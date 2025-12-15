@@ -1,8 +1,9 @@
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { useState } from 'react';
-import reactLogo from './assets/react.svg';
 import { invoke } from '@tauri-apps/api/core';
-import './App.css';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import './index.css';
 
 function App() {
   const [greetMsg, setGreetMsg] = useState('');
@@ -37,35 +38,24 @@ function App() {
 
   return (
     // data-tauri-drag-region: tauri 允许拖拽
-    <main data-tauri-drag-region className="container">
-      <h1>Welcome to Tauri + React</h1>
-
-      <div className="row">
-        <a href="https://vite.dev" target="_blank">
-          <img src="/vite.svg" className="logo vite" alt="Vite logo" />
-        </a>
-        <a href="https://tauri.app" target="_blank">
-          <img src="/tauri.svg" className="logo tauri" alt="Tauri logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <p>Click on the Tauri, Vite, and React logos to learn more.</p>
-
+    <main data-tauri-drag-region className="w-full h-full flex flex-col justify-center items-center m-0">
+      <h1 className="text-3xl font-bold mb-20 text-green-600">Welcome to dnhyxc-ai</h1>
       <form
-        className="row"
+        className=""
         onSubmit={(e) => {
           e.preventDefault();
           greet();
         }}
       >
-        <input id="greet-input" onChange={(e) => setName(e.currentTarget.value)} placeholder="Enter a name..." />
-        <button type="submit">Greet</button>
+        <div className="flex gap-2">
+          <Input id="greet-input" onChange={(e) => setName(e.currentTarget.value)} placeholder="Enter a name..." />
+          <Button className="cursor-pointer">Greet</Button>
+        </div>
       </form>
-      <p>{greetMsg}</p>
-
-      <button onClick={openChildWindow}>Open Child Window</button>
+      <p className="my-10 text-lg font-medium text-foreground">{greetMsg}</p>
+      <Button variant="default" className="cursor-pointer" onClick={openChildWindow}>
+        Open Child Window
+      </Button>
     </main>
   );
 }
