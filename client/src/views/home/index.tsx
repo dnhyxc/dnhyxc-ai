@@ -3,9 +3,8 @@ import { useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import './index.css';
 
-function App() {
+function Home() {
   const [greetMsg, setGreetMsg] = useState('');
   const [name, setName] = useState('');
 
@@ -38,7 +37,7 @@ function App() {
 
   return (
     // data-tauri-drag-region: tauri 允许拖拽
-    <main data-tauri-drag-region className="w-full h-full flex flex-col justify-center items-center m-0">
+    <div className="w-full h-full flex flex-col justify-center items-center m-0">
       <h1 className="text-3xl font-bold mb-20 text-green-600">Welcome to dnhyxc-ai</h1>
       <form
         className=""
@@ -56,8 +55,8 @@ function App() {
       <Button variant="default" className="cursor-pointer" onClick={openChildWindow}>
         Open Child Window
       </Button>
-    </main>
+    </div>
   );
 }
 
-export default App;
+export default Home;

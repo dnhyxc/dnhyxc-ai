@@ -12,6 +12,8 @@ body {
   background-color: transparent;
   height: 100%;
   width: 100%;
+  /* 禁止页面回弹效果 */
+  overscroll-behavior: none;
 }
 
 #root {
@@ -37,7 +39,7 @@ body {
   --destructive: oklch(0.577 0.245 27.325);
   --destructive-foreground: 210 40% 98%;
   --border: oklch(0.928 0.006 264.531);
-  --input: oklch(0.928 0.006 264.531);
+  /* --input: oklch(0.928 0.006 264.531); */
   --ring: oklch(0.707 0.022 261.325);
   --radius: 0.625rem;
   --chart-1: oklch(0.646 0.222 41.116);
@@ -73,7 +75,7 @@ body {
   --destructive: oklch(0.704 0.191 22.216);
   --destructive-foreground: 210 40% 98%;
   --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
+  /* --input: oklch(1 0 0 / 15%); */
   --ring: oklch(0.551 0.027 264.364);
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);
@@ -91,6 +93,7 @@ body {
 }
 
 @theme inline {
+  /* --spacing: 1px; */
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
