@@ -1,0 +1,35 @@
+html,
+body {
+	margin: 0;
+	padding: 0;
+	background-color: transparent;
+	height: 100%;
+	width: 100%;
+}
+
+#root {
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	text-align: center;
+}
+
+:root {
+	font-family: Inter, Avenir, Helvetica, Arial, sans-serif;
+	font-size: 16px;
+	line-height: 24px;
+	font-weight: 400;
+	/* color: #0f0f0f; */
+	background-color: transparent;
+}
+
+.container {
+	margin: 0;
+	padding-top: 10vh;
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	text-align: center;
+	border: 1px solid red;
+	-webkit-app-region: drag;
+}
