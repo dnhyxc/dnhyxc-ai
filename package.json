@@ -4,7 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "pnpm -C client tauri dev",
+    "build": "pnpm -C client tauri build"
   },
   "keywords": [],
   "author": "dnhyxc",
