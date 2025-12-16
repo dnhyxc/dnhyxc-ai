@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 const Home = () => {
 	const [greetMsg, setGreetMsg] = useState('');
 	const [name, setName] = useState('');
+	const [downloadResults, setDownloadResults] = useState<any[]>([]);
 
 	const openChildWindow = async () => {
 		const webview = new WebviewWindow('child-window', {
@@ -35,12 +36,103 @@ const Home = () => {
 		setGreetMsg(await invoke('greet', { name }));
 	}
 
+	async function saveFile() {
+		const result = await invoke('save_file_with_picker', {
+			options: {
+				content: '这是一个测试文件',
+				file_name: 'document.txt',
+			},
+		});
+
+		console.log(result, 'result');
+
+		// if (result.success) {
+		// 	alert(`文件保存成功: ${result.file_path}`);
+		// } else {
+		// 	alert(`保存失败: ${result.message}`);
+		// }
+	}
+
+	// 下载文件
+	const downloadFile = async (fileUrl: string, fileName?: string) => {
+		if (!fileUrl.trim()) {
+			alert('请输入文件的 URL');
+			return;
+		}
+
+		try {
+			console.log('开始下载文件:', fileUrl);
+
+			// 可选：先获取文件信息
+			const fileInfo = await invoke('get_file_info', {
+				url: fileUrl,
+			});
+			console.log('文件信息:', fileInfo);
+
+			// 下载文件
+			const result: any = await invoke('download_file', {
+				options: {
+					url: fileUrl,
+					file_name: fileName || undefined, // 如果用户输入了文件名则使用，否则自动获取
+					// save_dir: './downloads',
+					overwrite: true, // 覆盖已存在的文件
+				},
+			});
+
+			console.log('下载结果:', result);
+			setDownloadResults((prev) => [result, ...prev]);
+			if (result.success) {
+				console.log('文件保存成功:', result.file_path);
+				alert(
+					`文件下载成功！\n保存路径: ${result.file_path}\n文件大小: ${result.file_size} 字节\n类型: ${result.content_type || '未知'}`,
+				);
+			} else {
+				alert(`下载失败: ${result.message}`);
+			}
+		} catch (error) {
+			console.error('下载失败:', error);
+			alert(`下载失败: ${error}`);
+		}
+	};
+
 	return (
 		// data-tauri-drag-region: tauri 允许拖拽
 		<div className="w-full h-full flex flex-col justify-center items-center m-0">
 			<h1 className="text-3xl font-bold mb-20 text-green-600">
 				Welcome to dnhyxc-ai
 			</h1>
+			{downloadResults.length > 0 && (
+				<div className="mb-8 w-full max-w-2xl">
+					<h3 className="text-lg font-bold mb-2">下载历史</h3>
+					<div className="space-y-2 max-h-60 overflow-y-auto">
+						{downloadResults.map((result, index) => (
+							<div
+								key={index}
+								className={`p-3 rounded border ${
+									result.success
+										? 'bg-green-50 border-green-200'
+										: 'bg-red-50 border-red-200'
+								}`}
+							>
+								<div className="flex justify-between items-center">
+									<span className="font-medium">
+										{result.success ? '✅ 成功' : '❌ 失败'}
+									</span>
+									<span className="text-sm text-gray-500">
+										{result.file_size
+											? `${(result.file_size / 1024).toFixed(1)} KB`
+											: '未知大小'}
+									</span>
+								</div>
+								{result.file_path && (
+									<p className="text-sm truncate">路径: {result.file_path}</p>
+								)}
+								<p className="text-sm">{result.message}</p>
+							</div>
+						))}
+					</div>
+				</div>
+			)}
 			<form
 				className=""
 				onSubmit={(e) => {
@@ -64,6 +156,30 @@ const Home = () => {
 				onClick={openChildWindow}
 			>
 				Open Child Window
+			</Button>
+			<Button variant="default" className="cursor-pointer" onClick={saveFile}>
+				Save File
+			</Button>
+			<Button
+				variant="default"
+				className="cursor-pointer"
+				onClick={
+					() =>
+						downloadFile(
+							'https://dnhyxc.cn:9216/files/__FILE__c7ee5b931b68b9e227fd94957587796d.epub',
+						)
+					// downloadFile(
+					// 	'https://dnhyxc.cn:9216/files/__FILE__86960f6b9b59b7d5cd9a1dfe9a6f88a0.docx',
+					// )
+					// downloadFile(
+					// 	'https://dnhyxc.cn/files/__FILE__fc6e68a6e9f45f80d2de7d557d187e47.pdf',
+					// )
+					// downloadFile(
+					// 	'https://files.codelife.cc/wallhaven/full/wq/wallhaven-wqkw2r.jpg?x-oss-process=image/resize,limit_0,m_fill,w_2560,h_1440/quality,Q_93/format,webp',
+					// )
+				}
+			>
+				download File
 			</Button>
 		</div>
 	);
