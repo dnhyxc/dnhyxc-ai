@@ -1,4 +1,22 @@
 #!/usr/bin/env sh
 . "$(dirname -- "$0")/_/husky.sh"
 
-npm test
+# 运行 Biome 格式化并自动修复
+echo "Running Biome check..."
+pnpm biome check --write --no-errors-on-unmatched
+
+if [ $? -ne 0 ]; then
+    echo "Biome check failed. Please fix the issues before committing."
+    exit 1
+fi
+
+# 运行 Biome format 检查并自动修复可修复的问题
+echo "Running Biome format..."
+pnpm biome format --write --no-errors-on-unmatched
+
+if [ $? -ne 0 ]; then
+    echo "Biome format found errors. Please fix them before committing."
+    exit 1
+fi
+
+echo "Biome checks passed."
