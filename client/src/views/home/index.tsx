@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
-function Home() {
+const Home = () => {
 	const [greetMsg, setGreetMsg] = useState('');
 	const [name, setName] = useState('');
 
@@ -67,6 +67,6 @@ function Home() {
 			</Button>
 		</div>
 	);
-}
+};
 
 export default Home;
