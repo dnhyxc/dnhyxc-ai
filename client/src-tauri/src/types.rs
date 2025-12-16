@@ -54,11 +54,22 @@ pub struct FileInfo {
 
 #[derive(Serialize)]
 pub struct BatchDownloadProgress {
+    /// 当前正在下载的是第几个文件（从 0 开始计数）
     pub current_index: usize,
+    /// 本次批量下载任务中总共需要下载的文件数量
     pub total_files: usize,
+    /// 当前下载文件的远程 URL 地址
     pub url: String,
+    /// 已下载完成的字节数（随着下载进度实时累加）
     pub total_bytes: u64,
+    /// 服务器返回的 Content-Length，即可预期的文件总大小（单位：字节）
     pub content_length: u64,
+    /// 当前下载进度百分比，计算方式：total_bytes / content_length * 100.0
     pub percent: f64,
+    /// 文件在本地磁盘上的完整保存路径（包含文件名）
     pub file_path: String,
+    /// 可选的下载任务唯一标识符。
+    /// 当批量下载需要区分不同子任务或做回调匹配时，可传入此字段；
+    /// 若无特殊需求，可留空（None）。
+    pub id: Option<String>,
 }

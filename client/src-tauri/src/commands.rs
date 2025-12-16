@@ -309,6 +309,7 @@ pub async fn download_file(
                 content_length: content_length,
                 percent: percent as f64,
                 file_path: save_path_str.clone(),
+                id: options.id.clone(),
             };
         
             let _ = window.emit("download://progress", &progress_data);
@@ -447,6 +448,7 @@ pub async fn download_files(
             content_length: 0,
             percent: 0.0,
             file_path: String::new(),
+            id: file_options.id.clone(),
         };
         
         let _ = window.emit("download://progress", &progress_data);

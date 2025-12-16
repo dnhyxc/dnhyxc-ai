@@ -13,6 +13,7 @@ const Home = () => {
 		{
 			percent: number;
 			filename: string;
+			id: string;
 		}[]
 	>([]);
 
@@ -27,6 +28,7 @@ const Home = () => {
 				percent: number;
 				file_path: string;
 				filename: string;
+				id: string;
 			};
 
 			// console.log(`下载进度: ${progress.percent.toFixed(2)}%`);
@@ -34,14 +36,24 @@ const Home = () => {
 			// 	`已下载: ${progress.total_bytes} / ${progress.content_length} 字节`,
 			// );
 			// console.log(`文件: ${progress.file_path}`);
-			// 可以更新UI状态显示进度
-			setDownloadProgressInfo((prev) => [
-				...prev,
-				{
-					percent: progress.percent,
-					filename: progress.filename,
-				},
-			]);
+
+			const info = {
+				percent: progress.percent,
+				filename: progress.filename,
+				id: progress.id,
+			};
+
+			setDownloadProgressInfo((prev) => {
+				const idx = prev.findIndex((item) => item.id === info.id);
+				if (idx === -1) {
+					// 新增
+					return [...prev, info];
+				}
+				// 原地更新
+				const next = [...prev];
+				next[idx] = { ...next[idx], percent: info.percent };
+				return next;
+			});
 		});
 
 		return () => {
@@ -116,6 +128,7 @@ const Home = () => {
 					file_name: fileName || undefined, // 如果用户输入了文件名则使用，否则自动获取
 					// save_dir: './downloads',
 					overwrite: true, // 覆盖已存在的文件
+					id: Date().valueOf(),
 				},
 			});
 
@@ -143,7 +156,7 @@ const Home = () => {
 			</h1>
 			<div>
 				{downloadProgressInfo.map((i) => (
-					<div key={i.filename}>
+					<div key={i.id}>
 						文件名称: {i.filename}
 						下载进度: {i.percent}%
 					</div>
