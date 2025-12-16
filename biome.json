@@ -6,8 +6,7 @@
 		"useIgnoreFile": true
 	},
 	"files": {
-		"ignoreUnknown": false,
-		"includes": ["./client/src/**/*", "./client/src-tauri/src/**/*"]
+		"ignoreUnknown": false
 	},
 	"formatter": {
 		"enabled": true,
