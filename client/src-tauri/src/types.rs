@@ -30,6 +30,7 @@ pub struct DownloadFileOptions {
     pub file_name: Option<String>,
     pub save_dir: Option<String>,
     pub overwrite: Option<bool>, // 是否覆盖已存在的文件
+    pub id: Option<String>,      // 用于批处理下载的唯一标识符
 }
 
 // 通用下载文件结果
@@ -49,4 +50,15 @@ pub struct FileInfo {
     pub file_size: u64,
     pub content_type: Option<String>,
     pub is_downloadable: bool,
+}
+
+#[derive(Serialize)]
+pub struct BatchDownloadProgress {
+    pub current_index: usize,
+    pub total_files: usize,
+    pub url: String,
+    pub total_bytes: u64,
+    pub content_length: u64,
+    pub percent: f64,
+    pub file_path: String,
 }

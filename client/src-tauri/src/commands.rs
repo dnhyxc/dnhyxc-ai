@@ -4,6 +4,7 @@ use std::path::Path;
 use reqwest;
 use tauri;
 use std::path::PathBuf;
+use tauri::Emitter;
 
 // 导入 types 模块中的类型
 use crate::types::{
@@ -11,7 +12,8 @@ use crate::types::{
     SaveFileResult,
     DownloadFileOptions, 
     DownloadFileResult, 
-    FileInfo
+    FileInfo,
+    BatchDownloadProgress
 };
 
 #[tauri::command]
@@ -78,6 +80,7 @@ pub async fn save_file_with_picker(
 
 #[tauri::command]
 pub async fn download_file(
+    window: tauri::Window,  // window 应该是第一个参数
     options: DownloadFileOptions,
 ) -> Result<DownloadFileResult, String> {
     println!("开始下载文件: {}", options.url);
@@ -117,8 +120,6 @@ pub async fn download_file(
             Path::new(&dir).join(&file_name)
         }
         None => {
-            // 使用文件保存对话框（与 save_file_with_picker 一致）
-            
             // 1.1 确定默认文件名
             let default_file_name = match options.file_name {
                 Some(name) => name,
@@ -298,7 +299,19 @@ pub async fn download_file(
         // 可选：显示下载进度
         if content_length > 0 {
             let percent = (total_bytes * 100) / content_length;
-            println!("下载进度: {}/{} 字节 ({}%)", total_bytes, content_length, percent);
+            // println!("下载进度: {}/{} 字节 ({}%)", total_bytes, content_length, percent);
+            // 发送开始下载事件
+            let progress_data = BatchDownloadProgress {
+                current_index: 1,
+                total_files: 1,
+                url: options.url.clone(),
+                total_bytes: total_bytes,
+                content_length: content_length,
+                percent: percent as f64,
+                file_path: save_path_str.clone(),
+            };
+        
+            let _ = window.emit("download://progress", &progress_data);
         }
     }
 
@@ -408,24 +421,46 @@ pub async fn get_file_info(url: String) -> Result<FileInfo, String> {
 // 批量下载文件
 #[tauri::command]
 pub async fn download_files(
+    window: tauri::Window,
     files: Vec<DownloadFileOptions>,
 ) -> Result<Vec<DownloadFileResult>, String> {
     let mut results = Vec::new();
+    let total_files = files.len();
     
-    for (index, file_options) in files.iter().enumerate() {
-        println!("正在下载第 {}/{} 个文件", index + 1, files.len());
-        
-        let result = download_file(file_options.clone()).await;
-        match result {
-            Ok(res) => results.push(res),
-            Err(err) => results.push(DownloadFileResult {
-                success: false,
-                file_path: None,
-                message: err,
-                file_size: None,
-                content_type: None,
-            }),
+    // 改为使用 into_iter() 来获取所有权，而不是引用
+    for (index, mut file_options) in files.into_iter().enumerate() {
+        // 为每个文件生成唯一ID（如果未提供）
+        if file_options.id.is_none() {
+            let timestamp = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_millis())
+                .unwrap_or(0);
+            file_options.id = Some(format!("batch_{}_{}", index, timestamp));
         }
+        
+        // 发送开始下载事件
+        let progress_data = BatchDownloadProgress {
+            current_index: index + 1,
+            total_files,
+            url: file_options.url.clone(),
+            total_bytes: 0,
+            content_length: 0,
+            percent: 0.0,
+            file_path: String::new(),
+        };
+        
+        let _ = window.emit("download://progress", &progress_data);
+        
+        // 克隆 window 以便在每个下载任务中使用
+        let window_clone = window.clone();
+        let result = download_file(window_clone, file_options).await;
+        results.push(result.unwrap_or_else(|e| DownloadFileResult {
+            success: false,
+            file_path: None,
+            message: e,
+            file_size: None,
+            content_type: None,
+        }));
     }
     
     Ok(results)
