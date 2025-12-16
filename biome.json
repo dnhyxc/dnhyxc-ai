@@ -1,0 +1,62 @@
+{
+	"$schema": "https://biomejs.dev/schemas/2.3.9/schema.json",
+	"vcs": {
+		"enabled": true,
+		"clientKind": "git",
+		"useIgnoreFile": true
+	},
+	"files": {
+		"ignoreUnknown": false,
+		"includes": ["./client/src/**/*", "./client/src-tauri/src/**/*"]
+	},
+	"formatter": {
+		"enabled": true,
+		"formatWithErrors": true,
+		"indentStyle": "tab"
+	},
+	"linter": {
+		"enabled": true,
+		"rules": {
+			"recommended": true,
+			"correctness": {
+				"useExhaustiveDependencies": "off"
+			},
+			"complexity": {
+				"useArrowFunction": "off",
+				"noForEach": "off"
+			},
+			"style": {
+				"useTemplate": "info",
+				"useSelfClosingElements": "off",
+				"noNonNullAssertion": "off"
+			},
+			"a11y": {
+				"useKeyWithClickEvents": "off",
+				"noStaticElementInteractions": "off"
+			},
+			"suspicious": {
+				"noArrayIndexKey": "off",
+				"noExplicitAny": "off"
+			}
+		}
+	},
+	"javascript": {
+		"formatter": {
+			"quoteStyle": "single",
+			"semicolons": "always"
+		}
+	},
+	"css": {
+		"parser": {
+			"tailwindDirectives": true
+		}
+	},
+	"assist": {
+		"enabled": true,
+		"actions": {
+			"source": {
+				"organizeImports": "on"
+			}
+		}
+	}
+}
