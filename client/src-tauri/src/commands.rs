@@ -198,7 +198,7 @@ pub async fn download_file(
     if save_path.exists() && !overwrite {
         return Ok(DownloadFileResult {
             success: false,
-            file_path: Some(save_path_str),
+            file_path: Some(save_path_str.clone()),
             message: format!("文件已存在: {}", save_path.display()),
             file_size: None,
             content_type: None,
@@ -310,7 +310,7 @@ pub async fn download_file(
 
     Ok(DownloadFileResult {
         success: true,
-        file_path: Some(save_path_str),
+        file_path: Some(save_path_str.clone()),
         message: "文件下载成功".to_string(),
         file_size: Some(metadata.len()),
         content_type,
