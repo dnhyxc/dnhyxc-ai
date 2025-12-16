@@ -1,22 +1,22 @@
 {
-  "name": "dnhyxc-ai",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "dev": "pnpm -C client tauri dev",
-    "build": "pnpm -C client tauri build",
-    "check": "biome check --write",
-    "format": "biome format --write",
-    "prepare": "husky install"
-  },
-  "keywords": [],
-  "author": "dnhyxc",
-  "license": "ISC",
-  "packageManager": "pnpm@10.8.1",
-  "devDependencies": {
-    "@biomejs/biome": "2.3.9",
-    "husky": "8.0.3",
-    "typescript": "~5.8.3"
-  }
+	"name": "dnhyxc-ai",
+	"version": "1.0.0",
+	"description": "",
+	"main": "index.js",
+	"scripts": {
+		"dev": "pnpm -C client tauri dev",
+		"build": "pnpm -C client tauri build",
+		"check": "biome check --write",
+		"format": "biome format --write",
+		"prepare": "husky install"
+	},
+	"keywords": [],
+	"author": "dnhyxc",
+	"license": "ISC",
+	"packageManager": "pnpm@10.8.1",
+	"devDependencies": {
+		"@biomejs/biome": "2.3.9",
+		"husky": "8.0.3",
+		"typescript": "~5.8.3"
+	}
 }
