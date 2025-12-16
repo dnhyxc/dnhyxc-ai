@@ -14,6 +14,7 @@ const Home = () => {
 			percent: number;
 			filename: string;
 			id: string;
+			status: boolean;
 		}[]
 	>([]);
 
@@ -29,6 +30,7 @@ const Home = () => {
 				file_path: string;
 				filename: string;
 				id: string;
+				status: boolean;
 			};
 
 			// console.log(`下载进度: ${progress.percent.toFixed(2)}%`);
@@ -41,7 +43,10 @@ const Home = () => {
 				percent: progress.percent,
 				filename: progress.filename,
 				id: progress.id,
+				status: progress.status,
 			};
+
+			console.log(progress.status, 'progress.status');
 
 			setDownloadProgressInfo((prev) => {
 				const idx = prev.findIndex((item) => item.id === info.id);
@@ -51,7 +56,11 @@ const Home = () => {
 				}
 				// 原地更新
 				const next = [...prev];
-				next[idx] = { ...next[idx], percent: info.percent };
+				next[idx] = {
+					...next[idx],
+					percent: info.percent,
+					status: info.status,
+				};
 				return next;
 			});
 		});
@@ -158,7 +167,7 @@ const Home = () => {
 				{downloadProgressInfo.map((i) => (
 					<div key={i.id}>
 						文件名称: {i.filename}
-						下载进度: {i.percent}%
+						下载进度: {i.percent}% 下载状态: {i.status ? '完成' : '进行中'}
 					</div>
 				))}
 			</div>

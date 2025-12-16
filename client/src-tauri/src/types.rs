@@ -72,4 +72,5 @@ pub struct BatchDownloadProgress {
     /// 当批量下载需要区分不同子任务或做回调匹配时，可传入此字段；
     /// 若无特殊需求，可留空（None）。
     pub id: Option<String>,
+    pub status: Option<bool>,
 }
