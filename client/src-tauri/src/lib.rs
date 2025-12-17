@@ -1,5 +1,3 @@
-// use tauri::{TitleBarStyle, WebviewUrl, WebviewWindowBuilder};
-
 // 引入自定义命令模块，其中包含可供前端调用的 Rust 函数
 mod commands;
 mod dock;
@@ -30,18 +28,8 @@ pub fn run() {
                         api.prevent_close();
                         let _ = window.hide();
                     }
-                    WindowEvent::Focused { .. } => {
-                        // 窗口获取焦点时，显示窗口
-                        println!("窗口获取焦点: {:?}", event);
-                        // window.show().expect("显示窗口失败");
-                    }
-                    WindowEvent::Destroyed => {
-                        println!("窗口已销毁");
-                        // 执行最终清理
-                    }
                     _ => {}
                 });
-                // window.show().expect("显示窗口失败");
             }
 
             Ok(())
