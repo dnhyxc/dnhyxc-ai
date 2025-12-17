@@ -13,8 +13,12 @@ use crate::types::{
     DownloadFileOptions, 
     DownloadFileResult, 
     FileInfo,
-    BatchDownloadProgress
+    BatchDownloadProgress,
+    FileInfoEvent
 };
+
+// 导入 utils 模块中的辅助函数
+use crate::utils::{get_extension_from_content_type, get_remote_file_info};
 
 #[tauri::command]
 pub fn greet(name: &str) -> String {
@@ -84,7 +88,7 @@ pub async fn download_file(
     options: DownloadFileOptions,
 ) -> Result<DownloadFileResult, String> {
     println!("开始下载文件: {}", options.url);
-     // 1. 确定保存路径
+    // 1. 确定保存路径
     let save_path = match options.save_dir {
         Some(dir) => {
             // 如果提供了保存目录，则构建路径
@@ -175,8 +179,12 @@ pub async fn download_file(
             
             match result {
                 Some(file) => {
+                    // 用户点击了“保存”按钮，对话框返回了选中的文件路径
+                    // file 是 rfd::FileHandle，通过 path() 方法获取其真实路径
                     let path = file.path().to_path_buf();
+                    // 打印日志，方便调试：用户最终选择的保存位置
                     println!("用户选择的保存路径: {:?}", path);
+                    // 将 PathBuf 返回给外层，用于后续真正的下载与写入
                     path
                 }
                 None => {
@@ -286,6 +294,17 @@ pub async fn download_file(
 
     let mut stream = response.bytes_stream();
     let mut total_bytes: u64 = 0;
+
+    let file_info = FileInfoEvent {
+        file_path: Some(save_path_str.clone()),
+        file_size: Some(content_length.clone()),
+        content_type: content_type.clone(),
+        id: options.id.clone(),
+        success: false,
+        message: "文件下载开始".to_string(),
+    };
+        
+    let _ = window.emit("download://file_info", &file_info);
     
     use futures::StreamExt;
     use std::io::Write;
@@ -330,94 +349,6 @@ pub async fn download_file(
         file_size: Some(metadata.len()),
         content_type,
     })
-}
-
-// 辅助函数：根据 Content-Type 获取文件扩展名
-fn get_extension_from_content_type(content_type: &str) -> String {
-    match content_type {
-        "application/pdf" => ".pdf",
-        "image/jpeg" | "image/jpg" => ".jpg",
-        "image/png" => ".png",
-        "image/gif" => ".gif",
-        "image/webp" => ".webp",
-        "application/zip" => ".zip",
-        "application/x-rar-compressed" => ".rar",
-        "application/x-7z-compressed" => ".7z",
-        "application/x-tar" => ".tar",
-        "application/gzip" => ".gz",
-        "application/x-bzip2" => ".bz2",
-        "text/plain" => ".txt",
-        "text/html" => ".html",
-        "text/css" => ".css",
-        "text/javascript" => ".js",
-        "application/json" => ".json",
-        "application/xml" => ".xml",
-        "video/mp4" => ".mp4",
-        "video/mpeg" => ".mpeg",
-        "video/quicktime" => ".mov",
-        "video/x-msvideo" => ".avi",
-        "audio/mpeg" => ".mp3",
-        "audio/wav" => ".wav",
-        "audio/ogg" => ".ogg",
-        "application/msword" => ".doc",
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document" => ".docx",
-        "application/vnd.ms-excel" => ".xls",
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" => ".xlsx",
-        "application/vnd.ms-powerpoint" => ".ppt",
-        "application/vnd.openxmlformats-officedocument.presentationml.presentation" => ".pptx",
-        "application/epub+zip" => ".epub",
-        _ => ".bin", // 默认二进制文件
-    }.to_string()
-}
-
-// 辅助函数：获取远程文件信息
-async fn get_remote_file_info(url: &str) -> Result<FileInfo, String> {
-    let client = reqwest::Client::new();
-    let response = client
-        .head(url)
-        .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-        .send()
-        .await
-        .map_err(|e| format!("获取文件信息失败: {}", e))?;
-
-    if !response.status().is_success() {
-        return Err(format!("HTTP状态码 {}", response.status()));
-    }
-
-    // 获取文件名
-    let file_name = url
-        .split('/')
-        .last()
-        .unwrap_or("unknown_file")
-        .to_string();
-
-    // 获取文件大小
-    let file_size = response
-        .headers()
-        .get(reqwest::header::CONTENT_LENGTH)
-        .and_then(|value| value.to_str().ok())
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(0);
-
-    // 获取内容类型
-    let content_type = response
-        .headers()
-        .get(reqwest::header::CONTENT_TYPE)
-        .and_then(|value| value.to_str().ok())
-        .map(|s| s.to_string());
-
-    Ok(FileInfo {
-        file_name,
-        file_size,
-        content_type: content_type.clone(),
-        is_downloadable: response.status().is_success(),
-    })
-}
-
-#[tauri::command]
-pub async fn get_file_info(url: String) -> Result<FileInfo, String> {
-    println!("获取文件信息: {}", url);
-    get_remote_file_info(&url).await
 }
 
 // 批量下载文件
@@ -468,4 +399,10 @@ pub async fn download_files(
     }
     
     Ok(results)
+}
+
+#[tauri::command]
+pub async fn get_file_info(url: String) -> Result<FileInfo, String> {
+    println!("获取文件信息: {}", url);
+    get_remote_file_info(&url).await
 }

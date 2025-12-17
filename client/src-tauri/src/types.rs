@@ -74,3 +74,13 @@ pub struct BatchDownloadProgress {
     pub id: Option<String>,
     pub status: Option<bool>,
 }
+
+#[derive(Serialize)]
+pub struct FileInfoEvent {
+    pub file_path: Option<String>,
+    pub file_size: Option<u64>,
+    pub content_type: Option<String>,
+    pub id: Option<String>,
+    pub success: bool,
+    pub message: String,
+}

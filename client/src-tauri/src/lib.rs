@@ -3,6 +3,7 @@
 // 引入自定义命令模块，其中包含可供前端调用的 Rust 函数
 mod commands;
 mod types;
+mod utils;
 
 /// 移动端入口属性宏：当编译目标为移动平台时，自动标记该函数为 Tauri 移动端入口
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

@@ -9,6 +9,13 @@ const Home = () => {
 	const [greetMsg, setGreetMsg] = useState('');
 	const [name, setName] = useState('');
 	const [downloadResults, setDownloadResults] = useState<any[]>([]);
+	const [downloadFileInfo, setDownloadFileInfo] = useState<
+		{
+			file_path: string;
+			file_name: string;
+			id: string;
+		}[]
+	>([]);
 	const [downloadProgressInfo, setDownloadProgressInfo] = useState<
 		{
 			percent: number;
@@ -21,7 +28,6 @@ const Home = () => {
 	// 在组件中添加进度监听
 	useEffect(() => {
 		const unlistenPromise = listen('download://progress', (event) => {
-			// console.log(event, 'event');
 			const progress = event.payload as {
 				url: string;
 				total_bytes: number;
@@ -33,40 +39,42 @@ const Home = () => {
 				status: boolean;
 			};
 
-			// console.log(`下载进度: ${progress.percent.toFixed(2)}%`);
-			// console.log(
-			// 	`已下载: ${progress.total_bytes} / ${progress.content_length} 字节`,
-			// );
-			// console.log(`文件: ${progress.file_path}`);
-
 			const info = {
 				percent: progress.percent,
-				filename: progress.filename,
+				filename: progress.file_path.split('/').pop() || '',
 				id: progress.id,
 				status: progress.status,
 			};
 
-			console.log(progress.status, 'progress.status');
-
 			setDownloadProgressInfo((prev) => {
 				const idx = prev.findIndex((item) => item.id === info.id);
 				if (idx === -1) {
-					// 新增
 					return [...prev, info];
 				}
-				// 原地更新
 				const next = [...prev];
 				next[idx] = {
 					...next[idx],
 					percent: info.percent,
 					status: info.status,
+					filename: info.filename,
 				};
 				return next;
 			});
 		});
 
+		const unlistenFileInfoPromise = listen('download://file_info', (event) => {
+			const info = event.payload as {
+				file_path: string;
+				file_name: string;
+				id: string;
+			};
+			console.log('file-info', info);
+			setDownloadFileInfo((prev) => [info, ...prev]);
+		});
+
 		return () => {
 			unlistenPromise.then((unlisten) => unlisten());
+			unlistenFileInfoPromise.then((unlisten) => unlisten());
 		};
 	}, []);
 
@@ -122,14 +130,11 @@ const Home = () => {
 		}
 
 		try {
-			console.log('开始下载文件:', fileUrl);
-
 			// 可选：先获取文件信息
 			const fileInfo = await invoke('get_file_info', {
 				url: fileUrl,
 			});
 			console.log('文件信息:', fileInfo);
-
 			// 下载文件
 			const result: any = await invoke('download_file', {
 				options: {
@@ -140,7 +145,6 @@ const Home = () => {
 					id: Date().valueOf(),
 				},
 			});
-
 			console.log('下载结果:', result);
 			setDownloadResults((prev) => [result, ...prev]);
 			if (result.success) {
