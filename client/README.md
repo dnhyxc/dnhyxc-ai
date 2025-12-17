@@ -42,3 +42,136 @@ pub fn run() {
         .expect("error while running tauri application");
 }
 ```
+
+### tray
+
+```rust
+pub fn init_tray(app: &mut tauri::App) {
+    println!("init_tray");
+    use tauri::{
+        // image::Image,
+        menu::{MenuBuilder, MenuItem},
+        tray::TrayIconBuilder,
+    };
+
+    // // 退出按钮
+    // let quit_i = MenuItem::with_id(app, "quit", "Quit Coco", true, None::<&str>).unwrap();
+    // // 设置按钮
+    // let settings_i = MenuItem::with_id(app, "settings", "Settings...", true, None::<&str>).unwrap();
+    // // 打开按钮
+    // let open_i = MenuItem::with_id(app, "open", "Open Coco", true, None::<&str>).unwrap();
+    // // 关于按钮
+    // let about_i = MenuItem::with_id(app, "about", "About Coco", true, None::<&str>).unwrap();
+    // // 隐藏按钮
+    // let hide_i = MenuItem::with_id(app, "hide", "Hide Coco", true, None::<&str>).unwrap();
+
+    // 按照一定顺序 把按钮 放到 菜单里
+    // let menu = MenuBuilder::new(app)
+    //     .item(&open_i)
+    //     .separator() // 分割线
+    //     .item(&hide_i)
+    //     .item(&about_i)
+    //     .item(&settings_i)
+    //     .separator() // 分割线
+    //     .item(&quit_i)
+    //     .build()
+    //     .unwrap();
+
+    let _tray = TrayIconBuilder::with_id("tray")
+        .icon(app.default_window_icon().unwrap().clone()) // 默认的图片
+        // .icon(Image::from_bytes(include_bytes!("../icons/light@2x.png")).expect("REASON")) // 自定义的图片
+        // .menu(&menu)
+        // .on_menu_event(|app, event| match event.id.as_ref() {
+        //     "open" => {
+        //         println!("open");
+        //     }
+        //     "hide" => {
+        //         println!("hide");
+        //     }
+        //     "about" => {
+        //         println!("about");
+        //     }
+        //     // "settings" => {
+        //     //     // windows failed to open second window, issue: https://github.com/tauri-apps/tauri/issues/11144 https://github.com/tauri-apps/tauri/issues/8196
+        //     //     //#[cfg(windows)]
+        //     //     let _ = app.emit("open_settings", "");
+        //     //     // #[cfg(not(windows))]
+        //     //     // open_settings(&app);
+        //     // }
+        //     "quit" => {
+        //         println!("quit menu item was clicked");
+        //         app.exit(0);
+        //     }
+        //     _ => {
+        //         println!("menu item {:?} not handled", event.id);
+        //     }
+        // })
+        .build(app)
+        .unwrap();
+}
+```
+
+### 实现托盘图标切换
+
+创建一个 switch_tray_icon 命令：
+
+```rust
+#[tauri::command]
+fn switch_tray_icon(app: tauri::AppHandle, is_dark_mode: bool) {
+    let app_handle = app.app_handle();
+
+    println!("is_dark_mode: {}", is_dark_mode);
+
+    const DARK_ICON_PATH: &[u8] = include_bytes!("../icons/dark@2x.png");
+    const LIGHT_ICON_PATH: &[u8] = include_bytes!("../icons/light@2x.png");
+
+    // 根据 app 的主题切换 图标
+    let icon_path: &[u8] = if is_dark_mode {
+        DARK_ICON_PATH
+    } else {
+        LIGHT_ICON_PATH
+    };
+
+    // 获取托盘
+    let tray = match app_handle.tray_by_id("tray") {
+        Some(tray) => tray,
+        None => {
+            eprintln!("Tray with ID 'tray' not found");
+            return;
+        }
+    };
+
+    // 设置图标
+    if let Err(e) = tray.set_icon(Some(
+        tauri::image::Image::from_bytes(icon_path)
+            .unwrap_or_else(|e| panic!("Failed to load icon from bytes: {}", e)),
+    )) {
+        eprintln!("Failed to set tray icon: {}", e);
+    }
+}
+```
+
+代码说明：
+
+- 动态加载图标：根据 is_dark_mode 参数决定使用亮色或暗色图标。
+
+- 更新托盘图标：通过 set_icon 方法更新图标。
+
+- 错误处理：在托盘实例不存在或图标加载失败时记录错误日志。
+
+### 前端调用 switch_tray_icon 命令
+
+```ts
+import { invoke } from "@tauri-apps/api/core";
+
+async function switchTrayIcon(value: "dark" | "light") {
+	try {
+		// invoke  switch_tray_icon 事件名 isDarkMode 参数名
+		await invoke("switch_tray_icon", { isDarkMode: value === "dark" });
+	} catch (err) {
+		console.error("Failed to switch tray icon:", err);
+	}
+}
+```
+
+> 参考：https://juejin.cn/post/7460781093094670386

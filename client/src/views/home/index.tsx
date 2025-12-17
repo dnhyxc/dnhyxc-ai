@@ -34,14 +34,14 @@ const Home = () => {
 				content_length: number;
 				percent: number;
 				file_path: string;
-				filename: string;
+				file_name: string;
 				id: string;
 				status: boolean;
 			};
 
 			const info = {
 				percent: progress.percent,
-				filename: progress.file_path.split('/').pop() || '',
+				filename: progress.file_name || '',
 				id: progress.id,
 				status: progress.status,
 			};
@@ -80,13 +80,16 @@ const Home = () => {
 
 	const openChildWindow = async () => {
 		const webview = new WebviewWindow('child-window', {
-			url: 'https://dnhyxc.cn',
+			url: '/about',
 			width: 1000,
 			height: 690,
+			minWidth: 1000,
+			minHeight: 690,
 			resizable: true,
 			decorations: true,
 			title: 'Tauri + React',
-			center: true,
+			hiddenTitle: true,
+			titleBarStyle: 'overlay',
 		});
 		// since the webview window is created asynchronously,
 		// Tauri emits the `tauri://created` and `tauri://error` to notify you of the creation response
@@ -130,11 +133,6 @@ const Home = () => {
 		}
 
 		try {
-			// 可选：先获取文件信息
-			const fileInfo = await invoke('get_file_info', {
-				url: fileUrl,
-			});
-			console.log('文件信息:', fileInfo);
 			// 下载文件
 			const result: any = await invoke('download_file', {
 				options: {
@@ -142,7 +140,7 @@ const Home = () => {
 					file_name: fileName || undefined, // 如果用户输入了文件名则使用，否则自动获取
 					// save_dir: './downloads',
 					overwrite: true, // 覆盖已存在的文件
-					id: Date().valueOf(),
+					id: Date.now().toString(),
 				},
 			});
 			console.log('下载结果:', result);

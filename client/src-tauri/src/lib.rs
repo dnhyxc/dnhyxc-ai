@@ -2,6 +2,7 @@
 
 // 引入自定义命令模块，其中包含可供前端调用的 Rust 函数
 mod commands;
+mod tray;
 mod types;
 mod utils;
 
@@ -13,6 +14,10 @@ mod utils;
 pub fn run() {
     // 使用默认配置创建 Tauri 应用构建器
     tauri::Builder::default()
+        .setup(|app| {
+            tray::init_tray(app); // 注册事件
+            Ok(())
+        })
         // 注册“opener”插件，用于在系统默认程序中打开文件或 URL
         .plugin(tauri_plugin_opener::init())
         // 注册命令处理器：将 `commands::greet` 和 `commands::open_folder` 函数暴露给前端

@@ -87,7 +87,7 @@ pub async fn download_file(
     window: tauri::Window,  // window 应该是第一个参数
     options: DownloadFileOptions,
 ) -> Result<DownloadFileResult, String> {
-    println!("开始下载文件: {}", options.url);
+    // println!("开始下载文件: {}", options.url);
     // 1. 确定保存路径
     let save_path = match options.save_dir {
         Some(dir) => {
@@ -191,6 +191,7 @@ pub async fn download_file(
                     return Ok(DownloadFileResult {
                         success: false,
                         file_path: None,
+                        file_name: String::new(),
                         message: "用户取消了保存".to_string(),
                         file_size: None,
                         content_type: None,
@@ -207,6 +208,7 @@ pub async fn download_file(
     if save_path.exists() && !overwrite {
         return Ok(DownloadFileResult {
             success: false,
+            file_name: String::new(),
             file_path: Some(save_path_str.clone()),
             message: format!("文件已存在: {}", save_path.display()),
             file_size: None,
@@ -225,6 +227,7 @@ pub async fn download_file(
     if save_path.exists() && !overwrite {
         return Ok(DownloadFileResult {
             success: false,
+            file_name: String::new(),
             file_path: Some(save_path_str.clone()),
             message: format!("文件已存在: {}", save_path_str),
             file_size: None,
@@ -252,6 +255,7 @@ pub async fn download_file(
         return Ok(DownloadFileResult {
             success: false,
             file_path: None,
+            file_name: String::new(),
             message: format!("下载失败: HTTP状态码 {}", response.status()),
             file_size: None,
             content_type: None,
@@ -272,7 +276,7 @@ pub async fn download_file(
         .and_then(|value| value.to_str().ok())
         .map(|s| s.to_string());
 
-    println!("文件大小: {} 字节, 类型: {:?}", content_length, content_type);
+    // println!("文件大小: {} 字节, 类型: {:?}", content_length, content_type);
 
     // 9. 检查文件大小限制（可选，例如限制 100MB）
     const MAX_FILE_SIZE: u64 = 100 * 1024 * 1024; // 100MB
@@ -280,6 +284,7 @@ pub async fn download_file(
         return Ok(DownloadFileResult {
             success: false,
             file_path: None,
+            file_name: String::new(),
             message: format!("文件过大 ({} > {} MB)", 
                 content_length / (1024 * 1024), 
                 MAX_FILE_SIZE / (1024 * 1024)),
@@ -296,7 +301,7 @@ pub async fn download_file(
     let mut total_bytes: u64 = 0;
 
     let file_info = FileInfoEvent {
-        file_path: Some(save_path_str.clone()),
+        file_name: Some(save_path.file_name().unwrap().to_string_lossy().to_string()),
         file_size: Some(content_length.clone()),
         content_type: content_type.clone(),
         id: options.id.clone(),
@@ -328,6 +333,7 @@ pub async fn download_file(
                 content_length: content_length,
                 percent: percent as f64,
                 file_path: save_path_str.clone(),
+                file_name: save_path.file_name().unwrap().to_string_lossy().to_string(),
                 id: options.id.clone(),
                 status: Some(percent >= 100),
             };
@@ -340,10 +346,9 @@ pub async fn download_file(
     let metadata = fs::metadata(&save_path)
         .map_err(|e| format!("获取文件元数据失败: {}", e))?;
 
-    println!("文件已保存到: {:?}, 大小: {} 字节", save_path, metadata.len());
-
     Ok(DownloadFileResult {
         success: true,
+        file_name: String::new(),
         file_path: Some(save_path_str.clone()),
         message: "文件下载成功".to_string(),
         file_size: Some(metadata.len()),
@@ -380,6 +385,7 @@ pub async fn download_files(
             content_length: 0,
             percent: 0.0,
             file_path: String::new(),
+            file_name: String::new(),
             id: file_options.id.clone(),
             status: None,
         };
@@ -392,6 +398,7 @@ pub async fn download_files(
         results.push(result.unwrap_or_else(|e| DownloadFileResult {
             success: false,
             file_path: None,
+            file_name: String::new(),
             message: e,
             file_size: None,
             content_type: None,
@@ -403,6 +410,5 @@ pub async fn download_files(
 
 #[tauri::command]
 pub async fn get_file_info(url: String) -> Result<FileInfo, String> {
-    println!("获取文件信息: {}", url);
     get_remote_file_info(&url).await
 }

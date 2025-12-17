@@ -38,6 +38,7 @@ pub struct DownloadFileOptions {
 pub struct DownloadFileResult {
     pub success: bool,
     pub file_path: Option<String>,
+    pub file_name: String,
     pub message: String,
     pub file_size: Option<u64>,
     pub content_type: Option<String>,
@@ -66,8 +67,10 @@ pub struct BatchDownloadProgress {
     pub content_length: u64,
     /// 当前下载进度百分比，计算方式：total_bytes / content_length * 100.0
     pub percent: f64,
-    /// 文件在本地磁盘上的完整保存路径（包含文件名）
+    /// 当前下载文件的完整保存路径（包含文件名）
     pub file_path: String,
+    /// 当前下载文件的文件名（不包含路径）
+    pub file_name: String,
     /// 可选的下载任务唯一标识符。
     /// 当批量下载需要区分不同子任务或做回调匹配时，可传入此字段；
     /// 若无特殊需求，可留空（None）。
@@ -77,7 +80,7 @@ pub struct BatchDownloadProgress {
 
 #[derive(Serialize)]
 pub struct FileInfoEvent {
-    pub file_path: Option<String>,
+    pub file_name: Option<String>,
     pub file_size: Option<u64>,
     pub content_type: Option<String>,
     pub id: Option<String>,
