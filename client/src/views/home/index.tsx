@@ -70,6 +70,7 @@ const Home = () => {
 			};
 			console.log('file-info', info);
 			setDownloadFileInfo((prev) => [info, ...prev]);
+			console.log(downloadFileInfo, 'downloadFileInfo');
 		});
 
 		return () => {

@@ -22,7 +22,6 @@
 				"resizable": true,
 				"decorations": true,
 				"titleBarStyle": "Overlay",
-				"backgroundColor": "#00000000",
 				"transparent": true,
 				"center": true
 			}

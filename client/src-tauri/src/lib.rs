@@ -2,9 +2,13 @@
 
 // 引入自定义命令模块，其中包含可供前端调用的 Rust 函数
 mod commands;
+mod dock;
 mod tray;
 mod types;
 mod utils;
+
+use tauri::Manager;
+use tauri::WindowEvent;
 
 /// 移动端入口属性宏：当编译目标为移动平台时，自动标记该函数为 Tauri 移动端入口
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -16,6 +20,30 @@ pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
             tray::init_tray(app); // 注册事件
+
+            // 窗口获取焦点时，显示窗口
+            if let Some(main_window) = app.get_webview_window("main") {
+                let window = main_window.clone();
+                // 监听窗口事件
+                main_window.on_window_event(move |event| match event {
+                    WindowEvent::CloseRequested { api, .. } => {
+                        api.prevent_close();
+                        let _ = window.hide();
+                    }
+                    WindowEvent::Focused { .. } => {
+                        // 窗口获取焦点时，显示窗口
+                        println!("窗口获取焦点: {:?}", event);
+                        // window.show().expect("显示窗口失败");
+                    }
+                    WindowEvent::Destroyed => {
+                        println!("窗口已销毁");
+                        // 执行最终清理
+                    }
+                    _ => {}
+                });
+                // window.show().expect("显示窗口失败");
+            }
+
             Ok(())
         })
         // 注册“opener”插件，用于在系统默认程序中打开文件或 URL
@@ -28,8 +56,18 @@ pub fn run() {
             commands::download_files,        // 批量下载
             commands::get_file_info,         // 获取文件信息
         ])
-        // 启动应用并加载 `tauri.conf.json` 中的上下文配置
-        .run(tauri::generate_context!())
+        .build(tauri::generate_context!())
         // 如果启动失败，立即 panic 并打印错误信息
-        .expect("error while running tauri application");
+        .expect("error while running tauri application")
+        // 启动应用后的事件循环处理
+        .run(|app_handle, event| {
+            // macOS 平台：调用自定义的 app_event 模块处理应用事件
+            #[cfg(target_os = "macos")]
+            dock::dock_event(&app_handle, event);
+            // 非 macOS 平台：占位使用，避免未使用的变量警告
+            #[cfg(not(target_os = "macos"))]
+            {
+                let _ = (app_handle, event);
+            }
+        })
 }
