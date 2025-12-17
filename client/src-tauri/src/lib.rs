@@ -1,6 +1,7 @@
 // 引入自定义命令模块，其中包含可供前端调用的 Rust 函数
-mod commands;
+mod clients;
 mod dock;
+mod services;
 mod tray;
 mod types;
 mod utils;
@@ -36,13 +37,13 @@ pub fn run() {
         })
         // 注册“opener”插件，用于在系统默认程序中打开文件或 URL
         .plugin(tauri_plugin_opener::init())
-        // 注册命令处理器：将 `commands::greet` 和 `commands::open_folder` 函数暴露给前端
+        // 注册命令处理器：将 `clients::greet` 和 `services::open_folder` 函数暴露给前端
         .invoke_handler(tauri::generate_handler![
-            commands::greet,
-            commands::save_file_with_picker, // 通用保存
-            commands::download_file,         // 通用下载
-            commands::download_files,        // 批量下载
-            commands::get_file_info,         // 获取文件信息
+            clients::greet,
+            services::save_file_with_picker, // 通用保存
+            services::download_file,         // 通用下载
+            services::download_files,        // 批量下载
+            services::get_file_info,         // 获取文件信息
         ])
         .build(tauri::generate_context!())
         // 如果启动失败，立即 panic 并打印错误信息

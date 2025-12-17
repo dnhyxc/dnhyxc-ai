@@ -21,12 +21,6 @@ use crate::types::{
 use crate::utils::{get_extension_from_content_type, get_remote_file_info};
 
 #[tauri::command]
-pub fn greet(name: &str) -> String {
-    // 使用 format! 宏将名称嵌入到问候模板中
-    format!("Hello, {}! You've been greeted from Rust!", name)
-}
-
-#[tauri::command]
 pub async fn save_file_with_picker(
     options: SaveFileOptions
 ) -> Result<SaveFileResult, String> {
