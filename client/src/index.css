@@ -1,9 +1,9 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-/* @custom-variant dark (&:where(.dark, .dark *)); */
+@custom-variant dark (&:where(.dark, .dark *));
 /* 定义名为 "dark" 的自定义变体，当任意祖先元素带有 data-theme="dark" 时，其内部所有元素都会应用该变体下的样式规则 */
-@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+/* @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *)); */
 
 html,
 body {
@@ -93,7 +93,6 @@ body {
 	--sidebar-border: oklch(1 0 0 / 10%);
 	--sidebar-ring: oklch(0.551 0.027 264.364);
 	--shadow: 0 0 5px rgba(255, 255, 255, 0.5);
-	--font-family: "手札体-简";
 }
 
 @theme inline {

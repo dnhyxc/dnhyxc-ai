@@ -1,3 +1,5 @@
+export * from './tauri';
+
 export interface DownloadFileInfo {
 	file_path: string;
 	file_name: string;

@@ -1,11 +1,10 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { useEffect, useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { Button } from '@ui/button';
+import { Input } from '@ui/input';
 import type { DownloadFileInfo, DownloadProgress } from '@/types';
-import { onEmit, onListen } from '@/utils/event';
+import { onEmit, onListen, onCreateWindow } from '@/utils';
 
 const Home = () => {
 	const [greetMsg, setGreetMsg] = useState('');
@@ -81,37 +80,6 @@ const Home = () => {
 			logoutPromise.then((unlisten) => unlisten());
 		};
 	}, []);
-
-	const openChildWindow = async () => {
-		const WIDTH = 1000;
-		const HEIGHT = 690;
-		const webview = new WebviewWindow('child-window', {
-			url: '/detail',
-			width: WIDTH,
-			height: HEIGHT,
-			minWidth: WIDTH,
-			minHeight: HEIGHT,
-			resizable: true,
-			decorations: true,
-			title: 'dnhyxc-ai',
-			hiddenTitle: true,
-			titleBarStyle: 'overlay',
-			// theme: 'light', // 不设置将是跟随系统
-			// 计算屏幕中心坐标
-			x: (screen.width - WIDTH) / 2,
-			y: (screen.height - HEIGHT) / 2,
-		});
-		// since the webview window is created asynchronously,
-		// Tauri emits the `tauri://created` and `tauri://error` to notify you of the creation response
-		webview.once('tauri://created', function () {
-			// webview window successfully created
-			console.log('webview window successfully created');
-		});
-		webview.once('tauri://error', function (e: any) {
-			// an error occurred during webview window creation
-			console.log('webview window error', e);
-		});
-	};
 
 	async function greet() {
 		// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
@@ -266,7 +234,14 @@ const Home = () => {
 			<Button
 				variant="default"
 				className="cursor-pointer"
-				onClick={openChildWindow}
+				onClick={() =>
+					onCreateWindow({
+						label: 'child-window',
+						url: '/detail',
+						width: 1000,
+						height: 690,
+					})
+				}
 			>
 				Open Child Window
 			</Button>

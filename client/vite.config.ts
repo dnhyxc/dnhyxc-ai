@@ -10,6 +10,8 @@ export default defineConfig(async () => ({
 	resolve: {
 		alias: {
 			'@': '/src',
+			'@ui': '/src/components/ui',
+			'@design': '/src/components/design',
 		},
 	},
 	// Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`

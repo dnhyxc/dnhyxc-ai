@@ -5,16 +5,12 @@
  * @LastEditors: dnhyxc
  * @FilePath: \src\layout\index.tsx
  */
-import { Outlet, useLocation } from 'react-router';
-import Header from '@/components/design/Header';
-import Menu from '@/components/design/Menu';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { Outlet } from 'react-router';
+import Header from '@design/Header';
+import Menu from '@design/Menu';
+import { ScrollArea } from '@ui/scroll-area';
 
 const Layout = () => {
-	const location = useLocation();
-
-	console.log(location.pathname);
-
 	return (
 		<main className="w-full h-full flex flex-col rounded-lg box-border overflow-hidden">
 			<Header />
