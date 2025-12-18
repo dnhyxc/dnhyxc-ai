@@ -6,6 +6,11 @@
 	"scripts": {
 		"dev": "pnpm -C client tauri dev",
 		"build": "pnpm -C client tauri build",
+		"server:dev": "pnpm -C server start:dev",
+		"server:start": "pnpm -C server start",
+		"server:debug": "pnpm -C server start:debug",
+		"server:prod": "pnpm -C server start:prod",
+		"server:build": "pnpm -C server build",
 		"check": "biome check --write",
 		"format": "biome format --write",
 		"prepare": "husky install",
