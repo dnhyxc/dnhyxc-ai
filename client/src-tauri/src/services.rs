@@ -183,12 +183,13 @@ pub async fn download_file(
                 }
                 None => {
                     return Ok(DownloadFileResult {
-                        success: false,
+                        success: String::from("error"),
                         file_path: None,
                         file_name: String::new(),
                         message: "用户取消了保存".to_string(),
                         file_size: None,
                         content_type: None,
+                        id: options.id.clone(),
                     });
                 }
             }
@@ -201,12 +202,13 @@ pub async fn download_file(
     let overwrite = options.overwrite.unwrap_or(false);
     if save_path.exists() && !overwrite {
         return Ok(DownloadFileResult {
-            success: false,
+            success: String::from("error"),
             file_name: String::new(),
             file_path: Some(save_path_str.clone()),
             message: format!("文件已存在: {}", save_path.display()),
             file_size: None,
             content_type: None,
+            id: options.id.clone(),
         });
     }
 
@@ -220,12 +222,13 @@ pub async fn download_file(
     let overwrite = options.overwrite.unwrap_or(false);
     if save_path.exists() && !overwrite {
         return Ok(DownloadFileResult {
-            success: false,
+            success: String::from("error"),
             file_name: String::new(),
             file_path: Some(save_path_str.clone()),
             message: format!("文件已存在: {}", save_path_str),
             file_size: None,
             content_type: None,
+            id: options.id.clone(),
         });
     }
 
@@ -247,12 +250,13 @@ pub async fn download_file(
     // 7. 检查响应状态
     if !response.status().is_success() {
         return Ok(DownloadFileResult {
-            success: false,
+            success: String::from("error"),
             file_path: None,
             file_name: String::new(),
             message: format!("下载失败: HTTP状态码 {}", response.status()),
             file_size: None,
             content_type: None,
+            id: options.id.clone(),
         });
     }
 
@@ -276,7 +280,7 @@ pub async fn download_file(
     const MAX_FILE_SIZE: u64 = 100 * 1024 * 1024; // 100MB
     if content_length > MAX_FILE_SIZE {
         return Ok(DownloadFileResult {
-            success: false,
+            success: String::from("error"),
             file_path: None,
             file_name: String::new(),
             message: format!("文件过大 ({} > {} MB)", 
@@ -284,6 +288,7 @@ pub async fn download_file(
                 MAX_FILE_SIZE / (1024 * 1024)),
             file_size: Some(content_length),
             content_type,
+            id: options.id.clone(),
         });
     }
 
@@ -299,7 +304,7 @@ pub async fn download_file(
         file_size: Some(content_length.clone()),
         content_type: content_type.clone(),
         id: options.id.clone(),
-        success: false,
+        success: String::from("start"),
         message: "文件下载开始".to_string(),
     };
         
@@ -329,7 +334,8 @@ pub async fn download_file(
                 file_path: save_path_str.clone(),
                 file_name: save_path.file_name().unwrap().to_string_lossy().to_string(),
                 id: options.id.clone(),
-                status: Some(percent >= 100),
+                // status: Some(percent >= 100),
+                success: if percent >= 100 { String::from("success") } else { String::from("start") },
             };
         
             let _ = window.emit("download://progress", &progress_data);
@@ -341,12 +347,13 @@ pub async fn download_file(
         .map_err(|e| format!("获取文件元数据失败: {}", e))?;
 
     Ok(DownloadFileResult {
-        success: true,
-        file_name: String::new(),
+        success: String::from("success"),
+        file_name: save_path.file_name().unwrap().to_string_lossy().to_string(),
         file_path: Some(save_path_str.clone()),
         message: "文件下载成功".to_string(),
         file_size: Some(metadata.len()),
         content_type,
+        id: options.id.clone(),
     })
 }
 
@@ -381,7 +388,7 @@ pub async fn download_files(
             file_path: String::new(),
             file_name: String::new(),
             id: file_options.id.clone(),
-            status: None,
+            success: String::from("start"),
         };
         
         let _ = window.emit("download://progress", &progress_data);
@@ -390,12 +397,13 @@ pub async fn download_files(
         let window_clone = window.clone();
         let result = download_file(window_clone, file_options).await;
         results.push(result.unwrap_or_else(|e| DownloadFileResult {
-            success: false,
+            success: String::from("error"),
             file_path: None,
             file_name: String::new(),
             message: e,
             file_size: None,
             content_type: None,
+            id: None,
         }));
     }
     

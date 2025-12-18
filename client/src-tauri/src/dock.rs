@@ -26,8 +26,11 @@ pub fn dock_event<R: Runtime>(app_handle: &AppHandle<R>, event: RunEvent) {
         RunEvent::Reopen { .. } => {
             // 直接尝试获取 home 窗口，如果存在则显示并置于最顶部
             if let Some(home_window) = app_handle.get_webview_window("main") {
+                // 显示窗口（若之前被隐藏）
                 let _ = home_window.show();
+                // 恢复窗口（若之前被最小化）
                 let _ = home_window.unminimize();
+                // 将窗口置于最前并获取焦点
                 let _ = home_window.set_focus();
             }
         }

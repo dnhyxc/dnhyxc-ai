@@ -4,60 +4,52 @@ import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import type { DownloadFileInfo, DownloadProgress } from '@/types';
+import { onEmit, onListen } from '@/utils/event';
 
 const Home = () => {
 	const [greetMsg, setGreetMsg] = useState('');
-	const [name, setName] = useState('');
-	const [downloadResults, setDownloadResults] = useState<any[]>([]);
-	const [downloadFileInfo, setDownloadFileInfo] = useState<
-		{
-			file_path: string;
-			file_name: string;
-			id: string;
-		}[]
-	>([]);
+	const [downloadFileInfo, setDownloadFileInfo] = useState<DownloadFileInfo[]>(
+		[],
+	);
 	const [downloadProgressInfo, setDownloadProgressInfo] = useState<
-		{
-			percent: number;
-			filename: string;
-			id: string;
-			status: boolean;
-		}[]
+		DownloadProgress[]
 	>([]);
+	const [url, setUrl] = useState(
+		'https://dnhyxc.cn:9216/files/__FILE__88872d9ec263023cc77d8df9595e69c2.pdf',
+		// 'https://dnhyxc.cn:9216/files/__FILE__86960f6b9b59b7d5cd9a1dfe9a6f88a0.docx',
+	);
 
 	// 在组件中添加进度监听
 	useEffect(() => {
 		const unlistenPromise = listen('download://progress', (event) => {
-			const progress = event.payload as {
-				url: string;
-				total_bytes: number;
-				content_length: number;
-				percent: number;
-				file_path: string;
-				file_name: string;
-				id: string;
-				status: boolean;
-			};
+			const progress = event.payload as DownloadProgress;
 
 			const info = {
+				...progress,
 				percent: progress.percent,
 				filename: progress.file_name || '',
 				id: progress.id,
-				status: progress.status,
+				success: progress.success,
 			};
 
 			setDownloadProgressInfo((prev) => {
 				const idx = prev.findIndex((item) => item.id === info.id);
+				const payload = {
+					url: progress.url,
+					total_bytes: progress.total_bytes,
+					content_length: progress.content_length,
+					percent: progress.percent,
+					file_path: progress.file_path,
+					file_name: progress.file_name,
+					id: progress.id,
+					success: progress.success,
+				};
 				if (idx === -1) {
-					return [...prev, info];
+					return [...prev, payload];
 				}
 				const next = [...prev];
-				next[idx] = {
-					...next[idx],
-					percent: info.percent,
-					status: info.status,
-					filename: info.filename,
-				};
+				next[idx] = { ...next[idx], ...payload };
 				return next;
 			});
 		});
@@ -67,15 +59,21 @@ const Home = () => {
 				file_path: string;
 				file_name: string;
 				id: string;
+				content_type: string;
+				success: string;
+				message: string;
 			};
-			console.log('file-info', info);
 			setDownloadFileInfo((prev) => [info, ...prev]);
-			console.log(downloadFileInfo, 'downloadFileInfo');
+		});
+
+		const unlistenAboutPromise = onListen('about-send-message', (event) => {
+			console.log('about-send-message', event);
 		});
 
 		return () => {
 			unlistenPromise.then((unlisten) => unlisten());
 			unlistenFileInfoPromise.then((unlisten) => unlisten());
+			unlistenAboutPromise.then((unlisten) => unlisten());
 		};
 	}, []);
 
@@ -88,9 +86,11 @@ const Home = () => {
 			minHeight: 690,
 			resizable: true,
 			decorations: true,
-			title: 'Tauri + React',
+			title: 'dnhyxc-ai',
 			hiddenTitle: true,
 			titleBarStyle: 'overlay',
+			transparent: true,
+			// backgroundColor: '#1e1e1e',
 		});
 		// since the webview window is created asynchronously,
 		// Tauri emits the `tauri://created` and `tauri://error` to notify you of the creation response
@@ -106,7 +106,7 @@ const Home = () => {
 
 	async function greet() {
 		// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-		setGreetMsg(await invoke('greet', { name }));
+		setGreetMsg(await invoke('greet', { name: url }));
 	}
 
 	async function saveFile() {
@@ -127,9 +127,8 @@ const Home = () => {
 	}
 
 	// 下载文件
-	const downloadFile = async (fileUrl: string, fileName?: string) => {
-		if (!fileUrl.trim()) {
-			alert('请输入文件的 URL');
+	const downloadFile = async (fileName?: string) => {
+		if (!url.trim()) {
 			return;
 		}
 
@@ -137,27 +136,49 @@ const Home = () => {
 			// 下载文件
 			const result: any = await invoke('download_file', {
 				options: {
-					url: fileUrl,
+					url: url,
 					file_name: fileName || undefined, // 如果用户输入了文件名则使用，否则自动获取
 					// save_dir: './downloads',
 					overwrite: true, // 覆盖已存在的文件
 					id: Date.now().toString(),
 				},
 			});
-			console.log('下载结果:', result);
-			setDownloadResults((prev) => [result, ...prev]);
+			setDownloadFileInfo((prev) => {
+				const idx = prev.findIndex((item) => item.id === result.id);
+				if (idx === -1) {
+					return [result, ...prev];
+				}
+				const next = [...prev];
+				next[idx] = { ...next[idx], ...result };
+				return next;
+			});
 			if (result.success) {
 				console.log('文件保存成功:', result.file_path);
-				alert(
-					`文件下载成功！\n保存路径: ${result.file_path}\n文件大小: ${result.file_size} 字节\n类型: ${result.content_type || '未知'}`,
-				);
 			} else {
-				alert(`下载失败: ${result.message}`);
+				console.error(`下载失败: ${result.message}`);
 			}
 		} catch (error) {
 			console.error('下载失败:', error);
-			alert(`下载失败: ${error}`);
 		}
+	};
+
+	// downloadFile(
+	// 	'https://dnhyxc.cn:9216/files/__FILE__c7ee5b931b68b9e227fd94957587796d.epub',
+	// )
+	// downloadFile(
+	// 	'https://dnhyxc.cn:9216/files/__FILE__86960f6b9b59b7d5cd9a1dfe9a6f88a0.docx',
+	// )
+	// downloadFile(
+	// 	'https://dnhyxc.cn:9216/files/__FILE__88872d9ec263023cc77d8df9595e69c2.pdf',
+	// )
+	// downloadFile(
+	// 	'https://files.codelife.cc/wallhaven/full/wq/wallhaven-wqkw2r.jpg?x-oss-process=image/resize,limit_0,m_fill,w_2560,h_1440/quality,Q_93/format,webp',
+	// )
+
+	const sendMessage = async () => {
+		await onEmit('message', {
+			message: 'hello world',
+		});
 	};
 
 	return (
@@ -169,16 +190,21 @@ const Home = () => {
 			<div>
 				{downloadProgressInfo.map((i) => (
 					<div key={i.id}>
-						文件名称: {i.filename}
-						下载进度: {i.percent}% 下载状态: {i.status ? '完成' : '进行中'}
+						文件名称: {i.file_name}
+						下载进度: {i.percent}% 下载状态:{' '}
+						{i.success === 'success'
+							? '完成'
+							: i.success === 'start'
+								? '进行中'
+								: '失败'}
 					</div>
 				))}
 			</div>
-			{downloadResults.length > 0 && (
+			{downloadFileInfo.length > 0 && (
 				<div className="mb-8 w-full max-w-2xl">
 					<h3 className="text-lg font-bold mb-2">下载历史</h3>
 					<div className="space-y-2 max-h-60 overflow-y-auto">
-						{downloadResults.map((result, index) => (
+						{downloadFileInfo.map((result, index) => (
 							<div
 								key={index}
 								className={`p-3 rounded border ${
@@ -189,7 +215,11 @@ const Home = () => {
 							>
 								<div className="flex justify-between items-center">
 									<span className="font-medium">
-										{result.success ? '✅ 成功' : '❌ 失败'}
+										{result.success === 'success'
+											? '✅ 成功'
+											: result.success === 'start'
+												? '✨ 下载中'
+												: '❌ 失败'}
 									</span>
 									<span className="text-sm text-gray-500">
 										{result.file_size
@@ -197,8 +227,8 @@ const Home = () => {
 											: '未知大小'}
 									</span>
 								</div>
-								{result.file_path && (
-									<p className="text-sm truncate">路径: {result.file_path}</p>
+								{result.file_name && (
+									<p className="text-sm truncate">文件名: {result.file_name}</p>
 								)}
 								<p className="text-sm">{result.message}</p>
 							</div>
@@ -216,7 +246,8 @@ const Home = () => {
 				<div className="flex gap-2">
 					<Input
 						id="greet-input"
-						onChange={(e) => setName(e.currentTarget.value)}
+						value={url}
+						onChange={(e) => setUrl(e.currentTarget.value)}
 						placeholder="Enter a name..."
 					/>
 					<Button className="cursor-pointer">Greet</Button>
@@ -230,51 +261,30 @@ const Home = () => {
 			>
 				Open Child Window
 			</Button>
-			<Button variant="default" className="cursor-pointer" onClick={saveFile}>
-				Save File
-			</Button>
-			<Button
-				variant="default"
-				className="cursor-pointer"
-				onClick={
-					() =>
-						// downloadFile(
-						// 	'https://dnhyxc.cn:9216/files/__FILE__c7ee5b931b68b9e227fd94957587796d.epub',
-						// )
-						// downloadFile(
-						// 	'https://dnhyxc.cn:9216/files/__FILE__86960f6b9b59b7d5cd9a1dfe9a6f88a0.docx',
-						// )
-						downloadFile(
-							'https://dnhyxc.cn:9216/files/__FILE__88872d9ec263023cc77d8df9595e69c2.pdf',
-						)
-					// downloadFile(
-					// 	'https://files.codelife.cc/wallhaven/full/wq/wallhaven-wqkw2r.jpg?x-oss-process=image/resize,limit_0,m_fill,w_2560,h_1440/quality,Q_93/format,webp',
-					// )
-				}
-			>
-				download File
-			</Button>
-			<Button
-				variant="default"
-				className="cursor-pointer"
-				onClick={
-					() =>
-						// downloadFile(
-						// 	'https://dnhyxc.cn:9216/files/__FILE__c7ee5b931b68b9e227fd94957587796d.epub',
-						// )
-						// downloadFile(
-						// 	'https://dnhyxc.cn:9216/files/__FILE__86960f6b9b59b7d5cd9a1dfe9a6f88a0.docx',
-						// )
-						downloadFile(
-							'https://dnhyxc.cn:9216/files/__FILE__88872d9ec263023cc77d8df9595e69c2.pdf',
-						)
-					// downloadFile(
-					// 	'https://files.codelife.cc/wallhaven/full/wq/wallhaven-wqkw2r.jpg?x-oss-process=image/resize,limit_0,m_fill,w_2560,h_1440/quality,Q_93/format,webp',
-					// )
-				}
-			>
-				download pdf File
-			</Button>
+			<div className="flex justify-center items-center gap-4 mt-10">
+				<Button className="cursor-pointer" onClick={sendMessage}>
+					Send Message
+				</Button>
+			</div>
+			<div className="flex justify-center items-center gap-4 mt-10">
+				<Button variant="default" className="cursor-pointer" onClick={saveFile}>
+					Save File
+				</Button>
+				<Button
+					variant="default"
+					className="cursor-pointer"
+					onClick={() => downloadFile()}
+				>
+					download File
+				</Button>
+				<Button
+					variant="default"
+					className="cursor-pointer"
+					onClick={() => downloadFile()}
+				>
+					download pdf File
+				</Button>
+			</div>
 		</div>
 	);
 };

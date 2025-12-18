@@ -36,12 +36,13 @@ pub struct DownloadFileOptions {
 // 通用下载文件结果
 #[derive(Serialize, Clone)]
 pub struct DownloadFileResult {
-    pub success: bool,
+    pub success: String,
     pub file_path: Option<String>,
     pub file_name: String,
     pub message: String,
     pub file_size: Option<u64>,
     pub content_type: Option<String>,
+    pub id: Option<String>,
 }
 
 // 文件信息
@@ -75,7 +76,7 @@ pub struct BatchDownloadProgress {
     /// 当批量下载需要区分不同子任务或做回调匹配时，可传入此字段；
     /// 若无特殊需求，可留空（None）。
     pub id: Option<String>,
-    pub status: Option<bool>,
+    pub success: String,
 }
 
 #[derive(Serialize)]
@@ -84,6 +85,6 @@ pub struct FileInfoEvent {
     pub file_size: Option<u64>,
     pub content_type: Option<String>,
     pub id: Option<String>,
-    pub success: bool,
+    pub success: String,
     pub message: String,
 }
