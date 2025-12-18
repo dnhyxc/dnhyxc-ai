@@ -6,9 +6,9 @@
  * @FilePath: \src\layout\index.tsx
  */
 import { Outlet, useLocation } from 'react-router';
+import Header from '@/components/design/Header';
 import Menu from '@/components/design/Menu';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import Header from '@/components/design/Header';
 
 const Layout = () => {
 	const location = useLocation();

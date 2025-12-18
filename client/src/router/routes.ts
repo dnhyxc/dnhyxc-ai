@@ -1,7 +1,7 @@
 import Layout from '@/layout';
+import About from '@/views/about';
 import Detail from '@/views/detail';
 import Home from '@/views/home';
-import About from '@/views/about';
 
 const routes = [
 	{

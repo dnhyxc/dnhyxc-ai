@@ -1,8 +1,8 @@
 import { useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { onEmit, onListen } from '@/utils/event';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import Header from '@/components/design/Header';
+import { Button } from '@/components/ui/button';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { onEmit, onListen } from '@/utils/event';
 
 const Detail = () => {
 	useEffect(() => {

@@ -3,7 +3,7 @@ import { PromptController } from './prompt.controller';
 import { PromptService } from './prompt.service';
 
 @Module({
-  controllers: [PromptController],
-  providers: [PromptService]
+	controllers: [PromptController],
+	providers: [PromptService],
 })
 export class PromptModule {}
