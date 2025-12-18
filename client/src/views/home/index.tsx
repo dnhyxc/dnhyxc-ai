@@ -70,27 +70,36 @@ const Home = () => {
 			console.log('about-send-message', event);
 		});
 
+		const logoutPromise = listen('logout', (event) => {
+			console.log('logout', event);
+		});
+
 		return () => {
 			unlistenPromise.then((unlisten) => unlisten());
 			unlistenFileInfoPromise.then((unlisten) => unlisten());
 			unlistenAboutPromise.then((unlisten) => unlisten());
+			logoutPromise.then((unlisten) => unlisten());
 		};
 	}, []);
 
 	const openChildWindow = async () => {
+		const WIDTH = 1000;
+		const HEIGHT = 690;
 		const webview = new WebviewWindow('child-window', {
-			url: '/about',
-			width: 1000,
-			height: 690,
-			minWidth: 1000,
-			minHeight: 690,
+			url: '/detail',
+			width: WIDTH,
+			height: HEIGHT,
+			minWidth: WIDTH,
+			minHeight: HEIGHT,
 			resizable: true,
 			decorations: true,
 			title: 'dnhyxc-ai',
 			hiddenTitle: true,
 			titleBarStyle: 'overlay',
-			transparent: true,
-			// backgroundColor: '#1e1e1e',
+			// theme: 'light', // 不设置将是跟随系统
+			// 计算屏幕中心坐标
+			x: (screen.width - WIDTH) / 2,
+			y: (screen.height - HEIGHT) / 2,
 		});
 		// since the webview window is created asynchronously,
 		// Tauri emits the `tauri://created` and `tauri://error` to notify you of the creation response

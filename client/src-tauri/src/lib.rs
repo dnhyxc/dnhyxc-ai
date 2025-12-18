@@ -1,11 +1,13 @@
 // 引入自定义命令模块，其中包含可供前端调用的 Rust 函数
 mod clients;
 mod dock;
+mod menu;
 mod services;
 mod tray;
 mod types;
 mod utils;
 
+// use tauri::menu::{MenuBuilder, SubmenuBuilder};
 use tauri::Manager;
 use tauri::WindowEvent;
 
@@ -18,20 +20,33 @@ pub fn run() {
     // 使用默认配置创建 Tauri 应用构建器
     tauri::Builder::default()
         .setup(|app| {
-            tray::init_tray(app); // 注册事件
+            let main_window = app.get_webview_window("main").unwrap();
+            // 启动时设置窗口居中
+            utils::set_screen_center(&main_window);
+            // 注册托盘菜单
+            tray::init_tray(app);
+            let _ = menu::setup_menu(app);
 
-            // 窗口获取焦点时，显示窗口
-            if let Some(main_window) = app.get_webview_window("main") {
-                let window = main_window.clone();
-                // 监听窗口事件
-                main_window.on_window_event(move |event| match event {
-                    WindowEvent::CloseRequested { api, .. } => {
-                        api.prevent_close();
-                        let _ = window.hide();
-                    }
-                    _ => {}
-                });
-            }
+            let window = main_window.clone();
+            // 监听窗口事件
+            main_window.on_window_event(move |event| match event {
+                WindowEvent::CloseRequested { api, .. } => {
+                    api.prevent_close();
+                    let _ = window.hide();
+                }
+                _ => {}
+            });
+            // if let Some(main_window) = app.get_webview_window("main") {
+            //     let window = main_window.clone();
+            //     // 监听窗口事件
+            //     main_window.on_window_event(move |event| match event {
+            //         WindowEvent::CloseRequested { api, .. } => {
+            //             api.prevent_close();
+            //             let _ = window.hide();
+            //         }
+            //         _ => {}
+            //     });
+            // }
 
             Ok(())
         })

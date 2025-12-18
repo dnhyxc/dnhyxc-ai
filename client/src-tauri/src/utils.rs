@@ -1,6 +1,21 @@
 use reqwest;
 use crate::types::FileInfo;
 
+// 设置窗口居中
+pub fn set_screen_center<R: tauri::Runtime>(window: &tauri::WebviewWindow<R>) {
+    // let window = app.get_webview_window("main").unwrap();
+    if let Ok(Some(monitor)) = window.current_monitor() {
+        let size = monitor.size();
+        let physical_size = window.outer_size().unwrap_or_default();
+        let x = (size.width - physical_size.width) / 2;
+        let y = (size.height - physical_size.height) / 2;
+        let _ = window.set_position(tauri::Position::Physical(tauri::PhysicalPosition {
+            x: x.try_into().unwrap_or(0),
+            y: y.try_into().unwrap_or(0),
+        }));
+    }
+}
+
 // 辅助函数：根据 Content-Type 获取文件扩展名
 pub fn get_extension_from_content_type(content_type: &str) -> String {
     match content_type {

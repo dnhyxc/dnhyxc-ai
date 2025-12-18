@@ -1,6 +1,7 @@
 import Layout from '@/layout';
-import About from '@/views/about';
+import Detail from '@/views/detail';
 import Home from '@/views/home';
+import About from '@/views/about';
 
 const routes = [
 	{
@@ -10,11 +11,15 @@ const routes = [
 				index: true,
 				Component: Home,
 			},
-			{
-				path: 'about',
-				Component: About,
-			},
 		],
+	},
+	{
+		path: 'detail',
+		Component: Detail,
+	},
+	{
+		path: 'about',
+		Component: About,
 	},
 ];
 
