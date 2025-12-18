@@ -1,10 +1,10 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import { useEffect, useState } from 'react';
 import { Button } from '@ui/button';
 import { Input } from '@ui/input';
+import { useEffect, useState } from 'react';
 import type { DownloadFileInfo, DownloadProgress } from '@/types';
-import { onEmit, onListen, onCreateWindow } from '@/utils';
+import { onCreateWindow, onEmit, onListen } from '@/utils';
 
 const Home = () => {
 	const [greetMsg, setGreetMsg] = useState('');

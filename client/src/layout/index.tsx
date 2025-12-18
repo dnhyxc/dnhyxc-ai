@@ -5,10 +5,11 @@
  * @LastEditors: dnhyxc
  * @FilePath: \src\layout\index.tsx
  */
-import { Outlet } from 'react-router';
+
 import Header from '@design/Header';
 import Menu from '@design/Menu';
 import { ScrollArea } from '@ui/scroll-area';
+import { Outlet } from 'react-router';
 
 const Layout = () => {
 	return (
