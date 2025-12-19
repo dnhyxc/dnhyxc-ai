@@ -23,6 +23,15 @@ export const onCreateWindow = async (options: WindowOptions) => {
 		errorCallback,
 	} = options;
 
+	// 获取窗口
+	const getLabel = await WebviewWindow.getByLabel(label);
+
+	// 如果窗口已存在，则聚焦窗口
+	if (getLabel) {
+		getLabel.setFocus();
+	}
+
+	// 创建窗口
 	const webview = new WebviewWindow(label, {
 		url,
 		width,
