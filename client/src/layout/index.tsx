@@ -6,27 +6,48 @@
  * @FilePath: \src\layout\index.tsx
  */
 
+import { useEffect } from 'react';
 import Header from '@design/Header';
-import Menu from '@design/Menu';
+import Sidebar from '@design/Sidebar';
 import { ScrollArea } from '@ui/scroll-area';
 import { Outlet } from 'react-router';
+import { getStorage, onListen, setBodyClass } from '@/utils';
 
 const Layout = () => {
+	const theme = getStorage('theme');
+
+	useEffect(() => {
+		setBodyClass(theme as 'light' | 'dark');
+
+		const unlistenThemePromise = onListen('theme', (event: string) => {
+			setBodyClass(event);
+		});
+
+		return () => {
+			unlistenThemePromise.then((unlisten) => unlisten());
+		};
+	}, [theme]);
+
 	return (
-		<main className="w-full h-full flex flex-col rounded-lg box-border overflow-hidden">
-			<Header />
+		<main className="w-full h-full flex rounded-sm overflow-hidden">
+			<Sidebar />
 			<div
-				className={`h-[calc(100%-120px)] flex-1 flex justify-center items-center box-border px-5`}
+				data-tauri-drag-region
+				className={`w-full h-full flex-1 flex-col justify-center items-center box-border px-7 pl-0 py-7 rounded-sm`}
 			>
-				<ScrollArea className="w-full h-full flex justify-center items-center box-border rounded-lg p-1 shadow-(--shadow)">
-					<div className="w-full h-full flex-1 flex-col justify-center items-center">
-						<Outlet />
-					</div>
-				</ScrollArea>
+				<div className="h-full w-full rounded-sm bg-border">
+					{/* <div className="h-full w-full shadow-(--shadow) rounded-sm"> */}
+					<Header />
+					<ScrollArea className="w-full h-[calc(100%-52px)] flex justify-center items-center box-border rounded-sm p-1">
+						<div className="w-full h-full">
+							<Outlet />
+						</div>
+					</ScrollArea>
+				</div>
 			</div>
-			<footer className="h-15 flex items-center justify-center box-border">
+			{/* <footer className="h-15 flex items-center justify-center box-border">
 				<Menu />
-			</footer>
+			</footer> */}
 		</main>
 	);
 };

@@ -295,3 +295,7 @@ pub fn run() {
 > [https://v2.tauri.app/zh-cn/learn/window-menu/](https://v2.tauri.app/zh-cn/learn/window-menu/)
 >
 > [https://docs.rs/tauri/latest/tauri/menu/struct.PredefinedMenuItem.html](https://docs.rs/tauri/latest/tauri/menu/struct.PredefinedMenuItem.html)
+
+## Tailwind CSS 默认配色
+
+[https://tailwindcss.com/docs/theme#theme-variable-namespaces](https://tailwindcss.com/docs/theme#theme-variable-namespaces)

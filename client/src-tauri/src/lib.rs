@@ -1,6 +1,7 @@
 // 引入自定义命令模块，其中包含可供前端调用的 Rust 函数
 mod clients;
 mod dock;
+// mod event;
 mod menu;
 mod services;
 mod tray;

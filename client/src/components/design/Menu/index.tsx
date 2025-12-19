@@ -18,9 +18,9 @@ const Menu = () => {
 				</div>
 				<div
 					className="text-lg cursor-pointer text-[#069701] hover:text-green-600"
-					onClick={() => onJump('/about')}
+					onClick={() => onJump('/detail')}
 				>
-					About
+					Detail
 				</div>
 			</div>
 		</div>

@@ -1,5 +1,6 @@
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { WindowOptions } from '@/types';
+import { getStorage } from '@/utils';
 
 // 创建新窗口
 export const onCreateWindow = async (options: WindowOptions) => {
@@ -56,5 +57,31 @@ export const onCreateWindow = async (options: WindowOptions) => {
 	webview.once('tauri://error', (e: any) => {
 		// an error occurred during webview window creation
 		errorCallback?.(e);
+	});
+};
+
+// 根据 label 获取窗口
+export const getWindowByLabel = async (label: string) => {
+	return await WebviewWindow.getByLabel(label);
+};
+
+// 更具 label 获取窗口设置对应主题
+export const setTauriTheme = async (label: string, theme: 'dark' | 'light') => {
+	const _theme = theme || getStorage('theme') || 'light';
+	const win = await getWindowByLabel(label);
+	win?.setTheme(_theme);
+};
+
+// 获取所有窗口
+export const getAllWindows = async () => {
+	const allWindows = await WebviewWindow.getAll();
+	return allWindows;
+};
+
+export const setThemeToAllWindows = async (theme: 'dark' | 'light') => {
+	const _theme = theme || getStorage('theme') || 'light';
+	const allWindows = await getAllWindows();
+	allWindows.forEach((win) => {
+		win.setTheme(_theme);
 	});
 };

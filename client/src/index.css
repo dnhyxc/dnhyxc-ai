@@ -1,7 +1,9 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+/* @custom-variant dark (&:is(.dark *)); */
 @custom-variant dark (&:where(.dark, .dark *));
+/* @custom-variant dark (&:where(.dark, .dark *)); */
 /* 定义名为 "dark" 的自定义变体，当任意祖先元素带有 data-theme="dark" 时，其内部所有元素都会应用该变体下的样式规则 */
 /* @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *)); */
 
@@ -13,6 +15,7 @@ body {
 	width: 100%;
 	/* 禁止页面回弹效果 */
 	overscroll-behavior: none;
+	/*定义滚动条轨道*/
 }
 
 #root {
@@ -55,7 +58,7 @@ body {
 	--sidebar-accent-foreground: oklch(0.21 0.034 264.665);
 	--sidebar-border: oklch(0.928 0.006 264.531);
 	--sidebar-ring: oklch(0.707 0.022 261.325);
-	--shadow: 0 0 5px rgba(0, 0, 0, 0.2);
+	--shadow: 0 0 4px rgba(0, 0, 0, 0.2);
 	--font-family: "手札体-简";
 }
 
@@ -92,11 +95,12 @@ body {
 	--sidebar-accent-foreground: oklch(0.985 0.002 247.839);
 	--sidebar-border: oklch(1 0 0 / 10%);
 	--sidebar-ring: oklch(0.551 0.027 264.364);
-	--shadow: 0 0 5px rgba(255, 255, 255, 0.5);
+	--shadow: 0 0 4px rgba(255, 255, 255, 0.5);
 }
 
 @theme inline {
 	/* --spacing: 1px; */
+	--color-black: var(--background);
 	--radius-sm: calc(var(--radius) - 4px);
 	--radius-md: calc(var(--radius) - 2px);
 	--radius-lg: var(--radius);
@@ -135,6 +139,7 @@ body {
 	--color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
 	--color-sidebar-border: var(--sidebar-border);
 	--color-sidebar-ring: var(--sidebar-ring);
+	--color-background: var(--background);
 }
 
 @layer base {

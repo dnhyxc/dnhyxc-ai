@@ -237,7 +237,7 @@ const Home = () => {
 				onClick={() =>
 					onCreateWindow({
 						label: 'child-window',
-						url: '/detail',
+						url: '/win',
 						width: 1000,
 						height: 690,
 					})
