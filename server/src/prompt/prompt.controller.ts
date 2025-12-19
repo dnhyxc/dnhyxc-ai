@@ -1,24 +1,25 @@
 import {
 	Controller,
 	Get,
-	Post,
 	Inject,
+	type LoggerService,
+	Post,
 	// Logger,
 	// HttpException,
 	// HttpStatus,
 	// NotFoundException,
 	UnauthorizedException,
-	type LoggerService,
 } from '@nestjs/common';
+import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 // import { type ConfigService } from '@nestjs/config';
 import { PromptService } from './prompt.service';
-import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 
 @Controller('prompt')
 export class PromptController {
 	constructor(
 		private promptService: PromptService,
-		@Inject(WINSTON_MODULE_NEST_PROVIDER) private readonly logger: LoggerService,
+		@Inject(WINSTON_MODULE_NEST_PROVIDER)
+		private readonly logger: LoggerService,
 	) {
 		logger.log('PromptController init');
 	}
