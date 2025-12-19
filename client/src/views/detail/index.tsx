@@ -1,6 +1,4 @@
-import Header from '@design/Header';
 import { Button } from '@ui/button';
-import { ScrollArea } from '@ui/scroll-area';
 import { useEffect } from 'react';
 import { getStorage, setBodyClass } from '@/utils';
 import { onEmit, onListen } from '@/utils/event';
