@@ -1,8 +1,8 @@
 import Layout from '@/layout';
-import ChildWindow from '@/views/win';
 import About from '@/views/about';
 import Detail from '@/views/detail';
 import Home from '@/views/home';
+import ChildWindow from '@/views/win';
 
 const routes = [
 	{

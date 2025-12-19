@@ -17,10 +17,16 @@ const Sidebar = () => {
 			>
 				<img src={ICON} alt="" className="w-9 h-9 cursor-pointer mb-1" />
 			</div>
-			<div className="flex justify-center items-center w-12 h-12 bg-border cursor-pointer mb-4 rounded-md" onClick={() => onJump('/')}>
+			<div
+				className="flex justify-center items-center w-12 h-12 bg-border cursor-pointer mb-4 rounded-md"
+				onClick={() => onJump('/')}
+			>
 				H
 			</div>
-			<div className="flex justify-center items-center w-12 h-12 bg-border cursor-pointer mb-4 rounded-md" onClick={() => onJump('/detail')}>
+			<div
+				className="flex justify-center items-center w-12 h-12 bg-border cursor-pointer mb-4 rounded-md"
+				onClick={() => onJump('/detail')}
+			>
 				D
 			</div>
 		</div>

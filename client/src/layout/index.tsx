@@ -6,10 +6,10 @@
  * @FilePath: \src\layout\index.tsx
  */
 
-import { useEffect } from 'react';
 import Header from '@design/Header';
 import Sidebar from '@design/Sidebar';
 import { ScrollArea } from '@ui/scroll-area';
+import { useEffect } from 'react';
 import { Outlet } from 'react-router';
 import { getStorage, onListen, setBodyClass } from '@/utils';
 

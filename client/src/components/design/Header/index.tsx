@@ -1,6 +1,6 @@
+import { Button } from '@ui/button';
 import { useTheme } from '@/hooks';
 import { getStorage } from '@/utils';
-import { Button } from '@ui/button';
 
 const Header = () => {
 	const { theme = getStorage('theme'), toggleTheme } = useTheme();
