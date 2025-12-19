@@ -6,7 +6,7 @@ export class PromptService {
 		return 'This action returns all prompt';
 	}
 
-	addPrompt(prompt: string) {
+	addPrompt(prompt) {
 		return {
 			code: 200,
 			data: prompt,

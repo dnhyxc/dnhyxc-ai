@@ -22,6 +22,9 @@ pub fn init_tray(app: &mut tauri::App) {
                     tauri::tray::MouseButton::Left => {
                         // println!("Left click");
                     }
+                    tauri::tray::MouseButton::Right => {
+                        println!("Right click");
+                    }
                     _ => {}
                 }
             }

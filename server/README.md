@@ -31,3 +31,12 @@ $ nest g service prompt
 ```
 
 执行完成之后就会在 `src` 目录下创建 `prompt` 目录，目录下包含 `prompt.service.ts` 文件。
+
+## 日志配置
+
+安装依赖：[nestjs-winston](https://www.npmjs.com/package/nest-winston)、[winston-daily-rotate-file](https://www.npmjs.com/package/winston-daily-rotate-file)
+
+```bash
+pnpm i winston nestjs-winston
+pnpm i winston-daily-rotate-file
+```
