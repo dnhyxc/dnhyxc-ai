@@ -10,8 +10,8 @@ import {
 	// NotFoundException,
 	UnauthorizedException,
 } from '@nestjs/common';
-import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { ConfigService } from '@nestjs/config';
+import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { PromptService } from './prompt.service';
 
 @Controller('prompt')
