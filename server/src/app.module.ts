@@ -1,6 +1,7 @@
 import { Global, Logger, Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import * as dotenv from 'dotenv';
+import * as Joi from 'joi';
 import { LogsModule } from './logs/logs.module';
 import { PromptModule } from './prompt/prompt.module';
 
@@ -19,6 +20,14 @@ const envFilePath = `.env.${process.env.NODE_ENV || 'development'}`;
 			envFilePath,
 			// 自动合并 .env、.env.development、.env.production 文件
 			load: [() => dotenv.config({ path: '.env' })],
+			// TODO: Joi 配置未生效，后续完善
+			validationSchema: Joi.object({
+				// 使用 Joi 验证环境变量中的DB_PORT
+				DB_PORT: Joi.number().default(3306),
+				NODE_ENV: Joi.string()
+					.valid('development', 'production')
+					.default('development'),
+			}),
 		}),
 	],
 	controllers: [],

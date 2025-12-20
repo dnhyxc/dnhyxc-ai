@@ -37,11 +37,11 @@ export class PromptController {
 		// }
 		const db_host = this.configService.get(ConfigEnum.DB_HOST);
 		const db_database = this.configService.get(ConfigEnum.DB_DATABASE);
-		const test_db = this.configService.get(ConfigEnum.TEST_DB);
+		const db_port = this.configService.get(ConfigEnum.DB_PORT);
 
 		this.logger.log(`DB_HOST--------${db_host}`);
 		this.logger.log(`DB_DATABASE--------${db_database}`);
-		this.logger.log(`test_db--------${test_db}`);
+		this.logger.log(`db_port--------${db_port}`);
 
 		// this.logger.log('getPrompt-log');
 		// this.logger.warn('getPrompt-warn');
