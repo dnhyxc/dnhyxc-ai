@@ -8,11 +8,12 @@ import {
 	// HttpException,
 	// HttpStatus,
 	// NotFoundException,
-	UnauthorizedException,
+	// UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { PromptService } from './prompt.service';
+import { ConfigEnum } from '../enum/config.enum';
 
 @Controller('prompt')
 export class PromptController {
@@ -34,9 +35,13 @@ export class PromptController {
 		// 	// throw new HttpException('Forbidden', HttpStatus.FORBIDDEN);
 		// 	throw new UnauthorizedException('用户没有权限');
 		// }
-		const logLevel = this.configService.get('LOG_LEVEL');
+		const db_host = this.configService.get(ConfigEnum.DB_HOST);
+		const db_database = this.configService.get(ConfigEnum.DB_DATABASE);
+		const test_db = this.configService.get(ConfigEnum.TEST_DB);
 
-		this.logger.log(`logLevel--------${logLevel}`);
+		this.logger.log(`DB_HOST--------${db_host}`);
+		this.logger.log(`DB_DATABASE--------${db_database}`);
+		this.logger.log(`test_db--------${test_db}`);
 
 		// this.logger.log('getPrompt-log');
 		// this.logger.warn('getPrompt-warn');
