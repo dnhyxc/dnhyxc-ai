@@ -12,8 +12,8 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
-import { PromptService } from './prompt.service';
 import { ConfigEnum } from '../enum/config.enum';
+import { PromptService } from './prompt.service';
 
 @Controller('prompt')
 export class PromptController {
