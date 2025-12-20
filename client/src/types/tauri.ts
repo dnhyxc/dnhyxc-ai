@@ -1,8 +1,8 @@
 export interface WindowOptions {
-	label: string;
 	width: number;
 	height: number;
 	url: string;
+	label?: string;
 	title?: string;
 	resizable?: boolean;
 	decorations?: boolean;

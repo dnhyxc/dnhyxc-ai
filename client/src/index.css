@@ -15,7 +15,10 @@ body {
 	width: 100%;
 	/* 禁止页面回弹效果 */
 	overscroll-behavior: none;
-	/*定义滚动条轨道*/
+	user-select: none;
+	-webkit-user-select: none;
+	-moz-user-select: none;
+	-ms-user-select: none;
 }
 
 #root {
@@ -58,7 +61,11 @@ body {
 	--sidebar-accent-foreground: oklch(0.21 0.034 264.665);
 	--sidebar-border: oklch(0.928 0.006 264.531);
 	--sidebar-ring: oklch(0.707 0.022 261.325);
-	--shadow: 0 0 4px rgba(0, 0, 0, 0.2);
+	--shadow-2: 0 0 2px rgba(0, 0, 0, 0.2);
+	--shadow-4: 0 0 4px rgba(0, 0, 0, 0.2);
+	--shadow-6: 0 0 6px rgba(0, 0, 0, 0.2);
+	--shadow-8: 0 0 8px rgba(0, 0, 0, 0.2);
+	--shadow-10: 0 0 10px rgba(0, 0, 0, 0.2);
 	--font-family: "手札体-简";
 }
 
@@ -95,7 +102,11 @@ body {
 	--sidebar-accent-foreground: oklch(0.985 0.002 247.839);
 	--sidebar-border: oklch(1 0 0 / 10%);
 	--sidebar-ring: oklch(0.551 0.027 264.364);
-	--shadow: 0 0 4px rgba(255, 255, 255, 0.5);
+	--shadow-2: 0 0 2px rgba(255, 255, 255, 0.5);
+	--shadow-4: 0 0 4px rgba(255, 255, 255, 0.5);
+	--shadow-6: 0 0 6px rgba(255, 255, 255, 0.5);
+	--shadow-8: 0 0 8px rgba(255, 255, 255, 0.5);
+	--shadow-10: 0 0 10px rgba(255, 255, 255, 0.5);
 }
 
 @theme inline {

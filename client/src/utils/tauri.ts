@@ -5,7 +5,7 @@ import { getStorage } from '@/utils';
 // 创建新窗口
 export const onCreateWindow = async (options: WindowOptions) => {
 	const {
-		label,
+		label = 'child-window',
 		url,
 		width,
 		height,

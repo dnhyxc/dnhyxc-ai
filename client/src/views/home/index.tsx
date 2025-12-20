@@ -236,7 +236,6 @@ const Home = () => {
 				className="cursor-pointer"
 				onClick={() =>
 					onCreateWindow({
-						label: 'child-window',
 						url: '/win',
 						width: 1000,
 						height: 690,
