@@ -1,5 +1,5 @@
-import { useNavigate } from 'react-router';
 import { House, WalletCards } from 'lucide-react';
+import { useNavigate } from 'react-router';
 import ICON from '@/assets/icon.png';
 
 const Sidebar = () => {
