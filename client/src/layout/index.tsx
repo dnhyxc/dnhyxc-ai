@@ -29,16 +29,16 @@ const Layout = () => {
 	}, [theme]);
 
 	return (
-		<main className="w-full h-full flex rounded-sm overflow-hidden">
+		<main className="w-full h-full flex rounded-md overflow-hidden">
 			<Sidebar />
 			<div
 				data-tauri-drag-region
-				className={`w-full h-full flex-1 flex-col justify-center items-center box-border px-7 pl-0 py-7 rounded-sm`}
+				className={`w-full h-full flex-1 flex-col justify-center items-center box-border px-7 pl-0 py-7 rounded-md`}
 			>
-				<div className="h-full w-full rounded-sm bg-border">
+				<div className="h-full w-full rounded-md bg-border">
 					{/* <div className="h-full w-full shadow-(--shadow) rounded-sm"> */}
 					<Header />
-					<ScrollArea className="w-full h-[calc(100%-52px)] flex justify-center items-center box-border rounded-sm p-1">
+					<ScrollArea className="w-full h-[calc(100%-52px)] flex justify-center items-center box-border rounded-md p-1">
 						<div className="w-full h-full">
 							<Outlet />
 						</div>
