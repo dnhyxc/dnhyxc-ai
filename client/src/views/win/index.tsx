@@ -16,7 +16,6 @@ const ChildWindow = () => {
 		});
 
 		const unlistenThemePromise = onListen('theme', (value: string) => {
-			console.log('theme', value);
 			setBodyClass(value);
 		});
 
@@ -36,7 +35,7 @@ const ChildWindow = () => {
 			<div
 				className={`h-[calc(100%-60px)] flex-1 flex justify-center items-center box-border px-5 pb-5`}
 			>
-				<ScrollArea className="w-full h-full flex justify-center items-center box-border rounded-lg p-1 shadow-(--shadow)">
+				<ScrollArea className="w-full h-full flex justify-center items-center box-border rounded-lg p-1 shadow-(--shadow-2)">
 					<div className="w-full h-full flex-1 flex-col justify-center items-center">
 						<h1>All Child Window</h1>
 						<div>
