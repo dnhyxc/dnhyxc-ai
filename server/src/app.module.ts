@@ -1,15 +1,16 @@
 import { Global, Logger, Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { TypeOrmModule, TypeOrmModuleOptions } from '@nestjs/typeorm';
+import { ConfigModule } from '@nestjs/config';
+import { TypeOrmModule } from '@nestjs/typeorm';
 import * as dotenv from 'dotenv';
 import * as Joi from 'joi';
-import { ConfigEnum } from './enum/config.enum';
-import { Logs } from './logs/logs.entity';
+import { connectionOptions } from 'ormconfig';
+// import { ConfigEnum } from './enum/config.enum';
+// import { Logs } from './logs/logs.entity';
 import { LogsModule } from './logs/logs.module';
 import { PromptModule } from './prompt/prompt.module';
-import { Roles } from './roles/roles.entity';
-import { Profile } from './user/profile.entity';
-import { User } from './user/user.entity';
+// import { Roles } from './roles/roles.entity';
+// import { Profile } from './user/profile.entity';
+// import { User } from './user/user.entity';
 import { UserModule } from './user/user.module';
 
 const envFilePath = `.env.${process.env.NODE_ENV || 'development'}`;
@@ -20,6 +21,7 @@ const envFilePath = `.env.${process.env.NODE_ENV || 'development'}`;
 	imports: [
 		PromptModule,
 		LogsModule,
+		UserModule,
 		ConfigModule.forRoot({
 			// 全局注册配置模块，这样就不需要在每个模块的 @Module 中都使用 ConfigModule.forRoot() 注册过后才能使用
 			isGlobal: true,
@@ -34,33 +36,38 @@ const envFilePath = `.env.${process.env.NODE_ENV || 'development'}`;
 					.valid('development', 'production')
 					.default('development'),
 				DB_PORT: Joi.number().default(3090),
-				DB_HOST: Joi.string().ip(),
+				DB_HOST: Joi.alternatives().try(
+					Joi.string().ip(),
+					Joi.string().domain(),
+				),
 				DB_TYPE: Joi.string().valid('mysql', 'postgres'),
 				DB_USERNAME: Joi.string().required(),
 				DB_PASSWORD: Joi.string().required(),
 				DB_DATABASE: Joi.string().required(),
 				DB_SYNC: Joi.boolean().default(false),
+				LOG_LEVEL: Joi.string(),
+				LOG_ON: Joi.boolean(),
 			}),
 		}),
-		TypeOrmModule.forRootAsync({
-			imports: [ConfigModule],
-			inject: [ConfigService],
-			useFactory: (configService: ConfigService) =>
-				({
-					type: configService.get(ConfigEnum.DB_TYPE),
-					host: configService.get(ConfigEnum.DB_HOST),
-					port: configService.get(ConfigEnum.DB_PORT),
-					username: configService.get(ConfigEnum.DB_USERNAME),
-					password: configService.get(ConfigEnum.DB_PASSWORD),
-					database: configService.get(ConfigEnum.DB_DATABASE),
-					entities: [User, Profile, Roles, Logs],
-					synchronize: configService.get(ConfigEnum.DB_SYNC),
-					// 开发环境设置为 true，开启 SQL 语句日志，即所有的 SQL 语句都会打印日志，便于开发调试
-					logging: process.env.NODE_ENV === 'development',
-					// logging: ['error'],
-				}) as TypeOrmModuleOptions,
-		}),
-		UserModule,
+		TypeOrmModule.forRoot(connectionOptions),
+		// TypeOrmModule.forRootAsync({
+		// 	imports: [ConfigModule],
+		// 	inject: [ConfigService],
+		// 	useFactory: (configService: ConfigService) =>
+		// 		({
+		// 			type: configService.get(ConfigEnum.DB_TYPE),
+		// 			host: configService.get(ConfigEnum.DB_HOST),
+		// 			port: configService.get(ConfigEnum.DB_PORT),
+		// 			username: configService.get(ConfigEnum.DB_USERNAME),
+		// 			password: configService.get(ConfigEnum.DB_PASSWORD),
+		// 			database: configService.get(ConfigEnum.DB_DATABASE),
+		// 			entities: [User, Profile, Roles, Logs],
+		// 			synchronize: configService.get(ConfigEnum.DB_SYNC),
+		// 			// 开发环境设置为 true，开启 SQL 语句日志，即所有的 SQL 语句都会打印日志，便于开发调试
+		// 			logging: process.env.NODE_ENV === 'development',
+		// 			// logging: ['error'],
+		// 		}) as TypeOrmModuleOptions,
+		// }),
 		// TypeOrmModule.forRoot({
 		// 	type: 'mysql',
 		// 	host: 'localhost',

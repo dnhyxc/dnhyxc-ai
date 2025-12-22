@@ -3,12 +3,29 @@ import { ConfigService } from '@nestjs/config';
 import { utilities, WinstonModule } from 'nest-winston';
 import { LogEnum } from 'src/enum/config.enum';
 import * as winston from 'winston';
-// import { ConfigService } from '@nestjs/config';
-// import { type ConfigService } from '@nestjs/config';
 import { Console } from 'winston/lib/winston/transports';
 import DailyRotateFile from 'winston-daily-rotate-file';
-// import { LogEnum } from 'src/enum/config.enum';
-// import 'winston-daily-rotate-file';
+
+const createDailyRotateTransport = (
+	level: string,
+	fileName: string,
+): DailyRotateFile => {
+	return new DailyRotateFile({
+		level,
+		// TODO: 生产环境 dirname 指定一个专门存放日志的绝对路径，开发环境这里直接指定项目本地路径
+		dirname: 'logs',
+		filename: `${fileName}-%DATE%.log`,
+		datePattern: 'YYYY-MM-DD-HH',
+		zippedArchive: true,
+		maxSize: '20m',
+		maxFiles: '14d',
+		format: winston.format.combine(
+			winston.format.timestamp(),
+			winston.format.simple(),
+			// utilities.format.nestLike(),
+		),
+	});
+};
 
 @Module({
 	imports: [
@@ -23,49 +40,21 @@ import DailyRotateFile from 'winston-daily-rotate-file';
 					),
 				});
 
-				const dailyTransports = new DailyRotateFile({
-					level: 'warn',
-					// TODO: 生产环境 dirname 指定一个专门存放日志的绝对路径，开发环境这里直接指定项目本地路径
-					dirname: 'logs',
-					filename: 'application-%DATE%.log',
-					datePattern: 'YYYY-MM-DD-HH',
-					zippedArchive: true,
-					maxSize: '20m',
-					maxFiles: '14d',
-					format: winston.format.combine(
-						winston.format.timestamp(),
-						winston.format.simple(),
-						// utilities.format.nestLike(),
-					),
-				});
-
-				const dailyInfoTransports = new DailyRotateFile({
-					level: configService.get(LogEnum.LOG_LEVEL),
-					// TODO: 生产环境 dirname 指定一个专门存放日志的绝对路径，开发环境这里直接指定项目本地路径
-					dirname: 'logs',
-					filename: 'info-%DATE%.log',
-					datePattern: 'YYYY-MM-DD-HH',
-					zippedArchive: true,
-					maxSize: '20m',
-					maxFiles: '14d',
-					format: winston.format.combine(
-						winston.format.timestamp(),
-						winston.format.simple(),
-						// utilities.format.nestLike(),
-					),
-				});
-
 				return {
 					transports: [
 						consoleTransports,
 						...(configService.get(LogEnum.LOG_ON)
-							? [dailyTransports, dailyInfoTransports]
+							? [
+									createDailyRotateTransport('info', 'application'),
+									createDailyRotateTransport('warn', 'error'),
+								]
 							: []),
 					],
-					// transports: [consoleTransports, dailyTransports, dailyInfoTransports]
 				};
 			},
 		}),
 	],
+	controllers: [],
+	providers: [],
 })
 export class LogsModule {}
