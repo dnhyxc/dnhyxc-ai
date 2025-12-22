@@ -139,6 +139,130 @@ volumes:
     driver: local
 ```
 
+## TypeORM
+
+[TypeORM](https://typeorm.bootcss.com/) 是一个ORM框架，它可以运行在 NodeJS、Browser、Cordova、PhoneGap、Ionic、React Native、Expo 和 Electron 平台上，可以与 TypeScript 和 JavaScript (ES5,ES6,ES7,ES8)一起使用。 它的目标是始终支持最新的 JavaScript 特性并提供额外的特性以帮助你开发任何使用数据库的（不管是只有几张表的小型应用还是拥有多数据库的大型企业应用）应用程序。
+
+## @nestjs/typeorm
+
+[@nestjs/typeorm](https://www.npmjs.com/package/@nestjs/typeorm) 是一个 Nest 的 TypeORM 模块。方便在 nestjs 中使用 TypeORM。
+
+```ts
+import { Global, Module } from "@nestjs/common";
+import { ConfigModule, ConfigService } from "@nestjs/config";
+import { TypeOrmModule, TypeOrmModuleOptions } from "@nestjs/typeorm";
+import { ConfigEnum } from "./enum/config.enum";
+
+// 将 exports 中的模块注册为全局模块，在所有其他模块中都可以使用
+@Global()
+@Module({
+	imports: [
+		TypeOrmModule.forRootAsync({
+			imports: [ConfigModule],
+			inject: [ConfigService],
+			useFactory: (configService: ConfigService) =>
+				({
+					type: configService.get(ConfigEnum.DB_TYPE),
+					host: configService.get(ConfigEnum.DB_HOST),
+					port: configService.get(ConfigEnum.DB_PORT),
+					username: configService.get(ConfigEnum.DB_USERNAME),
+					password: configService.get(ConfigEnum.DB_PASSWORD),
+					database: configService.get(ConfigEnum.DB_DATABASE),
+					entities: [User, Profile, Roles, Logs],
+					synchronize: configService.get(ConfigEnum.DB_SYNC),
+					logging: ["error"],
+				}) as TypeOrmModuleOptions,
+		}),
+	],
+	controllers: [],
+	providers: [],
+	exports: [],
+})
+export class AppModule {}
+```
+
 ## MySQL
 
 [MySQL](https://hub.docker.com/_/mysql)
+
+## 从已有的数据库中导入数据
+
+这主要是通过 typeorm-model-generator 这个第三方库来实现的。
+
+### [typeorm-model-generator](https://www.npmjs.com/package/typeorm-model-generator)
+
+安装：
+
+```bash
+pnpm i typeorm-model-generator
+```
+
+配置运行脚本：
+
+```json
+"scripts": {
+  "generator:models": "typeorm-model-generator -h 127.0.0.1 -d database -u root -p 3306 -x example -e mysql -o ./src/entities"
+}
+```
+
+- 脚本参数说明：
+  - `-h` 数据库地址
+  - `-d` 数据库名称
+  - `-p` 数据库启动的端口号
+  - `-u` 数据库用户名
+  - `-x` 数据库密码
+  - `-e` 数据库类型
+  - `-o` 模型生成目录
+
+运行完 `generator:models` 命令之后，就会在 `./src/entities` 生成对应的模型文件了。
+
+之后在 `app.module.ts` 中引入对应的模型即可：
+
+```ts
+TypeOrmModule.forRootAsync({
+  // ...
+	useFactory: (configService: ConfigService) =>
+		({
+      // ...
+      // 导入刚刚生成的模型 User, Profile, Roles, Logs
+			entities: [User, Profile, Roles, Logs]
+      // ...
+		}) as TypeOrmModuleOptions,
+}),
+```
+
+## QueryBuilder
+
+[QueryBuilder](https://typeorm.bootcss.com/select-query-builder) 是 TypeORM 最强大的功能之一，它允许你使用优雅便捷的语法构建 SQL 查询，执行并获得自动转换的实体。
+
+简单示例：
+
+```ts
+const firstUser = await connection
+	.getRepository(User)
+	.createQueryBuilder("user")
+	// "user.id = :id", { id: 1 } 这种做法，而不是使用字符串拼接的方式传参，是为了防止 SQL 注入攻击
+	.where("user.id = :id", { id: 1 })
+	.getOne();
+```
+
+上述代码会生成以下 SQL 语句：
+
+```sql
+SELECT
+  user.id AS userId,
+  user.firstName AS userFirstName,
+  user.lastName AS userLastName,
+FROM users user
+WHERE user.id = 1
+```
+
+然后返回一个 `User` 实例：
+
+```ts
+User {
+  id: 1,
+  firstName: 'Dnh',
+  lastName: 'Yxc',
+}
+```
