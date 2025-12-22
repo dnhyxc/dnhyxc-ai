@@ -1,4 +1,5 @@
 export * from './event';
+export * from './event';
 export * from './tauri';
 
 export const setStorage = (key: string, value: string) => {

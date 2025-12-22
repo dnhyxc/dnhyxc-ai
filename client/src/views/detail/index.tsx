@@ -1,7 +1,7 @@
 import { Button } from '@ui/button';
 import { useEffect } from 'react';
-import { getStorage, setBodyClass } from '@/utils';
-import { onEmit, onListen } from '@/utils/event';
+import { getStorage, onEmit, onListen, setBodyClass } from '@/utils';
+import axios from '@/utils/axios';
 
 const Detail = () => {
 	const theme = getStorage('theme');
@@ -14,7 +14,6 @@ const Detail = () => {
 		});
 
 		const unlistenThemePromise = onListen('theme', (value: string) => {
-			console.log('theme', value);
 			setBodyClass(value);
 		});
 
@@ -28,6 +27,11 @@ const Detail = () => {
 		await onEmit('about-send-message', { message: 'about message' });
 	};
 
+	const getUsers = async () => {
+		const res = await axios.get('/user');
+		console.log(res);
+	};
+
 	return (
 		<div className="w-full h-full flex flex-col justify-center items-center m-0">
 			<h1>Detail</h1>
@@ -38,6 +42,9 @@ const Detail = () => {
 					onClick={sendMessage}
 				>
 					send message
+				</Button>
+				<Button variant="default" className="cursor-pointer" onClick={getUsers}>
+					Get Users
 				</Button>
 			</div>
 		</div>
