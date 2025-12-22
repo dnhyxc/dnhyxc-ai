@@ -3,11 +3,11 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule, TypeOrmModuleOptions } from '@nestjs/typeorm';
 import * as dotenv from 'dotenv';
 import * as Joi from 'joi';
+import { ConfigEnum } from './enum/config.enum';
 import { LogsModule } from './logs/logs.module';
 import { PromptModule } from './prompt/prompt.module';
-import { ConfigEnum } from './enum/config.enum';
-import { UserModule } from './user/user.module';
 import { User } from './user/user.entity';
+import { UserModule } from './user/user.module';
 
 const envFilePath = `.env.${process.env.NODE_ENV || 'development'}`;
 
