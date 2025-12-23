@@ -1,19 +1,18 @@
 import {
+	BadRequestException,
 	Body,
 	Controller,
 	Delete,
 	Get,
+	Headers,
+	NotAcceptableException,
+	NotFoundException,
 	Param,
 	Patch,
 	Post,
 	Query,
-	Headers,
-	UseFilters,
-	BadRequestException,
-	NotAcceptableException,
-	NotFoundException,
-	HttpException,
 	UnauthorizedException,
+	UseFilters,
 } from '@nestjs/common';
 import { TypeormFilter } from 'src/filters/typeorm.filter';
 import { User } from './user.entity';

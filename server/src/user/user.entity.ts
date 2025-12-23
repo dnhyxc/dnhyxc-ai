@@ -1,6 +1,8 @@
 import { Logs } from 'src/logs/logs.entity';
 import { Roles } from 'src/roles/roles.entity';
 import {
+	AfterInsert,
+	AfterRemove,
 	Column,
 	Entity,
 	JoinTable,
@@ -8,8 +10,6 @@ import {
 	OneToMany,
 	OneToOne,
 	PrimaryGeneratedColumn,
-	AfterRemove,
-	AfterInsert,
 } from 'typeorm';
 import { Profile } from './profile.entity';
 
