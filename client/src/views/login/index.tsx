@@ -1,10 +1,10 @@
+import { Button } from '@ui/button';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { getStorage, onListen, setBodyClass } from '@/utils';
-import LoginForm from './login-form';
-import { Button } from '@ui/button';
-import RegisterForm from './register-form';
 import ForgetPwdForm from './forget-pwd-form';
+import LoginForm from './login-form';
+import RegisterForm from './register-form';
 
 const Login = () => {
 	const [isRegister, setIsRegister] = useState(false);

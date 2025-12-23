@@ -1,4 +1,4 @@
-import { House, WalletCards, CircleUserRound } from 'lucide-react';
+import { CircleUserRound, House, WalletCards } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import ICON from '@/assets/icon.png';
 
