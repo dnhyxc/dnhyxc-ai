@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from './user.entity';
+import type { GetUserDTO } from './user.types';
 
 @Injectable()
 export class UserService {
@@ -9,8 +10,49 @@ export class UserService {
 		@InjectRepository(User) private readonly userRepository: Repository<User>,
 	) {}
 
-	async findAll(): Promise<User[]> {
-		return this.userRepository.find();
+	async findAll(query: GetUserDTO): Promise<User[]> {
+		console.log('query-findAllfindAllfindAll:', query);
+		const { limit, page, username, role, gender } = query;
+		const take = limit || 10;
+		const skip = ((page || 1) - 1) * take;
+		// SQL 语句联合查询写法一
+		// SELECT * FROM user u, profile p, role r WHERE u.id = p.user_id AND u.id = r.user_id AND ...
+		// SQL 语句联合查询写法二
+		// SELECT * FROM user u LEFT JOIN profile p ON u.id = p.user_id LEFT JOIN role r ON u.id = r.user_id WHERE ...
+		// 使用 TypeORM 提供的语法进行联合查询
+		return this.userRepository.find({
+			// 表示需要返回的数据字段，不加 select 的话，默认返回所有字段
+			select: {
+				id: true,
+				username: true,
+				profile: {
+					gender: true,
+				},
+			},
+			// 表示需要联合查询的表，写法一
+			// relations: ['profile', 'roles'],
+			// 联合查询的表，写法二
+			relations: {
+				profile: true,
+				roles: true,
+			},
+			where: {
+				username,
+				roles: role
+					? {
+							id: Number(role),
+						}
+					: {},
+				profile: {
+					gender,
+				},
+			},
+			take,
+			skip,
+			order: {
+				id: 'DESC',
+			},
+		});
 	}
 
 	async findOne(id: number): Promise<User | null> {

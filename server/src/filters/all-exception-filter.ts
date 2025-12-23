@@ -50,7 +50,7 @@ export class AllExceptionFilter implements ExceptionFilter {
 			message: exception.message,
 		};
 
-		const status = exception.getStatus();
+		const status = exception?.getStatus?.() || httpStatus || 520;
 
 		// 记录错误日志
 		this.logger.error('[dnhyxc-ai]', responseBody);
