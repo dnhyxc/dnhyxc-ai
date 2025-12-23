@@ -266,3 +266,7 @@ User {
   lastName: 'Yxc',
 }
 ```
+
+## [class-validator](https://github.com/typestack/class-validator?tab=readme-ov-file#custom-validation-classes)
+
+`class-validator` 是一个用于验证 JavaScript 对象的库。它允许你定义验证规则，并使用这些规则验证对象。

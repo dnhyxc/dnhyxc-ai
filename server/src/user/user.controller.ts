@@ -8,6 +8,7 @@ import {
 	NotAcceptableException,
 	NotFoundException,
 	Param,
+	ParseIntPipe,
 	Patch,
 	Post,
 	Query,
@@ -15,9 +16,11 @@ import {
 	UseFilters,
 } from '@nestjs/common';
 import { TypeormFilter } from 'src/filters/typeorm.filter';
+import { CreateUserDTO } from './dto/create-user.dto';
+import { GetUserDto } from './dto/get-user.dto';
+import { CreateUserPipe } from './pipes/create-user.pipe';
 import { User } from './user.entity';
 import { UserService } from './user.service';
-import type { GetUserDTO } from './user.types';
 
 @Controller('user')
 // 添加 TypeormFilter 异常过滤器
@@ -26,7 +29,7 @@ export class UserController {
 	constructor(private readonly userService: UserService) {}
 
 	@Get('/getUsers')
-	getUsers(@Query() query: GetUserDTO) {
+	getUsers(@Query() query: GetUserDto) {
 		return this.userService.findAll(query);
 	}
 
@@ -36,8 +39,8 @@ export class UserController {
 	}
 
 	@Post('/addUser')
-	addUser(@Body() user: User) {
-		return this.userService.create(user);
+	addUser(@Body(CreateUserPipe) user: CreateUserDTO) {
+		return this.userService.create(user as User);
 	}
 
 	@Patch('/updateUser/:id')
@@ -71,10 +74,11 @@ export class UserController {
 		}
 	}
 
+	// ParseIntPipe 将参数转换成数字
 	@Get('/profile')
-	getUserProfile(@Query('id') id: string) {
-		console.log(id, 'profile');
-		return this.userService.findProfile(Number(id));
+	getUserProfile(@Query('id', ParseIntPipe) id: number) {
+		console.log(id, 'profile', typeof id);
+		return this.userService.findProfile(id);
 	}
 
 	// @Get('/logs')

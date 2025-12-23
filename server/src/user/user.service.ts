@@ -1,17 +1,20 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Roles } from 'src/roles/roles.entity';
+import { In, Repository } from 'typeorm';
 import { andWhereCondition } from '../utils/db.helper';
+import { GetUserDto } from './dto/get-user.dto';
 import { User } from './user.entity';
-import type { GetUserDTO } from './user.types';
 
 @Injectable()
 export class UserService {
 	constructor(
 		@InjectRepository(User) private readonly userRepository: Repository<User>,
+		@InjectRepository(Roles)
+		private readonly rolesRepository: Repository<Roles>,
 	) {}
 
-	async findAll(query: GetUserDTO): Promise<User[]> {
+	async findAll(query: GetUserDto): Promise<User[]> {
 		const { limit, page, username, role, gender } = query;
 		const take = limit || 10;
 		const skip = ((page || 1) - 1) * take;
@@ -75,7 +78,21 @@ export class UserService {
 		return this.userRepository.findOne({ where: { id } });
 	}
 
-	async create(user: User): Promise<User> {
+	async create(user: Partial<User>): Promise<User> {
+		if (!user.roles) {
+			const role = await this.rolesRepository.findOne({ where: { id: 11 } });
+			if (role) {
+				user.roles = [role];
+			}
+		}
+		if (Array.isArray(user.roles) && typeof user.roles[0] === 'number') {
+			// 查询所有的用户角色
+			user.roles = await this.rolesRepository.find({
+				where: {
+					id: In(user.roles),
+				},
+			});
+		}
 		const _user = await this.userRepository.create(user);
 		return this.userRepository.save(_user);
 	}

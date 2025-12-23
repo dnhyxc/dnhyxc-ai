@@ -4,10 +4,12 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import * as dotenv from 'dotenv';
 import * as Joi from 'joi';
 import { connectionOptions } from 'ormconfig';
+import { AuthModule } from './auth/auth.module';
 // import { ConfigEnum } from './enum/config.enum';
 // import { Logs } from './logs/logs.entity';
 import { LogsModule } from './logs/logs.module';
 import { PromptModule } from './prompt/prompt.module';
+import { RolesModule } from './roles/roles.module';
 // import { Roles } from './roles/roles.entity';
 // import { Profile } from './user/profile.entity';
 // import { User } from './user/user.entity';
@@ -22,6 +24,8 @@ const envFilePath = `.env.${process.env.NODE_ENV || 'development'}`;
 		PromptModule,
 		LogsModule,
 		UserModule,
+		RolesModule,
+		AuthModule,
 		ConfigModule.forRoot({
 			// 全局注册配置模块，这样就不需要在每个模块的 @Module 中都使用 ConfigModule.forRoot() 注册过后才能使用
 			isGlobal: true,
