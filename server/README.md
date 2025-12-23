@@ -1,3 +1,7 @@
+## nestjs 中文文档
+
+[nestjs 中文文档](https://docs.nestjs.cn/introduction)
+
 ## 创建模块
 
 使用命令 `nest g MODULE_NAME FILE_NAME [--no-spec] [-d]` 创建模块。
@@ -270,3 +274,19 @@ User {
 ## [class-validator](https://github.com/typestack/class-validator?tab=readme-ov-file#custom-validation-classes)
 
 `class-validator` 是一个用于验证 JavaScript 对象的库。它允许你定义验证规则，并使用这些规则验证对象。
+
+## [class-transformer](https://github.com/typestack/class-transformer)
+
+基于装饰器的对象和类之间的转换、序列化和反序列化。
+
+## [@nestjs/jwt](https://github.com/nestjs/jwt?tab=readme-ov-file#async-options)
+
+## [@nestjs/passport](https://docs.nestjs.cn/recipes/passport)
+
+将 Passport 与 NestJS 集成实现认证。
+
+## 守卫
+
+[守卫](https://docs.nestjs.cn/overview/guards)
+
+守卫是一个用 @Injectable() 装饰器注解的类，它实现了 CanActivate 接口。

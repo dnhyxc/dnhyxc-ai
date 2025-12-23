@@ -7,10 +7,12 @@ export class AuthController {
 	constructor(private authService: AuthService) {}
 
 	@Post('/login')
-	login(@Body() dto: LoginUserDTO) {
-		console.log('dto', dto);
+	async login(@Body() dto: LoginUserDTO) {
 		const { username, password } = dto;
-		return this.authService.login(username, password);
+		const token = await this.authService.login(username, password);
+		return {
+			access_token: token,
+		};
 	}
 
 	@Post('/register')

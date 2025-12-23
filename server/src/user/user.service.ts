@@ -74,6 +74,10 @@ export class UserService {
 		return newQuery.take(take).skip(skip).getMany(); // getRawMany() 会将数据进行扁平话
 	}
 
+	findByUsername(username: string): Promise<User | null> {
+		return this.userRepository.findOne({ where: { username } });
+	}
+
 	findOne(id: number): Promise<User | null> {
 		return this.userRepository.findOne({ where: { id } });
 	}
@@ -109,6 +113,7 @@ export class UserService {
 	async remove(id: string): Promise<User | null> {
 		const user = await this.findOne(Number(id));
 		if (user) {
+			// remove 方法会触发 user.entity.ts 中的 afterRemove 钩子，delete 方法不会
 			return this.userRepository.remove(user);
 		} else {
 			return null;

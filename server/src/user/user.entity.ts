@@ -65,12 +65,12 @@ export class User {
 	// remove 方法触发
 	@AfterRemove()
 	afterRemove() {
-		console.log('afterRemove', this.id, this.username);
+		// console.log('afterRemove', this.id, this.username);
 	}
 
 	// insert 方法触发
 	@AfterInsert()
 	afterInsert() {
-		console.log('afterInsert');
+		// console.log('afterInsert');
 	}
 }

@@ -12,8 +12,10 @@ import {
 	Patch,
 	Post,
 	Query,
+	Req,
 	UnauthorizedException,
 	UseFilters,
+	UseGuards,
 } from '@nestjs/common';
 import { TypeormFilter } from 'src/filters/typeorm.filter';
 import { CreateUserDTO } from './dto/create-user.dto';
@@ -21,6 +23,7 @@ import { GetUserDto } from './dto/get-user.dto';
 import { CreateUserPipe } from './pipes/create-user.pipe';
 import { User } from './user.entity';
 import { UserService } from './user.service';
+import { AuthGuard } from '@nestjs/passport';
 
 @Controller('user')
 // 添加 TypeormFilter 异常过滤器
@@ -76,8 +79,14 @@ export class UserController {
 
 	// ParseIntPipe 将参数转换成数字
 	@Get('/profile')
-	getUserProfile(@Query('id', ParseIntPipe) id: number) {
-		console.log(id, 'profile', typeof id);
+	@UseGuards(AuthGuard('jwt'))
+	getUserProfile(
+		@Query('id', ParseIntPipe) id: number,
+		// 这里 req 中的 user 是通过 AuthGuard('jwt) 中的 validate 方法返回的
+		// 是通过 PassportModule 自动添加的
+		// @Req() req,
+	) {
+		// console.log('getUserProfile', req.user);
 		return this.userService.findProfile(id);
 	}
 
