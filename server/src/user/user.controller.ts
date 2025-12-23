@@ -7,18 +7,21 @@ import {
 	Patch,
 	Post,
 	Query,
+	UseFilters,
 } from '@nestjs/common';
 import { User } from './user.entity';
 import { UserService } from './user.service';
 import type { GetUserDTO } from './user.types';
+import { TypeormFilter } from 'src/filters/typeorm.filter';
 
 @Controller('user')
+// 添加 TypeormFilter 异常过滤器
+@UseFilters(new TypeormFilter())
 export class UserController {
 	constructor(private readonly userService: UserService) {}
 
 	@Get('/getUsers')
 	getUsers(@Query() query: GetUserDTO) {
-		console.log(query, 'query');
 		return this.userService.findAll(query);
 	}
 
@@ -29,14 +32,11 @@ export class UserController {
 
 	@Post('/addUser')
 	addUser(@Body() user: User) {
-		console.log(user, 'user');
 		return this.userService.create(user);
 	}
 
 	@Patch('/updateUser/:id')
 	updateUser(@Body() user: User, @Param('id') id: number) {
-		console.log(user, 'user');
-		console.log(id, 'id');
 		return this.userService.update(id, user);
 	}
 

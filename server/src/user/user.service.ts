@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from './user.entity';
 import type { GetUserDTO } from './user.types';
+import { andWhereCondition } from '../utils/db.helper';
 
 @Injectable()
 export class UserService {
@@ -20,39 +21,55 @@ export class UserService {
 		// SQL 语句联合查询写法二
 		// SELECT * FROM user u LEFT JOIN profile p ON u.id = p.user_id LEFT JOIN role r ON u.id = r.user_id WHERE ...
 		// 使用 TypeORM 提供的语法进行联合查询
-		return this.userRepository.find({
-			// 表示需要返回的数据字段，不加 select 的话，默认返回所有字段
-			select: {
-				id: true,
-				username: true,
-				profile: {
-					gender: true,
-				},
-			},
-			// 表示需要联合查询的表，写法一
-			// relations: ['profile', 'roles'],
-			// 联合查询的表，写法二
-			relations: {
-				profile: true,
-				roles: true,
-			},
-			where: {
-				username,
-				roles: role
-					? {
-							id: Number(role),
-						}
-					: {},
-				profile: {
-					gender,
-				},
-			},
-			take,
-			skip,
-			order: {
-				id: 'DESC',
-			},
-		});
+		// return this.userRepository.find({
+		// 	// 表示需要返回的数据字段，不加 select 的话，默认返回所有字段
+		// 	select: {
+		// 		id: true,
+		// 		username: true,
+		// 		profile: {
+		// 			gender: true,
+		// 		},
+		// 	},
+		// 	// 表示需要联合查询的表，写法一
+		// 	// relations: ['profile', 'roles'],
+		// 	// 联合查询的表，写法二
+		// 	relations: {
+		// 		profile: true,
+		// 		roles: true,
+		// 	},
+		// 	where: {
+		// 		username,
+		// 		roles: role
+		// 			? {
+		// 					id: Number(role),
+		// 				}
+		// 			: {},
+		// 		profile: {
+		// 			gender,
+		// 		},
+		// 	},
+		// 	take,
+		// 	skip,
+		// 	order: {
+		// 		id: 'DESC',
+		// 	},
+		// });
+
+		// 使用 queryBuilder 查询
+		const obj = {
+			'user.username': username,
+			'profile.gender': gender,
+			'roles.id': role,
+		};
+
+		const _query = this.userRepository
+			.createQueryBuilder('user')
+			.leftJoinAndSelect('user.profile', 'profile')
+			.leftJoinAndSelect('user.roles', 'roles');
+
+		const newQuery = andWhereCondition<User>(_query, obj);
+
+		return newQuery.take(take).skip(skip).getMany(); // getRawMany() 会将数据进行扁平话
 	}
 
 	async findOne(id: number): Promise<User | null> {

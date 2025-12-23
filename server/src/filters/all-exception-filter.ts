@@ -1,3 +1,5 @@
+// 全局错误处理中间件
+
 import {
 	ArgumentsHost,
 	Catch,
@@ -8,6 +10,7 @@ import {
 } from '@nestjs/common';
 import { HttpAdapterHost } from '@nestjs/core';
 import * as requestIp from 'request-ip';
+import { QueryFailedError } from 'typeorm';
 
 // 全局错误处理中间件
 @Catch()
@@ -22,28 +25,33 @@ export class AllExceptionFilter implements ExceptionFilter {
 		const response = ctx.getResponse();
 		const request = ctx.getRequest();
 
-		console.log(exception, 'all-exception-filter-exception');
-
 		const httpStatus =
 			exception instanceof HttpException
 				? exception.getStatus()
 				: HttpStatus.INTERNAL_SERVER_ERROR;
 
-		const exceptionResponse =
+		let exceptionResponse =
 			exception instanceof HttpException
 				? exception.getResponse()
 				: 'Internal Server Error';
+
+		if (exception instanceof QueryFailedError) {
+			exceptionResponse =
+				exception.driverError?.errno === 1062
+					? '数据库唯一索引冲突，记录重复'
+					: exception.message;
+		}
 
 		const responseBody = {
 			headers: request.headers,
 			query: request.query,
 			body: request.body,
 			params: request.params,
-			timestamp: new Date().toISOString(),
+			timestamp: new Date().toLocaleString('zh-CN'),
 			// ip 信息获取
 			ip: requestIp.getClientIp(request),
 			exception: exception.name,
-			error: exceptionResponse || 'Internal Server Error',
+			error: exceptionResponse,
 			code: httpStatus,
 			path: httpAdapter.getRequestUrl(request),
 			method: request.method,

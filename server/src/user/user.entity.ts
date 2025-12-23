@@ -16,7 +16,8 @@ export class User {
 	@PrimaryGeneratedColumn()
 	id: number;
 
-	@Column()
+	// unique: true -> 设置数据库 username 键值为唯一值
+	@Column({ unique: true })
 	username: string;
 
 	@Column()
