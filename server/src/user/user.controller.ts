@@ -12,18 +12,17 @@ import {
 	Patch,
 	Post,
 	Query,
-	Req,
 	UnauthorizedException,
 	UseFilters,
 	UseGuards,
 } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
 import { TypeormFilter } from 'src/filters/typeorm.filter';
 import { CreateUserDTO } from './dto/create-user.dto';
 import { GetUserDto } from './dto/get-user.dto';
 import { CreateUserPipe } from './pipes/create-user.pipe';
 import { User } from './user.entity';
 import { UserService } from './user.service';
-import { AuthGuard } from '@nestjs/passport';
 
 @Controller('user')
 // 添加 TypeormFilter 异常过滤器
