@@ -7,7 +7,13 @@ import {
 	Patch,
 	Post,
 	Query,
+	Headers,
 	UseFilters,
+	BadRequestException,
+	NotAcceptableException,
+	NotFoundException,
+	HttpException,
+	UnauthorizedException,
 } from '@nestjs/common';
 import { TypeormFilter } from 'src/filters/typeorm.filter';
 import { User } from './user.entity';
@@ -36,14 +42,34 @@ export class UserController {
 	}
 
 	@Patch('/updateUser/:id')
-	updateUser(@Body() user: User, @Param('id') id: number) {
-		return this.userService.update(id, user);
+	async updateUser(
+		@Body() user: User,
+		@Param('id') id: number,
+		@Headers() headers,
+	) {
+		// TODO: 验证用户权限，这里后续需要通过用户 token 进行校验，目前知识一个简单的测试
+		if (headers.authorization === id) {
+			if (!id) return new BadRequestException('id is required');
+			const res = await this.userService.update(id, user);
+			if (res) {
+				return res;
+			} else {
+				throw new NotAcceptableException('User update failed');
+			}
+		} else {
+			throw new UnauthorizedException('暂无权限');
+		}
 	}
 
 	@Delete('deleteUser/:id')
-	removeUser(@Param('id') id: string) {
-		console.log(id, 'id');
-		return this.userService.remove(Number(id));
+	async removeUser(@Param('id') id: string) {
+		if (!id) throw new BadRequestException('id is required');
+		const res = await this.userService.remove(id);
+		if (res) {
+			return { username: res.username, id: id };
+		} else {
+			throw new NotFoundException('User not found');
+		}
 	}
 
 	@Get('/profile')

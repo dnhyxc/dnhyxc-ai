@@ -8,6 +8,8 @@ import {
 	OneToMany,
 	OneToOne,
 	PrimaryGeneratedColumn,
+	AfterRemove,
+	AfterInsert,
 } from 'typeorm';
 import { Profile } from './profile.entity';
 
@@ -50,6 +52,25 @@ export class User {
 		() => Profile,
 		// 这里如果不写这个引用关系，查询 profile 数据时，会报：Cannot read properties of undefined (reading 'joinColumns')"
 		(profile) => profile.user,
+		{
+			// cascade: true 表示开启级联操作。
+			// 当保存（save）或删除（remove）当前 User 实体时，
+			// TypeORM 会自动级联保存或删除与之关联的 Profile 实体，
+			// 无需手动先处理 Profile，简化代码并保证数据一致性。
+			cascade: true,
+		},
 	)
 	profile: Profile;
+
+	// remove 方法触发
+	@AfterRemove()
+	afterRemove() {
+		console.log('afterRemove', this.id, this.username);
+	}
+
+	// insert 方法触发
+	@AfterInsert()
+	afterInsert() {
+		console.log('afterInsert');
+	}
 }

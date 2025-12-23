@@ -12,7 +12,6 @@ export class UserService {
 	) {}
 
 	async findAll(query: GetUserDTO): Promise<User[]> {
-		console.log('query-findAllfindAllfindAll:', query);
 		const { limit, page, username, role, gender } = query;
 		const take = limit || 10;
 		const skip = ((page || 1) - 1) * take;
@@ -72,7 +71,7 @@ export class UserService {
 		return newQuery.take(take).skip(skip).getMany(); // getRawMany() 会将数据进行扁平话
 	}
 
-	async findOne(id: number): Promise<User | null> {
+	findOne(id: number): Promise<User | null> {
 		return this.userRepository.findOne({ where: { id } });
 	}
 
@@ -82,11 +81,21 @@ export class UserService {
 	}
 
 	async update(id: number, user: Partial<User>) {
-		return this.userRepository.update(id, user);
+		const _user = await this.findProfile(id);
+		if (!_user) return null;
+		const newUser = await this.userRepository.merge(_user, user);
+		return this.userRepository.save(newUser);
+		// 这种直接更新的操作只适合单模型的更新，不适合有联合关系的模型更新
+		// return this.userRepository.update(id, user);
 	}
 
-	async remove(id: number) {
-		return this.userRepository.delete(id);
+	async remove(id: string): Promise<User | null> {
+		const user = await this.findOne(Number(id));
+		if (user) {
+			return this.userRepository.remove(user);
+		} else {
+			return null;
+		}
 	}
 
 	// 查询相关联的 profile

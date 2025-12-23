@@ -1,6 +1,12 @@
 // typeorm.filter.ts 模块，用户专门检测数据库错误
 
-import { ArgumentsHost, Catch, ExceptionFilter } from '@nestjs/common';
+import {
+	ArgumentsHost,
+	Catch,
+	ExceptionFilter,
+	HttpException,
+	HttpStatus,
+} from '@nestjs/common';
 import { QueryFailedError, TypeORMError } from 'typeorm';
 
 @Catch()
@@ -9,7 +15,12 @@ export class TypeormFilter implements ExceptionFilter {
 		const ctx = host.switchToHttp();
 		const response = ctx.getResponse();
 
-		let code = 500;
+		const httpStatus =
+			exception instanceof HttpException
+				? exception.getStatus()
+				: HttpStatus.INTERNAL_SERVER_ERROR;
+
+		let code = httpStatus;
 
 		if (exception instanceof QueryFailedError) {
 			code = exception.driverError?.errno;
