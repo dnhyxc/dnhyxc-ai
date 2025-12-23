@@ -2,6 +2,7 @@ import Layout from '@/layout';
 import About from '@/views/about';
 import Detail from '@/views/detail';
 import Home from '@/views/home';
+import Login from '@/views/login';
 import ChildWindow from '@/views/win';
 
 const routes = [
@@ -17,6 +18,10 @@ const routes = [
 				Component: Detail,
 			},
 		],
+	},
+	{
+		path: 'login',
+		Component: Login,
 	},
 	{
 		path: 'win',

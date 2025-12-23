@@ -1,4 +1,4 @@
-import { House, WalletCards } from 'lucide-react';
+import { House, WalletCards, CircleUserRound } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import ICON from '@/assets/icon.png';
 
@@ -39,9 +39,9 @@ const Sidebar = () => {
 				<div className="">
 					<div
 						className="flex justify-center items-center w-12 h-12 bg-border cursor-pointer rounded-md hover:text-green-600 transition-all duration-200 ease-in-out"
-						onClick={() => onJump('/detail')}
+						onClick={() => onJump('/login')}
 					>
-						<WalletCards className="hover:text-green-600" />
+						<CircleUserRound className="hover:text-green-600" />
 					</div>
 				</div>
 			</div>

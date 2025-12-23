@@ -220,7 +220,7 @@ const Home = () => {
 					greet();
 				}}
 			>
-				<div className="flex gap-2">
+				<div className="flex gap-2 w-150">
 					<Input
 						id="greet-input"
 						value={url}
