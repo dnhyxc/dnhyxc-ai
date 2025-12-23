@@ -9,10 +9,10 @@ import {
 	Query,
 	UseFilters,
 } from '@nestjs/common';
+import { TypeormFilter } from 'src/filters/typeorm.filter';
 import { User } from './user.entity';
 import { UserService } from './user.service';
 import type { GetUserDTO } from './user.types';
-import { TypeormFilter } from 'src/filters/typeorm.filter';
 
 @Controller('user')
 // 添加 TypeormFilter 异常过滤器

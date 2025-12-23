@@ -1,9 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { andWhereCondition } from '../utils/db.helper';
 import { User } from './user.entity';
 import type { GetUserDTO } from './user.types';
-import { andWhereCondition } from '../utils/db.helper';
 
 @Injectable()
 export class UserService {
