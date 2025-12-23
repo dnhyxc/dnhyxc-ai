@@ -75,7 +75,11 @@ export class UserService {
 	}
 
 	findByUsername(username: string): Promise<User | null> {
-		return this.userRepository.findOne({ where: { username } });
+		return this.userRepository.findOne({
+			where: { username },
+			// 同时查询出 roles
+			relations: ['roles'],
+		});
 	}
 
 	findOne(id: number): Promise<User | null> {
@@ -84,7 +88,8 @@ export class UserService {
 
 	async create(user: Partial<User>): Promise<User> {
 		if (!user.roles) {
-			const role = await this.rolesRepository.findOne({ where: { id: 11 } });
+			// 如果用户没有传 roles，默认给用户设置普通用户的角色权限
+			const role = await this.rolesRepository.findOne({ where: { id: 2 } });
 			if (role) {
 				user.roles = [role];
 			}

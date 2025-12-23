@@ -18,6 +18,7 @@ import {
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { TypeormFilter } from 'src/filters/typeorm.filter';
+import { AdminGuard } from 'src/guards/admin.guard';
 import { CreateUserDTO } from './dto/create-user.dto';
 import { GetUserDto } from './dto/get-user.dto';
 import { CreateUserPipe } from './pipes/create-user.pipe';
@@ -30,19 +31,28 @@ import { UserService } from './user.service';
 export class UserController {
 	constructor(private readonly userService: UserService) {}
 
+	@Post('/addUser')
+	addUser(@Body(CreateUserPipe) user: CreateUserDTO) {
+		return this.userService.create(user as User);
+	}
+
 	@Get('/getUsers')
+	/**
+	 * 1. 装饰器的执行顺序：方法的装饰器如果有多个，则是从下往上执行。
+	 * @UserGuards(AdminGuard) 后执行
+	 * @UseGuards(AuthGuard('jwt')) 先执行
+	 * 2. 如果使用 UserGuards 传递多个守卫，则是从前往后执行，如果前面的 Guard 没有通过，泽后面的 Guard 不会执行。
+	 * 3. 只有先使用 AuthGuard('jwt') 之后，才会触发 Passport 将 user 信息添加到 req 上。否则在 AdminGuard 中将无法获取到 user 信息
+	 */
+	@UseGuards(AuthGuard('jwt'), AdminGuard)
 	getUsers(@Query() query: GetUserDto) {
 		return this.userService.findAll(query);
 	}
 
-	@Get('/getUser/:id')
-	getUser() {
-		return 'heool world';
-	}
-
-	@Post('/addUser')
-	addUser(@Body(CreateUserPipe) user: CreateUserDTO) {
-		return this.userService.create(user as User);
+	@Get('/getUserById/:id')
+	@UseGuards(AuthGuard('jwt'))
+	getUserById(@Param('id', ParseIntPipe) id: number) {
+		return this.userService.findOne(id);
 	}
 
 	@Patch('/updateUser/:id')
