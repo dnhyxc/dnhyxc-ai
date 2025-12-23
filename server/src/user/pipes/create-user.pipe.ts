@@ -13,7 +13,7 @@ export class CreateUserPipe implements PipeTransform {
 		if (value.roles && Array.isArray(value.roles) && value.roles.length > 0) {
 			// Roles
 			if ((value.roles[0] as Roles).id) {
-				console.log('value.roles', value.roles);
+				// 只取用户传递的 id 信息，防止用户随意给角色设置不符合规则的角色名称
 				value.roles = value.roles.map((role) => role.id);
 			}
 			// number
