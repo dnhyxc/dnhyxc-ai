@@ -24,6 +24,7 @@ const ForgetPwdForm: React.FC<IProps> = ({ onForgetPwd, onRegister }) => {
 		}),
 		password: z
 			.string()
+			.trim()
 			.min(8, { message: '密码至少输入8个字符' })
 			.regex(
 				/^(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).+$/,
@@ -33,6 +34,7 @@ const ForgetPwdForm: React.FC<IProps> = ({ onForgetPwd, onRegister }) => {
 			),
 		email: z
 			.string()
+			.trim()
 			.regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, { message: '请输入合法的邮箱地址' }),
 	});
 

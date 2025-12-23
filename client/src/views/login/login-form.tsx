@@ -21,11 +21,12 @@ const LoginForm: React.FC<IProps> = ({ onForgetPwd }) => {
 	const navigate = useNavigate();
 
 	const formSchema = z.object({
-		username: z.string().min(2, {
+		username: z.string().trim().min(2, {
 			message: '用户名至少输入两个字符',
 		}),
 		password: z
 			.string()
+			.trim()
 			.min(8, { message: '密码至少输入8个字符' })
 			.regex(
 				/^(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).+$/,
