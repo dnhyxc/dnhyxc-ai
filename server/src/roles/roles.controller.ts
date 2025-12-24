@@ -3,6 +3,7 @@ import {
 	Controller,
 	Delete,
 	Get,
+	HttpStatus,
 	Param,
 	ParseIntPipe,
 	Patch,
@@ -40,12 +41,35 @@ export class RolesController {
 	}
 
 	@Patch('/updateRole/:id')
-	update(@Param('id') id: string, @Body() updateRoleDto: UpdateRoleDto) {
-		return this.rolesService.update(+id, updateRoleDto);
+	async update(
+		@Param('id', ParseIntPipe) id: number,
+		@Body() updateRoleDto: UpdateRoleDto,
+	) {
+		const res = await this.rolesService.update(id, updateRoleDto);
+		return {
+			code: HttpStatus.OK,
+			success: true,
+			data: res,
+			message: '更新成功',
+		};
 	}
 
 	@Delete('/deleteRoleById/:id')
-	delete(@Param('id') id: string) {
-		return this.rolesService.delete(+id);
+	async delete(@Param('id', ParseIntPipe) id: number) {
+		const res = await this.rolesService.delete(id);
+		if (res?.affected) {
+			return {
+				code: HttpStatus.OK,
+				success: true,
+				data: id,
+				count: res.affected,
+			};
+		} else {
+			return {
+				code: HttpStatus.OK,
+				success: false,
+				message: '当前数据不存在',
+			};
+		}
 	}
 }
