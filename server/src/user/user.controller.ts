@@ -28,6 +28,7 @@ import { UserService } from './user.service';
 @Controller('user')
 // 添加 TypeormFilter 异常过滤器
 @UseFilters(new TypeormFilter())
+@UseGuards(AuthGuard('jwt'))
 export class UserController {
 	constructor(private readonly userService: UserService) {}
 
@@ -44,19 +45,17 @@ export class UserController {
 	 * 2. 如果使用 UserGuards 传递多个守卫，则是从前往后执行，如果前面的 Guard 没有通过，泽后面的 Guard 不会执行。
 	 * 3. 只有先使用 AuthGuard('jwt') 之后，才会触发 Passport 将 user 信息添加到 req 上。否则在 AdminGuard 中将无法获取到 user 信息
 	 */
-	@UseGuards(AuthGuard('jwt'), AdminGuard)
+	@UseGuards(AdminGuard)
 	getUsers(@Query() query: GetUserDto) {
 		return this.userService.findAll(query);
 	}
 
 	@Get('/getUserById/:id')
-	@UseGuards(AuthGuard('jwt'))
 	getUserById(@Param('id', ParseIntPipe) id: number) {
 		return this.userService.findOne(id);
 	}
 
 	@Patch('/updateUser/:id')
-	@UseGuards(AuthGuard('jwt'))
 	async updateUser(
 		@Body() user: User,
 		@Param('id', ParseIntPipe) id: number,
@@ -89,7 +88,6 @@ export class UserController {
 
 	// ParseIntPipe 将参数转换成数字
 	@Get('/profile')
-	@UseGuards(AuthGuard('jwt'))
 	getUserProfile(
 		@Query('id', ParseIntPipe) id: number,
 		// 这里 req 中的 user 是通过 AuthGuard('jwt) 中的 validate 方法返回的
