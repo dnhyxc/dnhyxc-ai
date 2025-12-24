@@ -4,7 +4,6 @@ import {
 	Controller,
 	Delete,
 	Get,
-	Headers,
 	NotAcceptableException,
 	NotFoundException,
 	Param,
@@ -12,6 +11,7 @@ import {
 	Patch,
 	Post,
 	Query,
+	Req,
 	UnauthorizedException,
 	UseFilters,
 	UseGuards,
@@ -56,14 +56,15 @@ export class UserController {
 	}
 
 	@Patch('/updateUser/:id')
+	@UseGuards(AuthGuard('jwt'))
 	async updateUser(
 		@Body() user: User,
-		@Param('id') id: number,
-		@Headers() headers,
+		@Param('id', ParseIntPipe) id: number,
+		@Req() req,
 	) {
-		// TODO: 验证用户权限，这里后续需要通过用户 token 进行校验，目前知识一个简单的测试
-		if (headers.authorization === id) {
-			if (!id) return new BadRequestException('id is required');
+		if (!id) return new BadRequestException('id is required');
+		// 使用 jwt Passport 向 req 上添加的 user 信息，对比较用户 id
+		if (req.user.userId === id) {
 			const res = await this.userService.update(id, user);
 			if (res) {
 				return res;
