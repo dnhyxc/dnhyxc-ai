@@ -290,3 +290,9 @@ User {
 [守卫](https://docs.nestjs.cn/overview/guards)
 
 守卫是一个用 @Injectable() 装饰器注解的类，它实现了 CanActivate 接口。
+
+## [argon2](https://www.npmjs.com/package/argon2)
+
+## [node-rs/argon2](https://www.npmjs.com/package/@node-rs/argon2)
+
+使用 argon2 对密码加密
