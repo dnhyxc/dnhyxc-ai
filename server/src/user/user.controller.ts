@@ -24,11 +24,13 @@ import { GetUserDto } from './dto/get-user.dto';
 import { CreateUserPipe } from './pipes/create-user.pipe';
 import { User } from './user.entity';
 import { UserService } from './user.service';
+import { JwtGuard } from 'src/guards/jwt.guard';
 
 @Controller('user')
 // 添加 TypeormFilter 异常过滤器
 @UseFilters(new TypeormFilter())
-@UseGuards(AuthGuard('jwt'))
+// 添加 JwtGuard 守卫
+@UseGuards(JwtGuard)
 export class UserController {
 	constructor(private readonly userService: UserService) {}
 
