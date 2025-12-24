@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { getStorage } from '.';
 
 const instance = axios.create({
 	baseURL: '/api',
@@ -9,6 +10,9 @@ const instance = axios.create({
 instance.interceptors.request.use(
 	// 在发送请求之前做些什么
 	function (config) {
+		if (getStorage('token')) {
+			config.headers.Authorization = `Bearer ${getStorage('token')}`;
+		}
 		return config;
 	},
 	// 对请求错误做些什么
@@ -20,7 +24,8 @@ instance.interceptors.request.use(
 // 响应拦截器
 instance.interceptors.response.use(
 	function (response) {
-		if (response.status === 200) {
+		console.log(response, 'response');
+		if (response.status.toString().startsWith('2')) {
 			return response.data;
 		}
 		return response;

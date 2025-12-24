@@ -3,6 +3,7 @@ import { listen } from '@tauri-apps/api/event';
 import { Button } from '@ui/button';
 import { Input } from '@ui/input';
 import { useEffect, useState } from 'react';
+import { getUserProfile } from '@/server';
 import type { DownloadFileInfo, DownloadProgress } from '@/types';
 import { onCreateWindow, onEmit, onListen } from '@/utils';
 
@@ -158,6 +159,11 @@ const Home = () => {
 		});
 	};
 
+	const getUserInfo = async () => {
+		const res = await getUserProfile(2);
+		console.log(res, 'res-getUserInfo');
+	};
+
 	return (
 		// data-tauri-drag-region: tauri 允许拖拽
 		<div className="w-full h-full flex flex-col justify-center items-center m-0">
@@ -247,6 +253,9 @@ const Home = () => {
 			<div className="flex justify-center items-center gap-4 mt-10">
 				<Button className="cursor-pointer" onClick={sendMessage}>
 					Send Message
+				</Button>
+				<Button className="cursor-pointer" onClick={getUserInfo}>
+					获取用户信息
 				</Button>
 			</div>
 			<div className="flex justify-center items-center gap-4 mt-10">

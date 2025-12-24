@@ -2,6 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router';
 import { z } from 'zod';
+import { login } from '@/server';
 import { Button } from '@/components/ui/button';
 import {
 	Form,
@@ -12,6 +13,7 @@ import {
 	FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { setStorage } from '@/utils';
 
 interface IProps {
 	onForgetPwd: (status?: boolean) => void;
@@ -46,7 +48,10 @@ const LoginForm: React.FC<IProps> = ({ onForgetPwd }) => {
 
 	// 2. Define a submit handler.
 	const onSubmit = async (values: z.infer<typeof formSchema>) => {
-		console.log(values);
+		const res = await login(values);
+		if (res?.access_token) {
+			setStorage('token', res.access_token);
+		}
 		navigate('/');
 		onForgetPwd(false);
 	};

@@ -1,6 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
+import { register } from '@/server';
 import { Button } from '@/components/ui/button';
 import {
 	Form,
@@ -31,10 +32,10 @@ const RegisterForm: React.FC<IProps> = ({ onRegister }) => {
 					message: '密码必须包含英文、数字和特殊字符',
 				},
 			),
-		email: z
-			.string()
-			.trim()
-			.regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, { message: '请输入合法的邮箱地址' }),
+		// email: z
+		// 	.string()
+		// 	.trim()
+		// 	.regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, { message: '请输入合法的邮箱地址' }),
 	});
 
 	const form = useForm<z.infer<typeof formSchema>>({
@@ -42,13 +43,13 @@ const RegisterForm: React.FC<IProps> = ({ onRegister }) => {
 		defaultValues: {
 			username: '',
 			password: '',
-			email: '',
+			// email: '',
 		},
 	});
 
 	// 2. Define a submit handler.
 	const onSubmit = async (values: z.infer<typeof formSchema>) => {
-		console.log(values);
+		await register(values);
 		onRegister(false);
 	};
 
@@ -81,7 +82,7 @@ const RegisterForm: React.FC<IProps> = ({ onRegister }) => {
 						</FormItem>
 					)}
 				/>
-				<FormField
+				{/* <FormField
 					control={form.control}
 					name="email"
 					render={({ field }) => (
@@ -93,7 +94,7 @@ const RegisterForm: React.FC<IProps> = ({ onRegister }) => {
 							<FormMessage />
 						</FormItem>
 					)}
-				/>
+				/> */}
 				<Button type="submit" className="cursor-pointer w-full mt-5">
 					注册
 				</Button>
