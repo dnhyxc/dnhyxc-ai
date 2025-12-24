@@ -4,9 +4,9 @@ import { utilities, WinstonModule } from 'nest-winston';
 import { LogEnum } from 'src/enum/config.enum';
 import * as winston from 'winston';
 import { Console } from 'winston/lib/winston/transports';
+import DailyRotateFile from 'winston-daily-rotate-file';
 import { LogsController } from './logs.controller';
 import { LogsService } from './logs.service';
-import DailyRotateFile from 'winston-daily-rotate-file';
 
 const createDailyRotateTransport = (
 	level: string,

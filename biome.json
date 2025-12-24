@@ -22,7 +22,8 @@
 			},
 			"complexity": {
 				"useArrowFunction": "off",
-				"noForEach": "off"
+				"noForEach": "off",
+				"noUselessConstructor": "off"
 			},
 			"style": {
 				"useTemplate": "info",

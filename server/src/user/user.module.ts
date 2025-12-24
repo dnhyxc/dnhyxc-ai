@@ -1,11 +1,11 @@
 import { Global, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { Logs } from 'src/logs/logs.entity';
 import { Roles } from 'src/roles/roles.entity';
 import { RolesService } from 'src/roles/roles.service';
 import { UserController } from './user.controller';
 import { User } from './user.entity';
 import { UserService } from './user.service';
-import { Logs } from 'src/logs/logs.entity';
 
 // 将 UserModule 设置为全局的，其他模块就不需要在 Module 中 imports 中单独引入了
 @Global()

@@ -1,11 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { Logs } from 'src/logs/logs.entity';
 import { Roles } from 'src/roles/roles.entity';
 import { In, Repository } from 'typeorm';
 import { andWhereCondition } from '../utils/db.helper';
 import { GetUserDto } from './dto/get-user.dto';
 import { User } from './user.entity';
-import { Logs } from 'src/logs/logs.entity';
 
 @Injectable()
 export class UserService {
