@@ -2,7 +2,6 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router';
 import { z } from 'zod';
-import { login } from '@/server';
 import { Button } from '@/components/ui/button';
 import {
 	Form,
@@ -13,6 +12,7 @@ import {
 	FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { login } from '@/server';
 import { setStorage } from '@/utils';
 
 interface IProps {

@@ -1,7 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
-import { register } from '@/server';
 import { Button } from '@/components/ui/button';
 import {
 	Form,
@@ -12,6 +11,7 @@ import {
 	FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { register } from '@/server';
 
 interface IProps {
 	onRegister: (status?: boolean) => void;
