@@ -1,6 +1,7 @@
 import {
 	BadRequestException,
 	Body,
+	ClassSerializerInterceptor,
 	Controller,
 	Delete,
 	Get,
@@ -15,6 +16,7 @@ import {
 	UnauthorizedException,
 	UseFilters,
 	UseGuards,
+	UseInterceptors,
 } from '@nestjs/common';
 import { TypeormFilter } from '../filters/typeorm.filter';
 import { AdminGuard } from '../guards/admin.guard';
@@ -30,6 +32,7 @@ import { UserService } from './user.service';
 @UseFilters(new TypeormFilter())
 // 添加 JwtGuard 守卫
 @UseGuards(JwtGuard)
+@UseInterceptors(ClassSerializerInterceptor)
 export class UserController {
 	constructor(private readonly userService: UserService) {}
 
@@ -77,13 +80,13 @@ export class UserController {
 	}
 
 	@Delete('deleteUser/:id')
-	async removeUser(@Param('id') id: string) {
+	async removeUser(@Param('id', ParseIntPipe) id: number) {
 		if (!id) throw new BadRequestException('id is required');
 		const res = await this.userService.remove(id);
 		if (res) {
-			return { username: res.username, id: id };
+			return res;
 		} else {
-			throw new NotFoundException('User not found');
+			throw new NotFoundException('删除的用户不存在');
 		}
 	}
 
@@ -101,7 +104,6 @@ export class UserController {
 
 	@Get('/getLogs/:id')
 	getUserLogs(@Param('id', ParseIntPipe) id: number) {
-		console.log('getUserLogs', id);
 		return this.userService.findUserLogs(id);
 	}
 

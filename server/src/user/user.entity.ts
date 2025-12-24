@@ -59,6 +59,7 @@ export class User {
 			// 当保存（save）或删除（remove）当前 User 实体时，
 			// TypeORM 会自动级联保存或删除与之关联的 Profile 实体，
 			// 无需手动先处理 Profile，简化代码并保证数据一致性。
+			// 这里不设置 cascade为 true 则不会将修改的 profile 数据更新到数据库 Profile 表中
 			cascade: true,
 		},
 	)

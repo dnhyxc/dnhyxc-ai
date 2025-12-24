@@ -6,6 +6,7 @@ import { Logs } from '../logs/logs.entity';
 import { Roles } from '../roles/roles.entity';
 import { andWhereCondition } from '../utils/db.helper';
 import { GetUserDto } from './dto/get-user.dto';
+import { Profile } from './profile.entity';
 import { User } from './user.entity';
 
 @Injectable()
@@ -16,6 +17,8 @@ export class UserService {
 		private readonly rolesRepository: Repository<Roles>,
 		@InjectRepository(Logs)
 		private readonly logsRepository: Repository<Logs>,
+		@InjectRepository(Profile)
+		private readonly profileRepository: Repository<Profile>,
 	) {}
 
 	async findAll(query: GetUserDto): Promise<User[]> {
@@ -87,7 +90,10 @@ export class UserService {
 	}
 
 	findOne(id: number): Promise<User | null> {
-		return this.userRepository.findOne({ where: { id } });
+		return this.userRepository.findOne({
+			where: { id },
+			relations: ['profile'],
+		});
 	}
 
 	async create(user: Partial<User>): Promise<User> {
@@ -98,7 +104,10 @@ export class UserService {
 				user.roles = [role];
 			}
 		}
-		if (Array.isArray(user.roles) && typeof user.roles[0] === 'number') {
+		if (
+			Array.isArray(user.roles) &&
+			user.roles.every((i) => typeof i === 'number')
+		) {
 			// 查询所有的用户角色
 			user.roles = await this.rolesRepository.find({
 				where: {
@@ -115,14 +124,28 @@ export class UserService {
 	async update(id: number, user: Partial<User>) {
 		const _user = await this.findProfile(id);
 		if (!_user) return null;
+		if (
+			Array.isArray(user.roles) &&
+			user.roles.length > 0 &&
+			user.roles.every((r) => typeof r === 'number')
+		) {
+			user.roles = await this.rolesRepository.find({
+				where: {
+					id: In(user.roles),
+				},
+			});
+		}
 		const newUser = await this.userRepository.merge(_user, user);
 		return this.userRepository.save(newUser);
 		// 这种直接更新的操作只适合单模型的更新，不适合有联合关系的模型更新
 		// return this.userRepository.update(id, user);
 	}
 
-	async remove(id: string): Promise<User | null> {
-		const user = await this.findOne(Number(id));
+	async remove(id: number): Promise<User | null> {
+		const user = await this.findOne(id);
+		if (user?.profile) {
+			await this.profileRepository.delete(user.profile?.id);
+		}
 		if (user) {
 			// remove 方法会触发 user.entity.ts 中的 afterRemove 钩子，delete 方法不会
 			return this.userRepository.remove(user);
