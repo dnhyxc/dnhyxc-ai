@@ -1,8 +1,8 @@
 import { Global, Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { Logs } from 'src/logs/logs.entity';
-import { Roles } from 'src/roles/roles.entity';
-import { RolesService } from 'src/roles/roles.service';
+import { Logs } from '../logs/logs.entity';
+import { Roles } from '../roles/roles.entity';
+import { RolesService } from '../roles/roles.service';
 import { UserController } from './user.controller';
 import { User } from './user.entity';
 import { UserService } from './user.service';

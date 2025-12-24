@@ -296,3 +296,11 @@ User {
 ## [node-rs/argon2](https://www.npmjs.com/package/@node-rs/argon2)
 
 使用 argon2 对密码加密
+
+## [nestjs 拦截器](https://docs.nestjs.cn/overview/interceptors)
+
+使用 nestjs 拦截器对不需要响应给前端的字段过滤掉。
+
+## [使用序列化对响应给用户的字段进行过滤](https://docs.nestjs.cn/techniques/serialization)
+
+通过在 entry.ts 文件中定义字段时，使用 @Exclude() 装饰器来修饰需要过滤的字段，同时在 controller.ts 文件中使用 @UseInterceptors(ClassSerializerInterceptor) 来对通过 @Expose() 修饰的字段进行过滤。之后响应给前端的数据就没有通过 @Exclude() 标记的字段了。

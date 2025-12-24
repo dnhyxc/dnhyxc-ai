@@ -4,7 +4,7 @@
  */
 
 import { Injectable, PipeTransform } from '@nestjs/common';
-import { Roles } from 'src/roles/roles.entity';
+import { Roles } from '../../roles/roles.entity';
 import { CreateUserDTO } from '../dto/create-user.dto';
 
 @Injectable()

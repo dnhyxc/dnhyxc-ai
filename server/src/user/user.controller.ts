@@ -16,9 +16,9 @@ import {
 	UseFilters,
 	UseGuards,
 } from '@nestjs/common';
-import { TypeormFilter } from 'src/filters/typeorm.filter';
-import { AdminGuard } from 'src/guards/admin.guard';
-import { JwtGuard } from 'src/guards/jwt.guard';
+import { TypeormFilter } from '../filters/typeorm.filter';
+import { AdminGuard } from '../guards/admin.guard';
+import { JwtGuard } from '../guards/jwt.guard';
 import { CreateUserDTO } from './dto/create-user.dto';
 import { GetUserDto } from './dto/get-user.dto';
 import { CreateUserPipe } from './pipes/create-user.pipe';

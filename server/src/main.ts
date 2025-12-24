@@ -18,8 +18,8 @@ async function bootstrap() {
 	// 配置全局拦截器
 	app.useGlobalPipes(
 		new ValidationPipe({
-			// 自动删除在类上不存在的字段，保证数据库插入数据的安全性
-			// whitelist: true,
+			// 这里会对前端传递过来的没有在 DTO 中定义的字段全部过滤掉，生产要开启
+			whitelist: process.env.NODE_ENV !== 'development',
 		}),
 	);
 

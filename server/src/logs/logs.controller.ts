@@ -1,6 +1,6 @@
 import { Controller, Get, UseGuards } from '@nestjs/common';
-import { AdminGuard } from 'src/guards/admin.guard';
-import { JwtGuard } from 'src/guards/jwt.guard';
+import { AdminGuard } from '../guards/admin.guard';
+import { JwtGuard } from '../guards/jwt.guard';
 
 @Controller('logs')
 @UseGuards(JwtGuard, AdminGuard)

@@ -1,5 +1,4 @@
-import { Logs } from 'src/logs/logs.entity';
-import { Roles } from 'src/roles/roles.entity';
+import { Exclude } from 'class-transformer';
 import {
 	AfterInsert,
 	AfterRemove,
@@ -11,6 +10,8 @@ import {
 	OneToOne,
 	PrimaryGeneratedColumn,
 } from 'typeorm';
+import { Logs } from '../logs/logs.entity';
+import { Roles } from '../roles/roles.entity';
 import { Profile } from './profile.entity';
 
 @Entity()
@@ -23,6 +24,7 @@ export class User {
 	username: string;
 
 	@Column()
+	@Exclude() // 使用 Exclude 在响应时忽略 password 字段返回
 	password: string;
 
 	// 表示一个用户对应多个日志信息，即建立一个 typescript 与数据库之间的关联关系，相当于建立了一个 mapping
