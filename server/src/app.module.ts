@@ -5,14 +5,9 @@ import * as dotenv from 'dotenv';
 import * as Joi from 'joi';
 import { connectionOptions } from 'ormconfig';
 import { AuthModule } from './auth/auth.module';
-// import { ConfigEnum } from './enum/config.enum';
-// import { Logs } from './logs/logs.entity';
 import { LogsModule } from './logs/logs.module';
 import { PromptModule } from './prompt/prompt.module';
 import { RolesModule } from './roles/roles.module';
-// import { Roles } from './roles/roles.entity';
-// import { Profile } from './user/profile.entity';
-// import { User } from './user/user.entity';
 import { UserModule } from './user/user.module';
 
 const envFilePath = `.env.${process.env.NODE_ENV || 'development'}`;
@@ -54,39 +49,16 @@ const envFilePath = `.env.${process.env.NODE_ENV || 'development'}`;
 			}),
 		}),
 		TypeOrmModule.forRoot(connectionOptions),
-		// TypeOrmModule.forRootAsync({
-		// 	imports: [ConfigModule],
-		// 	inject: [ConfigService],
-		// 	useFactory: (configService: ConfigService) =>
-		// 		({
-		// 			type: configService.get(ConfigEnum.DB_TYPE),
-		// 			host: configService.get(ConfigEnum.DB_HOST),
-		// 			port: configService.get(ConfigEnum.DB_PORT),
-		// 			username: configService.get(ConfigEnum.DB_USERNAME),
-		// 			password: configService.get(ConfigEnum.DB_PASSWORD),
-		// 			database: configService.get(ConfigEnum.DB_DATABASE),
-		// 			entities: [User, Profile, Roles, Logs],
-		// 			synchronize: configService.get(ConfigEnum.DB_SYNC),
-		// 			// 开发环境设置为 true，开启 SQL 语句日志，即所有的 SQL 语句都会打印日志，便于开发调试
-		// 			logging: process.env.NODE_ENV === 'development',
-		// 			// logging: ['error'],
-		// 		}) as TypeOrmModuleOptions,
-		// }),
-		// TypeOrmModule.forRoot({
-		// 	type: 'mysql',
-		// 	host: 'localhost',
-		// 	port: 3090, // 这里必须在 docker-compose.yml 中的 db - ports 中暴露出来才能正常链接数据库
-		// 	username: 'root',
-		// 	password: 'example',
-		// 	database: 'testdb',
-		// 	entities: [],
-		// 	// 同步本地的 schema 与数据库 -> 初始化的时候使用
-		// 	synchronize: true,
-		// 	logging: ['error'],
-		// }),
 	],
 	controllers: [],
-	providers: [Logger],
+	providers: [
+		Logger,
+		// 这样配置全局守卫，就可以在 AdminGuard 或者 JwtGuard 中使用到 userService 了
+		// {
+		// 	provide: APP_GUARD,
+		// 	useClass: JwtGuard, // AdminGuard
+		// },
+	],
 	exports: [Logger],
 })
 export class AppModule {}

@@ -4,6 +4,7 @@ import { UserService } from 'src/user/user.service';
 // 实现权鉴路由守卫
 @Injectable()
 export class AdminGuard implements CanActivate {
+	// 这里使用到了 UserService，需要在使用的 AdminGuard 的模块注入 UserModule 模块，否则就需要将 UserModule 通过 @Global() 修饰符标记为全局模块，才能正常使用 UserService
 	constructor(private userService: UserService) {}
 	// 只有当校验通过之后才会走 canActivate 逻辑
 	async canActivate(context: ExecutionContext): Promise<boolean> {

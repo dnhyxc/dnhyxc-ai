@@ -1,22 +1,12 @@
 import { HttpAdapterHost, NestFactory } from '@nestjs/core';
-// import { NestFactory } from '@nestjs/core';
-// import { createLogger, format } from 'winston';
-// import * as winston from 'winston';
-// import { WinstonModule, utilities } from 'nest-winston';
 import { AppModule } from './app.module';
 import 'winston-daily-rotate-file';
 import { ValidationPipe } from '@nestjs/common';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
-// import { HttpExceptionFilter } from './filters/http-exception.filter';
 import { AllExceptionFilter } from './filters/all-exception-filter';
-
-// const { prettyPrint, label, timestamp, combine } = format;
 
 async function bootstrap() {
 	const app = await NestFactory.create(AppModule, {});
-	// const app = await NestFactory.create(AppModule, {
-	// 	logger,
-	// });
 	// 设置全局前缀为 api
 	app.setGlobalPrefix('api');
 	const logger = app.get(WINSTON_MODULE_NEST_PROVIDER);
@@ -32,6 +22,9 @@ async function bootstrap() {
 			// whitelist: true,
 		}),
 	);
+
+	// 全局守卫， 全局守卫有个弊端，无法使用 DI，即无法访问 userService，解决的方式是可以在 app.module.ts 中的 providers 中配置全局守卫
+	// app.useGlobalGuards(new JwtGuard());
 
 	await app.listen(process.env.PORT ?? 3000);
 }

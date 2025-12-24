@@ -99,18 +99,19 @@ export class UserController {
 		return this.userService.findProfile(id);
 	}
 
-	// @Get('/logs')
-	// getUserLogs() {
-	// 	return this.userService.findUserLogs(2);
-	// }
+	@Get('/getLogs/:id')
+	getUserLogs(@Param('id', ParseIntPipe) id: number) {
+		console.log('getUserLogs', id);
+		return this.userService.findUserLogs(id);
+	}
 
-	// @Get('/logsByGroup')
-	// async getLogsByGroup() {
-	// 	const res = await this.userService.findLogsByGroup(2);
-	//   // 过滤返回的数据
-	// 	return res.map((item) => ({
-	// 		result: item.result,
-	// 		count: item.count,
-	// 	}));
-	// }
+	@Get('/logsByGroup/:id')
+	async getLogsByGroup(@Param('id', ParseIntPipe) id: number) {
+		const res = await this.userService.findLogsByGroup(id);
+		// 过滤返回的数据
+		return res.map((item) => ({
+			result: item.result,
+			count: item.count,
+		}));
+	}
 }
