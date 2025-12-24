@@ -38,7 +38,6 @@ export class LogsController {
 	// 使用自定义的 Serialize 系列化装饰器对响应字段进行序列化
 	@Serialize(PublicLogsDto)
 	addLogs(@Body() dto: LogsDto) {
-		console.log(dto, '参数dto');
 		return dto;
 	}
 }
