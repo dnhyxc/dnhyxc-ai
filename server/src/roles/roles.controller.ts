@@ -12,7 +12,10 @@ import {
 	UseGuards,
 } from '@nestjs/common';
 import { TypeormFilter } from 'src/filters/typeorm.filter';
+import { Roles } from '../decorators/roles.decorator';
+import { Role } from '../enum/roles.enum';
 import { JwtGuard } from '../guards/jwt.guard';
+import { RoleGuard } from '../guards/role.guard';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
 import { RolesService } from './roles.service';
@@ -21,7 +24,8 @@ import { RolesService } from './roles.service';
 // 添加 TypeormFilter 异常过滤器
 @UseFilters(new TypeormFilter())
 // 添加 JwtGuard 守卫
-@UseGuards(JwtGuard)
+@Roles(Role.USER)
+@UseGuards(JwtGuard, RoleGuard)
 export class RolesController {
 	constructor(private readonly rolesService: RolesService) {}
 
@@ -31,6 +35,7 @@ export class RolesController {
 	}
 
 	@Get('/getRoles')
+	@Roles(Role.ADMIN) // 这里会把上面全局的@Roles(Role.ADMIN)覆盖掉，以当前的为准
 	findAll() {
 		return this.rolesService.findAll();
 	}

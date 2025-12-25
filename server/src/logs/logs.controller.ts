@@ -1,9 +1,13 @@
 import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
 import { Expose } from 'class-transformer';
 import { IsNotEmpty, IsString } from 'class-validator';
+import { Can, CheckPolicies } from '../decorators/casl.decorator';
 import { Serialize } from '../decorators/serialize.decorator';
-import { AdminGuard } from '../guards/admin.guard';
-import { JwtGuard } from '../guards/jwt.guard';
+import { Action } from '../enum/action.enum';
+// import { AdminGuard } from '../guards/admin.guard';
+import { CaslGuard } from '../guards/casl.guard';
+// import { JwtGuard } from '../guards/jwt.guard';
+import { Logs } from './logs.entity';
 
 class LogsDto {
 	@IsString()
@@ -25,9 +29,13 @@ class PublicLogsDto {
 }
 
 @Controller('logs')
-@UseGuards(JwtGuard, AdminGuard)
+// @UseGuards(JwtGuard, AdminGuard)
+@UseGuards(CaslGuard)
+@CheckPolicies((ability) => ability.can(Action.READ, Logs))
+@Can(Action.READ, Logs)
 export class LogsController {
 	@Get('/getLogs')
+	@Can(Action.UPDATE, Logs)
 	getLogs() {
 		return 'get logs';
 	}

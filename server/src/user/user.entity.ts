@@ -38,7 +38,6 @@ export class User {
 		() => Roles,
 		(roles) => roles.users,
 	)
-
 	/**
 	 * JoinTable 用于在 @ManyToMany 关系中声明“拥有方”，
 	 * 它会在数据库中自动生成一张中间表，用来存储两端实体的主键对应关系。

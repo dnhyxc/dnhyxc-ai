@@ -304,3 +304,9 @@ User {
 ## [使用序列化对响应给用户的字段进行过滤](https://docs.nestjs.cn/techniques/serialization)
 
 通过在 entry.ts 文件中定义字段时，使用 @Exclude() 装饰器来修饰需要过滤的字段，同时在 controller.ts 文件中使用 @UseInterceptors(ClassSerializerInterceptor) 来对通过 @Expose() 修饰的字段进行过滤。之后响应给前端的数据就没有通过 @Exclude() 标记的字段了。
+
+## 权鉴控制
+
+使用 [@casl/ability](https://www.npmjs.com/package/@casl/ability) 库来实现权限控制。
+
+[casl-ability 官网](https://casl.js.org/v5/en/api/casl-ability)

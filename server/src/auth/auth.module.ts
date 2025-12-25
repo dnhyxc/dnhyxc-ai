@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
@@ -7,7 +7,9 @@ import { UserModule } from '../user/user.module';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './auth.strategy';
+import { CaslAbilityService } from './casl-ability.service';
 
+@Global() // 将 exports: [CaslAbilityService] 导出的 CaslAbilityService 模块标记为全局模块
 @Module({
 	imports: [
 		UserModule,
@@ -25,7 +27,8 @@ import { JwtStrategy } from './auth.strategy';
 			inject: [ConfigService],
 		}),
 	],
-	providers: [AuthService, JwtStrategy],
+	providers: [AuthService, JwtStrategy, CaslAbilityService],
 	controllers: [AuthController],
+	exports: [CaslAbilityService], // 导出 casl 模块，用于其他模块使用
 })
 export class AuthModule {}
