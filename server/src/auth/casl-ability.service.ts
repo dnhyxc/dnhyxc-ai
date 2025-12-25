@@ -31,10 +31,10 @@ export class CaslAbilityService {
 			o.menus.forEach((menu) => {
 				// path -> acl -> actions
 				const actions = menu.acl.split(',');
-				for (let i = 0; i < actions.length; i++) {
-					const action = actions[i];
-					can(action, getEntities(menu.path));
-				}
+				const entities = getEntities(menu.path);
+				actions.forEach((action) => {
+					can(action, entities);
+				});
 			});
 		});
 
