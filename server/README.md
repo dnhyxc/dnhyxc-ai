@@ -310,3 +310,352 @@ User {
 使用 [@casl/ability](https://www.npmjs.com/package/@casl/ability) 库来实现权限控制。
 
 [casl-ability 官网](https://casl.js.org/v5/en/api/casl-ability)
+
+### 权鉴控制实现文件
+
+权限控制服务 casl-ability.service.ts:
+
+- /Users/dnhyxc/Documents/code/dnhyxc-ai/server/src/auth/casl-ability.service.ts
+
+```ts
+// 通过 casl/ability 来控制权限 Servives
+import {
+	AbilityBuilder,
+	createMongoAbility,
+	ExtractSubjectType,
+	Subject,
+} from "@casl/ability";
+import { Injectable } from "@nestjs/common";
+// import { Logs } from '../logs/logs.entity';
+import { UserService } from "../user/user.service";
+import { getEntities } from "../utils/common";
+
+@Injectable()
+export class CaslAbilityService {
+	constructor(private userService: UserService) {}
+	async forRoot(username: string) {
+		const { can, build } = new AbilityBuilder(createMongoAbility);
+
+		/**
+		 * 控制权限的思路：
+		 * 1. menu 名称、路径、acl -> actions -> 名称、路径 -> 实体对应
+		 * path -> prefix -> 写死在项目代码里
+		 *
+		 * 2. acl -> 通过表来进行存储 -> LogController + Action
+		 * log -> sys:log -> sys:log:read, sys:log:write
+		 */
+
+		// TODO：这里使用方式一，写死在项目中，后续进行优化，通过数据库表来存储
+		const user = await this.userService.findByUsername(username);
+		user?.roles.forEach((o) => {
+			o.menus.forEach((menu) => {
+				// path -> acl -> actions
+				const actions = menu.acl.split(",");
+				for (let i = 0; i < actions.length; i++) {
+					const action = actions[i];
+					can(action, getEntities(menu.path));
+				}
+			});
+		});
+
+		// user -> 1:n roles -> 1:n menus -> 去重 {}
+		// can('read', Logs);
+		// can('update', Logs);
+		// can('manage', 'all');
+
+		const ability = build({
+			detectSubjectType: (object) =>
+				object.constructor as ExtractSubjectType<Subject>,
+		});
+
+		return ability;
+	}
+}
+```
+
+权限控制自定义装饰器 casl.decorator.ts:
+
+- /Users/dnhyxc/Documents/code/dnhyxc-ai/server/src/decorators/casl.decorator.ts
+
+```ts
+// 权限控制自定义装饰器
+import { AnyMongoAbility, InferSubjects } from "@casl/ability";
+import { SetMetadata } from "@nestjs/common";
+import { Action } from "../enum/action.enum";
+
+/**
+ * 用于在 NestJS 路由处理器上挂载权限元数据的键名枚举。
+ * 守卫（Guard）通过反射读取这些键，拿到对应的策略回调并执行。
+ */
+export enum CHECK_POLICIES_KEY {
+	/** 对应 @CheckPolicies 装饰器，可放置任意自定义策略回调 */
+	HANDLER = "CHECK_POLICIES_HANDLER",
+	/** 对应 @Can 装饰器，内部调用 ability.can() */
+	CAN = "CHECK_POLICIES_CAN",
+	/** 对应 @Cannot 装饰器，内部调用 ability.cannot() */
+	CANNOT = "CHECK_POLICIES_CANNOT",
+}
+
+/**
+ * 策略回调类型：接收 CASL 的 Ability 实例，返回 true 表示通过，false 表示拒绝。
+ */
+export type PolicyHandlerCallback = (ability: AnyMongoAbility) => boolean;
+
+/**
+ * 允许单个回调或回调数组，方便装饰器参数灵活书写。
+ */
+export type CaslHandlerType = PolicyHandlerCallback | PolicyHandlerCallback[];
+
+/**
+ * 将一组自定义策略回调挂载到路由元数据上。
+ * 守卫通过 CHECK_POLICIES_KEY.HANDLER 取出这些回调并依次执行。
+ *
+ * @example
+ * \@CheckPolicies((ability) => ability.can(Action.Read, 'Article'))
+ * async findAll() { ... }
+ */
+export const CheckPolicies = (...handlers: PolicyHandlerCallback[]) =>
+	SetMetadata(CHECK_POLICIES_KEY.HANDLER, handlers);
+
+/**
+ * 快速声明“允许”某操作的装饰器，底层调用 ability.can(action, subject, conditions)。
+ * 守卫通过 CHECK_POLICIES_KEY.CAN 取出该回调并执行。
+ *
+ * @param action     动作枚举，如 Action.Read
+ * @param subject    主体（资源）类型或对象
+ * @param conditions 可选的额外条件，对应 CASL 条件对象
+ *
+ * @example
+ * \@Can(Action.Update, Article)
+ * async update(\@Body() dto) { ... }
+ */
+export const Can = (
+	action: Action,
+	subject: InferSubjects<any>,
+	conditions?: any
+) =>
+	SetMetadata(CHECK_POLICIES_KEY.CAN, (ability: AnyMongoAbility) =>
+		ability.can(action, subject, conditions)
+	);
+
+/**
+ * 快速声明“禁止”某操作的装饰器，底层调用 ability.cannot(action, subject, conditions)。
+ * 守卫通过 CHECK_POLICIES_KEY.CANNOT 取出该回调并执行。
+ *
+ * @param action     动作枚举，如 Action.Delete
+ * @param subject    主体（资源）类型或对象
+ * @param conditions 可选的额外条件，对应 CASL 条件对象
+ *
+ * @example
+ * \@Cannot(Action.Delete, Article, { status: 'published' })
+ * async remove() { ... }
+ */
+export const Cannot = (
+	action: Action,
+	subject: InferSubjects<any>,
+	conditions?: any
+) =>
+	SetMetadata(CHECK_POLICIES_KEY.CANNOT, (ability: AnyMongoAbility) =>
+		ability.cannot(action, subject, conditions)
+	);
+```
+
+权限控制守卫 casl.guard.ts:
+
+- /Users/dnhyxc/Documents/code/dnhyxc-ai/server/src/guards/casl.guard.ts
+
+```ts
+// 通过 casl/ability 来控制权限的守卫
+import { CanActivate, ExecutionContext, Injectable } from "@nestjs/common";
+import { Reflector } from "@nestjs/core";
+import { CaslAbilityService } from "../auth/casl-ability.service";
+import {
+	CaslHandlerType,
+	CHECK_POLICIES_KEY,
+	PolicyHandlerCallback,
+} from "../decorators/casl.decorator";
+
+/**
+ * 如果需要控制权限，需要在每个 Controller 方法上添加 @UseGuards(CaslGuard) 装饰器，
+ * 并且还需要在对应的接口之上中添加 @Can(Action.XXX, Logs 或 User 或 Menus 或 Roles 或 'Auth'（因为 Auth 没有 entity.ts 文件，没法导入 Auth，因此只能传字符串 'Auth'）])
+ */
+@Injectable()
+export class CaslGuard implements CanActivate {
+	constructor(
+		private reflector: Reflector,
+		private caslAbilityService: CaslAbilityService
+	) {}
+	async canActivate(context: ExecutionContext): Promise<boolean> {
+		const handlers = this.reflector.getAllAndMerge<PolicyHandlerCallback[]>(
+			CHECK_POLICIES_KEY.HANDLER,
+			[
+				context.getHandler(), // 当前路由的处理函数（如 @Get() 修饰的方法）
+				context.getClass(), // 当前路由所属的控制器类
+			]
+		);
+		const canHandlers = this.reflector.getAllAndMerge<PolicyHandlerCallback[]>(
+			CHECK_POLICIES_KEY.CAN,
+			[
+				context.getHandler(), // 当前路由的处理函数（如 @Get() 修饰的方法）
+				context.getClass(), // 当前路由所属的控制器类
+			]
+		) as CaslHandlerType;
+		const cannotHandlers = this.reflector.getAllAndMerge<
+			PolicyHandlerCallback[]
+		>(CHECK_POLICIES_KEY.CANNOT, [
+			context.getHandler(), // 当前路由的处理函数（如 @Get() 修饰的方法）
+			context.getClass(), // 当前路由所属的控制器类
+		]) as CaslHandlerType;
+
+		// 判断用户未设置上述的任何一个，那么直接返回 true
+		if (!handlers || !canHandlers || !cannotHandlers) {
+			return true;
+		}
+
+		const req = context.switchToHttp().getRequest();
+
+		if (req?.user) {
+			// 获取当前用户权限
+			const ability = await this.caslAbilityService.forRoot(
+				req?.user?.username
+			);
+
+			let flag = true;
+
+			if (handlers) {
+				flag = flag && handlers.every((handler) => handler(ability));
+			}
+
+			if (canHandlers) {
+				if (Array.isArray(canHandlers)) {
+					flag = flag && canHandlers.every((handler) => handler(ability));
+				} else if (typeof canHandlers === "function") {
+					flag = flag && canHandlers(ability);
+				}
+			}
+
+			if (cannotHandlers) {
+				if (Array.isArray(cannotHandlers)) {
+					flag = flag && cannotHandlers.every((handler) => handler(ability));
+				} else if (typeof cannotHandlers === "function") {
+					flag = flag && cannotHandlers(ability);
+				}
+			}
+			return flag;
+		} else {
+			return false;
+		}
+	}
+}
+```
+
+common.ts:
+
+- /Users/dnhyxc/Documents/code/dnhyxc-ai/server/src/utils/common.ts
+
+```ts
+import { Logs } from "src/logs/logs.entity";
+import { Menus } from "src/menus/menus.entity";
+import { Roles } from "src/roles/roles.entity";
+import { User } from "src/user/user.entity";
+
+// 获取对应有权限的实体，用于在 casl-ability.service.ts 中方便 casl/ability 使用来控制权限
+export const getEntities = (path: string) => {
+	// users -> User, /logs -> Logs, /menus -> Menus, /roles -> Roles, /auth -> 'Auth'
+	const map = {
+		"/user": User,
+		"/logs": Logs,
+		"/roles": Roles,
+		"/menus": Menus,
+		"/auth": "Auth",
+	};
+
+	for (let i = 0; i < Object.keys(map).length; i++) {
+		const key = Object.keys(map)[i];
+		if (path.startsWith(key)) {
+			return map[key];
+		}
+	}
+};
+```
+
+### 使用方式
+
+logs.controller.ts:
+
+- server/src/logs/logs.controller.ts
+
+```ts
+import { Body, Controller, Get, Post, UseGuards } from "@nestjs/common";
+import { Expose } from "class-transformer";
+import { IsNotEmpty, IsString } from "class-validator";
+import { Can, CheckPolicies } from "../decorators/casl.decorator";
+import { Serialize } from "../decorators/serialize.decorator";
+import { Action } from "../enum/action.enum";
+import { AdminGuard } from "../guards/admin.guard";
+import { CaslGuard } from "../guards/casl.guard";
+import { JwtGuard } from "../guards/jwt.guard";
+import { Logs } from "./logs.entity";
+
+class LogsDto {
+	@IsString()
+	@IsNotEmpty()
+	msg: string;
+
+	@IsString()
+	id: string;
+
+	@IsString()
+	name: string;
+}
+
+class PublicLogsDto {
+	@Expose()
+	msg: string;
+	@Expose()
+	name: string;
+}
+
+@Controller("logs")
+// UseGuards 用于在控制器或路由处理器级别注册守卫（Guards），守卫会在请求到达控制器方法之前执行，以决定是否允许继续处理请求。
+// 守卫的执行顺序为从左到右：JwtGuard -> AdminGuard -> CaslGuard。
+// JwtGuard：验证请求是否携带有效的 JWT 访问令牌，确保用户已登录。
+// AdminGuard：检查当前用户是否具备管理员身份，只有管理员才能继续访问。
+// CaslGuard：基于 CASL 权限策略，检查用户是否拥有对目标资源（这里是 Logs）执行特定操作的权限。
+// 只有当所有守卫都通过时，请求才会被放行到控制器方法。
+@UseGuards(JwtGuard, AdminGuard, CaslGuard)
+/*
+  CheckPolicies 是一个自定义装饰器，用来在**控制器类或路由方法**上声明“需要满足哪些 CASL 权限策略才能访问”。
+  1. 它接收一个回调函数 `(ability) => boolean` 作为参数；
+     - `ability` 是 CASL 根据当前登录用户动态创建的 Ability 实例，里面已挂载该用户拥有的全部权限规则。
+  2. 当请求进入时，CaslGuard 会：
+     a) 解析 `@CheckPolicies` 给出的回调；
+     b) 把 `ability` 传进去执行；
+     c) 若返回 `true` 则放行，返回 `false` 则抛出 `ForbiddenException`，前端收到 403。
+  3. 因此本行代码的含义是：
+     “只有当当前用户对 Logs 实体拥有 READ 权限时，才允许访问整个 LogsController 里的所有路由。”
+  4. 如果只想对单个路由生效，把 `@CheckPolicies` 写到具体的方法上即可；
+     多个策略可用 `&&`、`||` 组合，也可多次调用 `ability.can` / `ability.cannot`。
+*/
+@CheckPolicies((ability) => ability.can(Action.READ, Logs))
+// 使用 Can 自定义装饰器
+@Can(Action.READ, Logs)
+export class LogsController {
+	@Get("/getLogs")
+	@Can(Action.READ, Logs)
+	getLogs() {
+		return "get logs";
+	}
+
+	@Post("/addLogs")
+	// @Cannot(Action.CREATE, Logs)
+	@Can(Action.CREATE, Logs)
+	// 添加 SerializeInterceptor 后置拦截器对响应字段进行序列化
+	// @UseInterceptors(new SerializeInterceptor(PublicLogsDto))
+	// 使用自定义的 Serialize 系列化装饰器对响应字段进行序列化
+	@Serialize(PublicLogsDto)
+	addLogs(@Body() dto: LogsDto) {
+		return dto;
+	}
+}
+```

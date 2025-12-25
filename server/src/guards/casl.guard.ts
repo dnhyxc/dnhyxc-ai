@@ -1,3 +1,4 @@
+// 通过 casl/ability 来控制权限的守卫
 import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { CaslAbilityService } from '../auth/casl-ability.service';
@@ -7,6 +8,10 @@ import {
 	PolicyHandlerCallback,
 } from '../decorators/casl.decorator';
 
+/**
+ * 如果需要控制权限，需要在每个 Controller 方法上添加 @UseGuards(CaslGuard) 装饰器，
+ * 并且还需要在对应的接口之上中添加 @Can(Action.XXX, Logs 或 User 或 Menus 或 Roles 或 'Auth'（因为 Auth 没有 entity.ts 文件，没法导入 Auth，因此只能传字符串 'Auth'）])
+ */
 @Injectable()
 export class CaslGuard implements CanActivate {
 	constructor(
@@ -40,30 +45,38 @@ export class CaslGuard implements CanActivate {
 			return true;
 		}
 
-		const ability = this.caslAbilityService.forRoot();
+		const req = context.switchToHttp().getRequest();
 
-		let flag = true;
+		if (req?.user) {
+			// 获取当前用户权限
+			const ability = await this.caslAbilityService.forRoot(
+				req?.user?.username,
+			);
 
-		if (handlers) {
-			flag = flag && handlers.every((handler) => handler(ability));
-		}
+			let flag = true;
 
-		if (canHandlers) {
-			if (Array.isArray(canHandlers)) {
-				flag = flag && canHandlers.every((handler) => handler(ability));
-			} else if (typeof canHandlers === 'function') {
-				flag = flag && canHandlers(ability);
+			if (handlers) {
+				flag = flag && handlers.every((handler) => handler(ability));
 			}
-		}
 
-		if (cannotHandlers) {
-			if (Array.isArray(cannotHandlers)) {
-				flag = flag && cannotHandlers.every((handler) => handler(ability));
-			} else if (typeof cannotHandlers === 'function') {
-				flag = flag && cannotHandlers(ability);
+			if (canHandlers) {
+				if (Array.isArray(canHandlers)) {
+					flag = flag && canHandlers.every((handler) => handler(ability));
+				} else if (typeof canHandlers === 'function') {
+					flag = flag && canHandlers(ability);
+				}
 			}
-		}
 
-		return true;
+			if (cannotHandlers) {
+				if (Array.isArray(cannotHandlers)) {
+					flag = flag && cannotHandlers.every((handler) => handler(ability));
+				} else if (typeof cannotHandlers === 'function') {
+					flag = flag && cannotHandlers(ability);
+				}
+			}
+			return flag;
+		} else {
+			return false;
+		}
 	}
 }

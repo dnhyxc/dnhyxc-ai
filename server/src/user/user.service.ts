@@ -84,8 +84,8 @@ export class UserService {
 	findByUsername(username: string): Promise<User | null> {
 		return this.userRepository.findOne({
 			where: { username },
-			// 同时查询出 roles
-			relations: ['roles'],
+			// 同时查询出 roles，如果需要查询出 roles 下的 menus，需要通过 menus.role
+			relations: ['roles', 'roles.menus'],
 		});
 	}
 
