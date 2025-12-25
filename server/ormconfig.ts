@@ -1,8 +1,8 @@
 import * as fs from 'node:fs';
 import { TypeOrmModuleOptions } from '@nestjs/typeorm';
 import * as dotenv from 'dotenv';
-import { ConfigEnum } from 'src/enum/config.enum';
 import { DataSource, DataSourceOptions } from 'typeorm';
+import { ConfigEnum } from './src/enum/config.enum';
 
 const entitiesDir =
 	process.env.NODE_ENV === 'test'
@@ -43,6 +43,9 @@ export const connectionOptions: TypeOrmModuleOptions = buildConnectionOptions();
 
 export default new DataSource({
 	...connectionOptions,
-	migrations: ['src/migrations/**'],
+	migrations: ['./src/migrations/**'],
 	subscribers: [],
+	// 添加 migrations 目录
+	// migrationsTableName: 'migrations',
+	// migrationsRun: false,
 } as DataSourceOptions);
