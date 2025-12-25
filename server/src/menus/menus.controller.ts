@@ -4,6 +4,7 @@ import {
 	Delete,
 	Get,
 	Param,
+	ParseIntPipe,
 	Patch,
 	Post,
 } from '@nestjs/common';
@@ -15,28 +16,31 @@ import { MenusService } from './menus.service';
 export class MenusController {
 	constructor(private readonly menusService: MenusService) {}
 
-	@Post()
+	@Post('/createMenu')
 	create(@Body() createMenuDto: CreateMenuDto) {
 		return this.menusService.create(createMenuDto);
 	}
 
-	@Get()
+	@Get('/getMenus')
 	findAll() {
 		return this.menusService.findAll();
 	}
 
-	@Get(':id')
-	findOne(@Param('id') id: string) {
-		return this.menusService.findOne(+id);
+	@Get('/getMenuById/:id')
+	findOne(@Param('id', ParseIntPipe) id: number) {
+		return this.menusService.findOne(id);
 	}
 
-	@Patch(':id')
-	update(@Param('id') id: string, @Body() updateMenuDto: UpdateMenuDto) {
-		return this.menusService.update(+id, updateMenuDto);
+	@Patch('/updateMenu/:id')
+	update(
+		@Param('id', ParseIntPipe) id: number,
+		@Body() updateMenuDto: UpdateMenuDto,
+	) {
+		return this.menusService.update(id, updateMenuDto);
 	}
 
-	@Delete(':id')
-	remove(@Param('id') id: string) {
-		return this.menusService.remove(+id);
+	@Delete('/deleteMenuById/:id')
+	delete(@Param('id', ParseIntPipe) id: number) {
+		return this.menusService.delete(id);
 	}
 }

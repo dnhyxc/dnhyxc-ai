@@ -43,9 +43,6 @@ export const connectionOptions: TypeOrmModuleOptions = buildConnectionOptions();
 
 export default new DataSource({
 	...connectionOptions,
-	migrations: ['./src/migrations/**'],
+	migrations: ['src/migrations/**'],
 	subscribers: [],
-	// 添加 migrations 目录
-	// migrationsTableName: 'migrations',
-	// migrationsRun: false,
 } as DataSourceOptions);

@@ -1,26 +1,41 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { CreateMenuDto } from './dto/create-menu.dto';
 import { UpdateMenuDto } from './dto/update-menu.dto';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Menus } from './menus.entity';
+import { Repository } from 'typeorm';
 
 @Injectable()
 export class MenusService {
+	constructor(
+		@InjectRepository(Menus)
+		private readonly menusRepository: Repository<Menus>,
+	) {}
+
 	create(createMenuDto: CreateMenuDto) {
-		return 'This action adds a new menu';
+		const menu = this.menusRepository.create(createMenuDto);
+		return this.menusRepository.save(menu);
 	}
 
 	findAll() {
-		return `This action returns all menus`;
+		return this.menusRepository.find();
 	}
 
 	findOne(id: number) {
-		return `This action returns a #${id} menu`;
+		return this.menusRepository.findOne({ where: { id } });
 	}
 
-	update(id: number, updateMenuDto: UpdateMenuDto) {
-		return `This action updates a #${id} menu`;
+	async update(id: number, updateMenuDto: UpdateMenuDto) {
+		const menu = await this.findOne(id);
+		if (menu) {
+			const newMenu = await this.menusRepository.merge(menu, updateMenuDto);
+			return this.menusRepository.save(newMenu);
+		} else {
+			throw new NotFoundException('菜单不存在');
+		}
 	}
 
-	remove(id: number) {
-		return `This action removes a #${id} menu`;
+	delete(id: number) {
+		return this.menusRepository.delete(id);
 	}
 }
