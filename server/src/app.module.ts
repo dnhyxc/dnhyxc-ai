@@ -28,7 +28,7 @@ const envFilePath = `.env.${process.env.NODE_ENV || 'development'}`;
 			validationSchema: Joi.object({
 				// 使用 Joi 验证环境变量中的DB_PORT
 				NODE_ENV: Joi.string()
-					.valid('development', 'production')
+					.valid('development', 'production', 'test')
 					.default('development'),
 				DB_PORT: Joi.number().default(3090),
 				DB_HOST: Joi.alternatives().try(

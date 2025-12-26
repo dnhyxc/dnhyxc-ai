@@ -9,14 +9,14 @@ const entitiesDir =
 		? [`${__dirname}/**/*.entity.ts`]
 		: [`${__dirname}/**/*.entity.{ts,js}`];
 
-const getEnv = (env: string): Record<string, unknown> => {
+export const getEnv = (env: string): Record<string, unknown> => {
 	if (fs.existsSync(env)) {
 		return dotenv.parse(fs.readFileSync(env));
 	}
 	return {};
 };
 
-const buildConnectionOptions = () => {
+export const buildConnectionOptions = () => {
 	const defaultConfig = getEnv('.env');
 	const envConfig = getEnv(`.env.${process.env.NODE_ENV}`);
 	const config = {

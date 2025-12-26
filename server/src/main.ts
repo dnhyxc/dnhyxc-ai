@@ -3,10 +3,15 @@ import { AppModule } from './app.module';
 import 'winston-daily-rotate-file';
 import { ValidationPipe } from '@nestjs/common';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import { AllExceptionFilter } from './filters/all-exception-filter';
 
 async function bootstrap() {
-	const app = await NestFactory.create(AppModule, {});
+	const app = await NestFactory.create(AppModule, {
+		// 允许跨域
+		cors: true,
+	});
 	// 设置全局前缀为 api
 	app.setGlobalPrefix('api');
 	const logger = app.get(WINSTON_MODULE_NEST_PROVIDER);
@@ -25,6 +30,17 @@ async function bootstrap() {
 
 	// 全局守卫， 全局守卫有个弊端，无法使用 DI，即无法访问 userService，解决的方式是可以在 app.module.ts 中的 providers 中配置全局守卫
 	// app.useGlobalGuards(new JwtGuard());
+
+	// 配置 helmet 头部安全
+	app.use(helmet());
+
+	// 配置 rateLimit 中间件，限制请求次数
+	app.use(
+		rateLimit({
+			windowMs: 1 * 60 * 1000, // 1 minutes
+			max: 300, // limit each IP to 300 requests per windowMs
+		}),
+	);
 
 	await app.listen(process.env.PORT ?? 3000);
 }

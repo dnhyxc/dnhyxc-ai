@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsString, Length } from 'class-validator';
+import { IsNotEmpty, IsString, Length, Matches } from 'class-validator';
 
 export class LoginUserDTO {
 	@IsString({
@@ -28,7 +28,13 @@ export class LoginUserDTO {
 		message: '密码不能为空',
 	})
 	@Length(6, 32, {
-		message: '用户名长度必须在 5 到 33 个字符之间',
+		message: '密码长度必须在 6 到 32 个字符之间',
 	})
+	@Matches(
+		/^(?=.*[A-Za-z])(?=.*[\u4e00-\u9fa5])(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).*$/,
+		{
+			message: '密码必须包含英文、中文和特殊字符',
+		},
+	)
 	password: string;
 }
