@@ -1,10 +1,10 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { JwtService, JwtSignOptions } from '@nestjs/jwt';
 import { ForbiddenException } from '@nestjs/common';
+import { JwtService, JwtSignOptions } from '@nestjs/jwt';
+import { Test, TestingModule } from '@nestjs/testing';
 import * as argon2 from 'argon2';
-import { AuthService } from '../auth.service';
 import { User } from '../../user/user.entity';
 import { UserService } from '../../user/user.service';
+import { AuthService } from '../auth.service';
 
 describe('AuthService 登录认证服务', () => {
 	let service: AuthService;
