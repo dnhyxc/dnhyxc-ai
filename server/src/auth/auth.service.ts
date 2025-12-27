@@ -19,10 +19,10 @@ export class AuthService {
 	async login(dto: LoginUserDTO) {
 		const { username, password, captchaId, captchaText } = dto;
 		const isCaptchaValid = await this.verifyCaptcha(captchaId, captchaText);
-		if (!isCaptchaValid) throw new HttpException('验证码错误', 200);
+		if (!isCaptchaValid) throw new HttpException('验证码错误', 500);
 		const user = await this.userService.findByUsername(username);
 		if (!user) {
-			throw new HttpException('用户不存在，请先前往注册', 200);
+			throw new HttpException('用户不存在，请先前往注册', 500);
 		}
 		// 使用 argon2 验证密码
 		const isPasswordValid = await argon2.verify(user.password, password);
@@ -38,13 +38,13 @@ export class AuthService {
 				// },
 			);
 		} else {
-			throw new HttpException('用户名或密码错误', 200);
+			throw new HttpException('用户名或密码错误', 500);
 		}
 	}
 	async register(username: string, password: string) {
 		const user = await this.userService.findByUsername(username);
 		if (user) {
-			throw new HttpException('用户已存在', 200);
+			throw new HttpException('用户已存在', 500);
 		} else {
 			return await this.userService.create({
 				username,
@@ -88,12 +88,16 @@ export class AuthService {
 	// 从 redis 中取出验证码与登录时传递的验证码进行比对
 	async verifyCaptcha(captchaId: string, captchaText: string) {
 		const captchaTextInCache = await this.cache.get(captchaId);
+		if (!captchaTextInCache) {
+			throw new HttpException('验证码已过期，请重新获取', 500);
+		}
 		if (
 			captchaTextInCache &&
 			(captchaTextInCache as string).toLowerCase() === captchaText.toLowerCase()
 		) {
 			return true;
+		} else {
+			throw new HttpException('验证码错误', 500);
 		}
-		throw new HttpException('验证码已过期，请重新获取', 200);
 	}
 }

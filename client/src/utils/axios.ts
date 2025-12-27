@@ -1,3 +1,4 @@
+import { Toast } from '@ui/sonner';
 import axios from 'axios';
 import { getStorage } from '.';
 
@@ -24,7 +25,6 @@ instance.interceptors.request.use(
 // 响应拦截器
 instance.interceptors.response.use(
 	function (response) {
-		console.log(response, 'response');
 		if (response.status.toString().startsWith('2')) {
 			return response.data;
 		}
@@ -32,6 +32,10 @@ instance.interceptors.response.use(
 	},
 	// 超出 2xx 范围内的状态码都会触发该函数。
 	function (error) {
+		Toast({
+			type: 'error',
+			title: error.response?.data?.message || '请求接口异常',
+		});
 		return Promise.reject(error);
 	},
 );

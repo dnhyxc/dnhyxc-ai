@@ -42,8 +42,6 @@ export class AllExceptionFilter implements ExceptionFilter {
 					: exception.message;
 		}
 
-		const success = httpStatus >= 200 && httpStatus < 300;
-
 		const responseBody = {
 			headers: request.headers,
 			query: request.query,
@@ -56,7 +54,7 @@ export class AllExceptionFilter implements ExceptionFilter {
 			exception: exception.name,
 			path: httpAdapter.getRequestUrl(request),
 			error: exceptionResponse,
-			success,
+			success: false,
 			code: httpStatus,
 			message: exception.message,
 		};
