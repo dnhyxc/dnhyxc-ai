@@ -35,8 +35,8 @@ describe('AuthService 登录认证服务', () => {
 
 		jwt = {
 			signAsync: (
-				payload: string | object | Buffer,
-				options?: JwtSignOptions,
+				_payload: string | object | Buffer,
+				_options?: JwtSignOptions,
 			) => {
 				return Promise.resolve('token');
 			},
@@ -79,21 +79,36 @@ describe('AuthService 登录认证服务', () => {
 	it('用户登录', async () => {
 		await service.register(mockUser.username, mockUser.password);
 		await expect(
-			service.login(mockUser.username, mockUser.password),
+			service.login({
+				username: mockUser.username,
+				password: mockUser.password,
+				captchaId: '1',
+				captchaText: 'Fs1N',
+			}),
 		).resolves.toBe('token');
 	});
 
 	it('用户登录，用户名密码错误', async () => {
 		await service.register(mockUser.username, mockUser.password);
-		await expect(service.login(mockUser.username, 'qwqwqwq')).rejects.toThrow(
-			new ForbiddenException('用户名或密码错误'),
-		);
+		await expect(
+			service.login({
+				username: mockUser.username,
+				password: 'qwqwqwq',
+				captchaId: '1',
+				captchaText: 'Fs1N',
+			}),
+		).rejects.toThrow(new ForbiddenException('用户名或密码错误'));
 	});
 
 	it('用户登录，用户名不存在', async () => {
 		// await service.register(mockUser.username, mockUser.password);
 		await expect(
-			service.login(mockUser.username, mockUser.password),
+			service.login({
+				username: mockUser.username,
+				password: mockUser.password,
+				captchaId: '1',
+				captchaText: 'Fs1N',
+			}),
 		).rejects.toThrow(new ForbiddenException('用户不存在，请先前往注册'));
 	});
 });
