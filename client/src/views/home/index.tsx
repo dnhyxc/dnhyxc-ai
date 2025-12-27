@@ -3,7 +3,7 @@ import { listen } from '@tauri-apps/api/event';
 import { Button } from '@ui/button';
 import { Input } from '@ui/input';
 import { useEffect, useState } from 'react';
-import { getUserProfile } from '@/server';
+import { getUserProfile } from '@/service';
 import type { DownloadFileInfo, DownloadProgress } from '@/types';
 import { onCreateWindow, onEmit, onListen } from '@/utils';
 

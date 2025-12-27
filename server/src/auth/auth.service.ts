@@ -5,6 +5,8 @@ import { JwtService } from '@nestjs/jwt';
 import * as argon2 from 'argon2';
 import * as svgCaptcha from 'svg-captcha';
 import { UserService } from '../user/user.service';
+import { randomLightColor } from '../utils';
+import { CaptchaDto } from './dto/captcha.dto';
 import { LoginUserDTO } from './dto/login-user.dto';
 
 @Injectable()
@@ -51,13 +53,28 @@ export class AuthService {
 		}
 	}
 
-	async getCaptcha() {
+	async getVerifyCode(dto?: CaptchaDto) {
+		const {
+			size = 4,
+			width = 120,
+			height = 36,
+			fontSize = 50,
+			noise = 3,
+			background = randomLightColor(),
+		} = dto || {};
 		const captcha = svgCaptcha.create({
-			size: 4,
-			fontSize: 32,
-			width: 100,
-			height: 36,
-			background: '#cc9966',
+			size,
+			fontSize,
+			width,
+			height,
+			background,
+			noise,
+			ignoreChars: '0o1i',
+			color: true,
+			mathMin: 1,
+			mathMax: 9,
+			mathOperator: '+',
+			inverse: true,
 		});
 		const REDIS_KEY = `Captcha_Text_${randomUUID()}`;
 		// 设置验证码缓存，30 秒后自动过期并清除

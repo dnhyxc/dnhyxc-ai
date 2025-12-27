@@ -2,7 +2,6 @@ import {
 	Body,
 	ClassSerializerInterceptor,
 	Controller,
-	Get,
 	HttpStatus,
 	Post,
 	Res,
@@ -10,6 +9,7 @@ import {
 } from '@nestjs/common';
 // import { SerializeInterceptor } from '../interceptors/serialize.interceptor';
 import { AuthService } from './auth.service';
+import { CaptchaDto } from './dto/captcha.dto';
 import { LoginUserDTO } from './dto/login-user.dto';
 
 @Controller('auth')
@@ -42,9 +42,9 @@ export class AuthController {
 		};
 	}
 
-	@Get('/getCaptcha')
-	async getCaptcha(@Res() res) {
-		const data = await this.authService.getCaptcha();
+	@Post('/getVerifyCode')
+	async getCaptcha(@Body() dto: CaptchaDto, @Res() res) {
+		const data = await this.authService.getVerifyCode(dto);
 		if (data) {
 			res.type('image/svg+xml');
 			res.send({

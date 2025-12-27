@@ -10,8 +10,8 @@ describe('AuthController', () => {
 
 	beforeEach(async () => {
 		mockAuthService = {
-			login: (username: string, password: string) => {
-				if (username && password) {
+			login: (dto: LoginUserDTO) => {
+				if (dto.username && dto.password) {
 					return Promise.resolve('token');
 				} else {
 					return Promise.reject('error');
@@ -57,9 +57,9 @@ describe('AuthController', () => {
 			password: 'admin',
 		} as LoginUserDTO);
 		expect(await res).not.toBeNull();
-		expect((await res).id).not.toBeNull();
+		expect((await res).data.id).not.toBeNull();
 		expect((await res) instanceof User).toBeTruthy();
-		expect((await res).username).toBe('admin');
-		expect((await res).password).toBe('admin');
+		expect((await res).data.username).toBe('admin');
+		expect((await res).data.password).toBe('admin');
 	});
 });

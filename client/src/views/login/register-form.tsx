@@ -11,7 +11,7 @@ import {
 	FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { register } from '@/server';
+import { register } from '@/service';
 
 interface IProps {
 	onRegister: (status?: boolean) => void;

@@ -1,4 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
+import { Toast, Toaster } from '@ui/sonner';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router';
 import { z } from 'zod';
@@ -12,7 +14,7 @@ import {
 	FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { login } from '@/server';
+import { getVerifyCode, login } from '@/service';
 import { setStorage } from '@/utils';
 
 interface IProps {
@@ -20,7 +22,35 @@ interface IProps {
 }
 
 const LoginForm: React.FC<IProps> = ({ onForgetPwd }) => {
+	const [captchaInfo, setCaptchaInfo] = useState<{
+		captchaId: string;
+		captcha: string;
+	}>({
+		captchaId: '',
+		captcha: '',
+	});
+
 	const navigate = useNavigate();
+
+	useEffect(() => {
+		getCaptcha();
+	}, []);
+
+	const getCaptcha = async () => {
+		// 获取验证码
+		const res = await getVerifyCode();
+		if (res) {
+			setCaptchaInfo({
+				captchaId: res.data.captchaId,
+				captcha: res.data.captcha,
+			});
+		} else {
+			Toast({
+				title: '获取验证码失败!',
+				type: 'error',
+			});
+		}
+	};
 
 	const formSchema = z.object({
 		username: z.string().trim().min(2, {
@@ -36,6 +66,9 @@ const LoginForm: React.FC<IProps> = ({ onForgetPwd }) => {
 					message: '密码必须包含英文、数字和特殊字符',
 				},
 			),
+		captchaText: z.string().trim().min(4, {
+			message: '验证码至少输入4个字符',
+		}),
 	});
 
 	const form = useForm<z.infer<typeof formSchema>>({
@@ -43,12 +76,15 @@ const LoginForm: React.FC<IProps> = ({ onForgetPwd }) => {
 		defaultValues: {
 			username: '',
 			password: '',
+			captchaText: '',
 		},
 	});
 
-	// 2. Define a submit handler.
 	const onSubmit = async (values: z.infer<typeof formSchema>) => {
-		const res = await login(values);
+		const res = await login({
+			...values,
+			captchaId: captchaInfo.captchaId,
+		});
 		if (res?.access_token) {
 			setStorage('token', res.access_token);
 		}
@@ -58,6 +94,7 @@ const LoginForm: React.FC<IProps> = ({ onForgetPwd }) => {
 
 	return (
 		<Form {...form}>
+			<Toaster />
 			<form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
 				<FormField
 					control={form.control}
@@ -80,6 +117,32 @@ const LoginForm: React.FC<IProps> = ({ onForgetPwd }) => {
 							<FormLabel className="text-md">密码</FormLabel>
 							<FormControl>
 								<Input type="password" placeholder="请输入密码" {...field} />
+							</FormControl>
+							<FormMessage />
+						</FormItem>
+					)}
+				/>
+				<FormField
+					control={form.control}
+					name="captchaText"
+					render={({ field }) => (
+						<FormItem>
+							<FormLabel className="text-md">验证码</FormLabel>
+							<FormControl>
+								<div className="flex items-center justify-between">
+									<Input placeholder="请输入验证码" {...field} />
+									{captchaInfo.captcha && (
+										<div
+											dangerouslySetInnerHTML={{ __html: captchaInfo.captcha }}
+											className="
+												h-[36px] w-[115px] ml-2 rounded-md flex justify-center items-center 
+												border border-gray-950 dark:border-white [&>svg]:rounded-md cursor-pointer 
+												hover:border-ring hover:ring-ring/50 hover:ring-[3px]
+											"
+											onClick={getCaptcha}
+										/>
+									)}
+								</div>
 							</FormControl>
 							<FormMessage />
 						</FormItem>

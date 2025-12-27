@@ -35,6 +35,9 @@
 				"useKeyWithClickEvents": "off",
 				"noStaticElementInteractions": "off"
 			},
+			"security": {
+				"noDangerouslySetInnerHtml": "off"
+			},
 			"suspicious": {
 				"noArrayIndexKey": "off",
 				"noExplicitAny": "off"

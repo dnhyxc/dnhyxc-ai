@@ -26,8 +26,13 @@ const Login = () => {
 		};
 	}, [theme]);
 
-	const onRegister = (status?: boolean) => {
-		setIsRegister(status || !isRegister);
+	const onRegister = () => {
+		setIsRegister(!isRegister);
+		setIsForget(false);
+	};
+
+	const switchLogin = () => {
+		setIsRegister(false);
 		setIsForget(false);
 	};
 
@@ -48,7 +53,7 @@ const Login = () => {
 				{isRegister ? '注册账号' : isForget ? '重置密码' : '账号密码登录'}
 			</div>
 			{isForget ? (
-				<ForgetPwdForm onForgetPwd={onForgetPwd} onRegister={onRegister} />
+				<ForgetPwdForm onForgetPwd={onForgetPwd} switchLogin={switchLogin} />
 			) : isRegister ? (
 				<RegisterForm onRegister={onRegister} />
 			) : (
@@ -59,7 +64,7 @@ const Login = () => {
 					<Button
 						variant="link"
 						className="cursor-pointer p-0 text-sm"
-						onClick={() => onRegister()}
+						onClick={onRegister}
 					>
 						{isRegister ? '已有账号，前往登录' : '没有账号，点我注册'}
 					</Button>

@@ -21,3 +21,12 @@ export const getEntities = (path: string) => {
 		}
 	}
 };
+
+export const randomLightColor = () => {
+	// 生成128-255之间的RGB分量，避免深色
+	const r = Math.floor(Math.random() * 128) + 128;
+	const g = Math.floor(Math.random() * 128) + 128;
+	const b = Math.floor(Math.random() * 128) + 128;
+
+	return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+};

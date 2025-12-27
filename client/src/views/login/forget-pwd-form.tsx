@@ -14,10 +14,10 @@ import { Input } from '@/components/ui/input';
 
 interface IProps {
 	onForgetPwd: (status?: boolean) => void;
-	onRegister: (status?: boolean) => void;
+	switchLogin: (status?: boolean) => void;
 }
 
-const ForgetPwdForm: React.FC<IProps> = ({ onForgetPwd, onRegister }) => {
+const ForgetPwdForm: React.FC<IProps> = ({ onForgetPwd, switchLogin }) => {
 	const formSchema = z.object({
 		username: z.string().min(2, {
 			message: '用户名至少输入两个字符',
@@ -54,8 +54,7 @@ const ForgetPwdForm: React.FC<IProps> = ({ onForgetPwd, onRegister }) => {
 	};
 
 	const goToLogin = () => {
-		onForgetPwd(false);
-		onRegister(false);
+		switchLogin();
 	};
 
 	return (
