@@ -1,5 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Toast, Toaster } from '@ui/sonner';
+import { Spinner } from '@ui/spinner';
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router';
@@ -22,6 +23,7 @@ interface IProps {
 }
 
 const LoginForm: React.FC<IProps> = ({ onForgetPwd }) => {
+	const [isLoading, setIsLoading] = useState(false);
 	const [captchaInfo, setCaptchaInfo] = useState<{
 		captchaId: string;
 		captcha: string;
@@ -38,7 +40,9 @@ const LoginForm: React.FC<IProps> = ({ onForgetPwd }) => {
 
 	const getCaptcha = async () => {
 		// 获取验证码
+		setIsLoading(true);
 		const res = await getVerifyCode();
+		setIsLoading(false);
 		if (res) {
 			setCaptchaInfo({
 				captchaId: res.data.captchaId,
@@ -132,15 +136,24 @@ const LoginForm: React.FC<IProps> = ({ onForgetPwd }) => {
 								<div className="flex items-center justify-between">
 									<Input placeholder="请输入验证码" {...field} />
 									{captchaInfo.captcha && (
-										<div
-											dangerouslySetInnerHTML={{ __html: captchaInfo.captcha }}
-											className="
+										<div className="flex items-center justify-center relative">
+											<div
+												dangerouslySetInnerHTML={{
+													__html: captchaInfo.captcha,
+												}}
+												className="
 												h-[36px] w-[115px] ml-2 rounded-md flex justify-center items-center 
 												border border-gray-950 dark:border-white [&>svg]:rounded-md cursor-pointer 
 												hover:border-ring hover:ring-ring/50 hover:ring-[3px]
 											"
-											onClick={getCaptcha}
-										/>
+												onClick={getCaptcha}
+											/>
+											{isLoading && (
+												<div className="absolute top-0 left-0 w-[115px] h-full ml-2 rounded-md bg-gray-500 opacity-50">
+													<Spinner className="absolute top-[50%] left-[50%] translate-x-[-50%] translate-y-[-50%] size-5" />
+												</div>
+											)}
+										</div>
 									)}
 								</div>
 							</FormControl>
