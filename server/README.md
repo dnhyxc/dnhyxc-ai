@@ -659,3 +659,223 @@ export class LogsController {
 	}
 }
 ```
+
+## 集成 Redis
+
+[@keyv/redis](https://github.com/jaredwray/keyv/tree/main/packages/redis#using-with-nestjs)
+
+[@nestjs/cache-manager cache-manager](https://docs.nestjs.com/techniques/caching)
+
+```bash
+pnpm install --save keyv @keyv/redis
+
+pnpm i @nestjs/cache-manager cache-manager
+
+pnpm i @keyv/redis keyv @nestjs/cache-manager cache-manager cacheable
+```
+
+## CentOs 安装 Redis
+
+参考：
+
+- [CentOS下Redis简洁安装（无坑版](https://cloud.tencent.com/developer/article/2346429)
+
+- [Redis（一）Centos7.6安装Redis服务](https://developer.aliyun.com/article/897019)
+
+## 本地连接
+
+```ts
+import { createClient } from "redis";
+
+const client = createClient({
+	username: "default",
+	password: "Jgj0WUDmD1XNaItbvTCDaKocHopeqoT4",
+	socket: {
+		host: "redis-18382.c238.us-central1-2.gce.cloud.redislabs.com",
+		port: 18382,
+	},
+});
+
+client.on("error", (err) => console.log("Redis Client Error", err));
+
+await client.connect();
+
+await client.set("foo", "bar");
+const result = await client.get("foo");
+console.log(result); // >>> bar
+```
+
+## Redis 实现验证码校验
+
+[deepseek](https://chat.deepseek.com/a/chat/s/024b9e19-7c4c-4b20-8689-8babb2a6d894)
+
+[案例视频](https://www.bilibili.com/video/BV1Sa27B7EKE/?spm_id_from=333.337.search-card.all.click&vd_source=048c1562000d83337f08ff7451ab1f76)
+
+```ts
+// auth.service.ts
+import { ForbiddenException, Injectable } from "@nestjs/common";
+import { JwtService } from "@nestjs/jwt";
+import * as argon2 from "argon2";
+import * as svgCaptcha from "svg-captcha";
+import { UserService } from "../user/user.service";
+import { InjectRedis } from "@liaoliaots/nestjs-redis";
+import Redis from "ioredis";
+import { randomUUID } from "crypto";
+
+@Injectable()
+export class AuthService {
+	// Redis key 前缀
+	private readonly CAPTCHA_PREFIX = "captcha:";
+
+	constructor(
+		private readonly userService: UserService,
+		private jwt: JwtService,
+		@InjectRedis() private readonly redis: Redis
+	) {}
+
+	/**
+	 * 生成验证码
+	 */
+	async generateCaptcha() {
+		const captcha = svgCaptcha.create({
+			size: 4,
+			fontSize: 32,
+			width: 100,
+			height: 36,
+			background: "#cc9966",
+		});
+
+		// 生成唯一 captchaId
+		const captchaId = randomUUID();
+
+		// 将验证码文本存储到 Redis，设置5分钟过期
+		const key = `${this.CAPTCHA_PREFIX}${captchaId}`;
+		await this.redis.setex(key, 300, captcha.text.toLowerCase()); // 5分钟过期
+
+		// 返回 captchaId 和图片数据
+		return {
+			captchaId,
+			data: captcha.data, // SVG 图片数据
+			// 或者返回 base64 格式
+			// base64: `data:image/svg+xml;base64,${Buffer.from(captcha.data).toString('base64')}`
+		};
+	}
+
+	/**
+	 * 验证验证码
+	 */
+	async verifyCaptcha(
+		captchaId: string,
+		captchaText: string
+	): Promise<boolean> {
+		if (!captchaId || !captchaText) {
+			return false;
+		}
+
+		const key = `${this.CAPTCHA_PREFIX}${captchaId}`;
+
+		// 从 Redis 获取验证码
+		const storedCaptcha = await this.redis.get(key);
+
+		// 验证后删除验证码（防止重复使用）
+		await this.redis.del(key);
+
+		if (!storedCaptcha) {
+			return false; // 验证码已过期或不存在
+		}
+
+		// 比较验证码（不区分大小写）
+		return storedCaptcha.toLowerCase() === captchaText.toLowerCase();
+	}
+
+	/**
+	 * 登录接口（带验证码校验）
+	 */
+	async login(
+		username: string,
+		password: string,
+		captchaId: string,
+		captchaText: string
+	) {
+		// 1. 先验证验证码
+		const isCaptchaValid = await this.verifyCaptcha(captchaId, captchaText);
+		if (!isCaptchaValid) {
+			throw new ForbiddenException("验证码错误或已过期");
+		}
+
+		// 2. 验证用户
+		const user = await this.userService.findByUsername(username);
+		if (!user) {
+			throw new ForbiddenException("用户不存在，请先前往注册");
+		}
+
+		// 3. 验证密码
+		const isPasswordValid = await argon2.verify(user.password, password);
+		if (!isPasswordValid) {
+			throw new ForbiddenException("用户名或密码错误");
+		}
+
+		// 4. 生成 JWT token
+		const token = await this.jwt.signAsync({
+			username: user.username,
+			sub: user.id,
+		});
+
+		return {
+			token,
+			user: {
+				id: user.id,
+				username: user.username,
+			},
+		};
+	}
+
+	/**
+	 * 登录接口（保持原有兼容，可选）
+	 */
+	async loginWithoutCaptcha(username: string, password: string) {
+		const user = await this.userService.findByUsername(username);
+		if (!user) {
+			throw new ForbiddenException("用户不存在，请先前往注册");
+		}
+
+		const isPasswordValid = await argon2.verify(user.password, password);
+		if (isPasswordValid) {
+			return await this.jwt.signAsync({
+				username: user.username,
+				sub: user.id,
+			});
+		} else {
+			throw new ForbiddenException("用户名或密码错误");
+		}
+	}
+
+	/**
+	 * 注册接口（可以加上验证码校验）
+	 */
+	async register(
+		username: string,
+		password: string,
+		captchaId?: string,
+		captchaText?: string
+	) {
+		// 如果需要验证码校验
+		if (captchaId && captchaText) {
+			const isCaptchaValid = await this.verifyCaptcha(captchaId, captchaText);
+			if (!isCaptchaValid) {
+				throw new ForbiddenException("验证码错误或已过期");
+			}
+		}
+
+		const user = await this.userService.findByUsername(username);
+		if (user) {
+			throw new ForbiddenException("用户已存在");
+		} else {
+			return await this.userService.create({
+				username,
+				password,
+			});
+		}
+	}
+}
+```

@@ -2,7 +2,10 @@ import {
 	Body,
 	ClassSerializerInterceptor,
 	Controller,
+	Get,
+	HttpStatus,
 	Post,
+	Res,
 	UseInterceptors,
 } from '@nestjs/common';
 // import { SerializeInterceptor } from '../interceptors/serialize.interceptor';
@@ -17,17 +20,48 @@ export class AuthController {
 
 	@Post('/login')
 	async login(@Body() dto: LoginUserDTO) {
-		const { username, password } = dto;
-		const token = await this.authService.login(username, password);
+		const token = await this.authService.login(dto);
 		return {
 			access_token: token,
+			success: true,
+			message: '登录成功',
+			code: HttpStatus.OK,
 		};
 	}
 
 	@Post('/register')
 	// @UseInterceptors(SerializeInterceptor)
-	register(@Body() dto: LoginUserDTO) {
+	async register(@Body() dto: LoginUserDTO) {
 		const { username, password } = dto;
-		return this.authService.register(username, password);
+		const res = await this.authService.register(username, password);
+		return {
+			success: true,
+			message: '注册成功',
+			data: res,
+			code: HttpStatus.OK,
+		};
+	}
+
+	@Get('/getCaptcha')
+	async getCaptcha(@Res() res) {
+		const data = await this.authService.getCaptcha();
+		if (data) {
+			res.type('image/svg+xml');
+			res.send({
+				data: {
+					captcha: data.captcha,
+					captchaId: data.captchaId,
+				},
+				code: HttpStatus.OK,
+				success: true,
+				message: '获取验证码成功',
+			});
+		} else {
+			return {
+				code: HttpStatus.INTERNAL_SERVER_ERROR,
+				success: false,
+				message: '获取验证码失败',
+			};
+		}
 	}
 }

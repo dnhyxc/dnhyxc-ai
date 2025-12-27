@@ -42,19 +42,22 @@ export class AllExceptionFilter implements ExceptionFilter {
 					: exception.message;
 		}
 
+		const success = httpStatus >= 200 && httpStatus < 300;
+
 		const responseBody = {
 			headers: request.headers,
 			query: request.query,
 			body: request.body,
 			params: request.params,
-			timestamp: new Date().toLocaleString('zh-CN'),
+			method: request.method,
 			// ip 信息获取
 			ip: requestIp.getClientIp(request),
+			timestamp: new Date().toLocaleString('zh-CN'),
 			exception: exception.name,
-			error: exceptionResponse,
-			code: httpStatus,
 			path: httpAdapter.getRequestUrl(request),
-			method: request.method,
+			error: exceptionResponse,
+			success,
+			code: httpStatus,
 			message: exception.message,
 		};
 

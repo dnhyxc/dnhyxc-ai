@@ -37,4 +37,23 @@ export class LoginUserDTO {
 		},
 	)
 	password: string;
+	@IsString({
+		message: '验证码必须是字符串',
+	})
+
+	@IsNotEmpty({
+		message: '验证码不能为空',
+	})
+	@Length(4, 4, {
+		message: '验证码长度必须为 4 个字符',
+	})
+	captchaText: string;
+
+	@IsString({
+		message: '验证码 id 必须是字符串',
+	})
+	@IsNotEmpty({
+		message: '验证码 id 不能为空',
+	})
+	captchaId: string;
 }

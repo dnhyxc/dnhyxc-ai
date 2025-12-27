@@ -1,3 +1,5 @@
+import { createKeyv } from '@keyv/redis';
+import { CacheModule as NestCacheModule } from '@nestjs/cache-manager';
 import { Global, Logger, Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -45,6 +47,19 @@ const envFilePath = `.env.${process.env.NODE_ENV || 'development'}`;
 			}),
 		}),
 		TypeOrmModule.forRoot(connectionOptions),
+		// Redis 缓存
+		NestCacheModule.registerAsync({
+			isGlobal: true,
+			useFactory: () => ({
+				stores: [
+					createKeyv({
+						url: 'redis://redis-18382.c238.us-central1-2.gce.cloud.redislabs.com:18382',
+						username: 'default',
+						password: 'Jgj0WUDmD1XNaItbvTCDaKocHopeqoT4',
+					}),
+				],
+			}),
+		}),
 		PromptModule,
 		LogsModule,
 		UserModule,
