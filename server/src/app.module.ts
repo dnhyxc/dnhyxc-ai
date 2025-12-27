@@ -5,8 +5,9 @@ import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import * as dotenv from 'dotenv';
 import * as Joi from 'joi';
-import { connectionOptions } from '../ormconfig';
+import { connectionOptions, getEnvConfig } from '../ormconfig';
 import { AuthModule } from './auth/auth.module';
+import { RedisEnum } from './enum/config.enum';
 import { LogsModule } from './logs/logs.module';
 import { MenusModule } from './menus/menus.module';
 import { PromptModule } from './prompt/prompt.module';
@@ -14,6 +15,9 @@ import { RolesModule } from './roles/roles.module';
 import { UserModule } from './user/user.module';
 
 const envFilePath = `.env.${process.env.NODE_ENV || 'development'}`;
+
+// 获取环境配置信息
+const envConfig = getEnvConfig();
 
 // 将 exports 中的模块注册为全局模块，在所有其他模块中都可以使用
 @Global()
@@ -53,9 +57,9 @@ const envFilePath = `.env.${process.env.NODE_ENV || 'development'}`;
 			useFactory: () => ({
 				stores: [
 					createKeyv({
-						url: 'redis://redis-18382.c238.us-central1-2.gce.cloud.redislabs.com:18382',
-						username: 'default',
-						password: 'Jgj0WUDmD1XNaItbvTCDaKocHopeqoT4',
+						url: envConfig[RedisEnum.REDIS_URL],
+						username: envConfig[RedisEnum.REDIS_USERNAME],
+						password: envConfig[RedisEnum.REDIS_PASSWORD],
 					}),
 				],
 			}),

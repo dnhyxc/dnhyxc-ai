@@ -16,13 +16,24 @@ export const getEnv = (env: string): Record<string, unknown> => {
 	return {};
 };
 
-export const buildConnectionOptions = () => {
+export const getEnvConfig = (): Record<string, any> => {
 	const defaultConfig = getEnv('.env');
 	const envConfig = getEnv(`.env.${process.env.NODE_ENV}`);
 	const config = {
 		...defaultConfig,
 		...envConfig,
 	};
+	return config;
+};
+
+export const buildConnectionOptions = () => {
+	// const defaultConfig = getEnv('.env');
+	// const envConfig = getEnv(`.env.${process.env.NODE_ENV}`);
+	// const config = {
+	// 	...defaultConfig,
+	// 	...envConfig,
+	// };
+	const config = getEnvConfig();
 	return {
 		type: config[ConfigEnum.DB_TYPE],
 		host: config[ConfigEnum.DB_HOST],

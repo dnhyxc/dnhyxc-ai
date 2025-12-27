@@ -13,3 +13,9 @@ export enum LogEnum {
 	LOG_LEVEL = 'LOG_LEVEL',
 	LOG_ON = 'LOG_ON',
 }
+
+export enum RedisEnum {
+	REDIS_URL = 'REDIS_URL',
+	REDIS_PASSWORD = 'REDIS_PASSWORD',
+	REDIS_USERNAME = 'REDIS_USERNAME',
+}
