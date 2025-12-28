@@ -15,7 +15,7 @@ import {
 	FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { getVerifyCode, login } from '@/service';
+import { createVerifyCode, login } from '@/service';
 import { setStorage } from '@/utils';
 
 interface IProps {
@@ -41,7 +41,7 @@ const LoginForm: React.FC<IProps> = ({ onForgetPwd }) => {
 	const getCaptcha = async () => {
 		// 获取验证码
 		setIsLoading(true);
-		const res = await getVerifyCode();
+		const res = await createVerifyCode();
 		setIsLoading(false);
 		if (res) {
 			setCaptchaInfo({

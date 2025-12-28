@@ -4,7 +4,6 @@ import {
 	Controller,
 	HttpStatus,
 	Post,
-	Res,
 	UseInterceptors,
 } from '@nestjs/common';
 // import { SerializeInterceptor } from '../interceptors/serialize.interceptor';
@@ -43,12 +42,11 @@ export class AuthController {
 		};
 	}
 
-	@Post('/getVerifyCode')
-	async getCaptcha(@Body() dto: CaptchaDto, @Res() res) {
-		const data = await this.authService.getVerifyCode(dto);
+	@Post('/createVerifyCode')
+	async createVerifyCode(@Body() dto: CaptchaDto) {
+		const data = await this.authService.createVerifyCode(dto);
 		if (data) {
-			res.type('image/svg+xml');
-			res.send({
+			return {
 				data: {
 					captcha: data.captcha,
 					captchaId: data.captchaId,
@@ -56,7 +54,7 @@ export class AuthController {
 				code: HttpStatus.OK,
 				success: true,
 				message: '获取验证码成功',
-			});
+			};
 		} else {
 			return {
 				code: HttpStatus.INTERNAL_SERVER_ERROR,

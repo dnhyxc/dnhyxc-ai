@@ -160,7 +160,7 @@ const Home = () => {
 	};
 
 	const getUserInfo = async () => {
-		const res = await getUserProfile(2);
+		const res = await getUserProfile(71);
 		console.log(res, 'res-getUserInfo');
 	};
 

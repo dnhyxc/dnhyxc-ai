@@ -11,6 +11,7 @@ const instance = axios.create({
 instance.interceptors.request.use(
 	// 在发送请求之前做些什么
 	function (config) {
+		console.log('请求拦截器', config);
 		if (getStorage('token')) {
 			config.headers.Authorization = `Bearer ${getStorage('token')}`;
 		}
@@ -34,7 +35,10 @@ instance.interceptors.response.use(
 	function (error) {
 		Toast({
 			type: 'error',
-			title: error.response?.data?.message || '请求接口异常',
+			title:
+				error.response?.data?.error?.message ||
+				error.response?.data?.message ||
+				'请求接口异常',
 		});
 		return Promise.reject(error);
 	},

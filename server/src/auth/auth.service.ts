@@ -53,7 +53,7 @@ export class AuthService {
 		}
 	}
 
-	async getVerifyCode(dto?: CaptchaDto) {
+	async createVerifyCode(dto?: CaptchaDto) {
 		const {
 			size = 4,
 			width = 120,

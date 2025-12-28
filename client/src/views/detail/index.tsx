@@ -28,7 +28,7 @@ const Detail = () => {
 	};
 
 	const getUsers = async () => {
-		const res = await axios.get('/user');
+		const res = await axios.get('/user/getUsers');
 		console.log(res);
 	};
 

@@ -1,5 +1,5 @@
 import axios from '@/utils/axios';
-import { GET_USER_PROFILE, GET_VERIFY_CODE, LOGIN, REGISTER } from './api';
+import { CREATE_VERIFY_CODE, GET_USER_PROFILE, LOGIN, REGISTER } from './api';
 
 export const login = async ({
 	username,
@@ -33,11 +33,14 @@ export const register = async ({
 	});
 };
 
-export const getVerifyCode = async () => {
-	return await axios.post(GET_VERIFY_CODE);
+export const createVerifyCode = async () => {
+	return await axios.post(CREATE_VERIFY_CODE);
 };
 
 export const getUserProfile = async (id: number): Promise<any> => {
+	// get 请求传递 param 格式参数
+	// return await axios.get(`${GET_USER_PROFILE}/${id}`);
+	// get 请求传递 query 格式参数
 	return await axios.get(GET_USER_PROFILE, {
 		params: {
 			id,
