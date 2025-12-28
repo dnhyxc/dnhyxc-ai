@@ -99,7 +99,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
 					'--border-radius': 'var(--radius)',
 				} as React.CSSProperties
 			}
-			position={'top-right' || props.position}
+			position={props.position || 'top-right'}
 			{...props}
 		/>
 	);
