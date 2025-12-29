@@ -3,12 +3,13 @@ import { Toaster } from '@ui/sonner';
 import { useEffect } from 'react';
 import { createBrowserRouter } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
-import { onCreateWindow } from '@/utils';
+import { onCreateWindow, removeStorage } from '@/utils';
+import { http } from '@/utils/fetch';
 import routes from './routes';
 
 const App = () => {
 	useEffect(() => {
-		const aboutPromist = listen('about', (event) => {
+		const aboutPromise = listen('about', (event) => {
 			const eventOptions = event.payload as {
 				version: string;
 			};
@@ -23,8 +24,15 @@ const App = () => {
 				resizable: false,
 			});
 		});
+
+		const logoutPromise = listen('logout', () => {
+			removeStorage('token');
+			http.setAuthToken('');
+		});
+
 		return () => {
-			aboutPromist.then((unlisten) => unlisten());
+			aboutPromise.then((unlisten) => unlisten());
+			logoutPromise.then((unlisten) => unlisten());
 		};
 	}, []);
 

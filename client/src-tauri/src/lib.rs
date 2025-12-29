@@ -37,6 +37,14 @@ pub fn run() {
                     api.prevent_close();
                     let _ = window.hide();
                 }
+                // WindowEvent::Destroyed => {
+                //     println!("CloseRequested");
+                //     // 清空 localStorage 中的 token
+                //     // 清空 localStorage 中的 token
+                //     if let Some(webview) = window.get_webview_window("main") {
+                //         let _ = webview.eval("localStorage.removeItem('token');");
+                //     }
+                // }
                 _ => {}
             });
             // if let Some(main_window) = app.get_webview_window("main") {
@@ -69,6 +77,12 @@ pub fn run() {
         .expect("error while running tauri application")
         // 启动应用后的事件循环处理
         .run(|app_handle, event| {
+            // 应用退出前清空 token 信息
+            if let tauri::RunEvent::Exit = event {
+                if let Some(webview) = app_handle.get_webview_window("main") {
+                    let _ = webview.eval("localStorage.removeItem('token');");
+                }
+            }
             // macOS 平台：调用自定义的 app_event 模块处理应用事件
             #[cfg(target_os = "macos")]
             dock::dock_event(&app_handle, event);

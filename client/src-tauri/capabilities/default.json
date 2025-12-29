@@ -17,7 +17,7 @@
 			"identifier": "http:default",
 			"allow": [
 				{
-					"url": "http://localhost:9112/*"
+					"url": "http://101.34.214.188:9112/*"
 				},
 				{
 					"url": "http://localhost:9112/*"

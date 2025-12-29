@@ -71,15 +71,10 @@ const Home = () => {
 			console.log('about-send-message', event);
 		});
 
-		const logoutPromise = listen('logout', (event) => {
-			console.log('logout', event);
-		});
-
 		return () => {
 			unlistenPromise.then((unlisten) => unlisten());
 			unlistenFileInfoPromise.then((unlisten) => unlisten());
 			unlistenAboutPromise.then((unlisten) => unlisten());
-			logoutPromise.then((unlisten) => unlisten());
 		};
 	}, []);
 
