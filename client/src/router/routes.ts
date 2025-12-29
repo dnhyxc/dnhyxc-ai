@@ -3,6 +3,7 @@ import About from '@/views/about';
 import Detail from '@/views/detail';
 import Home from '@/views/home';
 import Login from '@/views/login';
+import Profile from '@/views/profile';
 import ChildWindow from '@/views/win';
 
 const routes = [
@@ -16,6 +17,10 @@ const routes = [
 			{
 				path: 'detail',
 				Component: Detail,
+			},
+			{
+				path: 'profile',
+				Component: Profile,
 			},
 		],
 	},

@@ -35,6 +35,12 @@ const Sidebar = () => {
 					>
 						<WalletCards className="hover:text-green-600" />
 					</div>
+					<div
+						className="flex justify-center items-center w-12 h-12 bg-border cursor-pointer mb-4 rounded-md hover:shadow-(--shadow-10) hover:text-green-600 transition-all duration-200 ease-in-out"
+						onClick={() => onJump('/profile')}
+					>
+						<WalletCards className="hover:text-green-600" />
+					</div>
 				</div>
 				<div className="">
 					<div

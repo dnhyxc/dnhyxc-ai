@@ -12,3 +12,6 @@ export const GET_USERS = '/user/getUsers';
 
 // 获取用户信息
 export const GET_USER_PROFILE = '/user/profile';
+
+// 获取七牛云上传token
+export const GET_UPLOAD_TOKEN = '/upload/getUploadToken';

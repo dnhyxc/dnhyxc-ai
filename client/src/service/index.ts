@@ -1,6 +1,7 @@
 import { http } from '@/utils/fetch';
 import {
 	CREATE_VERIFY_CODE,
+	GET_UPLOAD_TOKEN,
 	GET_USER_PROFILE,
 	GET_USERS,
 	LOGIN,
@@ -55,4 +56,9 @@ export const getUserProfile = async (id: number): Promise<any> => {
 // 获取用户列表
 export const getUsers = async () => {
 	return await http.get(GET_USERS);
+};
+
+// 获取七牛云上传token
+export const getUploadToken = async () => {
+	return await http.get(GET_UPLOAD_TOKEN);
 };

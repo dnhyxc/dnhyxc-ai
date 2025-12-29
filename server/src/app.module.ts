@@ -5,14 +5,16 @@ import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import * as dotenv from 'dotenv';
 import * as Joi from 'joi';
-import { connectionOptions, getEnvConfig } from '../ormconfig';
+import { connectionOptions } from '../ormconfig';
 import { AuthModule } from './auth/auth.module';
 import { RedisEnum } from './enum/config.enum';
 import { LogsModule } from './logs/logs.module';
 import { MenusModule } from './menus/menus.module';
 import { PromptModule } from './prompt/prompt.module';
 import { RolesModule } from './roles/roles.module';
+import { UploadModule } from './upload/upload.module';
 import { UserModule } from './user/user.module';
+import { getEnvConfig } from './utils';
 
 const envFilePath = `.env.${process.env.NODE_ENV || 'development'}`;
 
@@ -87,6 +89,7 @@ const envConfig = getEnvConfig();
 		RolesModule,
 		AuthModule,
 		MenusModule,
+		UploadModule,
 	],
 	controllers: [],
 	providers: [

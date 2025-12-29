@@ -1,30 +1,29 @@
-import * as fs from 'node:fs';
 import { TypeOrmModuleOptions } from '@nestjs/typeorm';
-import * as dotenv from 'dotenv';
 import { DataSource, DataSourceOptions } from 'typeorm';
 import { ConfigEnum } from './src/enum/config.enum';
+import { getEnvConfig } from './src/utils';
 
 const entitiesDir =
 	process.env.NODE_ENV === 'test'
 		? [`${__dirname}/**/*.entity.ts`]
 		: [`${__dirname}/**/*.entity.{ts,js}`];
 
-export const getEnv = (env: string): Record<string, unknown> => {
-	if (fs.existsSync(env)) {
-		return dotenv.parse(fs.readFileSync(env));
-	}
-	return {};
-};
+// export const getEnv = (env: string): Record<string, unknown> => {
+// 	if (fs.existsSync(env)) {
+// 		return dotenv.parse(fs.readFileSync(env));
+// 	}
+// 	return {};
+// };
 
-export const getEnvConfig = (): Record<string, any> => {
-	const defaultConfig = getEnv('.env');
-	const envConfig = getEnv(`.env.${process.env.NODE_ENV}`);
-	const config = {
-		...defaultConfig,
-		...envConfig,
-	};
-	return config;
-};
+// export const getEnvConfig = (): Record<string, any> => {
+// 	const defaultConfig = getEnv('.env');
+// 	const envConfig = getEnv(`.env.${process.env.NODE_ENV}`);
+// 	const config = {
+// 		...defaultConfig,
+// 		...envConfig,
+// 	};
+// 	return config;
+// };
 
 export const buildConnectionOptions = () => {
 	// const defaultConfig = getEnv('.env');
