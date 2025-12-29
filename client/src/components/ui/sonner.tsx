@@ -69,6 +69,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
 		<Sonner
 			theme={theme as ToasterProps['theme']}
 			className="toaster group"
+			offset={props.offset || 30}
 			icons={{
 				success: (
 					<CircleCheckIcon
