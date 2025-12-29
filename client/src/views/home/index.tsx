@@ -2,6 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 import { Button } from '@ui/button';
 import { Input } from '@ui/input';
+import { Toast } from '@ui/sonner';
 import { useEffect, useState } from 'react';
 import { getUserProfile } from '@/service';
 import type { DownloadFileInfo, DownloadProgress } from '@/types';
@@ -172,6 +173,11 @@ const Home = () => {
 		// );
 		const res = await getUserProfile(2);
 		console.log(res.data, 'res-getUserInfo');
+		Toast({
+			title: '获取用户信息成功!',
+			type: 'success',
+			message: res.data.username,
+		});
 	};
 
 	return (

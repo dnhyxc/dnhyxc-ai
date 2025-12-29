@@ -17,6 +17,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { createVerifyCode, login } from '@/service';
 import { setStorage } from '@/utils';
+import { http } from '@/utils/fetch';
 
 interface IProps {
 	onForgetPwd: (status?: boolean) => void;
@@ -106,6 +107,7 @@ const LoginForm: React.FC<IProps> = ({ onForgetPwd }) => {
 
 		if (res?.data?.access_token) {
 			setStorage('token', res.data.access_token);
+			http.setAuthToken(res.data.access_token);
 		}
 		navigate('/');
 		onForgetPwd(false);

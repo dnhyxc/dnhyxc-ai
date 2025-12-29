@@ -1,4 +1,5 @@
 import { listen } from '@tauri-apps/api/event';
+import { Toaster } from '@ui/sonner';
 import { useEffect } from 'react';
 import { createBrowserRouter } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
@@ -28,7 +29,12 @@ const App = () => {
 	}, []);
 
 	const router = createBrowserRouter(routes);
-	return <RouterProvider router={router} />;
+	return (
+		<div className="h-full w-full">
+			<Toaster />
+			<RouterProvider router={router} />
+		</div>
+	);
 };
 
 export default App;
