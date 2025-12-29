@@ -312,74 +312,57 @@ pub fn run() {
 
 [https://tailwindcss.com/docs/theme#theme-variable-namespaces](https://tailwindcss.com/docs/theme#theme-variable-namespaces)
 
-## Redis 环境变量设置问题
+## 加载线上资源
 
-执行 `source .bash_profile` 时报错：
-
-> manpath: can't set the locale; make sure $LC\_\* and $LANG are correct
-
-解决方式，执行如下命令：
-
-```bash
-sudo yum install -y glibc-common
-sudo localedef -v -c -i en_US -f UTF-8 en_US.UTF-8
-source ~/.bash_profile
-```
-
-具体解决参考：
-
-[deepseek-环境变量处理](https://chat.deepseek.com/a/chat/s/eeeace28-a831-49a4-826d-53e1c468cb3e)
-
-### 执行 `执行 ./install_server.sh` 后提示
-
-```
-Welcome to the redis service installer
-This script will help you easily set up a running redis server
-
-Please select the redis port for this instance: [6379] 12029
-Please select the redis config file name [/etc/redis/12029.conf]
-Selected default - /etc/redis/12029.conf
-Please select the redis log file name [/var/log/redis_12029.log]
-Selected default - /var/log/redis_12029.log
-Please select the data directory for this instance [/var/lib/redis/12029]
-Selected default - /var/lib/redis/12029
-Please select the redis executable path [/usr/local/redis//bin/redis-server]
-Selected config:
-Port           : 12029
-Config file    : /etc/redis/12029.conf
-Log file       : /var/log/redis_12029.log
-Data dir       : /var/lib/redis/12029
-Executable     : /usr/local/redis//bin/redis-server
-Cli Executable : /usr/local/redis//bin/redis-cli
-Is this ok? Then press ENTER to go on or Ctrl-C to abort.
-Copied /tmp/12029.conf => /etc/init.d/redis_12029
-Installing service...
-Successfully added to chkconfig!
-Successfully added to runlevels 345!
-Starting Redis server...
-Installation successful!
-```
-
-### 启动 Redis
-
-```bash
-ps -ef | grep redis
-```
-
-启动过后提示：
-
-```
-root     15307     1  0 20:50 ?        00:00:00 /usr/local/redis//bin/redis-server 127.0.0.1:12029
-root     21505 10337  0 20:53 pts/0    00:00:00 grep --color=auto redis
-```
-
-看到上述的提示，说明 Redis 已经成功启动了，启动在 12029 端口上。
-
-### 运行 redis-cli
-
-运行 redis-cli 命令，进入 Redis 的命令行模式：
-
-```bash
-# 指定端口，因为默认端口是 6379，我们设置的端口号是 12029
-redis-cli -p 12029
+```json
+{
+	"$schema": "https://schema.tauri.app/config/2",
+	"productName": "dnhyxc-ai",
+	"version": "0.0.1",
+	"identifier": "com.dnhyxc.dnhyxc-ai",
+	"build": {
+		"beforeDevCommand": "pnpm dev",
+		"devUrl": "http://localhost:1420",
+		"beforeBuildCommand": "pnpm build",
+		"frontendDist": "../dist"
+	},
+	"app": {
+		"windows": [
+			{
+				"label": "main",
+				"title": "dnhyxc-ai",
+				"width": 1050,
+				"height": 720,
+				"minWidth": 1050,
+				"minHeight": 720,
+				"hiddenTitle": true,
+				"resizable": true,
+				"decorations": true,
+				"titleBarStyle": "Overlay",
+				"center": true,
+				"devtools": true,
+				"url": "https://dnhyxc.cn",
+				"allowLinkPreview": true
+			}
+		],
+		"security": {
+			"csp": "default-src 'self' http://101.34.214.188; connect-src 'self' http://101.34.214.188; img-src 'self' http://101.34.214.188 data:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';",
+			"assetProtocol": {
+				"enable": true,
+				"scope": ["http://101.34.214.188", "https://*"]
+			}
+		}
+	},
+	"bundle": {
+		"active": true,
+		"targets": "all",
+		"icon": [
+			"icons/32x32.png",
+			"icons/128x128.png",
+			"icons/128x128@2x.png",
+			"icons/icon.icns",
+			"icons/icon.ico"
+		]
+	}
+}
 ```

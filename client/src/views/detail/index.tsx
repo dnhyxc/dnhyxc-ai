@@ -1,7 +1,7 @@
 import { Button } from '@ui/button';
 import { useEffect } from 'react';
+import { getUsers } from '@/service';
 import { getStorage, onEmit, onListen, setBodyClass } from '@/utils';
-import axios from '@/utils/axios';
 
 const Detail = () => {
 	const theme = getStorage('theme');
@@ -27,8 +27,8 @@ const Detail = () => {
 		await onEmit('about-send-message', { message: 'about message' });
 	};
 
-	const getUsers = async () => {
-		const res = await axios.get('/user/getUsers');
+	const getUserList = async () => {
+		const res = await getUsers();
 		console.log(res);
 	};
 
@@ -43,7 +43,11 @@ const Detail = () => {
 				>
 					send message
 				</Button>
-				<Button variant="default" className="cursor-pointer" onClick={getUsers}>
+				<Button
+					variant="default"
+					className="cursor-pointer"
+					onClick={getUserList}
+				>
 					Get Users
 				</Button>
 			</div>

@@ -10,6 +10,17 @@
 		"core:window:allow-start-dragging",
 		"core:webview:allow-create-webview-window",
 		"core:window:allow-set-focus",
-		"core:window:allow-set-theme"
+		"core:window:allow-set-theme",
+		"http:default",
+		"http:allow-fetch",
+		{
+			"identifier": "http:default",
+			"allow": [
+				{
+					"url": "http://101.34.214.188:9112/*"
+				}
+			],
+			"description": "dnhyxc-ai nest api"
+		}
 	]
 }

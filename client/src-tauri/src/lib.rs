@@ -2,6 +2,8 @@
 mod clients;
 mod dock;
 // mod event;
+mod init;
+use init::CustomInit;
 mod menu;
 mod services;
 mod tray;
@@ -51,8 +53,9 @@ pub fn run() {
 
             Ok(())
         })
-        // 注册“opener”插件，用于在系统默认程序中打开文件或 URL
-        .plugin(tauri_plugin_opener::init())
+        .init_plugin()
+        // .plugin(tauri_plugin_opener::init())
+        // .plugin(tauri_plugin_http::init())
         // 注册命令处理器：将 `clients::greet` 和 `services::open_folder` 函数暴露给前端
         .invoke_handler(tauri::generate_handler![
             clients::greet,

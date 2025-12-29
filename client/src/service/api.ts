@@ -8,4 +8,7 @@ export const REGISTER = '/auth/register';
 export const CREATE_VERIFY_CODE = '/auth/createVerifyCode';
 
 // 获取用户信息
+export const GET_USERS = '/user/getUsers';
+
+// 获取用户信息
 export const GET_USER_PROFILE = '/user/profile';

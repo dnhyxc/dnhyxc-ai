@@ -1,5 +1,11 @@
-import axios from '@/utils/axios';
-import { CREATE_VERIFY_CODE, GET_USER_PROFILE, LOGIN, REGISTER } from './api';
+import { http } from '@/utils/fetch';
+import {
+	CREATE_VERIFY_CODE,
+	GET_USER_PROFILE,
+	GET_USERS,
+	LOGIN,
+	REGISTER,
+} from './api';
 
 export const login = async ({
 	username,
@@ -11,8 +17,8 @@ export const login = async ({
 	password: string;
 	captchaText: string;
 	captchaId: string;
-}): Promise<{ access_token: string }> => {
-	return await axios.post(LOGIN, {
+}) => {
+	return await http.post(LOGIN, {
 		username,
 		password,
 		captchaText,
@@ -27,23 +33,26 @@ export const register = async ({
 	username: string;
 	password: string;
 }): Promise<any> => {
-	return await axios.post(REGISTER, {
+	return await http.post(REGISTER, {
 		username,
 		password,
 	});
 };
 
 export const createVerifyCode = async () => {
-	return await axios.post(CREATE_VERIFY_CODE);
+	return await http.post(CREATE_VERIFY_CODE);
 };
 
 export const getUserProfile = async (id: number): Promise<any> => {
 	// get 请求传递 param 格式参数
 	// return await axios.get(`${GET_USER_PROFILE}/${id}`);
 	// get 请求传递 query 格式参数
-	return await axios.get(GET_USER_PROFILE, {
-		params: {
-			id,
-		},
+	return await http.get(GET_USER_PROFILE, {
+		querys: { id },
 	});
+};
+
+// 获取用户列表
+export const getUsers = async () => {
+	return await http.get(GET_USERS);
 };

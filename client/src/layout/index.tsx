@@ -9,6 +9,7 @@
 import Header from '@design/Header';
 import Sidebar from '@design/Sidebar';
 import { ScrollArea } from '@ui/scroll-area';
+import { Toaster } from '@ui/sonner';
 import { useEffect } from 'react';
 import { Outlet } from 'react-router';
 import { getStorage, onListen, setBodyClass } from '@/utils';
@@ -30,6 +31,7 @@ const Layout = () => {
 
 	return (
 		<main className="w-full h-full flex rounded-md overflow-hidden">
+			<Toaster />
 			<Sidebar />
 			<div
 				data-tauri-drag-region

@@ -160,8 +160,18 @@ const Home = () => {
 	};
 
 	const getUserInfo = async () => {
-		const res = await getUserProfile(71);
-		console.log(res, 'res-getUserInfo');
+		// const res = await fetch(
+		// 	'http://101.34.214.188:9112/api/user/profile?id=2',
+		// 	{
+		// 		method: 'GET',
+		// 		headers: {
+		// 			'Content-Type': 'application/json',
+		// 			Authorization: `Bearer ${getStorage('token')}`,
+		// 		},
+		// 	},
+		// );
+		const res = await getUserProfile(2);
+		console.log(res.data, 'res-getUserInfo');
 	};
 
 	return (

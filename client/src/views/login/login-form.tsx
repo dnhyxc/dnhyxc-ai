@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Toast, Toaster } from '@ui/sonner';
+import { Toast } from '@ui/sonner';
 import { Spinner } from '@ui/spinner';
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
@@ -41,7 +41,19 @@ const LoginForm: React.FC<IProps> = ({ onForgetPwd }) => {
 	const getCaptcha = async () => {
 		// 获取验证码
 		setIsLoading(true);
+		// const response = await fetch(
+		// 	'http://101.34.214.188:9112/api/auth/createVerifyCode',
+		// 	{
+		// 		method: 'POST',
+		// 		body: JSON.stringify({
+		// 			username: 'admin',
+		// 			password: 'admin',
+		// 		}),
+		// 	},
+		// );
+		// const res = await response.json(); // 获取接口响应数据
 		const res = await createVerifyCode();
+		console.log(res, '获取验证码');
 		setIsLoading(false);
 		if (res) {
 			setCaptchaInfo({
@@ -89,8 +101,11 @@ const LoginForm: React.FC<IProps> = ({ onForgetPwd }) => {
 			...values,
 			captchaId: captchaInfo.captchaId,
 		});
-		if (res?.access_token) {
-			setStorage('token', res.access_token);
+
+		console.log(res.data.access_token, 'loginloginloginloginloginloginlogin');
+
+		if (res?.data?.access_token) {
+			setStorage('token', res.data.access_token);
 		}
 		navigate('/');
 		onForgetPwd(false);
@@ -98,7 +113,6 @@ const LoginForm: React.FC<IProps> = ({ onForgetPwd }) => {
 
 	return (
 		<Form {...form}>
-			<Toaster />
 			<form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
 				<FormField
 					control={form.control}

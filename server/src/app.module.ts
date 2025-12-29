@@ -54,15 +54,32 @@ const envConfig = getEnvConfig();
 		// Redis 缓存
 		NestCacheModule.registerAsync({
 			isGlobal: true,
-			useFactory: () => ({
-				stores: [
-					createKeyv({
-						url: envConfig[RedisEnum.REDIS_URL],
-						username: envConfig[RedisEnum.REDIS_USERNAME],
-						password: envConfig[RedisEnum.REDIS_PASSWORD],
-					}),
-				],
-			}),
+			useFactory: async () => {
+				const store = createKeyv({
+					url: envConfig[RedisEnum.REDIS_URL],
+					password: envConfig[RedisEnum.REDIS_PASSWORD],
+					username: envConfig[RedisEnum.REDIS_USERNAME],
+				});
+				// 添加错误监听
+				store.on('error', (err) => {
+					console.error('Keyv Store Error:', err.message);
+				});
+				// 测试连接
+				try {
+					await store.set('test_connection', Date.now(), 10000);
+					const testResult = await store.get('test_connection');
+					console.log(`Redis 连接测试 ${testResult ? '✅ 成功' : '❌ 失败'}`);
+					await store.delete('test_connection');
+				} catch (error) {
+					console.error('Redis连接测试失败:', error.message);
+				}
+				return {
+					store: store,
+					// ttl（time-to-live）表示缓存项的存活时间，单位毫秒。这里设置为 120000 毫秒（120 秒），
+					// 意味着写入缓存的数据默认在 5 秒后过期并被自动清除，防止脏数据长期残留。
+					ttl: 120000,
+				};
+			},
 		}),
 		PromptModule,
 		LogsModule,

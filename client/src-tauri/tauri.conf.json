@@ -5,7 +5,7 @@
 	"identifier": "com.dnhyxc.dnhyxc-ai",
 	"build": {
 		"beforeDevCommand": "pnpm dev",
-		"devUrl": "http://localhost:1420",
+		"devUrl": "http://127.0.0.1:9002",
 		"beforeBuildCommand": "pnpm build",
 		"frontendDist": "../dist"
 	},
@@ -22,7 +22,8 @@
 				"resizable": true,
 				"decorations": true,
 				"titleBarStyle": "Overlay",
-				"center": true
+				"center": true,
+				"transparent": false
 			}
 		],
 		"security": {
