@@ -1,14 +1,16 @@
 import { HttpAdapterHost, NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import 'winston-daily-rotate-file';
+import { join } from 'node:path';
 import { ValidationPipe } from '@nestjs/common';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { AllExceptionFilter } from './filters/all-exception-filter';
 
 async function bootstrap() {
-	const app = await NestFactory.create(AppModule, {
+	const app = await NestFactory.create<NestExpressApplication>(AppModule, {
 		// 允许跨域
 		cors: true,
 	});
@@ -42,6 +44,10 @@ async function bootstrap() {
 		}),
 	);
 
+	// 配置静态资源访问路径
+	app.useStaticAssets(join(__dirname, '..', 'uploads'));
+
 	await app.listen(process.env.PORT ?? 9112);
 }
+
 bootstrap();

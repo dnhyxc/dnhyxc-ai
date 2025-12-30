@@ -1,3 +1,4 @@
+import { join } from 'node:path';
 import { HttpException, Injectable } from '@nestjs/common';
 import * as qiniu from 'qiniu';
 import { QiniuEnum } from '../enum/config.enum';
@@ -19,6 +20,24 @@ export class UploadService {
 			return uploadToken;
 		} else {
 			throw new HttpException('获取上传凭证失败', 500);
+		}
+	}
+
+	// 获取静态资源访问路径
+	getStaticPath(filePath: string, mimetype: string): string {
+		// 获取上传根目录
+		const uploadsRootPath = join(__dirname, '..', '..', 'uploads');
+		if (mimetype.startsWith('image/')) {
+			const relativePath = filePath
+				.replace(uploadsRootPath, '')
+				.replace(/\\/g, '/');
+			return `${relativePath}`;
+		} else {
+			// 计算相对于 files 目录的路径
+			const relativePath = filePath
+				.replace(uploadsRootPath, '')
+				.replace(/\\/g, '/');
+			return `${relativePath}`;
 		}
 	}
 }
