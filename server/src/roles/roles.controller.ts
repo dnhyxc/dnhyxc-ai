@@ -8,10 +8,8 @@ import {
 	ParseIntPipe,
 	Patch,
 	Post,
-	UseFilters,
 	UseGuards,
 } from '@nestjs/common';
-import { TypeormFilter } from 'src/filters/typeorm.filter';
 import { Roles } from '../decorators/roles.decorator';
 import { Role } from '../enum/roles.enum';
 import { JwtGuard } from '../guards/jwt.guard';
@@ -21,8 +19,6 @@ import { UpdateRoleDto } from './dto/update-role.dto';
 import { RolesService } from './roles.service';
 
 @Controller('roles')
-// 添加 TypeormFilter 异常过滤器
-@UseFilters(new TypeormFilter())
 // 添加 JwtGuard 守卫
 @Roles(Role.USER)
 @UseGuards(JwtGuard, RoleGuard)
