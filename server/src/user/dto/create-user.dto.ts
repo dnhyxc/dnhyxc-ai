@@ -1,4 +1,3 @@
-import { ApiProperty } from '@nestjs/swagger';
 import { IsNotEmpty, IsString, Length } from 'class-validator';
 import { Roles } from '../../roles/roles.entity';
 
@@ -21,9 +20,6 @@ export class CreateUserDTO {
 		 */
 		message: '用户名长度必须在 1 到 21 个字符之间',
 	})
-	@ApiProperty({
-		example: 'admin',
-	})
 	username: string;
 
 	@IsString({
@@ -35,13 +31,7 @@ export class CreateUserDTO {
 	@Length(6, 32, {
 		message: '用户名长度必须在 5 到 33 个字符之间',
 	})
-	@ApiProperty({
-		example: 'admin@123456',
-	})
 	password: string;
 
-	@ApiProperty({
-		example: [1, 2],
-	})
 	roles?: Roles[] | number[];
 }

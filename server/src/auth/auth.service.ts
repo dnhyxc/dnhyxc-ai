@@ -46,6 +46,7 @@ export class AuthService {
 			throw new HttpException('用户名或密码错误', HttpStatus.BAD_REQUEST);
 		}
 	}
+
 	async register(username: string, password: string) {
 		const user = await this.userService.findByUsername(username);
 		if (user) {

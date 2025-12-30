@@ -16,13 +16,6 @@ import {
 	UseGuards,
 	UseInterceptors,
 } from '@nestjs/common';
-import {
-	ApiBearerAuth,
-	ApiOperation,
-	ApiParam,
-	ApiQuery,
-	ApiResponse,
-} from '@nestjs/swagger';
 // import { TypeormFilter } from '../filters/typeorm.filter';
 // import { AdminGuard } from '../guards/admin.guard';
 import { JwtGuard } from '../guards/jwt.guard';
@@ -33,10 +26,20 @@ import { UpdateUserDTO } from './dto/update-user.dto';
 import { CreateUserPipe } from './pipes/create-user.pipe';
 import { User } from './user.entity';
 import { UserService } from './user.service';
+import {
+	SwaggerAddUser,
+	SwaggerController,
+	SwaggerDeleteUser,
+	SwaggerGetLogsByGroup,
+	SwaggerGetUserById,
+	SwaggerGetUserLogs,
+	SwaggerGetUserProfile,
+	SwaggerGetUsers,
+	SwaggerUpdateUser,
+} from './user.swagger';
 
 @Controller('user')
-// 生成文档需要的装饰器，用于携带 token 信息
-@ApiBearerAuth()
+@SwaggerController()
 // TODO: 添加 TypeormFilter 异常过滤器，目前这会导致 DOT 报错不能正常响应，要使用的话，后续需要优化，目前直接使用全局错误响应过滤器
 // @UseFilters(new TypeormFilter())
 // 添加 JwtGuard 守卫
@@ -47,30 +50,14 @@ export class UserController {
 	constructor(private readonly userService: UserService) {}
 
 	@Post('/addUser')
-	@ApiOperation({ summary: '新增用户', description: '新增用户接口' })
-	@ApiResponse({
-		status: 200,
-		description: '创建用户成功',
-		schema: {
-			default: {
-				id: 1,
-				username: 'admin',
-				roles: [
-					{
-						id: 1,
-						name: 'admin',
-					},
-				],
-			},
-		},
-	})
+	@SwaggerAddUser() // 使用提取的装饰器
 	// 使用 CreateUserPipe 管道，对接收的参数进行处理
 	addUser(@Body(CreateUserPipe) user: CreateUserDTO) {
 		return this.userService.create(user as User);
 	}
 
 	@Get('/getUsers')
-	@ApiOperation({ summary: '获取用户列表', description: '获取用户列表接口' })
+	@SwaggerGetUsers()
 	/**
 	 * 1. 装饰器的执行顺序：方法的装饰器如果有多个，则是从下往上执行。
 	 * @UserGuards(AdminGuard) 后执行
@@ -84,20 +71,13 @@ export class UserController {
 	}
 
 	@Get('/getUserById/:id')
-	@ApiOperation({
-		summary: '根据id查询用户信息',
-		description: '根据id查询用户信息接口',
-	})
-	@ApiParam({
-		name: 'id',
-		description: '用户id',
-		required: true,
-	})
+	@SwaggerGetUserById()
 	getUserById(@Param('id', ParseIntPipe) id: number) {
 		return this.userService.findOne(id);
 	}
 
 	@Post('/updateUser')
+	@SwaggerUpdateUser()
 	async updateUser(
 		@Body() user: UpdateUserDTO,
 		// @Param('id', ParseIntPipe) id: number,
@@ -117,11 +97,7 @@ export class UserController {
 	}
 
 	@Delete('deleteUser/:id')
-	@ApiParam({
-		name: 'id',
-		description: '用户id',
-		required: true,
-	})
+	@SwaggerDeleteUser()
 	async removeUser(@Param('id', ParseIntPipe) id: number) {
 		if (!id) throw new BadRequestException('id is required');
 		const res = await this.userService.remove(id);
@@ -134,15 +110,7 @@ export class UserController {
 
 	// ParseIntPipe 将参数转换成数字
 	@Get('/profile')
-	@ApiOperation({
-		summary: '获取用户信息',
-		description: '获取用户信息接口',
-	})
-	@ApiQuery({
-		name: 'id',
-		description: '用户id',
-		required: true,
-	})
+	@SwaggerGetUserProfile()
 	getUserProfile(
 		@Query('id', ParseIntPipe) id: number,
 		// 这里 req 中的 user 是通过 AuthGuard('jwt) 中的 validate 方法返回的
@@ -154,29 +122,13 @@ export class UserController {
 	}
 
 	@Get('/getLogs/:id')
-	@ApiOperation({
-		summary: '获取用户日志信息',
-		description: '获取用户日志信息接口',
-	})
-	@ApiParam({
-		name: 'id',
-		description: '用户id',
-		required: true,
-	})
+	@SwaggerGetUserLogs()
 	getUserLogs(@Param('id', ParseIntPipe) id: number) {
 		return this.userService.findUserLogs(id);
 	}
 
 	@Get('/logsByGroup/:id')
-	@ApiOperation({
-		summary: '获取用户日志信息',
-		description: '获取用户日志信息接口',
-	})
-	@ApiParam({
-		name: 'id',
-		description: '用户id',
-		required: true,
-	})
+	@SwaggerGetLogsByGroup()
 	async getLogsByGroup(@Param('id', ParseIntPipe) id: number) {
 		const res = await this.userService.findLogsByGroup(id);
 		// 过滤返回的数据

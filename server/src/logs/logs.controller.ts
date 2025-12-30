@@ -40,8 +40,8 @@ class PublicLogsDto {
 // 它接收一个回调函数，参数为当前用户的 ability 实例（由 CaslGuard 注入），回调需返回布尔值。
 // 只有当回调返回 true 时，请求才会被放行；否则抛出 ForbiddenException，阻止访问。
 // 与类级别的 @Can 不同，@CheckPolicies 可在运行时根据请求参数或业务逻辑做更细粒度判断。
-@CheckPolicies((ability) => ability.can(Action.READ, Logs))
-@Can(Action.READ, Logs)
+@CheckPolicies((ability) => ability.can(Action.READ, Logs)) // 配合 CaslGuard 使用的
+@Can(Action.READ, Logs) // 配合 CaslGuard 使用的
 export class LogsController {
 	@Get('/getLogs')
 	@Can(Action.READ, Logs)
