@@ -21,6 +21,7 @@ import {
 import { TypeormFilter } from '../filters/typeorm.filter';
 import { AdminGuard } from '../guards/admin.guard';
 import { JwtGuard } from '../guards/jwt.guard';
+import { ResponseInterceptor } from '../interceptors/response.interceptor';
 import { CreateUserDTO } from './dto/create-user.dto';
 import { GetUserDto } from './dto/get-user.dto';
 import { CreateUserPipe } from './pipes/create-user.pipe';
@@ -32,7 +33,8 @@ import { UserService } from './user.service';
 @UseFilters(new TypeormFilter())
 // 添加 JwtGuard 守卫
 @UseGuards(JwtGuard)
-@UseInterceptors(ClassSerializerInterceptor)
+// ClassSerializerInterceptor 设置返回字段过滤，ResponseInterceptor 设置响应拦截器，统一响应的格式
+@UseInterceptors(ClassSerializerInterceptor, ResponseInterceptor)
 export class UserController {
 	constructor(private readonly userService: UserService) {}
 

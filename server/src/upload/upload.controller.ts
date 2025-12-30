@@ -5,25 +5,25 @@ import {
 	Post,
 	UploadedFile,
 	UploadedFiles,
+	UseGuards,
 	UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
+import { JwtGuard } from 'src/guards/jwt.guard';
+import { ResponseInterceptor } from '../interceptors/response.interceptor';
 import { UploadService } from './upload.service';
 
 @Controller('upload')
+// 设置响应拦截器
+@UseInterceptors(ResponseInterceptor)
+@UseGuards(JwtGuard)
 export class UploadController {
 	constructor(private readonly uploadService: UploadService) {}
 
 	// 获取七牛云文件上传token
 	@Get('/getUploadToken')
 	async getUploadToken() {
-		const res = await this.uploadService.getUploadToken();
-		return {
-			code: 200,
-			data: res,
-			success: true,
-			message: '获取上传凭证成功',
-		};
+		return await this.uploadService.getUploadToken();
 	}
 
 	@Post('/uploadFile')
@@ -36,9 +36,6 @@ export class UploadController {
 				file.mimetype,
 			);
 			return {
-				message: '图片上传成功',
-				code: 200,
-				success: true,
 				filename: file.filename,
 				path: filePath,
 				mimetype: file.mimetype,
@@ -66,12 +63,7 @@ export class UploadController {
 					size: file.size,
 				};
 			});
-			return {
-				data: res,
-				message: '上传成功',
-				code: 200,
-				success: true,
-			};
+			return res;
 		} catch (error) {
 			throw new HttpException(error.message || '上传失败', 500);
 		}

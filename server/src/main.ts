@@ -30,6 +30,9 @@ async function bootstrap() {
 		}),
 	);
 
+	// 配置全局响应拦截器
+	// app.useGlobalInterceptors(new ResponseInterceptor());
+
 	// 全局守卫， 全局守卫有个弊端，无法使用 DI，即无法访问 userService，解决的方式是可以在 app.module.ts 中的 providers 中配置全局守卫
 	// app.useGlobalGuards(new JwtGuard());
 
