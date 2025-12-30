@@ -6,6 +6,7 @@ import { Logs } from '../logs/logs.entity';
 import { Roles } from '../roles/roles.entity';
 import { andWhereCondition } from '../utils/db.helper';
 import { GetUserDto } from './dto/get-user.dto';
+import { UpdateUserDTO } from './dto/update-user.dto';
 import { Profile } from './profile.entity';
 import { User } from './user.entity';
 
@@ -122,7 +123,7 @@ export class UserService {
 		return this.userRepository.save(_user);
 	}
 
-	async update(id: number, user: Partial<User>) {
+	async update(id: number, user: Partial<UpdateUserDTO>) {
 		const _user = await this.findProfile(id);
 		if (!_user) return null;
 		if (
@@ -132,11 +133,11 @@ export class UserService {
 		) {
 			user.roles = await this.rolesRepository.find({
 				where: {
-					id: In(user.roles),
+					id: In(user.roles as number[]),
 				},
 			});
 		}
-		const newUser = await this.userRepository.merge(_user, user);
+		const newUser = await this.userRepository.merge(_user, user as User);
 		return this.userRepository.save(newUser);
 		// 这种直接更新的操作只适合单模型的更新，不适合有联合关系的模型更新
 		// return this.userRepository.update(id, user);

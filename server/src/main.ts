@@ -4,6 +4,7 @@ import 'winston-daily-rotate-file';
 import { join } from 'node:path';
 import { ValidationPipe } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
@@ -49,6 +50,18 @@ async function bootstrap() {
 
 	// 配置静态资源访问路径
 	app.useStaticAssets(join(__dirname, '..', 'uploads'));
+
+	// 生成接口文档
+	const options = new DocumentBuilder()
+		.addBearerAuth()
+		.setTitle('dnhyxc-ai API')
+		.setDescription('dnhyxc-ai API 文档')
+		.setVersion('1.0')
+		.build();
+
+	const document = SwaggerModule.createDocument(app, options);
+
+	SwaggerModule.setup('/api-docs', app, document);
 
 	await app.listen(process.env.PORT ?? 9112);
 }

@@ -955,3 +955,9 @@ export class AuthService {
 ## 密码脱敏处理
 
 [参考](https://juejin.cn/post/7306780139744182323)：https://juejin.cn/post/7306780139744182323
+
+## 生成接口文档
+
+需要安装 [swagger-ui-express](https://www.npmjs.com/package/swagger-ui-express)、[@nestjs/swagger](https://www.npmjs.com/package/@nestjs/swagger)
+
+[使用参考视频](https://www.bilibili.com/video/BV1NG41187Bs?spm_id_from=333.788.player.switch&vd_source=048c1562000d83337f08ff7451ab1f76&p=23)

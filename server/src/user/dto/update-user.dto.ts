@@ -1,13 +1,23 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsNotEmpty, IsString, Length } from 'class-validator';
+import {
+	IsNotEmpty,
+	IsNumber,
+	IsOptional,
+	IsString,
+	Length,
+} from 'class-validator';
 import { Roles } from '../../roles/roles.entity';
+import { Profile } from '../profile.entity';
 
-export class CreateUserDTO {
+export class UpdateUserDTO {
+	@IsNumber()
+	@IsNotEmpty({
+		message: '用户id不能为空',
+	})
+	id: number;
+
 	@IsString({
 		message: '用户名必须为字符串',
-	})
-	@IsNotEmpty({
-		message: '用户名不能为空',
 	})
 	@Length(2, 20, {
 		/**
@@ -21,27 +31,37 @@ export class CreateUserDTO {
 		 */
 		message: '用户名长度必须在 1 到 21 个字符之间',
 	})
+	@IsOptional()
 	@ApiProperty({
 		example: 'admin',
 	})
-	username: string;
+	username?: string;
 
+	@ApiProperty({
+		example: 'admin',
+	})
 	@IsString({
 		message: '密码必须是字符串',
-	})
-	@IsNotEmpty({
-		message: '密码不能为空',
 	})
 	@Length(6, 32, {
 		message: '用户名长度必须在 5 到 33 个字符之间',
 	})
-	@ApiProperty({
-		example: 'admin@123456',
-	})
+	@IsOptional()
 	password: string;
 
 	@ApiProperty({
-		example: [1, 2],
+		example: [1],
 	})
-	roles?: Roles[] | number[];
+	@IsOptional()
+	roles: Roles[] | number[];
+
+	@ApiProperty({
+		example: {
+			gender: 'male',
+			photo: 'img.png',
+			address: '上海',
+		},
+	})
+	@IsOptional()
+	profile: Profile;
 }

@@ -5,6 +5,7 @@ import {
 	Post,
 	UseInterceptors,
 } from '@nestjs/common';
+import { ApiOperation } from '@nestjs/swagger';
 import { ResponseInterceptor } from '../interceptors/response.interceptor';
 import { AuthService } from './auth.service';
 import { CaptchaDto } from './dto/captcha.dto';
@@ -19,11 +20,13 @@ export class AuthController {
 	constructor(private authService: AuthService) {}
 
 	@Post('/login')
+	@ApiOperation({ summary: '用户登录', description: '用户登录接口' })
 	async login(@Body() dto: LoginUserDTO) {
 		return await this.authService.login(dto);
 	}
 
 	@Post('/register')
+	@ApiOperation({ summary: '用户注册', description: '用户注册接口' })
 	// @UseInterceptors(SerializeInterceptor)
 	async register(@Body() dto: RegisterUserDTO) {
 		const { username, password } = dto;
@@ -31,6 +34,7 @@ export class AuthController {
 	}
 
 	@Post('/createVerifyCode')
+	@ApiOperation({ summary: '获取验证码', description: '获取验证码接口' })
 	async createVerifyCode(@Body() dto: CaptchaDto) {
 		return await this.authService.createVerifyCode(dto);
 	}

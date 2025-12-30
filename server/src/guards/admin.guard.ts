@@ -1,4 +1,9 @@
-import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
+import {
+	CanActivate,
+	ExecutionContext,
+	ForbiddenException,
+	Injectable,
+} from '@nestjs/common';
 import { UserService } from '../user/user.service';
 
 // 实现权鉴路由守卫
@@ -18,7 +23,8 @@ export class AdminGuard implements CanActivate {
 		// }
 		if (user) {
 			return true;
+		} else {
+			throw new ForbiddenException('暂无权限');
 		}
-		return false;
 	}
 }
