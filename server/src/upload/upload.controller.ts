@@ -2,6 +2,7 @@ import {
 	Controller,
 	Get,
 	HttpException,
+	HttpStatus,
 	Post,
 	UploadedFile,
 	UploadedFiles,
@@ -42,7 +43,10 @@ export class UploadController {
 				size: file.size,
 			};
 		} catch (error) {
-			throw new HttpException(error?.message || '上传失败', 500);
+			throw new HttpException(
+				error?.message || '上传失败',
+				HttpStatus.BAD_REQUEST,
+			);
 		}
 	}
 
@@ -65,7 +69,10 @@ export class UploadController {
 			});
 			return res;
 		} catch (error) {
-			throw new HttpException(error.message || '上传失败', 500);
+			throw new HttpException(
+				error.message || '上传失败',
+				HttpStatus.BAD_REQUEST,
+			);
 		}
 	}
 }

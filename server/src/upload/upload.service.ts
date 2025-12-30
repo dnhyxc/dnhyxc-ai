@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import { HttpException, Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import * as qiniu from 'qiniu';
 import { QiniuEnum } from '../enum/config.enum';
 import { getEnvConfig } from '../utils';
@@ -19,7 +19,7 @@ export class UploadService {
 		if (uploadToken) {
 			return uploadToken;
 		} else {
-			throw new HttpException('获取上传凭证失败', 500);
+			throw new HttpException('获取上传凭证失败', HttpStatus.BAD_REQUEST);
 		}
 	}
 

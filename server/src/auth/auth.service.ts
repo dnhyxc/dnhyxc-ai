@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { Cache } from '@nestjs/cache-manager';
-import { HttpException, Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as argon2 from 'argon2';
 import * as svgCaptcha from 'svg-captcha';
@@ -19,10 +19,14 @@ export class AuthService {
 	async login(dto: LoginUserDTO) {
 		const { username, password, captchaId, captchaText } = dto;
 		const isCaptchaValid = await this.verifyCaptcha(captchaId, captchaText);
-		if (!isCaptchaValid) throw new HttpException('验证码错误', 500);
+		if (!isCaptchaValid)
+			throw new HttpException('验证码错误', HttpStatus.BAD_REQUEST);
 		const user = await this.userService.findByUsername(username);
 		if (!user) {
-			throw new HttpException('用户不存在，请先前往注册', 500);
+			throw new HttpException(
+				'用户不存在，请先前往注册',
+				HttpStatus.BAD_REQUEST,
+			);
 		}
 		// 使用 argon2 验证密码
 		const isPasswordValid = await argon2.verify(user.password, password);
@@ -39,13 +43,13 @@ export class AuthService {
 				// },
 			);
 		} else {
-			throw new HttpException('用户名或密码错误', 500);
+			throw new HttpException('用户名或密码错误', HttpStatus.BAD_REQUEST);
 		}
 	}
 	async register(username: string, password: string) {
 		const user = await this.userService.findByUsername(username);
 		if (user) {
-			throw new HttpException('用户已存在', 500);
+			throw new HttpException('用户已存在', HttpStatus.BAD_REQUEST);
 		} else {
 			return await this.userService.create({
 				username,
@@ -90,7 +94,10 @@ export class AuthService {
 	async verifyCaptcha(captchaId: string, captchaText: string) {
 		const captchaTextInCache = await this.cache.get(captchaId);
 		if (!captchaTextInCache) {
-			throw new HttpException('验证码已过期，请重新获取', 500);
+			throw new HttpException(
+				'验证码已过期，请重新获取',
+				HttpStatus.BAD_REQUEST, // 400
+			);
 		}
 		if (
 			captchaTextInCache &&
@@ -98,7 +105,7 @@ export class AuthService {
 		) {
 			return true;
 		} else {
-			throw new HttpException('验证码错误', 500);
+			throw new HttpException('验证码错误', HttpStatus.BAD_REQUEST);
 		}
 	}
 }
