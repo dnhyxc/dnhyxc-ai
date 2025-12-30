@@ -7,12 +7,6 @@ interface FileWithPreview {
 	id: string;
 }
 
-interface UploadInfo {
-	percent: number;
-	loaded: number;
-	size: number;
-}
-
 interface IProps {
 	uploadFile?: (file: File) => Promise<void>;
 	getFileList?: (files: FileWithPreview[]) => void;

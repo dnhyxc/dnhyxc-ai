@@ -1,6 +1,6 @@
+import Upload from '@design/Upload';
 import { Button } from '@ui/button';
 import { Input } from '@ui/input';
-import Upload from '@design/Upload';
 import * as qiniu from 'qiniu-js';
 import { useMemo, useRef, useState } from 'react';
 import { getUploadToken } from '@/service';
@@ -11,23 +11,10 @@ interface UploadInfo {
 	size: number;
 }
 
-interface UploadObserver {
-	next: (res: { total: UploadInfo }) => void;
-	error: () => void;
-	complete: (res: { key: string; hash: string }) => void;
-}
-
-interface FileWithPreview {
-	file: File;
-	preview: string;
-	id: string;
-}
-
 const Profile = () => {
 	const [selectFile, setSelectFile] = useState<File | null>(null);
 	const [domainUrls, setDomainUrls] = useState<string[]>([]);
 	const [uploadInfos, setUploadInfos] = useState<UploadInfo[]>([]);
-	const [fileList, setFileList] = useState<FileWithPreview[]>([]);
 
 	const fileInputRef = useRef<HTMLInputElement>(null);
 
