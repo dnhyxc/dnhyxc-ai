@@ -27,6 +27,7 @@ export class AuthService {
 		// 使用 argon2 验证密码
 		const isPasswordValid = await argon2.verify(user.password, password);
 		if (isPasswordValid) {
+			// 返回根据用户的用户名及密码生成的 token
 			return await this.jwt.signAsync(
 				{
 					username: user.username,

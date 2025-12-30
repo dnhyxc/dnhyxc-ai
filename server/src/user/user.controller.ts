@@ -37,6 +37,7 @@ export class UserController {
 	constructor(private readonly userService: UserService) {}
 
 	@Post('/addUser')
+	// 使用 CreateUserPipe 管道，对接收的参数进行处理
 	addUser(@Body(CreateUserPipe) user: CreateUserDTO) {
 		return this.userService.create(user as User);
 	}

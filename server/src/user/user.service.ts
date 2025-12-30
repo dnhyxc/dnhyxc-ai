@@ -12,6 +12,7 @@ import { User } from './user.entity';
 @Injectable()
 export class UserService {
 	constructor(
+		// 注入数据库模型，便于操作数据库
 		@InjectRepository(User) private readonly userRepository: Repository<User>,
 		@InjectRepository(Roles)
 		private readonly rolesRepository: Repository<Roles>,

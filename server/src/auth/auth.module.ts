@@ -13,7 +13,7 @@ import { CaslAbilityService } from './casl-ability.service';
 @Module({
 	imports: [
 		UserModule,
-		PassportModule,
+		PassportModule, // PassportModule 提供基于 Passport 的认证策略支持，供本地、JWT 等策略使用
 		JwtModule.registerAsync({
 			imports: [ConfigModule],
 			useFactory: (configService: ConfigService) => ({
