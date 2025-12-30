@@ -366,3 +366,21 @@ pub fn run() {
 	}
 }
 ```
+
+## Tauri2 HTML5 拖拽事件失效解决
+
+需要在 `tauri.conf.json` 中设置 `dragDropEnabled` 为 `false`。
+
+```json
+{
+	// ...
+	"app": {
+		"windows": [
+			{
+                // ...
+				"dragDropEnabled": false
+			}
+		],
+	}
+}
+```
