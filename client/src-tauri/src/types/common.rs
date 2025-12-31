@@ -18,7 +18,7 @@ pub struct FileFilter {
 // 定义返回给前端的结果结构
 #[derive(Serialize)]
 pub struct SaveFileResult {
-    pub success: bool,
+    pub success: String,
     pub file_path: Option<String>,
     pub message: String,
 }
@@ -31,6 +31,7 @@ pub struct DownloadFileOptions {
     pub save_dir: Option<String>,
     pub overwrite: Option<bool>, // 是否覆盖已存在的文件
     pub id: Option<String>,      // 用于批处理下载的唯一标识符
+    pub max_size: Option<u64>,   // 最大支持的文件大小
 }
 
 // 通用下载blob文件选项

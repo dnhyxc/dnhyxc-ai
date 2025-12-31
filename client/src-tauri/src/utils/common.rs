@@ -121,7 +121,6 @@ pub async fn determine_save_path_for_blob(options: &DownloadZipOptions) -> Resul
             match file_dialog.save_file().await {
                 Some(file) => {
                     let path = file.path().to_path_buf();
-                    println!("用户选择的保存路径: {:?}", path);
                     path
                 }
                 None => {

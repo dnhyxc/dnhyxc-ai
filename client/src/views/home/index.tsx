@@ -1,17 +1,23 @@
 import { invoke } from '@tauri-apps/api/core';
-import { listen } from '@tauri-apps/api/event';
 import { Button } from '@ui/button';
 import { Input } from '@ui/input';
 import { Toast } from '@ui/sonner';
-import { useCallback, useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
 	downloadFile as download,
 	downloadZip,
 	getUserProfile,
 } from '@/service';
 import type { DownloadProgress } from '@/types';
-// import type { DownloadFileInfo, DownloadProgress } from '@/types';
-import { onCreateWindow, onEmit, onListen } from '@/utils';
+import {
+	createDownloadProgressListener,
+	donwnloadWithUrl,
+	downloadBlob,
+	onCreateWindow,
+	onEmit,
+	onListen,
+	saveFileWithPicker,
+} from '@/utils';
 
 const Home = () => {
 	const [greetMsg, setGreetMsg] = useState('');
@@ -28,39 +34,55 @@ const Home = () => {
 
 	// 在组件中添加进度监听
 	useEffect(() => {
-		const unlistenPromise = listen('download://progress', (event) => {
-			const progress = event.payload as DownloadProgress;
+		const unlistenProgress = createDownloadProgressListener(
+			setDownloadProgressInfo,
+		);
 
-			const info = {
-				...progress,
-				percent: progress.percent,
-				filename: progress.file_name || '',
-				id: progress.id,
-				success: progress.success,
-			};
-
-			setDownloadProgressInfo((prev) => {
-				const idx = prev.findIndex((item) => item.id === info.id);
-				const payload = {
-					url: progress.url,
-					total_bytes: progress.total_bytes,
-					content_length: progress.content_length,
-					percent: progress.percent,
-					file_path: progress.file_path,
-					file_name: progress.file_name,
-					file_size: progress.file_size,
-					id: progress.id,
-					success: progress.success,
-					message: progress.message,
-				};
-				if (idx === -1) {
-					return [payload, ...prev];
-				}
-				const next = [...prev];
-				next[idx] = { ...next[idx], ...payload };
-				return next;
-			});
+		const unlistenAboutPromise = onListen('about-send-message', (event) => {
+			console.log('about-send-message', event);
 		});
+
+		return () => {
+			unlistenProgress.then((unlisten) => unlisten());
+			unlistenAboutPromise.then((unlisten) => unlisten());
+		};
+	}, []);
+
+	// 在组件中添加进度监听
+	useEffect(() => {
+		// const unlistenPromise = listen('download://progress', (event) => {
+		// 	const progress = event.payload as DownloadProgress;
+
+		// 	const info = {
+		// 		...progress,
+		// 		percent: progress.percent,
+		// 		filename: progress.file_name || '',
+		// 		id: progress.id,
+		// 		success: progress.success,
+		// 	};
+
+		// 	setDownloadProgressInfo((prev) => {
+		// 		const idx = prev.findIndex((item) => item.id === info.id);
+		// 		const payload = {
+		// 			url: progress.url,
+		// 			total_bytes: progress.total_bytes,
+		// 			content_length: progress.content_length,
+		// 			percent: progress.percent,
+		// 			file_path: progress.file_path,
+		// 			file_name: progress.file_name,
+		// 			file_size: progress.file_size,
+		// 			id: progress.id,
+		// 			success: progress.success,
+		// 			message: progress.message,
+		// 		};
+		// 		if (idx === -1) {
+		// 			return [payload, ...prev];
+		// 		}
+		// 		const next = [...prev];
+		// 		next[idx] = { ...next[idx], ...payload };
+		// 		return next;
+		// 	});
+		// });
 
 		// const unlistenFileInfoPromise = listen('download://file_info', (event) => {
 		// 	const info = event.payload as {
@@ -79,7 +101,7 @@ const Home = () => {
 		});
 
 		return () => {
-			unlistenPromise.then((unlisten) => unlisten());
+			// unlistenPromise.then((unlisten) => unlisten());
 			// unlistenFileInfoPromise.then((unlisten) => unlisten());
 			unlistenAboutPromise.then((unlisten) => unlisten());
 		};
@@ -92,29 +114,15 @@ const Home = () => {
 		setGreetMsg(res);
 	}
 
-	async function saveFile() {
-		const result = (await invoke('save_file_with_picker', {
-			options: {
-				content: '这是一个测试文件',
-				file_name: 'document.txt',
-			},
-		})) as { success: boolean };
-
-		if (result.success) {
-			Toast({
-				type: 'success',
-				title: '文件保存成功',
-			});
-		} else {
-			Toast({
-				type: 'error',
-				title: '文件保存失败',
-			});
-		}
+	function saveFile() {
+		saveFileWithPicker({
+			content: '这是一个测试文件',
+			file_name: 'document.txt',
+		});
 	}
 
 	// 下载文件
-	const downloadFile = useCallback(async (url?: string, filename?: string) => {
+	const downloadFile = async (url?: string, filename?: string) => {
 		if (url?.trim() === '') {
 			return Toast({
 				title: '请先传入文件路径',
@@ -128,9 +136,10 @@ const Home = () => {
 				options: {
 					url: url,
 					file_name: filename || undefined, // 如果用户输入了文件名则使用，否则自动获取
-					// save_dir: './downloads',
 					overwrite: true, // 覆盖已存在的文件
 					id: Date.now().toString(),
+					// max_size: 10000,
+					// save_dir: './downloads',
 				},
 			});
 			// setDownloadFileInfo((prev) => {
@@ -144,13 +153,11 @@ const Home = () => {
 			// 	return next;
 			// });
 			if (result.success) {
-				console.log('文件保存成功:', result.file_path);
 				Toast({
 					title: result.message,
 					type: result.success,
 				});
 			} else {
-				console.error(`下载失败: ${result.message}`);
 				Toast({
 					title: result.message,
 					type: result.success,
@@ -162,7 +169,7 @@ const Home = () => {
 				type: 'error',
 			});
 		}
-	}, []);
+	};
 
 	// downloadFile(
 	// 	'https://dnhyxc.cn:9216/files/__FILE__c7ee5b931b68b9e227fd94957587796d.epub',
@@ -198,42 +205,21 @@ const Home = () => {
 			'0a6fad81-82d3-4598-8a55-f6dc326b1f61_128x128.png',
 		);
 		console.log(res, 'res-download', res.data);
-		// downloadFile(`${res.data}`);
-		downloadFile(`${import.meta.env.VITE_DEV_DOMAIN}${res.data}`);
+		const downloadUrl = `${import.meta.env.VITE_DEV_DOMAIN}${res.data}`;
+		await donwnloadWithUrl(downloadUrl);
 	};
 
 	const onDownloadZip = async () => {
-		const res = await downloadZip(
-			'0a6fad81-82d3-4598-8a55-f6dc326b1f61_128x128.png',
-		);
+		const res = await downloadZip('ppp.pdf');
 		console.log(res, 'res-downloadZip', res.data);
-		try {
-			const result: any = await invoke('download_blob', {
-				options: {
-					file_name: 'test.zip', // 如果用户输入了文件名则使用，否则自动获取
-					save_dir: '/Users/dnhyxc/Desktop',
-					overwrite: false, // 是否覆盖已存在的文件
-					id: Date.now().toString(),
-				},
-				blobData: res.data,
-			});
-			if (result) {
-				Toast({
-					type: result.success,
-					title: result.message,
-				});
-			} else {
-				Toast({
-					type: result.success,
-					title: result.message,
-				});
-			}
-		} catch (_error) {
-			Toast({
-				type: 'error',
-				title: '文件下载失败',
-			});
-		}
+		await downloadBlob(
+			{
+				file_name: 'test.zip',
+				overwrite: true,
+				id: Date.now().toString(),
+			},
+			res.data,
+		);
 	};
 
 	return (
@@ -344,7 +330,7 @@ const Home = () => {
 				<Button
 					variant="default"
 					className="cursor-pointer"
-					onClick={() => downloadFile(url)}
+					onClick={() => donwnloadWithUrl(url)}
 				>
 					download pdf File
 				</Button>

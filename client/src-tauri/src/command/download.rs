@@ -1,6 +1,8 @@
 // 需要在 Cargo.toml 中添加依赖项：rfd = "0.15.0"
+use futures::StreamExt;
 use reqwest;
 use std::fs;
+use std::io::Write;
 use std::path::Path;
 use std::path::PathBuf;
 use tauri;
@@ -101,7 +103,8 @@ pub async fn download_file(
                 )
                 .add_filter("视频文件", &["mp4", "avi", "mkv", "mov", "wmv"])
                 .add_filter("音频文件", &["mp3", "wav", "flac", "aac", "ogg"])
-                .add_filter("电子书", &["epub"]);
+                .add_filter("电子书", &["epub", "mobi", "azw3", "pdf"])
+                .add_filter("压缩文件", &["zip", "rar", "7z", "tar", "gz", "bz2", "xz"]);
 
             // 显示保存对话框
             let result = file_dialog.save_file().await;
@@ -211,16 +214,19 @@ pub async fn download_file(
     // println!("文件大小: {} 字节, 类型: {:?}", content_length, content_type);
 
     // 9. 检查文件大小限制（可选，例如限制 100MB）
-    const MAX_FILE_SIZE: u64 = 100 * 1024 * 1024; // 100MB
-    if content_length > MAX_FILE_SIZE {
+    // 优先从 options 中获取 max_size，若未提供则默认 100MB
+    const DEFAULT_MAX_SIZE: u64 = 100 * 1024 * 1024;
+    let max_size = options.max_size.unwrap_or(DEFAULT_MAX_SIZE);
+
+    if content_length > max_size {
         return Ok(DownloadFileResult {
             success: String::from("error"),
             file_path: None,
             file_name: String::new(),
             message: format!(
-                "文件过大 ({} > {} MB)",
-                content_length / (1024 * 1024),
-                MAX_FILE_SIZE / (1024 * 1024)
+                "文件过大 ({} > {} KB)",
+                content_length / 1024,
+                max_size / 1024
             ),
             file_size: Some(content_length),
             content_type,
@@ -244,9 +250,6 @@ pub async fn download_file(
     };
 
     let _ = window.emit("download://file_info", &file_info);
-
-    use futures::StreamExt;
-    use std::io::Write;
 
     while let Some(chunk) = stream.next().await {
         let chunk = chunk.map_err(|e| format!("读取数据块失败: {}", e))?;
@@ -358,7 +361,6 @@ pub async fn get_file_info(url: String) -> Result<FileInfo, String> {
 /// 新增函数：处理 blob 数据下载（由前端传递数据）
 #[tauri::command]
 pub async fn download_blob(
-    window: tauri::Window,
     options: DownloadZipOptions,
     blob_data: Vec<u8>,
     content_type: Option<String>,
@@ -454,19 +456,19 @@ pub async fn save_file_with_picker(options: SaveFileOptions) -> Result<SaveFileR
             // 保存文件
             match fs::write(path, &options.content) {
                 Ok(_) => Ok(SaveFileResult {
-                    success: true,
+                    success: "success".to_string(),
                     file_path: Some(path.to_string_lossy().to_string()),
                     message: "文件保存成功".to_string(),
                 }),
                 Err(e) => Ok(SaveFileResult {
-                    success: false,
+                    success: "success".to_string(),
                     file_path: None,
                     message: format!("保存失败: {}", e),
                 }),
             }
         }
         None => Ok(SaveFileResult {
-            success: false,
+            success: "success".to_string(),
             file_path: None,
             message: "用户取消了保存".to_string(),
         }),
