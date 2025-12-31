@@ -279,6 +279,13 @@ pub async fn download_file(
                 } else {
                     String::from("start")
                 },
+                message: if percent >= 100 {
+                    String::from("文件下载成功")
+                } else if percent < 100 {
+                    String::from("文件下载中...")
+                } else {
+                    String::from("文件开始下载")
+                },
             };
 
             let _ = window.emit("download://progress", &progress_data);
@@ -332,6 +339,7 @@ pub async fn download_files(
             file_size: None,
             id: file_options.id.clone(),
             success: String::from("start"),
+            message: String::from("文件开始下载"),
         };
 
         let _ = window.emit("download://progress", &progress_data);

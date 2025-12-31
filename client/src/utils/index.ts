@@ -38,16 +38,19 @@ export const setBodyClass = (theme: string) => {
 export const downloadFileFromUrl = async (
 	options: DownloadOptions,
 ): Promise<DownloadResult> => {
-	console.log(options, 'options');
+	const { url, file_name, overwrite = true, id, max_size, save_dir } = options;
 	try {
-		const result: any = await invoke('download_file', { options });
-		return {
-			success: result.success,
-			message: result.message,
-			id: result.id,
-			file_path: result.file_path,
-			file_name: result.file_name,
-		};
+		const result: DownloadResult = await invoke('download_file', {
+			options: {
+				url,
+				file_name,
+				overwrite,
+				id,
+				max_size,
+				save_dir,
+			},
+		});
+		return result;
 	} catch (error) {
 		return {
 			success: 'error',
@@ -65,10 +68,13 @@ export const downloadBlob = async (
 	blobData: any,
 ): Promise<DownloadResult> => {
 	try {
-		const result: any = await invoke('download_blob', { options, blobData });
+		const result: DownloadResult = await invoke('download_blob', {
+			options,
+			blobData,
+		});
 		if (result.success) {
 			Toast({
-				type: result.success,
+				type: result.success as 'success' | 'error',
 				title: result.message,
 			});
 		} else {
@@ -77,13 +83,7 @@ export const downloadBlob = async (
 				title: result.message,
 			});
 		}
-		return {
-			success: result.success,
-			message: result.message,
-			id: result.id,
-			file_path: result.file_path,
-			file_name: result.file_name,
-		};
+		return result;
 	} catch (error) {
 		return {
 			success: 'error',
@@ -137,7 +137,6 @@ export const createDownloadProgressListener = (
 ): Promise<UnlistenFn> => {
 	const unlistenPromise = listen('download://progress', (event) => {
 		const progress = event.payload as DownloadProgress;
-
 		setProgressInfo((prev) => {
 			const idx = prev.findIndex((item) => item.id === progress.id);
 			if (idx === -1) {
@@ -148,7 +147,24 @@ export const createDownloadProgressListener = (
 			return next;
 		});
 	});
+	return unlistenPromise;
+};
 
+export const createUnlistenFileInfoListener = (
+	setDownloadInfo: React.Dispatch<React.SetStateAction<DownloadResult[]>>,
+): Promise<UnlistenFn> => {
+	const unlistenPromise = listen('download://progress', (event) => {
+		const progress = event.payload as DownloadResult;
+		setDownloadInfo((prev) => {
+			const idx = prev.findIndex((item) => item.id === progress.id);
+			if (idx === -1) {
+				return [progress, ...prev];
+			}
+			const next = [...prev];
+			next[idx] = { ...next[idx], ...progress };
+			return next;
+		});
+	});
 	return unlistenPromise;
 };
 
@@ -156,10 +172,10 @@ export const createDownloadProgressListener = (
  * 处理网络下载并调用系统下载器
  */
 export const donwnloadWithUrl = async (
-	downloadUrl: string,
-	fileName = '',
+	opeions: DownloadOptions,
+	setDownloadFileInfo?: React.Dispatch<React.SetStateAction<DownloadResult[]>>,
 ): Promise<DownloadResult> => {
-	if (!downloadUrl?.trim()) {
+	if (!opeions.url?.trim()) {
 		Toast?.({
 			title: '请先传入文件路径',
 			type: 'info',
@@ -172,20 +188,30 @@ export const donwnloadWithUrl = async (
 	}
 
 	const result = await downloadFileFromUrl({
-		url: downloadUrl,
-		file_name: fileName || undefined,
+		url: opeions.url,
+		file_name: opeions.file_name || undefined,
 		overwrite: true,
 		id: Date.now().toString(),
 		// max_size: 10000,
 		// save_dir: './downloads',
 	});
 
-	console.log('result', result);
-
 	Toast({
 		title: result.message,
-		type: result.success,
+		type: result.success as 'success' | 'error',
 	});
+
+	if (setDownloadFileInfo) {
+		setDownloadFileInfo((prev) => {
+			const idx = prev.findIndex((item) => item.id === result.id);
+			if (idx === -1) {
+				return [result, ...prev];
+			}
+			const next = [...prev];
+			next[idx] = { ...next[idx], ...result };
+			return next;
+		});
+	}
 
 	return result;
 };

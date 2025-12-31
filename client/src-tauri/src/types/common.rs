@@ -88,6 +88,7 @@ pub struct BatchDownloadProgress {
     /// 若无特殊需求，可留空（None）。
     pub id: Option<String>,
     pub success: String,
+    pub message: String,
 }
 
 #[derive(Serialize)]

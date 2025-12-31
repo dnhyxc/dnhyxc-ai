@@ -8,9 +8,10 @@ import {
 	downloadZip,
 	getUserProfile,
 } from '@/service';
-import type { DownloadProgress } from '@/types';
+import type { DownloadProgress, DownloadResult } from '@/types';
 import {
 	createDownloadProgressListener,
+	createUnlistenFileInfoListener,
 	donwnloadWithUrl,
 	downloadBlob,
 	onCreateWindow,
@@ -21,15 +22,14 @@ import {
 
 const Home = () => {
 	const [greetMsg, setGreetMsg] = useState('');
-	// const [downloadFileInfo, setDownloadFileInfo] = useState<DownloadFileInfo[]>(
-	// 	[],
-	// );
+	const [downloadFileInfo, setDownloadFileInfo] = useState<DownloadResult[]>(
+		[],
+	);
 	const [downloadProgressInfo, setDownloadProgressInfo] = useState<
 		DownloadProgress[]
 	>([]);
 	const [url, setUrl] = useState(
 		'https://dnhyxc.cn:9216/files/__FILE__88872d9ec263023cc77d8df9595e69c2.pdf',
-		// 'https://dnhyxc.cn:9216/files/__FILE__86960f6b9b59b7d5cd9a1dfe9a6f88a0.docx',
 	);
 
 	// 在组件中添加进度监听
@@ -38,6 +38,9 @@ const Home = () => {
 			setDownloadProgressInfo,
 		);
 
+		const unlistenDownloadInfo =
+			createUnlistenFileInfoListener(setDownloadFileInfo);
+
 		const unlistenAboutPromise = onListen('about-send-message', (event) => {
 			console.log('about-send-message', event);
 		});
@@ -45,72 +48,12 @@ const Home = () => {
 		return () => {
 			unlistenProgress.then((unlisten) => unlisten());
 			unlistenAboutPromise.then((unlisten) => unlisten());
-		};
-	}, []);
-
-	// 在组件中添加进度监听
-	useEffect(() => {
-		// const unlistenPromise = listen('download://progress', (event) => {
-		// 	const progress = event.payload as DownloadProgress;
-
-		// 	const info = {
-		// 		...progress,
-		// 		percent: progress.percent,
-		// 		filename: progress.file_name || '',
-		// 		id: progress.id,
-		// 		success: progress.success,
-		// 	};
-
-		// 	setDownloadProgressInfo((prev) => {
-		// 		const idx = prev.findIndex((item) => item.id === info.id);
-		// 		const payload = {
-		// 			url: progress.url,
-		// 			total_bytes: progress.total_bytes,
-		// 			content_length: progress.content_length,
-		// 			percent: progress.percent,
-		// 			file_path: progress.file_path,
-		// 			file_name: progress.file_name,
-		// 			file_size: progress.file_size,
-		// 			id: progress.id,
-		// 			success: progress.success,
-		// 			message: progress.message,
-		// 		};
-		// 		if (idx === -1) {
-		// 			return [payload, ...prev];
-		// 		}
-		// 		const next = [...prev];
-		// 		next[idx] = { ...next[idx], ...payload };
-		// 		return next;
-		// 	});
-		// });
-
-		// const unlistenFileInfoPromise = listen('download://file_info', (event) => {
-		// 	const info = event.payload as {
-		// 		file_path: string;
-		// 		file_name: string;
-		// 		id: string;
-		// 		content_type: string;
-		// 		success: string;
-		// 		message: string;
-		// 	};
-		// 	setDownloadFileInfo((prev) => [info, ...prev]);
-		// });
-
-		const unlistenAboutPromise = onListen('about-send-message', (event) => {
-			console.log('about-send-message', event);
-		});
-
-		return () => {
-			// unlistenPromise.then((unlisten) => unlisten());
-			// unlistenFileInfoPromise.then((unlisten) => unlisten());
-			unlistenAboutPromise.then((unlisten) => unlisten());
+			unlistenDownloadInfo.then((unlisten) => unlisten());
 		};
 	}, []);
 
 	async function greet() {
 		const res: string = await invoke('greet_name', { name: url });
-		console.log(res, 'greet_namegreet_namegreet_name');
-		// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 		setGreetMsg(res);
 	}
 
@@ -122,67 +65,9 @@ const Home = () => {
 	}
 
 	// 下载文件
-	const downloadFile = async (url?: string, filename?: string) => {
-		if (url?.trim() === '') {
-			return Toast({
-				title: '请先传入文件路径',
-				type: 'info',
-			});
-		}
-
-		try {
-			// 下载文件
-			const result: any = await invoke('download_file', {
-				options: {
-					url: url,
-					file_name: filename || undefined, // 如果用户输入了文件名则使用，否则自动获取
-					overwrite: true, // 覆盖已存在的文件
-					id: Date.now().toString(),
-					// max_size: 10000,
-					// save_dir: './downloads',
-				},
-			});
-			// setDownloadFileInfo((prev) => {
-			// 	const idx = prev.findIndex((item) => item.id === result.id);
-			// 	console.log(idx, 'idx');
-			// 	if (idx === -1) {
-			// 		return [result, ...prev];
-			// 	}
-			// 	const next = [...prev];
-			// 	next[idx] = { ...next[idx], ...result };
-			// 	return next;
-			// });
-			if (result.success) {
-				Toast({
-					title: result.message,
-					type: result.success,
-				});
-			} else {
-				Toast({
-					title: result.message,
-					type: result.success,
-				});
-			}
-		} catch (_error) {
-			Toast({
-				title: '文件下载失败',
-				type: 'error',
-			});
-		}
+	const downloadFile = async (url: string, filename?: string) => {
+		await donwnloadWithUrl({ url, file_name: filename }, setDownloadFileInfo);
 	};
-
-	// downloadFile(
-	// 	'https://dnhyxc.cn:9216/files/__FILE__c7ee5b931b68b9e227fd94957587796d.epub',
-	// )
-	// downloadFile(
-	// 	'https://dnhyxc.cn:9216/files/__FILE__86960f6b9b59b7d5cd9a1dfe9a6f88a0.docx',
-	// )
-	// downloadFile(
-	// 	'https://dnhyxc.cn:9216/files/__FILE__88872d9ec263023cc77d8df9595e69c2.pdf',
-	// )
-	// downloadFile(
-	// 	'https://files.codelife.cc/wallhaven/full/wq/wallhaven-wqkw2r.jpg?x-oss-process=image/resize,limit_0,m_fill,w_2560,h_1440/quality,Q_93/format,webp',
-	// )
 
 	const sendMessage = async () => {
 		await onEmit('message', {
@@ -192,7 +77,6 @@ const Home = () => {
 
 	const getUserInfo = async () => {
 		const res = await getUserProfile(2);
-		console.log(res.data, 'res-getUserInfo');
 		Toast({
 			title: '获取用户信息成功!',
 			type: 'success',
@@ -204,14 +88,12 @@ const Home = () => {
 		const res = await download(
 			'0a6fad81-82d3-4598-8a55-f6dc326b1f61_128x128.png',
 		);
-		console.log(res, 'res-download', res.data);
 		const downloadUrl = `${import.meta.env.VITE_DEV_DOMAIN}${res.data}`;
-		await donwnloadWithUrl(downloadUrl);
+		await donwnloadWithUrl({ url: downloadUrl });
 	};
 
 	const onDownloadZip = async () => {
 		const res = await downloadZip('ppp.pdf');
-		console.log(res, 'res-downloadZip', res.data);
 		await downloadBlob(
 			{
 				file_name: 'test.zip',
@@ -223,7 +105,6 @@ const Home = () => {
 	};
 
 	return (
-		// data-tauri-drag-region: tauri 允许拖拽
 		<div className="w-full h-full flex flex-col justify-center items-center m-0">
 			<h1 className="text-3xl font-bold mb-20 text-green-600">
 				Welcome to dnhyxc-ai
@@ -261,6 +142,42 @@ const Home = () => {
 											: result.success === 'start'
 												? '✨ 下载中'
 												: '❌ 失败'}
+									</span>
+									<span className="text-sm text-gray-500">
+										{result.file_size
+											? `${(result.file_size / 1024).toFixed(1)} KB`
+											: '未知大小'}
+									</span>
+								</div>
+								{result.file_name && (
+									<p className="text-sm truncate">文件名: {result.file_name}</p>
+								)}
+								<p className="text-sm">{result.message}</p>
+							</div>
+						))}
+					</div>
+				</div>
+			)}
+			{downloadFileInfo.length > 0 && (
+				<div className="mb-8 w-full max-w-2xl">
+					<h3 className="text-lg font-bold mb-2">下载历史-INFO</h3>
+					<div className="space-y-2 max-h-60 overflow-y-auto">
+						{downloadFileInfo.map((result, index) => (
+							<div
+								key={index}
+								className={`p-3 rounded border ${
+									result.success
+										? 'bg-green-50 border-green-200'
+										: 'bg-red-50 border-red-200'
+								}`}
+							>
+								<div className="flex justify-between items-center">
+									<span className="font-medium">
+										{result.success === 'success'
+											? '✅ 成功'
+											: result.success === 'error'
+												? '❌ 失败'
+												: '🚀 开始'}
 									</span>
 									<span className="text-sm text-gray-500">
 										{result.file_size
@@ -330,9 +247,9 @@ const Home = () => {
 				<Button
 					variant="default"
 					className="cursor-pointer"
-					onClick={() => donwnloadWithUrl(url)}
+					onClick={() => donwnloadWithUrl({ url })}
 				>
-					download pdf File
+					download pdf File with url
 				</Button>
 				<Button
 					variant="default"
