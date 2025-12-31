@@ -3,10 +3,10 @@ import { DataSource, DataSourceOptions } from 'typeorm';
 import { ConfigEnum } from './src/enum/config.enum';
 import { getEnvConfig } from './src/utils';
 
-const entitiesDir =
-	process.env.NODE_ENV === 'test'
-		? [`${__dirname}/**/*.entity.ts`]
-		: [`${__dirname}/**/*.entity.{ts,js}`];
+// const entitiesDir =
+// 	process.env.NODE_ENV === 'test'
+// 		? [`${__dirname}/**/*.entity.ts`]
+// 		: [`${__dirname}/**/*.entity.{ts,js}`];
 
 export const buildConnectionOptions = () => {
 	const config = getEnvConfig();

@@ -43,16 +43,6 @@ export class RolesService {
 		});
 	}
 
-	async update(id: number, updateRoleDto: UpdateRoleDto) {
-		const role = await this.findOne(id);
-		if (role) {
-			const newRole = this.rolesRepository.merge(role, updateRoleDto);
-			return this.rolesRepository.save(newRole);
-		} else {
-			throw new NotFoundException('角色不存在');
-		}
-	}
-
 	async updateRole(id: number, dto: UpdateRoleDto) {
 		const role = await this.findOne(id);
 		if (role) {
@@ -81,4 +71,20 @@ export class RolesService {
 			throw new NotFoundException('角色不存在');
 		}
 	}
+
+	// transaction 事务，同时保证数据的同时性
+	// async manager(dto: any) {
+	// 	const from = { money: 100000, id: 1 };
+	// 	const to = { money: 10000, id: 2 };
+	// 	return this.rolesRepository.manager.transaction(async (entityManager) => {
+	// 		entityManager.save(Roles, {
+	// 			id: from.id,
+	// 			money: from.money - dto.money,
+	// 		});
+	// 		entityManager.save(Roles, {
+	// 			id: to.id,
+	// 			money: to.money + dto.money,
+	// 		});
+	// 	});
+	// }
 }

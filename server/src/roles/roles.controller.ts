@@ -3,12 +3,9 @@ import {
 	Controller,
 	Delete,
 	Get,
-	HttpStatus,
 	Param,
 	ParseIntPipe,
-	Patch,
 	Post,
-	Query,
 	UseGuards,
 } from '@nestjs/common';
 import { Roles } from '../decorators/roles.decorator';
@@ -32,7 +29,6 @@ export class RolesController {
 	}
 
 	@Get('/getRoles')
-	@Roles(Role.ADMIN) // 这里会把上面全局的@Roles(Role.ADMIN)覆盖掉，以当前的为准
 	findAll() {
 		return this.rolesService.findAll();
 	}
@@ -42,15 +38,12 @@ export class RolesController {
 		return this.rolesService.findOne(id);
 	}
 
-	@Patch('/updateRole')
-	async update(
-		@Param('id', ParseIntPipe) id: number,
-		@Body() dto: UpdateRoleDto,
-	) {
-		return await this.rolesService.update(id, dto);
-	}
-
 	@Post('/updateRole')
+	/**
+	 * 如果 guard 中使用 getAllAndOverride，这里会把上面全局的@Roles(Role.ADMIN)覆盖掉，以当前的为准。
+	 * 使用 getAllAndMerge 则会与 Controller 上设置的 @Roles 进行合并
+	 */
+	@Roles(Role.ADMIN)
 	async updateRole(@Body() dto: UpdateRoleDto) {
 		return await this.rolesService.updateRole(dto.id, dto);
 	}
@@ -59,4 +52,9 @@ export class RolesController {
 	async remove(@Param('id', ParseIntPipe) id: number) {
 		return await this.rolesService.remove(id);
 	}
+
+	// @Post('/manager')
+	// async manager(@Body() dto: any) {
+	// 	this.rolesService.manager(dto);
+	// }
 }
