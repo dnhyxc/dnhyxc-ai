@@ -3,6 +3,7 @@ import {
 	AfterInsert,
 	AfterRemove,
 	Column,
+	CreateDateColumn,
 	Entity,
 	JoinTable,
 	ManyToMany,
@@ -26,6 +27,9 @@ export class User {
 	@Column()
 	@Exclude() // 使用 Exclude 在响应时忽略 password 字段返回
 	password: string;
+
+	@CreateDateColumn({ type: 'timestamp' }) // 自动创建一个自增的时间戳
+	createTime: Date;
 
 	// 表示一个用户对应多个日志信息，即建立一个 typescript 与数据库之间的关联关系，相当于建立了一个 mapping
 	@OneToMany(

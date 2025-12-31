@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
+import { Menus } from '../menus/menus.entity';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
 import { Roles } from './roles.entity';
@@ -10,11 +11,25 @@ export class RolesService {
 	constructor(
 		@InjectRepository(Roles)
 		private readonly rolesRepository: Repository<Roles>,
+		@InjectRepository(Menus)
+		private readonly menusRepository: Repository<Menus>,
 	) {}
 
-	async create(createRoleDto: CreateRoleDto) {
-		const res = await this.rolesRepository.create(createRoleDto);
-		return this.rolesRepository.save(res);
+	async createRole(dto: CreateRoleDto) {
+		const { menuIds, name } = dto;
+		// 查找所有菜单
+		const menus = await this.menusRepository.findBy({ id: In(menuIds) });
+
+		// 创建角色并关联菜单
+		const role = this.rolesRepository.create({
+			name,
+			menus,
+		});
+
+		return await this.rolesRepository.save(role);
+
+		// const res = await this.rolesRepository.create(dto);
+		// return this.rolesRepository.save(res);
 	}
 
 	findAll() {
@@ -22,7 +37,10 @@ export class RolesService {
 	}
 
 	findOne(id: number) {
-		return this.rolesRepository.findOne({ where: { id } });
+		return this.rolesRepository.findOne({
+			where: { id },
+			relations: ['menus'],
+		});
 	}
 
 	async update(id: number, updateRoleDto: UpdateRoleDto) {
@@ -35,8 +53,32 @@ export class RolesService {
 		}
 	}
 
-	delete(id: number) {
-		// delete 方法不会出发 user.entity.ts 中的 beforeRemove、afterRemove 等钩子
-		return this.rolesRepository.delete(id);
+	async updateRole(id: number, dto: UpdateRoleDto) {
+		const role = await this.findOne(id);
+		if (role) {
+			if (dto?.menuIds?.length) {
+				const menus = await this.menusRepository.findBy({
+					id: In(dto.menuIds),
+				});
+				if (!menus.length) {
+					throw new NotFoundException('菜单不存在');
+				}
+				role.menus = menus;
+			}
+			const newRole = this.rolesRepository.merge(role, dto);
+			return this.rolesRepository.save(newRole);
+		} else {
+			throw new NotFoundException('角色不存在');
+		}
+	}
+
+	async remove(id: number) {
+		const role = await this.findOne(id);
+		if (role) {
+			// delete 方法不会出发 user.entity.ts 中的 beforeRemove、afterRemove 等钩子
+			return this.rolesRepository.remove(role);
+		} else {
+			throw new NotFoundException('角色不存在');
+		}
 	}
 }

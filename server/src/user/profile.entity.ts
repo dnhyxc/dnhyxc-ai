@@ -10,6 +10,7 @@ import { User } from './user.entity';
 
 @Entity()
 export class Profile {
+	// 自增 id
 	@PrimaryGeneratedColumn()
 	id: number;
 

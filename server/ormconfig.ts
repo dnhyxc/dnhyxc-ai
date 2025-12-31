@@ -8,30 +8,7 @@ const entitiesDir =
 		? [`${__dirname}/**/*.entity.ts`]
 		: [`${__dirname}/**/*.entity.{ts,js}`];
 
-// export const getEnv = (env: string): Record<string, unknown> => {
-// 	if (fs.existsSync(env)) {
-// 		return dotenv.parse(fs.readFileSync(env));
-// 	}
-// 	return {};
-// };
-
-// export const getEnvConfig = (): Record<string, any> => {
-// 	const defaultConfig = getEnv('.env');
-// 	const envConfig = getEnv(`.env.${process.env.NODE_ENV}`);
-// 	const config = {
-// 		...defaultConfig,
-// 		...envConfig,
-// 	};
-// 	return config;
-// };
-
 export const buildConnectionOptions = () => {
-	// const defaultConfig = getEnv('.env');
-	// const envConfig = getEnv(`.env.${process.env.NODE_ENV}`);
-	// const config = {
-	// 	...defaultConfig,
-	// 	...envConfig,
-	// };
 	const config = getEnvConfig();
 	return {
 		type: config[ConfigEnum.DB_TYPE],
@@ -40,8 +17,9 @@ export const buildConnectionOptions = () => {
 		username: config[ConfigEnum.DB_USERNAME],
 		password: config[ConfigEnum.DB_PASSWORD],
 		database: config[ConfigEnum.DB_DATABASE],
-		entities: entitiesDir,
-		synchronize: config[ConfigEnum.DB_SYNC],
+		// entities: entitiesDir, // 通过便利查找所有的 entity.ts 中的实体，设置到数据库中。使用 autoLoadEntities 更加便捷
+		autoLoadEntities: true, // 自动加载实体 forFeature() 方法注册的每个实体都将自动添加到配置对象的实体中，即自动给数据库添加实体
+		synchronize: config[ConfigEnum.DB_SYNC], // 首次使用 true，表示自动将实体类同步到数据库
 		// 开发环境设置为 true，开启 SQL 语句日志，即所有的 SQL 语句都会打印日志，便于开发调试
 		logging: false,
 		// logging: process.env.NODE_ENV === 'development',

@@ -8,6 +8,7 @@ import {
 	ParseIntPipe,
 	Patch,
 	Post,
+	Query,
 	UseGuards,
 } from '@nestjs/common';
 import { Roles } from '../decorators/roles.decorator';
@@ -26,8 +27,8 @@ export class RolesController {
 	constructor(private readonly rolesService: RolesService) {}
 
 	@Post('/createRole')
-	create(@Body() createRoleDto: CreateRoleDto) {
-		return this.rolesService.create(createRoleDto);
+	async createRole(@Body() createRoleDto: CreateRoleDto) {
+		return this.rolesService.createRole(createRoleDto);
 	}
 
 	@Get('/getRoles')
@@ -41,36 +42,21 @@ export class RolesController {
 		return this.rolesService.findOne(id);
 	}
 
-	@Patch('/updateRole/:id')
+	@Patch('/updateRole')
 	async update(
 		@Param('id', ParseIntPipe) id: number,
-		@Body() updateRoleDto: UpdateRoleDto,
+		@Body() dto: UpdateRoleDto,
 	) {
-		const res = await this.rolesService.update(id, updateRoleDto);
-		return {
-			code: HttpStatus.OK,
-			success: true,
-			data: res,
-			message: '更新成功',
-		};
+		return await this.rolesService.update(id, dto);
+	}
+
+	@Post('/updateRole')
+	async updateRole(@Body() dto: UpdateRoleDto) {
+		return await this.rolesService.updateRole(dto.id, dto);
 	}
 
 	@Delete('/deleteRoleById/:id')
-	async delete(@Param('id', ParseIntPipe) id: number) {
-		const res = await this.rolesService.delete(id);
-		if (res?.affected) {
-			return {
-				code: HttpStatus.OK,
-				success: true,
-				data: id,
-				count: res.affected,
-			};
-		} else {
-			return {
-				code: HttpStatus.OK,
-				success: false,
-				message: '当前数据不存在',
-			};
-		}
+	async remove(@Param('id', ParseIntPipe) id: number) {
+		return await this.rolesService.remove(id);
 	}
 }

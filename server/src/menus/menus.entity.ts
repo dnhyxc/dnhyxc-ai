@@ -50,6 +50,5 @@ export class Menus {
 		() => Roles,
 		(roles) => roles.menus,
 	)
-	@JoinTable({ name: 'role_menus' })
-	role: Roles[];
+	roles: Roles[];
 }

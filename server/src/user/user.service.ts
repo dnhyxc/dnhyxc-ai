@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as argon2 from 'argon2';
-import { In, Repository } from 'typeorm';
+import { In, Like, Repository } from 'typeorm';
 import { Logs } from '../logs/logs.entity';
 import { Roles } from '../roles/roles.entity';
-import { andWhereCondition } from '../utils/db.helper';
+// import { andWhereCondition } from '../utils/db.helper';
 import { GetUserDto } from './dto/get-user.dto';
 import { UpdateUserDTO } from './dto/update-user.dto';
 import { Profile } from './profile.entity';
@@ -23,64 +23,69 @@ export class UserService {
 		private readonly profileRepository: Repository<Profile>,
 	) {}
 
-	async findAll(query: GetUserDto): Promise<User[]> {
-		const { limit, page, username, role, gender } = query;
-		const take = limit || 10;
-		const skip = ((page || 1) - 1) * take;
+	async findAll(query: GetUserDto): Promise<{ list: User[]; total: number }> {
+		const { pageSize, pageNo, username, role, gender } = query;
+		const take = pageSize || 10;
+		const skip = ((pageNo || 1) - 1) * take;
 		// SQL 语句联合查询写法一
 		// SELECT * FROM user u, profile p, role r WHERE u.id = p.user_id AND u.id = r.user_id AND ...
 		// SQL 语句联合查询写法二
 		// SELECT * FROM user u LEFT JOIN profile p ON u.id = p.user_id LEFT JOIN role r ON u.id = r.user_id WHERE ...
 		// 使用 TypeORM 提供的语法进行联合查询
-		// return this.userRepository.find({
-		// 	// 表示需要返回的数据字段，不加 select 的话，默认返回所有字段
-		// 	select: {
-		// 		id: true,
-		// 		username: true,
-		// 		profile: {
-		// 			gender: true,
-		// 		},
-		// 	},
-		// 	// 表示需要联合查询的表，写法一
-		// 	// relations: ['profile', 'roles'],
-		// 	// 联合查询的表，写法二
-		// 	relations: {
-		// 		profile: true,
-		// 		roles: true,
-		// 	},
-		// 	where: {
-		// 		username,
-		// 		roles: role
-		// 			? {
-		// 					id: Number(role),
-		// 				}
-		// 			: {},
-		// 		profile: {
-		// 			gender,
-		// 		},
-		// 	},
-		// 	take,
-		// 	skip,
-		// 	order: {
-		// 		id: 'DESC',
-		// 	},
-		// });
+		const [list, total] = await this.userRepository.findAndCount({
+			// 表示需要返回的数据字段，不加 select 的话，默认返回所有字段
+			select: {
+				id: true,
+				username: true,
+				profile: {
+					gender: true,
+				},
+			},
+			// 表示需要联合查询的表，写法一
+			// relations: ['profile', 'roles'],
+			// 联合查询的表，写法二
+			relations: {
+				profile: true,
+				roles: true,
+			},
+			where: {
+				username: username ? Like(`%${username}%`) : username, // 模糊查询
+				roles: role
+					? {
+							id: Number(role),
+						}
+					: {},
+				profile: {
+					gender,
+				},
+			},
+			take,
+			skip,
+			order: {
+				id: 'DESC',
+			},
+		});
 
-		// 使用 queryBuilder 查询
-		const obj = {
-			'user.username': username,
-			'profile.gender': gender,
-			'roles.id': role,
+		return {
+			list,
+			total,
 		};
 
-		const _query = this.userRepository
-			.createQueryBuilder('user')
-			.leftJoinAndSelect('user.profile', 'profile')
-			.leftJoinAndSelect('user.roles', 'roles');
+		// // 使用 queryBuilder 查询
+		// const obj = {
+		// 	'user.username': username,
+		// 	'profile.gender': gender,
+		// 	'roles.id': role,
+		// };
 
-		const newQuery = andWhereCondition<User>(_query, obj);
+		// const _query = this.userRepository
+		// 	.createQueryBuilder('user')
+		// 	.leftJoinAndSelect('user.profile', 'profile')
+		// 	.leftJoinAndSelect('user.roles', 'roles');
 
-		return newQuery.take(take).skip(skip).getMany(); // getRawMany() 会将数据进行扁平话
+		// const newQuery = andWhereCondition<User>(_query, obj);
+
+		// return newQuery.take(take).skip(skip).getMany(); // getRawMany() 会将数据进行扁平话
 	}
 
 	findByUsername(username: string): Promise<User | null> {

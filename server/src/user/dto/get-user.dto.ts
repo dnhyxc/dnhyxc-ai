@@ -1,9 +1,17 @@
 // import { IsNotEmpty, IsNumber, IsString, Length } from 'class-validator';
 
+import { IsNotEmpty } from 'class-validator';
+
 export class GetUserDto {
-	page: number;
+	@IsNotEmpty({
+		message: 'pageNo 不能为空',
+	})
+	pageNo: number;
+	@IsNotEmpty({
+		message: 'pageSize 不能为空',
+	})
+	pageSize: number;
 	username?: string;
-	limit?: number;
 	role?: number;
 	gender?: string;
 }
