@@ -17,6 +17,8 @@ export interface DownloadProgress {
 	percent: number;
 	file_path: string;
 	file_name: string;
+	file_size: number;
+	message: string;
 	id: string;
 	success: string;
 }

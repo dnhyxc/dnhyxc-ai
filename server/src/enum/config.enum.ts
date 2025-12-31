@@ -26,3 +26,7 @@ export enum QiniuEnum {
 	BUCKET_NAME = 'BUCKET_NAME',
 	DOMAIN = 'DOMAIN',
 }
+
+export enum FileEnum {
+	FILE_ROOT = 'FILE_ROOT',
+}

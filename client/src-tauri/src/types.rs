@@ -72,6 +72,7 @@ pub struct BatchDownloadProgress {
     pub file_path: String,
     /// 当前下载文件的文件名（不包含路径）
     pub file_name: String,
+    pub file_size: Option<u64>,
     /// 可选的下载任务唯一标识符。
     /// 当批量下载需要区分不同子任务或做回调匹配时，可传入此字段；
     /// 若无特殊需求，可留空（None）。

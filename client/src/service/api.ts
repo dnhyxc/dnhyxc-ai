@@ -15,3 +15,9 @@ export const GET_USER_PROFILE = '/user/profile';
 
 // 获取七牛云上传token
 export const GET_UPLOAD_TOKEN = '/upload/getUploadToken';
+
+// 下载文件
+export const DOWNLOAD_FILE = '/upload/download';
+
+// 下载 zip 文件
+export const DOWNLOAD_ZIP_FILE = '/upload/downloadZip';

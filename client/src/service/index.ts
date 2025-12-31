@@ -1,6 +1,8 @@
 import { http } from '@/utils/fetch';
 import {
 	CREATE_VERIFY_CODE,
+	DOWNLOAD_FILE,
+	DOWNLOAD_ZIP_FILE,
 	GET_UPLOAD_TOKEN,
 	GET_USER_PROFILE,
 	GET_USERS,
@@ -61,4 +63,18 @@ export const getUsers = async () => {
 // 获取七牛云上传token
 export const getUploadToken = async () => {
 	return await http.get(GET_UPLOAD_TOKEN);
+};
+
+// 下载文件
+export const downloadFile = async (filename: string): Promise<any> => {
+	return await http.get(DOWNLOAD_FILE, {
+		querys: { filename },
+	});
+};
+
+// 下载zip文件
+export const downloadZip = async (filename: string): Promise<any> => {
+	return await http.get(DOWNLOAD_ZIP_FILE, {
+		querys: { filename },
+	});
 };

@@ -41,6 +41,7 @@
 		"cache-manager": "^7.2.7",
 		"class-transformer": "^0.5.1",
 		"class-validator": "^0.14.3",
+		"compressing": "^2.0.0",
 		"dotenv": "^17.2.3",
 		"express-rate-limit": "^8.2.1",
 		"helmet": "^8.1.0",

@@ -3,16 +3,21 @@ import { listen } from '@tauri-apps/api/event';
 import { Button } from '@ui/button';
 import { Input } from '@ui/input';
 import { Toast } from '@ui/sonner';
-import { useEffect, useState } from 'react';
-import { getUserProfile } from '@/service';
-import type { DownloadFileInfo, DownloadProgress } from '@/types';
+import { useCallback, useEffect, useState } from 'react';
+import {
+	downloadFile as download,
+	downloadZip,
+	getUserProfile,
+} from '@/service';
+import type { DownloadProgress } from '@/types';
+// import type { DownloadFileInfo, DownloadProgress } from '@/types';
 import { onCreateWindow, onEmit, onListen } from '@/utils';
 
 const Home = () => {
 	const [greetMsg, setGreetMsg] = useState('');
-	const [downloadFileInfo, setDownloadFileInfo] = useState<DownloadFileInfo[]>(
-		[],
-	);
+	// const [downloadFileInfo, setDownloadFileInfo] = useState<DownloadFileInfo[]>(
+	// 	[],
+	// );
 	const [downloadProgressInfo, setDownloadProgressInfo] = useState<
 		DownloadProgress[]
 	>([]);
@@ -43,8 +48,10 @@ const Home = () => {
 					percent: progress.percent,
 					file_path: progress.file_path,
 					file_name: progress.file_name,
+					file_size: progress.file_size,
 					id: progress.id,
 					success: progress.success,
+					message: progress.message,
 				};
 				if (idx === -1) {
 					return [...prev, payload];
@@ -55,17 +62,17 @@ const Home = () => {
 			});
 		});
 
-		const unlistenFileInfoPromise = listen('download://file_info', (event) => {
-			const info = event.payload as {
-				file_path: string;
-				file_name: string;
-				id: string;
-				content_type: string;
-				success: string;
-				message: string;
-			};
-			setDownloadFileInfo((prev) => [info, ...prev]);
-		});
+		// const unlistenFileInfoPromise = listen('download://file_info', (event) => {
+		// 	const info = event.payload as {
+		// 		file_path: string;
+		// 		file_name: string;
+		// 		id: string;
+		// 		content_type: string;
+		// 		success: string;
+		// 		message: string;
+		// 	};
+		// 	setDownloadFileInfo((prev) => [info, ...prev]);
+		// });
 
 		const unlistenAboutPromise = onListen('about-send-message', (event) => {
 			console.log('about-send-message', event);
@@ -73,7 +80,7 @@ const Home = () => {
 
 		return () => {
 			unlistenPromise.then((unlisten) => unlisten());
-			unlistenFileInfoPromise.then((unlisten) => unlisten());
+			// unlistenFileInfoPromise.then((unlisten) => unlisten());
 			unlistenAboutPromise.then((unlisten) => unlisten());
 		};
 	}, []);
@@ -101,9 +108,12 @@ const Home = () => {
 	}
 
 	// 下载文件
-	const downloadFile = async (fileName?: string) => {
-		if (!url.trim()) {
-			return;
+	const downloadFile = useCallback(async (url?: string, filename?: string) => {
+		if (url?.trim() === '') {
+			return Toast({
+				title: '请先传入文件路径',
+				type: 'info',
+			});
 		}
 
 		try {
@@ -111,30 +121,43 @@ const Home = () => {
 			const result: any = await invoke('download_file', {
 				options: {
 					url: url,
-					file_name: fileName || undefined, // 如果用户输入了文件名则使用，否则自动获取
+					file_name: filename || undefined, // 如果用户输入了文件名则使用，否则自动获取
 					// save_dir: './downloads',
 					overwrite: true, // 覆盖已存在的文件
 					id: Date.now().toString(),
 				},
 			});
-			setDownloadFileInfo((prev) => {
-				const idx = prev.findIndex((item) => item.id === result.id);
-				if (idx === -1) {
-					return [result, ...prev];
-				}
-				const next = [...prev];
-				next[idx] = { ...next[idx], ...result };
-				return next;
-			});
+			// setDownloadFileInfo((prev) => {
+			// 	const idx = prev.findIndex((item) => item.id === result.id);
+			// 	console.log(idx, 'idx');
+			// 	if (idx === -1) {
+			// 		return [result, ...prev];
+			// 	}
+			// 	const next = [...prev];
+			// 	next[idx] = { ...next[idx], ...result };
+			// 	return next;
+			// });
 			if (result.success) {
 				console.log('文件保存成功:', result.file_path);
+				Toast({
+					title: '文件下载成功',
+					type: 'success',
+				});
 			} else {
 				console.error(`下载失败: ${result.message}`);
+				Toast({
+					title: '文件下载失败',
+					type: 'error',
+				});
 			}
 		} catch (error) {
 			console.error('下载失败:', error);
+			Toast({
+				title: '文件下载失败',
+				type: 'error',
+			});
 		}
-	};
+	}, []);
 
 	// downloadFile(
 	// 	'https://dnhyxc.cn:9216/files/__FILE__c7ee5b931b68b9e227fd94957587796d.epub',
@@ -175,6 +198,33 @@ const Home = () => {
 		});
 	};
 
+	const onDownload = async () => {
+		const res = await download(
+			'0a6fad81-82d3-4598-8a55-f6dc326b1f61_128x128.png',
+		);
+		console.log(res, 'res-download', res.data);
+		// downloadFile(`${res.data}`);
+		downloadFile(`${import.meta.env.VITE_DEV_DOMAIN}${res.data}`);
+	};
+
+	const onDownloadZip = async () => {
+		const res = await downloadZip(
+			'0a6fad81-82d3-4598-8a55-f6dc326b1f61_128x128.png',
+		);
+		console.log(res, 'res-downloadZip', res.data);
+		const blob = new Blob([res.data]);
+		// const url = URL.createObjectURL(blob);
+		// downloadFile(`${res.data}`);
+		// downloadFile(url);
+		const result = await invoke('save_file_with_picker', {
+			options: {
+				content: blob,
+				file_name: 'document.zip',
+			},
+		});
+		console.log(result, 'result');
+	};
+
 	return (
 		// data-tauri-drag-region: tauri 允许拖拽
 		<div className="w-full h-full flex flex-col justify-center items-center m-0">
@@ -194,11 +244,11 @@ const Home = () => {
 					</div>
 				))}
 			</div>
-			{downloadFileInfo.length > 0 && (
+			{downloadProgressInfo.length > 0 && (
 				<div className="mb-8 w-full max-w-2xl">
 					<h3 className="text-lg font-bold mb-2">下载历史</h3>
 					<div className="space-y-2 max-h-60 overflow-y-auto">
-						{downloadFileInfo.map((result, index) => (
+						{downloadProgressInfo.map((result, index) => (
 							<div
 								key={index}
 								className={`p-3 rounded border ${
@@ -276,16 +326,30 @@ const Home = () => {
 				<Button
 					variant="default"
 					className="cursor-pointer"
-					onClick={() => downloadFile()}
+					onClick={() => downloadFile(url)}
 				>
 					download File
 				</Button>
 				<Button
 					variant="default"
 					className="cursor-pointer"
-					onClick={() => downloadFile()}
+					onClick={() => downloadFile(url)}
 				>
 					download pdf File
+				</Button>
+				<Button
+					variant="default"
+					className="cursor-pointer"
+					onClick={onDownload}
+				>
+					download file from network
+				</Button>
+				<Button
+					variant="default"
+					className="cursor-pointer"
+					onClick={onDownloadZip}
+				>
+					download zip file from network
 				</Button>
 			</div>
 		</div>

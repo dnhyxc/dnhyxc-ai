@@ -1,8 +1,10 @@
-import { join } from 'node:path';
+import { existsSync } from 'node:fs';
+import { extname, join } from 'node:path';
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import * as qiniu from 'qiniu';
-import { QiniuEnum } from '../enum/config.enum';
+import { FileEnum, QiniuEnum } from '../enum/config.enum';
 import { getEnvConfig } from '../utils';
+import { IMAGE_EXTS } from './upload.enum';
 
 @Injectable()
 export class UploadService {
@@ -39,5 +41,41 @@ export class UploadService {
 				.replace(/\\/g, '/');
 			return `${relativePath}`;
 		}
+	}
+
+	getStaticUrl(filename: string, floderName?: string, toReplace?: boolean) {
+		const config = getEnvConfig();
+		const rootPath = join(__dirname, config[FileEnum.FILE_ROOT]);
+		const fullPath = join(
+			__dirname,
+			`${config[FileEnum.FILE_ROOT]}/${floderName}`,
+			filename,
+		);
+		console.log(
+			'fullPath',
+			fullPath,
+			toReplace,
+			fullPath.replace(rootPath, '').replace(/\\/g, '/'),
+		);
+
+		if (existsSync(fullPath)) {
+			return toReplace
+				? fullPath.replace(rootPath, '').replace(/\\/g, '/')
+				: fullPath;
+		} else {
+			throw new HttpException('文件不存在', HttpStatus.BAD_REQUEST);
+		}
+	}
+
+	// download
+	download(filename: string, toReplace?: boolean) {
+		let filePath = '';
+		const isImage = IMAGE_EXTS.includes(extname(filename).toLowerCase());
+		if (isImage) {
+			filePath = this.getStaticUrl(filename, 'images', toReplace);
+		} else {
+			filePath = this.getStaticUrl(filename, 'files', toReplace);
+		}
+		return filePath;
 	}
 }

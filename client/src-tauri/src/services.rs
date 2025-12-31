@@ -1,39 +1,32 @@
 // 需要在 Cargo.toml 中添加依赖项：rfd = "0.15.0"
+use reqwest;
 use std::fs;
 use std::path::Path;
-use reqwest;
-use tauri;
 use std::path::PathBuf;
+use tauri;
 use tauri::Emitter;
 
 // 导入 types 模块中的类型
 use crate::types::{
-    SaveFileOptions, 
-    SaveFileResult,
-    DownloadFileOptions, 
-    DownloadFileResult, 
-    FileInfo,
-    BatchDownloadProgress,
-    FileInfoEvent
+    BatchDownloadProgress, DownloadFileOptions, DownloadFileResult, FileInfo, FileInfoEvent,
+    SaveFileOptions, SaveFileResult,
 };
 
 // 导入 utils 模块中的辅助函数
 use crate::utils::{get_extension_from_content_type, get_remote_file_info};
 
 #[tauri::command]
-pub async fn save_file_with_picker(
-    options: SaveFileOptions
-) -> Result<SaveFileResult, String> {
+pub async fn save_file_with_picker(options: SaveFileOptions) -> Result<SaveFileResult, String> {
     // 使用 rfd 进行文件对话框
     let file_dialog = rfd::AsyncFileDialog::new();
-    
+
     // 设置默认文件名
     let file_dialog = if let Some(ref default_name) = options.default_name {
         file_dialog.set_file_name(default_name)
     } else {
         file_dialog
     };
-    
+
     // 添加文件过滤器
     let file_dialog = if let Some(filters) = options.filters {
         filters.iter().fold(file_dialog, |dialog, filter| {
@@ -45,15 +38,15 @@ pub async fn save_file_with_picker(
             .add_filter("文本文件", &["txt", "md", "json"])
             .add_filter("所有文件", &["*"])
     };
-    
+
     // 显示保存对话框
     let result = file_dialog.save_file().await;
-    
+
     match result {
         Some(file) => {
             let path = file.path();
             println!("保存路径: {:?}", path);
-            
+
             // 保存文件
             match fs::write(path, &options.content) {
                 Ok(_) => Ok(SaveFileResult {
@@ -78,7 +71,7 @@ pub async fn save_file_with_picker(
 
 #[tauri::command]
 pub async fn download_file(
-    window: tauri::Window,  // window 应该是第一个参数
+    window: tauri::Window, // window 应该是第一个参数
     options: DownloadFileOptions,
 ) -> Result<DownloadFileResult, String> {
     // println!("开始下载文件: {}", options.url);
@@ -90,11 +83,8 @@ pub async fn download_file(
                 Some(name) => name,
                 None => {
                     // 从 URL 中提取文件名
-                    let url_filename = options.url
-                        .split('/')
-                        .last()
-                        .unwrap_or("downloaded_file");
-                    
+                    let url_filename = options.url.split('/').last().unwrap_or("downloaded_file");
+
                     // 如果 URL 中没有扩展名，尝试从 Content-Type 推断
                     if !url_filename.contains('.') {
                         // 先获取文件信息
@@ -123,11 +113,8 @@ pub async fn download_file(
                 Some(name) => name,
                 None => {
                     // 从 URL 中提取文件名
-                    let url_filename = options.url
-                        .split('/')
-                        .last()
-                        .unwrap_or("downloaded_file");
-                    
+                    let url_filename = options.url.split('/').last().unwrap_or("downloaded_file");
+
                     // 如果 URL 中没有扩展名，尝试从 Content-Type 推断
                     if !url_filename.contains('.') {
                         // 先获取文件信息（发送 HEAD 请求）
@@ -148,29 +135,32 @@ pub async fn download_file(
                     }
                 }
             };
-            
+
             let default_dir = PathBuf::from("/Users/dnhyxc/Documents/dnhyxc-download");
-            
+
             // 1.2 打开文件保存对话框
             let mut file_dialog = rfd::AsyncFileDialog::new()
                 .set_title("保存文件")
                 .set_directory(default_dir);
-            
+
             // 设置默认文件名
             file_dialog = file_dialog.set_file_name(&default_file_name);
-            
+
             // 添加文件过滤器
             file_dialog = file_dialog
                 .add_filter("所有文件", &["*"])
                 .add_filter("图片文件", &["jpg", "jpeg", "png", "gif", "webp", "bmp"])
-                .add_filter("文档文件", &["pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx"])
+                .add_filter(
+                    "文档文件",
+                    &["pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx"],
+                )
                 .add_filter("视频文件", &["mp4", "avi", "mkv", "mov", "wmv"])
                 .add_filter("音频文件", &["mp3", "wav", "flac", "aac", "ogg"])
                 .add_filter("电子书", &["epub"]);
-            
+
             // 显示保存对话框
             let result = file_dialog.save_file().await;
-            
+
             match result {
                 Some(file) => {
                     // 用户点击了“保存”按钮，对话框返回了选中的文件路径
@@ -214,8 +204,7 @@ pub async fn download_file(
 
     // 3. 创建目录（如果不存在）
     if let Some(parent) = save_path.parent() {
-        fs::create_dir_all(parent)
-            .map_err(|e| format!("创建目录失败: {}", e))?;
+        fs::create_dir_all(parent).map_err(|e| format!("创建目录失败: {}", e))?;
     }
 
     // 4. 检查文件是否已存在
@@ -234,15 +223,17 @@ pub async fn download_file(
 
     // 5. 创建目录（如果不存在）
     if let Some(parent) = save_path.parent() {
-        fs::create_dir_all(parent)
-            .map_err(|e| format!("创建目录失败: {}", e))?;
+        fs::create_dir_all(parent).map_err(|e| format!("创建目录失败: {}", e))?;
     }
 
     // 6. 下载文件
     let client = reqwest::Client::new();
     let response = client
         .get(&options.url)
-        .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+        .header(
+            "User-Agent",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        )
         .send()
         .await
         .map_err(|e| format!("下载请求失败: {}", e))?;
@@ -283,9 +274,11 @@ pub async fn download_file(
             success: String::from("error"),
             file_path: None,
             file_name: String::new(),
-            message: format!("文件过大 ({} > {} MB)", 
-                content_length / (1024 * 1024), 
-                MAX_FILE_SIZE / (1024 * 1024)),
+            message: format!(
+                "文件过大 ({} > {} MB)",
+                content_length / (1024 * 1024),
+                MAX_FILE_SIZE / (1024 * 1024)
+            ),
             file_size: Some(content_length),
             content_type,
             id: options.id.clone(),
@@ -293,8 +286,7 @@ pub async fn download_file(
     }
 
     // 10. 读取响应内容并写入文件（支持大文件流式写入）
-    let mut file = fs::File::create(&save_path)
-        .map_err(|e| format!("创建文件失败: {}", e))?;
+    let mut file = fs::File::create(&save_path).map_err(|e| format!("创建文件失败: {}", e))?;
 
     let mut stream = response.bytes_stream();
     let mut total_bytes: u64 = 0;
@@ -307,18 +299,18 @@ pub async fn download_file(
         success: String::from("start"),
         message: "文件下载开始".to_string(),
     };
-        
+
     let _ = window.emit("download://file_info", &file_info);
-    
+
     use futures::StreamExt;
     use std::io::Write;
-    
+
     while let Some(chunk) = stream.next().await {
         let chunk = chunk.map_err(|e| format!("读取数据块失败: {}", e))?;
         file.write_all(&chunk)
             .map_err(|e| format!("写入文件失败: {}", e))?;
         total_bytes += chunk.len() as u64;
-        
+
         // 可选：显示下载进度
         if content_length > 0 {
             let percent = (total_bytes * 100) / content_length;
@@ -332,19 +324,23 @@ pub async fn download_file(
                 content_length: content_length,
                 percent: percent as f64,
                 file_path: save_path_str.clone(),
+                file_size: Some(content_length.clone()),
                 file_name: save_path.file_name().unwrap().to_string_lossy().to_string(),
                 id: options.id.clone(),
                 // status: Some(percent >= 100),
-                success: if percent >= 100 { String::from("success") } else { String::from("start") },
+                success: if percent >= 100 {
+                    String::from("success")
+                } else {
+                    String::from("start")
+                },
             };
-        
+
             let _ = window.emit("download://progress", &progress_data);
         }
     }
 
     // 11. 验证文件大小
-    let metadata = fs::metadata(&save_path)
-        .map_err(|e| format!("获取文件元数据失败: {}", e))?;
+    let metadata = fs::metadata(&save_path).map_err(|e| format!("获取文件元数据失败: {}", e))?;
 
     Ok(DownloadFileResult {
         success: String::from("success"),
@@ -365,7 +361,7 @@ pub async fn download_files(
 ) -> Result<Vec<DownloadFileResult>, String> {
     let mut results = Vec::new();
     let total_files = files.len();
-    
+
     // 改为使用 into_iter() 来获取所有权，而不是引用
     for (index, mut file_options) in files.into_iter().enumerate() {
         // 为每个文件生成唯一ID（如果未提供）
@@ -376,7 +372,7 @@ pub async fn download_files(
                 .unwrap_or(0);
             file_options.id = Some(format!("batch_{}_{}", index, timestamp));
         }
-        
+
         // 发送开始下载事件
         let progress_data = BatchDownloadProgress {
             current_index: index + 1,
@@ -387,12 +383,13 @@ pub async fn download_files(
             percent: 0.0,
             file_path: String::new(),
             file_name: String::new(),
+            file_size: None,
             id: file_options.id.clone(),
             success: String::from("start"),
         };
-        
+
         let _ = window.emit("download://progress", &progress_data);
-        
+
         // 克隆 window 以便在每个下载任务中使用
         let window_clone = window.clone();
         let result = download_file(window_clone, file_options).await;
@@ -406,7 +403,7 @@ pub async fn download_files(
             id: None,
         }));
     }
-    
+
     Ok(results)
 }
 
