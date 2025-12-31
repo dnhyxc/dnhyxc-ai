@@ -54,7 +54,7 @@ const Home = () => {
 					message: progress.message,
 				};
 				if (idx === -1) {
-					return [...prev, payload];
+					return [payload, ...prev];
 				}
 				const next = [...prev];
 				next[idx] = { ...next[idx], ...payload };
@@ -86,25 +86,31 @@ const Home = () => {
 	}, []);
 
 	async function greet() {
+		const res: string = await invoke('greet_name', { name: url });
+		console.log(res, 'greet_namegreet_namegreet_name');
 		// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-		setGreetMsg(await invoke('greet', { name: url }));
+		setGreetMsg(res);
 	}
 
 	async function saveFile() {
-		const result = await invoke('save_file_with_picker', {
+		const result = (await invoke('save_file_with_picker', {
 			options: {
 				content: '这是一个测试文件',
 				file_name: 'document.txt',
 			},
-		});
+		})) as { success: boolean };
 
-		console.log(result, 'result');
-
-		// if (result.success) {
-		// 	alert(`文件保存成功: ${result.file_path}`);
-		// } else {
-		// 	alert(`保存失败: ${result.message}`);
-		// }
+		if (result.success) {
+			Toast({
+				type: 'success',
+				title: '文件保存成功',
+			});
+		} else {
+			Toast({
+				type: 'error',
+				title: '文件保存失败',
+			});
+		}
 	}
 
 	// 下载文件
@@ -140,18 +146,17 @@ const Home = () => {
 			if (result.success) {
 				console.log('文件保存成功:', result.file_path);
 				Toast({
-					title: '文件下载成功',
-					type: 'success',
+					title: result.message,
+					type: result.success,
 				});
 			} else {
 				console.error(`下载失败: ${result.message}`);
 				Toast({
-					title: '文件下载失败',
-					type: 'error',
+					title: result.message,
+					type: result.success,
 				});
 			}
-		} catch (error) {
-			console.error('下载失败:', error);
+		} catch (_error) {
 			Toast({
 				title: '文件下载失败',
 				type: 'error',
@@ -179,16 +184,6 @@ const Home = () => {
 	};
 
 	const getUserInfo = async () => {
-		// const res = await fetch(
-		// 	'http://101.34.214.188:9112/api/user/profile?id=2',
-		// 	{
-		// 		method: 'GET',
-		// 		headers: {
-		// 			'Content-Type': 'application/json',
-		// 			Authorization: `Bearer ${getStorage('token')}`,
-		// 		},
-		// 	},
-		// );
 		const res = await getUserProfile(2);
 		console.log(res.data, 'res-getUserInfo');
 		Toast({
@@ -212,17 +207,33 @@ const Home = () => {
 			'0a6fad81-82d3-4598-8a55-f6dc326b1f61_128x128.png',
 		);
 		console.log(res, 'res-downloadZip', res.data);
-		const blob = new Blob([res.data]);
-		// const url = URL.createObjectURL(blob);
-		// downloadFile(`${res.data}`);
-		// downloadFile(url);
-		const result = await invoke('save_file_with_picker', {
-			options: {
-				content: blob,
-				file_name: 'document.zip',
-			},
-		});
-		console.log(result, 'result');
+		try {
+			const result: any = await invoke('download_blob', {
+				options: {
+					file_name: 'test.zip', // 如果用户输入了文件名则使用，否则自动获取
+					save_dir: '/Users/dnhyxc/Desktop',
+					overwrite: false, // 是否覆盖已存在的文件
+					id: Date.now().toString(),
+				},
+				blobData: res.data,
+			});
+			if (result) {
+				Toast({
+					type: result.success,
+					title: result.message,
+				});
+			} else {
+				Toast({
+					type: result.success,
+					title: result.message,
+				});
+			}
+		} catch (_error) {
+			Toast({
+				type: 'error',
+				title: '文件下载失败',
+			});
+		}
 	};
 
 	return (

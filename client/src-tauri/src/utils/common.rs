@@ -1,5 +1,9 @@
 use reqwest;
-use crate::types::FileInfo;
+use std::path::Path;
+use std::path::PathBuf;
+use tauri;
+
+use crate::types::common::{DownloadZipOptions, FileInfo};
 
 // 设置窗口居中
 pub fn set_screen_center<R: tauri::Runtime>(window: &tauri::WebviewWindow<R>) {
@@ -51,7 +55,8 @@ pub fn get_extension_from_content_type(content_type: &str) -> String {
         "application/vnd.openxmlformats-officedocument.presentationml.presentation" => ".pptx",
         "application/epub+zip" => ".epub",
         _ => ".bin", // 默认二进制文件
-    }.to_string()
+    }
+    .to_string()
 }
 
 // 辅助函数：获取远程文件信息
@@ -59,7 +64,10 @@ pub async fn get_remote_file_info(url: &str) -> Result<FileInfo, String> {
     let client = reqwest::Client::new();
     let response = client
         .head(url)
-        .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+        .header(
+            "User-Agent",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        )
         .send()
         .await
         .map_err(|e| format!("获取文件信息失败: {}", e))?;
@@ -69,11 +77,7 @@ pub async fn get_remote_file_info(url: &str) -> Result<FileInfo, String> {
     }
 
     // 获取文件名
-    let file_name = url
-        .split('/')
-        .last()
-        .unwrap_or("unknown_file")
-        .to_string();
+    let file_name = url.split('/').last().unwrap_or("unknown_file").to_string();
 
     // 获取文件大小
     let file_size = response
@@ -96,4 +100,36 @@ pub async fn get_remote_file_info(url: &str) -> Result<FileInfo, String> {
         content_type: content_type.clone(),
         is_downloadable: response.status().is_success(),
     })
+}
+
+/// 为 blob 数据确定保存路径
+pub async fn determine_save_path_for_blob(options: &DownloadZipOptions) -> Result<PathBuf, String> {
+    // 确定文件名
+    let file_name = options.file_name.clone();
+
+    // 确定保存路径
+    let save_path = match &options.save_dir {
+        Some(dir) => Path::new(dir).join(&file_name),
+        None => {
+            let default_dir = PathBuf::from("/Users/dnhyxc/Documents/dnhyxc-download");
+
+            let file_dialog = rfd::AsyncFileDialog::new()
+                .set_title("保存文件")
+                .set_directory(default_dir)
+                .set_file_name(&file_name);
+
+            match file_dialog.save_file().await {
+                Some(file) => {
+                    let path = file.path().to_path_buf();
+                    println!("用户选择的保存路径: {:?}", path);
+                    path
+                }
+                None => {
+                    return Err("用户取消了保存".to_string());
+                }
+            }
+        }
+    };
+
+    Ok(save_path)
 }

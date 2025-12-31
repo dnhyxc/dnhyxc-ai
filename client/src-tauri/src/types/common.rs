@@ -33,6 +33,15 @@ pub struct DownloadFileOptions {
     pub id: Option<String>,      // 用于批处理下载的唯一标识符
 }
 
+// 通用下载blob文件选项
+#[derive(Deserialize, Clone)]
+pub struct DownloadZipOptions {
+    pub file_name: String,
+    pub save_dir: Option<String>,
+    pub overwrite: Option<bool>, // 是否覆盖已存在的文件
+    pub id: Option<String>,      // 用于批处理下载的唯一标识符
+}
+
 // 通用下载文件结果
 #[derive(Serialize, Clone)]
 pub struct DownloadFileResult {

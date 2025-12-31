@@ -1,18 +1,27 @@
-// 引入自定义命令模块，其中包含可供前端调用的 Rust 函数
-mod clients;
-mod dock;
-// mod event;
-mod init;
-use init::CustomInit;
-mod menu;
-mod services;
-mod tray;
+use tauri::Manager;
+use tauri::WindowEvent;
+// 声明并引入当前 crate 中的子模块：
+// - menu：窗口菜单相关功能
+// - services：供前端调用的文件保存、下载等后端服务
+// - tray：系统托盘图标及菜单
+// - types：公共类型定义
+// - utils：通用工具函数（窗口居中、文件下载等）
+mod command;
+mod plugin;
+mod system;
 mod types;
 mod utils;
 
+use plugin::init::CustomInit;
+use system::dock::dock_event;
+use system::menu::setup_menu;
+use system::tray::init_tray;
+use utils::common::set_screen_center;
 // use tauri::menu::{MenuBuilder, SubmenuBuilder};
-use tauri::Manager;
-use tauri::WindowEvent;
+use command::common::greet_name;
+use command::download::{
+    download_blob, download_file, download_files, get_file_info, save_file_with_picker,
+};
 
 /// 移动端入口属性宏：当编译目标为移动平台时，自动标记该函数为 Tauri 移动端入口
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -25,10 +34,10 @@ pub fn run() {
         .setup(|app| {
             let main_window = app.get_webview_window("main").unwrap();
             // 启动时设置窗口居中
-            utils::set_screen_center(&main_window);
+            set_screen_center(&main_window);
             // 注册托盘菜单
-            tray::init_tray(app);
-            let _ = menu::setup_menu(app);
+            init_tray(app);
+            let _ = setup_menu(app);
 
             let window = main_window.clone();
             // 监听窗口事件
@@ -66,11 +75,12 @@ pub fn run() {
         // .plugin(tauri_plugin_http::init())
         // 注册命令处理器：将 `clients::greet` 和 `services::open_folder` 函数暴露给前端
         .invoke_handler(tauri::generate_handler![
-            clients::greet,
-            services::save_file_with_picker, // 通用保存
-            services::download_file,         // 通用下载
-            services::download_files,        // 批量下载
-            services::get_file_info,         // 获取文件信息
+            greet_name,
+            save_file_with_picker, // 通用保存
+            download_file,         // 通用下载
+            download_files,        // 批量下载
+            get_file_info,         // 获取文件信息
+            download_blob,         // 获取文件信息
         ])
         .build(tauri::generate_context!())
         // 如果启动失败，立即 panic 并打印错误信息
@@ -85,7 +95,7 @@ pub fn run() {
             }
             // macOS 平台：调用自定义的 app_event 模块处理应用事件
             #[cfg(target_os = "macos")]
-            dock::dock_event(&app_handle, event);
+            dock_event(&app_handle, event);
             // 非 macOS 平台：占位使用，避免未使用的变量警告
             #[cfg(not(target_os = "macos"))]
             {

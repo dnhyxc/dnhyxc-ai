@@ -29,7 +29,7 @@ pub fn init_tray(app: &mut tauri::App) {
         .unwrap();
 
     let _tray = TrayIconBuilder::with_id("tray")
-        .icon(Image::from_bytes(include_bytes!("../icons/32x32.png")).expect("REASON")) // 自定义的图片
+        .icon(Image::from_bytes(include_bytes!("../../icons/32x32.png")).expect("REASON")) // 自定义的图片
         .menu(&menu)
         .show_menu_on_left_click(false) // 禁止鼠标左键显示菜单
         .on_tray_icon_event(|tray, event| {

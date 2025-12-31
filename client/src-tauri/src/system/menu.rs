@@ -1,8 +1,14 @@
-use tauri::menu::{MenuBuilder, SubmenuBuilder};
 use tauri::Emitter;
 use tauri::Manager;
+use tauri::menu::{MenuBuilder, SubmenuBuilder};
 
+// 使用 `use crate::utils;` 会把整个 `utils` 模块（即 src/utils/mod.rs 中公开的所有项）一次性引入当前作用域，
+// 后续代码里可以直接写 `utils::xxx` 来调用其中的子模块或函数。
+// 这与 `use utils::common::set_screen_center;` 不同，后者只单独引入了 `utils::common` 子模块里的 `set_screen_center` 函数，
+// 使得当前文件可以直接写 `set_screen_center(...)` 而无需再写完整路径。
 use crate::utils;
+
+use utils::common::set_screen_center;
 
 pub fn setup_menu<R: tauri::Runtime>(app: &mut tauri::App<R>) -> tauri::Result<()> {
     // 创建文件菜单
@@ -57,7 +63,7 @@ pub fn setup_menu<R: tauri::Runtime>(app: &mut tauri::App<R>) -> tauri::Result<(
             }
             "center" => {
                 // 获取当前显示器信息并计算居中位置
-                utils::set_screen_center(&win);
+                set_screen_center(&win);
             }
             "fill" => {
                 // 获取当前屏幕可用尺寸，实现填充效果

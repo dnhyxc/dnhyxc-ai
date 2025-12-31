@@ -6,68 +6,13 @@ use std::path::PathBuf;
 use tauri;
 use tauri::Emitter;
 
-// 导入 types 模块中的类型
-use crate::types::{
-    BatchDownloadProgress, DownloadFileOptions, DownloadFileResult, FileInfo, FileInfoEvent,
-    SaveFileOptions, SaveFileResult,
+use crate::types::common::{
+    BatchDownloadProgress, DownloadFileOptions, DownloadFileResult, DownloadZipOptions, FileInfo,
+    FileInfoEvent, SaveFileOptions, SaveFileResult,
 };
-
-// 导入 utils 模块中的辅助函数
-use crate::utils::{get_extension_from_content_type, get_remote_file_info};
-
-#[tauri::command]
-pub async fn save_file_with_picker(options: SaveFileOptions) -> Result<SaveFileResult, String> {
-    // 使用 rfd 进行文件对话框
-    let file_dialog = rfd::AsyncFileDialog::new();
-
-    // 设置默认文件名
-    let file_dialog = if let Some(ref default_name) = options.default_name {
-        file_dialog.set_file_name(default_name)
-    } else {
-        file_dialog
-    };
-
-    // 添加文件过滤器
-    let file_dialog = if let Some(filters) = options.filters {
-        filters.iter().fold(file_dialog, |dialog, filter| {
-            dialog.add_filter(&filter.name, &filter.extensions)
-        })
-    } else {
-        // 默认添加文本文件过滤器
-        file_dialog
-            .add_filter("文本文件", &["txt", "md", "json"])
-            .add_filter("所有文件", &["*"])
-    };
-
-    // 显示保存对话框
-    let result = file_dialog.save_file().await;
-
-    match result {
-        Some(file) => {
-            let path = file.path();
-            println!("保存路径: {:?}", path);
-
-            // 保存文件
-            match fs::write(path, &options.content) {
-                Ok(_) => Ok(SaveFileResult {
-                    success: true,
-                    file_path: Some(path.to_string_lossy().to_string()),
-                    message: "文件保存成功".to_string(),
-                }),
-                Err(e) => Ok(SaveFileResult {
-                    success: false,
-                    file_path: None,
-                    message: format!("保存失败: {}", e),
-                }),
-            }
-        }
-        None => Ok(SaveFileResult {
-            success: false,
-            file_path: None,
-            message: "用户取消了保存".to_string(),
-        }),
-    }
-}
+use crate::utils::common::{
+    determine_save_path_for_blob, get_extension_from_content_type, get_remote_file_info,
+};
 
 #[tauri::command]
 pub async fn download_file(
@@ -166,8 +111,6 @@ pub async fn download_file(
                     // 用户点击了“保存”按钮，对话框返回了选中的文件路径
                     // file 是 rfd::FileHandle，通过 path() 方法获取其真实路径
                     let path = file.path().to_path_buf();
-                    // 打印日志，方便调试：用户最终选择的保存位置
-                    println!("用户选择的保存路径: {:?}", path);
                     // 将 PathBuf 返回给外层，用于后续真正的下载与写入
                     path
                 }
@@ -176,7 +119,7 @@ pub async fn download_file(
                         success: String::from("error"),
                         file_path: None,
                         file_name: String::new(),
-                        message: "用户取消了保存".to_string(),
+                        message: "已取消保存".to_string(),
                         file_size: None,
                         content_type: None,
                         id: options.id.clone(),
@@ -244,7 +187,7 @@ pub async fn download_file(
             success: String::from("error"),
             file_path: None,
             file_name: String::new(),
-            message: format!("下载失败: HTTP状态码 {}", response.status()),
+            message: format!("下载失败: HTTP状态码为 {}", response.status()),
             file_size: None,
             content_type: None,
             id: options.id.clone(),
@@ -410,4 +353,122 @@ pub async fn download_files(
 #[tauri::command]
 pub async fn get_file_info(url: String) -> Result<FileInfo, String> {
     get_remote_file_info(&url).await
+}
+
+/// 新增函数：处理 blob 数据下载（由前端传递数据）
+#[tauri::command]
+pub async fn download_blob(
+    window: tauri::Window,
+    options: DownloadZipOptions,
+    blob_data: Vec<u8>,
+    content_type: Option<String>,
+) -> Result<DownloadFileResult, String> {
+    // 1. 确定保存路径
+    let save_path = match determine_save_path_for_blob(&options).await {
+        Ok(path) => path,
+        Err(e) => {
+            return Ok(DownloadFileResult {
+                success: String::from("error"),
+                file_path: None,
+                file_name: String::new(),
+                message: e,
+                file_size: None,
+                content_type: None,
+                id: options.id.clone(),
+            });
+        }
+    };
+
+    let save_path_str = save_path.to_string_lossy().to_string();
+    let file_name = save_path.file_name().unwrap().to_string_lossy().to_string();
+
+    // 2. 检查文件是否已存在
+    let overwrite = options.overwrite.unwrap_or(false);
+    if save_path.exists() && !overwrite {
+        return Ok(DownloadFileResult {
+            success: String::from("error"),
+            file_name: file_name.clone(),
+            file_path: Some(save_path_str.clone()),
+            message: format!("文件已存在: {}", save_path.display()),
+            file_size: None,
+            content_type: None,
+            id: options.id.clone(),
+        });
+    }
+
+    // 3. 创建目录
+    if let Some(parent) = save_path.parent() {
+        fs::create_dir_all(parent).map_err(|e| format!("创建目录失败: {}", e))?;
+    }
+
+    // 4. 写入文件
+    fs::write(&save_path, &blob_data).map_err(|e| format!("写入文件失败: {}", e))?;
+
+    // 5. 获取文件大小
+    let file_size = blob_data.len() as u64;
+
+    // 6. 发送完成事件
+    let result = DownloadFileResult {
+        success: String::from("success"),
+        file_name,
+        file_path: Some(save_path_str),
+        message: "文件下载成功".to_string(),
+        file_size: Some(file_size),
+        content_type,
+        id: options.id.clone(),
+    };
+
+    Ok(result)
+}
+
+#[tauri::command]
+pub async fn save_file_with_picker(options: SaveFileOptions) -> Result<SaveFileResult, String> {
+    // 使用 rfd 进行文件对话框
+    let file_dialog = rfd::AsyncFileDialog::new();
+
+    // 设置默认文件名
+    let file_dialog = if let Some(ref default_name) = options.default_name {
+        file_dialog.set_file_name(default_name)
+    } else {
+        file_dialog
+    };
+
+    // 添加文件过滤器
+    let file_dialog = if let Some(filters) = options.filters {
+        filters.iter().fold(file_dialog, |dialog, filter| {
+            dialog.add_filter(&filter.name, &filter.extensions)
+        })
+    } else {
+        // 默认添加文本文件过滤器
+        file_dialog
+            .add_filter("文本文件", &["txt", "md", "json"])
+            .add_filter("所有文件", &["*"])
+    };
+
+    // 显示保存对话框
+    let result = file_dialog.save_file().await;
+
+    match result {
+        Some(file) => {
+            let path = file.path();
+            // 保存文件
+            match fs::write(path, &options.content) {
+                Ok(_) => Ok(SaveFileResult {
+                    success: true,
+                    file_path: Some(path.to_string_lossy().to_string()),
+                    message: "文件保存成功".to_string(),
+                }),
+                Err(e) => Ok(SaveFileResult {
+                    success: false,
+                    file_path: None,
+                    message: format!("保存失败: {}", e),
+                }),
+            }
+        }
+        None => Ok(SaveFileResult {
+            success: false,
+            file_path: None,
+            message: "用户取消了保存".to_string(),
+        }),
+    }
 }
