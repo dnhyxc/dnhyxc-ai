@@ -51,33 +51,11 @@ pub fn run() {
                     api.prevent_close();
                     let _ = window.hide();
                 }
-                // WindowEvent::Destroyed => {
-                //     println!("CloseRequested");
-                //     // 清空 localStorage 中的 token
-                //     // 清空 localStorage 中的 token
-                //     if let Some(webview) = window.get_webview_window("main") {
-                //         let _ = webview.eval("localStorage.removeItem('token');");
-                //     }
-                // }
                 _ => {}
             });
-            // if let Some(main_window) = app.get_webview_window("main") {
-            //     let window = main_window.clone();
-            //     // 监听窗口事件
-            //     main_window.on_window_event(move |event| match event {
-            //         WindowEvent::CloseRequested { api, .. } => {
-            //             api.prevent_close();
-            //             let _ = window.hide();
-            //         }
-            //         _ => {}
-            //     });
-            // }
-
             Ok(())
         })
         .init_plugin()
-        // .plugin(tauri_plugin_opener::init())
-        // .plugin(tauri_plugin_http::init())
         // 注册命令处理器：将 `clients::greet` 和 `services::open_folder` 函数暴露给前端
         .invoke_handler(tauri::generate_handler![
             greet_name,

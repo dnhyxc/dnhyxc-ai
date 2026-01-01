@@ -3,7 +3,7 @@ use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut,
 
 pub fn setup_global_shortcut(
     app: &AppHandle,
-    main_window: &WebviewWindow,
+    window: &WebviewWindow,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let app_handle = app.clone();
 
@@ -12,10 +12,11 @@ pub fn setup_global_shortcut(
         Shortcut::new(Some(Modifiers::CONTROL), Code::KeyN),
         Shortcut::new(Some(Modifiers::META), Code::KeyK),
         Shortcut::new(Some(Modifiers::META), Code::KeyW),
+        Shortcut::new(Some(Modifiers::META), Code::KeyR),
         Shortcut::new(Some(Modifiers::META | Modifiers::SHIFT), Code::KeyL),
     ];
 
-    main_window.on_window_event(move |event| match event {
+    window.on_window_event(move |event| match event {
         tauri::WindowEvent::Focused(focused) => {
             if *focused {
                 for shortcut in &shortcuts {
@@ -35,8 +36,6 @@ pub fn setup_global_shortcut(
         }
         _ => {}
     });
-
-    println!("Global shortcut setup completed");
     Ok(())
 }
 
@@ -59,6 +58,11 @@ pub fn handle_shortcut<R: Runtime>(
         (mods, Code::KeyK) if mods == Modifiers::SUPER => {
             println!("cmd+k");
             let _ = app.emit("shortcut-triggered", "cmd+k");
+        }
+        (mods, Code::KeyR) if mods == Modifiers::SUPER => {
+            let _ = app.emit("shortcut-triggered", "cmd+r");
+            let window = app.get_webview_window("main").unwrap();
+            window.eval("window.location.reload()").ok();
         }
         (mods, Code::KeyL) if mods == Modifiers::SUPER | Modifiers::SHIFT => {
             println!("cmd+shift+l");
