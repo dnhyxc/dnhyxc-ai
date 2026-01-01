@@ -2,15 +2,11 @@ import Header from '@design/Header';
 import { Button } from '@ui/button';
 import { ScrollArea } from '@ui/scroll-area';
 import { useEffect } from 'react';
-import { getStorage, setBodyClass } from '@/utils';
-import { onEmit, onListen } from '@/utils/event';
+import { onListen, setBodyClass } from '@/utils';
+import { onEmit } from '@/utils/event';
 
 const ChildWindow = () => {
-	const theme = getStorage('theme');
-
 	useEffect(() => {
-		setBodyClass(theme as 'light' | 'dark');
-
 		const unlistenPromise = onListen('message', (value: string) => {
 			console.log('message', value);
 		});
@@ -23,7 +19,7 @@ const ChildWindow = () => {
 			unlistenPromise.then((unlisten) => unlisten());
 			unlistenThemePromise.then((unlisten) => unlisten());
 		};
-	}, [theme]);
+	}, []);
 
 	const sendMessage = async () => {
 		await onEmit('about-send-message', { message: 'about message' });

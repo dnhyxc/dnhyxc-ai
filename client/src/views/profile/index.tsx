@@ -18,10 +18,7 @@ const Profile = () => {
 
 	const fileInputRef = useRef<HTMLInputElement>(null);
 
-	console.log('res', import.meta.env.VITE_QINIU_DOMAIN);
-
 	const onChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-		console.log(e.target.files, 'e.target.files');
 		if (e.target.files?.[0]) {
 			setSelectFile(e.target.files?.[0]);
 		}

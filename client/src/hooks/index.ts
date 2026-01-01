@@ -1,17 +1,35 @@
-import { useState } from 'react';
-import { getStorage, onEmit, setStorage, setThemeToAllWindows } from '@/utils';
+import { useEffect, useState } from 'react';
+import {
+	getValue,
+	onEmit,
+	setBodyClass,
+	setThemeToAllWindows,
+	setValue,
+} from '@/utils';
 
 export const useTheme = () => {
-	const [theme, setTheme] = useState<'dark' | 'light'>(
-		(getStorage('theme') as 'dark' | 'light') || 'light',
-	);
-	const toggleTheme = async () => {
-		const currentTheme = theme === 'light' ? 'dark' : 'light';
-		onEmit('theme', currentTheme);
-		setThemeToAllWindows(currentTheme);
-		setStorage('theme', currentTheme);
-		setTheme(currentTheme);
+	const [currentTheme, setCurrentTheme] = useState<'dark' | 'light'>('light');
+
+	useEffect(() => {
+		initTheme();
+	}, []);
+
+	const initTheme = async () => {
+		const theme = (await getValue('theme')) as 'dark' | 'light';
+		setCurrentTheme(theme);
+		setThemeToAllWindows(theme);
+		setBodyClass(theme);
 	};
 
-	return { theme, toggleTheme };
+	const toggleTheme = async () => {
+		const beforeTheme = await getValue('theme');
+		const type = beforeTheme === 'light' ? 'dark' : 'light';
+		await setValue('theme', type);
+		setThemeToAllWindows(type);
+		setBodyClass(type);
+		setCurrentTheme(type);
+		onEmit('theme', type);
+	};
+
+	return { toggleTheme, currentTheme };
 };

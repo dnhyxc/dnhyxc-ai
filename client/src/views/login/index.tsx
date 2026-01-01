@@ -1,7 +1,6 @@
 import { Button } from '@ui/button';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router';
-import { getStorage, onListen, setBodyClass } from '@/utils';
 import ForgetPwdForm from './forget-pwd-form';
 import LoginForm from './login-form';
 import RegisterForm from './register-form';
@@ -11,20 +10,6 @@ const Login = () => {
 	const [isForget, setIsForget] = useState(false);
 
 	const navigate = useNavigate();
-
-	const theme = getStorage('theme');
-
-	useEffect(() => {
-		setBodyClass(theme as 'light' | 'dark');
-
-		const unlistenThemePromise = onListen('theme', (value: string) => {
-			setBodyClass(value);
-		});
-
-		return () => {
-			unlistenThemePromise.then((unlisten) => unlisten());
-		};
-	}, [theme]);
 
 	const onRegister = () => {
 		setIsRegister(!isRegister);

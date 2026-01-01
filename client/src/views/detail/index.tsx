@@ -1,28 +1,8 @@
 import { Button } from '@ui/button';
-import { useEffect } from 'react';
 import { getUsers } from '@/service';
-import { getStorage, onEmit, onListen, setBodyClass } from '@/utils';
+import { deleteValue, getValue, onEmit, setValue } from '@/utils';
 
 const Detail = () => {
-	const theme = getStorage('theme');
-
-	useEffect(() => {
-		setBodyClass(theme as 'light' | 'dark');
-
-		const unlistenPromise = onListen('message', (value: string) => {
-			console.log('message', value);
-		});
-
-		const unlistenThemePromise = onListen('theme', (value: string) => {
-			setBodyClass(value);
-		});
-
-		return () => {
-			unlistenPromise.then((unlisten) => unlisten());
-			unlistenThemePromise.then((unlisten) => unlisten());
-		};
-	}, [theme]);
-
 	const sendMessage = async () => {
 		await onEmit('about-send-message', { message: 'about message' });
 	};
@@ -30,6 +10,22 @@ const Detail = () => {
 	const getUserList = async () => {
 		const res = await getUsers();
 		console.log(res);
+	};
+
+	const setSettings = async () => {
+		await setValue('test-key', 'test');
+	};
+
+	const getSettings = async () => {
+		const res = await getValue('test-key');
+		console.log('getSettings', res);
+	};
+
+	const deleteSettings = async () => {
+		console.log('deleteSettings');
+		await deleteValue('test-key');
+		const res = await getValue('test-key');
+		console.log('deleteSettings', res);
 	};
 
 	return (
@@ -49,6 +45,17 @@ const Detail = () => {
 					onClick={getUserList}
 				>
 					Get Users
+				</Button>
+			</div>
+			<div className="flex justify-center items-center gap-4 mt-10">
+				<Button className="cursor-pointer" onClick={setSettings}>
+					保存设置
+				</Button>
+				<Button className="cursor-pointer" onClick={getSettings}>
+					获取设置
+				</Button>
+				<Button className="cursor-pointer" onClick={deleteSettings}>
+					删除设置
 				</Button>
 			</div>
 		</div>

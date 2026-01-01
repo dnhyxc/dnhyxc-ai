@@ -10,6 +10,7 @@ import type {
 
 export * from './event';
 export * from './event';
+export * from './store';
 export * from './tauri';
 
 export const setStorage = (key: string, value: string) => {

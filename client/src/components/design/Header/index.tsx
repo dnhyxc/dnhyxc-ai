@@ -1,9 +1,9 @@
 import { Button } from '@ui/button';
 import { useTheme } from '@/hooks';
-import { getStorage } from '@/utils';
 
 const Header = () => {
-	const { theme = getStorage('theme'), toggleTheme } = useTheme();
+	const { currentTheme, toggleTheme } = useTheme();
+
 	return (
 		<header
 			data-tauri-drag-region
@@ -25,7 +25,7 @@ const Header = () => {
 						className="cursor-pointer"
 						onClick={toggleTheme}
 					>
-						主题: {theme}
+						主题: {currentTheme}
 					</Button>
 				</div>
 			</div>

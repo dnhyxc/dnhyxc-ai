@@ -13,6 +13,8 @@
 		"core:window:allow-set-theme",
 		"http:default",
 		"http:allow-fetch",
+		"store:allow-load",
+		"store:default",
 		{
 			"identifier": "http:default",
 			"allow": [

@@ -3,12 +3,14 @@ import { Toaster } from '@ui/sonner';
 import { useEffect } from 'react';
 import { createBrowserRouter } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
-import { onCreateWindow, removeStorage } from '@/utils';
+import { getValue, onCreateWindow, removeStorage, setBodyClass } from '@/utils';
 import { http } from '@/utils/fetch';
 import routes from './routes';
 
 const App = () => {
 	useEffect(() => {
+		loadTheme();
+
 		const aboutPromise = listen('about', (event) => {
 			const eventOptions = event.payload as {
 				version: string;
@@ -35,6 +37,11 @@ const App = () => {
 			logoutPromise.then((unlisten) => unlisten());
 		};
 	}, []);
+
+	const loadTheme = async () => {
+		const theme = await getValue('theme');
+		setBodyClass(theme);
+	};
 
 	const router = createBrowserRouter(routes);
 	return (
