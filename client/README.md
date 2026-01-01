@@ -377,10 +377,10 @@ pub fn run() {
 	"app": {
 		"windows": [
 			{
-                // ...
+				// ...
 				"dragDropEnabled": false
 			}
-		],
+		]
 	}
 }
 ```

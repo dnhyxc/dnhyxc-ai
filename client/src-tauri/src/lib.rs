@@ -15,6 +15,7 @@ mod utils;
 use plugin::init::CustomInit;
 use system::dock::dock_event;
 use system::menu::setup_menu;
+use system::shortcut::setup_global_shortcut;
 use system::tray::init_tray;
 use utils::common::set_screen_center;
 // use tauri::menu::{MenuBuilder, SubmenuBuilder};
@@ -31,13 +32,17 @@ use command::download::{
 pub fn run() {
     // 使用默认配置创建 Tauri 应用构建器
     tauri::Builder::default()
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .setup(|app| {
             let main_window = app.get_webview_window("main").unwrap();
             // 启动时设置窗口居中
             set_screen_center(&main_window);
             // 注册托盘菜单
             init_tray(app);
+
             let _ = setup_menu(app);
+
+            let _ = setup_global_shortcut(&app.handle(), &main_window);
 
             let window = main_window.clone();
             // 监听窗口事件

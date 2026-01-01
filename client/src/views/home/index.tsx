@@ -45,10 +45,15 @@ const Home = () => {
 			console.log('about-send-message', event);
 		});
 
+		const unlistenShortcut = onListen('shortcut-triggered', (event) => {
+			console.log('shortcut-triggered', event);
+		});
+
 		return () => {
 			unlistenProgress.then((unlisten) => unlisten());
 			unlistenAboutPromise.then((unlisten) => unlisten());
 			unlistenDownloadInfo.then((unlisten) => unlisten());
+			unlistenShortcut.then((unlisten) => unlisten());
 		};
 	}, []);
 

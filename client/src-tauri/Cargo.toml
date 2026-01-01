@@ -34,3 +34,6 @@ rfd = "0.16.0"
 reqwest = { version = "0.12.26", features = ["json", "stream"] }
 tokio = { version = "1.0", features = ["full"] }
 futures = "0.3"
+
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-global-shortcut = "2"
