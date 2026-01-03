@@ -14,6 +14,7 @@ import {
 	createUnlistenFileInfoListener,
 	donwnloadWithUrl,
 	downloadBlob,
+	getStorage,
 	onCreateWindow,
 	onEmit,
 	onListen,
@@ -34,6 +35,7 @@ const Home = () => {
 
 	// 在组件中添加进度监听
 	useEffect(() => {
+		console.log(JSON.parse(getStorage('userInfo') || '{}'));
 		const unlistenProgress = createDownloadProgressListener(
 			setDownloadProgressInfo,
 		);

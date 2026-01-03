@@ -8,9 +8,11 @@
  */
 import { createContext, useContext } from 'react';
 import AuthStore from './auth';
+import UserStore from './user';
 
 class RootStore {
 	authStore = AuthStore;
+	userStore = UserStore;
 }
 
 const store = new RootStore();

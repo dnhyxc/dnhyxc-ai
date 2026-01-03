@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { createVerifyCode, login } from '@/service';
+import useStore from '@/store';
 import { setStorage } from '@/utils';
 import { http } from '@/utils/fetch';
 
@@ -34,6 +35,8 @@ const LoginForm: React.FC<IProps> = ({ onForgetPwd }) => {
 	});
 
 	const navigate = useNavigate();
+
+	const { userStore } = useStore();
 
 	useEffect(() => {
 		getCaptcha();
@@ -103,9 +106,9 @@ const LoginForm: React.FC<IProps> = ({ onForgetPwd }) => {
 			captchaId: captchaInfo.captchaId,
 		});
 
-		console.log(res, 'usersssss');
-
-		if (res?.data?.access_token) {
+		if (res.code === 200) {
+			userStore.setUserInfo(res.data);
+			setStorage('userInfo', JSON.stringify(res.data));
 			setStorage('token', res.data.access_token);
 			http.setAuthToken(res.data.access_token);
 		}
