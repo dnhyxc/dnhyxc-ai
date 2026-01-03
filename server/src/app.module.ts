@@ -33,7 +33,6 @@ const envConfig = getEnvConfig();
 			envFilePath,
 			// 自动合并 .env、.env.development、.env.production 文件
 			load: [() => dotenv.config({ path: '.env' })],
-			// TODO: Joi 配置未生效，后续完善
 			validationSchema: Joi.object({
 				// 使用 Joi 验证环境变量中的DB_PORT
 				NODE_ENV: Joi.string()
@@ -63,7 +62,7 @@ const envConfig = getEnvConfig();
 					password: envConfig[RedisEnum.REDIS_PASSWORD],
 					username: envConfig[RedisEnum.REDIS_USERNAME],
 				});
-				// 添加错误监听
+				// 监听错误事件
 				store.on('error', (err) => {
 					console.error('Keyv Store Error:', err.message);
 				});
@@ -77,7 +76,7 @@ const envConfig = getEnvConfig();
 					console.error('Redis连接测试失败:', error.message);
 				}
 				return {
-					store: store,
+					store,
 					// ttl（time-to-live）表示缓存项的存活时间，单位毫秒。这里设置为 120000 毫秒（120 秒），
 					// 意味着写入缓存的数据默认在 5 秒后过期并被自动清除，防止脏数据长期残留。
 					ttl: 120000,
