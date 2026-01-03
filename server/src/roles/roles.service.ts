@@ -18,7 +18,9 @@ export class RolesService {
 	async createRole(dto: CreateRoleDto) {
 		const { menuIds, name } = dto;
 		// 查找所有菜单
-		const menus = await this.menusRepository.findBy({ id: In(menuIds) });
+		const menus = await this.menusRepository.findBy(
+			menuIds?.length ? { id: In(menuIds) } : {},
+		);
 
 		// 创建角色并关联菜单
 		const role = this.rolesRepository.create({
