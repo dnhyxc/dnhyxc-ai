@@ -28,6 +28,9 @@ export class User {
 	@Exclude() // 使用 Exclude 在响应时忽略 password 字段返回
 	password: string;
 
+	@Column({ unique: true })
+	email: string;
+
 	@CreateDateColumn({ type: 'timestamp' }) // 自动创建一个自增的时间戳
 	createTime: Date;
 

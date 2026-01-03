@@ -8,6 +8,7 @@ import {
 	GET_USERS,
 	LOGIN,
 	REGISTER,
+	SEND_EMAIL,
 } from './api';
 
 export const login = async ({
@@ -29,16 +30,31 @@ export const login = async ({
 	});
 };
 
+export const sendEmail = async (email: string): Promise<any> => {
+	return await http.post(SEND_EMAIL, {
+		email,
+	});
+};
+
 export const register = async ({
 	username,
 	password,
+	email,
+	verifyCodeKey,
+	verifyCode,
 }: {
 	username: string;
 	password: string;
+	email: string;
+	verifyCodeKey: string;
+	verifyCode: string;
 }): Promise<any> => {
 	return await http.post(REGISTER, {
 		username,
 		password,
+		email,
+		verifyCodeKey,
+		verifyCode: Number(verifyCode),
 	});
 };
 

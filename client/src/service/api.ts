@@ -1,6 +1,9 @@
 // 登录
 export const LOGIN = '/auth/login';
 
+// 发送邮件获取验证码
+export const SEND_EMAIL = '/auth/sendEmail';
+
 // 注册
 export const REGISTER = '/auth/register';
 

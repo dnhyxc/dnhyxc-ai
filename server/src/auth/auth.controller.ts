@@ -1,16 +1,10 @@
-import { randomUUID } from 'node:crypto';
 import {
 	Body,
 	ClassSerializerInterceptor,
 	Controller,
-	HttpException,
-	HttpStatus,
 	Post,
 	UseInterceptors,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { MailerService } from '@nestjs-modules/mailer';
-import { EmailEnum } from '../enum/config.enum';
 import { ResponseInterceptor } from '../interceptors/response.interceptor';
 import { AuthService } from './auth.service';
 import { CaptchaDto } from './dto/captcha.dto';
@@ -22,11 +16,7 @@ import { RegisterUserDTO } from './dto/register-user.dto';
 @UseInterceptors(ClassSerializerInterceptor, ResponseInterceptor)
 // @UseInterceptors(ClassSerializerInterceptor)
 export class AuthController {
-	constructor(
-		private authService: AuthService,
-		private mailerService: MailerService,
-		private configService: ConfigService,
-	) {}
+	constructor(private authService: AuthService) {}
 
 	@Post('/login')
 	async login(@Body() dto: LoginUserDTO) {
@@ -39,8 +29,8 @@ export class AuthController {
 	@Post('/register')
 	// @UseInterceptors(SerializeInterceptor)
 	async register(@Body() dto: RegisterUserDTO) {
-		const { username, password } = dto;
-		return await this.authService.register(username, password);
+		console.log(dto, 'dtotototo');
+		return await this.authService.register(dto);
 	}
 
 	@Post('/createVerifyCode')
@@ -48,25 +38,8 @@ export class AuthController {
 		return await this.authService.createVerifyCode(dto);
 	}
 
-	@Post('/email')
+	@Post('/sendEmail')
 	async sendEmail(@Body('email') email: string) {
-		try {
-			const code = randomUUID().substring(0, 6);
-			const res = await this.mailerService.sendMail({
-				to: email,
-				from: `"dnhyxc-ai" <${this.configService.get(EmailEnum.EMAIL_FROM)}>`,
-				subject: '注册验证码',
-				template: 'mail',
-				context: {
-					code,
-				},
-			});
-			return res.envelope;
-		} catch (error) {
-			throw new HttpException(
-				error?.message || '发送邮件失败',
-				HttpStatus.BAD_REQUEST,
-			);
-		}
+		return await this.authService.sendEmail(email);
 	}
 }
