@@ -27,7 +27,7 @@ const ChildWindow = () => {
 
 	return (
 		<div className="w-full h-full flex flex-col rounded-lg box-border overflow-hidden">
-			<Header />
+			<Header actions={false} />
 			<div
 				className={`h-[calc(100%-60px)] flex-1 flex justify-center items-center box-border px-5 pb-5`}
 			>

@@ -1,4 +1,5 @@
 import Layout from '@/layout';
+import NotFound from '@/views/404';
 import About from '@/views/about';
 import Detail from '@/views/detail';
 import Home from '@/views/home';
@@ -35,6 +36,10 @@ const routes = [
 	{
 		path: 'about',
 		Component: About,
+	},
+	{
+		path: '*',
+		Component: NotFound,
 	},
 ];
 
