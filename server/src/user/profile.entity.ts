@@ -15,10 +15,10 @@ export class Profile {
 	id: number;
 
 	@Column()
-	gender: string;
+	gender: number; // 0 不可知 1 男 2 女
 
 	@Column()
-	photo: string;
+	avatar: string;
 
 	@Column()
 	address: string;

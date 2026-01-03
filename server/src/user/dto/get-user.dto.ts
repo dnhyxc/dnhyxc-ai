@@ -13,5 +13,5 @@ export class GetUserDto {
 	pageSize: number;
 	username?: string;
 	role?: number;
-	gender?: string;
+	gender?: number;
 }
