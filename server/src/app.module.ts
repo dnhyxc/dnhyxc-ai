@@ -9,6 +9,7 @@ import { connectionOptions } from '../ormconfig';
 import { AuthModule } from './auth/auth.module';
 import { RedisEnum } from './enum/config.enum';
 import { LogsModule } from './logs/logs.module';
+import { MailModule } from './mail/mail.module';
 import { MenusModule } from './menus/menus.module';
 import { PromptModule } from './prompt/prompt.module';
 import { RolesModule } from './roles/roles.module';
@@ -90,6 +91,7 @@ const envConfig = getEnvConfig();
 		AuthModule,
 		MenusModule,
 		UploadModule,
+		MailModule,
 	],
 	controllers: [],
 	providers: [

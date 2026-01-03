@@ -30,3 +30,8 @@ export enum QiniuEnum {
 export enum FileEnum {
 	FILE_ROOT = 'FILE_ROOT',
 }
+
+export enum EmailEnum {
+	EMAIL_TRANSPORT = 'EMAIL_TRANSPORT',
+	EMAIL_FROM = 'EMAIL_FROM',
+}

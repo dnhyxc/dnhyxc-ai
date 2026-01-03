@@ -961,3 +961,39 @@ export class AuthService {
 需要安装 [swagger-ui-express](https://www.npmjs.com/package/swagger-ui-express)、[@nestjs/swagger](https://www.npmjs.com/package/@nestjs/swagger)
 
 [使用参考视频](https://www.bilibili.com/video/BV1NG41187Bs?spm_id_from=333.788.player.switch&vd_source=048c1562000d83337f08ff7451ab1f76&p=23)
+
+## 接入邮件服务
+
+使用的库：
+
+[@nestjs-modules/mailer](https://www.npmjs.com/package/@nestjs-modules/mailer)
+
+[mailer](https://nest-modules.github.io/mailer/docs/mailer.html)
+
+### QQ 邮箱服务
+
+[QQ 邮箱服务](https://wx.mail.qq.com/account/index?sid=zfxkMozHYVUuKEVSADdGZAAA#/?tab=safety&r=1767434868588)
+
+找到“账号与安全” -> 安全设置 -> “POP3/IMAP/SMTP/Exchange/CardDAV 服务”, 开启服务，获取到授权码（pass）：`dnjqczdqtbofbdgd`。
+
+### 拷贝邮件模版到 dist 目录
+
+不拷贝文件到dist 目录，会导致在 `mail.module.ts` 中 `MailerModule.forRoot()` 配置项中的 `template` 下的 `dir` 无法正确找到模版，因此需要修改 `nest-cli.json` 中的 `assets` 配置项，将 `mail/templates/**/*.hbs` 拷贝到 `dist/src/auth/templates` 目录下。
+
+```json
+{
+	"$schema": "https://json.schemastore.org/nest-cli",
+	"collection": "@nestjs/schematics",
+	"sourceRoot": "src",
+	"compilerOptions": {
+		"deleteOutDir": true,
+		"watchAssets": true,
+		"assets": [
+			{
+				"include": "mail/templates/**/*.hbs",
+				"outDir": "dist/src"
+			}
+		]
+	}
+}
+```

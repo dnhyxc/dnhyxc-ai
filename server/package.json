@@ -27,6 +27,7 @@
 	"dependencies": {
 		"@casl/ability": "^6.7.5",
 		"@keyv/redis": "^5.1.5",
+		"@nestjs-modules/mailer": "^2.0.2",
 		"@nestjs/cache-manager": "^3.1.0",
 		"@nestjs/common": "^11.0.1",
 		"@nestjs/config": "^4.0.2",
@@ -44,6 +45,7 @@
 		"compressing": "^2.0.0",
 		"dotenv": "^17.2.3",
 		"express-rate-limit": "^8.2.1",
+		"handlebars": "^4.7.8",
 		"helmet": "^8.1.0",
 		"install": "^0.13.0",
 		"joi": "^18.0.2",
@@ -51,6 +53,7 @@
 		"multer": "^2.0.2",
 		"mysql2": "^3.16.0",
 		"nest-winston": "^1.10.2",
+		"nodemailer": "^7.0.12",
 		"passport": "^0.7.0",
 		"passport-jwt": "^4.0.1",
 		"qiniu": "^7.14.0",
