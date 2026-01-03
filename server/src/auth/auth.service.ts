@@ -37,17 +37,22 @@ export class AuthService {
 		// 使用 argon2 验证密码
 		const isPasswordValid = await argon2.verify(user.password, password);
 		if (isPasswordValid) {
-			// 返回根据用户的用户名及密码生成的 token
-			return await this.jwt.signAsync(
+			const { password, ...userInfo } = user; // 使用解构赋值排除password
+			const token = await this.jwt.signAsync(
 				{
-					username: user.username,
-					sub: user.id,
+					username: userInfo.username,
+					sub: userInfo.id,
 				},
 				// 局部设置 token 过期时间，一般用在 refreshToken 上
 				// {
 				// 	expiresIn: '1d',
 				// },
 			);
+			// 返回根据用户的用户名及密码生成的 token
+			return {
+				access_token: token,
+				...userInfo,
+			};
 		} else {
 			throw new HttpException('用户名或密码错误', HttpStatus.BAD_REQUEST);
 		}
