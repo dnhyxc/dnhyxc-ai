@@ -26,7 +26,6 @@ export class AuthController {
 	@Post('/register')
 	// @UseInterceptors(SerializeInterceptor)
 	async register(@Body() dto: RegisterUserDTO) {
-		console.log(dto, 'dtotototo');
 		return await this.authService.register(dto);
 	}
 

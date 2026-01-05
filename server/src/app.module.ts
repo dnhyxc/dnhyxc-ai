@@ -5,7 +5,7 @@ import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import * as dotenv from 'dotenv';
 import * as Joi from 'joi';
-import { connectionOptions } from '../ormconfig';
+import { connectionOptions, db1ConnectionOptions } from '../ormconfig';
 import { AuthModule } from './auth/auth.module';
 import { RedisEnum } from './enum/config.enum';
 import { LogsModule } from './logs/logs.module';
@@ -52,7 +52,10 @@ const envConfig = getEnvConfig();
 				LOG_ON: Joi.boolean(),
 			}),
 		}),
+		// 默认数据库
 		TypeOrmModule.forRoot(connectionOptions),
+		// 备用数据库
+		TypeOrmModule.forRoot(db1ConnectionOptions),
 		// Redis 缓存
 		NestCacheModule.registerAsync({
 			isGlobal: true,
