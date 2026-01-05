@@ -8,7 +8,6 @@
 
 import Header from '@design/Header';
 import Sidebar from '@design/Sidebar';
-import { ScrollArea } from '@ui/scroll-area';
 import { Toaster } from '@ui/sonner';
 import { Outlet } from 'react-router';
 
@@ -24,11 +23,14 @@ const Layout = () => {
 				<div className="h-full w-full rounded-md bg-border">
 					{/* <div className="h-full w-full shadow-(--shadow) rounded-sm"> */}
 					<Header />
-					<ScrollArea className="w-full h-[calc(100%-52px)] flex justify-center items-center box-border rounded-md p-1">
-						<div className="w-full h-full">
+					<div className="w-full h-[calc(100%-3.25rem)]">
+						<Outlet />
+					</div>
+					{/* <ScrollArea className="w-full h-[calc(100%-52px)] flex justify-center items-center box-border rounded-md p-1">
+						<div className="w-full h-[calc(100vh-52px)] border border-[red]">
 							<Outlet />
 						</div>
-					</ScrollArea>
+					</ScrollArea> */}
 				</div>
 			</div>
 			{/* <footer className="h-15 flex items-center justify-center box-border">

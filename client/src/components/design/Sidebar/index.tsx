@@ -7,6 +7,7 @@ import {
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router';
 import ICON from '@/assets/icon.png';
+import { getStorage } from '@/utils';
 import { MENUS } from './enum';
 
 const Sidebar = () => {
@@ -32,6 +33,11 @@ const Sidebar = () => {
 		[],
 	);
 
+	const userInfo = useMemo(
+		() => JSON.parse(getStorage('userInfo') || '{}'),
+		[],
+	);
+
 	return (
 		<div
 			data-tauri-drag-region
@@ -42,9 +48,18 @@ const Sidebar = () => {
 					<div
 						data-tauri-drag-region
 						className="flex justify-center items-center w-11 h-11 bg-border cursor-pointer mb-8 rounded-md hover:text-green-600 transition-all duration-200 ease-in-out"
-						onClick={() => onJump('/')}
+						onClick={() => onJump('/profile')}
 					>
-						<img src={ICON} alt="" className="w-7 h-7 cursor-pointer mb-1" />
+						<img
+							src={userInfo?.profile?.avatar || ICON}
+							alt=""
+							className={`${userInfo?.profile?.avatar ? 'rounded-md w-10.5 h-10.5' : 'w-7.5 h-7.5 cursor-pointer mb-1'}`}
+						/>
+						{/* <img
+							src={userInfo?.profile?.avatar || ICON}
+							alt="avatar"
+							className="rounded-md"
+						/> */}
 					</div>
 					{processedMenus.map((item) => (
 						<div

@@ -29,6 +29,7 @@ export const buildConnectionOptions = () => {
 
 export const connectionOptions: TypeOrmModuleOptions = buildConnectionOptions();
 
+// 这里是为了对接 typeorm 的数据源，方便使用 typeorm 的 cli 命令
 export default new DataSource({
 	...connectionOptions,
 	migrations: ['src/migrations/**'],
