@@ -1,59 +1,42 @@
 import {
+	Body,
 	Controller,
+	Delete,
 	Get,
-	Inject,
-	type LoggerService,
+	Param,
+	Patch,
 	Post,
-	// Logger,
-	// HttpException,
-	// HttpStatus,
-	// NotFoundException,
-	// UnauthorizedException,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
-import { ConfigEnum } from '../enum/config.enum';
+import { CreatePromptDto } from './dto/create-prompt.dto';
+import { UpdatePromptDto } from './dto/update-prompt.dto';
 import { PromptService } from './prompt.service';
 
 @Controller('prompt')
 export class PromptController {
-	constructor(
-		private promptService: PromptService,
-		@Inject(WINSTON_MODULE_NEST_PROVIDER)
-		private readonly logger: LoggerService,
-		private readonly configService: ConfigService,
-	) {
-		logger.log('PromptController init');
-	}
-	@Get()
-	getPrompt() {
-		// const user = {
-		// 	isAdmin: false,
-		// };
-		// if (!user.isAdmin) {
-		// 	// 抛出对应的异常
-		// 	// throw new HttpException('Forbidden', HttpStatus.FORBIDDEN);
-		// 	throw new UnauthorizedException('用户没有权限');
-		// }
-		const db_host = this.configService.get(ConfigEnum.DB_HOST);
-		const db_database = this.configService.get(ConfigEnum.DB_DATABASE);
-		const db_port = this.configService.get(ConfigEnum.DB_PORT);
+	constructor(private readonly promptService: PromptService) {}
 
-		this.logger.log(`DB_HOST--------${db_host}`);
-		this.logger.log(`DB_DATABASE--------${db_database}`);
-		this.logger.log(`db_port--------${db_port}`);
-
-		// this.logger.log('getPrompt-log');
-		// this.logger.warn('getPrompt-warn');
-		// this.logger.error('getPrompt-error');
-		// this.logger.debug('getPrompt-debug');
-		// this.logger.verbose('getPrompt-verbose');
-		return this.promptService.getPrompt();
+	@Post('/create')
+	create(@Body() createPromptDto: CreatePromptDto) {
+		return this.promptService.create(createPromptDto);
 	}
-	@Post()
-	addPrompt() {
-		const prompt = { name: 'test', prompt: 'test prompt' };
-		console.log(prompt, 'prompt');
-		return this.promptService.addPrompt(prompt);
+
+	@Get('/list')
+	findAll() {
+		return this.promptService.findAll();
+	}
+
+	@Get('/detail/:id')
+	findOne(@Param('id') id: string) {
+		return this.promptService.findOne(+id);
+	}
+
+	@Patch('/update/:id')
+	update(@Param('id') id: string, @Body() updatePromptDto: UpdatePromptDto) {
+		return this.promptService.update(+id, updatePromptDto);
+	}
+
+	@Delete('/delete/:id')
+	remove(@Param('id') id: string) {
+		return this.promptService.remove(+id);
 	}
 }

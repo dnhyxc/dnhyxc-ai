@@ -14,7 +14,7 @@ services:
       - --innodb-buffer-pool-size=128M
       - --skip-name-resolve
     ports:
-      - 12009:3306
+      - 12009:3306 # dev 3090:3306
     volumes:
       - mysql_data:/var/lib/mysql # 持久化数据
       # - ./init.sql:/docker-entrypoint-initdb.d/init.sql # 可选初始化脚本
@@ -37,7 +37,7 @@ services:
     image: adminer:latest
     restart: always
     ports:
-      - 12011:3306
+      - 12011:3306 # dev 3091:3306
     depends_on:
       db:
         condition: service_healthy

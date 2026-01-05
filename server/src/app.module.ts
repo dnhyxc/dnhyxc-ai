@@ -83,7 +83,6 @@ const envConfig = getEnvConfig();
 				};
 			},
 		}),
-		PromptModule,
 		LogsModule,
 		UserModule,
 		RolesModule,
@@ -91,6 +90,7 @@ const envConfig = getEnvConfig();
 		MenusModule,
 		UploadModule,
 		MailModule,
+		PromptModule,
 	],
 	controllers: [],
 	providers: [
