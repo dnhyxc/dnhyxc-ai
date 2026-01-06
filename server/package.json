@@ -45,7 +45,6 @@
 		"compressing": "^2.0.0",
 		"dotenv": "^17.2.3",
 		"express-rate-limit": "^8.2.1",
-		"handlebars": "^4.7.8",
 		"helmet": "^8.1.0",
 		"install": "^0.13.0",
 		"joi": "^18.0.2",

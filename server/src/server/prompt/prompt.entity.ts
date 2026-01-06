@@ -1,6 +1,6 @@
 import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
-import { ConfigEnum } from '../enum/config.enum';
-import { getEnvConfig } from '../utils';
+import { ConfigEnum } from '../../enum/config.enum';
+import { getEnvConfig } from '../../utils';
 
 const config = getEnvConfig();
 

@@ -8,10 +8,10 @@ import {
 	Post,
 	UseGuards,
 } from '@nestjs/common';
-import { Roles } from '../decorators/roles.decorator';
-import { Role } from '../enum/roles.enum';
-import { JwtGuard } from '../guards/jwt.guard';
-import { RoleGuard } from '../guards/role.guard';
+import { Roles } from '../../decorators/roles.decorator';
+import { Role } from '../../enum/roles.enum';
+import { JwtGuard } from '../../guards/jwt.guard';
+import { RoleGuard } from '../../guards/role.guard';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
 import { RolesService } from './roles.service';

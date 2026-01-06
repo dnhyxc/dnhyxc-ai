@@ -1,10 +1,12 @@
 import { Module } from '@nestjs/common';
 import { MailerModule } from '@nestjs-modules/mailer';
-import { HandlebarsAdapter } from '@nestjs-modules/mailer/dist/adapters/handlebars.adapter';
-import { EmailEnum } from '../enum/config.enum';
-import { getEnvConfig } from '../utils';
+// import { HandlebarsAdapter } from '@nestjs-modules/mailer/dist/adapters/handlebars.adapter';
+import { EmailEnum } from '../../enum/config.enum';
+import { getEnvConfig } from '../../utils';
 
 const config = getEnvConfig();
+
+console.log(`${__dirname}/templates`, 'mamammamam');
 
 @Module({
 	imports: [
@@ -15,13 +17,13 @@ const config = getEnvConfig();
 				defaults: {
 					from: `"dnhyxc-ai" <${config[EmailEnum.EMAIL_FROM]}>`,
 				},
-				template: {
-					dir: `${__dirname}/templates`,
-					adapter: new HandlebarsAdapter(),
-					options: {
-						strict: true,
-					},
-				},
+				// template: {
+				// 	dir: `${__dirname}/templates`,
+				// 	adapter: new HandlebarsAdapter(),
+				// 	options: {
+				// 		strict: true,
+				// 	},
+				// },
 			}),
 		}),
 	],

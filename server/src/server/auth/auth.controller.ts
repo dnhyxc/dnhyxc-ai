@@ -5,7 +5,7 @@ import {
 	Post,
 	UseInterceptors,
 } from '@nestjs/common';
-import { ResponseInterceptor } from '../interceptors/response.interceptor';
+import { ResponseInterceptor } from '../../interceptors/response.interceptor';
 import { AuthService } from './auth.service';
 import { CaptchaDto } from './dto/captcha.dto';
 import { LoginUserDTO } from './dto/login-user.dto';

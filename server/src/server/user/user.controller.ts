@@ -18,8 +18,8 @@ import {
 } from '@nestjs/common';
 // import { TypeormFilter } from '../filters/typeorm.filter';
 // import { AdminGuard } from '../guards/admin.guard';
-import { JwtGuard } from '../guards/jwt.guard';
-import { ResponseInterceptor } from '../interceptors/response.interceptor';
+import { JwtGuard } from '../../guards/jwt.guard';
+import { ResponseInterceptor } from '../../interceptors/response.interceptor';
 import { CreateUserDTO } from './dto/create-user.dto';
 import { GetUserDto } from './dto/get-user.dto';
 import { UpdateUserDTO } from './dto/update-user.dto';

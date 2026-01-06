@@ -1,7 +1,7 @@
-import { Logs } from '../logs/logs.entity';
-import { Menus } from '../menus/menus.entity';
-import { Roles } from '../roles/roles.entity';
-import { User } from '../user/user.entity';
+import { Logs } from '../server/logs/logs.entity';
+import { Menus } from '../server/menus/menus.entity';
+import { Roles } from '../server/roles/roles.entity';
+import { User } from '../server/user/user.entity';
 
 // 获取对应有权限的实体，用于在 casl-ability.service.ts 中方便 casl/ability 使用来控制权限
 export const getEntities = (path: string) => {

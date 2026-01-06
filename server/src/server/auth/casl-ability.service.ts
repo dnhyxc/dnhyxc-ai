@@ -7,8 +7,8 @@ import {
 } from '@casl/ability';
 import { Injectable } from '@nestjs/common';
 // import { Logs } from '../logs/logs.entity';
-import { UserService } from '../user/user.service';
-import { getEntities } from '../utils/common';
+import { UserService } from '../../server/user/user.service';
+import { getEntities } from '../../utils/common';
 
 @Injectable()
 export class CaslAbilityService {

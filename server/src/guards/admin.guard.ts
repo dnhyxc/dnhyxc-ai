@@ -4,7 +4,7 @@ import {
 	ForbiddenException,
 	Injectable,
 } from '@nestjs/common';
-import { UserService } from '../user/user.service';
+import { UserService } from '../server/user/user.service';
 
 // 实现权鉴路由守卫
 @Injectable()

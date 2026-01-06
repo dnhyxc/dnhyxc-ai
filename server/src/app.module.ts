@@ -4,18 +4,18 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 
 import { DataSource } from 'typeorm';
-import { AuthModule } from './auth/auth.module';
 import { TypeOrmConfigService } from './database/typeorm-config.service';
 import { TypeOrmDestroyService } from './database/typeorm-destroy.service';
 import { appConfig } from './factorys/app-config.factory';
 import { RedisConfigFactory } from './factorys/redis-config.factory';
-import { LogsModule } from './logs/logs.module';
-import { MailModule } from './mail/mail.module';
-import { MenusModule } from './menus/menus.module';
-import { PromptModule } from './prompt/prompt.module';
-import { RolesModule } from './roles/roles.module';
-import { UploadModule } from './upload/upload.module';
-import { UserModule } from './user/user.module';
+import { AuthModule } from './server/auth/auth.module';
+import { LogsModule } from './server/logs/logs.module';
+import { MailModule } from './server/mail/mail.module';
+import { MenusModule } from './server/menus/menus.module';
+import { PromptModule } from './server/prompt/prompt.module';
+import { RolesModule } from './server/roles/roles.module';
+import { UploadModule } from './server/upload/upload.module';
+import { UserModule } from './server/user/user.module';
 
 // 数据库连接池
 const connections = new Map();

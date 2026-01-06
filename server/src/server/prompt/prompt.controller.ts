@@ -8,7 +8,7 @@ import {
 	Post,
 	UseInterceptors,
 } from '@nestjs/common';
-import { ResponseInterceptor } from '../interceptors/response.interceptor';
+import { ResponseInterceptor } from '../../interceptors/response.interceptor';
 import { CreatePromptDto } from './dto/create-prompt.dto';
 import { UpdatePromptDto } from './dto/update-prompt.dto';
 import { PromptService } from './prompt.service';

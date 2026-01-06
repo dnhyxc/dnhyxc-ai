@@ -2,8 +2,8 @@ import { existsSync } from 'node:fs';
 import { extname, join } from 'node:path';
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import * as qiniu from 'qiniu';
-import { FileEnum, QiniuEnum } from '../enum/config.enum';
-import { getEnvConfig } from '../utils';
+import { FileEnum, QiniuEnum } from '../../enum/config.enum';
+import { getEnvConfig } from '../../utils';
 import { IMAGE_EXTS } from './upload.enum';
 
 @Injectable()

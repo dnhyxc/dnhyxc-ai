@@ -9,8 +9,8 @@ import {
 	Post,
 	UseGuards,
 } from '@nestjs/common';
-import { JwtGuard } from '../guards/jwt.guard';
-import { RoleGuard } from '../guards/role.guard';
+import { JwtGuard } from '../../guards/jwt.guard';
+import { RoleGuard } from '../../guards/role.guard';
 import { CreateMenuDto } from './dto/create-menu.dto';
 import { UpdateMenuDto } from './dto/update-menu.dto';
 import { MenusService } from './menus.service';

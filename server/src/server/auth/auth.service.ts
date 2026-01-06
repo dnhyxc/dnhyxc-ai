@@ -6,9 +6,9 @@ import { JwtService } from '@nestjs/jwt';
 import { MailerService } from '@nestjs-modules/mailer';
 import * as argon2 from 'argon2';
 import * as svgCaptcha from 'svg-captcha';
-import { EmailEnum } from '../enum/config.enum';
-import { UserService } from '../user/user.service';
-import { randomLightColor } from '../utils';
+import { EmailEnum } from '../../enum/config.enum';
+import { UserService } from '../../server/user/user.service';
+import { randomLightColor } from '../../utils';
 import { CaptchaDto } from './dto/captcha.dto';
 import { LoginUserDTO } from './dto/login-user.dto';
 import { RegisterUserDTO } from './dto/register-user.dto';
@@ -133,10 +133,18 @@ export class AuthService {
 				to,
 				from: `"dnhyxc-ai" <${this.configService.get(EmailEnum.EMAIL_FROM)}>`,
 				subject: '注册验证码',
-				template: 'mail',
-				context: {
-					code,
-				},
+				html: `
+					<div>
+						<h1>欢迎注册 dnhyxc-ai</h1>
+						<h3>接收验证码</h3>
+						<p>验证码：<span style="font-size: 20px;">${code}</span></p>
+						<p style="font-size: 14px;">此验证码只在 1 分钟内有效，请请尽快使用，同时请勿泄露给其他人。</p>
+					</div>
+				`,
+				// template: 'mail',
+				// context: {
+				// 	code,
+				// },
 			});
 			const REDIS_KEY = `EMAIL_${randomUUID()}_${to}`;
 			await this.cache.set(REDIS_KEY, code, 60 * 1000);

@@ -14,8 +14,8 @@ import {
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { zip } from 'compressing';
 import type { Response } from 'express';
-import { JwtGuard } from '../guards/jwt.guard';
-import { ResponseInterceptor } from '../interceptors/response.interceptor';
+import { JwtGuard } from '../../guards/jwt.guard';
+import { ResponseInterceptor } from '../../interceptors/response.interceptor';
 import { UploadService } from './upload.service';
 
 @Controller('upload')
