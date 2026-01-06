@@ -997,3 +997,13 @@ export class AuthService {
 	}
 }
 ```
+
+## 后端项目部署
+
+打包项目生成 dist 文件，如果需要安装新包，需要将 `dist.zip` 和 `package.json` 文件上传到服务器的 `/usr/local/dnhyxc-ai/server` 目录下。
+
+如果需要更新 docker 配置，需要将 `docker-compose.yml` 文件上传到服务器的 `/usr/local/dnhyxc-ai/mysql` 目录下。
+
+如果 `.evn` 和 `.env.production` 内容有更新，需要将它们也上传到服务器的 `/usr/local/dnhyxc-ai/server` 目录下，或者在服务器上手动修改，建议手动修改。
+
+只有运行 `pm2 start npm --name server -- run start:prod` 启动服务器。
