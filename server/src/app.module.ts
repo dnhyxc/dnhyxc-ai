@@ -6,6 +6,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import * as dotenv from 'dotenv';
 import * as Joi from 'joi';
 import { DataSource } from 'typeorm';
+import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { TypeOrmConfigService } from './database/typeorm-config.service';
 import { RedisEnum } from './enum/config.enum';
@@ -17,7 +18,6 @@ import { RolesModule } from './roles/roles.module';
 import { UploadModule } from './upload/upload.module';
 import { UserModule } from './user/user.module';
 import { getEnvConfig } from './utils';
-import { AppService } from './app.service';
 
 const envFilePath = `.env.${process.env.NODE_ENV || 'development'}`;
 
