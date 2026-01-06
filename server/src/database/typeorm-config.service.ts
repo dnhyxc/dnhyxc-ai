@@ -30,11 +30,11 @@ export class TypeOrmConfigService implements TypeOrmOptionsFactory {
 
 		if (version === 'v1' || body?.version === 'v1') {
 			config = {
-				port: 3092,
+				port: this.configService.get(ConfigEnum.DB_DB1_PORT),
 			};
 		} else {
 			config = {
-				port: 3090,
+				port: this.configService.get(ConfigEnum.DB_PORT),
 			};
 		}
 

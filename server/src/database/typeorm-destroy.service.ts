@@ -5,7 +5,7 @@ import { DataSource } from 'typeorm';
  * 应用服务类，负责在应用关闭时优雅地销毁所有 TypeORM 数据库连接。
  * 通过实现 OnApplicationShutdown 接口，NestJS 会在应用关闭时自动调用 onApplicationShutdown 方法。
  */
-export class AppService implements OnApplicationShutdown {
+export class TypeOrmDestroyService implements OnApplicationShutdown {
 	constructor(
 		// 使用自定义注入令牌 'TYPEORM_CONNECTIONS' 注入一个 Map，其中键为连接名称，值为对应的 TypeORM DataSource 实例
 		@Inject('TYPEORM_CONNECTIONS') private connections: Map<string, DataSource>,

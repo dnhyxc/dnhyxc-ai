@@ -2,13 +2,13 @@ import { CacheModule as NestCacheModule } from '@nestjs/cache-manager';
 import { Global, Logger, Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import * as dotenv from 'dotenv';
-import * as Joi from 'joi';
+
 import { DataSource } from 'typeorm';
-import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
-import { RedisConfigFactory } from './database/redis-config.factory';
 import { TypeOrmConfigService } from './database/typeorm-config.service';
+import { TypeOrmDestroyService } from './database/typeorm-destroy.service';
+import { appConfig } from './factorys/app-config.factory';
+import { RedisConfigFactory } from './factorys/redis-config.factory';
 import { LogsModule } from './logs/logs.module';
 import { MailModule } from './mail/mail.module';
 import { MenusModule } from './menus/menus.module';
@@ -17,8 +17,6 @@ import { RolesModule } from './roles/roles.module';
 import { UploadModule } from './upload/upload.module';
 import { UserModule } from './user/user.module';
 
-const envFilePath = `.env.${process.env.NODE_ENV || 'development'}`;
-
 // 数据库连接池
 const connections = new Map();
 
@@ -26,32 +24,7 @@ const connections = new Map();
 @Global()
 @Module({
 	imports: [
-		ConfigModule.forRoot({
-			// 全局注册配置模块，这样就不需要在每个模块的 @Module 中都使用 ConfigModule.forRoot() 注册过后才能使用
-			isGlobal: true,
-			// 配置加载的 env 文件路径
-			envFilePath,
-			// 自动合并 .env、.env.development、.env.production 文件
-			load: [() => dotenv.config({ path: '.env' })],
-			validationSchema: Joi.object({
-				// 使用 Joi 验证环境变量中的DB_PORT
-				NODE_ENV: Joi.string()
-					.valid('development', 'production', 'test')
-					.default('development'),
-				DB_PORT: Joi.number().default(3090),
-				DB_HOST: Joi.alternatives().try(
-					Joi.string().ip(),
-					Joi.string().domain(),
-				),
-				DB_TYPE: Joi.string().valid('mysql', 'postgres'),
-				DB_USERNAME: Joi.string().required(),
-				DB_PASSWORD: Joi.string().required(),
-				DB_DATABASE: Joi.string().required(),
-				DB_SYNC: Joi.boolean().default(false),
-				LOG_LEVEL: Joi.string(),
-				LOG_ON: Joi.boolean(),
-			}),
-		}),
+		ConfigModule.forRoot(appConfig()),
 		// 默认数据库
 		TypeOrmModule.forRootAsync({
 			inject: [ConfigService],
@@ -83,7 +56,7 @@ const connections = new Map();
 	controllers: [],
 	providers: [
 		Logger,
-		AppService,
+		TypeOrmDestroyService,
 		{
 			provide: 'TYPEORM_CONNECTIONS',
 			useValue: connections,
