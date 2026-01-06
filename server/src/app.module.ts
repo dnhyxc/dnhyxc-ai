@@ -1,4 +1,3 @@
-import { createKeyv } from '@keyv/redis';
 import { CacheModule as NestCacheModule } from '@nestjs/cache-manager';
 import { Global, Logger, Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
@@ -8,8 +7,8 @@ import * as Joi from 'joi';
 import { DataSource } from 'typeorm';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
+import { RedisConfigFactory } from './database/redis-config.factory';
 import { TypeOrmConfigService } from './database/typeorm-config.service';
-import { RedisEnum } from './enum/config.enum';
 import { LogsModule } from './logs/logs.module';
 import { MailModule } from './mail/mail.module';
 import { MenusModule } from './menus/menus.module';
@@ -17,12 +16,8 @@ import { PromptModule } from './prompt/prompt.module';
 import { RolesModule } from './roles/roles.module';
 import { UploadModule } from './upload/upload.module';
 import { UserModule } from './user/user.module';
-import { getEnvConfig } from './utils';
 
 const envFilePath = `.env.${process.env.NODE_ENV || 'development'}`;
-
-// 获取环境配置信息
-const envConfig = getEnvConfig();
 
 // 数据库连接池
 const connections = new Map();
@@ -67,7 +62,6 @@ const connections = new Map();
 					return connections.get(version);
 				}
 				const dataSource = await new DataSource(options!).initialize();
-				console.log('初始化数据库连接', dataSource);
 				connections.set(version, dataSource);
 				return dataSource;
 			},
@@ -75,32 +69,7 @@ const connections = new Map();
 		// Redis 缓存
 		NestCacheModule.registerAsync({
 			isGlobal: true,
-			useFactory: async () => {
-				const store = createKeyv({
-					url: envConfig[RedisEnum.REDIS_URL],
-					password: envConfig[RedisEnum.REDIS_PASSWORD],
-					username: envConfig[RedisEnum.REDIS_USERNAME],
-				});
-				// 监听错误事件
-				store.on('error', (err) => {
-					console.error('Keyv Store Error:', err.message);
-				});
-				// 测试连接
-				try {
-					await store.set('test_connection', Date.now(), 10000);
-					const testResult = await store.get('test_connection');
-					console.log(`Redis 连接测试 ${testResult ? '✅ 成功' : '❌ 失败'}`);
-					await store.delete('test_connection');
-				} catch (error) {
-					console.error('Redis连接测试失败:', error.message);
-				}
-				return {
-					store,
-					// ttl（time-to-live）表示缓存项的存活时间，单位毫秒。这里设置为 120000 毫秒（120 秒），
-					// 意味着写入缓存的数据默认在 5 秒后过期并被自动清除，防止脏数据长期残留。
-					ttl: 120000,
-				};
-			},
+			useClass: RedisConfigFactory,
 		}),
 		LogsModule,
 		UserModule,
