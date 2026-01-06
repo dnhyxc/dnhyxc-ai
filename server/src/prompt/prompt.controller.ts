@@ -28,6 +28,11 @@ export class PromptController {
 		return this.promptService.findAll();
 	}
 
+	@Post('/list')
+	findList() {
+		return this.promptService.findAll();
+	}
+
 	@Get('/detail/:id')
 	findOne(@Param('id') id: string) {
 		return this.promptService.findOne(+id);

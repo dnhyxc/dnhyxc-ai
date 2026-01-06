@@ -1,12 +1,13 @@
 import { createKeyv } from '@keyv/redis';
 import { CacheModule as NestCacheModule } from '@nestjs/cache-manager';
 import { Global, Logger, Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import * as dotenv from 'dotenv';
 import * as Joi from 'joi';
-import { connectionOptions, db1ConnectionOptions } from '../ormconfig';
+import { DataSource } from 'typeorm';
 import { AuthModule } from './auth/auth.module';
+import { TypeOrmConfigService } from './database/typeorm-config.service';
 import { RedisEnum } from './enum/config.enum';
 import { LogsModule } from './logs/logs.module';
 import { MailModule } from './mail/mail.module';
@@ -21,6 +22,9 @@ const envFilePath = `.env.${process.env.NODE_ENV || 'development'}`;
 
 // 获取环境配置信息
 const envConfig = getEnvConfig();
+
+// 数据库连接池
+const connections = new Map();
 
 // 将 exports 中的模块注册为全局模块，在所有其他模块中都可以使用
 @Global()
@@ -53,9 +57,19 @@ const envConfig = getEnvConfig();
 			}),
 		}),
 		// 默认数据库
-		TypeOrmModule.forRoot(connectionOptions),
-		// 备用数据库
-		TypeOrmModule.forRoot(db1ConnectionOptions),
+		TypeOrmModule.forRootAsync({
+			inject: [ConfigService],
+			useClass: TypeOrmConfigService,
+			dataSourceFactory: async (options) => {
+				const version = (options as any)?.version;
+				if (version && connections.get(version)) {
+					return connections.get(version);
+				}
+				const dataSource = new DataSource(options!).initialize();
+				connections.set(version, dataSource);
+				return dataSource;
+			},
+		}),
 		// Redis 缓存
 		NestCacheModule.registerAsync({
 			isGlobal: true,

@@ -1,20 +1,17 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { ConfigEnum } from '../enum/config.enum';
 import { User } from '../user/user.entity';
-import { getEnvConfig } from '../utils';
 import { CreatePromptDto } from './dto/create-prompt.dto';
 import { UpdatePromptDto } from './dto/update-prompt.dto';
 import { Prompt } from './prompt.entity';
-
-const config = getEnvConfig();
 
 @Injectable()
 export class PromptService {
 	constructor(
 		// 注入数据库模型，便于操作数据库
-		@InjectRepository(Prompt, config[ConfigEnum.DB_DB1_NAME])
+		@InjectRepository(Prompt)
+		// @InjectRepository(Prompt, config[ConfigEnum.DB_DB1_NAME])
 		private readonly promptRepository: Repository<Prompt>,
 		@InjectRepository(User)
 		private readonly userRepository: Repository<User>,
