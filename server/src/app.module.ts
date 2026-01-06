@@ -17,6 +17,7 @@ import { RolesModule } from './roles/roles.module';
 import { UploadModule } from './upload/upload.module';
 import { UserModule } from './user/user.module';
 import { getEnvConfig } from './utils';
+import { AppService } from './app.service';
 
 const envFilePath = `.env.${process.env.NODE_ENV || 'development'}`;
 
@@ -65,7 +66,8 @@ const connections = new Map();
 				if (version && connections.get(version)) {
 					return connections.get(version);
 				}
-				const dataSource = new DataSource(options!).initialize();
+				const dataSource = await new DataSource(options!).initialize();
+				console.log('初始化数据库连接', dataSource);
 				connections.set(version, dataSource);
 				return dataSource;
 			},
@@ -112,6 +114,11 @@ const connections = new Map();
 	controllers: [],
 	providers: [
 		Logger,
+		AppService,
+		{
+			provide: 'TYPEORM_CONNECTIONS',
+			useValue: connections,
+		},
 		// 这样配置全局守卫，就可以在 AdminGuard 或者 JwtGuard 中使用到 userService 了
 		// {
 		// 	provide: APP_GUARD,
