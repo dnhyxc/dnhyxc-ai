@@ -6,8 +6,6 @@ import { getEnvConfig } from '../../utils';
 
 const config = getEnvConfig();
 
-console.log(`${__dirname}/templates`, 'mamammamam');
-
 @Module({
 	imports: [
 		MailerModule.forRootAsync({
