@@ -8,14 +8,14 @@ import { TypeOrmConfigService } from './database/typeorm-config.service';
 import { TypeOrmDestroyService } from './database/typeorm-destroy.service';
 import { appConfig } from './factorys/app-config.factory';
 import { RedisConfigFactory } from './factorys/redis-config.factory';
-import { AuthModule } from './server/auth/auth.module';
-import { LogsModule } from './server/logs/logs.module';
-import { MailModule } from './server/mail/mail.module';
-import { MenusModule } from './server/menus/menus.module';
-import { PromptModule } from './server/prompt/prompt.module';
-import { RolesModule } from './server/roles/roles.module';
-import { UploadModule } from './server/upload/upload.module';
-import { UserModule } from './server/user/user.module';
+import { AuthModule } from './services/auth/auth.module';
+import { LogsModule } from './services/logs/logs.module';
+import { MailModule } from './services/mail/mail.module';
+import { MenusModule } from './services/menus/menus.module';
+import { PromptModule } from './services/prompt/prompt.module';
+import { RolesModule } from './services/roles/roles.module';
+import { UploadModule } from './services/upload/upload.module';
+import { UserModule } from './services/user/user.module';
 
 // 数据库连接池
 const connections = new Map();

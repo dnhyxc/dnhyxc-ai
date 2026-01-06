@@ -6,7 +6,7 @@ import {
 	CHECK_POLICIES_KEY,
 	PolicyHandlerCallback,
 } from '../decorators/casl.decorator';
-import { CaslAbilityService } from '../server/auth/casl-ability.service';
+import { CaslAbilityService } from '../services/auth/casl-ability.service';
 
 /**
  * 如果需要控制权限，需要在每个 Controller 方法上添加 @UseGuards(CaslGuard) 装饰器，
