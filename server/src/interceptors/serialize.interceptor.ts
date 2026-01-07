@@ -22,6 +22,8 @@ export class SerializeInterceptor implements NestInterceptor {
 					 * Expose 表示当前字段需要暴露，Exclude 表示当前字段不需要暴露
 					 */
 					excludeExtraneousValues: true,
+					// 开启隐式类型转换，将普通对象中的基本类型（如字符串、数字）自动转为 DTO 中装饰器声明的类型
+					// enableImplicitConversion: true,
 				});
 			}),
 		);

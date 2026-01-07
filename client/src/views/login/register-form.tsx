@@ -138,12 +138,6 @@ const RegisterForm: React.FC<IProps> = ({ onRegister }) => {
 
 	// 2. Define a submit handler.
 	const onSubmit = async (values: z.infer<typeof formSchema>) => {
-		console.log(
-			encrypt(values.password),
-			'encrypt(values.password)-register------',
-			values,
-			verifyCodeKey,
-		);
 		await register({
 			...values,
 			password: encrypt(values.password),

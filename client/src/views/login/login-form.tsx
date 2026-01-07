@@ -45,19 +45,7 @@ const LoginForm: React.FC<IProps> = ({ onForgetPwd }) => {
 	const getCaptcha = async () => {
 		// 获取验证码
 		setIsLoading(true);
-		// const response = await fetch(
-		// 	'http://101.34.214.188:9112/api/auth/createVerifyCode',
-		// 	{
-		// 		method: 'POST',
-		// 		body: JSON.stringify({
-		// 			username: 'admin',
-		// 			password: 'admin',
-		// 		}),
-		// 	},
-		// );
-		// const res = await response.json(); // 获取接口响应数据
 		const res = await createVerifyCode();
-		console.log(res, '获取验证码');
 		setIsLoading(false);
 		if (res) {
 			setCaptchaInfo({
@@ -101,21 +89,23 @@ const LoginForm: React.FC<IProps> = ({ onForgetPwd }) => {
 	});
 
 	const onSubmit = async (values: z.infer<typeof formSchema>) => {
-		console.log(encrypt(values.password), 'encrypt(values.password)');
-		const res = await login({
-			...values,
-			password: encrypt(values.password),
-			captchaId: captchaInfo.captchaId,
-		});
-
-		if (res.code === 200) {
-			userStore.setUserInfo(res.data);
-			setStorage('userInfo', JSON.stringify(res.data));
-			setStorage('token', res.data.access_token);
-			http.setAuthToken(res.data.access_token);
+		try {
+			const res = await login({
+				...values,
+				password: encrypt(values.password),
+				captchaId: captchaInfo.captchaId,
+			});
+			if (res.code === 200) {
+				userStore.setUserInfo(res.data);
+				setStorage('userInfo', JSON.stringify(res.data));
+				setStorage('token', res.data.access_token);
+				http.setAuthToken(res.data.access_token);
+				navigate('/');
+				onForgetPwd(false);
+			}
+		} catch (_error) {
+			await getCaptcha();
 		}
-		navigate('/');
-		onForgetPwd(false);
 	};
 
 	return (

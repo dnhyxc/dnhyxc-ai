@@ -4,7 +4,6 @@ import {
 	IsNumber,
 	IsString,
 	Length,
-	Matches,
 } from 'class-validator';
 
 export class RegisterUserDTO {
@@ -37,12 +36,6 @@ export class RegisterUserDTO {
 	@Length(6, 32, {
 		message: '密码长度必须在 6 到 32 个字符之间',
 	})
-	@Matches(
-		/^(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).+$/,
-		{
-			message: '密码必须包含英文、中文和特殊字符',
-		},
-	)
 	password: string;
 
 	@IsNotEmpty({

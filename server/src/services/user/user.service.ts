@@ -144,6 +144,9 @@ export class UserService {
 				},
 			});
 		}
+		if (user.password) {
+			user.password = await hashPassword(user.password);
+		}
 		const newUser = await this.userRepository.merge(_user, user as User);
 		return this.userRepository.save(newUser);
 		// 这种直接更新的操作只适合单模型的更新，不适合有联合关系的模型更新
