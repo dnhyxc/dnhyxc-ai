@@ -57,9 +57,7 @@ export class AllExceptionFilter implements ExceptionFilter {
 			error: exceptionResponse,
 			success: false,
 			code: httpStatus,
-			message: extractDuplicateValue(exception.message)
-				? `${extractDuplicateValue(exception.message)} 已被使用`
-				: exception.message,
+			message: extractDuplicateValue(exception.name) || exception.message,
 		};
 
 		const status = exception?.getStatus?.() || httpStatus || 520;

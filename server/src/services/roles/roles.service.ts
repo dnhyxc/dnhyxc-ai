@@ -16,7 +16,7 @@ export class RolesService {
 	) {}
 
 	async createRole(dto: CreateRoleDto) {
-		const { menuIds, name } = dto;
+		const { menuIds, name, description } = dto;
 		// 查找所有菜单
 		const menus = await this.menusRepository.findBy(
 			menuIds?.length ? { id: In(menuIds) } : {},
@@ -26,6 +26,7 @@ export class RolesService {
 		const role = this.rolesRepository.create({
 			name,
 			menus,
+			description,
 		});
 
 		return await this.rolesRepository.save(role);
@@ -35,7 +36,9 @@ export class RolesService {
 	}
 
 	findAll() {
-		return this.rolesRepository.find();
+		return this.rolesRepository.find({
+			relations: ['menus'],
+		});
 	}
 
 	findOne(id: number) {

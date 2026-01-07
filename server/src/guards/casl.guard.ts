@@ -1,5 +1,11 @@
 // 通过 casl/ability 来控制权限的守卫
-import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
+import {
+	CanActivate,
+	ExecutionContext,
+	HttpException,
+	Injectable,
+	UnauthorizedException,
+} from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import {
 	CaslHandlerType,
@@ -15,6 +21,7 @@ import { CaslAbilityService } from '../services/auth/casl-ability.service';
 @Injectable()
 export class CaslGuard implements CanActivate {
 	constructor(
+		// 从 Reflector 中获取元数据，即获取通过 SetMetadata 装饰器设置的 CHECK_POLICIES_KEY.HANDLER 等元数据
 		private reflector: Reflector,
 		private caslAbilityService: CaslAbilityService,
 	) {}
@@ -49,9 +56,7 @@ export class CaslGuard implements CanActivate {
 
 		if (req?.user) {
 			// 获取当前用户权限
-			const ability = await this.caslAbilityService.forRoot(
-				req?.user?.username,
-			);
+			const ability = await this.caslAbilityService.forRoot(req.user?.username);
 
 			let flag = true;
 
@@ -59,7 +64,7 @@ export class CaslGuard implements CanActivate {
 				flag = flag && handlers.every((handler) => handler(ability));
 			}
 
-			if (canHandlers) {
+			if (flag && canHandlers) {
 				if (Array.isArray(canHandlers)) {
 					flag = flag && canHandlers.every((handler) => handler(ability));
 				} else if (typeof canHandlers === 'function') {
@@ -67,16 +72,20 @@ export class CaslGuard implements CanActivate {
 				}
 			}
 
-			if (cannotHandlers) {
+			if (flag && cannotHandlers) {
 				if (Array.isArray(cannotHandlers)) {
 					flag = flag && cannotHandlers.every((handler) => handler(ability));
 				} else if (typeof cannotHandlers === 'function') {
 					flag = flag && cannotHandlers(ability);
 				}
 			}
-			return flag;
+			if (flag) {
+				return true;
+			} else {
+				throw new UnauthorizedException('无权访问');
+			}
 		} else {
-			return false;
+			throw new HttpException('无权访问', 401);
 		}
 	}
 }

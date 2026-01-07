@@ -6,7 +6,10 @@ import {
 } from '@nestjs/common';
 import { UserService } from '../services/user/user.service';
 
-// 实现权鉴路由守卫
+/**
+ * 实现权鉴路由守卫，主要用于判断是否是管理员。
+ * 如果某些路由只允许管理员访问，那么就可以在 Controller 中添加 @UseGuards(AdminGuard) 来进行守卫
+ */
 @Injectable()
 export class AdminGuard implements CanActivate {
 	// 这里使用到了 UserService，需要在使用的 AdminGuard 的模块注入 UserModule 模块，否则就需要将 UserModule 通过 @Global() 修饰符标记为全局模块，才能正常使用 UserService

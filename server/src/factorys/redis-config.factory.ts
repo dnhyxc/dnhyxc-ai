@@ -21,14 +21,14 @@ export class RedisConfigFactory implements CacheOptionsFactory {
 		});
 
 		// 测试连接
-		try {
-			await store.set('test_connection', Date.now(), 10000);
-			const testResult = await store.get('test_connection');
-			console.log(`Redis 连接测试 ${testResult ? '✅ 成功' : '❌ 失败'}`);
-			await store.delete('test_connection');
-		} catch (error) {
-			console.error('Redis连接测试失败:', error.message);
-		}
+		// try {
+		// 	await store.set('test_connection', Date.now(), 10000);
+		// 	const testResult = await store.get('test_connection');
+		// 	console.log(`Redis 连接测试 ${testResult ? '✅ 成功' : '❌ 失败'}`);
+		// 	await store.delete('test_connection');
+		// } catch (error) {
+		// 	console.error('Redis连接测试失败:', error.message);
+		// }
 
 		return {
 			store,

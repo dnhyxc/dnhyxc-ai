@@ -29,4 +29,8 @@ export class UpdateRoleDto extends PartialType(CreateRoleDto) {
 	@IsArray()
 	@IsOptional()
 	menuIds: Menus[];
+
+	@IsString()
+	@IsOptional()
+	description: string;
 }

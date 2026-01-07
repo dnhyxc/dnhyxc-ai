@@ -9,4 +9,8 @@ export class CreateRoleDto {
 	@IsArray()
 	@IsOptional() // 设置为可选参数
 	menuIds: Menus[];
+
+	@IsString()
+	@IsOptional()
+	description: string;
 }

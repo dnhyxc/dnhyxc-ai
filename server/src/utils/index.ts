@@ -22,24 +22,18 @@ export const getEnvConfig = (): Record<string, any> => {
 	return config;
 };
 
-// 从数据库唯一冲突中提取重复值
+// 判断是否以指定格式开头
+const isDuplicateEntryError = (errorMessage: string) => {
+	// 使用正则精确匹配格式
+	const pattern = /^Duplicate entry '([^']+)' for/;
+	return pattern.test(errorMessage);
+};
+
+// 提取值（仅在符合格式时）
 export const extractDuplicateValue = (errorMessage: string) => {
-	// 多种匹配模式
-	const patterns = [
-		/entry '([^']+)' for/i, // MySQL 格式
-		/duplicate key value "([^"]+)"/i, // PostgreSQL 格式
-		/key '([^']+)' already exists/i, // SQLite 格式
-		/value \(([^)]+)\) already exists/i, // 其他格式
-	];
-
-	for (const pattern of patterns) {
-		const match = errorMessage.match(pattern);
-		if (match?.[1]) {
-			return match[1];
-		}
+	if (!isDuplicateEntryError(errorMessage)) {
+		return null; // 或 throw new Error("不是重复条目错误")
 	}
-
-	// 备用方法：提取第一个单引号内的内容
-	const quotesMatch = errorMessage.match(/'([^']+)'/);
-	return quotesMatch ? quotesMatch[1] : null;
+	const match = errorMessage.match(/entry '([^']+)' for/);
+	return match ? `数据库 ${match[1]} 已存在` : null;
 };

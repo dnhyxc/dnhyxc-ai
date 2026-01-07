@@ -35,6 +35,8 @@ export type CaslHandlerType = PolicyHandlerCallback | PolicyHandlerCallback[];
  * async findAll() { ... }
  */
 export const CheckPolicies = (...handlers: PolicyHandlerCallback[]) =>
+	// handlers: 自定义策略回调数组，每个回调接收 CASL Ability 实例，返回 true 表示通过，false 表示拒绝
+	// 其实形成出来的就是 ability.can(action, subject, conditions), 只是这里是批量处理
 	SetMetadata(CHECK_POLICIES_KEY.HANDLER, handlers);
 
 /**
@@ -52,9 +54,12 @@ export const CheckPolicies = (...handlers: PolicyHandlerCallback[]) =>
 export const Can = (
 	action: Action,
 	subject: InferSubjects<any>,
-	conditions?: any,
+	conditions?: any, // 可选的额外条件，对应 CASL 条件对象，用于更细粒度的权限控制
 ) =>
 	SetMetadata(CHECK_POLICIES_KEY.CAN, (ability: AnyMongoAbility) =>
+		// action: 要检测的权限动作，如 Action.Read
+		// subject: 要检测的资源类型或实例，如 Article 或 article 实体
+		// conditions: 可选的额外过滤条件，对应 CASL 条件对象，用于更细粒度的权限控制
 		ability.can(action, subject, conditions),
 	);
 
@@ -73,8 +78,11 @@ export const Can = (
 export const Cannot = (
 	action: Action,
 	subject: InferSubjects<any>,
-	conditions?: any,
+	conditions?: any, // 可选的额外条件，对应 CASL 条件对象，用于更细粒度的权限控制
 ) =>
 	SetMetadata(CHECK_POLICIES_KEY.CANNOT, (ability: AnyMongoAbility) =>
+		// action: 要检测的权限动作，如 Action.Read
+		// subject: 要检测的资源类型或实例，如 Article 或 article 实体
+		// conditions: 可选的额外过滤条件，对应 CASL 条件对象，用于更细粒度的权限控制
 		ability.cannot(action, subject, conditions),
 	);

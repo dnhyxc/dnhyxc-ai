@@ -9,6 +9,7 @@ import { ROLES_KEY } from '../decorators/roles.decorator';
 import { Role } from '../enum/roles.enum';
 import { UserService } from '../services/user/user.service';
 
+// 鉴权守卫 guard，这个守卫只针对用户的角色（管理员，普通用户）进行判断是否有访问该路由的权限，颗粒度为路由级别
 @Injectable()
 export class RoleGuard implements CanActivate {
 	/**
@@ -28,8 +29,8 @@ export class RoleGuard implements CanActivate {
 		// getAllAndMerge 会合并类上的及当前路由上的元数据，并返回一个数组。getAllAndOverride 只会优先返回当前路由上的数据，忽略掉最上层类装饰器上的数据。
 		// 最终拿到当前请求所需要匹配的角色数组（Role[]）。
 		const requireRoles = this.reflector.getAllAndOverride<Role[]>(ROLES_KEY, [
-			context.getHandler(), // 当前路由的处理函数（如 @Get() 修饰的方法）
-			context.getClass(), // 当前路由所属的控制器类
+			context.getHandler(), // 当前路由的处理函数（如 @Get() 修饰的方法），获取到的数据是通过 SetMetadata 附加的元数据 @Roles(Role.USER) -> roles（ROLES_KEY）: 2
+			context.getClass(), // 当前路由所属的控制器类，获取到的数据是通过 SetMetadata 附加的元数据 @Roles(Role.ADMIN) -> roles（ROLES_KEY）: 1
 		]);
 		if (!requireRoles) {
 			return true;
