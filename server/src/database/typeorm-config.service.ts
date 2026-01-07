@@ -26,15 +26,18 @@ export class TypeOrmConfigService implements TypeOrmOptionsFactory {
 
 		let config = {
 			port: this.configService.get(ConfigEnum.DB_PORT),
+			synchronize: this.configService.get(ConfigEnum.DB_SYNC) === 'true',
 		};
 
 		if (version === 'v1' || body?.version === 'v1') {
 			config = {
 				port: this.configService.get(ConfigEnum.DB_DB1_PORT),
+				synchronize: this.configService.get(ConfigEnum.DB_DB1_SYNC) === 'true',
 			};
 		} else {
 			config = {
 				port: this.configService.get(ConfigEnum.DB_PORT),
+				synchronize: this.configService.get(ConfigEnum.DB_SYNC) === 'true',
 			};
 		}
 

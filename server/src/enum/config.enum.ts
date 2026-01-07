@@ -8,6 +8,7 @@ export enum ConfigEnum {
 	DB_PASSWORD = 'DB_PASSWORD',
 	DB_DATABASE = 'DB_DATABASE',
 	DB_SYNC = 'DB_SYNC',
+	DB_DB1_SYNC = 'DB_DB1_SYNC',
 	SECRET = 'SECRET',
 }
 
