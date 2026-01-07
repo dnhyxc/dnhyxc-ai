@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { register, sendEmail } from '@/service';
-import { getStorage, removeStorage, setStorage } from '@/utils';
+import { encrypt, getStorage, removeStorage, setStorage } from '@/utils';
 
 interface IProps {
 	onRegister: (status?: boolean) => void;
@@ -138,7 +138,17 @@ const RegisterForm: React.FC<IProps> = ({ onRegister }) => {
 
 	// 2. Define a submit handler.
 	const onSubmit = async (values: z.infer<typeof formSchema>) => {
-		await register({ ...values, verifyCodeKey: verifyCodeKey });
+		console.log(
+			encrypt(values.password),
+			'encrypt(values.password)-register------',
+			values,
+			verifyCodeKey,
+		);
+		await register({
+			...values,
+			password: encrypt(values.password),
+			verifyCodeKey,
+		});
 		removeStorage('countdown_time');
 		removeStorage('countdown_state');
 		onRegister(false);

@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import * as argon2 from 'argon2';
+// import * as argon2 from 'argon2';
 import { In, Like, Repository } from 'typeorm';
+import { hashPassword } from '../../utils';
 import { Logs } from '../logs/logs.entity';
 import { Roles } from '../roles/roles.entity';
 // import { andWhereCondition } from '../utils/db.helper';
@@ -124,7 +125,8 @@ export class UserService {
 		}
 		const _user = await this.userRepository.create(user);
 		// 使用 argon2 对用户密码进行加密
-		_user.password = await argon2.hash(_user.password);
+		// _user.password = await argon2.hash(_user.password);
+		_user.password = await hashPassword(_user.password);
 		return this.userRepository.save(_user);
 	}
 

@@ -11,6 +11,7 @@ import {
 import { HttpAdapterHost } from '@nestjs/core';
 import * as requestIp from 'request-ip';
 import { QueryFailedError } from 'typeorm';
+import { extractDuplicateValue } from '../utils';
 
 // 全局错误处理中间件
 @Catch()
@@ -56,7 +57,9 @@ export class AllExceptionFilter implements ExceptionFilter {
 			error: exceptionResponse,
 			success: false,
 			code: httpStatus,
-			message: exception.message,
+			message: extractDuplicateValue(exception.message)
+				? `${extractDuplicateValue(exception.message)} 已被使用`
+				: exception.message,
 		};
 
 		const status = exception?.getStatus?.() || httpStatus || 520;

@@ -4,10 +4,10 @@ import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { MailerService } from '@nestjs-modules/mailer';
-import * as argon2 from 'argon2';
+// import * as argon2 from 'argon2';
 import * as svgCaptcha from 'svg-captcha';
 import { EmailEnum } from '../../enum/config.enum';
-import { randomLightColor } from '../../utils';
+import { comparePassword, randomLightColor } from '../../utils';
 import { UserService } from '../user/user.service';
 import { CaptchaDto } from './dto/captcha.dto';
 import { LoginUserDTO } from './dto/login-user.dto';
@@ -25,8 +25,9 @@ export class AuthService {
 	async login(dto: LoginUserDTO) {
 		const { username, password, captchaId, captchaText } = dto;
 		const isCaptchaValid = await this.verifyCaptcha(captchaId, captchaText);
-		if (!isCaptchaValid)
+		if (!isCaptchaValid) {
 			throw new HttpException('验证码错误', HttpStatus.BAD_REQUEST);
+		}
 		const user = await this.userService.findByUsername(username);
 		if (!user) {
 			throw new HttpException(
@@ -35,7 +36,8 @@ export class AuthService {
 			);
 		}
 		// 使用 argon2 验证密码
-		const isPasswordValid = await argon2.verify(user.password, password);
+		// const isPasswordValid = await argon2.verify(user.password, password);
+		const isPasswordValid = await comparePassword(password, user.password);
 		if (isPasswordValid) {
 			const { password, ...userInfo } = user; // 使用解构赋值排除password
 			const token = await this.jwt.signAsync(
@@ -66,13 +68,12 @@ export class AuthService {
 		const user = await this.userService.findByUsername(dto.username);
 		if (user) {
 			throw new HttpException('用户已存在', HttpStatus.BAD_REQUEST);
-		} else {
-			return await this.userService.create({
-				username: dto.username,
-				password: dto.password,
-				email: dto.email,
-			});
 		}
+		return await this.userService.create({
+			username: dto.username,
+			password: dto.password,
+			email: dto.email,
+		});
 	}
 
 	async createVerifyCode(dto?: CaptchaDto) {

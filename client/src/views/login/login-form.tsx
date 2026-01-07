@@ -17,7 +17,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { createVerifyCode, login } from '@/service';
 import useStore from '@/store';
-import { setStorage } from '@/utils';
+import { encrypt, setStorage } from '@/utils';
 import { http } from '@/utils/fetch';
 
 interface IProps {
@@ -101,8 +101,10 @@ const LoginForm: React.FC<IProps> = ({ onForgetPwd }) => {
 	});
 
 	const onSubmit = async (values: z.infer<typeof formSchema>) => {
+		console.log(encrypt(values.password), 'encrypt(values.password)');
 		const res = await login({
 			...values,
+			password: encrypt(values.password),
 			captchaId: captchaInfo.captchaId,
 		});
 
