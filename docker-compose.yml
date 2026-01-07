@@ -1,24 +1,21 @@
-version: "3.8"
-
 services:
   db:
-    image: mysql:8.0 # 指定具体版本，避免使用 latest
-    # container_name: mysql_db # dnhyxc_db
-    container_name: mysql_db # dnhyxc_db
+    image: mysql:8.0
+    container_name: dnhyxc_ai_db
     restart: always
     environment:
       MYSQL_ROOT_PASSWORD: example
-      MYSQL_DATABASE: testdb # 添加默认数据库
+      MYSQL_DATABASE: dnhyxc_ai_db
     command:
       - --default-authentication-plugin=mysql_native_password
       - --innodb-buffer-pool-size=128M
       - --skip-name-resolve
     ports:
       - 3090:3306
-      # - 12009:3306 # dev 3090:3306
     volumes:
-      - mysql_data:/var/lib/mysql # 持久化数据
-      # - ./init.sql:/docker-entrypoint-initdb.d/init.sql # 可选初始化脚本
+      # 将宿主机的 ../mysql/db 目录挂载到容器的 /var/lib/mysql
+      - ../mysql/db:/var/lib/mysql
+      # - ./init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
       test:
         [
@@ -35,23 +32,22 @@ services:
       retries: 10
 
   db1:
-    image: mysql:8.0 # 指定具体版本，避免使用 latest
-    # container_name: mysql_db # dnhyxc_db
-    container_name: dnhyxc_ai_db # dnhyxc_db
+    image: mysql:8.0
+    container_name: dnhyxc_ai_db_1
     restart: always
     environment:
       MYSQL_ROOT_PASSWORD: example
-      MYSQL_DATABASE: app_db # 添加默认数据库
+      MYSQL_DATABASE: dnhyxc_ai_db
     command:
       - --default-authentication-plugin=mysql_native_password
       - --innodb-buffer-pool-size=128M
       - --skip-name-resolve
     ports:
       - 3092:3306
-      # - 12009:3306 # dev 3090:3306
     volumes:
-      - mysql_data_db1:/var/lib/mysql # 持久化数据
-      # - ./init.sql:/docker-entrypoint-initdb.d/init.sql # 可选初始化脚本
+      # 将宿主机的 ../mysql/db1 目录挂载到容器的 /var/lib/mysql
+      - ../mysql/db1:/var/lib/mysql
+      # - ./init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
       test:
         [
@@ -71,13 +67,7 @@ services:
     image: adminer:latest
     restart: always
     ports:
-      - 3091:8080 # dev 3091:8080
+      - 3091:8080
     depends_on:
       db:
         condition: service_healthy
-
-volumes:
-  mysql_data:
-    driver: local
-  mysql_data_db1:
-    driver: local

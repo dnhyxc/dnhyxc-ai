@@ -1007,3 +1007,15 @@ export class AuthService {
 如果 `.evn` 和 `.env.production` 内容有更新，需要将它们也上传到服务器的 `/usr/local/dnhyxc-ai/server` 目录下，或者在服务器上手动修改，建议手动修改。
 
 只有运行 `pm2 start npm --name server -- run start:prod` 启动服务器。
+
+## 部署
+
+防火墙设置使用 `firewall-cmd` 命令进行设置。
+
+```bash
+firewall-cmd --zone=public --add-port=12006/tcp --permanent
+
+firewall-cmd --reload
+
+firewall-cmd --help
+```
