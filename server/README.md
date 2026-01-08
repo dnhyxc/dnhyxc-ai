@@ -1072,7 +1072,7 @@ pm2 --version
 在服务器任意目录执行如下命令进行安装：
 
 ```bash
-curl -fsSL https://get.docker.com | bash -s docker
+curl -fsSL https://get.docker.com | bash -s docker --mirror Aliyun
 
 docker --version
 ```
@@ -1089,7 +1089,11 @@ sudo chmod +x /usr/local/bin/docker-compose
 docker-compose --version
 ```
 
-可参考：[菜鸟教程](https://www.runoob.com/docker/docker-compose.html)。
+可参考：
+
+- [菜鸟教程](https://www.runoob.com/docker/docker-compose.html)。
+
+- 本地 `/Users/dnhyxc/Documents/docker` 视频教程。
 
 ### 创建数据库
 
