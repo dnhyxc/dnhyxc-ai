@@ -723,7 +723,7 @@ source ~/.bash_profile
 
 [deepseek-环境变量处理](https://chat.deepseek.com/a/chat/s/eeeace28-a831-49a4-826d-53e1c468cb3e)
 
-### 执行 `执行 ./install_server.sh` 后提示
+### 执行 `./install_server.sh` 后提示
 
 ```
 Welcome to the redis service installer
@@ -762,7 +762,7 @@ ps -ef | grep redis
 启动过后提示：
 
 ```
-root     15307     1  0 20:50 ?        00:00:00 /usr/local/redis//bin/redis-server 127.0.0.1:12029
+root     15307     1  0 20:50 ?        00:00:00 /usr/local/redis/bin/redis-server 127.0.0.1:12029
 root     21505 10337  0 20:53 pts/0    00:00:00 grep --color=auto redis
 ```
 
@@ -1010,12 +1010,525 @@ export class AuthService {
 
 ## 部署
 
+### 安装 [nvm](https://github.com/nvm-sh/nvm)
+
+在服务器中执行如下命令进行安装：
+
+```bash
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+
+# 或
+wget -qO- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+```
+
+设置 nvm 环境变量：将如下命令移动到 `.bashrc` 文件中：
+
+```bash
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh" # This loads nvm
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion" # This loads nvm bash_completion
+```
+
+设置完成之后，执行 `source ~/.bashrc` 让配置生效。
+
+### 安装 node
+
+使用 `nvm` 安装 node：
+
+```bash
+nvm install node@16.14.2
+
+node -v
+```
+
+### 安装 nrm
+
+这一步可以忽略，根据自己的网络，带宽进行选择，如果网速快就不需要安装 nrm 去切换源了。
+
+```bash
+npm install -g nrm
+
+nrm --version
+```
+
+### 安装 pnpm
+
+```bash
+npm install -g pnpm
+
+pnpm --version
+```
+
+### 安装 [pm2](https://pm2.keymetrics.io/docs/usage/quick-start/)
+
+```bash
+npm install -g pm2
+
+pm2 --version
+```
+
+### 安装 docker
+
+在服务器任意目录执行如下命令进行安装：
+
+```bash
+curl -fsSL https://get.docker.com | bash -s docker
+
+docker --version
+```
+
+### 安装 docker-compose
+
+可通过 [github docker](https://github.com/docker/compose/releases) 查看具体版本，之后通过如下命令进行安装：
+
+```bash
+sudo curl -L "https://github.com/docker/compose/releases/download/v2.40.3/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+
+sudo chmod +x /usr/local/bin/docker-compose
+
+docker-compose --version
+```
+
+可参考：[菜鸟教程](https://www.runoob.com/docker/docker-compose.html)。
+
+### 创建数据库
+
+在服务器 `/usr/local/dnhyxc-ai/mysql` 目录下创建 `docker-compose.yml` 文件，内容如下：
+
+```yml
+services:
+  db:
+    image: mysql:8.0 # 指定具体版本，避免使用 latest
+    # container_name: mysql_db # dnhyxc_db
+    container_name: dnhyxc_ai_db # dnhyxc_db
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: dnh@902209
+      MYSQL_DATABASE: dnhyxc_ai_db # 添加默认数据库
+    command:
+      - --default-authentication-plugin=mysql_native_password
+      - --innodb-buffer-pool-size=128M
+      - --skip-name-resolve
+    ports:
+      - 12009:3306
+    volumes:
+      - /dnhyxc-ai/mysql/db:/var/lib/mysql # 持久化数据
+      # - ./init.sql:/docker-entrypoint-initdb.d/init.sql # 可选初始化脚本
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "-h",
+          "localhost",
+          "-u",
+          "root",
+          "-p$$MYSQL_ROOT_PASSWORD",
+        ]
+      timeout: 20s
+      retries: 10
+
+  db1:
+    image: mysql:8.0 # 指定具体版本，避免使用 latest
+    # container_name: mysql_db # dnhyxc_db
+    container_name: dnhyxc_ai_db_1 # dnhyxc_db
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: dnh@902209
+      MYSQL_DATABASE: dnhyxc_ai_db # 添加默认数据库
+    command:
+      - --default-authentication-plugin=mysql_native_password
+      - --innodb-buffer-pool-size=128M
+      - --skip-name-resolve
+    ports:
+      - 12006:3306
+    volumes:
+      - /dnhyxc-ai/mysql/db1:/var/lib/mysql # 持久化数据
+      # - ./init.sql:/docker-entrypoint-initdb.d/init.sql # 可选初始化脚本
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "-h",
+          "localhost",
+          "-u",
+          "root",
+          "-p$$MYSQL_ROOT_PASSWORD",
+        ]
+      timeout: 20s
+      retries: 10
+
+  adminer:
+    image: adminer:latest
+    restart: always
+    ports:
+      - 12011:8080 # dev 3091:8080
+    depends_on:
+      db:
+        condition: service_healthy
+```
+
+之后在当前目录下执行 `docker-compose up -d` 创建数据库容器。
+
+创建成功后，可以通过 `docker ps` 命令查看容器状态。
+
+### 安装 Redis
+
+[redis 版本列表](https://download.redis.io/releases/)。
+
+可以在上述列表中选择一个版本（redis-7.4.7.tar.gz ），并下载到本地的桌面目录。之后上传到服务器上的 `/usr/local` 目录下。之后在 `/usr/local` 目录下执行 `tar -zxvf redis-7.4.7.tar.gz` 解压。
+
+```bash
+# 从本地 /Users/dnhyxc/Desktop 目录下上传 redis-7.4.7.tar.gz 到服务器 /usr/local 目录下
+scp /Users/dnhyxc/Desktop/redis-7.4.7.tar.gz root@101.29.209.188:/usr/local
+
+cd /usr/local
+
+# 解压 redis-7.4.7.tar.gz
+tar -zxvf redis-7.4.7.tar.gz
+```
+
+之后进入 `/usr/local/redis-7.4.7` 目录下对 redis 进行编译：
+
+```bash
+cd /usr/local/redis-7.4.7
+
+# 编译 redis 并指定安装到 /usr/local/redis
+make && make PREFIX=/usr/local/redis install
+```
+
+安装完成之后进入 `/usr/local/redis/bin` 目录下，查看对应的文件列表：
+
+```bash
+cd /usr/local/redis/bin
+
+ls
+```
+
+如果 `bin` 目录下没有以下文件，则需要从 `/usr/local/redis-7.4.7/src` 目录下复制以下文件到 `/usr/local/redis/bin` 目录下：
+
+bin 目录下完全的文件列表：
+
+```bash
+-rwxr-xr-x 1 root root      903 Dec 27 20:04 mkreleasehdr.sh
+-rwxr-xr-x 1 root root  6830832 Dec 27 20:00 redis-benchmark
+lrwxrwxrwx 1 root root       12 Dec 27 20:00 redis-check-aof -> redis-server
+lrwxrwxrwx 1 root root       12 Dec 27 20:00 redis-check-rdb -> redis-server
+-rwxr-xr-x 1 root root  7804057 Dec 27 20:56 redis-cli
+lrwxrwxrwx 1 root root       12 Dec 27 20:00 redis-sentinel -> redis-server
+-rwxr-xr-x 1 root root 16198936 Dec 27 20:00 redis-server
+```
+
+如果缺少可以执行如下命令从 `/usr/local/redis-7.4.7/src` 中拷贝：
+
+```bash
+cd /usr/local/redis-7.4.7/src
+
+cp mkreleasehdr.sh /usr/local/redis/bin
+cp redis-check-aof /usr/local/redis/bin
+cp redis-check-rdb /usr/local/redis/bin
+cp redis-sentinel /usr/local/redis/bin
+```
+
+之后进入 `/usr/local/redis` 目录下，创建一个 `etc` 目录。
+
+```bash
+mkdir -p /usr/local/redis/etc
+
+# 进入到 /usr/local/redis 目录下
+cd /usr/local/redis
+mkdir etc
+```
+
+etc 文件夹创建完成之后，进入到 `/usr/local/redis-7.4.7` 文件夹下拷贝 `redis.conf` 文件到 `/usr/local/redis/etc` 文件夹下。
+
+```bash
+cd /usr/local/redis-7.4.7
+
+cp redis.conf /usr/local/redis/etc
+```
+
+之后进入 `/usr/local/redis/etc` 文件夹下，编辑 `redis.conf` 文件，修改该配置文件，大概在 **310 行** 左右，将 **daemonize** 由 **no** 修改为 **yes**。daemonize 表示是否以守护进程的方式启动 Redis 服务器。
+
+```bash
+cd /usr/local/redis/etc
+
+vi +310 redis.conf
+
+# 显示行号
+set nu
+```
+
+修改完成之后，就需要配置 redis 的环境变量了，通过 `vi ~/.bash_profile` 命令进行设置。
+
+```bash
+vi ~/.bash_profile
+```
+
+在 ~/.bash_profile 文件最后添加如下内容：
+
+```bash
+# REDIS
+export REDIS_HOME=/usr/local/redis/
+
+PATH=$PATH:$HOME/bin:$REDIS_HOME/bin
+```
+
+配置完成之后，运行 `source ~/.bash_profile` 命令，使配置生效。
+
+如果执行 `source .bash_profile` 时报错：
+
+> manpath: can't set the locale; make sure $LC\_\* and $LANG are correct
+
+解决方式，执行如下命令：
+
+```bash
+sudo yum install -y glibc-common
+sudo localedef -v -c -i en_US -f UTF-8 en_US.UTF-8
+source ~/.bash_profile
+```
+
+具体解决参考：
+
+[deepseek-环境变量处理](https://chat.deepseek.com/a/chat/s/eeeace28-a831-49a4-826d-53e1c468cb3e)
+
+上述操作处理完成之后，再进入 `/usr/local/redis-7.4.7/utils` 目录下执行 `./install_server.sh` 文件。
+
+但是在执行之前，需要修改 `./install_server.sh` 文件的第 77 行到 84行的代码注释掉，防止执行报错。
+
+```bash
+vi +77 install_server.sh
+```
+
+需要注释的内容为：
+
+```sh
+_pip_1_exe="$(readlink -f /proc/1/exe)"
+if [ "${_pip_1_exe##*/}" = systemd ]
+then
+	echo "This systems seems to use systemd."
+	echo "Please take a look at the provided example service unit files in this directory, and adapt and install them, Sorry!"
+	exit 1
+fi
+unset _pip_1_exe
+```
+
+注释完成之后再运行 `install_server.sh` 脚本，通过 `./install_server.sh` 这个服务脚本的安装，可以保证 redis 随着系统的启动而启动，即使系统重启也会帮助我们启动 redis 服务。
+
+```bash
+./install_server.sh
+```
+
+运行过后，按照指引进行安装即可，直接使用默认的，直接回车即可，如果不想要默认的端口号，可以输入其他端口（12029）。
+
+如果修改了端口号，那么就需要将 `redis.conf` 文件中的 `port 6379` 修改为 `port 你在上述步骤中设置的端口号（12029）`。
+
+修改完成之后运行 `ps -ef | grep redis` 命令查看 `redis` 是否启动成功。
+
+```bash
+ps -ef | grep redis
+```
+
+运行过后，如果看到如下提示，说明 redis 就启动成功了。
+
+```
+root     15307     1  0 20:50 ?        00:00:00 /usr/local/redis/bin/redis-server 127.0.0.1:12029
+root     21505 10337  0 20:53 pts/0    00:00:00 grep --color=auto redis
+```
+
+之后可以通过 `redis-cli` 命令进行测试。
+
+```bash
+cd /usr/local/redis/bin
+
+redis-cli -p 12029
+
+set test "hello world"
+
+get test
+```
+
+如果上述 `get test` 命令返回结果为 `"hello world"`，则说明 redis 配置已经成功了。
+
+如果想要关闭 redis，可以使用 `redis-cli` 连接服务器之后输入 `SHUTDOWN` 命令进行关闭。或者通过进程 id 运行 `kill -9 15307` 命令进行关闭。
+
+### 防火墙设置
+
 防火墙设置使用 `firewall-cmd` 命令进行设置。
 
 ```bash
+# 添加 12009 端口
+firewall-cmd --zone=public --add-port=12009/tcp --permanent
+
+# 添加 12006 端口
 firewall-cmd --zone=public --add-port=12006/tcp --permanent
 
+# 添加 12011 端口
+firewall-cmd --zone=public --add-port=12011/tcp --permanent
+
+# 添加 9112 端口
+firewall-cmd --zone=public --add-port=9112/tcp --permanent
+
+# 重新加载防火墙
 firewall-cmd --reload
 
+# 查看防火墙配置
+firewall-cmd --list-all
+
+# 查看所有开放端口
+firewall-cmd --list-ports
+
+# 查看所有允许的服务
+firewall-cmd --list-services
+
+# 查看防火墙状态
+firewall-cmd --state
+
+# 查看防火墙命令
 firewall-cmd --help
+
+# 查看最近 100 条日志
+journalctl -u firewalld -n 100
+```
+
+之后在浏览器中访问 `http://你的服务器IP:12011` 看是否能访问 `adminer` 界面，成功访问就说明配置成功了，即可通过 `docker-compose.yml` 中设置的 `mysql` 账号和密码登录数据库了，如果忘记了可以通过 `cat docker-compose.yml` 查看该文件中设置的密码。
+
+### 打包 nest 项目
+
+使用命令 `pnpm build` 打包 nest 项目。之后在服务器 `/usr/local` 目录下创建一个存放 nest 项目的文件夹，这里以 `dnhyxc-ai/server` 为例，之后将打包好的 `dist` 目录压缩成 `dist.zip` 之后，通过在 mac 端通过 `scp /Users/dnhyxc/Documents/code/dnhyxc-ai/dist.zip root@101.29.209.188:/usr/local/dnhyxc-ai/server`。注意：上传文件时不能先登录服务器，要在没有登录的状态下上传文件。如果是 windows，可以使用 xshell 上传文件，或者使用 git 的终端进行上传。
+
+上传完成中后，就可以在服务器目录 `/usr/local/dnhyxc-ai/server` 下使用 `unzip dist.zip` 来解压文件。
+
+```bash
+# 在服务器上创建 dnhyxc-ai/server 文件夹
+
+cd /usr/local
+
+mkdir dnhyxc-ai
+
+cd dnhyxc-ai
+
+mkdir server
+
+pnpm build
+
+压缩 dist 文件
+
+scp /Users/dnhyxc/Documents/code/dnhyxc-ai/dist.zip root@101.29.209.188:/usr/local/dnhyxc-ai/server
+
+unzip dist.zip
+```
+
+之后将项目中的 `package.json` 文件也上传到服务器中的 `dnhyxc-ai/server` 文件目录下，方便安装响应的依赖：
+
+```bash
+scp /Users/dnhyxc/Documents/code/dnhyxc-ai/package.json root@101.29.209.188:/usr/local/dnhyxc-ai/server
+```
+
+package.json 文件上传完成后，在服务器 `/user/local/dnhyxc-ai/server` 目录下执行以下命令安装项目所需的 `dependencies` 依赖：
+
+```bash
+# -P 只会安装 dependencies 依赖
+pnpm install -P
+```
+
+之后在服务器 `/user/local/dnhyxc-ai/server` 目录下分别创建 `.env` 和 `.env.production` 文件。并写入对应的环境变量，因为 env 文件默认是隐藏的，如果想要显示，可以使用 `ls -a` 命令。
+
+```bash
+touch .env
+
+touch .env.production
+```
+
+在 `.env` 文件中写入：
+
+```bash
+# 数据库
+DB_TYPE=mysql
+DB_HOST=127.0.0.1
+DB_USER=root
+DB_USERNAME=root
+DB_PASSWORD=example
+DB_DATABASE=dnhyxc_ai_db
+DB_SYNC=false
+DB_PORT=3090
+
+# 数据库2
+DB_DB1_PORT=3092
+DB_DB1_NAME=db1
+DB_DB1_SYNC=true
+
+# 日志
+LOG_ON=true
+LOG_LEVEL=info
+
+# 文件存储路径
+FILE_ROOT=../../uploads
+
+# 邮件服务 dnjqczdqtbofbdgd 授权码
+EMAIL_TRANSPORT=smtps://925419516@qq.com:dnjqczdqtbofbdgd@smtp.qq.com
+EMAIL_FROM=925419516@qq.com
+```
+
+在 `.env.production` 文件中写入：
+
+```bash
+# 数据库
+DB_TYPE=mysql
+DB_HOST=127.0.0.1
+DB_USER=root
+DB_USERNAME=root
+DB_PASSWORD=dnh@902209
+DB_DATABASE=dnhyxc_ai_db
+# 初始化环境时设置为 true，省的使用 typeorm cli 进行同步
+DB_SYNC=false
+DB_PORT=12009
+DB_DB1_PORT=12006
+DB_DB1_NAME=db1
+DB_DB1_SYNC=true
+
+# 日志
+LOG_ON=true
+LOG_LEVEL=info
+
+# JWT SECRET
+SECRET="wO4lVKu2MkW4viddIlLUsJXjyaS36VbXxlHKQSlrboDa7J0NQewZtXkSrfnBGFiY"
+
+# Redis
+REDIS_URL='redis://127.0.0.1:12029'
+
+# qiniu
+ACCESS_KEY=G4wtUYvoOUDeS0YdYIUqbV-DH3oe8hhjQiBqaG9E
+SECRET_KEY=YvrcD2RzNuClVawTXQ7DzqdZuMI4J5WW_urejemn
+BUCKET_NAME=dnhyxc-ai
+DOMAIN=http://t80w8cw4d.hd-bkt.clouddn.com/
+```
+
+上述操作都完成之后，就可以在 `server` 目录下运行 `node run start:prod` 命令尝试启动服务了。如果没有任何报错，那最好不过，如果有报错，则根据报错内容解决错误即可。没有报错之后，就可以使用 `pm2` 来启动服务了。
+
+在服务器 `/usr/local/dnhyxc-ai/server` 目录下运行如下命令来启动服务：
+
+```bash
+# 启动服务
+pm2 start npm --name server -- run start:prod
+
+# 查看服务列表
+pm2 list
+
+# 停止服务
+pm2 delete 服务ID（如 0）
+
+# 查看最近 100 行日志
+pm2 logs server 100
+```
+
+项目启动成功之后，可以运行 `pm2 save` 来保存当前配置，之后可以使用 `pm2 startup` 来将我们的项目添加到系统级别的启动进程中了。这样当系统启动时，pm2 就会自动启动我们的服务。
+
+```bash
+pm2 save
+
+pm2 startup
 ```

@@ -40,6 +40,9 @@ async function bootstrap() {
 	// 配置 helmet 头部安全
 	app.use(helmet());
 
+	// 如果 nginx 配置了反向代理，则需要设置 trust proxy 为 1，没有就不需要设置
+	// app.set('trust proxy', 1);
+
 	// 配置 rateLimit 中间件，限制请求次数
 	app.use(
 		rateLimit({
