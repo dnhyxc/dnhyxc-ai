@@ -998,6 +998,10 @@ export class AuthService {
 }
 ```
 
+## LangChain
+
+[langchain 中文网](https://js.langchain.com.cn/docs/getting-started/install)
+
 ## 后端项目部署
 
 打包项目生成 dist 文件，如果需要安装新包，需要将 `dist.zip` 和 `package.json` 文件上传到服务器的 `/usr/local/dnhyxc-ai/server` 目录下。
