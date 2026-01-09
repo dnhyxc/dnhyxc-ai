@@ -53,7 +53,7 @@ const Sidebar = () => {
 						<img
 							src={userInfo?.profile?.avatar || ICON}
 							alt=""
-							className={`${userInfo?.profile?.avatar ? 'rounded-md w-10.5 h-10.5' : 'w-7.5 h-7.5 cursor-pointer mb-1'}`}
+							className={`${userInfo?.profile?.avatar ? 'rounded-md w-10.5 h-10.5' : 'w-8 h-8 cursor-pointer'}`}
 						/>
 						{/* <img
 							src={userInfo?.profile?.avatar || ICON}

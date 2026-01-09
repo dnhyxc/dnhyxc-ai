@@ -74,6 +74,9 @@ pub fn run() {
             if let tauri::RunEvent::Exit = event {
                 if let Some(webview) = app_handle.get_webview_window("main") {
                     let _ = webview.eval("localStorage.removeItem('token');");
+                    let _ = webview.eval("localStorage.removeItem('userInfo');");
+                    let _ = webview.eval("localStorage.removeItem('countdown_state');");
+                    let _ = webview.eval("localStorage.removeItem('countdown_time');");
                 }
             }
             // macOS 平台：调用自定义的 app_event 模块处理应用事件
