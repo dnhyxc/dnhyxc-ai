@@ -1,6 +1,12 @@
+import { appDataDir, join } from '@tauri-apps/api/path';
 import { Store } from '@tauri-apps/plugin-store';
 
-const store = await Store.load('settings.json');
+const dataDir = await appDataDir();
+const settingsPath = await join(dataDir, 'settings.json');
+console.log(settingsPath, 'settingsPath');
+const store = await Store.load(settingsPath);
+
+console.log(store, 'store');
 
 export const setValue = async <T = any>(
 	key: string,

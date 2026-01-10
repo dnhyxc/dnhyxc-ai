@@ -5,6 +5,7 @@ import Detail from '@/views/detail';
 import Home from '@/views/home';
 import Login from '@/views/login';
 import Profile from '@/views/profile';
+import Setting from '@/views/setting';
 import ChildWindow from '@/views/win';
 
 const routes = [
@@ -12,29 +13,45 @@ const routes = [
 		Component: Layout,
 		children: [
 			{
-				index: true,
+				path: '/',
 				Component: Home,
+				meta: {
+					title: 'dnhyxc-ai',
+				},
 			},
 			{
-				path: 'detail',
+				path: '/detail',
 				Component: Detail,
+				meta: {
+					title: '详情',
+				},
 			},
 			{
-				path: 'profile',
+				path: '/profile',
 				Component: Profile,
+				meta: {
+					title: '个人主页',
+				},
+			},
+			{
+				path: '/setting',
+				Component: Setting,
+				meta: {
+					title: '系统设置',
+				},
 			},
 		],
 	},
 	{
-		path: 'login',
+		path: '/login',
 		Component: Login,
 	},
 	{
-		path: 'win',
+		path: '/win',
 		Component: ChildWindow,
 	},
 	{
-		path: 'about',
+		path: '/about',
 		Component: About,
 	},
 	{

@@ -14,14 +14,15 @@ use crate::types::common::{
 };
 use crate::utils::common::{
     determine_save_path_for_blob, get_extension_from_content_type, get_remote_file_info,
+    get_store_value,
 };
 
 #[tauri::command]
 pub async fn download_file(
-    window: tauri::Window, // window 应该是第一个参数
+    app_handle: tauri::AppHandle,
+    window: tauri::Window, // window 应该是第二个参数
     options: DownloadFileOptions,
 ) -> Result<DownloadFileResult, String> {
-    // println!("开始下载文件: {}", options.url);
     // 1. 确定保存路径
     let save_path = match options.save_dir {
         Some(dir) => {
@@ -83,7 +84,11 @@ pub async fn download_file(
                 }
             };
 
-            let default_dir = PathBuf::from("/Users/dnhyxc/Documents/dnhyxc-download");
+            // let default_dir = PathBuf::from("/Users/dnhyxc/Documents/dnhyxc-download");
+            let default_dir = match get_store_value(&app_handle, "savePath").await {
+                Ok(path) => PathBuf::from(path),
+                Err(_) => PathBuf::from("/Users/dnhyxc/Documents/dnhyxc-download"),
+            };
 
             // 1.2 打开文件保存对话框
             let mut file_dialog = rfd::AsyncFileDialog::new()
@@ -211,8 +216,6 @@ pub async fn download_file(
         .and_then(|value| value.to_str().ok())
         .map(|s| s.to_string());
 
-    // println!("文件大小: {} 字节, 类型: {:?}", content_length, content_type);
-
     // 9. 检查文件大小限制（可选，例如限制 100MB）
     // 优先从 options 中获取 max_size，若未提供则默认 100MB
     const DEFAULT_MAX_SIZE: u64 = 100 * 1024 * 1024;
@@ -260,7 +263,6 @@ pub async fn download_file(
         // 可选：显示下载进度
         if content_length > 0 {
             let percent = (total_bytes * 100) / content_length;
-            // println!("下载进度: {}/{} 字节 ({}%)", total_bytes, content_length, percent);
             // 发送开始下载事件
             let progress_data = BatchDownloadProgress {
                 current_index: 1,
@@ -309,6 +311,7 @@ pub async fn download_file(
 // 批量下载文件
 #[tauri::command]
 pub async fn download_files(
+    app_handle: tauri::AppHandle,
     window: tauri::Window,
     files: Vec<DownloadFileOptions>,
 ) -> Result<Vec<DownloadFileResult>, String> {
@@ -346,7 +349,7 @@ pub async fn download_files(
 
         // 克隆 window 以便在每个下载任务中使用
         let window_clone = window.clone();
-        let result = download_file(window_clone, file_options).await;
+        let result = download_file(app_handle.clone(), window_clone, file_options).await;
         results.push(result.unwrap_or_else(|e| DownloadFileResult {
             success: String::from("error"),
             file_path: None,
@@ -369,12 +372,13 @@ pub async fn get_file_info(url: String) -> Result<FileInfo, String> {
 /// 新增函数：处理 blob 数据下载（由前端传递数据）
 #[tauri::command]
 pub async fn download_blob(
+    app_handle: tauri::AppHandle,
     options: DownloadZipOptions,
     blob_data: Vec<u8>,
     content_type: Option<String>,
 ) -> Result<DownloadFileResult, String> {
     // 1. 确定保存路径
-    let save_path = match determine_save_path_for_blob(&options).await {
+    let save_path = match determine_save_path_for_blob(app_handle, &options).await {
         Ok(path) => path,
         Err(e) => {
             return Ok(DownloadFileResult {

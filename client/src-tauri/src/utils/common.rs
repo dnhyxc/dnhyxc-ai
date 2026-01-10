@@ -2,6 +2,8 @@ use reqwest;
 use std::path::Path;
 use std::path::PathBuf;
 use tauri;
+use tauri::Manager;
+use tauri_plugin_store::StoreBuilder;
 
 use crate::types::common::{DownloadZipOptions, FileInfo};
 
@@ -103,7 +105,10 @@ pub async fn get_remote_file_info(url: &str) -> Result<FileInfo, String> {
 }
 
 /// 为 blob 数据确定保存路径
-pub async fn determine_save_path_for_blob(options: &DownloadZipOptions) -> Result<PathBuf, String> {
+pub async fn determine_save_path_for_blob(
+    app_handle: tauri::AppHandle,
+    options: &DownloadZipOptions,
+) -> Result<PathBuf, String> {
     // 确定文件名
     let file_name = options.file_name.clone();
 
@@ -111,7 +116,11 @@ pub async fn determine_save_path_for_blob(options: &DownloadZipOptions) -> Resul
     let save_path = match &options.save_dir {
         Some(dir) => Path::new(dir).join(&file_name),
         None => {
-            let default_dir = PathBuf::from("/Users/dnhyxc/Documents/dnhyxc-download");
+            // 从 store 中获取保存的 savePath
+            let default_dir = match get_store_value(&app_handle, "savePath").await {
+                Ok(path) => PathBuf::from(path),
+                Err(_) => PathBuf::from("/Users/dnhyxc/Documents/dnhyxc-download"),
+            };
 
             let file_dialog = rfd::AsyncFileDialog::new()
                 .set_title("保存文件")
@@ -131,4 +140,28 @@ pub async fn determine_save_path_for_blob(options: &DownloadZipOptions) -> Resul
     };
 
     Ok(save_path)
+}
+
+/// 从 store 中获取指定 key 的值
+pub async fn get_store_value(app_handle: &tauri::AppHandle, key: &str) -> Result<String, String> {
+    // 使用与前端的 @tauri-apps/plugin-store 相同的存储路径
+    let app_data_dir = app_handle
+        .path()
+        .app_data_dir()
+        .map_err(|e| format!("获取应用数据目录失败: {}", e))?;
+
+    let store_path = app_data_dir.join("settings.json");
+    let store = StoreBuilder::new(app_handle, store_path)
+        .build()
+        .map_err(|e| format!("创建存储失败: {}", e))?;
+
+    match store.get(key) {
+        Some(value) => {
+            let value_str = value.to_string();
+            // 去除可能存在的引号
+            let cleaned_value = value_str.trim_matches('"');
+            Ok(cleaned_value.to_string())
+        }
+        None => Err(format!("未找到 key: {}", key)),
+    }
 }

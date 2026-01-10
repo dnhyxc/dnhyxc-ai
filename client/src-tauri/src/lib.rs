@@ -19,7 +19,7 @@ use system::shortcut::setup_global_shortcut;
 use system::tray::init_tray;
 use utils::common::set_screen_center;
 // use tauri::menu::{MenuBuilder, SubmenuBuilder};
-use command::common::greet_name;
+use command::common::{greet_name, select_directory, select_file};
 use command::download::{
     download_blob, download_file, download_files, get_file_info, save_file_with_picker,
 };
@@ -59,6 +59,8 @@ pub fn run() {
         // 注册命令处理器：将 `clients::greet` 和 `services::open_folder` 函数暴露给前端
         .invoke_handler(tauri::generate_handler![
             greet_name,
+            select_file,           // 选择文件
+            select_directory,      // 选择目录
             save_file_with_picker, // 通用保存
             download_file,         // 通用下载
             download_files,        // 批量下载

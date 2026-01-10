@@ -1,6 +1,8 @@
 import { MoonStar, Settings, Sun } from 'lucide-react';
-import { useNavigate } from 'react-router';
+import { useMemo } from 'react';
+import { useLocation, useNavigate } from 'react-router';
 import { useTheme } from '@/hooks';
+import routes from '@/router/routes';
 
 interface Iprops {
 	actions?: boolean;
@@ -11,6 +13,12 @@ const Header: React.FC<Iprops> = ({ actions = true, ccustomActions }) => {
 	const { currentTheme, toggleTheme } = useTheme();
 
 	const navigate = useNavigate();
+	const location = useLocation();
+
+	const title = useMemo(() => {
+		return routes[0].children?.find((item) => item.path === location.pathname)
+			?.meta?.title;
+	}, [location.pathname]);
 
 	const toSetting = () => {
 		navigate('/setting');
@@ -19,7 +27,7 @@ const Header: React.FC<Iprops> = ({ actions = true, ccustomActions }) => {
 	return (
 		<header
 			data-tauri-drag-region
-			className="h-13 flex items-start pl-[16px] pr-[9px] select-none align-middle"
+			className="h-13 flex items-start pl-[12px] pr-[6px] select-none align-middle"
 		>
 			<div
 				data-tauri-drag-region
@@ -29,7 +37,7 @@ const Header: React.FC<Iprops> = ({ actions = true, ccustomActions }) => {
 					data-tauri-drag-region
 					className="text-[24px] font-bold font-['手札体-简'] cursor-default bg-clip-text text-transparent bg-linear-to-r from-[#ff7b00] via-[#ff9900] to-[#ffb700]"
 				>
-					dnhyxc-ai
+					{title}
 				</div>
 				{actions ? (
 					<div data-tauri-drag-region className="flex items-center h-full">
