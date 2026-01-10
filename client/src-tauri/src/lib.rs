@@ -26,6 +26,7 @@ use command::common::{
 use command::download::{
     download_blob, download_file, download_files, get_file_info, save_file_with_picker,
 };
+use utils::common::get_store_value;
 
 /// 移动端入口属性宏：当编译目标为移动平台时，自动标记该函数为 Tauri 移动端入口
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -49,11 +50,39 @@ pub fn run() {
             let _ = setup_global_shortcut(&app.handle(), &main_window);
 
             let window = main_window.clone();
+            let app_handle = app.handle().clone();
             // 监听窗口事件
             main_window.on_window_event(move |event| match event {
                 WindowEvent::CloseRequested { api, .. } => {
+                    // 先阻止默认关闭行为
                     api.prevent_close();
-                    let _ = window.hide();
+
+                    // 获取前端设置的 closeType
+                    let app_handle_clone = app_handle.clone();
+                    let window_clone = window.clone();
+
+                    tauri::async_runtime::spawn(async move {
+                        if let Ok(close_type) =
+                            get_store_value(&app_handle_clone, "closeType").await
+                        {
+                            match close_type.as_str() {
+                                "2" => {
+                                    // 直接退出
+                                    println!("直接退出应用");
+                                    let _ = app_handle_clone.exit(0);
+                                }
+                                "1" | _ => {
+                                    // 最小化到托盘或默认行为
+                                    println!("最小化到托盘");
+                                    let _ = window_clone.hide();
+                                }
+                            }
+                        } else {
+                            // 获取 closeType 失败，默认最小化到托盘
+                            println!("获取 closeType 失败，最小化到托盘");
+                            let _ = window_clone.hide();
+                        }
+                    });
                 }
                 _ => {}
             });
