@@ -19,7 +19,10 @@ use system::shortcut::setup_global_shortcut;
 use system::tray::init_tray;
 use utils::common::set_screen_center;
 // use tauri::menu::{MenuBuilder, SubmenuBuilder};
-use command::common::{greet_name, select_directory, select_file};
+use command::common::{
+    disable_auto_start, enable_auto_start, greet_name, is_auto_start_enabled, select_directory,
+    select_file,
+};
 use command::download::{
     download_blob, download_file, download_files, get_file_info, save_file_with_picker,
 };
@@ -32,7 +35,8 @@ use command::download::{
 pub fn run() {
     // 使用默认配置创建 Tauri 应用构建器
     tauri::Builder::default()
-        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        // .plugin(tauri_plugin_autostart::Builder::new().build())
+        // .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .setup(|app| {
             let main_window = app.get_webview_window("main").unwrap();
             // 启动时设置窗口居中
@@ -66,6 +70,9 @@ pub fn run() {
             download_files,        // 批量下载
             get_file_info,         // 获取文件信息
             download_blob,         // 获取文件信息
+            disable_auto_start,    // 禁用开机启动
+            enable_auto_start,     // 启用开机启动
+            is_auto_start_enabled, // 检测开机启动
         ])
         .build(tauri::generate_context!())
         // 如果启动失败，立即 panic 并打印错误信息

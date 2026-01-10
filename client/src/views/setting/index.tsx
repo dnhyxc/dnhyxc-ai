@@ -13,24 +13,22 @@ const Setting = () => {
 
 	useEffect(() => {
 		getSavePath();
-		getStartType();
 		getCloseType();
+		checkStartType();
 	}, []);
+
+	const checkStartType = async () => {
+		const type = await invoke('is_auto_start_enabled');
+		setStartType(type ? '2' : '1');
+	};
 
 	const getSavePath = async () => {
 		const path = await getValue('savePath');
 		setSavePath(path);
 	};
 
-	const getStartType = async () => {
-		const type = await getValue('startType');
-		console.log('type', type);
-		setStartType(type);
-	};
-
 	const getCloseType = async () => {
 		const type = await getValue('closeType');
-		console.log('type', type);
 		setCloseType(type);
 	};
 
@@ -40,9 +38,15 @@ const Setting = () => {
 		setSavePath(path);
 	};
 
-	const onChangeAutoStart = (value: string) => {
+	const onChangeAutoStart = async (value: string) => {
+		if (value === '2' && startType === '1') {
+			// 需要开启自启且当前未开启
+			await invoke('enable_auto_start');
+		} else if (value === '1' && startType === '2') {
+			// 需要关闭自启且当前已开启
+			await invoke('disable_auto_start');
+		}
 		setStartType(value);
-		setValue('startType', value); // '1': 开机不自动启动，'2': 开机自启
 	};
 
 	const onChangeCloseType = (value: string) => {
@@ -79,13 +83,13 @@ const Setting = () => {
 							>
 								<div className="flex items-center gap-2 mr-5">
 									<RadioGroupItem value="1" id="r1" />
-									<Label htmlFor="r1" className="text-md">
+									<Label htmlFor="r1" className="text-md cursor-pointer">
 										开机不自动启动
 									</Label>
 								</div>
 								<div className="flex items-center gap-2">
 									<RadioGroupItem value="2" id="r2" />
-									<Label htmlFor="r2" className="text-md">
+									<Label htmlFor="r2" className="text-md cursor-pointer">
 										开机自动启动
 									</Label>
 								</div>
@@ -103,13 +107,13 @@ const Setting = () => {
 							>
 								<div className="flex items-center gap-2 mr-5">
 									<RadioGroupItem value="1" id="c1" />
-									<Label htmlFor="c1" className="text-md">
+									<Label htmlFor="c1" className="text-md cursor-pointer">
 										最小化到托盘，不退出程序
 									</Label>
 								</div>
 								<div className="flex items-center gap-2">
 									<RadioGroupItem value="2" id="c2" />
-									<Label htmlFor="c2" className="text-md">
+									<Label htmlFor="c2" className="text-md cursor-pointer">
 										退出程序
 									</Label>
 								</div>

@@ -1,4 +1,5 @@
 use rfd::FileDialog;
+use tauri_plugin_autostart::ManagerExt;
 
 #[tauri::command]
 pub fn greet_name(name: &str) -> String {
@@ -25,4 +26,34 @@ pub async fn select_directory() -> Result<String, String> {
         Some(path) => Ok(path.to_string_lossy().to_string()),
         None => Err("未选择目录".to_string()),
     }
+}
+
+/// 设置开机自启
+#[tauri::command]
+pub async fn enable_auto_start(app_handle: tauri::AppHandle) -> Result<(), String> {
+    app_handle
+        .autolaunch()
+        .enable()
+        .map_err(|e| format!("设置开机自启失败: {}", e))?;
+    Ok(())
+}
+
+/// 取消开机自启
+#[tauri::command]
+pub async fn disable_auto_start(app_handle: tauri::AppHandle) -> Result<(), String> {
+    app_handle
+        .autolaunch()
+        .disable()
+        .map_err(|e| format!("取消开机自启失败: {}", e))?;
+    Ok(())
+}
+
+/// 检查是否已设置开机自启
+#[tauri::command]
+pub async fn is_auto_start_enabled(app_handle: tauri::AppHandle) -> Result<bool, String> {
+    let is_enabled = app_handle
+        .autolaunch()
+        .is_enabled()
+        .map_err(|e| format!("检查开机自启状态失败: {}", e))?;
+    Ok(is_enabled)
 }
