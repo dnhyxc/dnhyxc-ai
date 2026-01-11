@@ -50,7 +50,6 @@ const Profile = () => {
 
 	// 在组件中添加进度监听
 	useEffect(() => {
-		console.log(JSON.parse(getStorage('userInfo') || '{}'));
 		const unlistenProgress = createDownloadProgressListener(
 			setDownloadProgressInfo,
 		);
@@ -135,7 +134,6 @@ const Profile = () => {
 	const observer = useMemo(() => {
 		return {
 			next(res: { total: UploadInfo }) {
-				console.log(res.total, 'total');
 				setUploadInfos((prev) => [res.total, ...prev]);
 			},
 			error() {

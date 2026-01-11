@@ -23,10 +23,8 @@ const Detail = () => {
 	};
 
 	const deleteSettings = async () => {
-		console.log('deleteSettings');
 		await deleteValue('test-key');
-		const res = await getValue('test-key');
-		console.log('deleteSettings', res);
+		await getValue('test-key');
 	};
 
 	return (

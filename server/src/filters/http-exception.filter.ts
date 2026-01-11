@@ -9,9 +9,7 @@ import {
 // 全局错误处理中间件
 @Catch(HttpException)
 export class HttpExceptionFilter implements ExceptionFilter {
-	constructor(private logger: LoggerService) {
-		console.log('HttpExceptionFilter init');
-	}
+	constructor(private logger: LoggerService) {}
 	catch(exception: HttpException, host: ArgumentsHost) {
 		const ctx = host.switchToHttp();
 		const response = ctx.getResponse();

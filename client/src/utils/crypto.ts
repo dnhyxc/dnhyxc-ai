@@ -6,8 +6,6 @@ const iv = CryptoJS.enc.Utf8.parse(
 	(md5 as any)(import.meta.env.VITE_MD5_IV_KEY),
 ); // 十六位十六进制数作为密钥偏移量
 
-console.log(key, iv);
-
 // 加密方法
 export const encrypt = (pwd: string) => {
 	const srcs = CryptoJS.enc.Utf8.parse(pwd);

@@ -50,7 +50,6 @@ class HttpClient {
 		config: RequestConfig = {},
 		token: string = getStorage('token') || '',
 	) {
-		console.log('token', token, getStorage('token'));
 		this.baseURL = baseURL;
 		this.defaultConfig = {
 			headers: {

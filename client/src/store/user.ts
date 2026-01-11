@@ -22,7 +22,6 @@ class UserStore {
 	};
 
 	setUserInfo(userInfo: any) {
-		console.log('setUserInfo', userInfo);
 		this.userInfo = userInfo;
 	}
 }

@@ -1,3 +1,4 @@
+import { Toast } from '@ui/sonner';
 import { CloudUpload } from 'lucide-react';
 import { useCallback, useRef, useState } from 'react';
 
@@ -32,7 +33,6 @@ const Upload: React.FC<IProps> = ({ uploadFile, getFileList }) => {
 	}, []);
 
 	const onDragLeave = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-		console.log('onDragLeave');
 		e.preventDefault();
 		setIsDragging(false);
 	}, []);
@@ -41,7 +41,6 @@ const Upload: React.FC<IProps> = ({ uploadFile, getFileList }) => {
 		(e: React.DragEvent<HTMLDivElement>) => {
 			e.preventDefault();
 			setIsDragging(false);
-			console.log('onDrop');
 
 			if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
 				onFileSelect(e.dataTransfer.files);
@@ -79,14 +78,20 @@ const Upload: React.FC<IProps> = ({ uploadFile, getFileList }) => {
 				'image/webp',
 			];
 			if (!validTypes.includes(file.type)) {
-				console.log(`不支持的文件类型: ${file.type}`);
+				Toast({
+					type: 'error',
+					title: `不支持的文件类型: ${file.type}`,
+				});
 				return false;
 			}
 
 			// 文件大小检查 (5MB)
 			const maxSize = 5 * 1024 * 1024; // 5MB
 			if (file.size > maxSize) {
-				console.log(`文件大小不能超过5MB: ${file.name}`);
+				Toast({
+					type: 'error',
+					title: '文件大小不能超过 5MB',
+				});
 				return false;
 			}
 
@@ -101,7 +106,6 @@ const Upload: React.FC<IProps> = ({ uploadFile, getFileList }) => {
 		}));
 
 		const fileList = [...filesWithPreview, ...files];
-		console.log(fileList, 'fileList');
 
 		setFiles((prev) => [...filesWithPreview, ...prev]);
 		getFileList?.(fileList);

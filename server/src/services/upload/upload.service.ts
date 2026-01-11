@@ -51,12 +51,6 @@ export class UploadService {
 			`${config[FileEnum.FILE_ROOT]}/${floderName}`,
 			filename,
 		);
-		console.log(
-			'fullPath',
-			fullPath,
-			toReplace,
-			fullPath.replace(rootPath, '').replace(/\\/g, '/'),
-		);
 
 		if (existsSync(fullPath)) {
 			return toReplace

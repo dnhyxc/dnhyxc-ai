@@ -117,7 +117,6 @@ export class UserController {
 		// 是通过 PassportModule 自动添加的
 		// @Req() req,
 	) {
-		// console.log('getUserProfile', req.user);
 		return this.userService.findProfile(id);
 	}
 
