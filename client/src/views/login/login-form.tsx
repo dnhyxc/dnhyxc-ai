@@ -118,7 +118,7 @@ const LoginForm: React.FC<IProps> = ({ onForgetPwd }) => {
 						<FormItem className="w-90">
 							<FormLabel className="text-md">用户名</FormLabel>
 							<FormControl>
-								<Input placeholder="请输入用户名" {...field} className="" />
+								<Input placeholder="请输入用户名" {...field} />
 							</FormControl>
 							<FormMessage />
 						</FormItem>

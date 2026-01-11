@@ -1,5 +1,4 @@
 use tauri::Manager;
-use tauri::WindowEvent;
 // 声明并引入当前 crate 中的子模块：
 // - menu：窗口菜单相关功能
 // - services：供前端调用的文件保存、下载等后端服务
@@ -14,6 +13,7 @@ mod utils;
 
 use plugin::init::CustomInit;
 use system::dock::dock_event;
+use system::event::setup_window_events;
 use system::menu::setup_menu;
 use system::shortcut::setup_global_shortcut;
 use system::tray::init_tray;
@@ -26,7 +26,6 @@ use command::common::{
 use command::download::{
     download_blob, download_file, download_files, get_file_info, save_file_with_picker,
 };
-use utils::common::get_store_value;
 
 /// 移动端入口属性宏：当编译目标为移动平台时，自动标记该函数为 Tauri 移动端入口
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -49,43 +48,8 @@ pub fn run() {
 
             let _ = setup_global_shortcut(&app.handle(), &main_window);
 
-            let window = main_window.clone();
-            let app_handle = app.handle().clone();
-            // 监听窗口事件
-            main_window.on_window_event(move |event| match event {
-                WindowEvent::CloseRequested { api, .. } => {
-                    // 先阻止默认关闭行为
-                    api.prevent_close();
-
-                    // 获取前端设置的 closeType
-                    let app_handle_clone = app_handle.clone();
-                    let window_clone = window.clone();
-
-                    tauri::async_runtime::spawn(async move {
-                        if let Ok(close_type) =
-                            get_store_value(&app_handle_clone, "closeType").await
-                        {
-                            match close_type.as_str() {
-                                "2" => {
-                                    // 直接退出
-                                    println!("直接退出应用");
-                                    let _ = app_handle_clone.exit(0);
-                                }
-                                "1" | _ => {
-                                    // 最小化到托盘或默认行为
-                                    println!("最小化到托盘");
-                                    let _ = window_clone.hide();
-                                }
-                            }
-                        } else {
-                            // 获取 closeType 失败，默认最小化到托盘
-                            println!("获取 closeType 失败，最小化到托盘");
-                            let _ = window_clone.hide();
-                        }
-                    });
-                }
-                _ => {}
-            });
+            // 设置窗口事件处理器
+            setup_window_events(main_window, app.handle().clone());
             Ok(())
         })
         .init_plugin()

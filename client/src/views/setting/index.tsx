@@ -3,19 +3,73 @@ import { Button } from '@ui/button';
 import { Label } from '@ui/label';
 import { RadioGroup, RadioGroupItem } from '@ui/radio-group';
 import { ScrollArea } from '@ui/scroll-area';
-import { useEffect, useState } from 'react';
-import { getValue, setValue } from '@/utils';
+import { useCallback, useEffect, useState } from 'react';
+import { capitalizeWords, getValue, setValue } from '@/utils';
+import { DEFAULT_INFO } from './config';
 
 const Setting = () => {
 	const [savePath, setSavePath] = useState('');
 	const [startType, setStartType] = useState('1');
 	const [closeType, setCloseType] = useState('1');
+	const [checkShortcut, setCheckShortcut] = useState<number | null>(null);
+	const [shortcutInfo, setShortcutInfo] = useState(DEFAULT_INFO);
+
+	const getShortCutInfo = () => {
+		DEFAULT_INFO.map(async (i) => {
+			i.defaultShortcut =
+				(await getValue(`shortcut_${i.key}`)) || i.defaultShortcut;
+		});
+		setShortcutInfo(DEFAULT_INFO);
+	};
 
 	useEffect(() => {
 		getSavePath();
 		getCloseType();
 		checkStartType();
+		getShortCutInfo();
 	}, []);
+
+	useEffect(() => {
+		window.addEventListener('keydown', onKeydown, true);
+		window.addEventListener('click', onClickPage);
+
+		return () => {
+			window.removeEventListener('keydown', onKeydown, true);
+			window.removeEventListener('click', onClickPage);
+		};
+	}, [checkShortcut]);
+
+	const onClickPage = (e: any) => {
+		if (e.target.id !== 'shortcut') {
+			setCheckShortcut(null);
+		}
+	};
+
+	const onKeydown = useCallback(
+		(e: KeyboardEvent) => {
+			const info = shortcutInfo.find((item) => item.key === checkShortcut);
+			if (!info?.key) return;
+			setShortcutInfo((prev) =>
+				prev.map((item) => {
+					if (item.key === checkShortcut) {
+						const shortcuts =
+							item.shortcut +
+							(item.shortcut ? ' + ' : '') +
+							capitalizeWords(e.key);
+						setValue(`shortcut_${item.key}`, shortcuts);
+						return {
+							...item,
+							shortcut: shortcuts,
+							defaultShortcut: shortcuts,
+						};
+					} else {
+						return item;
+					}
+				}),
+			);
+		},
+		[shortcutInfo, checkShortcut],
+	);
 
 	const checkStartType = async () => {
 		const type = await invoke('is_auto_start_enabled');
@@ -54,11 +108,25 @@ const Setting = () => {
 		setValue('closeType', value); // '1': 关闭时退出，'2': 关闭时最小化
 	};
 
+	const onChangeShortCut = (value: number) => {
+		setShortcutInfo((prev) =>
+			prev.map((item) =>
+				item.key === value
+					? {
+							...item,
+							shortcut: '',
+						}
+					: item,
+			),
+		);
+		setCheckShortcut(value);
+	};
+
 	return (
 		<div className="w-full h-full flex flex-col justify-center items-center m-0">
 			<ScrollArea className="w-full h-full overflow-y-auto p-2.5 rounded-none">
 				<div className="w-full h-full flex flex-col px-30 py-8">
-					<div className="border-b border-gray-600 pb-5.5 mb-1">
+					<div className="border-b border-gray-800 pb-5.5 mb-1">
 						<div className="text-lg font-bold">文件存储</div>
 						<div className="mt-2 px-10">
 							<span className="mr-2">默认存储路径</span>
@@ -72,7 +140,7 @@ const Setting = () => {
 							</Button>
 						</div>
 					</div>
-					<div className="my-5 border-b border-gray-600 pb-7">
+					<div className="my-5 border-b border-gray-800 pb-7">
 						<div className="text-lg font-bold">启动设置</div>
 						<div className="flex items-center mt-3.5 px-10">
 							<span className="mr-2">设置开机自启</span>
@@ -96,7 +164,7 @@ const Setting = () => {
 							</RadioGroup>
 						</div>
 					</div>
-					<div className="mt-1.5 border-b border-gray-600 pb-7">
+					<div className="mt-1.5 border-b border-gray-800 pb-7">
 						<div className="text-lg font-bold">关闭设置</div>
 						<div className="flex items-center mt-3.5 px-10">
 							<span className="mr-2">关闭应用程序</span>
@@ -118,6 +186,30 @@ const Setting = () => {
 									</Label>
 								</div>
 							</RadioGroup>
+						</div>
+					</div>
+					<div className="mt-6 pb-7">
+						<div className="text-lg font-bold">快捷键设置</div>
+						<div className="flex flex-col items-center mt-2 px-10">
+							<div className="grid grid-cols-2 w-full">
+								{shortcutInfo.map((i) => {
+									return (
+										<div key={i.key} className="flex items-center">
+											<span>{i.label}</span>
+											<Button
+												variant="link"
+												id={i.id}
+												className="cursor-pointer text-md"
+												onClick={() => onChangeShortCut(i.key)}
+											>
+												{checkShortcut === i.key
+													? i.shortcut || '按键盘输入快捷键'
+													: i.shortcut || i.defaultShortcut}
+											</Button>
+										</div>
+									);
+								})}
+							</div>
 						</div>
 					</div>
 				</div>

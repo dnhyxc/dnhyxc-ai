@@ -217,3 +217,11 @@ export const donwnloadWithUrl = async (
 
 	return result;
 };
+
+// 设置首字母大写
+export const capitalizeWords = (str: string) => {
+	return str
+		.split(' ')
+		.map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+		.join(' ');
+};
