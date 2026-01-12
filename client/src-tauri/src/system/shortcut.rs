@@ -1,8 +1,8 @@
 use crate::constant::common::get_key_code;
 use crate::utils::common::get_store_value;
 use std::collections::HashMap;
-use std::sync::{Mutex, LazyLock};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{LazyLock, Mutex};
 use tauri::{AppHandle, Emitter, Manager, Runtime, WebviewWindow, async_runtime};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutEvent};
 
@@ -12,6 +12,12 @@ pub enum ShortcutActionType {
     Reload,
     NewWorkflow,
     OpenSubWindow,
+}
+
+#[derive(Debug, Clone)]
+pub struct ShortcutAction {
+    pub shortcut: Shortcut,
+    pub key: i32,
 }
 
 impl ShortcutActionType {
@@ -26,17 +32,12 @@ impl ShortcutActionType {
     }
 }
 
+pub static SHORTCUT_KEY_MAPPING: LazyLock<Mutex<HashMap<(Modifiers, Code), ShortcutActionType>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+
 pub const MAX_SHORTCUT_KEY: i32 = 4;
 
 pub static SHORTCUT_HANDLING_ENABLED: AtomicBool = AtomicBool::new(true);
-
-#[derive(Debug, Clone)]
-pub struct ShortcutAction {
-    pub shortcut: Shortcut,
-    pub key: i32,
-}
-
-pub static SHORTCUT_KEY_MAPPING: LazyLock<Mutex<HashMap<(Modifiers, Code), ShortcutActionType>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
 
 /// 辅助函数：将快捷键转换为字符串表示
 fn shortcut_to_string(modifiers: Modifiers, key: Code) -> String {
@@ -105,10 +106,7 @@ pub fn load_shortcuts_from_store(app_handle: &AppHandle) -> Vec<ShortcutAction> 
                             let modifiers = shortcut.mods;
                             let code = shortcut.key;
                             mapping.insert((modifiers, code), action_type);
-                            shortcut_actions.push(ShortcutAction {
-                                shortcut,
-                                key: i,
-                            });
+                            shortcut_actions.push(ShortcutAction { shortcut, key: i });
                         } else {
                             eprintln!("Failed to parse shortcut: {}", shortcut_str);
                         }
@@ -135,8 +133,14 @@ pub fn setup_global_shortcut(
         tauri::WindowEvent::Focused(focused) => {
             if *focused {
                 for shortcut_action in &shortcut_actions {
-                    if let Err(e) = app_handle.global_shortcut().register(shortcut_action.shortcut.clone()) {
-                        eprintln!("Failed to register shortcut {:?}: {:?}", shortcut_action.shortcut, e);
+                    if let Err(e) = app_handle
+                        .global_shortcut()
+                        .register(shortcut_action.shortcut.clone())
+                    {
+                        eprintln!(
+                            "Failed to register shortcut {:?}: {:?}",
+                            shortcut_action.shortcut, e
+                        );
                     }
                 }
             } else {
@@ -144,7 +148,10 @@ pub fn setup_global_shortcut(
                     // 克隆 shortcut 以获得 owned 版本
                     let owned_shortcut = shortcut_action.shortcut.clone();
                     if let Err(e) = app_handle.global_shortcut().unregister(owned_shortcut) {
-                        eprintln!("Failed to unregister shortcut {:?}: {:?}", shortcut_action.shortcut, e);
+                        eprintln!(
+                            "Failed to unregister shortcut {:?}: {:?}",
+                            shortcut_action.shortcut, e
+                        );
                     }
                 }
             }
