@@ -175,7 +175,7 @@ const Setting = () => {
 		<div className="w-full h-full flex flex-col justify-center items-center m-0">
 			<ScrollArea className="w-full h-full overflow-y-auto p-2.5 rounded-none">
 				<div className="w-full h-full flex flex-col px-30 pt-8 pb-6">
-					<div className="border-b border-gray-800 pb-5.5 mb-1">
+					<div className="border-b dark:border-gray-800 border-gray-300 pb-5.5 mb-1">
 						<div className="text-lg font-bold">文件存储</div>
 						<div className="mt-2 px-10">
 							<span className="mr-2">默认存储路径</span>
@@ -189,7 +189,7 @@ const Setting = () => {
 							</Button>
 						</div>
 					</div>
-					<div className="my-5 border-b border-gray-800 pb-7">
+					<div className="my-5 border-b dark:border-gray-800 border-gray-300 pb-7">
 						<div className="text-lg font-bold">启动设置</div>
 						<div className="flex items-center mt-3.5 px-10">
 							<span className="mr-2">设置开机自启</span>
@@ -213,7 +213,7 @@ const Setting = () => {
 							</RadioGroup>
 						</div>
 					</div>
-					<div className="mt-1.5 border-b border-gray-800 pb-7">
+					<div className="mt-1.5 border-b dark:border-gray-800 border-gray-300 pb-7">
 						<div className="text-lg font-bold">关闭设置</div>
 						<div className="flex items-center mt-3.5 px-10">
 							<span className="mr-2">关闭应用程序</span>
