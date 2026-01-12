@@ -1,5 +1,6 @@
 import Header from '@design/Header';
 import { Button } from '@ui/button';
+import { Input } from '@ui/input';
 import { ScrollArea } from '@ui/scroll-area';
 import { useEffect } from 'react';
 import { onListen, setBodyClass } from '@/utils';
@@ -34,6 +35,7 @@ const ChildWindow = () => {
 				<ScrollArea className="w-full h-full flex justify-center items-center box-border rounded-lg p-1 shadow-(--shadow-2)">
 					<div className="w-full h-full flex-1 flex-col justify-center items-center">
 						<h1>All Child Window</h1>
+						<Input placeholder="input" />
 						<div>
 							<Button
 								variant="default"

@@ -15,6 +15,12 @@
 		"http:allow-fetch",
 		"store:allow-load",
 		"store:default",
+		"clipboard-manager:allow-clear",
+		"clipboard-manager:allow-read-image",
+		"clipboard-manager:allow-read-text",
+		"clipboard-manager:allow-write-html",
+		"clipboard-manager:allow-write-image",
+		"clipboard-manager:allow-write-text",
 		{
 			"identifier": "http:default",
 			"allow": [

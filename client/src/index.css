@@ -15,10 +15,10 @@ body {
 	width: 100%;
 	/* 禁止页面回弹效果 */
 	overscroll-behavior: none;
-	user-select: none;
+	/* user-select: none;
 	-webkit-user-select: none;
 	-moz-user-select: none;
-	-ms-user-select: none;
+	-ms-user-select: none; */
 }
 
 #root {

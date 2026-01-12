@@ -36,6 +36,7 @@ use command::download::{
 pub fn run() {
     // 使用默认配置创建 Tauri 应用构建器
     tauri::Builder::default()
+        .plugin(tauri_plugin_clipboard_manager::init())
         // .plugin(tauri_plugin_autostart::Builder::new().build())
         // .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .setup(|app| {

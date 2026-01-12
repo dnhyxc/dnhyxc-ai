@@ -3,7 +3,13 @@ import { Toaster } from '@ui/sonner';
 import { useEffect } from 'react';
 import { createBrowserRouter } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
-import { getValue, onCreateWindow, removeStorage, setBodyClass } from '@/utils';
+import {
+	clipboard,
+	getValue,
+	onCreateWindow,
+	removeStorage,
+	setBodyClass,
+} from '@/utils';
 import { http } from '@/utils/fetch';
 import routes from './routes';
 
@@ -32,9 +38,12 @@ const App = () => {
 			http.setAuthToken('');
 		});
 
+		document.addEventListener('keydown', clipboard);
+
 		return () => {
 			aboutPromise.then((unlisten) => unlisten());
 			logoutPromise.then((unlisten) => unlisten());
+			document.removeEventListener('keydown', clipboard);
 		};
 	}, []);
 
