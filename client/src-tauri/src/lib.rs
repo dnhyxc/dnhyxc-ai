@@ -6,6 +6,7 @@ use tauri::Manager;
 // - types：公共类型定义
 // - utils：通用工具函数（窗口居中、文件下载等）
 mod command;
+mod constant;
 mod plugin;
 mod system;
 mod types;

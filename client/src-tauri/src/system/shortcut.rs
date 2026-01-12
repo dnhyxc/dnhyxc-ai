@@ -1,3 +1,4 @@
+use crate::constant::common::get_key_code;
 use crate::utils::common::get_store_value;
 use std::collections::HashMap;
 use std::sync::{Mutex, LazyLock};
@@ -68,45 +69,7 @@ pub fn parse_shortcut(shortcut_str: &str) -> Option<Shortcut> {
     if parts.is_empty() {
         return None;
     }
-    let key_code = match parts.last()?.to_lowercase().as_str() {
-        "a" => Code::KeyA,
-        "b" => Code::KeyB,
-        "c" => Code::KeyC,
-        "d" => Code::KeyD,
-        "e" => Code::KeyE,
-        "f" => Code::KeyF,
-        "g" => Code::KeyG,
-        "h" => Code::KeyH,
-        "i" => Code::KeyI,
-        "j" => Code::KeyJ,
-        "k" => Code::KeyK,
-        "l" => Code::KeyL,
-        "m" => Code::KeyM,
-        "n" => Code::KeyN,
-        "o" => Code::KeyO,
-        "p" => Code::KeyP,
-        "q" => Code::KeyQ,
-        "r" => Code::KeyR,
-        "s" => Code::KeyS,
-        "t" => Code::KeyT,
-        "u" => Code::KeyU,
-        "v" => Code::KeyV,
-        "w" => Code::KeyW,
-        "x" => Code::KeyX,
-        "y" => Code::KeyY,
-        "z" => Code::KeyZ,
-        "0" => Code::Digit0,
-        "1" => Code::Digit1,
-        "2" => Code::Digit2,
-        "3" => Code::Digit3,
-        "4" => Code::Digit4,
-        "5" => Code::Digit5,
-        "6" => Code::Digit6,
-        "7" => Code::Digit7,
-        "8" => Code::Digit8,
-        "9" => Code::Digit9,
-        _ => return None,
-    };
+    let key_code = get_key_code(parts.last()?)?;
     let mut modifiers = Modifiers::empty();
     for part in &parts[..parts.len() - 1] {
         match part.to_lowercase().as_str() {
