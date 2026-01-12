@@ -9,8 +9,17 @@ export const DEFAULT_INFO = [
 		action: 'hide',
 	},
 	{
-		label: '刷新应用',
+		label: '显示隐藏应用',
 		key: 2,
+		id: 'shortcut',
+		shortcut: '',
+		defaultShortcut: 'Meta + E',
+		placeholder: '按键盘输入快捷键',
+		action: 'hideOrShowApp',
+	},
+	{
+		label: '刷新应用',
+		key: 3,
 		id: 'shortcut',
 		shortcut: '',
 		defaultShortcut: 'Command + Shift + W',
@@ -19,7 +28,7 @@ export const DEFAULT_INFO = [
 	},
 	{
 		label: '新建工作流',
-		key: 3,
+		key: 4,
 		id: 'shortcut',
 		shortcut: '',
 		defaultShortcut: 'Command + N',
@@ -28,7 +37,7 @@ export const DEFAULT_INFO = [
 	},
 	{
 		label: '打开子窗口',
-		key: 4,
+		key: 5,
 		id: 'shortcut',
 		shortcut: '',
 		defaultShortcut: 'Ctrl + Shift + L',

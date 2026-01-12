@@ -12,6 +12,7 @@ pub enum ShortcutActionType {
     Reload,
     NewWorkflow,
     OpenSubWindow,
+    HideOrShowApp,
 }
 
 #[derive(Debug, Clone)]
@@ -24,9 +25,10 @@ impl ShortcutActionType {
     fn from_key(key: i32) -> Option<Self> {
         match key {
             1 => Some(ShortcutActionType::Hide),
-            2 => Some(ShortcutActionType::Reload),
-            3 => Some(ShortcutActionType::NewWorkflow),
-            4 => Some(ShortcutActionType::OpenSubWindow),
+            2 => Some(ShortcutActionType::HideOrShowApp),
+            3 => Some(ShortcutActionType::Reload),
+            4 => Some(ShortcutActionType::NewWorkflow),
+            5 => Some(ShortcutActionType::OpenSubWindow),
             _ => None,
         }
     }
@@ -35,7 +37,7 @@ impl ShortcutActionType {
 pub static SHORTCUT_KEY_MAPPING: LazyLock<Mutex<HashMap<(Modifiers, Code), ShortcutActionType>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
-pub const MAX_SHORTCUT_KEY: i32 = 4;
+pub const MAX_SHORTCUT_KEY: i32 = 5;
 
 pub static SHORTCUT_HANDLING_ENABLED: AtomicBool = AtomicBool::new(true);
 
@@ -145,7 +147,17 @@ pub fn setup_global_shortcut(
                 }
             } else {
                 for shortcut_action in &shortcut_actions {
-                    // 克隆 shortcut 以获得 owned 版本
+                    let modifiers = shortcut_action.shortcut.mods;
+                    let code = shortcut_action.shortcut.key;
+
+                    if let Ok(mapping) = SHORTCUT_KEY_MAPPING.lock() {
+                        if let Some(&action_type) = mapping.get(&(modifiers, code)) {
+                            if action_type == ShortcutActionType::HideOrShowApp {
+                                continue;
+                            }
+                        }
+                    }
+
                     let owned_shortcut = shortcut_action.shortcut.clone();
                     if let Err(e) = app_handle.global_shortcut().unregister(owned_shortcut) {
                         eprintln!(
@@ -194,6 +206,18 @@ pub fn handle_shortcut<R: Runtime>(
                 }
                 ShortcutActionType::OpenSubWindow => {
                     let _ = app.emit("shortcut-triggered", "open_subwindow");
+                }
+                ShortcutActionType::HideOrShowApp => {
+                    if let Some(window) = app.get_webview_window("main") {
+                        if window.is_visible().unwrap_or(true) {
+                            // let _ = window.hide();
+                            let _ = app.emit("shortcut-triggered", "hide");
+                        } else {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                            let _ = app.emit("shortcut-triggered", "show");
+                        }
+                    }
                 }
             }
         } else {
