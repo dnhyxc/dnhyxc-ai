@@ -5,6 +5,28 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{AppHandle, Emitter, Manager, Runtime, WebviewWindow, async_runtime};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutEvent};
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum ShortcutActionType {
+    Hide,
+    Reload,
+    NewWorkflow,
+    OpenSubWindow,
+}
+
+impl ShortcutActionType {
+    fn from_key(key: i32) -> Option<Self> {
+        match key {
+            1 => Some(ShortcutActionType::Hide),
+            2 => Some(ShortcutActionType::Reload),
+            3 => Some(ShortcutActionType::NewWorkflow),
+            4 => Some(ShortcutActionType::OpenSubWindow),
+            _ => None,
+        }
+    }
+}
+
+pub const MAX_SHORTCUT_KEY: i32 = 4;
+
 pub static SHORTCUT_HANDLING_ENABLED: AtomicBool = AtomicBool::new(true);
 
 #[derive(Debug, Clone)]
@@ -13,7 +35,7 @@ pub struct ShortcutAction {
     pub key: i32,
 }
 
-pub static SHORTCUT_KEY_MAPPING: LazyLock<Mutex<HashMap<(Modifiers, Code), i32>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
+pub static SHORTCUT_KEY_MAPPING: LazyLock<Mutex<HashMap<(Modifiers, Code), ShortcutActionType>>> = LazyLock::new(|| Mutex::new(HashMap::new()));
 
 /// 辅助函数：将快捷键转换为字符串表示
 fn shortcut_to_string(modifiers: Modifiers, key: Code) -> String {
@@ -108,23 +130,25 @@ pub fn load_shortcuts_from_store(app_handle: &AppHandle) -> Vec<ShortcutAction> 
         let mut mapping = SHORTCUT_KEY_MAPPING.lock().unwrap();
         mapping.clear();
 
-        for i in 1..=4 {
+        for i in 1..=MAX_SHORTCUT_KEY {
             let key = format!("shortcut_{}", i);
             match get_store_value(app_handle, &key).await {
                 Ok(shortcut_str) => {
                     if shortcut_str.is_empty() {
                         continue;
                     }
-                    if let Some(shortcut) = parse_shortcut(&shortcut_str) {
-                        let modifiers = shortcut.mods;
-                        let code = shortcut.key;
-                        mapping.insert((modifiers, code), i);
-                        shortcut_actions.push(ShortcutAction {
-                            shortcut,
-                            key: i,
-                        });
-                    } else {
-                        eprintln!("Failed to parse shortcut: {}", shortcut_str);
+                    if let Some(action_type) = ShortcutActionType::from_key(i) {
+                        if let Some(shortcut) = parse_shortcut(&shortcut_str) {
+                            let modifiers = shortcut.mods;
+                            let code = shortcut.key;
+                            mapping.insert((modifiers, code), action_type);
+                            shortcut_actions.push(ShortcutAction {
+                                shortcut,
+                                key: i,
+                            });
+                        } else {
+                            eprintln!("Failed to parse shortcut: {}", shortcut_str);
+                        }
                     }
                 }
                 Err(_) => continue,
@@ -181,27 +205,26 @@ pub fn handle_shortcut<R: Runtime>(
     let code = shortcut.key;
 
     if let Ok(mapping) = SHORTCUT_KEY_MAPPING.lock() {
-        if let Some(&key) = mapping.get(&(modifiers, code)) {
-            match key {
-                1 => {
+        if let Some(&action_type) = mapping.get(&(modifiers, code)) {
+            match action_type {
+                ShortcutActionType::Hide => {
                     if let Some(window) = app.get_webview_window("main") {
                         let _ = window.close();
                         let _ = app.emit("shortcut-triggered", "hide");
                     }
                 }
-                2 => {
+                ShortcutActionType::Reload => {
                     if let Some(window) = app.get_webview_window("main") {
                         let _ = window.eval("window.location.reload()");
                         let _ = app.emit("shortcut-triggered", "reload");
                     }
                 }
-                3 => {
+                ShortcutActionType::NewWorkflow => {
                     let _ = app.emit("shortcut-triggered", "new_workflow");
                 }
-                4 => {
+                ShortcutActionType::OpenSubWindow => {
                     let _ = app.emit("shortcut-triggered", "open_subwindow");
                 }
-                _ => {}
             }
         } else {
             let shortcut_str = shortcut_to_string(shortcut.mods, shortcut.key);
