@@ -93,9 +93,8 @@ pub fn register_shortcut(
         }
     }
 
-    if let Err(e) = app.global_shortcut().register(shortcut.clone()) {
+    if let Err(_e) = app.global_shortcut().register(shortcut.clone()) {
         SHORTCUT_HANDLING_ENABLED.store(true, Ordering::SeqCst);
-        eprintln!("Failed to register shortcut {:?}: {:?}", shortcut, e);
     }
 
     SHORTCUT_HANDLING_ENABLED.store(true, Ordering::SeqCst);
@@ -112,16 +111,9 @@ pub fn reload_all_shortcuts(app: tauri::AppHandle) -> Result<(), String> {
     let shortcut_actions = load_shortcuts_from_store(&app);
 
     for shortcut_action in &shortcut_actions {
-        if let Err(e) = app
+        let _ = app
             .global_shortcut()
-            .register(shortcut_action.shortcut.clone())
-        {
-            SHORTCUT_HANDLING_ENABLED.store(true, Ordering::SeqCst);
-            return Err(format!(
-                "Failed to register shortcut {:?}: {:?}",
-                shortcut_action.shortcut, e
-            ));
-        }
+            .register(shortcut_action.shortcut.clone());
     }
 
     SHORTCUT_HANDLING_ENABLED.store(true, Ordering::SeqCst);

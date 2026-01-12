@@ -109,8 +109,6 @@ pub fn load_shortcuts_from_store(app_handle: &AppHandle) -> Vec<ShortcutAction> 
                             let code = shortcut.key;
                             mapping.insert((modifiers, code), action_type);
                             shortcut_actions.push(ShortcutAction { shortcut, key: i });
-                        } else {
-                            eprintln!("Failed to parse shortcut: {}", shortcut_str);
                         }
                     }
                 }
@@ -135,15 +133,9 @@ pub fn setup_global_shortcut(
         tauri::WindowEvent::Focused(focused) => {
             if *focused {
                 for shortcut_action in &shortcut_actions {
-                    if let Err(e) = app_handle
+                    let _ = app_handle
                         .global_shortcut()
-                        .register(shortcut_action.shortcut.clone())
-                    {
-                        eprintln!(
-                            "Failed to register shortcut {:?}: {:?}",
-                            shortcut_action.shortcut, e
-                        );
-                    }
+                        .register(shortcut_action.shortcut.clone());
                 }
             } else {
                 for shortcut_action in &shortcut_actions {
@@ -159,12 +151,7 @@ pub fn setup_global_shortcut(
                     }
 
                     let owned_shortcut = shortcut_action.shortcut.clone();
-                    if let Err(e) = app_handle.global_shortcut().unregister(owned_shortcut) {
-                        eprintln!(
-                            "Failed to unregister shortcut {:?}: {:?}",
-                            shortcut_action.shortcut, e
-                        );
-                    }
+                    let _ = app_handle.global_shortcut().unregister(owned_shortcut);
                 }
             }
         }
