@@ -43,6 +43,7 @@ const Setting = () => {
 	const onClickPage = (e: any) => {
 		if (e.target.id !== 'shortcut') {
 			setCheckShortcut(null);
+			invoke('reload_all_shortcuts');
 		}
 	};
 
@@ -59,6 +60,7 @@ const Setting = () => {
 							capitalizeWords(e.key);
 						setValue(`shortcut_${item.key}`, shortcuts);
 						invoke('register_shortcut', { shortcutStr: shortcuts });
+						invoke('reload_all_shortcuts');
 						return {
 							...item,
 							shortcut: shortcuts,
@@ -110,7 +112,7 @@ const Setting = () => {
 		setValue('closeType', value); // '1': 关闭时退出，'2': 关闭时最小化
 	};
 
-	const onChangeShortCut = (value: number) => {
+	const onChangeShortCut = async (value: number) => {
 		setShortcutInfo((prev) =>
 			prev.map((item) =>
 				item.key === value
@@ -122,6 +124,7 @@ const Setting = () => {
 			),
 		);
 		setCheckShortcut(value);
+		await invoke('clear_all_shortcuts');
 	};
 
 	return (

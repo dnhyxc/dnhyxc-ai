@@ -1,6 +1,9 @@
 use crate::utils::common::get_store_value;
+use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{AppHandle, Emitter, Manager, Runtime, WebviewWindow, async_runtime};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutEvent};
+
+static SHORTCUT_HANDLING_ENABLED: AtomicBool = AtomicBool::new(true);
 
 /// 辅助函数：将快捷键转换为字符串表示
 fn shortcut_to_string(modifiers: Modifiers, key: Code) -> String {
@@ -86,12 +89,15 @@ fn load_shortcuts_from_store(app_handle: &AppHandle) -> Vec<Shortcut> {
 /// 注册单个快捷键
 #[tauri::command]
 pub fn register_shortcut(app: tauri::AppHandle, shortcut_str: String) -> Result<(), String> {
+    SHORTCUT_HANDLING_ENABLED.store(false, Ordering::SeqCst);
+
     let shortcut = parse_shortcut(&shortcut_str)
         .ok_or_else(|| format!("Invalid shortcut format: {}", shortcut_str))?;
 
     println!("Registering shortcut: {:?}", shortcut);
 
     if let Err(e) = app.global_shortcut().register(shortcut.clone()) {
+        SHORTCUT_HANDLING_ENABLED.store(true, Ordering::SeqCst);
         return Err(format!(
             "Failed to register shortcut {:?}: {:?}",
             shortcut, e
@@ -99,18 +105,23 @@ pub fn register_shortcut(app: tauri::AppHandle, shortcut_str: String) -> Result<
     }
 
     println!("Shortcut registered successfully: {:?}", shortcut);
+
+    SHORTCUT_HANDLING_ENABLED.store(true, Ordering::SeqCst);
     Ok(())
 }
 
 /// 重新加载所有快捷键配置（从 store 读取）
 #[tauri::command]
 pub fn reload_all_shortcuts(app: tauri::AppHandle) -> Result<(), String> {
+    SHORTCUT_HANDLING_ENABLED.store(false, Ordering::SeqCst);
+
     let shortcuts = load_shortcuts_from_store(&app);
 
     println!("Reload all shortcuts--------: {:?}", shortcuts);
 
     for shortcut in &shortcuts {
         if let Err(e) = app.global_shortcut().register(shortcut.clone()) {
+            SHORTCUT_HANDLING_ENABLED.store(true, Ordering::SeqCst);
             return Err(format!(
                 "Failed to register shortcut {:?}: {:?}",
                 shortcut, e
@@ -119,6 +130,8 @@ pub fn reload_all_shortcuts(app: tauri::AppHandle) -> Result<(), String> {
     }
 
     println!("All shortcuts reloaded: {:?}", shortcuts);
+
+    SHORTCUT_HANDLING_ENABLED.store(true, Ordering::SeqCst);
     Ok(())
 }
 
@@ -175,7 +188,13 @@ pub fn handle_shortcut<R: Runtime>(
     shortcut: &tauri_plugin_global_shortcut::Shortcut,
     _event: ShortcutEvent,
 ) {
-    // TODO: 注册时先要暂停监听
+    if !SHORTCUT_HANDLING_ENABLED.load(Ordering::SeqCst) {
+        println!("handle_shortcut: disabled");
+        return;
+    }
+
+    println!("handle_shortcut-end: {:?}", shortcut);
+
     match (shortcut.mods, shortcut.key) {
         (mods, Code::KeyW) if mods == Modifiers::SUPER => {
             println!("cmd+w");

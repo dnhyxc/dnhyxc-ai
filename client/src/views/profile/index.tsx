@@ -18,7 +18,6 @@ import {
 	createUnlistenFileInfoListener,
 	donwnloadWithUrl,
 	downloadBlob,
-	getStorage,
 	onCreateWindow,
 	onEmit,
 	onListen,
