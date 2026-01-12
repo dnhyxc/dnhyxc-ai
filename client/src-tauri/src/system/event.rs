@@ -20,12 +20,10 @@ pub fn setup_window_events(main_window: tauri::WebviewWindow, app_handle: tauri:
                     match close_type.as_str() {
                         "2" => {
                             // 直接退出
-                            println!("直接退出应用");
                             let _ = app_handle_clone.exit(0);
                         }
                         "1" | _ => {
                             // 最小化到托盘或默认行为
-                            println!("最小化到托盘");
                             let _ = window_clone.hide();
                         }
                     }
