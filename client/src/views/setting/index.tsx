@@ -15,6 +15,7 @@ const Setting = () => {
 	const [shortcutInfo, setShortcutInfo] = useState(DEFAULT_INFO);
 
 	const getShortCutInfo = () => {
+		// invoke('clear_all_shortcuts');
 		DEFAULT_INFO.map(async (i) => {
 			i.defaultShortcut =
 				(await getValue(`shortcut_${i.key}`)) || i.defaultShortcut;
@@ -57,6 +58,7 @@ const Setting = () => {
 							(item.shortcut ? ' + ' : '') +
 							capitalizeWords(e.key);
 						setValue(`shortcut_${item.key}`, shortcuts);
+						invoke('register_shortcut', { shortcutStr: shortcuts });
 						return {
 							...item,
 							shortcut: shortcuts,

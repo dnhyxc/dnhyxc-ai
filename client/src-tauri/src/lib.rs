@@ -15,7 +15,7 @@ use plugin::init::CustomInit;
 use system::dock::dock_event;
 use system::event::setup_window_events;
 use system::menu::setup_menu;
-use system::shortcut::setup_global_shortcut;
+use system::shortcut::{clear_all_shortcuts, register_shortcut, reload_all_shortcuts, setup_global_shortcut};
 use system::tray::init_tray;
 use utils::common::set_screen_center;
 // use tauri::menu::{MenuBuilder, SubmenuBuilder};
@@ -66,6 +66,9 @@ pub fn run() {
             disable_auto_start,    // 禁用开机启动
             enable_auto_start,     // 启用开机启动
             is_auto_start_enabled, // 检测开机启动
+            register_shortcut,     // 注册单个快捷键
+            reload_all_shortcuts,  // 重新加载所有快捷键
+            clear_all_shortcuts,   // 清空所有快捷键
         ])
         .build(tauri::generate_context!())
         // 如果启动失败，立即 panic 并打印错误信息
