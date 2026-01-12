@@ -61,7 +61,20 @@ const Profile = () => {
 		});
 
 		const unlistenShortcut = onListen('shortcut-triggered', (event) => {
-			console.log('shortcut-triggered', event);
+			if (event === 'new_workflow') {
+				Toast({
+					title: '快捷键触发',
+					type: 'success',
+					message: '新建工作流',
+				});
+			}
+			if (event === 'open_subwindow') {
+				onCreateWindow({
+					url: '/win',
+					width: 1000,
+					height: 690,
+				});
+			}
 		});
 
 		return () => {

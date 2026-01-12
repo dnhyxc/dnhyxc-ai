@@ -6,6 +6,7 @@ export const DEFAULT_INFO = [
 		shortcut: '',
 		defaultShortcut: 'Command + W',
 		placeholder: '按键盘输入快捷键',
+		action: 'hide',
 	},
 	{
 		label: '刷新应用',
@@ -14,6 +15,7 @@ export const DEFAULT_INFO = [
 		shortcut: '',
 		defaultShortcut: 'Command + Shift + W',
 		placeholder: '按键盘输入快捷键',
+		action: 'reload',
 	},
 	{
 		label: '新建工作流',
@@ -22,6 +24,7 @@ export const DEFAULT_INFO = [
 		shortcut: '',
 		defaultShortcut: 'Command + N',
 		placeholder: '按键盘输入快捷键',
+		action: 'new_workflow',
 	},
 	{
 		label: '打开子窗口',
@@ -30,5 +33,6 @@ export const DEFAULT_INFO = [
 		shortcut: '',
 		defaultShortcut: 'Ctrl + Shift + L',
 		placeholder: '按键盘输入快捷键',
+		action: 'open_subwindow',
 	},
 ];

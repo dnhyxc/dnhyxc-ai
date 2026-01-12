@@ -84,11 +84,10 @@ pub fn register_shortcut(
     let shortcut = parse_shortcut(&shortcut_str)
         .ok_or_else(|| format!("Invalid shortcut format: {}", shortcut_str))?;
 
-    let shortcuts = load_shortcuts_from_store(&app);
+    let shortcut_actions = load_shortcuts_from_store(&app);
 
-    for (i, existing_shortcut) in shortcuts.iter().enumerate() {
-        let key = i + 1;
-        if Some(key as i32) != current_key && existing_shortcut == &shortcut {
+    for shortcut_action in &shortcut_actions {
+        if Some(shortcut_action.key) != current_key && shortcut_action.shortcut == shortcut {
             SHORTCUT_HANDLING_ENABLED.store(true, Ordering::SeqCst);
             return Err(format!("快捷键 '{}' 已被使用", shortcut_str));
         }
@@ -97,19 +96,6 @@ pub fn register_shortcut(
     if let Err(e) = app.global_shortcut().register(shortcut.clone()) {
         SHORTCUT_HANDLING_ENABLED.store(true, Ordering::SeqCst);
         eprintln!("Failed to register shortcut {:?}: {:?}", shortcut, e);
-        // let error_msg = e.to_string();
-
-        // if error_msg.contains("RegisterEventHotKey failed") {
-        //     return Err(format!(
-        //         "快捷键 '{}' 是系统保留的快捷键，无法注册",
-        //         shortcut_str
-        //     ));
-        // }
-
-        // return Err(format!(
-        //     "Failed to register shortcut '{}': {}",
-        //     shortcut_str, error_msg
-        // ));
     }
 
     SHORTCUT_HANDLING_ENABLED.store(true, Ordering::SeqCst);
@@ -123,14 +109,17 @@ pub fn reload_all_shortcuts(app: tauri::AppHandle) -> Result<(), String> {
 
     let _ = app.global_shortcut().unregister_all();
 
-    let shortcuts = load_shortcuts_from_store(&app);
+    let shortcut_actions = load_shortcuts_from_store(&app);
 
-    for shortcut in &shortcuts {
-        if let Err(e) = app.global_shortcut().register(shortcut.clone()) {
+    for shortcut_action in &shortcut_actions {
+        if let Err(e) = app
+            .global_shortcut()
+            .register(shortcut_action.shortcut.clone())
+        {
             SHORTCUT_HANDLING_ENABLED.store(true, Ordering::SeqCst);
             return Err(format!(
                 "Failed to register shortcut {:?}: {:?}",
-                shortcut, e
+                shortcut_action.shortcut, e
             ));
         }
     }
