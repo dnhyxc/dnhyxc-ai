@@ -14,6 +14,7 @@ pub fn setup_menu<R: tauri::Runtime>(app: &mut tauri::App<R>) -> tauri::Result<(
     // 创建文件菜单
     let file_menu = SubmenuBuilder::new(app, "File")
         .text("about", "关于应用")
+        .separator()
         .text("logout", "退出登录")
         .text("quit", "退出应用")
         .build()?;
@@ -21,17 +22,30 @@ pub fn setup_menu<R: tauri::Runtime>(app: &mut tauri::App<R>) -> tauri::Result<(
     // 创建窗口菜单
     let window_menu = SubmenuBuilder::new(app, "窗口")
         .text("minimize", "隐藏窗口")
+        .separator()
         .text("close", "关闭窗口")
         // .separator() // 分割线
         .text("scale", "缩放窗口")
         .text("fill", "填充窗口")
         .text("center", "居中窗口")
+        .separator()
         .text("fullscreen", "全屏窗口")
+        .build()?;
+
+    // 创建编辑菜单
+    let edit_menu = SubmenuBuilder::new(app, "编辑")
+        .text("undo", "撤回")
+        .separator()
+        .text("cut", "剪切")
+        .text("copy", "复制")
+        .text("paste", "粘贴")
+        .separator()
+        .text("selectAll", "全选")
         .build()?;
 
     // 创建主菜单
     let menu = MenuBuilder::new(app)
-        .items(&[&file_menu, &window_menu])
+        .items(&[&file_menu, &window_menu, &edit_menu])
         .build()?;
 
     // 设置菜单
@@ -39,8 +53,6 @@ pub fn setup_menu<R: tauri::Runtime>(app: &mut tauri::App<R>) -> tauri::Result<(
 
     // 绑定菜单事件
     app.on_menu_event(move |app_handle: &tauri::AppHandle<R>, event| {
-        println!("menu event: {:?}", event.id());
-
         let win = app_handle.get_webview_window("main").unwrap();
 
         match event.id().0.as_str() {
@@ -49,11 +61,9 @@ pub fn setup_menu<R: tauri::Runtime>(app: &mut tauri::App<R>) -> tauri::Result<(
                 let _ = win.minimize();
             }
             "close" => {
-                println!("close event");
                 let _ = win.hide();
             }
             "scale" => {
-                println!("scale event");
                 // 立即将窗口居中，模拟原生双击缩放效果
                 if win.is_maximized().unwrap_or(false) {
                     let _ = win.unmaximize();
@@ -80,27 +90,36 @@ pub fn setup_menu<R: tauri::Runtime>(app: &mut tauri::App<R>) -> tauri::Result<(
                 }
             }
             "fullscreen" => {
-                println!("fullscreen event");
                 let _ = win.set_fullscreen(true);
             }
             "quit" => {
-                println!("quit event");
                 let _ = app_handle.exit(0);
             }
             "logout" => {
-                println!("logout event");
                 // 向前端发送退出登录的消息
                 // 前端监听方式：window.addEventListener('logout', () => { ... })
                 let _ = win.emit("logout", ());
             }
             "about" => {
-                println!("about event");
                 let app_version = app_handle.package_info().version.to_string();
                 let _ = win.emit("about", serde_json::json!({"version": app_version}));
             }
-            _ => {
-                println!("unexpected menu event");
+            "undo" => {
+                let _ = win.eval("document.execCommand('undo')");
             }
+            "cut" => {
+                let _ = win.eval("document.execCommand('cut')");
+            }
+            "copy" => {
+                let _ = win.eval("document.execCommand('copy')");
+            }
+            "paste" => {
+                let _ = win.eval("document.execCommand('paste')");
+            }
+            "selectAll" => {
+                let _ = win.eval("document.execCommand('selectAll')");
+            }
+            _ => {}
         }
     });
 
