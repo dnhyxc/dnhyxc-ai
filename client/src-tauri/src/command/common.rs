@@ -1,5 +1,10 @@
+use crate::system::shortcut::{
+    SHORTCUT_HANDLING_ENABLED, load_shortcuts_from_store, parse_shortcut,
+};
 use rfd::FileDialog;
+use std::sync::atomic::Ordering;
 use tauri_plugin_autostart::ManagerExt;
+use tauri_plugin_global_shortcut::GlobalShortcutExt;
 
 #[tauri::command]
 pub fn greet_name(name: &str) -> String {
@@ -56,4 +61,80 @@ pub async fn is_auto_start_enabled(app_handle: tauri::AppHandle) -> Result<bool,
         .is_enabled()
         .map_err(|e| format!("检查开机自启状态失败: {}", e))?;
     Ok(is_enabled)
+}
+
+/// 清空所有已注册的快捷键
+#[tauri::command]
+pub fn clear_all_shortcuts(app: tauri::AppHandle) -> Result<(), String> {
+    if let Err(e) = app.global_shortcut().unregister_all() {
+        return Err(format!("Failed to clear all shortcuts: {:?}", e));
+    }
+    Ok(())
+}
+
+/// 注册单个快捷键
+#[tauri::command]
+pub fn register_shortcut(
+    app: tauri::AppHandle,
+    shortcut_str: String,
+    current_key: Option<i32>,
+) -> Result<(), String> {
+    SHORTCUT_HANDLING_ENABLED.store(false, Ordering::SeqCst);
+
+    let shortcut = parse_shortcut(&shortcut_str)
+        .ok_or_else(|| format!("Invalid shortcut format: {}", shortcut_str))?;
+
+    let shortcuts = load_shortcuts_from_store(&app);
+
+    for (i, existing_shortcut) in shortcuts.iter().enumerate() {
+        let key = i + 1;
+        if Some(key as i32) != current_key && existing_shortcut == &shortcut {
+            SHORTCUT_HANDLING_ENABLED.store(true, Ordering::SeqCst);
+            return Err(format!("快捷键 '{}' 已被使用", shortcut_str));
+        }
+    }
+
+    if let Err(e) = app.global_shortcut().register(shortcut.clone()) {
+        SHORTCUT_HANDLING_ENABLED.store(true, Ordering::SeqCst);
+        eprintln!("Failed to register shortcut {:?}: {:?}", shortcut, e);
+        // let error_msg = e.to_string();
+
+        // if error_msg.contains("RegisterEventHotKey failed") {
+        //     return Err(format!(
+        //         "快捷键 '{}' 是系统保留的快捷键，无法注册",
+        //         shortcut_str
+        //     ));
+        // }
+
+        // return Err(format!(
+        //     "Failed to register shortcut '{}': {}",
+        //     shortcut_str, error_msg
+        // ));
+    }
+
+    SHORTCUT_HANDLING_ENABLED.store(true, Ordering::SeqCst);
+    Ok(())
+}
+
+/// 重新加载所有快捷键配置（从 store 读取）
+#[tauri::command]
+pub fn reload_all_shortcuts(app: tauri::AppHandle) -> Result<(), String> {
+    SHORTCUT_HANDLING_ENABLED.store(false, Ordering::SeqCst);
+
+    let _ = app.global_shortcut().unregister_all();
+
+    let shortcuts = load_shortcuts_from_store(&app);
+
+    for shortcut in &shortcuts {
+        if let Err(e) = app.global_shortcut().register(shortcut.clone()) {
+            SHORTCUT_HANDLING_ENABLED.store(true, Ordering::SeqCst);
+            return Err(format!(
+                "Failed to register shortcut {:?}: {:?}",
+                shortcut, e
+            ));
+        }
+    }
+
+    SHORTCUT_HANDLING_ENABLED.store(true, Ordering::SeqCst);
+    Ok(())
 }

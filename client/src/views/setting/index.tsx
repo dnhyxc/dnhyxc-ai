@@ -3,6 +3,7 @@ import { Button } from '@ui/button';
 import { Label } from '@ui/label';
 import { RadioGroup, RadioGroupItem } from '@ui/radio-group';
 import { ScrollArea } from '@ui/scroll-area';
+import { toast } from '@ui/sonner';
 import { useCallback, useEffect, useState } from 'react';
 import { capitalizeWords, getValue, setValue } from '@/utils';
 import { DEFAULT_INFO } from './config';
@@ -32,13 +33,15 @@ const Setting = () => {
 
 	useEffect(() => {
 		window.addEventListener('keydown', onKeydown, true);
+		window.addEventListener('keyup', onKeyup, true);
 		window.addEventListener('click', onClickPage);
 
 		return () => {
 			window.removeEventListener('keydown', onKeydown, true);
+			window.removeEventListener('keyup', onKeyup, true);
 			window.removeEventListener('click', onClickPage);
 		};
-	}, [checkShortcut]);
+	}, [checkShortcut, shortcutInfo]);
 
 	const onClickPage = (e: any) => {
 		if (e.target.id !== 'shortcut') {
@@ -51,26 +54,67 @@ const Setting = () => {
 		(e: KeyboardEvent) => {
 			const info = shortcutInfo.find((item) => item.key === checkShortcut);
 			if (!info?.key) return;
+			let shortcuts = info.shortcut;
+
+			const modifiers: string[] = [];
+			if (e.metaKey) modifiers.push('Meta');
+			if (e.ctrlKey) modifiers.push('Control');
+			if (e.altKey) modifiers.push('Alt');
+			if (e.shiftKey) modifiers.push('Shift');
+
+			const key = e.key;
+			if (!['Control', 'Alt', 'Shift', 'Meta'].includes(key)) {
+				modifiers.push(capitalizeWords(key));
+			}
+
+			shortcuts = modifiers.join(' + ');
+
 			setShortcutInfo((prev) =>
-				prev.map((item) => {
-					if (item.key === checkShortcut) {
-						const shortcuts =
-							item.shortcut +
-							(item.shortcut ? ' + ' : '') +
-							capitalizeWords(e.key);
-						setValue(`shortcut_${item.key}`, shortcuts);
-						invoke('register_shortcut', { shortcutStr: shortcuts });
-						invoke('reload_all_shortcuts');
-						return {
-							...item,
-							shortcut: shortcuts,
-							defaultShortcut: shortcuts,
-						};
-					} else {
-						return item;
-					}
-				}),
+				prev.map((item) =>
+					item.key === checkShortcut ? { ...item, shortcut: shortcuts } : item,
+				),
 			);
+		},
+		[shortcutInfo, checkShortcut],
+	);
+
+	const onKeyup = useCallback(
+		(_e: KeyboardEvent) => {
+			const info = shortcutInfo.find((item) => item.key === checkShortcut);
+			if (!info?.key || !info.shortcut) return;
+
+			const shortcuts = info.shortcut;
+
+			invoke('register_shortcut', {
+				shortcutStr: shortcuts,
+				currentKey: checkShortcut,
+			})
+				.then(() => {
+					setShortcutInfo((prev) =>
+						prev.map((item) => {
+							if (item.key === checkShortcut) {
+								setValue(`shortcut_${item.key}`, shortcuts);
+								// invoke('reload_all_shortcuts');
+								return {
+									...item,
+									shortcut: shortcuts,
+									defaultShortcut: shortcuts,
+								};
+							} else {
+								return item;
+							}
+						}),
+					);
+				})
+				.catch((error: string) => {
+					toast.error(error);
+					console.error(error, 'error');
+					setShortcutInfo((prev) =>
+						prev.map((item) =>
+							item.key === checkShortcut ? { ...item, shortcut: '' } : item,
+						),
+					);
+				});
 		},
 		[shortcutInfo, checkShortcut],
 	);

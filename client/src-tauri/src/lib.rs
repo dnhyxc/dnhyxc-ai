@@ -15,13 +15,13 @@ use plugin::init::CustomInit;
 use system::dock::dock_event;
 use system::event::setup_window_events;
 use system::menu::setup_menu;
-use system::shortcut::{clear_all_shortcuts, register_shortcut, reload_all_shortcuts, setup_global_shortcut};
+use system::shortcut::setup_global_shortcut;
 use system::tray::init_tray;
 use utils::common::set_screen_center;
 // use tauri::menu::{MenuBuilder, SubmenuBuilder};
 use command::common::{
-    disable_auto_start, enable_auto_start, greet_name, is_auto_start_enabled, select_directory,
-    select_file,
+    clear_all_shortcuts, disable_auto_start, enable_auto_start, greet_name, is_auto_start_enabled,
+    register_shortcut, reload_all_shortcuts, select_directory, select_file,
 };
 use command::download::{
     download_blob, download_file, download_files, get_file_info, save_file_with_picker,

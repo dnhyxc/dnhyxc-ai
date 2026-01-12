@@ -8,7 +8,7 @@ export const DEFAULT_INFO = [
 		placeholder: '按键盘输入快捷键',
 	},
 	{
-		label: '显示程序',
+		label: '刷新应用',
 		key: 2,
 		id: 'shortcut',
 		shortcut: '',

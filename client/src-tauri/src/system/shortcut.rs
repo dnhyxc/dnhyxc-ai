@@ -3,22 +3,19 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{AppHandle, Emitter, Manager, Runtime, WebviewWindow, async_runtime};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutEvent};
 
-static SHORTCUT_HANDLING_ENABLED: AtomicBool = AtomicBool::new(true);
+pub static SHORTCUT_HANDLING_ENABLED: AtomicBool = AtomicBool::new(true);
 
 /// 辅助函数：将快捷键转换为字符串表示
 fn shortcut_to_string(modifiers: Modifiers, key: Code) -> String {
     let mut parts = Vec::new();
-    println!("modifiers: {:?}, key: {:?}", modifiers, key);
 
     if modifiers.contains(Modifiers::CONTROL) {
         parts.push("Control");
     }
     if modifiers.contains(Modifiers::SUPER) {
-        println!("SUPER");
         parts.push("SUPER");
     }
     if modifiers.contains(Modifiers::META) {
-        println!("META");
         parts.push("META");
     }
     if modifiers.contains(Modifiers::ALT) {
@@ -34,19 +31,48 @@ fn shortcut_to_string(modifiers: Modifiers, key: Code) -> String {
     parts.join(" + ")
 }
 
-fn parse_shortcut(shortcut_str: &str) -> Option<Shortcut> {
+pub fn parse_shortcut(shortcut_str: &str) -> Option<Shortcut> {
     let parts: Vec<&str> = shortcut_str.split(" + ").collect();
     if parts.is_empty() {
         return None;
     }
     let key_code = match parts.last()?.to_lowercase().as_str() {
-        "n" => Code::KeyN,
-        "k" => Code::KeyK,
-        "w" => Code::KeyW,
-        "r" => Code::KeyR,
-        "l" => Code::KeyL,
+        "a" => Code::KeyA,
+        "b" => Code::KeyB,
+        "c" => Code::KeyC,
+        "d" => Code::KeyD,
+        "e" => Code::KeyE,
         "f" => Code::KeyF,
         "g" => Code::KeyG,
+        "h" => Code::KeyH,
+        "i" => Code::KeyI,
+        "j" => Code::KeyJ,
+        "k" => Code::KeyK,
+        "l" => Code::KeyL,
+        "m" => Code::KeyM,
+        "n" => Code::KeyN,
+        "o" => Code::KeyO,
+        "p" => Code::KeyP,
+        "q" => Code::KeyQ,
+        "r" => Code::KeyR,
+        "s" => Code::KeyS,
+        "t" => Code::KeyT,
+        "u" => Code::KeyU,
+        "v" => Code::KeyV,
+        "w" => Code::KeyW,
+        "x" => Code::KeyX,
+        "y" => Code::KeyY,
+        "z" => Code::KeyZ,
+        "0" => Code::Digit0,
+        "1" => Code::Digit1,
+        "2" => Code::Digit2,
+        "3" => Code::Digit3,
+        "4" => Code::Digit4,
+        "5" => Code::Digit5,
+        "6" => Code::Digit6,
+        "7" => Code::Digit7,
+        "8" => Code::Digit8,
+        "9" => Code::Digit9,
         _ => return None,
     };
     let mut modifiers = Modifiers::empty();
@@ -66,7 +92,7 @@ fn parse_shortcut(shortcut_str: &str) -> Option<Shortcut> {
 }
 
 /// 从 store 中读取并解析快捷键配置
-fn load_shortcuts_from_store(app_handle: &AppHandle) -> Vec<Shortcut> {
+pub fn load_shortcuts_from_store(app_handle: &AppHandle) -> Vec<Shortcut> {
     async_runtime::block_on(async move {
         let mut shortcuts = Vec::new();
 
@@ -74,8 +100,13 @@ fn load_shortcuts_from_store(app_handle: &AppHandle) -> Vec<Shortcut> {
             let key = format!("shortcut_{}", i);
             match get_store_value(app_handle, &key).await {
                 Ok(shortcut_str) => {
+                    if shortcut_str.is_empty() {
+                        continue;
+                    }
                     if let Some(shortcut) = parse_shortcut(&shortcut_str) {
                         shortcuts.push(shortcut);
+                    } else {
+                        eprintln!("Failed to parse shortcut: {}", shortcut_str);
                     }
                 }
                 Err(_) => continue,
@@ -86,68 +117,6 @@ fn load_shortcuts_from_store(app_handle: &AppHandle) -> Vec<Shortcut> {
     })
 }
 
-/// 注册单个快捷键
-#[tauri::command]
-pub fn register_shortcut(app: tauri::AppHandle, shortcut_str: String) -> Result<(), String> {
-    SHORTCUT_HANDLING_ENABLED.store(false, Ordering::SeqCst);
-
-    let shortcut = parse_shortcut(&shortcut_str)
-        .ok_or_else(|| format!("Invalid shortcut format: {}", shortcut_str))?;
-
-    println!("Registering shortcut: {:?}", shortcut);
-
-    if let Err(e) = app.global_shortcut().register(shortcut.clone()) {
-        SHORTCUT_HANDLING_ENABLED.store(true, Ordering::SeqCst);
-        return Err(format!(
-            "Failed to register shortcut {:?}: {:?}",
-            shortcut, e
-        ));
-    }
-
-    println!("Shortcut registered successfully: {:?}", shortcut);
-
-    SHORTCUT_HANDLING_ENABLED.store(true, Ordering::SeqCst);
-    Ok(())
-}
-
-/// 重新加载所有快捷键配置（从 store 读取）
-#[tauri::command]
-pub fn reload_all_shortcuts(app: tauri::AppHandle) -> Result<(), String> {
-    SHORTCUT_HANDLING_ENABLED.store(false, Ordering::SeqCst);
-
-    let shortcuts = load_shortcuts_from_store(&app);
-
-    println!("Reload all shortcuts--------: {:?}", shortcuts);
-
-    for shortcut in &shortcuts {
-        if let Err(e) = app.global_shortcut().register(shortcut.clone()) {
-            SHORTCUT_HANDLING_ENABLED.store(true, Ordering::SeqCst);
-            return Err(format!(
-                "Failed to register shortcut {:?}: {:?}",
-                shortcut, e
-            ));
-        }
-    }
-
-    println!("All shortcuts reloaded: {:?}", shortcuts);
-
-    SHORTCUT_HANDLING_ENABLED.store(true, Ordering::SeqCst);
-    Ok(())
-}
-
-/// 清空所有已注册的快捷键
-#[tauri::command]
-pub fn clear_all_shortcuts(app: tauri::AppHandle) -> Result<(), String> {
-    println!("Clearing all shortcuts");
-
-    if let Err(e) = app.global_shortcut().unregister_all() {
-        return Err(format!("Failed to clear all shortcuts: {:?}", e));
-    }
-
-    println!("All shortcuts cleared successfully");
-    Ok(())
-}
-
 pub fn setup_global_shortcut(
     app: &AppHandle,
     window: &WebviewWindow,
@@ -156,8 +125,6 @@ pub fn setup_global_shortcut(
 
     // 从 store 中读取快捷键配置并解析
     let shortcuts = load_shortcuts_from_store(app);
-
-    println!("Shortcuts: {:?}", shortcuts);
 
     window.on_window_event(move |event| match event {
         tauri::WindowEvent::Focused(focused) => {
@@ -189,24 +156,18 @@ pub fn handle_shortcut<R: Runtime>(
     _event: ShortcutEvent,
 ) {
     if !SHORTCUT_HANDLING_ENABLED.load(Ordering::SeqCst) {
-        println!("handle_shortcut: disabled");
         return;
     }
 
-    println!("handle_shortcut-end: {:?}", shortcut);
-
     match (shortcut.mods, shortcut.key) {
         (mods, Code::KeyW) if mods == Modifiers::SUPER => {
-            println!("cmd+w");
             app.get_webview_window("main").unwrap().close().unwrap();
             let _ = app.emit("shortcut-triggered", "cmd+w");
         }
         (mods, Code::KeyN) if mods == Modifiers::CONTROL => {
-            println!("ctrl+n");
             let _ = app.emit("shortcut-triggered", "ctrl+n");
         }
         (mods, Code::KeyK) if mods == Modifiers::SUPER => {
-            println!("cmd+k");
             let _ = app.emit("shortcut-triggered", "cmd+k");
         }
         (mods, Code::KeyR) if mods == Modifiers::SUPER => {
@@ -215,7 +176,6 @@ pub fn handle_shortcut<R: Runtime>(
             window.eval("window.location.reload()").ok();
         }
         (mods, Code::KeyL) if mods == Modifiers::SUPER | Modifiers::SHIFT => {
-            println!("cmd+shift+l");
             let _ = app.emit("shortcut-triggered", "cmd+shift+l");
         }
         // 其他快捷键...
@@ -224,11 +184,7 @@ pub fn handle_shortcut<R: Runtime>(
 
     let shortcut_str = shortcut_to_string(shortcut.mods, shortcut.key);
 
-    println!("Shortcut triggered shortcut_str: {}", shortcut_str);
-
     let modifiers_str = format!("{:?}", shortcut.mods);
-
-    println!("Shortcut triggered modifiers_str: {}", modifiers_str);
 
     let shortcut_info = serde_json::json!({
         "shortcut": shortcut_str,
