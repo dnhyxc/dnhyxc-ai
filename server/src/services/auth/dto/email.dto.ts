@@ -8,4 +8,12 @@ export class EmailOptionsDTO {
 	@IsOptional()
 	@IsNumber()
 	timeout: number;
+
+	@IsString()
+	@IsOptional()
+	subject: string;
+
+	@IsString()
+	@IsOptional()
+	title: string;
 }

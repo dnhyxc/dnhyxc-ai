@@ -12,7 +12,6 @@ import {
 
 interface IProps {
 	open: boolean;
-	onSubmit: () => void;
 	onOpenChange: () => void;
 	title: string;
 	children: React.ReactNode;
@@ -21,6 +20,7 @@ interface IProps {
 	footer?: React.ReactNode;
 	description?: string;
 	trigger?: React.ReactNode;
+	onSubmit?: () => void;
 }
 
 const Model: React.FC<IProps> = ({
@@ -36,7 +36,7 @@ const Model: React.FC<IProps> = ({
 	onSubmit,
 }) => {
 	const onOk = () => {
-		onSubmit();
+		onSubmit?.();
 	};
 
 	return (
@@ -56,7 +56,7 @@ const Model: React.FC<IProps> = ({
 				{children}
 				{footer ? (
 					<DialogFooter>{footer}</DialogFooter>
-				) : (
+				) : footer === null ? null : (
 					<DialogFooter>
 						<Button
 							type="submit"

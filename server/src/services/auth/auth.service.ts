@@ -136,13 +136,13 @@ export class AuthService {
 			await this.mailerService.sendMail({
 				to,
 				from: `"dnhyxc-ai" <${this.configService.get(EmailEnum.EMAIL_FROM)}>`,
-				subject: '注册验证码',
+				subject: options?.subject || '注册验证码',
 				html: `
 					<div>
-						<h1>欢迎注册 dnhyxc-ai</h1>
+						<h1>${options?.title || '欢迎注册 dnhyxc-ai'}</h1>
 						<h3>接收验证码</h3>
 						<p>验证码：<span style="font-size: 20px;">${code}</span></p>
-						<p style="font-size: 14px;">此验证码只在 1 分钟内有效，请请尽快使用，同时请勿泄露给其他人。</p>
+						<p style="font-size: 14px;">此验证码只在 ${timeout / (60 * 1000)} 分钟内有效，请尽快使用，同时请勿泄露给其他人。</p>
 					</div>
 				`,
 				// template: 'mail',

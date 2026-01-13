@@ -1,3 +1,4 @@
+import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@ui/button';
 import { Input } from '@ui/input';
 import { Label } from '@ui/label';
@@ -6,7 +7,17 @@ import { ScrollArea } from '@ui/scroll-area';
 import { Toast } from '@ui/sonner';
 import { SquarePen } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { z } from 'zod';
 import Model from '@/components/design/Model';
+import {
+	Form,
+	FormControl,
+	FormField,
+	FormItem,
+	FormLabel,
+	FormMessage,
+} from '@/components/ui/form';
 import { sendEmail, updateEmail, updateUser } from '@/service';
 import { getStorage, setStorage } from '@/utils';
 
@@ -19,11 +30,6 @@ const GenderEnum: Record<string, string> = {
 const Account = () => {
 	const [open, setOpen] = useState(false);
 	const [editKey, setEditKey] = useState('');
-	const [verifyCodes, setVerifyCodes] = useState({
-		newVerifyCode: '',
-		oldVerifyCode: '',
-	});
-	const [newEmail, setNewEmail] = useState('');
 	const [accountInfo, setAccountInfo] = useState({
 		id: 0,
 		username: '',
@@ -202,53 +208,24 @@ const Account = () => {
 		setEditKey('');
 	};
 
-	const onSubmitEdit = async () => {
-		const res = await updateEmail({
-			id: userInfo.id,
-			email: newEmail,
-			oldVerifyCode: verifyCodes.oldVerifyCode,
-			newVerifyCode: verifyCodes.newVerifyCode,
-			oldVerifyCodeKey: verifyCodeInfo.oldVerifyCodeKey,
-			newVerifyCodeKey: verifyCodeInfo.newVerifyCodeKey,
-		});
-		if (res.code === 200) {
-			setStorage(
-				'userInfo',
-				JSON.stringify({
-					...userInfo,
-					email: newEmail,
-				}),
-			);
-			setAccountInfo({
-				...accountInfo,
-				email: newEmail,
-			});
-			onOpenChange();
-		}
-		Toast({
-			title: res.success ? '修改成功' : '修改失败',
-			type: res.success ? 'success' : 'error',
-		});
-	};
-
 	const onOpenChange = () => {
 		setOpen(false);
-		setVerifyCodes({
-			oldVerifyCode: '',
-			newVerifyCode: '',
-		});
+		form.reset();
 		setVerifyCodeInfo({
 			oldVerifyCodeKey: '',
 			newVerifyCodeKey: '',
 		});
-		setNewEmail('');
 	};
 
-	const onSendEmail = async (key: string) => {
-		const email = key === 'old' ? userInfo.email : newEmail;
+	const onSendEmail = async (
+		e: React.MouseEvent<HTMLButtonElement>,
+		key: string,
+	) => {
+		e.preventDefault();
+		const email = key === 'old' ? userInfo.email : form.watch('email');
 		const res = await sendEmail(email, {
 			key: key === 'old' ? 'OLD_EMAIL' : 'NEW_EMAIL',
-			timeout: 360 * 1000,
+			timeout: 300 * 1000,
 		});
 		if (res.code === 200) {
 			if (key === 'old') {
@@ -262,16 +239,70 @@ const Account = () => {
 					newVerifyCodeKey: res.data.key,
 				});
 			}
-			Toast({
-				type: 'success',
-				title: '发送成功',
-			});
-		} else {
-			Toast({
-				type: 'error',
-				title: '发送失败',
+		}
+		Toast({
+			title: res.success ? '获取验证码成功' : '获取验证码失败',
+			type: res.success ? 'success' : 'error',
+		});
+	};
+
+	const formSchema = z.object({
+		email: z
+			.string()
+			.trim()
+			.regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, { message: '请输入合法的邮箱地址' }),
+		oldVerifyCode: z
+			.string()
+			.trim()
+			.min(6, { message: '验证码至少输入6个字符' }),
+		newVerifyCode: z
+			.string()
+			.trim()
+			.min(6, { message: '验证码至少输入6个字符' }),
+	});
+
+	const form = useForm<z.infer<typeof formSchema>>({
+		resolver: zodResolver(formSchema),
+		defaultValues: {
+			email: '',
+			oldVerifyCode: '',
+			newVerifyCode: '',
+		},
+	});
+
+	const onSubmitEmail = async (values: z.infer<typeof formSchema>) => {
+		if (!verifyCodeInfo.oldVerifyCodeKey || !verifyCodeInfo.newVerifyCodeKey) {
+			return Toast({
+				type: 'info',
+				title: '验证码 Key 不能为空',
 			});
 		}
+		const res = await updateEmail({
+			id: userInfo.id,
+			email: values.email,
+			oldVerifyCode: values.oldVerifyCode,
+			newVerifyCode: values.newVerifyCode,
+			oldVerifyCodeKey: verifyCodeInfo.oldVerifyCodeKey,
+			newVerifyCodeKey: verifyCodeInfo.newVerifyCodeKey,
+		});
+		if (res.code === 200) {
+			setStorage(
+				'userInfo',
+				JSON.stringify({
+					...userInfo,
+					email: values.email,
+				}),
+			);
+			setAccountInfo({
+				...accountInfo,
+				email: values.email,
+			});
+			onOpenChange();
+		}
+		Toast({
+			title: res.success ? '修改成功' : '修改失败',
+			type: res.success ? 'success' : 'error',
+		});
 	};
 
 	return (
@@ -338,71 +369,89 @@ const Account = () => {
 				open={open}
 				title="修改邮箱"
 				width="350px"
+				footer={null}
 				onOpenChange={onOpenChange}
-				onSubmit={onSubmitEdit}
 			>
-				<div>
-					<div className="flex flex-col mt-1.5">
-						<span className="mb-1">原邮箱</span>
-						<Input
-							placeholder="请输入新邮箱"
-							className="mb-3"
-							disabled
-							value={userInfo.email}
+				{/* TODO: 回车问题 */}
+				<Form {...form}>
+					<form
+						onSubmit={form.handleSubmit(onSubmitEmail)}
+						className="space-y-6"
+					>
+						<div className="flex flex-col">
+							<div className="my-2 font-medium">原邮箱</div>
+							<Input value={userInfo?.email} disabled />
+						</div>
+						<FormField
+							control={form.control}
+							name="oldVerifyCode"
+							render={({ field }) => (
+								<FormItem>
+									<FormLabel className="text-md">原邮箱验证码</FormLabel>
+									<FormControl>
+										<div className="flex items-center">
+											<Input placeholder="请输入原邮箱验证码" {...field} />
+											<Button
+												className="ml-2 cursor-pointer"
+												onClick={(e) => onSendEmail(e, 'old')}
+											>
+												获取验证码
+											</Button>
+										</div>
+									</FormControl>
+									<FormMessage />
+								</FormItem>
+							)}
 						/>
-					</div>
-					<div className="flex flex-col mt-1.5">
-						<span className="mb-1">原邮箱验证码</span>
-						<div className="flex items-center">
-							<Input
-								placeholder="请输入验证码"
-								value={verifyCodes.oldVerifyCode}
-								onChange={(e) =>
-									setVerifyCodes({
-										...verifyCodes,
-										oldVerifyCode: e.target.value,
-									})
-								}
-							/>
+						<FormField
+							control={form.control}
+							name="email"
+							render={({ field }) => (
+								<FormItem>
+									<FormLabel className="text-md">新邮箱</FormLabel>
+									<FormControl>
+										<Input type="email" placeholder="请输入新邮箱" {...field} />
+									</FormControl>
+									<FormMessage />
+								</FormItem>
+							)}
+						/>
+						<FormField
+							control={form.control}
+							name="newVerifyCode"
+							render={({ field }) => (
+								<FormItem>
+									<FormLabel className="text-md">新邮箱验证码</FormLabel>
+									<FormControl>
+										<div className="flex items-center">
+											<Input placeholder="请输入新邮箱验证码" {...field} />
+											<Button
+												className="ml-2 cursor-pointer"
+												onClick={(e) => onSendEmail(e, 'new')}
+											>
+												获取验证码
+											</Button>
+										</div>
+									</FormControl>
+									<FormMessage />
+								</FormItem>
+							)}
+						/>
+						<div className="flex items-center justify-end mt-8">
+							<Button type="submit" className="cursor-pointer mr-2 w-20">
+								确定
+							</Button>
 							<Button
-								className="cursor-pointer ml-2"
-								onClick={() => onSendEmail('old')}
+								variant="outline"
+								type="reset"
+								className="cursor-pointer w-20"
+								onClick={onOpenChange}
 							>
-								获取验证码
+								取消
 							</Button>
 						</div>
-					</div>
-					<div className="flex flex-col mt-5">
-						<span className="mb-1">新邮箱</span>
-						<Input
-							placeholder="请输入新邮箱"
-							className="mb-3"
-							value={newEmail}
-							onChange={(e) => setNewEmail(e.target.value)}
-						/>
-					</div>
-					<div className="flex flex-col mt-2">
-						<span className="mb-1">新邮箱验证码</span>
-						<div className="flex items-center mb-4">
-							<Input
-								placeholder="请输入验证码"
-								value={verifyCodes.newVerifyCode}
-								onChange={(e) =>
-									setVerifyCodes({
-										...verifyCodes,
-										newVerifyCode: e.target.value,
-									})
-								}
-							/>
-							<Button
-								className="cursor-pointer ml-2"
-								onClick={() => onSendEmail('new')}
-							>
-								获取验证码
-							</Button>
-						</div>
-					</div>
-				</div>
+					</form>
+				</Form>
 			</Model>
 		</div>
 	);
