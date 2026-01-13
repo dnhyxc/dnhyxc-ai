@@ -207,6 +207,7 @@ const RegisterForm: React.FC<IProps> = ({ onRegister }) => {
 								<div className="flex items-center">
 									<Input placeholder="请输入邮箱收到的验证码" {...field} />
 									<Button
+										type="button"
 										className="ml-2 w-26 cursor-pointer"
 										disabled={
 											(timeLeft > 0 && timeLeft < 60) || !form.watch('email')

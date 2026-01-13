@@ -372,7 +372,6 @@ const Account = () => {
 				footer={null}
 				onOpenChange={onOpenChange}
 			>
-				{/* TODO: 回车问题 */}
 				<Form {...form}>
 					<form
 						onSubmit={form.handleSubmit(onSubmitEmail)}
@@ -392,6 +391,7 @@ const Account = () => {
 										<div className="flex items-center">
 											<Input placeholder="请输入原邮箱验证码" {...field} />
 											<Button
+												type="button"
 												className="ml-2 cursor-pointer"
 												onClick={(e) => onSendEmail(e, 'old')}
 											>
@@ -426,6 +426,7 @@ const Account = () => {
 										<div className="flex items-center">
 											<Input placeholder="请输入新邮箱验证码" {...field} />
 											<Button
+												type="button"
 												className="ml-2 cursor-pointer"
 												onClick={(e) => onSendEmail(e, 'new')}
 											>
