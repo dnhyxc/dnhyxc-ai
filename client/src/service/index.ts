@@ -34,7 +34,7 @@ export const login = async ({
 
 export const sendEmail = async (
 	email: string,
-	options?: { key: string; timeout?: number },
+	options?: { key: string; timeout?: number; subject?: string; title?: string },
 ): Promise<any> => {
 	return await http.post(SEND_EMAIL, {
 		email,
