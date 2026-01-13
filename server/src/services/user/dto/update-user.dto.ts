@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import {
+	IsEmail,
 	IsNotEmpty,
 	IsNumber,
 	IsOptional,
@@ -64,4 +65,44 @@ export class UpdateUserDTO {
 	})
 	@IsOptional()
 	profile: Profile;
+}
+
+export class UpdateEmailDTO {
+	@IsNumber()
+	@IsNotEmpty({
+		message: '用户id不能为空',
+	})
+	id: number;
+
+	@IsEmail(
+		{},
+		{
+			message: '邮箱格式不正确',
+		},
+	)
+	email: string;
+
+	@IsString()
+	@IsNotEmpty({
+		message: '原邮箱验证码不能为空',
+	})
+	oldVerifyCode: number;
+
+	@IsString()
+	@IsNotEmpty({
+		message: '新邮箱验证码不能为空',
+	})
+	newVerifyCode: number;
+
+	@IsString()
+	@IsNotEmpty({
+		message: '原邮箱验证码 Key 不能为空',
+	})
+	oldVerifyCodeKey: string;
+
+	@IsString()
+	@IsNotEmpty({
+		message: '新邮箱验证码 Key 不能为空',
+	})
+	newVerifyCodeKey: string;
 }

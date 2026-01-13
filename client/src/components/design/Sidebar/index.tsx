@@ -1,13 +1,21 @@
 import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuLabel,
+	DropdownMenuTrigger,
+} from '@ui/dropdown-menu';
+import {
 	BookOpenText,
 	CircleUserRound,
 	House,
+	LogOut,
 	WalletCards,
 } from 'lucide-react';
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router';
 import ICON from '@/assets/icon.png';
-import { getStorage } from '@/utils';
+import { getStorage, removeStorage } from '@/utils';
 import { MENUS } from './enum';
 
 const Sidebar = () => {
@@ -38,6 +46,14 @@ const Sidebar = () => {
 		[],
 	);
 
+	console.log('userInfo', userInfo);
+
+	const onLogout = () => {
+		removeStorage('token');
+		removeStorage('userInfo');
+		navigate('/login');
+	};
+
 	return (
 		<div
 			data-tauri-drag-region
@@ -48,12 +64,12 @@ const Sidebar = () => {
 					<div
 						data-tauri-drag-region
 						className="flex justify-center items-center w-11 h-11 bg-border cursor-pointer mb-8 rounded-md hover:text-green-600 transition-all duration-200 ease-in-out"
-						onClick={() => onJump('/profile')}
+						onClick={() => onJump('/')}
 					>
 						<img
 							src={userInfo?.profile?.avatar || ICON}
 							alt=""
-							className={`${userInfo?.profile?.avatar ? 'rounded-md w-10.5 h-10.5' : 'w-8 h-8 cursor-pointer'}`}
+							className={`${userInfo?.profile?.avatar ? 'rounded-md w-10.5 h-10.5' : 'w-9.5 h-9.5 cursor-pointer'}`}
 						/>
 						{/* <img
 							src={userInfo?.profile?.avatar || ICON}
@@ -72,12 +88,53 @@ const Sidebar = () => {
 					))}
 				</div>
 				<div>
-					<div
-						className="flex justify-center items-center w-11 h-11 bg-border cursor-pointer rounded-md hover:text-green-600 transition-all duration-200 ease-in-out"
-						onClick={() => onJump('/login')}
-					>
-						<CircleUserRound className="hover:text-green-600" />
-					</div>
+					{userInfo?.access_token ? (
+						<DropdownMenu>
+							<DropdownMenuTrigger asChild>
+								<div className="flex justify-center items-center w-11 h-11 bg-border cursor-pointer rounded-md hover:text-green-600 transition-all duration-200 ease-in-out">
+									<CircleUserRound className="hover:text-green-600" />
+								</div>
+							</DropdownMenuTrigger>
+							<DropdownMenuContent align="start" className="w-26">
+								<DropdownMenuLabel className="flex flex-col justify-center items-center">
+									<div
+										data-tauri-drag-region
+										className="flex justify-center items-center w-12 h-12 bg-border cursor-pointer rounded-md hover:text-green-600 transition-all duration-200 ease-in-out"
+									>
+										<img
+											src={userInfo?.profile?.avatar || ICON}
+											alt=""
+											className={`${userInfo?.profile?.avatar ? 'rounded-md w-11 h-11' : 'w-10 h-10 cursor-pointer'}`}
+										/>
+									</div>
+									<div className="mt-2 font-bold text-lg">
+										<div>{userInfo?.username}</div>
+									</div>
+								</DropdownMenuLabel>
+								<DropdownMenuItem
+									className="flex justify-center items-center cursor-pointer"
+									onClick={() => onJump('/profile')}
+								>
+									<CircleUserRound className="hover:text-green-600" />
+									我的主页
+								</DropdownMenuItem>
+								<DropdownMenuItem
+									className="flex justify-center items-center cursor-pointer"
+									onClick={onLogout}
+								>
+									<LogOut className="hover:text-green-600" />
+									退出登录
+								</DropdownMenuItem>
+							</DropdownMenuContent>
+						</DropdownMenu>
+					) : (
+						<div
+							className="flex justify-center items-center w-11 h-11 bg-border cursor-pointer rounded-md hover:text-green-600 transition-all duration-200 ease-in-out"
+							onClick={() => onJump('/login')}
+						>
+							<CircleUserRound className="hover:text-green-600" />
+						</div>
+					)}
 				</div>
 			</div>
 		</div>

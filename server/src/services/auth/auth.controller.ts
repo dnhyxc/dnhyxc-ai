@@ -8,6 +8,7 @@ import {
 import { ResponseInterceptor } from '../../interceptors/response.interceptor';
 import { AuthService } from './auth.service';
 import { CaptchaDto } from './dto/captcha.dto';
+import { EmailOptionsDTO } from './dto/email.dto';
 import { LoginUserDTO } from './dto/login-user.dto';
 import { RegisterUserDTO } from './dto/register-user.dto';
 
@@ -35,7 +36,10 @@ export class AuthController {
 	}
 
 	@Post('/sendEmail')
-	async sendEmail(@Body('email') email: string) {
-		return await this.authService.sendEmail(email);
+	async sendEmail(
+		@Body('email') email: string,
+		@Body('options') options?: EmailOptionsDTO,
+	) {
+		return await this.authService.sendEmail(email, options);
 	}
 }

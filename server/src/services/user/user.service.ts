@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 // import * as argon2 from 'argon2';
 import { In, Like, Repository } from 'typeorm';
@@ -151,6 +151,15 @@ export class UserService {
 		return this.userRepository.save(newUser);
 		// 这种直接更新的操作只适合单模型的更新，不适合有联合关系的模型更新
 		// return this.userRepository.update(id, user);
+	}
+
+	async updateEmail(id: number, email: string) {
+		const user = await this.userRepository.findOneBy({ id });
+		if (!user) {
+			throw new NotFoundException('用户不存在');
+		}
+		user.email = email;
+		return this.userRepository.save(user);
 	}
 
 	async remove(id: number): Promise<User | null> {

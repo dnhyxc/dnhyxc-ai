@@ -9,6 +9,8 @@ import {
 	LOGIN,
 	REGISTER,
 	SEND_EMAIL,
+	UPDATE_EMAIL,
+	UPDATE_USER,
 } from './api';
 
 export const login = async ({
@@ -30,9 +32,13 @@ export const login = async ({
 	});
 };
 
-export const sendEmail = async (email: string): Promise<any> => {
+export const sendEmail = async (
+	email: string,
+	options?: { key: string; timeout?: number },
+): Promise<any> => {
 	return await http.post(SEND_EMAIL, {
 		email,
+		options,
 	});
 };
 
@@ -60,6 +66,27 @@ export const register = async ({
 
 export const createVerifyCode = async () => {
 	return await http.post(CREATE_VERIFY_CODE);
+};
+
+export const updateUser = async (id: number, params: object): Promise<any> => {
+	// get 请求传递 param 格式参数
+	// return await axios.get(`${GET_USER_PROFILE}/${id}`);
+	// get 请求传递 query 格式参数
+	return await http.post(UPDATE_USER, {
+		id,
+		...params,
+	});
+};
+
+export const updateEmail = async (params: {
+	id: number;
+	email: string;
+	oldVerifyCode: string;
+	newVerifyCode: string;
+	oldVerifyCodeKey: string;
+	newVerifyCodeKey: string;
+}): Promise<any> => {
+	return await http.post(UPDATE_EMAIL, params);
 };
 
 export const getUserProfile = async (id: number): Promise<any> => {

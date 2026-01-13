@@ -1,6 +1,7 @@
 import Layout from '@/layout';
 import NotFound from '@/views/404';
 import About from '@/views/about';
+import Account from '@/views/account';
 import Detail from '@/views/detail';
 import Home from '@/views/home';
 import Login from '@/views/login';
@@ -31,6 +32,13 @@ const routes = [
 				Component: Profile,
 				meta: {
 					title: '个人主页',
+				},
+			},
+			{
+				path: '/account',
+				Component: Account,
+				meta: {
+					title: '账号设置',
 				},
 			},
 			{

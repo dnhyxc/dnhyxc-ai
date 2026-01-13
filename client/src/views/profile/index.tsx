@@ -6,6 +6,7 @@ import { ScrollArea } from '@ui/scroll-area';
 import { Toast } from '@ui/sonner';
 import * as qiniu from 'qiniu-js';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router';
 import {
 	downloadFile as download,
 	downloadZip,
@@ -46,6 +47,8 @@ const Profile = () => {
 	const [uploadInfos, setUploadInfos] = useState<UploadInfo[]>([]);
 
 	const fileInputRef = useRef<HTMLInputElement>(null);
+
+	const navigate = useNavigate();
 
 	// 在组件中添加进度监听
 	useEffect(() => {
@@ -187,6 +190,12 @@ const Profile = () => {
 			<ScrollArea className="w-full overflow-y-auto p-2.5">
 				<h1 className="text-3xl font-bold mb-10 text-green-600">
 					Welcome to dnhyxc-ai
+					<Button
+						className="ml-5 cursor-pointer"
+						onClick={() => navigate('/account')}
+					>
+						修改个人信息
+					</Button>
 				</h1>
 				<div className="w-full h-full mb-10">
 					<Upload uploadFile={uploadFile} />

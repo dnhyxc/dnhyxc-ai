@@ -10,6 +10,7 @@ import { EmailEnum } from '../../enum/config.enum';
 import { comparePassword, randomLightColor } from '../../utils';
 import { UserService } from '../user/user.service';
 import { CaptchaDto } from './dto/captcha.dto';
+import { EmailOptionsDTO } from './dto/email.dto';
 import { LoginUserDTO } from './dto/login-user.dto';
 import { RegisterUserDTO } from './dto/register-user.dto';
 
@@ -127,7 +128,9 @@ export class AuthService {
 		}
 	}
 
-	async sendEmail(to: string) {
+	async sendEmail(to: string, options?: EmailOptionsDTO) {
+		const key = options?.key || 'EMAIL';
+		const timeout = options?.timeout || 60 * 1000;
 		try {
 			const code = Math.floor(100000 + Math.random() * 900000).toString();
 			await this.mailerService.sendMail({
@@ -147,8 +150,8 @@ export class AuthService {
 				// 	code,
 				// },
 			});
-			const REDIS_KEY = `EMAIL_${randomUUID()}_${to}`;
-			await this.cache.set(REDIS_KEY, code, 60 * 1000);
+			const REDIS_KEY = `${key}_${randomUUID()}_${to}`;
+			await this.cache.set(REDIS_KEY, code, timeout);
 			return {
 				key: REDIS_KEY,
 			};
@@ -168,7 +171,7 @@ export class AuthService {
 				HttpStatus.BAD_REQUEST, // 400
 			);
 		}
-		if (codeInCache && Number(codeInCache) === verifyCode) {
+		if (codeInCache && Number(codeInCache) === Number(verifyCode)) {
 			return true;
 		} else {
 			throw new HttpException('验证码错误', HttpStatus.BAD_REQUEST);

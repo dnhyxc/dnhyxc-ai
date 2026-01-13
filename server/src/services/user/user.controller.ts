@@ -5,6 +5,8 @@ import {
 	Controller,
 	Delete,
 	Get,
+	HttpException,
+	HttpStatus,
 	NotAcceptableException,
 	NotFoundException,
 	Param,
@@ -20,9 +22,10 @@ import {
 // import { AdminGuard } from '../guards/admin.guard';
 import { JwtGuard } from '../../guards/jwt.guard';
 import { ResponseInterceptor } from '../../interceptors/response.interceptor';
+import { AuthService } from '../auth/auth.service';
 import { CreateUserDTO } from './dto/create-user.dto';
 import { GetUserDto } from './dto/get-user.dto';
-import { UpdateUserDTO } from './dto/update-user.dto';
+import { UpdateEmailDTO, UpdateUserDTO } from './dto/update-user.dto';
 import { CreateUserPipe } from './pipes/create-user.pipe';
 import { User } from './user.entity';
 import { UserService } from './user.service';
@@ -47,7 +50,10 @@ import {
 // ClassSerializerInterceptor 设置返回字段过滤，ResponseInterceptor 设置响应拦截器，统一响应的格式
 @UseInterceptors(ClassSerializerInterceptor, ResponseInterceptor)
 export class UserController {
-	constructor(private readonly userService: UserService) {}
+	constructor(
+		private readonly userService: UserService,
+		private readonly authService: AuthService,
+	) {}
 
 	@Post('/addUser')
 	@SwaggerAddUser() // 使用提取的装饰器
@@ -90,6 +96,36 @@ export class UserController {
 				return res;
 			} else {
 				throw new NotAcceptableException('User update failed');
+			}
+		} else {
+			throw new UnauthorizedException('暂无权限');
+		}
+	}
+
+	@Post('/updateEmail')
+	@SwaggerUpdateUser()
+	async updateEmail(@Body() dto: UpdateEmailDTO, @Req() req) {
+		const verify = await this.authService.verifyEmail(
+			dto.oldVerifyCodeKey,
+			dto.oldVerifyCode,
+		);
+		if (!verify) {
+			throw new HttpException('原邮箱验证码错误', HttpStatus.BAD_REQUEST);
+		}
+		const newVerify = await this.authService.verifyEmail(
+			dto.newVerifyCodeKey,
+			dto.newVerifyCode,
+		);
+		if (!newVerify) {
+			throw new HttpException('新邮箱验证码错误', HttpStatus.BAD_REQUEST);
+		}
+		// 使用 jwt Passport 向 req 上添加的 user 信息，对比较用户 id，如果不是本人将无法修改信息
+		if (req.user?.userId === dto.id) {
+			const res = await this.userService.updateEmail(dto.id, dto.email);
+			if (res) {
+				return res;
+			} else {
+				throw new NotAcceptableException('邮箱更新失败');
 			}
 		} else {
 			throw new UnauthorizedException('暂无权限');
