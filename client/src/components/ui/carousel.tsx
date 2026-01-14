@@ -54,7 +54,7 @@ function Carousel({
 			...opts,
 			axis: orientation === 'horizontal' ? 'x' : 'y',
 		},
-		[...(plugins || []), Autoplay()],
+		[...(plugins || []), Autoplay({ stopOnInteraction: false })],
 	);
 	const [canScrollPrev, setCanScrollPrev] = React.useState(false);
 	const [canScrollNext, setCanScrollNext] = React.useState(false);
