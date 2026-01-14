@@ -46,8 +46,6 @@ const Sidebar = () => {
 		[],
 	);
 
-	console.log('userInfo', userInfo);
-
 	const onLogout = () => {
 		removeStorage('token');
 		removeStorage('userInfo');
@@ -71,11 +69,6 @@ const Sidebar = () => {
 							alt=""
 							className={`${userInfo?.profile?.avatar ? 'rounded-md w-10.5 h-10.5' : 'w-9.5 h-9.5 cursor-pointer'}`}
 						/>
-						{/* <img
-							src={userInfo?.profile?.avatar || ICON}
-							alt="avatar"
-							className="rounded-md"
-						/> */}
 					</div>
 					{processedMenus.map((item) => (
 						<div

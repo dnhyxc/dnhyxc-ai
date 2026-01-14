@@ -1,4 +1,3 @@
-import Upload from '@design/Upload';
 import { invoke } from '@tauri-apps/api/core';
 import { Button } from '@ui/button';
 import { Input } from '@ui/input';
@@ -7,6 +6,7 @@ import { Toast } from '@ui/sonner';
 import * as qiniu from 'qiniu-js';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
+import DragUpload from '@/components/design/DragUpload';
 import {
 	downloadFile as download,
 	downloadZip,
@@ -198,7 +198,7 @@ const Profile = () => {
 					</Button>
 				</h1>
 				<div className="w-full h-full mb-10">
-					<Upload uploadFile={uploadFile} />
+					<DragUpload uploadFile={uploadFile} />
 					<Input
 						ref={fileInputRef}
 						type="file"

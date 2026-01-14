@@ -205,7 +205,16 @@ const RegisterForm: React.FC<IProps> = ({ onRegister }) => {
 							<FormLabel className="text-md">验证码</FormLabel>
 							<FormControl>
 								<div className="flex items-center">
-									<Input placeholder="请输入邮箱收到的验证码" {...field} />
+									<Input
+										maxLength={6}
+										inputMode="numeric"
+										placeholder="请输入邮箱收到的验证码"
+										{...field}
+										onChange={(e) => {
+											const value = e.target.value.replace(/\D/g, '');
+											field.onChange(value);
+										}}
+									/>
 									<Button
 										type="button"
 										className="ml-2 w-26 cursor-pointer"

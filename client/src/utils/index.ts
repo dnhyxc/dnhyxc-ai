@@ -17,6 +17,7 @@ export * from './tauri';
 
 export const setStorage = (key: string, value: string) => {
 	localStorage.setItem(key, value);
+	window.dispatchEvent(new Event(`${key}Changed`));
 };
 
 export const getStorage = (key: string) => {
@@ -25,6 +26,7 @@ export const getStorage = (key: string) => {
 
 export const removeStorage = (key: string) => {
 	localStorage.removeItem(key);
+	window.dispatchEvent(new Event(`${key}Changed`));
 };
 
 export const setBodyClass = (theme: string) => {

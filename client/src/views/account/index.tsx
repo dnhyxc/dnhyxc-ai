@@ -5,9 +5,11 @@ import { RadioGroup, RadioGroupItem } from '@ui/radio-group';
 import { ScrollArea } from '@ui/scroll-area';
 import { Toast } from '@ui/sonner';
 import { SquarePen } from 'lucide-react';
+import * as qiniu from 'qiniu-js';
 import { useEffect, useMemo, useState } from 'react';
 import Model from '@/components/design/Model';
-import { updateUser } from '@/service';
+import Upload, { type FileWithPreview } from '@/components/design/Upload';
+import { getUploadToken, updateUser } from '@/service';
 import { getStorage, setStorage } from '@/utils';
 import ResetEmailForm from './reset-email-form';
 
@@ -35,11 +37,16 @@ const Account = () => {
 	);
 
 	useEffect(() => {
+		console.log(userInfo, 'userInfouserInfouserInfo', { ...userInfo.profile });
 		setAccountInfo({
 			id: userInfo.id,
 			username: userInfo.username,
 			email: userInfo.email,
-			...(userInfo.profile || { gender: '3', avatar: '', address: '' }),
+			...(userInfo.profile || {
+				gender: '3',
+				avatar: '',
+				address: '',
+			}),
 		});
 	}, [userInfo]);
 
@@ -153,21 +160,32 @@ const Account = () => {
 
 	const onSubmit = async (key: string) => {
 		const value = accountInfo[key as keyof typeof accountInfo];
+
+		const profile = {
+			avatar: accountInfo.avatar,
+			address: accountInfo.address,
+			gender: +accountInfo.gender,
+		};
+
 		const actions = {
 			username: { username: value },
 			email: { email: value },
 			gender: {
 				profile: {
-					avatar: accountInfo.avatar,
-					address: accountInfo.address,
+					...profile,
 					gender: +value,
 				},
 			},
 			address: {
 				profile: {
-					avatar: accountInfo.avatar,
-					gender: +accountInfo.gender,
+					...profile,
 					address: value,
+				},
+			},
+			avatar: {
+				profile: {
+					...profile,
+					avatar: value,
 				},
 			},
 		};
@@ -175,6 +193,7 @@ const Account = () => {
 			accountInfo.id,
 			actions[key as keyof typeof actions],
 		);
+		console.log(res, 'resssssssssss');
 		if (res.success) {
 			Toast({
 				type: 'success',
@@ -205,17 +224,85 @@ const Account = () => {
 		setOpen(false);
 	};
 
+	const observer = useMemo(() => {
+		return {
+			complete(res: { key: string; hash: string }) {
+				const url = import.meta.env.VITE_QINIU_DOMAIN + res.key;
+				setAccountInfo({
+					...accountInfo,
+					avatar: url,
+				});
+			},
+		};
+	}, [accountInfo]);
+
+	const uploadFile = async (file: File) => {
+		const res = await getUploadToken();
+		const putExtra = {};
+		const config = {};
+		const observable = qiniu.upload(
+			file,
+			file.name,
+			res.data, // token
+			putExtra,
+			config,
+		);
+		observable.subscribe(observer); // 上传开始
+	};
+
+	const onUpload = async (files: FileWithPreview[]) => {
+		await uploadFile(files[0].file);
+	};
+
+	const onClearFileUrl = () => {
+		setAccountInfo({
+			...accountInfo,
+			avatar: '',
+		});
+	};
+
+	const onChangeAvatar = () => {
+		onSubmit('avatar');
+	};
+
+	const onCancelAvatar = () => {
+		setAccountInfo({
+			...accountInfo,
+			avatar: userInfo?.profile?.avatar || '',
+		});
+	};
+
 	return (
 		<div className="w-full h-full flex flex-col justify-center items-center m-0">
 			<ScrollArea className="w-full h-full overflow-y-auto p-2.5 rounded-none">
 				<div className="bg-gray-300 dark:bg-gray-900 rounded-md">
 					<div className="h-45 flex items-center justify-between gap-3 relative">
 						<div className="absolute left-10 -bottom-10 p-2 rounded-md bg-gray-800 box-border">
-							<img
-								src="https://picsum.photos/130/130"
-								alt="avatar"
-								className="w-32.5 h-32.5"
-							/>
+							<Upload
+								key={accountInfo.avatar}
+								onUpload={onUpload}
+								fileUrl={accountInfo.avatar}
+								onClearFileUrl={onClearFileUrl}
+							>
+								{accountInfo.avatar !== userInfo?.profile?.avatar ? (
+									<div className="absolute bottom-1 right-3">
+										<Button
+											variant="link"
+											className="p-0 mr-2 cursor-pointer hover:text-green-500"
+											onClick={onChangeAvatar}
+										>
+											更换
+										</Button>
+										<Button
+											variant="link"
+											className="p-0 cursor-pointer hover:text-green-500"
+											onClick={onCancelAvatar}
+										>
+											取消
+										</Button>
+									</div>
+								) : null}
+							</Upload>
 						</div>
 						<div className="flex-1 flex flex-col h-full pl-50 pt-5">
 							<div className="flex flex-col items-start mt-20 pl-10">

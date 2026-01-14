@@ -1,65 +1,37 @@
 import { Toast } from '@ui/sonner';
-import { CloudUpload } from 'lucide-react';
-import { useCallback, useRef, useState } from 'react';
+import { Download, Eye, Trash2, Upload as UploadIcon } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { cn } from '@/lib/utils';
 
-interface FileWithPreview {
+interface IProps {
+	onUpload: (files: FileWithPreview[]) => void;
+	className?: string;
+	getFileList?: (files: FileWithPreview[]) => void;
+	fileUrl?: string;
+	onClearFileUrl?: () => void;
+	children?: React.ReactNode;
+}
+
+export interface FileWithPreview {
 	file: File;
 	preview: string;
 	id: string;
 }
 
-interface IProps {
-	uploadFile?: (file: File) => Promise<void>;
-	getFileList?: (files: FileWithPreview[]) => void;
-}
-
-const Upload: React.FC<IProps> = ({ uploadFile, getFileList }) => {
+const Upload: React.FC<IProps> = ({
+	className,
+	getFileList,
+	onUpload,
+	fileUrl,
+	onClearFileUrl,
+	children,
+}) => {
 	const [files, setFiles] = useState<FileWithPreview[]>([]);
-	const [isDragging, setIsDragging] = useState(false);
 
 	const fileInputRef = useRef<HTMLInputElement>(null);
 
 	const triggerFileInput = () => {
 		fileInputRef.current?.click();
-	};
-
-	const onDragEnter = (e: any) => {
-		e.preventDefault();
-	};
-
-	const onDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-		e.preventDefault();
-		setIsDragging(true);
-	}, []);
-
-	const onDragLeave = useCallback((e: React.DragEvent<HTMLDivElement>) => {
-		e.preventDefault();
-		setIsDragging(false);
-	}, []);
-
-	const onDrop = useCallback(
-		(e: React.DragEvent<HTMLDivElement>) => {
-			e.preventDefault();
-			setIsDragging(false);
-
-			if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-				onFileSelect(e.dataTransfer.files);
-			}
-		},
-		[files],
-	);
-
-	const onFileInputChange = (e: any) => {
-		if (e.target.files.length > 0) {
-			onFileSelect(e.target.files);
-			// 重置input值，允许选择相同文件
-			e.target.value = null;
-		}
-	};
-
-	const onClickSelect = (e: React.MouseEvent<HTMLSpanElement>) => {
-		e.stopPropagation();
-		triggerFileInput();
 	};
 
 	const onFileSelect = (selectedFiles: File[] | FileList) => {
@@ -106,37 +78,26 @@ const Upload: React.FC<IProps> = ({ uploadFile, getFileList }) => {
 		}));
 
 		const fileList = [...filesWithPreview, ...files];
-
 		setFiles((prev) => [...filesWithPreview, ...prev]);
-		getFileList?.(fileList);
 		onUpload(fileList);
+		getFileList?.(fileList);
 	};
 
-	const onUpload = async (fileList: FileWithPreview[]) => {
-		if (fileList.length) {
-			fileList.forEach(async (data) => {
-				await uploadFile?.(data.file);
-				setFiles([]);
-				getFileList?.([]);
-			});
+	const onFileInputChange = (e: any) => {
+		if (e.target.files.length > 0) {
+			onFileSelect(e.target.files);
+			// 重置input值，允许选择相同文件
+			e.target.value = null;
 		}
 	};
 
+	const onDelete = (file: FileWithPreview) => {
+		setFiles((prev) => prev.filter((item) => item.id !== file.id));
+		onClearFileUrl?.();
+	};
+
 	return (
-		<div
-			className={`select-none border border-dashed rounded-xl p-8 text-center transition-all duration-300 cursor-pointer
-        ${
-					isDragging
-						? 'border-blue-500 bg-blue-50'
-						: 'border-gray-300 hover:border-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
-				}
-      `}
-			onDragEnter={onDragEnter}
-			onDragOver={onDragOver}
-			onDragLeave={onDragLeave}
-			onDrop={onDrop}
-			onClick={triggerFileInput}
-		>
+		<div className={cn('w-32.5 h-32.5', className)}>
 			<input
 				type="file"
 				ref={fileInputRef}
@@ -145,21 +106,31 @@ const Upload: React.FC<IProps> = ({ uploadFile, getFileList }) => {
 				multiple
 				className="hidden"
 			/>
-
-			<div className="flex flex-col items-center justify-center space-y-4">
-				<CloudUpload className="h-16 w-16 text-blue-500" />
-				<div>
-					<p className="text-md font-medium text-gray-900 dark:text-white">
-						拖拽图片到此处或
-						<span className="text-blue-500" onClick={onClickSelect}>
-							点击选择
-						</span>
-					</p>
-					<p className="text-gray-500 mt-1 text-sm">
-						支持 JPEG, PNG, GIF, SVG, WebP 格式，最大5MB
-					</p>
+			{files?.length || fileUrl ? (
+				<div className="relative flex items-center justify-center w-full h-full z-1 group">
+					<div className="absolute inset-0 z-1 rounded-md w-full h-full bg-black/50 items-center justify-center hidden group-hover:flex">
+						<Download className="w-5 h-5 cursor-pointer hover:text-green-500" />
+						<Eye className="w-5 h-5 cursor-pointer ml-2 hover:text-green-500" />
+						<Trash2
+							className="w-5 h-5 cursor-pointer ml-2 hover:text-green-500"
+							onClick={() => onDelete(files[0])}
+						/>
+						{children}
+					</div>
+					<img
+						src={fileUrl || files[0].preview}
+						alt=""
+						className="w-full h-full object-cover rounded-md"
+					/>
 				</div>
-			</div>
+			) : (
+				<div
+					className="w-full h-full flex items-center justify-center cursor-pointer select-none border border-dashed rounded-md p-8 text-center transition-all duration-300 border-gray-300 hover:border-gray-400 dark:hover:border-blue-400 hover:bg-gray-700 dark:hover:bg-gray-700"
+					onClick={triggerFileInput}
+				>
+					<UploadIcon className="w-8 h-8 mx-auto text-gray-400 dark:text-gray-500" />
+				</div>
+			)}
 		</div>
 	);
 };

@@ -44,11 +44,11 @@ const ResetEmailForm: React.FC<IProps> = ({
 		oldVerifyCode: z
 			.string()
 			.trim()
-			.min(6, { message: '验证码至少输入6个字符' }),
+			.regex(/^\d{6}$/, { message: '验证码必须为6位数字' }),
 		newVerifyCode: z
 			.string()
 			.trim()
-			.min(6, { message: '验证码至少输入6个字符' }),
+			.regex(/^\d{6}$/, { message: '验证码必须为6位数字' }),
 	});
 
 	const form = useForm<z.infer<typeof formSchema>>({
@@ -155,8 +155,13 @@ const ResetEmailForm: React.FC<IProps> = ({
 								<div className="flex items-center">
 									<Input
 										maxLength={6}
+										inputMode="numeric"
 										placeholder="请输入原邮箱验证码"
 										{...field}
+										onChange={(e) => {
+											const value = e.target.value.replace(/\D/g, '');
+											field.onChange(value);
+										}}
 									/>
 									<Button
 										type="button"
@@ -199,8 +204,13 @@ const ResetEmailForm: React.FC<IProps> = ({
 									<div className="flex items-center">
 										<Input
 											maxLength={6}
+											inputMode="numeric"
 											placeholder="请输入新邮箱验证码"
 											{...field}
+											onChange={(e) => {
+												const value = e.target.value.replace(/\D/g, '');
+												field.onChange(value);
+											}}
 										/>
 										<Button
 											type="button"
