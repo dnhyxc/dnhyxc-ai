@@ -9,8 +9,9 @@ import * as qiniu from 'qiniu-js';
 import { useEffect, useMemo, useState } from 'react';
 import Model from '@/components/design/Model';
 import Upload, { type FileWithPreview } from '@/components/design/Upload';
+import { useUserInfo } from '@/hooks';
 import { getUploadToken, updateUser } from '@/service';
-import { getStorage, setStorage } from '@/utils';
+import { setStorage } from '@/utils';
 import ResetEmailForm from './reset-email-form';
 
 const GenderEnum: Record<string, string> = {
@@ -31,13 +32,9 @@ const Account = () => {
 		avatar: '',
 	});
 
-	const userInfo = useMemo(
-		() => JSON.parse(getStorage('userInfo') || '{}'),
-		[],
-	);
+	const { userInfo, setUserInfo } = useUserInfo();
 
 	useEffect(() => {
-		console.log(userInfo, 'userInfouserInfouserInfo', { ...userInfo.profile });
 		setAccountInfo({
 			id: userInfo.id,
 			username: userInfo.username,
@@ -193,13 +190,14 @@ const Account = () => {
 			accountInfo.id,
 			actions[key as keyof typeof actions],
 		);
-		console.log(res, 'resssssssssss');
 		if (res.success) {
 			Toast({
 				type: 'success',
 				title: '修改成功',
 			});
-			setStorage('userInfo', JSON.stringify({ ...userInfo, ...res.data }));
+			const newUserInfo = { ...userInfo, ...res.data };
+			setUserInfo(newUserInfo);
+			setStorage('userInfo', JSON.stringify(newUserInfo));
 			setEditKey('');
 		} else {
 			Toast({

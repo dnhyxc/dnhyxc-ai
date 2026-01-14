@@ -1,4 +1,28 @@
 import { useEffect, useState } from 'react';
+import { getStorage } from '@/utils';
+
+export const useUserInfo = () => {
+	const [userInfo, setUserInfo] = useState(() =>
+		JSON.parse(getStorage('userInfo') || '{}'),
+	);
+
+	useEffect(() => {
+		const handleStorageChange = () => {
+			setUserInfo(JSON.parse(getStorage('userInfo') || '{}'));
+		};
+
+		window.addEventListener('storage', handleStorageChange);
+		window.addEventListener('userInfoChanged', handleStorageChange);
+
+		return () => {
+			window.removeEventListener('storage', handleStorageChange);
+			window.removeEventListener('userInfoChanged', handleStorageChange);
+		};
+	}, []);
+
+	return { userInfo, setUserInfo };
+};
+
 import {
 	getValue,
 	onEmit,

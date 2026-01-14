@@ -12,14 +12,15 @@ import {
 	LogOut,
 	WalletCards,
 } from 'lucide-react';
-import { useMemo } from 'react';
 import { useNavigate } from 'react-router';
 import ICON from '@/assets/icon.png';
-import { getStorage, removeStorage } from '@/utils';
+import { useUserInfo } from '@/hooks';
+import { removeStorage } from '@/utils';
 import { MENUS } from './enum';
 
 const Sidebar = () => {
 	const navigate = useNavigate();
+	const { userInfo } = useUserInfo();
 
 	const onJump = (path: string) => {
 		navigate(path);
@@ -31,20 +32,11 @@ const Sidebar = () => {
 		WalletCards: <WalletCards />,
 	};
 
-	const processedMenus = useMemo(
-		() =>
-			MENUS.map((menu) => ({
-				...menu,
-				icon: iconMap[menu.icon as keyof typeof iconMap],
-				onClick: () => onJump(menu.path),
-			})),
-		[],
-	);
-
-	const userInfo = useMemo(
-		() => JSON.parse(getStorage('userInfo') || '{}'),
-		[],
-	);
+	const processedMenus = MENUS.map((menu) => ({
+		...menu,
+		icon: iconMap[menu.icon as keyof typeof iconMap],
+		onClick: () => onJump(menu.path),
+	}));
 
 	const onLogout = () => {
 		removeStorage('token');
@@ -88,7 +80,7 @@ const Sidebar = () => {
 									<CircleUserRound className="hover:text-green-600" />
 								</div>
 							</DropdownMenuTrigger>
-							<DropdownMenuContent align="start" className="w-26">
+							<DropdownMenuContent align="start" className="min-w-26">
 								<DropdownMenuLabel className="flex flex-col justify-center items-center">
 									<div
 										data-tauri-drag-region
