@@ -228,3 +228,9 @@ export const capitalizeWords = (str: string) => {
 		.map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
 		.join(' ');
 };
+
+// 格式化显示时间
+export const formatTime = (seconds: number) => {
+	const secs = Math.max(0, Math.ceil(seconds));
+	return `${secs.toString()}s`;
+};

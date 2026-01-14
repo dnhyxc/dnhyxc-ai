@@ -140,7 +140,7 @@ const ResetEmailForm: React.FC<IProps> = ({
 
 	return (
 		<Form {...form}>
-			<form onSubmit={form.handleSubmit(onSubmitEmail)} className="space-y-6">
+			<form onSubmit={form.handleSubmit(onSubmitEmail)} className="space-y-5">
 				<div className="flex flex-col">
 					<div className="my-2 font-medium">原邮箱</div>
 					<Input value={userInfo?.email} disabled />

@@ -13,7 +13,13 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { register, sendEmail } from '@/service';
-import { encrypt, getStorage, removeStorage, setStorage } from '@/utils';
+import {
+	encrypt,
+	formatTime,
+	getStorage,
+	removeStorage,
+	setStorage,
+} from '@/utils';
 
 interface IProps {
 	onRegister: (status?: boolean) => void;
@@ -99,12 +105,6 @@ const RegisterForm: React.FC<IProps> = ({ onRegister }) => {
 		}
 	};
 
-	// 格式化显示时间
-	const formatTime = (seconds: number) => {
-		const secs = Math.max(0, Math.ceil(seconds));
-		return `${secs.toString()}s`;
-	};
-
 	const formSchema = z.object({
 		username: z.string().min(2, {
 			message: '用户名至少输入两个字符',
@@ -157,7 +157,7 @@ const RegisterForm: React.FC<IProps> = ({ onRegister }) => {
 
 	return (
 		<Form {...form}>
-			<form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+			<form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
 				<FormField
 					control={form.control}
 					name="username"

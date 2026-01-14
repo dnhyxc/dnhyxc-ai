@@ -59,7 +59,7 @@ const Sidebar = () => {
 						<img
 							src={userInfo?.profile?.avatar || ICON}
 							alt=""
-							className={`${userInfo?.profile?.avatar ? 'rounded-md w-10.5 h-10.5' : 'w-9.5 h-9.5 cursor-pointer'}`}
+							className={`${userInfo?.profile?.avatar ? 'rounded-md w-10.5 h-10.5 object-cover' : 'w-9.5 h-9.5 cursor-pointer'}`}
 						/>
 					</div>
 					{processedMenus.map((item) => (
@@ -89,7 +89,7 @@ const Sidebar = () => {
 										<img
 											src={userInfo?.profile?.avatar || ICON}
 											alt=""
-											className={`${userInfo?.profile?.avatar ? 'rounded-md w-11 h-11' : 'w-10 h-10 cursor-pointer'}`}
+											className={`${userInfo?.profile?.avatar ? 'rounded-md w-11 h-11 object-cover' : 'w-10 h-10 cursor-pointer'}`}
 										/>
 									</div>
 									<div className="mt-2 font-bold text-lg">
