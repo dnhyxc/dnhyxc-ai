@@ -11,17 +11,20 @@ import {
 import { Input } from '@ui/input';
 import { Toast } from '@ui/sonner';
 import { Spinner } from '@ui/spinner';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
+import { useCountdown } from '@/hooks';
 import { sendEmail, updateEmail } from '@/service';
-import { setStorage } from '@/utils';
+import { formatTime, removeStorage, setStorage } from '@/utils';
 
 interface IProps {
 	userInfo: any;
 	onOpenChange: () => void;
 	handleAccountInfo: (email: string) => void;
 }
+
+const DEFAULT_TIME = 60;
 
 const ResetEmailForm: React.FC<IProps> = ({
 	userInfo,
@@ -35,6 +38,23 @@ const ResetEmailForm: React.FC<IProps> = ({
 	const [sendOldLoading, setSendOldLoading] = useState(false);
 	const [sendNewLoading, setSendNewLoading] = useState(false);
 	const [loading, setLoading] = useState(false);
+	const { timeLeft: oldTimeLeft, startTimer: startOldTimer } = useCountdown(
+		DEFAULT_TIME,
+		'old_countdown',
+	);
+	const { timeLeft: newTimeLeft, startTimer: startNewTimer } = useCountdown(
+		DEFAULT_TIME,
+		'new_countdown',
+	);
+
+	useEffect(() => {
+		return () => {
+			removeStorage('old_countdown_time');
+			removeStorage('old_countdown_state');
+			removeStorage('new_countdown_time');
+			removeStorage('new_countdown_state');
+		};
+	}, [open]);
 
 	const formSchema = z.object({
 		email: z
@@ -67,8 +87,10 @@ const ResetEmailForm: React.FC<IProps> = ({
 		e.preventDefault();
 		try {
 			if (key === 'old') {
+				startOldTimer();
 				setSendOldLoading(true);
 			} else {
+				startNewTimer();
 				setSendNewLoading(true);
 			}
 			const email = key === 'old' ? userInfo.email : form.watch('email');
@@ -81,7 +103,7 @@ const ResetEmailForm: React.FC<IProps> = ({
 			} else {
 				setSendNewLoading(false);
 			}
-			if (res.code === 200) {
+			if (res.success) {
 				if (key === 'old') {
 					setVerifyCodeInfo({
 						...verifyCodeInfo,
@@ -128,7 +150,7 @@ const ResetEmailForm: React.FC<IProps> = ({
 				newVerifyCodeKey: verifyCodeInfo.newVerifyCodeKey,
 			});
 			setLoading(false);
-			if (res.code === 200) {
+			if (res.success) {
 				setStorage(
 					'userInfo',
 					JSON.stringify({
@@ -180,12 +202,20 @@ const ResetEmailForm: React.FC<IProps> = ({
 									/>
 									<Button
 										type="button"
-										className="ml-2 cursor-pointer"
-										disabled={sendOldLoading}
+										className="ml-2 w-26 cursor-pointer"
+										disabled={
+											sendOldLoading ||
+											(oldTimeLeft > 0 && oldTimeLeft < DEFAULT_TIME)
+										}
 										onClick={(e) => onSendEmail(e, 'old')}
 									>
-										{sendOldLoading ? <Spinner /> : null}
-										获取验证码
+										{sendOldLoading ? (
+											<Spinner />
+										) : oldTimeLeft > 0 && oldTimeLeft < DEFAULT_TIME ? (
+											`${formatTime(oldTimeLeft)}`
+										) : (
+											'获取验证码'
+										)}
 									</Button>
 								</div>
 							</FormControl>
@@ -229,12 +259,21 @@ const ResetEmailForm: React.FC<IProps> = ({
 										/>
 										<Button
 											type="button"
-											className="ml-2 cursor-pointer flex items-center"
-											disabled={sendNewLoading || !form.watch('email')}
+											className="ml-2 w-26 cursor-pointer flex items-center"
+											disabled={
+												sendNewLoading ||
+												!form.watch('email') ||
+												(newTimeLeft > 0 && newTimeLeft < DEFAULT_TIME)
+											}
 											onClick={(e) => onSendEmail(e, 'new')}
 										>
-											{sendNewLoading ? <Spinner /> : null}
-											获取验证码
+											{sendNewLoading ? (
+												<Spinner />
+											) : newTimeLeft > 0 && newTimeLeft < DEFAULT_TIME ? (
+												`${formatTime(newTimeLeft)}`
+											) : (
+												'获取验证码'
+											)}
 										</Button>
 									</div>
 								</FormControl>
