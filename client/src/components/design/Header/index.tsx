@@ -16,8 +16,21 @@ const Header: React.FC<Iprops> = ({ actions = true, ccustomActions }) => {
 	const location = useLocation();
 
 	const title = useMemo(() => {
-		return routes[0].children?.find((item) => item.path === location.pathname)
-			?.meta?.title;
+		const findRouteTitle = (
+			routes: any[],
+			pathname: string,
+		): string | undefined => {
+			for (const route of routes) {
+				if (route.path === pathname) {
+					return route.meta?.title;
+				}
+				if (route.children) {
+					const childTitle = findRouteTitle(route.children, pathname);
+					if (childTitle) return childTitle;
+				}
+			}
+		};
+		return findRouteTitle(routes, location.pathname);
 	}, [location.pathname]);
 
 	const toSetting = () => {

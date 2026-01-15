@@ -23,10 +23,10 @@ export const checkForUpdates = async () => {
 					break;
 				case 'Progress':
 					downloaded += event.data.chunkLength;
-					Toast({
-						title: `downloaded ${downloaded} from ${contentLength}`,
-						type: 'loading',
-					});
+					// Toast({
+					// 	title: `downloaded ${downloaded} from ${contentLength}`,
+					// 	type: 'loading',
+					// });
 					console.log(`downloaded ${downloaded} from ${contentLength}`);
 					break;
 				case 'Finished':
@@ -44,6 +44,7 @@ export const checkForUpdates = async () => {
 			title: '正在安装',
 			type: 'success',
 		});
+		await new Promise((resolve) => setTimeout(resolve, 1000));
 		// 此处 relaunch 前最好询问用户
 		await relaunch();
 	}

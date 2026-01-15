@@ -7,6 +7,8 @@ import Home from '@/views/home';
 import Login from '@/views/login';
 import Profile from '@/views/profile';
 import Setting from '@/views/setting';
+import AboutApp from '@/views/setting/about';
+import AppSystem from '@/views/setting/system';
 import ChildWindow from '@/views/win';
 
 const routes = [
@@ -47,6 +49,23 @@ const routes = [
 				meta: {
 					title: '系统设置',
 				},
+				children: [
+					{
+						index: true,
+						// path: '/setting/system',
+						Component: AppSystem,
+						meta: {
+							title: '系统设置',
+						},
+					},
+					{
+						path: '/setting/about',
+						Component: AboutApp,
+						meta: {
+							title: '关于应用',
+						},
+					},
+				],
 			},
 		],
 	},
