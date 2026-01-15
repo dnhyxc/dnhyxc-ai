@@ -209,7 +209,6 @@ export class AuthService {
 
 	async resetPassword(user: UpdatePasswordDTO) {
 		const _user = await this.userService.findByUsername(user.username);
-		console.log(_user, 'isisisisisisis', user);
 		if (!_user) {
 			throw new HttpException('用户不存在', HttpStatus.BAD_REQUEST);
 		}
@@ -223,7 +222,6 @@ export class AuthService {
 		if (isPasswordValid) {
 			throw new HttpException('新密码与原始密码相同', HttpStatus.BAD_REQUEST);
 		}
-		console.log(isPasswordValid, 'isPasswordValid');
 		const verify = await this.verifyEmail(user.verifyCodeKey, user.verifyCode);
 		if (!verify) {
 			throw new HttpException('验证码错误', HttpStatus.BAD_REQUEST);
