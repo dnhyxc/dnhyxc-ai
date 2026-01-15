@@ -14,8 +14,9 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
+import { useCountdown } from '@/hooks';
 import { resetPassword, sendResetPasswordEmail } from '@/service';
-import { encrypt } from '@/utils';
+import { encrypt, formatTime, removeStorage } from '@/utils';
 
 interface IProps {
 	onForgetPwd: (status?: boolean) => void;
@@ -26,6 +27,8 @@ const ForgetPwdForm: React.FC<IProps> = ({ onForgetPwd, switchLogin }) => {
 	const [verifyCodeKey, setVerifyCodeKey] = useState('');
 	const [sendLoading, setSendLoading] = useState(false);
 	const [resetLoading, setResetLoading] = useState(false);
+
+	const { timeLeft, startTimer } = useCountdown(60, 'forget_countdown');
 
 	const formSchema = z
 		.object({
@@ -89,6 +92,7 @@ const ForgetPwdForm: React.FC<IProps> = ({ onForgetPwd, switchLogin }) => {
 			return;
 		}
 		try {
+			startTimer();
 			setSendLoading(true);
 			const res = await sendResetPasswordEmail({
 				username: form.watch('username'),
@@ -123,6 +127,8 @@ const ForgetPwdForm: React.FC<IProps> = ({ onForgetPwd, switchLogin }) => {
 			if (res.success) {
 				onForgetPwd(false);
 				goToLogin();
+				removeStorage('forget_countdown_time');
+				removeStorage('forget_countdown_state');
 			}
 		} catch (_error) {
 			setResetLoading(false);
@@ -213,11 +219,20 @@ const ForgetPwdForm: React.FC<IProps> = ({ onForgetPwd, switchLogin }) => {
 									<Button
 										type="button"
 										className="ml-2 w-26 cursor-pointer"
-										disabled={sendLoading || !form.watch('email')}
+										disabled={
+											sendLoading ||
+											!form.watch('email') ||
+											(timeLeft > 0 && timeLeft < 60)
+										}
 										onClick={onGetVerifyCode}
 									>
-										{sendLoading ? <Spinner /> : null}
-										获取验证码
+										{sendLoading ? (
+											<Spinner />
+										) : timeLeft > 0 && timeLeft < 60 ? (
+											`${formatTime(timeLeft)}`
+										) : (
+											'获取验证码'
+										)}
 									</Button>
 								</div>
 							</FormControl>
