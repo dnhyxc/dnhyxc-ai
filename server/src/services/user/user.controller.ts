@@ -95,7 +95,7 @@ export class UserController {
 			if (res) {
 				return res;
 			} else {
-				throw new NotAcceptableException('User update failed');
+				throw new NotAcceptableException('用户信息更新失败');
 			}
 		} else {
 			throw new UnauthorizedException('暂无权限');
@@ -105,22 +105,22 @@ export class UserController {
 	@Post('/updateEmail')
 	@SwaggerUpdateUser()
 	async updateEmail(@Body() dto: UpdateEmailDTO, @Req() req) {
-		const verify = await this.authService.verifyEmail(
-			dto.oldVerifyCodeKey,
-			dto.oldVerifyCode,
-		);
-		if (!verify) {
-			throw new HttpException('原邮箱验证码错误', HttpStatus.BAD_REQUEST);
-		}
-		const newVerify = await this.authService.verifyEmail(
-			dto.newVerifyCodeKey,
-			dto.newVerifyCode,
-		);
-		if (!newVerify) {
-			throw new HttpException('新邮箱验证码错误', HttpStatus.BAD_REQUEST);
-		}
 		// 使用 jwt Passport 向 req 上添加的 user 信息，对比较用户 id，如果不是本人将无法修改信息
 		if (req.user?.userId === dto.id) {
+			const verify = await this.authService.verifyEmail(
+				dto.oldVerifyCodeKey,
+				dto.oldVerifyCode,
+			);
+			if (!verify) {
+				throw new HttpException('原邮箱验证码错误', HttpStatus.BAD_REQUEST);
+			}
+			const newVerify = await this.authService.verifyEmail(
+				dto.newVerifyCodeKey,
+				dto.newVerifyCode,
+			);
+			if (!newVerify) {
+				throw new HttpException('新邮箱验证码错误', HttpStatus.BAD_REQUEST);
+			}
 			const res = await this.userService.updateEmail(dto.id, dto.email);
 			if (res) {
 				return res;

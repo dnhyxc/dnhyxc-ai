@@ -65,77 +65,92 @@ const ResetEmailForm: React.FC<IProps> = ({
 		key: string,
 	) => {
 		e.preventDefault();
-		if (key === 'old') {
-			setSendOldLoading(true);
-		} else {
-			setSendNewLoading(true);
-		}
-		const email = key === 'old' ? userInfo.email : form.watch('email');
-		const res = await sendEmail(email, {
-			key: key === 'old' ? 'OLD_EMAIL' : 'NEW_EMAIL',
-			timeout: 300 * 1000,
-		});
-		if (key === 'old') {
-			setSendOldLoading(false);
-		} else {
-			setSendNewLoading(false);
-		}
-		if (res.code === 200) {
+		try {
 			if (key === 'old') {
-				setVerifyCodeInfo({
-					...verifyCodeInfo,
-					oldVerifyCodeKey: res.data.key,
-				});
+				setSendOldLoading(true);
 			} else {
-				setVerifyCodeInfo({
-					...verifyCodeInfo,
-					newVerifyCodeKey: res.data.key,
-				});
+				setSendNewLoading(true);
+			}
+			const email = key === 'old' ? userInfo.email : form.watch('email');
+			const res = await sendEmail(email, {
+				key: key === 'old' ? 'OLD_EMAIL' : 'NEW_EMAIL',
+				timeout: 300 * 1000,
+			});
+			if (key === 'old') {
+				setSendOldLoading(false);
+			} else {
+				setSendNewLoading(false);
+			}
+			if (res.code === 200) {
+				if (key === 'old') {
+					setVerifyCodeInfo({
+						...verifyCodeInfo,
+						oldVerifyCodeKey: res.data.key,
+					});
+				} else {
+					setVerifyCodeInfo({
+						...verifyCodeInfo,
+						newVerifyCodeKey: res.data.key,
+					});
+				}
+			}
+			Toast({
+				title: '获取验证码成功',
+				type: 'success',
+			});
+		} catch (_error) {
+			if (key === 'old') {
+				setSendOldLoading(false);
+			} else {
+				setSendNewLoading(false);
 			}
 		}
-		Toast({
-			title: res.success ? '获取验证码成功' : '获取验证码失败',
-			type: res.success ? 'success' : 'error',
-		});
 	};
 
 	const onSubmitEmail = async (values: z.infer<typeof formSchema>) => {
-		if (!verifyCodeInfo.oldVerifyCodeKey || !verifyCodeInfo.newVerifyCodeKey) {
-			return Toast({
-				type: 'info',
-				title: '验证码 Key 不能为空',
+		try {
+			if (
+				!verifyCodeInfo.oldVerifyCodeKey ||
+				!verifyCodeInfo.newVerifyCodeKey
+			) {
+				return Toast({
+					type: 'info',
+					title: '验证码 Key 不能为空',
+				});
+			}
+			setLoading(true);
+			const res = await updateEmail({
+				id: userInfo.id,
+				email: values.email,
+				oldVerifyCode: values.oldVerifyCode,
+				newVerifyCode: values.newVerifyCode,
+				oldVerifyCodeKey: verifyCodeInfo.oldVerifyCodeKey,
+				newVerifyCodeKey: verifyCodeInfo.newVerifyCodeKey,
 			});
-		}
-		setLoading(true);
-		const res = await updateEmail({
-			id: userInfo.id,
-			email: values.email,
-			oldVerifyCode: values.oldVerifyCode,
-			newVerifyCode: values.newVerifyCode,
-			oldVerifyCodeKey: verifyCodeInfo.oldVerifyCodeKey,
-			newVerifyCodeKey: verifyCodeInfo.newVerifyCodeKey,
-		});
-		setLoading(false);
-		if (res.code === 200) {
-			setStorage(
-				'userInfo',
-				JSON.stringify({
-					...userInfo,
-					email: values.email,
-				}),
-			);
-			handleAccountInfo?.(values.email);
-			onOpenChange?.();
-			form.reset();
-			setVerifyCodeInfo({
-				oldVerifyCodeKey: '',
-				newVerifyCodeKey: '',
+			setLoading(false);
+			if (res.code === 200) {
+				setStorage(
+					'userInfo',
+					JSON.stringify({
+						...userInfo,
+						email: values.email,
+					}),
+				);
+				handleAccountInfo?.(values.email);
+				onOpenChange?.();
+				form.reset();
+				setVerifyCodeInfo({
+					oldVerifyCodeKey: '',
+					newVerifyCodeKey: '',
+				});
+			}
+			Toast({
+				title: '邮箱修改成功',
+				type: 'success',
 			});
+		} catch (_error) {
+			setLoading(false);
 		}
-		Toast({
-			title: res.success ? '修改成功' : '修改失败',
-			type: res.success ? 'success' : 'error',
-		});
 	};
 
 	return (

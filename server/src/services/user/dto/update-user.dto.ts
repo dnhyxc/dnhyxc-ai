@@ -106,3 +106,81 @@ export class UpdateEmailDTO {
 	})
 	newVerifyCodeKey: string;
 }
+
+export class UpdatePasswordDTO {
+	@IsNotEmpty({
+		message: '用户名不能为空',
+	})
+	@Length(2, 20, {
+		message: '用户名长度必须在 1 到 21 个字符之间',
+	})
+	username: string;
+
+	@IsString({
+		message: '密码必须是字符串',
+	})
+	@IsNotEmpty({
+		message: '密码不能为空',
+	})
+	@Length(6, 32, {
+		message: '用户名长度必须在 5 到 33 个字符之间',
+	})
+	password: string;
+
+	@IsEmail(
+		{},
+		{
+			message: '邮箱格式不正确',
+		},
+	)
+	email: string;
+
+	@IsString()
+	@IsNotEmpty({
+		message: '邮箱验证码不能为空',
+	})
+	verifyCode: number;
+
+	@IsString()
+	@IsNotEmpty({
+		message: '邮箱验证码 Key 不能为空',
+	})
+	verifyCodeKey: string;
+}
+
+export class SendResetPasswordEmailDTO {
+	@IsNotEmpty({
+		message: '用户名不能为空',
+	})
+	@Length(2, 20, {
+		message: '用户名长度必须在 1 到 21 个字符之间',
+	})
+	username: string;
+
+	@IsEmail(
+		{},
+		{
+			message: '邮箱格式不正确',
+		},
+	)
+	@IsNotEmpty({
+		message: '邮箱不能为空',
+	})
+	email: string;
+
+	@IsOptional()
+	@IsString()
+	key: string;
+
+	@IsOptional()
+	@IsNumber()
+	timeout: number;
+
+	@IsString()
+	@IsOptional()
+	subject: string;
+
+	@IsString()
+	@IsOptional()
+	title: string;
+}

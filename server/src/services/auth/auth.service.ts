@@ -1,6 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { Cache } from '@nestjs/cache-manager';
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import {
+	Body,
+	HttpException,
+	HttpStatus,
+	Injectable,
+	Post,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import { MailerService } from '@nestjs-modules/mailer';
@@ -8,7 +14,12 @@ import { MailerService } from '@nestjs-modules/mailer';
 import * as svgCaptcha from 'svg-captcha';
 import { EmailEnum } from '../../enum/config.enum';
 import { comparePassword, randomLightColor } from '../../utils';
+import {
+	SendResetPasswordEmailDTO,
+	UpdatePasswordDTO,
+} from '../user/dto/update-user.dto';
 import { UserService } from '../user/user.service';
+import { SwaggerUpdateUser } from '../user/user.swagger';
 import { CaptchaDto } from './dto/captcha.dto';
 import { EmailOptionsDTO } from './dto/email.dto';
 import { LoginUserDTO } from './dto/login-user.dto';
@@ -176,5 +187,47 @@ export class AuthService {
 		} else {
 			throw new HttpException('验证码错误', HttpStatus.BAD_REQUEST);
 		}
+	}
+
+	@Post('/sendResetPwdEmail')
+	@SwaggerUpdateUser()
+	async sendResetPwdEmail(@Body() dto: Partial<SendResetPasswordEmailDTO>) {
+		const _user = await this.userService.findByUsername(dto.username!);
+		if (!_user) {
+			throw new HttpException('用户不存在', HttpStatus.BAD_REQUEST);
+		}
+		if (_user.email !== dto.email) {
+			throw new HttpException('当前用户未绑定该邮箱', HttpStatus.BAD_REQUEST);
+		}
+		return this.sendEmail(dto.email, {
+			subject: '重置密码',
+			title: '重置用户密码',
+			key: dto.key || 'RESET_PASSWORD',
+			timeout: dto.timeout || 120 * 1000,
+		});
+	}
+
+	async resetPassword(user: UpdatePasswordDTO) {
+		const _user = await this.userService.findByUsername(user.username);
+		console.log(_user, 'isisisisisisis', user);
+		if (!_user) {
+			throw new HttpException('用户不存在', HttpStatus.BAD_REQUEST);
+		}
+		if (_user.email !== user.email) {
+			throw new HttpException('邮箱不匹配', HttpStatus.BAD_REQUEST);
+		}
+		const isPasswordValid = await comparePassword(
+			user.password,
+			_user.password,
+		);
+		if (isPasswordValid) {
+			throw new HttpException('新密码与原始密码相同', HttpStatus.BAD_REQUEST);
+		}
+		console.log(isPasswordValid, 'isPasswordValid');
+		const verify = await this.verifyEmail(user.verifyCodeKey, user.verifyCode);
+		if (!verify) {
+			throw new HttpException('验证码错误', HttpStatus.BAD_REQUEST);
+		}
+		return this.userService.resetPassword(user, _user);
 	}
 }

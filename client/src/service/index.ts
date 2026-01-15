@@ -8,7 +8,9 @@ import {
 	GET_USERS,
 	LOGIN,
 	REGISTER,
+	RESET_PASSWORD,
 	SEND_EMAIL,
+	SEND_RESET_PWD_EMAIL,
 	UPDATE_EMAIL,
 	UPDATE_USER,
 } from './api';
@@ -87,6 +89,23 @@ export const updateEmail = async (params: {
 	newVerifyCodeKey: string;
 }): Promise<any> => {
 	return await http.post(UPDATE_EMAIL, params);
+};
+
+export const sendResetPasswordEmail = async (params: {
+	username: string;
+	email: string;
+}): Promise<any> => {
+	return await http.post(SEND_RESET_PWD_EMAIL, params);
+};
+
+export const resetPassword = async (params: {
+	username: string;
+	password: string;
+	email: string;
+	verifyCode: string;
+	verifyCodeKey: string;
+}): Promise<any> => {
+	return await http.post(RESET_PASSWORD, params);
 };
 
 export const getUserProfile = async (id: number): Promise<any> => {

@@ -22,6 +22,12 @@ export const UPDATE_USER = '/user/updateUser';
 // 修改用户邮件
 export const UPDATE_EMAIL = '/user/updateEmail';
 
+// 发送重置密码邮件
+export const SEND_RESET_PWD_EMAIL = '/auth/sendResetPwdEmail';
+
+// 修改用户密码
+export const RESET_PASSWORD = '/auth/resetPassword';
+
 // 获取七牛云上传token
 export const GET_UPLOAD_TOKEN = '/upload/getUploadToken';
 

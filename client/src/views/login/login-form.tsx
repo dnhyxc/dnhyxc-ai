@@ -43,16 +43,18 @@ const LoginForm: React.FC<IProps> = ({ onForgetPwd }) => {
 	}, []);
 
 	const getCaptcha = async () => {
-		// 获取验证码
-		setIsLoading(true);
-		const res = await createVerifyCode();
-		setIsLoading(false);
-		if (res) {
-			setCaptchaInfo({
-				captchaId: res.data.captchaId,
-				captcha: res.data.captcha,
-			});
-		} else {
+		try {
+			// 获取验证码
+			setIsLoading(true);
+			const res = await createVerifyCode();
+			setIsLoading(false);
+			if (res) {
+				setCaptchaInfo({
+					captchaId: res.data.captchaId,
+					captcha: res.data.captcha,
+				});
+			}
+		} catch (_error) {
 			Toast({
 				title: '获取验证码失败!',
 				type: 'error',
@@ -95,7 +97,7 @@ const LoginForm: React.FC<IProps> = ({ onForgetPwd }) => {
 				password: encrypt(values.password),
 				captchaId: captchaInfo.captchaId,
 			});
-			if (res.code === 200) {
+			if (res.success) {
 				userStore.setUserInfo(res.data);
 				setStorage('userInfo', JSON.stringify(res.data));
 				setStorage('token', res.data.access_token);
