@@ -1,0 +1,11 @@
+{
+	"version": "0.0.2",
+	"notes": "增加获取最新版本信息",
+	"pub_date": "2026-01-15T16:28:28.626Z",
+	"platforms": {
+		"darwin-aarch64": {
+			"signature": "dW50cnVzdGVkIGNvbW1lbnQ6IHNpZ25hdHVyZSBmcm9tIHRhdXJpIHNlY3JldCBrZXkKUlVUZnlvb2pqTTQ3c2RVL0c0NCt6emlGdDI1c0RldDJjM2o5WVZHK0lWQ2dJRGpIK0ovVDh3VURHWkp6V09XNk10cEhza1FpMFl3bCtTeFNqVHpqbk9OOVdEbzdwSVZlS3c0PQp0cnVzdGVkIGNvbW1lbnQ6IHRpbWVzdGFtcDoxNzY4NDY1NjY3CWZpbGU6ZG5oeXhjLWFpLmFwcC50YXIuZ3oKTGw1RlIySzhJd2kwMFAyei9ZaTIvZmNUMEZYbXc0WlphSXNiTzBWa3hSVEVoQXh6SjNTMEQzRUMxVnZjUkNVOEhjR2t2TStoSFV0Nk1CWTFZQWpkQlE9PQo=",
+			"url": "https://github.com/dnhyxc/dnhyxc-ai/archive/refs/tags/v0.0.1.tar.gz"
+		}
+	}
+}

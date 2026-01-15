@@ -1,12 +1,21 @@
 {
-	"identifier": "desktop-capability",
-	"platforms": ["macOS", "windows", "linux"],
-	"windows": ["main", "child-window", "about"],
-	"permissions": [
-		"global-shortcut:default",
-		"global-shortcut:allow-is-registered",
-		"global-shortcut:allow-register",
-		"global-shortcut:allow-unregister",
-		"autostart:default"
-	]
+  "identifier": "desktop-capability",
+  "platforms": [
+    "macOS",
+    "windows",
+    "linux"
+  ],
+  "windows": [
+    "main",
+    "child-window",
+    "about"
+  ],
+  "permissions": [
+    "global-shortcut:default",
+    "global-shortcut:allow-is-registered",
+    "global-shortcut:allow-register",
+    "global-shortcut:allow-unregister",
+    "autostart:default",
+    "updater:default"
+  ]
 }
