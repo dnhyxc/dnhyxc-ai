@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
@@ -12,14 +12,9 @@ import {
 	FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { useCountdown } from '@/hooks';
 import { register, sendEmail } from '@/service';
-import {
-	encrypt,
-	formatTime,
-	getStorage,
-	removeStorage,
-	setStorage,
-} from '@/utils';
+import { encrypt, formatTime, removeStorage } from '@/utils';
 
 interface IProps {
 	onRegister: (status?: boolean) => void;
@@ -27,83 +22,7 @@ interface IProps {
 
 const RegisterForm: React.FC<IProps> = ({ onRegister }) => {
 	const [verifyCodeKey, setVerifyCodeKey] = useState('');
-	const [timeLeft, setTimeLeft] = useState(() => {
-		const savedTime = getStorage('countdown_time');
-		return savedTime ? parseFloat(savedTime) : 60;
-	});
-	const [isRunning, setIsRunning] = useState(() => {
-		const savedState = getStorage('countdown_state');
-		return savedState === 'running';
-	});
-
-	const animationFrameRef = useRef<number>(null);
-	const lastTimestampRef = useRef<number>(null);
-
-	// 控制动画帧的启动和停止
-	useEffect(() => {
-		if (isRunning) {
-			animationFrameRef.current = requestAnimationFrame(animate);
-		} else {
-			if (animationFrameRef.current) {
-				cancelAnimationFrame(animationFrameRef.current);
-				animationFrameRef.current = null;
-			}
-		}
-
-		return () => {
-			if (animationFrameRef.current) {
-				cancelAnimationFrame(animationFrameRef.current);
-			}
-		};
-	}, [isRunning]);
-
-	// 保存数据到 localStorage
-	const saveToLocalStorage = (time: number, state: string) => {
-		setStorage('countdown_time', time.toString());
-		setStorage('countdown_state', state);
-	};
-
-	// 动画帧回调
-	const animate = (timestamp: number) => {
-		if (!lastTimestampRef.current) {
-			lastTimestampRef.current = timestamp;
-		}
-
-		const deltaTime = timestamp - lastTimestampRef.current;
-		lastTimestampRef.current = timestamp;
-
-		setTimeLeft((prevTime) => {
-			const newTime = prevTime - deltaTime / 1000;
-
-			if (newTime <= 0) {
-				setIsRunning(false);
-				saveToLocalStorage(0, 'stopped');
-				return 0;
-			}
-
-			saveToLocalStorage(newTime, 'running');
-			return newTime;
-		});
-
-		if (isRunning) {
-			animationFrameRef.current = requestAnimationFrame(animate);
-		}
-	};
-
-	// 开始倒计时
-	const startTimer = () => {
-		if (!isRunning) {
-			setIsRunning(true);
-			lastTimestampRef.current = null;
-
-			if (timeLeft <= 0) {
-				setTimeLeft(60);
-				saveToLocalStorage(60, 'running');
-			} else {
-				saveToLocalStorage(timeLeft, 'running');
-			}
-		}
-	};
+	const { timeLeft, startTimer } = useCountdown();
 
 	const formSchema = z.object({
 		username: z.string().min(2, {
