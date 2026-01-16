@@ -33,16 +33,16 @@ jobs:
         run: |
           SIGNATURE=$(cat client/src-tauri/target/release/bundle/macos/dnhyxc-ai.app.tar.gz.sig)
           VERSION=$(grep '"version"' client/src-tauri/tauri.conf.json | head -1 | sed 's/.*: *"\([^"]*\)".*/\1/')
-          sed -i '' "s|\"signature\": \".*\"|\"signature\": \"$SIGNATURE\"|g" latest.json
-          sed -i '' "s|\"version\": \".*\"|\"version\": \"$VERSION\"|g" latest.json
-          cat latest.json
+          sed -i '' "s|\"signature\": \".*\"|\"signature\": \"$SIGNATURE\"|g" client/latest.json
+          sed -i '' "s|\"version\": \".*\"|\"version\": \"$VERSION\"|g" client/latest.json
+          cat client/latest.json
 
       - name: Upload to Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.inputs.tag || github.event.release.tag_name }}
           files: |
-            latest.json
+            client/latest.json
             client/src-tauri/target/release/bundle/macos/dnhyxc-ai.app.tar.gz
             client/src-tauri/target/release/bundle/macos/*.dmg
         env:
