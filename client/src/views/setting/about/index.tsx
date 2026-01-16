@@ -9,14 +9,23 @@ import {
 	AlertDialogTitle,
 } from '@ui/alert-dialog';
 import { Button } from '@ui/button';
+import { Checkbox } from '@ui/checkbox';
+import { Label } from '@ui/label';
 import { Progress } from '@ui/progress';
 import { Toast } from '@ui/sonner';
 import { Spinner } from '@ui/spinner';
 import { CircleArrowUp, Download } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Icon from '@/assets/icon.png';
 import { useGetVersion } from '@/hooks';
-import { checkForUpdates, checkVersion, type UpdateType } from '@/utils';
+import {
+	checkForUpdates,
+	checkVersion,
+	getValue,
+	removeStorage,
+	setValue,
+	type UpdateType,
+} from '@/utils';
 
 const SettingAbout = () => {
 	const [updateInfo, setUpdateInfo] = useState<Partial<UpdateType> | null>(
@@ -27,10 +36,24 @@ const SettingAbout = () => {
 	const [downloaded, setDownloaded] = useState(0);
 	const [total, setTotal] = useState(0);
 	const [open, setOpen] = useState(false);
+	const [checked, setChecked] = useState(true);
 
 	const relaunchRef = useRef<() => Promise<void> | null>(null);
 
 	const { version: currentVersion } = useGetVersion();
+
+	const getAutoUpdate = async () => {
+		const autoUpdate = await getValue('autoUpdate');
+		if (autoUpdate === undefined) {
+			setValue('autoUpdate', true);
+		} else {
+			setChecked(autoUpdate);
+		}
+	};
+
+	useEffect(() => {
+		getAutoUpdate();
+	}, []);
 
 	const onCheckUpdate = async () => {
 		setCheckLoading(true);
@@ -80,6 +103,7 @@ const SettingAbout = () => {
 	};
 
 	const onRestart = async () => {
+		removeStorage('autoUpdate');
 		await relaunchRef.current?.();
 		onCancel();
 	};
@@ -89,6 +113,11 @@ const SettingAbout = () => {
 		setDownloaded(0);
 		setTotal(0);
 		setDownloading(false);
+	};
+
+	const onCheckedChange = (event: boolean) => {
+		setChecked(event);
+		setValue('autoUpdate', event);
 	};
 
 	return (
@@ -166,6 +195,20 @@ const SettingAbout = () => {
 					/>
 				</div>
 			) : null}
+			<div className="min-w-[610px] mt-12">
+				<div className="font-bold text-md">软件更新</div>
+				<div className="flex items-center gap-3 mt-3">
+					<Checkbox
+						id="terms"
+						checked={checked}
+						onCheckedChange={onCheckedChange}
+						className="cursor-pointer"
+					/>
+					<Label htmlFor="terms" className="cursor-pointer">
+						新版本发布时提醒我
+					</Label>
+				</div>
+			</div>
 			<AlertDialog open={open} onOpenChange={onCancel}>
 				<AlertDialogContent className="w-112.5">
 					<AlertDialogHeader>

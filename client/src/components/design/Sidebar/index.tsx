@@ -14,13 +14,13 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import ICON from '@/assets/icon.png';
-import { useUserInfo } from '@/hooks';
+import { useStorageInfo } from '@/hooks';
 import { removeStorage } from '@/utils';
 import { MENUS } from './enum';
 
 const Sidebar = () => {
 	const navigate = useNavigate();
-	const { userInfo } = useUserInfo();
+	const { storageInfo } = useStorageInfo();
 
 	const onJump = (path: string) => {
 		navigate(path);
@@ -57,9 +57,9 @@ const Sidebar = () => {
 						onClick={() => onJump('/')}
 					>
 						<img
-							src={userInfo?.profile?.avatar || ICON}
+							src={storageInfo?.profile?.avatar || ICON}
 							alt=""
-							className={`${userInfo?.profile?.avatar ? 'rounded-md w-10.5 h-10.5 object-cover' : 'w-9.5 h-9.5 cursor-pointer'}`}
+							className={`${storageInfo?.profile?.avatar ? 'rounded-md w-10.5 h-10.5 object-cover' : 'w-9.5 h-9.5 cursor-pointer'}`}
 						/>
 					</div>
 					{processedMenus.map((item) => (
@@ -73,7 +73,7 @@ const Sidebar = () => {
 					))}
 				</div>
 				<div>
-					{userInfo?.access_token ? (
+					{storageInfo?.access_token ? (
 						<DropdownMenu>
 							<DropdownMenuTrigger asChild>
 								<div className="flex justify-center items-center w-11 h-11 bg-border cursor-pointer rounded-md hover:text-green-600 transition-all duration-200 ease-in-out">
@@ -87,13 +87,13 @@ const Sidebar = () => {
 										className="flex justify-center items-center w-12 h-12 bg-border cursor-pointer rounded-md hover:text-green-600 transition-all duration-200 ease-in-out"
 									>
 										<img
-											src={userInfo?.profile?.avatar || ICON}
+											src={storageInfo?.profile?.avatar || ICON}
 											alt=""
-											className={`${userInfo?.profile?.avatar ? 'rounded-md w-11 h-11 object-cover' : 'w-10 h-10 cursor-pointer'}`}
+											className={`${storageInfo?.profile?.avatar ? 'rounded-md w-11 h-11 object-cover' : 'w-10 h-10 cursor-pointer'}`}
 										/>
 									</div>
 									<div className="mt-2 font-bold text-lg">
-										<div>{userInfo?.username}</div>
+										<div>{storageInfo?.username}</div>
 									</div>
 								</DropdownMenuLabel>
 								<DropdownMenuItem

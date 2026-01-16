@@ -1,8 +1,9 @@
 import { MoonStar, Settings, Sun } from 'lucide-react';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
-import { useTheme } from '@/hooks';
+import { useStorageInfo, useTheme } from '@/hooks';
 import routes from '@/router/routes';
+import { checkVersion, getValue, setStorage } from '@/utils';
 
 interface Iprops {
 	actions?: boolean;
@@ -10,7 +11,26 @@ interface Iprops {
 }
 
 const Header: React.FC<Iprops> = ({ actions = true, ccustomActions }) => {
+	const [autoUpdate, setAutoUpdate] = useState(false);
+
 	const { currentTheme, toggleTheme } = useTheme();
+
+	const { storageInfo } = useStorageInfo('autoUpdate');
+
+	useEffect(() => {
+		checkUpdate();
+	}, []);
+
+	const checkUpdate = async () => {
+		const autoUpdate = await getValue('autoUpdate');
+		setAutoUpdate(autoUpdate);
+		if (autoUpdate) {
+			const res = await checkVersion();
+			if (res) {
+				setStorage('autoUpdate', JSON.stringify({ version: res.version }));
+			}
+		}
+	};
 
 	const navigate = useNavigate();
 	const location = useLocation();
@@ -72,10 +92,13 @@ const Header: React.FC<Iprops> = ({ actions = true, ccustomActions }) => {
 									</div>
 								)}
 								<div
-									className="h-full w-8 flex justify-center items-center hover:text-green-600 cursor-pointer"
+									className="relative h-full w-8 flex justify-center items-center hover:text-green-600 cursor-pointer"
 									onClick={toSetting}
 								>
 									<Settings className="w-5 h-5" />
+									{storageInfo?.version && autoUpdate ? (
+										<div className="absolute top-3 right-0 w-2 h-2 bg-red-600 rounded-md"></div>
+									) : null}
 								</div>
 								{ccustomActions}
 							</div>

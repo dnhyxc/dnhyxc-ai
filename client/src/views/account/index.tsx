@@ -9,7 +9,7 @@ import * as qiniu from 'qiniu-js';
 import { useEffect, useMemo, useState } from 'react';
 import Model from '@/components/design/Model';
 import Upload, { type FileWithPreview } from '@/components/design/Upload';
-import { useUserInfo } from '@/hooks';
+import { useStorageInfo } from '@/hooks';
 import { getUploadToken, updateUser } from '@/service';
 import { setStorage } from '@/utils';
 import ResetEmailForm from './reset-email-form';
@@ -32,20 +32,20 @@ const Account = () => {
 		avatar: '',
 	});
 
-	const { userInfo, setUserInfo } = useUserInfo();
+	const { storageInfo, setStorageInfo } = useStorageInfo();
 
 	useEffect(() => {
 		setAccountInfo({
-			id: userInfo.id,
-			username: userInfo.username,
-			email: userInfo.email,
-			...(userInfo.profile || {
+			id: storageInfo.id,
+			username: storageInfo.username,
+			email: storageInfo.email,
+			...(storageInfo.profile || {
 				gender: '3',
 				avatar: '',
 				address: '',
 			}),
 		});
-	}, [userInfo]);
+	}, [storageInfo]);
 
 	const onChangeInputValue = (data: object) => {
 		setAccountInfo({
@@ -195,8 +195,8 @@ const Account = () => {
 				type: 'success',
 				title: '修改成功',
 			});
-			const newUserInfo = { ...userInfo, ...res.data };
-			setUserInfo(newUserInfo);
+			const newUserInfo = { ...storageInfo, ...res.data };
+			setStorageInfo(newUserInfo);
 			setStorage('userInfo', JSON.stringify(newUserInfo));
 			setEditKey('');
 		} else {
@@ -266,7 +266,7 @@ const Account = () => {
 	const onCancelAvatar = () => {
 		setAccountInfo({
 			...accountInfo,
-			avatar: userInfo?.profile?.avatar || '',
+			avatar: storageInfo?.profile?.avatar || '',
 		});
 	};
 
@@ -282,7 +282,7 @@ const Account = () => {
 								fileUrl={accountInfo.avatar}
 								onClearFileUrl={onClearFileUrl}
 							>
-								{accountInfo.avatar !== userInfo?.profile?.avatar ? (
+								{accountInfo.avatar !== storageInfo?.profile?.avatar ? (
 									<div className="absolute bottom-1 right-3">
 										<Button
 											variant="link"
@@ -358,7 +358,7 @@ const Account = () => {
 				onOpenChange={onOpenChange}
 			>
 				<ResetEmailForm
-					userInfo={userInfo}
+					userInfo={storageInfo}
 					onOpenChange={onOpenChange}
 					handleAccountInfo={handleAccountInfo}
 				/>

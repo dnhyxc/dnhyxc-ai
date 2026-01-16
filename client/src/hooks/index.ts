@@ -95,7 +95,7 @@ export const useCountdown = (initialTime = 60, storageKey = 'countdown') => {
 	return { timeLeft, isRunning, startTimer, resetTimer };
 };
 
-export const useUserInfo = () => {
+export const useUserInfo = (key?: string) => {
 	const [userInfo, setUserInfo] = useState(() =>
 		JSON.parse(getStorage('userInfo') || '{}'),
 	);
@@ -106,15 +106,41 @@ export const useUserInfo = () => {
 		};
 
 		window.addEventListener('storage', handleStorageChange);
-		window.addEventListener('userInfoChanged', handleStorageChange);
+		window.addEventListener(key || 'userInfoChanged', handleStorageChange);
 
 		return () => {
 			window.removeEventListener('storage', handleStorageChange);
-			window.removeEventListener('userInfoChanged', handleStorageChange);
+			window.removeEventListener(key || 'userInfoChanged', handleStorageChange);
 		};
 	}, []);
 
 	return { userInfo, setUserInfo };
+};
+
+export const useStorageInfo = (key?: string) => {
+	const [storageInfo, setStorageInfo] = useState(() =>
+		JSON.parse(getStorage(key || 'userInfo') || '{}'),
+	);
+
+	const eventKey = key ? `${key}Changed` : 'userInfoChanged';
+
+	console.log('useStorageInfo', eventKey);
+
+	useEffect(() => {
+		const handleStorageChange = () => {
+			setStorageInfo(JSON.parse(getStorage(key || 'userInfo') || '{}'));
+		};
+
+		window.addEventListener('storage', handleStorageChange);
+		window.addEventListener(eventKey, handleStorageChange);
+
+		return () => {
+			window.removeEventListener('storage', handleStorageChange);
+			window.removeEventListener(eventKey, handleStorageChange);
+		};
+	}, []);
+
+	return { storageInfo, setStorageInfo };
 };
 
 export const useTheme = () => {
