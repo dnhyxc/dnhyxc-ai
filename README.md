@@ -5,6 +5,7 @@
 ## 🏗️ 项目架构
 
 ### 整体架构
+
 ```
 dnhyxc-ai/
 ├── client/          # 前端桌面应用 (Tauri + React)
@@ -14,6 +15,7 @@ dnhyxc-ai/
 ```
 
 ### 前端架构 (Tauri + React)
+
 - **桌面应用框架**: Tauri 2.x
 - **前端框架**: React 19.x
 - **状态管理**: MobX 6.x
@@ -21,13 +23,14 @@ dnhyxc-ai/
 - **UI 组件库**: Radix UI + Tailwind CSS
 - **表单处理**: React Hook Form + Zod
 - **HTTP 请求**: Axios
-- **工具库**: 
+- **工具库**:
   - crypto-js (加密)
   - js-md5 (MD5 哈希)
   - qiniu-js (七牛云上传)
   - lucide-react (图标)
 
 ### 后端架构 (NestJS)
+
 - **后端框架**: NestJS 11.x
 - **数据库**: MySQL 8.0
 - **ORM**: TypeORM
@@ -38,7 +41,7 @@ dnhyxc-ai/
 - **缓存**: Redis (Keyv)
 - **邮件服务**: Nodemailer
 - **文件上传**: Multer + 七牛云
-- **安全**: 
+- **安全**:
   - Helmet (头部安全)
   - Express Rate Limit (请求限制)
   - bcrypt (密码加密)
@@ -47,42 +50,46 @@ dnhyxc-ai/
 ## 🚀 技术栈
 
 ### 前端技术
-| 技术 | 版本 | 描述 |
-|------|------|------|
-| Tauri | ^2 | 跨平台桌面应用框架 |
-| React | ^19.1.0 | 用户界面构建库 |
-| TypeScript | ^5.8.3 | 类型安全的 JavaScript |
-| Vite | ^7.0.4 | 现代前端构建工具 |
-| Tailwind CSS | ^4.1.18 | 实用优先的 CSS 框架 |
-| Radix UI | ^1.x | 无样式的可访问组件 |
-| MobX | ^6.15.0 | 简单可扩展的状态管理 |
-| React Router | ^7.10.1 | React 路由库 |
+
+| 技术         | 版本    | 描述                  |
+| ------------ | ------- | --------------------- |
+| Tauri        | ^2      | 跨平台桌面应用框架    |
+| React        | ^19.1.0 | 用户界面构建库        |
+| TypeScript   | ^5.8.3  | 类型安全的 JavaScript |
+| Vite         | ^7.0.4  | 现代前端构建工具      |
+| Tailwind CSS | ^4.1.18 | 实用优先的 CSS 框架   |
+| Radix UI     | ^1.x    | 无样式的可访问组件    |
+| MobX         | ^6.15.0 | 简单可扩展的状态管理  |
+| React Router | ^7.10.1 | React 路由库          |
 
 ### 后端技术
-| 技术 | 版本 | 描述 |
-|------|------|------|
-| NestJS | ^11.0.1 | 高效的 Node.js 服务端框架 |
-| TypeScript | ^5.x | 类型安全的 JavaScript |
-| MySQL | ^8.0 | 关系型数据库 |
-| TypeORM | ^0.3.28 | Node.js ORM 框架 |
-| JWT | ^11.0.2 | JSON Web Token 认证 |
-| Redis | ^5.1.5 | 内存数据库缓存 |
-| Winston | ^3.19.0 | 日志管理库 |
-| Swagger | ^11.2.3 | API 文档生成 |
+
+| 技术       | 版本    | 描述                      |
+| ---------- | ------- | ------------------------- |
+| NestJS     | ^11.0.1 | 高效的 Node.js 服务端框架 |
+| TypeScript | ^5.x    | 类型安全的 JavaScript     |
+| MySQL      | ^8.0    | 关系型数据库              |
+| TypeORM    | ^0.3.28 | Node.js ORM 框架          |
+| JWT        | ^11.0.2 | JSON Web Token 认证       |
+| Redis      | ^5.1.5  | 内存数据库缓存            |
+| Winston    | ^3.19.0 | 日志管理库                |
+| Swagger    | ^11.2.3 | API 文档生成              |
 
 ### 开发工具
-| 工具 | 版本 | 描述 |
-|------|------|------|
-| pnpm | ^10.8.1 | 高效的包管理器 |
-| Biome | ^2.3.9 | 代码格式化和检查 |
-| Husky | ^8.0.3 | Git hooks 管理 |
-| Commitizen | - | 规范化提交信息 |
-| Docker | - | 容器化部署 |
-| ESLint | ^9.18.0 | 代码质量检查 |
+
+| 工具       | 版本    | 描述             |
+| ---------- | ------- | ---------------- |
+| pnpm       | ^10.8.1 | 高效的包管理器   |
+| Biome      | ^2.3.9  | 代码格式化和检查 |
+| Husky      | ^8.0.3  | Git hooks 管理   |
+| Commitizen | -       | 规范化提交信息   |
+| Docker     | -       | 容器化部署       |
+| ESLint     | ^9.18.0 | 代码质量检查     |
 
 ## 🛠️ 开发环境搭建
 
 ### 环境要求
+
 - Node.js >= 18
 - Rust >= 1.70
 - MySQL >= 8.0
@@ -92,12 +99,14 @@ dnhyxc-ai/
 ### 安装步骤
 
 1. **克隆项目**
+
 ```bash
 git clone https://github.com/dnhyxc/dnhyxc-ai.git
 cd dnhyxc-ai
 ```
 
 2. **安装依赖**
+
 ```bash
 # 安装根目录依赖
 pnpm install
@@ -110,6 +119,7 @@ pnpm -C server install
 ```
 
 3. **配置环境变量**
+
 ```bash
 # 复制后端环境配置文件
 cp server/.env.example server/.env
@@ -117,12 +127,14 @@ cp server/.env.example server/.env
 ```
 
 4. **启动数据库服务**
+
 ```bash
 # 使用 Docker 启动 MySQL
 docker-compose up -d db
 ```
 
 5. **运行数据库迁移**
+
 ```bash
 # 进入后端目录
 cd server
@@ -133,30 +145,35 @@ pnpm m:run
 ## 🎯 核心功能
 
 ### 用户认证与授权
+
 - JWT 身份认证
 - 基于角色的权限控制 (RBAC)
 - 密码加密存储 (bcrypt + argon2)
 - 登录状态管理
 
 ### 文件管理
+
 - 文件上传 (支持本地和七牛云)
 - 文件下载管理
 - 文件类型验证
 - 上传进度追踪
 
 ### 提示词管理
+
 - 提示词模板管理
 - 分类和标签系统
 - 模板版本控制
 - 快速检索功能
 
 ### 系统功能
+
 - 菜单管理
 - 操作日志记录
 - 系统监控
 - 错误处理
 
 ### 桌面应用特性
+
 - 系统托盘集成
 - 全局快捷键支持
 - 文件系统访问
@@ -223,6 +240,7 @@ pnpm -C server test:e2e
 ## 🔧 配置说明
 
 ### 后端配置 (server/.env)
+
 ```env
 NODE_ENV=development
 PORT=9112
@@ -237,6 +255,7 @@ REDIS_PORT=6379
 ```
 
 ### 前端配置
+
 前端配置主要通过 Tauri 配置文件和 Vite 配置文件管理。
 
 ## 📊 项目状态
@@ -263,7 +282,7 @@ REDIS_PORT=6379
 
 ## 👨‍💻 作者
 
-- **dnhyxc** - *项目初始开发* - [dnhyxc](https://github.com/dnhyxc)
+- **dnhyxc** - _项目初始开发_ - [dnhyxc](https://github.com/dnhyxc)
 
 ## 🙏 致谢
 
@@ -271,3 +290,120 @@ REDIS_PORT=6379
 - [React](https://reactjs.org/) - 用户界面库
 - [NestJS](https://nestjs.com/) - Node.js 服务端框架
 - [TypeScript](https://www.typescriptlang.org/) - 类型安全的 JavaScript
+
+```js
+import fs from "node:fs";
+import https from "node:https";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+const TOKEN = process.env.GITHUB_TOKEN;
+const OWNER = "dnhyxc";
+const REPO = "dnhyxc-ai";
+const TAG = "v0.0.1";
+
+const LATEST_JSON_PATH = path.resolve(__dirname, "../latest.json");
+const APP_TAR_GZ_PATH = path.resolve(
+	__dirname,
+	"../client/src-tauri/target/release/bundle/macos/dnhyxc-ai.app.tar.gz"
+);
+
+async function uploadFile(filePath, name) {
+	if (!fs.existsSync(filePath)) {
+		console.error(`文件不存在: ${filePath}`);
+		return false;
+	}
+
+	const fileContent = fs.readFileSync(filePath);
+	const fileName = path.basename(filePath);
+
+	const url = new URL(
+		`https://uploads.github.com/repos/${OWNER}/${REPO}/releases/assets`
+	);
+	url.searchParams.append("name", name || fileName);
+	url.searchParams.append("label", name || fileName);
+
+	return new Promise((resolve, reject) => {
+		const req = https.request(
+			{
+				hostname: url.hostname,
+				path: url.pathname + url.search,
+				method: "POST",
+				headers: {
+					Authorization: `token ${TOKEN}`,
+					"Content-Type": "application/octet-stream",
+					"Content-Length": fileContent.length,
+				},
+			},
+			(res) => {
+				if (res.statusCode >= 200 && res.statusCode < 300) {
+					console.log(`✅ 上传成功: ${name || fileName}`);
+					resolve(true);
+				} else {
+					let data = "";
+					res.on("data", (chunk) => {
+						data += chunk;
+					});
+					res.on("end", () => {
+						console.error(
+							`❌ 上传失败: ${name || fileName}, 状态码: ${
+								res.statusCode
+							}, ${data}`
+						);
+						resolve(false);
+					});
+				}
+			}
+		);
+
+		req.on("error", (e) => {
+			console.error(`❌ 请求错误: ${e.message}`);
+			reject(e);
+		});
+
+		req.write(fileContent);
+		req.end();
+	});
+}
+
+async function main() {
+	if (!TOKEN) {
+		console.error("❌ 请设置 GITHUB_TOKEN 环境变量");
+		console.error("   export GITHUB_TOKEN=your_github_token");
+		process.exit(1);
+	}
+
+	console.log(`🚀 开始上传文件到 ${OWNER}/${REPO} @ ${TAG}`);
+	console.log(`📁 latest.json: ${LATEST_JSON_PATH}`);
+	console.log(`📁 app.tar.gz: ${APP_TAR_GZ_PATH}`);
+	console.log("");
+
+	const results = [];
+
+	if (fs.existsSync(LATEST_JSON_PATH)) {
+		results.push(await uploadFile(LATEST_JSON_PATH, `latest.json`));
+	} else {
+		console.error(`❌ latest.json 不存在`);
+		results.push(false);
+	}
+
+	if (fs.existsSync(APP_TAR_GZ_PATH)) {
+		results.push(await uploadFile(APP_TAR_GZ_PATH, "dnhyxc-ai.app.tar.gz"));
+	} else {
+		console.error(`❌ dnhyxc-ai.app.tar.gz 不存在`);
+		results.push(false);
+	}
+
+	console.log("");
+	if (results.every(Boolean)) {
+		console.log("✅ 所有文件上传成功!");
+	} else {
+		console.log("⚠️ 部分文件上传失败");
+		process.exit(1);
+	}
+}
+
+main();
+```
