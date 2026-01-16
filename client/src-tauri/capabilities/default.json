@@ -21,6 +21,8 @@
 		"clipboard-manager:allow-write-html",
 		"clipboard-manager:allow-write-image",
 		"clipboard-manager:allow-write-text",
+		"process:default",
+		"process:allow-restart",
 		{
 			"identifier": "http:default",
 			"allow": [

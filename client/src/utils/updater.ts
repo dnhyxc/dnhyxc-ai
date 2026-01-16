@@ -1,49 +1,33 @@
 import { relaunch } from '@tauri-apps/plugin-process';
-import { check } from '@tauri-apps/plugin-updater';
-import { Toast } from '@ui/sonner';
+import { check, type Update } from '@tauri-apps/plugin-updater';
 
 interface CheckForUpdatesOptions {
 	getProgress?: (progress: number) => void;
 	getTotal?: (total: number) => void;
 	onRelaunch?: (relaunch: () => Promise<void>) => void;
+	setLoading?: (loading: boolean) => void;
 }
+
+export type UpdateType = Update;
 
 export const checkVersion = async () => {
 	const update = await check();
-	return !!update;
+	return update;
 };
 
 export const checkForUpdates = async (options?: CheckForUpdatesOptions) => {
 	const update = await check();
 	if (update) {
-		// let downloaded = 0;
-		// let contentLength = 0;
-		// alternatively we could also call update.download() and update.install() separately
 		await update.downloadAndInstall((event) => {
 			switch (event.event) {
 				case 'Started':
+					options?.setLoading?.(true);
 					options?.getTotal?.(event.data.contentLength || 0);
-					// contentLength = event.data.contentLength || 0;
-					// console.log(`started downloading ${event.data.contentLength} bytes`);
-					Toast({
-						title: '正在下载更新...',
-						type: 'loading',
-					});
 					break;
 				case 'Progress':
 					options?.getProgress?.(event.data.chunkLength);
-					// downloaded += event.data.chunkLength;
-					// Toast({
-					// 	title: `downloaded ${downloaded} from ${contentLength}`,
-					// 	type: 'loading',
-					// });
-					// console.log(`downloaded ${downloaded} from ${contentLength}`);
 					break;
 				case 'Finished':
-					Toast({
-						title: '更新完成',
-						type: 'success',
-					});
 					break;
 			}
 		});
