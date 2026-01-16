@@ -1,6 +1,6 @@
-import { Toast } from '@/components/ui/sonner';
 import { relaunch } from '@tauri-apps/plugin-process';
 import { check, type Update } from '@tauri-apps/plugin-updater';
+import { Toast } from '@/components/ui/sonner';
 
 interface CheckForUpdatesOptions {
 	getProgress?: (progress: number) => void;
