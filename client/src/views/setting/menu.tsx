@@ -2,24 +2,54 @@ import {
 	NavigationMenu,
 	NavigationMenuItem,
 	NavigationMenuList,
-	navigationMenuTriggerStyle,
 } from '@ui/navigation-menu';
-import { Link } from 'react-router';
+import { useMemo } from 'react';
+import { useLocation, useNavigate } from 'react-router';
 
 const NavigationMenus = () => {
+	const { pathname } = useLocation();
+	const navigate = useNavigate();
+
+	const menus = useMemo(
+		() => [
+			{
+				name: '系统设置',
+				key: 'system',
+				path: '/setting',
+				icon: 'icon-setting',
+			},
+			{
+				name: '关于应用',
+				key: 'about',
+				path: '/setting/about',
+				icon: 'icon-about',
+			},
+		],
+		[],
+	);
+
 	return (
-		<div className="w-fullbg-background rounded-md">
-			<NavigationMenu className="">
+		<nav className="w-full relative border-b border-background after:content-[''] after:absolute after:bottom-0 after:right-0 after:w-full after:h-[8px] after:rounded-tr-[25px] after:bg-linear-to-r after:from-transparent after:to-(--background) after:max-w-[50vw]">
+			<NavigationMenu className="w-full">
 				<NavigationMenuList className="flex-wrap">
-					<NavigationMenuItem className={navigationMenuTriggerStyle()}>
-						<Link to="/setting">系统设置</Link>
-					</NavigationMenuItem>
-					<NavigationMenuItem className={navigationMenuTriggerStyle()}>
-						<Link to="/setting/about">关于应用</Link>
-					</NavigationMenuItem>
+					{menus.map((i) => {
+						return (
+							<NavigationMenuItem
+								key={i.key}
+								className={`${pathname === i.path ? 'bg-background dark:bg-gray-600' : 'bg-accent'} group inline-flex h-8 w-max items-center justify-center rounded-t-md text-sm font-medium dark:hover:bg-gray-600 hover:bg-background hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground disabled:pointer-events-none disabled:opacity-50 data-[state=open]:hover:bg-accent data-[state=open]:text-accent-foreground data-[state=open]:focus:bg-accent data-[state=open]:bg-accent/50 focus-visible:ring-ring/50 outline-none transition-[color,box-shadow] focus-visible:ring-[3px] focus-visible:outline-1`}
+							>
+								<div
+									className="w-full h-full flex justify-center items-center rounded-t-md px-4 cursor-pointer"
+									onClick={() => navigate(i.path)}
+								>
+									{i.name}
+								</div>
+							</NavigationMenuItem>
+						);
+					})}
 				</NavigationMenuList>
 			</NavigationMenu>
-		</div>
+		</nav>
 	);
 };
 
