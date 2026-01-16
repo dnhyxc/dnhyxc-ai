@@ -1,5 +1,14 @@
+import { getVersion } from '@tauri-apps/api/app';
 import { useEffect, useRef, useState } from 'react';
-import { getStorage, setStorage } from '@/utils';
+import {
+	getStorage,
+	getValue,
+	onEmit,
+	setBodyClass,
+	setStorage,
+	setThemeToAllWindows,
+	setValue,
+} from '@/utils';
 
 export const useCountdown = (initialTime = 60, storageKey = 'countdown') => {
 	const [timeLeft, setTimeLeft] = useState(() => {
@@ -108,14 +117,6 @@ export const useUserInfo = () => {
 	return { userInfo, setUserInfo };
 };
 
-import {
-	getValue,
-	onEmit,
-	setBodyClass,
-	setThemeToAllWindows,
-	setValue,
-} from '@/utils';
-
 export const useTheme = () => {
 	const [currentTheme, setCurrentTheme] = useState<'dark' | 'light'>('light');
 
@@ -141,4 +142,19 @@ export const useTheme = () => {
 	};
 
 	return { toggleTheme, currentTheme };
+};
+
+export const useGetVersion = () => {
+	const [version, setVersion] = useState('');
+
+	useEffect(() => {
+		getCurrentVersion();
+	}, []);
+
+	const getCurrentVersion = async () => {
+		const version = await getVersion();
+		setVersion(version);
+	};
+
+	return { version };
 };

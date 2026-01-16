@@ -1,11 +1,11 @@
-import { useSearchParams } from 'react-router';
+import { useGetVersion } from '@/hooks';
 
 const About = () => {
-	const [search] = useSearchParams();
+	const { version } = useGetVersion();
 
 	return (
 		<div className="flex justify-center items-center w-full h-full">
-			<div>dnhyxc-ai 版本 {search.get('version')}</div>
+			<div>dnhyxc-ai 版本 {version}</div>
 		</div>
 	);
 };

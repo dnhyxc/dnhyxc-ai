@@ -1,4 +1,3 @@
-import { getVersion } from '@tauri-apps/api/app';
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -13,44 +12,41 @@ import { Button } from '@ui/button';
 import { Progress } from '@ui/progress';
 import { Toast } from '@ui/sonner';
 import { Spinner } from '@ui/spinner';
-import { useEffect, useRef, useState } from 'react';
+import { CircleArrowUp, Download } from 'lucide-react';
+import { useRef, useState } from 'react';
 import Icon from '@/assets/icon.png';
+import { useGetVersion } from '@/hooks';
 import { checkForUpdates, checkVersion, type UpdateType } from '@/utils';
 
 const SettingAbout = () => {
 	const [updateInfo, setUpdateInfo] = useState<Partial<UpdateType> | null>(
 		null,
 	);
-	const [currentVersion, setCurrentVersion] = useState('');
 	const [checkLoading, setCheckLoading] = useState(false);
 	const [downloading, setDownloading] = useState(false);
-	const [isChecked, setIsChecked] = useState(false);
 	const [downloaded, setDownloaded] = useState(0);
+	const [total, setTotal] = useState(0);
 	const [open, setOpen] = useState(false);
 
-	const totalRef = useRef(0);
 	const relaunchRef = useRef<() => Promise<void> | null>(null);
 
-	useEffect(() => {
-		getCurrentVersion();
-	}, []);
-
-	const getCurrentVersion = async () => {
-		const version = await getVersion();
-		setCurrentVersion(version);
-	};
+	const { version: currentVersion } = useGetVersion();
 
 	const onCheckUpdate = async () => {
 		setCheckLoading(true);
-		setIsChecked(false);
 		const res = await checkVersion();
-		setIsChecked(true);
 		setCheckLoading(false);
+		if (!res) {
+			Toast({
+				title: '已经是最新版本',
+				type: 'success',
+			});
+		}
 		setUpdateInfo(res);
 	};
 
 	const getTotal = (total: number) => {
-		totalRef.current = total;
+		setTotal(total);
 	};
 
 	const getProgress = (chunkLength: number) => {
@@ -85,9 +81,14 @@ const SettingAbout = () => {
 
 	const onRestart = async () => {
 		await relaunchRef.current?.();
+		onCancel();
+	};
+
+	const onCancel = () => {
 		setOpen(false);
 		setDownloaded(0);
-		totalRef.current = 0;
+		setTotal(0);
+		setDownloading(false);
 	};
 
 	return (
@@ -106,57 +107,58 @@ const SettingAbout = () => {
 							</div>
 							{updateInfo?.version ? (
 								<div className="dark:text-gray-300 text-gray-600 text-sm mt-1">
-									当前版本 {updateInfo?.version}
+									最新版本 {updateInfo?.version}
 								</div>
 							) : null}
 						</div>
 						<div className="flex items-center">
 							<Button
 								size="sm"
-								className="cursor-pointer w-24"
+								className="cursor-pointer min-w-30"
 								disabled={checkLoading}
 								onClick={onCheckUpdate}
 							>
-								{checkLoading ? <Spinner /> : null}
+								{checkLoading ? (
+									<Spinner />
+								) : (
+									<CircleArrowUp className="mt-0.5 mr-1" />
+								)}
 								检查更新
 							</Button>
-							{updateInfo && isChecked ? (
+							{updateInfo ? (
 								<Button
 									size="sm"
-									className="cursor-pointer w-24 ml-5"
+									className="cursor-pointer min-w-24 ml-5"
 									disabled={downloading}
 									onClick={onDownloadAndInstall}
 								>
-									{downloading ? <Spinner /> : null}
+									{downloading ? (
+										<Spinner />
+									) : (
+										<Download className="mt-0.5 mr-1" />
+									)}
 									更新并重启
 								</Button>
-							) : isChecked ? (
-								<span className="ml-5">已是最新版本</span>
 							) : null}
 						</div>
 					</div>
 				</div>
 			</div>
-			{downloaded && totalRef.current ? (
+			{downloaded && total ? (
 				<div className="mt-4 min-w-[610px]">
 					<div className="flex items-center justify-between pt-10 pb-2">
-						<span>正在下载</span>
+						<span>{downloaded / total >= 1 ? '下载完成' : '正在下载'}</span>
 						<div>
 							<span className="mr-3">
-								{downloaded} / {totalRef.current}
+								{downloaded} / {total}
 							</span>
-							<span>
-								{Math.floor(downloaded / totalRef.current).toFixed(0)}%
-							</span>
+							<span>{Math.floor((downloaded / total) * 100).toFixed(0)}%</span>
 						</div>
 					</div>
-					<Progress
-						value={(downloaded / totalRef.current) * 100}
-						className="w-full"
-					/>
+					<Progress value={(downloaded / total) * 100} className="w-full" />
 				</div>
 			) : null}
-			<AlertDialog open={open} onOpenChange={setOpen}>
+			<AlertDialog open={open} onOpenChange={onCancel}>
 				<AlertDialogContent className="w-112.5">
 					<AlertDialogHeader>
 						<AlertDialogTitle>确定要现在重启应用吗?</AlertDialogTitle>
