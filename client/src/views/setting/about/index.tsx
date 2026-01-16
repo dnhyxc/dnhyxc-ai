@@ -1,5 +1,6 @@
 import { Button } from '@ui/button';
 import { Progress } from '@ui/progress';
+import { Toast } from '@ui/sonner';
 import { useRef, useState } from 'react';
 import Icon from '@/assets/icon.png';
 import { checkForUpdates, checkVersion } from '@/utils';
@@ -26,8 +27,19 @@ const SettingAbout = () => {
 		setDownloaded((prev) => prev + chunkLength);
 	};
 
+	const onRelaunch = async (relaunch: () => Promise<void>) => {
+		setDownloaded(0);
+		totalRef.current = 0;
+		Toast({
+			title: '正在安装',
+			type: 'success',
+		});
+		await new Promise((resolve) => setTimeout(resolve, 1000));
+		await relaunch();
+	};
+
 	const onDownloadAndInstall = () => {
-		checkForUpdates({ getProgress, getTotal });
+		checkForUpdates({ getProgress, getTotal, onRelaunch });
 	};
 
 	return (
@@ -63,9 +75,14 @@ const SettingAbout = () => {
 				<div className="mt-4 min-w-[610px]">
 					<div className="flex items-center justify-between pt-10 pb-2">
 						<span>正在下载</span>
-						<span>{(downloaded / totalRef.current || 0).toFixed(2)}%</span>
+						<span>
+							{downloaded} / {totalRef.current}
+						</span>
 					</div>
-					<Progress value={downloaded / totalRef.current} className="w-full" />
+					<Progress
+						value={(downloaded / totalRef.current) * 100}
+						className="w-full"
+					/>
 				</div>
 			) : null}
 		</div>

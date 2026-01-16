@@ -44,18 +44,11 @@ export const checkForUpdates = async (options?: CheckForUpdatesOptions) => {
 						title: '更新完成',
 						type: 'success',
 					});
-					options?.onRelaunch?.(async () => {
-						Toast({
-							title: '准备重启',
-							type: 'success',
-						});
-						await new Promise((resolve) => setTimeout(resolve, 1000));
-						// 此处 relaunch 前最好询问用户
-						await relaunch();
-					});
 					break;
 			}
 		});
+
+		options?.onRelaunch?.(relaunch);
 
 		// console.log('update installed');
 		// Toast({
