@@ -17,7 +17,7 @@ import { Spinner } from '@ui/spinner';
 import { CircleArrowUp, Download } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import Icon from '@/assets/icon.png';
-import { useGetVersion } from '@/hooks';
+import { useGetVersion, useStorageInfo } from '@/hooks';
 import {
 	checkForUpdates,
 	checkVersion,
@@ -41,6 +41,7 @@ const SettingAbout = () => {
 	const relaunchRef = useRef<() => Promise<void> | null>(null);
 
 	const { version: currentVersion } = useGetVersion();
+	const { storageInfo } = useStorageInfo('autoUpdate');
 
 	const getAutoUpdate = async () => {
 		const autoUpdate = await getValue('autoUpdate');
@@ -134,9 +135,9 @@ const SettingAbout = () => {
 							<div className="text-xl font-bold">
 								Dnhyxc AI {currentVersion}
 							</div>
-							{updateInfo?.version ? (
+							{storageInfo?.version || updateInfo?.version ? (
 								<div className="dark:text-gray-300 text-gray-600 text-sm mt-1">
-									最新版本 {updateInfo?.version}
+									最新版本 {storageInfo?.version || updateInfo?.version}
 								</div>
 							) : null}
 						</div>

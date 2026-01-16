@@ -95,28 +95,6 @@ export const useCountdown = (initialTime = 60, storageKey = 'countdown') => {
 	return { timeLeft, isRunning, startTimer, resetTimer };
 };
 
-export const useUserInfo = (key?: string) => {
-	const [userInfo, setUserInfo] = useState(() =>
-		JSON.parse(getStorage('userInfo') || '{}'),
-	);
-
-	useEffect(() => {
-		const handleStorageChange = () => {
-			setUserInfo(JSON.parse(getStorage('userInfo') || '{}'));
-		};
-
-		window.addEventListener('storage', handleStorageChange);
-		window.addEventListener(key || 'userInfoChanged', handleStorageChange);
-
-		return () => {
-			window.removeEventListener('storage', handleStorageChange);
-			window.removeEventListener(key || 'userInfoChanged', handleStorageChange);
-		};
-	}, []);
-
-	return { userInfo, setUserInfo };
-};
-
 export const useStorageInfo = (key?: string) => {
 	const [storageInfo, setStorageInfo] = useState(() =>
 		JSON.parse(getStorage(key || 'userInfo') || '{}'),
