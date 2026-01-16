@@ -10,10 +10,6 @@ on:
         required: true
         default: "v0.0.1"
 
-permissions:
-  contents: write
-  releases: write
-
 jobs:
   upload:
     runs-on: macos-latest
@@ -48,5 +44,7 @@ jobs:
           files: |
             client/latest.json
             client/src-tauri/target/release/bundle/macos/dnhyxc-ai.app.tar.gz
+            client/src-tauri/target/release/bundle/macos/dnhyxc-ai.app.tar.gz.sig
+
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
