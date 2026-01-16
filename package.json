@@ -1,11 +1,11 @@
 {
 	"name": "dnhyxc-ai",
-	"version": "1.0.0",
+	"version": "0.0.19",
 	"description": "",
 	"main": "index.js",
 	"scripts": {
 		"dev": "pnpm -C client tauri dev",
-		"build": "pnpm -C client tauri build",
+		"build": "node scripts/bump-version.js && pnpm -C client tauri build && node scripts/update-latest.js",
 		"server:dev": "pnpm -C server start:dev",
 		"server:start": "pnpm -C server start",
 		"server:debug": "pnpm -C server start:debug",

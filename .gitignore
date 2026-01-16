@@ -26,4 +26,12 @@ dist-ssr
 .env*
 .env.*
 
+# Tauri
+client/src-tauri/target
+!client/src-tauri/target/release/bundle
+
+# Build artifacts
+*.app.tar.gz
+*.app.tar.gz.sig
+
 docker-compose-prod.yml
