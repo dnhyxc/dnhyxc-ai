@@ -10,6 +10,10 @@ on:
         required: true
         default: "v0.0.1"
 
+permissions:
+  contents: write
+  releases: write
+
 jobs:
   upload:
     runs-on: macos-latest
