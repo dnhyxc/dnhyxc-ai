@@ -152,10 +152,18 @@ const SettingAbout = () => {
 							<span className="mr-3">
 								{downloaded} / {total}
 							</span>
-							<span>{Math.floor((downloaded / total) * 100).toFixed(0)}%</span>
+							<span>
+								{Math.floor(
+									(downloaded / total > 1 ? 1 : downloaded / total) * 100,
+								).toFixed(0)}
+								%
+							</span>
 						</div>
 					</div>
-					<Progress value={(downloaded / total) * 100} className="w-full" />
+					<Progress
+						value={(downloaded / total > 1 ? 1 : downloaded / total) * 100}
+						className="w-full"
+					/>
 				</div>
 			) : null}
 			<AlertDialog open={open} onOpenChange={onCancel}>
