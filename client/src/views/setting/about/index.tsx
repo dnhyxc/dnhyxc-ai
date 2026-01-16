@@ -155,7 +155,7 @@ const SettingAbout = () => {
 								)}
 								检查更新
 							</Button>
-							{updateInfo ? (
+							{storageInfo?.version || updateInfo ? (
 								<Button
 									size="sm"
 									className="cursor-pointer min-w-24 ml-5"

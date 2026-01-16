@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { useStorageInfo, useTheme } from '@/hooks';
 import routes from '@/router/routes';
-import { checkVersion, getValue, setStorage } from '@/utils';
+import { checkVersion, getValue, removeStorage, setStorage } from '@/utils';
 
 interface Iprops {
 	actions?: boolean;
@@ -28,6 +28,8 @@ const Header: React.FC<Iprops> = ({ actions = true, ccustomActions }) => {
 			const res = await checkVersion();
 			if (res) {
 				setStorage('autoUpdate', JSON.stringify({ version: res.version }));
+			} else {
+				removeStorage('autoUpdate');
 			}
 		}
 	};
