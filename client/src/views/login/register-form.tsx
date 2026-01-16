@@ -55,7 +55,6 @@ const RegisterForm: React.FC<IProps> = ({ onRegister }) => {
 		},
 	});
 
-	// 2. Define a submit handler.
 	const onSubmit = async (values: z.infer<typeof formSchema>) => {
 		await register({
 			...values,

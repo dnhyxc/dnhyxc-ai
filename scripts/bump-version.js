@@ -30,7 +30,9 @@ function bumpVersion() {
 	);
 
 	console.log(`🚀 版本号更新: ${tauriConfig.version} -> ${newVersion}`);
+	console.log('');
 	console.log(`📦 tauri.conf.json 和 package.json 版本已更新`);
+	console.log('');
 }
 
 bumpVersion();

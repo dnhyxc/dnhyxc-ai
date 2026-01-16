@@ -20,7 +20,12 @@ const FILE_PATHS = [
 	path.resolve(__dirname, '../client/latest.json'),
 ];
 
-const boundary = `----FormBoundary${Date.now().toString(16)}`;
+function getContentType(filePath) {
+	const ext = path.extname(filePath);
+	if (ext === '.json') return 'application/json';
+	if (ext === '.gz') return 'application/gzip';
+	return 'application/octet-stream';
+}
 
 async function getReleaseId(tag) {
 	return new Promise((resolve, reject) => {
@@ -58,22 +63,6 @@ async function getReleaseId(tag) {
 		req.on('error', (e) => reject(e));
 		req.end();
 	});
-}
-
-function buildFormDataBody(filePath) {
-	const fileName = path.basename(filePath);
-	const fileContent = fs.readFileSync(filePath);
-
-	const CRLF = '\r\n';
-	const header = Buffer.from(
-		`--${boundary}${CRLF}` +
-			`Content-Disposition: form-data; name="file"; filename="${fileName}"${CRLF}` +
-			`Content-Type: application/octet-stream${CRLF}${CRLF}`,
-	);
-	const footer = Buffer.from(`${CRLF}--${boundary}--${CRLF}`);
-
-	const body = Buffer.concat([header, fileContent, footer]);
-	return body;
 }
 
 async function getExistingAssetId(releaseId, fileName) {
@@ -137,7 +126,8 @@ async function uploadToRelease(filePath, releaseId) {
 	}
 
 	const fileName = path.basename(filePath);
-	const body = buildFormDataBody(filePath);
+	const fileContent = fs.readFileSync(filePath);
+	const contentType = getContentType(filePath);
 
 	const existingId = await getExistingAssetId(releaseId, fileName);
 	if (existingId) {
@@ -153,8 +143,8 @@ async function uploadToRelease(filePath, releaseId) {
 				method: 'POST',
 				headers: {
 					Authorization: `token ${TOKEN}`,
-					'Content-Type': `multipart/form-data; boundary=${boundary}`,
-					'Content-Length': body.length,
+					'Content-Type': contentType,
+					'Content-Length': fileContent.length,
 					'User-Agent': 'dnhyxc-ai-release-script',
 				},
 			},
@@ -181,7 +171,7 @@ async function uploadToRelease(filePath, releaseId) {
 			reject(e);
 		});
 
-		req.write(body);
+		req.write(fileContent);
 		req.end();
 	});
 }
@@ -193,12 +183,14 @@ async function main() {
 		process.exit(1);
 	}
 
+	console.log('');
 	console.log(`🚀 开始上传到 Release: ${TAG}`);
+	console.log('');
 
 	console.log(`🔍 获取 Release ID...`);
 	const releaseId = await getReleaseId(TAG);
 	console.log(`   Release ID: ${releaseId}`);
-
+	console.log('');
 	console.log(`📁 文件数量: ${FILE_PATHS.length}`);
 	console.log('');
 
@@ -206,6 +198,7 @@ async function main() {
 		await uploadToRelease(filePath, releaseId);
 		console.log('');
 	}
+	process.exit(0);
 }
 
 main();

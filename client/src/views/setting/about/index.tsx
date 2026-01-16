@@ -65,8 +65,9 @@ const SettingAbout = () => {
 				title: '已经是最新版本',
 				type: 'success',
 			});
+		} else {
+			setUpdateInfo(res);
 		}
-		setUpdateInfo(res);
 	};
 
 	const getTotal = (total: number) => {

@@ -7,10 +7,6 @@ settings:
 importers:
 
   .:
-    dependencies:
-      dotenv:
-        specifier: ^17.2.3
-        version: 17.2.3
     devDependencies:
       '@biomejs/biome':
         specifier: 2.3.9
@@ -24,6 +20,9 @@ importers:
       commitlint:
         specifier: 20.2.0
         version: 20.2.0(@types/node@22.19.3)(typescript@5.8.3)
+      dotenv:
+        specifier: ^17.2.3
+        version: 17.2.3
       husky:
         specifier: 8.0.3
         version: 8.0.3

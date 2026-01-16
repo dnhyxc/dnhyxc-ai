@@ -1,11 +1,11 @@
 {
 	"name": "dnhyxc-ai",
-	"version": "0.0.19",
+	"version": "0.0.27",
 	"description": "",
 	"main": "index.js",
 	"scripts": {
 		"dev": "pnpm -C client tauri dev",
-		"build": "node scripts/bump-version.js && pnpm -C client tauri build && node scripts/update-latest.js",
+		"build": "node scripts/bump-version.js && pnpm -C client tauri build && node scripts/update-latest.js && node scripts/upload-to-release.js",
 		"server:dev": "pnpm -C server start:dev",
 		"server:start": "pnpm -C server start",
 		"server:debug": "pnpm -C server start:debug",
@@ -26,6 +26,7 @@
 		"@commitlint/config-conventional": "^20.2.0",
 		"@types/node": "^22.10.7",
 		"commitlint": "20.2.0",
+		"dotenv": "^17.2.3",
 		"husky": "8.0.3",
 		"typescript": "~5.8.3"
 	},
@@ -33,8 +34,5 @@
 		"commitizen": {
 			"path": "cz-customizable"
 		}
-	},
-	"dependencies": {
-		"dotenv": "^17.2.3"
 	}
 }

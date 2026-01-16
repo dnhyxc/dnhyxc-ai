@@ -29,6 +29,7 @@ function updateLatestJson() {
 			signature,
 		};
 		console.log(`🔐 签名已更新`);
+		console.log('');
 	}
 
 	fs.writeFileSync(
@@ -37,6 +38,7 @@ function updateLatestJson() {
 	);
 
 	console.log(`📄 latest.json 已更新: version=${version}`);
+	console.log('');
 }
 
 updateLatestJson();

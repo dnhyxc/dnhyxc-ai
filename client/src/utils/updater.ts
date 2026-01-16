@@ -1,3 +1,4 @@
+import { Toast } from '@/components/ui/sonner';
 import { relaunch } from '@tauri-apps/plugin-process';
 import { check, type Update } from '@tauri-apps/plugin-updater';
 
@@ -11,8 +12,16 @@ interface CheckForUpdatesOptions {
 export type UpdateType = Update;
 
 export const checkVersion = async () => {
-	const update = await check();
-	return update;
+	try {
+		const update = await check();
+		return update;
+	} catch (error: any) {
+		Toast({
+			type: 'error',
+			title: '检查更新失败',
+			message: error?.message || String(error),
+		});
+	}
 };
 
 export const checkForUpdates = async (options?: CheckForUpdatesOptions) => {
