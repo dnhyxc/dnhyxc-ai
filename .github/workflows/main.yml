@@ -44,6 +44,5 @@ jobs:
           files: |
             client/latest.json
             client/src-tauri/target/release/bundle/macos/dnhyxc-ai.app.tar.gz
-            client/src-tauri/target/release/bundle/macos/*.dmg
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
