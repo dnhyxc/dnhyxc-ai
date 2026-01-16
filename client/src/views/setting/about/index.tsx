@@ -1,3 +1,4 @@
+import { getVersion } from '@tauri-apps/api/app';
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -12,7 +13,7 @@ import { Button } from '@ui/button';
 import { Progress } from '@ui/progress';
 import { Toast } from '@ui/sonner';
 import { Spinner } from '@ui/spinner';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Icon from '@/assets/icon.png';
 import { checkForUpdates, checkVersion, type UpdateType } from '@/utils';
 
@@ -20,6 +21,7 @@ const SettingAbout = () => {
 	const [updateInfo, setUpdateInfo] = useState<Partial<UpdateType> | null>(
 		null,
 	);
+	const [currentVersion, setCurrentVersion] = useState('');
 	const [checkLoading, setCheckLoading] = useState(false);
 	const [downloading, setDownloading] = useState(false);
 	const [isChecked, setIsChecked] = useState(false);
@@ -28,6 +30,15 @@ const SettingAbout = () => {
 
 	const totalRef = useRef(0);
 	const relaunchRef = useRef<() => Promise<void> | null>(null);
+
+	useEffect(() => {
+		getCurrentVersion();
+	}, []);
+
+	const getCurrentVersion = async () => {
+		const version = await getVersion();
+		setCurrentVersion(version);
+	};
 
 	const onCheckUpdate = async () => {
 		setCheckLoading(true);
@@ -91,7 +102,7 @@ const SettingAbout = () => {
 					<div className="flex-1 h-full flex flex-col justify-between ml-5 py-1">
 						<div className="flex flex-col">
 							<div className="text-xl font-bold">
-								Dnhyxc AI New {updateInfo?.currentVersion || ''}
+								Dnhyxc AI {currentVersion}
 							</div>
 							{updateInfo?.version ? (
 								<div className="dark:text-gray-300 text-gray-600 text-sm mt-1">
