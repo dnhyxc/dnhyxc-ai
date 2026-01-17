@@ -1,6 +1,6 @@
 import { relaunch } from '@tauri-apps/plugin-process';
 import { check, type Update } from '@tauri-apps/plugin-updater';
-import { Toast } from '@/components/ui/sonner';
+import { Toast } from '@ui/sonner';
 
 interface CheckForUpdatesOptions {
 	getProgress?: (progress: number) => void;
@@ -12,7 +12,7 @@ interface CheckForUpdatesOptions {
 
 export type UpdateType = Update;
 
-export const checkVersion = async () => {
+export const checkVersion = async (): Promise<Update | null> => {
 	try {
 		const update = await check();
 		return update;
@@ -22,6 +22,7 @@ export const checkVersion = async () => {
 			title: '检查更新失败',
 			message: error?.message || String(error),
 		});
+		return null;
 	}
 };
 

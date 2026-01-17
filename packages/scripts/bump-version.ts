@@ -8,7 +8,6 @@ const TAURI_CONFIG_PATH = path.resolve(
 	__dirname,
 	'../../apps/frontend/src-tauri/tauri.conf.json',
 );
-const PACKAGE_JSON_PATH = path.resolve(__dirname, '../../package.json');
 
 function bumpVersion() {
 	const tauriConfig = JSON.parse(fs.readFileSync(TAURI_CONFIG_PATH, 'utf-8'));
@@ -22,16 +21,9 @@ function bumpVersion() {
 		`${JSON.stringify(tauriConfig, null, '\t')}\n`,
 	);
 
-	const packageJson = JSON.parse(fs.readFileSync(PACKAGE_JSON_PATH, 'utf-8'));
-	packageJson.version = newVersion;
-	fs.writeFileSync(
-		PACKAGE_JSON_PATH,
-		`${JSON.stringify(packageJson, null, '\t')}\n`,
-	);
-
 	console.log(`🚀 版本号更新: ${tauriConfig.version} -> ${newVersion}`);
 	console.log('');
-	console.log(`📦 tauri.conf.json 和 package.json 版本已更新`);
+	console.log(`📦 tauri.conf.json 版本已更新`);
 	console.log('');
 }
 

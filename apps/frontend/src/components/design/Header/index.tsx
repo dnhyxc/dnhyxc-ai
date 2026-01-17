@@ -27,7 +27,14 @@ const Header: React.FC<Iprops> = ({ actions = true, ccustomActions }) => {
 		if (autoUpdate) {
 			const res = await checkVersion();
 			if (res) {
-				setStorage('autoUpdate', JSON.stringify({ version: res.version }));
+				setStorage(
+					'autoUpdate',
+					JSON.stringify({
+						version: res?.version,
+						date: res.date,
+						notes: res?.body,
+					}),
+				);
 			} else {
 				removeStorage('autoUpdate');
 			}

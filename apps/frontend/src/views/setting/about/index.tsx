@@ -8,13 +8,14 @@ import {
 	AlertDialogHeader,
 	AlertDialogTitle,
 } from '@ui/alert-dialog';
+import { openUrl } from '@tauri-apps/plugin-opener';
 import { Button } from '@ui/button';
 import { Checkbox } from '@ui/checkbox';
 import { Label } from '@ui/label';
 import { Progress } from '@ui/progress';
 import { Toast } from '@ui/sonner';
 import { Spinner } from '@ui/spinner';
-import { CircleArrowUp, Download } from 'lucide-react';
+import { CircleArrowUp, Download, Info } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import Icon from '@/assets/icon.png';
 import { useGetVersion, useStorageInfo } from '@/hooks';
@@ -158,19 +159,31 @@ const SettingAbout = () => {
 								检查更新
 							</Button>
 							{storageInfo?.version || updateInfo ? (
-								<Button
-									size="sm"
-									className="cursor-pointer min-w-24 ml-5"
-									disabled={downloading}
-									onClick={onDownloadAndInstall}
-								>
-									{downloading ? (
-										<Spinner />
-									) : (
-										<Download className="mt-0.5 mr-1" />
-									)}
-									更新并重启
-								</Button>
+								<>
+									<Button
+										size="sm"
+										className="cursor-pointer min-w-24 ml-5"
+										disabled={downloading}
+										onClick={onDownloadAndInstall}
+									>
+										{downloading ? (
+											<Spinner />
+										) : (
+											<Download className="mt-0.5 mr-1" />
+										)}
+										更新并重启
+									</Button>
+									<Button
+										size="sm"
+										className="cursor-pointer min-w-24 ml-5"
+										onClick={() =>
+											openUrl(storageInfo?.notes || updateInfo?.body)
+										}
+									>
+										<Info className="mt-0.5 mr-1" />
+										查看更新内容
+									</Button>
+								</>
 							) : null}
 						</div>
 					</div>
