@@ -22,10 +22,10 @@ import { useGetVersion, useStorageInfo } from '@/hooks';
 import {
 	checkForUpdates,
 	checkVersion,
+	formatDate,
 	getValue,
 	removeStorage,
 	setValue,
-	formatDate,
 	type UpdateType,
 } from '@/utils';
 
