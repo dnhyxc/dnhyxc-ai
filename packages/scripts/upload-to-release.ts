@@ -5,7 +5,8 @@ import { fileURLToPath } from 'node:url';
 import dotenv from 'dotenv';
 
 const _dirname = path.dirname(fileURLToPath(import.meta.url));
-dotenv.config({ path: path.resolve(_dirname, '../../.env') });
+
+dotenv.config();
 
 const TOKEN = process.env.GITHUB_TOKEN;
 const OWNER = 'dnhyxc';
