@@ -12,6 +12,8 @@ import {
 export const THEMES = [
 	{ name: 'light', value: '#ffffff', label: '浅色', type: 'default' },
 	{ name: 'dark', value: '#1e1e1e', label: '深色', type: 'default' },
+	{ name: 'white', value: '#ffffff', label: '白色', type: 'color' },
+	{ name: 'black', value: '#1e1e1e', label: '黑色', type: 'color' },
 	{ name: 'purple', value: '#8076c3', label: '紫色', type: 'color' },
 	{ name: 'blue-1', value: '#7987c4', label: '蓝紫', type: 'color' },
 	{ name: 'blue-2', value: '#607ce9', label: '蓝色', type: 'color' },

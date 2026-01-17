@@ -1,6 +1,5 @@
-/** biome-ignore-all lint/a11y/noSvgWithoutTitle: <explanation> */
-
 import { Button } from '@ui/button';
+import { CircleCheckBig } from 'lucide-react';
 import { THEMES, useTheme } from '@/hooks';
 
 const Theme = () => {
@@ -54,19 +53,7 @@ const Theme = () => {
 							{theme === t.name && (
 								<div className="absolute inset-0 flex items-center justify-center">
 									<div className="w-8 h-8 rounded-full bg-white/90 flex items-center justify-center">
-										<svg
-											className="w-5 h-5"
-											fill="none"
-											stroke={t.value}
-											viewBox="0 0 24 24"
-										>
-											<path
-												strokeLinecap="round"
-												strokeLinejoin="round"
-												strokeWidth={2}
-												d="M5 13l4 4L19 7"
-											/>
-										</svg>
+										<CircleCheckBig className="text-theme" />
 									</div>
 								</div>
 							)}
