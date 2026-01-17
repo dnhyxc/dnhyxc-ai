@@ -79,10 +79,10 @@ const Theme = () => {
 							</p>
 						</div>
 						<div className="flex gap-4">
-							<Button className="px-4 py-2 rounded-lg text-white text-sm bg-theme hover:opacity-90 transition-opacity">
+							<Button className="px-4 py-2 rounded-lg text-theme-foreground text-sm bg-theme hover:opacity-90 transition-opacity">
 								主要按钮
 							</Button>
-							<Button className="px-4 py-2 rounded-lg text-sm border border-theme text-theme hover:bg-theme-light/30 transition-colors">
+							<Button variant="ghost" className="px-4 py-2 rounded-lg text-sm">
 								次要按钮
 							</Button>
 						</div>

@@ -13,7 +13,7 @@ import { Outlet } from 'react-router';
 
 const Layout = () => {
 	return (
-		<main className="w-full h-full flex rounded-md overflow-hidden bg-theme-background">
+		<main className="w-full h-full flex rounded-md overflow-hidden bg-theme-background text-theme-foreground">
 			<Toaster />
 			<Sidebar />
 			<div
