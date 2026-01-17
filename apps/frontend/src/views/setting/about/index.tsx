@@ -1,3 +1,4 @@
+import { openUrl } from '@tauri-apps/plugin-opener';
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -8,7 +9,6 @@ import {
 	AlertDialogHeader,
 	AlertDialogTitle,
 } from '@ui/alert-dialog';
-import { openUrl } from '@tauri-apps/plugin-opener';
 import { Button } from '@ui/button';
 import { Checkbox } from '@ui/checkbox';
 import { Label } from '@ui/label';
