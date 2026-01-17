@@ -25,6 +25,7 @@ import {
 	getValue,
 	removeStorage,
 	setValue,
+	formatDate,
 	type UpdateType,
 } from '@/utils';
 
@@ -139,8 +140,19 @@ const SettingAbout = () => {
 								Dnhyxc AI {currentVersion}
 							</div>
 							{storageInfo?.version || updateInfo?.version ? (
-								<div className="dark:text-gray-300 text-gray-600 text-sm mt-1">
-									最新版本 {storageInfo?.version || updateInfo?.version}
+								<div className="flex items-center dark:text-gray-300 text-gray-600 text-sm mt-1">
+									<div>
+										最新版本
+										<span className="ml-2.5">
+											{storageInfo?.version || updateInfo?.version}
+										</span>
+									</div>
+									<div className="ml-5">
+										发布时间
+										<span className="ml-2.5">
+											{formatDate(storageInfo?.date || updateInfo?.date)}
+										</span>
+									</div>
 								</div>
 							) : null}
 						</div>
@@ -175,6 +187,7 @@ const SettingAbout = () => {
 									</Button>
 									<Button
 										size="sm"
+										variant="outline"
 										className="cursor-pointer min-w-24 ml-5"
 										onClick={() =>
 											openUrl(storageInfo?.notes || updateInfo?.body)
