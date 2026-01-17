@@ -101,16 +101,17 @@ const SettingAbout = () => {
 			getTotal,
 			onRelaunch,
 			setLoading,
+			onReset,
 		});
 	};
 
 	const onRestart = async () => {
 		removeStorage('autoUpdate');
 		await relaunchRef.current?.();
-		onCancel();
+		onReset();
 	};
 
-	const onCancel = () => {
+	const onReset = () => {
 		setOpen(false);
 		setDownloaded(0);
 		setTotal(0);
@@ -211,7 +212,7 @@ const SettingAbout = () => {
 					</Label>
 				</div>
 			</div>
-			<AlertDialog open={open} onOpenChange={onCancel}>
+			<AlertDialog open={open} onOpenChange={onReset}>
 				<AlertDialogContent className="w-112.5">
 					<AlertDialogHeader>
 						<AlertDialogTitle>确定要现在重启应用吗?</AlertDialogTitle>
