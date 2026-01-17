@@ -25,31 +25,40 @@ export const checkVersion = async () => {
 };
 
 export const checkForUpdates = async (options?: CheckForUpdatesOptions) => {
-	const update = await check();
-	if (update) {
-		await update.downloadAndInstall((event) => {
-			switch (event.event) {
-				case 'Started':
-					options?.setLoading?.(true);
-					options?.getTotal?.(event.data.contentLength || 0);
-					break;
-				case 'Progress':
-					options?.getProgress?.(event.data.chunkLength);
-					break;
-				case 'Finished':
-					break;
-			}
+	try {
+		options?.setLoading?.(true);
+		const update = await check();
+		if (update) {
+			await update.downloadAndInstall((event) => {
+				switch (event.event) {
+					case 'Started':
+						options?.getTotal?.(event.data.contentLength || 0);
+						break;
+					case 'Progress':
+						options?.getProgress?.(event.data.chunkLength);
+						break;
+					case 'Finished':
+						break;
+				}
+			});
+
+			options?.onRelaunch?.(relaunch);
+
+			// console.log('update installed');
+			// Toast({
+			// 	title: '正在安装',
+			// 	type: 'success',
+			// });
+			// await new Promise((resolve) => setTimeout(resolve, 1000));
+			// // 此处 relaunch 前最好询问用户
+			// await relaunch();
+		}
+	} catch (error: any) {
+		options?.setLoading?.(false);
+		Toast({
+			title: '更新失败',
+			type: 'error',
+			message: error?.message || String(error),
 		});
-
-		options?.onRelaunch?.(relaunch);
-
-		// console.log('update installed');
-		// Toast({
-		// 	title: '正在安装',
-		// 	type: 'success',
-		// });
-		// await new Promise((resolve) => setTimeout(resolve, 1000));
-		// // 此处 relaunch 前最好询问用户
-		// await relaunch();
 	}
 };
