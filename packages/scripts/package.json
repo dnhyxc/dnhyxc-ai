@@ -1,0 +1,15 @@
+{
+	"name": "@dnhyxc-ai/scripts",
+	"version": "0.0.1",
+	"type": "module",
+	"scripts": {
+		"bump-version": "tsx bump-version.ts",
+		"update-latest": "tsx update-latest.ts",
+		"upload-to-release": "tsx upload-to-release.ts"
+	},
+	"exports": {
+		"./bump-version": "./bump-version.ts",
+		"./update-latest": "./update-latest.ts",
+		"./upload-to-release": "./upload-to-release.ts"
+	}
+}

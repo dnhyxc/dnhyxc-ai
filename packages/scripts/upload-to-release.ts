@@ -4,9 +4,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import dotenv from 'dotenv';
 
-dotenv.config();
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const _dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.resolve(_dirname, '../../.env') });
 
 const TOKEN = process.env.GITHUB_TOKEN;
 const OWNER = 'dnhyxc';
@@ -14,20 +13,20 @@ const REPO = 'dnhyxc-ai';
 const TAG = 'v0.0.1';
 const FILE_PATHS = [
 	path.resolve(
-		__dirname,
-		'../apps/frontend/src-tauri/target/release/bundle/macos/dnhyxc-ai.app.tar.gz',
+		_dirname,
+		'../../apps/frontend/src-tauri/target/release/bundle/macos/dnhyxc-ai.app.tar.gz',
 	),
-	path.resolve(__dirname, '../apps/frontend/latest.json'),
+	path.resolve(_dirname, '../../apps/frontend/latest.json'),
 ];
 
-function getContentType(filePath) {
+function getContentType(filePath: string) {
 	const ext = path.extname(filePath);
 	if (ext === '.json') return 'application/json';
 	if (ext === '.gz') return 'application/gzip';
 	return 'application/octet-stream';
 }
 
-async function getReleaseId(tag) {
+async function getReleaseId(tag: string) {
 	return new Promise((resolve, reject) => {
 		const req = https.request(
 			{
@@ -65,7 +64,10 @@ async function getReleaseId(tag) {
 	});
 }
 
-async function getExistingAssetId(releaseId, fileName) {
+async function getExistingAssetId(
+	releaseId: number,
+	fileName: string,
+): Promise<number | null> {
 	return new Promise((resolve, reject) => {
 		const req = https.request(
 			{
@@ -85,7 +87,9 @@ async function getExistingAssetId(releaseId, fileName) {
 				res.on('end', () => {
 					try {
 						const assets = JSON.parse(data);
-						const existing = assets.find((a) => a.name === fileName);
+						const existing = assets.find(
+							(a: { name: string }) => a.name === fileName,
+						);
 						resolve(existing ? existing.id : null);
 					} catch (_e) {
 						resolve(null);
@@ -98,7 +102,7 @@ async function getExistingAssetId(releaseId, fileName) {
 	});
 }
 
-async function deleteAsset(assetId) {
+async function deleteAsset(assetId: number) {
 	return new Promise((resolve, reject) => {
 		const req = https.request(
 			{
@@ -119,7 +123,7 @@ async function deleteAsset(assetId) {
 	});
 }
 
-async function uploadToRelease(filePath, releaseId) {
+async function uploadToRelease(filePath: string, releaseId: number) {
 	if (!fs.existsSync(filePath)) {
 		console.error(`❌ 文件不存在: ${filePath}`);
 		process.exit(1);
@@ -132,7 +136,7 @@ async function uploadToRelease(filePath, releaseId) {
 	const existingId = await getExistingAssetId(releaseId, fileName);
 	if (existingId) {
 		console.log(`🗑️ 删除已有资源: ${fileName}`);
-		await deleteAsset(existingId);
+		await deleteAsset(existingId as number);
 	}
 
 	return new Promise((resolve, reject) => {
@@ -149,7 +153,8 @@ async function uploadToRelease(filePath, releaseId) {
 				},
 			},
 			(res) => {
-				if (res.statusCode >= 200 && res.statusCode < 300) {
+				const statusCode = res.statusCode ?? 0;
+				if (statusCode >= 200 && statusCode < 300) {
 					console.log(`✅ 上传成功: ${fileName}`);
 					resolve(true);
 				} else {
@@ -158,7 +163,7 @@ async function uploadToRelease(filePath, releaseId) {
 						data += chunk;
 					});
 					res.on('end', () => {
-						console.error(`❌ 上传失败: ${res.statusCode}`);
+						console.error(`❌ 上传失败: ${statusCode}`);
 						console.error(data);
 						resolve(false);
 					});
@@ -195,7 +200,7 @@ async function main() {
 	console.log('');
 
 	for (const filePath of FILE_PATHS) {
-		await uploadToRelease(filePath, releaseId);
+		await uploadToRelease(filePath, releaseId as number);
 		console.log('');
 	}
 	process.exit(0);

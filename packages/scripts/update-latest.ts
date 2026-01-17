@@ -4,14 +4,14 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const PACKAGE_JSON_PATH = path.resolve(__dirname, '../package.json');
+const PACKAGE_JSON_PATH = path.resolve(__dirname, '../../package.json');
 const LATEST_JSON_PATH = path.resolve(
 	__dirname,
-	'../apps/frontend/latest.json',
+	'../../apps/frontend/latest.json',
 );
 const SIG_FILE_PATH = path.resolve(
 	__dirname,
-	'../apps/frontend/src-tauri/target/release/bundle/macos/dnhyxc-ai.app.tar.gz.sig',
+	'../../apps/frontend/src-tauri/target/release/bundle/macos/dnhyxc-ai.app.tar.gz.sig',
 );
 
 function updateLatestJson() {

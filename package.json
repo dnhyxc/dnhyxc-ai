@@ -1,11 +1,11 @@
 {
 	"name": "dnhyxc-ai",
-	"version": "0.0.32",
+	"version": "0.0.35",
 	"description": "",
 	"type": "module",
 	"scripts": {
 		"dev": "pnpm -C apps/frontend tauri dev",
-		"build": "node scripts/bump-version.js && pnpm -C apps/frontend tauri build && node scripts/update-latest.js && node scripts/upload-to-release.js",
+		"build": "pnpm --filter @dnhyxc-ai/scripts bump-version && pnpm -C apps/frontend tauri build && pnpm --filter @dnhyxc-ai/scripts update-latest && pnpm --filter @dnhyxc-ai/scripts upload-to-release",
 		"server:dev": "pnpm -C apps/backend start:dev",
 		"server:start": "pnpm -C apps/backend start",
 		"server:debug": "pnpm -C apps/backend start:debug",
@@ -15,7 +15,9 @@
 		"format": "biome format --write",
 		"prepare": "husky install",
 		"commit": "git-cz",
-		"upload:to:release": "node scripts/upload-to-release.js"
+		"version": "pnpm --filter @dnhyxc-ai/scripts bump-version",
+		"latest": "pnpm --filter @dnhyxc-ai/scripts update-latest",
+		"upload": "pnpm --filter @dnhyxc-ai/scripts upload-to-release"
 	},
 	"keywords": [],
 	"author": "dnhyxc",
@@ -28,6 +30,8 @@
 		"commitlint": "20.2.0",
 		"dotenv": "^17.2.3",
 		"husky": "8.0.3",
+		"ts-node": "^10.9.2",
+		"tsx": "^4.21.0",
 		"typescript": "~5.8.3"
 	},
 	"config": {

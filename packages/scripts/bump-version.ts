@@ -6,9 +6,9 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const TAURI_CONFIG_PATH = path.resolve(
 	__dirname,
-	'../apps/frontend/src-tauri/tauri.conf.json',
+	'../../apps/frontend/src-tauri/tauri.conf.json',
 );
-const PACKAGE_JSON_PATH = path.resolve(__dirname, '../package.json');
+const PACKAGE_JSON_PATH = path.resolve(__dirname, '../../package.json');
 
 function bumpVersion() {
 	const tauriConfig = JSON.parse(fs.readFileSync(TAURI_CONFIG_PATH, 'utf-8'));
