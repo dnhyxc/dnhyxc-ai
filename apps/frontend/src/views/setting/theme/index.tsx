@@ -1,6 +1,7 @@
 /** biome-ignore-all lint/a11y/noSvgWithoutTitle: <explanation> */
-import { THEMES, useTheme } from '@/hooks';
+
 import { Button } from '@ui/button';
+import { THEMES, useTheme } from '@/hooks';
 
 const Theme = () => {
 	const { theme, changeTheme, isDark } = useTheme();
