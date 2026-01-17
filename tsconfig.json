@@ -26,5 +26,5 @@
 	},
 	// 这里不能包含 './server/**/*'，否则打包前台项目时，会去查找 server 文件目录，导致打包报错
 	"include": ["./apps/frontend/**/*"],
-	"references": [{ "path": "./apps/frontend/tsconfig.json" }]
+	"references": [{ "path": "./tsconfig.node.json" }]
 }
