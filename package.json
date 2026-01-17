@@ -4,8 +4,8 @@
 	"description": "",
 	"main": "index.js",
 	"scripts": {
-		"dev": "pnpm -C client tauri dev",
-		"build": "node scripts/bump-version.js && pnpm -C client tauri build && node scripts/update-latest.js && node scripts/upload-to-release.js",
+		"dev": "pnpm -C apps/frontend tauri dev",
+		"build": "node scripts/bump-version.js && pnpm -C apps/frontend tauri build && node scripts/update-latest.js && node scripts/upload-to-release.js",
 		"server:dev": "pnpm -C server start:dev",
 		"server:start": "pnpm -C server start",
 		"server:debug": "pnpm -C server start:debug",
