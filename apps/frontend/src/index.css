@@ -1,11 +1,7 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
-/* @custom-variant dark (&:is(.dark *)); */
 @custom-variant dark (&:where(.dark, .dark *));
-/* @custom-variant dark (&:where(.dark, .dark *)); */
-/* 定义名为 "dark" 的自定义变体，当任意祖先元素带有 data-theme="dark" 时，其内部所有元素都会应用该变体下的样式规则 */
-/* @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *)); */
 
 html,
 body {
@@ -13,12 +9,7 @@ body {
 	padding: 0;
 	height: 100%;
 	width: 100%;
-	/* 禁止页面回弹效果 */
 	overscroll-behavior: none;
-	/* user-select: none;
-	-webkit-user-select: none;
-	-moz-user-select: none;
-	-ms-user-select: none; */
 }
 
 #root {
@@ -29,7 +20,6 @@ body {
 }
 
 :root {
-	/* --background: #1e1e1e; */
 	--background: oklch(1 0 0);
 	--foreground: oklch(0.13 0.028 261.692);
 	--card: oklch(1 0 0);
@@ -47,7 +37,6 @@ body {
 	--destructive: oklch(0.577 0.245 27.325);
 	--destructive-foreground: 210 40% 98%;
 	--border: oklch(0.928 0.006 264.531);
-	/* --input: oklch(0.928 0.006 264.531); */
 	--ring: oklch(0.707 0.022 261.325);
 	--radius: 0.625rem;
 	--chart-1: oklch(0.646 0.222 41.116);
@@ -69,7 +58,14 @@ body {
 	--shadow-8: 0 0 8px rgba(0, 0, 0, 0.2);
 	--shadow-10: 0 0 10px rgba(0, 0, 0, 0.2);
 	--font-family: "手札体-简";
-	--h-color: #ffbf32;
+	--theme-color: oklch(0.55 0.12 264.665);
+	--theme-background: oklch(0.99 0.005 264.665);
+	--theme-card: oklch(1 0 0);
+	--theme-muted: oklch(0.96 0.01 264.665);
+	--theme-border: oklch(0.9 0.02 264.665);
+	--theme-foreground: oklch(0.25 0.03 264.665);
+	--theme-secondary: oklch(0.92 0.02 264.665);
+	--theme-sidebar: oklch(0.97 0.01 264.665);
 }
 
 .dark {
@@ -90,7 +86,6 @@ body {
 	--destructive: oklch(0.704 0.191 22.216);
 	--destructive-foreground: 210 40% 98%;
 	--border: oklch(1 0 0 / 10%);
-	/* --input: oklch(1 0 0 / 15%); */
 	--ring: oklch(0.551 0.027 264.364);
 	--chart-1: oklch(0.488 0.243 264.376);
 	--chart-2: oklch(0.696 0.17 162.48);
@@ -110,12 +105,105 @@ body {
 	--shadow-6: 0 0 6px rgba(255, 255, 255, 0.5);
 	--shadow-8: 0 0 8px rgba(255, 255, 255, 0.5);
 	--shadow-10: 0 0 10px rgba(255, 255, 255, 0.5);
-	--h-color: #ffbf32;
+	--theme-color: oklch(0.55 0.12 264.665);
+	--theme-background: oklch(0.14 0.02 264.665);
+	--theme-card: oklch(0.22 0.025 264.665);
+	--theme-muted: oklch(0.3 0.03 264.665);
+	--theme-border: oklch(1 0 0 / 15%);
+	--theme-foreground: oklch(0.95 0.01 264.665);
+	--theme-secondary: oklch(0.35 0.035 264.665);
+	--theme-sidebar: oklch(0.25 0.025 264.665);
+}
+
+.theme-purple {
+	--theme-color: oklch(0.55 0.12 293.83);
+	--theme-background: oklch(0.99 0.005 293.83);
+	--theme-card: oklch(1 0 0);
+	--theme-muted: oklch(0.96 0.01 293.83);
+	--theme-border: oklch(0.9 0.02 293.83);
+	--theme-foreground: oklch(0.25 0.03 293.83);
+	--theme-secondary: oklch(0.92 0.02 293.83);
+	--theme-sidebar: oklch(0.97 0.01 293.83);
+}
+
+.theme-blue-1 {
+	--theme-color: oklch(0.55 0.12 261.83);
+	--theme-background: oklch(0.99 0.005 261.83);
+	--theme-card: oklch(1 0 0);
+	--theme-muted: oklch(0.96 0.01 261.83);
+	--theme-border: oklch(0.9 0.02 261.83);
+	--theme-foreground: oklch(0.25 0.03 261.83);
+	--theme-secondary: oklch(0.92 0.02 261.83);
+	--theme-sidebar: oklch(0.97 0.01 261.83);
+}
+
+.theme-blue-2 {
+	--theme-color: oklch(0.55 0.15 248.83);
+	--theme-background: oklch(0.99 0.005 248.83);
+	--theme-card: oklch(1 0 0);
+	--theme-muted: oklch(0.96 0.01 248.83);
+	--theme-border: oklch(0.9 0.02 248.83);
+	--theme-foreground: oklch(0.25 0.03 248.83);
+	--theme-secondary: oklch(0.92 0.02 248.83);
+	--theme-sidebar: oklch(0.97 0.01 248.83);
+}
+
+.theme-blue-3 {
+	--theme-color: oklch(0.55 0.12 225.83);
+	--theme-background: oklch(0.99 0.005 225.83);
+	--theme-card: oklch(1 0 0);
+	--theme-muted: oklch(0.96 0.01 225.83);
+	--theme-border: oklch(0.9 0.02 225.83);
+	--theme-foreground: oklch(0.25 0.03 225.83);
+	--theme-secondary: oklch(0.92 0.02 225.83);
+	--theme-sidebar: oklch(0.97 0.01 225.83);
+}
+
+.theme-green {
+	--theme-color: oklch(0.55 0.12 152.83);
+	--theme-background: oklch(0.99 0.005 152.83);
+	--theme-card: oklch(1 0 0);
+	--theme-muted: oklch(0.96 0.01 152.83);
+	--theme-border: oklch(0.9 0.02 152.83);
+	--theme-foreground: oklch(0.25 0.03 152.83);
+	--theme-secondary: oklch(0.92 0.02 152.83);
+	--theme-sidebar: oklch(0.97 0.01 152.83);
+}
+
+.theme-orange {
+	--theme-color: oklch(0.6 0.12 70.83);
+	--theme-background: oklch(0.99 0.005 70.83);
+	--theme-card: oklch(1 0 0);
+	--theme-muted: oklch(0.96 0.01 70.83);
+	--theme-border: oklch(0.9 0.02 70.83);
+	--theme-foreground: oklch(0.3 0.03 70.83);
+	--theme-secondary: oklch(0.92 0.02 70.83);
+	--theme-sidebar: oklch(0.97 0.01 70.83);
+}
+
+.theme-red {
+	--theme-color: oklch(0.55 0.12 10.83);
+	--theme-background: oklch(0.99 0.005 10.83);
+	--theme-card: oklch(1 0 0);
+	--theme-muted: oklch(0.96 0.01 10.83);
+	--theme-border: oklch(0.9 0.02 10.83);
+	--theme-foreground: oklch(0.25 0.03 10.83);
+	--theme-secondary: oklch(0.92 0.02 10.83);
+	--theme-sidebar: oklch(0.97 0.01 10.83);
+}
+
+.theme-beige {
+	--theme-color: oklch(0.55 0.06 80.83);
+	--theme-background: oklch(0.99 0.005 80.83);
+	--theme-card: oklch(1 0 0);
+	--theme-muted: oklch(0.96 0.01 80.83);
+	--theme-border: oklch(0.85 0.015 80.83);
+	--theme-foreground: oklch(0.3 0.02 80.83);
+	--theme-secondary: oklch(0.92 0.01 80.83);
+	--theme-sidebar: oklch(0.97 0.005 80.83);
 }
 
 @theme inline {
-	/* --spacing: 1px; */
-	--color-black: var(--background);
 	--radius-sm: calc(var(--radius) - 4px);
 	--radius-md: calc(var(--radius) - 2px);
 	--radius-lg: var(--radius);
@@ -154,7 +242,14 @@ body {
 	--color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
 	--color-sidebar-border: var(--sidebar-border);
 	--color-sidebar-ring: var(--sidebar-ring);
-	--color-background: var(--background);
+	--color-theme: var(--theme-color);
+	--color-theme-background: var(--theme-background);
+	--color-theme-card: var(--theme-card);
+	--color-theme-muted: var(--theme-muted);
+	--color-theme-border: var(--theme-border);
+	--color-theme-foreground: var(--theme-foreground);
+	--color-theme-secondary: var(--theme-secondary);
+	--color-theme-sidebar: var(--theme-sidebar);
 }
 
 @layer base {

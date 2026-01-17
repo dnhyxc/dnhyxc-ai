@@ -53,7 +53,7 @@ const Sidebar = () => {
 				<div className="flex flex-col items-center">
 					<div
 						data-tauri-drag-region
-						className="flex justify-center items-center w-11 h-11 bg-border cursor-pointer mb-8 rounded-md hover:text-green-600 transition-all duration-200 ease-in-out"
+						className="flex justify-center items-center w-11 h-11 bg-theme-secondary cursor-pointer mb-8 rounded-md hover:text-green-600 transition-all duration-200 ease-in-out"
 						onClick={() => onJump('/')}
 					>
 						<img
@@ -65,7 +65,7 @@ const Sidebar = () => {
 					{processedMenus.map((item) => (
 						<div
 							key={item.path}
-							className="flex justify-center items-center w-11 h-11 bg-border mb-4 cursor-pointer rounded-md hover:text-green-600 transition-all duration-200 ease-in-out"
+							className="flex justify-center items-center w-11 h-11 bg-theme-secondary mb-4 cursor-pointer rounded-md hover:text-green-600 transition-all duration-200 ease-in-out"
 							onClick={item.onClick}
 						>
 							{item.icon}
@@ -76,7 +76,7 @@ const Sidebar = () => {
 					{storageInfo?.access_token ? (
 						<DropdownMenu>
 							<DropdownMenuTrigger asChild>
-								<div className="flex justify-center items-center w-11 h-11 bg-border cursor-pointer rounded-md hover:text-green-600 transition-all duration-200 ease-in-out">
+								<div className="flex justify-center items-center w-11 h-11 bg-theme-secondary cursor-pointer rounded-md hover:text-green-600 transition-all duration-200 ease-in-out">
 									<CircleUserRound className="hover:text-green-600" />
 								</div>
 							</DropdownMenuTrigger>
@@ -84,7 +84,7 @@ const Sidebar = () => {
 								<DropdownMenuLabel className="flex flex-col justify-center items-center">
 									<div
 										data-tauri-drag-region
-										className="flex justify-center items-center w-12 h-12 bg-border cursor-pointer rounded-md hover:text-green-600 transition-all duration-200 ease-in-out"
+										className="flex justify-center items-center w-12 h-12 bg-theme-secondary cursor-pointer rounded-md hover:text-green-600 transition-all duration-200 ease-in-out"
 									>
 										<img
 											src={storageInfo?.profile?.avatar || ICON}
@@ -114,7 +114,7 @@ const Sidebar = () => {
 						</DropdownMenu>
 					) : (
 						<div
-							className="flex justify-center items-center w-11 h-11 bg-border cursor-pointer rounded-md hover:text-green-600 transition-all duration-200 ease-in-out"
+							className="flex justify-center items-center w-11 h-11 bg-theme-secondary cursor-pointer rounded-md hover:text-green-600 transition-all duration-200 ease-in-out"
 							onClick={() => onJump('/login')}
 						>
 							<CircleUserRound className="hover:text-green-600" />

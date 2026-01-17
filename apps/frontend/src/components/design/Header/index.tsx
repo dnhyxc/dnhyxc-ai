@@ -13,7 +13,7 @@ interface Iprops {
 const Header: React.FC<Iprops> = ({ actions = true, ccustomActions }) => {
 	const [autoUpdate, setAutoUpdate] = useState(false);
 
-	const { currentTheme, toggleTheme } = useTheme();
+	const { isDark, toggleTheme } = useTheme();
 
 	const { storageInfo } = useStorageInfo('autoUpdate');
 
@@ -78,7 +78,7 @@ const Header: React.FC<Iprops> = ({ actions = true, ccustomActions }) => {
 					<div data-tauri-drag-region className="flex items-center h-full">
 						{
 							<div className="flex items-center h-full">
-								{currentTheme === 'light' ? (
+								{!isDark ? (
 									<div
 										className="h-full w-8 flex justify-center items-center hover:text-green-600 cursor-pointer"
 										onClick={toggleTheme}

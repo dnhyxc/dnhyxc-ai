@@ -15,7 +15,6 @@ const System = () => {
 	const [shortcutInfo, setShortcutInfo] = useState(DEFAULT_INFO);
 
 	const getShortCutInfo = () => {
-		// invoke('clear_all_shortcuts');
 		DEFAULT_INFO.map(async (i) => {
 			i.defaultShortcut =
 				(await getValue(`shortcut_${i.key}`)) || i.defaultShortcut;

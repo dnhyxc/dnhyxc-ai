@@ -13,29 +13,20 @@ import { Outlet } from 'react-router';
 
 const Layout = () => {
 	return (
-		<main className="w-full h-full flex rounded-md overflow-hidden">
+		<main className="w-full h-full flex rounded-md overflow-hidden bg-theme-background">
 			<Toaster />
 			<Sidebar />
 			<div
 				data-tauri-drag-region
 				className={`w-full h-full flex-1 flex-col justify-center items-center box-border px-7 pl-0 py-7 rounded-md`}
 			>
-				<div className="h-full w-full rounded-md bg-border">
-					{/* <div className="h-full w-full shadow-(--shadow) rounded-sm"> */}
+				<div className="h-full w-full rounded-md bg-theme-border">
 					<Header />
 					<div className="w-full h-[calc(100%-3.25rem)]">
 						<Outlet />
 					</div>
-					{/* <ScrollArea className="w-full h-[calc(100%-52px)] flex justify-center items-center box-border rounded-md p-1">
-						<div className="w-full h-[calc(100vh-52px)] border border-[red]">
-							<Outlet />
-						</div>
-					</ScrollArea> */}
 				</div>
 			</div>
-			{/* <footer className="h-15 flex items-center justify-center box-border">
-				<Menu />
-			</footer> */}
 		</main>
 	);
 };

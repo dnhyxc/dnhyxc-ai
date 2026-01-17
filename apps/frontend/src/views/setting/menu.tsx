@@ -19,6 +19,12 @@ const NavigationMenus = () => {
 				icon: 'icon-setting',
 			},
 			{
+				name: '主题设置',
+				key: 'theme',
+				path: '/setting/theme',
+				icon: 'icon-theme',
+			},
+			{
 				name: '关于应用',
 				key: 'about',
 				path: '/setting/about',
