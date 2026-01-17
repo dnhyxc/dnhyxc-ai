@@ -11,5 +11,8 @@
 		"./bump-version": "./bump-version.ts",
 		"./update-latest": "./update-latest.ts",
 		"./upload-to-release": "./upload-to-release.ts"
+	},
+	"dependencies": {
+		"dotenv": "^17.2.3"
 	}
 }
