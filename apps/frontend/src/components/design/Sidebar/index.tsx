@@ -53,7 +53,7 @@ const Sidebar = () => {
 				<div className="flex flex-col items-center">
 					<div
 						data-tauri-drag-region
-						className="flex justify-center items-center w-11 h-11 bg-theme-secondary cursor-pointer mb-8 rounded-md hover:text-green-600 transition-all duration-200 ease-in-out"
+						className="flex justify-center items-center w-11 h-11 bg-theme-secondary cursor-pointer mb-8 rounded-md hover:text-theme/70 transition-all duration-200 ease-in-out"
 						onClick={() => onJump('/')}
 					>
 						<img
@@ -65,7 +65,7 @@ const Sidebar = () => {
 					{processedMenus.map((item) => (
 						<div
 							key={item.path}
-							className="flex justify-center items-center w-11 h-11 bg-theme-secondary mb-4 cursor-pointer rounded-md hover:text-green-600 transition-all duration-200 ease-in-out"
+							className="text-theme flex justify-center items-center w-11 h-11 bg-theme-secondary mb-4 cursor-pointer rounded-md hover:text-theme/70 transition-all duration-200 ease-in-out"
 							onClick={item.onClick}
 						>
 							{item.icon}
@@ -76,15 +76,15 @@ const Sidebar = () => {
 					{storageInfo?.access_token ? (
 						<DropdownMenu>
 							<DropdownMenuTrigger asChild>
-								<div className="flex justify-center items-center w-11 h-11 bg-theme-secondary cursor-pointer rounded-md hover:text-green-600 transition-all duration-200 ease-in-out">
-									<CircleUserRound className="hover:text-green-600" />
+								<div className="text-theme flex justify-center items-center w-11 h-11 bg-theme-secondary cursor-pointer rounded-md hover:text-theme/70 transition-all duration-200 ease-in-out">
+									<CircleUserRound className="hover:text-theme/70" />
 								</div>
 							</DropdownMenuTrigger>
 							<DropdownMenuContent align="start" className="min-w-26">
 								<DropdownMenuLabel className="flex flex-col justify-center items-center">
 									<div
 										data-tauri-drag-region
-										className="flex justify-center items-center w-12 h-12 bg-theme-secondary cursor-pointer rounded-md hover:text-green-600 transition-all duration-200 ease-in-out"
+										className="flex justify-center items-center w-12 h-12 bg-theme-secondary cursor-pointer rounded-mdhover:text-theme/70 transition-all duration-200 ease-in-out"
 									>
 										<img
 											src={storageInfo?.profile?.avatar || ICON}
@@ -97,27 +97,27 @@ const Sidebar = () => {
 									</div>
 								</DropdownMenuLabel>
 								<DropdownMenuItem
-									className="flex justify-center items-center cursor-pointer"
+									className="text-theme flex justify-center items-center cursor-pointer"
 									onClick={() => onJump('/profile')}
 								>
-									<CircleUserRound className="hover:text-green-600" />
+									<CircleUserRound className="hover:text-theme/70" />
 									我的主页
 								</DropdownMenuItem>
 								<DropdownMenuItem
 									className="flex justify-center items-center cursor-pointer"
 									onClick={onLogout}
 								>
-									<LogOut className="hover:text-green-600" />
+									<LogOut className="hover:text-theme/70" />
 									退出登录
 								</DropdownMenuItem>
 							</DropdownMenuContent>
 						</DropdownMenu>
 					) : (
 						<div
-							className="flex justify-center items-center w-11 h-11 bg-theme-secondary cursor-pointer rounded-md hover:text-green-600 transition-all duration-200 ease-in-out"
+							className="text-theme flex justify-center items-center w-11 h-11 bg-theme-secondary cursor-pointer rounded-md hover:text-theme/70 transition-all duration-200 ease-in-out"
 							onClick={() => onJump('/login')}
 						>
-							<CircleUserRound className="hover:text-green-600" />
+							<CircleUserRound className="hover:text-theme/70" />
 						</div>
 					)}
 				</div>

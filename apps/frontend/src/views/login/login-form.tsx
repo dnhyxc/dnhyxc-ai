@@ -149,19 +149,19 @@ const LoginForm: React.FC<IProps> = ({ onForgetPwd }) => {
 								<div className="flex items-center justify-between">
 									<Input placeholder="请输入验证码" {...field} />
 									{captchaInfo.captcha && (
-										<div className="flex items-center justify-center relative ml-2 rounded-md hover:border-ring hover:ring-ring/50 hover:ring-[3px]">
+										<div className="flex items-center justify-center relative ml-2 rounded-md hover:border-theme/30 hover:ring-theme/30 hover:ring-[3px] group">
 											<div
 												dangerouslySetInnerHTML={{
 													__html: captchaInfo.captcha,
 												}}
 												className="
 													h-[36px] w-[115px] flex justify-center items-center 
-													border border-gray-950 rounded-md dark:border-white [&>svg]:rounded-md cursor-pointer 
+													border border-theme hover:border-theme/50 rounded-md dark:border-white [&>svg]:rounded-md cursor-pointer 
 												"
 												onClick={getCaptcha}
 											/>
 											{isLoading && (
-												<div className="absolute top-0 left-0 w-[115px] h-full bg-gray-500 opacity-50 rounded-md">
+												<div className="absolute top-0 left-0 w-[115px] h-full bg-theme/50 opacity-50 rounded-md">
 													<Spinner className="absolute top-[50%] left-[50%] translate-x-[-50%] translate-y-[-50%] size-5" />
 												</div>
 											)}

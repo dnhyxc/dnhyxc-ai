@@ -54,7 +54,7 @@ const App = () => {
 
 	const router = createBrowserRouter(routes);
 	return (
-		<div className="h-full w-full">
+		<div className="h-full w-full bg-theme-background">
 			<Toaster />
 			<RouterProvider router={router} />
 		</div>

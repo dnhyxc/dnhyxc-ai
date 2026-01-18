@@ -171,21 +171,21 @@ const System = () => {
 
 	return (
 		<div className="w-full h-full flex flex-col justify-center items-center m-0">
-			<div className="border-b dark:border-gray-800 border-gray-300 pb-5.5 mb-1 min-w-[610px]">
+			<div className="border-b dark:border-gray-800  border-theme/20 pb-5.5 mb-1 min-w-[610px]">
 				<div className="text-lg font-bold">文件存储</div>
 				<div className="mt-2 px-10">
 					<span className="mr-2">默认存储路径</span>
-					<span className="ml-2 text-blue-400 text-md">{savePath}</span>
+					<span className="ml-2 text-theme/90 text-md">{savePath}</span>
 					<Button
 						variant="link"
-						className="cursor-pointer text-green-500 text-md"
+						className="cursor-pointer text-theme text-md"
 						onClick={changeDir}
 					>
 						更改目录
 					</Button>
 				</div>
 			</div>
-			<div className="my-5 border-b dark:border-gray-800 border-gray-300 pb-7 min-w-[610px]">
+			<div className="my-5 border-b dark:border-gray-800 border-theme/20 pb-7 min-w-[610px]">
 				<div className="text-lg font-bold">启动设置</div>
 				<div className="flex items-center mt-3.5 px-10">
 					<span className="mr-2">设置开机自启</span>
@@ -209,7 +209,7 @@ const System = () => {
 					</RadioGroup>
 				</div>
 			</div>
-			<div className="mt-1.5 border-b dark:border-gray-800 border-gray-300 pb-7 min-w-[610px]">
+			<div className="mt-1.5 border-b dark:border-gray-800  border-theme/20 pb-7 min-w-[610px]">
 				<div className="text-lg font-bold">关闭设置</div>
 				<div className="flex items-center mt-3.5 px-10">
 					<span className="mr-2">关闭应用程序</span>

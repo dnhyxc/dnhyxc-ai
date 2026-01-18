@@ -3,17 +3,20 @@ import { Button } from '@ui/button';
 import { Input } from '@ui/input';
 import { ScrollArea } from '@ui/scroll-area';
 import { useEffect } from 'react';
-import { onListen, setBodyClass } from '@/utils';
+import { type ThemeName, useTheme } from '@/hooks';
+import { onListen } from '@/utils';
 import { onEmit } from '@/utils/event';
 
 const ChildWindow = () => {
+	const { changeTheme } = useTheme();
+
 	useEffect(() => {
 		const unlistenPromise = onListen('message', (value: string) => {
 			console.log('message', value);
 		});
 
 		const unlistenThemePromise = onListen('theme', (value: string) => {
-			setBodyClass(value);
+			changeTheme(value as ThemeName, false);
 		});
 
 		return () => {

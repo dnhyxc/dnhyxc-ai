@@ -10,10 +10,13 @@ import Header from '@design/Header';
 import Sidebar from '@design/Sidebar';
 import { Toaster } from '@ui/sonner';
 import { Outlet } from 'react-router';
+import { useTheme } from '@/hooks';
 
 const Layout = () => {
+	useTheme();
+
 	return (
-		<main className="w-full h-full flex rounded-md overflow-hidden bg-theme-background text-theme-foreground">
+		<main className="w-full h-full flex rounded-md overflow-hidden bg-theme-background">
 			<Toaster />
 			<Sidebar />
 			<div

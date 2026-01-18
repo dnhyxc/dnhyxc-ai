@@ -58,12 +58,14 @@ body {
 	--shadow-8: 0 0 8px rgba(0, 0, 0, 0.2);
 	--shadow-10: 0 0 10px rgba(0, 0, 0, 0.2);
 	--font-family: "手札体-简";
-	--theme-color: oklch(0.55 0.08 264.665);
+	--theme-color: oklch(60.325% 0.00007 271.152);
 	--theme-background: oklch(1 0 0);
 	--theme-card: oklch(1 0 0);
 	--theme-muted: oklch(0.967 0.003 264.542);
 	--theme-border: oklch(0.928 0.006 264.531);
 	--theme-foreground: oklch(0.13 0.028 261.692);
+	--theme-textcolor: oklch(100% 0.00011 271.152);
+	--theme-default: oklch(0.15 0.02 264.665);
 	--theme-secondary: oklch(0.967 0.003 264.542);
 	--theme-sidebar: oklch(0.985 0.002 247.839);
 }
@@ -110,29 +112,35 @@ body {
 	--theme-card: oklch(0.21 0.034 264.665);
 	--theme-muted: oklch(0.278 0.033 256.848);
 	--theme-border: oklch(1 0 0 / 10%);
+	--theme-textcolor: oklch(0.15 0.02 264.665);
+	--theme-default: oklch(100% 0.00011 271.152);
 	--theme-foreground: oklch(0.985 0.002 247.839);
 	--theme-secondary: oklch(0.278 0.033 256.848);
 	--theme-sidebar: oklch(0.21 0.034 264.665);
 }
 
 .theme-white {
-	--theme-color: oklch(0.15 0.02 264.665);
+	--theme-color: oklch(100% 0.00011 271.152);
 	--theme-background: oklch(1 0 0);
 	--theme-card: oklch(1 0 0);
 	--theme-muted: oklch(0.98 0.005 264.665);
 	--theme-border: oklch(0.92 0.01 264.665);
 	--theme-foreground: oklch(0.15 0.02 264.665);
+	--theme-textcolor: oklch(0.15 0.02 264.665);
+	--theme-default: oklch(100% 0.00011 271.152);
 	--theme-secondary: oklch(0.95 0.01 264.665);
 	--theme-sidebar: oklch(0.98 0.005 264.665);
 }
 
 .theme-black {
-	--theme-color: oklch(0.15 0.02 264.665);
-	--theme-background: oklch(0.08 0.01 264.665);
+	--theme-color: oklch(100% 0.00011 271.152);
+	--theme-background: oklch(12% 0.00818 255);
 	--theme-card: oklch(0.12 0.01 264.665);
 	--theme-muted: oklch(0.18 0.015 264.665);
-	--theme-border: oklch(1 0 0 / 25%);
-	--theme-foreground: oklch(1 0 0);
+	--theme-border: oklch(33.68% 0.00004 271.152 / 0.25);
+	--theme-textcolor: oklch(100% 0.00011 271.152);
+	--theme-default: oklch(0.08 0.01 264.665);
+	--theme-foreground: oklch(46.76% 0.00005 271.152);
 	--theme-secondary: oklch(0.22 0.02 264.665);
 	--theme-sidebar: oklch(0.12 0.01 264.665);
 }
@@ -143,6 +151,8 @@ body {
 	--theme-card: oklch(1 0 0);
 	--theme-muted: oklch(0.96 0.01 293.83);
 	--theme-border: oklch(0.9 0.02 293.83);
+	--theme-textcolor: oklch(0.25 0.03 152.83);
+	--theme-default: oklch(100% 0.00011 271.152);
 	--theme-foreground: oklch(0.25 0.03 293.83);
 	--theme-secondary: oklch(0.92 0.02 293.83);
 	--theme-sidebar: oklch(0.97 0.01 293.83);
@@ -154,17 +164,21 @@ body {
 	--theme-card: oklch(1 0 0);
 	--theme-muted: oklch(0.96 0.01 261.83);
 	--theme-border: oklch(0.9 0.02 261.83);
+	--theme-textcolor: oklch(0.25 0.03 152.83);
+	--theme-default: oklch(100% 0.00011 271.152);
 	--theme-foreground: oklch(0.25 0.03 261.83);
 	--theme-secondary: oklch(0.92 0.02 261.83);
 	--theme-sidebar: oklch(0.97 0.01 261.83);
 }
 
 .theme-blue-2 {
-	--theme-color: oklch(0.55 0.15 248.83);
+	--theme-color: oklch(59.015% 0.18409 269.469);
 	--theme-background: oklch(0.99 0.005 248.83);
 	--theme-card: oklch(1 0 0);
 	--theme-muted: oklch(0.96 0.01 248.83);
 	--theme-border: oklch(0.9 0.02 248.83);
+	--theme-textcolor: oklch(0.25 0.03 248.83);
+	--theme-default: oklch(100% 0.00011 271.152);
 	--theme-foreground: oklch(0.25 0.03 248.83);
 	--theme-secondary: oklch(0.92 0.02 248.83);
 	--theme-sidebar: oklch(0.97 0.01 248.83);
@@ -176,6 +190,8 @@ body {
 	--theme-card: oklch(1 0 0);
 	--theme-muted: oklch(0.96 0.01 225.83);
 	--theme-border: oklch(0.9 0.02 225.83);
+	--theme-textcolor: oklch(0.25 0.03 152.83);
+	--theme-default: oklch(100% 0.00011 271.152);
 	--theme-foreground: oklch(0.25 0.03 225.83);
 	--theme-secondary: oklch(0.92 0.02 225.83);
 	--theme-sidebar: oklch(0.97 0.01 225.83);
@@ -187,7 +203,9 @@ body {
 	--theme-card: oklch(1 0 0);
 	--theme-muted: oklch(0.96 0.01 152.83);
 	--theme-border: oklch(0.9 0.02 152.83);
-	--theme-foreground: oklch(0.25 0.03 152.83);
+	--theme-textcolor: oklch(0.25 0.03 152.83);
+	--theme-default: oklch(100% 0.00011 271.152);
+	--theme-foreground: oklch(0.9 0.02 152.83);
 	--theme-secondary: oklch(0.92 0.02 152.83);
 	--theme-sidebar: oklch(0.97 0.01 152.83);
 }
@@ -198,6 +216,8 @@ body {
 	--theme-card: oklch(1 0 0);
 	--theme-muted: oklch(0.96 0.01 70.83);
 	--theme-border: oklch(94.165% 0.02688 95.372);
+	--theme-textcolor: oklch(0.25 0.03 152.83);
+	--theme-default: oklch(100% 0.00011 271.152);
 	--theme-foreground: oklch(0.3 0.03 70.83);
 	--theme-secondary: oklch(0.92 0.02688 95.372);
 	--theme-sidebar: oklch(0.97 0.01 70.83);
@@ -209,6 +229,8 @@ body {
 	--theme-card: oklch(1 0 0);
 	--theme-muted: oklch(0.96 0.01 10.83);
 	--theme-border: oklch(0.9 0.02 10.83);
+	--theme-textcolor: oklch(0.25 0.03 152.83);
+	--theme-default: oklch(100% 0.00011 271.152);
 	--theme-foreground: oklch(0.25 0.03 10.83);
 	--theme-secondary: oklch(0.92 0.02 10.83);
 	--theme-sidebar: oklch(0.97 0.01 10.83);
@@ -220,6 +242,8 @@ body {
 	--theme-card: oklch(1 0 0);
 	--theme-muted: oklch(0.96 0.01 80.83);
 	--theme-border: oklch(0.85 0.015 80.83);
+	--theme-textcolor: oklch(0.25 0.03 152.83);
+	--theme-default: oklch(100% 0.00011 271.152);
 	--theme-foreground: oklch(0.3 0.02 80.83);
 	--theme-secondary: oklch(0.92 0.01 80.83);
 	--theme-sidebar: oklch(0.97 0.005 80.83);
@@ -269,6 +293,8 @@ body {
 	--color-theme-card: var(--theme-card);
 	--color-theme-muted: var(--theme-muted);
 	--color-theme-border: var(--theme-border);
+	--color-textcolor: var(--theme-textcolor);
+	--color-default: var(--theme-default);
 	--color-theme-foreground: var(--theme-foreground);
 	--color-theme-secondary: var(--theme-secondary);
 	--color-theme-sidebar: var(--theme-sidebar);
@@ -279,6 +305,6 @@ body {
 		@apply border-border outline-ring/50;
 	}
 	body {
-		@apply bg-background text-foreground;
+		@apply bg-background text-textcolor;
 	}
 }

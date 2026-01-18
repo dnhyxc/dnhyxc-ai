@@ -137,7 +137,7 @@ const SettingAbout = () => {
 								Dnhyxc AI {currentVersion}
 							</div>
 							{storageInfo?.version || updateInfo?.version ? (
-								<div className="dark:text-gray-300 text-gray-600 text-sm mt-1">
+								<div className="text-textcolor/60 text-sm mt-1">
 									最新版本 {storageInfo?.version || updateInfo?.version}
 								</div>
 							) : null}
