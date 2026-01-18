@@ -74,9 +74,6 @@ const Profile = () => {
 			}
 			if (event === 'open_subwindow') {
 				const theme = (await getValue('theme')) as 'dark' | 'light';
-
-				console.log(theme, 'iiiiii-------iiiiiii');
-
 				onCreateWindow({
 					url: '/win',
 					width: 1000,

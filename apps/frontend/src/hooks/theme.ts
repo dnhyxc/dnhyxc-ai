@@ -103,7 +103,6 @@ export const useTheme = () => {
 		if (themeItem?.type === 'color') {
 			setTheme(themeName);
 			setThemeClass(themeName);
-			console.log(themeName, 'themeNamethemeNamethemeNamethemeName');
 			await setValue('theme', themeName === 'black' ? 'dark' : 'light');
 			await setValue('themeType', themeName);
 		}
