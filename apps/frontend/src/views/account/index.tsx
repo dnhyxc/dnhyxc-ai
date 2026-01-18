@@ -119,7 +119,7 @@ const Account = () => {
 				icon: (
 					<SquarePen
 						size={18}
-						className="cursor-pointer text-transparent group-hover:text-green-500"
+						className="cursor-pointer text-transparent group-hover:text-theme"
 						onClick={onEditEmail}
 					/>
 				),
@@ -273,9 +273,9 @@ const Account = () => {
 	return (
 		<div className="w-full h-full flex flex-col justify-center items-center m-0">
 			<ScrollArea className="w-full h-full overflow-y-auto p-2.5 rounded-none">
-				<div className="bg-gray-300 dark:bg-gray-900 rounded-md">
+				<div className="bg-theme-background rounded-md">
 					<div className="h-45 flex items-center justify-between gap-3 relative">
-						<div className="absolute left-10 -bottom-10 p-2 rounded-md bg-gray-800 box-border">
+						<div className="absolute left-10 -bottom-10 p-2 rounded-md bg-theme-secondary box-border">
 							<Upload
 								key={accountInfo.avatar}
 								onUpload={onUpload}
@@ -286,14 +286,14 @@ const Account = () => {
 									<div className="absolute bottom-1 right-3">
 										<Button
 											variant="link"
-											className="p-0 mr-2 cursor-pointer hover:text-green-500"
+											className="p-0 mr-2 cursor-pointer hover:text-theme"
 											onClick={onChangeAvatar}
 										>
 											更换
 										</Button>
 										<Button
 											variant="link"
-											className="p-0 cursor-pointer hover:text-green-500"
+											className="p-0 cursor-pointer hover:text-theme"
 											onClick={onCancelAvatar}
 										>
 											取消
@@ -317,7 +317,7 @@ const Account = () => {
 													{i.icon || (
 														<SquarePen
 															size={18}
-															className="cursor-pointer text-transparent group-hover:text-green-500"
+															className="cursor-pointer text-transparent group-hover:text-theme"
 															onClick={() => setEdit(i.key)}
 														/>
 													)}

@@ -23,7 +23,7 @@ const Layout = () => {
 				data-tauri-drag-region
 				className={`w-full h-full flex-1 flex-col justify-center items-center box-border px-7 pl-0 py-7 rounded-md`}
 			>
-				<div className="h-full w-full rounded-md bg-theme-border">
+				<div className="h-full w-full rounded-md bg-theme-secondary">
 					<Header />
 					<div className="w-full h-[calc(100%-3.25rem)]">
 						<Outlet />

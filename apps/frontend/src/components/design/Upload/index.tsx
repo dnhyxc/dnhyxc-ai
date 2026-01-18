@@ -108,11 +108,11 @@ const Upload: React.FC<IProps> = ({
 			/>
 			{files?.length || fileUrl ? (
 				<div className="relative flex items-center justify-center w-full h-full z-1 group">
-					<div className="absolute inset-0 z-1 rounded-md w-full h-full bg-black/50 items-center justify-center hidden group-hover:flex">
-						<Download className="w-5 h-5 cursor-pointer hover:text-green-500" />
-						<Eye className="w-5 h-5 cursor-pointer ml-2 hover:text-green-500" />
+					<div className="absolute inset-0 z-1 rounded-md w-full h-full bg-theme-background/50 items-center justify-center hidden group-hover:flex">
+						<Download className="w-5 h-5 cursor-pointer hover:text-textcolor/80" />
+						<Eye className="w-5 h-5 cursor-pointer ml-2 hover:text-textcolor/80" />
 						<Trash2
-							className="w-5 h-5 cursor-pointer ml-2 hover:text-green-500"
+							className="w-5 h-5 cursor-pointer ml-2 hover:text-textcolor/80"
 							onClick={() => onDelete(files[0])}
 						/>
 						{children}
@@ -125,10 +125,10 @@ const Upload: React.FC<IProps> = ({
 				</div>
 			) : (
 				<div
-					className="w-full h-full flex items-center justify-center cursor-pointer select-none border border-dashed rounded-md p-8 text-center transition-all duration-300 border-gray-300 hover:border-gray-400 dark:hover:border-blue-400 hover:bg-gray-700 dark:hover:bg-gray-700"
+					className="w-full h-full flex items-center justify-center cursor-pointer select-none border border-dashed rounded-md p-8 text-center transition-all duration-300 border-theme/20 hover:border-theme/80 hover:bg-theme-background/90"
 					onClick={triggerFileInput}
 				>
-					<UploadIcon className="w-8 h-8 mx-auto text-gray-400 dark:text-gray-500" />
+					<UploadIcon className="w-8 h-8 mx-auto text-textcolor" />
 				</div>
 			)}
 		</div>

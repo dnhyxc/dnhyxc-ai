@@ -120,15 +120,15 @@ body {
 }
 
 .theme-white {
-	--theme-color: oklch(100% 0.00011 271.152);
+	--theme-color: oklch(0.15 0.02 264.665);
 	--theme-background: oklch(1 0 0);
+	--theme-secondary: oklch(0.95 0.00845 271.331);
 	--theme-card: oklch(1 0 0);
 	--theme-muted: oklch(0.98 0.005 264.665);
-	--theme-border: oklch(0.92 0.01 264.665);
+	--theme-border: oklch(0.95 0.00845 271.331);
 	--theme-foreground: oklch(0.15 0.02 264.665);
 	--theme-textcolor: oklch(0.15 0.02 264.665);
 	--theme-default: oklch(100% 0.00011 271.152);
-	--theme-secondary: oklch(0.95 0.01 264.665);
 	--theme-sidebar: oklch(0.98 0.005 264.665);
 }
 
