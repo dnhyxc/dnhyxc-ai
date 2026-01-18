@@ -328,14 +328,14 @@ const Account = () => {
 													<span className="min-w-10 mr-10">{i.label}</span>
 													{i.component}
 													<Button
-														className="mx-2 cursor-pointer dark:hover:bg-gray-300 hover:bg-gray-800"
+														className="mx-2 cursor-pointer"
 														onClick={() => onSubmit(i.key)}
 													>
 														确定
 													</Button>
 													<Button
 														variant="outline"
-														className="cursor-pointer hover:bg-gray-300 dark:hover:bg-gray-700"
+														className="cursor-pointer"
 														onClick={onCancel}
 													>
 														取消

@@ -29,7 +29,7 @@ const Toast = ({
 
 	toast.custom(() => {
 		return (
-			<div className="flex flex-col justify-center min-h-13 w-80 bg-white dark:bg-gray-900 dark:border-border shadow-lg rounded-md py-2 px-3">
+			<div className="flex flex-col justify-center min-h-13 w-80 bg-theme-background/80 shadow-lg rounded-md py-2 px-3">
 				<div className="flex items-center">
 					<div className="w-6 flex justify-center items-center">
 						{type === 'success' && (
