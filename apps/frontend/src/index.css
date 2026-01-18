@@ -134,10 +134,10 @@ body {
 
 .theme-black {
 	--theme-color: oklch(100% 0.00011 271.152);
-	--theme-background: oklch(12% 0.00818 255);
+	--theme-background: oklch(0.1592 0.0133 272.86);
 	--theme-card: oklch(0.12 0.01 264.665);
 	--theme-muted: oklch(0.18 0.015 264.665);
-	--theme-border: oklch(33.68% 0.00004 271.152 / 0.25);
+	--theme-border: oklch(0.2695 0.0133 272.86 / 0.35);
 	--theme-textcolor: oklch(100% 0.00011 271.152);
 	--theme-default: oklch(0.08 0.01 264.665);
 	--theme-foreground: oklch(46.76% 0.00005 271.152);
