@@ -1,11 +1,23 @@
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { Button } from '@ui/button';
-import { useGetVersion, useTheme } from '@/hooks';
+import { useEffect } from 'react';
+import { type ThemeName, useGetVersion, useTheme } from '@/hooks';
+import { onListen } from '@/utils';
 
 const About = () => {
 	const { version } = useGetVersion();
 
-	useTheme();
+	const { changeTheme } = useTheme();
+
+	useEffect(() => {
+		const unlistenThemePromise = onListen('theme', (value: string) => {
+			changeTheme(value as ThemeName, false);
+		});
+
+		return () => {
+			unlistenThemePromise.then((unlisten) => unlisten());
+		};
+	}, []);
 
 	const handleOpenLink = (url: string) => {
 		openUrl(url);

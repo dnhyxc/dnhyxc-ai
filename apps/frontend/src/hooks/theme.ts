@@ -1,9 +1,7 @@
 import { useEffect, useState } from 'react';
-import { getValue, onEmit, setBodyClass, setValue } from '@/utils';
+import { getValue, onEmit, setValue } from '@/utils';
 
 export const THEMES = [
-	{ name: 'light', value: '#ffffff', label: '浅色', type: 'default' },
-	{ name: 'dark', value: '#1e1e1e', label: '深色', type: 'default' },
 	{ name: 'white', value: '#ffffff', label: '白色', type: 'color' },
 	{ name: 'black', value: '#1e1e1e', label: '黑色', type: 'color' },
 	{ name: 'green', value: '#469c77', label: '绿色', type: 'color' },
@@ -19,43 +17,31 @@ export const THEMES = [
 export type ThemeName = (typeof THEMES)[number]['name'];
 
 export const useTheme = () => {
-	const [theme, setTheme] = useState<ThemeName>('light');
-	const [isDark, setIsDark] = useState(false);
+	const [theme, setTheme] = useState<ThemeName>('white');
 
 	useEffect(() => {
 		const initTheme = async () => {
-			const savedTheme = (await getValue('theme')) as ThemeName;
-			const savedDark = (await getValue('darkMode')) as string;
+			const themeType = (await getValue('themeType')) as ThemeName;
 
-			const themeItem = THEMES.find((t) => t.name === savedTheme);
+			const themeItem = THEMES.find((t) => t.name === themeType);
 			const isColorTheme = themeItem?.type === 'color';
 
-			if (isColorTheme && savedTheme) {
-				setTheme(savedTheme);
-				setThemeClass(savedTheme, false);
-			} else {
-				const dark = savedDark === 'dark' || savedTheme === 'dark';
-				setIsDark(dark);
-				setTheme(dark ? 'dark' : 'light');
-				setBodyClass(dark ? 'dark' : 'light');
+			if (isColorTheme && themeType) {
+				setTheme(themeType);
+				setThemeClass(themeType);
 			}
 		};
 		initTheme();
 	}, []);
 
-	const setThemeClass = (themeName: string, dark: boolean) => {
+	const setThemeClass = (themeName: string) => {
 		document.body.classList.remove(
 			...THEMES.filter((t) => t.type === 'color').map((t) => `theme-${t.name}`),
 		);
-		document.body.classList.remove('dark');
-
 		const themeItem = THEMES.find((t) => t.name === themeName);
 		if (themeItem?.type === 'color') {
 			document.body.classList.add(`theme-${themeName}`);
 			setTimeout(() => applyThemeVariables(), 10);
-		} else if (dark) {
-			document.body.classList.add('dark');
-			resetToDefaultTheme();
 		} else {
 			resetToDefaultTheme();
 		}
@@ -114,32 +100,17 @@ export const useTheme = () => {
 
 	const changeTheme = async (themeName: ThemeName, emit = true) => {
 		const themeItem = THEMES.find((t) => t.name === themeName);
-
 		if (themeItem?.type === 'color') {
 			setTheme(themeName);
-			setThemeClass(themeName, false);
-			await setValue('theme', themeName);
-			await setValue('darkMode', 'light');
-		} else {
-			const dark = themeName === 'dark';
-			setTheme(themeName);
-			setIsDark(dark);
-			setBodyClass(dark ? 'dark' : 'light');
-			await setValue('theme', themeName);
-			await setValue('darkMode', dark ? 'dark' : 'light');
+			setThemeClass(themeName);
+			console.log(themeName, 'themeNamethemeNamethemeNamethemeName');
+			await setValue('theme', themeName === 'black' ? 'dark' : 'light');
+			await setValue('themeType', themeName);
 		}
 		if (emit) {
 			onEmit('theme', themeName);
 		}
 	};
 
-	const toggleTheme = async () => {
-		const newDark = !isDark;
-		setIsDark(newDark);
-		setBodyClass(newDark ? 'dark' : 'light');
-		await setValue('darkMode', newDark ? 'dark' : 'light');
-		onEmit('theme', newDark ? 'dark' : 'light');
-	};
-
-	return { theme, isDark, changeTheme, toggleTheme, themes: THEMES };
+	return { theme, changeTheme, themes: THEMES };
 };
