@@ -97,17 +97,17 @@ const Sidebar = () => {
 									</div>
 								</DropdownMenuLabel>
 								<DropdownMenuItem
-									className="text-theme flex justify-center items-center cursor-pointer"
+									className="text-textcolor flex justify-center items-center cursor-pointer group"
 									onClick={() => onJump('/profile')}
 								>
-									<CircleUserRound className="hover:text-theme/70" />
+									<CircleUserRound className="text-textcolor" />
 									我的主页
 								</DropdownMenuItem>
 								<DropdownMenuItem
 									className="flex justify-center items-center cursor-pointer"
 									onClick={onLogout}
 								>
-									<LogOut className="hover:text-theme/70" />
+									<LogOut className="text-textcolor" />
 									退出登录
 								</DropdownMenuItem>
 							</DropdownMenuContent>
