@@ -9,6 +9,7 @@ import Profile from '@/views/profile';
 import Setting from '@/views/setting';
 import AboutApp from '@/views/setting/about';
 import AppSystem from '@/views/setting/system';
+import ThemeSetting from '@/views/setting/theme';
 import ChildWindow from '@/views/win';
 
 const routes = [
@@ -63,6 +64,13 @@ const routes = [
 						Component: AboutApp,
 						meta: {
 							title: '关于应用',
+						},
+					},
+					{
+						path: '/setting/theme',
+						Component: ThemeSetting,
+						meta: {
+							title: '主题设置',
 						},
 					},
 				],

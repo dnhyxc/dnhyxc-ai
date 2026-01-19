@@ -1,27 +1,21 @@
 import { getVersion } from '@tauri-apps/api/app';
 import { useEffect, useRef, useState } from 'react';
-import {
-	getStorage,
-	getValue,
-	onEmit,
-	setBodyClass,
-	setStorage,
-	setThemeToAllWindows,
-	setValue,
-} from '@/utils';
+import { getStorage as getLocalStorage, setStorage } from '@/utils';
+
+export * from './theme';
 
 export const useCountdown = (initialTime = 60, storageKey = 'countdown') => {
 	const [timeLeft, setTimeLeft] = useState(() => {
-		const savedTime = getStorage(`${storageKey}_time`);
+		const savedTime = getLocalStorage(`${storageKey}_time`);
 		return savedTime ? parseFloat(savedTime) : initialTime;
 	});
 	const [isRunning, setIsRunning] = useState(() => {
-		const savedState = getStorage(`${storageKey}_state`);
+		const savedState = getLocalStorage(`${storageKey}_state`);
 		return savedState === 'running';
 	});
 
-	const animationFrameRef = useRef<number>(null);
-	const lastTimestampRef = useRef<number>(null);
+	const animationFrameRef = useRef<number | null>(null);
+	const lastTimestampRef = useRef<number | null>(null);
 
 	useEffect(() => {
 		if (isRunning) {
@@ -48,7 +42,7 @@ export const useCountdown = (initialTime = 60, storageKey = 'countdown') => {
 		const deltaTime = timestamp - lastTimestampRef.current;
 		lastTimestampRef.current = timestamp;
 
-		setTimeLeft((prevTime) => {
+		setTimeLeft((prevTime: number) => {
 			const newTime = prevTime - deltaTime / 1000;
 
 			if (newTime <= 0) {
@@ -102,8 +96,6 @@ export const useStorageInfo = (key?: string) => {
 
 	const eventKey = key ? `${key}Changed` : 'userInfoChanged';
 
-	console.log('useStorageInfo', eventKey);
-
 	useEffect(() => {
 		const handleStorageChange = () => {
 			setStorageInfo(JSON.parse(getStorage(key || 'userInfo') || '{}'));
@@ -121,31 +113,11 @@ export const useStorageInfo = (key?: string) => {
 	return { storageInfo, setStorageInfo };
 };
 
-export const useTheme = () => {
-	const [currentTheme, setCurrentTheme] = useState<'dark' | 'light'>('light');
-
-	useEffect(() => {
-		initTheme();
-	}, []);
-
-	const initTheme = async () => {
-		const theme = (await getValue('theme')) as 'dark' | 'light';
-		setCurrentTheme(theme);
-		setThemeToAllWindows(theme);
-		setBodyClass(theme);
-	};
-
-	const toggleTheme = async () => {
-		const beforeTheme = await getValue('theme');
-		const type = beforeTheme === 'light' ? 'dark' : 'light';
-		await setValue('theme', type);
-		setThemeToAllWindows(type);
-		setBodyClass(type);
-		setCurrentTheme(type);
-		onEmit('theme', type);
-	};
-
-	return { toggleTheme, currentTheme };
+const getStorage = (key: string) => {
+	if (typeof window !== 'undefined') {
+		return localStorage.getItem(key);
+	}
+	return '';
 };
 
 export const useGetVersion = () => {

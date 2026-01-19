@@ -2,7 +2,9 @@ use crate::system::shortcut::{
     SHORTCUT_HANDLING_ENABLED, load_shortcuts_from_store, parse_shortcut,
 };
 use rfd::FileDialog;
+use std::fs;
 use std::sync::atomic::Ordering;
+use tauri::Manager;
 use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_global_shortcut::GlobalShortcutExt;
 
@@ -117,5 +119,21 @@ pub fn reload_all_shortcuts(app: tauri::AppHandle) -> Result<(), String> {
     }
 
     SHORTCUT_HANDLING_ENABLED.store(true, Ordering::SeqCst);
+    Ok(())
+}
+
+/// 清除 updater 插件缓存
+#[tauri::command]
+pub async fn clear_updater_cache(app_handle: tauri::AppHandle) -> Result<(), String> {
+    let cache_path = app_handle
+        .path()
+        .cache_dir()
+        .or_else(|_| Err("无法获取缓存目录".to_string()))?
+        .join("dnhyxc-ai");
+
+    if cache_path.exists() {
+        fs::remove_dir_all(&cache_path).map_err(|e| format!("清除缓存失败: {}", e))?;
+    }
+
     Ok(())
 }

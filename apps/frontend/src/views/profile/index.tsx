@@ -19,6 +19,7 @@ import {
 	createUnlistenFileInfoListener,
 	donwnloadWithUrl,
 	downloadBlob,
+	getValue,
 	onCreateWindow,
 	onEmit,
 	onListen,
@@ -63,7 +64,7 @@ const Profile = () => {
 			console.log('about-send-message', event);
 		});
 
-		const unlistenShortcut = onListen('shortcut-triggered', (event) => {
+		const unlistenShortcut = onListen('shortcut-triggered', async (event) => {
 			if (event === 'new_workflow') {
 				Toast({
 					title: '快捷键触发',
@@ -72,10 +73,12 @@ const Profile = () => {
 				});
 			}
 			if (event === 'open_subwindow') {
+				const theme = (await getValue('theme')) as 'dark' | 'light';
 				onCreateWindow({
 					url: '/win',
 					width: 1000,
 					height: 690,
+					theme,
 				});
 			}
 		});
@@ -87,6 +90,16 @@ const Profile = () => {
 			unlistenShortcut.then((unlisten) => unlisten());
 		};
 	}, []);
+
+	const onOpenWindow = async () => {
+		const theme = (await getValue('theme')) as 'dark' | 'light';
+		onCreateWindow({
+			url: '/win',
+			width: 1000,
+			height: 690,
+			theme,
+		});
+	};
 
 	async function greet() {
 		const res: string = await invoke('greet_name', { name: url });
@@ -349,13 +362,7 @@ const Profile = () => {
 					<Button
 						variant="default"
 						className="cursor-pointer"
-						onClick={() =>
-							onCreateWindow({
-								url: '/win',
-								width: 1000,
-								height: 690,
-							})
-						}
+						onClick={onOpenWindow}
 					>
 						Open Child Window
 					</Button>

@@ -34,7 +34,7 @@ const Home = () => {
 						{Array.from({ length: 10 }).map((_, index) => (
 							<CarouselItem key={index} className="md:basis-1/2 lg:basis-1/4">
 								<div className="px-1.5 h-43 rounded-md">
-									<div className="h-full w-full text-3xl font-semibold rounded-md bg-gray-300 dark:bg-black">
+									<div className="h-full w-full text-3xl font-semibold rounded-md bg-theme-background">
 										{index + 1}
 									</div>
 								</div>
@@ -44,7 +44,7 @@ const Home = () => {
 				</Carousel>
 			</div>
 			<div className="flex-1 w-full p-1.5 mt-2 overflow-y-auto">
-				<ScrollArea className="h-full p-1.5 bg-gray-300 dark:bg-black rounded-md">
+				<ScrollArea className="h-full p-1.5 bg-theme-background rounded-md">
 					<div className="h-500">aaaaa</div>
 				</ScrollArea>
 			</div>

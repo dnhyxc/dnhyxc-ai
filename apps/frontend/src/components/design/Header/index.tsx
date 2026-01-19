@@ -1,7 +1,7 @@
-import { MoonStar, Settings, Sun } from 'lucide-react';
+import { Settings, Shirt } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
-import { useStorageInfo, useTheme } from '@/hooks';
+import { useStorageInfo } from '@/hooks';
 import routes from '@/router/routes';
 import { checkVersion, getValue, removeStorage, setStorage } from '@/utils';
 
@@ -12,8 +12,6 @@ interface Iprops {
 
 const Header: React.FC<Iprops> = ({ actions = true, ccustomActions }) => {
 	const [autoUpdate, setAutoUpdate] = useState(false);
-
-	const { currentTheme, toggleTheme } = useTheme();
 
 	const { storageInfo } = useStorageInfo('autoUpdate');
 
@@ -31,8 +29,8 @@ const Header: React.FC<Iprops> = ({ actions = true, ccustomActions }) => {
 					'autoUpdate',
 					JSON.stringify({
 						version: res?.version,
-						date: res.date,
 						notes: res?.body,
+						date: res?.date,
 					}),
 				);
 			} else {
@@ -82,26 +80,20 @@ const Header: React.FC<Iprops> = ({ actions = true, ccustomActions }) => {
 					{title}
 				</div>
 				{actions ? (
-					<div data-tauri-drag-region className="flex items-center h-full">
+					<div
+						data-tauri-drag-region
+						className="text-theme flex items-center h-full"
+					>
 						{
 							<div className="flex items-center h-full">
-								{currentTheme === 'light' ? (
-									<div
-										className="h-full w-8 flex justify-center items-center hover:text-green-600 cursor-pointer"
-										onClick={toggleTheme}
-									>
-										<Sun className="w-5 h-5" />
-									</div>
-								) : (
-									<div
-										className="h-full w-8 flex justify-center items-center hover:text-green-600 cursor-pointer"
-										onClick={toggleTheme}
-									>
-										<MoonStar className="w-5 h-5" />
-									</div>
-								)}
 								<div
-									className="relative h-full w-8 flex justify-center items-center hover:text-green-600 cursor-pointer"
+									className="h-full w-8 flex justify-center items-center hover:text-theme/80 cursor-pointer"
+									onClick={() => navigate('/setting/theme')}
+								>
+									<Shirt className="w-5 h-4.5" />
+								</div>
+								<div
+									className="relative h-full w-8 flex justify-center items-center hover:text-theme/80 cursor-pointer"
 									onClick={toSetting}
 								>
 									<Settings className="w-5 h-5" />

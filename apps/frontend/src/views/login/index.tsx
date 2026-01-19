@@ -2,6 +2,7 @@ import { Button } from '@ui/button';
 import { ScrollArea } from '@ui/scroll-area';
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
+import { useTheme } from '@/hooks';
 import ForgetPwdForm from './forget-pwd-form';
 import LoginForm from './login-form';
 import RegisterForm from './register-form';
@@ -11,6 +12,8 @@ const Login = () => {
 	const [isForget, setIsForget] = useState(false);
 
 	const navigate = useNavigate();
+
+	useTheme();
 
 	const onRegister = () => {
 		setIsRegister(!isRegister);
@@ -31,7 +34,7 @@ const Login = () => {
 	};
 
 	return (
-		<div className="flex flex-col items-center justify-center w-full h-full rounded-md bg-border">
+		<div className="flex flex-col items-center justify-center w-full h-full rounded-md bg-theme-background">
 			<ScrollArea
 				dataTauriDragRegion
 				viewportClassName="flex items-center justify-center"
@@ -55,21 +58,21 @@ const Login = () => {
 						<div className="w-90 flex justify-end">
 							<Button
 								variant="link"
-								className="cursor-pointer p-0 text-sm"
+								className="cursor-pointer p-0 text-sm text-theme"
 								onClick={onRegister}
 							>
 								{isRegister ? '已有账号，前往登录' : '没有账号，点我注册'}
 							</Button>
 							<Button
 								variant="link"
-								className="cursor-pointer p-0 text-sm mx-4"
+								className="cursor-pointer p-0 text-sm mx-4 text-theme"
 								onClick={() => onForgetPwd()}
 							>
 								忘记密码
 							</Button>
 							<Button
 								variant="link"
-								className="cursor-pointer p-0 text-sm"
+								className="cursor-pointer p-0 text-sm text-theme"
 								onClick={goHome}
 							>
 								返回首页

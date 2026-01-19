@@ -394,3 +394,103 @@ export TAURI_SIGNING_PRIVATE_KEY="dW50cnVzdGVkIGNvbW1lbnQ6IHJzaWduIGVuY3J5cHRlZC
 ## Releases
 
 https://github.com/dnhyxc/dnhyxc-ai/releases/tag/v0.0.1
+
+## Auto Update
+
+```ts
+import { fetch } from "@tauri-apps/plugin-http";
+import { relaunch } from "@tauri-apps/plugin-process";
+import { check, type Update } from "@tauri-apps/plugin-updater";
+import { Toast } from "@/components/ui/sonner";
+
+interface CheckForUpdatesOptions {
+	getProgress?: (progress: number) => void;
+	getTotal?: (total: number) => void;
+	onRelaunch?: (relaunch: () => Promise<void>) => void;
+	setLoading?: (loading: boolean) => void;
+	onReset?: () => void;
+	onFinished?: () => void;
+}
+
+export type UpdateType = Update;
+
+export const checkVersion = async () => {
+	try {
+		const update = await check();
+		const latestVersion = await getLatestUpdateInfo();
+		if (
+			latestVersion &&
+			update &&
+			compareVersions(latestVersion.version, update.version) > 0
+		) {
+			return { ...update, ...latestVersion };
+		}
+		return update;
+	} catch (error: any) {
+		Toast({
+			type: "error",
+			title: "检查更新失败",
+			message: error?.message || String(error),
+		});
+	}
+};
+
+export const getLatestUpdateInfo = async (): Promise<Update | null> => {
+	try {
+		const response = await fetch(
+			"https://github.com/dnhyxc/dnhyxc-ai/releases/download/v0.0.1/latest.json"
+		);
+		if (!response.ok) {
+			throw new Error(`获取失败: ${response.status}`);
+		}
+		const latestJson = await response.json();
+		return latestJson;
+	} catch (error: any) {
+		console.error("获取最新版本失败:", error);
+		return null;
+	}
+};
+
+const compareVersions = (v1: string, v2: string): number => {
+	const parts1 = v1.split(".").map(Number);
+	const parts2 = v2.split(".").map(Number);
+	for (let i = 0; i < Math.max(parts1.length, parts2.length); i++) {
+		const part1 = parts1[i] || 0;
+		const part2 = parts2[i] || 0;
+		if (part1 !== part2) {
+			return part1 - part2;
+		}
+	}
+	return 0;
+};
+
+export const checkForUpdates = async (options?: CheckForUpdatesOptions) => {
+	try {
+		const update = await check();
+		if (update) {
+			options?.setLoading?.(true);
+			await update.downloadAndInstall((event) => {
+				switch (event.event) {
+					case "Started":
+						options?.getTotal?.(event.data.contentLength || 0);
+						break;
+					case "Progress":
+						options?.getProgress?.(event.data.chunkLength);
+						break;
+					case "Finished":
+						options?.onFinished?.();
+						break;
+				}
+			});
+			options?.onRelaunch?.(relaunch);
+		}
+	} catch (error: any) {
+		Toast({
+			type: "error",
+			title: "更新失败",
+			message: error?.message || String(error),
+		});
+		options?.onReset?.();
+	}
+};
+```

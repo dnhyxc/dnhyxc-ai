@@ -3,24 +3,17 @@ import { Toaster } from '@ui/sonner';
 import { useEffect } from 'react';
 import { createBrowserRouter } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
-import {
-	clipboard,
-	getValue,
-	onCreateWindow,
-	removeStorage,
-	setBodyClass,
-} from '@/utils';
+import { clipboard, getValue, onCreateWindow, removeStorage } from '@/utils';
 import { http } from '@/utils/fetch';
 import routes from './routes';
 
 const App = () => {
 	useEffect(() => {
-		loadTheme();
-
-		const aboutPromise = listen('about', (event) => {
+		const aboutPromise = listen('about', async (event) => {
 			const eventOptions = event.payload as {
 				version: string;
 			};
+			const theme = await getValue('theme');
 			onCreateWindow({
 				url: `/about?version=${eventOptions.version}`,
 				label: 'about',
@@ -30,6 +23,7 @@ const App = () => {
 				titleBarStyle: 'visible',
 				hiddenTitle: false,
 				resizable: false,
+				theme,
 			});
 		});
 
@@ -47,14 +41,9 @@ const App = () => {
 		};
 	}, []);
 
-	const loadTheme = async () => {
-		const theme = await getValue('theme');
-		setBodyClass(theme);
-	};
-
 	const router = createBrowserRouter(routes);
 	return (
-		<div className="h-full w-full">
+		<div className="h-full w-full bg-theme-background">
 			<Toaster />
 			<RouterProvider router={router} />
 		</div>

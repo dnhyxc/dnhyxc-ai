@@ -30,9 +30,7 @@ import {
 } from '@/utils';
 
 const SettingAbout = () => {
-	const [updateInfo, setUpdateInfo] = useState<Partial<UpdateType> | null>(
-		null,
-	);
+	const [updateInfo, setUpdateInfo] = useState<UpdateType | null>(null);
 	const [checkLoading, setCheckLoading] = useState(false);
 	const [downloading, setDownloading] = useState(false);
 	const [downloaded, setDownloaded] = useState(0);
@@ -45,6 +43,10 @@ const SettingAbout = () => {
 	const { version: currentVersion } = useGetVersion();
 	const { storageInfo } = useStorageInfo('autoUpdate');
 
+	useEffect(() => {
+		getAutoUpdate();
+	}, []);
+
 	const getAutoUpdate = async () => {
 		const autoUpdate = await getValue('autoUpdate');
 		if (autoUpdate === undefined) {
@@ -54,21 +56,21 @@ const SettingAbout = () => {
 		}
 	};
 
-	useEffect(() => {
-		getAutoUpdate();
-	}, []);
-
 	const onCheckUpdate = async () => {
-		setCheckLoading(true);
-		const res = await checkVersion();
-		setCheckLoading(false);
-		if (!res) {
-			Toast({
-				title: '已经是最新版本',
-				type: 'success',
-			});
-		} else {
-			setUpdateInfo(res);
+		try {
+			setCheckLoading(true);
+			const res = await checkVersion();
+			setCheckLoading(false);
+			if (!res) {
+				Toast({
+					title: '已经是最新版本',
+					type: 'success',
+				});
+			} else {
+				setUpdateInfo(res);
+			}
+		} catch (_error) {
+			setCheckLoading(false);
 		}
 	};
 
@@ -84,12 +86,14 @@ const SettingAbout = () => {
 		setOpen(true);
 		try {
 			relaunchRef.current = relaunch;
+			setDownloading(false);
 		} catch (error) {
 			Toast({
 				title: '重启失败',
 				message: String(error),
 				type: 'error',
 			});
+			onReset();
 		}
 	};
 
@@ -99,8 +103,8 @@ const SettingAbout = () => {
 
 	const onDownloadAndInstall = () => {
 		checkForUpdates({
-			getProgress,
 			getTotal,
+			getProgress,
 			onRelaunch,
 			setLoading,
 			onReset,
@@ -113,7 +117,7 @@ const SettingAbout = () => {
 		onReset();
 	};
 
-	const onReset = () => {
+	const onReset = async () => {
 		setOpen(false);
 		setDownloaded(0);
 		setTotal(0);
@@ -139,22 +143,24 @@ const SettingAbout = () => {
 							<div className="text-xl font-bold">
 								Dnhyxc AI {currentVersion}
 							</div>
-							{storageInfo?.version || updateInfo?.version ? (
-								<div className="flex items-center dark:text-gray-300 text-gray-600 text-sm mt-1">
-									<div>
+							<div className="flex items-center">
+								{storageInfo?.version || updateInfo?.version ? (
+									<div className="text-textcolor/60 text-sm mt-1 mr-5">
 										最新版本
 										<span className="ml-2.5">
 											{storageInfo?.version || updateInfo?.version}
 										</span>
 									</div>
-									<div className="ml-5">
+								) : null}
+								{storageInfo?.date || updateInfo?.date ? (
+									<div className="text-textcolor/60 text-sm mt-1">
 										发布时间
 										<span className="ml-2.5">
 											{formatDate(storageInfo?.date || updateInfo?.date)}
 										</span>
 									</div>
-								</div>
-							) : null}
+								) : null}
+							</div>
 						</div>
 						<div className="flex items-center">
 							<Button
@@ -197,6 +203,19 @@ const SettingAbout = () => {
 										查看更新内容
 									</Button>
 								</>
+							) : null}
+							{storageInfo?.notes || updateInfo?.body ? (
+								<Button
+									variant="outline"
+									size="sm"
+									className="cursor-pointer min-w-24 ml-5"
+									onClick={() =>
+										openUrl(storageInfo?.notes || updateInfo?.body)
+									}
+								>
+									<Info className="mt-0.5 mr-1" />
+									查看更新信息
+								</Button>
 							) : null}
 						</div>
 					</div>

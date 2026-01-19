@@ -1,3 +1,4 @@
+// import { invoke } from '@tauri-apps/api/core';
 import { relaunch } from '@tauri-apps/plugin-process';
 import { check, type Update } from '@tauri-apps/plugin-updater';
 import { Toast } from '@ui/sonner';
@@ -8,29 +9,22 @@ interface CheckForUpdatesOptions {
 	onRelaunch?: (relaunch: () => Promise<void>) => void;
 	setLoading?: (loading: boolean) => void;
 	onReset?: () => void;
+	onFinished?: () => void;
 }
 
 export type UpdateType = Update;
 
-export const checkVersion = async (): Promise<Update | null> => {
-	try {
-		const update = await check();
-		return update;
-	} catch (error: any) {
-		Toast({
-			type: 'error',
-			title: '检查更新失败',
-			message: error?.message || String(error),
-		});
-		return null;
-	}
+export const checkVersion = async () => {
+	// await invoke('clear_updater_cache');
+	const update = await check();
+	return update;
 };
 
 export const checkForUpdates = async (options?: CheckForUpdatesOptions) => {
 	try {
-		options?.setLoading?.(true);
-		const update = await check();
+		const update = await checkVersion();
 		if (update) {
+			options?.setLoading?.(true);
 			await update.downloadAndInstall((event) => {
 				switch (event.event) {
 					case 'Started':
@@ -40,18 +34,18 @@ export const checkForUpdates = async (options?: CheckForUpdatesOptions) => {
 						options?.getProgress?.(event.data.chunkLength);
 						break;
 					case 'Finished':
+						options?.onFinished?.();
 						break;
 				}
 			});
-
 			options?.onRelaunch?.(relaunch);
 		}
 	} catch (error: any) {
-		options?.onReset?.();
 		Toast({
-			title: '更新失败',
 			type: 'error',
+			title: '更新失败',
 			message: error?.message || String(error),
 		});
+		options?.onReset?.();
 	}
 };

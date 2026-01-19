@@ -48,14 +48,40 @@ const Detail = () => {
 					</Button>
 				</div>
 				<div className="flex justify-center items-center gap-4 mt-10">
-					<Button className="cursor-pointer" onClick={setSettings}>
-						保存设置
+					<Button
+						variant="destructive"
+						className="cursor-pointer"
+						onClick={setSettings}
+					>
+						destructive 保存设置
 					</Button>
-					<Button className="cursor-pointer" onClick={getSettings}>
-						获取设置
+					<Button
+						variant="ghost"
+						className="cursor-pointer"
+						onClick={getSettings}
+					>
+						ghost 获取设置
 					</Button>
-					<Button className="cursor-pointer" onClick={deleteSettings}>
-						删除设置
+					<Button
+						variant="link"
+						className="cursor-pointer"
+						onClick={deleteSettings}
+					>
+						link 删除设置
+					</Button>
+					<Button
+						variant="outline"
+						className="cursor-pointer"
+						onClick={deleteSettings}
+					>
+						outline 删除设置
+					</Button>
+					<Button
+						variant="secondary"
+						className="cursor-pointer"
+						onClick={deleteSettings}
+					>
+						secondary 删除设置
 					</Button>
 				</div>
 			</ScrollArea>

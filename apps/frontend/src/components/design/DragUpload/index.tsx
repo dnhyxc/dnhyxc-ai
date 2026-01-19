@@ -127,8 +127,8 @@ const Upload: React.FC<IProps> = ({ uploadFile, getFileList }) => {
 			className={`select-none border border-dashed rounded-xl p-8 text-center transition-all duration-300 cursor-pointer
         ${
 					isDragging
-						? 'border-blue-500 bg-blue-50'
-						: 'border-gray-300 hover:border-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+						? 'border-theme bg-theme/20'
+						: 'border-textcolor/20 hover:border-theme/50 hover:bg-theme-background'
 				}
       `}
 			onDragEnter={onDragEnter}
@@ -147,15 +147,15 @@ const Upload: React.FC<IProps> = ({ uploadFile, getFileList }) => {
 			/>
 
 			<div className="flex flex-col items-center justify-center space-y-4">
-				<CloudUpload className="h-16 w-16 text-blue-500" />
+				<CloudUpload className="h-16 w-16 text-theme" />
 				<div>
-					<p className="text-md font-medium text-gray-900 dark:text-white">
+					<p className="text-md font-medium">
 						拖拽图片到此处或
-						<span className="text-blue-500" onClick={onClickSelect}>
+						<span className="text-theme" onClick={onClickSelect}>
 							点击选择
 						</span>
 					</p>
-					<p className="text-gray-500 mt-1 text-sm">
+					<p className="text-textcolor/60 mt-1 text-sm">
 						支持 JPEG, PNG, GIF, SVG, WebP 格式，最大5MB
 					</p>
 				</div>

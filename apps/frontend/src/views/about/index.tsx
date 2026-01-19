@@ -1,8 +1,23 @@
 import { openUrl } from '@tauri-apps/plugin-opener';
-import { useGetVersion } from '@/hooks';
+import { Button } from '@ui/button';
+import { useEffect } from 'react';
+import { type ThemeName, useGetVersion, useTheme } from '@/hooks';
+import { onListen } from '@/utils';
 
 const About = () => {
 	const { version } = useGetVersion();
+
+	const { changeTheme } = useTheme();
+
+	useEffect(() => {
+		const unlistenThemePromise = onListen('theme', (value: string) => {
+			changeTheme(value as ThemeName, false);
+		});
+
+		return () => {
+			unlistenThemePromise.then((unlisten) => unlisten());
+		};
+	}, []);
 
 	const handleOpenLink = (url: string) => {
 		openUrl(url);
@@ -16,24 +31,24 @@ const About = () => {
 				<div className="mb-2">Copyright © 2025 - 2026 Dnhyxc</div>
 				<div className="mb-2">All Rights Reserved</div>
 				<div className="flex justify-center">
-					<button
-						type="button"
+					<Button
+						variant="link"
 						onClick={() =>
 							handleOpenLink(
 								'https://github.com/dnhyxc/dnhyxc-ai/blob/master/client/README.md',
 							)
 						}
-						className="mr-6 text-green-500 hover:text-green-400 bg-transparent border-none cursor-pointer p-0"
+						className="mr-6 text-blue-500 hover:text-blue-400 text-md bg-transparent border-none cursor-pointer p-0"
 					>
 						服务政策
-					</button>
-					<button
-						type="button"
+					</Button>
+					<Button
+						variant="link"
 						onClick={() => handleOpenLink('https://dnhyxc.cn')}
-						className="text-green-500 hover:text-green-400 bg-transparent border-none cursor-pointer p-0"
+						className="text-blue-500 hover:text-blue-400 text-md bg-transparent border-none cursor-pointer p-0"
 					>
 						用户服务协议
-					</button>
+					</Button>
 				</div>
 			</div>
 		</div>
