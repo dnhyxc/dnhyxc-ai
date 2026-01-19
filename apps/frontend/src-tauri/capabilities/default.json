@@ -31,6 +31,9 @@
 				},
 				{
 					"url": "http://localhost:9112/*"
+				},
+				{
+					"url": "https://github.com/*"
 				}
 			],
 			"description": "dnhyxc-ai nest api"

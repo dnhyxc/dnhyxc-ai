@@ -1,7 +1,7 @@
 {
 	"$schema": "https://schema.tauri.app/config/2",
 	"productName": "dnhyxc-ai",
-	"version": "0.0.61",
+	"version": "0.0.66",
 	"identifier": "com.dnhyxc.dnhyxc-ai",
 	"build": {
 		"beforeDevCommand": "pnpm dev",
