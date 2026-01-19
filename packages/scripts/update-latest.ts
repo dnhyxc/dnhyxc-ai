@@ -4,7 +4,10 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const PACKAGE_JSON_PATH = path.resolve(__dirname, '../../package.json');
+const TAURI_CONFIG_PATH = path.resolve(
+	__dirname,
+	'../../apps/frontend/src-tauri/tauri.conf.json',
+);
 const LATEST_JSON_PATH = path.resolve(
 	__dirname,
 	'../../apps/frontend/latest.json',
@@ -15,8 +18,8 @@ const SIG_FILE_PATH = path.resolve(
 );
 
 function updateLatestJson() {
-	const packageJson = JSON.parse(fs.readFileSync(PACKAGE_JSON_PATH, 'utf-8'));
-	const version = packageJson.version;
+	const tauriConfig = JSON.parse(fs.readFileSync(TAURI_CONFIG_PATH, 'utf-8'));
+	const version = tauriConfig.version;
 
 	const latestJson = JSON.parse(fs.readFileSync(LATEST_JSON_PATH, 'utf-8'));
 	latestJson.version = version;
