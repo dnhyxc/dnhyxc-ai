@@ -1,3 +1,4 @@
+import { openUrl } from '@tauri-apps/plugin-opener';
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -14,13 +15,14 @@ import { Label } from '@ui/label';
 import { Progress } from '@ui/progress';
 import { Toast } from '@ui/sonner';
 import { Spinner } from '@ui/spinner';
-import { CircleArrowUp, Download } from 'lucide-react';
+import { CircleArrowUp, Download, Info } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import Icon from '@/assets/icon.png';
 import { useGetVersion, useStorageInfo } from '@/hooks';
 import {
 	checkForUpdates,
 	checkVersion,
+	formatDate,
 	getValue,
 	removeStorage,
 	setValue,
@@ -28,9 +30,7 @@ import {
 } from '@/utils';
 
 const SettingAbout = () => {
-	const [updateInfo, setUpdateInfo] = useState<Partial<UpdateType> | null>(
-		null,
-	);
+	const [updateInfo, setUpdateInfo] = useState<UpdateType | null>(null);
 	const [checkLoading, setCheckLoading] = useState(false);
 	const [downloading, setDownloading] = useState(false);
 	const [downloaded, setDownloaded] = useState(0);
@@ -57,16 +57,20 @@ const SettingAbout = () => {
 	}, []);
 
 	const onCheckUpdate = async () => {
-		setCheckLoading(true);
-		const res = await checkVersion();
-		setCheckLoading(false);
-		if (!res) {
-			Toast({
-				title: '已经是最新版本',
-				type: 'success',
-			});
-		} else {
-			setUpdateInfo(res);
+		try {
+			setCheckLoading(true);
+			const res = await checkVersion();
+			setCheckLoading(false);
+			if (!res) {
+				Toast({
+					title: '已经是最新版本',
+					type: 'success',
+				});
+			} else {
+				setUpdateInfo(res);
+			}
+		} catch (_error) {
+			setCheckLoading(false);
 		}
 	};
 
@@ -82,12 +86,14 @@ const SettingAbout = () => {
 		setOpen(true);
 		try {
 			relaunchRef.current = relaunch;
+			setDownloading(false);
 		} catch (error) {
 			Toast({
 				title: '重启失败',
 				message: String(error),
 				type: 'error',
 			});
+			onReset();
 		}
 	};
 
@@ -97,20 +103,21 @@ const SettingAbout = () => {
 
 	const onDownloadAndInstall = () => {
 		checkForUpdates({
-			getProgress,
 			getTotal,
+			getProgress,
 			onRelaunch,
 			setLoading,
+			onReset,
 		});
 	};
 
 	const onRestart = async () => {
 		removeStorage('autoUpdate');
 		await relaunchRef.current?.();
-		onCancel();
+		onReset();
 	};
 
-	const onCancel = () => {
+	const onReset = async () => {
 		setOpen(false);
 		setDownloaded(0);
 		setTotal(0);
@@ -136,11 +143,24 @@ const SettingAbout = () => {
 							<div className="text-xl font-bold">
 								Dnhyxc AI {currentVersion}
 							</div>
-							{storageInfo?.version || updateInfo?.version ? (
-								<div className="text-textcolor/60 text-sm mt-1">
-									最新版本 {storageInfo?.version || updateInfo?.version}
-								</div>
-							) : null}
+							<div className="flex items-center">
+								{storageInfo?.version || updateInfo?.version ? (
+									<div className="text-textcolor/60 text-sm mt-1 mr-5">
+										最新版本
+										<span className="ml-2.5">
+											{storageInfo?.version || updateInfo?.version}
+										</span>
+									</div>
+								) : null}
+								{storageInfo?.date || updateInfo?.date ? (
+									<div className="text-textcolor/60 text-sm mt-1">
+										发布时间
+										<span className="ml-2.5">
+											{formatDate(storageInfo?.date || updateInfo?.date)}
+										</span>
+									</div>
+								) : null}
+							</div>
 						</div>
 						<div className="flex items-center">
 							<Button
@@ -169,6 +189,19 @@ const SettingAbout = () => {
 										<Download className="mt-0.5 mr-1" />
 									)}
 									更新并重启
+								</Button>
+							) : null}
+							{storageInfo?.notes || updateInfo?.body ? (
+								<Button
+									variant="outline"
+									size="sm"
+									className="cursor-pointer min-w-24 ml-5"
+									onClick={() =>
+										openUrl(storageInfo?.notes || updateInfo?.body)
+									}
+								>
+									<Info className="mt-0.5 mr-1" />
+									查看更新信息
 								</Button>
 							) : null}
 						</div>
@@ -211,7 +244,7 @@ const SettingAbout = () => {
 					</Label>
 				</div>
 			</div>
-			<AlertDialog open={open} onOpenChange={onCancel}>
+			<AlertDialog open={open} onOpenChange={onReset}>
 				<AlertDialogContent className="w-112.5">
 					<AlertDialogHeader>
 						<AlertDialogTitle>确定要现在重启应用吗?</AlertDialogTitle>
