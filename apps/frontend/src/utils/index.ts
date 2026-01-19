@@ -8,6 +8,7 @@ import type {
 	DownloadResult,
 } from '@/types';
 
+export * from './cache';
 export * from './clipboard';
 export * from './crypto';
 export * from './event';

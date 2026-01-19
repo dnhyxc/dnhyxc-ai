@@ -7,7 +7,7 @@ function Spinner({ className, ...props }: React.ComponentProps<'svg'>) {
 		<Bubbles
 			role="status"
 			aria-label="Loading"
-			className={cn('size-5 pl-px animate-spin text-theme', className)}
+			className={cn('size-5 pl-px animate-spin text-default', className)}
 			{...props}
 		/>
 	);

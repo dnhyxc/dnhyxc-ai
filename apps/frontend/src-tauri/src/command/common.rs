@@ -5,6 +5,7 @@ use rfd::FileDialog;
 use std::fs;
 use std::sync::atomic::Ordering;
 use tauri::Manager;
+use tauri::path::BaseDirectory;
 use tauri_plugin_autostart::ManagerExt;
 use tauri_plugin_global_shortcut::GlobalShortcutExt;
 
@@ -122,18 +123,51 @@ pub fn reload_all_shortcuts(app: tauri::AppHandle) -> Result<(), String> {
     Ok(())
 }
 
-/// 清除 updater 插件缓存
+/// 获取应用缓存目录
+fn get_cache_dir(app_handle: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
+    let app_name = app_handle.package_info().name.clone();
+    app_handle
+        .path()
+        .resolve(&app_name, BaseDirectory::Cache)
+        .map_err(|e| format!("无法获取缓存目录: {}", e))
+}
+
+/// 清除缓存
 #[tauri::command]
 pub async fn clear_updater_cache(app_handle: tauri::AppHandle) -> Result<(), String> {
-    let cache_path = app_handle
-        .path()
-        .cache_dir()
-        .or_else(|_| Err("无法获取缓存目录".to_string()))?
-        .join("dnhyxc-ai");
+    let cache_path = get_cache_dir(&app_handle)?;
 
     if cache_path.exists() {
         fs::remove_dir_all(&cache_path).map_err(|e| format!("清除缓存失败: {}", e))?;
     }
 
     Ok(())
+}
+
+/// 获取缓存大小（字节）
+#[tauri::command]
+pub async fn get_cache_size(app_handle: tauri::AppHandle) -> Result<u64, String> {
+    let cache_path = get_cache_dir(&app_handle)?;
+
+    if !cache_path.exists() {
+        return Ok(0);
+    }
+
+    let size = get_dir_size(&cache_path).map_err(|e| format!("计算缓存大小失败: {}", e))?;
+    Ok(size)
+}
+
+/// 递归计算目录大小
+fn get_dir_size(path: &std::path::Path) -> std::io::Result<u64> {
+    let mut size = 0;
+    for entry in std::fs::read_dir(path)? {
+        let entry = entry?;
+        let path = entry.path();
+        if path.is_file() {
+            size += entry.metadata()?.len();
+        } else if path.is_dir() {
+            size += get_dir_size(&path)?;
+        }
+    }
+    Ok(size)
 }

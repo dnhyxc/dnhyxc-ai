@@ -22,7 +22,9 @@ import { useGetVersion, useStorageInfo } from '@/hooks';
 import {
 	checkForUpdates,
 	checkVersion,
+	clearCache,
 	formatDate,
+	getCacheSize,
 	getValue,
 	removeStorage,
 	setValue,
@@ -37,6 +39,7 @@ const SettingAbout = () => {
 	const [total, setTotal] = useState(0);
 	const [open, setOpen] = useState(false);
 	const [checked, setChecked] = useState(true);
+	const [cacheSize, setCacheSize] = useState('0 B');
 
 	const relaunchRef = useRef<() => Promise<void> | null>(null);
 
@@ -45,7 +48,14 @@ const SettingAbout = () => {
 
 	useEffect(() => {
 		getAutoUpdate();
+		insetCacheSize();
 	}, []);
+
+	const insetCacheSize = async () => {
+		const size = await getCacheSize();
+		console.log(size, 'ssssssize');
+		setCacheSize(size);
+	};
 
 	const getAutoUpdate = async () => {
 		const autoUpdate = await getValue('autoUpdate');
@@ -129,8 +139,16 @@ const SettingAbout = () => {
 		setValue('autoUpdate', event);
 	};
 
+	const onClearCache = async () => {
+		await clearCache();
+		Toast({
+			type: 'success',
+			title: '缓存清理完成',
+		});
+	};
+
 	return (
-		<div className="w-full h-full flex flex-col justify-center items-center m-0">
+		<div className="w-full h-full flex flex-col justify-center items-center m-3.5">
 			<div className="min-w-[610px]">
 				<div className="flex items-center w-full h-28">
 					<img
@@ -245,7 +263,7 @@ const SettingAbout = () => {
 			) : null}
 			<div className="min-w-[610px] mt-12">
 				<div className="font-bold text-md">软件更新</div>
-				<div className="flex items-center gap-3 mt-3">
+				<div className="flex items-center gap-3 mt-5">
 					<Checkbox
 						id="terms"
 						checked={checked}
@@ -255,6 +273,19 @@ const SettingAbout = () => {
 					<Label htmlFor="terms" className="cursor-pointer">
 						新版本发布时提醒我
 					</Label>
+				</div>
+			</div>
+			<div className="min-w-[610px] mt-12">
+				<div className="font-bold text-md">应用缓存</div>
+				<div className="flex items-center gap-3 mt-2.5 text-sm">
+					当前缓存大小 <span className="text-sm">{cacheSize}</span>
+					<Button
+						variant="link"
+						className="cursor-pointer p-0 text-theme ml-5"
+						onClick={onClearCache}
+					>
+						清空缓存
+					</Button>
 				</div>
 			</div>
 			<AlertDialog open={open} onOpenChange={onReset}>

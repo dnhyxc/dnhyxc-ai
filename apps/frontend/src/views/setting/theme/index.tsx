@@ -8,9 +8,9 @@ const Theme = () => {
 	const colorThemes = THEMES.filter((t) => t.type === 'color');
 
 	return (
-		<div className="w-full h-full flex flex-col justify-center items-center m-0">
-			<div className="mt-6 border-b border-theme/20 pb-7 mb-2 min-w-[610px]">
-				<div className="text-lg font-bold mb-6">彩色主题</div>
+		<div className="w-full h-full flex flex-col justify-center items-center m-2">
+			<div className="border-b border-theme/20 pb-7 mb-2 min-w-[610px]">
+				<div className="text-md font-bold mb-6">彩色主题</div>
 				<div className="flex flex-wrap gap-4 px-10">
 					{colorThemes.map((t) => (
 						<Button
@@ -39,12 +39,12 @@ const Theme = () => {
 				</div>
 			</div>
 			<div className="mt-6 pb-7 w-full">
-				<div className="text-lg font-bold mb-6 px-10">主题预览</div>
+				<div className="text-md font-bold mb-6 px-10">主题预览</div>
 				<div className="mx-10 p-6 rounded-xl border border-theme-border bg-theme-card">
-					<div className="text-xl font-bold text-textcolor mb-4">
+					<div className="text-md font-bold text-textcolor mb-4">
 						选择彩色主题后，整个页面的背景色将跟随主题色变化
 					</div>
-					<div className="space-y-4">
+					<div className="space-y-4 text-sm">
 						<div className="p-4 rounded-lg bg-theme-muted">
 							<p className="text-textcolor">
 								这是一段示例文本，展示在不同主题下的显示效果。页面的主要背景色、
