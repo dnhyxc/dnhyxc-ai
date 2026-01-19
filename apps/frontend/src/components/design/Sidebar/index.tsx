@@ -84,7 +84,7 @@ const Sidebar = () => {
 								<DropdownMenuLabel className="flex flex-col justify-center items-center">
 									<div
 										data-tauri-drag-region
-										className="flex justify-center items-center w-12 h-12 bg-theme-secondary cursor-pointer rounded-mdhover:text-theme/70 transition-all duration-200 ease-in-out"
+										className="flex justify-center items-center w-12 h-12 bg-theme-secondary cursor-pointer rounded-md hover:text-theme/70 transition-all duration-200 ease-in-out"
 									>
 										<img
 											src={storageInfo?.profile?.avatar || ICON}
