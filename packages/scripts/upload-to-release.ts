@@ -9,9 +9,9 @@ const _dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config();
 
 const TOKEN = process.env.GITHUB_TOKEN;
-const OWNER = 'dnhyxc';
-const REPO = 'dnhyxc-ai';
-const TAG = 'v0.0.1';
+const OWNER = process.env.OWNER;
+const REPO = process.env.APP_REPO;
+const TAG = process.env.APP_TAG || 'latest';
 const FILE_PATHS = [
 	path.resolve(
 		_dirname,
