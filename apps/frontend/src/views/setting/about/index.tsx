@@ -43,6 +43,10 @@ const SettingAbout = () => {
 	const { version: currentVersion } = useGetVersion();
 	const { storageInfo } = useStorageInfo('autoUpdate');
 
+	useEffect(() => {
+		getAutoUpdate();
+	}, []);
+
 	const getAutoUpdate = async () => {
 		const autoUpdate = await getValue('autoUpdate');
 		if (autoUpdate === undefined) {
@@ -51,10 +55,6 @@ const SettingAbout = () => {
 			setChecked(autoUpdate);
 		}
 	};
-
-	useEffect(() => {
-		getAutoUpdate();
-	}, []);
 
 	const onCheckUpdate = async () => {
 		try {
