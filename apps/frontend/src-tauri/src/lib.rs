@@ -21,7 +21,7 @@ use system::tray::init_tray;
 use utils::common::set_screen_center;
 // use tauri::menu::{MenuBuilder, SubmenuBuilder};
 use command::common::{
-    clear_all_shortcuts, disable_auto_start, enable_auto_start, greet_name, is_auto_start_enabled,
+    clear_all_shortcuts, clear_updater_cache, disable_auto_start, enable_auto_start, greet_name, is_auto_start_enabled,
     register_shortcut, reload_all_shortcuts, select_directory, select_file,
 };
 use command::download::{
@@ -70,6 +70,7 @@ pub fn run() {
             register_shortcut,     // 注册单个快捷键
             reload_all_shortcuts,  // 重新加载所有快捷键
             clear_all_shortcuts,   // 清空所有快捷键
+            clear_updater_cache,   // 清除 updater 插件缓存
         ])
         .build(tauri::generate_context!())
         // 如果启动失败，立即 panic 并打印错误信息

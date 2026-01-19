@@ -1,3 +1,4 @@
+import { invoke } from '@tauri-apps/api/core';
 import { relaunch } from '@tauri-apps/plugin-process';
 import { check, type Update } from '@tauri-apps/plugin-updater';
 import { Toast } from '@/components/ui/sonner';
@@ -14,21 +15,14 @@ interface CheckForUpdatesOptions {
 export type UpdateType = Update;
 
 export const checkVersion = async () => {
-	try {
-		const update = await check();
-		return update;
-	} catch (error: any) {
-		Toast({
-			type: 'error',
-			title: '检查更新失败',
-			message: error?.message || String(error),
-		});
-	}
+	await invoke('clear_updater_cache');
+	const update = await check();
+	return update;
 };
 
 export const checkForUpdates = async (options?: CheckForUpdatesOptions) => {
 	try {
-		const update = await check();
+		const update = await checkVersion();
 		if (update) {
 			options?.setLoading?.(true);
 			await update.downloadAndInstall((event) => {
