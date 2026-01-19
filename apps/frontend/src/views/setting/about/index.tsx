@@ -53,7 +53,6 @@ const SettingAbout = () => {
 
 	const insetCacheSize = async () => {
 		const size = await getCacheSize();
-		console.log(size, 'ssssssize');
 		setCacheSize(size);
 	};
 
@@ -141,6 +140,7 @@ const SettingAbout = () => {
 
 	const onClearCache = async () => {
 		await clearCache();
+		await insetCacheSize();
 		Toast({
 			type: 'success',
 			title: '缓存清理完成',
@@ -221,19 +221,6 @@ const SettingAbout = () => {
 										查看更新内容
 									</Button>
 								</>
-							) : null}
-							{storageInfo?.notes || updateInfo?.body ? (
-								<Button
-									variant="outline"
-									size="sm"
-									className="cursor-pointer min-w-24 ml-5"
-									onClick={() =>
-										openUrl(storageInfo?.notes || updateInfo?.body)
-									}
-								>
-									<Info className="mt-0.5 mr-1" />
-									查看更新信息
-								</Button>
 							) : null}
 						</div>
 					</div>
