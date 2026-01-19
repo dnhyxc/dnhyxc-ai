@@ -494,3 +494,305 @@ export const checkForUpdates = async (options?: CheckForUpdatesOptions) => {
 	}
 };
 ```
+
+## 设置允许加载 http 的资源
+
+### main
+
+```rust
+ #[cfg(target_os = "macos")]
+        {
+            let out_dir = std::env::var("OUT_DIR").unwrap();
+            let dest_path = std::path::PathBuf::from(out_dir).join("Info.plist");
+
+            let info_plist = r#"<?xml version="1.0" encoding="UTF-8"?>
+            <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+            <plist version="1.0">
+            <dict>
+                <key>CFBundleDevelopmentRegion</key>
+                <string>$(DEVELOPMENT_LANGUAGE)</string>
+                <key>CFBundleExecutable</key>
+                <string>$(EXECUTABLE_NAME)</string>
+                <key>CFBundleIdentifier</key>
+                <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+                <key>CFBundleInfoDictionaryVersion</key>
+                <string>6.0</string>
+                <key>CFBundleName</key>
+                <string>$(PRODUCT_NAME)</string>
+                <key>CFBundlePackageType</key>
+                <string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
+                <key>CFBundleShortVersionString</key>
+                <string>$(MARKETING_VERSION)</string>
+                <key>CFBundleVersion</key>
+                <string>$(CURRENT_PROJECT_VERSION)</string>
+                <key>LSRequiresIPhoneOS</key>
+                <true/>
+                <key>NSAppTransportSecurity</key>
+                <dict>
+                    <key>NSAllowsArbitraryLoads</key>
+                    <true/>
+                </dict>
+                <key>UILaunchStoryboardName</key>
+                <string>LaunchScreen</string>
+                <key>UIRequiredDeviceCapabilities</key>
+                <array>
+                    <string>armv7</string>
+                </array>
+                <key>UISupportedInterfaceOrientations</key>
+                <array>
+                    <string>UIInterfaceOrientationPortrait</string>
+                    <string>UIInterfaceOrientationLandscapeLeft</string>
+                    <string>UIInterfaceOrientationLandscapeRight</string>
+                </array>
+                <key>UISupportedInterfaceOrientations~ipad</key>
+                <array>
+                    <string>UIInterfaceOrientationPortrait</string>
+                    <string>UIInterfaceOrientationPortraitUpsideDown</string>
+                    <string>UIInterfaceOrientationLandscapeLeft</string>
+                    <string>UIInterfaceOrientationLandscapeRight</string>
+                </array>
+            </dict>
+            </plist>
+            "#;
+
+            std::fs::write(&dest_path, info_plist).expect("Failed to write Info.plist");
+            println!("cargo:rustc-env=TAURI_BUNDLE_MACOS_PLIST={}", dest_path.display());
+        }
+```
+
+### tauri.conf.json
+
+```json
+// 这是 Tauri v2 的配置文件，采用 JSON 格式，遵循官方提供的 JSON Schema 进行校验
+{
+	// 指向 Tauri v2 官方 JSON Schema，用于 IDE 自动补全与语法校验
+	"$schema": "https://schema.tauri.app/config/2",
+
+	// 应用名称，打包后生成的可执行文件、安装包均以此为名
+	"productName": "dnhyxc-ai",
+
+	// 当前应用版本号，遵循语义化版本规范（SemVer）
+	"version": "0.0.85",
+
+	// 应用唯一标识符，采用反向域名风格，用于操作系统级别识别（如 macOS 的 bundle ID、Windows 的注册表路径）
+	"identifier": "com.dnhyxc.dnhyxc-ai",
+
+	// 构建阶段相关配置
+	"build": {
+		// 开发阶段启动前端开发服务器的命令，Tauri 会在 dev 前自动执行
+		"beforeDevCommand": "pnpm dev",
+
+		// 开发服务器地址，Tauri 会等待该地址可访问后才启动窗口
+		"devUrl": "http://127.0.0.1:9002",
+
+		// 正式构建前对前端进行打包的命令
+		"beforeBuildCommand": "pnpm build",
+
+		// 前端产物目录，相对于 tauri.conf.json 文件所在目录的上一级
+		"frontendDist": "../dist"
+	},
+
+	// 应用运行时行为配置
+	"app": {
+		// 窗口数组，可配置多窗口，此处仅定义主窗口
+		"windows": [
+			{
+				// 窗口标签，代码中可通过 label 获取该窗口实例
+				"label": "main",
+
+				// 窗口标题，显示在系统任务栏/窗口栏
+				"title": "dnhyxc-ai",
+
+				// 窗口初始宽高
+				"width": 1050,
+				"height": 720,
+
+				// 窗口最小尺寸限制，防止用户拖太小
+				"minWidth": 1050,
+				"minHeight": 720,
+
+				// 隐藏原生标题栏，配合 titleBarStyle: 'Overlay' 实现自定义标题栏
+				"hiddenTitle": true,
+
+				// 禁止拖放文件到窗口
+				"dragDropEnabled": false,
+
+				// 允许用户调整窗口大小
+				"resizable": true,
+
+				// 显示系统窗口边框（最大化、最小化、关闭按钮）
+				"decorations": true,
+
+				// 标题栏风格：Overlay 表示标题栏覆盖在窗口内容之上，适合自定义
+				"titleBarStyle": "Overlay",
+
+				// 启动时自动居中屏幕
+				"center": true,
+
+				// 窗口背景不透明，设为 true 可实现毛玻璃等特效
+				"transparent": false
+			}
+		],
+
+		// TODO:新增 macOS 平台专用：允许调用私有 API，用于实现某些系统级功能（需额外审核）
+		"macOSPrivateApi": true,
+
+		// 安全策略配置
+		"security": {
+			// 内容安全策略（CSP），限制页面可加载的资源来源，降低 XSS 风险
+			// default-src 'self'：默认仅允许同源
+			// img-src/media-src 扩展了 data:、https:、http:，允许加载网络图片与媒体
+			// script-src 'self'：仅允许执行同源脚本
+			// style-src 'self' 'unsafe-inline'：允许内联样式，便于 UI 框架动态注入样式
+			// connect-src：允许向任意 https/http 接口发起请求（如 AI 后端 API）
+			// TODO:新增
+			"csp": "default-src 'self'; img-src 'self' data: https: http:; media-src 'self' data: https: http:; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' https: http:"
+		}
+	},
+
+	// 打包与分发配置
+	"bundle": {
+		// 启用打包功能
+		"active": true,
+
+		// 目标平台：all 表示同时打 Windows、macOS、Linux 包
+		"targets": "all",
+
+		// 生成用于自动更新的签名文件（配合 updater 插件）
+		"createUpdaterArtifacts": true,
+
+		// TODO: 新增 macOS 平台专用：启用加固运行时（Hardened Runtime），提高安全性
+		"macOS": {
+			"hardenedRuntime": true
+		},
+
+		// 多尺寸图标路径，打包时会自动选取合适尺寸
+		"icon": [
+			"icons/32x32.png",
+			"icons/128x128.png",
+			"icons/128x128@2x.png",
+			"icons/icon.icns",
+			"icons/icon.ico"
+		]
+	},
+
+	// 插件配置
+	"plugins": {
+		// 内置自动更新插件
+		"updater": {
+			// 公钥，用于验证下载的更新包签名（base64 编码）
+			"pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEIxM0JDRThDMjM4QUNBREYKUldUZnlvb2pqTTQ3c2RMUlNlR1JnTjJRTjM3YzRkaE9kZXNJTklwZTdjOTRvaTZ6TVZ0aE5ydjYK",
+
+			// 更新服务器地址，Tauri 会轮询该地址获取 latest.json 版本信息
+			"endpoints": [
+				"https://github.com/dnhyxc/dnhyxc-ai-app/releases/download/latest/latest.json"
+			]
+		}
+	}
+}
+```
+
+### Cargo.toml
+
+```toml
+[package]
+name = "dnhyxc-ai"
+version = "0.1.0"
+description = "dnhyxc-ai"
+authors = ["dnhyxc"]
+edition = "2024"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+# The `_lib` suffix may seem redundant but it is necessary
+# to make the lib name unique and wouldn't conflict with the bin name.
+# This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
+name = "dnhyxc_ai_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["macos-private-api", "tray-icon", "image-png"] }
+tauri-plugin-opener = "2.5.3"
+tauri-plugin-single-instance = "2.3.7"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1.0.149"
+tauri-plugin-clipboard-manager = "2"
+tauri-plugin-process = "2"
+[target."cfg(target_os = \"macos\")".dependencies]
+tauri-plugin-http = { version = "2.5.6", features = [
+  "unsafe-headers",
+  "rustls-tls",
+] }
+
+cocoa = "0.26.1"
+rfd = "0.17.2"
+reqwest = { version = "0.13.1", features = ["json", "stream"] }
+tokio = { version = "1.49.0", features = ["full", "rt"] }
+futures = "0.3"
+
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-autostart = "2"
+tauri-plugin-global-shortcut = "2"
+tauri-plugin-store = "2.4.2"
+tauri-plugin-updater = "2"
+```
+
+### capabilities/default.json
+
+```json
+{
+	"$schema": "../gen/schemas/desktop-schema.json",
+	"identifier": "default",
+	"description": "Capability for the main window",
+	"windows": ["main", "child-window", "about"],
+	"permissions": [
+		"core:default",
+		"opener:default",
+		"core:window:default",
+		"core:window:allow-start-dragging",
+		"core:webview:allow-create-webview-window",
+		"core:window:allow-set-focus",
+		"core:window:allow-set-theme",
+		"http:default",
+		"http:allow-fetch",
+		"store:allow-load",
+		"store:default",
+		"clipboard-manager:allow-clear",
+		"clipboard-manager:allow-read-image",
+		"clipboard-manager:allow-read-text",
+		"clipboard-manager:allow-write-html",
+		"clipboard-manager:allow-write-image",
+		"clipboard-manager:allow-write-text",
+		"process:default",
+		"process:allow-restart",
+		{
+			"identifier": "http:default",
+			"allow": [
+				{
+					"url": "http://101.34.214.188:9112/*"
+				},
+				{
+					"url": "http://localhost:9112/*"
+				},
+				{
+					"url": "https://github.com/*"
+				},
+				{
+					"url": "http://t80w8cw4d.hd-bkt.clouddn.com/*"
+				}
+			],
+			"description": "dnhyxc-ai nest api"
+		}
+	]
+}
+```
+
+### 清理缓存
+
+```bash
+cd /Users/dnhyxc/Documents/code/dnhyxc-ai/apps/frontend/src-tauri && cargo clean
+```
