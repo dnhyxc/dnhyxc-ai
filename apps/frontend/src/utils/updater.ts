@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core';
+// import { invoke } from '@tauri-apps/api/core';
 import { relaunch } from '@tauri-apps/plugin-process';
 import { check, type Update } from '@tauri-apps/plugin-updater';
 import { Toast } from '@/components/ui/sonner';
@@ -15,7 +15,7 @@ interface CheckForUpdatesOptions {
 export type UpdateType = Update;
 
 export const checkVersion = async () => {
-	await invoke('clear_updater_cache');
+	// await invoke('clear_updater_cache');
 	const update = await check();
 	return update;
 };
