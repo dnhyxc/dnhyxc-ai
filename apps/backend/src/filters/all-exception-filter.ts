@@ -26,6 +26,8 @@ export class AllExceptionFilter implements ExceptionFilter {
 		const response = ctx.getResponse();
 		const request = ctx.getRequest();
 
+		let message = '';
+
 		const httpStatus =
 			exception instanceof HttpException
 				? exception.getStatus()
@@ -37,6 +39,9 @@ export class AllExceptionFilter implements ExceptionFilter {
 				: 'Internal Server Error';
 
 		if (exception instanceof QueryFailedError) {
+			message =
+				extractDuplicateValue(exception.driverError?.sqlMessage) ||
+				'数据库插入数据重复';
 			exceptionResponse =
 				exception.driverError?.errno === 1062
 					? '数据库唯一索引冲突，记录重复'
@@ -57,7 +62,7 @@ export class AllExceptionFilter implements ExceptionFilter {
 			error: exceptionResponse,
 			success: false,
 			code: httpStatus,
-			message: extractDuplicateValue(exception.name) || exception.message,
+			message: message || exception.message,
 		};
 
 		const status = exception?.getStatus?.() || httpStatus || 520;
