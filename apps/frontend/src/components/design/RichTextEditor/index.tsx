@@ -1,4 +1,4 @@
-import { createPopper, flip, offset } from '@popperjs/core';
+import { createPopper } from '@popperjs/core';
 import Blockquote from '@tiptap/extension-blockquote';
 import BulletList from '@tiptap/extension-bullet-list';
 import Code from '@tiptap/extension-code';
@@ -48,6 +48,16 @@ const headingLevels = [
 	{ level: 1, label: 'H1', className: 'text-2xl font-bold' },
 	{ level: 2, label: 'H2', className: 'text-xl font-bold' },
 	{ level: 3, label: 'H3', className: 'text-lg font-semibold' },
+];
+
+const fontSizes = [
+	{ size: 12, label: '12px' },
+	{ size: 14, label: '14px' },
+	{ size: 16, label: '16px' },
+	{ size: 18, label: '18px' },
+	{ size: 20, label: '20px' },
+	{ size: 24, label: '24px' },
+	{ size: 32, label: '32px' },
 ];
 
 interface CommandItem {
@@ -119,9 +129,11 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
 	const [imageUrl, setImageUrl] = useState('');
 	const [showImageInput, setShowImageInput] = useState(false);
 	const [showHeadingDropdown, setShowHeadingDropdown] = useState(false);
+	const [showFontSizeDropdown, setShowFontSizeDropdown] = useState(false);
 	const [showCommandMenu, setShowCommandMenu] = useState(false);
 	const [selectedIndex, setSelectedIndex] = useState(0);
 	const headingRef = useRef<HTMLDivElement>(null);
+	const fontSizeRef = useRef<HTMLDivElement>(null);
 	const commandMenuRef = useRef<HTMLDivElement>(null);
 	const popperRef = useRef<any>(null);
 
@@ -213,6 +225,33 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
 			}
 			editor.commands.setTextSelection(to);
 			setShowHeadingDropdown(false);
+		},
+		[editor],
+	);
+
+	const getCurrentFontSize = useCallback(() => {
+		if (!editor) return null;
+		const attrs = editor.getAttributes('textStyle');
+		if (!attrs || !attrs.fontSize) return null;
+		const fontSize = attrs.fontSize as string;
+		return parseInt(fontSize.replace('px', ''), 10);
+	}, [editor]);
+
+	const setFontSize = useCallback(
+		(size: number) => {
+			if (!editor) return;
+			const { from, to } = editor.state.selection;
+			if (from === to) {
+				setShowFontSizeDropdown(false);
+				return;
+			}
+			editor
+				.chain()
+				.focus()
+				.setMark('textStyle', { fontSize: `${size}px` })
+				.setTextSelection(to)
+				.run();
+			setShowFontSizeDropdown(false);
 		},
 		[editor],
 	);
@@ -351,6 +390,19 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
 		return () => document.removeEventListener('mousedown', handleClickOutside);
 	}, [showHeadingDropdown]);
 
+	useEffect(() => {
+		if (!showFontSizeDropdown) return;
+		const handleClickOutside = (e: MouseEvent) => {
+			if (
+				fontSizeRef.current &&
+				!fontSizeRef.current.contains(e.target as Node)
+			)
+				setShowFontSizeDropdown(false);
+		};
+		document.addEventListener('mousedown', handleClickOutside);
+		return () => document.removeEventListener('mousedown', handleClickOutside);
+	}, [showFontSizeDropdown]);
+
 	const ToolbarButton: React.FC<{
 		onClick: () => void;
 		isActive?: boolean;
@@ -410,6 +462,35 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
 									className={`w-full px-3 py-1.5 text-left hover:bg-theme/10 transition-colors ${getCurrentHeading() === h.level ? 'bg-theme/10 text-theme' : ''} ${h.className}`}
 								>
 									{h.label}
+								</button>
+							))}
+						</div>
+					)}
+				</div>
+
+				<div className="w-px h-5 bg-theme/20 mx-1" />
+
+				<div className="relative" ref={fontSizeRef}>
+					<button
+						type="button"
+						onClick={() => setShowFontSizeDropdown(!showFontSizeDropdown)}
+						className="flex items-center gap-1 px-2 py-1.5 rounded hover:bg-theme/10 transition-colors text-sm"
+					>
+						<span>
+							{getCurrentFontSize() ? `${getCurrentFontSize()}px` : '字体'}
+						</span>
+						<ChevronDown className="w-4 h-4" />
+					</button>
+					{showFontSizeDropdown && (
+						<div className="absolute top-full left-0 mt-1 py-1 bg-background border border-theme/20 rounded-md shadow-lg z-10 min-w-28">
+							{fontSizes.map((fs) => (
+								<button
+									type="button"
+									key={fs.size}
+									onClick={() => setFontSize(fs.size)}
+									className={`w-full px-3 py-1.5 text-left hover:bg-theme/10 transition-colors ${getCurrentFontSize() === fs.size ? 'bg-theme/10 text-theme' : ''}`}
+								>
+									{fs.label}
 								</button>
 							))}
 						</div>
