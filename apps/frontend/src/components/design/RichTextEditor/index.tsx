@@ -127,7 +127,10 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
 
 	const editor = useEditor({
 		extensions: [
-			StarterKit.configure({ heading: { levels: [1, 2, 3] } }),
+			StarterKit.configure({
+				heading: { levels: [1, 2, 3] },
+				code: false,
+			}),
 			Placeholder.configure({ placeholder }),
 			Code.configure({
 				HTMLAttributes: {
@@ -375,13 +378,13 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
 					onClick={() => editor.chain().focus().undo().run()}
 					title="撤销"
 				>
-					↩
+					<Undo />
 				</ToolbarButton>
 				<ToolbarButton
 					onClick={() => editor.chain().focus().redo().run()}
 					title="重做"
 				>
-					↪
+					<Redo />
 				</ToolbarButton>
 				<div className="w-px h-5 bg-theme/20 mx-1" />
 
