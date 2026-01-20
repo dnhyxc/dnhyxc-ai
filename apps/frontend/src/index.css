@@ -215,12 +215,12 @@ body {
 	--theme-background: oklch(0.99 0.02708 83.52);
 	--theme-card: oklch(1 0 0);
 	--theme-muted: oklch(0.96 0.01 70.83);
-	--theme-border: oklch(94.165% 0.02688 95.372);
+	--theme-border: oklch(0.95 0.03 99.955);
 	--theme-textcolor: oklch(0.25 0.03 152.83);
 	--theme-default: oklch(100% 0.00011 271.152);
 	--theme-foreground: oklch(0.3 0.03 70.83);
-	--theme-secondary: oklch(0.92 0.02688 95.372);
-	--theme-sidebar: oklch(0.97 0.01 70.83);
+	--theme-secondary: oklch(94.19% 0.0256 94.764);
+	--theme-sidebar: oklch(97.599% 0.0122 91.527);
 }
 
 .theme-red {
