@@ -286,14 +286,14 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
 			<div className="flex flex-wrap items-center gap-0.5 p-2 bg-theme-background/50 border-b border-theme/10">
 				<ToolbarButton
 					onClick={() => editor.chain().focus().undo().run()}
-					disabled={!editor.can().undo()}
+					// disabled={!editor.can().undo()}
 					title="撤销"
 				>
 					<Undo className="w-4 h-4" />
 				</ToolbarButton>
 				<ToolbarButton
 					onClick={() => editor.chain().focus().redo().run()}
-					disabled={!editor.can().redo()}
+					// disabled={!editor.can().redo()}
 					title="重做"
 				>
 					<Redo className="w-4 h-4" />
