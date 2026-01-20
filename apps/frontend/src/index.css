@@ -58,7 +58,7 @@ body {
 	--shadow-8: 0 0 8px rgba(0, 0, 0, 0.2);
 	--shadow-10: 0 0 10px rgba(0, 0, 0, 0.2);
 	--font-family: "手札体-简";
-	--theme-color: oklch(60.325% 0.00007 271.152);
+	--theme-color: oklch(100% 0.00011 271.152);
 	--theme-background: oklch(1 0 0);
 	--theme-card: oklch(1 0 0);
 	--theme-muted: oklch(0.967 0.003 264.542);

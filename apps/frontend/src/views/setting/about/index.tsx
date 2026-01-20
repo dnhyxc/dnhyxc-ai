@@ -80,6 +80,10 @@ const SettingAbout = () => {
 			}
 		} catch (_error) {
 			setCheckLoading(false);
+			Toast({
+				title: '获取版本信息失败',
+				type: 'error',
+			});
 		}
 	};
 
