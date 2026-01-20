@@ -35,6 +35,7 @@ import {
 	Undo,
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Input } from '@ui/input';
 
 interface RichTextEditorProps {
 	content?: string;
@@ -640,7 +641,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
 					</ToolbarButton>
 					{showImageInput && (
 						<div className="absolute top-full left-0 mt-1 p-2 bg-background border border-theme/20 rounded-md shadow-lg z-10 flex gap-1">
-							<input
+							<Input
 								type="url"
 								value={imageUrl}
 								onChange={(e) => setImageUrl(e.target.value)}
