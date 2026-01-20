@@ -13,6 +13,7 @@ import { FontSize, TextStyle } from '@tiptap/extension-text-style';
 import Underline from '@tiptap/extension-underline';
 import { Editor, EditorContent, useEditor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
+import { Input } from '@ui/input';
 import {
 	AlignCenter,
 	AlignJustify,
@@ -35,7 +36,6 @@ import {
 	Undo,
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Input } from '@ui/input';
 
 interface RichTextEditorProps {
 	content?: string;
