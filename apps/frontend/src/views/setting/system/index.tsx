@@ -171,9 +171,9 @@ const System = () => {
 
 	return (
 		<div className="w-full h-full flex flex-col justify-center items-center m-2">
-			<div className="border-b dark:border-gray-800  border-theme/20 pb-5.5 mb-1 min-w-[610px]">
+			<div className="border-b border-theme/20 pb-2 min-w-[610px]">
 				<div className="text-md font-bold">文件存储</div>
-				<div className="mt-2 px-10 text-sm">
+				<div className="mt-2 px-8.5 text-sm">
 					<span className="mr-2">默认存储路径</span>
 					<span className="ml-2 text-theme/90 text-md">{savePath}</span>
 					<Button
@@ -185,9 +185,9 @@ const System = () => {
 					</Button>
 				</div>
 			</div>
-			<div className="my-5 border-b dark:border-gray-800 border-theme/20 pb-7 min-w-[610px]">
+			<div className="my-3.5 border-b border-theme/20 pb-4.5 min-w-[610px]">
 				<div className="text-md font-bold">启动设置</div>
-				<div className="flex items-center mt-3.5 px-10 text-sm">
+				<div className="flex items-center mt-3.5 px-8.5 text-sm">
 					<span className="mr-2">设置开机自启</span>
 					<RadioGroup
 						value={startType}
@@ -209,9 +209,9 @@ const System = () => {
 					</RadioGroup>
 				</div>
 			</div>
-			<div className="mt-1.5 border-b border-theme/20 pb-7 min-w-[610px]">
+			<div className="border-b border-theme/20 pb-4.5 min-w-[610px]">
 				<div className="text-md font-bold">关闭设置</div>
-				<div className="flex items-center mt-3.5 px-10 text-sm">
+				<div className="flex items-center mt-3.5 px-8.5 text-sm">
 					<span className="mr-2">关闭应用程序</span>
 					<RadioGroup
 						value={closeType}
@@ -233,9 +233,9 @@ const System = () => {
 					</RadioGroup>
 				</div>
 			</div>
-			<div className="mt-6 pb-7 min-w-[610px]">
+			<div className="mt-3.5 pb-4.5 min-w-[610px]">
 				<div className="text-md font-bold">快捷键设置</div>
-				<div className="flex flex-col items-center mt-2 px-10 text-sm">
+				<div className="flex flex-col items-center mt-2 px-8.5 text-sm">
 					<div className="grid grid-cols-2 w-full">
 						{shortcutInfo.map((i) => {
 							return (

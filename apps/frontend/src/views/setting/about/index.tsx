@@ -248,9 +248,9 @@ const SettingAbout = () => {
 					/>
 				</div>
 			) : null}
-			<div className="min-w-[610px] mt-12">
+			<div className="min-w-[610px] mt-9 border-b pb-5 border-theme/20">
 				<div className="font-bold text-md">软件更新</div>
-				<div className="flex items-center gap-3 mt-5">
+				<div className="flex items-center gap-3 mt-4.5 px-8.5">
 					<Checkbox
 						id="terms"
 						checked={checked}
@@ -262,9 +262,9 @@ const SettingAbout = () => {
 					</Label>
 				</div>
 			</div>
-			<div className="min-w-[610px] mt-12">
+			<div className="min-w-[610px] mt-3.5">
 				<div className="font-bold text-md">应用缓存</div>
-				<div className="flex items-center gap-3 mt-2.5 text-sm">
+				<div className="flex items-center gap-3 mt-1.5 px-8.5 text-sm">
 					当前缓存大小 <span className="text-sm">{cacheSize}</span>
 					<Button
 						variant="link"

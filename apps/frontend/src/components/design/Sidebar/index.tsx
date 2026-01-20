@@ -97,17 +97,17 @@ const Sidebar = () => {
 									</div>
 								</DropdownMenuLabel>
 								<DropdownMenuItem
-									className="text-textcolor flex justify-center items-center cursor-pointer group"
+									className="text-textcolor focus:text-theme flex justify-center items-center cursor-pointer group"
 									onClick={() => onJump('/profile')}
 								>
-									<CircleUserRound className="text-textcolor" />
+									<CircleUserRound className="text-textcolor group-hover:text-theme" />
 									我的主页
 								</DropdownMenuItem>
 								<DropdownMenuItem
-									className="flex justify-center items-center cursor-pointer"
+									className="text-textcolor focus:text-theme flex justify-center items-center cursor-pointer group"
 									onClick={onLogout}
 								>
-									<LogOut className="text-textcolor" />
+									<LogOut className="text-textcolor group-hover:text-theme" />
 									退出登录
 								</DropdownMenuItem>
 							</DropdownMenuContent>
