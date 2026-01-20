@@ -796,3 +796,110 @@ tauri-plugin-updater = "2"
 ```bash
 cd /Users/dnhyxc/Documents/code/dnhyxc-ai/apps/frontend/src-tauri && cargo clean
 ```
+
+### tiptop
+
+```json
+{
+	"@tiptap/extension-color": "^3.15.3",
+	"@tiptap/extension-highlight": "^3.15.3",
+	"@tiptap/extension-history": "^3.15.3",
+	"@tiptap/extension-image": "^3.15.3",
+	"@tiptap/extension-link": "^3.15.3",
+	"@tiptap/extension-placeholder": "^3.15.3",
+	"@tiptap/extension-text-align": "^3.15.3",
+	"@tiptap/extension-text-style": "^3.15.3",
+	"@tiptap/extension-typography": "^3.15.3",
+	"@tiptap/extension-underline": "^3.15.3",
+	"@tiptap/pm": "^3.15.3",
+	"@tiptap/react": "^3.15.3",
+	"@tiptap/starter-kit": "^3.15.3"
+	"lowlight": "^3.3.0",
+}
+```
+
+完整 package.json
+
+```json
+{
+	"name": "@dnhyxc-ai/frontend",
+	"private": true,
+	"version": "0.0.1",
+	"type": "module",
+	"author": "dnhyxc <dnhyxc@gmail.com>",
+	"scripts": {
+		"dev": "vite",
+		"build": "tsc && vite build",
+		"preview": "vite preview",
+		"tauri": "tauri"
+	},
+	"dependencies": {
+		"@hookform/resolvers": "^5.2.2",
+		"@radix-ui/react-alert-dialog": "^1.1.15",
+		"@radix-ui/react-checkbox": "^1.3.3",
+		"@radix-ui/react-dialog": "^1.1.15",
+		"@radix-ui/react-dropdown-menu": "^2.1.16",
+		"@radix-ui/react-label": "^2.1.8",
+		"@radix-ui/react-navigation-menu": "^1.2.14",
+		"@radix-ui/react-progress": "^1.1.8",
+		"@radix-ui/react-radio-group": "^1.3.8",
+		"@radix-ui/react-scroll-area": "^1.2.10",
+		"@radix-ui/react-slot": "^1.2.4",
+		"@tauri-apps/api": "^2",
+		"@tauri-apps/plugin-autostart": "~2",
+		"@tauri-apps/plugin-clipboard-manager": "^2.3.2",
+		"@tauri-apps/plugin-global-shortcut": "~2",
+		"@tauri-apps/plugin-http": "^2.5.4",
+		"@tauri-apps/plugin-opener": "^2",
+		"@tauri-apps/plugin-process": "~2",
+		"@tauri-apps/plugin-store": "^2.4.1",
+		"@tauri-apps/plugin-updater": "~2",
+		"@tiptap/extension-color": "^3.15.3",
+		"@tiptap/extension-highlight": "^3.15.3",
+		"@tiptap/extension-history": "^3.15.3",
+		"@tiptap/extension-image": "^3.15.3",
+		"@tiptap/extension-link": "^3.15.3",
+		"@tiptap/extension-placeholder": "^3.15.3",
+		"@tiptap/extension-text-align": "^3.15.3",
+		"@tiptap/extension-text-style": "^3.15.3",
+		"@tiptap/extension-typography": "^3.15.3",
+		"@tiptap/extension-underline": "^3.15.3",
+		"@tiptap/pm": "^3.15.3",
+		"@tiptap/react": "^3.15.3",
+		"@tiptap/starter-kit": "^3.15.3",
+		"axios": "^1.13.2",
+		"class-variance-authority": "^0.7.1",
+		"clsx": "^2.1.1",
+		"crypto-js": "^4.2.0",
+		"embla-carousel-autoplay": "^8.6.0",
+		"embla-carousel-react": "^8.6.0",
+		"js-md5": "^0.8.3",
+		"lowlight": "^3.3.0",
+		"lucide-react": "^0.561.0",
+		"mobx": "^6.15.0",
+		"mobx-react": "^9.2.1",
+		"next-themes": "^0.4.6",
+		"qiniu-js": "^3.4.3",
+		"query-string": "^9.3.1",
+		"react": "^19.1.0",
+		"react-dom": "^19.1.0",
+		"react-hook-form": "^7.69.0",
+		"react-router": "^7.10.1",
+		"sonner": "^2.0.7",
+		"tailwind-merge": "^3.4.0",
+		"zod": "^4.2.1"
+	},
+	"devDependencies": {
+		"@tailwindcss/vite": "^4.1.18",
+		"@tauri-apps/cli": "^2",
+		"@types/crypto-js": "^4.2.2",
+		"@types/react": "^19.1.8",
+		"@types/react-dom": "^19.1.6",
+		"@vitejs/plugin-react": "^4.6.0",
+		"tailwindcss": "^4.1.18",
+		"tw-animate-css": "^1.4.0",
+		"vite": "^7.0.4"
+	},
+	"packageManager": "pnpm@10.8.1"
+}
+```

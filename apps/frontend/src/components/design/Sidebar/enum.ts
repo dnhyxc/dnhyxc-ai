@@ -10,6 +10,11 @@ export const MENUS = [
 		path: '/detail',
 	},
 	{
+		name: '文档编辑',
+		icon: 'Newspaper',
+		path: '/editor',
+	},
+	{
 		name: '个人主页',
 		icon: 'WalletCards',
 		path: '/profile',

@@ -9,6 +9,7 @@ import Profile from '@/views/profile';
 import Setting from '@/views/setting';
 import AboutApp from '@/views/setting/about';
 import AppSystem from '@/views/setting/system';
+import Editor from '@/views/editor';
 import ThemeSetting from '@/views/setting/theme';
 import ChildWindow from '@/views/win';
 
@@ -35,6 +36,13 @@ const routes = [
 				Component: Profile,
 				meta: {
 					title: '个人主页',
+				},
+			},
+			{
+				path: '/editor',
+				Component: Editor,
+				meta: {
+					title: '文档编辑',
 				},
 			},
 			{

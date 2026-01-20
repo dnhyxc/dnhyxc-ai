@@ -11,6 +11,7 @@ import {
 	House,
 	LogOut,
 	WalletCards,
+	Newspaper,
 } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import ICON from '@/assets/icon.png';
@@ -29,6 +30,7 @@ const Sidebar = () => {
 	const iconMap = {
 		House: <House />,
 		BookOpenText: <BookOpenText />,
+		Newspaper: <Newspaper />,
 		WalletCards: <WalletCards />,
 	};
 
