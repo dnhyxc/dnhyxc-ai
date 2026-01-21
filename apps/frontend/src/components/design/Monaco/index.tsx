@@ -44,13 +44,13 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	return (
 		<div
 			className={cn(
-				'border border-theme/20 rounded-md overflow-hidden bg-theme-background',
+				'rounded-md overflow-hidden bg-theme-background',
 				className,
 			)}
 		>
 			<div
 				className={cn(
-					'flex items-center gap-2 p-2 bg-theme-background border-b border-border',
+					'flex items-center gap-2 p-2 bg-theme-background border-b border-theme/10',
 				)}
 			>
 				<div className="text-sm font-medium text-textcolor">{language}</div>
