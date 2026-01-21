@@ -24,6 +24,7 @@ export const options: any = {
 	renderLineHighlight: 'none' as const,
 	hideCursorInOverviewRuler: true,
 	overviewRulerBorder: false,
+	contextmenu: false,
 	scrollbar: {
 		vertical: 'visible' as const,
 		horizontal: 'visible' as const,
