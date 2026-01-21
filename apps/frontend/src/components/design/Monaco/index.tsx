@@ -53,7 +53,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 					'flex items-center gap-2 p-2 bg-theme-background border-b border-border',
 				)}
 			>
-				<div className="text-sm font-medium text-textcolor">Markdown</div>
+				<div className="text-sm font-medium text-textcolor">{language}</div>
 			</div>
 			<Editor
 				height={height}
