@@ -236,7 +236,7 @@ const SettingAbout = () => {
 						<span>{downloaded / total >= 1 ? '下载完成' : '正在下载'}</span>
 						<div>
 							<span className="mr-3">
-								{downloaded} / {total}
+								{downloaded > total ? total : downloaded} / {total}
 							</span>
 							<span>
 								{Math.floor(
