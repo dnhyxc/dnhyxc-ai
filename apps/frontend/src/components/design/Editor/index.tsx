@@ -44,6 +44,7 @@ const headingLevels = [
 	{ level: 2, label: 'H2', className: 'text-xl font-bold' },
 	{ level: 3, label: 'H3', className: 'text-lg font-semibold' },
 	{ level: 4, label: 'H4', className: 'text-base font-semibold' },
+	{ level: 5, label: 'H5', className: 'text-sm font-semibold' },
 ];
 
 const Editor: React.FC<EditorProps> = ({
@@ -100,14 +101,39 @@ const Editor: React.FC<EditorProps> = ({
 			readOnly,
 			data: initialData,
 			tools: {
-				header: Header,
-				// header: {
-				// 	class: Header,
-				// 	config: {
-				// 		levels: [1, 2, 3, 4, 5],
-				// 		defaultLevel: 2,
-				// 	},
-				// },
+				header: {
+					class: Header as any,
+					inlineToolbar: true,
+					config: {
+						levels: [1, 2, 3, 4, 5],
+						defaultLevel: 1,
+					},
+					toolbox: {
+						title: 'H1',
+					},
+				},
+				heading: {
+					class: Header as any,
+					inlineToolbar: true,
+					config: {
+						levels: [1, 2, 3, 4, 5],
+						defaultLevel: 2,
+					},
+					toolbox: {
+						title: 'H2',
+					},
+				},
+				header3: {
+					class: Header as any,
+					inlineToolbar: true,
+					config: {
+						levels: [1, 2, 3, 4, 5],
+						defaultLevel: 3,
+					},
+					toolbox: {
+						title: 'H3',
+					},
+				},
 				list: List,
 				paragraph: Paragraph,
 				code: Code,
