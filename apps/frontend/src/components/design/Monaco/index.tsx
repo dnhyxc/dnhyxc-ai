@@ -1,5 +1,5 @@
 import Editor, { type OnMount } from '@monaco-editor/react';
-import { useCallback, useRef, useState } from 'react';
+import { useRef } from 'react';
 import { cn } from '@/lib/utils';
 
 interface MarkdownEditorProps {
@@ -19,10 +19,9 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	className,
 	height = '400px',
 	readOnly = false,
-	theme = 'vs-dark',
+	theme = 'vs',
 }) => {
 	const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
-	const [isFullscreen, setIsFullscreen] = useState(false);
 
 	const handleEditorMount: OnMount = (editor, monaco) => {
 		editorRef.current = editor;
@@ -39,46 +38,22 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 		editor.focus();
 	};
 
-	const handleFullscreen = useCallback(() => {
-		if (!editorRef.current) return;
-
-		if (!isFullscreen) {
-			editorRef.current.layout({
-				width: window.innerWidth,
-				height: window.innerHeight,
-			});
-		} else {
-			editorRef.current.layout();
-		}
-		setIsFullscreen(!isFullscreen);
-	}, [isFullscreen]);
-
 	return (
 		<div
 			className={cn(
 				'border border-theme/20 rounded-md overflow-hidden bg-theme-background',
-				isFullscreen && 'fixed inset-0 z-50',
 				className,
 			)}
 		>
 			<div
 				className={cn(
 					'flex items-center gap-2 p-2 bg-theme-background border-b border-border',
-					isFullscreen && 'fixed top-0 left-0 right-0 z-50',
 				)}
 			>
 				<div className="text-sm font-medium text-textcolor">Markdown</div>
-				<div className="flex-1" />
-				<button
-					type="button"
-					onClick={handleFullscreen}
-					className="px-2 py-1 text-xs rounded hover:bg-accent transition-colors"
-				>
-					{isFullscreen ? '退出全屏' : '全屏'}
-				</button>
 			</div>
 			<Editor
-				height={isFullscreen ? 'calc(100vh - 60px)' : height}
+				height={height}
 				language="markdown"
 				value={value}
 				onChange={(val) => onChange?.(val || '')}
