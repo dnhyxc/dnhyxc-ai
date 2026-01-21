@@ -14,14 +14,12 @@ export default defineConfig(async () => ({
 			'@design': '/src/components/design',
 		},
 	},
-	// Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
-	// 1. prevent Vite from obscuring rust errors
-	clearScreen: false,
-	// 2. tauri expects a fixed port, fail if that port is not available
+	optimizeDeps: {
+		include: ['monaco-editor'],
+	},
 	server: {
 		port: 9002,
 		strictPort: true,
-		// host: host || false,
 		host: '0.0.0.0',
 		hmr: host
 			? {
@@ -31,12 +29,10 @@ export default defineConfig(async () => ({
 				}
 			: undefined,
 		watch: {
-			// 3. tell Vite to ignore watching `src-tauri`
 			ignored: ['**/src-tauri/**'],
 		},
 		proxy: {
 			'/api': {
-				// target: 'http://101.34.214.188:9112',
 				target: 'http://localhost:9112',
 				changeOrigin: true,
 			},
