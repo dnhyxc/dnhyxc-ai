@@ -21,7 +21,7 @@ export const options: any = {
 	snippetSuggestions: 'inline' as const,
 	cursorBlinking: 'smooth' as const,
 	cursorSmoothCaretAnimation: 'off' as const,
-	renderLineHighlight: 'line' as const,
+	renderLineHighlight: 'none' as const,
 	hideCursorInOverviewRuler: true,
 	overviewRulerBorder: false,
 	scrollbar: {
