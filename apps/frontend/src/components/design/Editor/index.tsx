@@ -2,6 +2,7 @@ import Code from '@editorjs/code';
 import EditorJS, { type OutputData } from '@editorjs/editorjs';
 import Header from '@editorjs/header';
 import InlineCode from '@editorjs/inline-code';
+import Table from '@editorjs/table';
 import List from '@editorjs/list';
 import Marker from '@editorjs/marker';
 import Paragraph from '@editorjs/paragraph';
@@ -112,7 +113,7 @@ const Editor: React.FC<EditorProps> = ({
 						title: 'H1',
 					},
 				},
-				heading: {
+				header2: {
 					class: Header as any,
 					inlineToolbar: true,
 					config: {
@@ -156,11 +157,21 @@ const Editor: React.FC<EditorProps> = ({
 						title: 'H5',
 					},
 				},
+				'inline-code': InlineCode,
 				list: List,
 				paragraph: Paragraph,
 				code: Code,
 				marker: Marker,
-				'inline-code': InlineCode,
+				// table: {
+				// 	class: Table as any,
+				// 	inlineToolbar: true,
+				// 	config: {
+				// 		rows: 2,
+				// 		cols: 3,
+				// 		maxRows: 5,
+				// 		maxCols: 5,
+				// 	},
+				// },
 				underline: Underline,
 			},
 			inlineToolbar: [
@@ -171,6 +182,52 @@ const Editor: React.FC<EditorProps> = ({
 				'marker',
 				'link',
 			],
+			i18n: {
+				messages: {
+					ui: {
+						blockTunes: {
+							toggler: {
+								'Click to tune': '点击转换',
+							},
+						},
+						inlineToolbar: {
+							converter: {
+								'Convert to': '转换',
+							},
+						},
+						toolbar: {
+							toolbox: {
+								Add: '工具栏添加',
+							},
+						},
+						popover: {
+							Filter: '过滤',
+							'Nothing found': '找不到',
+						},
+					},
+					toolNames: {
+						Text: '段落',
+						Bold: '加粗',
+						Italic: '斜体',
+					},
+					tools: {
+						paragraph: {
+							'Press Tab': '输入内容',
+						},
+					},
+					blockTunes: {
+						delete: {
+							Delete: '删除',
+						},
+						moveUp: {
+							'Move up': '上移',
+						},
+						moveDown: {
+							'Move down': '下移',
+						},
+					},
+				},
+			},
 			onReady: () => {
 				editorRef.current = editor;
 				setIsReady(true);
@@ -180,6 +237,8 @@ const Editor: React.FC<EditorProps> = ({
 				onChange?.(content);
 			},
 		});
+
+		console.log(editor, 'editor');
 
 		editorRef.current = editor;
 	}, [data, onChange, placeholder, readOnly]);
