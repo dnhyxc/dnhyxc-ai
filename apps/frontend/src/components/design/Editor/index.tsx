@@ -134,6 +134,28 @@ const Editor: React.FC<EditorProps> = ({
 						title: 'H3',
 					},
 				},
+				header4: {
+					class: Header as any,
+					inlineToolbar: true,
+					config: {
+						levels: [1, 2, 3, 4, 5],
+						defaultLevel: 4,
+					},
+					toolbox: {
+						title: 'H4',
+					},
+				},
+				header5: {
+					class: Header as any,
+					inlineToolbar: true,
+					config: {
+						levels: [1, 2, 3, 4, 5],
+						defaultLevel: 5,
+					},
+					toolbox: {
+						title: 'H5',
+					},
+				},
 				list: List,
 				paragraph: Paragraph,
 				code: Code,
