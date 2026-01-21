@@ -19,7 +19,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	onChange,
 	placeholder = '# 输入内容...',
 	className,
-	height = '400px',
+	height = '300px',
 	readOnly = false,
 	theme = 'vs',
 	language = 'markdown',
