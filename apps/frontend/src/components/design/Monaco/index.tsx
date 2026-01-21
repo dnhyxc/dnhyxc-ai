@@ -85,7 +85,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 					snippetSuggestions: 'inline', // 代码片段建议显示方式：inline（内联）
 					cursorBlinking: 'smooth', // 光标平滑闪烁
 					cursorSmoothCaretAnimation: 'off', // 启用光标平滑动画
-					renderLineHighlight: 'line', // 高亮当前行
+					renderLineHighlight: 'none', // 高亮当前行
 					hideCursorInOverviewRuler: true, // 在概览标尺中隐藏光标
 					overviewRulerBorder: false, // 关闭概览标尺边框
 					scrollbar: {
@@ -96,8 +96,8 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 					},
 				}}
 				loading={
-					<div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-						加载中...
+					<div className="flex items-center justify-center w-full h-full text-textcolor bg-theme-background/20">
+						Loading...
 					</div>
 				}
 			/>
