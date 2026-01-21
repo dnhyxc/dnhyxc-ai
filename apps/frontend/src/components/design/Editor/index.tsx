@@ -2,10 +2,10 @@ import Code from '@editorjs/code';
 import EditorJS, { type OutputData } from '@editorjs/editorjs';
 import Header from '@editorjs/header';
 import InlineCode from '@editorjs/inline-code';
-import Table from '@editorjs/table';
 import List from '@editorjs/list';
 import Marker from '@editorjs/marker';
 import Paragraph from '@editorjs/paragraph';
+import Table from '@editorjs/table';
 import Underline from '@editorjs/underline';
 import {
 	Bold,
