@@ -56,20 +56,18 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	return (
 		<div
 			className={cn(
-				'border border-border rounded-md overflow-hidden bg-background',
+				'border border-theme/20 rounded-md overflow-hidden bg-theme-background',
 				isFullscreen && 'fixed inset-0 z-50',
 				className,
 			)}
 		>
 			<div
 				className={cn(
-					'flex items-center gap-2 p-2 bg-muted/50 border-b border-border',
+					'flex items-center gap-2 p-2 bg-theme-background border-b border-border',
 					isFullscreen && 'fixed top-0 left-0 right-0 z-50',
 				)}
 			>
-				<div className="text-sm font-medium text-muted-foreground">
-					Markdown
-				</div>
+				<div className="text-sm font-medium text-textcolor">Markdown</div>
 				<div className="flex-1" />
 				<button
 					type="button"
@@ -80,40 +78,46 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 				</button>
 			</div>
 			<Editor
-				height={isFullscreen ? '100vh' : height}
+				height={isFullscreen ? 'calc(100vh - 60px)' : height}
 				language="markdown"
 				value={value}
 				onChange={(val) => onChange?.(val || '')}
 				theme={theme}
 				onMount={handleEditorMount}
 				options={{
-					readOnly,
-					placeholder,
-					minimap: { enabled: false },
-					fontSize: 14,
-					lineHeight: 22,
-					fontFamily: '"SF Mono", "Monaco", "Menlo", "Consolas", monospace',
-					fontLigatures: true,
-					lineNumbers: 'on',
-					wordWrap: 'on',
-					scrollBeyondLastLine: false,
-					automaticLayout: true,
-					padding: { top: 10, bottom: 10 },
-					quickSuggestions: false,
-					suggestOnTriggerCharacters: false,
-					wordBasedSuggestions: 'off',
-					parameterHints: { enabled: false },
-					snippetSuggestions: 'none',
-					cursorBlinking: 'smooth',
-					cursorSmoothCaretAnimation: 'on',
-					renderLineHighlight: 'none',
-					hideCursorInOverviewRuler: true,
-					overviewRulerBorder: false,
+					readOnly, // 是否只读
+					placeholder, // 占位文本
+					minimap: { enabled: false }, // 关闭右侧缩略图
+					fontSize: 14, // 字号
+					lineHeight: 22, // 行高
+					fontFamily:
+						'Fira Code, "SF Mono", "Monaco", "Menlo", "Consolas", monospace', // 字体
+					fontLigatures: true, // 启用连字
+					lineNumbers: 'on', // 显示行号
+					wordWrap: 'on', // 自动换行
+					colorDecorators: true, // 呈现内联色彩装饰器和颜色选择器
+					scrollBeyondLastLine: false, // 禁止滚动到最后一行之后
+					automaticLayout: true, // 自动调整布局
+					padding: { top: 10, bottom: 10 }, // 上下内边距
+					quickSuggestions: false, // 禁用快速建议
+					suggestOnTriggerCharacters: false, // 禁用触发字符建议
+					tabSize: 2, // 缩进大小
+					folding: true, // 是否启用代码折叠
+					foldingHighlight: true, // 折叠时是否高亮
+					foldingStrategy: 'indentation', // 代码折叠策略，使用缩进方式
+					wordBasedSuggestions: 'allDocuments', // 关闭基于单词的建议
+					parameterHints: { enabled: false }, // 关闭参数提示
+					snippetSuggestions: 'inline', // 代码片段建议显示方式：inline（内联）
+					cursorBlinking: 'smooth', // 光标平滑闪烁
+					cursorSmoothCaretAnimation: 'off', // 启用光标平滑动画
+					renderLineHighlight: 'line', // 高亮当前行
+					hideCursorInOverviewRuler: true, // 在概览标尺中隐藏光标
+					overviewRulerBorder: false, // 关闭概览标尺边框
 					scrollbar: {
-						vertical: 'visible',
-						horizontal: 'visible',
-						verticalScrollbarSize: 8,
-						horizontalScrollbarSize: 8,
+						vertical: 'visible', // 垂直滚动条可见
+						horizontal: 'visible', // 水平滚动条可见
+						verticalScrollbarSize: 8, // 垂直滚动条宽度
+						horizontalScrollbarSize: 8, // 水平滚动条高度
 					},
 				}}
 				loading={
