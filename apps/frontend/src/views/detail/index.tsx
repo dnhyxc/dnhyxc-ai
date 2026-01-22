@@ -1,88 +1,21 @@
-import { Button } from '@ui/button';
 import { ScrollArea } from '@ui/scroll-area';
-import { getUsers } from '@/service';
-import { deleteValue, getValue, onEmit, setValue } from '@/utils';
+import MarkdownPreview from '@/components/design/Markdown';
+import useStore from '@/store';
 
 const Detail = () => {
-	const sendMessage = async () => {
-		await onEmit('about-send-message', { message: 'about message' });
-	};
-
-	const getUserList = async () => {
-		const res = await getUsers();
-		console.log(res);
-	};
-
-	const setSettings = async () => {
-		await setValue('test-key', 'test');
-	};
-
-	const getSettings = async () => {
-		const res = await getValue('test-key');
-		console.log('getSettings', res);
-	};
-
-	const deleteSettings = async () => {
-		await deleteValue('test-key');
-		await getValue('test-key');
-	};
+	const { detailStore } = useStore();
 
 	return (
-		<div className="w-full h-full flex flex-col justify-center items-center m-0">
-			<ScrollArea className="w-full h-full overflow-y-auto p-2.5 rounded-none">
-				<h1>Detail</h1>
-				<div>
-					<Button
-						variant="default"
-						className="cursor-pointer"
-						onClick={sendMessage}
-					>
-						send message
-					</Button>
-					<Button
-						variant="default"
-						className="cursor-pointer"
-						onClick={getUserList}
-					>
-						Get Users
-					</Button>
-				</div>
-				<div className="flex justify-center items-center gap-4 mt-10">
-					<Button
-						variant="destructive"
-						className="cursor-pointer"
-						onClick={setSettings}
-					>
-						destructive 保存设置
-					</Button>
-					<Button
-						variant="ghost"
-						className="cursor-pointer"
-						onClick={getSettings}
-					>
-						ghost 获取设置
-					</Button>
-					<Button
-						variant="link"
-						className="cursor-pointer"
-						onClick={deleteSettings}
-					>
-						link 删除设置
-					</Button>
-					<Button
-						variant="outline"
-						className="cursor-pointer"
-						onClick={deleteSettings}
-					>
-						outline 删除设置
-					</Button>
-					<Button
-						variant="secondary"
-						className="cursor-pointer"
-						onClick={deleteSettings}
-					>
-						secondary 删除设置
-					</Button>
+		<div className="w-full h-full flex flex-col pt-1.5 justify-center items-center m-0">
+			<ScrollArea className="w-full h-full overflow-y-auto p-2.5 pt-0 rounded-none">
+				<div className="bg-theme-background p-2 rounded-md">
+					<div className="text-xl">MARKDOWN</div>
+					<MarkdownPreview
+						value={detailStore.markdown}
+						// height="calc(100vh - 135px)"
+						width="calc(100vw - 148px)"
+						className="bg-theme-background"
+					/>
 				</div>
 			</ScrollArea>
 		</div>

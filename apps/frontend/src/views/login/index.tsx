@@ -56,14 +56,14 @@ const Login = () => {
 							<div className="flex items-center">
 								<Button
 									variant="link"
-									className={`p-0 text-md cursor-pointer ${loginType !== 'username' ? 'text-theme/70' : ''}`}
+									className={`p-0 text-md cursor-pointer ${loginType !== 'username' ? 'text-theme/70' : 'text-theme'}`}
 									onClick={() => switchLoginType('username')}
 								>
 									账号密码登录
 								</Button>
 								<Button
 									variant="link"
-									className={`p-0 ml-5 text-md cursor-pointer ${loginType !== 'email' ? 'text-theme/70' : ''}`}
+									className={`p-0 ml-5 text-md cursor-pointer ${loginType !== 'email' ? 'text-theme/70' : 'text-theme'}`}
 									onClick={() => switchLoginType('email')}
 								>
 									邮箱登录

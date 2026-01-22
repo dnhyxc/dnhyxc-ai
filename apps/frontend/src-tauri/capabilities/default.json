@@ -37,6 +37,9 @@
 				},
 				{
 					"url": "http://t80w8cw4d.hd-bkt.clouddn.com/*"
+				},
+				{
+					"url": "https://cdn.jsdelivr.net/*"
 				}
 			],
 			"description": "dnhyxc-ai nest api"
