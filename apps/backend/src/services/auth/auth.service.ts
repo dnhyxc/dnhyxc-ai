@@ -22,7 +22,7 @@ import { UserService } from '../user/user.service';
 import { SwaggerUpdateUser } from '../user/user.swagger';
 import { CaptchaDto } from './dto/captcha.dto';
 import { EmailOptionsDTO } from './dto/email.dto';
-import { LoginUserDTO } from './dto/login-user.dto';
+import { LoginByEmailDTO, LoginUserDTO } from './dto/login-user.dto';
 import { RegisterUserDTO } from './dto/register-user.dto';
 
 @Injectable()
@@ -69,6 +69,32 @@ export class AuthService {
 			};
 		} else {
 			throw new HttpException('用户名或密码错误', HttpStatus.BAD_REQUEST);
+		}
+	}
+
+	async loginByEmail(dto: LoginByEmailDTO) {
+		const { email, verifyCodeKey, verifyCode } = dto;
+		const user = await this.userService.findByEmail(email);
+		if (!user) {
+			throw new HttpException(
+				'用户不存在，请先前往注册',
+				HttpStatus.BAD_REQUEST,
+			);
+		}
+		const vertifyEmailCode = await this.verifyEmail(verifyCodeKey, verifyCode);
+		if (vertifyEmailCode) {
+			const { password, ...userInfo } = user; // 使用解构赋值排除password
+			const token = await this.jwt.signAsync({
+				username: userInfo.username,
+				sub: userInfo.id,
+			});
+			// 返回根据用户的用户名及密码生成的 token
+			return {
+				access_token: token,
+				...userInfo,
+			};
+		} else {
+			throw new HttpException('邮箱或邮箱验证码错误', HttpStatus.BAD_REQUEST);
 		}
 	}
 

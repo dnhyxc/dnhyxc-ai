@@ -1,4 +1,10 @@
-import { IsNotEmpty, IsString, Length } from 'class-validator';
+import {
+	IsEmail,
+	IsNotEmpty,
+	IsNumber,
+	IsString,
+	Length,
+} from 'class-validator';
 
 export class LoginUserDTO {
 	@IsString({
@@ -50,4 +56,39 @@ export class LoginUserDTO {
 		message: '验证码 id 不能为空',
 	})
 	captchaId: string;
+}
+
+export class LoginByEmailDTO {
+	@IsNotEmpty({
+		message: '邮箱不能为空',
+	})
+	@IsString({
+		message: '邮箱必须为字符串',
+	})
+	@IsEmail(
+		{},
+		{
+			message: '邮箱格式错误',
+		},
+	)
+	email: string;
+
+	@IsNumber(
+		{},
+		{
+			message: '验证码必须为数字',
+		},
+	)
+	@IsNotEmpty({
+		message: '验证码不能为空',
+	})
+	verifyCode: number;
+
+	@IsString({
+		message: '验证码Key必须为字符串',
+	})
+	@IsNotEmpty({
+		message: '验证码Key不能为空',
+	})
+	verifyCodeKey: string;
 }

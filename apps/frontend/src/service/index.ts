@@ -7,6 +7,7 @@ import {
 	GET_USER_PROFILE,
 	GET_USERS,
 	LOGIN,
+	LOGIN_BY_EMAIL,
 	REGISTER,
 	RESET_PASSWORD,
 	SEND_EMAIL,
@@ -31,6 +32,22 @@ export const login = async ({
 		password,
 		captchaText,
 		captchaId,
+	});
+};
+
+export const loginByEmail = async ({
+	email,
+	verifyCodeKey,
+	verifyCode,
+}: {
+	email: string;
+	verifyCodeKey: string;
+	verifyCode: string;
+}): Promise<any> => {
+	return await http.post(LOGIN_BY_EMAIL, {
+		email,
+		verifyCodeKey,
+		verifyCode: Number(verifyCode),
 	});
 };
 

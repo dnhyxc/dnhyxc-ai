@@ -4,12 +4,14 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useTheme } from '@/hooks';
 import ForgetPwdForm from './forget-pwd-form';
+import LoginByEmailForm from './login-by-email-form';
 import LoginForm from './login-form';
 import RegisterForm from './register-form';
 
 const Login = () => {
 	const [isRegister, setIsRegister] = useState(false);
 	const [isForget, setIsForget] = useState(false);
+	const [loginType, setLoginType] = useState('username');
 
 	const navigate = useNavigate();
 
@@ -23,6 +25,10 @@ const Login = () => {
 	const switchLogin = () => {
 		setIsRegister(false);
 		setIsForget(false);
+	};
+
+	const switchLoginType = (type: string) => {
+		setLoginType(type);
 	};
 
 	const onForgetPwd = (status?: boolean) => {
@@ -42,7 +48,28 @@ const Login = () => {
 			>
 				<div data-tauri-drag-region className="w-90 m-auto">
 					<div className="text-xl font-medium w-90 mb-10">
-						{isRegister ? '注册账号' : isForget ? '重置密码' : '账号密码登录'}
+						{isRegister ? (
+							'注册账号'
+						) : isForget ? (
+							'重置密码'
+						) : (
+							<div className="flex items-center">
+								<Button
+									variant="link"
+									className={`p-0 text-md cursor-pointer ${loginType !== 'username' ? 'text-theme/70' : ''}`}
+									onClick={() => switchLoginType('username')}
+								>
+									账号密码登录
+								</Button>
+								<Button
+									variant="link"
+									className={`p-0 ml-5 text-md cursor-pointer ${loginType !== 'email' ? 'text-theme/70' : ''}`}
+									onClick={() => switchLoginType('email')}
+								>
+									邮箱登录
+								</Button>
+							</div>
+						)}
 					</div>
 					{isForget ? (
 						<ForgetPwdForm
@@ -51,8 +78,10 @@ const Login = () => {
 						/>
 					) : isRegister ? (
 						<RegisterForm onRegister={onRegister} />
-					) : (
+					) : loginType === 'username' ? (
 						<LoginForm onForgetPwd={onForgetPwd} />
+					) : (
+						<LoginByEmailForm />
 					)}
 					{!isForget && (
 						<div className="w-90 flex justify-end">

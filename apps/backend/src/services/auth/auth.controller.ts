@@ -17,7 +17,7 @@ import { SwaggerUpdateUser } from '../user/user.swagger';
 import { AuthService } from './auth.service';
 import { CaptchaDto } from './dto/captcha.dto';
 import { EmailOptionsDTO } from './dto/email.dto';
-import { LoginUserDTO } from './dto/login-user.dto';
+import { LoginByEmailDTO, LoginUserDTO } from './dto/login-user.dto';
 import { RegisterUserDTO } from './dto/register-user.dto';
 
 @Controller('auth')
@@ -30,6 +30,11 @@ export class AuthController {
 	@Post('/login')
 	async login(@Body() dto: LoginUserDTO) {
 		return await this.authService.login(dto);
+	}
+
+	@Post('/loginByEmail')
+	async loginByEmail(@Body() dto: LoginByEmailDTO) {
+		return await this.authService.loginByEmail(dto);
 	}
 
 	@Post('/register')
