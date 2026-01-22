@@ -1,8 +1,8 @@
 import { ScrollArea } from '@ui/scroll-area';
+import { config } from 'md-editor-rt';
 import MarkdownEditor from '@/components/design/Monaco';
 import { useTheme } from '@/hooks';
 import useStore from '@/store';
-import { config } from 'md-editor-rt';
 
 const Editor = () => {
 	const { detailStore } = useStore();

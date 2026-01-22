@@ -1,4 +1,4 @@
-import { MdPreview, config } from 'md-editor-rt';
+import { config, MdPreview } from 'md-editor-rt';
 import 'md-editor-rt/lib/style.css';
 import { cn } from '@/lib/utils';
 
