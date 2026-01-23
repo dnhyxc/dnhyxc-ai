@@ -11,6 +11,7 @@ import Setting from '@/views/setting';
 import AboutApp from '@/views/setting/about';
 import AppSystem from '@/views/setting/system';
 import ThemeSetting from '@/views/setting/theme';
+import Skill from '@/views/skill';
 import ChildWindow from '@/views/win';
 
 const routes = [
@@ -22,6 +23,13 @@ const routes = [
 				Component: Home,
 				meta: {
 					title: 'dnhyxc-ai',
+				},
+			},
+			{
+				path: '/skill',
+				Component: Skill,
+				meta: {
+					title: '技能',
 				},
 			},
 			{

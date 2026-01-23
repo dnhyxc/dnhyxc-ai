@@ -14,7 +14,7 @@ const Editor = () => {
 	};
 
 	config({
-		markdownItPlugins(plugins, options) {
+		markdownItPlugins(plugins, _options) {
 			return plugins.map((item) => {
 				switch (item.type) {
 					case 'code': {

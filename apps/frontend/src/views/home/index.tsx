@@ -1,5 +1,6 @@
 import { Carousel, CarouselContent, CarouselItem } from '@ui/carousel';
 import { ScrollArea } from '@ui/scroll-area';
+import { motion } from 'framer-motion';
 import { useEffect } from 'react';
 import { onListen } from '@/utils';
 
@@ -22,7 +23,11 @@ const Home = () => {
 
 	return (
 		<div className="w-full h-full flex flex-col justify-center items-center p-1.5 rounded-md">
-			<div className="w-full h-43 flex items-center justify-center">
+			<motion.div
+				initial={{ opacity: 0, y: -20 }}
+				animate={{ opacity: 1, y: 0 }}
+				className="w-full h-43 flex items-center justify-center"
+			>
 				<Carousel
 					opts={{
 						align: 'start',
@@ -42,10 +47,16 @@ const Home = () => {
 						))}
 					</CarouselContent>
 				</Carousel>
-			</div>
+			</motion.div>
 			<div className="flex-1 w-full p-1.5 mt-2 overflow-y-auto">
 				<ScrollArea className="h-full p-1.5 bg-theme-background rounded-md">
-					<div className="h-500">aaaaa</div>
+					<motion.div
+						initial={{ opacity: 0, y: -20 }}
+						animate={{ opacity: 1, y: 0 }}
+						className="h-500"
+					>
+						aaaaa
+					</motion.div>
 				</ScrollArea>
 			</div>
 		</div>

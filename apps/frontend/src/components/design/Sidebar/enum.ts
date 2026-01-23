@@ -5,6 +5,11 @@ export const MENUS = [
 		path: '/',
 	},
 	{
+		name: '技能',
+		icon: 'Package',
+		path: '/skill',
+	},
+	{
 		name: '详情',
 		icon: 'BookOpenText',
 		path: '/detail',

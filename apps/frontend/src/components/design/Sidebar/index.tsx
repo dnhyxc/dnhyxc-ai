@@ -11,6 +11,7 @@ import {
 	House,
 	LogOut,
 	Newspaper,
+	Package,
 	WalletCards,
 } from 'lucide-react';
 import { useNavigate } from 'react-router';
@@ -29,6 +30,7 @@ const Sidebar = () => {
 
 	const iconMap = {
 		House: <House />,
+		Package: <Package />,
 		BookOpenText: <BookOpenText />,
 		Newspaper: <Newspaper />,
 		WalletCards: <WalletCards />,
