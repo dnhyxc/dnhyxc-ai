@@ -20,7 +20,7 @@ function ScrollArea({
 		<ScrollAreaPrimitive.Root
 			data-slot="scroll-area"
 			className={cn(
-				'relative rounded-lg border-2 border-transparent bg-transparent',
+				'relative border-2 border-transparent bg-transparent',
 				className,
 			)}
 			{...props}

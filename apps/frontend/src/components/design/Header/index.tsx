@@ -67,7 +67,7 @@ const Header: React.FC<Iprops> = ({ actions = true, ccustomActions }) => {
 	return (
 		<header
 			data-tauri-drag-region
-			className="h-13 flex items-start pl-[12px] pr-[6px] select-none align-middle"
+			className="h-13 flex items-start pl-5.5 pr-[15px] select-none align-middle"
 		>
 			<div
 				data-tauri-drag-region
