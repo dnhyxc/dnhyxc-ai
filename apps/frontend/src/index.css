@@ -176,6 +176,7 @@ body {
 	--theme-to: oklch(0.4202 0 0);
 	--theme-text-from: oklch(100% 0.00011 271.152);
 	--theme-text-to: oklch(100% 0.00011 271.152);
+	--theme-light: oklch(93.034% 0.12974 97.974 / 0.06);
 }
 
 .theme-purple {
@@ -343,6 +344,7 @@ body {
 	--color-theme-to: var(--theme-to);
 	--color-theme-text-from: var(--theme-text-from);
 	--color-theme-text-to: var(--theme-text-to);
+	--color-theme-light: var(--theme-light);
 }
 
 @layer base {

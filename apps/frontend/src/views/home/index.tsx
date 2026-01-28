@@ -11,12 +11,10 @@ import {
 	Sparkles,
 	Zap,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { onListen } from '@/utils';
 
 const Home = () => {
-	const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
-
 	useEffect(() => {
 		const unlistenAboutPromise = onListen('about-send-message', (event) => {
 			console.log('about-send-message', event);
@@ -32,33 +30,12 @@ const Home = () => {
 		};
 	}, []);
 
-	useEffect(() => {
-		const handleMouseMove = (e: MouseEvent) => {
-			const x = (e.clientX / window.innerWidth) * 100;
-			const y = (e.clientY / window.innerHeight) * 100;
-			setMousePosition({ x, y });
-		};
-
-		window.addEventListener('mousemove', handleMouseMove);
-		return () => window.removeEventListener('mousemove', handleMouseMove);
-	}, []);
-
 	return (
 		<div className="w-full h-full flex flex-col justify-center items-center relative overflow-hidden rounded-b-md">
-			<div
-				className="absolute inset-0 overflow-hidden pointer-events-none"
-				style={{
-					background: `
-						radial-gradient(circle at ${mousePosition.x}% ${mousePosition.y}%, rgba(139, 92, 246, 0.15), transparent 30%),
-						radial-gradient(circle at 60% 20%, transparent, transparent 50%)
-					`,
-				}}
-			/>
-
-			<div className="absolute top-30 right-10 w-50 h-50 rounded-full bg-linear-to-r from-purple-500/20 via-pink-500/20 to-blue-500/20 blur-3xl animate-pulse" />
+			<div className="absolute top-20 right-20 w-50 h-50 rounded-full bg-linear-to-r from-yellow-600/20 via-bule-500/20 to-yellow-500/20 blur-3xl animate-pulse" />
+			{/* <div className="absolute top-30 right-10 w-50 h-50 rounded-full bg-linear-to-r from-purple-500/20 via-pink-500/20 to-blue-500/20 blur-3xl animate-pulse" /> */}
 			<div className="absolute bottom-10 left-10 w-80 h-80 rounded-full bg-linear-to-r from-blue-500/20 via-cyan-500/20 to-purple-500/20 blur-3xl animate-pulse" />
-
-			<ScrollArea className="overflow-y-auto p-5 h-full backdrop-blur-sm rounded-b-md">
+			<ScrollArea className="overflow-y-auto p-5 pt-0 h-full backdrop-blur-sm rounded-b-md">
 				<div className="max-w-6xl mx-auto">
 					{/* Hero Section */}
 					<motion.div
@@ -67,10 +44,10 @@ const Home = () => {
 						initial={{ opacity: 0, scale: 0.95 }}
 						animate={{ opacity: 1, scale: 1 }}
 						transition={{ duration: 0.5 }}
-						className="relative border border-white/10 rounded-2xl px-6 py-8 bg-linear-to-br from-white/5 to-white/0 backdrop-blur-2xl mb-5.5 overflow-hidden group"
+						className="relative h-84 flex flex-col rounded-2xl px-6 py-8 bg-linear-to-br from-white/5 to-white/5 backdrop-blur-2xl mb-5.5 overflow-hidden group"
 					>
 						<div className="absolute inset-0 bg-linear-to-r from-white/5 to-white/0  group-hover:opacity-100 opacity-50 transition-opacity duration-500" />
-						<div className="relative z-10 flex flex-col md:flex-row items-center gap-10">
+						<div className="h-full relative z-10 flex flex-col md:flex-row items-center gap-10">
 							<div className="flex-1 text-center md:text-left">
 								<motion.div
 									initial={{ opacity: 0, y: 20 }}
@@ -230,10 +207,10 @@ const Home = () => {
 								// animate={{ opacity: 1, y: 0 }}
 								// transition={{ delay: 0.2 + idx * 0.1 }}
 								whileHover={{ y: -5 }}
-								className="relative rounded-2xl p-6 border border-white/10 bg-linear-to-br from-white/5 to-white/0 backdrop-blur-xl hover:bg-linear-to-br hover:from-white/10 hover:to-white/0 transition-all duration-300 cursor-pointer group"
-								style={{
-									background: `linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%)`,
-								}}
+								className="relative rounded-2xl p-6 bg-linear-to-br from-white/5 to-white/5 backdrop-blur-xl hover:bg-linear-to-br hover:from-white/10 hover:to-white/0 transition-all duration-300 cursor-pointer group"
+								// style={{
+								// 	background: `linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%)`,
+								// }}
 							>
 								<div
 									className={`absolute inset-0 rounded-2xl bg-linear-to-br ${feature.bg} opacity-0 group-hover:opacity-100 transition-opacity duration-300`}
@@ -271,7 +248,7 @@ const Home = () => {
 					</motion.div>
 
 					{/* Features Showcase */}
-					<div className="relative rounded-2xl p-6 border border-white/10 bg-linear-to-br from-white/5 to-white/0 backdrop-blur-xl mb-5.5 overflow-hidden group">
+					<div className="relative rounded-2xl p-6 bg-linear-to-br from-white/5 to-white/5 backdrop-blur-xl mb-5.5 overflow-hidden group">
 						<motion.h3
 							initial={{ opacity: 0, y: 20 }}
 							animate={{ opacity: 1, y: 0 }}
@@ -313,7 +290,7 @@ const Home = () => {
 									animate={{ opacity: 1, y: 0 }}
 									transition={{ delay: 0.3 + idx * 0.1 }}
 									whileHover={{ scale: 1.1, y: -3 }}
-									className="relative p-6 text-center rounded-2xl border border-white/5 bg-white/5 backdrop-blur-sm hover:bg-white/10 hover:border-white/20 transition-all duration-300 cursor-pointer group"
+									className="relative p-6 text-center rounded-2xl bg-white/5 backdrop-blur-sm hover:bg-white/10 hover:border-white/20 transition-all duration-300 cursor-pointer group"
 								>
 									<motion.div
 										className={`w-16 h-16 mx-auto mb-4 rounded-2xl bg-linear-to-br ${feature.color} flex items-center justify-center shadow-lg group-hover:shadow-xl group-hover:shadow-${feature.color.split(' ')[1]}-500/20`}
@@ -336,7 +313,7 @@ const Home = () => {
 						initial={{ opacity: 0, y: 20 }}
 						animate={{ opacity: 1, y: 0 }}
 						transition={{ delay: 0.8 }}
-						className="relative rounded-2xl p-6 border border-white/10 bg-linear-to-br from-white/5 to-white/0 backdrop-blur-xl mb-5.5 overflow-hidden group"
+						className="relative rounded-2xl p-6 bg-linear-to-br from-white/5 to-white/5 backdrop-blur-xl mb-5.5 overflow-hidden group"
 					>
 						<div className="absolute top-0 right-0 w-32 h-32 bg-linear-to-br from-purple-500/10 to-transparent rounded-full blur-3xl" />
 						<h3 className="text-xl font-semibold mb-8 text-white relative z-10">
@@ -379,7 +356,7 @@ const Home = () => {
 									animate={{ opacity: 1, x: 0 }}
 									transition={{ delay: 0.4 + idx * 0.1 }}
 									whileHover={{ scale: 1.02 }}
-									className="relative flex items-center p-5 rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm hover:bg-white/10 hover:border-white/20 hover:shadow-lg hover:shadow-purple-500/10 transition-all duration-300 cursor-pointer group"
+									className="relative flex items-center p-5 rounded-2xl bg-white/5 backdrop-blur-sm hover:bg-white/10 hover:border-white/20 hover:shadow-lg hover:shadow-purple-500/10 transition-all duration-300 cursor-pointer group"
 								>
 									<div
 										className={`w-12 h-12 rounded-xl bg-linear-to-br ${item.color} flex items-center justify-center mr-5 shadow-lg group-hover:shadow-xl`}
@@ -410,7 +387,7 @@ const Home = () => {
 						initial={{ opacity: 0, y: 20 }}
 						animate={{ opacity: 1, y: 0 }}
 						transition={{ delay: 0.9 }}
-						className="relative rounded-2xl p-6 border border-white/10 bg-linear-to-br from-white/5 to-white/0 backdrop-blur-xl overflow-hidden"
+						className="relative rounded-2xl p-6 bg-linear-to-br from-white/5 to-white/5 backdrop-blur-xl overflow-hidden"
 					>
 						<div className="absolute -top-10 -right-10 w-40 h-40 bg-linear-to-br from-blue-500/10 to-transparent rounded-full blur-3xl" />
 						<h3 className="text-xl font-semibold mb-8 text-white relative z-10">
@@ -443,7 +420,7 @@ const Home = () => {
 									animate={{ opacity: 1, y: 0 }}
 									transition={{ delay: 1 + idx * 0.1 }}
 									whileHover={{ scale: 1.01 }}
-									className="relative p-6 rounded-2xl border border-white/10 bg-white/5 backdrop-blur-sm hover:bg-white/10 hover:border-white/20 hover:shadow-lg hover:shadow-purple-500/10 transition-all duration-300 cursor-pointer group"
+									className="relative p-6 rounded-2xl bg-white/5 backdrop-blur-sm hover:bg-white/10 hover:border-white/20 hover:shadow-lg hover:shadow-purple-500/10 transition-all duration-300 cursor-pointer group"
 								>
 									<div className="flex items-start gap-4">
 										<motion.div
