@@ -8,6 +8,7 @@ import Home from '@/views/home';
 import Login from '@/views/login';
 import Profile from '@/views/profile';
 import Setting from '@/views/setting';
+import Document from '@/views/code';
 import AboutApp from '@/views/setting/about';
 import AppSystem from '@/views/setting/system';
 import ThemeSetting from '@/views/setting/theme';
@@ -30,6 +31,13 @@ const routes = [
 				Component: Skill,
 				meta: {
 					title: '技能',
+				},
+			},
+			{
+				path: '/document',
+				Component: Document,
+				meta: {
+					title: '文档处理',
 				},
 			},
 			{

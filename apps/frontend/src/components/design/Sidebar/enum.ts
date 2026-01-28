@@ -10,6 +10,11 @@ export const MENUS = [
 		path: '/skill',
 	},
 	{
+		name: 'document',
+		icon: 'SquareChartGantt',
+		path: '/document',
+	},
+	{
 		name: '详情',
 		icon: 'BookOpenText',
 		path: '/detail',

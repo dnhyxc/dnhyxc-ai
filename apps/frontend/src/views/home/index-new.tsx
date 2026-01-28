@@ -15,6 +15,7 @@ import { useEffect, useState } from 'react';
 import { onListen } from '@/utils';
 
 const Home = () => {
+	const [rotation, setRotation] = useState(0);
 	const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
 
 	useEffect(() => {
@@ -43,8 +44,15 @@ const Home = () => {
 		return () => window.removeEventListener('mousemove', handleMouseMove);
 	}, []);
 
+	useEffect(() => {
+		const interval = setInterval(() => {
+			setRotation((prev) => (prev + 2) % 360);
+		}, 50);
+		return () => clearInterval(interval);
+	}, []);
+
 	return (
-		<div className="w-full h-full flex flex-col justify-center items-center relative overflow-hidden rounded-b-md">
+		<div className="w-full h-full flex flex-col justify-center items-center relative overflow-hidden">
 			<div
 				className="absolute inset-0 overflow-hidden pointer-events-none"
 				style={{
@@ -54,95 +62,116 @@ const Home = () => {
 					`,
 				}}
 			/>
-
-			<div className="absolute top-30 right-10 w-50 h-50 rounded-full bg-linear-to-r from-purple-500/20 via-pink-500/20 to-blue-500/20 blur-3xl animate-pulse" />
-			<div className="absolute bottom-10 left-10 w-80 h-80 rounded-full bg-linear-to-r from-blue-500/20 via-cyan-500/20 to-purple-500/20 blur-3xl animate-pulse" />
-
-			<ScrollArea className="overflow-y-auto p-5 h-full backdrop-blur-sm rounded-b-md">
-				<div className="max-w-6xl mx-auto">
-					{/* Hero Section */}
+			<div className="absolute inset-0 overflow-hidden">
+				{Array.from({ length: 20 }).map((_, i) => (
 					<motion.div
-						// initial={{ opacity: 0, y: 20 }}
-						// animate={{ opacity: 1, y: 0 }}
-						initial={{ opacity: 0, scale: 0.95 }}
-						animate={{ opacity: 1, scale: 1 }}
-						transition={{ duration: 0.5 }}
-						className="relative border border-white/10 rounded-2xl px-6 py-8 bg-linear-to-br from-white/5 to-white/0 backdrop-blur-2xl mb-5.5 overflow-hidden group"
-					>
-						<div className="absolute inset-0 bg-linear-to-r from-white/5 to-white/0  group-hover:opacity-100 opacity-50 transition-opacity duration-500" />
-						<div className="relative z-10 flex flex-col md:flex-row items-center gap-10">
-							<div className="flex-1 text-center md:text-left">
-								<motion.div
-									initial={{ opacity: 0, y: 20 }}
-									animate={{ opacity: 1, y: 0 }}
-									transition={{ delay: 0.1 }}
-								>
-									<div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-purple-500/10 border border-purple-500/20 mb-4">
-										<Sparkles className="w-4 h-4 text-purple-400" />
-										<span className="text-sm text-purple-300">dnhyxc-ai</span>
-									</div>
-								</motion.div>
-								<motion.h2
-									initial={{ opacity: 0, y: 20 }}
-									animate={{ opacity: 1, y: 0 }}
-									transition={{ delay: 0.2 }}
-									className="text-3xl md:text-5xl pb-1 pt-px font-bold bg-linear-to-r from-purple-400 via-pink-400 to-blue-400 bg-clip-text text-transparent mb-8"
-								>
-									欢迎使用 dnhyxc-ai 智能助手
-								</motion.h2>
-								<motion.p
-									initial={{ opacity: 0, y: 20 }}
-									animate={{ opacity: 1, y: 0 }}
-									transition={{ delay: 0.3 }}
-									className="text-lg text-gray-300 mb-8 leading-relaxed"
-								>
-									一款功能强大的智能桌面应用，集成了多种AI工具和实用功能，帮助您更高效地工作和学习
-								</motion.p>
-								<motion.div
-									initial={{ opacity: 0, y: 20 }}
-									animate={{ opacity: 1, y: 0 }}
-									transition={{ delay: 0.4 }}
-									className="flex flex-wrap gap-4 justify-center md:justify-start"
-								>
-									<motion.button
-										whileHover={{ scale: 1.05 }}
-										whileTap={{ scale: 0.98 }}
-										type="button"
-										className="relative overflow-hidden group/btn pb-1 px-8 h-12 bg-linear-to-r from-purple-600 to-pink-600 text-white rounded-xl font-medium hover:shadow-lg hover:shadow-purple-500/25 transition-all duration-300 cursor-pointer"
+						key={i}
+						className="absolute w-2 h-2 rounded-full bg-purple-400/30 blur-sm"
+						initial={{
+							x: Math.random() * 100,
+							y: Math.random() * 100,
+							scale: 0,
+							opacity: 0,
+						}}
+						animate={{
+							scale: Math.random() * 2 + 1,
+							opacity: [0, 1, 0],
+							x: [null, Math.random() * 100 - 50],
+							y: [null, Math.random() * 100 - 50],
+						}}
+						transition={{
+							duration: Math.random() * 10 + 10,
+							repeat: Infinity,
+							delay: Math.random() * 10,
+						}}
+					/>
+				))}
+			</div>
+
+			<div className="absolute top-20 left-20 w-64 h-64 rounded-full bg-linear-to-r from-purple-500/20 via-pink-500/20 to-blue-500/20 blur-3xl animate-pulse" />
+			<div
+				className="absolute bottom-20 right-20 w-80 h-80 rounded-full bg-linear-to-r from-blue-500/20 via-cyan-500/20 to-purple-500/20 blur-3xl animate-pulse"
+				style={{ animationDelay: '1s' }}
+			/>
+
+			<ScrollArea className="overflow-y-auto p-5 pt-0 h-full backdrop-blur-sm rounded-b-md">
+				<div className="max-w-6xl mx-auto">
+					<div className="max-w-6xl mx-auto">
+						{/* Hero Section */}
+						<motion.div
+							initial={{ opacity: 0, scale: 0.95 }}
+							animate={{ opacity: 1, scale: 1 }}
+							transition={{ duration: 0.5 }}
+							className="relative border border-white/10 rounded-2xl p-8 bg-linear-to-br from-white/5 to-white/0 backdrop-blur-2xl mb-6 overflow-hidden group"
+						>
+							<div className="absolute inset-0 bg-linear-to-r from-white/5 to-white/0  group-hover:opacity-100 opacity-50 transition-opacity duration-500" />
+							<div className="relative z-10 flex flex-col md:flex-row items-center gap-10">
+								<div className="flex-1 text-center md:text-left">
+									<motion.div
+										initial={{ opacity: 0, y: 20 }}
+										animate={{ opacity: 1, y: 0 }}
+										transition={{ delay: 0.1 }}
 									>
-										<div className="absolute inset-0 bg-linear-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover/btn:translate-x-full transition-transform duration-700" />
-										快速开始
-										<ArrowRight className="inline-block ml-2 w-5 h-5" />
-									</motion.button>
-									<button
-										type="button"
-										className="pb-1 px-8 h-12 bg-white/5 backdrop-blur-sm border border-white/10 text-gray-200 rounded-xl font-medium hover:bg-white/10 hover:border-white/20 hover:shadow-lg transition-all duration-300 cursor-pointer"
+										<div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-purple-500/10 border border-purple-500/20 mb-4">
+											<Sparkles className="w-4 h-4 text-purple-400" />
+											<span className="text-sm text-purple-300">
+												AI 智能助手
+											</span>
+										</div>
+									</motion.div>
+									<motion.h2
+										initial={{ opacity: 0, y: 20 }}
+										animate={{ opacity: 1, y: 0 }}
+										transition={{ delay: 0.2 }}
+										className="text-3xl md:text-5xl font-bold bg-linear-to-r from-purple-400 via-pink-400 to-blue-400 bg-clip-text text-transparent mb-6"
 									>
-										了解更多
-									</button>
-								</motion.div>
-							</div>
-							{/* <motion.div
+										欢迎使用 AI 智能助手
+									</motion.h2>
+									<motion.p
+										initial={{ opacity: 0, y: 20 }}
+										animate={{ opacity: 1, y: 0 }}
+										transition={{ delay: 0.3 }}
+										className="text-lg text-gray-300 mb-8 leading-relaxed"
+									>
+										一款功能强大的智能桌面应用，集成了多种AI工具和实用功能，帮助您更高效地工作和学习
+									</motion.p>
+									<motion.div
+										initial={{ opacity: 0, y: 20 }}
+										animate={{ opacity: 1, y: 0 }}
+										transition={{ delay: 0.4 }}
+										className="flex flex-wrap gap-4 justify-center md:justify-start"
+									>
+										<motion.button
+											whileHover={{ scale: 1.05 }}
+											whileTap={{ scale: 0.98 }}
+											type="button"
+											className="relative overflow-hidden group/btn pb-1 px-8 h-12 bg-linear-to-r from-purple-600 to-pink-600 text-white rounded-xl font-medium hover:shadow-lg hover:shadow-purple-500/25 transition-all duration-300 cursor-pointer"
+										>
+											<div className="absolute inset-0 bg-linear-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover/btn:translate-x-full transition-transform duration-700" />
+											<ArrowRight className="inline-block ml-2 w-5 h-5" />
+										</motion.button>
+										<button
+											type="button"
+											className="pb-1 px-8 h-12 bg-white/5 backdrop-blur-sm border border-white/10 text-gray-200 rounded-xl font-medium hover:bg-white/10 hover:border-white/20 hover:shadow-lg transition-all duration-300 cursor-pointer"
+										>
+											了解更多
+										</button>
+									</motion.div>
+								</div>
+								<motion.div
 									initial={{ opacity: 0, y: 20 }}
 									animate={{ opacity: 1, y: 0 }}
 									transition={{ delay: 0.3 }}
 									className="relative"
 								>
 									<div className="relative w-48 h-48">
-										<motion.div
-											animate={{
-												scale: [1, 1.05, 1],
-												opacity: [0.8, 0.9, 0.8],
-											}}
-											transition={{
-												duration: 2.5,
-												repeat: Infinity,
-												ease: 'easeInOut',
-											}}
+										{/* <motion.div
+											animate={{ scale: [1, 1.05, 1], opacity: [0.8, 0.9, 0.8] }}
+											transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
 											className="absolute inset-0"
 										>
-											<div className="w-full h-full rounded-2xl bg-linear-to-br from-purple-500/20 via-pink-500/20 to-blue-500/20 backdrop-blur-xl shadow-2xl" />
-										</motion.div>
+											<div className="w-full h-full rounded-2xl bg-linear-to-br from-purple-500/20 via-pink-500/20 to-blue-500/20 backdrop-blur-xl border border-white/10 shadow-2xl" />
+										</motion.div> */}
 										<motion.div
 											animate={{
 												scale: [1, 1.05, 1],
@@ -154,7 +183,7 @@ const Home = () => {
 												ease: 'easeInOut',
 												// delay: 0.1,
 											}}
-											className="absolute inset-5"
+											className="absolute inset-0"
 										>
 											<div className="w-full h-full rounded-3xl bg-linear-to-br from-purple-500/30 via-pink-500/30 to-blue-500/30 backdrop-blur-xl shadow-xl" />
 										</motion.div>
@@ -166,7 +195,7 @@ const Home = () => {
 												ease: 'easeInOut',
 												// delay: 0.2,
 											}}
-											className="absolute inset-10"
+											className="absolute inset-5"
 										>
 											<div className="w-full h-full rounded-3xl bg-linear-to-br from-purple-500/40 via-pink-500/40 to-blue-500/40 backdrop-blur-xl shadow-lg flex items-center justify-center">
 												<motion.div
@@ -182,18 +211,17 @@ const Home = () => {
 											</div>
 										</motion.div>
 									</div>
-								</motion.div> */}
-						</div>
-					</motion.div>
+								</motion.div>
+							</div>
+						</motion.div>
+					</div>
 
 					{/* Features Grid */}
 					<motion.div
-						// initial={{ opacity: 0, y: 20 }}
-						// animate={{ opacity: 1, y: 0 }}
-						initial={{ opacity: 0, scale: 0.95 }}
-						animate={{ opacity: 1, scale: 1 }}
-						transition={{ duration: 0.5 }}
-						className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5.5 mb-5.5"
+						initial={{ opacity: 0, y: 20 }}
+						animate={{ opacity: 1, y: 0 }}
+						transition={{ delay: 0.1 }}
+						className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8"
 					>
 						{[
 							{
@@ -226,8 +254,8 @@ const Home = () => {
 						].map((feature) => (
 							<motion.div
 								key={feature.title}
-								// initial={{ opacity: 0, y: 30 }}
-								// animate={{ opacity: 1, y: 0 }}
+								initial={{ opacity: 0, y: 30 }}
+								animate={{ opacity: 1, y: 0 }}
 								// transition={{ delay: 0.2 + idx * 0.1 }}
 								whileHover={{ y: -5 }}
 								className="relative rounded-2xl p-6 border border-white/10 bg-linear-to-br from-white/5 to-white/0 backdrop-blur-xl hover:bg-linear-to-br hover:from-white/10 hover:to-white/0 transition-all duration-300 cursor-pointer group"
@@ -271,7 +299,7 @@ const Home = () => {
 					</motion.div>
 
 					{/* Features Showcase */}
-					<div className="relative rounded-2xl p-6 border border-white/10 bg-linear-to-br from-white/5 to-white/0 backdrop-blur-xl mb-5.5 overflow-hidden group">
+					<div className="relative rounded-2xl p-8 border border-white/10 bg-linear-to-br from-white/5 to-white/0 backdrop-blur-xl mb-8 overflow-hidden group">
 						<motion.h3
 							initial={{ opacity: 0, y: 20 }}
 							animate={{ opacity: 1, y: 0 }}
@@ -280,7 +308,7 @@ const Home = () => {
 						>
 							特色功能
 						</motion.h3>
-						<div className="grid grid-cols-2 md:grid-cols-4 gap-5.5">
+						<div className="grid grid-cols-2 md:grid-cols-4 gap-4">
 							{[
 								{
 									icon: Rocket,
@@ -336,7 +364,7 @@ const Home = () => {
 						initial={{ opacity: 0, y: 20 }}
 						animate={{ opacity: 1, y: 0 }}
 						transition={{ delay: 0.8 }}
-						className="relative rounded-2xl p-6 border border-white/10 bg-linear-to-br from-white/5 to-white/0 backdrop-blur-xl mb-5.5 overflow-hidden group"
+						className="relative rounded-2xl p-8 border border-white/10 bg-linear-to-br from-white/5 to-white/0 backdrop-blur-xl mb-8 overflow-hidden group"
 					>
 						<div className="absolute top-0 right-0 w-32 h-32 bg-linear-to-br from-purple-500/10 to-transparent rounded-full blur-3xl" />
 						<h3 className="text-xl font-semibold mb-8 text-white relative z-10">
@@ -410,7 +438,7 @@ const Home = () => {
 						initial={{ opacity: 0, y: 20 }}
 						animate={{ opacity: 1, y: 0 }}
 						transition={{ delay: 0.9 }}
-						className="relative rounded-2xl p-6 border border-white/10 bg-linear-to-br from-white/5 to-white/0 backdrop-blur-xl overflow-hidden"
+						className="relative rounded-2xl p-8 border border-white/10 bg-linear-to-br from-white/5 to-white/0 backdrop-blur-xl overflow-hidden"
 					>
 						<div className="absolute -top-10 -right-10 w-40 h-40 bg-linear-to-br from-blue-500/10 to-transparent rounded-full blur-3xl" />
 						<h3 className="text-xl font-semibold mb-8 text-white relative z-10">
