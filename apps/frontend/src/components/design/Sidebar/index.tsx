@@ -12,8 +12,8 @@ import {
 	LogOut,
 	Newspaper,
 	Package,
-	WalletCards,
 	SquareChartGantt,
+	WalletCards,
 } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import ICON from '@/assets/icon.png';

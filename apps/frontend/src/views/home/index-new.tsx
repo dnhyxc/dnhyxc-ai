@@ -15,7 +15,6 @@ import { useEffect, useState } from 'react';
 import { onListen } from '@/utils';
 
 const Home = () => {
-	const [rotation, setRotation] = useState(0);
 	const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
 
 	useEffect(() => {
@@ -42,13 +41,6 @@ const Home = () => {
 
 		window.addEventListener('mousemove', handleMouseMove);
 		return () => window.removeEventListener('mousemove', handleMouseMove);
-	}, []);
-
-	useEffect(() => {
-		const interval = setInterval(() => {
-			setRotation((prev) => (prev + 2) % 360);
-		}, 50);
-		return () => clearInterval(interval);
 	}, []);
 
 	return (
