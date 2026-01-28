@@ -38,3 +38,9 @@ export enum EmailEnum {
 	EMAIL_TRANSPORT = 'EMAIL_TRANSPORT',
 	EMAIL_FROM = 'EMAIL_FROM',
 }
+
+export enum ModelEnum {
+	QWEN_API_KEY = 'QWEN_API_KEY',
+	QWEN_MODEL_NAME = 'QWEN_MODEL_NAME',
+	QWEN_BASE_URL = 'QWEN_BASE_URL',
+}

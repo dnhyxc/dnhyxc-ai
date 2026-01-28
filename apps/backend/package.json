@@ -27,6 +27,8 @@
 	"dependencies": {
 		"@casl/ability": "^6.7.5",
 		"@keyv/redis": "^5.1.5",
+		"@langchain/core": "^1.1.17",
+		"@langchain/openai": "^1.2.3",
 		"@nestjs-modules/mailer": "^2.0.2",
 		"@nestjs/cache-manager": "^3.1.0",
 		"@nestjs/common": "^11.1.11",
@@ -50,6 +52,7 @@
 		"install": "^0.13.0",
 		"joi": "^18.0.2",
 		"keyv": "^5.5.5",
+		"langchain": "^1.2.14",
 		"multer": "^2.0.2",
 		"mysql2": "^3.16.0",
 		"nest-winston": "^1.10.2",
