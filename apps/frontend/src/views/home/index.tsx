@@ -44,9 +44,9 @@ const Home = () => {
 						initial={{ opacity: 0, scale: 0.95 }}
 						animate={{ opacity: 1, scale: 1 }}
 						transition={{ duration: 0.5 }}
-						className="relative h-84 flex flex-col rounded-2xl px-6 py-8 bg-linear-to-br from-white/5 to-white/5 backdrop-blur-2xl mb-5.5 overflow-hidden group"
+						className="relative h-84 flex flex-col rounded-2xl px-6 py-8 bg-linear-to-br from-theme-white/5 to-theme-white/5 backdrop-blur-2xl mb-5.5 overflow-hidden group"
 					>
-						<div className="absolute inset-0 bg-linear-to-r from-white/5 to-white/0  group-hover:opacity-100 opacity-50 transition-opacity duration-500" />
+						<div className="absolute inset-0 bg-linear-to-r from-theme-white/5 to-theme-white/0  group-hover:opacity-100 opacity-50 transition-opacity duration-500" />
 						<div className="h-full relative z-10 flex flex-col md:flex-row items-center gap-10">
 							<div className="flex-1 text-center md:text-left">
 								<motion.div
@@ -85,15 +85,15 @@ const Home = () => {
 										whileHover={{ scale: 1.05 }}
 										whileTap={{ scale: 0.98 }}
 										type="button"
-										className="relative overflow-hidden group/btn pb-1 px-8 h-12 bg-linear-to-r from-purple-600 to-pink-600 text-white rounded-xl font-medium hover:shadow-lg hover:shadow-purple-500/25 transition-all duration-300 cursor-pointer"
+										className="relative overflow-hidden group/btn pb-1 px-8 h-12 bg-linear-to-r from-purple-600 to-pink-600 text-textcolor rounded-xl font-medium hover:shadow-lg hover:shadow-purple-500/25 transition-all duration-300 cursor-pointer"
 									>
-										<div className="absolute inset-0 bg-linear-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover/btn:translate-x-full transition-transform duration-700" />
+										<div className="absolute inset-0 bg-linear-to-r from-transparent via-theme-white/20 to-transparent -translate-x-full group-hover/btn:translate-x-full transition-transform duration-700" />
 										快速开始
 										<ArrowRight className="inline-block ml-2 w-5 h-5" />
 									</motion.button>
 									<button
 										type="button"
-										className="pb-1 px-8 h-12 bg-white/5 backdrop-blur-sm border border-white/10 text-gray-200 rounded-xl font-medium hover:bg-white/10 hover:border-white/20 hover:shadow-lg transition-all duration-300 cursor-pointer"
+										className="pb-1 px-8 h-12 bg-theme-white/5 backdrop-blur-sm border border-theme-white/10 text-gray-200 rounded-xl font-medium hover:bg-theme-white/10 hover:border-theme-white/20 hover:shadow-lg transition-all duration-300 cursor-pointer"
 									>
 										了解更多
 									</button>
@@ -207,7 +207,7 @@ const Home = () => {
 								// animate={{ opacity: 1, y: 0 }}
 								// transition={{ delay: 0.2 + idx * 0.1 }}
 								whileHover={{ y: -5 }}
-								className="relative rounded-2xl p-6 bg-linear-to-br from-white/5 to-white/5 backdrop-blur-xl hover:bg-linear-to-br hover:from-white/10 hover:to-white/0 transition-all duration-300 cursor-pointer group"
+								className="relative rounded-2xl p-6 bg-linear-to-br from-theme-white/5 to-theme-white/5 backdrop-blur-xl hover:bg-linear-to-br hover:from-theme-white/10 hover:to-theme-white/0 transition-all duration-300 cursor-pointer group"
 								// style={{
 								// 	background: `linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%)`,
 								// }}
@@ -218,7 +218,7 @@ const Home = () => {
 								<div className="relative z-10">
 									<motion.div className="flex items-center justify-between mb-5">
 										<div>
-											<h3 className="text-xl font-semibold text-white mb-1">
+											<h3 className="text-xl font-semibold text-theme-white mb-1">
 												{feature.title}
 											</h3>
 											<p className="text-sm text-gray-400">
@@ -228,15 +228,15 @@ const Home = () => {
 										<div
 											className={`relative w-14 h-14 rounded-xl bg-linear-to-br ${feature.color} flex items-center justify-center shadow-lg`}
 										>
-											<feature.icon className="w-5 h-5 text-white" />
-											<div className="absolute inset-0 rounded-xl bg-linear-to-br from-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+											<feature.icon className="w-5 h-5 text-textcolor" />
+											<div className="absolute inset-0 rounded-xl bg-linear-to-br from-theme-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 										</div>
 									</motion.div>
-									<motion.p className="text-gray-400 mb-5 text-sm leading-relaxed">
+									<motion.p className="text-textcolor/60 mb-5 text-sm leading-relaxed">
 										{feature.desc}
 									</motion.p>
 									<motion.div
-										className="flex items-center text-sm text-gray-500"
+										className="flex items-center text-sm text-textcolor/60"
 										whileHover={{ x: 5 }}
 									>
 										<Zap className="w-4 h-4 text-purple-400 mr-2" />
@@ -248,7 +248,7 @@ const Home = () => {
 					</motion.div>
 
 					{/* Features Showcase */}
-					<div className="relative rounded-2xl p-6 bg-linear-to-br from-white/5 to-white/5 backdrop-blur-xl mb-5.5 overflow-hidden group">
+					<div className="relative rounded-2xl p-6 bg-linear-to-br from-theme-white/5 to-theme-white/5 backdrop-blur-xl mb-5.5 overflow-hidden group">
 						<motion.h3
 							initial={{ opacity: 0, y: 20 }}
 							animate={{ opacity: 1, y: 0 }}
@@ -290,17 +290,17 @@ const Home = () => {
 									animate={{ opacity: 1, y: 0 }}
 									transition={{ delay: 0.3 + idx * 0.1 }}
 									whileHover={{ scale: 1.1, y: -3 }}
-									className="relative p-6 text-center rounded-2xl bg-white/5 backdrop-blur-sm hover:bg-white/10 hover:border-white/20 transition-all duration-300 cursor-pointer group"
+									className="relative p-6 text-center rounded-2xl bg-theme-white/5 backdrop-blur-sm hover:bg-theme-white/10 hover:border-theme-white/20 transition-all duration-300 cursor-pointer group"
 								>
 									<motion.div
 										className={`w-16 h-16 mx-auto mb-4 rounded-2xl bg-linear-to-br ${feature.color} flex items-center justify-center shadow-lg group-hover:shadow-xl group-hover:shadow-${feature.color.split(' ')[1]}-500/20`}
 									>
-										<feature.icon className="w-6 h-6 text-white" />
+										<feature.icon className="w-6 h-6 text-textcolor" />
 									</motion.div>
-									<motion.h4 className="font-semibold text-white mb-2 group-hover:text-purple-300 transition-colors">
+									<motion.h4 className="font-semibold text-textcolor mb-2 transition-colors">
 										{feature.title}
 									</motion.h4>
-									<p className="text-xs text-gray-500 group-hover:text-gray-400 transition-colors">
+									<p className="text-xs text-textcolor/50 transition-colors">
 										{feature.desc}
 									</p>
 								</motion.div>
@@ -313,10 +313,10 @@ const Home = () => {
 						initial={{ opacity: 0, y: 20 }}
 						animate={{ opacity: 1, y: 0 }}
 						transition={{ delay: 0.8 }}
-						className="relative rounded-2xl p-6 bg-linear-to-br from-white/5 to-white/5 backdrop-blur-xl mb-5.5 overflow-hidden group"
+						className="relative rounded-2xl p-6 bg-linear-to-br from-theme-white/5 to-theme-white/5 backdrop-blur-xl mb-5.5 overflow-hidden"
 					>
 						<div className="absolute top-0 right-0 w-32 h-32 bg-linear-to-br from-purple-500/10 to-transparent rounded-full blur-3xl" />
-						<h3 className="text-xl font-semibold mb-8 text-white relative z-10">
+						<h3 className="text-xl font-semibold mb-8 text-textcolor relative z-10">
 							快速开始
 						</h3>
 						<div className="space-y-4">
@@ -356,23 +356,23 @@ const Home = () => {
 									animate={{ opacity: 1, x: 0 }}
 									transition={{ delay: 0.4 + idx * 0.1 }}
 									whileHover={{ scale: 1.02 }}
-									className="relative flex items-center p-5 rounded-2xl bg-white/5 backdrop-blur-sm hover:bg-white/10 hover:border-white/20 hover:shadow-lg hover:shadow-purple-500/10 transition-all duration-300 cursor-pointer group"
+									className="relative flex items-center p-5 rounded-2xl bg-theme-white/5 backdrop-blur-sm hover:bg-theme-white/10 hover:border-theme-white/20 hover:shadow-lg hover:shadow-purple-500/10 transition-all duration-300 cursor-pointer group"
 								>
 									<div
 										className={`w-12 h-12 rounded-xl bg-linear-to-br ${item.color} flex items-center justify-center mr-5 shadow-lg group-hover:shadow-xl`}
 									>
-										<span className="text-white text-lg font-bold">
+										<span className="text-textcolor text-lg font-bold">
 											{item.step}
 										</span>
 									</div>
 									<div className="flex-1">
-										<h4 className="font-semibold text-white mb-1 group-hover:text-purple-300 transition-colors">
+										<h4 className="font-semibold text-textcolor mb-1 group-hover:text-purple-300 transition-colors">
 											{item.title}
 										</h4>
-										<p className="text-sm text-gray-400">{item.desc}</p>
+										<p className="text-sm text-textcolor/50">{item.desc}</p>
 									</div>
 									<motion.div
-										className="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center group-hover:bg-white/10"
+										className="w-10 h-10 rounded-lg bg-theme-white/5 flex items-center justify-center group-hover:bg-theme-white/10"
 										whileHover={{ x: 5 }}
 									>
 										<ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-purple-400" />
@@ -387,10 +387,10 @@ const Home = () => {
 						initial={{ opacity: 0, y: 20 }}
 						animate={{ opacity: 1, y: 0 }}
 						transition={{ delay: 0.9 }}
-						className="relative rounded-2xl p-6 bg-linear-to-br from-white/5 to-white/5 backdrop-blur-xl overflow-hidden"
+						className="relative rounded-2xl p-6 bg-linear-to-br from-theme-white/5 to-theme-white/5 backdrop-blur-xl overflow-hidden"
 					>
 						<div className="absolute -top-10 -right-10 w-40 h-40 bg-linear-to-br from-blue-500/10 to-transparent rounded-full blur-3xl" />
-						<h3 className="text-xl font-semibold mb-8 text-white relative z-10">
+						<h3 className="text-xl font-semibold mb-8 text-textcolor relative z-10">
 							用户评价
 						</h3>
 						<div className="space-y-4">
@@ -420,7 +420,7 @@ const Home = () => {
 									animate={{ opacity: 1, y: 0 }}
 									transition={{ delay: 1 + idx * 0.1 }}
 									whileHover={{ scale: 1.01 }}
-									className="relative p-6 rounded-2xl bg-white/5 backdrop-blur-sm hover:bg-white/10 hover:border-white/20 hover:shadow-lg hover:shadow-purple-500/10 transition-all duration-300 cursor-pointer group"
+									className="relative p-6 rounded-2xl bg-theme-white/5 backdrop-blur-sm hover:bg-theme-white/10 hover:border-whitetheme-white/20 hover:shadow-lg hover:shadow-purple-500/10 transition-all duration-300 cursor-pointer group"
 								>
 									<div className="flex items-start gap-4">
 										<motion.div
@@ -432,24 +432,24 @@ const Home = () => {
 											<div
 												className={`absolute -top-1 -left-1 w-16 h-16 rounded-2xl bg-linear-to-br ${user.color} flex items-center justify-center shadow-lg`}
 											>
-												<span className="text-white text-xl font-bold">
+												<span className="text-textcolor text-xl font-bold">
 													{user.name.charAt(0)}
 												</span>
 											</div>
 											<div className="absolute -bottom-1 -right-1 w-8 h-8 rounded-lg bg-linear-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow-lg">
-												<Shield className="w-4 h-4 text-white" />
+												<Shield className="w-4 h-4 text-textcolor" />
 											</div>
 										</motion.div>
 										<div className="flex-1">
-											<p className="text-gray-300 italic mb-3 leading-relaxed">
+											<p className="text-textcolor/70 italic mb-3 leading-relaxed">
 												"{user.comment}"
 											</p>
 											<div className="flex items-center">
-												<p className="text-sm font-medium text-white">
+												<p className="text-sm font-medium text-textcolor">
 													{user.name}
 												</p>
-												<span className="mx-2 text-gray-600">·</span>
-												<p className="text-sm text-gray-400">{user.role}</p>
+												<span className="mx-2 text-textcolor/60">·</span>
+												<p className="text-sm text-textcolor/50">{user.role}</p>
 											</div>
 										</div>
 									</div>

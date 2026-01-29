@@ -1,9 +1,10 @@
 import DragUpload from '@design/DragUpload';
 import Markdown from '@design/Markdown';
-import { Button, ScrollArea, Spinner, Toast, Textarea } from '@ui/index';
+import { Button, ScrollArea, Spinner, Textarea, Toast } from '@ui/index';
 import { motion } from 'framer-motion';
 import {
 	CheckCircle,
+	ClipboardPenLine,
 	Copy,
 	FileCheck,
 	FileSpreadsheet,
@@ -11,7 +12,6 @@ import {
 	Sparkle,
 	Sparkles,
 	Upload,
-	ClipboardPenLine,
 } from 'lucide-react';
 import { useState } from 'react';
 import { useTheme } from '@/hooks';
@@ -117,7 +117,7 @@ const DocumentProcessor = () => {
 											<Button
 												key={format.id}
 												onClick={() => setSelectedFormat(format.id)}
-												className="relative cursor-pointer px-4 py-2 rounded-md font-medium transition-all duration-300 bg-white/5 hover:bg-white/10 text-textcolor"
+												className="relative cursor-pointer px-4 py-2 rounded-md font-medium transition-all duration-300 bg-theme-white/5 hover:bg-theme-white/10 text-textcolor"
 											>
 												{isActive && (
 													<motion.div
@@ -150,7 +150,7 @@ const DocumentProcessor = () => {
 
 							<div className="flex justify-between items-center h-46 gap-5">
 								<div className="flex-1 rounded-xl bg-theme/5 backdrop-blur-xl overflow-hidden">
-									<div className="px-3 py-3 rounded-t-xl border border-b-0 border-white/10 flex items-center justify-between">
+									<div className="px-3 py-3 rounded-t-xl border border-b-0 border-theme-white/10 flex items-center justify-between">
 										<div className="flex items-center gap-2">
 											<Upload className="w-4 h-4 text-blue-400" />
 											<span className="text-sm font-medium text-textcolor">
@@ -169,7 +169,7 @@ const DocumentProcessor = () => {
 									</div>
 								</div>
 								<div className="flex-1 h-full flex flex-col">
-									<div className="px-3 py-3 rounded-t-xl border border-b-0 border-white/10 bg-theme/5 flex items-center justify-between">
+									<div className="px-3 py-3 rounded-t-xl border border-b-0 border-theme-white/10 bg-theme/5 flex items-center justify-between">
 										<div className="flex items-center gap-2">
 											<ClipboardPenLine className="w-4 h-4 text-blue-400" />
 											<span className="text-sm font-medium text-textcolor">
@@ -194,9 +194,9 @@ const DocumentProcessor = () => {
 									<motion.div
 										initial={{ opacity: 0, y: 20 }}
 										animate={{ opacity: 1, y: 0 }}
-										className="mt-5.5 border border-white/10 rounded-xl bg-theme/5 backdrop-blur-xl overflow-hidden"
+										className="mt-5.5 border border-theme-white/10 rounded-xl bg-theme/5 backdrop-blur-xl overflow-hidden"
 									>
-										<div className="px-4 py-3 h-11.5 border-b border-white/10 bg-theme/5 flex items-center justify-between">
+										<div className="px-4 py-3 h-11.5 border-b border-theme-white/10 bg-theme/5 flex items-center justify-between">
 											<div className="flex items-center gap-2">
 												<Sparkles className="w-4 h-4 text-purple-400" />
 												<span className="text-sm font-medium text-slate-300">
@@ -207,7 +207,7 @@ const DocumentProcessor = () => {
 												whileHover={{ scale: 1.05 }}
 												whileTap={{ scale: 0.95 }}
 												onClick={handleCopy}
-												className="flex items-center gap-2 px-3 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 transition-all duration-300"
+												className="flex items-center gap-2 px-3 py-1 rounded-lg bg-theme-white/5 hover:bg-theme-white/10 border border-theme-white/10 transition-all duration-300"
 											>
 												{copied ? (
 													<>

@@ -83,6 +83,7 @@ body {
 	--theme-to: oklch(0.4202 0 0);
 	--theme-text-from: oklch(100% 0.00011 271.152);
 	--theme-text-to: oklch(100% 0.00011 271.152);
+	--theme-white: oklch(1 0 0);
 }
 
 .dark {
@@ -138,6 +139,7 @@ body {
 	--theme-to: oklch(0.4202 0 0);
 	--theme-text-from: oklch(100% 0.00011 271.152);
 	--theme-text-to: oklch(100% 0.00011 271.152);
+	--theme-white: oklch(1 0 0);
 }
 
 .theme-white {
@@ -157,6 +159,7 @@ body {
 	--theme-to: oklch(0.4202 0 0);
 	--theme-text-from: oklch(100% 0.00011 271.152);
 	--theme-text-to: oklch(100% 0.00011 271.152);
+	--theme-white: oklch(0% 0 0);
 }
 
 .theme-black {
@@ -177,6 +180,7 @@ body {
 	--theme-text-from: oklch(100% 0.00011 271.152);
 	--theme-text-to: oklch(100% 0.00011 271.152);
 	--theme-light: oklch(93.034% 0.12974 97.974 / 0.06);
+	--theme-white: oklch(1 0 0);
 }
 
 .theme-purple {
@@ -190,6 +194,7 @@ body {
 	--theme-foreground: oklch(0.25 0.03 293.83);
 	--theme-secondary: oklch(0.92 0.02 293.83);
 	--theme-sidebar: oklch(0.97 0.01 293.83);
+	--theme-white: oklch(0% 0 0);
 }
 
 .theme-blue-1 {
@@ -203,6 +208,7 @@ body {
 	--theme-foreground: oklch(0.25 0.03 261.83);
 	--theme-secondary: oklch(0.92 0.02 261.83);
 	--theme-sidebar: oklch(0.97 0.01 261.83);
+	--theme-white: oklch(0% 0 0);
 }
 
 .theme-blue-2 {
@@ -216,6 +222,7 @@ body {
 	--theme-foreground: oklch(0.25 0.03 248.83);
 	--theme-secondary: oklch(0.92 0.02 248.83);
 	--theme-sidebar: oklch(0.97 0.01 248.83);
+	--theme-white: oklch(0% 0 0);
 }
 
 .theme-blue-3 {
@@ -229,6 +236,7 @@ body {
 	--theme-foreground: oklch(0.25 0.03 225.83);
 	--theme-secondary: oklch(0.92 0.02 225.83);
 	--theme-sidebar: oklch(0.97 0.01 225.83);
+	--theme-white: oklch(0% 0 0);
 }
 
 .theme-green {
@@ -248,6 +256,7 @@ body {
 	--theme-to: oklch(0.8535 0.132 118.69);
 	--theme-text-from: oklch(19.9% 0.02356 154.589);
 	--theme-text-to: oklch(0.25 0.03 152.83);
+	--theme-white: oklch(0% 0 0);
 }
 
 .theme-orange {
@@ -261,6 +270,7 @@ body {
 	--theme-foreground: oklch(0.3 0.03 70.83);
 	--theme-secondary: oklch(94.19% 0.0256 94.764);
 	--theme-sidebar: oklch(97.599% 0.0122 91.527);
+	--theme-white: oklch(0% 0 0);
 }
 
 .theme-red {
@@ -274,6 +284,7 @@ body {
 	--theme-foreground: oklch(0.25 0.03 10.83);
 	--theme-secondary: oklch(0.92 0.02 10.83);
 	--theme-sidebar: oklch(0.97 0.01 10.83);
+	--theme-white: oklch(0% 0 0);
 }
 
 .theme-beige {
@@ -287,6 +298,7 @@ body {
 	--theme-foreground: oklch(0.3 0.02 80.83);
 	--theme-secondary: oklch(0.92 0.01 80.83);
 	--theme-sidebar: oklch(0.97 0.005 80.83);
+	--theme-white: oklch(0% 0 0);
 }
 
 @theme inline {
@@ -345,6 +357,7 @@ body {
 	--color-theme-text-from: var(--theme-text-from);
 	--color-theme-text-to: var(--theme-text-to);
 	--color-theme-light: var(--theme-light);
+	--color-theme-white: var(--theme-white);
 }
 
 @layer base {
