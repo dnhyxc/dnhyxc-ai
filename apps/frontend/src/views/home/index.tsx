@@ -14,6 +14,63 @@ import {
 import { useEffect } from 'react';
 import { onListen } from '@/utils';
 
+const FEATURES = [
+	{
+		icon: MessageSquare,
+		title: '智能对话',
+		subtitle: '自然语言处理',
+		desc: '与AI助手进行自然对话，获取实时解答、创作建议、学习辅导等全方位支持',
+		color: 'from-green-400 to-cyan-400',
+		bg: 'from-green-400/10 to-cyan-400/10',
+		border: 'border-green-500/20',
+	},
+	{
+		icon: Code2,
+		title: '代码助手',
+		subtitle: '编程支持',
+		desc: '智能代码生成、调试、优化和解释，支持多种编程语言，提升开发效率',
+		color: 'from-orange-400 to-yellow-400',
+		bg: 'from-orange-400/10 to-yellow-400/10',
+		border: 'border-orange-500/20',
+	},
+	{
+		icon: FileText,
+		title: '文档处理',
+		subtitle: '智能分析',
+		desc: '支持PDF、Word、Excel等多种格式的智能解析、总结和内容提取',
+		color: 'from-yellow-400 to-amber-400',
+		bg: 'from-yellow-400/10 to-amber-400/10',
+		border: 'border-yellow-500/20',
+	},
+];
+
+const SHOWCASE = [
+	{
+		icon: Rocket,
+		title: '快速响应',
+		desc: '毫秒级响应速度',
+		color: 'from-orange-400 to-yellow-400',
+	},
+	{
+		icon: Shield,
+		title: '隐私保护',
+		desc: '本地化处理',
+		color: 'from-yellow-400 to-orange-400',
+	},
+	{
+		icon: Globe,
+		title: '多语言',
+		desc: '全球用户支持',
+		color: 'from-green-400 to-cyan-400',
+	},
+	{
+		icon: Zap,
+		title: '轻量高效',
+		desc: '低资源占用',
+		color: 'from-green-400 to-emerald-400',
+	},
+];
+
 const Home = () => {
 	useEffect(() => {
 		const unlistenAboutPromise = onListen('about-send-message', (event) => {
@@ -172,35 +229,7 @@ const Home = () => {
 						transition={{ duration: 0.5 }}
 						className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5.5 mb-5.5"
 					>
-						{[
-							{
-								icon: MessageSquare,
-								title: '智能对话',
-								subtitle: '自然语言处理',
-								desc: '与AI助手进行自然对话，获取实时解答、创作建议、学习辅导等全方位支持',
-								color: 'from-green-400 to-cyan-400',
-								bg: 'from-green-400/10 to-cyan-400/10',
-								border: 'border-green-500/20',
-							},
-							{
-								icon: Code2,
-								title: '代码助手',
-								subtitle: '编程支持',
-								desc: '智能代码生成、调试、优化和解释，支持多种编程语言，提升开发效率',
-								color: 'from-orange-400 to-yellow-400',
-								bg: 'from-orange-400/10 to-yellow-400/10',
-								border: 'border-orange-500/20',
-							},
-							{
-								icon: FileText,
-								title: '文档处理',
-								subtitle: '智能分析',
-								desc: '支持PDF、Word、Excel等多种格式的智能解析、总结和内容提取',
-								color: 'from-yellow-400 to-amber-400',
-								bg: 'from-yellow-400/10 to-amber-400/10',
-								border: 'border-yellow-500/20',
-							},
-						].map((feature) => (
+						{FEATURES.map((feature) => (
 							<motion.div
 								key={feature.title}
 								// initial={{ opacity: 0, y: 30 }}
@@ -216,28 +245,49 @@ const Home = () => {
 									className={`absolute inset-0 rounded-2xl bg-linear-to-br ${feature.bg} opacity-0 group-hover:opacity-100 transition-opacity duration-300`}
 								/>
 								<div className="relative z-10">
-									<motion.div className="flex items-center justify-between mb-5">
+									<div className="flex items-center justify-between mb-5">
 										<div>
-											<h3 className="text-xl font-semibold text-theme-white mb-1">
+											<motion.h3
+												initial={{ opacity: 0, y: 20 }}
+												animate={{ opacity: 1, y: 0 }}
+												transition={{ delay: 0.1 }}
+												className="text-xl font-semibold text-theme-white mb-1"
+											>
 												{feature.title}
-											</h3>
-											<p className="text-sm text-gray-400">
+											</motion.h3>
+											<motion.p
+												initial={{ opacity: 0, y: 20 }}
+												animate={{ opacity: 1, y: 0 }}
+												transition={{ delay: 0.2 }}
+												className="text-sm text-textcolor/40"
+											>
 												{feature.subtitle}
-											</p>
+											</motion.p>
 										</div>
-										<div
+										<motion.div
+											initial={{ opacity: 0, y: 20 }}
+											animate={{ opacity: 1, y: 0 }}
+											transition={{ delay: 0.3 }}
 											className={`relative w-14 h-14 rounded-xl bg-linear-to-br ${feature.color} flex items-center justify-center shadow-lg`}
 										>
 											<feature.icon className="w-5 h-5 text-textcolor" />
 											<div className="absolute inset-0 rounded-xl bg-linear-to-br from-theme-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-										</div>
-									</motion.div>
-									<motion.p className="text-textcolor/60 mb-5 text-sm leading-relaxed">
+										</motion.div>
+									</div>
+									<motion.p
+										initial={{ opacity: 0, y: 20 }}
+										animate={{ opacity: 1, y: 0 }}
+										transition={{ delay: 0.4 }}
+										className="text-textcolor/60 mb-5 text-sm leading-relaxed"
+									>
 										{feature.desc}
 									</motion.p>
 									<motion.div
 										className="flex items-center text-sm text-textcolor/60"
 										whileHover={{ x: 5 }}
+										initial={{ opacity: 0, y: 20 }}
+										animate={{ opacity: 1, y: 0 }}
+										transition={{ delay: 0.5 }}
 									>
 										<Zap className="w-4 h-4 text-purple-400 mr-2" />
 										<span className="text-purple-300">高效智能处理</span>
@@ -258,32 +308,7 @@ const Home = () => {
 							特色功能
 						</motion.h3>
 						<div className="grid grid-cols-2 md:grid-cols-4 gap-5.5">
-							{[
-								{
-									icon: Rocket,
-									title: '快速响应',
-									desc: '毫秒级响应速度',
-									color: 'from-orange-400 to-yellow-400',
-								},
-								{
-									icon: Shield,
-									title: '隐私保护',
-									desc: '本地化处理',
-									color: 'from-yellow-400 to-orange-400',
-								},
-								{
-									icon: Globe,
-									title: '多语言',
-									desc: '全球用户支持',
-									color: 'from-green-400 to-cyan-400',
-								},
-								{
-									icon: Zap,
-									title: '轻量高效',
-									desc: '低资源占用',
-									color: 'from-green-400 to-emerald-400',
-								},
-							].map((feature, idx) => (
+							{SHOWCASE.map((feature, idx) => (
 								<motion.div
 									key={feature.title}
 									initial={{ opacity: 0, y: 20 }}

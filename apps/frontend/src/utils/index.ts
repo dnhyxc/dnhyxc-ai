@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { listen, UnlistenFn } from '@tauri-apps/api/event';
+import { fetch } from '@tauri-apps/plugin-http';
 import { Toast } from '@ui/sonner';
 import type {
 	DownloadBlobOptions,
@@ -179,48 +180,17 @@ export const createUnlistenFileInfoListener = (
  * 处理网络下载并调用系统下载器
  */
 export const donwnloadWithUrl = async (
-	opeions: DownloadOptions,
-	setDownloadFileInfo?: React.Dispatch<React.SetStateAction<DownloadResult[]>>,
+	options: DownloadOptions,
+	_setDownloadFileInfo?: React.Dispatch<React.SetStateAction<DownloadResult[]>>,
 ): Promise<DownloadResult> => {
-	if (!opeions.url?.trim()) {
-		Toast?.({
-			title: '请先传入文件路径',
-			type: 'info',
-		});
-		return {
-			success: 'error',
-			message: '请先传入文件路径',
-			id: Date.now().toString(),
-		};
-	}
+	return downloadFileFromUrl(options);
+};
 
-	const result = await downloadFileFromUrl({
-		url: opeions.url,
-		file_name: opeions.file_name || undefined,
-		overwrite: true,
-		id: Date.now().toString(),
-		// max_size: 10000,
-		// save_dir: './downloads',
-	});
-
-	Toast({
-		title: result.message,
-		type: result.success as 'success' | 'error',
-	});
-
-	if (setDownloadFileInfo) {
-		setDownloadFileInfo((prev) => {
-			const idx = prev.findIndex((item) => item.id === result.id);
-			if (idx === -1) {
-				return [result, ...prev];
-			}
-			const next = [...prev];
-			next[idx] = { ...next[idx], ...result };
-			return next;
-		});
-	}
-
-	return result;
+/**
+ * 处理图片下载
+ */
+export const handlerDownload = (url: string): void => {
+	downloadFileFromUrl({ url });
 };
 
 // 设置首字母大写
@@ -242,4 +212,33 @@ export const formatDate = (date: string) => {
 	const d = new Date(date);
 	const pad = (n: number) => n.toString().padStart(2, '0');
 	return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+};
+
+/**
+ * 通过 Tauri 的 HTTP 插件获取图片，并返回 Blob URL
+ * 用于绕过浏览器的跨域资源策略限制
+ */
+export const fetchImageAsBlobUrl = async (url: string): Promise<string> => {
+	try {
+		const response = await fetch(url, {
+			method: 'GET',
+		});
+		// response 是标准的 Response 对象
+		const arrayBuffer = await response.arrayBuffer();
+		const blob = new Blob([arrayBuffer]);
+		const blobUrl = URL.createObjectURL(blob);
+		return blobUrl;
+	} catch (_) {
+		// 如果失败，返回原始 URL
+		return url;
+	}
+};
+
+/**
+ * 清理 Blob URL 以防止内存泄漏
+ */
+export const revokeBlobUrl = (blobUrl: string): void => {
+	if (blobUrl.startsWith('blob:')) {
+		URL.revokeObjectURL(blobUrl);
+	}
 };

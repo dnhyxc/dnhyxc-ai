@@ -4,18 +4,18 @@ import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { ChatOpenAI } from '@langchain/openai';
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { InjectRepository } from '@nestjs/typeorm';
+// import { InjectRepository } from '@nestjs/typeorm';
 import { Observable } from 'rxjs';
 import { ModelEnum } from 'src/enum/config.enum';
-import { Repository } from 'typeorm';
+// import { Repository } from 'typeorm';
 import { CreateOcrDto } from './dto/create-ocr.dto';
-import { Ocr } from './ocr.entity';
+// import { Ocr } from './ocr.entity';
 
 @Injectable()
 export class OcrService {
 	constructor(
 		// 注入数据库模型，便于操作数据库
-		@InjectRepository(Ocr) private readonly ocrRepository: Repository<Ocr>,
+		// @InjectRepository(Ocr) private readonly ocrRepository: Repository<Ocr>,
 		private configService: ConfigService,
 	) {}
 

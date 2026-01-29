@@ -18,8 +18,18 @@ import { useTheme } from '@/hooks';
 import { uploadFile as upload_file } from '@/service';
 import { streamFetch } from '@/utils/sse';
 
+interface UploadFileInfo {
+	originalname: string;
+	filename: string;
+	mimetype: string;
+	url: string;
+	path: string;
+	size: number;
+}
+
 const DocumentProcessor = () => {
-	const [uploadFileInfo, setUploadFileInfo] = useState<any>({});
+	const [uploadFileInfo, setUploadFileInfo] =
+		useState<Partial<UploadFileInfo>>();
 	const [loading, setLoading] = useState(false);
 	const [selectedFormat, setSelectedFormat] = useState('image');
 	const [copied, setCopied] = useState(false);
@@ -27,6 +37,7 @@ const DocumentProcessor = () => {
 	const [prompt, setPrompt] = useState('');
 
 	const stopRequestRef = useRef<(() => void) | null>(null);
+	const dragUploadRef = useRef<{ onClear: () => void } | null>(null);
 
 	let timer: ReturnType<typeof setTimeout> | null = null;
 
@@ -67,6 +78,12 @@ const DocumentProcessor = () => {
 			color: 'from-green-500 to-emerald-500',
 		},
 	];
+
+	const onSelectFormat = (id: string) => {
+		setSelectedFormat(id);
+		dragUploadRef.current?.onClear?.();
+		setUploadFileInfo({});
+	};
 
 	const onCopy = () => {
 		navigator.clipboard.writeText(content);
@@ -168,7 +185,7 @@ const DocumentProcessor = () => {
 										return (
 											<Button
 												key={format.id}
-												onClick={() => setSelectedFormat(format.id)}
+												onClick={() => onSelectFormat(format.id)}
 												className="relative cursor-pointer px-4 py-2 rounded-md font-medium transition-all duration-300 bg-theme-white/5 hover:bg-theme-white/10 text-textcolor"
 											>
 												{isActive && (
@@ -209,7 +226,7 @@ const DocumentProcessor = () => {
 								<div className="flex-1 rounded-xl bg-theme/5 backdrop-blur-xl overflow-hidden">
 									<div className="px-3 py-3 rounded-t-xl bg-theme/5 border border-b-0 border-theme-white/10 flex items-center justify-between">
 										<div className="flex items-center gap-2">
-											<Upload className="w-4 h-4 text-blue-400" />
+											<Upload className="w-4 h-4" />
 											<span className="text-sm font-medium text-textcolor">
 												上传文件
 											</span>
@@ -220,6 +237,7 @@ const DocumentProcessor = () => {
 									</div>
 									<div className="p-0">
 										<DragUpload
+											ref={dragUploadRef}
 											className="rounded-b-xl h-35"
 											uploadFile={uploadFile}
 										/>
@@ -229,7 +247,7 @@ const DocumentProcessor = () => {
 									<div className="rounded-t-xl border border-b-0 border-theme-white/10 bg-theme/5">
 										<div className="w-full bg-theme/5 px-3 py-3 rounded-t-xl flex items-center justify-between">
 											<div className="flex items-center gap-2">
-												<ClipboardPenLine className="w-4 h-4 text-blue-400" />
+												<ClipboardPenLine className="w-4 h-4" />
 												<span className="text-sm font-medium text-textcolor">
 													设置提示词
 												</span>
