@@ -71,7 +71,7 @@ const Home = () => {
 									initial={{ opacity: 0, y: 20 }}
 									animate={{ opacity: 1, y: 0 }}
 									transition={{ delay: 0.3 }}
-									className="text-lg text-gray-300 mb-8 leading-relaxed"
+									className="text-lg text-textcolor mb-8 leading-relaxed"
 								>
 									一款功能强大的智能桌面应用，集成了多种AI工具和实用功能，帮助您更高效地工作和学习
 								</motion.p>
@@ -93,7 +93,7 @@ const Home = () => {
 									</motion.button>
 									<button
 										type="button"
-										className="pb-1 px-8 h-12 bg-theme-white/5 backdrop-blur-sm border border-theme-white/10 text-gray-200 rounded-xl font-medium hover:bg-theme-white/10 hover:border-theme-white/20 hover:shadow-lg transition-all duration-300 cursor-pointer"
+										className="pb-1 px-8 h-12 bg-theme-white/5 backdrop-blur-sm border border-theme-white/10 text-textcolor rounded-xl font-medium hover:bg-theme-white/10 hover:border-theme-white/20 hover:shadow-lg transition-all duration-300 cursor-pointer"
 									>
 										了解更多
 									</button>

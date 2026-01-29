@@ -143,7 +143,7 @@ const DocumentProcessor = () => {
 
 	return (
 		<div className="w-full h-full flex flex-col justify-center items-center relative overflow-hidden rounded-b-md">
-			<ScrollArea className="overflow-y-auto w-full h-full backdrop-blur-sm">
+			<ScrollArea className="pb-5.5 overflow-y-auto w-full h-full backdrop-blur-sm">
 				<motion.div
 					initial={{ opacity: 0, y: 20 }}
 					animate={{ opacity: 1, y: 0 }}
@@ -155,7 +155,7 @@ const DocumentProcessor = () => {
 						transition={{ duration: 0.5 }}
 						className="relative rounded-2xl backdrop-blur-xl overflow-hidden"
 					>
-						<div className="p-5">
+						<div className="p-5 pb-0">
 							<p className="text-textcolor/70 mb-6">
 								支持 PDF、Word、Excel、Image
 								等多种格式的智能解析、总结和内容提取
@@ -207,7 +207,7 @@ const DocumentProcessor = () => {
 
 							<div className="flex justify-between items-center h-46 gap-5">
 								<div className="flex-1 rounded-xl bg-theme/5 backdrop-blur-xl overflow-hidden">
-									<div className="px-3 py-3 rounded-t-xl border border-b-0 border-theme-white/10 flex items-center justify-between">
+									<div className="px-3 py-3 rounded-t-xl bg-theme/5 border border-b-0 border-theme-white/10 flex items-center justify-between">
 										<div className="flex items-center gap-2">
 											<Upload className="w-4 h-4 text-blue-400" />
 											<span className="text-sm font-medium text-textcolor">
@@ -226,15 +226,17 @@ const DocumentProcessor = () => {
 									</div>
 								</div>
 								<div className="flex-1 h-full flex flex-col">
-									<div className="px-3 py-3 rounded-t-xl border border-b-0 border-theme-white/10 bg-theme/5 flex items-center justify-between">
-										<div className="flex items-center gap-2">
-											<ClipboardPenLine className="w-4 h-4 text-blue-400" />
-											<span className="text-sm font-medium text-textcolor">
-												设置提示词
-											</span>
-										</div>
-										<div className="text-xs  text-textcolor/50">
-											最大输入 200 字
+									<div className="rounded-t-xl border border-b-0 border-theme-white/10 bg-theme/5">
+										<div className="w-full bg-theme/5 px-3 py-3 rounded-t-xl flex items-center justify-between">
+											<div className="flex items-center gap-2">
+												<ClipboardPenLine className="w-4 h-4 text-blue-400" />
+												<span className="text-sm font-medium text-textcolor">
+													设置提示词
+												</span>
+											</div>
+											<div className="text-xs  text-textcolor/50">
+												最大输入 200 字
+											</div>
 										</div>
 									</div>
 									<Textarea
