@@ -1,14 +1,11 @@
 import http from 'node:http';
 import https from 'node:https';
-import {
-	type ContentBlock,
-	HumanMessage,
-	SystemMessage,
-} from '@langchain/core/messages';
+import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { ChatOpenAI } from '@langchain/openai';
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
+import { Observable } from 'rxjs';
 import { ModelEnum } from 'src/enum/config.enum';
 import { Repository } from 'typeorm';
 import { CreateOcrDto } from './dto/create-ocr.dto';
@@ -27,11 +24,10 @@ export class OcrService {
 		const baseURL = this.configService.get(ModelEnum.QWEN_BASE_URL);
 		const modelName = this.configService.get(ModelEnum.QWEN_MODEL_NAME);
 
-		console.log(this.ocrRepository, 'ocrRepository');
-
 		const llm = new ChatOpenAI({
 			apiKey,
 			modelName,
+			streaming: true,
 			configuration: {
 				baseURL,
 			},
@@ -70,7 +66,7 @@ export class OcrService {
 		});
 	}
 
-	async imageOcr(dto: CreateOcrDto): Promise<string | (ContentBlock | Text)[]> {
+	async imageOcrStream(dto: CreateOcrDto): Promise<Observable<string>> {
 		try {
 			const llm = this.initLLM();
 
@@ -92,9 +88,28 @@ export class OcrService {
 				}),
 			];
 
-			const response = await llm.invoke(messages);
-
-			return response.content;
+			// 返回 Observable 流
+			return new Observable<string>((subscriber) => {
+				llm
+					.stream(messages)
+					.then(async (stream) => {
+						try {
+							for await (const chunk of stream) {
+								// 提取文本内容
+								const content = chunk.content;
+								if (typeof content === 'string') {
+									subscriber.next(content);
+								}
+							}
+							subscriber.complete();
+						} catch (error) {
+							subscriber.error(error);
+						}
+					})
+					.catch((error) => {
+						subscriber.error(error);
+					});
+			});
 		} catch (error) {
 			throw new InternalServerErrorException(error?.message || '解析失败');
 		}

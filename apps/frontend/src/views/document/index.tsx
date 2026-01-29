@@ -13,16 +13,20 @@ import {
 	Sparkles,
 	Upload,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTheme } from '@/hooks';
-import { imageOcr, uploadFile as upload_file } from '@/service';
+import { uploadFile as upload_file } from '@/service';
+import { streamFetch } from '@/utils/sse';
 
 const DocumentProcessor = () => {
 	const [uploadFileInfo, setUploadFileInfo] = useState<any>({});
 	const [loading, setLoading] = useState(false);
 	const [selectedFormat, setSelectedFormat] = useState('image');
-	const [analyzedContent, setAnalyzedContent] = useState('');
 	const [copied, setCopied] = useState(false);
+	const [content, setContent] = useState('');
+	const [prompt, setPrompt] = useState('');
+
+	const stopRequestRef = useRef<(() => void) | null>(null);
 
 	const { theme } = useTheme();
 
@@ -54,7 +58,7 @@ const DocumentProcessor = () => {
 	];
 
 	const handleCopy = () => {
-		navigator.clipboard.writeText(analyzedContent);
+		navigator.clipboard.writeText(content);
 		setCopied(true);
 		setTimeout(() => setCopied(false), 2000);
 	};
@@ -73,19 +77,56 @@ const DocumentProcessor = () => {
 		}
 	};
 
-	const onAnalysis = async () => {
-		try {
-			setLoading(true);
-			const res = await imageOcr(uploadFileInfo?.url);
-			if (res.success) {
-				Toast({
-					type: 'success',
-					title: '解析成功',
-				});
-				setAnalyzedContent(res.data);
-			}
-		} finally {
+	const onPromptChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+		setPrompt(e.target.value);
+	};
+
+	// 开始生成
+	const onStart = async () => {
+		setContent('');
+		// 调用工具函数，它会立即返回一个 stop 函数
+		const stop = await streamFetch({
+			options: {
+				body: JSON.stringify({
+					url: uploadFileInfo?.url,
+					prompt,
+				}),
+			},
+			callbacks: {
+				onStart: () => {
+					setLoading(true);
+				},
+				onData: (chunk) => setContent((prev) => prev + chunk),
+				onError: (err, type) => {
+					Toast({
+						type: type || 'error',
+						title: err?.message || String(err) || '解析失败',
+					});
+				},
+				onComplete: () => {
+					setLoading(false);
+				},
+			},
+		});
+
+		// 保存 stop 函数以便后续调用
+		stopRequestRef.current = stop;
+	};
+
+	// 停止生成
+	const onStop = () => {
+		if (stopRequestRef.current) {
+			stopRequestRef.current();
+			stopRequestRef.current = null;
 			setLoading(false);
+		}
+	};
+
+	const handleStart = () => {
+		if (loading) {
+			onStop();
+		} else {
+			onStart();
 		}
 	};
 
@@ -104,7 +145,7 @@ const DocumentProcessor = () => {
 						className="relative rounded-2xl backdrop-blur-xl overflow-hidden"
 					>
 						<div className="p-5">
-							<p className="text-slate-400 mb-6">
+							<p className="text-textcolor/70 mb-6">
 								支持 PDF、Word、Excel、Image
 								等多种格式的智能解析、总结和内容提取
 							</p>
@@ -135,16 +176,21 @@ const DocumentProcessor = () => {
 								</div>
 								<Button
 									variant="secondary"
-									disabled={!uploadFileInfo?.url || loading}
+									disabled={!uploadFileInfo?.url}
 									className="cursor-pointer flex justify-center min-w-30 bg-linear-to-r from-blue-500 to-cyan-500"
-									onClick={onAnalysis}
+									onClick={handleStart}
 								>
 									{loading ? (
-										<Spinner className="text-textcolor" />
+										<span className="flex items-center">
+											<Spinner className="text-textcolor mr-2" />
+											停止分析
+										</span>
 									) : (
-										<Sparkle className="w-12 h-12" />
+										<span className="flex items-center">
+											<Sparkle className="w-12 h-12 mr-2" />
+											{content ? '重新分析' : '开始分析'}
+										</span>
 									)}
-									开始分析
 								</Button>
 							</div>
 
@@ -184,12 +230,14 @@ const DocumentProcessor = () => {
 										spellCheck={false}
 										placeholder="请输入提示词"
 										maxLength={200}
+										value={prompt}
 										className="flex-1 resize-none border rounded-b-xl border-theme/10 focus-visible:border-theme/20 bg-theme/5 rounded-t-none focus-visible:ring-transparent"
+										onChange={onPromptChange}
 									/>
 								</div>
 							</div>
 
-							{analyzedContent && (
+							{content && (
 								<div className="space-y-4">
 									<motion.div
 										initial={{ opacity: 0, y: 20 }}
@@ -225,7 +273,7 @@ const DocumentProcessor = () => {
 											</motion.button>
 										</div>
 										<Markdown
-											value={analyzedContent}
+											value={content}
 											theme={theme === 'black' ? 'dark' : 'light'}
 											background="transparent"
 										/>

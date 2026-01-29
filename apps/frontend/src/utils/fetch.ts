@@ -1,5 +1,6 @@
 import { fetch } from '@tauri-apps/plugin-http';
 import { Toast } from '@ui/sonner';
+import { BASE_URL } from '@/constant';
 import { getStorage } from '.';
 
 // 定义自定义的 HTTP 选项类型
@@ -44,9 +45,7 @@ class HttpClient {
 	private defaultConfig: RequestConfig;
 
 	constructor(
-		baseURL: string = import.meta.env.PROD
-			? 'http://101.34.214.188:9112/api'
-			: 'http://localhost:9112/api',
+		baseURL: string = BASE_URL,
 		config: RequestConfig = {},
 		token: string = getStorage('token') || '',
 	) {
