@@ -13,7 +13,7 @@ import {
 	Sparkles,
 	Upload,
 } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTheme } from '@/hooks';
 import { uploadFile as upload_file } from '@/service';
 import { streamFetch } from '@/utils/sse';
@@ -28,7 +28,18 @@ const DocumentProcessor = () => {
 
 	const stopRequestRef = useRef<(() => void) | null>(null);
 
+	let timer: ReturnType<typeof setTimeout> | null = null;
+
 	const { theme } = useTheme();
+
+	useEffect(() => {
+		return () => {
+			if (timer) {
+				clearTimeout(timer);
+				timer = null;
+			}
+		};
+	}, []);
 
 	const formats = [
 		{
@@ -57,10 +68,10 @@ const DocumentProcessor = () => {
 		},
 	];
 
-	const handleCopy = () => {
+	const onCopy = () => {
 		navigator.clipboard.writeText(content);
 		setCopied(true);
-		setTimeout(() => setCopied(false), 2000);
+		timer = setTimeout(() => setCopied(false), 2000);
 	};
 
 	const uploadFile = async (file: File) => {
@@ -254,7 +265,7 @@ const DocumentProcessor = () => {
 											<motion.button
 												whileHover={{ scale: 1.05 }}
 												whileTap={{ scale: 0.95 }}
-												onClick={handleCopy}
+												onClick={onCopy}
 												className="flex items-center gap-2 px-3 py-1 rounded-lg bg-theme-white/5 hover:bg-theme-white/10 border border-theme-white/10 transition-all duration-300"
 											>
 												{copied ? (
