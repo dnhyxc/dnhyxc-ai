@@ -27,6 +27,8 @@ export class OcrService {
 		const baseURL = this.configService.get(ModelEnum.QWEN_BASE_URL);
 		const modelName = this.configService.get(ModelEnum.QWEN_MODEL_NAME);
 
+		console.log(this.ocrRepository, 'ocrRepository');
+
 		const llm = new ChatOpenAI({
 			apiKey,
 			modelName,

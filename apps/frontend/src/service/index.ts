@@ -177,6 +177,6 @@ export const downloadZip = async (filename: string): Promise<any> => {
 export const imageOcr = async (url?: string, prompt?: string) => {
 	return await http.post(IMAGE_OCR, {
 		url,
-		prompt: '给出识别的所有题目的答案',
+		prompt,
 	});
 };
