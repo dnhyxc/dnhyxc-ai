@@ -6,6 +6,7 @@ import {
 	GET_UPLOAD_TOKEN,
 	GET_USER_PROFILE,
 	GET_USERS,
+	IMAGE_OCR,
 	LOGIN,
 	LOGIN_BY_EMAIL,
 	REGISTER,
@@ -14,6 +15,7 @@ import {
 	SEND_RESET_PWD_EMAIL,
 	UPDATE_EMAIL,
 	UPDATE_USER,
+	UPLOAD_FILE,
 } from './api';
 
 export const login = async ({
@@ -144,6 +146,19 @@ export const getUploadToken = async () => {
 	return await http.get(GET_UPLOAD_TOKEN);
 };
 
+// 上传文件
+export const uploadFile = async (file: File) => {
+	return await http.post(
+		UPLOAD_FILE,
+		{ file },
+		{
+			headers: {
+				'Content-Type': 'multipart/form-data',
+			},
+		},
+	);
+};
+
 // 下载文件
 export const downloadFile = async (filename: string): Promise<any> => {
 	return await http.get(DOWNLOAD_FILE, {
@@ -155,5 +170,13 @@ export const downloadFile = async (filename: string): Promise<any> => {
 export const downloadZip = async (filename: string): Promise<any> => {
 	return await http.get(DOWNLOAD_ZIP_FILE, {
 		querys: { filename },
+	});
+};
+
+// 图片分析
+export const imageOcr = async (url?: string, prompt?: string) => {
+	return await http.post(IMAGE_OCR, {
+		url,
+		prompt: '给出识别的所有题目的答案',
 	});
 };

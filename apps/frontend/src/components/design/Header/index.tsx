@@ -76,7 +76,7 @@ const Header: React.FC<Iprops> = ({ actions = true, ccustomActions }) => {
 			>
 				<div
 					data-tauri-drag-region
-					className="text-2xl font-bold font-['手札体-简'] cursor-default bg-clip-text text-transparent bg-linear-to-r from-[#ff7b00] via-[#ff9900] to-[#ffb700]"
+					className="text-xl font-bold font-['手札体-简'] cursor-default bg-clip-text text-transparent bg-linear-to-r from-[#ff7b00] via-[#ff9900] to-[#ffb700]"
 				>
 					{title}
 				</div>

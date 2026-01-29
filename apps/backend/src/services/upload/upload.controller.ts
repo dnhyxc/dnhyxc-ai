@@ -41,6 +41,7 @@ export class UploadController {
 				file.mimetype,
 			);
 			return {
+				originalname: file.originalname,
 				filename: file.filename,
 				path: filePath,
 				mimetype: file.mimetype,

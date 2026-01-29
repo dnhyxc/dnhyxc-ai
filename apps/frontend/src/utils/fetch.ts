@@ -249,6 +249,9 @@ class HttpClient {
 			finalConfig.headers || {},
 		);
 
+		if (finalConfig.headers?.['Content-Type'] === 'multipart/form-data') {
+			delete finalConfig.headers?.['Content-Type'];
+		}
 		// 构建请求选项
 		const requestOptions: CustomHttpOptions = {
 			method,

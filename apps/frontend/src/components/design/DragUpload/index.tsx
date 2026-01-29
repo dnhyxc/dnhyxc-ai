@@ -1,6 +1,8 @@
 import { Toast } from '@ui/sonner';
 import { CloudUpload } from 'lucide-react';
 import { useCallback, useRef, useState } from 'react';
+import { cn } from '@/lib/utils';
+import { MAX_SIZE, VALID_TYPES } from './config';
 
 interface FileWithPreview {
 	file: File;
@@ -9,11 +11,24 @@ interface FileWithPreview {
 }
 
 interface IProps {
-	uploadFile?: (file: File) => Promise<void>;
+	uploadFile?: (file: File) => void;
 	getFileList?: (files: FileWithPreview[]) => void;
+	className?: string;
+	validTypes?: string[];
+	maxSize?: number;
+	infoText?: string;
+	multiple?: boolean;
 }
 
-const Upload: React.FC<IProps> = ({ uploadFile, getFileList }) => {
+const DragUpload: React.FC<IProps> = ({
+	uploadFile,
+	getFileList,
+	className,
+	validTypes,
+	maxSize,
+	infoText,
+	multiple = false,
+}) => {
 	const [files, setFiles] = useState<FileWithPreview[]>([]);
 	const [isDragging, setIsDragging] = useState(false);
 
@@ -69,15 +84,7 @@ const Upload: React.FC<IProps> = ({ uploadFile, getFileList }) => {
 		// }
 
 		const newFiles = Array.from(selectedFiles).filter((file) => {
-			// 文件类型检查
-			const validTypes = [
-				'image/jpeg',
-				'image/png',
-				'image/gif',
-				'image/svg+xml',
-				'image/webp',
-			];
-			if (!validTypes.includes(file.type)) {
+			if (!(validTypes || VALID_TYPES).includes(file.type)) {
 				Toast({
 					type: 'error',
 					title: `不支持的文件类型: ${file.type}`,
@@ -85,12 +92,10 @@ const Upload: React.FC<IProps> = ({ uploadFile, getFileList }) => {
 				return false;
 			}
 
-			// 文件大小检查 (5MB)
-			const maxSize = 5 * 1024 * 1024; // 5MB
-			if (file.size > maxSize) {
+			if (file.size > (maxSize ? maxSize * 1024 * 1024 : MAX_SIZE)) {
 				Toast({
 					type: 'error',
-					title: '文件大小不能超过 5MB',
+					title: `文件大小不能超过 ${maxSize || MAX_SIZE / 1024 / 1024} MB`,
 				});
 				return false;
 			}
@@ -98,39 +103,45 @@ const Upload: React.FC<IProps> = ({ uploadFile, getFileList }) => {
 			return true;
 		});
 
-		// 创建预览URL
 		const filesWithPreview = newFiles.map((file) => ({
 			file,
 			preview: URL.createObjectURL(file),
 			id: Math.random().toString(36).substring(2, 9),
 		}));
 
-		const fileList = [...filesWithPreview, ...files];
-
-		setFiles((prev) => [...filesWithPreview, ...prev]);
-		getFileList?.(fileList);
-		onUpload(fileList);
+		if (multiple) {
+			// 创建预览URL
+			const fileList = [...filesWithPreview, ...files];
+			setFiles((prev) => [...filesWithPreview, ...prev]);
+			getFileList?.(fileList);
+			onUpload(filesWithPreview);
+		} else {
+			setFiles(filesWithPreview);
+			getFileList?.(filesWithPreview);
+			onUpload(filesWithPreview);
+		}
 	};
 
 	const onUpload = async (fileList: FileWithPreview[]) => {
 		if (fileList.length) {
 			fileList.forEach(async (data) => {
 				await uploadFile?.(data.file);
-				setFiles([]);
-				getFileList?.([]);
 			});
 		}
 	};
 
 	return (
 		<div
-			className={`select-none border border-dashed rounded-xl p-8 text-center transition-all duration-300 cursor-pointer
+			className={cn(
+				`select-none border border-dashed p-5 text-center transition-all duration-300 cursor-pointer
         ${
 					isDragging
 						? 'border-theme bg-theme/20'
-						: 'border-textcolor/20 hover:border-theme/50 hover:bg-theme-background'
+						: 'border-textcolor/20 hover:border-theme/20 hover:bg-theme-background/30'
 				}
-      `}
+      `,
+				className,
+			)}
 			onDragEnter={onDragEnter}
 			onDragOver={onDragOver}
 			onDragLeave={onDragLeave}
@@ -142,26 +153,39 @@ const Upload: React.FC<IProps> = ({ uploadFile, getFileList }) => {
 				ref={fileInputRef}
 				onChange={onFileInputChange}
 				accept="image/*"
-				multiple
+				multiple={multiple}
 				className="hidden"
 			/>
 
-			<div className="flex flex-col items-center justify-center space-y-4">
-				<CloudUpload className="h-16 w-16 text-theme" />
-				<div>
-					<p className="text-md font-medium">
-						拖拽图片到此处或
-						<span className="text-theme" onClick={onClickSelect}>
-							点击选择
-						</span>
-					</p>
-					<p className="text-textcolor/60 mt-1 text-sm">
-						支持 JPEG, PNG, GIF, SVG, WebP 格式，最大5MB
-					</p>
+			{!files?.length ? (
+				<div className="flex flex-col items-center justify-center space-y-4 h-full">
+					<CloudUpload className="h-12 w-12 text-theme" />
+					<div>
+						<p className="text-md font-medium">
+							拖拽图片到此处或
+							<span className="text-theme" onClick={onClickSelect}>
+								点击选择
+							</span>
+						</p>
+						<p className="text-textcolor/60 mt-1 text-sm">
+							{infoText || '支持 JPEG, PNG, GIF, SVG, WebP 格式，最大5MB'}
+						</p>
+					</div>
 				</div>
-			</div>
+			) : (
+				<div className="flex flex-col items-center justify-center space-y-4 h-full">
+					{files.map((i) => {
+						return (
+							<div key={i.id}>
+								<div>{i.file?.name}</div>
+								<div>{i.file?.size}</div>
+							</div>
+						);
+					})}
+				</div>
+			)}
 		</div>
 	);
 };
 
-export default Upload;
+export default DragUpload;

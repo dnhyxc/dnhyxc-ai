@@ -1,3 +1,5 @@
+import http from 'node:http';
+import https from 'node:https';
 import {
 	type ContentBlock,
 	HumanMessage,
@@ -38,18 +40,48 @@ export class OcrService {
 		return llm;
 	}
 
-	async ocrByUrl(dto: CreateOcrDto): Promise<string | (ContentBlock | Text)[]> {
+	async urlToBase64Node(url: string) {
+		return new Promise((resolve, reject) => {
+			const protocol = url.startsWith('https') ? https : http;
+
+			protocol
+				.get(url, (response) => {
+					const chunks: any[] = [];
+
+					response.on('data', (chunk) => {
+						chunks.push(chunk);
+					});
+
+					response.on('end', () => {
+						const buffer = Buffer.concat(chunks);
+						const base64 = buffer.toString('base64');
+
+						// 获取 MIME 类型
+						const contentType =
+							response.headers['content-type'] || 'application/octet-stream';
+						const dataUrl = `data:${contentType};base64,${base64}`;
+
+						resolve(dataUrl);
+					});
+				})
+				.on('error', reject);
+		});
+	}
+
+	async imageOcr(dto: CreateOcrDto): Promise<string | (ContentBlock | Text)[]> {
 		try {
 			const llm = this.initLLM();
 
 			const systemPrompt =
 				'You are a professional OCR and image understanding assistant. Please analyze the provided image and extract all visible text, numbers, and other content accurately. Return the extracted content in a structured format.';
 
+			const base64Image = await this.urlToBase64Node(dto.url);
+
 			const messages = [
 				new SystemMessage(systemPrompt),
 				new HumanMessage({
 					content: [
-						{ type: 'image_url', image_url: { url: dto.url } },
+						{ type: 'image_url', image_url: { url: base64Image } },
 						{
 							type: 'text',
 							text: dto.prompt || 'Please extract all text from this image.',

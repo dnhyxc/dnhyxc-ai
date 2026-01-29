@@ -6,9 +6,9 @@ import { OcrService } from './ocr.service';
 export class OcrController {
 	constructor(private readonly ocrService: OcrService) {}
 
-	@Post('/ocrByUrl')
-	async ocrByUrl(@Body() dto: CreateOcrDto): Promise<any> {
-		return await this.ocrService.ocrByUrl(dto);
+	@Post('/imageOcr')
+	async imageOcr(@Body() dto: CreateOcrDto): Promise<any> {
+		return await this.ocrService.imageOcr(dto);
 	}
 
 	@Get()

@@ -1,12 +1,6 @@
-import { IsNotEmpty, IsOptional, IsUrl } from 'class-validator';
+import { IsNotEmpty, IsOptional } from 'class-validator';
 
 export class CreateOcrDto {
-	@IsUrl(
-		{},
-		{
-			message: '不是合法的 url',
-		},
-	)
 	@IsNotEmpty({
 		message: '图片 url 不能为空',
 	})

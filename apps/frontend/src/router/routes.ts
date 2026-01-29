@@ -2,8 +2,8 @@ import Layout from '@/layout';
 import NotFound from '@/views/404';
 import About from '@/views/about';
 import Account from '@/views/account';
-import Document from '@/views/code';
 import Detail from '@/views/detail';
+import Document from '@/views/document';
 import Editor from '@/views/editor';
 import Home from '@/views/home';
 import Login from '@/views/login';
@@ -37,7 +37,7 @@ const routes = [
 				path: '/document',
 				Component: Document,
 				meta: {
-					title: '文档处理',
+					title: '智能文档处理',
 				},
 			},
 			{

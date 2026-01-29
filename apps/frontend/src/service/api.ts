@@ -34,8 +34,14 @@ export const RESET_PASSWORD = '/auth/resetPassword';
 // 获取七牛云上传token
 export const GET_UPLOAD_TOKEN = '/upload/getUploadToken';
 
+// 上传文件
+export const UPLOAD_FILE = '/upload/uploadFile';
+
 // 下载文件
 export const DOWNLOAD_FILE = '/upload/download';
 
 // 下载 zip 文件
 export const DOWNLOAD_ZIP_FILE = '/upload/downloadZip';
+
+// 图片分析
+export const IMAGE_OCR = '/ocr/imageOcr';
