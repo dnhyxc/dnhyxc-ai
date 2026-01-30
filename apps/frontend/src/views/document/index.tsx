@@ -1,3 +1,5 @@
+import { MarkdownParser } from '@dnhyxc-ai/tools';
+import '@dnhyxc-ai/tools/styles.css';
 import DragUpload from '@design/DragUpload';
 import Markdown from '@design/Markdown';
 import {
@@ -18,7 +20,7 @@ import {
 	Sparkle,
 	Sparkles,
 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTheme } from '@/hooks';
 import { uploadFile } from '@/service';
 import { streamFetch } from '@/utils/sse';
@@ -49,6 +51,11 @@ const DocumentProcessor = () => {
 	let timer: ReturnType<typeof setTimeout> | null = null;
 
 	const { theme } = useTheme();
+
+	// 1. 初始化解析器
+	const parser = useMemo(() => {
+		return new MarkdownParser();
+	}, []);
 
 	useEffect(() => {
 		return () => {
@@ -144,6 +151,11 @@ const DocumentProcessor = () => {
 				onStart: () => {
 					setLoading(true);
 				},
+				// 				const onParser = () => {
+				// 	const htmlContent = parser.render(markdown);
+				// 	console.log(htmlContent, 'htmlContent');
+				// 	setHtmlContent(htmlContent);
+				// };
 				onData: (chunk) => setContent((prev) => prev + chunk),
 				onError: (err, type) => {
 					setLoading(false);
@@ -178,6 +190,8 @@ const DocumentProcessor = () => {
 			onStart();
 		}
 	};
+
+	console.log(content, 'content');
 
 	return (
 		<div className="w-full h-full flex flex-col justify-center items-center relative overflow-hidden rounded-b-md">
@@ -340,6 +354,11 @@ const DocumentProcessor = () => {
 											value={content}
 											theme={theme === 'black' ? 'dark' : 'light'}
 											background="transparent"
+										/>
+										<div
+											dangerouslySetInnerHTML={{
+												__html: parser.render(content),
+											}}
 										/>
 									</motion.div>
 								</div>
