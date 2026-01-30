@@ -1,4 +1,5 @@
 import { MarkdownParser } from '@dnhyxc-ai/tools';
+import '@dnhyxc-ai/tools/styles.css';
 import { Button } from '@ui/index';
 import { ScrollArea } from '@ui/scroll-area';
 import { config } from 'md-editor-rt';

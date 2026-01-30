@@ -6,7 +6,7 @@ export default defineConfig({
 	dts: true,
 	splitting: false,
 	sourcemap: false,
-	clean: true,
+	clean: false,
 	treeshake: true,
-	external: ['highlight.js', 'markdown-it', 'markdown-it-katex', 'katex'],
+	noExternal: ['highlight.js', 'markdown-it', 'markdown-it-katex', 'katex'],
 });

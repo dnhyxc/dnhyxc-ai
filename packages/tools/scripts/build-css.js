@@ -1,45 +1,169 @@
-import { readFileSync, writeFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const rootDir = resolve(__dirname, '..');
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-// CSS 文件映射
+const distDir = path.join(__dirname, '..', 'dist');
+const stylesDir = path.join(distDir, 'styles');
+
+// 确保目录存在
+if (!fs.existsSync(distDir)) {
+	fs.mkdirSync(distDir, { recursive: true });
+}
+if (!fs.existsSync(stylesDir)) {
+	fs.mkdirSync(stylesDir, { recursive: true });
+}
+
+// CSS文件映射
 const cssFiles = [
 	{
-		varName: 'githubMarkdownCss',
-		path: 'node_modules/github-markdown-css/github-markdown.css',
+		name: 'github-markdown.css',
+		source: path.join(
+			__dirname,
+			'..',
+			'node_modules',
+			'github-markdown-css',
+			'github-markdown.css',
+		),
 	},
-	{ varName: 'katexCss', path: 'node_modules/katex/dist/katex.min.css' },
 	{
-		varName: 'highlightCss',
-		path: 'node_modules/highlight.js/styles/github-dark.min.css',
+		name: 'katex.min.css',
+		source: path.join(
+			__dirname,
+			'..',
+			'node_modules',
+			'katex',
+			'dist',
+			'katex.min.css',
+		),
+	},
+	{
+		name: 'github-dark.min.css',
+		source: path.join(
+			__dirname,
+			'..',
+			'node_modules',
+			'highlight.js',
+			'styles',
+			'github-dark.min.css',
+		),
 	},
 ];
 
-let output = `// 此文件由 scripts/build-css.js 自动生成
-// 请勿手动修改
-
-`;
-
-for (const file of cssFiles) {
-	const fullPath = resolve(rootDir, file.path);
+// 复制CSS文件到dist/styles
+cssFiles.forEach((file) => {
 	try {
-		let content = readFileSync(fullPath, 'utf-8');
-		// 转义反引号和 ${} 模板字符串
-		content = content
-			.replace(/\\/g, '\\\\')
-			.replace(/`/g, '\\`')
-			.replace(/\$\{/g, '\\${');
-		output += `export const ${file.varName} = \`${content}\`;\n\n`;
-		console.log(`✓ 读取 ${file.varName} (${content.length} 字符)`);
+		const content = fs.readFileSync(file.source, 'utf-8');
+		const destPath = path.join(stylesDir, file.name);
+		fs.writeFileSync(destPath, content);
+		console.log(`Copied ${file.name} to ${destPath}`);
 	} catch (error) {
-		console.error(`✗ 无法读取 ${file.varName}: ${error.message}`);
-		output += `export const ${file.varName} = ''; // 读取失败\n\n`;
+		console.error(`Failed to copy ${file.name}:`, error.message);
 	}
+});
+
+// 复制KaTeX字体文件
+const fontsDir = path.join(stylesDir, 'fonts');
+if (!fs.existsSync(fontsDir)) {
+	fs.mkdirSync(fontsDir, { recursive: true });
 }
 
-const outputPath = resolve(rootDir, 'src/styles.ts');
-writeFileSync(outputPath, output, 'utf-8');
-console.log(`✅ 样式文件已生成: ${outputPath}`);
+const katexFontsSource = path.join(
+	__dirname,
+	'..',
+	'node_modules',
+	'katex',
+	'dist',
+	'fonts',
+);
+try {
+	const fontFiles = fs.readdirSync(katexFontsSource);
+	fontFiles.forEach((fontFile) => {
+		const sourcePath = path.join(katexFontsSource, fontFile);
+		const destPath = path.join(fontsDir, fontFile);
+		fs.copyFileSync(sourcePath, destPath);
+		console.log(`Copied font ${fontFile} to ${destPath}`);
+	});
+} catch (error) {
+	console.error('Failed to copy KaTeX fonts:', error.message);
+}
+
+// 创建合并的样式文件（可选）
+const combinedPath = path.join(stylesDir, 'markdown-styles.css');
+const combinedContent = cssFiles
+	.map((file) => {
+		try {
+			return fs.readFileSync(file.source, 'utf-8');
+		} catch {
+			return '';
+		}
+	})
+	.join('\n\n');
+fs.writeFileSync(combinedPath, combinedContent);
+console.log(`Created combined styles at ${combinedPath}`);
+
+// 创建styles.js文件，导出样式路径和内容
+const stylesJsPath = path.join(distDir, 'styles.js');
+const stylesJsContent = `// Auto-generated styles exports
+export const styles = {
+  githubMarkdown: './styles/github-markdown.css',
+  katex: './styles/katex.min.css',
+  highlight: './styles/github-dark.min.css',
+  combined: './styles/markdown-styles.css'
+};
+
+export const styleUrls = Object.values(styles);
+
+// 样式内容（字符串）
+export const styleContents = {
+${cssFiles.map((file) => `  ${file.name.replace(/[.-]/g, '_')}: ${JSON.stringify(fs.readFileSync(file.source, 'utf-8'))}`).join(',\n')}
+};
+`;
+fs.writeFileSync(stylesJsPath, stylesJsContent);
+console.log(`Created styles.js at ${stylesJsPath}`);
+
+// 创建styles.d.ts类型声明文件
+const stylesDtsPath = path.join(distDir, 'styles.d.ts');
+const stylesDtsContent = `// Type definitions for styles
+export declare const styles: {
+  githubMarkdown: string;
+  katex: string;
+  highlight: string;
+  combined: string;
+};
+
+export declare const styleUrls: string[];
+
+export declare const styleContents: {
+  github_markdown_css: string;
+  katex_min_css: string;
+  github_dark_min_css: string;
+};
+`;
+fs.writeFileSync(stylesDtsPath, stylesDtsContent);
+console.log(`Created styles.d.ts at ${stylesDtsPath}`);
+
+// 创建src/styles.ts文件，用于TypeScript类型和开发环境
+const srcStylesPath = path.join(__dirname, '..', 'src', 'styles.ts');
+const srcStylesContent = `// Auto-generated styles exports for TypeScript
+// This file is generated by scripts/build-css.js
+
+export const styles = {
+  githubMarkdown: './styles/github-markdown.css',
+  katex: './styles/katex.min.css',
+  highlight: './styles/github-dark.min.css',
+  combined: './styles/markdown-styles.css',
+} as const;
+
+export const styleUrls = Object.values(styles);
+
+export const styleContents = {
+  github_markdown_css: ${JSON.stringify(fs.readFileSync(cssFiles[0].source, 'utf-8'))},
+  katex_min_css: ${JSON.stringify(fs.readFileSync(cssFiles[1].source, 'utf-8'))},
+  github_dark_min_css: ${JSON.stringify(fs.readFileSync(cssFiles[2].source, 'utf-8'))},
+} as const;
+`;
+fs.writeFileSync(srcStylesPath, srcStylesContent);
+console.log(`Created src/styles.ts at ${srcStylesPath}`);

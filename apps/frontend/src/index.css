@@ -19,6 +19,13 @@ body {
 	.monaco-component {
 		display: none;
 	}
+
+	.markdown-body {
+		background-color: transparent;
+		h1 {
+			border: none;
+		}
+	}
 }
 
 #root {

@@ -3,8 +3,8 @@ import hljs from 'highlight.js';
 import MarkdownIt from 'markdown-it';
 import markdownItKatex from 'markdown-it-katex';
 
-// 导入内联的 CSS 字符串（由 build:css 脚本生成）
-import { githubMarkdownCss, highlightCss, katexCss } from './styles.js';
+// 注意：CSS样式不再自动导入，请从 @dnhyxc-ai/tools/dist/styles 导入所需样式
+// 例如：import '@dnhyxc-ai/tools/dist/styles/github-markdown.css';
 
 export interface MarkdownParserOptions {
 	html?: boolean;
@@ -19,45 +19,6 @@ export interface MarkdownParserOptions {
 	autoInjectStyles?: boolean;
 }
 
-// 样式注入标志
-let stylesInjected = false;
-
-/**
- * 注入 CSS 样式到页面中
- */
-function injectStyles(): void {
-	if (
-		stylesInjected ||
-		typeof window === 'undefined' ||
-		typeof document === 'undefined'
-	) {
-		return;
-	}
-
-	const styleId = 'markdown-parser-styles';
-	if (document.getElementById(styleId)) {
-		stylesInjected = true;
-		return;
-	}
-
-	// 创建 style 元素并注入所有 CSS
-	const style = document.createElement('style');
-	style.id = styleId;
-	style.textContent = `
-		/* GitHub Markdown CSS */
-		${githubMarkdownCss}
-		
-		/* KaTeX CSS */
-		${katexCss}
-		
-		/* Highlight.js CSS */
-		${highlightCss}
-	`;
-
-	document.head.appendChild(style);
-	stylesInjected = true;
-}
-
 class MarkdownParser {
 	private md;
 	private containerClass: string;
@@ -67,9 +28,13 @@ class MarkdownParser {
 		this.containerClass = options.containerClass || 'markdown-body';
 		this.onError = options.onError;
 
-		// 自动注入样式
+		// 警告：autoInjectStyles 选项已弃用，样式需要手动导入
 		if (options.autoInjectStyles !== false) {
-			injectStyles();
+			console.warn(
+				'MarkdownParser: autoInjectStyles is deprecated. ' +
+					'Please import CSS styles manually from @dnhyxc-ai/tools/dist/styles. ' +
+					'See documentation for details.',
+			);
 		}
 
 		this.md = new MarkdownIt({
@@ -111,13 +76,6 @@ class MarkdownParser {
 			// 降级：直接返回原文（仍包裹容器）
 			return `<div class="${this.containerClass}">${text}</div>`;
 		}
-	}
-
-	/**
-	 * 手动注入样式（如果构造函数中禁用了自动注入）
-	 */
-	static injectStyles(): void {
-		injectStyles();
 	}
 }
 
