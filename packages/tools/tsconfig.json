@@ -9,7 +9,9 @@
 		"noEmit": false,
 		"allowImportingTsExtensions": false,
 		"module": "NodeNext",
-		"moduleResolution": "NodeNext"
+		"moduleResolution": "NodeNext",
+		"experimentalDecorators": false,
+		"emitDecoratorMetadata": false
 	},
 	"include": ["./src/**/*"],
 	"exclude": ["node_modules"]
