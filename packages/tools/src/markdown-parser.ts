@@ -15,8 +15,6 @@ export interface MarkdownParserOptions {
 	containerClass?: string;
 	// 可选：自定义错误处理函数
 	onError?: (error: unknown) => void;
-	// 是否自动注入样式，默认为 true
-	autoInjectStyles?: boolean;
 }
 
 class MarkdownParser {
@@ -27,15 +25,6 @@ class MarkdownParser {
 	constructor(options: MarkdownParserOptions = {}) {
 		this.containerClass = options.containerClass || 'markdown-body';
 		this.onError = options.onError;
-
-		// 警告：autoInjectStyles 选项已弃用，样式需要手动导入
-		if (options.autoInjectStyles !== false) {
-			console.warn(
-				'MarkdownParser: autoInjectStyles is deprecated. ' +
-					'Please import CSS styles manually from @dnhyxc-ai/tools/dist/styles. ' +
-					'See documentation for details.',
-			);
-		}
 
 		this.md = new MarkdownIt({
 			// 允许渲染原生 HTML 标签

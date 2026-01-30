@@ -1,6 +1,6 @@
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -58,7 +58,6 @@ cssFiles.forEach((file) => {
 		const content = fs.readFileSync(file.source, 'utf-8');
 		const destPath = path.join(stylesDir, file.name);
 		fs.writeFileSync(destPath, content);
-		console.log(`Copied ${file.name} to ${destPath}`);
 	} catch (error) {
 		console.error(`Failed to copy ${file.name}:`, error.message);
 	}
@@ -84,7 +83,6 @@ try {
 		const sourcePath = path.join(katexFontsSource, fontFile);
 		const destPath = path.join(fontsDir, fontFile);
 		fs.copyFileSync(sourcePath, destPath);
-		console.log(`Copied font ${fontFile} to ${destPath}`);
 	});
 } catch (error) {
 	console.error('Failed to copy KaTeX fonts:', error.message);
@@ -102,7 +100,6 @@ const combinedContent = cssFiles
 	})
 	.join('\n\n');
 fs.writeFileSync(combinedPath, combinedContent);
-console.log(`Created combined styles at ${combinedPath}`);
 
 // 创建styles.js文件，导出样式路径和内容
 const stylesJsPath = path.join(distDir, 'styles.js');
@@ -122,7 +119,6 @@ ${cssFiles.map((file) => `  ${file.name.replace(/[.-]/g, '_')}: ${JSON.stringify
 };
 `;
 fs.writeFileSync(stylesJsPath, stylesJsContent);
-console.log(`Created styles.js at ${stylesJsPath}`);
 
 // 创建styles.d.ts类型声明文件
 const stylesDtsPath = path.join(distDir, 'styles.d.ts');
@@ -143,7 +139,6 @@ export declare const styleContents: {
 };
 `;
 fs.writeFileSync(stylesDtsPath, stylesDtsContent);
-console.log(`Created styles.d.ts at ${stylesDtsPath}`);
 
 // 创建src/styles.ts文件，用于TypeScript类型和开发环境
 const srcStylesPath = path.join(__dirname, '..', 'src', 'styles.ts');
@@ -166,4 +161,4 @@ export const styleContents = {
 } as const;
 `;
 fs.writeFileSync(srcStylesPath, srcStylesContent);
-console.log(`Created src/styles.ts at ${srcStylesPath}`);
+console.log('🎉🎉🎉 css generated successfully.\n');

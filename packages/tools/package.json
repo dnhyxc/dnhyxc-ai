@@ -7,9 +7,9 @@
 	"types": "./dist/index.d.ts",
 	"sideEffects": true,
 	"scripts": {
-		"build:css": "node scripts/build-css.js",
-		"build": "pnpm build:css && tsup",
 		"clean": "rm -rf dist src/styles.ts",
+		"build:css": "node scripts/build-mk-css.js",
+		"build": "pnpm clean && pnpm build:css && tsup",
 		"prepack": "pnpm build"
 	},
 	"exports": {
