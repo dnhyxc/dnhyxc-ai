@@ -99,7 +99,84 @@ const combinedContent = cssFiles
 		}
 	})
 	.join('\n\n');
-fs.writeFileSync(combinedPath, combinedContent);
+
+// 添加KaTeX间距规则
+const katexSpacingRules = `
+
+/* KaTeX spacing rules for better readability */
+/* Reset margins for all math elements */
+.katex .mord,
+.katex .mbin,
+.katex .mrel,
+.katex .mopen,
+.katex .mclose,
+.katex .mpunct,
+.katex .minner,
+.katex .mord.mtight,
+.katex .mbin.mtight,
+.katex .mrel.mtight {
+  margin: 0;
+}
+
+/* Add spacing between operators and operands */
+/* Binary operator spacing: +, -, ×, etc. */
+.katex .mbin {
+  margin-left: 0.22em;
+  margin-right: 0.22em;
+}
+
+/* Relation operator spacing: =, <, >, etc. */
+.katex .mrel {
+  margin-left: 0.28em;
+  margin-right: 0.28em;
+}
+
+/* Special handling for equals sign */
+.katex .mrel[data-marker="="] {
+  margin-left: 0.3em;
+  margin-right: 0.3em;
+}
+
+/* Ensure numbers stay together (no spacing between .mord elements) */
+.katex .mord + .mord {
+  margin-left: 0;
+  margin-right: 0;
+}
+
+/* Add spacing between operators and numbers */
+.katex .mord + .mbin,
+.katex .mbin + .mord,
+.katex .mord + .mrel,
+.katex .mrel + .mord {
+  /* Use the operator's margin, not adding extra */
+}
+
+/* For display mode, slightly increase spacing */
+.katex-display .katex .mbin {
+  margin-left: 0.25em;
+  margin-right: 0.25em;
+}
+
+.katex-display .katex .mrel {
+  margin-left: 0.32em;
+  margin-right: 0.32em;
+}
+
+.katex-display .katex .mrel[data-marker="="] {
+  margin-left: 0.35em;
+  margin-right: 0.35em;
+}
+
+/* Debug styles (uncomment if needed) */
+/*
+.katex .mord { background-color: rgba(255, 0, 0, 0.05); }
+.katex .mbin { background-color: rgba(0, 255, 0, 0.05); }
+.katex .mrel { background-color: rgba(0, 0, 255, 0.05); }
+*/
+`;
+
+const finalCombinedContent = combinedContent + katexSpacingRules;
+fs.writeFileSync(combinedPath, finalCombinedContent);
 
 // 创建styles.js文件，导出样式路径和内容
 const stylesJsPath = path.join(distDir, 'styles.js');
