@@ -1,21 +1,26 @@
 import DragUpload from '@design/DragUpload';
 import Markdown from '@design/Markdown';
-import { Button, ScrollArea, Spinner, Textarea, Toast } from '@ui/index';
+import {
+	Button,
+	ScrollArea,
+	Spinner,
+	Switch,
+	Textarea,
+	Toast,
+} from '@ui/index';
 import { motion } from 'framer-motion';
 import {
 	CheckCircle,
-	ClipboardPenLine,
 	Copy,
 	FileCheck,
 	FileSpreadsheet,
 	FileText,
 	Sparkle,
 	Sparkles,
-	Upload,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useTheme } from '@/hooks';
-import { uploadFile as upload_file } from '@/service';
+import { uploadFile } from '@/service';
 import { streamFetch } from '@/utils/sse';
 
 interface UploadFileInfo {
@@ -35,6 +40,8 @@ const DocumentProcessor = () => {
 	const [copied, setCopied] = useState(false);
 	const [content, setContent] = useState('');
 	const [prompt, setPrompt] = useState('');
+	const [onlineUrl, setOnlineUrl] = useState('');
+	const [fileType, setFileType] = useState(false);
 
 	const stopRequestRef = useRef<(() => void) | null>(null);
 	const dragUploadRef = useRef<{ onClear: () => void } | null>(null);
@@ -91,8 +98,8 @@ const DocumentProcessor = () => {
 		timer = setTimeout(() => setCopied(false), 2000);
 	};
 
-	const uploadFile = async (file: File) => {
-		const res = await upload_file(file);
+	const onUploadFile = async (file: File) => {
+		const res = await uploadFile(file);
 		if (res.success) {
 			Toast({
 				type: 'success',
@@ -109,6 +116,19 @@ const DocumentProcessor = () => {
 		setPrompt(e.target.value);
 	};
 
+	const onOnlineUrlChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+		setOnlineUrl(e.target.value);
+	};
+
+	const onCheckedChange = (value: boolean) => {
+		if (value) {
+			setUploadFileInfo({});
+		} else {
+			setOnlineUrl('');
+		}
+		setFileType(value);
+	};
+
 	// 开始生成
 	const onStart = async () => {
 		setContent('');
@@ -116,7 +136,7 @@ const DocumentProcessor = () => {
 		const stop = await streamFetch({
 			options: {
 				body: JSON.stringify({
-					url: uploadFileInfo?.url,
+					url: uploadFileInfo?.url || onlineUrl,
 					prompt,
 				}),
 			},
@@ -126,6 +146,7 @@ const DocumentProcessor = () => {
 				},
 				onData: (chunk) => setContent((prev) => prev + chunk),
 				onError: (err, type) => {
+					setLoading(false);
 					Toast({
 						type: type || 'error',
 						title: err?.message || String(err) || '解析失败',
@@ -204,7 +225,7 @@ const DocumentProcessor = () => {
 								</div>
 								<Button
 									variant="secondary"
-									disabled={!uploadFileInfo?.url}
+									disabled={!uploadFileInfo?.url && !onlineUrl}
 									className="cursor-pointer flex justify-center min-w-30 bg-linear-to-r from-blue-500 to-cyan-500"
 									onClick={handleStart}
 								>
@@ -223,35 +244,47 @@ const DocumentProcessor = () => {
 							</div>
 
 							<div className="flex justify-between items-center h-46 gap-5">
-								<div className="flex-1 rounded-xl bg-theme/5 backdrop-blur-xl overflow-hidden">
-									<div className="px-3 py-3 rounded-t-xl bg-theme/5 border border-b-0 border-theme-white/10 flex items-center justify-between">
+								<div className="flex-1 h-full flex flex-col rounded-xl backdrop-blur-xl overflow-hidden">
+									<div className="px-3 py-3 h-11 rounded-t-xl bg-theme/10 border border-b-0 border-theme-white/10 flex items-center justify-between">
 										<div className="flex items-center gap-2">
-											<Upload className="w-4 h-4" />
-											<span className="text-sm font-medium text-textcolor">
-												上传文件
-											</span>
+											<Switch
+												checked={fileType}
+												onCheckedChange={onCheckedChange}
+											>
+												{fileType ? '在线地址' : '上传文件'}
+											</Switch>
 										</div>
 										<div className="text-xs text-textcolor/50">
-											支持 PDF, DOCX, XLSX, PNG, JPEG, JPG
+											{fileType
+												? '支持合法的在线图片地址'
+												: '支持 PDF, DOCX, XLSX, PNG, JPEG, JPG'}
 										</div>
 									</div>
-									<div className="p-0">
-										<DragUpload
-											ref={dragUploadRef}
-											className="rounded-b-xl h-35"
-											uploadFile={uploadFile}
-										/>
+									<div className="p-0 h-full flex flex-1">
+										{fileType ? (
+											<Textarea
+												spellCheck={false}
+												placeholder="请输入在线图片地址"
+												maxLength={200}
+												value={onlineUrl}
+												className="flex-1 resize-none border rounded-b-xl border-theme/10 focus-visible:border-theme/20 bg-theme/5 rounded-t-none focus-visible:ring-transparent"
+												onChange={onOnlineUrlChange}
+											/>
+										) : (
+											<DragUpload
+												ref={dragUploadRef}
+												className="flex-1 rounded-b-xl h-35 bg-theme/5"
+												uploadFile={onUploadFile}
+											/>
+										)}
 									</div>
 								</div>
 								<div className="flex-1 h-full flex flex-col">
-									<div className="rounded-t-xl border border-b-0 border-theme-white/10 bg-theme/5">
-										<div className="w-full bg-theme/5 px-3 py-3 rounded-t-xl flex items-center justify-between">
-											<div className="flex items-center gap-2">
-												<ClipboardPenLine className="w-4 h-4" />
-												<span className="text-sm font-medium text-textcolor">
-													设置提示词
-												</span>
-											</div>
+									<div className="flex items-center justify-between rounded-t-xl h-11 border border-b-0 border-theme-white/10 bg-theme/10 w-full px-3 py-3">
+										<div className="flex flex-1 items-center justify-between gap-2">
+											<span className="text-sm font-medium text-textcolor">
+												设置提示词
+											</span>
 											<div className="text-xs  text-textcolor/50">
 												最大输入 200 字
 											</div>

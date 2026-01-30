@@ -1,0 +1,35 @@
+{
+	"name": "@dnhyxc-ai/tools",
+	"version": "0.0.1",
+	"type": "module",
+	"main": "./dist/index.js",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"sideEffects": true,
+	"scripts": {
+		"build:css": "node scripts/build-css.js",
+		"build": "pnpm build:css && tsup",
+		"clean": "rm -rf dist src/styles.ts",
+		"prepack": "pnpm build"
+	},
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		}
+	},
+	"dependencies": {
+		"github-markdown-css": "^5.8.1",
+		"highlight.js": "^11.11.1",
+		"katex": "^0.16.28",
+		"markdown-it": "^14.1.0",
+		"markdown-it-katex": "^2.0.3"
+	},
+	"devDependencies": {
+		"@types/highlight.js": "^10.1.0",
+		"@types/katex": "^0.16.8",
+		"@types/markdown-it": "^14.1.2",
+		"tsup": "^8.5.1"
+	}
+}

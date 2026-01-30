@@ -15,4 +15,5 @@ export * from './scroll-area';
 export * from './sheet';
 export * from './sonner';
 export * from './spinner';
+export * from './switch';
 export * from './textarea';
