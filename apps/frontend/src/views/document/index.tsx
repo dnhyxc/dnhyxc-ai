@@ -1,7 +1,6 @@
 import { MarkdownParser } from '@dnhyxc-ai/tools';
 import '@dnhyxc-ai/tools/styles.css';
 import DragUpload from '@design/DragUpload';
-import Markdown from '@design/Markdown';
 import {
 	Button,
 	ScrollArea,
@@ -21,7 +20,6 @@ import {
 	Sparkles,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useTheme } from '@/hooks';
 import { uploadFile } from '@/service';
 import { streamFetch } from '@/utils/sse';
 
@@ -49,8 +47,6 @@ const DocumentProcessor = () => {
 	const dragUploadRef = useRef<{ onClear: () => void } | null>(null);
 
 	let timer: ReturnType<typeof setTimeout> | null = null;
-
-	const { theme } = useTheme();
 
 	// 1. 初始化解析器
 	const parser = useMemo(() => {
@@ -350,12 +346,8 @@ const DocumentProcessor = () => {
 												)}
 											</motion.button>
 										</div>
-										<Markdown
-											value={content}
-											theme={theme === 'black' ? 'dark' : 'light'}
-											background="transparent"
-										/>
 										<div
+											className="p-3"
 											dangerouslySetInnerHTML={{
 												__html: parser.render(content),
 											}}
