@@ -5,7 +5,8 @@
 	"scripts": {
 		"bump-version": "tsx bump-version.ts",
 		"update-latest": "tsx update-latest.ts",
-		"upload-to-release": "tsx upload-to-release.ts"
+		"upload-to-release": "tsx upload-to-release.ts",
+		"export": "./export.sh --print"
 	},
 	"exports": {
 		"./bump-version": "./bump-version.ts",
