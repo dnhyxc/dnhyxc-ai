@@ -1,6 +1,7 @@
 import { MarkdownParser } from '@dnhyxc-ai/tools';
 import '@dnhyxc-ai/tools/styles.css';
 import DragUpload from '@design/DragUpload';
+import ImagePreview from '@design/ImagePreview';
 import {
 	Button,
 	ScrollArea,
@@ -42,6 +43,7 @@ const DocumentProcessor = () => {
 	const [prompt, setPrompt] = useState('');
 	const [onlineUrl, setOnlineUrl] = useState('');
 	const [fileType, setFileType] = useState(false);
+	const [previewVisible, setPreviewVisible] = useState(false);
 
 	const stopRequestRef = useRef<(() => void) | null>(null);
 	const dragUploadRef = useRef<{ onClear: () => void } | null>(null);
@@ -189,6 +191,10 @@ const DocumentProcessor = () => {
 
 	console.log(content, 'content');
 
+	const onPreview = () => {
+		setPreviewVisible(true);
+	};
+
 	return (
 		<div className="w-full h-full flex flex-col justify-center items-center relative overflow-hidden rounded-b-md">
 			<ScrollArea className="pb-5.5 overflow-y-auto w-full h-full backdrop-blur-sm">
@@ -270,7 +276,7 @@ const DocumentProcessor = () => {
 												: '支持 PDF, DOCX, XLSX, PNG, JPEG, JPG'}
 										</div>
 									</div>
-									<div className="p-0 h-full flex flex-1">
+									<div className="relative p-0 h-full flex flex-1">
 										{fileType ? (
 											<Textarea
 												spellCheck={false}
@@ -285,6 +291,14 @@ const DocumentProcessor = () => {
 												ref={dragUploadRef}
 												className="flex-1 rounded-b-xl h-35 bg-theme/5"
 												uploadFile={onUploadFile}
+											/>
+										)}
+										{onlineUrl && fileType && (
+											<img
+												src={onlineUrl}
+												alt=""
+												className="absolute bottom-3.5 right-3.5 w-15 h-15 object-cover rounded-md cursor-pointer"
+												onClick={onPreview}
 											/>
 										)}
 									</div>
@@ -359,6 +373,14 @@ const DocumentProcessor = () => {
 					</motion.div>
 				</motion.div>
 			</ScrollArea>
+			<ImagePreview
+				visible={previewVisible}
+				selectedImage={{
+					url: onlineUrl,
+					id: '1',
+				}}
+				onVisibleChange={() => setPreviewVisible(false)}
+			/>
 		</div>
 	);
 };
