@@ -5,14 +5,14 @@ export const MENUS = [
 		path: '/',
 	},
 	{
-		name: '技能',
+		name: 'document',
 		icon: 'Package',
-		path: '/skill',
+		path: '/document',
 	},
 	{
-		name: 'document',
+		name: '技能',
 		icon: 'SquareChartGantt',
-		path: '/document',
+		path: '/skill',
 	},
 	{
 		name: '详情',

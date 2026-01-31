@@ -27,17 +27,17 @@ const routes = [
 				},
 			},
 			{
-				path: '/skill',
-				Component: Skill,
-				meta: {
-					title: '技能',
-				},
-			},
-			{
 				path: '/document',
 				Component: Document,
 				meta: {
 					title: '智能文档处理',
+				},
+			},
+			{
+				path: '/skill',
+				Component: Skill,
+				meta: {
+					title: '技能',
 				},
 			},
 			{
