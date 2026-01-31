@@ -242,3 +242,40 @@ export const revokeBlobUrl = (blobUrl: string): void => {
 		URL.revokeObjectURL(blobUrl);
 	}
 };
+
+/**
+ * 验证 URL 是否是合法的图片地址
+ */
+export const isValidImageUrl = (url: string): boolean => {
+	try {
+		const parsed = new URL(url);
+		// 只允许 http 和 https 协议
+		if (!['http:', 'https:'].includes(parsed.protocol)) {
+			return false;
+		}
+		// 检查常见图片扩展名
+		const pathname = parsed.pathname.toLowerCase();
+		const imageExtensions = [
+			'.jpg',
+			'.jpeg',
+			'.png',
+			'.gif',
+			'.webp',
+			'.svg',
+			'.bmp',
+			'.tiff',
+			'.ico',
+		];
+		const hasImageExtension = imageExtensions.some((ext) =>
+			pathname.endsWith(ext),
+		);
+		// 如果 URL 有扩展名但不是图片扩展名，则拒绝
+		if (pathname.includes('.') && !hasImageExtension) {
+			return false;
+		}
+		// 其他情况允许通过（无扩展名或有效图片扩展名）
+		return true;
+	} catch {
+		return false;
+	}
+};

@@ -1,7 +1,7 @@
 import { MarkdownParser } from '@dnhyxc-ai/tools';
 import '@dnhyxc-ai/tools/styles.css';
 import DragUpload from '@design/DragUpload';
-import ImagePreview from '@design/ImagePreview';
+import Image from '@design/Image';
 import {
 	Button,
 	ScrollArea,
@@ -14,6 +14,7 @@ import { motion } from 'framer-motion';
 import {
 	CheckCircle,
 	Copy,
+	Eye,
 	FileCheck,
 	FileSpreadsheet,
 	FileText,
@@ -22,6 +23,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { uploadFile } from '@/service';
+import { isValidImageUrl } from '@/utils';
 import { streamFetch } from '@/utils/sse';
 
 interface UploadFileInfo {
@@ -42,11 +44,12 @@ const DocumentProcessor = () => {
 	const [content, setContent] = useState('');
 	const [prompt, setPrompt] = useState('');
 	const [onlineUrl, setOnlineUrl] = useState('');
+	const [onlineUrlError, setOnlineUrlError] = useState('');
 	const [fileType, setFileType] = useState(false);
-	const [previewVisible, setPreviewVisible] = useState(false);
 
 	const stopRequestRef = useRef<(() => void) | null>(null);
 	const dragUploadRef = useRef<{ onClear: () => void } | null>(null);
+	const imageRef = useRef<{ onPreview: () => void }>(null);
 
 	let timer: ReturnType<typeof setTimeout> | null = null;
 
@@ -122,7 +125,18 @@ const DocumentProcessor = () => {
 	};
 
 	const onOnlineUrlChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-		setOnlineUrl(e.target.value);
+		const value = e.target.value;
+		setOnlineUrl(value);
+		if (value.trim() === '') {
+			setOnlineUrlError('');
+		} else {
+			const isValid = isValidImageUrl(value);
+			if (!isValid) {
+				setOnlineUrlError('请输入合法的在线图片地址');
+			} else {
+				setOnlineUrlError('');
+			}
+		}
 	};
 
 	const onCheckedChange = (value: boolean) => {
@@ -130,6 +144,7 @@ const DocumentProcessor = () => {
 			setUploadFileInfo({});
 		} else {
 			setOnlineUrl('');
+			setOnlineUrlError('');
 		}
 		setFileType(value);
 	};
@@ -189,10 +204,10 @@ const DocumentProcessor = () => {
 		}
 	};
 
-	console.log(content, 'content');
-
 	const onPreview = () => {
-		setPreviewVisible(true);
+		if (imageRef.current) {
+			imageRef.current.onPreview();
+		}
 	};
 
 	return (
@@ -241,7 +256,10 @@ const DocumentProcessor = () => {
 								</div>
 								<Button
 									variant="secondary"
-									disabled={!uploadFileInfo?.url && !onlineUrl}
+									disabled={
+										!uploadFileInfo?.url &&
+										(!onlineUrl || onlineUrlError !== '')
+									}
 									className="cursor-pointer flex justify-center min-w-30 bg-linear-to-r from-blue-500 to-cyan-500"
 									onClick={handleStart}
 								>
@@ -270,9 +288,11 @@ const DocumentProcessor = () => {
 												{fileType ? '在线地址' : '上传文件'}
 											</Switch>
 										</div>
-										<div className="text-xs text-textcolor/50">
+										<div
+											className={`text-xs ${onlineUrlError ? 'text-red-500' : 'text-textcolor/50'}`}
+										>
 											{fileType
-												? '支持合法的在线图片地址'
+												? onlineUrlError || '支持合法的在线图片地址'
 												: '支持 PDF, DOCX, XLSX, PNG, JPEG, JPG'}
 										</div>
 									</div>
@@ -293,13 +313,19 @@ const DocumentProcessor = () => {
 												uploadFile={onUploadFile}
 											/>
 										)}
-										{onlineUrl && fileType && (
-											<img
+										{onlineUrl && fileType && !onlineUrlError && (
+											<Image
+												ref={imageRef}
 												src={onlineUrl}
-												alt=""
 												className="absolute bottom-3.5 right-3.5 w-15 h-15 object-cover rounded-md cursor-pointer"
-												onClick={onPreview}
-											/>
+											>
+												<div className="absolute inset-0 z-1 rounded-md w-full h-full bg-theme-background/50 items-center justify-center hidden group-hover:flex">
+													<Eye
+														className="w-5 h-5 cursor-pointer hover:text-textcolor/80"
+														onClick={onPreview}
+													/>
+												</div>
+											</Image>
 										)}
 									</div>
 								</div>
@@ -373,14 +399,6 @@ const DocumentProcessor = () => {
 					</motion.div>
 				</motion.div>
 			</ScrollArea>
-			<ImagePreview
-				visible={previewVisible}
-				selectedImage={{
-					url: onlineUrl,
-					id: '1',
-				}}
-				onVisibleChange={() => setPreviewVisible(false)}
-			/>
 		</div>
 	);
 };

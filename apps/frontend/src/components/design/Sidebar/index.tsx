@@ -19,6 +19,7 @@ import { useNavigate } from 'react-router';
 import ICON from '@/assets/icon.png';
 import { useStorageInfo } from '@/hooks';
 import { removeStorage } from '@/utils';
+import Image from '../Image';
 import { MENUS } from './enum';
 
 const Sidebar = () => {
@@ -62,9 +63,10 @@ const Sidebar = () => {
 						className="flex justify-center items-center w-11 h-11 bg-theme-secondary cursor-pointer mb-8 rounded-md hover:text-theme/70 transition-all duration-200 ease-in-out"
 						onClick={() => onJump('/')}
 					>
-						<img
-							src={storageInfo?.profile?.avatar || ICON}
-							alt=""
+						<Image
+							src={storageInfo?.profile?.avatar}
+							fallbackSrc={ICON}
+							showOnError
 							className={`${storageInfo?.profile?.avatar ? 'rounded-md w-10.5 h-10.5 object-cover' : 'w-9.5 h-9.5 cursor-pointer'}`}
 						/>
 					</div>

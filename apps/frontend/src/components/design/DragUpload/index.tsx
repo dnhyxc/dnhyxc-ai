@@ -1,5 +1,5 @@
 import { Toast } from '@ui/sonner';
-import { CloudUpload, X } from 'lucide-react';
+import { CloudUpload, Eye, Trash2 } from 'lucide-react';
 import React, {
 	forwardRef,
 	ReactNode,
@@ -9,7 +9,7 @@ import React, {
 	useState,
 } from 'react';
 import { cn } from '@/lib/utils';
-import ImagePreview from '../ImagePreview';
+import Image from '../Image';
 import { MAX_SIZE, VALID_TYPES } from './config';
 
 interface FileWithPreview {
@@ -49,9 +49,9 @@ const DragUpload = forwardRef<ForwardProps, IProps>(
 	) => {
 		const [files, setFiles] = useState<FileWithPreview[]>([]);
 		const [isDragging, setIsDragging] = useState(false);
-		const [visible, setVisible] = useState(false);
 
 		const fileInputRef = useRef<HTMLInputElement>(null);
+		const imageRef = useRef<{ onPreview: () => void }>(null);
 
 		useImperativeHandle(ref, () => ({
 			onClear,
@@ -153,9 +153,16 @@ const DragUpload = forwardRef<ForwardProps, IProps>(
 			}
 		};
 
-		const onPreview = (e: React.MouseEvent<HTMLImageElement>) => {
+		const onPreview = (e: React.MouseEvent<SVGElement, MouseEvent>) => {
 			e.stopPropagation();
-			setVisible(true);
+			if (imageRef.current) {
+				imageRef.current.onPreview();
+			}
+		};
+
+		const onRemove = (e: React.MouseEvent<SVGElement, MouseEvent>) => {
+			e.stopPropagation();
+			setFiles([]);
 		};
 
 		const onClear = () => {
@@ -163,10 +170,9 @@ const DragUpload = forwardRef<ForwardProps, IProps>(
 		};
 
 		return (
-			<>
-				<div
-					className={cn(
-						`select-none border ${files.length ? '' : 'border-dashed'} text-center transition-all duration-300 cursor-pointer
+			<div
+				className={cn(
+					`select-none border ${files.length ? '' : 'border-dashed'} text-center transition-all duration-300 cursor-pointer
         ${
 					isDragging
 						? files.length
@@ -177,85 +183,83 @@ const DragUpload = forwardRef<ForwardProps, IProps>(
 							: 'border-theme-white/10 hover:border-theme-white/20 hover:bg-theme-background/30'
 				}
       `,
-						className,
-					)}
-					onDragEnter={onDragEnter}
-					onDragOver={onDragOver}
-					onDragLeave={onDragLeave}
-					onDrop={onDrop}
-					onClick={triggerFileInput}
-				>
-					<input
-						type="file"
-						ref={fileInputRef}
-						onChange={onFileInputChange}
-						accept="image/*"
-						multiple={multiple}
-						disabled={!!files.length}
-						className="hidden"
-					/>
+					className,
+				)}
+				onDragEnter={onDragEnter}
+				onDragOver={onDragOver}
+				onDragLeave={onDragLeave}
+				onDrop={onDrop}
+				onClick={triggerFileInput}
+			>
+				<input
+					type="file"
+					ref={fileInputRef}
+					onChange={onFileInputChange}
+					accept="image/*"
+					multiple={multiple}
+					disabled={!!files.length}
+					className="hidden"
+				/>
 
-					{!files?.length ? (
-						<div className="p-2.5 flex flex-col items-center justify-center space-y-4 h-full">
-							<CloudUpload className="h-12 w-12 text-theme" />
-							<div>
-								<p className="text-md font-medium">
-									拖拽图片到此处或
-									<span className="text-theme" onClick={onClickSelect}>
-										点击选择
-									</span>
-								</p>
-								<p className="text-textcolor/60 mt-1 text-sm">
-									{infoText || '支持 JPEG, PNG, GIF, SVG, WebP 格式，最大5MB'}
-								</p>
-							</div>
+				{!files?.length ? (
+					<div className="p-2.5 flex flex-col items-center justify-center space-y-4 h-full">
+						<CloudUpload className="h-12 w-12 text-theme" />
+						<div>
+							<p className="text-md font-medium">
+								拖拽图片到此处或
+								<span className="text-theme" onClick={onClickSelect}>
+									点击选择
+								</span>
+							</p>
+							<p className="text-textcolor/60 mt-1 text-sm">
+								{infoText || '支持 JPEG, PNG, GIF, SVG, WebP 格式，最大5MB'}
+							</p>
 						</div>
-					) : (
-						children || (
-							<div className="p-3.5 flex flex-col items-center justify-center space-y-4 h-full">
-								{files?.map((i) => {
-									return (
-										<div
-											key={i.id}
-											className="flex items-center w-full h-full group"
+					</div>
+				) : (
+					children || (
+						<div className="p-3.5 flex flex-col items-center justify-center space-y-4 h-full">
+							{files?.map((i) => {
+								return (
+									<div
+										key={i.id}
+										className="flex items-center w-full h-full group"
+									>
+										<Image
+											ref={imageRef}
+											src={i.preview}
+											size={i.file.size}
+											alt={i.file.name}
+											className="w-auto h-full rounded-md"
 										>
-											<img
-												src={i.preview}
-												alt={i.file.name}
-												className="w-auto h-full rounded-md"
-												onClick={onPreview}
-											/>
-											<div className="ml-4 flex-1 h-full flex flex-col items-start justify-between">
-												<div className="line-clamp-2 text-textcolor break-all">
-													{i.file.name}
-												</div>
-												<div className="flex w-full items-center justify-between">
-													<span>
-														{(i.file.size / 1024 / 1024).toFixed(2)} M
-													</span>
-													<X
-														className="text-red-400 hidden group-hover:inline-block"
-														onClick={onClear}
-													/>
-												</div>
+											<div className="absolute inset-0 z-1 rounded-md w-full h-full bg-theme-background/50 items-center justify-center hidden group-hover:flex">
+												<Eye
+													size={22}
+													className="cursor-pointer text-textcolor/80 hover:text-textcolor"
+													onClick={onPreview}
+												/>
+												<Trash2
+													size={20}
+													className="cursor-pointer ml-2 text-textcolor/80 hover:text-red-400"
+													onClick={onRemove}
+												/>
+											</div>
+										</Image>
+										<div className="ml-4 flex-1 h-full flex flex-col items-start justify-between">
+											<div className="line-clamp-2 text-textcolor break-all">
+												{i.file.name}
+											</div>
+											<div className="flex w-full items-center justify-between">
+												{(i.file.size / 1024 / 1024).toFixed(2)} M
 											</div>
 										</div>
-									);
-								})}
-							</div>
-						)
-					)}
-				</div>
-				<ImagePreview
-					visible={visible}
-					selectedImage={{
-						url: files?.[0]?.preview,
-						size: files?.[0]?.file.size,
-						id: '1',
-					}}
-					onVisibleChange={() => setVisible(false)}
-				/>
-			</>
+									</div>
+								);
+							})}
+						</div>
+					)
+				)}
+			</div>
 		);
 	},
 );

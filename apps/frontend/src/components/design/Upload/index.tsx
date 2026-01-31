@@ -2,6 +2,7 @@ import { Toast } from '@ui/sonner';
 import { Download, Eye, Trash2, Upload as UploadIcon } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
+import Image from '../Image';
 
 interface IProps {
 	onUpload: (files: FileWithPreview[]) => void;
@@ -29,6 +30,7 @@ const Upload: React.FC<IProps> = ({
 	const [files, setFiles] = useState<FileWithPreview[]>([]);
 
 	const fileInputRef = useRef<HTMLInputElement>(null);
+	const imageRef = useRef<{ reset: () => void; onPreview: () => void }>(null);
 
 	const triggerFileInput = () => {
 		fileInputRef.current?.click();
@@ -96,6 +98,12 @@ const Upload: React.FC<IProps> = ({
 		onClearFileUrl?.();
 	};
 
+	const onPreview = () => {
+		if (imageRef.current) {
+			imageRef.current.onPreview();
+		}
+	};
+
 	return (
 		<div className={cn('w-32.5 h-32.5', className)}>
 			<input
@@ -108,20 +116,28 @@ const Upload: React.FC<IProps> = ({
 			/>
 			{files?.length || fileUrl ? (
 				<div className="relative flex items-center justify-center w-full h-full z-1 group">
-					<div className="absolute inset-0 z-1 rounded-md w-full h-full bg-theme-background/50 items-center justify-center hidden group-hover:flex">
-						<Download className="w-5 h-5 cursor-pointer hover:text-textcolor/80" />
-						<Eye className="w-5 h-5 cursor-pointer ml-2 hover:text-textcolor/80" />
-						<Trash2
-							className="w-5 h-5 cursor-pointer ml-2 hover:text-textcolor/80"
-							onClick={() => onDelete(files[0])}
-						/>
-						{children}
-					</div>
-					<img
+					<Image
+						// src={
+						// 	'https://dnhyxc.cn/image/__ARTICLE_IMG__d931518c149578ee4fc656514e2224437n66efe5c8d80d0da837a3e600h1769567982687.webp'
+						// }
+						ref={imageRef}
 						src={fileUrl || files[0].preview}
-						alt=""
-						className="w-full h-full object-cover rounded-md"
-					/>
+						showOnError
+						className="relative w-full h-full rounded-md"
+					>
+						<div className="absolute inset-0 z-1 rounded-md w-full h-full bg-theme-background/50 items-center justify-center hidden group-hover:flex">
+							<Download className="w-5 h-5 cursor-pointer hover:text-textcolor/80" />
+							<Eye
+								className="w-5 h-5 cursor-pointer ml-2 hover:text-textcolor/80"
+								onClick={onPreview}
+							/>
+							<Trash2
+								className="w-5 h-5 cursor-pointer ml-2 hover:text-textcolor/80"
+								onClick={() => onDelete(files[0])}
+							/>
+							{children}
+						</div>
+					</Image>
 				</div>
 			) : (
 				<div
