@@ -1,6 +1,7 @@
 import { fetch } from '@tauri-apps/plugin-http';
 import { Toast } from '@ui/index';
 import { BASE_URL } from '@/constant';
+import { getStorage } from '.';
 
 interface StreamCallbacks {
 	onData: (chunk: any) => void;
@@ -26,9 +27,14 @@ export const streamFetch = async ({
 	try {
 		onStart?.();
 
+		console.log(getStorage('token'), '  getStorage token');
+
 		const response = await fetch(BASE_URL + api, {
 			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
+			headers: {
+				Authorization: `Bearer ${getStorage('token')}`,
+				'Content-Type': 'application/json',
+			},
 			...options,
 		});
 

@@ -1,11 +1,14 @@
 import {
 	Body,
+	ClassSerializerInterceptor,
 	Controller,
 	Delete,
 	Get,
 	Param,
 	Post,
 	Sse,
+	UseGuards,
+	UseInterceptors,
 } from '@nestjs/common';
 import {
 	catchError,
@@ -17,10 +20,15 @@ import {
 	Observable,
 	of,
 } from 'rxjs';
+import { JwtGuard } from 'src/guards/jwt.guard';
+import { SwaggerController } from '../user/user.swagger';
 import { CreateOcrDto } from './dto/create-ocr.dto';
 import { OcrService } from './ocr.service';
 
 @Controller('ocr')
+@SwaggerController()
+@UseGuards(JwtGuard)
+@UseInterceptors(ClassSerializerInterceptor)
 export class OcrController {
 	constructor(private readonly ocrService: OcrService) {}
 
