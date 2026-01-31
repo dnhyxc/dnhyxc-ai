@@ -27,8 +27,6 @@ export const streamFetch = async ({
 	try {
 		onStart?.();
 
-		console.log(getStorage('token'), '  getStorage token');
-
 		const response = await fetch(BASE_URL + api, {
 			method: 'POST',
 			headers: {
