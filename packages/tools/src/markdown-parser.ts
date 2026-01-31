@@ -45,7 +45,18 @@ class MarkdownParser {
 			},
 		});
 
-		this.md.use(markdownItKatex, { throwOnError: false, displayMode: false });
+		this.md.use(markdownItKatex, {
+			// 关闭 KaTeX 报错，防止公式解析失败时中断渲染
+			throwOnError: false,
+			// 禁用 displayMode，让公式按行内模式处理
+			displayMode: false,
+			// 信任输入，允许渲染任意 LaTeX
+			// trust: true,
+			// 忽略严格模式，避免格式警告
+			strict: 'ignore',
+			// 将错误颜色设为透明，用户看不到渲染异常
+			errorColor: 'transparent',
+		});
 
 		// Add support for \(...\) and \[...\] delimiters
 		this.addLatexDelimiters();
@@ -59,8 +70,13 @@ class MarkdownParser {
 	public render(text: string): string {
 		if (!text) return '';
 
+		// Replace \text{○} with \circ to avoid KaTeX missing character metrics
+		// The ○ character (U+25CB) causes warnings that break markdown-it-katex rendering
+		// Using \circ (circle operator) is a valid LaTeX alternative
+		const processedText = text.replace(/\\text{○}/g, '\\circ');
+
 		try {
-			const rawHtml = this.md.render(text);
+			const rawHtml = this.md.render(processedText);
 			// 关键：自动包裹一层 div，带上类名，让 github-markdown-css 生效
 			return `<div class="${this.containerClass}">${rawHtml}</div>`;
 		} catch (error) {
@@ -75,28 +91,12 @@ class MarkdownParser {
 
 		// Helper function to check if delimiter is valid (similar to markdown-it-katex)
 		function isValidDelim(
-			state: any,
-			pos: number,
+			_state: any,
+			_pos: number,
 		): { can_open: boolean; can_close: boolean } {
-			const prevChar = pos > 0 ? state.src.charCodeAt(pos - 1) : -1;
-			const nextChar =
-				pos + 1 <= state.posMax ? state.src.charCodeAt(pos + 1) : -1;
-			let can_open = true;
-			let can_close = true;
-
-			// Check non-whitespace conditions for opening and closing
-			if (
-				prevChar === 0x20 ||
-				prevChar === 0x09 ||
-				(nextChar >= 0x30 && nextChar <= 0x39)
-			) {
-				can_close = false;
-			}
-			if (nextChar === 0x20 || nextChar === 0x09) {
-				can_open = false;
-			}
-
-			return { can_open, can_close };
+			// Always allow delimiters to open and close
+			// This simplifies the logic and ensures \(...\) always works
+			return { can_open: true, can_close: true };
 		}
 
 		// Inline math with \(...\)
