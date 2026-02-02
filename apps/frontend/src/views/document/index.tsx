@@ -46,10 +46,12 @@ const DocumentProcessor = () => {
 	const [onlineUrl, setOnlineUrl] = useState('');
 	const [onlineUrlError, setOnlineUrlError] = useState('');
 	const [fileType, setFileType] = useState(false);
+	const [autoScroll, setAutoScroll] = useState(true);
 
 	const stopRequestRef = useRef<(() => void) | null>(null);
 	const dragUploadRef = useRef<{ onClear: () => void } | null>(null);
 	const imageRef = useRef<{ onPreview: () => void }>(null);
+	const scrollContainerRef = useRef<HTMLDivElement>(null);
 
 	let timer: ReturnType<typeof setTimeout> | null = null;
 
@@ -66,6 +68,13 @@ const DocumentProcessor = () => {
 			}
 		};
 	}, []);
+
+	useEffect(() => {
+		if (autoScroll && scrollContainerRef.current) {
+			scrollContainerRef.current.scrollTop =
+				scrollContainerRef.current.scrollHeight;
+		}
+	}, [content, autoScroll]);
 
 	const formats = [
 		{
@@ -152,6 +161,7 @@ const DocumentProcessor = () => {
 	// 开始生成
 	const onStart = async () => {
 		setContent('');
+		setAutoScroll(true);
 		// 调用工具函数，它会立即返回一个 stop 函数
 		const stop = await streamFetch({
 			options: {
@@ -164,11 +174,6 @@ const DocumentProcessor = () => {
 				onStart: () => {
 					setLoading(true);
 				},
-				// 				const onParser = () => {
-				// 	const htmlContent = parser.render(markdown);
-				// 	console.log(htmlContent, 'htmlContent');
-				// 	setHtmlContent(htmlContent);
-				// };
 				onData: (chunk) => setContent((prev) => prev + chunk),
 				onError: (err, type) => {
 					setLoading(false);
@@ -210,9 +215,29 @@ const DocumentProcessor = () => {
 		}
 	};
 
+	const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+		const element = e.currentTarget;
+		if (!scrollContainerRef.current) {
+			scrollContainerRef.current = element;
+		}
+		const { scrollTop, scrollHeight, clientHeight } = element;
+		const SCROLL_THRESHOLD = 50;
+		const isAtBottom =
+			scrollHeight - scrollTop - clientHeight < SCROLL_THRESHOLD;
+		if (isAtBottom) {
+			setAutoScroll(true);
+		} else {
+			setAutoScroll(false);
+		}
+	};
+
 	return (
 		<div className="w-full h-full flex flex-col justify-center items-center relative overflow-hidden rounded-b-md">
-			<ScrollArea className="pb-5.5 overflow-y-auto w-full h-full backdrop-blur-sm">
+			<ScrollArea
+				ref={scrollContainerRef}
+				className="pb-5.5 overflow-y-auto w-full h-full backdrop-blur-sm overscroll-none"
+				onScroll={handleScroll}
+			>
 				<motion.div
 					initial={{ opacity: 0, y: 20 }}
 					animate={{ opacity: 1, y: 0 }}
@@ -317,7 +342,7 @@ const DocumentProcessor = () => {
 											<Image
 												ref={imageRef}
 												src={onlineUrl}
-												className="absolute bottom-3.5 right-3.5 w-15 h-15 object-cover rounded-md cursor-pointer"
+												className="absolute bottom-3.5 right-3.5 w-15 h-15 rounded-md cursor-pointer"
 											>
 												<div className="absolute inset-0 z-1 rounded-md w-full h-full bg-theme-background/50 items-center justify-center hidden group-hover:flex">
 													<Eye

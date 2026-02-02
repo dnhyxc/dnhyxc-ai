@@ -1,5 +1,5 @@
 import * as ScrollAreaPrimitive from '@radix-ui/react-scroll-area';
-import type * as React from 'react';
+import * as React from 'react';
 
 import { cn } from '@/lib/utils';
 
@@ -7,39 +7,50 @@ interface ScrollAreaProps
 	extends React.ComponentProps<typeof ScrollAreaPrimitive.Root> {
 	viewportClassName?: string;
 	dataTauriDragRegion?: boolean;
+	onScroll?: React.UIEventHandler<HTMLDivElement>;
 }
 
-function ScrollArea({
-	className,
-	children,
-	viewportClassName,
-	dataTauriDragRegion,
-	...props
-}: ScrollAreaProps) {
-	return (
-		<ScrollAreaPrimitive.Root
-			data-slot="scroll-area"
-			className={cn(
-				'relative border-2 border-transparent bg-transparent',
-				className,
-			)}
-			{...props}
-		>
-			<ScrollAreaPrimitive.Viewport
-				data-tauri-drag-region={dataTauriDragRegion}
-				data-slot="scroll-area-viewport"
+const ScrollArea = React.forwardRef<HTMLDivElement, ScrollAreaProps>(
+	(
+		{
+			className,
+			children,
+			viewportClassName,
+			dataTauriDragRegion,
+			onScroll,
+			...props
+		},
+		ref,
+	) => {
+		return (
+			<ScrollAreaPrimitive.Root
+				data-slot="scroll-area"
 				className={cn(
-					'focus-visible:ring-ring/50 size-full rounded-[inherit] transition-[color,box-shadow] outline-none focus-visible:ring-[3px] focus-visible:outline-1',
-					viewportClassName,
+					'relative border-2 border-transparent bg-transparent',
+					className,
 				)}
+				{...props}
 			>
-				{children}
-			</ScrollAreaPrimitive.Viewport>
-			<ScrollBar />
-			<ScrollAreaPrimitive.Corner />
-		</ScrollAreaPrimitive.Root>
-	);
-}
+				<ScrollAreaPrimitive.Viewport
+					ref={ref}
+					data-tauri-drag-region={dataTauriDragRegion}
+					data-slot="scroll-area-viewport"
+					className={cn(
+						'focus-visible:ring-ring/50 size-full rounded-[inherit] transition-[color,box-shadow] outline-none focus-visible:ring-[3px] focus-visible:outline-1',
+						viewportClassName,
+					)}
+					onScroll={onScroll}
+				>
+					{children}
+				</ScrollAreaPrimitive.Viewport>
+				<ScrollBar />
+				<ScrollAreaPrimitive.Corner />
+			</ScrollAreaPrimitive.Root>
+		);
+	},
+);
+
+ScrollArea.displayName = 'ScrollArea';
 
 function ScrollBar({
 	className,

@@ -39,6 +39,7 @@ const Image = forwardRef<ImageHandle, ImageProps>(
 			onLoad,
 			onError,
 			children,
+			imgClassName,
 			...props
 		},
 		ref,
@@ -109,14 +110,14 @@ const Image = forwardRef<ImageHandle, ImageProps>(
 		}
 
 		return (
-			<div className={cn('relative rounded overflow-hidden group', className)}>
+			<div className={cn('relative group', className)}>
 				<img
 					src={imageSrc}
 					alt={alt || ''}
 					className={cn(
-						'transition-opacity duration-200',
+						'transition-opacity duration-200 w-full h-full object-cover rounded-md',
 						isLoading ? 'opacity-0' : 'opacity-100',
-						className,
+						imgClassName,
 					)}
 					loading={loading}
 					onLoad={handleLoad}

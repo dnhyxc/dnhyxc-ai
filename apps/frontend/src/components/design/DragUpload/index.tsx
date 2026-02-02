@@ -230,7 +230,7 @@ const DragUpload = forwardRef<ForwardProps, IProps>(
 											src={i.preview}
 											size={i.file.size}
 											alt={i.file.name}
-											className="w-auto h-full rounded-md"
+											className="w-auto h-full max-w-27.5 rounded-md"
 										>
 											<div className="absolute inset-0 z-1 rounded-md w-full h-full bg-theme-background/50 items-center justify-center hidden group-hover:flex">
 												<Eye
