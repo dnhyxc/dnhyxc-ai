@@ -23,4 +23,9 @@ export class ChatRequestDto {
 	@IsOptional()
 	@IsBoolean()
 	stream?: boolean;
+
+	@IsOptional()
+	@IsArray()
+	@IsString({ each: true })
+	filePaths?: string[];
 }
