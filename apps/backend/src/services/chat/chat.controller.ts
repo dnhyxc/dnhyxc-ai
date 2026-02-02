@@ -1,0 +1,85 @@
+import {
+	Body,
+	Controller,
+	Delete,
+	Get,
+	Param,
+	Patch,
+	Post,
+	Sse,
+} from '@nestjs/common';
+import { catchError, concat, map, Observable, of } from 'rxjs';
+import { ChatService } from './chat.service';
+import { ChatRequestDto } from './dto/chat-request.dto';
+import { CreateChatDto } from './dto/create-chat.dto';
+import { UpdateChatDto } from './dto/update-chat.dto';
+
+@Controller('chat')
+export class ChatController {
+	constructor(private readonly chatService: ChatService) {}
+
+	@Post('/sse')
+	@Sse()
+	chatStream(@Body() chatRequestDto: ChatRequestDto): Observable<any> {
+		const source$ = this.chatService.chatStream(chatRequestDto).pipe(
+			map((chunk) => ({
+				data: {
+					content: chunk,
+					done: false,
+				},
+			})),
+		);
+		const done$ = of({
+			data: {
+				done: true,
+			},
+		});
+		return concat(source$, done$).pipe(
+			catchError((error) => {
+				return of({
+					data: {
+						error: error.message || '处理失败',
+						done: true,
+					},
+				});
+			}),
+		);
+	}
+
+	@Post('/message')
+	async chat(@Body() chatRequestDto: ChatRequestDto) {
+		const result = await this.chatService.chat(chatRequestDto);
+		return result;
+	}
+
+	@Delete('session/:sessionId')
+	clearSession(@Param('sessionId') sessionId: string) {
+		this.chatService.clearSession(sessionId);
+		return { success: true, message: 'Session cleared' };
+	}
+
+	@Post()
+	create(@Body() createChatDto: CreateChatDto) {
+		return this.chatService.create(createChatDto);
+	}
+
+	@Get()
+	findAll() {
+		return this.chatService.findAll();
+	}
+
+	@Get(':id')
+	findOne(@Param('id') id: string) {
+		return this.chatService.findOne(+id);
+	}
+
+	@Patch(':id')
+	update(@Param('id') id: string, @Body() updateChatDto: UpdateChatDto) {
+		return this.chatService.update(+id, updateChatDto);
+	}
+
+	@Delete(':id')
+	remove(@Param('id') id: string) {
+		return this.chatService.remove(+id);
+	}
+}
