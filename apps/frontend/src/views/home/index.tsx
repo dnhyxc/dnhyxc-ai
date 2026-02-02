@@ -111,16 +111,16 @@ const Home = () => {
 									animate={{ opacity: 1, y: 0 }}
 									transition={{ delay: 0.1 }}
 								>
-									<div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-purple-500/10 border border-purple-500/20 mb-4">
-										<Sparkles className="w-4 h-4 text-purple-400" />
-										<span className="text-sm text-purple-300">dnhyxc-ai</span>
+									<div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-cyan-500/10 border border-cyan-500/20 mb-4">
+										<Sparkles className="w-4 h-4 text-cyan-500" />
+										<span className="text-sm text-cyan-500">dnhyxc-ai</span>
 									</div>
 								</motion.div>
 								<motion.h2
 									initial={{ opacity: 0, y: 20 }}
 									animate={{ opacity: 1, y: 0 }}
 									transition={{ delay: 0.2 }}
-									className="text-3xl md:text-5xl pb-1 pt-px font-bold bg-linear-to-r from-purple-400 via-pink-400 to-blue-400 bg-clip-text text-transparent mb-8"
+									className="text-3xl md:text-5xl pb-1 pt-px font-bold bg-linear-to-r from-blue-500 via-cyan-500 to-blue-400 bg-clip-text text-transparent mb-8"
 								>
 									欢迎使用 dnhyxc-ai 智能助手
 								</motion.h2>
@@ -142,7 +142,7 @@ const Home = () => {
 										whileHover={{ scale: 1.05 }}
 										whileTap={{ scale: 0.98 }}
 										type="button"
-										className="relative overflow-hidden group/btn pb-1 px-8 h-12 bg-linear-to-r from-purple-600 to-pink-600 text-textcolor rounded-xl font-medium hover:shadow-lg hover:shadow-purple-500/25 transition-all duration-300 cursor-pointer"
+										className="relative overflow-hidden group/btn pb-1 px-8 h-12 bg-linear-to-r from-blue-500 to-cyan-500 text-textcolor rounded-xl font-medium hover:shadow-lg hover:shadow-cyan-500/25 transition-all duration-300 cursor-pointer"
 									>
 										<div className="absolute inset-0 bg-linear-to-r from-transparent via-theme-white/20 to-transparent -translate-x-full group-hover/btn:translate-x-full transition-transform duration-700" />
 										快速开始
