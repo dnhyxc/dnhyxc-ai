@@ -27,8 +27,8 @@ export const urlToBuffer = async (url: string) => {
 const parsePdf = async (buffer: Buffer): Promise<string> => {
 	try {
 		// 动态导入 pdf-parse 库
-		// @ts-expect-error
 		const pdf = await import('pdf-parse');
+		// @ts-expect-error - pdf-parse 的 TypeScript 类型可能不准确
 		const data = await pdf.default(buffer);
 		return data.text;
 	} catch (error) {
@@ -54,7 +54,6 @@ const parseDocx = async (buffer: Buffer): Promise<string> => {
 const parseExcel = async (buffer: Buffer): Promise<string> => {
 	try {
 		// 动态导入 xlsx 库
-		// @ts-expect-error
 		const xlsx = await import('xlsx');
 		const workbook = xlsx.read(buffer, { type: 'buffer' });
 		let text = '';

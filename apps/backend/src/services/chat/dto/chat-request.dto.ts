@@ -3,6 +3,7 @@ import {
 	ArrayMinSize,
 	IsArray,
 	IsBoolean,
+	IsNumber,
 	IsOptional,
 	IsString,
 	ValidateNested,
@@ -28,4 +29,16 @@ export class ChatRequestDto {
 	@IsArray()
 	@IsString({ each: true })
 	filePaths?: string[];
+
+	@IsString()
+	@IsOptional()
+	thinking?: 'enabled' | 'disabled'; // 'enabled' | 'disabled'
+
+	@IsNumber()
+	@IsOptional()
+	max_tokens?: number;
+
+	@IsNumber()
+	@IsOptional()
+	temperature?: number; // [0.0, 1.0]
 }

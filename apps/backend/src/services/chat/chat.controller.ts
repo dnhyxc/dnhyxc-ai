@@ -46,6 +46,35 @@ export class ChatController {
 		);
 	}
 
+	@Post('/zhipu-stream')
+	@Sse()
+	zhipuChatStream(@Body() chatRequestDto: ChatRequestDto): Observable<any> {
+		const source$ = this.chatService.zhipuChatStream(chatRequestDto).pipe(
+			map((chunk) => ({
+				data: {
+					content: chunk.data,
+					type: chunk.type,
+					done: false,
+				},
+			})),
+		);
+		const done$ = of({
+			data: {
+				done: true,
+			},
+		});
+		return concat(source$, done$).pipe(
+			catchError((error) => {
+				return of({
+					data: {
+						error: error.message || '处理失败',
+						done: true,
+					},
+				});
+			}),
+		);
+	}
+
 	@Post('/message')
 	async chat(@Body() chatRequestDto: ChatRequestDto) {
 		const result = await this.chatService.chat(chatRequestDto);
