@@ -10,6 +10,11 @@ export const MENUS = [
 		path: '/document',
 	},
 	{
+		name: '智能对话',
+		icon: 'Bot',
+		path: '/chat',
+	},
+	{
 		name: '技能',
 		icon: 'SquareChartGantt',
 		path: '/skill',

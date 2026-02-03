@@ -170,8 +170,6 @@ export class ChatService {
 		const newMessages = this.convertToLangChainMessages(enhancedMessages);
 		const allMessages = [...history, ...newMessages];
 
-		console.log('allMessages', allMessages);
-
 		const response = await llm.invoke(allMessages);
 		const responseContent = response.content as string;
 

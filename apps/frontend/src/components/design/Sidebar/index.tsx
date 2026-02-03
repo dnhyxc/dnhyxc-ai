@@ -7,6 +7,7 @@ import {
 } from '@ui/dropdown-menu';
 import {
 	BookOpenText,
+	Bot,
 	CircleUserRound,
 	House,
 	LogOut,
@@ -33,6 +34,7 @@ const Sidebar = () => {
 	const iconMap = {
 		House: <House />,
 		Package: <Package />,
+		Bot: <Bot />,
 		SquareChartGantt: <SquareChartGantt />,
 		BookOpenText: <BookOpenText />,
 		Newspaper: <Newspaper />,

@@ -14,6 +14,13 @@ body {
 	.monaco-editor .find-widget > .button.codicon-widget-close {
 		top: 8px;
 	}
+
+	ol,
+	ul,
+	menu {
+		list-style: revert;
+	}
+
 	/* find 样式 */
 	.context-view,
 	.monaco-component {

@@ -37,6 +37,7 @@ export const streamFetch = async ({
 		});
 
 		if (!response.ok) {
+			console.error('HTTP error! status:', response.statusText);
 			throw new Error(`HTTP error! status: ${response.status}`);
 		}
 
@@ -103,6 +104,7 @@ export const streamFetch = async ({
 			}
 		})();
 	} catch (error: any) {
+		console.error(error, 'errorerrorerror------end');
 		// 发起请求时的错误（如网络断开）
 		if (error.name !== 'AbortError') {
 			onError?.(error);

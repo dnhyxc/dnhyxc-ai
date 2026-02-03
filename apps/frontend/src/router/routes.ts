@@ -2,6 +2,7 @@ import Layout from '@/layout';
 import NotFound from '@/views/404';
 import About from '@/views/about';
 import Account from '@/views/account';
+import Chat from '@/views/chat';
 import Detail from '@/views/detail';
 import Document from '@/views/document';
 import Editor from '@/views/editor';
@@ -24,6 +25,13 @@ const routes = [
 				Component: Home,
 				meta: {
 					title: 'dnhyxc-ai',
+				},
+			},
+			{
+				path: '/chat',
+				Component: Chat,
+				meta: {
+					title: '智能对话',
 				},
 			},
 			{
