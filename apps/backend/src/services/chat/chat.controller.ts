@@ -27,7 +27,6 @@ export class ChatController {
 		const source$ = (await this.chatService.chatStream(chatRequestDto)).pipe(
 			map((chunk) => {
 				const data = JSON.parse(chunk);
-				console.log(data, 'datatatatatatatat');
 				return {
 					data: {
 						content: data.content,

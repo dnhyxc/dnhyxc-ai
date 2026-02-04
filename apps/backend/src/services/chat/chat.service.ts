@@ -197,65 +197,6 @@ export class ChatService {
 		};
 	}
 
-	// chatStream(dto: ChatRequestDto): Observable<string> {
-	// 	const llm = this.initDeepSeekLLM();
-
-	// 	const sessionId =
-	// 		dto.sessionId ||
-	// 		`session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
-	// 	return new Observable<string>((subscriber) => {
-	// 		// 异步处理文件附件和消息准备
-	// 		(async () => {
-	// 			try {
-	// 				// 处理文件附件
-	// 				let enhancedMessages = [...dto.messages];
-	// 				if (dto.filePaths && dto.filePaths.length > 0) {
-	// 					const fileContent = await this.processFileAttachments(
-	// 						dto.filePaths,
-	// 					);
-	// 					if (fileContent) {
-	// 						// 创建包含文件内容的系统消息
-	// 						const fileSystemMessage: ChatMessageDto = {
-	// 							role: 'system',
-	// 							content: `以下是上传的文件内容:\n${fileContent}\n请根据文件内容回答用户问题。`,
-	// 						};
-	// 						// 将系统消息插入到消息数组的开头
-	// 						enhancedMessages = [fileSystemMessage, ...enhancedMessages];
-	// 					}
-	// 				}
-
-	// 				let history: (HumanMessage | SystemMessage | AIMessage)[] = [];
-	// 				if (dto.sessionId && this.conversationMemory.has(dto.sessionId)) {
-	// 					history = this.conversationMemory.get(dto.sessionId) || [];
-	// 				}
-
-	// 				const newMessages = this.convertToLangChainMessages(enhancedMessages);
-	// 				const allMessages = [...history, ...newMessages];
-
-	// 				// 开始流式传输
-	// 				const stream = await llm.stream(allMessages);
-
-	// 				let fullContent = '';
-
-	// 				for await (const chunk of stream) {
-	// 					const content = chunk.content;
-	// 					if (typeof content === 'string') {
-	// 						subscriber.next(content);
-	// 						fullContent += content;
-	// 					}
-	// 				}
-
-	// 				const aiMessage = new AIMessage(fullContent);
-	// 				this.conversationMemory.set(sessionId, [...allMessages, aiMessage]);
-
-	// 				subscriber.complete();
-	// 			} catch (error) {
-	// 				subscriber.error(error);
-	// 			}
-	// 		})();
-	// 	});
-	// }
 	// 修改后的 chatStream 方法
 	async chatStream(dto: ChatRequestDto): Promise<Observable<any>> {
 		const llm = this.initDeepSeekLLM();
@@ -314,33 +255,54 @@ export class ChatService {
 					const stream = await llm.stream(allMessages);
 					let fullContent = '';
 
-					for await (const chunk of stream) {
-						// 每次迭代前检查是否被取消
-						if (cancel$.closed || subscriber.closed) {
-							console.log(
-								'Stream cancelled - cancel$.closed:',
-								cancel$.closed,
-								'subscriber.closed:',
-								subscriber.closed,
-							);
-							// 不要调用 stream.cancel() - 流在迭代时已被锁定
-							// 直接 break 退出循环，让流自动清理
-							break;
+					// 在开始迭代前检查是否已取消
+					if (cancel$.closed || subscriber.closed) {
+						// 尝试取消大模型调用
+						try {
+							if (typeof stream.cancel === 'function') {
+								await stream.cancel();
+							}
+						} catch (cancelError) {
+							console.error('Failed to cancel LLM stream:', cancelError);
 						}
+						return;
+					}
 
-						const content = chunk.content;
-						if (typeof content === 'string') {
-							subscriber.next(JSON.stringify({ content, sessionId }));
-							fullContent += content;
+					let wasCancelledDuringIteration = false;
+
+					try {
+						for await (const chunk of stream) {
+							// 每次迭代前检查是否被取消
+							if (cancel$.closed || subscriber.closed) {
+								wasCancelledDuringIteration = true;
+								break;
+							}
+
+							const content = chunk.content;
+							if (typeof content === 'string') {
+								subscriber.next(JSON.stringify({ content, sessionId }));
+								fullContent += content;
+							}
+						}
+					} catch (error) {
+						// 如果取消导致错误，忽略它
+						if (cancel$.closed || subscriber.closed) {
+							wasCancelledDuringIteration = true;
+						} else {
+							throw error;
 						}
 					}
 
-					console.log(
-						'Loop ended - cancel$.closed:',
-						cancel$.closed,
-						'subscriber.closed:',
-						subscriber.closed,
-					);
+					// 如果迭代过程中被取消，尝试取消底层流
+					if (wasCancelledDuringIteration) {
+						try {
+							if (typeof stream.cancel === 'function') {
+								await stream.cancel();
+							}
+						} catch (cancelError) {
+							console.error('Failed to cancel LLM stream:', cancelError);
+						}
+					}
 
 					// 只有在正常完成时才保存消息
 					const isCancelled = cancel$.closed || subscriber.closed;
@@ -358,22 +320,12 @@ export class ChatService {
 					}
 
 					if (!isCancelled) {
-						console.log('Stream completed normally', sessionId);
 						const aiMessage = new AIMessage(finalContent);
 						this.conversationMemory.set(sessionId, [...allMessages, aiMessage]);
 						// 清除部分响应（因为已经完成）
 						this.partialResponses.delete(sessionId);
 					} else {
 						// 保存部分响应用于继续生成
-						console.log(
-							'Saving partial response for session:',
-							sessionId,
-							'cancel$.closed:',
-							cancel$.closed,
-							'subscriber.closed:',
-							subscriber.closed,
-						);
-
 						if (finalContent.length > 0) {
 							this.partialResponses.set(sessionId, finalContent);
 							// 将部分助手消息保存到对话记忆中
@@ -415,29 +367,20 @@ export class ChatService {
 		if (!cancelController) {
 			return {
 				success: false,
-				message: 'Session not found or already completed',
+				message: '会话不存在或已完成',
 			};
 		}
-
-		console.log(
-			'stopStream called for session:',
-			sessionId,
-			'cancelController closed before:',
-			cancelController.closed,
-		);
 
 		// 发出取消信号
 		cancelController.next();
 		cancelController.complete();
-
-		console.log('cancelController closed after:', cancelController.closed);
 
 		// 清理资源
 		this.cleanupSession(sessionId);
 
 		return {
 			success: true,
-			message: 'Stream stopped successfully',
+			message: '已停止生成',
 		};
 	}
 
@@ -445,7 +388,7 @@ export class ChatService {
 	async continueStream(sessionId: string): Promise<Observable<any>> {
 		const partialContent = this.partialResponses.get(sessionId);
 		if (!partialContent) {
-			throw new Error('No partial response found for this session');
+			throw new Error('会话不存在或已完成');
 		}
 
 		// 获取历史消息
@@ -456,9 +399,6 @@ export class ChatService {
 		if (history.length > 0) {
 			const lastMessage = history[history.length - 1];
 			if (lastMessage instanceof AIMessage) {
-				console.log(
-					'Removing partial assistant message from history for continue',
-				);
 				history = history.slice(0, -1);
 			}
 		}
