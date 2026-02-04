@@ -8,6 +8,7 @@ interface MarkdownPreviewProps {
 	className?: string;
 	width?: string;
 	height?: string;
+	padding?: string;
 	theme?: 'light' | 'dark';
 	background?: string;
 }
@@ -18,6 +19,7 @@ const MarkdownPreview: React.FC<MarkdownPreviewProps> = ({
 	width,
 	height,
 	theme = 'light',
+	padding,
 	background,
 }) => {
 	// config({
@@ -63,10 +65,10 @@ const MarkdownPreview: React.FC<MarkdownPreviewProps> = ({
 				style={{
 					height,
 					width,
-					padding: '5px 10px',
+					padding: padding || '5px 10px',
 					// borderRadius: '8px',
 					backgroundColor: background,
-					color: 'red',
+					color: theme === 'light' ? 'black' : 'white',
 				}}
 			/>
 		</div>

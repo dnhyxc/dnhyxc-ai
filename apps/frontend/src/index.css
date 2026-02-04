@@ -33,6 +33,36 @@ body {
 			border: none;
 		}
 	}
+
+	.md-editor-dark,
+	.md-editor-modal-container[data-theme="dark"] {
+		--md-color: var(--theme-textcolor);
+		--md-hover-color: #bbb;
+		--md-bk-color: #000;
+		--md-bk-color-outstand: #333;
+		--md-bk-hover-color: #1b1a1a;
+		--md-border-color: #2d2d2d;
+		--md-border-hover-color: #636262;
+		--md-border-active-color: #777;
+		--md-modal-mask: #00000073;
+		--md-modal-shadow: 0px 6px 24px 2px #00000066;
+		--md-scrollbar-bg-color: #0f0f0f;
+		--md-scrollbar-thumb-color: transparent;
+		--md-scrollbar-thumb-hover-color: #3a3a3a;
+		--md-scrollbar-thumb-active-color: #3a3a3a;
+
+		/*定义滚动条轨道*/
+		::-webkit-scrollbar-track {
+			height: 6px;
+			background-color: transparent;
+		}
+
+		/*定义滑块*/
+		::-webkit-scrollbar-thumb {
+			background-color: var(--theme / 5);
+			border-radius: 5px;
+		}
+	}
 }
 
 #root {

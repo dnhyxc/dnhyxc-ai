@@ -5,6 +5,7 @@ import { getStorage } from '.';
 
 interface StreamCallbacks {
 	onData: (chunk: any) => void;
+	onThinking?: (chunk: any) => void;
 	onStart?: () => void;
 	onError?: (error: Error, type?: 'error' | 'info' | 'warning') => void;
 	onComplete?: () => void;
@@ -19,7 +20,7 @@ export const streamFetch = async ({
 	callbacks: StreamCallbacks;
 	api?: string;
 }): Promise<() => void> => {
-	const { onData, onError, onComplete, onStart } = callbacks;
+	const { onData, onError, onComplete, onStart, onThinking } = callbacks;
 
 	const controller = new AbortController();
 	options.signal = controller.signal;
@@ -83,7 +84,11 @@ export const streamFetch = async ({
 							if (dataStr) {
 								try {
 									const parsed = JSON.parse(dataStr);
-									onData(parsed.content ? parsed.content : '');
+									if (parsed?.type === 'thinking') {
+										onThinking?.(parsed.content ? parsed.content : '');
+									} else {
+										onData(parsed.content ? parsed.content : '');
+									}
 								} catch (e) {
 									Toast({
 										type: 'error',
@@ -104,7 +109,6 @@ export const streamFetch = async ({
 			}
 		})();
 	} catch (error: any) {
-		console.error(error, 'errorerrorerror------end');
 		// 发起请求时的错误（如网络断开）
 		if (error.name !== 'AbortError') {
 			onError?.(error);

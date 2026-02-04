@@ -1,24 +1,26 @@
-import { MarkdownParser } from '@dnhyxc-ai/tools';
 import { Button, ScrollArea, Spinner, Textarea, Toast } from '@ui/index';
 import '@dnhyxc-ai/tools/styles.css';
 import { motion } from 'framer-motion';
 import {
 	Bot,
+	ChevronDown,
+	ChevronRight,
 	CirclePlus,
 	Rocket,
 	StopCircle,
-	Trash2,
 	User,
 } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { streamFetch } from '@/utils/sse';
+import MarkdownPreview from '../Markdown';
 
 interface Message {
 	id: string;
 	content: string;
 	role: 'user' | 'assistant';
 	timestamp: Date;
+	thinkContent?: string;
 	isStreaming?: boolean;
 }
 
@@ -27,25 +29,26 @@ interface ChatBotProps {
 	initialMessages?: Message[];
 	apiEndpoint?: string;
 	maxHistory?: number;
+	showAvatar?: boolean;
 }
 
 const ChatBot: React.FC<ChatBotProps> = ({
 	className,
 	initialMessages = [],
+	// apiEndpoint = '/chat/sse',
 	apiEndpoint = '/chat/zhipu-stream',
+	showAvatar = false,
 }) => {
 	const [messages, setMessages] = useState<Message[]>(initialMessages);
 	const [input, setInput] = useState('');
 	const [loading, setLoading] = useState(false);
 	const [autoScroll, setAutoScroll] = useState(true);
 	const [isComposing, setIsComposing] = useState(false);
+	const [isShowThinkContent, setIsShowThinkContent] = useState(true);
 
 	const stopRequestRef = useRef<(() => void) | null>(null);
 	const scrollContainerRef = useRef<HTMLDivElement>(null);
 	const inputRef = useRef<HTMLTextAreaElement>(null);
-
-	// 初始化 markdown 解析器
-	const parser = useMemo(() => new MarkdownParser(), []);
 
 	// 自动滚动到底部
 	useEffect(() => {
@@ -55,6 +58,19 @@ const ChatBot: React.FC<ChatBotProps> = ({
 		}
 	}, [messages, autoScroll]);
 
+	// 聚焦输入框
+	useEffect(() => {
+		inputRef.current?.focus();
+	}, []);
+
+	// 输入内容变化时自动滚动到底部
+	useEffect(() => {
+		if (inputRef.current) {
+			const textarea = inputRef.current;
+			textarea.scrollTop = textarea.scrollHeight;
+		}
+	}, [input]);
+
 	// 滚动事件处理
 	const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
 		const element = e.currentTarget;
@@ -62,7 +78,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 			scrollContainerRef.current = element;
 		}
 		const { scrollTop, scrollHeight, clientHeight } = element;
-		const SCROLL_THRESHOLD = 50;
+		const SCROLL_THRESHOLD = 5;
 		const isAtBottom =
 			scrollHeight - scrollTop - clientHeight < SCROLL_THRESHOLD;
 		if (isAtBottom) {
@@ -94,6 +110,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 		const assistantMessage: Message = {
 			id: assistantMessageId,
 			content: '',
+			thinkContent: '',
 			role: 'assistant',
 			timestamp: new Date(),
 			isStreaming: true,
@@ -125,6 +142,21 @@ const ChatBot: React.FC<ChatBotProps> = ({
 					onStart: () => {
 						// 已经开始
 					},
+					onThinking: (thinking) => {
+						if (typeof thinking === 'string') {
+							setMessages((prev) =>
+								prev.map((msg) =>
+									msg.id === assistantMessageId
+										? {
+												...msg,
+												thinkContent: msg.thinkContent + thinking,
+												isStreaming: true,
+											}
+										: msg,
+								),
+							);
+						}
+					},
 					onData: (chunk) => {
 						if (typeof chunk === 'string') {
 							setMessages((prev) =>
@@ -149,7 +181,12 @@ const ChatBot: React.FC<ChatBotProps> = ({
 						// 移除失败的流式消息
 						setMessages((prev) =>
 							prev.filter(
-								(msg) => !(msg.id === assistantMessageId && msg.content === ''),
+								(msg) =>
+									!(
+										msg.id === assistantMessageId &&
+										msg.content === '' &&
+										msg.thinkContent === ''
+									),
 							),
 						);
 					},
@@ -176,7 +213,12 @@ const ChatBot: React.FC<ChatBotProps> = ({
 			});
 			setMessages((prev) =>
 				prev.filter(
-					(msg) => !(msg.id === assistantMessageId && msg.content === ''),
+					(msg) =>
+						!(
+							msg.id === assistantMessageId &&
+							msg.content === '' &&
+							msg.thinkContent === ''
+						),
 				),
 			);
 		}
@@ -201,6 +243,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 
 	// 清除对话
 	const clearChat = () => {
+		setInput('');
 		setMessages([]);
 		stopRequestRef.current?.();
 		stopRequestRef.current = null;
@@ -254,10 +297,9 @@ const ChatBot: React.FC<ChatBotProps> = ({
 				// Shift + Enter: 也插入换行符（常见约定）
 				insertNewline(e);
 			} else if (!hasModifier) {
-				// 纯 Enter（没有任何修饰键）: 发送消息
 				e.preventDefault();
-				// sendMessage();
-				console.log('发送消息');
+				// 纯 Enter（没有任何修饰键）: 发送消息
+				sendMessage();
 			}
 		}
 	};
@@ -275,10 +317,9 @@ const ChatBot: React.FC<ChatBotProps> = ({
 		}, 0);
 	};
 
-	// 聚焦输入框
-	useEffect(() => {
-		inputRef.current?.focus();
-	}, []);
+	const onToggleThinkContent = () => {
+		setIsShowThinkContent(!isShowThinkContent);
+	};
 
 	return (
 		<div className={cn('flex flex-col h-full w-full', className)}>
@@ -288,75 +329,128 @@ const ChatBot: React.FC<ChatBotProps> = ({
 				className="flex-1 overflow-hidden w-full backdrop-blur-sm"
 				onScroll={handleScroll}
 			>
-				<div className="max-w-4xl mx-auto p-4 space-y-6 overflow-auto">
-					{messages.length === 0 ? (
-						<div className="flex flex-col items-center justify-center h-96 text-textcolor/50">
-							<Bot className="w-16 h-16 mb-4" />
-							<p className="text-lg">开始与 AI 对话吧！</p>
-							<p className="text-sm mt-2">输入你的问题，按 Enter 发送</p>
-						</div>
-					) : (
-						messages.map((message) => (
-							<motion.div
-								key={message.id}
-								initial={{ opacity: 0, y: 10 }}
-								animate={{ opacity: 1, y: 0 }}
-								className={cn(
-									'flex gap-4',
-									message.role === 'user' ? 'flex-row-reverse' : '',
-								)}
-							>
-								{/* 头像 */}
-								<div
+				<div className="max-w-3xl m-auto">
+					<div className="mx-auto space-y-6 overflow-y-auto">
+						{messages.length === 0 ? (
+							<div className="flex flex-col items-center justify-center h-110 text-textcolor">
+								<Bot className="w-16 h-16 mb-4" />
+								<p className="text-2xl">欢迎来到 dnhyxc-ai 智能聊天</p>
+								<p className="text-lg mt-2">有什么问题可以帮您?</p>
+							</div>
+						) : (
+							messages.map((message) => (
+								<motion.div
+									key={message.id}
+									initial={{ opacity: 0, y: 10 }}
+									animate={{ opacity: 1, y: 0 }}
 									className={cn(
-										'shrink-0 w-10 h-10 rounded-full flex items-center justify-center',
-										message.role === 'user'
-											? 'bg-blue-500/20'
-											: 'bg-purple-500/20',
+										'flex gap-4 w-full',
+										message.role === 'user' ? 'flex-row-reverse' : '',
 									)}
 								>
-									{message.role === 'user' ? (
-										<User className="w-5 h-5 text-blue-400" />
-									) : (
-										<Bot className="w-5 h-5 text-purple-400" />
-									)}
-								</div>
-
-								{/* 消息内容 */}
-								<div
-									className={cn(
-										'flex-1 max-w-3xl rounded-2xl p-4',
-										message.role === 'user'
-											? 'bg-blue-500/10 border border-blue-500/20'
-											: 'bg-theme/5 border border-theme-white/10',
-									)}
-								>
-									<div
-										className="prose prose-invert max-w-none"
-										dangerouslySetInnerHTML={{
-											__html: parser.render(message.content || '思考中...'),
-										}}
-									/>
-									{message.isStreaming && (
-										<div className="mt-2 flex items-center">
-											<Spinner className="w-4 h-4 mr-2" />
-											<span className="text-sm text-textcolor/50">
-												正在输入...
-											</span>
+									{/* 头像 */}
+									{showAvatar ? (
+										<div
+											className={cn(
+												'shrink-0 w-10 h-10 rounded-full flex items-center justify-center',
+												message.role === 'user'
+													? 'bg-blue-500/20'
+													: 'bg-purple-500/20',
+											)}
+										>
+											{message.role === 'user' ? (
+												<User className="w-5 h-5 text-blue-400" />
+											) : (
+												<Bot className="w-5 h-5 text-purple-400" />
+											)}
 										</div>
-									)}
-								</div>
-							</motion.div>
-						))
-					)}
+									) : null}
+
+									{/* 消息内容 */}
+									<div
+										className={cn(
+											'flex-1 rounded-md p-4',
+											message.role === 'user'
+												? 'bg-blue-500/10 border border-blue-500/20 text-end'
+												: 'bg-theme/5 border border-theme-white/10',
+											showAvatar ? 'max-w-[calc(768px-113px)]' : 'w-full',
+										)}
+									>
+										{/* <div
+											className="prose prose-invert max-w-none"
+											dangerouslySetInnerHTML={{
+												__html: parser.render(message.content || '思考中...'),
+											}}
+										/> */}
+										{message.role === 'user' ? (
+											<div
+												className="prose prose-invert max-w-none"
+												dangerouslySetInnerHTML={{
+													__html: message.content,
+												}}
+											/>
+										) : (
+											<div className="w-full h-auto">
+												<div className="w-full">
+													{message?.thinkContent ? (
+														<div
+															className="mb-2 flex items-center cursor-pointer select-none"
+															onClick={onToggleThinkContent}
+														>
+															思考内容
+															{isShowThinkContent ? (
+																<ChevronDown
+																	size={20}
+																	className="ml-2 mt-0.5"
+																/>
+															) : (
+																<ChevronRight
+																	size={20}
+																	className="ml-2 mt-0.5"
+																/>
+															)}
+														</div>
+													) : null}
+													{message.thinkContent && isShowThinkContent && (
+														<MarkdownPreview
+															value={message.thinkContent || '思考中...'}
+															theme="dark"
+															className="h-auto p-0"
+															background="transparent"
+															padding="0"
+														/>
+													)}
+												</div>
+												<MarkdownPreview
+													value={message.content}
+													theme="dark"
+													className="h-auto p-0"
+													background="transparent"
+													padding="0"
+												/>
+											</div>
+										)}
+										{message.isStreaming && (
+											<div className="mt-1 flex items-center">
+												<Spinner className="w-4 h-4 mr-2 text-textcolor/50" />
+												<span className="text-sm text-textcolor/50">
+													正在生成中...
+												</span>
+											</div>
+										)}
+									</div>
+								</motion.div>
+							))
+						)}
+					</div>
 				</div>
 			</ScrollArea>
 
 			{/* 输入区域 */}
-			<div className="p-4 backdrop-blur-sm">
-				<div className="max-w-4xl mx-auto flex gap-5">
+			<div className="p-5.5 pt-5 backdrop-blur-sm">
+				<div className="max-w-3xl mx-auto flex gap-5">
 					<div className="flex-1 relative overflow-hidden">
-						<div className="flex flex-col overflow-y-auto rounded-md bg-theme/5">
+						<div className="flex flex-col overflow-y-auto rounded-md bg-theme/5 border border-theme-white/10">
 							<Textarea
 								ref={inputRef}
 								value={input}
@@ -364,19 +458,16 @@ const ChatBot: React.FC<ChatBotProps> = ({
 								onKeyDown={handleKeyDown}
 								onCompositionStart={handleCompositionStart}
 								onCompositionEnd={handleCompositionEnd}
-								placeholder="输入消息..."
+								placeholder="请输入您的问题"
 								spellCheck={false}
-								rows={4}
-								className="flex-1 resize-none border-none shadow-none pr-12 focus-visible:ring-transparent"
+								className="flex-1 min-h-20 resize-none border-none shadow-none pr-12 focus-visible:ring-transparent"
 								disabled={loading}
 							/>
 							<div className="flex items-center justify-between h-10 p-2.5 mb-1">
 								<Button
 									variant="ghost"
 									className="flex items-center text-sm bg-theme/5 mb-1 h-8 rounded-md"
-									onClick={() => {
-										setInput('');
-									}}
+									onClick={clearChat}
 								>
 									<CirclePlus className="w-4 h-4 mr-2" />
 									新对话
@@ -385,7 +476,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 									<Button
 										variant="ghost"
 										onClick={stopGenerating}
-										className="h-8 w-8 mb-1 bg-red-500/20 hover:bg-red-500/30 border border-red-500/30"
+										className="h-8 w-8 mb-1 flex items-center justify-center rounded-full bg-red-500/20 hover:bg-red-500/30 border border-red-500/30"
 									>
 										<StopCircle />
 									</Button>
@@ -402,14 +493,6 @@ const ChatBot: React.FC<ChatBotProps> = ({
 							</div>
 						</div>
 					</div>
-					<Button
-						variant="secondary"
-						onClick={clearChat}
-						className="h-12 px-4 bg-theme-white/5 hover:bg-theme-white/10 border border-theme-white/10"
-						disabled={messages.length === 0 && !loading}
-					>
-						<Trash2 className="w-4 h-4" />
-					</Button>
 				</div>
 			</div>
 		</div>
