@@ -45,3 +45,6 @@ export const DOWNLOAD_ZIP_FILE = '/upload/downloadZip';
 
 // 图片分析
 export const IMAGE_OCR = '/ocr/imageOcr';
+
+// 停止模型调用
+export const STOP_SSE = '/chat/stopSse';

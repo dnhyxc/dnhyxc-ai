@@ -11,6 +11,7 @@ import {
 import { catchError, concat, map, Observable, of } from 'rxjs';
 import { ChatService } from './chat.service';
 import { ChatRequestDto } from './dto/chat-request.dto';
+import { ChatStopDto } from './dto/chat-stop.dto';
 import { CreateChatDto } from './dto/create-chat.dto';
 import { UpdateChatDto } from './dto/update-chat.dto';
 
@@ -20,14 +21,21 @@ export class ChatController {
 
 	@Post('/sse')
 	@Sse()
-	chatStream(@Body() chatRequestDto: ChatRequestDto): Observable<any> {
-		const source$ = this.chatService.chatStream(chatRequestDto).pipe(
-			map((chunk) => ({
-				data: {
-					content: chunk,
-					done: false,
-				},
-			})),
+	async chatStream(
+		@Body() chatRequestDto: ChatRequestDto,
+	): Promise<Observable<any>> {
+		const source$ = (await this.chatService.chatStream(chatRequestDto)).pipe(
+			map((chunk) => {
+				const data = JSON.parse(chunk);
+				console.log(data, 'datatatatatatatat');
+				return {
+					data: {
+						content: data.content,
+						sessionId: data.sessionId,
+						done: false,
+					},
+				};
+			}),
 		);
 		const done$ = of({
 			data: {
@@ -44,6 +52,11 @@ export class ChatController {
 				});
 			}),
 		);
+	}
+
+	@Post('/stopSse')
+	stopStream(@Body() dto: ChatStopDto) {
+		return this.chatService.stopStream(dto.sessionId);
 	}
 
 	@Post('/zhipu-stream')

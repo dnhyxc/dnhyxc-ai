@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
+import { stopSse } from '@/service';
 import { streamFetch } from '@/utils/sse';
 import MarkdownPreview from '../Markdown';
 
@@ -35,11 +36,12 @@ interface ChatBotProps {
 const ChatBot: React.FC<ChatBotProps> = ({
 	className,
 	initialMessages = [],
-	// apiEndpoint = '/chat/sse',
-	apiEndpoint = '/chat/zhipu-stream',
+	apiEndpoint = '/chat/sse',
+	// apiEndpoint = '/chat/zhipu-stream',
 	showAvatar = false,
 }) => {
 	const [messages, setMessages] = useState<Message[]>(initialMessages);
+	const [sessionId, setSessionId] = useState('');
 	const [input, setInput] = useState('');
 	const [loading, setLoading] = useState(false);
 	const [autoScroll, setAutoScroll] = useState(true);
@@ -135,6 +137,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 							// ...history,
 							{ role: 'user', content: userMessage.content },
 						],
+						sessionId,
 						stream: true,
 					}),
 				},
@@ -171,6 +174,9 @@ const ChatBot: React.FC<ChatBotProps> = ({
 								),
 							);
 						}
+					},
+					getSessionId: (sessionId) => {
+						setSessionId(sessionId);
 					},
 					onError: (err, type) => {
 						setLoading(false);
@@ -225,8 +231,9 @@ const ChatBot: React.FC<ChatBotProps> = ({
 	};
 
 	// 停止生成
-	const stopGenerating = () => {
+	const stopGenerating = async () => {
 		if (stopRequestRef.current) {
+			await stopSse(sessionId);
 			stopRequestRef.current();
 			stopRequestRef.current = null;
 			setLoading(false);

@@ -6,7 +6,7 @@ import {
 import { ChatOpenAI } from '@langchain/openai';
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { Observable } from 'rxjs';
+import { catchError, Observable, Subject, takeUntil, throwError } from 'rxjs';
 import { ModelEnum } from 'src/enum/config.enum';
 import { parseFile } from '../../utils/file-parser';
 import { ChatMessageDto } from './dto/chat-message.dto';
@@ -19,6 +19,17 @@ export class ChatService {
 		string,
 		(HumanMessage | SystemMessage | AIMessage)[]
 	> = new Map();
+
+	// 存储会话的取消控制器
+	private cancelControllers = new Map<string, Subject<void>>();
+	// 存储正在进行的会话
+	private activeSessions = new Map<string, boolean>();
+
+	// 清理会话资源
+	private cleanupSession(sessionId: string): void {
+		this.cancelControllers.delete(sessionId);
+		this.activeSessions.delete(sessionId);
+	}
 
 	constructor(private configService: ConfigService) {}
 
@@ -183,30 +194,91 @@ export class ChatService {
 		};
 	}
 
-	chatStream(dto: ChatRequestDto): Observable<string> {
-		const llm = this.initDeepSeekLLM();
+	// chatStream(dto: ChatRequestDto): Observable<string> {
+	// 	const llm = this.initDeepSeekLLM();
 
+	// 	const sessionId =
+	// 		dto.sessionId ||
+	// 		`session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+	// 	return new Observable<string>((subscriber) => {
+	// 		// 异步处理文件附件和消息准备
+	// 		(async () => {
+	// 			try {
+	// 				// 处理文件附件
+	// 				let enhancedMessages = [...dto.messages];
+	// 				if (dto.filePaths && dto.filePaths.length > 0) {
+	// 					const fileContent = await this.processFileAttachments(
+	// 						dto.filePaths,
+	// 					);
+	// 					if (fileContent) {
+	// 						// 创建包含文件内容的系统消息
+	// 						const fileSystemMessage: ChatMessageDto = {
+	// 							role: 'system',
+	// 							content: `以下是上传的文件内容:\n${fileContent}\n请根据文件内容回答用户问题。`,
+	// 						};
+	// 						// 将系统消息插入到消息数组的开头
+	// 						enhancedMessages = [fileSystemMessage, ...enhancedMessages];
+	// 					}
+	// 				}
+
+	// 				let history: (HumanMessage | SystemMessage | AIMessage)[] = [];
+	// 				if (dto.sessionId && this.conversationMemory.has(dto.sessionId)) {
+	// 					history = this.conversationMemory.get(dto.sessionId) || [];
+	// 				}
+
+	// 				const newMessages = this.convertToLangChainMessages(enhancedMessages);
+	// 				const allMessages = [...history, ...newMessages];
+
+	// 				// 开始流式传输
+	// 				const stream = await llm.stream(allMessages);
+
+	// 				let fullContent = '';
+
+	// 				for await (const chunk of stream) {
+	// 					const content = chunk.content;
+	// 					if (typeof content === 'string') {
+	// 						subscriber.next(content);
+	// 						fullContent += content;
+	// 					}
+	// 				}
+
+	// 				const aiMessage = new AIMessage(fullContent);
+	// 				this.conversationMemory.set(sessionId, [...allMessages, aiMessage]);
+
+	// 				subscriber.complete();
+	// 			} catch (error) {
+	// 				subscriber.error(error);
+	// 			}
+	// 		})();
+	// 	});
+	// }
+	// 修改后的 chatStream 方法
+	async chatStream(dto: ChatRequestDto): Promise<Observable<any>> {
+		const llm = this.initDeepSeekLLM();
 		const sessionId =
 			dto.sessionId ||
 			`session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
+		// 创建取消控制器
+		const cancel$ = new Subject<void>();
+		this.cancelControllers.set(sessionId, cancel$);
+		this.activeSessions.set(sessionId, true);
+
 		return new Observable<string>((subscriber) => {
-			// 异步处理文件附件和消息准备
 			(async () => {
 				try {
-					// 处理文件附件
+					// 处理文件附件和消息准备（保持不变）
 					let enhancedMessages = [...dto.messages];
 					if (dto.filePaths && dto.filePaths.length > 0) {
 						const fileContent = await this.processFileAttachments(
 							dto.filePaths,
 						);
 						if (fileContent) {
-							// 创建包含文件内容的系统消息
 							const fileSystemMessage: ChatMessageDto = {
 								role: 'system',
 								content: `以下是上传的文件内容:\n${fileContent}\n请根据文件内容回答用户问题。`,
 							};
-							// 将系统消息插入到消息数组的开头
 							enhancedMessages = [fileSystemMessage, ...enhancedMessages];
 						}
 					}
@@ -219,28 +291,86 @@ export class ChatService {
 					const newMessages = this.convertToLangChainMessages(enhancedMessages);
 					const allMessages = [...history, ...newMessages];
 
-					// 开始流式传输
-					const stream = await llm.stream(allMessages);
+					console.log(
+						cancel$.closed,
+						'cancel$.closedcancel$.closedcancel$.closed',
+						cancel$,
+					);
 
+					// 检查是否被取消
+					if (cancel$.closed) {
+						subscriber.complete();
+						return;
+					}
+
+					const stream = await llm.stream(allMessages);
 					let fullContent = '';
 
 					for await (const chunk of stream) {
+						// 每次迭代前检查是否被取消
+						if (cancel$.closed) {
+							await stream.cancel?.(); // 如果 stream 有 cancel 方法就调用
+							break;
+						}
+
 						const content = chunk.content;
 						if (typeof content === 'string') {
-							subscriber.next(content);
+							subscriber.next(JSON.stringify({ content, sessionId }));
 							fullContent += content;
 						}
 					}
 
-					const aiMessage = new AIMessage(fullContent);
-					this.conversationMemory.set(sessionId, [...allMessages, aiMessage]);
+					// 只有在正常完成时才保存消息
+					if (!cancel$.closed) {
+						const aiMessage = new AIMessage(fullContent);
+						this.conversationMemory.set(sessionId, [...allMessages, aiMessage]);
+					}
 
 					subscriber.complete();
 				} catch (error) {
-					subscriber.error(error);
+					// 如果是取消操作，不视为错误
+					if (cancel$.closed) {
+						subscriber.complete();
+					} else {
+						subscriber.error(error);
+					}
+				} finally {
+					// 清理资源
+					this.cleanupSession(sessionId);
 				}
 			})();
-		});
+		}).pipe(
+			takeUntil(cancel$), // 当 cancel$ 发出时自动取消订阅
+			catchError(() => {
+				// 错误处理
+				this.cleanupSession(sessionId);
+				return throwError(() => new Error('Stream interrupted'));
+			}),
+		);
+	}
+
+	// 停止指定会话
+	stopStream(sessionId: string): { success: boolean; message: string } {
+		const cancelController = this.cancelControllers.get(sessionId);
+
+		if (!cancelController) {
+			return {
+				success: false,
+				message: 'Session not found or already completed',
+			};
+		}
+
+		// 发出取消信号
+		cancelController.next();
+		cancelController.complete();
+
+		// 清理资源
+		this.cleanupSession(sessionId);
+
+		return {
+			success: true,
+			message: 'Stream stopped successfully',
+		};
 	}
 
 	clearSession(sessionId: string): void {
