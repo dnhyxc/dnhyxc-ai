@@ -6,6 +6,7 @@ import {
 	ChevronDown,
 	ChevronRight,
 	CirclePlus,
+	Link,
 	Rocket,
 	StopCircle,
 	User,
@@ -23,6 +24,7 @@ interface Message {
 	timestamp: Date;
 	thinkContent?: string;
 	isStreaming?: boolean;
+	isStopped?: boolean;
 }
 
 interface ChatBotProps {
@@ -111,7 +113,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 				},
 				callbacks: {
 					onStart: () => {
-						// 已经开始
+						setLoading(true);
 					},
 					onThinking: (thinking) => {
 						if (typeof thinking === 'string') {
@@ -210,9 +212,11 @@ const ChatBot: React.FC<ChatBotProps> = ({
 		};
 
 		// 添加用户消息
-		setMessages((prev) => [...prev, userMessage]);
+		setMessages((prev) => [
+			...prev.map((msg) => ({ ...msg, isStopped: false })),
+			userMessage,
+		]);
 		setInput('');
-		setLoading(true);
 		setAutoScroll(true);
 
 		// 创建 assistant 消息占位符
@@ -228,120 +232,15 @@ const ChatBot: React.FC<ChatBotProps> = ({
 
 		setMessages((prev) => [...prev, assistantMessage]);
 
-		// 准备历史消息（限制长度）
-		// const recentMessages = messages.slice(-maxHistory);
-		// const history = recentMessages.map((msg) => ({
-		// 	role: msg.role,
-		// 	content: msg.content,
-		// }));
-
 		// 调用流式 API
 		await onSseFetch(apiEndpoint, assistantMessageId, userMessage);
-		// try {
-		// 	const stop = await streamFetch({
-		// 		api: apiEndpoint,
-		// 		options: {
-		// 			body: JSON.stringify({
-		// 				messages: [
-		// 					// ...history,
-		// 					{ role: 'user', content: userMessage.content },
-		// 				],
-		// 				sessionId,
-		// 				stream: true,
-		// 			}),
-		// 		},
-		// 		callbacks: {
-		// 			onStart: () => {
-		// 				// 已经开始
-		// 			},
-		// 			onThinking: (thinking) => {
-		// 				if (typeof thinking === 'string') {
-		// 					setMessages((prev) =>
-		// 						prev.map((msg) =>
-		// 							msg.id === assistantMessageId
-		// 								? {
-		// 										...msg,
-		// 										thinkContent: msg.thinkContent + thinking,
-		// 										isStreaming: true,
-		// 									}
-		// 								: msg,
-		// 						),
-		// 					);
-		// 				}
-		// 			},
-		// 			onData: (chunk) => {
-		// 				if (typeof chunk === 'string') {
-		// 					setMessages((prev) =>
-		// 						prev.map((msg) =>
-		// 							msg.id === assistantMessageId
-		// 								? {
-		// 										...msg,
-		// 										content: msg.content + chunk,
-		// 										isStreaming: true,
-		// 									}
-		// 								: msg,
-		// 						),
-		// 					);
-		// 				}
-		// 			},
-		// 			getSessionId: (sessionId) => {
-		// 				setSessionId(sessionId);
-		// 			},
-		// 			onError: (err, type) => {
-		// 				setLoading(false);
-		// 				Toast({
-		// 					type: type || 'error',
-		// 					title: err?.message || String(err) || '发送失败',
-		// 				});
-		// 				// 移除失败的流式消息
-		// 				setMessages((prev) =>
-		// 					prev.filter(
-		// 						(msg) =>
-		// 							!(
-		// 								msg.id === assistantMessageId &&
-		// 								msg.content === '' &&
-		// 								msg.thinkContent === ''
-		// 							),
-		// 					),
-		// 				);
-		// 			},
-		// 			onComplete: () => {
-		// 				setLoading(false);
-		// 				// 更新消息状态，结束流式传输
-		// 				setMessages((prev) =>
-		// 					prev.map((msg) =>
-		// 						msg.id === assistantMessageId
-		// 							? { ...msg, isStreaming: false }
-		// 							: msg,
-		// 					),
-		// 				);
-		// 			},
-		// 		},
-		// 	});
-
-		// 	stopRequestRef.current = stop;
-		// } catch (_error) {
-		// 	setLoading(false);
-		// 	Toast({
-		// 		type: 'error',
-		// 		title: '发送消息失败',
-		// 	});
-		// 	setMessages((prev) =>
-		// 		prev.filter(
-		// 			(msg) =>
-		// 				!(
-		// 					msg.id === assistantMessageId &&
-		// 					msg.content === '' &&
-		// 					msg.thinkContent === ''
-		// 				),
-		// 		),
-		// 	);
-		// }
 	};
 
 	const onContinue = async () => {
+		setMessages((prev) => [
+			...prev.map((msg) => ({ ...msg, isStopped: false })),
+		]);
 		const assistantMessageId = messages[messages.length - 1].id;
-		console.log('continue', assistantMessageId);
 		await onSseFetch('/chat/continueSse', assistantMessageId);
 	};
 
@@ -356,7 +255,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 			setMessages((prev) =>
 				prev.map((msg, index) =>
 					index === prev.length - 1 && msg.role === 'assistant'
-						? { ...msg, isStreaming: false }
+						? { ...msg, isStreaming: false, isStopped: true }
 						: msg,
 				),
 			);
@@ -443,6 +342,10 @@ const ChatBot: React.FC<ChatBotProps> = ({
 		setIsShowThinkContent(!isShowThinkContent);
 	};
 
+	const onUploadFile = async () => {
+		console.log('上传文件');
+	};
+
 	return (
 		<div className={cn('flex flex-col h-full w-full', className)}>
 			{/* 聊天消息区域 */}
@@ -498,12 +401,6 @@ const ChatBot: React.FC<ChatBotProps> = ({
 											showAvatar ? 'max-w-[calc(768px-113px)]' : 'w-full',
 										)}
 									>
-										{/* <div
-											className="prose prose-invert max-w-none"
-											dangerouslySetInnerHTML={{
-												__html: parser.render(message.content || '思考中...'),
-											}}
-										/> */}
 										{message.role === 'user' ? (
 											<div
 												className="prose prose-invert max-w-none"
@@ -560,6 +457,16 @@ const ChatBot: React.FC<ChatBotProps> = ({
 												</span>
 											</div>
 										)}
+										{message.isStopped && (
+											<div className="flex items-center justify-end">
+												<div
+													className="cursor-pointer text-sm text-cyan-400 hover:text-cyan-300"
+													onClick={onContinue}
+												>
+													继续生成
+												</div>
+											</div>
+										)}
 									</div>
 								</motion.div>
 							))
@@ -586,22 +493,24 @@ const ChatBot: React.FC<ChatBotProps> = ({
 								disabled={loading}
 							/>
 							<div className="flex items-center justify-between h-10 p-2.5 mb-1">
-								<Button
-									variant="ghost"
-									className="flex items-center text-sm bg-theme/5 mb-1 h-8 rounded-md"
-									onClick={clearChat}
-								>
-									<CirclePlus className="w-4 h-4 mr-2" />
-									新对话
-								</Button>
-								<Button
-									variant="ghost"
-									className="flex items-center text-sm bg-theme/5 mb-1 h-8 rounded-md"
-									onClick={onContinue}
-								>
-									<CirclePlus className="w-4 h-4 mr-2" />
-									继续生成
-								</Button>
+								<div className="flex items-center gap-2">
+									<Button
+										variant="ghost"
+										className="flex items-center text-sm bg-theme/5 mb-1 h-8 rounded-md"
+										onClick={clearChat}
+									>
+										<CirclePlus className="w-4 h-4" />
+										新对话
+									</Button>
+									<Button
+										variant="ghost"
+										className="flex items-center text-sm bg-theme/5 mb-1 h-8 rounded-md"
+										onClick={onUploadFile}
+									>
+										<Link className="w-4 h-4" />
+										上传附件
+									</Button>
+								</div>
 								{loading ? (
 									<Button
 										variant="ghost"
