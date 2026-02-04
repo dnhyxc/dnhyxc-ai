@@ -90,52 +90,20 @@ const ChatBot: React.FC<ChatBotProps> = ({
 		}
 	};
 
-	// 发送消息
-	const sendMessage = async () => {
-		if (!input.trim() || loading) return;
-
-		const userMessage: Message = {
-			id: Date.now().toString(),
-			content: input.trim(),
-			role: 'user',
-			timestamp: new Date(),
-		};
-
-		// 添加用户消息
-		setMessages((prev) => [...prev, userMessage]);
-		setInput('');
-		setLoading(true);
-		setAutoScroll(true);
-
-		// 创建 assistant 消息占位符
-		const assistantMessageId = (Date.now() + 1).toString();
-		const assistantMessage: Message = {
-			id: assistantMessageId,
-			content: '',
-			thinkContent: '',
-			role: 'assistant',
-			timestamp: new Date(),
-			isStreaming: true,
-		};
-
-		setMessages((prev) => [...prev, assistantMessage]);
-
-		// 准备历史消息（限制长度）
-		// const recentMessages = messages.slice(-maxHistory);
-		// const history = recentMessages.map((msg) => ({
-		// 	role: msg.role,
-		// 	content: msg.content,
-		// }));
-
+	const onSseFetch = async (
+		api: string = apiEndpoint,
+		assistantMessageId: string,
+		userMessage?: Message,
+	) => {
 		// 调用流式 API
 		try {
 			const stop = await streamFetch({
-				api: apiEndpoint,
+				api,
 				options: {
 					body: JSON.stringify({
 						messages: [
 							// ...history,
-							{ role: 'user', content: userMessage.content },
+							{ role: 'user', content: userMessage?.content || '' },
 						],
 						sessionId,
 						stream: true,
@@ -228,6 +196,153 @@ const ChatBot: React.FC<ChatBotProps> = ({
 				),
 			);
 		}
+	};
+
+	// 发送消息
+	const sendMessage = async () => {
+		if (!input.trim() || loading) return;
+
+		const userMessage: Message = {
+			id: Date.now().toString(),
+			content: input.trim(),
+			role: 'user',
+			timestamp: new Date(),
+		};
+
+		// 添加用户消息
+		setMessages((prev) => [...prev, userMessage]);
+		setInput('');
+		setLoading(true);
+		setAutoScroll(true);
+
+		// 创建 assistant 消息占位符
+		const assistantMessageId = (Date.now() + 1).toString();
+		const assistantMessage: Message = {
+			id: assistantMessageId,
+			content: '',
+			thinkContent: '',
+			role: 'assistant',
+			timestamp: new Date(),
+			isStreaming: true,
+		};
+
+		setMessages((prev) => [...prev, assistantMessage]);
+
+		// 准备历史消息（限制长度）
+		// const recentMessages = messages.slice(-maxHistory);
+		// const history = recentMessages.map((msg) => ({
+		// 	role: msg.role,
+		// 	content: msg.content,
+		// }));
+
+		// 调用流式 API
+		await onSseFetch(apiEndpoint, assistantMessageId, userMessage);
+		// try {
+		// 	const stop = await streamFetch({
+		// 		api: apiEndpoint,
+		// 		options: {
+		// 			body: JSON.stringify({
+		// 				messages: [
+		// 					// ...history,
+		// 					{ role: 'user', content: userMessage.content },
+		// 				],
+		// 				sessionId,
+		// 				stream: true,
+		// 			}),
+		// 		},
+		// 		callbacks: {
+		// 			onStart: () => {
+		// 				// 已经开始
+		// 			},
+		// 			onThinking: (thinking) => {
+		// 				if (typeof thinking === 'string') {
+		// 					setMessages((prev) =>
+		// 						prev.map((msg) =>
+		// 							msg.id === assistantMessageId
+		// 								? {
+		// 										...msg,
+		// 										thinkContent: msg.thinkContent + thinking,
+		// 										isStreaming: true,
+		// 									}
+		// 								: msg,
+		// 						),
+		// 					);
+		// 				}
+		// 			},
+		// 			onData: (chunk) => {
+		// 				if (typeof chunk === 'string') {
+		// 					setMessages((prev) =>
+		// 						prev.map((msg) =>
+		// 							msg.id === assistantMessageId
+		// 								? {
+		// 										...msg,
+		// 										content: msg.content + chunk,
+		// 										isStreaming: true,
+		// 									}
+		// 								: msg,
+		// 						),
+		// 					);
+		// 				}
+		// 			},
+		// 			getSessionId: (sessionId) => {
+		// 				setSessionId(sessionId);
+		// 			},
+		// 			onError: (err, type) => {
+		// 				setLoading(false);
+		// 				Toast({
+		// 					type: type || 'error',
+		// 					title: err?.message || String(err) || '发送失败',
+		// 				});
+		// 				// 移除失败的流式消息
+		// 				setMessages((prev) =>
+		// 					prev.filter(
+		// 						(msg) =>
+		// 							!(
+		// 								msg.id === assistantMessageId &&
+		// 								msg.content === '' &&
+		// 								msg.thinkContent === ''
+		// 							),
+		// 					),
+		// 				);
+		// 			},
+		// 			onComplete: () => {
+		// 				setLoading(false);
+		// 				// 更新消息状态，结束流式传输
+		// 				setMessages((prev) =>
+		// 					prev.map((msg) =>
+		// 						msg.id === assistantMessageId
+		// 							? { ...msg, isStreaming: false }
+		// 							: msg,
+		// 					),
+		// 				);
+		// 			},
+		// 		},
+		// 	});
+
+		// 	stopRequestRef.current = stop;
+		// } catch (_error) {
+		// 	setLoading(false);
+		// 	Toast({
+		// 		type: 'error',
+		// 		title: '发送消息失败',
+		// 	});
+		// 	setMessages((prev) =>
+		// 		prev.filter(
+		// 			(msg) =>
+		// 				!(
+		// 					msg.id === assistantMessageId &&
+		// 					msg.content === '' &&
+		// 					msg.thinkContent === ''
+		// 				),
+		// 		),
+		// 	);
+		// }
+	};
+
+	const onContinue = async () => {
+		const assistantMessageId = messages[messages.length - 1].id;
+		console.log('continue', assistantMessageId);
+		await onSseFetch('/chat/continueSse', assistantMessageId);
 	};
 
 	// 停止生成
@@ -478,6 +593,14 @@ const ChatBot: React.FC<ChatBotProps> = ({
 								>
 									<CirclePlus className="w-4 h-4 mr-2" />
 									新对话
+								</Button>
+								<Button
+									variant="ghost"
+									className="flex items-center text-sm bg-theme/5 mb-1 h-8 rounded-md"
+									onClick={onContinue}
+								>
+									<CirclePlus className="w-4 h-4 mr-2" />
+									继续生成
 								</Button>
 								{loading ? (
 									<Button

@@ -59,6 +59,38 @@ export class ChatController {
 		return this.chatService.stopStream(dto.sessionId);
 	}
 
+	@Post('/continueSse')
+	@Sse()
+	async continueStream(@Body() dto: ChatStopDto): Promise<Observable<any>> {
+		const source$ = (await this.chatService.continueStream(dto.sessionId)).pipe(
+			map((chunk) => {
+				const data = JSON.parse(chunk);
+				return {
+					data: {
+						content: data.content,
+						sessionId: data.sessionId,
+						done: false,
+					},
+				};
+			}),
+		);
+		const done$ = of({
+			data: {
+				done: true,
+			},
+		});
+		return concat(source$, done$).pipe(
+			catchError((error) => {
+				return of({
+					data: {
+						error: error.message || '处理失败',
+						done: true,
+					},
+				});
+			}),
+		);
+	}
+
 	@Post('/zhipu-stream')
 	@Sse()
 	zhipuChatStream(@Body() chatRequestDto: ChatRequestDto): Observable<any> {
