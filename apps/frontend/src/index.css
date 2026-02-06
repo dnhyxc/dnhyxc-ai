@@ -50,18 +50,6 @@ body {
 		--md-scrollbar-thumb-color: transparent;
 		--md-scrollbar-thumb-hover-color: #3a3a3a;
 		--md-scrollbar-thumb-active-color: #3a3a3a;
-
-		/*定义滚动条轨道*/
-		::-webkit-scrollbar-track {
-			height: 6px;
-			background-color: transparent;
-		}
-
-		/*定义滑块*/
-		::-webkit-scrollbar-thumb {
-			background-color: var(--theme / 5);
-			border-radius: 5px;
-		}
 	}
 }
 

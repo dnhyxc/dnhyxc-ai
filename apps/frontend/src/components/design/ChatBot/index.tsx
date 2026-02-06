@@ -3,11 +3,15 @@ import '@dnhyxc-ai/tools/styles.css';
 import { motion } from 'framer-motion';
 import {
 	Bot,
+	Check,
 	ChevronDown,
 	ChevronRight,
 	CirclePlus,
+	Copy,
 	Link,
+	PencilLine,
 	Rocket,
+	RotateCw,
 	StopCircle,
 	User,
 } from 'lucide-react';
@@ -49,10 +53,13 @@ const ChatBot: React.FC<ChatBotProps> = ({
 	const [autoScroll, setAutoScroll] = useState(true);
 	const [isComposing, setIsComposing] = useState(false);
 	const [isShowThinkContent, setIsShowThinkContent] = useState(true);
+	const [isCopyed, setIsCopyed] = useState(false);
 
 	const stopRequestRef = useRef<(() => void) | null>(null);
 	const scrollContainerRef = useRef<HTMLDivElement>(null);
 	const inputRef = useRef<HTMLTextAreaElement>(null);
+
+	let copyTimer: ReturnType<typeof setTimeout> | null = null;
 
 	// 自动滚动到底部
 	useEffect(() => {
@@ -65,6 +72,13 @@ const ChatBot: React.FC<ChatBotProps> = ({
 	// 聚焦输入框
 	useEffect(() => {
 		inputRef.current?.focus();
+
+		return () => {
+			if (copyTimer) {
+				clearTimeout(copyTimer);
+				copyTimer = null;
+			}
+		};
 	}, []);
 
 	// 输入内容变化时自动滚动到底部
@@ -201,21 +215,29 @@ const ChatBot: React.FC<ChatBotProps> = ({
 	};
 
 	// 发送消息
-	const sendMessage = async () => {
-		if (!input.trim() || loading) return;
+	const sendMessage = async (content?: string, index?: number) => {
+		if ((!content && !input.trim()) || loading) return;
 
 		const userMessage: Message = {
 			id: Date.now().toString(),
-			content: input.trim(),
+			content: content || input.trim(),
 			role: 'user',
 			timestamp: new Date(),
 		};
 
-		// 添加用户消息
-		setMessages((prev) => [
-			...prev.map((msg) => ({ ...msg, isStopped: false })),
-			userMessage,
-		]);
+		setMessages((prev) => {
+			if (content) {
+				const messages = [
+					...prev.slice(0, index).map((msg) => ({ ...msg, isStopped: false })),
+				];
+				return content ? messages : [...messages, userMessage];
+			}
+			return [
+				...prev.map((msg) => ({ ...msg, isStopped: false })),
+				userMessage,
+			];
+		});
+
 		setInput('');
 		setAutoScroll(true);
 
@@ -285,9 +307,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 		const newValue = `${input.substring(0, start)}\n${input.substring(end)}`;
 		setInput(newValue);
 		// 移动光标到插入位置后
-		setTimeout(() => {
-			textarea.selectionStart = textarea.selectionEnd = start + 1;
-		}, 0);
+		textarea.selectionStart = textarea.selectionEnd = start + 1;
 	};
 
 	// 处理输入框按键
@@ -346,6 +366,20 @@ const ChatBot: React.FC<ChatBotProps> = ({
 		console.log('上传文件');
 	};
 
+	const onCopy = (value: string) => {
+		navigator.clipboard.writeText(value);
+		setIsCopyed(true);
+		copyTimer = setTimeout(() => {
+			setIsCopyed(false);
+		}, 500);
+	};
+
+	const onReGenerate = (index: number) => {
+		const lastUserMessage = messages.filter((msg) => msg.role === 'user');
+		const lastUserContent = lastUserMessage?.pop()?.content;
+		sendMessage(lastUserContent, index);
+	};
+
 	return (
 		<div className={cn('flex flex-col h-full w-full', className)}>
 			{/* 聊天消息区域 */}
@@ -354,22 +388,22 @@ const ChatBot: React.FC<ChatBotProps> = ({
 				className="flex-1 overflow-hidden w-full backdrop-blur-sm"
 				onScroll={handleScroll}
 			>
-				<div className="max-w-3xl m-auto">
-					<div className="mx-auto space-y-6 overflow-y-auto">
+				<div className="max-w-3xl m-auto overflow-y-auto">
+					<div className="mx-auto space-y-6 overflow-hidden">
 						{messages.length === 0 ? (
 							<div className="flex flex-col items-center justify-center h-110 text-textcolor">
 								<Bot className="w-16 h-16 mb-4" />
 								<p className="text-2xl">欢迎来到 dnhyxc-ai 智能聊天</p>
-								<p className="text-lg mt-2">有什么问题可以帮您?</p>
+								<p className="text-lg mt-2">有什么我可以帮您的?</p>
 							</div>
 						) : (
-							messages.map((message) => (
+							messages.map((message, index) => (
 								<motion.div
 									key={message.id}
 									initial={{ opacity: 0, y: 10 }}
 									animate={{ opacity: 1, y: 0 }}
 									className={cn(
-										'flex gap-4 w-full',
+										'flex gap-3 w-full',
 										message.role === 'user' ? 'flex-row-reverse' : '',
 									)}
 								>
@@ -394,79 +428,115 @@ const ChatBot: React.FC<ChatBotProps> = ({
 									{/* 消息内容 */}
 									<div
 										className={cn(
-											'flex-1 rounded-md p-4',
-											message.role === 'user'
-												? 'bg-blue-500/10 border border-blue-500/20 text-end'
-												: 'bg-theme/5 border border-theme-white/10',
-											showAvatar ? 'max-w-[calc(768px-113px)]' : 'w-full',
+											'relative flex-1 flex flex-col gap-3 pb-6 w-full group',
+											message.role === 'user' ? 'items-end' : '',
 										)}
 									>
-										{message.role === 'user' ? (
-											<div
-												className="prose prose-invert max-w-none"
-												dangerouslySetInnerHTML={{
-													__html: message.content,
-												}}
-											/>
-										) : (
-											<div className="w-full h-auto">
-												<div className="w-full">
-													{message?.thinkContent ? (
-														<div
-															className="mb-2 flex items-center cursor-pointer select-none"
-															onClick={onToggleThinkContent}
-														>
-															思考内容
-															{isShowThinkContent ? (
-																<ChevronDown
-																	size={20}
-																	className="ml-2 mt-0.5"
-																/>
-															) : (
-																<ChevronRight
-																	size={20}
-																	className="ml-2 mt-0.5"
-																/>
-															)}
-														</div>
-													) : null}
-													{message.thinkContent && isShowThinkContent && (
-														<MarkdownPreview
-															value={message.thinkContent || '思考中...'}
-															theme="dark"
-															className="h-auto p-0"
-															background="transparent"
-															padding="0"
-														/>
-													)}
-												</div>
-												<MarkdownPreview
-													value={message.content}
-													theme="dark"
-													className="h-auto p-0"
-													background="transparent"
-													padding="0"
-												/>
-											</div>
-										)}
-										{message.isStreaming && (
-											<div className="mt-1 flex items-center">
-												<Spinner className="w-4 h-4 mr-2 text-textcolor/50" />
-												<span className="text-sm text-textcolor/50">
-													正在生成中...
-												</span>
-											</div>
-										)}
-										{message.isStopped && (
-											<div className="flex items-center justify-end">
+										<div
+											className={cn(
+												'flex-1 rounded-md p-4',
+												message.role === 'user'
+													? 'bg-blue-500/10 border border-blue-500/20 text-end'
+													: 'bg-theme/5 border border-theme-white/10',
+												showAvatar ? 'max-w-[calc(768px-105px)]' : 'w-auto',
+											)}
+										>
+											{message.role === 'user' ? (
 												<div
-													className="cursor-pointer text-sm text-cyan-400 hover:text-cyan-300"
-													onClick={onContinue}
-												>
-													继续生成
+													className="prose prose-invert max-w-none"
+													dangerouslySetInnerHTML={{
+														__html: message.content,
+													}}
+												/>
+											) : (
+												<div className="w-full h-auto">
+													<div className="w-full">
+														{message?.thinkContent ? (
+															<div
+																className="mb-2 flex items-center cursor-pointer select-none"
+																onClick={onToggleThinkContent}
+															>
+																思考内容
+																{isShowThinkContent ? (
+																	<ChevronDown
+																		size={20}
+																		className="ml-2 mt-0.5"
+																	/>
+																) : (
+																	<ChevronRight
+																		size={20}
+																		className="ml-2 mt-0.5"
+																	/>
+																)}
+															</div>
+														) : null}
+														{message.thinkContent && isShowThinkContent && (
+															<MarkdownPreview
+																value={message.thinkContent || '思考中...'}
+																theme="dark"
+																className="h-auto p-0"
+																background="transparent"
+																padding="0"
+															/>
+														)}
+													</div>
+													<MarkdownPreview
+														value={message.content}
+														theme="dark"
+														className="h-auto p-0"
+														background="transparent"
+														padding="0"
+													/>
 												</div>
+											)}
+											{message.isStreaming && (
+												<div className="mt-1 flex items-center">
+													<Spinner className="w-4 h-4 mr-2 text-textcolor/50" />
+													<span className="text-sm text-textcolor/50">
+														正在生成中...
+													</span>
+												</div>
+											)}
+											{message.isStopped && (
+												<div className="flex items-center justify-end">
+													<div
+														className="cursor-pointer text-sm text-cyan-400 hover:text-cyan-300"
+														onClick={onContinue}
+													>
+														继续生成
+													</div>
+												</div>
+											)}
+										</div>
+										<div
+											className={`absolute bottom-0 right-0 gap-3 ${index !== messages.length - 1 ? 'hidden group-hover:flex' : `${loading ? 'hidden' : 'flex items-center'}`} ${message.role === 'user' ? 'justify-end' : 'left-0'}`}
+										>
+											<div className="cursor-pointer flex items-center justify-center">
+												{!isCopyed ? (
+													<Copy
+														size={18}
+														onClick={() => onCopy(message.content)}
+													/>
+												) : (
+													<div className="flex items-center justify-center bg-blue-500 rounded-full box-border">
+														<Check size={18} />
+													</div>
+												)}
 											</div>
-										)}
+											{message.role === 'user' && (
+												<div className="cursor-pointer">
+													<PencilLine size={18} />
+												</div>
+											)}
+											{message.role !== 'user' && (
+												<div className="cursor-pointer">
+													<RotateCw
+														size={18}
+														onClick={() => onReGenerate(index)}
+													/>
+												</div>
+											)}
+										</div>
 									</div>
 								</motion.div>
 							))
@@ -489,10 +559,10 @@ const ChatBot: React.FC<ChatBotProps> = ({
 								onCompositionEnd={handleCompositionEnd}
 								placeholder="请输入您的问题"
 								spellCheck={false}
-								className="flex-1 min-h-20 resize-none border-none shadow-none pr-12 focus-visible:ring-transparent"
+								className="flex-1 min-h-16 resize-none border-none shadow-none focus-visible:ring-transparent"
 								disabled={loading}
 							/>
-							<div className="flex items-center justify-between h-10 p-2.5 mb-1">
+							<div className="flex items-center justify-between h-10 p-2.5 mb-1 mt-2.5">
 								<div className="flex items-center gap-2">
 									<Button
 										variant="ghost"
@@ -522,7 +592,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 								) : (
 									<Button
 										variant="ghost"
-										onClick={sendMessage}
+										onClick={() => sendMessage()}
 										disabled={!input.trim()}
 										className="h-8 w-8 mb-1 flex items-center justify-center rounded-full bg-linear-to-r from-blue-500 to-cyan-500"
 									>
