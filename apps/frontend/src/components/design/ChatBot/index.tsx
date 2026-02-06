@@ -52,8 +52,8 @@ interface ChatBotProps {
 const ChatBot: React.FC<ChatBotProps> = ({
 	className,
 	initialMessages = [],
-	apiEndpoint = '/chat/sse',
-	// apiEndpoint = '/chat/zhipu-stream',
+	// apiEndpoint = '/chat/sse',
+	apiEndpoint = '/chat/zhipu-stream',
 	showAvatar = false,
 }) => {
 	const [messages, setMessages] = useState<Message[]>(initialMessages);
@@ -523,7 +523,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 													<MarkdownPreview
 														value={
 															message.content ||
-															(message?.thinkContent ? '思考中...' : '')
+															(message?.thinkContent ? '' : '思考中...')
 														}
 														theme="dark"
 														className="h-auto p-0"
