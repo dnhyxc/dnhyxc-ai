@@ -52,7 +52,6 @@ async function bootstrap() {
 	);
 
 	// 配置静态资源访问路径
-	console.log(join(__dirname, '..', 'src/uploads'), '-----');
 	app.useStaticAssets(join(__dirname, '..', 'src/uploads'));
 
 	// 启用关闭钩子，用于在应用关闭时执行一些操作

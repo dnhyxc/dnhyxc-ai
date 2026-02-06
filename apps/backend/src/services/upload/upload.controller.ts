@@ -16,6 +16,7 @@ import { zip } from 'compressing';
 import type { Response } from 'express';
 import { JwtGuard } from '../../guards/jwt.guard';
 import { ResponseInterceptor } from '../../interceptors/response.interceptor';
+import { decodeChineseFilename } from '../../utils';
 import { UploadService } from './upload.service';
 
 @Controller('upload')
@@ -40,8 +41,10 @@ export class UploadController {
 				file.path,
 				file.mimetype,
 			);
+			// 处理中文文件名编码问题
+			const originalname = decodeChineseFilename(file.originalname);
 			return {
-				originalname: file.originalname,
+				originalname,
 				filename: file.filename,
 				path: filePath,
 				mimetype: file.mimetype,
@@ -65,7 +68,27 @@ export class UploadController {
 					file.path,
 					file.mimetype,
 				);
+				// 处理中文文件名编码问题
+				let originalname = file.originalname;
+				// 尝试解码，如果文件名看起来是乱码（包含%或其他编码字符）
+				if (originalname && /%[0-9A-F]{2}/i.test(originalname)) {
+					try {
+						originalname = decodeURIComponent(originalname);
+					} catch {
+						// 解码失败，保持原样
+					}
+				}
+				// 如果文件名看起来是 latin1 编码的中文，尝试转换
+				if (originalname && /[\x80-\xFF]/.test(originalname)) {
+					try {
+						const buffer = Buffer.from(originalname, 'binary');
+						originalname = buffer.toString('utf8');
+					} catch {
+						// 转换失败，保持原样
+					}
+				}
 				return {
+					originalname: originalname,
 					filename: file.filename,
 					path: filePath,
 					mimetype: file.mimetype,
@@ -113,9 +136,10 @@ export class UploadController {
 			const stream = new zip.Stream();
 			await stream.addEntry(url);
 			res.setHeader('Content-Type', 'application/octet-stream');
+			const encodedFilename = encodeURIComponent(filename).replace(/'/g, '%27');
 			res.setHeader(
 				'Content-Disposition',
-				`attachment; filename="${filename.replace(/\.[^.]+$/, '')}.zip"`,
+				`attachment; filename*=UTF-8''${encodedFilename}.zip; filename="${filename.replace(/\.[^.]+$/, '')}.zip"`,
 			);
 			stream.pipe(res);
 			return true;

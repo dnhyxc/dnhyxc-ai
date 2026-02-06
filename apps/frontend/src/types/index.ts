@@ -40,3 +40,18 @@ export interface DownloadBlobOptions {
 	id: string;
 	save_dir?: string;
 }
+
+// 文件上传接口
+export interface FileWithPreview {
+	file: File;
+	preview: string;
+	id: string;
+}
+
+export interface UploadedFile {
+	filename: string;
+	mimetype: string;
+	originalname: string;
+	path: string;
+	size: number;
+}

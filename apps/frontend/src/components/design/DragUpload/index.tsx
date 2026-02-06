@@ -9,23 +9,18 @@ import React, {
 	useState,
 } from 'react';
 import { cn } from '@/lib/utils';
+import { FileWithPreview } from '@/types';
 import Image from '../Image';
 import { MAX_SIZE, VALID_TYPES } from './config';
-
-interface FileWithPreview {
-	file: File;
-	preview: string;
-	id: string;
-}
 
 interface IProps {
 	uploadFile?: (file: File) => void;
 	getFileList?: (files: FileWithPreview[]) => void;
 	className?: string;
 	validTypes?: string[];
+	multiple?: boolean;
 	maxSize?: number;
 	infoText?: string;
-	multiple?: boolean;
 	children?: ReactNode;
 }
 

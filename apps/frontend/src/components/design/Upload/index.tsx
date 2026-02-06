@@ -1,22 +1,23 @@
+import { Button } from '@ui/index';
 import { Toast } from '@ui/sonner';
 import { Download, Eye, Trash2, Upload as UploadIcon } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
+import { FileWithPreview } from '@/types';
 import Image from '../Image';
 
 interface IProps {
-	onUpload: (files: FileWithPreview[]) => void;
+	validTypes?: string[];
+	multiple?: boolean;
+	maxSize?: number;
+	accept?: string;
 	className?: string;
-	getFileList?: (files: FileWithPreview[]) => void;
+	onUpload: (file: FileWithPreview | FileWithPreview[]) => void;
+	getFileList?: (file: FileWithPreview | FileWithPreview[]) => void;
 	fileUrl?: string;
 	onClearFileUrl?: () => void;
 	children?: React.ReactNode;
-}
-
-export interface FileWithPreview {
-	file: File;
-	preview: string;
-	id: string;
+	uploadType?: string;
 }
 
 const Upload: React.FC<IProps> = ({
@@ -26,6 +27,17 @@ const Upload: React.FC<IProps> = ({
 	fileUrl,
 	onClearFileUrl,
 	children,
+	uploadType = 'image',
+	validTypes = [
+		'image/jpeg',
+		'image/png',
+		'image/gif',
+		'image/svg+xml',
+		'image/webp',
+	],
+	multiple = false,
+	accept = 'image/*',
+	maxSize = 10 * 1024 * 1024, // 5MB
 }) => {
 	const [files, setFiles] = useState<FileWithPreview[]>([]);
 
@@ -44,13 +56,6 @@ const Upload: React.FC<IProps> = ({
 
 		const newFiles = Array.from(selectedFiles).filter((file) => {
 			// 文件类型检查
-			const validTypes = [
-				'image/jpeg',
-				'image/png',
-				'image/gif',
-				'image/svg+xml',
-				'image/webp',
-			];
 			if (!validTypes.includes(file.type)) {
 				Toast({
 					type: 'error',
@@ -59,12 +64,11 @@ const Upload: React.FC<IProps> = ({
 				return false;
 			}
 
-			// 文件大小检查 (5MB)
-			const maxSize = 5 * 1024 * 1024; // 5MB
+			// 文件大小检查 (10MB)
 			if (file.size > maxSize) {
 				Toast({
 					type: 'error',
-					title: '文件大小不能超过 5MB',
+					title: `文件大小不能超过 ${maxSize / 1024 / 1024} MB`,
 				});
 				return false;
 			}
@@ -79,10 +83,18 @@ const Upload: React.FC<IProps> = ({
 			id: Math.random().toString(36).substring(2, 9),
 		}));
 
-		const fileList = [...filesWithPreview, ...files];
-		setFiles((prev) => [...filesWithPreview, ...prev]);
-		onUpload(fileList);
-		getFileList?.(fileList);
+		const fileList = multiple
+			? [...filesWithPreview, ...files]
+			: filesWithPreview[0];
+		if (multiple) {
+			setFiles((prev) => [...filesWithPreview, ...prev]);
+			onUpload(fileList);
+			getFileList?.(fileList);
+		} else {
+			setFiles(filesWithPreview);
+			onUpload(filesWithPreview?.[0]);
+			getFileList?.(filesWithPreview?.[0]);
+		}
 	};
 
 	const onFileInputChange = (e: any) => {
@@ -110,42 +122,57 @@ const Upload: React.FC<IProps> = ({
 				type="file"
 				ref={fileInputRef}
 				onChange={onFileInputChange}
-				accept="image/*"
-				multiple
+				accept={accept}
+				multiple={multiple}
 				className="hidden"
 			/>
-			{files?.length || fileUrl ? (
-				<div className="relative flex items-center justify-center w-full h-full z-1 group">
-					<Image
-						// src={
-						// 	'https://dnhyxc.cn/image/__ARTICLE_IMG__d931518c149578ee4fc656514e2224437n66efe5c8d80d0da837a3e600h1769567982687.webp'
-						// }
-						ref={imageRef}
-						src={fileUrl || files[0].preview}
-						showOnError
-						className="relative w-full h-full rounded-md"
+			{uploadType === 'image' &&
+				(files?.length || fileUrl ? (
+					<div className="relative flex items-center justify-center w-full h-full z-1 group">
+						<Image
+							// src={
+							// 	'https://dnhyxc.cn/image/__ARTICLE_IMG__d931518c149578ee4fc656514e2224437n66efe5c8d80d0da837a3e600h1769567982687.webp'
+							// }
+							ref={imageRef}
+							src={fileUrl || files[0].preview}
+							showOnError
+							className="relative w-full h-full rounded-md"
+						>
+							<div className="absolute inset-0 z-1 rounded-md w-full h-full bg-theme-background/50 items-center justify-center hidden group-hover:flex">
+								<Download className="w-5 h-5 cursor-pointer hover:text-textcolor/80" />
+								<Eye
+									className="w-5 h-5 cursor-pointer ml-2 hover:text-textcolor/80"
+									onClick={onPreview}
+								/>
+								<Trash2
+									className="w-5 h-5 cursor-pointer ml-2 hover:text-textcolor/80"
+									onClick={() => onDelete(files[0])}
+								/>
+								{children}
+							</div>
+						</Image>
+					</div>
+				) : (
+					<div
+						className="w-full h-full flex items-center justify-center cursor-pointer select-none border border-dashed rounded-md p-8 text-center transition-all duration-300 border-theme/20 hover:border-theme/80 hover:bg-theme-background/90"
+						onClick={triggerFileInput}
 					>
-						<div className="absolute inset-0 z-1 rounded-md w-full h-full bg-theme-background/50 items-center justify-center hidden group-hover:flex">
-							<Download className="w-5 h-5 cursor-pointer hover:text-textcolor/80" />
-							<Eye
-								className="w-5 h-5 cursor-pointer ml-2 hover:text-textcolor/80"
-								onClick={onPreview}
-							/>
-							<Trash2
-								className="w-5 h-5 cursor-pointer ml-2 hover:text-textcolor/80"
-								onClick={() => onDelete(files[0])}
-							/>
-							{children}
-						</div>
-					</Image>
-				</div>
-			) : (
-				<div
-					className="w-full h-full flex items-center justify-center cursor-pointer select-none border border-dashed rounded-md p-8 text-center transition-all duration-300 border-theme/20 hover:border-theme/80 hover:bg-theme-background/90"
+						<UploadIcon className="w-8 h-8 mx-auto text-textcolor" />
+					</div>
+				))}
+			{uploadType === 'button' && (
+				<Button
+					variant="ghost"
+					className="flex items-center text-sm bg-theme/5 mb-1 h-8 rounded-md"
 					onClick={triggerFileInput}
 				>
-					<UploadIcon className="w-8 h-8 mx-auto text-textcolor" />
-				</div>
+					{children || (
+						<div className="flex items-center">
+							<UploadIcon className="w-8 h-8 mx-auto text-textcolor mr-2" />
+							上传文件
+						</div>
+					)}
+				</Button>
 			)}
 		</div>
 	);

@@ -1,9 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
+// import { extname, join } from 'node:path';
 import { Module } from '@nestjs/common';
 import { MulterModule } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
+import { decodeChineseFilename } from '../../utils';
 import { UploadController } from './upload.controller';
 import { UploadService } from './upload.service';
 
@@ -35,7 +37,9 @@ import { UploadService } from './upload.service';
 					cb(null, uploadPath);
 				},
 				filename: (_req, file, cb) => {
-					const filename = `${randomUUID()}_${file.originalname}`;
+					// 处理中文文件名编码问题
+					const originalname = decodeChineseFilename(file.originalname);
+					const filename = `${randomUUID()}_${originalname}`;
 					cb(null, filename);
 				},
 			}),

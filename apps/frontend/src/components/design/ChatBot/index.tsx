@@ -1,5 +1,4 @@
 import { Button, ScrollArea, Spinner, Textarea, Toast } from '@ui/index';
-import '@dnhyxc-ai/tools/styles.css';
 import { motion } from 'framer-motion';
 import {
 	Bot,
@@ -17,18 +16,29 @@ import {
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
-import { stopSse } from '@/service';
+import { stopSse, uploadFile } from '@/service';
+import { FileWithPreview, UploadedFile } from '@/types';
 import { streamFetch } from '@/utils/sse';
 import MarkdownPreview from '../Markdown';
+import Upload from '../Upload';
+import FileInfo from './FileInfo';
 
 interface Message {
 	id: string;
 	content: string;
 	role: 'user' | 'assistant';
 	timestamp: Date;
+	file?: UploadedFile | null;
 	thinkContent?: string;
 	isStreaming?: boolean;
 	isStopped?: boolean;
+}
+
+interface ChatRequestParams {
+	messages: { role: 'user' | 'assistant'; content: string }[];
+	sessionId: string;
+	stream?: boolean;
+	filePaths?: string[];
 }
 
 interface ChatBotProps {
@@ -54,6 +64,13 @@ const ChatBot: React.FC<ChatBotProps> = ({
 	const [isComposing, setIsComposing] = useState(false);
 	const [isShowThinkContent, setIsShowThinkContent] = useState(true);
 	const [isCopyed, setIsCopyed] = useState(false);
+	const [uploadedFile, setUploadedFile] = useState<UploadedFile>({
+		filename: '',
+		mimetype: '',
+		originalname: '',
+		path: '',
+		size: 0,
+	});
 
 	const stopRequestRef = useRef<(() => void) | null>(null);
 	const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -112,18 +129,19 @@ const ChatBot: React.FC<ChatBotProps> = ({
 		userMessage?: Message,
 	) => {
 		// 调用流式 API
+		const messages: ChatRequestParams = {
+			messages: [{ role: 'user', content: userMessage?.content || '' }],
+			sessionId,
+			stream: true,
+		};
+		if (userMessage?.file) {
+			messages.filePaths = [userMessage?.file?.path || ''];
+		}
 		try {
 			const stop = await streamFetch({
 				api,
 				options: {
-					body: JSON.stringify({
-						messages: [
-							// ...history,
-							{ role: 'user', content: userMessage?.content || '' },
-						],
-						sessionId,
-						stream: true,
-					}),
+					body: JSON.stringify(messages),
 				},
 				callbacks: {
 					onStart: () => {
@@ -225,6 +243,10 @@ const ChatBot: React.FC<ChatBotProps> = ({
 			timestamp: new Date(),
 		};
 
+		if (uploadedFile.path) {
+			userMessage.file = uploadedFile;
+		}
+
 		setMessages((prev) => {
 			if (content) {
 				const messages = [
@@ -239,6 +261,14 @@ const ChatBot: React.FC<ChatBotProps> = ({
 		});
 
 		setInput('');
+		setUploadedFile({
+			filename: '',
+			mimetype: '',
+			originalname: '',
+			path: '',
+			size: 0,
+		});
+
 		setAutoScroll(true);
 
 		// 创建 assistant 消息占位符
@@ -362,8 +392,15 @@ const ChatBot: React.FC<ChatBotProps> = ({
 		setIsShowThinkContent(!isShowThinkContent);
 	};
 
-	const onUploadFile = async () => {
-		console.log('上传文件');
+	const onUploadFile = async (data: FileWithPreview | FileWithPreview[]) => {
+		const res = await uploadFile((data as FileWithPreview).file);
+		if (res.success) {
+			setUploadedFile({
+				...res.data,
+				path: import.meta.env.VITE_DEV_DOMAIN + res.data.path,
+			});
+			inputRef.current?.focus();
+		}
 	};
 
 	const onCopy = (value: string) => {
@@ -432,11 +469,14 @@ const ChatBot: React.FC<ChatBotProps> = ({
 											message.role === 'user' ? 'items-end' : '',
 										)}
 									>
+										{message.file && message.role === 'user' && (
+											<FileInfo data={message.file} />
+										)}
 										<div
 											className={cn(
-												'flex-1 rounded-md p-4',
+												'flex-1 rounded-md p-3',
 												message.role === 'user'
-													? 'bg-blue-500/10 border border-blue-500/20 text-end'
+													? 'bg-blue-500/10 border border-blue-500/20 text-end pt-2 pb-2.5 px-3'
 													: 'bg-theme/5 border border-theme-white/10',
 												showAvatar ? 'max-w-[calc(768px-105px)]' : 'w-auto',
 											)}
@@ -481,7 +521,10 @@ const ChatBot: React.FC<ChatBotProps> = ({
 														)}
 													</div>
 													<MarkdownPreview
-														value={message.content}
+														value={
+															message.content ||
+															(message?.thinkContent ? '思考中...' : '')
+														}
 														theme="dark"
 														className="h-auto p-0"
 														background="transparent"
@@ -508,35 +551,37 @@ const ChatBot: React.FC<ChatBotProps> = ({
 												</div>
 											)}
 										</div>
-										<div
-											className={`absolute bottom-0 right-0 gap-3 ${index !== messages.length - 1 ? 'hidden group-hover:flex' : `${loading ? 'hidden' : 'flex items-center'}`} ${message.role === 'user' ? 'justify-end' : 'left-0'}`}
-										>
-											<div className="cursor-pointer flex items-center justify-center">
-												{!isCopyed ? (
-													<Copy
-														size={18}
-														onClick={() => onCopy(message.content)}
-													/>
-												) : (
-													<div className="flex items-center justify-center bg-blue-500 rounded-full box-border">
-														<Check size={18} />
+										{message.content && (
+											<div
+												className={`absolute bottom-0 right-0 gap-3 ${index !== messages.length - 1 ? 'hidden group-hover:flex' : `${loading ? 'hidden' : 'flex items-center'}`} ${message.role === 'user' ? 'justify-end' : 'left-0'}`}
+											>
+												<div className="cursor-pointer flex items-center justify-center">
+													{!isCopyed ? (
+														<Copy
+															size={18}
+															onClick={() => onCopy(message.content)}
+														/>
+													) : (
+														<div className="flex items-center justify-center bg-blue-500 rounded-full box-border">
+															<Check size={18} />
+														</div>
+													)}
+												</div>
+												{message.role === 'user' && (
+													<div className="cursor-pointer">
+														<PencilLine size={18} />
+													</div>
+												)}
+												{message.role !== 'user' && (
+													<div className="cursor-pointer">
+														<RotateCw
+															size={18}
+															onClick={() => onReGenerate(index)}
+														/>
 													</div>
 												)}
 											</div>
-											{message.role === 'user' && (
-												<div className="cursor-pointer">
-													<PencilLine size={18} />
-												</div>
-											)}
-											{message.role !== 'user' && (
-												<div className="cursor-pointer">
-													<RotateCw
-														size={18}
-														onClick={() => onReGenerate(index)}
-													/>
-												</div>
-											)}
-										</div>
+										)}
 									</div>
 								</motion.div>
 							))
@@ -550,6 +595,9 @@ const ChatBot: React.FC<ChatBotProps> = ({
 				<div className="max-w-3xl mx-auto flex gap-5">
 					<div className="flex-1 relative overflow-hidden">
 						<div className="flex flex-col overflow-y-auto rounded-md bg-theme/5 border border-theme-white/10">
+							{uploadedFile.originalname && (
+								<FileInfo data={uploadedFile} showInfo />
+							)}
 							<Textarea
 								ref={inputRef}
 								value={input}
@@ -572,14 +620,21 @@ const ChatBot: React.FC<ChatBotProps> = ({
 										<CirclePlus className="w-4 h-4" />
 										新对话
 									</Button>
-									<Button
-										variant="ghost"
-										className="flex items-center text-sm bg-theme/5 mb-1 h-8 rounded-md"
-										onClick={onUploadFile}
+									<Upload
+										uploadType="button"
+										className="w-auto h-auto"
+										validTypes={[
+											'application/pdf',
+											'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // docx
+											'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // xlsx
+										]}
+										onUpload={onUploadFile}
 									>
-										<Link className="w-4 h-4" />
-										上传附件
-									</Button>
+										<div className="flex items-center">
+											<Link className="w-4 h-4 mr-2" />
+											上传附件
+										</div>
+									</Upload>
 								</div>
 								{loading ? (
 									<Button

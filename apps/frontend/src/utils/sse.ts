@@ -87,7 +87,6 @@ export const streamFetch = async ({
 							if (dataStr) {
 								try {
 									const parsed = JSON.parse(dataStr);
-									console.log(parsed, 'parsed-----sssss');
 									if (!sessionId) {
 										sessionId = parsed.sessionId;
 									}
