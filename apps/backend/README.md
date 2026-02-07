@@ -1772,3 +1772,113 @@ npm run start:prod
 3. **更多模型**：扩展支持 OpenAI、Claude 等模型
 4. **流控限流**：添加速率限制防止滥用
 5. **监控日志**：添加详细的请求日志和性能监控
+
+## 线上 package.json
+
+```json
+{
+	"name": "server",
+	"version": "0.0.1",
+	"description": "",
+	"author": "dnhyxc <dnhyxc@gmail.com>",
+	"private": true,
+	"license": "UNLICENSED",
+	"scripts": {
+		"prebuid": "rimraf dist",
+		"build": "cross-env NODE_ENV=production nest build",
+		"start": "nest start",
+		"start:dev": "cross-env NODE_ENV=development nest start --watch",
+		"start:debug": "NODE_ENV=development nest start --debug --watch",
+		"start:prod": "cross-env NODE_ENV=production node dist/src/main",
+		"test": "jest",
+		"test:watch": "jest --watch",
+		"test:cov": "jest --coverage",
+		"test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
+		"test:e2e": "jest --config ./test/jest-e2e.json",
+		"typeorm": "typeorm-ts-node-commonjs -d ormconfig.ts",
+		"m:g": "f() { npm run typeorm migration:generate -p \"./src/migrations/$@\"; }; f",
+		"m:c": "typeorm-ts-node-commonjs migration:create",
+		"m:run": "npm run typeorm migration:run",
+		"m:revert": "npm run typeorm migration:revert",
+		"schema:drop": "npm run typeorm schema:drop"
+	},
+	"dependencies": {
+		"@casl/ability": "^6.7.5",
+		"@keyv/redis": "^5.1.5",
+		"@nestjs-modules/mailer": "^2.0.2",
+		"@nestjs/cache-manager": "^3.1.0",
+		"@nestjs/common": "^11.0.1",
+		"@nestjs/config": "^4.0.2",
+		"@nestjs/core": "^11.0.1",
+		"@nestjs/jwt": "^11.0.2",
+		"@nestjs/mapped-types": "*",
+		"@nestjs/passport": "^11.0.5",
+		"@nestjs/platform-express": "^11.0.1",
+		"@nestjs/swagger": "^11.2.3",
+		"@nestjs/typeorm": "^10.0.2",
+		"cache-manager": "^7.2.7",
+		"class-transformer": "^0.5.1",
+		"class-validator": "^0.14.3",
+		"compressing": "^2.0.0",
+		"dotenv": "^17.2.3",
+		"express-rate-limit": "^8.2.1",
+		"helmet": "^8.1.0",
+		"install": "^0.13.0",
+		"joi": "^18.0.2",
+		"keyv": "^5.5.5",
+		"multer": "^2.0.2",
+		"mysql2": "^3.16.0",
+		"nest-winston": "^1.10.2",
+		"nodemailer": "^7.0.12",
+		"passport": "^0.7.0",
+		"passport-jwt": "^4.0.1",
+		"qiniu": "^7.14.0",
+		"reflect-metadata": "^0.2.2",
+		"request-ip": "^3.3.0",
+		"rxjs": "^7.8.1",
+		"svg-captcha": "^1.4.0",
+		"swagger-ui-express": "^5.0.1",
+		"typeorm": "^0.3.28",
+		"uuid": "9",
+		"winston": "^3.19.0",
+		"winston-daily-rotate-file": "^5.0.0"
+	},
+	"devDependencies": {
+		"@eslint/eslintrc": "^3.2.0",
+		"@eslint/js": "^9.18.0",
+		"@nestjs/cli": "^11.0.0",
+		"@nestjs/schematics": "^11.0.0",
+		"@nestjs/testing": "^11.0.1",
+		"@types/express": "^5.0.0",
+		"@types/jest": "^30.0.0",
+		"@types/multer": "^2.0.0",
+		"@types/node": "^22.10.7",
+		"@types/passport-jwt": "^4.0.1",
+		"@types/supertest": "^6.0.2",
+		"cross-env": "^10.1.0",
+		"eslint": "^9.18.0",
+		"eslint-config-prettier": "^10.0.1",
+		"eslint-plugin-prettier": "^5.2.2",
+		"globals": "^16.0.0",
+		"jest": "^30.0.0",
+		"prettier": "^3.4.2",
+		"source-map-support": "^0.5.21",
+		"supertest": "^7.0.0",
+		"ts-jest": "^29.2.5",
+		"ts-loader": "^9.5.2",
+		"ts-node": "^10.9.2",
+		"tsconfig-paths": "^4.2.0"
+	},
+	"jest": {
+		"moduleFileExtensions": ["js", "json", "ts"],
+		"rootDir": "src",
+		"testRegex": ".*\\.spec\\.ts$",
+		"transform": {
+			"^.+\\.(t|j)s$": "ts-jest"
+		},
+		"collectCoverageFrom": ["**/*.(t|j)s"],
+		"coverageDirectory": "../coverage",
+		"testEnvironment": "node"
+	}
+}
+```

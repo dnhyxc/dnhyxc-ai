@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import {
 	AIMessage,
 	HumanMessage,
@@ -157,9 +158,7 @@ export class ChatService {
 
 	async chat(dto: ChatRequestDto): Promise<any> {
 		const llm = this.initDeepSeekLLM();
-		const sessionId =
-			dto.sessionId ||
-			`session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+		const sessionId = dto.sessionId || randomUUID();
 
 		// 处理文件附件
 		let enhancedMessages = [...dto.messages];
@@ -200,9 +199,7 @@ export class ChatService {
 	// 修改后的 chatStream 方法
 	async chatStream(dto: ChatRequestDto): Promise<Observable<any>> {
 		const llm = this.initDeepSeekLLM();
-		const sessionId =
-			dto.sessionId ||
-			`session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+		const sessionId = dto.sessionId || randomUUID();
 
 		// 如果已有相同会话的流，先取消它
 		const existingCancelController = this.cancelControllers.get(sessionId);
@@ -449,9 +446,7 @@ ${partialContent}
 						throw new Error('智谱API密钥未配置');
 					}
 
-					const sessionId =
-						dto.sessionId ||
-						`session_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+					const sessionId = dto.sessionId || randomUUID();
 
 					// 处理文件附件
 					let enhancedMessages = [...dto.messages];

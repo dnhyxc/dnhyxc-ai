@@ -15,6 +15,7 @@ import {
 	User,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router';
 import { cn } from '@/lib/utils';
 import { stopSse, uploadFile } from '@/service';
 import { FileWithPreview, UploadedFile } from '@/types';
@@ -52,8 +53,8 @@ interface ChatBotProps {
 const ChatBot: React.FC<ChatBotProps> = ({
 	className,
 	initialMessages = [],
-	// apiEndpoint = '/chat/sse',
-	apiEndpoint = '/chat/zhipu-stream',
+	apiEndpoint = '/chat/sse',
+	// apiEndpoint = '/chat/zhipu-stream',
 	showAvatar = false,
 }) => {
 	const [messages, setMessages] = useState<Message[]>(initialMessages);
@@ -77,6 +78,8 @@ const ChatBot: React.FC<ChatBotProps> = ({
 	const inputRef = useRef<HTMLTextAreaElement>(null);
 
 	let copyTimer: ReturnType<typeof setTimeout> | null = null;
+
+	const navigate = useNavigate();
 
 	// 自动滚动到底部
 	useEffect(() => {
@@ -179,6 +182,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 					},
 					getSessionId: (sessionId) => {
 						setSessionId(sessionId);
+						navigate(`/chat/${sessionId}`);
 					},
 					onError: (err, type) => {
 						setLoading(false);
@@ -321,6 +325,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 		stopRequestRef.current?.();
 		stopRequestRef.current = null;
 		setLoading(false);
+		navigate('/chat');
 	};
 
 	// 处理输入框变化
