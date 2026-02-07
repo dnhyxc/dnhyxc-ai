@@ -52,8 +52,8 @@ interface ChatBotProps {
 const ChatBot: React.FC<ChatBotProps> = ({
 	className,
 	initialMessages = [],
-	// apiEndpoint = '/chat/sse',
-	apiEndpoint = '/chat/zhipu-stream',
+	apiEndpoint = '/chat/sse',
+	// apiEndpoint = '/chat/zhipu-stream',
 	showAvatar = false,
 }) => {
 	const [messages, setMessages] = useState<Message[]>(initialMessages);
