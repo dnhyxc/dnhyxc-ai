@@ -98,6 +98,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 				clearTimeout(copyTimer);
 				copyTimer = null;
 			}
+			stopGenerating();
 		};
 	}, []);
 
@@ -180,9 +181,11 @@ const ChatBot: React.FC<ChatBotProps> = ({
 							);
 						}
 					},
-					getSessionId: (sessionId) => {
-						setSessionId(sessionId);
-						navigate(`/chat/${sessionId}`);
+					getSessionId: (chatId) => {
+						if (chatId !== sessionId) {
+							setSessionId(chatId);
+							navigate(`/chat/${chatId}`);
+						}
 					},
 					onError: (err, type) => {
 						setLoading(false);
@@ -306,6 +309,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 			await stopSse(sessionId);
 			stopRequestRef.current();
 			stopRequestRef.current = null;
+			setSessionId('');
 			setLoading(false);
 			// 更新最后一条助手消息状态
 			setMessages((prev) =>
@@ -325,6 +329,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 		stopRequestRef.current?.();
 		stopRequestRef.current = null;
 		setLoading(false);
+		setSessionId('');
 		navigate('/chat');
 	};
 

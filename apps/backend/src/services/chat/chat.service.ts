@@ -203,6 +203,7 @@ export class ChatService {
 
 		// 如果已有相同会话的流，先取消它
 		const existingCancelController = this.cancelControllers.get(sessionId);
+
 		if (existingCancelController) {
 			existingCancelController.next();
 			existingCancelController.complete();
