@@ -184,6 +184,7 @@ export const imageOcr = async (url?: string, prompt?: string) => {
 
 // 停止大模型调用
 export const stopSse = async (sessionId: string) => {
+	console.log(sessionId, 'sessionId');
 	return await http.post(STOP_SSE, {
 		sessionId,
 	});

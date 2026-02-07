@@ -3,19 +3,19 @@ import {
 	CreateDateColumn,
 	Entity,
 	OneToMany,
-	PrimaryGeneratedColumn,
+	PrimaryColumn,
 } from 'typeorm';
 import { ChatMessages } from './chat.entity';
 
 @Entity()
 export class ChatSessions {
-	@PrimaryGeneratedColumn()
+	@PrimaryColumn()
 	id: string;
 
 	// 对应 this.partialResponses
 	// 用于存储未完成流式传输时的部分内容，以便 continueStream 使用
 	@Column({ type: 'text', nullable: true, name: 'partial_content' })
-	partialContent: string;
+	partialContent: string | null;
 
 	// 对应 this.activeSessions (可选，用于记录会话是否在前端活跃)
 	@Column({ type: 'boolean', default: true, name: 'is_active' })

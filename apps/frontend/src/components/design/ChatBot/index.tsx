@@ -132,6 +132,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 		assistantMessageId: string,
 		userMessage?: Message,
 	) => {
+		console.log(sessionId, 'sessionId----->sessionId');
 		// 调用流式 API
 		const messages: ChatRequestParams = {
 			messages: [{ role: 'user', content: userMessage?.content || '' }],
@@ -182,7 +183,9 @@ const ChatBot: React.FC<ChatBotProps> = ({
 						}
 					},
 					getSessionId: (chatId) => {
+						console.log(sessionId, 'befffffore----->chatId', chatId);
 						if (chatId !== sessionId) {
+							console.log(sessionId, 'after---------->chatId', chatId);
 							setSessionId(chatId);
 							navigate(`/chat/${chatId}`);
 						}
@@ -309,7 +312,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 			await stopSse(sessionId);
 			stopRequestRef.current();
 			stopRequestRef.current = null;
-			setSessionId('');
+			// setSessionId('');
 			setLoading(false);
 			// 更新最后一条助手消息状态
 			setMessages((prev) =>
