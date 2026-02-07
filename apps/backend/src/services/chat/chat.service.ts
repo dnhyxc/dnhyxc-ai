@@ -7,15 +7,27 @@ import {
 import { ChatOpenAI } from '@langchain/openai';
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { InjectRepository } from '@nestjs/typeorm';
 import { catchError, Observable, Subject, takeUntil, throwError } from 'rxjs';
 import { ModelEnum } from 'src/enum/config.enum';
+import { Repository } from 'typeorm';
 import { parseFile } from '../../utils/file-parser';
+import { ChatMessages, MessageRole } from './chat.entity';
 import { ChatMessageDto } from './dto/chat-message.dto';
 import { ChatRequestDto } from './dto/chat-request.dto';
 import { ZhipuStreamData } from './dto/zhipu-stream-data.dto';
+import { ChatSessions } from './session.entity';
 
 @Injectable()
 export class ChatService {
+	constructor(
+		private configService: ConfigService,
+		@InjectRepository(ChatSessions)
+		private readonly chatSessionRepository: Repository<ChatSessions>,
+		@InjectRepository(ChatMessages)
+		private readonly chatMessageRepository: Repository<ChatMessages>,
+	) {}
+
 	private readonly conversationMemory: Map<
 		string,
 		(HumanMessage | SystemMessage | AIMessage)[]
@@ -34,8 +46,6 @@ export class ChatService {
 		this.activeSessions.delete(sessionId);
 		// 注意：partialResponses 不在这里清理，因为需要用于继续生成
 	}
-
-	constructor(private configService: ConfigService) {}
 
 	private async processFileAttachments(filePaths: string[]): Promise<string> {
 		if (!filePaths || filePaths.length === 0) {
