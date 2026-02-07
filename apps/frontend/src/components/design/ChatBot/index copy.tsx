@@ -52,8 +52,8 @@ interface ChatBotProps {
 const ChatBot: React.FC<ChatBotProps> = ({
 	className,
 	initialMessages = [],
-	// apiEndpoint = '/chat/sse',
-	apiEndpoint = '/chat/zhipu-stream',
+	apiEndpoint = '/chat/sse',
+	// apiEndpoint = '/chat/zhipu-stream',
 	showAvatar = false,
 }) => {
 	const [messages, setMessages] = useState<Message[]>(initialMessages);
@@ -71,10 +71,13 @@ const ChatBot: React.FC<ChatBotProps> = ({
 		path: '',
 		size: 0,
 	});
+	const [showEditInp, setShowEditInp] = useState(false);
+	const [editInput, setEditInput] = useState('');
 
 	const stopRequestRef = useRef<(() => void) | null>(null);
 	const scrollContainerRef = useRef<HTMLDivElement>(null);
 	const inputRef = useRef<HTMLTextAreaElement>(null);
+	const editInputRef = useRef<HTMLTextAreaElement>(null);
 
 	let copyTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -104,7 +107,11 @@ const ChatBot: React.FC<ChatBotProps> = ({
 			const textarea = inputRef.current;
 			textarea.scrollTop = textarea.scrollHeight;
 		}
-	}, [input]);
+		if (editInputRef.current) {
+			const textarea = editInputRef.current;
+			textarea.scrollTop = textarea.scrollHeight;
+		}
+	}, [input, editInput]);
 
 	// 滚动事件处理
 	const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
@@ -285,7 +292,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 		setMessages((prev) => [...prev, assistantMessage]);
 
 		// 调用流式 API
-		await onSseFetch(apiEndpoint, assistantMessageId, userMessage);
+		// await onSseFetch(apiEndpoint, assistantMessageId, userMessage);
 	};
 
 	const onContinue = async () => {
@@ -324,24 +331,41 @@ const ChatBot: React.FC<ChatBotProps> = ({
 	};
 
 	// 处理输入框变化
-	const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-		setInput(e.target.value);
+	const handleChange = (
+		e: React.ChangeEvent<HTMLTextAreaElement>,
+		id?: string,
+	) => {
+		if (id) {
+			setEditInput(e.target.value);
+		} else {
+			setInput(e.target.value);
+		}
 	};
 
 	// 插入换行符的辅助函数
-	const insertNewline = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+	const insertNewline = (
+		e: React.KeyboardEvent<HTMLTextAreaElement>,
+		id?: string,
+	) => {
 		e.preventDefault();
 		const textarea = e.currentTarget;
 		const start = textarea.selectionStart;
 		const end = textarea.selectionEnd;
 		const newValue = `${input.substring(0, start)}\n${input.substring(end)}`;
-		setInput(newValue);
+		if (id) {
+			setEditInput(newValue);
+		} else {
+			setInput(newValue);
+		}
 		// 移动光标到插入位置后
 		textarea.selectionStart = textarea.selectionEnd = start + 1;
 	};
 
 	// 处理输入框按键
-	const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+	const handleKeyDown = (
+		e: React.KeyboardEvent<HTMLTextAreaElement>,
+		id?: string,
+	) => {
 		if (e.key === 'Enter') {
 			// 检查是否按下了修饰键
 			const hasModifier = e.ctrlKey || e.metaKey || e.shiftKey || e.altKey;
@@ -354,7 +378,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 			if (isCurrentlyComposing) {
 				// 如果按下了 Ctrl/Cmd + Enter，即使在组合输入状态下也插入换行
 				if (e.ctrlKey || e.metaKey) {
-					insertNewline(e);
+					insertNewline(e, id);
 				}
 				// 其他情况允许默认行为（中文输入法选择候选词）
 				return;
@@ -363,14 +387,25 @@ const ChatBot: React.FC<ChatBotProps> = ({
 			// 非组合输入状态下
 			if (e.ctrlKey || e.metaKey) {
 				// Ctrl/Cmd + Enter: 插入换行符
-				insertNewline(e);
+				insertNewline(e, id);
 			} else if (e.shiftKey) {
 				// Shift + Enter: 也插入换行符（常见约定）
-				insertNewline(e);
+				insertNewline(e, id);
 			} else if (!hasModifier) {
 				e.preventDefault();
 				// 纯 Enter（没有任何修饰键）: 发送消息
-				sendMessage();
+				if (id) {
+					// 更新当前对话内容
+					setMessages((prev) =>
+						prev.map((msg) =>
+							msg.id === id ? { ...msg, content: editInput } : msg,
+						),
+					);
+					sendMessage(editInput);
+					setShowEditInp(false);
+				} else {
+					sendMessage();
+				}
 			}
 		}
 	};
@@ -409,6 +444,40 @@ const ChatBot: React.FC<ChatBotProps> = ({
 		copyTimer = setTimeout(() => {
 			setIsCopyed(false);
 		}, 500);
+	};
+
+	const onEditUserMessage = (message: Message) => {
+		console.log(message, 'message');
+		setShowEditInp(true);
+		let timer = null;
+		if (timer) {
+			clearTimeout(timer);
+			timer = null;
+		}
+		timer = setTimeout(() => {
+			const textarea = editInputRef.current as HTMLTextAreaElement;
+			const start = textarea.selectionStart;
+			const end = textarea.selectionEnd;
+			const newValue = `${message.content.substring(0, start)}${message.content.substring(end)}`;
+			setEditInput(newValue);
+			// 移动光标到插入位置后
+			textarea.selectionStart = textarea.selectionEnd = newValue.length + 1;
+			console.log(textarea.selectionStart, 'textarea.selectionStart', newValue);
+			editInputRef.current?.focus();
+		}, 0);
+	};
+
+	const onCancelEdit = () => {
+		setShowEditInp(false);
+	};
+
+	const onSendEdited = (id: string, index: number) => {
+		console.log(id, 'index', index, editInput);
+		setMessages((prev) =>
+			prev.map((msg) => (msg.id === id ? { ...msg, content: editInput } : msg)),
+		);
+		sendMessage();
+		setShowEditInp(false);
 	};
 
 	const onReGenerate = (index: number) => {
@@ -466,7 +535,11 @@ const ChatBot: React.FC<ChatBotProps> = ({
 									<div
 										className={cn(
 											'relative flex-1 flex flex-col gap-3 pb-6 w-full group',
-											message.role === 'user' ? 'items-end' : '',
+											message.role === 'user'
+												? showEditInp
+													? ''
+													: 'items-end'
+												: '',
 										)}
 									>
 										{message.file && message.role === 'user' && (
@@ -482,12 +555,44 @@ const ChatBot: React.FC<ChatBotProps> = ({
 											)}
 										>
 											{message.role === 'user' ? (
-												<div
-													className="prose prose-invert max-w-none"
-													dangerouslySetInnerHTML={{
-														__html: message.content,
-													}}
-												/>
+												showEditInp ? (
+													<div className="w-full">
+														<Textarea
+															ref={editInputRef}
+															value={editInput}
+															onChange={(e) => handleChange(e, message.id)}
+															onKeyDown={(e) => handleKeyDown(e, message.id)}
+															onCompositionStart={handleCompositionStart}
+															onCompositionEnd={handleCompositionEnd}
+															placeholder="请输入您的问题"
+															spellCheck={false}
+															className="flex-1 min-h-16 resize-none border-none shadow-none focus-visible:ring-transparent"
+														/>
+														<div className="flex items-center justify-end gap-2">
+															<Button
+																variant="ghost"
+																className="flex items-center text-sm bg-theme/5 mb-1 h-8 rounded-md"
+																onClick={onCancelEdit}
+															>
+																取消
+															</Button>
+															<Button
+																variant="ghost"
+																className="flex items-center text-sm bg-theme/5 mb-1 h-8 rounded-md"
+																onClick={() => onSendEdited(message.id, index)}
+															>
+																发送
+															</Button>
+														</div>
+													</div>
+												) : (
+													<div
+														className="prose prose-invert max-w-none"
+														dangerouslySetInnerHTML={{
+															__html: message.content,
+														}}
+													/>
+												)
 											) : (
 												<div className="w-full h-auto">
 													<div className="w-full">
@@ -569,7 +674,10 @@ const ChatBot: React.FC<ChatBotProps> = ({
 												</div>
 												{message.role === 'user' && (
 													<div className="cursor-pointer">
-														<PencilLine size={18} />
+														<PencilLine
+															size={18}
+															onClick={() => onEditUserMessage(message)}
+														/>
 													</div>
 												)}
 												{message.role !== 'user' && (
@@ -601,8 +709,8 @@ const ChatBot: React.FC<ChatBotProps> = ({
 							<Textarea
 								ref={inputRef}
 								value={input}
-								onChange={handleChange}
-								onKeyDown={handleKeyDown}
+								onChange={(e) => handleChange(e)}
+								onKeyDown={(e) => handleKeyDown(e)}
 								onCompositionStart={handleCompositionStart}
 								onCompositionEnd={handleCompositionEnd}
 								placeholder="请输入您的问题"
