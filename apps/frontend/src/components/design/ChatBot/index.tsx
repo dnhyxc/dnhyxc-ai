@@ -1,6 +1,5 @@
 import { Button, ScrollArea, Spinner, Textarea, Toast } from '@ui/index';
 import { motion } from 'framer-motion';
-import { useNavigate } from 'react-router';
 import {
 	Bot,
 	Check,
@@ -16,6 +15,7 @@ import {
 	User,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router';
 import { cn } from '@/lib/utils';
 import { stopSse, uploadFile } from '@/service';
 import { FileWithPreview, UploadedFile } from '@/types';
