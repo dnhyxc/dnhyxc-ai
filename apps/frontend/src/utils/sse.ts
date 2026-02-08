@@ -89,8 +89,6 @@ export const streamFetch = async ({
 									const parsed = JSON.parse(dataStr);
 									if (!sessionId) {
 										sessionId = parsed.sessionId;
-									}
-									if (sessionId) {
 										getSessionId?.(sessionId);
 									}
 									if (parsed?.type === 'thinking') {

@@ -28,7 +28,7 @@ const routes = [
 				},
 			},
 			{
-				path: '/chat',
+				path: '/chat/:id?',
 				Component: Chat,
 				meta: {
 					title: '智能对话',

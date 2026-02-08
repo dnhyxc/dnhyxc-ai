@@ -1,5 +1,6 @@
 import { Button, ScrollArea, Spinner, Textarea, Toast } from '@ui/index';
 import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router';
 import {
 	Bot,
 	Check,
@@ -78,6 +79,8 @@ const ChatBot: React.FC<ChatBotProps> = ({
 
 	let copyTimer: ReturnType<typeof setTimeout> | null = null;
 
+	const navigate = useNavigate();
+
 	// 自动滚动到底部
 	useEffect(() => {
 		if (autoScroll && scrollContainerRef.current) {
@@ -95,6 +98,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 				clearTimeout(copyTimer);
 				copyTimer = null;
 			}
+			stopGenerating();
 		};
 	}, []);
 
@@ -179,6 +183,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 					},
 					getSessionId: (sessionId) => {
 						setSessionId(sessionId);
+						navigate(`/chat/${sessionId}`);
 					},
 					onError: (err, type) => {
 						setLoading(false);
@@ -321,6 +326,8 @@ const ChatBot: React.FC<ChatBotProps> = ({
 		stopRequestRef.current?.();
 		stopRequestRef.current = null;
 		setLoading(false);
+		setSessionId('');
+		navigate('/chat');
 	};
 
 	// 处理输入框变化
