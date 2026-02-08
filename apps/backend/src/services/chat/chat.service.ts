@@ -51,7 +51,10 @@ export class ChatService {
 		return fileContents.join('\n');
 	}
 
-	private initDeepSeekLLM(): ChatOpenAI {
+	private initDeepSeekLLM(options?: {
+		temperature?: number;
+		maxTokens?: number;
+	}): ChatOpenAI {
 		const apiKey = this.configService.get(ModelEnum.DEEPSEEK_API_KEY);
 		const baseURL = this.configService.get(ModelEnum.DEEPSEEK_BASE_URL);
 		const modelName = this.configService.get(ModelEnum.DEEPSEEK_MODEL_NAME);
@@ -63,8 +66,8 @@ export class ChatService {
 			configuration: {
 				baseURL,
 			},
-			temperature: 0.7,
-			maxTokens: 4096,
+			temperature: options?.temperature ?? 0.7,
+			maxTokens: options?.maxTokens ?? 4096,
 		});
 
 		return llm;
@@ -157,7 +160,10 @@ export class ChatService {
 	}
 
 	async chat(dto: ChatRequestDto): Promise<any> {
-		const llm = this.initDeepSeekLLM();
+		const llm = this.initDeepSeekLLM({
+			temperature: dto.temperature,
+			maxTokens: dto.max_tokens,
+		});
 		const sessionId = dto.sessionId || randomUUID();
 
 		// 处理文件附件
@@ -388,22 +394,11 @@ export class ChatService {
 			throw new Error('会话不存在或已完成');
 		}
 
-		// 获取历史消息
-		let history = this.conversationMemory.get(sessionId) || [];
+		// 清除部分响应，因为历史中已包含部分助手消息
+		// 这样 chatStream 不会重复合并部分内容
+		this.partialResponses.delete(sessionId);
 
-		// 如果最后一个消息是助手消息（可能是部分响应），移除它
-		// 因为部分响应应该作为上下文包含在继续提示中，而不是独立的助手消息
-		if (history.length > 0) {
-			const lastMessage = history[history.length - 1];
-			if (lastMessage instanceof AIMessage) {
-				history = history.slice(0, -1);
-			}
-		}
-
-		// 更新会话记忆（移除部分助手消息）
-		this.conversationMemory.set(sessionId, history);
-
-		// 构建继续提示，明确包含部分内容
+		// 构建继续提示，不包含部分内容（部分内容已在历史中）
 		const continuePrompt: ChatMessageDto = {
 			role: 'user',
 			content: `以下是你之前生成的部分回答：
@@ -412,7 +407,7 @@ export class ChatService {
 ${partialContent}
 \`\`\`
 
-请继续从上面内容结束的地方继续生成，不要重复已经生成的内容。`,
+请继续你之前的回答，直接继续生成新的内容，不要以任何形式重复、总结或引用已经生成的内容。`,
 		};
 
 		// 创建继续请求 DTO
@@ -422,7 +417,7 @@ ${partialContent}
 			filePaths: [],
 			stream: true,
 			max_tokens: 4096,
-			temperature: 0.7,
+			temperature: 0.3, // 降低温度以减少随机性
 		};
 
 		// 调用现有的 chatStream 方法
