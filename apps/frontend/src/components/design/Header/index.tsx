@@ -48,7 +48,12 @@ const Header: React.FC<Iprops> = ({ actions = true, ccustomActions }) => {
 			pathname: string,
 		): string | undefined => {
 			for (const route of routes) {
-				if (route.path === pathname) {
+				const lastSlashIndex = route.path?.lastIndexOf('/');
+				const path =
+					lastSlashIndex > 0
+						? route.path?.substring(0, lastSlashIndex)
+						: route.path;
+				if (route.path === pathname || path === pathname) {
 					return route.meta?.title;
 				}
 				if (route.children) {

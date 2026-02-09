@@ -64,7 +64,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 	const [autoScroll, setAutoScroll] = useState(true);
 	const [isComposing, setIsComposing] = useState(false);
 	const [isShowThinkContent, setIsShowThinkContent] = useState(true);
-	const [isCopyed, setIsCopyed] = useState(false);
+	const [isCopyedId, setIsCopyedId] = useState('');
 	const [uploadedFile, setUploadedFile] = useState<UploadedFile>({
 		filename: '',
 		mimetype: '',
@@ -410,11 +410,11 @@ const ChatBot: React.FC<ChatBotProps> = ({
 		}
 	};
 
-	const onCopy = (value: string) => {
+	const onCopy = (value: string, id: string) => {
 		navigator.clipboard.writeText(value);
-		setIsCopyed(true);
+		setIsCopyedId(id);
 		copyTimer = setTimeout(() => {
-			setIsCopyed(false);
+			setIsCopyedId('');
 		}, 500);
 	};
 
@@ -560,13 +560,15 @@ const ChatBot: React.FC<ChatBotProps> = ({
 										</div>
 										{message.content && (
 											<div
-												className={`absolute bottom-0 right-0 gap-3 ${index !== messages.length - 1 ? 'hidden group-hover:flex' : `${loading ? 'hidden' : 'flex items-center'}`} ${message.role === 'user' ? 'justify-end' : 'left-0'}`}
+												className={`absolute bottom-0 right-2 gap-3 ${index !== messages.length - 1 ? 'hidden group-hover:flex' : `${loading ? 'hidden' : 'flex items-center'}`} ${message.role === 'user' ? 'justify-end' : 'left-2'}`}
 											>
 												<div className="cursor-pointer flex items-center justify-center">
-													{!isCopyed ? (
+													{isCopyedId !== message.id ? (
 														<Copy
 															size={18}
-															onClick={() => onCopy(message.content)}
+															onClick={() =>
+																onCopy(message.content, message.id)
+															}
 														/>
 													) : (
 														<div className="flex items-center justify-center bg-blue-500 rounded-full box-border">
