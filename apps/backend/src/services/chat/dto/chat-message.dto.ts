@@ -1,4 +1,4 @@
-import { IsEnum, IsNotEmpty, IsString } from 'class-validator';
+import { IsEnum, IsNotEmpty, IsOptional, IsString } from 'class-validator';
 
 export class ChatMessageDto {
 	@IsEnum(['user', 'assistant', 'system'], {
@@ -9,4 +9,7 @@ export class ChatMessageDto {
 	@IsNotEmpty({ message: '内容不能为空' })
 	@IsString()
 	content: string;
+
+	@IsOptional()
+	noSave?: boolean;
 }

@@ -353,7 +353,9 @@ export class ChatService {
 		this.activeSessions.set(sessionId, true);
 
 		// 保存用户消息到数据库
-		const lastUserMessage = dto.messages.find((msg) => msg.role === 'user');
+		const lastUserMessage = dto.messages.find(
+			(msg) => msg.role === 'user' && !msg.noSave,
+		);
 		if (lastUserMessage) {
 			// 异步保存，不等待结果
 			await this.saveMessage(
@@ -574,21 +576,23 @@ export class ChatService {
 			throw new Error('会话不存在或已完成');
 		}
 
-		const continuePrompt: ChatMessageDto = {
-			role: 'system',
-			content: `以下是你之前生成的部分回答：
-
-\`\`\`
-${partialContent}
-\`\`\`
-
-请基于你之前没完成的回答，从中断位置继续生成内容，不要以任何形式重复、总结或引用已经生成的内容，如果有相同的部分需要去除。同时继续生成的内容要与之前生成的部分回答有连续性，要保持格式统一，且勿改变主题。`,
-		};
+		const continueMessages: ChatMessageDto[] = [
+			{
+				role: 'assistant',
+				content: partialContent,
+			},
+			{
+				role: 'user',
+				noSave: true,
+				content:
+					'请继续完成上面的回答，不要重复已有的内容，不要输出任何额外的解释，直接从中断处继续生成。',
+			},
+		];
 
 		// 创建继续请求 DTO
 		const continueDto: ChatRequestDto = {
 			sessionId,
-			messages: [continuePrompt],
+			messages: continueMessages,
 			stream: true,
 			max_tokens: 4096,
 			temperature: 0.3, // 降低温度以减少随机性
