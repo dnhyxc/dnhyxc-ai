@@ -1,3 +1,4 @@
+import { IsOptional } from 'class-validator';
 import {
 	Column,
 	CreateDateColumn,
@@ -6,7 +7,6 @@ import {
 	PrimaryColumn,
 } from 'typeorm';
 import { ChatMessages } from './chat.entity';
-import { IsOptional } from 'class-validator';
 
 @Entity()
 export class ChatSessions {
