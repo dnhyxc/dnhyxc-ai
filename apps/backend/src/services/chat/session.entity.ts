@@ -19,6 +19,10 @@ export class ChatSessions {
 	@IsOptional()
 	partialContent: string | null;
 
+	@Column({ type: 'text', nullable: true, name: 'partial_user_message' })
+	@IsOptional()
+	lastUserMessage: string | null;
+
 	// 对应 this.activeSessions (可选，用于记录会话是否在前端活跃)
 	@Column({ type: 'boolean', default: true, name: 'is_active' })
 	@IsOptional()

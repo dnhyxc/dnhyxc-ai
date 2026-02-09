@@ -242,6 +242,7 @@ export class ChatService {
 	private async updateSessionPartialContent(
 		sessionId: string,
 		partialContent: string | null,
+		lastUserMessage: string | null,
 	): Promise<void> {
 		try {
 			const session = await this.chatSessionsRepository.findOne({
@@ -249,6 +250,7 @@ export class ChatService {
 			});
 			if (session) {
 				session.partialContent = partialContent;
+				session.lastUserMessage = lastUserMessage;
 				await this.chatSessionsRepository.save(session);
 			}
 		} catch (dbError) {
@@ -327,7 +329,10 @@ export class ChatService {
 
 	// deepseek 流式对话
 	async chatStream(dto: ChatRequestDto): Promise<Observable<any>> {
-		const llm = this.initModel();
+		const llm = this.initModel({
+			temperature: dto.temperature,
+			maxTokens: dto.max_tokens,
+		});
 		const sessionId = dto.sessionId || randomUUID();
 
 		// 从 redis 中获取，如果已有相同会话的流，先取消它
@@ -387,19 +392,29 @@ export class ChatService {
 						}
 					}
 
-					let history: (HumanMessage | SystemMessage | AIMessage)[] = [];
-					if (dto.sessionId && this.conversationMemory.has(dto.sessionId)) {
-						history = this.conversationMemory.get(dto.sessionId) || [];
-					}
+					const memeries = await this.chatSessionsRepository.findOne({
+						where: { id: sessionId },
+						relations: ['messages'],
+					});
 
-					const newMessages = this.convertToLangChainMessages(enhancedMessages);
-					const allMessages = [...history, ...newMessages];
+					// 根据 content 去重：保留 memeries.messages 中已有的，enhancedMessages 中 content 不重复的
+					const existingKeySet = new Set(
+						memeries?.messages.map((m) => `${m.role}::${m.content}`) || [],
+					);
+					const uniqueEnhanced = enhancedMessages.filter(
+						(m) => !existingKeySet.has(`${m.role}::${m.content}`),
+					);
+					const newData = [...(memeries?.messages || []), ...uniqueEnhanced];
+
+					const allMessages = this.convertToLangChainMessages(newData);
 
 					// 检查是否被取消
 					if (getStreamStatus()) {
 						subscriber.complete();
 						return;
 					}
+
+					console.log('allMessages:', allMessages);
 
 					const stream = await llm.stream(allMessages);
 					let fullContent = '';
@@ -468,27 +483,23 @@ export class ChatService {
 
 					// 正常完成，cancel$.isStopped 为 false, 暂停时 cancel$.isStopped 为 true
 					if (!cancel$.isStopped) {
-						const aiMessage = new AIMessage(finalContent);
-						this.conversationMemory.set(sessionId, [...allMessages, aiMessage]);
-						// 清除部分响应（因为已经完成）更新会话的partialContent为null
-						await this.updateSessionPartialContent(sessionId, null);
 						// 保存完整的AI回复到数据库
 						await this.saveMessage(
 							sessionId,
 							MessageRole.ASSISTANT,
 							finalContent,
 						);
+						// 清除部分响应（因为已经完成）更新会话的partialContent为null
+						await this.updateSessionPartialContent(sessionId, null, null);
 					} else {
 						// 保存部分响应用于继续生成
 						if (finalContent.length > 0) {
-							// 将部分助手消息保存到对话记忆中
-							const partialAiMessage = new AIMessage(finalContent);
-							this.conversationMemory.set(sessionId, [
-								...allMessages,
-								partialAiMessage,
-							]);
 							// 更新会话的partialContent
-							await this.updateSessionPartialContent(sessionId, finalContent);
+							await this.updateSessionPartialContent(
+								sessionId,
+								finalContent,
+								lastUserMessage?.content || '',
+							);
 						}
 					}
 
@@ -556,35 +567,28 @@ export class ChatService {
 		const session = await this.chatSessionsRepository.findOne({
 			where: { id: sessionId },
 		});
+
 		const partialContent = session?.partialContent;
 
 		if (!partialContent) {
 			throw new Error('会话不存在或已完成');
 		}
 
-		// 清除部分响应，因为历史中已包含部分助手消息
-		// 这样 chatStream 不会重复合并部分内容
-		await this.updateSessionPartialContent(sessionId, null);
-
-		// 构建继续提示，不包含部分内容（部分内容已在历史中）
 		const continuePrompt: ChatMessageDto = {
-			role: 'user',
+			role: 'system',
 			content: `以下是你之前生成的部分回答：
 
 \`\`\`
 ${partialContent}
 \`\`\`
 
-请继续你之前的回答，直接继续生成新的内容，不要以任何形式重复、总结或引用已经生成的内容。但是内容要有连续性，保持格式，请勿改变主题。`,
+请基于你之前没完成的回答，从中断位置继续生成内容，不要以任何形式重复、总结或引用已经生成的内容，如果有相同的部分需要去除。同时继续生成的内容要与之前生成的部分回答有连续性，要保持格式统一，且勿改变主题。`,
 		};
-
-		console.log(continuePrompt, 'continuePrompt');
 
 		// 创建继续请求 DTO
 		const continueDto: ChatRequestDto = {
 			sessionId,
 			messages: [continuePrompt],
-			filePaths: [],
 			stream: true,
 			max_tokens: 4096,
 			temperature: 0.3, // 降低温度以减少随机性
@@ -596,7 +600,7 @@ ${partialContent}
 
 	async clearSession(sessionId: string) {
 		this.conversationMemory.delete(sessionId);
-		await this.updateSessionPartialContent(sessionId, null);
+		await this.updateSessionPartialContent(sessionId, null, null);
 	}
 
 	zhipuChatStream(dto: ChatRequestDto): Observable<ZhipuStreamData> {
