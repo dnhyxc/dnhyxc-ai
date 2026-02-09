@@ -576,16 +576,26 @@ export class ChatService {
 			throw new Error('会话不存在或已完成');
 		}
 
+		// 策略变更：只取最后一段内容作为上下文，强制模型只关注接续
+		// 取最后 300 个字符（足够包含最近的上下文，又不足以让模型从头开始）
+		const tailLength = 300;
+		const tailContent =
+			partialContent.length > tailLength
+				? partialContent.slice(-tailLength)
+				: partialContent;
+
 		const continueMessages: ChatMessageDto[] = [
 			{
-				role: 'assistant',
-				content: partialContent,
-			},
-			{
 				role: 'user',
-				noSave: true,
-				content:
-					'请继续完成上面的回答，不要重复已有的内容，不要输出任何额外的解释，直接从中断处继续生成。',
+				content: `你刚才的回答中断了，最后一部分内容如下：
+
+...${tailContent}
+
+请紧接着上面的内容继续生成剩余部分。
+要求：
+1. 严禁重复上面已经展示的内容。
+2. 保持与上文完全一致的格式、缩进和风格。
+3. 直接开始生成后续内容，不要输出任何解释性文字。`,
 			},
 		];
 
