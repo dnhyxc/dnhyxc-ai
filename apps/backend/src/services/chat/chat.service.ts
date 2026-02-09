@@ -5,14 +5,20 @@ import {
 	SystemMessage,
 } from '@langchain/core/messages';
 import { ChatOpenAI } from '@langchain/openai';
+import { Cache } from '@nestjs/cache-manager';
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { catchError, Observable, Subject, takeUntil, throwError } from 'rxjs';
+import { InjectRepository } from '@nestjs/typeorm';
+import { catchError, Observable, Subject } from 'rxjs';
 import { ModelEnum } from 'src/enum/config.enum';
+import { Repository } from 'typeorm';
 import { parseFile } from '../../utils/file-parser';
+import { Attachments } from './attachments.entity';
+import { ChatMessages, MessageRole } from './chat.entity';
 import { ChatMessageDto } from './dto/chat-message.dto';
 import { ChatRequestDto } from './dto/chat-request.dto';
 import { ZhipuStreamData } from './dto/zhipu-stream-data.dto';
+import { ChatSessions } from './session.entity';
 
 @Injectable()
 export class ChatService {
@@ -21,21 +27,20 @@ export class ChatService {
 		(HumanMessage | SystemMessage | AIMessage)[]
 	> = new Map();
 
-	// 存储会话的取消控制器
-	private cancelControllers = new Map<string, Subject<void>>();
 	// 存储正在进行的会话
 	private activeSessions = new Map<string, boolean>();
-	// 存储部分响应内容（用于继续生成）
-	private partialResponses = new Map<string, string>();
 
-	// 清理会话资源
-	private cleanupSession(sessionId: string): void {
-		this.cancelControllers.delete(sessionId);
-		this.activeSessions.delete(sessionId);
-		// 注意：partialResponses 不在这里清理，因为需要用于继续生成
-	}
-
-	constructor(private configService: ConfigService) {}
+	constructor(
+		// 存储会话的取消控制器
+		private configService: ConfigService,
+		private cache: Cache,
+		@InjectRepository(ChatMessages)
+		private readonly chatMessagesRepository: Repository<ChatMessages>,
+		@InjectRepository(ChatSessions)
+		private readonly chatSessionsRepository: Repository<ChatSessions>,
+		@InjectRepository(Attachments)
+		private readonly attachmentsRepository: Repository<Attachments>,
+	) {}
 
 	private async processFileAttachments(filePaths: string[]): Promise<string> {
 		if (!filePaths || filePaths.length === 0) {
@@ -51,7 +56,8 @@ export class ChatService {
 		return fileContents.join('\n');
 	}
 
-	private initDeepSeekLLM(options?: {
+	// 初始化模型
+	private initModel(options?: {
 		temperature?: number;
 		maxTokens?: number;
 	}): ChatOpenAI {
@@ -159,8 +165,101 @@ export class ChatService {
 		}
 	}
 
+	// 辅助方法：从文件路径提取文件名
+	private extractFileName(filePath: string): string {
+		return filePath.split('/').pop() || filePath.split('\\').pop() || filePath;
+	}
+
+	// 辅助方法：获取文件MIME类型
+	private getMimeType(filePath: string): string {
+		const extension = filePath.split('.').pop()?.toLowerCase();
+		const mimeTypes: Record<string, string> = {
+			pdf: 'pdf',
+			txt: 'txt',
+			doc: 'doc',
+			docx: 'docx',
+			jpg: 'jpg',
+			jpeg: 'jpeg',
+			png: 'png',
+			gif: 'gif',
+			mp3: 'mpeg',
+			mp4: 'mp4',
+			csv: 'csv',
+			xlsx: 'xlsx',
+		};
+		return mimeTypes[extension || ''] || 'application/octet-stream';
+	}
+
+	// 保存消息到数据库
+	private async saveMessage(
+		sessionId: string,
+		role: MessageRole,
+		content: string,
+		filePaths: string[] = [],
+	) {
+		try {
+			// 查找或创建会话
+			let session = await this.chatSessionsRepository.findOne({
+				where: { id: sessionId },
+			});
+			if (!session) {
+				session = this.chatSessionsRepository.create({
+					id: sessionId,
+					partialContent: null,
+					isActive: true,
+				});
+				await this.chatSessionsRepository.save(session);
+			}
+			// 创建消息
+			const message = this.chatMessagesRepository.create({
+				role,
+				content,
+				session,
+			});
+			// 保存消息
+			const savedMessage = await this.chatMessagesRepository.save(message);
+			// 如果有附件，保存附件信息
+			if (filePaths && filePaths.length > 0) {
+				const attachments = filePaths.map((filePath) => {
+					const attachment = this.attachmentsRepository.create({
+						filePath,
+						originalName: this.extractFileName(filePath),
+						mimeType: this.getMimeType(filePath),
+						message: savedMessage,
+					});
+					return attachment;
+				});
+				await this.attachmentsRepository.save(attachments);
+			}
+			return savedMessage;
+		} catch (dbError) {
+			console.error('Failed to save message to database:', dbError);
+			return null;
+		}
+	}
+
+	// 更新数据库会话的 partialContent
+	private async updateSessionPartialContent(
+		sessionId: string,
+		partialContent: string | null,
+	): Promise<void> {
+		try {
+			const session = await this.chatSessionsRepository.findOne({
+				where: { id: sessionId },
+			});
+			if (session) {
+				session.partialContent = partialContent;
+				await this.chatSessionsRepository.save(session);
+			}
+		} catch (dbError) {
+			// 静默失败，不抛出异常
+			console.error('Failed to update session partial content:', dbError);
+		}
+	}
+
+	// deepseek 非流失对话
 	async chat(dto: ChatRequestDto): Promise<any> {
-		const llm = this.initDeepSeekLLM({
+		const llm = this.initModel({
 			temperature: dto.temperature,
 			maxTokens: dto.max_tokens,
 		});
@@ -189,11 +288,35 @@ export class ChatService {
 		const newMessages = this.convertToLangChainMessages(enhancedMessages);
 		const allMessages = [...history, ...newMessages];
 
+		// 保存用户消息到数据库
+		const lastUserMessage = enhancedMessages.find((msg) => msg.role === 'user');
+		if (lastUserMessage) {
+			// 异步保存，不等待结果
+			await this.saveMessage(
+				sessionId,
+				MessageRole.USER,
+				lastUserMessage.content,
+				dto.filePaths,
+			).catch((dbError) => {
+				console.error('Failed to save user message to database:', dbError);
+			});
+		}
+
 		const response = await llm.invoke(allMessages);
 		const responseContent = response.content as string;
 
 		const aiMessage = new AIMessage(responseContent);
 		this.conversationMemory.set(sessionId, [...allMessages, aiMessage]);
+
+		// 保存AI回复到数据库
+		// 异步保存，不等待结果
+		await this.saveMessage(
+			sessionId,
+			MessageRole.ASSISTANT,
+			responseContent,
+		).catch((dbError) => {
+			console.error('Failed to save assistant message to database:', dbError);
+		});
 
 		return {
 			content: responseContent,
@@ -202,13 +325,16 @@ export class ChatService {
 		};
 	}
 
-	// 修改后的 chatStream 方法
+	// deepseek 流式对话
 	async chatStream(dto: ChatRequestDto): Promise<Observable<any>> {
-		const llm = this.initDeepSeekLLM();
+		const llm = this.initModel();
 		const sessionId = dto.sessionId || randomUUID();
 
-		// 如果已有相同会话的流，先取消它
-		const existingCancelController = this.cancelControllers.get(sessionId);
+		// 从 redis 中获取，如果已有相同会话的流，先取消它
+		const existingCancelController = (await this.cache.get(
+			sessionId,
+		)) as Subject<void>;
+
 		if (existingCancelController) {
 			existingCancelController.next();
 			existingCancelController.complete();
@@ -217,14 +343,34 @@ export class ChatService {
 
 		// 创建取消控制器
 		const cancel$ = new Subject<void>();
-		this.cancelControllers.set(sessionId, cancel$);
+		// 缓存取消控制器，1天后自动过期并清除
+		await this.cache.set(sessionId, cancel$, 24 * 60 * 60 * 1000);
 		this.activeSessions.set(sessionId, true);
 
+		// 保存用户消息到数据库
+		const lastUserMessage = dto.messages.find((msg) => msg.role === 'user');
+		if (lastUserMessage) {
+			// 异步保存，不等待结果
+			await this.saveMessage(
+				sessionId,
+				MessageRole.USER,
+				lastUserMessage.content,
+				dto.filePaths,
+			).catch((dbError) => {
+				console.error('Failed to save user message to database:', dbError);
+			});
+		}
+
 		return new Observable<string>((subscriber) => {
+			const getStreamStatus = () => cancel$.isStopped || subscriber.closed;
 			(async () => {
 				try {
 					// 获取部分响应（如果有）
-					const partialContent = this.partialResponses.get(sessionId);
+					const session = await this.chatSessionsRepository.findOne({
+						where: { id: sessionId },
+					});
+
+					const partialContent = session?.partialContent;
 
 					// 处理文件附件和消息准备（保持不变）
 					let enhancedMessages = [...dto.messages];
@@ -250,7 +396,7 @@ export class ChatService {
 					const allMessages = [...history, ...newMessages];
 
 					// 检查是否被取消
-					if (cancel$.closed || subscriber.closed) {
+					if (getStreamStatus()) {
 						subscriber.complete();
 						return;
 					}
@@ -259,7 +405,7 @@ export class ChatService {
 					let fullContent = '';
 
 					// 在开始迭代前检查是否已取消
-					if (cancel$.closed || subscriber.closed) {
+					if (getStreamStatus()) {
 						// 尝试取消大模型调用
 						try {
 							if (typeof stream.cancel === 'function') {
@@ -276,12 +422,13 @@ export class ChatService {
 					try {
 						for await (const chunk of stream) {
 							// 每次迭代前检查是否被取消
-							if (cancel$.closed || subscriber.closed) {
+							if (getStreamStatus()) {
 								wasCancelledDuringIteration = true;
 								break;
 							}
 
 							const content = chunk.content;
+
 							if (typeof content === 'string') {
 								subscriber.next(JSON.stringify({ content, sessionId }));
 								fullContent += content;
@@ -289,7 +436,7 @@ export class ChatService {
 						}
 					} catch (error) {
 						// 如果取消导致错误，忽略它
-						if (cancel$.closed || subscriber.closed) {
+						if (getStreamStatus()) {
 							wasCancelledDuringIteration = true;
 						} else {
 							throw error;
@@ -307,9 +454,6 @@ export class ChatService {
 						}
 					}
 
-					// 只有在正常完成时才保存消息
-					const isCancelled = cancel$.closed || subscriber.closed;
-
 					// 计算最终内容，考虑部分响应
 					let finalContent = fullContent;
 					if (partialContent && partialContent.length > 0) {
@@ -322,28 +466,36 @@ export class ChatService {
 						}
 					}
 
-					if (!isCancelled) {
+					// 正常完成，cancel$.isStopped 为 false, 暂停时 cancel$.isStopped 为 true
+					if (!cancel$.isStopped) {
 						const aiMessage = new AIMessage(finalContent);
 						this.conversationMemory.set(sessionId, [...allMessages, aiMessage]);
-						// 清除部分响应（因为已经完成）
-						this.partialResponses.delete(sessionId);
+						// 清除部分响应（因为已经完成）更新会话的partialContent为null
+						await this.updateSessionPartialContent(sessionId, null);
+						// 保存完整的AI回复到数据库
+						await this.saveMessage(
+							sessionId,
+							MessageRole.ASSISTANT,
+							finalContent,
+						);
 					} else {
 						// 保存部分响应用于继续生成
 						if (finalContent.length > 0) {
-							this.partialResponses.set(sessionId, finalContent);
 							// 将部分助手消息保存到对话记忆中
 							const partialAiMessage = new AIMessage(finalContent);
 							this.conversationMemory.set(sessionId, [
 								...allMessages,
 								partialAiMessage,
 							]);
+							// 更新会话的partialContent
+							await this.updateSessionPartialContent(sessionId, finalContent);
 						}
 					}
 
 					subscriber.complete();
 				} catch (error) {
 					// 如果是取消操作，不视为错误
-					if (cancel$.closed || subscriber.closed) {
+					if (cancel$.isStopped || subscriber.closed) {
 						subscriber.complete();
 					} else {
 						subscriber.error(error);
@@ -354,18 +506,30 @@ export class ChatService {
 				}
 			})();
 		}).pipe(
-			takeUntil(cancel$), // 当 cancel$ 发出时自动取消订阅
-			catchError(() => {
-				// 错误处理
-				this.cleanupSession(sessionId);
-				return throwError(() => new Error('Stream interrupted'));
+			catchError((error) => {
+				throw new HttpException(
+					`模型调用异常: ${error}`,
+					HttpStatus.BAD_REQUEST,
+				);
+				// console.error('Stream interrupted in catchError:', error);
+				// // 注意：不在这里调用 cleanupSession，因为 finally 块已经处理了清理
+				// return throwError(() => new Error('Stream interrupted'));
 			}),
 		);
 	}
 
+	// 清理会话资源
+	async cleanupSession(sessionId: string) {
+		this.activeSessions.delete(sessionId);
+		await this.cache.del(sessionId);
+		// 注意：partialResponses 不在这里清理，因为需要用于继续生成
+	}
+
 	// 停止指定会话
-	stopStream(sessionId: string): { success: boolean; message: string } {
-		const cancelController = this.cancelControllers.get(sessionId);
+	async stopStream(
+		sessionId: string,
+	): Promise<{ success: boolean; message: string }> {
+		const cancelController = (await this.cache.get(sessionId)) as Subject<void>;
 
 		if (!cancelController) {
 			return {
@@ -389,14 +553,18 @@ export class ChatService {
 
 	// 继续生成指定会话
 	async continueStream(sessionId: string): Promise<Observable<any>> {
-		const partialContent = this.partialResponses.get(sessionId);
+		const session = await this.chatSessionsRepository.findOne({
+			where: { id: sessionId },
+		});
+		const partialContent = session?.partialContent;
+
 		if (!partialContent) {
 			throw new Error('会话不存在或已完成');
 		}
 
 		// 清除部分响应，因为历史中已包含部分助手消息
 		// 这样 chatStream 不会重复合并部分内容
-		this.partialResponses.delete(sessionId);
+		await this.updateSessionPartialContent(sessionId, null);
 
 		// 构建继续提示，不包含部分内容（部分内容已在历史中）
 		const continuePrompt: ChatMessageDto = {
@@ -407,8 +575,10 @@ export class ChatService {
 ${partialContent}
 \`\`\`
 
-请继续你之前的回答，直接继续生成新的内容，不要以任何形式重复、总结或引用已经生成的内容。`,
+请继续你之前的回答，直接继续生成新的内容，不要以任何形式重复、总结或引用已经生成的内容。但是内容要有连续性，保持格式，请勿改变主题。`,
 		};
+
+		console.log(continuePrompt, 'continuePrompt');
 
 		// 创建继续请求 DTO
 		const continueDto: ChatRequestDto = {
@@ -424,9 +594,9 @@ ${partialContent}
 		return this.chatStream(continueDto);
 	}
 
-	clearSession(sessionId: string): void {
+	async clearSession(sessionId: string) {
 		this.conversationMemory.delete(sessionId);
-		this.partialResponses.delete(sessionId);
+		await this.updateSessionPartialContent(sessionId, null);
 	}
 
 	zhipuChatStream(dto: ChatRequestDto): Observable<ZhipuStreamData> {
@@ -442,6 +612,25 @@ ${partialContent}
 					}
 
 					const sessionId = dto.sessionId || randomUUID();
+
+					// 保存用户消息到数据库
+					const lastUserMessage = dto.messages.find(
+						(msg) => msg.role === 'user',
+					);
+					if (lastUserMessage) {
+						// 异步保存，不等待结果
+						this.saveMessage(
+							sessionId,
+							MessageRole.USER,
+							lastUserMessage.content,
+							dto.filePaths,
+						).catch((dbError) => {
+							console.error(
+								'Failed to save user message to database:',
+								dbError,
+							);
+						});
+					}
 
 					// 处理文件附件
 					let enhancedMessages = [...dto.messages];
@@ -542,6 +731,18 @@ ${partialContent}
 											...allMessages,
 											aiMessage,
 										]);
+										// 保存AI回复到数据库
+										// 异步保存，不等待结果
+										this.saveMessage(
+											sessionId,
+											MessageRole.ASSISTANT,
+											fullContent,
+										).catch((dbError) => {
+											console.error(
+												'Failed to save assistant message to database:',
+												dbError,
+											);
+										});
 										subscriber.complete();
 										return;
 									}

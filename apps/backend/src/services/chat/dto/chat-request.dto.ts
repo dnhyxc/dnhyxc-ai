@@ -41,4 +41,8 @@ export class ChatRequestDto {
 	@IsNumber()
 	@IsOptional()
 	temperature?: number; // [0.0, 1.0]
+
+	@IsBoolean()
+	@IsOptional()
+	stop?: boolean;
 }
