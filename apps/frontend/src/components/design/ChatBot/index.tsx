@@ -2,7 +2,7 @@ import { Button, ScrollArea, Spinner, Textarea, Toast } from '@ui/index';
 import { motion } from 'framer-motion';
 import {
 	Bot,
-	Check,
+	CheckCircle,
 	ChevronDown,
 	ChevronRight,
 	CirclePlus,
@@ -571,8 +571,8 @@ const ChatBot: React.FC<ChatBotProps> = ({
 															}
 														/>
 													) : (
-														<div className="flex items-center justify-center bg-blue-500 rounded-full box-border">
-															<Check size={18} />
+														<div className="flex items-center justify-center text-green-400 rounded-full box-border">
+															<CheckCircle size={18} />
 														</div>
 													)}
 												</div>
