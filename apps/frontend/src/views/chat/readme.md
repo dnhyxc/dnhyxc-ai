@@ -453,3 +453,198 @@ null <- parent user children -><- parent assistant children -><- parent user chi
 - user -> assistant -> (user1) user2 -> assistant2
 
 - user -> assistant -> user1 (user2) -> assistant1 -> user -> assistant
+
+## 修改 user 对话
+
+```json
+{
+    "stream": true,
+    "model": "glm-4.7",
+    "messages": [
+        {
+            "role": "user",
+            "content": "一句话总结春天是什么样的"
+        }
+    ],
+    "signature_prompt": "一句话总结春天是什么样的",
+    "params": {},
+    "extra": {},
+    "features": {
+        "image_generation": false,
+        "web_search": false,
+        "auto_web_search": false,
+        "preview_mode": true,
+        "flags": [],
+        "enable_thinking": true
+    },
+    "variables": {
+        "{{USER_NAME}}": "dnhyxc",
+        "{{USER_LOCATION}}": "Unknown",
+        "{{CURRENT_DATETIME}}": "2026-02-11 11:53:54",
+        "{{CURRENT_DATE}}": "2026-02-11",
+        "{{CURRENT_TIME}}": "11:53:54",
+        "{{CURRENT_WEEKDAY}}": "Wednesday",
+        "{{CURRENT_TIMEZONE}}": "Asia/Shanghai",
+        "{{USER_LANGUAGE}}": "zh-CN"
+    },
+    "chat_id": "193e6008-0a81-434b-ac92-399480353aa5",
+    "id": "2d76fc81-72e2-411a-816d-8b7b642ecf8c",
+    "current_user_message_id": "80b0634b-9276-48b3-b6a8-c1225e005ada",
+    "current_user_message_parent_id": null,
+    "background_tasks": {
+        "title_generation": true,
+        "tags_generation": true
+    }
+},
+{
+	"stream": true,
+	"model": "glm-4.7",
+	"messages": [
+		{
+			"role": "user",
+			"content": "一句话总结冬天是什么样子"
+		}
+	],
+	"signature_prompt": "一句话总结冬天是什么样子",
+	"params": {},
+	"extra": {},
+	"features": {
+		"image_generation": false,
+		"web_search": false,
+		"auto_web_search": false,
+		"preview_mode": true,
+		"flags": [],
+		"enable_thinking": true
+	},
+	"variables": {
+		"{{USER_NAME}}": "dnhyxc",
+		"{{USER_LOCATION}}": "Unknown",
+		"{{CURRENT_DATETIME}}": "2026-02-11 12:14:11",
+		"{{CURRENT_DATE}}": "2026-02-11",
+		"{{CURRENT_TIME}}": "12:14:11",
+		"{{CURRENT_WEEKDAY}}": "Wednesday",
+		"{{CURRENT_TIMEZONE}}": "Asia/Shanghai",
+		"{{USER_LANGUAGE}}": "zh-CN"
+	},
+	"chat_id": "193e6008-0a81-434b-ac92-399480353aa5",
+	"id": "a0eb4a81-08e2-44e7-96f6-9258f7fc36fb",
+	"current_user_message_id": "996f7272-05aa-4942-b572-d0313ba622d0",
+	"current_user_message_parent_id": "99c2580c-b6bd-478b-92bb-c899ef0b800e",
+	"background_tasks": {
+		"title_generation": true,
+		"tags_generation": true
+	}
+},
+{
+    "stream": true,
+    "model": "glm-4.7",
+    "messages": [
+        {
+            "role": "user",
+            "content": "一句话说明春夏秋冬的样子"
+        }
+    ],
+    "signature_prompt": "一句话说明春夏秋冬的样子",
+    "params": {},
+    "extra": {},
+    "features": {
+        "image_generation": false,
+        "web_search": false,
+        "auto_web_search": false,
+        "preview_mode": true,
+        "flags": [],
+        "enable_thinking": true
+    },
+    "variables": {
+        "{{USER_NAME}}": "dnhyxc",
+        "{{USER_LOCATION}}": "Unknown",
+        "{{CURRENT_DATETIME}}": "2026-02-11 12:19:01",
+        "{{CURRENT_DATE}}": "2026-02-11",
+        "{{CURRENT_TIME}}": "12:19:01",
+        "{{CURRENT_WEEKDAY}}": "Wednesday",
+        "{{CURRENT_TIMEZONE}}": "Asia/Shanghai",
+        "{{USER_LANGUAGE}}": "zh-CN"
+    },
+    "chat_id": "193e6008-0a81-434b-ac92-399480353aa5",
+    "id": "20905ac3-52fe-4944-893a-b09e717ad08e",
+    "current_user_message_id": "857bb84e-d027-470b-8d7b-6be2cd3416bb",
+    "current_user_message_parent_id": "2c0bf124-b7d6-4bc6-bd5e-3b9abd817171",
+    "background_tasks": {
+        "title_generation": true,
+        "tags_generation": true
+    }
+},
+{
+    "stream": true,
+    "model": "glm-4.7",
+    "messages": [
+        {
+            "role": "user",
+            "content": "一句话总结冬天过后的样子"
+        }
+    ],
+    "signature_prompt": "一句话总结冬天过后的样子",
+    "params": {},
+    "extra": {},
+    "features": {
+        "image_generation": false,
+        "web_search": false,
+        "auto_web_search": false,
+        "preview_mode": true,
+        "flags": [],
+        "enable_thinking": true
+    },
+    "variables": {
+        "{{USER_NAME}}": "dnhyxc",
+        "{{USER_LOCATION}}": "Unknown",
+        "{{CURRENT_DATETIME}}": "2026-02-11 12:20:16",
+        "{{CURRENT_DATE}}": "2026-02-11",
+        "{{CURRENT_TIME}}": "12:20:16",
+        "{{CURRENT_WEEKDAY}}": "Wednesday",
+        "{{CURRENT_TIMEZONE}}": "Asia/Shanghai",
+        "{{USER_LANGUAGE}}": "zh-CN"
+    },
+    "chat_id": "193e6008-0a81-434b-ac92-399480353aa5",
+    "id": "b18a42d3-94e0-4bdd-9b64-1261a4239895",
+    "current_user_message_id": "dff0791a-4822-4847-8fb4-3e8473440d32",
+    "current_user_message_parent_id": "99c2580c-b6bd-478b-92bb-c899ef0b800e",
+    "background_tasks": {
+        "title_generation": true,
+        "tags_generation": true
+    }
+}
+```
+
+```json
+{
+    "stream": true,
+    "model": "glm-4.7",
+    "messages": [
+        {
+            "role": "user",
+            "content": "一句话总结秋天"
+        }
+    ],
+    "signature_prompt": "一句话总结秋天",
+    "chat_id": "ad22bf03-f640-4ec5-930a-b53f43575424",
+    "id": "edf25891-3a38-4113-ba91-67cf06785431",
+    "current_user_message_id": "d06eac41-37e0-452c-805b-d6740b13c310",
+    "current_user_message_parent_id": "1d8be4f5-e52f-4746-a110-2847a4a77e09",
+}
+
+{
+    "stream": true,
+    "model": "glm-4.7",
+    "messages": [
+        {
+            "role": "user",
+            "content": "一句话总结冬天"
+        }
+    ],
+    "signature_prompt": "一句话总结冬天",
+    "chat_id": "ad22bf03-f640-4ec5-930a-b53f43575424",
+    "id": "efc2f7de-0e92-41e8-8d4b-09206978a30b",
+    "current_user_message_id": "cbf1a35b-dca8-4c11-8c1d-0bf4c45d10fc",
+    "current_user_message_parent_id": "edf25891-3a38-4113-ba91-67cf06785431",
+}
+```

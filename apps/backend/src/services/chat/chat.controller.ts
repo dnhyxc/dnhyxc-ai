@@ -14,10 +14,14 @@ import { ChatRequestDto } from './dto/chat-request.dto';
 import { ChatStopDto } from './dto/chat-stop.dto';
 import { CreateChatDto } from './dto/create-chat.dto';
 import { UpdateChatDto } from './dto/update-chat.dto';
+import { MessageService } from './message.service';
 
 @Controller('chat')
 export class ChatController {
-	constructor(private readonly chatService: ChatService) {}
+	constructor(
+		private readonly chatService: ChatService,
+		private messageService: MessageService,
+	) {}
 
 	@Post('/sse')
 	@Sse()
@@ -133,26 +137,26 @@ export class ChatController {
 
 	@Post()
 	create(@Body() createChatDto: CreateChatDto) {
-		return this.chatService.create(createChatDto);
+		return this.messageService.create(createChatDto);
 	}
 
 	@Get()
 	findAll() {
-		return this.chatService.findAll();
+		return this.messageService.findAll();
 	}
 
-	@Get(':id')
-	findOne(@Param('id') id: string) {
-		return this.chatService.findOne(+id);
+	@Get('session/:sessionId')
+	findOneSession(@Param('sessionId') sessionId: string) {
+		return this.messageService.findOneSession(sessionId);
 	}
 
 	@Patch(':id')
 	update(@Param('id') id: string, @Body() updateChatDto: UpdateChatDto) {
-		return this.chatService.update(+id, updateChatDto);
+		return this.messageService.update(+id, updateChatDto);
 	}
 
 	@Delete(':id')
 	remove(@Param('id') id: string) {
-		return this.chatService.remove(+id);
+		return this.messageService.remove(+id);
 	}
 }

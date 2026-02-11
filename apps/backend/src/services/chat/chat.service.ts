@@ -8,17 +8,14 @@ import { ChatOpenAI } from '@langchain/openai';
 import { Cache } from '@nestjs/cache-manager';
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { InjectRepository } from '@nestjs/typeorm';
 import { catchError, Observable, Subject } from 'rxjs';
 import { ModelEnum } from 'src/enum/config.enum';
-import { Repository } from 'typeorm';
 import { parseFile } from '../../utils/file-parser';
-import { Attachments } from './attachments.entity';
 import { ChatMessages, MessageRole } from './chat.entity';
 import { ChatMessageDto } from './dto/chat-message.dto';
 import { ChatRequestDto } from './dto/chat-request.dto';
 import { ZhipuStreamData } from './dto/zhipu-stream-data.dto';
-import { ChatSessions } from './session.entity';
+import { MessageService } from './message.service';
 
 @Injectable()
 export class ChatService {
@@ -34,12 +31,7 @@ export class ChatService {
 		// 存储会话的取消控制器
 		private configService: ConfigService,
 		private cache: Cache,
-		@InjectRepository(ChatMessages)
-		private readonly chatMessagesRepository: Repository<ChatMessages>,
-		@InjectRepository(ChatSessions)
-		private readonly chatSessionsRepository: Repository<ChatSessions>,
-		@InjectRepository(Attachments)
-		private readonly attachmentsRepository: Repository<Attachments>,
+		private messageService: MessageService,
 	) {}
 
 	private async processFileAttachments(filePaths: string[]): Promise<string> {
@@ -165,100 +157,6 @@ export class ChatService {
 		}
 	}
 
-	// 辅助方法：从文件路径提取文件名
-	private extractFileName(filePath: string): string {
-		return filePath.split('/').pop() || filePath.split('\\').pop() || filePath;
-	}
-
-	// 辅助方法：获取文件MIME类型
-	private getMimeType(filePath: string): string {
-		const extension = filePath.split('.').pop()?.toLowerCase();
-		const mimeTypes: Record<string, string> = {
-			pdf: 'pdf',
-			txt: 'txt',
-			doc: 'doc',
-			docx: 'docx',
-			jpg: 'jpg',
-			jpeg: 'jpeg',
-			png: 'png',
-			gif: 'gif',
-			mp3: 'mpeg',
-			mp4: 'mp4',
-			csv: 'csv',
-			xlsx: 'xlsx',
-		};
-		return mimeTypes[extension || ''] || 'application/octet-stream';
-	}
-
-	// 保存消息到数据库
-	private async saveMessage(
-		sessionId: string,
-		role: MessageRole,
-		content: string,
-		filePaths: string[] = [],
-	) {
-		try {
-			// 查找或创建会话
-			let session = await this.chatSessionsRepository.findOne({
-				where: { id: sessionId },
-			});
-			if (!session) {
-				session = this.chatSessionsRepository.create({
-					id: sessionId,
-					partialContent: null,
-					isActive: true,
-				});
-				await this.chatSessionsRepository.save(session);
-			}
-			// 创建消息
-			const message = this.chatMessagesRepository.create({
-				role,
-				content,
-				session,
-			});
-			// 保存消息
-			const savedMessage = await this.chatMessagesRepository.save(message);
-			// 如果有附件，保存附件信息
-			if (filePaths && filePaths.length > 0) {
-				const attachments = filePaths.map((filePath) => {
-					const attachment = this.attachmentsRepository.create({
-						filePath,
-						originalName: this.extractFileName(filePath),
-						mimeType: this.getMimeType(filePath),
-						message: savedMessage,
-					});
-					return attachment;
-				});
-				await this.attachmentsRepository.save(attachments);
-			}
-			return savedMessage;
-		} catch (dbError) {
-			console.error('Failed to save message to database:', dbError);
-			return null;
-		}
-	}
-
-	// 更新数据库会话的 partialContent
-	private async updateSessionPartialContent(
-		sessionId: string,
-		partialContent: string | null,
-		lastUserMessage: string | null,
-	): Promise<void> {
-		try {
-			const session = await this.chatSessionsRepository.findOne({
-				where: { id: sessionId },
-			});
-			if (session) {
-				session.partialContent = partialContent;
-				session.lastUserMessage = lastUserMessage;
-				await this.chatSessionsRepository.save(session);
-			}
-		} catch (dbError) {
-			// 静默失败，不抛出异常
-			console.error('Failed to update session partial content:', dbError);
-		}
-	}
-
 	// deepseek 非流失对话
 	async chat(dto: ChatRequestDto): Promise<any> {
 		const llm = this.initModel({
@@ -291,17 +189,37 @@ export class ChatService {
 		const allMessages = [...history, ...newMessages];
 
 		// 保存用户消息到数据库
+		let parentId: string | null = null;
+		if (dto.sessionId) {
+			const lastMessage = await this.messageService.findOneMessage(sessionId, {
+				order: { createdAt: 'DESC' },
+			});
+			// const lastMessage = await this.chatMessagesRepository.findOne({
+			// 	where: { session: { id: sessionId } },
+			// 	order: { createdAt: 'DESC' },
+			// });
+			if (lastMessage) {
+				parentId = lastMessage.id;
+			}
+		}
+
 		const lastUserMessage = enhancedMessages.find((msg) => msg.role === 'user');
+		let savedUserMessage: ChatMessages | null = null;
+
 		if (lastUserMessage) {
 			// 异步保存，不等待结果
-			await this.saveMessage(
-				sessionId,
-				MessageRole.USER,
-				lastUserMessage.content,
-				dto.filePaths,
-			).catch((dbError) => {
-				console.error('Failed to save user message to database:', dbError);
-			});
+			savedUserMessage = await this.messageService
+				.saveMessage(
+					sessionId,
+					MessageRole.USER,
+					lastUserMessage.content,
+					dto.filePaths,
+					parentId,
+				)
+				.catch((dbError) => {
+					console.error('Failed to save user message to database:', dbError);
+					return null;
+				});
 		}
 
 		const response = await llm.invoke(allMessages);
@@ -312,13 +230,17 @@ export class ChatService {
 
 		// 保存AI回复到数据库
 		// 异步保存，不等待结果
-		await this.saveMessage(
-			sessionId,
-			MessageRole.ASSISTANT,
-			responseContent,
-		).catch((dbError) => {
-			console.error('Failed to save assistant message to database:', dbError);
-		});
+		await this.messageService
+			.saveMessage(
+				sessionId,
+				MessageRole.ASSISTANT,
+				responseContent,
+				[],
+				savedUserMessage?.id,
+			)
+			.catch((dbError) => {
+				console.error('Failed to save assistant message to database:', dbError);
+			});
 
 		return {
 			content: responseContent,
@@ -349,23 +271,46 @@ export class ChatService {
 		// 创建取消控制器
 		const cancel$ = new Subject<void>();
 		// 缓存取消控制器，1天后自动过期并清除
-		await this.cache.set(sessionId, cancel$, 24 * 60 * 60 * 1000);
+		await this.cache.set(sessionId, cancel$, 12 * 60 * 60 * 1000);
 		this.activeSessions.set(sessionId, true);
 
 		// 保存用户消息到数据库
+		let parentId: string | null = null;
+
+		if (dto.sessionId) {
+			const lastMessage = await this.messageService.findOneMessage(
+				dto.sessionId,
+				{
+					order: {
+						createdAt: 'DESC',
+					},
+				},
+			);
+			if (lastMessage) {
+				parentId = lastMessage.id;
+			}
+		}
+
 		const lastUserMessage = dto.messages.find(
 			(msg) => msg.role === 'user' && !msg.noSave,
 		);
+
+		let savedUserMessage: ChatMessages | null = null;
+
 		if (lastUserMessage) {
 			// 异步保存，不等待结果
-			await this.saveMessage(
-				sessionId,
-				MessageRole.USER,
-				lastUserMessage.content,
-				dto.filePaths,
-			).catch((dbError) => {
-				console.error('Failed to save user message to database:', dbError);
-			});
+			savedUserMessage = await this.messageService
+				.saveMessage(
+					sessionId,
+					MessageRole.USER,
+					lastUserMessage.content,
+					dto.filePaths,
+					parentId,
+				)
+				.catch((dbError) => {
+					console.error('Failed to save user message to database:', dbError);
+					return null;
+				});
 		}
 
 		return new Observable<string>((subscriber) => {
@@ -373,9 +318,7 @@ export class ChatService {
 			(async () => {
 				try {
 					// 获取部分响应（如果有）
-					const session = await this.chatSessionsRepository.findOne({
-						where: { id: sessionId },
-					});
+					const session = await this.messageService.findOneSession(sessionId);
 
 					const partialContent = session?.partialContent;
 
@@ -394,8 +337,7 @@ export class ChatService {
 						}
 					}
 
-					const memeries = await this.chatSessionsRepository.findOne({
-						where: { id: sessionId },
+					const memeries = await this.messageService.findOneSession(sessionId, {
 						relations: ['messages'],
 					});
 
@@ -486,18 +428,24 @@ export class ChatService {
 					// 正常完成，cancel$.isStopped 为 false, 暂停时 cancel$.isStopped 为 true
 					if (!cancel$.isStopped) {
 						// 保存完整的AI回复到数据库
-						await this.saveMessage(
+						await this.messageService.saveMessage(
 							sessionId,
 							MessageRole.ASSISTANT,
 							finalContent,
+							[],
+							savedUserMessage?.id,
 						);
 						// 清除部分响应（因为已经完成）更新会话的partialContent为null
-						await this.updateSessionPartialContent(sessionId, null, null);
+						await this.messageService.updateSessionPartialContent(
+							sessionId,
+							null,
+							null,
+						);
 					} else {
 						// 保存部分响应用于继续生成
 						if (finalContent.length > 0) {
 							// 更新会话的partialContent
-							await this.updateSessionPartialContent(
+							await this.messageService.updateSessionPartialContent(
 								sessionId,
 								finalContent,
 								lastUserMessage?.content || '',
@@ -566,9 +514,7 @@ export class ChatService {
 
 	// 继续生成指定会话
 	async continueStream(sessionId: string): Promise<Observable<any>> {
-		const session = await this.chatSessionsRepository.findOne({
-			where: { id: sessionId },
-		});
+		const session = await this.messageService.findOneSession(sessionId);
 
 		const partialContent = session?.partialContent;
 
@@ -614,7 +560,11 @@ export class ChatService {
 
 	async clearSession(sessionId: string) {
 		this.conversationMemory.delete(sessionId);
-		await this.updateSessionPartialContent(sessionId, null, null);
+		await this.messageService.updateSessionPartialContent(
+			sessionId,
+			null,
+			null,
+		);
 	}
 
 	zhipuChatStream(dto: ChatRequestDto): Observable<ZhipuStreamData> {
@@ -632,22 +582,43 @@ export class ChatService {
 					const sessionId = dto.sessionId || randomUUID();
 
 					// 保存用户消息到数据库
+					let parentId: string | null = null;
+					if (dto.sessionId) {
+						const lastMessage = await this.messageService.findOneMessage(
+							sessionId,
+							{
+								order: {
+									createdAt: 'DESC',
+								},
+							},
+						);
+						if (lastMessage) {
+							parentId = lastMessage.id;
+						}
+					}
+
 					const lastUserMessage = dto.messages.find(
 						(msg) => msg.role === 'user',
 					);
+					let savedUserMessage: ChatMessages | null = null;
+
 					if (lastUserMessage) {
 						// 异步保存，不等待结果
-						this.saveMessage(
-							sessionId,
-							MessageRole.USER,
-							lastUserMessage.content,
-							dto.filePaths,
-						).catch((dbError) => {
-							console.error(
-								'Failed to save user message to database:',
-								dbError,
-							);
-						});
+						savedUserMessage = await this.messageService
+							.saveMessage(
+								sessionId,
+								MessageRole.USER,
+								lastUserMessage.content,
+								dto.filePaths,
+								parentId,
+							)
+							.catch((dbError) => {
+								console.error(
+									'Failed to save user message to database:',
+									dbError,
+								);
+								return null;
+							});
 					}
 
 					// 处理文件附件
@@ -751,16 +722,20 @@ export class ChatService {
 										]);
 										// 保存AI回复到数据库
 										// 异步保存，不等待结果
-										this.saveMessage(
-											sessionId,
-											MessageRole.ASSISTANT,
-											fullContent,
-										).catch((dbError) => {
-											console.error(
-												'Failed to save assistant message to database:',
-												dbError,
-											);
-										});
+										this.messageService
+											.saveMessage(
+												sessionId,
+												MessageRole.ASSISTANT,
+												fullContent,
+												[],
+												savedUserMessage?.id,
+											)
+											.catch((dbError) => {
+												console.error(
+													'Failed to save assistant message to database:',
+													dbError,
+												);
+											});
 										subscriber.complete();
 										return;
 									}
@@ -784,25 +759,5 @@ export class ChatService {
 				}
 			})();
 		});
-	}
-
-	create(_createChatDto: any) {
-		return 'This action adds a new chat';
-	}
-
-	findAll() {
-		return `This action returns all chat`;
-	}
-
-	findOne(id: number) {
-		return `This action returns a #${id} chat`;
-	}
-
-	update(id: number, _updateChatDto: any) {
-		return `This action updates a #${id} chat`;
-	}
-
-	remove(id: number) {
-		return `This action removes a #${id} chat`;
 	}
 }

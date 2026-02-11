@@ -18,7 +18,7 @@ export enum MessageRole {
 
 @Entity()
 export class ChatMessages {
-	@PrimaryGeneratedColumn()
+	@PrimaryGeneratedColumn('uuid')
 	id: string;
 
 	@Column({
@@ -29,6 +29,12 @@ export class ChatMessages {
 
 	@Column('text')
 	content: string;
+
+	@Column({ type: 'text', nullable: true })
+	parentId: string | null;
+
+	@Column('simple-array', { nullable: true })
+	childrenIds: string[];
 
 	@CreateDateColumn({ name: 'created_at', type: 'timestamp' })
 	createdAt: Date;

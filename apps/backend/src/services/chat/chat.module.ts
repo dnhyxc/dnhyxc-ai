@@ -5,6 +5,7 @@ import { Attachments } from './attachments.entity';
 import { ChatController } from './chat.controller';
 import { ChatMessages } from './chat.entity';
 import { ChatService } from './chat.service';
+import { MessageService } from './message.service';
 import { ChatSessions } from './session.entity';
 
 @Module({
@@ -13,6 +14,6 @@ import { ChatSessions } from './session.entity';
 		TypeOrmModule.forFeature([ChatMessages, ChatSessions, Attachments]),
 	],
 	controllers: [ChatController],
-	providers: [ChatService],
+	providers: [ChatService, MessageService],
 })
 export class ChatModule {}
