@@ -1,21 +1,26 @@
 import {
 	Body,
+	ClassSerializerInterceptor,
 	Controller,
 	Delete,
 	Get,
 	Param,
 	Patch,
 	Post,
+	Query,
 	Sse,
+	UseInterceptors,
 } from '@nestjs/common';
 import { catchError, concat, map, Observable, of } from 'rxjs';
 import { ChatService } from './chat.service';
 import { ChatRequestDto } from './dto/chat-request.dto';
 import { ChatStopDto } from './dto/chat-stop.dto';
 import { CreateChatDto } from './dto/create-chat.dto';
+import { MessageDto } from './dto/message.dto';
 import { UpdateChatDto } from './dto/update-chat.dto';
 import { MessageService } from './message.service';
 
+@UseInterceptors(ClassSerializerInterceptor)
 @Controller('chat')
 export class ChatController {
 	constructor(
@@ -158,5 +163,10 @@ export class ChatController {
 	@Delete(':id')
 	remove(@Param('id') id: string) {
 		return this.messageService.remove(+id);
+	}
+
+	@Get('/session')
+	async findSession(@Query() dto: MessageDto) {
+		return this.messageService.findSession(dto);
 	}
 }

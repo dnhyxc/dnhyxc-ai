@@ -1,3 +1,4 @@
+import { Exclude } from 'class-transformer';
 import { IsOptional } from 'class-validator';
 import {
 	Column,
@@ -15,10 +16,12 @@ export class ChatSessions {
 
 	// 对应 this.partialResponses
 	// 用于存储未完成流式传输时的部分内容，以便 continueStream 使用
+	@Exclude()
 	@Column({ type: 'text', nullable: true, name: 'partial_content' })
 	@IsOptional()
 	partialContent: string | null;
 
+	@Exclude()
 	@Column({ type: 'text', nullable: true, name: 'partial_user_message' })
 	@IsOptional()
 	lastUserMessage: string | null;

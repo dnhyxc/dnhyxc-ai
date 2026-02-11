@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { FindOneOptions, Repository } from 'typeorm';
 import { Attachments } from './attachments.entity';
 import { ChatMessages, MessageRole } from './chat.entity';
+import { MessageDto } from './dto/message.dto';
 import { ChatSessions } from './session.entity';
 
 @Injectable()
@@ -174,5 +175,14 @@ export class MessageService {
 
 	remove(id: number) {
 		return `This action removes a #${id} chat`;
+	}
+
+	findSession(dto: MessageDto) {
+		return this.findOneSession(dto.sessionId, {
+			relations: ['messages'],
+			order: {
+				createdAt: 'DESC',
+			},
+		});
 	}
 }
