@@ -3,6 +3,8 @@ import {
 	CREATE_VERIFY_CODE,
 	DOWNLOAD_FILE,
 	DOWNLOAD_ZIP_FILE,
+	GET_SESSION,
+	GET_SESSION_LIST,
 	GET_UPLOAD_TOKEN,
 	GET_USER_PROFILE,
 	GET_USERS,
@@ -186,5 +188,25 @@ export const imageOcr = async (url?: string, prompt?: string) => {
 export const stopSse = async (sessionId: string) => {
 	return await http.post(STOP_SSE, {
 		sessionId,
+	});
+};
+
+export const getSession = async (sessionId: string) => {
+	return await http.get(GET_SESSION, {
+		querys: { sessionId },
+	});
+};
+
+export const getSessionList = async (options?: {
+	pageSize: number;
+	pageNo: number;
+	userId: string;
+}) => {
+	return await http.get(GET_SESSION_LIST, {
+		querys: {
+			pageSize: options?.pageSize || 9999,
+			pageNo: options?.pageNo || 1,
+			userId: options?.userId || '',
+		},
 	});
 };

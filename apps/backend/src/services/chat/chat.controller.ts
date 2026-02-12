@@ -5,6 +5,7 @@ import {
 	Delete,
 	Get,
 	Param,
+	ParseIntPipe,
 	Patch,
 	Post,
 	Query,
@@ -16,7 +17,7 @@ import { ChatService } from './chat.service';
 import { ChatRequestDto } from './dto/chat-request.dto';
 import { ChatStopDto } from './dto/chat-stop.dto';
 import { CreateChatDto } from './dto/create-chat.dto';
-import { MessageDto } from './dto/message.dto';
+import { HistoryDto, MessageDto } from './dto/message.dto';
 import { UpdateChatDto } from './dto/update-chat.dto';
 import { MessageService } from './message.service';
 
@@ -165,8 +166,23 @@ export class ChatController {
 		return this.messageService.remove(+id);
 	}
 
-	@Get('/session')
+	@Get('/getSession')
 	async findSession(@Query() dto: MessageDto) {
 		return this.messageService.findSession(dto);
+	}
+
+	@Get('/getHistory')
+	async getHistory(@Query() dto: HistoryDto) {
+		return this.messageService.getHistory(dto);
+	}
+
+	// @UseInterceptors(ResponseInterceptor)
+	@Get('/getSessionList')
+	async getSessionList(
+		@Query('pageSize', ParseIntPipe)
+		@Query('pageNo', ParseIntPipe)
+		dto: HistoryDto,
+	) {
+		return this.messageService.getSessionList(dto);
 	}
 }

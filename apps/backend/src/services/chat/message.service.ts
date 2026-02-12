@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { FindOneOptions, Repository } from 'typeorm';
 import { Attachments } from './attachments.entity';
 import { ChatMessages, MessageRole } from './chat.entity';
-import { MessageDto } from './dto/message.dto';
+import { HistoryDto, MessageDto } from './dto/message.dto';
 import { ChatSessions } from './session.entity';
 
 @Injectable()
@@ -184,5 +184,50 @@ export class MessageService {
 				createdAt: 'DESC',
 			},
 		});
+	}
+
+	getHistory(dto: HistoryDto) {
+		const { pageSize = 9999, pageNo = 1 } = dto;
+		const take = pageSize || 10;
+		const skip = ((pageNo || 1) - 1) * take;
+		return this.chatMessagesRepository.findAndCount({
+			// where: {
+			//   session: {
+			//     userId: dto.userId,
+			//   },
+			// },
+			relations: ['session', 'attachments'],
+			take,
+			skip,
+			order: {
+				id: 'DESC',
+			},
+		});
+	}
+
+	async getSessionList(
+		dto: HistoryDto,
+	): Promise<{ list: ChatSessions[]; total: number }> {
+		const { pageSize = 9999, pageNo = 1 } = dto;
+		const take = pageSize || 10;
+		const skip = ((pageNo || 1) - 1) * take;
+		const [list, total] = await this.chatSessionsRepository.findAndCount({
+			// where: {
+			//   session: {
+			//     userId: dto.userId,
+			//   },
+			// },
+			relations: ['messages'],
+			take,
+			skip,
+			order: {
+				id: 'DESC',
+			},
+		});
+
+		return {
+			list,
+			total,
+		};
 	}
 }

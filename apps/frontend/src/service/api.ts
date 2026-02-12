@@ -48,3 +48,9 @@ export const IMAGE_OCR = '/ocr/imageOcr';
 
 // 停止模型调用
 export const STOP_SSE = '/chat/stopSse';
+
+// 获取 session 对话历史
+export const GET_SESSION = '/chat/getSession';
+
+// 获取 session 对话历史列表
+export const GET_SESSION_LIST = '/chat/getSessionList';
