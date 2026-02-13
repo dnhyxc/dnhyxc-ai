@@ -1,9 +1,11 @@
+```js
 import { Button, ScrollArea, Spinner, Textarea, Toast } from '@ui/index';
 import { motion } from 'framer-motion';
 import {
 	Bot,
 	CheckCircle,
 	ChevronDown,
+	ChevronLeft,
 	ChevronRight,
 	CirclePlus,
 	Copy,
@@ -52,6 +54,7 @@ interface ChatBotProps {
 	apiEndpoint?: string;
 	maxHistory?: number;
 	showAvatar?: boolean;
+	onBranchChange?: (msgId: string, direction: 'prev' | 'next') => void;
 }
 
 const ChatBot: React.FC<ChatBotProps> = ({
@@ -60,6 +63,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 	apiEndpoint = '/chat/sse',
 	// apiEndpoint = '/chat/zhipu-stream',
 	showAvatar = false,
+	onBranchChange,
 }) => {
 	const [messages, setMessages] = useState<Message[]>(initialMessages);
 	const [sessionId, setSessionId] = useState('');
@@ -480,7 +484,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 									{/* 消息内容 */}
 									<div
 										className={cn(
-											'relative flex-1 flex flex-col gap-3 pb-6 w-full group',
+											'relative flex-1 flex flex-col gap-1 pb-6 w-full group',
 											message.role === 'user' ? 'items-end' : '',
 										)}
 									>
@@ -566,6 +570,42 @@ const ChatBot: React.FC<ChatBotProps> = ({
 												</div>
 											)}
 										</div>
+										{(message.siblingCount || 0) > 1 && (
+											<div className="flex items-center gap-1 -mt-1 text-xs text-textcolor/50 select-none">
+												<ChevronLeft
+													className={cn(
+														'w-4 h-4 cursor-pointer hover:text-textcolor',
+														(message.siblingIndex || 0) <= 0 &&
+															'opacity-30 cursor-not-allowed hover:text-textcolor/50',
+													)}
+													onClick={() => {
+														if ((message.siblingIndex || 0) > 0) {
+															onBranchChange?.(message.id, 'prev');
+														}
+													}}
+												/>
+												<span className="min-w-[2.5rem] text-center">
+													{(message.siblingIndex || 0) + 1} /{' '}
+													{message.siblingCount}
+												</span>
+												<ChevronRight
+													className={cn(
+														'w-4 h-4 cursor-pointer hover:text-textcolor',
+														(message.siblingIndex || 0) >=
+															(message.siblingCount || 0) - 1 &&
+															'opacity-30 cursor-not-allowed hover:text-textcolor/50',
+													)}
+													onClick={() => {
+														if (
+															(message.siblingIndex || 0) <
+															(message.siblingCount || 0) - 1
+														) {
+															onBranchChange?.(message.id, 'next');
+														}
+													}}
+												/>
+											</div>
+										)}
 										{message.content && (
 											<div
 												className={`absolute bottom-0 right-2 gap-3 ${index !== messages.length - 1 ? 'hidden group-hover:flex' : `${loading ? 'hidden' : 'flex items-center'}`} ${message.role === 'user' ? 'justify-end' : 'left-2'}`}
@@ -681,3 +721,4 @@ const ChatBot: React.FC<ChatBotProps> = ({
 };
 
 export default ChatBot;
+```

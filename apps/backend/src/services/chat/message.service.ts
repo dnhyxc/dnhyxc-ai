@@ -86,13 +86,32 @@ export class MessageService {
 				await this.chatSessionsRepository.save(session);
 			}
 
-			// 如果提供了 parentId，验证父消息是否存在
+			// 如果没有提供 parentId，尝试查找该会话的最后一条消息作为 parentId
+			if (!parentId) {
+				const lastMessage = await this.chatMessagesRepository.findOne({
+					where: { session: { id: sessionId } },
+					order: { createdAt: 'DESC' },
+				});
+				if (lastMessage) {
+					parentId = lastMessage.id;
+				}
+			}
+
+			// 如果提供了 parentId，验证父消息是否存在及处理层级逻辑
 			if (parentId) {
 				const parentMsg = await this.findOneMessage(parentId);
 				if (!parentMsg) {
 					// 如果父消息不存在，可能是一个新会话的开始或者数据不一致
-					// 这里我们可以选择置为 null，作为根消息
 					parentId = null;
+				} else {
+					// 如果当前是 User 消息，且父消息也是 User 消息，说明是基于已有问题的修改或分支
+					// 此时应将新消息挂载到该 User 消息的父节点（即上一条 Assistant 消息）
+					if (
+						role === MessageRole.USER &&
+						parentMsg.role === MessageRole.USER
+					) {
+						parentId = parentMsg.parentId;
+					}
 				}
 			}
 
@@ -221,7 +240,10 @@ export class MessageService {
 			take,
 			skip,
 			order: {
-				id: 'DESC',
+				createdAt: 'DESC',
+				messages: {
+					createdAt: 'ASC',
+				},
 			},
 		});
 
