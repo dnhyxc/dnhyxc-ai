@@ -727,7 +727,7 @@ const messages = [
 		content:
 			"**春天：** 万物在暖阳细雨中苏醒，生命初绽，充满希望。\n\n**夏天：** 阳光倾泻，万物在极致的繁茂与热烈中释放能量。\n\n**秋天：** 世界在绚烂的色彩中沉淀，丰收与凋零交织，归于深邃。\n\n**冬天：** 万物在凛冽与静谧中蛰伏，积蓄力量，等待新生。",
 		parentId: "abde52b2-5b77-4efc-adfd-643272fdf032",
-		childrenIds: [],
+		childrenIds: ["cd79d5ba-c2e4-40c9-b81c-a491466198nf"],
 		createdAt: "2026-02-12T04:28:16.922Z",
 		attachments: [],
 	},
@@ -749,7 +749,90 @@ const messages = [
 		createdAt: "2026-02-12T04:28:37.972Z",
 		attachments: [],
 	},
+	{
+		id: "cd79d5ba-c2e4-40c9-b81c-a491466198nf",
+		role: "user",
+		content: "我需要一句话总结冬天",
+		parentId: "f08b4675-a8fe-4b1e-81ce-a4b7e063ba73",
+		childrenIds: ["abcj5ab9-e352-4061-a30a-f2f2a18b76uy"],
+		createdAt: "2026-02-12T04:28:34.250Z",
+		attachments: [],
+	},
+	{
+		id: "dd79d5ba-c2e4-40c9-b81c-a496966198of",
+		role: "assistant",
+		content: "万物在凛冽与静谧中蛰伏，积蓄力量，等待新生",
+		parentId: "cd79d5ba-c2e4-40c9-b81c-a491466198nf",
+		childrenIds: [],
+		createdAt: "2026-02-12T04:28:34.250Z",
+		attachments: [],
+	},
 ];
+
+将这个数据结构根据 parendId 和 childrenIds 的关联关系依次渲染为 user、assistant 的对话结构，如果某个数据的 childrenIds 大于 1，那么这条数据需要显示左右箭头进行数据的切换，当切换到 childrenIds 中的某个数据时，这条数据下的数据根据它所属的 childrenIds 的数据依次显示，例如：{
+		id: "1374edca-0a2d-4cd3-922d-e4fc5f8f7bd6",
+		role: "assistant",
+		content:
+			"**春天：** 万物在暖阳与细雨中苏醒，生命初绽，充满希望与可能。\n\n**夏天：** 阳光倾泻，万物在极致的繁茂与热烈中，释放着蓬勃的能量。\n\n**秋天：** 世界在绚烂的色彩中沉淀，丰收与凋零交织，归于宁静与深邃。",
+		parentId: "beef1216-09cd-4017-8ae4-1610670a0dbd",
+		childrenIds: [
+			"abde52b2-5b77-4efc-adfd-643272fdf032",
+			"cee9d5bf-c2e4-40c9-b81c-a49146619c90",
+		],
+		createdAt: "2026-02-12T04:28:02.921Z",
+		attachments: [],
+	} 这条数据下就要显示左右切换按钮，当切换的 id 为 'abde52b2-5b77-4efc-adfd-643272fdf032' 时，依次显示 {
+		id: "abde52b2-5b77-4efc-adfd-643272fdf032",
+		role: "user",
+		content: "一句话总结冬天",
+		parentId: "1374edca-0a2d-4cd3-922d-e4fc5f8f7bd6",
+		childrenIds: ["f08b4675-a8fe-4b1e-81ce-a4b7e063ba73"],
+		createdAt: "2026-02-12T04:28:12.888Z",
+		attachments: [],
+	}、{
+		id: "f08b4675-a8fe-4b1e-81ce-a4b7e063ba73",
+		role: "assistant",
+		content:
+			"**春天：** 万物在暖阳细雨中苏醒，生命初绽，充满希望。\n\n**夏天：** 阳光倾泻，万物在极致的繁茂与热烈中释放能量。\n\n**秋天：** 世界在绚烂的色彩中沉淀，丰收与凋零交织，归于深邃。\n\n**冬天：** 万物在凛冽与静谧中蛰伏，积蓄力量，等待新生。",
+		parentId: "abde52b2-5b77-4efc-adfd-643272fdf032",
+		childrenIds: ["cd79d5ba-c2e4-40c9-b81c-a491466198nf"],
+		createdAt: "2026-02-12T04:28:16.922Z",
+		attachments: [],
+	}、{
+		id: "cd79d5ba-c2e4-40c9-b81c-a491466198nf",
+		role: "user",
+		content: "我需要一句话总结冬天",
+		parentId: "f08b4675-a8fe-4b1e-81ce-a4b7e063ba73",
+		childrenIds: ["abcj5ab9-e352-4061-a30a-f2f2a18b76uy"],
+		createdAt: "2026-02-12T04:28:34.250Z",
+		attachments: [],
+	},
+	{
+		id: "dd79d5ba-c2e4-40c9-b81c-a496966198of",
+		role: "assistant",
+		content: "万物在凛冽与静谧中蛰伏，积蓄力量，等待新生",
+		parentId: "cd79d5ba-c2e4-40c9-b81c-a491466198nf",
+		childrenIds: [],
+		createdAt: "2026-02-12T04:28:34.250Z",
+		attachments: [],
+	} 因为这几条数据都有 parendId 和 childrenIds 从属关系，及切换的当前数据是 'abde52b2-5b77-4efc-adfd-643272fdf032' 它的 childrenIds 存在 'f08b4675-a8fe-4b1e-81ce-a4b7e063ba73', 'f08b4675-a8fe-4b1e-81ce-a4b7e063ba73' 的 parentId 指向 'abde52b2-5b77-4efc-adfd-643272fdf032',而 'f08b4675-a8fe-4b1e-81ce-a4b7e063ba73' 的 childrenIds 包含了 'abcj5ab9-e352-4061-a30a-f2f2a18b76uy', 'abcj5ab9-e352-4061-a30a-f2f2a18b76uy' 的 parentId 指向 'cd79d5ba-c2e4-40c9-b81c-a491466198nf', 因此切换为 'abde52b2-5b77-4efc-adfd-643272fdf032' 时显示上述数据，而不显示 "cee9d5bf-c2e4-40c9-b81c-a49146619c90" 相关联的 {
+		id: "cee9d5bf-c2e4-40c9-b81c-a49146619c90",
+		role: "user",
+		content: "我不需要带其他季节，只要一句话总结冬天",
+		parentId: "1374edca-0a2d-4cd3-922d-e4fc5f8f7bd6",
+		childrenIds: ["a4be5ab9-e352-4061-a30a-f2f2a18b827e"],
+		createdAt: "2026-02-12T04:28:34.250Z",
+		attachments: [],
+	},
+	{
+		id: "a4be5ab9-e352-4061-a30a-f2f2a18b827e",
+		role: "assistant",
+		content: "**冬天：** 万物在凛冽与静谧中蛰伏，积蓄力量，等待新生。",
+		parentId: "cee9d5bf-c2e4-40c9-b81c-a49146619c90",
+		childrenIds: [],
+		createdAt: "2026-02-12T04:28:37.972Z",
+		attachments: [],
+	}, 这两条数据，具体实现完成后的效果如同 https://chat.z.ai/c/c788c2c7-6364-485b-a9d0-7fdf6e24f2b7 中的效果
 
 const [messages, setMessages] = useState([]);
 
