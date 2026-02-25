@@ -185,25 +185,32 @@ const ChatBot: React.FC<ChatBotProps> = ({
 										: msg,
 								);
 
-								// 更新显示的消息
-								const sortedMessages = buildMessageList(
-									newAllMessages,
-									selectedChildMap,
-								);
-								const formattedMessages: any[] = sortedMessages.map((msg) => ({
-									id: msg.id,
-									content: msg.content,
-									role: msg.role as 'user' | 'assistant',
-									timestamp: new Date(msg.createdAt as Date),
-									parentId: msg.parentId,
-									childrenIds: msg.childrenIds,
-									siblingIndex: msg.siblingIndex,
-									siblingCount: msg.siblingCount,
-									thinkContent: msg.thinkContent,
-									isStreaming: msg.isStreaming,
-								}));
+								// 使用函数式更新获取最新的 selectedChildMap
+								setSelectedChildMap((currentSelectedChildMap) => {
+									// 更新显示的消息
+									const sortedMessages = buildMessageList(
+										newAllMessages,
+										currentSelectedChildMap,
+									);
+									const formattedMessages: any[] = sortedMessages.map(
+										(msg) => ({
+											id: msg.id,
+											content: msg.content,
+											role: msg.role as 'user' | 'assistant',
+											timestamp: new Date(msg.createdAt as Date),
+											parentId: msg.parentId,
+											childrenIds: msg.childrenIds,
+											siblingIndex: msg.siblingIndex,
+											siblingCount: msg.siblingCount,
+											thinkContent: msg.thinkContent,
+											isStreaming: msg.isStreaming,
+										}),
+									);
 
-								setMessages(formattedMessages);
+									setMessages(formattedMessages);
+									return currentSelectedChildMap;
+								});
+
 								return newAllMessages;
 							});
 						}
@@ -221,25 +228,32 @@ const ChatBot: React.FC<ChatBotProps> = ({
 										: msg,
 								);
 
-								// 更新显示的消息
-								const sortedMessages = buildMessageList(
-									newAllMessages,
-									selectedChildMap,
-								);
-								const formattedMessages: any[] = sortedMessages.map((msg) => ({
-									id: msg.id,
-									content: msg.content,
-									role: msg.role as 'user' | 'assistant',
-									timestamp: new Date(msg.createdAt as Date),
-									parentId: msg.parentId,
-									childrenIds: msg.childrenIds,
-									siblingIndex: msg.siblingIndex,
-									siblingCount: msg.siblingCount,
-									thinkContent: msg.thinkContent,
-									isStreaming: msg.isStreaming,
-								}));
+								// 使用函数式更新获取最新的 selectedChildMap
+								setSelectedChildMap((currentSelectedChildMap) => {
+									// 更新显示的消息
+									const sortedMessages = buildMessageList(
+										newAllMessages,
+										currentSelectedChildMap,
+									);
+									const formattedMessages: any[] = sortedMessages.map(
+										(msg) => ({
+											id: msg.id,
+											content: msg.content,
+											role: msg.role as 'user' | 'assistant',
+											timestamp: new Date(msg.createdAt as Date),
+											parentId: msg.parentId,
+											childrenIds: msg.childrenIds,
+											siblingIndex: msg.siblingIndex,
+											siblingCount: msg.siblingCount,
+											thinkContent: msg.thinkContent,
+											isStreaming: msg.isStreaming,
+										}),
+									);
 
-								setMessages(formattedMessages);
+									setMessages(formattedMessages);
+									return currentSelectedChildMap;
+								});
+
 								return newAllMessages;
 							});
 						}
@@ -265,25 +279,30 @@ const ChatBot: React.FC<ChatBotProps> = ({
 									),
 							);
 
-							// 更新显示的消息
-							const sortedMessages = buildMessageList(
-								newAllMessages,
-								selectedChildMap,
-							);
-							const formattedMessages: any[] = sortedMessages.map((msg) => ({
-								id: msg.id,
-								content: msg.content,
-								role: msg.role as 'user' | 'assistant',
-								timestamp: new Date(msg.createdAt as Date),
-								parentId: msg.parentId,
-								childrenIds: msg.childrenIds,
-								siblingIndex: msg.siblingIndex,
-								siblingCount: msg.siblingCount,
-								thinkContent: msg.thinkContent,
-								isStreaming: msg.isStreaming,
-							}));
+							// 使用函数式更新获取最新的 selectedChildMap
+							setSelectedChildMap((currentSelectedChildMap) => {
+								// 更新显示的消息
+								const sortedMessages = buildMessageList(
+									newAllMessages,
+									currentSelectedChildMap,
+								);
+								const formattedMessages: any[] = sortedMessages.map((msg) => ({
+									id: msg.id,
+									content: msg.content,
+									role: msg.role as 'user' | 'assistant',
+									timestamp: new Date(msg.createdAt as Date),
+									parentId: msg.parentId,
+									childrenIds: msg.childrenIds,
+									siblingIndex: msg.siblingIndex,
+									siblingCount: msg.siblingCount,
+									thinkContent: msg.thinkContent,
+									isStreaming: msg.isStreaming,
+								}));
 
-							setMessages(formattedMessages);
+								setMessages(formattedMessages);
+								return currentSelectedChildMap;
+							});
+
 							return newAllMessages;
 						});
 					},
@@ -297,25 +316,30 @@ const ChatBot: React.FC<ChatBotProps> = ({
 									: msg,
 							);
 
-							// 更新显示的消息
-							const sortedMessages = buildMessageList(
-								newAllMessages,
-								selectedChildMap,
-							);
-							const formattedMessages: any[] = sortedMessages.map((msg) => ({
-								id: msg.id,
-								content: msg.content,
-								role: msg.role as 'user' | 'assistant',
-								timestamp: new Date(msg.createdAt as Date),
-								parentId: msg.parentId,
-								childrenIds: msg.childrenIds,
-								siblingIndex: msg.siblingIndex,
-								siblingCount: msg.siblingCount,
-								thinkContent: msg.thinkContent,
-								isStreaming: msg.isStreaming,
-							}));
+							// 使用函数式更新获取最新的 selectedChildMap
+							setSelectedChildMap((currentSelectedChildMap) => {
+								// 更新显示的消息
+								const sortedMessages = buildMessageList(
+									newAllMessages,
+									currentSelectedChildMap,
+								);
+								const formattedMessages: any[] = sortedMessages.map((msg) => ({
+									id: msg.id,
+									content: msg.content,
+									role: msg.role as 'user' | 'assistant',
+									timestamp: new Date(msg.createdAt as Date),
+									parentId: msg.parentId,
+									childrenIds: msg.childrenIds,
+									siblingIndex: msg.siblingIndex,
+									siblingCount: msg.siblingCount,
+									thinkContent: msg.thinkContent,
+									isStreaming: msg.isStreaming,
+								}));
 
-							setMessages(formattedMessages);
+								setMessages(formattedMessages);
+								return currentSelectedChildMap;
+							});
+
 							return newAllMessages;
 						});
 					},
@@ -398,9 +422,11 @@ const ChatBot: React.FC<ChatBotProps> = ({
 				// 更新 selectedChildMap 以选择新的 assistant 消息
 				const newSelectedChildMap = new Map(selectedChildMap);
 				newSelectedChildMap.set(userMessageToUse.id, assistantMessageId);
+
+				// 先更新 selectedChildMap
 				setSelectedChildMap(newSelectedChildMap);
 
-				// 更新显示的消息
+				// 然后更新显示的消息
 				const sortedMessages = buildMessageList(
 					newAllMessages,
 					newSelectedChildMap,
@@ -418,8 +444,10 @@ const ChatBot: React.FC<ChatBotProps> = ({
 
 				setMessages(formattedMessages);
 
-				// 调用流式 API
-				onSseFetch(apiEndpoint, assistantMessageId, userMessageToUse);
+				// 使用 setTimeout 确保状态更新后再调用流式 API
+				setTimeout(() => {
+					onSseFetch(apiEndpoint, assistantMessageId, userMessageToUse);
+				}, 0);
 
 				return newAllMessages;
 			});
