@@ -17,10 +17,12 @@ import {
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
+import { v4 as uuidv4 } from 'uuid';
 import { cn } from '@/lib/utils';
 import { stopSse, uploadFile } from '@/service';
 import { FileWithPreview, UploadedFile } from '@/types';
 import { streamFetch } from '@/utils/sse';
+import { buildMessageList } from '@/views/chat/tools';
 import MarkdownPreview from '../Markdown';
 import Upload from '../Upload';
 import FileInfo from './FileInfo';
@@ -65,6 +67,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 	showAvatar = false,
 	onBranchChange,
 }) => {
+	const [allMessages, setAllMessages] = useState<Message[]>(initialMessages);
 	const [messages, setMessages] = useState<Message[]>(initialMessages);
 	const [sessionId, setSessionId] = useState('');
 	const [input, setInput] = useState('');
@@ -80,6 +83,9 @@ const ChatBot: React.FC<ChatBotProps> = ({
 		path: '',
 		size: 0,
 	});
+	const [selectedChildMap, setSelectedChildMap] = useState<Map<string, string>>(
+		new Map(),
+	);
 
 	const stopRequestRef = useRef<(() => void) | null>(null);
 	const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -90,7 +96,10 @@ const ChatBot: React.FC<ChatBotProps> = ({
 	const navigate = useNavigate();
 
 	useEffect(() => {
+		setAllMessages(initialMessages);
 		setMessages(initialMessages);
+		// 重置选中状态
+		setSelectedChildMap(new Map());
 	}, [initialMessages]);
 
 	// 自动滚动到底部
@@ -165,32 +174,74 @@ const ChatBot: React.FC<ChatBotProps> = ({
 					},
 					onThinking: (thinking) => {
 						if (typeof thinking === 'string') {
-							setMessages((prev) =>
-								prev.map((msg) =>
+							setAllMessages((prevAll) => {
+								const newAllMessages = prevAll.map((msg) =>
 									msg.id === assistantMessageId
 										? {
 												...msg,
-												thinkContent: msg.thinkContent + thinking,
+												thinkContent: (msg.thinkContent || '') + thinking,
 												isStreaming: true,
 											}
 										: msg,
-								),
-							);
+								);
+
+								// 更新显示的消息
+								const sortedMessages = buildMessageList(
+									newAllMessages,
+									selectedChildMap,
+								);
+								const formattedMessages: any[] = sortedMessages.map((msg) => ({
+									id: msg.id,
+									content: msg.content,
+									role: msg.role as 'user' | 'assistant',
+									timestamp: new Date(msg.createdAt as Date),
+									parentId: msg.parentId,
+									childrenIds: msg.childrenIds,
+									siblingIndex: msg.siblingIndex,
+									siblingCount: msg.siblingCount,
+									thinkContent: msg.thinkContent,
+									isStreaming: msg.isStreaming,
+								}));
+
+								setMessages(formattedMessages);
+								return newAllMessages;
+							});
 						}
 					},
 					onData: (chunk) => {
 						if (typeof chunk === 'string') {
-							setMessages((prev) =>
-								prev.map((msg) =>
+							setAllMessages((prevAll) => {
+								const newAllMessages = prevAll.map((msg) =>
 									msg.id === assistantMessageId
 										? {
 												...msg,
-												content: msg.content + chunk,
+												content: (msg.content || '') + chunk,
 												isStreaming: true,
 											}
 										: msg,
-								),
-							);
+								);
+
+								// 更新显示的消息
+								const sortedMessages = buildMessageList(
+									newAllMessages,
+									selectedChildMap,
+								);
+								const formattedMessages: any[] = sortedMessages.map((msg) => ({
+									id: msg.id,
+									content: msg.content,
+									role: msg.role as 'user' | 'assistant',
+									timestamp: new Date(msg.createdAt as Date),
+									parentId: msg.parentId,
+									childrenIds: msg.childrenIds,
+									siblingIndex: msg.siblingIndex,
+									siblingCount: msg.siblingCount,
+									thinkContent: msg.thinkContent,
+									isStreaming: msg.isStreaming,
+								}));
+
+								setMessages(formattedMessages);
+								return newAllMessages;
+							});
 						}
 					},
 					getSessionId: (sessionId) => {
@@ -204,27 +255,69 @@ const ChatBot: React.FC<ChatBotProps> = ({
 							title: err?.message || String(err) || '发送失败',
 						});
 						// 移除失败的流式消息
-						setMessages((prev) =>
-							prev.filter(
+						setAllMessages((prevAll) => {
+							const newAllMessages = prevAll.filter(
 								(msg) =>
 									!(
 										msg.id === assistantMessageId &&
-										msg.content === '' &&
-										msg.thinkContent === ''
+										(!msg.content || msg.content === '') &&
+										(!msg.thinkContent || msg.thinkContent === '')
 									),
-							),
-						);
+							);
+
+							// 更新显示的消息
+							const sortedMessages = buildMessageList(
+								newAllMessages,
+								selectedChildMap,
+							);
+							const formattedMessages: any[] = sortedMessages.map((msg) => ({
+								id: msg.id,
+								content: msg.content,
+								role: msg.role as 'user' | 'assistant',
+								timestamp: new Date(msg.createdAt as Date),
+								parentId: msg.parentId,
+								childrenIds: msg.childrenIds,
+								siblingIndex: msg.siblingIndex,
+								siblingCount: msg.siblingCount,
+								thinkContent: msg.thinkContent,
+								isStreaming: msg.isStreaming,
+							}));
+
+							setMessages(formattedMessages);
+							return newAllMessages;
+						});
 					},
 					onComplete: () => {
 						setLoading(false);
 						// 更新消息状态，结束流式传输
-						setMessages((prev) =>
-							prev.map((msg) =>
+						setAllMessages((prevAll) => {
+							const newAllMessages = prevAll.map((msg) =>
 								msg.id === assistantMessageId
 									? { ...msg, isStreaming: false }
 									: msg,
-							),
-						);
+							);
+
+							// 更新显示的消息
+							const sortedMessages = buildMessageList(
+								newAllMessages,
+								selectedChildMap,
+							);
+							const formattedMessages: any[] = sortedMessages.map((msg) => ({
+								id: msg.id,
+								content: msg.content,
+								role: msg.role as 'user' | 'assistant',
+								timestamp: new Date(msg.createdAt as Date),
+								parentId: msg.parentId,
+								childrenIds: msg.childrenIds,
+								siblingIndex: msg.siblingIndex,
+								siblingCount: msg.siblingCount,
+								thinkContent: msg.thinkContent,
+								isStreaming: msg.isStreaming,
+							}));
+
+							setMessages(formattedMessages);
+							return newAllMessages;
+						});
 					},
 				},
 			});
@@ -253,29 +346,164 @@ const ChatBot: React.FC<ChatBotProps> = ({
 	const sendMessage = async (content?: string, index?: number) => {
 		if ((!content && !input.trim()) || loading) return;
 
-		const userMessage: Message = {
-			id: Date.now().toString(),
-			content: content || input.trim(),
-			role: 'user',
-			timestamp: new Date(),
-		};
+		// 生成 ID
+		const userMsgId = uuidv4();
+		const assistantMessageId = uuidv4();
 
-		if (uploadedFile.path) {
-			userMessage.file = uploadedFile;
-		}
+		// 区分模式：重新生成 vs 新消息
+		const isRegenerate = content !== undefined && index !== undefined;
 
-		setMessages((prev) => {
-			if (content) {
-				const messages = [
-					...prev.slice(0, index).map((msg) => ({ ...msg, isStopped: false })),
-				];
-				return content ? messages : [...messages, userMessage];
+		if (isRegenerate) {
+			// 重新生成模式：复用已有的 User 消息
+			// 注意：index 是当前显示的 assistant 消息的索引
+			// 我们需要从 allMessages 中找到对应的 user 消息
+			setAllMessages((prevAll) => {
+				// 找到当前显示的 assistant 消息
+				const currentAssistantMsg = messages[index];
+				if (!currentAssistantMsg) return prevAll;
+
+				// 找到对应的 user 消息
+				const userMsg = prevAll.find(
+					(m) => m.id === currentAssistantMsg.parentId,
+				);
+				if (!userMsg) return prevAll;
+
+				const userMessageToUse = { ...userMsg };
+
+				// 更新 user 消息的 childrenIds
+				const childrenIds = userMsg.childrenIds ? [...userMsg.childrenIds] : [];
+				if (!childrenIds.includes(assistantMessageId)) {
+					childrenIds.push(assistantMessageId);
+				}
+				userMessageToUse.childrenIds = childrenIds;
+
+				// 创建新的 assistant 消息
+				const assistantMessage: Message = {
+					id: assistantMessageId,
+					content: '',
+					thinkContent: '',
+					role: 'assistant',
+					timestamp: new Date(),
+					isStreaming: true,
+					parentId: userMessageToUse.id,
+					childrenIds: [],
+				};
+
+				// 更新 allMessages：添加新的 assistant 消息，更新 user 消息
+				const newAllMessages = prevAll.map((msg) =>
+					msg.id === userMessageToUse.id ? userMessageToUse : msg,
+				);
+				newAllMessages.push(assistantMessage);
+
+				// 更新 selectedChildMap 以选择新的 assistant 消息
+				const newSelectedChildMap = new Map(selectedChildMap);
+				newSelectedChildMap.set(userMessageToUse.id, assistantMessageId);
+				setSelectedChildMap(newSelectedChildMap);
+
+				// 更新显示的消息
+				const sortedMessages = buildMessageList(
+					newAllMessages,
+					newSelectedChildMap,
+				);
+				const formattedMessages: any[] = sortedMessages.map((msg) => ({
+					id: msg.id,
+					content: msg.content,
+					role: msg.role as 'user' | 'assistant',
+					timestamp: new Date(msg.createdAt as Date),
+					parentId: msg.parentId,
+					childrenIds: msg.childrenIds,
+					siblingIndex: msg.siblingIndex,
+					siblingCount: msg.siblingCount,
+				}));
+
+				setMessages(formattedMessages);
+
+				// 调用流式 API
+				onSseFetch(apiEndpoint, assistantMessageId, userMessageToUse);
+
+				return newAllMessages;
+			});
+		} else {
+			// 新消息模式：计算 parentId
+			let parentId: string | undefined;
+			const lastMsg = allMessages[allMessages.length - 1];
+			if (lastMsg) {
+				parentId = lastMsg.id;
 			}
-			return [
-				...prev.map((msg) => ({ ...msg, isStopped: false })),
-				userMessage,
-			];
-		});
+
+			const userMessageToUse: Message = {
+				id: userMsgId,
+				content: content || input.trim(),
+				role: 'user',
+				timestamp: new Date(),
+				parentId: parentId,
+				childrenIds: [assistantMessageId],
+			};
+			if (uploadedFile.path) {
+				userMessageToUse.file = uploadedFile;
+			}
+
+			// 创建 Assistant 消息
+			const assistantMessage: Message = {
+				id: assistantMessageId,
+				content: '',
+				thinkContent: '',
+				role: 'assistant',
+				timestamp: new Date(),
+				isStreaming: true,
+				parentId: userMessageToUse.id,
+				childrenIds: [],
+			};
+
+			setAllMessages((prevAll) => {
+				const newAllMessages = [...prevAll];
+
+				// 更新父节点 childrenIds
+				if (userMessageToUse.parentId) {
+					const parentIndex = newAllMessages.findIndex(
+						(m) => m.id === userMessageToUse.parentId,
+					);
+					if (parentIndex !== -1) {
+						const parentMsg = { ...newAllMessages[parentIndex] };
+						const pChildrenIds = parentMsg.childrenIds
+							? [...parentMsg.childrenIds]
+							: [];
+						if (!pChildrenIds.includes(userMsgId)) {
+							pChildrenIds.push(userMsgId);
+						}
+						parentMsg.childrenIds = pChildrenIds;
+						newAllMessages[parentIndex] = parentMsg;
+					}
+				}
+
+				// 添加 User 消息和 Assistant 消息
+				newAllMessages.push(userMessageToUse);
+				newAllMessages.push(assistantMessage);
+
+				// 更新显示的消息
+				const sortedMessages = buildMessageList(
+					newAllMessages,
+					selectedChildMap,
+				);
+				const formattedMessages: any[] = sortedMessages.map((msg) => ({
+					id: msg.id,
+					content: msg.content,
+					role: msg.role as 'user' | 'assistant',
+					timestamp: new Date(msg.createdAt as Date),
+					parentId: msg.parentId,
+					childrenIds: msg.childrenIds,
+					siblingIndex: msg.siblingIndex,
+					siblingCount: msg.siblingCount,
+				}));
+
+				setMessages(formattedMessages);
+
+				// 调用流式 API
+				onSseFetch(apiEndpoint, assistantMessageId, userMessageToUse);
+
+				return newAllMessages;
+			});
+		}
 
 		setInput('');
 		setUploadedFile({
@@ -287,30 +515,40 @@ const ChatBot: React.FC<ChatBotProps> = ({
 		});
 
 		setAutoScroll(true);
-
-		// 创建 assistant 消息占位符
-		const assistantMessageId = (Date.now() + 1).toString();
-		const assistantMessage: Message = {
-			id: assistantMessageId,
-			content: '',
-			thinkContent: '',
-			role: 'assistant',
-			timestamp: new Date(),
-			isStreaming: true,
-		};
-
-		setMessages((prev) => [...prev, assistantMessage]);
-
-		// 调用流式 API
-		await onSseFetch(apiEndpoint, assistantMessageId, userMessage);
 	};
 
 	const onContinue = async () => {
-		setMessages((prev) => [
-			...prev.map((msg) => ({ ...msg, isStopped: false })),
-		]);
-		const assistantMessageId = messages[messages.length - 1].id;
-		await onSseFetch('/chat/continueSse', assistantMessageId);
+		setAllMessages((prevAll) => {
+			const newAllMessages = prevAll.map((msg) => ({
+				...msg,
+				isStopped: false,
+			}));
+
+			// 更新显示的消息
+			const sortedMessages = buildMessageList(newAllMessages, selectedChildMap);
+			const formattedMessages: any[] = sortedMessages.map((msg) => ({
+				id: msg.id,
+				content: msg.content,
+				role: msg.role as 'user' | 'assistant',
+				timestamp: new Date(msg.createdAt as Date),
+				parentId: msg.parentId,
+				childrenIds: msg.childrenIds,
+				siblingIndex: msg.siblingIndex,
+				siblingCount: msg.siblingCount,
+			}));
+
+			setMessages(formattedMessages);
+
+			// 获取最后一条 assistant 消息的 ID
+			if (formattedMessages.length > 0) {
+				const lastMsg = formattedMessages[formattedMessages.length - 1];
+				if (lastMsg.role === 'assistant') {
+					onSseFetch('/chat/continueSse', lastMsg.id);
+				}
+			}
+
+			return newAllMessages;
+		});
 	};
 
 	// 停止生成
@@ -320,25 +558,61 @@ const ChatBot: React.FC<ChatBotProps> = ({
 			stopRequestRef.current();
 			stopRequestRef.current = null;
 			setLoading(false);
+
 			// 更新最后一条助手消息状态
-			setMessages((prev) =>
-				prev.map((msg, index) =>
-					index === prev.length - 1 && msg.role === 'assistant'
-						? { ...msg, isStreaming: false, isStopped: true }
-						: msg,
-				),
-			);
+			setAllMessages((prevAll) => {
+				// 找到最后一条 assistant 消息
+				let lastAssistantIndex = -1;
+				for (let i = prevAll.length - 1; i >= 0; i--) {
+					if (prevAll[i].role === 'assistant') {
+						lastAssistantIndex = i;
+						break;
+					}
+				}
+
+				if (lastAssistantIndex !== -1) {
+					const newAllMessages = [...prevAll];
+					newAllMessages[lastAssistantIndex] = {
+						...newAllMessages[lastAssistantIndex],
+						isStreaming: false,
+						isStopped: true,
+					};
+
+					// 更新显示的消息
+					const sortedMessages = buildMessageList(
+						newAllMessages,
+						selectedChildMap,
+					);
+					const formattedMessages: any[] = sortedMessages.map((msg) => ({
+						id: msg.id,
+						content: msg.content,
+						role: msg.role as 'user' | 'assistant',
+						timestamp: new Date(msg.createdAt as Date),
+						parentId: msg.parentId,
+						childrenIds: msg.childrenIds,
+						siblingIndex: msg.siblingIndex,
+						siblingCount: msg.siblingCount,
+					}));
+
+					setMessages(formattedMessages);
+					return newAllMessages;
+				}
+
+				return prevAll;
+			});
 		}
 	};
 
 	// 清除对话
 	const clearChat = () => {
 		setInput('');
+		setAllMessages([]);
 		setMessages([]);
 		stopRequestRef.current?.();
 		stopRequestRef.current = null;
 		setLoading(false);
 		setSessionId('');
+		setSelectedChildMap(new Map());
 		navigate('/chat');
 	};
 
@@ -431,9 +705,82 @@ const ChatBot: React.FC<ChatBotProps> = ({
 	};
 
 	const onReGenerate = (index: number) => {
-		const lastUserMessage = messages.filter((msg) => msg.role === 'user');
-		const lastUserContent = lastUserMessage?.pop()?.content;
-		sendMessage(lastUserContent, index);
+		// index 是当前显示的 assistant 消息的索引
+		// 我们需要获取对应的用户消息内容
+		if (index > 0) {
+			const userMsg = messages[index - 1];
+			if (userMsg && userMsg.role === 'user') {
+				sendMessage(userMsg.content, index);
+			}
+		}
+	};
+
+	const handleBranchChange = (msgId: string, direction: 'prev' | 'next') => {
+		// 首先调用父组件的回调（如果存在）
+		onBranchChange?.(msgId, direction);
+
+		setAllMessages((prevAll) => {
+			const currentMsg = prevAll.find((m) => m.id === msgId);
+			if (!currentMsg) return prevAll;
+
+			const parentId = currentMsg.parentId;
+
+			// 找到所有兄弟节点
+			let siblings: Message[] = [];
+
+			if (parentId) {
+				siblings = prevAll.filter((m) => m.parentId === parentId);
+			} else {
+				// Root siblings
+				const allChildren = new Set<string>();
+				prevAll.forEach((m) => {
+					m.childrenIds?.forEach((c) => {
+						allChildren.add(c);
+					});
+				});
+				siblings = prevAll.filter((m) => !allChildren.has(m.id));
+			}
+
+			// 按照创建时间排序
+			siblings.sort(
+				(a, b) =>
+					new Date(a.createdAt as Date).getTime() -
+					new Date(b.createdAt as Date).getTime(),
+			);
+
+			const currentIndex = siblings.findIndex((m) => m.id === msgId);
+			const nextIndex =
+				direction === 'next' ? currentIndex + 1 : currentIndex - 1;
+
+			if (nextIndex >= 0 && nextIndex < siblings.length) {
+				const nextMsg = siblings[nextIndex];
+				// 更新选中状态
+				const newSelectedChildMap = new Map(selectedChildMap);
+				if (parentId) {
+					newSelectedChildMap.set(parentId, nextMsg.id);
+				} else {
+					newSelectedChildMap.set('root', nextMsg.id);
+				}
+				setSelectedChildMap(newSelectedChildMap);
+
+				// 更新显示的消息
+				const sortedMessages = buildMessageList(prevAll, newSelectedChildMap);
+				const formattedMessages: any[] = sortedMessages.map((msg) => ({
+					id: msg.id,
+					content: msg.content,
+					role: msg.role as 'user' | 'assistant',
+					timestamp: new Date(msg.createdAt as Date),
+					parentId: msg.parentId,
+					childrenIds: msg.childrenIds,
+					siblingIndex: msg.siblingIndex,
+					siblingCount: msg.siblingCount,
+				}));
+
+				setMessages(formattedMessages);
+			}
+
+			return prevAll;
+		});
 	};
 
 	return (
@@ -579,12 +926,17 @@ const ChatBot: React.FC<ChatBotProps> = ({
 															'opacity-30 cursor-not-allowed hover:text-textcolor/50',
 													)}
 													onClick={() => {
+														console.log(
+															'click left',
+															message,
+															message.siblingIndex,
+														);
 														if ((message.siblingIndex || 0) > 0) {
-															onBranchChange?.(message.id, 'prev');
+															handleBranchChange(message.id, 'prev');
 														}
 													}}
 												/>
-												<span className="min-w-[2.5rem] text-center">
+												<span className="min-w-10 text-center">
 													{(message.siblingIndex || 0) + 1} /{' '}
 													{message.siblingCount}
 												</span>
@@ -600,7 +952,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 															(message.siblingIndex || 0) <
 															(message.siblingCount || 0) - 1
 														) {
-															onBranchChange?.(message.id, 'next');
+															handleBranchChange(message.id, 'next');
 														}
 													}}
 												/>

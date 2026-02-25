@@ -55,10 +55,12 @@ export const buildMessageList = (
 
 		if (currentMessage.parentId) {
 			const siblings = childrenMap.get(currentMessage.parentId) || [];
-			// siblings.sort(
-			// 	(a, b) =>
-			// 		new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
-			// );
+			// 按照创建时间排序，确保 siblingIndex 正确
+			siblings.sort(
+				(a, b) =>
+					new Date(a.createdAt as Date).getTime() -
+					new Date(b.createdAt as Date).getTime(),
+			);
 			siblingCount = siblings.length;
 			siblingIndex = siblings.findIndex((m) => m.id === currentMessage?.id);
 		} else {
