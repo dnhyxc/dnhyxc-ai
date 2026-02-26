@@ -20,12 +20,12 @@ const CodeRunner = () => {
 		useState<keyof typeof SANDBOX_TEMPLATES>('react');
 
 	return (
-		<div className="flex flex-col h-full w-full rounded-b-md">
+		<div className="flex flex-1 flex-col h-full w-full rounded-b-md">
 			<ScrollArea className="flex-1 rounded-md overflow-hidden w-full backdrop-blur-sm">
 				<motion.div
 					initial={{ opacity: 0, y: 20 }}
 					animate={{ opacity: 1, y: 0 }}
-					className="w-full h-full p-5 pt-0 rounded-md"
+					className="h-full p-5 pt-0 rounded-md w-[calc(100vw-100px)]"
 				>
 					<motion.div
 						initial={{ opacity: 0, scale: 0.95 }}
@@ -67,7 +67,7 @@ const CodeRunner = () => {
 														<SandpackPreview
 															showRestartButton
 															showOpenInCodeSandbox={false}
-															className="flex-1! h-full! w-full!"
+															className="flex-1! h-full!"
 														/>
 													</ResizablePanel>
 													<ResizableHandle withHandle />
@@ -75,7 +75,8 @@ const CodeRunner = () => {
 													<ResizablePanel defaultSize="50%">
 														<SandpackConsole
 															resetOnPreviewRestart
-															className="w-full! flex-1! h-full!"
+															className="w-full! h-full!"
+															// className="w-full! h-full! [&_.sp-console-list]:bg-(--sp-colors-errorSurface)"
 														/>
 													</ResizablePanel>
 												</ResizablePanelGroup>

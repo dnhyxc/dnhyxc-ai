@@ -46,7 +46,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
 					<DropdownMenuTrigger asChild>
 						<Button className="bg-transparent hover:bg-transparent bg-linear-to-r from-blue-600 to-cyan-600">
 							<PackagePlus />
-							运行模版
+							选择模版
 						</Button>
 					</DropdownMenuTrigger>
 					<DropdownMenuContent
