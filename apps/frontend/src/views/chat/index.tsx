@@ -191,6 +191,8 @@ const Chat = () => {
 		}));
 
 		setChatBotMessages(formattedMessages);
+
+		setOpen(false);
 	};
 
 	const onBranchChange = (msgId: string, direction: 'prev' | 'next') => {
@@ -288,9 +290,9 @@ const Chat = () => {
 			// 	onSelectSession(res.data.list[0]);
 			// }
 			setSessionListInfo(data as any);
-			if (res.data.list.length > 0) {
-				onSelectSession(data.list[0] as any);
-			}
+			// if (res.data.list.length > 0) {
+			// 	onSelectSession(data.list[0] as any);
+			// }
 		}
 		console.log(res, 'res');
 	};

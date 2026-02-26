@@ -25,7 +25,7 @@ const CodeRunner = () => {
 				<motion.div
 					initial={{ opacity: 0, y: 20 }}
 					animate={{ opacity: 1, y: 0 }}
-					className="h-full p-5 pt-0 rounded-md w-[calc(100vw-100px)]"
+					className="h-full p-5 pt-0 rounded-md w-[calc(100vw-110px)]"
 				>
 					<motion.div
 						initial={{ opacity: 0, scale: 0.95 }}

@@ -48,12 +48,7 @@ const Header: React.FC<Iprops> = ({ actions = true, ccustomActions }) => {
 			pathname: string,
 		): string | undefined => {
 			for (const route of routes) {
-				const lastSlashIndex = route.path?.lastIndexOf('/');
-				const path =
-					lastSlashIndex > 0
-						? route.path?.substring(0, lastSlashIndex)
-						: route.path;
-				if (route.path === pathname || path === pathname) {
+				if (route.path === pathname) {
 					return route.meta?.title;
 				}
 				if (route.children) {
@@ -83,7 +78,7 @@ const Header: React.FC<Iprops> = ({ actions = true, ccustomActions }) => {
 					data-tauri-drag-region
 					className="text-xl font-bold font-['手札体-简'] cursor-default bg-clip-text text-transparent bg-linear-to-r from-[#ff7b00] via-[#ff9900] to-[#ffb700]"
 				>
-					{title}
+					{title || '智能对话'}
 				</div>
 				{actions ? (
 					<div
