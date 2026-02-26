@@ -2,7 +2,7 @@ import { Settings, Shirt } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { useStorageInfo } from '@/hooks';
-import routes from '@/router/routes';
+import routes, { type RouteConfig } from '@/router/routes';
 import { checkVersion, getValue, removeStorage, setStorage } from '@/utils';
 
 interface Iprops {
@@ -44,7 +44,7 @@ const Header: React.FC<Iprops> = ({ actions = true, ccustomActions }) => {
 
 	const title = useMemo(() => {
 		const findRouteTitle = (
-			routes: any[],
+			routes: RouteConfig[],
 			pathname: string,
 		): string | undefined => {
 			for (const route of routes) {
@@ -56,6 +56,7 @@ const Header: React.FC<Iprops> = ({ actions = true, ccustomActions }) => {
 					if (childTitle) return childTitle;
 				}
 			}
+			return routes.find((i) => i.path === '/chat/:id?')?.meta?.title;
 		};
 		return findRouteTitle(routes, location.pathname);
 	}, [location.pathname]);

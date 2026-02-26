@@ -1,3 +1,4 @@
+import React from 'react';
 import Layout from '@/layout';
 import NotFound from '@/views/404';
 import About from '@/views/about';
@@ -17,7 +18,19 @@ import ThemeSetting from '@/views/setting/theme';
 import Skill from '@/views/skill';
 import ChildWindow from '@/views/win';
 
-const routes = [
+export interface RouteMeta {
+	title?: string;
+}
+
+export interface RouteConfig {
+	path?: string;
+	index?: boolean;
+	Component?: React.ComponentType;
+	meta?: RouteMeta;
+	children?: RouteConfig[];
+}
+
+const routes: RouteConfig[] = [
 	{
 		Component: Layout,
 		children: [
