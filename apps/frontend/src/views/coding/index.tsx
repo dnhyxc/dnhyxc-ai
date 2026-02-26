@@ -1,19 +1,19 @@
 import {
+	type SANDBOX_TEMPLATES,
 	SandpackCodeEditor,
 	SandpackConsole,
 	SandpackPreview,
 	SandpackProvider,
-	type SANDBOX_TEMPLATES,
 } from '@codesandbox/sandpack-react';
 import { ScrollArea } from '@radix-ui/react-scroll-area';
 import { motion } from 'framer-motion';
+import { useState } from 'react';
 import {
 	ResizableHandle,
 	ResizablePanel,
 	ResizablePanelGroup,
 } from '@/components/ui/resizable';
 import Toolbar from './toolbar';
-import { useState } from 'react';
 
 const CodeRunner = () => {
 	const [template, setTemplate] =
