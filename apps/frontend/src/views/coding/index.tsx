@@ -1,11 +1,11 @@
-import { useState } from 'react';
 import {
-	SandpackProvider,
 	SandpackCodeEditor,
 	SandpackConsole,
 	SandpackPreview,
+	SandpackProvider,
 } from '@codesandbox/sandpack-react';
 import { ScrollArea } from '@radix-ui/react-scroll-area';
+import { useState } from 'react';
 import Toolbar from './toolbar';
 
 const CodeRunner = () => {

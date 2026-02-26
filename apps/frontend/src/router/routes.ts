@@ -3,6 +3,7 @@ import NotFound from '@/views/404';
 import About from '@/views/about';
 import Account from '@/views/account';
 import Chat from '@/views/chat';
+import Coding from '@/views/coding';
 import Detail from '@/views/detail';
 import Document from '@/views/document';
 import Editor from '@/views/editor';
@@ -13,7 +14,6 @@ import Setting from '@/views/setting';
 import AboutApp from '@/views/setting/about';
 import AppSystem from '@/views/setting/system';
 import ThemeSetting from '@/views/setting/theme';
-import Coding from '@/views/coding';
 import Skill from '@/views/skill';
 import ChildWindow from '@/views/win';
 
