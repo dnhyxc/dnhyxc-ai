@@ -5,6 +5,7 @@ import {
 	SandpackProvider,
 } from '@codesandbox/sandpack-react';
 import { ScrollArea } from '@radix-ui/react-scroll-area';
+import { motion } from 'framer-motion';
 import {
 	ResizableHandle,
 	ResizablePanel,
@@ -16,8 +17,17 @@ const CodeRunner = () => {
 	return (
 		<div className="flex flex-col h-full w-full rounded-b-md">
 			<ScrollArea className="flex-1 rounded-md overflow-hidden w-full backdrop-blur-sm">
-				<div className="w-full h-full p-5 pt-0 rounded-md">
-					<div className="w-full h-full rounded-md border border-theme/5">
+				<motion.div
+					initial={{ opacity: 0, y: 20 }}
+					animate={{ opacity: 1, y: 0 }}
+					className="w-full h-full p-5 pt-0 rounded-md"
+				>
+					<motion.div
+						initial={{ opacity: 0, scale: 0.95 }}
+						animate={{ opacity: 1, scale: 1 }}
+						transition={{ duration: 0.5 }}
+						className="w-full h-full rounded-md border border-theme/5"
+					>
 						<SandpackProvider
 							template="react"
 							theme="dark"
@@ -70,8 +80,8 @@ const CodeRunner = () => {
 								</div>
 							</div>
 						</SandpackProvider>
-					</div>
-				</div>
+					</motion.div>
+				</motion.div>
 			</ScrollArea>
 		</div>
 	);
