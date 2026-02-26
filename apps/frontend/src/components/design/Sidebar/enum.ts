@@ -4,15 +4,21 @@ export const MENUS = [
 		icon: 'House',
 		path: '/',
 	},
+
+	{
+		name: '智能对话',
+		icon: 'Bot',
+		path: '/chat',
+	},
 	{
 		name: 'document',
 		icon: 'Package',
 		path: '/document',
 	},
 	{
-		name: '智能对话',
-		icon: 'Bot',
-		path: '/chat',
+		name: 'coding',
+		icon: 'Codesandbox',
+		path: '/coding',
 	},
 	{
 		name: '技能',

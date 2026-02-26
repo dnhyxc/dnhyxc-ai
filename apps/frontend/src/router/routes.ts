@@ -13,6 +13,7 @@ import Setting from '@/views/setting';
 import AboutApp from '@/views/setting/about';
 import AppSystem from '@/views/setting/system';
 import ThemeSetting from '@/views/setting/theme';
+import Coding from '@/views/coding';
 import Skill from '@/views/skill';
 import ChildWindow from '@/views/win';
 
@@ -39,6 +40,13 @@ const routes = [
 				Component: Document,
 				meta: {
 					title: '智能文档处理',
+				},
+			},
+			{
+				path: '/coding',
+				Component: Coding,
+				meta: {
+					title: '智能代码处理',
 				},
 			},
 			{
