@@ -17,3 +17,4 @@ export * from './sonner';
 export * from './spinner';
 export * from './switch';
 export * from './textarea';
+export * from './dropdown-menu';

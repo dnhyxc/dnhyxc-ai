@@ -3,6 +3,7 @@ import {
 	SandpackConsole,
 	SandpackPreview,
 	SandpackProvider,
+	type SANDBOX_TEMPLATES,
 } from '@codesandbox/sandpack-react';
 import { ScrollArea } from '@radix-ui/react-scroll-area';
 import { motion } from 'framer-motion';
@@ -12,8 +13,12 @@ import {
 	ResizablePanelGroup,
 } from '@/components/ui/resizable';
 import Toolbar from './toolbar';
+import { useState } from 'react';
 
 const CodeRunner = () => {
+	const [template, setTemplate] =
+		useState<keyof typeof SANDBOX_TEMPLATES>('react');
+
 	return (
 		<div className="flex flex-col h-full w-full rounded-b-md">
 			<ScrollArea className="flex-1 rounded-md overflow-hidden w-full backdrop-blur-sm">
@@ -29,7 +34,7 @@ const CodeRunner = () => {
 						className="w-full h-full rounded-md border border-theme/5"
 					>
 						<SandpackProvider
-							template="react"
+							template={template}
 							theme="dark"
 							options={{
 								autorun: false,
@@ -39,7 +44,7 @@ const CodeRunner = () => {
 						>
 							<div className="flex flex-col h-full">
 								{/* 顶部工具栏 */}
-								<Toolbar />
+								<Toolbar template={template} setTemplate={setTemplate} />
 								<div className="flex flex-1 rounded-b-md">
 									<ResizablePanelGroup
 										orientation="horizontal"

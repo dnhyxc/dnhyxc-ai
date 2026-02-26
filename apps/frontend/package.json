@@ -50,6 +50,7 @@
 		"next-themes": "^0.4.6",
 		"qiniu-js": "^3.4.3",
 		"query-string": "^9.3.1",
+		"radix-ui": "^1.4.3",
 		"react": "^19.1.0",
 		"react-dom": "^19.1.0",
 		"react-hook-form": "^7.69.0",
