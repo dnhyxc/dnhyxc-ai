@@ -21,10 +21,10 @@ export class ChatMessages {
 	@PrimaryGeneratedColumn('uuid')
 	id: string;
 
-	@Column('text')
+	@Column('text', { nullable: true })
 	chatId: string;
 
-	@Column('text')
+	@Column('text', { nullable: true })
 	currentChatId: string;
 
 	@Column({

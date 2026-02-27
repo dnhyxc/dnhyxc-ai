@@ -22,16 +22,17 @@ import { cn } from '@/lib/utils';
 import { stopSse, uploadFile } from '@/service';
 import { FileWithPreview, UploadedFile } from '@/types';
 import { streamFetch } from '@/utils/sse';
-import { buildMessageList } from '@/views/chat/tools';
+import { buildMessageList, getFormatMessages } from '@/views/chat/tools';
 import MarkdownPreview from '../Markdown';
 import Upload from '../Upload';
 import FileInfo from './FileInfo';
 
 export interface Message {
-	id: string;
+	chatId: string;
 	content: string;
 	role: 'user' | 'assistant';
 	timestamp: Date;
+	id?: string;
 	createdAt?: Date;
 	file?: UploadedFile | null;
 	thinkContent?: string;
@@ -50,6 +51,8 @@ interface ChatRequestParams {
 	filePaths?: string[];
 	isRegenerate?: boolean;
 	parentId?: string;
+	userMessage?: Message;
+	assistantMessage?: Message;
 }
 
 interface ChatBotProps {
@@ -154,15 +157,18 @@ const ChatBot: React.FC<ChatBotProps> = ({
 		api: string = apiEndpoint,
 		assistantMessageId: string,
 		userMessage?: Message,
+		assistantMessage?: Message,
 		isRegenerate?: boolean,
 	) => {
-		const parentId = isRegenerate ? userMessage?.id : userMessage?.parentId;
+		const parentId = isRegenerate ? userMessage?.chatId : userMessage?.parentId;
 		// 调用流式 API
 		const messages: ChatRequestParams = {
 			messages: [
 				{
 					role: 'user',
-					content: userMessage?.content || '',
+					content: isRegenerate
+						? `重新生成“${userMessage?.content}”的答案，不要与之前答案重复`
+						: userMessage?.content || '',
 					noSave: isRegenerate,
 				},
 			],
@@ -170,6 +176,8 @@ const ChatBot: React.FC<ChatBotProps> = ({
 			stream: true,
 			isRegenerate,
 			parentId,
+			userMessage,
+			assistantMessage,
 		};
 		if (userMessage?.file) {
 			messages.filePaths = [userMessage?.file?.path || ''];
@@ -188,7 +196,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 						if (typeof thinking === 'string') {
 							setAllMessages((prevAll) => {
 								const newAllMessages = prevAll.map((msg) =>
-									msg.id === assistantMessageId
+									msg.chatId === assistantMessageId
 										? {
 												...msg,
 												thinkContent: (msg.thinkContent || '') + thinking,
@@ -204,20 +212,8 @@ const ChatBot: React.FC<ChatBotProps> = ({
 										newAllMessages,
 										currentSelectedChildMap,
 									);
-									const formattedMessages: any[] = sortedMessages.map(
-										(msg) => ({
-											id: msg.id,
-											content: msg.content,
-											role: msg.role as 'user' | 'assistant',
-											timestamp: new Date(msg.createdAt as Date),
-											parentId: msg.parentId,
-											childrenIds: msg.childrenIds,
-											siblingIndex: msg.siblingIndex,
-											siblingCount: msg.siblingCount,
-											thinkContent: msg.thinkContent,
-											isStreaming: msg.isStreaming,
-										}),
-									);
+
+									const formattedMessages = getFormatMessages(sortedMessages);
 
 									setMessages(formattedMessages);
 									return currentSelectedChildMap;
@@ -231,7 +227,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 						if (typeof chunk === 'string') {
 							setAllMessages((prevAll) => {
 								const newAllMessages = prevAll.map((msg) =>
-									msg.id === assistantMessageId
+									msg.chatId === assistantMessageId
 										? {
 												...msg,
 												content: (msg.content || '') + chunk,
@@ -247,20 +243,8 @@ const ChatBot: React.FC<ChatBotProps> = ({
 										newAllMessages,
 										currentSelectedChildMap,
 									);
-									const formattedMessages: any[] = sortedMessages.map(
-										(msg) => ({
-											id: msg.id,
-											content: msg.content,
-											role: msg.role as 'user' | 'assistant',
-											timestamp: new Date(msg.createdAt as Date),
-											parentId: msg.parentId,
-											childrenIds: msg.childrenIds,
-											siblingIndex: msg.siblingIndex,
-											siblingCount: msg.siblingCount,
-											thinkContent: msg.thinkContent,
-											isStreaming: msg.isStreaming,
-										}),
-									);
+
+									const formattedMessages = getFormatMessages(sortedMessages);
 
 									setMessages(formattedMessages);
 									return currentSelectedChildMap;
@@ -285,7 +269,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 							const newAllMessages = prevAll.filter(
 								(msg) =>
 									!(
-										msg.id === assistantMessageId &&
+										msg.chatId === assistantMessageId &&
 										(!msg.content || msg.content === '') &&
 										(!msg.thinkContent || msg.thinkContent === '')
 									),
@@ -298,18 +282,8 @@ const ChatBot: React.FC<ChatBotProps> = ({
 									newAllMessages,
 									currentSelectedChildMap,
 								);
-								const formattedMessages: any[] = sortedMessages.map((msg) => ({
-									id: msg.id,
-									content: msg.content,
-									role: msg.role as 'user' | 'assistant',
-									timestamp: new Date(msg.createdAt as Date),
-									parentId: msg.parentId,
-									childrenIds: msg.childrenIds,
-									siblingIndex: msg.siblingIndex,
-									siblingCount: msg.siblingCount,
-									thinkContent: msg.thinkContent,
-									isStreaming: msg.isStreaming,
-								}));
+
+								const formattedMessages = getFormatMessages(sortedMessages);
 
 								setMessages(formattedMessages);
 								return currentSelectedChildMap;
@@ -323,7 +297,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 						// 更新消息状态，结束流式传输
 						setAllMessages((prevAll) => {
 							const newAllMessages = prevAll.map((msg) =>
-								msg.id === assistantMessageId
+								msg.chatId === assistantMessageId
 									? { ...msg, isStreaming: false }
 									: msg,
 							);
@@ -335,18 +309,8 @@ const ChatBot: React.FC<ChatBotProps> = ({
 									newAllMessages,
 									currentSelectedChildMap,
 								);
-								const formattedMessages: any[] = sortedMessages.map((msg) => ({
-									id: msg.id,
-									content: msg.content,
-									role: msg.role as 'user' | 'assistant',
-									timestamp: new Date(msg.createdAt as Date),
-									parentId: msg.parentId,
-									childrenIds: msg.childrenIds,
-									siblingIndex: msg.siblingIndex,
-									siblingCount: msg.siblingCount,
-									thinkContent: msg.thinkContent,
-									isStreaming: msg.isStreaming,
-								}));
+
+								const formattedMessages = getFormatMessages(sortedMessages);
 
 								setMessages(formattedMessages);
 								return currentSelectedChildMap;
@@ -369,7 +333,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 				prev.filter(
 					(msg) =>
 						!(
-							msg.id === assistantMessageId &&
+							msg.chatId === assistantMessageId &&
 							msg.content === '' &&
 							msg.thinkContent === ''
 						),
@@ -389,14 +353,13 @@ const ChatBot: React.FC<ChatBotProps> = ({
 		// 区分模式：重新生成 vs 新消息
 		const isRegenerate = content !== undefined && index !== undefined;
 
-		console.log(isRegenerate, 'sendMessage', content, index);
-
-		// TODO：重新生成时需要传递 parentId，即上一条 user 消息的 id，目前没传导致重新生成的消息挂在最后一条 user 消息上
 		if (isRegenerate) {
 			// 重新生成模式：复用已有的 User 消息
 			// 注意：index 是当前显示的 assistant 消息的索引
 			// 我们需要从 allMessages 中找到对应的 user 消息
 			let userMessageToUse: Message;
+			let assistantMessage: Message;
+
 			setAllMessages((prevAll) => {
 				// 找到当前显示的 assistant 消息
 				const currentAssistantMsg = messages[index];
@@ -404,7 +367,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 
 				// 找到对应的 user 消息
 				const userMsg = prevAll.find(
-					(m) => m.id === currentAssistantMsg.parentId,
+					(m) => m.chatId === currentAssistantMsg.parentId,
 				);
 				if (!userMsg) return prevAll;
 
@@ -418,26 +381,28 @@ const ChatBot: React.FC<ChatBotProps> = ({
 				userMessageToUse.childrenIds = childrenIds;
 
 				// 创建新的 assistant 消息
-				const assistantMessage: Message = {
+				assistantMessage = {
 					id: assistantMessageId,
+					chatId: assistantMessageId,
 					content: '',
 					thinkContent: '',
 					role: 'assistant',
 					timestamp: new Date(),
 					isStreaming: true,
-					parentId: userMessageToUse.id,
+					parentId: userMessageToUse.chatId,
 					childrenIds: [],
 				};
 
 				// 更新 allMessages：添加新的 assistant 消息，更新 user 消息
 				const newAllMessages = prevAll.map((msg) =>
-					msg.id === userMessageToUse.id ? userMessageToUse : msg,
+					msg.chatId === userMessageToUse.chatId ? userMessageToUse : msg,
 				);
+
 				newAllMessages.push(assistantMessage);
 
 				// 更新 selectedChildMap 以选择新的 assistant 消息
 				const newSelectedChildMap = new Map(selectedChildMap);
-				newSelectedChildMap.set(userMessageToUse.id, assistantMessageId);
+				newSelectedChildMap.set(userMessageToUse.chatId, assistantMessageId);
 
 				// 先更新 selectedChildMap
 				setSelectedChildMap(newSelectedChildMap);
@@ -447,16 +412,8 @@ const ChatBot: React.FC<ChatBotProps> = ({
 					newAllMessages,
 					newSelectedChildMap,
 				);
-				const formattedMessages: any[] = sortedMessages.map((msg) => ({
-					id: msg.id,
-					content: msg.content,
-					role: msg.role as 'user' | 'assistant',
-					timestamp: new Date(msg.createdAt as Date),
-					parentId: msg.parentId,
-					childrenIds: msg.childrenIds,
-					siblingIndex: msg.siblingIndex,
-					siblingCount: msg.siblingCount,
-				}));
+
+				const formattedMessages = getFormatMessages(sortedMessages);
 
 				setMessages(formattedMessages);
 
@@ -465,15 +422,11 @@ const ChatBot: React.FC<ChatBotProps> = ({
 
 			// 使用 setTimeout 确保状态更新后再调用流式 API
 			setTimeout(() => {
-				console.log(
-					isRegenerate,
-					'isRegenerateisRegenerateisRegenerate',
-					userMessageToUse,
-				);
 				onSseFetch(
 					apiEndpoint,
 					assistantMessageId,
 					userMessageToUse,
+					assistantMessage,
 					isRegenerate,
 				);
 			}, 0);
@@ -482,11 +435,12 @@ const ChatBot: React.FC<ChatBotProps> = ({
 			let parentId: string | undefined;
 			const lastMsg = allMessages[allMessages.length - 1];
 			if (lastMsg) {
-				parentId = lastMsg.id;
+				parentId = lastMsg.chatId;
 			}
 
 			const userMessageToUse: Message = {
 				id: userMsgId,
+				chatId: userMsgId,
 				content: content || input.trim(),
 				role: 'user',
 				timestamp: new Date(),
@@ -500,12 +454,13 @@ const ChatBot: React.FC<ChatBotProps> = ({
 			// 创建 Assistant 消息
 			const assistantMessage: Message = {
 				id: assistantMessageId,
+				chatId: assistantMessageId,
 				content: '',
 				thinkContent: '',
 				role: 'assistant',
 				timestamp: new Date(),
 				isStreaming: true,
-				parentId: userMessageToUse.id,
+				parentId: userMessageToUse.chatId,
 				childrenIds: [],
 			};
 
@@ -515,7 +470,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 				// 更新父节点 childrenIds
 				if (userMessageToUse.parentId) {
 					const parentIndex = newAllMessages.findIndex(
-						(m) => m.id === userMessageToUse.parentId,
+						(m) => m.chatId === userMessageToUse.parentId,
 					);
 					if (parentIndex !== -1) {
 						const parentMsg = { ...newAllMessages[parentIndex] };
@@ -539,28 +494,30 @@ const ChatBot: React.FC<ChatBotProps> = ({
 					newAllMessages,
 					selectedChildMap,
 				);
-				const formattedMessages: any[] = sortedMessages.map((msg) => ({
-					id: msg.id,
-					content: msg.content,
-					role: msg.role as 'user' | 'assistant',
-					timestamp: new Date(msg.createdAt as Date),
-					parentId: msg.parentId,
-					childrenIds: msg.childrenIds,
-					siblingIndex: msg.siblingIndex,
-					siblingCount: msg.siblingCount,
-				}));
+
+				const formattedMessages = getFormatMessages(sortedMessages);
 
 				setMessages(formattedMessages);
-
-				console.log('formattedMessages-----new', formattedMessages);
 
 				return newAllMessages;
 			});
 
-			console.log('userMessageToUse', userMessageToUse);
+			onSseFetch(
+				apiEndpoint,
+				assistantMessageId,
+				userMessageToUse,
+				assistantMessage,
+			);
 
-			// 调用流式 API
-			onSseFetch(apiEndpoint, assistantMessageId, userMessageToUse);
+			// setTimeout(() => {
+			// 	// 调用流式 API
+			// 	onSseFetch(
+			// 		apiEndpoint,
+			// 		assistantMessageId,
+			// 		userMessageToUse,
+			// 		assistantMessage,
+			// 	);
+			// }, 0);
 		}
 
 		setInput('');
@@ -584,16 +541,8 @@ const ChatBot: React.FC<ChatBotProps> = ({
 
 			// 更新显示的消息
 			const sortedMessages = buildMessageList(newAllMessages, selectedChildMap);
-			const formattedMessages: any[] = sortedMessages.map((msg) => ({
-				id: msg.id,
-				content: msg.content,
-				role: msg.role as 'user' | 'assistant',
-				timestamp: new Date(msg.createdAt as Date),
-				parentId: msg.parentId,
-				childrenIds: msg.childrenIds,
-				siblingIndex: msg.siblingIndex,
-				siblingCount: msg.siblingCount,
-			}));
+
+			const formattedMessages = getFormatMessages(sortedMessages);
 
 			setMessages(formattedMessages);
 
@@ -601,7 +550,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 			if (formattedMessages.length > 0) {
 				const lastMsg = formattedMessages[formattedMessages.length - 1];
 				if (lastMsg.role === 'assistant') {
-					onSseFetch('/chat/continueSse', lastMsg.id);
+					onSseFetch('/chat/continueSse', lastMsg.chatId);
 				}
 			}
 
@@ -641,16 +590,8 @@ const ChatBot: React.FC<ChatBotProps> = ({
 						newAllMessages,
 						selectedChildMap,
 					);
-					const formattedMessages: any[] = sortedMessages.map((msg) => ({
-						id: msg.id,
-						content: msg.content,
-						role: msg.role as 'user' | 'assistant',
-						timestamp: new Date(msg.createdAt as Date),
-						parentId: msg.parentId,
-						childrenIds: msg.childrenIds,
-						siblingIndex: msg.siblingIndex,
-						siblingCount: msg.siblingCount,
-					}));
+
+					const formattedMessages = getFormatMessages(sortedMessages);
 
 					setMessages(formattedMessages);
 					return newAllMessages;
@@ -778,7 +719,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 		onBranchChange?.(msgId, direction);
 
 		setAllMessages((prevAll) => {
-			const currentMsg = prevAll.find((m) => m.id === msgId);
+			const currentMsg = prevAll.find((m) => m.chatId === msgId);
 			if (!currentMsg) return prevAll;
 
 			const parentId = currentMsg.parentId;
@@ -796,7 +737,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 						allChildren.add(c);
 					});
 				});
-				siblings = prevAll.filter((m) => !allChildren.has(m.id));
+				siblings = prevAll.filter((m) => !allChildren.has(m.chatId));
 			}
 
 			// 按照创建时间排序
@@ -806,7 +747,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 					new Date(b.createdAt as Date).getTime(),
 			);
 
-			const currentIndex = siblings.findIndex((m) => m.id === msgId);
+			const currentIndex = siblings.findIndex((m) => m.chatId === msgId);
 			const nextIndex =
 				direction === 'next' ? currentIndex + 1 : currentIndex - 1;
 
@@ -815,24 +756,16 @@ const ChatBot: React.FC<ChatBotProps> = ({
 				// 更新选中状态
 				const newSelectedChildMap = new Map(selectedChildMap);
 				if (parentId) {
-					newSelectedChildMap.set(parentId, nextMsg.id);
+					newSelectedChildMap.set(parentId, nextMsg.chatId);
 				} else {
-					newSelectedChildMap.set('root', nextMsg.id);
+					newSelectedChildMap.set('root', nextMsg.chatId);
 				}
 				setSelectedChildMap(newSelectedChildMap);
 
 				// 更新显示的消息
 				const sortedMessages = buildMessageList(prevAll, newSelectedChildMap);
-				const formattedMessages: any[] = sortedMessages.map((msg) => ({
-					id: msg.id,
-					content: msg.content,
-					role: msg.role as 'user' | 'assistant',
-					timestamp: new Date(msg.createdAt as Date),
-					parentId: msg.parentId,
-					childrenIds: msg.childrenIds,
-					siblingIndex: msg.siblingIndex,
-					siblingCount: msg.siblingCount,
-				}));
+
+				const formattedMessages = getFormatMessages(sortedMessages);
 
 				setMessages(formattedMessages);
 			}
@@ -860,7 +793,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 						) : (
 							messages.map((message, index) => (
 								<motion.div
-									key={message.id}
+									key={message.chatId}
 									initial={{ opacity: 0, y: 10 }}
 									animate={{ opacity: 1, y: 0 }}
 									className={cn(
@@ -990,7 +923,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 															message.siblingIndex,
 														);
 														if ((message.siblingIndex || 0) > 0) {
-															handleBranchChange(message.id, 'prev');
+															handleBranchChange(message.chatId, 'prev');
 														}
 													}}
 												/>
@@ -1010,7 +943,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 															(message.siblingIndex || 0) <
 															(message.siblingCount || 0) - 1
 														) {
-															handleBranchChange(message.id, 'next');
+															handleBranchChange(message.chatId, 'next');
 														}
 													}}
 												/>
@@ -1021,11 +954,11 @@ const ChatBot: React.FC<ChatBotProps> = ({
 												className={`absolute bottom-0 right-2 gap-3 ${index !== messages.length - 1 ? 'hidden group-hover:flex' : `${loading ? 'hidden' : 'flex items-center'}`} ${message.role === 'user' ? 'justify-end' : 'left-2'}`}
 											>
 												<div className="cursor-pointer flex items-center justify-center">
-													{isCopyedId !== message.id ? (
+													{isCopyedId !== message.chatId ? (
 														<Copy
 															size={18}
 															onClick={() =>
-																onCopy(message.content, message.id)
+																onCopy(message.content, message.chatId)
 															}
 														/>
 													) : (

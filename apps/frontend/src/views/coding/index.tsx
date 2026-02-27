@@ -13,7 +13,7 @@ import {
 	ResizablePanel,
 	ResizablePanelGroup,
 } from '@/components/ui/resizable';
-import Toolbar from './toolbar';
+import Toolbar from './Toolbar';
 
 const CodeRunner = () => {
 	const [template, setTemplate] =

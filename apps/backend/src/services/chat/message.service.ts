@@ -55,11 +55,25 @@ export class MessageService {
 		});
 	}
 
-	// 获取单个消息
+	// 获取单个消息（通过id）
 	async findOneMessage(id: string, options?: FindOneOptions<ChatSessions>) {
 		return this.chatMessagesRepository.findOne({
 			where: {
 				id,
+			},
+			relations: options?.relations,
+			order: options?.order,
+		});
+	}
+
+	// 通过chatId获取单个消息
+	async findOneMessageByChatId(
+		chatId: string,
+		options?: FindOneOptions<ChatSessions>,
+	) {
+		return this.chatMessagesRepository.findOne({
+			where: {
+				chatId,
 			},
 			relations: options?.relations,
 			order: options?.order,
@@ -74,8 +88,19 @@ export class MessageService {
 		filePaths: string[] = [],
 		parentId: string | null = null,
 		isRegenerate: boolean = false,
+		chatId?: string,
+		childrenIds: string[] = [],
 	) {
-		console.log(isRegenerate, 'isRegenerate-----parentId', parentId);
+		console.log('saveMessage called:', {
+			sessionId,
+			role,
+			contentLength: content.length,
+			parentId,
+			isRegenerate,
+			chatId,
+			childrenIds,
+		});
+
 		try {
 			// 查找或创建会话
 			let session = await this.findOneSession(sessionId);
@@ -88,137 +113,56 @@ export class MessageService {
 				await this.chatSessionsRepository.save(session);
 			}
 
-			// 获取会话中的所有消息
-			const allMessages = await this.chatMessagesRepository.find({
-				where: { session: { id: sessionId } },
-				order: { createdAt: 'ASC' },
-			});
-
-			// 情况一：正常对话，第一个消息的 parentId 应为 null
-			// 情况二：编辑之前的 user 对话，parentId 应为离当前 user 会话最近的上一条 assistant 会话的 id
-			// 情况三：重新生成 assistant 会话，parentId 应为上一条 user 消息的 id
-
-			// 如果没有提供 parentId，根据场景确定 parentId
-			if (!parentId) {
-				if (allMessages.length === 0) {
-					// 情况一：第一个消息，parentId 为 null
-					parentId = null;
-				} else {
-					// 查找最后一条消息
-					const lastMessage = allMessages[allMessages.length - 1];
-
-					if (role === MessageRole.USER) {
-						// 用户消息
-						if (lastMessage.role === MessageRole.ASSISTANT) {
-							// 正常对话：parentId 应为最后一条 assistant 消息的 id
-							parentId = lastMessage.id;
-						} else if (lastMessage.role === MessageRole.USER) {
-							// 情况二：编辑 user 对话，需要找到最近的 assistant 消息
-							// 从后往前查找最近的 assistant 消息
-							const recentAssistant = [...allMessages]
-								.reverse()
-								.find((msg) => msg.role === MessageRole.ASSISTANT);
-							parentId = recentAssistant?.id || null;
-						}
-					} else if (role === MessageRole.ASSISTANT) {
-						// AI 回复消息
-						if (isRegenerate) {
-							// 情况三：重新生成，parentId 应为上一条 user 消息的 id
-							const lastUserMessage = [...allMessages]
-								.reverse()
-								.find((msg) => msg.role === MessageRole.USER);
-							parentId = lastUserMessage?.id || null;
-						} else {
-							// 正常回复：parentId 应为最后一条消息的 id
-							parentId = lastMessage.id;
-						}
-					}
-				}
-			} else {
-				// 如果提供了 parentId，验证父消息
-				const parentMsg = await this.findOneMessage(parentId);
-				if (!parentMsg) {
-					// 父消息不存在，重置为 null
-					parentId = null;
-				} else if (
-					role === MessageRole.USER &&
-					parentMsg.role === MessageRole.USER
-				) {
-					// 情况二：编辑 user 对话，parentId 指向的是 user 消息
-					// 需要找到该 user 消息的父消息（应该是 assistant 消息）
-					const grandParentId = parentMsg.parentId;
-					if (grandParentId) {
-						const grandParentMsg = await this.findOneMessage(grandParentId);
-						if (
-							grandParentMsg &&
-							grandParentMsg.role === MessageRole.ASSISTANT
-						) {
-							// 情况二：编辑 user 对话，parentId 应为上一条 assistant 消息
-							parentId = grandParentId;
-						}
-					}
-				}
-			}
-
 			// 创建消息
 			const message = this.chatMessagesRepository.create({
 				role,
 				content,
 				session,
 				parentId,
-				childrenIds: [], // 初始化为空数组
+				childrenIds: childrenIds || [], // 使用前端传递的 childrenIds
+				chatId: chatId || '', // 保存 chatId 字段
+				currentChatId: chatId || '', // 保存 currentChatId 字段
 			});
+
 			// 保存消息
 			const savedMessage = await this.chatMessagesRepository.save(message);
 
-			// 更新父消息的 childrenIds
+			// 更新父消息的 childrenIds（适用于所有消息类型）
+			// 严格参照前端逻辑：如果消息有 parentId，需要更新父消息的 childrenIds
+			// 注意：这个逻辑适用于所有消息类型，包括 user 和 assistant
+			// 当 user 消息的 parentId 指向 assistant 消息时，需要更新 assistant 消息的 childrenIds
+			// 当 assistant 消息的 parentId 指向 user 消息时，需要更新 user 消息的 childrenIds
+			// 对于重新生成的情况：新的 assistant 消息与原始 assistant 消息有相同的 parentId（指向 user 消息）
+			// user 消息的 childrenIds 应该包含所有 assistant 消息的 chatId（原始的和重新生成的）
 			if (parentId) {
-				const parentMsg = await this.findOneMessage(parentId);
-				if (parentMsg) {
-					if (!parentMsg.childrenIds) {
-						parentMsg.childrenIds = [];
+				console.log('更新父消息 childrenIds:', {
+					messageId: savedMessage.chatId,
+					parentId,
+					role,
+					isRegenerate,
+					messageType: isRegenerate ? '重新生成的assistant消息' : '普通消息',
+				});
+
+				// 查找父消息（通过chatId查找，因为parentId存储的是chatId）
+				const parentMessage = await this.findOneMessageByChatId(parentId);
+				if (parentMessage) {
+					// 确保 childrenIds 数组存在
+					if (!parentMessage.childrenIds) {
+						parentMessage.childrenIds = [];
 					}
-					// 确保不重复添加
-					if (!parentMsg.childrenIds.includes(savedMessage.id)) {
-						parentMsg.childrenIds.push(savedMessage.id);
-						await this.chatMessagesRepository.save(parentMsg);
+
+					// 添加当前消息的 chatId 到父消息的 childrenIds（不重复添加）
+					// 严格参照前端逻辑：检查是否已包含，避免重复添加
+					// 对于重新生成的 assistant 消息，user 消息的 childrenIds 应该包含所有 assistant 消息的 chatId
+					if (!parentMessage.childrenIds.includes(savedMessage.chatId)) {
+						parentMessage.childrenIds.push(savedMessage.chatId);
+						await this.chatMessagesRepository.save(parentMessage);
+						console.log('已更新父消息 childrenIds:', parentMessage.childrenIds);
+					} else {
+						console.log('父消息 childrenIds 已包含此消息 id，跳过更新');
 					}
-				}
-			}
-
-			// 调试日志：记录重新生成 assistant 的情况
-			if (role === MessageRole.ASSISTANT && isRegenerate) {
-				console.log('重新生成 assistant 消息:');
-				console.log('parentId:', parentId);
-				console.log('savedMessage.id:', savedMessage.id);
-
-				// 查找上一条 user 消息
-				const lastUserMessage = [...allMessages]
-					.reverse()
-					.find((msg) => msg.role === MessageRole.USER);
-
-				if (lastUserMessage) {
-					console.log('上一条 user 消息 id:', lastUserMessage.id);
-					console.log(
-						'上一条 user 消息 childrenIds:',
-						lastUserMessage.childrenIds,
-					);
-
-					// 如果 parentId 是 user 消息的 id，那么 childrenIds 应该已经更新了
-					// 如果不是，需要手动添加
-					if (lastUserMessage.id !== parentId) {
-						console.log(
-							'警告：重新生成的 assistant 的 parentId 不是上一条 user 消息',
-						);
-						if (!lastUserMessage.childrenIds) {
-							lastUserMessage.childrenIds = [];
-						}
-						if (!lastUserMessage.childrenIds.includes(savedMessage.id)) {
-							lastUserMessage.childrenIds.push(savedMessage.id);
-							await this.chatMessagesRepository.save(lastUserMessage);
-							console.log('已添加新 assistant 到 user 消息的 childrenIds');
-						}
-					}
+				} else {
+					console.log('未找到父消息，parentId:', parentId);
 				}
 			}
 
@@ -235,6 +179,16 @@ export class MessageService {
 				});
 				await this.attachmentsRepository.save(attachments);
 			}
+
+			console.log('Message saved successfully:', {
+				id: savedMessage.id,
+				chatId: savedMessage.chatId,
+				parentId: savedMessage.parentId,
+				childrenIds: savedMessage.childrenIds,
+				role: savedMessage.role,
+				isRegenerate,
+			});
+
 			return savedMessage;
 		} catch (dbError) {
 			console.error('Failed to save message to database:', dbError);

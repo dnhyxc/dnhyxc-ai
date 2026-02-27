@@ -8,7 +8,7 @@ export const buildMessageList = (
 	const childrenMap = new Map<string, Message[]>();
 
 	messages.forEach((msg) => {
-		messageMap.set(msg.id, msg);
+		messageMap.set(msg.chatId, msg);
 		if (msg.parentId) {
 			if (!childrenMap.has(msg.parentId)) {
 				childrenMap.set(msg.parentId, []);
@@ -27,7 +27,7 @@ export const buildMessageList = (
 				allChildren.add(c);
 			});
 		});
-		rootMessages = messages.filter((m) => !allChildren.has(m.id));
+		rootMessages = messages.filter((m) => !allChildren.has(m.chatId));
 	}
 
 	// 对 rootMessages 进行排序
@@ -41,7 +41,7 @@ export const buildMessageList = (
 
 	// 确定当前的 root message
 	const currentRootId = selectedChildMap.get('root');
-	let currentMessage = rootMessages.find((m) => m.id === currentRootId);
+	let currentMessage = rootMessages.find((m) => m.chatId === currentRootId);
 
 	// 如果没找到，默认选最新的一个
 	if (!currentMessage && rootMessages.length > 0) {
@@ -62,11 +62,15 @@ export const buildMessageList = (
 					new Date(b.createdAt as Date).getTime(),
 			);
 			siblingCount = siblings.length;
-			siblingIndex = siblings.findIndex((m) => m.id === currentMessage?.id);
+			siblingIndex = siblings.findIndex(
+				(m) => m.chatId === currentMessage?.chatId,
+			);
 		} else {
 			// Root 节点的兄弟就是 rootMessages
 			siblingCount = rootMessages.length;
-			siblingIndex = rootMessages.findIndex((m) => m.id === currentMessage?.id);
+			siblingIndex = rootMessages.findIndex(
+				(m) => m.chatId === currentMessage?.chatId,
+			);
 		}
 
 		result.push({
@@ -77,7 +81,7 @@ export const buildMessageList = (
 
 		if (currentMessage.childrenIds && currentMessage.childrenIds.length > 0) {
 			// 优先使用用户选择的子节点
-			let nextId = selectedChildMap.get(currentMessage.id);
+			let nextId = selectedChildMap.get(currentMessage.chatId);
 			if (!nextId || !messageMap.has(nextId)) {
 				// 默认使用最后一个子节点
 				nextId =
@@ -89,4 +93,19 @@ export const buildMessageList = (
 		}
 	}
 	return result;
+};
+
+export const getFormatMessages = (messages: Message[]) => {
+	return messages.map((msg) => ({
+		chatId: msg.chatId,
+		content: msg.content,
+		role: msg.role as 'user' | 'assistant',
+		timestamp: new Date(msg.createdAt as Date),
+		parentId: msg.parentId,
+		childrenIds: msg.childrenIds,
+		siblingIndex: msg.siblingIndex,
+		siblingCount: msg.siblingCount,
+		thinkContent: msg.thinkContent,
+		isStreaming: msg.isStreaming,
+	}));
 };

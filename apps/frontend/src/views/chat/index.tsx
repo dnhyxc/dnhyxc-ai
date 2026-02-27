@@ -5,7 +5,7 @@ import { ScrollArea } from '@ui/index';
 import { PanelRightClose, PanelRightOpen } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { getSessionList } from '@/service';
-import { buildMessageList } from './tools';
+import { buildMessageList, getFormatMessages } from './tools';
 
 const messageList = [
 	{
@@ -169,26 +169,21 @@ const Chat = () => {
 	}, []);
 
 	useEffect(() => {
-		getSessions();
-	}, []);
+		if (open) {
+			getSessions();
+		}
+	}, [open]);
 
 	const onSelectSession = (session: Session) => {
 		setActiveSessionId(session.id);
 
 		setSelectedChildMap(new Map());
 
+		console.log(session.messages, 'session.messagessession.messages');
+
 		const sortedMessages = buildMessageList(session.messages, new Map());
 
-		const formattedMessages: any[] = sortedMessages.map((msg) => ({
-			id: msg.id,
-			content: msg.content,
-			role: msg.role as 'user' | 'assistant',
-			timestamp: new Date(msg.createdAt as Date),
-			parentId: msg.parentId,
-			childrenIds: msg.childrenIds,
-			siblingIndex: msg.siblingIndex,
-			siblingCount: msg.siblingCount,
-		}));
+		const formattedMessages = getFormatMessages(sortedMessages);
 
 		setChatBotMessages(formattedMessages);
 
@@ -201,7 +196,7 @@ const Chat = () => {
 		);
 		if (!currentSession) return;
 
-		const currentMsg = currentSession.messages.find((m) => m.id === msgId);
+		const currentMsg = currentSession.messages.find((m) => m.chatId === msgId);
 		if (!currentMsg) return;
 
 		const parentId = currentMsg.parentId;
@@ -223,7 +218,7 @@ const Chat = () => {
 					});
 				});
 				siblings = currentSession.messages.filter(
-					(m) => !allChildren.has(m.id),
+					(m) => !allChildren.has(m.chatId),
 				);
 			}
 		}
@@ -233,7 +228,7 @@ const Chat = () => {
 		// 		new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
 		// );
 
-		const currentIndex = siblings.findIndex((m) => m.id === msgId);
+		const currentIndex = siblings.findIndex((m) => m.chatId === msgId);
 		const nextIndex =
 			direction === 'next' ? currentIndex + 1 : currentIndex - 1;
 
@@ -242,9 +237,9 @@ const Chat = () => {
 			// 更新选中状态
 			const newSelectedChildMap = new Map(selectedChildMap);
 			if (parentId) {
-				newSelectedChildMap.set(parentId, nextMsg.id);
+				newSelectedChildMap.set(parentId, nextMsg.chatId);
 			} else {
-				newSelectedChildMap.set('root', nextMsg.id);
+				newSelectedChildMap.set('root', nextMsg.chatId);
 			}
 
 			setSelectedChildMap(newSelectedChildMap);
@@ -255,16 +250,7 @@ const Chat = () => {
 				newSelectedChildMap,
 			);
 
-			const formattedMessages: any[] = sortedMessages.map((msg) => ({
-				id: msg.id,
-				content: msg.content,
-				role: msg.role as 'user' | 'assistant',
-				timestamp: new Date(msg.createdAt as Date),
-				parentId: msg.parentId,
-				childrenIds: msg.childrenIds,
-				siblingIndex: msg.siblingIndex,
-				siblingCount: msg.siblingCount,
-			}));
+			const formattedMessages = getFormatMessages(sortedMessages);
 
 			setChatBotMessages(formattedMessages);
 		}
@@ -285,6 +271,7 @@ const Chat = () => {
 				],
 				total: 1,
 			};
+			console.log(res.data, 'res.data');
 			setSessionListInfo(res.data);
 			// if (res.data.list.length > 0) {
 			// 	onSelectSession(res.data.list[0]);

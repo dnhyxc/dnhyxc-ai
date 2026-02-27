@@ -982,3 +982,137 @@ const data = [
 这种情况下，之前生成的 assistant 的 parentId 和重新生成的 assistant 的 parentId 都是 上一天 user 消息的 id。同时不要重复保存重新生成时携带的 user 消息
 
 具体实现可以参考 https://chat.z.ai/c/c788c2c7-6364-485b-a9d0-7fdf6e24f2b7 中的实现效果
+
+```json
+{
+	"list": [
+		{
+			"id": "d74fdb88-eaa5-429f-8221-b71dbef235f3",
+			"isActive": true,
+			"createdAt": "2026-02-26T21:24:45.278Z",
+			"updatedAt": "2026-02-26T21:24:45.278Z",
+			"messages": [
+				{
+					"id": "628e1eea-1caf-4272-99fc-58c4387dd73a",
+					"chatId": "07670e0d-68bd-4e3f-af14-bc25808db8d1",
+					"currentChatId": "07670e0d-68bd-4e3f-af14-bc25808db8d1",
+					"role": "user",
+					"content": "一句话总结冬天",
+					"parentId": null,
+					"childrenIds": ["737fbe79-1ce2-4b31-83e3-2c098967e497"],
+					"createdAt": "2026-02-26T21:24:45.284Z",
+					"attachments": []
+				},
+				{
+					"id": "35c75c8c-18b4-43de-b2dd-8f9e350b43c3",
+					"chatId": "737fbe79-1ce2-4b31-83e3-2c098967e497",
+					"currentChatId": "737fbe79-1ce2-4b31-83e3-2c098967e497",
+					"role": "assistant",
+					"content": "**冷冽中蕴藏寂静的生机。**",
+					"parentId": "07670e0d-68bd-4e3f-af14-bc25808db8d1",
+					"childrenIds": [],
+					"createdAt": "2026-02-26T21:24:48.665Z",
+					"attachments": []
+				},
+				{
+					"id": "87d7faac-e76c-47b4-bea5-4e089c2a07af",
+					"chatId": "f89b927b-8dcb-4ee9-ad1a-35160119e047",
+					"currentChatId": "f89b927b-8dcb-4ee9-ad1a-35160119e047",
+					"role": "user",
+					"content": "一句话总结春天",
+					"parentId": "737fbe79-1ce2-4b31-83e3-2c098967e497",
+					"childrenIds": ["3d870e6d-14cd-4409-b0c4-de199055d494"],
+					"createdAt": "2026-02-26T21:25:02.270Z",
+					"attachments": []
+				},
+				{
+					"id": "b3d45cc6-d7c7-49b7-8d43-13cbdb7335fb",
+					"chatId": "3d870e6d-14cd-4409-b0c4-de199055d494",
+					"currentChatId": "3d870e6d-14cd-4409-b0c4-de199055d494",
+					"role": "assistant",
+					"content": "冬天是冰封的沉睡，春天是苏醒的呼吸。",
+					"parentId": "f89b927b-8dcb-4ee9-ad1a-35160119e047",
+					"childrenIds": [],
+					"createdAt": "2026-02-26T21:25:03.586Z",
+					"attachments": []
+				},
+				{
+					"id": "6ea791f5-6bf2-475a-9cd1-5b50aee6ceda",
+					"chatId": "68208777-a03d-4ca9-a86e-9fbef5b27478",
+					"currentChatId": "68208777-a03d-4ca9-a86e-9fbef5b27478",
+					"role": "assistant",
+					"content": "冬天是冰封的沉睡，春天是苏醒的呼吸。",
+					"parentId": "07670e0d-68bd-4e3f-af14-bc25808db8d1",
+					"childrenIds": [],
+					"createdAt": "2026-02-26T21:25:32.450Z",
+					"attachments": []
+				}
+			]
+		},
+		{
+			"id": "6b7ce925-2c23-48a2-a4a2-d9da8d336733",
+			"isActive": true,
+			"createdAt": "2026-02-26T21:19:36.643Z",
+			"updatedAt": "2026-02-26T21:19:36.643Z",
+			"messages": [
+				{
+					"id": "f5486b96-cf4a-4522-a704-86f910782c73",
+					"chatId": "0ca9fd84-9a1e-405a-8f04-97826862d63c",
+					"currentChatId": "0ca9fd84-9a1e-405a-8f04-97826862d63c",
+					"role": "user",
+					"content": "一句话总结春天",
+					"parentId": null,
+					"childrenIds": ["a9536c5f-8362-4874-b9ab-69281661e8f3"],
+					"createdAt": "2026-02-26T21:19:36.653Z",
+					"attachments": []
+				},
+				{
+					"id": "c83b6f38-e9aa-4a05-a963-9d0f382480ab",
+					"chatId": "a9536c5f-8362-4874-b9ab-69281661e8f3",
+					"currentChatId": "a9536c5f-8362-4874-b9ab-69281661e8f3",
+					"role": "assistant",
+					"content": "**万物复苏，生机勃发。**",
+					"parentId": "0ca9fd84-9a1e-405a-8f04-97826862d63c",
+					"childrenIds": [],
+					"createdAt": "2026-02-26T21:19:40.620Z",
+					"attachments": []
+				},
+				{
+					"id": "de4f8411-392d-47c1-9e34-5a79d06964fe",
+					"chatId": "b7765184-864b-446e-9a7b-21576ab2a800",
+					"currentChatId": "b7765184-864b-446e-9a7b-21576ab2a800",
+					"role": "user",
+					"content": "一句话总结夏天",
+					"parentId": "a9536c5f-8362-4874-b9ab-69281661e8f3",
+					"childrenIds": ["4054aa0a-00db-4f60-8e79-6952372318f0"],
+					"createdAt": "2026-02-26T21:19:53.630Z",
+					"attachments": []
+				},
+				{
+					"id": "40f6f675-f42e-4672-8240-3a988da7d5fc",
+					"chatId": "4054aa0a-00db-4f60-8e79-6952372318f0",
+					"currentChatId": "4054aa0a-00db-4f60-8e79-6952372318f0",
+					"role": "assistant",
+					"content": "**春天：万物复苏，生命初绽。**  \n**夏天：骄阳似火，热烈生长。**",
+					"parentId": "b7765184-864b-446e-9a7b-21576ab2a800",
+					"childrenIds": [],
+					"createdAt": "2026-02-26T21:19:55.185Z",
+					"attachments": []
+				},
+				{
+					"id": "3f24cf78-89ca-42a9-b93b-2480b16b648e",
+					"chatId": "a1fc08bf-e0e7-435b-8ddd-180151e62184",
+					"currentChatId": "a1fc08bf-e0e7-435b-8ddd-180151e62184",
+					"role": "assistant",
+					"content": "**春天：生命在温柔中醒来。**  \n**夏天：万物在热烈中盛放。**",
+					"parentId": "0ca9fd84-9a1e-405a-8f04-97826862d63c",
+					"childrenIds": [],
+					"createdAt": "2026-02-26T21:20:57.135Z",
+					"attachments": []
+				}
+			]
+		}
+	],
+	"total": 2
+}
+```

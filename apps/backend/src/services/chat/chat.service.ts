@@ -188,34 +188,22 @@ export class ChatService {
 		const newMessages = this.convertToLangChainMessages(enhancedMessages);
 		const allMessages = [...history, ...newMessages];
 
-		// 保存用户消息到数据库
-		let parentId: string | null = null;
-		if (dto.sessionId) {
-			const lastMessage = await this.messageService.findOneMessage(sessionId, {
-				order: { createdAt: 'DESC' },
-			});
-			// const lastMessage = await this.chatMessagesRepository.findOne({
-			// 	where: { session: { id: sessionId } },
-			// 	order: { createdAt: 'DESC' },
-			// });
-			if (lastMessage) {
-				parentId = lastMessage.id;
-			}
-		}
-
+		// 保存用户消息到数据库（使用前端传递的数据）
 		const lastUserMessage = enhancedMessages.find((msg) => msg.role === 'user');
 		let savedUserMessage: ChatMessages | null = null;
 
-		if (lastUserMessage) {
-			// 异步保存，不等待结果
+		if (lastUserMessage && dto.userMessage) {
+			// 使用前端传递的 userMessage 数据
 			savedUserMessage = await this.messageService
 				.saveMessage(
 					sessionId,
 					MessageRole.USER,
 					lastUserMessage.content,
 					dto.filePaths,
-					parentId,
+					dto.userMessage.parentId || null,
 					false,
+					dto.userMessage.chatId, // chatId
+					dto.userMessage.childrenIds || [], // childrenIds
 				)
 				.catch((dbError) => {
 					console.error('Failed to save user message to database:', dbError);
@@ -229,20 +217,44 @@ export class ChatService {
 		const aiMessage = new AIMessage(responseContent);
 		this.conversationMemory.set(sessionId, [...allMessages, aiMessage]);
 
-		// 保存AI回复到数据库
+		// 保存AI回复到数据库（使用前端传递的数据）
 		// 异步保存，不等待结果
-		await this.messageService
-			.saveMessage(
-				sessionId,
-				MessageRole.ASSISTANT,
-				responseContent,
-				[],
-				savedUserMessage?.id,
-				false,
-			)
-			.catch((dbError) => {
-				console.error('Failed to save assistant message to database:', dbError);
-			});
+		if (dto.assistantMessage) {
+			await this.messageService
+				.saveMessage(
+					sessionId,
+					MessageRole.ASSISTANT,
+					responseContent,
+					[],
+					dto.assistantMessage.parentId || null,
+					false,
+					dto.assistantMessage.chatId, // chatId
+					dto.assistantMessage.childrenIds || [], // childrenIds
+				)
+				.catch((dbError) => {
+					console.error(
+						'Failed to save assistant message to database:',
+						dbError,
+					);
+				});
+		} else {
+			// 如果没有传递 assistantMessage，使用默认逻辑
+			await this.messageService
+				.saveMessage(
+					sessionId,
+					MessageRole.ASSISTANT,
+					responseContent,
+					[],
+					savedUserMessage?.id,
+					false,
+				)
+				.catch((dbError) => {
+					console.error(
+						'Failed to save assistant message to database:',
+						dbError,
+					);
+				});
+		}
 
 		return {
 			content: responseContent,
@@ -276,46 +288,26 @@ export class ChatService {
 		await this.cache.set(sessionId, cancel$, 12 * 60 * 60 * 1000);
 		this.activeSessions.set(sessionId, true);
 
-		// 保存用户消息到数据库
-		let parentId: string | null = null;
-
-		if (dto.sessionId) {
-			const lastMessage = await this.messageService.findOneMessage(
-				dto.sessionId,
-				{
-					order: {
-						createdAt: 'DESC',
-					},
-				},
-			);
-			if (lastMessage) {
-				parentId = lastMessage.id;
-			}
-		}
-
+		// 保存用户消息到数据库（使用前端传递的数据）
 		const lastUserMessage = dto.messages.find(
 			(msg) => msg.role === 'user' && !msg.noSave,
 		);
 
 		let savedUserMessage: ChatMessages | null = null;
 
-		if (lastUserMessage) {
-			console.log(
-				'lastUserMessage',
-				lastUserMessage,
-				'dto.parentId',
-				dto.parentId,
-			);
-			// 异步保存，不等待结果
+		if (lastUserMessage && dto.userMessage) {
+			console.log('Saving user message from frontend:', dto.userMessage);
+			// 使用前端传递的 userMessage 数据
 			savedUserMessage = await this.messageService
 				.saveMessage(
 					sessionId,
 					MessageRole.USER,
 					lastUserMessage.content,
 					dto.filePaths,
-					// parentId,
-					null,
-					dto.isRegenerate,
+					dto.userMessage.parentId || null,
+					dto.isRegenerate || false,
+					dto.userMessage.chatId, // chatId
+					dto.userMessage.childrenIds || [], // childrenIds
 				)
 				.catch((dbError) => {
 					console.error('Failed to save user message to database:', dbError);
@@ -437,16 +429,33 @@ export class ChatService {
 
 					// 正常完成，cancel$.isStopped 为 false, 暂停时 cancel$.isStopped 为 true
 					if (!cancel$.isStopped) {
-						console.log('stop-dto.parentId', dto.parentId);
-						// 保存完整的AI回复到数据库
-						await this.messageService.saveMessage(
-							sessionId,
-							MessageRole.ASSISTANT,
-							finalContent,
-							[],
-							dto.parentId || savedUserMessage?.id,
-							dto.isRegenerate || false,
+						console.log(
+							'Saving assistant message from frontend:',
+							dto.assistantMessage,
 						);
+						// 保存完整的AI回复到数据库（使用前端传递的数据）
+						if (dto.assistantMessage) {
+							await this.messageService.saveMessage(
+								sessionId,
+								MessageRole.ASSISTANT,
+								finalContent,
+								[],
+								dto.assistantMessage.parentId || null,
+								dto.isRegenerate || false,
+								dto.assistantMessage.chatId, // chatId
+								dto.assistantMessage.childrenIds || [], // childrenIds
+							);
+						} else {
+							// 如果没有传递 assistantMessage，使用默认逻辑
+							await this.messageService.saveMessage(
+								sessionId,
+								MessageRole.ASSISTANT,
+								finalContent,
+								[],
+								dto.parentId || savedUserMessage?.id,
+								dto.isRegenerate || false,
+							);
+						}
 						// 清除部分响应（因为已经完成）更新会话的partialContent为null
 						await this.messageService.updateSessionPartialContent(
 							sessionId,
@@ -484,9 +493,6 @@ export class ChatService {
 					`模型调用异常: ${error}`,
 					HttpStatus.BAD_REQUEST,
 				);
-				// console.error('Stream interrupted in catchError:', error);
-				// // 注意：不在这里调用 cleanupSession，因为 finally 块已经处理了清理
-				// return throwError(() => new Error('Stream interrupted'));
 			}),
 		);
 	}
@@ -593,37 +599,24 @@ export class ChatService {
 
 					const sessionId = dto.sessionId || randomUUID();
 
-					// 保存用户消息到数据库
-					let parentId: string | null = null;
-					if (dto.sessionId) {
-						const lastMessage = await this.messageService.findOneMessage(
-							sessionId,
-							{
-								order: {
-									createdAt: 'DESC',
-								},
-							},
-						);
-						if (lastMessage) {
-							parentId = lastMessage.id;
-						}
-					}
-
+					// 保存用户消息到数据库（使用前端传递的数据）
 					const lastUserMessage = dto.messages.find(
 						(msg) => msg.role === 'user',
 					);
 					let savedUserMessage: ChatMessages | null = null;
 
-					if (lastUserMessage) {
-						// 异步保存，不等待结果
+					if (lastUserMessage && dto.userMessage) {
+						// 使用前端传递的 userMessage 数据
 						savedUserMessage = await this.messageService
 							.saveMessage(
 								sessionId,
 								MessageRole.USER,
 								lastUserMessage.content,
 								dto.filePaths,
-								parentId,
+								dto.userMessage.parentId || null,
 								false, // isRegenerate: user 消息不是重新生成
+								dto.userMessage.chatId, // chatId
+								dto.userMessage.childrenIds || [], // childrenIds
 							)
 							.catch((dbError) => {
 								console.error(
@@ -733,23 +726,44 @@ export class ChatService {
 											...allMessages,
 											aiMessage,
 										]);
-										// 保存AI回复到数据库
+										// 保存AI回复到数据库（使用前端传递的数据）
 										// 异步保存，不等待结果
-										this.messageService
-											.saveMessage(
-												sessionId,
-												MessageRole.ASSISTANT,
-												fullContent,
-												[],
-												savedUserMessage?.id,
-												false, // isRegenerate: 正常回复
-											)
-											.catch((dbError) => {
-												console.error(
-													'Failed to save assistant message to database:',
-													dbError,
-												);
-											});
+										if (dto.assistantMessage) {
+											this.messageService
+												.saveMessage(
+													sessionId,
+													MessageRole.ASSISTANT,
+													fullContent,
+													[],
+													dto.assistantMessage.parentId || null,
+													false, // isRegenerate: 正常回复
+													dto.assistantMessage.chatId, // chatId
+													dto.assistantMessage.childrenIds || [], // childrenIds
+												)
+												.catch((dbError) => {
+													console.error(
+														'Failed to save assistant message to database:',
+														dbError,
+													);
+												});
+										} else {
+											// 如果没有传递 assistantMessage，使用默认逻辑
+											this.messageService
+												.saveMessage(
+													sessionId,
+													MessageRole.ASSISTANT,
+													fullContent,
+													[],
+													savedUserMessage?.id,
+													false, // isRegenerate: 正常回复
+												)
+												.catch((dbError) => {
+													console.error(
+														'Failed to save assistant message to database:',
+														dbError,
+													);
+												});
+										}
 										subscriber.complete();
 										return;
 									}

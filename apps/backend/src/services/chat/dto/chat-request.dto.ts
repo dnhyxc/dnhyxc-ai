@@ -4,11 +4,52 @@ import {
 	IsArray,
 	IsBoolean,
 	IsNumber,
+	IsObject,
 	IsOptional,
 	IsString,
 	ValidateNested,
 } from 'class-validator';
 import { ChatMessageDto } from './chat-message.dto';
+
+export class UserMessageDto {
+	@IsString()
+	chatId: string;
+
+	@IsString()
+	content: string;
+
+	@IsString()
+	role: 'user';
+
+	@IsOptional()
+	@IsString()
+	parentId?: string;
+
+	@IsOptional()
+	@IsArray()
+	@IsString({ each: true })
+	childrenIds?: string[];
+}
+
+export class AssistantMessageDto {
+	@IsString()
+	chatId: string;
+
+	@IsString()
+	content: string;
+
+	@IsString()
+	role: 'assistant';
+
+	@IsOptional()
+	@IsString()
+	parentId?: string;
+
+	@IsOptional()
+	@IsArray()
+	@IsString({ each: true })
+	childrenIds?: string[];
+}
 
 export class ChatRequestDto {
 	@IsArray()
@@ -50,7 +91,15 @@ export class ChatRequestDto {
 	@IsOptional()
 	isRegenerate?: boolean;
 
-	@IsString()
 	@IsOptional()
+	@IsString()
 	parentId?: string;
+
+	@IsOptional()
+	@IsObject()
+	userMessage?: UserMessageDto;
+
+	@IsOptional()
+	@IsObject()
+	assistantMessage?: AssistantMessageDto;
 }
