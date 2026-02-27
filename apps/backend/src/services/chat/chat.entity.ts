@@ -21,6 +21,12 @@ export class ChatMessages {
 	@PrimaryGeneratedColumn('uuid')
 	id: string;
 
+	@Column('text')
+	chatId: string;
+
+	@Column('text')
+	currentChatId: string;
+
 	@Column({
 		type: 'enum',
 		enum: MessageRole,

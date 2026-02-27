@@ -45,4 +45,12 @@ export class ChatRequestDto {
 	@IsBoolean()
 	@IsOptional()
 	stop?: boolean;
+
+	@IsBoolean()
+	@IsOptional()
+	isRegenerate?: boolean;
+
+	@IsString()
+	@IsOptional()
+	parentId?: string;
 }

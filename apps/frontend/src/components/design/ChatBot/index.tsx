@@ -44,10 +44,12 @@ export interface Message {
 }
 
 interface ChatRequestParams {
-	messages: { role: 'user' | 'assistant'; content: string }[];
+	messages: { role: 'user' | 'assistant'; content: string; noSave?: boolean }[];
 	sessionId: string;
 	stream?: boolean;
 	filePaths?: string[];
+	isRegenerate?: boolean;
+	parentId?: string;
 }
 
 interface ChatBotProps {
@@ -152,12 +154,22 @@ const ChatBot: React.FC<ChatBotProps> = ({
 		api: string = apiEndpoint,
 		assistantMessageId: string,
 		userMessage?: Message,
+		isRegenerate?: boolean,
 	) => {
+		const parentId = isRegenerate ? userMessage?.id : userMessage?.parentId;
 		// 调用流式 API
 		const messages: ChatRequestParams = {
-			messages: [{ role: 'user', content: userMessage?.content || '' }],
+			messages: [
+				{
+					role: 'user',
+					content: userMessage?.content || '',
+					noSave: isRegenerate,
+				},
+			],
 			sessionId,
 			stream: true,
+			isRegenerate,
+			parentId,
 		};
 		if (userMessage?.file) {
 			messages.filePaths = [userMessage?.file?.path || ''];
@@ -377,10 +389,14 @@ const ChatBot: React.FC<ChatBotProps> = ({
 		// 区分模式：重新生成 vs 新消息
 		const isRegenerate = content !== undefined && index !== undefined;
 
+		console.log(isRegenerate, 'sendMessage', content, index);
+
+		// TODO：重新生成时需要传递 parentId，即上一条 user 消息的 id，目前没传导致重新生成的消息挂在最后一条 user 消息上
 		if (isRegenerate) {
 			// 重新生成模式：复用已有的 User 消息
 			// 注意：index 是当前显示的 assistant 消息的索引
 			// 我们需要从 allMessages 中找到对应的 user 消息
+			let userMessageToUse: Message;
 			setAllMessages((prevAll) => {
 				// 找到当前显示的 assistant 消息
 				const currentAssistantMsg = messages[index];
@@ -392,7 +408,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 				);
 				if (!userMsg) return prevAll;
 
-				const userMessageToUse = { ...userMsg };
+				userMessageToUse = { ...userMsg };
 
 				// 更新 user 消息的 childrenIds
 				const childrenIds = userMsg.childrenIds ? [...userMsg.childrenIds] : [];
@@ -444,13 +460,23 @@ const ChatBot: React.FC<ChatBotProps> = ({
 
 				setMessages(formattedMessages);
 
-				// 使用 setTimeout 确保状态更新后再调用流式 API
-				setTimeout(() => {
-					onSseFetch(apiEndpoint, assistantMessageId, userMessageToUse);
-				}, 0);
-
 				return newAllMessages;
 			});
+
+			// 使用 setTimeout 确保状态更新后再调用流式 API
+			setTimeout(() => {
+				console.log(
+					isRegenerate,
+					'isRegenerateisRegenerateisRegenerate',
+					userMessageToUse,
+				);
+				onSseFetch(
+					apiEndpoint,
+					assistantMessageId,
+					userMessageToUse,
+					isRegenerate,
+				);
+			}, 0);
 		} else {
 			// 新消息模式：计算 parentId
 			let parentId: string | undefined;
@@ -526,11 +552,15 @@ const ChatBot: React.FC<ChatBotProps> = ({
 
 				setMessages(formattedMessages);
 
-				// 调用流式 API
-				onSseFetch(apiEndpoint, assistantMessageId, userMessageToUse);
+				console.log('formattedMessages-----new', formattedMessages);
 
 				return newAllMessages;
 			});
+
+			console.log('userMessageToUse', userMessageToUse);
+
+			// 调用流式 API
+			onSseFetch(apiEndpoint, assistantMessageId, userMessageToUse);
 		}
 
 		setInput('');

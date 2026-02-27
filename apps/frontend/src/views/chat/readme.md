@@ -848,3 +848,137 @@ const data = [
 	},
 ];
 ```
+
+## Server 数据存储
+
+```json
+[
+	{
+		"id": "80e7cb14-f089-4629-8afa-178fa49fec5f",
+		"role": "user",
+		"content": "一句话总结春天",
+		"parentId": null,
+		"childrenIds": ["c19e8e6c-3691-45b6-9750-c639d0f3bb6f"],
+		"createdAt": "2026-02-12T04:27:33.483Z",
+		"attachments": []
+	},
+	{
+		"id": "c19e8e6c-3691-45b6-9750-c639d0f3bb6f",
+		"role": "assistant",
+		"content": "**万物复苏，生机勃发。**",
+		"parentId": "80e7cb14-f089-4629-8afa-178fa49fec5f",
+		"childrenIds": ["a010e042-dc57-44f8-8f9e-0cca50468fd7"],
+		"createdAt": "2026-02-12T04:27:36.405Z",
+		"attachments": []
+	},
+	{
+		"id": "a010e042-dc57-44f8-8f9e-0cca50468fd7",
+		"role": "user",
+		"content": "一句话总结夏天",
+		"parentId": "c19e8e6c-3691-45b6-9750-c639d0f3bb6f",
+		"childrenIds": ["d1e8ab07-3c5b-4f6b-801f-fec247ffe9de"],
+		"createdAt": "2026-02-12T04:27:46.606Z",
+		"attachments": []
+	},
+	{
+		"id": "d1e8ab07-3c5b-4f6b-801f-fec247ffe9de",
+		"role": "assistant",
+		"content": "**春天：** 万物复苏，生机勃发。  \n**夏天：** 热烈繁盛，能量满溢。",
+		"parentId": "a010e042-dc57-44f8-8f9e-0cca50468fd7",
+		"childrenIds": ["beef1216-09cd-4017-8ae4-1610670a0dbd"],
+		"createdAt": "2026-02-12T04:27:48.687Z",
+		"attachments": []
+	},
+	{
+		"id": "beef1216-09cd-4017-8ae4-1610670a0dbd",
+		"role": "user",
+		"content": "一句话总结秋天",
+		"parentId": "d1e8ab07-3c5b-4f6b-801f-fec247ffe9de",
+		"childrenIds": ["1374edca-0a2d-4cd3-922d-e4fc5f8f7bd6"],
+		"createdAt": "2026-02-12T04:27:58.312Z",
+		"attachments": []
+	},
+	{
+		"id": "1374edca-0a2d-4cd3-922d-e4fc5f8f7bd6",
+		"role": "assistant",
+		"content": "**春天：** 万物在暖阳与细雨中苏醒，生命初绽，充满希望与可能。\n\n**夏天：** 阳光倾泻，万物在极致的繁茂与热烈中，释放着蓬勃的能量。\n\n**秋天：** 世界在绚烂的色彩中沉淀，丰收与凋零交织，归于宁静与深邃。",
+		"parentId": "beef1216-09cd-4017-8ae4-1610670a0dbd",
+		"childrenIds": [
+			"abde52b2-5b77-4efc-adfd-643272fdf032",
+			"cee9d5bf-c2e4-40c9-b81c-a49146619c90"
+		],
+		"createdAt": "2026-02-12T04:28:02.921Z",
+		"attachments": []
+	},
+	{
+		"id": "abde52b2-5b77-4efc-adfd-643272fdf032",
+		"role": "user",
+		"content": "一句话总结冬天",
+		"parentId": "1374edca-0a2d-4cd3-922d-e4fc5f8f7bd6",
+		"childrenIds": ["f08b4675-a8fe-4b1e-81ce-a4b7e063ba73"],
+		"createdAt": "2026-02-12T04:28:12.888Z",
+		"attachments": []
+	},
+	{
+		"id": "f08b4675-a8fe-4b1e-81ce-a4b7e063ba73",
+		"role": "assistant",
+		"content": "**春天：** 万物在暖阳细雨中苏醒，生命初绽，充满希望。\n\n**夏天：** 阳光倾泻，万物在极致的繁茂与热烈中释放能量。\n\n**秋天：** 世界在绚烂的色彩中沉淀，丰收与凋零交织，归于深邃。\n\n**冬天：** 万物在凛冽与静谧中蛰伏，积蓄力量，等待新生。",
+		"parentId": "abde52b2-5b77-4efc-adfd-643272fdf032",
+		"childrenIds": ["cd79d5ba-c2e4-40c9-b81c-a491466198nf"],
+		"createdAt": "2026-02-12T04:28:16.922Z",
+		"attachments": []
+	},
+	{
+		"id": "cee9d5bf-c2e4-40c9-b81c-a49146619c90",
+		"role": "user",
+		"content": "我不需要带其他季节，只要一句话总结冬天",
+		"parentId": "1374edca-0a2d-4cd3-922d-e4fc5f8f7bd6",
+		"childrenIds": ["a4be5ab9-e352-4061-a30a-f2f2a18b827e"],
+		"createdAt": "2026-02-12T04:28:34.250Z",
+		"attachments": []
+	},
+	{
+		"id": "a4be5ab9-e352-4061-a30a-f2f2a18b827e",
+		"role": "assistant",
+		"content": "**冬天：** 万物在凛冽与静谧中蛰伏，积蓄力量，等待新生。",
+		"parentId": "cee9d5bf-c2e4-40c9-b81c-a49146619c90",
+		"childrenIds": [],
+		"createdAt": "2026-02-12T04:28:37.972Z",
+		"attachments": []
+	},
+	{
+		"id": "cd79d5ba-c2e4-40c9-b81c-a491466198nf",
+		"role": "user",
+		"content": "我需要一句话总结冬天",
+		"parentId": "f08b4675-a8fe-4b1e-81ce-a4b7e063ba73",
+		"childrenIds": ["abcj5ab9-e352-4061-a30a-f2f2a18b76uy"],
+		"createdAt": "2026-02-12T04:28:34.250Z",
+		"attachments": []
+	},
+	{
+		"id": "dd79d5ba-c2e4-40c9-b81c-a496966198of",
+		"role": "assistant",
+		"content": "万物在凛冽与静谧中蛰伏，积蓄力量，等待新生",
+		"parentId": "cd79d5ba-c2e4-40c9-b81c-a491466198nf",
+		"childrenIds": [],
+		"createdAt": "2026-02-12T04:28:34.250Z",
+		"attachments": []
+	}
+]
+```
+
+我需要将数据以上述数据的格式存储到数据库，注意上述数据的 parentId，与 childrenIds，是一一相扣的。数据格式保存要严格参考上述数据格式，特别要注意的 parentId 和 childrenIds 的存储。
+
+### 情况一，正常对话，没有编辑之前的 user 对话，重新发送、没有点击已经生成回复下的重新生成按钮重新生成的情况
+
+第一个 user 问题的 parentId 为 null, 第一个 user 问题的回复 assistant 的 parentId 为第一个 user 问题的 id， 第一个 user 问题的 childrenIds 中要保存第一个 user 问题的回复 assistant 的 id，第二个 user 问题的 parentId 即为上一个 assistant 回复的 id，而上一个 assistant 的 childrenIds 中存储的就是 第二个 user 问题的 id，以此类推。
+
+### 情况二，编辑之前的 user 对话，重新发送问题
+
+这种情况，在编辑的 user 会话下将出现两个分支，原始 user 会话 parentId 和重新编辑发送的 user 会话 parentId 都是离当前 user 会话最近的上一条 assistant 会话的 id，而这条 assistant 会话的 childrenIds 将要保存 原始 user 会话的 id 和 修改后重新发送的 user 会话的 id。可能会多次编辑，多次编辑后的 user 会话的 parentId 也同前文描述的逻辑。如果修改的当前 user 会话下已经有 assistant，那么该 assistant 的 parentId 为 当前修改这条 user 会话的 id，属于修改前的 user 会话的分支，修改后的 user 会话下的 assistant 消息，从属于修改后 user 会话的分支。
+
+### 情况三，从新生成 assistant 会话
+
+这种情况下，之前生成的 assistant 的 parentId 和重新生成的 assistant 的 parentId 都是 上一天 user 消息的 id。同时不要重复保存重新生成时携带的 user 消息
+
+具体实现可以参考 https://chat.z.ai/c/c788c2c7-6364-485b-a9d0-7fdf6e24f2b7 中的实现效果

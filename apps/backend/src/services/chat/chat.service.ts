@@ -215,6 +215,7 @@ export class ChatService {
 					lastUserMessage.content,
 					dto.filePaths,
 					parentId,
+					false,
 				)
 				.catch((dbError) => {
 					console.error('Failed to save user message to database:', dbError);
@@ -237,6 +238,7 @@ export class ChatService {
 				responseContent,
 				[],
 				savedUserMessage?.id,
+				false,
 			)
 			.catch((dbError) => {
 				console.error('Failed to save assistant message to database:', dbError);
@@ -298,6 +300,12 @@ export class ChatService {
 		let savedUserMessage: ChatMessages | null = null;
 
 		if (lastUserMessage) {
+			console.log(
+				'lastUserMessage',
+				lastUserMessage,
+				'dto.parentId',
+				dto.parentId,
+			);
 			// 异步保存，不等待结果
 			savedUserMessage = await this.messageService
 				.saveMessage(
@@ -305,7 +313,9 @@ export class ChatService {
 					MessageRole.USER,
 					lastUserMessage.content,
 					dto.filePaths,
-					parentId,
+					// parentId,
+					null,
+					dto.isRegenerate,
 				)
 				.catch((dbError) => {
 					console.error('Failed to save user message to database:', dbError);
@@ -427,13 +437,15 @@ export class ChatService {
 
 					// 正常完成，cancel$.isStopped 为 false, 暂停时 cancel$.isStopped 为 true
 					if (!cancel$.isStopped) {
+						console.log('stop-dto.parentId', dto.parentId);
 						// 保存完整的AI回复到数据库
 						await this.messageService.saveMessage(
 							sessionId,
 							MessageRole.ASSISTANT,
 							finalContent,
 							[],
-							savedUserMessage?.id,
+							dto.parentId || savedUserMessage?.id,
+							dto.isRegenerate || false,
 						);
 						// 清除部分响应（因为已经完成）更新会话的partialContent为null
 						await this.messageService.updateSessionPartialContent(
@@ -611,6 +623,7 @@ export class ChatService {
 								lastUserMessage.content,
 								dto.filePaths,
 								parentId,
+								false, // isRegenerate: user 消息不是重新生成
 							)
 							.catch((dbError) => {
 								console.error(
@@ -729,6 +742,7 @@ export class ChatService {
 												fullContent,
 												[],
 												savedUserMessage?.id,
+												false, // isRegenerate: 正常回复
 											)
 											.catch((dbError) => {
 												console.error(

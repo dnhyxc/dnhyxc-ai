@@ -285,11 +285,11 @@ const Chat = () => {
 				],
 				total: 1,
 			};
-			// setSessionListInfo(res.data);
+			setSessionListInfo(res.data);
 			// if (res.data.list.length > 0) {
 			// 	onSelectSession(res.data.list[0]);
 			// }
-			setSessionListInfo(data as any);
+			// setSessionListInfo(data as any);
 			// if (res.data.list.length > 0) {
 			// 	onSelectSession(data.list[0] as any);
 			// }
