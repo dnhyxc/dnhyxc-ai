@@ -90,6 +90,7 @@ export class MessageService {
 		isRegenerate: boolean = false,
 		chatId?: string,
 		childrenIds: string[] = [],
+		currentChatId?: string,
 	) {
 		console.log('saveMessage called:', {
 			sessionId,
@@ -99,6 +100,7 @@ export class MessageService {
 			isRegenerate,
 			chatId,
 			childrenIds,
+			currentChatId,
 		});
 
 		try {
@@ -121,7 +123,7 @@ export class MessageService {
 				parentId,
 				childrenIds: childrenIds || [], // 使用前端传递的 childrenIds
 				chatId: chatId || '', // 保存 chatId 字段
-				currentChatId: chatId || '', // 保存 currentChatId 字段
+				currentChatId: currentChatId || chatId || '', // 保存 currentChatId 字段，以前端传递的为准
 			});
 
 			// 保存消息

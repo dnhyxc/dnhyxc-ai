@@ -107,5 +107,6 @@ export const getFormatMessages = (messages: Message[]) => {
 		siblingCount: msg.siblingCount,
 		thinkContent: msg.thinkContent,
 		isStreaming: msg.isStreaming,
+		currentChatId: msg.currentChatId,
 	}));
 };

@@ -204,6 +204,7 @@ export class ChatService {
 					false,
 					dto.userMessage.chatId, // chatId
 					dto.userMessage.childrenIds || [], // childrenIds
+					dto.userMessage.chatId, // currentChatId: 使用消息自己的chatId作为默认值
 				)
 				.catch((dbError) => {
 					console.error('Failed to save user message to database:', dbError);
@@ -230,6 +231,7 @@ export class ChatService {
 					false,
 					dto.assistantMessage.chatId, // chatId
 					dto.assistantMessage.childrenIds || [], // childrenIds
+					dto.assistantMessage.chatId, // currentChatId: 使用消息自己的chatId作为默认值
 				)
 				.catch((dbError) => {
 					console.error(
@@ -247,6 +249,9 @@ export class ChatService {
 					[],
 					savedUserMessage?.id,
 					false,
+					undefined, // chatId
+					[], // childrenIds
+					undefined, // currentChatId
 				)
 				.catch((dbError) => {
 					console.error(
@@ -308,6 +313,7 @@ export class ChatService {
 					dto.isRegenerate || false,
 					dto.userMessage.chatId, // chatId
 					dto.userMessage.childrenIds || [], // childrenIds
+					dto.userMessage.chatId, // currentChatId: 使用消息自己的chatId作为默认值
 				)
 				.catch((dbError) => {
 					console.error('Failed to save user message to database:', dbError);
@@ -444,6 +450,7 @@ export class ChatService {
 								dto.isRegenerate || false,
 								dto.assistantMessage.chatId, // chatId
 								dto.assistantMessage.childrenIds || [], // childrenIds
+								dto.assistantMessage.chatId, // currentChatId: 使用消息自己的chatId作为默认值
 							);
 						} else {
 							// 如果没有传递 assistantMessage，使用默认逻辑
@@ -454,6 +461,9 @@ export class ChatService {
 								[],
 								dto.parentId || savedUserMessage?.id,
 								dto.isRegenerate || false,
+								undefined, // chatId
+								[], // childrenIds
+								undefined, // currentChatId
 							);
 						}
 						// 清除部分响应（因为已经完成）更新会话的partialContent为null
@@ -617,6 +627,7 @@ export class ChatService {
 								false, // isRegenerate: user 消息不是重新生成
 								dto.userMessage.chatId, // chatId
 								dto.userMessage.childrenIds || [], // childrenIds
+								dto.userMessage.chatId, // currentChatId: 使用消息自己的chatId作为默认值
 							)
 							.catch((dbError) => {
 								console.error(
@@ -739,6 +750,7 @@ export class ChatService {
 													false, // isRegenerate: 正常回复
 													dto.assistantMessage.chatId, // chatId
 													dto.assistantMessage.childrenIds || [], // childrenIds
+													dto.assistantMessage.chatId, // currentChatId: 使用消息自己的chatId作为默认值
 												)
 												.catch((dbError) => {
 													console.error(
@@ -756,6 +768,9 @@ export class ChatService {
 													[],
 													savedUserMessage?.id,
 													false, // isRegenerate: 正常回复
+													undefined, // chatId
+													[], // childrenIds
+													undefined, // currentChatId
 												)
 												.catch((dbError) => {
 													console.error(

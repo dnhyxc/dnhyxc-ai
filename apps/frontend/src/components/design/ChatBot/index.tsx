@@ -42,6 +42,7 @@ export interface Message {
 	childrenIds?: string[];
 	siblingIndex?: number;
 	siblingCount?: number;
+	currentChatId?: string; // 当前活跃分支的最后一条消息的chatId
 }
 
 interface ChatRequestParams {
@@ -53,6 +54,7 @@ interface ChatRequestParams {
 	parentId?: string;
 	userMessage?: Message;
 	assistantMessage?: Message;
+	currentChatId?: string; // 当前活跃分支的最后一条消息的chatId
 }
 
 interface ChatBotProps {
@@ -91,6 +93,38 @@ const ChatBot: React.FC<ChatBotProps> = ({
 	const [selectedChildMap, setSelectedChildMap] = useState<Map<string, string>>(
 		new Map(),
 	);
+	const [currentChatId, setCurrentChatId] = useState<string>(''); // 当前活跃分支的最后一条消息的chatId
+
+	// 更新currentChatId的函数
+	const updateCurrentChatId = (msgs: Message[]) => {
+		setCurrentChatId((prevChatId) => {
+			if (msgs.length > 0) {
+				const lastMsg = msgs[msgs.length - 1];
+				const newChatId = lastMsg.chatId;
+				// 只在chatId实际变化时更新，避免不必要的重新渲染
+				return prevChatId !== newChatId ? newChatId : prevChatId;
+			} else {
+				// 只在currentChatId不为空时更新
+				return prevChatId !== '' ? '' : prevChatId;
+			}
+		});
+	};
+
+	// 包装setMessages，同时更新currentChatId
+	const setMessagesWithCurrentChatId = (
+		msgs: Message[] | ((prev: Message[]) => Message[]),
+	) => {
+		if (typeof msgs === 'function') {
+			setMessages((prev) => {
+				const newMsgs = msgs(prev);
+				updateCurrentChatId(newMsgs);
+				return newMsgs;
+			});
+		} else {
+			setMessages(msgs);
+			updateCurrentChatId(msgs);
+		}
+	};
 
 	const stopRequestRef = useRef<(() => void) | null>(null);
 	const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -102,7 +136,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 
 	useEffect(() => {
 		setAllMessages(initialMessages);
-		setMessages(initialMessages);
+		setMessagesWithCurrentChatId(initialMessages);
 		// 重置选中状态
 		setSelectedChildMap(new Map());
 	}, [initialMessages]);
@@ -178,6 +212,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 			parentId,
 			userMessage,
 			assistantMessage,
+			currentChatId, // 传递当前活跃分支的最后一条消息的chatId
 		};
 		if (userMessage?.file) {
 			messages.filePaths = [userMessage?.file?.path || ''];
@@ -215,7 +250,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 
 									const formattedMessages = getFormatMessages(sortedMessages);
 
-									setMessages(formattedMessages);
+									setMessagesWithCurrentChatId(formattedMessages);
 									return currentSelectedChildMap;
 								});
 
@@ -246,7 +281,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 
 									const formattedMessages = getFormatMessages(sortedMessages);
 
-									setMessages(formattedMessages);
+									setMessagesWithCurrentChatId(formattedMessages);
 									return currentSelectedChildMap;
 								});
 
@@ -285,7 +320,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 
 								const formattedMessages = getFormatMessages(sortedMessages);
 
-								setMessages(formattedMessages);
+								setMessagesWithCurrentChatId(formattedMessages);
 								return currentSelectedChildMap;
 							});
 
@@ -312,7 +347,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 
 								const formattedMessages = getFormatMessages(sortedMessages);
 
-								setMessages(formattedMessages);
+								setMessagesWithCurrentChatId(formattedMessages);
 								return currentSelectedChildMap;
 							});
 
@@ -329,7 +364,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 				type: 'error',
 				title: '发送消息失败',
 			});
-			setMessages((prev) =>
+			setMessagesWithCurrentChatId((prev) =>
 				prev.filter(
 					(msg) =>
 						!(
@@ -379,6 +414,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 					childrenIds.push(assistantMessageId);
 				}
 				userMessageToUse.childrenIds = childrenIds;
+				userMessageToUse.currentChatId = currentChatId; // 传递当前活跃分支的最后一条消息的chatId
 
 				// 创建新的 assistant 消息
 				assistantMessage = {
@@ -391,6 +427,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 					isStreaming: true,
 					parentId: userMessageToUse.chatId,
 					childrenIds: [],
+					currentChatId, // 传递当前活跃分支的最后一条消息的chatId
 				};
 
 				// 更新 allMessages：添加新的 assistant 消息，更新 user 消息
@@ -415,13 +452,14 @@ const ChatBot: React.FC<ChatBotProps> = ({
 
 				const formattedMessages = getFormatMessages(sortedMessages);
 
-				setMessages(formattedMessages);
+				setMessagesWithCurrentChatId(formattedMessages);
 
 				return newAllMessages;
 			});
 
 			// 使用 setTimeout 确保状态更新后再调用流式 API
 			setTimeout(() => {
+				console.log(messages, 'message');
 				onSseFetch(
 					apiEndpoint,
 					assistantMessageId,
@@ -432,8 +470,10 @@ const ChatBot: React.FC<ChatBotProps> = ({
 			}, 0);
 		} else {
 			// 新消息模式：计算 parentId
+			// 使用当前显示的消息列表（messages）的最后一条消息，而不是所有消息列表（allMessages）
+			// 这样当用户切换分支时，新消息会添加到当前活跃分支
 			let parentId: string | undefined;
-			const lastMsg = allMessages[allMessages.length - 1];
+			const lastMsg = messages[messages.length - 1];
 			if (lastMsg) {
 				parentId = lastMsg.chatId;
 			}
@@ -446,7 +486,9 @@ const ChatBot: React.FC<ChatBotProps> = ({
 				timestamp: new Date(),
 				parentId: parentId,
 				childrenIds: [assistantMessageId],
+				currentChatId, // 传递当前活跃分支的最后一条消息的chatId
 			};
+
 			if (uploadedFile.path) {
 				userMessageToUse.file = uploadedFile;
 			}
@@ -462,6 +504,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 				isStreaming: true,
 				parentId: userMessageToUse.chatId,
 				childrenIds: [],
+				currentChatId, // 传递当前活跃分支的最后一条消息的chatId
 			};
 
 			setAllMessages((prevAll) => {
@@ -497,10 +540,14 @@ const ChatBot: React.FC<ChatBotProps> = ({
 
 				const formattedMessages = getFormatMessages(sortedMessages);
 
-				setMessages(formattedMessages);
+				console.log(formattedMessages, 'formattedMessages');
+
+				setMessagesWithCurrentChatId(formattedMessages);
 
 				return newAllMessages;
 			});
+
+			console.log(messages, 'message---222222');
 
 			onSseFetch(
 				apiEndpoint,
@@ -544,7 +591,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 
 			const formattedMessages = getFormatMessages(sortedMessages);
 
-			setMessages(formattedMessages);
+			setMessagesWithCurrentChatId(formattedMessages);
 
 			// 获取最后一条 assistant 消息的 ID
 			if (formattedMessages.length > 0) {
@@ -593,7 +640,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 
 					const formattedMessages = getFormatMessages(sortedMessages);
 
-					setMessages(formattedMessages);
+					setMessagesWithCurrentChatId(formattedMessages);
 					return newAllMessages;
 				}
 
@@ -606,7 +653,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 	const clearChat = () => {
 		setInput('');
 		setAllMessages([]);
-		setMessages([]);
+		setMessagesWithCurrentChatId([]);
 		stopRequestRef.current?.();
 		stopRequestRef.current = null;
 		setLoading(false);
@@ -767,7 +814,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 
 				const formattedMessages = getFormatMessages(sortedMessages);
 
-				setMessages(formattedMessages);
+				setMessagesWithCurrentChatId(formattedMessages);
 			}
 
 			return prevAll;
