@@ -435,10 +435,6 @@ export class ChatService {
 
 					// 正常完成，cancel$.isStopped 为 false, 暂停时 cancel$.isStopped 为 true
 					if (!cancel$.isStopped) {
-						console.log(
-							'Saving assistant message from frontend:',
-							dto.assistantMessage,
-						);
 						// 保存完整的AI回复到数据库（使用前端传递的数据）
 						if (dto.assistantMessage) {
 							await this.messageService.saveMessage(

@@ -74,7 +74,8 @@ const ChatBot: React.FC<ChatBotProps> = ({
 	showAvatar = false,
 	onBranchChange,
 }) => {
-	const [allMessages, setAllMessages] = useState<Message[]>(initialMessages);
+	// allMessages存储所有消息（包括所有分支），通过setAllMessages的回调访问
+	const [, setAllMessages] = useState<Message[]>(initialMessages);
 	const [messages, setMessages] = useState<Message[]>(initialMessages);
 	const [sessionId, setSessionId] = useState('');
 	const [input, setInput] = useState('');
