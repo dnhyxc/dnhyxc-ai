@@ -380,17 +380,109 @@ const ChatBot: React.FC<ChatBotProps> = ({
 	};
 
 	// 发送消息
-	const sendMessage = async (content?: string, index?: number) => {
+	const sendMessage = async (
+		content?: string,
+		index?: number,
+		isEdit?: boolean,
+	) => {
 		if ((!content && !input.trim()) || loading) return;
 
 		// 生成 ID
 		const userMsgId = uuidv4();
 		const assistantMessageId = uuidv4();
 
-		// 区分模式：重新生成 vs 新消息
-		const isRegenerate = content !== undefined && index !== undefined;
+		// 区分模式：重新生成 vs 新消息 vs 编辑消息
+		const isRegenerate =
+			content !== undefined && index !== undefined && !isEdit;
+		const isEditMode = isEdit === true;
 
-		if (isRegenerate) {
+		if (isEditMode) {
+			// 编辑模式：创建新的分支，不删除原始消息
+			// 需要找到被编辑的 user 消息，获取它的 parentId
+			if (!editMessage) return;
+
+			let userMessageToUse: Message;
+			let assistantMessage: Message;
+
+			setAllMessages((prevAll) => {
+				// 找到被编辑的 user 消息
+				const editedMsg = prevAll.find((m) => m.chatId === editMessage.chatId);
+				if (!editedMsg) return prevAll;
+
+				// 获取被编辑消息的 parentId（即上一条 assistant 消息的 id）
+				const parentId = editedMsg.parentId;
+
+				// 创建新的 user 消息（编辑后的版本）
+				userMessageToUse = {
+					id: userMsgId,
+					chatId: userMsgId,
+					content: content || editMessage?.content.trim(),
+					role: 'user',
+					timestamp: new Date(),
+					parentId,
+					childrenIds: [assistantMessageId],
+					currentChatId,
+				};
+
+				// 创建 Assistant 消息
+				assistantMessage = {
+					id: assistantMessageId,
+					chatId: assistantMessageId,
+					content: '',
+					thinkContent: '',
+					role: 'assistant',
+					timestamp: new Date(),
+					isStreaming: true,
+					parentId: userMessageToUse.chatId,
+					childrenIds: [],
+					currentChatId: currentChatId,
+				};
+
+				// 更新父消息（assistant）的 childrenIds，添加新的 user 消息
+				const newAllMessages = [...prevAll];
+				if (parentId) {
+					const parentIndex = newAllMessages.findIndex(
+						(m) => m.chatId === parentId,
+					);
+					if (parentIndex !== -1) {
+						const parentMsg = { ...newAllMessages[parentIndex] };
+						const pChildrenIds = parentMsg.childrenIds
+							? [...parentMsg.childrenIds]
+							: [];
+						if (!pChildrenIds.includes(userMsgId)) {
+							pChildrenIds.push(userMsgId);
+						}
+						parentMsg.childrenIds = pChildrenIds;
+						newAllMessages[parentIndex] = parentMsg;
+					}
+				}
+
+				// 添加新的 user 消息和 assistant 消息
+				newAllMessages.push(userMessageToUse);
+				newAllMessages.push(assistantMessage);
+
+				// 更新显示的消息
+				const sortedMessages = buildMessageList(
+					newAllMessages,
+					selectedChildMap,
+				);
+				const formattedMessages = getFormatMessages(sortedMessages);
+				setMessagesWithCurrentChatId(formattedMessages);
+
+				return newAllMessages;
+			});
+			// 发送消息到后端（在状态更新后）
+			setTimeout(() => {
+				onSseFetch(
+					apiEndpoint,
+					assistantMessageId,
+					userMessageToUse,
+					assistantMessage,
+					false, // isRegenerate: 编辑不是重新生成
+				);
+				setEditMessage(null); // 清除编辑状态
+			}, 0);
+		} else if (isRegenerate) {
 			// 重新生成模式：复用已有的 User 消息
 			// 注意：index 是当前显示的 assistant 消息的索引
 			// 我们需要从 allMessages 中找到对应的 user 消息
@@ -661,7 +753,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 
 	// 发送重新编辑的消息
 	const onSendMessage = () => {
-		sendMessage(editMessage?.content);
+		sendMessage(editMessage?.content, undefined, true);
 	};
 
 	const handleEditChange = (
