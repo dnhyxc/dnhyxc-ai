@@ -169,7 +169,8 @@ const ChatBot: React.FC<ChatBotProps> = ({
 			childMap || selectedChildMap,
 		);
 		const formattedMessages = getFormatMessages(sortedMessages);
-		setMessagesWithCurrentChatId(formattedMessages);
+		// 使用函数式更新确保立即应用
+		setMessagesWithCurrentChatId(() => formattedMessages);
 	};
 
 	// 工具函数：更新单个消息
@@ -321,8 +322,18 @@ const ChatBot: React.FC<ChatBotProps> = ({
 		userMessage?: Message,
 		assistantMessage?: Message,
 		isRegenerate?: boolean,
+		selectedChildMapParam?: Map<string, string>,
 	) => {
 		const parentId = isRegenerate ? userMessage?.chatId : userMessage?.parentId;
+		// 使用传递的 selectedChildMap 参数，如果没有则使用当前状态
+		const currentSelectedChildMap = selectedChildMapParam
+			? new Map(selectedChildMapParam)
+			: new Map(selectedChildMap);
+		// 对于重新生成，确保使用新的 assistant 消息
+		if (isRegenerate && userMessage) {
+			currentSelectedChildMap.set(userMessage.chatId, assistantMessageId);
+		}
+
 		// 调用流式 API
 		const messages: ChatRequestParams = {
 			messages: [
@@ -370,7 +381,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 										isStreaming: true,
 									},
 								);
-								updateMessagesDisplay(newAllMessages);
+								updateMessagesDisplay(newAllMessages, currentSelectedChildMap);
 								return newAllMessages;
 							});
 						}
@@ -388,7 +399,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 										isStreaming: true,
 									},
 								);
-								updateMessagesDisplay(newAllMessages);
+								updateMessagesDisplay(newAllMessages, currentSelectedChildMap);
 								return newAllMessages;
 							});
 						}
@@ -413,7 +424,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 										(!msg.thinkContent || msg.thinkContent === '')
 									),
 							);
-							updateMessagesDisplay(newAllMessages);
+							updateMessagesDisplay(newAllMessages, currentSelectedChildMap);
 							return newAllMessages;
 						});
 					},
@@ -428,7 +439,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 									isStreaming: false,
 								},
 							);
-							updateMessagesDisplay(newAllMessages);
+							updateMessagesDisplay(newAllMessages, currentSelectedChildMap);
 							return newAllMessages;
 						});
 					},
@@ -499,6 +510,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 				userMessageToUse,
 				assistantMessage,
 				false,
+				selectedChildMap, // 传递当前的 selectedChildMap
 			);
 			setEditMessage(null);
 		}, 0);
@@ -507,8 +519,6 @@ const ChatBot: React.FC<ChatBotProps> = ({
 	// 处理重新生成消息
 	const handleRegenerateMessage = async (_content: string, index: number) => {
 		const assistantMessageId = uuidv4();
-		let userMessageToUse: Message;
-		let assistantMessage: Message;
 
 		setAllMessages((prevAll) => {
 			const currentAssistantMsg = messages[index];
@@ -519,7 +529,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 			);
 			if (!userMsg) return prevAll;
 
-			userMessageToUse = { ...userMsg };
+			const userMessageToUse = { ...userMsg };
 			const childrenIds = userMsg.childrenIds ? [...userMsg.childrenIds] : [];
 			if (!childrenIds.includes(assistantMessageId)) {
 				childrenIds.push(assistantMessageId);
@@ -527,7 +537,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 			userMessageToUse.childrenIds = childrenIds;
 			userMessageToUse.currentChatId = currentChatId;
 
-			assistantMessage = createAssistantMessage(
+			const assistantMessage = createAssistantMessage(
 				assistantMessageId,
 				userMessageToUse.chatId,
 			);
@@ -537,23 +547,29 @@ const ChatBot: React.FC<ChatBotProps> = ({
 			);
 			newAllMessages.push(assistantMessage);
 
+			// 更新 selectedChildMap
 			const newSelectedChildMap = new Map(selectedChildMap);
 			newSelectedChildMap.set(userMessageToUse.chatId, assistantMessageId);
+
+			// 先更新 selectedChildMap 状态
 			setSelectedChildMap(newSelectedChildMap);
 
 			updateMessagesDisplay(newAllMessages, newSelectedChildMap);
+
+			// 在状态更新后立即调用 onSseFetch，传递新的 selectedChildMap
+			setTimeout(() => {
+				onSseFetch(
+					apiEndpoint,
+					assistantMessageId,
+					userMessageToUse,
+					assistantMessage,
+					true,
+					newSelectedChildMap, // 传递更新后的 selectedChildMap
+				);
+			}, 0);
+
 			return newAllMessages;
 		});
-
-		setTimeout(() => {
-			onSseFetch(
-				apiEndpoint,
-				assistantMessageId,
-				userMessageToUse,
-				assistantMessage,
-				true,
-			);
-		}, 0);
 	};
 
 	// 处理新消息
@@ -599,6 +615,8 @@ const ChatBot: React.FC<ChatBotProps> = ({
 			assistantMessageId,
 			userMessageToUse,
 			assistantMessage,
+			false,
+			selectedChildMap, // 传递当前的 selectedChildMap
 		);
 	};
 
@@ -687,13 +705,21 @@ const ChatBot: React.FC<ChatBotProps> = ({
 								userMsgForApi, // 传递 user 消息
 								assistantMsgForApi, // 传递原来的 assistant 消息
 								false, // isRegenerate: 继续生成不是重新生成
+								selectedChildMap, // 传递当前的 selectedChildMap
 							);
 						}, 0);
 
 						return updatedAllMessages;
 					} else {
 						// 如果没有找到 user 消息，使用原来的逻辑
-						onSseFetch('/chat/continueSse', lastMsg.chatId);
+						onSseFetch(
+							'/chat/continueSse',
+							lastMsg.chatId,
+							undefined,
+							undefined,
+							false,
+							selectedChildMap,
+						);
 					}
 				}
 			}
@@ -863,7 +889,6 @@ const ChatBot: React.FC<ChatBotProps> = ({
 	};
 
 	const onEdit = (message: Message) => {
-		console.log(message, 'message');
 		setEditMessage(message);
 	};
 
@@ -1072,11 +1097,6 @@ const ChatBot: React.FC<ChatBotProps> = ({
 															'opacity-30 cursor-not-allowed hover:text-textcolor/50',
 													)}
 													onClick={() => {
-														console.log(
-															'click left',
-															message,
-															message.siblingIndex,
-														);
 														if ((message.siblingIndex || 0) > 0) {
 															handleBranchChange(message.chatId, 'prev');
 														}
