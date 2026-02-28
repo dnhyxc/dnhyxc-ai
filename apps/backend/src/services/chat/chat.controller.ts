@@ -72,16 +72,7 @@ export class ChatController {
 	@Post('/continueSse')
 	@Sse()
 	async continueStream(@Body() dto: ChatContinueDto): Promise<Observable<any>> {
-		const source$ = (
-			await this.chatService.continueStream(
-				dto.sessionId,
-				dto.parentId,
-				dto.userMessage,
-				dto.assistantMessage,
-				dto.currentChatId,
-				dto.isRegenerate,
-			)
-		).pipe(
+		const source$ = (await this.chatService.continueStream(dto)).pipe(
 			map((chunk) => {
 				const data = JSON.parse(chunk);
 				return {

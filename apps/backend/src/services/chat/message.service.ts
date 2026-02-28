@@ -2,8 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { FindOneOptions, Repository } from 'typeorm';
 import { Attachments } from './attachments.entity';
-import { ChatMessages, MessageRole } from './chat.entity';
-import { HistoryDto, MessageDto } from './dto/message.dto';
+import { ChatMessages } from './chat.entity';
+import { HistoryDto, MessageDto, SaveDto } from './dto/message.dto';
 import { ChatSessions } from './session.entity';
 
 @Injectable()
@@ -81,17 +81,19 @@ export class MessageService {
 	}
 
 	// 保存消息到数据库
-	async saveMessage(
-		sessionId: string,
-		role: MessageRole,
-		content: string,
-		filePaths: string[] = [],
-		parentId: string | null = null,
-		isRegenerate: boolean = false,
-		chatId?: string,
-		childrenIds: string[] = [],
-		currentChatId?: string,
-	) {
+	async saveMessage(params: SaveDto) {
+		const {
+			sessionId,
+			role,
+			content,
+			filePaths = [],
+			parentId = null,
+			// isRegenerate = false,
+			chatId,
+			childrenIds = [],
+			currentChatId,
+		} = params;
+
 		try {
 			// 查找或创建会话
 			let session = await this.findOneSession(sessionId);

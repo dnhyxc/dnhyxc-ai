@@ -12,12 +12,9 @@ import { catchError, Observable, Subject } from 'rxjs';
 import { ModelEnum } from 'src/enum/config.enum';
 import { parseFile } from '../../utils/file-parser';
 import { ChatMessages, MessageRole } from './chat.entity';
+import { ChatContinueDto } from './dto/chat-continue.dto';
 import { ChatMessageDto } from './dto/chat-message.dto';
-import {
-	AssistantMessageDto,
-	ChatRequestDto,
-	UserMessageDto,
-} from './dto/chat-request.dto';
+import { ChatRequestDto } from './dto/chat-request.dto';
 import { ZhipuStreamData } from './dto/zhipu-stream-data.dto';
 import { MessageService } from './message.service';
 
@@ -199,17 +196,17 @@ export class ChatService {
 		if (lastUserMessage && dto.userMessage) {
 			// 使用前端传递的 userMessage 数据
 			savedUserMessage = await this.messageService
-				.saveMessage(
+				.saveMessage({
 					sessionId,
-					MessageRole.USER,
-					lastUserMessage.content,
-					dto.filePaths,
-					dto.userMessage.parentId || null,
-					false,
-					dto.userMessage.chatId, // chatId
-					dto.userMessage.childrenIds || [], // childrenIds
-					dto.userMessage.chatId, // currentChatId: 使用消息自己的chatId作为默认值
-				)
+					role: MessageRole.USER,
+					content: lastUserMessage.content,
+					filePaths: dto.filePaths,
+					parentId: dto.userMessage.parentId || null,
+					isRegenerate: false,
+					chatId: dto.userMessage.chatId, // chatId
+					childrenIds: dto.userMessage.childrenIds || [], // childrenIds
+					currentChatId: dto.userMessage.chatId, // currentChatId: 使用消息自己的chatId作为默认值
+				})
 				.catch((dbError) => {
 					console.error('Failed to save user message to database:', dbError);
 					return null;
@@ -226,17 +223,17 @@ export class ChatService {
 		// 异步保存，不等待结果
 		if (dto.assistantMessage) {
 			await this.messageService
-				.saveMessage(
+				.saveMessage({
 					sessionId,
-					MessageRole.ASSISTANT,
-					responseContent,
-					[],
-					dto.assistantMessage.parentId || null,
-					false,
-					dto.assistantMessage.chatId, // chatId
-					dto.assistantMessage.childrenIds || [], // childrenIds
-					dto.assistantMessage.chatId, // currentChatId: 使用消息自己的chatId作为默认值
-				)
+					role: MessageRole.ASSISTANT,
+					content: responseContent,
+					filePaths: [],
+					parentId: dto.assistantMessage.parentId || null,
+					isRegenerate: false,
+					chatId: dto.assistantMessage.chatId, // chatId
+					childrenIds: dto.assistantMessage.childrenIds || [], // childrenIds
+					currentChatId: dto.assistantMessage.chatId, // currentChatId: 使用消息自己的chatId作为默认值
+				})
 				.catch((dbError) => {
 					console.error(
 						'Failed to save assistant message to database:',
@@ -246,17 +243,17 @@ export class ChatService {
 		} else {
 			// 如果没有传递 assistantMessage，使用默认逻辑
 			await this.messageService
-				.saveMessage(
+				.saveMessage({
 					sessionId,
-					MessageRole.ASSISTANT,
-					responseContent,
-					[],
-					savedUserMessage?.id,
-					false,
-					undefined, // chatId
-					[], // childrenIds
-					undefined, // currentChatId
-				)
+					role: MessageRole.ASSISTANT,
+					content: responseContent,
+					filePaths: [],
+					parentId: savedUserMessage?.id,
+					isRegenerate: false,
+					chatId: undefined, // chatId
+					childrenIds: [], // childrenIds
+					currentChatId: undefined, // currentChatId
+				})
 				.catch((dbError) => {
 					console.error(
 						'Failed to save assistant message to database:',
@@ -307,17 +304,17 @@ export class ChatService {
 		if (lastUserMessage && dto.userMessage) {
 			// 使用前端传递的 userMessage 数据
 			savedUserMessage = await this.messageService
-				.saveMessage(
+				.saveMessage({
 					sessionId,
-					MessageRole.USER,
-					lastUserMessage.content,
-					dto.filePaths,
-					dto.userMessage.parentId || null,
-					dto.isRegenerate || false,
-					dto.userMessage.chatId, // chatId
-					dto.userMessage.childrenIds || [], // childrenIds
-					dto.userMessage.chatId, // currentChatId: 使用消息自己的chatId作为默认值
-				)
+					role: MessageRole.USER,
+					content: lastUserMessage.content,
+					filePaths: dto.filePaths,
+					parentId: dto.userMessage.parentId || null,
+					isRegenerate: dto.isRegenerate || false,
+					chatId: dto.userMessage.chatId, // chatId
+					childrenIds: dto.userMessage.childrenIds || [], // childrenIds
+					currentChatId: dto.userMessage.chatId, // currentChatId: 使用消息自己的chatId作为默认值
+				})
 				.catch((dbError) => {
 					console.error('Failed to save user message to database:', dbError);
 					return null;
@@ -438,30 +435,30 @@ export class ChatService {
 					if (!cancel$.isStopped) {
 						// 保存完整的AI回复到数据库（使用前端传递的数据）
 						if (dto.assistantMessage) {
-							await this.messageService.saveMessage(
+							await this.messageService.saveMessage({
 								sessionId,
-								MessageRole.ASSISTANT,
-								finalContent,
-								[],
-								dto.assistantMessage.parentId || null,
-								dto.isRegenerate || false,
-								dto.assistantMessage.chatId, // chatId
-								dto.assistantMessage.childrenIds || [], // childrenIds
-								dto.assistantMessage.chatId, // currentChatId: 使用消息自己的chatId作为默认值
-							);
+								role: MessageRole.ASSISTANT,
+								content: finalContent,
+								filePaths: [],
+								parentId: dto.assistantMessage.parentId || null,
+								isRegenerate: dto.isRegenerate || false,
+								chatId: dto.assistantMessage.chatId, // chatId
+								childrenIds: dto.assistantMessage.childrenIds || [], // childrenIds
+								currentChatId: dto.assistantMessage.chatId, // currentChatId: 使用消息自己的chatId作为默认值
+							});
 						} else {
 							// 如果没有传递 assistantMessage，使用默认逻辑
-							await this.messageService.saveMessage(
+							await this.messageService.saveMessage({
 								sessionId,
-								MessageRole.ASSISTANT,
-								finalContent,
-								[],
-								dto.parentId || savedUserMessage?.id,
-								dto.isRegenerate || false,
-								undefined, // chatId
-								[], // childrenIds
-								undefined, // currentChatId
-							);
+								role: MessageRole.ASSISTANT,
+								content: finalContent,
+								filePaths: [],
+								parentId: dto.parentId || savedUserMessage?.id,
+								isRegenerate: dto.isRegenerate || false,
+								chatId: undefined, // chatId
+								childrenIds: [], // childrenIds
+								currentChatId: undefined, // currentChatId
+							});
 						}
 						// 清除部分响应（因为已经完成）更新会话的partialContent为null
 						await this.messageService.updateSessionPartialContent(
@@ -538,14 +535,14 @@ export class ChatService {
 	}
 
 	// 继续生成指定会话
-	async continueStream(
-		sessionId: string,
-		parentId?: string,
-		userMessage?: UserMessageDto,
-		assistantMessage?: AssistantMessageDto,
-		currentChatId?: string,
-		isRegenerate?: boolean,
-	): Promise<Observable<any>> {
+	async continueStream({
+		sessionId,
+		parentId,
+		userMessage,
+		assistantMessage,
+		// currentChatId,
+		isRegenerate,
+	}: ChatContinueDto): Promise<Observable<any>> {
 		const session = await this.messageService.findOneSession(sessionId);
 
 		const partialContent = session?.partialContent;
@@ -631,17 +628,17 @@ export class ChatService {
 					if (lastUserMessage && dto.userMessage) {
 						// 使用前端传递的 userMessage 数据
 						savedUserMessage = await this.messageService
-							.saveMessage(
+							.saveMessage({
 								sessionId,
-								MessageRole.USER,
-								lastUserMessage.content,
-								dto.filePaths,
-								dto.userMessage.parentId || null,
-								false, // isRegenerate: user 消息不是重新生成
-								dto.userMessage.chatId, // chatId
-								dto.userMessage.childrenIds || [], // childrenIds
-								dto.userMessage.chatId, // currentChatId: 使用消息自己的chatId作为默认值
-							)
+								role: MessageRole.USER,
+								content: lastUserMessage.content,
+								filePaths: dto.filePaths,
+								parentId: dto.userMessage.parentId || null,
+								isRegenerate: false, // isRegenerate: user 消息不是重新生成
+								chatId: dto.userMessage.chatId, // chatId
+								childrenIds: dto.userMessage.childrenIds || [], // childrenIds
+								currentChatId: dto.userMessage.chatId, // currentChatId: 使用消息自己的chatId作为默认值
+							})
 							.catch((dbError) => {
 								console.error(
 									'Failed to save user message to database:',
@@ -754,17 +751,17 @@ export class ChatService {
 										// 异步保存，不等待结果
 										if (dto.assistantMessage) {
 											this.messageService
-												.saveMessage(
+												.saveMessage({
 													sessionId,
-													MessageRole.ASSISTANT,
-													fullContent,
-													[],
-													dto.assistantMessage.parentId || null,
-													false, // isRegenerate: 正常回复
-													dto.assistantMessage.chatId, // chatId
-													dto.assistantMessage.childrenIds || [], // childrenIds
-													dto.assistantMessage.chatId, // currentChatId: 使用消息自己的chatId作为默认值
-												)
+													role: MessageRole.ASSISTANT,
+													content: fullContent,
+													filePaths: [],
+													parentId: dto.assistantMessage.parentId || null,
+													isRegenerate: false, // isRegenerate: 正常回复
+													chatId: dto.assistantMessage.chatId, // chatId
+													childrenIds: dto.assistantMessage.childrenIds || [], // childrenIds
+													currentChatId: dto.assistantMessage.chatId, // currentChatId: 使用消息自己的chatId作为默认值
+												})
 												.catch((dbError) => {
 													console.error(
 														'Failed to save assistant message to database:',
@@ -774,17 +771,17 @@ export class ChatService {
 										} else {
 											// 如果没有传递 assistantMessage，使用默认逻辑
 											this.messageService
-												.saveMessage(
+												.saveMessage({
 													sessionId,
-													MessageRole.ASSISTANT,
-													fullContent,
-													[],
-													savedUserMessage?.id,
-													false, // isRegenerate: 正常回复
-													undefined, // chatId
-													[], // childrenIds
-													undefined, // currentChatId
-												)
+													role: MessageRole.ASSISTANT,
+													content: fullContent,
+													filePaths: [],
+													parentId: savedUserMessage?.id,
+													isRegenerate: false, // isRegenerate: 正常回复
+													chatId: undefined, // chatId
+													childrenIds: [], // childrenIds
+													currentChatId: undefined, // currentChatId
+												})
 												.catch((dbError) => {
 													console.error(
 														'Failed to save assistant message to database:',

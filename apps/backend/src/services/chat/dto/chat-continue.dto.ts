@@ -1,14 +1,10 @@
-import { Type } from 'class-transformer';
 import {
-	IsArray,
 	IsBoolean,
 	IsNumber,
 	IsObject,
 	IsOptional,
 	IsString,
-	ValidateNested,
 } from 'class-validator';
-import { ChatMessageDto } from './chat-message.dto';
 import { AssistantMessageDto, UserMessageDto } from './chat-request.dto';
 
 export class ChatContinueDto {
