@@ -874,7 +874,9 @@ const ChatBot: React.FC<ChatBotProps> = ({
 			} else if (!hasModifier) {
 				e.preventDefault();
 				// 纯 Enter（没有任何修饰键）: 发送消息
-				sendMessage(isEdit ? editMessage?.content : '');
+				isEdit
+					? sendMessage(editMessage?.content, undefined, true)
+					: sendMessage();
 			}
 		}
 	};
@@ -1015,7 +1017,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 										)}
 										<div
 											className={cn(
-												'flex-1 rounded-md p-3',
+												'flex-1 rounded-md p-3 mb-1.5',
 												message.role === 'user'
 													? 'bg-blue-500/10 border border-blue-500/20 text-end pt-2 pb-2.5 px-3'
 													: 'bg-theme/5 border border-theme-white/10',
@@ -1051,6 +1053,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 															<Button
 																variant="secondary"
 																onClick={onSendMessage}
+																disabled={loading}
 															>
 																发送
 															</Button>
@@ -1127,78 +1130,87 @@ const ChatBot: React.FC<ChatBotProps> = ({
 												</div>
 											)}
 										</div>
-										{(message.siblingCount || 0) > 1 && (
-											<div className="flex items-center gap-1 -mt-1 text-xs text-textcolor/50 select-none">
-												<ChevronLeft
-													className={cn(
-														'w-4 h-4 cursor-pointer hover:text-textcolor',
-														(message.siblingIndex || 0) <= 0 &&
-															'opacity-30 cursor-not-allowed hover:text-textcolor/50',
-													)}
-													onClick={() => {
-														if ((message.siblingIndex || 0) > 0) {
-															handleBranchChange(message.chatId, 'prev');
-														}
-													}}
-												/>
-												<span className="min-w-10 text-center">
-													{(message.siblingIndex || 0) + 1} /{' '}
-													{message.siblingCount}
-												</span>
-												<ChevronRight
-													className={cn(
-														'w-4 h-4 cursor-pointer hover:text-textcolor',
-														(message.siblingIndex || 0) >=
-															(message.siblingCount || 0) - 1 &&
-															'opacity-30 cursor-not-allowed hover:text-textcolor/50',
-													)}
-													onClick={() => {
-														if (
-															(message.siblingIndex || 0) <
-															(message.siblingCount || 0) - 1
-														) {
-															handleBranchChange(message.chatId, 'next');
-														}
-													}}
-												/>
-											</div>
-										)}
-										{message.content && (
-											<div
-												className={`absolute bottom-0 right-2 gap-3 ${index !== messages.length - 1 ? 'hidden group-hover:flex' : `${loading ? 'hidden' : 'flex items-center'}`} ${message.role === 'user' ? 'justify-end' : 'left-2'}`}
-											>
-												<div className="cursor-pointer flex items-center justify-center">
-													{isCopyedId !== message.chatId ? (
-														<Copy
-															size={18}
-															onClick={() =>
-																onCopy(message.content, message.chatId)
+										<div
+											className={`"absolute bottom-0 right-2 flex items-center" ${message.role === 'user' ? 'justify-end' : 'left-2'}`}
+										>
+											{(message.siblingCount || 0) > 1 && (
+												<div
+													className={`${message.role === 'user' ? 'order-last ml-5 -mr-1.5' : 'order-first mr-5 -ml-1.5'} flex items-center gap-1 -mt-0.5 text-textcolor/70 select-none`}
+												>
+													<ChevronLeft
+														size={22}
+														className={cn(
+															'cursor-pointer hover:text-textcolor',
+															(message.siblingIndex || 0) <= 0 &&
+																'opacity-30 cursor-not-allowed hover:text-textcolor/60',
+														)}
+														onClick={() => {
+															if ((message.siblingIndex || 0) > 0) {
+																handleBranchChange(message.chatId, 'prev');
 															}
-														/>
-													) : (
-														<div className="flex items-center justify-center text-green-400 rounded-full box-border">
-															<CheckCircle size={18} />
+														}}
+													/>
+													<span className="min-w-10 text-center">
+														{(message.siblingIndex || 0) + 1} /{' '}
+														{message.siblingCount}
+													</span>
+													<ChevronRight
+														size={22}
+														className={cn(
+															'cursor-pointer hover:text-textcolor',
+															(message.siblingIndex || 0) >=
+																(message.siblingCount || 0) - 1 &&
+																'opacity-30 cursor-not-allowed hover:text-textcolor/60',
+														)}
+														onClick={() => {
+															if (
+																(message.siblingIndex || 0) <
+																(message.siblingCount || 0) - 1
+															) {
+																handleBranchChange(message.chatId, 'next');
+															}
+														}}
+													/>
+												</div>
+											)}
+											{message.content && (
+												<div
+													className={`gap-3 text-textcolor/70 ${index !== messages.length - 1 ? `hidden ${loading ? 'group-hover:hidden' : 'group-hover:flex'}` : `${loading ? 'hidden' : 'flex items-center'}`}`}
+												>
+													<div className="cursor-pointer flex items-center justify-center">
+														{isCopyedId !== message.chatId ? (
+															<Copy
+																size={16}
+																className="hover:text-textcolor"
+																onClick={() =>
+																	onCopy(message.content, message.chatId)
+																}
+															/>
+														) : (
+															<div className="flex items-center justify-center text-green-400 rounded-full box-border">
+																<CheckCircle size={16} />
+															</div>
+														)}
+													</div>
+													{message.role === 'user' && (
+														<div className="cursor-pointer hover:text-textcolor mt-0.5">
+															<PencilLine
+																size={16}
+																onClick={() => onEdit(message)}
+															/>
+														</div>
+													)}
+													{message.role !== 'user' && (
+														<div className="cursor-pointer hover:text-textcolor">
+															<RotateCw
+																size={16}
+																onClick={() => onReGenerate(index)}
+															/>
 														</div>
 													)}
 												</div>
-												{message.role === 'user' && (
-													<div className="cursor-pointer">
-														<PencilLine
-															size={18}
-															onClick={() => onEdit(message)}
-														/>
-													</div>
-												)}
-												{message.role !== 'user' && (
-													<div className="cursor-pointer">
-														<RotateCw
-															size={18}
-															onClick={() => onReGenerate(index)}
-														/>
-													</div>
-												)}
-											</div>
-										)}
+											)}
+										</div>
 									</div>
 								</motion.div>
 							))
