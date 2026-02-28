@@ -87,11 +87,6 @@ const Chat = () => {
 			}
 		}
 
-		// siblings.sort(
-		// 	(a, b) =>
-		// 		new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
-		// );
-
 		const currentIndex = siblings.findIndex((m) => m.chatId === msgId);
 		const nextIndex =
 			direction === 'next' ? currentIndex + 1 : currentIndex - 1;
@@ -151,6 +146,7 @@ const Chat = () => {
 				key={activeSessionId}
 				initialMessages={chatBotMessages as any[]}
 				onBranchChange={onBranchChange}
+				activeSessionId={activeSessionId}
 			/>
 			<Drawer title="历史对话" open={open} onOpenChange={() => setOpen(false)}>
 				<ScrollArea className="h-full overflow-y-auto pr-4 box-border">

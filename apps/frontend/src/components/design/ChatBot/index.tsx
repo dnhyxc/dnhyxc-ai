@@ -47,7 +47,7 @@ export interface Message {
 
 interface ChatRequestParams {
 	messages: { role: 'user' | 'assistant'; content: string; noSave?: boolean }[];
-	sessionId: string;
+	sessionId: string | undefined;
 	stream?: boolean;
 	filePaths?: string[];
 	isRegenerate?: boolean;
@@ -64,6 +64,7 @@ interface ChatBotProps {
 	maxHistory?: number;
 	showAvatar?: boolean;
 	onBranchChange?: (msgId: string, direction: 'prev' | 'next') => void;
+	activeSessionId?: string;
 }
 
 const ChatBot: React.FC<ChatBotProps> = ({
@@ -73,6 +74,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 	// apiEndpoint = '/chat/zhipu-stream',
 	showAvatar = false,
 	onBranchChange,
+	activeSessionId,
 }) => {
 	// allMessages存储所有消息（包括所有分支），通过setAllMessages的回调访问
 	const [, setAllMessages] = useState<Message[]>(initialMessages);
@@ -345,7 +347,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 					noSave: isRegenerate,
 				},
 			],
-			sessionId,
+			sessionId: sessionId || activeSessionId,
 			stream: true,
 			isRegenerate,
 			parentId,

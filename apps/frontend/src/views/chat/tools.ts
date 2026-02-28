@@ -31,11 +31,11 @@ export const buildMessageList = (
 	}
 
 	// 对 rootMessages 进行排序
-	rootMessages.sort(
-		(a, b) =>
-			new Date(a.createdAt as Date).getTime() -
-			new Date(b.createdAt as Date).getTime(),
-	);
+	// rootMessages.sort(
+	// 	(a, b) =>
+	// 		new Date(a.createdAt as Date).getTime() -
+	// 		new Date(b.createdAt as Date).getTime(),
+	// );
 
 	const result: Message[] = [];
 
