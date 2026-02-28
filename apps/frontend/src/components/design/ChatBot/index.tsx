@@ -472,22 +472,25 @@ const ChatBot: React.FC<ChatBotProps> = ({
 
 		const userMsgId = uuidv4();
 		const assistantMessageId = uuidv4();
-		let userMessageToUse: Message;
-		let assistantMessage: Message;
+		let userMessageToUse: Message | null = null;
+		let assistantMessage: Message | null = null;
 
 		setAllMessages((prevAll) => {
 			const editedMsg = prevAll.find((m) => m.chatId === editMessage.chatId);
 			if (!editedMsg) return prevAll;
 
 			const parentId = editedMsg.parentId;
-			userMessageToUse = createUserMessage(
+			const userMsg = createUserMessage(
 				userMsgId,
 				content || editMessage?.content.trim(),
 				parentId,
 			);
-			userMessageToUse.childrenIds = [assistantMessageId];
+			userMsg.childrenIds = [assistantMessageId];
 
-			assistantMessage = createAssistantMessage(assistantMessageId, userMsgId);
+			const assistantMsg = createAssistantMessage(
+				assistantMessageId,
+				userMsgId,
+			);
 
 			let newAllMessages = [...prevAll];
 			if (parentId) {
@@ -498,27 +501,37 @@ const ChatBot: React.FC<ChatBotProps> = ({
 				);
 			}
 
-			newAllMessages.push(userMessageToUse, assistantMessage);
+			newAllMessages.push(userMsg, assistantMsg);
+
+			// 存储到外部变量
+			userMessageToUse = userMsg;
+			assistantMessage = assistantMsg;
+
 			updateMessagesDisplay(newAllMessages);
 			return newAllMessages;
 		});
 
-		setTimeout(() => {
+		// 在状态更新后调用 onSseFetch
+		if (userMessageToUse && assistantMessage) {
 			onSseFetch(
 				apiEndpoint,
 				assistantMessageId,
 				userMessageToUse,
 				assistantMessage,
 				false,
-				selectedChildMap, // 传递当前的 selectedChildMap
+				selectedChildMap,
 			);
 			setEditMessage(null);
-		}, 0);
+		}
 	};
 
 	// 处理重新生成消息
 	const handleRegenerateMessage = async (_content: string, index: number) => {
 		const assistantMessageId = uuidv4();
+
+		let userMessageToUse: Message | null = null;
+		let assistantMessage: Message | null = null;
+		let newSelectedChildMap: Map<string, string> | null = null;
 
 		setAllMessages((prevAll) => {
 			const currentAssistantMsg = messages[index];
@@ -529,47 +542,52 @@ const ChatBot: React.FC<ChatBotProps> = ({
 			);
 			if (!userMsg) return prevAll;
 
-			const userMessageToUse = { ...userMsg };
+			const userMsgCopy = { ...userMsg };
 			const childrenIds = userMsg.childrenIds ? [...userMsg.childrenIds] : [];
 			if (!childrenIds.includes(assistantMessageId)) {
 				childrenIds.push(assistantMessageId);
 			}
-			userMessageToUse.childrenIds = childrenIds;
-			userMessageToUse.currentChatId = currentChatId;
+			userMsgCopy.childrenIds = childrenIds;
+			userMsgCopy.currentChatId = currentChatId;
 
-			const assistantMessage = createAssistantMessage(
+			const assistantMsg = createAssistantMessage(
 				assistantMessageId,
-				userMessageToUse.chatId,
+				userMsgCopy.chatId,
 			);
 
 			const newAllMessages = prevAll.map((msg) =>
-				msg.chatId === userMessageToUse.chatId ? userMessageToUse : msg,
+				msg.chatId === userMsgCopy.chatId ? userMsgCopy : msg,
 			);
-			newAllMessages.push(assistantMessage);
+			newAllMessages.push(assistantMsg);
 
 			// 更新 selectedChildMap
-			const newSelectedChildMap = new Map(selectedChildMap);
-			newSelectedChildMap.set(userMessageToUse.chatId, assistantMessageId);
+			const childMap = new Map(selectedChildMap);
+			childMap.set(userMsgCopy.chatId, assistantMessageId);
+
+			// 存储到外部变量
+			userMessageToUse = userMsgCopy;
+			assistantMessage = assistantMsg;
+			newSelectedChildMap = childMap;
 
 			// 先更新 selectedChildMap 状态
-			setSelectedChildMap(newSelectedChildMap);
+			setSelectedChildMap(childMap);
 
-			updateMessagesDisplay(newAllMessages, newSelectedChildMap);
-
-			// 在状态更新后立即调用 onSseFetch，传递新的 selectedChildMap
-			setTimeout(() => {
-				onSseFetch(
-					apiEndpoint,
-					assistantMessageId,
-					userMessageToUse,
-					assistantMessage,
-					true,
-					newSelectedChildMap, // 传递更新后的 selectedChildMap
-				);
-			}, 0);
+			updateMessagesDisplay(newAllMessages, childMap);
 
 			return newAllMessages;
 		});
+
+		// 在状态更新后调用 onSseFetch
+		if (userMessageToUse && assistantMessage && newSelectedChildMap) {
+			onSseFetch(
+				apiEndpoint,
+				assistantMessageId,
+				userMessageToUse,
+				assistantMessage,
+				true,
+				newSelectedChildMap,
+			);
+		}
 	};
 
 	// 处理新消息
@@ -652,6 +670,10 @@ const ChatBot: React.FC<ChatBotProps> = ({
 	};
 
 	const onContinue = async () => {
+		let userMsgForApi: Message | null = null;
+		let assistantMsgForApi: Message | null = null;
+		let lastMsgId: string | null = null;
+
 		setAllMessages((prevAll) => {
 			const newAllMessages = prevAll.map((msg) => ({
 				...msg,
@@ -686,45 +708,50 @@ const ChatBot: React.FC<ChatBotProps> = ({
 						const newFormattedMessages = getFormatMessages(sortedMessages);
 						setMessagesWithCurrentChatId(newFormattedMessages);
 
-						// 发送继续生成请求
-						setTimeout(() => {
-							// 确保 userMsg 包含必要的字段
-							const userMsgForApi: Message = {
-								...userMsg,
-								isStopped: false,
-							};
-							// 传递原来的 assistant 消息，不是创建新的
-							const assistantMsgForApi: Message = {
-								...lastMsg,
-								isStreaming: true,
-								isStopped: false,
-							};
-							onSseFetch(
-								'/chat/continueSse',
-								lastMsg.chatId, // 使用原来的 assistant 消息 ID
-								userMsgForApi, // 传递 user 消息
-								assistantMsgForApi, // 传递原来的 assistant 消息
-								false, // isRegenerate: 继续生成不是重新生成
-								selectedChildMap, // 传递当前的 selectedChildMap
-							);
-						}, 0);
+						// 存储数据用于后续调用
+						userMsgForApi = {
+							...userMsg,
+							isStopped: false,
+						};
+						assistantMsgForApi = {
+							...lastMsg,
+							isStreaming: true,
+							isStopped: false,
+						};
+						lastMsgId = lastMsg.chatId;
 
 						return updatedAllMessages;
 					} else {
 						// 如果没有找到 user 消息，使用原来的逻辑
-						onSseFetch(
-							'/chat/continueSse',
-							lastMsg.chatId,
-							undefined,
-							undefined,
-							false,
-							selectedChildMap,
-						);
+						lastMsgId = lastMsg.chatId;
 					}
 				}
 			}
 			return newAllMessages;
 		});
+
+		// 在状态更新后发送继续生成请求
+		if (lastMsgId) {
+			if (userMsgForApi && assistantMsgForApi) {
+				onSseFetch(
+					'/chat/continueSse',
+					lastMsgId,
+					userMsgForApi,
+					assistantMsgForApi,
+					false,
+					selectedChildMap,
+				);
+			} else {
+				onSseFetch(
+					'/chat/continueSse',
+					lastMsgId,
+					undefined,
+					undefined,
+					false,
+					selectedChildMap,
+				);
+			}
+		}
 	};
 
 	// 停止生成
