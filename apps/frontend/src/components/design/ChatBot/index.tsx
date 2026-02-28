@@ -42,7 +42,7 @@ export interface Message {
 	childrenIds?: string[];
 	siblingIndex?: number;
 	siblingCount?: number;
-	currentChatId?: string; // 当前活跃分支的最后一条消息的chatId
+	currentChatId?: string;
 }
 
 interface ChatRequestParams {
@@ -54,7 +54,7 @@ interface ChatRequestParams {
 	parentId?: string;
 	userMessage?: Message;
 	assistantMessage?: Message;
-	currentChatId?: string; // 当前活跃分支的最后一条消息的chatId
+	currentChatId?: string;
 }
 
 interface ChatBotProps {
@@ -71,14 +71,14 @@ const ChatBot: React.FC<ChatBotProps> = ({
 	className,
 	initialMessages = [],
 	apiEndpoint = '/chat/sse',
-	// apiEndpoint = '/chat/zhipu-stream',
 	showAvatar = false,
 	onBranchChange,
 	activeSessionId,
 }) => {
-	// allMessages存储所有消息（包括所有分支），通过setAllMessages的回调访问
+	// allMessages 存储完整树
 	const [, setAllMessages] = useState<Message[]>(initialMessages);
-	const [messages, setMessages] = useState<Message[]>(initialMessages);
+	// messages 存储当前显示的路径
+	const [messages, setMessages] = useState<Message[]>([]);
 	const [sessionId, setSessionId] = useState('');
 	const [input, setInput] = useState('');
 	const [loading, setLoading] = useState(false);
@@ -93,10 +93,11 @@ const ChatBot: React.FC<ChatBotProps> = ({
 		path: '',
 		size: 0,
 	});
+	// selectedChildMap 管理当前会话的分支选择状态
 	const [selectedChildMap, setSelectedChildMap] = useState<Map<string, string>>(
 		new Map(),
 	);
-	const [currentChatId, setCurrentChatId] = useState<string>(''); // 当前活跃分支的最后一条消息的chatId
+	const [currentChatId, setCurrentChatId] = useState<string>('');
 	const [editMessage, setEditMessage] = useState<Message | null>(null);
 
 	const stopRequestRef = useRef<(() => void) | null>(null);
@@ -105,17 +106,23 @@ const ChatBot: React.FC<ChatBotProps> = ({
 	const editInputRef = useRef<HTMLTextAreaElement>(null);
 
 	let copyTimer: ReturnType<typeof setTimeout> | null = null;
-
 	const navigate = useNavigate();
 
+	// 修改：初始化逻辑
 	useEffect(() => {
-		setAllMessages(initialMessages);
-		setMessagesWithCurrentChatId(initialMessages);
-		// 重置选中状态
-		setSelectedChildMap(new Map());
+		// 只有当 initialMessages 有变化且不为空时才更新，避免内部状态更新导致的循环
+		// 这里 initialMessages 传入的是完整树
+		if (initialMessages && initialMessages.length > 0) {
+			setAllMessages(initialMessages);
+			// 如果是新会话切换（通过 key 控制组件卸载重装，这里主要是初始挂载）
+			// 我们基于完整树计算初始显示路径
+			const sortedMessages = buildMessageList(initialMessages, new Map());
+			const formattedMessages = getFormatMessages(sortedMessages);
+			setMessages(formattedMessages);
+			updateCurrentChatId(sortedMessages);
+		}
 	}, [initialMessages]);
 
-	// 自动滚动到底部
 	useEffect(() => {
 		if (autoScroll && scrollContainerRef.current) {
 			scrollContainerRef.current.scrollTop =
@@ -123,10 +130,8 @@ const ChatBot: React.FC<ChatBotProps> = ({
 		}
 	}, [messages, autoScroll]);
 
-	// 聚焦输入框
 	useEffect(() => {
 		inputRef.current?.focus();
-
 		return () => {
 			if (copyTimer) {
 				clearTimeout(copyTimer);
@@ -136,7 +141,6 @@ const ChatBot: React.FC<ChatBotProps> = ({
 		};
 	}, []);
 
-	// 输入内容变化时自动滚动到底部
 	useEffect(() => {
 		if (inputRef.current) {
 			const textarea = inputRef.current;
@@ -144,7 +148,6 @@ const ChatBot: React.FC<ChatBotProps> = ({
 		}
 	}, [input]);
 
-	// 滚动事件处理
 	const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
 		const element = e.currentTarget;
 		if (!scrollContainerRef.current) {
@@ -162,20 +165,20 @@ const ChatBot: React.FC<ChatBotProps> = ({
 	};
 
 	// 工具函数：更新消息显示
+	// 关键修改：确保始终使用 allMessages (完整树) 来构建显示列表
 	const updateMessagesDisplay = (
-		allMessages: Message[],
+		currentAllMessages: Message[],
 		childMap?: Map<string, string>,
 	) => {
 		const sortedMessages = buildMessageList(
-			allMessages,
+			currentAllMessages, // 使用完整树
 			childMap || selectedChildMap,
 		);
 		const formattedMessages = getFormatMessages(sortedMessages);
-		// 使用函数式更新确保立即应用
-		setMessagesWithCurrentChatId(() => formattedMessages);
+		setMessages(formattedMessages);
+		updateCurrentChatId(sortedMessages);
 	};
 
-	// 工具函数：更新单个消息
 	const updateSingleMessage = (
 		allMessages: Message[],
 		messageId: string,
@@ -186,7 +189,6 @@ const ChatBot: React.FC<ChatBotProps> = ({
 		);
 	};
 
-	// 工具函数：创建用户消息
 	const createUserMessage = (
 		chatId: string,
 		content: string,
@@ -204,7 +206,6 @@ const ChatBot: React.FC<ChatBotProps> = ({
 		file,
 	});
 
-	// 工具函数：创建助手消息
 	const createAssistantMessage = (
 		chatId: string,
 		parentId: string,
@@ -221,7 +222,6 @@ const ChatBot: React.FC<ChatBotProps> = ({
 		currentChatId,
 	});
 
-	// 工具函数：更新父消息的 childrenIds
 	const updateParentChildrenIds = (
 		allMessages: Message[],
 		parentId: string,
@@ -245,7 +245,6 @@ const ChatBot: React.FC<ChatBotProps> = ({
 		return newAllMessages;
 	};
 
-	// 工具函数：查找最后一条助手消息
 	const findLastAssistantMessage = (allMessages: Message[]): Message | null => {
 		for (let i = allMessages.length - 1; i >= 0; i--) {
 			if (allMessages[i].role === 'assistant') {
@@ -255,67 +254,16 @@ const ChatBot: React.FC<ChatBotProps> = ({
 		return null;
 	};
 
-	// 工具函数：查找兄弟节点
-	const findSiblings = (
-		allMessages: Message[],
-		messageId: string,
-	): Message[] => {
-		const currentMsg = allMessages.find((m) => m.chatId === messageId);
-		if (!currentMsg) return [];
-
-		const parentId = currentMsg.parentId;
-		let siblings: Message[] = [];
-
-		if (parentId) {
-			siblings = allMessages.filter((m) => m.parentId === parentId);
-		} else {
-			// Root siblings
-			const allChildren = new Set<string>();
-			allMessages.forEach((m) => {
-				m.childrenIds?.forEach((c) => {
-					allChildren.add(c);
-				});
-			});
-			siblings = allMessages.filter((m) => !allChildren.has(m.chatId));
-		}
-
-		// 按照创建时间排序
-		return siblings.sort(
-			(a, b) =>
-				new Date(a.createdAt as Date).getTime() -
-				new Date(b.createdAt as Date).getTime(),
-		);
-	};
-
-	// 更新currentChatId的函数
 	const updateCurrentChatId = (msgs: Message[]) => {
 		setCurrentChatId((prevChatId) => {
 			if (msgs.length > 0) {
 				const lastMsg = msgs[msgs.length - 1];
 				const newChatId = lastMsg.chatId;
-				// 只在chatId实际变化时更新，避免不必要的重新渲染
 				return prevChatId !== newChatId ? newChatId : prevChatId;
 			} else {
-				// 只在currentChatId不为空时更新
 				return prevChatId !== '' ? '' : prevChatId;
 			}
 		});
-	};
-
-	// 包装setMessages，同时更新currentChatId
-	const setMessagesWithCurrentChatId = (
-		msgs: Message[] | ((prev: Message[]) => Message[]),
-	) => {
-		if (typeof msgs === 'function') {
-			setMessages((prev) => {
-				const newMsgs = msgs(prev);
-				updateCurrentChatId(newMsgs);
-				return newMsgs;
-			});
-		} else {
-			setMessages(msgs);
-			updateCurrentChatId(msgs);
-		}
 	};
 
 	const onSseFetch = async (
@@ -327,22 +275,20 @@ const ChatBot: React.FC<ChatBotProps> = ({
 		selectedChildMapParam?: Map<string, string>,
 	) => {
 		const parentId = isRegenerate ? userMessage?.chatId : userMessage?.parentId;
-		// 使用传递的 selectedChildMap 参数，如果没有则使用当前状态
 		const currentSelectedChildMap = selectedChildMapParam
 			? new Map(selectedChildMapParam)
 			: new Map(selectedChildMap);
-		// 对于重新生成，确保使用新的 assistant 消息
+
 		if (isRegenerate && userMessage) {
 			currentSelectedChildMap.set(userMessage.chatId, assistantMessageId);
 		}
 
-		// 调用流式 API
 		const messages: ChatRequestParams = {
 			messages: [
 				{
 					role: 'user',
 					content: isRegenerate
-						? `重新生成“${userMessage?.content}”的答案，不要与之前答案重复`
+						? `重新生成"${userMessage?.content}"的答案，不要与之前答案重复`
 						: userMessage?.content || '',
 					noSave: isRegenerate,
 				},
@@ -353,7 +299,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 			parentId,
 			userMessage,
 			assistantMessage,
-			currentChatId, // 传递当前活跃分支的最后一条消息的chatId
+			currentChatId,
 		};
 		if (userMessage?.file) {
 			messages.filePaths = [userMessage?.file?.path || ''];
@@ -370,6 +316,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 					},
 					onThinking: (thinking) => {
 						if (typeof thinking === 'string') {
+							// 修改：操作 allMessages
 							setAllMessages((prevAll) => {
 								const assistantChat = prevAll.find(
 									(m) => m.chatId === assistantMessageId,
@@ -383,6 +330,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 										isStreaming: true,
 									},
 								);
+								// 基于完整树更新显示
 								updateMessagesDisplay(newAllMessages, currentSelectedChildMap);
 								return newAllMessages;
 							});
@@ -416,7 +364,6 @@ const ChatBot: React.FC<ChatBotProps> = ({
 							type: type || 'error',
 							title: err?.message || String(err) || '发送失败',
 						});
-						// 移除失败的流式消息
 						setAllMessages((prevAll) => {
 							const newAllMessages = prevAll.filter(
 								(msg) =>
@@ -432,7 +379,6 @@ const ChatBot: React.FC<ChatBotProps> = ({
 					},
 					onComplete: () => {
 						setLoading(false);
-						// 更新消息状态，结束流式传输
 						setAllMessages((prevAll) => {
 							const newAllMessages = updateSingleMessage(
 								prevAll,
@@ -455,7 +401,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 				type: 'error',
 				title: '发送消息失败',
 			});
-			setMessagesWithCurrentChatId((prev) =>
+			setAllMessages((prev) =>
 				prev.filter(
 					(msg) =>
 						!(
@@ -468,7 +414,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 		}
 	};
 
-	// 处理编辑消息
+	// 确保这些函数都更新 allMessages，并调用 updateMessagesDisplay
 	const handleEditMessage = async (content?: string) => {
 		if (!editMessage) return;
 
@@ -505,15 +451,14 @@ const ChatBot: React.FC<ChatBotProps> = ({
 
 			newAllMessages.push(userMsg, assistantMsg);
 
-			// 存储到外部变量
 			userMessageToUse = userMsg;
 			assistantMessage = assistantMsg;
 
+			// 基于完整树更新显示
 			updateMessagesDisplay(newAllMessages);
 			return newAllMessages;
 		});
 
-		// 在状态更新后调用 onSseFetch
 		if (userMessageToUse && assistantMessage) {
 			onSseFetch(
 				apiEndpoint,
@@ -527,7 +472,6 @@ const ChatBot: React.FC<ChatBotProps> = ({
 		}
 	};
 
-	// 处理重新生成消息
 	const handleRegenerateMessage = async (_content: string, index: number) => {
 		const assistantMessageId = uuidv4();
 
@@ -535,10 +479,15 @@ const ChatBot: React.FC<ChatBotProps> = ({
 		let assistantMessage: Message | null = null;
 		let newSelectedChildMap: Map<string, string> | null = null;
 
-		setAllMessages((prevAll) => {
-			const currentAssistantMsg = messages[index];
-			if (!currentAssistantMsg) return prevAll;
+		// 修改：基于 allMessages 查找，而不是 messages (显示路径)
+		// 注意：这里的 index 是显示路径的 index，需要映射回 allMessages 中的消息
+		// 但通常 regenerate 是针对当前显示的最后一条 assistant 消息
+		// 为了安全，我们通过 messages 状态找到目标消息，然后在 allMessages 中更新
+		const currentAssistantMsg = messages[index];
+		if (!currentAssistantMsg) return;
 
+		setAllMessages((prevAll) => {
+			// 在完整树中找到对应的用户消息
 			const userMsg = prevAll.find(
 				(m) => m.chatId === currentAssistantMsg.parentId,
 			);
@@ -562,24 +511,20 @@ const ChatBot: React.FC<ChatBotProps> = ({
 			);
 			newAllMessages.push(assistantMsg);
 
-			// 更新 selectedChildMap
 			const childMap = new Map(selectedChildMap);
 			childMap.set(userMsgCopy.chatId, assistantMessageId);
 
-			// 存储到外部变量
 			userMessageToUse = userMsgCopy;
 			assistantMessage = assistantMsg;
 			newSelectedChildMap = childMap;
 
-			// 先更新 selectedChildMap 状态
 			setSelectedChildMap(childMap);
-
+			// 基于完整树更新显示
 			updateMessagesDisplay(newAllMessages, childMap);
 
 			return newAllMessages;
 		});
 
-		// 在状态更新后调用 onSseFetch
 		if (userMessageToUse && assistantMessage && newSelectedChildMap) {
 			onSseFetch(
 				apiEndpoint,
@@ -592,12 +537,15 @@ const ChatBot: React.FC<ChatBotProps> = ({
 		}
 	};
 
-	// 处理新消息
 	const handleNewMessage = async (content: string) => {
 		const userMsgId = uuidv4();
 		const assistantMessageId = uuidv4();
 
 		let parentId: string | undefined;
+		// 修改：基于 allMessages 获取最后一条消息，确保分支连接正确
+		// 如果 allMessages 为空，则 parentId 为 undefined
+		// 如果希望基于当前显示路径的最后一条，可以用 messages
+		// 这里假设是基于当前活跃分支的最后一条，即 messages 的最后一条
 		const lastMsg = messages[messages.length - 1];
 		if (lastMsg) {
 			parentId = lastMsg.chatId;
@@ -626,6 +574,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 				);
 			}
 			newAllMessages.push(userMessageToUse, assistantMessage);
+			// 基于完整树更新显示
 			updateMessagesDisplay(newAllMessages);
 			return newAllMessages;
 		});
@@ -636,11 +585,10 @@ const ChatBot: React.FC<ChatBotProps> = ({
 			userMessageToUse,
 			assistantMessage,
 			false,
-			selectedChildMap, // 传递当前的 selectedChildMap
+			selectedChildMap,
 		);
 	};
 
-	// 发送消息
 	const sendMessage = async (
 		content?: string,
 		index?: number,
@@ -681,17 +629,15 @@ const ChatBot: React.FC<ChatBotProps> = ({
 				...msg,
 				isStopped: false,
 			}));
+			// 基于完整树更新显示
 			updateMessagesDisplay(newAllMessages);
 
-			// 获取最后一条 assistant 消息
 			const formattedMessages = messages;
 			if (formattedMessages.length > 0) {
 				const lastMsg = formattedMessages[formattedMessages.length - 1];
 				if (lastMsg.role === 'assistant' && lastMsg.isStopped) {
-					// 找到最后一条 assistant 消息对应的 user 消息
 					const userMsg = prevAll.find((m) => m.chatId === lastMsg.parentId);
 					if (userMsg) {
-						// 更新原来的 assistant 消息状态，准备继续生成
 						const updatedAllMessages = newAllMessages.map((msg) =>
 							msg.chatId === lastMsg.chatId
 								? {
@@ -708,7 +654,8 @@ const ChatBot: React.FC<ChatBotProps> = ({
 							selectedChildMap,
 						);
 						const newFormattedMessages = getFormatMessages(sortedMessages);
-						setMessagesWithCurrentChatId(newFormattedMessages);
+						setMessages(newFormattedMessages);
+						updateCurrentChatId(sortedMessages);
 
 						// 存储数据用于后续调用
 						userMsgForApi = {
@@ -788,7 +735,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 	const clearChat = () => {
 		setInput('');
 		setAllMessages([]);
-		setMessagesWithCurrentChatId([]);
+		setMessages([]);
 		stopRequestRef.current?.();
 		stopRequestRef.current = null;
 		setLoading(false);
@@ -797,12 +744,10 @@ const ChatBot: React.FC<ChatBotProps> = ({
 		navigate('/chat');
 	};
 
-	// 处理输入框变化
 	const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
 		setInput(e.target.value);
 	};
 
-	// 发送重新编辑的消息
 	const onSendMessage = () => {
 		sendMessage(editMessage?.content, undefined, true);
 	};
@@ -934,9 +879,39 @@ const ChatBot: React.FC<ChatBotProps> = ({
 		}
 	};
 
+	const findSiblings = (
+		allMessages: Message[],
+		messageId: string,
+	): Message[] => {
+		const currentMsg = allMessages.find((m) => m.chatId === messageId);
+		if (!currentMsg) return [];
+
+		const parentId = currentMsg.parentId;
+		let siblings: Message[] = [];
+
+		if (parentId) {
+			siblings = allMessages.filter((m) => m.parentId === parentId);
+		} else {
+			const allChildren = new Set<string>();
+			allMessages.forEach((m) => {
+				m.childrenIds?.forEach((c) => {
+					allChildren.add(c);
+				});
+			});
+			siblings = allMessages.filter((m) => !allChildren.has(m.chatId));
+		}
+
+		return siblings.sort(
+			(a, b) =>
+				new Date(a.createdAt as Date).getTime() -
+				new Date(b.createdAt as Date).getTime(),
+		);
+	};
+
 	const handleBranchChange = (msgId: string, direction: 'prev' | 'next') => {
 		onBranchChange?.(msgId, direction);
 
+		// 修改：基于 allMessages 查找兄弟节点
 		setAllMessages((prevAll) => {
 			const siblings = findSiblings(prevAll, msgId);
 			const currentIndex = siblings.findIndex((m) => m.chatId === msgId);
@@ -955,6 +930,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 					newSelectedChildMap.set('root', nextMsg.chatId);
 				}
 				setSelectedChildMap(newSelectedChildMap);
+				// 基于完整树更新显示
 				updateMessagesDisplay(prevAll, newSelectedChildMap);
 			}
 
@@ -964,7 +940,6 @@ const ChatBot: React.FC<ChatBotProps> = ({
 
 	return (
 		<div className={cn('flex flex-col h-full w-full', className)}>
-			{/* 聊天消息区域 */}
 			<ScrollArea
 				ref={scrollContainerRef}
 				className="flex-1 overflow-hidden w-full backdrop-blur-sm"
@@ -976,7 +951,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 							<div className="flex flex-col items-center justify-center h-110 text-textcolor">
 								<Bot className="w-16 h-16 mb-4" />
 								<p className="text-2xl">欢迎来到 dnhyxc-ai 智能聊天</p>
-								<p className="text-lg mt-2">有什么我可以帮您的?</p>
+								<p className="text-lg mt-2">有什么我可以帮您的？</p>
 							</div>
 						) : (
 							messages.map((message, index) => (
@@ -1256,8 +1231,8 @@ const ChatBot: React.FC<ChatBotProps> = ({
 										className="w-auto h-auto"
 										validTypes={[
 											'application/pdf',
-											'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // docx
-											'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // xlsx
+											'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+											'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
 										]}
 										onUpload={onUploadFile}
 									>
