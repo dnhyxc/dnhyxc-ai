@@ -1008,7 +1008,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 									{/* 消息内容 */}
 									<div
 										className={cn(
-											'relative flex-1 flex flex-col gap-1 pb-6 w-full group',
+											'relative flex-1 flex flex-col gap-1 pb-10 w-full group',
 											message.role === 'user' ? 'items-end' : '',
 										)}
 									>
@@ -1017,7 +1017,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 										)}
 										<div
 											className={cn(
-												'flex-1 rounded-md p-3 mb-1.5',
+												'flex-1 rounded-md p-3',
 												message.role === 'user'
 													? 'bg-blue-500/10 border border-blue-500/20 text-end pt-2 pb-2.5 px-3'
 													: 'bg-theme/5 border border-theme-white/10',
@@ -1131,11 +1131,11 @@ const ChatBot: React.FC<ChatBotProps> = ({
 											)}
 										</div>
 										<div
-											className={`"absolute bottom-0 right-2 flex items-center" ${message.role === 'user' ? 'justify-end' : 'left-2'}`}
+											className={`absolute bottom-2 right-2 h-5 flex items-center ${message.role === 'user' ? 'justify-end' : 'left-2'}`}
 										>
 											{(message.siblingCount || 0) > 1 && (
 												<div
-													className={`${message.role === 'user' ? 'order-last ml-5 -mr-1.5' : 'order-first mr-5 -ml-1.5'} flex items-center gap-1 -mt-0.5 text-textcolor/70 select-none`}
+													className={`${message.role === 'user' ? 'order-last ml-5 -mr-3.5' : 'order-first mr-5 -ml-3.5'} flex items-center gap-1 text-textcolor/70 select-none`}
 												>
 													<ChevronLeft
 														size={22}
@@ -1175,7 +1175,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 											)}
 											{message.content && (
 												<div
-													className={`gap-3 text-textcolor/70 ${index !== messages.length - 1 ? `hidden ${loading ? 'group-hover:hidden' : 'group-hover:flex'}` : `${loading ? 'hidden' : 'flex items-center'}`}`}
+													className={`gap-3 text-textcolor/70 ${message.role === 'user' ? '-mr-2' : '-ml-2'} ${index !== messages.length - 1 ? `hidden ${loading ? 'group-hover:hidden' : 'group-hover:flex'}` : `${loading ? 'hidden' : 'flex items-center'}`}`}
 												>
 													<div className="cursor-pointer flex items-center justify-center">
 														{isCopyedId !== message.chatId ? (
