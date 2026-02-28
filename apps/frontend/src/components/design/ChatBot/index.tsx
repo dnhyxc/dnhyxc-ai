@@ -992,12 +992,16 @@ const ChatBot: React.FC<ChatBotProps> = ({
 												message.role === 'user'
 													? 'bg-blue-500/10 border border-blue-500/20 text-end pt-2 pb-2.5 px-3'
 													: 'bg-theme/5 border border-theme-white/10',
-												showAvatar ? 'max-w-[calc(768px-105px)]' : 'w-auto',
+												showAvatar
+													? 'max-w-[calc(768px-105px)]'
+													: editMessage?.chatId === message.chatId
+														? 'w-full bg-theme/5 border-theme-white/10'
+														: 'w-auto',
 											)}
 										>
 											{message.role === 'user' ? (
 												editMessage?.chatId === message.chatId ? (
-													<div className="w-full">
+													<div className="flex flex-col w-full">
 														<Textarea
 															ref={editInputRef}
 															value={editMessage.content}
@@ -1010,11 +1014,19 @@ const ChatBot: React.FC<ChatBotProps> = ({
 															className="flex-1 min-h-16 resize-none border-none shadow-none focus-visible:ring-transparent"
 															disabled={loading}
 														/>
-														<div>
-															<Button onClick={() => setEditMessage(null)}>
+														<div className="flex justify-end gap-2">
+															<Button
+																variant="secondary"
+																onClick={() => setEditMessage(null)}
+															>
 																取消
 															</Button>
-															<Button onClick={onSendMessage}>发送</Button>
+															<Button
+																variant="secondary"
+																onClick={onSendMessage}
+															>
+																发送
+															</Button>
 														</div>
 													</div>
 												) : (

@@ -45,6 +45,7 @@ export const streamFetch = async ({
 		}
 
 		const reader = response.body?.getReader();
+
 		if (!reader) {
 			throw new Error('Failed to get stream reader');
 		}
@@ -54,67 +55,65 @@ export const streamFetch = async ({
 		let sessionId = '';
 
 		// 异步执行读取循环，不阻塞主线程
-		(async () => {
-			try {
-				while (true) {
-					const { done, value } = await reader.read();
-					if (done) {
-						if (buffer.trim()) {
+		try {
+			while (true) {
+				const { done, value } = await reader.read();
+				if (done) {
+					if (buffer.trim()) {
+						try {
+							const parsed = JSON.parse(buffer.trim());
+							onData(parsed);
+						} catch (e) {
+							Toast({
+								type: 'error',
+								title: `Failed to parse final buffer:' ${e}`,
+							});
+						}
+					}
+					onComplete?.();
+					break;
+				}
+
+				const chunk = decoder.decode(value, { stream: true });
+				buffer += chunk;
+
+				const lines = buffer.split('\n');
+				buffer = lines.pop() || '';
+
+				for (const line of lines) {
+					const trimmedLine = line.trim();
+					if (trimmedLine.startsWith('data:')) {
+						const dataStr = trimmedLine.slice(5).trim();
+						if (dataStr) {
 							try {
-								const parsed = JSON.parse(buffer.trim());
-								onData(parsed);
+								const parsed = JSON.parse(dataStr);
+								if (!sessionId) {
+									sessionId = parsed.sessionId;
+									getSessionId?.(sessionId);
+								}
+								if (parsed?.type === 'thinking') {
+									onThinking?.(parsed.content ? parsed.content : '');
+								} else {
+									onData(parsed.content ? parsed.content : '');
+								}
 							} catch (e) {
 								Toast({
 									type: 'error',
-									title: `Failed to parse final buffer:' ${e}`,
+									title: `Failed to parse data line:' ${e}, ${dataStr}`,
 								});
 							}
 						}
-						onComplete?.();
-						break;
 					}
-
-					const chunk = decoder.decode(value, { stream: true });
-					buffer += chunk;
-
-					const lines = buffer.split('\n');
-					buffer = lines.pop() || '';
-
-					for (const line of lines) {
-						const trimmedLine = line.trim();
-						if (trimmedLine.startsWith('data:')) {
-							const dataStr = trimmedLine.slice(5).trim();
-							if (dataStr) {
-								try {
-									const parsed = JSON.parse(dataStr);
-									if (!sessionId) {
-										sessionId = parsed.sessionId;
-										getSessionId?.(sessionId);
-									}
-									if (parsed?.type === 'thinking') {
-										onThinking?.(parsed.content ? parsed.content : '');
-									} else {
-										onData(parsed.content ? parsed.content : '');
-									}
-								} catch (e) {
-									Toast({
-										type: 'error',
-										title: `Failed to parse data line:' ${e}, ${dataStr}`,
-									});
-								}
-							}
-						}
-					}
-				}
-			} catch (err: any) {
-				if (err.name !== 'AbortError') {
-					onError?.(
-						err === 'Request cancelled' ? '请求已停止' : err,
-						err === 'Request cancelled' ? 'info' : 'error',
-					);
 				}
 			}
-		})();
+		} catch (err: any) {
+			if (err.name !== 'AbortError') {
+				onError?.(
+					err === 'Request cancelled' ? '请求已停止' : err,
+					err === 'Request cancelled' ? 'info' : 'error',
+				);
+			}
+		}
 	} catch (error: any) {
 		// 发起请求时的错误（如网络断开）
 		if (error.name !== 'AbortError') {
