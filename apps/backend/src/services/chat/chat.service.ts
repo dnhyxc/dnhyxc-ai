@@ -13,7 +13,11 @@ import { ModelEnum } from 'src/enum/config.enum';
 import { parseFile } from '../../utils/file-parser';
 import { ChatMessages, MessageRole } from './chat.entity';
 import { ChatMessageDto } from './dto/chat-message.dto';
-import { ChatRequestDto } from './dto/chat-request.dto';
+import {
+	AssistantMessageDto,
+	ChatRequestDto,
+	UserMessageDto,
+} from './dto/chat-request.dto';
 import { ZhipuStreamData } from './dto/zhipu-stream-data.dto';
 import { MessageService } from './message.service';
 
@@ -301,7 +305,6 @@ export class ChatService {
 		let savedUserMessage: ChatMessages | null = null;
 
 		if (lastUserMessage && dto.userMessage) {
-			console.log('Saving user message from frontend:', dto.userMessage);
 			// 使用前端传递的 userMessage 数据
 			savedUserMessage = await this.messageService
 				.saveMessage(
@@ -365,8 +368,6 @@ export class ChatService {
 						subscriber.complete();
 						return;
 					}
-
-					console.log('allMessages:', allMessages);
 
 					const stream = await llm.stream(allMessages);
 					let fullContent = '';
@@ -537,7 +538,14 @@ export class ChatService {
 	}
 
 	// 继续生成指定会话
-	async continueStream(sessionId: string): Promise<Observable<any>> {
+	async continueStream(
+		sessionId: string,
+		parentId?: string,
+		userMessage?: UserMessageDto,
+		assistantMessage?: AssistantMessageDto,
+		currentChatId?: string,
+		isRegenerate?: boolean,
+	): Promise<Observable<any>> {
 		const session = await this.messageService.findOneSession(sessionId);
 
 		const partialContent = session?.partialContent;
@@ -554,10 +562,10 @@ export class ChatService {
 				? partialContent.slice(-tailLength)
 				: partialContent;
 
-		const continueMessages: ChatMessageDto[] = [
-			{
-				role: 'user',
-				content: `你刚才的回答中断了，最后一部分内容如下：
+		// 使用前端传递的用户消息内容，如果未提供则使用默认的继续提示
+		const userContent =
+			userMessage?.content ||
+			`你刚才的回答中断了，最后一部分内容如下：
 
 ...${tailContent}
 
@@ -565,7 +573,12 @@ export class ChatService {
 要求：
 1. 严禁重复上面已经展示的内容。
 2. 保持与上文完全一致的格式、缩进和风格。
-3. 直接开始生成后续内容，不要输出任何解释性文字。`,
+3. 直接开始生成后续内容，不要输出任何解释性文字。`;
+
+		const continueMessages: ChatMessageDto[] = [
+			{
+				role: 'user',
+				content: userContent,
 			},
 		];
 
@@ -576,6 +589,10 @@ export class ChatService {
 			stream: true,
 			max_tokens: 4096,
 			temperature: 0.3, // 降低温度以减少随机性
+			parentId,
+			userMessage,
+			assistantMessage,
+			isRegenerate,
 		};
 
 		// 调用现有的 chatStream 方法

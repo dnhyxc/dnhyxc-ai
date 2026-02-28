@@ -92,17 +92,6 @@ export class MessageService {
 		childrenIds: string[] = [],
 		currentChatId?: string,
 	) {
-		console.log('saveMessage called:', {
-			sessionId,
-			role,
-			contentLength: content.length,
-			parentId,
-			isRegenerate,
-			chatId,
-			childrenIds,
-			currentChatId,
-		});
-
 		try {
 			// 查找或创建会话
 			let session = await this.findOneSession(sessionId);
@@ -115,16 +104,34 @@ export class MessageService {
 				await this.chatSessionsRepository.save(session);
 			}
 
-			// 创建消息
-			const message = this.chatMessagesRepository.create({
-				role,
-				content,
-				session,
-				parentId,
-				childrenIds: childrenIds || [], // 使用前端传递的 childrenIds
-				chatId: chatId || '', // 保存 chatId 字段
-				currentChatId: currentChatId || chatId || '', // 保存 currentChatId 字段，以前端传递的为准
-			});
+			// 检查是否已存在相同 chatId 的消息
+			let message: ChatMessages | null = null;
+			const existingMessage = chatId
+				? await this.findOneMessageByChatId(chatId)
+				: null;
+
+			if (existingMessage) {
+				// 更新现有消息
+				// 对于继续生成，应该追加内容而不是替换
+				// 但前端传递的是完整内容，所以直接替换
+				existingMessage.content = content;
+				existingMessage.childrenIds =
+					childrenIds || existingMessage.childrenIds || [];
+				existingMessage.currentChatId =
+					currentChatId || existingMessage.currentChatId || chatId || '';
+				message = existingMessage;
+			} else {
+				// 创建新消息
+				message = this.chatMessagesRepository.create({
+					role,
+					content,
+					session,
+					parentId,
+					childrenIds: childrenIds || [], // 使用前端传递的 childrenIds
+					chatId: chatId || '', // 保存 chatId 字段
+					currentChatId: currentChatId || chatId || '', // 保存 currentChatId 字段，以前端传递的为准
+				});
+			}
 
 			// 保存消息
 			const savedMessage = await this.chatMessagesRepository.save(message);
@@ -137,14 +144,6 @@ export class MessageService {
 			// 对于重新生成的情况：新的 assistant 消息与原始 assistant 消息有相同的 parentId（指向 user 消息）
 			// user 消息的 childrenIds 应该包含所有 assistant 消息的 chatId（原始的和重新生成的）
 			if (parentId) {
-				console.log('更新父消息 childrenIds:', {
-					messageId: savedMessage.chatId,
-					parentId,
-					role,
-					isRegenerate,
-					messageType: isRegenerate ? '重新生成的assistant消息' : '普通消息',
-				});
-
 				// 查找父消息（通过chatId查找，因为parentId存储的是chatId）
 				const parentMessage = await this.findOneMessageByChatId(parentId);
 				if (parentMessage) {
@@ -159,12 +158,7 @@ export class MessageService {
 					if (!parentMessage.childrenIds.includes(savedMessage.chatId)) {
 						parentMessage.childrenIds.push(savedMessage.chatId);
 						await this.chatMessagesRepository.save(parentMessage);
-						console.log('已更新父消息 childrenIds:', parentMessage.childrenIds);
-					} else {
-						console.log('父消息 childrenIds 已包含此消息 id，跳过更新');
 					}
-				} else {
-					console.log('未找到父消息，parentId:', parentId);
 				}
 			}
 
@@ -181,15 +175,6 @@ export class MessageService {
 				});
 				await this.attachmentsRepository.save(attachments);
 			}
-
-			console.log('Message saved successfully:', {
-				id: savedMessage.id,
-				chatId: savedMessage.chatId,
-				parentId: savedMessage.parentId,
-				childrenIds: savedMessage.childrenIds,
-				role: savedMessage.role,
-				isRegenerate,
-			});
 
 			return savedMessage;
 		} catch (dbError) {

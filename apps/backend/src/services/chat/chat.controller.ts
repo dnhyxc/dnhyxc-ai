@@ -14,6 +14,7 @@ import {
 } from '@nestjs/common';
 import { catchError, concat, map, Observable, of } from 'rxjs';
 import { ChatService } from './chat.service';
+import { ChatContinueDto } from './dto/chat-continue.dto';
 import { ChatRequestDto } from './dto/chat-request.dto';
 import { ChatStopDto } from './dto/chat-stop.dto';
 import { CreateChatDto } from './dto/create-chat.dto';
@@ -70,8 +71,17 @@ export class ChatController {
 
 	@Post('/continueSse')
 	@Sse()
-	async continueStream(@Body() dto: ChatStopDto): Promise<Observable<any>> {
-		const source$ = (await this.chatService.continueStream(dto.sessionId)).pipe(
+	async continueStream(@Body() dto: ChatContinueDto): Promise<Observable<any>> {
+		const source$ = (
+			await this.chatService.continueStream(
+				dto.sessionId,
+				dto.parentId,
+				dto.userMessage,
+				dto.assistantMessage,
+				dto.currentChatId,
+				dto.isRegenerate,
+			)
+		).pipe(
 			map((chunk) => {
 				const data = JSON.parse(chunk);
 				return {
