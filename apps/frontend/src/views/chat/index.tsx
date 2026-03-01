@@ -85,11 +85,11 @@ const Chat = () => {
 				)}
 			</div>
 			<ChatBot
-				key={activeSessionId}
 				// 修改：传递完整树
 				initialMessages={chatBotMessages}
 				onBranchChange={onBranchChange}
 				activeSessionId={activeSessionId}
+				setActiveSessionId={setActiveSessionId}
 			/>
 			<Drawer title="历史对话" open={open} onOpenChange={() => setOpen(false)}>
 				<ScrollArea className="h-full overflow-y-auto pr-4 box-border">

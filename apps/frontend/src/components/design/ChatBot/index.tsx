@@ -65,6 +65,7 @@ interface ChatBotProps {
 	showAvatar?: boolean;
 	onBranchChange?: (msgId: string, direction: 'prev' | 'next') => void;
 	activeSessionId?: string;
+	setActiveSessionId?: (id: string) => void;
 }
 
 const ChatBot: React.FC<ChatBotProps> = ({
@@ -74,6 +75,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 	showAvatar = false,
 	onBranchChange,
 	activeSessionId,
+	setActiveSessionId,
 }) => {
 	// allMessages 存储完整树
 	const [, setAllMessages] = useState<Message[]>(initialMessages);
@@ -740,6 +742,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 		stopRequestRef.current = null;
 		setLoading(false);
 		setSessionId('');
+		setActiveSessionId?.('');
 		setSelectedChildMap(new Map());
 		navigate('/chat');
 	};
