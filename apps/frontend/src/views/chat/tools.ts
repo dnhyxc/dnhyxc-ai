@@ -99,6 +99,7 @@ export const getFormatMessages = (messages: Message[]) => {
 	return messages.map((msg) => ({
 		chatId: msg.chatId,
 		content: msg.content,
+		attachments: msg.attachments,
 		role: msg.role as 'user' | 'assistant',
 		timestamp: new Date(msg.createdAt as Date),
 		parentId: msg.parentId,

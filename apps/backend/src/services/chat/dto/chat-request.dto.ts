@@ -31,6 +31,26 @@ export class UserMessageDto {
 	childrenIds?: string[];
 }
 
+export class AttachmentDto {
+	@IsString()
+	id: string;
+
+	@IsString()
+	filename: string;
+
+	@IsString()
+	mimetype: string;
+
+	@IsString()
+	originalname: string;
+
+	@IsString()
+	path: string;
+
+	@IsNumber()
+	size: number;
+}
+
 export class AssistantMessageDto {
 	@IsString()
 	chatId: string;
@@ -68,8 +88,9 @@ export class ChatRequestDto {
 
 	@IsOptional()
 	@IsArray()
-	@IsString({ each: true })
-	filePaths?: string[];
+	// @ValidateNested({ each: true }) // 启用对数组内每个对象的嵌套验证
+	@Type(() => AttachmentDto) // 指定数组内对象的类型为 AttachmentDto
+	attachments?: AttachmentDto[];
 
 	@IsString()
 	@IsOptional()

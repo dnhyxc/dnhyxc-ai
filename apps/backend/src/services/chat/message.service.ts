@@ -17,31 +17,6 @@ export class MessageService {
 		private readonly attachmentsRepository: Repository<Attachments>,
 	) {}
 
-	// 辅助方法：从文件路径提取文件名
-	private extractFileName(filePath: string): string {
-		return filePath.split('/').pop() || filePath.split('\\').pop() || filePath;
-	}
-
-	// 辅助方法：获取文件MIME类型
-	private getMimeType(filePath: string): string {
-		const extension = filePath.split('.').pop()?.toLowerCase();
-		const mimeTypes: Record<string, string> = {
-			pdf: 'pdf',
-			txt: 'txt',
-			doc: 'doc',
-			docx: 'docx',
-			jpg: 'jpg',
-			jpeg: 'jpeg',
-			png: 'png',
-			gif: 'gif',
-			mp3: 'mpeg',
-			mp4: 'mp4',
-			csv: 'csv',
-			xlsx: 'xlsx',
-		};
-		return mimeTypes[extension || ''] || 'application/octet-stream';
-	}
-
 	// 获取会话
 	async findOneSession(
 		sessionId: string,
@@ -86,7 +61,7 @@ export class MessageService {
 			sessionId,
 			role,
 			content,
-			filePaths = [],
+			attachments = [],
 			parentId = null,
 			// isRegenerate = false,
 			chatId,
@@ -165,17 +140,15 @@ export class MessageService {
 			}
 
 			// 如果有附件，保存附件信息
-			if (filePaths && filePaths.length > 0) {
-				const attachments = filePaths.map((filePath) => {
-					const attachment = this.attachmentsRepository.create({
-						filePath,
-						originalName: this.extractFileName(filePath),
-						mimeType: this.getMimeType(filePath),
+			if (attachments?.length > 0) {
+				const files = attachments.map((attachment) => {
+					const createdAttachment = this.attachmentsRepository.create({
+						...attachment,
 						message: savedMessage,
 					});
-					return attachment;
+					return createdAttachment;
 				});
-				await this.attachmentsRepository.save(attachments);
+				await this.attachmentsRepository.save(files);
 			}
 
 			return savedMessage;
@@ -255,12 +228,7 @@ export class MessageService {
 		const take = pageSize || 10;
 		const skip = ((pageNo || 1) - 1) * take;
 		const [list, total] = await this.chatSessionsRepository.findAndCount({
-			// where: {
-			//   session: {
-			//     userId: dto.userId,
-			//   },
-			// },
-			relations: ['messages'],
+			relations: ['messages', 'messages.attachments'],
 			take,
 			skip,
 			order: {

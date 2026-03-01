@@ -1,3 +1,4 @@
+import { IsNumber, IsString } from 'class-validator';
 import {
 	Column,
 	CreateDateColumn,
@@ -15,15 +16,23 @@ export class Attachments {
 
 	// 存储文件路径
 	@Column({ type: 'varchar', length: 500 })
-	filePath: string;
+	path: string;
+
+	@Column()
+	@IsString()
+	filename: string;
 
 	// (可选) 存储原始文件名，如果 filePath 没有包含名字或者需要显示原名
 	@Column({ type: 'varchar', length: 255, nullable: true })
-	originalName: string;
+	originalname: string;
 
 	// (可选) 存储文件类型，如 'pdf', 'image'
-	@Column({ type: 'varchar', length: 50, nullable: true })
-	mimeType: string;
+	@Column({ type: 'varchar', nullable: true })
+	mimetype: string;
+
+	@Column()
+	@IsNumber()
+	size: number;
 
 	@CreateDateColumn({ name: 'created_at' })
 	createdAt: Date;

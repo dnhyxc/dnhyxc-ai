@@ -34,7 +34,7 @@ export interface Message {
 	timestamp: Date;
 	id?: string;
 	createdAt?: Date;
-	file?: UploadedFile | null;
+	attachments?: UploadedFile[] | null;
 	thinkContent?: string;
 	isStreaming?: boolean;
 	isStopped?: boolean;
@@ -49,7 +49,7 @@ interface ChatRequestParams {
 	messages: { role: 'user' | 'assistant'; content: string; noSave?: boolean }[];
 	sessionId: string | undefined;
 	stream?: boolean;
-	filePaths?: string[];
+	attachments?: UploadedFile[];
 	isRegenerate?: boolean;
 	parentId?: string;
 	userMessage?: Message;
@@ -86,13 +86,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 	const [isComposing, setIsComposing] = useState(false);
 	const [isShowThinkContent, setIsShowThinkContent] = useState(true);
 	const [isCopyedId, setIsCopyedId] = useState('');
-	const [uploadedFile, setUploadedFile] = useState<UploadedFile>({
-		filename: '',
-		mimetype: '',
-		originalname: '',
-		path: '',
-		size: 0,
-	});
+	const [uploadedFile, setUploadedFile] = useState<UploadedFile[]>([]);
 	// selectedChildMap 管理当前会话的分支选择状态
 	const [selectedChildMap, setSelectedChildMap] = useState<Map<string, string>>(
 		new Map(),
@@ -193,7 +187,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 		chatId: string,
 		content: string,
 		parentId?: string,
-		file?: UploadedFile,
+		attachments?: UploadedFile[],
 	): Message => ({
 		id: chatId,
 		chatId,
@@ -203,7 +197,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 		parentId,
 		childrenIds: [],
 		currentChatId,
-		file,
+		attachments,
 	});
 
 	const createAssistantMessage = (
@@ -301,8 +295,8 @@ const ChatBot: React.FC<ChatBotProps> = ({
 			assistantMessage,
 			currentChatId,
 		};
-		if (userMessage?.file) {
-			messages.filePaths = [userMessage?.file?.path || ''];
+		if (userMessage?.attachments?.length) {
+			messages.attachments = userMessage?.attachments;
 		}
 		try {
 			const stop = await streamFetch({
@@ -555,8 +549,9 @@ const ChatBot: React.FC<ChatBotProps> = ({
 			userMsgId,
 			content,
 			parentId,
-			uploadedFile.path ? uploadedFile : undefined,
+			uploadedFile?.length ? uploadedFile : undefined,
 		);
+
 		userMessageToUse.childrenIds = [assistantMessageId];
 
 		const assistantMessage = createAssistantMessage(
@@ -609,13 +604,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 		}
 
 		setInput('');
-		setUploadedFile({
-			filename: '',
-			mimetype: '',
-			originalname: '',
-			path: '',
-			size: 0,
-		});
+		setUploadedFile([]);
 		setAutoScroll(true);
 	};
 
@@ -848,9 +837,14 @@ const ChatBot: React.FC<ChatBotProps> = ({
 	const onUploadFile = async (data: FileWithPreview | FileWithPreview[]) => {
 		const res = await uploadFile((data as FileWithPreview).file);
 		if (res.success) {
-			setUploadedFile({
-				...res.data,
-				path: import.meta.env.VITE_DEV_DOMAIN + res.data.path,
+			setUploadedFile((prev) => {
+				return [
+					...prev,
+					{
+						...res.data,
+						path: import.meta.env.VITE_DEV_DOMAIN + res.data.path,
+					},
+				];
 			});
 			inputRef.current?.focus();
 		}
@@ -989,9 +983,13 @@ const ChatBot: React.FC<ChatBotProps> = ({
 											message.role === 'user' ? 'items-end' : '',
 										)}
 									>
-										{message.file && message.role === 'user' && (
-											<FileInfo data={message.file} />
-										)}
+										{message?.attachments &&
+										message?.attachments?.length > 0 &&
+										message.role === 'user'
+											? message?.attachments.map((i, index) => (
+													<FileInfo key={i.id || index} data={i} />
+												))
+											: null}
 										<div
 											className={cn(
 												'flex-1 rounded-md p-3',
@@ -1201,9 +1199,11 @@ const ChatBot: React.FC<ChatBotProps> = ({
 				<div className="max-w-3xl mx-auto flex gap-5">
 					<div className="flex-1 relative overflow-hidden">
 						<div className="flex flex-col overflow-y-auto rounded-md bg-theme/5 border border-theme-white/10">
-							{uploadedFile.originalname && (
-								<FileInfo data={uploadedFile} showInfo />
-							)}
+							{uploadedFile?.length > 0
+								? uploadedFile.map((i, index) => (
+										<FileInfo key={i.id || index} data={i} showInfo />
+									))
+								: null}
 							<Textarea
 								ref={inputRef}
 								value={input}

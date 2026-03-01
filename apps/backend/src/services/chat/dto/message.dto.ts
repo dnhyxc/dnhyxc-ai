@@ -1,3 +1,4 @@
+import { Type } from 'class-transformer';
 import {
 	IsArray,
 	IsBoolean,
@@ -5,8 +6,10 @@ import {
 	IsNumber,
 	IsOptional,
 	IsString,
+	ValidateNested,
 } from 'class-validator';
 import { MessageRole } from '../chat.entity';
+import { AttachmentDto } from './chat-request.dto';
 
 export class MessageDto {
 	@IsString()
@@ -39,8 +42,9 @@ export class SaveDto {
 
 	@IsOptional()
 	@IsArray()
-	@IsString({ each: true })
-	filePaths?: string[];
+	@ValidateNested({ each: true }) // 启用对数组内每个对象的嵌套验证
+	@Type(() => AttachmentDto) // 指定数组内对象的类型为 AttachmentDto
+	attachments?: AttachmentDto[];
 
 	@IsOptional()
 	@IsString()

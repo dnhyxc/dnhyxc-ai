@@ -168,8 +168,9 @@ export class ChatService {
 
 		// 处理文件附件
 		let enhancedMessages = [...dto.messages];
-		if (dto.filePaths && dto.filePaths.length > 0) {
-			const fileContent = await this.processFileAttachments(dto.filePaths);
+		if (dto.attachments && dto.attachments?.length > 0) {
+			const filePaths = dto.attachments.map((file) => file.path);
+			const fileContent = await this.processFileAttachments(filePaths);
 			if (fileContent) {
 				// 创建包含文件内容的系统消息
 				const fileSystemMessage: ChatMessageDto = {
@@ -200,7 +201,7 @@ export class ChatService {
 					sessionId,
 					role: MessageRole.USER,
 					content: lastUserMessage.content,
-					filePaths: dto.filePaths,
+					attachments: dto.attachments,
 					parentId: dto.userMessage.parentId || null,
 					isRegenerate: false,
 					chatId: dto.userMessage.chatId, // chatId
@@ -227,7 +228,7 @@ export class ChatService {
 					sessionId,
 					role: MessageRole.ASSISTANT,
 					content: responseContent,
-					filePaths: [],
+					attachments: [],
 					parentId: dto.assistantMessage.parentId || null,
 					isRegenerate: false,
 					chatId: dto.assistantMessage.chatId, // chatId
@@ -247,7 +248,7 @@ export class ChatService {
 					sessionId,
 					role: MessageRole.ASSISTANT,
 					content: responseContent,
-					filePaths: [],
+					attachments: [],
 					parentId: savedUserMessage?.id,
 					isRegenerate: false,
 					chatId: undefined, // chatId
@@ -308,7 +309,7 @@ export class ChatService {
 					sessionId,
 					role: MessageRole.USER,
 					content: lastUserMessage.content,
-					filePaths: dto.filePaths,
+					attachments: dto.attachments,
 					parentId: dto.userMessage.parentId || null,
 					isRegenerate: dto.isRegenerate || false,
 					chatId: dto.userMessage.chatId, // chatId
@@ -332,10 +333,9 @@ export class ChatService {
 
 					// 处理文件附件和消息准备（保持不变）
 					let enhancedMessages = [...dto.messages];
-					if (dto.filePaths && dto.filePaths.length > 0) {
-						const fileContent = await this.processFileAttachments(
-							dto.filePaths,
-						);
+					if (dto.attachments && dto.attachments?.length > 0) {
+						const filePaths = dto.attachments.map((file) => file.path);
+						const fileContent = await this.processFileAttachments(filePaths);
 						if (fileContent) {
 							const fileSystemMessage: ChatMessageDto = {
 								role: 'system',
@@ -439,7 +439,7 @@ export class ChatService {
 								sessionId,
 								role: MessageRole.ASSISTANT,
 								content: finalContent,
-								filePaths: [],
+								attachments: [],
 								parentId: dto.assistantMessage.parentId || null,
 								isRegenerate: dto.isRegenerate || false,
 								chatId: dto.assistantMessage.chatId, // chatId
@@ -452,7 +452,7 @@ export class ChatService {
 								sessionId,
 								role: MessageRole.ASSISTANT,
 								content: finalContent,
-								filePaths: [],
+								attachments: [],
 								parentId: dto.parentId || savedUserMessage?.id,
 								isRegenerate: dto.isRegenerate || false,
 								chatId: undefined, // chatId
@@ -632,7 +632,7 @@ export class ChatService {
 								sessionId,
 								role: MessageRole.USER,
 								content: lastUserMessage.content,
-								filePaths: dto.filePaths,
+								attachments: dto.attachments,
 								parentId: dto.userMessage.parentId || null,
 								isRegenerate: false, // isRegenerate: user 消息不是重新生成
 								chatId: dto.userMessage.chatId, // chatId
@@ -650,10 +650,9 @@ export class ChatService {
 
 					// 处理文件附件
 					let enhancedMessages = [...dto.messages];
-					if (dto.filePaths && dto.filePaths.length > 0) {
-						const fileContent = await this.processFileAttachments(
-							dto.filePaths,
-						);
+					if (dto.attachments && dto.attachments?.length > 0) {
+						const filePaths = dto.attachments.map((file) => file.path);
+						const fileContent = await this.processFileAttachments(filePaths);
 						if (fileContent) {
 							// 创建包含文件内容的系统消息
 							const fileSystemMessage: ChatMessageDto = {
@@ -755,7 +754,7 @@ export class ChatService {
 													sessionId,
 													role: MessageRole.ASSISTANT,
 													content: fullContent,
-													filePaths: [],
+													attachments: [],
 													parentId: dto.assistantMessage.parentId || null,
 													isRegenerate: false, // isRegenerate: 正常回复
 													chatId: dto.assistantMessage.chatId, // chatId
@@ -775,7 +774,7 @@ export class ChatService {
 													sessionId,
 													role: MessageRole.ASSISTANT,
 													content: fullContent,
-													filePaths: [],
+													attachments: [],
 													parentId: savedUserMessage?.id,
 													isRegenerate: false, // isRegenerate: 正常回复
 													chatId: undefined, // chatId

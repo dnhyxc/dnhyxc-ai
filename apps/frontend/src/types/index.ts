@@ -49,6 +49,7 @@ export interface FileWithPreview {
 }
 
 export interface UploadedFile {
+	id: string;
 	filename: string;
 	mimetype: string;
 	originalname: string;
