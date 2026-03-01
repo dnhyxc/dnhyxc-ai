@@ -57,7 +57,6 @@ export class ChatService {
 		const apiKey = this.configService.get(ModelEnum.DEEPSEEK_API_KEY);
 		const baseURL = this.configService.get(ModelEnum.DEEPSEEK_BASE_URL);
 		const modelName = this.configService.get(ModelEnum.DEEPSEEK_MODEL_NAME);
-
 		const llm = new ChatOpenAI({
 			apiKey,
 			modelName,
@@ -65,7 +64,7 @@ export class ChatService {
 			configuration: {
 				baseURL,
 			},
-			temperature: options?.temperature ?? 0.7,
+			temperature: options?.temperature ?? 0.3,
 			maxTokens: options?.maxTokens ?? 4096,
 		});
 
@@ -344,6 +343,13 @@ export class ChatService {
 							enhancedMessages = [fileSystemMessage, ...enhancedMessages];
 						}
 					}
+
+					// 添加系统提示词：如果问题与之前的问题不相关，则忽略之前的问答
+					const systemPrompt: ChatMessageDto = {
+						role: 'system',
+						content: `请根据用户问题回答，请勿重复回答之前的问题。同时确保你的回答与用户问题有关联，如果用户提出的问题与之前的问题及回答内容毫不相关，请自行忽略之前的所有问答记录，只根据最新的问题给出答案，不要关联之前的任何内容。`,
+					};
+					enhancedMessages = [systemPrompt, ...enhancedMessages];
 
 					const memeries = await this.messageService.findOneSession(sessionId, {
 						relations: ['messages'],
