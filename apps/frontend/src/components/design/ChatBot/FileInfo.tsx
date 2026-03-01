@@ -1,9 +1,9 @@
-import { CircleX, Download, FileText } from 'lucide-react';
-import { createDownloadProgressListener, donwnloadWithUrl } from '@/utils';
-import { DownloadProgress, UploadedFile } from '@/types';
 import { Toast } from '@ui/index';
+import { CircleX, Download, FileText } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { deleteFile } from '@/service';
+import { DownloadProgress, UploadedFile } from '@/types';
+import { createDownloadProgressListener, donwnloadWithUrl } from '@/utils';
 
 interface IProps {
 	data: UploadedFile;

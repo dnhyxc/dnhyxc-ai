@@ -8,8 +8,8 @@
 
 import Header from '@design/Header';
 import Sidebar from '@design/Sidebar';
-import { Toaster } from '@ui/sonner';
 import { TooltipProvider } from '@ui/index';
+import { Toaster } from '@ui/sonner';
 import { useEffect, useState } from 'react';
 import { Outlet } from 'react-router';
 import { useTheme } from '@/hooks';
