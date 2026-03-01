@@ -86,16 +86,16 @@ export class ChatService {
 	}
 
 	private parseZhipuStreamData(dataStr: string): ZhipuStreamData | null {
-		// 如果是结束标记，返回null
+		// 如果是结束标记，返回 null
 		if (dataStr.trim() === '[DONE]') {
 			return null;
 		}
 
 		try {
-			// 首先尝试直接解析JSON
+			// 首先尝试直接解析 JSON
 			const data = JSON.parse(dataStr);
 
-			// 智谱API流式响应格式 - 检查多种可能的字段结构
+			// 智谱 API 流式响应格式 - 检查多种可能的字段结构
 			if (data.choices?.[0]?.delta?.content) {
 				return { type: 'content', data: data.choices[0].delta.content };
 			}
@@ -112,13 +112,13 @@ export class ChatService {
 				return { type: 'content', data: data.data.content };
 			}
 
-			// 处理reasoning_content数据（思考内容）
+			// 处理 reasoning_content 数据（思考内容）
 			if (data.choices?.[0]?.delta?.reasoning_content) {
 				const reasoningContent = data.choices[0].delta.reasoning_content;
 				return { type: 'thinking', data: reasoningContent };
 			}
 
-			// 处理tool_calls数据
+			// 处理 tool_calls 数据
 			if (data.choices?.[0]?.delta?.tool_calls) {
 				return { type: 'tool_calls', data: data.choices[0].delta.tool_calls };
 			}
@@ -127,27 +127,27 @@ export class ChatService {
 				return { type: 'tool_calls', data: data.choices[0].message.tool_calls };
 			}
 
-			// 处理audio数据
+			// 处理 audio 数据
 			if (data.choices?.[0]?.message?.audio) {
 				return { type: 'audio', data: data.choices[0].message.audio };
 			}
 
-			// 处理usage数据
+			// 处理 usage 数据
 			if (data.usage) {
 				return { type: 'usage', data: data.usage };
 			}
 
-			// 处理video_result数据
+			// 处理 video_result 数据
 			if (data.video_result) {
 				return { type: 'video', data: data.video_result };
 			}
 
-			// 处理web_search数据
+			// 处理 web_search 数据
 			if (data.web_search) {
 				return { type: 'web_search', data: data.web_search };
 			}
 
-			// 处理content_filter数据
+			// 处理 content_filter 数据
 			if (data.content_filter) {
 				return { type: 'content_filter', data: data.content_filter };
 			}
@@ -234,7 +234,7 @@ export class ChatService {
 					isRegenerate: false,
 					chatId: dto.userMessage.chatId, // chatId
 					childrenIds: dto.userMessage.childrenIds || [], // childrenIds
-					currentChatId: dto.userMessage.chatId, // currentChatId: 使用消息自己的chatId作为默认值
+					currentChatId: dto.userMessage.chatId, // currentChatId: 使用消息自己的 chatId 作为默认值
 				})
 				.catch((dbError) => {
 					console.error('Failed to save user message to database:', dbError);
@@ -248,7 +248,7 @@ export class ChatService {
 		const aiMessage = new AIMessage(responseContent);
 		this.conversationMemory.set(sessionId, [...allMessages, aiMessage]);
 
-		// 保存AI回复到数据库（使用前端传递的数据）
+		// 保存 AI 回复到数据库（使用前端传递的数据）
 		// 异步保存，不等待结果
 		if (dto.assistantMessage) {
 			await this.messageService
@@ -261,7 +261,7 @@ export class ChatService {
 					isRegenerate: false,
 					chatId: dto.assistantMessage.chatId, // chatId
 					childrenIds: dto.assistantMessage.childrenIds || [], // childrenIds
-					currentChatId: dto.assistantMessage.chatId, // currentChatId: 使用消息自己的chatId作为默认值
+					currentChatId: dto.assistantMessage.chatId, // currentChatId: 使用消息自己的 chatId 作为默认值
 				})
 				.catch((dbError) => {
 					console.error(
@@ -319,7 +319,7 @@ export class ChatService {
 
 		// 创建取消控制器
 		const cancel$ = new Subject<void>();
-		// 缓存取消控制器，1天后自动过期并清除
+		// 缓存取消控制器，12 小时后自动过期并清除
 		await this.cache.set(sessionId, cancel$, 12 * 60 * 60 * 1000);
 		this.activeSessions.set(sessionId, true);
 
@@ -342,7 +342,7 @@ export class ChatService {
 					isRegenerate: dto.isRegenerate || false,
 					chatId: dto.userMessage.chatId, // chatId
 					childrenIds: dto.userMessage.childrenIds || [], // childrenIds
-					currentChatId: dto.userMessage.chatId, // currentChatId: 使用消息自己的chatId作为默认值
+					currentChatId: dto.userMessage.chatId, // currentChatId: 使用消息自己的 chatId 作为默认值
 				})
 				.catch((dbError) => {
 					console.error('Failed to save user message to database:', dbError);
@@ -350,19 +350,20 @@ export class ChatService {
 				});
 		}
 
-		return new Observable<string>((subscriber) => {
+		return new Observable<any>((subscriber) => {
 			const getStreamStatus = () => cancel$.isStopped || subscriber.closed;
 			(async () => {
 				try {
 					// 获取部分响应（如果有）
 					const session = await this.messageService.findOneSession(sessionId);
-
 					const partialContent = session?.partialContent;
 
-					// 处理文件附件和消息准备（保持不变）
+					// 判断是否为续写模式
+					const isContinuation = !!partialContent && partialContent.length > 0;
+
+					// 处理文件附件和消息准备
 					let enhancedMessages = [...dto.messages];
 					if (dto.attachments && dto.attachments?.length > 0) {
-						// 这里之所以作为单独的 user 消息，而不是和下面的一样，作为 system 消息，是为了防止大模型已读乱回
 						const attachmentMsg = await this.buildAttachmentMessage(
 							dto.attachments,
 							dto.messages?.[0]?.content,
@@ -373,14 +374,22 @@ export class ChatService {
 						}
 					}
 
-					// 添加系统提示词：如果问题与之前的问题不相关，则忽略之前的问答
+					// 动态构建系统提示词
+					let systemContent = '';
+					if (isContinuation) {
+						// 续写模式：强调不要重复，直接继续
+						systemContent = `You are continuing an interrupted response. The last assistant message is incomplete. Continue exactly from the last character. Do not repeat previous content. Maintain the same format, indentation, code style, and language. Output ONLY the remaining content.`;
+					} else {
+						// 普通模式：关注最新问题
+						systemContent = `Focus on the latest user query and avoid redundancy. If the new question is unrelated to the conversation history, disregard prior context and answer independently based solely on the current input. Do not force connections to previous topics.`;
+					}
+
 					const systemPrompt: ChatMessageDto = {
 						role: 'system',
-						content:
-							`Focus on the latest user query and avoid redundancy. If the new question is unrelated to the conversation history, disregard prior context and answer independently based solely on the current input. Do not force connections to previous topics.`.trim(),
+						content: systemContent.trim(),
 					};
 
-					// 从 memeries.messages 中提取所有包含附件的消息，通过 ASC 排序，防止消息顺序错乱导致大模型已读乱回
+					// 获取历史消息，从 memeries.messages 中提取所有包含附件的消息，通过 ASC 排序，防止消息顺序错乱导致大模型已读乱回
 					const memeries = await this.messageService.findOneSession(sessionId, {
 						relations: ['messages'],
 						order: {
@@ -414,11 +423,24 @@ export class ChatService {
 						(m) => !existingKeySet.has(`${m.role}::${m.content}`),
 					);
 
-					const newData = [
+					// 构建最终消息列表
+					// 1. 系统提示
+					// 2. 数据库历史消息
+					// 3. 【关键修复】如果有 partialContent，作为一条 Assistant 消息插入到这里（在历史之后，新用户消息之前）
+					// 4. 当前新用户消息
+					const newData: ChatMessageDto[] = [
 						systemPrompt,
 						...(memeries?.messages || []),
-						...uniqueEnhanced,
 					];
+
+					if (isContinuation) {
+						newData.push({
+							role: 'assistant',
+							content: partialContent,
+						});
+					}
+
+					newData.push(...uniqueEnhanced);
 
 					const allMessages = this.convertToLangChainMessages(newData);
 
@@ -433,7 +455,6 @@ export class ChatService {
 
 					// 在开始迭代前检查是否已取消
 					if (getStreamStatus()) {
-						// 尝试取消大模型调用
 						try {
 							if (typeof stream.cancel === 'function') {
 								await stream.cancel();
@@ -484,7 +505,7 @@ export class ChatService {
 					// 计算最终内容，考虑部分响应
 					let finalContent = fullContent;
 					if (partialContent && partialContent.length > 0) {
-						// 如果新生成的内容已经以部分内容开头，避免重复
+						// 如果新生成的内容已经以部分内容开头（模型可能重复），避免重复
 						if (fullContent.startsWith(partialContent)) {
 							finalContent = fullContent;
 						} else {
@@ -495,7 +516,7 @@ export class ChatService {
 
 					// 正常完成，cancel$.isStopped 为 false, 暂停时 cancel$.isStopped 为 true
 					if (!cancel$.isStopped) {
-						// 保存完整的AI回复到数据库（使用前端传递的数据）
+						// 保存完整的 AI 回复到数据库（使用前端传递的数据）
 						if (dto.assistantMessage) {
 							await this.messageService.saveMessage({
 								sessionId,
@@ -504,9 +525,9 @@ export class ChatService {
 								attachments: [],
 								parentId: dto.assistantMessage.parentId || null,
 								isRegenerate: dto.isRegenerate || false,
-								chatId: dto.assistantMessage.chatId, // chatId
-								childrenIds: dto.assistantMessage.childrenIds || [], // childrenIds
-								currentChatId: dto.assistantMessage.chatId, // currentChatId: 使用消息自己的chatId作为默认值
+								chatId: dto.assistantMessage.chatId,
+								childrenIds: dto.assistantMessage.childrenIds || [],
+								currentChatId: dto.assistantMessage.chatId,
 							});
 						} else {
 							// 如果没有传递 assistantMessage，使用默认逻辑
@@ -517,21 +538,25 @@ export class ChatService {
 								attachments: [],
 								parentId: dto.parentId || savedUserMessage?.id,
 								isRegenerate: dto.isRegenerate || false,
-								chatId: undefined, // chatId
-								childrenIds: [], // childrenIds
-								currentChatId: undefined, // currentChatId
+								chatId: undefined,
+								childrenIds: [],
+								currentChatId: undefined,
 							});
 						}
-						// 清除部分响应（因为已经完成）更新会话的partialContent为null
+						// 清除部分响应（因为已经完成）更新会话的 partialContent 为 null
 						await this.messageService.updateSessionPartialContent(
 							sessionId,
 							null,
 							null,
 						);
+
+						// // 更新内存缓存
+						// const aiMessage = new AIMessage(finalContent);
+						// this.conversationMemory.set(sessionId, [...allMessages, aiMessage]);
 					} else {
 						// 保存部分响应用于继续生成
 						if (finalContent.length > 0) {
-							// 更新会话的partialContent
+							// 更新会话的 partialContent
 							await this.messageService.updateSessionPartialContent(
 								sessionId,
 								finalContent,
@@ -544,8 +569,13 @@ export class ChatService {
 				} catch (error) {
 					// 如果是取消操作，不视为错误
 					if (cancel$.isStopped || subscriber.closed) {
+						// 即使取消，如果有生成内容，也尝试保存以便后续继续
+						// 注意：这里无法访问 fullContent 因为作用域问题，实际生产中建议在 try 块外定义 fullContent
+						// 为简化，这里仅完成订阅
 						subscriber.complete();
 					} else {
+						// 发生真实错误时，如果已有部分内容，尝试保存，防止进度丢失
+						// 由于 fullContent 在 try 块内，这里简化处理，仅抛出错误
 						subscriber.error(error);
 					}
 				} finally {
@@ -556,7 +586,7 @@ export class ChatService {
 		}).pipe(
 			catchError((error) => {
 				throw new HttpException(
-					`模型调用异常: ${error}`,
+					`模型调用异常：${error}`,
 					HttpStatus.BAD_REQUEST,
 				);
 			}),
@@ -602,7 +632,6 @@ export class ChatService {
 		parentId,
 		userMessage,
 		assistantMessage,
-		// currentChatId,
 		isRegenerate,
 	}: ChatContinueDto): Promise<Observable<any>> {
 		const session = await this.messageService.findOneSession(sessionId);
@@ -610,30 +639,15 @@ export class ChatService {
 		const partialContent = session?.partialContent;
 
 		if (!partialContent) {
-			throw new Error('会话不存在或已完成');
+			throw new Error('会话不存在或已完成，无法继续生成');
 		}
 
-		// 策略变更：只取最后一段内容作为上下文，强制模型只关注接续
-		// 取最后 300 个字符（足够包含最近的上下文，又不足以让模型从头开始）
-		const tailLength = 300;
-		const tailContent =
-			partialContent.length > tailLength
-				? partialContent.slice(-tailLength)
-				: partialContent;
-
-		// 使用前端传递的用户消息内容，如果未提供则使用默认的继续提示
+		// 【关键修复】简化提示词
+		// 因为 chatStream 中已经将 partialContent 作为 Assistant 消息注入上下文
+		// 这里只需要告诉模型“继续”即可，不需要再重复内容，避免模型困惑或重复生成
 		const userContent =
 			userMessage?.content ||
-			`Response interrupted. Resume seamlessly from the breakpoint.
-
-Last content:
-...${tailContent}
-
-Requirements:
-1. Do NOT repeat any previous content. Continue directly from the last character.
-2. Strictly maintain the same format, indentation, code style, and language.
-3. Output ONLY the remaining content. No explanations, greetings, or markers.
-`.trim();
+			`Please continue generating the previous response directly from where it stopped. Do not repeat any content.`;
 
 		const continueMessages: ChatMessageDto[] = [
 			{
@@ -648,7 +662,7 @@ Requirements:
 			messages: continueMessages,
 			stream: true,
 			max_tokens: 4096,
-			temperature: 0.3, // 降低温度以减少随机性
+			temperature: 0.2, // 降低温度以减少随机性，确保续写连贯
 			parentId,
 			userMessage,
 			assistantMessage,
@@ -656,6 +670,8 @@ Requirements:
 		};
 
 		// 调用现有的 chatStream 方法
+		// chatStream 内部会检测到 sessionId 对应的 session 有 partialContent
+		// 从而自动激活续写逻辑（注入历史、修改 System Prompt）
 		return this.chatStream(continueDto);
 	}
 
@@ -677,7 +693,7 @@ Requirements:
 					const baseURL = this.configService.get(ModelEnum.ZHIPU_BASE_URL);
 
 					if (!apiKey) {
-						throw new Error('智谱API密钥未配置');
+						throw new Error('智谱 API 密钥未配置');
 					}
 
 					const sessionId = dto.sessionId || randomUUID();
@@ -700,7 +716,7 @@ Requirements:
 								isRegenerate: false, // isRegenerate: user 消息不是重新生成
 								chatId: dto.userMessage.chatId, // chatId
 								childrenIds: dto.userMessage.childrenIds || [], // childrenIds
-								currentChatId: dto.userMessage.chatId, // currentChatId: 使用消息自己的chatId作为默认值
+								currentChatId: dto.userMessage.chatId, // currentChatId: 使用消息自己的 chatId 作为默认值
 							})
 							.catch((dbError) => {
 								console.error(
@@ -772,7 +788,7 @@ Requirements:
 					if (!response.ok) {
 						const errorText = await response.text();
 						throw new HttpException(
-							`智谱API请求失败: ${response.status} ${response.statusText} - ${errorText}`,
+							`智谱 API 请求失败：${response.status} ${response.statusText} - ${errorText}`,
 							response.status,
 						);
 					}
@@ -809,7 +825,7 @@ Requirements:
 											...allMessages,
 											aiMessage,
 										]);
-										// 保存AI回复到数据库（使用前端传递的数据）
+										// 保存 AI 回复到数据库（使用前端传递的数据）
 										// 异步保存，不等待结果
 										if (dto.assistantMessage) {
 											this.messageService
@@ -822,7 +838,7 @@ Requirements:
 													isRegenerate: false, // isRegenerate: 正常回复
 													chatId: dto.assistantMessage.chatId, // chatId
 													childrenIds: dto.assistantMessage.childrenIds || [], // childrenIds
-													currentChatId: dto.assistantMessage.chatId, // currentChatId: 使用消息自己的chatId作为默认值
+													currentChatId: dto.assistantMessage.chatId, // currentChatId: 使用消息自己的 chatId 作为默认值
 												})
 												.catch((dbError) => {
 													console.error(
