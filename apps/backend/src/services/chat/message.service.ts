@@ -27,6 +27,7 @@ export class MessageService {
 				id: sessionId,
 			},
 			relations: options?.relations,
+			order: options?.order,
 		});
 	}
 

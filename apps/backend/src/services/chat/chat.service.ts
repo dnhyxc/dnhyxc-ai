@@ -157,6 +157,35 @@ export class ChatService {
 		}
 	}
 
+	/**
+	 * 处理附件并构建系统提示消息
+	 * @param attachments 附件列表，需包含 path 属性
+	 * @param promptSuffix 提示词后缀，用于区分不同场景的指令
+	 * @param role 消息角色，默认 system
+	 * @returns 返回构建好的 ChatMessageDto，如果无内容则返回 null
+	 */
+	private async buildAttachmentMessage(
+		attachments: { path: string }[],
+		promptSuffix: string,
+		role?: MessageRole,
+	): Promise<ChatMessageDto | null> {
+		if (!attachments || attachments.length === 0) {
+			return null;
+		}
+
+		const filePaths = attachments.map((file) => file.path);
+		const fileContent = await this.processFileAttachments(filePaths);
+
+		if (!fileContent) {
+			return null;
+		}
+
+		return {
+			role: role || 'system',
+			content: `以下是上传的附件内容:\n${fileContent}，\n${promptSuffix}`,
+		};
+	}
+
 	// deepseek 非流失对话
 	async chat(dto: ChatRequestDto): Promise<any> {
 		const llm = this.initModel({
@@ -333,36 +362,63 @@ export class ChatService {
 					// 处理文件附件和消息准备（保持不变）
 					let enhancedMessages = [...dto.messages];
 					if (dto.attachments && dto.attachments?.length > 0) {
-						const filePaths = dto.attachments.map((file) => file.path);
-						const fileContent = await this.processFileAttachments(filePaths);
-						if (fileContent) {
-							const fileSystemMessage: ChatMessageDto = {
-								role: 'system',
-								content: `以下是上传的文件内容:\n${fileContent}\n请根据文件内容回答用户问题。`,
-							};
-							enhancedMessages = [fileSystemMessage, ...enhancedMessages];
+						// 这里之所以作为单独的 user 消息，而不是和下面的一样，作为 system 消息，是为了防止大模型已读乱回
+						const attachmentMsg = await this.buildAttachmentMessage(
+							dto.attachments,
+							dto.messages?.[0]?.content,
+							MessageRole.USER,
+						);
+						if (attachmentMsg) {
+							enhancedMessages = [attachmentMsg];
 						}
 					}
 
 					// 添加系统提示词：如果问题与之前的问题不相关，则忽略之前的问答
 					const systemPrompt: ChatMessageDto = {
 						role: 'system',
-						content: `请根据用户问题回答，请勿重复回答之前的问题。同时确保你的回答与用户问题有关联，如果用户提出的问题与之前的问题及回答内容毫不相关，请自行忽略之前的所有问答记录，只根据最新的问题给出答案，不要关联之前的任何内容。`,
+						content:
+							`Focus on the latest user query and avoid redundancy. If the new question is unrelated to the conversation history, disregard prior context and answer independently based solely on the current input. Do not force connections to previous topics.`.trim(),
 					};
-					enhancedMessages = [systemPrompt, ...enhancedMessages];
 
+					// 从 memeries.messages 中提取所有包含附件的消息，通过 ASC 排序，防止消息顺序错乱导致大模型已读乱回
 					const memeries = await this.messageService.findOneSession(sessionId, {
 						relations: ['messages'],
+						order: {
+							messages: {
+								createdAt: 'ASC',
+							},
+						},
 					});
+
+					// 从 memeries.messages 中提取所有包含附件的消息
+					const attachments = (memeries?.messages ?? []).flatMap(
+						(m) => m.attachments ?? [],
+					);
+
+					if (!dto.attachments && attachments && attachments?.length > 0) {
+						const attachmentMsg = await this.buildAttachmentMessage(
+							attachments,
+							`First, assess whether the user's query is relevant to the provided attachments. If relevant, answer strictly based on the attachment content. If irrelevant, ignore the attachments and respond using your general knowledge. Do not force connections to unrelated file content.`.trim(),
+						);
+						if (attachmentMsg) {
+							enhancedMessages = [attachmentMsg, ...enhancedMessages];
+						}
+					}
 
 					// 根据 content 去重：保留 memeries.messages 中已有的，enhancedMessages 中 content 不重复的
 					const existingKeySet = new Set(
 						memeries?.messages.map((m) => `${m.role}::${m.content}`) || [],
 					);
+
 					const uniqueEnhanced = enhancedMessages.filter(
 						(m) => !existingKeySet.has(`${m.role}::${m.content}`),
 					);
-					const newData = [...(memeries?.messages || []), ...uniqueEnhanced];
+
+					const newData = [
+						systemPrompt,
+						...(memeries?.messages || []),
+						...uniqueEnhanced,
+					];
 
 					const allMessages = this.convertToLangChainMessages(newData);
 
