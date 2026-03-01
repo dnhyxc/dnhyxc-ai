@@ -624,15 +624,16 @@ export class ChatService {
 		// 使用前端传递的用户消息内容，如果未提供则使用默认的继续提示
 		const userContent =
 			userMessage?.content ||
-			`你刚才的回答中断了，最后一部分内容如下：
+			`Response interrupted. Resume seamlessly from the breakpoint.
 
+Last content:
 ...${tailContent}
 
-请紧接着上面的内容继续生成剩余部分。
-要求：
-1. 严禁重复上面已经展示的内容。
-2. 保持与上文完全一致的格式、缩进和风格。
-3. 直接开始生成后续内容，不要输出任何解释性文字。`;
+Requirements:
+1. Do NOT repeat any previous content. Continue directly from the last character.
+2. Strictly maintain the same format, indentation, code style, and language.
+3. Output ONLY the remaining content. No explanations, greetings, or markers.
+`.trim();
 
 		const continueMessages: ChatMessageDto[] = [
 			{
