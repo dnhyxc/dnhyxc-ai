@@ -110,7 +110,10 @@ class HttpClient {
 	}
 
 	// 处理请求体
-	private handleRequestBody(data: any, headers: Record<string, string>): any {
+	private handleRequestBody(
+		data: any | any[],
+		headers: Record<string, string>,
+	): any {
 		const contentType = headers['Content-Type'] || '';
 
 		if (contentType.includes('application/json') && data) {
@@ -123,17 +126,30 @@ class HttpClient {
 
 		if (contentType.includes('multipart/form-data') && data) {
 			const formData = new FormData();
-			Object.entries(data).forEach(([key, value]) => {
+
+			const appendValue = (key: string, value: any) => {
 				if (value instanceof File) {
 					formData.append(key, value);
 				} else if (Array.isArray(value)) {
-					for (const v of value) {
-						formData.append(key, v);
-					}
+					value.forEach((v) => {
+						appendValue(key, v);
+					});
 				} else {
 					formData.append(key, String(value));
 				}
-			});
+			};
+
+			if (Array.isArray(data)) {
+				// 数组情况：默认 key 为 'files' 或根据业务指定
+				data.forEach((item) => {
+					appendValue('files', item);
+				});
+			} else {
+				// 对象情况
+				Object.entries(data).forEach(([key, value]) => {
+					appendValue(key, value);
+				});
+			}
 			return formData;
 		}
 

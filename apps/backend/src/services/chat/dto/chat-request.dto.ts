@@ -33,7 +33,7 @@ export class UserMessageDto {
 
 export class AttachmentDto {
 	@IsString()
-	id: string;
+	uuid: string;
 
 	@IsString()
 	filename: string;

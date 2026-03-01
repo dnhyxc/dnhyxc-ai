@@ -159,11 +159,11 @@ export const createDownloadProgressListener = (
 };
 
 export const createUnlistenFileInfoListener = (
-	setDownloadInfo: React.Dispatch<React.SetStateAction<DownloadResult[]>>,
+	setDownloadInfo?: React.Dispatch<React.SetStateAction<DownloadResult[]>>,
 ): Promise<UnlistenFn> => {
 	const unlistenPromise = listen('download://progress', (event) => {
 		const progress = event.payload as DownloadResult;
-		setDownloadInfo((prev) => {
+		setDownloadInfo?.((prev) => {
 			const idx = prev.findIndex((item) => item.id === progress.id);
 			if (idx === -1) {
 				return [progress, ...prev];

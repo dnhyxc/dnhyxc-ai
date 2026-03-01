@@ -1,5 +1,6 @@
 import {
 	Controller,
+	Delete,
 	Get,
 	HttpException,
 	HttpStatus,
@@ -60,7 +61,7 @@ export class UploadController {
 
 	@Post('/uploadFiles')
 	// FileInterceptor 上传单个文件，FilesInterceptor 上传多个
-	@UseInterceptors(FilesInterceptor('file'))
+	@UseInterceptors(FilesInterceptor('files'))
 	async uploadFiles(@UploadedFiles() files: Express.Multer.File[]) {
 		try {
 			const res = files.map((file) => {
@@ -147,6 +148,28 @@ export class UploadController {
 			throw new HttpException(
 				error.message || '下载失败',
 				HttpStatus.BAD_REQUEST,
+			);
+		}
+	}
+
+	@Delete('/deleteFile')
+	async deleteFile(@Query('filename') filename: string) {
+		try {
+			// 简单的文件名校验，防止空字符串
+			if (!filename || filename.trim() === '') {
+				throw new HttpException('文件名不能为空', HttpStatus.BAD_REQUEST);
+			}
+
+			// 调用服务层删除逻辑
+			return await this.uploadService.deleteFile(filename);
+		} catch (error) {
+			// 如果是 HttpException 直接抛出，否则包装一下
+			if (error instanceof HttpException) {
+				throw error;
+			}
+			throw new HttpException(
+				error.message || '删除失败',
+				HttpStatus.INTERNAL_SERVER_ERROR,
 			);
 		}
 	}

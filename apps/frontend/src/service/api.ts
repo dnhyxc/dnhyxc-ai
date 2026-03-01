@@ -37,6 +37,12 @@ export const GET_UPLOAD_TOKEN = '/upload/getUploadToken';
 // 上传文件
 export const UPLOAD_FILE = '/upload/uploadFile';
 
+// 批量上传文件
+export const UPLOAD_FILES = '/upload/uploadFiles';
+
+// 删除文件
+export const DELETE_FILE = '/upload/deleteFile';
+
 // 下载文件
 export const DOWNLOAD_FILE = '/upload/download';
 

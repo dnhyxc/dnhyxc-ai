@@ -5,19 +5,26 @@ import { useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { FileWithPreview } from '@/types';
 import Image from '../Image';
+import Tooltip from '../Tooltip';
 
 interface IProps {
 	validTypes?: string[];
 	multiple?: boolean;
 	maxSize?: number;
+	maxCount?: number;
+	countValidText?: string;
+	uploadedCount?: number;
 	accept?: string;
 	className?: string;
-	onUpload: (file: FileWithPreview | FileWithPreview[]) => void;
+	onUpload: (file: FileWithPreview | FileWithPreview[]) => Promise<void>;
 	getFileList?: (file: FileWithPreview | FileWithPreview[]) => void;
 	fileUrl?: string;
 	onClearFileUrl?: () => void;
 	children?: React.ReactNode;
 	uploadType?: string;
+	showTooltip?: boolean;
+	tooltipContent?: React.ReactNode | string;
+	disabled?: boolean;
 }
 
 const Upload: React.FC<IProps> = ({
@@ -37,7 +44,13 @@ const Upload: React.FC<IProps> = ({
 	],
 	multiple = false,
 	accept = 'image/*',
-	maxSize = 10 * 1024 * 1024, // 5MB
+	maxSize = 10 * 1024 * 1024, // 10MB
+	maxCount = 5,
+	countValidText = '',
+	uploadedCount = 0,
+	showTooltip = false,
+	tooltipContent = '仅支持PDF、Word、Excel文件',
+	disabled = false,
 }) => {
 	const [files, setFiles] = useState<FileWithPreview[]>([]);
 
@@ -48,11 +61,19 @@ const Upload: React.FC<IProps> = ({
 		fileInputRef.current?.click();
 	};
 
-	const onFileSelect = (selectedFiles: File[] | FileList) => {
+	const onFileSelect = async (selectedFiles: File[] | FileList) => {
 		// 文件数量检查
-		// if (selectedFiles.length + files.length > 5) {
-		// 	return;
-		// }
+		if (
+			(multiple && selectedFiles.length + files.length > maxCount) ||
+			uploadedCount + selectedFiles.length > maxCount
+		) {
+			Toast({
+				type: 'error',
+				title: countValidText || `最多只能同时上传 ${maxCount} 个文件`,
+			});
+			setFiles([]);
+			return;
+		}
 
 		const newFiles = Array.from(selectedFiles).filter((file) => {
 			// 文件类型检查
@@ -88,12 +109,14 @@ const Upload: React.FC<IProps> = ({
 			: filesWithPreview[0];
 		if (multiple) {
 			setFiles((prev) => [...filesWithPreview, ...prev]);
-			onUpload(fileList);
 			getFileList?.(fileList);
+			await onUpload(fileList);
+			setFiles([]);
 		} else {
 			setFiles(filesWithPreview);
-			onUpload(filesWithPreview?.[0]);
 			getFileList?.(filesWithPreview?.[0]);
+			await onUpload(filesWithPreview?.[0]);
+			setFiles([]);
 		}
 	};
 
@@ -130,9 +153,6 @@ const Upload: React.FC<IProps> = ({
 				(files?.length || fileUrl ? (
 					<div className="relative flex items-center justify-center w-full h-full z-1 group">
 						<Image
-							// src={
-							// 	'https://dnhyxc.cn/image/__ARTICLE_IMG__d931518c149578ee4fc656514e2224437n66efe5c8d80d0da837a3e600h1769567982687.webp'
-							// }
 							ref={imageRef}
 							src={fileUrl || files[0].preview}
 							showOnError
@@ -161,18 +181,21 @@ const Upload: React.FC<IProps> = ({
 					</div>
 				))}
 			{uploadType === 'button' && (
-				<Button
-					variant="ghost"
-					className="flex items-center text-sm bg-theme/5 mb-1 h-8 rounded-md"
-					onClick={triggerFileInput}
-				>
-					{children || (
-						<div className="flex items-center">
-							<UploadIcon className="w-8 h-8 mx-auto text-textcolor mr-2" />
-							上传文件
-						</div>
-					)}
-				</Button>
+				<Tooltip side="right" content={tooltipContent} disabled={!showTooltip}>
+					<Button
+						variant="ghost"
+						className="flex items-center text-sm bg-theme/5 mb-1 h-8 rounded-md"
+						disabled={disabled}
+						onClick={triggerFileInput}
+					>
+						{children || (
+							<div className="flex items-center">
+								<UploadIcon className="w-8 h-8 mx-auto text-textcolor mr-2" />
+								上传文件
+							</div>
+						)}
+					</Button>
+				</Tooltip>
 			)}
 		</div>
 	);

@@ -1,10 +1,14 @@
-import { existsSync } from 'node:fs';
-import { extname, join } from 'node:path';
+import { existsSync, unlink } from 'node:fs';
+import { extname, join, resolve } from 'node:path';
+import { promisify } from 'node:util';
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import * as qiniu from 'qiniu';
 import { FileEnum, QiniuEnum } from '../../enum/config.enum';
 import { getEnvConfig } from '../../utils';
 import { IMAGE_EXTS } from './upload.enum';
+
+// 将 unlink 包装为 Promise 以便 async/await 使用
+const unlinkAsync = promisify(unlink);
 
 @Injectable()
 export class UploadService {
@@ -71,5 +75,44 @@ export class UploadService {
 			filePath = this.getStaticUrl(filename, 'files', toReplace);
 		}
 		return filePath;
+	}
+
+	// delete file
+	// 新增：删除文件方法
+	async deleteFile(filename: string) {
+		if (!filename) {
+			throw new HttpException('文件名不能为空', HttpStatus.BAD_REQUEST);
+		}
+
+		// 1. 获取文件绝对路径 (复用 download 逻辑，toReplace=false 获取绝对路径)
+		// 注意：这里捕获错误，如果文件不存在，download 会抛出异常，直接向上抛即可
+		let absolutePath = '';
+		try {
+			absolutePath = this.download(filename, false);
+		} catch (_e) {
+			throw new HttpException('文件不存在或路径错误', HttpStatus.NOT_FOUND);
+		}
+
+		// 2. 安全校验：防止目录遍历攻击
+		// 确保解析后的路径在配置的根目录内
+		const config = getEnvConfig();
+		const rootPath = resolve(__dirname, config[FileEnum.FILE_ROOT]);
+		// 使用 resolve 标准化路径，消除 .. 等
+		const normalizedPath = resolve(absolutePath);
+
+		if (!normalizedPath.startsWith(rootPath)) {
+			throw new HttpException('非法的文件路径', HttpStatus.FORBIDDEN);
+		}
+
+		// 3. 执行删除
+		try {
+			await unlinkAsync(normalizedPath);
+			return { message: '删除成功', filename };
+		} catch (error) {
+			throw new HttpException(
+				`删除失败：${error.message}`,
+				HttpStatus.INTERNAL_SERVER_ERROR,
+			);
+		}
 	}
 }

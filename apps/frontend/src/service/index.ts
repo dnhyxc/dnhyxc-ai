@@ -1,6 +1,7 @@
 import { http } from '@/utils/fetch';
 import {
 	CREATE_VERIFY_CODE,
+	DELETE_FILE,
 	DOWNLOAD_FILE,
 	DOWNLOAD_ZIP_FILE,
 	GET_SESSION,
@@ -19,6 +20,7 @@ import {
 	UPDATE_EMAIL,
 	UPDATE_USER,
 	UPLOAD_FILE,
+	UPLOAD_FILES,
 } from './api';
 
 export const login = async ({
@@ -162,6 +164,19 @@ export const uploadFile = async (file: File) => {
 	);
 };
 
+// 上传多个文件
+export const uploadFiles = async (files: File[]) => {
+	return await http.post(
+		UPLOAD_FILES,
+		{ files },
+		{
+			headers: {
+				'Content-Type': 'multipart/form-data',
+			},
+		},
+	);
+};
+
 // 下载文件
 export const downloadFile = async (filename: string): Promise<any> => {
 	return await http.get(DOWNLOAD_FILE, {
@@ -172,6 +187,12 @@ export const downloadFile = async (filename: string): Promise<any> => {
 // 下载zip文件
 export const downloadZip = async (filename: string): Promise<any> => {
 	return await http.get(DOWNLOAD_ZIP_FILE, {
+		querys: { filename },
+	});
+};
+
+export const deleteFile = async (filename: string): Promise<any> => {
+	return await http.delete(DELETE_FILE, {
 		querys: { filename },
 	});
 };

@@ -19,7 +19,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { v4 as uuidv4 } from 'uuid';
 import { cn } from '@/lib/utils';
-import { stopSse, uploadFile } from '@/service';
+import { stopSse, uploadFiles } from '@/service';
 import { FileWithPreview, UploadedFile } from '@/types';
 import { streamFetch } from '@/utils/sse';
 import { buildMessageList, getFormatMessages } from '@/views/chat/tools';
@@ -86,7 +86,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 	const [isComposing, setIsComposing] = useState(false);
 	const [isShowThinkContent, setIsShowThinkContent] = useState(true);
 	const [isCopyedId, setIsCopyedId] = useState('');
-	const [uploadedFile, setUploadedFile] = useState<UploadedFile[]>([]);
+	const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
 	// selectedChildMap 管理当前会话的分支选择状态
 	const [selectedChildMap, setSelectedChildMap] = useState<Map<string, string>>(
 		new Map(),
@@ -559,7 +559,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 			userMsgId,
 			content,
 			parentId,
-			uploadedFile?.length ? uploadedFile : undefined,
+			uploadedFiles?.length ? uploadedFiles : undefined,
 		);
 
 		userMessageToUse.childrenIds = [assistantMessageId];
@@ -615,7 +615,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 		}
 
 		setInput('');
-		setUploadedFile([]);
+		setUploadedFiles([]);
 		setAutoScroll(true);
 	};
 
@@ -852,15 +852,18 @@ const ChatBot: React.FC<ChatBotProps> = ({
 	};
 
 	const onUploadFile = async (data: FileWithPreview | FileWithPreview[]) => {
-		const res = await uploadFile((data as FileWithPreview).file);
+		const files = Array.isArray(data) ? data : [data];
+		const fileList = files.map((item) => item.file);
+		const res = await uploadFiles(fileList);
 		if (res.success) {
-			setUploadedFile((prev) => {
+			setUploadedFiles((prev) => {
 				return [
 					...prev,
-					{
-						...res.data,
-						path: import.meta.env.VITE_DEV_DOMAIN + res.data.path,
-					},
+					...res.data.map((item: UploadedFile) => ({
+						...item,
+						path: import.meta.env.VITE_DEV_DOMAIN + item.path,
+						uuid: uuidv4(),
+					})),
 				];
 			});
 			inputRef.current?.focus();
@@ -1015,12 +1018,19 @@ const ChatBot: React.FC<ChatBotProps> = ({
 										)}
 									>
 										{message?.attachments &&
-										message?.attachments?.length > 0 &&
-										message.role === 'user'
-											? message?.attachments.map((i, index) => (
-													<FileInfo key={i.id || index} data={i} />
-												))
-											: null}
+											message?.attachments.length > 0 && (
+												<div className="flex flex-wrap gap-3 mb-2">
+													{message.role === 'user'
+														? message?.attachments?.map((i) => (
+																<FileInfo
+																	key={i.id || i.uuid}
+																	data={i}
+																	showDownload
+																/>
+															))
+														: null}
+												</div>
+											)}
 										<div
 											className={cn(
 												'flex-1 rounded-md p-3',
@@ -1227,14 +1237,26 @@ const ChatBot: React.FC<ChatBotProps> = ({
 
 			{/* 输入区域 */}
 			<div className="p-5.5 pt-5 backdrop-blur-sm">
-				<div className="max-w-3xl mx-auto flex gap-5">
+				<div className="max-w-3xl mx-auto flex">
 					<div className="flex-1 relative overflow-hidden">
 						<div className="flex flex-col overflow-y-auto rounded-md bg-theme/5 border border-theme-white/10">
-							{uploadedFile?.length > 0
-								? uploadedFile.map((i, index) => (
-										<FileInfo key={i.id || index} data={i} showInfo />
-									))
-								: null}
+							{uploadedFiles?.length > 0 ? (
+								<div className="my-2.5 mx-3 text-sm text-textcolor/70">
+									只识别附件中的文字
+								</div>
+							) : null}
+							{uploadedFiles?.length > 0 ? (
+								<div className="w-full flex flex-wrap gap-3 px-3 mb-2">
+									{uploadedFiles.map((i, index) => (
+										<FileInfo
+											key={i.id || index}
+											data={i}
+											showDelete
+											setUploadedFiles={setUploadedFiles}
+										/>
+									))}
+								</div>
+							) : null}
 							<Textarea
 								ref={inputRef}
 								value={input}
@@ -1260,11 +1282,18 @@ const ChatBot: React.FC<ChatBotProps> = ({
 									<Upload
 										uploadType="button"
 										className="w-auto h-auto"
+										maxSize={20 * 1024 * 1024}
+										multiple
+										countValidText="最多只能支持 5 个文件"
+										uploadedCount={uploadedFiles?.length}
+										disabled={uploadedFiles?.length >= 5}
 										validTypes={[
 											'application/pdf',
 											'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 											'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
 										]}
+										showTooltip
+										tooltipContent="仅支持PDF、DOCX、XLSX格式，最多同时支持 5 个文件，每个文件最大 20 MB"
 										onUpload={onUploadFile}
 									>
 										<div className="flex items-center">
