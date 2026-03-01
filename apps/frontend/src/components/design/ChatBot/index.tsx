@@ -100,6 +100,8 @@ const ChatBot: React.FC<ChatBotProps> = ({
 	const editInputRef = useRef<HTMLTextAreaElement>(null);
 
 	let copyTimer: ReturnType<typeof setTimeout> | null = null;
+	let focusTimer: ReturnType<typeof setTimeout> | null = null;
+
 	const navigate = useNavigate();
 
 	// 修改：初始化逻辑
@@ -130,6 +132,10 @@ const ChatBot: React.FC<ChatBotProps> = ({
 			if (copyTimer) {
 				clearTimeout(copyTimer);
 				copyTimer = null;
+			}
+			if (focusTimer) {
+				clearTimeout(focusTimer);
+				focusTimer = null;
 			}
 			stopGenerating();
 		};
@@ -869,8 +875,22 @@ const ChatBot: React.FC<ChatBotProps> = ({
 		}, 500);
 	};
 
+	const onFocusEditInput = () => {
+		focusTimer = setTimeout(() => {
+			if (editInputRef.current) {
+				editInputRef.current.focus();
+				// 将光标定位在文本内容的最后面
+				editInputRef.current.setSelectionRange(
+					editInputRef.current.value.length,
+					editInputRef.current.value.length,
+				);
+			}
+		}, 0);
+	};
+
 	const onEdit = (message: Message) => {
 		setEditMessage(message);
+		onFocusEditInput();
 	};
 
 	const onReGenerate = (index: number) => {
