@@ -8,7 +8,7 @@ import {
 import { useTheme } from 'next-themes';
 import { Toaster as Sonner, type ToasterProps, toast } from 'sonner';
 
-type ToastType = 'success' | 'error' | 'warning' | 'info' | 'loading';
+type ToastType = 'success' | 'error' | 'warning' | 'info' | 'loading' | 'start';
 
 const Toast = ({
 	title,
@@ -25,6 +25,7 @@ const Toast = ({
 		warning: 'text-amber-500',
 		info: 'text-gray-500',
 		loading: 'text-gray-500',
+		start: 'text-gray-500',
 	};
 
 	toast.custom(() => {
@@ -43,6 +44,7 @@ const Toast = ({
 						{type === 'loading' && (
 							<Loader2Icon color="var(--color-gray-500)" />
 						)}
+						{type === 'start' && <Loader2Icon color="var(--color-gray-500)" />}
 					</div>
 					<div
 						className={`ml-2 text-md ${colors[type]} whitespace-pre-wrap wrap-break-word`}

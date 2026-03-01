@@ -42,13 +42,8 @@ const FileInfo: React.FC<IProps> = ({
 		setLoading(false);
 		setDownloadProgressInfo([]);
 		Toast({
-			type:
-				res.success === 'success'
-					? 'success'
-					: res.success === 'error'
-						? 'error'
-						: 'info',
-			title: res.message,
+			type: res.success,
+			title: res.message.includes('Not Found') ? '文件不存在' : res.message,
 		});
 	};
 

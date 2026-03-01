@@ -1019,7 +1019,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 									>
 										{message?.attachments &&
 											message?.attachments.length > 0 && (
-												<div className="flex flex-wrap gap-3 mb-2">
+												<div className="flex flex-wrap justify-end gap-3 mb-2">
 													{message.role === 'user'
 														? message?.attachments?.map((i) => (
 																<FileInfo
