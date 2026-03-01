@@ -187,7 +187,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 		chatId: string,
 		content: string,
 		parentId?: string,
-		attachments?: UploadedFile[],
+		attachments?: UploadedFile[] | null,
 	): Message => ({
 		id: chatId,
 		chatId,
@@ -409,7 +409,10 @@ const ChatBot: React.FC<ChatBotProps> = ({
 	};
 
 	// 确保这些函数都更新 allMessages，并调用 updateMessagesDisplay
-	const handleEditMessage = async (content?: string) => {
+	const handleEditMessage = async (
+		content?: string,
+		attachments?: UploadedFile[] | null,
+	) => {
 		if (!editMessage) return;
 
 		const userMsgId = uuidv4();
@@ -426,6 +429,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 				userMsgId,
 				content || editMessage?.content.trim(),
 				parentId,
+				attachments,
 			);
 			userMsg.childrenIds = [assistantMessageId];
 
@@ -588,6 +592,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 		content?: string,
 		index?: number,
 		isEdit?: boolean,
+		attachments?: UploadedFile[] | null,
 	) => {
 		if ((!content && !input.trim()) || loading) return;
 
@@ -596,7 +601,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 		const isEditMode = isEdit === true;
 
 		if (isEditMode) {
-			await handleEditMessage(content);
+			await handleEditMessage(content, attachments);
 		} else if (isRegenerate) {
 			await handleRegenerateMessage(content!, index);
 		} else {
@@ -737,8 +742,8 @@ const ChatBot: React.FC<ChatBotProps> = ({
 		setInput(e.target.value);
 	};
 
-	const onSendMessage = () => {
-		sendMessage(editMessage?.content, undefined, true);
+	const onSendMessage = (message?: Message) => {
+		sendMessage(editMessage?.content, undefined, true, message?.attachments);
 	};
 
 	const handleEditChange = (
@@ -781,6 +786,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 	const handleKeyDown = (
 		e: React.KeyboardEvent<HTMLTextAreaElement>,
 		isEdit?: boolean,
+		message?: Message,
 	) => {
 		if (e.key === 'Enter') {
 			// 检查是否按下了修饰键
@@ -811,7 +817,12 @@ const ChatBot: React.FC<ChatBotProps> = ({
 				e.preventDefault();
 				// 纯 Enter（没有任何修饰键）: 发送消息
 				isEdit
-					? sendMessage(editMessage?.content, undefined, true)
+					? sendMessage(
+							editMessage?.content,
+							undefined,
+							true,
+							message?.attachments,
+						)
 					: sendMessage();
 			}
 		}
@@ -1010,7 +1021,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 															ref={editInputRef}
 															value={editMessage.content}
 															onChange={handleEditChange}
-															onKeyDown={(e) => handleKeyDown(e, true)}
+															onKeyDown={(e) => handleKeyDown(e, true, message)}
 															onCompositionStart={handleCompositionStart}
 															onCompositionEnd={handleCompositionEnd}
 															placeholder="请输入您的问题"
@@ -1027,7 +1038,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 															</Button>
 															<Button
 																variant="secondary"
-																onClick={onSendMessage}
+																onClick={() => onSendMessage(message)}
 																disabled={loading}
 															>
 																发送
