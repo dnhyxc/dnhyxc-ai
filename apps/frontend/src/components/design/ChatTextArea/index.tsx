@@ -94,7 +94,14 @@ const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 						</Button>
 						<Button
 							variant="secondary"
-							onClick={() => sendMessage(editMessage?.content || undefined)}
+							onClick={() =>
+								sendMessage(
+									editMessage?.content || undefined,
+									undefined,
+									true,
+									editMessage?.attachments,
+								)
+							}
 							disabled={loading}
 						>
 							发送

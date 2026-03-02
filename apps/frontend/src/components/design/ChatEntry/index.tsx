@@ -69,7 +69,7 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 
 						{/* 复用 ChatTextArea 组件 */}
 						<ChatTextArea
-							ref={chatInputRef} // 传递 ref
+							ref={chatInputRef}
 							mode="chat"
 							input={input}
 							setInput={setInput}
@@ -78,7 +78,6 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 							loading={loading}
 							handleEditChange={handleEditChange}
 							sendMessage={sendMessage}
-							className="pt-2"
 						/>
 
 						<div className="flex items-center justify-between h-10 p-2.5 mb-1 mt-2.5">
