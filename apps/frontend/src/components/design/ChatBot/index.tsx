@@ -417,6 +417,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 	};
 
 	// 确保这些函数都更新 allMessages，并调用 updateMessagesDisplay
+	// 确保这些函数都更新 allMessages，并调用 updateMessagesDisplay
 	const handleEditMessage = async (
 		content?: string,
 		attachments?: UploadedFile[] | null,
@@ -427,6 +428,9 @@ const ChatBot: React.FC<ChatBotProps> = ({
 		const assistantMessageId = uuidv4();
 		let userMessageToUse: Message | null = null;
 		let assistantMessage: Message | null = null;
+
+		// 【修复关键 1】预先创建新的分支映射表副本
+		const newSelectedChildMap = new Map(selectedChildMap);
 
 		setAllMessages((prevAll) => {
 			const editedMsg = prevAll.find((m) => m.chatId === editMessage.chatId);
@@ -453,6 +457,11 @@ const ChatBot: React.FC<ChatBotProps> = ({
 					parentId,
 					userMsgId,
 				);
+				// 【修复关键 2】如果是普通节点，更新父节点指向新的用户消息
+				newSelectedChildMap.set(parentId, userMsgId);
+			} else {
+				// 【修复关键 3】如果是根节点（第一条消息），更新 'root' 指向新的用户消息
+				newSelectedChildMap.set('root', userMsgId);
 			}
 
 			newAllMessages.push(userMsg, assistantMsg);
@@ -460,19 +469,23 @@ const ChatBot: React.FC<ChatBotProps> = ({
 			userMessageToUse = userMsg;
 			assistantMessage = assistantMsg;
 
-			// 基于完整树更新显示
-			updateMessagesDisplay(newAllMessages);
+			// 【修复关键 4】将新的 Map 传递给显示更新函数，确保 UI 立即切换到新分支
+			updateMessagesDisplay(newAllMessages, newSelectedChildMap);
 			return newAllMessages.map((i) => ({ ...i, isStopped: false }));
 		});
 
+		// 同步 React 状态
+		setSelectedChildMap(newSelectedChildMap);
+
 		if (userMessageToUse && assistantMessage) {
+			// 【修复关键 5】将新的 Map 传递给 SSE 请求，确保流式更新时路径正确
 			onSseFetch(
 				apiEndpoint,
 				assistantMessageId,
 				userMessageToUse,
 				assistantMessage,
 				false,
-				selectedChildMap,
+				newSelectedChildMap,
 			);
 			setEditMessage(null);
 		}
