@@ -1,4 +1,4 @@
-import { Message } from '@design/ChatBot';
+import { Message } from '@design/ChatBot/types';
 
 export const buildMessageList = (
 	messages: Message[],

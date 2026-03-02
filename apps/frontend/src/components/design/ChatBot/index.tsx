@@ -26,47 +26,16 @@ import { buildMessageList, getFormatMessages } from '@/views/chat/tools';
 import MarkdownPreview from '../Markdown';
 import Upload from '../Upload';
 import FileInfo from './FileInfo';
-
-export interface Message {
-	chatId: string;
-	content: string;
-	role: 'user' | 'assistant';
-	timestamp: Date;
-	id?: string;
-	createdAt?: Date;
-	attachments?: UploadedFile[] | null;
-	thinkContent?: string;
-	isStreaming?: boolean;
-	isStopped?: boolean;
-	parentId?: string;
-	childrenIds?: string[];
-	siblingIndex?: number;
-	siblingCount?: number;
-	currentChatId?: string;
-}
-
-interface ChatRequestParams {
-	messages: { role: 'user' | 'assistant'; content: string; noSave?: boolean }[];
-	sessionId: string | undefined;
-	stream?: boolean;
-	attachments?: UploadedFile[];
-	isRegenerate?: boolean;
-	parentId?: string;
-	userMessage?: Message;
-	assistantMessage?: Message;
-	currentChatId?: string;
-}
-
-interface ChatBotProps {
-	className?: string;
-	initialMessages?: Message[];
-	apiEndpoint?: string;
-	maxHistory?: number;
-	showAvatar?: boolean;
-	onBranchChange?: (msgId: string, direction: 'prev' | 'next') => void;
-	activeSessionId?: string;
-	setActiveSessionId?: (id: string) => void;
-}
+import {
+	createAssistantMessage,
+	createUserMessage,
+	findLastAssistantMessage,
+	findSiblings,
+	insertNewline,
+	updateParentChildrenIds,
+	updateSingleMessage,
+} from './tools';
+import { ChatBotProps, ChatRequestParams, Message } from './types';
 
 const ChatBot: React.FC<ChatBotProps> = ({
 	className,
@@ -179,81 +148,6 @@ const ChatBot: React.FC<ChatBotProps> = ({
 		const formattedMessages = getFormatMessages(sortedMessages);
 		setMessages(formattedMessages);
 		updateCurrentChatId(sortedMessages);
-	};
-
-	const updateSingleMessage = (
-		allMessages: Message[],
-		messageId: string,
-		updates: Partial<Message>,
-	) => {
-		return allMessages.map((msg) =>
-			msg.chatId === messageId ? { ...msg, ...updates } : msg,
-		);
-	};
-
-	const createUserMessage = (
-		chatId: string,
-		content: string,
-		parentId?: string,
-		attachments?: UploadedFile[] | null,
-	): Message => ({
-		id: chatId,
-		chatId,
-		content: content.trim(),
-		role: 'user',
-		timestamp: new Date(),
-		parentId,
-		childrenIds: [],
-		currentChatId,
-		attachments,
-	});
-
-	const createAssistantMessage = (
-		chatId: string,
-		parentId: string,
-	): Message => ({
-		id: chatId,
-		chatId,
-		content: '',
-		thinkContent: '',
-		role: 'assistant',
-		timestamp: new Date(),
-		isStreaming: true,
-		parentId,
-		childrenIds: [],
-		currentChatId,
-	});
-
-	const updateParentChildrenIds = (
-		allMessages: Message[],
-		parentId: string,
-		childId: string,
-	): Message[] => {
-		const parentIndex = allMessages.findIndex((m) => m.chatId === parentId);
-		if (parentIndex === -1) return allMessages;
-
-		const newAllMessages = [...allMessages];
-		const parentMsg = { ...newAllMessages[parentIndex] };
-		const pChildrenIds = parentMsg.childrenIds
-			? [...parentMsg.childrenIds]
-			: [];
-
-		if (!pChildrenIds.includes(childId)) {
-			pChildrenIds.push(childId);
-		}
-
-		parentMsg.childrenIds = pChildrenIds;
-		newAllMessages[parentIndex] = parentMsg;
-		return newAllMessages;
-	};
-
-	const findLastAssistantMessage = (allMessages: Message[]): Message | null => {
-		for (let i = allMessages.length - 1; i >= 0; i--) {
-			if (allMessages[i].role === 'assistant') {
-				return allMessages[i];
-			}
-		}
-		return null;
 	};
 
 	const updateCurrentChatId = (msgs: Message[]) => {
@@ -417,7 +311,6 @@ const ChatBot: React.FC<ChatBotProps> = ({
 	};
 
 	// 确保这些函数都更新 allMessages，并调用 updateMessagesDisplay
-	// 确保这些函数都更新 allMessages，并调用 updateMessagesDisplay
 	const handleEditMessage = async (
 		content?: string,
 		attachments?: UploadedFile[] | null,
@@ -437,26 +330,28 @@ const ChatBot: React.FC<ChatBotProps> = ({
 			if (!editedMsg) return prevAll.map((i) => ({ ...i, isStopped: false }));
 
 			const parentId = editedMsg.parentId;
-			const userMsg = createUserMessage(
-				userMsgId,
-				content || editMessage?.content.trim(),
+			const userMsg = createUserMessage({
+				chatId: userMsgId,
+				content: content || editMessage?.content.trim(),
 				parentId,
 				attachments,
-			);
+				currentChatId,
+			});
 			userMsg.childrenIds = [assistantMessageId];
 
-			const assistantMsg = createAssistantMessage(
-				assistantMessageId,
-				userMsgId,
-			);
+			const assistantMsg = createAssistantMessage({
+				chatId: assistantMessageId,
+				parentId: userMsgId,
+				currentChatId,
+			});
 
 			let newAllMessages = [...prevAll];
 			if (parentId) {
-				newAllMessages = updateParentChildrenIds(
-					newAllMessages,
+				newAllMessages = updateParentChildrenIds({
+					allMessages: newAllMessages,
 					parentId,
-					userMsgId,
-				);
+					childId: userMsgId,
+				});
 				// 【修复关键 2】如果是普通节点，更新父节点指向新的用户消息
 				newSelectedChildMap.set(parentId, userMsgId);
 			} else {
@@ -520,10 +415,11 @@ const ChatBot: React.FC<ChatBotProps> = ({
 			userMsgCopy.childrenIds = childrenIds;
 			userMsgCopy.currentChatId = currentChatId;
 
-			const assistantMsg = createAssistantMessage(
-				assistantMessageId,
-				userMsgCopy.chatId,
-			);
+			const assistantMsg = createAssistantMessage({
+				chatId: assistantMessageId,
+				parentId: userMsgCopy.chatId,
+				currentChatId,
+			});
 
 			const newAllMessages = prevAll.map((msg) =>
 				msg.chatId === userMsgCopy.chatId ? userMsgCopy : msg,
@@ -570,30 +466,32 @@ const ChatBot: React.FC<ChatBotProps> = ({
 			parentId = lastMsg.chatId;
 		}
 
-		const userMessageToUse = createUserMessage(
-			userMsgId,
+		const userMessageToUse = createUserMessage({
+			chatId: userMsgId,
 			content,
 			parentId,
-			uploadedFiles?.length ? uploadedFiles : undefined,
-		);
+			currentChatId,
+			attachments: uploadedFiles?.length ? uploadedFiles : undefined,
+		});
 
 		userMessageToUse.childrenIds = [assistantMessageId];
 
-		const assistantMessage = createAssistantMessage(
-			assistantMessageId,
-			userMsgId,
-		);
+		const assistantMessage = createAssistantMessage({
+			chatId: assistantMessageId,
+			parentId: userMsgId,
+			currentChatId,
+		});
 
 		setAllMessages((prevAll) => {
 			let newAllMessages = [
 				...prevAll.map((i) => ({ ...i, isStopped: false })),
 			] as Message[];
 			if (userMessageToUse.parentId) {
-				newAllMessages = updateParentChildrenIds(
-					newAllMessages,
-					userMessageToUse.parentId,
-					userMsgId,
-				);
+				newAllMessages = updateParentChildrenIds({
+					allMessages: newAllMessages,
+					parentId: userMessageToUse.parentId,
+					childId: userMsgId,
+				});
 			}
 			newAllMessages.push(userMessageToUse, assistantMessage);
 			// 基于完整树更新显示
@@ -748,6 +646,11 @@ const ChatBot: React.FC<ChatBotProps> = ({
 		}
 	};
 
+	// 处理发送消息
+	const onSendMessage = (message?: Message) => {
+		sendMessage(editMessage?.content, undefined, true, message?.attachments);
+	};
+
 	// 清除对话
 	const clearChat = () => {
 		setInput('');
@@ -762,12 +665,9 @@ const ChatBot: React.FC<ChatBotProps> = ({
 		navigate('/chat');
 	};
 
-	const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+	// 处理输入框变化
+	const onInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
 		setInput(e.target.value);
-	};
-
-	const onSendMessage = (message?: Message) => {
-		sendMessage(editMessage?.content, undefined, true, message?.attachments);
 	};
 
 	const handleEditChange = (
@@ -783,27 +683,6 @@ const ChatBot: React.FC<ChatBotProps> = ({
 			}
 			return prev;
 		});
-	};
-
-	// 插入换行符的辅助函数
-	const insertNewline = (
-		e: React.KeyboardEvent<HTMLTextAreaElement>,
-		isEdit?: boolean,
-	) => {
-		e.preventDefault();
-		const textarea = e.currentTarget;
-		const start = textarea.selectionStart;
-		const end = textarea.selectionEnd;
-		if (isEdit) {
-			const newValue = `${editMessage?.content?.substring(0, start)}\n${editMessage?.content?.substring(end)}`;
-			handleEditChange(newValue);
-		} else {
-			const newValue = `${input.substring(0, start)}\n${input.substring(end)}`;
-			setInput(newValue);
-		}
-
-		// 移动光标到插入位置后
-		textarea.selectionStart = textarea.selectionEnd = start + 1;
 	};
 
 	// 处理输入框按键
@@ -824,7 +703,14 @@ const ChatBot: React.FC<ChatBotProps> = ({
 			if (isCurrentlyComposing) {
 				// 如果按下了 Ctrl/Cmd + Enter，即使在组合输入状态下也插入换行
 				if (e.ctrlKey || e.metaKey) {
-					insertNewline(e, isEdit);
+					insertNewline({
+						e,
+						isEdit,
+						editMessage,
+						input,
+						setInputValue: setInput,
+						setEditInputValue: handleEditChange,
+					});
 				}
 				// 其他情况允许默认行为（中文输入法选择候选词）
 				return;
@@ -833,10 +719,24 @@ const ChatBot: React.FC<ChatBotProps> = ({
 			// 非组合输入状态下
 			if (e.ctrlKey || e.metaKey) {
 				// Ctrl/Cmd + Enter: 插入换行符
-				insertNewline(e, isEdit);
+				insertNewline({
+					e,
+					isEdit,
+					editMessage,
+					input,
+					setInputValue: setInput,
+					setEditInputValue: handleEditChange,
+				});
 			} else if (e.shiftKey) {
 				// Shift + Enter: 也插入换行符（常见约定）
-				insertNewline(e, isEdit);
+				insertNewline({
+					e,
+					isEdit,
+					editMessage,
+					input,
+					setInputValue: setInput,
+					setEditInputValue: handleEditChange,
+				});
 			} else if (!hasModifier) {
 				e.preventDefault();
 				// 纯 Enter（没有任何修饰键）: 发送消息
@@ -925,35 +825,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 		}
 	};
 
-	const findSiblings = (
-		allMessages: Message[],
-		messageId: string,
-	): Message[] => {
-		const currentMsg = allMessages.find((m) => m.chatId === messageId);
-		if (!currentMsg) return [];
-
-		const parentId = currentMsg.parentId;
-		let siblings: Message[] = [];
-
-		if (parentId) {
-			siblings = allMessages.filter((m) => m.parentId === parentId);
-		} else {
-			const allChildren = new Set<string>();
-			allMessages.forEach((m) => {
-				m.childrenIds?.forEach((c) => {
-					allChildren.add(c);
-				});
-			});
-			siblings = allMessages.filter((m) => !allChildren.has(m.chatId));
-		}
-
-		return siblings.sort(
-			(a, b) =>
-				new Date(a.createdAt as Date).getTime() -
-				new Date(b.createdAt as Date).getTime(),
-		);
-	};
-
+	// 分支切换
 	const handleBranchChange = (msgId: string, direction: 'prev' | 'next') => {
 		onBranchChange?.(msgId, direction);
 
@@ -1278,7 +1150,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 							<Textarea
 								ref={inputRef}
 								value={input}
-								onChange={handleChange}
+								onChange={onInputChange}
 								onKeyDown={(e) => handleKeyDown(e)}
 								onCompositionStart={handleCompositionStart}
 								onCompositionEnd={handleCompositionEnd}

@@ -1,4 +1,5 @@
-import ChatBot, { Message } from '@design/ChatBot';
+import ChatBot from '@design/ChatBot';
+import { Message } from '@design/ChatBot/types';
 import { Drawer } from '@design/Drawer';
 import { MarkdownParser } from '@dnhyxc-ai/tools';
 import { ScrollArea } from '@ui/index';
