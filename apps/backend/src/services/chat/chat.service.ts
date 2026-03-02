@@ -99,15 +99,12 @@ export class ChatService {
 			if (data.choices?.[0]?.delta?.content) {
 				return { type: 'content', data: data.choices[0].delta.content };
 			}
-
 			if (data.choices?.[0]?.message?.content) {
 				return { type: 'content', data: data.choices[0].message.content };
 			}
-
 			if (data.result) {
 				return { type: 'content', data: data.result };
 			}
-
 			if (data.data?.content) {
 				return { type: 'content', data: data.data.content };
 			}
@@ -122,7 +119,6 @@ export class ChatService {
 			if (data.choices?.[0]?.delta?.tool_calls) {
 				return { type: 'tool_calls', data: data.choices[0].delta.tool_calls };
 			}
-
 			if (data.choices?.[0]?.message?.tool_calls) {
 				return { type: 'tool_calls', data: data.choices[0].message.tool_calls };
 			}
@@ -279,9 +275,9 @@ export class ChatService {
 					attachments: [],
 					parentId: savedUserMessage?.id,
 					isRegenerate: false,
-					chatId: undefined, // chatId
-					childrenIds: [], // childrenIds
-					currentChatId: undefined, // currentChatId
+					chatId: undefined,
+					childrenIds: [],
+					currentChatId: undefined,
 				})
 				.catch((dbError) => {
 					console.error(
@@ -353,6 +349,10 @@ export class ChatService {
 		return new Observable<any>((subscriber) => {
 			const getStreamStatus = () => cancel$.isStopped || subscriber.closed;
 			(async () => {
+				// 【修复】将 fullContent 提升到 try 外部，确保在 catch 或停止逻辑中可访问
+				let fullContent = '';
+				let wasCancelledDuringIteration = false;
+
 				try {
 					// 获取部分响应（如果有）
 					const session = await this.messageService.findOneSession(sessionId);
@@ -451,7 +451,6 @@ export class ChatService {
 					}
 
 					const stream = await llm.stream(allMessages);
-					let fullContent = '';
 
 					// 在开始迭代前检查是否已取消
 					if (getStreamStatus()) {
@@ -465,8 +464,6 @@ export class ChatService {
 						return;
 					}
 
-					let wasCancelledDuringIteration = false;
-
 					try {
 						for await (const chunk of stream) {
 							// 每次迭代前检查是否被取消
@@ -476,7 +473,6 @@ export class ChatService {
 							}
 
 							const content = chunk.content;
-
 							if (typeof content === 'string') {
 								subscriber.next(JSON.stringify({ content, sessionId }));
 								fullContent += content;
@@ -514,6 +510,7 @@ export class ChatService {
 						}
 					}
 
+					// 【核心修复】无论是否被取消，只要有内容，都尝试保存到数据库
 					// 正常完成，cancel$.isStopped 为 false, 暂停时 cancel$.isStopped 为 true
 					if (!cancel$.isStopped) {
 						// 保存完整的 AI 回复到数据库（使用前端传递的数据）
@@ -549,14 +546,36 @@ export class ChatService {
 							null,
 							null,
 						);
-
-						// // 更新内存缓存
-						// const aiMessage = new AIMessage(finalContent);
-						// this.conversationMemory.set(sessionId, [...allMessages, aiMessage]);
 					} else {
-						// 保存部分响应用于继续生成
+						// 被停止时，保存已生成的部分响应到数据库，防止数据丢失
 						if (finalContent.length > 0) {
-							// 更新会话的 partialContent
+							// 1. 保存消息到 Message 表
+							if (dto.assistantMessage) {
+								await this.messageService.saveMessage({
+									sessionId,
+									role: MessageRole.ASSISTANT,
+									content: finalContent,
+									attachments: [],
+									parentId: dto.assistantMessage.parentId || null,
+									isRegenerate: dto.isRegenerate || false,
+									chatId: dto.assistantMessage.chatId,
+									childrenIds: dto.assistantMessage.childrenIds || [],
+									currentChatId: dto.assistantMessage.chatId,
+								});
+							} else {
+								await this.messageService.saveMessage({
+									sessionId,
+									role: MessageRole.ASSISTANT,
+									content: finalContent,
+									attachments: [],
+									parentId: dto.parentId || savedUserMessage?.id,
+									isRegenerate: dto.isRegenerate || false,
+									chatId: undefined,
+									childrenIds: [],
+									currentChatId: undefined,
+								});
+							}
+							// 2. 更新 Session 的 partialContent 以便后续续写
 							await this.messageService.updateSessionPartialContent(
 								sessionId,
 								finalContent,
@@ -567,19 +586,40 @@ export class ChatService {
 
 					subscriber.complete();
 				} catch (error) {
-					// 如果是取消操作，不视为错误
-					if (cancel$.isStopped || subscriber.closed) {
-						// 即使取消，如果有生成内容，也尝试保存以便后续继续
-						// 注意：这里无法访问 fullContent 因为作用域问题，实际生产中建议在 try 块外定义 fullContent
-						// 为简化，这里仅完成订阅
+					// 发生真实错误时，如果已有部分内容，尝试保存，防止进度丢失
+					if (
+						fullContent.length > 0 &&
+						(cancel$.isStopped || subscriber.closed)
+					) {
+						// 即使出错，如果是取消导致的，也保存已有内容
+						try {
+							await this.messageService.saveMessage({
+								sessionId,
+								role: MessageRole.ASSISTANT,
+								content: fullContent,
+								attachments: [],
+								parentId: dto.parentId || savedUserMessage?.id,
+								isRegenerate: dto.isRegenerate || false,
+								chatId: undefined,
+								childrenIds: [],
+								currentChatId: undefined,
+							});
+							await this.messageService.updateSessionPartialContent(
+								sessionId,
+								fullContent,
+								lastUserMessage?.content || '',
+							);
+						} catch (saveError) {
+							console.error(
+								'Failed to save partial message on error:',
+								saveError,
+							);
+						}
 						subscriber.complete();
 					} else {
-						// 发生真实错误时，如果已有部分内容，尝试保存，防止进度丢失
-						// 由于 fullContent 在 try 块内，这里简化处理，仅抛出错误
 						subscriber.error(error);
 					}
 				} finally {
-					// 清理资源
 					this.cleanupSession(sessionId);
 				}
 			})();
@@ -593,14 +633,11 @@ export class ChatService {
 		);
 	}
 
-	// 清理会话资源
 	async cleanupSession(sessionId: string) {
 		this.activeSessions.delete(sessionId);
 		await this.cache.del(sessionId);
-		// 注意：partialResponses 不在这里清理，因为需要用于继续生成
 	}
 
-	// 停止指定会话
 	async stopStream(
 		sessionId: string,
 	): Promise<{ success: boolean; message: string }> {
@@ -613,11 +650,8 @@ export class ChatService {
 			};
 		}
 
-		// 发出取消信号
 		cancelController.next();
 		cancelController.complete();
-
-		// 清理资源
 		this.cleanupSession(sessionId);
 
 		return {
@@ -626,7 +660,6 @@ export class ChatService {
 		};
 	}
 
-	// 继续生成指定会话
 	async continueStream({
 		sessionId,
 		parentId,
@@ -635,15 +668,13 @@ export class ChatService {
 		isRegenerate,
 	}: ChatContinueDto): Promise<Observable<any>> {
 		const session = await this.messageService.findOneSession(sessionId);
-
 		const partialContent = session?.partialContent;
 
 		if (!partialContent) {
 			throw new Error('会话不存在或已完成，无法继续生成');
 		}
 
-		// 【关键修复】简化提示词
-		// 因为 chatStream 中已经将 partialContent 作为 Assistant 消息注入上下文
+		// 简化提示词，因为 chatStream 中已经将 partialContent 作为 Assistant 消息注入上下文
 		// 这里只需要告诉模型“继续”即可，不需要再重复内容，避免模型困惑或重复生成
 		const userContent =
 			userMessage?.content ||
@@ -662,7 +693,7 @@ export class ChatService {
 			messages: continueMessages,
 			stream: true,
 			max_tokens: 4096,
-			temperature: 0.2, // 降低温度以减少随机性，确保续写连贯
+			temperature: 0.2,
 			parentId,
 			userMessage,
 			assistantMessage,
