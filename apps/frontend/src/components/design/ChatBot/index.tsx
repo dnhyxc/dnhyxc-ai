@@ -430,7 +430,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 
 		setAllMessages((prevAll) => {
 			const editedMsg = prevAll.find((m) => m.chatId === editMessage.chatId);
-			if (!editedMsg) return prevAll;
+			if (!editedMsg) return prevAll.map((i) => ({ ...i, isStopped: false }));
 
 			const parentId = editedMsg.parentId;
 			const userMsg = createUserMessage(
@@ -462,7 +462,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 
 			// 基于完整树更新显示
 			updateMessagesDisplay(newAllMessages);
-			return newAllMessages;
+			return newAllMessages.map((i) => ({ ...i, isStopped: false }));
 		});
 
 		if (userMessageToUse && assistantMessage) {
@@ -497,7 +497,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 			const userMsg = prevAll.find(
 				(m) => m.chatId === currentAssistantMsg.parentId,
 			);
-			if (!userMsg) return prevAll;
+			if (!userMsg) return prevAll.map((i) => ({ ...i, isStopped: false }));
 
 			const userMsgCopy = { ...userMsg };
 			const childrenIds = userMsg.childrenIds ? [...userMsg.childrenIds] : [];
@@ -528,7 +528,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 			// 基于完整树更新显示
 			updateMessagesDisplay(newAllMessages, childMap);
 
-			return newAllMessages;
+			return newAllMessages.map((i) => ({ ...i, isStopped: false }));
 		});
 
 		if (userMessageToUse && assistantMessage && newSelectedChildMap) {
@@ -572,7 +572,9 @@ const ChatBot: React.FC<ChatBotProps> = ({
 		);
 
 		setAllMessages((prevAll) => {
-			let newAllMessages = [...prevAll];
+			let newAllMessages = [
+				...prevAll.map((i) => ({ ...i, isStopped: false })),
+			] as Message[];
 			if (userMessageToUse.parentId) {
 				newAllMessages = updateParentChildrenIds(
 					newAllMessages,
@@ -583,7 +585,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 			newAllMessages.push(userMessageToUse, assistantMessage);
 			// 基于完整树更新显示
 			updateMessagesDisplay(newAllMessages);
-			return newAllMessages;
+			return newAllMessages.map((i) => ({ ...i, isStopped: false }));
 		});
 
 		onSseFetch(
