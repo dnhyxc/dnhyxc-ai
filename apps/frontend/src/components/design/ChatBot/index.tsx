@@ -1,4 +1,8 @@
-import { Button, ScrollArea, Spinner, Textarea, Toast } from '@ui/index';
+import ChatEntry from '@design/ChatEntry';
+import ChatFileList from '@design/ChatFileList';
+import ChatTextArea from '@design/ChatTextArea';
+import MarkdownPreview from '@design/Markdown';
+import { ScrollArea, Spinner, Toast } from '@ui/index';
 import { motion } from 'framer-motion';
 import {
 	Bot,
@@ -6,13 +10,9 @@ import {
 	ChevronDown,
 	ChevronLeft,
 	ChevronRight,
-	CirclePlus,
 	Copy,
-	Link,
 	PencilLine,
-	Rocket,
 	RotateCw,
-	StopCircle,
 	User,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -21,21 +21,17 @@ import { v4 as uuidv4 } from 'uuid';
 import { cn } from '@/lib/utils';
 import { stopSse, uploadFiles } from '@/service';
 import { FileWithPreview, UploadedFile } from '@/types';
+import { ChatBotProps, ChatRequestParams, Message } from '@/types/chat';
 import { streamFetch } from '@/utils/sse';
 import { buildMessageList, getFormatMessages } from '@/views/chat/tools';
-import MarkdownPreview from '../Markdown';
-import Upload from '../Upload';
-import FileInfo from './FileInfo';
 import {
 	createAssistantMessage,
 	createUserMessage,
 	findLastAssistantMessage,
 	findSiblings,
-	insertNewline,
 	updateParentChildrenIds,
 	updateSingleMessage,
 } from './tools';
-import { ChatBotProps, ChatRequestParams, Message } from './types';
 
 const ChatBot: React.FC<ChatBotProps> = ({
 	className,
@@ -54,11 +50,9 @@ const ChatBot: React.FC<ChatBotProps> = ({
 	const [input, setInput] = useState('');
 	const [loading, setLoading] = useState(false);
 	const [autoScroll, setAutoScroll] = useState(true);
-	const [isComposing, setIsComposing] = useState(false);
 	const [isShowThinkContent, setIsShowThinkContent] = useState(true);
 	const [isCopyedId, setIsCopyedId] = useState('');
 	const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
-	// selectedChildMap 管理当前会话的分支选择状态
 	const [selectedChildMap, setSelectedChildMap] = useState<Map<string, string>>(
 		new Map(),
 	);
@@ -67,22 +61,20 @@ const ChatBot: React.FC<ChatBotProps> = ({
 
 	const stopRequestRef = useRef<(() => void) | null>(null);
 	const scrollContainerRef = useRef<HTMLDivElement>(null);
-	const inputRef = useRef<HTMLTextAreaElement>(null);
+	// 创建 ref 用于获取编辑模式下的 textarea
 	const editInputRef = useRef<HTMLTextAreaElement>(null);
+	// 底部输入框如果需要自动聚焦也可以创建一个 ref，这里主要关注编辑模式
+	const chatInputRef = useRef<HTMLTextAreaElement>(null);
 
 	let copyTimer: ReturnType<typeof setTimeout> | null = null;
 	let focusTimer: ReturnType<typeof setTimeout> | null = null;
 
 	const navigate = useNavigate();
 
-	// 修改：初始化逻辑
+	// 初始化逻辑
 	useEffect(() => {
-		// 只有当 initialMessages 有变化且不为空时才更新，避免内部状态更新导致的循环
-		// 这里 initialMessages 传入的是完整树
 		if (initialMessages && initialMessages.length > 0) {
 			setAllMessages(initialMessages);
-			// 如果是新会话切换（通过 key 控制组件卸载重装，这里主要是初始挂载）
-			// 我们基于完整树计算初始显示路径
 			const sortedMessages = buildMessageList(initialMessages, new Map());
 			const formattedMessages = getFormatMessages(sortedMessages);
 			setMessages(formattedMessages);
@@ -98,7 +90,8 @@ const ChatBot: React.FC<ChatBotProps> = ({
 	}, [messages, autoScroll]);
 
 	useEffect(() => {
-		inputRef.current?.focus();
+		// 焦点逻辑现在由 ChatTextArea 内部处理，或者通过 ref 回调
+		// 这里保留原有逻辑结构，但实际焦点由组件内部管理
 		return () => {
 			if (copyTimer) {
 				clearTimeout(copyTimer);
@@ -111,13 +104,6 @@ const ChatBot: React.FC<ChatBotProps> = ({
 			stopGenerating();
 		};
 	}, []);
-
-	useEffect(() => {
-		if (inputRef.current) {
-			const textarea = inputRef.current;
-			textarea.scrollTop = textarea.scrollHeight;
-		}
-	}, [input]);
 
 	const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
 		const element = e.currentTarget;
@@ -135,14 +121,12 @@ const ChatBot: React.FC<ChatBotProps> = ({
 		}
 	};
 
-	// 工具函数：更新消息显示
-	// 关键修改：确保始终使用 allMessages (完整树) 来构建显示列表
 	const updateMessagesDisplay = (
 		currentAllMessages: Message[],
 		childMap?: Map<string, string>,
 	) => {
 		const sortedMessages = buildMessageList(
-			currentAllMessages, // 使用完整树
+			currentAllMessages,
 			childMap || selectedChildMap,
 		);
 		const formattedMessages = getFormatMessages(sortedMessages);
@@ -212,7 +196,6 @@ const ChatBot: React.FC<ChatBotProps> = ({
 					},
 					onThinking: (thinking) => {
 						if (typeof thinking === 'string') {
-							// 修改：操作 allMessages
 							setAllMessages((prevAll) => {
 								const assistantChat = prevAll.find(
 									(m) => m.chatId === assistantMessageId,
@@ -226,7 +209,6 @@ const ChatBot: React.FC<ChatBotProps> = ({
 										isStreaming: true,
 									},
 								);
-								// 基于完整树更新显示
 								updateMessagesDisplay(newAllMessages, currentSelectedChildMap);
 								return newAllMessages;
 							});
@@ -310,7 +292,6 @@ const ChatBot: React.FC<ChatBotProps> = ({
 		}
 	};
 
-	// 确保这些函数都更新 allMessages，并调用 updateMessagesDisplay
 	const handleEditMessage = async (
 		content?: string,
 		attachments?: UploadedFile[] | null,
@@ -322,7 +303,6 @@ const ChatBot: React.FC<ChatBotProps> = ({
 		let userMessageToUse: Message | null = null;
 		let assistantMessage: Message | null = null;
 
-		// 【修复关键 1】预先创建新的分支映射表副本
 		const newSelectedChildMap = new Map(selectedChildMap);
 
 		setAllMessages((prevAll) => {
@@ -352,10 +332,8 @@ const ChatBot: React.FC<ChatBotProps> = ({
 					parentId,
 					childId: userMsgId,
 				});
-				// 【修复关键 2】如果是普通节点，更新父节点指向新的用户消息
 				newSelectedChildMap.set(parentId, userMsgId);
 			} else {
-				// 【修复关键 3】如果是根节点（第一条消息），更新 'root' 指向新的用户消息
 				newSelectedChildMap.set('root', userMsgId);
 			}
 
@@ -364,16 +342,13 @@ const ChatBot: React.FC<ChatBotProps> = ({
 			userMessageToUse = userMsg;
 			assistantMessage = assistantMsg;
 
-			// 【修复关键 4】将新的 Map 传递给显示更新函数，确保 UI 立即切换到新分支
 			updateMessagesDisplay(newAllMessages, newSelectedChildMap);
 			return newAllMessages.map((i) => ({ ...i, isStopped: false }));
 		});
 
-		// 同步 React 状态
 		setSelectedChildMap(newSelectedChildMap);
 
 		if (userMessageToUse && assistantMessage) {
-			// 【修复关键 5】将新的 Map 传递给 SSE 请求，确保流式更新时路径正确
 			onSseFetch(
 				apiEndpoint,
 				assistantMessageId,
@@ -393,15 +368,10 @@ const ChatBot: React.FC<ChatBotProps> = ({
 		let assistantMessage: Message | null = null;
 		let newSelectedChildMap: Map<string, string> | null = null;
 
-		// 修改：基于 allMessages 查找，而不是 messages (显示路径)
-		// 注意：这里的 index 是显示路径的 index，需要映射回 allMessages 中的消息
-		// 但通常 regenerate 是针对当前显示的最后一条 assistant 消息
-		// 为了安全，我们通过 messages 状态找到目标消息，然后在 allMessages 中更新
 		const currentAssistantMsg = messages[index];
 		if (!currentAssistantMsg) return;
 
 		setAllMessages((prevAll) => {
-			// 在完整树中找到对应的用户消息
 			const userMsg = prevAll.find(
 				(m) => m.chatId === currentAssistantMsg.parentId,
 			);
@@ -434,7 +404,6 @@ const ChatBot: React.FC<ChatBotProps> = ({
 			newSelectedChildMap = childMap;
 
 			setSelectedChildMap(childMap);
-			// 基于完整树更新显示
 			updateMessagesDisplay(newAllMessages, childMap);
 
 			return newAllMessages.map((i) => ({ ...i, isStopped: false }));
@@ -457,10 +426,6 @@ const ChatBot: React.FC<ChatBotProps> = ({
 		const assistantMessageId = uuidv4();
 
 		let parentId: string | undefined;
-		// 修改：基于 allMessages 获取最后一条消息，确保分支连接正确
-		// 如果 allMessages 为空，则 parentId 为 undefined
-		// 如果希望基于当前显示路径的最后一条，可以用 messages
-		// 这里假设是基于当前活跃分支的最后一条，即 messages 的最后一条
 		const lastMsg = messages[messages.length - 1];
 		if (lastMsg) {
 			parentId = lastMsg.chatId;
@@ -494,7 +459,6 @@ const ChatBot: React.FC<ChatBotProps> = ({
 				});
 			}
 			newAllMessages.push(userMessageToUse, assistantMessage);
-			// 基于完整树更新显示
 			updateMessagesDisplay(newAllMessages);
 			return newAllMessages.map((i) => ({ ...i, isStopped: false }));
 		});
@@ -544,7 +508,6 @@ const ChatBot: React.FC<ChatBotProps> = ({
 				...msg,
 				isStopped: false,
 			}));
-			// 基于完整树更新显示
 			updateMessagesDisplay(newAllMessages);
 
 			const formattedMessages = messages;
@@ -563,7 +526,6 @@ const ChatBot: React.FC<ChatBotProps> = ({
 								: msg,
 						);
 
-						// 更新显示的消息
 						const sortedMessages = buildMessageList(
 							updatedAllMessages,
 							selectedChildMap,
@@ -572,7 +534,6 @@ const ChatBot: React.FC<ChatBotProps> = ({
 						setMessages(newFormattedMessages);
 						updateCurrentChatId(sortedMessages);
 
-						// 存储数据用于后续调用
 						userMsgForApi = {
 							...userMsg,
 							isStopped: false,
@@ -586,7 +547,6 @@ const ChatBot: React.FC<ChatBotProps> = ({
 
 						return updatedAllMessages;
 					} else {
-						// 如果没有找到 user 消息，使用原来的逻辑
 						lastMsgId = lastMsg.chatId;
 					}
 				}
@@ -594,7 +554,6 @@ const ChatBot: React.FC<ChatBotProps> = ({
 			return newAllMessages;
 		});
 
-		// 在状态更新后发送继续生成请求
 		if (lastMsgId) {
 			if (userMsgForApi && assistantMsgForApi) {
 				onSseFetch(
@@ -618,7 +577,6 @@ const ChatBot: React.FC<ChatBotProps> = ({
 		}
 	};
 
-	// 停止生成
 	const stopGenerating = async () => {
 		if (stopRequestRef.current) {
 			await stopSse(sessionId);
@@ -626,7 +584,6 @@ const ChatBot: React.FC<ChatBotProps> = ({
 			stopRequestRef.current = null;
 			setLoading(false);
 
-			// 更新最后一条助手消息状态
 			setAllMessages((prevAll) => {
 				const lastAssistantMsg = findLastAssistantMessage(prevAll);
 				if (lastAssistantMsg) {
@@ -646,12 +603,6 @@ const ChatBot: React.FC<ChatBotProps> = ({
 		}
 	};
 
-	// 处理发送消息
-	const onSendMessage = (message?: Message) => {
-		sendMessage(editMessage?.content, undefined, true, message?.attachments);
-	};
-
-	// 清除对话
 	const clearChat = () => {
 		setInput('');
 		setAllMessages([]);
@@ -663,11 +614,6 @@ const ChatBot: React.FC<ChatBotProps> = ({
 		setActiveSessionId?.('');
 		setSelectedChildMap(new Map());
 		navigate('/chat');
-	};
-
-	// 处理输入框变化
-	const onInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-		setInput(e.target.value);
 	};
 
 	const handleEditChange = (
@@ -683,86 +629,6 @@ const ChatBot: React.FC<ChatBotProps> = ({
 			}
 			return prev;
 		});
-	};
-
-	// 处理输入框按键
-	const handleKeyDown = (
-		e: React.KeyboardEvent<HTMLTextAreaElement>,
-		isEdit?: boolean,
-		message?: Message,
-	) => {
-		if (e.key === 'Enter') {
-			// 检查是否按下了修饰键
-			const hasModifier = e.ctrlKey || e.metaKey || e.shiftKey || e.altKey;
-
-			// 组合输入状态下（中文输入法）
-			// 使用原生事件的 isComposing 属性，这是最可靠的方法
-			const isCurrentlyComposing =
-				(e.nativeEvent as KeyboardEvent).isComposing || isComposing;
-
-			if (isCurrentlyComposing) {
-				// 如果按下了 Ctrl/Cmd + Enter，即使在组合输入状态下也插入换行
-				if (e.ctrlKey || e.metaKey) {
-					insertNewline({
-						e,
-						isEdit,
-						editMessage,
-						input,
-						setInputValue: setInput,
-						setEditInputValue: handleEditChange,
-					});
-				}
-				// 其他情况允许默认行为（中文输入法选择候选词）
-				return;
-			}
-
-			// 非组合输入状态下
-			if (e.ctrlKey || e.metaKey) {
-				// Ctrl/Cmd + Enter: 插入换行符
-				insertNewline({
-					e,
-					isEdit,
-					editMessage,
-					input,
-					setInputValue: setInput,
-					setEditInputValue: handleEditChange,
-				});
-			} else if (e.shiftKey) {
-				// Shift + Enter: 也插入换行符（常见约定）
-				insertNewline({
-					e,
-					isEdit,
-					editMessage,
-					input,
-					setInputValue: setInput,
-					setEditInputValue: handleEditChange,
-				});
-			} else if (!hasModifier) {
-				e.preventDefault();
-				// 纯 Enter（没有任何修饰键）: 发送消息
-				isEdit
-					? sendMessage(
-							editMessage?.content,
-							undefined,
-							true,
-							message?.attachments,
-						)
-					: sendMessage();
-			}
-		}
-	};
-
-	// 处理组合输入开始
-	const handleCompositionStart = () => {
-		setIsComposing(true);
-	};
-
-	// 处理组合输入结束
-	const handleCompositionEnd = () => {
-		// 延迟设置 isComposing 为 false，确保 keydown 事件能检测到组合状态
-		setTimeout(() => {
-			setIsComposing(false);
-		}, 0);
 	};
 
 	const onToggleThinkContent = () => {
@@ -784,7 +650,8 @@ const ChatBot: React.FC<ChatBotProps> = ({
 					})),
 				];
 			});
-			inputRef.current?.focus();
+			// 上传文件后，将焦点设置回输入框
+			chatInputRef.current?.focus();
 		}
 	};
 
@@ -796,15 +663,14 @@ const ChatBot: React.FC<ChatBotProps> = ({
 		}, 500);
 	};
 
+	// 编辑 user 消息时，在输入框获得焦点时，将光标定位在文本内容的最后面
 	const onFocusEditInput = () => {
 		focusTimer = setTimeout(() => {
 			if (editInputRef.current) {
 				editInputRef.current.focus();
 				// 将光标定位在文本内容的最后面
-				editInputRef.current.setSelectionRange(
-					editInputRef.current.value.length,
-					editInputRef.current.value.length,
-				);
+				const len = editInputRef.current.value.length;
+				editInputRef.current.setSelectionRange(len, len);
 			}
 		}, 0);
 	};
@@ -815,8 +681,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 	};
 
 	const onReGenerate = (index: number) => {
-		// index 是当前显示的 assistant 消息的索引
-		// 我们需要获取对应的用户消息内容
+		// index 是当前显示的 assistant 消息的索引，我们需要获取对应的用户消息内容
 		if (index > 0) {
 			const userMsg = messages[index - 1];
 			if (userMsg && userMsg.role === 'user') {
@@ -829,7 +694,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 	const handleBranchChange = (msgId: string, direction: 'prev' | 'next') => {
 		onBranchChange?.(msgId, direction);
 
-		// 修改：基于 allMessages 查找兄弟节点
+		// 基于 allMessages 查找兄弟节点
 		setAllMessages((prevAll) => {
 			const siblings = findSiblings(prevAll, msgId);
 			const currentIndex = siblings.findIndex((m) => m.chatId === msgId);
@@ -912,7 +777,7 @@ const ChatBot: React.FC<ChatBotProps> = ({
 												<div className="flex flex-wrap justify-end gap-3 mb-2">
 													{message.role === 'user'
 														? message?.attachments?.map((i) => (
-																<FileInfo
+																<ChatFileList
 																	key={i.id || i.uuid}
 																	data={i}
 																	showDownload
@@ -936,35 +801,17 @@ const ChatBot: React.FC<ChatBotProps> = ({
 										>
 											{message.role === 'user' ? (
 												editMessage?.chatId === message.chatId ? (
-													<div className="flex flex-col w-full">
-														<Textarea
-															ref={editInputRef}
-															value={editMessage.content}
-															onChange={handleEditChange}
-															onKeyDown={(e) => handleKeyDown(e, true, message)}
-															onCompositionStart={handleCompositionStart}
-															onCompositionEnd={handleCompositionEnd}
-															placeholder="请输入您的问题"
-															spellCheck={false}
-															className="flex-1 min-h-16 resize-none border-none shadow-none focus-visible:ring-transparent"
-															disabled={loading}
-														/>
-														<div className="flex justify-end gap-2">
-															<Button
-																variant="secondary"
-																onClick={() => setEditMessage(null)}
-															>
-																取消
-															</Button>
-															<Button
-																variant="secondary"
-																onClick={() => onSendMessage(message)}
-																disabled={loading}
-															>
-																发送
-															</Button>
-														</div>
-													</div>
+													<ChatTextArea
+														ref={editInputRef}
+														mode="edit"
+														input={input}
+														setInput={setInput}
+														editMessage={editMessage}
+														setEditMessage={setEditMessage}
+														loading={loading}
+														handleEditChange={handleEditChange}
+														sendMessage={sendMessage}
+													/>
 												) : (
 													<div
 														className="prose prose-invert max-w-none"
@@ -1125,96 +972,22 @@ const ChatBot: React.FC<ChatBotProps> = ({
 				</div>
 			</ScrollArea>
 
-			{/* 输入区域 */}
-			<div className="p-5.5 pt-5 backdrop-blur-sm">
-				<div className="max-w-3xl mx-auto flex">
-					<div className="flex-1 relative overflow-hidden">
-						<div className="flex flex-col overflow-y-auto rounded-md bg-theme/5 border border-theme-white/10">
-							{uploadedFiles?.length > 0 ? (
-								<div className="my-2.5 mx-3 text-sm text-textcolor/70">
-									只识别附件中的文字
-								</div>
-							) : null}
-							{uploadedFiles?.length > 0 ? (
-								<div className="w-full flex flex-wrap gap-3 px-3 mb-2">
-									{uploadedFiles.map((i, index) => (
-										<FileInfo
-											key={i.id || index}
-											data={i}
-											showDelete
-											setUploadedFiles={setUploadedFiles}
-										/>
-									))}
-								</div>
-							) : null}
-							<Textarea
-								ref={inputRef}
-								value={input}
-								onChange={onInputChange}
-								onKeyDown={(e) => handleKeyDown(e)}
-								onCompositionStart={handleCompositionStart}
-								onCompositionEnd={handleCompositionEnd}
-								placeholder="请输入您的问题"
-								spellCheck={false}
-								className="flex-1 min-h-16 resize-none border-none shadow-none focus-visible:ring-transparent"
-								disabled={loading}
-							/>
-							<div className="flex items-center justify-between h-10 p-2.5 mb-1 mt-2.5">
-								<div className="flex items-center gap-2">
-									<Button
-										variant="ghost"
-										className="flex items-center text-sm bg-theme/5 mb-1 h-8 rounded-md"
-										onClick={clearChat}
-									>
-										<CirclePlus className="w-4 h-4" />
-										新对话
-									</Button>
-									<Upload
-										uploadType="button"
-										className="w-auto h-auto"
-										maxSize={20 * 1024 * 1024}
-										multiple
-										countValidText="最多只能支持 5 个文件"
-										uploadedCount={uploadedFiles?.length}
-										disabled={uploadedFiles?.length >= 5}
-										validTypes={[
-											'application/pdf',
-											'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-											'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-										]}
-										showTooltip
-										tooltipContent="仅支持PDF、DOCX、XLSX格式，最多同时支持 5 个文件，每个文件最大 20 MB"
-										onUpload={onUploadFile}
-									>
-										<div className="flex items-center">
-											<Link className="w-4 h-4 mr-2" />
-											上传附件
-										</div>
-									</Upload>
-								</div>
-								{loading ? (
-									<Button
-										variant="ghost"
-										onClick={stopGenerating}
-										className="h-8 w-8 mb-1 flex items-center justify-center rounded-full bg-red-500/20 hover:bg-red-500/30 border border-red-500/30"
-									>
-										<StopCircle />
-									</Button>
-								) : (
-									<Button
-										variant="ghost"
-										onClick={() => sendMessage()}
-										disabled={!input.trim()}
-										className="h-8 w-8 mb-1 flex items-center justify-center rounded-full bg-linear-to-r from-blue-500 to-cyan-500"
-									>
-										<Rocket className="-rotate-45" />
-									</Button>
-								)}
-							</div>
-						</div>
-					</div>
-				</div>
-			</div>
+			{/* 使用封装后的底部输入栏组件 */}
+			<ChatEntry
+				chatInputRef={chatInputRef}
+				input={input}
+				setInput={setInput}
+				uploadedFiles={uploadedFiles}
+				setUploadedFiles={setUploadedFiles}
+				loading={loading}
+				editMessage={editMessage}
+				setEditMessage={setEditMessage}
+				handleEditChange={handleEditChange}
+				sendMessage={sendMessage}
+				onUploadFile={onUploadFile}
+				clearChat={clearChat}
+				stopGenerating={stopGenerating}
+			/>
 		</div>
 	);
 };

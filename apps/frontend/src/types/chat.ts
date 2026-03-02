@@ -56,4 +56,5 @@ export interface InsertNewlineParams {
 	setEditInputValue: (value: string) => void;
 	setInputValue: (value: string) => void;
 	isEdit?: boolean;
+	textareaNode?: HTMLTextAreaElement;
 }

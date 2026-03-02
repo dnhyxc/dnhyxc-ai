@@ -1,11 +1,11 @@
 import ChatBot from '@design/ChatBot';
-import { Message } from '@design/ChatBot/types';
 import { Drawer } from '@design/Drawer';
 import { MarkdownParser } from '@dnhyxc-ai/tools';
 import { ScrollArea } from '@ui/index';
 import { PanelRightClose, PanelRightOpen } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { getSessionList } from '@/service';
+import { Message } from '@/types/chat';
 
 interface Session {
 	id: string;

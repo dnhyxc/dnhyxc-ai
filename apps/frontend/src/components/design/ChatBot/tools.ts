@@ -1,4 +1,4 @@
-import { CreateUserMessageParams, InsertNewlineParams, Message } from './types';
+import { CreateUserMessageParams, Message } from '@/types/chat';
 
 export const createUserMessage = (
 	params: CreateUserMessageParams,
@@ -73,25 +73,6 @@ export const findLastAssistantMessage = (
 		}
 	}
 	return null;
-};
-
-export const insertNewline = (params: InsertNewlineParams) => {
-	const { e, isEdit, editMessage, input, setEditInputValue, setInputValue } =
-		params;
-	e.preventDefault();
-	const textarea = e.currentTarget;
-	const start = textarea.selectionStart;
-	const end = textarea.selectionEnd;
-	if (isEdit) {
-		const newValue = `${editMessage?.content?.substring(0, start)}\n${editMessage?.content?.substring(end)}`;
-		setEditInputValue(newValue);
-	} else {
-		const newValue = `${input.substring(0, start)}\n${input.substring(end)}`;
-		setInputValue(newValue);
-	}
-
-	// 移动光标到插入位置后
-	textarea.selectionStart = textarea.selectionEnd = start + 1;
 };
 
 export const findSiblings = (

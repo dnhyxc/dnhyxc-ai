@@ -12,7 +12,7 @@ interface IProps {
 	setUploadedFiles?: React.Dispatch<React.SetStateAction<UploadedFile[]>>;
 }
 
-const FileInfo: React.FC<IProps> = ({
+const ChatFileList: React.FC<IProps> = ({
 	data,
 	showDownload,
 	showDelete,
@@ -101,4 +101,4 @@ const FileInfo: React.FC<IProps> = ({
 	);
 };
 
-export default FileInfo;
+export default ChatFileList;
