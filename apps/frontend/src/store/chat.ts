@@ -16,6 +16,9 @@ class ChatStore {
 	// 全局跟踪所有会话中的流式消息
 	streamingMessages: Map<string, Message> = new Map();
 
+	// 存储每个会话的分支选择状态：sessionId -> selectedChildMap
+	sessionBranchSelections: Map<string, Map<string, string>> = new Map();
+
 	setAllMessages(
 		messages: Message[],
 		activeSessionId: string,
@@ -169,6 +172,32 @@ class ChatStore {
 	// 当会话切换时，清理不属于当前会话的已完成流式消息
 	cleanupStreamingMessagesForSession() {
 		this.cleanupCompletedStreamingMessages();
+	}
+
+	// 保存会话的分支选择状态
+	saveSessionBranchSelection(
+		sessionId: string,
+		selectedChildMap: Map<string, string>,
+	) {
+		if (sessionId) {
+			this.sessionBranchSelections.set(sessionId, new Map(selectedChildMap));
+		}
+	}
+
+	// 获取会话的分支选择状态
+	getSessionBranchSelection(
+		sessionId: string,
+	): Map<string, string> | undefined {
+		if (!sessionId) return undefined;
+		const selection = this.sessionBranchSelections.get(sessionId);
+		return selection ? new Map(selection) : undefined;
+	}
+
+	// 清除会话的分支选择状态
+	clearSessionBranchSelection(sessionId: string) {
+		if (sessionId) {
+			this.sessionBranchSelections.delete(sessionId);
+		}
 	}
 }
 

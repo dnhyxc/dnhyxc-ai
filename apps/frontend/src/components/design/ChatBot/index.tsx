@@ -30,6 +30,7 @@ import {
 	createAssistantMessage,
 	createUserMessage,
 	findLastAssistantMessage,
+	findLatestBranchSelection,
 	findSiblings,
 	updateParentChildrenIds,
 } from './tools';
@@ -115,8 +116,28 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 			return;
 		}
 
+		// 尝试从store恢复之前保存的分支选择状态
+		const savedSelection = chatStore.getSessionBranchSelection(activeSessionId);
+
 		if (chatStore.messages.length > 0) {
-			setSelectedChildMap(new Map());
+			if (savedSelection) {
+				// 恢复之前保存的分支选择
+				setSelectedChildMap(savedSelection);
+			} else {
+				// 没有保存的状态，检查是否需要自动选择最新分支
+				const latestBranchMap = findLatestBranchSelection(chatStore.messages);
+				if (latestBranchMap) {
+					setSelectedChildMap(latestBranchMap);
+					// 保存这个自动选择的状态
+					chatStore.saveSessionBranchSelection(
+						activeSessionId,
+						latestBranchMap,
+					);
+				} else {
+					setSelectedChildMap(new Map());
+				}
+			}
+
 			const streamingMsg = chatStore.messages.find((m) => m.isStreaming);
 			if (streamingMsg) {
 				setStreamingMessageId(streamingMsg.chatId);
@@ -396,6 +417,13 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 		});
 
 		setSelectedChildMap(newSelectedChildMap);
+		// 保存分支选择状态
+		if (activeSessionId) {
+			chatStore.saveSessionBranchSelection(
+				activeSessionId,
+				newSelectedChildMap,
+			);
+		}
 
 		if (userMessageToUse && assistantMessage) {
 			onSseFetch(
@@ -452,6 +480,10 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 			newSelectedChildMap = childMap;
 
 			setSelectedChildMap(childMap);
+			// 保存分支选择状态
+			if (activeSessionId) {
+				chatStore.saveSessionBranchSelection(activeSessionId, childMap);
+			}
 
 			return newAllMessages.map((i) => ({ ...i, isStopped: false }));
 		});
@@ -493,11 +525,22 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 			currentChatId,
 		});
 
-		// 如果是第一条消息（没有parentId），需要先更新selectedChildMap
+		// 更新selectedChildMap：将新消息设置为选中状态
+		const newSelectedChildMap = new Map(selectedChildMap);
 		if (!userMessageToUse.parentId) {
-			const newSelectedChildMap = new Map(selectedChildMap);
+			// 第一条消息（根消息）
 			newSelectedChildMap.set('root', userMsgId);
-			setSelectedChildMap(newSelectedChildMap);
+		} else {
+			// 非第一条消息：将新消息设置为父消息的选中子节点
+			newSelectedChildMap.set(userMessageToUse.parentId, userMsgId);
+		}
+		setSelectedChildMap(newSelectedChildMap);
+		// 保存分支选择状态
+		if (activeSessionId) {
+			chatStore.saveSessionBranchSelection(
+				activeSessionId,
+				newSelectedChildMap,
+			);
 		}
 
 		updateStoreMessages((prevAll) => {
@@ -621,6 +664,10 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 	const clearChat = () => {
 		setInput('');
 		chatStore.setAllMessages([], '', true); // isNewSession: true
+		// 清除当前会话的分支选择状态
+		if (activeSessionId) {
+			chatStore.clearSessionBranchSelection(activeSessionId);
+		}
 		setMessages([]);
 		stopRequestRef.current?.();
 		stopRequestRef.current = null;
@@ -724,6 +771,13 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 				newSelectedChildMap.set('root', nextMsg.chatId);
 			}
 			setSelectedChildMap(newSelectedChildMap);
+			// 保存分支选择状态
+			if (activeSessionId) {
+				chatStore.saveSessionBranchSelection(
+					activeSessionId,
+					newSelectedChildMap,
+				);
+			}
 			// 流式消息继续在 allMessages 中更新，不受视图切换影响
 		}
 	};
