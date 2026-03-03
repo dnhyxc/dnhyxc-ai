@@ -77,7 +77,7 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 		updater: (prevMessages: Message[]) => Message[],
 	) => {
 		const updatedMessages = updater(chatStore.messages);
-		chatStore.setAllMessages(updatedMessages, activeSessionId || '');
+		chatStore.setAllMessages(updatedMessages, activeSessionId || '', false);
 	};
 
 	const stopRequestRef = useRef<(() => void) | null>(null);
@@ -286,6 +286,7 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 									(m) => m.chatId !== assistantMessageId,
 								),
 								activeSessionId || '',
+								false,
 							);
 						} else {
 							// 标记流式结束
@@ -598,7 +599,7 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 
 	const clearChat = () => {
 		setInput('');
-		chatStore.setAllMessages([], '');
+		chatStore.setAllMessages([], '', true); // isNewSession: true
 		setMessages([]);
 		stopRequestRef.current?.();
 		stopRequestRef.current = null;

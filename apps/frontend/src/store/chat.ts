@@ -16,7 +16,11 @@ class ChatStore {
 	// 全局跟踪所有会话中的流式消息
 	private streamingMessages: Map<string, Message> = new Map();
 
-	setAllMessages(messages: Message[], activeSessionId: string) {
+	setAllMessages(
+		messages: Message[],
+		activeSessionId: string,
+		isNewSession: boolean = false,
+	) {
 		// 1. 首先保存当前所有的流式消息到全局跟踪器
 		this.messages.forEach((msg) => {
 			if (msg.isStreaming) {
@@ -24,10 +28,21 @@ class ChatStore {
 			}
 		});
 
-		// 2. 合并消息：从服务器加载的消息 + 全局流式消息
+		// 2. 如果是新会话，清空当前消息
+		if (isNewSession) {
+			this.messages = [];
+			// 清理当前活跃会话的流式消息
+			const activeSession = this.sessionData.list.find((s) => s.isActive);
+			if (activeSession) {
+				activeSession.messages = [];
+			}
+			return;
+		}
+
+		// 3. 合并消息：从服务器加载的消息 + 全局流式消息
 		const mergedMessages = [...messages];
 
-		// 3. 将全局流式消息合并到当前会话的消息中
+		// 4. 将全局流式消息合并到当前会话的消息中
 		this.streamingMessages.forEach((streamingMsg, chatId) => {
 			const existingIndex = mergedMessages.findIndex(
 				(m) => m.chatId === chatId,
@@ -55,7 +70,7 @@ class ChatStore {
 		// 直接赋值新数组，触发 MobX 响应式更新
 		this.messages = mergedMessages;
 
-		// 4. 更新 sessionData 中的消息
+		// 5. 更新 sessionData 中的消息
 		this.sessionData.list.forEach((item) => {
 			if (item.id === activeSessionId) {
 				// 创建新数组引用，确保响应式更新
@@ -96,6 +111,10 @@ class ChatStore {
 						isStreaming: false,
 						...updates,
 					});
+				} else {
+					// 如果流式消息不在跟踪器中，但我们需要标记为结束
+					// 这可能发生在消息已经保存到服务器但流式状态需要更新的情况
+					this.streamingMessages.set(chatId, updatedMessage);
 				}
 			}
 
@@ -133,7 +152,8 @@ class ChatStore {
 	// 清理旧的已完成流式消息，避免内存泄漏
 	cleanupCompletedStreamingMessages() {
 		// 清理所有已完成的流式消息（不再流式）
-		for (const [chatId, message] of this.streamingMessages.entries()) {
+		const entries = Array.from(this.streamingMessages.entries());
+		for (const [chatId, message] of entries) {
 			if (!message.isStreaming) {
 				this.streamingMessages.delete(chatId);
 			}

@@ -45,7 +45,7 @@ const Chat = observer(() => {
 
 			// 修改：直接传递完整消息树，不要调用 buildMessageList 裁剪
 			// ChatBot 内部会负责根据 selectedChildMap 计算显示路径
-			chatStore.setAllMessages(session.messages || [], session.id);
+			chatStore.setAllMessages(session.messages || [], session.id, false);
 			setOpen(false);
 		}
 	};
