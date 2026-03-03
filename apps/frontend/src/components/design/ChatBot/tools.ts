@@ -8,6 +8,7 @@ export const createUserMessage = (
 	content: params.content.trim(),
 	role: 'user',
 	timestamp: new Date(),
+	createdAt: new Date(),
 	parentId: params.parentId,
 	childrenIds: [],
 	currentChatId: params.currentChatId,
@@ -25,6 +26,7 @@ export const createAssistantMessage = (params: {
 	thinkContent: '',
 	role: 'assistant',
 	timestamp: new Date(),
+	createdAt: new Date(),
 	isStreaming: true,
 	parentId: params.parentId,
 	childrenIds: [],
@@ -94,12 +96,24 @@ export const findSiblings = (
 				allChildren.add(c);
 			});
 		});
-		siblings = allMessages.filter((m) => !allChildren.has(m.chatId));
+		// 过滤出所有不是任何消息子节点的消息（即根消息）
+		// 同时确保消息的 parentId 为 undefined 或空
+		siblings = allMessages.filter((m) => {
+			// 不是任何消息的子节点
+			const isNotChild = !allChildren.has(m.chatId);
+			// 并且没有父节点（parentId 为 undefined 或空）
+			const hasNoParent = !m.parentId;
+			return isNotChild && hasNoParent;
+		});
 	}
 
 	return siblings.sort(
 		(a, b) =>
-			new Date(a.createdAt as Date).getTime() -
-			new Date(b.createdAt as Date).getTime(),
+			(a.createdAt
+				? new Date(a.createdAt).getTime()
+				: new Date(a.timestamp).getTime()) -
+			(b.createdAt
+				? new Date(b.createdAt).getTime()
+				: new Date(b.timestamp).getTime()),
 	);
 };

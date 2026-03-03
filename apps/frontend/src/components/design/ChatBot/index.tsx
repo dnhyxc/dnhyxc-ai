@@ -493,6 +493,13 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 			currentChatId,
 		});
 
+		// 如果是第一条消息（没有parentId），需要先更新selectedChildMap
+		if (!userMessageToUse.parentId) {
+			const newSelectedChildMap = new Map(selectedChildMap);
+			newSelectedChildMap.set('root', userMsgId);
+			setSelectedChildMap(newSelectedChildMap);
+		}
+
 		updateStoreMessages((prevAll) => {
 			let newAllMessages = [
 				...prevAll.map((i) => ({ ...i, isStopped: false })),

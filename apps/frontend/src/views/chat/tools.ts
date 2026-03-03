@@ -27,7 +27,15 @@ export const buildMessageList = (
 				allChildren.add(c);
 			});
 		});
-		rootMessages = messages.filter((m) => !allChildren.has(m.chatId));
+		// 过滤出所有不是任何消息子节点的消息（即根消息）
+		// 同时确保消息的 parentId 为 undefined 或空
+		rootMessages = messages.filter((m) => {
+			// 不是任何消息的子节点
+			const isNotChild = !allChildren.has(m.chatId);
+			// 并且没有父节点（parentId 为 undefined 或空）
+			const hasNoParent = !m.parentId;
+			return isNotChild && hasNoParent;
+		});
 	}
 
 	const result: Message[] = [];
@@ -51,8 +59,12 @@ export const buildMessageList = (
 			// 按照创建时间排序，确保 siblingIndex 正确
 			siblings.sort(
 				(a, b) =>
-					new Date(a.createdAt as Date).getTime() -
-					new Date(b.createdAt as Date).getTime(),
+					(a.createdAt
+						? new Date(a.createdAt).getTime()
+						: new Date(a.timestamp).getTime()) -
+					(b.createdAt
+						? new Date(b.createdAt).getTime()
+						: new Date(b.timestamp).getTime()),
 			);
 			siblingCount = siblings.length;
 			siblingIndex = siblings.findIndex(
