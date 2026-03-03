@@ -18,7 +18,6 @@ import {
 import * as mobx from 'mobx';
 import { observer } from 'mobx-react';
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router';
 import { v4 as uuidv4 } from 'uuid';
 import { cn } from '@/lib/utils';
 import { stopSse, uploadFiles } from '@/service';
@@ -88,7 +87,7 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 	const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const focusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-	const navigate = useNavigate();
+	// const navigate = useNavigate();
 
 	// 监听store变化，同步到本地状态
 	useEffect(() => {
@@ -105,6 +104,16 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 	// 初始化逻辑 - 当 activeSessionId 变化时重置状态
 	useEffect(() => {
 		// 注意：切换会话时不停止流式输出，让它在后台继续
+		// 如果 activeSessionId 为空，表示是新会话，清空所有状态
+		if (!activeSessionId) {
+			setSelectedChildMap(new Map());
+			setStreamingMessageId(null);
+			setStreamingPathMap(new Map());
+			setInput('');
+			setUploadedFiles([]);
+			setEditMessage(null);
+			return;
+		}
 
 		if (chatStore.messages.length > 0) {
 			setSelectedChildMap(new Map());
@@ -118,6 +127,15 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 				setStreamingMessageId(null);
 				setStreamingPathMap(new Map());
 			}
+
+			// 重置所有消息的 isStopped 状态，避免显示"继续生成"按钮
+			chatStore.messages.forEach((msg) => {
+				if (msg.isStopped) {
+					chatStore.updateMessage(msg.chatId, {
+						isStopped: false,
+					});
+				}
+			});
 		} else {
 			setSelectedChildMap(new Map());
 			setStreamingMessageId(null);
@@ -170,10 +188,6 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 			stopGenerating();
 		};
 	}, []);
-
-	useEffect(() => {
-		console.log(chatStore.messages, 'chatStore.messages');
-	}, [chatStore.messages]);
 
 	const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
 		const element = e.currentTarget;
@@ -262,7 +276,7 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 					},
 					getSessionId: (sessionId) => {
 						setSessionId(sessionId);
-						navigate(`/chat/${sessionId}`);
+						// navigate(`/chat/${sessionId}`);
 					},
 					onError: (err, type) => {
 						setLoading(false);
@@ -609,7 +623,7 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 		setSessionId('');
 		setActiveSessionId?.('');
 		setSelectedChildMap(new Map());
-		navigate('/chat');
+		// navigate('/chat');
 	};
 
 	const handleEditChange = (

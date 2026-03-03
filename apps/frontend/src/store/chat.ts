@@ -14,7 +14,7 @@ class ChatStore {
 	};
 
 	// 全局跟踪所有会话中的流式消息
-	private streamingMessages: Map<string, Message> = new Map();
+	streamingMessages: Map<string, Message> = new Map();
 
 	setAllMessages(
 		messages: Message[],
@@ -67,14 +67,20 @@ class ChatStore {
 			}
 		});
 
+		// 重置所有消息的 isStopped 状态，避免显示"继续生成"按钮
+		const finalMessages = mergedMessages.map((msg) => ({
+			...msg,
+			isStopped: false, // 确保 isStopped 为 false
+		}));
+
 		// 直接赋值新数组，触发 MobX 响应式更新
-		this.messages = mergedMessages;
+		this.messages = finalMessages;
 
 		// 5. 更新 sessionData 中的消息
 		this.sessionData.list.forEach((item) => {
 			if (item.id === activeSessionId) {
 				// 创建新数组引用，确保响应式更新
-				item.messages = [...mergedMessages];
+				item.messages = [...finalMessages];
 			}
 		});
 	}

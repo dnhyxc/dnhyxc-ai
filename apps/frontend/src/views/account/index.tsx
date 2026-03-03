@@ -8,9 +8,10 @@ import { SquarePen } from 'lucide-react';
 import * as qiniu from 'qiniu-js';
 import { useEffect, useMemo, useState } from 'react';
 import Model from '@/components/design/Model';
-import Upload, { type FileWithPreview } from '@/components/design/Upload';
+import Upload from '@/components/design/Upload';
 import { useStorageInfo } from '@/hooks';
 import { getUploadToken, updateUser } from '@/service';
+import { type FileWithPreview } from '@/types';
 import { setStorage } from '@/utils';
 import ResetEmailForm from './reset-email-form';
 
@@ -248,7 +249,8 @@ const Account = () => {
 		observable.subscribe(observer); // 上传开始
 	};
 
-	const onUpload = async (files: FileWithPreview[]) => {
+	const onUpload = async (file: FileWithPreview | FileWithPreview[]) => {
+		const files = Array.isArray(file) ? file : [file];
 		await uploadFile(files[0].file);
 	};
 

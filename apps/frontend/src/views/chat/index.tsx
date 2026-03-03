@@ -28,6 +28,16 @@ const Chat = observer(() => {
 		}
 	}, [open]);
 
+	// 组件卸载时清理聊天状态
+	useEffect(() => {
+		return () => {
+			// 清理聊天消息，确保下次进入是新的聊天页面
+			chatStore.setAllMessages([], '', true);
+			setActiveSessionId('');
+			setStreamingSessionId('');
+		};
+	}, []);
+
 	const onSelectSession = (session: Session) => {
 		// 如果切换到不同的会话，更新 activeSessionId
 		if (session.id !== activeSessionId) {
