@@ -1,5 +1,5 @@
-import { Message, SessionData } from '@/types/chat';
 import { makeAutoObservable } from 'mobx';
+import { Message, SessionData } from '@/types/chat';
 
 class ChatStore {
 	constructor() {
