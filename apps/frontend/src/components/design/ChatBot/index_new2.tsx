@@ -15,14 +15,11 @@ import {
 	RotateCw,
 	User,
 } from 'lucide-react';
-import * as mobx from 'mobx';
-import { observer } from 'mobx-react';
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { v4 as uuidv4 } from 'uuid';
 import { cn } from '@/lib/utils';
 import { stopSse, uploadFiles } from '@/service';
-import useStore from '@/store';
 import { FileWithPreview, UploadedFile } from '@/types';
 import { ChatBotProps, ChatRequestParams, Message } from '@/types/chat';
 import { streamFetch } from '@/utils/sse';
@@ -36,20 +33,18 @@ import {
 	updateSingleMessage,
 } from './tools';
 
-const ChatBot = observer(function ChatBot(props: ChatBotProps) {
-	const {
-		className,
-		apiEndpoint = '/chat/sse',
-		showAvatar = false,
-		onBranchChange,
-		activeSessionId,
-		setActiveSessionId,
-	} = props;
-	const { chatStore } = useStore();
-
-	// allMessages 存储完整树（包含所有分支和流式消息）- 使用chatStore
-	// 使用useState同步store变化，确保React重新渲染
-	const [allMessages, setAllMessages] = useState<Message[]>(chatStore.messages);
+const ChatBot: React.FC<ChatBotProps> = ({
+	className,
+	initialMessages = [],
+	apiEndpoint = '/chat/sse',
+	showAvatar = false,
+	onBranchChange,
+	activeSessionId,
+	setActiveSessionId,
+	onStreamingStateChange,
+}) => {
+	// allMessages 存储完整树（包含所有分支和流式消息）
+	const [allMessages, setAllMessages] = useState<Message[]>(initialMessages);
 	// messages 存储当前显示的路径（由 selectedChildMap 决定）
 	const [messages, setMessages] = useState<Message[]>([]);
 	const [sessionId, setSessionId] = useState('');
@@ -73,14 +68,6 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 		new Map(),
 	);
 
-	// 辅助函数：更新store中的消息
-	const updateStoreMessages = (
-		updater: (prevMessages: Message[]) => Message[],
-	) => {
-		const updatedMessages = updater(chatStore.messages);
-		chatStore.setAllMessages(updatedMessages, activeSessionId || '');
-	};
-
 	const stopRequestRef = useRef<(() => void) | null>(null);
 	const scrollContainerRef = useRef<HTMLDivElement>(null);
 	const editInputRef = useRef<HTMLTextAreaElement>(null);
@@ -91,38 +78,39 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 
 	const navigate = useNavigate();
 
-	// 监听store变化，同步到本地状态
-	useEffect(() => {
-		const dispose = mobx.reaction(
-			() => chatStore.messages,
-			(newMessages) => {
-				setAllMessages([...newMessages]);
-			},
-			{ fireImmediately: true },
-		);
-		return () => dispose();
-	}, [chatStore]);
-
 	// 初始化逻辑
 	useEffect(() => {
-		if (chatStore.messages.length > 0) {
-			setSelectedChildMap(new Map());
-			const streamingMsg = chatStore.messages.find((m) => m.isStreaming);
+		if (initialMessages && initialMessages.length > 0) {
+			// 首先设置消息
+			setAllMessages(initialMessages);
+
+			// 检查是否有流式消息
+			const streamingMsg = initialMessages.find((m) => m.isStreaming);
 			if (streamingMsg) {
+				// 如果初始消息中有流式消息，设置流式状态
 				setStreamingMessageId(streamingMsg.chatId);
 				// 保存当前路径
 				const pathMap = new Map(selectedChildMap);
 				setStreamingPathMap(pathMap);
+			} else if (streamingMessageId) {
+				// 如果当前有流式消息但初始消息中没有，保留流式状态
+				// 这通常发生在切换到其他会话时，当前会话的流式消息应该继续
 			} else {
 				setStreamingMessageId(null);
 				setStreamingPathMap(new Map());
 			}
+
+			// 重置选择映射，除非当前有流式消息
+			if (!streamingMessageId) {
+				setSelectedChildMap(new Map());
+			}
 		} else {
+			setAllMessages([]);
 			setSelectedChildMap(new Map());
 			setStreamingMessageId(null);
 			setStreamingPathMap(new Map());
 		}
-	}, [activeSessionId]);
+	}, [initialMessages]);
 
 	// 核心逻辑：根据 allMessages 和 selectedChildMap 推导当前显示的 messages
 	// 流式消息始终在 allMessages 中更新，视图根据 selectedChildMap 显示
@@ -165,10 +153,6 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 		};
 	}, []);
 
-	useEffect(() => {
-		console.log(chatStore.messages, 'chatStore.messages');
-	}, [chatStore.messages]);
-
 	const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
 		const element = e.currentTarget;
 		if (!scrollContainerRef.current) {
@@ -198,6 +182,10 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 		setStreamingMessageId(assistantMessageId);
 		// 保存当前分支路径
 		setStreamingPathMap(new Map(selectedChildMap));
+		// 通知父组件流式状态开始
+		if (onStreamingStateChange && activeSessionId) {
+			onStreamingStateChange(true, activeSessionId);
+		}
 
 		const messages: ChatRequestParams = {
 			messages: [
@@ -233,7 +221,7 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 					onThinking: (thinking) => {
 						if (typeof thinking === 'string') {
 							// 流式更新只修改 allMessages，不影响视图路径
-							updateStoreMessages((prevAll) => {
+							setAllMessages((prevAll) => {
 								const assistantChat = prevAll.find(
 									(m) => m.chatId === assistantMessageId,
 								);
@@ -247,7 +235,7 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 					onData: (chunk) => {
 						if (typeof chunk === 'string') {
 							// 流式更新只修改 allMessages，不影响视图路径
-							updateStoreMessages((prevAll) => {
+							setAllMessages((prevAll) => {
 								return updateSingleMessage(prevAll, assistantMessageId, {
 									content:
 										(prevAll.find((m) => m.chatId === assistantMessageId)
@@ -268,7 +256,7 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 							type: type || 'error',
 							title: err?.message || String(err) || '发送失败',
 						});
-						updateStoreMessages((prevAll) => {
+						setAllMessages((prevAll) => {
 							return prevAll.filter(
 								(msg) =>
 									!(
@@ -278,15 +266,23 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 									),
 							);
 						});
+						// 通知父组件流式状态结束
+						if (onStreamingStateChange && activeSessionId) {
+							onStreamingStateChange(false, activeSessionId);
+						}
 					},
 					onComplete: () => {
 						setLoading(false);
 						setStreamingMessageId(null);
-						updateStoreMessages((prevAll) => {
+						setAllMessages((prevAll) => {
 							return updateSingleMessage(prevAll, assistantMessageId, {
 								isStreaming: false,
 							});
 						});
+						// 通知父组件流式状态结束
+						if (onStreamingStateChange && activeSessionId) {
+							onStreamingStateChange(false, activeSessionId);
+						}
 					},
 				},
 			});
@@ -299,7 +295,7 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 				type: 'error',
 				title: '发送消息失败',
 			});
-			updateStoreMessages((prev) =>
+			setAllMessages((prev) =>
 				prev.filter(
 					(msg) =>
 						!(
@@ -325,7 +321,7 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 
 		const newSelectedChildMap = new Map(selectedChildMap);
 
-		updateStoreMessages((prevAll) => {
+		setAllMessages((prevAll) => {
 			const editedMsg = prevAll.find((m) => m.chatId === editMessage.chatId);
 			if (!editedMsg) return prevAll.map((i) => ({ ...i, isStopped: false }));
 
@@ -389,7 +385,7 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 		const currentAssistantMsg = messages[index];
 		if (!currentAssistantMsg) return;
 
-		updateStoreMessages((prevAll) => {
+		setAllMessages((prevAll) => {
 			const userMsg = prevAll.find(
 				(m) => m.chatId === currentAssistantMsg.parentId,
 			);
@@ -463,7 +459,7 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 			currentChatId,
 		});
 
-		updateStoreMessages((prevAll) => {
+		setAllMessages((prevAll) => {
 			let newAllMessages = [
 				...prevAll.map((i) => ({ ...i, isStopped: false })),
 			] as Message[];
@@ -517,7 +513,7 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 		let assistantMsgForApi: Message | null = null;
 		let lastMsgId: string | null = null;
 
-		updateStoreMessages((prevAll) => {
+		setAllMessages((prevAll) => {
 			const newAllMessages = prevAll.map((msg) => ({
 				...msg,
 				isStopped: false,
@@ -582,7 +578,7 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 			setLoading(false);
 			setStreamingMessageId(null);
 
-			updateStoreMessages((prevAll) => {
+			setAllMessages((prevAll) => {
 				const lastAssistantMsg = findLastAssistantMessage(prevAll);
 				if (lastAssistantMsg) {
 					return updateSingleMessage(prevAll, lastAssistantMsg.chatId, {
@@ -592,12 +588,16 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 				}
 				return prevAll;
 			});
+			// 通知父组件流式状态结束
+			if (onStreamingStateChange && activeSessionId) {
+				onStreamingStateChange(false, activeSessionId);
+			}
 		}
 	};
 
 	const clearChat = () => {
 		setInput('');
-		chatStore.setAllMessages([], '');
+		setAllMessages([]);
 		setMessages([]);
 		stopRequestRef.current?.();
 		stopRequestRef.current = null;
@@ -684,14 +684,14 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 	const handleBranchChange = (msgId: string, direction: 'prev' | 'next') => {
 		onBranchChange?.(msgId, direction);
 
-		const siblings = findSiblings(chatStore.messages, msgId);
+		const siblings = findSiblings(allMessages, msgId);
 		const currentIndex = siblings.findIndex((m) => m.chatId === msgId);
 		const nextIndex =
 			direction === 'next' ? currentIndex + 1 : currentIndex - 1;
 
 		if (nextIndex >= 0 && nextIndex < siblings.length) {
 			const nextMsg = siblings[nextIndex];
-			const currentMsg = chatStore.messages.find((m) => m.chatId === msgId);
+			const currentMsg = allMessages.find((m) => m.chatId === msgId);
 			const parentId = currentMsg?.parentId;
 
 			const newSelectedChildMap = new Map(selectedChildMap);
@@ -994,6 +994,6 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 			/>
 		</div>
 	);
-});
+};
 
-export default ChatBot as React.FC<ChatBotProps>;
+export default ChatBot;

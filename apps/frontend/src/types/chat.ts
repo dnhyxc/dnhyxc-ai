@@ -1,5 +1,20 @@
 import { UploadedFile } from '@/types';
 
+export interface Session {
+	id: string;
+	content: string;
+	role: string;
+	isActive: boolean;
+	createdAt: Date;
+	updatedAt: Date;
+	messages: Message[];
+}
+
+export interface SessionData {
+	list: Session[];
+	total: number;
+}
+
 export interface Message {
 	chatId: string;
 	content: string;
@@ -39,6 +54,7 @@ export interface ChatBotProps {
 	onBranchChange?: (msgId: string, direction: 'prev' | 'next') => void;
 	activeSessionId?: string;
 	setActiveSessionId?: (id: string) => void;
+	onStreamingStateChange?: (isStreaming: boolean, sessionId: string) => void;
 }
 
 export interface CreateUserMessageParams {

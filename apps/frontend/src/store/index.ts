@@ -10,11 +10,13 @@ import { createContext, useContext } from 'react';
 import AuthStore from './auth';
 import DetailStore from './detail';
 import UserStore from './user';
+import ChatStore from './chat';
 
 class RootStore {
 	authStore = AuthStore;
 	userStore = UserStore;
 	detailStore = DetailStore;
+	chatStore = ChatStore;
 }
 
 const store = new RootStore();

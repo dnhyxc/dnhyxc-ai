@@ -3,18 +3,34 @@ import { Drawer } from '@design/Drawer';
 import { MarkdownParser } from '@dnhyxc-ai/tools';
 import { ScrollArea } from '@ui/index';
 import { PanelRightClose, PanelRightOpen } from 'lucide-react';
-import { observer } from 'mobx-react';
 import { useEffect, useMemo, useState } from 'react';
 import { getSessionList } from '@/service';
-import useStore from '@/store';
-import { Session } from '@/types/chat';
+import { Message } from '@/types/chat';
 
-const Chat = observer(() => {
+interface Session {
+	id: string;
+	content: string;
+	role: string;
+	isActive: boolean;
+	createdAt: Date;
+	updatedAt: Date;
+	messages: Message[];
+}
+
+interface SessionListInfo {
+	list: Session[];
+	total: number;
+}
+
+const Chat = () => {
 	const [open, setOpen] = useState(false);
 	const [activeSessionId, setActiveSessionId] = useState<string>('');
-
-	const { chatStore } = useStore();
-
+	// 修改：直接存储完整的消息树，而不是裁剪后的路径
+	const [chatBotMessages, setChatBotMessages] = useState<Message[]>([]);
+	const [sessionListInfo, setSessionListInfo] = useState<SessionListInfo>({
+		list: [],
+		total: 0,
+	});
 	// 跟踪当前正在流式的会话ID
 	const [streamingSessionId, setStreamingSessionId] = useState<string>('');
 
@@ -43,7 +59,7 @@ const Chat = observer(() => {
 
 		// 修改：直接传递完整消息树，不要调用 buildMessageList 裁剪
 		// ChatBot 内部会负责根据 selectedChildMap 计算显示路径
-		chatStore.setAllMessages(session.messages || [], session.id);
+		setChatBotMessages(session.messages || []);
 		setOpen(false);
 	};
 
@@ -64,15 +80,13 @@ const Chat = observer(() => {
 			setStreamingSessionId(sessionId);
 		} else if (streamingSessionId === sessionId) {
 			setStreamingSessionId('');
-			// 流式结束时，重新获取会话列表，更新最新数据
-			getSessions();
 		}
 	};
 
 	const getSessions = async () => {
 		const res = await getSessionList();
 		if (res.success) {
-			chatStore.setSessionData(res.data);
+			setSessionListInfo(res.data);
 		}
 	};
 
@@ -98,6 +112,7 @@ const Chat = observer(() => {
 			</div>
 			<ChatBot
 				// 修改：传递完整树
+				initialMessages={chatBotMessages}
 				onBranchChange={onBranchChange}
 				activeSessionId={activeSessionId}
 				setActiveSessionId={setActiveSessionId}
@@ -105,7 +120,7 @@ const Chat = observer(() => {
 			/>
 			<Drawer title="历史对话" open={open} onOpenChange={() => setOpen(false)}>
 				<ScrollArea className="h-full overflow-y-auto pr-4 box-border">
-					{chatStore.sessionData.list.map((item) => {
+					{sessionListInfo.list.map((item) => {
 						const hasStreamingMessage = item.messages?.some(
 							(m) => m.isStreaming,
 						);
@@ -138,6 +153,6 @@ const Chat = observer(() => {
 			</Drawer>
 		</div>
 	);
-});
+};
 
 export default Chat;
