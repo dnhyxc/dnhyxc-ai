@@ -1,7 +1,7 @@
 import { listen } from '@tauri-apps/api/event';
 import { Toaster } from '@ui/sonner';
 import { useEffect } from 'react';
-import { RouteObject, createBrowserRouter } from 'react-router';
+import { createBrowserRouter, RouteObject } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
 import { clipboard, getValue, onCreateWindow, removeStorage } from '@/utils';
 import { http } from '@/utils/fetch';
