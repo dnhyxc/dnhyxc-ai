@@ -29,22 +29,25 @@ const Chat = observer(() => {
 	}, [open]);
 
 	const onSelectSession = (session: Session) => {
-		setActiveSessionId(session.id);
+		// 如果切换到不同的会话，更新 activeSessionId
+		if (session.id !== activeSessionId) {
+			setActiveSessionId(session.id);
 
-		// 检查会话是否有流式消息
-		const hasStreamingMessage = session.messages?.some((m) => m.isStreaming);
+			// 检查会话是否有流式消息
+			const hasStreamingMessage = session.messages?.some((m) => m.isStreaming);
 
-		// 如果切换到正在流式的会话，需要确保流式状态正确
-		if (hasStreamingMessage || session.id === streamingSessionId) {
-			setStreamingSessionId(session.id);
-		} else {
-			setStreamingSessionId('');
+			// 如果切换到正在流式的会话，需要确保流式状态正确
+			if (hasStreamingMessage || session.id === streamingSessionId) {
+				setStreamingSessionId(session.id);
+			} else {
+				setStreamingSessionId('');
+			}
+
+			// 修改：直接传递完整消息树，不要调用 buildMessageList 裁剪
+			// ChatBot 内部会负责根据 selectedChildMap 计算显示路径
+			chatStore.setAllMessages(session.messages || [], session.id);
+			setOpen(false);
 		}
-
-		// 修改：直接传递完整消息树，不要调用 buildMessageList 裁剪
-		// ChatBot 内部会负责根据 selectedChildMap 计算显示路径
-		chatStore.setAllMessages(session.messages || [], session.id);
-		setOpen(false);
 	};
 
 	// 分支切换逻辑现在主要由 ChatBot 内部处理，
@@ -72,7 +75,7 @@ const Chat = observer(() => {
 	const getSessions = async () => {
 		const res = await getSessionList();
 		if (res.success) {
-			chatStore.setSessionData(res.data);
+			chatStore.sessionData = res.data;
 		}
 	};
 

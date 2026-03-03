@@ -33,7 +33,6 @@ import {
 	findLastAssistantMessage,
 	findSiblings,
 	updateParentChildrenIds,
-	updateSingleMessage,
 } from './tools';
 
 const ChatBot = observer(function ChatBot(props: ChatBotProps) {
@@ -103,8 +102,10 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 		return () => dispose();
 	}, [chatStore]);
 
-	// 初始化逻辑
+	// 初始化逻辑 - 当 activeSessionId 变化时重置状态
 	useEffect(() => {
+		// 注意：切换会话时不停止流式输出，让它在后台继续
+
 		if (chatStore.messages.length > 0) {
 			setSelectedChildMap(new Map());
 			const streamingMsg = chatStore.messages.find((m) => m.isStreaming);
@@ -122,6 +123,11 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 			setStreamingMessageId(null);
 			setStreamingPathMap(new Map());
 		}
+
+		// 重置输入状态
+		setInput('');
+		setUploadedFiles([]);
+		setEditMessage(null);
 	}, [activeSessionId]);
 
 	// 核心逻辑：根据 allMessages 和 selectedChildMap 推导当前显示的 messages
@@ -232,28 +238,25 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 					},
 					onThinking: (thinking) => {
 						if (typeof thinking === 'string') {
-							// 流式更新只修改 allMessages，不影响视图路径
-							updateStoreMessages((prevAll) => {
-								const assistantChat = prevAll.find(
-									(m) => m.chatId === assistantMessageId,
-								);
-								return updateSingleMessage(prevAll, assistantMessageId, {
-									thinkContent: (assistantChat?.thinkContent || '') + thinking,
-									isStreaming: true,
-								});
+							// 使用新的 updateMessage 方法，确保流式消息在后台继续更新
+							const currentMessage = chatStore.messages.find(
+								(m) => m.chatId === assistantMessageId,
+							);
+							chatStore.updateMessage(assistantMessageId, {
+								thinkContent: (currentMessage?.thinkContent || '') + thinking,
+								isStreaming: true,
 							});
 						}
 					},
 					onData: (chunk) => {
 						if (typeof chunk === 'string') {
-							// 流式更新只修改 allMessages，不影响视图路径
-							updateStoreMessages((prevAll) => {
-								return updateSingleMessage(prevAll, assistantMessageId, {
-									content:
-										(prevAll.find((m) => m.chatId === assistantMessageId)
-											?.content || '') + chunk,
-									isStreaming: true,
-								});
+							// 使用新的 updateMessage 方法，确保流式消息在后台继续更新
+							const currentMessage = chatStore.messages.find(
+								(m) => m.chatId === assistantMessageId,
+							);
+							chatStore.updateMessage(assistantMessageId, {
+								content: (currentMessage?.content || '') + chunk,
+								isStreaming: true,
 							});
 						}
 					},
@@ -268,24 +271,36 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 							type: type || 'error',
 							title: err?.message || String(err) || '发送失败',
 						});
-						updateStoreMessages((prevAll) => {
-							return prevAll.filter(
-								(msg) =>
-									!(
-										msg.chatId === assistantMessageId &&
-										(!msg.content || msg.content === '') &&
-										(!msg.thinkContent || msg.thinkContent === '')
-									),
+						// 移除空的流式消息
+						const currentMessage = chatStore.messages.find(
+							(m) => m.chatId === assistantMessageId,
+						);
+						if (
+							currentMessage &&
+							(!currentMessage.content || currentMessage.content === '') &&
+							(!currentMessage.thinkContent ||
+								currentMessage.thinkContent === '')
+						) {
+							chatStore.setAllMessages(
+								chatStore.messages.filter(
+									(m) => m.chatId !== assistantMessageId,
+								),
+								activeSessionId || '',
 							);
-						});
+						} else {
+							// 标记流式结束
+							chatStore.updateMessage(assistantMessageId, {
+								isStreaming: false,
+								isStopped: true,
+							});
+						}
 					},
 					onComplete: () => {
 						setLoading(false);
 						setStreamingMessageId(null);
-						updateStoreMessages((prevAll) => {
-							return updateSingleMessage(prevAll, assistantMessageId, {
-								isStreaming: false,
-							});
+						// 标记流式结束
+						chatStore.updateMessage(assistantMessageId, {
+							isStreaming: false,
 						});
 					},
 				},
@@ -517,47 +532,35 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 		let assistantMsgForApi: Message | null = null;
 		let lastMsgId: string | null = null;
 
-		updateStoreMessages((prevAll) => {
-			const newAllMessages = prevAll.map((msg) => ({
-				...msg,
-				isStopped: false,
-			}));
+		const formattedMessages = messages;
+		if (formattedMessages.length > 0) {
+			const lastMsg = formattedMessages[formattedMessages.length - 1];
+			if (lastMsg.role === 'assistant' && lastMsg.isStopped) {
+				const userMsg = chatStore.messages.find(
+					(m) => m.chatId === lastMsg.parentId,
+				);
+				if (userMsg) {
+					// 更新消息状态
+					chatStore.updateMessage(lastMsg.chatId, {
+						isStreaming: true,
+						isStopped: false,
+					});
 
-			const formattedMessages = messages;
-			if (formattedMessages.length > 0) {
-				const lastMsg = formattedMessages[formattedMessages.length - 1];
-				if (lastMsg.role === 'assistant' && lastMsg.isStopped) {
-					const userMsg = prevAll.find((m) => m.chatId === lastMsg.parentId);
-					if (userMsg) {
-						const updatedAllMessages = newAllMessages.map((msg) =>
-							msg.chatId === lastMsg.chatId
-								? {
-										...msg,
-										isStreaming: true,
-										isStopped: false,
-									}
-								: msg,
-						);
-
-						userMsgForApi = {
-							...userMsg,
-							isStopped: false,
-						};
-						assistantMsgForApi = {
-							...lastMsg,
-							isStreaming: true,
-							isStopped: false,
-						};
-						lastMsgId = lastMsg.chatId;
-
-						return updatedAllMessages;
-					} else {
-						lastMsgId = lastMsg.chatId;
-					}
+					userMsgForApi = {
+						...userMsg,
+						isStopped: false,
+					};
+					assistantMsgForApi = {
+						...lastMsg,
+						isStreaming: true,
+						isStopped: false,
+					};
+					lastMsgId = lastMsg.chatId;
+				} else {
+					lastMsgId = lastMsg.chatId;
 				}
 			}
-			return newAllMessages;
-		});
+		}
 
 		if (lastMsgId) {
 			if (userMsgForApi && assistantMsgForApi) {
@@ -582,16 +585,14 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 			setLoading(false);
 			setStreamingMessageId(null);
 
-			updateStoreMessages((prevAll) => {
-				const lastAssistantMsg = findLastAssistantMessage(prevAll);
-				if (lastAssistantMsg) {
-					return updateSingleMessage(prevAll, lastAssistantMsg.chatId, {
-						isStreaming: false,
-						isStopped: true,
-					});
-				}
-				return prevAll;
-			});
+			// 使用新的 updateMessage 方法
+			const lastAssistantMsg = findLastAssistantMessage(chatStore.messages);
+			if (lastAssistantMsg) {
+				chatStore.updateMessage(lastAssistantMsg.chatId, {
+					isStreaming: false,
+					isStopped: true,
+				});
+			}
 		}
 	};
 
