@@ -82,12 +82,21 @@ class ChatStore {
 				...this.messages.slice(messageIndex + 1),
 			];
 
-			// 如果是流式消息，更新全局跟踪器
+			// 更新全局跟踪器
 			if (updates.isStreaming !== false) {
+				// 如果是流式消息，更新全局跟踪器
 				this.streamingMessages.set(chatId, updatedMessage);
-			} else {
-				// 流式结束，从跟踪器中移除
-				this.streamingMessages.delete(chatId);
+			} else if (updates.isStreaming === false) {
+				// 流式结束，但我们保留消息内容在跟踪器中，以便切换会话时能恢复
+				// 只标记为不再流式，但保留内容
+				const existingStreamingMsg = this.streamingMessages.get(chatId);
+				if (existingStreamingMsg) {
+					this.streamingMessages.set(chatId, {
+						...existingStreamingMsg,
+						isStreaming: false,
+						...updates,
+					});
+				}
 			}
 
 			// 更新 sessionData 中所有包含此消息的会话
@@ -109,14 +118,31 @@ class ChatStore {
 		} else {
 			// 如果消息不在当前 messages 中，可能是其他会话的流式消息
 			// 更新全局跟踪器，确保切换回该会话时能恢复状态
-			if (updates.isStreaming !== false) {
-				const existingStreamingMsg = this.streamingMessages.get(chatId);
-				const updatedMessage = existingStreamingMsg
-					? { ...existingStreamingMsg, ...updates }
-					: ({ chatId, ...updates } as Message);
+			const existingStreamingMsg = this.streamingMessages.get(chatId);
+			const updatedMessage = existingStreamingMsg
+				? { ...existingStreamingMsg, ...updates }
+				: ({ chatId, ...updates } as Message);
+
+			// 只有当消息是流式消息时才更新跟踪器
+			if (updates.isStreaming !== false || existingStreamingMsg) {
 				this.streamingMessages.set(chatId, updatedMessage);
 			}
 		}
+	}
+
+	// 清理旧的已完成流式消息，避免内存泄漏
+	cleanupCompletedStreamingMessages() {
+		// 清理所有已完成的流式消息（不再流式）
+		for (const [chatId, message] of this.streamingMessages.entries()) {
+			if (!message.isStreaming) {
+				this.streamingMessages.delete(chatId);
+			}
+		}
+	}
+
+	// 当会话切换时，清理不属于当前会话的已完成流式消息
+	cleanupStreamingMessagesForSession() {
+		this.cleanupCompletedStreamingMessages();
 	}
 }
 
