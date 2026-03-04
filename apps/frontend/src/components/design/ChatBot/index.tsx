@@ -207,6 +207,7 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 				focusTimerRef.current = null;
 			}
 			stopGenerating();
+			clearChat();
 		};
 	}, []);
 
@@ -642,6 +643,7 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 		}
 	};
 
+	// TODO: 如果在流未响应时直接停止，无法让后端通知大模型停止生成，前端停止后，大模型还是会继续生成
 	const stopGenerating = async () => {
 		if (stopRequestRef.current) {
 			await stopSse(sessionId);
@@ -665,12 +667,11 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 		setInput('');
 		chatStore.setAllMessages([], '', true); // isNewSession: true
 		// 清除当前会话的分支选择状态
-		if (activeSessionId) {
-			chatStore.clearSessionBranchSelection(activeSessionId);
-		}
+		chatStore.clearSessionBranchSelection(activeSessionId);
 		setMessages([]);
-		stopRequestRef.current?.();
-		stopRequestRef.current = null;
+		// 不再停止接口调用
+		// stopRequestRef.current?.();
+		// stopRequestRef.current = null;
 		setLoading(false);
 		setStreamingMessageId(null);
 		setStreamingPathMap(new Map());

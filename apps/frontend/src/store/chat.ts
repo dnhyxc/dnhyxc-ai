@@ -39,6 +39,8 @@ class ChatStore {
 			if (activeSession) {
 				activeSession.messages = [];
 			}
+			// 清理已完成的流式消息
+			this.cleanupCompletedStreamingMessages();
 			return;
 		}
 
@@ -86,6 +88,9 @@ class ChatStore {
 				item.messages = [...finalMessages];
 			}
 		});
+
+		// 6. 清理已完成的流式消息
+		this.cleanupCompletedStreamingMessages();
 	}
 
 	setSessionData(sessionData: SessionData) {
@@ -148,8 +153,12 @@ class ChatStore {
 				}
 			});
 		} else {
-			// 如果消息不在当前 messages 中，可能是其他会话的流式消息
-			// 更新全局跟踪器，确保切换回该会话时能恢复状态
+			/**
+			 * 如果消息不在当前 messages 中，可能是其他会话的流式消息。
+			 * 更新全局跟踪器，确保切换回该会话时能恢复状态。
+			 * 不直接删除的只更改 streamingMessages 中的状态的原因：
+			 * 	- 是全局跟踪器，用于在用户切换不同会话时保持流式消息状态。如果直接删除，切换回原会话时无法恢复消息内容。
+			 */
 			const existingStreamingMsg = this.streamingMessages.get(chatId);
 			const updatedMessage = existingStreamingMsg
 				? { ...existingStreamingMsg, ...updates }
@@ -173,11 +182,6 @@ class ChatStore {
 		}
 	}
 
-	// 当会话切换时，清理不属于当前会话的已完成流式消息
-	cleanupStreamingMessagesForSession() {
-		this.cleanupCompletedStreamingMessages();
-	}
-
 	// 保存会话的分支选择状态
 	saveSessionBranchSelection(
 		sessionId: string,
@@ -198,7 +202,7 @@ class ChatStore {
 	}
 
 	// 清除会话的分支选择状态
-	clearSessionBranchSelection(sessionId: string) {
+	clearSessionBranchSelection(sessionId?: string) {
 		if (sessionId) {
 			this.sessionBranchSelections.delete(sessionId);
 		}

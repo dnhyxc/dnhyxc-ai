@@ -108,19 +108,12 @@ export const streamFetch = async ({
 					}
 				}
 			} catch (err: any) {
-				if (err.name !== 'AbortError') {
-					onError?.(
-						err === 'Request cancelled' ? '请求已停止' : err,
-						err === 'Request cancelled' ? 'info' : 'error',
-					);
-				}
+				onError?.(err || '请求停止', 'info');
 			}
 		})();
-	} catch (error: any) {
+	} catch (err: any) {
 		// 发起请求时的错误（如网络断开）
-		if (error.name !== 'AbortError') {
-			onError?.(error);
-		}
+		onError?.(err || '请求停止', 'info');
 	}
 
 	// 返回一个取消函数
