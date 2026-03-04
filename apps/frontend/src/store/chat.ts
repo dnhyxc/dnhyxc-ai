@@ -88,6 +88,10 @@ class ChatStore {
 		});
 	}
 
+	setSessionData(sessionData: SessionData) {
+		this.sessionData = sessionData;
+	}
+
 	// 更新单个消息（用于流式更新）
 	updateMessage(chatId: string, updates: Partial<Message>) {
 		const messageIndex = this.messages.findIndex((m) => m.chatId === chatId);

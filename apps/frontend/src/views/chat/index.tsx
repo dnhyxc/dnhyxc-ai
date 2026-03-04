@@ -71,7 +71,7 @@ const Chat = observer(() => {
 	const getSessions = async () => {
 		const res = await getSessionList();
 		if (res.success) {
-			chatStore.sessionData = res.data;
+			chatStore.setSessionData(res.data);
 		}
 	};
 
