@@ -9,6 +9,7 @@ import {
 } from 'typeorm';
 import { Attachments } from './attachments.entity';
 import { ChatSessions } from './session.entity';
+import { Expose } from 'class-transformer';
 
 export enum MessageRole {
 	SYSTEM = 'system',
@@ -45,6 +46,10 @@ export class ChatMessages {
 	@CreateDateColumn({ name: 'created_at', type: 'timestamp' })
 	createdAt: Date;
 
+	// 实体中显式声明 sessionId
+	@Column()
+	sessionId: string;
+
 	// 关联到会话
 	@ManyToOne(
 		() => ChatSessions,
@@ -53,7 +58,9 @@ export class ChatMessages {
 			onDelete: 'CASCADE', // 如果会话删除，消息级联删除
 		},
 	)
-	@JoinColumn()
+
+	@Expose()
+	@JoinColumn({ name: 'session_id' })
 	// @JoinColumn({ name: 'session_id' })
 	session: ChatSessions;
 

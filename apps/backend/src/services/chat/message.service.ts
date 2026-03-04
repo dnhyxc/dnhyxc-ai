@@ -108,6 +108,7 @@ export class MessageService {
 					childrenIds: childrenIds || [], // 使用前端传递的 childrenIds
 					chatId: chatId || '', // 保存 chatId 字段
 					currentChatId: currentChatId || chatId || '', // 保存 currentChatId 字段，以前端传递的为准
+					sessionId,
 				});
 			}
 
@@ -240,9 +241,6 @@ export class MessageService {
 			},
 		});
 
-		return {
-			list,
-			total,
-		};
+		return { list, total };
 	}
 }
