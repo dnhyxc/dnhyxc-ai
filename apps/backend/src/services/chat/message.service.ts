@@ -1,8 +1,10 @@
+import { randomUUID } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { FindOneOptions, Repository } from 'typeorm';
 import { Attachments } from './attachments.entity';
 import { ChatMessages } from './chat.entity';
+import { CreateSessionDto } from './dto/chat-request.dto';
 import { HistoryDto, MessageDto, SaveDto } from './dto/message.dto';
 import { ChatSessions } from './session.entity';
 
@@ -56,6 +58,20 @@ export class MessageService {
 		});
 	}
 
+	async createSession(dto: CreateSessionDto) {
+		const sessionId = dto.sessionId || randomUUID();
+		let session = await this.findOneSession(sessionId);
+		if (!session) {
+			session = this.chatSessionsRepository.create({
+				id: sessionId,
+				partialContent: null,
+				isActive: true,
+			});
+			await this.chatSessionsRepository.save(session);
+		}
+		return sessionId;
+	}
+
 	// 保存消息到数据库
 	async saveMessage(params: SaveDto) {
 		const {
@@ -71,17 +87,6 @@ export class MessageService {
 		} = params;
 
 		try {
-			// 查找或创建会话
-			let session = await this.findOneSession(sessionId);
-			if (!session) {
-				session = this.chatSessionsRepository.create({
-					id: sessionId,
-					partialContent: null,
-					isActive: true,
-				});
-				await this.chatSessionsRepository.save(session);
-			}
-
 			// 检查是否已存在相同 chatId 的消息
 			let message: ChatMessages | null = null;
 			const existingMessage = chatId
@@ -99,6 +104,8 @@ export class MessageService {
 					currentChatId || existingMessage.currentChatId || chatId || '';
 				message = existingMessage;
 			} else {
+				const session = await this.findOneSession(sessionId);
+				if (!session) return null;
 				// 创建新消息
 				message = this.chatMessagesRepository.create({
 					role,

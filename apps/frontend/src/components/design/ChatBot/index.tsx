@@ -20,7 +20,7 @@ import { observer } from 'mobx-react';
 import { useEffect, useRef, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { cn } from '@/lib/utils';
-import { stopSse, uploadFiles } from '@/service';
+import { createSession, stopSse, uploadFiles } from '@/service';
 import useStore from '@/store';
 import { FileWithPreview, UploadedFile } from '@/types';
 import { ChatBotProps, ChatRequestParams, Message } from '@/types/chat';
@@ -63,10 +63,6 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 	);
 	const [currentChatId, setCurrentChatId] = useState<string>('');
 	const [editMessage, setEditMessage] = useState<Message | null>(null);
-	// 记录流式开始时的分支路径（用于切换回来时恢复）
-	const [streamingPathMap, setStreamingPathMap] = useState<Map<string, string>>(
-		new Map(),
-	);
 
 	// 辅助函数：更新store中的消息
 	const updateStoreMessages = (
@@ -104,7 +100,6 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 		// 如果 activeSessionId 为空，表示是新会话，清空所有状态
 		if (!activeSessionId) {
 			setSelectedChildMap(new Map());
-			setStreamingPathMap(new Map());
 			setInput('');
 			setUploadedFiles([]);
 			setEditMessage(null);
@@ -133,15 +128,6 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 				}
 			}
 
-			const streamingMsg = chatStore.messages.find((m) => m.isStreaming);
-			if (streamingMsg) {
-				// 保存当前路径
-				const pathMap = new Map(selectedChildMap);
-				setStreamingPathMap(pathMap);
-			} else {
-				setStreamingPathMap(new Map());
-			}
-
 			// 重置所有消息的 isStopped 状态，避免显示"继续生成"按钮
 			chatStore.messages.forEach((msg) => {
 				if (msg.isStopped) {
@@ -152,7 +138,6 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 			});
 		} else {
 			setSelectedChildMap(new Map());
-			setStreamingPathMap(new Map());
 		}
 
 		// 重置输入状态
@@ -219,6 +204,14 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 		}
 	};
 
+	const getSessionInfo = async () => {
+		const res = await createSession(activeSessionId || sessionId);
+		if (res.success) {
+			setSessionId(res.data);
+		}
+		return res.data;
+	};
+
 	const onSseFetch = async (
 		api: string = apiEndpoint,
 		assistantMessageId: string,
@@ -226,9 +219,12 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 		assistantMessage?: Message,
 		isRegenerate?: boolean,
 	) => {
+		let session_Id = activeSessionId || sessionId;
+		if (!session_Id) {
+			session_Id = await getSessionInfo();
+		}
+
 		const parentId = isRegenerate ? userMessage?.chatId : userMessage?.parentId;
-		// 保存当前分支路径
-		setStreamingPathMap(new Map(selectedChildMap));
 
 		const messages: ChatRequestParams = {
 			messages: [
@@ -240,7 +236,7 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 					noSave: isRegenerate,
 				},
 			],
-			sessionId: sessionId || activeSessionId,
+			sessionId: session_Id,
 			stream: true,
 			isRegenerate,
 			parentId,
@@ -629,10 +625,10 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 		}
 	};
 
-	// TODO: 如果在流未响应时直接停止，无法让后端通知大模型停止生成，前端停止后，大模型还是会继续生成
 	const stopGenerating = async () => {
+		const session_id = activeSessionId || sessionId;
 		if (stopRequestRef.current) {
-			await stopSse(sessionId);
+			await stopSse(session_id);
 			stopRequestRef.current();
 			stopRequestRef.current = null;
 			setLoading(false);
@@ -658,7 +654,6 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 		// stopRequestRef.current?.();
 		// stopRequestRef.current = null;
 		setLoading(false);
-		setStreamingPathMap(new Map());
 		setSessionId('');
 		setActiveSessionId?.('');
 		setSelectedChildMap(new Map());
@@ -764,13 +759,6 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 				);
 			}
 			// 流式消息继续在 allMessages 中更新，不受视图切换影响
-		}
-	};
-
-	// 快速返回到流式消息所在的分支
-	const handleBackToStreaming = () => {
-		if (streamingPathMap.size > 0) {
-			setSelectedChildMap(new Map(streamingPathMap));
 		}
 	};
 

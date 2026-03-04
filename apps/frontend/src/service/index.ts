@@ -1,5 +1,6 @@
 import { http } from '@/utils/fetch';
 import {
+	CREATE_SESSION,
 	CREATE_VERIFY_CODE,
 	DELETE_FILE,
 	DOWNLOAD_FILE,
@@ -202,6 +203,13 @@ export const imageOcr = async (url?: string, prompt?: string) => {
 	return await http.post(IMAGE_OCR, {
 		url,
 		prompt,
+	});
+};
+
+// 创建 session
+export const createSession = async (sessionId?: string) => {
+	return await http.post(CREATE_SESSION, {
+		sessionId,
 	});
 };
 

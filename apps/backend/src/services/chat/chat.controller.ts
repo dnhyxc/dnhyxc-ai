@@ -15,7 +15,7 @@ import {
 import { catchError, concat, map, Observable, of } from 'rxjs';
 import { ChatService } from './chat.service';
 import { ChatContinueDto } from './dto/chat-continue.dto';
-import { ChatRequestDto } from './dto/chat-request.dto';
+import { ChatRequestDto, CreateSessionDto } from './dto/chat-request.dto';
 import { ChatStopDto } from './dto/chat-stop.dto';
 import { CreateChatDto } from './dto/create-chat.dto';
 import { HistoryDto, MessageDto } from './dto/message.dto';
@@ -30,6 +30,11 @@ export class ChatController {
 		private messageService: MessageService,
 	) {}
 
+	@Post('/createSession')
+	async createSession(@Body() dto: CreateSessionDto) {
+		return this.messageService.createSession(dto);
+	}
+
 	@Post('/sse')
 	@Sse()
 	async chatStream(
@@ -38,6 +43,7 @@ export class ChatController {
 		const source$ = (await this.chatService.chatStream(chatRequestDto)).pipe(
 			map((chunk) => {
 				const data = JSON.parse(chunk);
+				console.log(data);
 				return {
 					data: {
 						content: data.content,

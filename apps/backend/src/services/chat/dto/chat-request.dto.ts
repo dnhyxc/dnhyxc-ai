@@ -71,6 +71,12 @@ export class AssistantMessageDto {
 	childrenIds?: string[];
 }
 
+export class CreateSessionDto {
+	@IsString()
+	@IsOptional()
+	sessionId: string;
+}
+
 export class ChatRequestDto {
 	@IsArray()
 	@ArrayMinSize(1, { message: '至少需要一条消息' })
@@ -80,7 +86,7 @@ export class ChatRequestDto {
 
 	@IsOptional()
 	@IsString()
-	sessionId?: string;
+	sessionId: string;
 
 	@IsOptional()
 	@IsBoolean()

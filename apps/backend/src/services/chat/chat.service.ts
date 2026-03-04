@@ -25,8 +25,8 @@ export class ChatService {
 		(HumanMessage | SystemMessage | AIMessage)[]
 	> = new Map();
 
-	// 存储正在进行的会话
-	private activeSessions = new Map<string, boolean>();
+	// 存储会话的 AbortController，用于立即停止大模型生成
+	private abortControllers = new Map<string, AbortController>();
 
 	constructor(
 		// 存储会话的取消控制器
@@ -53,6 +53,7 @@ export class ChatService {
 	private initModel(options?: {
 		temperature?: number;
 		maxTokens?: number;
+		abortSignal?: AbortSignal;
 	}): ChatOpenAI {
 		const apiKey = this.configService.get(ModelEnum.DEEPSEEK_API_KEY);
 		const baseURL = this.configService.get(ModelEnum.DEEPSEEK_BASE_URL);
@@ -66,6 +67,9 @@ export class ChatService {
 			},
 			temperature: options?.temperature ?? 0.3,
 			maxTokens: options?.maxTokens ?? 4096,
+			...(options?.abortSignal && {
+				callOptions: { signal: options.abortSignal },
+			}),
 		});
 
 		return llm;
@@ -296,11 +300,11 @@ export class ChatService {
 
 	// deepseek 流式对话
 	async chatStream(dto: ChatRequestDto): Promise<Observable<any>> {
-		const llm = this.initModel({
-			temperature: dto.temperature,
-			maxTokens: dto.max_tokens,
-		});
-		const sessionId = dto.sessionId || randomUUID();
+		const sessionId = dto.sessionId;
+
+		// 创建 AbortController 用于立即停止大模型生成
+		const abortController = new AbortController();
+		this.abortControllers.set(sessionId, abortController);
 
 		// 从 redis 中获取，如果已有相同会话的流，先取消它
 		const existingCancelController = (await this.cache.get(
@@ -317,7 +321,12 @@ export class ChatService {
 		const cancel$ = new Subject<void>();
 		// 缓存取消控制器，12 小时后自动过期并清除
 		await this.cache.set(sessionId, cancel$, 12 * 60 * 60 * 1000);
-		this.activeSessions.set(sessionId, true);
+
+		const llm = this.initModel({
+			temperature: dto.temperature,
+			maxTokens: dto.max_tokens,
+			abortSignal: abortController.signal,
+		});
 
 		// 保存用户消息到数据库（使用前端传递的数据）
 		const lastUserMessage = dto.messages.find(
@@ -354,6 +363,12 @@ export class ChatService {
 				let wasCancelledDuringIteration = false;
 
 				try {
+					// 在开始任何耗时操作前检查是否已被停止
+					if (getStreamStatus()) {
+						subscriber.complete();
+						return;
+					}
+
 					// 获取部分响应（如果有）
 					const session = await this.messageService.findOneSession(sessionId);
 					const partialContent = session?.partialContent;
@@ -444,7 +459,7 @@ export class ChatService {
 
 					const allMessages = this.convertToLangChainMessages(newData);
 
-					// 检查是否被取消
+					// 再次检查是否被取消（在数据库操作后）
 					if (getStreamStatus()) {
 						subscriber.complete();
 						return;
@@ -634,7 +649,7 @@ export class ChatService {
 	}
 
 	async cleanupSession(sessionId: string) {
-		this.activeSessions.delete(sessionId);
+		this.abortControllers.delete(sessionId);
 		await this.cache.del(sessionId);
 	}
 
@@ -643,6 +658,7 @@ export class ChatService {
 	): Promise<{ success: boolean; message: string }> {
 		const cancelController = (await this.cache.get(sessionId)) as Subject<void>;
 
+		// 如果缓存中没有取消控制器，但会话标记为活跃，说明正在初始化
 		if (!cancelController) {
 			return {
 				success: false,
@@ -650,8 +666,20 @@ export class ChatService {
 			};
 		}
 
-		cancelController.next();
-		cancelController.complete();
+		// 1. 首先触发 AbortController 立即停止大模型生成
+		const abortController = this.abortControllers.get(sessionId);
+		if (abortController) {
+			abortController.abort('用户手动停止');
+			this.abortControllers.delete(sessionId);
+		}
+
+		// 2. 然后触发 RxJS Subject 取消流式处理
+		if (cancelController) {
+			cancelController.next();
+			cancelController.complete();
+		}
+
+		// 清理会话状态
 		this.cleanupSession(sessionId);
 
 		return {
@@ -716,6 +744,12 @@ export class ChatService {
 	}
 
 	zhipuChatStream(dto: ChatRequestDto): Observable<ZhipuStreamData> {
+		const sessionId = dto.sessionId || randomUUID();
+
+		// 创建 AbortController 用于智谱 API
+		const abortController = new AbortController();
+		this.abortControllers.set(sessionId, abortController);
+
 		return new Observable<ZhipuStreamData>((subscriber) => {
 			(async () => {
 				try {
@@ -726,8 +760,6 @@ export class ChatService {
 					if (!apiKey) {
 						throw new Error('智谱 API 密钥未配置');
 					}
-
-					const sessionId = dto.sessionId || randomUUID();
 
 					// 保存用户消息到数据库（使用前端传递的数据）
 					const lastUserMessage = dto.messages.find(
@@ -814,6 +846,7 @@ export class ChatService {
 							Authorization: `Bearer ${apiKey}`,
 						},
 						body: JSON.stringify(requestBody),
+						signal: abortController.signal,
 					});
 
 					if (!response.ok) {
