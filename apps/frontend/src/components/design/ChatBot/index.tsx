@@ -2,7 +2,7 @@ import ChatEntry from '@design/ChatEntry';
 import ChatFileList from '@design/ChatFileList';
 import ChatTextArea from '@design/ChatTextArea';
 import MarkdownPreview from '@design/Markdown';
-import { Button, ScrollArea, Spinner, Toast } from '@ui/index';
+import { ScrollArea, Spinner, Toast } from '@ui/index';
 import { motion } from 'framer-motion';
 import {
 	Bot,
@@ -63,10 +63,6 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 	);
 	const [currentChatId, setCurrentChatId] = useState<string>('');
 	const [editMessage, setEditMessage] = useState<Message | null>(null);
-	// 跟踪当前正在流式的消息 ID（用于持续更新，不影响视图）
-	const [streamingMessageId, setStreamingMessageId] = useState<string | null>(
-		null,
-	);
 	// 记录流式开始时的分支路径（用于切换回来时恢复）
 	const [streamingPathMap, setStreamingPathMap] = useState<Map<string, string>>(
 		new Map(),
@@ -108,7 +104,6 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 		// 如果 activeSessionId 为空，表示是新会话，清空所有状态
 		if (!activeSessionId) {
 			setSelectedChildMap(new Map());
-			setStreamingMessageId(null);
 			setStreamingPathMap(new Map());
 			setInput('');
 			setUploadedFiles([]);
@@ -140,12 +135,10 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 
 			const streamingMsg = chatStore.messages.find((m) => m.isStreaming);
 			if (streamingMsg) {
-				setStreamingMessageId(streamingMsg.chatId);
 				// 保存当前路径
 				const pathMap = new Map(selectedChildMap);
 				setStreamingPathMap(pathMap);
 			} else {
-				setStreamingMessageId(null);
 				setStreamingPathMap(new Map());
 			}
 
@@ -159,7 +152,6 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 			});
 		} else {
 			setSelectedChildMap(new Map());
-			setStreamingMessageId(null);
 			setStreamingPathMap(new Map());
 		}
 
@@ -193,7 +185,7 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 			scrollContainerRef.current.scrollTop =
 				scrollContainerRef.current.scrollHeight;
 		}
-	}, [messages, autoScroll, streamingMessageId]);
+	}, [messages, autoScroll]);
 
 	// 清理逻辑
 	useEffect(() => {
@@ -235,9 +227,6 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 		isRegenerate?: boolean,
 	) => {
 		const parentId = isRegenerate ? userMessage?.chatId : userMessage?.parentId;
-
-		// 设置流式消息跟踪
-		setStreamingMessageId(assistantMessageId);
 		// 保存当前分支路径
 		setStreamingPathMap(new Map(selectedChildMap));
 
@@ -302,7 +291,6 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 					},
 					onError: (err, type) => {
 						setLoading(false);
-						setStreamingMessageId(null);
 						Toast({
 							type: type || 'error',
 							title: err?.message || String(err) || '发送失败',
@@ -334,7 +322,6 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 					},
 					onComplete: () => {
 						setLoading(false);
-						setStreamingMessageId(null);
 						// 标记流式结束
 						chatStore.updateMessage(assistantMessageId, {
 							isStreaming: false,
@@ -346,7 +333,6 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 			stopRequestRef.current = stop;
 		} catch (_error) {
 			setLoading(false);
-			setStreamingMessageId(null);
 			Toast({
 				type: 'error',
 				title: '发送消息失败',
@@ -650,7 +636,6 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 			stopRequestRef.current();
 			stopRequestRef.current = null;
 			setLoading(false);
-			setStreamingMessageId(null);
 
 			// 使用新的 updateMessage 方法
 			const lastAssistantMsg = findLastAssistantMessage(chatStore.messages);
@@ -673,7 +658,6 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 		// stopRequestRef.current?.();
 		// stopRequestRef.current = null;
 		setLoading(false);
-		setStreamingMessageId(null);
 		setStreamingPathMap(new Map());
 		setSessionId('');
 		setActiveSessionId?.('');
@@ -1038,22 +1022,6 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 					</div>
 				</div>
 			</ScrollArea>
-
-			{/* 流式输出时的提示条 */}
-			{streamingMessageId && (
-				<div className="flex items-center justify-center py-2 bg-theme/10 border-t border-theme-white/10">
-					<Spinner className="w-4 h-4 mr-2 text-cyan-400" />
-					<span className="text-sm text-textcolor/70">正在生成回复中...</span>
-					{selectedChildMap !== streamingPathMap && (
-						<Button
-							onClick={handleBackToStreaming}
-							className="ml-4 px-3 py-1 text-sm bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-400 rounded-md transition-colors"
-						>
-							返回当前回复
-						</Button>
-					)}
-				</div>
-			)}
 
 			<ChatEntry
 				chatInputRef={chatInputRef}

@@ -104,11 +104,6 @@ const Chat = observer(() => {
 			<Drawer title="历史对话" open={open} onOpenChange={() => setOpen(false)}>
 				<ScrollArea className="h-full overflow-y-auto pr-4 box-border">
 					{chatStore.sessionData.list.map((item) => {
-						const hasStreamingMessage = item.messages?.some(
-							(m) => m.isStreaming,
-						);
-						const isStreamingSession = item.id === streamingSessionId;
-
 						return (
 							<div
 								key={item.id}
@@ -123,12 +118,6 @@ const Chat = observer(() => {
 										),
 									}}
 								/>
-								{(hasStreamingMessage || isStreamingSession) && (
-									<div className="ml-2 flex items-center">
-										<div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse mr-1" />
-										<span className="text-xs text-cyan-400">生成中</span>
-									</div>
-								)}
 							</div>
 						);
 					})}
