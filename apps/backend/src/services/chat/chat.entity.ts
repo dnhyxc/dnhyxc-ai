@@ -9,7 +9,6 @@ import {
 } from 'typeorm';
 import { Attachments } from './attachments.entity';
 import { ChatSessions } from './session.entity';
-import { Expose } from 'class-transformer';
 
 export enum MessageRole {
 	SYSTEM = 'system',
@@ -59,7 +58,6 @@ export class ChatMessages {
 		},
 	)
 
-	@Expose()
 	@JoinColumn({ name: 'session_id' })
 	// @JoinColumn({ name: 'session_id' })
 	session: ChatSessions;
