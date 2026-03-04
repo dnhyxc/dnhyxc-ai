@@ -68,20 +68,6 @@ const Chat = observer(() => {
 		console.log('Branch changed in Chat:', msgId, direction);
 	};
 
-	// 处理流式状态变化
-	const handleStreamingStateChange = (
-		isStreaming: boolean,
-		sessionId: string,
-	) => {
-		if (isStreaming) {
-			setStreamingSessionId(sessionId);
-		} else if (streamingSessionId === sessionId) {
-			setStreamingSessionId('');
-			// 流式结束时，重新获取会话列表，更新最新数据
-			getSessions();
-		}
-	};
-
 	const getSessions = async () => {
 		const res = await getSessionList();
 		if (res.success) {
@@ -114,7 +100,6 @@ const Chat = observer(() => {
 				onBranchChange={onBranchChange}
 				activeSessionId={activeSessionId}
 				setActiveSessionId={setActiveSessionId}
-				onStreamingStateChange={handleStreamingStateChange}
 			/>
 			<Drawer title="历史对话" open={open} onOpenChange={() => setOpen(false)}>
 				<ScrollArea className="h-full overflow-y-auto pr-4 box-border">

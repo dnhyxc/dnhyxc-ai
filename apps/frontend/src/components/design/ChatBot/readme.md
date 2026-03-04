@@ -210,10 +210,10 @@ clearSessionBranchSelection(sessionId: string) {
 ```typescript
 // 查找最新的分支选择：自动选择每个层级的最新（最后创建）子节点
 export const findLatestBranchSelection = (
-	allMessages: Message[],
+	allMessages: Message[]
 ): Map<string, string> => {
 	const selectionMap = new Map<string, string>();
-	
+
 	// 找出所有根消息
 	const allChildren = new Set<string>();
 	allMessages.forEach((m) => {
@@ -235,28 +235,38 @@ export const findLatestBranchSelection = (
 	// 按创建时间排序，选择最新的根消息
 	const sortedRootMessages = rootMessages.sort(
 		(a, b) =>
-			(a.createdAt ? new Date(a.createdAt).getTime() : new Date(a.timestamp).getTime()) -
-			(b.createdAt ? new Date(b.createdAt).getTime() : new Date(b.timestamp).getTime()),
+			(a.createdAt
+				? new Date(a.createdAt).getTime()
+				: new Date(a.timestamp).getTime()) -
+			(b.createdAt
+				? new Date(b.createdAt).getTime()
+				: new Date(b.timestamp).getTime())
 	);
 	const latestRoot = sortedRootMessages[sortedRootMessages.length - 1];
-	selectionMap.set('root', latestRoot.chatId);
+	selectionMap.set("root", latestRoot.chatId);
 
 	// 递归选择每个层级的最新子节点
 	let currentMessage = latestRoot;
 	while (currentMessage?.childrenIds?.length > 0) {
 		// 获取当前消息的所有子节点
-		const children = allMessages.filter((m) => m.parentId === currentMessage.chatId);
+		const children = allMessages.filter(
+			(m) => m.parentId === currentMessage.chatId
+		);
 		if (children.length === 0) break;
 
 		// 按创建时间排序，选择最新的子节点
 		const sortedChildren = children.sort(
 			(a, b) =>
-				(a.createdAt ? new Date(a.createdAt).getTime() : new Date(a.timestamp).getTime()) -
-				(b.createdAt ? new Date(b.createdAt).getTime() : new Date(b.timestamp).getTime()),
+				(a.createdAt
+					? new Date(a.createdAt).getTime()
+					: new Date(a.timestamp).getTime()) -
+				(b.createdAt
+					? new Date(b.createdAt).getTime()
+					: new Date(b.timestamp).getTime())
 		);
 		const latestChild = sortedChildren[sortedChildren.length - 1];
 		selectionMap.set(currentMessage.chatId, latestChild.chatId);
-		
+
 		// 继续下一层级
 		currentMessage = latestChild;
 	}
@@ -274,10 +284,10 @@ export const findLatestBranchSelection = (
 ```typescript
 useEffect(() => {
 	// ... 其他代码
-	
+
 	// 尝试从store恢复之前保存的分支选择状态
 	const savedSelection = chatStore.getSessionBranchSelection(activeSessionId);
-	
+
 	if (chatStore.messages.length > 0) {
 		if (savedSelection) {
 			// 恢复之前保存的分支选择
@@ -293,7 +303,7 @@ useEffect(() => {
 				setSelectedChildMap(new Map());
 			}
 		}
-		
+
 		// ... 其他代码
 	}
 }, [activeSessionId]);
@@ -306,14 +316,15 @@ useEffect(() => {
 **解决方案**：在每个分支操作函数中添加保存状态的逻辑。
 
 #### 4.1 `handleBranchChange()` - 用户手动切换分支时
+
 ```typescript
-const handleBranchChange = (msgId: string, direction: 'prev' | 'next') => {
+const handleBranchChange = (msgId: string, direction: "prev" | "next") => {
 	// ... 分支切换逻辑
-	
+
 	const newSelectedChildMap = new Map(selectedChildMap);
 	// ... 更新 newSelectedChildMap
 	setSelectedChildMap(newSelectedChildMap);
-	
+
 	// 保存分支选择状态
 	if (activeSessionId) {
 		chatStore.saveSessionBranchSelection(activeSessionId, newSelectedChildMap);
@@ -322,56 +333,62 @@ const handleBranchChange = (msgId: string, direction: 'prev' | 'next') => {
 ```
 
 #### 4.2 `handleEditMessage()` - 用户编辑消息创建新分支时
+
 ```typescript
-const handleEditMessage = async (content?: string, attachments?: UploadedFile[] | null) => {
+const handleEditMessage = async (
+	content?: string,
+	attachments?: UploadedFile[] | null
+) => {
 	// ... 编辑消息逻辑
-	
+
 	setSelectedChildMap(newSelectedChildMap);
 	// 保存分支选择状态
 	if (activeSessionId) {
 		chatStore.saveSessionBranchSelection(activeSessionId, newSelectedChildMap);
 	}
-	
+
 	// ... 发送消息
 };
 ```
 
-#### 4.3 `handleRegenerateMessage()` - 用户重新生成assistant消息时
+#### 4.3 `handleRegenerateMessage()` - 用户重新生成 assistant 消息时
+
 ```typescript
 const handleRegenerateMessage = async (_content: string, index: number) => {
 	// ... 重新生成逻辑
-	
+
 	setSelectedChildMap(childMap);
 	// 保存分支选择状态
 	if (activeSessionId) {
 		chatStore.saveSessionBranchSelection(activeSessionId, childMap);
 	}
-	
+
 	// ... 发送请求
 };
 ```
 
 #### 4.4 `handleNewMessage()` - 用户发送新消息时
+
 ```typescript
 const handleNewMessage = async (content: string) => {
 	// ... 创建新消息逻辑
-	
+
 	// 更新selectedChildMap：将新消息设置为选中状态
 	const newSelectedChildMap = new Map(selectedChildMap);
 	if (!userMessageToUse.parentId) {
 		// 第一条消息（根消息）
-		newSelectedChildMap.set('root', userMsgId);
+		newSelectedChildMap.set("root", userMsgId);
 	} else {
 		// 非第一条消息：将新消息设置为父消息的选中子节点
 		newSelectedChildMap.set(userMessageToUse.parentId, userMsgId);
 	}
 	setSelectedChildMap(newSelectedChildMap);
-	
+
 	// 保存分支选择状态
 	if (activeSessionId) {
 		chatStore.saveSessionBranchSelection(activeSessionId, newSelectedChildMap);
 	}
-	
+
 	// ... 更新消息存储和发送请求
 };
 ```
@@ -384,14 +401,14 @@ const handleNewMessage = async (content: string) => {
 
 ```typescript
 const clearChat = () => {
-	setInput('');
-	chatStore.setAllMessages([], '', true); // isNewSession: true
-	
+	setInput("");
+	chatStore.setAllMessages([], "", true); // isNewSession: true
+
 	// 清除当前会话的分支选择状态
 	if (activeSessionId) {
 		chatStore.clearSessionBranchSelection(activeSessionId);
 	}
-	
+
 	// ... 其他清理逻辑
 };
 ```
@@ -399,18 +416,22 @@ const clearChat = () => {
 ## 使用场景示例
 
 ### 场景：用户重新生成消息后切换会话再返回
-1. **用户在当前会话中点击"重新生成"assistant消息**
-   - 系统创建新的assistant分支
+
+1. **用户在当前会话中点击"重新生成"assistant 消息**
+
+   - 系统创建新的 assistant 分支
    - 更新 `selectedChildMap` 指向新分支
    - 保存分支选择状态到 `sessionBranchSelections`
 
 2. **用户切换到其他历史会话**
+
    - 当前会话的分支选择状态被保存
    - 新会话加载，可能恢复其之前保存的分支状态
 
 3. **用户切换回原来的会话**
+
    - 系统从 `sessionBranchSelections` 恢复之前保存的分支选择状态
-   - 自动显示用户之前选择的分支（最新生成的assistant消息）
+   - 自动显示用户之前选择的分支（最新生成的 assistant 消息）
 
 4. **如果会话没有保存的状态（第一次进入）**
    - 系统使用 `findLatestBranchSelection()` 自动选择最新分支
@@ -419,11 +440,13 @@ const clearChat = () => {
 ## 关键设计决策
 
 1. **状态存储位置**：选择在 `ChatStore` 中存储分支选择状态，而不是组件本地状态，因为：
+
    - 需要跨组件生命周期持久化
    - 需要在会话切换时保持状态
    - 与消息数据一起管理更合理
 
 2. **自动选择算法**：选择"最新创建"的消息作为默认分支，因为：
+
    - 用户通常关注最新的回复
    - 对于重新生成场景，最新分支通常是用户最想看到的
    - 符合大多数聊天应用的交互模式
@@ -436,11 +459,13 @@ const clearChat = () => {
 ## 测试要点
 
 1. **基本功能测试**：
+
    - 在当前会话中点击"重新生成"，验证新分支创建
    - 切换其他会话再返回，验证是否自动显示最新分支
    - 手动切换分支，验证状态是否保存
 
 2. **边界条件测试**：
+
    - 空会话（无消息）切换
    - 单分支会话切换
    - 多层级分支结构测试
@@ -449,3 +474,9 @@ const clearChat = () => {
    - 网络中断后恢复
    - 应用重启后状态恢复
    - 并发操作处理
+
+## TODO
+
+1. 解决正在输出时的提示，同时解决跳转到最新输出的分支问题
+
+2. 给 session 列表正在输出的 session 增加正在输出标识
