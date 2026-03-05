@@ -328,32 +328,29 @@ export class ChatService {
 			abortSignal: abortController.signal,
 		});
 
-		// 保存用户消息到数据库（使用前端传递的数据）
+		// 【修改】不立即保存用户消息，先缓存到临时变量
+		// 等到收到第一个 AI Token 时再保存（延迟持久化）
 		const lastUserMessage = dto.messages.find(
 			(msg) => msg.role === 'user' && !msg.noSave,
 		);
 
-		let savedUserMessage: ChatMessages | null = null;
+		// 临时存储用户消息数据（用于延迟持久化）
+		const pendingUserData =
+			lastUserMessage && dto.userMessage
+				? {
+						sessionId,
+						role: MessageRole.USER,
+						content: lastUserMessage.content,
+						attachments: dto.attachments,
+						parentId: dto.userMessage.parentId || null,
+						isRegenerate: dto.isRegenerate || false,
+						chatId: dto.userMessage.chatId,
+						childrenIds: dto.userMessage.childrenIds || [],
+						currentChatId: dto.userMessage.chatId,
+					}
+				: null;
 
-		if (lastUserMessage && dto.userMessage) {
-			// 使用前端传递的 userMessage 数据
-			savedUserMessage = await this.messageService
-				.saveMessage({
-					sessionId,
-					role: MessageRole.USER,
-					content: lastUserMessage.content,
-					attachments: dto.attachments,
-					parentId: dto.userMessage.parentId || null,
-					isRegenerate: dto.isRegenerate || false,
-					chatId: dto.userMessage.chatId, // chatId
-					childrenIds: dto.userMessage.childrenIds || [], // childrenIds
-					currentChatId: dto.userMessage.chatId, // currentChatId: 使用消息自己的 chatId 作为默认值
-				})
-				.catch((dbError) => {
-					console.error('Failed to save user message to database:', dbError);
-					return null;
-				});
-		}
+		let savedUserMessage: ChatMessages | null = null;
 
 		return new Observable<any>((subscriber) => {
 			const getStreamStatus = () => cancel$.isStopped || subscriber.closed;
@@ -361,6 +358,8 @@ export class ChatService {
 				// 【修复】将 fullContent 提升到 try 外部，确保在 catch 或停止逻辑中可访问
 				let fullContent = '';
 				let wasCancelledDuringIteration = false;
+				// 【新增】用于追踪是否已收到第一个 Token
+				let hasReceivedFirstToken = false;
 
 				try {
 					// 在开始任何耗时操作前检查是否已被停止
@@ -489,6 +488,24 @@ export class ChatService {
 
 							const content = chunk.content;
 							if (typeof content === 'string') {
+								// 【修改】收到第一个 Token 时，保存用户消息到数据库
+								if (!hasReceivedFirstToken) {
+									hasReceivedFirstToken = true;
+
+									// 保存用户消息（延迟持久化）
+									if (pendingUserData) {
+										savedUserMessage = await this.messageService
+											.saveMessage(pendingUserData)
+											.catch((dbError) => {
+												console.error(
+													'Failed to save user message to database:',
+													dbError,
+												);
+												return null;
+											});
+									}
+								}
+
 								subscriber.next(JSON.stringify({ content, sessionId }));
 								fullContent += content;
 							}
@@ -597,6 +614,8 @@ export class ChatService {
 								lastUserMessage?.content || '',
 							);
 						}
+						// 【关键】如果被停止且没有收到任何 Token，不需要删除用户消息
+						// 因为用户消息根本没有保存到数据库（延迟持久化）
 					}
 
 					subscriber.complete();
@@ -703,7 +722,7 @@ export class ChatService {
 		}
 
 		// 简化提示词，因为 chatStream 中已经将 partialContent 作为 Assistant 消息注入上下文
-		// 这里只需要告诉模型“继续”即可，不需要再重复内容，避免模型困惑或重复生成
+		// 这里只需要告诉模型"继续"即可，不需要再重复内容，避免模型困惑或重复生成
 		const userContent =
 			userMessage?.content ||
 			`Please continue generating the previous response directly from where it stopped. Do not repeat any content.`;
