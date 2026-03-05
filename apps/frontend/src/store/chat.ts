@@ -7,7 +7,6 @@ class ChatStore {
 	}
 
 	messages: Message[] = [];
-
 	sessionData: SessionData = {
 		list: [],
 		total: 0,
@@ -24,7 +23,7 @@ class ChatStore {
 		activeSessionId: string,
 		isNewSession: boolean = false,
 	) {
-		// 1. 首先保存当前所有的流式消息到全局跟踪器
+		// 1. 首先保存当前所有的流式消息到全局跟踪器 (保持原有逻辑)
 		this.messages.forEach((msg) => {
 			if (msg.isStreaming) {
 				this.streamingMessages.set(msg.chatId, { ...msg });
@@ -34,17 +33,15 @@ class ChatStore {
 		// 2. 如果是新会话，清空当前消息
 		if (isNewSession) {
 			this.messages = [];
-			// 清理当前活跃会话的流式消息
 			const activeSession = this.sessionData.list.find((s) => s.isActive);
 			if (activeSession) {
 				activeSession.messages = [];
 			}
-			// 清理已完成的流式消息
 			this.cleanupCompletedStreamingMessages();
 			return;
 		}
 
-		// 3. 合并消息：从服务器加载的消息 + 全局流式消息
+		// 3. 合并消息：从参数加载的消息 + 全局流式消息
 		const mergedMessages = [...messages];
 
 		// 4. 将全局流式消息合并到当前会话的消息中
@@ -53,7 +50,6 @@ class ChatStore {
 				(m) => m.chatId === chatId,
 			);
 			if (existingIndex >= 0) {
-				// 如果已存在，更新流式状态和内容
 				mergedMessages[existingIndex] = {
 					...mergedMessages[existingIndex],
 					isStreaming: streamingMsg.isStreaming,
@@ -65,31 +61,23 @@ class ChatStore {
 						mergedMessages[existingIndex].thinkContent,
 				};
 			} else {
-				// 如果不存在，检查是否属于当前会话
-				// 注意：流式消息可能属于其他会话，我们只添加属于当前会话的流式消息
-				// 通过检查消息的 session 关联性（这里简化处理，实际可能需要更复杂的逻辑）
 				mergedMessages.push(streamingMsg);
 			}
 		});
 
-		// 重置所有消息的 isStopped 状态，避免显示"继续生成"按钮
 		const finalMessages = mergedMessages.map((msg) => ({
 			...msg,
-			isStopped: false, // 确保 isStopped 为 false
+			isStopped: false,
 		}));
 
-		// 直接赋值新数组，触发 MobX 响应式更新
 		this.messages = finalMessages;
 
-		// 5. 更新 sessionData 中的消息
 		this.sessionData.list.forEach((item) => {
 			if (item.id === activeSessionId) {
-				// 创建新数组引用，确保响应式更新
 				item.messages = [...finalMessages];
 			}
 		});
 
-		// 6. 清理已完成的流式消息
 		this.cleanupCompletedStreamingMessages();
 	}
 
@@ -97,31 +85,24 @@ class ChatStore {
 		this.sessionData = sessionData;
 	}
 
-	// 更新单个消息（用于流式更新）
 	updateMessage(chatId: string, updates: Partial<Message>) {
 		const messageIndex = this.messages.findIndex((m) => m.chatId === chatId);
 
 		if (messageIndex >= 0) {
-			// 使用对象扩展来创建新对象
 			const updatedMessage = {
 				...this.messages[messageIndex],
 				...updates,
 			};
 
-			// 替换数组中的元素
 			this.messages = [
 				...this.messages.slice(0, messageIndex),
 				updatedMessage,
 				...this.messages.slice(messageIndex + 1),
 			];
 
-			// 更新全局跟踪器
 			if (updates.isStreaming !== false) {
-				// 如果是流式消息，更新全局跟踪器
 				this.streamingMessages.set(chatId, updatedMessage);
 			} else if (updates.isStreaming === false) {
-				// 流式结束，但我们保留消息内容在跟踪器中，以便切换会话时能恢复
-				// 只标记为不再流式，但保留内容
 				const existingStreamingMsg = this.streamingMessages.get(chatId);
 				if (existingStreamingMsg) {
 					this.streamingMessages.set(chatId, {
@@ -130,20 +111,16 @@ class ChatStore {
 						...updates,
 					});
 				} else {
-					// 如果流式消息不在跟踪器中，但我们需要标记为结束
-					// 这可能发生在消息已经保存到服务器但流式状态需要更新的情况
 					this.streamingMessages.set(chatId, updatedMessage);
 				}
 			}
 
-			// 更新 sessionData 中所有包含此消息的会话
 			this.sessionData.list.forEach((session) => {
 				if (session.messages && session.messages.length > 0) {
 					const sessionMessageIndex = session.messages.findIndex(
 						(m) => m.chatId === chatId,
 					);
 					if (sessionMessageIndex >= 0) {
-						// 创建新数组来触发响应式更新
 						session.messages = [
 							...session.messages.slice(0, sessionMessageIndex),
 							updatedMessage,
@@ -153,27 +130,43 @@ class ChatStore {
 				}
 			});
 		} else {
-			/**
-			 * 如果消息不在当前 messages 中，可能是其他会话的流式消息。
-			 * 更新全局跟踪器，确保切换回该会话时能恢复状态。
-			 * 不直接删除的只更改 streamingMessages 中的状态的原因：
-			 * 	- 是全局跟踪器，用于在用户切换不同会话时保持流式消息状态。如果直接删除，切换回原会话时无法恢复消息内容。
-			 */
 			const existingStreamingMsg = this.streamingMessages.get(chatId);
 			const updatedMessage = existingStreamingMsg
 				? { ...existingStreamingMsg, ...updates }
 				: ({ chatId, ...updates } as Message);
 
-			// 只有当消息是流式消息时才更新跟踪器
 			if (updates.isStreaming !== false || existingStreamingMsg) {
 				this.streamingMessages.set(chatId, updatedMessage);
 			}
 		}
 	}
 
-	// 清理旧的已完成流式消息，避免内存泄漏
+	// [新增] 从流式跟踪中移除指定消息，用于回滚
+	removeStreamingMessage(chatId: string) {
+		this.streamingMessages.delete(chatId);
+	}
+
+	// [新增] 恢复之前的状态（用于回滚）
+	restoreState(
+		messages: Message[],
+		selectedChildMap: Map<string, string>,
+		sessionId: string,
+	) {
+		// 1. 直接设置消息列表，不合并流式消息（因为回滚意味着流式消息不应存在）
+		this.messages = [...messages];
+
+		// 2. 恢复分支选择
+		this.sessionBranchSelections.set(sessionId, new Map(selectedChildMap));
+
+		// 3. 同步更新 sessionData
+		this.sessionData.list.forEach((item) => {
+			if (item.id === sessionId) {
+				item.messages = [...messages];
+			}
+		});
+	}
+
 	cleanupCompletedStreamingMessages() {
-		// 清理所有已完成的流式消息（不再流式）
 		const entries = Array.from(this.streamingMessages.entries());
 		for (const [chatId, message] of entries) {
 			if (!message.isStreaming) {
@@ -182,7 +175,6 @@ class ChatStore {
 		}
 	}
 
-	// 保存会话的分支选择状态
 	saveSessionBranchSelection(
 		sessionId: string,
 		selectedChildMap: Map<string, string>,
@@ -192,7 +184,6 @@ class ChatStore {
 		}
 	}
 
-	// 获取会话的分支选择状态
 	getSessionBranchSelection(
 		sessionId: string,
 	): Map<string, string> | undefined {
@@ -201,7 +192,6 @@ class ChatStore {
 		return selection ? new Map(selection) : undefined;
 	}
 
-	// 清除会话的分支选择状态
 	clearSessionBranchSelection(sessionId?: string) {
 		if (sessionId) {
 			this.sessionBranchSelections.delete(sessionId);
