@@ -14,8 +14,8 @@ export class TypeOrmConfigService implements TypeOrmOptionsFactory {
 	createTypeOrmOptions(
 		_connectionOptions?: string,
 	): TypeOrmModuleOptions | Promise<TypeOrmModuleOptions> {
-		const { version = '' } = this.request.query;
-		const body = this.request.body;
+		const { version = '' } = this.request?.query || {};
+		const body = this.request?.body;
 
 		const envConfig = {
 			...typeOrmConfig,

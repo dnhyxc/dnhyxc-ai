@@ -1,13 +1,16 @@
+import { BullModule } from '@nestjs/bullmq';
 import { CacheModule as NestCacheModule } from '@nestjs/cache-manager';
 import { Global, Logger, Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
-
 import { DataSource } from 'typeorm';
+
 import { TypeOrmConfigService } from './database/typeorm-config.service';
 import { TypeOrmDestroyService } from './database/typeorm-destroy.service';
+import { RedisEnum } from './enum/config.enum';
 import { appConfig } from './factorys/app-config.factory';
 import { RedisConfigFactory } from './factorys/redis-config.factory';
+// 业务模块
 import { AuthModule } from './services/auth/auth.module';
 import { ChatModule } from './services/chat/chat.module';
 import { LogsModule } from './services/logs/logs.module';
@@ -45,6 +48,27 @@ const connections = new Map();
 		NestCacheModule.registerAsync({
 			isGlobal: true,
 			useClass: RedisConfigFactory,
+		}),
+		BullModule.forRootAsync({
+			inject: [ConfigService],
+			useFactory: (configService: ConfigService) => ({
+				connection: {
+					host: configService.get<string>(RedisEnum.REDIS_HOST),
+					port: configService.get<number>(RedisEnum.REDIS_PORT),
+					// TODO: 生产环境不需要用户密码
+					username: configService.get<string>(RedisEnum.REDIS_USERNAME),
+					password: configService.get<string>(RedisEnum.REDIS_PASSWORD),
+				},
+				defaultJobOptions: {
+					attempts: 3,
+					backoff: {
+						type: 'exponential',
+						delay: 1000,
+					},
+					removeOnComplete: 100,
+					removeOnFail: 1000,
+				},
+			}),
 		}),
 		LogsModule,
 		UserModule,

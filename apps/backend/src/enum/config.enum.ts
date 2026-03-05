@@ -19,6 +19,8 @@ export enum LogEnum {
 
 export enum RedisEnum {
 	REDIS_URL = 'REDIS_URL',
+	REDIS_HOST = 'REDIS_HOST',
+	REDIS_PORT = 'REDIS_PORT',
 	REDIS_PASSWORD = 'REDIS_PASSWORD',
 	REDIS_USERNAME = 'REDIS_USERNAME',
 }

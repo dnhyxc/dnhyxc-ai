@@ -5,13 +5,15 @@ import {
 	SystemMessage,
 } from '@langchain/core/messages';
 import { ChatOpenAI } from '@langchain/openai';
+import { InjectQueue } from '@nestjs/bullmq';
 import { Cache } from '@nestjs/cache-manager';
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import type { Queue } from 'bullmq';
 import { catchError, Observable, Subject } from 'rxjs';
 import { ModelEnum } from 'src/enum/config.enum';
 import { parseFile } from '../../utils/file-parser';
-import { ChatMessages, MessageRole } from './chat.entity';
+import { MessageRole } from './chat.entity';
 import { ChatContinueDto } from './dto/chat-continue.dto';
 import { ChatMessageDto } from './dto/chat-message.dto';
 import { ChatRequestDto } from './dto/chat-request.dto';
@@ -33,6 +35,9 @@ export class ChatService {
 		private configService: ConfigService,
 		private cache: Cache,
 		private messageService: MessageService,
+		// 注入消息存储队列
+		@InjectQueue('chat-message-queue')
+		private readonly messageQueue: Queue,
 	) {}
 
 	private async processFileAttachments(filePaths: string[]): Promise<string> {
@@ -186,118 +191,6 @@ export class ChatService {
 		};
 	}
 
-	// deepseek 非流失对话
-	async chat(dto: ChatRequestDto): Promise<any> {
-		const llm = this.initModel({
-			temperature: dto.temperature,
-			maxTokens: dto.max_tokens,
-		});
-		const sessionId = dto.sessionId || randomUUID();
-
-		// 处理文件附件
-		let enhancedMessages = [...dto.messages];
-		if (dto.attachments && dto.attachments?.length > 0) {
-			const filePaths = dto.attachments.map((file) => file.path);
-			const fileContent = await this.processFileAttachments(filePaths);
-			if (fileContent) {
-				// 创建包含文件内容的系统消息
-				const fileSystemMessage: ChatMessageDto = {
-					role: 'system',
-					content: `${fileContent}\n请根据文件内容回答用户问题。`,
-				};
-				// 将系统消息插入到消息数组的开头
-				enhancedMessages = [fileSystemMessage, ...enhancedMessages];
-			}
-		}
-
-		let history: (HumanMessage | SystemMessage | AIMessage)[] = [];
-		if (dto.sessionId && this.conversationMemory.has(dto.sessionId)) {
-			history = this.conversationMemory.get(dto.sessionId) || [];
-		}
-
-		const newMessages = this.convertToLangChainMessages(enhancedMessages);
-		const allMessages = [...history, ...newMessages];
-
-		// 保存用户消息到数据库（使用前端传递的数据）
-		const lastUserMessage = enhancedMessages.find((msg) => msg.role === 'user');
-		let savedUserMessage: ChatMessages | null = null;
-
-		if (lastUserMessage && dto.userMessage) {
-			// 使用前端传递的 userMessage 数据
-			savedUserMessage = await this.messageService
-				.saveMessage({
-					sessionId,
-					role: MessageRole.USER,
-					content: lastUserMessage.content,
-					attachments: dto.attachments,
-					parentId: dto.userMessage.parentId || null,
-					isRegenerate: false,
-					chatId: dto.userMessage.chatId, // chatId
-					childrenIds: dto.userMessage.childrenIds || [], // childrenIds
-					currentChatId: dto.userMessage.chatId, // currentChatId: 使用消息自己的 chatId 作为默认值
-				})
-				.catch((dbError) => {
-					console.error('Failed to save user message to database:', dbError);
-					return null;
-				});
-		}
-
-		const response = await llm.invoke(allMessages);
-		const responseContent = response.content as string;
-
-		const aiMessage = new AIMessage(responseContent);
-		this.conversationMemory.set(sessionId, [...allMessages, aiMessage]);
-
-		// 保存 AI 回复到数据库（使用前端传递的数据）
-		// 异步保存，不等待结果
-		if (dto.assistantMessage) {
-			await this.messageService
-				.saveMessage({
-					sessionId,
-					role: MessageRole.ASSISTANT,
-					content: responseContent,
-					attachments: [],
-					parentId: dto.assistantMessage.parentId || null,
-					isRegenerate: false,
-					chatId: dto.assistantMessage.chatId, // chatId
-					childrenIds: dto.assistantMessage.childrenIds || [], // childrenIds
-					currentChatId: dto.assistantMessage.chatId, // currentChatId: 使用消息自己的 chatId 作为默认值
-				})
-				.catch((dbError) => {
-					console.error(
-						'Failed to save assistant message to database:',
-						dbError,
-					);
-				});
-		} else {
-			// 如果没有传递 assistantMessage，使用默认逻辑
-			await this.messageService
-				.saveMessage({
-					sessionId,
-					role: MessageRole.ASSISTANT,
-					content: responseContent,
-					attachments: [],
-					parentId: savedUserMessage?.id,
-					isRegenerate: false,
-					chatId: undefined,
-					childrenIds: [],
-					currentChatId: undefined,
-				})
-				.catch((dbError) => {
-					console.error(
-						'Failed to save assistant message to database:',
-						dbError,
-					);
-				});
-		}
-
-		return {
-			content: responseContent,
-			sessionId,
-			finishReason: 'stop',
-		};
-	}
-
 	// deepseek 流式对话
 	async chatStream(dto: ChatRequestDto): Promise<Observable<any>> {
 		const sessionId = dto.sessionId;
@@ -329,7 +222,7 @@ export class ChatService {
 		});
 
 		// 【修改】不立即保存用户消息，先缓存到临时变量
-		// 等到收到第一个 AI Token 时再保存（延迟持久化）
+		// 等到收到第一个 AI Token 时再保存（延迟持久化 - 加入队列）
 		const lastUserMessage = dto.messages.find(
 			(msg) => msg.role === 'user' && !msg.noSave,
 		);
@@ -350,7 +243,8 @@ export class ChatService {
 					}
 				: null;
 
-		let savedUserMessage: ChatMessages | null = null;
+		// 移除同步保存变量，因为现在是用队列
+		// let savedUserMessage: ChatMessages | null = null;
 
 		return new Observable<any>((subscriber) => {
 			const getStreamStatus = () => cancel$.isStopped || subscriber.closed;
@@ -488,20 +382,19 @@ export class ChatService {
 
 							const content = chunk.content;
 							if (typeof content === 'string') {
-								// 【修改】收到第一个 Token 时，保存用户消息到数据库
+								// 【修改】收到第一个 Token 时，将用户消息加入队列（延迟持久化）
 								if (!hasReceivedFirstToken) {
 									hasReceivedFirstToken = true;
 
-									// 保存用户消息（延迟持久化）
+									// 保存用户消息（延迟持久化 - 入队）
 									if (pendingUserData) {
-										savedUserMessage = await this.messageService
-											.saveMessage(pendingUserData)
+										await this.messageQueue
+											.add('save-message', pendingUserData)
 											.catch((dbError) => {
 												console.error(
-													'Failed to save user message to database:',
+													'Failed to add user message job to queue:',
 													dbError,
 												);
-												return null;
 											});
 									}
 								}
@@ -542,48 +435,13 @@ export class ChatService {
 						}
 					}
 
-					// 【核心修复】无论是否被取消，只要有内容，都尝试保存到数据库
+					// 【核心修复】无论是否被取消，只要有内容，都尝试保存到数据库（入队）
 					// 正常完成，cancel$.isStopped 为 false, 暂停时 cancel$.isStopped 为 true
 					if (!cancel$.isStopped) {
-						// 保存完整的 AI 回复到数据库（使用前端传递的数据）
+						// 保存完整的 AI 回复到队列（使用前端传递的数据）
 						if (dto.assistantMessage) {
-							await this.messageService.saveMessage({
-								sessionId,
-								role: MessageRole.ASSISTANT,
-								content: finalContent,
-								attachments: [],
-								parentId: dto.assistantMessage.parentId || null,
-								isRegenerate: dto.isRegenerate || false,
-								chatId: dto.assistantMessage.chatId,
-								childrenIds: dto.assistantMessage.childrenIds || [],
-								currentChatId: dto.assistantMessage.chatId,
-							});
-						} else {
-							// 如果没有传递 assistantMessage，使用默认逻辑
-							await this.messageService.saveMessage({
-								sessionId,
-								role: MessageRole.ASSISTANT,
-								content: finalContent,
-								attachments: [],
-								parentId: dto.parentId || savedUserMessage?.id,
-								isRegenerate: dto.isRegenerate || false,
-								chatId: undefined,
-								childrenIds: [],
-								currentChatId: undefined,
-							});
-						}
-						// 清除部分响应（因为已经完成）更新会话的 partialContent 为 null
-						await this.messageService.updateSessionPartialContent(
-							sessionId,
-							null,
-							null,
-						);
-					} else {
-						// 被停止时，保存已生成的部分响应到数据库，防止数据丢失
-						if (finalContent.length > 0) {
-							// 1. 保存消息到 Message 表
-							if (dto.assistantMessage) {
-								await this.messageService.saveMessage({
+							await this.messageQueue
+								.add('save-message', {
 									sessionId,
 									role: MessageRole.ASSISTANT,
 									content: finalContent,
@@ -593,19 +451,82 @@ export class ChatService {
 									chatId: dto.assistantMessage.chatId,
 									childrenIds: dto.assistantMessage.childrenIds || [],
 									currentChatId: dto.assistantMessage.chatId,
+								})
+								.catch((dbError) => {
+									console.error(
+										'Failed to add assistant message job to queue:',
+										dbError,
+									);
 								});
-							} else {
-								await this.messageService.saveMessage({
+						} else {
+							// 如果没有传递 assistantMessage，使用默认逻辑
+							await this.messageQueue
+								.add('save-message', {
 									sessionId,
 									role: MessageRole.ASSISTANT,
 									content: finalContent,
 									attachments: [],
-									parentId: dto.parentId || savedUserMessage?.id,
+									parentId: dto.parentId || null, // 异步模式下 ID 获取受限
 									isRegenerate: dto.isRegenerate || false,
 									chatId: undefined,
 									childrenIds: [],
 									currentChatId: undefined,
+								})
+								.catch((dbError) => {
+									console.error(
+										'Failed to add assistant message job to queue:',
+										dbError,
+									);
 								});
+						}
+						// 清除部分响应（因为已经完成）更新会话的 partialContent 为 null
+						await this.messageService.updateSessionPartialContent(
+							sessionId,
+							null,
+							null,
+						);
+					} else {
+						// 被停止时，保存已生成的部分响应到队列，防止数据丢失
+						if (finalContent.length > 0) {
+							// 1. 保存消息到 Message 表 (入队)
+							if (dto.assistantMessage) {
+								await this.messageQueue
+									.add('save-message', {
+										sessionId,
+										role: MessageRole.ASSISTANT,
+										content: finalContent,
+										attachments: [],
+										parentId: dto.assistantMessage.parentId || null,
+										isRegenerate: dto.isRegenerate || false,
+										chatId: dto.assistantMessage.chatId,
+										childrenIds: dto.assistantMessage.childrenIds || [],
+										currentChatId: dto.assistantMessage.chatId,
+									})
+									.catch((dbError) => {
+										console.error(
+											'Failed to add partial assistant message job to queue:',
+											dbError,
+										);
+									});
+							} else {
+								await this.messageQueue
+									.add('save-message', {
+										sessionId,
+										role: MessageRole.ASSISTANT,
+										content: finalContent,
+										attachments: [],
+										parentId: dto.parentId || null,
+										isRegenerate: dto.isRegenerate || false,
+										chatId: undefined,
+										childrenIds: [],
+										currentChatId: undefined,
+									})
+									.catch((dbError) => {
+										console.error(
+											'Failed to add partial assistant message job to queue:',
+											dbError,
+										);
+									});
 							}
 							// 2. 更新 Session 的 partialContent 以便后续续写
 							await this.messageService.updateSessionPartialContent(
@@ -627,12 +548,12 @@ export class ChatService {
 					) {
 						// 即使出错，如果是取消导致的，也保存已有内容
 						try {
-							await this.messageService.saveMessage({
+							await this.messageQueue.add('save-message', {
 								sessionId,
 								role: MessageRole.ASSISTANT,
 								content: fullContent,
 								attachments: [],
-								parentId: dto.parentId || savedUserMessage?.id,
+								parentId: dto.parentId || null,
 								isRegenerate: dto.isRegenerate || false,
 								chatId: undefined,
 								childrenIds: [],
@@ -645,7 +566,7 @@ export class ChatService {
 							);
 						} catch (saveError) {
 							console.error(
-								'Failed to save partial message on error:',
+								'Failed to queue partial message on error:',
 								saveError,
 							);
 						}
@@ -780,32 +701,30 @@ export class ChatService {
 						throw new Error('智谱 API 密钥未配置');
 					}
 
-					// 保存用户消息到数据库（使用前端传递的数据）
+					// 保存用户消息到队列（异步处理）
 					const lastUserMessage = dto.messages.find(
 						(msg) => msg.role === 'user',
 					);
-					let savedUserMessage: ChatMessages | null = null;
 
 					if (lastUserMessage && dto.userMessage) {
-						// 使用前端传递的 userMessage 数据
-						savedUserMessage = await this.messageService
-							.saveMessage({
+						// 使用前端传递的 userMessage 数据添加到队列
+						await this.messageQueue
+							.add('save-message', {
 								sessionId,
 								role: MessageRole.USER,
 								content: lastUserMessage.content,
 								attachments: dto.attachments,
 								parentId: dto.userMessage.parentId || null,
-								isRegenerate: false, // isRegenerate: user 消息不是重新生成
-								chatId: dto.userMessage.chatId, // chatId
-								childrenIds: dto.userMessage.childrenIds || [], // childrenIds
-								currentChatId: dto.userMessage.chatId, // currentChatId: 使用消息自己的 chatId 作为默认值
+								isRegenerate: false,
+								chatId: dto.userMessage.chatId,
+								childrenIds: dto.userMessage.childrenIds || [],
+								currentChatId: dto.userMessage.chatId,
 							})
 							.catch((dbError) => {
 								console.error(
-									'Failed to save user message to database:',
+									'Failed to add user message job to queue:',
 									dbError,
 								);
-								return null;
 							});
 					}
 
@@ -908,44 +827,43 @@ export class ChatService {
 											...allMessages,
 											aiMessage,
 										]);
-										// 保存 AI 回复到数据库（使用前端传递的数据）
-										// 异步保存，不等待结果
+										// 保存 AI 回复到队列（异步处理）
 										if (dto.assistantMessage) {
-											this.messageService
-												.saveMessage({
+											this.messageQueue
+												.add('save-message', {
 													sessionId,
 													role: MessageRole.ASSISTANT,
 													content: fullContent,
 													attachments: [],
 													parentId: dto.assistantMessage.parentId || null,
-													isRegenerate: false, // isRegenerate: 正常回复
-													chatId: dto.assistantMessage.chatId, // chatId
-													childrenIds: dto.assistantMessage.childrenIds || [], // childrenIds
-													currentChatId: dto.assistantMessage.chatId, // currentChatId: 使用消息自己的 chatId 作为默认值
+													isRegenerate: false,
+													chatId: dto.assistantMessage.chatId,
+													childrenIds: dto.assistantMessage.childrenIds || [],
+													currentChatId: dto.assistantMessage.chatId,
 												})
 												.catch((dbError) => {
 													console.error(
-														'Failed to save assistant message to database:',
+														'Failed to add assistant message job to queue:',
 														dbError,
 													);
 												});
 										} else {
 											// 如果没有传递 assistantMessage，使用默认逻辑
-											this.messageService
-												.saveMessage({
+											this.messageQueue
+												.add('save-message', {
 													sessionId,
 													role: MessageRole.ASSISTANT,
 													content: fullContent,
 													attachments: [],
-													parentId: savedUserMessage?.id,
-													isRegenerate: false, // isRegenerate: 正常回复
-													chatId: undefined, // chatId
-													childrenIds: [], // childrenIds
-													currentChatId: undefined, // currentChatId
+													parentId: null, // 异步模式下 ID 获取受限
+													isRegenerate: false,
+													chatId: undefined,
+													childrenIds: [],
+													currentChatId: undefined,
 												})
 												.catch((dbError) => {
 													console.error(
-														'Failed to save assistant message to database:',
+														'Failed to add assistant message job to queue:',
 														dbError,
 													);
 												});
@@ -973,5 +891,122 @@ export class ChatService {
 				}
 			})();
 		});
+	}
+
+	// deepseek 非流失对话
+	async chat(dto: ChatRequestDto): Promise<any> {
+		const llm = this.initModel({
+			temperature: dto.temperature,
+			maxTokens: dto.max_tokens,
+		});
+		const sessionId = dto.sessionId || randomUUID();
+
+		// 处理文件附件
+		let enhancedMessages = [...dto.messages];
+		if (dto.attachments && dto.attachments?.length > 0) {
+			const filePaths = dto.attachments.map((file) => file.path);
+			const fileContent = await this.processFileAttachments(filePaths);
+			if (fileContent) {
+				// 创建包含文件内容的系统消息
+				const fileSystemMessage: ChatMessageDto = {
+					role: 'system',
+					content: `${fileContent}\n请根据文件内容回答用户问题。`,
+				};
+				// 将系统消息插入到消息数组的开头
+				enhancedMessages = [fileSystemMessage, ...enhancedMessages];
+			}
+		}
+
+		let history: (HumanMessage | SystemMessage | AIMessage)[] = [];
+		if (dto.sessionId && this.conversationMemory.has(dto.sessionId)) {
+			history = this.conversationMemory.get(dto.sessionId) || [];
+		}
+
+		const newMessages = this.convertToLangChainMessages(enhancedMessages);
+		const allMessages = [...history, ...newMessages];
+
+		// 保存用户消息到队列（异步处理，不阻塞响应）
+		const lastUserMessage = enhancedMessages.find((msg) => msg.role === 'user');
+
+		if (lastUserMessage && dto.userMessage) {
+			// 使用前端传递的 userMessage 数据添加到队列
+			try {
+				await this.messageQueue
+					.add('save-message', {
+						sessionId,
+						role: MessageRole.USER,
+						content: lastUserMessage.content,
+						attachments: dto.attachments,
+						parentId: dto.userMessage.parentId || null,
+						isRegenerate: false,
+						chatId: dto.userMessage.chatId,
+						childrenIds: dto.userMessage.childrenIds || [],
+						currentChatId: dto.userMessage.chatId,
+					})
+					.catch((dbError) => {
+						console.error('Failed to add user message job to queue:', dbError);
+					});
+			} catch (error) {
+				console.error('Error processing message:', error);
+			}
+		}
+
+		const response = await llm.invoke(allMessages);
+		const responseContent = response.content as string;
+
+		const aiMessage = new AIMessage(responseContent);
+		this.conversationMemory.set(sessionId, [...allMessages, aiMessage]);
+
+		// 保存 AI 回复到队列（异步处理）
+		if (dto.assistantMessage) {
+			await this.messageQueue
+				.add('save-message', {
+					sessionId,
+					role: MessageRole.ASSISTANT,
+					content: responseContent,
+					attachments: [],
+					parentId: dto.assistantMessage.parentId || null,
+					isRegenerate: false,
+					chatId: dto.assistantMessage.chatId,
+					childrenIds: dto.assistantMessage.childrenIds || [],
+					currentChatId: dto.assistantMessage.chatId,
+				})
+				.catch((dbError) => {
+					console.error(
+						'Failed to add assistant message job to queue:',
+						dbError,
+					);
+				});
+		} else {
+			// 如果没有传递 assistantMessage，使用默认逻辑
+			// 注意：这里无法直接获取 savedUserMessage?.id，因为保存是异步的。
+			// 如果需要强关联 parentId，需要在 Processor 中通过时间戳或额外逻辑处理，
+			// 或者在此处暂时传 null，由后端服务后续修正。
+			// 为了保持原有逻辑最小改动，此处 parentId 暂设为 null 或依赖前端传递
+			await this.messageQueue
+				.add('save-message', {
+					sessionId,
+					role: MessageRole.ASSISTANT,
+					content: responseContent,
+					attachments: [],
+					parentId: null, // 异步模式下难以即时获取刚插入的用户消息 ID
+					isRegenerate: false,
+					chatId: undefined,
+					childrenIds: [],
+					currentChatId: undefined,
+				})
+				.catch((dbError) => {
+					console.error(
+						'Failed to add assistant message job to queue:',
+						dbError,
+					);
+				});
+		}
+
+		return {
+			content: responseContent,
+			sessionId,
+			finishReason: 'stop',
+		};
 	}
 }
