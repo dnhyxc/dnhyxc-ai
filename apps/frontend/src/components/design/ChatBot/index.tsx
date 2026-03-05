@@ -233,8 +233,16 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 		hasReceivedStreamDataRef.current = false;
 
 		let session_Id = activeSessionId || sessionId;
+
 		if (!session_Id) {
-			session_Id = await getSessionInfo();
+			try {
+				session_Id = await getSessionInfo();
+			} catch (_) {
+				// 接口调用失败，说明还没有创建 session，则清空会话
+				clearChat();
+				// 直接 return，禁止后续逻辑
+				return;
+			}
 		}
 
 		const parentId = isRegenerate ? userMessage?.chatId : userMessage?.parentId;
@@ -305,29 +313,28 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 							type: type || 'error',
 							title: err?.message || String(err) || '发送失败',
 						});
-						// 移除空的流式消息
-						const currentMessage = chatStore.messages.find(
-							(m) => m.chatId === assistantMessageId,
-						);
 						if (
-							currentMessage &&
-							(!currentMessage.content || currentMessage.content === '') &&
-							(!currentMessage.thinkContent ||
-								currentMessage.thinkContent === '')
+							requestSnapshotRef.current &&
+							!hasReceivedStreamDataRef.current
 						) {
-							chatStore.setAllMessages(
-								chatStore.messages.filter(
-									(m) => m.chatId !== assistantMessageId,
-								),
-								activeSessionId || '',
-								false,
+							const snapshot = requestSnapshotRef.current;
+
+							// 清理流式跟踪，防止恢复后流式消息又冒出来
+							chatStore.removeStreamingMessage(snapshot.assistantMessageId);
+
+							// 恢复 Store 状态
+							chatStore.restoreState(
+								snapshot.messages,
+								snapshot.selectedChildMap,
+								snapshot.sessionId,
 							);
-						} else {
-							// 标记流式结束
-							chatStore.updateMessage(assistantMessageId, {
-								isStreaming: false,
-								isStopped: true,
-							});
+
+							// 恢复本地 State
+							setAllMessages([...snapshot.messages]);
+							setSelectedChildMap(new Map(snapshot.selectedChildMap));
+
+							// 清除快照
+							requestSnapshotRef.current = null;
 						}
 					},
 					onComplete: () => {
@@ -347,16 +354,27 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 				type: 'error',
 				title: '发送消息失败',
 			});
-			updateStoreMessages((prev) =>
-				prev.filter(
-					(msg) =>
-						!(
-							msg.chatId === assistantMessageId &&
-							msg.content === '' &&
-							msg.thinkContent === ''
-						),
-				),
-			);
+
+			if (requestSnapshotRef.current && !hasReceivedStreamDataRef.current) {
+				const snapshot = requestSnapshotRef.current;
+
+				// 清理流式跟踪，防止恢复后流式消息又冒出来
+				chatStore.removeStreamingMessage(snapshot.assistantMessageId);
+
+				// 恢复 Store 状态
+				chatStore.restoreState(
+					snapshot.messages,
+					snapshot.selectedChildMap,
+					snapshot.sessionId,
+				);
+
+				// 恢复本地 State
+				setAllMessages([...snapshot.messages]);
+				setSelectedChildMap(new Map(snapshot.selectedChildMap));
+
+				// 清除快照
+				requestSnapshotRef.current = null;
+			}
 		}
 	};
 
