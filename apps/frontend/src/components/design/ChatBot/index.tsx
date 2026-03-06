@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import * as mobx from 'mobx';
 import { observer } from 'mobx-react';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { cn } from '@/lib/utils';
 import { createSession, stopSse, uploadFiles } from '@/service';
@@ -62,7 +62,7 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 	const [messages, setMessages] = useState<Message[]>([]);
 	const [sessionId, setSessionId] = useState('');
 	const [input, setInput] = useState('');
-	const [loading, setLoading] = useState(false);
+
 	const [autoScroll, setAutoScroll] = useState(true);
 	const [isShowThinkContent, setIsShowThinkContent] = useState(true);
 	const [isCopyedId, setIsCopyedId] = useState('');
@@ -77,6 +77,8 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 	const requestSnapshotRef = useRef<RequestSnapshot | null>(null);
 	// [新增] 标记是否已接收到流式数据 (Thinking 或 Content)
 	const hasReceivedStreamDataRef = useRef(false);
+	// [新增] 按 sessionId 维护加载状态集合
+	const loadingSessionsRef = useRef<Set<string>>(new Set());
 
 	const updateStoreMessages = (
 		updater: (prevMessages: Message[]) => Message[],
@@ -104,6 +106,30 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 		);
 		return () => dispose();
 	}, [chatStore]);
+
+	// 判断当前会话是否正在加载
+	const isCurrentSessionLoading = useCallback(() => {
+		const currentSessionId = activeSessionId || sessionId;
+		if (!currentSessionId) return false;
+		return loadingSessionsRef.current.has(currentSessionId);
+	}, [activeSessionId, sessionId]);
+
+	// 设置会话加载状态
+	const setSessionLoading = useCallback(
+		(sessionId: string, isLoading: boolean) => {
+			if (isLoading) {
+				loadingSessionsRef.current.add(sessionId);
+			} else {
+				loadingSessionsRef.current.delete(sessionId);
+			}
+		},
+		[],
+	);
+
+	// 清除所有会话的加载状态
+	const clearAllSessionLoading = useCallback(() => {
+		loadingSessionsRef.current.clear();
+	}, []);
 
 	useEffect(() => {
 		// 注意：切换会话时不停止流式输出，让它在后台继续
@@ -195,6 +221,8 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 			}
 			// 组件卸载时，如果正在请求且未收到数据，也应当清理
 			stopGenerating(true);
+			// 清理所有会话的加载状态
+			clearAllSessionLoading();
 		};
 	}, []);
 
@@ -276,7 +304,8 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 				},
 				callbacks: {
 					onStart: () => {
-						setLoading(true);
+						// 设置当前会话的加载状态
+						setSessionLoading(session_Id, true);
 					},
 					onThinking: (thinking) => {
 						if (typeof thinking === 'string') {
@@ -305,7 +334,8 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 						}
 					},
 					onError: (err, type) => {
-						setLoading(false);
+						// 清除当前会话的加载状态
+						setSessionLoading(session_Id, false);
 						Toast({
 							type: type || 'error',
 							title: err?.message || String(err) || '发送失败',
@@ -335,7 +365,8 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 						}
 					},
 					onComplete: () => {
-						setLoading(false);
+						// 清除当前会话的加载状态
+						setSessionLoading(session_Id, false);
 						// 标记流式结束
 						chatStore.updateMessage(assistantMessageId, {
 							isStreaming: false,
@@ -346,7 +377,8 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 
 			stopRequestRef.current = stop;
 		} catch (_error) {
-			setLoading(false);
+			// 清除当前会话的加载状态
+			setSessionLoading(session_Id, false);
 			Toast({
 				type: 'error',
 				title: '发送消息失败',
@@ -615,7 +647,7 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 		isEdit?: boolean,
 		attachments?: UploadedFile[] | null,
 	) => {
-		if ((!content && !input.trim()) || loading) return;
+		if ((!content && !input.trim()) || isCurrentSessionLoading()) return;
 
 		const isRegenerate =
 			content !== undefined && index !== undefined && !isEdit;
@@ -695,7 +727,8 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 			stopRequestRef.current = null;
 		}
 
-		setLoading(false);
+		// 清除当前会话的加载状态
+		setSessionLoading(session_id, false);
 
 		// 2. 判断是否需要回滚
 		// 条件：有快照 且 未收到任何流式数据 且 (是手动停止 或 组件卸载)
@@ -746,7 +779,7 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 		// 不再停止接口调用
 		// stopRequestRef.current?.();
 		// stopRequestRef.current = null;
-		setLoading(false);
+		clearAllSessionLoading();
 		setSessionId('');
 		setActiveSessionId?.('');
 		setSelectedChildMap(new Map());
@@ -940,7 +973,7 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 														setInput={setInput}
 														editMessage={editMessage}
 														setEditMessage={setEditMessage}
-														loading={loading}
+														loading={isCurrentSessionLoading()}
 														handleEditChange={handleEditChange}
 														sendMessage={sendMessage}
 													/>
@@ -1060,7 +1093,7 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 											)}
 											{message.content && (
 												<div
-													className={`gap-3 text-textcolor/70 ${message.role === 'user' ? '-mr-2' : '-ml-2'} ${index !== messages.length - 1 ? `hidden ${loading ? 'group-hover:hidden' : 'group-hover:flex'}` : `${loading ? 'hidden' : 'flex items-center'}`}`}
+													className={`gap-3 text-textcolor/70 ${message.role === 'user' ? '-mr-2' : '-ml-2'} ${index !== messages.length - 1 ? `hidden ${isCurrentSessionLoading() ? 'group-hover:hidden' : 'group-hover:flex'}` : `${isCurrentSessionLoading() ? 'hidden' : 'flex items-center'}`}`}
 												>
 													<div className="cursor-pointer flex items-center justify-center">
 														{isCopyedId !== message.chatId ? (
@@ -1110,7 +1143,7 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 				setInput={setInput}
 				uploadedFiles={uploadedFiles}
 				setUploadedFiles={setUploadedFiles}
-				loading={loading}
+				loading={isCurrentSessionLoading()}
 				editMessage={editMessage}
 				setEditMessage={setEditMessage}
 				handleEditChange={handleEditChange}
