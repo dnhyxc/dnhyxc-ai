@@ -304,9 +304,6 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 							});
 						}
 					},
-					getSessionId: (sessionId) => {
-						setSessionId(sessionId);
-					},
 					onError: (err, type) => {
 						setLoading(false);
 						Toast({

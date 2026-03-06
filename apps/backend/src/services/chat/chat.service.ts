@@ -399,7 +399,7 @@ export class ChatService {
 									}
 								}
 
-								subscriber.next(JSON.stringify({ content, sessionId }));
+								subscriber.next(content);
 								fullContent += content;
 							}
 						}

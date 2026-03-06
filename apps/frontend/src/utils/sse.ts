@@ -8,7 +8,6 @@ interface StreamCallbacks {
 	onThinking?: (chunk: any) => void;
 	onStart?: () => void;
 	onError?: (error: Error, type?: 'error' | 'info' | 'warning') => void;
-	getSessionId?: (sessionId: string) => void;
 	onComplete?: () => void;
 }
 
@@ -21,8 +20,7 @@ export const streamFetch = async ({
 	callbacks: StreamCallbacks;
 	api?: string;
 }): Promise<() => void> => {
-	const { onData, onError, onComplete, onStart, onThinking, getSessionId } =
-		callbacks;
+	const { onData, onError, onComplete, onStart, onThinking } = callbacks;
 
 	const controller = new AbortController();
 	options.signal = controller.signal;
@@ -52,7 +50,6 @@ export const streamFetch = async ({
 
 		const decoder = new TextDecoder('utf-8');
 		let buffer = '';
-		let sessionId = '';
 
 		// 异步执行读取循环，不阻塞主线程
 		(async () => {
@@ -88,10 +85,6 @@ export const streamFetch = async ({
 							if (dataStr) {
 								try {
 									const parsed = JSON.parse(dataStr);
-									if (!sessionId) {
-										sessionId = parsed.sessionId;
-										getSessionId?.(sessionId);
-									}
 									if (parsed?.type === 'thinking') {
 										onThinking?.(parsed.content ? parsed.content : '');
 									} else {
