@@ -20,6 +20,12 @@ class ChatStore {
 	// 存储每个会话的分支选择状态：sessionId -> selectedChildMap
 	sessionBranchSelections: Map<string, Map<string, string>> = new Map();
 
+	// 存储每个流式消息的分支选择状态：assistantMessageId -> { sessionId, branchMap }
+	streamingBranchMaps: Map<
+		string,
+		{ sessionId: string; branchMap: Map<string, string> }
+	> = new Map();
+
 	addLoadingSession(sessionId: string) {
 		this.loadingSessions.add(sessionId);
 	}
@@ -43,6 +49,14 @@ class ChatStore {
 	) {
 		// 1. 首先保存当前所有的流式消息到全局跟踪器 (保持原有逻辑)
 		this.messages.forEach((msg) => {
+			if (msg.isStreaming) {
+				this.streamingMessages.set(msg.chatId, { ...msg });
+			}
+		});
+
+		// [新增] 也要检查传入的 messages 参数中的流式消息
+		// 这样新创建的流式消息会立即被跟踪
+		messages.forEach((msg) => {
 			if (msg.isStreaming) {
 				this.streamingMessages.set(msg.chatId, { ...msg });
 			}
@@ -159,9 +173,10 @@ class ChatStore {
 		}
 	}
 
-	// [新增] 从流式跟踪中移除指定消息，用于回滚
+	// 从流式跟踪中移除指定消息，用于回滚
 	removeStreamingMessage(chatId: string) {
 		this.streamingMessages.delete(chatId);
+		this.streamingBranchMaps.delete(chatId);
 	}
 
 	// [新增] 恢复之前的状态（用于回滚）
@@ -189,6 +204,7 @@ class ChatStore {
 		for (const [chatId, message] of entries) {
 			if (!message.isStreaming) {
 				this.streamingMessages.delete(chatId);
+				this.streamingBranchMaps.delete(chatId);
 			}
 		}
 	}
@@ -221,6 +237,59 @@ class ChatStore {
 		return Array.from(this.streamingMessages.values()).filter(
 			(msg) => msg.isStreaming,
 		);
+	}
+
+	// 获取当前会话的流式消息
+	getCurrentSessionStreamingMessages(): Message[] {
+		const currentSessionId = this.activeSessionId;
+		if (!currentSessionId) return [];
+
+		return Array.from(this.streamingMessages.values()).filter(
+			(msg) => msg.isStreaming,
+		);
+	}
+
+	// 保存流式消息的分支映射
+	saveStreamingBranchMap(
+		assistantMessageId: string,
+		sessionId: string,
+		branchMap: Map<string, string>,
+	) {
+		this.streamingBranchMaps.set(assistantMessageId, {
+			sessionId,
+			branchMap: new Map(branchMap),
+		});
+	}
+
+	// 获取流式消息的分支映射
+	getStreamingBranchMap(
+		assistantMessageId: string,
+	): Map<string, string> | undefined {
+		const data = this.streamingBranchMaps.get(assistantMessageId);
+		return data?.branchMap ? new Map(data.branchMap) : undefined;
+	}
+
+	// 删除流式消息的分支映射
+	deleteStreamingBranchMap(assistantMessageId: string) {
+		this.streamingBranchMaps.delete(assistantMessageId);
+	}
+
+	// 清除指定会话的所有流式分支映射
+	clearSessionStreamingBranchMaps(sessionId: string) {
+		const keysToDelete: string[] = [];
+		this.streamingBranchMaps.forEach((value, key) => {
+			if (value.sessionId === sessionId) {
+				keysToDelete.push(key);
+			}
+		});
+		keysToDelete.forEach((key) => {
+			this.streamingBranchMaps.delete(key);
+		});
+	}
+
+	// 清除所有流式分支映射
+	clearAllStreamingBranchMaps() {
+		this.streamingBranchMaps.clear();
 	}
 }
 

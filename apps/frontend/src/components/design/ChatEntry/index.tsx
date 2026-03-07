@@ -27,6 +27,7 @@ interface ChatEntryProps {
 	clearChat: () => void;
 	stopGenerating: () => void;
 	chatInputRef?: React.RefObject<HTMLTextAreaElement | null>; // 新增
+	children?: React.ReactNode;
 }
 
 const ChatEntry: React.FC<ChatEntryProps> = ({
@@ -43,11 +44,13 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 	clearChat,
 	stopGenerating,
 	chatInputRef,
+	children,
 }) => {
 	return (
-		<div className="p-5.5 pt-5 backdrop-blur-sm">
+		<div className="relative p-5.5 pt-5 backdrop-blur-sm">
 			<div className="max-w-3xl mx-auto flex">
-				<div className="flex-1 relative overflow-hidden">
+				<div className="flex-1 relative">
+					{children}
 					<div className="flex flex-col overflow-y-auto rounded-md bg-theme/5 border border-theme-white/10">
 						{uploadedFiles?.length > 0 ? (
 							<>
