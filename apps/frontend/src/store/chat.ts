@@ -215,6 +215,13 @@ class ChatStore {
 			this.sessionBranchSelections.delete(sessionId);
 		}
 	}
+
+	// 获取当前正在流式输出的消息
+	getStreamingMessages(): Message[] {
+		return Array.from(this.streamingMessages.values()).filter(
+			(msg) => msg.isStreaming,
+		);
+	}
 }
 
 export default new ChatStore();
