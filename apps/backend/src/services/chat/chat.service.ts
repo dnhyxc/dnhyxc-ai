@@ -341,13 +341,6 @@ export class ChatService {
 						...(memeries?.messages || []),
 					];
 
-					if (isContinuation) {
-						newData.push({
-							role: 'assistant',
-							content: partialContent,
-						});
-					}
-
 					newData.push(...uniqueEnhanced);
 
 					const allMessages = this.convertToLangChainMessages(newData);
@@ -382,8 +375,8 @@ export class ChatService {
 
 							const content = chunk.content;
 							if (typeof content === 'string') {
-								// 【修改】收到第一个 Token 时，将用户消息加入队列（延迟持久化）
-								if (!hasReceivedFirstToken) {
+								// 【修改】收到第一个有效的 Token 时，将用户消息加入队列（延迟持久化）
+								if (!hasReceivedFirstToken && content.trim() !== '') {
 									hasReceivedFirstToken = true;
 
 									// 保存用户消息（延迟持久化 - 入队）

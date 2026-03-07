@@ -79,11 +79,9 @@ export class ChatController {
 	async continueStream(@Body() dto: ChatContinueDto): Promise<Observable<any>> {
 		const source$ = (await this.chatService.continueStream(dto)).pipe(
 			map((chunk) => {
-				const data = JSON.parse(chunk);
 				return {
 					data: {
-						content: data.content,
-						sessionId: data.sessionId,
+						content: chunk,
 						done: false,
 					},
 				};

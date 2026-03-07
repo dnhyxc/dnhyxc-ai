@@ -11,7 +11,6 @@ import { Session } from '@/types/chat';
 
 const Chat = observer(() => {
 	const [open, setOpen] = useState(false);
-	const [activeSessionId, setActiveSessionId] = useState<string>('');
 
 	const { chatStore } = useStore();
 
@@ -33,15 +32,15 @@ const Chat = observer(() => {
 		return () => {
 			// 清理聊天消息，确保下次进入是新的聊天页面
 			chatStore.setAllMessages([], '', true);
-			setActiveSessionId('');
+			chatStore.setActiveSessionId('');
 			setStreamingSessionId('');
 		};
 	}, []);
 
 	const onSelectSession = (session: Session) => {
 		// 如果切换到不同的会话，更新 activeSessionId
-		if (session.id !== activeSessionId) {
-			setActiveSessionId(session.id);
+		if (session.id !== chatStore.activeSessionId) {
+			chatStore.setActiveSessionId(session.id);
 
 			// 检查会话是否有流式消息
 			const hasStreamingMessage = session.messages?.some((m) => m.isStreaming);
@@ -98,8 +97,6 @@ const Chat = observer(() => {
 			<ChatBot
 				// 修改：传递完整树
 				onBranchChange={onBranchChange}
-				activeSessionId={activeSessionId}
-				setActiveSessionId={setActiveSessionId}
 			/>
 			<Drawer title="历史对话" open={open} onOpenChange={() => setOpen(false)}>
 				<ScrollArea className="h-full overflow-y-auto pr-4 box-border">
@@ -107,7 +104,7 @@ const Chat = observer(() => {
 						return (
 							<div
 								key={item.id}
-								className={`h-10 p-2 hover:bg-theme/10 rounded-sm cursor-pointer flex items-center justify-between ${activeSessionId === item.id ? 'bg-theme/10' : ''}`}
+								className={`h-10 p-2 hover:bg-theme/10 rounded-sm cursor-pointer flex items-center justify-between ${chatStore.activeSessionId === item.id ? 'bg-theme/10' : ''}`}
 								onClick={() => onSelectSession(item)}
 							>
 								<div
@@ -118,6 +115,7 @@ const Chat = observer(() => {
 										),
 									}}
 								/>
+								{chatStore.loadingSessions.has(item.id) ? '生成中' : null}
 							</div>
 						);
 					})}

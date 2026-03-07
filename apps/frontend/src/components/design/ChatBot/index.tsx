@@ -50,17 +50,13 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 		apiEndpoint = '/chat/sse',
 		showAvatar = false,
 		onBranchChange,
-		activeSessionId,
-		setActiveSessionId,
 	} = props;
 	const { chatStore } = useStore();
 
 	// allMessages 存储完整树（包含所有分支和流式消息）- 使用chatStore
 	// 使用useState同步store变化，确保React重新渲染
 	const [allMessages, setAllMessages] = useState<Message[]>(chatStore.messages);
-	// messages 存储当前显示的路径（由 selectedChildMap 决定）
 	const [messages, setMessages] = useState<Message[]>([]);
-	const [sessionId, setSessionId] = useState('');
 	const [input, setInput] = useState('');
 
 	const [autoScroll, setAutoScroll] = useState(true);
@@ -77,14 +73,16 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 	const requestSnapshotRef = useRef<RequestSnapshot | null>(null);
 	// [新增] 标记是否已接收到流式数据 (Thinking 或 Content)
 	const hasReceivedStreamDataRef = useRef(false);
-	// [新增] 按 sessionId 维护加载状态集合
-	const loadingSessionsRef = useRef<Set<string>>(new Set());
 
 	const updateStoreMessages = (
 		updater: (prevMessages: Message[]) => Message[],
 	) => {
 		const updatedMessages = updater(chatStore.messages);
-		chatStore.setAllMessages(updatedMessages, activeSessionId || '', false);
+		chatStore.setAllMessages(
+			updatedMessages,
+			chatStore.activeSessionId || '',
+			false,
+		);
 	};
 
 	const stopRequestRef = useRef<(() => void) | null>(null);
@@ -109,18 +107,18 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 
 	// 判断当前会话是否正在加载
 	const isCurrentSessionLoading = useCallback(() => {
-		const currentSessionId = activeSessionId || sessionId;
+		const currentSessionId = chatStore.activeSessionId;
 		if (!currentSessionId) return false;
-		return loadingSessionsRef.current.has(currentSessionId);
-	}, [activeSessionId, sessionId]);
+		return chatStore.loadingSessions.has(currentSessionId);
+	}, [chatStore.activeSessionId]);
 
 	// 设置会话加载状态
 	const setSessionLoading = useCallback(
 		(sessionId: string, isLoading: boolean) => {
 			if (isLoading) {
-				loadingSessionsRef.current.add(sessionId);
+				chatStore.addLoadingSession(sessionId);
 			} else {
-				loadingSessionsRef.current.delete(sessionId);
+				chatStore.delLoadingSession(sessionId);
 			}
 		},
 		[],
@@ -128,13 +126,13 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 
 	// 清除所有会话的加载状态
 	const clearAllSessionLoading = useCallback(() => {
-		loadingSessionsRef.current.clear();
+		chatStore.clearLoadingSessions();
 	}, []);
 
 	useEffect(() => {
 		// 注意：切换会话时不停止流式输出，让它在后台继续
 		// 如果 activeSessionId 为空，表示是新会话，清空所有状态
-		if (!activeSessionId) {
+		if (!chatStore.activeSessionId) {
 			setSelectedChildMap(new Map());
 			setInput('');
 			setUploadedFiles([]);
@@ -143,7 +141,9 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 		}
 
 		// 尝试从store恢复之前保存的分支选择状态
-		const savedSelection = chatStore.getSessionBranchSelection(activeSessionId);
+		const savedSelection = chatStore.getSessionBranchSelection(
+			chatStore.activeSessionId,
+		);
 
 		if (chatStore.messages.length > 0) {
 			if (savedSelection) {
@@ -156,7 +156,7 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 					setSelectedChildMap(latestBranchMap);
 					// 保存这个自动选择的状态
 					chatStore.saveSessionBranchSelection(
-						activeSessionId,
+						chatStore.activeSessionId,
 						latestBranchMap,
 					);
 				} else {
@@ -180,7 +180,7 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 		setInput('');
 		setUploadedFiles([]);
 		setEditMessage(null);
-	}, [activeSessionId]);
+	}, [chatStore.activeSessionId]);
 
 	// 核心逻辑：根据 allMessages 和 selectedChildMap 推导当前显示的 messages
 	// 流式消息始终在 allMessages 中更新，视图根据 selectedChildMap 显示
@@ -243,9 +243,9 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 	};
 
 	const getSessionInfo = async () => {
-		const res = await createSession(activeSessionId || sessionId);
+		const res = await createSession(chatStore.activeSessionId);
 		if (res.success) {
-			setSessionId(res.data);
+			chatStore.setActiveSessionId(res.data);
 		}
 		return res.data;
 	};
@@ -260,7 +260,7 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 		// [新增] 重置数据接收标记
 		hasReceivedStreamDataRef.current = false;
 
-		let session_Id = activeSessionId || sessionId;
+		let session_Id = chatStore.activeSessionId;
 
 		if (!session_Id) {
 			try {
@@ -442,7 +442,7 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 		}
 
 		// [新增] 在更新 Store 之前保存快照
-		const currentSessionId = activeSessionId || sessionId;
+		const currentSessionId = chatStore.activeSessionId;
 		requestSnapshotRef.current = {
 			messages: [...chatStore.messages],
 			selectedChildMap: new Map(selectedChildMap),
@@ -452,9 +452,9 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 		};
 
 		setSelectedChildMap(newSelectedChildMap);
-		if (activeSessionId) {
+		if (chatStore.activeSessionId) {
 			chatStore.saveSessionBranchSelection(
-				activeSessionId,
+				chatStore.activeSessionId,
 				newSelectedChildMap,
 			);
 		}
@@ -498,7 +498,7 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 		const newSelectedChildMap = new Map(selectedChildMap);
 
 		// [新增] 在更新 Store 之前保存快照
-		const currentSessionId = activeSessionId || sessionId;
+		const currentSessionId = chatStore.activeSessionId;
 		requestSnapshotRef.current = {
 			messages: [...chatStore.messages],
 			selectedChildMap: new Map(selectedChildMap),
@@ -549,9 +549,9 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 
 		setSelectedChildMap(newSelectedChildMap);
 		// 保存分支选择状态
-		if (activeSessionId) {
+		if (chatStore.activeSessionId) {
 			chatStore.saveSessionBranchSelection(
-				activeSessionId,
+				chatStore.activeSessionId,
 				newSelectedChildMap,
 			);
 		}
@@ -580,7 +580,7 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 		if (!currentAssistantMsg) return;
 
 		// [新增] 在更新 Store 之前保存快照
-		const currentSessionId = activeSessionId || sessionId;
+		const currentSessionId = chatStore.activeSessionId;
 		requestSnapshotRef.current = {
 			messages: [...chatStore.messages],
 			selectedChildMap: new Map(selectedChildMap),
@@ -623,8 +623,11 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 
 			setSelectedChildMap(childMap);
 			// 保存分支选择状态
-			if (activeSessionId) {
-				chatStore.saveSessionBranchSelection(activeSessionId, childMap);
+			if (chatStore.activeSessionId) {
+				chatStore.saveSessionBranchSelection(
+					chatStore.activeSessionId,
+					childMap,
+				);
 			}
 
 			return newAllMessages.map((i) => ({ ...i, isStopped: false }));
@@ -718,7 +721,7 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 
 	// [修改] 停止生成逻辑：支持回滚
 	const stopGenerating = async (isUnmount = false) => {
-		const session_id = activeSessionId || sessionId;
+		const session_id = chatStore.activeSessionId;
 
 		// 1. 停止网络请求
 		if (stopRequestRef.current) {
@@ -774,14 +777,13 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 	const clearChat = () => {
 		setInput('');
 		chatStore.setAllMessages([], '', true);
-		chatStore.clearSessionBranchSelection(activeSessionId);
+		chatStore.clearSessionBranchSelection(chatStore.activeSessionId);
 		setMessages([]);
 		// 不再停止接口调用
 		// stopRequestRef.current?.();
 		// stopRequestRef.current = null;
 		clearAllSessionLoading();
-		setSessionId('');
-		setActiveSessionId?.('');
+		chatStore.setActiveSessionId('');
 		setSelectedChildMap(new Map());
 		requestSnapshotRef.current = null;
 		hasReceivedStreamDataRef.current = false;
@@ -879,9 +881,9 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 			}
 			setSelectedChildMap(newSelectedChildMap);
 			// 保存分支选择状态
-			if (activeSessionId) {
+			if (chatStore.activeSessionId) {
 				chatStore.saveSessionBranchSelection(
-					activeSessionId,
+					chatStore.activeSessionId,
 					newSelectedChildMap,
 				);
 			}

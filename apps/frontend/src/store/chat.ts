@@ -11,12 +11,30 @@ class ChatStore {
 		list: [],
 		total: 0,
 	};
+	activeSessionId: string = '';
+	loadingSessions: Set<string> = new Set();
 
 	// 全局跟踪所有会话中的流式消息
 	streamingMessages: Map<string, Message> = new Map();
 
 	// 存储每个会话的分支选择状态：sessionId -> selectedChildMap
 	sessionBranchSelections: Map<string, Map<string, string>> = new Map();
+
+	addLoadingSession(sessionId: string) {
+		this.loadingSessions.add(sessionId);
+	}
+
+	delLoadingSession(sessionId: string) {
+		this.loadingSessions.delete(sessionId);
+	}
+
+	clearLoadingSessions() {
+		this.loadingSessions.clear();
+	}
+
+	setActiveSessionId(sessionId: string) {
+		this.activeSessionId = sessionId;
+	}
 
 	setAllMessages(
 		messages: Message[],
