@@ -12,7 +12,6 @@ import {
 	ChevronLeft,
 	ChevronRight,
 	Copy,
-	LocateFixed,
 	PencilLine,
 	RotateCw,
 	Sparkles,
