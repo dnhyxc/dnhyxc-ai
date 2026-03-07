@@ -1,7 +1,7 @@
 import ChatBot from '@design/ChatBot';
 import { Drawer } from '@design/Drawer';
 import { MarkdownParser } from '@dnhyxc-ai/tools';
-import { ScrollArea } from '@ui/index';
+import { ScrollArea, Spinner } from '@ui/index';
 import { PanelRightClose, PanelRightOpen } from 'lucide-react';
 import { observer } from 'mobx-react';
 import { useEffect, useMemo, useState } from 'react';
@@ -115,7 +115,9 @@ const Chat = observer(() => {
 										),
 									}}
 								/>
-								{chatStore.loadingSessions.has(item.id) ? '生成中' : null}
+								{chatStore.loadingSessions.has(item.id) ? (
+									<Spinner className="w-4 h-4 mr-2 text-cyan-400" />
+								) : null}
 							</div>
 						);
 					})}
