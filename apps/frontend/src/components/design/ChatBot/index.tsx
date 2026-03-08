@@ -21,6 +21,7 @@ import * as mobx from 'mobx';
 import { observer } from 'mobx-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
+import { useBranchManage } from '@/hooks/useBranchManage';
 import { cn } from '@/lib/utils';
 import { createSession, stopSse, uploadFiles } from '@/service';
 import useStore from '@/store';
@@ -94,6 +95,19 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 
 	const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const focusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+	// 使用分支管理 hook
+	const {
+		isStreamingBranchVisible,
+		isLatestBranch,
+		switchToLatestBranch,
+		switchToStreamingBranch,
+	} = useBranchManage({
+		messages,
+		selectedChildMap,
+		setSelectedChildMap,
+		setAutoScroll,
+	});
 
 	// 监听store变化，同步到本地状态
 	useEffect(() => {
@@ -658,31 +672,17 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 		}
 	};
 
-	const sendMessage = async (
-		content?: string,
-		index?: number,
-		isEdit?: boolean,
-		attachments?: UploadedFile[] | null,
-	) => {
-		if ((!content && !input.trim()) || isCurrentSessionLoading()) return;
-
-		const isRegenerate =
-			content !== undefined && index !== undefined && !isEdit;
-		const isEditMode = isEdit === true;
-
-		if (isEditMode) {
-			await handleEditMessage(content, attachments);
-		} else if (isRegenerate) {
-			await handleRegenerateMessage(content!, index);
-		} else {
-			await handleNewMessage(content || input.trim());
+	// 重新生成
+	const onReGenerate = (index: number) => {
+		if (index > 0) {
+			const userMsg = messages[index - 1];
+			if (userMsg && userMsg.role === 'user') {
+				sendMessage(userMsg.content, index);
+			}
 		}
-
-		setInput('');
-		setUploadedFiles([]);
-		setAutoScroll(true);
 	};
 
+	// 继续生成
 	const onContinue = async () => {
 		let userMsgForApi: Message | null = null;
 		let assistantMsgForApi: Message | null = null;
@@ -732,6 +732,32 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 				onSseFetch('/chat/continueSse', lastMsgId, undefined, undefined, false);
 			}
 		}
+	};
+
+	// 发送消息
+	const sendMessage = async (
+		content?: string,
+		index?: number,
+		isEdit?: boolean,
+		attachments?: UploadedFile[] | null,
+	) => {
+		if ((!content && !input.trim()) || isCurrentSessionLoading()) return;
+
+		const isRegenerate =
+			content !== undefined && index !== undefined && !isEdit;
+		const isEditMode = isEdit === true;
+
+		if (isEditMode) {
+			await handleEditMessage(content, attachments);
+		} else if (isRegenerate) {
+			await handleRegenerateMessage(content!, index);
+		} else {
+			await handleNewMessage(content || input.trim());
+		}
+
+		setInput('');
+		setUploadedFiles([]);
+		setAutoScroll(true);
 	};
 
 	// [修改] 停止生成逻辑：支持回滚
@@ -866,15 +892,6 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 		onFocusEditInput();
 	};
 
-	const onReGenerate = (index: number) => {
-		if (index > 0) {
-			const userMsg = messages[index - 1];
-			if (userMsg && userMsg.role === 'user') {
-				sendMessage(userMsg.content, index);
-			}
-		}
-	};
-
 	// 分支切换 - 支持流式输出时切换，流式消息在后台继续更新
 	const handleBranchChange = (msgId: string, direction: 'prev' | 'next') => {
 		onBranchChange?.(msgId, direction);
@@ -905,116 +922,6 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 			}
 		}
 	};
-
-	// 检测当前显示的分支是否包含流式消息，只检查当前会话的流式消息
-	const isStreamingBranchVisible = useCallback(() => {
-		const currentSessionId = chatStore.activeSessionId;
-		if (!currentSessionId) return true;
-
-		// 只获取当前会话的流式消息
-		const streamingMessages = chatStore.getStreamingMessages().filter((msg) => {
-			const branchData = chatStore.streamingBranchMaps.get(msg.chatId);
-			return branchData?.sessionId === currentSessionId;
-		});
-
-		// 如果没有当前会话的流式消息，返回 true 表示当前分支"可见"
-		if (streamingMessages.length === 0) return true;
-
-		// 检查当前显示的 messages 中是否包含任何当前会话的流式消息
-		const visibleChatIds = new Set(messages.map((m) => m.chatId));
-		return streamingMessages.some((msg) => visibleChatIds.has(msg.chatId));
-	}, [chatStore, messages]);
-
-	// 获取当前不可见的流式消息的分支映射，只查找当前会话的流式消息
-	const getInvisibleStreamingBranchMap = useCallback((): Map<
-		string,
-		string
-	> | null => {
-		const currentSessionId = chatStore.activeSessionId;
-		if (!currentSessionId) return null;
-
-		// 只获取当前会话的流式消息
-		const streamingMessages = chatStore.getStreamingMessages().filter((msg) => {
-			const branchData = chatStore.streamingBranchMaps.get(msg.chatId);
-			return branchData?.sessionId === currentSessionId;
-		});
-
-		if (streamingMessages.length === 0) return null;
-
-		// 获取当前可见的消息 ID
-		const visibleChatIds = new Set(messages.map((m) => m.chatId));
-
-		// 找到第一个不可见的当前会话的流式消息
-		for (const msg of streamingMessages) {
-			if (!visibleChatIds.has(msg.chatId)) {
-				// 找到对应的分支映射
-				const branchMap = chatStore.getStreamingBranchMap(msg.chatId);
-				if (branchMap) {
-					return branchMap;
-				}
-			}
-		}
-		return null;
-	}, [chatStore, messages]);
-
-	// 检测当前是否在最新分支，通过检查当前显示的每条消息是否是其父节点的最新子节点来判断
-	const isLatestBranch = useCallback(() => {
-		if (chatStore.messages.length === 0) return true;
-		if (messages.length === 0) return true;
-
-		// 获取最新分支的选择映射
-		const latestBranchMap = findLatestBranchSelection(chatStore.messages);
-		if (!latestBranchMap || latestBranchMap.size === 0) return true;
-
-		// 检查当前显示的每个节点是否与最新分支一致
-		// 遍历当前显示的消息，检查每个消息是否是最新分支中的消息
-		for (const msg of messages) {
-			const parentId = msg.parentId || 'root';
-			const latestChildId = latestBranchMap.get(parentId);
-			const currentChildId = selectedChildMap.get(parentId);
-
-			// 如果当前选择的子节点与最新分支的子节点不同，说明不在最新分支
-			if (latestChildId && currentChildId && latestChildId !== currentChildId) {
-				return false;
-			}
-		}
-
-		return true;
-	}, [chatStore.messages, messages, selectedChildMap]);
-
-	// 切换到最新分支
-	const switchToLatestBranch = useCallback(() => {
-		if (chatStore.messages.length === 0) return;
-		const latestBranchMap = findLatestBranchSelection(chatStore.messages);
-		if (latestBranchMap) {
-			setSelectedChildMap(new Map(latestBranchMap));
-			// 保存分支选择状态
-			if (chatStore.activeSessionId) {
-				chatStore.saveSessionBranchSelection(
-					chatStore.activeSessionId,
-					latestBranchMap,
-				);
-			}
-			setAutoScroll(true);
-		}
-	}, [chatStore.messages, chatStore.activeSessionId]);
-
-	// 切换回流式消息所在的分支
-	const switchToStreamingBranch = useCallback(() => {
-		const branchMap = getInvisibleStreamingBranchMap();
-		if (branchMap) {
-			const newSelectedChildMap = new Map(branchMap);
-			setSelectedChildMap(newSelectedChildMap);
-			// 保存分支选择状态
-			if (chatStore.activeSessionId) {
-				chatStore.saveSessionBranchSelection(
-					chatStore.activeSessionId,
-					newSelectedChildMap,
-				);
-			}
-			setAutoScroll(true);
-		}
-	}, [chatStore.activeSessionId, getInvisibleStreamingBranchMap]);
 
 	return (
 		<div className={cn('flex flex-col h-full w-full', className)}>
