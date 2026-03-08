@@ -10,10 +10,9 @@ import useStore from '@/store';
 import { Session } from '@/types/chat';
 
 const Chat = observer(() => {
-	const [open, setOpen] = useState(false);
-
 	const { chatStore } = useStore();
 
+	const [open, setOpen] = useState(false);
 	// 跟踪当前正在流式的会话ID
 	const [streamingSessionId, setStreamingSessionId] = useState<string>('');
 
@@ -52,7 +51,6 @@ const Chat = observer(() => {
 				setStreamingSessionId('');
 			}
 
-			// 修改：直接传递完整消息树，不要调用 buildMessageList 裁剪
 			// ChatBot 内部会负责根据 selectedChildMap 计算显示路径
 			chatStore.setAllMessages(session.messages || [], session.id, false);
 			setOpen(false);

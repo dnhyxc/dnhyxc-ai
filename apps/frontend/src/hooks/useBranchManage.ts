@@ -1,5 +1,4 @@
 import { useCallback } from 'react';
-import { findLatestBranchSelection } from '@/components/design/ChatBot/tools';
 import useStore from '@/store';
 import { Message } from '@/types/chat';
 
@@ -17,6 +16,75 @@ export const useBranchManage = ({
 	setAutoScroll,
 }: UseBranchManagementProps) => {
 	const { chatStore } = useStore();
+
+	// 查找最新的分支选择：自动选择每个层级的最新（最后创建）子节点
+	const findLatestBranchSelection = (
+		allMessages: Message[],
+	): Map<string, string> => {
+		const selectionMap = new Map<string, string>();
+
+		// 找出所有根消息
+		const allChildren = new Set<string>();
+		allMessages.forEach((m) => {
+			m.childrenIds?.forEach((c) => {
+				allChildren.add(c);
+			});
+		});
+		const rootMessages = allMessages.filter((m) => {
+			const isNotChild = !allChildren.has(m.chatId);
+			const hasNoParent = !m.parentId;
+			return isNotChild && hasNoParent;
+		});
+
+		// 如果没有根消息，返回空Map
+		if (rootMessages.length === 0) {
+			return selectionMap;
+		}
+
+		// 按创建时间排序，选择最新的根消息
+		const sortedRootMessages = rootMessages.sort(
+			(a, b) =>
+				(a.createdAt
+					? new Date(a.createdAt).getTime()
+					: new Date(a.timestamp).getTime()) -
+				(b.createdAt
+					? new Date(b.createdAt).getTime()
+					: new Date(b.timestamp).getTime()),
+		);
+		const latestRoot = sortedRootMessages[sortedRootMessages.length - 1];
+		selectionMap.set('root', latestRoot.chatId);
+
+		// 递归选择每个层级的最新子节点
+		let currentMessage = latestRoot;
+		while (
+			currentMessage?.childrenIds &&
+			currentMessage.childrenIds.length > 0
+		) {
+			// 获取当前消息的所有子节点
+			const children = allMessages.filter(
+				(m) => m.parentId === currentMessage.chatId,
+			);
+			if (children.length === 0) break;
+
+			// 按创建时间排序，选择最新的子节点
+			const sortedChildren = children.sort(
+				(a, b) =>
+					(a.createdAt
+						? new Date(a.createdAt).getTime()
+						: new Date(a.timestamp).getTime()) -
+					(b.createdAt
+						? new Date(b.createdAt).getTime()
+						: new Date(b.timestamp).getTime()),
+			);
+			const latestChild = sortedChildren[sortedChildren.length - 1];
+			selectionMap.set(currentMessage.chatId, latestChild.chatId);
+
+			// 继续下一层级
+			currentMessage = latestChild;
+		}
+
+		return selectionMap;
+	};
 
 	// 检测当前显示的分支是否包含流式消息，只检查当前会话的流式消息
 	const isStreamingBranchVisible = useCallback(() => {
@@ -139,5 +207,6 @@ export const useBranchManage = ({
 		isLatestBranch,
 		switchToLatestBranch,
 		switchToStreamingBranch,
+		findLatestBranchSelection,
 	};
 };

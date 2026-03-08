@@ -19,24 +19,26 @@ import {
 } from 'lucide-react';
 import * as mobx from 'mobx';
 import { observer } from 'mobx-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { useBranchManage } from '@/hooks/useBranchManage';
+import { useMessageTools } from '@/hooks/useMessageTools';
+import { useSessionLoading } from '@/hooks/useSessionLoading';
 import { cn } from '@/lib/utils';
 import { createSession, stopSse, uploadFiles } from '@/service';
 import useStore from '@/store';
 import { FileWithPreview, UploadedFile } from '@/types';
 import { ChatBotProps, ChatRequestParams, Message } from '@/types/chat';
 import { streamFetch } from '@/utils/sse';
-import { buildMessageList, getFormatMessages } from '@/views/chat/tools';
-import {
-	createAssistantMessage,
-	createUserMessage,
-	findLastAssistantMessage,
-	findLatestBranchSelection,
-	findSiblings,
-	updateParentChildrenIds,
-} from './tools';
+
+// import { buildMessageList, getFormatMessages } from '@/views/chat/tools';
+// import {
+// 	createAssistantMessage,
+// 	createUserMessage,
+// 	findLastAssistantMessage,
+// 	findSiblings,
+// 	updateParentChildrenIds,
+// } from './tools';
 
 // 定义快照类型
 interface RequestSnapshot {
@@ -102,12 +104,27 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 		isLatestBranch,
 		switchToLatestBranch,
 		switchToStreamingBranch,
+		findLatestBranchSelection,
 	} = useBranchManage({
 		messages,
 		selectedChildMap,
 		setSelectedChildMap,
 		setAutoScroll,
 	});
+
+	// 使用会话加载状态 hook
+	const { isCurrentSessionLoading, setSessionLoading, clearAllSessionLoading } =
+		useSessionLoading();
+
+	const {
+		createAssistantMessage,
+		createUserMessage,
+		findLastAssistantMessage,
+		findSiblings,
+		updateParentChildrenIds,
+		buildMessageList,
+		getFormatMessages,
+	} = useMessageTools();
 
 	// 监听store变化，同步到本地状态
 	useEffect(() => {
@@ -120,30 +137,6 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 		);
 		return () => dispose();
 	}, [chatStore]);
-
-	// 判断当前会话是否正在加载
-	const isCurrentSessionLoading = useCallback(() => {
-		const currentSessionId = chatStore.activeSessionId;
-		if (!currentSessionId) return false;
-		return chatStore.loadingSessions.has(currentSessionId);
-	}, [chatStore.activeSessionId]);
-
-	// 设置会话加载状态
-	const setSessionLoading = useCallback(
-		(sessionId: string, isLoading: boolean) => {
-			if (isLoading) {
-				chatStore.addLoadingSession(sessionId);
-			} else {
-				chatStore.delLoadingSession(sessionId);
-			}
-		},
-		[],
-	);
-
-	// 清除所有会话的加载状态
-	const clearAllSessionLoading = useCallback(() => {
-		chatStore.clearLoadingSessions();
-	}, []);
 
 	useEffect(() => {
 		// 注意：切换会话时不停止流式输出，让它在后台继续
@@ -198,8 +191,10 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 		setEditMessage(null);
 	}, [chatStore.activeSessionId]);
 
-	// 核心逻辑：根据 allMessages 和 selectedChildMap 推导当前显示的 messages
-	// 流式消息始终在 allMessages 中更新，视图根据 selectedChildMap 显示
+	/**
+	 * 核心逻辑：根据 allMessages 和 selectedChildMap 推导当前显示的 messages，
+	 * 流式消息始终在 allMessages 中更新，视图根据 selectedChildMap 显示
+	 */
 	useEffect(() => {
 		const sortedMessages = buildMessageList(allMessages, selectedChildMap);
 		const formattedMessages = getFormatMessages(sortedMessages);
@@ -266,15 +261,16 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 		return res.data;
 	};
 
+	// 流式处理器
 	const onSseFetch = async (
 		api: string = apiEndpoint,
 		assistantMessageId: string,
 		userMessage?: Message,
 		assistantMessage?: Message,
 		isRegenerate?: boolean,
-		branchMap?: Map<string, string>, // [新增] 可选的分支映射参数
+		branchMap?: Map<string, string>, // 可选的分支映射参数
 	) => {
-		// [新增] 重置数据接收标记
+		// 重置数据接收标记
 		hasReceivedStreamDataRef.current = false;
 
 		let session_Id = chatStore.activeSessionId;
@@ -290,7 +286,7 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 			}
 		}
 
-		// [修改] 在发起请求前设置 loading 状态并保存分支映射
+		// 在发起请求前设置 loading 状态并保存分支映射
 		// 使用传入的 branchMap 或当前的 selectedChildMap
 		const branchMapToSave = branchMap || selectedChildMap;
 		setSessionLoading(session_Id, true);
@@ -432,7 +428,7 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 		}
 	};
 
-	// [修改] 保存快照并发送新消息
+	// 保存快照并发送新消息
 	const handleNewMessage = async (content: string) => {
 		const userMsgId = uuidv4();
 		const assistantMessageId = uuidv4();
@@ -509,7 +505,7 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 		);
 	};
 
-	// [修改] 保存快照并编辑消息
+	// 保存快照并编辑消息
 	const handleEditMessage = async (
 		content?: string,
 		attachments?: UploadedFile[] | null,
@@ -760,7 +756,7 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 		setAutoScroll(true);
 	};
 
-	// [修改] 停止生成逻辑：支持回滚
+	// 停止生成逻辑：支持回滚
 	const stopGenerating = async (isUnmount = false) => {
 		const session_id = chatStore.activeSessionId;
 
