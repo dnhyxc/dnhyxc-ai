@@ -258,6 +258,7 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 		userMessage?: Message,
 		assistantMessage?: Message,
 		isRegenerate?: boolean,
+		branchMap?: Map<string, string>, // [新增] 可选的分支映射参数
 	) => {
 		// [新增] 重置数据接收标记
 		hasReceivedStreamDataRef.current = false;
@@ -274,6 +275,16 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 				return;
 			}
 		}
+
+		// [修改] 在发起请求前设置 loading 状态并保存分支映射
+		// 使用传入的 branchMap 或当前的 selectedChildMap
+		const branchMapToSave = branchMap || selectedChildMap;
+		setSessionLoading(session_Id, true);
+		chatStore.saveStreamingBranchMap(
+			assistantMessageId,
+			session_Id,
+			branchMapToSave,
+		);
 
 		const parentId = isRegenerate ? userMessage?.chatId : userMessage?.parentId;
 
@@ -305,10 +316,6 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 					body: JSON.stringify(messages),
 				},
 				callbacks: {
-					// onStart: () => {
-					// 	// 设置当前会话的加载状态
-					// 	setSessionLoading(session_Id, true);
-					// },
 					onThinking: (thinking) => {
 						if (typeof thinking === 'string') {
 							// [新增] 标记已收到数据
@@ -455,18 +462,7 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 			sessionId: currentSessionId,
 		};
 
-		// [修改] 在更新 store 之前设置 loading 状态，避免按钮闪烁
-		if (currentSessionId) {
-			setSessionLoading(currentSessionId, true);
-		}
-
 		setSelectedChildMap(newSelectedChildMap);
-		// 保存流式输出消息所在的分支选择状态
-		chatStore.saveStreamingBranchMap(
-			assistantMessageId,
-			chatStore.activeSessionId || '',
-			newSelectedChildMap,
-		);
 		if (chatStore.activeSessionId) {
 			chatStore.saveSessionBranchSelection(
 				chatStore.activeSessionId,
@@ -495,6 +491,7 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 			userMessageToUse,
 			assistantMessage,
 			false,
+			newSelectedChildMap, // [修改] 传递新创建的分支映射
 		);
 	};
 
@@ -521,11 +518,6 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 			userMessageId: userMsgId,
 			sessionId: currentSessionId,
 		};
-
-		// [修改] 在更新 store 之前设置 loading 状态，避免按钮闪烁
-		if (currentSessionId) {
-			setSessionLoading(currentSessionId, true);
-		}
 
 		updateStoreMessages((prevAll) => {
 			const editedMsg = prevAll.find((m) => m.chatId === editMessage.chatId);
@@ -568,12 +560,6 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 		});
 
 		setSelectedChildMap(newSelectedChildMap);
-		// 保存流式输出消息所在的分支选择状态
-		chatStore.saveStreamingBranchMap(
-			assistantMessageId,
-			chatStore.activeSessionId || '',
-			newSelectedChildMap,
-		);
 		// 保存分支选择状态
 		if (chatStore.activeSessionId) {
 			chatStore.saveSessionBranchSelection(
@@ -589,6 +575,7 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 				userMessageToUse,
 				assistantMessage,
 				false,
+				newSelectedChildMap, // [修改] 传递新创建的分支映射
 			);
 			setEditMessage(null);
 		}
@@ -614,11 +601,6 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 			userMessageId: currentAssistantMsg.parentId || '',
 			sessionId: currentSessionId,
 		};
-
-		// [修改] 在更新 store 之前设置 loading 状态，避免按钮闪烁
-		if (currentSessionId) {
-			setSessionLoading(currentSessionId, true);
-		}
 
 		updateStoreMessages((prevAll) => {
 			const userMsg = prevAll.find(
@@ -653,12 +635,6 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 			newSelectedChildMap = childMap;
 
 			setSelectedChildMap(childMap);
-			// 保存流式输出消息所在的分支选择状态
-			chatStore.saveStreamingBranchMap(
-				assistantMessageId,
-				chatStore.activeSessionId || '',
-				childMap,
-			);
 			// 保存分支选择状态
 			if (chatStore.activeSessionId) {
 				chatStore.saveSessionBranchSelection(
@@ -677,6 +653,7 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 				userMessageToUse,
 				assistantMessage,
 				true,
+				newSelectedChildMap, // [修改] 传递新创建的分支映射
 			);
 		}
 	};
@@ -742,7 +719,7 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 		}
 
 		if (lastMsgId) {
-			setSessionLoading(chatStore.activeSessionId, true);
+			// loading 状态和分支映射在 onSseFetch 中统一处理
 			if (userMsgForApi && assistantMsgForApi) {
 				onSseFetch(
 					'/chat/continueSse',
@@ -819,9 +796,6 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 		chatStore.setAllMessages([], '', true);
 		chatStore.clearSessionBranchSelection(chatStore.activeSessionId);
 		setMessages([]);
-		// 不再停止接口调用
-		// stopRequestRef.current?.();
-		// stopRequestRef.current = null;
 		clearAllSessionLoading();
 		chatStore.setActiveSessionId('');
 		setSelectedChildMap(new Map());
