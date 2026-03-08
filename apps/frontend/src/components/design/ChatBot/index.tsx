@@ -1192,7 +1192,7 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 							{isCurrentSessionLoading() && !isStreamingBranchVisible() && (
 								<Button
 									onClick={switchToStreamingBranch}
-									className="min-w-8 h-8 text-sm bg-cyan-500/20 text-cyan-400 rounded-full hover:bg-cyan-500/30 transition-colors flex items-center gap-2"
+									className="min-w-8 h-8 text-sm bg-cyan-500/25 text-cyan-400 rounded-full hover:bg-cyan-500/30 transition-colors flex items-center gap-2"
 								>
 									<Sparkles />
 									<span className="text-xs">回到正在生成的分支</span>
@@ -1202,7 +1202,7 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 							{!isLatestBranch() && messages.length > 0 && (
 								<Button
 									onClick={switchToLatestBranch}
-									className="min-w-8 h-8 text-sm bg-purple-500/20 text-purple-400 rounded-full hover:bg-purple-500/30 transition-colors flex items-center gap-2"
+									className="min-w-8 h-8 text-sm bg-green-500/25 text-green-400 rounded-full hover:bg-green-500/30 transition-colors flex items-center gap-2"
 								>
 									<Activity />
 									<span className="text-xs">回到最新分支</span>
