@@ -1,22 +1,16 @@
+import ChatAssistantMessage from '@design/ChatAssistantMessage';
 import ChatEntry from '@design/ChatEntry';
 import ChatFileList from '@design/ChatFileList';
 // 导入新提取的消息操作组件
 import ChatMessageActions from '@design/ChatMessageActions';
-import ChatTextArea from '@design/ChatTextArea';
-import MarkdownPreview from '@design/Markdown';
-import { Button, ScrollArea, Spinner, Toast } from '@ui/index';
+// 导入新提取的消息渲染组件
+import ChatUserMessage from '@design/ChatUserMessage';
+import { ScrollArea, Toast } from '@ui/index';
 import { motion } from 'framer-motion';
-import {
-	Activity,
-	Bot,
-	ChevronDown,
-	ChevronRight,
-	Sparkles,
-	User,
-} from 'lucide-react';
+import { Bot, User } from 'lucide-react';
 import * as mobx from 'mobx';
 import { observer } from 'mobx-react';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { useBranchManage } from '@/hooks/useBranchManage';
 import { useMessageTools } from '@/hooks/useMessageTools';
@@ -573,7 +567,8 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 				userMessageToUse,
 				assistantMessage,
 				false,
-				newSelectedChildMap, // [修改] 传递新创建的分支映射
+				// 传递新创建的分支映射
+				newSelectedChildMap,
 			);
 			setEditMessage(null);
 		}
@@ -905,6 +900,24 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 		}
 	};
 
+	const getMessageClassName = useCallback(
+		(message: Message) => {
+			const isEdit = editMessage?.chatId === message.chatId;
+			return cn(
+				'flex-1 rounded-md p-3',
+				message.role === 'user'
+					? `bg-blue-500/10 border border-blue-500/20 text-end pt-2 pb-2.5 px-3 ${isEdit ? 'p-0 pr-2.5 pb-2.5' : ''}`
+					: 'bg-theme/5 border border-theme-white/10',
+				showAvatar
+					? 'max-w-[calc(768px-105px)]'
+					: isEdit
+						? 'w-full bg-theme/5 border-theme-white/10'
+						: 'w-auto',
+			);
+		},
+		[showAvatar, editMessage?.chatId],
+	);
+
 	return (
 		<div className={cn('flex flex-col h-full w-full', className)}>
 			<ScrollArea
@@ -968,101 +981,26 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 														: null}
 												</div>
 											)}
-										<div
-											className={cn(
-												'flex-1 rounded-md p-3',
-												message.role === 'user'
-													? `bg-blue-500/10 border border-blue-500/20 text-end pt-2 pb-2.5 px-3 ${editMessage?.chatId === message.chatId ? 'p-0 pr-2.5 pb-2.5' : ''}`
-													: 'bg-theme/5 border border-theme-white/10',
-												showAvatar
-													? 'max-w-[calc(768px-105px)]'
-													: editMessage?.chatId === message.chatId
-														? 'w-full bg-theme/5 border-theme-white/10'
-														: 'w-auto',
-											)}
-										>
+										<div className={getMessageClassName(message)}>
 											{message.role === 'user' ? (
-												editMessage?.chatId === message.chatId ? (
-													<ChatTextArea
-														ref={editInputRef}
-														mode="edit"
-														input={input}
-														setInput={setInput}
-														editMessage={editMessage}
-														setEditMessage={setEditMessage}
-														loading={isCurrentSessionLoading()}
-														handleEditChange={handleEditChange}
-														sendMessage={sendMessage}
-													/>
-												) : (
-													<div
-														className="prose prose-invert max-w-none"
-														dangerouslySetInnerHTML={{
-															__html: message.content,
-														}}
-													/>
-												)
+												<ChatUserMessage
+													message={message}
+													editMessage={editMessage}
+													editInputRef={editInputRef}
+													input={input}
+													setInput={setInput}
+													setEditMessage={setEditMessage}
+													isLoading={isCurrentSessionLoading()}
+													handleEditChange={handleEditChange}
+													sendMessage={sendMessage}
+												/>
 											) : (
-												<div className="w-full h-auto">
-													<div className="w-full">
-														{message?.thinkContent ? (
-															<div
-																className="mb-2 flex items-center cursor-pointer select-none"
-																onClick={onToggleThinkContent}
-															>
-																思考过程
-																{isShowThinkContent ? (
-																	<ChevronDown
-																		size={20}
-																		className="ml-2 mt-0.5"
-																	/>
-																) : (
-																	<ChevronRight
-																		size={20}
-																		className="ml-2 mt-0.5"
-																	/>
-																)}
-															</div>
-														) : null}
-														{message.thinkContent && isShowThinkContent && (
-															<MarkdownPreview
-																value={message.thinkContent || '思考中...'}
-																theme="dark"
-																className="h-auto p-0"
-																background="transparent"
-																padding="0"
-															/>
-														)}
-													</div>
-													<MarkdownPreview
-														value={
-															message.content ||
-															(message?.thinkContent ? '' : '思考中...')
-														}
-														theme="dark"
-														className="h-auto p-0"
-														background="transparent"
-														padding="0"
-													/>
-												</div>
-											)}
-											{message.isStreaming && (
-												<div className="mt-1 flex items-center">
-													<Spinner className="w-4 h-4 mr-2 text-textcolor/50" />
-													<span className="text-sm text-textcolor/50">
-														正在生成中...
-													</span>
-												</div>
-											)}
-											{message.isStopped && (
-												<div className="flex items-center justify-end">
-													<div
-														className="cursor-pointer text-sm text-cyan-400 hover:text-cyan-300"
-														onClick={onContinue}
-													>
-														继续生成
-													</div>
-												</div>
+												<ChatAssistantMessage
+													message={message}
+													isShowThinkContent={isShowThinkContent}
+													onToggleThinkContent={onToggleThinkContent}
+													onContinue={onContinue}
+												/>
 											)}
 										</div>
 
@@ -1100,36 +1038,12 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 				onUploadFile={onUploadFile}
 				clearChat={clearChat}
 				stopGenerating={stopGenerating}
-			>
-				{/* 分支切换按钮区域 */}
-				{(isCurrentSessionLoading() && !isStreamingBranchVisible()) ||
-				(!isLatestBranch() && messages.length > 0) ? (
-					<div className="absolute -top-[47px] right-0 mb-5 z-10">
-						<div className="gap-3 flex items-center justify-center">
-							{/* 切换回流式消息分支的按钮 */}
-							{isCurrentSessionLoading() && !isStreamingBranchVisible() && (
-								<Button
-									onClick={switchToStreamingBranch}
-									className="min-w-8 h-8 text-sm bg-cyan-500/25 text-cyan-400 rounded-full hover:bg-cyan-500/30 transition-colors flex items-center gap-2"
-								>
-									<Sparkles />
-									<span className="text-xs">回到正在生成的分支</span>
-								</Button>
-							)}
-							{/* 切换到最新分支的按钮 */}
-							{!isLatestBranch() && messages.length > 0 && (
-								<Button
-									onClick={switchToLatestBranch}
-									className="min-w-8 h-8 text-sm bg-green-500/25 text-green-400 rounded-full hover:bg-green-500/30 transition-colors flex items-center gap-2"
-								>
-									<Activity />
-									<span className="text-xs">回到最新分支</span>
-								</Button>
-							)}
-						</div>
-					</div>
-				) : null}
-			</ChatEntry>
+				messages={messages}
+				isStreamingBranchVisible={isStreamingBranchVisible}
+				isLatestBranch={isLatestBranch}
+				switchToLatestBranch={switchToLatestBranch}
+				switchToStreamingBranch={switchToStreamingBranch}
+			/>
 		</div>
 	);
 });

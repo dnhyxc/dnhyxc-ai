@@ -2,7 +2,7 @@ import ChatBot from '@design/ChatBot';
 import { Drawer } from '@design/Drawer';
 import { MarkdownParser } from '@dnhyxc-ai/tools';
 import { ScrollArea, Spinner } from '@ui/index';
-import { PanelRightClose, PanelRightOpen } from 'lucide-react';
+import { History } from 'lucide-react';
 import { observer } from 'mobx-react';
 import { useEffect, useMemo, useState } from 'react';
 import { getSessionList } from '@/service';
@@ -80,22 +80,16 @@ const Chat = observer(() => {
 		<div className="w-full h-full overflow-hidden">
 			<div className="absolute top-4 left-28 z-9">
 				{open ? (
-					<PanelRightClose
-						size={20}
-						className="cursor-pointer hover:text-blue-500"
-					/>
+					<History size={20} className="cursor-pointer text-cyan-500" />
 				) : (
-					<PanelRightOpen
+					<History
 						size={20}
 						className="cursor-pointer hover:text-blue-500"
 						onClick={onOpenChange}
 					/>
 				)}
 			</div>
-			<ChatBot
-				// 修改：传递完整树
-				onBranchChange={onBranchChange}
-			/>
+			<ChatBot onBranchChange={onBranchChange} />
 			<Drawer title="历史对话" open={open} onOpenChange={() => setOpen(false)}>
 				<ScrollArea className="h-full overflow-y-auto pr-4 box-border">
 					{chatStore.sessionData.list.map((item) => {
