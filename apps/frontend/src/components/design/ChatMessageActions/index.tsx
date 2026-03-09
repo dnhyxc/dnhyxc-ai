@@ -78,7 +78,7 @@ export const MessageActions = ({
 
 	return (
 		<div
-			className={`absolute bottom-2 right-2 h-5 flex items-center ${
+			className={`absolute bottom-2 right-2 h-5 w-fit flex items-center z-100 ${
 				message.role === 'user' ? 'justify-end' : 'left-2'
 			}`}
 		>

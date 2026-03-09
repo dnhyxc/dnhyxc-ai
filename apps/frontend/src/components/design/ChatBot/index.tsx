@@ -1,4 +1,5 @@
 import ChatAssistantMessage from '@design/ChatAssistantMessage';
+import ChatControls from '@design/ChatControls';
 import ChatEntry from '@design/ChatEntry';
 import ChatFileList from '@design/ChatFileList';
 // 导入新提取的消息操作组件
@@ -10,7 +11,7 @@ import { motion } from 'framer-motion';
 import { Bot, User } from 'lucide-react';
 import * as mobx from 'mobx';
 import { observer } from 'mobx-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { useBranchManage } from '@/hooks/useBranchManage';
 import { useMessageTools } from '@/hooks/useMessageTools';
@@ -45,7 +46,6 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 	const [allMessages, setAllMessages] = useState<Message[]>(chatStore.messages);
 	const [messages, setMessages] = useState<Message[]>([]);
 	const [input, setInput] = useState('');
-
 	const [autoScroll, setAutoScroll] = useState(true);
 	const [isShowThinkContent, setIsShowThinkContent] = useState(true);
 	const [isCopyedId, setIsCopyedId] = useState('');
@@ -55,28 +55,17 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 	);
 	const [currentChatId, setCurrentChatId] = useState<string>('');
 	const [editMessage, setEditMessage] = useState<Message | null>(null);
+	const [scrollTop, setScrollTop] = useState<number>(0);
+	const [hasScrollbar, setHasScrollbar] = useState<boolean>(false);
 
 	// 保存请求前的状态快照，用于回滚
 	const requestSnapshotRef = useRef<RequestSnapshot | null>(null);
 	// 标记是否已接收到流式数据 (Thinking 或 Content)
 	const hasReceivedStreamDataRef = useRef(false);
-
-	const updateStoreMessages = (
-		updater: (prevMessages: Message[]) => Message[],
-	) => {
-		const updatedMessages = updater(chatStore.messages);
-		chatStore.setAllMessages(
-			updatedMessages,
-			chatStore.activeSessionId || '',
-			false,
-		);
-	};
-
 	const stopRequestRef = useRef<(() => void) | null>(null);
 	const scrollContainerRef = useRef<HTMLDivElement>(null);
 	const editInputRef = useRef<HTMLTextAreaElement>(null);
 	const chatInputRef = useRef<HTMLTextAreaElement>(null);
-
 	const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const focusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -219,12 +208,22 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 		};
 	}, []);
 
+	// 监听 messages 变化更新滚动条状态
+	useEffect(() => {
+		if (scrollContainerRef.current) {
+			const { scrollHeight, clientHeight } = scrollContainerRef.current;
+			setHasScrollbar(scrollHeight > clientHeight);
+		}
+	}, [messages]);
+
 	const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
 		const element = e.currentTarget;
 		if (!scrollContainerRef.current) {
 			scrollContainerRef.current = element;
 		}
 		const { scrollTop, scrollHeight, clientHeight } = element;
+		setScrollTop(scrollTop);
+		setHasScrollbar(scrollHeight > clientHeight);
 		const SCROLL_THRESHOLD = 5;
 		const isAtBottom =
 			scrollHeight - scrollTop - clientHeight < SCROLL_THRESHOLD;
@@ -408,6 +407,17 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 				requestSnapshotRef.current = null;
 			}
 		}
+	};
+
+	const updateStoreMessages = (
+		updater: (prevMessages: Message[]) => Message[],
+	) => {
+		const updatedMessages = updater(chatStore.messages);
+		chatStore.setAllMessages(
+			updatedMessages,
+			chatStore.activeSessionId || '',
+			false,
+		);
 	};
 
 	// 保存快照并发送新消息
@@ -918,14 +928,28 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 		[showAvatar, editMessage?.chatId],
 	);
 
+	const onScrollTo = (position: string) => {
+		scrollContainerRef.current?.scrollTo({
+			top: position === 'up' ? 0 : scrollContainerRef.current?.scrollHeight,
+			behavior: 'smooth',
+		});
+	};
+
+	// 计算是否在底部
+	const isAtBottom = useMemo(() => {
+		if (!scrollContainerRef.current) return false;
+		const { scrollHeight, clientHeight } = scrollContainerRef.current;
+		return scrollHeight - scrollTop - clientHeight < 5;
+	}, [scrollTop]);
+
 	return (
 		<div className={cn('flex flex-col h-full w-full', className)}>
 			<ScrollArea
 				ref={scrollContainerRef}
-				className="relative flex-1 overflow-hidden w-full backdrop-blur-sm"
+				className="flex-1 overflow-hidden w-full backdrop-blur-sm pb-5"
 				onScroll={handleScroll}
 			>
-				<div className="max-w-3xl m-auto overflow-y-auto">
+				<div className="relative max-w-3xl m-auto overflow-y-auto">
 					<div className="mx-auto space-y-6 overflow-hidden">
 						{messages.length === 0 ? (
 							<div className="flex flex-col items-center justify-center h-110 text-textcolor">
@@ -1022,6 +1046,18 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 						)}
 					</div>
 				</div>
+				{/* 回到最新分支/回到正在输出分支/回到底部按钮 */}
+				<ChatControls
+					isCurrentSessionLoading={isCurrentSessionLoading()}
+					isStreamingBranchVisible={isStreamingBranchVisible()}
+					isLatestBranch={isLatestBranch()}
+					messagesLength={messages.length}
+					switchToStreamingBranch={switchToStreamingBranch}
+					switchToLatestBranch={switchToLatestBranch}
+					hasScrollbar={hasScrollbar}
+					isAtBottom={isAtBottom}
+					onScrollTo={onScrollTo}
+				/>
 			</ScrollArea>
 
 			<ChatEntry
@@ -1038,11 +1074,6 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 				onUploadFile={onUploadFile}
 				clearChat={clearChat}
 				stopGenerating={stopGenerating}
-				messages={messages}
-				isStreamingBranchVisible={isStreamingBranchVisible}
-				isLatestBranch={isLatestBranch}
-				switchToLatestBranch={switchToLatestBranch}
-				switchToStreamingBranch={switchToStreamingBranch}
 			/>
 		</div>
 	);
