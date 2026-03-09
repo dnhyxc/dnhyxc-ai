@@ -2,9 +2,7 @@ import ChatAssistantMessage from '@design/ChatAssistantMessage';
 import ChatControls from '@design/ChatControls';
 import ChatEntry from '@design/ChatEntry';
 import ChatFileList from '@design/ChatFileList';
-// 导入新提取的消息操作组件
 import ChatMessageActions from '@design/ChatMessageActions';
-// 导入新提取的消息渲染组件
 import ChatUserMessage from '@design/ChatUserMessage';
 import { ScrollArea, Toast } from '@ui/index';
 import { motion } from 'framer-motion';
@@ -309,7 +307,7 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 				callbacks: {
 					onThinking: (thinking) => {
 						if (typeof thinking === 'string') {
-							// [新增] 标记已收到数据
+							// 标记已收到数据
 							hasReceivedStreamDataRef.current = true;
 							const currentMessage = chatStore.messages.find(
 								(m) => m.chatId === assistantMessageId,
@@ -322,7 +320,7 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 					},
 					onData: (chunk) => {
 						if (typeof chunk === 'string') {
-							// [新增] 标记已收到数据
+							// 标记已收到数据
 							hasReceivedStreamDataRef.current = true;
 							const currentMessage = chatStore.messages.find(
 								(m) => m.chatId === assistantMessageId,
@@ -454,7 +452,7 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 			newSelectedChildMap.set(userMessageToUse.parentId, userMsgId);
 		}
 
-		// [新增] 在更新 Store 之前保存快照
+		// 在更新 Store 之前保存快照
 		const currentSessionId = chatStore.activeSessionId;
 		requestSnapshotRef.current = {
 			messages: [...chatStore.messages],
@@ -493,7 +491,7 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 			userMessageToUse,
 			assistantMessage,
 			false,
-			newSelectedChildMap, // [修改] 传递新创建的分支映射
+			newSelectedChildMap, // 传递新创建的分支映射
 		);
 	};
 
@@ -511,7 +509,7 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 
 		const newSelectedChildMap = new Map(selectedChildMap);
 
-		// [新增] 在更新 Store 之前保存快照
+		// 在更新 Store 之前保存快照
 		const currentSessionId = chatStore.activeSessionId;
 		requestSnapshotRef.current = {
 			messages: [...chatStore.messages],
@@ -595,7 +593,7 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 		const currentAssistantMsg = messages[index];
 		if (!currentAssistantMsg) return;
 
-		// [新增] 在更新 Store 之前保存快照
+		// 在更新 Store 之前保存快照
 		const currentSessionId = chatStore.activeSessionId;
 		requestSnapshotRef.current = {
 			messages: [...chatStore.messages],
@@ -656,7 +654,7 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 				userMessageToUse,
 				assistantMessage,
 				true,
-				newSelectedChildMap, // [修改] 传递新创建的分支映射
+				newSelectedChildMap, // 传递新创建的分支映射
 			);
 		}
 	};
@@ -802,7 +800,7 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 				});
 			}
 		}
-		// [新增] 清除流式分支选择状态
+		// 清除流式分支选择状态
 		chatStore.clearAllStreamingBranchMaps();
 	};
 
