@@ -1,5 +1,7 @@
 import ChatEntry from '@design/ChatEntry';
 import ChatFileList from '@design/ChatFileList';
+// 导入新提取的消息操作组件
+import ChatMessageActions from '@design/ChatMessageActions';
 import ChatTextArea from '@design/ChatTextArea';
 import MarkdownPreview from '@design/Markdown';
 import { Button, ScrollArea, Spinner, Toast } from '@ui/index';
@@ -7,13 +9,8 @@ import { motion } from 'framer-motion';
 import {
 	Activity,
 	Bot,
-	CheckCircle,
 	ChevronDown,
-	ChevronLeft,
 	ChevronRight,
-	Copy,
-	PencilLine,
-	RotateCw,
 	Sparkles,
 	User,
 } from 'lucide-react';
@@ -30,15 +27,6 @@ import useStore from '@/store';
 import { FileWithPreview, UploadedFile } from '@/types';
 import { ChatBotProps, ChatRequestParams, Message } from '@/types/chat';
 import { streamFetch } from '@/utils/sse';
-
-// import { buildMessageList, getFormatMessages } from '@/views/chat/tools';
-// import {
-// 	createAssistantMessage,
-// 	createUserMessage,
-// 	findLastAssistantMessage,
-// 	findSiblings,
-// 	updateParentChildrenIds,
-// } from './tools';
 
 // 定义快照类型
 interface RequestSnapshot {
@@ -865,6 +853,7 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 		}
 	};
 
+	// 复制消息内容
 	const onCopy = (value: string, id: string) => {
 		navigator.clipboard.writeText(value);
 		setIsCopyedId(id);
@@ -873,7 +862,9 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 		}, 500);
 	};
 
-	const onFocusEditInput = () => {
+	// 编辑消息
+	const onEdit = (message: Message) => {
+		setEditMessage(message);
 		focusTimerRef.current = setTimeout(() => {
 			if (editInputRef.current) {
 				editInputRef.current.focus();
@@ -883,12 +874,7 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 		}, 0);
 	};
 
-	const onEdit = (message: Message) => {
-		setEditMessage(message);
-		onFocusEditInput();
-	};
-
-	// 分支切换 - 支持流式输出时切换，流式消息在后台继续更新
+	// 分支切换处理
 	const handleBranchChange = (msgId: string, direction: 'prev' | 'next') => {
 		onBranchChange?.(msgId, direction);
 
@@ -1079,87 +1065,19 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 												</div>
 											)}
 										</div>
-										<div
-											className={`absolute bottom-2 right-2 h-5 flex items-center ${message.role === 'user' ? 'justify-end' : 'left-2'}`}
-										>
-											{(message.siblingCount || 0) > 1 && (
-												<div
-													className={`${message.role === 'user' ? 'order-last ml-5 -mr-3.5' : 'order-first mr-5 -ml-3.5'} flex items-center gap-1 text-textcolor/70 select-none`}
-												>
-													<ChevronLeft
-														size={22}
-														className={cn(
-															'cursor-pointer hover:text-textcolor',
-															(message.siblingIndex || 0) <= 0 &&
-																'opacity-30 cursor-not-allowed hover:text-textcolor/60',
-														)}
-														onClick={() => {
-															if ((message.siblingIndex || 0) > 0) {
-																handleBranchChange(message.chatId, 'prev');
-															}
-														}}
-													/>
-													<span className="min-w-10 text-center">
-														{(message.siblingIndex || 0) + 1} /{' '}
-														{message.siblingCount}
-													</span>
-													<ChevronRight
-														size={22}
-														className={cn(
-															'cursor-pointer hover:text-textcolor',
-															(message.siblingIndex || 0) >=
-																(message.siblingCount || 0) - 1 &&
-																'opacity-30 cursor-not-allowed hover:text-textcolor/60',
-														)}
-														onClick={() => {
-															if (
-																(message.siblingIndex || 0) <
-																(message.siblingCount || 0) - 1
-															) {
-																handleBranchChange(message.chatId, 'next');
-															}
-														}}
-													/>
-												</div>
-											)}
-											{message.content && (
-												<div
-													className={`gap-3 text-textcolor/70 ${message.role === 'user' ? '-mr-2' : '-ml-2'} ${index !== messages.length - 1 ? `hidden ${isCurrentSessionLoading() ? 'group-hover:hidden' : 'group-hover:flex'}` : `${isCurrentSessionLoading() ? 'hidden' : 'flex items-center'}`}`}
-												>
-													<div className="cursor-pointer flex items-center justify-center">
-														{isCopyedId !== message.chatId ? (
-															<Copy
-																size={16}
-																className="hover:text-textcolor"
-																onClick={() =>
-																	onCopy(message.content, message.chatId)
-																}
-															/>
-														) : (
-															<div className="flex items-center justify-center text-green-400 rounded-full box-border">
-																<CheckCircle size={16} />
-															</div>
-														)}
-													</div>
-													{message.role === 'user' && (
-														<div className="cursor-pointer hover:text-textcolor mt-0.5">
-															<PencilLine
-																size={16}
-																onClick={() => onEdit(message)}
-															/>
-														</div>
-													)}
-													{message.role !== 'user' && (
-														<div className="cursor-pointer hover:text-textcolor">
-															<RotateCw
-																size={16}
-																onClick={() => onReGenerate(index)}
-															/>
-														</div>
-													)}
-												</div>
-											)}
-										</div>
+
+										{/* 消息操作组件 */}
+										<ChatMessageActions
+											message={message}
+											index={index}
+											messagesLength={messages.length}
+											isCopyedId={isCopyedId}
+											isLoading={isCurrentSessionLoading()}
+											onBranchChange={handleBranchChange}
+											onCopy={onCopy}
+											onEdit={onEdit}
+											onReGenerate={onReGenerate}
+										/>
 									</div>
 								</motion.div>
 							))
