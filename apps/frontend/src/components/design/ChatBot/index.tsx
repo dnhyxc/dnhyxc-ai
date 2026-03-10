@@ -68,6 +68,14 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 	const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const focusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+	const onScrollTo = (position: string) => {
+		scrollContainerRef.current?.scrollTo({
+			top:
+				position === 'up' ? 0 : scrollContainerRef.current?.scrollHeight + 100,
+			behavior: 'smooth',
+		});
+	};
+
 	// 使用分支管理 hook
 	const {
 		isStreamingBranchVisible,
@@ -79,7 +87,7 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 		messages,
 		selectedChildMap,
 		setSelectedChildMap,
-		setAutoScroll,
+		onScrollTo,
 	});
 
 	// 使用会话加载状态 hook
@@ -187,7 +195,13 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 			const { scrollHeight, clientHeight } = scrollContainerRef.current;
 			setHasScrollbar(scrollHeight > clientHeight);
 		}
-		if (autoScroll && scrollContainerRef.current) {
+		// 判断当前分支是否有流式输出：检查最后一条消息是否为助手消息且正在流式传输
+		const lastMessage = messages[messages.length - 1];
+		const isCurrentlyStreaming =
+			lastMessage?.role === 'assistant' && lastMessage?.isStreaming;
+
+		// 只有当 autoScroll 为 true 且当前有流式输出时，才执行自动滚动
+		if (autoScroll && isCurrentlyStreaming && scrollContainerRef.current) {
 			onScrollTo('down');
 		}
 	}, [messages, autoScroll]);
@@ -921,14 +935,6 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 		},
 		[showAvatar, editMessage?.chatId],
 	);
-
-	const onScrollTo = (position: string) => {
-		scrollContainerRef.current?.scrollTo({
-			top:
-				position === 'up' ? 0 : scrollContainerRef.current?.scrollHeight + 100,
-			behavior: 'smooth',
-		});
-	};
 
 	// 计算是否在底部
 	const isAtBottom = useMemo(() => {

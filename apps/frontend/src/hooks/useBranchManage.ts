@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect } from 'react';
 import useStore from '@/store';
 import { Message } from '@/types/chat';
 
@@ -6,16 +6,32 @@ interface UseBranchManagementProps {
 	messages: Message[];
 	selectedChildMap: Map<string, string>;
 	setSelectedChildMap: (map: Map<string, string>) => void;
-	setAutoScroll: (autoScroll: boolean) => void;
+	onScrollTo: (position: string) => void;
 }
 
 export const useBranchManage = ({
 	messages,
 	selectedChildMap,
 	setSelectedChildMap,
-	setAutoScroll,
+	onScrollTo,
 }: UseBranchManagementProps) => {
 	const { chatStore } = useStore();
+
+	let latestBranchTimer: ReturnType<typeof setTimeout> | null = null;
+	let streamingBranchTimer: ReturnType<typeof setTimeout> | null = null;
+
+	useEffect(() => {
+		return () => {
+			if (latestBranchTimer) {
+				clearTimeout(latestBranchTimer);
+				latestBranchTimer = null;
+			}
+			if (streamingBranchTimer) {
+				clearTimeout(streamingBranchTimer);
+				streamingBranchTimer = null;
+			}
+		};
+	}, []);
 
 	// 查找最新的分支选择：自动选择每个层级的最新（最后创建）子节点
 	const findLatestBranchSelection = (
@@ -175,9 +191,16 @@ export const useBranchManage = ({
 					latestBranchMap,
 				);
 			}
-			setAutoScroll(true);
+			if (latestBranchTimer) {
+				clearTimeout(latestBranchTimer);
+				latestBranchTimer = null;
+			}
+			// setAutoScroll(true);
+			latestBranchTimer = setTimeout(() => {
+				onScrollTo('down');
+			}, 50);
 		}
-	}, [chatStore, setSelectedChildMap, setAutoScroll]);
+	}, [chatStore, setSelectedChildMap, onScrollTo]);
 
 	// 切换回流式消息所在的分支
 	const switchToStreamingBranch = useCallback(() => {
@@ -192,13 +215,20 @@ export const useBranchManage = ({
 					newSelectedChildMap,
 				);
 			}
-			setAutoScroll(true);
+			if (streamingBranchTimer) {
+				clearTimeout(streamingBranchTimer);
+				streamingBranchTimer = null;
+			}
+			// setAutoScroll(true);
+			streamingBranchTimer = setTimeout(() => {
+				onScrollTo('down');
+			}, 50);
 		}
 	}, [
 		chatStore,
 		getInvisibleStreamingBranchMap,
 		setSelectedChildMap,
-		setAutoScroll,
+		onScrollTo,
 	]);
 
 	return {
