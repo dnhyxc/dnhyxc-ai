@@ -12,7 +12,7 @@ interface ChatScrollControlsProps {
 	// 滚动控制相关
 	hasScrollbar: boolean;
 	isAtBottom: boolean;
-	onScrollTo: (position: 'up' | 'down') => void;
+	onScrollTo: (position: 'up' | 'down', behavior?: 'smooth' | 'auto') => void;
 }
 
 const ChatControls = ({
@@ -64,7 +64,7 @@ const ChatControls = ({
 				{hasScrollbar && (
 					<div
 						className="w-8 h-8 bg-blue-300/25 hover:bg-blue-500/30 text-blue-100 flex justify-center items-center cursor-pointer border-theme/10 rounded-full ml-2"
-						onClick={() => onScrollTo(isAtBottom ? 'up' : 'down')}
+						onClick={() => onScrollTo(isAtBottom ? 'up' : 'down', 'auto')}
 					>
 						{isAtBottom ? <ArrowUp /> : <ArrowDown />}
 					</div>

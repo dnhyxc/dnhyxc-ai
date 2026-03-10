@@ -67,12 +67,13 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 	const chatInputRef = useRef<HTMLTextAreaElement>(null);
 	const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const focusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const scrollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-	const onScrollTo = (position: string) => {
+	const onScrollTo = (position: string, behavior?: 'smooth' | 'auto') => {
 		scrollContainerRef.current?.scrollTo({
 			top:
 				position === 'up' ? 0 : scrollContainerRef.current?.scrollHeight + 100,
-			behavior: 'smooth',
+			behavior: behavior || 'smooth',
 		});
 	};
 
@@ -163,6 +164,10 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 			setSelectedChildMap(new Map());
 		}
 
+		scrollTimer.current = setTimeout(() => {
+			onScrollTo('down', 'auto');
+		}, 50);
+
 		// 重置输入状态
 		setInput('');
 		setUploadedFiles([]);
@@ -189,7 +194,7 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 		});
 	}, [allMessages, selectedChildMap]);
 
-	// 自动滚动逻辑
+	// 修改自动滚动逻辑
 	useEffect(() => {
 		if (scrollContainerRef.current) {
 			const { scrollHeight, clientHeight } = scrollContainerRef.current;
@@ -202,13 +207,17 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 
 		// 只有当 autoScroll 为 true 且当前有流式输出时，才执行自动滚动
 		if (autoScroll && isCurrentlyStreaming && scrollContainerRef.current) {
-			onScrollTo('down');
+			onScrollTo('down', 'auto');
 		}
 	}, [messages, autoScroll]);
 
 	// 清理逻辑
 	useEffect(() => {
 		return () => {
+			if (scrollTimer.current) {
+				clearTimeout(scrollTimer.current);
+				scrollTimer.current = null;
+			}
 			if (copyTimerRef.current) {
 				clearTimeout(copyTimerRef.current);
 				copyTimerRef.current = null;
@@ -739,6 +748,9 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 		attachments?: UploadedFile[] | null,
 	) => {
 		if ((!content && !input.trim()) || isCurrentSessionLoading()) return;
+
+		// 发送消息时自动滚动到底部
+		onScrollTo('down');
 
 		const isRegenerate =
 			content !== undefined && index !== undefined && !isEdit;
