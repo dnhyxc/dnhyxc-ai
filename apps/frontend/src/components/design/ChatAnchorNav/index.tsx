@@ -1,3 +1,4 @@
+import Tooltip from '@design/Tooltip';
 import { Button } from '@ui/index';
 import { ChevronDown, ChevronUp } from 'lucide-react'; // 引入图标
 import { useEffect, useMemo, useState } from 'react';
@@ -128,20 +129,21 @@ const ChatAnchorNav = ({
 
 				{/* 锚点列表 */}
 				<div className="flex flex-col items-center">
-					{userMessages.map((msg, index) => {
+					{userMessages.map((msg) => {
 						return (
-							<div
-								key={msg.chatId}
-								title={`消息 ${index + 1}`}
-								className={cn(
-									'w-2 h-2 my-1 cursor-pointer rounded-full',
-									'hover:scale-145 active:scale-145 transition-all duration-300',
-									activeAnchor === msg.chatId
-										? 'bg-blue-500 scale-145 shadow-[0_0_8px_rgba(59,130,246,0.6)]'
-										: 'bg-theme/90 hover:bg-blue-500',
-								)}
-								onClick={() => scrollToMessage(msg.chatId)}
-							/>
+							<Tooltip key={msg.chatId} side="left" content={msg.content}>
+								<div
+									key={msg.chatId}
+									className={cn(
+										'w-2 h-2 my-1 cursor-pointer rounded-full',
+										'hover:scale-145 active:scale-145 transition-all duration-300',
+										activeAnchor === msg.chatId
+											? 'bg-blue-500 scale-145 shadow-[0_0_8px_rgba(59,130,246,0.6)]'
+											: 'bg-theme/90 hover:bg-blue-500',
+									)}
+									onClick={() => scrollToMessage(msg.chatId)}
+								/>
+							</Tooltip>
 						);
 					})}
 				</div>
