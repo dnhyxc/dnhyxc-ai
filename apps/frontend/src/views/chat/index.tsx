@@ -96,11 +96,11 @@ const Chat = observer(() => {
 						return (
 							<div
 								key={item.id}
-								className={`h-10 p-2 hover:bg-theme/10 rounded-sm cursor-pointer flex items-center justify-between ${chatStore.activeSessionId === item.id ? 'bg-theme/10' : ''}`}
+								className={`h-10 px-2 mb-1 hover:bg-theme/10 rounded-sm cursor-pointer flex items-center justify-between ${chatStore.activeSessionId === item.id ? 'bg-theme/10' : ''}`}
 								onClick={() => onSelectSession(item)}
 							>
 								<div
-									className="line-clamp-1 flex-1"
+									className="line-clamp-1 flex-1 text-sm"
 									dangerouslySetInnerHTML={{
 										__html: parser.render(
 											item.messages?.[0]?.content || '新对话',
