@@ -1,3 +1,4 @@
+import ChatAnchorNav from '@design/ChatAnchorNav';
 import ChatAssistantMessage from '@design/ChatAssistantMessage';
 import ChatControls from '@design/ChatControls';
 import ChatEntry from '@design/ChatEntry';
@@ -928,7 +929,8 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 
 	const onScrollTo = (position: string) => {
 		scrollContainerRef.current?.scrollTo({
-			top: position === 'up' ? 0 : scrollContainerRef.current?.scrollHeight,
+			top:
+				position === 'up' ? 0 : scrollContainerRef.current?.scrollHeight + 100,
 			behavior: 'smooth',
 		});
 	};
@@ -959,6 +961,7 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 							messages.map((message, index) => (
 								<motion.div
 									key={message.chatId}
+									id={`message-${message.chatId}`}
 									initial={{ opacity: 0, y: 10 }}
 									animate={{ opacity: 1, y: 0 }}
 									className={cn(
@@ -1044,6 +1047,11 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 						)}
 					</div>
 				</div>
+				{/* 消息锚点导航 */}
+				<ChatAnchorNav
+					messages={messages}
+					scrollContainerRef={scrollContainerRef}
+				/>
 				{/* 回到最新分支/回到正在输出分支/回到底部按钮 */}
 				<ChatControls
 					isCurrentSessionLoading={isCurrentSessionLoading()}
