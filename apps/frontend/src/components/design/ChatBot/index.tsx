@@ -949,7 +949,7 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 				className="flex-1 overflow-hidden w-full backdrop-blur-sm pb-5"
 				onScroll={handleScroll}
 			>
-				<div className="max-w-3xl m-auto overflow-auto">
+				<div className="max-w-3xl m-auto overflow-y-auto">
 					<div className="space-y-6 overflow-hidden">
 						{messages.length === 0 ? (
 							<div className="flex flex-col items-center justify-center h-110 text-textcolor">
