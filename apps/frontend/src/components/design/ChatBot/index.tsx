@@ -69,6 +69,8 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 	const focusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const scrollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+	const SCROLL_THRESHOLD = 5;
+
 	const onScrollTo = (position: string, behavior?: 'smooth' | 'auto') => {
 		scrollContainerRef.current?.scrollTo({
 			top:
@@ -241,7 +243,6 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 		const { scrollTop, scrollHeight, clientHeight } = element;
 		setScrollTop(scrollTop);
 		setHasScrollbar(scrollHeight > clientHeight);
-		const SCROLL_THRESHOLD = 5;
 		const isAtBottom =
 			scrollHeight - scrollTop - clientHeight < SCROLL_THRESHOLD;
 		if (isAtBottom) {
@@ -970,18 +971,20 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 				<div className="max-w-3xl m-auto overflow-y-auto">
 					<div className="space-y-6 overflow-hidden">
 						{messages.length === 0 ? (
-							<div className="flex flex-col items-center justify-center h-110 text-textcolor">
+							<motion.div
+								initial={{ opacity: 0, y: 10 }}
+								animate={{ opacity: 1, y: 0 }}
+								className="flex flex-col items-center justify-center h-110 text-textcolor"
+							>
 								<Bot className="w-16 h-16 mb-4" />
 								<p className="text-2xl">欢迎来到 dnhyxc-ai 智能聊天</p>
 								<p className="text-lg mt-2">有什么我可以帮您的？</p>
-							</div>
+							</motion.div>
 						) : (
 							messages.map((message, index) => (
-								<motion.div
+								<div
 									key={message.chatId}
 									id={`message-${message.chatId}`}
-									initial={{ opacity: 0, y: 10 }}
-									animate={{ opacity: 1, y: 0 }}
 									className={cn(
 										'flex gap-3 w-full',
 										message.role === 'user' ? 'flex-row-reverse' : '',
@@ -1060,7 +1063,7 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 											onReGenerate={onReGenerate}
 										/>
 									</div>
-								</motion.div>
+								</div>
 							))
 						)}
 					</div>
