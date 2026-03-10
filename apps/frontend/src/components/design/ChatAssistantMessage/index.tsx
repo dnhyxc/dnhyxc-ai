@@ -65,7 +65,7 @@ const ChatAssistantMessage = ({
 			{message.isStopped && (
 				<div className="flex items-center justify-end">
 					<div
-						className="cursor-pointer text-sm text-cyan-400 hover:text-cyan-300"
+						className="cursor-pointer text-sm text-cyan-400 hover:text-cyan-300 select-none"
 						onClick={onContinue}
 					>
 						继续生成

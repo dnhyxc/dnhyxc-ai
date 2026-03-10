@@ -183,9 +183,12 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 
 	// 自动滚动逻辑
 	useEffect(() => {
+		if (scrollContainerRef.current) {
+			const { scrollHeight, clientHeight } = scrollContainerRef.current;
+			setHasScrollbar(scrollHeight > clientHeight);
+		}
 		if (autoScroll && scrollContainerRef.current) {
-			scrollContainerRef.current.scrollTop =
-				scrollContainerRef.current.scrollHeight;
+			onScrollTo('down');
 		}
 	}, [messages, autoScroll]);
 
@@ -206,14 +209,6 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 			clearAllSessionLoading();
 		};
 	}, []);
-
-	// 监听 messages 变化更新滚动条状态
-	useEffect(() => {
-		if (scrollContainerRef.current) {
-			const { scrollHeight, clientHeight } = scrollContainerRef.current;
-			setHasScrollbar(scrollHeight > clientHeight);
-		}
-	}, [messages]);
 
 	const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
 		const element = e.currentTarget;
@@ -913,7 +908,7 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 		(message: Message) => {
 			const isEdit = editMessage?.chatId === message.chatId;
 			return cn(
-				'flex-1 rounded-md p-3',
+				'flex-1 rounded-md p-3 select-auto',
 				message.role === 'user'
 					? `bg-blue-500/10 border border-blue-500/20 text-end pt-2 pb-2.5 px-3 ${isEdit ? 'p-0 pr-2.5 pb-2.5' : ''}`
 					: 'bg-theme/5 border border-theme-white/10',
@@ -943,14 +938,19 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 	}, [scrollTop]);
 
 	return (
-		<div className={cn('flex flex-col h-full w-full', className)}>
+		<div
+			className={cn(
+				'relative flex flex-col h-full w-full select-none',
+				className,
+			)}
+		>
 			<ScrollArea
 				ref={scrollContainerRef}
 				className="flex-1 overflow-hidden w-full backdrop-blur-sm pb-5"
 				onScroll={handleScroll}
 			>
-				<div className="relative max-w-3xl m-auto overflow-y-auto">
-					<div className="mx-auto space-y-6 overflow-hidden">
+				<div className="max-w-3xl m-auto overflow-auto">
+					<div className="space-y-6 overflow-hidden">
 						{messages.length === 0 ? (
 							<div className="flex flex-col items-center justify-center h-110 text-textcolor">
 								<Bot className="w-16 h-16 mb-4" />
@@ -1065,7 +1065,6 @@ const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 					onScrollTo={onScrollTo}
 				/>
 			</ScrollArea>
-
 			<ChatEntry
 				chatInputRef={chatInputRef}
 				input={input}
