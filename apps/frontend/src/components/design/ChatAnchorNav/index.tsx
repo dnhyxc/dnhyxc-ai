@@ -1,7 +1,7 @@
 import Tooltip from '@design/Tooltip';
 import { Button } from '@ui/index';
 import { ChevronDown, ChevronUp } from 'lucide-react'; // 引入图标
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { Message } from '@/types/chat';
 
@@ -16,51 +16,80 @@ const ChatAnchorNav = ({
 }: ChatAnchorNavProps) => {
 	const [activeAnchor, setActiveAnchor] = useState<string>('');
 
+	// 用于节流的 rAF ID
+	const rafIdRef = useRef<number | null>(null);
+
 	// 过滤出用户消息
 	const userMessages = useMemo(() => {
 		return messages.filter((msg) => msg.role === 'user');
 	}, [messages]);
 
-	// 监听滚动位置
+	// 计算当前锚点的核心逻辑
+	const calculateActiveAnchor = useCallback(() => {
+		const container = scrollContainerRef.current;
+		if (!container) return;
+
+		const containerRect = container.getBoundingClientRect();
+		const containerCenter = containerRect.top + containerRect.height / 3;
+
+		const userMessageElements = userMessages
+			.map((msg) => ({
+				id: msg.chatId,
+				element: document.getElementById(`message-${msg.chatId}`),
+			}))
+			.filter((item) => item.element !== null);
+
+		if (userMessageElements.length === 0) return;
+
+		let currentAnchor = userMessageElements[0]?.id || '';
+
+		for (let i = 0; i < userMessageElements.length; i++) {
+			const { element, id } = userMessageElements[i];
+			if (!element) continue;
+			const rect = element.getBoundingClientRect();
+			if (rect.top <= containerCenter) {
+				currentAnchor = id;
+			}
+			if (rect.top > containerRect.bottom) {
+				break;
+			}
+		}
+		setActiveAnchor(currentAnchor);
+	}, [userMessages, scrollContainerRef]);
+
+	// 监听滚动位置 - 使用 requestAnimationFrame 节流
 	useEffect(() => {
 		const container = scrollContainerRef.current;
 		if (!container) return;
 
+		// 使用 rAF 节流的滚动处理函数
 		const handleScroll = () => {
-			const containerRect = container.getBoundingClientRect();
-			const containerCenter = containerRect.top + containerRect.height / 3;
+			// 如果已经有待处理的 rAF，则跳过
+			if (rafIdRef.current !== null) return;
 
-			const userMessageElements = userMessages
-				.map((msg) => ({
-					id: msg.chatId,
-					element: document.getElementById(`message-${msg.chatId}`),
-				}))
-				.filter((item) => item.element !== null);
-
-			if (userMessageElements.length === 0) return;
-
-			let currentAnchor = userMessageElements[0]?.id || '';
-
-			for (let i = 0; i < userMessageElements.length; i++) {
-				const { element, id } = userMessageElements[i];
-				if (!element) continue;
-				const rect = element.getBoundingClientRect();
-				if (rect.top <= containerCenter) {
-					currentAnchor = id;
-				}
-				if (rect.top > containerRect.bottom) {
-					break;
-				}
-			}
-			setActiveAnchor(currentAnchor);
+			// 使用 requestAnimationFrame 进行节流
+			// 这会自动与浏览器刷新率同步（约 60fps，即 16ms 一次）
+			rafIdRef.current = requestAnimationFrame(() => {
+				calculateActiveAnchor();
+				rafIdRef.current = null;
+			});
 		};
 
-		container.addEventListener('scroll', handleScroll);
+		container.addEventListener('scroll', handleScroll, { passive: true });
+
+		// 初始化时计算一次
+		calculateActiveAnchor();
 
 		return () => {
+			// 清理事件监听
 			container.removeEventListener('scroll', handleScroll);
+			// 取消待处理的 rAF
+			if (rafIdRef.current !== null) {
+				cancelAnimationFrame(rafIdRef.current);
+				rafIdRef.current = null;
+			}
 		};
-	}, [userMessages, scrollContainerRef]);
+	}, [calculateActiveAnchor, scrollContainerRef]);
 
 	// 滚动到指定消息
 	const scrollToMessage = (chatId: string) => {
