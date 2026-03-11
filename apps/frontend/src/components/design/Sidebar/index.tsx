@@ -92,7 +92,11 @@ const Sidebar = () => {
 									<CircleUserRound className="hover:text-theme/70" />
 								</div>
 							</DropdownMenuTrigger>
-							<DropdownMenuContent align="start" className="min-w-26">
+							<DropdownMenuContent
+								side="right"
+								align="end"
+								className="min-w-26"
+							>
 								<DropdownMenuLabel className="flex flex-col justify-center items-center">
 									<div
 										data-tauri-drag-region
