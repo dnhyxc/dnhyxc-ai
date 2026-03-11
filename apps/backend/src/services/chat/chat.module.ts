@@ -2,6 +2,7 @@ import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { OcrService } from '../ocr/ocr.service';
 import { Attachments } from './attachments.entity';
 import { ChatController } from './chat.controller';
 import { ChatMessages } from './chat.entity';
@@ -19,7 +20,7 @@ import { ChatSessions } from './session.entity';
 		TypeOrmModule.forFeature([ChatMessages, ChatSessions, Attachments]),
 	],
 	controllers: [ChatController],
-	providers: [ChatService, MessageService, ChatMessageProcessor],
+	providers: [ChatService, MessageService, ChatMessageProcessor, OcrService],
 	exports: [MessageService],
 })
 export class ChatModule {}

@@ -66,7 +66,9 @@ export class OcrService {
 		});
 	}
 
-	async imageOcrStream(dto: CreateOcrDto): Promise<Observable<string>> {
+	async imageOcrStream(
+		dto: CreateOcrDto,
+	): Promise<string | Observable<string>> {
 		try {
 			const llm = this.initLLM();
 
@@ -88,28 +90,33 @@ export class OcrService {
 				}),
 			];
 
-			// 返回 Observable 流
-			return new Observable<string>((subscriber) => {
-				llm
-					.stream(messages)
-					.then(async (stream) => {
-						try {
-							for await (const chunk of stream) {
-								// 提取文本内容
-								const content = chunk.content;
-								if (typeof content === 'string') {
-									subscriber.next(content);
+			if (dto.stream) {
+				// 返回 Observable 流
+				return new Observable<string>((subscriber) => {
+					llm
+						.stream(messages)
+						.then(async (stream) => {
+							try {
+								for await (const chunk of stream) {
+									// 提取文本内容
+									const content = chunk.content;
+									if (typeof content === 'string') {
+										subscriber.next(content);
+									}
 								}
+								subscriber.complete();
+							} catch (error) {
+								subscriber.error(error);
 							}
-							subscriber.complete();
-						} catch (error) {
+						})
+						.catch((error) => {
 							subscriber.error(error);
-						}
-					})
-					.catch((error) => {
-						subscriber.error(error);
-					});
-			});
+						});
+				});
+			} else {
+				const res = await llm.invoke(messages);
+				return res.content as string;
+			}
 		} catch (error) {
 			throw new InternalServerErrorException(error?.message || '解析失败');
 		}

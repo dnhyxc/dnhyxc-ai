@@ -13,6 +13,7 @@ import type { Queue } from 'bullmq';
 import { catchError, Observable, Subject } from 'rxjs';
 import { ModelEnum } from 'src/enum/config.enum';
 import { parseFile } from '../../utils/file-parser';
+import { OcrService } from '../ocr/ocr.service';
 import { MessageRole } from './chat.entity';
 import { ChatContinueDto } from './dto/chat-continue.dto';
 import { ChatMessageDto } from './dto/chat-message.dto';
@@ -38,6 +39,7 @@ export class ChatService {
 		// 注入消息存储队列
 		@InjectQueue('chat-message-queue')
 		private readonly messageQueue: Queue,
+		private readonly ocrService: OcrService,
 	) {}
 
 	private async processFileAttachments(filePaths: string[]): Promise<string> {
@@ -170,7 +172,7 @@ export class ChatService {
 	 * @returns 返回构建好的 ChatMessageDto，如果无内容则返回 null
 	 */
 	private async buildAttachmentMessage(
-		attachments: { path: string }[],
+		attachments: { path: string; mimetype: string }[],
 		promptSuffix: string,
 		role?: MessageRole,
 	): Promise<ChatMessageDto | null> {
@@ -178,17 +180,59 @@ export class ChatService {
 			return null;
 		}
 
-		const filePaths = attachments.map((file) => file.path);
-		const fileContent = await this.processFileAttachments(filePaths);
+		// 分类附件并创建处理 Promise
+		const imagePromises: Promise<string>[] = [];
+		const filePromises: Promise<string>[] = [];
 
-		if (!fileContent) {
-			return null;
+		const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
+
+		for (const attachment of attachments) {
+			console.log(attachment.mimetype, 'attachment.mimetype');
+			if (IMAGE_TYPES.includes(attachment.mimetype)) {
+				imagePromises.push(
+					this.ocrService
+						.imageOcrStream({
+							url: attachment.path,
+							prompt: `Please describe **only the actual content** in this image in full detail, including all text, objects, people, colors, layout, position, and scene elements.
+Do **not** add any information, reasoning, interpretation, or content that does not exist in the image.
+Stick strictly to what is visually present.`,
+							stream: false,
+						})
+						.then((content) => `文件 ${attachment.path} 内容:\n${content}\n`),
+				);
+			} else {
+				filePromises.push(
+					parseFile(attachment.path).then(
+						(content) => `文件 ${attachment.path} 内容:\n${content}\n`,
+					),
+				);
+			}
 		}
 
-		return {
-			role: role || 'system',
-			content: `以下是上传的附件内容:\n${fileContent}，\n${promptSuffix}`,
-		};
+		// 保持原有逻辑：图片优先，互斥处理
+		if (imagePromises.length > 0) {
+			const imageResults = await Promise.all(imagePromises);
+			const imagesContent = imageResults.join('\n');
+			if (!imagesContent) return null;
+
+			return {
+				role: role || 'system',
+				content: `以下是上传的图片附件内容:\n${imagesContent}，\n${promptSuffix}`,
+			};
+		}
+
+		if (filePromises.length > 0) {
+			const fileResults = await Promise.all(filePromises);
+			const filesContent = fileResults.join('\n');
+			if (!filesContent) return null;
+
+			return {
+				role: role || 'system',
+				content: `以下是上传的附件内容:\n${filesContent}，\n${promptSuffix}`,
+			};
+		}
+
+		return null;
 	}
 
 	// deepseek 流式对话
@@ -242,9 +286,6 @@ export class ChatService {
 						currentChatId: dto.userMessage.chatId,
 					}
 				: null;
-
-		// 移除同步保存变量，因为现在是用队列
-		// let savedUserMessage: ChatMessages | null = null;
 
 		return new Observable<any>((subscriber) => {
 			const getStreamStatus = () => cancel$.isStopped || subscriber.closed;

@@ -3,6 +3,7 @@ import ChatTextArea from '@design/ChatTextArea';
 import Upload from '@design/Upload';
 import { Button } from '@ui/index';
 import { CirclePlus, Link, Rocket, StopCircle } from 'lucide-react';
+import { CHAT_VALIDTYPES } from '@/constant';
 import { FileWithPreview, UploadedFile } from '@/types'; // 根据实际路径调整
 import { Message } from '@/types/chat';
 
@@ -101,13 +102,16 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 									countValidText="最多只能支持 5 个文件"
 									uploadedCount={uploadedFiles?.length}
 									disabled={uploadedFiles?.length >= 5}
-									validTypes={[
-										'application/pdf',
-										'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-										'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-									]}
+									validTypes={CHAT_VALIDTYPES}
 									showTooltip
-									tooltipContent="仅支持 PDF、DOCX、XLSX 格式，最多同时支持 5 个文件，每个文件最大 20 MB"
+									tooltipContent={
+										<div className="flex flex-col gap-1.5">
+											<div>
+												仅支持 PDF、DOCX、XLSX、PNG、JPG、JPEG、WEBP 格式！
+											</div>
+											<div>最多同时支持 5 个文件，每个文件最大 20 MB！</div>
+										</div>
+									}
 									onUpload={onUploadFile}
 								>
 									<div className="flex items-center">
