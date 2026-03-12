@@ -117,36 +117,55 @@ class ChatStore {
 		this.sessionData = sessionData;
 	}
 
+	/**
+	 * 更新指定 chatId 的消息内容
+	 * 1. 优先在 this.messages 中查找并更新
+	 * 2. 若未找到，则尝试在流式消息缓存中更新或新建
+	 * 3. 同步更新 sessionData 中对应会话的消息列表
+	 * 4. 根据 isStreaming 状态维护 streamingMessages 缓存
+	 *
+	 * @param chatId - 要更新的消息唯一标识
+	 * @param updates - 需要合并的字段（Partial<Message>）
+	 */
 	updateMessage(chatId: string, updates: Partial<Message>) {
+		// 在本地消息列表中查找目标消息
 		const messageIndex = this.messages.findIndex((m) => m.chatId === chatId);
 
 		if (messageIndex >= 0) {
+			// 场景 A：消息已存在于 this.messages
 			const updatedMessage = {
 				...this.messages[messageIndex],
 				...updates,
 			};
 
+			// 使用不可变方式替换数组中的消息
 			this.messages = [
 				...this.messages.slice(0, messageIndex),
 				updatedMessage,
 				...this.messages.slice(messageIndex + 1),
 			];
 
+			// 维护流式消息缓存：
+			// - 若 updates.isStreaming !== false，表示仍在流式输出，更新缓存
+			// - 若 updates.isStreaming === false，表示流式结束，同步状态到缓存
 			if (updates.isStreaming !== false) {
 				this.streamingMessages.set(chatId, updatedMessage);
 			} else if (updates.isStreaming === false) {
 				const existingStreamingMsg = this.streamingMessages.get(chatId);
 				if (existingStreamingMsg) {
+					// 缓存中已存在，合并更新
 					this.streamingMessages.set(chatId, {
 						...existingStreamingMsg,
 						isStreaming: false,
 						...updates,
 					});
 				} else {
+					// 缓存中不存在，直接写入
 					this.streamingMessages.set(chatId, updatedMessage);
 				}
 			}
 
+			// 同步更新 sessionData 中所有会话的对应消息
 			this.sessionData.list.forEach((session) => {
 				if (session.messages && session.messages.length > 0) {
 					const sessionMessageIndex = session.messages.findIndex(
@@ -162,11 +181,14 @@ class ChatStore {
 				}
 			});
 		} else {
+			// 场景 B：消息不存在于 this.messages
+			// 尝试从流式缓存中拿历史数据，否则新建消息对象
 			const existingStreamingMsg = this.streamingMessages.get(chatId);
 			const updatedMessage = existingStreamingMsg
 				? { ...existingStreamingMsg, ...updates }
 				: ({ chatId, ...updates } as Message);
 
+			// 只要仍在流式或缓存中已存在，就更新缓存
 			if (updates.isStreaming !== false || existingStreamingMsg) {
 				this.streamingMessages.set(chatId, updatedMessage);
 			}
