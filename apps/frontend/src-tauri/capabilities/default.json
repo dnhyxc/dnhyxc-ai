@@ -23,6 +23,11 @@
 		"clipboard-manager:allow-write-text",
 		"process:default",
 		"process:allow-restart",
+		"fs:allow-app-read",
+		"fs:allow-app-write",
+		"fs:allow-app-read-recursive",
+		"fs:allow-app-write-recursive",
+		"fs:allow-appcache-read",
 		{
 			"identifier": "http:default",
 			"allow": [
@@ -31,6 +36,9 @@
 				},
 				{
 					"url": "http://localhost:9112/*"
+				},
+				{
+					"url": "http://127.0.0.1:9112/*"
 				},
 				{
 					"url": "https://github.com/*"
