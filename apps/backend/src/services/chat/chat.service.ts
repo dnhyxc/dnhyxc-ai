@@ -209,30 +209,33 @@ Stick strictly to what is visually present.`,
 			}
 		}
 
-		// 保持原有逻辑：图片优先，互斥处理
-		if (imagePromises.length > 0) {
-			const imageResults = await Promise.all(imagePromises);
-			const imagesContent = imageResults.join('\n');
-			if (!imagesContent) return null;
+		// 并行处理所有附件（图片和文件）
+		const allPromises = [...imagePromises, ...filePromises];
 
-			return {
-				role: role || 'system',
-				content: `以下是上传的图片附件内容:\n${imagesContent}，\n${promptSuffix}`,
-			};
+		if (allPromises.length === 0) return null;
+
+		const results = await Promise.all(allPromises);
+		const combinedContent = results.join('\n');
+
+		if (!combinedContent) return null;
+
+		// 根据附件类型构建不同的提示前缀
+		const hasImages = imagePromises.length > 0;
+		const hasFiles = filePromises.length > 0;
+
+		let contentPrefix = '';
+		if (hasImages && hasFiles) {
+			contentPrefix = '以下是上传的图片和文件附件内容:\n';
+		} else if (hasImages) {
+			contentPrefix = '以下是上传的图片附件内容:\n';
+		} else {
+			contentPrefix = '以下是上传的附件内容:\n';
 		}
 
-		if (filePromises.length > 0) {
-			const fileResults = await Promise.all(filePromises);
-			const filesContent = fileResults.join('\n');
-			if (!filesContent) return null;
-
-			return {
-				role: role || 'system',
-				content: `以下是上传的附件内容:\n${filesContent}，\n${promptSuffix}`,
-			};
-		}
-
-		return null;
+		return {
+			role: role || 'system',
+			content: `${contentPrefix}${combinedContent}\n${promptSuffix}`,
+		};
 	}
 
 	// deepseek 流式对话

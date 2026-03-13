@@ -55,16 +55,17 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 					<div className="flex flex-col overflow-y-auto rounded-md bg-theme/5 border border-theme-white/10">
 						{uploadedFiles?.length > 0 ? (
 							<>
-								<div className="my-2.5 mx-3 text-sm text-textcolor/70">
+								<div className="mt-2.5 mb-0.5 mx-3 text-sm text-textcolor/70">
 									只识别附件中的文字
 								</div>
-								<div className="w-full flex flex-wrap gap-3 px-3 mb-2">
+								<div className="w-full flex flex-wrap px-3 mb-2">
 									{uploadedFiles.map((i, index) => (
 										<ChatFileList
 											key={i.id || index}
 											data={i}
 											showDelete
 											setUploadedFiles={setUploadedFiles}
+											className="mr-3 mt-3"
 										/>
 									))}
 								</div>

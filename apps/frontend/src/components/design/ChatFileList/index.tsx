@@ -2,6 +2,8 @@ import ImagePreview from '@design/ImagePreview';
 import { Toast } from '@ui/index';
 import { CircleX, Download, FileText } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { CHAT_IMAGE_VALIDTYPES } from '@/constant';
+import { cn } from '@/lib/utils';
 import { deleteFile } from '@/service';
 import { DownloadProgress, UploadedFile } from '@/types';
 import {
@@ -15,6 +17,7 @@ interface IProps {
 	showDownload?: boolean;
 	showDelete?: boolean;
 	setUploadedFiles?: React.Dispatch<React.SetStateAction<UploadedFile[]>>;
+	className?: string;
 }
 
 const ChatFileList: React.FC<IProps> = ({
@@ -22,6 +25,7 @@ const ChatFileList: React.FC<IProps> = ({
 	showDownload,
 	showDelete,
 	setUploadedFiles,
+	className,
 }) => {
 	const [downloadProgressInfo, setDownloadProgressInfo] = useState<
 		DownloadProgress[]
@@ -56,7 +60,11 @@ const ChatFileList: React.FC<IProps> = ({
 		};
 	}, []);
 
-	const onDownload = async (file: IProps['data']) => {
+	const onDownload = async (
+		e: React.MouseEvent<SVGSVGElement>,
+		file: IProps['data'],
+	) => {
+		e.stopPropagation();
 		setLoading(true);
 		const res = await donwnloadWithUrl({
 			url: file.path,
@@ -74,16 +82,25 @@ const ChatFileList: React.FC<IProps> = ({
 		await deleteFile(data.filename);
 	};
 
+	const showPreview = (e: React.MouseEvent<HTMLSpanElement>) => {
+		e.stopPropagation();
+		if (CHAT_IMAGE_VALIDTYPES.includes(data.mimetype)) {
+			setVisible(true);
+		}
+	};
+
 	return (
 		<>
-			<ImagePreview
-				visible={visible}
-				selectedImage={{ id: data.uuid, url: base64Url }}
-				onVisibleChange={() => setVisible(false)}
-			/>
+			{CHAT_IMAGE_VALIDTYPES.includes(data.mimetype) && (
+				<ImagePreview
+					visible={visible}
+					selectedImage={{ id: data.uuid, url: base64Url }}
+					onVisibleChange={() => setVisible(false)}
+				/>
+			)}
 			<div
-				className="flex flex-col items-start"
-				onClick={() => setVisible(true)}
+				className={cn('flex flex-col items-start', className)}
+				onClick={(e) => showPreview(e)}
 			>
 				<div className="relative group/file-card flex items-center min-w-50 gap-2 px-2.5 pr-2 py-1.5 w-auto bg-linear-to-r from-blue-500 to-cyan-500 rounded-md">
 					<FileText className="w-9 h-9" />
@@ -120,7 +137,7 @@ const ChatFileList: React.FC<IProps> = ({
 										<Download
 											size={18}
 											className="absolute bottom-0.5 right-0 cursor-pointer hidden group-hover/file-card:flex"
-											onClick={() => onDownload(data)}
+											onClick={(e) => onDownload(e, data)}
 										/>
 									)}
 								</div>

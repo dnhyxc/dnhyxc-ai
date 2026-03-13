@@ -11,3 +11,10 @@ export const CHAT_VALIDTYPES = [
 	'image/jpg',
 	'image/webp',
 ];
+
+export const CHAT_IMAGE_VALIDTYPES = [
+	'image/png',
+	'image/jpeg',
+	'image/jpg',
+	'image/webp',
+];
