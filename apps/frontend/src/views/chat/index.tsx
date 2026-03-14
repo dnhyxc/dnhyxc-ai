@@ -1,10 +1,10 @@
-import ChatBot from '@design/ChatBot';
+import ChatBot, { type ChatBotRef } from '@design/ChatBot';
 import { Drawer } from '@design/Drawer';
 import { MarkdownParser } from '@dnhyxc-ai/tools';
 import { ScrollArea, Spinner, Toast } from '@ui/index';
 import { History, SquarePen, Trash2 } from 'lucide-react';
 import { observer } from 'mobx-react';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Confirm from '@/components/design/Confirm';
 import { deleteSession, getSessionList } from '@/service';
 import useStore from '@/store';
@@ -19,6 +19,8 @@ const Chat = observer(() => {
 	// 确认对话框状态
 	const [confirmOpen, setConfirmOpen] = useState(false);
 	const [deleteItem, setDeleteItem] = useState<Session | null>(null);
+
+	const chatBotRef = useRef<ChatBotRef>(null);
 
 	const parser = useMemo(() => {
 		return new MarkdownParser();
@@ -94,10 +96,11 @@ const Chat = observer(() => {
 		if (deleteItem) {
 			const res = await deleteSession(deleteItem.id);
 			if (res.success) {
-				Toast({
-					type: 'success',
-					title: '删除成功',
-				});
+				console.log(chatBotRef.current, 'chatBotRef.current');
+				if (deleteItem.id === chatStore.activeSessionId) {
+					await chatBotRef.current?.stopGenerating(true);
+					chatBotRef.current?.clearChat();
+				}
 				getSessions();
 			} else {
 				Toast({
@@ -133,7 +136,7 @@ const Chat = observer(() => {
 					/>
 				)}
 			</div>
-			<ChatBot onBranchChange={onBranchChange} />
+			<ChatBot ref={chatBotRef} onBranchChange={onBranchChange} />
 			<Drawer title="历史对话" open={open} onOpenChange={() => setOpen(false)}>
 				<ScrollArea className="h-full overflow-y-auto pr-4 box-border">
 					{chatStore.sessionData.list.map((item) => {
@@ -143,6 +146,9 @@ const Chat = observer(() => {
 								className={`group relative h-10 px-2 mb-1 hover:bg-theme/10 rounded-sm cursor-pointer flex items-center justify-between ${chatStore.activeSessionId === item.id ? 'bg-theme/10' : ''}`}
 								onClick={(e) => onSelectSession(e, item)}
 							>
+								{chatStore.loadingSessions.has(item.id) ? (
+									<Spinner className="w-4 h-4 mr-2 text-cyan-400" />
+								) : null}
 								<div
 									className="line-clamp-1 flex-1 text-sm [&_.markdown-body]:text-textcolor!"
 									dangerouslySetInnerHTML={{
@@ -165,9 +171,6 @@ const Chat = observer(() => {
 										<Trash2 size={18} />
 									</div>
 								</div>
-								{chatStore.loadingSessions.has(item.id) ? (
-									<Spinner className="w-4 h-4 mr-2 text-cyan-400" />
-								) : null}
 							</div>
 						);
 					})}
