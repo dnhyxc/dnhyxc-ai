@@ -52,7 +52,7 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 			<div className="max-w-3xl mx-auto flex">
 				<div className="flex-1 relative">
 					{children}
-					<div className="flex flex-col overflow-y-auto rounded-md bg-theme/5 border border-theme-white/10">
+					<div className="flex flex-col overflow-y-auto rounded-md bg-theme/2 border border-theme-white/5">
 						{uploadedFiles?.length > 0 ? (
 							<>
 								<div className="mt-2.5 mb-0.5 mx-3 text-sm text-textcolor/70">

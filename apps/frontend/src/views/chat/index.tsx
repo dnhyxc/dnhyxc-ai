@@ -1,11 +1,12 @@
 import ChatBot from '@design/ChatBot';
 import { Drawer } from '@design/Drawer';
 import { MarkdownParser } from '@dnhyxc-ai/tools';
-import { ScrollArea, Spinner } from '@ui/index';
-import { History } from 'lucide-react';
+import { ScrollArea, Spinner, Toast } from '@ui/index';
+import { History, SquarePen, Trash2 } from 'lucide-react';
 import { observer } from 'mobx-react';
-import { useEffect, useMemo, useState } from 'react';
-import { getSessionList } from '@/service';
+import React, { useEffect, useMemo, useState } from 'react';
+import Confirm from '@/components/design/Confirm';
+import { deleteSession, getSessionList } from '@/service';
 import useStore from '@/store';
 import { Session } from '@/types/chat';
 
@@ -15,6 +16,9 @@ const Chat = observer(() => {
 	const [open, setOpen] = useState(false);
 	// 跟踪当前正在流式的会话ID
 	const [streamingSessionId, setStreamingSessionId] = useState<string>('');
+	// 确认对话框状态
+	const [confirmOpen, setConfirmOpen] = useState(false);
+	const [deleteItem, setDeleteItem] = useState<Session | null>(null);
 
 	const parser = useMemo(() => {
 		return new MarkdownParser();
@@ -36,7 +40,11 @@ const Chat = observer(() => {
 		};
 	}, []);
 
-	const onSelectSession = (session: Session) => {
+	const onSelectSession = (
+		e: React.MouseEvent<HTMLDivElement>,
+		session: Session,
+	) => {
+		e.stopPropagation();
 		// 如果切换到不同的会话，更新 activeSessionId
 		if (session.id !== chatStore.activeSessionId) {
 			chatStore.setActiveSessionId(session.id);
@@ -76,6 +84,42 @@ const Chat = observer(() => {
 		setOpen(true);
 	};
 
+	const onDelete = (e: React.MouseEvent<HTMLDivElement>, item: Session) => {
+		e.stopPropagation();
+		setDeleteItem(item);
+		setConfirmOpen(true);
+	};
+
+	const handleConfirmDelete = async () => {
+		if (deleteItem) {
+			const res = await deleteSession(deleteItem.id);
+			if (res.success) {
+				Toast({
+					type: 'success',
+					title: '删除成功',
+				});
+				getSessions();
+			} else {
+				Toast({
+					type: 'error',
+					title: res.message || '删除失败',
+				});
+			}
+		}
+		setConfirmOpen(false);
+		setDeleteItem(null);
+	};
+
+	const handleCancelDelete = () => {
+		setConfirmOpen(false);
+		setDeleteItem(null);
+	};
+
+	const onEdit = (e: React.MouseEvent<HTMLDivElement>, item: Session) => {
+		e.stopPropagation();
+		console.log(item, 'item');
+	};
+
 	return (
 		<div className="w-full h-full overflow-hidden">
 			<div className="absolute top-4 left-28 z-9">
@@ -96,17 +140,31 @@ const Chat = observer(() => {
 						return (
 							<div
 								key={item.id}
-								className={`h-10 px-2 mb-1 hover:bg-theme/10 rounded-sm cursor-pointer flex items-center justify-between ${chatStore.activeSessionId === item.id ? 'bg-theme/10' : ''}`}
-								onClick={() => onSelectSession(item)}
+								className={`group relative h-10 px-2 mb-1 hover:bg-theme/10 rounded-sm cursor-pointer flex items-center justify-between ${chatStore.activeSessionId === item.id ? 'bg-theme/10' : ''}`}
+								onClick={(e) => onSelectSession(e, item)}
 							>
 								<div
-									className="line-clamp-1 flex-1 text-sm"
+									className="line-clamp-1 flex-1 text-sm [&_.markdown-body]:text-textcolor!"
 									dangerouslySetInnerHTML={{
 										__html: parser.render(
 											item.messages?.[0]?.content || '新对话',
 										),
 									}}
 								/>
+								<div className="absolute right-2 items-center hidden group-hover:flex">
+									<div
+										className="bg-theme-background p-1 rounded-sm hover:text-blue-500"
+										onClick={(e) => onEdit(e, item)}
+									>
+										<SquarePen size={18} />
+									</div>
+									<div
+										className="bg-theme-background p-1 ml-2 rounded-sm hover:text-red-500"
+										onClick={(e) => onDelete(e, item)}
+									>
+										<Trash2 size={18} />
+									</div>
+								</div>
 								{chatStore.loadingSessions.has(item.id) ? (
 									<Spinner className="w-4 h-4 mr-2 text-cyan-400" />
 								) : null}
@@ -115,6 +173,15 @@ const Chat = observer(() => {
 					})}
 				</ScrollArea>
 			</Drawer>
+			<Confirm
+				open={confirmOpen}
+				onOpenChange={setConfirmOpen}
+				title="确认删除"
+				description="确定要删除这个会话吗？此操作无法撤销。"
+				className="w-100"
+				onConfirm={handleConfirmDelete}
+				onCancel={handleCancelDelete}
+			/>
 		</div>
 	);
 });

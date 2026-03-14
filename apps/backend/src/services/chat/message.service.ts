@@ -198,8 +198,8 @@ export class MessageService {
 		return `This action updates a #${id} chat`;
 	}
 
-	remove(id: number) {
-		return `This action removes a #${id} chat`;
+	deleteSessionById(id: string) {
+		return this.chatSessionsRepository.delete(id);
 	}
 
 	findSession(dto: MessageDto) {

@@ -3,6 +3,7 @@ import {
 	CREATE_SESSION,
 	CREATE_VERIFY_CODE,
 	DELETE_FILE,
+	DELETE_SESSION,
 	DOWNLOAD_FILE,
 	DOWNLOAD_ZIP_FILE,
 	GET_SESSION,
@@ -237,5 +238,12 @@ export const getSessionList = async (options?: {
 			pageNo: options?.pageNo || 1,
 			userId: options?.userId || '',
 		},
+	});
+};
+
+// 删除会话
+export const deleteSession = async (id: string): Promise<any> => {
+	return await http.delete(DELETE_SESSION, {
+		params: [id],
 	});
 };

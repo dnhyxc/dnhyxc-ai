@@ -34,6 +34,7 @@ interface RequestSnapshot {
 const ChatBot = observer(function ChatBot(props: ChatBotProps) {
 	const {
 		className,
+		// apiEndpoint = '/chat/zhipu-stream',
 		apiEndpoint = '/chat/sse',
 		showAvatar = false,
 		onBranchChange,

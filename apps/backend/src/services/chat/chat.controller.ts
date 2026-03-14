@@ -165,9 +165,9 @@ export class ChatController {
 		return this.messageService.update(+id, updateChatDto);
 	}
 
-	@Delete(':id')
-	remove(@Param('id') id: string) {
-		return this.messageService.remove(+id);
+	@Delete('delSession/:id')
+	delete(@Param('id') id: string) {
+		return this.messageService.deleteSessionById(id);
 	}
 
 	@Get('/getSession')
