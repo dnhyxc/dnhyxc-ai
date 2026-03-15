@@ -68,10 +68,10 @@ class ChatStore {
 		// 2. 如果是新会话，清空当前消息
 		if (isNewSession) {
 			this.messages = [];
-			const activeSession = this.sessionData.list.find((s) => s.isActive);
-			if (activeSession) {
-				activeSession.messages = [];
-			}
+			// const activeSession = this.sessionData.list.find((s) => s.isActive);
+			// if (activeSession) {
+			// 	activeSession.messages = [];
+			// }
 			this.cleanupCompletedStreamingMessages();
 			return;
 		}

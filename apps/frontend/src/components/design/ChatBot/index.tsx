@@ -922,10 +922,9 @@ const ChatBot = observer(
 			currentAssistantMessageMapRef.current.delete(session_id);
 		};
 
-		// ========== 核心修复：clearChat 支持指定会话 ==========
 		const clearChat = (targetSessionId?: string) => {
 			setInput('');
-			// chatStore.setAllMessages([], '', true);
+			chatStore.setAllMessages([], '', true);
 			// setMessages([]);
 
 			// 删除存储的每个会话的分支选择状态：sessionId -> selectedChildMap
