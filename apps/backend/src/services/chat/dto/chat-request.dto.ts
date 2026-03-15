@@ -129,4 +129,8 @@ export class ChatRequestDto {
 	@IsOptional()
 	@IsObject()
 	assistantMessage?: AssistantMessageDto;
+
+	@IsBoolean()
+	@IsOptional()
+	isContinuation?: boolean;
 }

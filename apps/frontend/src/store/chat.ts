@@ -1,4 +1,4 @@
-import { makeAutoObservable } from 'mobx';
+import { makeAutoObservable, observable } from 'mobx';
 import { Message, SessionData } from '@/types/chat';
 
 class ChatStore {
@@ -12,7 +12,10 @@ class ChatStore {
 		total: 0,
 	};
 	activeSessionId: string = '';
-	loadingSessions: Set<string> = new Set();
+
+	// ========== 修复：使用 observable.set 代替普通 Set ==========
+	// 这样 MobX 可以正确追踪 Set 的变化，触发 React 组件重新渲染
+	loadingSessions = observable.set<string>();
 
 	// 全局跟踪所有会话中的流式消息
 	streamingMessages: Map<string, Message> = new Map();
@@ -115,6 +118,14 @@ class ChatStore {
 
 	setSessionData(sessionData: SessionData) {
 		this.sessionData = sessionData;
+	}
+
+	updateSessionData(sessionId: string) {
+		const list = this.sessionData.list.filter((i) => i.id !== sessionId);
+		this.sessionData = {
+			...this.sessionData,
+			list,
+		};
 	}
 
 	/**

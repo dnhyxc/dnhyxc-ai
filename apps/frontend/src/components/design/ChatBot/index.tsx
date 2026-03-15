@@ -42,8 +42,11 @@ interface RequestSnapshot {
 
 // 定义暴露给父组件的方法类型
 export interface ChatBotRef {
-	clearChat: () => void;
-	stopGenerating: (isUnmount?: boolean) => Promise<void>;
+	clearChat: (targetSessionId?: string) => void;
+	stopGenerating: (
+		targetSessionId?: string,
+		isUnmount?: boolean,
+	) => Promise<void>;
 }
 
 const ChatBot = observer(
@@ -76,11 +79,21 @@ const ChatBot = observer(
 		const [scrollTop, setScrollTop] = useState<number>(0);
 		const [hasScrollbar, setHasScrollbar] = useState<boolean>(false);
 
-		// 保存请求前的状态快照，用于回滚
-		const requestSnapshotRef = useRef<RequestSnapshot | null>(null);
-		// 标记是否已接收到流式数据 (Thinking 或 Content)
-		const hasReceivedStreamDataRef = useRef(false);
-		const stopRequestRef = useRef<(() => void) | null>(null);
+		// ========== 核心修复：将单例 ref 改为 Map 结构 ==========
+		// 保存每个会话的请求停止函数：sessionId -> stop function
+		const stopRequestMapRef = useRef<Map<string, () => void>>(new Map());
+		// 保存每个会话的请求前状态快照：sessionId -> RequestSnapshot
+		const requestSnapshotMapRef = useRef<Map<string, RequestSnapshot>>(
+			new Map(),
+		);
+		// 标记每个会话是否已接收到流式数据：sessionId -> boolean
+		const hasReceivedStreamDataMapRef = useRef<Map<string, boolean>>(new Map());
+		// 保存每个会话当前流式输出的 assistantMessageId：sessionId -> assistantMessageId
+		const currentAssistantMessageMapRef = useRef<Map<string, string>>(
+			new Map(),
+		);
+		// ========== 核心修复结束 ==========
+
 		const scrollContainerRef = useRef<HTMLDivElement>(null);
 		const editInputRef = useRef<HTMLTextAreaElement>(null);
 		const chatInputRef = useRef<HTMLTextAreaElement>(null);
@@ -187,14 +200,7 @@ const ChatBot = observer(
 					}
 				}
 
-				// 重置所有消息的 isStopped 状态，避免显示"继续生成"按钮
-				chatStore.messages.forEach((msg) => {
-					if (msg.isStopped) {
-						chatStore.updateMessage(msg.chatId, {
-							isStopped: false,
-						});
-					}
-				});
+				// 注意：不要在这里重置 isStopped 状态，否则会影响"继续生成"按钮的显示
 			} else {
 				setSelectedChildMap(new Map());
 			}
@@ -261,8 +267,8 @@ const ChatBot = observer(
 					clearTimeout(focusTimerRef.current);
 					focusTimerRef.current = null;
 				}
-				// 组件卸载时，如果正在请求且未收到数据，也应当清理
-				stopGenerating(true);
+				// 组件卸载时，停止所有正在进行的请求
+				stopGenerating(undefined, true);
 				// 清理所有会话的加载状态
 				clearAllSessionLoading();
 			};
@@ -302,9 +308,6 @@ const ChatBot = observer(
 			isRegenerate?: boolean,
 			branchMap?: Map<string, string>, // 可选的分支映射参数
 		) => {
-			// 重置数据接收标记
-			hasReceivedStreamDataRef.current = false;
-
 			let session_Id = chatStore.activeSessionId;
 
 			if (!session_Id) {
@@ -317,6 +320,12 @@ const ChatBot = observer(
 					return;
 				}
 			}
+
+			// ========== 核心修复：使用 sessionId 为 key 存储状态 ==========
+			// 重置该会话的数据接收标记
+			hasReceivedStreamDataMapRef.current.set(session_Id, false);
+			// 保存当前会话的 assistantMessageId
+			currentAssistantMessageMapRef.current.set(session_Id, assistantMessageId);
 
 			// 在发起请求前设置 loading 状态并保存分支映射
 			// 使用传入的 branchMap 或当前的 selectedChildMap
@@ -362,8 +371,8 @@ const ChatBot = observer(
 					callbacks: {
 						onThinking: (thinking) => {
 							if (typeof thinking === 'string') {
-								// 标记已收到数据
-								hasReceivedStreamDataRef.current = true;
+								// 标记该会话已收到数据
+								hasReceivedStreamDataMapRef.current.set(session_Id, true);
 								const currentMessage = chatStore.messages.find(
 									(m) => m.chatId === assistantMessageId,
 								);
@@ -375,8 +384,8 @@ const ChatBot = observer(
 						},
 						onData: (chunk) => {
 							if (typeof chunk === 'string') {
-								// 标记已收到数据
-								hasReceivedStreamDataRef.current = true;
+								// 标记该会话已收到数据
+								hasReceivedStreamDataMapRef.current.set(session_Id, true);
 								const currentMessage = chatStore.messages.find(
 									(m) => m.chatId === assistantMessageId,
 								);
@@ -387,18 +396,17 @@ const ChatBot = observer(
 							}
 						},
 						onError: (err, type) => {
-							// 清除当前会话的加载状态
+							// 清除该会话的加载状态
 							setSessionLoading(session_Id, false);
 							Toast({
 								type: type || 'error',
 								title: err?.message || String(err) || '发送失败',
 							});
-							if (
-								requestSnapshotRef.current &&
-								!hasReceivedStreamDataRef.current
-							) {
-								const snapshot = requestSnapshotRef.current;
+							const snapshot = requestSnapshotMapRef.current.get(session_Id);
+							const hasReceivedData =
+								hasReceivedStreamDataMapRef.current.get(session_Id);
 
+							if (snapshot && hasReceivedData === false) {
 								// 清理流式跟踪，防止恢复后流式消息又冒出来
 								chatStore.removeStreamingMessage(snapshot.assistantMessageId);
 
@@ -413,35 +421,46 @@ const ChatBot = observer(
 								setAllMessages([...snapshot.messages]);
 								setSelectedChildMap(new Map(snapshot.selectedChildMap));
 
-								// 清除快照
-								requestSnapshotRef.current = null;
+								// 清除该会话的快照
+								requestSnapshotMapRef.current.delete(session_Id);
 							}
+
+							// 清理该会话的 ref
+							currentAssistantMessageMapRef.current.delete(session_Id);
 						},
 						onComplete: () => {
-							// 清除当前会话的加载状态
+							// 清除该会话的加载状态
 							setSessionLoading(session_Id, false);
 							// 标记流式结束
 							chatStore.updateMessage(assistantMessageId, {
 								isStreaming: false,
 							});
-							// 流结束时清除流式分支选择状态
+							// 流结束时清除该消息的流式分支选择状态
 							chatStore.deleteStreamingBranchMap(assistantMessageId);
+							// 清理该会话的 ref
+							stopRequestMapRef.current.delete(session_Id);
+							requestSnapshotMapRef.current.delete(session_Id);
+							hasReceivedStreamDataMapRef.current.delete(session_Id);
+							currentAssistantMessageMapRef.current.delete(session_Id);
 						},
 					},
 				});
 
-				stopRequestRef.current = stop;
+				// ========== 核心修复：使用 sessionId 存储 stop 函数 ==========
+				stopRequestMapRef.current.set(session_Id, stop);
 			} catch (_error) {
-				// 清除当前会话的加载状态
+				// 清除该会话的加载状态
 				setSessionLoading(session_Id, false);
 				Toast({
 					type: 'error',
 					title: '发送消息失败',
 				});
 
-				if (requestSnapshotRef.current && !hasReceivedStreamDataRef.current) {
-					const snapshot = requestSnapshotRef.current;
+				const snapshot = requestSnapshotMapRef.current.get(session_Id);
+				const hasReceivedData =
+					hasReceivedStreamDataMapRef.current.get(session_Id);
 
+				if (snapshot && hasReceivedData === false) {
 					// 清理流式跟踪，防止恢复后流式消息又冒出来
 					chatStore.removeStreamingMessage(snapshot.assistantMessageId);
 
@@ -456,9 +475,12 @@ const ChatBot = observer(
 					setAllMessages([...snapshot.messages]);
 					setSelectedChildMap(new Map(snapshot.selectedChildMap));
 
-					// 清除快照
-					requestSnapshotRef.current = null;
+					// 清除该会话的快照
+					requestSnapshotMapRef.current.delete(session_Id);
 				}
+
+				// 清理该会话的 ref
+				currentAssistantMessageMapRef.current.delete(session_Id);
 			}
 		};
 
@@ -509,13 +531,14 @@ const ChatBot = observer(
 
 			// 在更新 Store 之前保存快照
 			const currentSessionId = chatStore.activeSessionId;
-			requestSnapshotRef.current = {
+			// ========== 核心修复：使用 sessionId 存储 snapshot ==========
+			requestSnapshotMapRef.current.set(currentSessionId || 'new', {
 				messages: [...chatStore.messages],
 				selectedChildMap: new Map(selectedChildMap),
 				assistantMessageId,
 				userMessageId: userMsgId,
-				sessionId: currentSessionId,
-			};
+				sessionId: currentSessionId || '',
+			});
 
 			setSelectedChildMap(newSelectedChildMap);
 			if (chatStore.activeSessionId) {
@@ -566,13 +589,14 @@ const ChatBot = observer(
 
 			// 在更新 Store 之前保存快照
 			const currentSessionId = chatStore.activeSessionId;
-			requestSnapshotRef.current = {
+			// ========== 核心修复：使用 sessionId 存储 snapshot ==========
+			requestSnapshotMapRef.current.set(currentSessionId || 'new', {
 				messages: [...chatStore.messages],
 				selectedChildMap: new Map(selectedChildMap),
 				assistantMessageId,
 				userMessageId: userMsgId,
-				sessionId: currentSessionId,
-			};
+				sessionId: currentSessionId || '',
+			});
 
 			updateStoreMessages((prevAll) => {
 				const editedMsg = prevAll.find((m) => m.chatId === editMessage.chatId);
@@ -650,13 +674,14 @@ const ChatBot = observer(
 
 			// 在更新 Store 之前保存快照
 			const currentSessionId = chatStore.activeSessionId;
-			requestSnapshotRef.current = {
+			// ========== 核心修复：使用 sessionId 存储 snapshot ==========
+			requestSnapshotMapRef.current.set(currentSessionId || 'new', {
 				messages: [...chatStore.messages],
 				selectedChildMap: new Map(selectedChildMap),
 				assistantMessageId,
 				userMessageId: currentAssistantMsg.parentId || '',
-				sessionId: currentSessionId,
-			};
+				sessionId: currentSessionId || '',
+			});
 
 			updateStoreMessages((prevAll) => {
 				const userMsg = prevAll.find(
@@ -811,25 +836,38 @@ const ChatBot = observer(
 			setAutoScroll(true);
 		};
 
-		// 停止生成逻辑：支持回滚
-		const stopGenerating = async (isUnmount = false) => {
-			const session_id = chatStore.activeSessionId;
+		// ========== 核心修复：stopGenerating 支持指定会话 ==========
+		const stopGenerating = async (
+			targetSessionId?: string,
+			isUnmount = false,
+		) => {
+			const session_id = targetSessionId || chatStore.activeSessionId;
+			if (!session_id) return;
 
-			// 1. 停止网络请求
-			if (stopRequestRef.current) {
+			// 1. 停止指定会话的网络请求
+			const stopFn = stopRequestMapRef.current.get(session_id);
+			if (stopFn) {
 				await stopSse(session_id);
-				stopRequestRef.current();
-				stopRequestRef.current = null;
+				stopFn();
+				stopRequestMapRef.current.delete(session_id);
 			}
 
-			// 清除当前会话的加载状态
+			// 2. 清除指定会话的加载状态
 			setSessionLoading(session_id, false);
 
-			// 2. 判断是否需要回滚
-			// 条件：有快照 且 未收到任何流式数据 且 (是手动停止 或 组件卸载)
-			if (requestSnapshotRef.current && !hasReceivedStreamDataRef.current) {
-				const snapshot = requestSnapshotRef.current;
+			// 3. 获取指定会话的快照和数据接收状态
+			const snapshot = requestSnapshotMapRef.current.get(session_id);
+			const hasReceivedData =
+				hasReceivedStreamDataMapRef.current.get(session_id);
 
+			// 获取当前会话的 assistantMessageId
+			const assistantMessageId =
+				currentAssistantMessageMapRef.current.get(session_id);
+
+			// 4. 判断是否需要回滚
+			// 修复：只有明确标记为 false 时才认为没有收到数据，需要回滚
+			// undefined 表示请求已完成或未开始，不需要回滚
+			if (snapshot && hasReceivedData === false) {
 				// 清理流式跟踪，防止恢复后流式消息又冒出来
 				chatStore.removeStreamingMessage(snapshot.assistantMessageId);
 
@@ -840,12 +878,14 @@ const ChatBot = observer(
 					snapshot.sessionId,
 				);
 
-				// 恢复本地 State
-				setAllMessages([...snapshot.messages]);
-				setSelectedChildMap(new Map(snapshot.selectedChildMap));
+				// 恢复本地 State（仅当恢复的是当前活动会话时）
+				if (session_id === chatStore.activeSessionId) {
+					setAllMessages([...snapshot.messages]);
+					setSelectedChildMap(new Map(snapshot.selectedChildMap));
+				}
 
-				// 清除快照
-				requestSnapshotRef.current = null;
+				// 清除该会话的快照
+				requestSnapshotMapRef.current.delete(session_id);
 
 				// 如果是手动停止，给个提示
 				if (!isUnmount) {
@@ -854,32 +894,70 @@ const ChatBot = observer(
 						title: '已取消发送，恢复到发送前状态',
 					});
 				}
+			} else if (assistantMessageId) {
+				// 5. 常规停止逻辑（已收到数据，只标记停止）
+				// 使用保存的 assistantMessageId 直接更新消息状态
+				chatStore.updateMessage(assistantMessageId, {
+					isStreaming: false,
+					isStopped: true,
+				});
 			} else {
-				// 3. 常规停止逻辑（已收到数据，只标记停止）
+				// 6. 如果没有 assistantMessageId，尝试从消息列表中查找
+				// 这种情况不应该发生，但作为兜底逻辑
 				const lastAssistantMsg = findLastAssistantMessage(chatStore.messages);
-				if (lastAssistantMsg) {
+				if (lastAssistantMsg?.isStreaming) {
 					chatStore.updateMessage(lastAssistantMsg.chatId, {
 						isStreaming: false,
 						isStopped: true,
 					});
 				}
 			}
-			// 清除流式分支选择状态
-			chatStore.clearAllStreamingBranchMaps();
+
+			// 7. 只清除指定会话的流式分支映射
+			chatStore.clearSessionStreamingBranchMaps(session_id);
+
+			// 8. 清理该会话的 ref
+			requestSnapshotMapRef.current.delete(session_id);
+			hasReceivedStreamDataMapRef.current.delete(session_id);
+			currentAssistantMessageMapRef.current.delete(session_id);
 		};
 
-		const clearChat = () => {
+		// ========== 核心修复：clearChat 支持指定会话 ==========
+		const clearChat = (targetSessionId?: string) => {
 			setInput('');
-			chatStore.setAllMessages([], '', true);
-			chatStore.clearSessionBranchSelection(chatStore.activeSessionId);
-			setMessages([]);
-			clearAllSessionLoading();
+			// chatStore.setAllMessages([], '', true);
+			// setMessages([]);
+
+			// 删除存储的每个会话的分支选择状态：sessionId -> selectedChildMap
+			chatStore.clearSessionBranchSelection(
+				targetSessionId || chatStore.activeSessionId,
+			);
+
+			// 只清除指定会话的加载状态
+			if (targetSessionId) {
+				setSessionLoading(targetSessionId, false);
+			} else {
+				clearAllSessionLoading();
+			}
+
 			chatStore.setActiveSessionId('');
 			setSelectedChildMap(new Map());
-			requestSnapshotRef.current = null;
-			hasReceivedStreamDataRef.current = false;
-			// 清除流式分支选择状态
-			chatStore.clearAllStreamingBranchMaps();
+
+			// 清除指定会话的 ref
+			if (targetSessionId) {
+				requestSnapshotMapRef.current.delete(targetSessionId);
+				hasReceivedStreamDataMapRef.current.delete(targetSessionId);
+				stopRequestMapRef.current.delete(targetSessionId);
+				currentAssistantMessageMapRef.current.delete(targetSessionId);
+				chatStore.clearSessionStreamingBranchMaps(targetSessionId);
+			} else {
+				// 如果没有指定 session_id，清除所有
+				requestSnapshotMapRef.current.clear();
+				hasReceivedStreamDataMapRef.current.clear();
+				stopRequestMapRef.current.clear();
+				currentAssistantMessageMapRef.current.clear();
+				chatStore.clearAllStreamingBranchMaps();
+			}
 		};
 
 		const handleEditChange = (
@@ -1147,7 +1225,5 @@ const ChatBot = observer(
 	}),
 );
 
-// export default ChatBot as React.FC<ChatBotProps>;
-
 export default ChatBot as React.FC<ChatBotProps> &
-	(({ ref }: { ref?: React.Ref<ChatBotRef> } & ChatBotProps) => JSX.Element);
+	((props: { ref?: React.Ref<ChatBotRef> } & ChatBotProps) => JSX.Element);

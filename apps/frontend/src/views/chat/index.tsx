@@ -92,16 +92,21 @@ const Chat = observer(() => {
 		setConfirmOpen(true);
 	};
 
+	// ========== 核心修复：传递正确的 sessionId ==========
 	const handleConfirmDelete = async () => {
 		if (deleteItem) {
 			const res = await deleteSession(deleteItem.id);
 			if (res.success) {
-				console.log(chatBotRef.current, 'chatBotRef.current');
+				// ========== 核心修复：传递要删除的会话 ID ==========
 				if (deleteItem.id === chatStore.activeSessionId) {
-					await chatBotRef.current?.stopGenerating(true);
-					chatBotRef.current?.clearChat();
+					// 停止并清除指定会话，而不是当前活动会话
+					await chatBotRef.current?.stopGenerating(deleteItem.id, true);
+					chatBotRef.current?.clearChat(deleteItem.id);
+				} else {
+					// 如果删除的不是当前活动会话，只需要停止该会话的流式输出
+					await chatBotRef.current?.stopGenerating(deleteItem.id, true);
 				}
-				getSessions();
+				chatStore.updateSessionData(deleteItem.id);
 			} else {
 				Toast({
 					type: 'error',

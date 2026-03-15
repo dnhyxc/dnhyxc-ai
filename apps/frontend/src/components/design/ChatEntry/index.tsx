@@ -124,7 +124,7 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 							{loading ? (
 								<Button
 									variant="ghost"
-									onClick={stopGenerating}
+									onClick={() => stopGenerating()}
 									className="h-8 w-8 mb-1 flex items-center justify-center rounded-full bg-red-500/20 hover:bg-red-500/30 border border-red-500/30"
 								>
 									<StopCircle />

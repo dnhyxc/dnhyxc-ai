@@ -187,7 +187,6 @@ export class ChatService {
 		const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
 
 		for (const attachment of attachments) {
-			console.log(attachment.mimetype, 'attachment.mimetype');
 			if (IMAGE_TYPES.includes(attachment.mimetype)) {
 				imagePromises.push(
 					this.ocrService
@@ -268,7 +267,7 @@ Stick strictly to what is visually present.`,
 			abortSignal: abortController.signal,
 		});
 
-		// 【修改】不立即保存用户消息，先缓存到临时变量
+		// 不立即保存用户消息，先缓存到临时变量
 		// 等到收到第一个 AI Token 时再保存（延迟持久化 - 加入队列）
 		const lastUserMessage = dto.messages.find(
 			(msg) => msg.role === 'user' && !msg.noSave,
@@ -293,7 +292,7 @@ Stick strictly to what is visually present.`,
 		return new Observable<any>((subscriber) => {
 			const getStreamStatus = () => cancel$.isStopped || subscriber.closed;
 			(async () => {
-				// 【修复】将 fullContent 提升到 try 外部，确保在 catch 或停止逻辑中可访问
+				// 将 fullContent 提升到 try 外部，确保在 catch 或停止逻辑中可访问
 				let fullContent = '';
 				let wasCancelledDuringIteration = false;
 				// 【新增】用于追踪是否已收到第一个 Token
@@ -305,13 +304,6 @@ Stick strictly to what is visually present.`,
 						subscriber.complete();
 						return;
 					}
-
-					// 获取部分响应（如果有）
-					const session = await this.messageService.findOneSession(sessionId);
-					const partialContent = session?.partialContent;
-
-					// 判断是否为续写模式
-					const isContinuation = !!partialContent && partialContent.length > 0;
 
 					// 处理文件附件和消息准备
 					let enhancedMessages = [...dto.messages];
@@ -328,7 +320,9 @@ Stick strictly to what is visually present.`,
 
 					// 动态构建系统提示词
 					let systemContent = '';
-					if (isContinuation) {
+
+					// 判断是否为续写模式
+					if (dto.isContinuation) {
 						// 续写模式：强调不要重复，直接继续
 						systemContent = `You are continuing an interrupted response. The last assistant message is incomplete. Continue exactly from the last character. Do not repeat previous content. Maintain the same format, indentation, code style, and language. Output ONLY the remaining content.`;
 					} else {
@@ -378,7 +372,7 @@ Stick strictly to what is visually present.`,
 					// 构建最终消息列表
 					// 1. 系统提示
 					// 2. 数据库历史消息
-					// 3. 【关键修复】如果有 partialContent，作为一条 Assistant 消息插入到这里（在历史之后，新用户消息之前）
+					// 3. 如果有 partialContent，作为一条 Assistant 消息插入到这里（在历史之后，新用户消息之前）
 					// 4. 当前新用户消息
 					const newData: ChatMessageDto[] = [
 						systemPrompt,
@@ -460,18 +454,6 @@ Stick strictly to what is visually present.`,
 						}
 					}
 
-					// 计算最终内容，考虑部分响应
-					let finalContent = fullContent;
-					if (partialContent && partialContent.length > 0) {
-						// 如果新生成的内容已经以部分内容开头（模型可能重复），避免重复
-						if (fullContent.startsWith(partialContent)) {
-							finalContent = fullContent;
-						} else {
-							// 合并部分内容和新内容
-							finalContent = partialContent + fullContent;
-						}
-					}
-
 					// 【核心修复】无论是否被取消，只要有内容，都尝试保存到数据库（入队）
 					// 正常完成，cancel$.isStopped 为 false, 暂停时 cancel$.isStopped 为 true
 					if (!cancel$.isStopped) {
@@ -481,7 +463,7 @@ Stick strictly to what is visually present.`,
 								.add('save-message', {
 									sessionId,
 									role: MessageRole.ASSISTANT,
-									content: finalContent,
+									content: fullContent,
 									attachments: [],
 									parentId: dto.assistantMessage.parentId || null,
 									isRegenerate: dto.isRegenerate || false,
@@ -501,7 +483,7 @@ Stick strictly to what is visually present.`,
 								.add('save-message', {
 									sessionId,
 									role: MessageRole.ASSISTANT,
-									content: finalContent,
+									content: fullContent,
 									attachments: [],
 									parentId: dto.parentId || null, // 异步模式下 ID 获取受限
 									isRegenerate: dto.isRegenerate || false,
@@ -516,22 +498,16 @@ Stick strictly to what is visually present.`,
 									);
 								});
 						}
-						// 清除部分响应（因为已经完成）更新会话的 partialContent 为 null
-						await this.messageService.updateSessionPartialContent(
-							sessionId,
-							null,
-							null,
-						);
 					} else {
 						// 被停止时，保存已生成的部分响应到队列，防止数据丢失
-						if (finalContent.length > 0) {
+						if (fullContent.length > 0) {
 							// 1. 保存消息到 Message 表 (入队)
 							if (dto.assistantMessage) {
 								await this.messageQueue
 									.add('save-message', {
 										sessionId,
 										role: MessageRole.ASSISTANT,
-										content: finalContent,
+										content: fullContent,
 										attachments: [],
 										parentId: dto.assistantMessage.parentId || null,
 										isRegenerate: dto.isRegenerate || false,
@@ -550,7 +526,7 @@ Stick strictly to what is visually present.`,
 									.add('save-message', {
 										sessionId,
 										role: MessageRole.ASSISTANT,
-										content: finalContent,
+										content: fullContent,
 										attachments: [],
 										parentId: dto.parentId || null,
 										isRegenerate: dto.isRegenerate || false,
@@ -565,15 +541,7 @@ Stick strictly to what is visually present.`,
 										);
 									});
 							}
-							// 2. 更新 Session 的 partialContent 以便后续续写
-							await this.messageService.updateSessionPartialContent(
-								sessionId,
-								finalContent,
-								lastUserMessage?.content || '',
-							);
 						}
-						// 【关键】如果被停止且没有收到任何 Token，不需要删除用户消息
-						// 因为用户消息根本没有保存到数据库（延迟持久化）
 					}
 
 					subscriber.complete();
@@ -596,11 +564,6 @@ Stick strictly to what is visually present.`,
 								childrenIds: [],
 								currentChatId: undefined,
 							});
-							await this.messageService.updateSessionPartialContent(
-								sessionId,
-								fullContent,
-								lastUserMessage?.content || '',
-							);
 						} catch (saveError) {
 							console.error(
 								'Failed to queue partial message on error:',
@@ -672,13 +635,6 @@ Stick strictly to what is visually present.`,
 		assistantMessage,
 		isRegenerate,
 	}: ChatContinueDto): Promise<Observable<any>> {
-		const session = await this.messageService.findOneSession(sessionId);
-		const partialContent = session?.partialContent;
-
-		if (!partialContent) {
-			throw new Error('会话不存在或已完成，无法继续生成');
-		}
-
 		// 简化提示词，因为 chatStream 中已经将 partialContent 作为 Assistant 消息注入上下文
 		// 这里只需要告诉模型"继续"即可，不需要再重复内容，避免模型困惑或重复生成
 		const userContent =
@@ -703,6 +659,7 @@ Stick strictly to what is visually present.`,
 			userMessage,
 			assistantMessage,
 			isRegenerate,
+			isContinuation: true,
 		};
 
 		// 调用现有的 chatStream 方法
@@ -713,11 +670,6 @@ Stick strictly to what is visually present.`,
 
 	async clearSession(sessionId: string) {
 		this.conversationMemory.delete(sessionId);
-		await this.messageService.updateSessionPartialContent(
-			sessionId,
-			null,
-			null,
-		);
 	}
 
 	zhipuChatStream(dto: ChatRequestDto): Observable<ZhipuStreamData> {
