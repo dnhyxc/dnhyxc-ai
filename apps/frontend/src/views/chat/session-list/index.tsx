@@ -1,24 +1,19 @@
 import { Drawer } from '@design/Drawer';
 import { MarkdownParser } from '@dnhyxc-ai/tools';
 import { ScrollArea, Spinner, Toast } from '@ui/index';
-import { History, SquarePen, Trash2 } from 'lucide-react';
-import { observer } from 'mobx-react';
-import React, {
-	useCallback,
-	useEffect,
-	useMemo,
-	useRef,
-	useState,
-} from 'react';
-import { Outlet, useNavigate } from 'react-router';
-import { v4 as uuidv4 } from 'uuid';
-import ChatEntry from '@/components/design/ChatEntry';
+import { SquarePen, Trash2 } from 'lucide-react';
+import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router';
 import Confirm from '@/components/design/Confirm';
 import { useChatCore } from '@/hooks/useChatCore';
-import { deleteSession, getSessionList, uploadFiles } from '@/service';
+import { deleteSession, getSessionList } from '@/service';
 import useStore from '@/store';
-import { FileWithPreview, UploadedFile } from '@/types';
 import { Session } from '@/types/chat';
+
+interface IProps {
+	open: boolean;
+	onOpenChange: () => void;
+}
 
 interface SessionItemProps {
 	item: Session;
@@ -30,7 +25,7 @@ interface SessionItemProps {
 }
 
 // 会话列表项组件
-const SessionItem = React.memo<SessionItemProps>(
+const SessionItem = memo<SessionItemProps>(
 	({ item, isActive, isLoading, onSelect, onDelete, parser }) => {
 		return (
 			<div
@@ -60,21 +55,9 @@ const SessionItem = React.memo<SessionItemProps>(
 	},
 );
 
-// Chat 主组件
-const ChatContent = observer(() => {
+const SessionList: React.FC<IProps> = () => {
 	const { chatStore } = useStore();
-	const {
-		input,
-		setInput,
-		uploadedFiles,
-		setUploadedFiles,
-		editMessage,
-		setEditMessage,
-		sendMessage,
-		handleEditChange,
-		clearChat,
-		stopGenerating,
-	} = useChatCore();
+	const { clearChat, stopGenerating } = useChatCore();
 
 	const navigate = useNavigate();
 
@@ -83,51 +66,11 @@ const ChatContent = observer(() => {
 	const [confirmOpen, setConfirmOpen] = useState(false);
 	const [deleteItem, setDeleteItem] = useState<Session | null>(null);
 
-	const chatInputRef = useRef<HTMLTextAreaElement>(null);
-	const focusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
 	const parser = useMemo(() => new MarkdownParser(), []);
 
 	useEffect(() => {
 		if (open) getSessions();
 	}, [open]);
-
-	useEffect(() => {
-		return () => {
-			chatStore.setActiveSessionId('');
-		};
-	}, []);
-
-	const onUploadFile = useCallback(
-		async (data: FileWithPreview | FileWithPreview[]) => {
-			const files = Array.isArray(data) ? data : [data];
-			const fileList = files.map((item) => item.file);
-			const res = await uploadFiles(fileList);
-			console.log(res, 'res', res.data);
-			if (res.success) {
-				setUploadedFiles((prev) => {
-					return [
-						...prev,
-						...res.data.map((item: UploadedFile) => ({
-							...item,
-							path: import.meta.env.VITE_DEV_DOMAIN + item.path,
-							uuid: uuidv4(),
-						})),
-					];
-				});
-				chatInputRef.current?.focus();
-			}
-		},
-		[setUploadedFiles],
-	);
-
-	useEffect(() => {
-		return () => {
-			if (focusTimerRef.current) {
-				clearTimeout(focusTimerRef.current);
-			}
-		};
-	}, []);
 
 	const getSessions = useCallback(async () => {
 		const res = await getSessionList();
@@ -190,11 +133,6 @@ const ChatContent = observer(() => {
 		[],
 	);
 
-	const toNewChat = () => {
-		clearChat();
-		navigate('/chat');
-	};
-
 	const sessionList = useMemo(() => {
 		return chatStore.sessionData.list.map((item) => (
 			<SessionItem
@@ -217,43 +155,10 @@ const ChatContent = observer(() => {
 	]);
 
 	return (
-		<div className="flex flex-col w-full h-full overflow-hidden">
-			<div className="absolute top-4 left-28 z-50">
-				{open ? (
-					<History size={20} className="cursor-pointer text-cyan-500" />
-				) : (
-					<History
-						size={20}
-						className="cursor-pointer hover:text-blue-500"
-						onClick={() => setOpen(true)}
-					/>
-				)}
-			</div>
-
-			<Outlet />
-
-			<ChatEntry
-				chatInputRef={chatInputRef}
-				input={input}
-				setInput={setInput}
-				uploadedFiles={uploadedFiles}
-				setUploadedFiles={setUploadedFiles}
-				loading={chatStore.isCurrentSessionLoading}
-				editMessage={editMessage}
-				setEditMessage={setEditMessage}
-				handleEditChange={handleEditChange}
-				sendMessage={sendMessage}
-				onUploadFile={onUploadFile as any}
-				clearChat={toNewChat}
-				stopGenerating={stopGenerating}
-			/>
-
-			<Drawer title="历史对话" open={open} onOpenChange={setOpen}>
-				<ScrollArea className="h-full overflow-y-auto pr-4 box-border">
-					{sessionList}
-				</ScrollArea>
-			</Drawer>
-
+		<Drawer title="历史对话" open={open} onOpenChange={setOpen}>
+			<ScrollArea className="h-full overflow-y-auto pr-4 box-border">
+				{sessionList}
+			</ScrollArea>
 			<Confirm
 				open={confirmOpen}
 				onOpenChange={setConfirmOpen}
@@ -263,8 +168,8 @@ const ChatContent = observer(() => {
 				onConfirm={handleConfirmDelete}
 				onCancel={handleCancelDelete}
 			/>
-		</div>
+		</Drawer>
 	);
-});
+};
 
-export default ChatContent;
+export default SessionList;
