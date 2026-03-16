@@ -4,6 +4,8 @@ import NotFound from '@/views/404';
 import About from '@/views/about';
 import Account from '@/views/account';
 import Chat from '@/views/chat';
+import NewChat from '@/views/chat/new';
+import Session from '@/views/chat/session';
 import Coding from '@/views/coding';
 import Detail from '@/views/detail';
 import Document from '@/views/document';
@@ -41,12 +43,36 @@ const routes: RouteConfig[] = [
 					title: 'dnhyxc-ai',
 				},
 			},
+			// {
+			// 	path: '/chat/:id?',
+			// 	Component: Chat,
+			// 	meta: {
+			// 		title: '智能对话',
+			// 	},
+			// },
 			{
-				path: '/chat/:id?',
+				path: '/chat',
 				Component: Chat,
 				meta: {
 					title: '智能对话',
 				},
+				children: [
+					{
+						index: true,
+						// path: '/setting/system',
+						Component: NewChat,
+						meta: {
+							title: '智能对话',
+						},
+					},
+					{
+						path: '/chat/c/:id?',
+						Component: Session,
+						meta: {
+							title: '智能对话',
+						},
+					},
+				],
 			},
 			{
 				path: '/document',

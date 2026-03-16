@@ -1,4 +1,4 @@
-import { makeAutoObservable, observable } from 'mobx';
+import { action, computed, makeAutoObservable, observable } from 'mobx';
 import { Message, SessionData } from '@/types/chat';
 
 class ChatStore {
@@ -15,7 +15,22 @@ class ChatStore {
 
 	// ========== 修复：使用 observable.set 代替普通 Set ==========
 	// 这样 MobX 可以正确追踪 Set 的变化，触发 React 组件重新渲染
-	loadingSessions = observable.set<string>();
+	// ========== loading 状态管理 ==========
+	@observable loadingSessions = observable.set<string>();
+
+	@action
+	setSessionLoading = (sessionId: string, loading: boolean) => {
+		if (loading) {
+			this.loadingSessions.add(sessionId);
+		} else {
+			this.loadingSessions.delete(sessionId);
+		}
+	};
+
+	@computed
+	get isCurrentSessionLoading() {
+		return this.loadingSessions.has(this.activeSessionId);
+	}
 
 	// 全局跟踪所有会话中的流式消息
 	streamingMessages: Map<string, Message> = new Map();
@@ -67,12 +82,29 @@ class ChatStore {
 
 		// 2. 如果是新会话，清空当前消息
 		if (isNewSession) {
-			this.messages = [];
-			// const activeSession = this.sessionData.list.find((s) => s.isActive);
-			// if (activeSession) {
-			// 	activeSession.messages = [];
-			// }
-			this.cleanupCompletedStreamingMessages();
+			// [修复] 在清空消息之前，保留正在流式传输的消息
+			// 这样当用户切换回正在接收流的会话时，已接收的内容不会丢失
+			const streamingMsgsToKeep = Array.from(
+				this.streamingMessages.values(),
+			).filter((msg) => msg.isStreaming);
+
+			// 如果有正在流式传输的消息，保留它们而不是完全清空
+			if (streamingMsgsToKeep.length > 0) {
+				this.messages = streamingMsgsToKeep;
+			} else {
+				this.messages = [];
+			}
+
+			// [修复] 只清理已完成的流式消息（isStreaming: false），保留正在进行的
+			// 原来的 cleanupCompletedStreamingMessages 会清理所有 isStreaming: false 的消息
+			// 但我们已经在上面保留了正在流式传输的消息，所以这里只需要清理缓存中已完成的
+			const entries = Array.from(this.streamingMessages.entries());
+			for (const [chatId, message] of entries) {
+				if (!message.isStreaming) {
+					this.streamingMessages.delete(chatId);
+					this.streamingBranchMaps.delete(chatId);
+				}
+			}
 			return;
 		}
 

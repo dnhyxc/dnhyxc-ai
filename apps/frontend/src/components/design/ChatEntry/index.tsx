@@ -4,7 +4,7 @@ import Upload from '@design/Upload';
 import { Button } from '@ui/index';
 import { CirclePlus, Link, Rocket, StopCircle } from 'lucide-react';
 import { CHAT_VALIDTYPES } from '@/constant';
-import { FileWithPreview, UploadedFile } from '@/types'; // 根据实际路径调整
+import { UploadedFile } from '@/types'; // 根据实际路径调整
 import { Message } from '@/types/chat';
 
 interface ChatEntryProps {
@@ -24,9 +24,9 @@ interface ChatEntryProps {
 		isEdit?: boolean,
 		attachments?: any,
 	) => void;
-	onUploadFile: (data: FileWithPreview | FileWithPreview[]) => Promise<void>;
-	clearChat: () => void;
-	stopGenerating: () => void;
+	onUploadFile: (data: UploadedFile[]) => Promise<void>;
+	clearChat?: () => void;
+	stopGenerating?: () => void;
 	chatInputRef?: React.RefObject<HTMLTextAreaElement | null>; // 新增
 	children?: React.ReactNode;
 }
@@ -87,14 +87,16 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 
 						<div className="flex items-center justify-between h-10 p-2.5 mb-1 mt-2.5">
 							<div className="flex items-center gap-2">
-								<Button
-									variant="ghost"
-									className="flex items-center text-sm bg-theme/5 mb-1 h-8 rounded-md"
-									onClick={clearChat}
-								>
-									<CirclePlus className="w-4 h-4" />
-									新对话
-								</Button>
+								{clearChat && (
+									<Button
+										variant="ghost"
+										className="flex items-center text-sm bg-theme/5 mb-1 h-8 rounded-md"
+										onClick={clearChat}
+									>
+										<CirclePlus className="w-4 h-4" />
+										新对话
+									</Button>
+								)}
 								<Upload
 									uploadType="button"
 									className="w-auto h-auto"
@@ -113,7 +115,7 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 											<div>最多同时支持 5 个文件，每个文件最大 20 MB！</div>
 										</div>
 									}
-									onUpload={onUploadFile}
+									onUpload={onUploadFile as any}
 								>
 									<div className="flex items-center">
 										<Link className="w-4 h-4 mr-2" />
@@ -124,7 +126,7 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 							{loading ? (
 								<Button
 									variant="ghost"
-									onClick={() => stopGenerating()}
+									onClick={() => stopGenerating?.()}
 									className="h-8 w-8 mb-1 flex items-center justify-center rounded-full bg-red-500/20 hover:bg-red-500/30 border border-red-500/30"
 								>
 									<StopCircle />
