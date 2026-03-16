@@ -3,7 +3,7 @@ import { Activity, ArrowDown, ArrowUp, Sparkles } from 'lucide-react';
 
 interface ChatScrollControlsProps {
 	// 分支切换相关
-	isCurrentSessionLoading: boolean;
+	isLoading: boolean;
 	isStreamingBranchVisible: boolean;
 	isLatestBranch: boolean;
 	messagesLength: number;
@@ -16,7 +16,7 @@ interface ChatScrollControlsProps {
 }
 
 const ChatControls = ({
-	isCurrentSessionLoading,
+	isLoading,
 	isStreamingBranchVisible,
 	isLatestBranch,
 	messagesLength,
@@ -28,7 +28,7 @@ const ChatControls = ({
 }: ChatScrollControlsProps) => {
 	// 是否显示分支切换按钮
 	const showBranchButtons =
-		(isCurrentSessionLoading && !isStreamingBranchVisible) ||
+		(isLoading && !isStreamingBranchVisible) ||
 		(!isLatestBranch && messagesLength > 0);
 
 	return (
@@ -38,7 +38,7 @@ const ChatControls = ({
 				{showBranchButtons && (
 					<div className="flex items-center justify-center">
 						{/* 切换回流式消息分支的按钮 */}
-						{isCurrentSessionLoading && !isStreamingBranchVisible && (
+						{isLoading && !isStreamingBranchVisible && (
 							<Button
 								onClick={switchToStreamingBranch}
 								className="min-w-8 h-8 text-sm bg-cyan-500/25 text-cyan-400 hover:bg-cyan-500/30 rounded-full transition-colors flex items-center"

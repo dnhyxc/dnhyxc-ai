@@ -3,9 +3,9 @@ import ChatAssistantMessage from '@design/ChatAssistantMessage';
 import ChatControls from '@design/ChatControls';
 import ChatFileList from '@design/ChatFileList';
 import ChatMessageActions from '@design/ChatMessageActions';
+import ChatNewSession from '@design/ChatNewSession';
 import ChatUserMessage from '@design/ChatUserMessage';
 import { ScrollArea } from '@ui/index';
-import { motion } from 'framer-motion';
 import { Bot, User } from 'lucide-react';
 import * as mobx from 'mobx';
 import { observer } from 'mobx-react';
@@ -40,7 +40,6 @@ export interface ChatBotRef {
 		isEdit?: boolean,
 		attachments?: UploadedFile[] | null,
 	) => Promise<void>;
-	isCurrentSessionLoading: () => boolean;
 }
 
 const ChatBot = observer(
@@ -51,6 +50,7 @@ const ChatBot = observer(
 			showAvatar = false,
 			onBranchChange,
 		} = props;
+
 		const { chatStore } = useStore();
 
 		// 使用 useChatCore hook（共享状态）
@@ -63,7 +63,6 @@ const ChatBot = observer(
 			sendMessage,
 			clearChat,
 			stopGenerating,
-			isCurrentSessionLoading,
 			handleEditChange,
 			onContinue, // 新增
 		} = useChatCore({
@@ -345,9 +344,8 @@ const ChatBot = observer(
 				clearChat,
 				stopGenerating,
 				sendMessage,
-				isCurrentSessionLoading,
 			}),
-			[clearChat, stopGenerating, sendMessage, isCurrentSessionLoading],
+			[clearChat, stopGenerating, sendMessage],
 		);
 
 		return (
@@ -364,89 +362,93 @@ const ChatBot = observer(
 				>
 					<div className="max-w-3xl m-auto overflow-y-auto">
 						<div className="space-y-6 overflow-hidden">
-							{messages.map((message, index) => (
-								<div
-									key={message.chatId}
-									id={`message-${message.chatId}`}
-									className={cn(
-										'flex gap-3 w-full',
-										message.role === 'user' ? 'flex-row-reverse' : '',
-									)}
-								>
-									{showAvatar ? (
-										<div
-											className={cn(
-												'shrink-0 w-10 h-10 rounded-full flex items-center justify-center',
-												message.role === 'user'
-													? 'bg-blue-500/20'
-													: 'bg-purple-500/20',
-											)}
-										>
-											{message.role === 'user' ? (
-												<User className="w-5 h-5 text-blue-400" />
-											) : (
-												<Bot className="w-5 h-5 text-purple-400" />
-											)}
-										</div>
-									) : null}
-
+							{!messages.length ? (
+								<ChatNewSession />
+							) : (
+								messages.map((message, index) => (
 									<div
+										key={message.chatId}
+										id={`message-${message.chatId}`}
 										className={cn(
-											'relative flex-1 flex flex-col gap-1 pb-10 w-full group',
-											message.role === 'user' ? 'items-end' : '',
+											'flex gap-3 w-full',
+											message.role === 'user' ? 'flex-row-reverse' : '',
 										)}
 									>
-										{message?.attachments &&
-											message?.attachments.length > 0 && (
-												<div className="flex flex-wrap justify-end gap-1.5 mb-2">
-													{message.role === 'user'
-														? message?.attachments?.map((i) => (
-																<ChatFileList
-																	key={i.id || i.uuid}
-																	data={i}
-																	showDownload
-																/>
-															))
-														: null}
-												</div>
-											)}
-										<div className={getMessageClassName(message)}>
-											{message.role === 'user' ? (
-												<ChatUserMessage
-													message={message}
-													editMessage={editMessage}
-													editInputRef={editInputRef}
-													input={input}
-													setInput={setInput}
-													setEditMessage={setEditMessage}
-													isLoading={isCurrentSessionLoading()}
-													handleEditChange={handleEditChange}
-													sendMessage={sendMessage}
-												/>
-											) : (
-												<ChatAssistantMessage
-													message={message}
-													isShowThinkContent={isShowThinkContent}
-													onToggleThinkContent={onToggleThinkContent}
-													onContinue={onContinue}
-												/>
-											)}
-										</div>
+										{showAvatar ? (
+											<div
+												className={cn(
+													'shrink-0 w-10 h-10 rounded-full flex items-center justify-center',
+													message.role === 'user'
+														? 'bg-blue-500/20'
+														: 'bg-purple-500/20',
+												)}
+											>
+												{message.role === 'user' ? (
+													<User className="w-5 h-5 text-blue-400" />
+												) : (
+													<Bot className="w-5 h-5 text-purple-400" />
+												)}
+											</div>
+										) : null}
 
-										<ChatMessageActions
-											message={message}
-											index={index}
-											messagesLength={messages.length}
-											isCopyedId={isCopyedId}
-											isLoading={isCurrentSessionLoading()}
-											onBranchChange={handleBranchChange}
-											onCopy={onCopy}
-											onEdit={onEdit}
-											onReGenerate={onReGenerate}
-										/>
+										<div
+											className={cn(
+												'relative flex-1 flex flex-col gap-1 pb-10 w-full group',
+												message.role === 'user' ? 'items-end' : '',
+											)}
+										>
+											{message?.attachments &&
+												message?.attachments.length > 0 && (
+													<div className="flex flex-wrap justify-end gap-1.5 mb-2">
+														{message.role === 'user'
+															? message?.attachments?.map((i) => (
+																	<ChatFileList
+																		key={i.id || i.uuid}
+																		data={i}
+																		showDownload
+																	/>
+																))
+															: null}
+													</div>
+												)}
+											<div className={getMessageClassName(message)}>
+												{message.role === 'user' ? (
+													<ChatUserMessage
+														message={message}
+														editMessage={editMessage}
+														editInputRef={editInputRef}
+														input={input}
+														setInput={setInput}
+														setEditMessage={setEditMessage}
+														isLoading={chatStore.isCurrentSessionLoading}
+														handleEditChange={handleEditChange}
+														sendMessage={sendMessage}
+													/>
+												) : (
+													<ChatAssistantMessage
+														message={message}
+														isShowThinkContent={isShowThinkContent}
+														onToggleThinkContent={onToggleThinkContent}
+														onContinue={onContinue}
+													/>
+												)}
+											</div>
+
+											<ChatMessageActions
+												message={message}
+												index={index}
+												messagesLength={messages.length}
+												isCopyedId={isCopyedId}
+												isLoading={chatStore.isCurrentSessionLoading}
+												onBranchChange={handleBranchChange}
+												onCopy={onCopy}
+												onEdit={onEdit}
+												onReGenerate={onReGenerate}
+											/>
+										</div>
 									</div>
-								</div>
-							))}
+								))
+							)}
 						</div>
 					</div>
 					<ChatAnchorNav
@@ -454,7 +456,7 @@ const ChatBot = observer(
 						scrollContainerRef={scrollContainerRef}
 					/>
 					<ChatControls
-						isCurrentSessionLoading={isCurrentSessionLoading()}
+						isLoading={chatStore.isCurrentSessionLoading}
 						isStreamingBranchVisible={isStreamingBranchVisible()}
 						isLatestBranch={isLatestBranch()}
 						messagesLength={messages.length}

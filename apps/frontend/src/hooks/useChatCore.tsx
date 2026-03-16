@@ -15,7 +15,6 @@ import { UploadedFile } from '@/types';
 import { ChatRequestParams, Message } from '@/types/chat';
 import { streamFetch } from '@/utils/sse';
 import { useMessageTools } from './useMessageTools';
-import { useSessionLoading } from './useSessionLoading';
 
 interface UseChatCoreOptions {
 	apiEndpoint?: string;
@@ -43,8 +42,7 @@ interface UseChatCoreReturn {
 		targetSessionId?: string,
 		isUnmount?: boolean,
 	) => Promise<void>;
-	isCurrentSessionLoading: () => boolean;
-	onContinue: () => Promise<void>; // 新增
+	onContinue: () => Promise<void>;
 
 	// 内部方法
 	handleEditChange: (
@@ -74,10 +72,6 @@ export const useChatCore = (
 
 	const navigate = useNavigate();
 
-	// Hooks
-	const { isCurrentSessionLoading, setSessionLoading, clearAllSessionLoading } =
-		useSessionLoading();
-
 	const {
 		createAssistantMessage,
 		createUserMessage,
@@ -86,11 +80,6 @@ export const useChatCore = (
 		buildMessageList,
 		getFormatMessages,
 	} = useMessageTools();
-
-	// 获取当前消息列表（所有消息）
-	const getAllMessages = useCallback(() => {
-		return chatStore.messages;
-	}, [chatStore]);
 
 	// 获取当前选择的分支映射
 	const getSelectedChildMap = useCallback(() => {
@@ -185,7 +174,7 @@ export const useChatCore = (
 
 			const selectedChildMap = getSelectedChildMap();
 			const branchMapToSave = branchMap || selectedChildMap;
-			setSessionLoading(session_Id, true);
+			chatStore.setSessionLoading(session_Id, true);
 			chatStore.saveStreamingBranchMap(
 				assistantMessageId,
 				session_Id,
@@ -251,7 +240,7 @@ export const useChatCore = (
 							}
 						},
 						onError: (err, type) => {
-							setSessionLoading(session_Id, false);
+							chatStore.setSessionLoading(session_Id, false);
 							Toast({
 								type: type || 'error',
 								title: err?.message || String(err) || '发送失败',
@@ -273,7 +262,7 @@ export const useChatCore = (
 							currentAssistantMessageMapRef.current.delete(session_Id);
 						},
 						onComplete: () => {
-							setSessionLoading(session_Id, false);
+							chatStore.setSessionLoading(session_Id, false);
 							chatStore.updateMessage(assistantMessageId, {
 								isStreaming: false,
 							});
@@ -288,7 +277,7 @@ export const useChatCore = (
 
 				stopRequestMapRef.current.set(session_Id, stop);
 			} catch (_error) {
-				setSessionLoading(session_Id, false);
+				chatStore.setSessionLoading(session_Id, false);
 				Toast({
 					type: 'error',
 					title: '发送消息失败',
@@ -315,7 +304,6 @@ export const useChatCore = (
 			chatStore,
 			getSessionInfo,
 			getSelectedChildMap,
-			setSessionLoading,
 			currentChatId,
 			hasReceivedStreamDataMapRef,
 			currentAssistantMessageMapRef,
@@ -652,7 +640,8 @@ export const useChatCore = (
 			isEdit?: boolean,
 			attachments?: UploadedFile[] | null,
 		) => {
-			if ((!content && !input.trim()) || isCurrentSessionLoading()) return;
+			if ((!content && !input.trim()) || chatStore.isCurrentSessionLoading)
+				return;
 
 			onScrollTo?.('down');
 
@@ -673,7 +662,7 @@ export const useChatCore = (
 		},
 		[
 			input,
-			isCurrentSessionLoading,
+			chatStore.isCurrentSessionLoading,
 			onScrollTo,
 			editMessage,
 			uploadedFiles,
@@ -690,13 +679,16 @@ export const useChatCore = (
 			if (!session_id) return;
 
 			const stopFn = stopRequestMapRef.current.get(session_id);
+
+			console.log(stopFn, 'stopFn');
+
 			if (stopFn) {
 				await stopSse(session_id);
 				stopFn();
 				stopRequestMapRef.current.delete(session_id);
 			}
 
-			setSessionLoading(session_id, false);
+			chatStore.setSessionLoading(session_id, false);
 
 			const snapshot = requestSnapshotMapRef.current.get(session_id);
 			const hasReceivedData =
@@ -744,7 +736,6 @@ export const useChatCore = (
 		},
 		[
 			chatStore,
-			setSessionLoading,
 			findLastAssistantMessage,
 			stopRequestMapRef,
 			requestSnapshotMapRef,
@@ -756,50 +747,64 @@ export const useChatCore = (
 	// 清除聊天
 	const clearChat = useCallback(
 		(targetSessionId?: string) => {
-			const hasActiveStreaming = chatStore.getStreamingMessages().length > 0;
+			console.log('clearChatclearChatclearChatclearChatclearChatclearChat');
+
+			// 获取正在流式输出的会话ID列表
+			const streamingSessionIds = chatStore.getStreamingSessionIds();
+			// 判断 targetSessionId 是否是正在流式输出的会话
+			const isTargetStreaming =
+				targetSessionId && streamingSessionIds.includes(targetSessionId);
 
 			setInput('');
 			setUploadedFiles([]);
 			setEditMessage(null);
 
-			if (!hasActiveStreaming) {
-				chatStore.setAllMessages([], '', true);
-			}
+			// 清空当前显示的消息列表
+			chatStore.setAllMessages([], '', true);
 
-			if (!(hasActiveStreaming && !targetSessionId)) {
+			// 清除分支选择：只有当 targetSessionId 不是正在流式输出的会话时，才清除
+			if (!isTargetStreaming) {
 				chatStore.clearSessionBranchSelection(
 					targetSessionId || chatStore.activeSessionId,
 				);
 			}
 
+			// 清除引用：只有当 targetSessionId 不是正在流式输出的会话时，才清除
 			if (targetSessionId) {
-				setSessionLoading(targetSessionId, false);
+				if (!isTargetStreaming) {
+					requestSnapshotMapRef.current.delete(targetSessionId);
+					hasReceivedStreamDataMapRef.current.delete(targetSessionId);
+					stopRequestMapRef.current.delete(targetSessionId);
+					currentAssistantMessageMapRef.current.delete(targetSessionId);
+					chatStore.clearSessionStreamingBranchMaps(targetSessionId);
+				}
 			} else {
-				clearAllSessionLoading();
+				// 没有指定 targetSessionId 时，只清除非流式输出会话的引用
+				// 遍历所有引用，删除不在 streamingSessionIds 中的
+				const allSessionIds = new Set([
+					...requestSnapshotMapRef.current.keys(),
+					...hasReceivedStreamDataMapRef.current.keys(),
+					...stopRequestMapRef.current.keys(),
+					...currentAssistantMessageMapRef.current.keys(),
+				]);
+
+				allSessionIds.forEach((sessionId) => {
+					if (!streamingSessionIds.includes(sessionId)) {
+						requestSnapshotMapRef.current.delete(sessionId);
+						hasReceivedStreamDataMapRef.current.delete(sessionId);
+						stopRequestMapRef.current.delete(sessionId);
+						currentAssistantMessageMapRef.current.delete(sessionId);
+					}
+				});
+
+				// 清除非流式输出会话的 streamingBranchMaps
+				chatStore.clearNonStreamingBranchMaps(streamingSessionIds);
 			}
 
-			if (!hasActiveStreaming) {
-				chatStore.setActiveSessionId('');
-			}
-
-			if (targetSessionId) {
-				requestSnapshotMapRef.current.delete(targetSessionId);
-				hasReceivedStreamDataMapRef.current.delete(targetSessionId);
-				stopRequestMapRef.current.delete(targetSessionId);
-				currentAssistantMessageMapRef.current.delete(targetSessionId);
-				chatStore.clearSessionStreamingBranchMaps(targetSessionId);
-			} else {
-				requestSnapshotMapRef.current.clear();
-				hasReceivedStreamDataMapRef.current.clear();
-				stopRequestMapRef.current.clear();
-				currentAssistantMessageMapRef.current.clear();
-				chatStore.clearAllStreamingBranchMaps();
-			}
+			chatStore.setActiveSessionId('');
 		},
 		[
 			chatStore,
-			setSessionLoading,
-			clearAllSessionLoading,
 			stopRequestMapRef,
 			requestSnapshotMapRef,
 			hasReceivedStreamDataMapRef,
@@ -824,31 +829,17 @@ export const useChatCore = (
 		[],
 	);
 
-	// 组件卸载时清理
-	useEffect(() => {
-		return () => {
-			stopGenerating(undefined, true);
-			clearAllSessionLoading();
-		};
-	}, []);
-
 	return {
-		// 状态
 		input,
 		setInput,
 		uploadedFiles,
 		setUploadedFiles,
 		editMessage,
 		setEditMessage,
-
-		// 方法
 		sendMessage,
 		clearChat,
 		stopGenerating,
-		isCurrentSessionLoading,
-		onContinue, // 新增
-
-		// 内部方法
+		onContinue,
 		handleEditChange,
 	};
 };

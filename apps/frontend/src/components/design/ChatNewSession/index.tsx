@@ -6,7 +6,7 @@ import { useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { ChatBotProps } from '@/types/chat';
 
-const ChatBot = observer(function ChatBot(props) {
+const ChatNewSession = observer(function ChatBot(props) {
 	const { className } = props;
 
 	const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -40,4 +40,4 @@ const ChatBot = observer(function ChatBot(props) {
 	);
 });
 
-export default ChatBot as React.FC<ChatBotProps>;
+export default ChatNewSession as React.FC<ChatBotProps>;

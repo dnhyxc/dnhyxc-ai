@@ -155,9 +155,12 @@ const ChatContent = observer(() => {
 
 	useEffect(() => {
 		return () => {
-			chatStore.setAllMessages([], '', true);
+			// chatStore.setAllMessages([], '', true);
 			chatStore.setActiveSessionId('');
-			setStreamingSessionId('');
+			// setStreamingSessionId('');
+			// stopGenerating(undefined, true);
+			// clearChat();
+			// chatStore.clearLoadingSessions();
 		};
 	}, []);
 

@@ -27,6 +27,11 @@ class ChatStore {
 		}
 	};
 
+	@action
+	clearLoadingSessions() {
+		this.loadingSessions.clear();
+	}
+
 	@computed
 	get isCurrentSessionLoading() {
 		return this.loadingSessions.has(this.activeSessionId);
@@ -50,10 +55,6 @@ class ChatStore {
 
 	delLoadingSession(sessionId: string) {
 		this.loadingSessions.delete(sessionId);
-	}
-
-	clearLoadingSessions() {
-		this.loadingSessions.clear();
 	}
 
 	setActiveSessionId(sessionId: string) {
@@ -82,12 +83,12 @@ class ChatStore {
 
 		// 2. 如果是新会话，清空当前消息
 		if (isNewSession) {
-			// [修复] 在清空消息之前，保留正在流式传输的消息
-			// 这样当用户切换回正在接收流的会话时，已接收的内容不会丢失
+			// [修复] 创建新会话时，清空当前显示的消息列表
+			// 流式消息已经保存在 streamingMessages 中，会继续在后台输出
+			// 当用户切换回那个会话时，可以从 streamingMessages 中恢复
 			const streamingMsgsToKeep = Array.from(
 				this.streamingMessages.values(),
 			).filter((msg) => msg.isStreaming);
-
 			// 如果有正在流式传输的消息，保留它们而不是完全清空
 			if (streamingMsgsToKeep.length > 0) {
 				this.messages = streamingMsgsToKeep;
@@ -95,9 +96,7 @@ class ChatStore {
 				this.messages = [];
 			}
 
-			// [修复] 只清理已完成的流式消息（isStreaming: false），保留正在进行的
-			// 原来的 cleanupCompletedStreamingMessages 会清理所有 isStreaming: false 的消息
-			// 但我们已经在上面保留了正在流式传输的消息，所以这里只需要清理缓存中已完成的
+			// 只清理已完成的流式消息（isStreaming: false），保留正在进行的
 			const entries = Array.from(this.streamingMessages.entries());
 			for (const [chatId, message] of entries) {
 				if (!message.isStreaming) {
@@ -235,6 +234,23 @@ class ChatStore {
 			if (updates.isStreaming !== false || existingStreamingMsg) {
 				this.streamingMessages.set(chatId, updatedMessage);
 			}
+
+			// [修复] 同步更新 sessionData 中所有会话的对应消息
+			// 当消息不在当前 messages 中时（如切换到新会话后），仍需更新原会话的消息
+			this.sessionData.list.forEach((session) => {
+				if (session.messages && session.messages.length > 0) {
+					const sessionMessageIndex = session.messages.findIndex(
+						(m) => m.chatId === chatId,
+					);
+					if (sessionMessageIndex >= 0) {
+						session.messages = [
+							...session.messages.slice(0, sessionMessageIndex),
+							updatedMessage,
+							...session.messages.slice(sessionMessageIndex + 1),
+						];
+					}
+				}
+			});
 		}
 	}
 
@@ -304,6 +320,15 @@ class ChatStore {
 		);
 	}
 
+	// 获取正在流式输出的会话ID列表
+	getStreamingSessionIds(): string[] {
+		const sessionIds = new Set<string>();
+		this.streamingBranchMaps.forEach((value) => {
+			sessionIds.add(value.sessionId);
+		});
+		return Array.from(sessionIds);
+	}
+
 	// 获取当前会话的流式消息
 	getCurrentSessionStreamingMessages(): Message[] {
 		const currentSessionId = this.activeSessionId;
@@ -355,6 +380,19 @@ class ChatStore {
 	// 清除所有流式分支映射
 	clearAllStreamingBranchMaps() {
 		this.streamingBranchMaps.clear();
+	}
+
+	// 清除非流式输出会话的流式分支映射
+	clearNonStreamingBranchMaps(streamingSessionIds: string[]) {
+		const keysToDelete: string[] = [];
+		this.streamingBranchMaps.forEach((value, key) => {
+			if (!streamingSessionIds.includes(value.sessionId)) {
+				keysToDelete.push(key);
+			}
+		});
+		keysToDelete.forEach((key) => {
+			this.streamingBranchMaps.delete(key);
+		});
 	}
 }
 
