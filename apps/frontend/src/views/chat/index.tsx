@@ -1,4 +1,3 @@
-import ChatEntry from '@/components/design/ChatEntry';
 import { Drawer } from '@design/Drawer';
 import { MarkdownParser } from '@dnhyxc-ai/tools';
 import { ScrollArea, Spinner, Toast } from '@ui/index';
@@ -11,15 +10,16 @@ import React, {
 	useRef,
 	useState,
 } from 'react';
-import Confirm from '@/components/design/Confirm';
-import { deleteSession, getSessionList, uploadFiles } from '@/service';
-import useStore from '@/store';
-import { Session } from '@/types/chat';
 import { Outlet, useNavigate } from 'react-router';
 import { v4 as uuidv4 } from 'uuid';
-import { FileWithPreview, UploadedFile } from '@/types';
+import ChatEntry from '@/components/design/ChatEntry';
+import Confirm from '@/components/design/Confirm';
 import { ChatCoreProvider } from '@/contexts';
 import { useChatCore } from '@/hooks/useChatCore';
+import { deleteSession, getSessionList, uploadFiles } from '@/service';
+import useStore from '@/store';
+import { FileWithPreview, UploadedFile } from '@/types';
+import { Session } from '@/types/chat';
 
 // ChatEntry 包装组件 - 使用 observer 响应 MobX 状态变化
 const ChatEntryWrapper = observer(() => {
