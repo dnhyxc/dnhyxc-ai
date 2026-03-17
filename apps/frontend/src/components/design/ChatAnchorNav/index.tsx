@@ -1,5 +1,5 @@
 import Tooltip from '@design/Tooltip';
-import { Button } from '@ui/index';
+import { Button, ScrollArea } from '@ui/index';
 import { ChevronDown, ChevronUp } from 'lucide-react'; // 引入图标
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -143,7 +143,7 @@ const ChatAnchorNav = ({
 		currentIndex === -1 || currentIndex >= userMessages.length - 1;
 
 	return (
-		<div className="group absolute right-[max(calc((100%-48rem)/2-1.8rem),0rem)] top-1/2 -translate-y-1/2 z-20">
+		<div className="group absolute right-[max(calc((100%-48rem)/2-2.2rem),0rem)] top-1/2 -translate-y-1/2 z-20">
 			<div className="relative flex flex-col items-center">
 				{/* 上翻按钮 */}
 				<div className="opacity-0 group-hover:opacity-100 mb-2">
@@ -157,26 +157,29 @@ const ChatAnchorNav = ({
 				</div>
 
 				{/* 锚点列表 */}
-				<div className="flex flex-col items-center">
-					{userMessages.map((msg) => {
-						return (
-							<Tooltip key={msg.chatId} side="left" content={msg.content}>
-								<div
-									key={msg.chatId}
-									className={cn(
-										'w-2 h-2 my-1 cursor-pointer rounded-full',
-										'hover:scale-145 active:scale-145 transition-all duration-300',
-										activeAnchor === msg.chatId
-											? 'bg-blue-500 scale-145 shadow-[0_0_8px_rgba(59,130,246,0.6)]'
-											: 'bg-theme/90 hover:bg-blue-500',
-									)}
-									onClick={() => scrollToMessage(msg.chatId)}
-								/>
-							</Tooltip>
-						);
-					})}
+				<div className="flex-1 flex max-h-80 overflow-hidden">
+					<ScrollArea className="flex-1 overflow-hidden w-full">
+						<div className="flex flex-col items-center px-3 overflow-y-auto">
+							{userMessages.map((msg) => {
+								return (
+									<Tooltip key={msg.chatId} side="left" content={msg.content}>
+										<div
+											key={msg.chatId}
+											className={cn(
+												'w-2 h-2 my-[5px] cursor-pointer rounded-full',
+												'hover:scale-145 active:scale-145 transition-all duration-300',
+												activeAnchor === msg.chatId
+													? 'bg-blue-500 scale-145 shadow-[0_0_8px_rgba(59,130,246,0.6)]'
+													: 'bg-theme/20 hover:bg-blue-500',
+											)}
+											onClick={() => scrollToMessage(msg.chatId)}
+										/>
+									</Tooltip>
+								);
+							})}
+						</div>
+					</ScrollArea>
 				</div>
-
 				{/* 下翻按钮 */}
 				<div className="opacity-0 group-hover:opacity-100 mt-2">
 					<Button
