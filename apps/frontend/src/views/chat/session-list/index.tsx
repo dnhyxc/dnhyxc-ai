@@ -4,8 +4,8 @@ import { ScrollArea, Spinner, Toast } from '@ui/index';
 import { SquarePen, Trash2 } from 'lucide-react';
 import {
 	Dispatch,
-	SetStateAction,
 	memo,
+	SetStateAction,
 	useCallback,
 	useEffect,
 	useMemo,

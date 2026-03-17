@@ -53,7 +53,7 @@ interface UseChatCoreReturn {
 export const useChatCore = (
 	options: UseChatCoreOptions = {},
 ): UseChatCoreReturn => {
-	const { apiEndpoint = '/chat/sse', onScrollTo } = options;
+	const { apiEndpoint = '/chat/sse', onScrollTo: onScrollToProp } = options;
 	const { chatStore } = useStore();
 
 	// 从 Context 获取共享的 Refs
@@ -62,6 +62,7 @@ export const useChatCore = (
 		requestSnapshotMapRef,
 		hasReceivedStreamDataMapRef,
 		currentAssistantMessageMapRef,
+		onScrollToRef,
 	} = useChatCoreContext();
 
 	// 状态
@@ -80,6 +81,13 @@ export const useChatCore = (
 		buildMessageList,
 		getFormatMessages,
 	} = useMessageTools();
+
+	// 如果传入了 onScrollTo，同步到 Context ref
+	useEffect(() => {
+		if (onScrollToProp) {
+			onScrollToRef.current = onScrollToProp;
+		}
+	}, [onScrollToProp, onScrollToRef]);
 
 	// 获取当前选择的分支映射
 	const getSelectedChildMap = useCallback(() => {
@@ -642,9 +650,6 @@ export const useChatCore = (
 			if ((!content && !input.trim()) || chatStore.isCurrentSessionLoading)
 				return;
 
-			onScrollTo?.('down', 'auto');
-			console.log('111111', onScrollTo);
-
 			const isRegenerate =
 				content !== undefined && index !== undefined && !isEdit;
 			const isEditMode = isEdit === true;
@@ -657,13 +662,17 @@ export const useChatCore = (
 				await handleNewMessage(content || input.trim(), uploadedFiles);
 			}
 
+			const scrollTo = onScrollToProp || onScrollToRef.current;
+			scrollTo?.('down', 'auto');
+
 			setInput('');
 			setUploadedFiles([]);
 		},
 		[
 			input,
 			chatStore.isCurrentSessionLoading,
-			onScrollTo,
+			onScrollToProp,
+			onScrollToRef,
 			editMessage,
 			uploadedFiles,
 			handleEditMessage,

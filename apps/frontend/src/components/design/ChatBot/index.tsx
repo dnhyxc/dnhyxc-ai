@@ -19,6 +19,7 @@ import {
 	useRef,
 	useState,
 } from 'react';
+import { useChatCoreContext } from '@/contexts';
 import { useBranchManage } from '@/hooks/useBranchManage';
 import { useChatCore } from '@/hooks/useChatCore';
 import { useMessageTools } from '@/hooks/useMessageTools';
@@ -67,15 +68,6 @@ const ChatBot = observer(
 			onContinue, // 新增
 		} = useChatCore({
 			apiEndpoint,
-			onScrollTo: (position, behavior) => {
-				scrollContainerRef.current?.scrollTo({
-					top:
-						position === 'up'
-							? 0
-							: scrollContainerRef.current?.scrollHeight + 100,
-					behavior: behavior || 'smooth',
-				});
-			},
 		});
 
 		// 消息状态
@@ -127,6 +119,16 @@ const ChatBot = observer(
 
 		const { findSiblings, buildMessageList, getFormatMessages } =
 			useMessageTools();
+
+		const { onScrollToRef } = useChatCoreContext();
+
+		// 将滚动方法设置到 Context
+		useEffect(() => {
+			onScrollToRef.current = onScrollTo;
+			return () => {
+				onScrollToRef.current = null;
+			};
+		}, [onScrollTo, onScrollToRef]);
 
 		// 监听 store 变化
 		useEffect(() => {

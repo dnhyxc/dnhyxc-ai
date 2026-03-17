@@ -39,6 +39,9 @@ interface ChatCoreContextValue {
 	requestSnapshotMapRef: MutableRefObject<Map<string, RequestSnapshot>>;
 	hasReceivedStreamDataMapRef: MutableRefObject<Map<string, boolean>>;
 	currentAssistantMessageMapRef: MutableRefObject<Map<string, string>>;
+	onScrollToRef: React.MutableRefObject<
+		((position: string, behavior?: 'smooth' | 'auto') => void) | null
+	>;
 
 	// 操作方法注册
 	actionsRef: MutableRefObject<ChatBotActions | null>;
@@ -54,6 +57,9 @@ export const ChatCoreProvider = ({ children }: { children: ReactNode }) => {
 	const requestSnapshotMapRef = useRef<Map<string, RequestSnapshot>>(new Map());
 	const hasReceivedStreamDataMapRef = useRef<Map<string, boolean>>(new Map());
 	const currentAssistantMessageMapRef = useRef<Map<string, string>>(new Map());
+	const onScrollToRef = useRef<
+		((position: string, behavior?: 'smooth' | 'auto') => void) | null
+	>(null);
 
 	// 操作方法注册
 	const actionsRef = useRef<ChatBotActions | null>(null);
@@ -73,6 +79,7 @@ export const ChatCoreProvider = ({ children }: { children: ReactNode }) => {
 				requestSnapshotMapRef,
 				hasReceivedStreamDataMapRef,
 				currentAssistantMessageMapRef,
+				onScrollToRef,
 				actionsRef,
 				registerActions,
 				unregisterActions,
