@@ -37,65 +37,58 @@ export const useBranchManage = ({
 	const findLatestBranchSelection = (
 		allMessages: Message[],
 	): Map<string, string> => {
+		//
 		const selectionMap = new Map<string, string>();
+		// 构建父子关系映射，同时找出所有子节点ID
+		const childIdSet = new Set<string>();
+		const childrenByParentId = new Map<string, Message[]>();
 
-		// 找出所有根消息
-		const allChildren = new Set<string>();
 		allMessages.forEach((m) => {
+			// 收集所有子节点ID
 			m.childrenIds?.forEach((c) => {
-				allChildren.add(c);
+				childIdSet.add(c);
 			});
-		});
-		const rootMessages = allMessages.filter((m) => {
-			const isNotChild = !allChildren.has(m.chatId);
-			const hasNoParent = !m.parentId;
-			return isNotChild && hasNoParent;
+			// 构建父节点到子消息的映射
+			if (m.parentId) {
+				const siblings = childrenByParentId.get(m.parentId) || [];
+				siblings.push(m);
+				childrenByParentId.set(m.parentId, siblings);
+			}
 		});
 
-		// 如果没有根消息，返回空Map
+		// 找出根消息：不是任何消息的子节点 且 没有父节点
+		const rootMessages = allMessages.filter(
+			(m) => !childIdSet.has(m.chatId) && !m.parentId,
+		);
+
 		if (rootMessages.length === 0) {
 			return selectionMap;
 		}
 
-		// 按创建时间排序，选择最新的根消息
-		const sortedRootMessages = rootMessages.sort(
-			(a, b) =>
-				(a.createdAt
-					? new Date(a.createdAt).getTime()
-					: new Date(a.timestamp).getTime()) -
-				(b.createdAt
-					? new Date(b.createdAt).getTime()
-					: new Date(b.timestamp).getTime()),
-		);
-		const latestRoot = sortedRootMessages[sortedRootMessages.length - 1];
+		// 获取消息时间戳
+		const getTimestamp = (m: Message): number =>
+			m.createdAt
+				? new Date(m.createdAt).getTime()
+				: new Date(m.timestamp).getTime();
+
+		// 获取最新的消息
+		const getLatestMessage = (messages: Message[]): Message =>
+			messages.reduce((latest, current) =>
+				getTimestamp(current) > getTimestamp(latest) ? current : latest,
+			);
+
+		// 选择最新的根消息
+		const latestRoot = getLatestMessage(rootMessages);
 		selectionMap.set('root', latestRoot.chatId);
 
 		// 递归选择每个层级的最新子节点
 		let currentMessage = latestRoot;
-		while (
-			currentMessage?.childrenIds &&
-			currentMessage.childrenIds.length > 0
-		) {
-			// 获取当前消息的所有子节点
-			const children = allMessages.filter(
-				(m) => m.parentId === currentMessage.chatId,
-			);
-			if (children.length === 0) break;
+		while (currentMessage.childrenIds?.length) {
+			const children = childrenByParentId.get(currentMessage.chatId);
+			if (!children?.length) break;
 
-			// 按创建时间排序，选择最新的子节点
-			const sortedChildren = children.sort(
-				(a, b) =>
-					(a.createdAt
-						? new Date(a.createdAt).getTime()
-						: new Date(a.timestamp).getTime()) -
-					(b.createdAt
-						? new Date(b.createdAt).getTime()
-						: new Date(b.timestamp).getTime()),
-			);
-			const latestChild = sortedChildren[sortedChildren.length - 1];
+			const latestChild = getLatestMessage(children);
 			selectionMap.set(currentMessage.chatId, latestChild.chatId);
-
-			// 继续下一层级
 			currentMessage = latestChild;
 		}
 
