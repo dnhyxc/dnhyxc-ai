@@ -99,7 +99,6 @@ export const useEntry = ({
 					// onSendMessage(message as Message);
 					sendMessage(message?.content, undefined, true, message?.attachments);
 				} else {
-					console.log('-------------------');
 					sendMessage();
 				}
 			}

@@ -580,7 +580,6 @@ export const useChatCore = (
 		],
 	);
 
-	// ========== 新增：继续生成 ==========
 	const onContinue = useCallback(async () => {
 		let userMsgForApi: Message | null = null;
 		let assistantMsgForApi: Message | null = null;
@@ -643,7 +642,8 @@ export const useChatCore = (
 			if ((!content && !input.trim()) || chatStore.isCurrentSessionLoading)
 				return;
 
-			onScrollTo?.('down');
+			onScrollTo?.('down', 'auto');
+			console.log('111111', onScrollTo);
 
 			const isRegenerate =
 				content !== undefined && index !== undefined && !isEdit;
@@ -679,8 +679,6 @@ export const useChatCore = (
 			if (!session_id) return;
 
 			const stopFn = stopRequestMapRef.current.get(session_id);
-
-			console.log(stopFn, 'stopFn');
 
 			if (stopFn) {
 				await stopSse(session_id);
@@ -747,8 +745,6 @@ export const useChatCore = (
 	// 清除聊天
 	const clearChat = useCallback(
 		(targetSessionId?: string) => {
-			console.log('clearChatclearChatclearChatclearChatclearChatclearChat');
-
 			// 获取正在流式输出的会话ID列表
 			const streamingSessionIds = chatStore.getStreamingSessionIds();
 			// 判断 targetSessionId 是否是正在流式输出的会话

@@ -2,7 +2,15 @@ import { Drawer } from '@design/Drawer';
 import { MarkdownParser } from '@dnhyxc-ai/tools';
 import { ScrollArea, Spinner, Toast } from '@ui/index';
 import { SquarePen, Trash2 } from 'lucide-react';
-import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import {
+	Dispatch,
+	SetStateAction,
+	memo,
+	useCallback,
+	useEffect,
+	useMemo,
+	useState,
+} from 'react';
 import { useNavigate } from 'react-router';
 import Confirm from '@/components/design/Confirm';
 import { useChatCore } from '@/hooks/useChatCore';
@@ -12,7 +20,7 @@ import { Session } from '@/types/chat';
 
 interface IProps {
 	open: boolean;
-	onOpenChange: () => void;
+	onOpenChange: Dispatch<SetStateAction<boolean>>;
 }
 
 interface SessionItemProps {
@@ -55,13 +63,12 @@ const SessionItem = memo<SessionItemProps>(
 	},
 );
 
-const SessionList: React.FC<IProps> = () => {
+const SessionList: React.FC<IProps> = ({ open, onOpenChange }) => {
 	const { chatStore } = useStore();
 	const { clearChat, stopGenerating } = useChatCore();
 
 	const navigate = useNavigate();
 
-	const [open, setOpen] = useState(false);
 	const [streamingSessionId, setStreamingSessionId] = useState<string>('');
 	const [confirmOpen, setConfirmOpen] = useState(false);
 	const [deleteItem, setDeleteItem] = useState<Session | null>(null);
@@ -118,7 +125,7 @@ const SessionList: React.FC<IProps> = () => {
 			}
 
 			chatStore.setAllMessages(session.messages || [], session.id, false);
-			setOpen(false);
+			onOpenChange(false);
 			navigate(`/chat/c/${session.id}`);
 		},
 		[chatStore, streamingSessionId, navigate],
@@ -155,7 +162,7 @@ const SessionList: React.FC<IProps> = () => {
 	]);
 
 	return (
-		<Drawer title="历史对话" open={open} onOpenChange={setOpen}>
+		<Drawer title="历史对话" open={open} onOpenChange={onOpenChange}>
 			<ScrollArea className="h-full overflow-y-auto pr-4 box-border">
 				{sessionList}
 			</ScrollArea>
