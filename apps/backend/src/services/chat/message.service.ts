@@ -186,18 +186,6 @@ export class MessageService {
 		}
 	}
 
-	create(_createChatDto: any) {
-		return 'This action adds a new chat';
-	}
-
-	findAll() {
-		return `This action returns all chat`;
-	}
-
-	update(id: number, _updateChatDto: any) {
-		return `This action updates a #${id} chat`;
-	}
-
 	deleteSessionById(id: string) {
 		return this.chatSessionsRepository.delete(id);
 	}

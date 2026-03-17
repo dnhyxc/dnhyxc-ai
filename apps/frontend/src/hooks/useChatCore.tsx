@@ -165,6 +165,7 @@ export const useChatCore = (
 			assistantMessage?: Message,
 			isRegenerate?: boolean,
 			branchMap?: Map<string, string>,
+			to?: boolean,
 		) => {
 			let session_Id = chatStore.activeSessionId;
 
@@ -175,6 +176,11 @@ export const useChatCore = (
 					clearChat();
 					return;
 				}
+			}
+
+			// 判断是否是新对话，如果是则发送消息时需要跳转
+			if (to) {
+				navigate(`/chat/c/${session_Id}`);
 			}
 
 			hasReceivedStreamDataMapRef.current.set(session_Id, false);
@@ -383,8 +389,6 @@ export const useChatCore = (
 				return newAllMessages.map((i) => ({ ...i, isStopped: false }));
 			});
 
-			navigate('/chat/c');
-
 			onSseFetch(
 				apiEndpoint,
 				assistantMessageId,
@@ -392,6 +396,7 @@ export const useChatCore = (
 				assistantMessage,
 				false,
 				newSelectedChildMap,
+				true,
 			);
 		},
 		[

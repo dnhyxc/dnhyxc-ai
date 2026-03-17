@@ -65,7 +65,7 @@ const ChatBot = observer(
 			clearChat,
 			stopGenerating,
 			handleEditChange,
-			onContinue, // 新增
+			onContinue,
 		} = useChatCore({
 			apiEndpoint,
 		});

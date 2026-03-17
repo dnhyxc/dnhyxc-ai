@@ -6,7 +6,6 @@ import {
 	Get,
 	Param,
 	ParseIntPipe,
-	Patch,
 	Post,
 	Query,
 	Sse,
@@ -17,9 +16,7 @@ import { ChatService } from './chat.service';
 import { ChatContinueDto } from './dto/chat-continue.dto';
 import { ChatRequestDto, CreateSessionDto } from './dto/chat-request.dto';
 import { ChatStopDto } from './dto/chat-stop.dto';
-import { CreateChatDto } from './dto/create-chat.dto';
 import { HistoryDto, MessageDto } from './dto/message.dto';
-import { UpdateChatDto } from './dto/update-chat.dto';
 import { MessageService } from './message.service';
 
 @UseInterceptors(ClassSerializerInterceptor)
@@ -145,24 +142,9 @@ export class ChatController {
 		return { success: true, message: 'Session cleared' };
 	}
 
-	@Post()
-	create(@Body() createChatDto: CreateChatDto) {
-		return this.messageService.create(createChatDto);
-	}
-
-	@Get()
-	findAll() {
-		return this.messageService.findAll();
-	}
-
 	@Get('session/:sessionId')
 	findOneSession(@Param('sessionId') sessionId: string) {
 		return this.messageService.findOneSession(sessionId);
-	}
-
-	@Patch(':id')
-	update(@Param('id') id: string, @Body() updateChatDto: UpdateChatDto) {
-		return this.messageService.update(+id, updateChatDto);
 	}
 
 	@Delete('delSession/:id')
