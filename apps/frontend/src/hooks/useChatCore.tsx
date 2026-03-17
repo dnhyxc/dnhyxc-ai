@@ -253,10 +253,12 @@ export const useChatCore = (
 						},
 						onError: (err, type) => {
 							chatStore.setSessionLoading(session_Id, false);
-							Toast({
-								type: type || 'error',
-								title: err?.message || String(err) || '发送失败',
-							});
+							if (!err?.message.includes('Request cancelled')) {
+								Toast({
+									type: type || 'error',
+									title: err?.message || String(err) || '发送失败',
+								});
+							}
 							const snapshot = requestSnapshotMapRef.current.get(session_Id);
 							const hasReceivedData =
 								hasReceivedStreamDataMapRef.current.get(session_Id);
@@ -722,7 +724,7 @@ export const useChatCore = (
 				if (!isUnmount) {
 					Toast({
 						type: 'info',
-						title: '已取消发送，恢复到发送前状态',
+						title: '立即停止了生成，消息内容未添加！',
 					});
 				}
 			} else if (assistantMessageId) {
