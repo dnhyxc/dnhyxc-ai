@@ -6,7 +6,7 @@ interface UseBranchManagementProps {
 	messages: Message[];
 	selectedChildMap: Map<string, string>;
 	setSelectedChildMap: (map: Map<string, string>) => void;
-	onScrollTo: (position: string) => void;
+	onScrollTo: (position: 'down' | 'up', behavior?: 'smooth' | 'auto') => void;
 }
 
 export const useBranchManage = ({
@@ -215,9 +215,8 @@ export const useBranchManage = ({
 				clearTimeout(latestBranchTimer);
 				latestBranchTimer = null;
 			}
-			// setAutoScroll(true);
 			latestBranchTimer = setTimeout(() => {
-				onScrollTo('down');
+				onScrollTo('down', 'auto');
 			}, 50);
 		}
 	}, [chatStore, setSelectedChildMap, onScrollTo]);
@@ -239,9 +238,8 @@ export const useBranchManage = ({
 				clearTimeout(streamingBranchTimer);
 				streamingBranchTimer = null;
 			}
-			// setAutoScroll(true);
 			streamingBranchTimer = setTimeout(() => {
-				onScrollTo('down');
+				onScrollTo('down', 'auto');
 			}, 50);
 		}
 	}, [
