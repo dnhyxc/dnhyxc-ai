@@ -156,7 +156,7 @@ export const useChatCore = (
 		return res.data;
 	}, [chatStore]);
 
-	// 流式处理器
+	// 流式处理器 - 优化版本
 	const onSseFetch = useCallback(
 		async (
 			api: string,
@@ -226,25 +226,23 @@ export const useChatCore = (
 						onThinking: (thinking) => {
 							if (typeof thinking === 'string') {
 								hasReceivedStreamDataMapRef.current.set(session_Id, true);
-								const currentMessage = chatStore.messages.find(
-									(m) => m.chatId === assistantMessageId,
+								// 【优化】使用 appendStreamingContent 替代直接更新
+								chatStore.appendStreamingContent(
+									assistantMessageId,
+									thinking,
+									'thinkContent',
 								);
-								chatStore.updateMessage(assistantMessageId, {
-									thinkContent: (currentMessage?.thinkContent || '') + thinking,
-									isStreaming: true,
-								});
 							}
 						},
 						onData: (chunk) => {
 							if (typeof chunk === 'string') {
 								hasReceivedStreamDataMapRef.current.set(session_Id, true);
-								const currentMessage = chatStore.messages.find(
-									(m) => m.chatId === assistantMessageId,
+								// 【优化】使用 appendStreamingContent 替代直接更新
+								chatStore.appendStreamingContent(
+									assistantMessageId,
+									chunk,
+									'content',
 								);
-								chatStore.updateMessage(assistantMessageId, {
-									content: (currentMessage?.content || '') + chunk,
-									isStreaming: true,
-								});
 							}
 						},
 						onError: (err, type) => {
@@ -271,6 +269,8 @@ export const useChatCore = (
 						},
 						onComplete: () => {
 							chatStore.setSessionLoading(session_Id, false);
+							// 【优化】流式结束时，确保刷新缓冲区
+							chatStore.flushMessageUpdate(assistantMessageId);
 							chatStore.updateMessage(assistantMessageId, {
 								isStreaming: false,
 							});
@@ -721,6 +721,8 @@ export const useChatCore = (
 					});
 				}
 			} else if (assistantMessageId) {
+				// 【优化】停止时刷新缓冲区
+				chatStore.flushMessageUpdate(assistantMessageId);
 				chatStore.updateMessage(assistantMessageId, {
 					isStreaming: false,
 					isStopped: true,
@@ -728,6 +730,7 @@ export const useChatCore = (
 			} else {
 				const lastAssistantMsg = findLastAssistantMessage(chatStore.messages);
 				if (lastAssistantMsg?.isStreaming) {
+					chatStore.flushMessageUpdate(lastAssistantMsg.chatId);
 					chatStore.updateMessage(lastAssistantMsg.chatId, {
 						isStreaming: false,
 						isStopped: true,
