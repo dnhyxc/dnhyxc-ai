@@ -101,7 +101,7 @@ const ChatContent = observer(() => {
 				setEditMessage={setEditMessage}
 				handleEditChange={handleEditChange}
 				sendMessage={sendMessage}
-				onUploadFile={onUploadFile as any}
+				onUploadFile={onUploadFile}
 				clearChat={toNewChat}
 				stopGenerating={stopGenerating}
 			/>

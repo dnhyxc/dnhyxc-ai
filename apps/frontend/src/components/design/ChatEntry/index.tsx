@@ -1,10 +1,10 @@
-import ChatFileList from '@design/ChatFileList'; // 根据实际路径调整，原代码是 ./FileInfo
+import ChatFileList from '@design/ChatFileList';
 import ChatTextArea from '@design/ChatTextArea';
 import Upload from '@design/Upload';
 import { Button } from '@ui/index';
 import { CirclePlus, Link, Rocket, StopCircle } from 'lucide-react';
 import { CHAT_VALIDTYPES } from '@/constant';
-import { UploadedFile } from '@/types'; // 根据实际路径调整
+import { FileWithPreview, UploadedFile } from '@/types';
 import { Message } from '@/types/chat';
 
 interface ChatEntryProps {
@@ -24,7 +24,7 @@ interface ChatEntryProps {
 		isEdit?: boolean,
 		attachments?: any,
 	) => void;
-	onUploadFile: (data: UploadedFile[]) => Promise<void>;
+	onUploadFile: (data: FileWithPreview | FileWithPreview[]) => Promise<void>;
 	clearChat?: () => void;
 	stopGenerating?: () => void;
 	chatInputRef?: React.RefObject<HTMLTextAreaElement | null>; // 新增
