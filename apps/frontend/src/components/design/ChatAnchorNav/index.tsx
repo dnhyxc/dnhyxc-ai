@@ -18,6 +18,10 @@ const ChatAnchorNav = ({
 
 	// 用于节流的 rAF ID
 	const rafIdRef = useRef<number | null>(null);
+	// 锚点列表容器的 ref，用于滚动锚点列表
+	const anchorListRef = useRef<HTMLDivElement | null>(null);
+	// 锚点元素的 ref map，用于获取每个锚点的 DOM 元素
+	const anchorItemRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
 	// 过滤出用户消息
 	const userMessages = useMemo(() => {
@@ -91,6 +95,46 @@ const ChatAnchorNav = ({
 		};
 	}, [calculateActiveAnchor, scrollContainerRef]);
 
+	// 当 activeAnchor 变化时，滚动锚点列表使活动锚点可见
+	useEffect(() => {
+		if (!activeAnchor || !anchorListRef.current) return;
+
+		const activeElement = anchorItemRefs.current.get(activeAnchor);
+		if (!activeElement) return;
+
+		// 获取 ScrollArea 的实际滚动容器（viewport）
+		// ScrollArea 组件内部有一个 [data-radix-scroll-area-viewport] 元素
+		const scrollAreaContainer = anchorListRef.current.closest(
+			'[data-radix-scroll-area-viewport]',
+		) as HTMLDivElement | null;
+		const listContainer = scrollAreaContainer || anchorListRef.current;
+
+		if (!listContainer) return;
+
+		const listRect = listContainer.getBoundingClientRect();
+		const elementRect = activeElement.getBoundingClientRect();
+
+		// 检查元素是否在可视区域内
+		const isAboveViewport = elementRect.top < listRect.top;
+		const isBelowViewport = elementRect.bottom > listRect.bottom;
+
+		if (isAboveViewport || isBelowViewport) {
+			// 计算滚动位置，使活动锚点居中
+			const elementOffsetTop = activeElement.offsetTop;
+			const containerHeight = listRect.height;
+			const elementHeight = elementRect.height;
+
+			// 计算使元素居中的滚动位置
+			const targetScrollTop =
+				elementOffsetTop - containerHeight / 2 + elementHeight / 2;
+
+			listContainer.scrollTo({
+				top: Math.max(0, targetScrollTop),
+				behavior: 'smooth',
+			});
+		}
+	}, [activeAnchor]);
+
 	// 滚动到指定消息
 	const scrollToMessage = (chatId: string) => {
 		const element = document.getElementById(`message-${chatId}`);
@@ -159,12 +203,21 @@ const ChatAnchorNav = ({
 				{/* 锚点列表 */}
 				<div className="flex-1 flex max-h-80 overflow-hidden">
 					<ScrollArea className="flex-1 overflow-hidden w-full">
-						<div className="flex flex-col items-center px-3 overflow-y-auto">
+						<div
+							ref={anchorListRef}
+							className="flex flex-col items-center px-3 overflow-y-auto"
+						>
 							{userMessages.map((msg) => {
 								return (
 									<Tooltip key={msg.chatId} side="left" content={msg.content}>
 										<div
-											key={msg.chatId}
+											ref={(el) => {
+												if (el) {
+													anchorItemRefs.current.set(msg.chatId, el);
+												} else {
+													anchorItemRefs.current.delete(msg.chatId);
+												}
+											}}
 											className={cn(
 												'w-2 h-2 my-[5px] cursor-pointer rounded-full',
 												'hover:scale-145 active:scale-145 transition-all duration-300',
