@@ -1,14 +1,6 @@
 import { action, computed, makeAutoObservable, observable } from 'mobx';
 import { Message, SessionData } from '@/types/chat';
 
-// 流式更新缓冲区类型
-interface StreamingBuffer {
-	content: string;
-	thinkContent: string;
-	lastUpdateTime: number;
-	pendingUpdate: boolean;
-}
-
 class ChatStore {
 	constructor() {
 		makeAutoObservable(this);
@@ -23,12 +15,19 @@ class ChatStore {
 
 	// ========== 流式更新优化：缓冲区 ==========
 	// 存储每个消息的流式更新缓冲
-	private streamingBuffers: Map<string, StreamingBuffer> = new Map();
+	streamingBuffers: Map<
+		string,
+		{
+			content: string;
+			thinkContent: string;
+			lastUpdateTime: number;
+			pendingUpdate: boolean;
+		}
+	> = new Map();
 	// 节流更新定时器
-	private updateThrottleTimer: ReturnType<typeof requestAnimationFrame> | null =
-		null;
+	updateThrottleTimer: ReturnType<typeof requestAnimationFrame> | null = null;
 	// 批量更新的消息ID集合
-	private pendingUpdateIds: Set<string> = new Set();
+	pendingUpdateIds: Set<string> = new Set();
 
 	// ========== loading 状态管理 ==========
 	@observable loadingSessions = observable.set<string>();
@@ -201,7 +200,7 @@ class ChatStore {
 	/**
 	 * 调度节流更新
 	 */
-	private scheduleThrottledUpdate() {
+	scheduleThrottledUpdate() {
 		if (this.updateThrottleTimer !== null) {
 			return; // 已有待处理的更新
 		}
@@ -216,7 +215,7 @@ class ChatStore {
 	 * 执行批量更新
 	 */
 	@action
-	private flushStreamingUpdates() {
+	flushStreamingUpdates() {
 		if (this.pendingUpdateIds.size === 0) return;
 
 		const updatesToApply = new Map<
@@ -256,7 +255,7 @@ class ChatStore {
 	 * 批量应用更新到消息列表
 	 */
 	@action
-	private applyBatchUpdates(
+	applyBatchUpdates(
 		updates: Map<string, { content?: string; thinkContent?: string }>,
 	) {
 		// 创建消息映射以快速查找
@@ -406,7 +405,7 @@ class ChatStore {
 	/**
 	 * 优化：只更新受影响的 session
 	 */
-	private updateSessionMessage(chatId: string, updatedMessage: Message) {
+	updateSessionMessage(chatId: string, updatedMessage: Message) {
 		this.sessionData.list.forEach((session) => {
 			if (session.messages && session.messages.length > 0) {
 				const sessionMessageIndex = session.messages.findIndex(
