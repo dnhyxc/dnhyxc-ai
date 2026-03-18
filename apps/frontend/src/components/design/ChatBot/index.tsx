@@ -142,7 +142,7 @@ const ChatBot = observer(
 			return () => dispose();
 		}, [chatStore]);
 
-		// 监听 store 中 selectedChildMap 的变化
+		// 监听 store 中 selectedChildMap 的变化，使在重新编辑 user 信息重新发送时，能够自动切换到最新的 user 分支
 		useEffect(() => {
 			const dispose = mobx.reaction(
 				() => {
