@@ -17,6 +17,7 @@ import { ChatContinueDto } from './dto/chat-continue.dto';
 import { ChatRequestDto, CreateSessionDto } from './dto/chat-request.dto';
 import { ChatStopDto } from './dto/chat-stop.dto';
 import { HistoryDto, MessageDto } from './dto/message.dto';
+import { UpdateChatDto } from './dto/update-chat.dto';
 import { MessageService } from './message.service';
 
 @UseInterceptors(ClassSerializerInterceptor)
@@ -169,5 +170,10 @@ export class ChatController {
 		dto: HistoryDto,
 	) {
 		return this.messageService.getSessionList(dto);
+	}
+
+	@Post('/updateSession')
+	async updateSession(dto: UpdateChatDto) {
+		return this.messageService.updateSession(dto);
 	}
 }

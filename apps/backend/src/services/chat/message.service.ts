@@ -1,11 +1,12 @@
 import { randomUUID } from 'node:crypto';
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { FindOneOptions, Repository } from 'typeorm';
 import { Attachments } from './attachments.entity';
 import { ChatMessages } from './chat.entity';
 import { CreateSessionDto } from './dto/chat-request.dto';
 import { HistoryDto, MessageDto, SaveDto } from './dto/message.dto';
+import { UpdateChatDto } from './dto/update-chat.dto';
 import { ChatSessions } from './session.entity';
 
 @Injectable()
@@ -64,7 +65,6 @@ export class MessageService {
 		if (!session) {
 			session = this.chatSessionsRepository.create({
 				id: sessionId,
-				partialContent: null,
 				isActive: true,
 			});
 			await this.chatSessionsRepository.save(session);
@@ -160,29 +160,10 @@ export class MessageService {
 				await this.attachmentsRepository.save(files);
 			}
 
-			return savedMessage;
+			return savedMessage.id;
 		} catch (dbError) {
 			console.error('Failed to save message to database:', dbError);
 			return null;
-		}
-	}
-
-	// 更新数据库会话的 partialContent
-	async updateSessionPartialContent(
-		sessionId: string,
-		partialContent: string | null,
-		lastUserMessage: string | null,
-	): Promise<void> {
-		try {
-			const session = await this.findOneSession(sessionId);
-			if (session) {
-				session.partialContent = partialContent;
-				session.lastUserMessage = lastUserMessage;
-				await this.chatSessionsRepository.save(session);
-			}
-		} catch (dbError) {
-			// 静默失败，不抛出异常
-			console.error('Failed to update session partial content:', dbError);
 		}
 	}
 
@@ -197,6 +178,17 @@ export class MessageService {
 				createdAt: 'DESC',
 			},
 		});
+	}
+
+	// 更新 session title
+	async updateSession(dto: UpdateChatDto) {
+		const session = await this.findOneSession(dto.sessionId);
+		if (session) {
+			const newMenu = this.chatSessionsRepository.merge(session, dto);
+			return this.chatSessionsRepository.save(newMenu);
+		} else {
+			throw new NotFoundException('会话不存在');
+		}
 	}
 
 	getHistory(dto: HistoryDto) {

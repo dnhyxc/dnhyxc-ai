@@ -1,4 +1,3 @@
-import { Exclude } from 'class-transformer';
 import { IsOptional } from 'class-validator';
 import {
 	Column,
@@ -14,17 +13,9 @@ export class ChatSessions {
 	@PrimaryColumn()
 	id: string;
 
-	// 对应 this.partialResponses
-	// 用于存储未完成流式传输时的部分内容，以便 continueStream 使用
-	@Exclude()
-	@Column({ type: 'text', nullable: true, name: 'partial_content' })
+	@Column({ type: 'varchar', nullable: true, length: 200 })
 	@IsOptional()
-	partialContent: string | null;
-
-	@Exclude()
-	@Column({ type: 'text', nullable: true, name: 'partial_user_message' })
-	@IsOptional()
-	lastUserMessage: string | null;
+	title: string;
 
 	// 对应 this.activeSessions (可选，用于记录会话是否在前端活跃)
 	@Column({ type: 'boolean', default: true, name: 'is_active' })
@@ -32,8 +23,8 @@ export class ChatSessions {
 	isActive: boolean;
 
 	// 预留字段：如果需要存储模型配置（如 temperature, model_name）可以加在这里
-	// @Column({ type: 'varchar', nullable: true })
-	// modelName: string;
+	@Column({ type: 'varchar', nullable: true })
+	modelName: string;
 
 	@CreateDateColumn({ name: 'created_at', type: 'timestamp' })
 	createdAt: Date;

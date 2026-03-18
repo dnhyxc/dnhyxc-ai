@@ -370,10 +370,6 @@ Stick strictly to what is visually present.`,
 					);
 
 					// 构建最终消息列表
-					// 1. 系统提示
-					// 2. 数据库历史消息
-					// 3. 如果有 partialContent，作为一条 Assistant 消息插入到这里（在历史之后，新用户消息之前）
-					// 4. 当前新用户消息
 					const newData: ChatMessageDto[] = [
 						systemPrompt,
 						...(memeries?.messages || []),

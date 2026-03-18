@@ -1,4 +1,14 @@
-import { PartialType } from '@nestjs/swagger';
-import { CreateChatDto } from './create-chat.dto';
+import { IsOptional, IsString } from 'class-validator';
 
-export class UpdateChatDto extends PartialType(CreateChatDto) {}
+export class UpdateChatDto {
+	@IsString()
+	sessionId: string;
+
+	@IsString()
+	@IsOptional()
+	title?: string;
+
+	@IsString()
+	@IsOptional()
+	modelName?: string;
+}

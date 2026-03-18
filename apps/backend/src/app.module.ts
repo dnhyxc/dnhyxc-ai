@@ -60,12 +60,16 @@ const connections = new Map();
 					password: configService.get<string>(RedisEnum.REDIS_PASSWORD),
 				},
 				defaultJobOptions: {
+					// 任务失败时的最大重试次数
 					attempts: 3,
+					// 重试退避策略：指数退避，延迟 1000ms
 					backoff: {
 						type: 'exponential',
 						delay: 1000,
 					},
+					// 任务成功完成后，保留最近 100 条记录
 					removeOnComplete: 100,
+					// 任务失败时，保留最近 1000 条记录
 					removeOnFail: 1000,
 				},
 			}),

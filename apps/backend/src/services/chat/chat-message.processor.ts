@@ -1,8 +1,12 @@
 // chat-message.processor.ts
 import { Processor, WorkerHost } from '@nestjs/bullmq';
+import { Inject, type LoggerService } from '@nestjs/common';
 import type { Job } from 'bullmq';
+import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { MessageRole } from './chat.entity';
 import { MessageService } from './message.service';
+
+// ==================== 类型定义 ====================
 
 interface SaveMessageJobData {
 	sessionId: string;
@@ -16,25 +20,261 @@ interface SaveMessageJobData {
 	currentChatId?: string;
 }
 
-@Processor('chat-message-queue')
+interface JobResult {
+	success: boolean;
+	messageId?: string;
+	error?: string;
+	attemptsMade: number;
+}
+
+// ==================== 重试配置 ====================
+
+// const RETRY_CONFIG = {
+// 	MAX_ATTEMPTS: 3,
+// 	BACKOFF_DELAY: 2000,
+// 	BACKOFF_TYPE: 'exponential' as const,
+// } as const;
+
+// ==================== 可重试错误码 ====================
+
+const RETRYABLE_ERROR_CODES = new Set([
+	'ECONNREFUSED',
+	'ENOTFOUND',
+	'EHOSTUNREACH',
+	'EPIPE',
+	'ECONNRESET',
+	'ETIMEDOUT',
+	'PROTOCOL_CONNECTION_LOST',
+	'ER_CON_COUNT_ERROR',
+	'40P01',
+	'1213',
+	'NR_CLOSED',
+]);
+
+/**
+ * 聊天消息队列处理器
+ * 负责消费 chat-message-queue 队列中的任务
+ */
+@Processor('chat-message-queue', {
+	// 同时并发处理的任务数，避免数据库瞬时压力过大
+	concurrency: 5,
+	// 限流器：每 1 秒最多处理 100 个任务，超出部分排队等待
+	limiter: {
+		max: 100,
+		duration: 1000,
+	},
+})
 export class ChatMessageProcessor extends WorkerHost {
-	constructor(private readonly messageService: MessageService) {
+	constructor(
+		private readonly messageService: MessageService,
+		@Inject(WINSTON_MODULE_NEST_PROVIDER)
+		private readonly logger: LoggerService,
+	) {
 		super();
 	}
 
-	async process(job: Job<SaveMessageJobData, any, string>): Promise<any> {
+	async process(job: Job<SaveMessageJobData, JobResult>): Promise<JobResult> {
+		const { name, data, attemptsMade } = job;
+
 		try {
-			switch (job.name) {
+			switch (name) {
 				case 'save-message': {
-					await this.messageService.saveMessage(job.data);
-					break;
+					return await this.handleSaveMessage(data, attemptsMade);
 				}
 				default:
-					console.warn(`⚠️ [Processor] Unknown job name: ${job.name}`);
+					this.logger.warn?.(
+						`[ChatMessageProcessor] Unknown job name: ${name}`,
+					);
+					return {
+						success: false,
+						error: `Unknown job name: ${name}`,
+						attemptsMade: attemptsMade + 1,
+					};
 			}
-		} catch (error) {
-			console.error('❌ [Processor] Job failed:', error);
-			throw error; // 让 BullMQ 重试
+		} catch (error: any) {
+			return this.handleError(job, error);
 		}
 	}
+
+	private async handleSaveMessage(
+		data: SaveMessageJobData,
+		attemptsMade: number,
+	): Promise<JobResult> {
+		const messageId = await this.messageService.saveMessage(data);
+		if (!messageId) {
+			return {
+				success: false,
+				attemptsMade: attemptsMade + 1,
+			};
+		}
+		return {
+			success: true,
+			messageId,
+			attemptsMade: attemptsMade + 1,
+		};
+	}
+
+	private handleError(
+		job: Job<SaveMessageJobData>,
+		error: any,
+	): never | JobResult {
+		const { id, attemptsMade, data } = job;
+		const isRetryable = this.isRetryableError(error);
+
+		this.logger.error?.(
+			`[ChatMessageProcessor] Job ${id} error | Attempt: ${attemptsMade + 1} | Retryable: ${isRetryable}`,
+			{
+				jobId: id,
+				sessionId: data.sessionId,
+				role: data.role,
+				attemptsMade: attemptsMade + 1,
+				isRetryable,
+				error: {
+					name: error.name,
+					message: error.message,
+					code: error.code,
+					stack: error.stack,
+				},
+				timestamp: new Date().toISOString(),
+			},
+		);
+
+		if (isRetryable) {
+			throw error;
+		}
+
+		return {
+			success: false,
+			error: error.message,
+			attemptsMade: attemptsMade + 1,
+		};
+	}
+
+	private isRetryableError(error: any): boolean {
+		if (
+			RETRYABLE_ERROR_CODES.has(error.code) ||
+			RETRYABLE_ERROR_CODES.has(String(error.errno))
+		) {
+			return true;
+		}
+
+		if (this.isDatabaseConnectionError(error)) {
+			return true;
+		}
+
+		if (error.code === 'ETIMEDOUT' || error.message?.includes('timeout')) {
+			return true;
+		}
+
+		if (
+			error.status === 400 ||
+			error.code === 'VALIDATION_ERROR' ||
+			error.code === 'INVALID_DATA'
+		) {
+			return false;
+		}
+
+		if (error.code === '23505' || error.code === 'ER_DUP_ENTRY') {
+			return false;
+		}
+
+		return true;
+	}
+
+	private isDatabaseConnectionError(error: any): boolean {
+		const dbErrorPatterns = [
+			'connection',
+			'connect',
+			'ECONNREFUSED',
+			'ETIMEDOUT',
+			'PROTOCOL',
+			'handshake',
+		];
+
+		const message = (error.message || '').toLowerCase();
+		return dbErrorPatterns.some((pattern) =>
+			message.includes(pattern.toLowerCase()),
+		);
+	}
+
+	// ==================== 事件监听 ====================
+
+	// @OnWorkerEvent('active')
+	// onActive(job: Job<SaveMessageJobData>): void {
+	// 	this.logger.log?.(
+	// 		`[ChatMessageProcessor] Job ${job.id} started processing`,
+	// 		{ jobId: job.id, sessionId: job.data.sessionId },
+	// 	);
+	// }
+
+	// @OnWorkerEvent('completed')
+	// onCompleted(job: Job<SaveMessageJobData, JobResult>): void {
+	// 	this.logger.log?.(
+	// 		`[ChatMessageProcessor] Job ${job.id} completed | Attempts: ${job.returnvalue?.attemptsMade || 1}`,
+	// 		{
+	// 			jobId: job.id,
+	// 			sessionId: job.data.sessionId,
+	// 			messageId: job.returnvalue?.messageId,
+	// 			attemptsMade: job.returnvalue?.attemptsMade || 1,
+	// 			timestamp: new Date().toISOString(),
+	// 		},
+	// 	);
+	// }
+
+	// @OnWorkerEvent('failed')
+	// onFailed(job: Job<SaveMessageJobData>, error: Error): void {
+	// 	const maxAttempts = job.opts.attempts || RETRY_CONFIG.MAX_ATTEMPTS;
+	// 	const isFinalAttempt = job.attemptsMade >= maxAttempts;
+
+	// 	if (isFinalAttempt) {
+	// 		this.logger.error?.(
+	// 			`[ChatMessageProcessor] Job ${job.id} FAILED permanently after ${job.attemptsMade} attempts`,
+	// 			{
+	// 				jobId: job.id,
+	// 				sessionId: job.data.sessionId,
+	// 				attemptsMade: job.attemptsMade,
+	// 				error: {
+	// 					name: error.name,
+	// 					message: error.message,
+	// 					stack: error.stack,
+	// 				},
+	// 				timestamp: new Date().toISOString(),
+	// 			},
+	// 		);
+	// 	} else {
+	// 		this.logger.warn?.(
+	// 			`[ChatMessageProcessor] Job ${job.id} failed, will retry | Attempt: ${job.attemptsMade}/${maxAttempts}`,
+	// 			{
+	// 				jobId: job.id,
+	// 				sessionId: job.data.sessionId,
+	// 				attemptsMade: job.attemptsMade,
+	// 				error: error.message,
+	// 				timestamp: new Date().toISOString(),
+	// 			},
+	// 		);
+	// 	}
+	// }
+
+	// @OnWorkerEvent('error')
+	// onError(error: Error): void {
+	// 	this.logger.error?.(
+	// 		`[ChatMessageProcessor] Worker error: ${error.message}`,
+	// 		{
+	// 			error: {
+	// 				name: error.name,
+	// 				message: error.message,
+	// 				stack: error.stack,
+	// 			},
+	// 			timestamp: new Date().toISOString(),
+	// 		},
+	// 	);
+	// }
+
+	// @OnWorkerEvent('stalled')
+	// onStalled(jobId: string): void {
+	// 	this.logger.warn?.(`[ChatMessageProcessor] Job ${jobId} stalled`, {
+	// 		jobId,
+	// 		timestamp: new Date().toISOString(),
+	// 	});
+	// }
 }
