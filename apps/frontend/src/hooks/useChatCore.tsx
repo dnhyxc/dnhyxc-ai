@@ -253,7 +253,10 @@ export const useChatCore = (
 						},
 						onError: (err, type) => {
 							chatStore.setSessionLoading(session_Id, false);
-							if (!err?.message.includes('Request cancelled')) {
+							if (
+								err?.message &&
+								!err?.message?.includes('Request cancelled')
+							) {
 								Toast({
 									type: type || 'error',
 									title: err?.message || String(err) || '发送失败',
