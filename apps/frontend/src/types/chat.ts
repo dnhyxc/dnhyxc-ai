@@ -8,6 +8,7 @@ export interface Session {
 	createdAt: Date;
 	updatedAt: Date;
 	messages: Message[];
+	title: string;
 }
 
 export interface SessionData {

@@ -154,12 +154,28 @@ class ChatStore {
 		this.sessionData = sessionData;
 	}
 
-	updateSessionData(sessionId: string) {
-		const list = this.sessionData.list.filter((i) => i.id !== sessionId);
-		this.sessionData = {
-			...this.sessionData,
-			list,
-		};
+	updateSessionData(sessionId: string, title?: string) {
+		if (title) {
+			const list = this.sessionData.list.map((item) => {
+				if (item.id === sessionId) {
+					return {
+						...item,
+						title,
+					};
+				}
+				return item;
+			});
+			this.sessionData = {
+				...this.sessionData,
+				list,
+			};
+		} else {
+			const list = this.sessionData.list.filter((i) => i.id !== sessionId);
+			this.sessionData = {
+				...this.sessionData,
+				list,
+			};
+		}
 	}
 
 	/**

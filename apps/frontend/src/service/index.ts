@@ -20,6 +20,7 @@ import {
 	SEND_RESET_PWD_EMAIL,
 	STOP_SSE,
 	UPDATE_EMAIL,
+	UPDATE_SESSION,
 	UPDATE_USER,
 	UPLOAD_FILE,
 	UPLOAD_FILES,
@@ -245,5 +246,16 @@ export const getSessionList = async (options?: {
 export const deleteSession = async (id: string): Promise<any> => {
 	return await http.delete(DELETE_SESSION, {
 		params: [id],
+	});
+};
+
+// 更新会话
+export const updateSession = async (
+	sessionId: string,
+	title: string,
+): Promise<any> => {
+	return await http.post(UPDATE_SESSION, {
+		sessionId,
+		title,
 	});
 };

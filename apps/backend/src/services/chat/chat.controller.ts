@@ -173,7 +173,7 @@ export class ChatController {
 	}
 
 	@Post('/updateSession')
-	async updateSession(dto: UpdateChatDto) {
+	async updateSession(@Body() dto: UpdateChatDto) {
 		return this.messageService.updateSession(dto);
 	}
 }

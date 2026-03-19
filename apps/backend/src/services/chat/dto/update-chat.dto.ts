@@ -6,7 +6,7 @@ export class UpdateChatDto {
 
 	@IsString()
 	@IsOptional()
-	title?: string;
+	title: string;
 
 	@IsString()
 	@IsOptional()

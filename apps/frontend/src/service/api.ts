@@ -66,3 +66,6 @@ export const DELETE_SESSION = '/chat/delSession';
 
 // 获取 session 对话历史列表
 export const GET_SESSION_LIST = '/chat/getSessionList';
+
+// 更新会话
+export const UPDATE_SESSION = '/chat/updateSession';

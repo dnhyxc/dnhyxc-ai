@@ -1,9 +1,12 @@
 import { Drawer } from '@design/Drawer';
 import { MarkdownParser } from '@dnhyxc-ai/tools';
-import { ScrollArea, Spinner, Toast } from '@ui/index';
-import { SquarePen, Trash2 } from 'lucide-react';
+import { Input, ScrollArea, Spinner, Toast } from '@ui/index';
+import { Check, SquarePen, Trash2, X } from 'lucide-react';
 import {
+	ChangeEvent,
 	Dispatch,
+	FocusEvent,
+	MouseEvent,
 	memo,
 	SetStateAction,
 	useCallback,
@@ -14,7 +17,7 @@ import {
 import { useNavigate } from 'react-router';
 import Confirm from '@/components/design/Confirm';
 import { useChatCore } from '@/hooks/useChatCore';
-import { deleteSession, getSessionList } from '@/service';
+import { deleteSession, getSessionList, updateSession } from '@/service';
 import useStore from '@/store';
 import { Session } from '@/types/chat';
 
@@ -25,39 +28,168 @@ interface IProps {
 
 interface SessionItemProps {
 	item: Session;
+	editItem: Session | null;
 	isActive: boolean;
 	isLoading: boolean;
-	onSelect: (e: React.MouseEvent<HTMLDivElement>, session: Session) => void;
-	onDelete: (e: React.MouseEvent<HTMLDivElement>, item: Session) => void;
 	parser: MarkdownParser;
+	onSelect: (e: React.MouseEvent<HTMLDivElement>, session: Session) => void;
+	onEdit: (e: React.MouseEvent<HTMLDivElement>, item: Session) => void;
+	onDelete: (e: React.MouseEvent<HTMLDivElement>, item: Session) => void;
+	setEditItem: Dispatch<SetStateAction<Session | null>>;
 }
 
 // 会话列表项组件
 const SessionItem = memo<SessionItemProps>(
-	({ item, isActive, isLoading, onSelect, onDelete, parser }) => {
+	({
+		item,
+		editItem,
+		setEditItem,
+		isActive,
+		isLoading,
+		onSelect,
+		onDelete,
+		onEdit,
+		parser,
+	}) => {
+		const [isComposing, setIsComposing] = useState(false);
+		const { chatStore } = useStore();
+
+		const onChangeEditValue = (e: ChangeEvent<HTMLInputElement>) => {
+			e.stopPropagation();
+			setEditItem((item) => {
+				if (item) {
+					return {
+						...item,
+						title: e.target.value,
+					};
+				}
+				return item;
+			});
+		};
+
+		const onSubmit = async () => {
+			if (
+				editItem?.title.trim() &&
+				editItem?.id &&
+				(item.title || item?.messages?.[0].content) !== editItem?.title
+			) {
+				const res = await updateSession(editItem.id, editItem.title);
+				if (res.success) {
+					Toast({
+						type: 'success',
+						title: '会话标题更新成功',
+					});
+				}
+				chatStore.updateSessionData(editItem.id, editItem.title);
+			}
+		};
+
+		const onSubmitEdit = async (
+			e: MouseEvent<HTMLDivElement, globalThis.MouseEvent>,
+		) => {
+			e.stopPropagation();
+			await onSubmit();
+			setEditItem(null);
+		};
+
+		const onKeyDown = async (e: React.KeyboardEvent<HTMLInputElement>) => {
+			const isCurrentlyComposing =
+				(e.nativeEvent as KeyboardEvent).isComposing || isComposing;
+
+			if (isCurrentlyComposing) return;
+			if (e.key === 'Enter') {
+				e.preventDefault();
+				await onSubmit();
+				setEditItem(null);
+			}
+		};
+
+		const onCancelEdit = (
+			e: MouseEvent<HTMLDivElement, globalThis.MouseEvent>,
+		) => {
+			e.stopPropagation();
+			setEditItem(null);
+		};
+
+		const handleCompositionStart = () => {
+			setIsComposing(true);
+		};
+
+		const handleCompositionEnd = () => {
+			setTimeout(() => {
+				setIsComposing(false);
+			}, 0);
+		};
+
+		const onBlur = async (e: FocusEvent<HTMLInputElement, Element>) => {
+			e.stopPropagation();
+			await onSubmit();
+			setEditItem(null);
+		};
+
 		return (
 			<div
-				className={`group relative h-10 px-2 mb-1 hover:bg-theme/10 rounded-sm cursor-pointer flex items-center justify-between ${isActive ? 'bg-theme/10' : ''}`}
+				className={`group relative h-10 ${editItem?.id === item.id ? 'px-1' : 'px-2'} mb-1.5 hover:bg-theme/10 rounded-sm cursor-pointer flex items-center justify-between ${isActive ? 'bg-theme/10' : ''}`}
 				onClick={(e) => onSelect(e, item)}
 			>
-				{isLoading && <Spinner className="w-4 h-4 mr-2 text-cyan-400" />}
-				<div
-					className="line-clamp-1 flex-1 text-sm [&_.markdown-body]:text-textcolor!"
-					dangerouslySetInnerHTML={{
-						__html: parser.render(item.messages?.[0]?.content || '新对话'),
-					}}
-				/>
-				<div className="absolute right-2 items-center hidden group-hover:flex">
-					<div className="bg-theme-background p-1 rounded-sm hover:text-blue-500">
-						<SquarePen size={18} />
+				{isLoading ? <Spinner className="w-4 h-4 mr-2 text-cyan-400" /> : null}
+				{editItem?.id === item.id ? (
+					<div className="flex items-center w-full h-full">
+						<Input
+							className="rounded-sm"
+							value={editItem?.title || ''}
+							onChange={(e) => onChangeEditValue(e)}
+							onClick={(e) => e.stopPropagation()}
+							onCompositionStart={handleCompositionStart}
+							onCompositionEnd={handleCompositionEnd}
+							autoFocus
+							onKeyDown={(e) => onKeyDown(e)}
+							onBlur={(e) => onBlur(e)}
+						/>
 					</div>
+				) : (
 					<div
-						className="bg-theme-background p-1 ml-2 rounded-sm hover:text-red-500"
-						onClick={(e) => onDelete(e, item)}
-					>
-						<Trash2 size={18} />
+						className="line-clamp-1 flex-1 text-sm [&_.markdown-body]:text-textcolor!"
+						dangerouslySetInnerHTML={{
+							__html: parser.render(
+								item?.title || item.messages?.[0]?.content || '新对话',
+							),
+						}}
+					/>
+				)}
+				{editItem?.id === item.id ? (
+					<div className="absolute right-2 items-center hidden group-hover:flex">
+						<div
+							className="bg-theme-background p-1 rounded-sm hover:bg-blue-500"
+							onClick={(e) => onSubmitEdit(e)}
+							onMouseDown={(e) => e.preventDefault()}
+						>
+							<Check size={18} />
+						</div>
+						<div
+							className="bg-theme-background p-1 ml-2 rounded-sm hover:bg-orange-500"
+							onClick={(e) => onCancelEdit(e)}
+							onMouseDown={(e) => e.preventDefault()}
+						>
+							<X size={18} />
+						</div>
 					</div>
-				</div>
+				) : (
+					<div className="absolute right-2 items-center hidden group-hover:flex">
+						<div
+							className="bg-theme-background p-1 rounded-sm hover:bg-blue-500"
+							onClick={(e) => onEdit(e, item)}
+						>
+							<SquarePen size={18} />
+						</div>
+						<div
+							className="bg-theme-background p-1 ml-2 rounded-sm hover:bg-red-500"
+							onClick={(e) => onDelete(e, item)}
+						>
+							<Trash2 size={18} />
+						</div>
+					</div>
+				)}
 			</div>
 		);
 	},
@@ -72,11 +204,15 @@ const SessionList: React.FC<IProps> = ({ open, onOpenChange }) => {
 	const [streamingSessionId, setStreamingSessionId] = useState<string>('');
 	const [confirmOpen, setConfirmOpen] = useState(false);
 	const [deleteItem, setDeleteItem] = useState<Session | null>(null);
+	const [editItem, setEditItem] = useState<Session | null>(null);
 
 	const parser = useMemo(() => new MarkdownParser(), []);
 
 	useEffect(() => {
 		if (open) getSessions();
+		return () => {
+			setEditItem(null);
+		};
 	}, [open]);
 
 	const getSessions = useCallback(async () => {
@@ -131,6 +267,17 @@ const SessionList: React.FC<IProps> = ({ open, onOpenChange }) => {
 		[chatStore, streamingSessionId, navigate],
 	);
 
+	const onEdit = useCallback(
+		(e: React.MouseEvent<HTMLDivElement>, item: Session) => {
+			e.stopPropagation();
+			setEditItem({
+				...item,
+				title: item.title || item?.messages?.[0]?.content,
+			});
+		},
+		[],
+	);
+
 	const onDelete = useCallback(
 		(e: React.MouseEvent<HTMLDivElement>, item: Session) => {
 			e.stopPropagation();
@@ -145,20 +292,26 @@ const SessionList: React.FC<IProps> = ({ open, onOpenChange }) => {
 			<SessionItem
 				key={item.id}
 				item={item}
+				editItem={editItem}
+				setEditItem={setEditItem}
 				isActive={chatStore.activeSessionId === item.id}
 				isLoading={chatStore.loadingSessions.has(item.id)}
 				onSelect={onSelectSession}
 				onDelete={onDelete}
+				onEdit={onEdit}
 				parser={parser}
 			/>
 		));
 	}, [
 		chatStore.sessionData.list,
 		chatStore.activeSessionId,
-		chatStore.loadingSessions,
+		// 这里需要展开，否则监听不到 loadingSessions 的变化，isLoading 的值不会动态更新从而触发重新渲染
+		[...chatStore.loadingSessions],
 		onSelectSession,
 		onDelete,
 		parser,
+		editItem,
+		setEditItem,
 	]);
 
 	return (
