@@ -22,8 +22,15 @@ const Layout = () => {
 
 	useEffect(() => {
 		const handleMouseMove = (e: MouseEvent) => {
-			const x = (e.clientX / window.innerWidth) * 100;
-			const y = (e.clientY / window.innerHeight) * 100;
+			const container = document.querySelector(
+				'[data-gradient-container]',
+			) as HTMLElement;
+			if (!container) return;
+
+			const rect = container.getBoundingClientRect();
+			const x = ((e.clientX - rect.left) / rect.width) * 100;
+			const y = ((e.clientY - rect.top) / rect.height) * 100;
+
 			setMousePosition({ x, y });
 		};
 
@@ -43,6 +50,7 @@ const Layout = () => {
 					>
 						<div className="relative h-full w-full rounded-md bg-theme-secondary">
 							<div
+								data-gradient-container
 								className="absolute rounded-md inset-0 overflow-hidden pointer-events-none"
 								style={{
 									background: `
