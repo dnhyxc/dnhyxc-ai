@@ -1,0 +1,36 @@
+{
+	"compilerOptions": {
+		"target": "ES2020",
+		"useDefineForClassFields": true,
+		"lib": ["ES2020", "DOM", "DOM.Iterable"],
+		"module": "ESNext",
+		"skipLibCheck": true,
+
+		/* Bundler mode */
+		"moduleResolution": "bundler",
+		"allowImportingTsExtensions": true,
+		"resolveJsonModule": true,
+		"isolatedModules": true,
+		"noEmit": true,
+		"jsx": "react-jsx",
+		/* 处理无法识别参数中间件问题 */
+		"experimentalDecorators": true,
+		/* 处理无法识别参数中间件问题 */
+		"emitDecoratorMetadata": true,
+
+		/* Linting */
+		"strict": true,
+		"noUnusedLocals": true,
+		"noUnusedParameters": true,
+		"noFallthroughCasesInSwitch": true,
+		"composite": true,
+		"baseUrl": ".",
+		"paths": {
+			"@/*": ["./src/*"],
+			"@ui/*": ["./src/components/ui/*"],
+			"@design/*": ["./src/components/design/*"]
+		}
+	},
+	// 这里不能包含 './server/**/*'，否则打包前台项目时，会去查找 server 文件目录，导致打包报错
+	"references": [{ "path": "./tsconfig.node.json" }]
+}
