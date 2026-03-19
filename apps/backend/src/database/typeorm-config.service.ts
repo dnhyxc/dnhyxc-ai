@@ -7,6 +7,13 @@ import { typeOrmConfig } from '../../ormconfig';
 import { ConfigEnum } from '../enum/config.enum';
 
 export class TypeOrmConfigService implements TypeOrmOptionsFactory {
+	/**
+	 * TypeORM 配置服务
+	 *
+	 * 使用 @Inject(REQUEST) 在每次请求时动态获取数据库配置
+	 *
+	 * 注意：这会导致此服务变成 request-scoped
+	 */
 	constructor(
 		@Inject(REQUEST) private readonly request: Request,
 		private configService: ConfigService,

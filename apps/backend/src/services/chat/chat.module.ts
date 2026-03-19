@@ -2,6 +2,7 @@ import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { QueueEventsListener } from '../../utils/queue-events-listener';
 import { OcrService } from '../ocr/ocr.service';
 import { Attachments } from './attachments.entity';
 import { ChatController } from './chat.controller';
@@ -20,7 +21,14 @@ import { ChatSessions } from './session.entity';
 		TypeOrmModule.forFeature([ChatMessages, ChatSessions, Attachments]),
 	],
 	controllers: [ChatController],
-	providers: [ChatService, MessageService, ChatMessageProcessor, OcrService],
+	// QueueEventsListener 是一个 BullMQ 独立的队列事件监听器，可以在任何地方使用
+	providers: [
+		ChatService,
+		MessageService,
+		ChatMessageProcessor,
+		OcrService,
+		QueueEventsListener,
+	],
 	exports: [MessageService],
 })
 export class ChatModule {}

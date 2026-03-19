@@ -21,7 +21,7 @@ import { CaslAbilityService } from './casl-ability.service';
 				secret: configService.get(ConfigEnum.SECRET),
 				signOptions: {
 					// 设置全局过期时间
-					expiresIn: '1d',
+					expiresIn: '7d',
 				},
 			}),
 			inject: [ConfigService],
