@@ -59,6 +59,47 @@ export class MessageService {
 		});
 	}
 
+	async findMessages(dto: { chatSessionId: string; messageIds?: string[] }) {
+		if (!dto.messageIds || dto.messageIds.length === 0) {
+			// 如果没有指定 message_ids，返回空的 messages
+			const chatSession = await this.chatSessionsRepository.findOne({
+				where: { id: dto.chatSessionId },
+				relations: ['messages'],
+				order: {
+					messages: {
+						createdAt: 'ASC',
+					},
+				},
+			});
+
+			if (!chatSession) {
+				throw new NotFoundException('会话不存在');
+			}
+
+			return chatSession;
+		}
+
+		const chatSession = await this.chatSessionsRepository
+			.createQueryBuilder('chatSession')
+			.leftJoinAndSelect(
+				'chatSession.messages',
+				'message',
+				'message.id IN (:...messageIds)',
+				{ messageIds: dto.messageIds },
+			)
+			.where('chatSession.id = :chatSessionId', {
+				chatSessionId: dto.chatSessionId,
+			})
+			.orderBy('message.createdAt', 'ASC')
+			.getOne();
+
+		if (!chatSession) {
+			throw new NotFoundException('会话不存在');
+		}
+
+		return chatSession;
+	}
+
 	async createSession(dto: CreateSessionDto) {
 		const sessionId = dto.sessionId || randomUUID();
 		let session = await this.findOneSession(sessionId);
