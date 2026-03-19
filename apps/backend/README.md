@@ -777,6 +777,16 @@ root     21505 10337  0 20:53 pts/0    00:00:00 grep --color=auto redis
 redis-cli -p 12029
 ```
 
+### Redis 操作 - 清空数据
+
+```bash
+# 在 Redis 客户端中执行清空所有数据
+FLUSHDB
+
+# 在 Redis 终端中执行清空所有数据
+redis-cli FLUSHDB
+```
+
 ## Redis 实现验证码校验
 
 [deepseek](https://chat.deepseek.com/a/chat/s/024b9e19-7c4c-4b20-8689-8babb2a6d894)

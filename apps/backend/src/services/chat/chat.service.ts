@@ -7,7 +7,7 @@ import {
 import { ChatOpenAI } from '@langchain/openai';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Cache } from '@nestjs/cache-manager';
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable, Scope } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { Queue } from 'bullmq';
 import { catchError, Observable, Subject } from 'rxjs';
@@ -21,7 +21,8 @@ import { ChatRequestDto } from './dto/chat-request.dto';
 import { ZhipuStreamData } from './dto/zhipu-stream-data.dto';
 import { MessageService } from './message.service';
 
-@Injectable()
+// Scope.REQUEST: 声明作用域，否则 queue-events.listener 中的队列监听器会被忽略，不生效
+@Injectable({ scope: Scope.REQUEST })
 export class ChatService {
 	private readonly conversationMemory: Map<
 		string,
@@ -455,7 +456,8 @@ Stick strictly to what is visually present.`,
 					if (!cancel$.isStopped) {
 						// 保存完整的 AI 回复到队列（使用前端传递的数据）
 						if (dto.assistantMessage) {
-							await this.messageQueue
+							// 不 await mq 消息保存，直接先返回流，防止前端一直在 loading 消息保存，流才结束
+							this.messageQueue
 								.add('save-message', {
 									sessionId,
 									role: MessageRole.ASSISTANT,
@@ -475,7 +477,7 @@ Stick strictly to what is visually present.`,
 								});
 						} else {
 							// 如果没有传递 assistantMessage，使用默认逻辑
-							await this.messageQueue
+							this.messageQueue
 								.add('save-message', {
 									sessionId,
 									role: MessageRole.ASSISTANT,
@@ -499,7 +501,7 @@ Stick strictly to what is visually present.`,
 						if (fullContent.length > 0) {
 							// 1. 保存消息到 Message 表 (入队)
 							if (dto.assistantMessage) {
-								await this.messageQueue
+								this.messageQueue
 									.add('save-message', {
 										sessionId,
 										role: MessageRole.ASSISTANT,
@@ -518,7 +520,7 @@ Stick strictly to what is visually present.`,
 										);
 									});
 							} else {
-								await this.messageQueue
+								this.messageQueue
 									.add('save-message', {
 										sessionId,
 										role: MessageRole.ASSISTANT,
@@ -549,7 +551,7 @@ Stick strictly to what is visually present.`,
 					) {
 						// 即使出错，如果是取消导致的，也保存已有内容
 						try {
-							await this.messageQueue.add('save-message', {
+							this.messageQueue.add('save-message', {
 								sessionId,
 								role: MessageRole.ASSISTANT,
 								content: fullContent,

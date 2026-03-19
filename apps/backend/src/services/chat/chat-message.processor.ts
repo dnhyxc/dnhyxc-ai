@@ -6,8 +6,6 @@ import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { MessageRole } from './chat.entity';
 import { MessageService } from './message.service';
 
-// ==================== 类型定义 ====================
-
 interface SaveMessageJobData {
 	sessionId: string;
 	role: MessageRole;
@@ -26,16 +24,6 @@ interface JobResult {
 	error?: string;
 	attemptsMade: number;
 }
-
-// ==================== 重试配置 ====================
-
-// const RETRY_CONFIG = {
-// 	MAX_ATTEMPTS: 3,
-// 	BACKOFF_DELAY: 2000,
-// 	BACKOFF_TYPE: 'exponential' as const,
-// } as const;
-
-// ==================== 可重试错误码 ====================
 
 const RETRYABLE_ERROR_CODES = new Set([
 	'ECONNREFUSED',
@@ -196,85 +184,4 @@ export class ChatMessageProcessor extends WorkerHost {
 			message.includes(pattern.toLowerCase()),
 		);
 	}
-
-	// ==================== 事件监听 ====================
-
-	// @OnWorkerEvent('active')
-	// onActive(job: Job<SaveMessageJobData>): void {
-	// 	this.logger.log?.(
-	// 		`[ChatMessageProcessor] Job ${job.id} started processing`,
-	// 		{ jobId: job.id, sessionId: job.data.sessionId },
-	// 	);
-	// }
-
-	// @OnWorkerEvent('completed')
-	// onCompleted(job: Job<SaveMessageJobData, JobResult>): void {
-	// 	this.logger.log?.(
-	// 		`[ChatMessageProcessor] Job ${job.id} completed | Attempts: ${job.returnvalue?.attemptsMade || 1}`,
-	// 		{
-	// 			jobId: job.id,
-	// 			sessionId: job.data.sessionId,
-	// 			messageId: job.returnvalue?.messageId,
-	// 			attemptsMade: job.returnvalue?.attemptsMade || 1,
-	// 			timestamp: new Date().toISOString(),
-	// 		},
-	// 	);
-	// }
-
-	// @OnWorkerEvent('failed')
-	// onFailed(job: Job<SaveMessageJobData>, error: Error): void {
-	// 	const maxAttempts = job.opts.attempts || RETRY_CONFIG.MAX_ATTEMPTS;
-	// 	const isFinalAttempt = job.attemptsMade >= maxAttempts;
-
-	// 	if (isFinalAttempt) {
-	// 		this.logger.error?.(
-	// 			`[ChatMessageProcessor] Job ${job.id} FAILED permanently after ${job.attemptsMade} attempts`,
-	// 			{
-	// 				jobId: job.id,
-	// 				sessionId: job.data.sessionId,
-	// 				attemptsMade: job.attemptsMade,
-	// 				error: {
-	// 					name: error.name,
-	// 					message: error.message,
-	// 					stack: error.stack,
-	// 				},
-	// 				timestamp: new Date().toISOString(),
-	// 			},
-	// 		);
-	// 	} else {
-	// 		this.logger.warn?.(
-	// 			`[ChatMessageProcessor] Job ${job.id} failed, will retry | Attempt: ${job.attemptsMade}/${maxAttempts}`,
-	// 			{
-	// 				jobId: job.id,
-	// 				sessionId: job.data.sessionId,
-	// 				attemptsMade: job.attemptsMade,
-	// 				error: error.message,
-	// 				timestamp: new Date().toISOString(),
-	// 			},
-	// 		);
-	// 	}
-	// }
-
-	// @OnWorkerEvent('error')
-	// onError(error: Error): void {
-	// 	this.logger.error?.(
-	// 		`[ChatMessageProcessor] Worker error: ${error.message}`,
-	// 		{
-	// 			error: {
-	// 				name: error.name,
-	// 				message: error.message,
-	// 				stack: error.stack,
-	// 			},
-	// 			timestamp: new Date().toISOString(),
-	// 		},
-	// 	);
-	// }
-
-	// @OnWorkerEvent('stalled')
-	// onStalled(jobId: string): void {
-	// 	this.logger.warn?.(`[ChatMessageProcessor] Job ${jobId} stalled`, {
-	// 		jobId,
-	// 		timestamp: new Date().toISOString(),
-	// 	});
-	// }
 }
