@@ -64,7 +64,7 @@ export class MessageService {
 			// 如果没有指定 message_ids，返回空的 messages
 			const chatSession = await this.chatSessionsRepository.findOne({
 				where: { id: dto.chatSessionId },
-				relations: ['messages'],
+				relations: ['messages', 'messages.attachments'],
 				order: {
 					messages: {
 						createdAt: 'ASC',
@@ -87,6 +87,7 @@ export class MessageService {
 				'message.chatId IN (:...messageIds)',
 				{ messageIds: dto.messageIds },
 			)
+			.leftJoinAndSelect('message.attachments', 'attachment')
 			.where('chatSession.id = :chatSessionId', {
 				chatSessionId: dto.chatSessionId,
 			})
@@ -214,7 +215,7 @@ export class MessageService {
 
 	findSession(dto: MessageDto) {
 		return this.findOneSession(dto.sessionId, {
-			relations: ['messages'],
+			relations: ['messages', 'messages.attachments'],
 			order: {
 				createdAt: 'DESC',
 				// 这里注意一定要按顺序排序，否则前端如果没有排序会导致分支渲染出错
@@ -246,7 +247,7 @@ export class MessageService {
 			//     userId: dto.userId,
 			//   },
 			// },
-			relations: ['session', 'attachments'],
+			relations: ['session', 'messages.attachments'],
 			take,
 			skip,
 			order: {

@@ -1,9 +1,9 @@
 import ChatEntry from '@design/ChatEntry';
 import { Button, Checkbox, Label } from '@ui/index';
-import { History } from 'lucide-react';
+import { History, Waypoints } from 'lucide-react';
 import { observer } from 'mobx-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Outlet, useNavigate } from 'react-router';
+import { Outlet, useNavigate, useParams } from 'react-router';
 import { v4 as uuidv4 } from 'uuid';
 import { useChatCoreContext } from '@/contexts';
 import { useChatCore } from '@/hooks/useChatCore';
@@ -31,6 +31,8 @@ const ChatContent = observer(() => {
 	} = useChatCore();
 
 	const navigate = useNavigate();
+	const params = useParams();
+
 	const {
 		isSharing,
 		setIsSharing,
@@ -118,9 +120,15 @@ const ChatContent = observer(() => {
 		clearAllCheckedMessages();
 	};
 
+	const onShare = () => {
+		setIsSharing(true);
+		const displayMessages = getDisplayMessages();
+		setAllCheckedMessages(displayMessages);
+	};
+
 	return (
 		<div className="flex flex-col w-full h-full overflow-hidden">
-			<div className="absolute top-4 left-28 z-50">
+			<div className="absolute top-4 left-28 z-50 flex items-center gap-3">
 				{open ? (
 					<History size={20} className="cursor-pointer text-cyan-500" />
 				) : (
@@ -128,6 +136,13 @@ const ChatContent = observer(() => {
 						size={20}
 						className="cursor-pointer hover:text-blue-500"
 						onClick={() => setOpen(true)}
+					/>
+				)}
+				{params?.id && !chatStore.isCurrentSessionLoading && !isSharing && (
+					<Waypoints
+						size={20}
+						className="cursor-pointer hover:text-blue-500"
+						onClick={onShare}
 					/>
 				)}
 			</div>
