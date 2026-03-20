@@ -190,7 +190,7 @@ const ChatAnchorNav = ({
 		<div className="group absolute right-[max(calc((100%-48rem)/2-2.2rem),0rem)] top-1/2 -translate-y-1/2 z-20">
 			<div className="relative flex flex-col items-center">
 				{/* 上翻按钮 */}
-				<div className="opacity-0 group-hover:opacity-100 mb-2">
+				<div className="opacity-0 group-hover:opacity-100 mb-0.5">
 					<Button
 						className="w-6 h-6 rounded-full bg-theme/10 hover:bg-theme/20 text-textcolor/60 hover:text-textcolor"
 						onClick={handlePrev}
@@ -205,7 +205,7 @@ const ChatAnchorNav = ({
 					<ScrollArea className="flex-1 overflow-hidden w-full">
 						<div
 							ref={anchorListRef}
-							className="flex flex-col items-center px-3 overflow-y-auto"
+							className="flex flex-col items-center px-3 py-1 overflow-y-auto"
 						>
 							{userMessages.map((msg) => {
 								return (
@@ -222,7 +222,7 @@ const ChatAnchorNav = ({
 												'w-2 h-2 my-[5px] cursor-pointer rounded-full',
 												'hover:scale-145 active:scale-145 transition-all duration-300',
 												activeAnchor === msg.chatId
-													? 'bg-blue-500 scale-145 shadow-[0_0_8px_rgba(59,130,246,0.6)]'
+													? 'bg-blue-500 scale-145 shadow-[0_0_5px_rgba(59,130,246,0.6)]'
 													: 'bg-theme/20 hover:bg-blue-500',
 											)}
 											onClick={() => scrollToMessage(msg.chatId)}
@@ -234,7 +234,7 @@ const ChatAnchorNav = ({
 					</ScrollArea>
 				</div>
 				{/* 下翻按钮 */}
-				<div className="opacity-0 group-hover:opacity-100 mt-2">
+				<div className="opacity-0 group-hover:opacity-100 mt-0.5">
 					<Button
 						className="w-6 h-6 rounded-full bg-theme/10 hover:bg-theme/20 text-textcolor/60 hover:text-textcolor"
 						onClick={handleNext}
