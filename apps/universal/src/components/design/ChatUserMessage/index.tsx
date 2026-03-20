@@ -4,16 +4,16 @@ import { Message } from '@/types/chat';
 
 interface UserMessageProps {
 	message: Message;
-	editMessage: Message | null;
-	editInputRef: React.RefObject<HTMLTextAreaElement | null>;
-	input: string;
-	setInput: (value: string) => void;
-	setEditMessage: (message: Message | null) => void;
-	isLoading: boolean;
-	handleEditChange: (
+	editMessage?: Message | null;
+	editInputRef?: React.RefObject<HTMLTextAreaElement | null>;
+	input?: string;
+	setInput?: (value: string) => void;
+	setEditMessage?: (message: Message | null) => void;
+	isLoading?: boolean;
+	handleEditChange?: (
 		e: React.ChangeEvent<HTMLTextAreaElement> | string,
 	) => void;
-	sendMessage: (
+	sendMessage?: (
 		content?: string,
 		index?: number,
 		isEdit?: boolean,

@@ -7,7 +7,7 @@ interface AssistantMessageProps {
 	message: Message;
 	isShowThinkContent: boolean;
 	onToggleThinkContent: () => void;
-	onContinue: () => void;
+	onContinue?: () => void;
 }
 
 const ChatAssistantMessage = ({
@@ -47,7 +47,6 @@ const ChatAssistantMessage = ({
 			{/* 主要内容区域 */}
 			<MarkdownPreview
 				value={message.content || (message?.thinkContent ? '' : '思考中...')}
-				theme="dark"
 				className="h-auto p-0"
 				background="transparent"
 				padding="0"

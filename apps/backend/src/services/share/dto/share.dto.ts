@@ -103,7 +103,7 @@ export class GetShareResponseDto {
 	title: string;
 
 	@ApiProperty({ description: '消息列表', type: [MessageDto] })
-	session: ChatSessions;
+	session?: ChatSessions;
 
 	@ApiProperty({ description: '创建时间（时间戳）' })
 	createdAt: number;

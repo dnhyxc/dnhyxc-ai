@@ -7,7 +7,8 @@
 import { randomUUID } from 'node:crypto';
 import { Cache } from '@nestjs/cache-manager';
 import {
-	GoneException,
+	HttpException,
+	HttpStatus,
 	Injectable,
 	Logger,
 	NotFoundException,
@@ -100,13 +101,13 @@ export class ShareService {
 		const cacheData = await this.cache.get<ShareCacheData>(key);
 
 		if (!cacheData) {
-			throw new NotFoundException('分享不存在或已过期');
+			throw new HttpException('分享不存在或已过期', HttpStatus.BAD_REQUEST);
 		}
 
 		// 检查过期
 		if (cacheData.expiresAt && Date.now() > cacheData.expiresAt) {
 			await this.cache.del(key);
-			throw new GoneException('分享已过期');
+			throw new HttpException('分享不存在或已过期', HttpStatus.BAD_REQUEST);
 		}
 
 		// 查询数据库获取消息
@@ -117,8 +118,8 @@ export class ShareService {
 
 		return {
 			shareId: cacheData.shareId,
+			...session,
 			title: session.title || this.generateTitle(session.messages),
-			session,
 			createdAt: cacheData.createdAt,
 			expiresAt: cacheData.expiresAt,
 		};

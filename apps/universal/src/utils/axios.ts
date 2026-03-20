@@ -25,9 +25,6 @@ instance.interceptors.request.use(
 // 响应拦截器
 instance.interceptors.response.use(
 	function (response) {
-		if (response.status.toString().startsWith('2')) {
-			return response.data;
-		}
 		return response;
 	},
 	// 超出 2xx 范围内的状态码都会触发该函数。

@@ -84,7 +84,7 @@ export class MessageService {
 			.leftJoinAndSelect(
 				'chatSession.messages',
 				'message',
-				'message.id IN (:...messageIds)',
+				'message.chatId IN (:...messageIds)',
 				{ messageIds: dto.messageIds },
 			)
 			.where('chatSession.id = :chatSessionId', {

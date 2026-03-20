@@ -20,17 +20,17 @@ interface MessageActionsProps {
 	/** 消息总数 */
 	messagesLength: number;
 	/** 当前已复制成功的消息ID */
-	isCopyedId: string;
+	isCopyedId?: string;
 	/** 当前会话是否正在加载 */
-	isLoading: boolean;
+	isLoading?: boolean;
 	/** 分支切换回调 */
-	onBranchChange: (msgId: string, direction: 'prev' | 'next') => void;
+	onBranchChange?: (msgId: string, direction: 'prev' | 'next') => void;
 	/** 复制回调 */
 	onCopy: (content: string, chatId: string) => void;
 	/** 编辑回调 */
-	onEdit: (message: Message) => void;
+	onEdit?: (message: Message) => void;
 	/** 重新生成回调 */
-	onReGenerate: (index: number) => void;
+	onReGenerate?: (index: number) => void;
 }
 
 /**
@@ -101,7 +101,7 @@ export const MessageActions = ({
 						)}
 						onClick={() => {
 							if (canPrev) {
-								onBranchChange(message.chatId, 'prev');
+								onBranchChange?.(message.chatId, 'prev');
 							}
 						}}
 					/>
@@ -121,7 +121,7 @@ export const MessageActions = ({
 						)}
 						onClick={() => {
 							if (canNext) {
-								onBranchChange(message.chatId, 'next');
+								onBranchChange?.(message.chatId, 'next');
 							}
 						}}
 					/>
@@ -129,7 +129,7 @@ export const MessageActions = ({
 			)}
 
 			{/* 操作按钮区域（复制、编辑、重新生成） */}
-			{message.content && (
+			{message.content && onCopy && (
 				<div
 					className={`gap-3 text-textcolor/70 ${
 						message.role === 'user' ? '-mr-2' : '-ml-2'
@@ -151,16 +151,16 @@ export const MessageActions = ({
 					</div>
 
 					{/* 编辑按钮 - 仅用户消息显示 */}
-					{message.role === 'user' && (
+					{message.role === 'user' && onEdit && (
 						<div className="cursor-pointer hover:text-textcolor mt-0.5">
-							<PencilLine size={16} onClick={() => onEdit(message)} />
+							<PencilLine size={16} onClick={() => onEdit?.(message)} />
 						</div>
 					)}
 
 					{/* 重新生成按钮 - 仅助手消息显示 */}
-					{message.role !== 'user' && (
+					{message.role !== 'user' && onReGenerate && (
 						<div className="cursor-pointer hover:text-textcolor">
-							<RotateCw size={16} onClick={() => onReGenerate(index)} />
+							<RotateCw size={16} onClick={() => onReGenerate?.(index)} />
 						</div>
 					)}
 				</div>
