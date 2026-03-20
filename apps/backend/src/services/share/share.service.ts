@@ -107,7 +107,7 @@ export class ShareService {
 		// 检查过期
 		if (cacheData.expiresAt && Date.now() > cacheData.expiresAt) {
 			await this.cache.del(key);
-			throw new HttpException('分享不存在或已过期', HttpStatus.BAD_REQUEST);
+			throw new HttpException('分享已失效', HttpStatus.BAD_REQUEST);
 		}
 
 		// 查询数据库获取消息
@@ -117,8 +117,8 @@ export class ShareService {
 		});
 
 		return {
-			shareId: cacheData.shareId,
 			...session,
+			shareId: cacheData.shareId,
 			title: session.title || this.generateTitle(session.messages),
 			createdAt: cacheData.createdAt,
 			expiresAt: cacheData.expiresAt,

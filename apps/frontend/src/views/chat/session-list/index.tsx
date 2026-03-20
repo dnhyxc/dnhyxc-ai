@@ -203,7 +203,6 @@ const SessionList: React.FC<IProps> = ({ open, onOpenChange }) => {
 
 	const navigate = useNavigate();
 
-	const [streamingSessionId, setStreamingSessionId] = useState<string>('');
 	const [confirmOpen, setConfirmOpen] = useState(false);
 	const [deleteItem, setDeleteItem] = useState<Session | null>(null);
 	const [editItem, setEditItem] = useState<Session | null>(null);
@@ -252,24 +251,14 @@ const SessionList: React.FC<IProps> = ({ open, onOpenChange }) => {
 	const onSelectSession = useCallback(
 		(e: React.MouseEvent<HTMLDivElement>, session: Session) => {
 			e.stopPropagation();
-
 			// 选择历史会话时，关闭分享
 			setIsSharing(false);
-
 			chatStore.setActiveSessionId(session.id);
-
-			const hasStreamingMessage = session.messages?.some((m) => m.isStreaming);
-			if (hasStreamingMessage || session.id === streamingSessionId) {
-				setStreamingSessionId(session.id);
-			} else {
-				setStreamingSessionId('');
-			}
-
 			chatStore.setAllMessages(session.messages || [], session.id, false);
 			onOpenChange(false);
 			navigate(`/chat/c/${session.id}`);
 		},
-		[chatStore, streamingSessionId, navigate],
+		[chatStore, navigate],
 	);
 
 	const onEdit = useCallback(

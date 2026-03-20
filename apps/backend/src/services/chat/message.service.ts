@@ -217,6 +217,10 @@ export class MessageService {
 			relations: ['messages'],
 			order: {
 				createdAt: 'DESC',
+				// 这里注意一定要按顺序排序，否则前端如果没有排序会导致分支渲染出错
+				messages: {
+					createdAt: 'ASC',
+				},
 			},
 		});
 	}

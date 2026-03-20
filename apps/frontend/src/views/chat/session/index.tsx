@@ -1,5 +1,5 @@
 import ChatBot from '@design/ChatBot';
-import { useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
 import { useParams } from 'react-router';
 import { getSession } from '@/service';
 import useStore from '@/store';
@@ -20,13 +20,16 @@ const Session = () => {
 		}
 	}, [params.id, chatStore.messages, chatStore.sessionData.total]);
 
-	const getSessionInfo = async (id: string) => {
-		const res = await getSession(id);
-		if (res.success && res.data.messages.length) {
-			chatStore.setAllMessages(res.data.messages, id, false);
-			chatStore.setActiveSessionId(id);
-		}
-	};
+	const getSessionInfo = useCallback(
+		async (id: string) => {
+			const res = await getSession(id);
+			if (res.success && res.data.messages.length) {
+				chatStore.setAllMessages(res.data.messages, id, false);
+				chatStore.setActiveSessionId(id);
+			}
+		},
+		[chatStore],
+	);
 
 	return (
 		<div className="flex-1 w-full overflow-hidden">
