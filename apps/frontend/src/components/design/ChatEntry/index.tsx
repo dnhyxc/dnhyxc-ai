@@ -4,6 +4,7 @@ import Upload from '@design/Upload';
 import { Button } from '@ui/index';
 import { CirclePlus, Link, Rocket, StopCircle } from 'lucide-react';
 import { CHAT_VALIDTYPES } from '@/constant';
+import { cn } from '@/lib/utils';
 import { FileWithPreview, UploadedFile } from '@/types';
 import { Message } from '@/types/chat';
 
@@ -29,6 +30,7 @@ interface ChatEntryProps {
 	stopGenerating?: () => void;
 	chatInputRef?: React.RefObject<HTMLTextAreaElement | null>; // 新增
 	children?: React.ReactNode;
+	className?: string;
 }
 
 const ChatEntry: React.FC<ChatEntryProps> = ({
@@ -46,9 +48,10 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 	stopGenerating,
 	chatInputRef,
 	children,
+	className,
 }) => {
 	return (
-		<div className="relative p-5.5 pt-0 backdrop-blur-sm">
+		<div className={cn('relative p-5.5 pt-0 backdrop-blur-sm', className)}>
 			<div className="max-w-3xl mx-auto flex">
 				<div className="flex-1 relative">
 					{children}

@@ -6,7 +6,6 @@ import useStore from '@/store';
 
 const Session = () => {
 	const params = useParams();
-
 	const { chatStore } = useStore();
 
 	useEffect(() => {

@@ -39,9 +39,6 @@ interface ChatCoreContextValue {
 	isSharing: React.RefObject<boolean>;
 	checkedMessages: React.RefObject<Map<string, string>>;
 	setCheckedMessage: (message: Message) => void;
-	setAllCheckedMessages: (messages: Message[]) => void;
-	clearAllCheckedMessages: () => void;
-	isAllChecked: (messages: Message[]) => boolean;
 
 	// 操作方法注册
 	actionsRef: React.RefObject<ChatBotActions | null>;
@@ -94,35 +91,6 @@ export const ChatCoreProvider = ({ children }: { children: ReactNode }) => {
 		}
 	};
 
-	// 批量设置选中消息（全选）
-	const setAllCheckedMessages = (messages: Message[]) => {
-		messages.forEach((message) => {
-			const { chatId } = message;
-			checkedMessages.current.set(chatId, chatId);
-		});
-	};
-
-	// 清除所有选中消息（取消全选）
-	const clearAllCheckedMessages = () => {
-		checkedMessages.current.clear();
-	};
-
-	// 检查是否已全选
-	const isAllChecked = (messages: Message[]): boolean => {
-		if (!messages.length) return false;
-		// 获取messages中所有的chatId
-		const messageChatIds = messages.map((msg) => msg.chatId);
-		// 找出Map中所有不在messages中的chatId
-		const missingChatIds = messageChatIds.filter(
-			(chatId) =>
-				!Array.from(checkedMessages.current.values()).includes(chatId),
-		);
-		if (missingChatIds.length > 0) {
-			return false;
-		}
-		return true;
-	};
-
 	const registerActions = (actions: ChatBotActions) => {
 		actionsRef.current = actions;
 	};
@@ -145,9 +113,6 @@ export const ChatCoreProvider = ({ children }: { children: ReactNode }) => {
 				isSharing,
 				checkedMessages,
 				setCheckedMessage,
-				setAllCheckedMessages,
-				clearAllCheckedMessages,
-				isAllChecked,
 			}}
 		>
 			{children}

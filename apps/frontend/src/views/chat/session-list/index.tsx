@@ -16,6 +16,7 @@ import {
 } from 'react';
 import { useNavigate } from 'react-router';
 import Confirm from '@/components/design/Confirm';
+import { useChatCoreContext } from '@/contexts';
 import { useChatCore } from '@/hooks/useChatCore';
 import { deleteSession, getSessionList, updateSession } from '@/service';
 import useStore from '@/store';
@@ -198,6 +199,7 @@ const SessionItem = memo<SessionItemProps>(
 const SessionList: React.FC<IProps> = ({ open, onOpenChange }) => {
 	const { chatStore } = useStore();
 	const { clearChat, stopGenerating } = useChatCore();
+	const { isSharing } = useChatCoreContext();
 
 	const navigate = useNavigate();
 
@@ -250,6 +252,9 @@ const SessionList: React.FC<IProps> = ({ open, onOpenChange }) => {
 	const onSelectSession = useCallback(
 		(e: React.MouseEvent<HTMLDivElement>, session: Session) => {
 			e.stopPropagation();
+
+			// 选择历史会话时，关闭分享
+			isSharing.current = false;
 
 			chatStore.setActiveSessionId(session.id);
 

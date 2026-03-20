@@ -43,6 +43,7 @@ interface UseChatCoreReturn {
 		isUnmount?: boolean,
 	) => Promise<void>;
 	onContinue: () => Promise<void>;
+	getDisplayMessages: () => Message[];
 
 	// 内部方法
 	handleEditChange: (
@@ -114,7 +115,7 @@ export const useChatCore = (
 			chatStore.messages,
 			selectedChildMap,
 		);
-		return getFormatMessages(sortedMessages);
+		return sortedMessages;
 	}, [chatStore, getSelectedChildMap, buildMessageList, getFormatMessages]);
 
 	// 更新 Store 消息
@@ -858,6 +859,7 @@ export const useChatCore = (
 		clearChat,
 		stopGenerating,
 		onContinue,
+		getDisplayMessages,
 		handleEditChange,
 	};
 };

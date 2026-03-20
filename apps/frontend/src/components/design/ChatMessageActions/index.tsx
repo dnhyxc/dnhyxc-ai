@@ -1,3 +1,4 @@
+import { Checkbox } from '@ui/index';
 import {
 	CheckCircle,
 	ChevronLeft,
@@ -5,6 +6,7 @@ import {
 	Copy,
 	PencilLine,
 	RotateCw,
+	Share2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Message } from '@/types/chat';
@@ -31,6 +33,11 @@ interface MessageActionsProps {
 	onEdit: (message: Message) => void;
 	/** 重新生成回调 */
 	onReGenerate: (index: number) => void;
+	onShare?: (message: Message) => void;
+	isSharing?: boolean;
+	checkedMessages?: Map<string, string>;
+	setCheckedMessage?: (message: Message) => void;
+	deleteCheckedMessage?: (message: Message) => void;
 }
 
 /**
@@ -55,6 +62,10 @@ export const MessageActions = ({
 	onCopy,
 	onEdit,
 	onReGenerate,
+	onShare,
+	isSharing,
+	checkedMessages,
+	setCheckedMessage,
 }: MessageActionsProps) => {
 	// 是否有多个兄弟节点（分支）
 	const hasSiblings = (message.siblingCount || 0) > 1;
@@ -76,14 +87,35 @@ export const MessageActions = ({
 		return `hidden ${isLoading ? 'group-hover:hidden' : 'group-hover:flex'}`;
 	};
 
+	const onCheckedMessage = (message: Message) => {
+		setCheckedMessage?.(message);
+	};
+
 	return (
 		<div
 			className={`absolute bottom-2 right-2 h-5 w-fit flex items-center ${
 				message.role === 'user' ? 'justify-end' : 'left-2'
 			}`}
 		>
+			{isSharing && (
+				<div
+					className={`${
+						message.role === 'user'
+							? 'order-last ml-5 -mr-2'
+							: 'order-first mr-5 -ml-2'
+					} mt-0.5`}
+				>
+					<Checkbox
+						id={message.chatId}
+						className="cursor-pointer border-textcolor/60"
+						checked={checkedMessages?.has(message.chatId)}
+						onCheckedChange={() => onCheckedMessage(message)}
+					/>
+				</div>
+			)}
+
 			{/* 分支切换按钮区域 */}
-			{hasSiblings && (
+			{hasSiblings && !isSharing && (
 				<div
 					className={`${
 						message.role === 'user'
@@ -129,7 +161,7 @@ export const MessageActions = ({
 			)}
 
 			{/* 操作按钮区域（复制、编辑、重新生成） */}
-			{message.content && (
+			{message.content && !isSharing && (
 				<div
 					className={`gap-3 text-textcolor/70 ${
 						message.role === 'user' ? '-mr-2' : '-ml-2'
@@ -151,16 +183,25 @@ export const MessageActions = ({
 					</div>
 
 					{/* 编辑按钮 - 仅用户消息显示 */}
-					{message.role === 'user' && (
+					{message.role === 'user' && !isSharing && (
 						<div className="cursor-pointer hover:text-textcolor mt-0.5">
 							<PencilLine size={16} onClick={() => onEdit(message)} />
 						</div>
 					)}
 
 					{/* 重新生成按钮 - 仅助手消息显示 */}
-					{message.role !== 'user' && (
+					{message.role !== 'user' && !isSharing && (
 						<div className="cursor-pointer hover:text-textcolor">
 							<RotateCw size={16} onClick={() => onReGenerate(index)} />
+						</div>
+					)}
+
+					{message.role !== 'user' && !isSharing && (
+						<div
+							className="cursor-pointer hover:text-textcolor"
+							title="分享此回答"
+						>
+							<Share2 size={16} onClick={() => onShare?.(message)} />
 						</div>
 					)}
 				</div>

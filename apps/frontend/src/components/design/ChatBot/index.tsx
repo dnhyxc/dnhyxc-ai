@@ -19,6 +19,7 @@ import {
 	useRef,
 	useState,
 } from 'react';
+import { useParams } from 'react-router';
 import { useChatCoreContext } from '@/contexts';
 import { useBranchManage } from '@/hooks/useBranchManage';
 import { useChatCore } from '@/hooks/useChatCore';
@@ -53,6 +54,7 @@ const ChatBot = observer(
 		} = props;
 
 		const { chatStore } = useStore();
+		const params = useParams();
 
 		// 使用 useChatCore hook（共享状态）
 		const {
@@ -120,7 +122,8 @@ const ChatBot = observer(
 		const { findSiblings, buildMessageList, getFormatMessages } =
 			useMessageTools();
 
-		const { onScrollToRef } = useChatCoreContext();
+		const { onScrollToRef, isSharing, setCheckedMessage, checkedMessages } =
+			useChatCoreContext();
 
 		// 将滚动方法设置到 Context
 		useEffect(() => {
@@ -340,6 +343,16 @@ const ChatBot = observer(
 			return scrollHeight - scrollTop - clientHeight < 5;
 		}, [scrollTop]);
 
+		const onShare = useCallback(
+			(message: Message) => {
+				isSharing.current = true;
+				const messageIds = [message.parentId, message.chatId];
+				const sessionId = params?.id;
+				console.log(messageIds, 'messageIds', sessionId);
+			},
+			[params?.id],
+		);
+
 		useImperativeHandle(
 			ref,
 			() => ({
@@ -392,7 +405,6 @@ const ChatBot = observer(
 												)}
 											</div>
 										) : null}
-
 										<div
 											className={cn(
 												'relative flex-1 flex flex-col gap-1 pb-10 w-full group',
@@ -435,7 +447,6 @@ const ChatBot = observer(
 													/>
 												)}
 											</div>
-
 											<ChatMessageActions
 												message={message}
 												index={index}
@@ -446,6 +457,10 @@ const ChatBot = observer(
 												onCopy={onCopy}
 												onEdit={onEdit}
 												onReGenerate={onReGenerate}
+												onShare={onShare}
+												isSharing={isSharing.current}
+												checkedMessages={checkedMessages.current}
+												setCheckedMessage={setCheckedMessage}
 											/>
 										</div>
 									</div>

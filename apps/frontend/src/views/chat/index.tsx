@@ -1,9 +1,11 @@
+import ChatEntry from '@design/ChatEntry';
+import { Button, Checkbox, Label } from '@ui/index';
 import { History } from 'lucide-react';
 import { observer } from 'mobx-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Outlet, useNavigate } from 'react-router';
 import { v4 as uuidv4 } from 'uuid';
-import ChatEntry from '@/components/design/ChatEntry';
+import { useChatCoreContext } from '@/contexts';
 import { useChatCore } from '@/hooks/useChatCore';
 import { uploadFiles } from '@/service';
 import useStore from '@/store';
@@ -24,9 +26,16 @@ const ChatContent = observer(() => {
 		handleEditChange,
 		clearChat,
 		stopGenerating,
+		getDisplayMessages,
 	} = useChatCore();
 
 	const navigate = useNavigate();
+	const {
+		isSharing,
+		setAllCheckedMessages,
+		clearAllCheckedMessages,
+		isAllChecked,
+	} = useChatCoreContext();
 
 	const [open, setOpen] = useState(false);
 
@@ -41,6 +50,7 @@ const ChatContent = observer(() => {
 
 	useEffect(() => {
 		return () => {
+			isSharing.current = false;
 			if (focusTimerRef.current) {
 				clearTimeout(focusTimerRef.current);
 			}
@@ -71,7 +81,26 @@ const ChatContent = observer(() => {
 
 	const toNewChat = () => {
 		clearChat();
+		isSharing.current = false;
 		navigate('/chat');
+	};
+
+	const onCancelShare = () => {
+		isSharing.current = false;
+		clearAllCheckedMessages();
+	};
+
+	const onCheckedChange = () => {
+		// 获取当前显示的消息列表（根据分支选择过滤后的）
+		const displayMessages = getDisplayMessages();
+		// 检查是否已全选
+		if (isAllChecked(displayMessages)) {
+			// 已全选，则取消全选
+			clearAllCheckedMessages();
+		} else {
+			// 未全选，则全选当前显示的消息
+			setAllCheckedMessages(displayMessages);
+		}
 	};
 
 	return (
@@ -90,21 +119,58 @@ const ChatContent = observer(() => {
 
 			<Outlet />
 
-			<ChatEntry
-				chatInputRef={chatInputRef}
-				input={input}
-				setInput={setInput}
-				uploadedFiles={uploadedFiles}
-				setUploadedFiles={setUploadedFiles}
-				loading={chatStore.isCurrentSessionLoading}
-				editMessage={editMessage}
-				setEditMessage={setEditMessage}
-				handleEditChange={handleEditChange}
-				sendMessage={sendMessage}
-				onUploadFile={onUploadFile}
-				clearChat={toNewChat}
-				stopGenerating={stopGenerating}
-			/>
+			{isSharing.current ? (
+				<div className="w-full flex justify-between items-center max-w-3xl mx-auto mb-5">
+					<div className="flex-1 flex items-center gap-3 text-textcolor/80">
+						<div className="flex items-center">
+							<Checkbox
+								id="terms"
+								checked={isAllChecked(getDisplayMessages())}
+								onCheckedChange={onCheckedChange}
+								className="cursor-pointer border-textcolor/60"
+							/>
+							<Label htmlFor="terms" className="cursor-pointer ml-2 text-md">
+								全选
+							</Label>
+						</div>
+						<div className="border-l border-textcolor/50 h-3" />
+						<div>已选择 0 组对话</div>
+					</div>
+					<div className="flex items-center gap-3">
+						<Button
+							variant="outline"
+							size="sm"
+							className="border-textcolor/30 pt-0.5"
+							onClick={onCancelShare}
+						>
+							取消
+						</Button>
+						<Button
+							variant="outline"
+							size="sm"
+							className="border-textcolor/30 pt-0.5 bg-transparent hover:bg-transparent bg-linear-to-r from-blue-500/80 to-cyan-500/80"
+						>
+							创建分享链接
+						</Button>
+					</div>
+				</div>
+			) : (
+				<ChatEntry
+					chatInputRef={chatInputRef}
+					input={input}
+					setInput={setInput}
+					uploadedFiles={uploadedFiles}
+					setUploadedFiles={setUploadedFiles}
+					loading={chatStore.isCurrentSessionLoading}
+					editMessage={editMessage}
+					setEditMessage={setEditMessage}
+					handleEditChange={handleEditChange}
+					sendMessage={sendMessage}
+					onUploadFile={onUploadFile}
+					clearChat={toNewChat}
+					stopGenerating={stopGenerating}
+				/>
+			)}
 
 			<SessionList open={open} onOpenChange={setOpen} />
 		</div>
