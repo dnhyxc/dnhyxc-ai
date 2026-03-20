@@ -77,15 +77,8 @@ export const MessageActions = ({
 	const canNext = (message.siblingIndex || 0) < (message.siblingCount || 0) - 1;
 
 	// 是否是最后一条消息
-	const isLastMessage = index === messagesLength - 1;
-
-	// 是否显示操作按钮（非最后一条消息时 hover 显示，最后一条消息始终显示）
-	const getActionsVisibilityClass = () => {
-		if (isLastMessage) {
-			return isLoading ? 'hidden' : 'flex items-center';
-		}
-		return `hidden ${isLoading ? 'group-hover:hidden' : 'group-hover:flex'}`;
-	};
+	const isLastMessage =
+		index === messagesLength - 1 || index === messagesLength - 2;
 
 	const onCheckShare = (message: Message) => {
 		setCheckedMessage?.(message);
@@ -170,7 +163,7 @@ export const MessageActions = ({
 				<div
 					className={`gap-3 text-textcolor/70 ${
 						message.role === 'user' ? '-mr-2' : '-ml-2'
-					} ${getActionsVisibilityClass()}`}
+					} ${isLastMessage ? 'flex items-center' : 'hidden group-hover:flex'}`}
 				>
 					{/* 复制按钮 */}
 					<div className="cursor-pointer flex items-center justify-center">
@@ -188,20 +181,20 @@ export const MessageActions = ({
 					</div>
 
 					{/* 编辑按钮 - 仅用户消息显示 */}
-					{message.role === 'user' && !isSharing && (
+					{message.role === 'user' && !isLoading && !isSharing && (
 						<div className="cursor-pointer hover:text-textcolor mt-0.5">
 							<PencilLine size={16} onClick={() => onEdit(message)} />
 						</div>
 					)}
 
 					{/* 重新生成按钮 - 仅助手消息显示 */}
-					{message.role !== 'user' && !isSharing && (
+					{message.role !== 'user' && !isLoading && !isSharing && (
 						<div className="cursor-pointer hover:text-textcolor">
 							<RotateCw size={16} onClick={() => onReGenerate(index)} />
 						</div>
 					)}
 
-					{message.role !== 'user' && !isSharing && (
+					{message.role !== 'user' && !isLoading && !isSharing && (
 						<div
 							className="cursor-pointer hover:text-textcolor"
 							title="分享此回答"

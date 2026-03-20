@@ -1,5 +1,4 @@
 import ChatTextArea from '@design/ChatTextArea';
-import { Label } from '@ui/index';
 import { UploadedFile } from '@/types';
 import { Message } from '@/types/chat';
 
@@ -50,14 +49,12 @@ const ChatUserMessage = ({
 					sendMessage={sendMessage}
 				/>
 			) : (
-				<Label htmlFor={message.chatId}>
-					<div
-						className="prose prose-invert max-w-none"
-						dangerouslySetInnerHTML={{
-							__html: message.content,
-						}}
-					/>
-				</Label>
+				<div
+					className="prose prose-invert max-w-none"
+					dangerouslySetInnerHTML={{
+						__html: message.content,
+					}}
+				/>
 			)}
 		</>
 	);

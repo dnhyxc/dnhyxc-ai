@@ -5,7 +5,7 @@ import ChatFileList from '@design/ChatFileList';
 import ChatMessageActions from '@design/ChatMessageActions';
 import ChatNewSession from '@design/ChatNewSession';
 import ChatUserMessage from '@design/ChatUserMessage';
-import { ScrollArea } from '@ui/index';
+import { Label, ScrollArea } from '@ui/index';
 import { Bot, User } from 'lucide-react';
 import * as mobx from 'mobx';
 import { observer } from 'mobx-react';
@@ -337,9 +337,10 @@ const ChatBot = observer(
 						: isEdit
 							? 'w-full bg-theme/5 border-theme-white/10'
 							: 'w-auto',
+					isSharing ? 'cursor-pointer' : '',
 				);
 			},
-			[showAvatar, editMessage?.chatId],
+			[showAvatar, editMessage?.chatId, isSharing],
 		);
 
 		const isAtBottom = useMemo(() => {
@@ -424,7 +425,10 @@ const ChatBot = observer(
 															: null}
 													</div>
 												)}
-											<div className={getMessageClassName(message)}>
+											<Label
+												className={getMessageClassName(message)}
+												htmlFor={message.chatId}
+											>
 												{message.role === 'user' ? (
 													<ChatUserMessage
 														message={message}
@@ -445,7 +449,7 @@ const ChatBot = observer(
 														onContinue={onContinue}
 													/>
 												)}
-											</div>
+											</Label>
 											<ChatMessageActions
 												message={message}
 												index={index}
