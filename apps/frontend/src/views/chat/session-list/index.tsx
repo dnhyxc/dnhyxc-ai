@@ -199,7 +199,7 @@ const SessionItem = memo<SessionItemProps>(
 const SessionList: React.FC<IProps> = ({ open, onOpenChange }) => {
 	const { chatStore } = useStore();
 	const { clearChat, stopGenerating } = useChatCore();
-	const { setIsSharing } = useChatCoreContext();
+	const { setIsSharing, clearAllCheckedMessages } = useChatCoreContext();
 
 	const navigate = useNavigate();
 
@@ -253,6 +253,8 @@ const SessionList: React.FC<IProps> = ({ open, onOpenChange }) => {
 			e.stopPropagation();
 			// 选择历史会话时，关闭分享
 			setIsSharing(false);
+			// 选择历史会话时要清空消息选中状态
+			clearAllCheckedMessages();
 			chatStore.setActiveSessionId(session.id);
 			chatStore.setAllMessages(session.messages || [], session.id, false);
 			onOpenChange(false);

@@ -338,9 +338,10 @@ const ChatBot = observer(
 							? 'w-full bg-theme/5 border-theme-white/10'
 							: 'w-auto',
 					isSharing ? 'cursor-pointer' : '',
+					checkedMessages.has(message.chatId) ? 'bg-theme-background/5' : '',
 				);
 			},
-			[showAvatar, editMessage?.chatId, isSharing],
+			[showAvatar, editMessage?.chatId, isSharing, checkedMessages],
 		);
 
 		const isAtBottom = useMemo(() => {
