@@ -20,7 +20,7 @@ const ChatNewSession = observer(function ChatBot(props) {
 		>
 			<ScrollArea
 				ref={scrollContainerRef}
-				className="flex-1 overflow-hidden w-full backdrop-blur-sm pb-5"
+				className="flex-1 overflow-hidden w-full backdrop-blur-sm"
 			>
 				<div className="max-w-3xl m-auto overflow-y-auto">
 					<div className="space-y-6 overflow-hidden">
