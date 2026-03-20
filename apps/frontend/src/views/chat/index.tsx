@@ -3,7 +3,7 @@ import { Button, Checkbox, Label } from '@ui/index';
 import { History } from 'lucide-react';
 import { observer } from 'mobx-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Outlet, useNavigate } from 'react-router';
+import { Outlet, useNavigate, useParams } from 'react-router';
 import { v4 as uuidv4 } from 'uuid';
 import { useChatCoreContext } from '@/contexts';
 import { useChatCore } from '@/hooks/useChatCore';
@@ -15,6 +15,7 @@ import SessionList from './session-list';
 // Chat 主组件
 const ChatContent = observer(() => {
 	const { chatStore } = useStore();
+	const params = useParams();
 	const {
 		input,
 		setInput,
@@ -32,6 +33,8 @@ const ChatContent = observer(() => {
 	const navigate = useNavigate();
 	const {
 		isSharing,
+		setIsSharing,
+		checkedMessages,
 		setAllCheckedMessages,
 		clearAllCheckedMessages,
 		isAllChecked,
@@ -50,7 +53,7 @@ const ChatContent = observer(() => {
 
 	useEffect(() => {
 		return () => {
-			isSharing.current = false;
+			setIsSharing(false);
 			if (focusTimerRef.current) {
 				clearTimeout(focusTimerRef.current);
 			}
@@ -81,12 +84,12 @@ const ChatContent = observer(() => {
 
 	const toNewChat = () => {
 		clearChat();
-		isSharing.current = false;
+		setIsSharing(false);
 		navigate('/chat');
 	};
 
 	const onCancelShare = () => {
-		isSharing.current = false;
+		setIsSharing(false);
 		clearAllCheckedMessages();
 	};
 
@@ -102,6 +105,11 @@ const ChatContent = observer(() => {
 			setAllCheckedMessages(displayMessages);
 		}
 	};
+
+	const onCreateShare = useCallback(() => {
+		const chatSessionId = params?.id;
+		console.log(chatSessionId, [...checkedMessages]);
+	}, [params?.id, checkedMessages]);
 
 	return (
 		<div className="flex flex-col w-full h-full overflow-hidden">
@@ -119,7 +127,7 @@ const ChatContent = observer(() => {
 
 			<Outlet />
 
-			{isSharing.current ? (
+			{isSharing ? (
 				<div className="w-full flex justify-between items-center max-w-3xl mx-auto mb-5">
 					<div className="flex-1 flex items-center gap-3 text-textcolor/80">
 						<div className="flex items-center">
@@ -149,6 +157,7 @@ const ChatContent = observer(() => {
 							variant="outline"
 							size="sm"
 							className="border-textcolor/30 pt-0.5 bg-transparent hover:bg-transparent bg-linear-to-r from-blue-500/80 to-cyan-500/80"
+							onClick={onCreateShare}
 						>
 							创建分享链接
 						</Button>

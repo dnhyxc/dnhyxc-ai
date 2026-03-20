@@ -1,4 +1,4 @@
-import { createContext, ReactNode, useContext, useRef } from 'react';
+import { createContext, ReactNode, useContext, useRef, useState } from 'react';
 import { UploadedFile } from '@/types';
 import { Message } from '@/types/chat';
 
@@ -36,8 +36,9 @@ interface ChatCoreContextValue {
 	onScrollToRef: React.RefObject<
 		((position: string, behavior?: 'smooth' | 'auto') => void) | null
 	>;
-	isSharing: React.RefObject<boolean>;
-	checkedMessages: React.RefObject<Map<string, string>>;
+	isSharing: boolean;
+	setIsSharing: React.Dispatch<React.SetStateAction<boolean>>;
+	checkedMessages: Set<string>;
 	setCheckedMessage: (message: Message) => void;
 	setAllCheckedMessages: (messages: Message[]) => void;
 	clearAllCheckedMessages: () => void;
@@ -65,19 +66,26 @@ export const ChatCoreProvider = ({ children }: { children: ReactNode }) => {
 	const actionsRef = useRef<ChatBotActions | null>(null);
 
 	// 是否开启分享
-	const isSharing = useRef<boolean>(false);
+	const [isSharing, setIsSharing] = useState<boolean>(false);
 
 	// 选中的消息
-	const checkedMessages = useRef<Map<string, string>>(new Map());
+	const [checkedMessages, setCheckedMessages] = useState<Set<string>>(
+		new Set(),
+	);
 
 	const onCheckedMessage = (id1: string, id2: string) => {
-		if (checkedMessages.current.has(id1) || checkedMessages.current.has(id2)) {
-			checkedMessages.current.delete(id1);
-			checkedMessages.current.delete(id2);
-		} else {
-			checkedMessages.current.set(id1, id1);
-			checkedMessages.current.set(id2, id2);
-		}
+		setCheckedMessages((prev) => {
+			// 创建新 Set（不可变更新）
+			const newSet = new Set(prev);
+			if (newSet.has(id1) || newSet.has(id2)) {
+				newSet.delete(id1);
+				newSet.delete(id2);
+			} else {
+				newSet.add(id1);
+				newSet.add(id2);
+			}
+			return newSet;
+		});
 	};
 
 	const setCheckedMessage = (message: Message) => {
@@ -89,38 +97,31 @@ export const ChatCoreProvider = ({ children }: { children: ReactNode }) => {
 			if (!message?.childrenIds?.length) return;
 			onCheckedMessage(
 				chatId,
-				message.childrenIds?.[message.childrenIds.length - 1],
+				message.childrenIds[message.childrenIds.length - 1],
 			);
 		}
 	};
 
 	// 批量设置选中消息（全选）
 	const setAllCheckedMessages = (messages: Message[]) => {
-		messages.forEach((message) => {
-			const { chatId } = message;
-			checkedMessages.current.set(chatId, chatId);
+		setCheckedMessages((prev) => {
+			const newSet = new Set(prev);
+			messages.forEach((message) => {
+				newSet.add(message.chatId);
+			});
+			return newSet;
 		});
 	};
 
 	// 清除所有选中消息（取消全选）
 	const clearAllCheckedMessages = () => {
-		checkedMessages.current.clear();
+		setCheckedMessages(new Set());
 	};
 
 	// 检查是否已全选
 	const isAllChecked = (messages: Message[]): boolean => {
 		if (!messages.length) return false;
-		// 获取messages中所有的chatId
-		const messageChatIds = messages.map((msg) => msg.chatId);
-		// 找出Map中所有不在messages中的chatId
-		const missingChatIds = messageChatIds.filter(
-			(chatId) =>
-				!Array.from(checkedMessages.current.values()).includes(chatId),
-		);
-		if (missingChatIds.length > 0) {
-			return false;
-		}
-		return true;
+		return messages.every((msg) => checkedMessages.has(msg.chatId));
 	};
 
 	const registerActions = (actions: ChatBotActions) => {
@@ -143,6 +144,7 @@ export const ChatCoreProvider = ({ children }: { children: ReactNode }) => {
 				registerActions,
 				unregisterActions,
 				isSharing,
+				setIsSharing,
 				checkedMessages,
 				setCheckedMessage,
 				setAllCheckedMessages,

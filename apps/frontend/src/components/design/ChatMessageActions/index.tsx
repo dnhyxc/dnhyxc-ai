@@ -35,7 +35,7 @@ interface MessageActionsProps {
 	onReGenerate: (index: number) => void;
 	onShare?: (message: Message) => void;
 	isSharing?: boolean;
-	checkedMessages?: Map<string, string>;
+	checkedMessages?: Set<string>;
 	setCheckedMessage?: (message: Message) => void;
 	deleteCheckedMessage?: (message: Message) => void;
 }

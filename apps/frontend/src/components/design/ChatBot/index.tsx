@@ -122,8 +122,13 @@ const ChatBot = observer(
 		const { findSiblings, buildMessageList, getFormatMessages } =
 			useMessageTools();
 
-		const { onScrollToRef, isSharing, setCheckedMessage, checkedMessages } =
-			useChatCoreContext();
+		const {
+			onScrollToRef,
+			isSharing,
+			setIsSharing,
+			setCheckedMessage,
+			checkedMessages,
+		} = useChatCoreContext();
 
 		// 将滚动方法设置到 Context
 		useEffect(() => {
@@ -343,15 +348,9 @@ const ChatBot = observer(
 			return scrollHeight - scrollTop - clientHeight < 5;
 		}, [scrollTop]);
 
-		const onShare = useCallback(
-			(message: Message) => {
-				isSharing.current = true;
-				const messageIds = [message.parentId, message.chatId];
-				const sessionId = params?.id;
-				console.log(messageIds, 'messageIds', sessionId);
-			},
-			[params?.id],
-		);
+		const onShare = useCallback(() => {
+			setIsSharing(true);
+		}, [params?.id]);
 
 		useImperativeHandle(
 			ref,
@@ -458,8 +457,8 @@ const ChatBot = observer(
 												onEdit={onEdit}
 												onReGenerate={onReGenerate}
 												onShare={onShare}
-												isSharing={isSharing.current}
-												checkedMessages={checkedMessages.current}
+												isSharing={isSharing}
+												checkedMessages={checkedMessages}
 												setCheckedMessage={setCheckedMessage}
 											/>
 										</div>
