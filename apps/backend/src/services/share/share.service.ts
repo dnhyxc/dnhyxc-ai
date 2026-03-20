@@ -57,10 +57,7 @@ export class ShareService {
 	 * 创建分享
 	 * 只存储参数到 Redis，不查询数据库
 	 */
-	async createShare(
-		dto: CreateShareDto,
-		baseUrl?: string,
-	): Promise<CreateShareResponseDto> {
+	async createShare(dto: CreateShareDto): Promise<CreateShareResponseDto> {
 		const shareId = randomUUID().replace(/-/g, '');
 		const now = Date.now();
 		const expiresAt = now + DEFAULT_EXPIRES_IN;
@@ -68,8 +65,8 @@ export class ShareService {
 		// 存储到 Redis
 		const cacheData: ShareCacheData = {
 			shareId,
-			chatSessionId: dto.chat_session_id,
-			messageIds: dto.message_ids,
+			chatSessionId: dto.chatSessionId,
+			messageIds: dto.messageIds,
 			createdAt: now,
 			expiresAt,
 		};
@@ -81,12 +78,14 @@ export class ShareService {
 		);
 
 		this.logger.log(
-			`创建分享: ${shareId}, 会话: ${dto.chat_session_id}, 消息: ${dto.message_ids.length}条`,
+			`创建分享: ${shareId}, 会话: ${dto.chatSessionId}, 消息: ${dto?.messageIds?.length} 条`,
 		);
 
 		return {
 			shareId,
-			shareUrl: baseUrl ? `${baseUrl}/s/${shareId}` : `/s/${shareId}`,
+			shareUrl: dto.baseUrl
+				? `${dto.baseUrl}/share/${shareId}`
+				: `/share/${shareId}`,
 			createdAt: now,
 			expiresAt,
 		};

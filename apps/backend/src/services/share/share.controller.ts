@@ -11,10 +11,8 @@ import {
 	HttpStatus,
 	Param,
 	Post,
-	Req,
 } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { type Request } from 'express';
 import {
 	CreateShareDto,
 	CreateShareResponseDto,
@@ -42,21 +40,15 @@ export class ShareController {
 		type: CreateShareResponseDto,
 	})
 	@ApiResponse({ status: HttpStatus.BAD_REQUEST, description: '参数错误' })
-	async create(
-		@Body() dto: CreateShareDto,
-		@Req() req: Request,
-	): Promise<CreateShareResponseDto> {
-		const protocol = req.protocol;
-		const host = req.get('host');
-		const baseUrl = `${protocol}://${host}`;
-		return this.shareService.createShare(dto, baseUrl);
+	async create(@Body() dto: CreateShareDto): Promise<CreateShareResponseDto> {
+		return this.shareService.createShare(dto);
 	}
 
 	/**
 	 * 获取分享
-	 * GET /api/share/:shareId
+	 * GET /api/share/get/:shareId
 	 */
-	@Get(':shareId')
+	@Get('/get/:shareId')
 	@ApiOperation({
 		summary: '获取分享',
 		description: '获取分享内容，从Redis获取参数后查询数据库',
@@ -79,9 +71,9 @@ export class ShareController {
 
 	/**
 	 * 检查分享是否存在
-	 * GET /api/share/:shareId/exists
+	 * GET /api/share/check/:shareId/exists
 	 */
-	@Get(':shareId/exists')
+	@Get('/check/:shareId/exists')
 	@ApiOperation({ summary: '检查分享是否存在' })
 	@ApiParam({ name: 'shareId', description: '分享ID' })
 	@ApiResponse({ status: HttpStatus.OK, description: '返回是否存在' })
@@ -93,9 +85,9 @@ export class ShareController {
 
 	/**
 	 * 删除分享
-	 * DELETE /api/share/:shareId
+	 * DELETE /api/share/delete/:shareId
 	 */
-	@Delete(':shareId')
+	@Delete('/delete/:shareId')
 	@HttpCode(HttpStatus.NO_CONTENT)
 	@ApiOperation({ summary: '删除分享' })
 	@ApiParam({ name: 'shareId', description: '分享ID' })

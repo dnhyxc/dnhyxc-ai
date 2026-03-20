@@ -56,22 +56,6 @@ const ChatBot = observer(
 		const { chatStore } = useStore();
 		const params = useParams();
 
-		// 使用 useChatCore hook（共享状态）
-		const {
-			input,
-			setInput,
-			setUploadedFiles,
-			editMessage,
-			setEditMessage,
-			sendMessage,
-			clearChat,
-			stopGenerating,
-			handleEditChange,
-			onContinue,
-		} = useChatCore({
-			apiEndpoint,
-		});
-
 		// 消息状态
 		const [allMessages, setAllMessages] = useState<Message[]>(
 			chatStore.messages,
@@ -129,6 +113,22 @@ const ChatBot = observer(
 			setCheckedMessage,
 			checkedMessages,
 		} = useChatCoreContext();
+
+		// 使用 useChatCore hook（共享状态）
+		const {
+			input,
+			setInput,
+			setUploadedFiles,
+			editMessage,
+			setEditMessage,
+			sendMessage,
+			clearChat,
+			stopGenerating,
+			handleEditChange,
+			onContinue,
+		} = useChatCore({
+			apiEndpoint,
+		});
 
 		// 将滚动方法设置到 Context
 		useEffect(() => {

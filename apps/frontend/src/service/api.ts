@@ -69,3 +69,9 @@ export const GET_SESSION_LIST = '/chat/getSessionList';
 
 // 更新会话
 export const UPDATE_SESSION = '/chat/updateSession';
+
+// 创建 Chat 分享
+export const CREATE_SHARE = '/share/create';
+
+// 获取 Chat 分享
+export const GET_SHARE = '/share/get';

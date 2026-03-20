@@ -16,7 +16,7 @@ export default defineConfig(async () => ({
 		include: ['monaco-editor'],
 	},
 	server: {
-		port: 9126,
+		port: 9226,
 		strictPort: true,
 		proxy: {
 			'/api': {

@@ -27,7 +27,7 @@ const routes: RouteConfig[] = [
 				},
 			},
 			{
-				path: '/share',
+				path: '/share/:shareId',
 				Component: Share,
 				meta: {
 					title: '会话分享',

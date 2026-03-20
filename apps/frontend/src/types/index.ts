@@ -57,3 +57,10 @@ export interface UploadedFile {
 	path: string;
 	size: number;
 }
+
+export interface ShareInfo {
+	createdAt: number;
+	expiresAt: number;
+	shareId: string;
+	shareUrl: string;
+}

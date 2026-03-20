@@ -3,7 +3,7 @@ import { Button, Checkbox, Label } from '@ui/index';
 import { History } from 'lucide-react';
 import { observer } from 'mobx-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Outlet, useNavigate, useParams } from 'react-router';
+import { Outlet, useNavigate } from 'react-router';
 import { v4 as uuidv4 } from 'uuid';
 import { useChatCoreContext } from '@/contexts';
 import { useChatCore } from '@/hooks/useChatCore';
@@ -11,11 +11,11 @@ import { uploadFiles } from '@/service';
 import useStore from '@/store';
 import { FileWithPreview, UploadedFile } from '@/types';
 import SessionList from './session-list';
+import ShareChat from './share';
 
 // Chat 主组件
 const ChatContent = observer(() => {
 	const { chatStore } = useStore();
-	const params = useParams();
 	const {
 		input,
 		setInput,
@@ -41,6 +41,7 @@ const ChatContent = observer(() => {
 	} = useChatCoreContext();
 
 	const [open, setOpen] = useState(false);
+	const [shareModelVisible, setShareModelVisible] = useState(false);
 
 	const chatInputRef = useRef<HTMLTextAreaElement>(null);
 	const focusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -106,10 +107,16 @@ const ChatContent = observer(() => {
 		}
 	};
 
-	const onCreateShare = useCallback(() => {
-		const chatSessionId = params?.id;
-		console.log(chatSessionId, [...checkedMessages]);
-	}, [params?.id, checkedMessages]);
+	const onShowShareModel = () => {
+		setShareModelVisible(true);
+	};
+
+	// 关闭分享弹窗时清空分享状态及选中的对话
+	const onCloseShareModel = () => {
+		setShareModelVisible(false);
+		setIsSharing(false);
+		clearAllCheckedMessages();
+	};
 
 	return (
 		<div className="flex flex-col w-full h-full overflow-hidden">
@@ -142,7 +149,7 @@ const ChatContent = observer(() => {
 							</Label>
 						</div>
 						<div className="border-l border-textcolor/50 h-3" />
-						<div>已选择 0 组对话</div>
+						<div>已选择 {checkedMessages.size / 2} 组对话</div>
 					</div>
 					<div className="flex items-center gap-3">
 						<Button
@@ -156,8 +163,8 @@ const ChatContent = observer(() => {
 						<Button
 							variant="outline"
 							size="sm"
-							className="border-textcolor/30 pt-0.5 bg-transparent hover:bg-transparent bg-linear-to-r from-blue-500/80 to-cyan-500/80"
-							onClick={onCreateShare}
+							className="border-textcolor/30 pt-0.5 bg-transparent hover:bg-transparent bg-linear-to-r from-blue-500/80 to-cyan-500/80 hover:from-blue-500 hover:to-cyan-500"
+							onClick={onShowShareModel}
 						>
 							创建分享链接
 						</Button>
@@ -182,6 +189,12 @@ const ChatContent = observer(() => {
 			)}
 
 			<SessionList open={open} onOpenChange={setOpen} />
+
+			<ShareChat
+				open={shareModelVisible}
+				onOpenChange={onCloseShareModel}
+				checkedMessages={checkedMessages}
+			/>
 		</div>
 	);
 });

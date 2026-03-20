@@ -87,6 +87,11 @@ export const MessageActions = ({
 		return `hidden ${isLoading ? 'group-hover:hidden' : 'group-hover:flex'}`;
 	};
 
+	const onCheckShare = (message: Message) => {
+		setCheckedMessage?.(message);
+		onShare?.(message);
+	};
+
 	const onCheckedMessage = (message: Message) => {
 		setCheckedMessage?.(message);
 	};
@@ -201,7 +206,7 @@ export const MessageActions = ({
 							className="cursor-pointer hover:text-textcolor"
 							title="分享此回答"
 						>
-							<Share2 size={16} onClick={() => onShare?.(message)} />
+							<Share2 size={16} onClick={() => onCheckShare(message)} />
 						</div>
 					)}
 				</div>

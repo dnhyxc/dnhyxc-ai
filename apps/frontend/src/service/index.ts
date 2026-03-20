@@ -1,6 +1,8 @@
+import { ShareInfo } from '@/types';
 import { http } from '@/utils/fetch';
 import {
 	CREATE_SESSION,
+	CREATE_SHARE,
 	CREATE_VERIFY_CODE,
 	DELETE_FILE,
 	DELETE_SESSION,
@@ -257,5 +259,18 @@ export const updateSession = async (
 	return await http.post(UPDATE_SESSION, {
 		sessionId,
 		title,
+	});
+};
+
+// 创建会话分享
+export const createShare = async (params: {
+	chatSessionId: string;
+	messageIds?: string[] | undefined;
+	baseUrl?: string;
+}) => {
+	return await http.post<ShareInfo>(CREATE_SHARE, {
+		chatSessionId: params.chatSessionId,
+		messageIds: params.messageIds,
+		baseUrl: params.baseUrl,
 	});
 };

@@ -102,3 +102,11 @@ export const clipboard = async (event: KeyboardEvent) => {
 		}
 	}
 };
+
+export const copyToClipboard = async (text: string): Promise<void> => {
+	await writeText(text);
+};
+
+export const pasteFromClipboard = async (): Promise<string> => {
+	return readText();
+};
