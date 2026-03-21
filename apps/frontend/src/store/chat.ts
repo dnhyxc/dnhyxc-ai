@@ -594,14 +594,21 @@ class ChatStore {
 	) {
 		this.finishReasonMap.set(chatId, finishReason);
 
+		// const messageIndex = this.messages.findIndex((m) => m.chatId === chatId);
+		// if (messageIndex >= 0) {
+		// 	this.messages = [
+		// 		...this.messages.slice(0, messageIndex),
+		// 		{ ...this.messages[messageIndex], finishReason },
+		// 		...this.messages.slice(messageIndex + 1),
+		// 	];
+		// }
+
+		// 优化：直接找到消息对象并修改属性，避免数组展开
 		// 同时更新 Message 对象中的 finishReason 字段
-		const messageIndex = this.messages.findIndex((m) => m.chatId === chatId);
-		if (messageIndex >= 0) {
-			this.messages = [
-				...this.messages.slice(0, messageIndex),
-				{ ...this.messages[messageIndex], finishReason },
-				...this.messages.slice(messageIndex + 1),
-			];
+		const message = this.messages.find((m) => m.chatId === chatId);
+		if (message) {
+			// 直接修改属性，MobX 会追踪到这个变化
+			(message as any).finishReason = finishReason;
 		}
 	}
 
@@ -620,15 +627,20 @@ class ChatStore {
 		this.finishReasonMap.delete(chatId);
 
 		// 同时清空 Message 对象中的 finishReason 字段
-		const messageIndex = this.messages.findIndex((m) => m.chatId === chatId);
-		if (messageIndex >= 0) {
-			const { finishReason: _, ...rest } = this.messages[messageIndex] as any;
-			this.messages = [
-				...this.messages.slice(0, messageIndex),
-				rest as Message,
-				...this.messages.slice(messageIndex + 1),
-			];
+		// 优化：直接找到消息对象并删除属性
+		const message = this.messages.find((m) => m.chatId === chatId);
+		if (message?.finishReason) {
+			delete message.finishReason;
 		}
+		// const messageIndex = this.messages.findIndex((m) => m.chatId === chatId);
+		// if (messageIndex >= 0) {
+		// 	const { finishReason: _, ...rest } = this.messages[messageIndex] as any;
+		// 	this.messages = [
+		// 		...this.messages.slice(0, messageIndex),
+		// 		rest as Message,
+		// 		...this.messages.slice(messageIndex + 1),
+		// 	];
+		// }
 	}
 
 	/**
@@ -642,13 +654,19 @@ class ChatStore {
 		});
 
 		// 批量更新消息列表
-		this.messages = this.messages.map((msg) => {
-			if (branchPath.has(msg.chatId)) {
-				const { finishReason: _, ...rest } = msg as any;
-				return rest as Message;
+		// 优化：直接遍历修改属性，避免数组 map 操作
+		this.messages.forEach((msg) => {
+			if (branchPath.has(msg.chatId) && msg?.finishReason) {
+				delete msg.finishReason;
 			}
-			return msg;
 		});
+		// this.messages = this.messages.map((msg) => {
+		// 	if (branchPath.has(msg.chatId)) {
+		// 		const { finishReason: _, ...rest } = msg as any;
+		// 		return rest as Message;
+		// 	}
+		// 	return msg;
+		// });
 	}
 
 	/**

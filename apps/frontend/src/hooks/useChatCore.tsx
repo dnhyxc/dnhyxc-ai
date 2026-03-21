@@ -236,7 +236,7 @@ export const useChatCore = (
 				assistantMessage,
 				currentChatId,
 				role,
-				// max_tokens: 20,
+				// max_tokens: 100,
 			};
 
 			if (userMessage?.attachments?.length) {

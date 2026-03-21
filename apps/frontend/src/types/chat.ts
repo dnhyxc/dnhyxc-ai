@@ -56,6 +56,10 @@ export interface ChatRequestParams {
 	currentChatId?: string;
 	role?: 'user' | 'assistant' | 'system';
 	max_tokens?: number;
+	thinking?: 'enabled' | 'disabled';
+	temperature?: number;
+	stop?: boolean;
+	isContinuation?: boolean;
 }
 
 export interface ChatBotProps {
