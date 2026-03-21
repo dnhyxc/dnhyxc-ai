@@ -179,8 +179,7 @@ class ChatStore {
 	}
 
 	/**
-	 * 【优化】流式更新消息 - 高性能版本
-	 * 使用缓冲区和节流机制，减少不必要的渲染
+	 * 流式更新消息 - 使用缓冲区和节流机制，减少不必要的渲染
 	 */
 	appendStreamingContent(
 		chatId: string,

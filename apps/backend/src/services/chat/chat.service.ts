@@ -74,7 +74,8 @@ export class ChatService {
 				baseURL,
 			},
 			temperature: options?.temperature ?? 0.3,
-			maxTokens: options?.maxTokens ?? 4096,
+			// 没有传递 maxTokens 时不限制
+			...(options?.maxTokens !== undefined && { maxTokens: options.maxTokens }),
 			...(options?.abortSignal && {
 				callOptions: { signal: options.abortSignal },
 			}),
@@ -264,7 +265,7 @@ Stick strictly to what is visually present.`,
 
 		const llm = this.initModel({
 			temperature: dto.temperature,
-			maxTokens: dto.max_tokens,
+			maxTokens: dto.max_tokens || 20,
 			abortSignal: abortController.signal,
 		});
 
@@ -296,8 +297,10 @@ Stick strictly to what is visually present.`,
 				// 将 fullContent 提升到 try 外部，确保在 catch 或停止逻辑中可访问
 				let fullContent = '';
 				let wasCancelledDuringIteration = false;
-				// 【新增】用于追踪是否已收到第一个 Token
+				// 用于追踪是否已收到第一个 Token
 				let hasReceivedFirstToken = false;
+				// 【新增】用于追踪停止原因
+				let finishReason: 'stop' | 'length' | null = null;
 
 				try {
 					// 在开始任何耗时操作前检查是否已被停止
@@ -410,7 +413,7 @@ Stick strictly to what is visually present.`,
 
 							const content = chunk.content;
 							if (typeof content === 'string') {
-								// 【修改】收到第一个有效的 Token 时，将用户消息加入队列（延迟持久化）
+								// 收到第一个有效的 Token 时，将用户消息加入队列（延迟持久化）
 								if (!hasReceivedFirstToken && content.trim() !== '') {
 									hasReceivedFirstToken = true;
 
@@ -429,6 +432,16 @@ Stick strictly to what is visually present.`,
 
 								subscriber.next(content);
 								fullContent += content;
+							}
+
+							// 【新增】检查 finish_reason，判断是否因达到最大 token 而停止
+							// LangChain 的 chunk 可能在 response_metadata 中包含 finish_reason
+							const chunkFinishReason = chunk?.response_metadata?.finish_reason;
+							if (
+								chunkFinishReason === 'stop' ||
+								chunkFinishReason === 'length'
+							) {
+								finishReason = chunkFinishReason;
 							}
 						}
 					} catch (error) {
@@ -451,7 +464,7 @@ Stick strictly to what is visually present.`,
 						}
 					}
 
-					// 【核心修复】无论是否被取消，只要有内容，都尝试保存到数据库（入队）
+					// 无论是否被取消，只要有内容，都尝试保存到数据库（入队）
 					// 正常完成，cancel$.isStopped 为 false, 暂停时 cancel$.isStopped 为 true
 					if (!cancel$.isStopped) {
 						// 保存完整的 AI 回复到队列（使用前端传递的数据）
@@ -540,6 +553,18 @@ Stick strictly to what is visually present.`,
 									});
 							}
 						}
+					}
+
+					// 在流结束前发送停止原因给前端
+					// 如果 finishReason 为 'length'，表示因达到最大 token 限制而停止
+					// 如果 finishReason 为 'stop' 或 null，表示正常完成
+					if (!wasCancelledDuringIteration) {
+						subscriber.next({
+							type: 'finish',
+							reason: finishReason || 'stop',
+							// 如果是因 length 停止，标记为需要续写
+							maxTokensReached: finishReason === 'length',
+						});
 					}
 
 					subscriber.complete();

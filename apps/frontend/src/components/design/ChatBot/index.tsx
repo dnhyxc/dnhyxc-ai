@@ -76,6 +76,10 @@ const ChatBot = observer(
 		const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 		const focusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 		const scrollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+		// 新增的 refs
+		const resizeObserverRef = useRef<ResizeObserver | null>(null);
+		const lastScrollHeightRef = useRef<number>(0);
+		const mutationObserverRef = useRef<MutationObserver | null>(null);
 
 		const SCROLL_THRESHOLD = 5;
 
@@ -126,6 +130,7 @@ const ChatBot = observer(
 			stopGenerating,
 			handleEditChange,
 			onContinue,
+			onContinueAnswering,
 		} = useChatCore({
 			apiEndpoint,
 		});
@@ -170,6 +175,78 @@ const ChatBot = observer(
 			);
 			return () => dispose();
 		}, [chatStore]);
+
+		// 自动滚动 - 使用 ResizeObserver 监听内容高度变化
+		useEffect(() => {
+			const lastMessage = messages[messages.length - 1];
+			const isCurrentlyStreaming =
+				lastMessage?.role === 'assistant' && lastMessage?.isStreaming;
+
+			// 更新滚动条状态
+			const updateScrollbarState = () => {
+				if (scrollContainerRef.current) {
+					const { scrollHeight, clientHeight } = scrollContainerRef.current;
+					setHasScrollbar(scrollHeight > clientHeight);
+				}
+			};
+
+			// 滚动到底部的函数
+			const scrollToBottom = () => {
+				if (scrollContainerRef.current && autoScroll && isCurrentlyStreaming) {
+					const currentScrollHeight = scrollContainerRef.current.scrollHeight;
+					// 只有当高度确实变化时才滚动
+					if (currentScrollHeight !== lastScrollHeightRef.current) {
+						lastScrollHeightRef.current = currentScrollHeight;
+						scrollContainerRef.current.scrollTo({
+							top: currentScrollHeight + 100,
+							behavior: 'auto',
+						});
+					}
+				}
+			};
+
+			// 立即执行一次
+			updateScrollbarState();
+			scrollToBottom();
+
+			// 使用 ResizeObserver 监听内容区域高度变化
+			const contentWrapper =
+				scrollContainerRef.current?.querySelector('#message-content');
+			if (contentWrapper && isCurrentlyStreaming) {
+				resizeObserverRef.current = new ResizeObserver(() => {
+					updateScrollbarState();
+					scrollToBottom();
+				});
+				resizeObserverRef.current.observe(contentWrapper);
+			}
+
+			// 备用方案：使用 MutationObserver 监听 DOM 变化
+			const contentArea =
+				scrollContainerRef.current?.querySelector('#message-container');
+			if (contentArea && isCurrentlyStreaming) {
+				mutationObserverRef.current = new MutationObserver(() => {
+					updateScrollbarState();
+					scrollToBottom();
+				});
+				mutationObserverRef.current.observe(contentArea, {
+					childList: true,
+					subtree: true,
+					characterData: true,
+				});
+			}
+
+			// 清理函数
+			return () => {
+				if (resizeObserverRef.current) {
+					resizeObserverRef.current.disconnect();
+					resizeObserverRef.current = null;
+				}
+				if (mutationObserverRef.current) {
+					mutationObserverRef.current.disconnect();
+					mutationObserverRef.current = null;
+				}
+			};
+		}, [messages, autoScroll]);
 
 		// 切换会话时恢复状态
 		useEffect(() => {
@@ -220,21 +297,6 @@ const ChatBot = observer(
 			setMessages(formattedMessages);
 		}, [allMessages, selectedChildMap]);
 
-		// 自动滚动
-		useEffect(() => {
-			if (scrollContainerRef.current) {
-				const { scrollHeight, clientHeight } = scrollContainerRef.current;
-				setHasScrollbar(scrollHeight > clientHeight);
-			}
-			const lastMessage = messages[messages.length - 1];
-			const isCurrentlyStreaming =
-				lastMessage?.role === 'assistant' && lastMessage?.isStreaming;
-
-			if (autoScroll && isCurrentlyStreaming && scrollContainerRef.current) {
-				onScrollTo('down', 'auto');
-			}
-		}, [messages, autoScroll]);
-
 		// 清理
 		useEffect(() => {
 			return () => {
@@ -246,6 +308,12 @@ const ChatBot = observer(
 				}
 				if (focusTimerRef.current) {
 					clearTimeout(focusTimerRef.current);
+				}
+				if (resizeObserverRef.current) {
+					resizeObserverRef.current.disconnect();
+				}
+				if (mutationObserverRef.current) {
+					mutationObserverRef.current.disconnect();
 				}
 			};
 		}, []);
@@ -376,8 +444,11 @@ const ChatBot = observer(
 					className="flex-1 overflow-hidden w-full backdrop-blur-sm pb-5"
 					onScroll={handleScroll}
 				>
-					<div className="max-w-3xl m-auto overflow-y-auto">
-						<div className="space-y-6 overflow-hidden">
+					<div
+						id="message-container"
+						className="max-w-3xl m-auto overflow-y-auto"
+					>
+						<div id="message-content" className="space-y-6 overflow-hidden">
 							{!messages.length ? (
 								<ChatNewSession />
 							) : (
@@ -448,6 +519,7 @@ const ChatBot = observer(
 														isShowThinkContent={isShowThinkContent}
 														onToggleThinkContent={onToggleThinkContent}
 														onContinue={onContinue}
+														onContinueAnswering={onContinueAnswering}
 													/>
 												)}
 											</Label>

@@ -55,8 +55,11 @@ const ChatCoreContext = createContext<ChatCoreContextValue | null>(null);
 export const ChatCoreProvider = ({ children }: { children: ReactNode }) => {
 	// 共享的 Refs - 所有使用 useChatCore 的组件共享这些状态
 	const stopRequestMapRef = useRef<Map<string, () => void>>(new Map());
+	// 存储每个会话的请求快照，用于停止对应的请求
 	const requestSnapshotMapRef = useRef<Map<string, RequestSnapshot>>(new Map());
+	// 记录每个会话是否已收到流式数据，用于没有收到流式数据立即停止时，控制是否会滚消息内容
 	const hasReceivedStreamDataMapRef = useRef<Map<string, boolean>>(new Map());
+	// 当前会话的助手消息ID，用户消息回滚
 	const currentAssistantMessageMapRef = useRef<Map<string, string>>(new Map());
 	const onScrollToRef = useRef<
 		((position: string, behavior?: 'smooth' | 'auto') => void) | null

@@ -75,3 +75,10 @@ export interface InsertNewlineParams {
 	isEdit?: boolean;
 	textareaNode?: HTMLTextAreaElement;
 }
+
+export interface FinishInfo {
+	type: 'finish';
+	reason: 'length' | 'stop' | null;
+	maxTokensReached: boolean;
+	sessionId: string; // 新增：记录产生此 finishInfo 的会话 ID
+}

@@ -43,6 +43,7 @@ interface UseChatCoreReturn {
 		isUnmount?: boolean,
 	) => Promise<void>;
 	onContinue: () => Promise<void>;
+	onContinueAnswering: () => Promise<void>;
 	getDisplayMessages: () => Message[];
 
 	// 内部方法
@@ -118,6 +119,23 @@ export const useChatCore = (
 		return sortedMessages;
 	}, [chatStore, getSelectedChildMap, buildMessageList, getFormatMessages]);
 
+	// // 🔴 构建消息分支链路（定义在这里）
+	// const buildBranchPath = useCallback(
+	// 	(chatId: string): Set<string> => {
+	// 		const path = new Set<string>();
+	// 		let currentId: string | undefined = chatId;
+
+	// 		while (currentId) {
+	// 			path.add(currentId);
+	// 			const msg = chatStore.messages.find((m) => m.chatId === currentId);
+	// 			currentId = msg?.parentId;
+	// 		}
+
+	// 		return path;
+	// 	},
+	// 	[chatStore.messages],
+	// );
+
 	// 更新 Store 消息
 	const updateStoreMessages = useCallback(
 		(updater: (prevMessages: Message[]) => Message[]) => {
@@ -185,8 +203,10 @@ export const useChatCore = (
 			}
 
 			hasReceivedStreamDataMapRef.current.set(session_Id, false);
+			// 设置当前正在等待回复的消息 assistant id
 			currentAssistantMessageMapRef.current.set(session_Id, assistantMessageId);
 
+			// 获取当前选择的分支映射
 			const selectedChildMap = getSelectedChildMap();
 			const branchMapToSave = branchMap || selectedChildMap;
 			chatStore.setSessionLoading(session_Id, true);
@@ -244,12 +264,16 @@ export const useChatCore = (
 						onData: (chunk) => {
 							if (typeof chunk === 'string') {
 								hasReceivedStreamDataMapRef.current.set(session_Id, true);
-								// 【优化】使用 appendStreamingContent 替代直接更新
+								// 使用 appendStreamingContent 替代直接更新
 								chatStore.appendStreamingContent(
 									assistantMessageId,
 									chunk,
 									'content',
 								);
+								console.log('chunk-string', chunk);
+							} else {
+								console.log('chunk', chunk);
+								// TODO: 将 stop 是的 reason 保存到对应的 message 中
 							}
 						},
 						onError: (err, type) => {
@@ -280,8 +304,9 @@ export const useChatCore = (
 							currentAssistantMessageMapRef.current.delete(session_Id);
 						},
 						onComplete: () => {
+							console.log('onComplete');
 							chatStore.setSessionLoading(session_Id, false);
-							// 【优化】流式结束时，确保刷新缓冲区
+							// 流式结束时，确保刷新缓冲区
 							chatStore.flushMessageUpdate(assistantMessageId);
 							chatStore.updateMessage(assistantMessageId, {
 								isStreaming: false,
@@ -304,9 +329,14 @@ export const useChatCore = (
 				});
 
 				const snapshot = requestSnapshotMapRef.current.get(session_Id);
+				// 检查当前会话是否已收到任何流式数据
 				const hasReceivedData =
 					hasReceivedStreamDataMapRef.current.get(session_Id);
 
+				// 如果存在快照且未收到流式数据，则回滚状态：
+				// 1. 移除正在流式输出的助手消息
+				// 2. 恢复会话到发送前的消息和分支选择状态
+				// 3. 清理当前会话的请求快照
 				if (snapshot && hasReceivedData === false) {
 					chatStore.removeStreamingMessage(snapshot.assistantMessageId);
 					chatStore.restoreState(
@@ -317,6 +347,7 @@ export const useChatCore = (
 					requestSnapshotMapRef.current.delete(session_Id);
 				}
 
+				// 无论是否回滚，都要清理当前会话的助手消息映射
 				currentAssistantMessageMapRef.current.delete(session_Id);
 			}
 		},
@@ -650,6 +681,11 @@ export const useChatCore = (
 		}
 	}, [getDisplayMessages, chatStore, onSseFetch]);
 
+	// TODO: 接着回答
+	const onContinueAnswering = useCallback(async () => {
+		console.log('接着输出。。。。。。。。。');
+	}, [getDisplayMessages, chatStore, onSseFetch]);
+
 	// 发送消息
 	const sendMessage = useCallback(
 		async (
@@ -861,5 +897,6 @@ export const useChatCore = (
 		onContinue,
 		getDisplayMessages,
 		handleEditChange,
+		onContinueAnswering,
 	};
 };

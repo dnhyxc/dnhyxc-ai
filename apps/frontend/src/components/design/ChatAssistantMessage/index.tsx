@@ -8,6 +8,7 @@ interface AssistantMessageProps {
 	isShowThinkContent: boolean;
 	onToggleThinkContent: () => void;
 	onContinue: () => void;
+	onContinueAnswering?: () => void;
 }
 
 const ChatAssistantMessage = ({
@@ -15,6 +16,7 @@ const ChatAssistantMessage = ({
 	isShowThinkContent,
 	onToggleThinkContent,
 	onContinue,
+	onContinueAnswering,
 }: AssistantMessageProps) => {
 	return (
 		<div className="w-full h-auto">
@@ -43,7 +45,6 @@ const ChatAssistantMessage = ({
 					/>
 				)}
 			</div>
-
 			{/* 主要内容区域 */}
 			<MarkdownPreview
 				value={message.content || (message?.thinkContent ? '' : '思考中...')}
@@ -52,7 +53,6 @@ const ChatAssistantMessage = ({
 				background="transparent"
 				padding="0"
 			/>
-
 			{/* 流式生成状态 */}
 			{message.isStreaming && (
 				<div className="mt-1 flex items-center">
@@ -60,7 +60,6 @@ const ChatAssistantMessage = ({
 					<span className="text-sm text-textcolor/50">正在生成中...</span>
 				</div>
 			)}
-
 			{/* 停止生成后的继续按钮 */}
 			{message.isStopped && (
 				<div className="flex items-center justify-end">
@@ -69,6 +68,18 @@ const ChatAssistantMessage = ({
 						onClick={onContinue}
 					>
 						继续生成
+					</div>
+				</div>
+			)}
+			{message?.isStopped}-{message.chatId}
+			{message?.isStopped && (
+				<div className="flex items-center justify-end">
+					超出最大输出长度，
+					<div
+						className="cursor-pointer text-sm text-cyan-400 hover:text-cyan-300 select-none"
+						onClick={onContinueAnswering}
+					>
+						点击接着回答
 					</div>
 				</div>
 			)}
