@@ -104,7 +104,7 @@ export class ChatRequestDto {
 
 	@IsNumber()
 	@IsOptional()
-	max_tokens?: number;
+	maxTokens?: number;
 
 	@IsNumber()
 	@IsOptional()

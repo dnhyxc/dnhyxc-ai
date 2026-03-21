@@ -265,7 +265,7 @@ Stick strictly to what is visually present.`,
 
 		const llm = this.initModel({
 			temperature: dto.temperature,
-			maxTokens: dto.max_tokens || 8192, // 65536
+			maxTokens: dto.maxTokens || 8192, // 65536
 			abortSignal: abortController.signal,
 		});
 
@@ -682,7 +682,7 @@ Stick strictly to what is visually present.`,
 			sessionId,
 			messages: continueMessages,
 			stream: true,
-			max_tokens: 8192, // 默认 4096
+			maxTokens: 8192, // 默认 4096
 			temperature: 0.2,
 			parentId,
 			userMessage,
@@ -789,7 +789,7 @@ Stick strictly to what is visually present.`,
 						messages: requestMessages,
 						thinking: { type: dto.thinking || 'enabled' }, // 'enabled' | 'disabled'
 						stream: dto.stream || true,
-						max_tokens: dto.max_tokens || 4096,
+						max_tokens: dto.maxTokens || 4096,
 						temperature: dto.temperature || 0.2, // [0.0, 1.0]
 					};
 
@@ -915,7 +915,7 @@ Stick strictly to what is visually present.`,
 	async chat(dto: ChatRequestDto): Promise<any> {
 		const llm = this.initModel({
 			temperature: dto.temperature,
-			maxTokens: dto.max_tokens || 4096,
+			maxTokens: dto.maxTokens || 4096,
 		});
 		const sessionId = dto.sessionId || randomUUID();
 

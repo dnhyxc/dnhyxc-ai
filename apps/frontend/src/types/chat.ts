@@ -55,7 +55,7 @@ export interface ChatRequestParams {
 	assistantMessage?: Message;
 	currentChatId?: string;
 	role?: 'user' | 'assistant' | 'system';
-	max_tokens?: number;
+	maxTokens?: number;
 	thinking?: 'enabled' | 'disabled';
 	temperature?: number;
 	stop?: boolean;
