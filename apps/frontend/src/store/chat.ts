@@ -567,6 +567,107 @@ class ChatStore {
 			this.streamingBranchMaps.delete(key);
 		});
 	}
+
+	// 存储每个消息的 finishReason：chatId -> finishReason
+	finishReasonMap: Map<
+		string,
+		{
+			type: 'finish';
+			reason: 'stop' | 'length';
+			maxTokensReached: boolean;
+			sessionId: string;
+		}
+	> = new Map();
+
+	/**
+	 * 设置消息的 finishReason
+	 */
+	@action
+	setFinishReason(
+		chatId: string,
+		finishReason: {
+			type: 'finish';
+			reason: 'stop' | 'length';
+			maxTokensReached: boolean;
+			sessionId: string;
+		},
+	) {
+		this.finishReasonMap.set(chatId, finishReason);
+
+		// 同时更新 Message 对象中的 finishReason 字段
+		const messageIndex = this.messages.findIndex((m) => m.chatId === chatId);
+		if (messageIndex >= 0) {
+			this.messages = [
+				...this.messages.slice(0, messageIndex),
+				{ ...this.messages[messageIndex], finishReason },
+				...this.messages.slice(messageIndex + 1),
+			];
+		}
+	}
+
+	/**
+	 * 获取消息的 finishReason
+	 */
+	getFinishReason(chatId: string) {
+		return this.finishReasonMap.get(chatId);
+	}
+
+	/**
+	 * 清空指定消息的 finishReason
+	 */
+	@action
+	clearFinishReason(chatId: string) {
+		this.finishReasonMap.delete(chatId);
+
+		// 同时清空 Message 对象中的 finishReason 字段
+		const messageIndex = this.messages.findIndex((m) => m.chatId === chatId);
+		if (messageIndex >= 0) {
+			const { finishReason: _, ...rest } = this.messages[messageIndex] as any;
+			this.messages = [
+				...this.messages.slice(0, messageIndex),
+				rest as Message,
+				...this.messages.slice(messageIndex + 1),
+			];
+		}
+	}
+
+	/**
+	 * 清空指定分支链路上所有消息的 finishReason
+	 * @param branchPath 分支链路上的所有消息 chatId 集合
+	 */
+	@action
+	clearFinishReasonByBranchPath(branchPath: Set<string>) {
+		branchPath.forEach((chatId) => {
+			this.finishReasonMap.delete(chatId);
+		});
+
+		// 批量更新消息列表
+		this.messages = this.messages.map((msg) => {
+			if (branchPath.has(msg.chatId)) {
+				const { finishReason: _, ...rest } = msg as any;
+				return rest as Message;
+			}
+			return msg;
+		});
+	}
+
+	/**
+	 * 构建从指定消息到根节点的分支链路
+	 * @param chatId 起始消息的 chatId
+	 * @returns 分支链路上所有消息的 chatId 集合
+	 */
+	buildBranchPath(chatId: string): Set<string> {
+		const path = new Set<string>();
+		let currentId: string | undefined = chatId;
+
+		while (currentId) {
+			path.add(currentId);
+			const msg = this.messages.find((m) => m.chatId === currentId);
+			currentId = msg?.parentId;
+		}
+
+		return path;
+	}
 }
 
 export default new ChatStore();

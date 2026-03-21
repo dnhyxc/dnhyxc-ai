@@ -265,7 +265,7 @@ Stick strictly to what is visually present.`,
 
 		const llm = this.initModel({
 			temperature: dto.temperature,
-			maxTokens: dto.max_tokens || 20,
+			maxTokens: dto.max_tokens || 8192, // 65536
 			abortSignal: abortController.signal,
 		});
 
@@ -334,9 +334,15 @@ Stick strictly to what is visually present.`,
 						systemContent = `Focus on the latest user query and avoid redundancy. If the new question is unrelated to the conversation history, disregard prior context and answer independently based solely on the current input. Do not force connections to previous topics.`;
 					}
 
+					const systemPromptMessage = dto?.messages.find(
+						(i) => i.role === 'system',
+					);
+
 					const systemPrompt: ChatMessageDto = {
 						role: 'system',
-						content: systemContent.trim(),
+						content: systemPromptMessage
+							? systemPromptMessage.content
+							: systemContent.trim(),
 					};
 
 					// 获取历史消息，从 memeries.messages 中提取所有包含附件的消息，通过 ASC 排序，防止消息顺序错乱导致大模型已读乱回
@@ -676,7 +682,7 @@ Stick strictly to what is visually present.`,
 			sessionId,
 			messages: continueMessages,
 			stream: true,
-			max_tokens: 4096,
+			max_tokens: 8192, // 默认 4096
 			temperature: 0.2,
 			parentId,
 			userMessage,
@@ -783,7 +789,7 @@ Stick strictly to what is visually present.`,
 						messages: requestMessages,
 						thinking: { type: dto.thinking || 'enabled' }, // 'enabled' | 'disabled'
 						stream: dto.stream || true,
-						max_tokens: dto.max_tokens || 65536,
+						max_tokens: dto.max_tokens || 4096,
 						temperature: dto.temperature || 0.2, // [0.0, 1.0]
 					};
 
@@ -909,7 +915,7 @@ Stick strictly to what is visually present.`,
 	async chat(dto: ChatRequestDto): Promise<any> {
 		const llm = this.initModel({
 			temperature: dto.temperature,
-			maxTokens: dto.max_tokens,
+			maxTokens: dto.max_tokens || 4096,
 		});
 		const sessionId = dto.sessionId || randomUUID();
 

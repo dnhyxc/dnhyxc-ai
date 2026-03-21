@@ -133,4 +133,8 @@ export class ChatRequestDto {
 	@IsBoolean()
 	@IsOptional()
 	isContinuation?: boolean;
+
+	@IsString()
+	@IsOptional()
+	role?: 'user' | 'assistant' | 'system';
 }

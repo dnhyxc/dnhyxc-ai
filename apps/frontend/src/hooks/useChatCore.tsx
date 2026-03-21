@@ -43,13 +43,20 @@ interface UseChatCoreReturn {
 		isUnmount?: boolean,
 	) => Promise<void>;
 	onContinue: () => Promise<void>;
-	onContinueAnswering: () => Promise<void>;
+	onContinueAnswering: (message?: Message) => Promise<void>;
 	getDisplayMessages: () => Message[];
 
 	// 内部方法
 	handleEditChange: (
 		e: React.ChangeEvent<HTMLTextAreaElement> | string,
 	) => void;
+}
+
+type ROLE_TYPE = 'user' | 'assistant' | 'system';
+
+interface SystemMessage {
+	role: ROLE_TYPE;
+	content: string;
 }
 
 export const useChatCore = (
@@ -119,23 +126,6 @@ export const useChatCore = (
 		return sortedMessages;
 	}, [chatStore, getSelectedChildMap, buildMessageList, getFormatMessages]);
 
-	// // 🔴 构建消息分支链路（定义在这里）
-	// const buildBranchPath = useCallback(
-	// 	(chatId: string): Set<string> => {
-	// 		const path = new Set<string>();
-	// 		let currentId: string | undefined = chatId;
-
-	// 		while (currentId) {
-	// 			path.add(currentId);
-	// 			const msg = chatStore.messages.find((m) => m.chatId === currentId);
-	// 			currentId = msg?.parentId;
-	// 		}
-
-	// 		return path;
-	// 	},
-	// 	[chatStore.messages],
-	// );
-
 	// 更新 Store 消息
 	const updateStoreMessages = useCallback(
 		(updater: (prevMessages: Message[]) => Message[]) => {
@@ -185,12 +175,14 @@ export const useChatCore = (
 			isRegenerate?: boolean,
 			branchMap?: Map<string, string>,
 			to?: boolean,
+			role?: ROLE_TYPE,
+			systemMessage?: SystemMessage,
 		) => {
-			let session_Id = chatStore.activeSessionId;
+			let sessionId = chatStore.activeSessionId;
 
-			if (!session_Id) {
+			if (!sessionId) {
 				try {
-					session_Id = await getSessionInfo();
+					sessionId = await getSessionInfo();
 				} catch (_) {
 					clearChat();
 					return;
@@ -199,20 +191,20 @@ export const useChatCore = (
 
 			// 判断是否是新对话，如果是则发送消息时需要跳转
 			if (to) {
-				navigate(`/chat/c/${session_Id}`);
+				navigate(`/chat/c/${sessionId}`);
 			}
 
-			hasReceivedStreamDataMapRef.current.set(session_Id, false);
+			hasReceivedStreamDataMapRef.current.set(sessionId, false);
 			// 设置当前正在等待回复的消息 assistant id
-			currentAssistantMessageMapRef.current.set(session_Id, assistantMessageId);
+			currentAssistantMessageMapRef.current.set(sessionId, assistantMessageId);
 
 			// 获取当前选择的分支映射
 			const selectedChildMap = getSelectedChildMap();
 			const branchMapToSave = branchMap || selectedChildMap;
-			chatStore.setSessionLoading(session_Id, true);
+			chatStore.setSessionLoading(sessionId, true);
 			chatStore.saveStreamingBranchMap(
 				assistantMessageId,
-				session_Id,
+				sessionId,
 				branchMapToSave,
 			);
 
@@ -220,39 +212,47 @@ export const useChatCore = (
 				? userMessage?.chatId
 				: userMessage?.parentId;
 
-			const messages: ChatRequestParams = {
-				messages: [
-					{
-						role: 'user',
-						content: isRegenerate
-							? `重新生成"${userMessage?.content}"的答案，不要与之前答案重复`
-							: userMessage?.content || '',
-						noSave: isRegenerate,
-					},
-				],
-				sessionId: session_Id,
+			const messages = [
+				{
+					role: role || 'user',
+					content: isRegenerate
+						? `重新生成"${userMessage?.content}"的答案，不要与之前答案重复`
+						: userMessage?.content || '',
+					noSave: isRegenerate,
+				},
+			];
+
+			if (systemMessage) {
+				messages.push({ ...systemMessage, noSave: true });
+			}
+
+			const messageParams: ChatRequestParams = {
+				messages,
+				sessionId,
 				stream: true,
 				isRegenerate,
 				parentId,
 				userMessage,
 				assistantMessage,
 				currentChatId,
+				role,
+				// max_tokens: 20,
 			};
 
 			if (userMessage?.attachments?.length) {
-				messages.attachments = userMessage?.attachments;
+				messageParams.attachments = userMessage?.attachments;
 			}
 
 			try {
 				const stop = await streamFetch({
 					api,
 					options: {
-						body: JSON.stringify(messages),
+						body: JSON.stringify(messageParams),
 					},
 					callbacks: {
 						onThinking: (thinking) => {
 							if (typeof thinking === 'string') {
-								hasReceivedStreamDataMapRef.current.set(session_Id, true);
+								hasReceivedStreamDataMapRef.current.set(sessionId, true);
 								// 【优化】使用 appendStreamingContent 替代直接更新
 								chatStore.appendStreamingContent(
 									assistantMessageId,
@@ -263,21 +263,23 @@ export const useChatCore = (
 						},
 						onData: (chunk) => {
 							if (typeof chunk === 'string') {
-								hasReceivedStreamDataMapRef.current.set(session_Id, true);
+								hasReceivedStreamDataMapRef.current.set(sessionId, true);
 								// 使用 appendStreamingContent 替代直接更新
 								chatStore.appendStreamingContent(
 									assistantMessageId,
 									chunk,
 									'content',
 								);
-								console.log('chunk-string', chunk);
 							} else {
-								console.log('chunk', chunk);
-								// TODO: 将 stop 是的 reason 保存到对应的 message 中
+								// 设置 finishReason 到 store
+								chatStore.setFinishReason(assistantMessageId, {
+									...chunk,
+									sessionId,
+								});
 							}
 						},
 						onError: (err, type) => {
-							chatStore.setSessionLoading(session_Id, false);
+							chatStore.setSessionLoading(sessionId, false);
 							if (
 								err?.message &&
 								!err?.message?.includes('Request cancelled')
@@ -287,9 +289,9 @@ export const useChatCore = (
 									title: err?.message || String(err) || '发送失败',
 								});
 							}
-							const snapshot = requestSnapshotMapRef.current.get(session_Id);
+							const snapshot = requestSnapshotMapRef.current.get(sessionId);
 							const hasReceivedData =
-								hasReceivedStreamDataMapRef.current.get(session_Id);
+								hasReceivedStreamDataMapRef.current.get(sessionId);
 
 							if (snapshot && hasReceivedData === false) {
 								chatStore.removeStreamingMessage(snapshot.assistantMessageId);
@@ -298,40 +300,39 @@ export const useChatCore = (
 									snapshot.selectedChildMap,
 									snapshot.sessionId,
 								);
-								requestSnapshotMapRef.current.delete(session_Id);
+								requestSnapshotMapRef.current.delete(sessionId);
 							}
 
-							currentAssistantMessageMapRef.current.delete(session_Id);
+							currentAssistantMessageMapRef.current.delete(sessionId);
 						},
 						onComplete: () => {
-							console.log('onComplete');
-							chatStore.setSessionLoading(session_Id, false);
+							chatStore.setSessionLoading(sessionId, false);
 							// 流式结束时，确保刷新缓冲区
 							chatStore.flushMessageUpdate(assistantMessageId);
 							chatStore.updateMessage(assistantMessageId, {
 								isStreaming: false,
 							});
 							chatStore.deleteStreamingBranchMap(assistantMessageId);
-							stopRequestMapRef.current.delete(session_Id);
-							requestSnapshotMapRef.current.delete(session_Id);
-							hasReceivedStreamDataMapRef.current.delete(session_Id);
-							currentAssistantMessageMapRef.current.delete(session_Id);
+							stopRequestMapRef.current.delete(sessionId);
+							requestSnapshotMapRef.current.delete(sessionId);
+							hasReceivedStreamDataMapRef.current.delete(sessionId);
+							currentAssistantMessageMapRef.current.delete(sessionId);
 						},
 					},
 				});
 
-				stopRequestMapRef.current.set(session_Id, stop);
+				stopRequestMapRef.current.set(sessionId, stop);
 			} catch (_error) {
-				chatStore.setSessionLoading(session_Id, false);
+				chatStore.setSessionLoading(sessionId, false);
 				Toast({
 					type: 'error',
 					title: '发送消息失败',
 				});
 
-				const snapshot = requestSnapshotMapRef.current.get(session_Id);
+				const snapshot = requestSnapshotMapRef.current.get(sessionId);
 				// 检查当前会话是否已收到任何流式数据
 				const hasReceivedData =
-					hasReceivedStreamDataMapRef.current.get(session_Id);
+					hasReceivedStreamDataMapRef.current.get(sessionId);
 
 				// 如果存在快照且未收到流式数据，则回滚状态：
 				// 1. 移除正在流式输出的助手消息
@@ -344,11 +345,11 @@ export const useChatCore = (
 						snapshot.selectedChildMap,
 						snapshot.sessionId,
 					);
-					requestSnapshotMapRef.current.delete(session_Id);
+					requestSnapshotMapRef.current.delete(sessionId);
 				}
 
 				// 无论是否回滚，都要清理当前会话的助手消息映射
-				currentAssistantMessageMapRef.current.delete(session_Id);
+				currentAssistantMessageMapRef.current.delete(sessionId);
 			}
 		},
 		[
@@ -365,15 +366,24 @@ export const useChatCore = (
 
 	// 发送新消息
 	const handleNewMessage = useCallback(
-		async (content: string, files: UploadedFile[]) => {
+		async (
+			content: string,
+			files: UploadedFile[],
+			role?: ROLE_TYPE,
+			systemMessage?: SystemMessage,
+		) => {
 			const userMsgId = uuidv4();
 			const assistantMessageId = uuidv4();
 
+			// 获取当前页面显示的所有会话信息
 			const displayMessages = getDisplayMessages();
 			let parentId: string | undefined;
 			const lastMsg = displayMessages[displayMessages.length - 1];
 			if (lastMsg) {
 				parentId = lastMsg.chatId;
+				// 清空当前分支链路上所有消息的 finishReason，只有在同一分支下发送新消息时才清空
+				const branchPath = chatStore.buildBranchPath(lastMsg.chatId);
+				chatStore.clearFinishReasonByBranchPath(branchPath);
 			}
 
 			const userMessageToUse = createUserMessage({
@@ -382,6 +392,7 @@ export const useChatCore = (
 				parentId,
 				currentChatId,
 				attachments: files?.length ? files : undefined,
+				role: role || 'user',
 			});
 
 			userMessageToUse.childrenIds = [assistantMessageId];
@@ -434,6 +445,8 @@ export const useChatCore = (
 				false,
 				newSelectedChildMap,
 				true,
+				role,
+				systemMessage,
 			);
 		},
 		[
@@ -652,6 +665,7 @@ export const useChatCore = (
 
 					userMsgForApi = {
 						...userMsg,
+						content: `继续上次没有输出完成的内容，你要检查上次是从哪里断开的，从断开处继续输出`,
 						isStopped: false,
 					};
 					assistantMsgForApi = {
@@ -681,10 +695,17 @@ export const useChatCore = (
 		}
 	}, [getDisplayMessages, chatStore, onSseFetch]);
 
-	// TODO: 接着回答
-	const onContinueAnswering = useCallback(async () => {
-		console.log('接着输出。。。。。。。。。');
-	}, [getDisplayMessages, chatStore, onSseFetch]);
+	// 接着回答（因长度限制停止后继续）
+	const onContinueAnswering = useCallback(
+		async (_message?: Message) => {
+			await handleNewMessage('继续回答', uploadedFiles, 'user', {
+				role: 'system',
+				content:
+					'继续上次未完成的内容。请先核对上次的断点位置，再从那之后继续输出。',
+			});
+		},
+		[getDisplayMessages, chatStore, onSseFetch],
+	);
 
 	// 发送消息
 	const sendMessage = useCallback(

@@ -8,7 +8,7 @@ interface AssistantMessageProps {
 	isShowThinkContent: boolean;
 	onToggleThinkContent: () => void;
 	onContinue: () => void;
-	onContinueAnswering?: () => void;
+	onContinueAnswering?: (message?: Message) => void;
 }
 
 const ChatAssistantMessage = ({
@@ -71,13 +71,13 @@ const ChatAssistantMessage = ({
 					</div>
 				</div>
 			)}
-			{message?.isStopped}-{message.chatId}
-			{message?.isStopped && (
+			{/* 因长度限制停止时显示【点击接着回答】按钮 */}
+			{message?.finishReason?.maxTokensReached && (
 				<div className="flex items-center justify-end">
 					超出最大输出长度，
 					<div
 						className="cursor-pointer text-sm text-cyan-400 hover:text-cyan-300 select-none"
-						onClick={onContinueAnswering}
+						onClick={() => onContinueAnswering?.(message)}
 					>
 						点击接着回答
 					</div>

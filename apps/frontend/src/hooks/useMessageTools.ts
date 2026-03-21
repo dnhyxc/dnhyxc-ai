@@ -6,7 +6,7 @@ export const useMessageTools = () => {
 		id: params.chatId,
 		chatId: params.chatId,
 		content: params.content.trim(),
-		role: 'user',
+		role: params?.role || 'user',
 		timestamp: new Date(),
 		createdAt: new Date(),
 		parentId: params.parentId,
@@ -20,12 +20,13 @@ export const useMessageTools = () => {
 		chatId: string;
 		parentId: string;
 		currentChatId: string;
+		role?: 'assistant' | 'system' | 'system';
 	}): Message => ({
 		id: params.chatId,
 		chatId: params.chatId,
 		content: '',
 		thinkContent: '',
-		role: 'assistant',
+		role: params?.role || 'assistant',
 		timestamp: new Date(),
 		createdAt: new Date(),
 		isStreaming: true,
@@ -240,6 +241,7 @@ export const useMessageTools = () => {
 			isStreaming: msg.isStreaming,
 			isStopped: msg.isStopped,
 			currentChatId: msg.currentChatId,
+			finishReason: msg.finishReason,
 		}));
 	};
 

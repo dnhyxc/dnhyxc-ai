@@ -14,7 +14,7 @@ import SessionList from './session-list';
 import ShareChat from './share';
 
 // Chat 主组件
-const ChatContent = observer(() => {
+const Chat = observer(() => {
 	const { chatStore } = useStore();
 	const {
 		input,
@@ -214,4 +214,4 @@ const ChatContent = observer(() => {
 	);
 });
 
-export default ChatContent;
+export default Chat;
