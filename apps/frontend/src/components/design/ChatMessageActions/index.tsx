@@ -77,8 +77,10 @@ export const MessageActions = ({
 	const canNext = (message.siblingIndex || 0) < (message.siblingCount || 0) - 1;
 
 	// 是否是最后一条消息
-	const isLastMessage =
-		index === messagesLength - 1 || index === messagesLength - 2;
+	const isLastMessage = index === messagesLength - 1;
+
+	// 判断是否是倒数第二条消息
+	const isSecondToLastMessage = index === messagesLength - 2;
 
 	const onCheckShare = (message: Message) => {
 		setCheckedMessage?.(message);
@@ -163,7 +165,7 @@ export const MessageActions = ({
 				<div
 					className={`gap-3 text-textcolor/70 ${
 						message.role === 'user' ? '-mr-2' : '-ml-2'
-					} ${isLastMessage ? 'flex items-center' : 'hidden group-hover:flex'}`}
+					} ${isSecondToLastMessage || isLastMessage ? (isLastMessage && isLoading ? 'hidden' : 'flex items-center') : 'hidden group-hover:flex'}`}
 				>
 					{/* 复制按钮 */}
 					<div className="cursor-pointer flex items-center justify-center">
