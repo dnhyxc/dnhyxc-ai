@@ -19,6 +19,7 @@ const Session = () => {
 			!chatStore.messages.length &&
 			!chatStore.sessionData.total
 		) {
+			chatStore.setActiveSessionId(params.id);
 			getSessionInfo(params.id);
 		}
 	}, [params.id, chatStore.messages, chatStore.sessionData.total]);
