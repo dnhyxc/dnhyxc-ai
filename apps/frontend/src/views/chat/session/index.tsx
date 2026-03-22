@@ -1,12 +1,15 @@
 import ChatBot from '@design/ChatBot';
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'react-router';
+import Loading from '@/components/design/Loading';
 import { getSession } from '@/service';
 import useStore from '@/store';
 
 const Session = () => {
 	const params = useParams();
 	const { chatStore } = useStore();
+
+	const [loading, setLoading] = useState(false);
 
 	useEffect(() => {
 		// 只有在刷新后，store 中的 messages 为空的时候才调用接口获取 messages，
@@ -22,10 +25,15 @@ const Session = () => {
 
 	const getSessionInfo = useCallback(
 		async (id: string) => {
-			const res = await getSession(id);
-			if (res.success && res.data.messages.length) {
-				chatStore.setAllMessages(res.data.messages, id, false);
-				chatStore.setActiveSessionId(id);
+			try {
+				setLoading(true);
+				const res = await getSession(id);
+				if (res.success && res.data.messages.length) {
+					chatStore.setAllMessages(res.data.messages, id, false);
+					chatStore.setActiveSessionId(id);
+				}
+			} finally {
+				setLoading(false);
 			}
 		},
 		[chatStore],
@@ -33,6 +41,11 @@ const Session = () => {
 
 	return (
 		<div className="flex-1 w-full overflow-hidden">
+			{loading && (
+				<div className="absolute top-0 left-0 z-900 flex flex-col gap-5 items-center justify-center w-full h-full bg-theme-background/80 rounded-md">
+					<Loading />
+				</div>
+			)}
 			<ChatBot />
 		</div>
 	);

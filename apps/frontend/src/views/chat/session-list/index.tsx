@@ -1,4 +1,6 @@
+import Confirm from '@design/Confirm';
 import { Drawer } from '@design/Drawer';
+import Loading from '@design/Loading';
 import { MarkdownParser } from '@dnhyxc-ai/tools';
 import { Input, ScrollArea, Spinner, Toast } from '@ui/index';
 import { Check, SquarePen, Trash2, X } from 'lucide-react';
@@ -15,7 +17,6 @@ import {
 	useState,
 } from 'react';
 import { useNavigate } from 'react-router';
-import Confirm from '@/components/design/Confirm';
 import { useChatCoreContext } from '@/contexts';
 import { useChatCore } from '@/hooks/useChatCore';
 import { deleteSession, getSessionList, updateSession } from '@/service';
@@ -206,6 +207,7 @@ const SessionList: React.FC<IProps> = ({ open, onOpenChange }) => {
 	const [confirmOpen, setConfirmOpen] = useState(false);
 	const [deleteItem, setDeleteItem] = useState<Session | null>(null);
 	const [editItem, setEditItem] = useState<Session | null>(null);
+	const [loading, setLoading] = useState(false);
 
 	const parser = useMemo(() => new MarkdownParser(), []);
 
@@ -217,9 +219,14 @@ const SessionList: React.FC<IProps> = ({ open, onOpenChange }) => {
 	}, [open]);
 
 	const getSessions = useCallback(async () => {
-		const res = await getSessionList();
-		if (res.success) {
-			chatStore.setSessionData(res.data);
+		try {
+			setLoading(true);
+			const res = await getSessionList();
+			if (res.success) {
+				chatStore.setSessionData(res.data);
+			}
+		} finally {
+			setLoading(false);
 		}
 	}, [chatStore]);
 
@@ -313,6 +320,11 @@ const SessionList: React.FC<IProps> = ({ open, onOpenChange }) => {
 	return (
 		<Drawer title="历史对话" open={open} onOpenChange={onOpenChange}>
 			<ScrollArea className="h-full overflow-y-auto pr-4 box-border">
+				{loading && (
+					<div className="absolute top-0 left-0 z-900 flex flex-col gap-5 items-center justify-center w-full h-full bg-theme-background/80 rounded-md">
+						<Loading />
+					</div>
+				)}
 				{sessionList}
 			</ScrollArea>
 			<Confirm
