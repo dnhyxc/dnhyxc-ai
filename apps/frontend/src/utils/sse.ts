@@ -8,7 +8,7 @@ interface StreamCallbacks {
 	onThinking?: (chunk: any) => void;
 	onStart?: () => void;
 	onError?: (error: Error, type?: 'error' | 'info' | 'warning') => void;
-	onComplete?: () => void;
+	onComplete?: (error?: string) => void;
 }
 
 export const streamFetch = async ({
@@ -85,10 +85,14 @@ export const streamFetch = async ({
 							if (dataStr) {
 								try {
 									const parsed = JSON.parse(dataStr);
+									if (parsed?.error) {
+										onComplete?.(parsed?.error);
+										return;
+									}
 									if (parsed?.type === 'thinking') {
 										onThinking?.(parsed.content ? parsed.content : '');
 									} else {
-										onData(parsed.content ? parsed.content : '');
+										onData(parsed.content);
 									}
 								} catch (e) {
 									Toast({

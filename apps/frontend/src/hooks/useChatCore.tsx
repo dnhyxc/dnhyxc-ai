@@ -305,12 +305,13 @@ export const useChatCore = (
 
 							currentAssistantMessageMapRef.current.delete(sessionId);
 						},
-						onComplete: () => {
+						onComplete: (error?: string) => {
 							chatStore.setSessionLoading(sessionId, false);
 							// 流式结束时，确保刷新缓冲区
 							chatStore.flushMessageUpdate(assistantMessageId);
 							chatStore.updateMessage(assistantMessageId, {
 								isStreaming: false,
+								...(error && { content: error }),
 							});
 							chatStore.deleteStreamingBranchMap(assistantMessageId);
 							stopRequestMapRef.current.delete(sessionId);
