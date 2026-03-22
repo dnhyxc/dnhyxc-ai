@@ -957,21 +957,17 @@ Stick strictly to what is visually present.`,
 		if (lastUserMessage && dto.userMessage) {
 			// 使用前端传递的 userMessage 数据添加到队列
 			try {
-				await this.messageQueue
-					.add('save-message', {
-						sessionId,
-						role: MessageRole.USER,
-						content: lastUserMessage.content,
-						attachments: dto.attachments,
-						parentId: dto.userMessage.parentId || null,
-						isRegenerate: false,
-						chatId: dto.userMessage.chatId,
-						childrenIds: dto.userMessage.childrenIds || [],
-						currentChatId: dto.userMessage.chatId,
-					})
-					.catch((dbError) => {
-						console.error('Failed to add user message job to queue:', dbError);
-					});
+				await this.messageQueue.add('save-message', {
+					sessionId,
+					role: MessageRole.USER,
+					content: lastUserMessage.content,
+					attachments: dto.attachments,
+					parentId: dto.userMessage.parentId || null,
+					isRegenerate: false,
+					chatId: dto.userMessage.chatId,
+					childrenIds: dto.userMessage.childrenIds || [],
+					currentChatId: dto.userMessage.chatId,
+				});
 			} catch (error) {
 				console.error('Error processing message:', error);
 			}
