@@ -384,6 +384,9 @@ export const useChatCore = (
 				// 清空当前分支链路上所有消息的 finishReason，只有在同一分支下发送新消息时才清空
 				const branchPath = chatStore.buildBranchPath(lastMsg.chatId);
 				chatStore.clearFinishReasonByBranchPath(branchPath);
+				// 清空当前分支链路上所有消息的停止状态，只有在同一分支下发送新消息时才清空
+				// chatStore.clearStoppedMessageByBranchPath(branchPath);
+				chatStore.clearStoppedMessage(parentId);
 			}
 
 			const userMessageToUse = createUserMessage({
@@ -422,10 +425,9 @@ export const useChatCore = (
 
 			setSelectedChildMap(newSelectedChildMap);
 
+			// 注意：不再设置 isStopped: false，停止状态由 stoppedMessages Map 管理
 			updateStoreMessages((prevAll) => {
-				let newAllMessages = [
-					...prevAll.map((i) => ({ ...i, isStopped: false })),
-				] as Message[];
+				let newAllMessages = [...prevAll] as Message[];
 				if (userMessageToUse.parentId) {
 					newAllMessages = updateParentChildrenIds({
 						allMessages: newAllMessages,
@@ -434,7 +436,7 @@ export const useChatCore = (
 					});
 				}
 				newAllMessages.push(userMessageToUse, assistantMessage);
-				return newAllMessages.map((i) => ({ ...i, isStopped: false }));
+				return newAllMessages;
 			});
 
 			onSseFetch(
@@ -481,6 +483,12 @@ export const useChatCore = (
 			const selectedChildMap = getSelectedChildMap();
 			const newSelectedChildMap = new Map(selectedChildMap);
 
+			// 清空当前分支链路上所有消息的停止状态
+			// if (editMsg.parentId) {
+			// 	const branchPath = chatStore.buildBranchPath(editMsg.parentId);
+			// 	chatStore.clearStoppedMessageByBranchPath(branchPath);
+			// }
+
 			const currentSessionId = chatStore.activeSessionId;
 			requestSnapshotMapRef.current.set(currentSessionId || 'new', {
 				messages: [...chatStore.messages],
@@ -492,7 +500,7 @@ export const useChatCore = (
 
 			updateStoreMessages((prevAll) => {
 				const editedMsg = prevAll.find((m) => m.chatId === editMsg.chatId);
-				if (!editedMsg) return prevAll.map((i) => ({ ...i, isStopped: false }));
+				if (!editedMsg) return prevAll;
 
 				const parentId = editedMsg.parentId;
 				const userMsg = createUserMessage({
@@ -527,7 +535,7 @@ export const useChatCore = (
 				userMessageToUse = userMsg;
 				assistantMessage = assistantMsg;
 
-				return newAllMessages.map((i) => ({ ...i, isStopped: false }));
+				return newAllMessages;
 			});
 
 			setSelectedChildMap(newSelectedChildMap);
@@ -572,6 +580,9 @@ export const useChatCore = (
 			const currentAssistantMsg = displayMessages[index];
 			if (!currentAssistantMsg) return;
 
+			// 清空当前消息的停止状态（重新生成时）
+			// chatStore.clearStoppedMessage(currentAssistantMsg.chatId);
+
 			const currentSessionId = chatStore.activeSessionId;
 			requestSnapshotMapRef.current.set(currentSessionId || 'new', {
 				messages: [...chatStore.messages],
@@ -585,7 +596,7 @@ export const useChatCore = (
 				const userMsg = prevAll.find(
 					(m) => m.chatId === currentAssistantMsg.parentId,
 				);
-				if (!userMsg) return prevAll.map((i) => ({ ...i, isStopped: false }));
+				if (!userMsg) return prevAll;
 
 				const userMsgCopy = { ...userMsg };
 				const childrenIds = userMsg.childrenIds ? [...userMsg.childrenIds] : [];
@@ -615,7 +626,7 @@ export const useChatCore = (
 
 				setSelectedChildMap(childMap);
 
-				return newAllMessages.map((i) => ({ ...i, isStopped: false }));
+				return newAllMessages;
 			});
 
 			if (userMessageToUse && assistantMessage && newSelectedChildMap) {
@@ -643,6 +654,7 @@ export const useChatCore = (
 		],
 	);
 
+	// 继续生成
 	const onContinue = useCallback(async () => {
 		let userMsgForApi: Message | null = null;
 		let assistantMsgForApi: Message | null = null;
@@ -652,26 +664,33 @@ export const useChatCore = (
 
 		if (displayMessages.length > 0) {
 			const lastMsg = displayMessages[displayMessages.length - 1];
-			if (lastMsg.role === 'assistant' && lastMsg.isStopped) {
+			// 使用 stoppedMessages Map 来检查停止状态
+			if (
+				lastMsg.role === 'assistant' &&
+				chatStore.isMessageStopped(lastMsg.chatId)
+			) {
 				const userMsg = chatStore.messages.find(
 					(m) => m.chatId === lastMsg.parentId,
 				);
 				if (userMsg) {
+					// 清空停止状态
+					chatStore.clearStoppedMessage(lastMsg.chatId);
+
 					// 更新消息状态
 					chatStore.updateMessage(lastMsg.chatId, {
 						isStreaming: true,
-						isStopped: false,
+						// isStopped: false,
 					});
 
 					userMsgForApi = {
 						...userMsg,
 						content: `继续上次没有输出完成的内容，你要检查上次是从哪里断开的，从断开处继续输出`,
-						isStopped: false,
+						// isStopped: false,
 					};
 					assistantMsgForApi = {
 						...lastMsg,
-						isStreaming: true,
-						isStopped: false,
+						isStreaming: true, // 标识正在输出
+						// isStopped: false, // 将状态改为 false，用于隐藏继续生成按钮的显示
 					};
 					lastMsgId = lastMsg.chatId;
 				} else {
@@ -793,16 +812,20 @@ export const useChatCore = (
 				chatStore.flushMessageUpdate(assistantMessageId);
 				chatStore.updateMessage(assistantMessageId, {
 					isStreaming: false,
-					isStopped: true,
+					// isStopped: true,
 				});
+				// 设置停止状态到 stoppedMessages Map
+				chatStore.setStoppedMessage(assistantMessageId, session_id);
 			} else {
 				const lastAssistantMsg = findLastAssistantMessage(chatStore.messages);
 				if (lastAssistantMsg?.isStreaming) {
 					chatStore.flushMessageUpdate(lastAssistantMsg.chatId);
 					chatStore.updateMessage(lastAssistantMsg.chatId, {
 						isStreaming: false,
-						isStopped: true,
+						// isStopped: true,
 					});
+					// 设置停止状态到 stoppedMessages Map
+					chatStore.setStoppedMessage(lastAssistantMsg.chatId, session_id);
 				}
 			}
 

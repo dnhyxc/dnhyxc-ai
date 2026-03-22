@@ -63,6 +63,81 @@ class ChatStore {
 		{ sessionId: string; branchMap: Map<string, string> }
 	> = new Map();
 
+	// 存储每条消息的停止状态：chatId -> { sessionId, stoppedAt }
+	// 使用独立的 Map 来管理停止状态，避免在 setAllMessages 中被意外清空
+	stoppedMessages: Map<string, { sessionId: string; stoppedAt: number }> =
+		new Map();
+
+	/**
+	 * 设置消息的停止状态
+	 * @param chatId 消息ID
+	 * @param sessionId 会话ID
+	 */
+	@action
+	setStoppedMessage(chatId: string, sessionId: string) {
+		this.stoppedMessages.set(chatId, {
+			sessionId,
+			stoppedAt: Date.now(),
+		});
+	}
+
+	/**
+	 * 清空单条消息的停止状态
+	 * @param chatId 消息ID
+	 */
+	@action
+	clearStoppedMessage(chatId: string) {
+		this.stoppedMessages.delete(chatId);
+	}
+
+	/**
+	 * 清空分支链路上所有消息的停止状态
+	 * @param branchPath 分支链路上的所有消息 chatId 集合
+	 */
+	@action
+	clearStoppedMessageByBranchPath(branchPath: Set<string>) {
+		branchPath.forEach((chatId) => {
+			this.stoppedMessages.delete(chatId);
+		});
+	}
+
+	/**
+	 * 检查消息是否处于停止状态
+	 * @param chatId 消息ID
+	 * @returns 是否处于停止状态
+	 */
+	isMessageStopped(chatId: string): boolean {
+		return this.stoppedMessages.has(chatId);
+	}
+
+	/**
+	 * 获取消息的停止状态信息
+	 * @param chatId 消息ID
+	 * @returns 停止状态信息
+	 */
+	getStoppedMessageInfo(
+		chatId: string,
+	): { sessionId: string; stoppedAt: number } | undefined {
+		return this.stoppedMessages.get(chatId);
+	}
+
+	/**
+	 * 清空指定会话的所有停止状态
+	 * @param sessionId 会话ID
+	 */
+	@action
+	clearStoppedMessageBySession(sessionId: string) {
+		const keysToDelete: string[] = [];
+		this.stoppedMessages.forEach((value, key) => {
+			if (value.sessionId === sessionId) {
+				keysToDelete.push(key);
+			}
+		});
+		keysToDelete.forEach((key) => {
+			this.stoppedMessages.delete(key);
+		});
+	}
+
 	addLoadingSession(sessionId: string) {
 		this.loadingSessions.add(sessionId);
 	}
@@ -122,7 +197,7 @@ class ChatStore {
 				mergedMessages[existingIndex] = {
 					...mergedMessages[existingIndex],
 					isStreaming: streamingMsg.isStreaming,
-					isStopped: streamingMsg.isStopped,
+					// 注意：不再从 streamingMsg 同步 isStopped，因为停止状态由 stoppedMessages Map 管理
 					content:
 						streamingMsg.content || mergedMessages[existingIndex].content,
 					thinkContent:
@@ -134,9 +209,11 @@ class ChatStore {
 			}
 		});
 
+		// 注意：不再强制设置 isStopped: false，停止状态由 stoppedMessages Map 独立管理
 		const finalMessages = mergedMessages.map((msg) => ({
 			...msg,
-			isStopped: false,
+			// 从 stoppedMessages Map 获取停止状态
+			isStopped: this.stoppedMessages.has(msg.chatId),
 		}));
 
 		this.messages = finalMessages;
@@ -293,6 +370,8 @@ class ChatStore {
 						thinkContent: (message.thinkContent || '') + update.thinkContent,
 					}),
 					isStreaming: true,
+					// 保持停止状态由 stoppedMessages Map 管理
+					isStopped: this.stoppedMessages.has(chatId),
 				};
 				messageMap.set(chatId, { index, message: updatedMessage });
 			}
@@ -375,6 +454,8 @@ class ChatStore {
 			const updatedMessage = {
 				...this.messages[messageIndex],
 				...updates,
+				// 保持停止状态由 stoppedMessages Map 管理
+				isStopped: this.stoppedMessages.has(chatId),
 			};
 
 			this.messages = [
@@ -395,6 +476,8 @@ class ChatStore {
 						...existingStreamingMsg,
 						isStreaming: false,
 						...updates,
+						// 保持停止状态由 stoppedMessages Map 管理
+						isStopped: this.stoppedMessages.has(chatId),
 					});
 				} else {
 					this.streamingMessages.set(chatId, updatedMessage);
@@ -406,8 +489,16 @@ class ChatStore {
 		} else {
 			const existingStreamingMsg = this.streamingMessages.get(chatId);
 			const updatedMessage = existingStreamingMsg
-				? { ...existingStreamingMsg, ...updates }
-				: ({ chatId, ...updates } as Message);
+				? {
+						...existingStreamingMsg,
+						...updates,
+						isStopped: this.stoppedMessages.has(chatId),
+					}
+				: ({
+						chatId,
+						...updates,
+						isStopped: this.stoppedMessages.has(chatId),
+					} as Message);
 
 			if (updates.isStreaming !== false || existingStreamingMsg) {
 				this.streamingMessages.set(chatId, updatedMessage);

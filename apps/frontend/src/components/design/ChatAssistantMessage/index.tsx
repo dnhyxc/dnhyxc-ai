@@ -9,6 +9,7 @@ interface AssistantMessageProps {
 	onToggleThinkContent: () => void;
 	onContinue: () => void;
 	onContinueAnswering?: (message?: Message) => void;
+	isStopped?: boolean;
 }
 
 const ChatAssistantMessage = ({
@@ -17,6 +18,7 @@ const ChatAssistantMessage = ({
 	onToggleThinkContent,
 	onContinue,
 	onContinueAnswering,
+	isStopped,
 }: AssistantMessageProps) => {
 	return (
 		<div className="w-full h-auto">
@@ -61,7 +63,7 @@ const ChatAssistantMessage = ({
 				</div>
 			)}
 			{/* 停止生成后的继续按钮 */}
-			{message.isStopped && (
+			{isStopped && (
 				<div className="flex items-center justify-end">
 					<div
 						className="cursor-pointer text-sm text-cyan-400 hover:text-cyan-300 select-none"

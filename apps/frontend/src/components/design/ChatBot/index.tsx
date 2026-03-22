@@ -155,6 +155,18 @@ const ChatBot = observer(
 			return () => dispose();
 		}, [chatStore]);
 
+		// 监听 stoppedMessages 变化，确保停止状态实时更新
+		useEffect(() => {
+			const dispose = mobx.reaction(
+				() => chatStore.stoppedMessages.size,
+				() => {
+					// 强制重新渲染消息列表
+					setAllMessages([...chatStore.messages]);
+				},
+			);
+			return () => dispose();
+		}, [chatStore]);
+
 		// 监听 store 中 selectedChildMap 的变化，使在重新编辑 user 信息重新发送时，能够自动切换到最新的 user 分支
 		useEffect(() => {
 			const dispose = mobx.reaction(
@@ -520,6 +532,9 @@ const ChatBot = observer(
 														onToggleThinkContent={onToggleThinkContent}
 														onContinue={onContinue}
 														onContinueAnswering={onContinueAnswering}
+														isStopped={chatStore.isMessageStopped(
+															message.chatId,
+														)}
 													/>
 												)}
 											</Label>

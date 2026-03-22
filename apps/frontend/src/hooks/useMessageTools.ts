@@ -239,7 +239,9 @@ export const useMessageTools = () => {
 			siblingCount: msg.siblingCount,
 			thinkContent: msg.thinkContent,
 			isStreaming: msg.isStreaming,
+			// 从 stoppedMessages Map 获取停止状态，确保实时性
 			isStopped: msg.isStopped,
+			// isStopped: chatStore.isMessageStopped(msg.chatId),
 			currentChatId: msg.currentChatId,
 			finishReason: msg.finishReason,
 		}));
