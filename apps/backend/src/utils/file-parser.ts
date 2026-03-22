@@ -1,10 +1,10 @@
 import http from 'node:http';
 import https from 'node:https';
 import { extname } from 'node:path';
+import { InternalServerErrorException } from '@nestjs/common';
+import mammoth from 'mammoth';
 import * as pdf from 'pdf-parse';
 import xlsx from 'xlsx';
-import mammoth from 'mammoth';
-import { InternalServerErrorException } from '@nestjs/common';
 
 export const urlToBuffer = async (url: string) => {
 	return new Promise((resolve, reject) => {
