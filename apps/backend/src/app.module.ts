@@ -59,6 +59,21 @@ const connections = new Map();
 					// TODO: 生产环境不需要用户密码
 					username: configService.get<string>(RedisEnum.REDIS_USERNAME),
 					password: configService.get<string>(RedisEnum.REDIS_PASSWORD),
+					// 每隔 10 秒发送一次心跳，防止连接被防火墙或 Redis 服务器判定为空闲而断开
+					keepAlive: 10000,
+					// 增加连接超时时间，默认可能较短，建议设为 10秒或更长
+					connectTimeout: 10000,
+					// 增加命令超时时间，防止大任务执行时 Redis 响应慢导致超时
+					commandTimeout: 10000,
+					// 开启自动重连策略，当连接断开时，自动尝试重连，而不是直接报错
+					retryStrategy: (times: number) => {
+						if (times > 10) {
+							// 重试次数过多则停止
+							return null;
+						}
+						// 间隔时间：最小 1 秒，最大 3 秒
+						return Math.min(times * 100, 3000);
+					},
 				},
 				defaultJobOptions: {
 					// 任务失败时的最大重试次数

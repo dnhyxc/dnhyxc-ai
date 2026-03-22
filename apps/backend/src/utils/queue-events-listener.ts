@@ -63,14 +63,14 @@ export class QueueEventsListener implements OnModuleInit, OnModuleDestroy {
 
 				this.logger.log?.(
 					`[QueueEventsListener] ✅ Job ${jobId} completed | Attempts: ${result?.attemptsMade || 0}`,
-					{
+					`${JSON.stringify({
 						event: 'completed',
 						jobId,
 						messageId: result?.messageId,
 						attemptsMade: result?.attemptsMade || 1,
 						success: result?.success,
 						timestamp: new Date().toISOString(),
-					},
+					})}`,
 				);
 			} catch (error) {
 				this.logger.error?.(
@@ -83,55 +83,67 @@ export class QueueEventsListener implements OnModuleInit, OnModuleDestroy {
 		this.queueEvents.on('failed', ({ jobId, failedReason, prev }) => {
 			this.logger.error?.(
 				`[QueueEventsListener] ❌ Job ${jobId} failed: ${failedReason}`,
-				{
+				`${JSON.stringify({
 					event: 'failed',
 					jobId,
 					failedReason,
 					prev,
 					timestamp: new Date().toISOString(),
-				},
+				})}`,
 			);
 		});
 
 		// ==================== Job 停滞事件 ====================
 		this.queueEvents.on('stalled', ({ jobId }) => {
-			this.logger.warn?.(`[QueueEventsListener] ⚠️ Job ${jobId} stalled`, {
-				event: 'stalled',
-				jobId,
-				timestamp: new Date().toISOString(),
-			});
+			this.logger.warn?.(
+				`[QueueEventsListener] ⚠️ Job ${jobId} stalled`,
+				`${JSON.stringify({
+					event: 'stalled',
+					jobId,
+					timestamp: new Date().toISOString(),
+				})}`,
+			);
 		});
 
 		// ==================== Job 进度事件 ====================
 		this.queueEvents.on('progress', ({ jobId, data }) => {
-			this.logger.debug?.(`[QueueEventsListener] 📊 Job ${jobId} progress`, {
-				event: 'progress',
-				jobId,
-				data,
-				timestamp: new Date().toISOString(),
-			});
+			this.logger.debug?.(
+				`[QueueEventsListener] 📊 Job ${jobId} progress`,
+				`${JSON.stringify({
+					event: 'progress',
+					jobId,
+					data,
+					timestamp: new Date().toISOString(),
+				})}`,
+			);
 		});
 
 		// ==================== 等待中事件 ====================
 		this.queueEvents.on('waiting', ({ jobId }) => {
-			this.logger.debug?.(`[QueueEventsListener] ⏳ Job ${jobId} waiting`, {
-				event: 'waiting',
-				jobId,
-				timestamp: new Date().toISOString(),
-			});
+			this.logger.debug?.(
+				`[QueueEventsListener] ⏳ Job ${jobId} waiting`,
+				`${JSON.stringify({
+					event: 'waiting',
+					jobId,
+					timestamp: new Date().toISOString(),
+				})}`,
+			);
 		});
 
 		// ==================== 错误事件 ====================
 		this.queueEvents.on('error', (error) => {
-			this.logger.error?.(`[QueueEventsListener] 🔴 Error: ${error.message}`, {
-				event: 'error',
-				error: {
-					name: error.name,
-					message: error.message,
-					stack: error.stack,
-				},
-				timestamp: new Date().toISOString(),
-			});
+			this.logger.error?.(
+				`[QueueEventsListener] 🔴 Error: ${error.message}`,
+				`${JSON.stringify({
+					event: 'error',
+					error: {
+						name: error.name,
+						message: error.message,
+						stack: error.stack,
+					},
+					timestamp: new Date().toISOString(),
+				})}`,
+			);
 		});
 
 		this.logger.log?.('[QueueEventsListener] ✅ Initialized successfully');
