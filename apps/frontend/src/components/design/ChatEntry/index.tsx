@@ -118,7 +118,7 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 											<div>最多同时支持 5 个文件，每个文件最大 20 MB！</div>
 										</div>
 									}
-									onUpload={onUploadFile as any}
+									onUpload={onUploadFile}
 								>
 									<div className="flex items-center">
 										<Link className="w-4 h-4 mr-2" />
@@ -137,7 +137,10 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 							) : (
 								<Button
 									variant="ghost"
-									onClick={() => sendMessage()}
+									onClick={() => {
+										sendMessage();
+										chatInputRef?.current?.focus();
+									}}
 									disabled={!input.trim()}
 									className="h-8 w-8 mb-1 flex items-center justify-center rounded-full bg-linear-to-r from-blue-500 to-cyan-500"
 								>

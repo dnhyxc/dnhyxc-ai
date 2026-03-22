@@ -3,7 +3,7 @@ import { Button, Checkbox, Label } from '@ui/index';
 import { History, Waypoints } from 'lucide-react';
 import { observer } from 'mobx-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Outlet, useNavigate, useParams } from 'react-router';
+import { Outlet, useLocation, useNavigate, useParams } from 'react-router';
 import { v4 as uuidv4 } from 'uuid';
 import { useChatCoreContext } from '@/contexts';
 import { useChatCore } from '@/hooks/useChatCore';
@@ -32,6 +32,7 @@ const Chat = observer(() => {
 
 	const navigate = useNavigate();
 	const params = useParams();
+	const location = useLocation();
 
 	const {
 		isSharing,
@@ -49,13 +50,12 @@ const Chat = observer(() => {
 	const focusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
 	useEffect(() => {
-		return () => {
-			chatStore.setActiveSessionId('');
-		};
-	}, []);
+		chatInputRef.current?.focus();
+	}, [chatInputRef.current, location.pathname]);
 
 	useEffect(() => {
 		return () => {
+			chatStore.setActiveSessionId('');
 			setIsSharing(false);
 			if (focusTimerRef.current) {
 				clearTimeout(focusTimerRef.current);
