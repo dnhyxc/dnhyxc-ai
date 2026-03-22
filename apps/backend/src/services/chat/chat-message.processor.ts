@@ -118,7 +118,7 @@ export class ChatMessageProcessor extends WorkerHost {
 
 	/**
 	 * 处理保存消息任务
-	 * 使用内存锁确保同一 chatId 的消息按顺序处理
+	 * 使用内存锁确保同一 chatId 的消息按顺序处理，因为是单机部署，所以直接使用内存锁，如果是分布式部署，这里需要改为 redis 分布式锁
 	 */
 	private async handleSaveMessage(
 		data: SaveMessageJobData,
