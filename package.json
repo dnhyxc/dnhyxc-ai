@@ -11,6 +11,7 @@
 		"server:debug": "pnpm -C apps/backend start:debug",
 		"server:prod": "pnpm -C apps/backend start:prod",
 		"server:build": "pnpm -C apps/backend build",
+		"uni:dev": "pnpm -C apps/universal dev",
 		"check": "biome check --write",
 		"format": "biome format --write",
 		"prepare": "husky install",

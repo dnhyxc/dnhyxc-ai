@@ -7,8 +7,7 @@
 	"scripts": {
 		"dev": "vite",
 		"build": "tsc && vite build",
-		"preview": "vite preview",
-		"tauri": "tauri"
+		"preview": "vite preview"
 	},
 	"dependencies": {
 		"@dnhyxc-ai/tools": "workspace:*",
