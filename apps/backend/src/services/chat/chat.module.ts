@@ -14,6 +14,7 @@ import { ChatSessions } from './session.entity';
 
 @Module({
 	imports: [
+		// 注册队列，使用 app.module.ts 中的全局 defaultJobOptions 配置
 		BullModule.registerQueueAsync({
 			name: 'chat-message-queue',
 		}),

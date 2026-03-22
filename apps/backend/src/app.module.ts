@@ -70,8 +70,8 @@ const connections = new Map();
 					},
 					// 任务成功完成后，保留最近 100 条记录
 					removeOnComplete: 100,
-					// 任务失败时，保留最近 1000 条记录
-					removeOnFail: 1000,
+					// 任务失败时，保留最近 5000 条记录
+					removeOnFail: 5000,
 				},
 			}),
 		}),
