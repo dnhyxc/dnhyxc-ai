@@ -440,8 +440,8 @@ Stick strictly to what is visually present.`,
 								fullContent += content;
 							}
 
-							// 【新增】检查 finish_reason，判断是否因达到最大 token 而停止
-							// LangChain 的 chunk 可能在 response_metadata 中包含 finish_reason
+							// 检查 finish_reason，判断是否因达到最大 token 而停止
+							// LangChain 的 chunk 在 response_metadata 中包含 finish_reason
 							const chunkFinishReason = chunk?.response_metadata?.finish_reason;
 							if (
 								chunkFinishReason === 'stop' ||
@@ -487,6 +487,7 @@ Stick strictly to what is visually present.`,
 									chatId: dto.assistantMessage.chatId,
 									childrenIds: dto.assistantMessage.childrenIds || [],
 									currentChatId: dto.assistantMessage.chatId,
+									isContinuation: dto.isContinuation || false, // 传递续写标志
 								})
 								.catch((dbError) => {
 									console.error(
@@ -507,6 +508,7 @@ Stick strictly to what is visually present.`,
 									chatId: undefined,
 									childrenIds: [],
 									currentChatId: undefined,
+									isContinuation: dto.isContinuation || false, // 传递续写标志
 								})
 								.catch((dbError) => {
 									console.error(
@@ -531,6 +533,8 @@ Stick strictly to what is visually present.`,
 										chatId: dto.assistantMessage.chatId,
 										childrenIds: dto.assistantMessage.childrenIds || [],
 										currentChatId: dto.assistantMessage.chatId,
+										// 注意：停止时不传递 isContinuation，因为这是首次保存部分内容
+										isContinuation: false, // 传递续写标志
 									})
 									.catch((dbError) => {
 										console.error(
@@ -550,6 +554,8 @@ Stick strictly to what is visually present.`,
 										chatId: undefined,
 										childrenIds: [],
 										currentChatId: undefined,
+										// 注意：停止时不传递 isContinuation，因为这是首次保存部分内容
+										isContinuation: false, // 传递续写标志
 									})
 									.catch((dbError) => {
 										console.error(
@@ -592,6 +598,7 @@ Stick strictly to what is visually present.`,
 								chatId: undefined,
 								childrenIds: [],
 								currentChatId: undefined,
+								isContinuation: false, // 传递续写标志
 							});
 						} catch (saveError) {
 							console.error(
@@ -674,6 +681,7 @@ Stick strictly to what is visually present.`,
 			{
 				role: 'user',
 				content: userContent,
+				noSave: true,
 			},
 		];
 

@@ -63,7 +63,12 @@ export class SaveDto {
 	@IsString({ each: true })
 	childrenIds?: string[];
 
-	@IsOptional()
 	@IsString()
+	@IsOptional()
 	currentChatId?: string;
+
+	@IsBoolean()
+	@IsOptional()
+	// true 表示续写模式，需要追加内容而不是替换
+	isContinuation?: boolean;
 }

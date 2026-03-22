@@ -126,6 +126,7 @@ export class MessageService {
 			chatId,
 			childrenIds = [],
 			currentChatId,
+			isContinuation = false, // 续写标志
 		} = params;
 
 		try {
@@ -137,9 +138,15 @@ export class MessageService {
 
 			if (existingMessage) {
 				// 更新现有消息
-				// 对于继续生成，应该追加内容而不是替换
-				// 但前端传递的是完整内容，所以直接替换
-				existingMessage.content = content;
+				// 对于续写场景（isContinuation），应该追加内容而不是替换
+				// 这样可以保留停止前已保存的内容
+				if (isContinuation && role === 'assistant') {
+					// 续写模式：追加新内容到已有内容后面
+					existingMessage.content = existingMessage.content + content;
+				} else {
+					// 非续写模式：直接替换内容
+					existingMessage.content = content;
+				}
 				existingMessage.childrenIds =
 					childrenIds || existingMessage.childrenIds || [];
 				existingMessage.currentChatId =

@@ -16,6 +16,7 @@ interface SaveMessageJobData {
 	chatId?: string;
 	childrenIds?: string[];
 	currentChatId?: string;
+	isContinuation?: boolean; // 续写标志：true 表示续写模式，需要追加内容而不是替换
 }
 
 interface JobResult {
@@ -61,6 +62,11 @@ export class ChatMessageProcessor extends WorkerHost {
 		super();
 	}
 
+	/**
+	 * MQ 消息需要注意竞态条件，因为MQ消息可能无法保证保存的顺序，在停止后，再继续生成时，继续生成的内容可能存在冲突，导致消息丢失。
+	 * @param job
+	 * @returns
+	 */
 	async process(job: Job<SaveMessageJobData, JobResult>): Promise<JobResult> {
 		const { name, data, attemptsMade } = job;
 
