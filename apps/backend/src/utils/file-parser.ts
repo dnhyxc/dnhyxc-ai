@@ -1,6 +1,9 @@
 import http from 'node:http';
 import https from 'node:https';
 import { extname } from 'node:path';
+import * as pdf from 'pdf-parse';
+import xlsx from 'xlsx';
+import mammoth from 'mammoth';
 import { InternalServerErrorException } from '@nestjs/common';
 
 export const urlToBuffer = async (url: string) => {
@@ -24,13 +27,17 @@ export const urlToBuffer = async (url: string) => {
 	});
 };
 
-const parsePdf = async (buffer: Buffer): Promise<string> => {
+const parsePdf = async (
+	_buffer: Buffer,
+	filePath?: string,
+): Promise<string> => {
 	try {
 		// 动态导入 pdf-parse 库
-		const pdf = await import('pdf-parse');
-		// @ts-expect-error - pdf-parse 的 TypeScript 类型可能不准确
-		const data = await pdf.default(buffer);
-		return data.text;
+		const parser = new (pdf as any).PDFParse({
+			url: filePath,
+		});
+		const result = await parser.getText();
+		return result.text;
 	} catch (error) {
 		throw new InternalServerErrorException(
 			`PDF 解析失败: ${error.message}. 请确保已安装 pdf-parse 库: npm install pdf-parse`,
@@ -40,8 +47,6 @@ const parsePdf = async (buffer: Buffer): Promise<string> => {
 
 const parseDocx = async (buffer: Buffer): Promise<string> => {
 	try {
-		// 动态导入 mammoth 库
-		const mammoth = await import('mammoth');
 		const result = await mammoth.extractRawText({ buffer });
 		return result.value;
 	} catch (error) {
@@ -53,8 +58,6 @@ const parseDocx = async (buffer: Buffer): Promise<string> => {
 
 const parseExcel = async (buffer: Buffer): Promise<string> => {
 	try {
-		// 动态导入 xlsx 库
-		const xlsx = await import('xlsx');
 		const workbook = xlsx.read(buffer, { type: 'buffer' });
 		let text = '';
 
@@ -92,7 +95,7 @@ export const parseFile = async (
 
 		switch (extension) {
 			case '.pdf':
-				return await parsePdf(buffer);
+				return await parsePdf(buffer, filePath);
 			case '.docx':
 				return await parseDocx(buffer);
 			case '.xlsx':
