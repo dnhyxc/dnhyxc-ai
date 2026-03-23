@@ -1,4 +1,4 @@
-import { Button } from '@ui/index';
+import { Button, Spinner } from '@ui/index';
 import { Toast } from '@ui/sonner';
 import { Download, Eye, Trash2, Upload as UploadIcon } from 'lucide-react';
 import { useRef, useState } from 'react';
@@ -25,6 +25,7 @@ interface IProps {
 	showTooltip?: boolean;
 	tooltipContent?: React.ReactNode | string;
 	disabled?: boolean;
+	loading?: boolean;
 }
 
 const Upload: React.FC<IProps> = ({
@@ -51,6 +52,7 @@ const Upload: React.FC<IProps> = ({
 	showTooltip = false,
 	tooltipContent = '仅支持PDF、Word、Excel文件',
 	disabled = false,
+	loading,
 }) => {
 	const [files, setFiles] = useState<FileWithPreview[]>([]);
 
@@ -188,12 +190,18 @@ const Upload: React.FC<IProps> = ({
 						disabled={disabled}
 						onClick={triggerFileInput}
 					>
-						{children || (
-							<div className="flex items-center">
-								<UploadIcon className="w-8 h-8 mx-auto text-textcolor mr-2" />
-								上传文件
+						{loading && (
+							<div className="flex items-center gap-2">
+								<Spinner className="text-textcolor" /> 上传中...
 							</div>
 						)}
+						{!loading &&
+							(children || (
+								<div className="flex items-center">
+									<UploadIcon className="w-8 h-8 mx-auto text-textcolor mr-2" />
+									上传文件
+								</div>
+							))}
 					</Button>
 				</Tooltip>
 			)}

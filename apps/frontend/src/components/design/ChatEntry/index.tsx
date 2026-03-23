@@ -31,6 +31,7 @@ interface ChatEntryProps {
 	chatInputRef?: React.RefObject<HTMLTextAreaElement | null>; // 新增
 	children?: React.ReactNode;
 	className?: string;
+	uploadLoading?: boolean;
 }
 
 const ChatEntry: React.FC<ChatEntryProps> = ({
@@ -49,6 +50,7 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 	chatInputRef,
 	children,
 	className,
+	uploadLoading,
 }) => {
 	return (
 		<div className={cn('relative p-5.5 pt-0 backdrop-blur-sm', className)}>
@@ -107,7 +109,8 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 									multiple
 									countValidText="最多只能支持 5 个文件"
 									uploadedCount={uploadedFiles?.length}
-									disabled={uploadedFiles?.length >= 5}
+									disabled={uploadedFiles?.length >= 5 || uploadLoading}
+									loading={uploadLoading}
 									validTypes={CHAT_VALIDTYPES}
 									showTooltip
 									tooltipContent={

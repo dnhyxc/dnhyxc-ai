@@ -45,6 +45,7 @@ const Chat = observer(() => {
 
 	const [open, setOpen] = useState(false);
 	const [shareModelVisible, setShareModelVisible] = useState(false);
+	const [uploadLoading, setUploadLoading] = useState(false);
 
 	const chatInputRef = useRef<HTMLTextAreaElement>(null);
 	const focusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -65,21 +66,26 @@ const Chat = observer(() => {
 
 	const onUploadFile = useCallback(
 		async (data: FileWithPreview | FileWithPreview[]) => {
-			const files = Array.isArray(data) ? data : [data];
-			const fileList = files.map((item) => item.file);
-			const res = await uploadFiles(fileList);
-			if (res.success) {
-				setUploadedFiles((prev) => {
-					return [
-						...prev,
-						...res.data.map((item: UploadedFile) => ({
-							...item,
-							path: import.meta.env.VITE_DEV_DOMAIN + item.path,
-							uuid: uuidv4(),
-						})),
-					];
-				});
-				chatInputRef.current?.focus();
+			try {
+				setUploadLoading(true);
+				const files = Array.isArray(data) ? data : [data];
+				const fileList = files.map((item) => item.file);
+				const res = await uploadFiles(fileList);
+				if (res.success) {
+					setUploadedFiles((prev) => {
+						return [
+							...prev,
+							...res.data.map((item: UploadedFile) => ({
+								...item,
+								path: import.meta.env.VITE_DEV_DOMAIN + item.path,
+								uuid: uuidv4(),
+							})),
+						];
+					});
+					chatInputRef.current?.focus();
+				}
+			} finally {
+				setUploadLoading(false);
 			}
 		},
 		[setUploadedFiles],
@@ -191,6 +197,7 @@ const Chat = observer(() => {
 					input={input}
 					setInput={setInput}
 					uploadedFiles={uploadedFiles}
+					uploadLoading={uploadLoading}
 					setUploadedFiles={setUploadedFiles}
 					loading={chatStore.isCurrentSessionLoading}
 					editMessage={editMessage}

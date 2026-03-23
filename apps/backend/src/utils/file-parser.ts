@@ -83,6 +83,10 @@ const parseText = async (buffer: Buffer): Promise<string> => {
 	return buffer.toString('utf-8');
 };
 
+const parseMarkdown = async (buffer: Buffer): Promise<string> => {
+	return await parseText(buffer);
+};
+
 export const parseFile = async (
 	filePath: string,
 	mimeType?: string,
@@ -103,9 +107,11 @@ export const parseFile = async (
 				return await parseExcel(buffer);
 			case '.txt':
 				return await parseText(buffer);
+			case '.md':
+				return await parseMarkdown(buffer);
 			default:
 				throw new InternalServerErrorException(
-					`不支持的文件格式: ${extension}. 支持的格式: .pdf, .docx, .xlsx, .xls, .txt`,
+					`不支持的文件格式: ${extension}. 支持的格式: .pdf, .docx, .xlsx, .xls, .txt, .md`,
 				);
 		}
 	} catch (error) {
