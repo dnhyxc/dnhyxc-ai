@@ -171,15 +171,11 @@ export const uploadFile = async (file: File) => {
 
 // 上传多个文件
 export const uploadFiles = async (files: File[]) => {
-	return await http.post(
-		UPLOAD_FILES,
-		{ files },
-		{
-			headers: {
-				'Content-Type': 'multipart/form-data',
-			},
+	return await http.post(UPLOAD_FILES, files, {
+		headers: {
+			'Content-Type': 'multipart/form-data',
 		},
-	);
+	});
 };
 
 // 下载文件

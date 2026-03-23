@@ -9,7 +9,6 @@ interface CustomHttpOptions {
 	headers?: Record<string, string>;
 	body?: string | FormData | Blob | ArrayBuffer | URLSearchParams;
 	timeout?: number;
-	// 添加其他需要的选项
 }
 
 // 请求配置接口
@@ -20,6 +19,7 @@ export interface RequestConfig
 	data?: any;
 	timeout?: number;
 	headers?: Record<string, string>;
+	onUploadProgress?: (progress: number) => void; // 上传进度回调
 }
 
 // 响应数据接口
@@ -83,7 +83,6 @@ class HttpClient {
 		if (!params || params.length === 0) {
 			return url;
 		}
-		// 按照数组索引顺序拼接路径参数
 		const paramPath = params.join('/');
 		return `${url}/${paramPath}`;
 	}
@@ -109,51 +108,119 @@ class HttpClient {
 		return `${url}${url.includes('?') ? '&' : '?'}${queryString}`;
 	}
 
-	// 处理请求体
-	private handleRequestBody(
-		data: any | any[],
-		headers: Record<string, string>,
-	): any {
-		const contentType = headers['Content-Type'] || '';
+	// 异步构建 FormData，避免阻塞主线程
+	private async buildFormDataAsync(
+		data: any,
+		onProgress?: (progress: number) => void,
+	): Promise<FormData> {
+		const formData = new FormData();
 
-		if (contentType.includes('application/json') && data) {
-			return JSON.stringify(data);
-		}
+		// 计算总文件大小（用于进度计算）
+		let totalSize = 0;
+		let processedSize = 0;
 
-		if (contentType.includes('application/x-www-form-urlencoded') && data) {
-			return new URLSearchParams(data).toString();
-		}
+		// 先计算总大小
+		const calculateSize = (value: any): number => {
+			if (value instanceof File) {
+				return value.size;
+			} else if (Array.isArray(value)) {
+				return value.reduce((sum, item) => sum + calculateSize(item), 0);
+			} else if (value && typeof value === 'object') {
+				return Object.values(value).reduce(
+					(sum: number, val) => sum + calculateSize(val),
+					0,
+				);
+			}
+			return 0;
+		};
 
-		if (contentType.includes('multipart/form-data') && data) {
-			const formData = new FormData();
+		totalSize = calculateSize(data);
 
-			const appendValue = (key: string, value: any) => {
+		const updateProgress = () => {
+			if (onProgress && totalSize > 0) {
+				const progress = (processedSize / totalSize) * 100;
+				onProgress(Math.min(progress, 99));
+			}
+		};
+
+		const appendValue = (key: string, value: any) => {
+			if (value instanceof File) {
+				formData.append(key, value);
+				processedSize += value.size;
+				updateProgress();
+			} else if (value !== undefined && value !== null) {
+				formData.append(key, String(value));
+			}
+		};
+
+		// 让出主线程的辅助函数
+		const yieldToMain = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+		if (Array.isArray(data)) {
+			// 异步处理数组中的文件
+			for (let i = 0; i < data.length; i++) {
+				const item = data[i];
+				if (item instanceof File) {
+					formData.append('files', item);
+					processedSize += item.size;
+					updateProgress();
+
+					// 每处理一个文件，让出主线程
+					await yieldToMain();
+				} else {
+					appendValue('files', item);
+				}
+			}
+		} else if (data && typeof data === 'object') {
+			const entries = Object.entries(data);
+			for (let i = 0; i < entries.length; i++) {
+				const [key, value] = entries[i];
+
 				if (value instanceof File) {
 					formData.append(key, value);
+					processedSize += value.size;
+					updateProgress();
+
+					// 遇到文件时让出主线程
+					await yieldToMain();
 				} else if (Array.isArray(value)) {
-					value.forEach((v) => {
-						appendValue(key, v);
+					// 处理数组类型的值
+					for (let j = 0; j < value.length; j++) {
+						const item = value[j];
+						if (item instanceof File) {
+							formData.append(key, item);
+							processedSize += item.size;
+							updateProgress();
+
+							// 每处理 2 个文件让出一次主线程
+							if (j % 2 === 1) {
+								await yieldToMain();
+							}
+						} else {
+							appendValue(key, item);
+						}
+					}
+				} else if (value && typeof value === 'object') {
+					// 处理嵌套对象
+					Object.entries(value).forEach(([subKey, subValue]) => {
+						appendValue(`${key}[${subKey}]`, subValue);
 					});
 				} else {
-					formData.append(key, String(value));
-				}
-			};
-
-			if (Array.isArray(data)) {
-				// 数组情况：默认 key 为 'files' 或根据业务指定
-				data.forEach((item) => {
-					appendValue('files', item);
-				});
-			} else {
-				// 对象情况
-				Object.entries(data).forEach(([key, value]) => {
 					appendValue(key, value);
-				});
+				}
+
+				// 每处理 5 个字段让出一次主线程
+				if (i % 5 === 4) {
+					await yieldToMain();
+				}
 			}
-			return formData;
 		}
 
-		return data;
+		if (onProgress) {
+			onProgress(100);
+		}
+
+		return formData;
 	}
 
 	// 解析响应体
@@ -175,18 +242,15 @@ class HttpClient {
 		}
 	}
 
-	// 错误处理 - 现在可以接收服务器返回的详细错误信息
+	// 错误处理
 	private async handleErrorResponse(
 		response: Response,
 		error?: any,
 	): Promise<RequestError> {
 		try {
-			// 首先尝试解析服务器的响应体
 			const responseBody = await this.parseResponseBody(response);
 
 			if (responseBody && typeof responseBody === 'object') {
-				// 根据您的服务器响应结构，提取错误信息
-				// 您的服务器返回格式示例：{ error: '验证码错误', success: false, code: 500, message: '验证码错误' }
 				return {
 					code: responseBody.code || response.status || 500,
 					message:
@@ -209,7 +273,6 @@ class HttpClient {
 			console.warn('Failed to parse error response:', parseError);
 		}
 
-		// 如果无法解析响应体，返回通用的错误信息
 		return {
 			code: response.status || 500,
 			message: response.statusText || '请求失败',
@@ -220,7 +283,6 @@ class HttpClient {
 	// 处理网络错误等其他错误
 	private handleNetworkError(error: any): RequestError {
 		if (error && typeof error === 'object') {
-			// 如果错误对象已经有我们需要的结构，直接返回
 			if ('code' in error && 'message' in error) {
 				return error as RequestError;
 			}
@@ -259,33 +321,54 @@ class HttpClient {
 		const finalUrl = this.handleUrlQuerys(paramUrl, finalConfig.querys);
 
 		// 处理请求体
-		const body = this.handleRequestBody(
-			finalConfig.data,
-			finalConfig.headers || {},
-		);
+		let body: any;
+		const contentType = finalConfig.headers?.['Content-Type'] || '';
 
-		if (finalConfig.headers?.['Content-Type'] === 'multipart/form-data') {
+		// 判断是否为 FormData 上传
+		const isFormData =
+			contentType.includes('multipart/form-data') && finalConfig.data;
+
+		if (isFormData) {
+			// 异步构建 FormData，避免阻塞主线程
+			body = await this.buildFormDataAsync(
+				finalConfig.data,
+				finalConfig.onUploadProgress,
+			);
+			// 删除 Content-Type，让浏览器自动设置 boundary
 			delete finalConfig.headers?.['Content-Type'];
+		} else if (contentType.includes('application/json') && finalConfig.data) {
+			body = JSON.stringify(finalConfig.data);
+		} else if (
+			contentType.includes('application/x-www-form-urlencoded') &&
+			finalConfig.data
+		) {
+			body = new URLSearchParams(finalConfig.data).toString();
+		} else {
+			body = finalConfig.data;
 		}
+
 		// 构建请求选项
 		const requestOptions: CustomHttpOptions = {
 			method,
-			...finalConfig,
+			headers: finalConfig.headers,
+			timeout: finalConfig.timeout,
 			body: method === 'GET' || method === 'HEAD' ? undefined : body,
 		};
 
 		let response: Response | null = null;
 
 		try {
+			// 让出主线程，确保 UI 有机会更新
+			await new Promise((resolve) => setTimeout(resolve, 0));
+
 			// 发送请求
 			response = await fetch(finalUrl, requestOptions);
 
-			// 解析响应数据（无论成功还是失败都需要解析）
+			// 解析响应数据
 			const responseData = await this.parseResponseBody(response);
 
 			// 检查响应状态
 			if (!response.ok) {
-				// 服务器返回了错误状态码，获取详细的错误信息
 				const errorInfo = await this.handleErrorResponse(
 					response,
 					responseData,
@@ -315,7 +398,6 @@ class HttpClient {
 			let requestError: RequestError;
 
 			if (response) {
-				// 有响应但状态码不是2xx
 				requestError = await this.handleErrorResponse(response, error);
 			} else if (
 				error &&
@@ -323,10 +405,8 @@ class HttpClient {
 				'code' in error &&
 				'message' in error
 			) {
-				// 如果是我们抛出的错误（已经包含了服务器错误信息），直接使用
 				requestError = error as RequestError;
 			} else {
-				// 网络错误等其他错误
 				requestError = this.handleNetworkError(error);
 			}
 
@@ -339,8 +419,8 @@ class HttpClient {
 					requestError.message,
 			});
 
-			// 抛出错误，让调用者可以继续处理
-			throw requestError.data.data || requestError;
+			// 抛出错误
+			throw requestError.data?.data || requestError;
 		}
 	}
 
@@ -398,75 +478,5 @@ export const createHttpClient = (
 ) => {
 	return new HttpClient(baseURL, config);
 };
-
-// 使用示例：
-/*
-// 1. 基本使用
-async function login(credentials) {
-	try {
-		const response = await http.post('/auth/login', credentials);
-		if (response.success) {
-			console.log('登录成功:', response.data);
-			return response.data;
-		} else {
-			console.warn('登录失败:', response.message);
-			return null;
-		}
-	} catch (error) {
-		console.error('请求错误详情:', {
-			状态码: error.code,
-			错误信息: error.message,
-			详细错误: error.error,
-			是否成功: error.success
-		});
-		
-		// 可以根据具体错误类型做不同处理
-		if (error.error === '验证码错误') {
-			// 刷新验证码
-			refreshCaptcha();
-		}
-		
-		return null;
-	}
-}
-
-// 2. GET 请求示例
-http.get('/users/1', {
-	querys: { include: 'profile' }
-})
-	.then(response => console.log(response.data))
-	.catch(error => console.error(error));
-
-// 3. POST 请求示例
-http.post('/users', {
-	name: '张三',
-	email: 'zhangsan@example.com'
-}, {
-	headers: {
-		'X-Custom-Header': 'value'
-	}
-});
-
-// 4. 上传文件
-const formData = new FormData();
-formData.append('file', file);
-formData.append('name', '文件名');
-
-http.post('/upload', formData, {
-	headers: {
-		'Content-Type': 'multipart/form-data'
-	}
-});
-
-// 5. 设置认证 token
-http.setAuthToken('your-jwt-token-here');
-
-// 6. 创建特定实例
-const apiClient = createHttpClient('https://api.example.com', {
-	headers: {
-		'X-API-Key': 'your-api-key'
-	}
-});
-*/
 
 export default HttpClient;
