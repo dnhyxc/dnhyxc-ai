@@ -61,18 +61,45 @@ const connections = new Map();
 					password: configService.get<string>(RedisEnum.REDIS_PASSWORD),
 					// 每隔 10 秒发送一次心跳，防止连接被防火墙或 Redis 服务器判定为空闲而断开
 					keepAlive: 10000,
-					// 增加连接超时时间，默认可能较短，建议设为 10秒或更长
-					connectTimeout: 10000,
+					// 增加连接超时时间，默认可能较短，建议设为 5秒或更长
+					connectTimeout: 5000,
 					// 增加命令超时时间，防止大任务执行时 Redis 响应慢导致超时
 					commandTimeout: 10000,
+					socket: {
+						keepAlive: true, // 启用 TCP Keep-Alive
+						// 初始发送 Keep-Alive 探测包的延迟（毫秒），建议设为比中间设备超时时间短一点
+						keepAliveInitialDelay: 10000, // 10秒
+					},
 					// 开启自动重连策略，当连接断开时，自动尝试重连，而不是直接报错
 					retryStrategy: (times: number) => {
-						if (times > 10) {
+						if (times > 5) {
 							// 重试次数过多则停止
 							return null;
 						}
 						// 间隔时间：最小 1 秒，最大 3 秒
 						return Math.min(times * 100, 3000);
+					},
+					// 启用离线队列（默认开启），连接断开期间命令会排队，重连后自动重发
+					enableOfflineQueue: true,
+					// 如果是 BullMQ，建议开启 readyCheck 就绪检查，但是开启后有时 Redis 环境不支持 INFO 命令或检查耗时过长，禁用可加快重连速度
+					enableReadyCheck: true,
+					// 懒加载连接：只有在有任务需要处理时才建立连接，避免启动时即断开的问题
+					// lazyConnect: true,
+					// 自动重连：当连接断开时，自动尝试重连（关键配置）
+					// 注意：ioredis 默认会尝试重连，但显式声明可以确保逻辑清晰
+					// 实际上 retryStrategy 的存在就启用了自动重连，但我们可以通过 reconnectOnError 处理错误时的重连
+					reconnectOnError: (err: any) => {
+						const targetErrors = [
+							'READONLY',
+							'ECONNRESET',
+							'ECONNREFUSED',
+							'ETIMEDOUT',
+						];
+						// 如果遇到特定错误，尝试重连
+						if (targetErrors.some((e) => err.message.includes(e))) {
+							return true; // 返回 true 表示尝试重连
+						}
+						return false;
 					},
 				},
 				defaultJobOptions: {
