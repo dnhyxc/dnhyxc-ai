@@ -1,7 +1,7 @@
-import { Button, Spinner } from '@ui/index';
+import { Button, Input, Spinner } from '@ui/index';
 import { Toast } from '@ui/sonner';
 import { Download, Eye, Trash2, Upload as UploadIcon } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { FileWithPreview } from '@/types';
 import Image from '../Image';
@@ -59,52 +59,108 @@ const Upload: React.FC<IProps> = ({
 	const fileInputRef = useRef<HTMLInputElement>(null);
 	const imageRef = useRef<{ reset: () => void; onPreview: () => void }>(null);
 
+	useEffect(() => {
+		return () => {
+			files.forEach((file) => {
+				if (file.preview) {
+					URL.revokeObjectURL(file.preview);
+				}
+			});
+		};
+	}, [files]);
+
+	const revokeObjectURL = (preview: string) => {
+		if (preview?.startsWith('blob:')) {
+			URL.revokeObjectURL(preview);
+		}
+	};
+
+	const revokeAllObjectURLs = (fileList: FileWithPreview[]) => {
+		fileList.forEach((file) => {
+			if (file.preview) {
+				URL.revokeObjectURL(file.preview);
+			}
+		});
+	};
+
 	const triggerFileInput = () => {
 		fileInputRef.current?.click();
 	};
 
-	const onFileSelect = async (selectedFiles: File[] | FileList) => {
-		// 文件数量检查
-		if (
-			(multiple && selectedFiles.length + files.length > maxCount) ||
-			uploadedCount + selectedFiles.length > maxCount
-		) {
-			Toast({
-				type: 'error',
-				title: countValidText || `最多只能同时上传 ${maxCount} 个文件`,
+	// 🔧 关键修复: 验证文件（同步但轻量）
+	const validateFiles = useCallback(
+		(
+			selectedFiles: File[] | FileList,
+			currentFilesLength: number,
+		): { valid: boolean; files: File[] } => {
+			// 文件数量检查
+			if (
+				(multiple && selectedFiles.length + currentFilesLength > maxCount) ||
+				uploadedCount + selectedFiles.length > maxCount
+			) {
+				Toast({
+					type: 'error',
+					title: countValidText || `最多只能同时上传 ${maxCount} 个文件`,
+				});
+				return { valid: false, files: [] };
+			}
+
+			const validFiles = Array.from(selectedFiles).filter((file) => {
+				// 文件类型检查
+				if (!validTypes.includes(file.type)) {
+					Toast({
+						type: 'error',
+						title: `不支持的文件类型: ${file.type}`,
+					});
+					return false;
+				}
+
+				// 文件大小检查
+				if (file.size > maxSize) {
+					Toast({
+						type: 'error',
+						title: `文件大小不能超过 ${maxSize / 1024 / 1024} MB`,
+					});
+					return false;
+				}
+
+				return true;
 			});
-			setFiles([]);
+
+			return { valid: true, files: validFiles };
+		},
+		[multiple, maxCount, uploadedCount, countValidText, validTypes, maxSize],
+	);
+
+	const createPreviewURLs = useCallback(
+		(fileList: File[]): FileWithPreview[] => {
+			return fileList.map((file) => {
+				// 仅对图片类型创建预览 URL
+				if (file.type.startsWith('image/')) {
+					const preview = URL.createObjectURL(file);
+					return {
+						file,
+						preview,
+						id: Math.random().toString(36).substring(2, 9),
+					};
+				}
+				return {
+					file,
+					id: Math.random().toString(36).substring(2, 9),
+				};
+			});
+		},
+		[],
+	);
+
+	const onFileSelect = async (selectedFiles: File[] | FileList) => {
+		const validation = validateFiles(selectedFiles, files.length);
+		if (!validation.valid || validation.files.length === 0) {
 			return;
 		}
 
-		const newFiles = Array.from(selectedFiles).filter((file) => {
-			// 文件类型检查
-			if (!validTypes.includes(file.type)) {
-				Toast({
-					type: 'error',
-					title: `不支持的文件类型: ${file.type}`,
-				});
-				return false;
-			}
-
-			// 文件大小检查 (10MB)
-			if (file.size > maxSize) {
-				Toast({
-					type: 'error',
-					title: `文件大小不能超过 ${maxSize / 1024 / 1024} MB`,
-				});
-				return false;
-			}
-
-			return true;
-		});
-
 		// 创建预览URL
-		const filesWithPreview = newFiles.map((file) => ({
-			file,
-			preview: URL.createObjectURL(file),
-			id: Math.random().toString(36).substring(2, 9),
-		}));
+		const filesWithPreview = createPreviewURLs(validation.files);
 
 		const fileList = multiple
 			? [...filesWithPreview, ...files]
@@ -113,11 +169,15 @@ const Upload: React.FC<IProps> = ({
 			setFiles((prev) => [...filesWithPreview, ...prev]);
 			getFileList?.(fileList);
 			await onUpload(fileList);
+			revokeAllObjectURLs(filesWithPreview);
 			setFiles([]);
 		} else {
 			setFiles(filesWithPreview);
 			getFileList?.(filesWithPreview?.[0]);
 			await onUpload(filesWithPreview?.[0]);
+			if (filesWithPreview[0]?.preview) {
+				revokeObjectURL(filesWithPreview[0].preview);
+			}
 			setFiles([]);
 		}
 	};
@@ -131,6 +191,9 @@ const Upload: React.FC<IProps> = ({
 	};
 
 	const onDelete = (file: FileWithPreview) => {
+		if (file.preview) {
+			revokeObjectURL(file.preview);
+		}
 		setFiles((prev) => prev.filter((item) => item.id !== file.id));
 		onClearFileUrl?.();
 	};
@@ -143,7 +206,7 @@ const Upload: React.FC<IProps> = ({
 
 	return (
 		<div className={cn('w-32.5 h-32.5', className)}>
-			<input
+			<Input
 				type="file"
 				ref={fileInputRef}
 				onChange={onFileInputChange}
@@ -156,7 +219,7 @@ const Upload: React.FC<IProps> = ({
 					<div className="relative flex items-center justify-center w-full h-full z-1 group">
 						<Image
 							ref={imageRef}
-							src={fileUrl || files[0].preview}
+							src={fileUrl || files[0]?.preview || ''}
 							showOnError
 							className="relative w-full h-full rounded-md"
 						>

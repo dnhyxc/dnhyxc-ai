@@ -39,7 +39,10 @@ const ChatFileList: React.FC<IProps> = ({
 	}, [data]);
 
 	const getUrl = async () => {
-		if (data.path.includes('http://localhost:')) {
+		if (
+			data.path.includes('http://localhost:') &&
+			data.mimetype.startsWith('image/')
+		) {
 			const res = await fetchImageAsBlobUrl(data.path);
 			if (res) {
 				setBase64Url(res);

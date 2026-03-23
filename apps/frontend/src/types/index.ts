@@ -44,7 +44,7 @@ export interface DownloadBlobOptions {
 // 文件上传接口
 export interface FileWithPreview {
 	file: File;
-	preview: string;
+	preview?: string;
 	id: string;
 }
 
