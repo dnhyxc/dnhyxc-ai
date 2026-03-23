@@ -294,8 +294,8 @@ const ChatBot = observer(
 			}
 
 			scrollTimer.current = setTimeout(() => {
-				onScrollTo('down', 'auto');
-			}, 50);
+				onScrollTo('down');
+			}, 100);
 
 			setInput('');
 			setUploadedFiles([]);
