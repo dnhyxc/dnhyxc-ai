@@ -59,8 +59,6 @@ const connections = new Map();
 					// TODO: 生产环境不需要用户密码
 					username: configService.get<string>(RedisEnum.REDIS_USERNAME),
 					password: configService.get<string>(RedisEnum.REDIS_PASSWORD),
-					// 每隔 10 秒发送一次心跳，防止连接被防火墙或 Redis 服务器判定为空闲而断开
-					keepAlive: 10000,
 					// 增加连接超时时间，默认可能较短，建议设为 5秒或更长
 					connectTimeout: 5000,
 					// 增加命令超时时间，防止大任务执行时 Redis 响应慢导致超时
@@ -68,7 +66,7 @@ const connections = new Map();
 					socket: {
 						keepAlive: true, // 启用 TCP Keep-Alive
 						// 初始发送 Keep-Alive 探测包的延迟（毫秒），建议设为比中间设备超时时间短一点
-						keepAliveInitialDelay: 10000, // 10秒
+						keepAliveInitialDelay: 30000, // 30秒
 					},
 					// 开启自动重连策略，当连接断开时，自动尝试重连，而不是直接报错
 					retryStrategy: (times: number) => {
