@@ -1,7 +1,7 @@
 // components/ChatTextArea.tsx
 
-import { Button, Textarea } from '@ui/index';
-import { forwardRef } from 'react';
+import { Button, ScrollArea, Textarea } from '@ui/index';
+import React, { forwardRef, useRef } from 'react';
 import { useEntry } from '@/hooks/useEntry'; // 根据实际路径调整
 import { Message } from '@/types/chat'; // 根据实际路径调整
 
@@ -67,18 +67,31 @@ const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 			} as React.RefObject<HTMLTextAreaElement | null>,
 		});
 
+		const scrollRef = useRef<HTMLDivElement>(null);
+
 		const isEditMode = mode === 'edit';
 		const value = isEditMode ? editMessage?.content || '' : input;
 
+		const onScrollTo = () => {
+			scrollRef.current?.scrollTo({
+				top: scrollRef.current.scrollHeight + 100,
+			});
+		};
+
 		return (
-			<div className={`flex flex-col w-full ${className || ''}`}>
+			<ScrollArea
+				ref={scrollRef}
+				className={`flex flex-col w-full max-h-35 overflow-y-auto ${className || ''}`}
+			>
 				<Textarea
 					ref={ref}
 					value={value}
 					onChange={
 						isEditMode ? handleEditChange : (e) => setInput(e.target.value)
 					}
-					onKeyDown={(e) => handleKeyDown(e, isEditMode ? editMessage : null)}
+					onKeyDown={(e) =>
+						handleKeyDown(e, isEditMode ? editMessage : null, onScrollTo)
+					}
 					onCompositionStart={handleCompositionStart}
 					onCompositionEnd={handleCompositionEnd}
 					placeholder={placeholder}
@@ -108,7 +121,7 @@ const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 						</Button>
 					</div>
 				)}
-			</div>
+			</ScrollArea>
 		);
 	},
 );

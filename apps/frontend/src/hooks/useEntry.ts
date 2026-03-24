@@ -65,6 +65,7 @@ export const useEntry = ({
 	const handleKeyDown = (
 		e: React.KeyboardEvent<HTMLTextAreaElement>,
 		message?: Message | null,
+		scrollTo?: () => void,
 	) => {
 		if (e.key === 'Enter') {
 			const hasModifier = e.ctrlKey || e.metaKey || e.shiftKey || e.altKey;
@@ -82,6 +83,8 @@ export const useEntry = ({
 					setEditInputValue: handleEditChange,
 					textareaNode: textareaRef?.current || undefined, // 传递 ref 给工具函数
 				});
+				// textarea 超出最大高度时，自动滚动到底部
+				scrollTo?.();
 			};
 
 			if (isCurrentlyComposing) {
