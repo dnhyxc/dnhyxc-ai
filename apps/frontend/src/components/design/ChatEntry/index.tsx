@@ -1,8 +1,16 @@
 import ChatFileList from '@design/ChatFileList';
 import ChatTextArea from '@design/ChatTextArea';
 import Upload from '@design/Upload';
-import { Button } from '@ui/index';
-import { CirclePlus, Link, Rocket, StopCircle } from 'lucide-react';
+import { Button, ScrollArea, ScrollBar } from '@ui/index';
+import {
+	ChevronFirst,
+	ChevronLast,
+	CirclePlus,
+	Link,
+	Rocket,
+	StopCircle,
+} from 'lucide-react';
+import { useRef } from 'react';
 import { CHAT_VALIDTYPES } from '@/constant';
 import { cn } from '@/lib/utils';
 import { FileWithPreview, UploadedFile } from '@/types';
@@ -52,29 +60,64 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 	className,
 	uploadLoading,
 }) => {
+	const scrollContainer = useRef<HTMLDivElement>(null);
 	return (
 		<div className={cn('relative p-5.5 pt-0 backdrop-blur-sm', className)}>
 			<div className="max-w-3xl mx-auto flex">
 				<div className="flex-1 relative">
 					{children}
-					<div className="flex flex-col overflow-y-auto rounded-md bg-theme/2 border border-theme-white/5">
+					<div className="max-w-3xl flex flex-col overflow-y-auto rounded-md bg-theme/2 border border-theme-white/5">
 						{uploadedFiles?.length > 0 ? (
-							<>
-								<div className="mt-2.5 mb-0.5 mx-3 text-sm text-textcolor/70">
+							<div className="flex flex-1 flex-col rounded-md">
+								<div className="mt-2.5 mb-0.5 px-3 text-sm text-textcolor/70">
 									只识别附件中的文字
 								</div>
-								<div className="w-full flex flex-wrap px-3 mb-2">
-									{uploadedFiles.map((i, index) => (
-										<ChatFileList
-											key={i.id || index}
-											data={i}
-											showDelete
-											setUploadedFiles={setUploadedFiles}
-											className="mr-3 mt-3"
-										/>
-									))}
+								<div className="w-full px-3 group">
+									<ScrollArea
+										ref={scrollContainer}
+										className="relative max-w-3xl rounded-md"
+									>
+										<div className="flex items-center rounded-md">
+											<Button
+												type="button"
+												onClick={() =>
+													scrollContainer.current?.scrollBy?.({
+														left: -200,
+														behavior: 'smooth',
+													})
+												}
+												className="hidden group-hover:flex items-center absolute left-0 top-3 w-6 h-14 rounded-md z-10 bg-theme-background/5 hover:bg-theme-background/60 p-2 shadow-md"
+											>
+												<ChevronFirst className="text-textcolor" />
+											</Button>
+											<div className="flex mb-2">
+												{uploadedFiles.map((i, index) => (
+													<ChatFileList
+														key={i.id || index}
+														data={i}
+														showDelete
+														setUploadedFiles={setUploadedFiles}
+														className={cn('mt-3 shrink-0', 'mr-3 last:mr-0')}
+													/>
+												))}
+											</div>
+											<Button
+												type="button"
+												onClick={() =>
+													scrollContainer.current?.scrollBy?.({
+														left: 200,
+														behavior: 'smooth',
+													})
+												}
+												className="hidden group-hover:flex items-center absolute right-0 top-3 z-10 w-6 h-14 rounded-md bg-theme-background/5 hover:bg-theme-background/60 p-2 shadow-md"
+											>
+												<ChevronLast className="text-textcolor" />
+											</Button>
+										</div>
+										<ScrollBar orientation="horizontal" />
+									</ScrollArea>
 								</div>
-							</>
+							</div>
 						) : null}
 
 						{/* 复用 ChatTextArea 组件 */}
