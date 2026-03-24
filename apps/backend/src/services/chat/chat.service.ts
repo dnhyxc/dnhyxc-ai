@@ -7,9 +7,17 @@ import {
 import { ChatOpenAI } from '@langchain/openai';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Cache } from '@nestjs/cache-manager';
-import { HttpException, HttpStatus, Injectable, Scope } from '@nestjs/common';
+import {
+	HttpException,
+	HttpStatus,
+	Inject,
+	Injectable,
+	type LoggerService,
+	Scope,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import type { Queue } from 'bullmq';
+import { type Queue } from 'bullmq';
+import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { catchError, Observable, Subject } from 'rxjs';
 import { ModelEnum } from 'src/enum/config.enum';
 import { parseFile } from '../../utils/file-parser';
@@ -18,7 +26,6 @@ import { MessageRole } from './chat.entity';
 import { ChatContinueDto } from './dto/chat-continue.dto';
 import { ChatMessageDto } from './dto/chat-message.dto';
 import { ChatRequestDto } from './dto/chat-request.dto';
-import { ZhipuStreamData } from './dto/zhipu-stream-data.dto';
 import { MessageService } from './message.service';
 
 // Scope.REQUEST: 声明作用域，否则 queue-events.listener 中的队列监听器会被忽略，不生效
@@ -41,6 +48,8 @@ export class ChatService {
 		@InjectQueue('chat-message-queue')
 		private readonly messageQueue: Queue,
 		private readonly ocrService: OcrService,
+		@Inject(WINSTON_MODULE_NEST_PROVIDER)
+		private readonly logger: LoggerService,
 	) {}
 
 	private async processFileAttachments(filePaths: string[]): Promise<string> {
@@ -96,74 +105,6 @@ export class ChatService {
 				return new SystemMessage(msg.content);
 			}
 		});
-	}
-
-	private parseZhipuStreamData(dataStr: string): ZhipuStreamData | null {
-		// 如果是结束标记，返回 null
-		if (dataStr.trim() === '[DONE]') {
-			return null;
-		}
-
-		try {
-			// 首先尝试直接解析 JSON
-			const data = JSON.parse(dataStr);
-
-			// 智谱 API 流式响应格式 - 检查多种可能的字段结构
-			if (data.choices?.[0]?.delta?.content) {
-				return { type: 'content', data: data.choices[0].delta.content };
-			}
-			if (data.choices?.[0]?.message?.content) {
-				return { type: 'content', data: data.choices[0].message.content };
-			}
-			if (data.result) {
-				return { type: 'content', data: data.result };
-			}
-			if (data.data?.content) {
-				return { type: 'content', data: data.data.content };
-			}
-
-			// 处理 reasoning_content 数据（思考内容）
-			if (data.choices?.[0]?.delta?.reasoning_content) {
-				const reasoningContent = data.choices[0].delta.reasoning_content;
-				return { type: 'thinking', data: reasoningContent };
-			}
-
-			// 处理 tool_calls 数据
-			if (data.choices?.[0]?.delta?.tool_calls) {
-				return { type: 'tool_calls', data: data.choices[0].delta.tool_calls };
-			}
-			if (data.choices?.[0]?.message?.tool_calls) {
-				return { type: 'tool_calls', data: data.choices[0].message.tool_calls };
-			}
-
-			// 处理 audio 数据
-			if (data.choices?.[0]?.message?.audio) {
-				return { type: 'audio', data: data.choices[0].message.audio };
-			}
-
-			// 处理 usage 数据
-			if (data.usage) {
-				return { type: 'usage', data: data.usage };
-			}
-
-			// 处理 video_result 数据
-			if (data.video_result) {
-				return { type: 'video', data: data.video_result };
-			}
-
-			// 处理 web_search 数据
-			if (data.web_search) {
-				return { type: 'web_search', data: data.web_search };
-			}
-
-			// 处理 content_filter 数据
-			if (data.content_filter) {
-				return { type: 'content_filter', data: data.content_filter };
-			}
-			return null;
-		} catch (_error) {
-			return null;
-		}
 	}
 
 	/**
@@ -404,7 +345,9 @@ Stick strictly to what is visually present.`,
 								await stream.cancel();
 							}
 						} catch (cancelError) {
-							console.error('Failed to cancel LLM stream:', cancelError);
+							this.logger.error(
+								`[ChatStream]: Failed to cancel LLM stream: ${JSON.stringify(cancelError)}`,
+							);
 						}
 						return;
 					}
@@ -428,9 +371,8 @@ Stick strictly to what is visually present.`,
 										await this.messageQueue
 											.add('save-message', pendingUserData)
 											.catch((dbError) => {
-												console.error(
-													'Failed to add user message job to queue:',
-													dbError,
+												this.logger.error(
+													`[ChatStream]: Failed to add user message job to queue: ${JSON.stringify(dbError)}`,
 												);
 											});
 									}
@@ -466,7 +408,9 @@ Stick strictly to what is visually present.`,
 								await stream.cancel();
 							}
 						} catch (cancelError) {
-							console.error('Failed to cancel LLM stream:', cancelError);
+							this.logger.error(
+								`[ChatStream]: Failed to cancel LLM stream: ${JSON.stringify(cancelError)}`,
+							);
 						}
 					}
 
@@ -490,30 +434,8 @@ Stick strictly to what is visually present.`,
 									isContinuation: dto.isContinuation || false, // 传递续写标志
 								})
 								.catch((dbError) => {
-									console.error(
-										'Failed to add assistant message job to queue:',
-										dbError,
-									);
-								});
-						} else {
-							// 如果没有传递 assistantMessage，使用默认逻辑
-							this.messageQueue
-								.add('save-message', {
-									sessionId,
-									role: MessageRole.ASSISTANT,
-									content: fullContent,
-									attachments: [],
-									parentId: dto.parentId || null, // 异步模式下 ID 获取受限
-									isRegenerate: dto.isRegenerate || false,
-									chatId: undefined,
-									childrenIds: [],
-									currentChatId: undefined,
-									isContinuation: dto.isContinuation || false, // 传递续写标志
-								})
-								.catch((dbError) => {
-									console.error(
-										'Failed to add assistant message job to queue:',
-										dbError,
+									this.logger.error(
+										`[ChatStream]: Failed to add assistant message job to queue: ${JSON.stringify(dbError)}`,
 									);
 								});
 						}
@@ -537,30 +459,8 @@ Stick strictly to what is visually present.`,
 										isContinuation: false, // 传递续写标志
 									})
 									.catch((dbError) => {
-										console.error(
-											'Failed to add partial assistant message job to queue:',
-											dbError,
-										);
-									});
-							} else {
-								this.messageQueue
-									.add('save-message', {
-										sessionId,
-										role: MessageRole.ASSISTANT,
-										content: fullContent,
-										attachments: [],
-										parentId: dto.parentId || null,
-										isRegenerate: dto.isRegenerate || false,
-										chatId: undefined,
-										childrenIds: [],
-										currentChatId: undefined,
-										// 注意：停止时不传递 isContinuation，因为这是首次保存部分内容
-										isContinuation: false, // 传递续写标志
-									})
-									.catch((dbError) => {
-										console.error(
-											'Failed to add partial assistant message job to queue:',
-											dbError,
+										this.logger.error(
+											`[ChatStream]: Failed to add partial assistant message job to queue: ${JSON.stringify(dbError)}`,
 										);
 									});
 							}
@@ -601,9 +501,8 @@ Stick strictly to what is visually present.`,
 								isContinuation: false, // 传递续写标志
 							});
 						} catch (saveError) {
-							console.error(
-								'Failed to queue partial message on error:',
-								saveError,
+							this.logger.error(
+								`[ChatStream]: Failed to add assistant message job to queue: ${JSON.stringify(saveError)}`,
 							);
 						}
 						subscriber.complete();
@@ -705,220 +604,6 @@ Stick strictly to what is visually present.`,
 		return this.chatStream(continueDto);
 	}
 
-	async clearSession(sessionId: string) {
-		this.conversationMemory.delete(sessionId);
-	}
-
-	zhipuChatStream(dto: ChatRequestDto): Observable<ZhipuStreamData> {
-		const sessionId = dto.sessionId || randomUUID();
-
-		// 创建 AbortController 用于智谱 API
-		const abortController = new AbortController();
-		this.abortControllers.set(sessionId, abortController);
-
-		return new Observable<ZhipuStreamData>((subscriber) => {
-			(async () => {
-				try {
-					const apiKey = this.configService.get(ModelEnum.ZHIPU_API_KEY);
-					const modelName = this.configService.get(ModelEnum.ZHIPU_MODEL_NAME);
-					const baseURL = this.configService.get(ModelEnum.ZHIPU_BASE_URL);
-
-					if (!apiKey) {
-						throw new Error('智谱 API 密钥未配置');
-					}
-
-					// 保存用户消息到队列（异步处理）
-					const lastUserMessage = dto.messages.find(
-						(msg) => msg.role === 'user',
-					);
-
-					if (lastUserMessage && dto.userMessage) {
-						// 使用前端传递的 userMessage 数据添加到队列
-						await this.messageQueue
-							.add('save-message', {
-								sessionId,
-								role: MessageRole.USER,
-								content: lastUserMessage.content,
-								attachments: dto.attachments,
-								parentId: dto.userMessage.parentId || null,
-								isRegenerate: false,
-								chatId: dto.userMessage.chatId,
-								childrenIds: dto.userMessage.childrenIds || [],
-								currentChatId: dto.userMessage.chatId,
-							})
-							.catch((dbError) => {
-								console.error(
-									'Failed to add user message job to queue:',
-									dbError,
-								);
-							});
-					}
-
-					// 处理文件附件
-					let enhancedMessages = [...dto.messages];
-					if (dto.attachments && dto.attachments?.length > 0) {
-						const filePaths = dto.attachments.map((file) => file.path);
-						const fileContent = await this.processFileAttachments(filePaths);
-						if (fileContent) {
-							// 创建包含文件内容的系统消息
-							const fileSystemMessage: ChatMessageDto = {
-								role: 'system',
-								content: `以下是上传的文件内容:\n${fileContent}\n请根据文件内容回答用户问题。`,
-							};
-							// 将系统消息插入到消息数组的开头
-							enhancedMessages = [fileSystemMessage, ...enhancedMessages];
-						}
-					}
-
-					let history: (HumanMessage | SystemMessage | AIMessage)[] = [];
-					if (dto.sessionId && this.conversationMemory.has(dto.sessionId)) {
-						history = this.conversationMemory.get(dto.sessionId) || [];
-					}
-
-					// 将历史消息和当前消息合并
-					const allMessages = [
-						...history,
-						...this.convertToLangChainMessages(enhancedMessages),
-					];
-
-					// 构建请求消息格式
-					const requestMessages = allMessages.map((msg) => {
-						if (msg instanceof HumanMessage) {
-							return { role: 'user', content: msg.content as string };
-						} else if (msg instanceof AIMessage) {
-							return { role: 'assistant', content: msg.content as string };
-						} else {
-							return { role: 'system', content: msg.content as string };
-						}
-					});
-
-					const requestBody = {
-						model: modelName || 'glm-4.7-flash',
-						messages: requestMessages,
-						thinking: { type: dto.thinking || 'enabled' }, // 'enabled' | 'disabled'
-						stream: dto.stream || true,
-						max_tokens: dto.maxTokens || 4096,
-						temperature: dto.temperature || 0.2, // [0.0, 1.0]
-					};
-
-					const url = `${baseURL}/chat/completions`;
-
-					const response = await fetch(url, {
-						method: 'POST',
-						headers: {
-							'Content-Type': 'application/json',
-							Authorization: `Bearer ${apiKey}`,
-						},
-						body: JSON.stringify(requestBody),
-						signal: abortController.signal,
-					});
-
-					if (!response.ok) {
-						const errorText = await response.text();
-						throw new HttpException(
-							`智谱 API 请求失败：${response.status} ${response.statusText} - ${errorText}`,
-							response.status,
-						);
-					}
-
-					const reader = response.body?.getReader();
-
-					if (!reader) {
-						throw new HttpException(
-							'无法读取响应流',
-							HttpStatus.INTERNAL_SERVER_ERROR,
-						);
-					}
-
-					const decoder = new TextDecoder();
-					let fullContent = '';
-
-					try {
-						while (true) {
-							const { done, value } = await reader.read();
-							if (done) break;
-
-							const chunk = decoder.decode(value);
-							const lines = chunk
-								.split('\n')
-								.filter((line) => line.trim() !== '');
-
-							for (const line of lines) {
-								if (line.startsWith('data: ')) {
-									const dataStr = line.slice(6);
-									if (dataStr === '[DONE]') {
-										// 流结束
-										const aiMessage = new AIMessage(fullContent);
-										this.conversationMemory.set(sessionId, [
-											...allMessages,
-											aiMessage,
-										]);
-										// 保存 AI 回复到队列（异步处理）
-										if (dto.assistantMessage) {
-											this.messageQueue
-												.add('save-message', {
-													sessionId,
-													role: MessageRole.ASSISTANT,
-													content: fullContent,
-													attachments: [],
-													parentId: dto.assistantMessage.parentId || null,
-													isRegenerate: false,
-													chatId: dto.assistantMessage.chatId,
-													childrenIds: dto.assistantMessage.childrenIds || [],
-													currentChatId: dto.assistantMessage.chatId,
-												})
-												.catch((dbError) => {
-													console.error(
-														'Failed to add assistant message job to queue:',
-														dbError,
-													);
-												});
-										} else {
-											// 如果没有传递 assistantMessage，使用默认逻辑
-											this.messageQueue
-												.add('save-message', {
-													sessionId,
-													role: MessageRole.ASSISTANT,
-													content: fullContent,
-													attachments: [],
-													parentId: null, // 异步模式下 ID 获取受限
-													isRegenerate: false,
-													chatId: undefined,
-													childrenIds: [],
-													currentChatId: undefined,
-												})
-												.catch((dbError) => {
-													console.error(
-														'Failed to add assistant message job to queue:',
-														dbError,
-													);
-												});
-										}
-										subscriber.complete();
-										return;
-									}
-
-									const streamData = this.parseZhipuStreamData(dataStr);
-									if (streamData) {
-										subscriber.next(streamData);
-										// 只累积内容类型的数据到完整响应中
-										if (streamData.type === 'content') {
-											fullContent += streamData.data;
-										}
-									}
-								}
-							}
-						}
-					} finally {
-						reader.releaseLock();
-					}
-				} catch (error) {
-					subscriber.error(error);
-				}
-			})();
-		});
-	}
-
 	// deepseek 非流失对话
 	async chat(dto: ChatRequestDto): Promise<any> {
 		const llm = this.initModel({
@@ -969,7 +654,9 @@ Stick strictly to what is visually present.`,
 					currentChatId: dto.userMessage.chatId,
 				});
 			} catch (error) {
-				console.error('Error processing message:', error);
+				this.logger.error(
+					`[Chat]: Failed to add user message job to queue: ${JSON.stringify(error)}`,
+				);
 			}
 		}
 
@@ -994,9 +681,8 @@ Stick strictly to what is visually present.`,
 					currentChatId: dto.assistantMessage.chatId,
 				})
 				.catch((dbError) => {
-					console.error(
-						'Failed to add assistant message job to queue:',
-						dbError,
+					this.logger.error(
+						`[Chat]: Failed to add assistant message job to queue: ${JSON.stringify(dbError)}`,
 					);
 				});
 		} else {
@@ -1018,9 +704,8 @@ Stick strictly to what is visually present.`,
 					currentChatId: undefined,
 				})
 				.catch((dbError) => {
-					console.error(
-						'Failed to add assistant message job to queue:',
-						dbError,
+					this.logger.error(
+						`[Chat]: Failed to add assistant message job to queue: ${JSON.stringify(dbError)}`,
 					);
 				});
 		}

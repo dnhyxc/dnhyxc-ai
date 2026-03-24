@@ -9,6 +9,7 @@ import { ChatController } from './chat.controller';
 import { ChatMessages } from './chat.entity';
 import { ChatService } from './chat.service';
 import { ChatMessageProcessor } from './chat-message.processor';
+import { GlmChatService } from './glm.service';
 import { MessageService } from './message.service';
 import { ChatSessions } from './session.entity';
 
@@ -25,6 +26,7 @@ import { ChatSessions } from './session.entity';
 	// QueueEventsListener 是一个 BullMQ 独立的队列事件监听器，可以在任何地方使用
 	providers: [
 		ChatService,
+		GlmChatService,
 		MessageService,
 		ChatMessageProcessor,
 		OcrService,

@@ -18,6 +18,7 @@ import { ChatRequestDto, CreateSessionDto } from './dto/chat-request.dto';
 import { ChatStopDto } from './dto/chat-stop.dto';
 import { HistoryDto, MessageDto } from './dto/message.dto';
 import { UpdateChatDto } from './dto/update-chat.dto';
+import { GlmChatService } from './glm.service';
 import { MessageService } from './message.service';
 
 @UseInterceptors(ClassSerializerInterceptor)
@@ -26,6 +27,7 @@ export class ChatController {
 	constructor(
 		private readonly chatService: ChatService,
 		private messageService: MessageService,
+		private glmChatService: GlmChatService,
 	) {}
 
 	@Post('/createSession')
@@ -40,7 +42,6 @@ export class ChatController {
 	): Promise<Observable<any>> {
 		const source$ = (await this.chatService.chatStream(chatRequestDto)).pipe(
 			map((chunk) => {
-				console.log(chunk);
 				return {
 					data: {
 						content: chunk,
@@ -101,10 +102,10 @@ export class ChatController {
 		);
 	}
 
-	@Post('/zhipu-stream')
+	@Post('/glm-stream')
 	@Sse()
-	zhipuChatStream(@Body() chatRequestDto: ChatRequestDto): Observable<any> {
-		const source$ = this.chatService.zhipuChatStream(chatRequestDto).pipe(
+	glmChatStream(@Body() chatRequestDto: ChatRequestDto): Observable<any> {
+		const source$ = this.glmChatService.glmChatStream(chatRequestDto).pipe(
 			map((chunk) => ({
 				data: {
 					content: chunk.data,
@@ -134,12 +135,6 @@ export class ChatController {
 	async chat(@Body() chatRequestDto: ChatRequestDto) {
 		const result = await this.chatService.chat(chatRequestDto);
 		return result;
-	}
-
-	@Delete('session/:sessionId')
-	clearSession(@Param('sessionId') sessionId: string) {
-		this.chatService.clearSession(sessionId);
-		return { success: true, message: 'Session cleared' };
 	}
 
 	@Get('session/:sessionId')

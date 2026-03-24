@@ -64,7 +64,7 @@ const connections = new Map();
 					// 增加连接超时时间，默认可能较短，建议设为 5秒或更长
 					connectTimeout: 5000,
 					// 增加命令超时时间，防止大任务执行时 Redis 响应慢导致超时
-					commandTimeout: 10000,
+					commandTimeout: 20000,
 					socket: {
 						keepAlive: true, // 启用 TCP Keep-Alive
 						// 初始发送 Keep-Alive 探测包的延迟（毫秒），建议设为比中间设备超时时间短一点
@@ -77,7 +77,7 @@ const connections = new Map();
 							return null;
 						}
 						// 间隔时间：最小 1 秒，最大 3 秒
-						return Math.min(times * 100, 3000);
+						return Math.min(times * 100, 3000) + Math.random() * 500;
 					},
 					// 启用离线队列（默认开启），连接断开期间命令会排队，重连后自动重发
 					enableOfflineQueue: true,

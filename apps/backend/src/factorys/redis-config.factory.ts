@@ -14,16 +14,15 @@ export class RedisConfigFactory implements CacheOptionsFactory {
 			password: this.configService.get<string>(RedisEnum.REDIS_PASSWORD),
 			username: this.configService.get<string>(RedisEnum.REDIS_USERNAME),
 			socket: {
-				connectTimeout: 5000,
+				connectTimeout: 10000,
 				keepAlive: true, // 启用 TCP Keep-Alive
 				// 初始发送 Keep-Alive 探测包的延迟（毫秒），建议设为比中间设备超时时间短一点
 				keepAliveInitialDelay: 10000, // 10秒
-				reconnectStrategy: (retries: number) => {
-					if (retries > 5) {
+				reconnectStrategy: (times: number) => {
+					if (times > 5) {
 						return new Error('停止重试');
 					}
-					const delay = Math.min(retries * 100, 3000);
-					return delay;
+					return Math.min(times * 100, 3000) + Math.random() * 500;
 				},
 			},
 		});
