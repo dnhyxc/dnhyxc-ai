@@ -1,4 +1,6 @@
 import ChatTextArea from '@design/ChatTextArea';
+import { MarkdownParser } from '@dnhyxc-ai/tools';
+import { useMemo } from 'react';
 import { UploadedFile } from '@/types';
 import { Message } from '@/types/chat';
 
@@ -34,6 +36,8 @@ const ChatUserMessage = ({
 }: UserMessageProps) => {
 	const isEditing = editMessage?.chatId === message.chatId;
 
+	const parser = useMemo(() => new MarkdownParser(), []);
+
 	return (
 		<>
 			{isEditing ? (
@@ -50,9 +54,9 @@ const ChatUserMessage = ({
 				/>
 			) : (
 				<div
-					className="prose prose-invert max-w-none"
+					className="max-w-none text-left [&_.markdown-body]:text-textcolor/90!"
 					dangerouslySetInnerHTML={{
-						__html: message.content,
+						__html: parser.render(message.content),
 					}}
 				/>
 			)}
