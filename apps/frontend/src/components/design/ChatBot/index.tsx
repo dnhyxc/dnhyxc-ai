@@ -188,7 +188,7 @@ const ChatBot = observer(
 			return () => dispose();
 		}, [chatStore]);
 
-		// 自动滚动 - 使用 ResizeObserver 监听内容高度变化
+		// 流式消息加载自动滚动 - 使用 ResizeObserver 监听内容高度变化
 		useEffect(() => {
 			const lastMessage = messages[messages.length - 1];
 			const isCurrentlyStreaming =
@@ -292,10 +292,6 @@ const ChatBot = observer(
 			} else {
 				setSelectedChildMap(new Map());
 			}
-
-			scrollTimer.current = setTimeout(() => {
-				onScrollTo('down');
-			}, 100);
 
 			setInput('');
 			setUploadedFiles([]);
