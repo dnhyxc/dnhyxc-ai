@@ -1,6 +1,7 @@
 import { fetch } from '@tauri-apps/plugin-http';
 import { Toast } from '@ui/index';
 import { BASE_URL } from '@/constant';
+import { FinishInfo } from '@/types/chat';
 import { getStorage } from '.';
 
 interface StreamCallbacks {
@@ -9,6 +10,7 @@ interface StreamCallbacks {
 	onStart?: () => void;
 	onError?: (error: Error, type?: 'error' | 'info' | 'warning') => void;
 	onComplete?: (error?: string) => void;
+	onGetFinishInfo?: (info: FinishInfo) => void;
 }
 
 export const streamFetch = async ({
@@ -20,7 +22,8 @@ export const streamFetch = async ({
 	callbacks: StreamCallbacks;
 	api?: string;
 }): Promise<() => void> => {
-	const { onData, onError, onComplete, onStart, onThinking } = callbacks;
+	const { onData, onError, onComplete, onStart, onThinking, onGetFinishInfo } =
+		callbacks;
 
 	const controller = new AbortController();
 	options.signal = controller.signal;
@@ -85,6 +88,7 @@ export const streamFetch = async ({
 							if (dataStr) {
 								try {
 									const parsed = JSON.parse(dataStr);
+									// 大模型报错处理
 									if (parsed?.error) {
 										onComplete?.(parsed?.error);
 										return;
@@ -93,6 +97,12 @@ export const streamFetch = async ({
 										onThinking?.(parsed.content ? parsed.content : '');
 									} else {
 										onData(parsed.content);
+									}
+									if (
+										typeof parsed === 'object' &&
+										parsed.content?.reason === 'length'
+									) {
+										onGetFinishInfo?.(parsed.content);
 									}
 								} catch (e) {
 									Toast({

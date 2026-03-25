@@ -12,7 +12,7 @@ import { useChatCoreContext } from '@/contexts';
 import { createSession, stopSse } from '@/service';
 import useStore from '@/store';
 import { UploadedFile } from '@/types';
-import { ChatRequestParams, Message } from '@/types/chat';
+import { ChatRequestParams, FinishInfo, Message } from '@/types/chat';
 import { streamFetch } from '@/utils/sse';
 import { useMessageTools } from './useMessageTools';
 
@@ -237,7 +237,7 @@ export const useChatCore = (
 				assistantMessage,
 				currentChatId,
 				role,
-				// maxTokens: 100,
+				// maxTokens: 10,
 			};
 
 			if (userMessage?.attachments?.length) {
@@ -271,13 +271,13 @@ export const useChatCore = (
 									chunk,
 									'content',
 								);
-							} else {
-								// 设置 finishReason 到 store
-								chatStore.setFinishReason(assistantMessageId, {
-									...chunk,
-									sessionId,
-								});
 							}
+						},
+						onGetFinishInfo: (reason: FinishInfo) => {
+							chatStore.setFinishReason(assistantMessageId, {
+								...reason,
+								sessionId,
+							});
 						},
 						onError: (err, type) => {
 							chatStore.setSessionLoading(sessionId, false);
@@ -306,7 +306,7 @@ export const useChatCore = (
 
 							currentAssistantMessageMapRef.current.delete(sessionId);
 						},
-						onComplete: (error?: string) => {
+						onComplete: (error?: any) => {
 							chatStore.setSessionLoading(sessionId, false);
 							// 流式结束时，确保刷新缓冲区
 							chatStore.flushMessageUpdate(assistantMessageId);

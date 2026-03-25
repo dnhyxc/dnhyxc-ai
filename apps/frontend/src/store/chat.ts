@@ -193,18 +193,26 @@ class ChatStore {
 				(m) => m.chatId === chatId,
 			);
 			if (existingIndex >= 0) {
+				// 增加 shouldMergeStreamContent 判断，防止在发送新消息时，导致上一条消息内容丢失
+				const shouldMergeStreamContent = streamingMsg.isStreaming;
+
 				mergedMessages[existingIndex] = {
 					...mergedMessages[existingIndex],
 					isStreaming: streamingMsg.isStreaming,
-					// 注意：不再从 streamingMsg 同步 isStopped，因为停止状态由 stoppedMessages Map 管理
-					content:
-						streamingMsg.content || mergedMessages[existingIndex].content,
-					thinkContent:
-						streamingMsg.thinkContent ||
-						mergedMessages[existingIndex].thinkContent,
+					// 只有在流式进行中才覆盖 content，否则保留 existing 内容
+					content: shouldMergeStreamContent
+						? streamingMsg.content || mergedMessages[existingIndex].content
+						: mergedMessages[existingIndex].content,
+					// thinkContent 同理
+					thinkContent: shouldMergeStreamContent
+						? streamingMsg.thinkContent ||
+							mergedMessages[existingIndex].thinkContent
+						: mergedMessages[existingIndex].thinkContent,
 				};
 			} else {
-				mergedMessages.push(streamingMsg);
+				if (streamingMsg.isStreaming) {
+					mergedMessages.push(streamingMsg);
+				}
 			}
 		});
 
@@ -669,7 +677,7 @@ class ChatStore {
 		string,
 		{
 			type: 'finish';
-			reason: 'stop' | 'length';
+			reason: 'stop' | 'length' | null;
 			maxTokensReached: boolean;
 			sessionId: string;
 		}
@@ -683,7 +691,7 @@ class ChatStore {
 		chatId: string,
 		finishReason: {
 			type: 'finish';
-			reason: 'stop' | 'length';
+			reason: 'stop' | 'length' | null;
 			maxTokensReached: boolean;
 			sessionId: string;
 		},
