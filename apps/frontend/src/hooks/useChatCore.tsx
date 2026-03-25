@@ -62,6 +62,7 @@ interface SystemMessage {
 export const useChatCore = (
 	options: UseChatCoreOptions = {},
 ): UseChatCoreReturn => {
+	// /chat/glm-stream /chat/sse
 	const { apiEndpoint = '/chat/sse', onScrollTo: onScrollToProp } = options;
 	const { chatStore } = useStore();
 

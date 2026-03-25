@@ -81,7 +81,7 @@ export const streamFetch = async ({
 					for (const line of lines) {
 						const trimmedLine = line.trim();
 						if (trimmedLine.startsWith('data:')) {
-							const dataStr = trimmedLine.slice(5).trim();
+							const dataStr = trimmedLine.slice(5).trimStart();
 							if (dataStr) {
 								try {
 									const parsed = JSON.parse(dataStr);

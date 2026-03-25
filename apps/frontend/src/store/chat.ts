@@ -13,7 +13,6 @@ class ChatStore {
 	};
 	activeSessionId: string = '';
 
-	// ========== 流式更新优化：缓冲区 ==========
 	// 存储每个消息的流式更新缓冲
 	streamingBuffers: Map<
 		string,
@@ -272,7 +271,6 @@ class ChatStore {
 				lastUpdateTime: 0,
 				pendingUpdate: false,
 			};
-			this.streamingBuffers.set(chatId, buffer);
 		}
 
 		// 2. 累积内容到缓冲区
@@ -281,6 +279,9 @@ class ChatStore {
 		} else {
 			buffer.thinkContent += chunk;
 		}
+
+		// ⚠️ 更新 streamingBuffers，防止丢失第一个 chunk
+		this.streamingBuffers.set(chatId, buffer);
 
 		// 3. 标记为待更新
 		this.pendingUpdateIds.add(chatId);
@@ -320,13 +321,17 @@ class ChatStore {
 			const buffer = this.streamingBuffers.get(chatId);
 			if (buffer) {
 				const update: { content?: string; thinkContent?: string } = {};
-				if (buffer.content) {
-					update.content = buffer.content;
-					buffer.content = ''; // 清空缓冲区
+				const contentToFlush = buffer.content;
+				const thinkContentToFlush = buffer.thinkContent;
+				// 立即清空缓冲区，防止数据被重复处理
+				buffer.content = '';
+				buffer.thinkContent = '';
+				// 使用保存的局部变量来构建 update
+				if (contentToFlush) {
+					update.content = contentToFlush;
 				}
-				if (buffer.thinkContent) {
-					update.thinkContent = buffer.thinkContent;
-					buffer.thinkContent = '';
+				if (thinkContentToFlush) {
+					update.thinkContent = thinkContentToFlush;
 				}
 				if (Object.keys(update).length > 0) {
 					updatesToApply.set(chatId, update);
@@ -367,7 +372,7 @@ class ChatStore {
 						content: message.content + update.content,
 					}),
 					...(update.thinkContent !== undefined && {
-						thinkContent: (message.thinkContent || '') + update.thinkContent,
+						thinkContent: message.thinkContent + update.thinkContent,
 					}),
 					isStreaming: true,
 					// 保持停止状态由 stoppedMessages Map 管理
@@ -410,7 +415,7 @@ class ChatStore {
 				}
 				if (buffer.thinkContent) {
 					update.thinkContent =
-						(currentMessage.thinkContent || '') + buffer.thinkContent;
+						currentMessage.thinkContent + buffer.thinkContent;
 				}
 
 				this.messages = [
