@@ -13,6 +13,7 @@ export * from './navigation-menu';
 export * from './progress';
 export * from './radio-group';
 export * from './scroll-area';
+export * from './select';
 export * from './sheet';
 export * from './sonner';
 export * from './spinner';

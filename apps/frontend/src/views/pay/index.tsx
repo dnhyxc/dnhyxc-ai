@@ -3,6 +3,13 @@ import { loadStripe } from '@stripe/stripe-js';
 import { Button } from '@ui/button';
 import { Input } from '@ui/input';
 import { Label } from '@ui/label';
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from '@ui/select';
 import { Toast } from '@ui/sonner';
 import { motion } from 'framer-motion';
 import { CreditCard, Loader2, Lock, ShieldCheck, X } from 'lucide-react';
@@ -40,6 +47,7 @@ const Pay = () => {
 	const containerRef = useRef<HTMLDivElement>(null);
 	/** 带内边距的外壳，白底收银台与圆角容器底部之间留出灰色「呼吸区」 */
 	const stripeHostRef = useRef<HTMLDivElement>(null);
+	const timerRef = useRef<NodeJS.Timeout | null>(null);
 
 	const token = getStorage('token');
 	const zeroDecimal = useMemo(
@@ -51,6 +59,10 @@ const Pay = () => {
 		checkoutRef.current?.destroy();
 		checkoutRef.current = null;
 		setEmbeddedOpen(false);
+		if (timerRef.current) {
+			clearTimeout(timerRef.current);
+			timerRef.current = null;
+		}
 	}, []);
 
 	useEffect(() => () => destroyEmbedded(), [destroyEmbedded]);
@@ -154,7 +166,7 @@ const Pay = () => {
 				// 		"radial-gradient(ellipse 80% 60% at 20% 0%, oklch(0.72 0.14 165 / 0.22), transparent 55%), radial-gradient(ellipse 70% 50% at 100% 20%, oklch(0.65 0.12 250 / 0.12), transparent 50%)",
 				// }}
 			/>
-			<div className="relative mx-auto flex max-w-3xl flex-col gap-8 px-6 py-16">
+			<div className="relative mx-auto flex max-w-3xl flex-col gap-8 px-6 py-10">
 				<motion.header
 					initial={{ opacity: 0, y: 12 }}
 					animate={{ opacity: 1, y: 0 }}
@@ -174,7 +186,7 @@ const Pay = () => {
 					initial={{ opacity: 0, y: 16 }}
 					animate={{ opacity: 1, y: 0 }}
 					transition={{ duration: 0.5, delay: 0.08 }}
-					className="rounded-2xl border border-border/80 bg-theme-background p-6 shadow-lg shadow-emerald-950/5 backdrop-blur-sm dark:shadow-black/20"
+					className="rounded-md border border-theme/10 bg-theme-background p-6 shadow-lg shadow-emerald-950/5 backdrop-blur-sm dark:shadow-black/20"
 				>
 					{!token ? (
 						<div className="space-y-4 text-center">
@@ -186,90 +198,93 @@ const Pay = () => {
 							</Button>
 						</div>
 					) : (
-						<div className="space-y-5">
-							<div className="space-y-2">
-								<Label htmlFor="pay-currency">货币</Label>
-								<select
-									id="pay-currency"
-									className="border-input focus-visible:ring-ring flex h-9 w-full border px-3 text-sm shadow-xs outline-none focus-visible:ring-2"
-									value={currency}
-									disabled={embeddedOpen}
-									onChange={(e) =>
-										setCurrency(e.target.value as typeof currency)
-									}
-								>
-									{CURRENCIES.map((c) => (
-										<option key={c.value} value={c.value}>
-											{c.label}
-										</option>
-									))}
-								</select>
-							</div>
-							<div className="space-y-2">
-								<Label htmlFor="pay-amount">
-									金额（{zeroDecimal ? '整数，无小数' : '含两位小数'}）
-								</Label>
-								<Input
-									id="pay-amount"
-									type="number"
-									step={zeroDecimal ? '1' : '0.01'}
-									min={zeroDecimal ? '1' : '0.01'}
-									value={majorAmount}
-									disabled={embeddedOpen}
-									onChange={(e) => setMajorAmount(e.target.value)}
-								/>
-							</div>
-							<div className="space-y-2">
-								<Label htmlFor="pay-product">商品说明（可选）</Label>
-								<Input
-									id="pay-product"
-									placeholder="例如：月度会员"
-									value={productName}
-									disabled={embeddedOpen}
-									onChange={(e) => setProductName(e.target.value)}
-								/>
-							</div>
-							<div className="flex flex-wrap gap-2">
-								<Button
-									type="button"
-									className="h-11 flex-1 gap-2 bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500"
-									disabled={loading || embeddedOpen}
-									onClick={() => void onOpenEmbeddedCheckout()}
-								>
-									{loading ? (
-										<Loader2 className="size-4 animate-spin" aria-hidden />
-									) : (
-										<CreditCard className="size-4" aria-hidden />
-									)}
-									在页面内打开收银台
-								</Button>
-								{embeddedOpen ? (
+						<>
+							<div className="space-y-5">
+								<div className="space-y-2">
+									<Label htmlFor="pay-currency">货币</Label>
+									<Select
+										value={currency}
+										onValueChange={(v) =>
+											setCurrency(v as (typeof CURRENCIES)[number]['value'])
+										}
+										disabled={embeddedOpen}
+									>
+										<SelectTrigger id="pay-currency" className="w-full">
+											<SelectValue placeholder="选择货币" />
+										</SelectTrigger>
+										<SelectContent position="popper">
+											{CURRENCIES.map((c) => (
+												<SelectItem key={c.value} value={c.value}>
+													{c.label}
+												</SelectItem>
+											))}
+										</SelectContent>
+									</Select>
+								</div>
+								<div className="space-y-2">
+									<Label htmlFor="pay-amount">
+										金额（{zeroDecimal ? '整数，无小数' : '含两位小数'}）
+									</Label>
+									<Input
+										id="pay-amount"
+										type="number"
+										step={zeroDecimal ? '1' : '0.01'}
+										min={zeroDecimal ? '1' : '0.01'}
+										value={majorAmount}
+										disabled={embeddedOpen}
+										onChange={(e) => setMajorAmount(e.target.value)}
+									/>
+								</div>
+								<div className="space-y-2">
+									<Label htmlFor="pay-product">商品说明（可选）</Label>
+									<Input
+										id="pay-product"
+										placeholder="例如：月度会员"
+										value={productName}
+										disabled={embeddedOpen}
+										onChange={(e) => setProductName(e.target.value)}
+									/>
+								</div>
+								<div className="flex flex-wrap gap-2">
 									<Button
 										type="button"
-										variant="outline"
-										className="h-11 gap-2"
-										onClick={destroyEmbedded}
+										className="h-11 w-full gap-2 bg-emerald-600 text-white hover:bg-emerald-700"
+										disabled={loading || embeddedOpen}
+										onClick={() => void onOpenEmbeddedCheckout()}
 									>
-										<X className="size-4" aria-hidden />
-										关闭
+										{loading ? (
+											<Loader2 className="size-4 animate-spin" aria-hidden />
+										) : (
+											<CreditCard className="size-4" aria-hidden />
+										)}
+										在页面内打开收银台
 									</Button>
-								) : null}
+								</div>
+								<div className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
+									<Lock className="size-3" aria-hidden />
+									支付表单由 Stripe 嵌入组件提供
+								</div>
 							</div>
-							<p className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
-								<Lock className="size-3" aria-hidden />
-								支付表单由 Stripe 嵌入组件提供
-							</p>
-
 							<div
 								ref={stripeHostRef}
-								className="bg-white box-border min-h-[750px] w-full overflow-hidden rounded-xl"
+								className="relative bg-white box-border min-h-[750px] w-full overflow-hidden rounded-md mt-5"
 								hidden={!embeddedOpen}
 							>
+								<Button
+									type="button"
+									variant="outline"
+									size="icon"
+									className="absolute top-2 right-2 z-20 size-9 rounded-full border-theme/20 bg-theme-background/50 text-textcolor shadow-sm backdrop-blur-sm hover:bg-theme-background/80"
+									onClick={destroyEmbedded}
+									aria-label="关闭收银台"
+								>
+									<X className="size-4 text-textcolor" aria-hidden />
+								</Button>
 								<div className="bg-white rounded-xl mb-8">
 									<div ref={containerRef} className="w-full" />
 								</div>
 							</div>
-						</div>
+						</>
 					)}
 				</motion.div>
 			</div>
