@@ -40,4 +40,9 @@ export const MENUS = [
 		icon: 'WalletCards',
 		path: '/profile',
 	},
+	{
+		name: '会员充值',
+		icon: 'CreditCard',
+		path: '/pay',
+	},
 ];

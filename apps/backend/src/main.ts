@@ -14,6 +14,8 @@ async function bootstrap() {
 	const app = await NestFactory.create<NestExpressApplication>(AppModule, {
 		// 允许跨域
 		cors: true,
+		// Stripe Webhook 签名校验需要原始请求体
+		rawBody: true,
 	});
 	// 设置全局前缀为 api
 	app.setGlobalPrefix('api');

@@ -1,6 +1,7 @@
 import { ShareInfo } from '@/types';
 import { http } from '@/utils/fetch';
 import {
+	CREATE_CHECKOUT_SESSION,
 	CREATE_SESSION,
 	CREATE_SHARE,
 	CREATE_VERIFY_CODE,
@@ -256,6 +257,25 @@ export const updateSession = async (
 		sessionId,
 		title,
 	});
+};
+
+/** Stripe Checkout：创建支付会话（需已登录，后端需配置 STRIPE_SECRET_KEY） */
+export const createCheckoutSession = async (params: {
+	amount: number;
+	currency: string;
+	productName?: string;
+	/** true：内嵌收银台，需 returnUrl（含 {CHECKOUT_SESSION_ID}）；false/不传：跳转托管页 */
+	embedded?: boolean;
+	successUrl?: string;
+	/** 仅托管跳转模式需要；embedded 模式勿传 */
+	cancelUrl?: string;
+	returnUrl?: string;
+}) => {
+	return await http.post<{
+		url: string | null;
+		sessionId: string;
+		clientSecret: string | null;
+	}>(CREATE_CHECKOUT_SESSION, params);
 };
 
 // 创建会话分享

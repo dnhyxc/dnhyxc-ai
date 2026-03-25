@@ -10,6 +10,7 @@ import {
 	Bot,
 	CircleUserRound,
 	Codesandbox,
+	CreditCard,
 	House,
 	LogOut,
 	Newspaper,
@@ -41,6 +42,7 @@ const Sidebar = () => {
 		BookOpenText: <BookOpenText />,
 		Newspaper: <Newspaper />,
 		WalletCards: <WalletCards />,
+		CreditCard: <CreditCard />,
 	};
 
 	const processedMenus = MENUS.map((menu) => ({

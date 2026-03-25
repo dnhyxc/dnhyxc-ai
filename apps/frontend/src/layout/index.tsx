@@ -60,7 +60,7 @@ const Layout = () => {
 								}}
 							/>
 							<Header />
-							<div className="w-full h-[calc(100%-3.25rem)]">
+							<div className="box-border min-h-0 w-full h-[calc(100%-3.25rem)] overflow-y-auto overflow-x-hidden">
 								<Outlet />
 							</div>
 						</div>

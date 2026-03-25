@@ -12,6 +12,7 @@ import Document from '@/views/document';
 import Editor from '@/views/editor';
 import Home from '@/views/home';
 import Login from '@/views/login';
+import Pay from '@/views/pay';
 import Profile from '@/views/profile';
 import Setting from '@/views/setting';
 import AboutApp from '@/views/setting/about';
@@ -121,6 +122,13 @@ const routes: RouteConfig[] = [
 				Component: Account,
 				meta: {
 					title: '账号设置',
+				},
+			},
+			{
+				path: '/pay',
+				Component: Pay,
+				meta: {
+					title: '支付',
 				},
 			},
 			{

@@ -222,7 +222,7 @@ const DragUpload = forwardRef<ForwardProps, IProps>(
 									>
 										<Image
 											ref={imageRef}
-											src={i.preview}
+											src={i.preview ?? ''}
 											size={i.file.size}
 											alt={i.file.name}
 											className="w-auto h-full max-w-27.5 rounded-md"

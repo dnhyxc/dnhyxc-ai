@@ -38,6 +38,9 @@ export const appConfig = () => ({
 		REDIS_URL: Joi.string().uri(),
 		REDIS_PASSWORD: Joi.string(),
 		REDIS_USERNAME: Joi.string(),
+		// Stripe（可选，未配置时创建 Checkout 会返回服务不可用）
+		STRIPE_SECRET_KEY: Joi.string().optional().allow(''),
+		STRIPE_WEBHOOK_SECRET: Joi.string().optional().allow(''),
 	}),
 });
 

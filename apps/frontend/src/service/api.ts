@@ -75,3 +75,6 @@ export const CREATE_SHARE = '/share/create';
 
 // 获取 Chat 分享
 export const GET_SHARE = '/share/get';
+
+// Stripe：创建 Checkout 会话（需登录）
+export const CREATE_CHECKOUT_SESSION = '/pay/createCheckoutSession';
