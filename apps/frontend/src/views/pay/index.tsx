@@ -1,32 +1,32 @@
-import type { StripeEmbeddedCheckout } from "@stripe/stripe-js";
-import { loadStripe } from "@stripe/stripe-js";
-import { Button } from "@ui/button";
-import { Input } from "@ui/input";
-import { Label } from "@ui/label";
+import type { StripeEmbeddedCheckout } from '@stripe/stripe-js';
+import { loadStripe } from '@stripe/stripe-js';
+import { Button } from '@ui/button';
+import { Input } from '@ui/input';
+import { Label } from '@ui/label';
 import {
 	Select,
 	SelectContent,
 	SelectItem,
 	SelectTrigger,
 	SelectValue,
-} from "@ui/select";
-import { Toast } from "@ui/sonner";
-import { motion } from "framer-motion";
-import { CreditCard, Loader2, Lock, ShieldCheck, X } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { flushSync } from "react-dom";
-import { Link } from "react-router";
-import { cn } from "@/lib/utils";
-import { createCheckoutSession } from "@/service";
-import { getStorage } from "@/utils";
+} from '@ui/select';
+import { Toast } from '@ui/sonner';
+import { motion } from 'framer-motion';
+import { CreditCard, Loader2, Lock, ShieldCheck, X } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
+import { Link } from 'react-router';
+import { cn } from '@/lib/utils';
+import { createCheckoutSession } from '@/service';
+import { getStorage } from '@/utils';
 
 const CURRENCIES = [
-	{ value: "cny", label: "CNY · 人民币", zeroDecimal: false },
-	{ value: "usd", label: "USD · 美元", zeroDecimal: false },
-	{ value: "eur", label: "EUR · 欧元", zeroDecimal: false },
-	{ value: "hkd", label: "HKD · 港币", zeroDecimal: false },
-	{ value: "gbp", label: "GBP · 英镑", zeroDecimal: false },
-	{ value: "jpy", label: "JPY · 日元", zeroDecimal: true },
+	{ value: 'cny', label: 'CNY · 人民币', zeroDecimal: false },
+	{ value: 'usd', label: 'USD · 美元', zeroDecimal: false },
+	{ value: 'eur', label: 'EUR · 欧元', zeroDecimal: false },
+	{ value: 'hkd', label: 'HKD · 港币', zeroDecimal: false },
+	{ value: 'gbp', label: 'GBP · 英镑', zeroDecimal: false },
+	{ value: 'jpy', label: 'JPY · 日元', zeroDecimal: true },
 ] as const;
 
 function toStripeMinorUnits(majorAmount: number, zeroDecimal: boolean): number {
@@ -37,9 +37,9 @@ function toStripeMinorUnits(majorAmount: number, zeroDecimal: boolean): number {
 
 const Pay = () => {
 	const [currency, setCurrency] =
-		useState<(typeof CURRENCIES)[number]["value"]>("cny");
-	const [majorAmount, setMajorAmount] = useState<string>("9.99");
-	const [productName, setProductName] = useState("Pro 额度充值");
+		useState<(typeof CURRENCIES)[number]['value']>('cny');
+	const [majorAmount, setMajorAmount] = useState<string>('9.99');
+	const [productName, setProductName] = useState('Pro 额度充值');
 	const [loading, setLoading] = useState(false);
 	const [embeddedOpen, setEmbeddedOpen] = useState(false);
 
@@ -50,7 +50,7 @@ const Pay = () => {
 	const stripeHostRef = useRef<HTMLDivElement>(null);
 	const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-	const token = getStorage("token");
+	const token = getStorage('token');
 	const zeroDecimal = useMemo(
 		() => CURRENCIES.find((c) => c.value === currency)?.zeroDecimal ?? false,
 		[currency],
@@ -70,16 +70,16 @@ const Pay = () => {
 
 	const onOpenEmbeddedCheckout = useCallback(async () => {
 		if (!token) {
-			Toast({ type: "error", title: "请先登录后再发起支付" });
+			Toast({ type: 'error', title: '请先登录后再发起支付' });
 			return;
 		}
 		const pk = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY?.trim();
 		if (!pk) {
 			Toast({
-				type: "error",
-				title: "缺少 VITE_STRIPE_PUBLISHABLE_KEY",
+				type: 'error',
+				title: '缺少 VITE_STRIPE_PUBLISHABLE_KEY',
 				message:
-					"在前端 .env 中配置 Publishable key（pk_test_… / pk_live_…）。",
+					'在前端 .env 中配置 Publishable key（pk_test_… / pk_live_…）。',
 			});
 			return;
 		}
@@ -87,12 +87,12 @@ const Pay = () => {
 			? Number.parseInt(majorAmount, 10)
 			: Number.parseFloat(majorAmount);
 		if (!Number.isFinite(parsed) || parsed <= 0) {
-			Toast({ type: "error", title: "请输入有效金额" });
+			Toast({ type: 'error', title: '请输入有效金额' });
 			return;
 		}
 		const amount = toStripeMinorUnits(parsed, zeroDecimal);
 		if (amount < 1) {
-			Toast({ type: "error", title: "金额过小" });
+			Toast({ type: 'error', title: '金额过小' });
 			return;
 		}
 		setLoading(true);
@@ -107,16 +107,16 @@ const Pay = () => {
 			const clientSecret = res.data?.clientSecret;
 			if (!clientSecret) {
 				Toast({
-					type: "error",
-					title: "未返回 client_secret",
-					message: "请确认后端已创建 ui_mode=embedded 的 Checkout Session。",
+					type: 'error',
+					title: '未返回 client_secret',
+					message: '请确认后端已创建 ui_mode=embedded 的 Checkout Session。',
 				});
 				return;
 			}
 
 			const stripe = await loadStripe(pk);
 			if (!stripe) {
-				Toast({ type: "error", title: "Stripe.js 加载失败" });
+				Toast({ type: 'error', title: 'Stripe.js 加载失败' });
 				return;
 			}
 
@@ -125,9 +125,9 @@ const Pay = () => {
 				onComplete: () => {
 					destroyEmbedded();
 					Toast({
-						type: "success",
-						title: "支付已完成",
-						message: "感谢支持。",
+						type: 'success',
+						title: '支付已完成',
+						message: '感谢支持。',
 					});
 				},
 			});
@@ -141,16 +141,16 @@ const Pay = () => {
 				checkout.destroy();
 				checkoutRef.current = null;
 				setEmbeddedOpen(false);
-				Toast({ type: "error", title: "挂载节点未就绪" });
+				Toast({ type: 'error', title: '挂载节点未就绪' });
 				return;
 			}
 			checkout.mount(el);
 			// 等内嵌 iframe 占位后再滚到主内容区顶部（Outlet 为 overflow-y-auto）
 			timerRef.current = setTimeout(() => {
 				host.scrollIntoView({
-					behavior: "smooth",
-					block: "start",
-					inline: "nearest",
+					behavior: 'smooth',
+					block: 'start',
+					inline: 'nearest',
 				});
 			}, 100);
 		} finally {
@@ -206,7 +206,7 @@ const Pay = () => {
 									<Select
 										value={currency}
 										onValueChange={(v) =>
-											setCurrency(v as (typeof CURRENCIES)[number]["value"])
+											setCurrency(v as (typeof CURRENCIES)[number]['value'])
 										}
 										disabled={embeddedOpen}
 									>
@@ -224,13 +224,13 @@ const Pay = () => {
 								</div>
 								<div className="space-y-2">
 									<Label htmlFor="pay-amount">
-										金额（{zeroDecimal ? "整数，无小数" : "含两位小数"}）
+										金额（{zeroDecimal ? '整数，无小数' : '含两位小数'}）
 									</Label>
 									<Input
 										id="pay-amount"
 										type="number"
-										step={zeroDecimal ? "1" : "0.01"}
-										min={zeroDecimal ? "1" : "0.01"}
+										step={zeroDecimal ? '1' : '0.01'}
+										min={zeroDecimal ? '1' : '0.01'}
 										value={majorAmount}
 										disabled={embeddedOpen}
 										onChange={(e) => setMajorAmount(e.target.value)}
@@ -250,8 +250,8 @@ const Pay = () => {
 									<Button
 										type="button"
 										className={cn(
-											"h-11 w-full gap-2 bg-emerald-600 text-white hover:bg-emerald-700",
-											loading && "pointer-events-none",
+											'h-11 w-full gap-2 bg-emerald-600 text-white hover:bg-emerald-700',
+											loading && 'pointer-events-none',
 										)}
 										disabled={embeddedOpen}
 										aria-busy={loading}
@@ -263,18 +263,18 @@ const Pay = () => {
 										>
 											<Loader2
 												className={cn(
-													"absolute left-1/2 top-1/2 size-4 -translate-x-1/2 -translate-y-1/2 animate-spin",
+													'absolute left-1/2 top-1/2 size-4 -translate-x-1/2 -translate-y-1/2 animate-spin',
 													loading
-														? "opacity-100"
-														: "opacity-0 pointer-events-none",
+														? 'opacity-100'
+														: 'opacity-0 pointer-events-none',
 												)}
 											/>
 											<CreditCard
 												className={cn(
-													"absolute left-1/2 top-1/2 size-4 -translate-x-1/2 -translate-y-1/2",
+													'absolute left-1/2 top-1/2 size-4 -translate-x-1/2 -translate-y-1/2',
 													loading
-														? "opacity-0 pointer-events-none"
-														: "opacity-100",
+														? 'opacity-0 pointer-events-none'
+														: 'opacity-100',
 												)}
 											/>
 										</span>

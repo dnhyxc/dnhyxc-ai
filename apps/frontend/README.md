@@ -290,6 +290,8 @@ REDIS_PORT=6379
 - [React](https://reactjs.org/) - 用户界面库
 - [NestJS](https://nestjs.com/) - Node.js 服务端框架
 - [TypeScript](https://www.typescriptlang.org/) - 类型安全的 JavaScript
+- [Stripe](https://dashboard.stripe.com) - Stripe
+- [Stripe doc](https://docs.stripe.com/payments) - Stripe 支付平台文档
 
 ## 🔗 链接
 
