@@ -8,7 +8,7 @@ import { motion } from 'framer-motion';
 import { CreditCard, Loader2, Lock, ShieldCheck, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
-import { Link, useSearchParams } from 'react-router';
+import { Link } from 'react-router';
 import { createCheckoutSession } from '@/service';
 import { getStorage } from '@/utils';
 
@@ -28,7 +28,6 @@ function toStripeMinorUnits(majorAmount: number, zeroDecimal: boolean): number {
 }
 
 const Pay = () => {
-	const [searchParams, setSearchParams] = useSearchParams();
 	const [currency, setCurrency] =
 		useState<(typeof CURRENCIES)[number]['value']>('cny');
 	const [majorAmount, setMajorAmount] = useState<string>('9.99');
@@ -37,7 +36,10 @@ const Pay = () => {
 	const [embeddedOpen, setEmbeddedOpen] = useState(false);
 
 	const checkoutRef = useRef<StripeEmbeddedCheckout | null>(null);
+	/** Stripe mount 目标（仅内层，避免 iframe 贴满外层导致底边无空隙） */
 	const containerRef = useRef<HTMLDivElement>(null);
+	/** 带内边距的外壳，白底收银台与圆角容器底部之间留出灰色「呼吸区」 */
+	const stripeHostRef = useRef<HTMLDivElement>(null);
 
 	const token = getStorage('token');
 	const zeroDecimal = useMemo(
@@ -52,20 +54,6 @@ const Pay = () => {
 	}, []);
 
 	useEffect(() => () => destroyEmbedded(), [destroyEmbedded]);
-
-	useEffect(() => {
-		const sid = searchParams.get('session_id');
-		const status = searchParams.get('status');
-		if (sid && status === 'success') {
-			Toast({ type: 'success', title: '支付已完成', message: '感谢支持。' });
-			destroyEmbedded();
-			setSearchParams({}, { replace: true });
-		} else if (status === 'cancel') {
-			Toast({ type: 'info', title: '已取消支付' });
-			destroyEmbedded();
-			setSearchParams({}, { replace: true });
-		}
-	}, [searchParams, setSearchParams, destroyEmbedded]);
 
 	const onOpenEmbeddedCheckout = useCallback(async () => {
 		if (!token) {
@@ -94,9 +82,6 @@ const Pay = () => {
 			Toast({ type: 'error', title: '金额过小' });
 			return;
 		}
-		const origin = window.location.origin;
-		const returnUrl = `${origin}/pay?session_id={CHECKOUT_SESSION_ID}&status=success`;
-
 		setLoading(true);
 		try {
 			destroyEmbedded();
@@ -105,7 +90,6 @@ const Pay = () => {
 				currency,
 				productName: productName.trim() || undefined,
 				embedded: true,
-				returnUrl,
 			});
 			const clientSecret = res.data?.clientSecret;
 			if (!clientSecret) {
@@ -125,13 +109,22 @@ const Pay = () => {
 
 			const checkout = await stripe.initEmbeddedCheckout({
 				clientSecret,
+				onComplete: () => {
+					destroyEmbedded();
+					Toast({
+						type: 'success',
+						title: '支付已完成',
+						message: '感谢支持。',
+					});
+				},
 			});
 			checkoutRef.current = checkout;
 			flushSync(() => {
 				setEmbeddedOpen(true);
 			});
 			const el = containerRef.current;
-			if (!el) {
+			const host = stripeHostRef.current;
+			if (!el || !host) {
 				checkout.destroy();
 				checkoutRef.current = null;
 				setEmbeddedOpen(false);
@@ -139,19 +132,27 @@ const Pay = () => {
 				return;
 			}
 			checkout.mount(el);
+			// 等内嵌 iframe 占位后再滚到主内容区顶部（Outlet 为 overflow-y-auto）
+			setTimeout(() => {
+				host.scrollIntoView({
+					behavior: 'smooth',
+					block: 'start',
+					inline: 'nearest',
+				});
+			}, 100);
 		} finally {
 			setLoading(false);
 		}
 	}, [token, zeroDecimal, majorAmount, currency, productName, destroyEmbedded]);
 
 	return (
-		<div className="relative min-h-full bg-theme-background">
+		<div className="relative min-h-full bg-theme-gradient">
 			<div
 				className="pointer-events-none absolute inset-0 opacity-[0.45]"
-				style={{
-					background:
-						'radial-gradient(ellipse 80% 60% at 20% 0%, oklch(0.72 0.14 165 / 0.22), transparent 55%), radial-gradient(ellipse 70% 50% at 100% 20%, oklch(0.65 0.12 250 / 0.12), transparent 50%)',
-				}}
+				// style={{
+				// 	background:
+				// 		"radial-gradient(ellipse 80% 60% at 20% 0%, oklch(0.72 0.14 165 / 0.22), transparent 55%), radial-gradient(ellipse 70% 50% at 100% 20%, oklch(0.65 0.12 250 / 0.12), transparent 50%)",
+				// }}
 			/>
 			<div className="relative mx-auto flex max-w-3xl flex-col gap-8 px-6 py-16">
 				<motion.header
@@ -173,7 +174,7 @@ const Pay = () => {
 					initial={{ opacity: 0, y: 16 }}
 					animate={{ opacity: 1, y: 0 }}
 					transition={{ duration: 0.5, delay: 0.08 }}
-					className="rounded-2xl border border-border/80 bg-card/80 p-6 shadow-lg shadow-emerald-950/5 backdrop-blur-sm dark:shadow-black/20"
+					className="rounded-2xl border border-border/80 bg-theme-background p-6 shadow-lg shadow-emerald-950/5 backdrop-blur-sm dark:shadow-black/20"
 				>
 					{!token ? (
 						<div className="space-y-4 text-center">
@@ -190,7 +191,7 @@ const Pay = () => {
 								<Label htmlFor="pay-currency">货币</Label>
 								<select
 									id="pay-currency"
-									className="border-input bg-background focus-visible:ring-ring flex h-10 w-full rounded-md border px-3 text-sm shadow-xs outline-none focus-visible:ring-2"
+									className="border-input focus-visible:ring-ring flex h-9 w-full border px-3 text-sm shadow-xs outline-none focus-visible:ring-2"
 									value={currency}
 									disabled={embeddedOpen}
 									onChange={(e) =>
@@ -260,10 +261,14 @@ const Pay = () => {
 							</p>
 
 							<div
-								ref={containerRef}
-								className="border-border/80 bg-background/50 relative min-h-[480px] w-full overflow-hidden rounded-xl border"
+								ref={stripeHostRef}
+								className="bg-white box-border min-h-[750px] w-full overflow-hidden rounded-xl"
 								hidden={!embeddedOpen}
-							/>
+							>
+								<div className="bg-white rounded-xl mb-8">
+									<div ref={containerRef} className="w-full" />
+								</div>
+							</div>
 						</div>
 					)}
 				</motion.div>

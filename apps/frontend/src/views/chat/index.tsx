@@ -133,7 +133,7 @@ const Chat = observer(() => {
 	};
 
 	return (
-		<div className="flex flex-col w-full h-full overflow-hidden">
+		<div className="flex flex-col w-full h-full overflow-hidden rounded-b-md">
 			<div className="absolute top-4 left-28 z-50 flex items-center gap-3">
 				{open ? (
 					<History size={20} className="cursor-pointer text-cyan-500" />

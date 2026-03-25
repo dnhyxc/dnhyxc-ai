@@ -83,7 +83,8 @@ export class PayService {
 			const session = await stripe.checkout.sessions.create({
 				...common,
 				ui_mode: 'embedded',
-				return_url: dto.returnUrl!,
+				/** 完成后不整页跳转，由前端 initEmbeddedCheckout 的 onComplete 关闭内嵌表单 */
+				redirect_on_completion: 'never',
 			});
 			return {
 				sessionId: session.id,

@@ -264,12 +264,11 @@ export const createCheckoutSession = async (params: {
 	amount: number;
 	currency: string;
 	productName?: string;
-	/** true：内嵌收银台，需 returnUrl（含 {CHECKOUT_SESSION_ID}）；false/不传：跳转托管页 */
+	/** true：内嵌收银台（完成后不整页跳转）；false/不传：跳转托管页 */
 	embedded?: boolean;
 	successUrl?: string;
 	/** 仅托管跳转模式需要；embedded 模式勿传 */
 	cancelUrl?: string;
-	returnUrl?: string;
 }) => {
 	return await http.post<{
 		url: string | null;

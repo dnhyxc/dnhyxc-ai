@@ -6,7 +6,6 @@ import {
 	IsOptional,
 	IsString,
 	IsUrl,
-	Matches,
 	Max,
 	MaxLength,
 	Min,
@@ -39,7 +38,7 @@ export class CreateCheckoutSessionDto {
 	@MaxLength(120)
 	productName?: string;
 
-	/** 为 true 时使用 Embedded Checkout（页面内嵌），需传 returnUrl */
+	/** 为 true 时使用 Embedded Checkout（页面内嵌，redirect_on_completion: never） */
 	@IsOptional()
 	@Transform(({ value }) => value === true || value === 'true')
 	@IsBoolean()
@@ -54,14 +53,4 @@ export class CreateCheckoutSessionDto {
 	@ValidateIf((o) => !o.embedded)
 	@IsUrl({ require_tld: false, protocols: ['http', 'https'] })
 	cancelUrl?: string;
-
-	/**
-	 * 内嵌模式必填，且须包含字面量 `{CHECKOUT_SESSION_ID}`（Stripe 会替换为真实 id）
-	 */
-	@ValidateIf((o) => o.embedded === true)
-	@IsUrl({ require_tld: false, protocols: ['http', 'https'] })
-	@Matches(/\{CHECKOUT_SESSION_ID\}/, {
-		message: 'returnUrl 必须包含字面量 {CHECKOUT_SESSION_ID}',
-	})
-	returnUrl?: string;
 }
