@@ -146,7 +146,7 @@ const Pay = () => {
 			}
 			checkout.mount(el);
 			// 等内嵌 iframe 占位后再滚到主内容区顶部（Outlet 为 overflow-y-auto）
-			setTimeout(() => {
+			timerRef.current = setTimeout(() => {
 				host.scrollIntoView({
 					behavior: "smooth",
 					block: "start",
