@@ -82,9 +82,13 @@ export const MessageActions = ({
 				message.role === 'user' ? 'justify-end' : 'left-2'
 			}`}
 		>
-			{/* 分支切换按钮区域 */}
+			{/*
+				分支切换按钮区域。data-branch-switch-anchor：ChatBotView 切换兄弟时测量该元素视口位置并补偿 scrollTop，
+				使长消息下底部的箭头条不随整行滚动错位；勿删改属性名。
+			*/}
 			{hasSiblings && (
 				<div
+					data-branch-switch-anchor=""
 					className={`${
 						message.role === 'user'
 							? 'order-last ml-5 -mr-3.5'

@@ -306,6 +306,25 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 		const focusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 		const scrollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 		const lastScrollHeightRef = useRef<number>(0);
+		/**
+		 * 分支切换（左右箭头换兄弟回答）时的滚动锚点快照，供下一帧把「分支箭头条」贴回同一屏幕位置。
+		 *
+		 * 背景：MessageActions 在气泡内 `absolute bottom`，长文时箭头在整条消息最底部。若用整行
+		 * `scrollIntoView` / `scrollToIndex(align:center)`，是按整条消息行对齐，箭头仍会相对视口下沉。
+		 *
+		 * 做法：点击切换前记录「箭头条」相对 Radix ScrollArea Viewport 的 top 差；React 提交新分支
+		 * DOM 后再量一次，用 scrollTop 补偿差值，使箭头条的视口 top 与切换前一致。
+		 *
+		 * 依赖：ChatMessageActions 内分支区域根节点上的 `data-branch-switch-anchor`；每条消息行根节点
+		 * 上的 `data-message-list-index`（切换兄弟后 chatId 会变，用列表下标定位同一「槽位」）。
+		 * 自定义 renderMessageActions 时请在分支 UI 外包一层并加同名 data 属性，否则不会写入本 ref。
+		 */
+		const branchSwitchAnchorRef = useRef<{
+			/** 当前展示链路上该条消息的下标，切换兄弟后不变 */
+			listIndex: number;
+			/** 切换前：分支箭头条上边缘距滚动视口上边缘的像素距离（与 getBoundingClientRect 一致） */
+			targetViewportTop: number;
+		} | null>(null);
 
 		const SCROLL_THRESHOLD = 5;
 		/** 流式时「仍算在底部」的容差；过大会导致用户上滑后仍被跟底，难以打断 */
@@ -598,6 +617,25 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 					const currentMsg = flatMessages.find((m) => m.chatId === msgId);
 					const parentId = currentMsg?.parentId;
 
+					// --- 分支滚动锚点：必须在 setState（更新 selectedChildMap）之前采样，否则已是新兄弟的 DOM ---
+					const listIndex = messages.findIndex((m) => m.chatId === msgId);
+					const container = scrollContainerRef.current;
+					if (listIndex >= 0 && container) {
+						// 限定在第 listIndex 行内查找，避免 query 误命中其它消息上的分支条
+						const anchor = container.querySelector(
+							`[data-message-list-index="${listIndex}"] [data-branch-switch-anchor]`,
+						) as HTMLElement | null;
+						if (anchor) {
+							const cRect = container.getBoundingClientRect();
+							const aRect = anchor.getBoundingClientRect();
+							branchSwitchAnchorRef.current = {
+								listIndex,
+								targetViewportTop: aRect.top - cRect.top,
+							};
+						}
+						// 未找到锚点（例如自定义操作条未带 data-branch-switch-anchor）时不写 ref，后续 effect 不滚动
+					}
+
 					const newSelectedChildMap = new Map(selectedChildMap);
 					if (parentId) {
 						newSelectedChildMap.set(parentId, nextMsg.chatId);
@@ -621,8 +659,60 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 				onPersistSessionBranchSelection,
 				onSelectedChildMapChange,
 				selectedChildMap,
+				messages,
 			],
 		);
+
+		/**
+		 * 分支切换后：按「分支箭头条」对齐滚动，而不是对齐整条消息行。
+		 *
+		 * 几何关系（仅考虑纵向）：
+		 * - 视口内某固定点相对视口顶部的距离，在 scrollTop 增加 1px 时，该点对应内容整体上移 1px，
+		 *   即 getBoundingClientRect().top 减少约 1。故：希望锚点 top 从 current 变回 target 时，
+		 *   应满足 currentTop - ΔscrollTop ≈ targetTop → ΔscrollTop ≈ currentTop - targetTop。
+		 * - 代码：`adjust = currentTop - targetTop`，`scrollTop += adjust`。此前若误用 target - current
+		 *   会与上述关系相反，会把列表滚向错误方向。
+		 *
+		 * suppressVirtualScrollAdjustUntilRef：TanStack Virtual 在子项高度变化时会回调
+		 * shouldAdjustScrollPositionOnItemSizeChange 并可能改写 scrollTop；分支切换会换 chatId、
+		 * 高度常变，短时关闭该补偿避免与本次手动对齐抢滚动。
+		 *
+		 * layout / microtask / 双 rAF：虚拟列表换 key 后测量与布局可能晚半帧到一帧，多拍执行使补偿
+		 * 在测量稳定后仍有机会收敛；重复调用时若已对齐则 adjust≈0，不再改动 scrollTop。
+		 */
+		useLayoutEffect(() => {
+			const pending = branchSwitchAnchorRef.current;
+			if (!pending) return;
+			// 立即消费，避免同一次会话里后续 messages 更新（如流式）重复执行对齐
+			branchSwitchAnchorRef.current = null;
+			const idx = pending.listIndex;
+			const targetTop = pending.targetViewportTop;
+			const container = scrollContainerRef.current;
+			if (!container || idx < 0) return;
+
+			const tryAlignBranchAnchor = () => {
+				const anchor = container.querySelector(
+					`[data-message-list-index="${idx}"] [data-branch-switch-anchor]`,
+				) as HTMLElement | null;
+				if (!anchor) return;
+				if (typeof performance !== 'undefined') {
+					suppressVirtualScrollAdjustUntilRef.current = performance.now() + 360;
+				}
+				const cRect = container.getBoundingClientRect();
+				const currentTop = anchor.getBoundingClientRect().top - cRect.top;
+				const adjust = currentTop - targetTop;
+				if (Math.abs(adjust) >= 0.5) {
+					container.scrollTop += adjust;
+				}
+			};
+
+			tryAlignBranchAnchor();
+			queueMicrotask(tryAlignBranchAnchor);
+			requestAnimationFrame(() => {
+				tryAlignBranchAnchor();
+				requestAnimationFrame(tryAlignBranchAnchor);
+			});
+		}, [messages]);
 
 		const onReGenerate = useCallback(
 			(index: number) => {
@@ -701,6 +791,8 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 		const renderMessageRow = (message: Message, index: number) => (
 			<div
 				id={`message-${message.chatId}`}
+				// 当前分支链路上的序号；切换兄弟回答后该槽位 index 不变，仅 chatId/内容变，供分支滚动用选择器限定行
+				data-message-list-index={index}
 				className={cn(
 					'flex gap-3 w-full',
 					message.role === 'user' ? 'flex-row-reverse' : '',

@@ -114,9 +114,15 @@ export const MessageActions = ({
 				</div>
 			)}
 
-			{/* 分支切换按钮区域 */}
+			{/*
+				分支切换按钮区域（左右箭头 + 序号）。
+				data-branch-switch-anchor：
+				ChatBotView 在切换兄弟节点前后会测量该节点相对滚动视口的 top，并通过 scrollTop 补偿，
+				使长消息气泡底部的箭头条仍停留在用户切换前的屏幕位置；勿删改属性名，自定义主题勿包裹掉该节点。
+			*/}
 			{hasSiblings && !isSharing && (
 				<div
+					data-branch-switch-anchor=""
 					className={`${
 						message.role === 'user'
 							? 'order-last ml-5 -mr-3.5'
