@@ -16,12 +16,15 @@ import ChatBotView from './ChatBotView';
 
 export type {
 	ChatBotRef,
+	ChatBotSimpleViewProps,
 	ChatBotViewAnchorNavContext,
 	ChatBotViewChatControlsContext,
 	ChatBotViewMessageActionsContext,
 	ChatBotViewProps,
 } from '@/types/chat';
 export { default as ChatBotView } from './ChatBotView';
+/** 仅需 messages 的 ChatBotView 轻量封装，操作区可通过 render* / show* 扩展 */
+export { default as SimpleChatBotView } from './SimpleChatBotView';
 
 /**
  * ChatBot（默认导出）= 本应用专用的「连接层」：
@@ -31,6 +34,7 @@ export { default as ChatBotView } from './ChatBotView';
  *
  * 这样业务页仍只需 `<ChatBot />`，行为与拆分前一致；
  * 需要跨项目复用时请使用 ChatBotView，并自行注入 ChatBotViewProps（零 Store）。
+ * 若只需传入消息数组、分支在本地维护即可，可用同目录导出的 SimpleChatBotView。
  */
 const ChatBot = observer(
 	forwardRef<ChatBotRef, ChatBotProps>(function ChatBot(props, ref) {

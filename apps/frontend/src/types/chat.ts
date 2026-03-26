@@ -226,6 +226,20 @@ export interface ChatBotViewProps {
 	renderChatControls?: (ctx: ChatBotViewChatControlsContext) => ReactNode;
 }
 
+/**
+ * `ChatBotSimpleView` 入参：相对 ChatBotView 省略 flatMessages / selectedChildMap / onSelectedChildMapChange，
+ * 改为单一 `messages` 与可选 `initialSelectedChildMap`（仅首屏初始化）。分支状态在封装内用 useState 维护，
+ * 不与 MobX 会话持久化对齐；需要与 Store 同步时请直接使用 ChatBotView。
+ */
+export type ChatBotSimpleViewProps = Omit<
+	ChatBotViewProps,
+	'flatMessages' | 'selectedChildMap' | 'onSelectedChildMapChange'
+> & {
+	messages: Message[];
+	/** 仅 mount 时拷贝进内部 state；之后改此 prop 不会同步（避免与内部分支操作打架） */
+	initialSelectedChildMap?: Map<string, string>;
+};
+
 /** 连接层 ChatBot 与 ChatBotView 共用的业务入口 props（含可选插槽）。 */
 export interface ChatBotProps {
 	className?: string;

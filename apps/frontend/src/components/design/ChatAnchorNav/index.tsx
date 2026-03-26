@@ -191,6 +191,9 @@ const ChatAnchorNav = ({
 			<div className="relative flex flex-col items-center">
 				{/* 上翻按钮 */}
 				<div className="opacity-0 group-hover:opacity-100 mb-0.5">
+					<div className="opacity-0 group-hover:opacity-100 text-sm text-textcolor/60 mb-2">
+						{currentIndex + 1}
+					</div>
 					<Button
 						className="w-6 h-6 rounded-full bg-theme/10 hover:bg-theme/20 text-textcolor/60 hover:text-textcolor"
 						onClick={handlePrev}
@@ -219,7 +222,7 @@ const ChatAnchorNav = ({
 												}
 											}}
 											className={cn(
-												'w-2 h-2 my-[5px] cursor-pointer rounded-full',
+												'relative w-2 h-2 my-[5px] cursor-pointer rounded-full',
 												'hover:scale-145 active:scale-145 transition-all duration-300',
 												activeAnchor === msg.chatId
 													? 'bg-blue-500 scale-145 shadow-[0_0_5px_rgba(59,130,246,0.6)]'
@@ -242,6 +245,9 @@ const ChatAnchorNav = ({
 					>
 						<ChevronDown className="w-4 h-4" />
 					</Button>
+					<div className="opacity-0 group-hover:opacity-100 text-sm text-textcolor/60 mt-2">
+						{userMessages.length}
+					</div>
 				</div>
 			</div>
 		</div>
