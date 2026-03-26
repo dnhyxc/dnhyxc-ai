@@ -5,14 +5,14 @@ import ChatFileList from '@design/ChatFileList';
 import ChatMessageActions from '@design/ChatMessageActions';
 import ChatNewSession from '@design/ChatNewSession';
 import ChatUserMessage from '@design/ChatUserMessage';
-import { Label, ScrollArea } from '@ui/index';
 import { useVirtualizer } from '@tanstack/react-virtual';
+import { Label, ScrollArea } from '@ui/index';
 import { Bot, User } from 'lucide-react';
 import React, {
 	type ChangeEvent,
 	type Dispatch,
-	forwardRef,
 	Fragment,
+	forwardRef,
 	JSX,
 	type SetStateAction,
 	useCallback,
