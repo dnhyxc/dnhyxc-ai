@@ -22,7 +22,7 @@ const Session = () => {
 			chatStore.setActiveSessionId(params.id);
 			getSessionInfo(params.id);
 		}
-	}, [params.id, chatStore.messages, chatStore.sessionData.total]);
+	}, [params.id, chatStore.messages.length, chatStore.sessionData.total]);
 
 	const getSessionInfo = useCallback(
 		async (id: string) => {

@@ -19,7 +19,6 @@ import {
 	useRef,
 	useState,
 } from 'react';
-import { useParams } from 'react-router';
 import { useChatCoreContext } from '@/contexts';
 import { useBranchManage } from '@/hooks/useBranchManage';
 import { useChatCore } from '@/hooks/useChatCore';
@@ -54,7 +53,6 @@ const ChatBot = observer(
 		} = props;
 
 		const { chatStore } = useStore();
-		const params = useParams();
 
 		// 消息状态
 		const [allMessages, setAllMessages] = useState<Message[]>(
@@ -83,15 +81,18 @@ const ChatBot = observer(
 
 		const SCROLL_THRESHOLD = 5;
 
-		const onScrollTo = (position: string, behavior?: 'smooth' | 'auto') => {
-			scrollContainerRef.current?.scrollTo({
-				top:
-					position === 'up'
-						? 0
-						: scrollContainerRef.current?.scrollHeight + 100,
-				behavior: behavior || 'smooth',
-			});
-		};
+		const onScrollTo = useCallback(
+			(position: string, behavior?: 'smooth' | 'auto') => {
+				scrollContainerRef.current?.scrollTo({
+					top:
+						position === 'up'
+							? 0
+							: scrollContainerRef.current?.scrollHeight + 100,
+					behavior: behavior || 'smooth',
+				});
+			},
+			[],
+		);
 
 		// 使用分支管理 hook
 		const {
@@ -155,17 +156,7 @@ const ChatBot = observer(
 			return () => dispose();
 		}, [chatStore]);
 
-		// 监听 stoppedMessages 变化，确保停止状态实时更新
-		useEffect(() => {
-			const dispose = mobx.reaction(
-				() => chatStore.stoppedMessages.size,
-				() => {
-					// 强制重新渲染消息列表
-					setAllMessages([...chatStore.messages]);
-				},
-			);
-			return () => dispose();
-		}, [chatStore]);
+		// 停止态由 observer 读取 chatStore.isMessageStopped 即可触发重渲染，无需再整表拷贝触发 setAllMessages
 
 		// 监听 store 中 selectedChildMap 的变化，使在重新编辑 user 信息重新发送时，能够自动切换到最新的 user 分支
 		useEffect(() => {
@@ -326,7 +317,7 @@ const ChatBot = observer(
 			};
 		}, []);
 
-		const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+		const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
 			const element = e.currentTarget;
 			if (!scrollContainerRef.current) {
 				scrollContainerRef.current = element;
@@ -337,68 +328,77 @@ const ChatBot = observer(
 			const isAtBottom =
 				scrollHeight - scrollTop - clientHeight < SCROLL_THRESHOLD;
 			setAutoScroll(isAtBottom);
-		};
+		}, []);
 
-		const onToggleThinkContent = () => {
-			setIsShowThinkContent(!isShowThinkContent);
-		};
+		const onToggleThinkContent = useCallback(() => {
+			setIsShowThinkContent((prev) => !prev);
+		}, []);
 
-		const onCopy = (value: string, id: string) => {
+		const onCopy = useCallback((value: string, id: string) => {
 			navigator.clipboard.writeText(value);
 			setIsCopyedId(id);
 			copyTimerRef.current = setTimeout(() => {
 				setIsCopyedId('');
 			}, 500);
-		};
+		}, []);
 
-		const onEdit = (message: Message) => {
-			setEditMessage(message);
-			focusTimerRef.current = setTimeout(() => {
-				if (editInputRef.current) {
-					editInputRef.current.focus();
-					const len = editInputRef.current.value.length;
-					editInputRef.current.setSelectionRange(len, len);
+		const onEdit = useCallback(
+			(message: Message) => {
+				setEditMessage(message);
+				focusTimerRef.current = setTimeout(() => {
+					if (editInputRef.current) {
+						editInputRef.current.focus();
+						const len = editInputRef.current.value.length;
+						editInputRef.current.setSelectionRange(len, len);
+					}
+				}, 0);
+			},
+			[setEditMessage],
+		);
+
+		const handleBranchChange = useCallback(
+			(msgId: string, direction: 'prev' | 'next') => {
+				onBranchChange?.(msgId, direction);
+
+				const siblings = findSiblings(chatStore.messages, msgId);
+				const currentIndex = siblings.findIndex((m) => m.chatId === msgId);
+				const nextIndex =
+					direction === 'next' ? currentIndex + 1 : currentIndex - 1;
+
+				if (nextIndex >= 0 && nextIndex < siblings.length) {
+					const nextMsg = siblings[nextIndex];
+					const currentMsg = chatStore.messages.find((m) => m.chatId === msgId);
+					const parentId = currentMsg?.parentId;
+
+					const newSelectedChildMap = new Map(selectedChildMap);
+					if (parentId) {
+						newSelectedChildMap.set(parentId, nextMsg.chatId);
+					} else {
+						newSelectedChildMap.set('root', nextMsg.chatId);
+					}
+					setSelectedChildMap(newSelectedChildMap);
+					if (chatStore.activeSessionId) {
+						chatStore.saveSessionBranchSelection(
+							chatStore.activeSessionId,
+							newSelectedChildMap,
+						);
+					}
 				}
-			}, 0);
-		};
+			},
+			[chatStore, findSiblings, onBranchChange, selectedChildMap],
+		);
 
-		const handleBranchChange = (msgId: string, direction: 'prev' | 'next') => {
-			onBranchChange?.(msgId, direction);
-
-			const siblings = findSiblings(chatStore.messages, msgId);
-			const currentIndex = siblings.findIndex((m) => m.chatId === msgId);
-			const nextIndex =
-				direction === 'next' ? currentIndex + 1 : currentIndex - 1;
-
-			if (nextIndex >= 0 && nextIndex < siblings.length) {
-				const nextMsg = siblings[nextIndex];
-				const currentMsg = chatStore.messages.find((m) => m.chatId === msgId);
-				const parentId = currentMsg?.parentId;
-
-				const newSelectedChildMap = new Map(selectedChildMap);
-				if (parentId) {
-					newSelectedChildMap.set(parentId, nextMsg.chatId);
-				} else {
-					newSelectedChildMap.set('root', nextMsg.chatId);
+		const onReGenerate = useCallback(
+			(index: number) => {
+				if (index > 0) {
+					const userMsg = messages[index - 1];
+					if (userMsg && userMsg.role === 'user') {
+						sendMessage(userMsg.content, index);
+					}
 				}
-				setSelectedChildMap(newSelectedChildMap);
-				if (chatStore.activeSessionId) {
-					chatStore.saveSessionBranchSelection(
-						chatStore.activeSessionId,
-						newSelectedChildMap,
-					);
-				}
-			}
-		};
-
-		const onReGenerate = (index: number) => {
-			if (index > 0) {
-				const userMsg = messages[index - 1];
-				if (userMsg && userMsg.role === 'user') {
-					sendMessage(userMsg.content, index);
-				}
-			}
-		};
+			},
+			[messages, sendMessage],
+		);
 
 		const getMessageClassName = useCallback(
 			(message: Message) => {
@@ -428,7 +428,7 @@ const ChatBot = observer(
 
 		const onShare = useCallback(() => {
 			setIsSharing(true);
-		}, [params?.id]);
+		}, [setIsSharing]);
 
 		useImperativeHandle(
 			ref,

@@ -290,6 +290,9 @@ const SessionList: React.FC<IProps> = ({ open, onOpenChange }) => {
 		[],
 	);
 
+	// 用稳定字符串作依赖，避免每次 render 新建数组导致 useMemo 失效
+	const loadingSessionsKey = [...chatStore.loadingSessions].sort().join('|');
+
 	const sessionList = useMemo(() => {
 		return chatStore.sessionData.list.map((item) => (
 			<SessionItem
@@ -308,8 +311,7 @@ const SessionList: React.FC<IProps> = ({ open, onOpenChange }) => {
 	}, [
 		chatStore.sessionData.list,
 		chatStore.activeSessionId,
-		// 这里需要展开，否则监听不到 loadingSessions 的变化，isLoading 的值不会动态更新从而触发重新渲染
-		[...chatStore.loadingSessions],
+		loadingSessionsKey,
 		onSelectSession,
 		onDelete,
 		parser,

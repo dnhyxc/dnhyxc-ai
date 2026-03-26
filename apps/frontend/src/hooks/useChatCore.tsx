@@ -89,7 +89,6 @@ export const useChatCore = (
 		findLastAssistantMessage,
 		updateParentChildrenIds,
 		buildMessageList,
-		getFormatMessages,
 	} = useMessageTools();
 
 	// 如果传入了 onScrollTo，同步到 Context ref
@@ -125,7 +124,7 @@ export const useChatCore = (
 			selectedChildMap,
 		);
 		return sortedMessages;
-	}, [chatStore, getSelectedChildMap, buildMessageList, getFormatMessages]);
+	}, [chatStore, getSelectedChildMap, buildMessageList]);
 
 	// 更新 Store 消息
 	const updateStoreMessages = useCallback(

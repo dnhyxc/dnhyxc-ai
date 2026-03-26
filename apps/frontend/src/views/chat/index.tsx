@@ -52,7 +52,7 @@ const Chat = observer(() => {
 
 	useEffect(() => {
 		chatInputRef.current?.focus();
-	}, [chatInputRef.current, location.pathname]);
+	}, [location.pathname]);
 
 	useEffect(() => {
 		return () => {
