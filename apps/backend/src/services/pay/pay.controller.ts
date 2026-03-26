@@ -42,7 +42,8 @@ export class PayController {
 		if (userId == null) {
 			throw new UnauthorizedException('无法识别当前用户');
 		}
-		return this.payService.createCheckoutSession(dto, userId);
+		const result = await this.payService.createCheckoutSession(dto, userId);
+		return result;
 	}
 
 	/**

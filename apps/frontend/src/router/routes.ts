@@ -128,7 +128,7 @@ const routes: RouteConfig[] = [
 				path: '/pay',
 				Component: Pay,
 				meta: {
-					title: '支付',
+					title: '会员充值',
 				},
 			},
 			{

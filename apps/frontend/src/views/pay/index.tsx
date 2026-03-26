@@ -167,7 +167,7 @@ const Pay = () => {
 				// 		"radial-gradient(ellipse 80% 60% at 20% 0%, oklch(0.72 0.14 165 / 0.22), transparent 55%), radial-gradient(ellipse 70% 50% at 100% 20%, oklch(0.65 0.12 250 / 0.12), transparent 50%)",
 				// }}
 			/>
-			<div className="relative mx-auto flex max-w-3xl flex-col gap-8 px-6 py-10">
+			<div className="relative mx-auto flex max-w-2xl flex-col gap-8 px-6 py-10">
 				<motion.header
 					initial={{ opacity: 0, y: 12 }}
 					animate={{ opacity: 1, y: 0 }}
