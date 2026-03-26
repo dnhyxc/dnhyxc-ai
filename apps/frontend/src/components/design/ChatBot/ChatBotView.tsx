@@ -80,7 +80,9 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 			if (props.displayMessages !== undefined) {
 				return props.displayMessages;
 			}
-			return getFormatMessages(buildMessageList(flatMessages, selectedChildMap));
+			return getFormatMessages(
+				buildMessageList(flatMessages, selectedChildMap),
+			);
 		}, [
 			props.displayMessages,
 			flatMessages,
@@ -107,8 +109,7 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 		// 无 checkedMessages 时用实例级空 Set，避免模块级单例被误 mutate 导致串会话
 		const defaultCheckedRef = useRef<Set<string>>(new Set());
 		const checkedMessages = props.checkedMessages ?? defaultCheckedRef.current;
-		const setCheckedMessage =
-			props.setCheckedMessage ?? noopSetCheckedMessage;
+		const setCheckedMessage = props.setCheckedMessage ?? noopSetCheckedMessage;
 
 		const [autoScroll, setAutoScroll] = useState(true);
 		const [isShowThinkContent, setIsShowThinkContent] = useState(true);
