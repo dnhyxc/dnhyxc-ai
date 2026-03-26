@@ -342,7 +342,7 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 		}, [onScrollTo, onScrollToRegister]);
 
 		// 流式：layout 贴底 + microtask/rAF 再贴（Markdown/换行后高度晚一帧才稳定）。
-		// 流式结束：尾条并回虚拟列表总高与 scrollTop 易错位，必须贴底并同步虚拟器，否则会「整体往上弹」。
+		// 流式结束：仅当用户仍在跟底（未上滑读历史）时贴底，修正尾条并回虚拟列表的错位；已上滑则不抢滚动位置。
 		useLayoutEffect(() => {
 			const el = scrollContainerRef.current;
 			if (el) {
@@ -371,18 +371,27 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 			const streamJustEnded = prevStreaming && !nowStreaming;
 			wasStreamingRef.current = nowStreaming;
 
-			// 刚结束流式：无条件贴底，修正 DOM 结构切换（文档流尾条 → 虚拟项）带来的视口错位
 			if (streamJustEnded) {
-				pinNativeBottom();
-				pinVirtualBottomIfNeeded();
-				requestAnimationFrame(() => {
+				const v = scrollContainerRef.current;
+				const distFromBottom = v
+					? v.scrollHeight - v.scrollTop - v.clientHeight
+					: 0;
+				const stillFollowingBottom =
+					autoScrollRef.current &&
+					!streamFollowUserPausedRef.current &&
+					distFromBottom < STREAM_BOTTOM_SLACK_PX;
+				if (stillFollowingBottom) {
 					pinNativeBottom();
 					pinVirtualBottomIfNeeded();
 					requestAnimationFrame(() => {
 						pinNativeBottom();
 						pinVirtualBottomIfNeeded();
+						requestAnimationFrame(() => {
+							pinNativeBottom();
+							pinVirtualBottomIfNeeded();
+						});
 					});
-				});
+				}
 				return;
 			}
 
