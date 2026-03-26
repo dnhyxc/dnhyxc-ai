@@ -11,6 +11,8 @@ const Session = () => {
 
 	const [loading, setLoading] = useState(false);
 
+	// 性能：依赖整个 chatStore.messages 会在流式输出时频繁触发 effect（内部虽有 length 判断不会重复请求，但仍白跑）。
+	// 依赖改为 messages.length：仅条数变化时重跑；体内仍用 !chatStore.messages.length，逻辑等价。
 	useEffect(() => {
 		// 只有在刷新后，store 中的 messages 为空的时候才调用接口获取 messages，
 		// 同时要保证 chatStore.sessionData.total 为 0，防止进入的是空 session，并没有对话的情况

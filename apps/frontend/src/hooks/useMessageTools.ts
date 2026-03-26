@@ -1,6 +1,11 @@
 import { CreateUserMessageParams, Message } from '@/types/chat';
 
-// 纯函数工具集放在模块级，保证引用稳定，避免 useChatCore / ChatBot 中 useCallback、useEffect 被无意义地失效
+/**
+ * 性能：以下函数不依赖 Hook 闭包，全部放在模块级。
+ * 原先在 useMessageTools() 内每次 render 都会新建函数引用，导致依赖 buildMessageList / findSiblings 等的
+ * useCallback、useEffect 依赖比较永远认为「变了」，从而重复执行或让子组件认为 props 变了。
+ * 抽成常量引用后，调用方可以稳定依赖这些函数，逻辑与之前完全一致（仍是同一套纯函数实现）。
+ */
 const createUserMessage = (params: CreateUserMessageParams): Message => ({
 	id: params.chatId,
 	chatId: params.chatId,
@@ -215,6 +220,7 @@ const getFormatMessages = (messages: Message[]) => {
 	}));
 };
 
+/** 单例对象：useMessageTools() 始终返回同一引用，避免无意义的依赖链抖动 */
 const MESSAGE_TOOLS = {
 	createUserMessage,
 	createAssistantMessage,

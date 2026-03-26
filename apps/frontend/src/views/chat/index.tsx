@@ -50,6 +50,7 @@ const Chat = observer(() => {
 	const chatInputRef = useRef<HTMLTextAreaElement>(null);
 	const focusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+	// 性能/正确性：不要把 chatInputRef.current 放进依赖。ref 变化不会触发重渲染，写在依赖里无效且易误导；
 	useEffect(() => {
 		chatInputRef.current?.focus();
 	}, [location.pathname]);

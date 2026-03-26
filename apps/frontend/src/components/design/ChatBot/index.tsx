@@ -81,6 +81,8 @@ const ChatBot = observer(
 
 		const SCROLL_THRESHOLD = 5;
 
+		// 性能：onScrollTo 每次 render 若都是新函数，下面同步到 onScrollToRef 的 effect 会反复执行；
+		// useCallback + 空依赖（只通过 ref 读 DOM）可固定引用，行为与原先一致。
 		const onScrollTo = useCallback(
 			(position: string, behavior?: 'smooth' | 'auto') => {
 				scrollContainerRef.current?.scrollTo({
@@ -155,8 +157,6 @@ const ChatBot = observer(
 			);
 			return () => dispose();
 		}, [chatStore]);
-
-		// 停止态由 observer 读取 chatStore.isMessageStopped 即可触发重渲染，无需再整表拷贝触发 setAllMessages
 
 		// 监听 store 中 selectedChildMap 的变化，使在重新编辑 user 信息重新发送时，能够自动切换到最新的 user 分支
 		useEffect(() => {
@@ -317,6 +317,7 @@ const ChatBot = observer(
 			};
 		}, []);
 
+		// 性能：ScrollArea 的 onScroll 若每次 render 换新函数，可能增加子树不必要的更新。
 		const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
 			const element = e.currentTarget;
 			if (!scrollContainerRef.current) {
@@ -330,10 +331,12 @@ const ChatBot = observer(
 			setAutoScroll(isAtBottom);
 		}, []);
 
+		// 函数式更新可减少对 isShowThinkContent 的依赖，避免回调随开关状态频繁换引用。
 		const onToggleThinkContent = useCallback(() => {
 			setIsShowThinkContent((prev) => !prev);
 		}, []);
 
+		// 性能：传给 ChatMessageActions 等子组件的回调固定引用，减轻 memo 子组件的重渲染。
 		const onCopy = useCallback((value: string, id: string) => {
 			navigator.clipboard.writeText(value);
 			setIsCopyedId(id);
@@ -356,6 +359,7 @@ const ChatBot = observer(
 			[setEditMessage],
 		);
 
+		// 性能：分支切换回调传给 ChatMessageActions；useCallback + 与状态一致的依赖，避免无意义的引用变化。
 		const handleBranchChange = useCallback(
 			(msgId: string, direction: 'prev' | 'next') => {
 				onBranchChange?.(msgId, direction);
@@ -388,6 +392,7 @@ const ChatBot = observer(
 			[chatStore, findSiblings, onBranchChange, selectedChildMap],
 		);
 
+		// 依赖 messages / sendMessage：与原先闭包一致，仅把函数引用稳定下来给子组件。
 		const onReGenerate = useCallback(
 			(index: number) => {
 				if (index > 0) {
@@ -426,6 +431,7 @@ const ChatBot = observer(
 			return scrollHeight - scrollTop - clientHeight < 5;
 		}, [scrollTop]);
 
+		// 原依赖 params?.id 但函数体内未使用，仅会随路由无意义地换新引用；改为只依赖 setIsSharing（Context 稳定）。
 		const onShare = useCallback(() => {
 			setIsSharing(true);
 		}, [setIsSharing]);

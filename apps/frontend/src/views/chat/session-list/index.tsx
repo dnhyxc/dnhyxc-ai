@@ -290,7 +290,11 @@ const SessionList: React.FC<IProps> = ({ open, onOpenChange }) => {
 		[],
 	);
 
-	// 用稳定字符串作依赖，避免每次 render 新建数组导致 useMemo 失效
+	/**
+	 * 性能：useMemo 依赖项若写 [...chatStore.loadingSessions]，每次 render 都是新数组引用，
+	 * React 用 Object.is 比较会认为依赖变了，sessionList 的 useMemo 几乎永远重算，memo 形同虚设。
+	 * 改成「当前加载中会话 id 排序后拼接」的字符串：只有集合内容变化时 key 才变，列表才重算；渲染结果一致。
+	 */
 	const loadingSessionsKey = [...chatStore.loadingSessions].sort().join('|');
 
 	const sessionList = useMemo(() => {
@@ -308,6 +312,7 @@ const SessionList: React.FC<IProps> = ({ open, onOpenChange }) => {
 				parser={parser}
 			/>
 		));
+		// loadingSessionsKey 替代原 [...loadingSessions] 数组依赖，见上方说明
 	}, [
 		chatStore.sessionData.list,
 		chatStore.activeSessionId,
