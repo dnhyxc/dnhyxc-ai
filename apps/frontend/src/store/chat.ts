@@ -3,7 +3,18 @@ import { Message, SessionData } from '@/types/chat';
 
 class ChatStore {
 	constructor() {
-		makeAutoObservable(this);
+		makeAutoObservable(this, {
+			// 纯查询，不包成 action，避免在 computed 等上下文中误用 action 语义
+			firstMessageIndexByChatId: false,
+		});
+	}
+
+	/** 与 findIndex(m => m.chatId === chatId) 一致：首个匹配下标，无则 -1；for 循环避免回调分配 */
+	firstMessageIndexByChatId(chatId: string): number {
+		for (let i = 0; i < this.messages.length; i++) {
+			if (this.messages[i].chatId === chatId) return i;
+		}
+		return -1;
 	}
 
 	messages: Message[] = [];
@@ -187,12 +198,19 @@ class ChatStore {
 		}
 
 		const mergedMessages = [...messages];
+		// 用 chatId -> 下标 替代每条流式消息都 findIndex 全表扫描；合并结果与原先一致，仅降低 O(n×流式条数) 为 O(n+流式条数)。
+		const mergedIndexByChatId = new Map<string, number>();
+		for (let i = 0; i < mergedMessages.length; i++) {
+			const id = mergedMessages[i].chatId;
+			// 与 findIndex 一致：重复 chatId 时取第一次出现，避免 Map 后写覆盖改变合并目标下标
+			if (!mergedIndexByChatId.has(id)) {
+				mergedIndexByChatId.set(id, i);
+			}
+		}
 
 		this.streamingMessages.forEach((streamingMsg, chatId) => {
-			const existingIndex = mergedMessages.findIndex(
-				(m) => m.chatId === chatId,
-			);
-			if (existingIndex >= 0) {
+			const existingIndex = mergedIndexByChatId.get(chatId);
+			if (existingIndex !== undefined) {
 				// 增加 shouldMergeStreamContent 判断，防止在发送新消息时，导致上一条消息内容丢失
 				const shouldMergeStreamContent = streamingMsg.isStreaming;
 
@@ -212,6 +230,7 @@ class ChatStore {
 			} else {
 				if (streamingMsg.isStreaming) {
 					mergedMessages.push(streamingMsg);
+					mergedIndexByChatId.set(chatId, mergedMessages.length - 1);
 				}
 			}
 		});
@@ -363,44 +382,39 @@ class ChatStore {
 	applyBatchUpdates(
 		updates: Map<string, { content?: string; thinkContent?: string }>,
 	) {
-		// 创建消息映射以快速查找
-		const messageMap = new Map<string, { index: number; message: Message }>();
+		// 与原先 forEach 写 messageMap 一致：同一 chatId 多次出现时保留最后一次下标（覆盖 set）
+		const indexByChatId = new Map<string, number>();
 		this.messages.forEach((msg, index) => {
-			messageMap.set(msg.chatId, { index, message: msg });
+			indexByChatId.set(msg.chatId, index);
 		});
 
-		// 应用更新
-		updates.forEach((update, chatId) => {
-			const entry = messageMap.get(chatId);
-			if (entry) {
-				const { index, message } = entry;
-				const updatedMessage = {
-					...message,
-					...(update.content !== undefined && {
-						content: message.content + update.content,
-					}),
-					...(update.thinkContent !== undefined && {
-						thinkContent: message.thinkContent + update.thinkContent,
-					}),
-					isStreaming: true,
-					// 保持停止状态由 stoppedMessages Map 管理
-					isStopped: this.stoppedMessages.has(chatId),
-				};
-				messageMap.set(chatId, { index, message: updatedMessage });
-			}
-		});
-
-		// 一次性更新数组
 		const newMessages = [...this.messages];
-		messageMap.forEach(({ index, message }) => {
-			newMessages[index] = message;
+
+		updates.forEach((update, chatId) => {
+			const index = indexByChatId.get(chatId);
+			if (index === undefined) return;
+			const message = newMessages[index];
+			const updatedMessage = {
+				...message,
+				...(update.content !== undefined && {
+					content: message.content + update.content,
+				}),
+				...(update.thinkContent !== undefined && {
+					thinkContent: message.thinkContent + update.thinkContent,
+				}),
+				isStreaming: true,
+				isStopped: this.stoppedMessages.has(chatId),
+			};
+			newMessages[index] = updatedMessage;
 		});
+
 		this.messages = newMessages;
 
-		// 更新流式消息缓存
-		messageMap.forEach(({ message }) => {
+		// 与原先 messageMap.forEach 一致：对每个「唯一 chatId」对应的当前行（末次出现下标）若仍在流式则写回缓存，条数=去重后 id 数而非全数组长度
+		indexByChatId.forEach((index, chatId) => {
+			const message = newMessages[index];
 			if (message.isStreaming) {
-				this.streamingMessages.set(message.chatId, message);
+				this.streamingMessages.set(chatId, message);
 			}
 		});
 	}
@@ -415,7 +429,7 @@ class ChatStore {
 			// 立即应用剩余内容
 			const update: Partial<Message> = { isStreaming: false };
 
-			const messageIndex = this.messages.findIndex((m) => m.chatId === chatId);
+			const messageIndex = this.firstMessageIndexByChatId(chatId);
 			if (messageIndex >= 0) {
 				const currentMessage = this.messages[messageIndex];
 				if (buffer.content) {
@@ -461,7 +475,7 @@ class ChatStore {
 		}
 
 		// 非流式更新：直接更新
-		const messageIndex = this.messages.findIndex((m) => m.chatId === chatId);
+		const messageIndex = this.firstMessageIndexByChatId(chatId);
 
 		if (messageIndex >= 0) {
 			const updatedMessage = {
@@ -526,17 +540,22 @@ class ChatStore {
 	 */
 	updateSessionMessage(chatId: string, updatedMessage: Message) {
 		this.sessionData.list.forEach((session) => {
-			if (session.messages && session.messages.length > 0) {
-				const sessionMessageIndex = session.messages.findIndex(
-					(m) => m.chatId === chatId,
-				);
-				if (sessionMessageIndex >= 0) {
-					session.messages = [
-						...session.messages.slice(0, sessionMessageIndex),
-						updatedMessage,
-						...session.messages.slice(sessionMessageIndex + 1),
-					];
+			if (!session.messages?.length) return;
+			// findIndex 只认首次出现的 chatId；建「首下标」映射避免每条 session 对长列表 O(n) 扫描
+			const firstIndexById = new Map<string, number>();
+			for (let i = 0; i < session.messages.length; i++) {
+				const id = session.messages[i].chatId;
+				if (!firstIndexById.has(id)) {
+					firstIndexById.set(id, i);
 				}
+			}
+			const sessionMessageIndex = firstIndexById.get(chatId);
+			if (sessionMessageIndex !== undefined) {
+				session.messages = [
+					...session.messages.slice(0, sessionMessageIndex),
+					updatedMessage,
+					...session.messages.slice(sessionMessageIndex + 1),
+				];
 			}
 		});
 	}
@@ -661,9 +680,11 @@ class ChatStore {
 	}
 
 	clearNonStreamingBranchMaps(streamingSessionIds: string[]) {
+		// Set.has O(1) 替代 Array.includes O(k)，删除条件与原先相同
+		const keepSessionIds = new Set(streamingSessionIds);
 		const keysToDelete: string[] = [];
 		this.streamingBranchMaps.forEach((value, key) => {
-			if (!streamingSessionIds.includes(value.sessionId)) {
+			if (!keepSessionIds.has(value.sessionId)) {
 				keysToDelete.push(key);
 			}
 		});
@@ -700,10 +721,9 @@ class ChatStore {
 
 		// 优化：直接找到消息对象并修改属性，避免数组展开
 		// 同时更新 Message 对象中的 finishReason 字段
-		const message = this.messages.find((m) => m.chatId === chatId);
-		if (message) {
-			// 直接修改属性，MobX 会追踪到这个变化
-			message.finishReason = finishReason;
+		const idx = this.firstMessageIndexByChatId(chatId);
+		if (idx >= 0) {
+			this.messages[idx].finishReason = finishReason;
 		}
 	}
 
@@ -723,7 +743,8 @@ class ChatStore {
 
 		// 同时清空 Message 对象中的 finishReason 字段
 		// 优化：直接找到消息对象并删除属性
-		const message = this.messages.find((m) => m.chatId === chatId);
+		const idx = this.firstMessageIndexByChatId(chatId);
+		const message = idx >= 0 ? this.messages[idx] : undefined;
 		if (message?.finishReason) {
 			delete message.finishReason;
 		}
@@ -754,12 +775,22 @@ class ChatStore {
 	 * @returns 分支链路上所有消息的 chatId 集合
 	 */
 	buildBranchPath(chatId: string): Set<string> {
+		// 沿 parentId 向上遍历时，每次 find 为 O(n)；先建 chatId->Message 映射后每步 O(1)
+		// 与 find 一致：重复 chatId 只认第一次出现，避免后写覆盖改变 parentId 链（旧实现是 find 取首条）
+		const byChatId = new Map<string, Message>();
+		for (let i = 0; i < this.messages.length; i++) {
+			const m = this.messages[i];
+			if (!byChatId.has(m.chatId)) {
+				byChatId.set(m.chatId, m);
+			}
+		}
+
 		const path = new Set<string>();
 		let currentId: string | undefined = chatId;
 
 		while (currentId) {
 			path.add(currentId);
-			const msg = this.messages.find((m) => m.chatId === currentId);
+			const msg = byChatId.get(currentId);
 			currentId = msg?.parentId;
 		}
 
