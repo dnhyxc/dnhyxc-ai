@@ -118,7 +118,9 @@ export const useBranchManage = ({
 	const streamingMsgsThisSession = useMemo(() => {
 		if (!streamingBranchSource || !activeSessionId) return [];
 		return streamingBranchSource.getStreamingMessages().filter((msg) => {
-			const sid = streamingBranchSource.getStreamingMessageSessionId(msg.chatId);
+			const sid = streamingBranchSource.getStreamingMessageSessionId(
+				msg.chatId,
+			);
 			return sid === activeSessionId;
 		});
 	}, [streamingBranchSource, activeSessionId, messages]);
@@ -131,7 +133,9 @@ export const useBranchManage = ({
 	const isStreamingBranchVisibleValue = useMemo(() => {
 		if (!streamingBranchSource || !activeSessionId) return true;
 		if (streamingMsgsThisSession.length === 0) return true;
-		return streamingMsgsThisSession.some((msg) => visibleChatIds.has(msg.chatId));
+		return streamingMsgsThisSession.some((msg) =>
+			visibleChatIds.has(msg.chatId),
+		);
 	}, [
 		streamingBranchSource,
 		activeSessionId,

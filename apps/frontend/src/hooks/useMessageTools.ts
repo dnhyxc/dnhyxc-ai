@@ -223,11 +223,7 @@ const buildMessageList = (
 
 const getFormatMessages = (messages: Message[]) => {
 	return messages.map((msg) =>
-		formatMessageForDisplay(
-			msg,
-			msg.siblingIndex ?? 0,
-			msg.siblingCount ?? 1,
-		),
+		formatMessageForDisplay(msg, msg.siblingIndex ?? 0, msg.siblingCount ?? 1),
 	);
 };
 

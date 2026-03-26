@@ -80,7 +80,12 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 				return props.displayMessages;
 			}
 			return buildMessageList(flatMessages, selectedChildMap);
-		}, [props.displayMessages, flatMessages, selectedChildMap, buildMessageList]);
+		}, [
+			props.displayMessages,
+			flatMessages,
+			selectedChildMap,
+			buildMessageList,
+		]);
 
 		const activeSessionId = props.activeSessionId ?? null;
 		const input = props.input ?? '';
