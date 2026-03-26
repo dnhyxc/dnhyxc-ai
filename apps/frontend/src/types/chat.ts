@@ -1,4 +1,10 @@
-import type { ChangeEvent, Dispatch, ReactNode, SetStateAction } from 'react';
+import type {
+	ChangeEvent,
+	Dispatch,
+	ReactNode,
+	RefObject,
+	SetStateAction,
+} from 'react';
 import { UploadedFile } from '@/types';
 
 export interface Session {
@@ -63,18 +69,6 @@ export interface ChatRequestParams {
 	isContinuation?: boolean;
 }
 
-export interface ChatBotProps {
-	className?: string;
-	initialMessages?: Message[];
-	apiEndpoint?: string;
-	maxHistory?: number;
-	showAvatar?: boolean;
-	onBranchChange?: (msgId: string, direction: 'prev' | 'next') => void;
-	activeSessionId?: string;
-	setActiveSessionId?: (id: string) => void;
-	onStreamingStateChange?: (isStreaming: boolean, sessionId: string) => void;
-}
-
 /**
  * 通过 ref 暴露给父级的能力（发送、清空、停止）。
  * 抽到类型文件是为了让 ChatBot 连接层与 ChatBotView 纯 UI 层共用同一契约，避免循环依赖。
@@ -103,6 +97,43 @@ export interface ChatStreamingBranchSource {
 	getStreamingBranchMap: (
 		assistantMessageId: string,
 	) => Map<string, string> | undefined;
+}
+
+/** 传给自定义「单条消息操作区」的上下文；与内置 ChatMessageActions 所需数据、回调一致。 */
+export interface ChatBotViewMessageActionsContext {
+	message: Message;
+	index: number;
+	messagesLength: number;
+	isCopyedId: string;
+	isLoading: boolean;
+	onBranchChange: (msgId: string, direction: 'prev' | 'next') => void;
+	onCopy: (content: string, chatId: string) => void;
+	onEdit: (message: Message) => void;
+	onReGenerate: (index: number) => void;
+	/** 进入分享勾选模式；内置条会在分享流程中配合 setCheckedMessage 使用 */
+	onShare: () => void;
+	isSharing: boolean;
+	checkedMessages: Set<string>;
+	setCheckedMessage: (message: Message) => void;
+}
+
+/** 自定义左侧锚点导航时的上下文；与内置 ChatAnchorNav 一致。 */
+export interface ChatBotViewAnchorNavContext {
+	messages: Message[];
+	scrollContainerRef: RefObject<HTMLDivElement | null>;
+}
+
+/** 自定义底部分支/滚动控制条时的上下文；布尔值已算好，避免重复调用分支检测函数。 */
+export interface ChatBotViewChatControlsContext {
+	isLoading: boolean;
+	isStreamingBranchVisible: boolean;
+	isLatestBranch: boolean;
+	messagesLength: number;
+	switchToStreamingBranch: () => void;
+	switchToLatestBranch: () => void;
+	hasScrollbar: boolean;
+	isAtBottom: boolean;
+	onScrollTo: (position: 'up' | 'down', behavior?: 'smooth' | 'auto') => void;
 }
 
 /**
@@ -161,6 +192,48 @@ export interface ChatBotViewProps {
 
 	/** 无消息时的占位；默认使用内置 ChatNewSession */
 	emptyState?: ReactNode;
+
+	/** 为 false 时不展示每条消息下的操作条（忽略 renderMessageActions）；默认 true */
+	showMessageActions?: boolean;
+	/** 为 false 时不展示左侧锚点导航（忽略 renderAnchorNav）；默认 true */
+	showAnchorNav?: boolean;
+	/** 为 false 时不展示底部分支/滚动控制（忽略 renderChatControls）；默认 true */
+	showChatControls?: boolean;
+
+	/**
+	 * 自定义每条消息下的操作区（分支切换、复制、编辑、重生成、分享等）。
+	 * 不传则渲染内置 ChatMessageActions；返回 null 表示不渲染该区域。
+	 */
+	renderMessageActions?: (
+		ctx: ChatBotViewMessageActionsContext,
+	) => ReactNode;
+	/**
+	 * 自定义用户消息锚点导航；不传则渲染内置 ChatAnchorNav；返回 null 可隐藏。
+	 */
+	renderAnchorNav?: (ctx: ChatBotViewAnchorNavContext) => ReactNode;
+	/**
+	 * 自定义底部分支切换与滚动按钮；不传则渲染内置 ChatControls；返回 null 可隐藏。
+	 */
+	renderChatControls?: (ctx: ChatBotViewChatControlsContext) => ReactNode;
+}
+
+/** 连接层 ChatBot 与 ChatBotView 共用的业务入口 props（含可选插槽）。 */
+export interface ChatBotProps {
+	className?: string;
+	initialMessages?: Message[];
+	apiEndpoint?: string;
+	maxHistory?: number;
+	showAvatar?: boolean;
+	onBranchChange?: (msgId: string, direction: 'prev' | 'next') => void;
+	activeSessionId?: string;
+	setActiveSessionId?: (id: string) => void;
+	onStreamingStateChange?: (isStreaming: boolean, sessionId: string) => void;
+	showMessageActions?: ChatBotViewProps['showMessageActions'];
+	showAnchorNav?: ChatBotViewProps['showAnchorNav'];
+	showChatControls?: ChatBotViewProps['showChatControls'];
+	renderMessageActions?: ChatBotViewProps['renderMessageActions'];
+	renderAnchorNav?: ChatBotViewProps['renderAnchorNav'];
+	renderChatControls?: ChatBotViewProps['renderChatControls'];
 }
 
 export interface CreateUserMessageParams {

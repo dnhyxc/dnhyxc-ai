@@ -31,6 +31,10 @@ import { ChatBotRef, ChatBotViewProps, Message } from '@/types/chat';
  *
  * 注意：子组件（ChatUserMessage / useChatCore 等）仍可能依赖本项目的 service、路由；
  * 若要在完全异构的项目使用，需一并替换输入区与发送逻辑，或仅复用本文件做消息列表展示。
+ *
+ * 插槽：renderMessageActions / renderAnchorNav / renderChatControls 可替换对应内置条；
+ * 不传则渲染默认组件。自定义实现应使用回调上下文中的 onBranchChange、switchToLatestBranch 等以操作同一份分支与滚动数据。
+ * showMessageActions / showAnchorNav / showChatControls 为 false 时强制不展示对应区域（优先生效于 render*）。
  */
 const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 	function ChatBotView(props, ref) {
@@ -64,6 +68,12 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 			setCheckedMessage,
 			onScrollToRegister,
 			emptyState,
+			showMessageActions = true,
+			showAnchorNav = true,
+			showChatControls = true,
+			renderMessageActions,
+			renderAnchorNav,
+			renderChatControls,
 		} = props;
 
 		const [autoScroll, setAutoScroll] = useState(true);
@@ -334,6 +344,17 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 			setIsSharing(true);
 		}, [setIsSharing]);
 
+		// 分支条用布尔值传入插槽与默认 ChatControls，避免子组件或自定义渲染里重复调用 getter。
+		const streamingBranchVisibleFlag = isStreamingBranchVisible();
+		const isLatestBranchFlag = isLatestBranch();
+
+		const onScrollToUpDown = useCallback(
+			(position: 'up' | 'down', behavior?: 'smooth' | 'auto') => {
+				onScrollTo(position, behavior);
+			},
+			[onScrollTo],
+		);
+
 		useImperativeHandle(
 			ref,
 			() => ({
@@ -437,41 +458,86 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 														/>
 													)}
 												</Label>
-												<ChatMessageActions
-													message={message}
-													index={index}
-													messagesLength={messages.length}
-													isCopyedId={isCopyedId}
-													isLoading={isCurrentSessionLoading}
-													onBranchChange={handleBranchChange}
-													onCopy={onCopy}
-													onEdit={onEdit}
-													onReGenerate={onReGenerate}
-													onShare={onShare}
-													isSharing={isSharing}
-													checkedMessages={checkedMessages}
-													setCheckedMessage={setCheckedMessage}
-												/>
+												{showMessageActions ? (
+													renderMessageActions ? (
+														renderMessageActions({
+															message,
+															index,
+															messagesLength: messages.length,
+															isCopyedId,
+															isLoading: isCurrentSessionLoading,
+															onBranchChange: handleBranchChange,
+															onCopy,
+															onEdit,
+															onReGenerate,
+															onShare,
+															isSharing,
+															checkedMessages,
+															setCheckedMessage,
+														})
+													) : (
+														<ChatMessageActions
+															message={message}
+															index={index}
+															messagesLength={messages.length}
+															isCopyedId={isCopyedId}
+															isLoading={isCurrentSessionLoading}
+															onBranchChange={handleBranchChange}
+															onCopy={onCopy}
+															onEdit={onEdit}
+															onReGenerate={onReGenerate}
+															onShare={onShare}
+															isSharing={isSharing}
+															checkedMessages={checkedMessages}
+															setCheckedMessage={setCheckedMessage}
+														/>
+													)
+												) : null}
 											</div>
 										</div>
 									))}
 						</div>
 					</div>
-					<ChatAnchorNav
-						messages={messages}
-						scrollContainerRef={scrollContainerRef}
-					/>
-					<ChatControls
-						isLoading={isCurrentSessionLoading}
-						isStreamingBranchVisible={isStreamingBranchVisible()}
-						isLatestBranch={isLatestBranch()}
-						messagesLength={messages.length}
-						switchToStreamingBranch={switchToStreamingBranch}
-						switchToLatestBranch={switchToLatestBranch}
-						hasScrollbar={hasScrollbar}
-						isAtBottom={isAtBottom}
-						onScrollTo={onScrollTo}
-					/>
+					{showAnchorNav ? (
+						renderAnchorNav ? (
+							renderAnchorNav({
+								messages,
+								scrollContainerRef,
+							})
+						) : (
+							<ChatAnchorNav
+								messages={messages}
+								scrollContainerRef={scrollContainerRef}
+							/>
+						)
+					) : null}
+					{showChatControls ? (
+						renderChatControls ? (
+							renderChatControls({
+								isLoading: isCurrentSessionLoading,
+								isStreamingBranchVisible: streamingBranchVisibleFlag,
+								isLatestBranch: isLatestBranchFlag,
+								messagesLength: messages.length,
+								switchToStreamingBranch,
+								switchToLatestBranch,
+								hasScrollbar,
+								isAtBottom,
+								onScrollTo: onScrollToUpDown,
+							})
+						) : (
+							<ChatControls
+								isLoading={isCurrentSessionLoading}
+								isStreamingBranchVisible={streamingBranchVisibleFlag}
+								isLatestBranch={isLatestBranchFlag}
+								messagesLength={messages.length}
+								switchToStreamingBranch={switchToStreamingBranch}
+								switchToLatestBranch={switchToLatestBranch}
+								hasScrollbar={hasScrollbar}
+								isAtBottom={isAtBottom}
+								onScrollTo={onScrollToUpDown}
+							/>
+						)
+					) : null}
 				</ScrollArea>
 			</div>
 		);

@@ -15,7 +15,13 @@ import useStore from '@/store';
 import { ChatBotProps, ChatBotRef, Message } from '@/types/chat';
 import ChatBotView from './ChatBotView';
 
-export type { ChatBotRef, ChatBotViewProps } from '@/types/chat';
+export type {
+	ChatBotRef,
+	ChatBotViewAnchorNavContext,
+	ChatBotViewChatControlsContext,
+	ChatBotViewMessageActionsContext,
+	ChatBotViewProps,
+} from '@/types/chat';
 export { default as ChatBotView } from './ChatBotView';
 
 /**
@@ -34,6 +40,12 @@ const ChatBot = observer(
 			apiEndpoint = '/chat/sse',
 			showAvatar = false,
 			onBranchChange,
+			showMessageActions,
+			showAnchorNav,
+			showChatControls,
+			renderMessageActions,
+			renderAnchorNav,
+			renderChatControls,
 		} = props;
 
 		const { chatStore } = useStore();
@@ -209,6 +221,12 @@ const ChatBot = observer(
 				checkedMessages={checkedMessages}
 				setCheckedMessage={setCheckedMessage}
 				onScrollToRegister={handleScrollToRegister}
+				showMessageActions={showMessageActions}
+				showAnchorNav={showAnchorNav}
+				showChatControls={showChatControls}
+				renderMessageActions={renderMessageActions}
+				renderAnchorNav={renderAnchorNav}
+				renderChatControls={renderChatControls}
 			/>
 		);
 	}),
