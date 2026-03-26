@@ -18,6 +18,11 @@ const ChatAnchorNav = ({
 
 	// 用于节流的 rAF ID
 	const rafIdRef = useRef<number | null>(null);
+	/** 点击锚点/上下条触发的主区域 smooth 滚动期间为 true，避免 scroll 回调里反复 calculateActiveAnchor 与点击目标打架造成高亮来回跳 */
+	const isProgrammaticMainScrollRef = useRef(false);
+	const programmaticScrollFallbackTimerRef = useRef<ReturnType<
+		typeof setTimeout
+	> | null>(null);
 	// 锚点列表容器的 ref，用于滚动锚点列表
 	const anchorListRef = useRef<HTMLDivElement | null>(null);
 	// 锚点元素的 ref map，用于获取每个锚点的 DOM 元素
@@ -61,6 +66,15 @@ const ChatAnchorNav = ({
 		setActiveAnchor(currentAnchor);
 	}, [userMessages, scrollContainerRef]);
 
+	const endProgrammaticMainScroll = useCallback(() => {
+		if (!isProgrammaticMainScrollRef.current) return;
+		isProgrammaticMainScrollRef.current = false;
+		if (programmaticScrollFallbackTimerRef.current !== null) {
+			clearTimeout(programmaticScrollFallbackTimerRef.current);
+			programmaticScrollFallbackTimerRef.current = null;
+		}
+	}, []);
+
 	// 监听滚动位置 - 使用 requestAnimationFrame 节流
 	useEffect(() => {
 		const container = scrollContainerRef.current;
@@ -68,6 +82,8 @@ const ChatAnchorNav = ({
 
 		// 使用 rAF 节流的滚动处理函数
 		const handleScroll = () => {
+			// 程序化滚动过程中不根据视口重算高亮，否则 smooth 动画中途会连续命中不同「中线」锚点，表现为上下弹跳
+			if (isProgrammaticMainScrollRef.current) return;
 			// 如果已经有待处理的 rAF，则跳过
 			if (rafIdRef.current !== null) return;
 
@@ -79,7 +95,12 @@ const ChatAnchorNav = ({
 			});
 		};
 
+		const handleScrollEnd = () => {
+			endProgrammaticMainScroll();
+		};
+
 		container.addEventListener('scroll', handleScroll, { passive: true });
+		container.addEventListener('scrollend', handleScrollEnd);
 
 		// 初始化时计算一次
 		calculateActiveAnchor();
@@ -87,13 +108,18 @@ const ChatAnchorNav = ({
 		return () => {
 			// 清理事件监听
 			container.removeEventListener('scroll', handleScroll);
+			container.removeEventListener('scrollend', handleScrollEnd);
 			// 取消待处理的 rAF
 			if (rafIdRef.current !== null) {
 				cancelAnimationFrame(rafIdRef.current);
 				rafIdRef.current = null;
 			}
+			if (programmaticScrollFallbackTimerRef.current !== null) {
+				clearTimeout(programmaticScrollFallbackTimerRef.current);
+				programmaticScrollFallbackTimerRef.current = null;
+			}
 		};
-	}, [calculateActiveAnchor, scrollContainerRef]);
+	}, [calculateActiveAnchor, scrollContainerRef, endProgrammaticMainScroll]);
 
 	// 当 activeAnchor 变化时，滚动锚点列表使活动锚点可见
 	useEffect(() => {
@@ -128,9 +154,10 @@ const ChatAnchorNav = ({
 			const targetScrollTop =
 				elementOffsetTop - containerHeight / 2 + elementHeight / 2;
 
+			// 侧栏用 instant，避免与主列表 smooth 同时进行两次弹性动画，加重「回弹」观感
 			listContainer.scrollTo({
 				top: Math.max(0, targetScrollTop),
-				behavior: 'smooth',
+				behavior: 'auto',
 			});
 		}
 	}, [activeAnchor]);
@@ -138,13 +165,23 @@ const ChatAnchorNav = ({
 	// 滚动到指定消息
 	const scrollToMessage = (chatId: string) => {
 		const element = document.getElementById(`message-${chatId}`);
-		if (element && scrollContainerRef.current) {
-			const containerRect = scrollContainerRef.current.getBoundingClientRect();
+		const main = scrollContainerRef.current;
+		if (element && main) {
+			isProgrammaticMainScrollRef.current = true;
+			if (programmaticScrollFallbackTimerRef.current !== null) {
+				clearTimeout(programmaticScrollFallbackTimerRef.current);
+			}
+			// scrollend 在部分环境不可用或偶发不触发，用超时兜底解锁；时长略长于常见 smooth 动画，避免尚未滚完就恢复 calculate 再次抖动
+			programmaticScrollFallbackTimerRef.current = setTimeout(() => {
+				endProgrammaticMainScroll();
+			}, 1000);
+
+			const containerRect = main.getBoundingClientRect();
 			const elementRect = element.getBoundingClientRect();
-			const scrollTop = scrollContainerRef.current.scrollTop;
+			const scrollTop = main.scrollTop;
 			const offset = elementRect.top - containerRect.top + scrollTop - 20;
 
-			scrollContainerRef.current.scrollTo({
+			main.scrollTo({
 				top: offset,
 				behavior: 'smooth',
 			});
