@@ -5,7 +5,11 @@ import ChatFileList from '@design/ChatFileList';
 import ChatMessageActions from '@design/ChatMessageActions';
 import ChatNewSession from '@design/ChatNewSession';
 import ChatUserMessage from '@design/ChatUserMessage';
-import { useVirtualizer } from '@tanstack/react-virtual';
+import {
+	useVirtualizer,
+	type VirtualItem,
+	type Virtualizer,
+} from '@tanstack/react-virtual';
 import { Label, ScrollArea } from '@ui/index';
 import { Bot, User } from 'lucide-react';
 import React, {
@@ -18,6 +22,7 @@ import React, {
 	useCallback,
 	useEffect,
 	useImperativeHandle,
+	useLayoutEffect,
 	useMemo,
 	useRef,
 	useState,
@@ -61,6 +66,7 @@ const noopIsMessageStopped = (_chatId: string) => false;
  * 性能相关（与 hooks / 类型改动配套）：
  * - 默认 `virtualizeMessages`：用 `@tanstack/react-virtual` 只渲染可视区消息；`ScrollArea` 的 ref 指向 Radix Viewport，与 `getScrollElement` 一致。
  * - `gap: 24` 对齐原 Tailwind `space-y-6`；`scrollPaddingStart: 20` 对齐锚点滚动「距顶约 20px」；`estimateSize` 为初值，真实高度靠 `measureElement` 修正。
+ * - 流式输出且最后一条为助手时：该条移出虚拟列表、走文档流（上方历史仍为虚拟列表），避免变高行在 absolute+translateY 下反复测量导致抖动；跟底用 `scrollTop = scrollHeight - clientHeight`（layout 阶段）。
  * - 虚拟开启时向 `ChatAnchorNav`（及 `renderAnchorNav` 上下文）传入 `anchorScrollAdapter`，保证离屏消息仍能滚动定位与高亮。
  * - `buildMessageList` 已含展示字段形态，此处不再调用 `getFormatMessages`，减少一次全表遍历。
  * - 底栏布尔值经 `useBranchManage` 内缓存后再 `useMemo`，避免无关 render 上重复求值（见该 hook 文件头注释）。
@@ -132,13 +138,66 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 		const [hasScrollbar, setHasScrollbar] = useState<boolean>(false);
 
 		const scrollContainerRef = useRef<HTMLDivElement>(null);
+		/** 流式跟底：供虚拟器尺寸回调与 handleScroll 读取，避免闭包陈旧 */
+		const followStreamRef = useRef(false);
+		/** 用户主动向上滚/上滑：同步置位，避免晚于 useLayoutEffect 跟底把滚动抢回去 */
+		const streamFollowUserPausedRef = useRef(false);
+		const touchStreamLastYRef = useRef<number | null>(null);
+		/** 上一帧是否在流式，用于检测「刚结束」并贴底（尾条并回虚拟列表时总高突变） */
+		const wasStreamingRef = useRef(false);
+		const autoScrollRef = useRef(autoScroll);
+		autoScrollRef.current = autoScroll;
+		const isStreamingRef = useRef(false);
+		const streamTailDetachedRef = useRef(false);
+		const messagesRef = useRef<Message[]>(messages);
+
+		messagesRef.current = messages;
+
+		const lastMessageForStream = messages[messages.length - 1];
+		const isCurrentlyStreaming =
+			lastMessageForStream?.role === 'assistant' &&
+			lastMessageForStream?.isStreaming;
+		if (!isCurrentlyStreaming) {
+			streamFollowUserPausedRef.current = false;
+			touchStreamLastYRef.current = null;
+		}
+		followStreamRef.current =
+			Boolean(autoScroll && isCurrentlyStreaming) &&
+			!streamFollowUserPausedRef.current;
+
+		/** 流式助手尾条不进入虚拟列表，避免变高时虚拟测量与 translateY 抖动 */
+		const streamTailDetached =
+			virtualizeMessages &&
+			messages.length > 0 &&
+			lastMessageForStream?.role === 'assistant' &&
+			Boolean(lastMessageForStream?.isStreaming);
+		const virtualCount = streamTailDetached
+			? Math.max(0, messages.length - 1)
+			: messages.length;
+
+		streamTailDetachedRef.current = streamTailDetached;
+		isStreamingRef.current = Boolean(isCurrentlyStreaming);
+
+		// 流式内容指纹：避免仅引用未变但漏触发；短句快换行时 length 会变
+		const streamContentFingerprint = useMemo(
+			() =>
+				isCurrentlyStreaming && lastMessageForStream
+					? `${lastMessageForStream.chatId}:${lastMessageForStream.content?.length ?? 0}:${lastMessageForStream.thinkContent?.length ?? 0}`
+					: '',
+			[
+				isCurrentlyStreaming,
+				lastMessageForStream?.chatId,
+				lastMessageForStream?.content,
+				lastMessageForStream?.thinkContent,
+			],
+		);
 
 		// 必须在 `scrollContainerRef` 之后创建：滚动元素为 Radix ScrollArea Viewport（与本组件原有滚动行为一致）。
-		// `enabled` 在无消息时关闭，避免空列表下的无效订阅；有消息且未关闭虚拟化时开启。
+		// 流式尾条拆出后 `count` 不含最后一条；仅一条且正在流式时 `count===0` 关闭虚拟器。
 		const virtualizer = useVirtualizer({
-			count: messages.length,
+			count: virtualCount,
 			getScrollElement: () => scrollContainerRef.current,
-			// 首屏估算高度，流式/长文本会由 `measureElement` + ResizeObserver 纠正；过小会多一次布局跳动，过大则浪费空白。
+			// 首屏估算高度，流式/长文本由 `measureElement` 与虚拟器内部测量纠正。
 			estimateSize: () => 200,
 			// 与 `space-y-6`（1.5rem）一致，保证总高度与旧版全量列表 spacing 接近。
 			gap: 24,
@@ -148,8 +207,37 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 			paddingEnd: 1,
 			// 分支切换时同 index 可能换 chatId，用 chatId 做 key 可让虚拟器复用测量缓存更合理。
 			getItemKey: (index) => messages[index]?.chatId ?? index,
-			enabled: virtualizeMessages && messages.length > 0,
+			enabled: virtualizeMessages && virtualCount > 0,
+			// 尾条在文档流时变高不会触发虚拟测量；此处仅在「全在虚拟内」的流式场景补跟底
+			onChange: () => {
+				if (!isStreamingRef.current) return;
+				if (streamFollowUserPausedRef.current || !autoScrollRef.current) return;
+				if (streamTailDetachedRef.current) return;
+				const el = scrollContainerRef.current;
+				if (!el) return;
+				el.scrollTop = el.scrollHeight - el.clientHeight;
+			},
 		});
+
+		// 类型上未列入 VirtualizerOptions，但实例支持；跟底流式时禁用尺寸补偿以免与 scrollToIndex 抢滚动。
+		useLayoutEffect(() => {
+			virtualizer.shouldAdjustScrollPositionOnItemSizeChange = (
+				item: VirtualItem,
+				_delta: number,
+				instance: Virtualizer<HTMLDivElement, Element>,
+			) => {
+				if (followStreamRef.current) return false;
+				// virtual-core 默认逻辑；getScrollOffset / scrollAdjustments 未在 .d.ts 中公开
+				const core = instance as unknown as {
+					getScrollOffset(): number;
+					scrollAdjustments: number;
+				};
+				return item.start < core.getScrollOffset() + core.scrollAdjustments;
+			};
+			return () => {
+				virtualizer.shouldAdjustScrollPositionOnItemSizeChange = undefined;
+			};
+		}, [virtualizer]);
 
 		// 仅虚拟列表需要：闭包内读取 `virtualizer.measurementsCache` 最新值，勿把 cache 本身放进 deps（会导致无意义失效）。
 		const anchorScrollAdapter = useMemo(():
@@ -160,6 +248,18 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 				scrollToChatId: (chatId: string) => {
 					const idx = messages.findIndex((m) => m.chatId === chatId);
 					if (idx < 0) return;
+					const lastIdx = messages.length - 1;
+					if (
+						streamTailDetached &&
+						idx === lastIdx &&
+						scrollContainerRef.current
+					) {
+						scrollContainerRef.current.scrollTo({
+							top: scrollContainerRef.current.scrollHeight,
+							behavior: 'smooth',
+						});
+						return;
+					}
 					virtualizer.scrollToIndex(idx, {
 						align: 'start',
 						behavior: 'smooth',
@@ -187,17 +287,17 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 					return current;
 				},
 			};
-		}, [virtualizeMessages, messages, virtualizer]);
+		}, [virtualizeMessages, messages, virtualizer, streamTailDetached]);
 
 		const editInputRef = useRef<HTMLTextAreaElement>(null);
 		const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 		const focusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 		const scrollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-		const resizeObserverRef = useRef<ResizeObserver | null>(null);
 		const lastScrollHeightRef = useRef<number>(0);
-		const mutationObserverRef = useRef<MutationObserver | null>(null);
 
 		const SCROLL_THRESHOLD = 5;
+		/** 流式时「仍算在底部」的容差；过大会导致用户上滑后仍被跟底，难以打断 */
+		const STREAM_BOTTOM_SLACK_PX = 48;
 
 		const onScrollTo = useCallback(
 			(position: string, behavior?: 'smooth' | 'auto') => {
@@ -241,69 +341,110 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 			};
 		}, [onScrollTo, onScrollToRegister]);
 
-		useEffect(() => {
-			const lastMessage = messages[messages.length - 1];
-			const isCurrentlyStreaming =
-				lastMessage?.role === 'assistant' && lastMessage?.isStreaming;
+		// 流式：layout 贴底 + microtask/rAF 再贴（Markdown/换行后高度晚一帧才稳定）。
+		// 流式结束：尾条并回虚拟列表总高与 scrollTop 易错位，必须贴底并同步虚拟器，否则会「整体往上弹」。
+		useLayoutEffect(() => {
+			const el = scrollContainerRef.current;
+			if (el) {
+				setHasScrollbar(el.scrollHeight > el.clientHeight);
+			}
+			if (!el) return;
 
-			const updateScrollbarState = () => {
-				if (scrollContainerRef.current) {
-					const { scrollHeight, clientHeight } = scrollContainerRef.current;
-					setHasScrollbar(scrollHeight > clientHeight);
-				}
+			const pinNativeBottom = () => {
+				const v = scrollContainerRef.current;
+				if (!v) return;
+				v.scrollTop = v.scrollHeight - v.clientHeight;
 			};
 
-			const scrollToBottom = () => {
-				if (scrollContainerRef.current && autoScroll && isCurrentlyStreaming) {
-					const currentScrollHeight = scrollContainerRef.current.scrollHeight;
-					if (currentScrollHeight !== lastScrollHeightRef.current) {
-						lastScrollHeightRef.current = currentScrollHeight;
-						scrollContainerRef.current.scrollTo({
-							top: currentScrollHeight + 100,
-							behavior: 'auto',
-						});
-					}
-				}
-			};
-
-			updateScrollbarState();
-			scrollToBottom();
-
-			const contentWrapper =
-				scrollContainerRef.current?.querySelector('#message-content');
-			if (contentWrapper && isCurrentlyStreaming) {
-				resizeObserverRef.current = new ResizeObserver(() => {
-					updateScrollbarState();
-					scrollToBottom();
+			const pinVirtualBottomIfNeeded = () => {
+				if (!virtualizeMessages || messagesRef.current.length === 0) return;
+				const lastIdx = messagesRef.current.length - 1;
+				if (lastIdx < 0) return;
+				virtualizer.scrollToIndex(lastIdx, {
+					align: 'end',
+					behavior: 'auto',
 				});
-				resizeObserverRef.current.observe(contentWrapper);
+			};
+
+			const prevStreaming = wasStreamingRef.current;
+			const nowStreaming = Boolean(isCurrentlyStreaming);
+			const streamJustEnded = prevStreaming && !nowStreaming;
+			wasStreamingRef.current = nowStreaming;
+
+			// 刚结束流式：无条件贴底，修正 DOM 结构切换（文档流尾条 → 虚拟项）带来的视口错位
+			if (streamJustEnded) {
+				pinNativeBottom();
+				pinVirtualBottomIfNeeded();
+				requestAnimationFrame(() => {
+					pinNativeBottom();
+					pinVirtualBottomIfNeeded();
+					requestAnimationFrame(() => {
+						pinNativeBottom();
+						pinVirtualBottomIfNeeded();
+					});
+				});
+				return;
 			}
 
-			const contentArea =
-				scrollContainerRef.current?.querySelector('#message-container');
-			if (contentArea && isCurrentlyStreaming) {
-				mutationObserverRef.current = new MutationObserver(() => {
-					updateScrollbarState();
-					scrollToBottom();
+			if (!isCurrentlyStreaming) return;
+			if (streamFollowUserPausedRef.current) return;
+			if (!autoScroll) return;
+
+			pinNativeBottom();
+
+			if (!virtualizeMessages || messages.length === 0) {
+				const sh = el.scrollHeight;
+				if (sh !== lastScrollHeightRef.current) {
+					lastScrollHeightRef.current = sh;
+				}
+				queueMicrotask(() => {
+					if (
+						!isStreamingRef.current ||
+						streamFollowUserPausedRef.current ||
+						!autoScrollRef.current
+					)
+						return;
+					pinNativeBottom();
 				});
-				mutationObserverRef.current.observe(contentArea, {
-					childList: true,
-					subtree: true,
-					characterData: true,
+				requestAnimationFrame(() => {
+					if (
+						!isStreamingRef.current ||
+						streamFollowUserPausedRef.current ||
+						!autoScrollRef.current
+					)
+						return;
+					pinNativeBottom();
 				});
+				return;
 			}
 
-			return () => {
-				if (resizeObserverRef.current) {
-					resizeObserverRef.current.disconnect();
-					resizeObserverRef.current = null;
-				}
-				if (mutationObserverRef.current) {
-					mutationObserverRef.current.disconnect();
-					mutationObserverRef.current = null;
-				}
-			};
-		}, [messages, autoScroll]);
+			queueMicrotask(() => {
+				if (
+					!isStreamingRef.current ||
+					streamFollowUserPausedRef.current ||
+					!autoScrollRef.current
+				)
+					return;
+				pinNativeBottom();
+			});
+			requestAnimationFrame(() => {
+				if (
+					!isStreamingRef.current ||
+					streamFollowUserPausedRef.current ||
+					!autoScrollRef.current
+				)
+					return;
+				pinNativeBottom();
+			});
+		}, [
+			messages,
+			autoScroll,
+			isCurrentlyStreaming,
+			virtualizeMessages,
+			messages.length,
+			streamContentFingerprint,
+			virtualizer,
+		]);
 
 		useEffect(() => {
 			return () => {
@@ -316,13 +457,41 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 				if (focusTimerRef.current) {
 					clearTimeout(focusTimerRef.current);
 				}
-				if (resizeObserverRef.current) {
-					resizeObserverRef.current.disconnect();
-				}
-				if (mutationObserverRef.current) {
-					mutationObserverRef.current.disconnect();
-				}
 			};
+		}, []);
+
+		const pauseStreamFollowFromUser = useCallback(() => {
+			streamFollowUserPausedRef.current = true;
+			setAutoScroll(false);
+		}, []);
+
+		const onWheelPauseStreamFollow = useCallback(
+			(e: React.WheelEvent) => {
+				if (e.deltaY >= 0) return;
+				const viewport = scrollContainerRef.current;
+				if (!viewport || viewport.scrollTop <= 0) return;
+				pauseStreamFollowFromUser();
+			},
+			[pauseStreamFollowFromUser],
+		);
+
+		const onTouchMovePauseStreamFollow = useCallback(
+			(e: React.TouchEvent) => {
+				if (e.touches.length !== 1) return;
+				const y = e.touches[0].clientY;
+				const prev = touchStreamLastYRef.current;
+				touchStreamLastYRef.current = y;
+				if (prev == null) return;
+				// 手指上移：内容向上滚去看历史，打断跟底
+				if (y < prev - 8) {
+					pauseStreamFollowFromUser();
+				}
+			},
+			[pauseStreamFollowFromUser],
+		);
+
+		const onTouchEndStreamTrack = useCallback(() => {
+			touchStreamLastYRef.current = null;
 		}, []);
 
 		const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
@@ -333,9 +502,23 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 			const { scrollTop, scrollHeight, clientHeight } = element;
 			setScrollTop(scrollTop);
 			setHasScrollbar(scrollHeight > clientHeight);
-			const isAtBottom =
-				scrollHeight - scrollTop - clientHeight < SCROLL_THRESHOLD;
-			setAutoScroll(isAtBottom);
+			const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+			const isAtBottom = distanceFromBottom < SCROLL_THRESHOLD;
+			const msgs = messagesRef.current;
+			const last = msgs[msgs.length - 1];
+			const streaming = last?.role === 'assistant' && last?.isStreaming;
+			if (streaming) {
+				if (distanceFromBottom < SCROLL_THRESHOLD) {
+					streamFollowUserPausedRef.current = false;
+				} else if (distanceFromBottom > STREAM_BOTTOM_SLACK_PX) {
+					// 滚动条拖离底部同样打断跟底（不依赖 wheel）
+					streamFollowUserPausedRef.current = true;
+				}
+				const nearBottom = distanceFromBottom < STREAM_BOTTOM_SLACK_PX;
+				setAutoScroll(nearBottom && !streamFollowUserPausedRef.current);
+			} else {
+				setAutoScroll(isAtBottom);
+			}
 		}, []);
 
 		const onToggleThinkContent = useCallback(() => {
@@ -597,8 +780,12 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 					<div
 						id="message-container"
 						className="max-w-3xl m-auto overflow-y-auto"
+						onWheelCapture={onWheelPauseStreamFollow}
+						onTouchMove={onTouchMovePauseStreamFollow}
+						onTouchEnd={onTouchEndStreamTrack}
+						onTouchCancel={onTouchEndStreamTrack}
 					>
-						{/* 虚拟模式：`relative` + 总高 = 虚拟列表 scrollHeight；非虚拟：保留原 `space-y-6` 流式布局 */}
+						{/* 虚拟模式：流式助手尾条拆出文档流，其余仍虚拟；非虚拟：space-y-6 */}
 						<div
 							id="message-content"
 							className={cn(
@@ -606,41 +793,77 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 								virtualListActive ? 'relative' : 'space-y-6',
 							)}
 							style={
-								virtualListActive
+								virtualListActive && !streamTailDetached
 									? { height: `${virtualizer.getTotalSize()}px` }
 									: undefined
 							}
 						>
-							{!messages.length
-								? (emptyState ?? <ChatNewSession />)
-								: virtualListActive
-									? // TanStack 要求测量节点带 `data-index`（默认），`measureElement` 挂在行容器上以修正变高气泡
-										virtualizer
-											.getVirtualItems()
-											.map((virtualRow) => {
-												const message = messages[virtualRow.index];
-												if (!message) return null;
-												return (
-													<div
-														key={virtualRow.key}
-														data-index={virtualRow.index}
-														ref={virtualizer.measureElement}
-														className="left-0 top-0 w-full"
-														style={{
-															position: 'absolute',
-															transform: `translateY(${virtualRow.start}px)`,
-														}}
-													>
-														{renderMessageRow(message, virtualRow.index)}
-													</div>
-												);
-											})
-									: // 关闭虚拟化时与历史实现一致：每条消息真实 DOM，便于锚点与调试
-										messages.map((message, index) => (
-											<Fragment key={message.chatId}>
-												{renderMessageRow(message, index)}
-											</Fragment>
-										))}
+							{!messages.length ? (
+								(emptyState ?? <ChatNewSession />)
+							) : virtualListActive ? (
+								streamTailDetached ? (
+									<>
+										{virtualCount > 0 ? (
+											<div
+												className="relative w-full"
+												style={{
+													height: `${virtualizer.getTotalSize()}px`,
+												}}
+											>
+												{virtualizer.getVirtualItems().map((virtualRow) => {
+													const message = messages[virtualRow.index];
+													if (!message) return null;
+													return (
+														<div
+															key={virtualRow.key}
+															data-index={virtualRow.index}
+															ref={virtualizer.measureElement}
+															className="left-0 top-0 w-full"
+															style={{
+																position: 'absolute',
+																transform: `translateY(${virtualRow.start}px)`,
+															}}
+														>
+															{renderMessageRow(message, virtualRow.index)}
+														</div>
+													);
+												})}
+											</div>
+										) : null}
+										<div className={cn('w-full', virtualCount > 0 && 'mt-6')}>
+											{renderMessageRow(
+												messages[messages.length - 1],
+												messages.length - 1,
+											)}
+										</div>
+									</>
+								) : (
+									virtualizer.getVirtualItems().map((virtualRow) => {
+										const message = messages[virtualRow.index];
+										if (!message) return null;
+										return (
+											<div
+												key={virtualRow.key}
+												data-index={virtualRow.index}
+												ref={virtualizer.measureElement}
+												className="left-0 top-0 w-full"
+												style={{
+													position: 'absolute',
+													transform: `translateY(${virtualRow.start}px)`,
+												}}
+											>
+												{renderMessageRow(message, virtualRow.index)}
+											</div>
+										);
+									})
+								)
+							) : (
+								messages.map((message, index) => (
+									<Fragment key={message.chatId}>
+										{renderMessageRow(message, index)}
+									</Fragment>
+								))
+							)}
 						</div>
 					</div>
 					{showAnchorNav ? (
