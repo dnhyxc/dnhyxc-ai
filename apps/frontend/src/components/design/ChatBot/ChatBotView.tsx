@@ -8,8 +8,11 @@ import ChatUserMessage from '@design/ChatUserMessage';
 import { Label, ScrollArea } from '@ui/index';
 import { Bot, User } from 'lucide-react';
 import React, {
+	type ChangeEvent,
+	type Dispatch,
 	forwardRef,
 	JSX,
+	type SetStateAction,
 	useCallback,
 	useEffect,
 	useImperativeHandle,
@@ -21,6 +24,16 @@ import { useBranchManage } from '@/hooks/useBranchManage';
 import { useMessageTools } from '@/hooks/useMessageTools';
 import { cn } from '@/lib/utils';
 import { ChatBotRef, ChatBotViewProps, Message } from '@/types/chat';
+
+/** 省略业务回调时的稳定空实现，避免每次 render 新建函数导致子组件重渲染 */
+const asyncNoop = async () => {};
+const noopSetInput = (_: string) => {};
+const noopSetEditMessage = (_: Message | null) => {};
+const noopHandleEdit = (_: ChangeEvent<HTMLTextAreaElement> | string) => {};
+const noopSetCheckedMessage = (_: Message) => {};
+const noopDispatchBool: Dispatch<SetStateAction<boolean>> = () => {};
+const noopClearChat = (_?: string) => {};
+const noopIsMessageStopped = (_chatId: string) => false;
 
 /**
  * 聊天主界面纯 UI（单一渲染组件）。
@@ -35,10 +48,11 @@ import { ChatBotRef, ChatBotViewProps, Message } from '@/types/chat';
  * 插槽：renderMessageActions / renderAnchorNav / renderChatControls 可替换对应内置条；
  * 不传则渲染默认组件。自定义实现应使用回调上下文中的 onBranchChange、switchToLatestBranch 等以操作同一份分支与滚动数据。
  * showMessageActions / showAnchorNav / showChatControls 为 false 时强制不展示对应区域（优先生效于 render*）。
+ *
+ * 渲染数据源：`flatMessages`、`selectedChildMap`、`onSelectedChildMapChange` 类型上必填，禁止组件内「偷偷造一份默认消息/分支」导致与父状态脱节。
  */
 const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 	function ChatBotView(props, ref) {
-		// displayMessages 重命名为 messages：与拆分前组件内状态同名，减少 diff、降低误改风险。
 		const {
 			className,
 			showAvatar = false,
@@ -46,26 +60,8 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 			flatMessages,
 			selectedChildMap,
 			onSelectedChildMapChange,
-			activeSessionId,
 			onPersistSessionBranchSelection,
 			streamingBranchSource,
-			displayMessages: messages,
-			input,
-			setInput,
-			editMessage,
-			setEditMessage,
-			sendMessage,
-			clearChat,
-			stopGenerating,
-			handleEditChange,
-			onContinue,
-			onContinueAnswering,
-			isCurrentSessionLoading,
-			isMessageStopped,
-			isSharing,
-			setIsSharing,
-			checkedMessages,
-			setCheckedMessage,
 			onScrollToRegister,
 			emptyState,
 			showMessageActions = true,
@@ -75,6 +71,44 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 			renderAnchorNav,
 			renderChatControls,
 		} = props;
+
+		const { buildMessageList, getFormatMessages, findSiblings } =
+			useMessageTools();
+
+		// 未传 displayMessages 时由 flat + map 推导展示列；二者均为父级传入的渲染依据，避免无源列表。
+		const messages = useMemo(() => {
+			if (props.displayMessages !== undefined) {
+				return props.displayMessages;
+			}
+			return getFormatMessages(buildMessageList(flatMessages, selectedChildMap));
+		}, [
+			props.displayMessages,
+			flatMessages,
+			selectedChildMap,
+			buildMessageList,
+			getFormatMessages,
+		]);
+
+		const activeSessionId = props.activeSessionId ?? null;
+		const input = props.input ?? '';
+		const setInput = props.setInput ?? noopSetInput;
+		const editMessage = props.editMessage ?? null;
+		const setEditMessage = props.setEditMessage ?? noopSetEditMessage;
+		const sendMessage = props.sendMessage ?? asyncNoop;
+		const clearChat = props.clearChat ?? noopClearChat;
+		const stopGenerating = props.stopGenerating ?? asyncNoop;
+		const handleEditChange = props.handleEditChange ?? noopHandleEdit;
+		const onContinue = props.onContinue ?? asyncNoop;
+		const onContinueAnswering = props.onContinueAnswering ?? asyncNoop;
+		const isCurrentSessionLoading = props.isCurrentSessionLoading ?? false;
+		const isMessageStopped = props.isMessageStopped ?? noopIsMessageStopped;
+		const isSharing = props.isSharing ?? false;
+		const setIsSharing = props.setIsSharing ?? noopDispatchBool;
+		// 无 checkedMessages 时用实例级空 Set，避免模块级单例被误 mutate 导致串会话
+		const defaultCheckedRef = useRef<Set<string>>(new Set());
+		const checkedMessages = props.checkedMessages ?? defaultCheckedRef.current;
+		const setCheckedMessage =
+			props.setCheckedMessage ?? noopSetCheckedMessage;
 
 		const [autoScroll, setAutoScroll] = useState(true);
 		const [isShowThinkContent, setIsShowThinkContent] = useState(true);
@@ -124,9 +158,6 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 			streamingBranchSource,
 			onPersistSessionBranchSelection,
 		});
-
-		// 仅用到 findSiblings；buildMessageList/getFormatMessages 留在连接层，保证列表推导顺序与旧 effect 完全一致。
-		const { findSiblings } = useMessageTools();
 
 		// 替代原先在 ChatBot 根组件里写 onScrollToRef.current = onScrollTo：把「注册副作用」收口到 View 内，
 		// 连接层只提供 setter（handleScrollToRegister），避免 Context ref 与滚动实现细节绑死。

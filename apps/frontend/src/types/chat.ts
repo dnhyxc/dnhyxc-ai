@@ -137,19 +137,26 @@ export interface ChatBotViewChatControlsContext {
 }
 
 /**
- * 纯渲染层入参：所有数据与副作用均由父组件 / 连接层注入，不引用 useStore、ChatCoreProvider。
- * 其它项目可复制 ChatBotView + 自行实现与 useChatCore 等价的状态机，或只读展示传入的 displayMessages。
+ * 纯渲染层入参：凡直接决定「屏幕上消息长什么样」的数据须由调用方显式传入，避免无源渲染、隐式状态难以排查。
+ *
+ * 必填：`flatMessages`（全量树，无消息传 `[]`）、`selectedChildMap` + `onSelectedChildMapChange`（当前分支路径，空会话可 `new Map()` + setState）。
+ * 可选：`displayMessages` 仅当你要完全覆盖内部推导的展示列时传入；否则由 buildMessageList + getFormatMessages 从 flat + map 算出。
+ * 交互类（发送、分享等）仍可省略，由空回调占位，便于只读壳。
  */
 export interface ChatBotViewProps {
 	className?: string;
 	showAvatar?: boolean;
 	onBranchChange?: (msgId: string, direction: 'prev' | 'next') => void;
 
-	/** 完整消息树（含多分支），用于兄弟消息切换等；对应原先 chatStore.messages */
+	/**
+	 * 完整消息树（含多分支）；兄弟切换、buildMessageList 均依赖此数据。空会话传 `[]`。
+	 */
 	flatMessages: Message[];
+	/** 当前选中的子节点路径，与展示列表一一对应；须与 onSelectedChildMapChange 同步更新 */
 	selectedChildMap: Map<string, string>;
 	onSelectedChildMapChange: (map: Map<string, string>) => void;
-	activeSessionId: string | null;
+	/** 省略为 null，不写会话级持久化时与原先「无 active 会话」行为一致 */
+	activeSessionId?: string | null;
 	/**
 	 * 用户切换分支时写入会话级持久化；主项目映射到 chatStore.saveSessionBranchSelection。
 	 * 独立场景可不传，仅内存中的 selectedChildMap 生效。
@@ -160,27 +167,31 @@ export interface ChatBotViewProps {
 	) => void;
 	streamingBranchSource?: ChatStreamingBranchSource;
 
-	/** 当前选中分支下的展示列表（已 format），由父级用 buildMessageList + getFormatMessages 算出，保持与原 effect 两阶段一致 */
-	displayMessages: Message[];
+	/**
+	 * 当前分支已 format 的展示列表。省略则由内部根据 flatMessages + selectedChildMap 推导，
+	 * 避免调用方重复维护两份数组（本仓库 ChatBot 连接层已改为依赖此行为）。
+	 */
+	displayMessages?: Message[];
 
-	input: string;
-	setInput: (value: string) => void;
-	editMessage: Message | null;
-	setEditMessage: (message: Message | null) => void;
-	sendMessage: ChatBotRef['sendMessage'];
-	clearChat: ChatBotRef['clearChat'];
-	stopGenerating: ChatBotRef['stopGenerating'];
-	handleEditChange: (e: ChangeEvent<HTMLTextAreaElement> | string) => void;
-	onContinue: () => Promise<void>;
-	onContinueAnswering: (message?: Message) => Promise<void>;
+	/** 以下聊天交互字段省略时使用安全空实现，保证子组件可挂载；真正发消息/流式需由连接层或业务注入 */
+	input?: string;
+	setInput?: (value: string) => void;
+	editMessage?: Message | null;
+	setEditMessage?: (message: Message | null) => void;
+	sendMessage?: ChatBotRef['sendMessage'];
+	clearChat?: ChatBotRef['clearChat'];
+	stopGenerating?: ChatBotRef['stopGenerating'];
+	handleEditChange?: (e: ChangeEvent<HTMLTextAreaElement> | string) => void;
+	onContinue?: () => Promise<void>;
+	onContinueAnswering?: (message?: Message) => Promise<void>;
 
-	isCurrentSessionLoading: boolean;
-	isMessageStopped: (chatId: string) => boolean;
+	isCurrentSessionLoading?: boolean;
+	isMessageStopped?: (chatId: string) => boolean;
 
-	isSharing: boolean;
-	setIsSharing: Dispatch<SetStateAction<boolean>>;
-	checkedMessages: Set<string>;
-	setCheckedMessage: (message: Message) => void;
+	isSharing?: boolean;
+	setIsSharing?: Dispatch<SetStateAction<boolean>>;
+	checkedMessages?: Set<string>;
+	setCheckedMessage?: (message: Message) => void;
 
 	/**
 	 * 将内部 scrollTo 注册给外层（如 ChatCoreContext.onScrollToRef）。

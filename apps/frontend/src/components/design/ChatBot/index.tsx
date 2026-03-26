@@ -10,7 +10,6 @@ import React, {
 import { useChatCoreContext } from '@/contexts';
 import { findLatestBranchSelection } from '@/hooks/useBranchManage';
 import { useChatCore } from '@/hooks/useChatCore';
-import { useMessageTools } from '@/hooks/useMessageTools';
 import useStore from '@/store';
 import { ChatBotProps, ChatBotRef, Message } from '@/types/chat';
 import ChatBotView from './ChatBotView';
@@ -63,9 +62,6 @@ const ChatBot = observer(
 		const [selectedChildMap, setSelectedChildMap] = useState<
 			Map<string, string>
 		>(new Map());
-		const [messages, setMessages] = useState<Message[]>([]);
-
-		const { buildMessageList, getFormatMessages } = useMessageTools();
 
 		// 稳定引用，避免 ChatBotView 内注册滚动的 effect 随父级无意义重跑（原先 onScrollToRef 来自 useRef，引用不变）。
 		const handleScrollToRegister = useCallback(
@@ -147,11 +143,8 @@ const ChatBot = observer(
 			return () => dispose();
 		}, [chatStore]);
 
-		useEffect(() => {
-			const sortedMessages = buildMessageList(allMessages, selectedChildMap);
-			const formattedMessages = getFormatMessages(sortedMessages);
-			setMessages(formattedMessages);
-		}, [allMessages, selectedChildMap, buildMessageList, getFormatMessages]);
+		// 展示列表改由 ChatBotView 内部根据 flatMessages + selectedChildMap memo 推导，
+		// 与原先此处 effect + getFormatMessages 语义一致，减少连接层重复状态。
 
 		// 依赖项刻意保持仅 activeSessionId，与旧实现一致，避免在其它 store 字段变化时误触会话重置逻辑。
 		useEffect(() => {
@@ -203,7 +196,6 @@ const ChatBot = observer(
 				activeSessionId={chatStore.activeSessionId ?? null}
 				onPersistSessionBranchSelection={onPersistSessionBranchSelection}
 				streamingBranchSource={streamingBranchSource}
-				displayMessages={messages}
 				input={input}
 				setInput={setInput}
 				editMessage={editMessage}
