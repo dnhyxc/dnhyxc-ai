@@ -264,7 +264,7 @@ const ChatAnchorNav = ({
 			<div className="relative flex flex-col items-center">
 				{/* 上翻按钮 */}
 				<div className="opacity-0 group-hover:opacity-100 mb-0.5">
-					<div className="opacity-0 group-hover:opacity-100 text-sm text-textcolor/60 mb-2">
+					<div className="opacity-0 group-hover:opacity-100 text-sm text-textcolor/60 mb-2 text-center">
 						{currentIndex + 1}
 					</div>
 					<Button
@@ -318,7 +318,7 @@ const ChatAnchorNav = ({
 					>
 						<ChevronDown className="w-4 h-4" />
 					</Button>
-					<div className="opacity-0 group-hover:opacity-100 text-sm text-textcolor/60 mt-2">
+					<div className="opacity-0 group-hover:opacity-100 text-sm text-textcolor/60 mt-2 text-center">
 						{userMessages.length}
 					</div>
 				</div>
