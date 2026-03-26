@@ -193,7 +193,7 @@ const ChatAnchorNav = ({
 				{/* 上翻按钮 */}
 				<div className="opacity-0 group-hover:opacity-100 mb-2">
 					<Button
-						className="w-6 h-6 rounded-full bg-theme/10 hover:bg-theme/20 text-textcolor/60 hover:text-textcolor"
+						className="w-6 h-6 rounded-full bg-black/10 hover:bg-black/20 text-black/60 hover:text-black"
 						onClick={handlePrev}
 						disabled={isPrevDisabled}
 					>
@@ -224,7 +224,7 @@ const ChatAnchorNav = ({
 												'hover:scale-145 active:scale-145 transition-all duration-300',
 												activeAnchor === msg.chatId
 													? 'bg-blue-500 scale-145 shadow-[0_0_8px_rgba(59,130,246,0.6)]'
-													: 'bg-theme/20 hover:bg-blue-500',
+													: 'bg-black/20 hover:bg-blue-500',
 											)}
 											onClick={() => scrollToMessage(msg.chatId)}
 										/>
@@ -237,7 +237,7 @@ const ChatAnchorNav = ({
 				{/* 下翻按钮 */}
 				<div className="opacity-0 group-hover:opacity-100 mt-2">
 					<Button
-						className="w-6 h-6 rounded-full bg-theme/10 hover:bg-theme/20 text-textcolor/60 hover:text-textcolor"
+						className="w-6 h-6 rounded-full bg-black/10 hover:bg-black/20 text-black/60 hover:text-black"
 						onClick={handleNext}
 						disabled={isNextDisabled}
 					>

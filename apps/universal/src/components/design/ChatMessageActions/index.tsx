@@ -18,7 +18,7 @@ interface MessageActionsProps {
 	/** 消息在列表中的索引 */
 	index: number;
 	/** 消息总数 */
-	messagesLength: number;
+	messagesLength?: number;
 	/** 当前已复制成功的消息ID */
 	isCopyedId?: string;
 	/** 当前会话是否正在加载 */
@@ -66,7 +66,7 @@ export const MessageActions = ({
 	const canNext = (message.siblingIndex || 0) < (message.siblingCount || 0) - 1;
 
 	// 是否是最后一条消息
-	const isLastMessage = index === messagesLength - 1;
+	const isLastMessage = index === (messagesLength || 0) - 1;
 
 	// 是否显示操作按钮（非最后一条消息时 hover 显示，最后一条消息始终显示）
 	const getActionsVisibilityClass = () => {

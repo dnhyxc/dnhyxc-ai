@@ -1,10 +1,4 @@
-import {
-	createContext,
-	MutableRefObject,
-	ReactNode,
-	useContext,
-	useRef,
-} from 'react';
+import { createContext, ReactNode, useContext, useRef, useState } from 'react';
 import { UploadedFile } from '@/types';
 import { Message } from '@/types/chat';
 
@@ -35,16 +29,23 @@ export interface ChatBotActions {
 
 interface ChatCoreContextValue {
 	// 共享的 Refs
-	stopRequestMapRef: MutableRefObject<Map<string, () => void>>;
-	requestSnapshotMapRef: MutableRefObject<Map<string, RequestSnapshot>>;
-	hasReceivedStreamDataMapRef: MutableRefObject<Map<string, boolean>>;
-	currentAssistantMessageMapRef: MutableRefObject<Map<string, string>>;
-	onScrollToRef: React.MutableRefObject<
+	stopRequestMapRef: React.RefObject<Map<string, () => void>>;
+	requestSnapshotMapRef: React.RefObject<Map<string, RequestSnapshot>>;
+	hasReceivedStreamDataMapRef: React.RefObject<Map<string, boolean>>;
+	currentAssistantMessageMapRef: React.RefObject<Map<string, string>>;
+	onScrollToRef: React.RefObject<
 		((position: string, behavior?: 'smooth' | 'auto') => void) | null
 	>;
+	isSharing: boolean;
+	setIsSharing: React.Dispatch<React.SetStateAction<boolean>>;
+	checkedMessages: Set<string>;
+	setCheckedMessage: (message: Message) => void;
+	setAllCheckedMessages: (messages: Message[]) => void;
+	clearAllCheckedMessages: () => void;
+	isAllChecked: (messages: Message[]) => boolean;
 
 	// 操作方法注册
-	actionsRef: MutableRefObject<ChatBotActions | null>;
+	actionsRef: React.RefObject<ChatBotActions | null>;
 	registerActions: (actions: ChatBotActions) => void;
 	unregisterActions: () => void;
 }
@@ -54,8 +55,11 @@ const ChatCoreContext = createContext<ChatCoreContextValue | null>(null);
 export const ChatCoreProvider = ({ children }: { children: ReactNode }) => {
 	// 共享的 Refs - 所有使用 useChatCore 的组件共享这些状态
 	const stopRequestMapRef = useRef<Map<string, () => void>>(new Map());
+	// 存储每个会话的请求快照，用于停止对应的请求
 	const requestSnapshotMapRef = useRef<Map<string, RequestSnapshot>>(new Map());
+	// 记录每个会话是否已收到流式数据，用于没有收到流式数据立即停止时，控制是否会滚消息内容
 	const hasReceivedStreamDataMapRef = useRef<Map<string, boolean>>(new Map());
+	// 当前会话的助手消息ID，用户消息回滚
 	const currentAssistantMessageMapRef = useRef<Map<string, string>>(new Map());
 	const onScrollToRef = useRef<
 		((position: string, behavior?: 'smooth' | 'auto') => void) | null
@@ -63,6 +67,65 @@ export const ChatCoreProvider = ({ children }: { children: ReactNode }) => {
 
 	// 操作方法注册
 	const actionsRef = useRef<ChatBotActions | null>(null);
+
+	// 是否开启分享
+	const [isSharing, setIsSharing] = useState<boolean>(false);
+
+	// 选中的消息
+	const [checkedMessages, setCheckedMessages] = useState<Set<string>>(
+		new Set(),
+	);
+
+	const onCheckedMessage = (id1: string, id2: string) => {
+		setCheckedMessages((prev) => {
+			// 创建新 Set（不可变更新）
+			const newSet = new Set(prev);
+			if (newSet.has(id1) || newSet.has(id2)) {
+				newSet.delete(id1);
+				newSet.delete(id2);
+			} else {
+				newSet.add(id1);
+				newSet.add(id2);
+			}
+			return newSet;
+		});
+	};
+
+	const setCheckedMessage = (message: Message) => {
+		const { chatId, parentId } = message;
+		if (message.role === 'assistant') {
+			if (!parentId) return;
+			onCheckedMessage(chatId, parentId);
+		} else {
+			if (!message?.childrenIds?.length) return;
+			onCheckedMessage(
+				chatId,
+				message.childrenIds[message.childrenIds.length - 1],
+			);
+		}
+	};
+
+	// 批量设置选中消息（全选）
+	const setAllCheckedMessages = (messages: Message[]) => {
+		setCheckedMessages((prev) => {
+			const newSet = new Set(prev);
+			messages.forEach((message) => {
+				newSet.add(message.chatId);
+			});
+			return newSet;
+		});
+	};
+
+	// 清除所有选中消息（取消全选）
+	const clearAllCheckedMessages = () => {
+		setCheckedMessages(new Set());
+	};
+
+	// 检查是否已全选
+	const isAllChecked = (messages: Message[]): boolean => {
+		if (!messages.length) return false;
+		return messages.every((msg) => checkedMessages.has(msg.chatId));
+	};
 
 	const registerActions = (actions: ChatBotActions) => {
 		actionsRef.current = actions;
@@ -83,6 +146,13 @@ export const ChatCoreProvider = ({ children }: { children: ReactNode }) => {
 				actionsRef,
 				registerActions,
 				unregisterActions,
+				isSharing,
+				setIsSharing,
+				checkedMessages,
+				setCheckedMessage,
+				setAllCheckedMessages,
+				clearAllCheckedMessages,
+				isAllChecked,
 			}}
 		>
 			{children}

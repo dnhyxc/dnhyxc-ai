@@ -1,48 +1,41 @@
-import ChatAnchorNav from '@design/ChatAnchorNav';
-import ChatAssistantMessage from '@design/ChatAssistantMessage';
-import ChatControls from '@design/ChatControls';
-import ChatFileList from '@design/ChatFileList';
-import ChatMessageActions from '@design/ChatMessageActions';
-import ChatNewSession from '@design/ChatNewSession';
-import ChatUserMessage from '@design/ChatUserMessage';
-import { ScrollArea } from '@ui/scroll-area';
-import { Bot, User } from 'lucide-react';
 import * as mobx from 'mobx';
 import { observer } from 'mobx-react';
-import {
+import React, {
 	forwardRef,
-	JSX,
 	useCallback,
 	useEffect,
-	useImperativeHandle,
 	useMemo,
-	useRef,
 	useState,
 } from 'react';
 import { useChatCoreContext } from '@/contexts';
-import { useBranchManage } from '@/hooks/useBranchManage';
+import { findLatestBranchSelection } from '@/hooks/useBranchManage';
 import { useChatCore } from '@/hooks/useChatCore';
-import { useMessageTools } from '@/hooks/useMessageTools';
-import { cn } from '@/lib/utils';
 import useStore from '@/store';
-import { UploadedFile } from '@/types';
-import { ChatBotProps, Message } from '@/types/chat';
+import { ChatBotProps, ChatBotRef, Message } from '@/types/chat';
+import ChatBotView from './ChatBotView';
 
-// 定义暴露给父组件的方法类型
-export interface ChatBotRef {
-	clearChat: (targetSessionId?: string) => void;
-	stopGenerating: (
-		targetSessionId?: string,
-		isUnmount?: boolean,
-	) => Promise<void>;
-	sendMessage: (
-		content?: string,
-		index?: number,
-		isEdit?: boolean,
-		attachments?: UploadedFile[] | null,
-	) => Promise<void>;
-}
+export type {
+	ChatBotRef,
+	ChatBotSimpleViewProps,
+	ChatBotViewAnchorNavContext,
+	ChatBotViewChatControlsContext,
+	ChatBotViewMessageActionsContext,
+	ChatBotViewProps,
+} from '@/types/chat';
+export { default as ChatBotView } from './ChatBotView';
+/** 仅需 messages 的 ChatBotView 轻量封装，操作区可通过 render* / show* 扩展 */
+export { default as SimpleChatBotView } from './SimpleChatBotView';
 
+/**
+ * ChatBot（默认导出）= 本应用专用的「连接层」：
+ * - 从 MobX chatStore 订阅消息与分支、会话加载态；
+ * - 从 ChatCoreProvider 取分享勾选、滚动 ref 注册；
+ * - 调用 useChatCore 绑定发送/流式与本仓库后端。
+ *
+ * 这样业务页仍只需 `<ChatBot />`，行为与拆分前一致；
+ * 需要跨项目复用时请使用 ChatBotView，并自行注入 ChatBotViewProps（零 Store）。
+ * 若只需传入消息数组、分支在本地维护即可，可用同目录导出的 SimpleChatBotView。
+ */
 const ChatBot = observer(
 	forwardRef<ChatBotRef, ChatBotProps>(function ChatBot(props, ref) {
 		const {
@@ -50,11 +43,62 @@ const ChatBot = observer(
 			apiEndpoint = '/chat/sse',
 			showAvatar = false,
 			onBranchChange,
+			showMessageActions,
+			showAnchorNav,
+			showChatControls,
+			renderMessageActions,
+			renderAnchorNav,
+			renderChatControls,
 		} = props;
 
 		const { chatStore } = useStore();
+		const {
+			onScrollToRef,
+			isSharing,
+			setIsSharing,
+			setCheckedMessage,
+			checkedMessages,
+		} = useChatCoreContext();
 
-		// 使用 useChatCore hook（共享状态）
+		const [allMessages, setAllMessages] = useState<Message[]>(() => [
+			...chatStore.messages,
+		]);
+		const [selectedChildMap, setSelectedChildMap] = useState<
+			Map<string, string>
+		>(new Map());
+
+		// 稳定引用，避免 ChatBotView 内注册滚动的 effect 随父级无意义重跑（原先 onScrollToRef 来自 useRef，引用不变）。
+		const handleScrollToRegister = useCallback(
+			(
+				handler:
+					| ((position: string, behavior?: 'smooth' | 'auto') => void)
+					| null,
+			) => {
+				onScrollToRef.current = handler;
+			},
+			[onScrollToRef],
+		);
+
+		// useMemo 固定 streamingBranchSource 引用：否则 useBranchManage 内依赖它的 useCallback 每帧失效，
+		// 可能放大重渲染；闭包内仍每次调用读 MobX，行为与重构前一致。
+		const streamingBranchSource = useMemo(
+			() => ({
+				getStreamingMessages: () => chatStore.getStreamingMessages(),
+				getStreamingMessageSessionId: (id: string) =>
+					chatStore.streamingBranchMaps.get(id)?.sessionId,
+				getStreamingBranchMap: (id: string) =>
+					chatStore.getStreamingBranchMap(id),
+			}),
+			[chatStore],
+		);
+
+		const onPersistSessionBranchSelection = useCallback(
+			(sessionId: string, map: Map<string, string>) => {
+				chatStore.saveSessionBranchSelection(sessionId, map);
+			},
+			[chatStore],
+		);
+
 		const {
 			input,
 			setInput,
@@ -66,71 +110,12 @@ const ChatBot = observer(
 			stopGenerating,
 			handleEditChange,
 			onContinue,
+			onContinueAnswering,
 		} = useChatCore({
 			apiEndpoint,
 		});
 
-		// 消息状态
-		const [allMessages, setAllMessages] = useState<Message[]>(
-			chatStore.messages,
-		);
-		const [messages, setMessages] = useState<Message[]>([]);
-		const [autoScroll, setAutoScroll] = useState(true);
-		const [isShowThinkContent, setIsShowThinkContent] = useState(true);
-		const [isCopyedId, setIsCopyedId] = useState('');
-		const [selectedChildMap, setSelectedChildMap] = useState<
-			Map<string, string>
-		>(new Map());
-		const [scrollTop, setScrollTop] = useState<number>(0);
-		const [hasScrollbar, setHasScrollbar] = useState<boolean>(false);
-
-		// Refs
-		const scrollContainerRef = useRef<HTMLDivElement>(null);
-		const editInputRef = useRef<HTMLTextAreaElement>(null);
-		const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-		const focusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-		const scrollTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-		const SCROLL_THRESHOLD = 5;
-
-		const onScrollTo = (position: string, behavior?: 'smooth' | 'auto') => {
-			scrollContainerRef.current?.scrollTo({
-				top:
-					position === 'up'
-						? 0
-						: scrollContainerRef.current?.scrollHeight + 100,
-				behavior: behavior || 'smooth',
-			});
-		};
-
-		// 使用分支管理 hook
-		const {
-			isStreamingBranchVisible,
-			isLatestBranch,
-			switchToLatestBranch,
-			switchToStreamingBranch,
-			findLatestBranchSelection,
-		} = useBranchManage({
-			messages,
-			selectedChildMap,
-			setSelectedChildMap,
-			onScrollTo,
-		});
-
-		const { findSiblings, buildMessageList, getFormatMessages } =
-			useMessageTools();
-
-		const { onScrollToRef } = useChatCoreContext();
-
-		// 将滚动方法设置到 Context
-		useEffect(() => {
-			onScrollToRef.current = onScrollTo;
-			return () => {
-				onScrollToRef.current = null;
-			};
-		}, [onScrollTo, onScrollToRef]);
-
-		// 监听 store 变化
+		// 与拆分前相同：用 reaction 把可观察数组拷贝到 React state，保证下游 effect 依赖的是快照而非直接持有 observable 引用链。
 		useEffect(() => {
 			const dispose = mobx.reaction(
 				() => chatStore.messages,
@@ -142,7 +127,6 @@ const ChatBot = observer(
 			return () => dispose();
 		}, [chatStore]);
 
-		// 监听 store 中 selectedChildMap 的变化，使在重新编辑 user 信息重新发送时，能够自动切换到最新的 user 分支
 		useEffect(() => {
 			const dispose = mobx.reaction(
 				() => {
@@ -163,7 +147,10 @@ const ChatBot = observer(
 			return () => dispose();
 		}, [chatStore]);
 
-		// 切换会话时恢复状态
+		// 展示列表改由 ChatBotView 内部根据 flatMessages + selectedChildMap memo 推导，
+		// 与原先此处 effect + getFormatMessages 语义一致，减少连接层重复状态。
+
+		// 依赖项刻意保持仅 activeSessionId，与旧实现一致，避免在其它 store 字段变化时误触会话重置逻辑。
 		useEffect(() => {
 			if (!chatStore.activeSessionId) {
 				setSelectedChildMap(new Map());
@@ -196,283 +183,52 @@ const ChatBot = observer(
 				setSelectedChildMap(new Map());
 			}
 
-			scrollTimer.current = setTimeout(() => {
-				onScrollTo('down', 'auto');
-			}, 50);
-
 			setInput('');
 			setUploadedFiles([]);
 			setEditMessage(null);
 		}, [chatStore.activeSessionId]);
 
-		// 构建消息列表
-		useEffect(() => {
-			const sortedMessages = buildMessageList(allMessages, selectedChildMap);
-			const formattedMessages = getFormatMessages(sortedMessages);
-			setMessages(formattedMessages);
-		}, [allMessages, selectedChildMap]);
-
-		// 自动滚动
-		useEffect(() => {
-			if (scrollContainerRef.current) {
-				const { scrollHeight, clientHeight } = scrollContainerRef.current;
-				setHasScrollbar(scrollHeight > clientHeight);
-			}
-			const lastMessage = messages[messages.length - 1];
-			const isCurrentlyStreaming =
-				lastMessage?.role === 'assistant' && lastMessage?.isStreaming;
-
-			if (autoScroll && isCurrentlyStreaming && scrollContainerRef.current) {
-				onScrollTo('down', 'auto');
-			}
-		}, [messages, autoScroll]);
-
-		// 清理
-		useEffect(() => {
-			return () => {
-				if (scrollTimer.current) {
-					clearTimeout(scrollTimer.current);
-				}
-				if (copyTimerRef.current) {
-					clearTimeout(copyTimerRef.current);
-				}
-				if (focusTimerRef.current) {
-					clearTimeout(focusTimerRef.current);
-				}
-			};
-		}, []);
-
-		const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-			const element = e.currentTarget;
-			if (!scrollContainerRef.current) {
-				scrollContainerRef.current = element;
-			}
-			const { scrollTop, scrollHeight, clientHeight } = element;
-			setScrollTop(scrollTop);
-			setHasScrollbar(scrollHeight > clientHeight);
-			const isAtBottom =
-				scrollHeight - scrollTop - clientHeight < SCROLL_THRESHOLD;
-			setAutoScroll(isAtBottom);
-		};
-
-		const onToggleThinkContent = () => {
-			setIsShowThinkContent(!isShowThinkContent);
-		};
-
-		const onCopy = (value: string, id: string) => {
-			navigator.clipboard.writeText(value);
-			setIsCopyedId(id);
-			copyTimerRef.current = setTimeout(() => {
-				setIsCopyedId('');
-			}, 500);
-		};
-
-		const onEdit = (message: Message) => {
-			setEditMessage(message);
-			focusTimerRef.current = setTimeout(() => {
-				if (editInputRef.current) {
-					editInputRef.current.focus();
-					const len = editInputRef.current.value.length;
-					editInputRef.current.setSelectionRange(len, len);
-				}
-			}, 0);
-		};
-
-		const handleBranchChange = (msgId: string, direction: 'prev' | 'next') => {
-			onBranchChange?.(msgId, direction);
-
-			const siblings = findSiblings(chatStore.messages, msgId);
-			const currentIndex = siblings.findIndex((m) => m.chatId === msgId);
-			const nextIndex =
-				direction === 'next' ? currentIndex + 1 : currentIndex - 1;
-
-			if (nextIndex >= 0 && nextIndex < siblings.length) {
-				const nextMsg = siblings[nextIndex];
-				const currentMsg = chatStore.messages.find((m) => m.chatId === msgId);
-				const parentId = currentMsg?.parentId;
-
-				const newSelectedChildMap = new Map(selectedChildMap);
-				if (parentId) {
-					newSelectedChildMap.set(parentId, nextMsg.chatId);
-				} else {
-					newSelectedChildMap.set('root', nextMsg.chatId);
-				}
-				setSelectedChildMap(newSelectedChildMap);
-				if (chatStore.activeSessionId) {
-					chatStore.saveSessionBranchSelection(
-						chatStore.activeSessionId,
-						newSelectedChildMap,
-					);
-				}
-			}
-		};
-
-		const onReGenerate = (index: number) => {
-			if (index > 0) {
-				const userMsg = messages[index - 1];
-				if (userMsg && userMsg.role === 'user') {
-					sendMessage(userMsg.content, index);
-				}
-			}
-		};
-
-		const getMessageClassName = useCallback(
-			(message: Message) => {
-				const isEdit = editMessage?.chatId === message.chatId;
-				return cn(
-					'flex-1 rounded-md p-3 select-auto',
-					message.role === 'user'
-						? `bg-blue-500/10 border border-blue-500/20 text-end pt-2 pb-2.5 px-3 ${isEdit ? 'p-0 pr-2.5 pb-2.5' : ''}`
-						: 'bg-theme/5 border border-theme-white/10',
-					showAvatar
-						? 'max-w-[calc(768px-105px)]'
-						: isEdit
-							? 'w-full bg-theme/5 border-theme-white/10'
-							: 'w-auto',
-				);
-			},
-			[showAvatar, editMessage?.chatId],
-		);
-
-		const isAtBottom = useMemo(() => {
-			if (!scrollContainerRef.current) return false;
-			const { scrollHeight, clientHeight } = scrollContainerRef.current;
-			return scrollHeight - scrollTop - clientHeight < 5;
-		}, [scrollTop]);
-
-		useImperativeHandle(
-			ref,
-			() => ({
-				clearChat,
-				stopGenerating,
-				sendMessage,
-			}),
-			[clearChat, stopGenerating, sendMessage],
-		);
-
 		return (
-			<div
-				className={cn(
-					'relative flex flex-col h-full w-full select-none',
-					className,
-				)}
-			>
-				<ScrollArea
-					ref={scrollContainerRef}
-					className="flex-1 overflow-hidden w-full backdrop-blur-sm pb-5"
-					onScroll={handleScroll}
-				>
-					<div className="max-w-3xl m-auto overflow-y-auto">
-						<div className="space-y-6 overflow-hidden">
-							{!messages.length ? (
-								<ChatNewSession />
-							) : (
-								messages.map((message, index) => (
-									<div
-										key={message.chatId}
-										id={`message-${message.chatId}`}
-										className={cn(
-											'flex gap-3 w-full',
-											message.role === 'user' ? 'flex-row-reverse' : '',
-										)}
-									>
-										{showAvatar ? (
-											<div
-												className={cn(
-													'shrink-0 w-10 h-10 rounded-full flex items-center justify-center',
-													message.role === 'user'
-														? 'bg-blue-500/20'
-														: 'bg-purple-500/20',
-												)}
-											>
-												{message.role === 'user' ? (
-													<User className="w-5 h-5 text-blue-400" />
-												) : (
-													<Bot className="w-5 h-5 text-purple-400" />
-												)}
-											</div>
-										) : null}
-
-										<div
-											className={cn(
-												'relative flex-1 flex flex-col gap-1 pb-10 w-full group',
-												message.role === 'user' ? 'items-end' : '',
-											)}
-										>
-											{message?.attachments &&
-												message?.attachments.length > 0 && (
-													<div className="flex flex-wrap justify-end gap-1.5 mb-2">
-														{message.role === 'user'
-															? message?.attachments?.map((i) => (
-																	<ChatFileList
-																		key={i.id || i.uuid}
-																		data={i}
-																		showDownload
-																	/>
-																))
-															: null}
-													</div>
-												)}
-											<div className={getMessageClassName(message)}>
-												{message.role === 'user' ? (
-													<ChatUserMessage
-														message={message}
-														editMessage={editMessage}
-														editInputRef={editInputRef}
-														input={input}
-														setInput={setInput}
-														setEditMessage={setEditMessage}
-														isLoading={chatStore.isCurrentSessionLoading}
-														handleEditChange={handleEditChange}
-														sendMessage={sendMessage}
-													/>
-												) : (
-													<ChatAssistantMessage
-														message={message}
-														isShowThinkContent={isShowThinkContent}
-														onToggleThinkContent={onToggleThinkContent}
-														onContinue={onContinue}
-													/>
-												)}
-											</div>
-
-											<ChatMessageActions
-												message={message}
-												index={index}
-												messagesLength={messages.length}
-												isCopyedId={isCopyedId}
-												isLoading={chatStore.isCurrentSessionLoading}
-												onBranchChange={handleBranchChange}
-												onCopy={onCopy}
-												onEdit={onEdit}
-												onReGenerate={onReGenerate}
-											/>
-										</div>
-									</div>
-								))
-							)}
-						</div>
-					</div>
-					<ChatAnchorNav
-						messages={messages}
-						scrollContainerRef={scrollContainerRef}
-					/>
-					<ChatControls
-						isLoading={chatStore.isCurrentSessionLoading}
-						isStreamingBranchVisible={isStreamingBranchVisible()}
-						isLatestBranch={isLatestBranch()}
-						messagesLength={messages.length}
-						switchToStreamingBranch={switchToStreamingBranch}
-						switchToLatestBranch={switchToLatestBranch}
-						hasScrollbar={hasScrollbar}
-						isAtBottom={isAtBottom}
-						onScrollTo={onScrollTo}
-					/>
-				</ScrollArea>
-			</div>
+			<ChatBotView
+				ref={ref}
+				className={className}
+				showAvatar={showAvatar}
+				onBranchChange={onBranchChange}
+				flatMessages={allMessages}
+				selectedChildMap={selectedChildMap}
+				onSelectedChildMapChange={setSelectedChildMap}
+				activeSessionId={chatStore.activeSessionId ?? null}
+				onPersistSessionBranchSelection={onPersistSessionBranchSelection}
+				streamingBranchSource={streamingBranchSource}
+				input={input}
+				setInput={setInput}
+				editMessage={editMessage}
+				setEditMessage={setEditMessage}
+				sendMessage={sendMessage}
+				clearChat={clearChat}
+				stopGenerating={stopGenerating}
+				handleEditChange={handleEditChange}
+				onContinue={onContinue}
+				onContinueAnswering={onContinueAnswering}
+				isCurrentSessionLoading={chatStore.isCurrentSessionLoading}
+				isMessageStopped={(id) => chatStore.isMessageStopped(id)}
+				isSharing={isSharing}
+				setIsSharing={setIsSharing}
+				checkedMessages={checkedMessages}
+				setCheckedMessage={setCheckedMessage}
+				onScrollToRegister={handleScrollToRegister}
+				showMessageActions={showMessageActions}
+				showAnchorNav={showAnchorNav}
+				showChatControls={showChatControls}
+				renderMessageActions={renderMessageActions}
+				renderAnchorNav={renderAnchorNav}
+				renderChatControls={renderChatControls}
+			/>
 		);
 	}),
 );
 
 export default ChatBot as React.FC<ChatBotProps> &
-	((props: { ref?: React.Ref<ChatBotRef> } & ChatBotProps) => JSX.Element);
+	((
+		props: { ref?: React.Ref<ChatBotRef> } & ChatBotProps,
+	) => React.JSX.Element);

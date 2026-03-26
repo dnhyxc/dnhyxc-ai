@@ -2,14 +2,14 @@ import { useRef, useState } from 'react';
 import { InsertNewlineParams, Message } from '@/types/chat';
 
 interface UseChatInputOptions {
-	input?: string;
-	setInput?: (val: string) => void;
-	editMessage?: Message | null;
-	setEditMessage?: (msg: Message | null) => void;
-	handleEditChange?: (
+	input: string;
+	setInput: (val: string) => void;
+	editMessage: Message | null;
+	setEditMessage: (msg: Message | null) => void;
+	handleEditChange: (
 		e: React.ChangeEvent<HTMLTextAreaElement> | string,
 	) => void;
-	sendMessage?: (
+	sendMessage: (
 		content?: string,
 		index?: number,
 		isEdit?: boolean,
@@ -42,10 +42,10 @@ export const useEntry = ({
 		const end = textarea.selectionEnd;
 		if (isEdit) {
 			const newValue = `${editMessage?.content?.substring(0, start)}\n${editMessage?.content?.substring(end)}`;
-			setEditInputValue?.(newValue);
+			setEditInputValue(newValue);
 		} else {
-			const newValue = `${input?.substring(0, start)}\n${input?.substring(end)}`;
-			setInputValue?.(newValue);
+			const newValue = `${input.substring(0, start)}\n${input.substring(end)}`;
+			setInputValue(newValue);
 		}
 
 		// 移动光标到插入位置后
@@ -65,6 +65,7 @@ export const useEntry = ({
 	const handleKeyDown = (
 		e: React.KeyboardEvent<HTMLTextAreaElement>,
 		message?: Message | null,
+		scrollTo?: () => void,
 	) => {
 		if (e.key === 'Enter') {
 			const hasModifier = e.ctrlKey || e.metaKey || e.shiftKey || e.altKey;
@@ -82,6 +83,8 @@ export const useEntry = ({
 					setEditInputValue: handleEditChange,
 					textareaNode: textareaRef?.current || undefined, // 传递 ref 给工具函数
 				});
+				// textarea 超出最大高度时，自动滚动到底部
+				scrollTo?.();
 			};
 
 			if (isCurrentlyComposing) {
@@ -97,14 +100,9 @@ export const useEntry = ({
 				e.preventDefault();
 				if (isEdit) {
 					// onSendMessage(message as Message);
-					sendMessage?.(
-						message?.content,
-						undefined,
-						true,
-						message?.attachments,
-					);
+					sendMessage(message?.content, undefined, true, message?.attachments);
 				} else {
-					sendMessage?.();
+					sendMessage();
 				}
 			}
 		}

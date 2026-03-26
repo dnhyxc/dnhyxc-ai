@@ -13,7 +13,6 @@ class ChatStore {
 	};
 	activeSessionId: string = '';
 
-	// ========== 流式更新优化：缓冲区 ==========
 	// 存储每个消息的流式更新缓冲
 	streamingBuffers: Map<
 		string,
@@ -62,6 +61,81 @@ class ChatStore {
 		string,
 		{ sessionId: string; branchMap: Map<string, string> }
 	> = new Map();
+
+	// 存储每条消息的停止状态：chatId -> { sessionId, stoppedAt }
+	// 使用独立的 Map 来管理停止状态，避免在 setAllMessages 中被意外清空
+	stoppedMessages: Map<string, { sessionId: string; stoppedAt: number }> =
+		new Map();
+
+	/**
+	 * 设置消息的停止状态
+	 * @param chatId 消息ID
+	 * @param sessionId 会话ID
+	 */
+	@action
+	setStoppedMessage(chatId: string, sessionId: string) {
+		this.stoppedMessages.set(chatId, {
+			sessionId,
+			stoppedAt: Date.now(),
+		});
+	}
+
+	/**
+	 * 清空单条消息的停止状态
+	 * @param chatId 消息ID
+	 */
+	@action
+	clearStoppedMessage(chatId: string) {
+		this.stoppedMessages.delete(chatId);
+	}
+
+	/**
+	 * 清空分支链路上所有消息的停止状态
+	 * @param branchPath 分支链路上的所有消息 chatId 集合
+	 */
+	@action
+	clearStoppedMessageByBranchPath(branchPath: Set<string>) {
+		branchPath.forEach((chatId) => {
+			this.stoppedMessages.delete(chatId);
+		});
+	}
+
+	/**
+	 * 检查消息是否处于停止状态
+	 * @param chatId 消息ID
+	 * @returns 是否处于停止状态
+	 */
+	isMessageStopped(chatId: string): boolean {
+		return this.stoppedMessages.has(chatId);
+	}
+
+	/**
+	 * 获取消息的停止状态信息
+	 * @param chatId 消息ID
+	 * @returns 停止状态信息
+	 */
+	getStoppedMessageInfo(
+		chatId: string,
+	): { sessionId: string; stoppedAt: number } | undefined {
+		return this.stoppedMessages.get(chatId);
+	}
+
+	/**
+	 * 清空指定会话的所有停止状态
+	 * @param sessionId 会话ID
+	 */
+	@action
+	clearStoppedMessageBySession(sessionId: string) {
+		const keysToDelete: string[] = [];
+		this.stoppedMessages.forEach((value, key) => {
+			if (value.sessionId === sessionId) {
+				keysToDelete.push(key);
+			}
+		});
+		keysToDelete.forEach((key) => {
+			this.stoppedMessages.delete(key);
+		});
+	}
 
 	addLoadingSession(sessionId: string) {
 		this.loadingSessions.add(sessionId);
@@ -119,24 +193,34 @@ class ChatStore {
 				(m) => m.chatId === chatId,
 			);
 			if (existingIndex >= 0) {
+				// 增加 shouldMergeStreamContent 判断，防止在发送新消息时，导致上一条消息内容丢失
+				const shouldMergeStreamContent = streamingMsg.isStreaming;
+
 				mergedMessages[existingIndex] = {
 					...mergedMessages[existingIndex],
 					isStreaming: streamingMsg.isStreaming,
-					isStopped: streamingMsg.isStopped,
-					content:
-						streamingMsg.content || mergedMessages[existingIndex].content,
-					thinkContent:
-						streamingMsg.thinkContent ||
-						mergedMessages[existingIndex].thinkContent,
+					// 只有在流式进行中才覆盖 content，否则保留 existing 内容
+					content: shouldMergeStreamContent
+						? streamingMsg.content || mergedMessages[existingIndex].content
+						: mergedMessages[existingIndex].content,
+					// thinkContent 同理
+					thinkContent: shouldMergeStreamContent
+						? streamingMsg.thinkContent ||
+							mergedMessages[existingIndex].thinkContent
+						: mergedMessages[existingIndex].thinkContent,
 				};
 			} else {
-				mergedMessages.push(streamingMsg);
+				if (streamingMsg.isStreaming) {
+					mergedMessages.push(streamingMsg);
+				}
 			}
 		});
 
+		// 注意：不再强制设置 isStopped: false，停止状态由 stoppedMessages Map 独立管理
 		const finalMessages = mergedMessages.map((msg) => ({
 			...msg,
-			isStopped: false,
+			// 从 stoppedMessages Map 获取停止状态
+			isStopped: this.stoppedMessages.has(msg.chatId),
 		}));
 
 		this.messages = finalMessages;
@@ -179,8 +263,7 @@ class ChatStore {
 	}
 
 	/**
-	 * 【优化】流式更新消息 - 高性能版本
-	 * 使用缓冲区和节流机制，减少不必要的渲染
+	 * 流式更新消息 - 使用缓冲区和节流机制，减少不必要的渲染
 	 */
 	appendStreamingContent(
 		chatId: string,
@@ -196,7 +279,6 @@ class ChatStore {
 				lastUpdateTime: 0,
 				pendingUpdate: false,
 			};
-			this.streamingBuffers.set(chatId, buffer);
 		}
 
 		// 2. 累积内容到缓冲区
@@ -205,6 +287,9 @@ class ChatStore {
 		} else {
 			buffer.thinkContent += chunk;
 		}
+
+		// ⚠️ 更新 streamingBuffers，防止丢失第一个 chunk
+		this.streamingBuffers.set(chatId, buffer);
 
 		// 3. 标记为待更新
 		this.pendingUpdateIds.add(chatId);
@@ -244,13 +329,17 @@ class ChatStore {
 			const buffer = this.streamingBuffers.get(chatId);
 			if (buffer) {
 				const update: { content?: string; thinkContent?: string } = {};
-				if (buffer.content) {
-					update.content = buffer.content;
-					buffer.content = ''; // 清空缓冲区
+				const contentToFlush = buffer.content;
+				const thinkContentToFlush = buffer.thinkContent;
+				// 立即清空缓冲区，防止数据被重复处理
+				buffer.content = '';
+				buffer.thinkContent = '';
+				// 使用保存的局部变量来构建 update
+				if (contentToFlush) {
+					update.content = contentToFlush;
 				}
-				if (buffer.thinkContent) {
-					update.thinkContent = buffer.thinkContent;
-					buffer.thinkContent = '';
+				if (thinkContentToFlush) {
+					update.thinkContent = thinkContentToFlush;
 				}
 				if (Object.keys(update).length > 0) {
 					updatesToApply.set(chatId, update);
@@ -291,9 +380,11 @@ class ChatStore {
 						content: message.content + update.content,
 					}),
 					...(update.thinkContent !== undefined && {
-						thinkContent: (message.thinkContent || '') + update.thinkContent,
+						thinkContent: message.thinkContent + update.thinkContent,
 					}),
 					isStreaming: true,
+					// 保持停止状态由 stoppedMessages Map 管理
+					isStopped: this.stoppedMessages.has(chatId),
 				};
 				messageMap.set(chatId, { index, message: updatedMessage });
 			}
@@ -332,7 +423,7 @@ class ChatStore {
 				}
 				if (buffer.thinkContent) {
 					update.thinkContent =
-						(currentMessage.thinkContent || '') + buffer.thinkContent;
+						currentMessage.thinkContent + buffer.thinkContent;
 				}
 
 				this.messages = [
@@ -376,6 +467,8 @@ class ChatStore {
 			const updatedMessage = {
 				...this.messages[messageIndex],
 				...updates,
+				// 保持停止状态由 stoppedMessages Map 管理
+				isStopped: this.stoppedMessages.has(chatId),
 			};
 
 			this.messages = [
@@ -396,6 +489,8 @@ class ChatStore {
 						...existingStreamingMsg,
 						isStreaming: false,
 						...updates,
+						// 保持停止状态由 stoppedMessages Map 管理
+						isStopped: this.stoppedMessages.has(chatId),
 					});
 				} else {
 					this.streamingMessages.set(chatId, updatedMessage);
@@ -407,8 +502,16 @@ class ChatStore {
 		} else {
 			const existingStreamingMsg = this.streamingMessages.get(chatId);
 			const updatedMessage = existingStreamingMsg
-				? { ...existingStreamingMsg, ...updates }
-				: ({ chatId, ...updates } as Message);
+				? {
+						...existingStreamingMsg,
+						...updates,
+						isStopped: this.stoppedMessages.has(chatId),
+					}
+				: ({
+						chatId,
+						...updates,
+						isStopped: this.stoppedMessages.has(chatId),
+					} as Message);
 
 			if (updates.isStreaming !== false || existingStreamingMsg) {
 				this.streamingMessages.set(chatId, updatedMessage);
@@ -567,6 +670,100 @@ class ChatStore {
 		keysToDelete.forEach((key) => {
 			this.streamingBranchMaps.delete(key);
 		});
+	}
+
+	// 存储每个消息的 finishReason：chatId -> finishReason
+	finishReasonMap: Map<
+		string,
+		{
+			type: 'finish';
+			reason: 'stop' | 'length' | null;
+			maxTokensReached: boolean;
+			sessionId: string;
+		}
+	> = new Map();
+
+	/**
+	 * 设置消息的 finishReason
+	 */
+	@action
+	setFinishReason(
+		chatId: string,
+		finishReason: {
+			type: 'finish';
+			reason: 'stop' | 'length' | null;
+			maxTokensReached: boolean;
+			sessionId: string;
+		},
+	) {
+		this.finishReasonMap.set(chatId, finishReason);
+
+		// 优化：直接找到消息对象并修改属性，避免数组展开
+		// 同时更新 Message 对象中的 finishReason 字段
+		const message = this.messages.find((m) => m.chatId === chatId);
+		if (message) {
+			// 直接修改属性，MobX 会追踪到这个变化
+			message.finishReason = finishReason;
+		}
+	}
+
+	/**
+	 * 获取消息的 finishReason
+	 */
+	getFinishReason(chatId: string) {
+		return this.finishReasonMap.get(chatId);
+	}
+
+	/**
+	 * 清空指定消息的 finishReason
+	 */
+	@action
+	clearFinishReason(chatId: string) {
+		this.finishReasonMap.delete(chatId);
+
+		// 同时清空 Message 对象中的 finishReason 字段
+		// 优化：直接找到消息对象并删除属性
+		const message = this.messages.find((m) => m.chatId === chatId);
+		if (message?.finishReason) {
+			delete message.finishReason;
+		}
+	}
+
+	/**
+	 * 清空指定分支链路上所有消息的 finishReason
+	 * @param branchPath 分支链路上的所有消息 chatId 集合
+	 */
+	@action
+	clearFinishReasonByBranchPath(branchPath: Set<string>) {
+		branchPath.forEach((chatId) => {
+			this.finishReasonMap.delete(chatId);
+		});
+
+		// 批量更新消息列表
+		// 优化：直接遍历修改属性，避免数组 map 操作
+		this.messages.forEach((msg) => {
+			if (branchPath.has(msg.chatId) && msg?.finishReason) {
+				delete msg.finishReason;
+			}
+		});
+	}
+
+	/**
+	 * 构建从指定消息到根节点的分支链路
+	 * @param chatId 起始消息的 chatId
+	 * @returns 分支链路上所有消息的 chatId 集合
+	 */
+	buildBranchPath(chatId: string): Set<string> {
+		const path = new Set<string>();
+		let currentId: string | undefined = chatId;
+
+		while (currentId) {
+			path.add(currentId);
+			const msg = this.messages.find((m) => m.chatId === currentId);
+			currentId = msg?.parentId;
+		}
+
+		return path;
 	}
 }
 

@@ -12,9 +12,6 @@ export default defineConfig(async () => ({
 			'@design': '/src/components/design',
 		},
 	},
-	optimizeDeps: {
-		include: ['monaco-editor'],
-	},
 	server: {
 		port: 9226,
 		strictPort: true,
