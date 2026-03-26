@@ -204,9 +204,7 @@ export interface ChatBotViewProps {
 	 * 自定义每条消息下的操作区（分支切换、复制、编辑、重生成、分享等）。
 	 * 不传则渲染内置 ChatMessageActions；返回 null 表示不渲染该区域。
 	 */
-	renderMessageActions?: (
-		ctx: ChatBotViewMessageActionsContext,
-	) => ReactNode;
+	renderMessageActions?: (ctx: ChatBotViewMessageActionsContext) => ReactNode;
 	/**
 	 * 自定义用户消息锚点导航；不传则渲染内置 ChatAnchorNav；返回 null 可隐藏。
 	 */
