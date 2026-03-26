@@ -750,8 +750,17 @@ export const useChatCore = (
 				await handleNewMessage(content || input.trim(), uploadedFiles);
 			}
 
+			// MobX → reaction → setAllMessages 与 React 提交晚于本 await 微任务；单次 scroll 时 scrollHeight/条数仍为旧值
 			const scrollTo = onScrollToProp || onScrollToRef.current;
-			scrollTo?.('down', 'auto');
+			if (scrollTo) {
+				const pin = () => scrollTo('down', 'auto');
+				pin();
+				queueMicrotask(pin);
+				requestAnimationFrame(() => {
+					pin();
+					requestAnimationFrame(pin);
+				});
+			}
 
 			setInput('');
 			setUploadedFiles([]);

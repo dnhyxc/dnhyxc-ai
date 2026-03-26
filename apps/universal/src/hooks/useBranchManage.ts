@@ -187,6 +187,15 @@ export const useBranchManage = ({
 		[activeSessionId, onPersistSessionBranchSelection],
 	);
 
+	const flushScrollToBottom = useCallback(() => {
+		onScrollTo('down', 'auto');
+		queueMicrotask(() => onScrollTo('down', 'auto'));
+		requestAnimationFrame(() => {
+			onScrollTo('down', 'auto');
+			requestAnimationFrame(() => onScrollTo('down', 'auto'));
+		});
+	}, [onScrollTo]);
+
 	const switchToLatestBranch = useCallback(() => {
 		if (allFlatMessages.length === 0) return;
 		const latestBranchMap = findLatestBranchSelection(allFlatMessages);
@@ -198,10 +207,15 @@ export const useBranchManage = ({
 				latestBranchTimer = null;
 			}
 			latestBranchTimer = setTimeout(() => {
-				onScrollTo('down', 'auto');
+				flushScrollToBottom();
 			}, 50);
 		}
-	}, [allFlatMessages, setSelectedChildMap, onScrollTo, persistIfNeeded]);
+	}, [
+		allFlatMessages,
+		setSelectedChildMap,
+		flushScrollToBottom,
+		persistIfNeeded,
+	]);
 
 	const switchToStreamingBranch = useCallback(() => {
 		const branchMap = getInvisibleStreamingBranchMap();
@@ -214,13 +228,13 @@ export const useBranchManage = ({
 				streamingBranchTimer = null;
 			}
 			streamingBranchTimer = setTimeout(() => {
-				onScrollTo('down', 'auto');
+				flushScrollToBottom();
 			}, 50);
 		}
 	}, [
 		getInvisibleStreamingBranchMap,
 		setSelectedChildMap,
-		onScrollTo,
+		flushScrollToBottom,
 		persistIfNeeded,
 	]);
 

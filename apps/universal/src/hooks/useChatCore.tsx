@@ -750,8 +750,17 @@ export const useChatCore = (
 				await handleNewMessage(content || input.trim(), uploadedFiles);
 			}
 
+			// 状态入 Store 后 React 提交可能晚于 await；多拍钉底避免 scrollHeight 仍为旧值
 			const scrollTo = onScrollToProp || onScrollToRef.current;
-			scrollTo?.('down', 'auto');
+			if (scrollTo) {
+				const pin = () => scrollTo('down', 'auto');
+				pin();
+				queueMicrotask(pin);
+				requestAnimationFrame(() => {
+					pin();
+					requestAnimationFrame(pin);
+				});
+			}
 
 			setInput('');
 			setUploadedFiles([]);

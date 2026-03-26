@@ -154,8 +154,11 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 		/** 流式结束并入虚拟列表后短时间内关闭虚拟器 scroll 补偿，减轻闪动 */
 		const suppressVirtualScrollAdjustUntilRef = useRef(0);
 		const messagesRef = useRef<Message[]>(messages);
+		/** 供 onScrollTo 等在 React 提交后再调用时读取最新条数，避免闭包仍是旧 messages.length */
+		const messagesLengthRef = useRef(messages.length);
 
 		messagesRef.current = messages;
+		messagesLengthRef.current = messages.length;
 
 		const lastMessageForStream = messages[messages.length - 1];
 		const isCurrentlyStreaming =
@@ -348,13 +351,12 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 					v.scrollTop = Math.max(0, v.scrollHeight - v.clientHeight);
 				};
 
-				const lastIdx = messages.length - 1;
-				// 尾条拆出时最后一条不在 virtualizer 的 count 里，不能 scrollToIndex(last)
+				const len = messagesLengthRef.current;
+				const lastIdx = len - 1;
+				// 尾条拆出时最后一条不在 virtualizer 的 count 里，不能 scrollToIndex(last)；用 ref 读当前是否拆尾条
+				const tailDetachedNow = streamTailDetachedRef.current;
 				const useVirtualPinToLast =
-					virtualizeMessages &&
-					messages.length > 0 &&
-					!streamTailDetached &&
-					lastIdx >= 0;
+					virtualizeMessages && len > 0 && !tailDetachedNow && lastIdx >= 0;
 
 				if (useVirtualPinToLast) {
 					virtualizer.scrollToIndex(lastIdx, {
@@ -364,15 +366,18 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 				}
 
 				if (!useSmooth) {
-					// auto：原生 max + 延后两帧再钉一次，避免虚拟总高与视口 scrollHeight 暂不一致导致差一截
+					// auto：发送消息/切分支后常在「下一帧」才量准总高；多拍 pin 避免差一截
 					pinNativeBottom();
 					queueMicrotask(pinNativeBottom);
-					requestAnimationFrame(pinNativeBottom);
+					requestAnimationFrame(() => {
+						pinNativeBottom();
+						requestAnimationFrame(pinNativeBottom);
+					});
 				} else if (!useVirtualPinToLast) {
 					el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
 				}
 			},
-			[virtualizer, messages.length, virtualizeMessages, streamTailDetached],
+			[virtualizer, virtualizeMessages],
 		);
 
 		const {

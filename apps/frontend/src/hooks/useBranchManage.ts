@@ -231,6 +231,16 @@ export const useBranchManage = ({
 		[activeSessionId, onPersistSessionBranchSelection],
 	);
 
+	/** 分支 map 更新后 DOM/虚拟列表往往晚一帧才量准 scrollHeight，多拍钉底避免偶发停在半截 */
+	const flushScrollToBottom = useCallback(() => {
+		onScrollTo('down', 'auto');
+		queueMicrotask(() => onScrollTo('down', 'auto'));
+		requestAnimationFrame(() => {
+			onScrollTo('down', 'auto');
+			requestAnimationFrame(() => onScrollTo('down', 'auto'));
+		});
+	}, [onScrollTo]);
+
 	const switchToLatestBranch = useCallback(() => {
 		if (allFlatMessages.length === 0) return;
 		// `latestBranchMapFlat` 恒为 Map 实例故 if 恒真；空 Map 时仍 set + persist，与旧 findLatest 后立即应用的行为对齐。
@@ -242,14 +252,14 @@ export const useBranchManage = ({
 				latestBranchTimer = null;
 			}
 			latestBranchTimer = setTimeout(() => {
-				onScrollTo('down', 'auto');
+				flushScrollToBottom();
 			}, 50);
 		}
 	}, [
 		allFlatMessages.length,
 		latestBranchMapFlat,
 		setSelectedChildMap,
-		onScrollTo,
+		flushScrollToBottom,
 		persistIfNeeded,
 	]);
 
@@ -265,13 +275,13 @@ export const useBranchManage = ({
 				streamingBranchTimer = null;
 			}
 			streamingBranchTimer = setTimeout(() => {
-				onScrollTo('down', 'auto');
+				flushScrollToBottom();
 			}, 50);
 		}
 	}, [
 		invisibleStreamingBranchMapValue,
 		setSelectedChildMap,
-		onScrollTo,
+		flushScrollToBottom,
 		persistIfNeeded,
 	]);
 
