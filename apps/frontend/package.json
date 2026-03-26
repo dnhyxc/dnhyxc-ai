@@ -6,6 +6,7 @@
 	"author": "dnhyxc <dnhyxc@gmail.com>",
 	"scripts": {
 		"dev": "vite",
+		"test:branch-smoke": "tsx src/hooks/branchLogic.smoke.ts",
 		"build": "tsc && vite build",
 		"preview": "vite preview",
 		"tauri": "tauri"

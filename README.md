@@ -216,3 +216,5 @@ pnpm -C apps/frontend tauri build
 10. 安全与合规：敏感信息脱敏、凭据仅会话态、审计日志与链路追踪。
 
 注意：要给出完整的实现代码
+
+// Always respond in 中文
