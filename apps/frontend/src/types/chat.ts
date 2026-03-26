@@ -117,10 +117,39 @@ export interface ChatBotViewMessageActionsContext {
 	setCheckedMessage: (message: Message) => void;
 }
 
+/**
+ * 虚拟列表与左侧锚点导航的「契约」：主列表仅挂载视口附近节点时，`#message-{chatId}` 在离屏不存在，
+ * 锚点组件不能再依赖 `document.getElementById` / `getBoundingClientRect` 遍历全部用户消息。
+ *
+ * ChatBotView 在开启 `virtualizeMessages` 时构造本适配器并下发给内置或自定义 `ChatAnchorNav`。
+ * 自定义 `renderAnchorNav` 时应透传 `anchorScrollAdapter`，或自行实现等价滚动与高亮逻辑。
+ */
+export interface ChatAnchorScrollAdapter {
+	/**
+	 * 将指定用户/消息行滚入视口：内部应对应 TanStack Virtual 的 `scrollToIndex`（或等价实现），
+	 * 并配合 `scrollPaddingStart` 等与旧版「距顶约 20px」视觉对齐。
+	 */
+	scrollToChatId: (chatId: string) => void;
+	/**
+	 * 根据当前滚动偏移 + 虚拟器 `measurementsCache` 推算「应对哪条用户消息高亮」。
+	 * 算法需与 DOM 路径一致：以视口上约 1/3 处为参考线，从上到下最后一条满足「行顶 ≤ 参考线」的用户消息为当前锚点；
+	 * 超过视口底边的行可提前 break 优化。
+	 */
+	resolveActiveUserAnchor: (
+		scrollContainer: HTMLElement,
+		userMessages: Message[],
+	) => string;
+}
+
 /** 自定义左侧锚点导航时的上下文；与内置 ChatAnchorNav 一致。 */
 export interface ChatBotViewAnchorNavContext {
 	messages: Message[];
 	scrollContainerRef: RefObject<HTMLDivElement | null>;
+	/**
+	 * 仅当 `ChatBotView` 开启消息虚拟列表时有值；内置 `ChatAnchorNav` 会自动切换为适配器路径。
+	 * 自定义锚点若忽略此字段，长列表下点击侧栏/高亮可能错误。
+	 */
+	anchorScrollAdapter?: ChatAnchorScrollAdapter;
 }
 
 /** 自定义底部分支/滚动控制条时的上下文；布尔值已算好，避免重复调用分支检测函数。 */
@@ -140,7 +169,8 @@ export interface ChatBotViewChatControlsContext {
  * 纯渲染层入参：凡直接决定「屏幕上消息长什么样」的数据须由调用方显式传入，避免无源渲染、隐式状态难以排查。
  *
  * 必填：`flatMessages`（全量树，无消息传 `[]`）、`selectedChildMap` + `onSelectedChildMapChange`（当前分支路径，空会话可 `new Map()` + setState）。
- * 可选：`displayMessages` 仅当你要完全覆盖内部推导的展示列时传入；否则由 buildMessageList 从 flat + map 算出（列表项字段形态与原 getFormatMessages 输出一致）。
+ * 可选：`displayMessages` 仅当你要完全覆盖内部推导的展示列时传入；否则由 `buildMessageList` 从 flat + map 直接产出展示列
+ *（字段形态与原 `getFormatMessages` 一致，无需在 View 内二次 map）。
  * 交互类（发送、分享等）仍可省略，由空回调占位，便于只读壳。
  */
 export interface ChatBotViewProps {
@@ -172,6 +202,13 @@ export interface ChatBotViewProps {
 	 * 避免调用方重复维护两份数组（本仓库 ChatBot 连接层已改为依赖此行为）。
 	 */
 	displayMessages?: Message[];
+
+	/**
+	 * 是否对消息列表做虚拟滚动（TanStack Virtual + 动态 `measureElement`）。
+	 * - `true`（默认）：仅挂载视口附近行，长会话 DOM 与布局计算量显著下降；左侧锚点通过 `anchorScrollAdapter` 驱动滚动与高亮。
+	 * - `false`：恢复每条消息全量挂载，`ChatAnchorNav` 走 `getElementById`，便于对照调试或规避极端布局问题。
+	 */
+	virtualizeMessages?: boolean;
 
 	/** 以下聊天交互字段省略时使用安全空实现，保证子组件可挂载；真正发消息/流式需由连接层或业务注入 */
 	input?: string;
@@ -257,6 +294,8 @@ export interface ChatBotProps {
 	renderMessageActions?: ChatBotViewProps['renderMessageActions'];
 	renderAnchorNav?: ChatBotViewProps['renderAnchorNav'];
 	renderChatControls?: ChatBotViewProps['renderChatControls'];
+	/** 透传至 `ChatBotView`；省略时与 View 默认一致（虚拟列表开启） */
+	virtualizeMessages?: ChatBotViewProps['virtualizeMessages'];
 }
 
 export interface CreateUserMessageParams {

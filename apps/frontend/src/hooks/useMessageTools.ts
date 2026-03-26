@@ -114,7 +114,14 @@ const findSiblings = (allMessages: Message[], messageId: string): Message[] => {
 	);
 };
 
-/** 与原先 getFormatMessages 单条输出一致；在 buildMessageList 内直接调用，少一轮 map */
+/**
+ * 单条消息的「展示形态」：与历史 `getFormatMessages` 逐字段一致（含 `timestamp: new Date(createdAt)`），
+ * 但不扩散 `id` / 原始 `createdAt` 等与列表渲染无关的字段。
+ *
+ * 阶段一：`buildMessageList` 在 push 时直接调用本函数，等价于旧路径
+ * `getFormatMessages(buildMessageList(...))`，省掉整表第二次 map。
+ * `getFormatMessages` 仍保留对外导出，供其它调用方或兼容旧代码；内部委托到本函数，并对缺失的 sibling 字段做 `??` 兜底。
+ */
 const formatMessageForDisplay = (
 	m: Message,
 	siblingIndex: number,
@@ -203,6 +210,7 @@ const buildMessageList = (
 			);
 		}
 
+		// 此处已含格式化，调用方无需再套一层 getFormatMessages
 		result.push(
 			formatMessageForDisplay(currentMessage, siblingIndex, siblingCount),
 		);
@@ -221,6 +229,10 @@ const buildMessageList = (
 	return result;
 };
 
+/**
+ * 将已有 Message 数组统一成展示用字段（例如从 Store 拉取的节点可能已带 siblingIndex）。
+ * 若输入来自 `buildMessageList`，通常已是格式化结果，再调本函数会得到结构相同的拷贝。
+ */
 const getFormatMessages = (messages: Message[]) => {
 	return messages.map((msg) =>
 		formatMessageForDisplay(msg, msg.siblingIndex ?? 0, msg.siblingCount ?? 1),

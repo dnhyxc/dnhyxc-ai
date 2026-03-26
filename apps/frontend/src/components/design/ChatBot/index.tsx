@@ -14,7 +14,9 @@ import useStore from '@/store';
 import { ChatBotProps, ChatBotRef, Message } from '@/types/chat';
 import ChatBotView from './ChatBotView';
 
+/** 类型 re-export：`ChatAnchorScrollAdapter` 供自定义 `renderAnchorNav` 与 View 契约对齐 */
 export type {
+	ChatAnchorScrollAdapter,
 	ChatBotRef,
 	ChatBotSimpleViewProps,
 	ChatBotViewAnchorNavContext,
@@ -35,6 +37,8 @@ export { default as SimpleChatBotView } from './SimpleChatBotView';
  * 这样业务页仍只需 `<ChatBot />`，行为与拆分前一致；
  * 需要跨项目复用时请使用 ChatBotView，并自行注入 ChatBotViewProps（零 Store）。
  * 若只需传入消息数组、分支在本地维护即可，可用同目录导出的 SimpleChatBotView。
+ *
+ * 消息列表默认启用虚拟滚动（见 `virtualizeMessages` → `ChatBotView`）；连接层将同名 prop 原样下传。
  */
 const ChatBot = observer(
 	forwardRef<ChatBotRef, ChatBotProps>(function ChatBot(props, ref) {
@@ -49,6 +53,8 @@ const ChatBot = observer(
 			renderMessageActions,
 			renderAnchorNav,
 			renderChatControls,
+			// 透传至 ChatBotView；省略时走 View 默认（虚拟列表开启），业务可显式 `false` 关闭以排查问题
+			virtualizeMessages,
 		} = props;
 
 		const { chatStore } = useStore();
@@ -223,6 +229,7 @@ const ChatBot = observer(
 				renderMessageActions={renderMessageActions}
 				renderAnchorNav={renderAnchorNav}
 				renderChatControls={renderChatControls}
+				virtualizeMessages={virtualizeMessages}
 			/>
 		);
 	}),

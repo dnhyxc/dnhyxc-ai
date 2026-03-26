@@ -6,11 +6,13 @@ import ChatMessageActions from '@design/ChatMessageActions';
 import ChatNewSession from '@design/ChatNewSession';
 import ChatUserMessage from '@design/ChatUserMessage';
 import { Label, ScrollArea } from '@ui/index';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { Bot, User } from 'lucide-react';
 import React, {
 	type ChangeEvent,
 	type Dispatch,
 	forwardRef,
+	Fragment,
 	JSX,
 	type SetStateAction,
 	useCallback,
@@ -23,7 +25,12 @@ import React, {
 import { useBranchManage } from '@/hooks/useBranchManage';
 import { useMessageTools } from '@/hooks/useMessageTools';
 import { cn } from '@/lib/utils';
-import { ChatBotRef, ChatBotViewProps, Message } from '@/types/chat';
+import {
+	type ChatAnchorScrollAdapter,
+	ChatBotRef,
+	ChatBotViewProps,
+	Message,
+} from '@/types/chat';
 
 /** 省略业务回调时的稳定空实现，避免每次 render 新建函数导致子组件重渲染 */
 const asyncNoop = async () => {};
@@ -50,6 +57,13 @@ const noopIsMessageStopped = (_chatId: string) => false;
  * showMessageActions / showAnchorNav / showChatControls 为 false 时强制不展示对应区域（优先生效于 render*）。
  *
  * 渲染数据源：`flatMessages`、`selectedChildMap`、`onSelectedChildMapChange` 类型上必填，禁止组件内「偷偷造一份默认消息/分支」导致与父状态脱节。
+ *
+ * 性能相关（与 hooks / 类型改动配套）：
+ * - 默认 `virtualizeMessages`：用 `@tanstack/react-virtual` 只渲染可视区消息；`ScrollArea` 的 ref 指向 Radix Viewport，与 `getScrollElement` 一致。
+ * - `gap: 24` 对齐原 Tailwind `space-y-6`；`scrollPaddingStart: 20` 对齐锚点滚动「距顶约 20px」；`estimateSize` 为初值，真实高度靠 `measureElement` 修正。
+ * - 虚拟开启时向 `ChatAnchorNav`（及 `renderAnchorNav` 上下文）传入 `anchorScrollAdapter`，保证离屏消息仍能滚动定位与高亮。
+ * - `buildMessageList` 已含展示字段形态，此处不再调用 `getFormatMessages`，减少一次全表遍历。
+ * - 底栏布尔值经 `useBranchManage` 内缓存后再 `useMemo`，避免无关 render 上重复求值（见该 hook 文件头注释）。
  */
 const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 	function ChatBotView(props, ref) {
@@ -72,9 +86,13 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 			renderChatControls,
 		} = props;
 
+		// `undefined` 视为开启虚拟列表，仅显式 `false` 时关闭（与类型注释中的 default 一致）。
+		const virtualizeMessages = props.virtualizeMessages !== false;
+
 		const { buildMessageList, findSiblings } = useMessageTools();
 
-		// 未传 displayMessages 时由 flat + map 推导展示列；buildMessageList 内已产出与原 getFormatMessages 一致的字段形态，避免二次 map。
+		// 未传 `displayMessages` 时由 flat + `selectedChildMap` 推导当前分支展示列；
+		// `buildMessageList` 内已对每条调用 `formatMessageForDisplay`，形态同旧 `getFormatMessages`，此处不再二次 map。
 		const messages = useMemo(() => {
 			if (props.displayMessages !== undefined) {
 				return props.displayMessages;
@@ -114,6 +132,63 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 		const [hasScrollbar, setHasScrollbar] = useState<boolean>(false);
 
 		const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+		// 必须在 `scrollContainerRef` 之后创建：滚动元素为 Radix ScrollArea Viewport（与本组件原有滚动行为一致）。
+		// `enabled` 在无消息时关闭，避免空列表下的无效订阅；有消息且未关闭虚拟化时开启。
+		const virtualizer = useVirtualizer({
+			count: messages.length,
+			getScrollElement: () => scrollContainerRef.current,
+			// 首屏估算高度，流式/长文本会由 `measureElement` + ResizeObserver 纠正；过小会多一次布局跳动，过大则浪费空白。
+			estimateSize: () => 200,
+			// 与 `space-y-6`（1.5rem）一致，保证总高度与旧版全量列表 spacing 接近。
+			gap: 24,
+			overscan: 8,
+			// 与 ChatAnchorNav 非虚拟路径下「scrollTop 减 20px」的视觉效果对齐（见 scrollPaddingStart 语义）。
+			scrollPaddingStart: 20,
+			paddingEnd: 32,
+			// 分支切换时同 index 可能换 chatId，用 chatId 做 key 可让虚拟器复用测量缓存更合理。
+			getItemKey: (index) => messages[index]?.chatId ?? index,
+			enabled: virtualizeMessages && messages.length > 0,
+		});
+
+		// 仅虚拟列表需要：闭包内读取 `virtualizer.measurementsCache` 最新值，勿把 cache 本身放进 deps（会导致无意义失效）。
+		const anchorScrollAdapter = useMemo(():
+			| ChatAnchorScrollAdapter
+			| undefined => {
+			if (!virtualizeMessages || messages.length === 0) return undefined;
+			return {
+				scrollToChatId: (chatId: string) => {
+					const idx = messages.findIndex((m) => m.chatId === chatId);
+					if (idx < 0) return;
+					virtualizer.scrollToIndex(idx, {
+						align: 'start',
+						behavior: 'smooth',
+					});
+				},
+				resolveActiveUserAnchor: (container, userMessages) => {
+					// 与 ChatAnchorNav DOM 算法在同一坐标系：内容纵坐标 = scrollTop + 视口内比例。
+					const scrollTop = container.scrollTop;
+					const clientHeight = container.clientHeight;
+					const lineY = scrollTop + clientHeight / 3;
+					const scrollBottom = scrollTop + clientHeight;
+					let current = userMessages[0]?.chatId ?? '';
+					for (const msg of userMessages) {
+						const idx = messages.findIndex((m) => m.chatId === msg.chatId);
+						if (idx < 0) continue;
+						const item = virtualizer.measurementsCache[idx];
+						if (!item) continue;
+						if (item.start <= lineY) {
+							current = msg.chatId;
+						}
+						if (item.start > scrollBottom) {
+							break;
+						}
+					}
+					return current;
+				},
+			};
+		}, [virtualizeMessages, messages, virtualizer]);
+
 		const editInputRef = useRef<HTMLTextAreaElement>(null);
 		const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 		const focusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -372,7 +447,8 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 			setIsSharing(true);
 		}, [setIsSharing]);
 
-		// 分支条用布尔值传入插槽与默认 ChatControls；getter 已由 useBranchManage 缓存，此处再 memo 与回调引用对齐，减少无关 render 重复取值。
+		// 分支条用布尔值传入插槽与默认 ChatControls：`useBranchManage` 已返回稳定 getter + 内部缓存，
+		// 此处 `useMemo` 使 ChatControls 收到原始 boolean，避免子树仅因「又调了一次函数」而重渲染。
 		const streamingBranchVisibleFlag = useMemo(
 			() => isStreamingBranchVisible(),
 			[isStreamingBranchVisible],
@@ -399,6 +475,113 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 			[clearChat, stopGenerating, sendMessage],
 		);
 
+		// 与 `virtualizer.options.enabled` 条件保持一致：无消息时不走虚拟布局（空会话仍用占位 UI）。
+		const virtualListActive = virtualizeMessages && messages.length > 0;
+
+		// 单条消息的 UI 块：虚拟与全量路径共用，保证行为一致；根节点保留 `id` 以便非虚拟模式下锚点 DOM 查询仍可用。
+		const renderMessageRow = (message: Message, index: number) => (
+			<div
+				id={`message-${message.chatId}`}
+				className={cn(
+					'flex gap-3 w-full',
+					message.role === 'user' ? 'flex-row-reverse' : '',
+				)}
+			>
+				{showAvatar ? (
+					<div
+						className={cn(
+							'shrink-0 w-10 h-10 rounded-full flex items-center justify-center',
+							message.role === 'user' ? 'bg-blue-500/20' : 'bg-purple-500/20',
+						)}
+					>
+						{message.role === 'user' ? (
+							<User className="w-5 h-5 text-blue-400" />
+						) : (
+							<Bot className="w-5 h-5 text-purple-400" />
+						)}
+					</div>
+				) : null}
+				<div
+					className={cn(
+						'relative flex-1 flex flex-col gap-1 pb-10 w-full group',
+						message.role === 'user' ? 'items-end' : '',
+					)}
+				>
+					{message?.attachments && message?.attachments.length > 0 && (
+						<div className="flex flex-wrap justify-end gap-1.5 mb-2">
+							{message.role === 'user'
+								? message?.attachments?.map((i) => (
+										<ChatFileList key={i.id || i.uuid} data={i} showDownload />
+									))
+								: null}
+						</div>
+					)}
+					<Label
+						className={getMessageClassName(message)}
+						htmlFor={message.chatId}
+					>
+						{message.role === 'user' ? (
+							<ChatUserMessage
+								message={message}
+								editMessage={editMessage}
+								editInputRef={editInputRef}
+								input={input}
+								setInput={setInput}
+								setEditMessage={setEditMessage}
+								isLoading={isCurrentSessionLoading}
+								handleEditChange={handleEditChange}
+								sendMessage={sendMessage}
+							/>
+						) : (
+							<ChatAssistantMessage
+								message={message}
+								isShowThinkContent={isShowThinkContent}
+								onToggleThinkContent={onToggleThinkContent}
+								onContinue={onContinue}
+								onContinueAnswering={onContinueAnswering}
+								isStopped={isMessageStopped(message.chatId)}
+							/>
+						)}
+					</Label>
+					{showMessageActions ? (
+						renderMessageActions ? (
+							renderMessageActions({
+								message,
+								index,
+								messagesLength: messages.length,
+								isCopyedId,
+								isLoading: isCurrentSessionLoading,
+								onBranchChange: handleBranchChange,
+								onCopy,
+								onEdit,
+								onReGenerate,
+								onShare,
+								isSharing,
+								checkedMessages,
+								setCheckedMessage,
+							})
+						) : (
+							<ChatMessageActions
+								message={message}
+								index={index}
+								messagesLength={messages.length}
+								isCopyedId={isCopyedId}
+								isLoading={isCurrentSessionLoading}
+								onBranchChange={handleBranchChange}
+								onCopy={onCopy}
+								onEdit={onEdit}
+								onReGenerate={onReGenerate}
+								onShare={onShare}
+								isSharing={isSharing}
+								checkedMessages={checkedMessages}
+								setCheckedMessage={setCheckedMessage}
+							/>
+						)
+					) : null}
+				</div>
+			</div>
+		);
+
 		return (
 			<div
 				className={cn(
@@ -415,121 +598,49 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 						id="message-container"
 						className="max-w-3xl m-auto overflow-y-auto"
 					>
-						<div id="message-content" className="space-y-6 overflow-hidden">
+						{/* 虚拟模式：`relative` + 总高 = 虚拟列表 scrollHeight；非虚拟：保留原 `space-y-6` 流式布局 */}
+						<div
+							id="message-content"
+							className={cn(
+								'overflow-hidden',
+								virtualListActive ? 'relative' : 'space-y-6',
+							)}
+							style={
+								virtualListActive
+									? { height: `${virtualizer.getTotalSize()}px` }
+									: undefined
+							}
+						>
 							{!messages.length
-								? // emptyState 可选：嵌入方自定义欢迎页；默认保持原 ChatNewSession，避免行为变化。
-									(emptyState ?? <ChatNewSession />)
-								: messages.map((message, index) => (
-										<div
-											key={message.chatId}
-											id={`message-${message.chatId}`}
-											className={cn(
-												'flex gap-3 w-full',
-												message.role === 'user' ? 'flex-row-reverse' : '',
-											)}
-										>
-											{showAvatar ? (
-												<div
-													className={cn(
-														'shrink-0 w-10 h-10 rounded-full flex items-center justify-center',
-														message.role === 'user'
-															? 'bg-blue-500/20'
-															: 'bg-purple-500/20',
-													)}
-												>
-													{message.role === 'user' ? (
-														<User className="w-5 h-5 text-blue-400" />
-													) : (
-														<Bot className="w-5 h-5 text-purple-400" />
-													)}
-												</div>
-											) : null}
-											<div
-												className={cn(
-													'relative flex-1 flex flex-col gap-1 pb-10 w-full group',
-													message.role === 'user' ? 'items-end' : '',
-												)}
-											>
-												{message?.attachments &&
-													message?.attachments.length > 0 && (
-														<div className="flex flex-wrap justify-end gap-1.5 mb-2">
-															{message.role === 'user'
-																? message?.attachments?.map((i) => (
-																		<ChatFileList
-																			key={i.id || i.uuid}
-																			data={i}
-																			showDownload
-																		/>
-																	))
-																: null}
-														</div>
-													)}
-												<Label
-													className={getMessageClassName(message)}
-													htmlFor={message.chatId}
-												>
-													{message.role === 'user' ? (
-														<ChatUserMessage
-															message={message}
-															editMessage={editMessage}
-															editInputRef={editInputRef}
-															input={input}
-															setInput={setInput}
-															setEditMessage={setEditMessage}
-															isLoading={isCurrentSessionLoading}
-															handleEditChange={handleEditChange}
-															sendMessage={sendMessage}
-														/>
-													) : (
-														/* isStopped 由外部注入：主项目用 chatStore.isMessageStopped；独立项目可自实现映射 */
-														<ChatAssistantMessage
-															message={message}
-															isShowThinkContent={isShowThinkContent}
-															onToggleThinkContent={onToggleThinkContent}
-															onContinue={onContinue}
-															onContinueAnswering={onContinueAnswering}
-															isStopped={isMessageStopped(message.chatId)}
-														/>
-													)}
-												</Label>
-												{showMessageActions ? (
-													renderMessageActions ? (
-														renderMessageActions({
-															message,
-															index,
-															messagesLength: messages.length,
-															isCopyedId,
-															isLoading: isCurrentSessionLoading,
-															onBranchChange: handleBranchChange,
-															onCopy,
-															onEdit,
-															onReGenerate,
-															onShare,
-															isSharing,
-															checkedMessages,
-															setCheckedMessage,
-														})
-													) : (
-														<ChatMessageActions
-															message={message}
-															index={index}
-															messagesLength={messages.length}
-															isCopyedId={isCopyedId}
-															isLoading={isCurrentSessionLoading}
-															onBranchChange={handleBranchChange}
-															onCopy={onCopy}
-															onEdit={onEdit}
-															onReGenerate={onReGenerate}
-															onShare={onShare}
-															isSharing={isSharing}
-															checkedMessages={checkedMessages}
-															setCheckedMessage={setCheckedMessage}
-														/>
-													)
-												) : null}
-											</div>
-										</div>
-									))}
+								? (emptyState ?? <ChatNewSession />)
+								: virtualListActive
+									? // TanStack 要求测量节点带 `data-index`（默认），`measureElement` 挂在行容器上以修正变高气泡
+										virtualizer
+											.getVirtualItems()
+											.map((virtualRow) => {
+												const message = messages[virtualRow.index];
+												if (!message) return null;
+												return (
+													<div
+														key={virtualRow.key}
+														data-index={virtualRow.index}
+														ref={virtualizer.measureElement}
+														className="left-0 top-0 w-full"
+														style={{
+															position: 'absolute',
+															transform: `translateY(${virtualRow.start}px)`,
+														}}
+													>
+														{renderMessageRow(message, virtualRow.index)}
+													</div>
+												);
+											})
+									: // 关闭虚拟化时与历史实现一致：每条消息真实 DOM，便于锚点与调试
+										messages.map((message, index) => (
+											<Fragment key={message.chatId}>
+												{renderMessageRow(message, index)}
+											</Fragment>
+										))}
 						</div>
 					</div>
 					{showAnchorNav ? (
@@ -537,11 +648,14 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 							renderAnchorNav({
 								messages,
 								scrollContainerRef,
+								// 自定义锚点请务必透传，否则虚拟列表下点击侧栏无法 scrollToIndex
+								anchorScrollAdapter,
 							})
 						) : (
 							<ChatAnchorNav
 								messages={messages}
 								scrollContainerRef={scrollContainerRef}
+								anchorScrollAdapter={anchorScrollAdapter}
 							/>
 						)
 					) : null}

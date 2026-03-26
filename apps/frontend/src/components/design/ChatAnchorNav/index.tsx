@@ -1,18 +1,35 @@
+/**
+ * 左侧用户消息锚点导航
+ *
+ * 双路径说明（与 ChatBotView 虚拟列表配套）：
+ * - 未传入 `anchorScrollAdapter`：依赖主列表每条消息的 DOM（`#message-{chatId}`），滚动与高亮用视口坐标计算（历史行为）。
+ * - 传入 `anchorScrollAdapter`：主列表可能不挂载离屏节点，点击锚点改为 `scrollToChatId`（内部 `scrollToIndex`），
+ *   滚动中高亮由 `resolveActiveUserAnchor` 基于虚拟器测量缓存计算，语义与非虚拟路径对齐。
+ *
+ * 程序化滚动时通过 `isProgrammaticMainScrollRef` 抑制 scroll 回调里的重算，避免 smooth 动画期间高亮乱跳。
+ */
 import Tooltip from '@design/Tooltip';
 import { Button, ScrollArea } from '@ui/index';
-import { ChevronDown, ChevronUp } from 'lucide-react'; // 引入图标
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
+import type { ChatAnchorScrollAdapter } from '@/types/chat';
 import { Message } from '@/types/chat';
 
 interface ChatAnchorNavProps {
 	messages: Message[];
 	scrollContainerRef: React.RefObject<HTMLDivElement | null>;
+	/**
+	 * 由 `ChatBotView` 在 `virtualizeMessages !== false` 且列表非空时注入。
+	 * 有值时禁止仅依赖 `getElementById` 遍历用户消息（离屏无节点）。
+	 */
+	anchorScrollAdapter?: ChatAnchorScrollAdapter;
 }
 
 const ChatAnchorNav = ({
 	messages,
 	scrollContainerRef,
+	anchorScrollAdapter,
 }: ChatAnchorNavProps) => {
 	const [activeAnchor, setActiveAnchor] = useState<string>('');
 
@@ -33,10 +50,20 @@ const ChatAnchorNav = ({
 		return messages.filter((msg) => msg.role === 'user');
 	}, [messages]);
 
-	// 计算当前锚点的核心逻辑
+	// 计算当前应对哪条用户消息高亮：虚拟路径委托 adapter（测量坐标系与 scrollTop 一致），否则走 DOM 几何。
 	const calculateActiveAnchor = useCallback(() => {
 		const container = scrollContainerRef.current;
 		if (!container) return;
+
+		if (anchorScrollAdapter) {
+			if (userMessages.length === 0) return;
+			const next = anchorScrollAdapter.resolveActiveUserAnchor(
+				container,
+				userMessages,
+			);
+			if (next) setActiveAnchor(next);
+			return;
+		}
 
 		const containerRect = container.getBoundingClientRect();
 		const containerCenter = containerRect.top + containerRect.height / 3;
@@ -64,7 +91,7 @@ const ChatAnchorNav = ({
 			}
 		}
 		setActiveAnchor(currentAnchor);
-	}, [userMessages, scrollContainerRef]);
+	}, [userMessages, scrollContainerRef, anchorScrollAdapter]);
 
 	const endProgrammaticMainScroll = useCallback(() => {
 		if (!isProgrammaticMainScrollRef.current) return;
@@ -162,20 +189,29 @@ const ChatAnchorNav = ({
 		}
 	}, [activeAnchor]);
 
-	// 滚动到指定消息
+	// 滚动到指定消息：两路径共用「程序化滚动」锁，避免 scroll 监听与目标打架。
 	const scrollToMessage = (chatId: string) => {
-		const element = document.getElementById(`message-${chatId}`);
 		const main = scrollContainerRef.current;
-		if (element && main) {
-			isProgrammaticMainScrollRef.current = true;
-			if (programmaticScrollFallbackTimerRef.current !== null) {
-				clearTimeout(programmaticScrollFallbackTimerRef.current);
-			}
-			// scrollend 在部分环境不可用或偶发不触发，用超时兜底解锁；时长略长于常见 smooth 动画，避免尚未滚完就恢复 calculate 再次抖动
-			programmaticScrollFallbackTimerRef.current = setTimeout(() => {
-				endProgrammaticMainScroll();
-			}, 1000);
+		if (!main) return;
 
+		isProgrammaticMainScrollRef.current = true;
+		if (programmaticScrollFallbackTimerRef.current !== null) {
+			clearTimeout(programmaticScrollFallbackTimerRef.current);
+		}
+		programmaticScrollFallbackTimerRef.current = setTimeout(() => {
+			endProgrammaticMainScroll();
+		}, 1000);
+
+		if (anchorScrollAdapter) {
+			// 虚拟列表：由 ChatBotView 内 virtualizer.scrollToIndex 完成滚动（含 scrollPaddingStart）
+			anchorScrollAdapter.scrollToChatId(chatId);
+			setActiveAnchor(chatId);
+			return;
+		}
+
+		// 全量 DOM：按元素相对视口换算 scrollTop，并保留距顶 20px 偏移（与虚拟路径 scrollPaddingStart 对应）
+		const element = document.getElementById(`message-${chatId}`);
+		if (element) {
 			const containerRect = main.getBoundingClientRect();
 			const elementRect = element.getBoundingClientRect();
 			const scrollTop = main.scrollTop;
