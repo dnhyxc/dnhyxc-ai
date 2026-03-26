@@ -149,6 +149,10 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 		autoScrollRef.current = autoScroll;
 		const isStreamingRef = useRef(false);
 		const streamTailDetachedRef = useRef(false);
+		/** 仅在「新一段流式开始」时清空暂停，避免在流式结束当帧误清 pause，导致结束贴底条件错乱 */
+		const prevIsStreamingForPauseReset = useRef(false);
+		/** 流式结束并入虚拟列表后短时间内关闭虚拟器 scroll 补偿，减轻闪动 */
+		const suppressVirtualScrollAdjustUntilRef = useRef(0);
 		const messagesRef = useRef<Message[]>(messages);
 
 		messagesRef.current = messages;
@@ -157,10 +161,12 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 		const isCurrentlyStreaming =
 			lastMessageForStream?.role === 'assistant' &&
 			lastMessageForStream?.isStreaming;
-		if (!isCurrentlyStreaming) {
+		const nowStreamingBool = Boolean(isCurrentlyStreaming);
+		if (!prevIsStreamingForPauseReset.current && nowStreamingBool) {
 			streamFollowUserPausedRef.current = false;
 			touchStreamLastYRef.current = null;
 		}
+		prevIsStreamingForPauseReset.current = nowStreamingBool;
 		followStreamRef.current =
 			Boolean(autoScroll && isCurrentlyStreaming) &&
 			!streamFollowUserPausedRef.current;
@@ -227,6 +233,12 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 				instance: Virtualizer<HTMLDivElement, Element>,
 			) => {
 				if (followStreamRef.current) return false;
+				if (
+					typeof performance !== 'undefined' &&
+					performance.now() < suppressVirtualScrollAdjustUntilRef.current
+				) {
+					return false;
+				}
 				// virtual-core 默认逻辑；getScrollOffset / scrollAdjustments 未在 .d.ts 中公开
 				const core = instance as unknown as {
 					getScrollOffset(): number;
@@ -301,15 +313,47 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 
 		const onScrollTo = useCallback(
 			(position: string, behavior?: 'smooth' | 'auto') => {
-				scrollContainerRef.current?.scrollTo({
-					top:
-						position === 'up'
-							? 0
-							: scrollContainerRef.current?.scrollHeight + 100,
-					behavior: behavior || 'smooth',
-				});
+				const el = scrollContainerRef.current;
+				if (!el) return;
+				const b = behavior ?? 'smooth';
+				const useSmooth = b === 'smooth';
+
+				if (position === 'up') {
+					el.scrollTo({ top: 0, behavior: b });
+					return;
+				}
+
+				const pinNativeBottom = () => {
+					const v = scrollContainerRef.current;
+					if (!v) return;
+					v.scrollTop = Math.max(0, v.scrollHeight - v.clientHeight);
+				};
+
+				const lastIdx = messages.length - 1;
+				// 尾条拆出时最后一条不在 virtualizer 的 count 里，不能 scrollToIndex(last)
+				const useVirtualPinToLast =
+					virtualizeMessages &&
+					messages.length > 0 &&
+					!streamTailDetached &&
+					lastIdx >= 0;
+
+				if (useVirtualPinToLast) {
+					virtualizer.scrollToIndex(lastIdx, {
+						align: 'end',
+						behavior: useSmooth ? 'smooth' : 'auto',
+					});
+				}
+
+				if (!useSmooth) {
+					// auto：原生 max + 延后两帧再钉一次，避免虚拟总高与视口 scrollHeight 暂不一致导致差一截
+					pinNativeBottom();
+					queueMicrotask(pinNativeBottom);
+					requestAnimationFrame(pinNativeBottom);
+				} else if (!useVirtualPinToLast) {
+					el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+				}
 			},
-			[],
+			[virtualizer, messages.length, virtualizeMessages, streamTailDetached],
 		);
 
 		const {
@@ -342,7 +386,7 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 		}, [onScrollTo, onScrollToRegister]);
 
 		// 流式：layout 贴底 + microtask/rAF 再贴（Markdown/换行后高度晚一帧才稳定）。
-		// 流式结束：仅当用户仍在跟底（未上滑读历史）时贴底，修正尾条并回虚拟列表的错位；已上滑则不抢滚动位置。
+		// 流式结束：仅 autoScroll 且未主动暂停时贴底；不用距底像素判断（尾条并进虚拟列表当帧 scrollHeight 会突变，距离会失真）。
 		useLayoutEffect(() => {
 			const el = scrollContainerRef.current;
 			if (el) {
@@ -356,40 +400,23 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 				v.scrollTop = v.scrollHeight - v.clientHeight;
 			};
 
-			const pinVirtualBottomIfNeeded = () => {
-				if (!virtualizeMessages || messagesRef.current.length === 0) return;
-				const lastIdx = messagesRef.current.length - 1;
-				if (lastIdx < 0) return;
-				virtualizer.scrollToIndex(lastIdx, {
-					align: 'end',
-					behavior: 'auto',
-				});
-			};
-
 			const prevStreaming = wasStreamingRef.current;
 			const nowStreaming = Boolean(isCurrentlyStreaming);
 			const streamJustEnded = prevStreaming && !nowStreaming;
 			wasStreamingRef.current = nowStreaming;
 
 			if (streamJustEnded) {
-				const v = scrollContainerRef.current;
-				const distFromBottom = v
-					? v.scrollHeight - v.scrollTop - v.clientHeight
-					: 0;
 				const stillFollowingBottom =
-					autoScrollRef.current &&
-					!streamFollowUserPausedRef.current &&
-					distFromBottom < STREAM_BOTTOM_SLACK_PX;
+					autoScrollRef.current && !streamFollowUserPausedRef.current;
 				if (stillFollowingBottom) {
+					if (typeof performance !== 'undefined') {
+						suppressVirtualScrollAdjustUntilRef.current =
+							performance.now() + 200;
+					}
+					// 只信原生 max scroll，避免与 scrollToIndex 连续抢滚造成闪烁
 					pinNativeBottom();
-					pinVirtualBottomIfNeeded();
 					requestAnimationFrame(() => {
 						pinNativeBottom();
-						pinVirtualBottomIfNeeded();
-						requestAnimationFrame(() => {
-							pinNativeBottom();
-							pinVirtualBottomIfNeeded();
-						});
 					});
 				}
 				return;
