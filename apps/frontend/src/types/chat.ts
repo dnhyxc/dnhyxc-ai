@@ -140,7 +140,7 @@ export interface ChatBotViewChatControlsContext {
  * 纯渲染层入参：凡直接决定「屏幕上消息长什么样」的数据须由调用方显式传入，避免无源渲染、隐式状态难以排查。
  *
  * 必填：`flatMessages`（全量树，无消息传 `[]`）、`selectedChildMap` + `onSelectedChildMapChange`（当前分支路径，空会话可 `new Map()` + setState）。
- * 可选：`displayMessages` 仅当你要完全覆盖内部推导的展示列时传入；否则由 buildMessageList + getFormatMessages 从 flat + map 算出。
+ * 可选：`displayMessages` 仅当你要完全覆盖内部推导的展示列时传入；否则由 buildMessageList 从 flat + map 算出（列表项字段形态与原 getFormatMessages 输出一致）。
  * 交互类（发送、分享等）仍可省略，由空回调占位，便于只读壳。
  */
 export interface ChatBotViewProps {
@@ -168,7 +168,7 @@ export interface ChatBotViewProps {
 	streamingBranchSource?: ChatStreamingBranchSource;
 
 	/**
-	 * 当前分支已 format 的展示列表。省略则由内部根据 flatMessages + selectedChildMap 推导，
+	 * 当前分支展示列表（字段形态与 buildMessageList / 原 getFormatMessages 一致）。省略则由内部根据 flatMessages + selectedChildMap 推导，
 	 * 避免调用方重复维护两份数组（本仓库 ChatBot 连接层已改为依赖此行为）。
 	 */
 	displayMessages?: Message[];

@@ -114,6 +114,28 @@ const findSiblings = (allMessages: Message[], messageId: string): Message[] => {
 	);
 };
 
+/** 与原先 getFormatMessages 单条输出一致；在 buildMessageList 内直接调用，少一轮 map */
+const formatMessageForDisplay = (
+	m: Message,
+	siblingIndex: number,
+	siblingCount: number,
+): Message => ({
+	chatId: m.chatId,
+	content: m.content,
+	attachments: m.attachments,
+	role: m.role as 'user' | 'assistant',
+	timestamp: new Date(m.createdAt as Date),
+	parentId: m.parentId,
+	childrenIds: m.childrenIds,
+	siblingIndex,
+	siblingCount,
+	thinkContent: m.thinkContent,
+	isStreaming: m.isStreaming,
+	isStopped: m.isStopped,
+	currentChatId: m.currentChatId,
+	finishReason: m.finishReason,
+});
+
 const buildMessageList = (
 	messages: Message[],
 	selectedChildMap: Map<string, string>,
@@ -181,11 +203,9 @@ const buildMessageList = (
 			);
 		}
 
-		result.push({
-			...currentMessage,
-			siblingIndex,
-			siblingCount,
-		});
+		result.push(
+			formatMessageForDisplay(currentMessage, siblingIndex, siblingCount),
+		);
 
 		if (currentMessage.childrenIds && currentMessage.childrenIds.length > 0) {
 			let nextId = selectedChildMap.get(currentMessage.chatId);
@@ -202,22 +222,13 @@ const buildMessageList = (
 };
 
 const getFormatMessages = (messages: Message[]) => {
-	return messages.map((msg) => ({
-		chatId: msg.chatId,
-		content: msg.content,
-		attachments: msg.attachments,
-		role: msg.role as 'user' | 'assistant',
-		timestamp: new Date(msg.createdAt as Date),
-		parentId: msg.parentId,
-		childrenIds: msg.childrenIds,
-		siblingIndex: msg.siblingIndex,
-		siblingCount: msg.siblingCount,
-		thinkContent: msg.thinkContent,
-		isStreaming: msg.isStreaming,
-		isStopped: msg.isStopped,
-		currentChatId: msg.currentChatId,
-		finishReason: msg.finishReason,
-	}));
+	return messages.map((msg) =>
+		formatMessageForDisplay(
+			msg,
+			msg.siblingIndex ?? 0,
+			msg.siblingCount ?? 1,
+		),
+	);
 };
 
 /** 单例对象：useMessageTools() 始终返回同一引用，避免无意义的依赖链抖动 */

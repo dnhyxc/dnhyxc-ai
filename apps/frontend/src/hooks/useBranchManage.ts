@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useMemo } from 'react';
 import type { ChatStreamingBranchSource } from '@/types/chat';
 import { Message } from '@/types/chat';
 
@@ -108,44 +108,44 @@ export const useBranchManage = ({
 		};
 	}, []);
 
-	const isStreamingBranchVisible = useCallback(() => {
-		if (!streamingBranchSource || !activeSessionId) return true;
+	// 与原先 isLatestBranch / switchToLatest 内每次调用一致，但 allFlat 未变时只算一次
+	const latestBranchMapFlat = useMemo(
+		() => findLatestBranchSelection(allFlatMessages),
+		[allFlatMessages],
+	);
 
-		const streamingMessages = streamingBranchSource
-			.getStreamingMessages()
-			.filter((msg) => {
-				const sid = streamingBranchSource.getStreamingMessageSessionId(
-					msg.chatId,
-				);
-				return sid === activeSessionId;
-			});
-
-		if (streamingMessages.length === 0) return true;
-
-		const visibleChatIds = new Set(messages.map((m) => m.chatId));
-		return streamingMessages.some((msg) => visibleChatIds.has(msg.chatId));
+	// 依赖 messages：流式更新后父组件换新引用，与原先每次在回调里 getStreamingMessages() 一致
+	const streamingMsgsThisSession = useMemo(() => {
+		if (!streamingBranchSource || !activeSessionId) return [];
+		return streamingBranchSource.getStreamingMessages().filter((msg) => {
+			const sid = streamingBranchSource.getStreamingMessageSessionId(msg.chatId);
+			return sid === activeSessionId;
+		});
 	}, [streamingBranchSource, activeSessionId, messages]);
 
-	const getInvisibleStreamingBranchMap = useCallback((): Map<
+	const visibleChatIds = useMemo(
+		() => new Set(messages.map((m) => m.chatId)),
+		[messages],
+	);
+
+	const isStreamingBranchVisibleValue = useMemo(() => {
+		if (!streamingBranchSource || !activeSessionId) return true;
+		if (streamingMsgsThisSession.length === 0) return true;
+		return streamingMsgsThisSession.some((msg) => visibleChatIds.has(msg.chatId));
+	}, [
+		streamingBranchSource,
+		activeSessionId,
+		streamingMsgsThisSession,
+		visibleChatIds,
+	]);
+
+	const invisibleStreamingBranchMapValue = useMemo((): Map<
 		string,
 		string
 	> | null => {
 		if (!streamingBranchSource || !activeSessionId) return null;
-
-		const streamingMessages = streamingBranchSource
-			.getStreamingMessages()
-			.filter((msg) => {
-				const sid = streamingBranchSource.getStreamingMessageSessionId(
-					msg.chatId,
-				);
-				return sid === activeSessionId;
-			});
-
-		if (streamingMessages.length === 0) return null;
-
-		const visibleChatIds = new Set(messages.map((m) => m.chatId));
-
-		for (const msg of streamingMessages) {
+		if (streamingMsgsThisSession.length === 0) return null;
+		for (const msg of streamingMsgsThisSession) {
 			if (!visibleChatIds.has(msg.chatId)) {
 				const branchMap = streamingBranchSource.getStreamingBranchMap(
 					msg.chatId,
@@ -156,18 +156,31 @@ export const useBranchManage = ({
 			}
 		}
 		return null;
-	}, [streamingBranchSource, activeSessionId, messages]);
+	}, [
+		streamingBranchSource,
+		activeSessionId,
+		streamingMsgsThisSession,
+		visibleChatIds,
+	]);
 
-	const isLatestBranch = useCallback(() => {
+	const isStreamingBranchVisible = useCallback(
+		() => isStreamingBranchVisibleValue,
+		[isStreamingBranchVisibleValue],
+	);
+
+	const getInvisibleStreamingBranchMap = useCallback(
+		() => invisibleStreamingBranchMapValue,
+		[invisibleStreamingBranchMapValue],
+	);
+
+	const isLatestBranchValue = useMemo(() => {
 		if (allFlatMessages.length === 0) return true;
 		if (messages.length === 0) return true;
-
-		const latestBranchMap = findLatestBranchSelection(allFlatMessages);
-		if (!latestBranchMap || latestBranchMap.size === 0) return true;
+		if (latestBranchMapFlat.size === 0) return true;
 
 		for (const msg of messages) {
 			const parentId = msg.parentId || 'root';
-			const latestChildId = latestBranchMap.get(parentId);
+			const latestChildId = latestBranchMapFlat.get(parentId);
 			const currentChildId = selectedChildMap.get(parentId);
 
 			if (latestChildId && currentChildId && latestChildId !== currentChildId) {
@@ -176,7 +189,12 @@ export const useBranchManage = ({
 		}
 
 		return true;
-	}, [allFlatMessages, messages, selectedChildMap]);
+	}, [allFlatMessages.length, messages, selectedChildMap, latestBranchMapFlat]);
+
+	const isLatestBranch = useCallback(
+		() => isLatestBranchValue,
+		[isLatestBranchValue],
+	);
 
 	const persistIfNeeded = useCallback(
 		(map: Map<string, string>) => {
@@ -189,10 +207,10 @@ export const useBranchManage = ({
 
 	const switchToLatestBranch = useCallback(() => {
 		if (allFlatMessages.length === 0) return;
-		const latestBranchMap = findLatestBranchSelection(allFlatMessages);
-		if (latestBranchMap) {
-			setSelectedChildMap(new Map(latestBranchMap));
-			persistIfNeeded(latestBranchMap);
+		// Map 恒为 truthy；空 Map 时与原先 findLatest 得到空后仍进入 if 的行为一致
+		if (latestBranchMapFlat) {
+			setSelectedChildMap(new Map(latestBranchMapFlat));
+			persistIfNeeded(latestBranchMapFlat);
 			if (latestBranchTimer) {
 				clearTimeout(latestBranchTimer);
 				latestBranchTimer = null;
@@ -201,10 +219,16 @@ export const useBranchManage = ({
 				onScrollTo('down', 'auto');
 			}, 50);
 		}
-	}, [allFlatMessages, setSelectedChildMap, onScrollTo, persistIfNeeded]);
+	}, [
+		allFlatMessages.length,
+		latestBranchMapFlat,
+		setSelectedChildMap,
+		onScrollTo,
+		persistIfNeeded,
+	]);
 
 	const switchToStreamingBranch = useCallback(() => {
-		const branchMap = getInvisibleStreamingBranchMap();
+		const branchMap = invisibleStreamingBranchMapValue;
 		if (branchMap) {
 			const newSelectedChildMap = new Map(branchMap);
 			setSelectedChildMap(newSelectedChildMap);
@@ -218,7 +242,7 @@ export const useBranchManage = ({
 			}, 50);
 		}
 	}, [
-		getInvisibleStreamingBranchMap,
+		invisibleStreamingBranchMapValue,
 		setSelectedChildMap,
 		onScrollTo,
 		persistIfNeeded,

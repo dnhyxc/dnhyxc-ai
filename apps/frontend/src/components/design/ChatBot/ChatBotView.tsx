@@ -72,24 +72,15 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 			renderChatControls,
 		} = props;
 
-		const { buildMessageList, getFormatMessages, findSiblings } =
-			useMessageTools();
+		const { buildMessageList, findSiblings } = useMessageTools();
 
-		// 未传 displayMessages 时由 flat + map 推导展示列；二者均为父级传入的渲染依据，避免无源列表。
+		// 未传 displayMessages 时由 flat + map 推导展示列；buildMessageList 内已产出与原 getFormatMessages 一致的字段形态，避免二次 map。
 		const messages = useMemo(() => {
 			if (props.displayMessages !== undefined) {
 				return props.displayMessages;
 			}
-			return getFormatMessages(
-				buildMessageList(flatMessages, selectedChildMap),
-			);
-		}, [
-			props.displayMessages,
-			flatMessages,
-			selectedChildMap,
-			buildMessageList,
-			getFormatMessages,
-		]);
+			return buildMessageList(flatMessages, selectedChildMap);
+		}, [props.displayMessages, flatMessages, selectedChildMap, buildMessageList]);
 
 		const activeSessionId = props.activeSessionId ?? null;
 		const input = props.input ?? '';
@@ -376,9 +367,15 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 			setIsSharing(true);
 		}, [setIsSharing]);
 
-		// 分支条用布尔值传入插槽与默认 ChatControls，避免子组件或自定义渲染里重复调用 getter。
-		const streamingBranchVisibleFlag = isStreamingBranchVisible();
-		const isLatestBranchFlag = isLatestBranch();
+		// 分支条用布尔值传入插槽与默认 ChatControls；getter 已由 useBranchManage 缓存，此处再 memo 与回调引用对齐，减少无关 render 重复取值。
+		const streamingBranchVisibleFlag = useMemo(
+			() => isStreamingBranchVisible(),
+			[isStreamingBranchVisible],
+		);
+		const isLatestBranchFlag = useMemo(
+			() => isLatestBranch(),
+			[isLatestBranch],
+		);
 
 		const onScrollToUpDown = useCallback(
 			(position: 'up' | 'down', behavior?: 'smooth' | 'auto') => {
