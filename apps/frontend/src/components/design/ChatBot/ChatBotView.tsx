@@ -145,7 +145,7 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 			overscan: 8,
 			// 与 ChatAnchorNav 非虚拟路径下「scrollTop 减 20px」的视觉效果对齐（见 scrollPaddingStart 语义）。
 			scrollPaddingStart: 20,
-			paddingEnd: 32,
+			paddingEnd: 1,
 			// 分支切换时同 index 可能换 chatId，用 chatId 做 key 可让虚拟器复用测量缓存更合理。
 			getItemKey: (index) => messages[index]?.chatId ?? index,
 			enabled: virtualizeMessages && messages.length > 0,
