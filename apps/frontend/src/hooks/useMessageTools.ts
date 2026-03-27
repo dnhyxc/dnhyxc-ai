@@ -80,6 +80,23 @@ const findLastAssistantMessage = (allMessages: Message[]): Message | null => {
 	return null;
 };
 
+/**
+ * 取单条消息用于「按时间线排序」的时间戳毫秒值。
+ * 优先 createdAt，否则退化为 timestamp，与历史 buildMessageList 内联逻辑一致。
+ */
+const getMessageSortTime = (m: Message): number =>
+	m.createdAt
+		? new Date(m.createdAt).getTime() // 优先 ISO 字符串，与旧内联逻辑一致
+		: new Date(m.timestamp).getTime(); // 仅 timestamp 时仍可排兄弟/根
+
+/**
+ * 原地按时间升序排序（早的在前），用于兄弟列表与根列表；
+ * 与原先 while 循环里每一步 sort 相比，改为「每组兄弟只排一次」，降低长对话下的 CPU。
+ */
+const sortMessagesByTimeAsc = (arr: Message[]) => {
+	arr.sort((a, b) => getMessageSortTime(a) - getMessageSortTime(b)); // 每组兄弟一次 sort，避免 walk 内重复排序
+};
+
 const findSiblings = (allMessages: Message[], messageId: string): Message[] => {
 	const currentMsg = allMessages.find((m) => m.chatId === messageId);
 	if (!currentMsg) return [];
@@ -103,15 +120,8 @@ const findSiblings = (allMessages: Message[], messageId: string): Message[] => {
 		});
 	}
 
-	return siblings.sort(
-		(a, b) =>
-			(a.createdAt
-				? new Date(a.createdAt).getTime()
-				: new Date(a.timestamp).getTime()) -
-			(b.createdAt
-				? new Date(b.createdAt).getTime()
-				: new Date(b.timestamp).getTime()),
-	);
+	sortMessagesByTimeAsc(siblings); // 与 buildMessageList 同一排序键，分支 next/prev 与 siblingIndex 一致
+	return siblings;
 };
 
 const buildMessageList = (
@@ -146,6 +156,13 @@ const buildMessageList = (
 		});
 	}
 
+	for (const siblings of childrenMap.values()) {
+		sortMessagesByTimeAsc(siblings); // childrenMap 构建时无序；walk 里 findIndex 需有序兄弟
+	}
+	if (rootMessages.length > 1) {
+		sortMessagesByTimeAsc(rootMessages); // 多根时「最后一个」默认取根；排序后=时间最晚
+	}
+
 	const result: Message[] = [];
 
 	const currentRootId = selectedChildMap.get('root');
@@ -160,16 +177,7 @@ const buildMessageList = (
 		let siblingCount = 1;
 
 		if (currentMessage.parentId) {
-			const siblings = childrenMap.get(currentMessage.parentId) || [];
-			siblings.sort(
-				(a, b) =>
-					(a.createdAt
-						? new Date(a.createdAt).getTime()
-						: new Date(a.timestamp).getTime()) -
-					(b.createdAt
-						? new Date(b.createdAt).getTime()
-						: new Date(b.timestamp).getTime()),
-			);
+			const siblings = childrenMap.get(currentMessage.parentId) || []; // 兄弟已在循环外排好序，此处只读 index
 			siblingCount = siblings.length;
 			siblingIndex = siblings.findIndex(
 				(m) => m.chatId === currentMessage?.chatId,

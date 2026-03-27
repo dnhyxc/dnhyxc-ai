@@ -13,6 +13,8 @@ import React, {
 	forwardRef,
 	JSX,
 	type SetStateAction,
+	// startTransition：把「整表消息列表」更新标为低优先级，点击分支箭头时优先响应输入/交互，再并发渲染列表
+	startTransition,
 	useCallback,
 	useEffect,
 	useImperativeHandle,
@@ -75,14 +77,66 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 		const { buildMessageList, getFormatMessages, findSiblings } =
 			useMessageTools();
 
+		/**
+		 * 保存上一轮推导出的展示列表，用于「结构共享」：同索引且业务字段相同则复用对象引用，
+		 * 使子组件 memo 与 MdPreview 能跳过无意义更新（尤其分支切换后前缀消息不变时）。
+		 */
+		const stableDisplayMessagesRef = useRef<Message[]>([]);
+
 		// 未传 displayMessages 时由 flat + map 推导展示列；二者均为父级传入的渲染依据，避免无源列表。
 		const messages = useMemo(() => {
+			// 调用方完全托管展示数组：直接同步 ref 并返回，不做合并
 			if (props.displayMessages !== undefined) {
+				stableDisplayMessagesRef.current = props.displayMessages;
 				return props.displayMessages;
 			}
-			return getFormatMessages(
-				buildMessageList(flatMessages, selectedChildMap),
-			);
+			// 从全量树 + 分支选择得到当前链路上的原始消息行
+			const raw = buildMessageList(flatMessages, selectedChildMap);
+			// 规范化为展示用 Message（如 timestamp 转 Date），得到本轮「理想」列表 fresh
+			const fresh = getFormatMessages(raw);
+			const prev = stableDisplayMessagesRef.current;
+
+			// 首次无历史：整表采用 fresh，并记入 ref
+			if (prev.length === 0) {
+				stableDisplayMessagesRef.current = fresh;
+				return fresh;
+			}
+
+			// 按索引对齐：同一位置若语义未变则沿用 prev[i] 引用，否则使用新对象 n
+			const merged = fresh.map((n, i) => {
+				const p = prev[i];
+				// 为何：列表变长或首屏新增行时没有旧引用；影响：必须用新对象，否则缺字段
+				if (!p) return n;
+				if (
+					// 为何：身份不变才允许复用引用；影响：换分支后 chatId 会变，强制换新对象触发子树更新
+					p.chatId === n.chatId &&
+					// 为何：正文驱动 MdPreview value；影响：内容不变则 memo 的 Markdown 可跳过重渲染
+					p.content === n.content &&
+					// 为何：思考区单独渲染；影响：展开区与 memo 比较需同步
+					(p.thinkContent ?? '') === (n.thinkContent ?? '') &&
+					// 为何：流式结束要从「始终富文本」切到可懒加载；影响：状态翻转须换新引用
+					p.isStreaming === n.isStreaming &&
+					// 为何：分支箭头依赖 siblingIndex；影响：切兄弟仅这两字段变，仍须换新对象
+					p.siblingIndex === n.siblingIndex &&
+					p.siblingCount === n.siblingCount &&
+					// 为何：用户/助手渲染路径不同；影响：角色切换必须重挂载
+					p.role === n.role &&
+					// 为何：附件列表引用常稳定；影响：同一引用表示附件未变，可省重渲染
+					p.attachments === n.attachments &&
+					// 为何：maxTokens 等影响「接着回答」按钮；影响：finishReason 变须更新 UI
+					p.finishReason === n.finishReason &&
+					// 为何：停止态控制「继续生成」；影响：与 chatStore 同步停止标记
+					(p.isStopped ?? false) === (n.isStopped ?? false)
+				) {
+					// 影响：保持 message 引用稳定 → ChatAssistantMessage.memo 与 MarkdownPreview.memo 命中跳过
+					return p;
+				}
+				// 为何：任一展示语义变化；影响：新引用推动下游 hooks/子组件拿到新 props
+				return n;
+			});
+			// 为何：下一轮 useMemo 与跨渲染比较都以本次结果为「上一帧」；影响：连续多次部分更新仍能逐级复用
+			stableDisplayMessagesRef.current = merged;
+			return merged;
 		}, [
 			props.displayMessages,
 			flatMessages,
@@ -142,8 +196,9 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 		);
 
 		const {
-			isStreamingBranchVisible,
-			isLatestBranch,
+			// hook 内已用 useMemo 算好布尔值，此处解构重命名后直接传给 ChatControls，避免再调用函数
+			isStreamingBranchVisible: streamingBranchVisibleFlag,
+			isLatestBranch: isLatestBranchFlag,
 			switchToLatestBranch,
 			switchToStreamingBranch,
 		} = useBranchManage({
@@ -308,18 +363,23 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 					const currentMsg = flatMessages.find((m) => m.chatId === msgId);
 					const parentId = currentMsg?.parentId;
 
+					// 拷贝当前 Map，在对应父键上写入选中的子 chatId（根层用 'root'）
 					const newSelectedChildMap = new Map(selectedChildMap);
 					if (parentId) {
 						newSelectedChildMap.set(parentId, nextMsg.chatId);
 					} else {
 						newSelectedChildMap.set('root', nextMsg.chatId);
 					}
-					onSelectedChildMapChange(newSelectedChildMap);
+					startTransition(() => {
+						// 分支切换会重算整表 messages：可中断更新，点击不卡、输入框先响应；列表在并发渲染中稍晚一致
+						onSelectedChildMapChange(newSelectedChildMap);
+					});
 					if (activeSessionId && onPersistSessionBranchSelection) {
-						onPersistSessionBranchSelection(
-							activeSessionId,
-							newSelectedChildMap,
-						);
+						const sid = activeSessionId; // 微任务执行时会话可能已切，先捕获 id 避免写错会话
+						const mapSnapshot = new Map(newSelectedChildMap); // Map 引用可能被父 mutate，快照=点击瞬间分支
+						queueMicrotask(() => {
+							onPersistSessionBranchSelection(sid, mapSnapshot); // commit 后异步持久化，减轻与 paint/layout 同帧争抢
+						});
 					}
 				}
 			},
@@ -376,10 +436,6 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 			setIsSharing(true);
 		}, [setIsSharing]);
 
-		// 分支条用布尔值传入插槽与默认 ChatControls，避免子组件或自定义渲染里重复调用 getter。
-		const streamingBranchVisibleFlag = isStreamingBranchVisible();
-		const isLatestBranchFlag = isLatestBranch();
-
 		const onScrollToUpDown = useCallback(
 			(position: 'up' | 'down', behavior?: 'smooth' | 'auto') => {
 				onScrollTo(position, behavior);
@@ -404,6 +460,7 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 					className,
 				)}
 			>
+				{/* ref 指向 Radix Viewport（可滚动节点），供 ChatAssistantMessage 作 IntersectionObserver.root */}
 				<ScrollArea
 					ref={scrollContainerRef}
 					className="flex-1 overflow-hidden w-full backdrop-blur-sm pb-5"
@@ -487,6 +544,8 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 															onContinue={onContinue}
 															onContinueAnswering={onContinueAnswering}
 															isStopped={isMessageStopped(message.chatId)}
+															// 与上列 ScrollArea ref 相同：助手气泡内据此懒挂载 MdPreview
+															scrollViewportRef={scrollContainerRef}
 														/>
 													)}
 												</Label>

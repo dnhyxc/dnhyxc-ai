@@ -42,6 +42,7 @@ export class ChatController {
 	): Promise<Observable<any>> {
 		const source$ = (await this.chatService.chatStream(chatRequestDto)).pipe(
 			map((chunk) => {
+				console.log('chunk', chunk);
 				return {
 					data: {
 						content: chunk,
