@@ -114,9 +114,10 @@ export const MessageActions = ({
 				</div>
 			)}
 
-			{/* 分支切换按钮区域 */}
+			{/* 分支切换按钮区域；data 供 ChatBotView 在切换兄弟后钉住视口位置 */}
 			{hasSiblings && !isSharing && (
 				<div
+					data-message-branch-anchor
 					className={`${
 						message.role === 'user'
 							? 'order-last ml-5 -mr-3.5'

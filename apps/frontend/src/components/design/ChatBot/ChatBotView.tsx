@@ -13,15 +13,15 @@ import React, {
 	forwardRef,
 	JSX,
 	type SetStateAction,
-	// startTransition：把「整表消息列表」更新标为低优先级，点击分支箭头时优先响应输入/交互，再并发渲染列表
-	startTransition,
 	useCallback,
 	useEffect,
+	useLayoutEffect,
 	useImperativeHandle,
 	useMemo,
 	useRef,
 	useState,
 } from 'react';
+import { flushSync } from 'react-dom';
 import { useBranchManage } from '@/hooks/useBranchManage';
 import { useMessageTools } from '@/hooks/useMessageTools';
 import { cn } from '@/lib/utils';
@@ -40,6 +40,37 @@ const noopIsMessageStopped = (_chatId: string) => false;
 /** 滚动容器合法 scrollTop 上限（勿用 scrollHeight+N 依赖浏览器钳位） */
 function getMaxScrollTop(el: HTMLElement) {
 	return Math.max(0, el.scrollHeight - el.clientHeight);
+}
+
+type BranchScrollPending = {
+	kind: 'anchorTop' | 'rowBottom';
+	before: number;
+	nextRowId: string;
+	seq: number;
+};
+
+/**
+ * 分支切换后按锚点修正 scrollTop 一次。
+ * 返回 true：可结束本次钉视口（成功对齐或 seq 已过期）；false：DOM 尚未就绪，可交给 useLayoutEffect 再试。
+ */
+function tryApplyBranchScrollAnchor(
+	sc: HTMLElement,
+	pending: BranchScrollPending,
+	currentSeq: number,
+): boolean {
+	if (pending.seq !== currentSeq) return true;
+	const r = sc.querySelector(`#message-${pending.nextRowId}`);
+	if (!(r instanceof HTMLElement)) return false;
+	let d = 0;
+	if (pending.kind === 'anchorTop') {
+		const a = r.querySelector('[data-message-branch-anchor]');
+		if (!(a instanceof HTMLElement)) return false;
+		d = a.getBoundingClientRect().top - pending.before;
+	} else {
+		d = r.getBoundingClientRect().bottom - pending.before;
+	}
+	if (Math.abs(d) > 0.5) sc.scrollTop += d;
+	return true;
 }
 
 /**
@@ -186,6 +217,11 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 		const mutationObserverRef = useRef<MutationObserver | null>(null);
 		/** 用户手动「滚到底」时注册的 ResizeObserver，需在下次滚顶/卸载时 disconnect */
 		const manualScrollToBottomCleanupRef = useRef<(() => void) | null>(null);
+		/** 分支切换后：把「当前操作的那条消息行」在视口内的纵向位置钉住，避免下方新链路变长把操作区顶出视野 */
+		const pendingBranchScrollAnchorRef = useRef<BranchScrollPending | null>(
+			null,
+		);
+		const branchScrollSeqRef = useRef(0);
 
 		const SCROLL_THRESHOLD = 5;
 
@@ -430,10 +466,79 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 					} else {
 						newSelectedChildMap.set('root', nextMsg.chatId);
 					}
-					startTransition(() => {
-						// 分支切换会重算整表 messages：可中断更新，点击不卡、输入框先响应；列表在并发渲染中稍晚一致
+
+					// 切换后若当前链路上该条已是最后一条（底下没有后续消息），应贴齐滚动容器底部，锚点钉视口会差一截
+					let shouldScrollToBottom = false;
+					if (props.displayMessages === undefined) {
+						const rawPath = buildMessageList(flatMessages, newSelectedChildMap);
+						const lastInChain = rawPath[rawPath.length - 1];
+						shouldScrollToBottom = lastInChain?.chatId === nextMsg.chatId;
+					}
+
+					const sc = scrollContainerRef.current;
+					const oldRow = sc?.querySelector(`#message-${msgId}`);
+					const oldBranchEl = oldRow?.querySelector(
+						'[data-message-branch-anchor]',
+					);
+					if (shouldScrollToBottom) {
+						pendingBranchScrollAnchorRef.current = null;
+					} else if (oldRow instanceof HTMLElement) {
+						branchScrollSeqRef.current += 1;
+						// 分支按钮在气泡内 absolute bottom，钉行顶无法稳定按钮；优先钉分支条，否则钉整条消息行底边
+						if (oldBranchEl instanceof HTMLElement) {
+							pendingBranchScrollAnchorRef.current = {
+								kind: 'anchorTop',
+								before: oldBranchEl.getBoundingClientRect().top,
+								nextRowId: nextMsg.chatId,
+								seq: branchScrollSeqRef.current,
+							};
+						} else {
+							pendingBranchScrollAnchorRef.current = {
+								kind: 'rowBottom',
+								before: oldRow.getBoundingClientRect().bottom,
+								nextRowId: nextMsg.chatId,
+								seq: branchScrollSeqRef.current,
+							};
+						}
+					} else {
+						pendingBranchScrollAnchorRef.current = null;
+					}
+
+					// 同步提交：回复内容与分支 Map 同一帧到位，无 transition 延迟
+					flushSync(() => {
 						onSelectedChildMapChange(newSelectedChildMap);
 					});
+					const scAfter = scrollContainerRef.current;
+					if (shouldScrollToBottom && scAfter) {
+						scAfter.scrollTop = getMaxScrollTop(scAfter);
+						requestAnimationFrame(() => {
+							const el = scrollContainerRef.current;
+							if (!el) return;
+							el.scrollTop = getMaxScrollTop(el);
+						});
+					} else {
+						// 在首帧绘制前钉住分支条视口（避免仅靠 effect/rAF 晚于 paint 导致错乱或「滚完再补」）
+						const anchorPending = pendingBranchScrollAnchorRef.current;
+						if (anchorPending && scAfter) {
+							const done = tryApplyBranchScrollAnchor(
+								scAfter,
+								anchorPending,
+								branchScrollSeqRef.current,
+							);
+							if (done) pendingBranchScrollAnchorRef.current = null;
+							if (done) {
+								const snap = anchorPending;
+								requestAnimationFrame(() => {
+									if (snap.seq !== branchScrollSeqRef.current) return;
+									tryApplyBranchScrollAnchor(
+										scAfter,
+										snap,
+										branchScrollSeqRef.current,
+									);
+								});
+							}
+						}
+					}
 					if (activeSessionId && onPersistSessionBranchSelection) {
 						const sid = activeSessionId; // 微任务执行时会话可能已切，先捕获 id 避免写错会话
 						const mapSnapshot = new Map(newSelectedChildMap); // Map 引用可能被父 mutate，快照=点击瞬间分支
@@ -445,14 +550,30 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 			},
 			[
 				activeSessionId,
+				buildMessageList,
 				findSiblings,
 				flatMessages,
 				onBranchChange,
 				onPersistSessionBranchSelection,
 				onSelectedChildMapChange,
+				props.displayMessages,
 				selectedChildMap,
 			],
 		);
+
+		// flushSync 后若 DOM 未就绪未钉住，仅在此处补一次；不挂 RO、不连帧 rAF，避免滚动反复改导致按钮错位与迟滞
+		useLayoutEffect(() => {
+			const pending = pendingBranchScrollAnchorRef.current;
+			if (!pending) return;
+			const sc = scrollContainerRef.current;
+			if (!sc) return;
+			const done = tryApplyBranchScrollAnchor(
+				sc,
+				pending,
+				branchScrollSeqRef.current,
+			);
+			if (done) pendingBranchScrollAnchorRef.current = null;
+		}, [messages, selectedChildMap]);
 
 		const onReGenerate = useCallback(
 			(index: number) => {
