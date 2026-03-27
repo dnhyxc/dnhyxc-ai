@@ -189,65 +189,68 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 
 		const SCROLL_THRESHOLD = 5;
 
-		const onScrollTo = useCallback((position: string, behavior?: 'smooth' | 'auto') => {
-			const el = scrollContainerRef.current;
-			if (!el) return;
-			const bh = behavior ?? 'smooth';
+		const onScrollTo = useCallback(
+			(position: string, behavior?: 'smooth' | 'auto') => {
+				const el = scrollContainerRef.current;
+				if (!el) return;
+				const bh = behavior ?? 'smooth';
 
-			if (position === 'up') {
+				if (position === 'up') {
+					manualScrollToBottomCleanupRef.current?.();
+					manualScrollToBottomCleanupRef.current = null;
+					el.scrollTo({ top: 0, behavior: bh });
+					return;
+				}
+
+				// 刷新后首次滚到底：首帧 scrollHeight 常偏小（字体/MdPreview 懒挂载晚一步），需跟随后续增高
 				manualScrollToBottomCleanupRef.current?.();
 				manualScrollToBottomCleanupRef.current = null;
-				el.scrollTo({ top: 0, behavior: bh });
-				return;
-			}
 
-			// 刷新后首次滚到底：首帧 scrollHeight 常偏小（字体/MdPreview 懒挂载晚一步），需跟随后续增高
-			manualScrollToBottomCleanupRef.current?.();
-			manualScrollToBottomCleanupRef.current = null;
+				const alignToMax = (scrollBehavior: ScrollBehavior) => {
+					el.scrollTo({ top: getMaxScrollTop(el), behavior: scrollBehavior });
+				};
 
-			const alignToMax = (scrollBehavior: ScrollBehavior) => {
-				el.scrollTo({ top: getMaxScrollTop(el), behavior: scrollBehavior });
-			};
-
-			const contentRoot = el.querySelector('#message-content');
-			const lastRow = contentRoot?.lastElementChild;
-			if (lastRow instanceof HTMLElement) {
-				lastRow.scrollIntoView({
-					block: 'end',
-					inline: 'nearest',
-					behavior: bh,
-				});
-			}
-			alignToMax(bh === 'smooth' ? 'smooth' : 'auto');
-
-			if (bh === 'auto') {
-				requestAnimationFrame(() => {
-					alignToMax('auto');
-					requestAnimationFrame(() => alignToMax('auto'));
-				});
-				if (contentRoot) {
-					const ro = new ResizeObserver(() => alignToMax('auto'));
-					ro.observe(contentRoot);
-					let disposed = false;
-					// DOM 的 setTimeout 返回 number，与 @types/node 的 Timeout 在合并时易冲突，此处仅作定时清理用
-					let tid = 0;
-					const dispose = () => {
-						if (disposed) return;
-						disposed = true;
-						ro.disconnect();
-						window.clearTimeout(tid);
-						if (manualScrollToBottomCleanupRef.current === dispose) {
-							manualScrollToBottomCleanupRef.current = null;
-						}
-					};
-					tid = window.setTimeout(() => {
-						alignToMax('auto');
-						dispose();
-					}, 600);
-					manualScrollToBottomCleanupRef.current = dispose;
+				const contentRoot = el.querySelector('#message-content');
+				const lastRow = contentRoot?.lastElementChild;
+				if (lastRow instanceof HTMLElement) {
+					lastRow.scrollIntoView({
+						block: 'end',
+						inline: 'nearest',
+						behavior: bh,
+					});
 				}
-			}
-		}, []);
+				alignToMax(bh === 'smooth' ? 'smooth' : 'auto');
+
+				if (bh === 'auto') {
+					requestAnimationFrame(() => {
+						alignToMax('auto');
+						requestAnimationFrame(() => alignToMax('auto'));
+					});
+					if (contentRoot) {
+						const ro = new ResizeObserver(() => alignToMax('auto'));
+						ro.observe(contentRoot);
+						let disposed = false;
+						// DOM 的 setTimeout 返回 number，与 @types/node 的 Timeout 在合并时易冲突，此处仅作定时清理用
+						let tid = 0;
+						const dispose = () => {
+							if (disposed) return;
+							disposed = true;
+							ro.disconnect();
+							window.clearTimeout(tid);
+							if (manualScrollToBottomCleanupRef.current === dispose) {
+								manualScrollToBottomCleanupRef.current = null;
+							}
+						};
+						tid = window.setTimeout(() => {
+							alignToMax('auto');
+							dispose();
+						}, 600);
+						manualScrollToBottomCleanupRef.current = dispose;
+					}
+				}
+			},
+			[],
+		);
 
 		const {
 			// hook 内已用 useMemo 算好布尔值，此处解构重命名后直接传给 ChatControls，避免再调用函数
