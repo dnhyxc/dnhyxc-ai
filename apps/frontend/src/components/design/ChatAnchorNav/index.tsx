@@ -228,7 +228,7 @@ const ChatAnchorNav = ({
 			<div className="relative flex flex-col items-center">
 				{/* 上翻按钮 */}
 				<div className="opacity-0 group-hover:opacity-100 mb-0.5">
-					<div className="opacity-0 group-hover:opacity-100 text-sm text-textcolor/60 mb-2">
+					<div className="opacity-0 group-hover:opacity-100 text-sm text-textcolor/60 mb-2 text-center">
 						{currentIndex + 1}
 					</div>
 					<Button
@@ -247,9 +247,13 @@ const ChatAnchorNav = ({
 							ref={anchorListRef}
 							className="flex flex-col items-center px-3 py-1 overflow-y-auto"
 						>
-							{userMessages.map((msg) => {
+							{userMessages.map((msg, index) => {
 								return (
-									<Tooltip key={msg.chatId} side="left" content={msg.content}>
+									<Tooltip
+										key={msg.chatId}
+										side="left"
+										content={`对话 ${index + 1}：${msg.content}`}
+									>
 										<div
 											ref={(el) => {
 												if (el) {
@@ -282,7 +286,7 @@ const ChatAnchorNav = ({
 					>
 						<ChevronDown className="w-4 h-4" />
 					</Button>
-					<div className="opacity-0 group-hover:opacity-100 text-sm text-textcolor/60 mt-2">
+					<div className="opacity-0 group-hover:opacity-100 text-sm text-textcolor/60 mt-2 text-center">
 						{userMessages.length}
 					</div>
 				</div>
