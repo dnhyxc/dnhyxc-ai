@@ -37,6 +37,11 @@ const noopDispatchBool: Dispatch<SetStateAction<boolean>> = () => {};
 const noopClearChat = (_?: string) => {};
 const noopIsMessageStopped = (_chatId: string) => false;
 
+/** 滚动容器合法 scrollTop 上限（勿用 scrollHeight+N 依赖浏览器钳位） */
+function getMaxScrollTop(el: HTMLElement) {
+	return Math.max(0, el.scrollHeight - el.clientHeight);
+}
+
 /**
  * 聊天主界面纯 UI（单一渲染组件）。
  *
@@ -179,21 +184,70 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 		const resizeObserverRef = useRef<ResizeObserver | null>(null);
 		const lastScrollHeightRef = useRef<number>(0);
 		const mutationObserverRef = useRef<MutationObserver | null>(null);
+		/** 用户手动「滚到底」时注册的 ResizeObserver，需在下次滚顶/卸载时 disconnect */
+		const manualScrollToBottomCleanupRef = useRef<(() => void) | null>(null);
 
 		const SCROLL_THRESHOLD = 5;
 
-		const onScrollTo = useCallback(
-			(position: string, behavior?: 'smooth' | 'auto') => {
-				scrollContainerRef.current?.scrollTo({
-					top:
-						position === 'up'
-							? 0
-							: scrollContainerRef.current?.scrollHeight + 100,
-					behavior: behavior || 'smooth',
+		const onScrollTo = useCallback((position: string, behavior?: 'smooth' | 'auto') => {
+			const el = scrollContainerRef.current;
+			if (!el) return;
+			const bh = behavior ?? 'smooth';
+
+			if (position === 'up') {
+				manualScrollToBottomCleanupRef.current?.();
+				manualScrollToBottomCleanupRef.current = null;
+				el.scrollTo({ top: 0, behavior: bh });
+				return;
+			}
+
+			// 刷新后首次滚到底：首帧 scrollHeight 常偏小（字体/MdPreview 懒挂载晚一步），需跟随后续增高
+			manualScrollToBottomCleanupRef.current?.();
+			manualScrollToBottomCleanupRef.current = null;
+
+			const alignToMax = (scrollBehavior: ScrollBehavior) => {
+				el.scrollTo({ top: getMaxScrollTop(el), behavior: scrollBehavior });
+			};
+
+			const contentRoot = el.querySelector('#message-content');
+			const lastRow = contentRoot?.lastElementChild;
+			if (lastRow instanceof HTMLElement) {
+				lastRow.scrollIntoView({
+					block: 'end',
+					inline: 'nearest',
+					behavior: bh,
 				});
-			},
-			[],
-		);
+			}
+			alignToMax(bh === 'smooth' ? 'smooth' : 'auto');
+
+			if (bh === 'auto') {
+				requestAnimationFrame(() => {
+					alignToMax('auto');
+					requestAnimationFrame(() => alignToMax('auto'));
+				});
+				if (contentRoot) {
+					const ro = new ResizeObserver(() => alignToMax('auto'));
+					ro.observe(contentRoot);
+					let disposed = false;
+					// DOM 的 setTimeout 返回 number，与 @types/node 的 Timeout 在合并时易冲突，此处仅作定时清理用
+					let tid = 0;
+					const dispose = () => {
+						if (disposed) return;
+						disposed = true;
+						ro.disconnect();
+						window.clearTimeout(tid);
+						if (manualScrollToBottomCleanupRef.current === dispose) {
+							manualScrollToBottomCleanupRef.current = null;
+						}
+					};
+					tid = window.setTimeout(() => {
+						alignToMax('auto');
+						dispose();
+					}, 600);
+					manualScrollToBottomCleanupRef.current = dispose;
+				}
+			}
+		}, []);
 
 		const {
 			// hook 内已用 useMemo 算好布尔值，此处解构重命名后直接传给 ChatControls，避免再调用函数
@@ -238,12 +292,13 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 			};
 
 			const scrollToBottom = () => {
-				if (scrollContainerRef.current && autoScroll && isCurrentlyStreaming) {
-					const currentScrollHeight = scrollContainerRef.current.scrollHeight;
+				const sc = scrollContainerRef.current;
+				if (sc && autoScroll && isCurrentlyStreaming) {
+					const currentScrollHeight = sc.scrollHeight;
 					if (currentScrollHeight !== lastScrollHeightRef.current) {
 						lastScrollHeightRef.current = currentScrollHeight;
-						scrollContainerRef.current.scrollTo({
-							top: currentScrollHeight + 100,
+						sc.scrollTo({
+							top: getMaxScrollTop(sc),
 							behavior: 'auto',
 						});
 					}
@@ -306,6 +361,8 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 				if (mutationObserverRef.current) {
 					mutationObserverRef.current.disconnect();
 				}
+				manualScrollToBottomCleanupRef.current?.();
+				manualScrollToBottomCleanupRef.current = null;
 			};
 		}, []);
 
@@ -463,6 +520,7 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 				{/* ref 指向 Radix Viewport（可滚动节点），供 ChatAssistantMessage 作 IntersectionObserver.root */}
 				<ScrollArea
 					ref={scrollContainerRef}
+					viewportClassName="[overflow-anchor:none]"
 					className="flex-1 overflow-hidden w-full backdrop-blur-sm pb-5"
 					onScroll={handleScroll}
 				>
