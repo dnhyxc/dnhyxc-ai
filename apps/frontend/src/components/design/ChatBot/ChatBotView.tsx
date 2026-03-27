@@ -42,6 +42,9 @@ function getMaxScrollTop(el: HTMLElement) {
 	return Math.max(0, el.scrollHeight - el.clientHeight);
 }
 
+/** 底下仍有后续消息时：钉视口目标略偏上，补偿下方气泡叠层与留白不足 */
+const BRANCH_ANCHOR_NUDGE_UP_PX = 47; // 17
+
 type BranchScrollPending = {
 	kind: 'anchorTop' | 'rowBottom';
 	before: number;
@@ -488,14 +491,18 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 						if (oldBranchEl instanceof HTMLElement) {
 							pendingBranchScrollAnchorRef.current = {
 								kind: 'anchorTop',
-								before: oldBranchEl.getBoundingClientRect().top,
+								before:
+									oldBranchEl.getBoundingClientRect().top -
+									BRANCH_ANCHOR_NUDGE_UP_PX,
 								nextRowId: nextMsg.chatId,
 								seq: branchScrollSeqRef.current,
 							};
 						} else {
 							pendingBranchScrollAnchorRef.current = {
 								kind: 'rowBottom',
-								before: oldRow.getBoundingClientRect().bottom,
+								before:
+									oldRow.getBoundingClientRect().bottom -
+									BRANCH_ANCHOR_NUDGE_UP_PX,
 								nextRowId: nextMsg.chatId,
 								seq: branchScrollSeqRef.current,
 							};
@@ -652,7 +659,7 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 						id="message-container"
 						className="max-w-3xl m-auto overflow-y-auto"
 					>
-						<div id="message-content" className="space-y-6 overflow-hidden">
+						<div id="message-content" className="space-y-6 min-w-0">
 							{!messages.length
 								? // emptyState 可选：嵌入方自定义欢迎页；默认保持原 ChatNewSession，避免行为变化。
 									(emptyState ?? <ChatNewSession />)
@@ -660,6 +667,8 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 										<div
 											key={message.chatId}
 											id={`message-${message.chatId}`}
+											// 靠后的消息默认后绘制会盖住上一条的 absolute 操作区；提高靠前行的 z-index，避免分支按钮被下一条盖住
+											style={{ zIndex: messages.length - index }}
 											className={cn(
 												'flex gap-3 w-full',
 												message.role === 'user' ? 'flex-row-reverse' : '',
