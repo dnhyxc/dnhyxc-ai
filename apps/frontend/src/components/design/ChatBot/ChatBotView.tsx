@@ -42,8 +42,31 @@ function getMaxScrollTop(el: HTMLElement) {
 	return Math.max(0, el.scrollHeight - el.clientHeight);
 }
 
-/** 底下仍有后续消息时：钉视口目标略偏上，补偿下方气泡叠层与留白不足 */
-const BRANCH_ANCHOR_NUDGE_UP_PX = 47; // 17
+/**
+ * 行高 ≥ 视口一半时视为「长消息」：分支操作在气泡底部，若仍用钉锚点 top 会滚到对齐气泡上沿，操作区被顶到视口上方。
+ * 此时改为把整条 #message-row 的底边与 ScrollArea viewport 底边对齐（只滚外层 scrollContainerRef）。
+ */
+const LONG_ROW_VIEWPORT_HEIGHT_RATIO = 0.5;
+
+function alignMessageRowBottomToViewportBottom(sc: HTMLElement, rowId: string) {
+	const row = sc.querySelector(`#message-${rowId}`);
+	if (!(row instanceof HTMLElement)) return;
+	const delta =
+		row.getBoundingClientRect().bottom - sc.getBoundingClientRect().bottom;
+	if (Math.abs(delta) > 0.5) sc.scrollTop += delta;
+}
+
+function isLongMessageRowForBranchScroll(sc: HTMLElement, rowId: string) {
+	const row = sc.querySelector(`#message-${rowId}`);
+	if (!(row instanceof HTMLElement)) return false;
+	return (
+		row.getBoundingClientRect().height >=
+		sc.clientHeight * LONG_ROW_VIEWPORT_HEIGHT_RATIO
+	);
+}
+
+/** 底下仍有后续消息时：钉视口目标略偏上（仅短消息路径） */
+const BRANCH_ANCHOR_NUDGE_UP_PX = 20;
 
 type BranchScrollPending = {
 	kind: 'anchorTop' | 'rowBottom';
@@ -523,26 +546,43 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 							if (!el) return;
 							el.scrollTop = getMaxScrollTop(el);
 						});
-					} else {
-						// 在首帧绘制前钉住分支条视口（避免仅靠 effect/rAF 晚于 paint 导致错乱或「滚完再补」）
-						const anchorPending = pendingBranchScrollAnchorRef.current;
-						if (anchorPending && scAfter) {
-							const done = tryApplyBranchScrollAnchor(
-								scAfter,
-								anchorPending,
-								branchScrollSeqRef.current,
-							);
-							if (done) pendingBranchScrollAnchorRef.current = null;
-							if (done) {
-								const snap = anchorPending;
-								requestAnimationFrame(() => {
-									if (snap.seq !== branchScrollSeqRef.current) return;
-									tryApplyBranchScrollAnchor(
-										scAfter,
-										snap,
-										branchScrollSeqRef.current,
-									);
-								});
+					} else if (scAfter) {
+						const nextId = nextMsg.chatId;
+						if (isLongMessageRowForBranchScroll(scAfter, nextId)) {
+							pendingBranchScrollAnchorRef.current = null;
+							alignMessageRowBottomToViewportBottom(scAfter, nextId);
+							requestAnimationFrame(() => {
+								const sc = scrollContainerRef.current;
+								if (!sc) return;
+								alignMessageRowBottomToViewportBottom(sc, nextId);
+							});
+						} else {
+							const anchorPending = pendingBranchScrollAnchorRef.current;
+							if (anchorPending) {
+								const done = tryApplyBranchScrollAnchor(
+									scAfter,
+									anchorPending,
+									branchScrollSeqRef.current,
+								);
+								if (done) pendingBranchScrollAnchorRef.current = null;
+								if (done) {
+									const snap = anchorPending;
+									requestAnimationFrame(() => {
+										if (snap.seq !== branchScrollSeqRef.current) return;
+										const sc = scrollContainerRef.current;
+										if (!sc) return;
+										// 首帧可能尚未撑高（MdPreview 等），第二帧若已变长消息则改用语义对齐，避免仍按锚点把操作顶上去
+										if (isLongMessageRowForBranchScroll(sc, snap.nextRowId)) {
+											alignMessageRowBottomToViewportBottom(sc, snap.nextRowId);
+										} else {
+											tryApplyBranchScrollAnchor(
+												sc,
+												snap,
+												branchScrollSeqRef.current,
+											);
+										}
+									});
+								}
 							}
 						}
 					}
@@ -568,12 +608,18 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 			],
 		);
 
-		// flushSync 后若 DOM 未就绪未钉住，仅在此处补一次；不挂 RO、不连帧 rAF，避免滚动反复改导致按钮错位与迟滞
+		// flushSync 后若 DOM 未就绪未钉住，仅在此处补一次；长消息在首帧可能尚未撑高，此处再判一次
 		useLayoutEffect(() => {
 			const pending = pendingBranchScrollAnchorRef.current;
 			if (!pending) return;
 			const sc = scrollContainerRef.current;
 			if (!sc) return;
+			const nextId = pending.nextRowId;
+			if (isLongMessageRowForBranchScroll(sc, nextId)) {
+				pendingBranchScrollAnchorRef.current = null;
+				alignMessageRowBottomToViewportBottom(sc, nextId);
+				return;
+			}
 			const done = tryApplyBranchScrollAnchor(
 				sc,
 				pending,
@@ -657,7 +703,7 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 				>
 					<div
 						id="message-container"
-						className="max-w-3xl m-auto overflow-y-auto"
+						className="max-w-3xl m-auto min-w-0"
 					>
 						<div id="message-content" className="space-y-6 min-w-0">
 							{!messages.length
