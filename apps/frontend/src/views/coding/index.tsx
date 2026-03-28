@@ -1,4 +1,6 @@
+// https://sandpack.codesandbox.io/docs/getting-started/usage
 import {
+	type CodeEditorRef,
 	type SANDBOX_TEMPLATES,
 	SandpackCodeEditor,
 	SandpackConsole,
@@ -7,17 +9,86 @@ import {
 } from '@codesandbox/sandpack-react';
 import { ScrollArea } from '@radix-ui/react-scroll-area';
 import { motion } from 'framer-motion';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
 	ResizableHandle,
 	ResizablePanel,
 	ResizablePanelGroup,
 } from '@/components/ui/resizable';
 import Toolbar from './Toolbar';
+import { tauriSandpackClipboardExtension } from './tauriSandpackClipboard';
+
+type TemplateKey = keyof typeof SANDBOX_TEMPLATES;
+
+interface SandpackWorkspaceProps {
+	template: TemplateKey;
+	setTemplate: (t: TemplateKey) => void;
+}
+
+/** 必须在 SandpackProvider 内，以便 useActiveCode / 编辑器 ref 生效 */
+const SandpackWorkspace = ({
+	template,
+	setTemplate,
+}: SandpackWorkspaceProps) => {
+	const editorRef = useRef<CodeEditorRef>(null);
+
+	return (
+		<div className="flex flex-col h-full">
+			<Toolbar
+				editorRef={editorRef}
+				template={template}
+				setTemplate={setTemplate}
+			/>
+			<div className="flex flex-1 rounded-b-md overflow-hidden">
+				<ResizablePanelGroup
+					orientation="horizontal"
+					className="h-full w-full rounded-b-md"
+				>
+					{/* 左侧编辑器 */}
+					<ResizablePanel defaultSize="50%" className="w-full h-full">
+						<SandpackCodeEditor
+							ref={editorRef}
+							className="h-full"
+							showTabs
+							closableTabs
+							extensions={[tauriSandpackClipboardExtension]}
+						/>
+					</ResizablePanel>
+					<ResizableHandle withHandle />
+					{/* 右侧区域 */}
+					<ResizablePanel defaultSize="50%" className="w-full h-full">
+						<div className="flex-1 flex flex-col h-full">
+							{/* UI 预览 */}
+							<ResizablePanelGroup
+								orientation="vertical"
+								className="flex-1 flex flex-col h-full"
+							>
+								<ResizablePanel defaultSize="50%">
+									<SandpackPreview
+										showRestartButton
+										showOpenInCodeSandbox={false}
+										className="flex-1! h-full!"
+									/>
+								</ResizablePanel>
+								<ResizableHandle withHandle />
+								{/* 控制台 */}
+								<ResizablePanel defaultSize="50%">
+									<SandpackConsole
+										resetOnPreviewRestart
+										className="w-full! h-full!"
+									/>
+								</ResizablePanel>
+							</ResizablePanelGroup>
+						</div>
+					</ResizablePanel>
+				</ResizablePanelGroup>
+			</div>
+		</div>
+	);
+};
 
 const CodeRunner = () => {
-	const [template, setTemplate] =
-		useState<keyof typeof SANDBOX_TEMPLATES>('react');
+	const [template, setTemplate] = useState<TemplateKey>('react');
 
 	return (
 		<div className="flex flex-1 flex-col h-full w-full rounded-b-md">
@@ -42,49 +113,10 @@ const CodeRunner = () => {
 							}}
 							className="h-full!"
 						>
-							<div className="flex flex-col h-full">
-								{/* 顶部工具栏 */}
-								<Toolbar template={template} setTemplate={setTemplate} />
-								<div className="flex flex-1 rounded-b-md overflow-hidden">
-									<ResizablePanelGroup
-										orientation="horizontal"
-										className="h-full w-full rounded-b-md"
-									>
-										{/* 左侧编辑器 */}
-										<ResizablePanel defaultSize="50%" className="w-full h-full">
-											<SandpackCodeEditor className="h-full" />
-										</ResizablePanel>
-										<ResizableHandle withHandle />
-										{/* 右侧区域 */}
-										<ResizablePanel defaultSize="50%" className="w-full h-full">
-											<div className="flex-1 flex flex-col h-full">
-												{/* UI 预览 */}
-												<ResizablePanelGroup
-													orientation="vertical"
-													className="flex-1 flex flex-col h-full"
-												>
-													<ResizablePanel defaultSize="50%">
-														<SandpackPreview
-															showRestartButton
-															showOpenInCodeSandbox={false}
-															className="flex-1! h-full!"
-														/>
-													</ResizablePanel>
-													<ResizableHandle withHandle />
-													{/* 控制台 */}
-													<ResizablePanel defaultSize="50%">
-														<SandpackConsole
-															resetOnPreviewRestart
-															className="w-full! h-full!"
-															// className="w-full! h-full! [&_.sp-console-list]:bg-(--sp-colors-errorSurface)"
-														/>
-													</ResizablePanel>
-												</ResizablePanelGroup>
-											</div>
-										</ResizablePanel>
-									</ResizablePanelGroup>
-								</div>
-							</div>
+							<SandpackWorkspace
+								template={template}
+								setTemplate={setTemplate}
+							/>
 						</SandpackProvider>
 					</motion.div>
 				</motion.div>

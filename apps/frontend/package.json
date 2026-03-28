@@ -12,6 +12,8 @@
 		"tauri": "tauri"
 	},
 	"dependencies": {
+		"@codemirror/state": "^6.5.2",
+		"@codemirror/view": "^6.38.8",
 		"@codesandbox/sandpack-react": "^2.20.0",
 		"@dnhyxc-ai/tools": "workspace:*",
 		"@hookform/resolvers": "^5.2.2",

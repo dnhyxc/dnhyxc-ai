@@ -1,9 +1,23 @@
 import { readText, writeText } from '@tauri-apps/plugin-clipboard-manager';
 
+/** 焦点在 CodeMirror（Sandpack 编辑器等）内时不拦截快捷键，避免破坏选区与撤销栈 */
+function isFocusInsideCodeMirror(): boolean {
+	const el = document.activeElement;
+	return el instanceof Element && Boolean(el.closest('.cm-editor'));
+}
+
 // 复制粘贴逻辑
 export const clipboard = async (event: KeyboardEvent) => {
 	// 检查是否按下了Command（Mac）或Control（Windows/Linux）
 	const isMod = event.metaKey || event.ctrlKey;
+
+	if (
+		isMod &&
+		isFocusInsideCodeMirror() &&
+		['a', 'c', 'v', 'x', 'z'].includes(event.key)
+	) {
+		return;
+	}
 
 	if (isMod && event.key === 'a') {
 		// 阻止默认行为，因为我们想要自定义全选

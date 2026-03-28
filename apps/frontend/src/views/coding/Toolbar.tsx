@@ -1,4 +1,5 @@
 import {
+	type CodeEditorRef,
 	type SANDBOX_TEMPLATES,
 	useSandpack,
 } from '@codesandbox/sandpack-react';
@@ -10,9 +11,11 @@ import {
 	DropdownMenuTrigger,
 } from '@ui/index';
 import { PackagePlus, RotateCw } from 'lucide-react';
+import type { RefObject } from 'react';
 import { TEMPLATES } from './template';
 
 interface ToolbarProps {
+	editorRef?: RefObject<CodeEditorRef | null>;
 	onTogglePreview?: () => void;
 	onToggleConsole?: () => void;
 	isPreviewVisible?: boolean;
