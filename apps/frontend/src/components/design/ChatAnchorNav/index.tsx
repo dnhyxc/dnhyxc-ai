@@ -224,7 +224,7 @@ const ChatAnchorNav = ({
 		currentIndex === -1 || currentIndex >= userMessages.length - 1;
 
 	return (
-		<div className="group absolute right-[max(calc((100%-48rem)/2-2.2rem),0rem)] top-1/2 -translate-y-1/2 z-20">
+		<div className="group absolute right-[max(calc((100%-48rem)/2-3rem),0rem)] top-1/2 -translate-y-1/2 z-20">
 			<div className="relative flex flex-col items-center">
 				{/* 上翻按钮 */}
 				<div className="opacity-0 group-hover:opacity-100 mb-0.5">
