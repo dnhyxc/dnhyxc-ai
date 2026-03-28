@@ -444,56 +444,75 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 		// 兄弟切换必须基于完整 flatMessages，不能用 displayMessages：后者只含当前分支一条链，会丢其它兄弟节点。
 		const handleBranchChange = useCallback(
 			(msgId: string, direction: 'prev' | 'next') => {
+				// 通知外部（如埋点、Store）：用户在该消息上点了上一/下一分支
 				onBranchChange?.(msgId, direction);
 
+				// 在整棵 flat 树里找出与 msgId 同父、同层的所有兄弟（含自己），用于 prev/next 边界判断
 				const siblings = findSiblings(flatMessages, msgId);
+				// 当前消息在兄弟数组中的下标，用于计算目标兄弟下标
 				const currentIndex = siblings.findIndex((m) => m.chatId === msgId);
+				// 下一目标：next 则 +1，prev 则 -1；越界时下方 if 直接不执行
 				const nextIndex =
 					direction === 'next' ? currentIndex + 1 : currentIndex - 1;
 
 				if (nextIndex >= 0 && nextIndex < siblings.length) {
+					// 切换后要展示的那条兄弟消息（assistant 或 user 皆可能）
 					const nextMsg = siblings[nextIndex];
+					// 从全量列表取当前行元数据（父 id、角色等），siblings 里字段可能不如 flat 全
 					const currentMsg = flatMessages.find((m) => m.chatId === msgId);
+					// 父消息 id：有则分支选择挂在父节点下；无则表示根层多条用户消息等，用 'root' 键
 					const parentId = currentMsg?.parentId;
-					// 用户消息兄弟切换不涉及气泡底部分支条，无需钉视口/长消息向下补偿；仅助手消息切换保留
+					// 仅助手气泡底部有分支条，需要钉视口；用户消息切换不做滚动补偿
 					const isAssistantBranchSwitch = currentMsg?.role === 'assistant';
 
-					// 拷贝当前 Map，在对应父键上写入选中的子 chatId（根层用 'root'）
+					// 浅拷贝分支 map，避免直接 mutate 父传入的 Map 引用
 					const newSelectedChildMap = new Map(selectedChildMap);
 					if (parentId) {
+						// 在父节点下记录「选中的子节点」为 nextMsg，从而整条展示链切换到该兄弟分支
 						newSelectedChildMap.set(parentId, nextMsg.chatId);
 					} else {
+						// 无 parentId 时根 competing 消息共用虚拟键 'root'
 						newSelectedChildMap.set('root', nextMsg.chatId);
 					}
 
-					// 切换后若当前链路上该条已是最后一条（底下没有后续消息），应贴齐滚动容器底部，锚点钉视口会差一截
+					// 是否在切换后应滚到列表最底：仅当组件自己推导展示链时才算（外部 displayMessages 则无法在此推断）
 					let shouldScrollToBottom = false;
 					if (props.displayMessages === undefined) {
+						// 用新 map 从 flat 推导出当前分支上的消息顺序
 						const rawPath = buildMessageList(flatMessages, newSelectedChildMap);
+						// 链尾消息：若就是刚选中的兄弟，说明下面没有更多回复，视口应贴底而非钉中间
 						const lastInChain = rawPath[rawPath.length - 1];
 						shouldScrollToBottom = lastInChain?.chatId === nextMsg.chatId;
 					}
 
+					// 滚动视口 DOM（ScrollArea 的 viewport），用于读切换前元素位置
 					const sc = scrollContainerRef.current;
+					// 切换前当前消息对应行节点，id 与列表渲染约定一致
 					const oldRow = sc?.querySelector(`#message-${msgId}`);
+					// 助手气泡内分支控件上的锚点，用于记录「分支条顶部」视口坐标
 					const oldBranchEl = oldRow?.querySelector(
 						'[data-message-branch-anchor]',
 					);
 					if (shouldScrollToBottom || !isAssistantBranchSwitch) {
+						// 链尾贴底路径或用户消息：不需要后续按锚点修正 scrollTop
 						pendingBranchScrollAnchorRef.current = null;
 					} else if (oldRow instanceof HTMLElement) {
+						// 新一轮助手钉视口操作，递增序号；过期 seq 在 rAF 里会被丢弃，避免快速连点错乱
 						branchScrollSeqRef.current += 1;
-						// 分支按钮在气泡内 absolute bottom，钉行顶无法稳定按钮；优先钉分支条，否则钉整条消息行底边
 						if (oldBranchEl instanceof HTMLElement) {
+							// 优先用分支条顶部作为钉视口参照（比钉整行顶更能稳住底部按钮）
 							pendingBranchScrollAnchorRef.current = {
 								kind: 'anchorTop',
+								// 记录切换前视口中的纵向位置，并略向上偏移，避免贴顶太死
 								before:
 									oldBranchEl.getBoundingClientRect().top -
 									BRANCH_ANCHOR_NUDGE_UP_PX,
+								// 切换后 DOM 行 id 变为 nextMsg，对齐时找新行上的同位置
 								nextRowId: nextMsg.chatId,
 								seq: branchScrollSeqRef.current,
 							};
 						} else {
+							// 无分支锚点节点时退化为钉整行底边（同样带向上 nudge）
 							pendingBranchScrollAnchorRef.current = {
 								kind: 'rowBottom',
 								before:
@@ -504,24 +523,30 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 							};
 						}
 					} else {
+						// 未找到旧行 DOM，无法采样 before，放弃本次钉视口
 						pendingBranchScrollAnchorRef.current = null;
 					}
 
-					// 同步提交：回复内容与分支 Map 同一帧到位，无 transition 延迟
+					// 同步更新 React 状态，使新分支内容与 map 同一帧提交，避免中间帧闪错分支
 					flushSync(() => {
 						onSelectedChildMapChange(newSelectedChildMap);
 					});
+					// flushSync 后重新取容器：子树已换成 next 兄弟，可测量新行并改 scrollTop
 					const scAfter = scrollContainerRef.current;
 					if (shouldScrollToBottom && scAfter) {
+						// 立即滚到最大 scrollTop，让链尾贴齐容器底
 						scAfter.scrollTop = getMaxScrollTop(scAfter);
+						// 下一帧再滚一次：首帧后 lazy 内容（如 MdPreview）可能增高，需二次对齐到底
 						requestAnimationFrame(() => {
 							const el = scrollContainerRef.current;
 							if (!el) return;
 							el.scrollTop = getMaxScrollTop(el);
 						});
 					} else if (scAfter && isAssistantBranchSwitch) {
+						// 非链尾且为助手：用长消息或锚点逻辑保持操作区在视口内
 						const nextId = nextMsg.chatId;
 						if (isLongMessageRowForBranchScroll(scAfter, nextId)) {
+							// 行高超过视口一半时钉「行底贴视口底」，避免只钉锚点顶把长气泡底部操作区顶出屏
 							pendingBranchScrollAnchorRef.current = null;
 							alignMessageRowBottomToViewportBottom(scAfter, nextId);
 							requestAnimationFrame(() => {
@@ -530,6 +555,7 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 								alignMessageRowBottomToViewportBottom(sc, nextId);
 							});
 						} else {
+							// 短消息：用切换前记录的 before 与切换后新行上对应点做差，修正 scrollTop
 							const anchorPending = pendingBranchScrollAnchorRef.current;
 							if (anchorPending) {
 								const done = tryApplyBranchScrollAnchor(
@@ -537,17 +563,21 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 									anchorPending,
 									branchScrollSeqRef.current,
 								);
+								// 对齐成功或 seq 已作废：清 pending，避免 layout effect 重复应用
 								if (done) pendingBranchScrollAnchorRef.current = null;
 								if (done) {
+									// 快照本次 pending，供 rAF 内使用（ref 可能已被清空）
 									const snap = anchorPending;
 									requestAnimationFrame(() => {
+										// 若用户又点了一次分支，seq 已变，本帧不再改滚动避免打架
 										if (snap.seq !== branchScrollSeqRef.current) return;
 										const sc = scrollContainerRef.current;
 										if (!sc) return;
-										// 首帧可能尚未撑高（MdPreview 等），第二帧若已变长消息则改用语义对齐，避免仍按锚点把操作顶上去
 										if (isLongMessageRowForBranchScroll(sc, snap.nextRowId)) {
+											// 第二帧内容撑高后变为长消息：改用语义对齐行底
 											alignMessageRowBottomToViewportBottom(sc, snap.nextRowId);
 										} else {
+											// 仍短消息：再应用一次锚点修正（处理首帧测量不准）
 											tryApplyBranchScrollAnchor(
 												sc,
 												snap,
@@ -560,10 +590,13 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 						}
 					}
 					if (activeSessionId && onPersistSessionBranchSelection) {
-						const sid = activeSessionId; // 微任务执行时会话可能已切，先捕获 id 避免写错会话
-						const mapSnapshot = new Map(newSelectedChildMap); // Map 引用可能被父 mutate，快照=点击瞬间分支
+						// 闭包捕获当前会话 id，避免微任务跑时会话已切换写到别会话
+						const sid = activeSessionId;
+						// 拷贝 map：防止父组件随后 mutate 同一 Map 导致持久化内容漂移
+						const mapSnapshot = new Map(newSelectedChildMap);
 						queueMicrotask(() => {
-							onPersistSessionBranchSelection(sid, mapSnapshot); // commit 后异步持久化，减轻与 paint/layout 同帧争抢
+							// 延后到当前同步渲染与布局之后，减少与浏览器 layout/paint 同帧竞争
+							onPersistSessionBranchSelection(sid, mapSnapshot);
 						});
 					}
 				}
