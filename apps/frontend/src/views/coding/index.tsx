@@ -45,7 +45,7 @@ const CodeRunner = () => {
 							<div className="flex flex-col h-full">
 								{/* 顶部工具栏 */}
 								<Toolbar template={template} setTemplate={setTemplate} />
-								<div className="flex flex-1 rounded-b-md">
+								<div className="flex flex-1 rounded-b-md overflow-hidden">
 									<ResizablePanelGroup
 										orientation="horizontal"
 										className="h-full w-full rounded-b-md"
