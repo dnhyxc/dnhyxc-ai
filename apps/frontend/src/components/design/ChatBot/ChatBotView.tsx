@@ -22,18 +22,18 @@ import React, {
 	useState,
 } from 'react';
 import { flushSync } from 'react-dom';
-import {
-	BRANCH_ANCHOR_NUDGE_UP_PX,
-	type BranchScrollPending,
-	alignMessageRowBottomToViewportBottom,
-	getMaxScrollTop,
-	isLongMessageRowForBranchScroll,
-	tryApplyBranchScrollAnchor,
-} from './utils';
 import { useBranchManage } from '@/hooks/useBranchManage';
 import { useMessageTools } from '@/hooks/useMessageTools';
 import { cn } from '@/lib/utils';
 import { ChatBotRef, ChatBotViewProps, Message } from '@/types/chat';
+import {
+	alignMessageRowBottomToViewportBottom,
+	BRANCH_ANCHOR_NUDGE_UP_PX,
+	type BranchScrollPending,
+	getMaxScrollTop,
+	isLongMessageRowForBranchScroll,
+	tryApplyBranchScrollAnchor,
+} from './utils';
 
 /** 省略业务回调时的稳定空实现，避免每次 render 新建函数导致子组件重渲染 */
 const asyncNoop = async () => {};

@@ -34,7 +34,10 @@ export function alignMessageRowBottomToViewportBottom(
 	if (Math.abs(delta) > 0.5) sc.scrollTop += delta;
 }
 
-export function isLongMessageRowForBranchScroll(sc: HTMLElement, rowId: string) {
+export function isLongMessageRowForBranchScroll(
+	sc: HTMLElement,
+	rowId: string,
+) {
 	const row = sc.querySelector(`#message-${rowId}`);
 	if (!(row instanceof HTMLElement)) return false;
 	return (
