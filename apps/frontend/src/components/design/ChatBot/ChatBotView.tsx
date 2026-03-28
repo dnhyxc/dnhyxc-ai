@@ -455,6 +455,8 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 					const nextMsg = siblings[nextIndex];
 					const currentMsg = flatMessages.find((m) => m.chatId === msgId);
 					const parentId = currentMsg?.parentId;
+					// 用户消息兄弟切换不涉及气泡底部分支条，无需钉视口/长消息向下补偿；仅助手消息切换保留
+					const isAssistantBranchSwitch = currentMsg?.role === 'assistant';
 
 					// 拷贝当前 Map，在对应父键上写入选中的子 chatId（根层用 'root'）
 					const newSelectedChildMap = new Map(selectedChildMap);
@@ -477,7 +479,7 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 					const oldBranchEl = oldRow?.querySelector(
 						'[data-message-branch-anchor]',
 					);
-					if (shouldScrollToBottom) {
+					if (shouldScrollToBottom || !isAssistantBranchSwitch) {
 						pendingBranchScrollAnchorRef.current = null;
 					} else if (oldRow instanceof HTMLElement) {
 						branchScrollSeqRef.current += 1;
@@ -517,7 +519,7 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 							if (!el) return;
 							el.scrollTop = getMaxScrollTop(el);
 						});
-					} else if (scAfter) {
+					} else if (scAfter && isAssistantBranchSwitch) {
 						const nextId = nextMsg.chatId;
 						if (isLongMessageRowForBranchScroll(scAfter, nextId)) {
 							pendingBranchScrollAnchorRef.current = null;
