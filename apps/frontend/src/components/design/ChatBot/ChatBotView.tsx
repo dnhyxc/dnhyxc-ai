@@ -196,8 +196,21 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 		const branchScrollSeqRef = useRef(0);
 		/** 从会话列表进入会话时，同一会话仅滚到底一次（非流式首屏不走下方 observer 跟底） */
 		const sessionEnterScrolledRef = useRef<string | null>(null);
+		/** 滚到底双帧 rAF：无 contentRoot 时无 dispose，卸载或新一轮滚底前需 cancel */
+		const scrollToBottomRafCancelRef = useRef<(() => void) | null>(null);
+		/** 分支切换里登记的 rAF id，卸载时 cancel 避免卸载后仍触达 DOM */
+		const branchChangeRafIdsRef = useRef<Set<number>>(new Set());
 
 		const SCROLL_THRESHOLD = 5;
+
+		/** 包装 rAF：登记 id，执行后移除；卸载时批量 cancel */
+		const scheduleBranchRaf = useCallback((fn: FrameRequestCallback) => {
+			const id = requestAnimationFrame((time) => {
+				branchChangeRafIdsRef.current.delete(id);
+				fn(time);
+			});
+			branchChangeRafIdsRef.current.add(id);
+		}, []);
 
 		const onScrollTo = useCallback(
 			(position: string, behavior?: 'smooth' | 'auto') => {
@@ -208,6 +221,8 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 				if (position === 'up') {
 					manualScrollToBottomCleanupRef.current?.();
 					manualScrollToBottomCleanupRef.current = null;
+					scrollToBottomRafCancelRef.current?.();
+					scrollToBottomRafCancelRef.current = null;
 					el.scrollTo({ top: 0, behavior: bh });
 					return;
 				}
@@ -215,6 +230,8 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 				// 刷新后首次滚到底：首帧 scrollHeight 常偏小（字体/MdPreview 懒挂载晚一步），需跟随后续增高
 				manualScrollToBottomCleanupRef.current?.();
 				manualScrollToBottomCleanupRef.current = null;
+				scrollToBottomRafCancelRef.current?.();
+				scrollToBottomRafCancelRef.current = null;
 
 				const alignToMax = (scrollBehavior: ScrollBehavior) => {
 					el.scrollTo({ top: getMaxScrollTop(el), behavior: scrollBehavior });
@@ -232,9 +249,19 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 				alignToMax(bh === 'smooth' ? 'smooth' : 'auto');
 
 				if (bh === 'auto') {
-					requestAnimationFrame(() => {
+					const rafHandles = { outer: 0, inner: 0 };
+					const cancelScrollToBottomRafs = () => {
+						cancelAnimationFrame(rafHandles.outer);
+						cancelAnimationFrame(rafHandles.inner);
+						rafHandles.outer = rafHandles.inner = 0;
+					};
+					rafHandles.outer = requestAnimationFrame(() => {
+						rafHandles.outer = 0;
 						alignToMax('auto');
-						requestAnimationFrame(() => alignToMax('auto'));
+						rafHandles.inner = requestAnimationFrame(() => {
+							rafHandles.inner = 0;
+							alignToMax('auto');
+						});
 					});
 					if (contentRoot) {
 						const ro = new ResizeObserver(() => alignToMax('auto'));
@@ -245,6 +272,7 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 						const dispose = () => {
 							if (disposed) return;
 							disposed = true;
+							cancelScrollToBottomRafs();
 							ro.disconnect();
 							window.clearTimeout(tid);
 							if (manualScrollToBottomCleanupRef.current === dispose) {
@@ -256,6 +284,8 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 							dispose();
 						}, 600);
 						manualScrollToBottomCleanupRef.current = dispose;
+					} else {
+						scrollToBottomRafCancelRef.current = cancelScrollToBottomRafs;
 					}
 				}
 			},
@@ -399,6 +429,12 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 				}
 				manualScrollToBottomCleanupRef.current?.();
 				manualScrollToBottomCleanupRef.current = null;
+				scrollToBottomRafCancelRef.current?.();
+				scrollToBottomRafCancelRef.current = null;
+				branchChangeRafIdsRef.current.forEach((id) => {
+					cancelAnimationFrame(id);
+				});
+				branchChangeRafIdsRef.current.clear();
 			};
 		}, []);
 
@@ -537,7 +573,7 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 						// 立即滚到最大 scrollTop，让链尾贴齐容器底
 						scAfter.scrollTop = getMaxScrollTop(scAfter);
 						// 下一帧再滚一次：首帧后 lazy 内容（如 MdPreview）可能增高，需二次对齐到底
-						requestAnimationFrame(() => {
+						scheduleBranchRaf(() => {
 							const el = scrollContainerRef.current;
 							if (!el) return;
 							el.scrollTop = getMaxScrollTop(el);
@@ -549,7 +585,7 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 							// 行高超过视口一半时钉「行底贴视口底」，避免只钉锚点顶把长气泡底部操作区顶出屏
 							pendingBranchScrollAnchorRef.current = null;
 							alignMessageRowBottomToViewportBottom(scAfter, nextId);
-							requestAnimationFrame(() => {
+							scheduleBranchRaf(() => {
 								const sc = scrollContainerRef.current;
 								if (!sc) return;
 								alignMessageRowBottomToViewportBottom(sc, nextId);
@@ -568,7 +604,7 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 								if (done) {
 									// 快照本次 pending，供 rAF 内使用（ref 可能已被清空）
 									const snap = anchorPending;
-									requestAnimationFrame(() => {
+									scheduleBranchRaf(() => {
 										// 若用户又点了一次分支，seq 已变，本帧不再改滚动避免打架
 										if (snap.seq !== branchScrollSeqRef.current) return;
 										const sc = scrollContainerRef.current;
@@ -610,6 +646,7 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 				onPersistSessionBranchSelection,
 				onSelectedChildMapChange,
 				props.displayMessages,
+				scheduleBranchRaf,
 				selectedChildMap,
 			],
 		);
