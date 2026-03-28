@@ -248,6 +248,8 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 			null,
 		);
 		const branchScrollSeqRef = useRef(0);
+		/** 从会话列表进入会话时，同一会话仅滚到底一次（非流式首屏不走下方 observer 跟底） */
+		const sessionEnterScrolledRef = useRef<string | null>(null);
 
 		const SCROLL_THRESHOLD = 5;
 
@@ -343,6 +345,34 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 				onScrollToRegister(null);
 			};
 		}, [onScrollTo, onScrollToRegister]);
+
+		// 从消息记录进入会话：历史消息非流式，原 effect 仅在 isStreaming 时跟底，需补一次滚到底
+		useEffect(() => {
+			if (!activeSessionId) {
+				sessionEnterScrolledRef.current = null;
+				return;
+			}
+			if (isCurrentSessionLoading) return;
+			if (messages.length === 0) return;
+
+			const lastMessage = messages[messages.length - 1];
+			const lastStreaming =
+				lastMessage?.role === 'assistant' && lastMessage?.isStreaming;
+			if (lastStreaming) return;
+
+			if (sessionEnterScrolledRef.current === activeSessionId) return;
+
+			sessionEnterScrolledRef.current = activeSessionId;
+
+			queueMicrotask(() => {
+				onScrollTo('down', 'auto');
+			});
+		}, [
+			activeSessionId,
+			messages,
+			isCurrentSessionLoading,
+			onScrollTo,
+		]);
 
 		useEffect(() => {
 			const lastMessage = messages[messages.length - 1];
