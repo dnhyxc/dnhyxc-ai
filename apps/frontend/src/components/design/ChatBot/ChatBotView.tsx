@@ -367,12 +367,7 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 			queueMicrotask(() => {
 				onScrollTo('down', 'auto');
 			});
-		}, [
-			activeSessionId,
-			messages,
-			isCurrentSessionLoading,
-			onScrollTo,
-		]);
+		}, [activeSessionId, messages, isCurrentSessionLoading, onScrollTo]);
 
 		useEffect(() => {
 			const lastMessage = messages[messages.length - 1];
