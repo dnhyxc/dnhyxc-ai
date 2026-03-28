@@ -131,7 +131,7 @@ const SessionItem = memo<SessionItemProps>(
 
 		return (
 			<div
-				className={`group relative h-10 ${editItem?.id === item.id ? 'px-1' : 'px-2'} mb-1.5 hover:bg-theme/10 rounded-sm cursor-pointer flex items-center justify-between ${isActive ? 'bg-theme/10' : ''}`}
+				className={`line-clamp-1 group relative h-10 ${editItem?.id === item.id ? 'px-1' : 'px-2'} mb-1.5 hover:bg-theme/10 rounded-sm cursor-pointer flex items-center justify-between ${isActive ? 'bg-theme/10' : ''}`}
 				onClick={(e) => onSelect(e, item)}
 			>
 				{isLoading ? <Spinner className="w-4 h-4 mr-2 text-cyan-400" /> : null}
@@ -151,7 +151,7 @@ const SessionItem = memo<SessionItemProps>(
 					</div>
 				) : (
 					<div
-						className="line-clamp-1 flex-1 text-sm [&_.markdown-body]:text-textcolor!"
+						className="line-clamp-1 max-w-82.5 flex-1 text-sm [&_.markdown-body]:text-textcolor!"
 						dangerouslySetInnerHTML={{
 							__html: parser.render(
 								item?.title || item.messages?.[0]?.content || '新对话',

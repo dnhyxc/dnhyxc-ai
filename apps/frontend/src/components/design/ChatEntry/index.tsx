@@ -8,7 +8,6 @@ import {
 	CirclePlus,
 	Link,
 	Rocket,
-	StopCircle,
 	Target,
 } from 'lucide-react';
 import { useCallback, useRef, useState } from 'react';
@@ -259,7 +258,7 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 									</div>
 								</Upload>
 							</div>
-							{!loading ? (
+							{loading ? (
 								<span
 									className={cn(
 										'inline-flex mb-1 h-8 w-8 items-center justify-center rounded-full',
