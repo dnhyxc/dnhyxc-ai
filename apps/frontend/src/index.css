@@ -390,6 +390,41 @@ body {
 	--color-theme-text-to: var(--theme-text-to);
 	--color-theme-light: var(--theme-light);
 	--color-theme-white: var(--theme-white);
+	/* 聊天停止按钮：呼吸光晕（与 ChatEntry 停止生成按钮配套） */
+	--animate-chat-stop-breathe: chat-stop-breathe 2.2s ease-in-out infinite;
+	--animate-chat-stop-icon-breathe: chat-stop-icon-breathe 2.2s ease-in-out
+		infinite;
+}
+
+@keyframes chat-stop-breathe {
+	0%,
+	100% {
+		transform: scale(1);
+		box-shadow:
+			0 0 0 1px rgb(239 68 68 / 0.2),
+			0 0 6px 1px rgb(239 68 68 / 0.22),
+			0 1px 6px -1px rgb(239 68 68 / 0.35);
+	}
+	50% {
+		transform: scale(1.07);
+		box-shadow:
+			0 0 0 2px rgb(239 68 68 / 0.28),
+			0 0 10px 4px rgb(239 68 68 / 0.38),
+			0 2px 10px -2px rgb(239 68 68 / 0.48);
+	}
+}
+
+/* 停止图标：与外圈同频缩放+透明度呼吸，色相与 border-red-500 一致（Lucide 走 currentColor） */
+@keyframes chat-stop-icon-breathe {
+	0%,
+	100% {
+		transform: scale(1);
+		opacity: 0.82;
+	}
+	50% {
+		transform: scale(1.1);
+		opacity: 1;
+	}
 }
 
 @layer base {
