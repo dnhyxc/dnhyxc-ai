@@ -49,7 +49,7 @@ export function applyOrganicCitationAnchors(
 		if (!link) {
 			return null;
 		}
-		return `<a href="${escapeHrefForDoubleQuotedAttr(link)}">${idx}</a>`;
+		return `<a href="${escapeHrefForDoubleQuotedAttr(link)}" target="_blank" rel="noopener noreferrer" style="cursor: default;" class="__md-search-organic__">${idx}</a>`;
 	};
 
 	let out = text.replace(/【(\d+)】/g, (full, raw: string) => {
@@ -76,7 +76,7 @@ export class SerperService {
 		private readonly configService: ConfigService,
 		@Inject(WINSTON_MODULE_NEST_PROVIDER)
 		private readonly logger: LoggerService,
-	) {}
+	) { }
 
 	isConfigured(): boolean {
 		return !!this.configService.get<string>(ModelEnum.SERPER_API_KEY)?.trim();
@@ -114,7 +114,9 @@ export class SerperService {
 				},
 				body: JSON.stringify({
 					q,
-					num: options?.num ?? 8,
+					hl: "zh-cn",
+					tbs: "qdr:d",
+					num: options?.num ?? 10,
 				}),
 			});
 

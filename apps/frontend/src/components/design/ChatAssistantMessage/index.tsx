@@ -165,6 +165,11 @@ function ChatAssistantMessageInner({
 			ref={shellRef} // IO 观察目标：整条气泡（思考区+正文+操作区），进视口判定与此一致
 			className="w-full h-auto"
 		>
+			{message?.searchOrganic && message.searchOrganic?.length > 0 && (
+				<div className="text-sm text-textcolor/50">
+					已阅读 {message.searchOrganic?.length} 个网页
+				</div>
+			)}
 			<div className="w-full">
 				{message?.thinkContent ? (
 					<div
