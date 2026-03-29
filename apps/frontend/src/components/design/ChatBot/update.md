@@ -1287,3 +1287,223 @@ git diff ba10fff^...HEAD -- \
 ---
 
 **说明**：`ChatBotView.tsx` 全文约九百行，若逐行抄写将严重重复仓库内容。本文已按**功能块**把近三天相关逻辑全部拆开并附**逐行级**释义；**第七节**为钉视口与置底的交互逻辑；**第八节**为「多轮 + 多分支」场景下**卡死/卡顿**的成因与 `useMessageTools` / 结构共享 / `latestBranchMapMemo` / 连接层与微任务等**性能向**修改对照。与源码一一对应时，请以仓库当前文件为准，用行号或块标题对照即可。
+
+---
+
+## 九、本次需求：Markdown 围栏代码块吸顶工具栏（Portal + 全局 layout）
+
+> **说明**：本节与上文「近三天 Chat 性能/分支」等主题**独立**，专门记录**代码块工具栏吸顶**相关改动的**完整代码位置**、**功能点**、**影响面**与**设计原因**。行号以写入本文档时仓库为准；后续若增删行，请以 Git 或 IDE 为准对照**小节标题与符号名**。
+
+### 9.1 需求与方案摘要
+
+| 维度 | 内容 |
+|------|------|
+| **目标** | 助手消息内 Markdown 围栏代码块：顶栏展示语言 + 复制/下载；用户向上滚动使代码块跨过聊天区视口顶边时，工具栏**贴在滚动视口上沿**，并与代码块/气泡水平范围协调。 |
+| **痛点** | `position: sticky` 在 Radix `ScrollArea`（内部 `overflow`）链路上易失效；在滚动容器子树内用 `transform` 模拟或 `fixed` 易受祖先 `transform`/`filter` 建立Containing Block 的影响；**每条消息各自更新**易出现多实例竞争、水平偏移。 |
+| **方案** | ① `MarkdownParser` 输出统一 DOM（`data-chat-code-block`、`toolbar-slot`）；② `layoutChatCodeToolbars(viewport)` 在视口内只 **pin** 一个块并写全局 store；③ `ChatCodeToolbarFloating` 用 **`createPortal(..., document.body)`** + **`fixed`** + 视口矩形；④ 被 pin 块的内联工具栏 **`visibility:hidden`**，**slot 设 `minHeight`** 防布局跳动；⑤ `ChatBotView` 统一在滚动/resize/消息变化时调 `layout`。 |
+
+### 9.2 改动文件清单（本次需求）
+
+| 文件 | 改动性质 |
+|------|----------|
+| `packages/tools/src/markdown-parser.ts` | fence HTML 增加外层 `chat-md-code-toolbar-slot`（改后需 `pnpm --filter @dnhyxc-ai/tools build`）。 |
+| `apps/frontend/src/utils/chatCodeToolbar.ts` | 新增/替换为 store + `layoutChatCodeToolbars` + `getPinnedChatCodeBlock` 等；移除旧的 `subscribe`/`notify`/`updateChatCodeToolbarsInShell`（若仍有引用需删）。 |
+| `apps/frontend/src/components/design/ChatCodeToolBar/index.tsx` | 浮动工具栏组件（默认导出；`ChatBotView` 从 `@design/ChatCodeToolBar` 引入）。 |
+| `apps/frontend/src/components/design/ChatAssistantMessage/index.tsx` | 根节点 `data-chat-assistant-shell`；移除对 `subscribeChatCodeToolbarScrollSync` / `notify` / `updateChatCodeToolbarsInShell` 的 effect；保留内联按钮事件委托。 |
+| `apps/frontend/src/components/design/ChatBot/ChatBotView.tsx` | 引入并渲染浮动组件；`syncViewportScrollMetrics`、resize、scroll、`messages` effect 中调用 `layoutChatCodeToolbars`。 |
+| `apps/frontend/src/index.css` | slot、隐藏态、浮动态样式；工具栏去掉 `will-change: transform`。 |
+
+---
+
+### 9.3 `packages/tools/src/markdown-parser.ts`（fence 模板）
+
+**功能点**：仅在 `options.enableChatCodeFenceToolbar === true` 时 `patchChatCodeFenceRenderer()` 覆盖 `md.renderer.rules.fence`。
+
+**关键输出结构**（逻辑行约 96–114，以仓库为准）：
+
+```ts
+// fence 规则 return 拼接字符串（节选）
+'<div class="chat-md-code-block" data-chat-code-block>' +
+'<div class="chat-md-code-toolbar-slot">' +
+'<div class="chat-md-code-toolbar">' +
+// ... lang + buttons ...
+'</div></div>' +  // 先闭合 toolbar，再闭合 slot
+'<pre><code class="...">' + highlighted + '</code></pre></div>\n'
+```
+
+**逐段说明**
+
+| 片段 | 功能点 | 影响点 | 为什么这么写 |
+|------|--------|--------|----------------|
+| `chat-md-code-block` + `data-chat-code-block` | 标识一个可参与吸顶算法的代码块根节点 | `layoutChatCodeToolbars` 内 `querySelectorAll('[data-chat-code-block]')` | 与正文其它 div 区分，避免误选 |
+| `chat-md-code-toolbar-slot` | 占位容器 | JS 对 pin 块设置 `slot.style.minHeight`；`reset` 时清空 | 内联工具栏隐藏后仍占高度，**防止 pre 上顶导致页面跳动** |
+| 内层 `chat-md-code-toolbar` | 非吸顶/未 pin 时可见的条 | 加类 `--replaced-by-float` 后仅隐藏条本身，不占「可见」但 slot 撑高度 | 与浮动条复用同一套 class，样式一致 |
+| `data-chat-code-action` / `data-chat-code-lang` | 内联按钮语义 | `ChatAssistantMessage` 点击委托复制/下载 | 未 pin 时用户仍点原文；pin 时点浮动条（Portal 内 React 按钮） |
+
+---
+
+### 9.4 `apps/frontend/src/utils/chatCodeToolbar.ts`（全文件逐行/逐符号说明）
+
+下面按**行号区间**说明；区间内若多行同属一句法单元，合并为一行描述。
+
+| 行号 | 代码要点 | 功能点 | 影响点 | 为什么这么写 |
+|------|----------|--------|--------|----------------|
+| 1–5 | 文件头注释 | 文档化架构决策 | 维护者理解为何不用 sticky | 避免后续改回子树 fixed/transform |
+| 7–14 | `ChatCodeFloatingToolbarState` | 描述 Portal 条需要的几何与语言、`pinId` | `useSyncExternalStore` 的快照类型 | 单次更新原子替换 `state` |
+| 16–23 | `HIDDEN` 常量 | 不可见时的统一初始快照 | `layout` 无候选或 `viewport==null` | 避免魔法数字散落 |
+| 25–27 | `state` / `listeners` / `pinSession` | 模块级 store；`pinSession` 单调递增 | 全局单例；多 Tab 各页面独立加载各一份模块 | 无需 Redux；与单一浮动条 UI 匹配 |
+| 29 | `PIN_ATTR` | `data-chat-toolbar-pin` 常量 | DOM 与 `querySelector` 一致 | 避免字符串拼写漂移 |
+| 31–35 | `emit` | 通知所有 React 订阅者 | 每次 `layout` 结束调用 | 最小 pub/sub |
+| 37–41 | `subscribeChatCodeFloatingToolbar` | `useSyncExternalStore` 的 subscribe | 仅 `ChatCodeToolbarFloating` 订阅 | React 18 推荐外部 store 形态 |
+| 43–45 | `getChatCodeFloatingToolbarSnapshot` | 返回当前 `state` 引用 | 重渲染时读位置/语言 | 与 subscribe 成对 |
+| 47–57 | `resetFloatingMarkersInViewport` | 清除上一轮 pin、隐藏类、slot 的 `minHeight` | **仅遍历 viewport 子树**，不扫全 `document` | 多聊天实例若共存需各自 viewport；性能可控 |
+| 59–76 | `computePinnedBarBox` | 算 `left`/`width`（视口坐标） | 浮动条水平范围 | 优先用**代码块与视口交集**；宽度过小则退化为**视口与 shell 交集**，避免条宽为 0 |
+| 81–86 | `layout` 入口 `viewport===null` | 隐藏浮动条 | 卸载、ref 未就绪 | 防止 Portal 残留错位 |
+| 88–89 | `getBoundingClientRect` + `reset` | 取视口矩形；清标记 | 每一帧 layout 都先清再算 | 保证不会两个块同时带 pin |
+| 91–115 | 遍历 blocks，收集 `toolbar`/`slot`/`shell` | 缺任一则跳过 | 旧 HTML 无 slot 时**不参与吸顶**（兼容未重建 tools 包） | 强制 slot 存在才吸顶，保证占位逻辑成立 |
+| 117–121 | `PIN_EPS` + `candidates` | 「跨过视口顶」判定 | 决定谁有资格吸顶 | `±1px` 减少浮点边界抖动 |
+| 123–127 | 无候选 → `HIDDEN` | 不显示浮动条 | 用户滚到无代码块区域 | |
+| 129 | `reduce` 选 `br.top` 最大 | **多个块跨顶时取最靠下的一条** | 视觉上「当前正在读」的块 | 与 DeepSeek 等产品行为一致 |
+| 130–134 | `pinId`++、设 attr、加隐藏类、写 `minHeight` | 锁定 DOM；占位 | 内联条不可见但高度保留 | `offsetHeight \|\| 36` 防止首帧高度为 0 |
+| 136–139 | `shellRect` + `computePinnedBarBox` + `lang` | 水平盒 + 展示语言 | 浮动条文案 | `lang` 来自 `.chat-md-code-lang` 文本 |
+| 141–149 | 写 `state` + `emit` | 触发 React 更新 Portal | 一帧内完成测量与提交 | |
+| 152–180 | `LANG_TO_EXT` + `fileExtension` | 下载文件名后缀 | `downloadChatCodeBlock` | 与原先工具栏逻辑一致 |
+| 182–185 | `getChatCodeBlockPlainText` | 读 `pre code` 文本 | 复制/下载 | 与 Markdown 结构耦合 |
+| 187–190 | `getPinnedChatCodeBlock` | `document.querySelector` 按 `pinId` | 浮动按钮找块 | pin 全局唯一，故全局查询安全 |
+| 192–204 | `downloadChatCodeBlock` | Blob + 临时 `<a>` | 浏览器下载 | 标准前端下载模式 |
+
+**风险小结**：`layout` 含多次 DOM 查询与 `getBoundingClientRect`，滚动时若与 `syncViewportScrollMetrics`、原生 `scroll` **重复调用**，主线程成本约 **2 倍**（见 9.7）。
+
+---
+
+### 9.5 `apps/frontend/src/components/design/ChatCodeToolBar/index.tsx`（浮动组件，逐行）
+
+| 行号 | 代码要点 | 功能点 | 影响点 | 为什么这么写 |
+|------|----------|--------|--------|----------------|
+| 1–2 | `useSyncExternalStore` + `createPortal` | 订阅 store + 挂 body | 脱离 ScrollArea 层叠 | 解决 fixed 参照系问题 |
+| 3–9 | 从 `chatCodeToolbar` 引入工具函数 | 复制/下载/订阅 | 单一数据源 | 避免重复实现 |
+| 14–26 | `useSyncExternalStore(..., serverSnapshot)` | SSR 时快照全 false | Next/SSR 不报错 | 第三参数给 `getServerSnapshot` |
+| 28 | `copied` 本地 state | 「已复制」文案 | 仅浮动条按钮 | 与内联按钮的 1.5s 提示一致体验 |
+| 30–36 | `onCopy` | `getPinnedChatCodeBlock` → 剪贴板 | 依赖 `state.pinId` | pin 变时 callback 更新 |
+| 38–42 | `onDownload` | 同上 + `downloadChatCodeBlock` | 依赖 `lang` | 语言与 store 同步 |
+| 44–46 | `document` 判空 + `visible` + `width<8` | 不渲染 | SSR、无候选、几何异常 | 避免 Portal 空条或 NaN |
+| 48–71 | `node` 的 `className` / `style` | `fixed` + `top/left/width` + `zIndex:60` | 可能盖住页面其它 fixed 层 | 需与全局模态 z-index 策略统一 |
+| 59–60 | `role="toolbar"`、`aria-label` | a11y | 读屏 | 基础可访问性 |
+| 74 | `createPortal(node, document.body)` | 实际挂载点 | DOM 不在 ChatBot 子树 | **核心架构点** |
+
+---
+
+### 9.6 `apps/frontend/src/components/design/ChatAssistantMessage/index.tsx`（与本次需求相关部分）
+
+**未改动的相关逻辑**：`MarkdownParser({ enableChatCodeFenceToolbar: true })`、`parser.render` 输出仍带工具栏 HTML；`useEffect` 点击委托处理 `[data-chat-code-action]`（**未吸顶**时点击内联按钮）。
+
+**本次改动**
+
+| 行号（约） | 改动 | 功能点 | 影响点 | 为什么这么写 |
+|------------|------|--------|--------|----------------|
+| 13–16 | 仅从 `chatCodeToolbar` 引入 `download`/`getPlainText` | 去掉 notify/subscribe/update | 不再按消息订阅全局滚动 | 避免与 `ChatBotView` 双重 layout |
+| 11 | 去掉 `useLayoutEffect` import | 无 rAF notify | 减少无效帧 | 吸顶改由父级统一驱动 |
+| 183–209 | 保留点击委托 | 内联复制/下载 | 与浮动条并存 | 未 pin 的块仍只靠内联条交互 |
+| 212–216 | 根 `div` 增加 `data-chat-assistant-shell` | 标记助手气泡边界 | `layout` 内 `closest` 算水平盒 | **无此属性则 `shell` 为 null，该块不参与 scored**（被跳过） |
+| （删除） | 原 `subscribeChatCodeToolbarScrollSync` + `updateChatCodeToolbarsInShell` 的 `useEffect` | — | — | 防止每条消息各跑一遍 transform/layout |
+| （删除） | 原 `useLayoutEffect` + `requestAnimationFrame(notify)` | — | — | 同上，统一收口到 View |
+
+**回归注意**：若其它页面渲染助手消息但**未**包在带 `data-chat-assistant-shell` 的容器内，代码块**不会出现吸顶**（仍可用内联条）。
+
+---
+
+### 9.7 `apps/frontend/src/components/design/ChatBot/ChatBotView.tsx`（本次需求相关片段）
+
+**下列行号为写入本文档时近似值，请以仓库为准。**
+
+#### 9.7.1 import 与 JSX
+
+| 行号（约） | 代码 | 功能点 | 影响点 | 为什么这么写 |
+|------------|------|--------|--------|----------------|
+| 3 | `import ChatCodeToolbarFloating from '@design/ChatCodeToolBar'` | 挂载浮动 UI | 多 1 个子组件 | 与路径别名一致 |
+| 30 | `import { layoutChatCodeToolbars } from '@/utils/chatCodeToolbar'` | 布局入口 | 替代旧 `notify` | 必须传 viewport |
+| 807 | `<ChatCodeToolbarFloating />` | 在 View 树注册订阅者 | Portal 实际在 body | 放在 `ScrollArea` 外同级，避免嵌套干扰 |
+| 808–809 | 注释 | 说明 ref 与 Portal 关系 | 维护 | — |
+
+#### 9.7.2 `syncViewportScrollMetrics`（约 213–223 行）
+
+| 行号（约） | 代码 | 功能点 | 影响点 | 为什么这么写 |
+|------------|------|--------|--------|----------------|
+| 214–221 | 原有 `scrollTop` / 滚动条 / 是否到底 | **未改行为** | `ChatControls`、自动跟底等 | 保持原逻辑 |
+| 222 | `layoutChatCodeToolbars(el)` | 与视口指标同步刷新吸顶条 | 任何调用 `syncViewportScrollMetrics` 的路径都会更新工具栏 | `onScrollTo`、滚底双帧、`handleScroll` 等**间接**受益 |
+
+#### 9.7.3 `handleScroll`（约 511–518 行）
+
+| 代码 | 功能点 | 影响点 | 为什么这么写 |
+|------|--------|--------|----------------|
+| `syncViewportScrollMetrics()` | 用户滚动时更新状态 + **layout** | 与 9.7.4 原生 `scroll` 可能**连续两次** layout | Radix 的 `onScroll` 可靠性 + 原有 ref 回填逻辑保留 |
+
+#### 9.7.4 resize 与 `useLayoutEffect`（约 350–369 行）
+
+| 行号（约） | 代码 | 功能点 | 影响点 | 为什么这么写 |
+|------------|------|--------|--------|----------------|
+| 350–355 | `resize` → `layoutChatCodeToolbars(scrollContainerRef.current)` | 窗宽变化重算 `left/width` | 全局 `window` 监听 | 浮动条用视口像素，必须随窗宽变 |
+| 357–364 | `useLayoutEffect`：`vp.addEventListener('scroll', ...)` | 滚动必 layout | `activeSessionId` / `messages.length` 变时重绑 | 防止会话切换后 listener 挂在旧 DOM |
+| 366–369 | `useLayoutEffect([messages])` | 列表引用变化 layout 一次 | 流式/懒加载高度变而无 scroll 事件时补一帧 | **不解决**「同引用仅内容变」的极端情况（见 9.4 风险） |
+
+**与原有功能冲突评估**：**不修改** `messages` 合并算法、分支滚动、`flushSync` 等；仅增加 **layout 副作用**。理论上**不应**改变跟底判定；若发现滚动卡顿，优先 profiling `layoutChatCodeToolbars` 调用次数。
+
+---
+
+### 9.8 `apps/frontend/src/index.css`（`.chat-md-*` 相关）
+
+| 选择器/行（约） | 声明 | 功能点 | 影响点 | 为什么这么写 |
+|-----------------|------|--------|--------|----------------|
+| 37–38 | 注释 | 说明工具栏来源 | 维护 | — |
+| 38–45 | `.chat-md-code-block` | 块容器样式 | 全局助手 Markdown | 原样保留 |
+| 47–50 | `.chat-md-code-toolbar-slot` | `flex-shrink: 0` | 与 flex 布局共存时 slot 不被压扁 | 保证占位稳定 |
+| 52–71 | `.chat-md-code-toolbar` | 条样式 | 内联与结构一致 | **删除**原 `will-change: transform`：已不再用 transform 吸顶，避免无谓合成层 |
+| 73–76 | `--replaced-by-float` | `visibility:hidden` + `pointer-events:none` | pin 时内联条不可点不可见 | 保留布局参与（配合 slot 高度）；不用 `display:none` 以免高度逻辑更难统一 |
+| 78–86 | `--floating` | 整块圆角、边框、阴影 | 仅 Portal 条额外 class | 视觉与块内条区分（浮在内容之上） |
+| 88–121 | lang / actions / btn | 子元素样式 | 内联与浮动共用 | 复用同一套 DOM 结构 |
+
+---
+
+### 9.9 数据流与时序（便于排查 bug）
+
+```mermaid
+flowchart LR
+  subgraph dom [DOM]
+    VP[ScrollArea viewport]
+    BLOCK[data-chat-code-block]
+    SLOT[slot + toolbar]
+    BODY[document.body]
+  end
+  CBV[ChatBotView] -->|scroll resize messages sync| LAYOUT[layoutChatCodeToolbars]
+  LAYOUT -->|read| VP
+  LAYOUT -->|query| BLOCK
+  LAYOUT -->|pin attr minHeight class| SLOT
+  LAYOUT -->|set state emit| STORE[chatCodeToolbar store]
+  STORE -->|subscribe| FLOAT[ChatCodeToolbarFloating]
+  FLOAT -->|Portal fixed| BODY
+```
+
+**常见 bug 对照**
+
+| 现象 | 可能原因 |
+|------|----------|
+| 无吸顶条 | `@dnhyxc-ai/tools` 未 build；HTML 无 `toolbar-slot`；无 `data-chat-assistant-shell` |
+| 条位置闪 | `messages` 引用未变但内容大变，需滚动或补 ResizeObserver |
+| 双次卡顿 | `handleScroll` 与原生 `scroll` 双重 `layout`（可优化为单次） |
+| z-index 被挡 | 浮动条 `z-index:60` 低于模态 |
+
+---
+
+### 9.10 构建与联调命令
+
+```bash
+# 修改 markdown-parser 后必做
+pnpm --filter @dnhyxc-ai/tools run build
+
+# 前端类型检查
+cd apps/frontend && pnpm exec tsc --noEmit
+```
+
+---
+
+**本节完**：九、本次需求「代码块吸顶工具栏」从 **parser 输出 → store/layout → Portal UI → View 驱动 → CSS** 全链路说明完毕；与**第一节至第八节**（历史性能与分支等）可并列查阅，互不替代。

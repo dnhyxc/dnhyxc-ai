@@ -15,6 +15,11 @@ export interface MarkdownParserOptions {
 	containerClass?: string;
 	// 可选：自定义错误处理函数
 	onError?: (error: unknown) => void;
+	/**
+	 * 为围栏代码块输出带工具栏的 DOM（语言 / 复制 / 下载），供聊天等场景配合滚动同步贴顶。
+	 * 默认 false，避免会话列表、编辑器等处的代码块出现多余按钮。
+	 */
+	enableChatCodeFenceToolbar?: boolean;
 }
 
 class MarkdownParser {
@@ -60,6 +65,54 @@ class MarkdownParser {
 
 		// Add support for \(...\) and \[...\] delimiters
 		this.addLatexDelimiters();
+
+		if (options.enableChatCodeFenceToolbar) {
+			this.patchChatCodeFenceRenderer();
+		}
+	}
+
+	/**
+	 * 覆盖 fence 渲染：外层 chat-md-code-block + 工具栏 + pre/code，高亮逻辑与默认 highlight 一致。
+	 */
+	private patchChatCodeFenceRenderer(): void {
+		const md = this.md;
+		md.renderer.rules.fence = (tokens, idx, options, _env, _slf) => {
+			const token = tokens[idx];
+			const info = token.info
+				? md.utils.unescapeAll(String(token.info)).trim()
+				: '';
+			const langName = info.split(/\s+/g)[0] || '';
+			let highlighted = '';
+			if (options.highlight) {
+				highlighted = options.highlight(token.content, langName, '') || '';
+			}
+			if (!highlighted) {
+				highlighted = md.utils.escapeHtml(token.content);
+			}
+			const escapedLangLabel = md.utils.escapeHtml(langName || 'text');
+			const codeClass = langName
+				? `language-${md.utils.escapeHtml(langName)} hljs`
+				: 'hljs';
+			return (
+				'<div class="chat-md-code-block" data-chat-code-block>' +
+				'<div class="chat-md-code-toolbar-slot">' +
+				'<div class="chat-md-code-toolbar">' +
+				'<span class="chat-md-code-lang">' +
+				escapedLangLabel +
+				'</span>' +
+				'<div class="chat-md-code-actions">' +
+				'<button type="button" class="chat-md-code-btn" data-chat-code-action="copy">复制</button>' +
+				'<button type="button" class="chat-md-code-btn" data-chat-code-action="download" data-chat-code-lang="' +
+				escapedLangLabel +
+				'">下载</button>' +
+				'</div></div></div>' +
+				'<pre><code class="' +
+				codeClass +
+				'">' +
+				highlighted +
+				'</code></pre></div>\n'
+			);
+		};
 	}
 
 	/**

@@ -34,6 +34,100 @@ body {
 		}
 	}
 
+	/* 助手 Markdown 围栏代码：工具栏由 MarkdownParser(enableChatCodeFenceToolbar) 输出，位移由 chatCodeToolbar 滚动同步 */
+	.chat-md-code-block {
+		position: relative;
+		margin: 0.75rem 0;
+		border: 1px solid var(--theme-border);
+		border-radius: 0.5rem;
+		background: color-mix(in oklch, var(--theme-secondary) 55%, transparent);
+		user-select: text;
+	}
+
+	/* 占位：吸顶时内联工具栏 visibility:hidden，高度由 JS 写 min-height，避免正文跳动 */
+	.chat-md-code-toolbar-slot {
+		flex-shrink: 0;
+	}
+
+	.chat-md-code-toolbar {
+		position: relative;
+		z-index: 4;
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.5rem;
+		padding: 0.375rem 0.625rem;
+		border-bottom: 1px solid var(--theme-border);
+		border-radius: 0.5rem 0.5rem 0 0;
+		background: color-mix(
+			in oklch,
+			var(--theme-background) 88%,
+			var(--theme-card)
+		);
+		backdrop-filter: blur(8px);
+		-webkit-backdrop-filter: blur(8px);
+		box-shadow: 0 1px 0
+			color-mix(in oklch, var(--theme-border) 40%, transparent);
+	}
+
+	.chat-md-code-toolbar--replaced-by-float {
+		visibility: hidden;
+		pointer-events: none;
+	}
+
+	/* Portal 到 body 的吸顶条：整块圆角与描边，与块内工具栏视觉一致 */
+	.chat-md-code-toolbar--floating {
+		border: 1px solid var(--theme-border);
+		border-radius: 0.5rem;
+		border-bottom: 1px solid var(--theme-border);
+		box-shadow:
+			0 4px 24px color-mix(in oklch, var(--theme-background) 40%, black),
+			0 1px 0 color-mix(in oklch, var(--theme-border) 40%, transparent);
+	}
+
+	.chat-md-code-lang {
+		font-size: 0.75rem;
+		line-height: 1.25;
+		color: var(--theme-textcolor);
+		opacity: 0.72;
+		font-variant-numeric: tabular-nums;
+	}
+
+	.chat-md-code-actions {
+		display: flex;
+		align-items: center;
+		gap: 0.25rem;
+		flex-shrink: 0;
+	}
+
+	.chat-md-code-btn {
+		font-size: 0.75rem;
+		line-height: 1.25;
+		padding: 0.125rem 0.375rem;
+		border-radius: 0.25rem;
+		border: none;
+		background: transparent;
+		color: var(--theme-textcolor);
+		opacity: 0.85;
+		cursor: pointer;
+		transition:
+			opacity 0.15s ease,
+			background-color 0.15s ease;
+	}
+
+	.chat-md-code-btn:hover {
+		opacity: 1;
+		background: color-mix(in oklch, var(--theme-textcolor) 8%, transparent);
+	}
+
+	.chat-md-code-block pre {
+		margin: 0 !important;
+		padding: 0.75rem 1rem !important;
+		border-radius: 0 0 0.5rem 0.5rem;
+		background: transparent !important;
+		overflow-x: auto;
+	}
+
 	.md-editor-dark,
 	.md-editor-modal-container[data-theme="dark"] {
 		--md-color: var(--theme-textcolor);

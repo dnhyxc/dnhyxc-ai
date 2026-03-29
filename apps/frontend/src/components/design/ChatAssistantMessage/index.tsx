@@ -10,6 +10,10 @@ import { ChevronDown, ChevronRight } from 'lucide-react';
 // memo：父级重渲染时若 props 判定相等则跳过本组件，减少与 PlainTextFallback / MdPreview 的协调成本
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { Message } from '@/types/chat';
+import {
+	downloadChatCodeBlock,
+	getChatCodeBlockPlainText,
+} from '@/utils/chatCodeToolbar';
 import { applyOrganicCitationAnchors } from '@/utils/organicCitation';
 
 // 扩大「可见」判定范围，用户快速滚动时先一步挂载 MdPreview，减轻从纯文本切到排版的闪烁感
@@ -74,9 +78,13 @@ function ChatAssistantMessageInner({
 		Boolean(message.isStreaming),
 	);
 
-	const parser = useMemo(() => {
-		return new MarkdownParser();
-	}, []);
+	const parser = useMemo(
+		() =>
+			new MarkdownParser({
+				enableChatCodeFenceToolbar: true,
+			}),
+		[],
+	);
 	// ↑ false：正文/思考走 PlainTextFallback；true：挂 MdPreview。初始：流式须立刻 true 跟 token；非流式 false 可走视口懒加载减主线程压力
 
 	// 随 isStreaming：一旦流式则强制 richReady（中途转流式/首屏滞后时避免半段纯文本）
@@ -172,10 +180,39 @@ function ChatAssistantMessageInner({
 		return applyOrganicCitationAnchors(raw, org);
 	}, [message.content, message.thinkContent, message.searchOrganic]);
 
+	useEffect(() => {
+		const el = shellRef.current;
+		if (!el) return;
+		const onClick = (e: MouseEvent) => {
+			const target = e.target as HTMLElement;
+			const btn = target.closest<HTMLButtonElement>('[data-chat-code-action]');
+			if (!btn || !el.contains(btn)) return;
+			const action = btn.getAttribute('data-chat-code-action');
+			const block = btn.closest<HTMLElement>('[data-chat-code-block]');
+			if (!block) return;
+			if (action === 'copy') {
+				void navigator.clipboard.writeText(getChatCodeBlockPlainText(block));
+				const prev = btn.textContent;
+				btn.textContent = '已复制';
+				window.setTimeout(() => {
+					btn.textContent = prev;
+				}, 1500);
+				return;
+			}
+			if (action === 'download') {
+				const lang = btn.getAttribute('data-chat-code-lang') || 'text';
+				downloadChatCodeBlock(block, lang);
+			}
+		};
+		el.addEventListener('click', onClick);
+		return () => el.removeEventListener('click', onClick);
+	}, []);
+
 	return (
 		<div
 			ref={shellRef} // IO 观察目标：整条气泡（思考区+正文+操作区），进视口判定与此一致
 			className="w-full h-auto"
+			data-chat-assistant-shell
 		>
 			{message?.searchOrganic && message.searchOrganic?.length > 0 && (
 				<div className="text-sm text-textcolor/50">
