@@ -7,8 +7,9 @@ import MarkdownPreview from '@design/Markdown';
 import { Spinner } from '@ui/index';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 // memo：父级重渲染时若 props 判定相等则跳过本组件，减少与 PlainTextFallback / MdPreview 的协调成本
-import { memo, useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { Message } from '@/types/chat';
+import { applyOrganicCitationAnchors } from '@/utils/organicCitation';
 
 // 扩大「可见」判定范围，用户快速滚动时先一步挂载 MdPreview，减轻从纯文本切到排版的闪烁感
 const LAZY_ROOT_MARGIN = '360px 0px 520px 0px';
@@ -156,9 +157,15 @@ function ChatAssistantMessageInner({
 		// chatId 变：新气泡重新走懒加载；isStreaming 变：与上一 effect 协同；richReady 变：升级后卸载监听
 	}, [message.chatId, message.isStreaming, scrollViewportRef, richReady]);
 
-	// 正文展示字符串：无正文但有思考时显示空串；都无则显示「思考中...」占位
-	const bodyText =
-		message.content || (message?.thinkContent ? '' : '思考中...');
+	// 正文：流式阶段后端仍推送原始 [n]，有 searchOrganic 时在前端做与落库相同的引用转换
+	const bodyText = useMemo(() => {
+		const raw = message.content || (message?.thinkContent ? '' : '思考中...');
+		const org = message.searchOrganic;
+		if (!org?.length || raw === '思考中...') {
+			return raw;
+		}
+		return applyOrganicCitationAnchors(raw, org);
+	}, [message.content, message.thinkContent, message.searchOrganic]);
 
 	return (
 		<div
@@ -249,6 +256,7 @@ const ChatAssistantMessage = memo(
 		prev.message.chatId === next.message.chatId &&
 		prev.message.content === next.message.content && // 正文未变 → 子 Markdown memo 也可跳过
 		(prev.message.thinkContent ?? '') === (next.message.thinkContent ?? '') &&
+		prev.message.searchOrganic === next.message.searchOrganic &&
 		prev.message.isStreaming === next.message.isStreaming && // 懒加载分支 + 底部「正在生成…」
 		prev.message.finishReason === next.message.finishReason &&
 		prev.isShowThinkContent === next.isShowThinkContent &&

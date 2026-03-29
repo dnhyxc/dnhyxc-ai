@@ -29,6 +29,32 @@ function escapeHrefForDoubleQuotedAttr(url: string): string {
 	return url.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
 }
 
+/** Markdown 链接 destination：含空白、尖括号或圆括号时用尖括号包裹并转义 <>，避免破坏解析 */
+function wrapMarkdownLinkDestination(url: string): string {
+	const t = url.trim();
+	if (!t) {
+		return t;
+	}
+	if (/[\s<>()]/.test(t)) {
+		return `<${t.replace(/</g, '%3C').replace(/>/g, '%3E')}>`;
+	}
+	return t;
+}
+
+/** 与 organic 条目的 URL 比对（trim + 尽力 decodeURIComponent 归一化） */
+function urlsMatchForOrganic(dest: string, organicLink: string): boolean {
+	const norm = (u: string) => {
+		let s = u.trim();
+		try {
+			s = decodeURIComponent(s);
+		} catch {
+			// 非法百分号序列时保持原样
+		}
+		return s;
+	};
+	return norm(dest) === norm(organicLink);
+}
+
 /**
  * 将模型常用的【n】、以及非 Markdown 链接形式的 [n] 转为指向 organic[n-1].link 的 <a>。
  * 与提示词配合使用：即使模型不输出 HTML，前端与落库仍可得可点击引用。
@@ -52,7 +78,27 @@ export function applyOrganicCitationAnchors(
 		return `<a href="${escapeHrefForDoubleQuotedAttr(link)}" target="_blank" rel="noopener noreferrer" style="cursor: default;" class="__md-search-organic__">${idx}</a>`;
 	};
 
-	let out = text.replace(/【(\d+)】/g, (full, raw: string) => {
+	// 模型按提示输出 Markdown [n](url) 时，转为与【n】相同属性的 <a>（href 以 organic 为准，防篡改）
+	let out = text.replace(
+		/\[(\d+)\]\(\s*(?:<([^>\n]+)>|([^)\n]+))\s*\)/g,
+		(full, raw: string, angled?: string, plain?: string) => {
+			const i = Number.parseInt(raw, 10);
+			if (Number.isNaN(i)) {
+				return full;
+			}
+			const destRaw = (angled ?? plain ?? '').trim();
+			if (!destRaw) {
+				return full;
+			}
+			const expected = organic[i - 1]?.link?.trim();
+			if (!expected || !urlsMatchForOrganic(destRaw, expected)) {
+				return full;
+			}
+			return toAnchor(i) ?? full;
+		},
+	);
+
+	out = out.replace(/【(\d+)】/g, (full, raw: string) => {
 		const i = Number.parseInt(raw, 10);
 		if (Number.isNaN(i)) {
 			return full;
@@ -144,13 +190,18 @@ export class SerperService {
 			const blocks = organic.map((item, i) => {
 				const snippet = item.snippet ?? '';
 				const n = i + 1;
-				// 每条给出可复制示例，降低模型写错 href 的概率
-				return `${n}. **${item.title}**\n   链接: ${item.link}\n   摘要: ${snippet}\n   引用示例（正文须按此 HTML 形式输出）: <a href="${item.link}" target="_blank" rel="noopener noreferrer" style="cursor: default;" class="__md-search-organic__">${n}</a>`;
+				const mdDest = wrapMarkdownLinkDestination(item.link);
+				// 每条给出可复制 Markdown 引用示例；落库前由 applyOrganicCitationAnchors 转为带 class 等属性的 <a>
+				return `${n}. **${item.title}**\n   URL: ${item.link}\n   摘要: ${snippet}\n   引用示例（正文须使用此 Markdown 链接形式）: [${n}](${mdDest})`;
 			});
 
 			const promptText =
 				'\n\n---\n**以下为通过 Serper（Google 搜索结果 SERP，即搜索引擎结果页）获取的参考资料**。回答时请结合这些内容；与问题无关的可忽略。\n\n' +
-				'**引用格式**：引用第 n 条资料时，请使用全角括号序号 **【n】**（n 为行首编号，如【1】【2】）；系统会将其转为可点击链接。若直接输出 HTML，格式须为 `<a href="完整 URL" target="_blank" rel="noopener noreferrer" style="cursor: default;" class="__md-search-organic__">序号</a>`，且 `href` 与该条「链接:」后 URL 完全一致。\n\n' +
+				'**引用格式（须严格遵守）**：\n' +
+				'1. 引用第 n 条资料时，**必须**使用 **Markdown 链接** `[n](URL)`，其中 URL 与对应条目的「URL:」行**逐字符一致**（含特殊字符时与「引用示例」相同，可能为尖括号包裹 `<...>`）。\n' +
+				'2. **禁止**只写半角方括号序号如 `[n]`（后接句号、空格或句末等），也禁止写脚注式上标；那不是有效 Markdown 链接，引用会失效。\n' +
+				'3. 或使用全角序号 **【n】**。\n' +
+				'系统会将合规引用转为带 `target="_blank"`、`rel="noopener noreferrer"`、`style="cursor: default;"`、`class="__md-search-organic__"` 的可点击样式。\n\n' +
 				blocks.join('\n\n') +
 				'\n---\n';
 
