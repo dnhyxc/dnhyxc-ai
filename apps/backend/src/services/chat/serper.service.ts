@@ -24,13 +24,59 @@ export interface SerperSearchContextResult {
  */
 const SERPER_GOOGLE_SEARCH_URL = 'https://google.serper.dev/search';
 
+/** 转义 href 属性中的引号与 &，避免破坏 HTML */
+function escapeHrefForDoubleQuotedAttr(url: string): string {
+	return url.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+}
+
+/**
+ * 将模型常用的【n】、以及非 Markdown 链接形式的 [n] 转为指向 organic[n-1].link 的 <a>。
+ * 与提示词配合使用：即使模型不输出 HTML，前端与落库仍可得可点击引用。
+ */
+export function applyOrganicCitationAnchors(
+	text: string,
+	organic: Pick<SerperOrganicItem, 'link'>[],
+): string {
+	if (!text || !organic?.length) {
+		return text;
+	}
+	const max = organic.length;
+	const toAnchor = (idx: number): string | null => {
+		if (idx < 1 || idx > max) {
+			return null;
+		}
+		const link = organic[idx - 1]?.link?.trim();
+		if (!link) {
+			return null;
+		}
+		return `<a href="${escapeHrefForDoubleQuotedAttr(link)}">${idx}</a>`;
+	};
+
+	let out = text.replace(/【(\d+)】/g, (full, raw: string) => {
+		const i = Number.parseInt(raw, 10);
+		if (Number.isNaN(i)) {
+			return full;
+		}
+		return toAnchor(i) ?? full;
+	});
+	// 排除 Markdown 链接 [text](url) 中的 [数字]
+	out = out.replace(/\[(\d+)\](?!\()/g, (full, raw: string) => {
+		const i = Number.parseInt(raw, 10);
+		if (Number.isNaN(i)) {
+			return full;
+		}
+		return toAnchor(i) ?? full;
+	});
+	return out;
+}
+
 @Injectable()
 export class SerperService {
 	constructor(
 		private readonly configService: ConfigService,
 		@Inject(WINSTON_MODULE_NEST_PROVIDER)
 		private readonly logger: LoggerService,
-	) {}
+	) { }
 
 	isConfigured(): boolean {
 		return !!this.configService.get<string>(ModelEnum.SERPER_API_KEY)?.trim();
@@ -95,11 +141,14 @@ export class SerperService {
 
 			const blocks = organic.map((item, i) => {
 				const snippet = item.snippet ?? '';
-				return `${i + 1}. **${item.title}**\n   链接: ${item.link}\n   摘要: ${snippet}`;
+				const n = i + 1;
+				// 每条给出可复制示例，降低模型写错 href 的概率
+				return `${n}. **${item.title}**\n   链接: ${item.link}\n   摘要: ${snippet}\n   引用示例（正文须按此 HTML 形式输出）: <a href="${item.link}" target="_blank" rel="noopener noreferrer" style="cursor: default;" class="__md-search-organic__">${n}</a>`;
 			});
 
 			const promptText =
-				'\n\n---\n**以下为通过 Serper（Google 搜索结果 SERP）获取的参考资料**，回答时请结合这些内容，必要时标注来源链接或序号；若与用户问题无关可忽略。\n\n' +
+				'\n\n---\n**以下为通过 Serper（Google 搜索结果 SERP，即搜索引擎结果页）获取的参考资料**。回答时请结合这些内容；与问题无关的可忽略。\n\n' +
+				'**引用格式**：引用第 n 条资料时，请使用全角括号序号 **【n】**（n 为行首编号，如【1】【2】）；系统会将其转为可点击链接。若直接输出 HTML，格式须为 `<a href="完整 URL" target="_blank" rel="noopener noreferrer" style="cursor: default;" class="__md-search-organic__">序号</a>`，且 `href` 与该条「链接:」后 URL 完全一致。\n\n' +
 				blocks.join('\n\n') +
 				'\n---\n';
 

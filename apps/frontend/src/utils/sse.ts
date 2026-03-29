@@ -115,7 +115,7 @@ export const streamFetch = async ({
 									if (
 										typeof parsed.content === 'object' &&
 										(parsed.content as { type?: string }).type ===
-											'searchOrganic' &&
+										'searchOrganic' &&
 										Array.isArray(
 											(parsed.content as { organic?: SearchOrganicItem })
 												.organic,

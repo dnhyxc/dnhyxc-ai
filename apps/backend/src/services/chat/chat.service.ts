@@ -27,7 +27,11 @@ import { ChatContinueDto } from './dto/chat-continue.dto';
 import { ChatMessageDto } from './dto/chat-message.dto';
 import { ChatRequestDto } from './dto/chat-request.dto';
 import { MessageService } from './message.service';
-import { type SerperOrganicItem, SerperService } from './serper.service';
+import {
+	applyOrganicCitationAnchors,
+	type SerperOrganicItem,
+	SerperService,
+} from './serper.service';
 
 // Scope.REQUEST: 声明作用域，否则 queue-events.listener 中的队列监听器会被忽略，不生效
 @Injectable({ scope: Scope.REQUEST })
@@ -63,6 +67,26 @@ export class ChatService {
 		const userMsgs = dto.messages.filter((m) => m.role === 'user');
 		const last = userMsgs[userMsgs.length - 1];
 		return last?.content?.trim() ?? '';
+	}
+
+	/**
+	 * 续写轮次不重新跑 Serper，需从已落库的助手消息取 searchOrganic，才能把【n】转成 <a>。
+	 */
+	private async getSearchOrganicForAnchors(
+		fromSerper: SerperOrganicItem[] | null,
+		dto: ChatRequestDto,
+	): Promise<SerperOrganicItem[] | null> {
+		if (fromSerper?.length) {
+			return fromSerper;
+		}
+		if (dto.isContinuation && dto.assistantMessage?.chatId) {
+			const msg = await this.messageService.findOneMessageByChatId(
+				dto.assistantMessage.chatId,
+			);
+			const o = msg?.searchOrganic;
+			return o?.length ? o : null;
+		}
+		return null;
 	}
 
 	private async processFileAttachments(filePaths: string[]): Promise<string> {
@@ -464,6 +488,15 @@ Stick strictly to what is visually present.`,
 						}
 					}
 
+					const organicForAnchors = await this.getSearchOrganicForAnchors(
+						serperOrganicForAssistant,
+						dto,
+					);
+					const anchoredAssistantContent = applyOrganicCitationAnchors(
+						fullContent,
+						organicForAnchors ?? [],
+					);
+
 					// 无论是否被取消，只要有内容，都尝试保存到数据库（入队）
 					// 正常完成，cancel$.isStopped 为 false, 暂停时 cancel$.isStopped 为 true
 					if (!cancel$.isStopped) {
@@ -474,7 +507,7 @@ Stick strictly to what is visually present.`,
 								.add('save-message', {
 									sessionId,
 									role: MessageRole.ASSISTANT,
-									content: fullContent,
+									content: anchoredAssistantContent,
 									attachments: [],
 									parentId: dto.assistantMessage.parentId || null,
 									isRegenerate: dto.isRegenerate || false,
@@ -501,7 +534,7 @@ Stick strictly to what is visually present.`,
 									.add('save-message', {
 										sessionId,
 										role: MessageRole.ASSISTANT,
-										content: fullContent,
+										content: anchoredAssistantContent,
 										attachments: [],
 										parentId: dto.assistantMessage.parentId || null,
 										isRegenerate: dto.isRegenerate || false,
@@ -542,12 +575,20 @@ Stick strictly to what is visually present.`,
 						fullContent.length > 0 &&
 						(cancel$.isStopped || subscriber.closed)
 					) {
+						const organicErr = await this.getSearchOrganicForAnchors(
+							serperOrganicForAssistant,
+							dto,
+						);
+						const anchoredErrContent = applyOrganicCitationAnchors(
+							fullContent,
+							organicErr ?? [],
+						);
 						// 即使出错，如果是取消导致的，也保存已有内容
 						try {
 							this.messageQueue.add('save-message', {
 								sessionId,
 								role: MessageRole.ASSISTANT,
-								content: fullContent,
+								content: anchoredErrContent,
 								attachments: [],
 								parentId: dto.parentId || null,
 								isRegenerate: dto.isRegenerate || false,
@@ -749,8 +790,16 @@ Stick strictly to what is visually present.`,
 
 		const response = await llm.invoke(allMessages);
 		const responseContent = response.content as string;
+		const organicForAnchors = await this.getSearchOrganicForAnchors(
+			serperOrganicForAssistant,
+			dto,
+		);
+		const anchoredResponseContent = applyOrganicCitationAnchors(
+			responseContent,
+			organicForAnchors ?? [],
+		);
 
-		const aiMessage = new AIMessage(responseContent);
+		const aiMessage = new AIMessage(anchoredResponseContent);
 		this.conversationMemory.set(sessionId, [...allMessages, aiMessage]);
 
 		// 保存 AI 回复到队列（异步处理）
@@ -759,7 +808,7 @@ Stick strictly to what is visually present.`,
 				.add('save-message', {
 					sessionId,
 					role: MessageRole.ASSISTANT,
-					content: responseContent,
+					content: anchoredResponseContent,
 					attachments: [],
 					parentId: dto.assistantMessage.parentId || null,
 					isRegenerate: false,
@@ -785,7 +834,7 @@ Stick strictly to what is visually present.`,
 				.add('save-message', {
 					sessionId,
 					role: MessageRole.ASSISTANT,
-					content: responseContent,
+					content: anchoredResponseContent,
 					attachments: [],
 					parentId: null, // 异步模式下难以即时获取刚插入的用户消息 ID
 					isRegenerate: false,
@@ -801,7 +850,7 @@ Stick strictly to what is visually present.`,
 		}
 
 		return {
-			content: responseContent,
+			content: anchoredResponseContent,
 			sessionId,
 			finishReason: 'stop',
 		};

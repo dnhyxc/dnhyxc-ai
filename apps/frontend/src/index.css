@@ -51,6 +51,30 @@ body {
 		--md-scrollbar-thumb-hover-color: #3a3a3a;
 		--md-scrollbar-thumb-active-color: #3a3a3a;
 	}
+
+	.__md-search-organic__ {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		cursor: pointer !important;
+		margin-left: 4px;
+		border-block-end: none !important;
+		border-radius: 100%;
+		background-color: var(--theme-secondary);
+		width: 18px;
+		height: 18px;
+		font-size: 12px;
+		vertical-align: text-top;
+		color: var(--theme-textcolor);
+
+		&:hover {
+			background-color: var(--theme-background);
+		}
+
+		&::after {
+			content: none !important;
+		}
+	}
 }
 
 #root {
