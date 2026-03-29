@@ -8,6 +8,7 @@ import {
 	PrimaryGeneratedColumn,
 } from 'typeorm';
 import { Attachments } from './attachments.entity';
+import type { SerperOrganicItem } from './serper.service';
 import { ChatSessions } from './session.entity';
 
 export enum MessageRole {
@@ -35,6 +36,10 @@ export class ChatMessages {
 
 	@Column('text')
 	content: string;
+
+	/** Serper 联网检索 organic 快照（仅助手消息可能非空） */
+	@Column({ type: 'json', nullable: true })
+	searchOrganic: SerperOrganicItem[] | null;
 
 	@Column({ type: 'text', nullable: true })
 	parentId: string | null;

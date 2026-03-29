@@ -23,6 +23,19 @@ export interface SessionData {
 	total: number;
 }
 
+/** Serper 联网检索单条 organic（与后端 searchOrganic 字段一致） */
+export interface SearchOrganicItem {
+	title: string;
+	link: string;
+	snippet?: string;
+}
+
+export interface SearchOrganic {
+	chatId: string;
+	organic: SearchOrganicItem[];
+	type: 'searchOrganic';
+}
+
 export interface Message {
 	chatId: string;
 	content: string;
@@ -45,6 +58,8 @@ export interface Message {
 		maxTokensReached: boolean;
 		sessionId: string; // 新增：记录产生此 finishInfo 的会话 ID
 	};
+	/** 联网搜索 Serper organic 热点（助手消息） */
+	searchOrganic?: SearchOrganicItem[] | null;
 }
 
 export interface ChatRequestParams {

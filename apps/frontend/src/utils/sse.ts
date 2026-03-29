@@ -1,7 +1,7 @@
 import { fetch } from '@tauri-apps/plugin-http';
 import { Toast } from '@ui/index';
 import { BASE_URL } from '@/constant';
-import { FinishInfo } from '@/types/chat';
+import { FinishInfo, SearchOrganic, SearchOrganicItem } from '@/types/chat';
 import { getStorage } from '.';
 
 interface StreamCallbacks {
@@ -11,6 +11,7 @@ interface StreamCallbacks {
 	onError?: (error: Error, type?: 'error' | 'info' | 'warning') => void;
 	onComplete?: (error?: string) => void;
 	onGetFinishInfo?: (info: FinishInfo) => void;
+	onGetSearchOrganic?: (organic: SearchOrganic) => void;
 }
 
 export const streamFetch = async ({
@@ -22,8 +23,15 @@ export const streamFetch = async ({
 	callbacks: StreamCallbacks;
 	api?: string;
 }): Promise<() => void> => {
-	const { onData, onError, onComplete, onStart, onThinking, onGetFinishInfo } =
-		callbacks;
+	const {
+		onData,
+		onError,
+		onComplete,
+		onStart,
+		onThinking,
+		onGetFinishInfo,
+		onGetSearchOrganic,
+	} = callbacks;
 
 	const controller = new AbortController();
 	options.signal = controller.signal;
@@ -103,6 +111,17 @@ export const streamFetch = async ({
 										parsed.content?.reason === 'length'
 									) {
 										onGetFinishInfo?.(parsed.content);
+									}
+									if (
+										typeof parsed.content === 'object' &&
+										(parsed.content as { type?: string }).type ===
+											'searchOrganic' &&
+										Array.isArray(
+											(parsed.content as { organic?: SearchOrganicItem })
+												.organic,
+										)
+									) {
+										onGetSearchOrganic?.(parsed.content);
 									}
 								} catch (e) {
 									Toast({

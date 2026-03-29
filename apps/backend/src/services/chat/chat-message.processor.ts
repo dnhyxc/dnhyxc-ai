@@ -5,6 +5,7 @@ import type { Job } from 'bullmq';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { MessageRole } from './chat.entity';
 import { MessageService } from './message.service';
+import type { SerperOrganicItem } from './serper.service';
 
 interface SaveMessageJobData {
 	sessionId: string;
@@ -17,6 +18,8 @@ interface SaveMessageJobData {
 	childrenIds?: string[];
 	currentChatId?: string;
 	isContinuation?: boolean; // 续写标志：true 表示续写模式，需要追加内容而不是替换
+	/** 助手消息：Serper organic 热点，与流式推送一致 */
+	searchOrganic?: SerperOrganicItem[];
 }
 
 interface JobResult {

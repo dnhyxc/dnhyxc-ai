@@ -225,6 +225,8 @@ const getFormatMessages = (messages: Message[]) => {
 		isStopped: msg.isStopped,
 		currentChatId: msg.currentChatId,
 		finishReason: msg.finishReason,
+		searchOrganic: msg.searchOrganic,
+		...messages,
 	}));
 };
 

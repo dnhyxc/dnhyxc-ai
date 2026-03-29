@@ -127,6 +127,7 @@ export class MessageService {
 			childrenIds = [],
 			currentChatId,
 			isContinuation = false, // 续写标志
+			searchOrganic,
 		} = params;
 
 		try {
@@ -151,6 +152,10 @@ export class MessageService {
 					childrenIds || existingMessage.childrenIds || [];
 				existingMessage.currentChatId =
 					currentChatId || existingMessage.currentChatId || chatId || '';
+				// 仅助手消息写入联网检索快照；未传 searchOrganic 时保留库中原值（如续写）
+				if (role === 'assistant' && searchOrganic !== undefined) {
+					existingMessage.searchOrganic = searchOrganic ?? null;
+				}
 				message = existingMessage;
 			} else {
 				const session = await this.findOneSession(sessionId);
@@ -165,6 +170,10 @@ export class MessageService {
 					chatId: chatId || '', // 保存 chatId 字段
 					currentChatId: currentChatId || chatId || '', // 保存 currentChatId 字段，以前端传递的为准
 					sessionId,
+					...(role === 'assistant' &&
+						searchOrganic !== undefined && {
+							searchOrganic: searchOrganic ?? null,
+						}),
 				});
 			}
 

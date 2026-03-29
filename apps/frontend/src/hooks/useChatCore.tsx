@@ -12,7 +12,12 @@ import { useChatCoreContext } from '@/contexts';
 import { createSession, stopSse } from '@/service';
 import useStore from '@/store';
 import { UploadedFile } from '@/types';
-import { ChatRequestParams, FinishInfo, Message } from '@/types/chat';
+import {
+	ChatRequestParams,
+	FinishInfo,
+	Message,
+	SearchOrganic,
+} from '@/types/chat';
 import { streamFetch } from '@/utils/sse';
 import { useMessageTools } from './useMessageTools';
 
@@ -283,6 +288,12 @@ export const useChatCore = (
 							chatStore.setFinishReason(assistantMessageId, {
 								...reason,
 								sessionId,
+							});
+						},
+						onGetSearchOrganic: (data: SearchOrganic) => {
+							const { chatId, organic } = data;
+							chatStore.updateMessage(chatId ?? assistantMessageId, {
+								searchOrganic: organic,
 							});
 						},
 						onError: (err, type) => {

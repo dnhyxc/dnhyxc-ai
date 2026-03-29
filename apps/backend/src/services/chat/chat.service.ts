@@ -27,7 +27,7 @@ import { ChatContinueDto } from './dto/chat-continue.dto';
 import { ChatMessageDto } from './dto/chat-message.dto';
 import { ChatRequestDto } from './dto/chat-request.dto';
 import { MessageService } from './message.service';
-import { SerperService } from './serper.service';
+import { type SerperOrganicItem, SerperService } from './serper.service';
 
 // Scope.REQUEST: 声明作用域，否则 queue-events.listener 中的队列监听器会被忽略，不生效
 @Injectable({ scope: Scope.REQUEST })
@@ -255,6 +255,8 @@ Stick strictly to what is visually present.`,
 				let hasReceivedFirstToken = false;
 				// 【新增】用于追踪停止原因
 				let finishReason: 'stop' | 'length' | null = null;
+				// 本轮联网检索 organic，写入助手消息并在流中推送
+				let serperOrganicForAssistant: SerperOrganicItem[] | null = null;
 
 				try {
 					// 在开始任何耗时操作前检查是否已被停止
@@ -299,24 +301,23 @@ Stick strictly to what is visually present.`,
 							: systemContent.trim(),
 					};
 
-					console.log(dto.webSearch, 'dto.webSearchdto.webSearchdto.webSearch');
-
 					// Serper 联网搜索：将检索摘要并入系统提示（续写轮次不重复检索）
 					if (dto.webSearch && !dto.isContinuation) {
 						const searchQuery = this.resolveWebSearchQuery(dto);
-						console.log('searchQuery', searchQuery);
 						if (searchQuery) {
 							if (!this.serperService.isConfigured()) {
 								systemPrompt.content +=
-									'\n（用户开启了联网搜索，但服务端未配置 SERPER_API_KEY，请说明无法实时检索并尽量用已有知识回答。）\n';
+									'\n（用户开启了联网搜索，但服务端联网搜索接口出错，请说明无法实时检索并尽量用已有知识回答。）\n';
 							} else {
-								const serperCtx =
+								const serperResult =
 									await this.serperService.formatSearchContextForPrompt(
 										searchQuery,
 									);
-								console.log('serperCtx-----serperCtx--', serperCtx);
-								if (serperCtx) {
-									systemPrompt.content += serperCtx;
+								if (serperResult.promptText) {
+									systemPrompt.content += serperResult.promptText;
+								}
+								if (serperResult.organic?.length) {
+									serperOrganicForAssistant = serperResult.organic;
 								}
 							}
 						}
@@ -370,6 +371,19 @@ Stick strictly to what is visually present.`,
 					if (getStreamStatus()) {
 						subscriber.complete();
 						return;
+					}
+
+					// 在模型流式输出之前推送 organic，与后续落库字段一致
+					if (
+						serperOrganicForAssistant?.length &&
+						dto.assistantMessage?.chatId &&
+						!getStreamStatus()
+					) {
+						subscriber.next({
+							type: 'searchOrganic',
+							chatId: dto.assistantMessage.chatId,
+							organic: serperOrganicForAssistant,
+						});
 					}
 
 					const stream = await llm.stream(allMessages);
@@ -468,6 +482,9 @@ Stick strictly to what is visually present.`,
 									childrenIds: dto.assistantMessage.childrenIds || [],
 									currentChatId: dto.assistantMessage.chatId,
 									isContinuation: dto.isContinuation || false, // 传递续写标志
+									...(serperOrganicForAssistant?.length && {
+										searchOrganic: serperOrganicForAssistant,
+									}),
 								})
 								.catch((dbError) => {
 									this.logger.error(
@@ -493,6 +510,9 @@ Stick strictly to what is visually present.`,
 										currentChatId: dto.assistantMessage.chatId,
 										// 注意：停止时不传递 isContinuation，因为这是首次保存部分内容
 										isContinuation: false, // 传递续写标志
+										...(serperOrganicForAssistant?.length && {
+											searchOrganic: serperOrganicForAssistant,
+										}),
 									})
 									.catch((dbError) => {
 										this.logger.error(
@@ -535,6 +555,9 @@ Stick strictly to what is visually present.`,
 								childrenIds: [],
 								currentChatId: undefined,
 								isContinuation: false, // 传递续写标志
+								...(serperOrganicForAssistant?.length && {
+									searchOrganic: serperOrganicForAssistant,
+								}),
 							});
 						} catch (saveError) {
 							this.logger.error(
@@ -650,6 +673,7 @@ Stick strictly to what is visually present.`,
 
 		// 处理文件附件
 		let enhancedMessages = [...dto.messages];
+		let serperOrganicForAssistant: SerperOrganicItem[] | null = null;
 
 		if (dto.webSearch && !dto.isContinuation) {
 			const searchQuery = this.resolveWebSearchQuery(dto);
@@ -659,10 +683,13 @@ Stick strictly to what is visually present.`,
 					serperBlock =
 						'\n（用户开启了联网搜索，但服务端未配置 SERPER_API_KEY，请说明无法实时检索并尽量用已有知识回答。）\n';
 				} else {
-					const ctx =
+					const serperResult =
 						await this.serperService.formatSearchContextForPrompt(searchQuery);
-					if (ctx) {
-						serperBlock = ctx;
+					if (serperResult.promptText) {
+						serperBlock = serperResult.promptText;
+					}
+					if (serperResult.organic?.length) {
+						serperOrganicForAssistant = serperResult.organic;
 					}
 				}
 				if (serperBlock) {
@@ -739,6 +766,9 @@ Stick strictly to what is visually present.`,
 					chatId: dto.assistantMessage.chatId,
 					childrenIds: dto.assistantMessage.childrenIds || [],
 					currentChatId: dto.assistantMessage.chatId,
+					...(serperOrganicForAssistant?.length && {
+						searchOrganic: serperOrganicForAssistant,
+					}),
 				})
 				.catch((dbError) => {
 					this.logger.error(

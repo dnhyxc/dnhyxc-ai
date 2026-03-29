@@ -11,6 +11,19 @@ import {
 import { MessageRole } from '../chat.entity';
 import { AttachmentDto } from './chat-request.dto';
 
+/** Serper organic 单条（与落库 JSON 结构一致） */
+export class SerperOrganicItemDto {
+	@IsString()
+	title: string;
+
+	@IsString()
+	link: string;
+
+	@IsOptional()
+	@IsString()
+	snippet?: string;
+}
+
 export class MessageDto {
 	@IsString()
 	sessionId: string;
@@ -71,4 +84,10 @@ export class SaveDto {
 	@IsOptional()
 	// true 表示续写模式，需要追加内容而不是替换
 	isContinuation?: boolean;
+
+	@IsOptional()
+	@IsArray()
+	@ValidateNested({ each: true })
+	@Type(() => SerperOrganicItemDto)
+	searchOrganic?: SerperOrganicItemDto[];
 }
