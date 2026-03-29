@@ -82,6 +82,8 @@ export const useChatCore = (
 		hasReceivedStreamDataMapRef,
 		currentAssistantMessageMapRef,
 		onScrollToRef,
+		webSearchEnabled,
+		setWebSearchEnabled,
 	} = useChatCoreContext();
 
 	// 状态
@@ -89,7 +91,6 @@ export const useChatCore = (
 	const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
 	const [editMessage, setEditMessage] = useState<Message | null>(null);
 	const [currentChatId, setCurrentChatId] = useState<string>('');
-	const [webSearchEnabled, setWebSearchEnabled] = useState(false);
 
 	const navigate = useNavigate();
 

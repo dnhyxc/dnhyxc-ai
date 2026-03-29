@@ -1,4 +1,12 @@
-import { createContext, ReactNode, useContext, useRef, useState } from 'react';
+import {
+	createContext,
+	Dispatch,
+	ReactNode,
+	SetStateAction,
+	useContext,
+	useRef,
+	useState,
+} from 'react';
 import { UploadedFile } from '@/types';
 import { Message } from '@/types/chat';
 
@@ -44,6 +52,10 @@ interface ChatCoreContextValue {
 	clearAllCheckedMessages: () => void;
 	isAllChecked: (messages: Message[]) => boolean;
 
+	/** 联网搜索开关：Chat 输入区与 ChatBot 内重新生成/编辑共用，避免双份 useChatCore 状态不一致 */
+	webSearchEnabled: boolean;
+	setWebSearchEnabled: Dispatch<SetStateAction<boolean>>;
+
 	// 操作方法注册
 	actionsRef: React.RefObject<ChatBotActions | null>;
 	registerActions: (actions: ChatBotActions) => void;
@@ -70,6 +82,9 @@ export const ChatCoreProvider = ({ children }: { children: ReactNode }) => {
 
 	// 是否开启分享
 	const [isSharing, setIsSharing] = useState<boolean>(false);
+
+	// 联网搜索（与 useChatCore 共用，保证 ChatEntry 与 ChatBot 为同一状态）
+	const [webSearchEnabled, setWebSearchEnabled] = useState(false);
 
 	// 选中的消息
 	const [checkedMessages, setCheckedMessages] = useState<Set<string>>(
@@ -153,6 +168,8 @@ export const ChatCoreProvider = ({ children }: { children: ReactNode }) => {
 				setAllCheckedMessages,
 				clearAllCheckedMessages,
 				isAllChecked,
+				webSearchEnabled,
+				setWebSearchEnabled,
 			}}
 		>
 			{children}

@@ -23,7 +23,8 @@
 			"complexity": {
 				"useArrowFunction": "off",
 				"noForEach": "off",
-				"noUselessConstructor": "off"
+				"noUselessConstructor": "off",
+				"noImportantStyles": "off"
 			},
 			"style": {
 				"useTemplate": "info",
