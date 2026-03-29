@@ -22,7 +22,7 @@ export class SerperService {
 		private readonly configService: ConfigService,
 		@Inject(WINSTON_MODULE_NEST_PROVIDER)
 		private readonly logger: LoggerService,
-	) { }
+	) {}
 
 	isConfigured(): boolean {
 		return !!this.configService.get<string>(ModelEnum.SERPER_API_KEY)?.trim();
@@ -37,7 +37,9 @@ export class SerperService {
 		options?: { num?: number },
 	): Promise<string | null> {
 		const apiKey = this.configService.get<string>(ModelEnum.SERPER_API_KEY);
-		const configuredUrl = this.configService.get<string>(ModelEnum.SERPER_SEARCH_URL);
+		const configuredUrl = this.configService.get<string>(
+			ModelEnum.SERPER_SEARCH_URL,
+		);
 		const searchUrl = configuredUrl || SERPER_GOOGLE_SEARCH_URL;
 		if (!apiKey?.trim()) {
 			this.logger.warn?.('[Serper] SERPER_API_KEY 未配置，跳过联网搜索');

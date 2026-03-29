@@ -52,7 +52,7 @@ export class ChatService {
 		private readonly serperService: SerperService,
 		@Inject(WINSTON_MODULE_NEST_PROVIDER)
 		private readonly logger: LoggerService,
-	) { }
+	) {}
 
 	/** 从本次请求中解析用于 Serper 的检索词（优先 userMessage，否则取最后一条用户消息） */
 	private resolveWebSearchQuery(dto: ChatRequestDto): string {
@@ -233,16 +233,16 @@ Stick strictly to what is visually present.`,
 		const pendingUserData =
 			lastUserMessage && dto.userMessage
 				? {
-					sessionId,
-					role: MessageRole.USER,
-					content: lastUserMessage.content,
-					attachments: dto.attachments,
-					parentId: dto.userMessage.parentId || null,
-					isRegenerate: dto.isRegenerate || false,
-					chatId: dto.userMessage.chatId,
-					childrenIds: dto.userMessage.childrenIds || [],
-					currentChatId: dto.userMessage.chatId,
-				}
+						sessionId,
+						role: MessageRole.USER,
+						content: lastUserMessage.content,
+						attachments: dto.attachments,
+						parentId: dto.userMessage.parentId || null,
+						isRegenerate: dto.isRegenerate || false,
+						chatId: dto.userMessage.chatId,
+						childrenIds: dto.userMessage.childrenIds || [],
+						currentChatId: dto.userMessage.chatId,
+					}
 				: null;
 
 		return new Observable<any>((subscriber) => {
@@ -299,7 +299,7 @@ Stick strictly to what is visually present.`,
 							: systemContent.trim(),
 					};
 
-					console.log(dto.webSearch, 'dto.webSearchdto.webSearchdto.webSearch')
+					console.log(dto.webSearch, 'dto.webSearchdto.webSearchdto.webSearch');
 
 					// Serper 联网搜索：将检索摘要并入系统提示（续写轮次不重复检索）
 					if (dto.webSearch && !dto.isContinuation) {
