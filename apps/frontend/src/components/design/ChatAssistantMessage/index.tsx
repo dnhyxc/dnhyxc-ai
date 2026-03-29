@@ -3,7 +3,8 @@
  * 性能策略：非流式消息在离开视口时不立即挂载 MdPreview，用 IntersectionObserver + 几何预判，
  * 避免分支切换时数百条编辑器同步初始化卡死主线程（非虚拟列表，DOM 仍保留）。
  */
-import MarkdownPreview from '@design/Markdown';
+
+import { MarkdownParser } from '@dnhyxc-ai/tools';
 import { Spinner } from '@ui/index';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 // memo：父级重渲染时若 props 判定相等则跳过本组件，减少与 PlainTextFallback / MdPreview 的协调成本
@@ -33,15 +34,15 @@ interface AssistantMessageProps {
 /**
  * MdPreview 未挂载时的占位：无 Markdown 解析、无代码高亮，仅排版纯文本，成本极低。
  */
-function PlainTextFallback({ text }: { text: string }) {
-	return (
-		// text-[15px]：与正文区域视觉接近；whitespace-pre-wrap：保留换行；wrap-break-word：长串不换行溢出
-		<div className="text-textcolor/90 text-[15px] leading-relaxed whitespace-pre-wrap wrap-break-word">
-			{/* 空字符串时给不间断空格，避免 div 高度塌成 0 */}
-			{text.length ? text : '\u00a0'}
-		</div>
-	);
-}
+// function PlainTextFallback({ text }: { text: string }) {
+// 	return (
+// 		// text-[15px]：与正文区域视觉接近；whitespace-pre-wrap：保留换行；wrap-break-word：长串不换行溢出
+// 		<div className="text-textcolor/90 text-[15px] leading-relaxed whitespace-pre-wrap wrap-break-word">
+// 			{/* 空字符串时给不间断空格，避免 div 高度塌成 0 */}
+// 			{text.length ? text : '\u00a0'}
+// 		</div>
+// 	);
+// }
 
 /**
  * 同步判断「元素矩形是否与视口（上下各扩 marginY）有交集」，不等待 IntersectionObserver 回调，
@@ -72,6 +73,10 @@ function ChatAssistantMessageInner({
 	const [richReady, setRichReady] = useState(() =>
 		Boolean(message.isStreaming),
 	);
+
+	const parser = useMemo(() => {
+		return new MarkdownParser();
+	}, []);
 	// ↑ false：正文/思考走 PlainTextFallback；true：挂 MdPreview。初始：流式须立刻 true 跟 token；非流式 false 可走视口懒加载减主线程压力
 
 	// 随 isStreaming：一旦流式则强制 richReady（中途转流式/首屏滞后时避免半段纯文本）
@@ -193,21 +198,26 @@ function ChatAssistantMessageInner({
 				) : null}
 				{/* 思考展开且存在 thinkContent：richReady 前纯文本，就绪后 MdPreview */}
 				{message.thinkContent && isShowThinkContent ? (
-					richReady ? (
-						<MarkdownPreview
-							value={message.thinkContent || '思考中...'}
-							theme="dark"
-							className="h-auto p-0"
-							background="transparent"
-							padding="0"
-						/>
-					) : (
-						<PlainTextFallback text={message.thinkContent} />
-					)
+					// richReady ? (
+					// 	<MarkdownPreview
+					// 		value={message.thinkContent || '思考中...'}
+					// 		theme="dark"
+					// 		className="h-auto p-0"
+					// 		background="transparent"
+					// 		padding="0"
+					// 	/>
+					// ) : (
+					// 	<PlainTextFallback text={message.thinkContent} />
+					// )
+					<div
+						dangerouslySetInnerHTML={{
+							__html: parser.render(message.thinkContent),
+						}}
+					/>
 				) : null}
 			</div>
 			{/* 主回答区：与思考区相同的懒加载策略 */}
-			{richReady ? (
+			{/* {richReady ? (
 				<MarkdownPreview
 					value={bodyText}
 					theme="dark"
@@ -217,7 +227,9 @@ function ChatAssistantMessageInner({
 				/>
 			) : (
 				<PlainTextFallback text={bodyText} />
-			)}
+			)} */}
+			<div dangerouslySetInnerHTML={{ __html: parser.render(bodyText) }} />
+
 			{message.isStreaming && (
 				<div className="mt-1 flex items-center">
 					<Spinner className="w-4 h-4 mr-2 text-textcolor/50" />
