@@ -13,7 +13,7 @@
 - `apps/frontend/src/hooks/useBranchManage.ts`
 - `apps/frontend/src/hooks/useMessageTools.ts`（模块级纯函数与 `buildMessageList` 排序优化）
 
-**主要提交主题（节选）**：Chat 性能与注释、将 UI 抽成 `ChatBotView`、`ChatBotView` 参数与插槽、锚点滚动与条数展示、分支切换卡顿优化、刷新后首次置底、分支按钮钉视口与长消息/遮挡问题、从历史记录进入会话滚到底等。
+**主要提交主题（节选）**：Chat 性能与注释、将 UI 抽成 `ChatBotView`、`ChatBotView` 参数与插槽、锚点滚动与条数展示、分支切换卡顿优化、刷新后首次置底、分支按钮钉视口与长消息/遮挡问题、从历史记录进入会话滚到底、`syncViewportScrollMetrics` 多触点同步视口与底栏箭头等。
 
 ---
 
@@ -1043,7 +1043,50 @@ branchChangeRafIdsRef.current.forEach((id) => {
 branchChangeRafIdsRef.current.clear();
 ```
 
-**小结**：分支切换的「不卡顿、不跳错」依赖 **同帧 `flushSync` + 视口锚点数学（utils）+ 长/短分支 + seq**；列表进入的「不卡在中间」依赖 **`sessionEnterScrolledRef` 单次触发 + `queueMicrotask` + `onScrollTo` 双帧与 RO**；**rAF cancel** 负责卸载与快速打断时的安全收尾。
+### 7.9 `syncViewportScrollMetrics`：为何多处调用、影响点与作用
+
+#### 作用（这一函数到底干什么）
+
+从 `ScrollArea` 的**视口节点**（与 `scrollContainerRef` 绑定的 Radix `Viewport`）**同一次读取**：
+
+- `scrollTop`
+- `scrollHeight`
+- `clientHeight`
+
+并据此**一并更新**与滚动相关的 React state：
+
+- `scrollTop`（供其它逻辑需要时与 DOM 对齐，避免「只信过期的 state」）
+- `hasScrollbar`（`scrollHeight > clientHeight`，控制底栏是否出现滚动按钮）
+- `isAtBottom`（`scrollHeight - scrollTop - clientHeight < SCROLL_THRESHOLD`，控制 `ChatControls` 箭头朝上/朝下）
+- `autoScroll`（与「是否在底部」一致，供流式输出时是否自动跟底使用）
+
+**设计动机**：历史上用 `useMemo` 计算「是否在底部」时，曾把 **state 里的 `scrollTop`** 和 **ref 里当前帧的 `scrollHeight` / `clientHeight`** 混在一起算。换会话、换分支或从无滚动条列表切到有滚动条列表时，DOM 已是新内容高度，但 **`scrollTop` 的 state 仍可能停留在上一会话/上一分支**（程序化改 `scrollTop` 或未冒泡的 `scroll`），就会误判「已在底部」→ **`ChatControls` 箭头方向反了**（例如应显示「置底」向下箭头却显示「置顶」向上箭头）。`syncViewportScrollMetrics` 把「读 DOM → 写 state」收口成一处，保证**四项指标来自同一快照**。
+
+#### 影响点（谁会因它变对/变错）
+
+| 消费方 | 依赖字段 | 不同步时的典型问题 |
+|--------|----------|-------------------|
+| `ChatControls` | `hasScrollbar`、`isAtBottom` | 从无滚动条会话切到有滚动条会话后，按钮突然出现但箭头方向错误；或该显示「滚到底」却显示「滚到顶」 |
+| 流式跟底逻辑 | `autoScroll` + 真实 `scrollTop` | 误判跟底开关，或 `lastScrollHeightRef` 与视口脱节（与其它修复配合） |
+| 调试与后续扩展 | `scrollTop` state | 避免日志/后续功能读到与视口不一致的滚动位置 |
+
+#### 为何要在「这么多地方」调用（而不是只放在 `handleScroll` 里）
+
+浏览器与当前实现里，**并不是每一次视口滚动或 `scrollTop` 变化都会触发挂在 Viewport 上的 React `onScroll`**。只要在下面任一情况下**只依赖 `handleScroll`**，就会出现「DOM 已经滚过去了，state 没更新」的窗口期：
+
+1. **`onScrollTo` / `alignToMax`**：`element.scrollTo(...)`、`scrollIntoView` 以及双帧 `rAF`、内部 `ResizeObserver` 触发的贴底，在部分时序下**不保证**走 `handleScroll`，或走在了 React 批更新尚未反映到依赖的帧。因此在 **`alignToMax` 末尾**通过 `syncViewportScrollMetricsRef.current()` 补一刀（`onScrollTo` 用 ref 是为了 `useCallback([])` 稳定且仍能调到最新实现）。
+2. **滚顶分支** `position === 'up'`：`scrollTo({ top: 0 })` 后同样显式同步。
+3. **从会话列表进入会话**：`queueMicrotask` 里 `onScrollTo('down','auto')` 后，再在**双 `requestAnimationFrame`** 末尾同步，覆盖「滚底在 rAF 链末尾才落定、中间没有可靠 `scroll` 事件」的情况。
+4. **流式 `useEffect`**：在 **`scrollToBottom()` 之后**调用，避免「先读了 metrics 再滚」的顺序颠倒；在 **ResizeObserver / MutationObserver** 回调里 **`scrollToBottom()` 之后**再同步，避免仅内容高度变而 state 未跟。
+5. **`useLayoutEffect([messages, activeSessionId, selectedChildMap])`**：在 **DOM 已按新会话/新分支/新列表提交后**立刻用视口真值覆盖 state，专门解决「列表结构已换，scroll 相关 state 仍是上一上下文」的错位。
+6. **`handleScroll`**：用户滚轮/拖拽滚动条等**正常会触发** `onScroll` 的路径，统一走 `syncViewportScrollMetrics()`，与程序化路径行为一致。
+7. **`handleBranchChange`**：存在 **`sc.scrollTop = getMaxScrollTop(...)`** 或 `alignMessageRowBottomToViewportBottom` 等**直接改 DOM** 的逻辑，**不保证**产生 `onScroll`。因此在 **`queueMicrotask` / `scheduleBranchRaf` 回调末尾**补同步，保证切分支后底栏箭头与 `hasScrollbar` 立即正确。
+
+#### 性能与重复调用
+
+单次 `sync` 仅为**常数次 DOM 属性读取**与**至多若干次 `setState`**；React 18+ 会对同一事件/同一 commit 内的更新做批处理。流式场景下主要在「确实发生了滚底或布局变化」的回调里调用，属于**用可接受的同步成本换 UI 状态与视口一致**，避免出现难以排查的「箭头反了、跟底停了」类问题。
+
+**小结**：分支切换的「不卡顿、不跳错」依赖 **同帧 `flushSync` + 视口锚点数学（utils）+ 长/短分支 + seq**；列表进入的「不卡在中间」依赖 **`sessionEnterScrolledRef` 单次触发 + `queueMicrotask` + `onScrollTo` 双帧与 RO**；**rAF cancel** 负责卸载与快速打断时的安全收尾；**`syncViewportScrollMetrics` 多触点调用**则保证 **程序化滚动 / 直接改 `scrollTop` / 换会话换分支** 后，`ChatControls` 与流式跟底所依赖的 state 与**真实视口**一致。
 
 ---
 

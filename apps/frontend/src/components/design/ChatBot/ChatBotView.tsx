@@ -176,8 +176,10 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 		const [autoScroll, setAutoScroll] = useState(true);
 		const [isShowThinkContent, setIsShowThinkContent] = useState(true);
 		const [isCopyedId, setIsCopyedId] = useState('');
-		const [scrollTop, setScrollTop] = useState<number>(0);
+		const [, setScrollTop] = useState<number>(0);
 		const [hasScrollbar, setHasScrollbar] = useState<boolean>(false);
+		/** 与 ChatControls 箭头一致：须与视口 DOM 同步，勿混用「旧 scrollTop state + 新 scrollHeight」 */
+		const [isAtBottom, setIsAtBottom] = useState(true);
 
 		const scrollContainerRef = useRef<HTMLDivElement>(null);
 		const editInputRef = useRef<HTMLTextAreaElement>(null);
@@ -203,6 +205,22 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 
 		const SCROLL_THRESHOLD = 5;
 
+		/** 供 onScrollTo 等闭包内调用：始终指向最新同步函数 */
+		const syncViewportScrollMetricsRef = useRef<() => void>(() => {});
+
+		const syncViewportScrollMetrics = useCallback(() => {
+			const el = scrollContainerRef.current;
+			if (!el) return;
+			const { scrollTop: st, scrollHeight, clientHeight } = el;
+			setScrollTop(st);
+			setHasScrollbar(scrollHeight > clientHeight);
+			const atBottom = scrollHeight - st - clientHeight < SCROLL_THRESHOLD;
+			setAutoScroll(atBottom);
+			setIsAtBottom(atBottom);
+		}, []);
+
+		syncViewportScrollMetricsRef.current = syncViewportScrollMetrics;
+
 		/** 包装 rAF：登记 id，执行后移除；卸载时批量 cancel */
 		const scheduleBranchRaf = useCallback((fn: FrameRequestCallback) => {
 			const id = requestAnimationFrame((time) => {
@@ -224,6 +242,7 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 					scrollToBottomRafCancelRef.current?.();
 					scrollToBottomRafCancelRef.current = null;
 					el.scrollTo({ top: 0, behavior: bh });
+					syncViewportScrollMetricsRef.current();
 					return;
 				}
 
@@ -235,6 +254,7 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 
 				const alignToMax = (scrollBehavior: ScrollBehavior) => {
 					el.scrollTo({ top: getMaxScrollTop(el), behavior: scrollBehavior });
+					syncViewportScrollMetricsRef.current();
 				};
 
 				const contentRoot = el.querySelector('#message-content');
@@ -264,7 +284,9 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 						});
 					});
 					if (contentRoot) {
-						const ro = new ResizeObserver(() => alignToMax('auto'));
+						const ro = new ResizeObserver(() => {
+							alignToMax('auto');
+						});
 						ro.observe(contentRoot);
 						let disposed = false;
 						// DOM 的 setTimeout 返回 number，与 @types/node 的 Timeout 在合并时易冲突，此处仅作定时清理用
@@ -347,6 +369,12 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 
 			queueMicrotask(() => {
 				onScrollTo('down', 'auto');
+				// 滚底在微任务/rAF 内完成，scroll 事件可能未驱动 handleScroll；双帧后对齐底栏箭头
+				requestAnimationFrame(() => {
+					requestAnimationFrame(() => {
+						syncViewportScrollMetricsRef.current();
+					});
+				});
 			});
 		}, [activeSessionId, messages, isCurrentSessionLoading, onScrollTo]);
 
@@ -378,6 +406,7 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 
 			updateScrollbarState();
 			scrollToBottom();
+			syncViewportScrollMetrics();
 
 			const contentWrapper =
 				scrollContainerRef.current?.querySelector('#message-content');
@@ -385,6 +414,7 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 				resizeObserverRef.current = new ResizeObserver(() => {
 					updateScrollbarState();
 					scrollToBottom();
+					syncViewportScrollMetrics();
 				});
 				resizeObserverRef.current.observe(contentWrapper);
 			}
@@ -395,6 +425,7 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 				mutationObserverRef.current = new MutationObserver(() => {
 					updateScrollbarState();
 					scrollToBottom();
+					syncViewportScrollMetrics();
 				});
 				mutationObserverRef.current.observe(contentArea, {
 					childList: true,
@@ -413,7 +444,17 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 					mutationObserverRef.current = null;
 				}
 			};
-		}, [messages, autoScroll]);
+		}, [messages, autoScroll, syncViewportScrollMetrics]);
+
+		// 会话/分支切换后：列表高度与 scrollTop 须同取自 DOM，避免沿用上一会话的 scrollTop 误判「在底部」→ 箭头反向
+		useLayoutEffect(() => {
+			syncViewportScrollMetrics();
+		}, [
+			messages,
+			activeSessionId,
+			selectedChildMap,
+			syncViewportScrollMetrics,
+		]);
 
 		useEffect(() => {
 			return () => {
@@ -443,18 +484,16 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 			};
 		}, []);
 
-		const handleScroll = useCallback((e: React.UIEvent<HTMLDivElement>) => {
-			const element = e.currentTarget;
-			if (!scrollContainerRef.current) {
-				scrollContainerRef.current = element;
-			}
-			const { scrollTop, scrollHeight, clientHeight } = element;
-			setScrollTop(scrollTop);
-			setHasScrollbar(scrollHeight > clientHeight);
-			const isAtBottom =
-				scrollHeight - scrollTop - clientHeight < SCROLL_THRESHOLD;
-			setAutoScroll(isAtBottom);
-		}, []);
+		const handleScroll = useCallback(
+			(e: React.UIEvent<HTMLDivElement>) => {
+				const element = e.currentTarget;
+				if (!scrollContainerRef.current) {
+					scrollContainerRef.current = element;
+				}
+				syncViewportScrollMetrics();
+			},
+			[syncViewportScrollMetrics],
+		);
 
 		const onToggleThinkContent = useCallback(() => {
 			setIsShowThinkContent((prev) => !prev);
@@ -577,11 +616,13 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 					if (shouldScrollToBottom && scAfter) {
 						// 立即滚到最大 scrollTop，让链尾贴齐容器底
 						scAfter.scrollTop = getMaxScrollTop(scAfter);
+						queueMicrotask(() => syncViewportScrollMetrics());
 						// 下一帧再滚一次：首帧后 lazy 内容（如 MdPreview）可能增高，需二次对齐到底
 						scheduleBranchRaf(() => {
 							const el = scrollContainerRef.current;
 							if (!el) return;
 							el.scrollTop = getMaxScrollTop(el);
+							syncViewportScrollMetrics();
 						});
 					} else if (scAfter && isAssistantBranchSwitch) {
 						// 非链尾且为助手：用长消息或锚点逻辑保持操作区在视口内
@@ -590,10 +631,12 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 							// 行高超过视口一半时钉「行底贴视口底」，避免只钉锚点顶把长气泡底部操作区顶出屏
 							pendingBranchScrollAnchorRef.current = null;
 							alignMessageRowBottomToViewportBottom(scAfter, nextId);
+							queueMicrotask(() => syncViewportScrollMetrics());
 							scheduleBranchRaf(() => {
 								const sc = scrollContainerRef.current;
 								if (!sc) return;
 								alignMessageRowBottomToViewportBottom(sc, nextId);
+								syncViewportScrollMetrics();
 							});
 						} else {
 							// 短消息：用切换前记录的 before 与切换后新行上对应点做差，修正 scrollTop
@@ -653,6 +696,7 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 				props.displayMessages,
 				scheduleBranchRaf,
 				selectedChildMap,
+				syncViewportScrollMetrics,
 			],
 		);
 
@@ -707,12 +751,6 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 			},
 			[showAvatar, editMessage?.chatId, isSharing, checkedMessages],
 		);
-
-		const isAtBottom = useMemo(() => {
-			if (!scrollContainerRef.current) return false;
-			const { scrollHeight, clientHeight } = scrollContainerRef.current;
-			return scrollHeight - scrollTop - clientHeight < 5;
-		}, [scrollTop]);
 
 		const onShare = useCallback(() => {
 			setIsSharing(true);
