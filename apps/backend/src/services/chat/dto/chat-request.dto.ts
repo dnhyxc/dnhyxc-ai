@@ -137,4 +137,9 @@ export class ChatRequestDto {
 	@IsString()
 	@IsOptional()
 	role?: 'user' | 'assistant' | 'system';
+
+	/** 是否启用联网搜索（DeepSeek：Serper 注入上下文；智谱：tools web_search） */
+	@IsBoolean()
+	@IsOptional()
+	webSearch?: boolean;
 }

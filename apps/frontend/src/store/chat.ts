@@ -1,5 +1,5 @@
 import { action, computed, makeAutoObservable, observable } from 'mobx';
-import { Message, SessionData } from '@/types/chat';
+import { Message, SessionData, WebSearchSourceItem } from '@/types/chat';
 
 class ChatStore {
 	constructor() {
@@ -77,6 +77,32 @@ class ChatStore {
 	// 使用独立的 Map 来管理停止状态，避免在 setAllMessages 中被意外清空
 	stoppedMessages: Map<string, { sessionId: string; stoppedAt: number }> =
 		new Map();
+
+	/** 输入栏「联网搜索」开关（与 ChatEntry、useChatCore 共享） */
+	webSearchEnabled = false;
+
+	@action
+	setWebSearchEnabled(value: boolean) {
+		this.webSearchEnabled = value;
+	}
+
+	@action
+	setMessageWebSearchSources(chatId: string, sources: WebSearchSourceItem[]) {
+		const idx = this.firstMessageIndexByChatId(chatId);
+		if (idx >= 0) {
+			this.messages[idx].webSearchSources = sources;
+			delete this.messages[idx].webSearchError;
+		}
+	}
+
+	@action
+	setMessageWebSearchError(chatId: string, message: string) {
+		const idx = this.firstMessageIndexByChatId(chatId);
+		if (idx >= 0) {
+			this.messages[idx].webSearchError = message;
+			delete this.messages[idx].webSearchSources;
+		}
+	}
 
 	/**
 	 * 设置消息的停止状态

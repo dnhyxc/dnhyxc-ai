@@ -41,6 +41,8 @@ export const appConfig = () => ({
 		// Stripe（可选，未配置时创建 Checkout 会返回服务不可用）
 		STRIPE_SECRET_KEY: Joi.string().optional().allow(''),
 		STRIPE_WEBHOOK_SECRET: Joi.string().optional().allow(''),
+		// 联网搜索（Serper.dev，可选；未配置时关闭 DeepSeek 侧检索或接口报错）
+		SERPER_API_KEY: Joi.string().optional().allow(''),
 	}),
 });
 

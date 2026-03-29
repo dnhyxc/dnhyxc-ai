@@ -12,6 +12,7 @@ import { ChatMessageProcessor } from './chat-message.processor';
 import { GlmChatService } from './glm.service';
 import { MessageService } from './message.service';
 import { ChatSessions } from './session.entity';
+import { WebSearchService } from './web-search.service';
 
 @Module({
 	imports: [
@@ -27,6 +28,7 @@ import { ChatSessions } from './session.entity';
 	providers: [
 		ChatService,
 		GlmChatService,
+		WebSearchService,
 		MessageService,
 		ChatMessageProcessor,
 		OcrService,

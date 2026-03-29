@@ -45,6 +45,17 @@ export interface Message {
 		maxTokensReached: boolean;
 		sessionId: string; // 新增：记录产生此 finishInfo 的会话 ID
 	};
+	/** 本轮回答关联的联网检索来源（流式阶段由后端推送，不落库） */
+	webSearchSources?: WebSearchSourceItem[];
+	/** 联网搜索失败时的提示文案 */
+	webSearchError?: string;
+}
+
+/** 与后端 Serper 注入及智谱解析结果对齐的来源条目 */
+export interface WebSearchSourceItem {
+	title: string;
+	link: string;
+	snippet?: string;
 }
 
 export interface ChatRequestParams {
@@ -67,6 +78,8 @@ export interface ChatRequestParams {
 	temperature?: number;
 	stop?: boolean;
 	isContinuation?: boolean;
+	/** 是否启用联网搜索（与后端 ChatRequestDto.webSearch 一致） */
+	webSearch?: boolean;
 }
 
 /**

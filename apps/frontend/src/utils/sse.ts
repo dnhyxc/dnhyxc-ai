@@ -7,6 +7,8 @@ import { getStorage } from '.';
 interface StreamCallbacks {
 	onData: (chunk: any) => void;
 	onThinking?: (chunk: any) => void;
+	/** 智谱 glm-stream 等返回的联网搜索元数据 */
+	onWebSearch?: (payload: unknown) => void;
 	onStart?: () => void;
 	onError?: (error: Error, type?: 'error' | 'info' | 'warning') => void;
 	onComplete?: (error?: string) => void;
@@ -22,8 +24,15 @@ export const streamFetch = async ({
 	callbacks: StreamCallbacks;
 	api?: string;
 }): Promise<() => void> => {
-	const { onData, onError, onComplete, onStart, onThinking, onGetFinishInfo } =
-		callbacks;
+	const {
+		onData,
+		onError,
+		onComplete,
+		onStart,
+		onThinking,
+		onWebSearch,
+		onGetFinishInfo,
+	} = callbacks;
 
 	const controller = new AbortController();
 	options.signal = controller.signal;
@@ -95,6 +104,8 @@ export const streamFetch = async ({
 									}
 									if (parsed?.type === 'thinking') {
 										onThinking?.(parsed.content ? parsed.content : '');
+									} else if (parsed?.type === 'web_search') {
+										onWebSearch?.(parsed.content);
 									} else {
 										onData(parsed.content);
 									}

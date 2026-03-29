@@ -208,6 +208,10 @@ const Chat = observer(() => {
 					onUploadFile={onUploadFile}
 					clearChat={toNewChat}
 					stopGenerating={stopGenerating}
+					webSearchEnabled={chatStore.webSearchEnabled}
+					onWebSearchChange={(enabled) =>
+						chatStore.setWebSearchEnabled(enabled)
+					}
 				/>
 			)}
 

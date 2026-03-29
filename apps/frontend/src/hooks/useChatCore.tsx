@@ -13,8 +13,10 @@ import { createSession, stopSse } from '@/service';
 import useStore from '@/store';
 import { UploadedFile } from '@/types';
 import { ChatRequestParams, FinishInfo, Message } from '@/types/chat';
+import { normalizeZhipuWebSearchPayload } from '@/utils/chatWebSearch';
 import { streamFetch } from '@/utils/sse';
 import { useMessageTools } from './useMessageTools';
+import type { WebSearchSourceItem } from '@/types/chat';
 
 interface UseChatCoreOptions {
 	apiEndpoint?: string;
@@ -236,6 +238,10 @@ export const useChatCore = (
 				assistantMessage,
 				currentChatId,
 				role,
+				// 续写接口不应重复触发联网检索
+				webSearch: api.includes('continueSse')
+					? false
+					: chatStore.webSearchEnabled,
 				// maxTokens: 10,
 			};
 
@@ -250,6 +256,15 @@ export const useChatCore = (
 						body: JSON.stringify(messageParams),
 					},
 					callbacks: {
+						onWebSearch: (payload) => {
+							const sources = normalizeZhipuWebSearchPayload(payload);
+							if (sources.length) {
+								chatStore.setMessageWebSearchSources(
+									assistantMessageId,
+									sources,
+								);
+							}
+						},
 						onThinking: (thinking) => {
 							if (typeof thinking === 'string') {
 								hasReceivedStreamDataMapRef.current.set(sessionId, true);
@@ -262,6 +277,36 @@ export const useChatCore = (
 							}
 						},
 						onData: (chunk) => {
+							if (chunk !== null && typeof chunk === 'object') {
+								const o = chunk as Record<string, unknown>;
+								if (o.type === 'web_search') {
+									if (o.error) {
+										const msg = String(o.message ?? '联网搜索失败');
+										chatStore.setMessageWebSearchError(
+											assistantMessageId,
+											msg,
+										);
+										Toast({ type: 'warning', title: msg });
+									} else if (Array.isArray(o.sources)) {
+										chatStore.setMessageWebSearchSources(
+											assistantMessageId,
+											o.sources as WebSearchSourceItem[],
+										);
+									}
+									return;
+								}
+								if (o.type === 'finish') {
+									chatStore.setFinishReason(assistantMessageId, {
+										type: 'finish',
+										reason:
+											(o.reason as 'length' | 'stop' | null | undefined) ??
+											null,
+										maxTokensReached: Boolean(o.maxTokensReached),
+										sessionId,
+									});
+									return;
+								}
+							}
 							if (typeof chunk === 'string') {
 								hasReceivedStreamDataMapRef.current.set(sessionId, true);
 								// 使用 appendStreamingContent 替代直接更新

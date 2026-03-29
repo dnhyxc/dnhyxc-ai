@@ -27,6 +27,7 @@ import { ChatContinueDto } from './dto/chat-continue.dto';
 import { ChatMessageDto } from './dto/chat-message.dto';
 import { ChatRequestDto } from './dto/chat-request.dto';
 import { MessageService } from './message.service';
+import { WebSearchService } from './web-search.service';
 
 // Scope.REQUEST: 声明作用域，否则 queue-events.listener 中的队列监听器会被忽略，不生效
 @Injectable({ scope: Scope.REQUEST })
@@ -48,6 +49,7 @@ export class ChatService {
 		@InjectQueue('chat-message-queue')
 		private readonly messageQueue: Queue,
 		private readonly ocrService: OcrService,
+		private readonly webSearchService: WebSearchService,
 		@Inject(WINSTON_MODULE_NEST_PROVIDER)
 		private readonly logger: LoggerService,
 	) {}
@@ -320,9 +322,50 @@ Stick strictly to what is visually present.`,
 						(m) => !existingKeySet.has(`${m.role}::${m.content}`),
 					);
 
+					// 联网搜索：在注入上下文前检查是否已取消
+					const webSearchContextMessages: ChatMessageDto[] = [];
+					if (dto.webSearch && !dto.isContinuation) {
+						const q = lastUserMessage?.content?.trim();
+						if (q) {
+							try {
+								const { items, contextText } =
+									await this.webSearchService.search(q);
+								if (getStreamStatus()) {
+									subscriber.complete();
+									return;
+								}
+								subscriber.next({
+									type: 'web_search',
+									sources: items,
+								});
+								if (contextText) {
+									webSearchContextMessages.push({
+										role: 'system',
+										content: `以下是针对用户最新问题的联网检索摘要（web search），请结合摘要与自身知识作答，引用处标明来源序号（如 [1]）。\n\n${contextText}`,
+									});
+								}
+							} catch (searchErr) {
+								this.logger.error(
+									`[ChatStream] 联网搜索失败: ${searchErr instanceof Error ? searchErr.message : String(searchErr)}`,
+								);
+								if (!getStreamStatus()) {
+									subscriber.next({
+										type: 'web_search',
+										error: true,
+										message:
+											searchErr instanceof Error
+												? searchErr.message
+												: String(searchErr),
+									});
+								}
+							}
+						}
+					}
+
 					// 构建最终消息列表
 					const newData: ChatMessageDto[] = [
 						systemPrompt,
+						...webSearchContextMessages,
 						...(memeries?.messages || []),
 					];
 
@@ -625,6 +668,32 @@ Stick strictly to what is visually present.`,
 				};
 				// 将系统消息插入到消息数组的开头
 				enhancedMessages = [fileSystemMessage, ...enhancedMessages];
+			}
+		}
+
+		// 非流式：联网检索上下文注入到本轮消息前
+		if (dto.webSearch) {
+			const lastUser = [...enhancedMessages]
+				.reverse()
+				.find((m) => m.role === 'user');
+			const q = lastUser?.content?.trim();
+			if (q) {
+				try {
+					const { contextText } = await this.webSearchService.search(q);
+					if (contextText) {
+						enhancedMessages = [
+							{
+								role: 'system',
+								content: `以下是针对用户最新问题的联网检索摘要（web search），请结合摘要与自身知识作答，引用处标明来源序号（如 [1]）。\n\n${contextText}`,
+							},
+							...enhancedMessages,
+						];
+					}
+				} catch (searchErr) {
+					this.logger.error(
+						`[Chat] 联网搜索失败: ${searchErr instanceof Error ? searchErr.message : String(searchErr)}`,
+					);
+				}
 			}
 		}
 

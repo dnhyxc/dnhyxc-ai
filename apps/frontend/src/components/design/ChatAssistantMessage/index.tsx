@@ -206,6 +206,43 @@ function ChatAssistantMessageInner({
 			) : (
 				<PlainTextFallback text={bodyText} />
 			)}
+			{message.webSearchError ? (
+				<div className="mt-2 text-sm text-amber-500/90">
+					联网搜索未生效：{message.webSearchError}
+				</div>
+			) : null}
+			{message.webSearchSources && message.webSearchSources.length > 0 ? (
+				<div className="mt-3 border-t border-theme-white/10 pt-2">
+					<div className="text-xs text-textcolor/60 mb-1.5">参考来源</div>
+					<ul className="space-y-1.5 list-none pl-0">
+						{message.webSearchSources.map((s, i) => (
+							<li
+								key={`${s.link || s.title}-${i}`}
+								className="text-xs text-textcolor/75 leading-relaxed"
+							>
+								<span className="text-cyan-500/80 tabular-nums">[{i + 1}]</span>{' '}
+								{s.link ? (
+									<a
+										href={s.link}
+										target="_blank"
+										rel="noopener noreferrer"
+										className="underline decoration-textcolor/30 hover:text-cyan-400 hover:decoration-cyan-400/50"
+									>
+										{s.title || s.link}
+									</a>
+								) : (
+									<span>{s.title}</span>
+								)}
+								{s.snippet ? (
+									<span className="block mt-0.5 text-textcolor/50 pl-4">
+										{s.snippet}
+									</span>
+								) : null}
+							</li>
+						))}
+					</ul>
+				</div>
+			) : null}
 			{message.isStreaming && (
 				<div className="mt-1 flex items-center">
 					<Spinner className="w-4 h-4 mr-2 text-textcolor/50" />
@@ -246,6 +283,10 @@ const ChatAssistantMessage = memo(
 		(prev.message.thinkContent ?? '') === (next.message.thinkContent ?? '') &&
 		prev.message.isStreaming === next.message.isStreaming && // 懒加载分支 + 底部「正在生成…」
 		prev.message.finishReason === next.message.finishReason &&
+		(prev.message.webSearchSources?.length ?? 0) ===
+			(next.message.webSearchSources?.length ?? 0) &&
+		(prev.message.webSearchError ?? '') ===
+			(next.message.webSearchError ?? '') &&
 		prev.isShowThinkContent === next.isShowThinkContent &&
 		prev.isStopped === next.isStopped &&
 		prev.scrollViewportRef === next.scrollViewportRef && // ref 变须重绑 IntersectionObserver
