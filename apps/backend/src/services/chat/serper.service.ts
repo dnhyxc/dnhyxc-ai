@@ -76,7 +76,7 @@ export class SerperService {
 		private readonly configService: ConfigService,
 		@Inject(WINSTON_MODULE_NEST_PROVIDER)
 		private readonly logger: LoggerService,
-	) { }
+	) {}
 
 	isConfigured(): boolean {
 		return !!this.configService.get<string>(ModelEnum.SERPER_API_KEY)?.trim();
@@ -114,8 +114,8 @@ export class SerperService {
 				},
 				body: JSON.stringify({
 					q,
-					hl: "zh-cn",
-					tbs: "qdr:d",
+					hl: 'zh-cn',
+					tbs: 'qdr:d',
 					num: options?.num ?? 10,
 				}),
 			});
