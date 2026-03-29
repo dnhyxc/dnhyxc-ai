@@ -76,7 +76,7 @@ export class SerperService {
 		private readonly configService: ConfigService,
 		@Inject(WINSTON_MODULE_NEST_PROVIDER)
 		private readonly logger: LoggerService,
-	) { }
+	) {}
 
 	isConfigured(): boolean {
 		return !!this.configService.get<string>(ModelEnum.SERPER_API_KEY)?.trim();
