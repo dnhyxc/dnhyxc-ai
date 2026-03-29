@@ -268,9 +268,7 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 										<Checkbox
 											id="chat-web-search"
 											checked={webSearchEnabled}
-											onCheckedChange={(v) =>
-												onWebSearchChange(v === true)
-											}
+											onCheckedChange={(v) => onWebSearchChange(v === true)}
 											disabled={loading}
 											className="cursor-pointer border-textcolor/60"
 										/>

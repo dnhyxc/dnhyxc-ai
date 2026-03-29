@@ -28,7 +28,10 @@ export class WebSearchService {
 	 * 使用 Serper（Google 搜索聚合）执行联网检索。
 	 * 未配置 SERPER_API_KEY 时抛出，由上层决定是否降级。
 	 */
-	async search(query: string, num = 8): Promise<{
+	async search(
+		query: string,
+		num = 8,
+	): Promise<{
 		items: WebSearchResultItem[];
 		contextText: string;
 	}> {
@@ -42,8 +45,7 @@ export class WebSearchService {
 			throw new Error('SERPER_API_KEY 未配置，无法使用联网搜索');
 		}
 
-		const q =
-			trimmed.length > 400 ? `${trimmed.slice(0, 400)}…` : trimmed;
+		const q = trimmed.length > 400 ? `${trimmed.slice(0, 400)}…` : trimmed;
 
 		const res = await fetch('https://google.serper.dev/search', {
 			method: 'POST',

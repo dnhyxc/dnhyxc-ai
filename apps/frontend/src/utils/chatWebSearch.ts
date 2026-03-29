@@ -7,7 +7,10 @@ export function normalizeZhipuWebSearchPayload(
 ): WebSearchSourceItem[] {
 	if (!data || typeof data !== 'object') return [];
 	const o = data as Record<string, unknown>;
-	const list = (o.search_result ?? o.items ?? o.organic ?? o.results) as unknown;
+	const list = (o.search_result ??
+		o.items ??
+		o.organic ??
+		o.results) as unknown;
 	if (!Array.isArray(list)) return [];
 	const out: WebSearchSourceItem[] = [];
 	for (const item of list) {

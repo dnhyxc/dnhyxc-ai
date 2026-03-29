@@ -345,7 +345,9 @@ export class GlmChatService {
 						max_tokens: dto.maxTokens || 4096,
 						temperature: dto.temperature || 0.2, // [0.0, 1.0]
 						// 智谱侧联网搜索工具，流式中会回传 web_search 类型数据块
-						...(dto.webSearch ? { tools: [{ type: 'web_search' as const }] } : {}),
+						...(dto.webSearch
+							? { tools: [{ type: 'web_search' as const }] }
+							: {}),
 					};
 
 					const url = `${baseURL}/chat/completions`;

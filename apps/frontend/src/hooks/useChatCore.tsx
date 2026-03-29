@@ -12,11 +12,11 @@ import { useChatCoreContext } from '@/contexts';
 import { createSession, stopSse } from '@/service';
 import useStore from '@/store';
 import { UploadedFile } from '@/types';
+import type { WebSearchSourceItem } from '@/types/chat';
 import { ChatRequestParams, FinishInfo, Message } from '@/types/chat';
 import { normalizeZhipuWebSearchPayload } from '@/utils/chatWebSearch';
 import { streamFetch } from '@/utils/sse';
 import { useMessageTools } from './useMessageTools';
-import type { WebSearchSourceItem } from '@/types/chat';
 
 interface UseChatCoreOptions {
 	apiEndpoint?: string;
@@ -282,10 +282,7 @@ export const useChatCore = (
 								if (o.type === 'web_search') {
 									if (o.error) {
 										const msg = String(o.message ?? '联网搜索失败');
-										chatStore.setMessageWebSearchError(
-											assistantMessageId,
-											msg,
-										);
+										chatStore.setMessageWebSearchError(assistantMessageId, msg);
 										Toast({ type: 'warning', title: msg });
 									} else if (Array.isArray(o.sources)) {
 										chatStore.setMessageWebSearchSources(
