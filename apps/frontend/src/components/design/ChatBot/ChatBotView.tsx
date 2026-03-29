@@ -322,19 +322,24 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 			};
 		}, [onScrollTo, onScrollToRegister]);
 
-		// 从消息记录进入会话：历史消息非流式，原 effect 仅在 isStreaming 时跟底，需补一次滚到底
+		// 切换会话：恢复跟底与流式高度基准。上一会话若用户上滚，autoScroll 为 false 会导致
+		// 进入本会话（尤其列表尾部仍有合并进来的流式气泡时）无法跟底；lastScrollHeightRef 沿用旧值也会挡住首次 scrollToBottom。
 		useEffect(() => {
 			if (!activeSessionId) {
 				sessionEnterScrolledRef.current = null;
 				return;
 			}
+			setAutoScroll(true);
+			lastScrollHeightRef.current = 0;
+		}, [activeSessionId]);
+
+		// 从消息记录进入会话：补一次滚到底（含尾条仍在流式的会话；仅靠下方 observer 在 autoScroll=false 时不会触发）
+		useEffect(() => {
+			if (!activeSessionId) {
+				return;
+			}
 			if (isCurrentSessionLoading) return;
 			if (messages.length === 0) return;
-
-			const lastMessage = messages[messages.length - 1];
-			const lastStreaming =
-				lastMessage?.role === 'assistant' && lastMessage?.isStreaming;
-			if (lastStreaming) return;
 
 			if (sessionEnterScrolledRef.current === activeSessionId) return;
 
