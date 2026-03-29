@@ -53,9 +53,11 @@ body {
 	}
 
 	.__md-search-organic__ {
-		display: flex;
+		/* display: flex;
 		align-items: center;
-		justify-content: center;
+		justify-content: center; */
+		display: inline-block;
+		text-align: center;
 		cursor: pointer !important;
 		margin-left: 4px;
 		border-block-end: none !important;
