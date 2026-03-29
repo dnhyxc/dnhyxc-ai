@@ -27,6 +27,7 @@ import { ChatContinueDto } from './dto/chat-continue.dto';
 import { ChatMessageDto } from './dto/chat-message.dto';
 import { ChatRequestDto } from './dto/chat-request.dto';
 import { MessageService } from './message.service';
+import { SerperService } from './serper.service';
 
 // Scope.REQUEST: 声明作用域，否则 queue-events.listener 中的队列监听器会被忽略，不生效
 @Injectable({ scope: Scope.REQUEST })
@@ -48,9 +49,21 @@ export class ChatService {
 		@InjectQueue('chat-message-queue')
 		private readonly messageQueue: Queue,
 		private readonly ocrService: OcrService,
+		private readonly serperService: SerperService,
 		@Inject(WINSTON_MODULE_NEST_PROVIDER)
 		private readonly logger: LoggerService,
-	) {}
+	) { }
+
+	/** 从本次请求中解析用于 Serper 的检索词（优先 userMessage，否则取最后一条用户消息） */
+	private resolveWebSearchQuery(dto: ChatRequestDto): string {
+		const fromMeta = dto.userMessage?.content?.trim();
+		if (fromMeta) {
+			return fromMeta;
+		}
+		const userMsgs = dto.messages.filter((m) => m.role === 'user');
+		const last = userMsgs[userMsgs.length - 1];
+		return last?.content?.trim() ?? '';
+	}
 
 	private async processFileAttachments(filePaths: string[]): Promise<string> {
 		if (!filePaths || filePaths.length === 0) {
@@ -220,16 +233,16 @@ Stick strictly to what is visually present.`,
 		const pendingUserData =
 			lastUserMessage && dto.userMessage
 				? {
-						sessionId,
-						role: MessageRole.USER,
-						content: lastUserMessage.content,
-						attachments: dto.attachments,
-						parentId: dto.userMessage.parentId || null,
-						isRegenerate: dto.isRegenerate || false,
-						chatId: dto.userMessage.chatId,
-						childrenIds: dto.userMessage.childrenIds || [],
-						currentChatId: dto.userMessage.chatId,
-					}
+					sessionId,
+					role: MessageRole.USER,
+					content: lastUserMessage.content,
+					attachments: dto.attachments,
+					parentId: dto.userMessage.parentId || null,
+					isRegenerate: dto.isRegenerate || false,
+					chatId: dto.userMessage.chatId,
+					childrenIds: dto.userMessage.childrenIds || [],
+					currentChatId: dto.userMessage.chatId,
+				}
 				: null;
 
 		return new Observable<any>((subscriber) => {
@@ -285,6 +298,29 @@ Stick strictly to what is visually present.`,
 							? systemPromptMessage.content
 							: systemContent.trim(),
 					};
+
+					console.log(dto.webSearch, 'dto.webSearchdto.webSearchdto.webSearch')
+
+					// Serper 联网搜索：将检索摘要并入系统提示（续写轮次不重复检索）
+					if (dto.webSearch && !dto.isContinuation) {
+						const searchQuery = this.resolveWebSearchQuery(dto);
+						console.log('searchQuery', searchQuery);
+						if (searchQuery) {
+							if (!this.serperService.isConfigured()) {
+								systemPrompt.content +=
+									'\n（用户开启了联网搜索，但服务端未配置 SERPER_API_KEY，请说明无法实时检索并尽量用已有知识回答。）\n';
+							} else {
+								const serperCtx =
+									await this.serperService.formatSearchContextForPrompt(
+										searchQuery,
+									);
+								console.log('serperCtx-----serperCtx--', serperCtx);
+								if (serperCtx) {
+									systemPrompt.content += serperCtx;
+								}
+							}
+						}
+					}
 
 					// 获取历史消息，从 memeries.messages 中提取所有包含附件的消息，通过 ASC 排序，防止消息顺序错乱导致大模型已读乱回
 					const memeries = await this.messageService.findOneSession(sessionId, {
@@ -614,6 +650,30 @@ Stick strictly to what is visually present.`,
 
 		// 处理文件附件
 		let enhancedMessages = [...dto.messages];
+
+		if (dto.webSearch && !dto.isContinuation) {
+			const searchQuery = this.resolveWebSearchQuery(dto);
+			if (searchQuery) {
+				let serperBlock = '';
+				if (!this.serperService.isConfigured()) {
+					serperBlock =
+						'\n（用户开启了联网搜索，但服务端未配置 SERPER_API_KEY，请说明无法实时检索并尽量用已有知识回答。）\n';
+				} else {
+					const ctx =
+						await this.serperService.formatSearchContextForPrompt(searchQuery);
+					if (ctx) {
+						serperBlock = ctx;
+					}
+				}
+				if (serperBlock) {
+					enhancedMessages = [
+						{ role: 'system', content: serperBlock },
+						...enhancedMessages,
+					];
+				}
+			}
+		}
+
 		if (dto.attachments && dto.attachments?.length > 0) {
 			const filePaths = dto.attachments.map((file) => file.path);
 			const fileContent = await this.processFileAttachments(filePaths);

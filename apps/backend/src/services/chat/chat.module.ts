@@ -11,6 +11,7 @@ import { ChatService } from './chat.service';
 import { ChatMessageProcessor } from './chat-message.processor';
 import { GlmChatService } from './glm.service';
 import { MessageService } from './message.service';
+import { SerperService } from './serper.service';
 import { ChatSessions } from './session.entity';
 
 @Module({
@@ -27,6 +28,7 @@ import { ChatSessions } from './session.entity';
 	providers: [
 		ChatService,
 		GlmChatService,
+		SerperService,
 		MessageService,
 		ChatMessageProcessor,
 		OcrService,

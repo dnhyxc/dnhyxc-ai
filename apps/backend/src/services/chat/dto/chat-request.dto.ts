@@ -137,4 +137,9 @@ export class ChatRequestDto {
 	@IsString()
 	@IsOptional()
 	role?: 'user' | 'assistant' | 'system';
+
+	/** 为 true 时服务端通过 Serper 检索后把摘要注入系统提示（需配置 SERPER_API_KEY） */
+	@IsBoolean()
+	@IsOptional()
+	webSearch?: boolean;
 }

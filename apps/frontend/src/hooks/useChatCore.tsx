@@ -46,6 +46,10 @@ interface UseChatCoreReturn {
 	onContinueAnswering: (message?: Message) => Promise<void>;
 	getDisplayMessages: () => Message[];
 
+	/** 是否在本次发送时启用 Serper 联网搜索 */
+	webSearchEnabled: boolean;
+	setWebSearchEnabled: Dispatch<SetStateAction<boolean>>;
+
 	// 内部方法
 	handleEditChange: (
 		e: React.ChangeEvent<HTMLTextAreaElement> | string,
@@ -80,6 +84,7 @@ export const useChatCore = (
 	const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
 	const [editMessage, setEditMessage] = useState<Message | null>(null);
 	const [currentChatId, setCurrentChatId] = useState<string>('');
+	const [webSearchEnabled, setWebSearchEnabled] = useState(false);
 
 	const navigate = useNavigate();
 
@@ -177,6 +182,7 @@ export const useChatCore = (
 			to?: boolean,
 			role?: ROLE_TYPE,
 			systemMessage?: SystemMessage,
+			webSearch?: boolean,
 		) => {
 			let sessionId = chatStore.activeSessionId;
 
@@ -236,6 +242,7 @@ export const useChatCore = (
 				assistantMessage,
 				currentChatId,
 				role,
+				...(webSearch ? { webSearch: true } : {}),
 				// maxTokens: 10,
 			};
 
@@ -450,6 +457,7 @@ export const useChatCore = (
 				true,
 				role,
 				systemMessage,
+				webSearchEnabled,
 			);
 		},
 		[
@@ -466,6 +474,7 @@ export const useChatCore = (
 			apiEndpoint,
 			requestSnapshotMapRef,
 			navigate,
+			webSearchEnabled,
 		],
 	);
 
@@ -549,6 +558,10 @@ export const useChatCore = (
 					assistantMessage,
 					false,
 					newSelectedChildMap,
+					undefined,
+					undefined,
+					undefined,
+					webSearchEnabled,
 				);
 				setEditMessage(null);
 			}
@@ -565,6 +578,7 @@ export const useChatCore = (
 			onSseFetch,
 			apiEndpoint,
 			requestSnapshotMapRef,
+			webSearchEnabled,
 		],
 	);
 
@@ -638,6 +652,10 @@ export const useChatCore = (
 					assistantMessage,
 					true,
 					newSelectedChildMap,
+					undefined,
+					undefined,
+					undefined,
+					webSearchEnabled,
 				);
 			}
 		},
@@ -652,6 +670,7 @@ export const useChatCore = (
 			onSseFetch,
 			apiEndpoint,
 			requestSnapshotMapRef,
+			webSearchEnabled,
 		],
 	);
 
@@ -943,5 +962,7 @@ export const useChatCore = (
 		getDisplayMessages,
 		handleEditChange,
 		onContinueAnswering,
+		webSearchEnabled,
+		setWebSearchEnabled,
 	};
 };

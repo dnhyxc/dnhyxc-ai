@@ -1,11 +1,12 @@
 import ChatFileList from '@design/ChatFileList';
 import ChatTextArea from '@design/ChatTextArea';
 import Upload from '@design/Upload';
-import { Button, ScrollArea, ScrollBar } from '@ui/index';
+import { Button, Checkbox, Label, ScrollArea, ScrollBar } from '@ui/index';
 import {
 	ChevronFirst,
 	ChevronLast,
 	CirclePlus,
+	Globe,
 	Link,
 	Rocket,
 	Target,
@@ -40,6 +41,9 @@ interface ChatEntryProps {
 	children?: React.ReactNode;
 	className?: string;
 	uploadLoading?: boolean;
+	/** 是否启用 Serper 联网搜索（由后端注入检索上下文） */
+	webSearchEnabled?: boolean;
+	onWebSearchEnabledChange?: (enabled: boolean) => void;
 }
 
 const ChatEntry: React.FC<ChatEntryProps> = ({
@@ -59,6 +63,8 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 	children,
 	className,
 	uploadLoading,
+	webSearchEnabled = false,
+	onWebSearchEnabledChange,
 }) => {
 	const scrollContainer = useRef<HTMLDivElement>(null);
 	const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -257,6 +263,26 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 										上传附件
 									</div>
 								</Upload>
+								{onWebSearchEnabledChange ? (
+									<div className="flex items-center gap-1.5 ml-1">
+										<Checkbox
+											id="chat-web-search"
+											checked={webSearchEnabled}
+											onCheckedChange={(v) =>
+												onWebSearchEnabledChange(v === true)
+											}
+											disabled={loading}
+											className="cursor-pointer border-textcolor/60"
+										/>
+										<Label
+											htmlFor="chat-web-search"
+											className="cursor-pointer text-sm text-textcolor/80 flex items-center gap-1"
+										>
+											<Globe className="w-3.5 h-3.5 shrink-0" />
+											联网搜索
+										</Label>
+									</div>
+								) : null}
 							</div>
 							{loading ? (
 								<span

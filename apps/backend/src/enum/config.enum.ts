@@ -56,4 +56,7 @@ export enum ModelEnum {
 	ZHIPU_API_KEY = 'ZHIPU_API_KEY',
 	ZHIPU_MODEL_NAME = 'ZHIPU_MODEL_NAME',
 	ZHIPU_BASE_URL = 'ZHIPU_BASE_URL',
+	/** Serper.dev 联网搜索（用于 Chat 注入检索上下文） */
+	SERPER_API_KEY = 'SERPER_API_KEY',
+	SERPER_SEARCH_URL = 'SERPER_SEARCH_URL',
 }

@@ -67,6 +67,8 @@ export interface ChatRequestParams {
 	temperature?: number;
 	stop?: boolean;
 	isContinuation?: boolean;
+	/** 为 true 时走后端 Serper 联网检索并注入上下文 */
+	webSearch?: boolean;
 }
 
 /**

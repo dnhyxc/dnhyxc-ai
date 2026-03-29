@@ -28,6 +28,8 @@ const Chat = observer(() => {
 		clearChat,
 		stopGenerating,
 		getDisplayMessages,
+		webSearchEnabled,
+		setWebSearchEnabled,
 	} = useChatCore();
 
 	const navigate = useNavigate();
@@ -208,6 +210,8 @@ const Chat = observer(() => {
 					onUploadFile={onUploadFile}
 					clearChat={toNewChat}
 					stopGenerating={stopGenerating}
+					webSearchEnabled={webSearchEnabled}
+					onWebSearchEnabledChange={setWebSearchEnabled}
 				/>
 			)}
 
