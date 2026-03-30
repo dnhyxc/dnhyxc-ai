@@ -1,5 +1,6 @@
 import { Button } from '@ui/index';
 import { Activity, ArrowDown, ArrowUp, Sparkles } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface ChatScrollControlsProps {
 	// 分支切换相关
@@ -14,6 +15,10 @@ interface ChatScrollControlsProps {
 	isAtBottom: boolean;
 	onScrollTo: (position: 'up' | 'down', behavior?: 'smooth' | 'auto') => void;
 }
+
+/** 与工具栏一致的毛玻璃：主题底 + 轻模糊 + oklch 混色阴影 */
+const glassChipClass =
+	'h-5 flex items-center justify-between gap-2 pl-3.5 pr-1 rounded-2xl bg-theme/5 border border-theme/5 backdrop-blur-[2px] transition-colors duration-200 z-99';
 
 const ChatControls = ({
 	isLoading,
@@ -41,7 +46,10 @@ const ChatControls = ({
 						{isLoading && !isStreamingBranchVisible && (
 							<Button
 								onClick={switchToStreamingBranch}
-								className="min-w-8 h-8 text-sm bg-cyan-500/25 text-cyan-400 hover:bg-cyan-500/30 rounded-full transition-colors flex items-center"
+								className={cn(
+									glassChipClass,
+									'min-h-8 text-sm text-cyan-400 hover:bg-theme/15',
+								)}
 							>
 								<Sparkles />
 								<span className="text-md">回到正在生成的分支</span>
@@ -51,7 +59,10 @@ const ChatControls = ({
 						{!isLatestBranch && messagesLength > 0 && (
 							<Button
 								onClick={switchToLatestBranch}
-								className="min-w-8 h-8 text-sm bg-green-500/25 text-green-400 hover:bg-green-500/30 rounded-full transition-colors flex items-center ml-2"
+								className={cn(
+									glassChipClass,
+									'min-h-8 text-sm text-green-400 hover:bg-theme/15 ml-2',
+								)}
 							>
 								<Activity />
 								<span className="text-md">回到最新分支</span>
@@ -63,7 +74,7 @@ const ChatControls = ({
 				{/* 滚动控制按钮 */}
 				{hasScrollbar && (
 					<div
-						className="w-8 h-8 bg-theme/5 hover:bg-theme/20 text-textcolor/90 flex justify-center items-center cursor-pointer border border-theme/5 rounded-full ml-2"
+						className="w-8.5 h-8.5 bg-theme/5 hover:bg-theme/15 text-textcolor/90 flex justify-center items-center cursor-pointer border border-theme/5 rounded-full ml-2 z-99"
 						onClick={() => onScrollTo(isAtBottom ? 'up' : 'down', 'auto')}
 					>
 						{isAtBottom ? <ArrowUp /> : <ArrowDown />}
