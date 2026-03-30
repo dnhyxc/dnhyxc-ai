@@ -310,27 +310,32 @@ function ChatAssistantMessageInner({
 						本回答由 AI 生成，内容仅供参考，请仔细甄别
 					</div>
 				)}
-			<div className="flex items-center justify-end">
-				{message?.searchOrganic &&
-					message.searchOrganic?.length > 0 &&
-					!message.isStreaming && (
+			{((message?.searchOrganic &&
+				message.searchOrganic?.length > 0 &&
+				!message.isStreaming) ||
+				isStopped) && (
+				<div className="flex items-center justify-end mt-3">
+					{message?.searchOrganic &&
+						message.searchOrganic?.length > 0 &&
+						!message.isStreaming && (
+							<div
+								className="h-9 flex items-center bg-theme/5 hover:bg-theme/10 w-fit px-3 py-2 rounded-md cursor-pointer select-none"
+								onClick={() => setOpen(true)}
+							>
+								<Earth size={16} className="mr-2 text-textcolor" />
+								{message.searchOrganic?.length} 个网页
+							</div>
+						)}
+					{isStopped && (
 						<div
-							className="h-9 flex items-center bg-theme/5 hover:bg-theme/10 w-fit px-3 py-2 rounded-md cursor-pointer select-none"
-							onClick={() => setOpen(true)}
+							className="h-9 flex items-center ml-3 cursor-pointer text-sm text-cyan-400 hover:text-cyan-300 select-none bg-theme/5 hover:bg-theme/10 py-1.5 px-3 rounded-md"
+							onClick={onContinue}
 						>
-							<Earth size={16} className="mr-2 text-textcolor" />
-							{message.searchOrganic?.length} 个网页
+							<Rotate3d size={16} className="mr-2" /> 继续生成
 						</div>
 					)}
-				{isStopped && (
-					<div
-						className="h-9 flex items-center ml-3 cursor-pointer text-sm text-cyan-400 hover:text-cyan-300 select-none bg-theme/5 hover:bg-theme/10 py-1.5 px-3 rounded-md"
-						onClick={onContinue}
-					>
-						<Rotate3d size={16} className="mr-2" /> 继续生成
-					</div>
-				)}
-			</div>
+				</div>
+			)}
 			{message?.finishReason?.maxTokensReached && (
 				<div className="flex items-center justify-end">
 					超出最大输出长度，
