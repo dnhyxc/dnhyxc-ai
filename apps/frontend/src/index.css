@@ -49,6 +49,7 @@ body {
 				font-size: 12px;
 				vertical-align: text-top;
 				color: var(--theme-textcolor);
+				overflow: hidden;
 
 				&:hover {
 					background-color: var(--theme-background);

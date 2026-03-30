@@ -27,7 +27,7 @@ const SearchOrganics: React.FC<IProps> = ({ open, onOpenChange, organics }) => {
 							{/* float：首行标题在序号/日期右侧，换行后与 position 左缘齐平 */}
 							<div className="flow-root">
 								<div className="float-left flex items-center gap-2">
-									<span className="bg-theme/20 text-textcolor rounded-full text-sm w-5.5 h-5.5 p-2 flex items-center justify-center">
+									<span className="bg-theme/20 text-textcolor rounded-full text-[13px] w-5 h-5 p-2 flex items-center justify-center">
 										{searchOrganic.position}
 									</span>
 									{searchOrganic.date && (

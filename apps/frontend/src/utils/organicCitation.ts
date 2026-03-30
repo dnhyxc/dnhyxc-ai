@@ -3,6 +3,8 @@
  * 流式阶段前端只收到原始文本，需在展示层把 【n】、[n](url)、裸 [n] 转为带样式的 <a>。
  */
 
+import type { SearchOrganicItem } from '@/types/chat';
+
 export interface OrganicLinkItem {
 	link: string;
 }
@@ -41,7 +43,7 @@ export function applyOrganicCitationAnchors(
 		if (!link) {
 			return null;
 		}
-		return `<a href="${escapeHrefForDoubleQuotedAttr(link)}" target="_blank" rel="noopener noreferrer" style="cursor: default;" class="__md-search-organic__">${idx}</a>`;
+		return `<a href="${escapeHrefForDoubleQuotedAttr(link)}" data-organic-cite="${idx}" target="_blank" rel="noopener noreferrer" style="cursor: pointer;" class="__md-search-organic__">${idx}</a>`;
 	};
 
 	let out = text.replace(
@@ -79,4 +81,54 @@ export function applyOrganicCitationAnchors(
 		return toAnchor(i) ?? full;
 	});
 	return out;
+}
+
+/** 由正文中的引用锚点解析对应的 Serper 条目（优先 data-organic-cite，否则按 href 匹配） */
+export function resolveSearchOrganicFromCitationAnchor(
+	anchor: HTMLAnchorElement,
+	organics: SearchOrganicItem[],
+): SearchOrganicItem | undefined {
+	const cite = anchor.getAttribute('data-organic-cite');
+	if (cite) {
+		const n = Number.parseInt(cite, 10);
+		if (!Number.isNaN(n) && n >= 1 && n <= organics.length) {
+			return organics[n - 1];
+		}
+	}
+	const href = anchor.getAttribute('href');
+	if (!href?.trim()) {
+		return undefined;
+	}
+	return organics.find((o) => urlsMatchForOrganic(href.trim(), o.link.trim()));
+}
+
+/**
+ * 从事件目标向上查找：位于 root 内、且能对应到 searchOrganic 的引用 <a>。
+ * 不依赖 __md-search-organic__（Markdown 可能剥掉 class）；兼容 target 为文本节点。
+ */
+export function findClosestOrganicCitationAnchor(
+	start: EventTarget | null,
+	root: HTMLElement,
+	organics: SearchOrganicItem[],
+): HTMLAnchorElement | null {
+	if (!organics.length) {
+		return null;
+	}
+	const el =
+		start instanceof Element
+			? start
+			: start instanceof Text
+				? start.parentElement
+				: null;
+	if (!el) {
+		return null;
+	}
+	const a = el.closest('a');
+	if (!a || !root.contains(a)) {
+		return null;
+	}
+	const anchor = a as HTMLAnchorElement;
+	return resolveSearchOrganicFromCitationAnchor(anchor, organics)
+		? anchor
+		: null;
 }

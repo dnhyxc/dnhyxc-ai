@@ -75,7 +75,7 @@ export function applyOrganicCitationAnchors(
 		if (!link) {
 			return null;
 		}
-		return `<a href="${escapeHrefForDoubleQuotedAttr(link)}" target="_blank" rel="noopener noreferrer" style="cursor: default;" class="__md-search-organic__">${idx}</a>`;
+		return `<a href="${escapeHrefForDoubleQuotedAttr(link)}" data-organic-cite="${idx}" target="_blank" rel="noopener noreferrer" style="cursor: pointer;" class="__md-search-organic__">${idx}</a>`;
 	};
 
 	// 模型按提示输出 Markdown [n](url) 时，转为与【n】相同属性的 <a>（href 以 organic 为准，防篡改）
@@ -201,7 +201,7 @@ export class SerperService {
 				'1. 引用第 n 条资料时，**必须**使用 **Markdown 链接** `[n](URL)`，其中 URL 与对应条目的「URL:」行**逐字符一致**（含特殊字符时与「引用示例」相同，可能为尖括号包裹 `<...>`）。\n' +
 				'2. **禁止**只写半角方括号序号如 `[n]`（后接句号、空格或句末等），也禁止写脚注式上标；那不是有效 Markdown 链接，引用会失效。\n' +
 				'3. 或使用全角序号 **【n】**。\n' +
-				'系统会将合规引用转为带 `target="_blank"`、`rel="noopener noreferrer"`、`style="cursor: default;"`、`class="__md-search-organic__"` 的可点击样式。\n\n' +
+				'系统会将合规引用转为带 `target="_blank"`、`rel="noopener noreferrer"`、`data-organic-cite`、`style="cursor: pointer;"`、`class="__md-search-organic__"` 的可点击样式。\n\n' +
 				blocks.join('\n\n') +
 				'\n---\n';
 
