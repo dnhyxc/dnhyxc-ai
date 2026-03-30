@@ -4,22 +4,21 @@ export const MENUS = [
 		icon: 'House',
 		path: '/',
 	},
-
-	{
-		name: '智能对话',
-		icon: 'Bot',
-		path: '/chat',
-	},
-	{
-		name: 'document',
-		icon: 'Package',
-		path: '/document',
-	},
-	{
-		name: 'coding',
-		icon: 'Codesandbox',
-		path: '/coding',
-	},
+	// {
+	// 	name: '智能对话',
+	// 	icon: 'Bot',
+	// 	path: '/chat',
+	// },
+	// {
+	// 	name: 'document',
+	// 	icon: 'Package',
+	// 	path: '/document',
+	// },
+	// {
+	// 	name: 'coding',
+	// 	icon: 'Codesandbox',
+	// 	path: '/coding',
+	// },
 	{
 		name: '技能',
 		icon: 'SquareChartGantt',
@@ -35,11 +34,11 @@ export const MENUS = [
 		icon: 'Newspaper',
 		path: '/editor',
 	},
-	{
-		name: '个人主页',
-		icon: 'WalletCards',
-		path: '/profile',
-	},
+	// {
+	// 	name: '个人主页',
+	// 	icon: 'WalletCards',
+	// 	path: '/profile',
+	// },
 	{
 		name: '会员充值',
 		icon: 'CreditCard',

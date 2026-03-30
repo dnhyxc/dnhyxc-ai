@@ -11,38 +11,10 @@ import {
 	Sparkles,
 	Zap,
 } from 'lucide-react';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { onListen } from '@/utils';
-
-const FEATURES = [
-	{
-		icon: MessageSquare,
-		title: '智能对话',
-		subtitle: '自然语言处理',
-		desc: '与AI助手进行自然对话，获取实时解答、创作建议、学习辅导等全方位支持',
-		color: 'from-green-400 to-cyan-400',
-		bg: 'from-green-400/10 to-cyan-400/10',
-		border: 'border-green-500/20',
-	},
-	{
-		icon: Code2,
-		title: '代码助手',
-		subtitle: '编程支持',
-		desc: '智能代码生成、调试、优化和解释，支持多种编程语言，提升开发效率',
-		color: 'from-orange-400 to-yellow-400',
-		bg: 'from-orange-400/10 to-yellow-400/10',
-		border: 'border-orange-500/20',
-	},
-	{
-		icon: FileText,
-		title: '文档处理',
-		subtitle: '智能分析',
-		desc: '支持PDF、Word、Excel等多种格式的智能解析、总结和内容提取',
-		color: 'from-yellow-400 to-amber-400',
-		bg: 'from-yellow-400/10 to-amber-400/10',
-		border: 'border-yellow-500/20',
-	},
-];
+import { useNavigate } from 'react-router';
+import { openUrl } from '@tauri-apps/plugin-opener';
 
 const SHOWCASE = [
 	{
@@ -72,6 +44,49 @@ const SHOWCASE = [
 ];
 
 const Home = () => {
+	const navigate = useNavigate();
+
+	const FEATURES = useMemo(() => {
+		return [
+			{
+				icon: MessageSquare,
+				title: '智能对话',
+				subtitle: '自然语言处理',
+				desc: '与AI助手自然对话，获取实时解答、创作建议、学习辅导等全方位支持',
+				color: 'from-green-400 to-cyan-400',
+				bg: 'from-green-400/10 to-cyan-400/10',
+				border: 'border-green-500/20',
+				onClick: () => {
+					navigate('/chat');
+				},
+			},
+			{
+				icon: Code2,
+				title: '代码助手',
+				subtitle: '编程支持',
+				desc: '智能代码生成、调试、优化和解释，支持多种编程语言，提升开发效率',
+				color: 'from-orange-400 to-yellow-400',
+				bg: 'from-orange-400/10 to-yellow-400/10',
+				border: 'border-orange-500/20',
+				onClick: () => {
+					navigate('/coding');
+				},
+			},
+			{
+				icon: FileText,
+				title: '文档处理',
+				subtitle: '智能分析',
+				desc: '支持PDF、Word、Excel等多种格式的智能解析、总结和内容提取',
+				color: 'from-yellow-400 to-amber-400',
+				bg: 'from-yellow-400/10 to-amber-400/10',
+				border: 'border-yellow-500/20',
+				onClick: () => {
+					navigate('/document');
+				},
+			},
+		];
+	}, []);
+
 	useEffect(() => {
 		const unlistenAboutPromise = onListen('about-send-message', (event) => {
 			console.log('about-send-message', event);
@@ -143,6 +158,9 @@ const Home = () => {
 										whileTap={{ scale: 0.98 }}
 										type="button"
 										className="relative overflow-hidden group/btn pb-1 px-8 h-12 bg-linear-to-r from-blue-500 to-cyan-500 text-textcolor rounded-xl font-medium hover:shadow-lg hover:shadow-cyan-500/25 transition-all duration-300 cursor-pointer"
+										onClick={() => {
+											navigate('/chat');
+										}}
 									>
 										<div className="absolute inset-0 bg-linear-to-r from-transparent via-theme-white/20 to-transparent -translate-x-full group-hover/btn:translate-x-full transition-transform duration-700" />
 										快速开始
@@ -151,6 +169,9 @@ const Home = () => {
 									<button
 										type="button"
 										className="pb-1 px-8 h-12 bg-theme-white/5 backdrop-blur-sm border border-theme-white/10 text-textcolor rounded-xl font-medium hover:bg-theme-white/10 hover:border-theme-white/20 hover:shadow-lg transition-all duration-300 cursor-pointer"
+										onClick={() => {
+											openUrl('https://github.com/dnhyxc/dnhyxc-ai/wiki');
+										}}
 									>
 										了解更多
 									</button>
@@ -240,6 +261,7 @@ const Home = () => {
 								// style={{
 								// 	background: `linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%)`,
 								// }}
+								onClick={feature.onClick}
 							>
 								<div
 									className={`absolute inset-0 rounded-2xl bg-linear-to-br ${feature.bg} opacity-0 group-hover:opacity-100 transition-opacity duration-300`}
