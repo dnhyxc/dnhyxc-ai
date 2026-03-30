@@ -47,7 +47,7 @@ export default function ChatCodeToolbarFloating() {
 
 	const node = (
 		<div
-			className="chat-md-code-toolbar chat-md-code-toolbar--floating"
+			className="flex items-center justify-between gap-2 pl-3.5 pr-1 rounded-md bg-theme-background/50 shadow-[0_4px_10px_-4px_color-mix(in_oklch,var(--theme-background)_40%,black)] backdrop-blur-[2px]"
 			style={{
 				position: 'fixed',
 				top: state.top,
@@ -59,12 +59,20 @@ export default function ChatCodeToolbarFloating() {
 			role="toolbar"
 			aria-label="代码块工具栏"
 		>
-			<span className="chat-md-code-lang">{state.lang}</span>
-			<div className="chat-md-code-actions">
-				<button type="button" className="chat-md-code-btn" onClick={onCopy}>
+			<span className="text-[12px] text-textcolor/80">{state.lang}</span>
+			<div className="flex items-center h-8">
+				<button
+					type="button"
+					className="p-0 text-[12px] rounded-[5px] h-6 w-11 hover:bg-theme/10 cursor-pointer text-textcolor/80 hover:text-textcolor"
+					onClick={onCopy}
+				>
 					{copied ? '已复制' : '复制'}
 				</button>
-				<button type="button" className="chat-md-code-btn" onClick={onDownload}>
+				<button
+					type="button"
+					className="p-0 text-[12px] rounded-[5px] h-6 w-11 hover:bg-theme/10 cursor-pointer text-textcolor/80 hover:text-textcolor"
+					onClick={onDownload}
+				>
 					下载
 				</button>
 			</div>
