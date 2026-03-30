@@ -26,7 +26,12 @@ import { flushSync } from 'react-dom';
 import { useBranchManage } from '@/hooks/useBranchManage';
 import { useMessageTools } from '@/hooks/useMessageTools';
 import { cn } from '@/lib/utils';
-import { ChatBotRef, ChatBotViewProps, Message } from '@/types/chat';
+import {
+	ChatBotRef,
+	type ChatBotViewChatControlsContext,
+	ChatBotViewProps,
+	Message,
+} from '@/types/chat';
 import { layoutChatCodeToolbars } from '@/utils/chatCodeToolbar';
 import {
 	alignMessageRowBottomToViewportBottom,
@@ -36,6 +41,27 @@ import {
 	isLongMessageRowForBranchScroll,
 	tryApplyBranchScrollAnchor,
 } from './utils';
+
+/** 与视口底部判定一致：scrollTop 距最大值的像素容差 */
+const SCROLL_VIEWPORT_BOTTOM_THRESHOLD_PX = 5;
+
+/**
+ * 展示列表「结构共享」合并：同索引两条消息展示语义一致则复用 prev 引用。
+ */
+function isSameMessageForStableDisplay(prev: Message, next: Message): boolean {
+	return (
+		prev.chatId === next.chatId &&
+		prev.content === next.content &&
+		(prev.thinkContent ?? '') === (next.thinkContent ?? '') &&
+		prev.isStreaming === next.isStreaming &&
+		prev.siblingIndex === next.siblingIndex &&
+		prev.siblingCount === next.siblingCount &&
+		prev.role === next.role &&
+		prev.attachments === next.attachments &&
+		prev.finishReason === next.finishReason &&
+		(prev.isStopped ?? false) === (next.isStopped ?? false)
+	);
+}
 
 /** 省略业务回调时的稳定空实现，避免每次 render 新建函数导致子组件重渲染 */
 const asyncNoop = async () => {};
@@ -117,27 +143,7 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 				const p = prev[i];
 				// 为何：列表变长或首屏新增行时没有旧引用；影响：必须用新对象，否则缺字段
 				if (!p) return n;
-				if (
-					// 为何：身份不变才允许复用引用；影响：换分支后 chatId 会变，强制换新对象触发子树更新
-					p.chatId === n.chatId &&
-					// 为何：正文驱动 MdPreview value；影响：内容不变则 memo 的 Markdown 可跳过重渲染
-					p.content === n.content &&
-					// 为何：思考区单独渲染；影响：展开区与 memo 比较需同步
-					(p.thinkContent ?? '') === (n.thinkContent ?? '') &&
-					// 为何：流式结束要从「始终富文本」切到可懒加载；影响：状态翻转须换新引用
-					p.isStreaming === n.isStreaming &&
-					// 为何：分支箭头依赖 siblingIndex；影响：切兄弟仅这两字段变，仍须换新对象
-					p.siblingIndex === n.siblingIndex &&
-					p.siblingCount === n.siblingCount &&
-					// 为何：用户/助手渲染路径不同；影响：角色切换必须重挂载
-					p.role === n.role &&
-					// 为何：附件列表引用常稳定；影响：同一引用表示附件未变，可省重渲染
-					p.attachments === n.attachments &&
-					// 为何：maxTokens 等影响「接着回答」按钮；影响：finishReason 变须更新 UI
-					p.finishReason === n.finishReason &&
-					// 为何：停止态控制「继续生成」；影响：与 chatStore 同步停止标记
-					(p.isStopped ?? false) === (n.isStopped ?? false)
-				) {
+				if (isSameMessageForStableDisplay(p, n)) {
 					// 影响：保持 message 引用稳定 → ChatAssistantMessage.memo 与 MarkdownPreview.memo 命中跳过
 					return p;
 				}
@@ -204,8 +210,6 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 		/** 分支切换里登记的 rAF id，卸载时 cancel 避免卸载后仍触达 DOM */
 		const branchChangeRafIdsRef = useRef<Set<number>>(new Set());
 
-		const SCROLL_THRESHOLD = 5;
-
 		/** 供 onScrollTo 等闭包内调用：始终指向最新同步函数 */
 		const syncViewportScrollMetricsRef = useRef<() => void>(() => {});
 
@@ -214,7 +218,8 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 			if (!el) return;
 			const { scrollTop: st, scrollHeight, clientHeight } = el;
 			setHasScrollbar(scrollHeight > clientHeight);
-			const atBottom = scrollHeight - st - clientHeight < SCROLL_THRESHOLD;
+			const atBottom =
+				scrollHeight - st - clientHeight < SCROLL_VIEWPORT_BOTTOM_THRESHOLD_PX;
 			setAutoScroll(atBottom);
 			setIsAtBottom(atBottom);
 			layoutChatCodeToolbars(el);
@@ -778,11 +783,29 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 			setIsSharing(true);
 		}, [setIsSharing]);
 
-		const onScrollToUpDown = useCallback(
-			(position: 'up' | 'down', behavior?: 'smooth' | 'auto') => {
-				onScrollTo(position, behavior);
-			},
-			[onScrollTo],
+		const chatControlsContext = useMemo<ChatBotViewChatControlsContext>(
+			() => ({
+				isLoading: isCurrentSessionLoading,
+				isStreamingBranchVisible: streamingBranchVisibleFlag,
+				isLatestBranch: isLatestBranchFlag,
+				messagesLength: messages.length,
+				switchToStreamingBranch,
+				switchToLatestBranch,
+				hasScrollbar,
+				isAtBottom,
+				onScrollTo: onScrollTo as ChatBotViewChatControlsContext['onScrollTo'],
+			}),
+			[
+				isCurrentSessionLoading,
+				streamingBranchVisibleFlag,
+				isLatestBranchFlag,
+				messages.length,
+				switchToStreamingBranch,
+				switchToLatestBranch,
+				hasScrollbar,
+				isAtBottom,
+				onScrollTo,
+			],
 		);
 
 		useImperativeHandle(
@@ -848,20 +871,19 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 													message.role === 'user' ? 'items-end' : '',
 												)}
 											>
-												{message?.attachments &&
-													message?.attachments.length > 0 && (
-														<div className="flex flex-wrap justify-end gap-1.5 mb-2">
-															{message.role === 'user'
-																? message?.attachments?.map((i) => (
-																		<ChatFileList
-																			key={i.id || i.uuid}
-																			data={i}
-																			showDownload
-																		/>
-																	))
-																: null}
-														</div>
-													)}
+												{!!message.attachments?.length && (
+													<div className="flex flex-wrap justify-end gap-1.5 mb-2">
+														{message.role === 'user'
+															? message.attachments.map((i) => (
+																	<ChatFileList
+																		key={i.id || i.uuid}
+																		data={i}
+																		showDownload
+																	/>
+																))
+															: null}
+													</div>
+												)}
 												<Label
 													className={getMessageClassName(message)}
 													htmlFor={message.chatId}
@@ -947,29 +969,9 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 					) : null}
 					{showChatControls ? (
 						renderChatControls ? (
-							renderChatControls({
-								isLoading: isCurrentSessionLoading,
-								isStreamingBranchVisible: streamingBranchVisibleFlag,
-								isLatestBranch: isLatestBranchFlag,
-								messagesLength: messages.length,
-								switchToStreamingBranch,
-								switchToLatestBranch,
-								hasScrollbar,
-								isAtBottom,
-								onScrollTo: onScrollToUpDown,
-							})
+							renderChatControls(chatControlsContext)
 						) : (
-							<ChatControls
-								isLoading={isCurrentSessionLoading}
-								isStreamingBranchVisible={streamingBranchVisibleFlag}
-								isLatestBranch={isLatestBranchFlag}
-								messagesLength={messages.length}
-								switchToStreamingBranch={switchToStreamingBranch}
-								switchToLatestBranch={switchToLatestBranch}
-								hasScrollbar={hasScrollbar}
-								isAtBottom={isAtBottom}
-								onScrollTo={onScrollToUpDown}
-							/>
+							<ChatControls {...chatControlsContext} />
 						)
 					) : null}
 				</ScrollArea>

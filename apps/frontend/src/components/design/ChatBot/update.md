@@ -1507,3 +1507,210 @@ cd apps/frontend && pnpm exec tsc --noEmit
 ---
 
 **本节完**：九、本次需求「代码块吸顶工具栏」从 **parser 输出 → store/layout → Portal UI → View 驱动 → CSS** 全链路说明完毕；与**第一节至第八节**（历史性能与分支等）可并列查阅，互不替代。
+
+---
+
+## 十、`ChatBotView.tsx` 滚动体系：为何多套、各自解决什么问题（附逐句释义）
+
+聊天列表的滚动**不是**「调一次 `scrollTop = 最大值`」就能万事大吉。真实场景里同时存在：**流式输出撑高内容**、**Markdown 懒加载二次撑高**、**用户是否愿意跟底（autoScroll）**、**换会话/换分支后 DOM 与 React 状态不同步**、**ScrollArea 与内部 `#message-content` 多层节点**、**代码块吸顶条（`layoutChatCodeToolbars`）要随滚动重算** 等。因此文件里会出现：**同步视口度量**、**程序化滚顶/滚底**、**双帧 rAF 补滚底**、**ResizeObserver / MutationObserver 跟底**、**分支切换钉视口**、**多处调用同一套 `syncViewportScrollMetrics`**。下面按源码出现顺序，对**每一句（或紧密相连的一句组）**说明「写什么、为什么」。
+
+> 行号以当前仓库 `ChatBotView.tsx` 为准；若你本地改过文件，请以实际行为为准对照。
+
+### 10.1 与滚动相关的 import 与模块常量
+
+| 代码位置 | 语句 | 作用与原因 |
+|----------|------|------------|
+| L35 | `import { layoutChatCodeToolbars } from '@/utils/chatCodeToolbar'` | 每次视口滚动或内容尺寸变化时，要重算**代码块浮动工具栏**相对视口的位置；否则吸顶条会漂。 |
+| L36–L43 | 从 `./utils` 引入 `alignMessageRowBottomToViewportBottom`、`BRANCH_ANCHOR_NUDGE_UP_PX`、`BranchScrollPending`、`getMaxScrollTop`、`isLongMessageRowForBranchScroll`、`tryApplyBranchScrollAnchor` | **分支切换**时不能简单滚到列表底：要在「换行前后」保持用户眼睛附近的锚点；`utils.ts` 把这些几何计算抽成纯函数，便于测试与注释。 |
+| L45–L46 | `const SCROLL_VIEWPORT_BOTTOM_THRESHOLD_PX = 5` | **判定是否在底部**时留 5px 容差，避免亚像素舍入导致底栏箭头（上/下）在「几乎贴底」时抖动。 |
+
+`utils.ts` 中与滚动直接相关的补充（View 会调用）：
+
+| 符号 | 逐句含义 |
+|------|----------|
+| `getMaxScrollTop(el)` | `Math.max(0, scrollHeight - clientHeight)`：合法 `scrollTop` 上限，避免依赖浏览器对超大值的钳位差异。 |
+| `alignMessageRowBottomToViewportBottom` | 取 `#message-${rowId}` 行与视口的底边差 `delta`，`scrollTop += delta`：把**整行底**对齐到**视口底**，用于**长助手气泡**分支切换。 |
+| `isLongMessageRowForBranchScroll` | 行高 ≥ 视口一半的「长消息」：若仍只钉分支锚点顶部，底部操作区会被顶出屏，故走「行底对齐视口底」。 |
+| `tryApplyBranchScrollAnchor` | 用切换前记录的 `before`（视口坐标）与切换后新 DOM 上对应点做差，修正 `scrollTop`；`seq` 不一致则视为过期操作直接返回 true，避免快速连点打架。 |
+| `BRANCH_ANCHOR_NUDGE_UP_PX` | 钉锚点时略向上偏一点，避免条紧贴视口上沿太「死」。 |
+
+---
+
+### 10.2 状态：`autoScroll` / `hasScrollbar` / `isAtBottom`
+
+| 代码位置 | 语句 | 作用与原因 |
+|----------|------|------------|
+| L184 | `const [autoScroll, setAutoScroll] = useState(true)` | **是否跟底**：用户往上滚阅读历史时应为 `false`，流式输出时不应强行把页面拽下去；切会话时重置为 `true`（见下文 effect）。 |
+| L187 | `const [hasScrollbar, setHasScrollbar] = useState(false)` | 传给底栏等 UI：**是否有纵向滚动条**，用于控制滚动按钮是否显示或样式；须与真实 DOM 一致。 |
+| L188–L189 | `isAtBottom` 的注释与 `useState(true)` | **是否在底部**的展示状态，须与 **ScrollArea viewport 的当前 DOM** 同步；注释强调不能混用「旧的 scrollTop 状态 + 新的 scrollHeight」。 |
+
+---
+
+### 10.3 ref：为什么需要这么多个
+
+| 代码位置 | 语句 | 作用与原因 |
+|----------|------|------------|
+| L191 | `scrollContainerRef` | 指向 **ScrollArea 的 viewport**（可滚动元素），一切 `scrollTo` / `scrollTop` / `getBoundingClientRect` 都以它为基准。 |
+| L195 | `scrollTimer` | 预留/历史定时器引用；卸载时清理（L488–L490）。 |
+| L196 | `resizeObserverRef` | **流式阶段**挂在 `#message-content` 上的 `ResizeObserver`，用于内容高度变化时跟底与更新滚动条状态。 |
+| L197 | `lastScrollHeightRef` | 记录**上一次**容器的 `scrollHeight`：仅在高度**真的变化**时才 `scrollTo` 跟底，避免流式回调风暴导致无意义重复滚动。 |
+| L198 | `mutationObserverRef` | 观察 `#message-container` 子树 DOM 变化（流式时节点/文本常变），作为 Resize 之外的补充触发。 |
+| L199–L200 | `manualScrollToBottomCleanupRef` | 用户触发「滚到底」且 `behavior === 'auto'` 时，可能注册 **ResizeObserver + 超时 dispose**；下次滚顶/滚底/卸载要先执行清理，防止泄漏与重复观察。 |
+| L201–L204 | `pendingBranchScrollAnchorRef` | 分支切换后**待应用**的锚点信息（`BranchScrollPending`），可能在 `flushSync` 当下 DOM 未就绪，需配合 `useLayoutEffect` 再试。 |
+| L205 | `branchScrollSeqRef` | 单调递增序号：快速连续点分支时，旧 rAF 里若发现 `seq` 已变则**不再改滚动**，避免多帧互相覆盖。 |
+| L206–L207 | `sessionEnterScrolledRef` | **同一会话进入时只自动滚底一次**，避免每次 `messages` 引用变化都跳底打断用户。 |
+| L208–L209 | `scrollToBottomRafCancelRef` | `onScrollTo('down','auto')` 在**没有** `#message-content` 时只注册双帧 rAF，需保存 cancel 函数供下次滚顶/卸载取消。 |
+| L210–L211 | `branchChangeRafIdsRef` | 登记分支逻辑里所有 `requestAnimationFrame` 的 id，卸载时 `cancelAnimationFrame` 全集。 |
+| L213–L214 | `syncViewportScrollMetricsRef` | **固定模式**：`syncViewportScrollMetrics` 本体用 `useCallback([])` 稳定，但内部要用最新实现；每轮 render 把最新函数赋给 ref，供 `onScrollTo`、微任务、observer 等闭包调用。 |
+
+---
+
+### 10.4 `syncViewportScrollMetrics`（核心：一函数多触点）
+
+| 代码位置 | 语句 | 作用与原因 |
+|----------|------|------------|
+| L216–L218 | `const el = scrollContainerRef.current` / `if (!el) return` | 无挂载容器则直接返回，避免空引用。 |
+| L219 | 解构 `scrollTop`、`scrollHeight`、`clientHeight` | 从**同一时刻**的 DOM 读三项，保证「是否在底部」判断自洽。 |
+| L220 | `setHasScrollbar(scrollHeight > clientHeight)` | 内容高于视口则有滚动条；供底栏等 UI。 |
+| L221–L222 | `atBottom` 与 `SCROLL_VIEWPORT_BOTTOM_THRESHOLD_PX` | 距底部小于阈值视为在底，减少抖动。 |
+| L223 | `setAutoScroll(atBottom)` | 用户滚回底部则恢复「允许流式跟底」；往上拖则 `false`。 |
+| L224 | `setIsAtBottom(atBottom)` | 驱动底栏箭头方向等。 |
+| L225 | `layoutChatCodeToolbars(el)` | **吸顶代码工具栏**依赖视口滚动位置与尺寸，必须在此同步调用。 |
+| L227 | `useCallback(..., [])` | 函数引用稳定，避免无意义下游 effect 依赖抖动；逻辑通过 ref 读最新 DOM。 |
+| L228 | `syncViewportScrollMetricsRef.current = syncViewportScrollMetrics` | 把稳定包装的最新实现挂到 ref，解决闭包陈旧问题。 |
+
+---
+
+### 10.5 `scheduleBranchRaf`
+
+| 代码位置 | 语句 | 作用与原因 |
+|----------|------|------------|
+| L231–L237 | `requestAnimationFrame` 包一层、`branchChangeRafIdsRef` add/delete | 分支切换后常在**下一帧**再量一次高度（懒加载 Markdown）；统一登记 id 便于卸载时全部 cancel。 |
+
+---
+
+### 10.6 `onScrollTo(position, behavior)`：对外「滚顶 / 滚底」的完整策略
+
+| 代码位置 | 语句 | 作用与原因 |
+|----------|------|------------|
+| L239–L243 | `useCallback` + 取 `el` / `bh = behavior ?? 'smooth'` | 外部（如 `useBranchManage`、会话进入 effect）可调；默认平滑滚动。 |
+| L245–L252 | `position === 'up'` 分支 | **滚到顶**：先清掉「自动滚底」注册的 RO/RAF（`manualScrollToBottomCleanupRef`、`scrollToBottomRafCancelRef`），避免旧监听在新滚动上捣乱；`scrollTo({ top: 0 })`；再 `syncViewportScrollMetricsRef.current()` 同步状态与工具栏。 |
+| L255–L259 | `down` 前同样清理两类 ref | 每次新的「滚底」会话前释放上一轮的资源。 |
+| L261–L264 | `alignToMax` 内部函数 | 将 `scrollTop` 设为 `getMaxScrollTop(el)` 并同步度量；复用于多处。 |
+| L266–L267 | `querySelector('#message-content')` / `lastElementChild` | 找**最后一条消息行**，优先用浏览器 `scrollIntoView` 把尾行拉进视口。 |
+| L268–L274 | `lastRow instanceof HTMLElement` 时 `scrollIntoView({ block: 'end', ... })` | 尾行底部对齐策略，辅助「真的看见最后一条」。 |
+| L275 | `alignToMax(bh === 'smooth' ? 'smooth' : 'auto')` | 再强制对齐到数学上的最大滚动位置，双保险。 |
+| L277 | `if (bh === 'auto')` | **仅非平滑**时启用「首帧高度不准」补偿：刷新/首屏常见 `scrollHeight` 偏小。 |
+| L278–L283 | `rafHandles` / `cancelScrollToBottomRafs` | 保存 outer/inner 两个 rAF id，便于取消；重置为 0 防重复 cancel 错 id。 |
+| L284–L291 | 双帧 `requestAnimationFrame` 连续 `alignToMax('auto')` | **第一帧布局后第二帧再滚**：等字体、懒组件挂载后再对齐到底。 |
+| L292–L314 | 存在 `contentRoot` 时 `ResizeObserver` + `setTimeout(600)` + `dispose` | 内容仍在增高时**持续贴底**；600ms 后停止观察并清理，避免永久监听；`dispose` 幂等、`manualScrollToBottomCleanupRef` 指向它以便外部统一清理。 |
+| L315–L317 | `else` 分支把 `cancelScrollToBottomRafs` 赋给 `scrollToBottomRafCancelRef` | 没有 `#message-content` 时无法挂 RO，只依赖双帧 rAF，需把 cancel 存起来供滚顶/卸载调用。 |
+
+---
+
+### 10.7 注册与窗口、滚动监听（工具栏与 viewport）
+
+| 代码位置 | 语句 | 作用与原因 |
+|----------|------|------------|
+| L345–L351 | `onScrollToRegister` 的 `useEffect` | 父级（如 Context）可拿到**当前** `onScrollTo`，供会话外按钮触发滚底；卸载时置 `null`。 |
+| L353–L358 | `window resize` → `layoutChatCodeToolbars` | 窗口宽高变，浮动条绝对位置要重算。 |
+| L360–L367 | `useLayoutEffect`：`vp.addEventListener('scroll', ... passive)` | **与 React `onScroll`（handleScroll）解耦**：原生监听保证用户拖动滚动条时**每一帧**都更新吸顶条几何；依赖 `activeSessionId`、`messages.length` 以便换会话/列表行数变化时重新绑定到正确 viewport。 |
+| L369–L372 | `useLayoutEffect` 依赖 `[messages]` → `layoutChatCodeToolbars` | 消息数组变化（内容/条数）后布局可能变，需在 commit 后立刻重算工具栏。 |
+
+---
+
+### 10.8 切会话：重置跟底与「进入会话只滚一次」
+
+| 代码位置 | 语句 | 作用与原因 |
+|----------|------|------------|
+| L374–L383 | `activeSessionId` effect | 无会话时清空 `sessionEnterScrolledRef`；有会话时 `setAutoScroll(true)` 与 `lastScrollHeightRef.current = 0`，避免上一会话「用户上滚 + 旧 scrollHeight」阻止新会话首次跟底。 |
+| L385–L406 | 另一 effect：`sessionEnterScrolledRef === activeSessionId` 则 return | **防抖**：同一会话只自动 `onScrollTo('down','auto')` 一次。 |
+| L390–L391 | `isCurrentSessionLoading` / `messages.length === 0` 提前 return | 仍在加载或无消息时不滚。 |
+| L397–L404 | `queueMicrotask` + `onScrollTo` + 双 rAF 后 `syncViewportScrollMetricsRef` | 等 DOM 挂载后再滚；滚底可能不触发 `handleScroll`，故双 rAF 后**强制同步**底栏箭头与 `autoScroll`。 |
+
+---
+
+### 10.9 流式输出：`ResizeObserver` + `MutationObserver` + `lastScrollHeightRef`
+
+| 代码位置 | 语句 | 作用与原因 |
+|----------|------|------------|
+| L408–L411 | 取 `lastMessage`、`isCurrentlyStreaming` | **仅当最后一条是助手且在流式**时，才启用跟底与观察器，避免干扰历史浏览。 |
+| L413–L418 | `updateScrollbarState` | 只更新 `hasScrollbar`（此处不调用完整 `sync`，因下面会调）。 |
+| L420–L431 | `scrollToBottom` | 同时满足：`sc` 存在、`autoScroll`、`isCurrentlyStreaming`；且 **`currentScrollHeight !== lastScrollHeightRef.current`** 才滚：避免同高度重复 `scrollTo`。 |
+| L434–L436 | effect 开头立即 `updateScrollbarState`、`scrollToBottom`、`syncViewportScrollMetrics` | 依赖变化时先跑一轮同步，保证状态与 DOM 一致。 |
+| L438–L446 | `#message-content` + `ResizeObserver` | 流式/Markdown 撑高多表现为**布局尺寸变化**，RO 捕获。 |
+| L449–L461 | `#message-container` + `MutationObserver`（childList/subtree/characterData） | 纯 DOM 增删改字有时先于布局稳定，**补漏**。 |
+| L464–L473 | cleanup `disconnect` 并置 `null` | 防止泄漏与旧 observer 活到下一轮流式会话。 |
+| L474 | 依赖 `[messages, autoScroll, syncViewportScrollMetrics]` | 消息或跟底意愿变化时重建监听逻辑。 |
+
+---
+
+### 10.10 会话 / 分支变化后：再同步一次视口度量
+
+| 代码位置 | 语句 | 作用与原因 |
+|----------|------|------------|
+| L476–L484 | `useLayoutEffect`：`syncViewportScrollMetrics()`，依赖 `messages`、`activeSessionId`、`selectedChildMap` | 切换会话或分支后 **scrollHeight / scrollTop 与 React 旧状态可能不一致**；在浏览器 paint 前纠正 `isAtBottom` / `autoScroll` / 工具栏，避免底栏箭头反向。 |
+
+---
+
+### 10.11 卸载：统一释放定时器与观察器与 rAF
+
+| 代码位置 | 语句 | 作用与原因 |
+|----------|------|------------|
+| L486–L511 | 空依赖 `useEffect` 仅 return cleanup | 组件卸载时：`clearTimeout` 各类 timer；`resizeObserverRef`/`mutationObserverRef` 再 disconnect；执行 `manualScrollToBottomCleanupRef`；取消滚底 rAF；遍历 `branchChangeRafIdsRef` **全部 cancel**。防止卸载后仍操作 DOM 或 setState。 |
+
+---
+
+### 10.12 `handleScroll`
+
+| 代码位置 | 语句 | 作用与原因 |
+|----------|------|------------|
+| L514–L520 | `onScroll` 里若 ref 未赋值则 `scrollContainerRef.current = element` | 兼容 ref 回调时机，确保后续逻辑能拿到 viewport。 |
+| L520 | `syncViewportScrollMetrics()` | 用户滚动时更新 `autoScroll`、`isAtBottom`、`hasScrollbar` 与代码块工具栏位置。 |
+
+---
+
+### 10.13 分支切换 `handleBranchChange` 中的滚动（约 L552 起）
+
+| 代码位置 | 语句 | 作用与原因 |
+|----------|------|------------|
+| L572–L573 | `isAssistantBranchSwitch` | 用户消息切换分支通常不需要「钉视口」补偿。 |
+| L585–L593 | `shouldScrollToBottom` | 若新选兄弟已是**当前链尾**，用户期望视口在**列表底部**而非钉在中间。 |
+| L595–L602 | 取 `sc`、`oldRow`、`oldBranchEl` | 切换**前**采样 DOM，记录锚点或行底的 `getBoundingClientRect`。 |
+| L603–L635 | 分支设置 `pendingBranchScrollAnchorRef` 或清空 | 链尾/用户消息/找不到 DOM 则清空 pending；助手且非链尾则写入 `anchorTop` 或 `rowBottom` + `nudge`。 |
+| L637–L640 | `flushSync` 更新 `selectedChildMap` | 同一帧提交，避免闪错分支。 |
+| L642–L653 | `shouldScrollToBottom`：`scrollTop = getMaxScrollTop` + microtask 同步 + `scheduleBranchRaf` 再滚一次 | 立即贴底 + 等懒内容长高后再贴底。 |
+| L654–L701 | `isAssistantBranchSwitch` 且非链尾：`isLongMessageRowForBranchScroll` → `alignMessageRowBottomToViewportBottom` 否则 `tryApplyBranchScrollAnchor` + 可能第二帧 rAF | **长消息**与**短消息**两套几何策略；rAF 内再次判断长度变化（首帧矮、二帧撑高）。 |
+| L703–L711 | `onPersistSessionBranchSelection` 微任务 | 与滚动无直接关系，但与分支状态同一用户操作闭环，放在 `flushSync` 后延后执行。 |
+
+---
+
+### 10.14 `useLayoutEffect`：补应用分支锚点（L730–L748）
+
+| 代码位置 | 语句 | 作用与原因 |
+|----------|------|------------|
+| L731–L735 | 无 `pending` 或无 `sc` 则 return | 无事可做。 |
+| L736–L740 | 若已变长消息则改 `alignMessageRowBottomToViewportBottom` 并清 pending | `flushSync` 当下可能测不准高度，layout 阶段再判一次。 |
+| L742–L747 | `tryApplyBranchScrollAnchor`；成功则清 pending | DOM 晚就绪时在此**补钉**一次。 |
+
+---
+
+### 10.15 JSX：`ScrollArea` 与 `scrollViewportRef`
+
+| 代码位置 | 语句 | 作用与原因 |
+|----------|------|------------|
+| L829–L835 | 注释、`ScrollArea` 的 `ref={scrollContainerRef}`、`viewportClassName="[overflow-anchor:none]"`、`onScroll={handleScroll}` | ref 指向 **Viewport**；`overflow-anchor:none` 降低浏览器 scroll anchoring 与程序化滚底打架的概率；`onScroll` 驱动 `syncViewportScrollMetrics`。 |
+| L836–L837 | `id="message-container"`、`#message-content` 内层 | **约定 ID**：`onScrollTo`、流式 observer、分支 DOM 查询都依赖这两层，改动须全文件同步。 |
+| L912–L914 | 注释与 `scrollViewportRef={scrollContainerRef}` | 子组件（如懒挂载 MdPreview）需要知道**外层滚动容器**是谁，以便内部可见性/滚动相关逻辑与列表一致。 |
+
+---
+
+### 10.16 小结：为什么要「这么多套」滚动
+
+1. **跟底（流式）**：高度连续变，且用户可能不在底部 → 要 `autoScroll` + `lastScrollHeightRef` + RO/MO。  
+2. **一次性滚底（进会话 / 刷新）**：首帧 `scrollHeight` 不可靠 → 要双 rAF、必要时 RO + 超时。  
+3. **分支切换**：不是总滚到底 → 要锚点 / 行底对齐 / seq / layout effect 补刀。  
+4. **底栏与工具栏**：`isAtBottom`、`hasScrollbar`、吸顶条必须与 **真实 viewport** 同源更新 → `syncViewportScrollMetrics` 多路调用 + 独立 `scroll` 监听。  
+5. **安全**：凡异步（rAF、RO、timeout）都要在卸载或下一次操作前 **cancel/disconnect**，故 ref 特别多。
+
+以上与**第九节**「代码块吸顶工具栏」互为补充：第九节偏 **parser/store/Portal**，本节偏 **ChatBotView 内与滚动相关的状态机与 DOM 监听**。
