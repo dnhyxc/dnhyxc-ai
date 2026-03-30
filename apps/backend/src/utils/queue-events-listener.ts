@@ -9,7 +9,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { QueueEvents } from 'bullmq';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
-import { RedisEnum } from '../enum/config.enum';
+import { createBullRedisConnectionOptions } from '../factorys/bull-redis-connection.factory';
 
 /**
  * 独立的队列事件监听器
@@ -28,14 +28,9 @@ export class QueueEventsListener implements OnModuleInit, OnModuleDestroy {
 		private readonly logger: LoggerService,
 		private readonly configService: ConfigService,
 	) {
-		// 创建 QueueEvents 实例
+		// 与 BullModule.forRoot 使用同一套连接参数，避免独立连接缺字段或与 commandTimeout 行为不一致
 		this.queueEvents = new QueueEvents('chat-message-queue', {
-			connection: {
-				host:
-					this.configService.get<string>(RedisEnum.REDIS_HOST) || 'localhost',
-				port: this.configService.get<number>(RedisEnum.REDIS_PORT) || 6379,
-				password: this.configService.get<string>(RedisEnum.REDIS_PASSWORD),
-			},
+			connection: createBullRedisConnectionOptions(this.configService),
 		});
 	}
 

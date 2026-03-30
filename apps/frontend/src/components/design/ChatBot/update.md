@@ -1714,3 +1714,228 @@ cd apps/frontend && pnpm exec tsc --noEmit
 5. **安全**：凡异步（rAF、RO、timeout）都要在卸载或下一次操作前 **cancel/disconnect**，故 ref 特别多。
 
 以上与**第九节**「代码块吸顶工具栏」互为补充：第九节偏 **parser/store/Portal**，本节偏 **ChatBotView 内与滚动相关的状态机与 DOM 监听**。
+
+---
+
+## 十一、联网引用预览、流式结束贴底与前后端引用锚点（近期改动说明）
+
+**本节范围**：助手消息内 Serper 引用角标悬停预览、引用 DOM 与工具函数、**仅开联网时**流式结束后的补滚底、后端落库/提示词与前端一致。  
+**涉及路径**：
+
+| 路径 | 角色 |
+|------|------|
+| `apps/frontend/src/utils/organicCitation.ts` | 正文里 `[n]` / `【n】` 转 `<a>`、`data-organic-cite`、按锚点反查条目、事件目标向上找引用链接 |
+| `apps/frontend/src/components/design/ChatAssistantMessage/index.tsx` | 悬停气泡（Portal + 指针坐标）、正文监听、`SearchOrganics` 抽屉、顶部/底部联网入口 UI |
+| `apps/frontend/src/components/design/ChatBot/ChatBotView.tsx` | `wasLastAssistantStreamingRef`、`webSearchEnabled` 门控的流式结束 `onScrollTo` |
+| `apps/frontend/src/components/design/ChatBot/index.tsx` | 从 `useChatCoreContext` 注入 `webSearchEnabled` |
+| `apps/frontend/src/types/chat.ts` | `ChatBotViewProps.webSearchEnabled` |
+| `apps/backend/src/services/chat/serper.service.ts` | 与前端一致的 `<a>` 属性及提示词中对属性的描述 |
+
+---
+
+### 11.1 功能目标（产品行为）
+
+1. **引用角标**：联网回答里正文会出现引用序号（链接到检索结果）。用户悬停时应看到与「联网搜索结果」抽屉里**同类信息**（序号、日期、标题、摘要），且不因 Markdown 剥掉 `class` 而失效，有时候后端返回的 a 标签没有携带 `__md-search-organic__` 类名。  
+2. **气泡定位**：采用 **`clientX/clientY` + 视口夹紧**，通过 `createPortal` 将气泡渲染到 `body` 上，避免依赖锚点 `getBoundingClientRect` 与 `translate(-100%)` 带来的首帧错位、innerHTML 替换后旧锚点 `rect` 为 0 等问题。  
+3. **流式结束滚底**：`isStreaming` 变为 `false` 后，助手气泡会多出仅在非流式下展示的区块（如底部「N 个网页」、免责声明）；原先 RO/MO 只在流式中为真时挂载，结束后会卸掉，导致**不再自动跟底**。在**用户仍处于跟底模式（`autoScroll`）且已打开联网开关**时，补一次与「进会话滚底」同款的 `onScrollTo('down', 'auto')`。  
+4. **后端一致**：落库/流式前对正文做的引用替换与前端 `applyOrganicCitationAnchors` 使用相同 `<a>` 属性，便于前后端与提示词对齐。
+
+---
+
+### 11.2 `organicCitation.ts`（逐段说明）
+
+| 位置 | 代码意图 | 说明 |
+|------|----------|------|
+| 文件头注释 | 与 `serper.service.ts` 一致 | 避免流式阶段只收到原始 `[n]` 而前端展示与落库不一致。 |
+| `import type { SearchOrganicItem }` | 类型来自 `@/types/chat` | `resolveSearchOrganicFromCitationAnchor` 返回完整条目（含 `title/snippet`）。 |
+| `escapeHrefForDoubleQuotedAttr` | `&` → `&amp;`，`"` → `&quot;` | 拼进 `href="..."` 时避免破坏 HTML 属性。 |
+| `urlsMatchForOrganic` | `trim` + `decodeURIComponent` 后比较 | 模型输出的 URL 与 organic 里链接编码形式可能不同，归一化后再比。 |
+| `applyOrganicCitationAnchors` 早退 | `!text \|\| !organic?.length` | 无正文或无检索列表则不替换。 |
+| `toAnchor(idx)` | 生成 `<a href=... data-organic-cite="${idx}" target="_blank" rel="noopener noreferrer" style="cursor: pointer;" class="__md-search-organic__">${idx}</a>` | **`data-organic-cite`**：运行时优先用序号映射 `organics[idx-1]`，不依赖 class 是否被 Markdown 保留；**`cursor: pointer`**：提示可点/可悬停；**`__md-search-organic__`**：样式或脚本仍可定向（可选）。 |
+| 第一段 `replace`（`[n](url)`） | 仅当 url 与 `organic[i-1].link` 匹配才替换 | 防止模型伪造链接却标同一序号。 |
+| `【n】`、`[n]`（非 `(` 跟随） | 全角/裸半角序号 | 与提示词允许的两种写法一致。 |
+| `resolveSearchOrganicFromCitationAnchor` | 先读 `data-organic-cite` 合法下标 → `organics[n-1]`；否则 `getAttribute('href')` 与 `urlsMatchForOrganic` 查找 | **旧消息**可能没有 `data-organic-cite`，仅靠 `href` 仍可匹配。 |
+| `findClosestOrganicCitationAnchor` | `EventTarget` → `Element` 或 `Text.parentElement` → `closest('a')` → `root.contains` → `resolve...` 校验 | **关键**：`pointer` 事件 `target` 常为**文本节点**，没有 `closest`，必须先升到 `Element`；**不依赖** `.__md-search-organic__`，只要 `<a>` 的 href/cite 能对应 organic 即视为引用。 |
+
+---
+
+### 11.3 `ChatAssistantMessage/index.tsx`（结构与关键语句）
+
+#### 11.3.1 模块级 `clampOrganicPopoverToViewport(clientX, clientY)`
+
+| 语句 | 含义 |
+|------|------|
+| `estW = min(352, innerWidth - 2*margin)`、`estH = 280` | 与气泡 `max-w` / `max-h` 量级一致，用于**预估**弹层占位，避免贴边溢出。 |
+| `left = clientX + 12`、`top = clientY + 12` | 气泡出现在指针右下偏移，不挡角标。 |
+| 四段 `if` 修正 `left/top` | 右、下、左、上超出视口时往内收，保证 `fixed` 窗口内可见。 |
+
+#### 11.3.2 状态与 ref
+
+| 符号 | 用途 |
+|------|------|
+| `shellRef` | 整条助手气泡根节点；代码块工具栏点击委托挂在此（原逻辑）。 |
+| `bodyMarkdownRef` | **正文** `dangerouslySetInnerHTML` 容器；`pointerover/move/out` 委托在此根上，只响应当前消息正文内的引用。 |
+| `previewBubbleRef` | Portal 内气泡 DOM；`pointerout` 时判断 `relatedTarget` 是否进入气泡以取消关闭定时器。 |
+| `previewLeaveTimerRef` | 延迟关闭悬停层，避免鼠标经间隙闪断。 |
+| `open` / `setOpen` | 控制 `SearchOrganics` 抽屉开关。 |
+| `organicPreview` | `{ item, clientX, clientY } \| null`；**无**锚点测量，位置完全由指针与 `clamp` 推导。 |
+
+#### 11.3.3 `bodyText`（`useMemo`）
+
+| 逻辑 | 说明 |
+|------|------|
+| `raw` 来自 `content` 或占位「思考中...」 | 与原先一致。 |
+| 有 `searchOrganic` 且非占位 | `applyOrganicCitationAnchors(raw, org)`，与流式/落库展示一致。 |
+
+#### 11.3.4 代码块点击 `useEffect` | 与联网无关，保持复制/下载工具栏行为。
+
+#### 11.3.5 `clearOrganicPreviewLeaveTimer` / `closeOrganicPreviewNow` / `scheduleHideOrganicPreview`
+
+| 函数 | 行为 |
+|------|------|
+| `clearOrganicPreviewLeaveTimer` | `useCallback` 稳定；清 `setTimeout` id。 |
+| `closeOrganicPreviewNow` | 清定时器 + `setOrganicPreview(null)`。 |
+| `scheduleHideOrganicPreview` | 约 180ms 后关闭；给鼠标移到 Portal 气泡留时间。 |
+
+#### 11.3.6 正文指针 `useEffect`（依赖 `message.searchOrganic`、`bodyText`、`clearOrganicPreviewLeaveTimer`）
+
+| 语句 | 说明 |
+|------|------|
+| `root = bodyMarkdownRef.current`，无 `organics` 则 return | 无检索结果不做悬停层。 |
+| `applyIfCitation(e)` | `findClosestOrganicCitationAnchor(e.target, root, organics)` → `resolve...` → `setOrganicPreview` + 当前 `clientX/Y`。 |
+| `pointerover` + `pointermove` 都绑定 `applyIfCitation` | 进入角标与在角标上移动都会更新内容与位置。 |
+| `onPointerOut` | 从引用 `<a>` 离开且未进入子节点、未进入气泡时 `scheduleHide`。 |
+| cleanup | 移除三个监听并清定时器，防泄漏。 |
+
+#### 11.3.7 `prevBodyTextRef` + `useEffect([bodyText])`
+
+| 行为 | 原因 |
+|------|------|
+| 仅当 `bodyText` **字符串引用变化**（相对上次）时 `closeOrganicPreviewNow` | 流式/重渲染会替换 innerHTML，旧 `<a>` 已失效；避免无条件 effect 误杀刚打开的预览（曾用 `close` 回调依赖出过问题）。 |
+
+#### 11.3.8 `useEffect([message.searchOrganic])`
+
+| 行为 | 原因 |
+|------|------|
+| `searchOrganic` 变空时关闭预览 | 本条不再展示检索时不应残留气泡。 |
+
+#### 11.3.9 `popoverPos`（`useMemo`）
+
+| 行为 | 原因 |
+|------|------|
+| `organicPreview` 存在时对 `clientX/Y` 调用 `clampOrganicPopoverToViewport` | 渲染期得到合法 `left/top`，首帧即可在视口内。 |
+
+#### 11.3.10 `useEffect`：scroll（capture）+ resize
+
+| 行为 | 原因 |
+|------|------|
+| 预览打开时监听 `scroll`/`resize`，触发则 `closeOrganicPreviewNow` | 指针坐标不再对应视觉位置，关闭比跟屏重算更简单。 |
+
+#### 11.3.11 `useEffect`：`document` `pointerdown` capture
+
+| 行为 | 原因 |
+|------|------|
+| 点击不在气泡内则关闭 | 点击空白关闭；气泡上 `stopPropagation` 避免点气泡时先被 document 关掉。 |
+
+#### 11.3.12 `useEffect`：`Escape`
+
+| 行为 | 原因 |
+|------|------|
+| 键盘关闭无障碍/习惯操作。 |
+
+#### 11.3.13 JSX：顶部「已阅读 N 个网页」、底部联网条、免责声明
+
+| 片段 | 说明 |
+|------|------|
+| 条件 `searchOrganic?.length` | 有检索结果才显示入口。 |
+| 底部 `!message.isStreaming` | 流式中不显示免责声明与底部「N 个网页」条，避免半截 UI；流式结束后高度变化与 **ChatBotView 补滚底** 联动。 |
+| `Earth` 图标等 | 与产品当前设计一致（原 `SearchIcon` 可替换为地球图标强化「联网」）。 |
+
+#### 11.3.14 Portal 气泡
+
+| 属性/类名 | 说明 |
+|-----------|------|
+| `createPortal(..., document.body)` | 避免聊天区域 `overflow: hidden` 裁剪气泡。 |
+| `fixed` + `popoverPos.left/top` | 直接使用夹紧后的坐标，无 `transform: translate(-50%,-100%)`。 |
+| `z-10050`、`max-h`、`overflow-y-auto` | 层级与长摘要可滚动。 |
+| `onPointerDown={e => e.stopPropagation()}` | 与 document 捕获配合。 |
+| `onPointerEnter` / `onPointerLeave` | 悬停气泡时取消/延迟关闭。 |
+| 内部 `flex flex-col gap-2` + `flow-root` + `float-left` + 序号 `w-5.5 h-5.5` + 日期 `text-base` + 标题 `ml-3` + 摘要 `text-sm text-textcolor/70` | **与 `SearchOrganics.tsx` 列表项排版、字号对齐**，减少两处 UI 漂移。 |
+
+#### 11.3.15 `memo` 比较函数
+
+| 字段 | 说明 |
+|------|------|
+| 含 `searchOrganic`、`isStreaming`、`finishReason` 等 | 检索结果或流式态变必须重渲染；否则悬停层与底部条不同步。 |
+
+---
+
+### 11.4 `ChatBotView.tsx`（流式结束贴底 + 联网门控）
+
+#### 11.4.1 `wasLastAssistantStreamingRef`
+
+| 语句 | 说明 |
+|------|------|
+| `useRef(false)` | 存**上一轮 effect 认为**「尾条助手是否在流式」。 |
+| 在 `activeSessionId` 的 effect 里置 `wasLastAssistantStreamingRef.current = false` | 换会话后避免把上一会话的「刚结束流式」误判到本会话。 |
+
+#### 11.4.2 `props` 解构 `webSearchEnabled = false`
+
+| 说明 |
+|------|
+| 未接入联网开关的 `ChatBotView` 调用方默认为关，**不**执行补滚底，避免无关场景多一次 `onScrollTo`。 |
+
+#### 11.4.3 独立 `useEffect([messages, autoScroll, onScrollTo, webSearchEnabled])`
+
+| 语句 | 说明 |
+|------|------|
+| `last = messages[messages.length - 1]` | 只关心列表最后一条。 |
+| `nowStreaming = last 为 assistant 且 isStreaming` | 当前是否仍在生成。 |
+| `wasStreaming = ref.current` | 上一拍是否仍在生成。 |
+| 条件 `webSearchEnabled && wasStreaming && !nowStreaming && last?.role==='assistant' && autoScroll` | **仅联网开**：否则非联网回复结束也会 `onScrollTo`，无必要；**仅跟底**：用户已上滚不抢滚动条。 |
+| `queueMicrotask(() => onScrollTo('down','auto')` + 双 `rAF` + `syncViewportScrollMetricsRef` | 与「进会话滚底」同款，保证底栏箭头等与真实 `scrollTop` 一致。 |
+| 末尾 `wasLastAssistantStreamingRef.current = nowStreaming` | 为下一帧更新「上一拍流式状态」。 |
+
+**与原有流式 RO/MO 的关系**：原 effect 仅在 `isCurrentlyStreaming` 为真时挂载观察器；结束时观察器卸载，**不再**因 DOM 增高而 `scrollToBottom`；本 effect 专门补上这一拍。
+
+---
+
+### 11.5 `ChatBot/index.tsx`（连接层）
+
+| 语句 | 说明 |
+|------|------|
+| `useChatCoreContext()` 增加解构 `webSearchEnabled` | 与 `ChatEntry`、发送参数共用同一开关（`ChatCoreProvider` 内 state）。 |
+| `<ChatBotView ... webSearchEnabled={webSearchEnabled} />` | 把开关传入纯 UI 层，由 View 决定是否做「流式结束补贴底」。 |
+
+---
+
+### 11.6 `types/chat.ts`：`ChatBotViewProps`
+
+| 字段 | 说明 |
+|------|------|
+| `webSearchEnabled?: boolean` | 可选；注释写明用途，方便第三方只引 `ChatBotView` 时按需接入。 |
+
+---
+
+### 11.7 后端 `serper.service.ts`（`applyOrganicCitationAnchors` 与提示词）
+
+| 位置 | 说明 |
+|------|------|
+| `toAnchor` 返回的 `<a>` | 与前端同：`data-organic-cite`、`cursor: pointer`、`class="__md-search-organic__"`，保证**落库正文**与前端流式补锚一致。 |
+| `promptText` 中系统说明行 | 写明会转为含 `data-organic-cite` 等属性，方便模型与排查时对照。 |
+
+---
+
+### 11.8 行为小结表
+
+| 场景 | 预期 |
+|------|------|
+| 悬停引用数字（文本节点为 target） | `findClosestOrganicCitationAnchor` 仍能命中父级 `<a>`，气泡显示。 |
+| Markdown 去掉引用 `<a>` 的 class | 仍有 `data-organic-cite` 或 `href` 匹配时可识别。 |
+| 流式中 `bodyText` 变 | 关闭预览，避免 detached 锚点。 |
+| 联网关、`webSearchEnabled === false` | 流式结束**不**走补 `onScrollTo`；其它滚底逻辑不变。 |
+| 联网开、用户跟底、流式结束 | 多出的底部联网 UI 出现后，列表再贴底一次。 |
+
+---
+
+**文档维护**：若后续改为「按本条消息是否含 `searchOrganic`」而非全局开关来决定补滚底，需同步改 **11.4.3** 条件与 **11.5/11.6** 文案。
