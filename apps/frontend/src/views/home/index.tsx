@@ -1,3 +1,4 @@
+import { openUrl } from '@tauri-apps/plugin-opener';
 import { ScrollArea } from '@ui/scroll-area';
 import { motion } from 'framer-motion';
 import {
@@ -12,9 +13,8 @@ import {
 	Zap,
 } from 'lucide-react';
 import { useEffect, useMemo } from 'react';
-import { onListen } from '@/utils';
 import { useNavigate } from 'react-router';
-import { openUrl } from '@tauri-apps/plugin-opener';
+import { onListen } from '@/utils';
 
 const SHOWCASE = [
 	{
