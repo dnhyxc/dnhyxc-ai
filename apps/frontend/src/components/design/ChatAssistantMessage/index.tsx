@@ -15,6 +15,7 @@ import {
 	getChatCodeBlockPlainText,
 } from '@/utils/chatCodeToolbar';
 import { applyOrganicCitationAnchors } from '@/utils/organicCitation';
+import SearchOrganics from './SearchOrganics';
 
 // 扩大「可见」判定范围，用户快速滚动时先一步挂载 MdPreview，减轻从纯文本切到排版的闪烁感
 const LAZY_ROOT_MARGIN = '360px 0px 520px 0px';
@@ -77,6 +78,7 @@ function ChatAssistantMessageInner({
 	const [richReady, setRichReady] = useState(() =>
 		Boolean(message.isStreaming),
 	);
+	const [open, setOpen] = useState(false);
 
 	const parser = useMemo(
 		() =>
@@ -215,7 +217,10 @@ function ChatAssistantMessageInner({
 			data-chat-assistant-shell
 		>
 			{message?.searchOrganic && message.searchOrganic?.length > 0 && (
-				<div className="flex items-center text-[13px] text-textcolor/50 mb-3 bg-theme/5 hover:bg-theme/10 w-fit py-2 px-3 rounded-md cursor-pointer select-none">
+				<div
+					className="flex items-center text-[13px] text-textcolor/50 mb-3 bg-theme/5 hover:bg-theme/10 w-fit py-2 px-3 rounded-md cursor-pointer select-none"
+					onClick={() => setOpen(true)}
+				>
 					<SearchIcon size={16} className="mr-1 mt-0.5" />
 					<div>已阅读 {message.searchOrganic?.length} 个网页</div>
 				</div>
@@ -261,7 +266,10 @@ function ChatAssistantMessageInner({
 				{message?.searchOrganic &&
 					message.searchOrganic?.length > 0 &&
 					!message.isStreaming && (
-						<div className="flex items-center text-[13px] text-textcolor/50 bg-theme/5 hover:bg-theme/10 w-fit py-[11px] px-3 rounded-md cursor-pointer select-none">
+						<div
+							className="flex items-center text-[13px] text-textcolor/50 bg-theme/5 hover:bg-theme/10 w-fit py-[11px] px-3 rounded-md cursor-pointer select-none"
+							onClick={() => setOpen(true)}
+						>
 							{message.searchOrganic?.length} 个网页
 						</div>
 					)}
@@ -285,6 +293,11 @@ function ChatAssistantMessageInner({
 					</div>
 				</div>
 			)}
+			<SearchOrganics
+				open={open}
+				onOpenChange={() => setOpen(false)}
+				organics={message.searchOrganic || []}
+			/>
 		</div>
 	);
 }

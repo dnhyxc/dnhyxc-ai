@@ -27,7 +27,10 @@ export interface SessionData {
 export interface SearchOrganicItem {
 	title: string;
 	link: string;
+	position: number;
 	snippet?: string;
+	date?: string;
+	icon?: string;
 }
 
 export interface SearchOrganic {
