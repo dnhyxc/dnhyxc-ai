@@ -2,6 +2,8 @@
  * 聊天分支切换后钉住视口滚动位置：与 ChatBot 消息行 DOM（#message-*、[data-message-branch-anchor]）配套。
  */
 
+import { Message } from "@/types/chat";
+
 export type BranchScrollPending = {
 	kind: 'anchorTop' | 'rowBottom';
 	before: number;
@@ -68,4 +70,23 @@ export function tryApplyBranchScrollAnchor(
 	}
 	if (Math.abs(d) > 0.5) sc.scrollTop += d;
 	return true;
+}
+
+
+/**
+ * 展示列表「结构共享」合并：同索引两条消息展示语义一致则复用 prev 引用。
+ */
+export function isSameMessageForStableDisplay(prev: Message, next: Message): boolean {
+	return (
+		prev.chatId === next.chatId &&
+		prev.content === next.content &&
+		(prev.thinkContent ?? '') === (next.thinkContent ?? '') &&
+		prev.isStreaming === next.isStreaming &&
+		prev.siblingIndex === next.siblingIndex &&
+		prev.siblingCount === next.siblingCount &&
+		prev.role === next.role &&
+		prev.attachments === next.attachments &&
+		prev.finishReason === next.finishReason &&
+		(prev.isStopped ?? false) === (next.isStopped ?? false)
+	);
 }

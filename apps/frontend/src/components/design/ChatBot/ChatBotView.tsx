@@ -39,29 +39,12 @@ import {
 	type BranchScrollPending,
 	getMaxScrollTop,
 	isLongMessageRowForBranchScroll,
+	isSameMessageForStableDisplay,
 	tryApplyBranchScrollAnchor,
 } from './utils';
 
 /** 与视口底部判定一致：scrollTop 距最大值的像素容差 */
 const SCROLL_VIEWPORT_BOTTOM_THRESHOLD_PX = 5;
-
-/**
- * 展示列表「结构共享」合并：同索引两条消息展示语义一致则复用 prev 引用。
- */
-function isSameMessageForStableDisplay(prev: Message, next: Message): boolean {
-	return (
-		prev.chatId === next.chatId &&
-		prev.content === next.content &&
-		(prev.thinkContent ?? '') === (next.thinkContent ?? '') &&
-		prev.isStreaming === next.isStreaming &&
-		prev.siblingIndex === next.siblingIndex &&
-		prev.siblingCount === next.siblingCount &&
-		prev.role === next.role &&
-		prev.attachments === next.attachments &&
-		prev.finishReason === next.finishReason &&
-		(prev.isStopped ?? false) === (next.isStopped ?? false)
-	);
-}
 
 /** 省略业务回调时的稳定空实现，避免每次 render 新建函数导致子组件重渲染 */
 const asyncNoop = async () => {};
