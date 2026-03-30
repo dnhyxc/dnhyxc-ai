@@ -6,7 +6,7 @@
 
 import { MarkdownParser } from '@dnhyxc-ai/tools';
 import { Spinner } from '@ui/index';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronRight, Rotate3d, SearchIcon } from 'lucide-react';
 // memo：父级重渲染时若 props 判定相等则跳过本组件，减少与 PlainTextFallback / MdPreview 的协调成本
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { Message } from '@/types/chat';
@@ -215,8 +215,9 @@ function ChatAssistantMessageInner({
 			data-chat-assistant-shell
 		>
 			{message?.searchOrganic && message.searchOrganic?.length > 0 && (
-				<div className="text-sm text-textcolor/50">
-					已阅读 {message.searchOrganic?.length} 个网页
+				<div className="flex items-center text-[13px] text-textcolor/50 mb-3 bg-theme/5 hover:bg-theme/10 w-fit py-2 px-3 rounded-md cursor-pointer select-none">
+					<SearchIcon size={16} className="mr-1 mt-0.5" />
+					<div>已阅读 {message.searchOrganic?.length} 个网页</div>
 				</div>
 			)}
 			<div className="w-full">
@@ -235,17 +236,6 @@ function ChatAssistantMessageInner({
 				) : null}
 				{/* 思考展开且存在 thinkContent：richReady 前纯文本，就绪后 MdPreview */}
 				{message.thinkContent && isShowThinkContent ? (
-					// richReady ? (
-					// 	<MarkdownPreview
-					// 		value={message.thinkContent || '思考中...'}
-					// 		theme="dark"
-					// 		className="h-auto p-0"
-					// 		background="transparent"
-					// 		padding="0"
-					// 	/>
-					// ) : (
-					// 	<PlainTextFallback text={message.thinkContent} />
-					// )
 					<div
 						dangerouslySetInnerHTML={{
 							__html: parser.render(message.thinkContent),
@@ -253,36 +243,37 @@ function ChatAssistantMessageInner({
 					/>
 				) : null}
 			</div>
-			{/* 主回答区：与思考区相同的懒加载策略 */}
-			{/* {richReady ? (
-				<MarkdownPreview
-					value={bodyText}
-					theme="dark"
-					className="h-auto p-0"
-					background="transparent"
-					padding="0"
-				/>
-			) : (
-				<PlainTextFallback text={bodyText} />
-			)} */}
 			<div dangerouslySetInnerHTML={{ __html: parser.render(bodyText) }} />
-
 			{message.isStreaming && (
 				<div className="mt-1 flex items-center">
 					<Spinner className="w-4 h-4 mr-2 text-textcolor/50" />
 					<span className="text-sm text-textcolor/50">正在生成中...</span>
 				</div>
 			)}
-			{isStopped && (
-				<div className="flex items-center justify-end">
+			{message?.searchOrganic &&
+				message.searchOrganic?.length > 0 &&
+				!message.isStreaming && (
+					<div className="flex items-center justify-end text-[13px] text-textcolor/50 my-3 italic">
+						本回答由 AI 生成，内容仅供参考，请仔细甄别
+					</div>
+				)}
+			<div className="flex items-center justify-end">
+				{message?.searchOrganic &&
+					message.searchOrganic?.length > 0 &&
+					!message.isStreaming && (
+						<div className="flex items-center text-[13px] text-textcolor/50 bg-theme/5 hover:bg-theme/10 w-fit py-[11px] px-3 rounded-md cursor-pointer select-none">
+							{message.searchOrganic?.length} 个网页
+						</div>
+					)}
+				{isStopped && (
 					<div
-						className="cursor-pointer text-sm text-cyan-400 hover:text-cyan-300 select-none"
+						className="flex items-center ml-3 cursor-pointer text-sm text-cyan-400 hover:text-cyan-300 select-none bg-theme/5 hover:bg-theme/10 py-2 px-3 rounded-md"
 						onClick={onContinue}
 					>
-						继续生成
+						<Rotate3d size={16} className="mr-2" /> 继续生成
 					</div>
-				</div>
-			)}
+				)}
+			</div>
 			{message?.finishReason?.maxTokensReached && (
 				<div className="flex items-center justify-end">
 					超出最大输出长度，
