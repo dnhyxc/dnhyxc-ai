@@ -1,7 +1,7 @@
 import ChatFileList from '@design/ChatFileList';
 import ChatTextArea from '@design/ChatTextArea';
 import Upload from '@design/Upload';
-import { Button, Checkbox, Label, ScrollArea, ScrollBar } from '@ui/index';
+import { Button, ScrollArea, ScrollBar } from '@ui/index';
 import {
 	ChevronFirst,
 	ChevronLast,
@@ -264,24 +264,23 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 									</div>
 								</Upload>
 								{onWebSearchEnabledChange ? (
-									<div className="flex items-center gap-1.5 ml-1">
-										<Checkbox
-											id="chat-web-search"
-											checked={webSearchEnabled}
-											onCheckedChange={(v) =>
-												onWebSearchEnabledChange(v === true)
-											}
-											disabled={loading}
-											className="cursor-pointer border-textcolor/60"
-										/>
-										<Label
-											htmlFor="chat-web-search"
-											className="cursor-pointer text-sm text-textcolor/80 flex items-center gap-1"
-										>
-											<Globe className="w-3.5 h-3.5 shrink-0" />
-											联网搜索
-										</Label>
-									</div>
+									<Button
+										type="button"
+										variant="ghost"
+										aria-pressed={webSearchEnabled}
+										aria-label="联网搜索"
+										disabled={loading}
+										onClick={() => onWebSearchEnabledChange(!webSearchEnabled)}
+										className={cn(
+											'mb-1 h-8 shrink-0 gap-1.5 rounded-md px-2.5 text-sm',
+											webSearchEnabled
+												? 'border border-theme/40 bg-theme/15 text-textcolor hover:bg-theme/20'
+												: 'border border-transparent bg-theme/5 text-textcolor/80 hover:bg-theme/20 hover:text-textcolor',
+										)}
+									>
+										<Globe className="h-3.5 w-3.5 shrink-0" />
+										联网搜索
+									</Button>
 								) : null}
 							</div>
 							{loading ? (
