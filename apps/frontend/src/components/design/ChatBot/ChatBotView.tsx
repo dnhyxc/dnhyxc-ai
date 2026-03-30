@@ -868,6 +868,7 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 													</div>
 												)}
 												<Label
+													id="message-md-wrap"
 													className={getMessageClassName(message)}
 													htmlFor={message.chatId}
 												>
