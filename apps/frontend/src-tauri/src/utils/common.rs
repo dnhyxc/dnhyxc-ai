@@ -133,7 +133,7 @@ pub async fn determine_save_path_for_blob(
                     path
                 }
                 None => {
-                    return Err("用户取消了保存".to_string());
+                    return Err("用户取消了下载".to_string());
                 }
             }
         }

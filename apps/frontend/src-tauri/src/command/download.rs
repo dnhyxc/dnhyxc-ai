@@ -127,7 +127,7 @@ pub async fn download_file(
                         success: String::from("error"),
                         file_path: None,
                         file_name: String::new(),
-                        message: "已取消保存".to_string(),
+                        message: "已取消下载".to_string(),
                         file_size: None,
                         content_type: None,
                         id: options.id.clone(),
@@ -482,7 +482,7 @@ pub async fn save_file_with_picker(options: SaveFileOptions) -> Result<SaveFileR
         None => Ok(SaveFileResult {
             success: "success".to_string(),
             file_path: None,
-            message: "用户取消了保存".to_string(),
+            message: "用户取消了下载".to_string(),
         }),
     }
 }
