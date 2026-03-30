@@ -11,11 +11,8 @@ interface IProps {
 
 const SearchOrganics: React.FC<IProps> = ({ open, onOpenChange, organics }) => {
 	const onClickOrganic = (link: string) => {
-		console.log('link', link);
 		openUrl(link);
 	};
-
-	console.log(organics, 'organics');
 
 	return (
 		<Drawer title="联网搜索结果" open={open} onOpenChange={onOpenChange}>

@@ -69,16 +69,53 @@ export const downloadFileFromUrl = async (
 };
 
 /**
- * 下载Blob数据
+ * 将前端二进制数据转为 Tauri `download_blob` 所需的字节数组。
+ * Blob/File 无法被 IPC JSON 正确序列化，必须先转为 number[]。
+ */
+async function toDownloadBlobBytes(blobData: unknown): Promise<{
+	bytes: number[];
+	contentType: string | null;
+}> {
+	if (blobData instanceof Blob) {
+		const ab = await blobData.arrayBuffer();
+		return {
+			bytes: Array.from(new Uint8Array(ab)),
+			contentType: blobData.type || null,
+		};
+	}
+	if (blobData instanceof ArrayBuffer) {
+		return {
+			bytes: Array.from(new Uint8Array(blobData)),
+			contentType: null,
+		};
+	}
+	if (blobData instanceof Uint8Array) {
+		return {
+			bytes: Array.from(blobData),
+			contentType: null,
+		};
+	}
+	if (Array.isArray(blobData)) {
+		return { bytes: blobData as number[], contentType: null };
+	}
+	throw new Error(
+		'downloadBlob：仅支持 Blob、ArrayBuffer、Uint8Array 或字节数组',
+	);
+}
+
+/**
+ * 下载Blob数据（Tauri 侧为 Vec<u8>，须传可序列化的字节数组）
  */
 export const downloadBlob = async (
 	options: DownloadBlobOptions,
-	blobData: any,
+	blobData: unknown,
 ): Promise<DownloadResult> => {
 	try {
+		const { bytes, contentType } = await toDownloadBlobBytes(blobData);
 		const result: DownloadResult = await invoke('download_blob', {
 			options,
-			blobData,
+			blobData: bytes,
+			contentType,
 		});
 		if (result.success) {
 			Toast({

@@ -4,6 +4,8 @@
  * 由 ChatBotView 在滚动/resize/消息变化时统一调用 layoutChatCodeToolbars。
  */
 
+import { downloadBlob } from '.';
+
 export type ChatCodeFloatingToolbarState = {
 	visible: boolean;
 	top: number;
@@ -173,7 +175,7 @@ const LANG_TO_EXT: Record<string, string> = {
 	bash: 'sh',
 };
 
-function fileExtension(lang: string): string {
+export function fileExtension(lang: string): string {
 	const key = lang.toLowerCase().trim();
 	if (!key) return 'txt';
 	return LANG_TO_EXT[key] || (/^[a-z0-9+.#-]{1,24}$/i.test(key) ? key : 'txt');
@@ -189,16 +191,16 @@ export function getPinnedChatCodeBlock(pinId: number): HTMLElement | null {
 	return document.querySelector<HTMLElement>(`[${PIN_ATTR}="${pinId}"]`);
 }
 
-export function downloadChatCodeBlock(block: HTMLElement, lang: string): void {
+export async function downloadChatCodeBlock(block: HTMLElement, lang: string) {
 	const text = getChatCodeBlockPlainText(block);
 	const ext = fileExtension(lang);
 	const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
-	const url = URL.createObjectURL(blob);
-	const a = document.createElement('a');
-	a.href = url;
-	a.download = `snippet.${ext}`;
-	document.body.appendChild(a);
-	a.click();
-	a.remove();
-	URL.revokeObjectURL(url);
+	await downloadBlob(
+		{
+			file_name: `code_${Date.now()}.${ext}`,
+			id: Date.now().toString(),
+			overwrite: true,
+		},
+		blob,
+	);
 }

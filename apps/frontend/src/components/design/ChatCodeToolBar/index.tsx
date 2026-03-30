@@ -35,10 +35,10 @@ export default function ChatCodeToolbarFloating() {
 		window.setTimeout(() => setCopied(false), 1500);
 	}, [state.pinId]);
 
-	const onDownload = useCallback(() => {
+	const onDownload = useCallback(async () => {
 		const block = getPinnedChatCodeBlock(state.pinId);
 		if (!block) return;
-		downloadChatCodeBlock(block, state.lang);
+		await downloadChatCodeBlock(block, state.lang);
 	}, [state.pinId, state.lang]);
 
 	if (typeof document === 'undefined' || !state.visible || state.width < 8) {
