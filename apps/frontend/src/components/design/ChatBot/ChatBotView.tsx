@@ -88,6 +88,7 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 			showMessageActions = true,
 			showAnchorNav = true,
 			showChatControls = true,
+			webSearchEnabled = false,
 			renderMessageActions,
 			renderAnchorNav,
 			renderChatControls,
@@ -188,6 +189,8 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 		const branchScrollSeqRef = useRef(0);
 		/** 从会话列表进入会话时，同一会话仅滚到底一次（非流式首屏不走下方 observer 跟底） */
 		const sessionEnterScrolledRef = useRef<string | null>(null);
+		/** 用于检测「尾条助手刚结束流式」；与 webSearchEnabled 联用，仅在开联网时补贴底 */
+		const wasLastAssistantStreamingRef = useRef(false);
 		/** 滚到底双帧 rAF：无 contentRoot 时无 dispose，卸载或新一轮滚底前需 cancel */
 		const scrollToBottomRafCancelRef = useRef<(() => void) | null>(null);
 		/** 分支切换里登记的 rAF id，卸载时 cancel 避免卸载后仍触达 DOM */
@@ -363,6 +366,7 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 			}
 			setAutoScroll(true);
 			lastScrollHeightRef.current = 0;
+			wasLastAssistantStreamingRef.current = false;
 		}, [activeSessionId]);
 
 		// 从消息记录进入会话：补一次滚到底（含尾条仍在流式的会话；仅靠下方 observer 在 autoScroll=false 时不会触发）
@@ -455,6 +459,34 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 				}
 			};
 		}, [messages, autoScroll, syncViewportScrollMetrics]);
+
+		// 流式刚结束：observer 已卸；仅「已开联网」时尾条会多出联网区等高，补一次贴底（仅跟底模式）
+		useEffect(() => {
+			const last = messages[messages.length - 1];
+			const nowStreaming = Boolean(
+				last?.role === 'assistant' && last?.isStreaming,
+			);
+			const wasStreaming = wasLastAssistantStreamingRef.current;
+
+			if (
+				webSearchEnabled &&
+				wasStreaming &&
+				!nowStreaming &&
+				last?.role === 'assistant' &&
+				autoScroll
+			) {
+				queueMicrotask(() => {
+					onScrollTo('down', 'auto');
+					requestAnimationFrame(() => {
+						requestAnimationFrame(() => {
+							syncViewportScrollMetricsRef.current();
+						});
+					});
+				});
+			}
+
+			wasLastAssistantStreamingRef.current = nowStreaming;
+		}, [messages, autoScroll, onScrollTo, webSearchEnabled]);
 
 		// 会话/分支切换后：列表高度与 scrollTop 须同取自 DOM，避免沿用上一会话的 scrollTop 误判「在底部」→ 箭头反向
 		useLayoutEffect(() => {

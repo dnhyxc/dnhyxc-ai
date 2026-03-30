@@ -58,6 +58,7 @@ const ChatBot = observer(
 			setIsSharing,
 			setCheckedMessage,
 			checkedMessages,
+			webSearchEnabled,
 		} = useChatCoreContext();
 
 		const [allMessages, setAllMessages] = useState<Message[]>(() => [
@@ -217,6 +218,7 @@ const ChatBot = observer(
 				checkedMessages={checkedMessages}
 				setCheckedMessage={setCheckedMessage}
 				onScrollToRegister={handleScrollToRegister}
+				webSearchEnabled={webSearchEnabled}
 				showMessageActions={showMessageActions}
 				showAnchorNav={showAnchorNav}
 				showChatControls={showChatControls}

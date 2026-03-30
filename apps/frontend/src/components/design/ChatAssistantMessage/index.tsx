@@ -6,7 +6,13 @@
 
 import { MarkdownParser } from '@dnhyxc-ai/tools';
 import { Spinner } from '@ui/index';
-import { ChevronDown, ChevronRight, Rotate3d, SearchIcon } from 'lucide-react';
+import {
+	ChevronDown,
+	ChevronRight,
+	Earth,
+	Rotate3d,
+	SearchIcon,
+} from 'lucide-react';
 // memo：父级重渲染时若 props 判定相等则跳过本组件，减少与 PlainTextFallback / MdPreview 的协调成本
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -292,7 +298,7 @@ function ChatAssistantMessageInner({
 				dangerouslySetInnerHTML={{ __html: parser.render(bodyText) }}
 			/>
 			{message.isStreaming && (
-				<div className="mt-1 flex items-center">
+				<div className="mt-2.5 flex items-center">
 					<Spinner className="w-4 h-4 mr-2 text-textcolor/50" />
 					<span className="text-sm text-textcolor/50">正在生成中...</span>
 				</div>
@@ -309,15 +315,16 @@ function ChatAssistantMessageInner({
 					message.searchOrganic?.length > 0 &&
 					!message.isStreaming && (
 						<div
-							className="flex items-center text-[13px] text-textcolor/50 bg-theme/5 hover:bg-theme/10 w-fit py-[11px] px-3 rounded-md cursor-pointer select-none"
+							className="h-9 flex items-center bg-theme/5 hover:bg-theme/10 w-fit px-3 py-2 rounded-md cursor-pointer select-none"
 							onClick={() => setOpen(true)}
 						>
+							<Earth size={16} className="mr-2 text-textcolor" />
 							{message.searchOrganic?.length} 个网页
 						</div>
 					)}
 				{isStopped && (
 					<div
-						className="flex items-center ml-3 cursor-pointer text-sm text-cyan-400 hover:text-cyan-300 select-none bg-theme/5 hover:bg-theme/10 py-2 px-3 rounded-md"
+						className="h-9 flex items-center ml-3 cursor-pointer text-sm text-cyan-400 hover:text-cyan-300 select-none bg-theme/5 hover:bg-theme/10 py-1.5 px-3 rounded-md"
 						onClick={onContinue}
 					>
 						<Rotate3d size={16} className="mr-2" /> 继续生成

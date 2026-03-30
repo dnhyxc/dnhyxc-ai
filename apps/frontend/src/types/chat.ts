@@ -208,6 +208,11 @@ export interface ChatBotViewProps {
 	isCurrentSessionLoading?: boolean;
 	isMessageStopped?: (chatId: string) => boolean;
 
+	/**
+	 * 联网搜索开关（与输入区一致）。为 true 时，尾条助手流式结束后因联网区块增高会补一次贴底。
+	 */
+	webSearchEnabled?: boolean;
+
 	isSharing?: boolean;
 	setIsSharing?: Dispatch<SetStateAction<boolean>>;
 	checkedMessages?: Set<string>;

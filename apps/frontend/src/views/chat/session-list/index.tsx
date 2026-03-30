@@ -131,6 +131,7 @@ const SessionItem = memo<SessionItemProps>(
 
 		return (
 			<div
+				id="__session-item-title__"
 				className={`line-clamp-1 group relative h-10 ${editItem?.id === item.id ? 'px-1' : 'px-2'} mb-1.5 hover:bg-theme/10 rounded-sm cursor-pointer flex items-center justify-between ${isActive ? 'bg-theme/10' : ''}`}
 				onClick={(e) => onSelect(e, item)}
 			>

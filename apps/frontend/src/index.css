@@ -62,6 +62,12 @@ body {
 		}
 	}
 
+	#__session-item-title__ {
+		.markdown-body {
+			background-color: transparent;
+		}
+	}
+
 	/* 助手 Markdown 围栏代码：工具栏由 MarkdownParser(enableChatCodeFenceToolbar) 输出，位移由 chatCodeToolbar 滚动同步 */
 	.chat-md-code-block {
 		position: relative;
