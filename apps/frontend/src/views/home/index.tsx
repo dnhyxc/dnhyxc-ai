@@ -146,7 +146,7 @@ const Home = () => {
 											initial={{ opacity: 0, x: -12 }}
 											animate={{ opacity: 1, x: 0 }}
 											transition={{ delay: 0.08, duration: 0.4 }}
-											className="inline-flex items-center gap-2 rounded-full border border-teal-400/25 bg-teal-500/10 px-3 py-2"
+											className="inline-flex items-center gap-2 rounded-md border border-teal-400/25 bg-teal-500/10 px-3 py-2"
 										>
 											<Sparkles className="h-4 w-4 text-teal-400" />
 											<span
@@ -174,7 +174,7 @@ const Home = () => {
 											initial={{ opacity: 0, y: 12 }}
 											animate={{ opacity: 1, y: 0 }}
 											transition={{ delay: 0.18, duration: 0.4 }}
-											className="mt-[19px] text-pretty text-xl leading-relaxed text-textcolor/75"
+											className="mt-[21px] text-pretty text-xl leading-relaxed text-textcolor/75"
 										>
 											一处集成对话、代码与文档的桌面 AI
 											工作台。三种能力在此交融，随需切换，从念头闪现到成果落地，皆在这方寸之间完成。
