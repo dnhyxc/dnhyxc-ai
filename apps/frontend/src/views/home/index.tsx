@@ -124,7 +124,7 @@ const Home = () => {
 							initial={{ opacity: 0, y: 20 }}
 							animate={{ opacity: 1, y: 0 }}
 							transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
-							className="relative flex min-h-0 w-full max-w-6xl flex-1 flex-col overflow-hidden rounded-md border border-theme/5 bg-linear-to-b from-theme-white/[0.07] to-theme-white/2 backdrop-blur-xl"
+							className="relative flex min-h-0 w-full max-w-6xl flex-1 flex-col overflow-hidden rounded-md bg-linear-to-b from-theme-white/[0.07] to-theme-white/2 backdrop-blur-xl"
 							style={{
 								fontFamily: '"Noto Sans SC", system-ui, sans-serif',
 							}}
@@ -274,7 +274,7 @@ const Home = () => {
 
 					{/* 下方内容在 ScrollArea 内滚动 */}
 					<div className="relative mx-auto w-full max-w-6xl space-y-5 px-3 pt-3 sm:px-5">
-						<div className="relative overflow-hidden rounded-md border border-theme/5 bg-linear-to-br from-theme-white/5 to-theme-white/5 p-6 backdrop-blur-xl ">
+						<div className="relative overflow-hidden rounded-md bg-linear-to-br from-theme-white/5 to-theme-white/5 p-6 backdrop-blur-xl ">
 							<div
 								className="pointer-events-none absolute inset-0 opacity-[0.18] mix-blend-overlay"
 								style={{
@@ -325,7 +325,7 @@ const Home = () => {
 							whileInView={{ opacity: 1, y: 0 }}
 							viewport={{ once: true, margin: '-40px' }}
 							transition={{ duration: 0.4 }}
-							className="relative mb-5 overflow-hidden rounded-md border border-theme/5 bg-linear-to-br from-theme-white/5 to-theme-white/5 p-6 backdrop-blur-xl"
+							className="relative mb-5 overflow-hidden rounded-md bg-linear-to-br from-theme-white/5 to-theme-white/5 p-6 backdrop-blur-xl"
 						>
 							<div
 								className="pointer-events-none absolute inset-0 opacity-[0.18] mix-blend-overlay"
