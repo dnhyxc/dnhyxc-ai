@@ -116,11 +116,7 @@ pub async fn determine_save_path_for_blob(
     let save_path = match &options.save_dir {
         Some(dir) => Path::new(dir).join(&file_name),
         None => {
-            // 从 store 中获取保存的 savePath
-            let default_dir = match get_store_value(&app_handle, "savePath").await {
-                Ok(path) => PathBuf::from(path),
-                Err(_) => PathBuf::from("/Users/dnhyxc/Documents/dnhyxc-download"),
-            };
+            let default_dir = default_save_base_dir(&app_handle).await;
 
             let file_dialog = rfd::AsyncFileDialog::new()
                 .set_title("保存文件")
@@ -163,5 +159,31 @@ pub async fn get_store_value(app_handle: &tauri::AppHandle, key: &str) -> Result
             Ok(cleaned_value.to_string())
         }
         None => Err(format!("未找到 key: {}", key)),
+    }
+}
+
+/// 未配置 savePath 时的兜底：系统下载目录下 `dnhyxc-download`，否则 `~/Documents/dnhyxc-download`
+pub fn fallback_save_base_dir(app_handle: &tauri::AppHandle) -> PathBuf {
+    if let Ok(dir) = app_handle.path().download_dir() {
+        return dir.join("dnhyxc-download");
+    }
+    if let Ok(home) = app_handle.path().home_dir() {
+        return home.join("Documents").join("dnhyxc-download");
+    }
+    PathBuf::from("dnhyxc-download")
+}
+
+/// 默认下载/保存根目录：store 中 `savePath`，空或未设置时用 [`fallback_save_base_dir`]
+pub async fn default_save_base_dir(app_handle: &tauri::AppHandle) -> PathBuf {
+    match get_store_value(app_handle, "savePath").await {
+        Ok(path) => {
+            let t = path.trim();
+            if !t.is_empty() {
+                PathBuf::from(t)
+            } else {
+                fallback_save_base_dir(app_handle)
+            }
+        }
+        Err(_) => fallback_save_base_dir(app_handle),
     }
 }

@@ -14,6 +14,7 @@ export * from './clipboard';
 export * from './crypto';
 export * from './event';
 export * from './event';
+export * from './knowledge-save';
 export * from './store';
 export * from './tauri';
 export * from './updater';

@@ -15,8 +15,9 @@ pub struct FileFilter {
     pub extensions: Vec<String>,
 }
 
-// 定义返回给前端的结果结构
+// 定义返回给前端的结果结构（camelCase 与 TypeScript / `invoke` 一致）
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SaveFileResult {
     pub success: String,
     pub file_path: Option<String>,

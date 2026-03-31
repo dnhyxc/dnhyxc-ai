@@ -13,6 +13,7 @@ import { RedisConfigFactory } from './factorys/redis-config.factory';
 // 业务模块
 import { AuthModule } from './services/auth/auth.module';
 import { ChatModule } from './services/chat/chat.module';
+import { KnowledgeModule } from './services/knowledge/knowledge.module';
 import { LogsModule } from './services/logs/logs.module';
 import { MailModule } from './services/mail/mail.module';
 import { MenusModule } from './services/menus/menus.module';
@@ -80,6 +81,7 @@ const connections = new Map();
 		PromptModule,
 		OcrModule,
 		ChatModule,
+		KnowledgeModule,
 		ShareModule,
 		PayModule,
 	],

@@ -70,6 +70,9 @@ export const GET_SESSION_LIST = '/chat/getSessionList';
 // 更新会话
 export const UPDATE_SESSION = '/chat/updateSession';
 
+// 知识库：保存 Markdown 到服务端 knowledge 目录
+export const SAVE_KNOWLEDGE = '/knowledge/save';
+
 // 创建 Chat 分享
 export const CREATE_SHARE = '/share/create';
 

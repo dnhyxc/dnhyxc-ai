@@ -4,7 +4,6 @@ use reqwest;
 use std::fs;
 use std::io::Write;
 use std::path::Path;
-use std::path::PathBuf;
 use tauri;
 use tauri::Emitter;
 
@@ -13,8 +12,8 @@ use crate::types::common::{
     FileInfoEvent, SaveFileOptions, SaveFileResult,
 };
 use crate::utils::common::{
-    determine_save_path_for_blob, get_extension_from_content_type, get_remote_file_info,
-    get_store_value,
+    default_save_base_dir, determine_save_path_for_blob, get_extension_from_content_type,
+    get_remote_file_info,
 };
 
 #[tauri::command]
@@ -84,11 +83,7 @@ pub async fn download_file(
                 }
             };
 
-            // let default_dir = PathBuf::from("/Users/dnhyxc/Documents/dnhyxc-download");
-            let default_dir = match get_store_value(&app_handle, "savePath").await {
-                Ok(path) => PathBuf::from(path),
-                Err(_) => PathBuf::from("/Users/dnhyxc/Documents/dnhyxc-download"),
-            };
+            let default_dir = default_save_base_dir(&app_handle).await;
 
             // 1.2 打开文件保存对话框
             let mut file_dialog = rfd::AsyncFileDialog::new()

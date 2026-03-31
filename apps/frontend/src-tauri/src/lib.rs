@@ -28,6 +28,7 @@ use command::common::{
 use command::download::{
     download_blob, download_file, download_files, get_file_info, save_file_with_picker,
 };
+use command::knowledge::save_knowledge_markdown;
 
 /// 移动端入口属性宏：当编译目标为移动平台时，自动标记该函数为 Tauri 移动端入口
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -61,6 +62,7 @@ pub fn run() {
             select_file,           // 选择文件
             select_directory,      // 选择目录
             save_file_with_picker, // 通用保存
+            save_knowledge_markdown, // 知识页 Markdown 写入 knowledge 目录
             download_file,         // 通用下载
             download_files,        // 批量下载
             get_file_info,         // 获取文件信息

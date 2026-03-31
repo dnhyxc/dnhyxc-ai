@@ -19,6 +19,7 @@ import {
 	LOGIN_BY_EMAIL,
 	REGISTER,
 	RESET_PASSWORD,
+	SAVE_KNOWLEDGE,
 	SEND_EMAIL,
 	SEND_RESET_PWD_EMAIL,
 	STOP_SSE,
@@ -275,6 +276,21 @@ export const createCheckoutSession = async (params: {
 		sessionId: string;
 		clientSecret: string | null;
 	}>(CREATE_CHECKOUT_SESSION, params);
+};
+
+/** 通过后端将 Markdown 写入仓库 knowledge/ 目录（需启动 server:dev） */
+export const saveKnowledge = async (params: {
+	title?: string;
+	content: string;
+	filePath?: string;
+}) => {
+	return await http.post<{ filePath: string; filename: string }>(
+		SAVE_KNOWLEDGE,
+		{
+			title: params.title,
+			content: params.content,
+		},
+	);
 };
 
 // 创建会话分享
