@@ -45,6 +45,7 @@ const ChatControls = ({
 						{/* 切换回流式消息分支的按钮 */}
 						{isLoading && !isStreamingBranchVisible && (
 							<Button
+								variant="dynamic"
 								onClick={switchToStreamingBranch}
 								className={cn(
 									glassChipClass,
@@ -58,6 +59,7 @@ const ChatControls = ({
 						{/* 切换到最新分支的按钮 */}
 						{!isLatestBranch && messagesLength > 0 && (
 							<Button
+								variant="dynamic"
 								onClick={switchToLatestBranch}
 								className={cn(
 									glassChipClass,

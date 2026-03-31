@@ -63,7 +63,7 @@ const ChatControls = ({
 				{/* 滚动控制按钮 */}
 				{hasScrollbar && (
 					<div
-						className="w-8 h-8 bg-black/10 hover:bg-black/25 text-black/90 flex justify-center items-center cursor-pointer border-black/10 rounded-full ml-2"
+						className="w-8 h-8 bg-black/50 hover:bg-black/60 text-white flex justify-center items-center cursor-pointer border border-white/20 rounded-full ml-2"
 						onClick={() => onScrollTo?.(isAtBottom ? 'up' : 'down', 'auto')}
 					>
 						{isAtBottom ? <ArrowUp /> : <ArrowDown />}

@@ -5,7 +5,7 @@
  */
 
 import { MarkdownParser } from '@dnhyxc-ai/tools';
-import { Spinner } from '@ui/index';
+import { Button, Spinner } from '@ui/index';
 import {
 	ChevronDown,
 	ChevronRight,
@@ -318,21 +318,23 @@ function ChatAssistantMessageInner({
 					{message?.searchOrganic &&
 						message.searchOrganic?.length > 0 &&
 						!message.isStreaming && (
-							<div
-								className="h-9 flex items-center bg-theme/5 hover:bg-theme/10 w-fit px-3 py-2 rounded-md cursor-pointer select-none"
+							<Button
+								variant="dynamic"
+								className="h-8.5 flex items-center bg-theme/5 hover:bg-theme/10 w-fit px-3 py-2 rounded-md cursor-pointer select-none"
 								onClick={() => setOpen(true)}
 							>
-								<Earth size={16} className="mr-2 text-textcolor" />
+								<Earth size={16} className="text-textcolor mb-0.5" />
 								{message.searchOrganic?.length} 个网页
-							</div>
+							</Button>
 						)}
 					{isStopped && (
-						<div
-							className="h-9 flex items-center ml-3 cursor-pointer text-sm text-cyan-400 hover:text-cyan-300 select-none bg-theme/5 hover:bg-theme/10 py-1.5 px-3 rounded-md"
+						<Button
+							variant="dynamic"
+							className="h-8.5 flex items-center ml-3 cursor-pointer text-sm text-cyan-400 hover:text-cyan-300 select-none bg-theme/5 hover:bg-theme/10 py-1.5 px-3 rounded-md"
 							onClick={onContinue}
 						>
 							<Rotate3d size={16} className="mr-2" /> 继续生成
-						</div>
+						</Button>
 					)}
 				</div>
 			)}
