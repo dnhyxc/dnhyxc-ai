@@ -122,24 +122,27 @@ const Home = () => {
 			<ScrollArea className="relative z-1 h-full w-full rounded-b-md">
 				<div className="relative min-h-full w-full">
 					{/* 首屏：单一「欢迎」容器，内含标题区 + 三大入口，占满 Outlet 可视高度 */}
-					<section className="relative box-border flex min-h-full w-full flex-col px-3 py-2 pt-0 sm:px-5 sm:py-3 sm:pt-0">
+					<section className="mx-auto w-full max-w-6xl px-3 pb-2 sm:px-5">
 						<motion.div
 							initial={{ opacity: 0, y: 20 }}
 							animate={{ opacity: 1, y: 0 }}
 							transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
-							className="relative flex min-h-0 w-full max-w-6xl flex-1 flex-col overflow-hidden rounded-md border border-theme-white/12 bg-linear-to-b from-theme-white/[0.07] to-theme-white/2 shadow-[0_24px_80px_-24px_rgba(0,0,0,0.55)] backdrop-blur-xl "
+							className="relative flex min-h-0 w-full max-w-6xl flex-1 flex-col overflow-hidden rounded-md border border-theme/5 bg-linear-to-b from-theme-white/[0.07] to-theme-white/2 backdrop-blur-xl"
 							style={{
 								fontFamily: '"Noto Sans SC", system-ui, sans-serif',
 							}}
 						>
 							<div
 								className="pointer-events-none absolute inset-0 opacity-[0.18] mix-blend-overlay"
-								style={{ backgroundImage: NOISE_BG }}
+								style={{
+									// backgroundImage: NOISE_BG,
+									backgroundAttachment: 'fixed',
+								}}
 								aria-hidden
 							/>
 
 							{/* 顶栏：品牌 + 主文案 + 操作（与入口同属一个欢迎模块） */}
-							<header className="relative z-10 shrink-0 border-b border-theme-white/8 px-4 pb-4 pt-4 sm:px-6 sm:pb-5 sm:pt-5 md:px-8 md:pt-6">
+							<header className="relative z-10 shrink-0 border-b border-theme/5 px-3 pb-4 pt-4 sm:px-2 sm:pb-5 sm:pt-5 md:px-6 md:pt-6">
 								<div className="flex flex-col gap-5">
 									<div className="min-w-0 flex-1">
 										<motion.div
@@ -189,7 +192,7 @@ const Home = () => {
 										<Button
 											variant="dynamic"
 											onClick={onClickStart}
-											className="relative h-10 w-30 cursor-pointer overflow-hidden rounded-xl bg-linear-to-r from-teal-500 to-cyan-600 px-6 pt-3 text-sm font-semibold text-textcolor shadow-lg transition-[transform,box-shadow] duration-200 ease-out hover:scale-[1.03] hover:shadow-teal-500/30 active:scale-[0.98]"
+											className="relative h-10 w-30 cursor-pointer overflow-hidden rounded-md bg-linear-to-r from-teal-500 to-cyan-600 px-6 pt-3 text-sm font-semibold text-textcolor shadow-lg transition-[transform,box-shadow] duration-200 ease-out hover:scale-[1.03] hover:shadow-teal-500/30 active:scale-[0.98]"
 											style={{
 												fontFamily: '"Syne", "Noto Sans SC", sans-serif',
 											}}
@@ -202,7 +205,7 @@ const Home = () => {
 											onClick={() => {
 												openUrl('https://github.com/dnhyxc/dnhyxc-ai/wiki');
 											}}
-											className="h-10 w-30 rounded-xl border border-theme-white/15 bg-theme-white/5 px-6 text-sm font-medium text-textcolor backdrop-blur-sm transition-colors hover:border-theme-white/25 hover:bg-theme-white/10"
+											className="h-10 w-30 rounded-md border border-theme/5 bg-theme-white/5 px-6 text-sm font-medium text-textcolor backdrop-blur-sm transition-colors hover:border-theme/10 hover:bg-theme-white/10"
 										>
 											了解更多
 											<ArrowRight className="h-4 w-4" />
@@ -212,7 +215,7 @@ const Home = () => {
 							</header>
 
 							{/* 三大入口：与欢迎同属一块，纵向吃满剩余高度 */}
-							<div className="relative z-10 grid min-h-0 flex-1 auto-rows-fr grid-cols-1 divide-y divide-theme-white/10 p-3 sm:p-4 md:grid-cols-3 md:divide-x md:divide-y-0 md:divide-theme-white/10 md:p-0">
+							<div className="relative z-10 grid min-h-0 flex-1 auto-rows-fr grid-cols-1 p-3 sm:p-4 md:grid-cols-3 md:divide-x md:divide-y-0 md:divide-theme/2 md:p-0">
 								{FEATURES.map((feature, tileIndex) => (
 									<motion.div
 										key={feature.title}
@@ -228,12 +231,6 @@ const Home = () => {
 										whileHover={{ y: -3 }}
 										whileTap={{ scale: 0.99 }}
 										onClick={feature.onClick}
-										onKeyDown={(e) => {
-											if (e.key === 'Enter' || e.key === ' ') {
-												e.preventDefault();
-												feature.onClick();
-											}
-										}}
 										className={`group relative flex min-h-0 cursor-pointer flex-col overflow-hidden bg-theme-white/4 p-4 transition-colors duration-300 md:p-5 lg:p-6 ${feature.hoverBg}`}
 									>
 										<div
@@ -268,7 +265,7 @@ const Home = () => {
 											{feature.desc}
 										</p>
 
-										<div className="relative mt-4 flex items-center gap-2 border-t border-dashed border-theme-white/12 pt-4 text-sm font-semibold text-teal-400/85 transition-all duration-300 group-hover:translate-x-0.5 group-hover:text-teal-300">
+										<div className="relative mt-4 flex items-center gap-2 border-t border-dashed border-theme/5 pt-4 text-sm font-semibold text-teal-400/85 transition-all duration-300 group-hover:translate-x-0.5 group-hover:text-teal-300">
 											<span>进入模块</span>
 											<ArrowRight className="h-4 w-4" />
 										</div>
@@ -279,8 +276,16 @@ const Home = () => {
 					</section>
 
 					{/* 下方内容在 ScrollArea 内滚动 */}
-					<div className="relative mx-auto w-full max-w-6xl space-y-5 px-3 pb-8 pt-3 sm:px-5">
-						<div className="relative overflow-hidden rounded-md border border-theme-white/8 bg-linear-to-br from-theme-white/5 to-theme-white/5 p-6 backdrop-blur-xl ">
+					<div className="relative mx-auto w-full max-w-6xl space-y-5 px-3 pt-3 sm:px-5">
+						<div className="relative overflow-hidden rounded-md border border-theme/5 bg-linear-to-br from-theme-white/5 to-theme-white/5 p-6 backdrop-blur-xl ">
+							<div
+								className="pointer-events-none absolute inset-0 opacity-[0.18] mix-blend-overlay"
+								style={{
+									// backgroundImage: NOISE_BG,
+									backgroundAttachment: 'fixed',
+								}}
+								aria-hidden
+							/>
 							<motion.h3
 								initial={{ opacity: 0, y: 16 }}
 								whileInView={{ opacity: 1, y: 0 }}
@@ -323,8 +328,16 @@ const Home = () => {
 							whileInView={{ opacity: 1, y: 0 }}
 							viewport={{ once: true, margin: '-40px' }}
 							transition={{ duration: 0.4 }}
-							className="relative mb-5 overflow-hidden rounded-md border border-theme-white/8 bg-linear-to-br from-theme-white/5 to-theme-white/5 p-6 backdrop-blur-xl "
+							className="relative mb-5 overflow-hidden rounded-md border border-theme/5 bg-linear-to-br from-theme-white/5 to-theme-white/5 p-6 backdrop-blur-xl"
 						>
+							<div
+								className="pointer-events-none absolute inset-0 opacity-[0.18] mix-blend-overlay"
+								style={{
+									// backgroundImage: NOISE_BG,
+									backgroundAttachment: 'fixed',
+								}}
+								aria-hidden
+							/>
 							<div className="pointer-events-none absolute right-0 top-0 h-32 w-32 rounded-full bg-linear-to-br from-teal-500/12 to-transparent blur-3xl" />
 							<h3
 								className="relative z-10 mb-6 text-xl font-semibold text-textcolor"
