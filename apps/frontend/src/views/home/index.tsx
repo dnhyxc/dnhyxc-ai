@@ -78,7 +78,7 @@ const Home = () => {
 				icon: FileText,
 				title: '文档处理',
 				subtitle: '智能分析',
-				desc: 'PDF、Word、Excel 等格式的解析、总结与内容提取',
+				desc: 'Image、PDF、Word、Excel 等格式的解析、总结与内容提取',
 				color: 'from-rose-400 to-amber-600',
 				glow: 'shadow-rose-500/20',
 				hoverBg:
