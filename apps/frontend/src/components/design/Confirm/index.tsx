@@ -1,4 +1,5 @@
 import * as AlertDialogPrimitive from '@radix-ui/react-alert-dialog';
+import type { ReactNode } from 'react';
 import { buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -6,9 +7,17 @@ interface ConfirmProps {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
 	title: string;
-	description: string;
+	description: ReactNode;
+	/** 描述区域额外 className（例如 text-left） */
+	descriptionClassName?: string;
 	confirmText?: string;
 	cancelText?: string;
+	/** 确认按钮样式，覆盖保存等危险操作用 destructive */
+	confirmVariant?: 'default' | 'destructive';
+	/**
+	 * 点击确认后是否立即关闭。异步 onConfirm 且需在失败时保持打开时设为 false，由调用方自行 onOpenChange(false)
+	 */
+	closeOnConfirm?: boolean;
 	onConfirm: () => void;
 	onCancel?: () => void;
 	className?: string;
@@ -19,15 +28,20 @@ const Confirm = ({
 	onOpenChange,
 	title,
 	description,
+	descriptionClassName,
 	confirmText = '确认',
 	cancelText = '取消',
+	confirmVariant = 'default',
+	closeOnConfirm = true,
 	onConfirm,
 	onCancel,
 	className,
 }: ConfirmProps) => {
 	const handleConfirm = () => {
 		onConfirm();
-		onOpenChange(false);
+		if (closeOnConfirm) {
+			onOpenChange(false);
+		}
 	};
 
 	const handleCancel = () => {
@@ -52,7 +66,9 @@ const Confirm = ({
 					<AlertDialogPrimitive.Title className="text-lg font-semibold">
 						{title}
 					</AlertDialogPrimitive.Title>
-					<AlertDialogPrimitive.Description className="text-textcolor text-md">
+					<AlertDialogPrimitive.Description
+						className={cn('text-textcolor text-md', descriptionClassName)}
+					>
 						{description}
 					</AlertDialogPrimitive.Description>
 					<div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end mt-4">
@@ -64,7 +80,7 @@ const Confirm = ({
 						</AlertDialogPrimitive.Cancel>
 						<AlertDialogPrimitive.Action
 							onClick={handleConfirm}
-							className={cn(buttonVariants())}
+							className={cn(buttonVariants({ variant: confirmVariant }))}
 						>
 							{confirmText}
 						</AlertDialogPrimitive.Action>

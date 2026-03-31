@@ -3,7 +3,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use tauri::AppHandle;
 
 use crate::types::common::SaveFileResult;
@@ -76,6 +76,29 @@ pub struct SaveKnowledgeMarkdownInput {
 	pub file_path: Option<String>,
 	#[serde(default)]
 	pub dir_path: Option<String>,
+	/// 为 true 时允许覆盖已存在的同名文件
+	#[serde(default)]
+	pub overwrite: bool,
+}
+
+/// 解析后的保存目标路径（`content` / `overwrite` 不参与计算）
+async fn compute_save_target_path(
+	app: &AppHandle,
+	input: &SaveKnowledgeMarkdownInput,
+) -> Result<PathBuf, String> {
+	let title = &input.title;
+	if let Some(ref fp) = input.file_path {
+		resolve_write_path_from_file_path_arg(fp, title)
+	} else if let Some(ref dp) = input.dir_path {
+		let dir = PathBuf::from(dp.trim());
+		if dir.as_os_str().is_empty() {
+			return Err("dirPath 不能为空".to_string());
+		}
+		Ok(dir.join(sanitize_filename(title)))
+	} else {
+		let dir = resolve_knowledge_dir(app).await?;
+		Ok(dir.join(sanitize_filename(title)))
+	}
 }
 
 /// 未传 `file_path`/`dir_path` 时的目录：`KNOWLEDGE_DIR` 环境变量，否则为「savePath + knowledge 子目录」
@@ -90,25 +113,47 @@ async fn resolve_knowledge_dir(app: &AppHandle) -> Result<PathBuf, String> {
 	Ok(base.join("knowledge"))
 }
 
-/// 将 Markdown 写入本地。前端：`invoke('save_knowledge_markdown', { input: { title, content, filePath?, dirPath? } })`
+/// 查询即将写入的完整路径及是否已存在同名文件（供前端二次确认）
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct KnowledgeMarkdownTarget {
+	pub path: String,
+	pub exists: bool,
+}
+
+#[tauri::command]
+pub async fn resolve_knowledge_markdown_target(
+	app: AppHandle,
+	input: SaveKnowledgeMarkdownInput,
+) -> Result<KnowledgeMarkdownTarget, String> {
+	let path = compute_save_target_path(&app, &input).await?;
+	let exists = path.exists()
+		&& fs::metadata(&path)
+			.map(|m| m.is_file())
+			.unwrap_or(false);
+	Ok(KnowledgeMarkdownTarget {
+		path: path.to_string_lossy().to_string(),
+		exists,
+	})
+}
+
+/// 将 Markdown 写入本地。覆盖已存在文件须 `overwrite: true`
 #[tauri::command]
 pub async fn save_knowledge_markdown(
 	app: AppHandle,
 	input: SaveKnowledgeMarkdownInput,
 ) -> Result<SaveFileResult, String> {
-	let title = &input.title;
-	let path = if let Some(ref fp) = input.file_path {
-		resolve_write_path_from_file_path_arg(fp, title)?
-	} else if let Some(ref dp) = input.dir_path {
-		let dir = PathBuf::from(dp.trim());
-		if dir.as_os_str().is_empty() {
-			return Err("dirPath 不能为空".to_string());
+	let path = compute_save_target_path(&app, &input).await?;
+
+	if path.exists() {
+		let meta = fs::metadata(&path).map_err(|e| e.to_string())?;
+		if meta.is_file() && !input.overwrite {
+			return Err(format!(
+				"文件已存在：{}",
+				path.to_string_lossy()
+			));
 		}
-		dir.join(sanitize_filename(title))
-	} else {
-		let dir = resolve_knowledge_dir(&app).await?;
-		dir.join(sanitize_filename(title))
-	};
+	}
 
 	if let Some(parent) = path.parent() {
 		fs::create_dir_all(parent).map_err(|e| e.to_string())?;

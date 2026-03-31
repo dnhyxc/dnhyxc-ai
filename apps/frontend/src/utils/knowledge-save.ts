@@ -5,6 +5,12 @@ export type SaveKnowledgeMarkdownResult = {
 	filePath?: string;
 };
 
+/** `resolve_knowledge_markdown_target` 返回 */
+export type KnowledgeMarkdownTarget = {
+	path: string;
+	exists: boolean;
+};
+
 /** 解析 `invoke` 抛错（Tauri 常为非 Error 对象） */
 export function formatTauriInvokeError(e: unknown): string {
 	if (e instanceof Error) return e.message;
@@ -20,7 +26,21 @@ export function formatTauriInvokeError(e: unknown): string {
 	}
 }
 
-/** Tauri `save_knowledge_markdown` 入参（与 Rust `SaveKnowledgeMarkdownArgs` 对应） */
+function buildInvokeInput(payload: SaveKnowledgeMarkdownPayload) {
+	return {
+		title: payload.title,
+		content: payload.content,
+		...(payload.filePath != null && payload.filePath !== ''
+			? { filePath: payload.filePath }
+			: {}),
+		...(payload.dirPath != null && payload.dirPath !== ''
+			? { dirPath: payload.dirPath }
+			: {}),
+		...(payload.overwrite === true ? { overwrite: true } : {}),
+	};
+}
+
+/** Tauri `save_knowledge_markdown` / `resolve_knowledge_markdown_target` 入参 */
 export type SaveKnowledgeMarkdownPayload = {
 	title: string;
 	content: string;
@@ -32,24 +52,26 @@ export type SaveKnowledgeMarkdownPayload = {
 	filePath?: string;
 	/** 仅目录；等价于把目录传给 filePath */
 	dirPath?: string;
+	/** 为 true 时覆盖已存在的同名文件 */
+	overwrite?: boolean;
 };
 
-/** 桌面端写入本地 Markdown（可选自定义路径）。未传路径时写入「与下载相同的 savePath」下的 `knowledge` 子目录 */
+/** 解析即将写入的路径及是否已存在（用于覆盖确认） */
+export async function invokeResolveKnowledgeMarkdownTarget(
+	payload: SaveKnowledgeMarkdownPayload,
+): Promise<KnowledgeMarkdownTarget> {
+	const { invoke } = await import('@tauri-apps/api/core');
+	return invoke<KnowledgeMarkdownTarget>('resolve_knowledge_markdown_target', {
+		input: buildInvokeInput(payload),
+	});
+}
+
+/** 桌面端写入本地 Markdown */
 export async function invokeSaveKnowledgeMarkdown(
 	payload: SaveKnowledgeMarkdownPayload,
 ): Promise<SaveKnowledgeMarkdownResult> {
 	const { invoke } = await import('@tauri-apps/api/core');
-	// Tauri 2：结构体参数必须放在与 Rust 形参同名的键下（此处为 `input`），字段用 camelCase 对应 SaveKnowledgeMarkdownInput
 	return invoke<SaveKnowledgeMarkdownResult>('save_knowledge_markdown', {
-		input: {
-			title: payload.title,
-			content: payload.content,
-			...(payload.filePath != null && payload.filePath !== ''
-				? { filePath: payload.filePath }
-				: {}),
-			...(payload.dirPath != null && payload.dirPath !== ''
-				? { dirPath: payload.dirPath }
-				: {}),
-		},
+		input: buildInvokeInput(payload),
 	});
 }

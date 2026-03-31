@@ -35,3 +35,6 @@ client/src-tauri/target
 *.app.tar.gz.sig
 
 docker-compose-prod.yml
+
+# 本地知识库目录，不纳入版本控制
+knowledge/
