@@ -1,14 +1,20 @@
 import { ScrollArea } from '@ui/scroll-area';
-import { Layers2, LayersPlus } from 'lucide-react';
+import {
+	BookOpen,
+	Layers2,
+	LayersPlus,
+	LibraryBig,
+	ScrollText,
+} from 'lucide-react';
 import { useState } from 'react';
 import MarkdownEditor from '@/components/design/Monaco';
-import { Button } from '@/components/ui';
+import { Button, Input } from '@/components/ui';
 import { useTheme } from '@/hooks';
 import useStore from '@/store';
 
 const Knowledge = () => {
 	const [, setMarkdown] = useState('');
-
+	const [title, setTitle] = useState('');
 	const { detailStore } = useStore();
 	const { theme } = useTheme();
 
@@ -40,6 +46,14 @@ const Knowledge = () => {
 								className="flex items-center gap-0! px-0!"
 								onClick={onDraft}
 							>
+								<LibraryBig />
+								<span className="mt-0.5 ml-1">知识库</span>
+							</Button>
+							<Button
+								variant="link"
+								className="flex items-center gap-0! px-0!"
+								onClick={onDraft}
+							>
 								<Layers2 />
 								<span className="mt-0.5 ml-1">草稿</span>
 							</Button>
@@ -51,6 +65,18 @@ const Knowledge = () => {
 								<LayersPlus />
 								<span className="mt-0.5 ml-1">保存</span>
 							</Button>
+						</div>
+					}
+					title={
+						<div className="flex flex-1 items-center pl-3">
+							<ScrollText size={18} />
+							<Input
+								value={title}
+								onChange={(e) => setTitle(e.target.value)}
+								placeholder="输入标题..."
+								aria-label="知识标题"
+								className="md:text-base h-full border-0 bg-transparent pr-2 text-textcolor shadow-none placeholder:text-sm placeholder:text-textcolor/60 focus-visible:border-0 focus-visible:ring-0"
+							/>
 						</div>
 					}
 				/>

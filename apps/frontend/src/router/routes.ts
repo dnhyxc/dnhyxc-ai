@@ -114,7 +114,7 @@ const routes: RouteConfig[] = [
 				path: '/knowledge',
 				Component: Knowledge,
 				meta: {
-					title: '知识库',
+					title: '知识库编辑',
 				},
 			},
 			{
