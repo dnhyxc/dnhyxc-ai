@@ -17,6 +17,7 @@ import {
 	useState,
 } from 'react';
 import { useNavigate } from 'react-router';
+import { CHAT_MARKDOWN_HIGHLIGHT_THEME } from '@/constant';
 import { useChatCoreContext } from '@/contexts';
 import { useChatCore } from '@/hooks/useChatCore';
 import { deleteSession, getSessionList, updateSession } from '@/service';
@@ -210,7 +211,13 @@ const SessionList: React.FC<IProps> = ({ open, onOpenChange }) => {
 	const [editItem, setEditItem] = useState<Session | null>(null);
 	const [loading, setLoading] = useState(false);
 
-	const parser = useMemo(() => new MarkdownParser(), []);
+	const parser = useMemo(
+		() =>
+			new MarkdownParser({
+				highlightTheme: CHAT_MARKDOWN_HIGHLIGHT_THEME,
+			}),
+		[],
+	);
 
 	useEffect(() => {
 		if (open) getSessions();

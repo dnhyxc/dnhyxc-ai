@@ -2,9 +2,11 @@
 import hljs from 'highlight.js';
 import MarkdownIt from 'markdown-it';
 import markdownItKatex from 'markdown-it-katex';
+import type { HighlightJsThemeId } from './generated/highlight-js-theme-ids.js';
+import { applyHighlightJsTheme } from './inject-highlight-theme.js';
 
-// 注意：CSS样式不再自动导入，请从 @dnhyxc-ai/tools/dist/styles 导入所需样式
-// 例如：import '@dnhyxc-ai/tools/dist/styles/github-markdown.css';
+// 正文/公式样式仍建议 import '@dnhyxc-ai/tools/styles.css' 或 markdown-base.css。
+// 代码块主题可通过构造参数 highlightTheme（CDN）或 highlightThemeCss（内联）注入，亦可继续用手动 import。
 
 export interface MarkdownParserOptions {
 	html?: boolean;
@@ -20,6 +22,22 @@ export interface MarkdownParserOptions {
 	 * 默认 false，避免会话列表、编辑器等处的代码块出现多余按钮。
 	 */
 	enableChatCodeFenceToolbar?: boolean;
+	/**
+	 * highlight.js 主题 id（与 highlightJsThemes / highlightJsThemeIds 一致，如 `github-dark`、`atom-one-dark`、`base16/dracula`）。
+	 * 设置后在浏览器内向 document.head 注入一条 `<link rel="stylesheet">`（jsDelivr CDN，需联网）。
+	 * 若同时设置 highlightThemeCss（非空字符串），则仅用内联样式，不请求 CDN。
+	 */
+	highlightTheme?: HighlightJsThemeId;
+	/**
+	 * 主题 CSS 全文；适合离线、Tauri 或与打包器 `?raw` 结合。非空时优先于 highlightTheme 的 CDN。
+	 * 传空字符串 `''` 表示仅移除本包已注入的主题节点，不再挂载新样式。
+	 */
+	highlightThemeCss?: string;
+	/**
+	 * 为 false 时不执行主题注入（即使传了 highlightTheme / highlightThemeCss），便于完全由外部 import 控制样式。
+	 * @default true
+	 */
+	injectHighlightTheme?: boolean;
 }
 
 class MarkdownParser {
@@ -68,6 +86,15 @@ class MarkdownParser {
 
 		if (options.enableChatCodeFenceToolbar) {
 			this.patchChatCodeFenceRenderer();
+		}
+
+		const shouldInject = options.injectHighlightTheme !== false;
+		if (shouldInject) {
+			applyHighlightJsTheme({
+				themeId: options.highlightTheme,
+				themeCss: options.highlightThemeCss,
+				onError: options.onError,
+			});
 		}
 	}
 

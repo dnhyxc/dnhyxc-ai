@@ -6,6 +6,7 @@ import { config } from 'md-editor-rt';
 // import MarkdownParser from '@/utils/markdownParser';
 import { useMemo, useState } from 'react';
 import MarkdownEditor from '@/components/design/Monaco';
+import { CHAT_MARKDOWN_HIGHLIGHT_THEME } from '@/constant';
 import { useTheme } from '@/hooks';
 import useStore from '@/store';
 
@@ -18,7 +19,9 @@ const Editor = () => {
 
 	// 1. 初始化解析器
 	const parser = useMemo(() => {
-		return new MarkdownParser();
+		return new MarkdownParser({
+			highlightTheme: CHAT_MARKDOWN_HIGHLIGHT_THEME,
+		});
 	}, []);
 
 	const getValue = (value: string) => {

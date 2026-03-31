@@ -16,6 +16,7 @@ import {
 // memo：父级重渲染时若 props 判定相等则跳过本组件，减少与 PlainTextFallback / MdPreview 的协调成本
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { CHAT_MARKDOWN_HIGHLIGHT_THEME } from '@/constant';
 import { Message, SearchOrganicItem } from '@/types/chat';
 import {
 	downloadChatCodeBlock,
@@ -93,6 +94,7 @@ function ChatAssistantMessageInner({
 		() =>
 			new MarkdownParser({
 				enableChatCodeFenceToolbar: true,
+				highlightTheme: CHAT_MARKDOWN_HIGHLIGHT_THEME,
 			}),
 		[],
 	);

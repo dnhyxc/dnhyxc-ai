@@ -25,8 +25,10 @@
 		},
 		"./styles/*": "./dist/styles/*.css",
 		"./styles/*.css": "./dist/styles/*.css",
+		"./styles/hljs/*": "./dist/styles/hljs/*",
 		"./styles.css": "./dist/styles/markdown-styles.css",
-		"./markdown-styles.css": "./dist/styles/markdown-styles.css"
+		"./markdown-styles.css": "./dist/styles/markdown-styles.css",
+		"./markdown-base.css": "./dist/styles/markdown-base.css"
 	},
 	"dependencies": {
 		"github-markdown-css": "^5.8.1",
