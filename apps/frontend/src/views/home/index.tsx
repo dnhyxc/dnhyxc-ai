@@ -130,14 +130,14 @@ const Home = () => {
 							}}
 						>
 							{/* 顶栏：品牌 + 主文案 + 操作（与入口同属一个欢迎模块） */}
-							<header className="relative z-10 shrink-0 px-3 pb-4 pt-4 sm:px-2 sm:pb-5 sm:pt-5 md:px-6 md:pt-6 bg-theme-white/4 border-b border-theme/3">
+							<header className="relative z-10 shrink-0 px-3 pb-4 pt-4 sm:px-2 sm:pb-5 sm:pt-5 md:px-6 md:pt-6 bg-theme-background/80 border-b border-theme/3">
 								<div className="flex flex-col gap-5">
 									<div className="min-w-0 flex-1">
 										<motion.div
 											initial={{ opacity: 0, x: -12 }}
 											animate={{ opacity: 1, x: 0 }}
 											transition={{ delay: 0.08, duration: 0.4 }}
-											className="inline-flex items-center gap-2 rounded-md border border-teal-400/25 bg-teal-500/10 px-3 py-2"
+											className="inline-flex items-center gap-2 rounded-md border border-teal-400/5 bg-teal-500/10 px-3 py-2"
 										>
 											<Sparkles className="h-4 w-4 text-teal-400" />
 											<span
@@ -165,7 +165,7 @@ const Home = () => {
 											initial={{ opacity: 0, y: 12 }}
 											animate={{ opacity: 1, y: 0 }}
 											transition={{ delay: 0.18, duration: 0.4 }}
-											className="mt-[21px] text-pretty text-xl leading-relaxed text-textcolor/75"
+											className="mt-[21px] text-pretty text-xl leading-relaxed text-textcolor/50"
 										>
 											一处集成对话、代码与文档的桌面 AI
 											工作台。三种能力在此交融，随需切换，从念头闪现到成果落地，皆在这方寸之间完成。
@@ -219,7 +219,7 @@ const Home = () => {
 										// whileHover={{ y: -3 }}
 										whileTap={{ scale: 0.99 }}
 										onClick={feature.onClick}
-										className={`group relative flex min-h-0 cursor-pointer flex-col overflow-hidden bg-theme-white/4 p-4 transition-colors duration-300 md:p-5 lg:p-6 ${feature.hoverBg}`}
+										className={`group relative flex min-h-0 cursor-pointer flex-col overflow-hidden bg-theme-background/80 p-4 transition-colors duration-300 md:p-5 lg:p-6 ${feature.hoverBg}`}
 									>
 										<div
 											className={`pointer-events-none absolute -right-6 -top-10 text-[5.5rem] font-black leading-none text-theme-white/4 transition-colors duration-300 group-hover:text-theme-white/7 sm:text-[6.5rem]`}
@@ -265,7 +265,7 @@ const Home = () => {
 
 					{/* 下方内容在 ScrollArea 内滚动 */}
 					<div className="relative mx-auto w-full max-w-6xl space-y-5 px-3 pt-3 sm:px-5">
-						<div className="relative overflow-hidden rounded-md bg-linear-to-br from-theme-white/5 to-theme-white/5 p-6 backdrop-blur-xl ">
+						<div className="relative overflow-hidden rounded-md bg-theme-background/80 p-6 backdrop-blur-xl ">
 							<motion.h3
 								initial={{ opacity: 0, y: 16 }}
 								whileInView={{ opacity: 1, y: 0 }}
@@ -308,7 +308,7 @@ const Home = () => {
 							whileInView={{ opacity: 1, y: 0 }}
 							viewport={{ once: true, margin: '-40px' }}
 							transition={{ duration: 0.4 }}
-							className="relative mb-5 overflow-hidden rounded-md bg-linear-to-br from-theme-white/5 to-theme-white/5 p-6 backdrop-blur-xl"
+							className="relative mb-5 overflow-hidden rounded-md bg-theme-background/80 p-6 backdrop-blur-xl"
 						>
 							<div className="pointer-events-none absolute right-0 top-0 h-32 w-32 rounded-full bg-linear-to-br from-teal-500/12 to-transparent blur-3xl" />
 							<h3
