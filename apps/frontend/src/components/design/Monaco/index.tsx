@@ -1,6 +1,7 @@
 import Editor, { type OnMount } from '@monaco-editor/react';
 import { useRef } from 'react';
 import { cn } from '@/lib/utils';
+import { registerPrettierFormatProviders } from './format';
 import { options } from './options';
 
 interface MarkdownEditorProps {
@@ -29,12 +30,21 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	const handleEditorMount: OnMount = (editor, monaco) => {
 		editorRef.current = editor;
 
+		registerPrettierFormatProviders(monaco);
+
+		// 与 VS Code 一致：格式化文档（Format Document）— Windows/Linux: Shift+Alt+F，Mac: Shift+Option+F
+		editor.addCommand(
+			monaco.KeyMod.Shift | monaco.KeyMod.Alt | monaco.KeyCode.KeyF,
+			() => {
+				editor.trigger('keyboard', 'editor.action.formatDocument', null);
+			},
+		);
+
 		editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyB, () => {
 			editor.trigger('keyboard', 'editor.action.commentLine', null);
 		});
 
 		editor.onDidChangeModelContent(() => {
-			console.log('editor.getValue()', editor.getValue());
 			onChange?.(editor.getValue());
 		});
 

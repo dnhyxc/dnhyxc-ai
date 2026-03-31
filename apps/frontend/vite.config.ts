@@ -15,7 +15,16 @@ export default defineConfig(async () => ({
 		},
 	},
 	optimizeDeps: {
-		include: ['monaco-editor'],
+		include: [
+			'monaco-editor',
+			'pangu',
+			'prettier/standalone',
+			'prettier/plugins/babel',
+			'prettier/plugins/estree',
+			'prettier/plugins/html',
+			'prettier/plugins/markdown',
+			'prettier/plugins/typescript',
+		],
 	},
 	server: {
 		port: 9002,

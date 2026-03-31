@@ -6,17 +6,17 @@
 
 ## 1. 源码与产物结构
 
-| 路径 | 角色 |
-|------|------|
-| `src/markdown-parser.ts` | `MarkdownIt` + `markdown-it-katex` + `highlight.js` 高亮；可选围栏工具栏；构造末尾调用主题注入。 |
-| `src/inject-highlight-theme.ts` | `applyHighlightJsTheme` / `clearAppliedHighlightJsTheme`：向 `document.head` 注入 `<link>`（CDN）或 `<style>`（内联）。 |
-| `src/highlight-theme-import.ts` | `resolveHighlightJsThemeSpecifier`：把主题 id 转成 `@dnhyxc-ai/tools/styles/hljs/...` 包内说明符。 |
-| `src/generated/highlight-js-theme-ids.ts` | **构建生成**：`HighlightJsThemeId` 字面量联合，与 `dist/styles/hljs` 下文件一一对应。 |
-| `src/styles.ts` | **构建生成**：`highlightJsThemes`、`highlightJsThemeIds`、`styleContents`、`styles` 等（`pnpm clean` 会删，勿手改）。 |
-| `src/index.ts` | 包入口：聚合导出类型与函数。 |
-| `scripts/build-mk-css.js` | 复制 CSS/字体、写合并文件、写 `dist/styles.js` / `styles.d.ts` / `src/styles.ts`、写 `highlight-js-theme-ids.ts`。 |
-| `tsup.config.ts` | 打 `dist/index.{js,cjs}` + `d.ts`；`noExternal` 打入 markdown-it / katex / highlight.js。 |
-| `dist/styles/**` | 运行时样式产物（`dist/` 默认不提交，由 CI/本地 `pnpm build` 生成）。 |
+| 路径                                      | 角色                                                                                                                    |
+| ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `src/markdown-parser.ts`                  | `MarkdownIt` + `markdown-it-katex` + `highlight.js` 高亮；可选围栏工具栏；构造末尾调用主题注入。                        |
+| `src/inject-highlight-theme.ts`           | `applyHighlightJsTheme` / `clearAppliedHighlightJsTheme`：向 `document.head` 注入 `<link>`（CDN）或 `<style>`（内联）。 |
+| `src/highlight-theme-import.ts`           | `resolveHighlightJsThemeSpecifier`：把主题 id 转成 `@dnhyxc-ai/tools/styles/hljs/...` 包内说明符。                      |
+| `src/generated/highlight-js-theme-ids.ts` | **构建生成**：`HighlightJsThemeId` 字面量联合，与 `dist/styles/hljs` 下文件一一对应。                                   |
+| `src/styles.ts`                           | **构建生成**：`highlightJsThemes`、`highlightJsThemeIds`、`styleContents`、`styles` 等（`pnpm clean` 会删，勿手改）。   |
+| `src/index.ts`                            | 包入口：聚合导出类型与函数。                                                                                            |
+| `scripts/build-mk-css.js`                 | 复制 CSS/字体、写合并文件、写 `dist/styles.js` / `styles.d.ts` / `src/styles.ts`、写 `highlight-js-theme-ids.ts`。      |
+| `tsup.config.ts`                          | 打 `dist/index.{js,cjs}` + `d.ts`；`noExternal` 打入 markdown-it / katex / highlight.js。                               |
+| `dist/styles/**`                          | 运行时样式产物（`dist/` 默认不提交，由 CI/本地 `pnpm build` 生成）。                                                    |
 
 ---
 
@@ -79,14 +79,14 @@
 
 ## 3. `package.json` exports（消费方式）
 
-| 条件导出 | 含义 |
-|----------|------|
-| `.` | 主入口：`MarkdownParser`、主题 API、样式元数据等。 |
-| `./styles` | `dist/styles.js` + 类型。 |
-| `./styles/*`、`./styles/*.css` | `dist/styles/` 下根级 CSS。 |
-| `./styles/hljs/*` | 各 highlight 主题文件。 |
-| `./styles.css`、`./markdown-styles.css` | 合并默认（含 github-dark）。 |
-| `./markdown-base.css` | 无 hljs 的基础包。 |
+| 条件导出                                | 含义                                               |
+| --------------------------------------- | -------------------------------------------------- |
+| `.`                                     | 主入口：`MarkdownParser`、主题 API、样式元数据等。 |
+| `./styles`                              | `dist/styles.js` + 类型。                          |
+| `./styles/*`、`./styles/*.css`          | `dist/styles/` 下根级 CSS。                        |
+| `./styles/hljs/*`                       | 各 highlight 主题文件。                            |
+| `./styles.css`、`./markdown-styles.css` | 合并默认（含 github-dark）。                       |
+| `./markdown-base.css`                   | 无 hljs 的基础包。                                 |
 
 `sideEffects: true` 提示存在 CSS 副作用；tree-shaking 时勿误删未使用的「仅样式」导入。
 
@@ -123,15 +123,15 @@
 
 ### 5.2 构造参数注入 CDN（适合少配置页面）
 
-- **推荐搭配**：再 `import '@dnhyxc-ai/tools/markdown-base.css'`，得到与工具包一致的 **GitHub Markdown 正文 + KaTeX 公式 + 间距**，代码配色由 `highlightTheme` 的 CDN 注入补齐。  
-- **也可以不引 `markdown-base.css`**：只要应用里已有其它全局样式能覆盖 `.markdown-body`、列表、引用、`.katex`、代码块容器等（例如本仓库 `apps/frontend/src/index.css` 对聊天区的规则），页面仍会「看起来正常」。此时你**没有**用到 `github-markdown-css` / `katex.min.css` 的完整规则集，复杂排版或公式可能出现与官方预览不一致、字体回退等问题。  
+- **推荐搭配**：再 `import '@dnhyxc-ai/tools/markdown-base.css'`，得到与工具包一致的 **GitHub Markdown 正文 + KaTeX 公式 + 间距**，代码配色由 `highlightTheme` 的 CDN 注入补齐。
+- **也可以不引 `markdown-base.css`**：只要应用里已有其它全局样式能覆盖 `.markdown-body`、列表、引用、`.katex`、代码块容器等（例如本仓库 `apps/frontend/src/index.css` 对聊天区的规则），页面仍会「看起来正常」。此时你**没有**用到 `github-markdown-css` / `katex.min.css` 的完整规则集，复杂排版或公式可能出现与官方预览不一致、字体回退等问题。
 - 典型写法：  
-  `new MarkdownParser({ highlightTheme: 'github-dark' })`  
+  `new MarkdownParser({ highlightTheme: 'github-dark' })`
 - **注意**：若已 `import '@dnhyxc-ai/tools/styles.css'`（已含 github-dark），再传 `highlightTheme` 会**多加载**一套 hljs；应二选一或关闭注入。
 
 ### 5.3 离线 / Tauri / `?raw`
 
-- `import css from '@dnhyxc-ai/tools/styles/hljs/night-owl.min.css?raw'`（路径以打包器为准）  
+- `import css from '@dnhyxc-ai/tools/styles/hljs/night-owl.min.css?raw'`（路径以打包器为准）
 - `new MarkdownParser({ highlightThemeCss: css })`
 
 ### 5.4 类型安全的主题常量（本仓库实践）
@@ -143,26 +143,25 @@
 ### 5.5 最小示例
 
 ```tsx
-import { useMemo } from 'react';
-import { MarkdownParser } from '@dnhyxc-ai/tools';
-import '@dnhyxc-ai/tools/styles.css';
+import { useMemo } from "react";
+import { MarkdownParser } from "@dnhyxc-ai/tools";
+import "@dnhyxc-ai/tools/styles.css";
 
 export function Preview({ md }: { md: string }) {
-  const parser = useMemo(() => new MarkdownParser({ injectHighlightTheme: false }), []);
-  return (
-    <div
-      dangerouslySetInnerHTML={{ __html: parser.render(md) }}
-    />
-  );
+	const parser = useMemo(
+		() => new MarkdownParser({ injectHighlightTheme: false }),
+		[],
+	);
+	return <div dangerouslySetInnerHTML={{ __html: parser.render(md) }} />;
 }
 ```
 
 ```tsx
-import { MarkdownParser } from '@dnhyxc-ai/tools';
+import { MarkdownParser } from "@dnhyxc-ai/tools";
 // 可选：无此行时依赖应用全局 CSS 是否已覆盖 .markdown-body / .katex 等
-import '@dnhyxc-ai/tools/markdown-base.css';
+import "@dnhyxc-ai/tools/markdown-base.css";
 
-const parser = new MarkdownParser({ highlightTheme: 'atom-one-dark' });
+const parser = new MarkdownParser({ highlightTheme: "atom-one-dark" });
 ```
 
 ---
@@ -171,12 +170,12 @@ const parser = new MarkdownParser({ highlightTheme: 'atom-one-dark' });
 
 ### 6.1 命令
 
-| 命令 | 作用 |
-|------|------|
-| `pnpm --filter @dnhyxc-ai/tools run clean` | 删除 `dist/`、`src/styles.ts`（**不删** `src/generated/highlight-js-theme-ids.ts`，由下次 `build:css` 覆盖）。 |
-| `pnpm --filter @dnhyxc-ai/tools run build:css` | 跑 `scripts/build-mk-css.js`。 |
-| `pnpm --filter @dnhyxc-ai/tools run build` | `clean` → `build:css` → `tsup`。 |
-| `prepack` | 等价于 `pnpm build`，发包前保证产物完整。 |
+| 命令                                           | 作用                                                                                                           |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `pnpm --filter @dnhyxc-ai/tools run clean`     | 删除 `dist/`、`src/styles.ts`（**不删** `src/generated/highlight-js-theme-ids.ts`，由下次 `build:css` 覆盖）。 |
+| `pnpm --filter @dnhyxc-ai/tools run build:css` | 跑 `scripts/build-mk-css.js`。                                                                                 |
+| `pnpm --filter @dnhyxc-ai/tools run build`     | `clean` → `build:css` → `tsup`。                                                                               |
+| `prepack`                                      | 等价于 `pnpm build`，发包前保证产物完整。                                                                      |
 
 ### 6.2 修改代码后何时要 build
 
@@ -204,12 +203,12 @@ const parser = new MarkdownParser({ highlightTheme: 'atom-one-dark' });
 
 ## 7. 本仓库引用现状（摘要）
 
-| 区域 | 方式 |
-|------|------|
-| `ChatAssistantMessage` | `enableChatCodeFenceToolbar: true` + `highlightTheme: CHAT_MARKDOWN_HIGHLIGHT_THEME` |
-| `ChatUserMessage`、`session-list` | `highlightTheme: CHAT_MARKDOWN_HIGHLIGHT_THEME` |
-| `editor`、`document` | `import styles.css` + `highlightTheme`（若需避免重复 hljs，可评估改为 `markdown-base` + `highlightTheme` 或对解析器设 `injectHighlightTheme: false`） |
-| 主题常量 | `apps/frontend/src/constant/index.ts` 中 `CHAT_MARKDOWN_HIGHLIGHT_THEME: HighlightJsThemeId` |
+| 区域                              | 方式                                                                                                                                                  |
+| --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ChatAssistantMessage`            | `enableChatCodeFenceToolbar: true` + `highlightTheme: CHAT_MARKDOWN_HIGHLIGHT_THEME`                                                                  |
+| `ChatUserMessage`、`session-list` | `highlightTheme: CHAT_MARKDOWN_HIGHLIGHT_THEME`                                                                                                       |
+| `editor`、`document`              | `import styles.css` + `highlightTheme`（若需避免重复 hljs，可评估改为 `markdown-base` + `highlightTheme` 或对解析器设 `injectHighlightTheme: false`） |
+| 主题常量                          | `apps/frontend/src/constant/index.ts` 中 `CHAT_MARKDOWN_HIGHLIGHT_THEME: HighlightJsThemeId`                                                          |
 
 聊天区若未全局引入 tools 的合并 CSS，仍可能依赖 **`apps/frontend/src/index.css`** 内对 `.markdown-body`、`.chat-md-code-block` 等的定制；与「完整 GitHub Markdown + KaTeX + hljs」并存时，以实际 import 为准。
 
@@ -237,4 +236,4 @@ const parser = new MarkdownParser({ highlightTheme: 'atom-one-dark' });
 
 ---
 
-*文档与 `packages/tools` 当前实现对齐；升级 `highlight.js` 后请同步更新 `inject-highlight-theme.ts` 内 `HLJS_CDN_VERSION` 并重新执行 `build:css`。*
+_文档与 `packages/tools` 当前实现对齐；升级 `highlight.js` 后请同步更新 `inject-highlight-theme.ts` 内 `HLJS_CDN_VERSION` 并重新执行 `build:css`。_

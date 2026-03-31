@@ -8,7 +8,7 @@ import { useTheme } from '@/hooks';
 import useStore from '@/store';
 
 const Editor = () => {
-	const [markdown, setMarkdown] = useState('');
+	const [, setMarkdown] = useState('');
 
 	const { detailStore } = useStore();
 	const { theme } = useTheme();
