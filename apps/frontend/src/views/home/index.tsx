@@ -106,6 +106,7 @@ const Home = () => {
 		};
 	}, []);
 
+	// 使用原生 button + CSS 过渡，避免 motion.button 的 whileTap 与路由卸载叠在同一帧造成卡顿
 	const onClickStart = () => {
 		navigate('/chat');
 	};
@@ -145,7 +146,7 @@ const Home = () => {
 											initial={{ opacity: 0, x: -12 }}
 											animate={{ opacity: 1, x: 0 }}
 											transition={{ delay: 0.08, duration: 0.4 }}
-											className="mb-3 inline-flex items-center gap-2 rounded-full border border-teal-400/25 bg-teal-500/10 px-3 py-1.5"
+											className="inline-flex items-center gap-2 rounded-full border border-teal-400/25 bg-teal-500/10 px-3 py-2"
 										>
 											<Sparkles className="h-4 w-4 text-teal-400" />
 											<span
@@ -173,10 +174,10 @@ const Home = () => {
 											initial={{ opacity: 0, y: 12 }}
 											animate={{ opacity: 1, y: 0 }}
 											transition={{ delay: 0.18, duration: 0.4 }}
-											className="mt-6 mb-[11px] text-pretty text-xl leading-relaxed text-textcolor/75"
+											className="mt-[19px] text-pretty text-xl leading-relaxed text-textcolor/75"
 										>
-											一款桌面端 AI
-											工作台：对话、代码与文档能力集中在一处，按需进入对应模块即可开始。
+											一处集成对话、代码与文档的桌面 AI
+											工作台。三种能力在此交融，随需切换，从念头闪现到成果落地，皆在这方寸之间完成。
 										</motion.div>
 									</div>
 									<motion.div
@@ -185,29 +186,26 @@ const Home = () => {
 										transition={{ delay: 0.22, duration: 0.4 }}
 										className="flex shrink-0 flex-wrap items-center gap-3 sm:gap-3 mb-1.5"
 									>
-										<motion.button
-											type="button"
-											whileHover={{ scale: 1.03 }}
-											whileTap={{ scale: 0.98 }}
+										<Button
+											variant="dynamic"
 											onClick={onClickStart}
-											className="relative h-11 cursor-pointer overflow-hidden rounded-xl bg-linear-to-r from-teal-500 to-cyan-600 px-6 text-sm font-semibold text-textcolor shadow-lg transition-shadow hover:shadow-teal-500/30 sm:h-12 sm:px-7"
+											className="relative h-10 w-30 cursor-pointer overflow-hidden rounded-xl bg-linear-to-r from-teal-500 to-cyan-600 px-6 pt-3 text-sm font-semibold text-textcolor shadow-lg transition-[transform,box-shadow] duration-200 ease-out hover:scale-[1.03] hover:shadow-teal-500/30 active:scale-[0.98]"
 											style={{
 												fontFamily: '"Syne", "Noto Sans SC", sans-serif',
 											}}
 										>
-											<span className="relative z-10 flex items-center gap-2">
-												快速开始
-												<ArrowRight className="h-4 w-4" />
-											</span>
-										</motion.button>
+											快速开始
+											<ArrowRight className="h-4 w-4 mb-1" />
+										</Button>
 										<Button
 											variant="dynamic"
 											onClick={() => {
 												openUrl('https://github.com/dnhyxc/dnhyxc-ai/wiki');
 											}}
-											className="h-11 rounded-xl border border-theme-white/15 bg-theme-white/5 px-6 text-sm font-medium text-textcolor backdrop-blur-sm transition-colors hover:border-theme-white/25 hover:bg-theme-white/10 sm:h-12 sm:px-7"
+											className="h-10 w-30 rounded-xl border border-theme-white/15 bg-theme-white/5 px-6 text-sm font-medium text-textcolor backdrop-blur-sm transition-colors hover:border-theme-white/25 hover:bg-theme-white/10"
 										>
 											了解更多
+											<ArrowRight className="h-4 w-4" />
 										</Button>
 									</motion.div>
 								</div>
