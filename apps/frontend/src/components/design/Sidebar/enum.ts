@@ -26,13 +26,13 @@ export const MENUS = [
 	},
 	{
 		name: '详情',
-		icon: 'BookOpenText',
+		icon: 'Newspaper',
 		path: '/detail',
 	},
 	{
-		name: '文档编辑',
-		icon: 'Newspaper',
-		path: '/editor',
+		name: '知识库',
+		icon: 'BookOpenText',
+		path: '/knowledge',
 	},
 	// {
 	// 	name: '个人主页',

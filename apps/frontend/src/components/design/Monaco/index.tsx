@@ -13,6 +13,7 @@ interface MarkdownEditorProps {
 	readOnly?: boolean;
 	theme?: 'vs' | 'vs-dark' | 'hc-black';
 	language?: string;
+	toolbar: React.ReactNode;
 }
 
 const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
@@ -24,6 +25,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	readOnly = false,
 	theme = 'vs',
 	language = 'markdown',
+	toolbar,
 }) => {
 	const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
 
@@ -54,9 +56,16 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	return (
 		<div className={cn('rounded-md overflow-hidden bg-theme/5', className)}>
 			<div
-				className={cn('flex items-center gap-2 p-2 border-b border-theme/10')}
+				className={cn(
+					'flex items-center justify-between h-10 gap-2 border-b border-theme/10',
+				)}
 			>
-				<div className="text-sm font-medium text-textcolor">{language}</div>
+				<div className="text-base font-medium text-textcolor pl-3.5">
+					{language}
+				</div>
+				{toolbar ? (
+					<div className="flex items-center gap-2">{toolbar}</div>
+				) : null}
 			</div>
 			<Editor
 				height={height}

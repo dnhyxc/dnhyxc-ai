@@ -9,8 +9,8 @@ import Session from '@/views/chat/session';
 import Coding from '@/views/coding';
 import Detail from '@/views/detail';
 import Document from '@/views/document';
-import Editor from '@/views/editor';
 import Home from '@/views/home';
+import Knowledge from '@/views/knowledge';
 import Login from '@/views/login';
 import Pay from '@/views/pay';
 import Profile from '@/views/profile';
@@ -111,10 +111,10 @@ const routes: RouteConfig[] = [
 				},
 			},
 			{
-				path: '/editor',
-				Component: Editor,
+				path: '/knowledge',
+				Component: Knowledge,
 				meta: {
-					title: '文档编辑',
+					title: '知识库',
 				},
 			},
 			{
