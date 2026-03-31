@@ -85,7 +85,7 @@ body {
 
 	.chat-md-code-toolbar {
 		position: relative;
-		z-index: 4;
+		z-index: 1;
 		display: flex;
 		align-items: center;
 		justify-content: space-between;

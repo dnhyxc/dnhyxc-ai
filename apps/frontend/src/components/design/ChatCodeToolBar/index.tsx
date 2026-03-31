@@ -53,7 +53,7 @@ export default function ChatCodeToolbarFloating() {
 				top: state.top,
 				left: state.left,
 				width: state.width,
-				zIndex: 60,
+				zIndex: 1,
 				boxSizing: 'border-box',
 			}}
 			role="toolbar"
