@@ -1,5 +1,4 @@
 import { openUrl } from '@tauri-apps/plugin-opener';
-import { Button } from '@ui/index';
 import { ScrollArea } from '@ui/scroll-area';
 import { motion } from 'framer-motion';
 import {
@@ -106,10 +105,6 @@ const Home = () => {
 		};
 	}, []);
 
-	const onClickStart = () => {
-		navigate('/chat');
-	};
-
 	return (
 		<div className="relative h-full min-h-0 w-full overflow-hidden rounded-b-md">
 			{/* 环境光：压低饱和度，避免与欢迎区抢戏 */}
@@ -126,11 +121,31 @@ const Home = () => {
 							initial={{ opacity: 0, y: 20 }}
 							animate={{ opacity: 1, y: 0 }}
 							transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
-							className="relative flex min-h-0 w-full max-w-6xl flex-1 flex-col overflow-hidden rounded-md border border-theme-white/12 bg-linear-to-b from-theme-white/[0.07] to-theme-white/2 shadow-[0_24px_80px_-24px_rgba(0,0,0,0.55)] backdrop-blur-xl "
+							className="relative flex min-h-0 w-full max-w-6xl flex-1 flex-col overflow-hidden rounded-2xl border border-theme-white/12 bg-linear-to-b from-theme-white/[0.07] to-theme-white/2 shadow-[0_24px_80px_-24px_rgba(0,0,0,0.55)] backdrop-blur-xl md:rounded-3xl"
 							style={{
 								fontFamily: '"Noto Sans SC", system-ui, sans-serif',
 							}}
 						>
+							{/* 网格与光晕底纹 */}
+							{/* <div
+								className="pointer-events-none absolute inset-0 opacity-[0.35]"
+								style={{
+									backgroundImage: `
+								linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+								linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px)
+							`,
+									backgroundSize: '48px 48px',
+								}}
+								aria-hidden
+							/>
+							<div
+								className="pointer-events-none absolute -left-1/4 top-0 h-[120%] w-[70%] rotate-12 bg-linear-to-br from-teal-500/12 via-transparent to-transparent blur-3xl"
+								aria-hidden
+							/>
+							<div
+								className="pointer-events-none absolute -right-1/4 bottom-0 h-full w-[60%] -rotate-6 bg-linear-to-tl from-amber-500/10 via-transparent to-transparent blur-3xl"
+								aria-hidden
+							/> */}
 							<div
 								className="pointer-events-none absolute inset-0 opacity-[0.18] mix-blend-overlay"
 								style={{ backgroundImage: NOISE_BG }}
@@ -189,8 +204,8 @@ const Home = () => {
 											type="button"
 											whileHover={{ scale: 1.03 }}
 											whileTap={{ scale: 0.98 }}
-											onClick={onClickStart}
-											className="relative h-11 cursor-pointer overflow-hidden rounded-xl bg-linear-to-r from-teal-500 to-cyan-600 px-6 text-sm font-semibold text-textcolor shadow-lg transition-shadow hover:shadow-teal-500/30 sm:h-12 sm:px-7"
+											onClick={() => navigate('/chat')}
+											className="relative h-11 overflow-hidden rounded-xl bg-linear-to-r from-teal-500 to-cyan-600 px-6 text-sm font-semibold text-textcolor shadow-lg transition-shadow hover:shadow-teal-500/30 sm:h-12 sm:px-7"
 											style={{
 												fontFamily: '"Syne", "Noto Sans SC", sans-serif',
 											}}
@@ -200,15 +215,15 @@ const Home = () => {
 												<ArrowRight className="h-4 w-4" />
 											</span>
 										</motion.button>
-										<Button
-											variant="dynamic"
+										<button
+											type="button"
 											onClick={() => {
 												openUrl('https://github.com/dnhyxc/dnhyxc-ai/wiki');
 											}}
 											className="h-11 rounded-xl border border-theme-white/15 bg-theme-white/5 px-6 text-sm font-medium text-textcolor backdrop-blur-sm transition-colors hover:border-theme-white/25 hover:bg-theme-white/10 sm:h-12 sm:px-7"
 										>
 											了解更多
-										</Button>
+										</button>
 									</motion.div>
 								</div>
 							</header>
@@ -247,7 +262,7 @@ const Home = () => {
 										</div>
 
 										<div
-											className={`relative mb-4 flex h-12 w-12 items-center justify-center rounded-md bg-linear-to-br ${feature.color} shadow-lg ${feature.glow} sm:h-14 sm:w-14`}
+											className={`relative mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-linear-to-br ${feature.color} shadow-lg ${feature.glow} sm:h-14 sm:w-14`}
 										>
 											<feature.icon
 												className="h-6 w-6 text-textcolor"
@@ -282,7 +297,7 @@ const Home = () => {
 
 					{/* 下方内容在 ScrollArea 内滚动 */}
 					<div className="relative mx-auto w-full max-w-6xl space-y-5 px-3 pb-8 pt-3 sm:px-5">
-						<div className="relative overflow-hidden rounded-md border border-theme-white/8 bg-linear-to-br from-theme-white/5 to-theme-white/5 p-6 backdrop-blur-xl ">
+						<div className="relative overflow-hidden rounded-2xl border border-theme-white/8 bg-linear-to-br from-theme-white/5 to-theme-white/5 p-6 backdrop-blur-xl md:rounded-3xl">
 							<motion.h3
 								initial={{ opacity: 0, y: 16 }}
 								whileInView={{ opacity: 1, y: 0 }}
@@ -302,10 +317,10 @@ const Home = () => {
 										viewport={{ once: true, margin: '-20px' }}
 										transition={{ delay: idx * 0.05, duration: 0.35 }}
 										whileHover={{ scale: 1.04, y: -2 }}
-										className="group relative cursor-pointer rounded-md border border-transparent bg-theme-white/5 p-5 text-center backdrop-blur-sm transition-all duration-300 hover:border-theme-white/15 hover:bg-theme-white/10"
+										className="group relative cursor-pointer rounded-2xl border border-transparent bg-theme-white/5 p-5 text-center backdrop-blur-sm transition-all duration-300 hover:border-theme-white/15 hover:bg-theme-white/10"
 									>
 										<div
-											className={`mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-md bg-linear-to-br ${feature.color} shadow-lg group-hover:shadow-xl`}
+											className={`mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-linear-to-br ${feature.color} shadow-lg group-hover:shadow-xl`}
 										>
 											<feature.icon className="h-6 w-6 text-textcolor" />
 										</div>
@@ -325,7 +340,7 @@ const Home = () => {
 							whileInView={{ opacity: 1, y: 0 }}
 							viewport={{ once: true, margin: '-40px' }}
 							transition={{ duration: 0.4 }}
-							className="relative mb-5 overflow-hidden rounded-md border border-theme-white/8 bg-linear-to-br from-theme-white/5 to-theme-white/5 p-6 backdrop-blur-xl "
+							className="relative mb-5 overflow-hidden rounded-2xl border border-theme-white/8 bg-linear-to-br from-theme-white/5 to-theme-white/5 p-6 backdrop-blur-xl md:rounded-3xl"
 						>
 							<div className="pointer-events-none absolute right-0 top-0 h-32 w-32 rounded-full bg-linear-to-br from-teal-500/12 to-transparent blur-3xl" />
 							<h3
@@ -372,7 +387,7 @@ const Home = () => {
 										viewport={{ once: true }}
 										transition={{ delay: idx * 0.06, duration: 0.35 }}
 										whileHover={{ scale: 1.01 }}
-										className="group relative flex cursor-pointer items-center rounded-md border border-transparent bg-theme-white/5 p-5 backdrop-blur-sm transition-all duration-300 hover:border-theme-white/12 hover:bg-theme-white/10 hover:shadow-lg hover:shadow-teal-500/10"
+										className="group relative flex cursor-pointer items-center rounded-2xl border border-transparent bg-theme-white/5 p-5 backdrop-blur-sm transition-all duration-300 hover:border-theme-white/12 hover:bg-theme-white/10 hover:shadow-lg hover:shadow-teal-500/10"
 									>
 										<div
 											className={`mr-4 flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-linear-to-br ${item.color} shadow-lg group-hover:shadow-xl md:mr-5`}
@@ -393,6 +408,81 @@ const Home = () => {
 										>
 											<ArrowRight className="h-5 w-5 text-textcolor/40 group-hover:text-teal-400" />
 										</motion.div>
+									</motion.div>
+								))}
+							</div>
+						</motion.div>
+
+						<motion.div
+							initial={{ opacity: 0, y: 16 }}
+							whileInView={{ opacity: 1, y: 0 }}
+							viewport={{ once: true, margin: '-40px' }}
+							transition={{ duration: 0.4 }}
+							className="relative overflow-hidden rounded-2xl border border-theme-white/8 bg-linear-to-br from-theme-white/5 to-theme-white/5 p-6 backdrop-blur-xl md:rounded-3xl"
+						>
+							<div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-linear-to-br from-cyan-500/10 to-transparent blur-3xl" />
+							<h3
+								className="relative z-10 mb-6 text-xl font-semibold text-textcolor"
+								style={{ fontFamily: '"Syne", "Noto Sans SC", sans-serif' }}
+							>
+								用户评价
+							</h3>
+							<div className="space-y-4">
+								{[
+									{
+										name: '张明',
+										comment: '这款AI助手极大地提升了我的工作效率！',
+										role: '软件工程师',
+										color: 'from-yellow-400 to-orange-400',
+									},
+									{
+										name: '李娜',
+										comment: '代码生成功能非常实用，节省了大量时间。',
+										role: '前端开发',
+										color: 'from-orange-400 to-amber-400',
+									},
+									{
+										name: '王涛',
+										comment: '文档处理功能让我的工作变得轻松多了。',
+										role: '产品经理',
+										color: 'from-emerald-400 to-teal-400',
+									},
+								].map((user, idx) => (
+									<motion.div
+										key={user.name}
+										initial={{ opacity: 0, y: 10 }}
+										whileInView={{ opacity: 1, y: 0 }}
+										viewport={{ once: true }}
+										transition={{ delay: idx * 0.06, duration: 0.35 }}
+										whileHover={{ scale: 1.005 }}
+										className="group relative cursor-pointer rounded-2xl border border-transparent bg-theme-white/5 p-6 backdrop-blur-sm transition-all duration-300 hover:border-theme-white/12 hover:bg-theme-white/10 hover:shadow-lg hover:shadow-teal-500/10"
+									>
+										<div className="flex items-start gap-4">
+											<div className="relative shrink-0">
+												<div
+													className={`flex h-14 w-14 items-center justify-center rounded-2xl bg-linear-to-br ${user.color} shadow-lg md:h-16 md:w-16`}
+												>
+													<span className="text-xl font-bold text-textcolor">
+														{user.name.charAt(0)}
+													</span>
+												</div>
+												<div className="absolute -bottom-1 -right-1 flex h-8 w-8 items-center justify-center rounded-lg bg-linear-to-br from-teal-500 to-cyan-600 shadow-lg">
+													<Shield className="h-4 w-4 text-textcolor" />
+												</div>
+											</div>
+											<div className="min-w-0 flex-1">
+												<p className="mb-3 leading-relaxed text-textcolor/70 italic">
+													"{user.comment}"
+												</p>
+												<div className="flex flex-wrap items-center gap-1 text-sm">
+													<span className="font-medium text-textcolor">
+														{user.name}
+													</span>
+													<span className="text-textcolor/60">·</span>
+													<span className="text-textcolor/50">{user.role}</span>
+												</div>
+											</div>
+										</div>
 									</motion.div>
 								))}
 							</div>
