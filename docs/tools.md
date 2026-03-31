@@ -1,189 +1,146 @@
-# `@dnhyxc-ai/tools` 包说明
+# `@dnhyxc-ai/tools` 包说明（功能、实现与用法）
 
-`packages/tools` 发布为 npm 包 **`@dnhyxc-ai/tools`**，面向本 monorepo 内 **前端 / universal** 应用：提供 **Markdown → HTML** 的统一解析（代码高亮、数学公式、可选聊天代码块工具栏），以及 **打包好的样式与 KaTeX 字体**，避免各应用重复集成 `markdown-it`、`highlight.js`、`katex` 等细节。
+`packages/tools` 发布为 **`@dnhyxc-ai/tools`**，供本 monorepo 内前端 / universal 使用。核心交付物是：**Markdown → HTML 解析器（`MarkdownParser`）**、**可打包的 Markdown/KaTeX/highlight.js 样式与字体**、以及 **highlight.js 主题的「类型安全 id + 多路径消费（import / CDN / 内联）」**。
 
 ---
 
-## 1. 功能概览
+## 1. 源码与产物结构
 
-| 能力 | 说明 |
+| 路径 | 角色 |
 |------|------|
-| **Markdown 渲染** | 基于 [markdown-it](https://github.com/markdown-it/markdown-it)，默认开启 HTML、链接识别、排版优化、单换行转 `<br>`。 |
-| **代码高亮** | 围栏代码块通过 [highlight.js](https://highlightjs.org/) 按语言高亮；未知语言则回退为转义原文。 |
-| **数学公式** | [markdown-it-katex](https://github.com/waylonflinn/markdown-it-katex) + [KaTeX](https://katex.org/)；配置为失败不抛错、错误色透明，避免半段公式拖垮整页。 |
-| **LaTeX 定界符扩展** | 除常见 `$...$` 外，额外支持行内 `\(...\)` 与块级 `\[...\]`（在 `markdown-parser.ts` 中通过自定义 ruler 注入）。 |
-| **容器类名** | `render()` 结果外包一层 `<div class="markdown-body">`（或 `MarkdownParserOptions.containerClass` 自定义），与 GitHub Markdown CSS 对齐。 |
-| **聊天代码块工具栏（可选）** | `enableChatCodeFenceToolbar: true` 时重写 `fence` 规则，输出带 `data-chat-code-block`、`data-chat-code-action` 的 DOM，供复制/下载等交互（样式由宿主应用补充，见本仓库 `ChatAssistantMessage`）。 |
-| **样式导出** | 将 `github-markdown-css`、`katex.min.css` 复制到 `dist/styles/`；**highlight.js 全部 `*.min.css` 主题**复制到 `dist/styles/hljs/`（含 `base16/` 等子目录）；默认仍提供根目录 `github-dark.min.css` 与合并包 `markdown-styles.css`；另提供**不含代码配色的** `markdown-base.css`。 |
-| **代码块主题选择** | 导出 `highlightJsThemes`、`highlightJsThemeIds`、`defaultHighlightJsThemeId` 与 `resolveHighlightJsThemeSpecifier()`，便于按需 `import` 某一主题 CSS。 |
-
-**刻意不做的事：** 包内 **不自动 `import` 任何 CSS**，由使用方按页面引入，避免打包器对样式顺序与副作用失去控制（源码注释见 `packages/tools/src/markdown-parser.ts`）。
-
----
-
-## 2. 公共 API
-
-### 2.1 主入口 `@dnhyxc-ai/tools`
-
-```ts
-import { MarkdownParser, type MarkdownParserOptions } from '@dnhyxc-ai/tools';
-```
-
-- **`MarkdownParser`**：类，构造时传入选项，调用 **`render(text: string): string`** 得到 HTML 字符串。
-- **`MarkdownParserOptions`**（摘录）：
-  - `html`、`linkify`、`typographer`、`breaks`：透传给 `markdown-it`。
-  - `containerClass`：外层包裹类名，默认 `markdown-body`。
-  - `onError`：解析抛错时回调；默认行为为包一层容器并回退为原文。
-  - `enableChatCodeFenceToolbar`：为 `true` 时围栏输出聊天场景工具栏结构（默认 `false`）。
-  - **`highlightTheme`**：类型为 **`HighlightJsThemeId`**（由 `pnpm build:css` 生成 `src/generated/highlight-js-theme-ids.ts` 中的字面量联合，**IDE 自动补全/校验**）。在浏览器中于 **`document.head` 注入**一条指向 **jsDelivr** 上 `highlightjs/cdn-release` 的 `<link rel="stylesheet">`（版本与包内 `highlight.js` 依赖对齐，当前 `11.11.1`），**需联网**。全局仅保留一条由本包管理的主题节点，新建另一个带主题的 `MarkdownParser` 会替换上一条。
-  - **`highlightThemeCss`**：直接传入主题 CSS 字符串，使用 `<style>` 注入，**优先于** `highlightTheme` 的 CDN；适用于离线、Tauri、或 `import theme from '...css?raw'`。传 **`''`** 表示只移除本包已注入的主题节点，不挂新样式。
-  - **`injectHighlightTheme`**：为 `false` 时**不**做上述注入（即使传了 `highlightTheme` / `highlightThemeCss`），便于继续完全用手动 `import` 控制。
-
-正文与公式（`github-markdown`、KaTeX）仍须通过 **`import '@dnhyxc-ai/tools/markdown-base.css'`** 或 **`styles.css`** 等方式引入；`highlightTheme*` 只负责 **代码块配色**。
-
-也可在任意时机调用 **`applyHighlightJsTheme({ themeId, themeCss, onError })`** 或 **`clearAppliedHighlightJsTheme()`**（与构造参数行为一致，见 `inject-highlight-theme.ts`）。
-
-### 2.2 样式相关导出（主入口与子路径）
-
-主入口同时 re-export（来自构建期生成的 `styles` 模块）：
-
-- **`styles`**：各 CSS 的相对路径对象，含 `githubMarkdown`、`katex`、`highlight`（默认 `github-dark`）、`combined`（完整合并）、**`markdownBase`**（正文 + 公式 + KaTeX 间距，**不含** highlight.js）。
-- **`highlightJsThemes`**：`Record<string, string>`，键为主题 id（如 `github-dark`、`atom-one-dark`、`base16/zenburn`），值为包内相对路径（如 `./styles/hljs/atom-one-dark.min.css`）。
-- **`highlightJsThemeIds`**：所有已打包主题的 id 列表（构建时自 `highlight.js` 样式目录扫描 `*.min.css`）。
-- **`defaultHighlightJsThemeId`**：与 `markdown-styles.css` / `styles.highlight` 一致，默认为 `github-dark`。
-- **`resolveHighlightJsThemeSpecifier(themeId)`**：返回形如 `@dnhyxc-ai/tools/styles/hljs/atom-one-dark.min.css` 的 **package specifier**，便于写静态 `import` 或日志提示。
-- **`styleUrls`**：`styles` 的值数组（不含逐主题 hljs 路径）。
-- **`styleContents`**：仅内联 **github-markdown、katex、默认 github-dark** 三份 CSS 字符串；**不会**内联全部 hljs 主题，避免 JS 体积爆炸。
-
-**子路径（推荐在应用里引 CSS 文件）：**
-
-| 子路径 | 指向 |
-|--------|------|
-| `@dnhyxc-ai/tools/styles.css` | `markdown-styles.css`（正文 + 公式 + **默认 github-dark** + KaTeX 间距），**向后兼容** |
-| `@dnhyxc-ai/tools/markdown-base.css` | 正文 + 公式 + KaTeX 间距，**无**代码块配色（需再引一条 hljs 主题） |
-| `@dnhyxc-ai/tools/markdown-styles.css` | 与 `styles.css` 相同 |
-| `@dnhyxc-ai/tools/styles/github-markdown.css` 等 | `dist/styles/` 根下单文件 |
-| `@dnhyxc-ai/tools/styles/hljs/<主题>.min.css` | 单个 highlight.js 主题（含子路径，如 `styles/hljs/base16/dracula.min.css`） |
-| `@dnhyxc-ai/tools/styles` | `dist/styles.js` |
-
-**自选代码块样式示例：**
-
-```ts
-// 方式 A：在默认合并包之后追加一条主题，利用层叠覆盖默认 github-dark
-import '@dnhyxc-ai/tools/styles.css';
-import '@dnhyxc-ai/tools/styles/hljs/atom-one-dark.min.css';
-
-// 方式 B：只要一套主题，避免先加载默认暗色再覆盖
-import '@dnhyxc-ai/tools/markdown-base.css';
-import '@dnhyxc-ai/tools/styles/hljs/night-owl.min.css';
-
-// 方式 C：用工具函数拼出说明符（需 bundler 能解析该静态字符串）
-import { resolveHighlightJsThemeSpecifier } from '@dnhyxc-ai/tools';
-void resolveHighlightJsThemeSpecifier('github-dark'); // → '@dnhyxc-ai/tools/styles/hljs/github-dark.min.css'
-
-// 方式 D：构造 MarkdownParser 时注入代码块主题（CDN，需联网）
-import { MarkdownParser } from '@dnhyxc-ai/tools';
-import '@dnhyxc-ai/tools/markdown-base.css';
-const parser = new MarkdownParser({ highlightTheme: 'atom-one-dark' });
-
-// 方式 E：离线传入 CSS 字符串（配合 Vite ?raw 等）
-import themeCss from '@dnhyxc-ai/tools/styles/hljs/night-owl.min.css?raw';
-const parser2 = new MarkdownParser({ highlightThemeCss: themeCss });
-```
-
-手动 `import` 主题与 `highlightTheme` / `highlightThemeCss` **不要重复加载同一套 hljs**，否则易产生重复规则；若使用构造参数注入，建议正文用 **`markdown-base.css`** 或去掉合并包里的 hljs 后再由参数注入单一主题。
-
-`package.json` 中 `sideEffects: true` 表示存在全局 CSS 等副作用；按需引入样式时仍建议显式 `import '...css'`。
-
-### 2.3 KaTeX 字体
-
-`scripts/build-mk-css.js` 会把 `node_modules/katex/dist/fonts/` **整目录复制到** `dist/styles/fonts/`。`katex.min.css` 内 `@font-face` 使用相对路径 `url(fonts/...)`，因此 **只要最终部署时 CSS 与 `fonts/` 目录相对位置不变**，公式字体即可加载。使用 Vite 等解析 workspace 包时，通常会把静态资源一并处理；若自行拷贝 `dist`，需同时带上 `dist/styles/fonts/`。
+| `src/markdown-parser.ts` | `MarkdownIt` + `markdown-it-katex` + `highlight.js` 高亮；可选围栏工具栏；构造末尾调用主题注入。 |
+| `src/inject-highlight-theme.ts` | `applyHighlightJsTheme` / `clearAppliedHighlightJsTheme`：向 `document.head` 注入 `<link>`（CDN）或 `<style>`（内联）。 |
+| `src/highlight-theme-import.ts` | `resolveHighlightJsThemeSpecifier`：把主题 id 转成 `@dnhyxc-ai/tools/styles/hljs/...` 包内说明符。 |
+| `src/generated/highlight-js-theme-ids.ts` | **构建生成**：`HighlightJsThemeId` 字面量联合，与 `dist/styles/hljs` 下文件一一对应。 |
+| `src/styles.ts` | **构建生成**：`highlightJsThemes`、`highlightJsThemeIds`、`styleContents`、`styles` 等（`pnpm clean` 会删，勿手改）。 |
+| `src/index.ts` | 包入口：聚合导出类型与函数。 |
+| `scripts/build-mk-css.js` | 复制 CSS/字体、写合并文件、写 `dist/styles.js` / `styles.d.ts` / `src/styles.ts`、写 `highlight-js-theme-ids.ts`。 |
+| `tsup.config.ts` | 打 `dist/index.{js,cjs}` + `d.ts`；`noExternal` 打入 markdown-it / katex / highlight.js。 |
+| `dist/styles/**` | 运行时样式产物（`dist/` 默认不提交，由 CI/本地 `pnpm build` 生成）。 |
 
 ---
 
-## 3. 打包与构建流程
+## 2. 功能清单与实现方式
 
-### 3.1 脚本命令（`packages/tools/package.json`）
+### 2.1 Markdown 渲染与容器
 
-| 命令 | 作用 |
-|------|------|
-| `pnpm clean` | 删除 `dist` 与 **`src/styles.ts`**（后者为生成文件，勿手改持久内容）。 |
-| `pnpm build:css` | 执行 `node scripts/build-mk-css.js`。 |
-| `pnpm build` | `clean` → `build:css` → **`tsup`**。 |
-| `prepack` | `pnpm build`，在 `npm pack` / `pnpm pack` 发布 tarball 前保证产物最新。 |
+- **实现**：`MarkdownIt` 实例，默认 `html/linkify/typographer/breaks` 与项目需求对齐。
+- **输出**：`render(text)` 内先对 `\text{○}` 做替换以规避 KaTeX 度量问题，再 `md.render`，外层包 `<div class="${containerClass}">`（默认 `markdown-body`），便于配合 `github-markdown-css`。
+- **错误**：`try/catch` 中调用可选 `onError`，失败时仍包容器并回退为转义前的原文占位。
 
-### 3.2 `build-mk-css.js` 做什么
+### 2.2 代码高亮（highlight.js）
 
-1. 确保 `dist/`、`dist/styles/` 存在。
-2. 复制 **github-markdown.css、katex.min.css** 到 `dist/styles/`；复制默认 **github-dark.min.css** 到 `dist/styles/`（保持旧路径 `./styles/github-dark.min.css` 可用）。
-3. 将 **highlight.js `styles` 目录下全部 `*.min.css`**（含子目录，如 `base16/`）复制到 **`dist/styles/hljs/`**，并生成 **`highlightJsThemes` / `highlightJsThemeIds`** 元数据。
-4. 复制 **KaTeX 字体**到 `dist/styles/fonts/`。
-5. 写入 **`markdown-base.css`**：github-markdown + katex + KaTeX 间距规则（**无** hljs）。
-6. 写入 **`markdown-styles.css`**：github-markdown + katex + **github-dark** + KaTeX 间距（与历史行为一致）。
-7. 生成 **`dist/styles.js`**、**`dist/styles.d.ts`**、`src/styles.ts`（供 tsup 与 `@dnhyxc-ai/tools/styles` 子路径使用）。
+- **实现**：`markdown-it` 的 `highlight(str, lang)` 回调里调用 `hljs.getLanguage` + `hljs.highlight`；失败返回 `''`，后续由 markdown-it 走默认转义路径。
+- **与主题的关系**：高亮生成的是带 `hljs`、各类 `hljs-*` class 的 HTML；**颜色完全由 CSS 决定**。主题来源三选一：**手动 import 某 `.min.css`**、**CDN `<link>`（`highlightTheme`）**、**内联 `<style>`（`highlightThemeCss`）**。
 
-### 3.3 `tsup`（`tsup.config.ts`）
+### 2.3 数学公式（KaTeX）
 
-- **入口：** `src/index.ts`。
-- **产物：** `dist/index.js`（ESM）、`dist/index.cjs`（CJS）、`dist/index.d.ts`。
-- **`noExternal`：** `highlight.js`、`markdown-it`、`markdown-it-katex`、`katex` 打入包内，宿主无需再单独安装这些依赖即可使用解析逻辑（样式仍建议走包的 CSS 导出）。
+- **实现**：`markdown-it-katex`，`throwOnError: false`、`displayMode: false`、`strict: 'ignore'`、`errorColor: 'transparent'`，避免半段公式阻断整页。
+- **定界符扩展**：`addLatexDelimiters()` 向 `md.inline.ruler` / `md.block.ruler` 注册规则，支持 `\(...\)` 与 `\[...\]`（在标准 `$` 之外）。
 
----
+### 2.4 聊天围栏代码块工具栏（可选）
 
-## 4. 部署与发布方式
+- **开关**：`enableChatCodeFenceToolbar: true`。
+- **实现**：覆盖 `md.renderer.rules.fence`，输出固定结构：`chat-md-code-block`、`chat-md-code-toolbar-slot`、`data-chat-code-action="copy|download"`、`data-chat-code-lang` 等；高亮逻辑与默认 `highlight` 回调一致。
+- **样式与交互**：包内**不**包含工具栏视觉与点击逻辑；宿主（如本仓库 `ChatAssistantMessage` + `index.css` + `chatCodeToolbar`）负责布局与事件。
 
-### 4.1 Monorepo 内使用（当前主路径）
+### 2.5 样式产物（`build-mk-css.js`）
 
-`apps/frontend`、`apps/universal` 的 `package.json` 中依赖写为：
+1. **基础复制**：`github-markdown.css`、`katex.min.css` → `dist/styles/`；默认 **`github-dark.min.css`** 仍复制到 `dist/styles/` 根目录（兼容旧子路径）。
+2. **全量主题**：递归扫描 `node_modules/highlight.js/styles` 下所有 **`*.min.css`** → `dist/styles/hljs/`（含 `base16/` 等），用于 `import '@dnhyxc-ai/tools/styles/hljs/...'`。
+3. **KaTeX 字体**：`katex/dist/fonts` → `dist/styles/fonts/`，保证 `katex.min.css` 内相对 `url(fonts/...)` 可解析。
+4. **`markdown-base.css`**：`github-markdown` + `katex` + 脚本内嵌的 **KaTeX 间距补丁**（**不含** highlight.js）。
+5. **`markdown-styles.css`**：上述基础 + **github-dark** + 间距补丁（历史默认「一键全量」）。
+6. **元数据**：根据磁盘上的 hljs 文件生成 `highlightJsThemes`（id → `./styles/hljs/...`）、`highlightJsThemeIds` 数组；写入 `dist/styles.js`、`dist/styles.d.ts`、`src/styles.ts`。
+7. **`HighlightJsThemeId` 类型**：根据排序后的 `themeIds` 生成 `src/generated/highlight-js-theme-ids.ts` 中的 **`export type HighlightJsThemeId = | "..." | ...`**，供 TS 补全与 `MarkdownParserOptions.highlightTheme` 使用。
 
-```json
-"@dnhyxc-ai/tools": "workspace:*"
-```
+### 2.6 运行时主题注入（`inject-highlight-theme.ts`）
 
-- **安装：** 在仓库根执行 `pnpm install`，workspace 协议会把包链接到 `packages/tools`。
-- **应用构建：** 前端打包（如 `pnpm -C apps/frontend build` / Tauri）会按 Vite 配置解析 `@dnhyxc-ai/tools`；请确保在改动了 `markdown-parser` 或样式脚本后，对 tools 执行一次 **`pnpm --filter @dnhyxc-ai/tools run build`**，否则 `dist` 可能过期（例如聊天代码块工具栏 HTML 结构变更后未重建）。
+- **入口**：`applyHighlightJsTheme({ themeId?, themeCss?, onError? })`。
+- **全局单例 DOM**：固定 `id="dnhyxc-ai-tools-hljs-theme"`，每次应用前 `remove()` 旧节点，保证全页**只有一条**由本包管理的主题样式。
+- **分支逻辑**：
+  - `themeCss !== undefined`：若为非空字符串，写 `<style id="...">`；若为空字符串，仅删除节点后 `return`（用于「卸主题」）。
+  - 否则若 `themeId`：校验 `themeId in highlightJsThemes`，拼 **jsDelivr** URL：  
+    `https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@${HLJS_CDN_VERSION}/build/styles/${themeId}.min.css`  
+    （`HLJS_CDN_VERSION` 需与 `package.json` 的 `highlight.js` 大版本一致，当前 **`11.11.1`**）。
+- **SSR**：无 `document` 时直接 return。
+- **`MarkdownParser` 构造**：若 `injectHighlightTheme !== false`，将 `highlightTheme` / `highlightThemeCss` / `onError` 转给 `applyHighlightJsTheme`。
 
-### 4.2 发布到 npm（可选）
+### 2.7 包说明符解析（`highlight-theme-import.ts`）
 
-1. 在 `packages/tools` 下 bump `version`。
-2. 执行 `pnpm build`（或由 `prepack` 在 pack 时触发）。
-3. `npm publish` / `pnpm publish`（需有对应 scope 权限）。
+- **实现**：`highlightJsThemes[themeId]` 取相对路径，去掉 leading `./`，前缀 `@dnhyxc-ai/tools/`，得到例如 `@dnhyxc-ai/tools/styles/hljs/atom-one-dark.min.css`。
+- **类型**：参数为 `HighlightJsThemeId`，非法 id 在运行期抛错。
 
-发布后其它项目可：
+### 2.8 刻意不自动做的事
 
-```bash
-pnpm add @dnhyxc-ai/tools
-```
-
-并同样通过 `import { MarkdownParser } from '@dnhyxc-ai/tools'` 与 `import '@dnhyxc-ai/tools/styles.css'` 使用。
-
-### 4.3 CI 建议
-
-若 CI 中「仅安装依赖、不构建 workspace 包」即开始编译前端，可能缺少最新 `dist`。建议在流水线中增加一步：
-
-```bash
-pnpm --filter @dnhyxc-ai/tools run build
-```
-
-或在根目录用 `pnpm -r --filter @dnhyxc-ai/tools build` 等形式，再构建依赖该包的应用。
+- **不在任何 TS 模块里静态 `import '*.css'`**，避免打包器副作用顺序不可控；正文/公式/代码配色均由应用 **`import` 子路径** 或 **构造参数注入** 显式引入。
 
 ---
 
-## 5. 在本仓库中的使用方式
+## 3. `package.json` exports（消费方式）
 
-| 位置 | 用法 |
-|------|------|
-| `apps/frontend/.../ChatAssistantMessage/index.tsx` | `new MarkdownParser({ enableChatCodeFenceToolbar: true })`，配合 `dangerouslySetInnerHTML` 与点击委托实现复制/下载（`data-chat-code-action`）。 |
-| `apps/frontend/.../ChatUserMessage/index.tsx`、`session-list` | `new MarkdownParser()`，无工具栏。 |
-| `apps/frontend/src/views/editor/index.tsx`、`document/index.tsx` | `MarkdownParser` + **`import '@dnhyxc-ai/tools/styles.css'`** 引入合并样式。 |
-| `apps/universal/.../ChatUserMessage` | 与前端用户消息类似，默认无工具栏。 |
-| `apps/frontend/src/index.css` | 注释中说明助手侧代码块工具栏与 `MarkdownParser` 输出结构的关系。 |
+| 条件导出 | 含义 |
+|----------|------|
+| `.` | 主入口：`MarkdownParser`、主题 API、样式元数据等。 |
+| `./styles` | `dist/styles.js` + 类型。 |
+| `./styles/*`、`./styles/*.css` | `dist/styles/` 下根级 CSS。 |
+| `./styles/hljs/*` | 各 highlight 主题文件。 |
+| `./styles.css`、`./markdown-styles.css` | 合并默认（含 github-dark）。 |
+| `./markdown-base.css` | 无 hljs 的基础包。 |
 
-**样式：** 聊天相关页面若未全局引入 `styles.css`，需依赖应用其它入口（如布局或 `index.css`）已包含与 `markdown-body`、`.hljs`、`.katex` 一致的规则，否则会出现「有 HTML 无样式」或公式字体缺失。
+`sideEffects: true` 提示存在 CSS 副作用；tree-shaking 时勿误删未使用的「仅样式」导入。
 
 ---
 
-## 6. 最小接入示例
+## 4. 对外 API 速查
+
+### 4.1 `MarkdownParser` / `MarkdownParserOptions`
+
+- `render(text: string): string`
+- `highlightTheme?: HighlightJsThemeId` — CDN 注入（需联网）。
+- `highlightThemeCss?: string` — 内联注入；`''` 仅清除本包注入节点。
+- `injectHighlightTheme?: boolean` — 默认 `true`；`false` 则完全不注入。
+- `enableChatCodeFenceToolbar?: boolean`
+- 其余：`html`、`linkify`、`typographer`、`breaks`、`containerClass`、`onError`
+
+### 4.2 主题与样式元数据
+
+- `HighlightJsThemeId`（类型）
+- `highlightJsThemes`、`highlightJsThemeIds`、`defaultHighlightJsThemeId`
+- `styles`、`styleUrls`、`styleContents`（仅三份基础 CSS 字符串 + 默认 hljs，**不含**全部主题内联）
+- `applyHighlightJsTheme`、`clearAppliedHighlightJsTheme`
+- `resolveHighlightJsThemeSpecifier(themeId)`
+
+---
+
+## 5. 用法（推荐组合）
+
+### 5.1 仅打包器 import（无 CDN）
+
+- **全套默认**：`import '@dnhyxc-ai/tools/styles.css'`。
+- **自选 hljs**：`import '@dnhyxc-ai/tools/markdown-base.css'` + `import '@dnhyxc-ai/tools/styles/hljs/<id>.min.css'`（后导入可覆盖先导入的 hljs 规则）。若宿主已有等价全局样式，可省略 `markdown-base`，见 §8。
+- **构造器**：建议 `injectHighlightTheme: false`，避免与手动 CSS 重复。
+
+### 5.2 构造参数注入 CDN（适合少配置页面）
+
+- **推荐搭配**：再 `import '@dnhyxc-ai/tools/markdown-base.css'`，得到与工具包一致的 **GitHub Markdown 正文 + KaTeX 公式 + 间距**，代码配色由 `highlightTheme` 的 CDN 注入补齐。  
+- **也可以不引 `markdown-base.css`**：只要应用里已有其它全局样式能覆盖 `.markdown-body`、列表、引用、`.katex`、代码块容器等（例如本仓库 `apps/frontend/src/index.css` 对聊天区的规则），页面仍会「看起来正常」。此时你**没有**用到 `github-markdown-css` / `katex.min.css` 的完整规则集，复杂排版或公式可能出现与官方预览不一致、字体回退等问题。  
+- 典型写法：  
+  `new MarkdownParser({ highlightTheme: 'github-dark' })`  
+- **注意**：若已 `import '@dnhyxc-ai/tools/styles.css'`（已含 github-dark），再传 `highlightTheme` 会**多加载**一套 hljs；应二选一或关闭注入。
+
+### 5.3 离线 / Tauri / `?raw`
+
+- `import css from '@dnhyxc-ai/tools/styles/hljs/night-owl.min.css?raw'`（路径以打包器为准）  
+- `new MarkdownParser({ highlightThemeCss: css })`
+
+### 5.4 类型安全的主题常量（本仓库实践）
+
+- 自 `@dnhyxc-ai/tools` 引入 `HighlightJsThemeId`，例如：  
+  `export const CHAT_MARKDOWN_HIGHLIGHT_THEME: HighlightJsThemeId = 'base16/unikitty-dark';`
+- `ChatAssistantMessage` / `ChatUserMessage` / `session-list` / `editor` / `document` 等处 `new MarkdownParser({ highlightTheme: CHAT_MARKDOWN_HIGHLIGHT_THEME, ... })`，修改主题 id 时 IDE 会提示全部合法字面量。
+
+### 5.5 最小示例
 
 ```tsx
 import { useMemo } from 'react';
@@ -191,57 +148,93 @@ import { MarkdownParser } from '@dnhyxc-ai/tools';
 import '@dnhyxc-ai/tools/styles.css';
 
 export function Preview({ md }: { md: string }) {
-  const parser = useMemo(() => new MarkdownParser(), []);
+  const parser = useMemo(() => new MarkdownParser({ injectHighlightTheme: false }), []);
   return (
     <div
-      className="prose-wrap"
       dangerouslySetInnerHTML={{ __html: parser.render(md) }}
     />
   );
 }
 ```
 
-聊天场景若需要代码块工具栏，将 `useMemo` 内改为 `new MarkdownParser({ enableChatCodeFenceToolbar: true })`，并在宿主层监听 `[data-chat-code-action]`（与本仓库 `chatCodeToolbar` 工具函数一致）。
-
-用构造参数切换代码块主题（避免再 `import` 一份 hljs）时，建议正文用 `markdown-base`，解析器里传 `highlightTheme`：
-
 ```tsx
+import { MarkdownParser } from '@dnhyxc-ai/tools';
+// 可选：无此行时依赖应用全局 CSS 是否已覆盖 .markdown-body / .katex 等
 import '@dnhyxc-ai/tools/markdown-base.css';
-const parser = useMemo(
-  () => new MarkdownParser({ highlightTheme: 'night-owl' }),
-  [],
-);
+
+const parser = new MarkdownParser({ highlightTheme: 'atom-one-dark' });
 ```
 
 ---
 
-## 7. 维护说明与 `README.md`
+## 6. 开发与构建流程
 
-- 包内 **`packages/tools/README.md`** 仍为早期示例片段（含已迁移走的 Toast 等），**以本文档与源码为准**。
-- 修改 **`markdown-parser.ts`** 或 **`scripts/build-mk-css.js`** 后务必执行 **`pnpm --filter @dnhyxc-ai/tools run build`**。`src/generated/highlight-js-theme-ids.ts` 随 **`build:css`** 再生，升级 `highlight.js` 后应提交更新后的该文件，以便依赖方获得最新主题 id 提示。本包 `.gitignore` 忽略 **`dist/`**，本地与 **CI 在构建前端前** 需能跑到上述 build（或由 `prepack` 在发包时生成）。
+### 6.1 命令
+
+| 命令 | 作用 |
+|------|------|
+| `pnpm --filter @dnhyxc-ai/tools run clean` | 删除 `dist/`、`src/styles.ts`（**不删** `src/generated/highlight-js-theme-ids.ts`，由下次 `build:css` 覆盖）。 |
+| `pnpm --filter @dnhyxc-ai/tools run build:css` | 跑 `scripts/build-mk-css.js`。 |
+| `pnpm --filter @dnhyxc-ai/tools run build` | `clean` → `build:css` → `tsup`。 |
+| `prepack` | 等价于 `pnpm build`，发包前保证产物完整。 |
+
+### 6.2 修改代码后何时要 build
+
+- 改了 **`markdown-parser.ts`**、**`inject-highlight-theme.ts`**、**`highlight-theme-import.ts`**、**`index.ts`**：至少 **`pnpm build`**（或仅 `tsup` 若 styles 未变）。
+- 改了 **`build-mk-css.js`** 或升级 **`highlight.js`**：必须 **`build:css`**（会刷新 `hljs` 文件与 **`highlight-js-theme-ids.ts`**），再 **`tsup`**。
+- **`src/generated/highlight-js-theme-ids.ts`**：应**提交仓库**，这样他人未先 build tools 也能获得正确类型；升级 hljs 后记得重新生成并提交。
+
+### 6.3 tsup 说明
+
+- **单入口** `src/index.ts`，**ESM + CJS** + **dts**。
+- **`noExternal`**：`highlight.js`、`markdown-it`、`markdown-it-katex`、`katex` 打进包内，应用侧只需依赖 `@dnhyxc-ai/tools` 即可使用解析逻辑；样式仍走 exports 子路径或 CDN/内联注入。
+
+### 6.4 Monorepo / CI
+
+- 依赖写法：`"@dnhyxc-ai/tools": "workspace:*"`。
+- CI 在构建前端前执行：  
+  `pnpm --filter @dnhyxc-ai/tools run build`  
+  以免 `dist` 缺失或过旧。
+
+### 6.5 对外发布 npm（可选）
+
+- bump `packages/tools` 的 `version`，`pnpm build`，再 `pnpm publish`（需 scope 权限）。
 
 ---
 
-## 8. 常见问题：未 `import '@dnhyxc-ai/tools/styles.css'` 为何仍有样式？
+## 7. 本仓库引用现状（摘要）
 
-`@dnhyxc-ai/tools` **有意不在 JS 里自动注入** `github-markdown.css` / `katex.min.css` / `github-dark.min.css`，但 **`MarkdownParser.render()` 仍会输出带类名的 HTML**（默认外层 `markdown-body`，代码块带 `hljs`、`language-xxx`，公式带 KaTeX 结构等）。因此是否「看起来像有样式」取决于**宿主应用**还加载了什么 CSS：
+| 区域 | 方式 |
+|------|------|
+| `ChatAssistantMessage` | `enableChatCodeFenceToolbar: true` + `highlightTheme: CHAT_MARKDOWN_HIGHLIGHT_THEME` |
+| `ChatUserMessage`、`session-list` | `highlightTheme: CHAT_MARKDOWN_HIGHLIGHT_THEME` |
+| `editor`、`document` | `import styles.css` + `highlightTheme`（若需避免重复 hljs，可评估改为 `markdown-base` + `highlightTheme` 或对解析器设 `injectHighlightTheme: false`） |
+| 主题常量 | `apps/frontend/src/constant/index.ts` 中 `CHAT_MARKDOWN_HIGHLIGHT_THEME: HighlightJsThemeId` |
 
-1. **本仓库前端聊天区（`apps/frontend`）**  
-   - `main.tsx` 全局引入了 **`apps/frontend/src/index.css`**。其中已包含与聊天 Markdown 强相关的规则，例如 **`#message-md-wrap .markdown-body`** 下的链接/排版覆盖、**`.chat-md-code-block` / `.chat-md-code-toolbar` / `.chat-md-code-block pre`** 等（见 `ChatBotView` 里消息外层的 `id="message-md-wrap"` 与 `MarkdownParser({ enableChatCodeFenceToolbar: true })` 输出的 DOM）。  
-   - 这些样式**不来自** `@dnhyxc-ai/tools/styles.css`，所以聊天页即使不写该 import，**气泡、代码块容器、工具栏**仍会按主题显示正常。
-
-2. **浏览器默认样式 + Tailwind Preflight**  
-   - 标题、列表、段落、`pre`/`code` 等**语义标签**本身就有基础排版；再配合 `index.css` 里诸如 `ol, ul, menu { list-style: revert }` 等，列表等不会「完全没样式」。
-
-3. **与「完整 tools 样式包」的差别**  
-   - 未引入 `styles.css` 时，一般**不会**获得 `github-markdown-css` 的完整 GitHub 风正文排版，也**不会**获得 `github-dark.min.css` 里 **hljs 关键字配色**（高亮 DOM 里仍有 `hljs-*` class，只是没有对应颜色规则时多为默认前景色）。  
-   - **KaTeX 公式**若未引入 `katex.min.css` 及字体，可能出现排版异常或字体回退；聊天若公式少，有时不易察觉。
-
-4. **其它页面**  
-   - **`editor` / `document`** 在本仓库中**显式**写了 `import '@dnhyxc-ai/tools/styles.css'`，用于需要完整 Markdown + 代码高亮主题 + 公式的场景。
-
-**结论：** 聊天里「有样式」主要来自 **`index.css` 对聊天消息区域的定制**，而不是 tools 包的合并 CSS；若在新页面仅用 `MarkdownParser` 且没有复制这套全局规则，仍建议按需引入 `@dnhyxc-ai/tools/styles.css`（或分拆引入 `styles/github-markdown.css` 等）。
+聊天区若未全局引入 tools 的合并 CSS，仍可能依赖 **`apps/frontend/src/index.css`** 内对 `.markdown-body`、`.chat-md-code-block` 等的定制；与「完整 GitHub Markdown + KaTeX + hljs」并存时，以实际 import 为准。
 
 ---
 
-*路径与脚本名称以仓库 `packages/tools` 当前版本为准。*
+## 8. 常见问题
+
+**不 `import markdown-base.css` 也能用、样式也像生效？**  
+可以。`markdown-base.css` 只是把 **github-markdown-css + katex + 间距补丁**打成一份方便引用的包；**不是**解析器运行所必需。若项目里已有 **`styles.css` / `styles` 子路径其它文件**、或像本仓库 **`index.css` 里对 `#message-md-wrap .markdown-body`、`.chat-md-code-block` 等**的定制，再加上 **`highlightTheme` CDN 注入的 hljs**，视觉上往往已经够用。缺 `markdown-base` 时，差异主要在：**是否具备完整的 GitHub 风正文规则**、**KaTeX 专用字体与细节**是否与官方一致；无全局补全时，才更容易出现「只有结构、没有精致排版」或公式回退字体。
+
+**未 `import styles.css` 为何仍有部分样式？**  
+`MarkdownParser` 仍会输出带 class 的 DOM；宿主全局 CSS（如本仓库 `index.css`）与浏览器默认样式会让列表、代码块容器等「看起来有样式」。完整的 **hljs 配色**与 **KaTeX 字体**仍依赖对应 CSS 或 CDN/内联注入。
+
+**CDN 注入失败？**  
+检查网络、防火墙；离线场景改用 `highlightThemeCss` 或打包器 `import '*.css'`。
+
+**多个 `MarkdownParser` 实例、不同主题？**  
+注入节点全局唯一，后创建的实例会替换前一个主题；同一页多主题需 Shadow DOM 等额外方案，本包未内置。
+
+---
+
+## 9. `README.md`
+
+`packages/tools/README.md` 中部分片段已过时，**以本文档与 `src/` 源码为准**。
+
+---
+
+*文档与 `packages/tools` 当前实现对齐；升级 `highlight.js` 后请同步更新 `inject-highlight-theme.ts` 内 `HLJS_CDN_VERSION` 并重新执行 `build:css`。*
