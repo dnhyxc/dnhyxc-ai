@@ -1,28 +1,17 @@
-import { MarkdownParser } from '@dnhyxc-ai/tools';
 import '@dnhyxc-ai/tools/styles.css';
-import { Button } from '@ui/index';
 import { ScrollArea } from '@ui/scroll-area';
 import { config } from 'md-editor-rt';
 // import MarkdownParser from '@/utils/markdownParser';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import MarkdownEditor from '@/components/design/Monaco';
-import { CHAT_MARKDOWN_HIGHLIGHT_THEME } from '@/constant';
 import { useTheme } from '@/hooks';
 import useStore from '@/store';
 
 const Editor = () => {
 	const [markdown, setMarkdown] = useState('');
-	const [htmlContent, setHtmlContent] = useState('');
 
 	const { detailStore } = useStore();
 	const { theme } = useTheme();
-
-	// 1. 初始化解析器
-	const parser = useMemo(() => {
-		return new MarkdownParser({
-			highlightTheme: CHAT_MARKDOWN_HIGHLIGHT_THEME,
-		});
-	}, []);
 
 	const getValue = (value: string) => {
 		setMarkdown(value);
@@ -60,23 +49,12 @@ const Editor = () => {
 		},
 	});
 
-	const onParser = () => {
-		const htmlContent = parser.render(markdown);
-		console.log(htmlContent, 'htmlContent');
-		setHtmlContent(htmlContent);
-	};
-
 	return (
 		<div className="w-full h-full flex flex-col justify-center items-center m-0">
-			<ScrollArea className="w-full h-full overflow-y-auto p-2.5 pt-0 rounded-none">
-				<Button onClick={onParser}>解析 MD</Button>
-				<div
-					className="h-full w-full border border-[red]"
-					dangerouslySetInnerHTML={{ __html: htmlContent }}
-				/>
+			<ScrollArea className="w-full h-full overflow-y-auto p-5 pt-0 rounded-none">
 				<MarkdownEditor
 					className="w-full h-full"
-					height="calc(100vh - 161px)"
+					height="calc(100vh - 169px)"
 					theme={theme === 'black' ? 'vs-dark' : 'vs'}
 					onChange={getValue}
 				/>

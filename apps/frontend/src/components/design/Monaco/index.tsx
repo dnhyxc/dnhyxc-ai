@@ -42,16 +42,9 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	};
 
 	return (
-		<div
-			className={cn(
-				'rounded-md overflow-hidden bg-theme-background',
-				className,
-			)}
-		>
+		<div className={cn('rounded-md overflow-hidden bg-theme/5', className)}>
 			<div
-				className={cn(
-					'flex items-center gap-2 p-2 bg-theme-background border-b border-theme/10',
-				)}
+				className={cn('flex items-center gap-2 p-2 border-b border-theme/10')}
 			>
 				<div className="text-sm font-medium text-textcolor">{language}</div>
 			</div>
