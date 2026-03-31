@@ -130,7 +130,7 @@ const Home = () => {
 							}}
 						>
 							{/* 顶栏：品牌 + 主文案 + 操作（与入口同属一个欢迎模块） */}
-							<header className="relative z-10 shrink-0 border-b border-theme/5 px-3 pb-4 pt-4 sm:px-2 sm:pb-5 sm:pt-5 md:px-6 md:pt-6">
+							<header className="relative z-10 shrink-0 px-3 pb-4 pt-4 sm:px-2 sm:pb-5 sm:pt-5 md:px-6 md:pt-6 bg-theme-white/4 border-b border-theme/3">
 								<div className="flex flex-col gap-5">
 									<div className="min-w-0 flex-1">
 										<motion.div
