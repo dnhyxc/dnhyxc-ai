@@ -129,15 +129,6 @@ const Home = () => {
 								fontFamily: '"Noto Sans SC", system-ui, sans-serif',
 							}}
 						>
-							<div
-								className="pointer-events-none absolute inset-0 opacity-[0.18] mix-blend-overlay"
-								style={{
-									// backgroundImage: NOISE_BG,
-									backgroundAttachment: 'fixed',
-								}}
-								aria-hidden
-							/>
-
 							{/* 顶栏：品牌 + 主文案 + 操作（与入口同属一个欢迎模块） */}
 							<header className="relative z-10 shrink-0 border-b border-theme/5 px-3 pb-4 pt-4 sm:px-2 sm:pb-5 sm:pt-5 md:px-6 md:pt-6">
 								<div className="flex flex-col gap-5">
@@ -225,7 +216,7 @@ const Home = () => {
 											duration: 0.45,
 											ease: [0.22, 1, 0.36, 1],
 										}}
-										whileHover={{ y: -3 }}
+										// whileHover={{ y: -3 }}
 										whileTap={{ scale: 0.99 }}
 										onClick={feature.onClick}
 										className={`group relative flex min-h-0 cursor-pointer flex-col overflow-hidden bg-theme-white/4 p-4 transition-colors duration-300 md:p-5 lg:p-6 ${feature.hoverBg}`}
@@ -275,14 +266,6 @@ const Home = () => {
 					{/* 下方内容在 ScrollArea 内滚动 */}
 					<div className="relative mx-auto w-full max-w-6xl space-y-5 px-3 pt-3 sm:px-5">
 						<div className="relative overflow-hidden rounded-md bg-linear-to-br from-theme-white/5 to-theme-white/5 p-6 backdrop-blur-xl ">
-							<div
-								className="pointer-events-none absolute inset-0 opacity-[0.18] mix-blend-overlay"
-								style={{
-									// backgroundImage: NOISE_BG,
-									backgroundAttachment: 'fixed',
-								}}
-								aria-hidden
-							/>
 							<motion.h3
 								initial={{ opacity: 0, y: 16 }}
 								whileInView={{ opacity: 1, y: 0 }}
@@ -327,14 +310,6 @@ const Home = () => {
 							transition={{ duration: 0.4 }}
 							className="relative mb-5 overflow-hidden rounded-md bg-linear-to-br from-theme-white/5 to-theme-white/5 p-6 backdrop-blur-xl"
 						>
-							<div
-								className="pointer-events-none absolute inset-0 opacity-[0.18] mix-blend-overlay"
-								style={{
-									// backgroundImage: NOISE_BG,
-									backgroundAttachment: 'fixed',
-								}}
-								aria-hidden
-							/>
 							<div className="pointer-events-none absolute right-0 top-0 h-32 w-32 rounded-full bg-linear-to-br from-teal-500/12 to-transparent blur-3xl" />
 							<h3
 								className="relative z-10 mb-6 text-xl font-semibold text-textcolor"
