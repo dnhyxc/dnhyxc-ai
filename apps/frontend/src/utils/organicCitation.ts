@@ -102,6 +102,62 @@ export function resolveSearchOrganicFromCitationAnchor(
 	return organics.find((o) => urlsMatchForOrganic(href.trim(), o.link.trim()));
 }
 
+function anchorRectsHitPoint(
+	a: HTMLAnchorElement,
+	x: number,
+	y: number,
+	pad: number,
+): boolean {
+	const br = a.getBoundingClientRect();
+	const rects =
+		br.width > 0.5 && br.height > 0.5
+			? [br]
+			: a.getClientRects().length > 0
+				? Array.from(a.getClientRects())
+				: [br];
+	for (const r of rects) {
+		if (
+			x >= r.left - pad &&
+			x <= r.right + pad &&
+			y >= r.top - pad &&
+			y <= r.bottom + pad
+		) {
+			return true;
+		}
+	}
+	return false;
+}
+
+/**
+ * a 被 pointer-events:none 时 target 不会是 <a>，用指针坐标在 root 内命中 Serper 引用角标。
+ */
+export function findOrganicCitationAnchorAtPoint(
+	root: HTMLElement,
+	organics: SearchOrganicItem[],
+	clientX: number,
+	clientY: number,
+): HTMLAnchorElement | null {
+	if (!organics.length) return null;
+	const pad = 4;
+	const candidates: HTMLAnchorElement[] = [];
+	for (const node of root.querySelectorAll('a')) {
+		const a = node as HTMLAnchorElement;
+		if (a.closest('pre')) continue;
+		if (!resolveSearchOrganicFromCitationAnchor(a, organics)) continue;
+		if (!root.contains(a)) continue;
+		if (anchorRectsHitPoint(a, clientX, clientY, pad)) {
+			candidates.push(a);
+		}
+	}
+	if (candidates.length === 0) return null;
+	if (candidates.length === 1) return candidates[0];
+	return candidates.reduce((best, cur) => {
+		const br = best.getBoundingClientRect();
+		const cr = cur.getBoundingClientRect();
+		return cr.width * cr.height <= br.width * br.height ? cur : best;
+	});
+}
+
 /**
  * 从事件目标向上查找：位于 root 内、且能对应到 searchOrganic 的引用 <a>。
  * 不依赖 __md-search-organic__（Markdown 可能剥掉 class）；兼容 target 为文本节点。

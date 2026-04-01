@@ -26,6 +26,7 @@ import { openExternalUrl } from '@/utils/open-external';
 import {
 	applyOrganicCitationAnchors,
 	findClosestOrganicCitationAnchor,
+	findOrganicCitationAnchorAtPoint,
 	resolveSearchOrganicFromCitationAnchor,
 } from '@/utils/organicCitation';
 import SearchOrganics from './SearchOrganics';
@@ -172,7 +173,15 @@ function ChatAssistantMessageInner({
 		}
 
 		const applyIfCitation = (e: PointerEvent) => {
-			const a = findClosestOrganicCitationAnchor(e.target, root, organics);
+			let a = findClosestOrganicCitationAnchor(e.target, root, organics);
+			if (!a) {
+				a = findOrganicCitationAnchorAtPoint(
+					root,
+					organics,
+					e.clientX,
+					e.clientY,
+				);
+			}
 			if (!a) return;
 			const item = resolveSearchOrganicFromCitationAnchor(a, organics);
 			if (!item) return;

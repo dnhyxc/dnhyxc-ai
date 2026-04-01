@@ -60,6 +60,12 @@ body {
 				}
 			}
 		}
+
+		/* 助手气泡内：与上列 a 样式同源，禁止角标/正文链接响应点击（避免 WebView 内跳转） */
+		[data-chat-assistant-shell] .markdown-body a {
+			pointer-events: none !important;
+			cursor: default !important;
+		}
 	}
 
 	#__session-item-title__ {
