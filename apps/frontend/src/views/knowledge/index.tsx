@@ -222,6 +222,17 @@ const Knowledge = () => {
 		[editingKnowledgeId, resetEditorToNewDraft],
 	);
 
+	/** 仅当删除的是当前正在编辑的条目时才清空标题与正文（本地文件删成功后的回调） */
+	const handleAfterLocalDelete = useCallback(
+		(deletedKnowledgeId: string) => {
+			if (!deletedKnowledgeId) return;
+			if (editingKnowledgeId === deletedKnowledgeId) {
+				resetEditorToNewDraft();
+			}
+		},
+		[editingKnowledgeId, resetEditorToNewDraft],
+	);
+
 	const overwriteFileName =
 		overwriteTargetPath.split(/[/\\]/).filter(Boolean).pop() ??
 		overwriteTargetPath;
@@ -281,7 +292,7 @@ const Knowledge = () => {
 				open={listOpen}
 				onOpenChange={setListOpen}
 				currentTitle={title}
-				onAfterLocalDelete={resetEditorToNewDraft}
+				onAfterLocalDelete={handleAfterLocalDelete}
 				onDeletedRecord={handleDeletedRecord}
 				onPick={handlePickRecord}
 			/>

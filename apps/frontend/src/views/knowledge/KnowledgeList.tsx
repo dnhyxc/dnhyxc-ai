@@ -23,8 +23,8 @@ interface IProps {
 	onPick?: (record: KnowledgeRecord) => void | Promise<void>;
 	/** 当前编辑区标题（Tauri 下用于「删除本地文件」） */
 	currentTitle?: string;
-	/** 本地文件删除成功后清空编辑区等 */
-	onAfterLocalDelete?: () => void;
+	/** 本地文件删除成功；参数为被删条目的 id，由调用方决定是否清空编辑器 */
+	onAfterLocalDelete?: (deletedKnowledgeId: string) => void;
 	/** 数据库记录删除成功后回调（用于当前正在编辑的条目被删时清空编辑器） */
 	onDeletedRecord?: (id: string) => void;
 }
@@ -193,7 +193,7 @@ const KnowledgeList: React.FC<IProps> = observer(
 					});
 					setDeleteLocalOpen(false);
 					setDeleteLocalPath('');
-					onAfterLocalDelete?.();
+					onAfterLocalDelete?.(selectKnowledge?.id ?? '');
 					setSelectKnowledge(null);
 				} else {
 					Toast({
