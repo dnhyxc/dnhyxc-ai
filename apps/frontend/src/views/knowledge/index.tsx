@@ -19,6 +19,61 @@ import {
 import { TAURI_KNOWLEDGE_DIR } from './constants';
 import KnowledgeList from './KnowledgeList';
 
+const EDITOR_HEIGHT = 'calc(100vh - 172px)';
+
+type StoredUserInfo = { username?: unknown; id?: unknown } | null;
+
+function readUserInfoFromStorage(): StoredUserInfo {
+	const raw = getStorage('userInfo');
+	if (!raw) return null;
+	return JSON.parse(raw as string) as StoredUserInfo;
+}
+
+/** 与原先 persist 内联逻辑一致：仅有 username / id 时写入 author / authorId */
+function buildAuthorMeta(user: StoredUserInfo): {
+	author?: string;
+	authorId?: number;
+} {
+	if (!user || (user.username == null && user.id == null)) {
+		return {};
+	}
+	return {
+		...(user.username != null ? { author: user.username as string } : {}),
+		...(user.id != null ? { authorId: user.id as number } : {}),
+	};
+}
+
+/** 编辑器顶栏：知识库 / 草稿 / 保存 */
+function KnowledgeEditorToolbar(props: {
+	onOpenLibrary: () => void;
+	onNewDraft: () => void;
+	onSave: () => void;
+}) {
+	const { onOpenLibrary, onNewDraft, onSave } = props;
+	const linkBtn =
+		'flex items-center gap-1 px-0 has-[>svg]:px-0' as const;
+	return (
+		<div className="flex items-center pr-3 gap-4">
+			<Button
+				variant="link"
+				className={linkBtn}
+				onClick={onOpenLibrary}
+			>
+				<LibraryBig />
+				<span className="mt-0.5">知识库</span>
+			</Button>
+			<Button variant="link" className={linkBtn} onClick={onNewDraft}>
+				<Layers2 />
+				<span className="mt-0.5">草稿</span>
+			</Button>
+			<Button variant="link" className={linkBtn} onClick={onSave}>
+				<LayersPlus />
+				<span className="mt-0.5">保存</span>
+			</Button>
+		</div>
+	);
+}
+
 const Knowledge = () => {
 	const [title, setTitle] = useState('');
 	/** 正在编辑的云端知识库 id；为空表示新建 */
@@ -34,24 +89,26 @@ const Knowledge = () => {
 		useState<SaveKnowledgeMarkdownPayload | null>(null);
 
 	const [editorKey, setEditorKey] = useState(0);
-	const [open, setOpen] = useState(false);
+	const [listOpen, setListOpen] = useState(false);
 
-	const getValue = (value: string) => {
-		detailStore.setMarkdown(value);
-	};
+	const getUserInfo = useMemo(() => readUserInfoFromStorage(), []);
 
-	const onDraft = () => {
+	const monacoTheme = theme === 'black' ? 'vs-dark' : 'vs';
+
+	/** 清空标题与正文并 remount 编辑器（与原先四处内联一致） */
+	const resetEditorToNewDraft = useCallback(() => {
 		setEditingKnowledgeId(null);
 		setTitle('');
 		detailStore.setMarkdown('');
 		setEditorKey((k) => k + 1);
-	};
+	}, [detailStore]);
 
-	const getUserInfo = useMemo(() => {
-		return getStorage('userInfo')
-			? JSON.parse(getStorage('userInfo') as string)
-			: null;
-	}, []);
+	const handleMarkdownChange = useCallback(
+		(value: string) => {
+			detailStore.setMarkdown(value);
+		},
+		[detailStore],
+	);
 
 	const runTauriSave = useCallback(
 		async (payload: SaveKnowledgeMarkdownPayload) => {
@@ -76,17 +133,7 @@ const Knowledge = () => {
 		const markdown = detailStore.markdown ?? '';
 		const trimmedTitle = title.trim();
 		const base = { title: trimmedTitle, content: markdown };
-		const meta =
-			getUserInfo?.username != null || getUserInfo?.id != null
-				? {
-						...(getUserInfo?.username != null
-							? { author: getUserInfo.username as string }
-							: {}),
-						...(getUserInfo?.id != null
-							? { authorId: getUserInfo.id as number }
-							: {}),
-					}
-				: {};
+		const meta = buildAuthorMeta(getUserInfo);
 		if (editingKnowledgeId) {
 			await knowledgeStore.updateItem(editingKnowledgeId, { ...base, ...meta });
 		} else {
@@ -153,6 +200,33 @@ const Knowledge = () => {
 		}
 	}, [pendingSavePayload, persistKnowledgeApi, runTauriSave]);
 
+	const handleOverwriteOpenChange = useCallback((open: boolean) => {
+		setOverwriteOpen(open);
+		if (!open) {
+			setPendingSavePayload(null);
+			setOverwriteTargetPath('');
+		}
+	}, []);
+
+	const handlePickRecord = useCallback(
+		(record: KnowledgeRecord) => {
+			setEditingKnowledgeId(record.id);
+			setTitle(record.title ?? '');
+			detailStore.setMarkdown(record.content ?? '');
+			setEditorKey((k) => k + 1);
+		},
+		[detailStore],
+	);
+
+	const handleDeletedRecord = useCallback(
+		(id: string) => {
+			if (editingKnowledgeId === id) {
+				resetEditorToNewDraft();
+			}
+		},
+		[editingKnowledgeId, resetEditorToNewDraft],
+	);
+
 	const overwriteFileName =
 		overwriteTargetPath.split(/[/\\]/).filter(Boolean).pop() ??
 		overwriteTargetPath;
@@ -161,13 +235,7 @@ const Knowledge = () => {
 		<div className="w-full h-full flex flex-col justify-center items-center m-0">
 			<Confirm
 				open={overwriteOpen}
-				onOpenChange={(open) => {
-					setOverwriteOpen(open);
-					if (!open) {
-						setPendingSavePayload(null);
-						setOverwriteTargetPath('');
-					}
-				}}
+				onOpenChange={handleOverwriteOpenChange}
 				title="覆盖已有文件？"
 				description={
 					<>
@@ -189,37 +257,16 @@ const Knowledge = () => {
 				<MarkdownEditor
 					key={editorKey}
 					className="w-full h-full"
-					height="calc(100vh - 172px)"
-					theme={theme === 'black' ? 'vs-dark' : 'vs'}
+					height={EDITOR_HEIGHT}
+					theme={monacoTheme}
 					value={detailStore.markdown}
-					onChange={getValue}
+					onChange={handleMarkdownChange}
 					toolbar={
-						<div className="flex items-center pr-3 gap-4">
-							<Button
-								variant="link"
-								className="flex items-center gap-1 px-0 has-[>svg]:px-0"
-								onClick={() => setOpen(true)}
-							>
-								<LibraryBig />
-								<span className="mt-0.5">知识库</span>
-							</Button>
-							<Button
-								variant="link"
-								className="flex items-center gap-1 px-0 has-[>svg]:px-0"
-								onClick={onDraft}
-							>
-								<Layers2 />
-								<span className="mt-0.5">草稿</span>
-							</Button>
-							<Button
-								variant="link"
-								className="flex items-center gap-1 px-0 has-[>svg]:px-0"
-								onClick={onSave}
-							>
-								<LayersPlus />
-								<span className="mt-0.5">保存</span>
-							</Button>
-						</div>
+						<KnowledgeEditorToolbar
+							onOpenLibrary={() => setListOpen(true)}
+							onNewDraft={resetEditorToNewDraft}
+							onSave={onSave}
+						/>
 					}
 					title={
 						<div className="flex flex-1 items-center pl-3">
@@ -236,29 +283,12 @@ const Knowledge = () => {
 				/>
 			</ScrollArea>
 			<KnowledgeList
-				open={open}
-				onOpenChange={setOpen}
+				open={listOpen}
+				onOpenChange={setListOpen}
 				currentTitle={title}
-				onAfterLocalDelete={() => {
-					setEditingKnowledgeId(null);
-					setTitle('');
-					detailStore.setMarkdown('');
-					setEditorKey((k) => k + 1);
-				}}
-				onDeletedRecord={(id) => {
-					if (editingKnowledgeId === id) {
-						setEditingKnowledgeId(null);
-						setTitle('');
-						detailStore.setMarkdown('');
-						setEditorKey((k) => k + 1);
-					}
-				}}
-				onPick={(record) => {
-					setEditingKnowledgeId(record.id);
-					setTitle(record.title ?? '');
-					detailStore.setMarkdown(record.content ?? '');
-					setEditorKey((k) => k + 1);
-				}}
+				onAfterLocalDelete={resetEditorToNewDraft}
+				onDeletedRecord={handleDeletedRecord}
+				onPick={handlePickRecord}
 			/>
 		</div>
 	);
