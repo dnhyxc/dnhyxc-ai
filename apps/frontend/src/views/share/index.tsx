@@ -3,6 +3,7 @@ import { useParams } from 'react-router';
 import ChatAssistantMessage from '@/components/design/ChatAssistantMessage';
 import ChatFileList from '@/components/design/ChatFileList';
 import ChatUserMessage from '@/components/design/ChatUserMessage';
+import { useTheme } from '@/hooks';
 import { cn } from '@/lib/utils';
 import { getShare } from '@/service';
 
@@ -47,6 +48,8 @@ export interface Message {
 
 const SessionShare = () => {
 	const params = useParams();
+	// 分享路由不在 Layout 内，需自行初始化主题（含 URL ?theme= 与本地 store）
+	useTheme();
 
 	const [chatData, setChatData] = useState<Session>();
 
@@ -65,7 +68,7 @@ const SessionShare = () => {
 	};
 
 	return (
-		<div className="bg-black/80 pt-10">
+		<div className="min-h-screen bg-theme-background pt-10">
 			<div
 				className={cn(
 					'max-w-3xl mx-auto relative flex flex-col h-full w-full select-none',

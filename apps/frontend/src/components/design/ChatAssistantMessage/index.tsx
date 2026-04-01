@@ -360,14 +360,14 @@ function ChatAssistantMessageInner({
 						dangerouslySetInnerHTML={{
 							__html: parser.render(message.thinkContent),
 						}}
-						className={cn(className)}
+						className={cn(`[&_.markdown-body]:text-textcolor/90!`, className)}
 					/>
 				) : null}
 			</div>
 			<div
 				ref={bodyMarkdownRef}
 				dangerouslySetInnerHTML={{ __html: parser.render(bodyText) }}
-				className={cn(className)}
+				className={cn(`[&_.markdown-body]:text-textcolor/90!`, className)}
 			/>
 			{message.isStreaming && (
 				<div className="mt-2.5 flex items-center">

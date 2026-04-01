@@ -3,9 +3,15 @@ import { Button, Spinner, Toast } from '@ui/index';
 import { CheckCircle, Copy } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router';
+import {
+	appendShareThemeQuery,
+	THEMES,
+	type ThemeName,
+	useTheme,
+} from '@/hooks/theme';
 import { createShare } from '@/service';
 import { ShareInfo } from '@/types';
-import { copyToClipboard } from '@/utils';
+import { copyToClipboard, getValue } from '@/utils';
 
 interface ShareProps {
 	open: boolean;
@@ -22,6 +28,7 @@ const Share: React.FC<ShareProps> = ({
 	const [copied, setCopied] = useState(false);
 	const [loading, setLoading] = useState(false);
 
+	const { theme } = useTheme();
 	const params = useParams();
 
 	const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -42,7 +49,7 @@ const Share: React.FC<ShareProps> = ({
 				baseUrl?: string;
 			} = {
 				chatSessionId,
-				baseUrl: 'http://localhost:9226',
+				baseUrl: 'http://localhost:9002', // http://localhost:9226
 			};
 			if (checkedMessages.size) {
 				data.messageIds = [...checkedMessages];
@@ -50,8 +57,14 @@ const Share: React.FC<ShareProps> = ({
 			const res = await createShare(data);
 			setLoading(false);
 			if (res.success) {
-				setShareInfo(res.data);
-				onCopy(res.data.shareUrl);
+				// 以 store 为准，避免 useTheme 异步未完成时主题仍是默认值
+				const stored = (await getValue('themeType')) as ThemeName;
+				const themeName = THEMES.some((t) => t.name === stored)
+					? stored
+					: theme;
+				const shareUrl = appendShareThemeQuery(res.data.shareUrl, themeName);
+				setShareInfo({ ...res.data, shareUrl });
+				onCopy(shareUrl);
 			} else {
 				Toast({
 					type: 'error',
@@ -59,7 +72,7 @@ const Share: React.FC<ShareProps> = ({
 				});
 			}
 		}
-	}, [params?.id, checkedMessages]);
+	}, [params?.id, checkedMessages, theme]);
 
 	const onCopy = async (shareUrl: string) => {
 		try {

@@ -16,11 +16,57 @@ export const THEMES = [
 
 export type ThemeName = (typeof THEMES)[number]['name'];
 
+/** 从查询串解析主题名（用于分享页等在浏览器中还原壳内主题） */
+export function parseThemeFromSearch(search: string): ThemeName | null {
+	const params = new URLSearchParams(
+		search.startsWith('?') ? search : `?${search}`,
+	);
+	const raw = params.get('theme') || params.get('themeType');
+	if (!raw) {
+		return null;
+	}
+	const item = THEMES.find((t) => t.name === raw);
+	return item ? (item.name as ThemeName) : null;
+}
+
+/**
+ * 为分享链接追加 theme 查询参数（独立浏览器打开时可读到与 Tauri 一致的主题）
+ * @param url 后端返回的绝对或相对 URL
+ * @param themeName 当前配色主题名
+ */
+export function appendShareThemeQuery(
+	url: string,
+	themeName: ThemeName,
+): string {
+	try {
+		const base =
+			typeof window !== 'undefined'
+				? window.location.origin
+				: 'http://localhost';
+		const u = new URL(url, url.startsWith('http') ? undefined : base);
+		u.searchParams.set('theme', themeName);
+		return u.toString();
+	} catch {
+		const sep = url.includes('?') ? '&' : '?';
+		return `${url}${sep}theme=${encodeURIComponent(themeName)}`;
+	}
+}
+
 export const useTheme = () => {
 	const [theme, setTheme] = useState<ThemeName>('white');
 
 	useEffect(() => {
 		const initTheme = async () => {
+			// URL 优先：从 Tauri 复制出的分享链接带 ?theme=，浏览器无 store 也能对齐
+			if (typeof window !== 'undefined') {
+				const fromUrl = parseThemeFromSearch(window.location.search);
+				if (fromUrl) {
+					setTheme(fromUrl);
+					setThemeClass(fromUrl);
+					return;
+				}
+			}
+
 			const themeType = (await getValue('themeType')) as ThemeName;
 
 			const themeItem = THEMES.find((t) => t.name === themeType);
