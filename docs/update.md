@@ -1736,7 +1736,7 @@ cd apps/frontend && pnpm exec tsc --noEmit
 ### 11.1 功能目标（产品行为）
 
 1. **引用角标**：联网回答里正文会出现引用序号（链接到检索结果）。用户悬停时应看到与「联网搜索结果」抽屉里**同类信息**（序号、日期、标题、摘要），且不因 Markdown 剥掉 `class` 而失效，有时候后端返回的 a 标签没有携带 `__md-search-organic__` 类名。  
-2. **气泡定位**：采用 **`clientX/clientY` + 视口夹紧**，通过 `createPortal` 将气泡渲染到 `body` 上，避免依赖锚点 `getBoundingClientRect` 与 `translate(-100%)` 带来的首帧错位、innerHTML 替换后旧锚点 `rect` 为 0 等问题。  
+2. **气泡定位**：早期采用 **`clientX/clientY` + 视口夹紧**；后续迭代改为 **角标 `getBoundingClientRect()` 快照 + 上下方 `top`/`bottom` 布局 + 动态 `maxHeight`**，解决跟手抖、同名角标跑偏与「上方虚高」等问题；详见 **§11.9**。仍通过 `createPortal` 挂到 `document.body`，避免聊天区域 `overflow` 裁剪。  
 3. **流式结束滚底**：`isStreaming` 变为 `false` 后，助手气泡会多出仅在非流式下展示的区块（如底部「N 个网页」、免责声明）；原先 RO/MO 只在流式中为真时挂载，结束后会卸掉，导致**不再自动跟底**。在**用户仍处于跟底模式（`autoScroll`）且已打开联网开关**时，补一次与「进会话滚底」同款的 `onScrollTo('down', 'auto')`。  
 4. **后端一致**：落库/流式前对正文做的引用替换与前端 `applyOrganicCitationAnchors` 使用相同 `<a>` 属性，便于前后端与提示词对齐。
 
@@ -1938,4 +1938,109 @@ cd apps/frontend && pnpm exec tsc --noEmit
 
 ---
 
-**文档维护**：若后续改为「按本条消息是否含 `searchOrganic`」而非全局开关来决定补滚底，需同步改 **11.4.3** 条件与 **11.5/11.6** 文案。
+### 11.9 联网引用悬停气泡：定位与命中迭代（相对 §11.3 早期 `clientX/clientY` 方案）
+
+**与上文关系**：§**11.3.1**（`clampOrganicPopoverToViewport`）、§**11.3.2**（`organicPreview` 为 `{ item, clientX, clientY }`）、§**11.3.6**（`applyIfCitation` 每次写入指针坐标）、§**11.3.9** / §**11.3.14**（仅 `left/top`、类名含 `max-h-[min(280px,70vh)]`）等描述**已被本节替代**；§11.2 `organicCitation` 中除 **`findOrganicCitationAnchorAtPoint` 多候选策略** 外仍与 §11.2 表一致。其它小节（抽屉、`SearchOrganics`、流式结束贴底、后端 `serper.service.ts`）不变。
+
+**本轮涉及路径**：
+
+| 路径 | 变更角色 |
+|------|----------|
+| `apps/frontend/src/components/design/ChatAssistantMessage/index.tsx` | 预览状态结构、`layoutOrganicPopoverForAnchor`、`organicPreviewAnchorRef`、Portal 的 `style`（`top`/`bottom`/`maxHeight`） |
+| `apps/frontend/src/utils/organicCitation.ts` | `pointToOrganicAnchorDistSq`（新增）、`findOrganicCitationAnchorAtPoint` 多候选时选最近角标 |
+
+---
+
+#### 11.9.1 产品 / 交互影响面
+
+| 范围 | 说明 |
+|------|------|
+| **生效场景** | 仅当消息带 `searchOrganic`、用户将指针悬停在正文内由 `applyOrganicCitationAnchors` 生成的引用 `<a>`（或 `pointer-events` 异常时由坐标回退命中）上。 |
+| **不变** | `SearchOrganics` 抽屉、顶部/底部「N 个网页」入口、流式结束联网补滚底（§11.4）、`document` 上 `pointerdown` / `Escape` 关闭预览、`bodyText` 变化时关闭预览等。 |
+| **用户可感知变化** | 气泡相对角标**稳定**（不随 `pointermove` 微抖）；正文**多处相同序号** `[n]` 时气泡跟**当前那颗角标**；**视口边缘**时不再出现整块被错误抬到角标上方很远；多角标 `pad` 重叠时更倾向**离指针最近**的那颗。 |
+
+---
+
+#### 11.9.2 是否可能导致其它问题（风险与边界）
+
+| 点 | 说明 |
+|----|------|
+| **上下侧选择规则** | `preferBelow = spaceBelow >= spaceAbove`（`spaceBelow` / `spaceAbove` 为相对视口 `margin` 与 `gap` 后的剩余空间）。角标紧贴视口底或顶时，可能长期落在「下方」或「上方」一侧；极端情况依赖 **`maxHeight` 收缩 + `overflow-y-auto`**，内容过长时在气泡内滚动。 |
+| **`maxHeight` 下限** | 计算中使用 `Math.max(80, …)` 与 `maxPopH = min(280, round(vh*0.7))` 的较小值再与可用空间取 `min`。若角标距视口边缘的可用高度 **小于 80px**，仍可能感到略挤，属有意保留可读高度的权衡。 |
+| **位置快照与时效** | 打开预览时写入的是角标 **`getBoundingClientRect()` 数值快照**（`OrganicAnchorRect`）。当前策略仍在 **scroll（capture）/ resize** 时 **`closeOrganicPreviewNow`**，一般不出现「滚动后气泡与角标脱节仍不关」；若将来改为滚动中保持打开，需**额外**在滚动时重算 rect 或改定位策略。 |
+| **`organicPreviewAnchorRef` 与 DOM 重建** | `bodyText` / `innerHTML` 更新会先关闭预览；正常路径下不会在「旧节点已卸、ref 仍指向幽灵」的状态下长期展示。 |
+| **同 `SearchOrganicItem.position` 的语义** | 仍用 `item.position`（与 organic 列表下标对应）参与「同一条目」判断，但**与 `organicPreviewAnchorRef.current === a` 组合**：同一序号、**不同 DOM 角标**会触发重新快照，避免气泡钉死在第一次出现的 `[n]` 上。 |
+| **`findOrganicCitationAnchorAtPoint` 行为变化** | 多候选时由「面积最小」改为「到角标可见矩形距离最小，平局再比面积」。在极罕见「距离完全相等」时仍可能与旧版选不同节点；整体更符合「指针下最近角标」预期。 |
+
+---
+
+#### 11.9.3 `ChatAssistantMessage/index.tsx` 代码明细
+
+**类型与模块级函数**
+
+| 位置 | 符号 / 代码 | 作用 |
+|------|-------------|------|
+| L34–L38 | `OrganicAnchorRect` | 从 `DOMRect` 抽取 `left/top/right/bottom/width/height` 数值，避免状态里挂 `DOMRect` 引用。 |
+| L40–L50 | `snapshotOrganicAnchorRect(el)` | 打开或切换预览时对当前 `<a>` 拍快照。 |
+| L52–L54 | `ORGANIC_POPOVER_MAX_H`、`ORGANIC_POPOVER_MAX_VH_RATIO` | 与原先 Tailwind `max-h-[min(280px,70vh)]` 量级对齐，用于计算 `maxPopH`。 |
+| L56–L101 | `layoutOrganicPopoverForAnchor(anchorRect)` | **横向**：`left` 与预估宽度 `estW` 在 `[margin, innerWidth-margin]` 内夹紧。**纵向**：若 `spaceBelow >= spaceAbove`，`top = anchorRect.bottom + gap`，`bottom: 'auto'`，`maxHeight = max(80, min(maxPopH, vh - margin - top))`；否则 **`bottom = vh - anchorRect.top + gap`**（弹层底边贴视口上侧、与角标上沿留 `gap`），`top: 'auto'`，`maxHeight` 受角标上方可用空间限制。**不再**使用「`top = anchorRect.top - 280 - 8`」这类按虚构全高反推的写法。 |
+
+**组件内 ref / state**
+
+| 位置 | 符号 | 作用 |
+|------|------|------|
+| L130–L131 | `organicPreviewAnchorRef` | 当前预览绑定的 `HTMLAnchorElement`；与 `prev.item.position` 一起决定是否可 `return prev` 跳过 `setState`。 |
+| L134–L138 | `organicPreview` | `{ item, anchorRect } \| null`；**不再**存 `clientX/clientY`。 |
+
+**关闭路径与 ref 清理**
+
+| 位置 | 代码 | 作用 |
+|------|------|------|
+| L194–L197 | `closeOrganicPreviewNow` | 清定时器、`organicPreviewAnchorRef.current = null`、`setOrganicPreview(null)`。 |
+| L200–L205 | `scheduleHideOrganicPreview` 内 `setTimeout` | 延迟关闭时同样置空 `organicPreviewAnchorRef`，避免下次打开残留旧锚点引用。 |
+| L265–L267 | `useEffect` cleanup | 解绑监听时置空 `organicPreviewAnchorRef`。 |
+
+**正文指针 `useEffect`（L214–L272）**
+
+| 位置 | 代码 | 作用 |
+|------|------|------|
+| L222–L231 | `applyIfCitation` 内 `findClosestOrganicCitationAnchor` → `findOrganicCitationAnchorAtPoint` | 与 §11.2 一致：先事件目标向上找 `<a>`，失败再用坐标 + `pad` 命中（供 `pointer-events` 异常等）。 |
+| L236–L246 | `setOrganicPreview` 函数式更新 | 若 `prev.item.position === item.position` **且** `organicPreviewAnchorRef.current === a`，则 `return prev`（避免同一角标上 `pointermove` 反复 setState）；否则 `organicPreviewAnchorRef.current = a` 并 `return { item, anchorRect: snapshotOrganicAnchorRect(a) }`。 |
+| L262–L264 | 仍绑定 `pointerover` / `pointermove` / `pointerout` | 行为语义更新为「位置由角标快照决定 + 同锚点去抖」，而非「每帧跟指针」。 |
+
+**`popoverPos`（`useMemo`）**
+
+| 位置 | 代码 | 作用 |
+|------|------|------|
+| L287–L290 | `layoutOrganicPopoverForAnchor(organicPreview.anchorRect)` | 由快照算 `left`、`top` 或 `bottom`、`maxHeight`。 |
+
+**Portal 气泡 JSX（L426–L438）**
+
+| 属性 | 说明 |
+|------|------|
+| `className` | **移除**固定 `max-h-[min(280px,70vh)]`，避免与行内 `maxHeight` 双轨；宽度类名等保留。 |
+| `style` | `left`、`top`、`bottom`、`maxHeight` 均来自 `popoverPos`；上方展示时 `top: 'auto'` + `bottom` 为像素值。 |
+
+---
+
+#### 11.9.4 `organicCitation.ts` 代码明细
+
+| 位置 | 符号 / 代码 | 作用 |
+|------|-------------|------|
+| L131–L156 | `pointToOrganicAnchorDistSq(a, x, y)` | 对 `getBoundingClientRect` / `getClientRects` 的每个矩形算指针到矩形的最短距离平方（矩形内为 0）。 |
+| L161–L193 | `findOrganicCitationAnchorAtPoint` 内 `reduce` | 候选数 > 1 时：**优先**比较 `pointToOrganicAnchorDistSq`；相等时再按 **面积较小** 打破平局（保留原有一类 tie-break 习惯）。 |
+
+---
+
+#### 11.9.5 行为小结（迭代后）
+
+| 场景 | 预期 |
+|------|------|
+| 在同一颗引用角标上小幅移动鼠标 | `organicPreviewAnchorRef === a`，不重复 setState，气泡位置不变。 |
+| 从第一处 `[n]` 移到第二处 `[n]`（同 `position`、不同 `<a>`） | 更新 `anchorRect`，气泡跟第二颗角标。 |
+| 角标靠近视口下沿、下方空间小于上方 | `preferBelow` 为 false，用 `bottom` 锚定，短摘要贴近角标上沿，而非整块上浮到「虚高」。 |
+| 多个角标同时落入 `pad` 扩展命中区 | 选离指针几何距离最近的角标，减少气泡出现在远处角标旁的情况。 |
+
+---
+
+**文档维护**：若后续改为「按本条消息是否含 `searchOrganic`」而非全局开关来决定补滚底，需同步改 **11.4.3** 条件与 **11.5/11.6** 文案。若悬停气泡定位策略再变，请同步 **§11.1 点 2**、**§11.9** 及仍引用 `clientX/clientY` 的 **§11.3** 子节。

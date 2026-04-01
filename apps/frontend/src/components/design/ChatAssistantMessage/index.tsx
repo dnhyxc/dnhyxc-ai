@@ -31,29 +31,73 @@ import {
 } from '@/utils/organicCitation';
 import SearchOrganics from './SearchOrganics';
 
-/** 预估弹层尺寸，把 fixed 左上角夹在视口内（不依赖锚点 DOM 与气泡 ref） */
-function clampOrganicPopoverToViewport(
-	clientX: number,
-	clientY: number,
-): { left: number; top: number } {
+/** 角标矩形快照（仅存数值，避免持有 DOMRect 引用） */
+type OrganicAnchorRect = Pick<
+	DOMRect,
+	'left' | 'top' | 'right' | 'bottom' | 'width' | 'height'
+>;
+
+function snapshotOrganicAnchorRect(el: HTMLElement): OrganicAnchorRect {
+	const r = el.getBoundingClientRect();
+	return {
+		left: r.left,
+		top: r.top,
+		right: r.right,
+		bottom: r.bottom,
+		width: r.width,
+		height: r.height,
+	};
+}
+
+/** 与弹层 class 中 max-h-[min(280px,70vh)] 一致，用于算可用高度，避免用固定 280 推 top 导致短内容「悬在天上」 */
+const ORGANIC_POPOVER_MAX_H = 280;
+const ORGANIC_POPOVER_MAX_VH_RATIO = 0.7;
+
+/**
+ * 按角标定位：优先在角标下方用 top；空间不够时在上方用 bottom 贴住角标上沿（不用虚构全高去减 top）。
+ */
+function layoutOrganicPopoverForAnchor(anchorRect: OrganicAnchorRect): {
+	left: number;
+	top: number | 'auto';
+	bottom: number | 'auto';
+	maxHeight: number;
+} {
 	const margin = 10;
+	const gap = 8;
+	const vh = window.innerHeight;
 	const estW = Math.min(352, window.innerWidth - 2 * margin);
-	const estH = 280;
-	let left = clientX + 12;
-	let top = clientY + 12;
+	const maxPopH = Math.min(
+		ORGANIC_POPOVER_MAX_H,
+		Math.round(vh * ORGANIC_POPOVER_MAX_VH_RATIO),
+	);
+
+	let left = anchorRect.left;
 	if (left + estW > window.innerWidth - margin) {
 		left = window.innerWidth - estW - margin;
-	}
-	if (top + estH > window.innerHeight - margin) {
-		top = window.innerHeight - estH - margin;
 	}
 	if (left < margin) {
 		left = margin;
 	}
-	if (top < margin) {
-		top = margin;
+
+	const spaceBelow = vh - margin - anchorRect.bottom - gap;
+	const spaceAbove = anchorRect.top - gap - margin;
+	const preferBelow = spaceBelow >= spaceAbove;
+
+	if (preferBelow) {
+		const top = anchorRect.bottom + gap;
+		const maxHeight = Math.max(
+			80,
+			Math.min(maxPopH, vh - margin - top),
+		);
+		return { left, top, bottom: 'auto', maxHeight };
 	}
-	return { left, top };
+
+	const bottom = vh - anchorRect.top + gap;
+	const maxHeight = Math.max(
+		80,
+		Math.min(maxPopH, anchorRect.top - gap - margin),
+	);
+	return { left, top: 'auto', bottom, maxHeight };
 }
 
 interface AssistantMessageProps {
@@ -83,13 +127,14 @@ function ChatAssistantMessageInner({
 	const shellRef = useRef<HTMLDivElement>(null);
 	const bodyMarkdownRef = useRef<HTMLDivElement>(null);
 	const previewBubbleRef = useRef<HTMLDivElement>(null);
+	/** 与当前预览绑定的角标节点；同 position 多出处时需区分，否则会沿用旧 rect 导致气泡跑偏 */
+	const organicPreviewAnchorRef = useRef<HTMLAnchorElement | null>(null);
 	const previewLeaveTimerRef = useRef(0);
 	const [open, setOpen] = useState(false);
-	/** 跟随指针位置展示，避免锚点 rect / Portal ref / translate(-100%) 导致闪烁与卡死 */
+	/** 按角标矩形定位；同一条引用在 pointermove 内不重复 setState，避免气泡跟手抖 */
 	const [organicPreview, setOrganicPreview] = useState<{
 		item: SearchOrganicItem;
-		clientX: number;
-		clientY: number;
+		anchorRect: OrganicAnchorRect;
 	} | null>(null);
 
 	const parser = useMemo(
@@ -148,12 +193,14 @@ function ChatAssistantMessageInner({
 
 	const closeOrganicPreviewNow = useCallback(() => {
 		clearOrganicPreviewLeaveTimer();
+		organicPreviewAnchorRef.current = null;
 		setOrganicPreview(null);
 	}, [clearOrganicPreviewLeaveTimer]);
 
 	const scheduleHideOrganicPreview = () => {
 		clearOrganicPreviewLeaveTimer();
 		previewLeaveTimerRef.current = window.setTimeout(() => {
+			organicPreviewAnchorRef.current = null;
 			setOrganicPreview(null);
 		}, 180);
 	};
@@ -186,10 +233,16 @@ function ChatAssistantMessageInner({
 			const item = resolveSearchOrganicFromCitationAnchor(a, organics);
 			if (!item) return;
 			clearOrganicPreviewLeaveTimer();
-			setOrganicPreview({
-				item,
-				clientX: e.clientX,
-				clientY: e.clientY,
+			setOrganicPreview((prev) => {
+				if (
+					prev &&
+					prev.item.position === item.position &&
+					organicPreviewAnchorRef.current === a
+				) {
+					return prev;
+				}
+				organicPreviewAnchorRef.current = a;
+				return { item, anchorRect: snapshotOrganicAnchorRect(a) };
 			});
 		};
 
@@ -211,6 +264,7 @@ function ChatAssistantMessageInner({
 		root.addEventListener('pointerout', onPointerOut);
 		return () => {
 			clearOrganicPreviewLeaveTimer();
+			organicPreviewAnchorRef.current = null;
 			root.removeEventListener('pointerover', applyIfCitation);
 			root.removeEventListener('pointermove', applyIfCitation);
 			root.removeEventListener('pointerout', onPointerOut);
@@ -232,10 +286,7 @@ function ChatAssistantMessageInner({
 
 	const popoverPos = useMemo(() => {
 		if (!organicPreview) return null;
-		return clampOrganicPopoverToViewport(
-			organicPreview.clientX,
-			organicPreview.clientY,
-		);
+		return layoutOrganicPopoverForAnchor(organicPreview.anchorRect);
 	}, [organicPreview]);
 
 	useEffect(() => {
@@ -378,10 +429,12 @@ function ChatAssistantMessageInner({
 					<div
 						ref={previewBubbleRef}
 						role="tooltip"
-						className="pointer-events-auto cursor-pointer fixed z-10050 max-h-[min(280px,70vh)] w-[min(22rem,calc(100vw-1.5rem))] overflow-y-auto rounded-lg border border-theme-white/10 bg-theme-background/95 p-3 text-left shadow-lg backdrop-blur-md"
+						className="pointer-events-auto cursor-pointer fixed z-10050 w-[min(22rem,calc(100vw-1.5rem))] overflow-y-auto rounded-lg border border-theme-white/10 bg-theme-background/95 p-3 text-left shadow-lg backdrop-blur-md"
 						style={{
 							left: popoverPos.left,
 							top: popoverPos.top,
+							bottom: popoverPos.bottom,
+							maxHeight: popoverPos.maxHeight,
 						}}
 						onPointerDown={(e) => e.stopPropagation()}
 						onPointerEnter={clearOrganicPreviewLeaveTimer}

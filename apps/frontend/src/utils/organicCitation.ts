@@ -128,6 +128,33 @@ function anchorRectsHitPoint(
 	return false;
 }
 
+/** 指针到角标可见矩形的最短距离平方（在矩形内为 0），用于多角标同时落在 pad 内时选最近者 */
+function pointToOrganicAnchorDistSq(
+	a: HTMLAnchorElement,
+	x: number,
+	y: number,
+): number {
+	const br = a.getBoundingClientRect();
+	const rects =
+		br.width > 0.5 && br.height > 0.5
+			? [br]
+			: a.getClientRects().length > 0
+				? Array.from(a.getClientRects())
+				: [br];
+	let min = Infinity;
+	for (const r of rects) {
+		const cx = Math.max(r.left, Math.min(x, r.right));
+		const cy = Math.max(r.top, Math.min(y, r.bottom));
+		const dx = x - cx;
+		const dy = y - cy;
+		const d = dx * dx + dy * dy;
+		if (d < min) {
+			min = d;
+		}
+	}
+	return min;
+}
+
 /**
  * a 被 pointer-events:none 时 target 不会是 <a>，用指针坐标在 root 内命中 Serper 引用角标。
  */
@@ -152,6 +179,14 @@ export function findOrganicCitationAnchorAtPoint(
 	if (candidates.length === 0) return null;
 	if (candidates.length === 1) return candidates[0];
 	return candidates.reduce((best, cur) => {
+		const db = pointToOrganicAnchorDistSq(best, clientX, clientY);
+		const dc = pointToOrganicAnchorDistSq(cur, clientX, clientY);
+		if (dc < db) {
+			return cur;
+		}
+		if (dc > db) {
+			return best;
+		}
 		const br = best.getBoundingClientRect();
 		const cr = cur.getBoundingClientRect();
 		return cr.width * cr.height <= br.width * br.height ? cur : best;
