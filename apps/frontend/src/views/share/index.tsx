@@ -1,3 +1,4 @@
+import { ScrollArea } from '@ui/index';
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router';
 import ChatAssistantMessage from '@/components/design/ChatAssistantMessage';
@@ -6,7 +7,6 @@ import ChatUserMessage from '@/components/design/ChatUserMessage';
 import { useTheme } from '@/hooks';
 import { cn } from '@/lib/utils';
 import { getShare } from '@/service';
-import { ScrollArea } from '@ui/index';
 
 export interface Session {
 	id: string;
