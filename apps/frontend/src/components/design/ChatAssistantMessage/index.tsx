@@ -85,10 +85,7 @@ function layoutOrganicPopoverForAnchor(anchorRect: OrganicAnchorRect): {
 
 	if (preferBelow) {
 		const top = anchorRect.bottom + gap;
-		const maxHeight = Math.max(
-			80,
-			Math.min(maxPopH, vh - margin - top),
-		);
+		const maxHeight = Math.max(80, Math.min(maxPopH, vh - margin - top));
 		return { left, top, bottom: 'auto', maxHeight };
 	}
 
