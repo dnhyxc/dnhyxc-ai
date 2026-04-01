@@ -40,12 +40,55 @@ function formatTime(iso?: string): string {
 	}
 }
 
+/** 单行：点击打开详情；垃圾桶仅触发删除流程（冒泡已阻止） */
+function KnowledgeListRow(props: {
+	item: KnowledgeListItem;
+	onActivate: (item: KnowledgeListItem) => void;
+	onTrashClick: (e: React.MouseEvent, item: KnowledgeListItem) => void;
+}) {
+	const { item, onActivate, onTrashClick } = props;
+
+	const onKeyDown = (e: React.KeyboardEvent) => {
+		if (e.key === 'Enter' || e.key === ' ') {
+			e.preventDefault();
+			void onActivate(item);
+		}
+	};
+
+	return (
+		<div
+			role="button"
+			tabIndex={0}
+			onClick={() => void onActivate(item)}
+			onKeyDown={onKeyDown}
+			className="w-full cursor-pointer overflow-hidden flex flex-col gap-1 hover:bg-theme/10 p-2 rounded-md group"
+		>
+			<div className="flex items-start justify-between gap-2">
+				<div className="flow-root flex-1 min-w-0 font-medium">
+					{item.title?.trim() || '未命名'}
+				</div>
+				<button
+					type="button"
+					aria-label="从知识库删除"
+					className="cursor-pointer shrink-0 p-1 rounded-md text-textcolor/50 hover:text-destructive hover:bg-destructive/10 opacity-70 group-hover:opacity-100"
+					onClick={(e) => onTrashClick(e, item)}
+				>
+					<Trash2 size={16} />
+				</button>
+			</div>
+			<div className="text-xs text-textcolor/50">
+				更新 {formatTime(item.updatedAt)}
+			</div>
+		</div>
+	);
+}
+
 const KnowledgeList: React.FC<IProps> = observer(
 	({
 		open,
 		onOpenChange,
 		onPick,
-		currentTitle = '',
+		currentTitle: _currentTitle = '',
 		onAfterLocalDelete,
 		onDeletedRecord,
 	}) => {
@@ -62,42 +105,49 @@ const KnowledgeList: React.FC<IProps> = observer(
 			}
 		}, [open, knowledgeStore]);
 
-		const handleRowClick = async (item: KnowledgeListItem) => {
-			const detail = await knowledgeStore.fetchDetail(item.id);
-			if (!detail) {
-				Toast({
-					type: 'error',
-					title: '加载失败',
-					message: '无法获取该条详情',
-				});
-				return;
-			}
-			await onPick?.(detail);
-			onOpenChange(false);
-		};
+		const handleRowClick = useCallback(
+			async (item: KnowledgeListItem) => {
+				const detail = await knowledgeStore.fetchDetail(item.id);
+				if (!detail) {
+					Toast({
+						type: 'error',
+						title: '加载失败',
+						message: '无法获取该条详情',
+					});
+					return;
+				}
+				await onPick?.(detail);
+				onOpenChange(false);
+			},
+			[knowledgeStore, onPick, onOpenChange],
+		);
 
-		/** 列表行删除：调用后端 DELETE 删除数据库记录，再更新本地列表 */
-		const handleDeleteApi = async (item: KnowledgeListItem) => {
-			const res = await deleteKnowledge(item.id);
-			if (!res.success) {
-				Toast({
-					type: 'error',
-					title: '删除失败',
-					message: res.message || '请稍后重试',
-				});
-				return;
-			}
-			knowledgeStore.removeFromLocalList(item.id);
-			onDeletedRecord?.(item.id);
-		};
+		const handleDeleteApi = useCallback(
+			async (item: KnowledgeListItem) => {
+				const res = await deleteKnowledge(item.id);
+				if (!res.success) {
+					Toast({
+						type: 'error',
+						title: '删除失败',
+						message: res.message || '请稍后重试',
+					});
+					return;
+				}
+				knowledgeStore.removeFromLocalList(item.id);
+				onDeletedRecord?.(item.id);
+			},
+			[knowledgeStore, onDeletedRecord],
+		);
 
-		const onDeleteLocalByTitle = useCallback(
+		/** 解析 Tauri 本地路径并弹出「删除本地文件」确认框 */
+		const openDeleteLocalConfirm = useCallback(
 			async (knowledge: KnowledgeListItem) => {
 				if (!isTauriRuntime()) {
-					return Toast({
+					Toast({
 						type: 'warning',
 						title: '删除本地文件仅在桌面端可用',
 					});
+					return;
 				}
 				try {
 					const target = await invokeResolveKnowledgeMarkdownTarget({
@@ -106,11 +156,12 @@ const KnowledgeList: React.FC<IProps> = observer(
 						filePath: TAURI_KNOWLEDGE_DIR,
 					});
 					if (!target.exists) {
-						return Toast({
+						Toast({
 							type: 'warning',
 							title: '未找到对应文件',
 							message: '当前标题在指定目录下没有已保存的 Markdown 文件',
 						});
+						return;
 					}
 					setDeleteLocalPath(target.path);
 					setDeleteLocalOpen(true);
@@ -121,9 +172,10 @@ const KnowledgeList: React.FC<IProps> = observer(
 					});
 				}
 			},
-			[currentTitle],
+			[],
 		);
 
+		/** 确认删除：先删数据库记录（若有选中项），再删本地 Markdown */
 		const onConfirmDeleteLocal = useCallback(async () => {
 			try {
 				if (selectKnowledge) {
@@ -156,19 +208,24 @@ const KnowledgeList: React.FC<IProps> = observer(
 					title: formatTauriInvokeError(e),
 				});
 			}
-		}, [currentTitle, onAfterLocalDelete, selectKnowledge]);
+		}, [handleDeleteApi, onAfterLocalDelete, selectKnowledge]);
 
-		const onDelete = async (
-			e: React.MouseEvent,
-			knowledge: Omit<KnowledgeRecord, 'content'>,
-		) => {
-			e.stopPropagation();
-			setSelectKnowledge(knowledge);
-			await onDeleteLocalByTitle(knowledge);
-		};
+		const onTrashClick = useCallback(
+			async (e: React.MouseEvent, knowledge: KnowledgeListItem) => {
+				e.stopPropagation();
+				setSelectKnowledge(knowledge);
+				await openDeleteLocalConfirm(knowledge);
+			},
+			[openDeleteLocalConfirm],
+		);
 
 		const deleteLocalFileName =
 			deleteLocalPath.split(/[/\\]/).filter(Boolean).pop() ?? deleteLocalPath;
+
+		const { loading, loadingMore, list } = knowledgeStore;
+		const showInitialPlaceholder = loading && list.length === 0;
+		const showLoadMoreHint = loadingMore;
+		const showEmptyHint = !loading && list.length === 0 && !loadingMore;
 
 		return (
 			<>
@@ -200,51 +257,25 @@ const KnowledgeList: React.FC<IProps> = observer(
 						onScroll={knowledgeStore.onListViewportScroll}
 					>
 						<div className="flex flex-col gap-2">
-							{knowledgeStore.loading && knowledgeStore.list.length === 0 ? (
+							{showInitialPlaceholder ? (
 								<div className="text-sm text-textcolor/60 py-6 text-center">
 									加载中…
 								</div>
 							) : null}
-							{knowledgeStore.list.map((knowledge) => (
-								<div
+							{list.map((knowledge) => (
+								<KnowledgeListRow
 									key={knowledge.id}
-									role="button"
-									tabIndex={0}
-									onClick={() => void handleRowClick(knowledge)}
-									onKeyDown={(e) => {
-										if (e.key === 'Enter' || e.key === ' ') {
-											e.preventDefault();
-											void handleRowClick(knowledge);
-										}
-									}}
-									className="w-full cursor-pointer overflow-hidden flex flex-col gap-1 hover:bg-theme/10 p-2 rounded-md group"
-								>
-									<div className="flex items-start justify-between gap-2">
-										<div className="flow-root flex-1 min-w-0 font-medium">
-											{knowledge.title?.trim() || '未命名'}
-										</div>
-										<button
-											type="button"
-											aria-label="从知识库删除"
-											className="cursor-pointer shrink-0 p-1 rounded-md text-textcolor/50 hover:text-destructive hover:bg-destructive/10 opacity-70 group-hover:opacity-100"
-											onClick={(e) => onDelete(e, knowledge)}
-										>
-											<Trash2 size={16} />
-										</button>
-									</div>
-									<div className="text-xs text-textcolor/50">
-										更新 {formatTime(knowledge.updatedAt)}
-									</div>
-								</div>
+									item={knowledge}
+									onActivate={handleRowClick}
+									onTrashClick={onTrashClick}
+								/>
 							))}
-							{knowledgeStore.loadingMore ? (
+							{showLoadMoreHint ? (
 								<div className="text-xs text-textcolor/50 py-2 text-center">
 									加载更多…
 								</div>
 							) : null}
-							{!knowledgeStore.loading &&
-							knowledgeStore.list.length === 0 &&
-							!knowledgeStore.loadingMore ? (
+							{showEmptyHint ? (
 								<div className="text-sm text-textcolor/60 py-8 text-center">
 									暂无知识库条目
 								</div>
