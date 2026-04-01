@@ -2,26 +2,28 @@ import ChatTextArea from '@design/ChatTextArea';
 import { MarkdownParser } from '@dnhyxc-ai/tools';
 import { useMemo } from 'react';
 import { CHAT_MARKDOWN_HIGHLIGHT_THEME } from '@/constant';
+import { cn } from '@/lib/utils';
 import { UploadedFile } from '@/types';
 import { Message } from '@/types/chat';
 
 interface UserMessageProps {
 	message: Message;
-	editMessage: Message | null;
-	editInputRef: React.RefObject<HTMLTextAreaElement | null>;
-	input: string;
-	setInput: (value: string) => void;
-	setEditMessage: (message: Message | null) => void;
-	isLoading: boolean;
-	handleEditChange: (
+	editMessage?: Message | null;
+	editInputRef?: React.RefObject<HTMLTextAreaElement | null>;
+	input?: string;
+	setInput?: (value: string) => void;
+	setEditMessage?: (message: Message | null) => void;
+	isLoading?: boolean;
+	handleEditChange?: (
 		e: React.ChangeEvent<HTMLTextAreaElement> | string,
 	) => void;
-	sendMessage: (
+	sendMessage?: (
 		content?: string,
 		index?: number,
 		isEdit?: boolean,
 		attachments?: UploadedFile[] | null,
 	) => void;
+	className?: string;
 }
 
 const ChatUserMessage = ({
@@ -34,6 +36,7 @@ const ChatUserMessage = ({
 	isLoading,
 	handleEditChange,
 	sendMessage,
+	className,
 }: UserMessageProps) => {
 	const isEditing = editMessage?.chatId === message.chatId;
 
@@ -61,7 +64,10 @@ const ChatUserMessage = ({
 				/>
 			) : (
 				<div
-					className="max-w-none text-left [&_.markdown-body]:text-textcolor/90!"
+					className={cn(
+						`max-w-none text-left [&_.markdown-body]:text-textcolor/90!`,
+						className,
+					)}
 					dangerouslySetInnerHTML={{
 						__html: parser.render(message.content),
 					}}

@@ -17,6 +17,7 @@ import {
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { CHAT_MARKDOWN_HIGHLIGHT_THEME } from '@/constant';
+import { cn } from '@/lib/utils';
 import { Message, SearchOrganicItem } from '@/types/chat';
 import {
 	downloadChatCodeBlock,
@@ -99,9 +100,9 @@ function layoutOrganicPopoverForAnchor(anchorRect: OrganicAnchorRect): {
 
 interface AssistantMessageProps {
 	message: Message;
-	isShowThinkContent: boolean;
-	onToggleThinkContent: () => void;
-	onContinue: () => void;
+	isShowThinkContent?: boolean;
+	onToggleThinkContent?: () => void;
+	onContinue?: () => void;
 	onContinueAnswering?: (message?: Message) => void;
 	isStopped?: boolean;
 	/**
@@ -109,6 +110,7 @@ interface AssistantMessageProps {
 	 * 有值：启用「进视口才挂 MdPreview」；无值：保持旧行为，始终富文本（兼容其它调用方）。
 	 */
 	scrollViewportRef?: React.RefObject<HTMLElement | null>;
+	className?: string;
 }
 
 function ChatAssistantMessageInner({
@@ -119,6 +121,7 @@ function ChatAssistantMessageInner({
 	onContinueAnswering,
 	isStopped,
 	// scrollViewportRef,
+	className,
 }: AssistantMessageProps) {
 	// 挂在外层 div，作为 IntersectionObserver 的 observe 目标，覆盖整条助手气泡
 	const shellRef = useRef<HTMLDivElement>(null);
@@ -269,6 +272,7 @@ function ChatAssistantMessageInner({
 	}, [message.searchOrganic, bodyText, clearOrganicPreviewLeaveTimer]);
 
 	const prevBodyTextRef = useRef(bodyText);
+
 	useEffect(() => {
 		if (prevBodyTextRef.current === bodyText) return;
 		prevBodyTextRef.current = bodyText;
@@ -356,12 +360,14 @@ function ChatAssistantMessageInner({
 						dangerouslySetInnerHTML={{
 							__html: parser.render(message.thinkContent),
 						}}
+						className={cn(className)}
 					/>
 				) : null}
 			</div>
 			<div
 				ref={bodyMarkdownRef}
 				dangerouslySetInnerHTML={{ __html: parser.render(bodyText) }}
+				className={cn(className)}
 			/>
 			{message.isStreaming && (
 				<div className="mt-2.5 flex items-center">

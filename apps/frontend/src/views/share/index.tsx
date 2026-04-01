@@ -1,0 +1,118 @@
+import { useEffect, useState } from 'react';
+import { useParams } from 'react-router';
+import ChatAssistantMessage from '@/components/design/ChatAssistantMessage';
+import ChatFileList from '@/components/design/ChatFileList';
+import ChatUserMessage from '@/components/design/ChatUserMessage';
+import { cn } from '@/lib/utils';
+import { getShare } from '@/service';
+
+export interface Session {
+	id: string;
+	content: string;
+	role: string;
+	isActive: boolean;
+	createdAt: Date;
+	updatedAt: Date;
+	messages: Message[];
+	title: string;
+}
+
+export interface UploadedFile {
+	id: string;
+	uuid: string;
+	filename: string;
+	mimetype: string;
+	originalname: string;
+	path: string;
+	size: number;
+}
+
+export interface Message {
+	chatId: string;
+	content: string;
+	role: 'user' | 'assistant';
+	timestamp: Date;
+	id?: string;
+	createdAt?: Date;
+	attachments?: UploadedFile[] | null;
+	thinkContent?: string;
+	isStreaming?: boolean;
+	isStopped?: boolean;
+	parentId?: string;
+	childrenIds?: string[];
+	siblingIndex?: number;
+	siblingCount?: number;
+	currentChatId?: string;
+}
+
+const SessionShare = () => {
+	const params = useParams();
+
+	const [chatData, setChatData] = useState<Session>();
+
+	useEffect(() => {
+		if (params?.shareId) {
+			getShareData(params.shareId);
+		}
+	}, [params?.shareId]);
+
+	const getShareData = async (id: string) => {
+		const res = await getShare<Session>(id);
+		console.log(res.data, 'ssssssres');
+		if (res.success) {
+			setChatData(res.data);
+		}
+	};
+
+	return (
+		<div className="bg-black/80 pt-10">
+			<div
+				className={cn(
+					'max-w-3xl mx-auto relative flex flex-col h-full w-full select-none',
+				)}
+			>
+				{chatData?.messages.map((message) => (
+					<div
+						key={message.id}
+						className={cn(
+							'relative flex-1 flex flex-col gap-1 pb-10 w-full group',
+							message.role === 'user' ? 'items-end' : '',
+						)}
+					>
+						{!!message.attachments?.length && (
+							<div className="flex flex-wrap justify-end gap-1.5 mb-2">
+								{message.role === 'user'
+									? message.attachments.map((i) => (
+											<ChatFileList
+												key={i.id || i.uuid}
+												data={i}
+												showDownload
+											/>
+										))
+									: null}
+							</div>
+						)}
+						<div
+							id="message-md-wrap"
+							className={cn(
+								'flex-1 rounded-md p-3 select-auto',
+								'flex-1 rounded-md p-3 select-auto text-textcolor',
+								message.role === 'user'
+									? 'bg-blue-500/10 border border-blue-500/20 text-end pt-2 pb-2.5 px-3'
+									: 'bg-theme/5 border border-theme/20',
+							)}
+						>
+							{message.role === 'user' ? (
+								<ChatUserMessage message={message} />
+							) : (
+								<ChatAssistantMessage message={message} />
+							)}
+						</div>
+					</div>
+				))}
+			</div>
+		</div>
+	);
+};
+
+export default SessionShare;

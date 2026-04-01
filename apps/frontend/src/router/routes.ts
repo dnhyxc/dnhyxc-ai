@@ -18,6 +18,7 @@ import Setting from '@/views/setting';
 import AboutApp from '@/views/setting/about';
 import AppSystem from '@/views/setting/system';
 import ThemeSetting from '@/views/setting/theme';
+import Share from '@/views/share';
 import Skill from '@/views/skill';
 import ChildWindow from '@/views/win';
 
@@ -175,6 +176,10 @@ const routes: RouteConfig[] = [
 	{
 		path: '/about',
 		Component: About,
+	},
+	{
+		path: '/share/:shareId',
+		Component: Share,
 	},
 	{
 		path: '*',

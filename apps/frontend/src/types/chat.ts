@@ -295,10 +295,10 @@ export interface CreateUserMessageParams {
 
 export interface InsertNewlineParams {
 	e: React.KeyboardEvent<HTMLTextAreaElement>;
-	editMessage: Message | null;
-	input: string;
-	setEditInputValue: (value: string) => void;
-	setInputValue: (value: string) => void;
+	editMessage?: Message | null;
+	input?: string;
+	setEditInputValue?: (value: string) => void;
+	setInputValue?: (value: string) => void;
 	isEdit?: boolean;
 	textareaNode?: HTMLTextAreaElement;
 }

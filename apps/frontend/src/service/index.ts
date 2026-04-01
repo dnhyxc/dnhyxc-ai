@@ -11,6 +11,7 @@ import {
 	DOWNLOAD_ZIP_FILE,
 	GET_SESSION,
 	GET_SESSION_LIST,
+	GET_SHARE,
 	GET_UPLOAD_TOKEN,
 	GET_USER_PROFILE,
 	GET_USERS,
@@ -304,4 +305,10 @@ export const createShare = async (params: {
 		messageIds: params.messageIds,
 		baseUrl: params.baseUrl,
 	});
+};
+
+// 获取会话分享数据
+export const getShare = async <T>(shareId: string) => {
+	const res = await http.get<T>(`${GET_SHARE}/${shareId}`);
+	return res;
 };

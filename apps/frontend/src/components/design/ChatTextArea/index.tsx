@@ -7,17 +7,17 @@ import { Message } from '@/types/chat'; // 根据实际路径调整
 
 interface ChatTextAreaProps {
 	// 状态
-	input: string;
-	setInput: (val: string) => void;
-	editMessage: Message | null;
-	setEditMessage: (msg: Message | null) => void;
-	loading: boolean;
+	input?: string;
+	setInput?: (val: string) => void;
+	editMessage?: Message | null;
+	setEditMessage?: (msg: Message | null) => void;
+	loading?: boolean;
 
 	// 回调
-	handleEditChange: (
+	handleEditChange?: (
 		e: React.ChangeEvent<HTMLTextAreaElement> | string,
 	) => void;
-	sendMessage: (
+	sendMessage?: (
 		content?: string,
 		index?: number,
 		isEdit?: boolean,
@@ -25,7 +25,7 @@ interface ChatTextAreaProps {
 	) => void;
 
 	// 模式：'chat' (底部输入框) | 'edit' (消息编辑模式)
-	mode: 'chat' | 'edit';
+	mode?: 'chat' | 'edit';
 
 	// 样式
 	className?: string;
@@ -87,7 +87,7 @@ const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 					ref={ref}
 					value={value}
 					onChange={
-						isEditMode ? handleEditChange : (e) => setInput(e.target.value)
+						isEditMode ? handleEditChange : (e) => setInput?.(e.target.value)
 					}
 					onKeyDown={(e) =>
 						handleKeyDown(e, isEditMode ? editMessage : null, onScrollTo)
@@ -102,13 +102,13 @@ const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 
 				{isEditMode && (
 					<div className="flex justify-end gap-2 mt-2">
-						<Button variant="secondary" onClick={() => setEditMessage(null)}>
+						<Button variant="secondary" onClick={() => setEditMessage?.(null)}>
 							取消
 						</Button>
 						<Button
 							variant="secondary"
 							onClick={() =>
-								sendMessage(
+								sendMessage?.(
 									editMessage?.content || undefined,
 									undefined,
 									true,
