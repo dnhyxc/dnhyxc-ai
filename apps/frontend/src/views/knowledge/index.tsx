@@ -252,7 +252,7 @@ const Knowledge = () => {
 					theme={theme === 'black' ? 'vs-dark' : 'vs'}
 					onChange={getValue}
 					toolbar={
-						<div className="flex items-center pr-3 gap-4 mr-3">
+						<div className="flex items-center pr-3 gap-4">
 							<Button
 								variant="link"
 								className="flex items-center gap-1 px-0 has-[>svg]:px-0"

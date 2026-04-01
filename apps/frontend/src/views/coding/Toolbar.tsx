@@ -43,13 +43,13 @@ const Toolbar: React.FC<ToolbarProps> = ({
 	};
 
 	return (
-		<div className="flex justify-between gap-2 items-center text-textcolor rounded-t-md p-2 border-b border-theme/5">
+		<div className="h-11 flex justify-between gap-2 items-center rounded-t-md px-3 border-b border-theme/5">
 			<div className="flex gap-2 items-center">
 				<DropdownMenu>
 					<DropdownMenuTrigger asChild>
-						<Button className="bg-transparent hover:bg-transparent bg-linear-to-r from-blue-600 to-cyan-600">
+						<Button className="bg-transparent hover:bg-transparent hover:text-cyan-500 px-0 has-[>svg]:px-0">
 							<PackagePlus />
-							选择模版
+							<span className="mt-0.5">选择模版</span>
 						</Button>
 					</DropdownMenuTrigger>
 					<DropdownMenuContent
@@ -94,10 +94,10 @@ const Toolbar: React.FC<ToolbarProps> = ({
 				<Button
 					onClick={handleRun}
 					disabled={sandpack.status !== 'running'}
-					className="bg-transparent hover:bg-transparent bg-linear-to-r from-blue-600 to-cyan-600"
+					className="bg-transparent hover:bg-transparent hover:text-cyan-500 disabled:hover:text-default ml-2 px-0 has-[>svg]:px-0"
 				>
-					<RotateCw />
-					强制刷新
+					<RotateCw className="mt-0.5" />
+					<span className="mt-0.5">强制刷新</span>
 				</Button>
 			</div>
 			<div className="text-theme/90 font-medium">
