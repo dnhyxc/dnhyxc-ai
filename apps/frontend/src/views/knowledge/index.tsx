@@ -50,15 +50,10 @@ function KnowledgeEditorToolbar(props: {
 	onSave: () => void;
 }) {
 	const { onOpenLibrary, onNewDraft, onSave } = props;
-	const linkBtn =
-		'flex items-center gap-1 px-0 has-[>svg]:px-0' as const;
+	const linkBtn = 'flex items-center gap-1 px-0 has-[>svg]:px-0' as const;
 	return (
 		<div className="flex items-center pr-3 gap-4">
-			<Button
-				variant="link"
-				className={linkBtn}
-				onClick={onOpenLibrary}
-			>
+			<Button variant="link" className={linkBtn} onClick={onOpenLibrary}>
 				<LibraryBig />
 				<span className="mt-0.5">知识库</span>
 			</Button>
