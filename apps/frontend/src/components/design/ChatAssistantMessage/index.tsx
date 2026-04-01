@@ -22,6 +22,7 @@ import {
 	downloadChatCodeBlock,
 	getChatCodeBlockPlainText,
 } from '@/utils/chatCodeToolbar';
+import { openExternalUrl } from '@/utils/open-external';
 import {
 	applyOrganicCitationAnchors,
 	findClosestOrganicCitationAnchor,
@@ -155,6 +156,12 @@ function ChatAssistantMessageInner({
 			setOrganicPreview(null);
 		}, 180);
 	};
+
+	// 点击预览气泡，在新标签页中打开链接
+	const onClickOrganicPreview = useCallback(() => {
+		if (!organicPreview) return;
+		void openExternalUrl(organicPreview.item.link);
+	}, [organicPreview]);
 
 	// 正文内 Serper 引用：悬停/在链接上移动时跟随指针展示摘要（不量锚点）
 	useEffect(() => {
@@ -370,6 +377,7 @@ function ChatAssistantMessageInner({
 						onPointerDown={(e) => e.stopPropagation()}
 						onPointerEnter={clearOrganicPreviewLeaveTimer}
 						onPointerLeave={scheduleHideOrganicPreview}
+						onClick={onClickOrganicPreview}
 					>
 						{/* 与 SearchOrganics 列表项排版、字号一致 */}
 						<div className="flex flex-col gap-2">
