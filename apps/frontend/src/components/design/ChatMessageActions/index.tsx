@@ -24,15 +24,16 @@ interface MessageActionsProps {
 	/** 当前已复制成功的消息ID */
 	isCopyedId: string;
 	/** 当前会话是否正在加载 */
-	isLoading: boolean;
+	isLoading?: boolean;
+	needShare?: boolean;
 	/** 分支切换回调 */
-	onBranchChange: (msgId: string, direction: 'prev' | 'next') => void;
+	onBranchChange?: (msgId: string, direction: 'prev' | 'next') => void;
 	/** 复制回调 */
-	onCopy: (content: string, chatId: string) => void;
+	onCopy?: (content: string, chatId: string) => void;
 	/** 编辑回调 */
-	onEdit: (message: Message) => void;
+	onEdit?: (message: Message) => void;
 	/** 重新生成回调 */
-	onReGenerate: (index: number) => void;
+	onReGenerate?: (index: number) => void;
 	onShare?: (message: Message) => void;
 	isSharing?: boolean;
 	checkedMessages?: Set<string>;
@@ -66,6 +67,7 @@ export const MessageActions = ({
 	isSharing,
 	checkedMessages,
 	setCheckedMessage,
+	needShare = true,
 }: MessageActionsProps) => {
 	// 是否有多个兄弟节点（分支）
 	const hasSiblings = (message.siblingCount || 0) > 1;
@@ -93,9 +95,12 @@ export const MessageActions = ({
 
 	return (
 		<div
-			className={`absolute bottom-2 right-2 h-5 w-fit flex items-center ${
-				message.role === 'user' ? 'justify-end' : 'left-2'
-			}`}
+			className={cn(
+				'absolute bottom-2 flex h-5 w-fit items-center',
+				message.role === 'user'
+					? 'right-2 justify-end'
+					: 'left-2 justify-start',
+			)}
 		>
 			{isSharing && (
 				<div
@@ -134,7 +139,7 @@ export const MessageActions = ({
 						)}
 						onClick={() => {
 							if (canPrev) {
-								onBranchChange(message.chatId, 'prev');
+								onBranchChange?.(message.chatId, 'prev');
 							}
 						}}
 					/>
@@ -154,7 +159,7 @@ export const MessageActions = ({
 						)}
 						onClick={() => {
 							if (canNext) {
-								onBranchChange(message.chatId, 'next');
+								onBranchChange?.(message.chatId, 'next');
 							}
 						}}
 					/>
@@ -174,7 +179,7 @@ export const MessageActions = ({
 							<Copy
 								size={16}
 								className="hover:text-textcolor"
-								onClick={() => onCopy(message.content, message.chatId)}
+								onClick={() => onCopy?.(message.content, message.chatId)}
 							/>
 						) : (
 							<div className="flex items-center justify-center text-green-400 rounded-full box-border">
@@ -184,20 +189,23 @@ export const MessageActions = ({
 					</div>
 
 					{/* 编辑按钮 - 仅用户消息显示 */}
-					{message.role === 'user' && !isLoading && !isSharing && (
+					{onEdit && message.role === 'user' && !isLoading && !isSharing && (
 						<div className="cursor-pointer hover:text-textcolor mt-0.5">
-							<PencilLine size={16} onClick={() => onEdit(message)} />
+							<PencilLine size={16} onClick={() => onEdit?.(message)} />
 						</div>
 					)}
 
 					{/* 重新生成按钮 - 仅助手消息显示 */}
-					{message.role !== 'user' && !isLoading && !isSharing && (
-						<div className="cursor-pointer hover:text-textcolor">
-							<RotateCw size={16} onClick={() => onReGenerate(index)} />
-						</div>
-					)}
+					{onReGenerate &&
+						message.role !== 'user' &&
+						!isLoading &&
+						!isSharing && (
+							<div className="cursor-pointer hover:text-textcolor">
+								<RotateCw size={16} onClick={() => onReGenerate?.(index)} />
+							</div>
+						)}
 
-					{message.role !== 'user' && !isLoading && !isSharing && (
+					{needShare && message.role !== 'user' && !isLoading && !isSharing && (
 						<div
 							className="cursor-pointer hover:text-textcolor"
 							title="分享此回答"

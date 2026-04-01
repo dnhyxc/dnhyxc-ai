@@ -1,8 +1,9 @@
 import { ScrollArea } from '@ui/index';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router';
 import ChatAssistantMessage from '@/components/design/ChatAssistantMessage';
 import ChatFileList from '@/components/design/ChatFileList';
+import ChatMessageActions from '@/components/design/ChatMessageActions';
 import ChatUserMessage from '@/components/design/ChatUserMessage';
 import { useTheme } from '@/hooks';
 import { cn } from '@/lib/utils';
@@ -48,6 +49,10 @@ export interface Message {
 }
 
 const SessionShare = () => {
+	const [isCopyedId, setIsCopyedId] = useState('');
+
+	const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
 	const params = useParams();
 	// 分享路由不在 Layout 内，需自行初始化主题（含 URL ?theme= 与本地 store）
 	useTheme();
@@ -60,11 +65,29 @@ const SessionShare = () => {
 		}
 	}, [params?.shareId]);
 
+	useEffect(() => {
+		return () => {
+			if (copyTimerRef.current) {
+				clearTimeout(copyTimerRef.current);
+				copyTimerRef.current = null;
+			}
+		};
+	}, []);
+
 	const getShareData = async (id: string) => {
 		const res = await getShare<Session>(id);
 		if (res.success) {
 			setChatData(res.data);
 		}
+	};
+
+	const onCopy = (content: string, chatId: string) => {
+		console.log(content, chatId);
+		navigator.clipboard.writeText(content);
+		setIsCopyedId(chatId);
+		copyTimerRef.current = setTimeout(() => {
+			setIsCopyedId('');
+		}, 500);
 	};
 
 	return (
@@ -73,10 +96,10 @@ const SessionShare = () => {
 			<ScrollArea className="min-h-0 flex-1" viewportClassName="pt-10 pb-8">
 				<div
 					className={cn(
-						'max-w-3xl mx-auto relative flex w-full flex-col select-none px-4',
+						'max-w-208 mx-auto relative flex w-full flex-col select-none px-4',
 					)}
 				>
-					{chatData?.messages.map((message) => (
+					{chatData?.messages.map((message, index) => (
 						<div
 							key={message.id}
 							className={cn(
@@ -100,7 +123,7 @@ const SessionShare = () => {
 							<div
 								id="message-md-wrap"
 								className={cn(
-									'flex-1 rounded-md p-3 select-auto text-textcolor',
+									'relative flex-1 rounded-md p-3 select-auto text-textcolor mb-5',
 									message.role === 'user'
 										? 'bg-blue-500/10 border border-blue-500/20 text-end pt-2 pb-2.5 px-3'
 										: 'bg-theme/5 border border-theme/20',
@@ -111,6 +134,22 @@ const SessionShare = () => {
 								) : (
 									<ChatAssistantMessage message={message} />
 								)}
+
+								<div
+									className={cn(
+										'absolute -bottom-9',
+										message.role === 'user' ? 'right-0' : 'left-0',
+									)}
+								>
+									<ChatMessageActions
+										message={message}
+										index={index}
+										isCopyedId={isCopyedId}
+										messagesLength={chatData?.messages.length || 0}
+										onCopy={onCopy}
+										needShare={false}
+									/>
+								</div>
 							</div>
 						</div>
 					))}
