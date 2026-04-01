@@ -61,7 +61,6 @@ const SessionShare = () => {
 
 	const getShareData = async (id: string) => {
 		const res = await getShare<Session>(id);
-		console.log(res.data, 'ssssssres');
 		if (res.success) {
 			setChatData(res.data);
 		}
