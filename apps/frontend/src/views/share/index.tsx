@@ -1,5 +1,6 @@
-import { ScrollArea } from '@ui/index';
-import { useEffect, useRef, useState } from 'react';
+import { Button, ScrollArea } from '@ui/index';
+import { ArrowDownToLine, ArrowUpToLine } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router';
 import ChatAssistantMessage from '@/components/design/ChatAssistantMessage';
 import ChatFileList from '@/components/design/ChatFileList';
@@ -8,6 +9,9 @@ import ChatUserMessage from '@/components/design/ChatUserMessage';
 import { useTheme } from '@/hooks';
 import { cn } from '@/lib/utils';
 import { getShare } from '@/service';
+
+/** 判定「已到底」允许的像素误差（避免子像素取整导致箭头来回跳） */
+const SCROLL_BOTTOM_THRESHOLD = 48;
 
 export interface Session {
 	id: string;
@@ -52,12 +56,30 @@ const SessionShare = () => {
 	const [isCopyedId, setIsCopyedId] = useState('');
 
 	const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const scrollViewportRef = useRef<HTMLDivElement>(null);
+
+	const [scrollMetrics, setScrollMetrics] = useState({
+		top: 0,
+		scrollHeight: 0,
+		clientHeight: 0,
+	});
 
 	const params = useParams();
-	// 分享路由不在 Layout 内，需自行初始化主题（含 URL ?theme= 与本地 store）
 	useTheme();
 
 	const [chatData, setChatData] = useState<Session>();
+
+	const syncScrollMetrics = useCallback(() => {
+		const el = scrollViewportRef.current;
+		if (!el) {
+			return;
+		}
+		setScrollMetrics({
+			top: el.scrollTop,
+			scrollHeight: el.scrollHeight,
+			clientHeight: el.clientHeight,
+		});
+	}, []);
 
 	useEffect(() => {
 		if (params?.shareId) {
@@ -74,6 +96,22 @@ const SessionShare = () => {
 		};
 	}, []);
 
+	useEffect(() => {
+		syncScrollMetrics();
+		const id = requestAnimationFrame(() => syncScrollMetrics());
+		return () => cancelAnimationFrame(id);
+	}, [chatData, syncScrollMetrics]);
+
+	useEffect(() => {
+		const el = scrollViewportRef.current;
+		if (!el) {
+			return;
+		}
+		const ro = new ResizeObserver(() => syncScrollMetrics());
+		ro.observe(el);
+		return () => ro.disconnect();
+	}, [syncScrollMetrics]);
+
 	const getShareData = async (id: string) => {
 		const res = await getShare<Session>(id);
 		if (res.success) {
@@ -82,7 +120,6 @@ const SessionShare = () => {
 	};
 
 	const onCopy = (content: string, chatId: string) => {
-		console.log(content, chatId);
 		navigator.clipboard.writeText(content);
 		setIsCopyedId(chatId);
 		copyTimerRef.current = setTimeout(() => {
@@ -90,10 +127,44 @@ const SessionShare = () => {
 		}, 500);
 	};
 
+	const scrollShareToTop = () => {
+		scrollViewportRef.current?.scrollTo({ top: 0, behavior: 'auto' });
+	};
+
+	const scrollShareToBottom = () => {
+		const el = scrollViewportRef.current;
+		if (!el) {
+			return;
+		}
+		el.scrollTo({ top: el.scrollHeight, behavior: 'auto' });
+	};
+
+	const { top: scrollTop, scrollHeight, clientHeight } = scrollMetrics;
+	const maxScroll = Math.max(0, scrollHeight - clientHeight);
+	const canScroll = maxScroll > 4;
+	const atBottom =
+		!canScroll ||
+		scrollTop + clientHeight >= scrollHeight - SCROLL_BOTTOM_THRESHOLD;
+
+	const onScrollFabClick = () => {
+		if (!canScroll) {
+			return;
+		}
+		if (atBottom) {
+			scrollShareToTop();
+		} else {
+			scrollShareToBottom();
+		}
+	};
+
 	return (
-		// ScrollArea 视口为 size-full，祖先必须固定高度（min-h-screen 会随内容变高 → 无法滚动）
-		<div className="flex h-dvh w-full flex-col overflow-hidden bg-theme-background">
-			<ScrollArea className="min-h-0 flex-1" viewportClassName="pt-10 pb-8">
+		<div className="relative flex h-dvh w-full flex-col overflow-hidden bg-theme-background">
+			<ScrollArea
+				ref={scrollViewportRef}
+				className="min-h-0 flex-1"
+				viewportClassName="pt-10 pb-1"
+				onScroll={syncScrollMetrics}
+			>
 				<div
 					className={cn(
 						'max-w-208 mx-auto relative flex w-full flex-col select-none px-4',
@@ -155,6 +226,27 @@ const SessionShare = () => {
 					))}
 				</div>
 			</ScrollArea>
+
+			{/* 单图标：未到底为下箭头（置底），到底后变为上箭头（回顶） */}
+			{canScroll ? (
+				<Button
+					title={atBottom ? '回到顶部' : '滚动到底部'}
+					aria-label={atBottom ? '滚动到顶部' : '滚动到底部'}
+					onClick={onScrollFabClick}
+					className={cn(
+						'fixed bottom-6 right-5 z-50 flex size-10 items-center justify-center rounded-full',
+						'border border-theme/20 bg-theme-background/95 text-textcolor/85 shadow-md backdrop-blur-sm',
+						'transition-colors hover:border-theme/50 hover:bg-theme/10 hover:text-textcolor',
+						'focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none',
+					)}
+				>
+					{atBottom ? (
+						<ArrowUpToLine className="size-5" strokeWidth={2} />
+					) : (
+						<ArrowDownToLine className="size-5" strokeWidth={2} />
+					)}
+				</Button>
+			) : null}
 		</div>
 	);
 };
