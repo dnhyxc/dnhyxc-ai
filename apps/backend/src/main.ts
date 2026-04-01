@@ -30,6 +30,8 @@ async function bootstrap() {
 		new ValidationPipe({
 			// 这里会对前端传递过来的没有在 DTO 中定义的字段全部过滤掉，生产要开启
 			whitelist: process.env.NODE_ENV !== 'development',
+			// 启用以应用 class-transformer（如 DTO 中 @Type(() => Number) 将 authorId 从字符串转为数字）
+			transform: true,
 		}),
 	);
 

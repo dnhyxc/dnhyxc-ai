@@ -1,13 +1,15 @@
+import Confirm from '@design/Confirm';
 import { ScrollArea } from '@ui/scroll-area';
 import { Toast } from '@ui/sonner';
 import { Layers2, LayersPlus, LibraryBig, ScrollText } from 'lucide-react';
-import { useCallback, useState } from 'react';
-import Confirm from '@design/Confirm';
+import { useCallback, useMemo, useState } from 'react';
 import MarkdownEditor from '@/components/design/Monaco';
 import { Button, Input } from '@/components/ui';
 import { useTheme } from '@/hooks';
 import { saveKnowledge } from '@/service';
 import useStore from '@/store';
+import { KnowledgeRecord } from '@/types';
+import { getStorage, isTauriRuntime } from '@/utils';
 import {
 	formatTauriInvokeError,
 	invokeDeleteKnowledgeMarkdown,
@@ -15,14 +17,12 @@ import {
 	invokeSaveKnowledgeMarkdown,
 	type SaveKnowledgeMarkdownPayload,
 } from '@/utils/knowledge-save';
-import { isTauriRuntime } from '@/utils/runtime';
 
-/** Tauri 下知识 Markdown 所在目录（保存 / 删除共用，与后端 `filePath` 语义一致） */
-const TAURI_KNOWLEDGE_DIR =
-	'/Users/dnhyxc/Documents/code/dnhyxc-ai/knowledge';
+/** Tauri 下知识 Markdown 所在目录（保存 / 删除共用） */
+const TAURI_KNOWLEDGE_DIR = '/Users/dnhyxc/Documents/code/dnhyxc-ai/knowledge';
 
 const Knowledge = () => {
-	const [, setMarkdown] = useState('');
+	const [content, setContent] = useState('');
 	const [title, setTitle] = useState('');
 	const { detailStore } = useStore();
 	const { theme } = useTheme();
@@ -37,7 +37,7 @@ const Knowledge = () => {
 	const [editorKey, setEditorKey] = useState(0);
 
 	const getValue = (value: string) => {
-		setMarkdown(value);
+		setContent(value);
 		detailStore.setMarkdown(value);
 	};
 
@@ -45,11 +45,23 @@ const Knowledge = () => {
 		console.log('草稿');
 	};
 
+	const getUserInfo = useMemo(() => {
+		return getStorage('userInfo')
+			? JSON.parse(getStorage('userInfo') as string)
+			: null;
+	}, []);
+
 	const runTauriSave = useCallback(
 		async (payload: SaveKnowledgeMarkdownPayload) => {
 			const result = await invokeSaveKnowledgeMarkdown(payload);
 			if (result.success === 'success') {
-				Toast({ type: 'success', title: '文件已保存', message: result.filePath ? `已保存到：${result.filePath}` : '已保存到默认目录' });
+				Toast({
+					type: 'success',
+					title: '文件已保存',
+					message: result.filePath
+						? `已保存到：${result.filePath}`
+						: '已保存到默认目录',
+				});
 			} else {
 				Toast({ type: 'error', title: '保存失败', message: result.message });
 			}
@@ -57,10 +69,19 @@ const Knowledge = () => {
 		[],
 	);
 
+	// 保存到数据库
+	const runSave = useCallback(
+		async (params: Omit<KnowledgeRecord, 'id'>) => {
+			await saveKnowledge(params);
+		},
+		[title, content],
+	);
+
 	const onSave = useCallback(async () => {
 		const content = detailStore.markdown ?? '';
 		const trimmedTitle = title.trim();
-		if (!trimmedTitle) return Toast({ type: 'warning', title: '请先输入文件名「标题」' });
+		if (!trimmedTitle)
+			return Toast({ type: 'warning', title: '请先输入文件名「标题」' });
 		if (!content) return Toast({ type: 'warning', title: '请先输入内容' });
 		try {
 			if (isTauriRuntime()) {
@@ -71,29 +92,20 @@ const Knowledge = () => {
 				};
 				const target = await invokeResolveKnowledgeMarkdownTarget(payload);
 				if (!target.exists) {
+					await runSave({
+						title,
+						content,
+						author: getUserInfo?.username,
+						authorId: getUserInfo?.id,
+					});
 					await runTauriSave(payload);
-					// TODO: 调接口保存到数据库
-					return;
+				} else {
+					setOverwriteTargetPath(target.path);
+					setPendingSavePayload(payload);
+					setOverwriteOpen(true);
 				}
-				setOverwriteTargetPath(target.path);
-				setPendingSavePayload(payload);
-				setOverwriteOpen(true);
-				return;
 			}
-			const res = await saveKnowledge({
-				title: trimmedTitle || undefined,
-				content,
-			});
-			const name = res.data?.filename ?? '';
-			Toast({
-				type: 'success',
-				title: '文件已保存',
-				message: name ? `已保存到：${name}` : '已保存到默认目录',
-			});
 		} catch (e) {
-			if (!isTauriRuntime()) {
-				return;
-			}
 			Toast({
 				type: 'error',
 				title: formatTauriInvokeError(e),
@@ -104,8 +116,13 @@ const Knowledge = () => {
 	const onConfirmOverwrite = useCallback(async () => {
 		if (!pendingSavePayload) return;
 		try {
+			await runSave({
+				title,
+				content,
+				author: getUserInfo?.username,
+				authorId: getUserInfo?.id,
+			});
 			await runTauriSave({ ...pendingSavePayload, overwrite: true });
-			// TODO: 调接口保存到数据库
 			setOverwriteOpen(false);
 			setPendingSavePayload(null);
 			setOverwriteTargetPath('');
@@ -163,9 +180,7 @@ const Knowledge = () => {
 				Toast({
 					type: 'success',
 					title: '文件已删除',
-					message: result.filePath
-						? `已删除：${result.filePath}`
-						: undefined,
+					message: result.filePath ? `已删除：${result.filePath}` : undefined,
 				});
 				setDeleteOpen(false);
 				setDeleteTargetPath('');

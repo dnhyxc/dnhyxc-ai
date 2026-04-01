@@ -1,4 +1,4 @@
-import { ShareInfo } from '@/types';
+import { KnowledgeListItem, KnowledgeRecord, ShareInfo } from '@/types';
 import { http } from '@/utils/fetch';
 import {
 	CREATE_CHECKOUT_SESSION,
@@ -16,11 +16,15 @@ import {
 	GET_USER_PROFILE,
 	GET_USERS,
 	IMAGE_OCR,
+	KNOWLEDGE_DELETE,
+	KNOWLEDGE_DETAIL,
+	KNOWLEDGE_LIST,
+	KNOWLEDGE_SAVE,
+	KNOWLEDGE_UPDATE,
 	LOGIN,
 	LOGIN_BY_EMAIL,
 	REGISTER,
 	RESET_PASSWORD,
-	SAVE_KNOWLEDGE,
 	SEND_EMAIL,
 	SEND_RESET_PWD_EMAIL,
 	STOP_SSE,
@@ -279,21 +283,6 @@ export const createCheckoutSession = async (params: {
 	}>(CREATE_CHECKOUT_SESSION, params);
 };
 
-/** 通过后端将 Markdown 写入仓库 knowledge/ 目录（需启动 server:dev） */
-export const saveKnowledge = async (params: {
-	title?: string;
-	content: string;
-	filePath?: string;
-}) => {
-	return await http.post<{ filePath: string; filename: string }>(
-		SAVE_KNOWLEDGE,
-		{
-			title: params.title,
-			content: params.content,
-		},
-	);
-};
-
 // 创建会话分享
 export const createShare = async (params: {
 	chatSessionId: string;
@@ -311,4 +300,53 @@ export const createShare = async (params: {
 export const getShare = async <T>(shareId: string) => {
 	const res = await http.get<T>(`${GET_SHARE}/${shareId}`);
 	return res;
+};
+
+// ---------- 知识库（knowledge.controller）----------
+
+/** POST /knowledge/save：新建 */
+export const saveKnowledge = async (params: Omit<KnowledgeRecord, 'id'>) => {
+	return await http.post<{ id: string }>(KNOWLEDGE_SAVE, {
+		title: params.title,
+		content: params.content,
+		author: params.author,
+		authorId: params.authorId,
+	});
+};
+
+/** GET /knowledge/list：分页列表 */
+export const getKnowledgeList = async (params?: {
+	pageNo?: number;
+	pageSize?: number;
+	title?: string;
+}) => {
+	return await http.get<{ list: KnowledgeListItem[]; total: number }>(
+		KNOWLEDGE_LIST,
+		{
+			querys: {
+				pageNo: params?.pageNo,
+				pageSize: params?.pageSize,
+				title: params?.title,
+			},
+		},
+	);
+};
+
+/** GET /knowledge/detail/:id：单条含正文 */
+export const getKnowledgeDetail = async (id: string) => {
+	return await http.get<KnowledgeRecord>(KNOWLEDGE_DETAIL, {
+		params: [id],
+	});
+};
+
+/** PUT /knowledge/update：更新（body 需含 id，与后端 UpdateKnowledgeDto 一致） */
+export const updateKnowledge = async (params: Pick<KnowledgeRecord, 'id'>) => {
+	return await http.put<KnowledgeRecord>(KNOWLEDGE_UPDATE, params);
+};
+
+/** DELETE /knowledge/delete/:id */
+export const deleteKnowledge = async (id: string) => {
+	return await http.delete<{ id: string }>(KNOWLEDGE_DELETE, {
+		params: [id],
+	});
 };

@@ -36,5 +36,5 @@ client/src-tauri/target
 
 docker-compose-prod.yml
 
-# 本地知识库目录，不纳入版本控制
-knowledge/
+# 本地知识库目录（仅仓库根目录），不纳入版本控制
+/knowledge/

@@ -1,4 +1,5 @@
-import { IsOptional, IsString, MaxLength } from 'class-validator';
+import { Type } from 'class-transformer';
+import { IsInt, IsOptional, IsString, MaxLength } from 'class-validator';
 
 export class SaveKnowledgeDto {
 	@IsOptional()
@@ -9,4 +10,12 @@ export class SaveKnowledgeDto {
 	@IsString()
 	@MaxLength(5_000_000)
 	content!: string;
+
+	@IsString()
+	@MaxLength(255)
+	author?: string;
+
+	@Type(() => Number)
+	@IsInt()
+	authorId?: number;
 }

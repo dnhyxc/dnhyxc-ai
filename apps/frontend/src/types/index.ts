@@ -64,3 +64,15 @@ export interface ShareInfo {
 	shareId: string;
 	shareUrl: string;
 }
+
+/** 知识库单条（与后端 Knowledge 一致；接口 JSON 日期多为 ISO 字符串） */
+export type KnowledgeRecord = {
+	id: string;
+	title: string | null;
+	content: string;
+	author: string | null;
+	authorId: number | null;
+};
+
+/** 列表项（无正文大字段） */
+export type KnowledgeListItem = Omit<KnowledgeRecord, 'content'>;

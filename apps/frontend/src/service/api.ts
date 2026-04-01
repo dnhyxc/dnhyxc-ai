@@ -70,9 +70,6 @@ export const GET_SESSION_LIST = '/chat/getSessionList';
 // 更新会话
 export const UPDATE_SESSION = '/chat/updateSession';
 
-// 知识库：保存 Markdown 到服务端 knowledge 目录
-export const SAVE_KNOWLEDGE = '/knowledge/save';
-
 // 创建 Chat 分享
 export const CREATE_SHARE = '/share/create';
 
@@ -81,3 +78,10 @@ export const GET_SHARE = '/share/get';
 
 // Stripe：创建 Checkout 会话（需登录）
 export const CREATE_CHECKOUT_SESSION = '/pay/createCheckoutSession';
+
+// 知识库（与 knowledge.controller 路径一致，全局前缀 api 由 BASE_URL 侧拼接）
+export const KNOWLEDGE_SAVE = '/knowledge/save';
+export const KNOWLEDGE_LIST = '/knowledge/list';
+export const KNOWLEDGE_DETAIL = '/knowledge/detail';
+export const KNOWLEDGE_UPDATE = '/knowledge/update';
+export const KNOWLEDGE_DELETE = '/knowledge/delete';
