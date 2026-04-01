@@ -1,6 +1,4 @@
-import { invoke } from '@tauri-apps/api/core';
-import { listen, UnlistenFn } from '@tauri-apps/api/event';
-import { fetch } from '@tauri-apps/plugin-http';
+import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { Toast } from '@ui/sonner';
 import type {
 	DownloadBlobOptions,
@@ -8,6 +6,8 @@ import type {
 	DownloadProgress,
 	DownloadResult,
 } from '@/types';
+import { getPlatformFetch } from './fetch';
+import { isTauriRuntime } from './runtime';
 
 export * from './cache';
 export * from './clipboard';
@@ -15,6 +15,8 @@ export * from './crypto';
 export * from './event';
 export * from './event';
 export * from './knowledge-save';
+export { openExternalUrl } from './open-external';
+export { isTauriRuntime } from './runtime';
 export * from './store';
 export * from './tauri';
 export * from './updater';
@@ -49,6 +51,24 @@ export const downloadFileFromUrl = async (
 ): Promise<DownloadResult> => {
 	const { url, file_name, overwrite = true, id, max_size, save_dir } = options;
 	try {
+		if (!isTauriRuntime()) {
+			const a = document.createElement('a');
+			a.href = url;
+			if (file_name) {
+				a.download = file_name;
+			}
+			a.target = '_blank';
+			a.rel = 'noopener noreferrer';
+			document.body.appendChild(a);
+			a.click();
+			document.body.removeChild(a);
+			return {
+				success: 'success',
+				message: '已开始下载',
+				id: options.id,
+			} as DownloadResult;
+		}
+		const { invoke } = await import('@tauri-apps/api/core');
 		const result: DownloadResult = await invoke('download_file', {
 			options: {
 				url,
@@ -112,7 +132,27 @@ export const downloadBlob = async (
 	blobData: unknown,
 ): Promise<DownloadResult> => {
 	try {
+		if (!isTauriRuntime()) {
+			const { bytes, contentType } = await toDownloadBlobBytes(blobData);
+			const blob = new Blob([new Uint8Array(bytes)], {
+				type: contentType || 'application/octet-stream',
+			});
+			const objectUrl = URL.createObjectURL(blob);
+			const a = document.createElement('a');
+			a.href = objectUrl;
+			a.download = options.file_name || 'download';
+			document.body.appendChild(a);
+			a.click();
+			document.body.removeChild(a);
+			URL.revokeObjectURL(objectUrl);
+			return {
+				success: 'success',
+				message: '已开始下载',
+				id: options.id,
+			} as DownloadResult;
+		}
 		const { bytes, contentType } = await toDownloadBlobBytes(blobData);
+		const { invoke } = await import('@tauri-apps/api/core');
 		const result: DownloadResult = await invoke('download_blob', {
 			options,
 			blobData: bytes,
@@ -147,6 +187,48 @@ export const saveFileWithPicker = async (options: {
 	file_name: string;
 }): Promise<{ success: boolean; message?: string }> => {
 	try {
+		if (!isTauriRuntime()) {
+			try {
+				if (typeof window !== 'undefined' && 'showSaveFilePicker' in window) {
+					const handle = await (
+						window as unknown as {
+							showSaveFilePicker: (opts: {
+								suggestedName?: string;
+							}) => Promise<FileSystemFileHandle>;
+						}
+					).showSaveFilePicker({
+						suggestedName: options.file_name,
+					});
+					const writable = await handle.createWritable();
+					await writable.write(options.content);
+					await writable.close();
+					Toast({
+						type: 'success',
+						title: '文件保存成功',
+					});
+					return { success: true };
+				}
+			} catch {
+				// 用户取消或 API 不可用，走 Blob 回退
+			}
+			const blob = new Blob([options.content], {
+				type: 'text/plain;charset=utf-8',
+			});
+			const objectUrl = URL.createObjectURL(blob);
+			const a = document.createElement('a');
+			a.href = objectUrl;
+			a.download = options.file_name;
+			document.body.appendChild(a);
+			a.click();
+			document.body.removeChild(a);
+			URL.revokeObjectURL(objectUrl);
+			Toast({
+				type: 'success',
+				title: '文件保存成功',
+			});
+			return { success: true };
+		}
+		const { invoke } = await import('@tauri-apps/api/core');
 		const result = (await invoke('save_file_with_picker', { options })) as {
 			success: boolean;
 			message?: string;
@@ -181,6 +263,9 @@ export const saveFileWithPicker = async (options: {
 export const createDownloadProgressListener = (
 	setProgressInfo: React.Dispatch<React.SetStateAction<DownloadProgress[]>>,
 ): Promise<UnlistenFn> => {
+	if (!isTauriRuntime()) {
+		return Promise.resolve(() => {});
+	}
 	const unlistenPromise = listen('download://progress', (event) => {
 		const progress = event.payload as DownloadProgress;
 		setProgressInfo((prev) => {
@@ -199,6 +284,9 @@ export const createDownloadProgressListener = (
 export const createUnlistenFileInfoListener = (
 	setDownloadInfo?: React.Dispatch<React.SetStateAction<DownloadResult[]>>,
 ): Promise<UnlistenFn> => {
+	if (!isTauriRuntime()) {
+		return Promise.resolve(() => {});
+	}
 	const unlistenPromise = listen('download://progress', (event) => {
 		const progress = event.payload as DownloadResult;
 		setDownloadInfo?.((prev) => {
@@ -258,7 +346,8 @@ export const formatDate = (date: string) => {
  */
 export const fetchImageAsBlobUrl = async (url: string): Promise<string> => {
 	try {
-		const response = await fetch(url, {
+		const platformFetch = await getPlatformFetch();
+		const response = await platformFetch(url, {
 			method: 'GET',
 		});
 		// response 是标准的 Response 对象

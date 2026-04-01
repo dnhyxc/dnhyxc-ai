@@ -1,4 +1,3 @@
-import { openUrl } from '@tauri-apps/plugin-opener';
 import { ScrollArea } from '@ui/scroll-area';
 import { motion } from 'framer-motion';
 import {
@@ -14,7 +13,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router';
-import { onListen } from '@/utils';
+import { onListen, openExternalUrl } from '@/utils';
 
 const SHOWCASE = [
 	{
@@ -218,7 +217,9 @@ const Home = () => {
 										<button
 											type="button"
 											onClick={() => {
-												openUrl('https://github.com/dnhyxc/dnhyxc-ai/wiki');
+												void openExternalUrl(
+													'https://github.com/dnhyxc/dnhyxc-ai/wiki',
+												);
 											}}
 											className="h-11 rounded-xl border border-theme-white/15 bg-theme-white/5 px-6 text-sm font-medium text-textcolor backdrop-blur-sm transition-colors hover:border-theme-white/25 hover:bg-theme-white/10 sm:h-12 sm:px-7"
 										>

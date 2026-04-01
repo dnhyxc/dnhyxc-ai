@@ -1,7 +1,11 @@
-import { invoke } from '@tauri-apps/api/core';
+import { isTauriRuntime } from './runtime';
 
 export const getCacheSize = async (): Promise<string> => {
+	if (!isTauriRuntime()) {
+		return '0 B';
+	}
 	try {
+		const { invoke } = await import('@tauri-apps/api/core');
 		const size = await invoke<number>('get_cache_size');
 		return formatBytes(size);
 	} catch {
@@ -10,6 +14,10 @@ export const getCacheSize = async (): Promise<string> => {
 };
 
 export const clearCache = async (): Promise<void> => {
+	if (!isTauriRuntime()) {
+		return;
+	}
+	const { invoke } = await import('@tauri-apps/api/core');
 	await invoke('clear_updater_cache');
 };
 

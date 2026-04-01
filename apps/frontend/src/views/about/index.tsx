@@ -1,8 +1,7 @@
-import { openUrl } from '@tauri-apps/plugin-opener';
 import { Button } from '@ui/button';
 import { useEffect } from 'react';
 import { type ThemeName, useGetVersion, useTheme } from '@/hooks';
-import { onListen } from '@/utils';
+import { onListen, openExternalUrl } from '@/utils';
 
 const About = () => {
 	const { version } = useGetVersion();
@@ -20,7 +19,7 @@ const About = () => {
 	}, []);
 
 	const handleOpenLink = (url: string) => {
-		openUrl(url);
+		void openExternalUrl(url);
 	};
 
 	return (

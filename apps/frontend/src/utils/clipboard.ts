@@ -1,9 +1,33 @@
-import { readText, writeText } from '@tauri-apps/plugin-clipboard-manager';
+import { isTauriRuntime } from './runtime';
 
 /** 焦点在 CodeMirror（Sandpack 编辑器等）内时不拦截快捷键，避免破坏选区与撤销栈 */
 function isFocusInsideCodeMirror(): boolean {
 	const el = document.activeElement;
 	return el instanceof Element && Boolean(el.closest('.cm-editor'));
+}
+
+async function writeClipText(text: string): Promise<void> {
+	if (isTauriRuntime()) {
+		const { writeText } = await import('@tauri-apps/plugin-clipboard-manager');
+		await writeText(text);
+		return;
+	}
+	if (navigator.clipboard?.writeText) {
+		await navigator.clipboard.writeText(text);
+		return;
+	}
+	throw new Error('剪贴板不可用');
+}
+
+async function readClipText(): Promise<string> {
+	if (isTauriRuntime()) {
+		const { readText } = await import('@tauri-apps/plugin-clipboard-manager');
+		return readText();
+	}
+	if (navigator.clipboard?.readText) {
+		return navigator.clipboard.readText();
+	}
+	return '';
 }
 
 // 复制粘贴逻辑
@@ -42,7 +66,7 @@ export const clipboard = async (event: KeyboardEvent) => {
 		const selectedText = window.getSelection()?.toString();
 
 		if (selectedText) {
-			await writeText(selectedText);
+			await writeClipText(selectedText);
 		}
 	}
 
@@ -70,8 +94,8 @@ export const clipboard = async (event: KeyboardEvent) => {
 				inputElement.value = newValue;
 				inputElement.setSelectionRange(deletePos, deletePos);
 
-				const event = new Event('input', { bubbles: true });
-				inputElement.dispatchEvent(event);
+				const ev = new Event('input', { bubbles: true });
+				inputElement.dispatchEvent(ev);
 			}
 		}
 	}
@@ -94,7 +118,7 @@ export const clipboard = async (event: KeyboardEvent) => {
 
 			if (selectedText) {
 				// 将选中的文本写入剪贴板
-				await writeText(selectedText);
+				await writeClipText(selectedText);
 				// 删除选中的文本
 				document.execCommand('delete');
 			}
@@ -103,7 +127,7 @@ export const clipboard = async (event: KeyboardEvent) => {
 
 	if (isMod && event.key === 'v') {
 		event.preventDefault();
-		const text = await readText();
+		const text = await readClipText();
 		// 将剪贴板内容插入到当前焦点元素（如果有）或者做其他处理
 		const activeElement = document.activeElement;
 		if (
@@ -118,9 +142,9 @@ export const clipboard = async (event: KeyboardEvent) => {
 };
 
 export const copyToClipboard = async (text: string): Promise<void> => {
-	await writeText(text);
+	await writeClipText(text);
 };
 
 export const pasteFromClipboard = async (): Promise<string> => {
-	return readText();
+	return readClipText();
 };

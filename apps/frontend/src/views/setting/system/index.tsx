@@ -1,11 +1,20 @@
-import { invoke } from '@tauri-apps/api/core';
 import { Button } from '@ui/button';
 import { Label } from '@ui/label';
 import { RadioGroup, RadioGroupItem } from '@ui/radio-group';
 import { toast } from '@ui/sonner';
 import { useCallback, useEffect, useState } from 'react';
 import { capitalizeWords, getValue, setValue } from '@/utils';
+import { isTauriRuntime } from '@/utils/runtime';
 import { DEFAULT_INFO } from './config';
+
+/** 仅在桌面壳内调用 Rust 命令 */
+async function desktopInvoke<T>(
+	cmd: string,
+	args?: Record<string, unknown>,
+): Promise<T> {
+	const { invoke } = await import('@tauri-apps/api/core');
+	return invoke(cmd, args) as Promise<T>;
+}
 
 const System = () => {
 	const [savePath, setSavePath] = useState('');
@@ -41,10 +50,13 @@ const System = () => {
 		};
 	}, [checkShortcut, shortcutInfo]);
 
-	const onClickPage = (e: any) => {
-		if (e.target.id !== 'shortcut') {
+	const onClickPage = (e: { target: EventTarget | null }) => {
+		const target = e.target as HTMLElement | null;
+		if (target?.id !== 'shortcut') {
 			setCheckShortcut(null);
-			invoke('reload_all_shortcuts');
+			if (isTauriRuntime()) {
+				void desktopInvoke('reload_all_shortcuts');
+			}
 		}
 	};
 
@@ -83,7 +95,12 @@ const System = () => {
 
 			const shortcuts = info.shortcut;
 
-			invoke('register_shortcut', {
+			if (!isTauriRuntime()) {
+				toast.info('全局快捷键仅在桌面客户端可用');
+				return;
+			}
+
+			desktopInvoke('register_shortcut', {
 				shortcutStr: shortcuts,
 				currentKey: checkShortcut,
 			})
@@ -118,7 +135,11 @@ const System = () => {
 	);
 
 	const checkStartType = async () => {
-		const type = await invoke('is_auto_start_enabled');
+		if (!isTauriRuntime()) {
+			setStartType('1');
+			return;
+		}
+		const type = await desktopInvoke<boolean>('is_auto_start_enabled');
 		setStartType(type ? '2' : '1');
 	};
 
@@ -133,18 +154,24 @@ const System = () => {
 	};
 
 	const changeDir = async () => {
-		const path: string = await invoke('select_directory');
+		if (!isTauriRuntime()) {
+			toast.info('选择存储目录仅在桌面客户端可用');
+			return;
+		}
+		const path: string = await desktopInvoke<string>('select_directory');
 		setValue('savePath', path);
 		setSavePath(path);
 	};
 
 	const onChangeAutoStart = async (value: string) => {
+		if (!isTauriRuntime()) {
+			toast.info('开机自启仅在桌面客户端可用');
+			return;
+		}
 		if (value === '2' && startType === '1') {
-			// 需要开启自启且当前未开启
-			await invoke('enable_auto_start');
+			await desktopInvoke('enable_auto_start');
 		} else if (value === '1' && startType === '2') {
-			// 需要关闭自启且当前已开启
-			await invoke('disable_auto_start');
+			await desktopInvoke('disable_auto_start');
 		}
 		setStartType(value);
 	};
@@ -166,7 +193,9 @@ const System = () => {
 			),
 		);
 		setCheckShortcut(value);
-		await invoke('clear_all_shortcuts');
+		if (isTauriRuntime()) {
+			await desktopInvoke('clear_all_shortcuts');
+		}
 	};
 
 	return (

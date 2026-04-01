@@ -1,6 +1,6 @@
-import { getVersion } from '@tauri-apps/api/app';
 import { useEffect, useRef, useState } from 'react';
 import { getStorage as getLocalStorage, setStorage } from '@/utils';
+import { isTauriRuntime } from '@/utils/runtime';
 
 export * from './theme';
 
@@ -128,8 +128,13 @@ export const useGetVersion = () => {
 	}, []);
 
 	const getCurrentVersion = async () => {
-		const version = await getVersion();
-		setVersion(version);
+		if (!isTauriRuntime()) {
+			setVersion(import.meta.env.VITE_APP_VERSION ?? '浏览器预览');
+			return;
+		}
+		const { getVersion } = await import('@tauri-apps/api/app');
+		const v = await getVersion();
+		setVersion(v);
 	};
 
 	return { version };

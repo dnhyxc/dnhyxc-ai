@@ -1,8 +1,14 @@
-import { fetch } from '@tauri-apps/plugin-http';
 import { Toast } from '@ui/index';
 import { BASE_URL } from '@/constant';
 import { FinishInfo, SearchOrganic, SearchOrganicItem } from '@/types/chat';
-import { getStorage } from '.';
+import { getPlatformFetch } from '@/utils/fetch';
+
+function readToken(): string {
+	if (typeof window === 'undefined') {
+		return '';
+	}
+	return localStorage.getItem('token') || '';
+}
 
 interface StreamCallbacks {
 	onData: (chunk: any) => void;
@@ -39,10 +45,11 @@ export const streamFetch = async ({
 	try {
 		onStart?.();
 
-		const response = await fetch(BASE_URL + api, {
+		const platformFetch = await getPlatformFetch();
+		const response = await platformFetch(BASE_URL + api, {
 			method: 'POST',
 			headers: {
-				Authorization: `Bearer ${getStorage('token')}`,
+				Authorization: `Bearer ${readToken()}`,
 				'Content-Type': 'application/json',
 			},
 			...options,

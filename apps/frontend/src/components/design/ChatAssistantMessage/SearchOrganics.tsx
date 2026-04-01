@@ -1,7 +1,7 @@
 import { Drawer } from '@design/Drawer';
-import { openUrl } from '@tauri-apps/plugin-opener';
 import { ScrollArea } from '@ui/index';
 import { SearchOrganicItem } from '@/types/chat';
+import { openExternalUrl } from '@/utils';
 
 interface IProps {
 	open: boolean;
@@ -11,7 +11,7 @@ interface IProps {
 
 const SearchOrganics: React.FC<IProps> = ({ open, onOpenChange, organics }) => {
 	const onClickOrganic = (link: string) => {
-		openUrl(link);
+		void openExternalUrl(link);
 	};
 
 	return (

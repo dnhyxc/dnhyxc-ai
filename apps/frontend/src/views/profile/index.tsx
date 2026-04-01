@@ -1,4 +1,3 @@
-import { invoke } from '@tauri-apps/api/core';
 import { Button } from '@ui/button';
 import { Input } from '@ui/input';
 import { ScrollArea } from '@ui/scroll-area';
@@ -25,6 +24,7 @@ import {
 	onListen,
 	saveFileWithPicker,
 } from '@/utils';
+import { isTauriRuntime } from '@/utils/runtime';
 
 interface UploadInfo {
 	percent: number;
@@ -102,6 +102,11 @@ const Profile = () => {
 	};
 
 	async function greet() {
+		if (!isTauriRuntime()) {
+			setGreetMsg('（浏览器预览：此演示需桌面客户端）');
+			return;
+		}
+		const { invoke } = await import('@tauri-apps/api/core');
 		const res: string = await invoke('greet_name', { name: url });
 		setGreetMsg(res);
 	}

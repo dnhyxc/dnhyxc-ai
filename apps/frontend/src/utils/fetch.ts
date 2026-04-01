@@ -1,7 +1,29 @@
-import { fetch } from '@tauri-apps/plugin-http';
 import { Toast } from '@ui/sonner';
 import { BASE_URL } from '@/constant';
-import { getStorage } from '.';
+import { isTauriRuntime } from './runtime';
+
+function readAuthTokenFromLocal(): string {
+	if (typeof window === 'undefined') {
+		return '';
+	}
+	return localStorage.getItem('token') || '';
+}
+
+let cachedPlatformFetch: typeof globalThis.fetch | null = null;
+
+/** Tauri 下使用 HTTP 插件，浏览器下使用原生 fetch */
+export async function getPlatformFetch(): Promise<typeof globalThis.fetch> {
+	if (cachedPlatformFetch) {
+		return cachedPlatformFetch;
+	}
+	if (!isTauriRuntime()) {
+		cachedPlatformFetch = globalThis.fetch.bind(globalThis);
+		return cachedPlatformFetch;
+	}
+	const mod = await import('@tauri-apps/plugin-http');
+	cachedPlatformFetch = mod.fetch as typeof globalThis.fetch;
+	return cachedPlatformFetch;
+}
 
 // 定义自定义的 HTTP 选项类型
 interface CustomHttpOptions {
@@ -47,7 +69,7 @@ class HttpClient {
 	constructor(
 		baseURL: string = BASE_URL,
 		config: RequestConfig = {},
-		token: string = getStorage('token') || '',
+		token: string = readAuthTokenFromLocal(),
 	) {
 		this.baseURL = baseURL;
 		this.defaultConfig = {
@@ -362,7 +384,8 @@ class HttpClient {
 			await new Promise((resolve) => setTimeout(resolve, 0));
 
 			// 发送请求
-			response = await fetch(finalUrl, requestOptions);
+			const platformFetch = await getPlatformFetch();
+			response = await platformFetch(finalUrl, requestOptions);
 
 			// 解析响应数据
 			const responseData = await this.parseResponseBody(response);

@@ -1,42 +1,58 @@
-import { listen } from '@tauri-apps/api/event';
 import { Toaster } from '@ui/sonner';
 import { useEffect } from 'react';
 import { createBrowserRouter, RouteObject } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
 import { clipboard, getValue, onCreateWindow, removeStorage } from '@/utils';
 import { http } from '@/utils/fetch';
+import { isTauriRuntime } from '@/utils/runtime';
 import routes from './routes';
 
 const App = () => {
 	useEffect(() => {
-		const aboutPromise = listen('about', async (event) => {
-			const eventOptions = event.payload as {
-				version: string;
-			};
-			const theme = await getValue('theme');
-			onCreateWindow({
-				url: `/about?version=${eventOptions.version}`,
-				label: 'about',
-				title: '关于 dnhyxc-ai',
-				width: 400,
-				height: 300,
-				titleBarStyle: 'visible',
-				hiddenTitle: false,
-				resizable: false,
-				theme,
-			});
-		});
+		let cancelled = false;
+		const unlistenFns: Array<() => void> = [];
 
-		const logoutPromise = listen('logout', () => {
-			removeStorage('token');
-			http.setAuthToken('');
-		});
+		(async () => {
+			if (!isTauriRuntime()) {
+				return;
+			}
+			const { listen } = await import('@tauri-apps/api/event');
+			const aboutUnlisten = await listen('about', async (event) => {
+				const eventOptions = event.payload as {
+					version: string;
+				};
+				const theme = (await getValue('theme')) as 'light' | 'dark' | undefined;
+				onCreateWindow({
+					url: `/about?version=${eventOptions.version}`,
+					label: 'about',
+					title: '关于 dnhyxc-ai',
+					width: 400,
+					height: 300,
+					titleBarStyle: 'visible',
+					hiddenTitle: false,
+					resizable: false,
+					theme,
+				});
+			});
+			const logoutUnlisten = await listen('logout', () => {
+				removeStorage('token');
+				http.setAuthToken('');
+			});
+			if (!cancelled) {
+				unlistenFns.push(aboutUnlisten, logoutUnlisten);
+			} else {
+				aboutUnlisten();
+				logoutUnlisten();
+			}
+		})();
 
 		document.addEventListener('keydown', clipboard);
 
 		return () => {
-			aboutPromise.then((unlisten) => unlisten());
-			logoutPromise.then((unlisten) => unlisten());
+			cancelled = true;
+			for (const u of unlistenFns) {
+				u();
+			}
 			document.removeEventListener('keydown', clipboard);
 		};
 	}, []);

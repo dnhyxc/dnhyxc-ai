@@ -27,7 +27,7 @@ const ChatNewSession = observer(function ChatBot(props) {
 						<motion.div
 							initial={{ opacity: 0, y: 10 }}
 							animate={{ opacity: 1, y: 0 }}
-							className="flex flex-col items-center justify-center h-110 text-textcolor"
+							className="flex flex-col items-center justify-center h-105 text-textcolor"
 						>
 							<Bot className="w-16 h-16 mb-4" />
 							<p className="text-2xl">欢迎来到 dnhyxc-ai 智能聊天</p>

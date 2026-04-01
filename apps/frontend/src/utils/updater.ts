@@ -1,7 +1,5 @@
-// import { invoke } from '@tauri-apps/api/core';
-import { relaunch } from '@tauri-apps/plugin-process';
-import { check, type Update } from '@tauri-apps/plugin-updater';
 import { Toast } from '@ui/sonner';
+import { isTauriRuntime } from './runtime';
 
 interface CheckForUpdatesOptions {
 	getProgress?: (progress: number) => void;
@@ -12,17 +10,31 @@ interface CheckForUpdatesOptions {
 	onFinished?: () => void;
 }
 
-export type UpdateType = Update;
+export type UpdateType = import('@tauri-apps/plugin-updater').Update;
 
 export const checkVersion = async () => {
-	// await invoke('clear_updater_cache');
-	const update = await check();
-	return update;
+	if (!isTauriRuntime()) {
+		return null;
+	}
+	const { check } = await import('@tauri-apps/plugin-updater');
+	return check();
 };
 
 export const checkForUpdates = async (options?: CheckForUpdatesOptions) => {
+	if (!isTauriRuntime()) {
+		Toast({
+			type: 'info',
+			title: '应用内更新仅在桌面客户端可用',
+		});
+		options?.onReset?.();
+		return;
+	}
 	try {
-		const update = await checkVersion();
+		const [{ check }, { relaunch }] = await Promise.all([
+			import('@tauri-apps/plugin-updater'),
+			import('@tauri-apps/plugin-process'),
+		]);
+		const update = await check();
 		if (update) {
 			options?.setLoading?.(true);
 			await update.downloadAndInstall((event) => {
@@ -40,11 +52,15 @@ export const checkForUpdates = async (options?: CheckForUpdatesOptions) => {
 			});
 			options?.onRelaunch?.(relaunch);
 		}
-	} catch (error: any) {
+	} catch (error: unknown) {
+		const msg =
+			error && typeof error === 'object' && 'message' in error
+				? String((error as { message: unknown }).message)
+				: String(error);
 		Toast({
 			type: 'error',
 			title: '更新失败',
-			message: error?.message || String(error),
+			message: msg,
 		});
 		options?.onReset?.();
 	}

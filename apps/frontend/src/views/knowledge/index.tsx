@@ -15,11 +15,7 @@ import {
 	invokeSaveKnowledgeMarkdown,
 	type SaveKnowledgeMarkdownPayload,
 } from '@/utils/knowledge-save';
-
-/** 是否在 Tauri 桌面壳内运行（用于直连本地 knowledge 目录） */
-function isTauriRuntime(): boolean {
-	return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
-}
+import { isTauriRuntime } from '@/utils/runtime';
 
 /** Tauri 下知识 Markdown 所在目录（保存 / 删除共用，与后端 `filePath` 语义一致） */
 const TAURI_KNOWLEDGE_DIR =

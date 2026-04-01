@@ -1,4 +1,3 @@
-import { openUrl } from '@tauri-apps/plugin-opener';
 import {
 	AlertDialog,
 	AlertDialogAction,
@@ -26,6 +25,7 @@ import {
 	formatDate,
 	getCacheSize,
 	getValue,
+	openExternalUrl,
 	removeStorage,
 	setValue,
 	type UpdateType,
@@ -218,7 +218,9 @@ const SettingAbout = () => {
 										variant="outline"
 										className="cursor-pointer min-w-24 ml-5"
 										onClick={() =>
-											openUrl(storageInfo?.notes || updateInfo?.body)
+											void openExternalUrl(
+												storageInfo?.notes || updateInfo?.body || '',
+											)
 										}
 									>
 										<Info className="mt-0.5 mr-1" />
