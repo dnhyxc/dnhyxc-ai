@@ -68,9 +68,7 @@ const Confirm = ({
 					</AlertDialogPrimitive.Title>
 					{/* 使用 asChild + div：避免默认 <p> 内嵌 <div> 导致非法 DOM 与水合报错 */}
 					<AlertDialogPrimitive.Description asChild>
-						<div
-							className={cn('text-textcolor text-md', descriptionClassName)}
-						>
+						<div className={cn('text-textcolor text-md', descriptionClassName)}>
 							{description}
 						</div>
 					</AlertDialogPrimitive.Description>
