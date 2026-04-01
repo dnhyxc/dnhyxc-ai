@@ -279,6 +279,7 @@ const Knowledge = () => {
 							<ScrollText size={18} />
 							<Input
 								value={title}
+								maxLength={100}
 								onChange={(e) => setTitle(e.target.value)}
 								placeholder="请先输入文件名「标题」..."
 								aria-label="知识标题"
@@ -292,6 +293,7 @@ const Knowledge = () => {
 				open={listOpen}
 				onOpenChange={setListOpen}
 				currentTitle={title}
+				editingKnowledgeId={editingKnowledgeId}
 				onAfterLocalDelete={handleAfterLocalDelete}
 				onDeletedRecord={handleDeletedRecord}
 				onPick={handlePickRecord}

@@ -5,6 +5,7 @@ import { Toast } from '@ui/sonner';
 import { Trash2 } from 'lucide-react';
 import { observer } from 'mobx-react';
 import { useCallback, useEffect, useState } from 'react';
+import { cn } from '@/lib/utils';
 import { deleteKnowledge } from '@/service';
 import useStore from '@/store';
 import type { KnowledgeListItem, KnowledgeRecord } from '@/types';
@@ -27,6 +28,8 @@ interface IProps {
 	onAfterLocalDelete?: (deletedKnowledgeId: string) => void;
 	/** 数据库记录删除成功后回调（用于当前正在编辑的条目被删时清空编辑器） */
 	onDeletedRecord?: (id: string) => void;
+	/** 当前在编辑器中打开的条目 id，用于列表行高亮 */
+	editingKnowledgeId?: string | null;
 }
 
 function formatTime(iso?: string): string {
@@ -43,10 +46,11 @@ function formatTime(iso?: string): string {
 /** 单行：点击打开详情；垃圾桶仅触发删除流程（冒泡已阻止） */
 function KnowledgeListRow(props: {
 	item: KnowledgeListItem;
+	selected: boolean;
 	onActivate: (item: KnowledgeListItem) => void;
 	onTrashClick: (e: React.MouseEvent, item: KnowledgeListItem) => void;
 }) {
-	const { item, onActivate, onTrashClick } = props;
+	const { item, selected, onActivate, onTrashClick } = props;
 
 	const onKeyDown = (e: React.KeyboardEvent) => {
 		if (e.key === 'Enter' || e.key === ' ') {
@@ -59,18 +63,28 @@ function KnowledgeListRow(props: {
 		<div
 			role="button"
 			tabIndex={0}
+			aria-current={selected ? 'true' : undefined}
 			onClick={() => void onActivate(item)}
 			onKeyDown={onKeyDown}
-			className="w-full cursor-pointer overflow-hidden flex flex-col gap-1 hover:bg-theme/10 p-2 rounded-md group"
+			className={cn(
+				'w-full cursor-pointer overflow-hidden flex flex-col gap-1 p-2 rounded-md group transition-colors',
+				selected ? 'bg-theme/15' : 'hover:bg-theme/10',
+			)}
 		>
-			<div className="flex items-start justify-between gap-2">
-				<div className="flow-root flex-1 min-w-0 font-medium">
+			<div className="flex items-start justify-between gap-2 min-w-0 w-full">
+				<div className="flow-root flex-1 min-w-0 max-w-full font-medium wrap-anywhere">
 					{item.title?.trim() || '未命名'}
 				</div>
 				<button
 					type="button"
 					aria-label="从知识库删除"
-					className="cursor-pointer shrink-0 p-1 rounded-md text-textcolor/50 hover:text-destructive hover:bg-destructive/10 opacity-70 group-hover:opacity-100"
+					className={cn(
+						'cursor-pointer shrink-0 p-1 rounded-md text-textcolor/50 transition-opacity duration-150',
+						'opacity-0 pointer-events-none',
+						'hover:text-destructive hover:bg-destructive/10',
+						/* 仅 hover 显示：勿用 focus-within，否则抽屉打开时焦点落在首行会导致第一个删除钮常显 */
+						'group-hover:opacity-100 group-hover:pointer-events-auto',
+					)}
 					onClick={(e) => onTrashClick(e, item)}
 				>
 					<Trash2 size={16} />
@@ -91,6 +105,7 @@ const KnowledgeList: React.FC<IProps> = observer(
 		currentTitle: _currentTitle = '',
 		onAfterLocalDelete,
 		onDeletedRecord,
+		editingKnowledgeId = null,
 	}) => {
 		const { knowledgeStore } = useStore();
 
@@ -266,6 +281,10 @@ const KnowledgeList: React.FC<IProps> = observer(
 								<KnowledgeListRow
 									key={knowledge.id}
 									item={knowledge}
+									selected={
+										editingKnowledgeId != null &&
+										editingKnowledgeId === knowledge.id
+									}
 									onActivate={handleRowClick}
 									onTrashClick={onTrashClick}
 								/>
