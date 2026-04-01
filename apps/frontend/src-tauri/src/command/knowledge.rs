@@ -81,6 +81,17 @@ pub struct SaveKnowledgeMarkdownInput {
 	pub overwrite: bool,
 }
 
+/// 删除知识 Markdown：与保存相同的 `filePath`/`dirPath` + `title` 解析目标文件
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DeleteKnowledgeMarkdownInput {
+	pub title: String,
+	#[serde(default)]
+	pub file_path: Option<String>,
+	#[serde(default)]
+	pub dir_path: Option<String>,
+}
+
 /// 解析后的保存目标路径（`content` / `overwrite` 不参与计算）
 async fn compute_save_target_path(
 	app: &AppHandle,
@@ -163,5 +174,39 @@ pub async fn save_knowledge_markdown(
 		success: "success".to_string(),
 		file_path: Some(path.to_string_lossy().to_string()),
 		message: format!("已保存至 {}", path.display()),
+	})
+}
+
+/// 按与保存一致的路径规则删除本地 Markdown 文件
+#[tauri::command]
+pub async fn delete_knowledge_markdown(
+	app: AppHandle,
+	input: DeleteKnowledgeMarkdownInput,
+) -> Result<SaveFileResult, String> {
+	let save_like = SaveKnowledgeMarkdownInput {
+		title: input.title,
+		content: String::new(),
+		file_path: input.file_path,
+		dir_path: input.dir_path,
+		overwrite: false,
+	};
+	let path = compute_save_target_path(&app, &save_like).await?;
+
+	if !path.exists() {
+		return Err(format!("文件不存在：{}", path.display()));
+	}
+	let meta = fs::metadata(&path).map_err(|e| e.to_string())?;
+	if !meta.is_file() {
+		return Err("目标不是可删除的文件".to_string());
+	}
+	if !is_md_file_path(&path) {
+		return Err("仅允许删除 .md 文件".to_string());
+	}
+
+	fs::remove_file(&path).map_err(|e| e.to_string())?;
+	Ok(SaveFileResult {
+		success: "success".to_string(),
+		file_path: Some(path.to_string_lossy().to_string()),
+		message: format!("已删除 {}", path.display()),
 	})
 }

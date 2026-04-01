@@ -75,3 +75,32 @@ export async function invokeSaveKnowledgeMarkdown(
 		input: buildInvokeInput(payload),
 	});
 }
+
+/** Tauri `delete_knowledge_markdown` 入参（与保存共用路径规则） */
+export type DeleteKnowledgeMarkdownPayload = {
+	title: string;
+	filePath?: string;
+	dirPath?: string;
+};
+
+function buildDeleteInvokeInput(payload: DeleteKnowledgeMarkdownPayload) {
+	return {
+		title: payload.title,
+		...(payload.filePath != null && payload.filePath !== ''
+			? { filePath: payload.filePath }
+			: {}),
+		...(payload.dirPath != null && payload.dirPath !== ''
+			? { dirPath: payload.dirPath }
+			: {}),
+	};
+}
+
+/** 桌面端按标题与目录删除本地 Markdown */
+export async function invokeDeleteKnowledgeMarkdown(
+	payload: DeleteKnowledgeMarkdownPayload,
+): Promise<SaveKnowledgeMarkdownResult> {
+	const { invoke } = await import('@tauri-apps/api/core');
+	return invoke<SaveKnowledgeMarkdownResult>('delete_knowledge_markdown', {
+		input: buildDeleteInvokeInput(payload),
+	});
+}

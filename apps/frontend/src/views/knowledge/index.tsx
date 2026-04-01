@@ -10,6 +10,7 @@ import { saveKnowledge } from '@/service';
 import useStore from '@/store';
 import {
 	formatTauriInvokeError,
+	invokeDeleteKnowledgeMarkdown,
 	invokeResolveKnowledgeMarkdownTarget,
 	invokeSaveKnowledgeMarkdown,
 	type SaveKnowledgeMarkdownPayload,
@@ -19,6 +20,10 @@ import {
 function isTauriRuntime(): boolean {
 	return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
 }
+
+/** Tauri 下知识 Markdown 所在目录（保存 / 删除共用，与后端 `filePath` 语义一致） */
+const TAURI_KNOWLEDGE_DIR =
+	'/Users/dnhyxc/Documents/code/dnhyxc-ai/knowledge';
 
 const Knowledge = () => {
 	const [, setMarkdown] = useState('');
@@ -30,6 +35,10 @@ const Knowledge = () => {
 	const [overwriteTargetPath, setOverwriteTargetPath] = useState('');
 	const [pendingSavePayload, setPendingSavePayload] =
 		useState<SaveKnowledgeMarkdownPayload | null>(null);
+
+	const [deleteOpen, setDeleteOpen] = useState(false);
+	const [deleteTargetPath, setDeleteTargetPath] = useState('');
+	const [editorKey, setEditorKey] = useState(0);
 
 	const getValue = (value: string) => {
 		setMarkdown(value);
@@ -55,15 +64,14 @@ const Knowledge = () => {
 	const onSave = useCallback(async () => {
 		const content = detailStore.markdown ?? '';
 		const trimmedTitle = title.trim();
-		if (!trimmedTitle) return Toast({ type: 'warning', title: '请先输入标题' });
+		if (!trimmedTitle) return Toast({ type: 'warning', title: '请先输入文件名「标题」' });
 		if (!content) return Toast({ type: 'warning', title: '请先输入内容' });
 		try {
 			if (isTauriRuntime()) {
 				const payload: SaveKnowledgeMarkdownPayload = {
 					title: trimmedTitle,
 					content,
-					// 可选：filePath / dirPath
-					filePath: `/Users/dnhyxc/Documents/code/dnhyxc-ai/knowledge`,
+					filePath: TAURI_KNOWLEDGE_DIR,
 				};
 				const target = await invokeResolveKnowledgeMarkdownTarget(payload);
 				if (!target.exists) {
@@ -113,9 +121,82 @@ const Knowledge = () => {
 		}
 	}, [pendingSavePayload, runTauriSave]);
 
+	const onDelete = useCallback(async () => {
+		const trimmedTitle = title.trim();
+		if (!trimmedTitle) {
+			return Toast({ type: 'warning', title: '请先输入文件名「标题」' });
+		}
+		if (!isTauriRuntime()) {
+			return Toast({
+				type: 'warning',
+				title: '删除本地文件仅在桌面端可用',
+			});
+		}
+		try {
+			const target = await invokeResolveKnowledgeMarkdownTarget({
+				title: trimmedTitle,
+				content: '',
+				filePath: TAURI_KNOWLEDGE_DIR,
+			});
+			if (!target.exists) {
+				return Toast({
+					type: 'warning',
+					title: '未找到对应文件',
+					message: '当前标题在指定目录下没有已保存的 Markdown 文件',
+				});
+			}
+			setDeleteTargetPath(target.path);
+			setDeleteOpen(true);
+		} catch (e) {
+			Toast({
+				type: 'error',
+				title: formatTauriInvokeError(e),
+			});
+		}
+	}, [title]);
+
+	const onConfirmDelete = useCallback(async () => {
+		const trimmedTitle = title.trim();
+		if (!trimmedTitle) return;
+		try {
+			const result = await invokeDeleteKnowledgeMarkdown({
+				title: trimmedTitle,
+				filePath: TAURI_KNOWLEDGE_DIR,
+			});
+			if (result.success === 'success') {
+				Toast({
+					type: 'success',
+					title: '文件已删除',
+					message: result.filePath
+						? `已删除：${result.filePath}`
+						: undefined,
+				});
+				setDeleteOpen(false);
+				setDeleteTargetPath('');
+				setTitle('');
+				detailStore.setMarkdown('');
+				setEditorKey((k) => k + 1);
+			} else {
+				Toast({
+					type: 'error',
+					title: '删除失败',
+					message: result.message,
+				});
+			}
+		} catch (e) {
+			Toast({
+				type: 'error',
+				title: formatTauriInvokeError(e),
+			});
+		}
+	}, [title, detailStore]);
+
 	const overwriteFileName =
 		overwriteTargetPath.split(/[/\\]/).filter(Boolean).pop() ??
 		overwriteTargetPath;
+
+	const deleteFileName =
+		deleteTargetPath.split(/[/\\]/).filter(Boolean).pop() ?? deleteTargetPath;
 
 	return (
 		<div className="w-full h-full flex flex-col justify-center items-center m-0">
@@ -145,37 +226,68 @@ const Knowledge = () => {
 				onConfirm={onConfirmOverwrite}
 			/>
 
+			<Confirm
+				open={deleteOpen}
+				onOpenChange={(open) => {
+					setDeleteOpen(open);
+					if (!open) setDeleteTargetPath('');
+				}}
+				title="删除本地文件？"
+				description={
+					<>
+						确定要删除「{deleteFileName}」吗？此操作不可撤销。
+						<div className="mt-2 block break-all text-xs opacity-80">
+							{deleteTargetPath}
+						</div>
+					</>
+				}
+				descriptionClassName="text-left"
+				confirmText="删除"
+				confirmVariant="destructive"
+				closeOnConfirm={false}
+				onConfirm={onConfirmDelete}
+			/>
+
 			<ScrollArea className="w-full h-full overflow-y-auto p-5 pt-0 rounded-none">
 				<MarkdownEditor
+					key={editorKey}
 					className="w-full h-full"
 					height="calc(100vh - 172px)"
 					theme={theme === 'black' ? 'vs-dark' : 'vs'}
 					onChange={getValue}
 					toolbar={
-						<div className="flex items-center pr-3 gap-4">
+						<div className="flex items-center pr-3 gap-4 mr-3">
 							<Button
 								variant="link"
-								className="flex items-center gap-0! px-0!"
+								className="flex items-center gap-1 px-0 has-[>svg]:px-0"
 								onClick={onDraft}
 							>
 								<LibraryBig />
-								<span className="mt-0.5 ml-1">知识库</span>
+								<span className="mt-0.5">知识库</span>
 							</Button>
 							<Button
 								variant="link"
-								className="flex items-center gap-0! px-0!"
+								className="flex items-center gap-1 px-0 has-[>svg]:px-0"
 								onClick={onDraft}
 							>
 								<Layers2 />
-								<span className="mt-0.5 ml-1">草稿</span>
+								<span className="mt-0.5">草稿</span>
 							</Button>
 							<Button
 								variant="link"
-								className="flex items-center gap-0! px-0!"
+								className="flex items-center gap-1 px-0 has-[>svg]:px-0"
+								onClick={onDelete}
+							>
+								<LayersPlus />
+								<span className="mt-0.5">删除</span>
+							</Button>
+							<Button
+								variant="link"
+								className="flex items-center gap-1 px-0 has-[>svg]:px-0"
 								onClick={onSave}
 							>
 								<LayersPlus />
-								<span className="mt-0.5 ml-1">保存</span>
+								<span className="mt-0.5">保存</span>
 							</Button>
 						</div>
 					}
@@ -185,7 +297,7 @@ const Knowledge = () => {
 							<Input
 								value={title}
 								onChange={(e) => setTitle(e.target.value)}
-								placeholder="输入标题..."
+								placeholder="请先输入文件名「标题」..."
 								aria-label="知识标题"
 								className="md:text-base h-full border-0 bg-transparent pr-2 text-textcolor shadow-none placeholder:text-sm placeholder:text-textcolor/60 focus-visible:border-0 focus-visible:ring-0"
 							/>
