@@ -66,10 +66,13 @@ const Confirm = ({
 					<AlertDialogPrimitive.Title className="text-lg font-semibold">
 						{title}
 					</AlertDialogPrimitive.Title>
-					<AlertDialogPrimitive.Description
-						className={cn('text-textcolor text-md', descriptionClassName)}
-					>
-						{description}
+					{/* 使用 asChild + div：避免默认 <p> 内嵌 <div> 导致非法 DOM 与水合报错 */}
+					<AlertDialogPrimitive.Description asChild>
+						<div
+							className={cn('text-textcolor text-md', descriptionClassName)}
+						>
+							{description}
+						</div>
 					</AlertDialogPrimitive.Description>
 					<div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end mt-4">
 						<AlertDialogPrimitive.Cancel
