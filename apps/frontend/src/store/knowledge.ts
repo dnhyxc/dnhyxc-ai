@@ -102,17 +102,24 @@ class KnowledgeStore {
 		return res.data;
 	}
 
-	/** 删除一条并同步本地列表 */
+	/**
+	 * 调用 DELETE 接口删除数据库记录成功后，从本地分页列表中移除该项
+	 */
+	removeFromLocalList(id: string): void {
+		runInAction(() => {
+			this.list = this.list.filter((x) => x.id !== id);
+			this.total = Math.max(0, this.total - 1);
+		});
+	}
+
+	/** 删除一条：请求接口 + 同步本地列表 */
 	async removeItem(id: string): Promise<boolean> {
 		try {
 			const res = await deleteKnowledge(id);
 			if (!res.success) {
 				return false;
 			}
-			runInAction(() => {
-				this.list = this.list.filter((x) => x.id !== id);
-				this.total = Math.max(0, this.total - 1);
-			});
+			this.removeFromLocalList(id);
 			return true;
 		} catch {
 			return false;
