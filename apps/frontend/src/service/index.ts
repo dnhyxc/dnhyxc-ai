@@ -1,4 +1,8 @@
-import { KnowledgeListItem, KnowledgeRecord, ShareInfo } from '@/types';
+import {
+	type KnowledgeListItem,
+	type KnowledgeRecord,
+	ShareInfo,
+} from '@/types';
 import { http } from '@/utils/fetch';
 import {
 	CREATE_CHECKOUT_SESSION,
@@ -339,9 +343,18 @@ export const getKnowledgeDetail = async (id: string) => {
 	});
 };
 
-/** PUT /knowledge/update：更新（body 需含 id，与后端 UpdateKnowledgeDto 一致） */
-export const updateKnowledge = async (params: Pick<KnowledgeRecord, 'id'>) => {
-	return await http.put<KnowledgeRecord>(KNOWLEDGE_UPDATE, params);
+/** PUT /knowledge/update/:id（body 含 id，与后端 UpdateKnowledgeDto 一致） */
+export const updateKnowledge = async (
+	id: string,
+	body: Partial<
+		Pick<KnowledgeRecord, 'title' | 'content' | 'author' | 'authorId'>
+	>,
+) => {
+	return await http.put<KnowledgeRecord>(
+		KNOWLEDGE_UPDATE,
+		{ id, ...body },
+		{ params: [id] },
+	);
 };
 
 /** DELETE /knowledge/delete/:id */

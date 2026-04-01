@@ -17,14 +17,18 @@ import {
 	invokeSaveKnowledgeMarkdown,
 	type SaveKnowledgeMarkdownPayload,
 } from '@/utils/knowledge-save';
+import KnowledgeList from './KnowledgeList';
 
 /** Tauri 下知识 Markdown 所在目录（保存 / 删除共用） */
 const TAURI_KNOWLEDGE_DIR = '/Users/dnhyxc/Documents/code/dnhyxc-ai/knowledge';
 
 const Knowledge = () => {
-	const [content, setContent] = useState('');
 	const [title, setTitle] = useState('');
-	const { detailStore } = useStore();
+	/** 正在编辑的云端知识库 id；为空表示新建 */
+	const [editingKnowledgeId, setEditingKnowledgeId] = useState<string | null>(
+		null,
+	);
+	const { detailStore, knowledgeStore } = useStore();
 	const { theme } = useTheme();
 
 	const [overwriteOpen, setOverwriteOpen] = useState(false);
@@ -35,14 +39,17 @@ const Knowledge = () => {
 	const [deleteOpen, setDeleteOpen] = useState(false);
 	const [deleteTargetPath, setDeleteTargetPath] = useState('');
 	const [editorKey, setEditorKey] = useState(0);
+	const [open, setOpen] = useState(false);
 
 	const getValue = (value: string) => {
-		setContent(value);
 		detailStore.setMarkdown(value);
 	};
 
 	const onDraft = () => {
-		console.log('草稿');
+		setEditingKnowledgeId(null);
+		setTitle('');
+		detailStore.setMarkdown('');
+		setEditorKey((k) => k + 1);
 	};
 
 	const getUserInfo = useMemo(() => {
@@ -69,59 +76,75 @@ const Knowledge = () => {
 		[],
 	);
 
-	// 保存到数据库
-	const runSave = useCallback(
-		async (params: Omit<KnowledgeRecord, 'id'>) => {
-			await saveKnowledge(params);
-		},
-		[title, content],
-	);
+	/** 写入后端：有 editingKnowledgeId 则更新，否则新建并刷新列表 */
+	const persistKnowledgeApi = useCallback(async () => {
+		const markdown = detailStore.markdown ?? '';
+		const trimmedTitle = title.trim();
+		const base = { title: trimmedTitle, content: markdown };
+		const meta =
+			getUserInfo?.username != null || getUserInfo?.id != null
+				? {
+						...(getUserInfo?.username != null
+							? { author: getUserInfo.username as string }
+							: {}),
+						...(getUserInfo?.id != null
+							? { authorId: getUserInfo.id as number }
+							: {}),
+					}
+				: {};
+		if (editingKnowledgeId) {
+			await knowledgeStore.updateItem(editingKnowledgeId, { ...base, ...meta });
+		} else {
+			await saveKnowledge({ ...base, ...meta } as Omit<KnowledgeRecord, 'id'>);
+		}
+	}, [detailStore, title, getUserInfo, editingKnowledgeId, knowledgeStore]);
 
 	const onSave = useCallback(async () => {
-		const content = detailStore.markdown ?? '';
+		const markdown = detailStore.markdown ?? '';
 		const trimmedTitle = title.trim();
 		if (!trimmedTitle)
 			return Toast({ type: 'warning', title: '请先输入文件名「标题」' });
-		if (!content) return Toast({ type: 'warning', title: '请先输入内容' });
+		if (!markdown) return Toast({ type: 'warning', title: '请先输入内容' });
 		try {
 			if (isTauriRuntime()) {
 				const payload: SaveKnowledgeMarkdownPayload = {
 					title: trimmedTitle,
-					content,
+					content: markdown,
 					filePath: TAURI_KNOWLEDGE_DIR,
 				};
 				const target = await invokeResolveKnowledgeMarkdownTarget(payload);
 				if (!target.exists) {
-					await runSave({
-						title,
-						content,
-						author: getUserInfo?.username,
-						authorId: getUserInfo?.id,
-					});
+					await persistKnowledgeApi();
 					await runTauriSave(payload);
 				} else {
 					setOverwriteTargetPath(target.path);
 					setPendingSavePayload(payload);
 					setOverwriteOpen(true);
 				}
+			} else {
+				await persistKnowledgeApi();
+				Toast({
+					type: 'success',
+					title: '文件已保存',
+					message: trimmedTitle ? `「${trimmedTitle}」` : undefined,
+				});
 			}
 		} catch (e) {
 			Toast({
 				type: 'error',
-				title: formatTauriInvokeError(e),
+				title: isTauriRuntime()
+					? formatTauriInvokeError(e)
+					: e instanceof Error
+						? e.message
+						: '保存失败',
 			});
 		}
-	}, [title, runTauriSave]);
+	}, [title, detailStore, persistKnowledgeApi, runTauriSave]);
 
 	const onConfirmOverwrite = useCallback(async () => {
 		if (!pendingSavePayload) return;
 		try {
-			await runSave({
-				title,
-				content,
-				author: getUserInfo?.username,
-				authorId: getUserInfo?.id,
-			});
+			await persistKnowledgeApi();
 			await runTauriSave({ ...pendingSavePayload, overwrite: true });
 			setOverwriteOpen(false);
 			setPendingSavePayload(null);
@@ -132,7 +155,7 @@ const Knowledge = () => {
 				title: formatTauriInvokeError(e),
 			});
 		}
-	}, [pendingSavePayload, runTauriSave]);
+	}, [pendingSavePayload, persistKnowledgeApi, runTauriSave]);
 
 	const onDelete = useCallback(async () => {
 		const trimmedTitle = title.trim();
@@ -265,13 +288,22 @@ const Knowledge = () => {
 					className="w-full h-full"
 					height="calc(100vh - 172px)"
 					theme={theme === 'black' ? 'vs-dark' : 'vs'}
+					value={detailStore.markdown}
 					onChange={getValue}
 					toolbar={
 						<div className="flex items-center pr-3 gap-4">
 							<Button
 								variant="link"
 								className="flex items-center gap-1 px-0 has-[>svg]:px-0"
-								onClick={onDraft}
+								onClick={onDelete}
+							>
+								<LayersPlus />
+								<span className="mt-0.5">删除</span>
+							</Button>
+							<Button
+								variant="link"
+								className="flex items-center gap-1 px-0 has-[>svg]:px-0"
+								onClick={() => setOpen(true)}
 							>
 								<LibraryBig />
 								<span className="mt-0.5">知识库</span>
@@ -283,14 +315,6 @@ const Knowledge = () => {
 							>
 								<Layers2 />
 								<span className="mt-0.5">草稿</span>
-							</Button>
-							<Button
-								variant="link"
-								className="flex items-center gap-1 px-0 has-[>svg]:px-0"
-								onClick={onDelete}
-							>
-								<LayersPlus />
-								<span className="mt-0.5">删除</span>
 							</Button>
 							<Button
 								variant="link"
@@ -316,6 +340,16 @@ const Knowledge = () => {
 					}
 				/>
 			</ScrollArea>
+			<KnowledgeList
+				open={open}
+				onOpenChange={setOpen}
+				onPick={(record) => {
+					setEditingKnowledgeId(record.id);
+					setTitle(record.title ?? '');
+					detailStore.setMarkdown(record.content ?? '');
+					setEditorKey((k) => k + 1);
+				}}
+			/>
 		</div>
 	);
 };

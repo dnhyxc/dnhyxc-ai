@@ -11,10 +11,12 @@ export class SaveKnowledgeDto {
 	@MaxLength(5_000_000)
 	content!: string;
 
+	@IsOptional()
 	@IsString()
 	@MaxLength(255)
 	author?: string;
 
+	@IsOptional()
 	@Type(() => Number)
 	@IsInt()
 	authorId?: number;

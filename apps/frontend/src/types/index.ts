@@ -72,6 +72,8 @@ export type KnowledgeRecord = {
 	content: string;
 	author: string | null;
 	authorId: number | null;
+	createdAt?: string;
+	updatedAt?: string;
 };
 
 /** 列表项（无正文大字段） */
