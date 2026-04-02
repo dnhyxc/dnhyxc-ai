@@ -16,6 +16,43 @@ export const THEMES = [
 
 export type ThemeName = (typeof THEMES)[number]['name'];
 
+/** 供 index.html 首屏脚本读取，与 Tauri store 同步，减轻刷新时主题晚于首帧 */
+export const THEME_BOOTSTRAP_STORAGE_KEY = 'dnhyxc_theme_bootstrap';
+
+function persistThemeBootstrap(themeName: ThemeName) {
+	try {
+		localStorage.setItem(THEME_BOOTSTRAP_STORAGE_KEY, themeName);
+	} catch {
+		// 私密模式等场景忽略
+	}
+}
+
+/** 与 index.html 首屏逻辑一致，供 useState 初值与 body class 对齐 */
+function readThemeBootstrapSync(): ThemeName | null {
+	if (typeof window === 'undefined') {
+		return null;
+	}
+	try {
+		const fromUrl = parseThemeFromSearch(window.location.search);
+		if (fromUrl) {
+			return fromUrl;
+		}
+		const b = localStorage.getItem(THEME_BOOTSTRAP_STORAGE_KEY) as ThemeName;
+		if (b && THEMES.some((t) => t.name === b)) {
+			return b;
+		}
+		const j = localStorage.getItem('dnhyxc_settings_json');
+		if (!j) {
+			return null;
+		}
+		const o = JSON.parse(j) as { themeType?: string };
+		const t = o.themeType as ThemeName;
+		return t && THEMES.some((x) => x.name === t) ? t : null;
+	} catch {
+		return null;
+	}
+}
+
 /** 从查询串解析主题名（用于分享页等在浏览器中还原壳内主题） */
 export function parseThemeFromSearch(search: string): ThemeName | null {
 	const params = new URLSearchParams(
@@ -53,7 +90,9 @@ export function appendShareThemeQuery(
 }
 
 export const useTheme = () => {
-	const [theme, setTheme] = useState<ThemeName>('white');
+	const [theme, setTheme] = useState<ThemeName>(
+		() => readThemeBootstrapSync() ?? 'white',
+	);
 
 	useEffect(() => {
 		const initTheme = async () => {
@@ -63,6 +102,7 @@ export const useTheme = () => {
 				if (fromUrl) {
 					setTheme(fromUrl);
 					setThemeClass(fromUrl);
+					persistThemeBootstrap(fromUrl);
 					return;
 				}
 			}
@@ -75,6 +115,7 @@ export const useTheme = () => {
 			if (isColorTheme && themeType) {
 				setTheme(themeType);
 				setThemeClass(themeType);
+				persistThemeBootstrap(themeType);
 			}
 		};
 		initTheme();
@@ -149,6 +190,7 @@ export const useTheme = () => {
 		if (themeItem?.type === 'color') {
 			setTheme(themeName);
 			setThemeClass(themeName);
+			persistThemeBootstrap(themeName);
 			await setValue('theme', themeName === 'black' ? 'dark' : 'light');
 			await setValue('themeType', themeName);
 		}

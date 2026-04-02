@@ -5,6 +5,8 @@
 		<link rel="icon" type="image/svg+xml" href="/icon.svg" />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 		<title>dnhyxc-ai</title>
+		<!-- 提前加载全局样式，使首帧即可应用 body.theme-* 与 Tailwind，避免深色主题白屏闪烁 -->
+		<link rel="stylesheet" href="/src/index.css" />
 		<link rel="stylesheet" href="/src/assets/font/index.css" />
 		<style type="text/css">
 			html,
@@ -18,20 +20,14 @@
 				padding: 0px;
 			}
 
+			/* 与当前主题一致：首屏脚本已为 body 挂上 theme-*，无存储时继承 :root 的 --theme-background */
 			#loader-wrapper {
 				position: fixed;
 				top: 0;
 				left: 0;
 				width: 100%;
 				height: 100%;
-				background: linear-gradient(
-					29deg,
-					#e9defa,
-					#fbfcdb,
-					#a8edea,
-					#e0c3fc,
-					#d1e8f3
-				);
+				background: var(--theme-background);
 			}
 
 			#loader-wrapper .load_title {
@@ -60,12 +56,57 @@
 	</head>
 
 	<body>
+		<script>
+			(function () {
+				// 与 src/hooks/theme.ts 中配色主题 name 保持一致（供首屏同步应用 class）
+				var ALLOWED = {
+					white: 1,
+					black: 1,
+					green: 1,
+					purple: 1,
+					"blue-1": 1,
+					"blue-2": 1,
+					"blue-3": 1,
+					orange: 1,
+					red: 1,
+					beige: 1,
+				};
+				function fromSearch() {
+					try {
+						const s = location.search || "";
+						const p = new URLSearchParams(s.startsWith("?") ? s : `?${s}`);
+						const raw = p.get("theme") || p.get("themeType");
+						return raw && ALLOWED[raw] ? raw : null;
+					} catch (_e) {
+						return null;
+					}
+				}
+				function fromStorage() {
+					try {
+						const b = localStorage.getItem("dnhyxc_theme_bootstrap");
+						if (b && ALLOWED[b]) return b;
+						const j = localStorage.getItem("dnhyxc_settings_json");
+						if (!j) return null;
+						const o = JSON.parse(j);
+						const t = o?.themeType;
+						return typeof t === "string" && ALLOWED[t] ? t : null;
+					} catch (_e) {
+						return null;
+					}
+				}
+				var theme = fromSearch() || fromStorage();
+				if (theme) {
+					document.body.classList.add(`theme-${theme}`);
+				}
+			})();
+		</script>
 		<div id="root"></div>
 		<script>
 			const pathname = location.pathname;
 			if (pathname !== "/about") {
 				const root = document.querySelector("#root");
-				root.innerHTML = `<div id="loader-wrapper"></div>`;
+				// 背景色由 #loader-wrapper 的 var(--theme-background) 决定，与 white/black 等各主题一致
+				root.innerHTML = '<div id="loader-wrapper"></div>';
 			}
 		</script>
 		<script type="module" src="/src/main.tsx"></script>

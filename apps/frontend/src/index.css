@@ -459,6 +459,31 @@ body {
 	--theme-white: oklch(0% 0 0);
 }
 
+/*
+ * 首屏避免白底闪烁：配色主题类上的 --theme-* 立即映射到 shadcn 语义变量，
+ * 在 useTheme 的 applyThemeVariables 写入 html 之前，#root 等即可继承正确背景。
+ */
+body.theme-white,
+body.theme-black,
+body.theme-green,
+body.theme-purple,
+body.theme-blue-1,
+body.theme-blue-2,
+body.theme-blue-3,
+body.theme-orange,
+body.theme-red,
+body.theme-beige {
+	--background: var(--theme-background);
+	--card: var(--theme-card);
+	--muted: var(--theme-muted);
+	--border: var(--theme-border);
+	--foreground: var(--theme-foreground);
+	--secondary: var(--theme-secondary);
+	--sidebar: var(--theme-sidebar);
+	--popover: var(--theme-card);
+	--accent: var(--theme-muted);
+}
+
 @theme inline {
 	--radius-sm: calc(var(--radius) - 4px);
 	--radius-md: calc(var(--radius) - 2px);
