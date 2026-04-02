@@ -1,9 +1,33 @@
 // MarkdownParser.ts
 import hljs from 'highlight.js';
 import MarkdownIt from 'markdown-it';
+import type StateCore from 'markdown-it/lib/rules_core/state_core.mjs';
+import type Token from 'markdown-it/lib/token.mjs';
 import markdownItKatex from 'markdown-it-katex';
+// CJS 包，无官方类型
+import markdownItTaskLists from 'markdown-it-task-lists';
 import type { HighlightJsThemeId } from './generated/highlight-js-theme-ids.js';
 import { applyHighlightJsTheme } from './inject-highlight-theme.js';
+
+function taskListAttrSet(token: Token, name: string, value: string): void {
+	const index = token.attrIndex(name);
+	const attr: [string, string] = [name, value];
+	if (index < 0) {
+		token.attrPush(attr);
+	} else {
+		token.attrs![index] = attr;
+	}
+}
+
+function taskListParentTokenIndex(tokens: Token[], index: number): number {
+	const targetLevel = tokens[index].level - 1;
+	for (let i = index - 1; i >= 0; i--) {
+		if (tokens[i].level === targetLevel) {
+			return i;
+		}
+	}
+	return -1;
+}
 
 // 正文/公式样式仍建议 import '@dnhyxc-ai/tools/styles.css' 或 markdown-base.css。
 // 代码块主题可通过构造参数 highlightTheme（CDN）或 highlightThemeCss（内联）注入，亦可继续用手动 import。
@@ -81,6 +105,14 @@ class MarkdownParser {
 			errorColor: 'transparent',
 		});
 
+		// GFM 待办列表（有序 / 无序均可），与 github-markdown-css 的 .task-list-item 等配套
+		this.md.use(markdownItTaskLists, {
+			// 静态 HTML 与 GitHub 展示一致，禁用交互避免 XSS 面
+			enabled: false,
+		});
+
+		this.patchGfmTaskListBareMarkers();
+
 		// Add support for \(...\) and \[...\] delimiters
 		this.addLatexDelimiters();
 
@@ -96,6 +128,48 @@ class MarkdownParser {
 				onError: options.onError,
 			});
 		}
+	}
+
+	/**
+	 * markdown-it-task-lists 依赖 `[ ] ` / `[x] ` 等「标记后带空格」；解析后纯 `[x]`、`[ ]` 常见于行尾无正文，
+	 * 且补空格也会被 markdown-it 吃掉。对这类列表项在 core 阶段补渲染勾选框。
+	 */
+	private patchGfmTaskListBareMarkers(): void {
+		const md = this.md;
+		md.core.ruler.after(
+			'github-task-lists',
+			'gfm-task-list-bare',
+			(state: StateCore) => {
+				const tokens = state.tokens;
+				const TokenCtor = state.Token;
+				for (let i = 2; i < tokens.length; i++) {
+					const inline = tokens[i];
+					if (inline.type !== 'inline') continue;
+					if (tokens[i - 1].type !== 'paragraph_open') continue;
+					if (tokens[i - 2].type !== 'list_item_open') continue;
+
+					const c = inline.content;
+					if (c !== '[x]' && c !== '[X]' && c !== '[ ]') continue;
+
+					const checked = c !== '[ ]';
+					const checkbox = new TokenCtor('html_inline', '', 0);
+					checkbox.content = `<input class="task-list-item-checkbox"${checked ? ' checked=""' : ''} disabled="" type="checkbox">`;
+
+					const children = inline.children;
+					if (!children?.length || children[0].type !== 'text') continue;
+
+					children.unshift(checkbox);
+					children[1].content = '';
+					inline.content = '';
+
+					taskListAttrSet(tokens[i - 2], 'class', 'task-list-item');
+					const listIdx = taskListParentTokenIndex(tokens, i - 2);
+					if (listIdx >= 0) {
+						taskListAttrSet(tokens[listIdx], 'class', 'contains-task-list');
+					}
+				}
+			},
+		);
 	}
 
 	/**

@@ -8,14 +8,15 @@
 
 | 路径                                      | 角色                                                                                                                    |
 | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `src/markdown-parser.ts`                  | `MarkdownIt` + `markdown-it-katex` + `highlight.js` 高亮；可选围栏工具栏；构造末尾调用主题注入。                        |
+| `src/markdown-parser.ts`                  | `MarkdownIt` + `markdown-it-katex` + **`markdown-it-task-lists`（GFM 待办）** + 自研「纯 `[x]`/`[ ]`」补丁 + `highlight.js` 高亮；可选围栏工具栏；构造末尾调用主题注入。 |
+| `src/types.d.ts`                          | 为无官方类型的依赖补充 `declare module`（如 `markdown-it-katex`、`markdown-it-task-lists`）。                         |
 | `src/inject-highlight-theme.ts`           | `applyHighlightJsTheme` / `clearAppliedHighlightJsTheme`：向 `document.head` 注入 `<link>`（CDN）或 `<style>`（内联）。 |
 | `src/highlight-theme-import.ts`           | `resolveHighlightJsThemeSpecifier`：把主题 id 转成 `@dnhyxc-ai/tools/styles/hljs/...` 包内说明符。                      |
 | `src/generated/highlight-js-theme-ids.ts` | **构建生成**：`HighlightJsThemeId` 字面量联合，与 `dist/styles/hljs` 下文件一一对应。                                   |
 | `src/styles.ts`                           | **构建生成**：`highlightJsThemes`、`highlightJsThemeIds`、`styleContents`、`styles` 等（`pnpm clean` 会删，勿手改）。   |
 | `src/index.ts`                            | 包入口：聚合导出类型与函数。                                                                                            |
 | `scripts/build-mk-css.js`                 | 复制 CSS/字体、写合并文件、写 `dist/styles.js` / `styles.d.ts` / `src/styles.ts`、写 `highlight-js-theme-ids.ts`。      |
-| `tsup.config.ts`                          | 打 `dist/index.{js,cjs}` + `d.ts`；`noExternal` 打入 markdown-it / katex / highlight.js。                               |
+| `tsup.config.ts`                          | 打 `dist/index.{js,cjs}` + `d.ts`；`noExternal` 打入 `highlight.js` / `markdown-it` / `markdown-it-katex` / `katex`；**`markdown-it-task-lists` 保持外部 import**（见 §6.3、§10）。 |
 | `dist/styles/**`                          | 运行时样式产物（`dist/` 默认不提交，由 CI/本地 `pnpm build` 生成）。                                                    |
 
 ---
@@ -25,6 +26,7 @@
 ### 2.1 Markdown 渲染与容器
 
 - **实现**：`MarkdownIt` 实例，默认 `html/linkify/typographer/breaks` 与项目需求对齐。
+- **GFM 待办**：在 KaTeX 之后注册 `markdown-it-task-lists`，再注册自研 `patchGfmTaskListBareMarkers`（见 **§10**）。有序 / 无序列表中的 `- [ ] foo`、`- [x] bar`、`1. [ ]` 等会输出带 `contains-task-list`、`task-list-item`、`task-list-item-checkbox` 的 HTML，与 `github-markdown-css` 中任务列表样式一致。
 - **输出**：`render(text)` 内先对 `\text{○}` 做替换以规避 KaTeX 度量问题，再 `md.render`，外层包 `<div class="${containerClass}">`（默认 `markdown-body`），便于配合 `github-markdown-css`。
 - **错误**：`try/catch` 中调用可选 `onError`，失败时仍包容器并回退为转义前的原文占位。
 
@@ -186,7 +188,7 @@ const parser = new MarkdownParser({ highlightTheme: "atom-one-dark" });
 ### 6.3 tsup 说明
 
 - **单入口** `src/index.ts`，**ESM + CJS** + **dts**。
-- **`noExternal`**：`highlight.js`、`markdown-it`、`markdown-it-katex`、`katex` 打进包内，应用侧只需依赖 `@dnhyxc-ai/tools` 即可使用解析逻辑；样式仍走 exports 子路径或 CDN/内联注入。
+- **`noExternal`**：`highlight.js`、`markdown-it`、`markdown-it-katex`、`katex` 打进包内；**`markdown-it-task-lists` 不在此列**，列在 **`@dnhyxc-ai/tools` 的 `dependencies`** 中，由包管理器随本包安装；打包产物中保留 `import … from 'markdown-it-task-lists'`（不打进单文件 bundle）。
 
 ### 6.4 Monorepo / CI
 
@@ -233,6 +235,74 @@ const parser = new MarkdownParser({ highlightTheme: "atom-one-dark" });
 ## 9. `README.md`
 
 `packages/tools/README.md` 中部分片段已过时，**以本文档与 `src/` 源码为准**。
+
+---
+
+## 10. GFM 待办列表（Task lists）— 影响面、风险与实现说明
+
+本节对应 **`packages/tools` 中为 Markdown 增加 GitHub 风格待办勾选框** 的改动：依赖 `markdown-it-task-lists`，并增加一层 core 规则以兼容「行内仅有 `[x]` / `[X]` / `[ ]`、无后续正文」的常见写法。
+
+### 10.1 改动概要
+
+| 类别           | 内容                                                                                                                                 |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| **依赖**       | `package.json` 增加 **`markdown-it-task-lists`**（运行时依赖，见 §6.3）。                                                            |
+| **类型**       | `src/types.d.ts` 增加 **`declare module 'markdown-it-task-lists'`**，便于 TypeScript 识别默认导出插件函数。                          |
+| **解析逻辑**   | `src/markdown-parser.ts`：`md.use(markdownItTaskLists, { enabled: false })` + 私有方法 **`patchGfmTaskListBareMarkers()`** + 模块级辅助函数。 |
+| **对外 API**   | **无新增构造参数**；`render()` 签名与选项对象与改动前一致。                                                                          |
+| **样式**       | 仍依赖宿主引入的 **`github-markdown-css`**（如 `styles.css` / `markdown-base.css`）中的 `.contains-task-list`、`.task-list-item-checkbox` 等；本包未新增独立 CSS 文件。 |
+
+### 10.2 影响点（谁会感知到）
+
+1. **所有调用 `MarkdownParser.render()` 的场景**（聊天消息、知识库预览、分享页、文档编辑预览等）：凡原文中出现 GFM 待办语法，**输出 HTML 会从「纯文本列表」变为「带 disabled checkbox 的结构」**，视觉与 GitHub 预览更一致。
+2. **DOM / 安全策略**：输出中出现 **`<input type="checkbox" disabled>`**（`html: true` 本就允许富 HTML；此处为固定模板字符串，不拼接用户原文到标签属性）。若业务曾对 `dangerouslySetInnerHTML` 做 **严格 DOMPurify 白名单** 且未允许 `input`，可能被剥离勾选框——需自行放宽白名单或保持现状（列表仍可读，只是无框）。
+3. **可访问性 / 交互**：`enabled: false` 与 **`disabled`** 表示**展示用**待办，与 GitHub 静态渲染一致；**不会**在页面上产生可点击改状态的待办（避免与「只读预览」模型冲突，并减小误触与 XSS 面）。
+4. **打包体积 / 依赖树**：多一个较小依赖；`tsup` 未将其打入 `noExternal`，安装 `@dnhyxc-ai/tools` 时会一并安装 `markdown-it-task-lists`。
+
+### 10.3 是否破坏原有功能逻辑？
+
+**总体结论：预期不破坏既有非待办 Markdown 行为；待办相关为增量能力。仍须注意下列边界：**
+
+| 场景 | 说明 |
+| ---- | ---- |
+| **普通列表** | 无 `[ ]` / `[x]` 语法的列表，token 流与以前一致，**不受影响**。 |
+| **标准 GFM 待办** | `- [ ] 文案`、`- [x] 文案` 等由 **`markdown-it-task-lists`** 处理，与社区常用行为一致。 |
+| **仅勾选框、无正文** | 如 `2. [x]`、`- [ ]`：插件无法识别（解析后 inline 仅为 `[x]`/`[ ]`），由 **`patchGfmTaskListBareMarkers`** 补勾选框；**属新增能力**，不改变非匹配列表项。 |
+| **`[x]文字`（`]` 后无空格）** | Markdown 中 `[x]` 易被识别为**链接引用**前缀，**无法**可靠当作待办；与 GitHub 一致写法应为 **`[x] 文字`**（`]` 与正文之间有空格）。这不是回归，而是语法限制。 |
+| **KaTeX / 代码块 / 围栏工具栏** | 插件注册顺序为：KaTeX → task-lists → **bare 补丁** → `addLatexDelimiters` → 可选 fence 覆盖；待办规则在 **core** 阶段、与块级数学规则正交，**不修改** fence 与高亮回调。 |
+| **性能** | 每次 `render` 多一次 core 扫描（O(token 数)），量级与 markdown-it 自身相比可忽略。 |
+
+若未来升级 **`markdown-it`** 或 **`markdown-it-task-lists`** 大版本，需回归：**待办 HTML 结构**、**`github-task-lists` ruler 名称是否仍为 `github-task-lists`**（`patchGfmTaskListBareMarkers` 使用 `md.core.ruler.after('github-task-lists', …)`，名称若变需同步修改）。
+
+### 10.4 代码说明（逐段）
+
+#### 10.4.1 模块级辅助函数（`taskListAttrSet` / `taskListParentTokenIndex`）
+
+- **`taskListAttrSet(token, name, value)`**：对 markdown-it 的 **`Token`** 写入或覆盖 `class` 等属性（内部用 `attrIndex` / `attrPush`），与 `markdown-it-task-lists` 源码中的 `attrSet` 同理，避免重复造轮子时行为不一致。
+- **`taskListParentTokenIndex(tokens, index)`**：从某一 `list_item_open` 向前找 **低一级 `level`** 的 token，用于定位外层 **`ul_open` / `ol_open`**，以便打上 **`contains-task-list`**，与官方 GFM 结构一致。
+
+#### 10.4.2 `md.use(markdownItTaskLists, { enabled: false })`
+
+- **作用**：在 token 流上把符合插件条件的列表项改为带 **`html_inline`** 勾选框 + 调整 `class`。
+- **`enabled: false`**：勾选框带 **`disabled`**，静态展示；与本文档 §10.2 中「只读预览」策略一致。
+
+#### 10.4.3 `patchGfmTaskListBareMarkers()`
+
+- **挂载点**：`md.core.ruler.after('github-task-lists', 'gfm-task-list-bare', callback)`，保证在官方插件跑完之后再修正「漏网」项。
+- **匹配条件**（需同时满足）：
+  - 当前 token 为 **`inline`**；
+  - 前一个是 **`paragraph_open`**；
+  - 再前一个是 **`list_item_open`**；
+  - **`inline.content`** 精确等于 **`[x]`**、**`[X]`** 或 **`[ ]`**（整段列表项正文只有勾选标记、无其它字符）。
+- **动作**：
+  1. 用 **`state.Token`** 构造 **`html_inline`**，内容为带 `task-list-item-checkbox`、`disabled`、`type="checkbox"` 的 `<input>`，已勾选项加 **`checked=""`**。
+  2. 将该 token **插入** `inline.children` 首部，并把原 **第一个 `text` 子节点** 的 `content` 置空，同步清空 **`inline.content`**，避免重复输出文本。
+  3. 给对应 **`list_item_open`** 设置 **`class="task-list-item"`**，给父级 **`ul`/`ol`** 设置 **`class="contains-task-list"`**（与插件输出对齐）。
+- **刻意不处理**：`inline.content` 为 **`[x]foo`** 等紧贴正文（无空格）的情况，避免与链接引用等 inline 规则冲突；用户应使用 **`[x] foo`**。
+
+#### 10.4.4 `src/types.d.ts`
+
+- 为 **`markdown-it-task-lists`** 声明 **`export =`** 风格的默认导出及可选 **`TaskListsOptions`**，避免 `TS7016`（无声明文件）。
 
 ---
 

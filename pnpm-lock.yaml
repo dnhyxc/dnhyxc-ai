@@ -481,6 +481,9 @@ importers:
       markdown-it-katex:
         specifier: ^2.0.3
         version: 2.0.3
+      markdown-it-task-lists:
+        specifier: ^2.1.1
+        version: 2.1.1
     devDependencies:
       '@types/highlight.js':
         specifier: ^10.1.0
@@ -6193,6 +6196,9 @@ packages:
 
   markdown-it-sup@2.0.0:
     resolution: {integrity: sha512-5VgmdKlkBd8sgXuoDoxMpiU+BiEt3I49GItBzzw7Mxq9CxvnhE/k09HFli09zgfFDRixDQDfDxi0mgBCXtaTvA==}
+
+  markdown-it-task-lists@2.1.1:
+    resolution: {integrity: sha512-TxFAc76Jnhb2OUu+n3yz9RMu4CwGfaT788br6HhEDlvWfdeJcLUsxk1Hgw2yJio0OXsxv7pyIPmvECY7bMbluA==}
 
   markdown-it@14.1.0:
     resolution: {integrity: sha512-a54IwgWPaeBCAAsv13YgmALOF1elABB08FxO9i+r4VFk5Vl4pKokRPeX8u5TCgSsPi6ec1otfLjdOpVcgbpshg==}
@@ -13335,7 +13341,7 @@ snapshots:
       isstream: 0.1.2
       jsonwebtoken: 9.0.3
       mime-types: 2.1.35
-      retry-axios: 2.6.0(axios@1.13.6(debug@4.4.3))
+      retry-axios: 2.6.0(axios@1.13.6)
       tough-cookie: 4.1.4
     transitivePeerDependencies:
       - supports-color
@@ -14299,6 +14305,8 @@ snapshots:
   markdown-it-sub@2.0.0: {}
 
   markdown-it-sup@2.0.0: {}
+
+  markdown-it-task-lists@2.1.1: {}
 
   markdown-it@14.1.0:
     dependencies:
@@ -15615,7 +15623,7 @@ snapshots:
       onetime: 5.1.2
       signal-exit: 3.0.7
 
-  retry-axios@2.6.0(axios@1.13.6(debug@4.4.3)):
+  retry-axios@2.6.0(axios@1.13.6):
     dependencies:
       axios: 1.13.6(debug@4.4.3)
 
