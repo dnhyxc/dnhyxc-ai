@@ -2,7 +2,13 @@ import { MarkdownParser } from '@dnhyxc-ai/tools';
 import '@dnhyxc-ai/tools/styles.css';
 import Editor, { type OnMount } from '@monaco-editor/react';
 import { ScrollArea } from '@ui/index';
-import { Columns2, Eye, FilePenLine } from 'lucide-react';
+import {
+	ChevronDown,
+	ChevronUp,
+	Columns2,
+	Eye,
+	FilePenLine,
+} from 'lucide-react';
 import {
 	memo,
 	type RefObject,
@@ -219,10 +225,13 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	const [viewMode, setViewMode] = useState<MarkdownViewMode>('edit');
 	const [splitPreviewScrollFollow, setSplitPreviewScrollFollow] =
 		useState(false);
+	/** 底部 Markdown 操作条是否展开（顶栏按钮切换，带动画） */
+	const [markdownBottomBarOpen, setMarkdownBottomBarOpen] = useState(false);
 	const viewModeRef = useRef(viewMode);
 	const splitScrollFollowRef = useRef(splitPreviewScrollFollow);
 	const previewViewportRef = useRef<HTMLDivElement | null>(null);
 	const splitScrollFollowSwitchId = useId();
+	const markdownBottomBarId = useId();
 
 	const isMarkdown = language === 'markdown' && enableMarkdownPreview;
 
@@ -296,7 +305,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 
 	const modeBtnClass = (active: boolean) =>
 		cn(
-			'cursor-pointer inline-flex items-center justify-center rounded px-2 py-1 text-xs transition-colors',
+			'cursor-pointer inline-flex items-center justify-center rounded px-1 pb-1 pt-0.5 text-xs transition-colors',
 			active
 				? 'bg-theme/25 text-textcolor'
 				: 'text-textcolor/60 hover:bg-theme/10 hover:text-textcolor',
@@ -304,150 +313,192 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 
 	return (
 		<div
-			className={cn(
-				'min-w-0 max-w-full rounded-md overflow-hidden bg-theme/5',
-				className,
-			)}
+			className={cn('relative min-w-0 max-w-full overflow-hidden', className)}
 		>
-			<div
-				className={cn(
-					'flex h-10 min-w-0 items-center gap-2 border-b border-theme/5',
-				)}
-			>
-				{title}
-				{isMarkdown ? (
-					<div
-						className="flex shrink-0 items-center gap-0.5 rounded-md border border-theme/10 p-0.5"
-						role="tablist"
-						aria-label="Markdown 视图"
-					>
-						<button
-							type="button"
-							role="tab"
-							aria-selected={viewMode === 'edit'}
-							className={modeBtnClass(viewMode === 'edit')}
-							title="编辑源码"
-							onClick={() => {
-								setViewMode('edit');
-								queueMicrotask(focusEditor);
-							}}
-						>
-							<FilePenLine size={14} className="mr-1 opacity-80" />
-							编辑
-						</button>
-						<button
-							type="button"
-							role="tab"
-							aria-selected={viewMode === 'preview'}
-							className={modeBtnClass(viewMode === 'preview')}
-							title="预览渲染"
-							onClick={() => setViewMode('preview')}
-						>
-							<Eye size={14} className="mr-1 opacity-80" />
-							预览
-						</button>
-						<button
-							type="button"
-							role="tab"
-							aria-selected={viewMode === 'split'}
-							className={modeBtnClass(viewMode === 'split')}
-							title="分屏：左编辑右预览"
-							onClick={() => {
-								setViewMode('split');
-								queueMicrotask(focusEditor);
-							}}
-						>
-							<Columns2 size={14} className="mr-1 opacity-80" />
-							分屏
-						</button>
-					</div>
-				) : null}
-				{toolbar ? (
-					<div className="flex min-w-0 flex-1 items-center justify-end gap-2">
-						{toolbar}
-					</div>
-				) : null}
-			</div>
-
-			<div
-				className="min-h-0 min-w-0 max-w-full overflow-hidden"
-				style={{ height }}
-			>
-				{!isMarkdown || viewMode === 'edit' ? (
-					<Editor
-						height={height}
-						language={language}
-						value={value}
-						onChange={(val) => onChange?.(val || '')}
-						theme={theme}
-						onMount={handleEditorMount}
-						options={{ ...options, readOnly, placeholder }}
-						loading={<Loading text="正在加载编辑器..." />}
-					/>
-				) : null}
-
-				{isMarkdown && viewMode === 'preview' ? (
-					<div className="h-full min-h-0 min-w-0 max-w-full w-full overflow-hidden contain-[inline-size]">
-						<ParserMarkdownPreviewPane markdown={value} />
-					</div>
-				) : null}
-
-				{isMarkdown && viewMode === 'split' ? (
-					<ResizablePanelGroup
-						orientation="horizontal"
-						className="h-full min-h-0 min-w-0 max-w-full"
-					>
-						<ResizablePanel
-							defaultSize={50}
-							minSize={20}
-							className="min-h-0 min-w-0"
-						>
-							<div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden border-r border-theme/10">
-								<Editor
-									height="100%"
-									language={language}
-									value={value}
-									onChange={(val) => onChange?.(val || '')}
-									theme={theme}
-									onMount={handleEditorMount}
-									options={{ ...options, readOnly, placeholder }}
-									loading={<Loading text="正在加载编辑器..." />}
-								/>
+			<div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-md bg-theme/5">
+				<div
+					className={cn(
+						'flex h-10 min-w-0 shrink-0 items-center gap-2 border-b border-theme/5',
+					)}
+				>
+					{title}
+					{isMarkdown ? (
+						<div className="flex min-w-0 shrink-0 items-center gap-1 rounded-md border border-theme/10 p-1">
+							<div
+								className="flex shrink-0 items-center gap-0.5"
+								role="tablist"
+								aria-label="Markdown 视图"
+							>
+								<button
+									type="button"
+									role="tab"
+									aria-selected={viewMode === 'edit'}
+									className={modeBtnClass(viewMode === 'edit')}
+									title="编辑源码"
+									onClick={() => {
+										setViewMode('edit');
+										queueMicrotask(focusEditor);
+									}}
+								>
+									<FilePenLine size={14} className="mr-1 opacity-80" />
+									编辑
+								</button>
+								<button
+									type="button"
+									role="tab"
+									aria-selected={viewMode === 'preview'}
+									className={modeBtnClass(viewMode === 'preview')}
+									title="预览渲染"
+									onClick={() => setViewMode('preview')}
+								>
+									<Eye size={14} className="mr-1 opacity-80" />
+									预览
+								</button>
+								<button
+									type="button"
+									role="tab"
+									aria-selected={viewMode === 'split'}
+									className={modeBtnClass(viewMode === 'split')}
+									title="分屏：左编辑右预览"
+									onClick={() => {
+										setViewMode('split');
+										queueMicrotask(focusEditor);
+									}}
+								>
+									<Columns2 size={14} className="mr-1 opacity-80" />
+									分屏
+								</button>
 							</div>
-						</ResizablePanel>
-						<ResizableHandle withHandle />
-						<ResizablePanel
-							defaultSize={50}
-							minSize={20}
-							className="min-h-0 min-w-0"
+							<span className="h-5 w-px shrink-0 bg-theme/15" aria-hidden />
+							<button
+								type="button"
+								className="flex cursor-pointer size-5 shrink-0 items-center justify-center rounded text-textcolor/55 transition-colors hover:bg-theme/10 hover:text-textcolor"
+								title={
+									markdownBottomBarOpen ? '收起底部操作条' : '展开底部操作条'
+								}
+								aria-label={
+									markdownBottomBarOpen ? '收起底部操作条' : '展开底部操作条'
+								}
+								aria-expanded={markdownBottomBarOpen}
+								aria-controls={markdownBottomBarId}
+								onClick={() => setMarkdownBottomBarOpen((o) => !o)}
+							>
+								{markdownBottomBarOpen ? (
+									<ChevronDown size={15} />
+								) : (
+									<ChevronUp size={15} className="mb-0.5" />
+								)}
+							</button>
+						</div>
+					) : null}
+					{toolbar ? (
+						<div className="flex min-w-0 flex-1 items-center justify-end gap-2">
+							{toolbar}
+						</div>
+					) : null}
+				</div>
+
+				<div
+					className="min-h-0 min-w-0 max-w-full overflow-hidden"
+					style={{ height }}
+				>
+					{!isMarkdown || viewMode === 'edit' ? (
+						<Editor
+							height={height}
+							language={language}
+							value={value}
+							onChange={(val) => onChange?.(val || '')}
+							theme={theme}
+							onMount={handleEditorMount}
+							options={{ ...options, readOnly, placeholder }}
+							loading={<Loading text="正在加载编辑器..." />}
+						/>
+					) : null}
+
+					{isMarkdown && viewMode === 'preview' ? (
+						<div className="h-full min-h-0 min-w-0 max-w-full w-full overflow-hidden contain-[inline-size]">
+							<ParserMarkdownPreviewPane markdown={value} />
+						</div>
+					) : null}
+
+					{isMarkdown && viewMode === 'split' ? (
+						<ResizablePanelGroup
+							orientation="horizontal"
+							className="h-full min-h-0 min-w-0 max-w-full"
 						>
-							<div className="relative h-full min-h-0 min-w-0 overflow-hidden contain-[inline-size]">
-								<ParserMarkdownPreviewPane
-									markdown={value}
-									viewportRef={previewViewportRef}
-								/>
-								<div className="pointer-events-none absolute -right-1 -bottom-1 z-99 flex items-end justify-end p-2">
-									<div className="pointer-events-auto flex items-center gap-1.5 rounded-md border border-theme/15 bg-theme/5 px-2 py-1 shadow-sm backdrop-blur-xs">
-										<Switch
-											id={splitScrollFollowSwitchId}
-											size="sm"
-											checked={splitPreviewScrollFollow}
-											onCheckedChange={setSplitPreviewScrollFollow}
-											aria-label="预览跟随左侧编辑器滚动"
-										/>
-										<Label
-											htmlFor={splitScrollFollowSwitchId}
-											className="cursor-pointer text-xs text-textcolor/75"
-										>
-											跟随滚动
-										</Label>
-									</div>
+							<ResizablePanel
+								defaultSize={50}
+								minSize={20}
+								className="min-h-0 min-w-0"
+							>
+								<div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden border-r border-theme/10">
+									<Editor
+										height="100%"
+										language={language}
+										value={value}
+										onChange={(val) => onChange?.(val || '')}
+										theme={theme}
+										onMount={handleEditorMount}
+										options={{ ...options, readOnly, placeholder }}
+										loading={<Loading text="正在加载编辑器..." />}
+									/>
 								</div>
-							</div>
-						</ResizablePanel>
-					</ResizablePanelGroup>
-				) : null}
+							</ResizablePanel>
+							<ResizableHandle withHandle />
+							<ResizablePanel
+								defaultSize={50}
+								minSize={20}
+								className="min-h-0 min-w-0"
+							>
+								<div className="h-full min-h-0 min-w-0 overflow-hidden contain-[inline-size]">
+									<ParserMarkdownPreviewPane
+										markdown={value}
+										viewportRef={previewViewportRef}
+									/>
+								</div>
+							</ResizablePanel>
+						</ResizablePanelGroup>
+					) : null}
+				</div>
 			</div>
+
+			{isMarkdown ? (
+				<div
+					id={markdownBottomBarId}
+					role="toolbar"
+					aria-label="Markdown 底部操作"
+					className={cn(
+						'absolute bottom-0 left-1/2 z-30 flex w-full max-w-md -translate-x-1/2 justify-center px-3 transition-transform duration-300 ease-out motion-reduce:transition-none motion-reduce:duration-0',
+						markdownBottomBarOpen
+							? '-translate-y-2 pointer-events-auto'
+							: 'translate-y-15 pointer-events-none',
+					)}
+				>
+					<div className="flex h-10 w-full items-center justify-center gap-4 rounded-md border border-theme/10 bg-theme/5 px-4 shadow-[0_-6px_20px_-8px_color-mix(in_oklch,var(--theme-background)_60%,black)] backdrop-blur-sm">
+						{viewMode === 'split' ? (
+							<div className="flex items-center gap-2">
+								<Switch
+									id={splitScrollFollowSwitchId}
+									size="sm"
+									checked={splitPreviewScrollFollow}
+									onCheckedChange={setSplitPreviewScrollFollow}
+									aria-label="预览跟随左侧编辑器滚动"
+								/>
+								<Label
+									htmlFor={splitScrollFollowSwitchId}
+									className="cursor-pointer whitespace-nowrap text-xs text-textcolor/80"
+								>
+									跟随滚动
+								</Label>
+							</div>
+						) : (
+							<span className="text-xs text-textcolor/45">
+								切换为「分屏」后可开启预览跟随左侧滚动
+							</span>
+						)}
+					</div>
+				</div>
+			) : null}
 		</div>
 	);
 };
