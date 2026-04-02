@@ -1,22 +1,18 @@
 import { Button, ScrollArea } from '@ui/index';
 import { ArrowDownToLine, ArrowUpToLine } from 'lucide-react';
-import {
-	useCallback,
-	useEffect,
-	useLayoutEffect,
-	useRef,
-	useState,
-} from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router';
 import ChatAssistantMessage from '@/components/design/ChatAssistantMessage';
-import ChatCodeToolbarFloating from '@/components/design/ChatCodeToolBar';
 import ChatFileList from '@/components/design/ChatFileList';
 import ChatMessageActions from '@/components/design/ChatMessageActions';
 import ChatUserMessage from '@/components/design/ChatUserMessage';
 import { useTheme } from '@/hooks';
+import {
+	ChatCodeFloatingToolbar,
+	useChatCodeFloatingToolbar,
+} from '@/hooks/useChatCodeFloatingToolbar';
 import { cn } from '@/lib/utils';
 import { getShare } from '@/service';
-import { layoutChatCodeToolbars } from '@/utils/chatCodeToolbar';
 
 /** 判定「已到底」允许的像素误差（避免子像素取整导致箭头来回跳） */
 const SCROLL_BOTTOM_THRESHOLD = 48;
@@ -77,6 +73,11 @@ const SessionShare = () => {
 
 	const [chatData, setChatData] = useState<Session>();
 
+	const { relayout: relayoutCodeToolbar } = useChatCodeFloatingToolbar(
+		scrollViewportRef,
+		{ layoutDeps: [chatData] },
+	);
+
 	const syncScrollMetrics = useCallback(() => {
 		const el = scrollViewportRef.current;
 		if (!el) {
@@ -87,9 +88,8 @@ const SessionShare = () => {
 			scrollHeight: el.scrollHeight,
 			clientHeight: el.clientHeight,
 		});
-		// 与 ChatBotView 一致：每帧滚动更新代码块吸顶条几何，否则 ChatCodeToolbarFloating 无状态可渲染
-		layoutChatCodeToolbars(el);
-	}, []);
+		relayoutCodeToolbar();
+	}, [relayoutCodeToolbar]);
 
 	useEffect(() => {
 		if (params?.shareId) {
@@ -121,23 +121,6 @@ const SessionShare = () => {
 		ro.observe(el);
 		return () => ro.disconnect();
 	}, [syncScrollMetrics]);
-
-	// Markdown 渲染后高度变化，补算一次浮动工具栏
-	useLayoutEffect(() => {
-		const el = scrollViewportRef.current;
-		if (!el) {
-			return;
-		}
-		layoutChatCodeToolbars(el);
-		const id = requestAnimationFrame(() => layoutChatCodeToolbars(el));
-		return () => cancelAnimationFrame(id);
-	}, [chatData]);
-
-	useEffect(() => {
-		const onResize = () => layoutChatCodeToolbars(scrollViewportRef.current);
-		window.addEventListener('resize', onResize);
-		return () => window.removeEventListener('resize', onResize);
-	}, []);
 
 	const getShareData = async (id: string) => {
 		const res = await getShare<Session>(id);
@@ -186,7 +169,7 @@ const SessionShare = () => {
 
 	return (
 		<div className="relative flex h-dvh w-full flex-col overflow-hidden bg-theme-background">
-			<ChatCodeToolbarFloating />
+			<ChatCodeFloatingToolbar />
 			<ScrollArea
 				ref={scrollViewportRef}
 				className="min-h-0 flex-1"

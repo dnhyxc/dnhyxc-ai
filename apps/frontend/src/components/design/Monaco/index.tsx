@@ -16,7 +16,6 @@ import {
 	useCallback,
 	useEffect,
 	useId,
-	useLayoutEffect,
 	useMemo,
 	useRef,
 	useState,
@@ -28,13 +27,15 @@ import {
 } from '@/components/ui/resizable';
 import { CHAT_MARKDOWN_HIGHLIGHT_THEME } from '@/constant';
 import { useTheme } from '@/hooks/theme';
+import {
+	ChatCodeFloatingToolbar,
+	useChatCodeFloatingToolbar,
+} from '@/hooks/useChatCodeFloatingToolbar';
 import { cn } from '@/lib/utils';
 import {
 	downloadChatCodeBlock,
 	getChatCodeBlockPlainText,
-	layoutChatCodeToolbars,
 } from '@/utils/chatCodeToolbar';
-import ChatCodeToolbarFloating from '../ChatCodeToolBar';
 import Loading from '../Loading';
 import { registerPrettierFormatProviders } from './format';
 import { options } from './options';
@@ -125,12 +126,16 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 		return () => el.removeEventListener('click', onClick);
 	}, []);
 
+	const { relayout: relayoutCodeToolbar } = useChatCodeFloatingToolbar(
+		localViewportRef,
+		{ layoutDeps: [markdown] },
+	);
+
 	const syncScrollMetrics = useCallback(() => {
 		const el = localViewportRef.current;
 		if (!el) return;
-		// 与 ChatBotView / share 页一致：滚动时调用 layout，否则 ChatCodeToolbarFloating 不更新
-		layoutChatCodeToolbars(el);
-	}, []);
+		relayoutCodeToolbar();
+	}, [relayoutCodeToolbar]);
 
 	useEffect(() => {
 		syncScrollMetrics();
@@ -138,35 +143,12 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 		return () => cancelAnimationFrame(id);
 	}, [markdown, syncScrollMetrics]);
 
-	useEffect(() => {
-		const el = localViewportRef.current;
-		if (!el) return;
-		const ro = new ResizeObserver(() => syncScrollMetrics());
-		ro.observe(el);
-		return () => ro.disconnect();
-	}, [markdown, syncScrollMetrics]);
-
-	// Markdown 渲染后高度变化，补算一次浮动工具栏
-	useLayoutEffect(() => {
-		const el = localViewportRef.current;
-		if (!el) return;
-		layoutChatCodeToolbars(el);
-		const id = requestAnimationFrame(() => layoutChatCodeToolbars(el));
-		return () => cancelAnimationFrame(id);
-	}, [markdown]);
-
-	useEffect(() => {
-		const onResize = () => layoutChatCodeToolbars(localViewportRef.current);
-		window.addEventListener('resize', onResize);
-		return () => window.removeEventListener('resize', onResize);
-	}, []);
-
 	return (
 		<div
 			ref={markdownRef}
 			className="h-full min-h-0 min-w-0 max-w-full w-full overflow-hidden contain-[inline-size]"
 		>
-			<ChatCodeToolbarFloating />
+			<ChatCodeFloatingToolbar />
 			<ScrollArea
 				ref={assignViewportRef}
 				scrollbars="both"

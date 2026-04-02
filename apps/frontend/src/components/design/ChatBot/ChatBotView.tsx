@@ -1,6 +1,5 @@
 import ChatAnchorNav from '@design/ChatAnchorNav';
 import ChatAssistantMessage from '@design/ChatAssistantMessage';
-import ChatCodeToolbarFloating from '@design/ChatCodeToolBar';
 import ChatControls from '@design/ChatControls';
 import ChatFileList from '@design/ChatFileList';
 import ChatMessageActions from '@design/ChatMessageActions';
@@ -24,6 +23,10 @@ import React, {
 } from 'react';
 import { flushSync } from 'react-dom';
 import { useBranchManage } from '@/hooks/useBranchManage';
+import {
+	ChatCodeFloatingToolbar,
+	useChatCodeFloatingToolbar,
+} from '@/hooks/useChatCodeFloatingToolbar';
 import { useMessageTools } from '@/hooks/useMessageTools';
 import { cn } from '@/lib/utils';
 import {
@@ -32,7 +35,6 @@ import {
 	ChatBotViewProps,
 	Message,
 } from '@/types/chat';
-import { layoutChatCodeToolbars } from '@/utils/chatCodeToolbar';
 import {
 	alignMessageRowBottomToViewportBottom,
 	BRANCH_ANCHOR_NUDGE_UP_PX,
@@ -200,6 +202,15 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 		/** 供 onScrollTo 等闭包内调用：始终指向最新同步函数 */
 		const syncViewportScrollMetricsRef = useRef<() => void>(() => {});
 
+		const { relayout: relayoutCodeToolbar } = useChatCodeFloatingToolbar(
+			scrollContainerRef,
+			{
+				layoutDeps: [messages],
+				passiveScrollLayout: true,
+				passiveScrollDeps: [activeSessionId, messages.length],
+			},
+		);
+
 		const syncViewportScrollMetrics = useCallback(() => {
 			const el = scrollContainerRef.current;
 			if (!el) return;
@@ -209,8 +220,8 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 				scrollHeight - st - clientHeight < SCROLL_VIEWPORT_BOTTOM_THRESHOLD_PX;
 			setAutoScroll(atBottom);
 			setIsAtBottom(atBottom);
-			layoutChatCodeToolbars(el);
-		}, []);
+			relayoutCodeToolbar();
+		}, [relayoutCodeToolbar]);
 
 		syncViewportScrollMetricsRef.current = syncViewportScrollMetrics;
 
@@ -336,27 +347,6 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 				onScrollToRegister(null);
 			};
 		}, [onScrollTo, onScrollToRegister]);
-
-		// 窗口尺寸变化时重算浮动工具栏几何
-		useEffect(() => {
-			const onResize = () => layoutChatCodeToolbars(scrollContainerRef.current);
-			window.addEventListener('resize', onResize);
-			return () => window.removeEventListener('resize', onResize);
-		}, []);
-
-		// 原生 scroll：与 sync 解耦，保证每帧滚动都更新吸顶条
-		useLayoutEffect(() => {
-			const vp = scrollContainerRef.current;
-			if (!vp) return;
-			const onScroll = () => layoutChatCodeToolbars(vp);
-			vp.addEventListener('scroll', onScroll, { passive: true });
-			return () => vp.removeEventListener('scroll', onScroll);
-		}, [activeSessionId, messages.length]);
-
-		// 流式/懒加载导致 Markdown 高度变化时重算
-		useLayoutEffect(() => {
-			layoutChatCodeToolbars(scrollContainerRef.current);
-		}, [messages]);
 
 		// 切换会话：恢复跟底与流式高度基准。上一会话若用户上滚，autoScroll 为 false 会导致
 		// 进入本会话（尤其列表尾部仍有合并进来的流式气泡时）无法跟底；lastScrollHeightRef 沿用旧值也会挡住首次 scrollToBottom。
@@ -841,8 +831,8 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 					className,
 				)}
 			>
-				<ChatCodeToolbarFloating />
-				{/* ref 指向 ScrollArea Viewport；代码块吸顶条 Portal 到 body，几何由 layoutChatCodeToolbars 统一计算 */}
+				<ChatCodeFloatingToolbar />
+				{/* ref 指向 ScrollArea Viewport；吸顶条由 useChatCodeFloatingToolbar + layoutChatCodeToolbars 同步 */}
 				<ScrollArea
 					ref={scrollContainerRef}
 					viewportClassName="[overflow-anchor:none]"

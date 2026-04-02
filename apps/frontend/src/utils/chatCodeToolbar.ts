@@ -1,7 +1,8 @@
 /**
  * 聊天代码块工具栏：ScrollArea 等祖先的 overflow 会使 sticky/fixed 参照系异常，
  * 故将「吸顶」工具栏通过 Portal 挂到 document.body，用视口坐标 position:fixed，
- * 由 ChatBotView 在滚动/resize/消息变化时统一调用 layoutChatCodeToolbars。
+ * 由 `layoutChatCodeToolbars(viewport)` 在滚动/resize/内容变化时更新几何。
+ * React 侧推荐用 `useChatCodeFloatingToolbar`（`@/hooks/useChatCodeFloatingToolbar`）统一注册监听并渲染 `ChatCodeFloatingToolbar`。
  */
 
 import { downloadBlob } from '.';
