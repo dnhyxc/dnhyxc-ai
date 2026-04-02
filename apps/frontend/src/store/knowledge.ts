@@ -60,7 +60,7 @@ class KnowledgeStore {
 		}
 	};
 
-	private async fetchPage(page: number, append: boolean): Promise<void> {
+	async fetchPage(page: number, append: boolean): Promise<void> {
 		if (append) {
 			this.loadingMore = true;
 		} else {

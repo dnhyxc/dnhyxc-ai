@@ -1,9 +1,9 @@
 import Confirm from '@design/Confirm';
 import { Drawer } from '@design/Drawer';
-import Loading from '@design/Loading';
 import { MarkdownParser } from '@dnhyxc-ai/tools';
 import { Input, ScrollArea, Spinner, Toast } from '@ui/index';
 import { Check, SquarePen, Trash2, X } from 'lucide-react';
+import { observer } from 'mobx-react';
 import {
 	ChangeEvent,
 	Dispatch,
@@ -20,7 +20,7 @@ import { useNavigate } from 'react-router';
 import { CHAT_MARKDOWN_HIGHLIGHT_THEME } from '@/constant';
 import { useChatCoreContext } from '@/contexts';
 import { useChatCore } from '@/hooks/useChatCore';
-import { deleteSession, getSessionList, updateSession } from '@/service';
+import { deleteSession, updateSession } from '@/service';
 import useStore from '@/store';
 import { Session } from '@/types/chat';
 
@@ -199,7 +199,7 @@ const SessionItem = memo<SessionItemProps>(
 	},
 );
 
-const SessionList: React.FC<IProps> = ({ open, onOpenChange }) => {
+const SessionList = observer(({ open, onOpenChange }: IProps) => {
 	const { chatStore } = useStore();
 	const { clearChat, stopGenerating } = useChatCore();
 	const { setIsSharing, clearAllCheckedMessages } = useChatCoreContext();
@@ -209,7 +209,6 @@ const SessionList: React.FC<IProps> = ({ open, onOpenChange }) => {
 	const [confirmOpen, setConfirmOpen] = useState(false);
 	const [deleteItem, setDeleteItem] = useState<Session | null>(null);
 	const [editItem, setEditItem] = useState<Session | null>(null);
-	const [loading, setLoading] = useState(false);
 
 	const parser = useMemo(
 		() =>
@@ -220,23 +219,12 @@ const SessionList: React.FC<IProps> = ({ open, onOpenChange }) => {
 	);
 
 	useEffect(() => {
-		if (open) getSessions();
-		return () => {
+		if (open) {
+			void chatStore.refreshHistorySessionList();
+		} else {
 			setEditItem(null);
-		};
-	}, [open]);
-
-	const getSessions = useCallback(async () => {
-		try {
-			setLoading(true);
-			const res = await getSessionList();
-			if (res.success) {
-				chatStore.setSessionData(res.data);
-			}
-		} finally {
-			setLoading(false);
 		}
-	}, [chatStore]);
+	}, [open, chatStore]);
 
 	const handleConfirmDelete = useCallback(async () => {
 		if (deleteItem) {
@@ -332,15 +320,38 @@ const SessionList: React.FC<IProps> = ({ open, onOpenChange }) => {
 		setEditItem,
 	]);
 
+	const { sessionData, historySessionLoading, historySessionLoadingMore } =
+		chatStore;
+	const list = sessionData.list;
+	const showInitialPlaceholder = historySessionLoading && list.length === 0;
+	const showLoadMoreHint = historySessionLoadingMore;
+	const showEmptyHint =
+		!historySessionLoading && list.length === 0 && !historySessionLoadingMore;
+
 	return (
 		<Drawer title="历史对话" open={open} onOpenChange={onOpenChange}>
-			<ScrollArea className="h-full overflow-y-auto pr-4 box-border">
-				{loading && (
-					<div className="absolute top-0 left-0 z-900 flex flex-col gap-5 items-center justify-center w-full h-full bg-theme-background/80 rounded-md">
-						<Loading />
-					</div>
-				)}
-				{sessionList}
+			<ScrollArea
+				className="h-full overflow-y-auto pr-4 box-border"
+				onScroll={chatStore.onHistorySessionViewportScroll}
+			>
+				<div className="flex flex-col gap-0">
+					{showInitialPlaceholder ? (
+						<div className="text-sm text-textcolor/60 py-6 text-center">
+							加载中…
+						</div>
+					) : null}
+					{sessionList}
+					{showLoadMoreHint ? (
+						<div className="text-xs text-textcolor/50 py-2 text-center">
+							加载更多…
+						</div>
+					) : null}
+					{showEmptyHint ? (
+						<div className="text-sm text-textcolor/60 py-8 text-center">
+							暂无历史对话
+						</div>
+					) : null}
+				</div>
 			</ScrollArea>
 			<Confirm
 				open={confirmOpen}
@@ -353,6 +364,6 @@ const SessionList: React.FC<IProps> = ({ open, onOpenChange }) => {
 			/>
 		</Drawer>
 	);
-};
+});
 
 export default SessionList;

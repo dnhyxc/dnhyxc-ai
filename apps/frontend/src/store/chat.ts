@@ -1,5 +1,18 @@
-import { action, computed, makeAutoObservable, observable } from 'mobx';
-import { Message, SessionData } from '@/types/chat';
+import {
+	action,
+	computed,
+	makeAutoObservable,
+	observable,
+	runInAction,
+} from 'mobx';
+import type { UIEventHandler } from 'react';
+import { getSessionList } from '@/service';
+import type { Message, Session, SessionData } from '@/types/chat';
+
+/** 历史会话抽屉分页：与 knowledgeStore 默认 pageSize 一致 */
+const HISTORY_SESSION_LIST_PAGE_SIZE = 20;
+/** 距底部小于该像素时触发加载下一页（与 knowledgeStore 一致） */
+const HISTORY_SESSION_SCROLL_THRESHOLD_PX = 72;
 
 class ChatStore {
 	constructor() {
@@ -23,6 +36,86 @@ class ChatStore {
 		total: 0,
 	};
 	activeSessionId: string = '';
+
+	// ---------- 历史会话抽屉：分页 + 滚动加载（对齐 knowledgeStore） ----------
+	/** 已成功拉取到的最后一页页码 */
+	historySessionPageNo = 1;
+	historySessionLoading = false;
+	historySessionLoadingMore = false;
+
+	get historySessionHasMore(): boolean {
+		return this.sessionData.list.length < this.sessionData.total;
+	}
+
+	/** 打开抽屉时从第一页重拉 */
+	async refreshHistorySessionList(): Promise<void> {
+		await this.fetchHistorySessionListPage(1, false);
+	}
+
+	/** 滚动接近底部时加载下一页 */
+	async loadMoreHistorySessions(): Promise<void> {
+		if (
+			!this.historySessionHasMore ||
+			this.historySessionLoading ||
+			this.historySessionLoadingMore
+		) {
+			return;
+		}
+		await this.fetchHistorySessionListPage(this.historySessionPageNo + 1, true);
+	}
+
+	/** 绑定到历史会话 ScrollArea Viewport 的 onScroll */
+	onHistorySessionViewportScroll: UIEventHandler<HTMLDivElement> = (e) => {
+		const el = e.currentTarget;
+		const rest = el.scrollHeight - el.scrollTop - el.clientHeight;
+		if (rest < HISTORY_SESSION_SCROLL_THRESHOLD_PX) {
+			void this.loadMoreHistorySessions();
+		}
+	};
+
+	async fetchHistorySessionListPage(
+		page: number,
+		append: boolean,
+	): Promise<void> {
+		runInAction(() => {
+			if (append) {
+				this.historySessionLoadingMore = true;
+			} else {
+				this.historySessionLoading = true;
+			}
+		});
+		try {
+			const res = await getSessionList({
+				pageNo: page,
+				pageSize: HISTORY_SESSION_LIST_PAGE_SIZE,
+			});
+			if (!res.success || !res.data) {
+				return;
+			}
+			runInAction(() => {
+				const { list: chunk, total } = res.data as SessionData;
+				this.historySessionPageNo = page;
+				if (append) {
+					const existingIds = new Set(this.sessionData.list.map((s) => s.id));
+					const merged = [...this.sessionData.list];
+					for (const s of chunk) {
+						if (!existingIds.has(s.id)) {
+							existingIds.add(s.id);
+							merged.push(s as Session);
+						}
+					}
+					this.sessionData = { list: merged, total };
+				} else {
+					this.sessionData = { list: chunk as Session[], total };
+				}
+			});
+		} finally {
+			runInAction(() => {
+				this.historySessionLoading = false;
+				this.historySessionLoadingMore = false;
+			});
+		}
+	}
 
 	// 存储每个消息的流式更新缓冲
 	streamingBuffers: Map<
@@ -277,6 +370,7 @@ class ChatStore {
 			this.sessionData = {
 				...this.sessionData,
 				list,
+				total: Math.max(0, this.sessionData.total - 1),
 			};
 		}
 	}

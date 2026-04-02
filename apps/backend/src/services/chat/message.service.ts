@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { FindOneOptions, Repository } from 'typeorm';
+import { FindOneOptions, In, Repository } from 'typeorm';
 import { Attachments } from './attachments.entity';
 import { ChatMessages } from './chat.entity';
 import { CreateSessionDto } from './dto/chat-request.dto';
@@ -275,21 +275,69 @@ export class MessageService {
 	async getSessionList(
 		dto: HistoryDto,
 	): Promise<{ list: ChatSessions[]; total: number }> {
-		const { pageSize = 9999, pageNo = 1 } = dto;
-		const take = pageSize || 10;
-		const skip = ((pageNo || 1) - 1) * take;
-		const [list, total] = await this.chatSessionsRepository.findAndCount({
+		// 与知识库列表默认分页一致：未传时每页 20 条
+		const take = dto.pageSize != null && dto.pageSize > 0 ? dto.pageSize : 20;
+		const pageNo = dto.pageNo != null && dto.pageNo > 0 ? dto.pageNo : 1;
+		const skip = (pageNo - 1) * take;
+
+		/*
+		 * 1) 一页 id + 全表总数：一次查询（COUNT(*) OVER()，PostgreSQL / MySQL 8+）。
+		 *    空页（OFFSET 越界或表空）时再 count() 补 total。
+		 * 2) 禁止 findAndCount + relations(messages) 与 take/skip 混用（JOIN 行上 LIMIT 错位）。
+		 * 3) 再按 In(ids) 一次加载 messages + attachments。
+		 */
+		const { ids, total } = await this.getSessionListIdPageWithTotal(skip, take);
+		if (ids.length === 0) {
+			return { list: [], total };
+		}
+
+		const list = await this.chatSessionsRepository.find({
+			where: { id: In(ids) },
 			relations: ['messages', 'messages.attachments'],
-			take,
-			skip,
 			order: {
-				createdAt: 'DESC',
-				messages: {
-					createdAt: 'ASC',
-				},
+				messages: { createdAt: 'ASC' },
 			},
 		});
 
+		const orderIndex = new Map(ids.map((id, i) => [id, i]));
+		list.sort(
+			(a, b) => (orderIndex.get(a.id) ?? 0) - (orderIndex.get(b.id) ?? 0),
+		);
+
 		return { list, total };
+	}
+
+	/**
+	 * 分页拉取会话 id，并带上全表会话总数（窗口函数，避免 count + find 两次往返）。
+	 */
+	private async getSessionListIdPageWithTotal(
+		skip: number,
+		take: number,
+	): Promise<{ ids: string[]; total: number }> {
+		const raw = await this.chatSessionsRepository
+			.createQueryBuilder('s')
+			.select('s.id', 'id')
+			.addSelect('COUNT(*) OVER ()', 'session_total')
+			.orderBy('s.createdAt', 'DESC')
+			.skip(skip)
+			.take(take)
+			.getRawMany<Record<string, unknown>>();
+
+		if (raw.length === 0) {
+			const total = await this.chatSessionsRepository.count();
+			return { ids: [], total };
+		}
+
+		const totalVal = raw[0].session_total ?? raw[0].SESSION_TOTAL;
+		const total =
+			typeof totalVal === 'number'
+				? totalVal
+				: Number.parseInt(String(totalVal), 10);
+
+		const ids = raw.map((row) => String(row.id));
+		return {
+			ids,
+			total: Number.isFinite(total) ? total : 0,
+		};
 	}
 }

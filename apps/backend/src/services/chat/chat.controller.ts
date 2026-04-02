@@ -5,7 +5,6 @@ import {
 	Delete,
 	Get,
 	Param,
-	ParseIntPipe,
 	Post,
 	Query,
 	Sse,
@@ -160,11 +159,7 @@ export class ChatController {
 
 	// @UseInterceptors(ResponseInterceptor)
 	@Get('/getSessionList')
-	async getSessionList(
-		@Query('pageSize', ParseIntPipe)
-		@Query('pageNo', ParseIntPipe)
-		dto: HistoryDto,
-	) {
+	async getSessionList(@Query() dto: HistoryDto) {
 		return this.messageService.getSessionList(dto);
 	}
 

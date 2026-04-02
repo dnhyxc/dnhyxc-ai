@@ -3,9 +3,10 @@ import {
 	IsArray,
 	IsBoolean,
 	IsEnum,
-	IsNumber,
+	IsInt,
 	IsOptional,
 	IsString,
+	Min,
 	ValidateNested,
 } from 'class-validator';
 import { MessageRole } from '../chat.entity';
@@ -30,17 +31,21 @@ export class MessageDto {
 }
 
 export class HistoryDto {
-	@IsNumber()
 	@IsOptional()
-	pageSize: number;
+	@Type(() => Number)
+	@IsInt()
+	@Min(1)
+	pageSize?: number;
 
-	@IsNumber()
 	@IsOptional()
-	pageNo: number;
+	@Type(() => Number)
+	@IsInt()
+	@Min(1)
+	pageNo?: number;
 
 	@IsString()
 	@IsOptional()
-	userId: string;
+	userId?: string;
 }
 
 export class SaveDto {

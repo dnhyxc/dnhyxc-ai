@@ -238,15 +238,15 @@ export const getSession = async (sessionId: string) => {
 };
 
 export const getSessionList = async (options?: {
-	pageSize: number;
-	pageNo: number;
-	userId: string;
+	pageSize?: number;
+	pageNo?: number;
+	userId?: string;
 }) => {
 	return await http.get(GET_SESSION_LIST, {
 		querys: {
-			pageSize: options?.pageSize || 9999,
-			pageNo: options?.pageNo || 1,
-			userId: options?.userId || '',
+			pageSize: options?.pageSize ?? 20,
+			pageNo: options?.pageNo ?? 1,
+			userId: options?.userId ?? '',
 		},
 	});
 };
