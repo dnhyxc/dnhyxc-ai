@@ -177,7 +177,7 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 	return (
 		<div
 			ref={markdownRef}
-			className="h-full min-h-0 min-w-0 max-w-full overflow-hidden"
+			className="h-full min-h-0 min-w-0 max-w-full w-full overflow-hidden contain-[inline-size]"
 		>
 			<ChatCodeToolbarFloating />
 			<ScrollArea
@@ -191,9 +191,9 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 				// 覆盖 Radix 内层 display:table + minWidth:100%，否则 table 会按内容扩宽并顶破分栏
 				viewportClassName="[&>div]:!box-border [&>div]:!block [&>div]:!w-full [&>div]:!min-w-0 [&>div]:!max-w-full"
 			>
-				<div className="box-border min-w-0 max-w-full p-3">
+				<div className="box-border min-w-0 max-w-full w-full p-3">
 					<div
-						className="[&_.markdown-body]:min-w-0 [&_.markdown-body]:max-w-none [&_.markdown-body]:wrap-break-word [&_.markdown-body]:bg-transparent! [&_.markdown-body]:text-textcolor/90! [&_.markdown-body_pre]:max-w-full [&_.markdown-body_pre]:overflow-x-auto"
+						className="[&_.markdown-body]:min-w-0 [&_.markdown-body]:max-w-none [&_.markdown-body]:wrap-break-word [&_.markdown-body]:overflow-x-auto [&_.markdown-body]:bg-transparent! [&_.markdown-body]:text-textcolor/90! [&_.markdown-body_pre]:max-w-full [&_.markdown-body_pre]:overflow-x-auto [&_.markdown-body_table]:block [&_.markdown-body_table]:max-w-full [&_.markdown-body_table]:overflow-x-auto"
 						dangerouslySetInnerHTML={{ __html: html }}
 					/>
 				</div>
@@ -387,7 +387,9 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 				) : null}
 
 				{isMarkdown && viewMode === 'preview' ? (
-					<ParserMarkdownPreviewPane markdown={value} />
+					<div className="h-full min-h-0 min-w-0 max-w-full w-full overflow-hidden contain-[inline-size]">
+						<ParserMarkdownPreviewPane markdown={value} />
+					</div>
 				) : null}
 
 				{isMarkdown && viewMode === 'split' ? (
