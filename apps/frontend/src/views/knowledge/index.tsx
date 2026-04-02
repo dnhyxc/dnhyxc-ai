@@ -2,6 +2,7 @@ import Confirm from '@design/Confirm';
 import { ScrollArea } from '@ui/scroll-area';
 import { Toast } from '@ui/sonner';
 import { LayersPlus, LibraryBig, OctagonX, ScrollText } from 'lucide-react';
+import { observer } from 'mobx-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import MarkdownEditor from '@/components/design/Monaco';
 import { Button, Input } from '@/components/ui';
@@ -81,7 +82,7 @@ function KnowledgeEditorToolbar(props: {
 	);
 }
 
-const Knowledge = () => {
+const Knowledge = observer(() => {
 	const [title, setTitle] = useState('');
 	/** 正在编辑的云端知识库 id；为空表示新建 */
 	const [editingKnowledgeId, setEditingKnowledgeId] = useState<string | null>(
@@ -340,6 +341,12 @@ const Knowledge = () => {
 		overwriteTargetPath.split(/[/\\]/).filter(Boolean).pop() ??
 		overwriteTargetPath;
 
+	const markdownForDirty = detailStore.markdown ?? '';
+	const snapForDirty = lastPersistedSnapshotRef.current;
+	const hasUnsavedChanges =
+		title.trim() !== snapForDirty.title ||
+		markdownForDirty !== snapForDirty.content;
+
 	return (
 		<div className="w-full h-full flex flex-col justify-center items-center m-0">
 			<Confirm
@@ -378,8 +385,20 @@ const Knowledge = () => {
 						/>
 					}
 					title={
-						<div className="flex flex-1 items-center pl-3">
-							<ScrollText size={18} />
+						<div className="flex flex-1 items-center pl-3 gap-2">
+							<span
+								role="img"
+								aria-label={hasUnsavedChanges ? '有未保存的修改' : '知识文档'}
+								className="relative inline-flex shrink-0"
+							>
+								<ScrollText size={18} className="text-textcolor" />
+								{hasUnsavedChanges ? (
+									<span
+										className="pointer-events-none absolute -right-0.5 -top-0.5 size-2 rounded-full bg-orange-500"
+										aria-hidden
+									/>
+								) : null}
+							</span>
 							<Input
 								value={title}
 								maxLength={100}
@@ -403,6 +422,6 @@ const Knowledge = () => {
 			/>
 		</div>
 	);
-};
+});
 
 export default Knowledge;
