@@ -305,7 +305,6 @@ const Knowledge = () => {
 
 			<ScrollArea className="w-full h-full overflow-y-auto p-5 pt-0 rounded-none">
 				<MarkdownEditor
-					// key={editorKey}
 					className="w-full h-full"
 					height={EDITOR_HEIGHT}
 					theme={monacoTheme}
