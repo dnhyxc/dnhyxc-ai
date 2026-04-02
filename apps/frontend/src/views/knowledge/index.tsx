@@ -6,6 +6,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import MarkdownEditor from '@/components/design/Monaco';
 import { Button, Input } from '@/components/ui';
 import { useTheme } from '@/hooks';
+import { cn } from '@/lib/utils';
 import { saveKnowledge } from '@/service';
 import useStore from '@/store';
 import { KnowledgeRecord } from '@/types';
@@ -18,7 +19,6 @@ import {
 } from '@/utils/knowledge-save';
 import { EDITOR_HEIGHT, TAURI_KNOWLEDGE_DIR } from './constants';
 import KnowledgeList from './KnowledgeList';
-import { cn } from '@/lib/utils';
 
 type StoredUserInfo = { username?: unknown; id?: unknown } | null;
 
