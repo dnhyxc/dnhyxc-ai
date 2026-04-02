@@ -92,6 +92,7 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 			renderMessageActions,
 			renderAnchorNav,
 			renderChatControls,
+			onSaveToKnowledge,
 		} = props;
 
 		const { buildMessageList, getFormatMessages, findSiblings } =
@@ -946,6 +947,7 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 															isSharing,
 															checkedMessages,
 															setCheckedMessage,
+															onSaveToKnowledge,
 														})
 													) : (
 														<ChatMessageActions
@@ -962,6 +964,7 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 															isSharing={isSharing}
 															checkedMessages={checkedMessages}
 															setCheckedMessage={setCheckedMessage}
+															onSaveToKnowledge={onSaveToKnowledge}
 														/>
 													)
 												) : null}

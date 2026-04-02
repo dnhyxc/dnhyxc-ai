@@ -4,6 +4,7 @@ import {
 	ChevronLeft,
 	ChevronRight,
 	Copy,
+	LayersPlus,
 	PencilLine,
 	RotateCw,
 	Share2,
@@ -26,6 +27,7 @@ interface MessageActionsProps {
 	/** 当前会话是否正在加载 */
 	isLoading?: boolean;
 	needShare?: boolean;
+	needSave?: boolean;
 	/** 分支切换回调 */
 	onBranchChange?: (msgId: string, direction: 'prev' | 'next') => void;
 	/** 复制回调 */
@@ -39,6 +41,8 @@ interface MessageActionsProps {
 	checkedMessages?: Set<string>;
 	setCheckedMessage?: (message: Message) => void;
 	deleteCheckedMessage?: (message: Message) => void;
+	/** 将助手回复写入知识库草稿（由 ChatBot 注入后跳转知识页） */
+	onSaveToKnowledge?: (message: Message) => void;
 }
 
 /**
@@ -67,7 +71,9 @@ export const MessageActions = ({
 	isSharing,
 	checkedMessages,
 	setCheckedMessage,
+	onSaveToKnowledge,
 	needShare = true,
+	needSave = true,
 }: MessageActionsProps) => {
 	// 是否有多个兄弟节点（分支）
 	const hasSiblings = (message.siblingCount || 0) > 1;
@@ -205,14 +211,34 @@ export const MessageActions = ({
 							</div>
 						)}
 
-					{needShare && message.role !== 'user' && !isLoading && !isSharing && (
-						<div
-							className="cursor-pointer hover:text-textcolor"
-							title="分享此回答"
-						>
-							<Share2 size={16} onClick={() => onCheckShare(message)} />
-						</div>
-					)}
+					{needSave &&
+						onSaveToKnowledge &&
+						message.role !== 'user' &&
+						!isLoading &&
+						!isSharing && (
+							<div
+								className="cursor-pointer hover:text-textcolor"
+								title="保存到知识库"
+							>
+								<LayersPlus
+									size={16}
+									onClick={() => onSaveToKnowledge(message)}
+								/>
+							</div>
+						)}
+
+					{needShare &&
+						message.role !== 'user' &&
+						!isLoading &&
+						!isSharing &&
+						onShare && (
+							<div
+								className="cursor-pointer hover:text-textcolor"
+								title="分享此回答"
+							>
+								<Share2 size={16} onClick={() => onCheckShare(message)} />
+							</div>
+						)}
 				</div>
 			)}
 		</div>

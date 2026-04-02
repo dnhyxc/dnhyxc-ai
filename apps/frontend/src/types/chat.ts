@@ -135,6 +135,8 @@ export interface ChatBotViewMessageActionsContext {
 	isSharing: boolean;
 	checkedMessages: Set<string>;
 	setCheckedMessage: (message: Message) => void;
+	/** 将助手回复写入知识库草稿并跳转（由 ChatBot 连接层注入） */
+	onSaveToKnowledge?: (message: Message) => void;
 }
 
 /** 自定义左侧锚点导航时的上下文；与内置 ChatAnchorNav 一致。 */
@@ -249,6 +251,9 @@ export interface ChatBotViewProps {
 	 * 自定义底部分支切换与滚动按钮；不传则渲染内置 ChatControls；返回 null 可隐藏。
 	 */
 	renderChatControls?: (ctx: ChatBotViewChatControlsContext) => ReactNode;
+
+	/** 助手消息「保存到知识库」：写入 DetailStore 草稿并跳转 `/knowledge` */
+	onSaveToKnowledge?: (message: Message) => void;
 }
 
 /**
@@ -282,6 +287,7 @@ export interface ChatBotProps {
 	renderMessageActions?: ChatBotViewProps['renderMessageActions'];
 	renderAnchorNav?: ChatBotViewProps['renderAnchorNav'];
 	renderChatControls?: ChatBotViewProps['renderChatControls'];
+	onSaveToKnowledge?: ChatBotViewProps['onSaveToKnowledge'];
 }
 
 export interface CreateUserMessageParams {

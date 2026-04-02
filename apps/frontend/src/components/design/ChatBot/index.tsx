@@ -1,3 +1,4 @@
+import { Toast } from '@ui/sonner';
 import * as mobx from 'mobx';
 import { observer } from 'mobx-react';
 import React, {
@@ -7,6 +8,7 @@ import React, {
 	useMemo,
 	useState,
 } from 'react';
+import { useNavigate } from 'react-router';
 import { useChatCoreContext } from '@/contexts';
 import { findLatestBranchSelection } from '@/hooks/useBranchManage';
 import { useChatCore } from '@/hooks/useChatCore';
@@ -49,9 +51,11 @@ const ChatBot = observer(
 			renderMessageActions,
 			renderAnchorNav,
 			renderChatControls,
+			onSaveToKnowledge: onSaveToKnowledgeProp,
 		} = props;
 
-		const { chatStore } = useStore();
+		const navigate = useNavigate();
+		const { chatStore, detailStore } = useStore();
 		const {
 			onScrollToRef,
 			isSharing,
@@ -189,6 +193,25 @@ const ChatBot = observer(
 			setEditMessage(null);
 		}, [chatStore.activeSessionId]);
 
+		const defaultSaveToKnowledge = useCallback(
+			(message: Message) => {
+				const content = message.content?.trim() ?? '';
+				if (!content) {
+					Toast({
+						type: 'warning',
+						title: '暂无内容',
+						message: '该条回复为空，无法保存到知识库',
+					});
+					return;
+				}
+				detailStore.applyKnowledgeDraftFromChatReply(content);
+				navigate('/knowledge');
+			},
+			[detailStore, navigate],
+		);
+
+		const onSaveToKnowledge = onSaveToKnowledgeProp ?? defaultSaveToKnowledge;
+
 		return (
 			<ChatBotView
 				ref={ref}
@@ -225,6 +248,7 @@ const ChatBot = observer(
 				renderMessageActions={renderMessageActions}
 				renderAnchorNav={renderAnchorNav}
 				renderChatControls={renderChatControls}
+				onSaveToKnowledge={onSaveToKnowledge}
 			/>
 		);
 	}),

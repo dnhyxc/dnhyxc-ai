@@ -82,6 +82,7 @@ function KnowledgeEditorToolbar(props: {
 	);
 }
 
+/** 知识编辑页：正文与标题等草稿存于 detailStore，聊天助手条「保存到知识库」会写入同一份草稿并跳转至此 */
 const Knowledge = observer(() => {
 	const { detailStore, knowledgeStore } = useStore();
 	const { theme } = useTheme();

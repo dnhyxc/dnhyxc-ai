@@ -5,6 +5,24 @@ import type { SaveKnowledgeMarkdownPayload } from '@/utils/knowledge-save';
 /** 知识编辑：与上次保存或从列表载入对齐的快照，用于脏检查 */
 export type KnowledgePersistedSnapshot = { title: string; content: string };
 
+/** 从 Markdown 正文推断默认标题：优先首条非空标题行，否则带时间戳的「对话摘录」 */
+function deriveKnowledgeTitleFromMarkdown(markdown: string): string {
+	const lines = markdown.split(/\r?\n/);
+	for (const line of lines) {
+		const t = line.trim();
+		if (!t) continue;
+		const withoutHash = t.replace(/^#{1,6}\s*/, '').trim();
+		if (withoutHash) {
+			return withoutHash.length > 80
+				? `${withoutHash.slice(0, 80)}…`
+				: withoutHash;
+		}
+	}
+	const d = new Date();
+	const pad = (n: number) => String(n).padStart(2, '0');
+	return `对话摘录-${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}`;
+}
+
 class DetailStore {
 	constructor() {
 		makeAutoObservable(this);
@@ -83,6 +101,22 @@ class DetailStore {
 		this.knowledgeOverwriteOpen = false;
 		this.knowledgeOverwriteTargetPath = '';
 		this.knowledgePendingSavePayload = null;
+	}
+
+	/**
+	 * 用助手回复填充知识库草稿（新条目），不调用接口。
+	 * 用于聊天页「保存到知识库」后跳转编辑。
+	 */
+	applyKnowledgeDraftFromChatReply(markdown: string) {
+		const body = markdown.trim();
+		if (!body) return;
+		this.setKnowledgeOverwriteOpen(false);
+		this.knowledgeEditingKnowledgeId = null;
+		this.knowledgeLocalDiskTitle = null;
+		this.markdown = body;
+		this.knowledgeTitle = deriveKnowledgeTitleFromMarkdown(body);
+		// 空快照：与当前内容不一致，展示未保存标识并允许保存
+		this.knowledgePersistedSnapshot = { title: '', content: '' };
 	}
 
 	get getMarkdown() {
