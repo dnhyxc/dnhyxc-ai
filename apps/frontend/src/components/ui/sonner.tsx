@@ -6,23 +6,80 @@ import {
 	TriangleAlertIcon,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
-import { Toaster as Sonner, type ToasterProps, toast } from 'sonner';
+import type { CSSProperties } from 'react';
+import {
+	type ExternalToast,
+	Toaster as Sonner,
+	type ToasterProps,
+	toast,
+} from 'sonner';
+import { cn } from '@/lib/utils';
 
 type ToastType = 'success' | 'error' | 'warning' | 'info' | 'loading' | 'start';
 
-/** 未传 `duration` 时自动关闭延迟（毫秒）；`toast.*` 直连也受 `<Toaster duration />` 影响 */
-const DEFAULT_TOAST_DURATION_MS = 4000;
+/** 与 sonner 一致：四角 + 上下居中，用于 `<Toaster position />` 与单条 toast 的 `position` */
+export type ToastPosition = NonNullable<ToasterProps['position']>;
 
+/** 未传 `duration` 时自动关闭延迟（毫秒）；`toast.*` 直连也受 `<Toaster duration />` 影响 */
+export const DEFAULT_TOAST_DURATION_MS = 2000;
+
+/** 未传 `position` 时使用；可选：`top-left` | `top-right` | `bottom-left` | `bottom-right` | `top-center` | `bottom-center` */
+export const DEFAULT_TOAST_POSITION: ToastPosition = 'top-right';
+
+/** 与 `<Toaster offset />` 同类型；单条通过根节点 margin 近似，非 sonner 原生 per-toast 边距 */
+export type ToastOffset = NonNullable<ToasterProps['offset']>;
+
+/** 将 offset 转为单条 toast 外层 li 的 style（勿覆盖 sonner 内部使用的 --index 等变量） */
+function offsetToToastStyle(offset: ToastOffset): CSSProperties {
+	if (typeof offset === 'number') {
+		return { margin: `${offset}px` };
+	}
+	if (typeof offset === 'string') {
+		return { margin: offset };
+	}
+	const style: CSSProperties = {};
+	if (offset.top != null) {
+		style.marginTop =
+			typeof offset.top === 'number' ? `${offset.top}px` : offset.top;
+	}
+	if (offset.right != null) {
+		style.marginRight =
+			typeof offset.right === 'number' ? `${offset.right}px` : offset.right;
+	}
+	if (offset.bottom != null) {
+		style.marginBottom =
+			typeof offset.bottom === 'number' ? `${offset.bottom}px` : offset.bottom;
+	}
+	if (offset.left != null) {
+		style.marginLeft =
+			typeof offset.left === 'number' ? `${offset.left}px` : offset.left;
+	}
+	return style;
+}
+
+/**
+ * 封装 `toast.custom` 的轻量 Toast。
+ *
+ * - `position`：sonner 支持单条，会进入对应角的列表。
+ * - `offset`：通过根节点 margin 近似整器 `offset`，堆叠时可能与全局 Toaster 边距叠加。
+ * - `expand`：sonner 2.x 仅 `<Toaster expand />` 生效，单条传参无效，保留仅为与 Toaster API 对齐。
+ */
 const Toast = ({
 	title,
 	message,
 	type,
 	duration,
+	position,
+	expand: _expand,
+	offset,
 }: {
 	type: ToastType;
 	title: string;
 	message?: string;
 	duration?: number;
+	position?: ToastPosition;
+	expand?: boolean;
+	offset?: ToastOffset;
 }) => {
 	const colors: Record<ToastType, string> = {
 		success: 'text-green-500',
@@ -72,25 +129,62 @@ const Toast = ({
 				</div>
 			);
 		},
-		{
-			duration:
+		(() => {
+			const resolvedDuration =
 				duration ??
 				(type === 'loading' || type === 'start'
 					? Number.POSITIVE_INFINITY
-					: DEFAULT_TOAST_DURATION_MS),
-		},
+					: DEFAULT_TOAST_DURATION_MS);
+			const options: ExternalToast = { duration: resolvedDuration };
+			if (position !== undefined) {
+				options.position = position;
+			}
+			if (offset !== undefined) {
+				options.style = {
+					...options.style,
+					...offsetToToastStyle(offset),
+				};
+			}
+			return options;
+		})(),
 	);
 };
 
-const Toaster = ({ ...props }: ToasterProps) => {
+/**
+ * 全局 Toast 容器（sonner）。
+ *
+ * **位置 `position`**：`'top-left'` | `'top-right'` | `'bottom-left'` | `'bottom-right'` | `'top-center'` | `'bottom-center'`，默认见 {@link DEFAULT_TOAST_POSITION}。
+ *
+ * **展开 `expand`**：`true` 时堆叠区展开占更高区域；`false`（默认）为紧凑堆叠，入场动画方向随 `position` 由 sonner 处理。
+ *
+ * **滑动关闭 `swipeDirections`**：如 `['top','right','bottom','left']` 的子集，控制可滑走关闭的方向。
+ *
+ * **排版方向 `dir`**：`'ltr'` | `'rtl'` | `'auto'`。
+ *
+ * @example
+ * ```tsx
+ * <Toaster position="bottom-right" expand swipeDirections={['bottom', 'right']} />
+ * ```
+ */
+const Toaster = (props: ToasterProps) => {
 	const { theme = 'system' } = useTheme();
+
+	const baseStyle = {
+		'--normal-bg': 'var(--popover)',
+		'--normal-text': 'var(--popover-foreground)',
+		'--normal-border': 'var(--border)',
+		'--border-radius': 'var(--radius)',
+	} as React.CSSProperties;
 
 	return (
 		<Sonner
+			{...props}
 			theme={theme as ToasterProps['theme']}
-			className="toaster group"
+			className={cn('toaster group', props.className)}
 			duration={props.duration ?? DEFAULT_TOAST_DURATION_MS}
-			offset={props.offset || 30}
+			offset={props.offset ?? 30}
+			position={props.position ?? DEFAULT_TOAST_POSITION}
+			expand={props.expand ?? false}
 			icons={{
 				success: (
 					<CircleCheckIcon
@@ -113,18 +207,10 @@ const Toaster = ({ ...props }: ToasterProps) => {
 				),
 				loading: <Loader2Icon className="size-4 animate-spin" />,
 			}}
-			style={
-				{
-					'--normal-bg': 'var(--popover)',
-					'--normal-text': 'var(--popover-foreground)',
-					'--normal-border': 'var(--border)',
-					'--border-radius': 'var(--radius)',
-				} as React.CSSProperties
-			}
-			position={props.position || 'top-right'}
-			{...props}
+			style={{ ...baseStyle, ...props.style }}
 		/>
 	);
 };
 
 export { Toaster, toast, Toast };
+export type { ToasterProps };
