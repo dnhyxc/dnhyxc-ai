@@ -2,7 +2,7 @@ import Confirm from '@design/Confirm';
 import { ScrollArea } from '@ui/scroll-area';
 import { Toast } from '@ui/sonner';
 import { LayersPlus, LibraryBig, OctagonX, ScrollText } from 'lucide-react';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import MarkdownEditor from '@/components/design/Monaco';
 import { Button, Input } from '@/components/ui';
 import { useTheme } from '@/hooks';
@@ -101,6 +101,12 @@ const Knowledge = () => {
 	/** 打开该条时的标题：桌面端用于标题变更时重命名本地 .md，避免残留旧文件 */
 	const knowledgeLocalTitleRef = useRef<string | null>(null);
 
+	/** 上次成功保存或从列表载入后的标题（trim）与正文，用于判断是否与当前编辑一致 */
+	const lastPersistedSnapshotRef = useRef<{ title: string; content: string }>({
+		title: '',
+		content: '',
+	});
+
 	const getUserInfo = useMemo(() => readUserInfoFromStorage(), []);
 
 	const monacoTheme = theme === 'black' ? 'vs-dark' : 'vs';
@@ -108,6 +114,7 @@ const Knowledge = () => {
 	/** 清空标题与正文并 remount 编辑器（与原先四处内联一致） */
 	const resetEditorToNewDraft = useCallback(() => {
 		knowledgeLocalTitleRef.current = null;
+		lastPersistedSnapshotRef.current = { title: '', content: '' };
 		setEditingKnowledgeId(null);
 		setTitle('');
 		detailStore.setMarkdown('');
@@ -171,12 +178,24 @@ const Knowledge = () => {
 		}
 	}, [detailStore, title, getUserInfo, editingKnowledgeId, knowledgeStore]);
 
+	const syncSnapshotAfterPersist = useCallback(
+		(trimmedTitle: string, markdown: string) => {
+			lastPersistedSnapshotRef.current = {
+				title: trimmedTitle,
+				content: markdown,
+			};
+		},
+		[],
+	);
+
 	const onSave = useCallback(async () => {
 		const markdown = detailStore.markdown ?? '';
 		const trimmedTitle = title.trim();
 		if (!trimmedTitle)
 			return Toast({ type: 'warning', title: '请先输入文件名「标题」' });
 		if (!markdown) return Toast({ type: 'warning', title: '请先输入内容' });
+		const snap = lastPersistedSnapshotRef.current;
+		if (snap.title === trimmedTitle && snap.content === markdown) return;
 		setSaveLoading(true);
 		try {
 			if (isTauriRuntime()) {
@@ -197,6 +216,7 @@ const Knowledge = () => {
 					await persistKnowledgeApi();
 					await runTauriSave(payload);
 					knowledgeLocalTitleRef.current = trimmedTitle;
+					syncSnapshotAfterPersist(trimmedTitle, markdown);
 				} else {
 					setOverwriteTargetPath(target.path);
 					setPendingSavePayload(payload);
@@ -205,6 +225,7 @@ const Knowledge = () => {
 			} else {
 				await persistKnowledgeApi();
 				knowledgeLocalTitleRef.current = trimmedTitle;
+				syncSnapshotAfterPersist(trimmedTitle, markdown);
 			}
 		} finally {
 			setSaveLoading(false);
@@ -215,16 +236,45 @@ const Knowledge = () => {
 		persistKnowledgeApi,
 		runTauriSave,
 		editingKnowledgeId,
+		syncSnapshotAfterPersist,
 	]);
+
+	/** Command/Ctrl + S：与工具栏保存一致（捕获阶段优先于 Monaco 默认行为） */
+	useEffect(() => {
+		const onKeyDown = (e: KeyboardEvent) => {
+			if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 's') return;
+			e.preventDefault();
+			if (saveLoading || overwriteOpen) return;
+			void onSave();
+		};
+		window.addEventListener('keydown', onKeyDown, true);
+		return () => window.removeEventListener('keydown', onKeyDown, true);
+	}, [onSave, saveLoading, overwriteOpen]);
 
 	const onConfirmOverwrite = useCallback(async () => {
 		if (!pendingSavePayload) return;
+		const markdown = detailStore.markdown ?? '';
+		const trimmedTitle = title.trim();
+		const snap = lastPersistedSnapshotRef.current;
+		if (snap.title === trimmedTitle && snap.content === markdown) {
+			Toast({
+				type: 'info',
+				title: '暂无修改',
+				message: '标题与内容与上次保存一致，未执行保存',
+				duration: 2000,
+			});
+			setOverwriteOpen(false);
+			setPendingSavePayload(null);
+			setOverwriteTargetPath('');
+			return;
+		}
 		setSaveLoading(true);
 		try {
 			await persistKnowledgeApi();
 			const merged = { ...pendingSavePayload, overwrite: true };
 			await runTauriSave(merged);
 			knowledgeLocalTitleRef.current = merged.title.trim();
+			syncSnapshotAfterPersist(trimmedTitle, markdown);
 			setOverwriteOpen(false);
 			setPendingSavePayload(null);
 			setOverwriteTargetPath('');
@@ -236,7 +286,14 @@ const Knowledge = () => {
 		} finally {
 			setSaveLoading(false);
 		}
-	}, [pendingSavePayload, persistKnowledgeApi, runTauriSave]);
+	}, [
+		pendingSavePayload,
+		persistKnowledgeApi,
+		runTauriSave,
+		detailStore,
+		title,
+		syncSnapshotAfterPersist,
+	]);
 
 	const handleOverwriteOpenChange = useCallback((open: boolean) => {
 		setOverwriteOpen(open);
@@ -251,8 +308,10 @@ const Knowledge = () => {
 			setEditingKnowledgeId(record.id);
 			const t = (record.title ?? '').trim();
 			knowledgeLocalTitleRef.current = t || null;
+			const content = record.content ?? '';
+			lastPersistedSnapshotRef.current = { title: t, content };
 			setTitle(record.title ?? '');
-			detailStore.setMarkdown(record.content ?? '');
+			detailStore.setMarkdown(content);
 		},
 		[detailStore],
 	);
