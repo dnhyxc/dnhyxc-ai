@@ -17,7 +17,6 @@ export default defineConfig(async () => ({
 	optimizeDeps: {
 		include: [
 			'monaco-editor',
-			'pangu',
 			'prettier/standalone',
 			'prettier/plugins/babel',
 			'prettier/plugins/estree',

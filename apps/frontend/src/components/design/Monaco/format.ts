@@ -1,6 +1,9 @@
 import type { OnMount } from '@monaco-editor/react';
-import pangu from 'pangu';
 import type { Plugin } from 'prettier';
+
+/** 与 pangu 一致的 CJK Unicode 块，用于轻量「盘古之白」 */
+const PANGU_CJK =
+	'\u2E80-\u2EFF\u2F00-\u2FDF\u3040-\u309F\u30A0-\u30FA\u30FC-\u30FF\u3100-\u312F\u3200-\u32FF\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF';
 
 type MonacoApi = Parameters<OnMount>[1];
 
@@ -65,9 +68,12 @@ async function formatWithTypeScriptParser(source: string): Promise<string> {
 }
 
 /**
- * 对正文做 CJK 与半角字符间空格（盘古之白），不处理 fenced code 与单行行内代码。
+ * 仅在 CJK 与 ASCII 字母数字交界处插入空格（精简版盘古之白）。
+ * 不使用 pangu.spacingText：其会在标点、括号、引号、运算符等与文字之间也加空格，易破坏 Markdown/排版。
  */
 function spacingMarkdownProse(markdown: string): string {
+	const cjkThenAlnum = new RegExp(`([${PANGU_CJK}])([A-Za-z0-9])`, 'g');
+	const alnumThenCjk = new RegExp(`([A-Za-z0-9])([${PANGU_CJK}])`, 'g');
 	const outsideFences = markdown.split(/(```[\s\S]*?```)/g);
 	return outsideFences
 		.map((chunk) => {
@@ -80,7 +86,9 @@ function spacingMarkdownProse(markdown: string): string {
 					if (part.startsWith('`') && part.endsWith('`')) {
 						return part;
 					}
-					return pangu.spacingText(part);
+					return part
+						.replace(cjkThenAlnum, '$1 $2')
+						.replace(alnumThenCjk, '$1 $2');
 				})
 				.join('');
 		})
