@@ -92,13 +92,26 @@ const Toast = ({
 		start: 'text-gray-500',
 	};
 
+	/** 关闭按钮与对应类型主色一致（Lucide X 使用 currentColor） */
+	const closeButtonTone: Record<ToastType, string> = {
+		success: 'text-green-500 hover:text-green-600',
+		error: 'text-red-500 hover:text-red-600',
+		warning: 'text-amber-500 hover:text-amber-600',
+		info: 'text-gray-500 hover:text-gray-600',
+		loading: 'text-gray-500 hover:text-gray-600',
+		start: 'text-gray-500 hover:text-gray-600',
+	};
+
 	toast.custom(
 		(toastId) => {
 			return (
 				<div className="group relative flex flex-col justify-center min-h-13 w-80 bg-theme-background/80 shadow-lg rounded-md py-2 pl-3 pr-9">
 					<button
 						type="button"
-						className="absolute right-1 top-1 flex size-7 shrink-0 items-center justify-center rounded-md text-textcolor/70 opacity-0 pointer-events-none transition-opacity duration-150 group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto hover:bg-theme/15 hover:text-textcolor focus-visible:opacity-100 focus-visible:pointer-events-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 cursor-pointer"
+						className={cn(
+							'absolute right-1 top-1 flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md opacity-0 pointer-events-none transition-opacity duration-150 group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto hover:bg-theme/15 focus-visible:opacity-100 focus-visible:pointer-events-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50',
+							closeButtonTone[type],
+						)}
 						aria-label="关闭"
 						onClick={(e) => {
 							e.stopPropagation();

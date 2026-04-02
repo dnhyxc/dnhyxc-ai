@@ -18,6 +18,7 @@ import {
 } from '@/utils/knowledge-save';
 import { EDITOR_HEIGHT, TAURI_KNOWLEDGE_DIR } from './constants';
 import KnowledgeList from './KnowledgeList';
+import { cn } from '@/lib/utils';
 
 type StoredUserInfo = { username?: unknown; id?: unknown } | null;
 
@@ -64,7 +65,11 @@ function KnowledgeEditorToolbar(props: {
 				<LayersPlus className="mt-0.5" />
 				<span className="mt-0.5">保存</span>
 			</Button>
-			<Button variant="link" className={linkBtn} onClick={onNewDraft}>
+			<Button
+				variant="link"
+				className={cn(linkBtn, 'hover:text-orange-500')}
+				onClick={onNewDraft}
+			>
 				<OctagonX className="mt-0.5" />
 				<span className="mt-0.5">清空</span>
 			</Button>
