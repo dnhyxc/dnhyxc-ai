@@ -427,7 +427,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 									viewportRef={previewViewportRef}
 								/>
 								<div className="pointer-events-none absolute -right-1 -bottom-1 z-99 flex items-end justify-end p-2">
-									<div className="pointer-events-auto flex items-center gap-1.5 rounded-md border border-theme/15 bg-theme/10 px-2 py-1 shadow-sm backdrop-blur-sm">
+									<div className="pointer-events-auto flex items-center gap-1.5 rounded-md border border-theme/15 bg-theme/5 px-2 py-1 shadow-sm backdrop-blur-xs">
 										<Switch
 											id={splitScrollFollowSwitchId}
 											size="sm"
