@@ -4,6 +4,11 @@ export const MENUS = [
 		icon: 'House',
 		path: '/',
 	},
+	{
+		name: '知识库',
+		icon: 'BookOpenText',
+		path: '/knowledge',
+	},
 	// {
 	// 	name: '智能对话',
 	// 	icon: 'Bot',
@@ -19,21 +24,6 @@ export const MENUS = [
 	// 	icon: 'Codesandbox',
 	// 	path: '/coding',
 	// },
-	{
-		name: '技能',
-		icon: 'SquareChartGantt',
-		path: '/skill',
-	},
-	{
-		name: '详情',
-		icon: 'Newspaper',
-		path: '/detail',
-	},
-	{
-		name: '知识库',
-		icon: 'BookOpenText',
-		path: '/knowledge',
-	},
 	// {
 	// 	name: '个人主页',
 	// 	icon: 'WalletCards',

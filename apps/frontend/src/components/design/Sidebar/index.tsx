@@ -13,9 +13,7 @@ import {
 	CreditCard,
 	House,
 	LogOut,
-	Newspaper,
 	Package,
-	SquareChartGantt,
 	WalletCards,
 } from 'lucide-react';
 import { useNavigate } from 'react-router';
@@ -37,10 +35,8 @@ const Sidebar = () => {
 		House: <House />,
 		Package: <Package />,
 		Bot: <Bot />,
-		SquareChartGantt: <SquareChartGantt />,
 		Codesandbox: <Codesandbox />,
 		BookOpenText: <BookOpenText />,
-		Newspaper: <Newspaper />,
 		WalletCards: <WalletCards />,
 		CreditCard: <CreditCard />,
 	};

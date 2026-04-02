@@ -7,7 +7,6 @@ import Chat from '@/views/chat';
 import NewChat from '@/views/chat/new';
 import Session from '@/views/chat/session';
 import Coding from '@/views/coding';
-import Detail from '@/views/detail';
 import Document from '@/views/document';
 import Home from '@/views/home';
 import Knowledge from '@/views/knowledge';
@@ -19,7 +18,6 @@ import AboutApp from '@/views/setting/about';
 import AppSystem from '@/views/setting/system';
 import ThemeSetting from '@/views/setting/theme';
 import Share from '@/views/share';
-import Skill from '@/views/skill';
 import ChildWindow from '@/views/win';
 
 export interface RouteMeta {
@@ -45,13 +43,6 @@ const routes: RouteConfig[] = [
 					title: 'dnhyxc-ai',
 				},
 			},
-			// {
-			// 	path: '/chat/:id?',
-			// 	Component: Chat,
-			// 	meta: {
-			// 		title: '智能对话',
-			// 	},
-			// },
 			{
 				path: '/chat',
 				Component: Chat,
@@ -88,20 +79,6 @@ const routes: RouteConfig[] = [
 				Component: Coding,
 				meta: {
 					title: '智能代码处理',
-				},
-			},
-			{
-				path: '/skill',
-				Component: Skill,
-				meta: {
-					title: '技能',
-				},
-			},
-			{
-				path: '/detail',
-				Component: Detail,
-				meta: {
-					title: '详情',
 				},
 			},
 			{
