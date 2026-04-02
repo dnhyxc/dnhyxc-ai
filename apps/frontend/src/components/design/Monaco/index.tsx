@@ -2,13 +2,13 @@ import { MarkdownParser } from '@dnhyxc-ai/tools';
 import '@dnhyxc-ai/tools/styles.css';
 import Tooltip from '@design/Tooltip';
 import Editor, { type OnMount } from '@monaco-editor/react';
-import { ScrollArea } from '@ui/index';
+import { Button, ScrollArea } from '@ui/index';
 import {
-	ChevronDown,
-	ChevronUp,
 	Columns2,
 	Eye,
 	FilePenLine,
+	PanelTopClose,
+	PanelTopOpen,
 	Scroll,
 } from 'lucide-react';
 import {
@@ -225,7 +225,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	const [viewMode, setViewMode] = useState<MarkdownViewMode>('edit');
 	const [splitPreviewScrollFollow, setSplitPreviewScrollFollow] =
 		useState(false);
-	/** 底部 Markdown 操作条是否展开（顶栏按钮切换，带动画） */
+	/** 底部 Markdown 操作条是否展开（由顶栏 toolbar 区域按钮切换） */
 	const [markdownBottomBarOpen, setMarkdownBottomBarOpen] = useState(false);
 	const viewModeRef = useRef(viewMode);
 	const splitScrollFollowRef = useRef(splitPreviewScrollFollow);
@@ -302,12 +302,13 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 		editorRef.current?.focus();
 	}, []);
 
-	const modeBtnClass = (active: boolean) =>
+	/** 底部操作栏内图标按钮（与「跟随滚动」一致） */
+	const markdownBarIconBtnClass = (active: boolean) =>
 		cn(
-			'cursor-pointer inline-flex items-center justify-center rounded px-1 pb-1 pt-0.5 text-xs transition-colors',
+			'flex size-7 cursor-pointer items-center justify-center rounded-md p-1 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-theme/40',
 			active
 				? 'bg-theme/25 text-textcolor'
-				: 'text-textcolor/60 hover:bg-theme/10 hover:text-textcolor',
+				: 'text-textcolor/80 hover:bg-theme/10 hover:text-textcolor',
 		);
 
 	return (
@@ -320,85 +321,36 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 						'flex h-10 min-w-0 shrink-0 items-center gap-2 border-b border-theme/5',
 					)}
 				>
-					{title}
-					{isMarkdown ? (
-						<div className="flex min-w-0 shrink-0 items-center gap-1 rounded-md border border-theme/10 p-1">
-							<div
-								className="flex shrink-0 items-center gap-0.5"
-								role="tablist"
-								aria-label="Markdown 视图"
-							>
-								<button
-									type="button"
-									role="tab"
-									aria-selected={viewMode === 'edit'}
-									className={modeBtnClass(viewMode === 'edit')}
-									title="编辑源码"
-									onClick={() => {
-										setViewMode('edit');
-										queueMicrotask(focusEditor);
-									}}
-								>
-									<FilePenLine size={14} className="mr-1 opacity-80" />
-									编辑
-								</button>
-								<button
-									type="button"
-									role="tab"
-									aria-selected={viewMode === 'preview'}
-									className={modeBtnClass(viewMode === 'preview')}
-									title="预览渲染"
-									onClick={() => setViewMode('preview')}
-								>
-									<Eye size={14} className="mr-1 opacity-80" />
-									预览
-								</button>
-								<button
-									type="button"
-									role="tab"
-									aria-selected={viewMode === 'split'}
-									className={modeBtnClass(viewMode === 'split')}
-									title="分屏：左编辑右预览"
-									onClick={() => {
-										setViewMode('split');
-										queueMicrotask(focusEditor);
-									}}
-								>
-									<Columns2 size={14} className="mr-1 opacity-80" />
-									分屏
-								</button>
-							</div>
-							<span className="h-5 w-px shrink-0 bg-theme/15" aria-hidden />
-							<button
-								type="button"
-								className="flex cursor-pointer size-5 shrink-0 items-center justify-center rounded text-textcolor/55 transition-colors hover:bg-theme/10 hover:text-textcolor"
-								title={
-									markdownBottomBarOpen ? '收起底部操作条' : '展开底部操作条'
-								}
+					<div className="min-w-0 flex-1">{title}</div>
+					<div className="flex min-w-0 shrink-0 items-center justify-end">
+						{isMarkdown ? (
+							<Button
+								variant="link"
 								aria-label={
-									markdownBottomBarOpen ? '收起底部操作条' : '展开底部操作条'
+									markdownBottomBarOpen
+										? '收起 Markdown 底部操作栏'
+										: '展开 Markdown 底部操作栏'
 								}
 								aria-expanded={markdownBottomBarOpen}
 								aria-controls={markdownBottomBarId}
 								onClick={() => setMarkdownBottomBarOpen((o) => !o)}
 							>
-								{markdownBottomBarOpen ? (
-									<ChevronDown size={15} />
-								) : (
-									<ChevronUp size={15} className="mb-0.5" />
-								)}
-							</button>
-						</div>
-					) : null}
-					{toolbar ? (
-						<div className="flex min-w-0 flex-1 items-center justify-end gap-2">
-							{toolbar}
-						</div>
-					) : null}
+								<div className="flex items-center gap-1">
+									{markdownBottomBarOpen ? (
+										<PanelTopOpen className="mt-0.5" />
+									) : (
+										<PanelTopClose className="mt-0.5" />
+									)}
+									<span className="mt-0.5">操作栏</span>
+								</div>
+							</Button>
+						) : null}
+						{toolbar}
+					</div>
 				</div>
 
 				<div
-					className="min-h-0 min-w-0 max-w-full overflow-hidden"
+					className="box-border min-h-0 min-w-0 max-w-full overflow-hidden"
 					style={{ height }}
 				>
 					{!isMarkdown || viewMode === 'edit' ? (
@@ -467,37 +419,76 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 					role="toolbar"
 					aria-label="Markdown 底部操作"
 					className={cn(
-						'absolute bottom-0 left-1/2 z-30 flex w-full max-w-md -translate-x-1/2 justify-center px-3 transition-transform duration-300 ease-out motion-reduce:transition-none motion-reduce:duration-0',
+						'absolute bottom-0 left-1/2 z-30 flex max-w-2xl -translate-x-1/2 justify-center transition-transform duration-300 ease-out motion-reduce:transition-none motion-reduce:duration-0',
 						markdownBottomBarOpen
 							? '-translate-y-2 pointer-events-auto'
 							: 'translate-y-15 pointer-events-none',
 					)}
 				>
-					<div className="flex h-11 w-full items-center justify-center gap-4 rounded-md border border-theme/10 bg-theme/5 px-1 shadow-[0_-6px_20px_-8px_color-mix(in_oklch,var(--theme-background)_60%,black)] backdrop-blur-sm">
-						{viewMode === 'split' ? (
-							<div className="flex w-full items-center justify-start gap-2">
+					<div className="flex h-10 w-full min-w-0 px-1.5 items-center justify-between rounded-md border border-theme/5 bg-theme/5 shadow-[0_-6px_20px_-8px_color-mix(in_oklch,var(--theme-background)_60%,black)] backdrop-blur-[2px]">
+						<div
+							className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+							role="tablist"
+							aria-label="Markdown 视图"
+						>
+							<Tooltip content="编辑源码">
+								<button
+									type="button"
+									role="tab"
+									aria-selected={viewMode === 'edit'}
+									className={markdownBarIconBtnClass(viewMode === 'edit')}
+									aria-label="编辑源码"
+									onClick={() => {
+										setViewMode('edit');
+										queueMicrotask(focusEditor);
+									}}
+								>
+									<FilePenLine size={18} strokeWidth={1.75} />
+								</button>
+							</Tooltip>
+							<Tooltip content="预览渲染">
+								<button
+									type="button"
+									role="tab"
+									aria-selected={viewMode === 'preview'}
+									className={markdownBarIconBtnClass(viewMode === 'preview')}
+									aria-label="预览渲染"
+									onClick={() => setViewMode('preview')}
+								>
+									<Eye size={18} strokeWidth={1.75} />
+								</button>
+							</Tooltip>
+							<Tooltip content="分屏：左编辑右预览">
+								<button
+									type="button"
+									role="tab"
+									aria-selected={viewMode === 'split'}
+									className={markdownBarIconBtnClass(viewMode === 'split')}
+									aria-label="分屏：左编辑右预览"
+									onClick={() => {
+										setViewMode('split');
+										queueMicrotask(focusEditor);
+									}}
+								>
+									<Columns2 size={18} strokeWidth={1.75} />
+								</button>
+							</Tooltip>
+							{viewMode === 'split' && (
 								<Tooltip content="跟随滚动">
 									<button
 										type="button"
-										className={cn(
-											'flex items-center justify-center cursor-pointer rounded-md p-1.5 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-theme/40',
-											splitPreviewScrollFollow
-												? 'bg-theme/25 text-textcolor'
-												: 'text-textcolor/80 hover:bg-theme/10 hover:text-textcolor',
+										className={markdownBarIconBtnClass(
+											splitPreviewScrollFollow,
 										)}
 										aria-pressed={splitPreviewScrollFollow}
 										aria-label="跟随滚动"
 										onClick={() => setSplitPreviewScrollFollow((v) => !v)}
 									>
-										<Scroll size={22} strokeWidth={1.75} />
+										<Scroll size={18} strokeWidth={1.75} />
 									</button>
 								</Tooltip>
-							</div>
-						) : (
-							<span className="text-xs text-textcolor/45">
-								切换为「分屏」后可开启预览跟随左侧滚动
-							</span>
-						)}
+							)}
+						</div>
 					</div>
 				</div>
 			) : null}
