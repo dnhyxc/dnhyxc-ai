@@ -1,5 +1,6 @@
 import { MarkdownParser } from '@dnhyxc-ai/tools';
 import '@dnhyxc-ai/tools/styles.css';
+import Tooltip from '@design/Tooltip';
 import Editor, { type OnMount } from '@monaco-editor/react';
 import { ScrollArea } from '@ui/index';
 import {
@@ -8,6 +9,7 @@ import {
 	Columns2,
 	Eye,
 	FilePenLine,
+	Scroll,
 } from 'lucide-react';
 import {
 	memo,
@@ -20,13 +22,11 @@ import {
 	useRef,
 	useState,
 } from 'react';
-import { Label } from '@/components/ui/label';
 import {
 	ResizableHandle,
 	ResizablePanel,
 	ResizablePanelGroup,
 } from '@/components/ui/resizable';
-import { Switch } from '@/components/ui/switch';
 import { CHAT_MARKDOWN_HIGHLIGHT_THEME } from '@/constant';
 import { useTheme } from '@/hooks/theme';
 import { cn } from '@/lib/utils';
@@ -230,7 +230,6 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	const viewModeRef = useRef(viewMode);
 	const splitScrollFollowRef = useRef(splitPreviewScrollFollow);
 	const previewViewportRef = useRef<HTMLDivElement | null>(null);
-	const splitScrollFollowSwitchId = useId();
 	const markdownBottomBarId = useId();
 
 	const isMarkdown = language === 'markdown' && enableMarkdownPreview;
@@ -474,22 +473,25 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 							: 'translate-y-15 pointer-events-none',
 					)}
 				>
-					<div className="flex h-10 w-full items-center justify-center gap-4 rounded-md border border-theme/10 bg-theme/5 px-4 shadow-[0_-6px_20px_-8px_color-mix(in_oklch,var(--theme-background)_60%,black)] backdrop-blur-sm">
+					<div className="flex h-11 w-full items-center justify-center gap-4 rounded-md border border-theme/10 bg-theme/5 px-1 shadow-[0_-6px_20px_-8px_color-mix(in_oklch,var(--theme-background)_60%,black)] backdrop-blur-sm">
 						{viewMode === 'split' ? (
-							<div className="flex items-center gap-2">
-								<Switch
-									id={splitScrollFollowSwitchId}
-									size="sm"
-									checked={splitPreviewScrollFollow}
-									onCheckedChange={setSplitPreviewScrollFollow}
-									aria-label="预览跟随左侧编辑器滚动"
-								/>
-								<Label
-									htmlFor={splitScrollFollowSwitchId}
-									className="cursor-pointer whitespace-nowrap text-xs text-textcolor/80"
-								>
-									跟随滚动
-								</Label>
+							<div className="flex w-full items-center justify-start gap-2">
+								<Tooltip content="跟随滚动">
+									<button
+										type="button"
+										className={cn(
+											'flex items-center justify-center cursor-pointer rounded-md p-1.5 transition-colors outline-none focus-visible:ring-2 focus-visible:ring-theme/40',
+											splitPreviewScrollFollow
+												? 'bg-theme/25 text-textcolor'
+												: 'text-textcolor/80 hover:bg-theme/10 hover:text-textcolor',
+										)}
+										aria-pressed={splitPreviewScrollFollow}
+										aria-label="跟随滚动"
+										onClick={() => setSplitPreviewScrollFollow((v) => !v)}
+									>
+										<Scroll size={22} strokeWidth={1.75} />
+									</button>
+								</Tooltip>
 							</div>
 						) : (
 							<span className="text-xs text-textcolor/45">
