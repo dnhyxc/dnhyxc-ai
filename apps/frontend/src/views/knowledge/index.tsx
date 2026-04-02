@@ -342,9 +342,9 @@ const Knowledge = observer(() => {
 				onConfirm={onConfirmOverwrite}
 			/>
 
-			<ScrollArea className="w-full h-full overflow-y-auto p-5 pt-0 rounded-none">
+			<ScrollArea className="h-full min-w-0 w-full overflow-y-auto p-5 pt-0 rounded-none">
 				<MarkdownEditor
-					className="w-full h-full"
+					className="h-full min-w-0 max-w-full w-full"
 					height={EDITOR_HEIGHT}
 					theme={monacoTheme}
 					value={detailStore.markdown}

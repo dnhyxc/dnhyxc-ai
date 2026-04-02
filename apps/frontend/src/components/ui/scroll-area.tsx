@@ -3,11 +3,15 @@ import * as React from 'react';
 
 import { cn } from '@/lib/utils';
 
+type ScrollAreaScrollbars = 'vertical' | 'horizontal' | 'both';
+
 interface ScrollAreaProps
 	extends React.ComponentProps<typeof ScrollAreaPrimitive.Root> {
 	viewportClassName?: string;
 	dataTauriDragRegion?: boolean;
 	onScroll?: React.UIEventHandler<HTMLDivElement>;
+	/** Radix 须挂载对应 Scrollbar 才开启该方向滚动；Markdown 预览等需 both 以免撑破 flex 父级 */
+	scrollbars?: ScrollAreaScrollbars;
 }
 
 const ScrollArea = React.forwardRef<HTMLDivElement, ScrollAreaProps>(
@@ -18,10 +22,14 @@ const ScrollArea = React.forwardRef<HTMLDivElement, ScrollAreaProps>(
 			viewportClassName,
 			dataTauriDragRegion,
 			onScroll,
+			scrollbars = 'vertical',
 			...props
 		},
 		ref,
 	) => {
+		const showVertical = scrollbars === 'vertical' || scrollbars === 'both';
+		const showHorizontal = scrollbars === 'horizontal' || scrollbars === 'both';
+
 		return (
 			<ScrollAreaPrimitive.Root
 				data-slot="scroll-area"
@@ -43,7 +51,8 @@ const ScrollArea = React.forwardRef<HTMLDivElement, ScrollAreaProps>(
 				>
 					{children}
 				</ScrollAreaPrimitive.Viewport>
-				<ScrollBar />
+				{showVertical ? <ScrollBar /> : null}
+				{showHorizontal ? <ScrollBar orientation="horizontal" /> : null}
 				<ScrollAreaPrimitive.Corner />
 			</ScrollAreaPrimitive.Root>
 		);

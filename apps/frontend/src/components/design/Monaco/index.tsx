@@ -1,9 +1,11 @@
 import { MarkdownParser } from '@dnhyxc-ai/tools';
 import '@dnhyxc-ai/tools/styles.css';
 import Editor, { type OnMount } from '@monaco-editor/react';
+import { ScrollArea } from '@ui/index';
 import { Columns2, Eye, FilePenLine } from 'lucide-react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CHAT_MARKDOWN_HIGHLIGHT_THEME } from '@/constant';
+import { useTheme } from '@/hooks/theme';
 import { cn } from '@/lib/utils';
 import {
 	downloadChatCodeBlock,
@@ -23,6 +25,10 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 	markdown: string;
 }) {
 	const markdownRef = useRef<HTMLDivElement>(null);
+
+	const { theme } = useTheme();
+
+	console.log(theme);
 
 	useEffect(() => {
 		const el = markdownRef.current;
@@ -62,12 +68,26 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 	);
 	const html = useMemo(() => parser.render(markdown), [parser, markdown]);
 	return (
-		<div ref={markdownRef} className="h-full min-h-0 overflow-auto p-3">
-			<div
-				className="[&_.markdown-body]:bg-transparent [&_.markdown-body]:max-w-none [&_.markdown-body]:text-textcolor/90"
-				// Markdown 来自当前编辑器内容，由用户自行编辑
-				dangerouslySetInnerHTML={{ __html: html }}
-			/>
+		<div
+			ref={markdownRef}
+			className="h-full min-h-0 min-w-0 max-w-full overflow-hidden"
+		>
+			<ScrollArea
+				scrollbars="both"
+				className={cn(
+					'h-full min-h-0 min-w-0 max-w-full w-full',
+					theme === 'black' ? 'bg-[#1e1e1e]' : 'bg-white',
+				)}
+				// 覆盖 Radix 内层 display:table + minWidth:100%，否则 table 会按内容扩宽并顶破分栏
+				viewportClassName="[&>div]:!box-border [&>div]:!block [&>div]:!w-full [&>div]:!min-w-0 [&>div]:!max-w-full"
+			>
+				<div className="box-border min-w-0 max-w-full p-3">
+					<div
+						className="[&_.markdown-body]:min-w-0 [&_.markdown-body]:max-w-none [&_.markdown-body]:wrap-break-word [&_.markdown-body]:bg-transparent! [&_.markdown-body]:text-textcolor/90! [&_.markdown-body_pre]:max-w-full [&_.markdown-body_pre]:overflow-x-auto"
+						dangerouslySetInnerHTML={{ __html: html }}
+					/>
+				</div>
+			</ScrollArea>
 		</div>
 	);
 });
@@ -136,14 +156,19 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 
 	const modeBtnClass = (active: boolean) =>
 		cn(
-			'inline-flex items-center justify-center rounded px-2 py-1 text-xs transition-colors',
+			'cursor-pointer inline-flex items-center justify-center rounded px-2 py-1 text-xs transition-colors',
 			active
 				? 'bg-theme/25 text-textcolor'
 				: 'text-textcolor/60 hover:bg-theme/10 hover:text-textcolor',
 		);
 
 	return (
-		<div className={cn('rounded-md overflow-hidden bg-theme/5', className)}>
+		<div
+			className={cn(
+				'min-w-0 max-w-full rounded-md overflow-hidden bg-theme/5',
+				className,
+			)}
+		>
 			<div
 				className={cn(
 					'flex h-10 min-w-0 items-center gap-2 border-b border-theme/5',
@@ -204,7 +229,10 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 				) : null}
 			</div>
 
-			<div className="min-h-0" style={{ height }}>
+			<div
+				className="min-h-0 min-w-0 max-w-full overflow-hidden"
+				style={{ height }}
+			>
 				{!isMarkdown || viewMode === 'edit' ? (
 					<Editor
 						height={height}
@@ -223,8 +251,8 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 				) : null}
 
 				{isMarkdown && viewMode === 'split' ? (
-					<div className="flex h-full min-h-0 flex-row">
-						<div className="flex min-h-0 min-w-0 w-1/2 flex-col border-r border-theme/10">
+					<div className="grid h-full min-h-0 min-w-0 max-w-full grid-cols-[minmax(0,1fr)_minmax(0,1fr)] overflow-hidden">
+						<div className="flex min-h-0 min-w-0 flex-col overflow-hidden border-r border-theme/10">
 							<Editor
 								height="100%"
 								language={language}
@@ -236,7 +264,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 								loading={<Loading text="正在加载编辑器..." />}
 							/>
 						</div>
-						<div className="min-h-0 min-w-0 w-1/2">
+						<div className="min-h-0 min-w-0 overflow-hidden contain-[inline-size]">
 							<ParserMarkdownPreviewPane markdown={value} />
 						</div>
 					</div>
