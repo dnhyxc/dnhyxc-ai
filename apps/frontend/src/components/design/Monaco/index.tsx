@@ -3,6 +3,7 @@ import { useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { registerPrettierFormatProviders } from './format';
 import { options } from './options';
+import Loading from '../Loading';
 
 interface MarkdownEditorProps {
 	value?: string;
@@ -76,11 +77,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 				theme={theme}
 				onMount={handleEditorMount}
 				options={{ ...options, readOnly, placeholder }}
-				loading={
-					<div className="flex items-center justify-center w-full h-full text-textcolor bg-theme-background/20">
-						Loading...
-					</div>
-				}
+				loading={<Loading text="正在加载编辑器..." />}
 			/>
 		</div>
 	);
