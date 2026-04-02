@@ -1,7 +1,7 @@
 import Confirm from '@design/Confirm';
 import { ScrollArea } from '@ui/scroll-area';
 import { Toast } from '@ui/sonner';
-import { LayersPlus, LibraryBig, OctagonX, ScrollText } from 'lucide-react';
+import { LayersPlus, LibraryBig, NotebookPen, OctagonX } from 'lucide-react';
 import { observer } from 'mobx-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import MarkdownEditor from '@/components/design/Monaco';
@@ -364,7 +364,7 @@ const Knowledge = observer(() => {
 								aria-label={hasUnsavedChanges ? '有未保存的修改' : '知识文档'}
 								className="relative inline-flex shrink-0"
 							>
-								<ScrollText size={18} className="text-textcolor" />
+								<NotebookPen size={16} className="text-textcolor" />
 								{hasUnsavedChanges ? (
 									<span
 										className="pointer-events-none absolute -right-0.5 -top-0.5 size-2 rounded-full bg-orange-500"
