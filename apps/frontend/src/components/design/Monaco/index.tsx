@@ -1,9 +1,78 @@
+import { MarkdownParser } from '@dnhyxc-ai/tools';
+import '@dnhyxc-ai/tools/styles.css';
 import Editor, { type OnMount } from '@monaco-editor/react';
-import { useRef } from 'react';
+import { Columns2, Eye, FilePenLine } from 'lucide-react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { CHAT_MARKDOWN_HIGHLIGHT_THEME } from '@/constant';
 import { cn } from '@/lib/utils';
+import {
+	downloadChatCodeBlock,
+	getChatCodeBlockPlainText,
+} from '@/utils/chatCodeToolbar';
 import Loading from '../Loading';
 import { registerPrettierFormatProviders } from './format';
 import { options } from './options';
+
+/**
+ * 使用 @dnhyxc-ai/tools 的 MarkdownParser 渲染预览（与文档处理等页一致）
+ * 知识库预览不需要聊天代码块吸顶工具栏，故关闭 enableChatCodeFenceToolbar
+ */
+const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
+	markdown,
+}: {
+	markdown: string;
+}) {
+	const markdownRef = useRef<HTMLDivElement>(null);
+
+	useEffect(() => {
+		const el = markdownRef.current;
+		if (!el) return;
+		const onClick = (e: MouseEvent) => {
+			const target = e.target as HTMLElement;
+			const btn = target.closest<HTMLButtonElement>('[data-chat-code-action]');
+			if (!btn || !el.contains(btn)) return;
+			const action = btn.getAttribute('data-chat-code-action');
+			const block = btn.closest<HTMLElement>('[data-chat-code-block]');
+			if (!block) return;
+			if (action === 'copy') {
+				void navigator.clipboard.writeText(getChatCodeBlockPlainText(block));
+				const prev = btn.textContent;
+				btn.textContent = '已复制';
+				window.setTimeout(() => {
+					btn.textContent = prev;
+				}, 1500);
+				return;
+			}
+			if (action === 'download') {
+				const lang = btn.getAttribute('data-chat-code-lang') || 'text';
+				downloadChatCodeBlock(block, lang);
+			}
+		};
+		el.addEventListener('click', onClick);
+		return () => el.removeEventListener('click', onClick);
+	}, []);
+
+	const parser = useMemo(
+		() =>
+			new MarkdownParser({
+				highlightTheme: CHAT_MARKDOWN_HIGHLIGHT_THEME,
+				enableChatCodeFenceToolbar: true,
+			}),
+		[],
+	);
+	const html = useMemo(() => parser.render(markdown), [parser, markdown]);
+	return (
+		<div ref={markdownRef} className="h-full min-h-0 overflow-auto p-3">
+			<div
+				className="[&_.markdown-body]:bg-transparent [&_.markdown-body]:max-w-none [&_.markdown-body]:text-textcolor/90"
+				// Markdown 来自当前编辑器内容，由用户自行编辑
+				dangerouslySetInnerHTML={{ __html: html }}
+			/>
+		</div>
+	);
+});
+
+type MarkdownViewMode = 'edit' | 'preview' | 'split';
 
 interface MarkdownEditorProps {
 	value?: string;
@@ -16,6 +85,8 @@ interface MarkdownEditorProps {
 	language?: string;
 	toolbar: React.ReactNode;
 	title?: React.ReactNode;
+	/** 为 markdown 时是否显示编辑/预览/分屏切换；默认 true */
+	enableMarkdownPreview?: boolean;
 }
 
 const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
@@ -29,15 +100,18 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	language = 'markdown',
 	toolbar,
 	title,
+	enableMarkdownPreview = true,
 }) => {
 	const editorRef = useRef<Parameters<OnMount>[0] | null>(null);
+	const [viewMode, setViewMode] = useState<MarkdownViewMode>('edit');
+
+	const isMarkdown = language === 'markdown' && enableMarkdownPreview;
 
 	const handleEditorMount: OnMount = (editor, monaco) => {
 		editorRef.current = editor;
 
 		registerPrettierFormatProviders(monaco);
 
-		// 与 VS Code 一致：格式化文档（Format Document）— Windows/Linux: Shift+Alt+F，Mac: Shift+Option+F
 		editor.addCommand(
 			monaco.KeyMod.Shift | monaco.KeyMod.Alt | monaco.KeyCode.KeyF,
 			() => {
@@ -56,29 +130,118 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 		editor.focus();
 	};
 
+	const focusEditor = useCallback(() => {
+		editorRef.current?.focus();
+	}, []);
+
+	const modeBtnClass = (active: boolean) =>
+		cn(
+			'inline-flex items-center justify-center rounded px-2 py-1 text-xs transition-colors',
+			active
+				? 'bg-theme/25 text-textcolor'
+				: 'text-textcolor/60 hover:bg-theme/10 hover:text-textcolor',
+		);
+
 	return (
 		<div className={cn('rounded-md overflow-hidden bg-theme/5', className)}>
 			<div
-				className={cn('flex h-10 items-center gap-2 border-b border-theme/5')}
+				className={cn(
+					'flex h-10 min-w-0 items-center gap-2 border-b border-theme/5',
+				)}
 			>
-				{/* <div className="flex items-center shrink-0 text-lg font-medium text-textcolor h-full">
-					{language}
-				</div> */}
 				{title}
+				{isMarkdown ? (
+					<div
+						className="flex shrink-0 items-center gap-0.5 rounded-md border border-theme/10 p-0.5"
+						role="tablist"
+						aria-label="Markdown 视图"
+					>
+						<button
+							type="button"
+							role="tab"
+							aria-selected={viewMode === 'edit'}
+							className={modeBtnClass(viewMode === 'edit')}
+							title="编辑源码"
+							onClick={() => {
+								setViewMode('edit');
+								queueMicrotask(focusEditor);
+							}}
+						>
+							<FilePenLine size={14} className="mr-1 opacity-80" />
+							编辑
+						</button>
+						<button
+							type="button"
+							role="tab"
+							aria-selected={viewMode === 'preview'}
+							className={modeBtnClass(viewMode === 'preview')}
+							title="预览渲染"
+							onClick={() => setViewMode('preview')}
+						>
+							<Eye size={14} className="mr-1 opacity-80" />
+							预览
+						</button>
+						<button
+							type="button"
+							role="tab"
+							aria-selected={viewMode === 'split'}
+							className={modeBtnClass(viewMode === 'split')}
+							title="分屏：左编辑右预览"
+							onClick={() => {
+								setViewMode('split');
+								queueMicrotask(focusEditor);
+							}}
+						>
+							<Columns2 size={14} className="mr-1 opacity-80" />
+							分屏
+						</button>
+					</div>
+				) : null}
 				{toolbar ? (
-					<div className="flex shrink-0 items-center gap-2">{toolbar}</div>
+					<div className="flex min-w-0 flex-1 items-center justify-end gap-2">
+						{toolbar}
+					</div>
 				) : null}
 			</div>
-			<Editor
-				height={height}
-				language={language}
-				value={value}
-				onChange={(val) => onChange?.(val || '')}
-				theme={theme}
-				onMount={handleEditorMount}
-				options={{ ...options, readOnly, placeholder }}
-				loading={<Loading text="正在加载编辑器..." />}
-			/>
+
+			<div className="min-h-0" style={{ height }}>
+				{!isMarkdown || viewMode === 'edit' ? (
+					<Editor
+						height={height}
+						language={language}
+						value={value}
+						onChange={(val) => onChange?.(val || '')}
+						theme={theme}
+						onMount={handleEditorMount}
+						options={{ ...options, readOnly, placeholder }}
+						loading={<Loading text="正在加载编辑器..." />}
+					/>
+				) : null}
+
+				{isMarkdown && viewMode === 'preview' ? (
+					<ParserMarkdownPreviewPane markdown={value} />
+				) : null}
+
+				{isMarkdown && viewMode === 'split' ? (
+					<div className="flex h-full min-h-0 flex-row">
+						<div className="flex min-h-0 min-w-0 w-1/2 flex-col border-r border-theme/10">
+							<Editor
+								height="100%"
+								language={language}
+								value={value}
+								onChange={(val) => onChange?.(val || '')}
+								theme={theme}
+								onMount={handleEditorMount}
+								options={{ ...options, readOnly, placeholder }}
+								loading={<Loading text="正在加载编辑器..." />}
+							/>
+						</div>
+						<div className="min-h-0 min-w-0 w-1/2">
+							<ParserMarkdownPreviewPane markdown={value} />
+						</div>
+					</div>
+				) : null}
+			</div>
 		</div>
 	);
 };
