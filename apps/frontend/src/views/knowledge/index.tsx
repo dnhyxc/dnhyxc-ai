@@ -358,7 +358,7 @@ const Knowledge = observer(() => {
 						/>
 					}
 					title={
-						<div className="flex flex-1 items-center pl-3 gap-2">
+						<div className="flex flex-1 items-center pl-3 gap-1">
 							<span
 								role="img"
 								aria-label={hasUnsavedChanges ? '有未保存的修改' : '知识文档'}
