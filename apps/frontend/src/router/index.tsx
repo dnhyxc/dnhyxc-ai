@@ -1,3 +1,4 @@
+import { Toaster } from '@ui/sonner';
 import { useEffect } from 'react';
 import { createBrowserRouter, RouteObject } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
@@ -59,6 +60,7 @@ const App = () => {
 	const router = createBrowserRouter(routes as RouteObject[]);
 	return (
 		<div className="h-full w-full bg-theme-background">
+			<Toaster />
 			<RouterProvider router={router} />
 		</div>
 	);

@@ -439,7 +439,8 @@ class HttpClient {
 				title:
 					requestError?.data?.data?.error?.message ||
 					requestError?.data?.data?.message ||
-					requestError.message,
+					requestError.message ||
+					'请求接口异常',
 			});
 
 			// 抛出错误

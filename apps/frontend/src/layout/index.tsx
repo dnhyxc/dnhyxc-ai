@@ -9,7 +9,6 @@
 import Header from '@design/Header';
 import Sidebar from '@design/Sidebar';
 import { TooltipProvider } from '@ui/index';
-import { Toaster } from '@ui/sonner';
 import { useEffect, useState } from 'react';
 import { Outlet } from 'react-router';
 import { ChatCoreProvider } from '@/contexts';
@@ -41,7 +40,6 @@ const Layout = () => {
 	return (
 		<ChatCoreProvider>
 			<main className="w-full h-full flex rounded-md overflow-hidden bg-theme-background">
-				<Toaster />
 				<Sidebar />
 				<TooltipProvider>
 					<div
