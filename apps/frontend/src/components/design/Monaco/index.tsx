@@ -1,9 +1,9 @@
 import Editor, { type OnMount } from '@monaco-editor/react';
 import { useRef } from 'react';
 import { cn } from '@/lib/utils';
+import Loading from '../Loading';
 import { registerPrettierFormatProviders } from './format';
 import { options } from './options';
-import Loading from '../Loading';
 
 interface MarkdownEditorProps {
 	value?: string;
