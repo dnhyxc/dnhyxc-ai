@@ -1,5 +1,6 @@
 import * as AlertDialogPrimitive from '@radix-ui/react-alert-dialog';
 import type { ReactNode } from 'react';
+import { useCallback, useEffect } from 'react';
 import { buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -18,6 +19,10 @@ interface ConfirmProps {
 	 * 点击确认后是否立即关闭。异步 onConfirm 且需在失败时保持打开时设为 false，由调用方自行 onOpenChange(false)
 	 */
 	closeOnConfirm?: boolean;
+	/**
+	 * 为 true 且弹层打开时，回车触发与「确认」相同逻辑（会排除 input/textarea 等，避免与编辑器冲突）
+	 */
+	confirmOnEnter?: boolean;
 	onConfirm: () => void;
 	onCancel?: () => void;
 	className?: string;
@@ -33,21 +38,43 @@ const Confirm = ({
 	cancelText = '取消',
 	confirmVariant = 'default',
 	closeOnConfirm = true,
+	confirmOnEnter = false,
 	onConfirm,
 	onCancel,
 	className,
 }: ConfirmProps) => {
-	const handleConfirm = () => {
+	const handleConfirm = useCallback(() => {
 		onConfirm();
 		if (closeOnConfirm) {
 			onOpenChange(false);
 		}
-	};
+	}, [onConfirm, closeOnConfirm, onOpenChange]);
 
 	const handleCancel = () => {
 		onCancel?.();
 		onOpenChange(false);
 	};
+
+	/** 按需：弹层打开时回车等同点击确认（排除输入类元素，避免与编辑器抢键） */
+	useEffect(() => {
+		if (!open || !confirmOnEnter) return;
+		const onKeyDown = (e: KeyboardEvent) => {
+			if (e.key !== 'Enter' || e.repeat) return;
+			const el = e.target as HTMLElement | null;
+			if (
+				el?.closest(
+					'input, textarea, select, [contenteditable="true"], [role="textbox"]',
+				)
+			) {
+				return;
+			}
+			e.preventDefault();
+			e.stopPropagation();
+			handleConfirm();
+		};
+		window.addEventListener('keydown', onKeyDown, true);
+		return () => window.removeEventListener('keydown', onKeyDown, true);
+	}, [open, confirmOnEnter, handleConfirm]);
 
 	return (
 		<AlertDialogPrimitive.Root open={open} onOpenChange={onOpenChange}>

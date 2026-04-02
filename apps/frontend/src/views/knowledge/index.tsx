@@ -337,6 +337,7 @@ const Knowledge = observer(() => {
 				confirmText="覆盖保存"
 				confirmVariant="destructive"
 				closeOnConfirm={false}
+				confirmOnEnter
 				onConfirm={onConfirmOverwrite}
 			/>
 
