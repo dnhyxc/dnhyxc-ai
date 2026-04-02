@@ -86,11 +86,6 @@ const Knowledge = observer(() => {
 	const { detailStore, knowledgeStore } = useStore();
 	const { theme } = useTheme();
 
-	const [overwriteOpen, setOverwriteOpen] = useState(false);
-	const [overwriteTargetPath, setOverwriteTargetPath] = useState('');
-	const [pendingSavePayload, setPendingSavePayload] =
-		useState<SaveKnowledgeMarkdownPayload | null>(null);
-
 	const [listOpen, setListOpen] = useState(false);
 	const [saveLoading, setSaveLoading] = useState(false);
 
@@ -203,9 +198,7 @@ const Knowledge = observer(() => {
 					detailStore.setKnowledgeLocalDiskTitle(trimmedTitle);
 					syncSnapshotAfterPersist(trimmedTitle, markdown);
 				} else {
-					setOverwriteTargetPath(target.path);
-					setPendingSavePayload(payload);
-					setOverwriteOpen(true);
+					detailStore.openKnowledgeOverwriteConfirm(target.path, payload);
 				}
 			} else {
 				await persistKnowledgeApi();
@@ -227,15 +220,16 @@ const Knowledge = observer(() => {
 		const onKeyDown = (e: KeyboardEvent) => {
 			if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 's') return;
 			e.preventDefault();
-			if (saveLoading || overwriteOpen) return;
+			if (saveLoading || detailStore.knowledgeOverwriteOpen) return;
 			void onSave();
 		};
 		window.addEventListener('keydown', onKeyDown, true);
 		return () => window.removeEventListener('keydown', onKeyDown, true);
-	}, [onSave, saveLoading, overwriteOpen]);
+	}, [onSave, saveLoading, detailStore]);
 
 	const onConfirmOverwrite = useCallback(async () => {
-		if (!pendingSavePayload) return;
+		const pending = detailStore.knowledgePendingSavePayload;
+		if (!pending) return;
 		const markdown = detailStore.markdown ?? '';
 		const trimmedTitle = detailStore.knowledgeTitle.trim();
 		const snap = detailStore.knowledgePersistedSnapshot;
@@ -246,21 +240,17 @@ const Knowledge = observer(() => {
 				message: '标题与内容与上次保存一致，未执行保存',
 				duration: 2000,
 			});
-			setOverwriteOpen(false);
-			setPendingSavePayload(null);
-			setOverwriteTargetPath('');
+			detailStore.setKnowledgeOverwriteOpen(false);
 			return;
 		}
 		setSaveLoading(true);
 		try {
 			await persistKnowledgeApi();
-			const merged = { ...pendingSavePayload, overwrite: true };
+			const merged = { ...pending, overwrite: true };
 			await runTauriSave(merged);
 			detailStore.setKnowledgeLocalDiskTitle(merged.title.trim());
 			syncSnapshotAfterPersist(trimmedTitle, markdown);
-			setOverwriteOpen(false);
-			setPendingSavePayload(null);
-			setOverwriteTargetPath('');
+			detailStore.setKnowledgeOverwriteOpen(false);
 		} catch (e) {
 			Toast({
 				type: 'error',
@@ -270,23 +260,22 @@ const Knowledge = observer(() => {
 			setSaveLoading(false);
 		}
 	}, [
-		pendingSavePayload,
 		persistKnowledgeApi,
 		runTauriSave,
 		detailStore,
 		syncSnapshotAfterPersist,
 	]);
 
-	const handleOverwriteOpenChange = useCallback((open: boolean) => {
-		setOverwriteOpen(open);
-		if (!open) {
-			setPendingSavePayload(null);
-			setOverwriteTargetPath('');
-		}
-	}, []);
+	const handleOverwriteOpenChange = useCallback(
+		(open: boolean) => {
+			detailStore.setKnowledgeOverwriteOpen(open);
+		},
+		[detailStore],
+	);
 
 	const handlePickRecord = useCallback(
 		(record: KnowledgeRecord) => {
+			detailStore.setKnowledgeOverwriteOpen(false);
 			detailStore.setKnowledgeEditingKnowledgeId(record.id);
 			const t = (record.title ?? '').trim();
 			detailStore.setKnowledgeLocalDiskTitle(t || null);
@@ -318,6 +307,7 @@ const Knowledge = observer(() => {
 		[detailStore, resetEditorToNewDraft],
 	);
 
+	const overwriteTargetPath = detailStore.knowledgeOverwriteTargetPath;
 	const overwriteFileName =
 		overwriteTargetPath.split(/[/\\]/).filter(Boolean).pop() ??
 		overwriteTargetPath;
@@ -331,7 +321,7 @@ const Knowledge = observer(() => {
 	return (
 		<div className="w-full h-full flex flex-col justify-center items-center m-0">
 			<Confirm
-				open={overwriteOpen}
+				open={detailStore.knowledgeOverwriteOpen}
 				onOpenChange={handleOverwriteOpenChange}
 				title="覆盖已有文件？"
 				description={
