@@ -10,14 +10,19 @@ import { Toaster as Sonner, type ToasterProps, toast } from 'sonner';
 
 type ToastType = 'success' | 'error' | 'warning' | 'info' | 'loading' | 'start';
 
+/** 未传 `duration` 时自动关闭延迟（毫秒）；`toast.*` 直连也受 `<Toaster duration />` 影响 */
+const DEFAULT_TOAST_DURATION_MS = 4000;
+
 const Toast = ({
 	title,
 	message,
 	type,
+	duration,
 }: {
 	type: ToastType;
 	title: string;
 	message?: string;
+	duration?: number;
 }) => {
 	const colors: Record<ToastType, string> = {
 		success: 'text-green-500',
@@ -28,40 +33,53 @@ const Toast = ({
 		start: 'text-gray-500',
 	};
 
-	toast.custom(() => {
-		return (
-			<div className="flex flex-col justify-center min-h-13 w-80 bg-theme-background/80 shadow-lg rounded-md py-2 px-3">
-				<div className="flex items-center">
-					<div className="w-6 flex justify-center items-center">
-						{type === 'success' && (
-							<CircleCheckIcon color="var(--color-green-500)" />
-						)}
-						{type === 'info' && <InfoIcon color="var(--color-gray-500)" />}
-						{type === 'warning' && (
-							<TriangleAlertIcon color="var(--color-amber-500)" />
-						)}
-						{type === 'error' && <OctagonXIcon color="var(--color-red-500)" />}
-						{type === 'loading' && (
-							<Loader2Icon color="var(--color-gray-500)" />
-						)}
-						{type === 'start' && <Loader2Icon color="var(--color-gray-500)" />}
+	toast.custom(
+		() => {
+			return (
+				<div className="flex flex-col justify-center min-h-13 w-80 bg-theme-background/80 shadow-lg rounded-md py-2 px-3">
+					<div className="flex items-center">
+						<div className="w-6 flex justify-center items-center">
+							{type === 'success' && (
+								<CircleCheckIcon color="var(--color-green-500)" />
+							)}
+							{type === 'info' && <InfoIcon color="var(--color-gray-500)" />}
+							{type === 'warning' && (
+								<TriangleAlertIcon color="var(--color-amber-500)" />
+							)}
+							{type === 'error' && (
+								<OctagonXIcon color="var(--color-red-500)" />
+							)}
+							{type === 'loading' && (
+								<Loader2Icon color="var(--color-gray-500)" />
+							)}
+							{type === 'start' && (
+								<Loader2Icon color="var(--color-gray-500)" />
+							)}
+						</div>
+						<div
+							className={`ml-2 text-md ${colors[type]} whitespace-pre-wrap wrap-break-word`}
+						>
+							{title}
+						</div>
 					</div>
-					<div
-						className={`ml-2 text-md ${colors[type]} whitespace-pre-wrap wrap-break-word`}
-					>
-						{title}
-					</div>
+					{message ? (
+						<div
+							className={`ml-8 ${colors[type]} text-sm mt-1 whitespace-pre-wrap wrap-break-word`}
+						>
+							{message}
+						</div>
+					) : null}
 				</div>
-				{message ? (
-					<div
-						className={`ml-8 ${colors[type]} text-sm mt-1 whitespace-pre-wrap wrap-break-word`}
-					>
-						{message}
-					</div>
-				) : null}
-			</div>
-		);
-	});
+			);
+		},
+		{
+			duration:
+				duration ??
+				(type === 'loading' || type === 'start'
+					? Number.POSITIVE_INFINITY
+					: DEFAULT_TOAST_DURATION_MS),
+		},
+	);
 };
 
 const Toaster = ({ ...props }: ToasterProps) => {
@@ -71,6 +89,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
 		<Sonner
 			theme={theme as ToasterProps['theme']}
 			className="toaster group"
+			duration={props.duration ?? DEFAULT_TOAST_DURATION_MS}
 			offset={props.offset || 30}
 			icons={{
 				success: (

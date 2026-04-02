@@ -2,7 +2,7 @@ import Confirm from '@design/Confirm';
 import { ScrollArea } from '@ui/scroll-area';
 import { Toast } from '@ui/sonner';
 import { Layers2, LayersPlus, LibraryBig, ScrollText } from 'lucide-react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import MarkdownEditor from '@/components/design/Monaco';
 import { Button, Input } from '@/components/ui';
 import { useTheme } from '@/hooks';
@@ -83,12 +83,16 @@ const Knowledge = () => {
 
 	const [listOpen, setListOpen] = useState(false);
 
+	/** 打开该条时的标题：桌面端用于标题变更时重命名本地 .md，避免残留旧文件 */
+	const knowledgeLocalTitleRef = useRef<string | null>(null);
+
 	const getUserInfo = useMemo(() => readUserInfoFromStorage(), []);
 
 	const monacoTheme = theme === 'black' ? 'vs-dark' : 'vs';
 
 	/** 清空标题与正文并 remount 编辑器（与原先四处内联一致） */
 	const resetEditorToNewDraft = useCallback(() => {
+		knowledgeLocalTitleRef.current = null;
 		setEditingKnowledgeId(null);
 		setTitle('');
 		detailStore.setMarkdown('');
@@ -111,6 +115,7 @@ const Knowledge = () => {
 					message: result.filePath
 						? `已保存到：${result.filePath}`
 						: '已保存到默认目录',
+					duration: 1000,
 				});
 			} else {
 				Toast({ type: 'error', title: '保存失败', message: result.message });
@@ -126,7 +131,18 @@ const Knowledge = () => {
 		const base = { title: trimmedTitle, content: markdown };
 		const meta = buildAuthorMeta(getUserInfo);
 		if (editingKnowledgeId) {
-			await knowledgeStore.updateItem(editingKnowledgeId, { ...base, ...meta });
+			const row = await knowledgeStore.updateItem(editingKnowledgeId, {
+				...base,
+				...meta,
+			});
+			if (!row) {
+				Toast({
+					type: 'error',
+					title: '保存失败',
+					message: '更新知识失败，请稍后重试',
+				});
+				throw new Error('updateKnowledge failed');
+			}
 		} else {
 			const res = await saveKnowledge({
 				...base,
@@ -135,8 +151,8 @@ const Knowledge = () => {
 			// 新建成功后必须记下 id，否则删除本条时 editingKnowledgeId 仍为 null，无法清空编辑器
 			if (res.success && res.data?.id) {
 				setEditingKnowledgeId(res.data.id);
+				knowledgeLocalTitleRef.current = trimmedTitle;
 			}
-			void knowledgeStore.refreshList();
 		}
 	}, [detailStore, title, getUserInfo, editingKnowledgeId, knowledgeStore]);
 
@@ -148,15 +164,23 @@ const Knowledge = () => {
 		if (!markdown) return Toast({ type: 'warning', title: '请先输入内容' });
 		try {
 			if (isTauriRuntime()) {
+				const previousTitle =
+					editingKnowledgeId &&
+					knowledgeLocalTitleRef.current &&
+					knowledgeLocalTitleRef.current !== trimmedTitle
+						? knowledgeLocalTitleRef.current
+						: undefined;
 				const payload: SaveKnowledgeMarkdownPayload = {
 					title: trimmedTitle,
 					content: markdown,
 					filePath: TAURI_KNOWLEDGE_DIR,
+					...(previousTitle ? { previousTitle } : {}),
 				};
 				const target = await invokeResolveKnowledgeMarkdownTarget(payload);
 				if (!target.exists) {
 					await persistKnowledgeApi();
 					await runTauriSave(payload);
+					knowledgeLocalTitleRef.current = trimmedTitle;
 				} else {
 					setOverwriteTargetPath(target.path);
 					setPendingSavePayload(payload);
@@ -164,6 +188,7 @@ const Knowledge = () => {
 				}
 			} else {
 				await persistKnowledgeApi();
+				knowledgeLocalTitleRef.current = trimmedTitle;
 			}
 		} catch (e) {
 			Toast({
@@ -175,13 +200,21 @@ const Knowledge = () => {
 						: '保存失败',
 			});
 		}
-	}, [title, detailStore, persistKnowledgeApi, runTauriSave]);
+	}, [
+		title,
+		detailStore,
+		persistKnowledgeApi,
+		runTauriSave,
+		editingKnowledgeId,
+	]);
 
 	const onConfirmOverwrite = useCallback(async () => {
 		if (!pendingSavePayload) return;
 		try {
 			await persistKnowledgeApi();
-			await runTauriSave({ ...pendingSavePayload, overwrite: true });
+			const merged = { ...pendingSavePayload, overwrite: true };
+			await runTauriSave(merged);
+			knowledgeLocalTitleRef.current = merged.title.trim();
 			setOverwriteOpen(false);
 			setPendingSavePayload(null);
 			setOverwriteTargetPath('');
@@ -204,6 +237,8 @@ const Knowledge = () => {
 	const handlePickRecord = useCallback(
 		(record: KnowledgeRecord) => {
 			setEditingKnowledgeId(record.id);
+			const t = (record.title ?? '').trim();
+			knowledgeLocalTitleRef.current = t || null;
 			setTitle(record.title ?? '');
 			detailStore.setMarkdown(record.content ?? '');
 		},

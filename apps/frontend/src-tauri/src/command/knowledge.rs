@@ -79,6 +79,9 @@ pub struct SaveKnowledgeMarkdownInput {
 	/// 为 true 时允许覆盖已存在的同名文件
 	#[serde(default)]
 	pub overwrite: bool,
+	/// 编辑已有条目且标题已改时传入：与 `title` 对应的原磁盘文件名，用于重命名旧 .md，避免产生重复文件
+	#[serde(default)]
+	pub previous_title: Option<String>,
 }
 
 /// 删除知识 Markdown：与保存相同的 `filePath`/`dirPath` + `title` 解析目标文件
@@ -156,9 +159,48 @@ pub async fn save_knowledge_markdown(
 ) -> Result<SaveFileResult, String> {
 	let path = compute_save_target_path(&app, &input).await?;
 
+	let mut renamed_from_previous = false;
+	if let Some(ref prev_raw) = input.previous_title {
+		let prev = prev_raw.trim();
+		let cur = input.title.trim();
+		if !prev.is_empty() && prev != cur {
+			let old_input = SaveKnowledgeMarkdownInput {
+				title: prev_raw.clone(),
+				content: String::new(),
+				file_path: input.file_path.clone(),
+				dir_path: input.dir_path.clone(),
+				overwrite: false,
+				previous_title: None,
+			};
+			let old_path = compute_save_target_path(&app, &old_input).await?;
+			if old_path != path && old_path.exists() {
+				let meta = fs::metadata(&old_path).map_err(|e| e.to_string())?;
+				if !meta.is_file() {
+					return Err("原知识文件路径不是普通文件".to_string());
+				}
+				if path.exists() {
+					let pmeta = fs::metadata(&path).map_err(|e| e.to_string())?;
+					if !pmeta.is_file() {
+						return Err("目标路径已存在且非文件".to_string());
+					}
+					if !input.overwrite {
+						return Err(format!(
+							"文件已存在：{}",
+							path.to_string_lossy()
+						));
+					}
+					fs::remove_file(&old_path).map_err(|e| e.to_string())?;
+				} else {
+					fs::rename(&old_path, &path).map_err(|e| e.to_string())?;
+					renamed_from_previous = true;
+				}
+			}
+		}
+	}
+
 	if path.exists() {
 		let meta = fs::metadata(&path).map_err(|e| e.to_string())?;
-		if meta.is_file() && !input.overwrite {
+		if meta.is_file() && !input.overwrite && !renamed_from_previous {
 			return Err(format!(
 				"文件已存在：{}",
 				path.to_string_lossy()
@@ -189,6 +231,7 @@ pub async fn delete_knowledge_markdown(
 		file_path: input.file_path,
 		dir_path: input.dir_path,
 		overwrite: false,
+		previous_title: None,
 	};
 	let path = compute_save_target_path(&app, &save_like).await?;
 

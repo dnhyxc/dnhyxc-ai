@@ -37,6 +37,9 @@ function buildInvokeInput(payload: SaveKnowledgeMarkdownPayload) {
 			? { dirPath: payload.dirPath }
 			: {}),
 		...(payload.overwrite === true ? { overwrite: true } : {}),
+		...(payload.previousTitle != null && payload.previousTitle !== ''
+			? { previousTitle: payload.previousTitle }
+			: {}),
 	};
 }
 
@@ -54,6 +57,10 @@ export type SaveKnowledgeMarkdownPayload = {
 	dirPath?: string;
 	/** 为 true 时覆盖已存在的同名文件 */
 	overwrite?: boolean;
+	/**
+	 * 编辑已有条目且标题已变更时传入：打开该条时的原标题（用于本地 .md 重命名，避免旧文件残留成「第二条」）
+	 */
+	previousTitle?: string;
 };
 
 /** 解析即将写入的路径及是否已存在（用于覆盖确认） */
