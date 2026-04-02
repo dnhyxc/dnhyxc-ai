@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 	<head>
 		<meta charset="UTF-8" />
 		<link rel="icon" type="image/svg+xml" href="/icon.svg" />
@@ -12,8 +12,6 @@
 			html,
 			body,
 			#app {
-				--color: #2ca800;
-				/* --color: rgb(251, 255, 0); */
 				width: 100%;
 				height: 100%;
 				margin: 0px;
@@ -28,29 +26,163 @@
 				width: 100%;
 				height: 100%;
 				background: var(--theme-background);
+				display: flex;
+				align-items: center;
+				justify-content: center;
 			}
 
-			#loader-wrapper .load_title {
-				color: var(--color);
-				font-size: 2.1rem;
-				font-weight: 700;
-				text-transform: uppercase;
-				line-height: 1;
-				white-space: nowrap;
-				/* font-family: "手札体-简"; */
-				text-shadow: 1px 1px 0 #c9e1c9, 2px 2px 0 var(--color);
+			/*
+			 * 与 src/components/design/Loading/index.tsx（size=75）视觉一致：
+			 * 三环 SVG + 发光滤镜 + 中心光点 + 逐字波浪（无 framer-motion，用 CSS 动画实现）
+			 */
+			.initial-loading {
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				justify-content: center;
+				color: var(--theme-textcolor);
+				font-family: var(--font-family), ui-sans-serif, system-ui, sans-serif;
 			}
 
-			.load_title_first {
+			.initial-loading__col {
+				display: flex;
+				flex-direction: column;
+				align-items: center;
+				gap: 1rem;
+			}
+
+			.initial-loading__stage {
+				position: relative;
+				width: 75px;
+				height: 75px;
+			}
+
+			.initial-loading__svg {
+				display: block;
+				width: 100%;
+				height: 100%;
+			}
+
+			.initial-loading__orbit {
+				transform-origin: 50px 50px;
+			}
+
+			.initial-loading__orbit--1 {
+				animation: initial-loading-spin-cw 2.5s linear infinite;
+			}
+
+			.initial-loading__orbit--2 {
+				animation: initial-loading-spin-ccw 3s linear infinite;
+			}
+
+			.initial-loading__orbit--3 {
+				animation: initial-loading-spin-cw 1.5s linear infinite;
+				opacity: 0.6;
+			}
+
+			@keyframes initial-loading-spin-cw {
+				to {
+					transform: rotate(360deg);
+				}
+			}
+
+			@keyframes initial-loading-spin-ccw {
+				to {
+					transform: rotate(-360deg);
+				}
+			}
+
+			.initial-loading__glow-host {
 				position: absolute;
-				top: 20%;
-				left: 10%;
+				inset: 0;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				pointer-events: none;
 			}
 
-			.load_title_second {
+			.initial-loading__glow-outer {
 				position: absolute;
-				top: 28%;
-				left: 20%;
+				width: 18.75px;
+				height: 18.75px;
+				border-radius: 50%;
+				background: currentColor;
+				opacity: 0.2;
+				filter: blur(4px);
+				animation: initial-loading-glow-outer 1.5s ease-in-out infinite;
+			}
+
+			.initial-loading__glow-inner {
+				position: absolute;
+				width: 9.375px;
+				height: 9.375px;
+				border-radius: 50%;
+				background: currentColor;
+				opacity: 0.8;
+				animation: initial-loading-glow-inner 1.5s ease-in-out infinite;
+			}
+
+			@keyframes initial-loading-glow-outer {
+				0%,
+				100% {
+					transform: scale(1);
+					opacity: 0.2;
+				}
+				50% {
+					transform: scale(0.9);
+					opacity: 0.4;
+				}
+			}
+
+			@keyframes initial-loading-glow-inner {
+				0%,
+				100% {
+					transform: scale(1);
+					opacity: 0.8;
+				}
+				50% {
+					transform: scale(1.2);
+					opacity: 0.4;
+				}
+			}
+
+			.initial-loading__text-row {
+				display: flex;
+				justify-content: center;
+				flex-wrap: wrap;
+				margin: 0;
+				font-size: 0.9375rem;
+				font-weight: 500;
+				letter-spacing: 0.05em;
+			}
+
+			.initial-loading__text-row--welcome {
+				font-size: 1.0625rem;
+				font-weight: 600;
+				letter-spacing: 0.12em;
+			}
+
+			.initial-loading__text-row--sub {
+				font-size: 0.8125rem;
+				opacity: 0.88;
+			}
+
+			.initial-loading__ch {
+				display: inline-block;
+				animation: initial-loading-char 1.5s ease-in-out infinite;
+				filter: drop-shadow(0 0 1px currentColor);
+			}
+
+			@keyframes initial-loading-char {
+				0%,
+				100% {
+					transform: translateY(0) scale(1);
+					opacity: 0.6;
+				}
+				50% {
+					transform: translateY(-8px) scale(1.1);
+					opacity: 1;
+				}
 			}
 		</style>
 	</head>
@@ -105,8 +237,95 @@
 			const pathname = location.pathname;
 			if (pathname !== "/about") {
 				const root = document.querySelector("#root");
-				// 背景色由 #loader-wrapper 的 var(--theme-background) 决定，与 white/black 等各主题一致
-				root.innerHTML = '<div id="loader-wrapper"></div>';
+				/** @param {string} s */
+				const waveChars = (s) =>
+					[...s]
+						.map(
+							(ch, i) =>
+								`<span class="initial-loading__ch" style="animation-delay:${i * 0.08}s">${ch === " " ? "\u00A0" : ch}</span>`,
+						)
+						.join("");
+				// 背景色由 #loader-wrapper 的 var(--theme-background) 决定；动效对齐 design/Loading
+				root.innerHTML = `
+					<div id="loader-wrapper">
+						<div class="initial-loading" role="status" aria-live="polite" aria-busy="true">
+							<div class="initial-loading__col">
+								<div class="initial-loading__stage">
+									<svg
+										class="initial-loading__svg"
+										viewBox="0 0 100 100"
+										role="img"
+										aria-label="加载中"
+										preserveAspectRatio="xMidYMid meet"
+									>
+										<title>加载动画</title>
+										<defs>
+											<filter id="initial-loading-glow" x="-50%" y="-50%" width="200%" height="200%">
+												<feGaussianBlur stdDeviation="2.5" result="coloredBlur" />
+												<feMerge>
+													<feMergeNode in="coloredBlur" />
+													<feMergeNode in="SourceGraphic" />
+												</feMerge>
+											</filter>
+											<linearGradient id="initial-loading-grad1" x1="0%" y1="0%" x2="100%" y2="0%">
+												<stop offset="0%" stop-color="currentColor" stop-opacity="1" />
+												<stop offset="100%" stop-color="currentColor" stop-opacity="0" />
+											</linearGradient>
+											<linearGradient id="initial-loading-grad2" x1="0%" y1="0%" x2="100%" y2="0%">
+												<stop offset="0%" stop-color="currentColor" stop-opacity="0" />
+												<stop offset="100%" stop-color="currentColor" stop-opacity="1" />
+											</linearGradient>
+										</defs>
+										<g class="initial-loading__orbit initial-loading__orbit--1">
+											<circle
+												cx="50"
+												cy="50"
+												r="33.75"
+												fill="none"
+												stroke="url(#initial-loading-grad1)"
+												stroke-width="4.6875"
+												stroke-linecap="round"
+												stroke-dasharray="112.5 168.75"
+												filter="url(#initial-loading-glow)"
+											/>
+										</g>
+										<g class="initial-loading__orbit initial-loading__orbit--2">
+											<circle
+												cx="50"
+												cy="50"
+												r="24.375"
+												fill="none"
+												stroke="url(#initial-loading-grad2)"
+												stroke-width="3.75"
+												stroke-linecap="round"
+												stroke-dasharray="84.375 131.25"
+												filter="url(#initial-loading-glow)"
+											/>
+										</g>
+										<g class="initial-loading__orbit initial-loading__orbit--3">
+											<circle
+												cx="50"
+												cy="50"
+												r="16.875"
+												fill="none"
+												stroke="url(#initial-loading-grad1)"
+												stroke-width="2.8125"
+												stroke-linecap="round"
+												stroke-dasharray="56.25 103.125"
+												filter="url(#initial-loading-glow)"
+											/>
+										</g>
+									</svg>
+									<div class="initial-loading__glow-host" aria-hidden="true">
+										<div class="initial-loading__glow-outer"></div>
+										<div class="initial-loading__glow-inner"></div>
+									</div>
+								</div>
+								<p class="initial-loading__text-row initial-loading__text-row--welcome">${waveChars("欢迎来到 dnhyxc-ai")}</p>
+							</div>
+						</div>
+					</div>
+				`;
 			}
 		</script>
 		<script type="module" src="/src/main.tsx"></script>
