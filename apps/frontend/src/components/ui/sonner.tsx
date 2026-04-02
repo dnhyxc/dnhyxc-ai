@@ -4,6 +4,7 @@ import {
 	Loader2Icon,
 	OctagonXIcon,
 	TriangleAlertIcon,
+	X,
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import type { CSSProperties } from 'react';
@@ -63,6 +64,7 @@ function offsetToToastStyle(offset: ToastOffset): CSSProperties {
  * - `position`：sonner 支持单条，会进入对应角的列表。
  * - `offset`：通过根节点 margin 近似整器 `offset`，堆叠时可能与全局 Toaster 边距叠加。
  * - `expand`：sonner 2.x 仅 `<Toaster expand />` 生效，单条传参无效，保留仅为与 Toaster API 对齐。
+ * - 右上角有关闭按钮；`toast.custom` 不会使用 sonner 内置关闭钮，故在内容区内自绘。
  */
 const Toast = ({
 	title,
@@ -91,9 +93,20 @@ const Toast = ({
 	};
 
 	toast.custom(
-		() => {
+		(toastId) => {
 			return (
-				<div className="flex flex-col justify-center min-h-13 w-80 bg-theme-background/80 shadow-lg rounded-md py-2 px-3">
+				<div className="group relative flex flex-col justify-center min-h-13 w-80 bg-theme-background/80 shadow-lg rounded-md py-2 pl-3 pr-9">
+					<button
+						type="button"
+						className="absolute right-1 top-1 flex size-7 shrink-0 items-center justify-center rounded-md text-textcolor/70 opacity-0 pointer-events-none transition-opacity duration-150 group-hover:opacity-100 group-hover:pointer-events-auto group-focus-within:opacity-100 group-focus-within:pointer-events-auto hover:bg-theme/15 hover:text-textcolor focus-visible:opacity-100 focus-visible:pointer-events-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 cursor-pointer"
+						aria-label="关闭"
+						onClick={(e) => {
+							e.stopPropagation();
+							toast.dismiss(toastId);
+						}}
+					>
+						<X className="size-4" strokeWidth={2} aria-hidden />
+					</button>
 					<div className="flex items-center">
 						<div className="w-6 flex justify-center items-center">
 							{type === 'success' && (
