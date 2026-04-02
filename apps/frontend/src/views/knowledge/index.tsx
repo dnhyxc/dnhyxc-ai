@@ -1,7 +1,7 @@
 import Confirm from '@design/Confirm';
 import { ScrollArea } from '@ui/scroll-area';
 import { Toast } from '@ui/sonner';
-import { Layers2, LayersPlus, LibraryBig, ScrollText } from 'lucide-react';
+import { LayersPlus, LibraryBig, OctagonX, ScrollText } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import MarkdownEditor from '@/components/design/Monaco';
 import { Button, Input } from '@/components/ui';
@@ -46,22 +46,31 @@ function KnowledgeEditorToolbar(props: {
 	onOpenLibrary: () => void;
 	onNewDraft: () => void;
 	onSave: () => void;
+	/** 保存请求进行中：禁用保存按钮 */
+	saveLoading?: boolean;
 }) {
-	const { onOpenLibrary, onNewDraft, onSave } = props;
-	const linkBtn = 'flex items-center gap-1 px-0 has-[>svg]:px-0' as const;
+	const { onOpenLibrary, onNewDraft, onSave, saveLoading = false } = props;
+	const linkBtn =
+		'flex items-center gap-1 px-0 has-[>svg]:px-0 disabled:hover:text-textcolor' as const;
 	return (
 		<div className="flex items-center pr-3 gap-4">
+			<Button
+				variant="link"
+				className={linkBtn}
+				onClick={onSave}
+				disabled={saveLoading}
+				aria-busy={saveLoading}
+			>
+				<LayersPlus className="mt-0.5" />
+				<span className="mt-0.5">保存</span>
+			</Button>
 			<Button variant="link" className={linkBtn} onClick={onNewDraft}>
-				<Layers2 />
+				<OctagonX className="mt-0.5" />
 				<span className="mt-0.5">清空</span>
 			</Button>
 			<Button variant="link" className={linkBtn} onClick={onOpenLibrary}>
-				<LibraryBig />
+				<LibraryBig className="mt-0.5" />
 				<span className="mt-0.5">知识库</span>
-			</Button>
-			<Button variant="link" className={linkBtn} onClick={onSave}>
-				<LayersPlus />
-				<span className="mt-0.5">保存</span>
 			</Button>
 		</div>
 	);
@@ -82,6 +91,7 @@ const Knowledge = () => {
 		useState<SaveKnowledgeMarkdownPayload | null>(null);
 
 	const [listOpen, setListOpen] = useState(false);
+	const [saveLoading, setSaveLoading] = useState(false);
 
 	/** 打开该条时的标题：桌面端用于标题变更时重命名本地 .md，避免残留旧文件 */
 	const knowledgeLocalTitleRef = useRef<string | null>(null);
@@ -162,6 +172,7 @@ const Knowledge = () => {
 		if (!trimmedTitle)
 			return Toast({ type: 'warning', title: '请先输入文件名「标题」' });
 		if (!markdown) return Toast({ type: 'warning', title: '请先输入内容' });
+		setSaveLoading(true);
 		try {
 			if (isTauriRuntime()) {
 				const previousTitle =
@@ -190,15 +201,8 @@ const Knowledge = () => {
 				await persistKnowledgeApi();
 				knowledgeLocalTitleRef.current = trimmedTitle;
 			}
-		} catch (e) {
-			Toast({
-				type: 'error',
-				title: isTauriRuntime()
-					? formatTauriInvokeError(e)
-					: e instanceof Error
-						? e.message
-						: '保存失败',
-			});
+		} finally {
+			setSaveLoading(false);
 		}
 	}, [
 		title,
@@ -210,6 +214,7 @@ const Knowledge = () => {
 
 	const onConfirmOverwrite = useCallback(async () => {
 		if (!pendingSavePayload) return;
+		setSaveLoading(true);
 		try {
 			await persistKnowledgeApi();
 			const merged = { ...pendingSavePayload, overwrite: true };
@@ -223,6 +228,8 @@ const Knowledge = () => {
 				type: 'error',
 				title: formatTauriInvokeError(e),
 			});
+		} finally {
+			setSaveLoading(false);
 		}
 	}, [pendingSavePayload, persistKnowledgeApi, runTauriSave]);
 
@@ -304,6 +311,7 @@ const Knowledge = () => {
 							onOpenLibrary={() => setListOpen(true)}
 							onNewDraft={resetEditorToNewDraft}
 							onSave={onSave}
+							saveLoading={saveLoading}
 						/>
 					}
 					title={

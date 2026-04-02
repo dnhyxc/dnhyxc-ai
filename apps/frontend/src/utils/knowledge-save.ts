@@ -20,7 +20,7 @@ export function formatTauriInvokeError(e: unknown): string {
 		if (typeof m === 'string') return m;
 	}
 	try {
-		return JSON.stringify(e);
+		return '保存失败';
 	} catch {
 		return '未知错误';
 	}
