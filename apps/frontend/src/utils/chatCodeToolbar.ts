@@ -105,8 +105,10 @@ export function layoutChatCodeToolbars(viewport: HTMLElement | null): void {
 	for (const block of blocks) {
 		const toolbar = block.querySelector<HTMLElement>('.chat-md-code-toolbar');
 		const slot = block.querySelector<HTMLElement>('.chat-md-code-toolbar-slot');
-		const shell = block.closest<HTMLElement>('[data-chat-assistant-shell]');
-		if (!toolbar || !slot || !shell) continue;
+		// 聊天气泡内有 data-chat-assistant-shell；知识库/独立 Markdown 预览无该节点，用滚动视口作水平参照
+		const shell =
+			block.closest<HTMLElement>('[data-chat-assistant-shell]') ?? viewport;
+		if (!toolbar || !slot) continue;
 		scored.push({
 			block,
 			br: block.getBoundingClientRect(),

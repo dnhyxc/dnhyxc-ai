@@ -5,10 +5,11 @@ import { ScrollArea } from '@ui/index';
 import { Columns2, Eye, FilePenLine } from 'lucide-react';
 import {
 	memo,
-	type Ref,
+	type RefObject,
 	useCallback,
 	useEffect,
 	useId,
+	useLayoutEffect,
 	useMemo,
 	useRef,
 	useState,
@@ -26,12 +27,31 @@ import { cn } from '@/lib/utils';
 import {
 	downloadChatCodeBlock,
 	getChatCodeBlockPlainText,
+	layoutChatCodeToolbars,
 } from '@/utils/chatCodeToolbar';
+import ChatCodeToolbarFloating from '../ChatCodeToolBar';
 import Loading from '../Loading';
 import { registerPrettierFormatProviders } from './format';
 import { options } from './options';
 
 type MonacoEditorInstance = Parameters<OnMount>[0];
+
+type MarkdownViewMode = 'edit' | 'preview' | 'split';
+
+interface MarkdownEditorProps {
+	value?: string;
+	onChange?: (value: string) => void;
+	placeholder?: string;
+	className?: string;
+	height?: string;
+	readOnly?: boolean;
+	theme?: 'vs' | 'vs-dark' | 'hc-black';
+	language?: string;
+	toolbar: React.ReactNode;
+	title?: React.ReactNode;
+	/** 为 markdown 时是否显示编辑/预览/分屏切换；默认 true */
+	enableMarkdownPreview?: boolean;
+}
 
 function clamp01(n: number): number {
 	return Math.min(1, Math.max(0, n));
@@ -64,11 +84,31 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 }: {
 	markdown: string;
 	/** 分屏同步滚动：指向 ScrollArea 的 Viewport（Radix ref 落在 viewport 上） */
-	viewportRef?: Ref<HTMLDivElement>;
+	viewportRef?: RefObject<HTMLDivElement | null>;
 }) {
 	const markdownRef = useRef<HTMLDivElement>(null);
+	const localViewportRef = useRef<HTMLDivElement | null>(null);
 
 	const { theme } = useTheme();
+
+	const assignViewportRef = useCallback(
+		(node: HTMLDivElement | null) => {
+			localViewportRef.current = node;
+			if (viewportRef) viewportRef.current = node;
+		},
+		[viewportRef],
+	);
+
+	const parser = useMemo(
+		() =>
+			new MarkdownParser({
+				highlightTheme: CHAT_MARKDOWN_HIGHLIGHT_THEME,
+				enableChatCodeFenceToolbar: true,
+			}),
+		[],
+	);
+
+	const html = useMemo(() => parser.render(markdown), [parser, markdown]);
 
 	useEffect(() => {
 		const el = markdownRef.current;
@@ -98,23 +138,52 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 		return () => el.removeEventListener('click', onClick);
 	}, []);
 
-	const parser = useMemo(
-		() =>
-			new MarkdownParser({
-				highlightTheme: CHAT_MARKDOWN_HIGHLIGHT_THEME,
-				enableChatCodeFenceToolbar: true,
-			}),
-		[],
-	);
-	const html = useMemo(() => parser.render(markdown), [parser, markdown]);
+	const syncScrollMetrics = useCallback(() => {
+		const el = localViewportRef.current;
+		if (!el) return;
+		// 与 ChatBotView / share 页一致：滚动时调用 layout，否则 ChatCodeToolbarFloating 不更新
+		layoutChatCodeToolbars(el);
+	}, []);
+
+	useEffect(() => {
+		syncScrollMetrics();
+		const id = requestAnimationFrame(() => syncScrollMetrics());
+		return () => cancelAnimationFrame(id);
+	}, [markdown, syncScrollMetrics]);
+
+	useEffect(() => {
+		const el = localViewportRef.current;
+		if (!el) return;
+		const ro = new ResizeObserver(() => syncScrollMetrics());
+		ro.observe(el);
+		return () => ro.disconnect();
+	}, [markdown, syncScrollMetrics]);
+
+	// Markdown 渲染后高度变化，补算一次浮动工具栏
+	useLayoutEffect(() => {
+		const el = localViewportRef.current;
+		if (!el) return;
+		layoutChatCodeToolbars(el);
+		const id = requestAnimationFrame(() => layoutChatCodeToolbars(el));
+		return () => cancelAnimationFrame(id);
+	}, [markdown]);
+
+	useEffect(() => {
+		const onResize = () => layoutChatCodeToolbars(localViewportRef.current);
+		window.addEventListener('resize', onResize);
+		return () => window.removeEventListener('resize', onResize);
+	}, []);
+
 	return (
 		<div
 			ref={markdownRef}
 			className="h-full min-h-0 min-w-0 max-w-full overflow-hidden"
 		>
+			<ChatCodeToolbarFloating />
 			<ScrollArea
-				ref={viewportRef}
+				ref={assignViewportRef}
 				scrollbars="both"
+				onScroll={syncScrollMetrics}
 				className={cn(
 					'h-full min-h-0 min-w-0 max-w-full w-full',
 					theme === 'black' ? 'bg-[#1e1e1e]' : 'bg-white',
@@ -132,23 +201,6 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 		</div>
 	);
 });
-
-type MarkdownViewMode = 'edit' | 'preview' | 'split';
-
-interface MarkdownEditorProps {
-	value?: string;
-	onChange?: (value: string) => void;
-	placeholder?: string;
-	className?: string;
-	height?: string;
-	readOnly?: boolean;
-	theme?: 'vs' | 'vs-dark' | 'hc-black';
-	language?: string;
-	toolbar: React.ReactNode;
-	title?: React.ReactNode;
-	/** 为 markdown 时是否显示编辑/预览/分屏切换；默认 true */
-	enableMarkdownPreview?: boolean;
-}
 
 const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	value = '',
