@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 import { deleteKnowledge } from '@/service';
 import useStore from '@/store';
 import type { KnowledgeListItem, KnowledgeRecord } from '@/types';
-import { isTauriRuntime } from '@/utils';
+import { formatDate, isTauriRuntime } from '@/utils';
 import {
 	formatTauriInvokeError,
 	invokeDeleteKnowledgeMarkdown,
@@ -30,17 +30,6 @@ interface IProps {
 	onDeletedRecord?: (id: string) => void;
 	/** 当前在编辑器中打开的条目 id，用于列表行高亮 */
 	editingKnowledgeId?: string | null;
-}
-
-function formatTime(iso?: string): string {
-	if (!iso) return '';
-	try {
-		const d = new Date(iso);
-		if (Number.isNaN(d.getTime())) return iso;
-		return d.toLocaleString();
-	} catch {
-		return iso;
-	}
 }
 
 /** 单行：点击打开详情；垃圾桶仅触发删除流程（冒泡已阻止） */
@@ -91,7 +80,7 @@ function KnowledgeListRow(props: {
 				</button>
 			</div>
 			<div className="text-xs text-textcolor/50">
-				更新 {formatTime(item.updatedAt)}
+				更新 {formatDate(item.updatedAt?.toString() ?? '')}
 			</div>
 		</div>
 	);

@@ -23,6 +23,7 @@ import { useChatCore } from '@/hooks/useChatCore';
 import { deleteSession, updateSession } from '@/service';
 import useStore from '@/store';
 import { Session } from '@/types/chat';
+import { formatDate } from '@/utils';
 
 interface IProps {
 	open: boolean;
@@ -133,14 +134,14 @@ const SessionItem = memo<SessionItemProps>(
 		return (
 			<div
 				id="__session-item-title__"
-				className={`line-clamp-1 group relative h-10 ${editItem?.id === item.id ? 'px-1' : 'px-2'} mb-1.5 hover:bg-theme/10 rounded-sm cursor-pointer flex items-center justify-between ${isActive ? 'bg-theme/10' : ''}`}
+				className={`line-clamp-1 group relative ${editItem?.id === item.id ? 'px-0 bg-theme/10 border border-theme/10' : 'px-2'} mb-1.5 hover:bg-theme/10 rounded-sm cursor-pointer flex items-center justify-between ${isActive ? 'bg-theme/10' : ''}`}
 				onClick={(e) => onSelect(e, item)}
 			>
 				{isLoading ? <Spinner className="w-4 h-4 mr-2 text-cyan-400" /> : null}
 				{editItem?.id === item.id ? (
-					<div className="flex items-center w-full h-full">
+					<div className="flex items-center w-full h-10">
 						<Input
-							className="rounded-sm"
+							className="rounded-sm border-0 bg-transparent focus-visible:border-0 focus-visible:ring-0"
 							value={editItem?.title || ''}
 							onChange={(e) => onChangeEditValue(e)}
 							onClick={(e) => e.stopPropagation()}
@@ -152,14 +153,19 @@ const SessionItem = memo<SessionItemProps>(
 						/>
 					</div>
 				) : (
-					<div
-						className="line-clamp-1 max-w-82.5 flex-1 text-sm [&_.markdown-body]:text-textcolor!"
-						dangerouslySetInnerHTML={{
-							__html: parser.render(
-								item?.title || item.messages?.[0]?.content || '新对话',
-							),
-						}}
-					/>
+					<div className="flex flex-col mt-1">
+						<div
+							className="line-clamp-1 max-w-82.5 flex-1 text-sm [&_.markdown-body]:text-textcolor!"
+							dangerouslySetInnerHTML={{
+								__html: parser.render(
+									item?.title || item.messages?.[0]?.content || '新对话',
+								),
+							}}
+						/>
+						<div className="text-xs text-textcolor/50 mt-1 mb-1.5">
+							{formatDate(item.createdAt)}
+						</div>
+					</div>
 				)}
 				{editItem?.id === item.id ? (
 					<div className="absolute right-2 items-center hidden group-hover:flex">
@@ -258,6 +264,7 @@ const SessionList = observer(({ open, onOpenChange }: IProps) => {
 			setIsSharing(false);
 			// 选择历史会话时要清空消息选中状态
 			clearAllCheckedMessages();
+			// 切换会话 loading：setActiveSessionId 会置 sessionChromeLoading，由 ChatBot 遮罩至首帧渲染完成
 			chatStore.setActiveSessionId(session.id);
 			chatStore.setAllMessages(session.messages || [], session.id, false);
 			onOpenChange(false);
