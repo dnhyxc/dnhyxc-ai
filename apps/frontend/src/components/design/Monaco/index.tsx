@@ -4,6 +4,11 @@ import Editor, { type OnMount } from '@monaco-editor/react';
 import { ScrollArea } from '@ui/index';
 import { Columns2, Eye, FilePenLine } from 'lucide-react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+	ResizableHandle,
+	ResizablePanel,
+	ResizablePanelGroup,
+} from '@/components/ui/resizable';
 import { CHAT_MARKDOWN_HIGHLIGHT_THEME } from '@/constant';
 import { useTheme } from '@/hooks/theme';
 import { cn } from '@/lib/utils';
@@ -27,8 +32,6 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 	const markdownRef = useRef<HTMLDivElement>(null);
 
 	const { theme } = useTheme();
-
-	console.log(theme);
 
 	useEffect(() => {
 		const el = markdownRef.current;
@@ -251,23 +254,39 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 				) : null}
 
 				{isMarkdown && viewMode === 'split' ? (
-					<div className="grid h-full min-h-0 min-w-0 max-w-full grid-cols-[minmax(0,1fr)_minmax(0,1fr)] overflow-hidden">
-						<div className="flex min-h-0 min-w-0 flex-col overflow-hidden border-r border-theme/10">
-							<Editor
-								height="100%"
-								language={language}
-								value={value}
-								onChange={(val) => onChange?.(val || '')}
-								theme={theme}
-								onMount={handleEditorMount}
-								options={{ ...options, readOnly, placeholder }}
-								loading={<Loading text="正在加载编辑器..." />}
-							/>
-						</div>
-						<div className="min-h-0 min-w-0 overflow-hidden contain-[inline-size]">
-							<ParserMarkdownPreviewPane markdown={value} />
-						</div>
-					</div>
+					<ResizablePanelGroup
+						orientation="horizontal"
+						className="h-full min-h-0 min-w-0 max-w-full"
+					>
+						<ResizablePanel
+							defaultSize={50}
+							minSize={20}
+							className="min-h-0 min-w-0"
+						>
+							<div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden border-r border-theme/10">
+								<Editor
+									height="100%"
+									language={language}
+									value={value}
+									onChange={(val) => onChange?.(val || '')}
+									theme={theme}
+									onMount={handleEditorMount}
+									options={{ ...options, readOnly, placeholder }}
+									loading={<Loading text="正在加载编辑器..." />}
+								/>
+							</div>
+						</ResizablePanel>
+						<ResizableHandle withHandle />
+						<ResizablePanel
+							defaultSize={50}
+							minSize={20}
+							className="min-h-0 min-w-0"
+						>
+							<div className="h-full min-h-0 min-w-0 overflow-hidden contain-[inline-size]">
+								<ParserMarkdownPreviewPane markdown={value} />
+							</div>
+						</ResizablePanel>
+					</ResizablePanelGroup>
 				) : null}
 			</div>
 		</div>
