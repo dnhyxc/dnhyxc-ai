@@ -16,10 +16,8 @@ import {
 	invokeSaveKnowledgeMarkdown,
 	type SaveKnowledgeMarkdownPayload,
 } from '@/utils/knowledge-save';
-import { TAURI_KNOWLEDGE_DIR } from './constants';
+import { EDITOR_HEIGHT, TAURI_KNOWLEDGE_DIR } from './constants';
 import KnowledgeList from './KnowledgeList';
-
-const EDITOR_HEIGHT = 'calc(100vh - 172px)';
 
 type StoredUserInfo = { username?: unknown; id?: unknown } | null;
 
@@ -53,13 +51,13 @@ function KnowledgeEditorToolbar(props: {
 	const linkBtn = 'flex items-center gap-1 px-0 has-[>svg]:px-0' as const;
 	return (
 		<div className="flex items-center pr-3 gap-4">
+			<Button variant="link" className={linkBtn} onClick={onNewDraft}>
+				<Layers2 />
+				<span className="mt-0.5">清空</span>
+			</Button>
 			<Button variant="link" className={linkBtn} onClick={onOpenLibrary}>
 				<LibraryBig />
 				<span className="mt-0.5">知识库</span>
-			</Button>
-			<Button variant="link" className={linkBtn} onClick={onNewDraft}>
-				<Layers2 />
-				<span className="mt-0.5">草稿</span>
 			</Button>
 			<Button variant="link" className={linkBtn} onClick={onSave}>
 				<LayersPlus />
@@ -83,7 +81,6 @@ const Knowledge = () => {
 	const [pendingSavePayload, setPendingSavePayload] =
 		useState<SaveKnowledgeMarkdownPayload | null>(null);
 
-	const [editorKey, setEditorKey] = useState(0);
 	const [listOpen, setListOpen] = useState(false);
 
 	const getUserInfo = useMemo(() => readUserInfoFromStorage(), []);
@@ -95,7 +92,6 @@ const Knowledge = () => {
 		setEditingKnowledgeId(null);
 		setTitle('');
 		detailStore.setMarkdown('');
-		setEditorKey((k) => k + 1);
 	}, [detailStore]);
 
 	const handleMarkdownChange = useCallback(
@@ -132,7 +128,14 @@ const Knowledge = () => {
 		if (editingKnowledgeId) {
 			await knowledgeStore.updateItem(editingKnowledgeId, { ...base, ...meta });
 		} else {
-			await saveKnowledge({ ...base, ...meta } as Omit<KnowledgeRecord, 'id'>);
+			const res = await saveKnowledge({
+				...base,
+				...meta,
+			} as Omit<KnowledgeRecord, 'id'>);
+			// 新建成功后必须记下 id，否则删除本条时 editingKnowledgeId 仍为 null，无法清空编辑器
+			if (res.success && res.data?.id) {
+				setEditingKnowledgeId(res.data.id);
+			}
 			void knowledgeStore.refreshList();
 		}
 	}, [detailStore, title, getUserInfo, editingKnowledgeId, knowledgeStore]);
@@ -161,11 +164,6 @@ const Knowledge = () => {
 				}
 			} else {
 				await persistKnowledgeApi();
-				Toast({
-					type: 'success',
-					title: '文件已保存',
-					message: trimmedTitle ? `「${trimmedTitle}」` : undefined,
-				});
 			}
 		} catch (e) {
 			Toast({
@@ -208,7 +206,6 @@ const Knowledge = () => {
 			setEditingKnowledgeId(record.id);
 			setTitle(record.title ?? '');
 			detailStore.setMarkdown(record.content ?? '');
-			setEditorKey((k) => k + 1);
 		},
 		[detailStore],
 	);
@@ -261,7 +258,7 @@ const Knowledge = () => {
 
 			<ScrollArea className="w-full h-full overflow-y-auto p-5 pt-0 rounded-none">
 				<MarkdownEditor
-					key={editorKey}
+					// key={editorKey}
 					className="w-full h-full"
 					height={EDITOR_HEIGHT}
 					theme={monacoTheme}
