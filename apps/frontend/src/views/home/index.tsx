@@ -319,7 +319,7 @@ const Home = () => {
 										title: '安装应用',
 										desc: '下载并安装桌面版应用',
 										icon: Rocket,
-										color: 'from-teal-500 to-cyan-500',
+										color: 'from-teal-500 to-cyan-600',
 									},
 									{
 										step: '2',

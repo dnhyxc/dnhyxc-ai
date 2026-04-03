@@ -105,7 +105,7 @@ const ChatFileList: React.FC<IProps> = ({
 				className={cn('flex flex-col items-start', className)}
 				onClick={(e) => showPreview(e)}
 			>
-				<div className="relative group/file-card flex items-center min-w-50 gap-2 px-2.5 pr-2 py-1.5 w-auto bg-linear-to-r from-blue-500 to-cyan-500 rounded-md">
+				<div className="relative group/file-card flex items-center min-w-50 gap-2 px-2.5 pr-2 py-1.5 w-auto bg-linear-to-r from-teal-500 to-cyan-600 rounded-md">
 					<FileText className="w-9 h-9" />
 					{showDelete ? (
 						<CircleX

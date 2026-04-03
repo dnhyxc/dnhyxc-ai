@@ -96,7 +96,7 @@ const DocumentProcessor = () => {
 			id: 'word',
 			label: 'Word 文档',
 			icon: FileText,
-			color: 'from-blue-500 to-indigo-500',
+			color: 'from-teal-500 to-indigo-500',
 		},
 		{
 			id: 'excel',
@@ -271,7 +271,7 @@ const DocumentProcessor = () => {
 												{isActive && (
 													<motion.div
 														layoutId="activeFormat"
-														className="absolute inset-0 rounded-md bg-linear-to-r from-blue-600 to-cyan-600 -z-1"
+														className="absolute inset-0 rounded-md bg-linear-to-r from-teal-600 to-cyan-600 -z-1"
 													/>
 												)}
 												<div className="flex items-center gap-2">
@@ -288,7 +288,7 @@ const DocumentProcessor = () => {
 										!uploadFileInfo?.url &&
 										(!onlineUrl || onlineUrlError !== '')
 									}
-									className="cursor-pointer flex justify-center min-w-30 bg-linear-to-r from-blue-500 to-cyan-500"
+									className="cursor-pointer flex justify-center min-w-30 bg-linear-to-r from-teal-500 to-cyan-600"
 									onClick={handleStart}
 								>
 									{loading ? (

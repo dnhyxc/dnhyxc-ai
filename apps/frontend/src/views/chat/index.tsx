@@ -187,7 +187,7 @@ const Chat = observer(() => {
 						<Button
 							variant="outline"
 							size="sm"
-							className="border-textcolor/30 pt-0.5 bg-transparent hover:bg-transparent bg-linear-to-r from-blue-500/80 to-cyan-500/80 hover:from-blue-500 hover:to-cyan-500"
+							className="border-textcolor/30 pt-0.5 bg-transparent hover:bg-transparent bg-linear-to-r from-teal-500/80 to-cyan-600/80 hover:from-teal-500 hover:to-cyan-600"
 							onClick={onShowShareModel}
 						>
 							创建分享链接

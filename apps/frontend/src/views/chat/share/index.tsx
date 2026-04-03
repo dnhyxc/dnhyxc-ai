@@ -108,7 +108,7 @@ const Share: React.FC<ShareProps> = ({
 						<div className=" h-full">
 							<Button
 								variant="outline"
-								className="rounded-none rounded-r-md border-none h-full w-25 bg-linear-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 "
+								className="rounded-none rounded-r-md border-none h-full w-25 bg-linear-to-r from-teal-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-600 "
 								disabled={copied}
 								onClick={() => onCopy(shareInfo.shareUrl)}
 							>
@@ -129,7 +129,7 @@ const Share: React.FC<ShareProps> = ({
 				) : (
 					<Button
 						variant="outline"
-						className="border-textcolor/30 w-full bg-transparent hover:bg-transparent bg-linear-to-r from-blue-500/80 to-cyan-500/80 hover:from-blue-500 hover:to-cyan-500"
+						className="border-textcolor/30 w-full bg-transparent hover:bg-transparent bg-linear-to-r from-teal-500/80 to-cyan-600/80 hover:from-teal-500 hover:to-cyan-600"
 						disabled={loading}
 						onClick={onCreateShare}
 					>
