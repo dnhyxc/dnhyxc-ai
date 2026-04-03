@@ -22,7 +22,9 @@ export default defineConfig(async () => ({
 			'prettier/plugins/estree',
 			'prettier/plugins/html',
 			'prettier/plugins/markdown',
+			'prettier/plugins/postcss',
 			'prettier/plugins/typescript',
+			'prettier/plugins/yaml',
 		],
 	},
 	server: {

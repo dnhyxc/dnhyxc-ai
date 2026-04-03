@@ -1,5 +1,13 @@
 import type { OnMount } from '@monaco-editor/react';
 import type { Plugin } from 'prettier';
+import * as babelPluginMod from 'prettier/plugins/babel';
+import * as estreePluginMod from 'prettier/plugins/estree';
+import * as htmlPluginMod from 'prettier/plugins/html';
+import * as markdownPluginMod from 'prettier/plugins/markdown';
+import * as postcssPluginMod from 'prettier/plugins/postcss';
+import * as typescriptPluginMod from 'prettier/plugins/typescript';
+import * as yamlPluginMod from 'prettier/plugins/yaml';
+import { format } from 'prettier/standalone';
 
 import { MONACO_TAB_SIZE } from './options';
 
@@ -9,64 +17,68 @@ const PANGU_CJK =
 
 type MonacoApi = Parameters<OnMount>[1];
 
-/** 与仓库 biome.json 接近 */
-const PRETTIER_CODE_OPTIONS = {
-	useTabs: true,
-	tabWidth: 2,
+/** ESM 下 Prettier 插件常为 default 导出 */
+function asPrettierPlugin(mod: unknown): Plugin {
+	const m = mod as { default?: Plugin };
+	return (m?.default ?? mod) as Plugin;
+}
+
+/**
+ * 与参考代码一致：一次性传入 markdown / babel / ts / html / postcss / yaml 等插件。
+ * 浏览器端使用 standalone 的 format，不可用主包 `import prettier from 'prettier'`（依赖 Node）。
+ */
+const PRETTIER_PLUGINS: Plugin[] = [
+	asPrettierPlugin(markdownPluginMod),
+	asPrettierPlugin(babelPluginMod),
+	asPrettierPlugin(estreePluginMod),
+	asPrettierPlugin(typescriptPluginMod),
+	asPrettierPlugin(htmlPluginMod),
+	asPrettierPlugin(postcssPluginMod),
+	asPrettierPlugin(yamlPluginMod),
+];
+
+/** 与参考示例及仓库习惯对齐 */
+const PRETTIER_BASE_OPTIONS = {
 	singleQuote: true,
+	tabWidth: 2,
 	semi: true,
+	arrowParens: 'avoid' as const,
 	printWidth: 100,
-	proseWrap: 'preserve' as const,
 	endOfLine: 'lf' as const,
 };
 
-const registered = new Set<string>();
+const documentFormatterDisposables = new Map<string, { dispose: () => void }>();
+const rangeFormatterDisposables = new Map<string, { dispose: () => void }>();
 
-function registerOnce(
-	monaco: MonacoApi,
-	languageId: string,
-	formatter: (source: string) => Promise<string>,
-): void {
-	if (registered.has(languageId)) return;
-	registered.add(languageId);
-	monaco.languages.registerDocumentFormattingEditProvider(languageId, {
-		async provideDocumentFormattingEdits(model: any) {
-			const text = model.getValue();
-			try {
-				const formatted = await formatter(text);
-				if (formatted === text) return [];
-				return [{ range: model.getFullModelRange(), text: formatted }];
-			} catch {
-				return [];
-			}
-		},
-	});
-}
-
-async function formatWithBabelParser(source: string): Promise<string> {
-	const [{ format }, babelMod, estreeMod] = await Promise.all([
-		import('prettier/standalone'),
-		import('prettier/plugins/babel'),
-		import('prettier/plugins/estree'),
-	]);
-	return format(source, {
-		...PRETTIER_CODE_OPTIONS,
-		parser: 'babel',
-		plugins: [babelMod as unknown as Plugin, estreeMod as unknown as Plugin],
-	});
-}
-
-async function formatWithTypeScriptParser(source: string): Promise<string> {
-	const [{ format }, tsMod, estreeMod] = await Promise.all([
-		import('prettier/standalone'),
-		import('prettier/plugins/typescript'),
-		import('prettier/plugins/estree'),
-	]);
-	return format(source, {
-		...PRETTIER_CODE_OPTIONS,
-		parser: 'typescript',
-		plugins: [tsMod as unknown as Plugin, estreeMod as unknown as Plugin],
-	});
+/**
+ * Monaco languageId -> Prettier parser 名。
+ * Prettier 3 中 CSS 系由 postcss 插件提供，解析器名为 css / scss / less（对应旧版 postcss 插件 + parser: 'postcss' 场景）。
+ */
+function prettierParserForMonacoLanguage(languageId: string): string | null {
+	switch (languageId) {
+		case 'markdown':
+			return 'markdown';
+		case 'javascript':
+		case 'javascriptreact':
+			return 'babel';
+		case 'typescript':
+		case 'typescriptreact':
+			return 'typescript';
+		case 'html':
+			return 'html';
+		case 'css':
+			return 'css';
+		case 'less':
+			return 'less';
+		case 'scss':
+			return 'scss';
+		case 'yaml':
+			return 'yaml';
+		case 'json':
+			return 'json';
+		default:
+			return null;
+	}
 }
 
 /**
@@ -97,68 +109,131 @@ function spacingMarkdownProse(markdown: string): string {
 		.join('');
 }
 
-/**
- * Prettier 仅传 markdown 插件时不会排版围栏内代码；需同时加载 babel/estree/typescript/html。
- */
-async function formatMarkdownWithPrettier(source: string): Promise<string> {
-	const [{ format }, markdownMod, babelMod, estreeMod, typescriptMod, htmlMod] =
-		await Promise.all([
-			import('prettier/standalone'),
-			import('prettier/plugins/markdown'),
-			import('prettier/plugins/babel'),
-			import('prettier/plugins/estree'),
-			import('prettier/plugins/typescript'),
-			import('prettier/plugins/html'),
-		]);
-	const plugins: Plugin[] = [
-		markdownMod as unknown as Plugin,
-		babelMod as unknown as Plugin,
-		estreeMod as unknown as Plugin,
-		typescriptMod as unknown as Plugin,
-		htmlMod as unknown as Plugin,
-	];
-	const formatted = await format(source, {
-		parser: 'markdown',
-		plugins,
-		...PRETTIER_CODE_OPTIONS,
-		useTabs: false,
-		tabWidth: MONACO_TAB_SIZE,
-	});
-	return spacingMarkdownProse(formatted);
+async function formatWithPrettierForModel(model: {
+	getValue: () => string;
+	getLanguageId: () => string;
+}): Promise<string | null> {
+	const language = model.getLanguageId();
+	if (language === 'c' || language === 'python') {
+		return null;
+	}
+	const parser = prettierParserForMonacoLanguage(language);
+	if (!parser) {
+		return null;
+	}
+	const text = model.getValue();
+	try {
+		const formatted = await format(text, {
+			parser,
+			plugins: PRETTIER_PLUGINS,
+			...PRETTIER_BASE_OPTIONS,
+			...(parser === 'markdown'
+				? {
+						useTabs: false,
+						tabWidth: MONACO_TAB_SIZE,
+						proseWrap: 'preserve' as const,
+					}
+				: {
+						useTabs: true,
+					}),
+		});
+		const out =
+			language === 'markdown' ? spacingMarkdownProse(formatted) : formatted;
+		return out === text ? null : out;
+	} catch (err) {
+		if (import.meta.env.DEV) {
+			console.warn(`[Monaco Prettier] 格式化失败 (${language}):`, err);
+		}
+		return null;
+	}
 }
 
-async function formatJson(source: string): Promise<string> {
-	const [{ format }, babelMod, estreeMod] = await Promise.all([
-		import('prettier/standalone'),
-		import('prettier/plugins/babel'),
-		import('prettier/plugins/estree'),
-	]);
-	return format(source, {
-		...PRETTIER_CODE_OPTIONS,
-		parser: 'json',
-		plugins: [babelMod as unknown as Plugin, estreeMod as unknown as Plugin],
-	});
+function createDocumentFormattingProvider() {
+	return {
+		displayName: 'Prettier',
+		async provideDocumentFormattingEdits(model: {
+			getValue: () => string;
+			getLanguageId: () => string;
+			getFullModelRange: () => unknown;
+		}) {
+			const out = await formatWithPrettierForModel(model);
+			if (out == null) return [];
+			return [{ range: model.getFullModelRange(), text: out }];
+		},
+	};
 }
 
-async function formatHtml(source: string): Promise<string> {
-	const [{ format }, htmlMod] = await Promise.all([
-		import('prettier/standalone'),
-		import('prettier/plugins/html'),
-	]);
-	return format(source, {
-		...PRETTIER_CODE_OPTIONS,
-		parser: 'html',
-		plugins: [htmlMod as unknown as Plugin],
-	});
+function createRangeFormattingProvider() {
+	return {
+		displayName: 'Prettier',
+		async provideDocumentRangeFormattingEdits(
+			model: {
+				getValue: () => string;
+				getLanguageId: () => string;
+				getFullModelRange: () => {
+					startLineNumber: number;
+					startColumn: number;
+					endLineNumber: number;
+					endColumn: number;
+				};
+			},
+			range: {
+				startLineNumber: number;
+				startColumn: number;
+				endLineNumber: number;
+				endColumn: number;
+			},
+		) {
+			const full = model.getFullModelRange();
+			if (
+				range.startLineNumber !== full.startLineNumber ||
+				range.startColumn !== full.startColumn ||
+				range.endLineNumber !== full.endLineNumber ||
+				range.endColumn !== full.endColumn
+			) {
+				return [];
+			}
+			const out = await formatWithPrettierForModel(model);
+			if (out == null) return [];
+			return [{ range: full, text: out }];
+		},
+	};
 }
 
-/** Monaco 文档格式化：Markdown（含围栏内多语言）与纯 JS/TS/JSON/HTML */
+/** 与参考 registerDocumentFormatInfo 一致：按语言注册同一套 Provider，内部用 getLanguageId 选 parser */
+const LANGUAGES_WITH_FORMAT: string[] = [
+	'markdown',
+	'javascript',
+	'javascriptreact',
+	'typescript',
+	'typescriptreact',
+	'html',
+	'css',
+	'less',
+	'scss',
+	'yaml',
+	'json',
+];
+
 export function registerPrettierFormatProviders(monaco: MonacoApi): void {
-	registerOnce(monaco, 'markdown', formatMarkdownWithPrettier);
-	registerOnce(monaco, 'javascript', formatWithBabelParser);
-	registerOnce(monaco, 'javascriptreact', formatWithBabelParser);
-	registerOnce(monaco, 'typescript', formatWithTypeScriptParser);
-	registerOnce(monaco, 'typescriptreact', formatWithTypeScriptParser);
-	registerOnce(monaco, 'json', formatJson);
-	registerOnce(monaco, 'html', formatHtml);
+	const docProvider = createDocumentFormattingProvider();
+	const rangeProvider = createRangeFormattingProvider();
+	for (const languageId of LANGUAGES_WITH_FORMAT) {
+		documentFormatterDisposables.get(languageId)?.dispose();
+		rangeFormatterDisposables.get(languageId)?.dispose();
+		documentFormatterDisposables.set(
+			languageId,
+			monaco.languages.registerDocumentFormattingEditProvider(
+				languageId,
+				docProvider,
+			),
+		);
+		rangeFormatterDisposables.set(
+			languageId,
+			monaco.languages.registerDocumentRangeFormattingEditProvider(
+				languageId,
+				rangeProvider,
+			),
+		);
+	}
 }

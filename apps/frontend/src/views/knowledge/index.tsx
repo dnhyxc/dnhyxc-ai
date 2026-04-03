@@ -21,6 +21,47 @@ import {
 import { EDITOR_HEIGHT, TAURI_KNOWLEDGE_DIR } from './constants';
 import KnowledgeList from './KnowledgeList';
 
+/** 根据标题扩展名选择 Monaco language，CSS 等才能走对应 Prettier parser */
+function monacoLanguageFromKnowledgeTitle(title: string): string {
+	const t = title.trim().toLowerCase();
+	const dot = t.lastIndexOf('.');
+	if (dot < 0) return 'markdown';
+	const ext = t.slice(dot + 1);
+	switch (ext) {
+		case 'css':
+			return 'css';
+		case 'scss':
+		case 'sass':
+			return 'scss';
+		case 'less':
+			return 'less';
+		case 'json':
+			return 'json';
+		case 'html':
+		case 'htm':
+			return 'html';
+		case 'ts':
+			return 'typescript';
+		case 'tsx':
+			return 'typescriptreact';
+		case 'jsx':
+			return 'javascriptreact';
+		case 'js':
+		case 'mjs':
+		case 'cjs':
+			return 'javascript';
+		case 'yaml':
+		case 'yml':
+			return 'yaml';
+		case 'md':
+		case 'markdown':
+		case 'mdx':
+			return 'markdown';
+		default:
+			return 'markdown';
+	}
+}
+
 type StoredUserInfo = { username?: unknown; id?: unknown } | null;
 
 function readUserInfoFromStorage(): StoredUserInfo {
@@ -93,6 +134,11 @@ const Knowledge = observer(() => {
 	const getUserInfo = useMemo(() => readUserInfoFromStorage(), []);
 
 	const monacoTheme = theme === 'black' ? 'vs-dark' : 'vs';
+
+	const monacoLanguage = useMemo(
+		() => monacoLanguageFromKnowledgeTitle(detailStore.knowledgeTitle),
+		[detailStore.knowledgeTitle],
+	);
 
 	/** 清空标题与正文（store 级草稿，与 markdown 一并清除） */
 	const resetEditorToNewDraft = useCallback(() => {
@@ -347,6 +393,7 @@ const Knowledge = observer(() => {
 					className="h-full min-w-0 max-w-full w-full"
 					height={EDITOR_HEIGHT}
 					theme={monacoTheme}
+					language={monacoLanguage}
 					documentIdentity={
 						detailStore.knowledgeEditingKnowledgeId ?? 'draft-new'
 					}

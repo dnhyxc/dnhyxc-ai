@@ -451,6 +451,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 
 	const handleMonacoBeforeMount: BeforeMount = useCallback((monaco) => {
 		registerMonacoGlassThemes(monaco);
+		registerPrettierFormatProviders(monaco);
 	}, []);
 
 	/** 仅换 path 时更新，避免 defaultValue 每键变化导致 memo(Editor) 重渲染与 IME 叠字 */
@@ -692,7 +693,6 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	const handleEditorMount = useCallback<OnMount>(
 		(editor, monaco) => {
 			editorRef.current = editor;
-			registerPrettierFormatProviders(monaco);
 
 			editor.addCommand(
 				monaco.KeyMod.Shift | monaco.KeyMod.Alt | monaco.KeyCode.KeyF,
