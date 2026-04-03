@@ -42,9 +42,8 @@ import { registerPrettierFormatProviders } from './format';
 import { GLASS_THEME_BY_UI, registerMonacoGlassThemes } from './glassTheme';
 import { options } from './options';
 import {
-	editorVerticalScrollRatio,
 	type MonacoEditorInstance,
-	setPreviewVerticalScrollRatio,
+	syncPreviewScrollFromMarkdownEditorByHeadings,
 } from './utils';
 
 type MarkdownViewMode = 'edit' | 'preview' | 'split';
@@ -100,6 +99,8 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 			new MarkdownParser({
 				highlightTheme: getChatMarkdownHighlightTheme(theme),
 				enableChatCodeFenceToolbar: true,
+				// 分屏跟随滚动：预览标题带源码行号，与编辑器按标题区间对齐
+				enableHeadingSourceLineAttr: true,
 			}),
 		[theme],
 	);
@@ -206,6 +207,8 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	const viewModeRef = useRef(viewMode);
 	const splitScrollFollowRef = useRef(splitPreviewScrollFollow);
 	const previewViewportRef = useRef<HTMLDivElement | null>(null);
+	/** 合并滚动同步到下一帧，避免 onDidScrollChange 高频读布局 */
+	const scrollSyncRafRef = useRef(0);
 	const markdownBottomBarId = useId();
 
 	const isMarkdown = language === 'markdown' && enableMarkdownPreview;
@@ -304,7 +307,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 		const editor = editorRef.current;
 		const vp = previewViewportRef.current;
 		if (!editor || !vp) return;
-		setPreviewVerticalScrollRatio(vp, editorVerticalScrollRatio(editor));
+		syncPreviewScrollFromMarkdownEditorByHeadings(editor, vp);
 	}, []);
 
 	// 进入分屏或打开「跟随滚动」时，按编辑器位置对齐预览（仅当跟开启）
@@ -324,8 +327,14 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 		const editor = editorRef.current;
 		const vp = previewViewportRef.current;
 		if (!editor || !vp) return;
-		const ratio = editorVerticalScrollRatio(editor);
-		setPreviewVerticalScrollRatio(vp, ratio);
+		cancelAnimationFrame(scrollSyncRafRef.current);
+		scrollSyncRafRef.current = requestAnimationFrame(() => {
+			scrollSyncRafRef.current = 0;
+			const ed = editorRef.current;
+			const v = previewViewportRef.current;
+			if (!ed || !v) return;
+			syncPreviewScrollFromMarkdownEditorByHeadings(ed, v);
+		});
 	}, []);
 
 	const handleEditorMount = useCallback<OnMount>(
@@ -425,6 +434,8 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 
 			editor.onDidDispose(() => {
 				cancelAnimationFrame(pushRaf);
+				cancelAnimationFrame(scrollSyncRafRef.current);
+				scrollSyncRafRef.current = 0;
 				for (const d of disposables) {
 					d.dispose();
 				}

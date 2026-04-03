@@ -62,6 +62,11 @@ export interface MarkdownParserOptions {
 	 * @default true
 	 */
 	injectHighlightTheme?: boolean;
+	/**
+	 * 为标题标签写入 `data-md-heading-line`（1-based 源码行号，与 Monaco 一致），供分屏预览按标题对齐滚动。
+	 * @default false
+	 */
+	enableHeadingSourceLineAttr?: boolean;
 }
 
 class MarkdownParser {
@@ -118,6 +123,10 @@ class MarkdownParser {
 
 		if (options.enableChatCodeFenceToolbar) {
 			this.patchChatCodeFenceRenderer();
+		}
+
+		if (options.enableHeadingSourceLineAttr) {
+			this.patchHeadingSourceLineAttr();
 		}
 
 		const shouldInject = options.injectHighlightTheme !== false;
@@ -213,6 +222,23 @@ class MarkdownParser {
 				highlighted +
 				'</code></pre></div>\n'
 			);
+		};
+	}
+
+	/** 为 heading_open 注入 `data-md-heading-line`，与 markdown-it 的 token.map 行号一致 */
+	private patchHeadingSourceLineAttr(): void {
+		const md = this.md;
+		const prev = md.renderer.rules.heading_open;
+		md.renderer.rules.heading_open = (tokens, idx, options, env, self) => {
+			const token = tokens[idx];
+			const map = token.map;
+			if (map) {
+				taskListAttrSet(token, 'data-md-heading-line', String(map[0] + 1));
+			}
+			if (prev) {
+				return prev(tokens, idx, options, env, self);
+			}
+			return self.renderToken(tokens, idx, options);
 		};
 	}
 
