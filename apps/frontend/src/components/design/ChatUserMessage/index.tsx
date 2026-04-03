@@ -1,7 +1,8 @@
 import ChatTextArea from '@design/ChatTextArea';
 import { MarkdownParser } from '@dnhyxc-ai/tools';
 import { useMemo } from 'react';
-import { CHAT_MARKDOWN_HIGHLIGHT_THEME } from '@/constant';
+import { getChatMarkdownHighlightTheme } from '@/constant';
+import { useTheme } from '@/hooks/theme';
 import { cn } from '@/lib/utils';
 import { UploadedFile } from '@/types';
 import { Message } from '@/types/chat';
@@ -38,14 +39,15 @@ const ChatUserMessage = ({
 	sendMessage,
 	className,
 }: UserMessageProps) => {
+	const { theme: appTheme } = useTheme();
 	const isEditing = editMessage?.chatId === message.chatId;
 
 	const parser = useMemo(
 		() =>
 			new MarkdownParser({
-				highlightTheme: CHAT_MARKDOWN_HIGHLIGHT_THEME,
+				highlightTheme: getChatMarkdownHighlightTheme(appTheme),
 			}),
-		[],
+		[appTheme],
 	);
 
 	return (

@@ -30,7 +30,8 @@
 				"useTemplate": "info",
 				"useSelfClosingElements": "off",
 				"noNonNullAssertion": "off",
-				"useImportType": "off"
+				"useImportType": "off",
+				"noDescendingSpecificity": "off"
 			},
 			"a11y": {
 				"useKeyWithClickEvents": "off",

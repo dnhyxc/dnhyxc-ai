@@ -25,7 +25,7 @@ import {
 	ResizablePanel,
 	ResizablePanelGroup,
 } from '@/components/ui/resizable';
-import { CHAT_MARKDOWN_HIGHLIGHT_THEME } from '@/constant';
+import { getChatMarkdownHighlightTheme } from '@/constant';
 import { useTheme } from '@/hooks/theme';
 import {
 	ChatCodeFloatingToolbar,
@@ -90,10 +90,10 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 	const parser = useMemo(
 		() =>
 			new MarkdownParser({
-				highlightTheme: CHAT_MARKDOWN_HIGHLIGHT_THEME,
+				highlightTheme: getChatMarkdownHighlightTheme(theme),
 				enableChatCodeFenceToolbar: true,
 			}),
-		[],
+		[theme],
 	);
 
 	const html = useMemo(() => parser.render(markdown), [parser, markdown]);

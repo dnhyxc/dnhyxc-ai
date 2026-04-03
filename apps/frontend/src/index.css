@@ -74,6 +74,19 @@ body {
 		}
 	}
 
+	/*
+	 * 表格行背景：GitHub Markdown 默认用 --bgColor-default/--bgColor-muted（跟系统深浅走），
+	 * 改为跟随应用主题 body.theme-* 的 token。
+	 */
+	.markdown-body table tr {
+		background-color: var(--theme-card);
+		border-top-color: var(--theme-border);
+	}
+
+	.markdown-body table tr:nth-child(2n) {
+		background-color: var(--theme-muted);
+	}
+
 	/* 助手 Markdown 围栏代码：工具栏由 MarkdownParser(enableChatCodeFenceToolbar) 输出，位移由 chatCodeToolbar 滚动同步 */
 	.chat-md-code-block {
 		position: relative;

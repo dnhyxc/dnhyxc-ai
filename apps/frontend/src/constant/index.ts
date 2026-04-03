@@ -1,5 +1,7 @@
 import type { HighlightJsThemeId } from '@dnhyxc-ai/tools';
 
+import type { ThemeName } from '@/hooks/theme';
+
 export const BASE_URL = import.meta.env.PROD
 	? import.meta.env.VITE_PROD_API_DOMAIN
 	: import.meta.env.VITE_DEV_API_DOMAIN;
@@ -22,6 +24,11 @@ export const CHAT_IMAGE_VALIDTYPES = [
 	'image/webp',
 ];
 
-/** Chat 内 MarkdownParser 通过 CDN 注入的 highlight.js 主题 id（修改时值有完整字面量提示） */
-export const CHAT_MARKDOWN_HIGHLIGHT_THEME: HighlightJsThemeId =
-	'base16/unikitty-dark';
+/**
+ * Chat / 文档等 MarkdownParser 的 highlight.js 主题：黑色配色用暗色高亮，其余用亮色高亮。
+ */
+export function getChatMarkdownHighlightTheme(
+	themeName: ThemeName,
+): HighlightJsThemeId {
+	return themeName === 'black' ? 'atom-one-dark' : 'atom-one-light';
+}

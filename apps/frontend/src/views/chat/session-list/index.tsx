@@ -17,8 +17,9 @@ import {
 	useState,
 } from 'react';
 import { useNavigate } from 'react-router';
-import { CHAT_MARKDOWN_HIGHLIGHT_THEME } from '@/constant';
+import { getChatMarkdownHighlightTheme } from '@/constant';
 import { useChatCoreContext } from '@/contexts';
+import { useTheme } from '@/hooks/theme';
 import { useChatCore } from '@/hooks/useChatCore';
 import { deleteSession, updateSession } from '@/service';
 import useStore from '@/store';
@@ -209,6 +210,7 @@ const SessionList = observer(({ open, onOpenChange }: IProps) => {
 	const { chatStore } = useStore();
 	const { clearChat, stopGenerating } = useChatCore();
 	const { setIsSharing, clearAllCheckedMessages } = useChatCoreContext();
+	const { theme: appTheme } = useTheme();
 
 	const navigate = useNavigate();
 
@@ -219,9 +221,9 @@ const SessionList = observer(({ open, onOpenChange }: IProps) => {
 	const parser = useMemo(
 		() =>
 			new MarkdownParser({
-				highlightTheme: CHAT_MARKDOWN_HIGHLIGHT_THEME,
+				highlightTheme: getChatMarkdownHighlightTheme(appTheme),
 			}),
-		[],
+		[appTheme],
 	);
 
 	useEffect(() => {

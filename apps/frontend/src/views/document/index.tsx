@@ -22,7 +22,8 @@ import {
 	Sparkles,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { CHAT_MARKDOWN_HIGHLIGHT_THEME } from '@/constant';
+import { getChatMarkdownHighlightTheme } from '@/constant';
+import { useTheme } from '@/hooks/theme';
 import { uploadFile } from '@/service';
 import { isValidImageUrl } from '@/utils';
 import { streamFetch } from '@/utils/sse';
@@ -37,6 +38,7 @@ interface UploadFileInfo {
 }
 
 const DocumentProcessor = () => {
+	const { theme: appTheme } = useTheme();
 	const [uploadFileInfo, setUploadFileInfo] =
 		useState<Partial<UploadFileInfo>>();
 	const [loading, setLoading] = useState(false);
@@ -59,9 +61,9 @@ const DocumentProcessor = () => {
 	// 1. 初始化解析器
 	const parser = useMemo(() => {
 		return new MarkdownParser({
-			highlightTheme: CHAT_MARKDOWN_HIGHLIGHT_THEME,
+			highlightTheme: getChatMarkdownHighlightTheme(appTheme),
 		});
-	}, []);
+	}, [appTheme]);
 
 	useEffect(() => {
 		return () => {

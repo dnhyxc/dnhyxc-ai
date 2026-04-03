@@ -16,7 +16,8 @@ import {
 // memo：父级重渲染时若 props 判定相等则跳过本组件，减少与 PlainTextFallback / MdPreview 的协调成本
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { CHAT_MARKDOWN_HIGHLIGHT_THEME } from '@/constant';
+import { getChatMarkdownHighlightTheme } from '@/constant';
+import { useTheme } from '@/hooks/theme';
 import { cn } from '@/lib/utils';
 import { Message, SearchOrganicItem } from '@/types/chat';
 import {
@@ -123,6 +124,7 @@ function ChatAssistantMessageInner({
 	// scrollViewportRef,
 	className,
 }: AssistantMessageProps) {
+	const { theme: appTheme } = useTheme();
 	// 挂在外层 div，作为 IntersectionObserver 的 observe 目标，覆盖整条助手气泡
 	const shellRef = useRef<HTMLDivElement>(null);
 	const bodyMarkdownRef = useRef<HTMLDivElement>(null);
@@ -141,9 +143,9 @@ function ChatAssistantMessageInner({
 		() =>
 			new MarkdownParser({
 				enableChatCodeFenceToolbar: true,
-				highlightTheme: CHAT_MARKDOWN_HIGHLIGHT_THEME,
+				highlightTheme: getChatMarkdownHighlightTheme(appTheme),
 			}),
-		[],
+		[appTheme],
 	);
 
 	// 正文：流式阶段后端仍推送原始 [n]，有 searchOrganic 时在前端做与落库相同的引用转换
