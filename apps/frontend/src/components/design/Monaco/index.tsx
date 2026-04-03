@@ -262,12 +262,16 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	 * 缩进与 options 一致：继承拉丁等宽在前的 fontFamily；Markdown 下与全局相同保留 disableMonospaceOptimizations: true 以偏 IME，
 	 * 若 Tab 列仍不齐可试改为 false（见 docs/monaco-markdown-ime-ghosting.md §4）。
 	 */
+	/** 有正文时勿传占位文案，否则部分 Monaco 版本在失焦或未编辑时仍叠画「# 输入内容...」 */
+	const hasEditorBody = normalizeMonacoEol(value ?? '').trim().length > 0;
+	const effectivePlaceholder = hasEditorBody ? '' : placeholder;
+
 	const mergedEditorOptions = useMemo(() => {
 		const base = { ...options, readOnly };
 		if (language === 'markdown') {
 			return {
 				...base,
-				placeholder,
+				placeholder: effectivePlaceholder,
 				fontLigatures: false,
 				// 与 base 同为 true：关等宽快速路径，利于 IME；列对齐问题见文档 §4.2 B / §4.4
 				disableMonospaceOptimizations: true,
@@ -281,8 +285,8 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 				cursorBlinking: 'solid' as const,
 			};
 		}
-		return { ...base, placeholder };
-	}, [readOnly, placeholder, language]);
+		return { ...base, placeholder: effectivePlaceholder };
+	}, [readOnly, effectivePlaceholder, language]);
 
 	const glassThemeId = GLASS_THEME_BY_UI[theme];
 
@@ -327,7 +331,8 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 		if (ed.hasTextFocus()) return;
 		lastEmittedRef.current = next;
 		ed.setValue(next);
-	}, [value]);
+		ed.updateOptions({ placeholder: next.trim() ? '' : placeholder });
+	}, [value, placeholder]);
 
 	useEffect(() => {
 		viewModeRef.current = viewMode;
@@ -563,9 +568,14 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 			}
 			lastEmittedRef.current = initial;
 
+			// 与 mergedEditorOptions 一致：有正文时清空 placeholder，避免挂载帧仍叠画占位 ghost
+			editor.updateOptions({
+				placeholder: initial.trim() ? '' : placeholder,
+			});
+
 			editor.focus();
 		},
-		[syncPreviewFromEditor],
+		[syncPreviewFromEditor, placeholder],
 	);
 
 	const focusEditor = useCallback(() => {
