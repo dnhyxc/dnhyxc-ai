@@ -79,10 +79,13 @@ interface MarkdownEditorProps {
 const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 	markdown,
 	viewportRef,
+	documentIdentity,
 }: {
 	markdown: string;
 	/** 分屏同步滚动：指向 ScrollArea 的 Viewport（Radix ref 落在 viewport 上） */
 	viewportRef?: RefObject<HTMLDivElement | null>;
+	/** 逻辑文档切换时重置预览滚动，避免沿用上一篇的 scrollTop */
+	documentIdentity?: string;
 }) {
 	const markdownRef = useRef<HTMLDivElement>(null);
 	const localViewportRef = useRef<HTMLDivElement | null>(null);
@@ -111,6 +114,14 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 	);
 
 	const html = useMemo(() => parser.render(markdown), [parser, markdown]);
+
+	useLayoutEffect(() => {
+		const vp = localViewportRef.current;
+		if (vp) {
+			vp.scrollTop = 0;
+			vp.scrollLeft = 0;
+		}
+	}, [documentIdentity]);
 
 	useEffect(() => {
 		const el = markdownRef.current;
@@ -314,6 +325,21 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 			lastEmittedRef.current = normalizeMonacoEol(
 				valueFromPropsRef.current ?? '',
 			);
+		}
+	}, [documentIdentity]);
+
+	// 换篇时重置编辑器滚动与预览锚点缓存，避免 Monaco / 分屏跟滚沿用上一篇位置
+	useLayoutEffect(() => {
+		headingScrollCacheRef.current = null;
+		const vp = previewViewportRef.current;
+		if (vp) {
+			vp.scrollTop = 0;
+			vp.scrollLeft = 0;
+		}
+		const ed = editorRef.current;
+		if (ed?.getModel()) {
+			ed.setScrollTop(0);
+			ed.setScrollLeft(0);
 		}
 	}, [documentIdentity]);
 
@@ -650,7 +676,10 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 
 					{isMarkdown && viewMode === 'preview' ? (
 						<div className="h-full min-h-0 min-w-0 max-w-full w-full overflow-hidden contain-[inline-size]">
-							<ParserMarkdownPreviewPane markdown={deferredPreviewMarkdown} />
+							<ParserMarkdownPreviewPane
+								markdown={deferredPreviewMarkdown}
+								documentIdentity={documentIdentity}
+							/>
 						</div>
 					) : null}
 
@@ -688,6 +717,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 								<div className="h-full min-h-0 min-w-0 overflow-hidden contain-[inline-size]">
 									<ParserMarkdownPreviewPane
 										markdown={deferredPreviewMarkdown}
+										documentIdentity={documentIdentity}
 										viewportRef={previewViewportRef}
 									/>
 								</div>
