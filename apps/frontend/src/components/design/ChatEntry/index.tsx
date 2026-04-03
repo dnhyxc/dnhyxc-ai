@@ -274,8 +274,8 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 										className={cn(
 											'mb-1 h-8 shrink-0 gap-1.5 rounded-md px-2.5 text-sm',
 											webSearchEnabled
-												? 'border border-theme/40 bg-linear-to-r from-teal-500/20 to-cyan-600/20 text-textcolor hover:from-teal-500/30 hover:to-cyan-600/30'
-												: 'border border-transparent bg-theme/5 bg-linear-to-r text-textcolor/80 hover:from-teal-500/30 hover:to-cyan-600/30 hover:text-textcolor',
+												? 'border border-teal-600/50 bg-teal-600/20 text-teal-400 hover:bg-teal-600/30'
+												: 'border border-transparent bg-theme/5 text-textcolor',
 										)}
 									>
 										<Globe className="h-3.5 w-3.5 shrink-0" />
