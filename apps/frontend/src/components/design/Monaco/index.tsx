@@ -1,6 +1,6 @@
 import Tooltip from '@design/Tooltip';
 import { MarkdownParser } from '@dnhyxc-ai/tools';
-import Editor, { type OnMount } from '@monaco-editor/react';
+import Editor, { type BeforeMount, type OnMount } from '@monaco-editor/react';
 import { Button, ScrollArea } from '@ui/index';
 import {
 	Columns2,
@@ -14,6 +14,7 @@ import {
 	memo,
 	type RefObject,
 	useCallback,
+	useDeferredValue,
 	useEffect,
 	useId,
 	useMemo,
@@ -38,6 +39,7 @@ import {
 } from '@/utils/chatCodeToolbar';
 import Loading from '../Loading';
 import { registerPrettierFormatProviders } from './format';
+import { GLASS_THEME_BY_UI, registerMonacoGlassThemes } from './glassTheme';
 import { options } from './options';
 import {
 	editorVerticalScrollRatio,
@@ -47,9 +49,19 @@ import {
 
 type MarkdownViewMode = 'edit' | 'preview' | 'split';
 
+function normalizeMonacoEol(text: string): string {
+	return text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+}
+
+/** 中文 Markdown：系统黑体优先，减轻 IME 与拉丁等宽混排测量问题 */
+const MARKDOWN_EDITOR_FONT_STACK =
+	'ui-sans-serif, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", "Source Han Sans SC", "Fira Code", "SF Mono", Monaco, Menlo, Consolas, monospace';
+
 interface MarkdownEditorProps {
 	value?: string;
 	onChange?: (value: string) => void;
+	/** 逻辑文档 id（如知识库条目），变化时换 model，避免串文 */
+	documentIdentity?: string;
 	placeholder?: string;
 	className?: string;
 	height?: string;
@@ -174,6 +186,7 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	value = '',
 	onChange,
+	documentIdentity = 'default',
 	placeholder = '# 输入内容...',
 	className,
 	height = '300px',
@@ -185,6 +198,11 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	enableMarkdownPreview = true,
 }) => {
 	const editorRef = useRef<MonacoEditorInstance | null>(null);
+	const imeComposingRef = useRef(false);
+	const onChangeRef = useRef(onChange);
+	const valueFromPropsRef = useRef(value);
+	const lastEmittedRef = useRef(normalizeMonacoEol(value));
+	const prevDocumentIdentityRef = useRef(documentIdentity);
 	const [viewMode, setViewMode] = useState<MarkdownViewMode>('edit');
 	const [splitPreviewScrollFollow, setSplitPreviewScrollFollow] =
 		useState(false);
@@ -196,6 +214,85 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	const markdownBottomBarId = useId();
 
 	const isMarkdown = language === 'markdown' && enableMarkdownPreview;
+
+	valueFromPropsRef.current = value;
+
+	const monacoModelPath = useMemo(() => {
+		const lang = language.replace(/[^a-zA-Z0-9_-]/g, '_');
+		const id = String(documentIdentity).replace(/[^a-zA-Z0-9_-]/g, '_');
+		return `dnhyxc-editor-${lang}__${id}`;
+	}, [language, documentIdentity]);
+
+	/**
+	 * Markdown：换行后 wordWrap+automaticLayout 会反复重算折行，与透明底+IME 合成层叠画（首行无折行故正常）。
+	 * 关闭折行与部分装饰层，组合结束后再 layout，减轻第二行起重影。
+	 */
+	const mergedEditorOptions = useMemo(() => {
+		const base = { ...options, readOnly };
+		if (language === 'markdown') {
+			return {
+				...base,
+				placeholder,
+				fontFamily: MARKDOWN_EDITOR_FONT_STACK,
+				fontLigatures: false,
+				disableMonospaceOptimizations: true,
+				colorDecorators: false,
+				wordWrap: 'off' as const,
+				folding: false,
+				foldingHighlight: false,
+				stickyScroll: { enabled: false },
+				glyphMargin: false,
+				accessibilitySupport: 'off' as const,
+				cursorBlinking: 'solid' as const,
+			};
+		}
+		return { ...base, placeholder };
+	}, [readOnly, placeholder, language]);
+
+	const glassThemeId = GLASS_THEME_BY_UI[theme];
+
+	const handleMonacoBeforeMount: BeforeMount = useCallback((monaco) => {
+		registerMonacoGlassThemes(monaco);
+	}, []);
+
+	/** 仅换 path 时更新，避免 defaultValue 每键变化导致 memo(Editor) 重渲染与 IME 叠字 */
+	const lastPathForBootstrapRef = useRef<string | null>(null);
+	const editorBootstrapTextRef = useRef(value);
+	if (lastPathForBootstrapRef.current !== monacoModelPath) {
+		lastPathForBootstrapRef.current = monacoModelPath;
+		editorBootstrapTextRef.current = value;
+	}
+
+	const deferredPreviewMarkdown = useDeferredValue(value);
+
+	useEffect(() => {
+		onChangeRef.current = onChange;
+	}, [onChange]);
+
+	useEffect(() => {
+		if (prevDocumentIdentityRef.current !== documentIdentity) {
+			prevDocumentIdentityRef.current = documentIdentity;
+			lastEmittedRef.current = normalizeMonacoEol(
+				valueFromPropsRef.current ?? '',
+			);
+		}
+	}, [documentIdentity]);
+
+	/** 不向 Editor 传受控 value；仅在外部正文变化且非 IME、无焦点内落后回写时 setValue */
+	useEffect(() => {
+		const ed = editorRef.current;
+		if (!ed || imeComposingRef.current || ed.inComposition) return;
+		const next = normalizeMonacoEol(value ?? '');
+		if (next === lastEmittedRef.current) return;
+		const cur = normalizeMonacoEol(ed.getValue());
+		if (cur === next) {
+			lastEmittedRef.current = next;
+			return;
+		}
+		if (ed.hasTextFocus()) return;
+		lastEmittedRef.current = next;
+		ed.setValue(next);
+	}, [value]);
 
 	useEffect(() => {
 		viewModeRef.current = viewMode;
@@ -234,32 +331,123 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 		setPreviewVerticalScrollRatio(vp, ratio);
 	}, []);
 
-	const handleEditorMount: OnMount = (editor, monaco) => {
-		editorRef.current = editor;
+	const handleEditorMount = useCallback<OnMount>(
+		(editor, monaco) => {
+			editorRef.current = editor;
 
-		registerPrettierFormatProviders(monaco);
+			registerPrettierFormatProviders(monaco);
 
-		editor.addCommand(
-			monaco.KeyMod.Shift | monaco.KeyMod.Alt | monaco.KeyCode.KeyF,
-			() => {
-				editor.trigger('keyboard', 'editor.action.formatDocument', null);
-			},
-		);
+			editor.addCommand(
+				monaco.KeyMod.Shift | monaco.KeyMod.Alt | monaco.KeyCode.KeyF,
+				() => {
+					editor.trigger('keyboard', 'editor.action.formatDocument', null);
+				},
+			);
 
-		editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyB, () => {
-			editor.trigger('keyboard', 'editor.action.commentLine', null);
-		});
+			editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyB, () => {
+				editor.trigger('keyboard', 'editor.action.commentLine', null);
+			});
 
-		editor.onDidChangeModelContent(() => {
-			onChange?.(editor.getValue());
-		});
+			const pushToParent = (raw: string) => {
+				const v = normalizeMonacoEol(raw);
+				lastEmittedRef.current = v;
+				onChangeRef.current?.(v);
+			};
 
-		editor.onDidScrollChange(() => {
-			syncPreviewFromEditor();
-		});
+			/** 换行等变更与下一键同帧时合并上报，减少与 automaticLayout 打架 */
+			let pushRaf = 0;
+			const queuePushFromModel = () => {
+				if (imeComposingRef.current || editor.inComposition) return;
+				cancelAnimationFrame(pushRaf);
+				pushRaf = requestAnimationFrame(() => {
+					pushRaf = 0;
+					if (imeComposingRef.current || editor.inComposition) return;
+					pushToParent(editor.getValue());
+				});
+			};
 
-		editor.focus();
-	};
+			const contentSub = editor.onDidChangeModelContent(() => {
+				queuePushFromModel();
+			});
+
+			const imeSubs = [
+				editor.onDidCompositionStart(() => {
+					imeComposingRef.current = true;
+					cancelAnimationFrame(pushRaf);
+					pushRaf = 0;
+				}),
+				editor.onDidCompositionEnd(() => {
+					imeComposingRef.current = false;
+					queueMicrotask(() => {
+						pushToParent(editor.getValue());
+						requestAnimationFrame(() => {
+							editor.layout();
+							requestAnimationFrame(() => editor.layout());
+						});
+					});
+				}),
+			];
+
+			const blurSub = editor.onDidBlurEditorText(() => {
+				queueMicrotask(() => {
+					if (imeComposingRef.current || editor.inComposition) return;
+					const v = normalizeMonacoEol(editor.getValue());
+					if (v === lastEmittedRef.current) return;
+					lastEmittedRef.current = v;
+					onChangeRef.current?.(v);
+				});
+			});
+
+			const root = editor.getDomNode();
+			const inputArea = root?.querySelector(
+				'textarea.inputarea',
+			) as HTMLTextAreaElement | null;
+			const disposables: Array<{ dispose: () => void }> = [
+				contentSub,
+				blurSub,
+				...imeSubs,
+			];
+			if (inputArea) {
+				const onNativeCompStart = () => {
+					imeComposingRef.current = true;
+				};
+				const onNativeCompEnd = () => {
+					imeComposingRef.current = false;
+				};
+				inputArea.addEventListener('compositionstart', onNativeCompStart);
+				inputArea.addEventListener('compositionend', onNativeCompEnd);
+				disposables.push({
+					dispose: () => {
+						inputArea.removeEventListener(
+							'compositionstart',
+							onNativeCompStart,
+						);
+						inputArea.removeEventListener('compositionend', onNativeCompEnd);
+					},
+				});
+			}
+
+			editor.onDidDispose(() => {
+				cancelAnimationFrame(pushRaf);
+				for (const d of disposables) {
+					d.dispose();
+				}
+			});
+
+			editor.onDidScrollChange(() => {
+				syncPreviewFromEditor();
+			});
+
+			const initial = normalizeMonacoEol(valueFromPropsRef.current ?? '');
+			if (normalizeMonacoEol(editor.getValue()) !== initial) {
+				editor.setValue(initial);
+			}
+			lastEmittedRef.current = initial;
+
+			editor.focus();
+		},
+		[syncPreviewFromEditor],
+	);
 
 	const focusEditor = useCallback(() => {
 		editorRef.current?.focus();
@@ -318,20 +506,22 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 				>
 					{!isMarkdown || viewMode === 'edit' ? (
 						<Editor
+							key={monacoModelPath}
 							height={height}
 							language={language}
-							value={value}
-							onChange={(val) => onChange?.(val || '')}
-							theme={theme}
+							path={monacoModelPath}
+							defaultValue={editorBootstrapTextRef.current}
+							beforeMount={handleMonacoBeforeMount}
+							theme={glassThemeId}
 							onMount={handleEditorMount}
-							options={{ ...options, readOnly, placeholder }}
+							options={mergedEditorOptions}
 							loading={<Loading text="正在加载编辑器..." />}
 						/>
 					) : null}
 
 					{isMarkdown && viewMode === 'preview' ? (
 						<div className="h-full min-h-0 min-w-0 max-w-full w-full overflow-hidden contain-[inline-size]">
-							<ParserMarkdownPreviewPane markdown={value} />
+							<ParserMarkdownPreviewPane markdown={deferredPreviewMarkdown} />
 						</div>
 					) : null}
 
@@ -347,13 +537,15 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 							>
 								<div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden border-r border-theme/10">
 									<Editor
+										key={monacoModelPath}
 										height="100%"
 										language={language}
-										value={value}
-										onChange={(val) => onChange?.(val || '')}
-										theme={theme}
+										path={monacoModelPath}
+										defaultValue={editorBootstrapTextRef.current}
+										beforeMount={handleMonacoBeforeMount}
+										theme={glassThemeId}
 										onMount={handleEditorMount}
-										options={{ ...options, readOnly, placeholder }}
+										options={mergedEditorOptions}
 										loading={<Loading text="正在加载编辑器..." />}
 									/>
 								</div>
@@ -366,7 +558,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 							>
 								<div className="h-full min-h-0 min-w-0 overflow-hidden contain-[inline-size]">
 									<ParserMarkdownPreviewPane
-										markdown={value}
+										markdown={deferredPreviewMarkdown}
 										viewportRef={previewViewportRef}
 									/>
 								</div>

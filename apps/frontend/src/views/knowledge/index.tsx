@@ -347,6 +347,9 @@ const Knowledge = observer(() => {
 					className="h-full min-w-0 max-w-full w-full"
 					height={EDITOR_HEIGHT}
 					theme={monacoTheme}
+					documentIdentity={
+						detailStore.knowledgeEditingKnowledgeId ?? 'draft-new'
+					}
 					value={detailStore.markdown}
 					onChange={handleMarkdownChange}
 					toolbar={
