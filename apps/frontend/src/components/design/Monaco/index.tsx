@@ -9,11 +9,8 @@ import {
 	Columns2,
 	Eye,
 	FilePenLine,
-	ListIndentIncrease,
 	PanelTopClose,
 	PanelTopOpen,
-	ScrollText,
-	StretchVertical,
 } from 'lucide-react';
 import {
 	memo,
