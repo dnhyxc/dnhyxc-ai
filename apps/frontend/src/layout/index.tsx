@@ -14,8 +14,20 @@ import { Outlet } from 'react-router';
 import { ChatCoreProvider } from '@/contexts';
 import { useTheme } from '@/hooks';
 
+/** 距容器中心归一化：中心 0、四角约 1，用于光圈随位置缩放 */
+function pointerEdge01(xPct: number, yPct: number) {
+	const nx = xPct / 100;
+	const ny = yPct / 100;
+	return Math.min(1, Math.hypot((nx - 0.5) * 2, (ny - 0.5) * 2) / Math.SQRT2);
+}
+
 const Layout = () => {
-	const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
+	const [mousePosition, setMousePosition] = useState({
+		x: 50,
+		y: 50,
+		scale: 1,
+	});
+	const { x, y, scale } = mousePosition;
 
 	useTheme();
 
@@ -27,10 +39,15 @@ const Layout = () => {
 			if (!container) return;
 
 			const rect = container.getBoundingClientRect();
-			const x = ((e.clientX - rect.left) / rect.width) * 100;
-			const y = ((e.clientY - rect.top) / rect.height) * 100;
+			if (rect.width < 1 || rect.height < 1) return;
 
-			setMousePosition({ x, y });
+			const xPct = ((e.clientX - rect.left) / rect.width) * 100;
+			const yPct = ((e.clientY - rect.top) / rect.height) * 100;
+			const edge = pointerEdge01(xPct, yPct);
+			/* 靠边略放大；整体系数压低，避免光圈过大 */
+			const s = 0.84 + edge * 0.2;
+
+			setMousePosition({ x: xPct, y: yPct, scale: s });
 		};
 
 		window.addEventListener('mousemove', handleMouseMove);
@@ -49,10 +66,13 @@ const Layout = () => {
 						<div className="relative h-full w-full rounded-md bg-theme-secondary">
 							<div
 								data-gradient-container
-								className="absolute rounded-md inset-0 overflow-hidden pointer-events-none"
+								className="absolute rounded-md inset-0 overflow-hidden pointer-events-none will-change-[background,opacity,filter]"
 								style={{
+									/* 由内到外：正圆；半径乘 scale 随指针距中心变化 */
 									background: `
-						radial-gradient(circle at ${mousePosition.x}% ${mousePosition.y}%, var(--theme-light), transparent 25%),
+						radial-gradient(circle min(${Math.round(92 * scale)}px, ${(10.5 * scale).toFixed(2)}vmin) at ${x}% ${y}%, color-mix(in oklch, var(--theme-color) var(--theme-pointer-core), transparent) 0%, color-mix(in oklch, var(--theme-color) var(--theme-pointer-core-mid), transparent) 34%, transparent 88%),
+						radial-gradient(circle min(${Math.round(228 * scale)}px, ${(26 * scale).toFixed(2)}vmin) at ${x}% ${y}%, color-mix(in oklch, var(--theme-light) 48%, transparent) 0%, color-mix(in oklch, var(--theme-light) 18%, transparent) 45%, transparent 62%),
+						radial-gradient(circle min(${Math.round(400 * scale)}px, ${(42 * scale).toFixed(2)}vmin) at ${x}% ${y}%, color-mix(in oklch, var(--theme-light) 32%, transparent) 0%, color-mix(in oklch, var(--theme-light) 10%, transparent) 48%, transparent 72%),
 						radial-gradient(circle at 50% 20%, transparent, transparent 20%)
 					`,
 								}}

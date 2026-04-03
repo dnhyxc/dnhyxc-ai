@@ -109,12 +109,6 @@ const Home = () => {
 
 	return (
 		<div className="relative h-full min-h-0 w-full overflow-hidden rounded-b-md">
-			{/* 环境光：压低饱和度，避免与欢迎区抢戏 */}
-			<div className="pointer-events-none absolute inset-0 z-0 opacity-40">
-				<div className="absolute right-[8%] top-[12%] h-64 w-64 rounded-full bg-teal-500/15 blur-[100px]" />
-				<div className="absolute bottom-[18%] left-[5%] h-72 w-72 rounded-full bg-amber-500/10 blur-[110px]" />
-			</div>
-
 			<ScrollArea className="relative z-1 h-full w-full rounded-b-md">
 				<div className="relative min-h-full w-full">
 					{/* 首屏：单一「欢迎」容器，内含标题区 + 三大入口，占满 Outlet 可视高度 */}
@@ -223,7 +217,7 @@ const Home = () => {
 										className={`group relative flex min-h-0 cursor-pointer flex-col overflow-hidden bg-theme-background/80 p-4 transition-colors duration-300 md:p-5 lg:p-6 ${feature.hoverBg}`}
 									>
 										<div
-											className={`pointer-events-none absolute -right-6 -top-10 text-[5.5rem] font-black leading-none text-theme-white/4 transition-colors duration-300 group-hover:text-theme-white/7 sm:text-[6.5rem]`}
+											className={`pointer-events-none absolute -right-6 -top-10 text-[5.5rem] font-extrabold leading-none text-theme-white/4 transition-colors duration-300 group-hover:text-theme-white/7 sm:text-[6.5rem]`}
 											style={{ fontFamily: '"Syne", sans-serif' }}
 											aria-hidden
 										>

@@ -181,8 +181,14 @@ body {
 
 #root {
 	height: 100%;
+	min-height: 100%;
 	width: 100%;
 	background-color: var(--background);
+	/* 氛围渐变（atmosphere gradient）：由各主题 --theme-bg-atmosphere 提供，避免单调平涂 */
+	background-image: var(--theme-bg-atmosphere);
+	background-repeat: no-repeat;
+	background-size: cover;
+	background-attachment: fixed;
 	font-family: var(--font-family);
 }
 
@@ -242,6 +248,30 @@ body {
 	--theme-text-from: oklch(100% 0.00011 271.152);
 	--theme-text-to: oklch(100% 0.00011 271.152);
 	--theme-white: oklch(1 0 0);
+	/* 浅色默认：冷色边缘光晕 + 选区/光标 */
+	--theme-bg-atmosphere:
+		radial-gradient(
+			ellipse 120% 70% at 100% -15%,
+			color-mix(in oklch, oklch(0.7 0.05 264) 16%, transparent) 0%,
+			transparent 52%
+		),
+		radial-gradient(
+			ellipse 90% 55% at -5% 105%,
+			color-mix(in oklch, oklch(0.88 0.03 220) 10%, transparent) 0%,
+			transparent 48%
+		);
+	--theme-selection-bg: color-mix(
+		in oklch,
+		var(--primary) 32%,
+		var(--background)
+	);
+	--theme-selection-fg: var(--foreground);
+	--theme-ring: oklch(0.707 0.022 261.325);
+	--theme-caret: oklch(0.28 0.06 264.665);
+	/* 主布局光圈：浅色底需更高浓度才可见（内层用 pointer-core*） */
+	--theme-pointer-core: 12%;
+	--theme-pointer-core-mid: 4%;
+	--theme-light: color-mix(in oklch, var(--theme-foreground) 14%, transparent);
 }
 
 .dark {
@@ -298,6 +328,28 @@ body {
 	--theme-text-from: oklch(100% 0.00011 271.152);
 	--theme-text-to: oklch(100% 0.00011 271.152);
 	--theme-white: oklch(1 0 0);
+	--theme-bg-atmosphere:
+		radial-gradient(
+			ellipse 110% 65% at 80% -25%,
+			color-mix(in oklch, var(--sidebar-primary) 22%, transparent) 0%,
+			transparent 55%
+		),
+		radial-gradient(
+			ellipse 70% 50% at 0% 100%,
+			color-mix(in oklch, var(--chart-2) 14%, transparent) 0%,
+			transparent 45%
+		);
+	--theme-selection-bg: color-mix(
+		in oklch,
+		var(--sidebar-primary) 45%,
+		oklch(0.16 0.03 264)
+	);
+	--theme-selection-fg: oklch(0.98 0.01 264);
+	--theme-ring: var(--ring);
+	--theme-caret: oklch(0.72 0.14 264);
+	--theme-pointer-core: 10%;
+	--theme-pointer-core-mid: 3.5%;
+	--theme-light: color-mix(in oklch, var(--theme-color) 20%, transparent);
 }
 
 .theme-white {
@@ -318,27 +370,88 @@ body {
 	--theme-text-from: oklch(100% 0.00011 271.152);
 	--theme-text-to: oklch(100% 0.00011 271.152);
 	--theme-white: oklch(0% 0 0);
+	--theme-bg-atmosphere:
+		radial-gradient(
+			ellipse 125% 82% at 98% -18%,
+			color-mix(in oklch, oklch(0.62 0.09 264) 20%, transparent) 0%,
+			transparent 54%
+		),
+		radial-gradient(
+			ellipse 95% 58% at -8% 102%,
+			color-mix(in oklch, oklch(0.9 0.025 250) 12%, transparent) 0%,
+			transparent 50%
+		);
+	--theme-selection-bg: color-mix(in oklch, oklch(0.42 0.1 264) 34%, white);
+	--theme-selection-fg: oklch(0.11 0.03 264);
+	--theme-ring: color-mix(in oklch, oklch(0.42 0.1 264) 62%, white);
+	--theme-caret: oklch(0.32 0.08 264);
+	--theme-pointer-core: 14%;
+	--theme-pointer-core-mid: 5%;
+	--theme-light: color-mix(in oklch, var(--theme-color) 18%, transparent);
 }
 
 .theme-black {
-	--theme-color: oklch(100% 0.00011 271.152);
-	--theme-background: oklch(0.1592 0.0133 272.86);
-	--theme-card: oklch(0.12 0.01 264.665);
-	--theme-muted: oklch(0.18 0.015 264.665);
-	--theme-border: oklch(24.372% 0.0059 271.178);
-	--theme-textcolor: oklch(100% 0.00011 271.152);
+	/*
+	 * 深色锚点 + 极少掺白：卡片/光晕只做极弱层次，避免整体发灰发亮。
+	 * 仍从单一 --theme-seed 用 color-mix 衍生，与 THEMES.black 气质一致。
+	 */
+	--theme-seed: oklch(0.152 0.011 272);
+	--theme-background: var(--theme-seed);
+	--theme-card: color-mix(in oklch, var(--theme-seed) 94%, white);
+	--theme-muted: color-mix(in oklch, var(--theme-seed) 90%, white);
+	--theme-border: color-mix(
+		in oklch,
+		color-mix(in oklch, var(--theme-seed) 72%, white) 22%,
+		transparent
+	);
+	--theme-textcolor: color-mix(in oklch, white 94%, var(--theme-seed));
 	--theme-default: oklch(0.08 0.01 264.665);
-	--theme-foreground: oklch(46.76% 0.00005 271.152);
-	--theme-secondary: oklch(20.105% 0.00397 285.961);
-	--theme-sidebar: oklch(0.12 0.01 264.665);
-	--theme-active-color: oklch(0% 0 0);
-	--theme-from: oklch(0.1592 0.0133 272.86);
-	--theme-via: oklch(0.2178 0 0);
-	--theme-to: oklch(0.4202 0 0);
-	--theme-text-from: oklch(100% 0.00011 271.152);
-	--theme-text-to: oklch(100% 0.00011 271.152);
-	--theme-light: oklch(93.034% 0.12974 97.974 / 0.06);
+	--theme-foreground: color-mix(in oklch, white 72%, var(--theme-seed));
+	--theme-secondary: color-mix(in oklch, var(--theme-seed) 92%, white);
+	--theme-sidebar: color-mix(in oklch, var(--theme-seed) 95%, white);
+	--theme-active-color: color-mix(in oklch, var(--theme-seed) 82%, white);
+	--theme-color: color-mix(in oklch, white 84%, var(--theme-seed));
+	--theme-from: color-mix(in oklch, var(--theme-seed) 88%, white);
+	--theme-via: color-mix(in oklch, var(--theme-seed) 92%, white);
+	--theme-to: color-mix(in oklch, var(--theme-seed) 86%, white);
+	--theme-text-from: var(--theme-color);
+	--theme-text-to: color-mix(in oklch, white 82%, var(--theme-seed));
+	/* 黑色：光圈保持克制；浅色主题在各自块里单独加浓 */
+	--theme-light: color-mix(in oklch, var(--theme-color) 15%, transparent);
+	--theme-pointer-core: 5%;
+	--theme-pointer-core-mid: 1.5%;
 	--theme-white: oklch(1 0 0);
+	--theme-bg-atmosphere:
+		radial-gradient(
+			ellipse 120% 78% at 100% -6%,
+			color-mix(
+					in oklch,
+					color-mix(in oklch, var(--theme-seed) 82%, white) 7%,
+					transparent
+				)
+				0%,
+			transparent 56%
+		),
+		radial-gradient(
+			ellipse 92% 68% at -4% 101%,
+			color-mix(
+					in oklch,
+					color-mix(in oklch, var(--theme-seed) 85%, white) 5%,
+					transparent
+				)
+				0%,
+			transparent 54%
+		),
+		linear-gradient(
+			168deg,
+			color-mix(in oklch, var(--theme-seed) 97%, black) 0%,
+			var(--theme-seed) 50%,
+			color-mix(in oklch, var(--theme-seed) 96%, black) 100%
+		);
+	--theme-selection-bg: color-mix(in oklch, var(--theme-seed) 58%, white);
+	--theme-selection-fg: color-mix(in oklch, white 96%, var(--theme-seed));
+	--theme-ring: color-mix(in oklch, white 48%, var(--theme-seed));
+	--theme-caret: color-mix(in oklch, white 55%, var(--theme-seed));
 }
 
 .theme-purple {
@@ -353,6 +466,28 @@ body {
 	--theme-secondary: oklch(0.92 0.02 293.83);
 	--theme-sidebar: oklch(0.97 0.01 293.83);
 	--theme-white: oklch(0% 0 0);
+	--theme-from: oklch(0.62 0.14 300);
+	--theme-via: oklch(0.78 0.07 295);
+	--theme-to: oklch(0.52 0.18 305);
+	--theme-active-color: color-mix(in oklch, var(--theme-color) 38%, white);
+	--theme-bg-atmosphere:
+		radial-gradient(
+			ellipse 130% 78% at 105% -22%,
+			color-mix(in oklch, var(--theme-color) 32%, transparent) 0%,
+			transparent 58%
+		),
+		radial-gradient(
+			ellipse 88% 52% at -10% 108%,
+			color-mix(in oklch, var(--theme-secondary) 38%, transparent) 0%,
+			transparent 48%
+		);
+	--theme-selection-bg: color-mix(in oklch, var(--theme-color) 40%, white);
+	--theme-selection-fg: oklch(0.18 0.06 293);
+	--theme-ring: color-mix(in oklch, var(--theme-color) 52%, white);
+	--theme-caret: var(--theme-color);
+	--theme-pointer-core: 13%;
+	--theme-pointer-core-mid: 4.5%;
+	--theme-light: color-mix(in oklch, var(--theme-color) 28%, transparent);
 }
 
 .theme-blue-1 {
@@ -367,6 +502,28 @@ body {
 	--theme-secondary: oklch(0.92 0.02 261.83);
 	--theme-sidebar: oklch(0.97 0.01 261.83);
 	--theme-white: oklch(0% 0 0);
+	--theme-from: oklch(0.58 0.13 255);
+	--theme-via: oklch(0.72 0.08 262);
+	--theme-to: oklch(0.48 0.16 268);
+	--theme-active-color: color-mix(in oklch, var(--theme-color) 38%, white);
+	--theme-bg-atmosphere:
+		radial-gradient(
+			ellipse 128% 76% at 102% -20%,
+			color-mix(in oklch, var(--theme-color) 30%, transparent) 0%,
+			transparent 56%
+		),
+		radial-gradient(
+			ellipse 86% 54% at -12% 104%,
+			color-mix(in oklch, var(--theme-secondary) 36%, transparent) 0%,
+			transparent 50%
+		);
+	--theme-selection-bg: color-mix(in oklch, var(--theme-color) 38%, white);
+	--theme-selection-fg: oklch(0.2 0.06 262);
+	--theme-ring: color-mix(in oklch, var(--theme-color) 50%, white);
+	--theme-caret: var(--theme-color);
+	--theme-pointer-core: 13%;
+	--theme-pointer-core-mid: 4.5%;
+	--theme-light: color-mix(in oklch, var(--theme-color) 28%, transparent);
 }
 
 .theme-blue-2 {
@@ -381,6 +538,28 @@ body {
 	--theme-secondary: oklch(0.92 0.02 248.83);
 	--theme-sidebar: oklch(0.97 0.01 248.83);
 	--theme-white: oklch(0% 0 0);
+	--theme-from: oklch(0.55 0.18 268);
+	--theme-via: oklch(0.68 0.12 272);
+	--theme-to: oklch(0.5 0.2 265);
+	--theme-active-color: color-mix(in oklch, var(--theme-color) 36%, white);
+	--theme-bg-atmosphere:
+		radial-gradient(
+			ellipse 126% 80% at 100% -24%,
+			color-mix(in oklch, var(--theme-color) 34%, transparent) 0%,
+			transparent 57%
+		),
+		radial-gradient(
+			ellipse 92% 56% at -8% 106%,
+			color-mix(in oklch, var(--theme-secondary) 34%, transparent) 0%,
+			transparent 49%
+		);
+	--theme-selection-bg: color-mix(in oklch, var(--theme-color) 36%, white);
+	--theme-selection-fg: oklch(0.22 0.08 268);
+	--theme-ring: color-mix(in oklch, var(--theme-color) 48%, white);
+	--theme-caret: var(--theme-color);
+	--theme-pointer-core: 13%;
+	--theme-pointer-core-mid: 4.5%;
+	--theme-light: color-mix(in oklch, var(--theme-color) 28%, transparent);
 }
 
 .theme-blue-3 {
@@ -395,6 +574,28 @@ body {
 	--theme-secondary: oklch(0.92 0.02 225.83);
 	--theme-sidebar: oklch(0.97 0.01 225.83);
 	--theme-white: oklch(0% 0 0);
+	--theme-from: oklch(0.52 0.12 220);
+	--theme-via: oklch(0.65 0.1 228);
+	--theme-to: oklch(0.48 0.14 215);
+	--theme-active-color: color-mix(in oklch, var(--theme-color) 38%, white);
+	--theme-bg-atmosphere:
+		radial-gradient(
+			ellipse 124% 74% at 103% -18%,
+			color-mix(in oklch, var(--theme-color) 28%, transparent) 0%,
+			transparent 55%
+		),
+		radial-gradient(
+			ellipse 80% 58% at -10% 100%,
+			color-mix(in oklch, var(--theme-secondary) 40%, transparent) 0%,
+			transparent 51%
+		);
+	--theme-selection-bg: color-mix(in oklch, var(--theme-color) 36%, white);
+	--theme-selection-fg: oklch(0.2 0.06 225);
+	--theme-ring: color-mix(in oklch, var(--theme-color) 46%, white);
+	--theme-caret: var(--theme-color);
+	--theme-pointer-core: 13%;
+	--theme-pointer-core-mid: 4.5%;
+	--theme-light: color-mix(in oklch, var(--theme-color) 28%, transparent);
 }
 
 .theme-green {
@@ -415,6 +616,29 @@ body {
 	--theme-text-from: oklch(19.9% 0.02356 154.589);
 	--theme-text-to: oklch(0.25 0.03 152.83);
 	--theme-white: oklch(0% 0 0);
+	--theme-bg-atmosphere:
+		radial-gradient(
+			ellipse 132% 76% at 98% -20%,
+			color-mix(in oklch, var(--theme-color) 30%, transparent) 0%,
+			transparent 56%
+		),
+		radial-gradient(
+			ellipse 88% 56% at -6% 104%,
+			color-mix(in oklch, var(--theme-from) 22%, transparent) 0%,
+			transparent 50%
+		),
+		radial-gradient(
+			ellipse 70% 45% at 70% 100%,
+			color-mix(in oklch, var(--theme-to) 16%, transparent) 0%,
+			transparent 46%
+		);
+	--theme-selection-bg: color-mix(in oklch, var(--theme-color) 42%, white);
+	--theme-selection-fg: oklch(0.16 0.05 145);
+	--theme-ring: color-mix(in oklch, var(--theme-color) 48%, white);
+	--theme-caret: var(--theme-color);
+	--theme-pointer-core: 13%;
+	--theme-pointer-core-mid: 4.5%;
+	--theme-light: color-mix(in oklch, var(--theme-color) 28%, transparent);
 }
 
 .theme-orange {
@@ -429,6 +653,28 @@ body {
 	--theme-secondary: oklch(94.19% 0.0256 94.764);
 	--theme-sidebar: oklch(97.599% 0.0122 91.527);
 	--theme-white: oklch(0% 0 0);
+	--theme-from: oklch(0.72 0.16 65);
+	--theme-via: oklch(0.82 0.12 75);
+	--theme-to: oklch(0.62 0.18 55);
+	--theme-active-color: color-mix(in oklch, var(--theme-color) 32%, white);
+	--theme-bg-atmosphere:
+		radial-gradient(
+			ellipse 128% 78% at 100% -22%,
+			color-mix(in oklch, var(--theme-color) 26%, transparent) 0%,
+			transparent 58%
+		),
+		radial-gradient(
+			ellipse 90% 50% at -8% 108%,
+			color-mix(in oklch, var(--theme-secondary) 32%, transparent) 0%,
+			transparent 48%
+		);
+	--theme-selection-bg: color-mix(in oklch, var(--theme-color) 34%, white);
+	--theme-selection-fg: oklch(0.22 0.06 55);
+	--theme-ring: color-mix(in oklch, var(--theme-color) 45%, white);
+	--theme-caret: oklch(0.55 0.14 55);
+	--theme-pointer-core: 12%;
+	--theme-pointer-core-mid: 4%;
+	--theme-light: color-mix(in oklch, var(--theme-from) 22%, transparent);
 }
 
 .theme-red {
@@ -443,6 +689,28 @@ body {
 	--theme-secondary: oklch(0.92 0.02 10.83);
 	--theme-sidebar: oklch(0.97 0.01 10.83);
 	--theme-white: oklch(0% 0 0);
+	--theme-from: oklch(0.58 0.18 18);
+	--theme-via: oklch(0.68 0.14 12);
+	--theme-to: oklch(0.52 0.2 25);
+	--theme-active-color: color-mix(in oklch, var(--theme-color) 38%, white);
+	--theme-bg-atmosphere:
+		radial-gradient(
+			ellipse 126% 76% at 104% -20%,
+			color-mix(in oklch, var(--theme-color) 30%, transparent) 0%,
+			transparent 57%
+		),
+		radial-gradient(
+			ellipse 84% 52% at -10% 102%,
+			color-mix(in oklch, var(--theme-secondary) 36%, transparent) 0%,
+			transparent 50%
+		);
+	--theme-selection-bg: color-mix(in oklch, var(--theme-color) 38%, white);
+	--theme-selection-fg: oklch(0.2 0.06 15);
+	--theme-ring: color-mix(in oklch, var(--theme-color) 48%, white);
+	--theme-caret: var(--theme-color);
+	--theme-pointer-core: 13%;
+	--theme-pointer-core-mid: 4.5%;
+	--theme-light: color-mix(in oklch, var(--theme-color) 28%, transparent);
 }
 
 .theme-beige {
@@ -457,6 +725,28 @@ body {
 	--theme-secondary: oklch(0.92 0.01 80.83);
 	--theme-sidebar: oklch(0.97 0.005 80.83);
 	--theme-white: oklch(0% 0 0);
+	--theme-from: oklch(0.62 0.06 75);
+	--theme-via: oklch(0.78 0.04 82);
+	--theme-to: oklch(0.52 0.08 70);
+	--theme-active-color: color-mix(in oklch, var(--theme-color) 35%, white);
+	--theme-bg-atmosphere:
+		radial-gradient(
+			ellipse 120% 72% at 96% -16%,
+			color-mix(in oklch, var(--theme-color) 24%, transparent) 0%,
+			transparent 54%
+		),
+		radial-gradient(
+			ellipse 92% 58% at -6% 100%,
+			color-mix(in oklch, var(--theme-secondary) 28%, transparent) 0%,
+			transparent 52%
+		);
+	--theme-selection-bg: color-mix(in oklch, var(--theme-color) 32%, white);
+	--theme-selection-fg: oklch(0.24 0.04 80);
+	--theme-ring: color-mix(in oklch, var(--theme-color) 42%, white);
+	--theme-caret: oklch(0.42 0.06 80);
+	--theme-pointer-core: 13%;
+	--theme-pointer-core-mid: 4.5%;
+	--theme-light: color-mix(in oklch, var(--theme-color) 26%, transparent);
 }
 
 /*
@@ -482,6 +772,7 @@ body.theme-beige {
 	--sidebar: var(--theme-sidebar);
 	--popover: var(--theme-card);
 	--accent: var(--theme-muted);
+	--ring: var(--theme-ring);
 }
 
 @theme inline {
@@ -547,6 +838,31 @@ body.theme-beige {
 		infinite;
 }
 
+/* 主布局：鼠标光圈透明度呼吸（layout data-gradient-container） */
+@keyframes pointer-glow-breathe {
+	0%,
+	100% {
+		opacity: 0.38;
+		filter: brightness(0.82);
+	}
+	50% {
+		opacity: 1;
+		filter: brightness(1.14);
+	}
+}
+
+[data-gradient-container] {
+	animation: pointer-glow-breathe 3s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	[data-gradient-container] {
+		animation: none;
+		opacity: 0.82;
+		filter: none;
+	}
+}
+
 @keyframes chat-stop-breathe {
 	0%,
 	100% {
@@ -584,5 +900,19 @@ body.theme-beige {
 	}
 	body {
 		@apply bg-background text-textcolor;
+	}
+	/* 文本选区与输入光标：随主题变量变化 */
+	::selection {
+		background-color: var(--theme-selection-bg);
+		color: var(--theme-selection-fg);
+	}
+	::-moz-selection {
+		background-color: var(--theme-selection-bg);
+		color: var(--theme-selection-fg);
+	}
+	input,
+	textarea,
+	[contenteditable="true"] {
+		caret-color: var(--theme-caret);
 	}
 }

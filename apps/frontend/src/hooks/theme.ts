@@ -135,7 +135,8 @@ export const useTheme = () => {
 	};
 
 	const applyThemeVariables = () => {
-		const themeStyles = getComputedStyle(document.documentElement);
+		/* 主题类挂在 body 上，需从 body 读取 --theme-*，避免 html 上仍是 :root 默认值 */
+		const themeStyles = getComputedStyle(document.body);
 		const themeBg = themeStyles.getPropertyValue('--theme-background').trim();
 		const themeCard = themeStyles.getPropertyValue('--theme-card').trim();
 		const themeMuted = themeStyles.getPropertyValue('--theme-muted').trim();
@@ -143,16 +144,21 @@ export const useTheme = () => {
 		const themeFg = themeStyles.getPropertyValue('--theme-foreground').trim();
 		const themeSec = themeStyles.getPropertyValue('--theme-secondary').trim();
 		const themeSidebar = themeStyles.getPropertyValue('--theme-sidebar').trim();
+		const themeRing = themeStyles.getPropertyValue('--theme-ring').trim();
 
-		document.documentElement.style.setProperty('--background', themeBg);
-		document.documentElement.style.setProperty('--card', themeCard);
-		document.documentElement.style.setProperty('--muted', themeMuted);
-		document.documentElement.style.setProperty('--border', themeBorder);
-		document.documentElement.style.setProperty('--foreground', themeFg);
-		document.documentElement.style.setProperty('--secondary', themeSec);
-		document.documentElement.style.setProperty('--sidebar', themeSidebar);
-		document.documentElement.style.setProperty('--popover', themeCard);
-		document.documentElement.style.setProperty('--accent', themeMuted);
+		const root = document.documentElement;
+		root.style.setProperty('--background', themeBg);
+		root.style.setProperty('--card', themeCard);
+		root.style.setProperty('--muted', themeMuted);
+		root.style.setProperty('--border', themeBorder);
+		root.style.setProperty('--foreground', themeFg);
+		root.style.setProperty('--secondary', themeSec);
+		root.style.setProperty('--sidebar', themeSidebar);
+		root.style.setProperty('--popover', themeCard);
+		root.style.setProperty('--accent', themeMuted);
+		if (themeRing) {
+			root.style.setProperty('--ring', themeRing);
+		}
 	};
 
 	const resetToDefaultTheme = () => {
@@ -183,6 +189,7 @@ export const useTheme = () => {
 			'--accent',
 			'oklch(0.967 0.003 264.542)',
 		);
+		document.documentElement.style.removeProperty('--ring');
 	};
 
 	const changeTheme = async (themeName: ThemeName, emit = true) => {
