@@ -100,6 +100,8 @@ const KnowledgeList: React.FC<IProps> = observer(
 
 		const [deleteLocalOpen, setDeleteLocalOpen] = useState(false);
 		const [deleteLocalPath, setDeleteLocalPath] = useState('');
+		/** 本地无文件或非 Tauri：仅删除数据库记录 */
+		const [deleteRecordOnlyOpen, setDeleteRecordOnlyOpen] = useState(false);
 		const [selectKnowledge, setSelectKnowledge] =
 			useState<KnowledgeListItem | null>(null);
 
@@ -127,7 +129,7 @@ const KnowledgeList: React.FC<IProps> = observer(
 		);
 
 		const handleDeleteApi = useCallback(
-			async (item: KnowledgeListItem) => {
+			async (item: KnowledgeListItem): Promise<boolean> => {
 				const res = await deleteKnowledge(item.id);
 				if (!res.success) {
 					Toast({
@@ -135,55 +137,50 @@ const KnowledgeList: React.FC<IProps> = observer(
 						title: '删除失败',
 						message: res.message || '请稍后重试',
 					});
-					return;
+					return false;
 				}
 				knowledgeStore.removeFromLocalList(item.id);
 				onDeletedRecord?.(item.id);
+				return true;
 			},
 			[knowledgeStore, onDeletedRecord],
 		);
 
-		/** 解析 Tauri 本地路径并弹出「删除本地文件」确认框 */
-		const openDeleteLocalConfirm = useCallback(
-			async (knowledge: KnowledgeListItem) => {
-				if (!isTauriRuntime()) {
-					Toast({
-						type: 'warning',
-						title: '删除本地文件仅在桌面端可用',
-					});
+		/**
+		 * 桌面端：有本地 Markdown 则弹「删本地+库」；无本地则弹「仅删数据库」。
+		 * 浏览器：仅弹「删数据库」。
+		 */
+		const openDeleteFlow = useCallback(async (knowledge: KnowledgeListItem) => {
+			if (!isTauriRuntime()) {
+				setDeleteRecordOnlyOpen(true);
+				return;
+			}
+			try {
+				const target = await invokeResolveKnowledgeMarkdownTarget({
+					title: knowledge.title ?? '',
+					content: '',
+					filePath: TAURI_KNOWLEDGE_DIR,
+				});
+				if (!target.exists) {
+					setDeleteRecordOnlyOpen(true);
 					return;
 				}
-				try {
-					const target = await invokeResolveKnowledgeMarkdownTarget({
-						title: knowledge.title ?? '',
-						content: '',
-						filePath: TAURI_KNOWLEDGE_DIR,
-					});
-					if (!target.exists) {
-						Toast({
-							type: 'warning',
-							title: '未找到对应文件',
-							message: '当前标题在指定目录下没有已保存的 Markdown 文件',
-						});
-						return;
-					}
-					setDeleteLocalPath(target.path);
-					setDeleteLocalOpen(true);
-				} catch (e) {
-					Toast({
-						type: 'error',
-						title: formatTauriInvokeError(e),
-					});
-				}
-			},
-			[],
-		);
+				setDeleteLocalPath(target.path);
+				setDeleteLocalOpen(true);
+			} catch (e) {
+				Toast({
+					type: 'error',
+					title: formatTauriInvokeError(e),
+				});
+			}
+		}, []);
 
 		/** 确认删除：先删数据库记录（若有选中项），再删本地 Markdown */
 		const onConfirmDeleteLocal = useCallback(async () => {
 			try {
 				if (selectKnowledge) {
-					await handleDeleteApi(selectKnowledge);
+					const dbOk = await handleDeleteApi(selectKnowledge);
+					if (!dbOk) return;
 				}
 				const result = await invokeDeleteKnowledgeMarkdown({
 					title: selectKnowledge?.title ?? '',
@@ -214,13 +211,22 @@ const KnowledgeList: React.FC<IProps> = observer(
 			}
 		}, [handleDeleteApi, onAfterLocalDelete, selectKnowledge]);
 
+		const onConfirmDeleteRecordOnly = useCallback(async () => {
+			if (!selectKnowledge) return;
+			const ok = await handleDeleteApi(selectKnowledge);
+			if (ok) {
+				setDeleteRecordOnlyOpen(false);
+				setSelectKnowledge(null);
+			}
+		}, [handleDeleteApi, selectKnowledge]);
+
 		const onTrashClick = useCallback(
 			async (e: React.MouseEvent, knowledge: KnowledgeListItem) => {
 				e.stopPropagation();
 				setSelectKnowledge(knowledge);
-				await openDeleteLocalConfirm(knowledge);
+				await openDeleteFlow(knowledge);
 			},
-			[openDeleteLocalConfirm],
+			[openDeleteFlow],
 		);
 
 		const deleteLocalFileName =
@@ -231,8 +237,34 @@ const KnowledgeList: React.FC<IProps> = observer(
 		const showLoadMoreHint = loadingMore;
 		const showEmptyHint = !loading && list.length === 0 && !loadingMore;
 
+		const deleteRecordTitle = selectKnowledge?.title?.trim() || '未命名';
+
 		return (
 			<>
+				<Confirm
+					open={deleteRecordOnlyOpen}
+					onOpenChange={(v) => {
+						setDeleteRecordOnlyOpen(v);
+						if (!v) setSelectKnowledge(null);
+					}}
+					title="删除知识库记录？"
+					description={
+						<>
+							{isTauriRuntime()
+								? '本地目录未找到对应文件，是否仅从数据库删除该条目？'
+								: '是否从数据库删除该条目？'}
+							<div className="mt-2 font-medium wrap-anywhere">
+								文件名称：「{deleteRecordTitle}」
+							</div>
+						</>
+					}
+					descriptionClassName="text-left"
+					confirmText="删除"
+					confirmVariant="destructive"
+					closeOnConfirm={false}
+					onConfirm={onConfirmDeleteRecordOnly}
+				/>
+
 				<Confirm
 					open={deleteLocalOpen}
 					onOpenChange={(v) => {
