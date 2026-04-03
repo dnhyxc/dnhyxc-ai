@@ -53,10 +53,6 @@ function normalizeMonacoEol(text: string): string {
 	return text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 }
 
-/** 中文 Markdown：系统黑体优先，减轻 IME 与拉丁等宽混排测量问题 */
-const MARKDOWN_EDITOR_FONT_STACK =
-	'ui-sans-serif, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", "Source Han Sans SC", "Fira Code", "SF Mono", Monaco, Menlo, Consolas, monospace';
-
 interface MarkdownEditorProps {
 	value?: string;
 	onChange?: (value: string) => void;
@@ -224,8 +220,10 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	}, [language, documentIdentity]);
 
 	/**
-	 * Markdown：换行后 wordWrap+automaticLayout 会反复重算折行，与透明底+IME 合成层叠画（首行无折行故正常）。
-	 * 关闭折行与部分装饰层，组合结束后再 layout，减轻第二行起重影。
+	 * Markdown：换行后 wordWrap+automaticLayout 会反复重算折行，与透明底+IME 合成层叠画。
+	 * 曾用「黑体优先 + disableMonospaceOptimizations」减轻重影，但比例字体会让 tab/空格列宽像「只有 1」；
+	 * 缩进与 options 一致：继承拉丁等宽在前的 fontFamily；Markdown 下与全局相同保留 disableMonospaceOptimizations: true 以偏 IME，
+	 * 若 Tab 列仍不齐可试改为 false（见 docs/monaco-markdown-ime-ghosting.md §4）。
 	 */
 	const mergedEditorOptions = useMemo(() => {
 		const base = { ...options, readOnly };
@@ -233,8 +231,8 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 			return {
 				...base,
 				placeholder,
-				fontFamily: MARKDOWN_EDITOR_FONT_STACK,
 				fontLigatures: false,
+				// 与 base 同为 true：关等宽快速路径，利于 IME；列对齐问题见文档 §4.2 B / §4.4
 				disableMonospaceOptimizations: true,
 				colorDecorators: false,
 				wordWrap: 'off' as const,
@@ -334,7 +332,6 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	const handleEditorMount = useCallback<OnMount>(
 		(editor, monaco) => {
 			editorRef.current = editor;
-
 			registerPrettierFormatProviders(monaco);
 
 			editor.addCommand(
@@ -506,7 +503,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 				>
 					{!isMarkdown || viewMode === 'edit' ? (
 						<Editor
-							key={monacoModelPath}
+							// key={monacoModelPath}
 							height={height}
 							language={language}
 							path={monacoModelPath}
@@ -537,7 +534,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 							>
 								<div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden border-r border-theme/10">
 									<Editor
-										key={monacoModelPath}
+										// key={monacoModelPath}
 										height="100%"
 										language={language}
 										path={monacoModelPath}

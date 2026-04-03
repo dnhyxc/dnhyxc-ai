@@ -1,6 +1,8 @@
 import type { OnMount } from '@monaco-editor/react';
 import type { Plugin } from 'prettier';
 
+import { MONACO_TAB_SIZE } from './options';
+
 /** 与 pangu 一致的 CJK Unicode 块，用于轻量「盘古之白」 */
 const PANGU_CJK =
 	'\u2E80-\u2EFF\u2F00-\u2FDF\u3040-\u309F\u30A0-\u30FA\u30FC-\u30FF\u3100-\u312F\u3200-\u32FF\u3400-\u4DBF\u4E00-\u9FFF\uF900-\uFAFF';
@@ -119,6 +121,8 @@ async function formatMarkdownWithPrettier(source: string): Promise<string> {
 		parser: 'markdown',
 		plugins,
 		...PRETTIER_CODE_OPTIONS,
+		useTabs: false,
+		tabWidth: MONACO_TAB_SIZE,
 	});
 	return spacingMarkdownProse(formatted);
 }

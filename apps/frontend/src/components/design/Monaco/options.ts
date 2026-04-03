@@ -2,6 +2,8 @@
 const EDITOR_FONT_STACK =
 	'"Fira Code", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", "Source Han Sans SC", "SF Mono", Monaco, Menlo, Consolas, monospace';
 
+export const MONACO_TAB_SIZE = 2;
+
 export const options: any = {
 	minimap: { enabled: false },
 	fontSize: 14,
@@ -20,6 +22,7 @@ export const options: any = {
 	quickSuggestions: false,
 	suggestOnTriggerCharacters: false,
 	tabSize: 2,
+	indentSize: 2,
 	folding: true,
 	foldingHighlight: true,
 	foldingStrategy: 'indentation' as const,
