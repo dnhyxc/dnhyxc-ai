@@ -68,7 +68,7 @@ function KnowledgeListRow(props: {
 					type="button"
 					aria-label="从知识库删除"
 					className={cn(
-						'cursor-pointer shrink-0 p-1 rounded-md text-textcolor/50 transition-opacity duration-150',
+						'cursor-pointer shrink-0 p-1 rounded-md text-textcolor/80 transition-opacity duration-150',
 						'opacity-0 pointer-events-none',
 						'hover:text-destructive hover:bg-destructive/10',
 						/* 仅 hover 显示：勿用 focus-within，否则抽屉打开时焦点落在首行会导致第一个删除钮常显 */
@@ -253,7 +253,7 @@ const KnowledgeList: React.FC<IProps> = observer(
 							{isTauriRuntime()
 								? '本地目录未找到对应文件，是否仅从数据库删除该条目？'
 								: '是否从数据库删除该条目？'}
-							<div className="mt-2 font-medium wrap-anywhere">
+							<div className="mt-2 font-medium text-base wrap-anywhere">
 								文件名称：「{deleteRecordTitle}」
 							</div>
 						</>
@@ -275,7 +275,7 @@ const KnowledgeList: React.FC<IProps> = observer(
 					description={
 						<>
 							确定要删除「{deleteLocalFileName}」吗？此操作不可撤销。
-							<div className="mt-2 block break-all text-xs opacity-80">
+							<div className="mt-2 block break-all text-sm opacity-80">
 								{deleteLocalPath}
 							</div>
 						</>

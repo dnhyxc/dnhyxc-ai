@@ -86,16 +86,21 @@ const Confirm = ({
 				/>
 				<AlertDialogPrimitive.Content
 					className={cn(
-						'bg-theme-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border border-theme/10 p-6 shadow-lg duration-200 sm:max-w-lg',
+						'bg-theme-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full min-w-0 max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border border-theme/10 p-6 shadow-lg duration-200 sm:max-w-lg',
 						className,
 					)}
 				>
-					<AlertDialogPrimitive.Title className="text-lg font-semibold">
+					<AlertDialogPrimitive.Title className="min-w-0 wrap-break-word text-lg font-semibold">
 						{title}
 					</AlertDialogPrimitive.Title>
 					{/* 使用 asChild + div：避免默认 <p> 内嵌 <div> 导致非法 DOM 与水合报错 */}
 					<AlertDialogPrimitive.Description asChild>
-						<div className={cn('text-textcolor text-md', descriptionClassName)}>
+						<div
+							className={cn(
+								'text-textcolor text-md min-w-0 wrap-anywhere',
+								descriptionClassName,
+							)}
+						>
 							{description}
 						</div>
 					</AlertDialogPrimitive.Description>
