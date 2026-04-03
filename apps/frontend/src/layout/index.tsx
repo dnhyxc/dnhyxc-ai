@@ -61,9 +61,9 @@ const Layout = () => {
 				<TooltipProvider>
 					<div
 						data-tauri-drag-region
-						className={`w-full h-full flex-1 flex-col justify-center items-center box-border px-7 pl-0 py-7 rounded-md`}
+						className={`box-border flex h-full w-full min-w-0 max-w-full flex-1 flex-col rounded-md px-7 py-7 pl-0`}
 					>
-						<div className="relative h-full w-full rounded-md bg-theme-secondary">
+						<div className="relative h-full w-full min-w-0 max-w-full rounded-md bg-theme-secondary">
 							<div
 								data-gradient-container
 								className="absolute rounded-md inset-0 overflow-hidden pointer-events-none will-change-[background,opacity,filter]"
@@ -78,7 +78,7 @@ const Layout = () => {
 								}}
 							/>
 							<Header />
-							<div className="box-border min-h-0 w-full h-[calc(100%-3.25rem)] overflow-y-auto overflow-x-hidden">
+							<div className="box-border h-[calc(100%-3.25rem)] min-h-0 min-w-0 w-full max-w-full overflow-x-hidden overflow-y-auto">
 								<Outlet />
 							</div>
 						</div>

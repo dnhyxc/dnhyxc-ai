@@ -4,11 +4,11 @@ import NavigationMenus from './menu';
 
 const Setting = () => {
 	return (
-		<div className="w-full h-full flex flex-col justify-center items-center m-0">
-			<div className="px-3 pb-7 pt-2.5 w-full flex items-center">
+		<div className="m-0 flex h-full min-h-0 w-full min-w-0 flex-col">
+			<div className="flex w-full shrink-0 items-center px-5 pb-5">
 				<NavigationMenus />
 			</div>
-			<ScrollArea className="w-full h-full overflow-y-auto rounded-none">
+			<ScrollArea className="h-full min-h-0 min-w-0 w-full flex-1 rounded-none">
 				<Outlet />
 			</ScrollArea>
 		</div>
