@@ -138,7 +138,7 @@ const SessionItem = memo<SessionItemProps>(
 				className={`line-clamp-1 group relative ${editItem?.id === item.id ? 'px-0 bg-theme/10 border border-theme/10' : 'px-2'} mb-1.5 hover:bg-theme/10 rounded-sm cursor-pointer flex items-center justify-between ${isActive ? 'bg-theme/10' : ''}`}
 				onClick={(e) => onSelect(e, item)}
 			>
-				{isLoading ? <Spinner className="w-4 h-4 mr-2 text-cyan-400" /> : null}
+				{isLoading ? <Spinner className="w-4 h-4 mr-2 text-teal-500" /> : null}
 				{editItem?.id === item.id ? (
 					<div className="flex items-center w-full h-10">
 						<Input
@@ -171,7 +171,7 @@ const SessionItem = memo<SessionItemProps>(
 				{editItem?.id === item.id ? (
 					<div className="absolute right-2 items-center hidden group-hover:flex">
 						<div
-							className="bg-theme-background p-1 rounded-sm hover:bg-blue-500"
+							className="bg-theme-background p-1 rounded-sm hover:bg-teal-500"
 							onClick={(e) => onSubmitEdit(e)}
 							onMouseDown={(e) => e.preventDefault()}
 						>
@@ -188,7 +188,7 @@ const SessionItem = memo<SessionItemProps>(
 				) : (
 					<div className="absolute right-2 items-center hidden group-hover:flex">
 						<div
-							className="bg-theme-background p-1 rounded-sm hover:bg-blue-500"
+							className="bg-theme-background p-1 rounded-sm hover:bg-teal-500"
 							onClick={(e) => onEdit(e, item)}
 						>
 							<SquarePen size={18} />

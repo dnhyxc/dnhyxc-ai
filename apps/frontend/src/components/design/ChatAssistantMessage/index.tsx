@@ -404,7 +404,7 @@ function ChatAssistantMessageInner({
 					{isStopped && (
 						<Button
 							variant="dynamic"
-							className="h-8.5 flex items-center ml-3 cursor-pointer text-sm text-cyan-400 hover:text-cyan-300 select-none bg-theme/5 hover:bg-theme/10 py-1.5 px-3 rounded-md"
+							className="h-8.5 flex items-center ml-3 cursor-pointer text-sm text-teal-400 hover:text-teal-300 select-none bg-theme/5 hover:bg-theme/10 py-1.5 px-3 rounded-md"
 							onClick={onContinue}
 						>
 							<Rotate3d size={16} className="mr-2" /> 继续生成
