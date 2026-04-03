@@ -68,6 +68,32 @@ function interpolatePreviewScrollTop(
 	);
 }
 
+/** 预览 scrollTop → 对应编辑器首可见行（与 interpolatePreviewScrollTop 互逆，按同一段锚点插值） */
+function interpolateLineFromPreviewScroll(
+	points: HeadingScrollPoint[],
+	previewScrollTop: number,
+	maxScroll: number,
+	lineCount: number,
+): number {
+	const y = Math.min(maxScroll, Math.max(0, previewScrollTop));
+	if (points.length < 2) {
+		return 1;
+	}
+	let i = 0;
+	while (i < points.length - 1 && points[i + 1].scrollTop < y) {
+		i++;
+	}
+	const a = points[i];
+	const b = points[Math.min(i + 1, points.length - 1)];
+	const ds = b.scrollTop - a.scrollTop;
+	if (Math.abs(ds) < 1e-6) {
+		return Math.min(lineCount, Math.max(1, a.line));
+	}
+	const t = clamp01((y - a.scrollTop) / ds);
+	const line = a.line + t * (b.line - a.line);
+	return Math.min(lineCount, Math.max(1, line));
+}
+
 export function isHeadingScrollCacheValid(
 	cache: HeadingScrollCache,
 	viewport: HTMLElement,
@@ -189,4 +215,63 @@ export function syncPreviewScrollFromMarkdownEditorByHeadings(
 		topLine,
 		maxScroll,
 	);
+}
+
+/**
+ * 按标题锚点反推：根据预览 `scrollTop` 将编辑器滚到对应首行（与 syncPreviewScrollFromMarkdownEditorByHeadings 对偶）。
+ */
+export function syncEditorScrollFromPreviewByHeadings(
+	editor: MonacoEditorInstance,
+	viewport: HTMLElement,
+	cacheRef?: { current: HeadingScrollCache | null },
+): void {
+	const model = editor.getModel();
+	if (!model) {
+		return;
+	}
+
+	const lineCount = model.getLineCount();
+	const maxPreview = Math.max(0, viewport.scrollHeight - viewport.clientHeight);
+	const y = viewport.scrollTop;
+
+	const layout = editor.getLayoutInfo();
+	const contentHeight = editor.getContentHeight();
+	const maxEditor = Math.max(0, contentHeight - layout.height);
+
+	const cache = cacheRef?.current;
+	if (cache && isHeadingScrollCacheValid(cache, viewport, lineCount)) {
+		if (cache.useRatioFallback) {
+			const ratio = maxPreview <= 0 ? 0 : clamp01(y / maxPreview);
+			editor.setScrollTop(ratio * maxEditor);
+			return;
+		}
+		const lineF = interpolateLineFromPreviewScroll(
+			cache.points,
+			y,
+			maxPreview,
+			lineCount,
+		);
+		const ln = Math.round(lineF);
+		editor.revealLineNearTop(ln);
+		return;
+	}
+
+	const built = buildHeadingScrollCache(viewport, lineCount);
+	if (cacheRef) {
+		cacheRef.current = built;
+	}
+
+	if (built.useRatioFallback) {
+		const ratio = maxPreview <= 0 ? 0 : clamp01(y / maxPreview);
+		editor.setScrollTop(ratio * maxEditor);
+		return;
+	}
+
+	const lineF = interpolateLineFromPreviewScroll(
+		built.points,
+		y,
+		maxPreview,
+		lineCount,
+	);
+	editor.revealLineNearTop(Math.round(lineF));
 }

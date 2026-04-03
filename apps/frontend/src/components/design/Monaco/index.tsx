@@ -13,6 +13,7 @@ import {
 import {
 	memo,
 	type RefObject,
+	type UIEvent,
 	useCallback,
 	useDeferredValue,
 	useEffect,
@@ -46,6 +47,7 @@ import {
 	buildHeadingScrollCache,
 	type HeadingScrollCache,
 	type MonacoEditorInstance,
+	syncEditorScrollFromPreviewByHeadings,
 	syncPreviewScrollFromMarkdownEditorByHeadings,
 } from './utils';
 
@@ -80,12 +82,15 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 	markdown,
 	viewportRef,
 	documentIdentity,
+	onViewportScrollFollow,
 }: {
 	markdown: string;
 	/** 分屏同步滚动：指向 ScrollArea 的 Viewport（Radix ref 落在 viewport 上） */
 	viewportRef?: RefObject<HTMLDivElement | null>;
 	/** 逻辑文档切换时重置预览滚动，避免沿用上一篇的 scrollTop */
 	documentIdentity?: string;
+	/** 分屏且开启跟随时：预览滚动时驱动编辑器对齐 */
+	onViewportScrollFollow?: () => void;
 }) {
 	const markdownRef = useRef<HTMLDivElement>(null);
 	const localViewportRef = useRef<HTMLDivElement | null>(null);
@@ -188,6 +193,14 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 		relayoutCodeToolbar();
 	}, [relayoutCodeToolbar]);
 
+	const handleViewportScroll = useCallback(
+		(_e: UIEvent<HTMLDivElement>) => {
+			syncScrollMetrics();
+			onViewportScrollFollow?.();
+		},
+		[syncScrollMetrics, onViewportScrollFollow],
+	);
+
 	useEffect(() => {
 		syncScrollMetrics();
 		const id = requestAnimationFrame(() => syncScrollMetrics());
@@ -203,7 +216,7 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 			<ScrollArea
 				ref={assignViewportRef}
 				scrollbars="both"
-				onScroll={syncScrollMetrics}
+				onScroll={handleViewportScroll}
 				className={cn(
 					'h-full min-h-0 min-w-0 max-w-full w-full bg-transparent',
 				)}
@@ -253,6 +266,12 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	const headingScrollCacheRef = useRef<HeadingScrollCache | null>(null);
 	/** 合并滚动同步到下一帧，避免 onDidScrollChange 高频读布局 */
 	const scrollSyncRafRef = useRef(0);
+	/** 预览滚动驱动编辑器的 rAF 合并 */
+	const previewToEditorRafRef = useRef(0);
+	/** 编辑器改预览 scrollTop 后，忽略下一波预览 scroll 回声，防双向打架 */
+	const suppressPreviewScrollEchoRef = useRef(false);
+	/** 预览改编辑器滚动后，忽略下一波 onDidScrollChange 回声 */
+	const suppressEditorScrollEchoRef = useRef(false);
 	/** ResizeObserver 回调合并到单帧，减轻分栏拖拽时连续测量 */
 	const previewResizeRafRef = useRef(0);
 	const markdownBottomBarId = useId();
@@ -380,17 +399,67 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 		);
 	}, []);
 
-	const alignPreviewScrollToEditor = useCallback(() => {
-		if (viewModeRef.current !== 'split') return;
+	/** 双 rAF 后清除抑制，跳过程序化滚动触发的对向同步 */
+	const scheduleClearSuppressPreviewEcho = useCallback(() => {
+		requestAnimationFrame(() => {
+			requestAnimationFrame(() => {
+				suppressPreviewScrollEchoRef.current = false;
+			});
+		});
+	}, []);
+
+	const scheduleClearSuppressEditorEcho = useCallback(() => {
+		requestAnimationFrame(() => {
+			requestAnimationFrame(() => {
+				suppressEditorScrollEchoRef.current = false;
+			});
+		});
+	}, []);
+
+	/** 按编辑器首可见行写预览 scrollTop（带预览侧回声抑制） */
+	const flushEditorScrollToPreviewSync = useCallback(() => {
 		const editor = editorRef.current;
 		const vp = previewViewportRef.current;
 		if (!editor || !vp) return;
-		syncPreviewScrollFromMarkdownEditorByHeadings(
-			editor,
-			vp,
-			headingScrollCacheRef,
-		);
-	}, []);
+		suppressPreviewScrollEchoRef.current = true;
+		try {
+			syncPreviewScrollFromMarkdownEditorByHeadings(
+				editor,
+				vp,
+				headingScrollCacheRef,
+			);
+		} finally {
+			scheduleClearSuppressPreviewEcho();
+		}
+	}, [scheduleClearSuppressPreviewEcho]);
+
+	const alignPreviewScrollToEditor = useCallback(() => {
+		if (viewModeRef.current !== 'split') return;
+		flushEditorScrollToPreviewSync();
+	}, [flushEditorScrollToPreviewSync]);
+
+	const syncEditorFromPreview = useCallback(() => {
+		if (suppressPreviewScrollEchoRef.current) return;
+		if (viewModeRef.current !== 'split' || !splitScrollFollowRef.current) {
+			return;
+		}
+		const editor = editorRef.current;
+		const vp = previewViewportRef.current;
+		if (!editor || !vp) return;
+		cancelAnimationFrame(previewToEditorRafRef.current);
+		previewToEditorRafRef.current = requestAnimationFrame(() => {
+			previewToEditorRafRef.current = 0;
+			const ed = editorRef.current;
+			const v = previewViewportRef.current;
+			if (!ed || !v) return;
+			suppressEditorScrollEchoRef.current = true;
+			try {
+				syncEditorScrollFromPreviewByHeadings(ed, v, headingScrollCacheRef);
+			} finally {
+				scheduleClearSuppressEditorEcho();
+			}
+		});
+	}, [scheduleClearSuppressEditorEcho]);
 
 	// 预览 HTML / 分屏开关变化后同步测量锚点；hljs 等异步增高后再测一帧
 	useLayoutEffect(() => {
@@ -435,14 +504,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 					) {
 						return;
 					}
-					const ed = editorRef.current;
-					const v = previewViewportRef.current;
-					if (!ed || !v) return;
-					syncPreviewScrollFromMarkdownEditorByHeadings(
-						ed,
-						v,
-						headingScrollCacheRef,
-					);
+					flushEditorScrollToPreviewSync();
 				});
 			});
 		});
@@ -457,9 +519,11 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 		splitPreviewScrollFollow,
 		isMarkdown,
 		rebuildHeadingPreviewScrollCache,
+		flushEditorScrollToPreviewSync,
 	]);
 
 	const syncPreviewFromEditor = useCallback(() => {
+		if (suppressEditorScrollEchoRef.current) return;
 		if (viewModeRef.current !== 'split' || !splitScrollFollowRef.current) {
 			return;
 		}
@@ -469,16 +533,9 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 		cancelAnimationFrame(scrollSyncRafRef.current);
 		scrollSyncRafRef.current = requestAnimationFrame(() => {
 			scrollSyncRafRef.current = 0;
-			const ed = editorRef.current;
-			const v = previewViewportRef.current;
-			if (!ed || !v) return;
-			syncPreviewScrollFromMarkdownEditorByHeadings(
-				ed,
-				v,
-				headingScrollCacheRef,
-			);
+			flushEditorScrollToPreviewSync();
 		});
-	}, []);
+	}, [flushEditorScrollToPreviewSync]);
 
 	const handleEditorMount = useCallback<OnMount>(
 		(editor, monaco) => {
@@ -579,6 +636,8 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 				cancelAnimationFrame(pushRaf);
 				cancelAnimationFrame(scrollSyncRafRef.current);
 				scrollSyncRafRef.current = 0;
+				cancelAnimationFrame(previewToEditorRafRef.current);
+				previewToEditorRafRef.current = 0;
 				for (const d of disposables) {
 					d.dispose();
 				}
@@ -719,6 +778,11 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 										markdown={deferredPreviewMarkdown}
 										documentIdentity={documentIdentity}
 										viewportRef={previewViewportRef}
+										onViewportScrollFollow={
+											splitPreviewScrollFollow
+												? syncEditorFromPreview
+												: undefined
+										}
 									/>
 								</div>
 							</ResizablePanel>
@@ -788,14 +852,14 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 								</button>
 							</Tooltip>
 							{viewMode === 'split' && (
-								<Tooltip content="跟随滚动">
+								<Tooltip content="跟随滚动：编辑与预览互相同步">
 									<button
 										type="button"
 										className={markdownBarIconBtnClass(
 											splitPreviewScrollFollow,
 										)}
 										aria-pressed={splitPreviewScrollFollow}
-										aria-label="跟随滚动"
+										aria-label="跟随滚动：编辑与预览互相同步"
 										onClick={() => setSplitPreviewScrollFollow((v) => !v)}
 									>
 										<ScrollText size={18} strokeWidth={1.75} />
