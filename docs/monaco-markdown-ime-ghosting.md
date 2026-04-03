@@ -1,6 +1,6 @@
 # Monaco Markdown 编辑器：中文 IME 重影 / 叠字问题与解决方案
 
-本文记录知识库等页面使用 `@monaco-editor/react` + 透明主题编辑 Markdown 时，**中文输入法（IME）** 出现**重影、拼音与汉字叠画、仅首行正常换行后必现**等问题的**成因**与**最终解决办法**；并单独说明与 IME 缓解方案相关的 **Tab / 缩进（`tabSize`）** 问题及处理（**§4**），便于后续维护与排查。
+本文记录知识库等页面使用 `@monaco-editor/react` + 透明主题编辑 Markdown 时，**中文输入法（IME）** 出现**重影、拼音与汉字叠画、仅首行正常换行后必现**等问题的**成因**与**最终解决办法**；并单独说明与 IME 缓解方案相关的 **Tab / 缩进（`tabSize`）** 问题及处理（**§4**）；以及分屏模式下 **「跟随滚动」** 如何按**标题锚点**与源码行号对齐预览（**§5**），便于后续维护与排查。
 
 ---
 
@@ -70,9 +70,11 @@ MobX/React 回显时，若 `value` 与编辑器当前内容一致但仍是「父
 
 相关代码主要在：
 
-- `apps/frontend/src/components/design/Monaco/index.tsx` — 主编排、IME、`mergedEditorOptions`、`Editor` 的 props  
+- `apps/frontend/src/components/design/Monaco/index.tsx` — 主编排、IME、`mergedEditorOptions`、`Editor` 的 props、分屏 **`onDidScrollChange`** 与 **`previewViewportRef`**  
+- `apps/frontend/src/components/design/Monaco/utils.ts` — **`syncPreviewScrollFromMarkdownEditorByHeadings`**、**`buildHeadingScrollCache`**、**`HeadingScrollCache`**，及比例回退 **`editorVerticalScrollRatio` / `setPreviewVerticalScrollRatio`**（详见 **§5**、**§5.8**）  
 - `apps/frontend/src/components/design/Monaco/glassTheme.ts` — 继承内置主题的透明 chrome 主题注册  
 - `apps/frontend/src/components/design/Monaco/options.ts` — 全局默认编辑器选项（Markdown 在 index 内再覆盖一部分）  
+- `packages/tools/src/markdown-parser.ts` — **`MarkdownParser`**；**`enableHeadingSourceLineAttr`** 为预览标题注入 **`data-md-heading-line`**（详见 **§5**）  
 - `apps/frontend/src/views/knowledge/index.tsx` — 传入 **`documentIdentity`**，保证换篇时 model 与引导文本一致  
 
 ### 3.1 数据流（概念）
@@ -185,14 +187,108 @@ Monaco 在插入 Tab 时，`CursorConfiguration` 使用 **`model.getOptions()`**
 
 ---
 
-## 5. 权衡与后续可调项
+## 5. 分屏「跟随滚动」：按标题锚点同步（实现逻辑）
+
+分屏（左编辑、右预览）开启 **「跟随滚动」** 时，右侧预览的 `scrollTop` **不再**简单按「编辑器已滚高度 / 编辑器可滚总高」的比例去乘预览可滚高度。原因是：源码一行对应预览里未必是同等像素高度（标题、列表、代码块、KaTeX、GFM 等块级结构高度差异大），**整篇比例同步**会出现「明明滚到某一节标题，预览却停在另一段中间」的错位感。
+
+当前实现改为：**以 Markdown 标题行为锚点**，在「文首 ↔ 各标题 ↔ 文末」之间用**源码行号**做一维插值，把编辑器**当前首可见行**映射到预览**垂直滚动位置**。核心代码在 `apps/frontend/src/components/design/Monaco/utils.ts` 的 **`syncPreviewScrollFromMarkdownEditorByHeadings`**（可选传入 **`headingScrollCacheRef`** 走热路径，见 **§5.8**），预览 DOM 行号由 `packages/tools` 的 **`MarkdownParser`** 在渲染标题时注入。
+
+### 5.1 预览侧：标题绑定源码行号（`data-md-heading-line`）
+
+- **`MarkdownParserOptions.enableHeadingSourceLineAttr`**（默认 `false`）：为 `true` 时，在 **`heading_open`** 渲染阶段给每个标题 token 写入属性 **`data-md-heading-line`**，值为 **`token.map[0] + 1`**（**1-based**，与 Monaco `ITextModel` 行号一致）。
+- `token.map` 来自 **markdown-it** 对块级 token 记录的源码行区间（起始行为 0-based），故 `+1` 后与 `editor.getVisibleRanges()[0].startLineNumber` 同一套坐标。
+- **ATX（`#`）与 Setext（下划线标题）** 只要解析为 `heading_open`，都会带该属性；**围栏代码块内**不会出现标题 token，因此不会误标。
+- 知识库 Monaco 内嵌的 **`ParserMarkdownPreviewPane`** 构造解析器时显式传入 **`enableHeadingSourceLineAttr: true`**（与 `enableChatCodeFenceToolbar` 等并列）；其它场景（如仅会话列表缩略预览）若未开启，则预览 HTML 无该属性，同步逻辑会走回退（见 5.5）。
+
+实现位置：`packages/tools/src/markdown-parser.ts` 中 **`patchHeadingSourceLineAttr`**（包装原有 `renderer.rules.heading_open`，在 `renderToken` 前 `taskListAttrSet(token, 'data-md-heading-line', ...)`）。
+
+### 5.2 编辑器侧：用「首可见行」代表当前阅读位置
+
+- 取 **`editor.getModel()`**；无 model 则直接回退（5.5）。
+- 取 **`editor.getVisibleRanges()[0].startLineNumber`** 作为 **`topLine`**（视口顶部对应的第一行）。未取到可见区时按行 1 处理。
+- 该信号表示用户当前**从哪一行开始看**，在标题锚点之间做插值时，语义是「阅读进度在源码行维度上落在哪一段」，而不是画布像素一比一对应。
+
+### 5.3 预览侧：锚点序列 `points` 的构造
+
+在右侧 **滚动视口** `viewport`（Radix `ScrollArea` 的 viewport 节点，`previewViewportRef` 指向该元素）内：
+
+1. **`querySelectorAll('[data-md-heading-line]')`**，读出每个标题元素的行号，按行号排序。
+2. **文首锚点**：`{ line: 1, scrollTop: 0 }`（文档顶对齐预览顶、不额外滚动）。
+3. **每个标题锚点**：对该 DOM 元素计算「若要把该标题顶边与视口顶边对齐，预览应使用的 **`scrollTop`**」。计算用 **`getBoundingClientRect`**：  
+   `scrollTopToAlign = viewport.scrollTop + (el.top - viewport.top)`  
+   该值与当前 `viewport.scrollTop` 无关，避免依赖 offsetParent 链；再 **`clamp` 到 `[0, maxScroll]`**，`maxScroll = scrollHeight - clientHeight`。
+4. **同一源码行多个标题元素**：按排序后顺序，若与上一点 **行号相同**，则 **合并**为更新上一点的 `scrollTop`（典型情况：**第一行就是 `# 标题`**，文首锚点与首标题行号均为 1，应用标题元素算出的 `scrollTop` 覆盖文首的 0）。
+5. **文末锚点**：`{ line: lineCount, scrollTop: maxScroll }`，其中 **`lineCount = model.getLineCount()`**。这样当用户滚到文档后部时，预览也会趋向底对齐。
+
+### 5.4 插值：在相邻锚点间按行号线性映射
+
+设排序后的锚点序列为 \(P_0, P_1, \ldots, P_k\)，每个 \(P_j = (\text{line}_j, \text{scrollTop}_j)\)，且 **`line` 单调不减**。
+
+1. 自 **`i = 0`** 起循环：在 **`i < points.length - 1`** 且 **`points[i + 1].line <= topLine`** 时执行 **`i++`**（**`topLine` 恰好等于下一锚点行号**时会进入下一段，使该段起点对应「标题顶对齐」的 **`scrollTop`**）。结束后取 **`a = points[i]`**、**`b = points[min(i + 1, length - 1)]`**；若已处于**文末锚点**且 **`a`** 与 **`b`** 重合，分母用 **`max(1, b.line - a.line)`** 避免除零。
+2. 令 **`a = points[i]`**，**`b = points[i+1]`**（若退化到同一点，则 `b` 与 `a` 相同，下面分母仍用 `max(1, b.line - a.line)` 避免除零）。
+3. 比例  
+   \[
+   t = \mathrm{clamp}_{[0,1]}\Bigl(\frac{\text{topLine} - a.\text{line}}{b.\text{line} - a.\text{line}}\Bigr)
+   \]
+4. 预览目标滚动：  
+   **`targetScrollTop = a.scrollTop + t × (b.scrollTop - a.scrollTop)`**，再 **`clamp` 到 `[0, maxScroll]`** 写回 **`viewport.scrollTop`**。
+
+直观理解：在**两个标题之间的源码区间**内，用户从上一标题行滚到下一标题行，预览在**对应两个标题 DOM 位置之间**按比例移动；**文首到第一个标题**、**最后一个标题到文末**同理。这样「跟节」比「跟整篇像素比例」稳定得多。
+
+### 5.5 回退：无标题或尚无 DOM 锚点时
+
+若 **没有 model**、或 **预览中没有任何带 `data-md-heading-line` 的元素**（正文无标题、或解析器未开注入、或预览尚未挂载完成），则退回到 **`editorVerticalScrollRatio` + `setPreviewVerticalScrollRatio`**：仍按**整篇垂直滚动比例**同步，与早期实现一致，避免完全失去联动。
+
+### 5.6 接线与时序（`index.tsx`）
+
+- **`previewViewportRef`**：传给 `ParserMarkdownPreviewPane` 的 **`viewportRef`**，与 Radix 内层可滚 viewport 绑定，保证读写的 `scrollTop` 作用在正确容器上。
+- **`headingScrollCacheRef`**：持有 **`HeadingScrollCache | null`**（见 **§5.8**），传给 **`syncPreviewScrollFromMarkdownEditorByHeadings` 的第三个参数**；退出分屏或关闭跟随时置 **`null`**，避免沿用过期测量。
+- **`splitPreviewScrollFollow`**：仅在为 **true** 且 **`viewMode === 'split'`** 时执行同步；**`viewModeRef` / `splitScrollFollowRef`** 供回调内读取最新状态，避免闭包陈旧。
+- **`useLayoutEffect`**（依赖 **`deferredPreviewMarkdown`、`viewMode`、`splitPreviewScrollFollow`、`isMarkdown`**）：在分屏且开启跟随时调用 **`rebuildHeadingPreviewScrollCache`**，并在 **`requestAnimationFrame` 内再测一帧**后执行 **`alignPreviewScrollToEditor`**，减轻 **highlight.js** 等异步撑高预览后锚点 **`scrollTop`** 偏差。
+- **`ResizeObserver`** 监听预览 **viewport**：分栏宽度变化时重建缓存并在 **rAF** 内再同步一次；观察器回调用 **`previewResizeRafRef`** **合并到单帧**，避免拖拽分隔条时连续触发多次全量 DOM 测量。
+- **`editor.onDidScrollChange`** → **`syncPreviewFromEditor`**：内部 **`cancelAnimationFrame` + `requestAnimationFrame`** 合并到**下一帧**再调用 **`syncPreviewScrollFromMarkdownEditorByHeadings(..., headingScrollCacheRef)`**。
+- **`alignPreviewScrollToEditor`**：与滚动同步共用上述 **`sync` + `cacheRef`** 调用方式。
+- **`editor.onDidDispose`**：取消挂起的 **`scrollSyncRafRef`**，避免卸载后仍改预览滚动。
+
+### 5.7 与 §2.7 的关系与局限
+
+- 预览仍由 **`useDeferredValue(value)`** 降低更新优先级（§2.7），**极端快速输入**时预览 HTML 可能略滞后于一帧，短时间内标题节点集合与编辑器行号可能短暂不一致；下一帧渲染完成后会自然对齐。
+- **局限**：插值在**源码行号**维度是线性的，**同一标题区间内**预览像素高度与行数仍不成正比，只能做到「区间对了、区间内大致跟随」；若需像素级对齐，需要更重的布局度量（例如逐行 Source Map 或块级映射表）。
+- **回归建议**：分屏开启跟随滚动，文档含多级 `#` 标题，从文首滚到文末，观察预览是否大致与当前章节同步；无标题短文应仍能整体比例滚动。
+
+### 5.8 性能与顺滑：`HeadingScrollCache`（滚动热路径）
+
+**问题**：若每次 **`onDidScrollChange`**（经 rAF）都执行 **§5.3** 的全流程，则每帧都会对预览 **`querySelectorAll('[data-md-heading-line]')`**，并对**每个标题**调用 **`getBoundingClientRect`**。Monaco 滚动事件很密，容易形成**高频布局读**，主线程吃紧时表现为预览跟随**发涩、掉帧**。
+
+**做法**：把「锚点测量」与「按 `topLine` 插值写 `scrollTop`」拆开。
+
+1. **冷路径 — `buildHeadingScrollCache(viewport, lineCount)`**（`utils.ts`）  
+   - 与原先单次同步相同：枚举标题节点、算各锚点 **`scrollTop`**、拼 **`points`**，并记录当时的 **`viewport.scrollHeight` / `clientHeight`**、**`lineCount`**。  
+   - 无标题时返回 **`useRatioFallback: true`**，热路径仍走整篇比例（**§5.5**）。
+
+2. **有效性 — `isHeadingScrollCacheValid(cache, viewport, lineCount)`**  
+   - 当且仅当 **`cache.lineCount === model.getLineCount()`** 且 **`scrollHeight` / `clientHeight` 与当前 viewport 一致** 时，认为缓存仍对应当前布局；否则丢弃缓存走冷路径。
+
+3. **热路径 — `syncPreviewScrollFromMarkdownEditorByHeadings(editor, viewport, cacheRef?)`**  
+   - 若传入 **`cacheRef`** 且 **`cacheRef.current` 有效**：只做 **`getVisibleRanges` → `interpolatePreviewScrollTop` → 赋值 `viewport.scrollTop`**，**不再**每帧扫 DOM。  
+   - 若无效或未传 ref：执行完整测量，并把新结果写回 **`cacheRef.current`**（下一帧起可走热路径）。
+
+4. **`index.tsx` 何时重建缓存**  
+   - **`useLayoutEffect`**：随 **`deferredPreviewMarkdown`、分屏、跟随开关** 重建；**双 rAF** 中的第二次测量兼顾代码高亮等导致的**滞后增高**。  
+   - **`ResizeObserver`**：预览区尺寸变化时重建，并对齐一次；回调经 **`previewResizeRafRef`** 合并，减轻**拖拽分栏**时的连续测量。
+
+**维护注意**：修改锚点 DOM 结构或标题属性名时，需同步 **`buildHeadingScrollCache`** 与 **`MarkdownParser`** 的注入约定；若新增会改变预览高度的异步内容（大图懒加载等），可能需在适当时机**主动 `rebuildHeadingPreviewScrollCache`**，否则短时内缓存与真实布局会偏差。
+
+---
+
+## 6. 权衡与后续可调项
 
 - **`wordWrap: 'off'`** 下，超长行需**横向滚动**。若产品强需求自动折行，可尝试 **`wordWrap: 'bounded'`** 或较大 **`wordWrapColumn`** 等折中，并在真机 IME 上回归。  
 - 玻璃主题仍使用**全透明**编辑区底色时，若在**仅换肤**场景再出现合成问题，可评估：换肤后强制 **`layout()`**，或改为读取设计 token 的**不透明**底色写入 `defineTheme`。
 
 ---
 
-## 6. 回归检查建议
+## 7. 回归检查建议
 
 1. 单行中文、连续组词。  
 2. **首行输入后回车**，在第二行、第三行再输入中文。  
@@ -200,13 +296,16 @@ Monaco 在插入 Tab 时，`CursorConfiguration` 使用 **`model.getOptions()`**
 4. 切换 **vs / vs-dark**（及页面明暗主题）。  
 5. **分屏预览**下快速输入（观察卡顿与视觉是否异常）。  
 6. **切换知识库条目**后内容是否与列表一致、无串篇。  
-7. **Tab / 格式化**：列表嵌套、代码围栏内缩进是否为 **2 空格** 宽度；`getModel().getOptions()` 中 `tabSize` / `indentSize` 是否与预期一致（参见 **§4**）。
+7. **Tab / 格式化**：列表嵌套、代码围栏内缩进是否为 **2 空格** 宽度；`getModel().getOptions()` 中 `tabSize` / `indentSize` 是否与预期一致（参见 **§4**）。  
+8. **分屏跟随滚动**：开启「跟随滚动」后，含多级标题的长文从顶滚到底，预览是否大致与当前章节对齐；**无标题**短文是否仍能整体联动；连续快速滚动时预览是否仍较顺滑（参见 **§5**，含 **§5.8** 缓存路径）。
 
 ---
 
-## 7. 修订记录
+## 8. 修订记录
 
 - 文档初稿：总结「受控回写 + 换行折行布局 + IME 时序 + 玻璃主题」等成因与当前代码中的对策。  
 - 增补 **§4**：Tab/缩进问题与 IME 方案的关联、`@monaco-editor/react` 建 model 时机、Prettier 与 `MONACO_TAB_SIZE`；修正 **§3.3** 中已过时的「中文优先 `fontFamily`」表述；原 §4–§6 顺延为 §5–§7。  
 - 代码为准：若 `index.tsx` / `options.ts` / `format.ts` / `glassTheme.ts` 与本文不一致，**以仓库实现优先**，并建议同步更新本节。  
-- **§6** 增补 Tab/缩进回归项；**§4.2 B、§4.3** 与 `index.tsx` 对齐（Markdown 下 `disableMonospaceOptimizations` 实际为 `true`）；修正 `index.tsx` 中与实现不符的注释。
+- **§6**（现 **§7**）增补 Tab/缩进回归项；**§4.2 B、§4.3** 与 `index.tsx` 对齐（Markdown 下 `disableMonospaceOptimizations` 实际为 `true`）；修正 `index.tsx` 中与实现不符的注释。  
+- 增补 **§5**：分屏「跟随滚动」按标题锚点与源码行号插值同步的实现说明（`MarkdownParser.enableHeadingSourceLineAttr`、`utils.ts` 插值、`index.tsx` 时序）；原 **§5–§7** 顺延为 **§6–§8**；**§7**（回归）增补跟随滚动检查项。  
+- 增补 **§5.8** 与 **§5.6** 修订：**`HeadingScrollCache`**、**`buildHeadingScrollCache`**、滚动热路径与冷路径；**`useLayoutEffect` + 双 rAF** 重建锚点；**`ResizeObserver` + `previewResizeRafRef`** 合并 resize；解决跟随滚动时每帧全量 DOM 测量导致的卡顿感。

@@ -35,25 +35,61 @@ function scrollTopToAlignElementTop(
 	return viewport.scrollTop + (er.top - vr.top);
 }
 
-type HeadingScrollPoint = { line: number; scrollTop: number };
+export type HeadingScrollPoint = { line: number; scrollTop: number };
 
 /**
- * 按标题（及文首/文末）分段插值同步预览滚动：编辑器当前首可见行落在哪两个锚点之间，就在预览对应垂直区间按比例对齐。
- * 无标题或预览中尚无 `data-md-heading-line` 时回退为整篇滚动比例同步。
+ * 跟随滚动缓存：在正文/视口尺寸未变时，滚动回调里只做插值 + 写 scrollTop，避免每帧 querySelector 与批量 getBoundingClientRect。
  */
-export function syncPreviewScrollFromMarkdownEditorByHeadings(
-	editor: MonacoEditorInstance,
-	viewport: HTMLElement,
-): void {
-	const model = editor.getModel();
-	if (!model) {
-		setPreviewVerticalScrollRatio(viewport, editorVerticalScrollRatio(editor));
-		return;
-	}
+export type HeadingScrollCache = {
+	points: HeadingScrollPoint[];
+	scrollHeight: number;
+	clientHeight: number;
+	lineCount: number;
+	/** 无标题等场景下始终用整篇比例同步 */
+	useRatioFallback: boolean;
+};
 
-	const lineCount = model.getLineCount();
-	const visible = editor.getVisibleRanges()[0];
-	const topLine = visible?.startLineNumber ?? 1;
+function interpolatePreviewScrollTop(
+	points: HeadingScrollPoint[],
+	topLine: number,
+	maxScroll: number,
+): number {
+	let i = 0;
+	while (i < points.length - 1 && points[i + 1].line <= topLine) {
+		i++;
+	}
+	const a = points[i];
+	const b = points[Math.min(i + 1, points.length - 1)];
+	const denom = Math.max(1, b.line - a.line);
+	const t = clamp01((topLine - a.line) / denom);
+	return Math.min(
+		maxScroll,
+		Math.max(0, a.scrollTop + t * (b.scrollTop - a.scrollTop)),
+	);
+}
+
+export function isHeadingScrollCacheValid(
+	cache: HeadingScrollCache,
+	viewport: HTMLElement,
+	lineCount: number,
+): boolean {
+	return (
+		cache.lineCount === lineCount &&
+		cache.scrollHeight === viewport.scrollHeight &&
+		cache.clientHeight === viewport.clientHeight
+	);
+}
+
+/**
+ * 测量预览 DOM，构建标题锚点缓存（在 layout 后或 ResizeObserver 中调用，勿放在每帧滚动里）。
+ */
+export function buildHeadingScrollCache(
+	viewport: HTMLElement,
+	lineCount: number,
+): HeadingScrollCache {
+	const scrollHeight = viewport.scrollHeight;
+	const clientHeight = viewport.clientHeight;
+	const maxScroll = Math.max(0, scrollHeight - clientHeight);
 
 	const headingEls = [
 		...viewport.querySelectorAll<HTMLElement>('[data-md-heading-line]'),
@@ -67,11 +103,14 @@ export function syncPreviewScrollFromMarkdownEditorByHeadings(
 		.sort((a, b) => a.line - b.line);
 
 	if (headingEls.length === 0) {
-		setPreviewVerticalScrollRatio(viewport, editorVerticalScrollRatio(editor));
-		return;
+		return {
+			points: [],
+			scrollHeight,
+			clientHeight,
+			lineCount,
+			useRatioFallback: true,
+		};
 	}
-
-	const maxScroll = Math.max(0, viewport.scrollHeight - viewport.clientHeight);
 
 	const points: HeadingScrollPoint[] = [{ line: 1, scrollTop: 0 }];
 	for (const { line, el } of headingEls) {
@@ -80,7 +119,6 @@ export function syncPreviewScrollFromMarkdownEditorByHeadings(
 			Math.max(0, scrollTopToAlignElementTop(viewport, el)),
 		);
 		const last = points[points.length - 1];
-		// 首行即标题时与文首锚点合并为同一行的预览 scrollTop
 		if (last.line === line) {
 			last.scrollTop = y;
 			continue;
@@ -89,15 +127,66 @@ export function syncPreviewScrollFromMarkdownEditorByHeadings(
 	}
 	points.push({ line: lineCount, scrollTop: maxScroll });
 
-	let i = 0;
-	while (i < points.length - 1 && points[i + 1].line <= topLine) {
-		i++;
+	return {
+		points,
+		scrollHeight,
+		clientHeight,
+		lineCount,
+		useRatioFallback: false,
+	};
+}
+
+/**
+ * 按标题（及文首/文末）分段插值同步预览滚动。
+ * 传入 **`cacheRef`** 且缓存与当前视口/行数一致时走热路径（无 DOM 枚举）；否则全量测量并写回缓存。
+ */
+export function syncPreviewScrollFromMarkdownEditorByHeadings(
+	editor: MonacoEditorInstance,
+	viewport: HTMLElement,
+	cacheRef?: { current: HeadingScrollCache | null },
+): void {
+	const model = editor.getModel();
+	if (!model) {
+		setPreviewVerticalScrollRatio(viewport, editorVerticalScrollRatio(editor));
+		return;
 	}
 
-	const a = points[i];
-	const b = points[Math.min(i + 1, points.length - 1)];
-	const denom = Math.max(1, b.line - a.line);
-	const t = clamp01((topLine - a.line) / denom);
-	const target = a.scrollTop + t * (b.scrollTop - a.scrollTop);
-	viewport.scrollTop = Math.min(maxScroll, Math.max(0, target));
+	const lineCount = model.getLineCount();
+	const visible = editor.getVisibleRanges()[0];
+	const topLine = visible?.startLineNumber ?? 1;
+	const maxScroll = Math.max(0, viewport.scrollHeight - viewport.clientHeight);
+
+	const cache = cacheRef?.current;
+	if (cache && isHeadingScrollCacheValid(cache, viewport, lineCount)) {
+		if (cache.useRatioFallback) {
+			setPreviewVerticalScrollRatio(
+				viewport,
+				editorVerticalScrollRatio(editor),
+			);
+			return;
+		}
+		viewport.scrollTop = interpolatePreviewScrollTop(
+			cache.points,
+			topLine,
+			maxScroll,
+		);
+		return;
+	}
+
+	// 冷路径：全量测量并刷新缓存
+	const built = buildHeadingScrollCache(viewport, lineCount);
+	if (cacheRef) {
+		cacheRef.current = built;
+	}
+
+	if (built.useRatioFallback) {
+		setPreviewVerticalScrollRatio(viewport, editorVerticalScrollRatio(editor));
+		return;
+	}
+
+	viewport.scrollTop = interpolatePreviewScrollTop(
+		built.points,
+		topLine,
+		maxScroll,
+	);
 }

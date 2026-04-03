@@ -17,6 +17,7 @@ import {
 	useDeferredValue,
 	useEffect,
 	useId,
+	useLayoutEffect,
 	useMemo,
 	useRef,
 	useState,
@@ -42,6 +43,8 @@ import { registerPrettierFormatProviders } from './format';
 import { GLASS_THEME_BY_UI, registerMonacoGlassThemes } from './glassTheme';
 import { options } from './options';
 import {
+	buildHeadingScrollCache,
+	type HeadingScrollCache,
 	type MonacoEditorInstance,
 	syncPreviewScrollFromMarkdownEditorByHeadings,
 } from './utils';
@@ -207,8 +210,12 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	const viewModeRef = useRef(viewMode);
 	const splitScrollFollowRef = useRef(splitPreviewScrollFollow);
 	const previewViewportRef = useRef<HTMLDivElement | null>(null);
+	/** 标题锚点测量缓存：滚动热路径只插值，避免每帧 querySelector + getBoundingClientRect */
+	const headingScrollCacheRef = useRef<HeadingScrollCache | null>(null);
 	/** 合并滚动同步到下一帧，避免 onDidScrollChange 高频读布局 */
 	const scrollSyncRafRef = useRef(0);
+	/** ResizeObserver 回调合并到单帧，减轻分栏拖拽时连续测量 */
+	const previewResizeRafRef = useRef(0);
 	const markdownBottomBarId = useId();
 
 	const isMarkdown = language === 'markdown' && enableMarkdownPreview;
@@ -302,23 +309,96 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 		splitScrollFollowRef.current = splitPreviewScrollFollow;
 	}, [splitPreviewScrollFollow]);
 
+	const rebuildHeadingPreviewScrollCache = useCallback(() => {
+		const vp = previewViewportRef.current;
+		const ed = editorRef.current;
+		if (!vp || !ed) return;
+		const model = ed.getModel();
+		if (!model) return;
+		headingScrollCacheRef.current = buildHeadingScrollCache(
+			vp,
+			model.getLineCount(),
+		);
+	}, []);
+
 	const alignPreviewScrollToEditor = useCallback(() => {
 		if (viewModeRef.current !== 'split') return;
 		const editor = editorRef.current;
 		const vp = previewViewportRef.current;
 		if (!editor || !vp) return;
-		syncPreviewScrollFromMarkdownEditorByHeadings(editor, vp);
+		syncPreviewScrollFromMarkdownEditorByHeadings(
+			editor,
+			vp,
+			headingScrollCacheRef,
+		);
 	}, []);
 
-	// 进入分屏或打开「跟随滚动」时，按编辑器位置对齐预览（仅当跟开启）
-	useEffect(() => {
-		if (viewMode !== 'split' || !splitPreviewScrollFollow) return;
-		queueMicrotask(() => {
-			if (viewModeRef.current !== 'split' || !splitScrollFollowRef.current)
+	// 预览 HTML / 分屏开关变化后同步测量锚点；hljs 等异步增高后再测一帧
+	useLayoutEffect(() => {
+		if (viewMode !== 'split' || !splitPreviewScrollFollow || !isMarkdown) {
+			headingScrollCacheRef.current = null;
+			return;
+		}
+		rebuildHeadingPreviewScrollCache();
+		const id = requestAnimationFrame(() => {
+			rebuildHeadingPreviewScrollCache();
+			if (viewModeRef.current !== 'split' || !splitScrollFollowRef.current) {
 				return;
+			}
 			alignPreviewScrollToEditor();
 		});
-	}, [viewMode, splitPreviewScrollFollow, alignPreviewScrollToEditor]);
+		return () => cancelAnimationFrame(id);
+	}, [
+		deferredPreviewMarkdown,
+		viewMode,
+		splitPreviewScrollFollow,
+		isMarkdown,
+		rebuildHeadingPreviewScrollCache,
+		alignPreviewScrollToEditor,
+	]);
+
+	// 分栏拖拽改变预览宽度时重建锚点并跟手对齐（rAF 合并，避免连续 resize 多次全量测量）
+	useEffect(() => {
+		if (viewMode !== 'split' || !splitPreviewScrollFollow || !isMarkdown) {
+			return;
+		}
+		const vp = previewViewportRef.current;
+		if (!vp) return;
+		const ro = new ResizeObserver(() => {
+			cancelAnimationFrame(previewResizeRafRef.current);
+			previewResizeRafRef.current = requestAnimationFrame(() => {
+				previewResizeRafRef.current = 0;
+				rebuildHeadingPreviewScrollCache();
+				requestAnimationFrame(() => {
+					if (
+						viewModeRef.current !== 'split' ||
+						!splitScrollFollowRef.current
+					) {
+						return;
+					}
+					const ed = editorRef.current;
+					const v = previewViewportRef.current;
+					if (!ed || !v) return;
+					syncPreviewScrollFromMarkdownEditorByHeadings(
+						ed,
+						v,
+						headingScrollCacheRef,
+					);
+				});
+			});
+		});
+		ro.observe(vp);
+		return () => {
+			ro.disconnect();
+			cancelAnimationFrame(previewResizeRafRef.current);
+			previewResizeRafRef.current = 0;
+		};
+	}, [
+		viewMode,
+		splitPreviewScrollFollow,
+		isMarkdown,
+		rebuildHeadingPreviewScrollCache,
+	]);
 
 	const syncPreviewFromEditor = useCallback(() => {
 		if (viewModeRef.current !== 'split' || !splitScrollFollowRef.current) {
@@ -333,7 +413,11 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 			const ed = editorRef.current;
 			const v = previewViewportRef.current;
 			if (!ed || !v) return;
-			syncPreviewScrollFromMarkdownEditorByHeadings(ed, v);
+			syncPreviewScrollFromMarkdownEditorByHeadings(
+				ed,
+				v,
+				headingScrollCacheRef,
+			);
 		});
 	}, []);
 
