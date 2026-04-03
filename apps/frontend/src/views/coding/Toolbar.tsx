@@ -49,7 +49,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
 					<DropdownMenuTrigger asChild>
 						<Button variant="link" className="px-0 has-[>svg]:px-0">
 							<PackagePlus />
-							<span className="mt-0.5">选择模版</span>
+							<span>选择模版</span>
 						</Button>
 					</DropdownMenuTrigger>
 					<DropdownMenuContent
@@ -99,12 +99,13 @@ const Toolbar: React.FC<ToolbarProps> = ({
 					disabled={sandpack.status !== 'running'}
 					className="ml-2 px-0 has-[>svg]:px-0 disabled:hover:text-textcolor/50"
 				>
-					<RotateCw className="mt-0.5" />
-					<span className="mt-0.5">强制刷新</span>
+					<RotateCw />
+					<span>强制刷新</span>
 				</Button>
 			</div>
-			<div className="font-medium text-textcolor">
-				当前语言：<span className="text-lg text-theme">{template}</span>
+			<div className="font-medium text-sm text-textcolor h-full flex items-center">
+				<span>当前语言：</span>
+				<span className="text-lg text-theme">{template}</span>
 			</div>
 		</div>
 	);

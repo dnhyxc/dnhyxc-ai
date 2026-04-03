@@ -17,7 +17,7 @@ const buttonVariants = cva(
 				secondary: 'bg-theme/20 text-textcolor hover:bg-theme/30',
 				ghost:
 					'hover:bg-theme/10 hover::text-textcolor dark:hover:bg-accent/50',
-				link: 'text-textcolor underline-offset-4 hover:text-cyan-500',
+				link: 'text-textcolor underline-offset-4 hover:text-teal-400/85',
 				dynamic:
 					'relative overflow-hidden hover:bg-theme/10 dark:hover:bg-accent/50 before:pointer-events-none before:absolute before:inset-0 before:z-0 before:content-[""] before:-translate-x-full before:bg-linear-to-r before:from-transparent before:via-white/30 before:to-transparent dark:before:via-white/12 before:transition-transform before:duration-500 before:ease-out hover:before:translate-x-full [&>*]:relative [&>*]:z-[1]',
 			},
