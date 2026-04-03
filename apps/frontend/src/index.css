@@ -404,7 +404,12 @@ body {
 		color-mix(in oklch, var(--theme-seed) 72%, white) 22%,
 		transparent
 	);
-	--theme-textcolor: color-mix(in oklch, white 94%, var(--theme-seed));
+	/*
+	 * 须用可序列化的 oklch 字面量：若用 color-mix，部分 WebView 上 getComputedStyle(body)
+	 * 对 --theme-textcolor 可能返回空串，theme.ts 无法写回 html，会残留上一主题的深色字。
+	 * 近似等价于 color-mix(in oklch, white 94%, var(--theme-seed))，seed L≈0.152。
+	 */
+	--theme-textcolor: oklch(0.949 0.0008 272);
 	--theme-default: oklch(0.08 0.01 264.665);
 	--theme-foreground: color-mix(in oklch, white 72%, var(--theme-seed));
 	--theme-secondary: color-mix(in oklch, var(--theme-seed) 92%, white);

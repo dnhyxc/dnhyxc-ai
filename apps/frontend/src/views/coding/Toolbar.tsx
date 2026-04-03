@@ -43,24 +43,24 @@ const Toolbar: React.FC<ToolbarProps> = ({
 	};
 
 	return (
-		<div className="h-11 flex justify-between gap-2 items-center rounded-t-md px-3 border-b border-theme/5">
-			<div className="flex gap-2 items-center">
+		<div className="flex h-11 items-center justify-between gap-2 rounded-t-md border-b border-theme/5 px-3">
+			<div className="flex items-center gap-2">
 				<DropdownMenu>
 					<DropdownMenuTrigger asChild>
-						<Button className="bg-transparent hover:bg-transparent hover:text-cyan-500 px-0 has-[>svg]:px-0">
+						<Button variant="link" className="px-0 has-[>svg]:px-0">
 							<PackagePlus />
 							<span className="mt-0.5">选择模版</span>
 						</Button>
 					</DropdownMenuTrigger>
 					<DropdownMenuContent
-						className="w-40 bg-theme-secondary text-textcolor max-h-80 border-theme/10"
+						className="w-40 max-h-80 border-theme/10 bg-theme-secondary text-textcolor"
 						align="start"
 					>
 						{TEMPLATES.map((i) => {
 							return (
 								<DropdownMenuItem
 									key={i}
-									className="hover:bg-amber-300"
+									className="text-textcolor focus:bg-theme/15 focus:text-textcolor"
 									onClick={() =>
 										onSelectTemplate(
 											i as unknown as keyof typeof SANDBOX_TEMPLATES,
@@ -75,8 +75,9 @@ const Toolbar: React.FC<ToolbarProps> = ({
 				</DropdownMenu>
 				{onTogglePreview && (
 					<Button
+						variant="link"
 						onClick={onTogglePreview}
-						className="bg-transparent hover:bg-transparent bg-linear-to-r from-blue-600 to-cyan-600"
+						className="text-textcolor hover:bg-theme/10 hover:text-theme"
 					>
 						{isPreviewVisible ? '👁️ 隐藏预览' : '👁️‍🗨️ 显示预览'}
 					</Button>
@@ -84,24 +85,26 @@ const Toolbar: React.FC<ToolbarProps> = ({
 
 				{onToggleConsole && (
 					<Button
+						variant="link"
 						onClick={onToggleConsole}
-						className="bg-transparent hover:bg-transparent bg-linear-to-r from-blue-600 to-cyan-600"
+						className="text-textcolor hover:bg-theme/10 hover:text-theme"
 					>
 						{isConsoleVisible ? '👁️ 隐藏日志' : '👁️‍🗨️ 显示日志'}
 					</Button>
 				)}
 
 				<Button
+					variant="link"
 					onClick={handleRun}
 					disabled={sandpack.status !== 'running'}
-					className="bg-transparent hover:bg-transparent hover:text-cyan-500 disabled:hover:text-default ml-2 px-0 has-[>svg]:px-0"
+					className="ml-2 px-0 has-[>svg]:px-0 disabled:hover:text-textcolor/50"
 				>
 					<RotateCw className="mt-0.5" />
 					<span className="mt-0.5">强制刷新</span>
 				</Button>
 			</div>
-			<div className="text-theme/90 font-medium">
-				当前语言：<span className="text-lg">{template}</span>
+			<div className="font-medium text-textcolor">
+				当前语言：<span className="text-lg text-theme">{template}</span>
 			</div>
 		</div>
 	);

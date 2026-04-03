@@ -10,6 +10,7 @@ import {
 import { ScrollArea } from '@radix-ui/react-scroll-area';
 import { motion } from 'framer-motion';
 import { useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
 	ResizableHandle,
 	ResizablePanel,
@@ -23,26 +24,34 @@ type TemplateKey = keyof typeof SANDBOX_TEMPLATES;
 interface SandpackWorkspaceProps {
 	template: TemplateKey;
 	setTemplate: (t: TemplateKey) => void;
+	/** 宿主须在 .sp-wrapper 外：Sandpack 根节点有 all:initial，会切断 --theme-* / --color-textcolor 继承 */
+	toolbarHost: HTMLDivElement | null;
 }
 
 /** 必须在 SandpackProvider 内，以便 useActiveCode / 编辑器 ref 生效 */
 const SandpackWorkspace = ({
 	template,
 	setTemplate,
+	toolbarHost,
 }: SandpackWorkspaceProps) => {
 	const editorRef = useRef<CodeEditorRef>(null);
 
+	// .sp-wrapper 常为 display:block，子级仅 flex-1 无法获得高度；用 h-full 占满父级分配高度
 	return (
-		<div className="flex flex-col h-full">
-			<Toolbar
-				editorRef={editorRef}
-				template={template}
-				setTemplate={setTemplate}
-			/>
-			<div className="flex flex-1 rounded-b-md overflow-hidden">
+		<div className="flex h-full min-h-0 w-full flex-col">
+			{toolbarHost &&
+				createPortal(
+					<Toolbar
+						editorRef={editorRef}
+						template={template}
+						setTemplate={setTemplate}
+					/>,
+					toolbarHost,
+				)}
+			<div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-b-md">
 				<ResizablePanelGroup
 					orientation="horizontal"
-					className="h-full w-full rounded-b-md"
+					className="h-full min-h-0 w-full flex-1 rounded-b-md"
 				>
 					{/* 左侧编辑器 */}
 					<ResizablePanel defaultSize="50%" className="w-full h-full">
@@ -89,6 +98,7 @@ const SandpackWorkspace = ({
 
 const CodeRunner = () => {
 	const [template, setTemplate] = useState<TemplateKey>('react');
+	const [toolbarHost, setToolbarHost] = useState<HTMLDivElement | null>(null);
 
 	return (
 		<div className="flex flex-1 flex-col h-full w-full rounded-b-md">
@@ -102,8 +112,9 @@ const CodeRunner = () => {
 						initial={{ opacity: 0, scale: 0.95 }}
 						animate={{ opacity: 1, scale: 1 }}
 						transition={{ duration: 0.5 }}
-						className="w-full h-full rounded-md border border-theme/5"
+						className="w-full h-full rounded-md border border-theme/5 box-border"
 					>
+						<div ref={setToolbarHost} className="shrink-0" />
 						<SandpackProvider
 							template={template}
 							theme="dark"
@@ -111,9 +122,10 @@ const CodeRunner = () => {
 								autorun: false,
 								recompileMode: 'immediate',
 							}}
-							className="h-full!"
+							className="h-[calc(100vh-174px)]!"
 						>
 							<SandpackWorkspace
+								toolbarHost={toolbarHost}
 								template={template}
 								setTemplate={setTemplate}
 							/>
