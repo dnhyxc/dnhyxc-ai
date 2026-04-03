@@ -104,6 +104,8 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 				enableChatCodeFenceToolbar: true,
 				// 分屏跟随滚动：预览标题带源码行号，与编辑器按标题区间对齐
 				enableHeadingSourceLineAttr: true,
+				// 目录 / `[文字](#slug)` 跳转：标题生成 id，点击在 ScrollArea 内 scrollIntoView
+				enableHeadingAnchorIds: true,
 			}),
 		[theme],
 	);
@@ -115,6 +117,32 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 		if (!el) return;
 		const onClick = (e: MouseEvent) => {
 			const target = e.target as HTMLElement;
+			if (!el.contains(target)) return;
+
+			// 页内锚点：预览在 Radix ScrollArea 内，默认 hash 跳转无效，改为在视口内 scrollIntoView
+			const link = target.closest<HTMLAnchorElement>('a[href^="#"]');
+			if (link) {
+				const href = link.getAttribute('href');
+				if (href && href.length > 1) {
+					const raw = href.slice(1);
+					const id = decodeURIComponent(raw.replace(/\+/g, ' '));
+					if (id) {
+						const root = el.querySelector('.markdown-body') ?? el;
+						let dest: Element | null = null;
+						try {
+							dest = root.querySelector(`#${CSS.escape(id)}`);
+						} catch {
+							dest = null;
+						}
+						if (dest instanceof HTMLElement) {
+							e.preventDefault();
+							dest.scrollIntoView({ behavior: 'smooth', block: 'start' });
+							return;
+						}
+					}
+				}
+			}
+
 			const btn = target.closest<HTMLButtonElement>('[data-chat-code-action]');
 			if (!btn || !el.contains(btn)) return;
 			const action = btn.getAttribute('data-chat-code-action');
@@ -173,7 +201,7 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 			>
 				<div className="box-border min-w-0 max-w-full w-full p-3">
 					<div
-						className="[&_.markdown-body]:min-w-0 [&_.markdown-body]:max-w-none [&_.markdown-body]:wrap-break-word [&_.markdown-body]:overflow-x-auto [&_.markdown-body]:bg-transparent! [&_.markdown-body]:text-textcolor/90! [&_.markdown-body_pre]:max-w-full [&_.markdown-body_pre]:overflow-x-auto [&_.markdown-body_table]:block [&_.markdown-body_table]:max-w-full [&_.markdown-body_table]:overflow-x-auto"
+						className="[&_.markdown-body]:min-w-0 [&_.markdown-body]:max-w-none [&_.markdown-body]:wrap-break-word [&_.markdown-body]:overflow-x-auto [&_.markdown-body]:bg-transparent! [&_.markdown-body]:text-textcolor/90! [&_.markdown-body_:is(h1,h2,h3,h4,h5,h6)]:scroll-mt-3 [&_.markdown-body_pre]:max-w-full [&_.markdown-body_pre]:overflow-x-auto [&_.markdown-body_table]:block [&_.markdown-body_table]:max-w-full [&_.markdown-body_table]:overflow-x-auto"
 						dangerouslySetInnerHTML={{ __html: html }}
 					/>
 				</div>

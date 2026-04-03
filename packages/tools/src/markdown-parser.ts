@@ -29,6 +29,51 @@ function taskListParentTokenIndex(tokens: Token[], index: number): number {
 	return -1;
 }
 
+/** markdown-it render(env) 上挂标题 slug 计数，供锚点 id 去重 */
+export type MarkdownRenderEnv = {
+	headingSlugCounts?: Record<string, number>;
+};
+
+/** 从 heading 后的 inline token 抽纯文本，用于生成与目录链接一致的 slug */
+function headingPlainTextFromInline(inlineToken: Token | undefined): string {
+	if (!inlineToken || inlineToken.type !== 'inline' || !inlineToken.content) {
+		return '';
+	}
+	let s = inlineToken.content;
+	s = s
+		.replace(/!\[([^\]]*)\]\([^)]*\)/g, '$1')
+		.replace(/\[([^\]]+)\]\([^)]*\)/g, '$1');
+	s = s.replace(/`+([^`]+)`+/g, '$1');
+	s = s.replace(/\*\*([^*]+)\*\*/g, '$1').replace(/\*([^*]+)\*/g, '$1');
+	s = s.replace(/__([^_]+)__/g, '$1').replace(/_([^_]+)_/g, '$1');
+	s = s.replace(/~~([^~]+)~~/g, '$1');
+	return s.trim();
+}
+
+/** 生成 HTML id（与常见 GFM 目录链接风格接近）；空标题用行号兜底 */
+function slugifyHeadingText(text: string, line1Based: number): string {
+	let base = text
+		.toLowerCase()
+		.replace(/[^\p{L}\p{N}\s\-_]/gu, '')
+		.trim()
+		.replace(/\s+/g, '-');
+	base = base.replace(/^-+/, '');
+	if (!base) {
+		base = `heading-${line1Based}`;
+	}
+	return base;
+}
+
+function nextHeadingAnchorId(base: string, env: MarkdownRenderEnv): string {
+	if (!env.headingSlugCounts) {
+		env.headingSlugCounts = {};
+	}
+	const counts = env.headingSlugCounts;
+	counts[base] = (counts[base] ?? 0) + 1;
+	const n = counts[base];
+	return n === 1 ? base : `${base}-${n - 1}`;
+}
+
 // 正文/公式样式仍建议 import '@dnhyxc-ai/tools/styles.css' 或 markdown-base.css。
 // 代码块主题可通过构造参数 highlightTheme（CDN）或 highlightThemeCss（内联）注入，亦可继续用手动 import。
 
@@ -67,6 +112,11 @@ export interface MarkdownParserOptions {
 	 * @default false
 	 */
 	enableHeadingSourceLineAttr?: boolean;
+	/**
+	 * 为标题写入 `id`（由标题纯文本 slug 化 + 重复时 `-1`、`-2`），供 `[目录](#xxx)` 页内跳转。
+	 * 需与 `render` 传入的 **env** 配合（本类 `render()` 已内置）；默认 false。
+	 */
+	enableHeadingAnchorIds?: boolean;
 }
 
 class MarkdownParser {
@@ -125,8 +175,8 @@ class MarkdownParser {
 			this.patchChatCodeFenceRenderer();
 		}
 
-		if (options.enableHeadingSourceLineAttr) {
-			this.patchHeadingSourceLineAttr();
+		if (options.enableHeadingSourceLineAttr || options.enableHeadingAnchorIds) {
+			this.patchHeadingPreviewAttrs(options);
 		}
 
 		const shouldInject = options.injectHighlightTheme !== false;
@@ -225,20 +275,33 @@ class MarkdownParser {
 		};
 	}
 
-	/** 为 heading_open 注入 `data-md-heading-line`，与 markdown-it 的 token.map 行号一致 */
-	private patchHeadingSourceLineAttr(): void {
+	/**
+	 * 为 heading_open 注入 `data-md-heading-line`、可选 `id`（目录锚点），与 markdown-it 的 token.map 一致。
+	 */
+	private patchHeadingPreviewAttrs(options: MarkdownParserOptions): void {
+		const wantLine = !!options.enableHeadingSourceLineAttr;
+		const wantId = !!options.enableHeadingAnchorIds;
 		const md = this.md;
 		const prev = md.renderer.rules.heading_open;
-		md.renderer.rules.heading_open = (tokens, idx, options, env, self) => {
+		md.renderer.rules.heading_open = (tokens, idx, opt, env, self) => {
 			const token = tokens[idx];
 			const map = token.map;
-			if (map) {
-				taskListAttrSet(token, 'data-md-heading-line', String(map[0] + 1));
+			const line1 = map ? map[0] + 1 : 1;
+			if (map && wantLine) {
+				taskListAttrSet(token, 'data-md-heading-line', String(line1));
+			}
+			if (map && wantId) {
+				const inline = tokens[idx + 1];
+				const plain = headingPlainTextFromInline(inline);
+				const base = slugifyHeadingText(plain, line1);
+				const renderEnv = env as MarkdownRenderEnv;
+				const id = nextHeadingAnchorId(base, renderEnv);
+				taskListAttrSet(token, 'id', id);
 			}
 			if (prev) {
-				return prev(tokens, idx, options, env, self);
+				return prev(tokens, idx, opt, env, self);
 			}
-			return self.renderToken(tokens, idx, options);
+			return self.renderToken(tokens, idx, opt);
 		};
 	}
 
@@ -256,7 +319,8 @@ class MarkdownParser {
 		const processedText = text.replace(/\\text{○}/g, '\\circ');
 
 		try {
-			const rawHtml = this.md.render(processedText);
+			const env: MarkdownRenderEnv = {};
+			const rawHtml = this.md.render(processedText, env);
 			// 关键：自动包裹一层 div，带上类名，让 github-markdown-css 生效
 			return `<div class="${this.containerClass}">${rawHtml}</div>`;
 		} catch (error) {

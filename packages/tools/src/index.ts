@@ -6,7 +6,10 @@ export {
 	applyHighlightJsTheme,
 	clearAppliedHighlightJsTheme,
 } from './inject-highlight-theme.js';
-export type { MarkdownParserOptions } from './markdown-parser.js';
+export type {
+	MarkdownParserOptions,
+	MarkdownRenderEnv,
+} from './markdown-parser.js';
 export { default as MarkdownParser } from './markdown-parser.js';
 export {
 	defaultHighlightJsThemeId,
