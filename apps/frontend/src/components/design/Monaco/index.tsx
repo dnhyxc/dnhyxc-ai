@@ -3,6 +3,8 @@ import { MarkdownParser } from '@dnhyxc-ai/tools';
 import Editor, { type BeforeMount, type OnMount } from '@monaco-editor/react';
 import { Button, ScrollArea } from '@ui/index';
 import {
+	ArrowDown,
+	ArrowUp,
 	BetweenHorizontalEnd,
 	BetweenHorizontalStart,
 	BetweenVerticalEnd,
@@ -71,6 +73,9 @@ function normalizeMonacoEol(text: string): string {
 	return text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 }
 
+/** 纯预览模式右下角：可滚动时显示置底，触底后切换为置顶 */
+type PreviewScrollCornerFabMode = 'hidden' | 'toBottom' | 'toTop';
+
 interface MarkdownEditorProps {
 	value?: string;
 	onChange?: (value: string) => void;
@@ -97,6 +102,7 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 	viewportRef,
 	documentIdentity,
 	onViewportScrollFollow,
+	showPreviewScrollCornerFab = false,
 }: {
 	markdown: string;
 	/** 分屏同步滚动：指向 ScrollArea 的 Viewport（Radix ref 落在 viewport 上） */
@@ -105,9 +111,13 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 	documentIdentity?: string;
 	/** 分屏且开启跟随时：预览滚动时驱动编辑器对齐 */
 	onViewportScrollFollow?: () => void;
+	/** 纯预览模式：右下角置底 / 触底后置顶浮动按钮 */
+	showPreviewScrollCornerFab?: boolean;
 }) {
 	const markdownRef = useRef<HTMLDivElement>(null);
 	const localViewportRef = useRef<HTMLDivElement | null>(null);
+	const [previewScrollFabMode, setPreviewScrollFabMode] =
+		useState<PreviewScrollCornerFabMode>('hidden');
 
 	const { theme } = useTheme();
 
@@ -134,6 +144,25 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 
 	const html = useMemo(() => parser.render(markdown), [parser, markdown]);
 
+	const refreshPreviewScrollFab = useCallback(() => {
+		if (!showPreviewScrollCornerFab) {
+			setPreviewScrollFabMode('hidden');
+			return;
+		}
+		const vp = localViewportRef.current;
+		if (!vp) return;
+		const { scrollTop, scrollHeight, clientHeight } = vp;
+		const maxScroll = scrollHeight - clientHeight;
+		if (maxScroll <= 4) {
+			setPreviewScrollFabMode('hidden');
+			return;
+		}
+		const threshold = 8;
+		setPreviewScrollFabMode(
+			scrollTop >= maxScroll - threshold ? 'toTop' : 'toBottom',
+		);
+	}, [showPreviewScrollCornerFab]);
+
 	useLayoutEffect(() => {
 		const vp = localViewportRef.current;
 		if (vp) {
@@ -141,6 +170,12 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 			vp.scrollLeft = 0;
 		}
 	}, [documentIdentity]);
+
+	// 换篇或开启角标后更新「置底/置顶」状态（勿与上一段合并，避免 refresh 回调变动时误重置滚动）
+	useLayoutEffect(() => {
+		if (!showPreviewScrollCornerFab) return;
+		requestAnimationFrame(() => refreshPreviewScrollFab());
+	}, [documentIdentity, showPreviewScrollCornerFab, refreshPreviewScrollFab]);
 
 	useEffect(() => {
 		const el = markdownRef.current;
@@ -211,8 +246,14 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 		(_e: UIEvent<HTMLDivElement>) => {
 			syncScrollMetrics();
 			onViewportScrollFollow?.();
+			if (showPreviewScrollCornerFab) refreshPreviewScrollFab();
 		},
-		[syncScrollMetrics, onViewportScrollFollow],
+		[
+			syncScrollMetrics,
+			onViewportScrollFollow,
+			showPreviewScrollCornerFab,
+			refreshPreviewScrollFab,
+		],
 	);
 
 	useEffect(() => {
@@ -221,10 +262,45 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 		return () => cancelAnimationFrame(id);
 	}, [markdown, syncScrollMetrics]);
 
+	// 正文变化 / 视口尺寸变化时更新「是否可滚、是否触底」
+	useEffect(() => {
+		if (!showPreviewScrollCornerFab) {
+			setPreviewScrollFabMode('hidden');
+			return;
+		}
+		let ro: ResizeObserver | null = null;
+		const tid = window.setTimeout(() => {
+			refreshPreviewScrollFab();
+			requestAnimationFrame(() => refreshPreviewScrollFab());
+			const vp = localViewportRef.current;
+			if (vp) {
+				ro = new ResizeObserver(() => refreshPreviewScrollFab());
+				ro.observe(vp);
+			}
+		}, 0);
+		return () => {
+			window.clearTimeout(tid);
+			ro?.disconnect();
+		};
+	}, [markdown, html, showPreviewScrollCornerFab, refreshPreviewScrollFab]);
+
+	const onPreviewScrollCornerFabClick = useCallback(() => {
+		const vp = localViewportRef.current;
+		if (!vp) return;
+		if (previewScrollFabMode === 'toBottom') {
+			vp.scrollTo({
+				top: vp.scrollHeight - vp.clientHeight,
+				behavior: 'smooth',
+			});
+		} else if (previewScrollFabMode === 'toTop') {
+			vp.scrollTo({ top: 0, behavior: 'smooth' });
+		}
+	}, [previewScrollFabMode]);
+
 	return (
 		<div
 			ref={markdownRef}
-			className="h-full min-h-0 min-w-0 max-w-full w-full overflow-hidden contain-[inline-size]"
+			className="relative h-full min-h-0 min-w-0 max-w-full w-full overflow-hidden contain-[inline-size]"
 		>
 			<ChatCodeFloatingToolbar />
 			<ScrollArea
@@ -244,6 +320,32 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 					/>
 				</div>
 			</ScrollArea>
+			{showPreviewScrollCornerFab && previewScrollFabMode !== 'hidden' ? (
+				<Tooltip
+					content={
+						previewScrollFabMode === 'toBottom' ? '滚动到底部' : '滚动到顶部'
+					}
+				>
+					<button
+						type="button"
+						className={cn(
+							// 与 ChatControls 滚动按钮一致，并加轻量 backdrop 滤镜（同 glassChip 的 blur）
+							'absolute bottom-2 right-2 z-99 flex h-8.5 w-8.5 cursor-pointer items-center justify-center rounded-full border border-theme/5 bg-theme/5 text-textcolor/90 backdrop-blur-[2px] hover:bg-theme/15',
+							'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme/40',
+						)}
+						aria-label={
+							previewScrollFabMode === 'toBottom' ? '滚动到底部' : '滚动到顶部'
+						}
+						onClick={onPreviewScrollCornerFabClick}
+					>
+						{previewScrollFabMode === 'toBottom' ? (
+							<ArrowDown aria-hidden />
+						) : (
+							<ArrowUp aria-hidden />
+						)}
+					</button>
+				</Tooltip>
+			) : null}
 		</div>
 	);
 });
@@ -783,6 +885,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 							<ParserMarkdownPreviewPane
 								markdown={deferredPreviewMarkdown}
 								documentIdentity={documentIdentity}
+								showPreviewScrollCornerFab
 							/>
 						</div>
 					) : null}
