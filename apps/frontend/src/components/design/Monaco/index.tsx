@@ -162,8 +162,7 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 				scrollbars="both"
 				onScroll={syncScrollMetrics}
 				className={cn(
-					'h-full min-h-0 min-w-0 max-w-full w-full',
-					theme === 'black' ? 'bg-[#1e1e1e]' : 'bg-white',
+					'h-full min-h-0 min-w-0 max-w-full w-full bg-transparent',
 				)}
 				// 覆盖 Radix 内层 display:table + minWidth:100%，否则 table 会按内容扩宽并顶破分栏
 				viewportClassName="[&>div]:!box-border [&>div]:!block [&>div]:!w-full [&>div]:!min-w-0 [&>div]:!max-w-full"
