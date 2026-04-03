@@ -3,6 +3,8 @@ import { MarkdownParser } from '@dnhyxc-ai/tools';
 import Editor, { type BeforeMount, type OnMount } from '@monaco-editor/react';
 import { Button, ScrollArea } from '@ui/index';
 import {
+	ChevronsLeft,
+	ChevronsRight,
 	Columns2,
 	Eye,
 	FilePenLine,
@@ -52,6 +54,18 @@ import {
 } from './utils';
 
 type MarkdownViewMode = 'edit' | 'preview' | 'split';
+
+/**
+ * 分屏跟滚（一次只开一种）：
+ * - previewFollowsEditor：右边预览跟随左边编辑；滚预览不带动编辑区
+ * - editorFollowsPreview：左边编辑跟随右边预览；滚编辑区不带动预览
+ * - bidirectional：双边跟随（编辑↔预览互相同步，带回声抑制）
+ */
+type MarkdownSplitScrollFollowMode =
+	| 'none'
+	| 'previewFollowsEditor'
+	| 'editorFollowsPreview'
+	| 'bidirectional';
 
 function normalizeMonacoEol(text: string): string {
 	return text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
@@ -255,12 +269,20 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	const lastEmittedRef = useRef(normalizeMonacoEol(value));
 	const prevDocumentIdentityRef = useRef(documentIdentity);
 	const [viewMode, setViewMode] = useState<MarkdownViewMode>('edit');
-	const [splitPreviewScrollFollow, setSplitPreviewScrollFollow] =
-		useState(false);
+	const [splitScrollFollowMode, setSplitScrollFollowMode] =
+		useState<MarkdownSplitScrollFollowMode>('none');
 	/** 底部 Markdown 操作条是否展开（由顶栏 toolbar 区域按钮切换） */
 	const [markdownBottomBarOpen, setMarkdownBottomBarOpen] = useState(false);
 	const viewModeRef = useRef(viewMode);
-	const splitScrollFollowRef = useRef(splitPreviewScrollFollow);
+	viewModeRef.current = viewMode;
+	const splitScrollFollowModeRef = useRef(splitScrollFollowMode);
+	// 与 useLayoutEffect / rAF 对齐：避免仅用 useEffect 写 ref 时滞后一帧
+	splitScrollFollowModeRef.current = splitScrollFollowMode;
+	const scrollFollowActive = splitScrollFollowMode !== 'none';
+	/** 预览侧是否监听 scroll 以驱动编辑器（单向左跟右 + 双边） */
+	const editorFollowsPreviewActive =
+		splitScrollFollowMode === 'editorFollowsPreview' ||
+		splitScrollFollowMode === 'bidirectional';
 	const previewViewportRef = useRef<HTMLDivElement | null>(null);
 	/** 标题锚点测量缓存：滚动热路径只插值，避免每帧 querySelector + getBoundingClientRect */
 	const headingScrollCacheRef = useRef<HeadingScrollCache | null>(null);
@@ -379,14 +401,6 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 		ed.updateOptions({ placeholder: next.trim() ? '' : placeholder });
 	}, [value, placeholder]);
 
-	useEffect(() => {
-		viewModeRef.current = viewMode;
-	}, [viewMode]);
-
-	useEffect(() => {
-		splitScrollFollowRef.current = splitPreviewScrollFollow;
-	}, [splitPreviewScrollFollow]);
-
 	const rebuildHeadingPreviewScrollCache = useCallback(() => {
 		const vp = previewViewportRef.current;
 		const ed = editorRef.current;
@@ -440,7 +454,11 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 
 	const syncEditorFromPreview = useCallback(() => {
 		if (suppressPreviewScrollEchoRef.current) return;
-		if (viewModeRef.current !== 'split' || !splitScrollFollowRef.current) {
+		const mode = splitScrollFollowModeRef.current;
+		if (
+			viewModeRef.current !== 'split' ||
+			(mode !== 'editorFollowsPreview' && mode !== 'bidirectional')
+		) {
 			return;
 		}
 		const editor = editorRef.current;
@@ -461,25 +479,44 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 		});
 	}, [scheduleClearSuppressEditorEcho]);
 
+	/**
+	 * 预览 onScroll 用稳定引用，避免 memo(ParserMarkdownPreviewPane) 在
+	 * editorFollowsPreview ↔ bidirectional 间因 props 浅比较相同而跳过重渲染，
+	 * 导致 handleViewportScroll 闭包陈旧、双边跟随不触发。
+	 */
+	const syncEditorFromPreviewRef = useRef(syncEditorFromPreview);
+	syncEditorFromPreviewRef.current = syncEditorFromPreview;
+	const dispatchViewportScrollFollow = useCallback(() => {
+		syncEditorFromPreviewRef.current();
+	}, []);
+
 	// 预览 HTML / 分屏开关变化后同步测量锚点；hljs 等异步增高后再测一帧
 	useLayoutEffect(() => {
-		if (viewMode !== 'split' || !splitPreviewScrollFollow || !isMarkdown) {
+		if (viewMode !== 'split' || !scrollFollowActive || !isMarkdown) {
 			headingScrollCacheRef.current = null;
 			return;
 		}
 		rebuildHeadingPreviewScrollCache();
 		const id = requestAnimationFrame(() => {
 			rebuildHeadingPreviewScrollCache();
-			if (viewModeRef.current !== 'split' || !splitScrollFollowRef.current) {
+			if (
+				viewModeRef.current !== 'split' ||
+				splitScrollFollowModeRef.current === 'none'
+			) {
 				return;
 			}
-			alignPreviewScrollToEditor();
+			// 「预览跟编辑」或双边时把预览滚到与编辑器一致；仅「编辑跟预览」时不改预览
+			const m = splitScrollFollowModeRef.current;
+			if (m === 'previewFollowsEditor' || m === 'bidirectional') {
+				alignPreviewScrollToEditor();
+			}
 		});
 		return () => cancelAnimationFrame(id);
 	}, [
 		deferredPreviewMarkdown,
 		viewMode,
-		splitPreviewScrollFollow,
+		splitScrollFollowMode,
+		scrollFollowActive,
 		isMarkdown,
 		rebuildHeadingPreviewScrollCache,
 		alignPreviewScrollToEditor,
@@ -487,7 +524,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 
 	// 分栏拖拽改变预览宽度时重建锚点并跟手对齐（rAF 合并，避免连续 resize 多次全量测量）
 	useEffect(() => {
-		if (viewMode !== 'split' || !splitPreviewScrollFollow || !isMarkdown) {
+		if (viewMode !== 'split' || !scrollFollowActive || !isMarkdown) {
 			return;
 		}
 		const vp = previewViewportRef.current;
@@ -500,11 +537,14 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 				requestAnimationFrame(() => {
 					if (
 						viewModeRef.current !== 'split' ||
-						!splitScrollFollowRef.current
+						splitScrollFollowModeRef.current === 'none'
 					) {
 						return;
 					}
-					flushEditorScrollToPreviewSync();
+					const m = splitScrollFollowModeRef.current;
+					if (m === 'previewFollowsEditor' || m === 'bidirectional') {
+						flushEditorScrollToPreviewSync();
+					}
 				});
 			});
 		});
@@ -516,7 +556,8 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 		};
 	}, [
 		viewMode,
-		splitPreviewScrollFollow,
+		splitScrollFollowMode,
+		scrollFollowActive,
 		isMarkdown,
 		rebuildHeadingPreviewScrollCache,
 		flushEditorScrollToPreviewSync,
@@ -524,7 +565,11 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 
 	const syncPreviewFromEditor = useCallback(() => {
 		if (suppressEditorScrollEchoRef.current) return;
-		if (viewModeRef.current !== 'split' || !splitScrollFollowRef.current) {
+		const mode = splitScrollFollowModeRef.current;
+		if (
+			viewModeRef.current !== 'split' ||
+			(mode !== 'previewFollowsEditor' && mode !== 'bidirectional')
+		) {
 			return;
 		}
 		const editor = editorRef.current;
@@ -779,8 +824,8 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 										documentIdentity={documentIdentity}
 										viewportRef={previewViewportRef}
 										onViewportScrollFollow={
-											splitPreviewScrollFollow
-												? syncEditorFromPreview
+											editorFollowsPreviewActive
+												? dispatchViewportScrollFollow
 												: undefined
 										}
 									/>
@@ -852,19 +897,67 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 								</button>
 							</Tooltip>
 							{viewMode === 'split' && (
-								<Tooltip content="跟随滚动：编辑与预览互相同步">
-									<button
-										type="button"
-										className={markdownBarIconBtnClass(
-											splitPreviewScrollFollow,
-										)}
-										aria-pressed={splitPreviewScrollFollow}
-										aria-label="跟随滚动：编辑与预览互相同步"
-										onClick={() => setSplitPreviewScrollFollow((v) => !v)}
-									>
-										<ScrollText size={18} strokeWidth={1.75} />
-									</button>
-								</Tooltip>
+								<>
+									<Tooltip content="右边跟随左边：滚动编辑区时预览同步；滚动预览时不带动编辑区">
+										<button
+											type="button"
+											className={markdownBarIconBtnClass(
+												splitScrollFollowMode === 'previewFollowsEditor',
+											)}
+											aria-pressed={
+												splitScrollFollowMode === 'previewFollowsEditor'
+											}
+											aria-label="右边跟随左边：预览跟随编辑滚动"
+											onClick={() =>
+												setSplitScrollFollowMode((m) =>
+													m === 'previewFollowsEditor'
+														? 'none'
+														: 'previewFollowsEditor',
+												)
+											}
+										>
+											<ChevronsRight size={18} strokeWidth={1.75} aria-hidden />
+										</button>
+									</Tooltip>
+									<Tooltip content="左边跟随右边：滚动预览时编辑区同步；滚动编辑区时不带动预览">
+										<button
+											type="button"
+											className={markdownBarIconBtnClass(
+												splitScrollFollowMode === 'editorFollowsPreview',
+											)}
+											aria-pressed={
+												splitScrollFollowMode === 'editorFollowsPreview'
+											}
+											aria-label="左边跟随右边：编辑区跟随预览滚动"
+											onClick={() =>
+												setSplitScrollFollowMode((m) =>
+													m === 'editorFollowsPreview'
+														? 'none'
+														: 'editorFollowsPreview',
+												)
+											}
+										>
+											<ChevronsLeft size={18} strokeWidth={1.75} aria-hidden />
+										</button>
+									</Tooltip>
+									<Tooltip content="双边跟随：编辑区与预览双向同步滚动（带回声抑制）">
+										<button
+											type="button"
+											className={markdownBarIconBtnClass(
+												splitScrollFollowMode === 'bidirectional',
+											)}
+											aria-pressed={splitScrollFollowMode === 'bidirectional'}
+											aria-label="双边跟随：编辑与预览互相同步滚动"
+											onClick={() =>
+												setSplitScrollFollowMode((m) =>
+													m === 'bidirectional' ? 'none' : 'bidirectional',
+												)
+											}
+										>
+											<ScrollText size={18} strokeWidth={1.75} aria-hidden />
+										</button>
+									</Tooltip>
+								</>
 							)}
 						</div>
 					</div>
