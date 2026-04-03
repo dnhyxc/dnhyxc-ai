@@ -3,14 +3,17 @@ import { MarkdownParser } from '@dnhyxc-ai/tools';
 import Editor, { type BeforeMount, type OnMount } from '@monaco-editor/react';
 import { Button, ScrollArea } from '@ui/index';
 import {
-	ChevronsLeft,
-	ChevronsRight,
+	BetweenHorizontalEnd,
+	BetweenHorizontalStart,
+	BetweenVerticalEnd,
 	Columns2,
 	Eye,
 	FilePenLine,
+	ListIndentIncrease,
 	PanelTopClose,
 	PanelTopOpen,
 	ScrollText,
+	StretchVertical,
 } from 'lucide-react';
 import {
 	memo,
@@ -898,7 +901,29 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 							</Tooltip>
 							{viewMode === 'split' && (
 								<>
-									<Tooltip content="右边跟随左边：滚动编辑区时预览同步；滚动预览时不带动编辑区">
+									<Tooltip content="双边跟随：编辑区与预览区双向同步滚动">
+										<button
+											type="button"
+											className={markdownBarIconBtnClass(
+												splitScrollFollowMode === 'bidirectional',
+											)}
+											aria-pressed={splitScrollFollowMode === 'bidirectional'}
+											aria-label="双边跟随：编辑与预览互相同步滚动"
+											onClick={() =>
+												setSplitScrollFollowMode((m) =>
+													m === 'bidirectional' ? 'none' : 'bidirectional',
+												)
+											}
+										>
+											<BetweenVerticalEnd
+												size={18}
+												strokeWidth={1.75}
+												aria-hidden
+											/>
+										</button>
+									</Tooltip>
+
+									<Tooltip content="右边跟随左边：滚动编辑区时预览区同步滚动">
 										<button
 											type="button"
 											className={markdownBarIconBtnClass(
@@ -916,10 +941,14 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 												)
 											}
 										>
-											<ChevronsRight size={18} strokeWidth={1.75} aria-hidden />
+											<BetweenHorizontalEnd
+												size={18}
+												strokeWidth={1.75}
+												aria-hidden
+											/>
 										</button>
 									</Tooltip>
-									<Tooltip content="左边跟随右边：滚动预览时编辑区同步；滚动编辑区时不带动预览">
+									<Tooltip content="左边跟随右边：滚动预览区时编辑区同步滚动">
 										<button
 											type="button"
 											className={markdownBarIconBtnClass(
@@ -937,24 +966,11 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 												)
 											}
 										>
-											<ChevronsLeft size={18} strokeWidth={1.75} aria-hidden />
-										</button>
-									</Tooltip>
-									<Tooltip content="双边跟随：编辑区与预览双向同步滚动（带回声抑制）">
-										<button
-											type="button"
-											className={markdownBarIconBtnClass(
-												splitScrollFollowMode === 'bidirectional',
-											)}
-											aria-pressed={splitScrollFollowMode === 'bidirectional'}
-											aria-label="双边跟随：编辑与预览互相同步滚动"
-											onClick={() =>
-												setSplitScrollFollowMode((m) =>
-													m === 'bidirectional' ? 'none' : 'bidirectional',
-												)
-											}
-										>
-											<ScrollText size={18} strokeWidth={1.75} aria-hidden />
+											<BetweenHorizontalStart
+												size={18}
+												strokeWidth={1.75}
+												aria-hidden
+											/>
 										</button>
 									</Tooltip>
 								</>

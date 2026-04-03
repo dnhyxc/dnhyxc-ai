@@ -1,6 +1,6 @@
 # Monaco Markdown 编辑器：中文 IME 重影 / 叠字问题与解决方案
 
-本文记录知识库等页面使用 `@monaco-editor/react` + 透明主题编辑 Markdown 时，**中文输入法（IME）** 出现**重影、拼音与汉字叠画、仅首行正常换行后必现**等问题的**成因**与**最终解决办法**；并单独说明与 IME 缓解方案相关的 **Tab / 缩进（`tabSize`）** 问题及处理（**§4**）；以及分屏模式下 **「跟随滚动」** 如何按**标题锚点**与源码行号对齐预览（**§5**）。**§2.8** 将根因、设计取舍与 **§3–§5** 的落代码方式串成**实现思路**，便于后续维护与排查。
+本文记录知识库等页面使用 `@monaco-editor/react` + 透明主题编辑 Markdown 时，**中文输入法（IME）** 出现**重影、拼音与汉字叠画、仅首行正常换行后必现**等问题的**成因**与**最终解决办法**；并单独说明与 IME 缓解方案相关的 **Tab / 缩进（`tabSize`）** 问题及处理（**§4**）；以及分屏模式下 **「跟随滚动」** 如何按**标题锚点**与源码行号对齐预览，并支持 **单向 / 双边** 三种跟滚模式与 **React `memo` 集成**（**§5**、**§5.11**）。**§2.8** 将根因、设计取舍与 **§3–§5** 的落代码方式串成**实现思路**，便于后续维护与排查。
 
 ---
 
@@ -115,8 +115,8 @@ MobX/React 回显时，若 `value` 与编辑器当前内容一致但仍是「父
 - **缓存何时失效**  
   行数变、预览 `scrollHeight`/`clientHeight` 变，说明排版或视口变了，锚点几何不再可信，必须重走冷路径（**§5.8**）。**`useDeferredValue`** 导致的一帧 HTML 滞后是已知局限（**§5.7**），接受「短时偏差、下一帧自愈」，避免为绝对精确引入更重 Source Map 方案。
 
-- **双向与回声抑制**  
-  正向：首可见行 → `topLine` → 预览 `scrollTop`。反向：预览 `scrollTop` → 反插值行号 → `revealLineNearTop`。两条边都会在对方产生「程序化滚动」事件，因此 **成对 `suppress*Ref` + 双 rAF 清除** 是 **环路打破** 的最小实现（**§5.9.3、§5.10.4**）。
+- **单向 vs 双边与回声抑制**  
+  正向：首可见行 → `topLine` → 预览 `scrollTop`。反向：预览 `scrollTop` → 反插值行号 → `revealLineNearTop`。产品在 UI 上拆成 **仅右跟左、仅左跟右、双边** 三种（**§5.11**）：单向模式下在入口函数里**直接不注册或不执行**对向同步，避免「只想滚一侧却被另一侧拽回去」；**双边**时两条边都启用，仍靠 **成对 `suppress*Ref` + 双 rAF 清除** 打破环路（**§5.9.3、§5.10.4**）。
 
 #### 2.8.5 预览与主线程：为何 `useDeferredValue`
 
@@ -128,7 +128,7 @@ MobX/React 回显时，若 `value` 与编辑器当前内容一致但仍是「父
 |--------------|----------|
 | 清单式文件与 props | **§3** |
 | Tab / Prettier / model 缩进 | **§4** |
-| 跟滚公式、缓存、双向与走读 | **§5、§5.10** |
+| 跟滚公式、缓存、模式 UI、`memo` 与走读 | **§5、§5.10、§5.11** |
 | 可调权衡 | **§6** |
 
 ---
@@ -256,11 +256,11 @@ Monaco 在插入 Tab 时，`CursorConfiguration` 使用 **`model.getOptions()`**
 
 ## 5. 分屏「跟随滚动」：按标题锚点同步（实现逻辑）
 
-分屏（左编辑、右预览）开启 **「跟随滚动」** 时，右侧预览的 `scrollTop` **不再**简单按「编辑器已滚高度 / 编辑器可滚总高」的比例去乘预览可滚高度。原因是：源码一行对应预览里未必是同等像素高度（标题、列表、代码块、KaTeX、GFM 等块级结构高度差异大），**整篇比例同步**会出现「明明滚到某一节标题，预览却停在另一段中间」的错位感。
+分屏（左编辑、右预览）在**任意一种跟滚模式**开启时，右侧预览的 `scrollTop` **不再**简单按「编辑器已滚高度 / 编辑器可滚总高」的比例去乘预览可滚高度。原因是：源码一行对应预览里未必是同等像素高度（标题、列表、代码块、KaTeX、GFM 等块级结构高度差异大），**整篇比例同步**会出现「明明滚到某一节标题，预览却停在另一段中间」的错位感。
 
-当前实现改为：**以 Markdown 标题行为锚点**，在「文首 ↔ 各标题 ↔ 文末」之间用**源码行号**与预览 **`scrollTop`** 做**分段线性映射**；并在开启跟随时 **双向联动**：**编辑器滚动 → 预览**（§5.2–§5.4、§5.8）、**预览滚动 → 编辑器**（**§5.9**）。两套方向共用同一套 **`HeadingScrollCache`** 与插值几何，另用 **回声抑制**（**§5.9**）避免程序化改一方滚动时触发对向回调形成环路。
+当前实现改为：**以 Markdown 标题行为锚点**，在「文首 ↔ 各标题 ↔ 文末」之间用**源码行号**与预览 **`scrollTop`** 做**分段线性映射**。同步方向由 **`MarkdownSplitScrollFollowMode`** 控制（**§5.11**）：**仅预览跟编辑**、**仅编辑跟预览**，或 **双边**（两侧互相同步，仍用 **§5.9.3** 回声抑制防环路）。两套方向的 **utils 层 API** 不变，共用 **`HeadingScrollCache`** 与插值几何。
 
-核心正向 API：`utils.ts` 的 **`syncPreviewScrollFromMarkdownEditorByHeadings`**；反向 API：**`syncEditorScrollFromPreviewByHeadings`**；预览 DOM 行号由 `packages/tools` 的 **`MarkdownParser`** 注入（§5.1）。**与源码逐行对照的走读**见 **§5.10**。
+核心正向 API：`utils.ts` 的 **`syncPreviewScrollFromMarkdownEditorByHeadings`**；反向 API：**`syncEditorScrollFromPreviewByHeadings`**；预览 DOM 行号由 `packages/tools` 的 **`MarkdownParser`** 注入（§5.1）。**与源码逐行对照的走读**见 **§5.10**；**模式门控、底部栏按钮、`memo` 与稳定回调**见 **§5.11**。
 
 ### 5.1 预览侧：标题绑定源码行号（`data-md-heading-line`）
 
@@ -310,15 +310,18 @@ Monaco 在插入 Tab 时，`CursorConfiguration` 使用 **`model.getOptions()`**
 ### 5.6 接线与时序（`index.tsx`）
 
 - **`previewViewportRef`**：传给 `ParserMarkdownPreviewPane` 的 **`viewportRef`**，与 Radix 内层可滚 viewport 绑定，保证读写的 `scrollTop` 作用在正确容器上。
-- **`headingScrollCacheRef`**：持有 **`HeadingScrollCache | null`**（见 **§5.8**），**正向 / 反向**同步函数均传入同一 **`cacheRef`**；退出分屏或关闭跟随时可置 **`null`**；**`documentIdentity` 换篇**时在 **`useLayoutEffect`** 中置 **`null`** 并重置预览与编辑器滚动（见下），避免沿用上一篇位置。
-- **`splitPreviewScrollFollow`**：仅在为 **true** 且 **`viewMode === 'split'`** 时启用双向跟随；**`viewModeRef` / `splitScrollFollowRef`** 供回调内读取最新状态，避免闭包陈旧。
-- **`flushEditorScrollToPreviewSync`**：封装 **编辑器 → 预览** 的 **`syncPreviewScrollFromMarkdownEditorByHeadings(..., headingScrollCacheRef)`**，并在写入预览 **`scrollTop` 前**置 **`suppressPreviewScrollEchoRef = true`**，在 **`finally`** 中调度 **双 `requestAnimationFrame`** 后清回 **`false`**（与 **§5.9** 回声抑制一致）。
-- **`syncPreviewFromEditor`**：**`onDidScrollChange`** 入口；若 **`suppressEditorScrollEchoRef`** 为 **true**（表示刚由预览驱动过编辑器滚动）则 **直接返回**；否则 **`cancelAnimationFrame` + `requestAnimationFrame`** 合并到下一帧再调 **`flushEditorScrollToPreviewSync`**。
-- **`syncEditorFromPreview`**：**预览 → 编辑器**；若 **`suppressPreviewScrollEchoRef`** 为 **true** 则返回；否则 **`previewToEditorRafRef`** 合并到下一帧后 **`suppressEditorScrollEchoRef = true`**，调用 **`syncEditorScrollFromPreviewByHeadings`**，再双 **rAF** 清除抑制。
-- **`ParserMarkdownPreviewPane`**：可选 **`onViewportScrollFollow`**；**`ScrollArea` 的 `onScroll`** 中先 **`syncScrollMetrics`**（代码块工具栏等），再调用该回调。仅当 **`splitPreviewScrollFollow`** 为 **true** 时传入 **`syncEditorFromPreview`**，关闭跟随时不传，避免纯预览模式无意义回调。
-- **`useLayoutEffect`**（依赖 **`deferredPreviewMarkdown`、`viewMode`、`splitPreviewScrollFollow`、`isMarkdown`**）：分屏且开启跟随时 **`rebuildHeadingPreviewScrollCache`**，双 **rAF** 后再 **`alignPreviewScrollToEditor`**（内部即 **`flushEditorScrollToPreviewSync`**）。
+- **`headingScrollCacheRef`**：持有 **`HeadingScrollCache | null`**（见 **§5.8**），**正向 / 反向**同步函数均传入同一 **`cacheRef`**；**`splitScrollFollowMode === 'none'`** 或退出分屏时逻辑上可不再依赖缓存（effect 内会置 **`null`**）；**`documentIdentity` 换篇**时在 **`useLayoutEffect`** 中置 **`null`** 并重置预览与编辑器滚动，避免沿用上一篇位置。
+- **`splitScrollFollowMode` / `MarkdownSplitScrollFollowMode`**：**`'none' | 'previewFollowsEditor' | 'editorFollowsPreview' | 'bidirectional'`**，一次只开一种；语义与 UI 见 **§5.11**。
+- **`splitScrollFollowModeRef` / `viewModeRef`**：在**每次 render** 末尾写 **`ref.current = state`**（与过去仅用 **`useEffect` 同步 ref** 相比），保证 **`useLayoutEffect` 及其内部 `requestAnimationFrame` 回调**读到与当前 UI 一致的跟滚模式，避免滞后一帧导致误判 **`'none'`** 或门控错误（**§5.11.5**）。
+- **`scrollFollowActive`**：派生量 **`splitScrollFollowMode !== 'none'`**；为 **true** 时才重建标题缓存、挂 **`ResizeObserver`** 等「跟滚基础设施」。
+- **`editorFollowsPreviewActive`**：派生量 **`mode === 'editorFollowsPreview' || mode === 'bidirectional'`**；为 **true** 时才向预览传入 **`onViewportScrollFollow`**（经 **§5.11.6** 的 **`dispatchViewportScrollFollow`** 转发，而非裸传 **`syncEditorFromPreview`**）。
+- **`flushEditorScrollToPreviewSync`**：封装 **编辑器 → 预览** 的 **`syncPreviewScrollFromMarkdownEditorByHeadings(..., headingScrollCacheRef)`**，写入预览 **`scrollTop` 前**置 **`suppressPreviewScrollEchoRef = true`**，**`finally`** 里 **双 rAF** 清除（**§5.9.3**）。
+- **`syncPreviewFromEditor`**：**`onDidScrollChange`** 入口；若 **`suppressEditorScrollEchoRef`** 为 **true** 则 **return**；若 **`splitScrollFollowModeRef.current`** 不是 **`previewFollowsEditor` 或 `bidirectional`** 则 **return**（单向「仅左跟右」时不应改预览）；否则 **rAF** 合并后 **`flushEditorScrollToPreviewSync`**。
+- **`syncEditorFromPreview`**：**预览 `scroll` → 编辑器**；若 **`suppressPreviewScrollEchoRef`** 为 **true** 则 **return**；若模式不是 **`editorFollowsPreview` 或 `bidirectional`** 则 **return**；否则 **rAF** 后 **`suppressEditorScrollEchoRef = true`**，**`syncEditorScrollFromPreviewByHeadings`**，再双 **rAF** 清除抑制。
+- **`ParserMarkdownPreviewPane`**：**`memo(...)`** 包裹；**`onViewportScrollFollow`** 见 **§5.11.6**。**`ScrollArea` 的 `onScroll`** 内先 **`syncScrollMetrics`**，再 **`onViewportScrollFollow?.()`**。
+- **`useLayoutEffect`**（依赖 **`deferredPreviewMarkdown`、`viewMode`、`splitScrollFollowMode`、`scrollFollowActive`、`isMarkdown`** 等）：分屏且 **`scrollFollowActive`** 时 **`rebuildHeadingPreviewScrollCache`**，双 **rAF** 后：若模式为 **`previewFollowsEditor` 或 `bidirectional`** 才 **`alignPreviewScrollToEditor`**；**仅 `editorFollowsPreview`** 时不调用，避免布局阶段把预览强行对齐到编辑区、破坏「只让编辑跟预览」的预期。
 - **`useLayoutEffect`（`documentIdentity`）**：换篇时 **`headingScrollCacheRef = null`**，**`previewViewportRef.scrollTop/Left = 0`**，若编辑器已挂载则 **`setScrollTop(0)` / `setScrollLeft(0)`**。
-- **`ResizeObserver`**：预览 **viewport** 尺寸变化 → **rAF 合并**后 **`rebuildHeadingPreviewScrollCache`**，再 **`flushEditorScrollToPreviewSync`**（与编辑器当前首行对齐）。
+- **`ResizeObserver`**：预览 **viewport** 尺寸变化 → **rAF 合并**后 **`rebuildHeadingPreviewScrollCache`**，下一 **rAF** 内仅当模式为 **`previewFollowsEditor` 或 `bidirectional`** 时 **`flushEditorScrollToPreviewSync`**（resize 时把预览与当前编辑首行对齐；纯「左跟右」模式不刷预览）。
 - **`alignPreviewScrollToEditor`**：分屏时调用 **`flushEditorScrollToPreviewSync`**。
 - **`editor.onDidDispose`**：取消 **`scrollSyncRafRef`** 与 **`previewToEditorRafRef`**，避免卸载后仍写对侧滚动。
 
@@ -326,7 +329,7 @@ Monaco 在插入 Tab 时，`CursorConfiguration` 使用 **`model.getOptions()`**
 
 - 预览仍由 **`useDeferredValue(value)`** 降低更新优先级（§2.7），**极端快速输入**时预览 HTML 可能略滞后于一帧，短时间内标题节点集合与编辑器行号可能短暂不一致；下一帧渲染完成后会自然对齐。
 - **局限**：插值在**源码行号**维度是线性的，**同一标题区间内**预览像素高度与行数仍不成正比，只能做到「区间对了、区间内大致跟随」；若需像素级对齐，需要更重的布局度量（例如逐行 Source Map 或块级映射表）。
-- **回归建议**：分屏开启跟随滚动，文档含多级 `#` 标题，从文首滚到文末，观察预览是否大致与当前章节同步；无标题短文应仍能整体比例滚动。
+- **回归建议**：分屏下按 **§5.11** 分别验证三种跟滚模式；文档含多级 `#` 标题，从文首滚到文末，观察预览 / 编辑是否大致与当前章节同步；无标题短文应仍能整体比例滚动。
 
 ### 5.8 性能与顺滑：`HeadingScrollCache`（滚动热路径）
 
@@ -346,8 +349,8 @@ Monaco 在插入 Tab 时，`CursorConfiguration` 使用 **`model.getOptions()`**
    - 若无效或未传 ref：执行完整测量，并把新结果写回 **`cacheRef.current`**（下一帧起可走热路径）。
 
 4. **`index.tsx` 何时重建缓存**  
-   - **`useLayoutEffect`**：随 **`deferredPreviewMarkdown`、分屏、跟随开关** 重建；**双 rAF** 中的第二次测量兼顾代码高亮等导致的**滞后增高**。  
-   - **`ResizeObserver`**：预览区尺寸变化时重建，并对齐一次；回调经 **`previewResizeRafRef`** 合并，减轻**拖拽分栏**时的连续测量。
+   - **`useLayoutEffect`**：随 **`deferredPreviewMarkdown`、分屏、`splitScrollFollowMode`（**`scrollFollowActive`**）** 重建；**双 rAF** 中的第二次测量兼顾代码高亮等导致的**滞后增高**；第二次 **rAF** 末尾是否 **`alignPreviewScrollToEditor`** 见 **§5.6 / §5.11.3**。  
+   - **`ResizeObserver`**：预览区尺寸变化时重建，并对齐一次；回调经 **`previewResizeRafRef`** 合并，减轻**拖拽分栏**时的连续测量；是否 **`flushEditorScrollToPreviewSync`** 见 **§5.11.3**。
 
 **维护注意**：修改锚点 DOM 结构或标题属性名时，需同步 **`buildHeadingScrollCache`** 与 **`MarkdownParser`** 的注入约定；若新增会改变预览高度的异步内容（大图懒加载等），可能需在适当时机**主动 `rebuildHeadingPreviewScrollCache`**，否则短时内缓存与真实布局会偏差。
 
@@ -372,7 +375,8 @@ Monaco 在插入 Tab 时，`CursorConfiguration` 使用 **`model.getOptions()`**
 - **`suppressPreviewScrollEchoRef`**：在 **编辑器驱动**、即将写入预览 **`scrollTop`** 前置 **true**；**`ParserMarkdownPreviewPane`** 的滚动回调开头若见 **true** 则 **不调用 `syncEditorFromPreview`**。清除时机：**双 `requestAnimationFrame`**（跳过同一更新周期内由本次写入触发的 scroll 事件）。实现上由 **`scheduleClearSuppressPreviewEcho`** 调度。  
 - **`suppressEditorScrollEchoRef`**：在 **预览驱动**、即将 **`revealLineNearTop`** 前置 **true**；**`syncPreviewFromEditor`** 开头若见 **true** 则 **不**再写预览。清除由 **`scheduleClearSuppressEditorEcho`** 双 **rAF** 完成。
 
-**`flushEditorScrollToPreviewSync`** 统一包裹「置 **`suppressPreviewScrollEchoRef` → 调正向 sync → 调度清除**」，供 **`syncPreviewFromEditor`、`alignPreviewScrollToEditor`、`ResizeObserver`** 等路径复用，避免漏设抑制。
+**`flushEditorScrollToPreviewSync`** 统一包裹「置 **`suppressPreviewScrollEchoRef` → 调正向 sync → 调度清除**」，供 **`syncPreviewFromEditor`、`alignPreviewScrollToEditor`、`ResizeObserver`** 等路径复用，避免漏设抑制。  
+在 **`previewFollowsEditor` / `bidirectional`** 下会走上述正向链；**仅 `editorFollowsPreview`** 时不在布局 / resize 路径强行 **`flush`**，避免破坏单向语义（**§5.6、§5.11.3**）。
 
 #### 5.9.4 与 §5.8 的关系
 
@@ -410,7 +414,10 @@ Monaco 在插入 Tab 时，`CursorConfiguration` 使用 **`model.getOptions()`**
 | **`previewToEditorRafRef`** | 合并预览 **`scroll`** 触发的反向同步。 |
 | **`suppressPreviewScrollEchoRef`** | **`true`** 表示「即将或正在由编辑器程序化改预览 **`scrollTop`**」，**`syncEditorFromPreview`** 开头见则 **return**。 |
 | **`suppressEditorScrollEchoRef`** | **`true`** 表示「即将或正在由预览程序化改编辑器滚动」，**`syncPreviewFromEditor`** 开头见则 **return**。 |
-| **`viewModeRef` / `splitScrollFollowRef`** | 与 **`viewMode` / `splitPreviewScrollFollow`** 同步，供滚动回调读**最新**开关状态，避免闭包陈旧。 |
+| **`viewModeRef`** | 每轮 render 写 **`viewModeRef.current = viewMode`**，供 **`alignPreviewScrollToEditor`** 等与 **`onDidScrollChange` 异步回调**读最新分屏状态。 |
+| **`splitScrollFollowModeRef`** | 每轮 render 写 **`splitScrollFollowModeRef.current = splitScrollFollowMode`**；**`syncPreviewFromEditor` / `syncEditorFromPreview`** 内读 **`.current`** 做模式门控，避免依赖挂载时闭包里的旧模式。 |
+| **`syncEditorFromPreviewRef`** | 每轮 render 赋 **`current = syncEditorFromPreview`**，供 **`dispatchViewportScrollFollow`** 转发到**最新**回调实现（**§5.11.6**）。 |
+| **`dispatchViewportScrollFollow`** | **`useCallback` 且依赖数组 `[]`**：体为 **`syncEditorFromPreviewRef.current()`**；作为 **`onViewportScrollFollow`** 传入预览，**引用稳定**，缓解 **`memo(ParserMarkdownPreviewPane)`** 与单向/双边切换时的重渲染问题。 |
 
 #### 5.10.3 `index.tsx`：核心回调如何拼在一起
 
@@ -424,29 +431,31 @@ Monaco 在插入 Tab 时，`CursorConfiguration` 使用 **`model.getOptions()`**
    **`suppressPreviewScrollEchoRef = true`** → **`try { syncPreviewScrollFromMarkdownEditorByHeadings(editor, vp, headingScrollCacheRef) }`** → **`finally { scheduleClearSuppressPreviewEcho() }`**。所有「应把预览拉到与编辑器一致」的入口应走此函数，避免漏设抑制。
 
 4. **`syncPreviewFromEditor`**  
-   若 **`suppressEditorScrollEchoRef`** → **return**。若非分屏或未开跟随 → **return**。**`cancelAnimationFrame(scrollSyncRafRef)`** 后 **`requestAnimationFrame`** 里调 **`flushEditorScrollToPreviewSync`**。
+   若 **`suppressEditorScrollEchoRef`** → **return**。若 **`viewModeRef` 非 split** 或 **`splitScrollFollowModeRef.current`** 非 **`previewFollowsEditor` / `bidirectional`** → **return**。**`cancelAnimationFrame(scrollSyncRafRef)`** 后 **`requestAnimationFrame`** 里调 **`flushEditorScrollToPreviewSync`**。
 
 5. **`syncEditorFromPreview`**  
-   若 **`suppressPreviewScrollEchoRef`** → **return**。若分屏/跟随不满足 → **return**。**`cancelAnimationFrame(previewToEditorRafRef)`** 后 **`requestAnimationFrame`** 内：**`suppressEditorScrollEchoRef = true`** → **`try { syncEditorScrollFromPreviewByHeadings(ed, v, headingScrollCacheRef) }`** → **`finally { scheduleClearSuppressEditorEcho() }`**。
+   若 **`suppressPreviewScrollEchoRef`** → **return**。若 **`splitScrollFollowModeRef.current`** 非 **`editorFollowsPreview` / `bidirectional`** → **return**。**`cancelAnimationFrame(previewToEditorRafRef)`** 后 **`requestAnimationFrame`** 内：**`suppressEditorScrollEchoRef = true`** → **`try { syncEditorScrollFromPreviewByHeadings(ed, v, headingScrollCacheRef) }`** → **`finally { scheduleClearSuppressEditorEcho() }`**。
 
 6. **`handleEditorMount`**  
-   **`editor.onDidScrollChange(() => syncPreviewFromEditor())`**；**`onDidDispose`** 里 **`cancelAnimationFrame`** **`scrollSyncRafRef` 与 `previewToEditorRafRef`**，防止卸载后仍调度。
+   **`editor.onDidScrollChange(() => syncPreviewFromEditor())`**（**`syncPreviewFromEditor`** 自身再按模式短路）；**`onDidDispose`** 里 **`cancelAnimationFrame`** **`scrollSyncRafRef` 与 `previewToEditorRafRef`**，防止卸载后仍调度。
 
 7. **分屏下的 `ParserMarkdownPreviewPane`**  
-   **`onViewportScrollFollow={splitPreviewScrollFollow ? syncEditorFromPreview : undefined}`**（仅开启跟随时传）。组件内 **`handleViewportScroll`**：**`syncScrollMetrics()`**（代码块工具栏布局）→ **`onViewportScrollFollow?.()`**。
+   **`onViewportScrollFollow={editorFollowsPreviewActive ? dispatchViewportScrollFollow : undefined}`**。组件内 **`handleViewportScroll`**：**`syncScrollMetrics()`** → **`onViewportScrollFollow?.()`**。
 
 #### 5.10.4 调用链速查（用户操作 → 函数）
+
+以下在 **`viewMode === 'split'`** 且 **`splitScrollFollowMode !== 'none'`** 的前提下成立；具体方向还受 **§5.11.3** 模式门控（单向时整条链在一侧被短路）。
 
 **用户滚动编辑器**
 
 1. Monaco 触发 **`onDidScrollChange`**。  
-2. **`syncPreviewFromEditor`**：若未被 **`suppressEditorScrollEchoRef`** 拦住 → **rAF** → **`flushEditorScrollToPreviewSync`**。  
+2. **`syncPreviewFromEditor`**：若 **`suppressEditorScrollEchoRef`** 或模式不允许「编辑 → 预览」→ **return**；否则 **rAF** → **`flushEditorScrollToPreviewSync`**。  
 3. **`suppressPreviewScrollEchoRef = true`** → **`syncPreviewScrollFromMarkdownEditorByHeadings`**（热路径只算 **`topLine` + 插值 + 写 `viewport.scrollTop`**）→ 双 **rAF** 清除 **`suppressPreviewScrollEchoRef`**。  
-4. 预览 **`scroll` 事件**到 **`handleViewportScroll`**：见 **`suppressPreviewScrollEchoRef === true`** → **不**调 **`syncEditorFromPreview`**，环路打断。
+4. 预览 **`scroll` 事件**到 **`handleViewportScroll`**：若 **`suppressPreviewScrollEchoRef === true`** → **`dispatchViewportScrollFollow` / `syncEditorFromPreview`** 入口即 **return**，环路打断。
 
 **用户滚动预览**
 
-1. **`handleViewportScroll`** → **`syncEditorFromPreview`**（若已传 **callback**）。  
+1. **`handleViewportScroll`** → **`dispatchViewportScrollFollow?.()`**（若 **`editorFollowsPreviewActive`**）。  
 2. **rAF** → **`suppressEditorScrollEchoRef = true`** → **`syncEditorScrollFromPreviewByHeadings`** → **`revealLineNearTop`** → 双 **rAF** 清除 **`suppressEditorScrollEchoRef`**。  
 3. Monaco **`onDidScrollChange`**：**`syncPreviewFromEditor`** 见 **`suppressEditorScrollEchoRef === true`**（清除前）→ **return**，避免立刻把预览 **`scrollTop`** 再改回去。
 
@@ -460,6 +469,68 @@ Monaco 在插入 Tab 时，`CursorConfiguration` 使用 **`model.getOptions()`**
 
 - **`render(text)`** 内 **`const env: MarkdownRenderEnv = {}`**，**`this.md.render(processedText, env)`**，为标题 **`id`** 去重提供 **`env.headingSlugCounts`**（目录功能）；与 **`data-md-heading-line`** 独立但同在 **`patchHeadingPreviewAttrs`** 的 **`heading_open`** 包装里写入属性。  
 - **`patchHeadingPreviewAttrs`**：保存原 **`heading_open`** 规则；新规则里若 **`token.map` 存在**：按需 **`taskListAttrSet(..., 'data-md-heading-line', String(map[0]+1))`**；若 **`enableHeadingAnchorIds`**：从 **`tokens[idx+1]`** 内联 token 抽纯文本 → **`slugifyHeadingText` / `nextHeadingAnchorId`** → **`taskListAttrSet(..., 'id', id)`**；最后 **`prev(...)` 或 `self.renderToken`**。
+
+### 5.11 跟滚模式、实现思路与 React 集成（详细）
+
+本节对应 `apps/frontend/src/components/design/Monaco/index.tsx` 中与 **`MarkdownSplitScrollFollowMode`**、底部操作栏、**`ParserMarkdownPreviewPane` + `memo`** 相关的增量设计，便于排查「某一种模式不生效」或「双边切换后预览不跟」等问题。
+
+#### 5.11.1 类型与产品语义
+
+```ts
+type MarkdownSplitScrollFollowMode =
+  | 'none'
+  | 'previewFollowsEditor'  // 右边预览跟随左边编辑
+  | 'editorFollowsPreview' // 左边编辑跟随右边预览
+  | 'bidirectional';       // 双边跟随（互相同步 + 回声抑制）
+```
+
+| 模式 | 用户操作 → 系统行为 |
+|------|---------------------|
+| **`none`** | 不跟滚；不挂预览 **`onViewportScrollFollow`**；**`useLayoutEffect` / `ResizeObserver`** 中与跟滚相关的重建与对齐不运行（**`scrollFollowActive === false`** 时清空 **`headingScrollCacheRef`**）。 |
+| **`previewFollowsEditor`** | 滚**编辑区** → 预览 **`scrollTop`** 跟随；滚**预览** → **不**改编辑区（**`onViewportScrollFollow`** 为 **`undefined`**，**`syncEditorFromPreview`** 不会被预览 **`scroll` 调用）。 |
+| **`editorFollowsPreview`** | 滚**预览** → 编辑器 **`revealLineNearTop`** 跟随；滚**编辑区** → **不**改预览（**`syncPreviewFromEditor`** 入口按 **`splitScrollFollowModeRef`** 直接 **return**）。布局 / 分栏 resize **不**执行 **`alignPreviewScrollToEditor` / `flushEditorScrollToPreviewSync`**，避免一打开模式就把预览拽到与编辑区对齐。 |
+| **`bidirectional`** | 两侧均可驱动对侧；**§5.9.3** 的 **`suppressPreviewScrollEchoRef` / `suppressEditorScrollEchoRef`** 与 **双 rAF** 清除必须始终成对使用，否则会 **编辑器 ↔ 预览** 振荡。 |
+
+**UI**：分屏时底部操作栏三个图标按钮（**`ChevronsRight` / `ChevronsLeft` / `ScrollText`**），分别对应上表三种非 **`none`** 模式；**再点当前已选模式**切回 **`none`**；点另一种模式则**互斥切换**（状态机始终是四选一）。
+
+#### 5.11.2 实现思路：为何拆成四种状态
+
+- **整篇锚点插值**（§5.2–§5.5）解决的是「**几何上**怎么对齐」；**模式**解决的是「**哪一侧的用户手势有权改对侧**」。  
+- **单向**满足「只读预览对照改稿」或「只盯编辑区、预览仅作参照」：**关闭对向 hook** 比仅靠 **`suppress*Ref`** 更直观，也避免 **`ResizeObserver` / `useLayoutEffect`** 在「仅左跟右」时误改预览。  
+- **双边**保留原有产品能力；与单向共用 **utils** 与 **缓存**，仅在 **`index.tsx`** 入口处分流。
+
+#### 5.11.3 派生标志与门控表（与代码一一对应）
+
+- **`scrollFollowActive`**：`splitScrollFollowMode !== 'none'` — 是否维持 **`HeadingScrollCache`** 冷路径、**`ResizeObserver`** 等。  
+- **`editorFollowsPreviewActive`**：`mode === 'editorFollowsPreview' || mode === 'bidirectional'` — 是否向 **`ParserMarkdownPreviewPane`** 传入 **`onViewportScrollFollow`**。
+
+| 逻辑 | 允许 **`previewFollowsEditor`** | 允许 **`editorFollowsPreview`** | 允许 **`bidirectional`** |
+|------|--------------------------------|--------------------------------|---------------------------|
+| **`syncPreviewFromEditor`（`onDidScrollChange`）** | ✓ | ✗ | ✓ |
+| **`syncEditorFromPreview`（预览 `onScroll`）** | ✗ | ✓ | ✓ |
+| **`useLayoutEffect` 第二帧 **`alignPreviewScrollToEditor`** | ✓ | ✗ | ✓ |
+| **`ResizeObserver` 末尾 **`flushEditorScrollToPreviewSync`** | ✓ | ✗ | ✓ |
+
+实现上 **`sync*`** 函数读 **`splitScrollFollowModeRef.current`** 做分支；**`useLayoutEffect` / `ResizeObserver`** 的内层 **rAF** 同样读 **`.current`**，与 **§5.11.5** 渲染期 ref 同步配合。
+
+#### 5.11.4 `memo(ParserMarkdownPreviewPane)` 与 `dispatchViewportScrollFollow`（双边不生效的根因与修复）
+
+**现象**：在 **`editorFollowsPreview`** 与 **`bidirectional`** 之间切换时，**`onViewportScrollFollow`** 形参往往都指向**同一个** **`syncEditorFromPreview`**（**`useCallback`** 引用不变）；**`markdown` / `documentIdentity` / `viewportRef`** 也未变。  
+**`memo` 默认浅比较**认为 props 未变 → **子组件不重渲染** → 内部 **`handleViewportScroll`**（依赖 **`onViewportScrollFollow`**）仍闭包在**旧** props 上。单向与双边对「是否应响应预览滚动」的细微差别若依赖子树刷新，会出现 **双边模式开启后预览滚不动编辑区** 等表现。
+
+**思路**：给预览传 **引用稳定** 的外壳函数 **`dispatchViewportScrollFollow`**（**`useCallback`，`[]`**），体为 **`syncEditorFromPreviewRef.current()`**；每一轮父组件 render 把 **`syncEditorFromPreviewRef.current = syncEditorFromPreview`**。这样：
+
+- **`memo`** 在「需要回调」时看到的 **`onViewportScrollFollow`** 引用**恒定**，不会因 **`syncEditorFromPreview` 身份**变化而强制重挂载预览；  
+- 实际执行时总调用**最新** **`syncEditorFromPreview`**，其内部再读 **`splitScrollFollowModeRef`**，模式判断始终正确。
+
+#### 5.11.5 `viewModeRef` / `splitScrollFollowModeRef` 为何在 render 内赋值
+
+滚动相关回调可能在 **`useLayoutEffect` 安排的 `requestAnimationFrame`** 里读 ref。若仅用 **`useEffect(() => { ref.current = mode }, [mode])`** 同步，则同一提交内 **layout effect 先于 passive effect** 执行，**rAF 若较早触发**时 ref 可能仍指向**上一帧**模式，导致误判 **`'none'`** 或走错分支。  
+**做法**：在声明 ref 之后、同一组件函数体内直接 **`ref.current = state`**，保证任意 **layout effect / 同步子树** 开始前 ref 已与 **当前 render 的 state** 一致。
+
+#### 5.11.6 阅读提示
+
+改跟滚行为时建议同时对照：**§5.6**（接线）、**§5.10**（符号表与调用链）、本节（模式与 React 边界）；**utils 层**（§5.10.1）一般无需为单向/双边分叉。
 
 ---
 
@@ -479,7 +550,7 @@ Monaco 在插入 Tab 时，`CursorConfiguration` 使用 **`model.getOptions()`**
 5. **分屏预览**下快速输入（观察卡顿与视觉是否异常）。  
 6. **切换知识库条目**后内容是否与列表一致、无串篇。  
 7. **Tab / 格式化**：列表嵌套、代码围栏内缩进是否为 **2 空格** 宽度；`getModel().getOptions()` 中 `tabSize` / `indentSize` 是否与预期一致（参见 **§4**）。  
-8. **分屏跟随滚动**：开启「跟随滚动」后，含多级标题的长文从顶滚到底，**编辑器滚**时预览是否大致对齐当前章节；**预览滚**时编辑器是否大致跟上；**无标题**短文是否双向仍能整体比例联动；连续快速滚动是否仍较顺滑（参见 **§5**、**§5.8**、**§5.9**）。
+8. **分屏跟随滚动**：在 **§5.11** 三种模式下分别验证：① **右边跟随左边** — 仅滚编辑区时预览跟手、滚预览时编辑区不动；② **左边跟随右边** — 仅滚预览时编辑区跟手、滚编辑区时预览不动；③ **双边** — 两侧互跟且无振荡；**无标题**短文是否仍能整体比例回退；快速滚动是否顺滑（**§5**、**§5.8**、**§5.9**、**§5.11**）。
 
 ---
 
@@ -494,4 +565,5 @@ Monaco 在插入 Tab 时，`CursorConfiguration` 使用 **`model.getOptions()`**
 - 增补 **§5.9**：预览 → 编辑器的 **`interpolateLineFromPreviewScroll`**、**`syncEditorScrollFromPreviewByHeadings`**（**`revealLineNearTop`**）、**`suppressPreviewScrollEchoRef` / `suppressEditorScrollEchoRef`** 与 **`flushEditorScrollToPreviewSync`**；**§5** 开篇与 **§5.6** 接线改为双向跟随表述；**§3**、**§7** 相应补充。  
 - 增补 **§5.10**：按 **`utils.ts` / `index.tsx` / `markdown-parser.ts`** 的**函数表、ref 表、用户滚编辑器/预览的调用链**与 **`ParserMarkdownPreviewPane` ref** 做代码级走读；**§5.1** 实现处更正为 **`patchHeadingPreviewAttrs`**。  
 - **§5** 开篇增加「与源码逐行对照见 **§5.10**」；**§5.4** 插值步骤合并重复条目，编号为 1–3。  
-- 增补 **§2.8**：从根因到代码的**实现思路**（分层原则、IME 根因—思路—落点表、Markdown 选项动机、跟滚建模与锚点/缓存/回声取舍、预览 defer、阅读地图）。
+- 增补 **§2.8**：从根因到代码的**实现思路**（分层原则、IME 根因—思路—落点表、Markdown 选项动机、跟滚建模与锚点/缓存/回声取舍、预览 defer、阅读地图）。  
+- 增补 **§5.11**：**`MarkdownSplitScrollFollowMode`**（**`none` / 右跟左 / 左跟右 / 双边**）语义与底部栏三按钮；**派生标志**与 **门控表**；**`dispatchViewportScrollFollow` + `syncEditorFromPreviewRef`** 解决 **`memo(ParserMarkdownPreviewPane)`** 下双边不生效；**render 内同步 `viewModeRef` / `splitScrollFollowModeRef`** 的时序原因。同步修订 **§5** 开篇、**§5.6**、**§5.8** 缓存触发描述、**§5.9.3**、**§5.10.2–5.10.4**、**§2.8.4**、**§7** 回归项与引言。
