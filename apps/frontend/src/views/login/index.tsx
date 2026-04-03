@@ -32,7 +32,7 @@ const Login = () => {
 	};
 
 	const onForgetPwd = (status?: boolean) => {
-		setIsForget(status || true);
+		setIsForget(status ?? true);
 	};
 
 	const goHome = () => {

@@ -3,6 +3,7 @@ import { Label } from '@ui/label';
 import { RadioGroup, RadioGroupItem } from '@ui/radio-group';
 import { toast } from '@ui/sonner';
 import { useCallback, useEffect, useState } from 'react';
+import { cn } from '@/lib/utils';
 import { capitalizeWords, getValue, setValue } from '@/utils';
 import { isTauriRuntime } from '@/utils/runtime';
 import { DEFAULT_INFO } from './config';
@@ -273,7 +274,12 @@ const System = () => {
 									<Button
 										variant="link"
 										id={i.id}
-										className="cursor-pointer text-md"
+										className={cn(
+											'cursor-pointer text-md mt-1',
+											checkShortcut === i.key && !i.shortcut
+												? 'text-textcolor/70'
+												: 'text-textcolor',
+										)}
 										onClick={() => onChangeShortCut(i.key)}
 									>
 										{checkShortcut === i.key
