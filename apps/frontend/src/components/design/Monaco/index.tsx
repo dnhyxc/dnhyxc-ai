@@ -46,7 +46,7 @@ import {
 import Loading from '../Loading';
 import { registerPrettierFormatProviders } from './format';
 import { GLASS_THEME_BY_UI, registerMonacoGlassThemes } from './glassTheme';
-import { options } from './options';
+import { MARKDOWN_EDITOR_WORD_WRAP_COLUMN, options } from './options';
 import {
 	buildHeadingScrollCache,
 	type HeadingScrollCache,
@@ -76,6 +76,13 @@ function normalizeMonacoEol(text: string): string {
 /** 纯预览模式右下角：可滚动时显示置底，触底后切换为置顶 */
 type PreviewScrollCornerFabMode = 'hidden' | 'toBottom' | 'toTop';
 
+/** 与 Monaco 编辑器 `wordWrap` 一致，仅 `language === 'markdown'` 时写入 options */
+export type MarkdownEditorWordWrap =
+	| 'off'
+	| 'on'
+	| 'wordWrapColumn'
+	| 'bounded';
+
 interface MarkdownEditorProps {
 	value?: string;
 	onChange?: (value: string) => void;
@@ -91,6 +98,16 @@ interface MarkdownEditorProps {
 	title?: React.ReactNode;
 	/** 为 markdown 时是否显示编辑/预览/分屏切换；默认 true */
 	enableMarkdownPreview?: boolean;
+	/**
+	 * Markdown 编辑区折行模式；默认 `bounded`（与 `wordWrapColumn`、视口宽度取较小者折行）。
+	 * 若 IME 重影可传 `off`（见 docs/monaco-markdown-ime-ghosting.md）。
+	 */
+	wordWrap?: MarkdownEditorWordWrap;
+	/**
+	 * Markdown 折行列参考宽度；默认 `MARKDOWN_EDITOR_WORD_WRAP_COLUMN`（120，见 `options.ts`）。
+	 * 在 `wordWrap` 为 `wordWrapColumn` / `bounded` / `on` 时由 Monaco 使用。
+	 */
+	wordWrapColumn?: number;
 }
 
 /**
@@ -363,6 +380,8 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	toolbar,
 	title,
 	enableMarkdownPreview = true,
+	wordWrap = 'bounded',
+	wordWrapColumn = MARKDOWN_EDITOR_WORD_WRAP_COLUMN,
 }) => {
 	const editorRef = useRef<MonacoEditorInstance | null>(null);
 	const imeComposingRef = useRef(false);
@@ -410,12 +429,6 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 		return `dnhyxc-editor-${lang}__${id}`;
 	}, [language, documentIdentity]);
 
-	/**
-	 * Markdown：换行后 wordWrap+automaticLayout 会反复重算折行，与透明底+IME 合成层叠画。
-	 * 曾用「黑体优先 + disableMonospaceOptimizations」减轻重影，但比例字体会让 tab/空格列宽像「只有 1」；
-	 * 缩进与 options 一致：继承拉丁等宽在前的 fontFamily；Markdown 下与全局相同保留 disableMonospaceOptimizations: true 以偏 IME，
-	 * 若 Tab 列仍不齐可试改为 false（见 docs/monaco-markdown-ime-ghosting.md §4）。
-	 */
 	/** 有正文时勿传占位文案，否则部分 Monaco 版本在失焦或未编辑时仍叠画「# 输入内容...」 */
 	const hasEditorBody = normalizeMonacoEol(value ?? '').trim().length > 0;
 	const effectivePlaceholder = hasEditorBody ? '' : placeholder;
@@ -426,21 +439,13 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 			return {
 				...base,
 				placeholder: effectivePlaceholder,
-				fontLigatures: false,
-				// 与 base 同为 true：关等宽快速路径，利于 IME；列对齐问题见文档 §4.2 B / §4.4
-				disableMonospaceOptimizations: true,
-				colorDecorators: false,
-				wordWrap: 'off' as const,
-				folding: false,
-				foldingHighlight: false,
-				stickyScroll: { enabled: false },
-				glyphMargin: false,
-				accessibilitySupport: 'off' as const,
-				cursorBlinking: 'solid' as const,
+				// wordWrap = 'bounded' 开启折行，开启折行之后会导致重影
+				wordWrap,
+				wordWrapColumn,
 			};
 		}
 		return { ...base, placeholder: effectivePlaceholder };
-	}, [readOnly, effectivePlaceholder, language]);
+	}, [readOnly, effectivePlaceholder, language, wordWrap, wordWrapColumn]);
 
 	const glassThemeId = GLASS_THEME_BY_UI[theme];
 
@@ -1084,3 +1089,4 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 };
 
 export default MarkdownEditor;
+export { MARKDOWN_EDITOR_WORD_WRAP_COLUMN } from './options';

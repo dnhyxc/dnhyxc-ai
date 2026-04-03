@@ -4,18 +4,16 @@ const EDITOR_FONT_STACK =
 
 export const MONACO_TAB_SIZE = 2;
 
+/** Markdown 编辑区：折行上限（列），与 `wordWrap: bounded` 配合；窄于此时按视口宽度折行 */
+export const MARKDOWN_EDITOR_WORD_WRAP_COLUMN = 120;
+
 export const options: any = {
 	minimap: { enabled: false },
 	fontSize: 14,
 	lineHeight: 22,
 	fontFamily: EDITOR_FONT_STACK,
-	// 连字会干扰 IME 合成区间测量，易与拼音/汉字叠画
-	fontLigatures: false,
-	// 关闭等宽快速路径，避免中日文与西文字宽混排时测量偏差
-	disableMonospaceOptimizations: true,
 	lineNumbers: 'on' as const,
 	wordWrap: 'on' as const,
-	colorDecorators: true,
 	scrollBeyondLastLine: false,
 	automaticLayout: true,
 	padding: { top: 10, bottom: 10 },
@@ -23,13 +21,10 @@ export const options: any = {
 	suggestOnTriggerCharacters: false,
 	tabSize: 2,
 	indentSize: 2,
-	folding: true,
-	foldingHighlight: true,
 	foldingStrategy: 'indentation' as const,
 	wordBasedSuggestions: 'allDocuments' as const,
 	parameterHints: { enabled: false },
 	snippetSuggestions: 'inline' as const,
-	cursorBlinking: 'smooth' as const,
 	cursorSmoothCaretAnimation: 'off' as const,
 	renderLineHighlight: 'none' as const,
 	hideCursorInOverviewRuler: true,
@@ -41,4 +36,22 @@ export const options: any = {
 		verticalScrollbarSize: 8,
 		horizontalScrollbarSize: 8,
 	},
+	// 连字会干扰 IME 合成区间测量，易与拼音/汉字叠画
+	// fontLigatures: false,
+	// 关闭等宽快速路径，避免中日文与西文字宽混排时测量偏差
+	// disableMonospaceOptimizations: true,
+	// colorDecorators: true,
+	// folding: true,
+	// foldingHighlight: true,
+	// cursorBlinking: 'smooth' as const,
+	fontLigatures: false,
+	// 与 base 同为 true：关等宽快速路径，利于 IME；列对齐问题见文档 §4.2 B / §4.4
+	disableMonospaceOptimizations: true,
+	colorDecorators: false,
+	folding: false,
+	foldingHighlight: false,
+	stickyScroll: { enabled: false },
+	glyphMargin: false,
+	accessibilitySupport: 'off' as const,
+	cursorBlinking: 'solid' as const,
 };
