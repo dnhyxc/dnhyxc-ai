@@ -416,7 +416,7 @@ function ChatAssistantMessageInner({
 				<div className="flex items-center justify-end">
 					超出最大输出长度，
 					<div
-						className="cursor-pointer text-sm text-cyan-400 hover:text-cyan-300 select-none"
+						className="cursor-pointer text-sm text-teal-400 hover:text-teal-300 select-none"
 						onClick={() => onContinueAnswering?.(message)}
 					>
 						点击接着回答

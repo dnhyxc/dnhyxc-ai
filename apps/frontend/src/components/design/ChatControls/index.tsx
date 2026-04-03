@@ -49,7 +49,7 @@ const ChatControls = ({
 								onClick={switchToStreamingBranch}
 								className={cn(
 									glassChipClass,
-									'min-h-8 text-sm text-cyan-400 hover:bg-theme/15',
+									'min-h-8 text-sm text-cyan-500 hover:bg-theme/15',
 								)}
 							>
 								<Sparkles />
@@ -63,7 +63,7 @@ const ChatControls = ({
 								onClick={switchToLatestBranch}
 								className={cn(
 									glassChipClass,
-									'min-h-8 text-sm text-green-400 hover:bg-theme/15 ml-2',
+									'min-h-8 text-sm text-teal-400 hover:bg-theme/15 ml-2',
 								)}
 							>
 								<Activity />

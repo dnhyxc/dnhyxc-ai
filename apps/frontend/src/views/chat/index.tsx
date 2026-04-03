@@ -137,20 +137,20 @@ const Chat = observer(() => {
 
 	return (
 		<div className="flex flex-col w-full h-full overflow-hidden rounded-b-md">
-			<div className="absolute top-4 left-28 z-50 flex items-center gap-3">
+			<div className="absolute top-4 left-29 z-50 flex items-center gap-3">
 				{open ? (
-					<History size={20} className="cursor-pointer text-cyan-500" />
+					<History size={20} className="cursor-pointer text-teal-500 mt-px" />
 				) : (
 					<History
 						size={20}
-						className="cursor-pointer hover:text-blue-500"
+						className="cursor-pointer hover:text-teal-500 mt-px"
 						onClick={() => setOpen(true)}
 					/>
 				)}
 				{params?.id && !chatStore.isCurrentSessionLoading && !isSharing && (
 					<Waypoints
 						size={20}
-						className="cursor-pointer hover:text-blue-500"
+						className="cursor-pointer hover:text-teal-500"
 						onClick={onShare}
 					/>
 				)}

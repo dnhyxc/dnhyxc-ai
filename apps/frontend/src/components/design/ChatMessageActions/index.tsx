@@ -188,7 +188,7 @@ export const MessageActions = ({
 								onClick={() => onCopy?.(message.content, message.chatId)}
 							/>
 						) : (
-							<div className="flex items-center justify-center text-green-400 rounded-full box-border">
+							<div className="flex items-center justify-center text-teal-400 rounded-full box-border">
 								<CheckCircle size={16} />
 							</div>
 						)}
