@@ -16,7 +16,8 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { useCountdown } from '@/hooks';
 import { sendEmail, updateEmail } from '@/service';
-import { formatTime, removeStorage, setStorage } from '@/utils';
+import useStore from '@/store';
+import { formatTime, removeStorage } from '@/utils';
 
 interface IProps {
 	userInfo: any;
@@ -38,6 +39,7 @@ const ResetEmailForm: React.FC<IProps> = ({
 	const [sendOldLoading, setSendOldLoading] = useState(false);
 	const [sendNewLoading, setSendNewLoading] = useState(false);
 	const [loading, setLoading] = useState(false);
+	const { userStore } = useStore();
 	const { timeLeft: oldTimeLeft, startTimer: startOldTimer } = useCountdown(
 		DEFAULT_TIME,
 		'old_countdown',
@@ -151,13 +153,10 @@ const ResetEmailForm: React.FC<IProps> = ({
 			});
 			setLoading(false);
 			if (res.success) {
-				setStorage(
-					'userInfo',
-					JSON.stringify({
-						...userInfo,
-						email: values.email,
-					}),
-				);
+				userStore.setUserInfo({
+					...userInfo,
+					email: values.email,
+				});
 				handleAccountInfo?.(values.email);
 				onOpenChange?.();
 				form.reset();

@@ -19,12 +19,14 @@ import {
 import { useNavigate } from 'react-router';
 import ICON from '@/assets/icon.png';
 import { useStorageInfo } from '@/hooks';
+import useStore from '@/store';
 import { removeStorage } from '@/utils';
 import Image from '../Image';
 import { MENUS } from './enum';
 
 const Sidebar = () => {
 	const navigate = useNavigate();
+	const { userStore } = useStore();
 	const { storageInfo } = useStorageInfo();
 
 	const onJump = (path: string) => {
@@ -49,7 +51,7 @@ const Sidebar = () => {
 
 	const onLogout = () => {
 		removeStorage('token');
-		removeStorage('userInfo');
+		userStore.clearUserInfo();
 		navigate('/login');
 	};
 

@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils';
 import { saveKnowledge } from '@/service';
 import useStore from '@/store';
 import { KnowledgeRecord } from '@/types';
-import { getStorage, isTauriRuntime } from '@/utils';
+import { isTauriRuntime } from '@/utils';
 import {
 	formatTauriInvokeError,
 	invokeResolveKnowledgeMarkdownTarget,
@@ -63,12 +63,6 @@ function monacoLanguageFromKnowledgeTitle(title: string): string {
 }
 
 type StoredUserInfo = { username?: unknown; id?: unknown } | null;
-
-function readUserInfoFromStorage(): StoredUserInfo {
-	const raw = getStorage('userInfo');
-	if (!raw) return null;
-	return JSON.parse(raw as string) as StoredUserInfo;
-}
 
 /** 与原先 persist 内联逻辑一致：仅有 username / id 时写入 author / authorId */
 function buildAuthorMeta(user: StoredUserInfo): {
@@ -125,13 +119,18 @@ function KnowledgeEditorToolbar(props: {
 
 /** 知识编辑页：正文与标题等草稿存于 detailStore，聊天助手条「保存到知识库」会写入同一份草稿并跳转至此 */
 const Knowledge = observer(() => {
-	const { detailStore, knowledgeStore } = useStore();
+	const { detailStore, knowledgeStore, userStore } = useStore();
 	const { theme } = useTheme();
 
 	const [listOpen, setListOpen] = useState(false);
 	const [saveLoading, setSaveLoading] = useState(false);
 
-	const getUserInfo = useMemo(() => readUserInfoFromStorage(), []);
+	/** 与 localStorage 脱钩，统一从 userStore 取（刷新后由 store 从缓存恢复） */
+	const getUserInfo = useMemo((): StoredUserInfo => {
+		const u = userStore.userInfo;
+		if (u.id === 0 && !String(u.username ?? '').trim()) return null;
+		return { id: u.id, username: u.username };
+	}, [userStore.userInfo]);
 
 	const monacoTheme = theme === 'black' ? 'vs-dark' : 'vs';
 

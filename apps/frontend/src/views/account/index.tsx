@@ -11,8 +11,8 @@ import Model from '@/components/design/Model';
 import Upload from '@/components/design/Upload';
 import { useStorageInfo } from '@/hooks';
 import { getUploadToken, updateUser } from '@/service';
+import useStore from '@/store';
 import { type FileWithPreview } from '@/types';
-import { setStorage } from '@/utils';
 import ResetEmailForm from './reset-email-form';
 
 const GenderEnum: Record<string, string> = {
@@ -22,6 +22,7 @@ const GenderEnum: Record<string, string> = {
 };
 
 const Account = () => {
+	const { userStore } = useStore();
 	const [open, setOpen] = useState(false);
 	const [editKey, setEditKey] = useState('');
 	const [accountInfo, setAccountInfo] = useState({
@@ -198,7 +199,7 @@ const Account = () => {
 			});
 			const newUserInfo = { ...storageInfo, ...res.data };
 			setStorageInfo(newUserInfo);
-			setStorage('userInfo', JSON.stringify(newUserInfo));
+			userStore.setUserInfo(newUserInfo);
 			setEditKey('');
 		} else {
 			Toast({

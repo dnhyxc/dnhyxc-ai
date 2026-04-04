@@ -99,7 +99,6 @@ const LoginForm: React.FC<IProps> = ({ onForgetPwd }) => {
 			});
 			if (res.success) {
 				userStore.setUserInfo(res.data);
-				setStorage('userInfo', JSON.stringify(res.data));
 				setStorage('token', res.data.access_token);
 				http.setAuthToken(res.data.access_token);
 				navigate('/');
