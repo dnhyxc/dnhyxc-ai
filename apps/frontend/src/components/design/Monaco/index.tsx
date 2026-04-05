@@ -108,6 +108,8 @@ interface MarkdownEditorProps {
 	 * 在 `wordWrap` 为 `wordWrapColumn` / `bounded` / `on` 时由 Monaco 使用。
 	 */
 	wordWrapColumn?: number;
+	/** 是否显示编辑/预览/分屏切换的 tab 栏；默认 true */
+	showTabBar?: boolean;
 }
 
 /**
@@ -382,6 +384,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	enableMarkdownPreview = true,
 	wordWrap = 'bounded',
 	wordWrapColumn = MARKDOWN_EDITOR_WORD_WRAP_COLUMN,
+	showTabBar = true,
 }) => {
 	const editorRef = useRef<MonacoEditorInstance | null>(null);
 	const imeComposingRef = useRef(false);
@@ -850,27 +853,29 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 				>
 					<div className="min-w-0 flex-1">{title}</div>
 					<div className="flex min-w-0 shrink-0 items-center justify-end">
-						{isMarkdown ? (
-							<Button
-								variant="link"
-								aria-label={
-									markdownBottomBarOpen
-										? '收起 Markdown 底部操作栏'
-										: '展开 Markdown 底部操作栏'
-								}
-								aria-expanded={markdownBottomBarOpen}
-								aria-controls={markdownBottomBarId}
-								onClick={() => setMarkdownBottomBarOpen((o) => !o)}
-							>
-								<div className="flex items-center gap-1">
-									{markdownBottomBarOpen ? (
-										<PanelTopOpen className="mt-0.5" />
-									) : (
-										<PanelTopClose className="mt-0.5" />
-									)}
-									<span className="mt-0.5">操作栏</span>
-								</div>
-							</Button>
+						{showTabBar && isMarkdown ? (
+							<Tooltip side="top" content="Command/Ctrl + Control + B">
+								<Button
+									variant="link"
+									aria-label={
+										markdownBottomBarOpen
+											? '收起 Markdown 底部操作栏'
+											: '展开 Markdown 底部操作栏'
+									}
+									aria-expanded={markdownBottomBarOpen}
+									aria-controls={markdownBottomBarId}
+									onClick={() => setMarkdownBottomBarOpen((o) => !o)}
+								>
+									<div className="flex items-center gap-1">
+										{markdownBottomBarOpen ? (
+											<PanelTopOpen className="mt-0.5" />
+										) : (
+											<PanelTopClose className="mt-0.5" />
+										)}
+										<span className="mt-0.5">操作栏</span>
+									</div>
+								</Button>
+							</Tooltip>
 						) : null}
 						{toolbar}
 					</div>

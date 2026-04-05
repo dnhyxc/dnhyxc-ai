@@ -1,4 +1,5 @@
 import Confirm from '@design/Confirm';
+import Tooltip from '@design/Tooltip';
 import { ScrollArea } from '@ui/scroll-area';
 import { Toast } from '@ui/sonner';
 import { LayersPlus, LibraryBig, NotebookPen, OctagonX } from 'lucide-react';
@@ -146,28 +147,34 @@ function KnowledgeEditorToolbar(props: {
 		'flex items-center gap-1 px-0 has-[>svg]:px-0 disabled:hover:text-textcolor' as const;
 	return (
 		<div className="flex items-center pr-3 gap-4">
-			<Button
-				variant="link"
-				className={linkBtn}
-				onClick={onSave}
-				disabled={saveLoading}
-				aria-busy={saveLoading}
-			>
-				<LayersPlus className="mt-0.5" />
-				<span className="mt-0.5">保存</span>
-			</Button>
-			<Button
-				variant="link"
-				className={cn(linkBtn, 'hover:text-orange-500')}
-				onClick={onNewDraft}
-			>
-				<OctagonX className="mt-0.5" />
-				<span className="mt-0.5">清空</span>
-			</Button>
-			<Button variant="link" className={linkBtn} onClick={onOpenLibrary}>
-				<LibraryBig className="mt-0.5" />
-				<span className="mt-0.5">知识库</span>
-			</Button>
+			<Tooltip side="top" content="Command/Ctrl + S">
+				<Button
+					variant="link"
+					className={linkBtn}
+					onClick={onSave}
+					disabled={saveLoading}
+					aria-busy={saveLoading}
+				>
+					<LayersPlus className="mt-0.5" />
+					<span className="mt-0.5">保存</span>
+				</Button>
+			</Tooltip>
+			<Tooltip side="top" content="Command/Ctrl + Control + D">
+				<Button
+					variant="link"
+					className={cn(linkBtn, 'hover:text-orange-500')}
+					onClick={onNewDraft}
+				>
+					<OctagonX className="mt-0.5" />
+					<span className="mt-0.5">清空</span>
+				</Button>
+			</Tooltip>
+			<Tooltip side="top" content="Command/Ctrl + Control + L">
+				<Button variant="link" className={linkBtn} onClick={onOpenLibrary}>
+					<LibraryBig className="mt-0.5" />
+					<span className="mt-0.5">知识库</span>
+				</Button>
+			</Tooltip>
 		</div>
 	);
 }
