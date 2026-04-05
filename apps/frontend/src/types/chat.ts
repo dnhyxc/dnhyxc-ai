@@ -252,7 +252,7 @@ export interface ChatBotViewProps {
 	 */
 	renderChatControls?: (ctx: ChatBotViewChatControlsContext) => ReactNode;
 
-	/** 助手消息「保存到知识库」：写入 DetailStore 草稿并跳转 `/knowledge` */
+	/** 助手消息「保存到知识库」：写入 KnowledgeStore 草稿并跳转 `/knowledge` */
 	onSaveToKnowledge?: (message: Message) => void;
 }
 

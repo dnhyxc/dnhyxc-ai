@@ -121,9 +121,9 @@ function KnowledgeEditorToolbar(props: {
 	);
 }
 
-/** 知识编辑页：正文与标题等草稿存于 detailStore，聊天助手条「保存到知识库」会写入同一份草稿并跳转至此 */
+/** 知识编辑页：正文与标题等草稿存于 knowledgeStore，聊天助手条「保存到知识库」会写入同一份草稿并跳转至此 */
 const Knowledge = observer(() => {
-	const { detailStore, knowledgeStore, userStore } = useStore();
+	const { knowledgeStore, userStore } = useStore();
 	const { theme } = useTheme();
 
 	const [listOpen, setListOpen] = useState(false);
@@ -139,20 +139,20 @@ const Knowledge = observer(() => {
 	const monacoTheme = theme === 'black' ? 'vs-dark' : 'vs';
 
 	const monacoLanguage = useMemo(
-		() => monacoLanguageFromKnowledgeTitle(detailStore.knowledgeTitle),
-		[detailStore.knowledgeTitle],
+		() => monacoLanguageFromKnowledgeTitle(knowledgeStore.knowledgeTitle),
+		[knowledgeStore.knowledgeTitle],
 	);
 
 	/** 清空标题与正文（store 级草稿，与 markdown 一并清除） */
 	const resetEditorToNewDraft = useCallback(() => {
-		detailStore.clearKnowledgeDraft();
-	}, [detailStore]);
+		knowledgeStore.clearKnowledgeDraft();
+	}, [knowledgeStore]);
 
 	const handleMarkdownChange = useCallback(
 		(value: string) => {
-			detailStore.setMarkdown(value);
+			knowledgeStore.setMarkdown(value);
 		},
-		[detailStore],
+		[knowledgeStore],
 	);
 
 	const runTauriSave = useCallback(
@@ -176,11 +176,11 @@ const Knowledge = observer(() => {
 
 	/** 写入后端：有 knowledgeEditingKnowledgeId 则更新，否则新建并刷新列表 */
 	const persistKnowledgeApi = useCallback(async () => {
-		const markdown = detailStore.markdown ?? '';
-		const trimmedTitle = detailStore.knowledgeTitle.trim();
+		const markdown = knowledgeStore.markdown ?? '';
+		const trimmedTitle = knowledgeStore.knowledgeTitle.trim();
 		const base = { title: trimmedTitle, content: markdown };
 		const meta = buildAuthorMeta(getUserInfo);
-		const editingId = detailStore.knowledgeEditingKnowledgeId;
+		const editingId = knowledgeStore.knowledgeEditingKnowledgeId;
 		/** 本地文件夹打开的条目仅写磁盘，不同步云端 */
 		if (isKnowledgeLocalMarkdownId(editingId)) {
 			return;
@@ -205,44 +205,44 @@ const Knowledge = observer(() => {
 			} as Omit<KnowledgeRecord, 'id'>);
 			// 新建成功后必须记下 id，否则删除本条时 id 仍为 null，无法清空编辑器
 			if (res.success && res.data?.id) {
-				detailStore.setKnowledgeEditingKnowledgeId(res.data.id);
-				detailStore.setKnowledgeLocalDiskTitle(trimmedTitle);
+				knowledgeStore.setKnowledgeEditingKnowledgeId(res.data.id);
+				knowledgeStore.setKnowledgeLocalDiskTitle(trimmedTitle);
 			}
 		}
-	}, [detailStore, getUserInfo, knowledgeStore]);
+	}, [knowledgeStore, getUserInfo]);
 
 	const syncSnapshotAfterPersist = useCallback(
 		(trimmedTitle: string, markdown: string) => {
-			detailStore.setKnowledgePersistedSnapshot({
+			knowledgeStore.setKnowledgePersistedSnapshot({
 				title: trimmedTitle,
 				content: markdown,
 			});
 		},
-		[detailStore],
+		[knowledgeStore],
 	);
 
 	const onSave = useCallback(async () => {
-		const markdown = detailStore.markdown ?? '';
-		const trimmedTitle = detailStore.knowledgeTitle.trim();
+		const markdown = knowledgeStore.markdown ?? '';
+		const trimmedTitle = knowledgeStore.knowledgeTitle.trim();
 		if (!trimmedTitle)
 			return Toast({ type: 'warning', title: '请先输入文件名「标题」' });
 		if (!markdown) return Toast({ type: 'warning', title: '请先输入内容' });
-		const snap = detailStore.knowledgePersistedSnapshot;
+		const snap = knowledgeStore.knowledgePersistedSnapshot;
 		if (snap.title === trimmedTitle && snap.content === markdown) return;
 		setSaveLoading(true);
 		try {
 			if (isTauriRuntime()) {
-				const diskTitle = detailStore.knowledgeLocalDiskTitle;
+				const diskTitle = knowledgeStore.knowledgeLocalDiskTitle;
 				const previousTitle =
-					detailStore.knowledgeEditingKnowledgeId &&
+					knowledgeStore.knowledgeEditingKnowledgeId &&
 					diskTitle &&
 					diskTitle !== trimmedTitle
 						? diskTitle
 						: undefined;
 				const tauriBaseDir = isKnowledgeLocalMarkdownId(
-					detailStore.knowledgeEditingKnowledgeId,
+					knowledgeStore.knowledgeEditingKnowledgeId,
 				)
-					? detailStore.knowledgeLocalDirPath?.trim() || TAURI_KNOWLEDGE_DIR
+					? knowledgeStore.knowledgeLocalDirPath?.trim() || TAURI_KNOWLEDGE_DIR
 					: TAURI_KNOWLEDGE_DIR;
 				const payload: SaveKnowledgeMarkdownPayload = {
 					title: trimmedTitle,
@@ -254,21 +254,21 @@ const Knowledge = observer(() => {
 				if (!target.exists) {
 					await persistKnowledgeApi();
 					await runTauriSave(payload);
-					detailStore.setKnowledgeLocalDiskTitle(trimmedTitle);
+					knowledgeStore.setKnowledgeLocalDiskTitle(trimmedTitle);
 					syncSnapshotAfterPersist(trimmedTitle, markdown);
 				} else {
-					detailStore.openKnowledgeOverwriteConfirm(target.path, payload);
+					knowledgeStore.openKnowledgeOverwriteConfirm(target.path, payload);
 				}
 			} else {
 				await persistKnowledgeApi();
-				detailStore.setKnowledgeLocalDiskTitle(trimmedTitle);
+				knowledgeStore.setKnowledgeLocalDiskTitle(trimmedTitle);
 				syncSnapshotAfterPersist(trimmedTitle, markdown);
 			}
 		} finally {
 			setSaveLoading(false);
 		}
 	}, [
-		detailStore,
+		knowledgeStore,
 		persistKnowledgeApi,
 		runTauriSave,
 		syncSnapshotAfterPersist,
@@ -279,19 +279,19 @@ const Knowledge = observer(() => {
 		const onKeyDown = (e: KeyboardEvent) => {
 			if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 's') return;
 			e.preventDefault();
-			if (saveLoading || detailStore.knowledgeOverwriteOpen) return;
+			if (saveLoading || knowledgeStore.knowledgeOverwriteOpen) return;
 			void onSave();
 		};
 		window.addEventListener('keydown', onKeyDown, true);
 		return () => window.removeEventListener('keydown', onKeyDown, true);
-	}, [onSave, saveLoading, detailStore]);
+	}, [onSave, saveLoading, knowledgeStore]);
 
 	const onConfirmOverwrite = useCallback(async () => {
-		const pending = detailStore.knowledgePendingSavePayload;
+		const pending = knowledgeStore.knowledgePendingSavePayload;
 		if (!pending) return;
-		const markdown = detailStore.markdown ?? '';
-		const trimmedTitle = detailStore.knowledgeTitle.trim();
-		const snap = detailStore.knowledgePersistedSnapshot;
+		const markdown = knowledgeStore.markdown ?? '';
+		const trimmedTitle = knowledgeStore.knowledgeTitle.trim();
+		const snap = knowledgeStore.knowledgePersistedSnapshot;
 		if (snap.title === trimmedTitle && snap.content === markdown) {
 			Toast({
 				type: 'info',
@@ -299,7 +299,7 @@ const Knowledge = observer(() => {
 				message: '标题与内容与上次保存一致，未执行保存',
 				duration: 2000,
 			});
-			detailStore.setKnowledgeOverwriteOpen(false);
+			knowledgeStore.setKnowledgeOverwriteOpen(false);
 			return;
 		}
 		setSaveLoading(true);
@@ -307,9 +307,9 @@ const Knowledge = observer(() => {
 			await persistKnowledgeApi();
 			const merged = { ...pending, overwrite: true };
 			await runTauriSave(merged);
-			detailStore.setKnowledgeLocalDiskTitle(merged.title.trim());
+			knowledgeStore.setKnowledgeLocalDiskTitle(merged.title.trim());
 			syncSnapshotAfterPersist(trimmedTitle, markdown);
-			detailStore.setKnowledgeOverwriteOpen(false);
+			knowledgeStore.setKnowledgeOverwriteOpen(false);
 		} catch (e) {
 			Toast({
 				type: 'error',
@@ -321,67 +321,67 @@ const Knowledge = observer(() => {
 	}, [
 		persistKnowledgeApi,
 		runTauriSave,
-		detailStore,
+		knowledgeStore,
 		syncSnapshotAfterPersist,
 	]);
 
 	const handleOverwriteOpenChange = useCallback(
 		(open: boolean) => {
-			detailStore.setKnowledgeOverwriteOpen(open);
+			knowledgeStore.setKnowledgeOverwriteOpen(open);
 		},
-		[detailStore],
+		[knowledgeStore],
 	);
 
 	const handlePickRecord = useCallback(
 		(record: KnowledgeRecord) => {
-			detailStore.setKnowledgeOverwriteOpen(false);
-			detailStore.setKnowledgeEditingKnowledgeId(record.id);
-			detailStore.setKnowledgeLocalDirPath(record.localDirPath ?? null);
+			knowledgeStore.setKnowledgeOverwriteOpen(false);
+			knowledgeStore.setKnowledgeEditingKnowledgeId(record.id);
+			knowledgeStore.setKnowledgeLocalDirPath(record.localDirPath ?? null);
 			const t = (record.title ?? '').trim();
-			detailStore.setKnowledgeLocalDiskTitle(t || null);
+			knowledgeStore.setKnowledgeLocalDiskTitle(t || null);
 			const content = record.content ?? '';
-			detailStore.setKnowledgePersistedSnapshot({ title: t, content });
-			detailStore.setKnowledgeTitle(record.title ?? '');
-			detailStore.setMarkdown(content);
+			knowledgeStore.setKnowledgePersistedSnapshot({ title: t, content });
+			knowledgeStore.setKnowledgeTitle(record.title ?? '');
+			knowledgeStore.setMarkdown(content);
 		},
-		[detailStore],
+		[knowledgeStore],
 	);
 
 	const handleDeletedRecord = useCallback(
 		(id: string) => {
-			if (detailStore.knowledgeEditingKnowledgeId === id) {
+			if (knowledgeStore.knowledgeEditingKnowledgeId === id) {
 				resetEditorToNewDraft();
 			}
 		},
-		[detailStore, resetEditorToNewDraft],
+		[knowledgeStore, resetEditorToNewDraft],
 	);
 
 	/** 仅当删除的是当前正在编辑的条目时才清空标题与正文（本地文件删成功后的回调） */
 	const handleAfterLocalDelete = useCallback(
 		(deletedKnowledgeId: string) => {
 			if (!deletedKnowledgeId) return;
-			if (detailStore.knowledgeEditingKnowledgeId === deletedKnowledgeId) {
+			if (knowledgeStore.knowledgeEditingKnowledgeId === deletedKnowledgeId) {
 				resetEditorToNewDraft();
 			}
 		},
-		[detailStore, resetEditorToNewDraft],
+		[knowledgeStore, resetEditorToNewDraft],
 	);
 
-	const overwriteTargetPath = detailStore.knowledgeOverwriteTargetPath;
+	const overwriteTargetPath = knowledgeStore.knowledgeOverwriteTargetPath;
 	const overwriteFileName =
 		overwriteTargetPath.split(/[/\\]/).filter(Boolean).pop() ??
 		overwriteTargetPath;
 
-	const markdownForDirty = detailStore.markdown ?? '';
-	const snapForDirty = detailStore.knowledgePersistedSnapshot;
+	const markdownForDirty = knowledgeStore.markdown ?? '';
+	const snapForDirty = knowledgeStore.knowledgePersistedSnapshot;
 	const hasUnsavedChanges =
-		detailStore.knowledgeTitle.trim() !== snapForDirty.title ||
+		knowledgeStore.knowledgeTitle.trim() !== snapForDirty.title ||
 		markdownForDirty !== snapForDirty.content;
 
 	return (
 		<div className="w-full h-full flex flex-col justify-center items-center m-0">
 			<Confirm
-				open={detailStore.knowledgeOverwriteOpen}
+				open={knowledgeStore.knowledgeOverwriteOpen}
 				onOpenChange={handleOverwriteOpenChange}
 				title="覆盖已有文件？"
 				description={
@@ -408,9 +408,9 @@ const Knowledge = observer(() => {
 					theme={monacoTheme}
 					language={monacoLanguage}
 					documentIdentity={
-						detailStore.knowledgeEditingKnowledgeId ?? 'draft-new'
+						knowledgeStore.knowledgeEditingKnowledgeId ?? 'draft-new'
 					}
-					value={detailStore.markdown}
+					value={knowledgeStore.markdown}
 					onChange={handleMarkdownChange}
 					toolbar={
 						<KnowledgeEditorToolbar
@@ -436,9 +436,11 @@ const Knowledge = observer(() => {
 								) : null}
 							</span>
 							<Input
-								value={detailStore.knowledgeTitle}
+								value={knowledgeStore.knowledgeTitle}
 								maxLength={100}
-								onChange={(e) => detailStore.setKnowledgeTitle(e.target.value)}
+								onChange={(e) =>
+									knowledgeStore.setKnowledgeTitle(e.target.value)
+								}
 								placeholder="请先输入文件名「标题」..."
 								aria-label="知识标题"
 								className="md:text-base h-full border-0 bg-transparent pr-2 text-textcolor shadow-none placeholder:text-sm placeholder:text-textcolor/60 focus-visible:border-0 focus-visible:ring-0"
@@ -450,8 +452,8 @@ const Knowledge = observer(() => {
 			<KnowledgeList
 				open={listOpen}
 				onOpenChange={setListOpen}
-				currentTitle={detailStore.knowledgeTitle}
-				editingKnowledgeId={detailStore.knowledgeEditingKnowledgeId}
+				currentTitle={knowledgeStore.knowledgeTitle}
+				editingKnowledgeId={knowledgeStore.knowledgeEditingKnowledgeId}
 				onAfterLocalDelete={handleAfterLocalDelete}
 				onDeletedRecord={handleDeletedRecord}
 				onPick={handlePickRecord}

@@ -92,12 +92,7 @@ function KnowledgeListRow(props: {
 				</button>
 			</div>
 			<div className="text-xs text-textcolor/50 space-y-0.5">
-				{item.localAbsolutePath ? (
-					<div className="truncate opacity-70" title={item.localAbsolutePath}>
-						{item.localAbsolutePath}
-					</div>
-				) : null}
-				<div>更新 {formatDate(item.updatedAt?.toString() ?? '')}</div>
+				更新 {formatDate(item.updatedAt?.toString() ?? '')}
 			</div>
 		</div>
 	);

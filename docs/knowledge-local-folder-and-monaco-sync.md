@@ -20,7 +20,7 @@
 | `apps/frontend/src/utils/knowledge-save.ts` | 前端封装 `invoke` |
 | `apps/frontend/src/types/index.ts` | `KnowledgeRecord` / `KnowledgeListItem` 扩展字段 |
 | `apps/frontend/src/views/knowledge/constants.ts` | 本地条目 id 前缀与判定函数 |
-| `apps/frontend/src/store/detail.ts` | `knowledgeLocalDirPath` 与清空草稿 |
+| `apps/frontend/src/store/knowledge.ts` | 列表分页 + 编辑器草稿（含 `knowledgeLocalDirPath`、清空草稿） |
 | `apps/frontend/src/views/knowledge/index.tsx` | 保存走云端或仅磁盘、回填 `localDirPath` |
 | `apps/frontend/src/views/knowledge/KnowledgeList.tsx` | 开关、选文件夹、本地列表与删除分支 |
 | `apps/frontend/src/components/design/Monaco/index.tsx` | 外部 `value` 与编辑器同步策略 |
@@ -38,7 +38,7 @@
 ### 2.2 保存策略
 
 - **`persistKnowledgeApi`**：若当前 `knowledgeEditingKnowledgeId` 为本地合成 id，**直接 return**，不调用 `update` / `save` 接口。
-- **Tauri 写盘**：`filePath` 传入的「目录」在本地条目下取 **`detailStore.knowledgeLocalDirPath`**（打开文件时设为**该 `.md` 所在目录**），否则沿用 `TAURI_KNOWLEDGE_DIR`。与既有 `previousTitle` 逻辑配合，支持改标题时的本地重命名。
+- **Tauri 写盘**：`filePath` 传入的「目录」在本地条目下取 **`knowledgeStore.knowledgeLocalDirPath`**（打开文件时设为**该 `.md` 所在目录**），否则沿用 `TAURI_KNOWLEDGE_DIR`。与既有 `previousTitle` 逻辑配合，支持改标题时的本地重命名。
 
 ### 2.3 Rust 侧能力
 
@@ -117,7 +117,7 @@ export type KnowledgeListItem = Omit<KnowledgeRecord, 'content'> & {
 };
 ```
 
-### 3.3 `detail.ts` — 目录状态与清空
+### 3.3 `knowledge.ts`（编辑器草稿段）— 目录状态与清空
 
 ```ts
 	/**
@@ -143,6 +143,7 @@ export type KnowledgeListItem = Omit<KnowledgeRecord, 'content'> & {
 	applyKnowledgeDraftFromChatReply(markdown: string) {
 		// ...
 		this.knowledgeLocalDirPath = null; // 从聊天注入草稿时按默认目录保存，不设本地扫描目录
+	}
 ```
 
 ### 3.4 `knowledge-save.ts` — invoke 封装
@@ -185,15 +186,15 @@ export async function invokeReadKnowledgeMarkdownFile(
 }
 ```
 
-### 3.5 `knowledge/index.tsx` — 云端跳过与保存目录
+### 3.5 `views/knowledge/index.tsx` — 云端跳过与保存目录
 
 ```ts
 	const persistKnowledgeApi = useCallback(async () => {
-		const markdown = detailStore.markdown ?? '';
-		const trimmedTitle = detailStore.knowledgeTitle.trim();
+		const markdown = knowledgeStore.markdown ?? '';
+		const trimmedTitle = knowledgeStore.knowledgeTitle.trim();
 		const base = { title: trimmedTitle, content: markdown };
 		const meta = buildAuthorMeta(getUserInfo);
-		const editingId = detailStore.knowledgeEditingKnowledgeId;
+		const editingId = knowledgeStore.knowledgeEditingKnowledgeId;
 		/** 本地合成 id：不写后端，仅后续 Tauri 落盘 */
 		if (isKnowledgeLocalMarkdownId(editingId)) {
 			return; // 既不 update 也不 saveKnowledge
@@ -203,22 +204,22 @@ export async function invokeReadKnowledgeMarkdownFile(
 		} else {
 			// 云端新建...
 		}
-	}, [detailStore, getUserInfo, knowledgeStore]);
+	}, [knowledgeStore, getUserInfo]);
 ```
 
 ```ts
 			if (isTauriRuntime()) {
-				const diskTitle = detailStore.knowledgeLocalDiskTitle;
+				const diskTitle = knowledgeStore.knowledgeLocalDiskTitle;
 				const previousTitle =
-					detailStore.knowledgeEditingKnowledgeId &&
+					knowledgeStore.knowledgeEditingKnowledgeId &&
 					diskTitle &&
 					diskTitle !== trimmedTitle
 						? diskTitle
 						: undefined; // 标题变更时传给 Rust 做本地文件重命名
 				const tauriBaseDir = isKnowledgeLocalMarkdownId(
-					detailStore.knowledgeEditingKnowledgeId,
+					knowledgeStore.knowledgeEditingKnowledgeId,
 				)
-					? (detailStore.knowledgeLocalDirPath?.trim() ||
+					? (knowledgeStore.knowledgeLocalDirPath?.trim() ||
 							TAURI_KNOWLEDGE_DIR) // 本地条目优先用打开文件所在目录
 					: TAURI_KNOWLEDGE_DIR; // 云端条目固定默认目录
 				const payload: SaveKnowledgeMarkdownPayload = {
@@ -234,17 +235,17 @@ export async function invokeReadKnowledgeMarkdownFile(
 ```ts
 	const handlePickRecord = useCallback(
 		(record: KnowledgeRecord) => {
-			detailStore.setKnowledgeOverwriteOpen(false);
-			detailStore.setKnowledgeEditingKnowledgeId(record.id);
-			detailStore.setKnowledgeLocalDirPath(record.localDirPath ?? null); // 本地打开带目录；云端为 null
+			knowledgeStore.setKnowledgeOverwriteOpen(false);
+			knowledgeStore.setKnowledgeEditingKnowledgeId(record.id);
+			knowledgeStore.setKnowledgeLocalDirPath(record.localDirPath ?? null); // 本地打开带目录；云端为 null
 			const t = (record.title ?? '').trim();
-			detailStore.setKnowledgeLocalDiskTitle(t || null);
+			knowledgeStore.setKnowledgeLocalDiskTitle(t || null);
 			const content = record.content ?? '';
-			detailStore.setKnowledgePersistedSnapshot({ title: t, content });
-			detailStore.setKnowledgeTitle(record.title ?? '');
-			detailStore.setMarkdown(content);
+			knowledgeStore.setKnowledgePersistedSnapshot({ title: t, content });
+			knowledgeStore.setKnowledgeTitle(record.title ?? '');
+			knowledgeStore.setMarkdown(content);
 		},
-		[detailStore],
+		[knowledgeStore],
 	);
 ```
 
@@ -474,16 +475,16 @@ flowchart LR
     R[read_knowledge_markdown_file]
   end
   subgraph editor [知识页]
-    DS[detailStore]
+    KS[KnowledgeStore]
     P[persistKnowledgeApi]
     T[save_knowledge_markdown]
   end
   SW -->|本地| L
   L -->|列表| R
-  R -->|KnowledgeRecord + localDirPath| DS
-  DS -->|本地 id| P
+  R -->|KnowledgeRecord + localDirPath| KS
+  KS -->|本地 id| P
   P -->|跳过| API[云端 API]
-  DS --> T
+  KS --> T
 ```
 
 ---

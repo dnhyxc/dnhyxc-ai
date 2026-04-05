@@ -55,7 +55,7 @@ const ChatBot = observer(
 		} = props;
 
 		const navigate = useNavigate();
-		const { chatStore, detailStore } = useStore();
+		const { chatStore, knowledgeStore } = useStore();
 		const {
 			onScrollToRef,
 			isSharing,
@@ -204,10 +204,10 @@ const ChatBot = observer(
 					});
 					return;
 				}
-				detailStore.applyKnowledgeDraftFromChatReply(content);
+				knowledgeStore.applyKnowledgeDraftFromChatReply(content);
 				navigate('/knowledge');
 			},
-			[detailStore, navigate],
+			[knowledgeStore, navigate],
 		);
 
 		const onSaveToKnowledge = onSaveToKnowledgeProp ?? defaultSaveToKnowledge;
