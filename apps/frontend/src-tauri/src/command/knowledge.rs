@@ -425,27 +425,193 @@ fn frontmost_application_name() -> Option<String> {
 	None
 }
 
-fn detect_editor_from_frontmost() -> DetectedMarkdownEditor {
-	let Some(name) = frontmost_application_name() else {
-		return DetectedMarkdownEditor::Trae;
+/// 子进程退出码 0 视为成功（如 pgrep 找到进程）
+fn command_exit_zero(program: &str, args: &[&str]) -> bool {
+	Command::new(program)
+		.args(args)
+		.status()
+		.ok()
+		.is_some_and(|s| s.success())
+}
+
+/// macOS：用「系统事件」进程名 + `ps` 命令行（含 Cursor.app）+ `pgrep` 多重判定；Electron 常只有 Helper 进程带完整路径，`pgrep -x Cursor` 易漏检
+#[cfg(target_os = "macos")]
+fn is_cursor_running_applescript() -> bool {
+	let Some(out) = Command::new("/usr/bin/osascript")
+		.args([
+			"-e",
+			r#"tell application "System Events""#,
+			"-e",
+			r#"repeat with procName in (name of every process)"#,
+			"-e",
+			r#"set t to procName as string"#,
+			"-e",
+			r#"if t contains "Cursor" then return true"#,
+			"-e",
+			r#"end repeat"#,
+			"-e",
+			r#"end tell"#,
+			"-e",
+			r#"return false"#,
+		])
+		.output()
+		.ok()
+	else {
+		return false;
 	};
-	let lower = name.to_lowercase();
-	// 前台为 Cursor（进程名常见为 Cursor，macOS 显示名亦含 cursor）
-	if lower.contains("cursor") {
+	if !out.status.success() {
+		return false;
+	}
+	String::from_utf8_lossy(&out.stdout)
+		.trim()
+		.eq_ignore_ascii_case("true")
+}
+
+#[cfg(target_os = "macos")]
+fn is_cursor_running_ps() -> bool {
+	let Ok(output) = Command::new("/bin/ps")
+		.args(["-ax", "-o", "command="])
+		.output()
+	else {
+		return false;
+	};
+	String::from_utf8_lossy(&output.stdout).lines().any(|line| {
+		// 典型：.../Cursor.app/...；无路径时仍有 Electron Helper 进程名
+		line.contains("Cursor.app/")
+			|| line.contains("Cursor Helper")
+			|| line.contains("MacOS/Cursor")
+	})
+}
+
+#[cfg(target_os = "macos")]
+fn is_cursor_running() -> bool {
+	is_cursor_running_applescript()
+		|| is_cursor_running_ps()
+		|| command_exit_zero("/usr/bin/pgrep", &["-x", "Cursor"])
+		|| command_exit_zero("/usr/bin/pgrep", &["-f", "Cursor.app"])
+		|| command_exit_zero("/usr/bin/pgrep", &["-x", "cursor"])
+}
+
+/// Cursor 稳定版常见 Bundle ID（Todesktop 分发）；若变更可再补 `open -a Cursor`
+#[cfg(target_os = "macos")]
+const CURSOR_MACOS_BUNDLE_ID: &str = "com.todesktop.230313mzl4w4u92";
+
+/// macOS：优先按 Bundle ID 打开，再 `open -a Cursor`，再尝试 PATH 中的 `cursor` CLI
+#[cfg(target_os = "macos")]
+fn spawn_open_cursor_macos(path: &Path) -> Result<(), String> {
+	let path_str = path.to_str().ok_or("路径包含无效字符")?;
+	if Command::new("/usr/bin/open")
+		.args(["-b", CURSOR_MACOS_BUNDLE_ID, "--", path_str])
+		.status()
+		.map(|s| s.success())
+		.unwrap_or(false)
+	{
+		return Ok(());
+	}
+	if spawn_open_editor("Cursor", path).is_ok() {
+		return Ok(());
+	}
+	Command::new("cursor")
+		.arg(path_str)
+		.spawn()
+		.map_err(|e| format!("无法用 Cursor 打开文件: {e}"))?;
+	Ok(())
+}
+
+#[cfg(target_os = "windows")]
+fn is_cursor_running() -> bool {
+	let Ok(output) = Command::new("tasklist").args(["/FO", "CSV", "/NH"]).output() else {
+		return false;
+	};
+	String::from_utf8_lossy(&output.stdout)
+		.to_lowercase()
+		.contains("cursor.exe")
+}
+
+#[cfg(all(unix, not(target_os = "macos")))]
+fn is_cursor_running() -> bool {
+	command_exit_zero("pgrep", &["-x", "cursor"])
+		|| command_exit_zero("pgrep", &["-f", "/Cursor.app/"])
+		|| command_exit_zero("pgrep", &["-f", "cursor"])
+}
+
+#[cfg(target_os = "macos")]
+fn is_trae_running() -> bool {
+	for name in ["Trae", "Trae CN"] {
+		if command_exit_zero("/usr/bin/pgrep", &["-x", name]) {
+			return true;
+		}
+	}
+	command_exit_zero("/usr/bin/pgrep", &["-f", "Trae.app"])
+}
+
+#[cfg(target_os = "windows")]
+fn is_trae_running() -> bool {
+	let Ok(output) = Command::new("tasklist").args(["/FO", "CSV", "/NH"]).output() else {
+		return false;
+	};
+	let lower = String::from_utf8_lossy(&output.stdout).to_lowercase();
+	lower.contains("trae.exe")
+}
+
+#[cfg(all(unix, not(target_os = "macos")))]
+fn is_trae_running() -> bool {
+	command_exit_zero("pgrep", &["-x", "trae"]) || command_exit_zero("pgrep", &["-f", "trae"])
+}
+
+/// 1) 前台为 Cursor → Cursor；2) 前台为 Trae → Trae；3) 否则看谁已在运行（**优先 Cursor**，解决本应用前台时误走 Trae）；4) 都未运行则默认 Trae
+fn detect_markdown_editor() -> DetectedMarkdownEditor {
+	if let Some(name) = frontmost_application_name() {
+		let lower = name.to_lowercase();
+		if lower.contains("cursor") {
+			return DetectedMarkdownEditor::Cursor;
+		}
+		if lower.contains("trae") {
+			return DetectedMarkdownEditor::Trae;
+		}
+	}
+	if is_cursor_running() {
 		return DetectedMarkdownEditor::Cursor;
 	}
-	// Trae（字节）在 macOS 可能显示为 Trae / Trae CN 等
-	if lower.contains("trae") {
+	if is_trae_running() {
 		return DetectedMarkdownEditor::Trae;
 	}
-	// 当前不在上述编辑器内（含本应用前台）：默认用 Trae 打开
+	// 进程检测失败时（如未授权自动化 System Events）：按是否安装 Cursor.app / Trae.app 兜底
+	#[cfg(target_os = "macos")]
+	if let Some(kind) = detect_editor_by_cursor_trae_installed() {
+		return kind;
+	}
 	DetectedMarkdownEditor::Trae
+}
+
+#[cfg(target_os = "macos")]
+fn macos_app_bundle_present(name: &str) -> bool {
+	let home = env::var("HOME").unwrap_or_default();
+	[
+		format!("/Applications/{name}.app"),
+		format!("{home}/Applications/{name}.app"),
+	]
+	.iter()
+	.any(|p| Path::new(p).is_dir())
+}
+
+/// 仅当能明确判断「只装了其一」或「两者都装了」时用；双装优先 Cursor
+#[cfg(target_os = "macos")]
+fn detect_editor_by_cursor_trae_installed() -> Option<DetectedMarkdownEditor> {
+	let cursor = macos_app_bundle_present("Cursor");
+	let trae = macos_app_bundle_present("Trae") || macos_app_bundle_present("Trae CN");
+	match (cursor, trae) {
+		(true, false) => Some(DetectedMarkdownEditor::Cursor),
+		(false, true) => Some(DetectedMarkdownEditor::Trae),
+		(true, true) => Some(DetectedMarkdownEditor::Cursor),
+		_ => None,
+	}
 }
 
 #[cfg(target_os = "macos")]
 fn spawn_open_editor(app_bundle_name: &str, path: &Path) -> Result<(), String> {
 	let path_str = path.to_str().ok_or("路径包含无效字符")?;
-	let status = Command::new("open")
+	let status = Command::new("/usr/bin/open")
 		.args(["-a", app_bundle_name, "--", path_str])
 		.status()
 		.map_err(|e| format!("无法启动 {app_bundle_name}: {e}"))?;
@@ -467,12 +633,12 @@ fn spawn_open_editor(cli_name: &str, path: &Path) -> Result<(), String> {
 }
 
 fn open_markdown_with_detected_editor(path: &Path) -> Result<DetectedMarkdownEditor, String> {
-	let kind = detect_editor_from_frontmost();
+	let kind = detect_markdown_editor();
 	match kind {
 		DetectedMarkdownEditor::Cursor => {
 			#[cfg(target_os = "macos")]
 			{
-				spawn_open_editor("Cursor", path)?;
+				spawn_open_cursor_macos(path)?;
 			}
 			#[cfg(not(target_os = "macos"))]
 			{
@@ -510,7 +676,7 @@ pub struct OpenKnowledgeMarkdownInEditorResult {
 	pub opened_with: String,
 }
 
-/// 在检测到的编辑器中打开本地 `.md`：前台为 Cursor 则用 Cursor，为 Trae 则用 Trae，否则默认 Trae（macOS 下 Trae 失败时尝试 Trae CN）
+/// 在检测到的编辑器中打开本地 `.md`：前台名 → 运行中进程（优先 Cursor）→ macOS 再按已安装 .app 兜底；打开时 macOS Cursor 用 Bundle ID / open -a / CLI，Trae 支持 Trae CN
 #[tauri::command]
 pub fn open_knowledge_markdown_in_editor(
 	input: OpenKnowledgeMarkdownInEditorInput,

@@ -1,9 +1,7 @@
 import Confirm from '@design/Confirm';
 import { Drawer } from '@design/Drawer';
-import { Button } from '@ui/button';
-import { ScrollArea } from '@ui/index';
-import { Toast } from '@ui/sonner';
-import { Switch } from '@ui/switch';
+import Tooltip from '@design/Tooltip';
+import { Button, ScrollArea, Switch, Toast } from '@ui/index';
 import { Code2, Trash2 } from 'lucide-react';
 import { observer } from 'mobx-react';
 import { useCallback, useEffect, useState } from 'react';
@@ -90,27 +88,28 @@ function KnowledgeListRow(props: {
 				<div className="flow-root flex-1 min-w-0 max-w-full font-medium wrap-anywhere">
 					{item.title?.trim() || '未命名'}
 				</div>
-				<div className="flex shrink-0 items-start gap-0.5">
+				<div className="flex shrink-0 items-start gap-1">
 					{showOpenInExternalEditor &&
 					item.localAbsolutePath &&
 					onOpenInExternalEditorClick ? (
-						<button
-							type="button"
-							aria-label="在 Cursor 或 Trae 中打开"
-							title="根据当前前台应用选择：前台为 Cursor 则用 Cursor，否则用 Trae 打开"
-							className={cn(
-								'cursor-pointer shrink-0 p-1 rounded-md text-textcolor/80 transition-opacity duration-150',
-								'opacity-0 pointer-events-none',
-								'hover:text-teal-400 hover:bg-theme/10',
-								'group-hover:opacity-100 group-hover:pointer-events-auto',
-							)}
-							onClick={(e) => {
-								e.stopPropagation();
-								onOpenInExternalEditorClick(e, item);
-							}}
-						>
-							<Code2 size={16} />
-						</button>
+						<Tooltip side="left" content="在 Cursor 或 Trae 中打开">
+							<button
+								type="button"
+								aria-label="在 Cursor 或 Trae 中打开"
+								className={cn(
+									'cursor-pointer shrink-0 p-1 rounded-md text-textcolor/80 transition-opacity duration-150',
+									'opacity-0 pointer-events-none',
+									'hover:text-teal-400 hover:bg-theme/10',
+									'group-hover:opacity-100 group-hover:pointer-events-auto',
+								)}
+								onClick={(e) => {
+									e.stopPropagation();
+									onOpenInExternalEditorClick(e, item);
+								}}
+							>
+								<Code2 size={16} />
+							</button>
+						</Tooltip>
 					) : null}
 					<button
 						type="button"
@@ -402,7 +401,7 @@ const KnowledgeList: React.FC<IProps> = observer(
 			[openDeleteFlow],
 		);
 
-		/** 本地列表：在 Cursor / Trae 中打开（由 Rust 根据前台进程名判定，默认 Trae） */
+		/** 本地列表：在 Cursor / Trae 中打开（由 Rust detect_markdown_editor，优先 Cursor） */
 		const onOpenInExternalEditorClick = useCallback(
 			async (_e: React.MouseEvent, knowledge: KnowledgeListItem) => {
 				const p = knowledge.localAbsolutePath;

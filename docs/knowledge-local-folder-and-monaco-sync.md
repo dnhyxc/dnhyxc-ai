@@ -10,19 +10,20 @@
 
 1. **知识库抽屉**：用开关在「云端数据库列表」与「本地指定文件夹内递归 `.md` 列表」之间切换；桌面端可选目录、读文件、删文件；打开条目后编辑器可保存到对应目录。
 2. **Monaco 编辑器**：点击「清空」或从外部把正文设为空时，即使焦点仍在编辑器内，也能把视图与父组件 `value` 对齐（修复不同步问题）。
+3. **本地文件夹列表**：在删除按钮左侧提供「在外部编辑器打开」，将当前 `.md` 绝对路径交给 Tauri，由 Rust 在 **Cursor** 或 **Trae**（字节，用户口语中的 tare）中打开；优先匹配前台应用与已运行进程，macOS 下可再按 `/Applications` 安装位置兜底。
 
 ### 1.2 涉及文件
 
 | 路径                                                    | 作用                                                                            |
 | ------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| `apps/frontend/src-tauri/src/command/knowledge.rs`      | 列出目录下 `.md`、读取单文件                                                    |
+| `apps/frontend/src-tauri/src/command/knowledge.rs`      | 列出目录下 `.md`、读取单文件；`open_knowledge_markdown_in_editor`（Cursor/Trae） |
 | `apps/frontend/src-tauri/src/lib.rs`                    | 注册 Tauri `invoke` 命令                                                        |
 | `apps/frontend/src/utils/knowledge-save.ts`             | 前端封装 `invoke`                                                               |
 | `apps/frontend/src/types/index.ts`                      | `KnowledgeRecord` / `KnowledgeListItem` 扩展字段                                |
 | `apps/frontend/src/views/knowledge/constants.ts`        | 本地条目 id 前缀与判定函数                                                      |
 | `apps/frontend/src/store/knowledge.ts`                  | 列表分页 + 编辑器草稿（含 `knowledgeLocalDirPath`、清空草稿）                   |
 | `apps/frontend/src/views/knowledge/index.tsx`           | 保存走云端或仅磁盘、回填 `localDirPath`；覆盖/另存为冲突流程                    |
-| `apps/frontend/src/views/knowledge/KnowledgeList.tsx`   | 开关、选文件夹、本地列表与删除分支                                              |
+| `apps/frontend/src/views/knowledge/KnowledgeList.tsx`   | 开关、选文件夹、本地列表与删除分支；本地模式下「在外部编辑器打开」按钮            |
 | `apps/frontend/src/components/design/Confirm/index.tsx` | 通用确认框；支持第三钮「另存为」（`secondaryActionText` / `onSecondaryAction`） |
 | `apps/frontend/src/components/design/Monaco/index.tsx`  | 外部 `value` 与编辑器同步策略                                                   |
 
@@ -168,6 +169,57 @@ flowchart TD
   ApiNew --> TauriNew[runTauriSave diskTitle]
   Over --> ApiUp[persistKnowledgeApi]
   ApiUp --> TauriOv[runTauriSave overwrite true]
+```
+
+### 2.8 本地文件夹：在外部编辑器（Cursor / Trae）中打开
+
+**范围**
+
+- 仅当抽屉内 **数据来源 = 本地文件夹** 且运行环境为 **Tauri** 时，列表每一行在 **删除按钮左侧** 显示 `Code2` 图标按钮。
+- 云端数据库列表无此按钮（无 `localAbsolutePath`）。
+
+**前端**
+
+- 点击后 `stopPropagation`，避免触发行点击打开详情。
+- 调用 `invokeOpenKnowledgeMarkdownInEditor(localAbsolutePath)`，成功 Toast 展示 Rust 返回的 `openedWith`（`Cursor` 或 `Trae`）。
+
+**Tauri 命令 `open_knowledge_markdown_in_editor`**
+
+- 入参：`filePath`（camelCase）为绝对路径。
+- 校验：非空、路径为已存在普通文件、扩展名为 `.md`（与读文件命令一致）。
+- 通过 `detect_markdown_editor()` 决定用哪种编辑器，再 `open_markdown_with_detected_editor` 执行打开。
+
+**编辑器选择逻辑 `detect_markdown_editor`（优先级）**
+
+1. **前台应用名**（macOS：`osascript` + System Events；Windows：PowerShell + `user32` 取前台进程名）：名中含 `cursor` → Cursor；含 `trae` → Trae。
+2. 否则判断 **是否已有对应进程在运行**（避免用户正在本应用内点击时前台永远是本应用）：
+   - **macOS Cursor**：AppleScript 枚举进程名是否含 `Cursor`；`/bin/ps -ax -o command=` 是否含 `Cursor.app/`、`Cursor Helper`、`MacOS/Cursor`；`/usr/bin/pgrep` 多种参数。
+   - **macOS Trae**：`pgrep -x Trae` / `Trae CN`、`pgrep -f Trae.app`。
+   - **Windows**：`tasklist` 文本中是否含 `cursor.exe` / `trae.exe`。
+   - **Linux 等**：`pgrep` 等；前台名在非 macOS/Windows 上可能恒为「无」。
+3. **仍无法判定进程时（仅 macOS）**：检查 `/Applications` 与 `~/Applications` 下是否存在 `Cursor.app`、`Trae.app` / `Trae CN.app`——仅 Cursor → Cursor；仅 Trae → Trae；**两者皆装则优先 Cursor**；皆无则返回 Trae（后续打开会走 Trae 分支，可能报错提示安装）。
+4. 在 **2** 中已明确 **优先 Cursor 再 Trae**，与「Cursor 已开、Trae 未开」的预期一致。
+
+**实际打开方式**
+
+- **macOS + Cursor**：依次尝试 `open -b com.todesktop.230313mzl4w4u92`（Todesktop 分发常见 Bundle ID）、`open -a Cursor`、`cursor <路径>`（PATH 中的 CLI）。
+- **macOS + Trae**：`open -a Trae`，失败则 `open -a Trae CN`。
+- **非 macOS + Cursor / Trae**：`std::process::Command` 启动 `cursor` / `trae` 可执行文件并传入路径。
+- `open` 一律使用 **`/usr/bin/open`**，避免 GUI 进程 `PATH` 过短找不到命令。
+
+**权限与维护**
+
+- macOS 若未授权本应用通过 **自动化** 控制 **System Events**，AppleScript 列举进程可能失败，此时仍依赖 `ps` / `pgrep` / 安装目录兜底。
+- Cursor 若更换 Bundle ID，需同步修改 `CURSOR_MACOS_BUNDLE_ID` 常量。
+
+```mermaid
+flowchart LR
+  Row[本地行 hover] --> Btn[Code2 按钮]
+  Btn --> Inv[invokeOpenKnowledgeMarkdownInEditor]
+  Inv --> Cmd[open_knowledge_markdown_in_editor]
+  Cmd --> Pick[detect_markdown_editor]
+  Pick --> Open[open_markdown_with_detected_editor]
+  Open --> Cur[Cursor 打开链 / Trae 打开链]
 ```
 
 ---
@@ -1185,6 +1237,429 @@ fn sanitize_filename(title: &str) -> String {
 }
 ```
 
+### 3.12 外部编辑器打开本地 `.md` — `lib.rs` / `knowledge-save.ts` / `KnowledgeList.tsx` / `knowledge.rs`（逐行注释）
+
+以下摘录与仓库实现一致；行号随重构可能变化，以路径为准。
+
+#### 3.12.1 `lib.rs` — 注册 invoke
+
+```rust
+use command::knowledge::{
+    delete_knowledge_markdown, list_knowledge_markdown_files, open_knowledge_markdown_in_editor,
+    read_knowledge_markdown_file, resolve_knowledge_markdown_target, save_knowledge_markdown,
+};
+// ...
+            open_knowledge_markdown_in_editor, // 本地 .md 在 Cursor / Trae 中打开
+```
+
+- 第一处：`use` 引入命令函数，供 `generate_handler!` 宏注册。
+- 第二处：与 `read_knowledge_markdown_file` 等并列注册，前端 `invoke('open_knowledge_markdown_in_editor', …)` 才能调到 Rust。
+
+#### 3.12.2 `knowledge-save.ts` — 封装 invoke
+
+```ts
+/** 在检测到的编辑器中打开本地 .md（逻辑见 Tauri `open_knowledge_markdown_in_editor`） */
+export async function invokeOpenKnowledgeMarkdownInEditor(
+	filePath: string, // 列表项上的 localAbsolutePath
+): Promise<{ openedWith: string }> {
+	const { invoke } = await import('@tauri-apps/api/core'); // 动态 import，非 Tauri 构建不强制加载
+	return invoke<{ openedWith: string }>('open_knowledge_markdown_in_editor', {
+		input: { filePath }, // 与 Rust `OpenKnowledgeMarkdownInEditorInput` 的 camelCase 对齐
+	});
+}
+```
+
+- 返回的 `openedWith` 用于 Toast 文案（`Cursor` 或 `Trae`）。
+
+#### 3.12.3 `KnowledgeList.tsx` — 行组件 props、按钮与回调
+
+```tsx
+import { Code2, Trash2 } from 'lucide-react'; // Code2：外部编辑器；Trash2：删除
+// ...
+import {
+	// ...
+	invokeOpenKnowledgeMarkdownInEditor,
+	// ...
+} from '@/utils/knowledge-save';
+```
+
+```tsx
+/** 单行：点击打开详情；删除图标与数据库列表一致，仅行 hover 时显示 */
+function KnowledgeListRow(props: {
+	item: KnowledgeListItem; // 含可选 localAbsolutePath
+	selected: boolean; // 是否与当前编辑 id 一致
+	onActivate: (item: KnowledgeListItem) => void; // 点击行主体
+	onTrashClick: (e: React.MouseEvent, item: KnowledgeListItem) => void; // 删除
+	/** 本地文件夹模式：在 Cursor / Trae 中打开（按钮在删除左侧） */
+	showOpenInExternalEditor?: boolean; // 由父组件传入，仅本地+Tauri 为 true
+	onOpenInExternalEditorClick?: (
+		e: React.MouseEvent,
+		item: KnowledgeListItem,
+	) => void; // 点击 Code2 时调用
+}) {
+	const {
+		item,
+		selected,
+		onActivate,
+		onTrashClick,
+		showOpenInExternalEditor = false, // 默认不展示外部打开
+		onOpenInExternalEditorClick,
+	} = props;
+```
+
+```tsx
+				<div className="flex shrink-0 items-start gap-0.5">
+					{showOpenInExternalEditor &&
+					item.localAbsolutePath &&
+					onOpenInExternalEditorClick ? (
+						<button
+							type="button" // 避免 submit
+							aria-label="在 Cursor 或 Trae 中打开" // 读屏
+							title="前台为 Cursor/Trae 则对应用之；否则若 Cursor 已在运行则优先 Cursor，再检测 Trae，都未开则尝试 Trae" // 悬停说明检测规则
+							className={cn(
+								'cursor-pointer shrink-0 p-1 rounded-md text-textcolor/80 transition-opacity duration-150',
+								'opacity-0 pointer-events-none', // 默认隐藏
+								'hover:text-teal-400 hover:bg-theme/10', // 与删除钮区分色
+								'group-hover:opacity-100 group-hover:pointer-events-auto', // 与删除钮同一套 hover 显隐
+							)}
+							onClick={(e) => {
+								e.stopPropagation(); // 不触发行 onClick 打开详情
+								onOpenInExternalEditorClick(e, item);
+							}}
+						>
+							<Code2 size={16} />
+						</button>
+					) : null}
+					<button
+						type="button"
+						aria-label={
+							item.localAbsolutePath ? '删除本地 Markdown 文件' : '从知识库删除'
+						}
+						// ... 删除钮 className 与 onTrashClick 同前
+					>
+						<Trash2 size={16} />
+					</button>
+				</div>
+```
+
+```ts
+		/** 本地列表：在 Cursor / Trae 中打开（由 Rust 判定编辑器并执行打开） */
+		const onOpenInExternalEditorClick = useCallback(
+			async (_e: React.MouseEvent, knowledge: KnowledgeListItem) => {
+				const p = knowledge.localAbsolutePath; // 仅本地行有值
+				if (!p) return; // 防御
+				try {
+					const { openedWith } = await invokeOpenKnowledgeMarkdownInEditor(p); // Tauri 打开
+					Toast({
+						type: 'success',
+						title: '已在外部编辑器打开',
+						message: `使用 ${openedWith} 打开文件`, // 与 Rust 返回一致
+						duration: 2000,
+					});
+				} catch (err) {
+					Toast({
+						type: 'error',
+						title: '打开失败',
+						message: formatTauriInvokeError(err), // 统一解析 Tauri 错误
+					});
+				}
+			},
+			[],
+		);
+```
+
+```tsx
+									<KnowledgeListRow
+										key={knowledge.id}
+										item={knowledge}
+										selected={
+											editingKnowledgeId != null &&
+											editingKnowledgeId === knowledge.id
+										}
+										onActivate={handleRowClick}
+										onTrashClick={onTrashClick}
+										showOpenInExternalEditor={
+											useLocalFolder && isTauriRuntime() // 仅本地数据源且桌面端
+										}
+										onOpenInExternalEditorClick={onOpenInExternalEditorClick}
+									/>
+```
+
+#### 3.12.4 `knowledge.rs` — 枚举、前台名、Cursor 检测与打开
+
+```rust
+// —— 本地 .md 用 Cursor / Trae（用户所称 tare）打开 ——
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DetectedMarkdownEditor {
+	Cursor, // 选用 Cursor 打开
+	Trae,   // 选用 Trae 打开
+}
+```
+
+```rust
+#[cfg(target_os = "macos")]
+fn frontmost_application_name() -> Option<String> {
+	let script =
+		r#"tell application "System Events" to get name of first application process whose frontmost is true"#; // 前台应用显示名
+	let output = Command::new("osascript").args(["-e", script]).output().ok()?; // 执行 AppleScript
+	if !output.status.success() {
+		return None; // 无权限或失败
+	}
+	let s = String::from_utf8(output.stdout).ok()?;
+	let t = s.trim();
+	if t.is_empty() {
+		None
+	} else {
+		Some(t.to_string()) // 供 detect 与 cursor/trae 子串匹配
+	}
+}
+```
+
+（Windows / 非 macOS Unix 的 `frontmost_application_name` 实现见仓库同文件：`windows` 用 PowerShell + `GetForegroundWindow`；其它 Unix 返回 `None`。）
+
+```rust
+/// 子进程退出码 0 视为成功（如 pgrep 找到进程）
+fn command_exit_zero(program: &str, args: &[&str]) -> bool {
+	Command::new(program)
+		.args(args)
+		.status()
+		.ok()
+		.is_some_and(|s| s.success()) // pgrep 找到目标进程时 exit 0
+}
+```
+
+```rust
+#[cfg(target_os = "macos")]
+fn is_cursor_running_applescript() -> bool {
+	let Some(out) = Command::new("/usr/bin/osascript")
+		.args([
+			"-e", r#"tell application "System Events""#,
+			"-e", r#"repeat with procName in (name of every process)"#,
+			"-e", r#"set t to procName as string"#,
+			"-e", r#"if t contains "Cursor" then return true"#,
+			"-e", r#"end repeat"#,
+			"-e", r#"end tell"#,
+			"-e", r#"return false"#,
+		])
+		.output()
+		.ok()
+	else {
+		return false; // 无法启动 osascript
+	};
+	if !out.status.success() {
+		return false; // 自动化权限等
+	}
+	String::from_utf8_lossy(&out.stdout)
+		.trim()
+		.eq_ignore_ascii_case("true") // AppleScript 打印 true/false
+}
+```
+
+```rust
+#[cfg(target_os = "macos")]
+fn is_cursor_running_ps() -> bool {
+	let Ok(output) = Command::new("/bin/ps").args(["-ax", "-o", "command="]).output() else {
+		return false;
+	};
+	String::from_utf8_lossy(&output.stdout).lines().any(|line| {
+		line.contains("Cursor.app/")
+			|| line.contains("Cursor Helper") // Electron 子进程名
+			|| line.contains("MacOS/Cursor") // 路径截断时仍可能匹配
+	})
+}
+```
+
+```rust
+#[cfg(target_os = "macos")]
+fn is_cursor_running() -> bool {
+	is_cursor_running_applescript()
+		|| is_cursor_running_ps()
+		|| command_exit_zero("/usr/bin/pgrep", &["-x", "Cursor"])
+		|| command_exit_zero("/usr/bin/pgrep", &["-f", "Cursor.app"])
+		|| command_exit_zero("/usr/bin/pgrep", &["-x", "cursor"])
+}
+```
+
+```rust
+#[cfg(target_os = "macos")]
+const CURSOR_MACOS_BUNDLE_ID: &str = "com.todesktop.230313mzl4w4u92"; // Todesktop 分发常见 ID
+
+#[cfg(target_os = "macos")]
+fn spawn_open_cursor_macos(path: &Path) -> Result<(), String> {
+	let path_str = path.to_str().ok_or("路径包含无效字符")?;
+	if Command::new("/usr/bin/open")
+		.args(["-b", CURSOR_MACOS_BUNDLE_ID, "--", path_str])
+		.status()
+		.map(|s| s.success())
+		.unwrap_or(false)
+	{
+		return Ok(()); // Bundle ID 打开成功
+	}
+	if spawn_open_editor("Cursor", path).is_ok() {
+		return Ok(()); // 显示名打开成功
+	}
+	Command::new("cursor")
+		.arg(path_str)
+		.spawn()
+		.map_err(|e| format!("无法用 Cursor 打开文件: {e}"))?; // 官方 CLI
+	Ok(())
+}
+```
+
+#### 3.12.5 `knowledge.rs` — Trae 检测、安装兜底、分发打开与命令入口
+
+```rust
+#[cfg(target_os = "macos")]
+fn is_trae_running() -> bool {
+	for name in ["Trae", "Trae CN"] {
+		if command_exit_zero("/usr/bin/pgrep", &["-x", name]) {
+			return true;
+		}
+	}
+	command_exit_zero("/usr/bin/pgrep", &["-f", "Trae.app"])
+}
+```
+
+（Windows：`tasklist` 含 `trae.exe`；Linux：`pgrep` — 见仓库。）
+
+```rust
+fn detect_markdown_editor() -> DetectedMarkdownEditor {
+	if let Some(name) = frontmost_application_name() {
+		let lower = name.to_lowercase();
+		if lower.contains("cursor") {
+			return DetectedMarkdownEditor::Cursor; // 用户正停在 Cursor
+		}
+		if lower.contains("trae") {
+			return DetectedMarkdownEditor::Trae;
+		}
+	}
+	if is_cursor_running() {
+		return DetectedMarkdownEditor::Cursor; // 后台已开 Cursor，优先于 Trae
+	}
+	if is_trae_running() {
+		return DetectedMarkdownEditor::Trae;
+	}
+	#[cfg(target_os = "macos")]
+	if let Some(kind) = detect_editor_by_cursor_trae_installed() {
+		return kind; // 进程检测全失败时用 .app 是否安装推断
+	}
+	DetectedMarkdownEditor::Trae // 最后默认走 Trae 分支
+}
+```
+
+```rust
+#[cfg(target_os = "macos")]
+fn macos_app_bundle_present(name: &str) -> bool {
+	let home = env::var("HOME").unwrap_or_default();
+	[
+		format!("/Applications/{name}.app"),
+		format!("{home}/Applications/{name}.app"),
+	]
+	.iter()
+	.any(|p| Path::new(p).is_dir()) // 是否为目录即视为已安装
+}
+
+#[cfg(target_os = "macos")]
+fn detect_editor_by_cursor_trae_installed() -> Option<DetectedMarkdownEditor> {
+	let cursor = macos_app_bundle_present("Cursor");
+	let trae = macos_app_bundle_present("Trae") || macos_app_bundle_present("Trae CN");
+	match (cursor, trae) {
+		(true, false) => Some(DetectedMarkdownEditor::Cursor),
+		(false, true) => Some(DetectedMarkdownEditor::Trae),
+		(true, true) => Some(DetectedMarkdownEditor::Cursor), // 双装优先 Cursor
+		_ => None,
+	}
+}
+```
+
+```rust
+#[cfg(target_os = "macos")]
+fn spawn_open_editor(app_bundle_name: &str, path: &Path) -> Result<(), String> {
+	let path_str = path.to_str().ok_or("路径包含无效字符")?;
+	let status = Command::new("/usr/bin/open")
+		.args(["-a", app_bundle_name, "--", path_str]) // -a：按应用名打开文件
+		.status()
+		.map_err(|e| format!("无法启动 {app_bundle_name}: {e}"))?;
+	if status.success() {
+		Ok(())
+	} else {
+		Err(format!("open -a {app_bundle_name} 退出码非 0"))
+	}
+}
+```
+
+```rust
+fn open_markdown_with_detected_editor(path: &Path) -> Result<DetectedMarkdownEditor, String> {
+	let kind = detect_markdown_editor();
+	match kind {
+		DetectedMarkdownEditor::Cursor => {
+			#[cfg(target_os = "macos")]
+			{
+				spawn_open_cursor_macos(path)?; // macOS 专用打开链
+			}
+			#[cfg(not(target_os = "macos"))]
+			{
+				spawn_open_editor("cursor", path)?; // Windows/Linux CLI 名
+			}
+			Ok(DetectedMarkdownEditor::Cursor)
+		}
+		DetectedMarkdownEditor::Trae => {
+			#[cfg(target_os = "macos")]
+			{
+				if spawn_open_editor("Trae", path).is_err() {
+					spawn_open_editor("Trae CN", path)?; // 中文区安装名
+				}
+			}
+			#[cfg(not(target_os = "macos"))]
+			{
+				spawn_open_editor("trae", path)?;
+			}
+			Ok(DetectedMarkdownEditor::Trae)
+		}
+	}
+}
+```
+
+```rust
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OpenKnowledgeMarkdownInEditorInput {
+	pub file_path: String, // 前端 filePath
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OpenKnowledgeMarkdownInEditorResult {
+	pub opened_with: String, // "Cursor" | "Trae"
+}
+
+#[tauri::command]
+pub fn open_knowledge_markdown_in_editor(
+	input: OpenKnowledgeMarkdownInEditorInput,
+) -> Result<OpenKnowledgeMarkdownInEditorResult, String> {
+	let trimmed = input.file_path.trim();
+	if trimmed.is_empty() {
+		return Err("filePath 不能为空".to_string());
+	}
+	let p = PathBuf::from(trimmed);
+	if !p.exists() || !p.is_file() {
+		return Err("文件不存在或不是普通文件".to_string());
+	}
+	if !is_md_file_path(&p) {
+		return Err("仅允许打开 .md 文件".to_string());
+	}
+	let used = open_markdown_with_detected_editor(&p)?; // 检测 + 打开
+	let opened_with = match used {
+		DetectedMarkdownEditor::Cursor => "Cursor",
+		DetectedMarkdownEditor::Trae => "Trae",
+	};
+	Ok(OpenKnowledgeMarkdownInEditorResult {
+		opened_with: opened_with.to_string(),
+	})
+}
+```
+
 ---
 
 ## 4. 数据流简图
@@ -1216,6 +1691,8 @@ flowchart LR
 - `TAURI_KNOWLEDGE_DIR` 当前为**写死的绝对路径**；多环境部署时可改为与 Rust `resolve_knowledge_dir` 对齐或由配置注入。
 - 本地合成 id 依赖 `encodeURIComponent(path)`；若未来 id 长度或字符集成为问题，可改为哈希缩短，但需同步调整删除回调比对逻辑。
 - 另存为文件名中的 `:` 依赖 Rust `sanitize_filename` 替换为 `-`；若修改 sanitize 规则，需同步核对 Windows 落盘与文档 **§2.7 / §3.11.9** 描述。
+- **外部编辑器打开**：macOS 需在「隐私与安全性 → 自动化」中允许本应用控制 **System Events**，AppleScript 列举进程才稳定；若 Cursor 更换 **Bundle ID**，需同步 `knowledge.rs` 中 `CURSOR_MACOS_BUNDLE_ID` 与文档 **§2.8 / §3.12**。
+- Trae 若仅提供其它 `.app` 名称，可在 `spawn_open_editor` / `macos_app_bundle_present` 中增补别名；Windows/Linux 依赖 `cursor`/`trae` 是否在 `PATH`。
 
 ---
 
