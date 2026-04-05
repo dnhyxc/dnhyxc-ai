@@ -77,10 +77,14 @@ const Sidebar = () => {
 					{processedMenus.map((item) => (
 						<div
 							key={item.path}
-							className="text-theme flex justify-center items-center w-11 h-11 bg-theme-secondary mb-4 cursor-pointer rounded-md hover:text-teal-500 transition-all duration-200 ease-in-out"
+							role="button"
+							tabIndex={0}
+							className="sidebar-nav-btn group text-theme mb-4 flex h-11 w-11 cursor-pointer items-center justify-center rounded-md bg-theme-secondary transition-[color,background-color] duration-200 ease-linear hover:bg-theme/12 hover:text-teal-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/50"
 							onClick={item.onClick}
 						>
-							{item.icon}
+							<span className="flex size-full items-center justify-center [&>svg]:size-[22px] [&>svg]:shrink-0 [&>svg]:overflow-visible">
+								{item.icon}
+							</span>
 						</div>
 					))}
 				</div>
@@ -88,8 +92,8 @@ const Sidebar = () => {
 					{storageInfo?.access_token ? (
 						<DropdownMenu>
 							<DropdownMenuTrigger asChild>
-								<div className="text-theme flex justify-center items-center w-11 h-11 bg-theme-secondary cursor-pointer rounded-md hover:text-theme/70 transition-all duration-200 ease-in-out">
-									<CircleUserRound className="hover:text-theme/70" />
+								<div className="sidebar-nav-btn group text-theme flex h-11 w-11 cursor-pointer items-center justify-center rounded-md bg-theme-secondary transition-[color,background-color] duration-200 ease-linear hover:bg-theme/12 hover:text-teal-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/50">
+									<CircleUserRound className="size-[22px] shrink-0 overflow-visible" />
 								</div>
 							</DropdownMenuTrigger>
 							<DropdownMenuContent
@@ -130,10 +134,12 @@ const Sidebar = () => {
 						</DropdownMenu>
 					) : (
 						<div
-							className="text-theme flex justify-center items-center w-11 h-11 bg-theme-secondary cursor-pointer rounded-md hover:text-teal-500 transition-all duration-200 ease-in-out"
+							role="button"
+							tabIndex={0}
+							className="sidebar-nav-btn group text-theme flex h-11 w-11 cursor-pointer items-center justify-center rounded-md bg-theme-secondary transition-[color,background-color] duration-200 ease-linear hover:bg-theme/12 hover:text-teal-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/50"
 							onClick={() => onJump('/login')}
 						>
-							<CircleUserRound className="hover:text-teal-500" />
+							<CircleUserRound className="size-[22px] shrink-0 overflow-visible" />
 						</div>
 					)}
 				</div>
