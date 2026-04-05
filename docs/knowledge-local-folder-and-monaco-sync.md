@@ -49,7 +49,7 @@
 
 - **数据库模式**：打开抽屉时 `knowledgeStore.refreshList()`；列表滚动继续触发分页。
 - **本地模式**：仅 Tauri 可用；`select_directory` 更新 `localFolderPath`；`invokeListKnowledgeMarkdownFiles` 填充 `localList`；点击行 `invokeReadKnowledgeMarkdownFile` 后组装 `KnowledgeRecord`（含 `localDirPath`）再 `onPick`。
-- **删除**：若列表项带 `localAbsolutePath`，只删磁盘文件并刷新本地列表，不调 `deleteKnowledge`。
+- **删除**：流程与 UI 约定见 **§2.6**。
 
 ### 2.5 Monaco 清空不同步的根因与修复
 
@@ -63,6 +63,58 @@
 - 以 **`ed.getValue()` 与 props `value` 规范化后是否一致** 为是否需同步的首要条件。
 - **有焦点时**：若既非「清空」（`next === ''`），也非「换篇」（`documentIdentity` 相对上次同步引用发生变化），则**不**覆盖，避免 `onDidChangeModelContent` 里 RAF 合并导致父组件 `value` 暂时落后时误删正在输入的字符。
 - **清空**或**换篇**：允许在焦点仍在编辑器时执行 `setValue`。
+
+### 2.6 列表删除操作（实现思路）
+
+**统一删除图标 UI（本地列表 = 数据库列表）**
+
+- 数据库行与本地扫描行共用组件 `KnowledgeListRow`，同一颗 `Trash2`（`size={16}`）与同一套按钮样式（`p-1 rounded-md`、`hover:text-destructive`、`hover:bg-destructive/10`）。
+- 默认 `opacity-0 pointer-events-none`，通过行容器 `className` 中的 **`group`**，配合 **`group-hover:opacity-100 group-hover:pointer-events-auto`**，仅在**鼠标悬停整行**时显示删除钮。
+- **刻意不用 `focus-within`**：否则抽屉打开后焦点若落在第一行，第一个删除钮会长期可见，与产品预期不符。
+
+**状态位**
+
+| 状态 | 含义 |
+|------|------|
+| `deleteRecordOnlyOpen` | 仅删除云端记录的确认弹窗 |
+| `deleteLocalOpen` | 涉及磁盘 `.md` 的确认弹窗（纯本地删文件 **或** 库+盘双删） |
+| `localFileDeleteOnly` | `true`：确认后**只**调 Tauri 删盘，**不**调 `deleteKnowledge` |
+| `selectKnowledge` | 当前在删流程中选中的列表项 |
+| `deleteLocalPath` | 待删文件的绝对路径（本地行 = `localAbsolutePath`；库+盘流程 = resolve 出的路径） |
+
+**`openDeleteFlow` 分支**
+
+1. **`localAbsolutePath` 存在且 `isTauriRuntime()`**（本地文件夹列表行）：置 `localFileDeleteOnly = true`，`deleteLocalPath = localAbsolutePath`，打开 `deleteLocalOpen`。确认后走 `invokeDeleteKnowledgeMarkdown({ title, filePath })`，`filePath` 为**完整 `.md` 路径**，Rust 按既有规则解析为单文件；成功后 `onAfterLocalDelete(合成 id)`、`loadLocalMarkdownList()`。
+2. **非 Tauri**：只打开「删除知识库记录」`deleteRecordOnlyOpen`（浏览器无法删本地默认目录文件）。
+3. **Tauri + 云端列表行**：`invokeResolveKnowledgeMarkdownTarget({ title, filePath: TAURI_KNOWLEDGE_DIR })`；若目标不存在 → 同「仅删库」；若存在 → `deleteLocalPath = target.path`，`localFileDeleteOnly = false`，打开 `deleteLocalOpen`，文案为库+盘双删。
+
+**`onConfirmDeleteLocal`**
+
+- 若 `localFileDeleteOnly && selectKnowledge?.localAbsolutePath`：只执行磁盘删除分支（见上），**不**调用 `handleDeleteApi`。
+- 否则：先 `handleDeleteApi`（`deleteKnowledge` + `removeFromLocalList`），再 `invokeDeleteKnowledgeMarkdown` 使用 `TAURI_KNOWLEDGE_DIR` 解析默认目录下标题对应文件。
+
+**父页 `views/knowledge/index.tsx`**
+
+- `onDeletedRecord`：`knowledgeEditingKnowledgeId === id` 时 `resetEditorToNewDraft()`。
+- `onAfterLocalDelete`：比较**合成 id**（`__local_md__:…`），一致则清空草稿。
+
+**Rust**：`delete_knowledge_markdown` 与保存共用路径解析（`DeleteKnowledgeMarkdownInput` / `compute_save_target_path`）；仅允许删除 `.md` 文件。
+
+```mermaid
+flowchart TD
+  Trash[点击行内删除图标] --> StopProp[stopPropagation 避免触发行打开]
+  StopProp --> Open[openDeleteFlow]
+  Open --> Q1{localAbsolutePath 且 Tauri?}
+  Q1 -->|是| OnlyDisk[localFileDeleteOnly=true 弹 deleteLocalOpen]
+  Q1 -->|否| Q2{Tauri?}
+  Q2 -->|否| OnlyApi[deleteRecordOnlyOpen 仅删库]
+  Q2 -->|是| Resolve[invokeResolveKnowledgeMarkdownTarget]
+  Resolve --> Q3{文件存在?}
+  Q3 -->|否| OnlyApi
+  Q3 -->|是| ApiDisk[localFileDeleteOnly=false 弹 deleteLocalOpen]
+  OnlyDisk --> Invoke1[invokeDeleteKnowledgeMarkdown 全路径]
+  ApiDisk --> DelApi[handleDeleteApi 再 invoke 默认目录]
+```
 
 ---
 
@@ -320,31 +372,7 @@ function dirnameFs(filePath: string): string {
 		);
 ```
 
-```ts
-		const openDeleteFlow = useCallback(async (knowledge: KnowledgeListItem) => {
-			setLocalFileDeleteOnly(false); // 默认走「库+本地」或「仅库」流程
-			if (knowledge.localAbsolutePath && isTauriRuntime()) {
-				setSelectKnowledge(knowledge);
-				setDeleteLocalPath(knowledge.localAbsolutePath);
-				setLocalFileDeleteOnly(true); // 标记：确认时只删文件、不调 deleteKnowledge
-				setDeleteLocalOpen(true);
-				return;
-			}
-			// ... 原有云端条目删除分支
-		}, []);
-```
-
-```ts
-				if (localFileDeleteOnly && selectKnowledge?.localAbsolutePath) {
-					const result = await invokeDeleteKnowledgeMarkdown({
-						title: selectKnowledge.title ?? '',
-						filePath: deleteLocalPath, // 传完整 .md 路径，Rust 解析为单文件删除
-					});
-					// ...
-					await loadLocalMarkdownList(); // 删后刷新本地列表
-					return;
-				}
-```
+（行内删除的完整逐行注释见 **§3.10**。）
 
 ### 3.7 `knowledge.rs` — 列出与读取（Rust）
 
@@ -424,6 +452,7 @@ use command::knowledge::{
 // ...
         .invoke_handler(tauri::generate_handler![
             // ...
+            delete_knowledge_markdown,     // 前端：invokeDeleteKnowledgeMarkdown
             list_knowledge_markdown_files, // 前端：invokeListKnowledgeMarkdownFiles
             read_knowledge_markdown_file,  // 前端：invokeReadKnowledgeMarkdownFile
         ])
@@ -461,6 +490,263 @@ use command::knowledge::{
 		ed.setValue(next); // 强制与 props 一致
 		ed.updateOptions({ placeholder: next.trim() ? '' : placeholder }); // 占位符与正文联动
 	}, [value, placeholder, documentIdentity]); // identity 参与：换篇必同步
+```
+
+### 3.10 `KnowledgeList.tsx` / `knowledge-save.ts` / `index.tsx` — 删除操作（逐行注释）
+
+#### 3.10.1 前端 invoke 封装
+
+```ts
+/** Tauri `delete_knowledge_markdown` 入参（与保存共用路径规则） */
+export type DeleteKnowledgeMarkdownPayload = {
+	title: string;       // 与 filePath/dirPath 一起解析目标文件（目录模式下为「标题.md」）
+	filePath?: string;   // 可为完整 .md 路径或目录；本地列表删除传绝对路径文件
+	dirPath?: string;    // 仅目录时等价于 filePath 传目录
+};
+
+/** 桌面端按标题与路径删除本地 Markdown */
+export async function invokeDeleteKnowledgeMarkdown(
+	payload: DeleteKnowledgeMarkdownPayload,
+): Promise<SaveKnowledgeMarkdownResult> {
+	const { invoke } = await import('@tauri-apps/api/core'); // 动态 import，避免非 Tauri 打包问题
+	return invoke<SaveKnowledgeMarkdownResult>('delete_knowledge_markdown', {
+		input: buildDeleteInvokeInput(payload), // 转成 Rust 期望的 camelCase 字段
+	});
+}
+```
+
+#### 3.10.2 列表行：删除按钮（与数据源无关，样式一致）
+
+```tsx
+/** 单行：点击打开详情；删除图标与数据库列表一致，仅行 hover 时显示 */
+function KnowledgeListRow(props: {
+	item: KnowledgeListItem; // 云端或本地项；本地项带 localAbsolutePath
+	selected: boolean; // 是否与当前编辑器 knowledgeEditingKnowledgeId 一致
+	onActivate: (item: KnowledgeListItem) => void; // 点击行主体打开详情
+	onTrashClick: (e: React.MouseEvent, item: KnowledgeListItem) => void; // 删除
+}) {
+	const { item, selected, onActivate, onTrashClick } = props; // 解构 props
+
+	const onKeyDown = (e: React.KeyboardEvent) => {
+		if (e.key === 'Enter' || e.key === ' ') { // 键盘激活行同点击
+			e.preventDefault(); // 避免空格滚动页面
+			void onActivate(item); // 打开条目
+		}
+	};
+
+	return (
+		<div
+			role="button" // 可聚焦、可键盘操作
+			tabIndex={0}
+			aria-current={selected ? 'true' : undefined} // 当前编辑高亮
+			onClick={() => void onActivate(item)} // 整行打开详情
+			onKeyDown={onKeyDown}
+			className={cn(
+				'w-full cursor-pointer overflow-hidden flex flex-col gap-1 p-2 rounded-md group transition-colors',
+				// ↑ 必须有 group，供子元素 group-hover 显示删除钮
+				selected ? 'bg-theme/15' : 'hover:bg-theme/10',
+			)}
+		>
+			<div className="flex items-start justify-between gap-2 min-w-0 w-full">
+				<div className="flow-root flex-1 min-w-0 max-w-full font-medium wrap-anywhere">
+					{item.title?.trim() || '未命名'} {/* 列表标题 */}
+				</div>
+				<button
+					type="button"
+					aria-label={
+						item.localAbsolutePath ? '删除本地 Markdown 文件' : '从知识库删除'
+					} // 读屏区分语义；视觉样式相同
+					className={cn(
+						'cursor-pointer shrink-0 p-1 rounded-md text-textcolor/80 transition-opacity duration-150',
+						'opacity-0 pointer-events-none', // 默认隐藏且不可点，避免误触
+						'hover:text-destructive hover:bg-destructive/10', // 悬停删除钮本身高亮
+						'group-hover:opacity-100 group-hover:pointer-events-auto', // 悬停整行才显示
+					)}
+					onClick={(e) => onTrashClick(e, item)} // 冒泡外层由 onTrashClick 内 stopPropagation
+				>
+					<Trash2 size={16} /> {/* 与数据库行相同图标尺寸 */}
+				</button>
+			</div>
+			<div className="text-xs text-textcolor/50 space-y-0.5">
+				更新 {formatDate(item.updatedAt?.toString() ?? '')}
+			</div>
+		</div>
+	);
+}
+```
+
+#### 3.10.3 状态与「仅删库」API
+
+```ts
+		const [deleteLocalOpen, setDeleteLocalOpen] = useState(false); // 磁盘相关确认框显隐
+		const [deleteLocalPath, setDeleteLocalPath] = useState(''); // 弹窗展示的完整路径
+		const [localFileDeleteOnly, setLocalFileDeleteOnly] = useState(false); // true=只删盘不删库
+		const [deleteRecordOnlyOpen, setDeleteRecordOnlyOpen] = useState(false); // 仅删库确认框
+		const [selectKnowledge, setSelectKnowledge] = useState<KnowledgeListItem | null>(null); // 待删项
+
+		const handleDeleteApi = useCallback(
+			async (item: KnowledgeListItem): Promise<boolean> => {
+				const res = await deleteKnowledge(item.id); // REST 删除云端记录
+				if (!res.success) {
+					Toast({ type: 'error', title: '删除失败', message: res.message || '请稍后重试' });
+					return false; // 中止后续删本地文件
+				}
+				knowledgeStore.removeFromLocalList(item.id); // 同步 MobX 列表与 total
+				onDeletedRecord?.(item.id); // 通知父页：可能需清空编辑器
+				return true;
+			},
+			[knowledgeStore, onDeletedRecord],
+		);
+```
+
+#### 3.10.4 `openDeleteFlow`（完整分支）
+
+```ts
+		const openDeleteFlow = useCallback(async (knowledge: KnowledgeListItem) => {
+			setLocalFileDeleteOnly(false); // 先清标记，避免沿用上一条的状态
+			if (knowledge.localAbsolutePath && isTauriRuntime()) {
+				setSelectKnowledge(knowledge); // 与 onTrashClick 重复设置，保证流程内一致
+				setDeleteLocalPath(knowledge.localAbsolutePath); // Confirm 展示完整路径
+				setLocalFileDeleteOnly(true); // 确认回调走「仅磁盘」分支
+				setDeleteLocalOpen(true); // 打开删盘确认
+				return; // 不再走云端 resolve
+			}
+			if (!isTauriRuntime()) {
+				setDeleteRecordOnlyOpen(true); // Web 环境只能删库
+				return;
+			}
+			try {
+				const target = await invokeResolveKnowledgeMarkdownTarget({
+					title: knowledge.title ?? '',
+					content: '',
+					filePath: TAURI_KNOWLEDGE_DIR, // 默认知识目录下是否有 标题.md
+				});
+				if (!target.exists) {
+					setDeleteRecordOnlyOpen(true); // 无本地文件 → 只删库
+					return;
+				}
+				setDeleteLocalPath(target.path); // 有文件 → 双删确认里展示路径
+				setDeleteLocalOpen(true); // localFileDeleteOnly 仍为 false → 先删库再删盘
+			} catch (e) {
+				Toast({ type: 'error', title: formatTauriInvokeError(e) });
+			}
+		}, []);
+```
+
+#### 3.10.5 `onConfirmDeleteLocal`（确认删盘 / 库+盘）
+
+```ts
+		const onConfirmDeleteLocal = useCallback(async () => {
+			try {
+				if (localFileDeleteOnly && selectKnowledge?.localAbsolutePath) {
+					const result = await invokeDeleteKnowledgeMarkdown({
+						title: selectKnowledge.title ?? '',
+						filePath: deleteLocalPath, // 已是绝对 .md 路径
+					});
+					if (result.success === 'success') {
+						Toast({ type: 'success', title: '文件已删除', message: result.filePath });
+						setDeleteLocalOpen(false);
+						setDeleteLocalPath('');
+						setLocalFileDeleteOnly(false);
+						onAfterLocalDelete?.(selectKnowledge.id); // 合成 id，父页比对后清空编辑器
+						setSelectKnowledge(null);
+						await loadLocalMarkdownList(); // 本地列表与磁盘一致
+					} else {
+						Toast({ type: 'error', title: '删除失败', message: result.message });
+					}
+					return; // 绝不调用 handleDeleteApi
+				}
+				if (selectKnowledge) {
+					const dbOk = await handleDeleteApi(selectKnowledge); // 先删库
+					if (!dbOk) return; // 库删失败则不再动磁盘
+				}
+				const result = await invokeDeleteKnowledgeMarkdown({
+					title: selectKnowledge?.title ?? '',
+					filePath: TAURI_KNOWLEDGE_DIR, // 按默认目录 + 标题解析
+				});
+				if (result.success === 'success') {
+					Toast({ type: 'success', title: '文件已删除', message: result.filePath });
+					setDeleteLocalOpen(false);
+					setDeleteLocalPath('');
+					setLocalFileDeleteOnly(false);
+					onAfterLocalDelete?.(selectKnowledge?.id ?? ''); // 云端 id 或空
+					setSelectKnowledge(null);
+				} else {
+					Toast({ type: 'error', title: '删除失败', message: result.message });
+				}
+			} catch (e) {
+				Toast({ type: 'error', title: formatTauriInvokeError(e) });
+			}
+		}, [deleteLocalPath, handleDeleteApi, loadLocalMarkdownList, localFileDeleteOnly, onAfterLocalDelete, selectKnowledge]);
+```
+
+#### 3.10.6 点击删除与弹窗绑定
+
+```ts
+		const onTrashClick = useCallback(
+			async (e: React.MouseEvent, knowledge: KnowledgeListItem) => {
+				e.stopPropagation(); // 防止触发行 onClick 打开详情
+				setSelectKnowledge(knowledge); // 先记下当前行（openDeleteFlow 内会再设）
+				await openDeleteFlow(knowledge); // 按行类型分支
+			},
+			[openDeleteFlow],
+		);
+
+		const deleteLocalFileName =
+			deleteLocalPath.split(/[/\\]/).filter(Boolean).pop() ?? deleteLocalPath; // 弹窗标题用文件名
+```
+
+```tsx
+				<Confirm open={deleteRecordOnlyOpen} onConfirm={onConfirmDeleteRecordOnly} title="删除知识库记录？" /* ... */ />
+				<Confirm
+					open={deleteLocalOpen}
+					onOpenChange={(v) => {
+						setDeleteLocalOpen(v);
+						if (!v) {
+							setDeleteLocalPath(''); // 关闭时清路径
+							setLocalFileDeleteOnly(false); // 避免下次误用「仅删盘」标记
+						}
+					}}
+					title="删除本地文件？"
+					description={
+						<>
+							{localFileDeleteOnly
+								? '将仅从磁盘删除该文件，不涉及云端知识库数据。'
+								: '将同时移除数据库条目与本地同名文件。'}
+							{/* ... 文件名与 deleteLocalPath 展示 ... */}
+						</>
+					}
+					onConfirm={onConfirmDeleteLocal}
+				/>
+```
+
+#### 3.10.7 知识页父组件回调
+
+```ts
+	const handleDeletedRecord = useCallback(
+		(id: string) => {
+			if (knowledgeStore.knowledgeEditingKnowledgeId === id) {
+				resetEditorToNewDraft(); // 正在编辑的云端条目被删 → 清空草稿
+			}
+		},
+		[knowledgeStore, resetEditorToNewDraft],
+	);
+
+	const handleAfterLocalDelete = useCallback(
+		(deletedKnowledgeId: string) => {
+			if (!deletedKnowledgeId) return;
+			if (knowledgeStore.knowledgeEditingKnowledgeId === deletedKnowledgeId) {
+				resetEditorToNewDraft(); // 正在编辑的本地合成 id 对应文件被删
+			}
+		},
+		[knowledgeStore, resetEditorToNewDraft],
+	);
+
+			<KnowledgeList
+				onAfterLocalDelete={handleAfterLocalDelete}
+				onDeletedRecord={handleDeletedRecord}
+				// ...
+			/>
 ```
 
 ---
