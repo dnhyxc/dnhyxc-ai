@@ -44,7 +44,7 @@ interface IProps {
 	editingKnowledgeId?: string | null;
 }
 
-/** 单行：点击打开详情；垃圾桶仅触发删除流程（冒泡已阻止） */
+/** 单行：点击打开详情；删除图标与数据库列表一致，仅行 hover 时显示 */
 function KnowledgeListRow(props: {
 	item: KnowledgeListItem;
 	selected: boolean;
@@ -78,7 +78,9 @@ function KnowledgeListRow(props: {
 				</div>
 				<button
 					type="button"
-					aria-label="从知识库删除"
+					aria-label={
+						item.localAbsolutePath ? '删除本地 Markdown 文件' : '从知识库删除'
+					}
 					className={cn(
 						'cursor-pointer shrink-0 p-1 rounded-md text-textcolor/80 transition-opacity duration-150',
 						'opacity-0 pointer-events-none',
@@ -417,7 +419,7 @@ const KnowledgeList: React.FC<IProps> = observer(
 					description={
 						<>
 							{localFileDeleteOnly
-								? '将仅从磁盘删除该 Markdown 文件，不涉及云端知识库记录。'
+								? '将仅从磁盘删除该文件，不涉及云端知识库数据。'
 								: '将同时移除数据库条目与本地同名文件。'}
 							<div className="mt-2 font-medium text-base wrap-anywhere">
 								「{deleteLocalFileName}」
