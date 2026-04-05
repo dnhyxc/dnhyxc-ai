@@ -1,7 +1,9 @@
 import Confirm from '@design/Confirm';
 import { Drawer } from '@design/Drawer';
+import { Button } from '@ui/button';
 import { ScrollArea } from '@ui/index';
 import { Toast } from '@ui/sonner';
+import { Switch } from '@ui/switch';
 import { Trash2 } from 'lucide-react';
 import { observer } from 'mobx-react';
 import { useCallback, useEffect, useState } from 'react';
@@ -13,9 +15,19 @@ import { formatDate, isTauriRuntime } from '@/utils';
 import {
 	formatTauriInvokeError,
 	invokeDeleteKnowledgeMarkdown,
+	invokeListKnowledgeMarkdownFiles,
+	invokeReadKnowledgeMarkdownFile,
 	invokeResolveKnowledgeMarkdownTarget,
 } from '@/utils/knowledge-save';
-import { TAURI_KNOWLEDGE_DIR } from './constants';
+import { KNOWLEDGE_LOCAL_MD_ID_PREFIX, TAURI_KNOWLEDGE_DIR } from './constants';
+
+/** 从绝对路径取所在目录（兼容 `/` 与 `\`） */
+function dirnameFs(filePath: string): string {
+	const n = filePath.replace(/[/\\]+$/, '');
+	const i = Math.max(n.lastIndexOf('/'), n.lastIndexOf('\\'));
+	if (i <= 0) return n;
+	return n.slice(0, i);
+}
 
 interface IProps {
 	open: boolean;
@@ -79,8 +91,13 @@ function KnowledgeListRow(props: {
 					<Trash2 size={16} />
 				</button>
 			</div>
-			<div className="text-xs text-textcolor/50">
-				更新 {formatDate(item.updatedAt?.toString() ?? '')}
+			<div className="text-xs text-textcolor/50 space-y-0.5">
+				{item.localAbsolutePath ? (
+					<div className="truncate opacity-70" title={item.localAbsolutePath}>
+						{item.localAbsolutePath}
+					</div>
+				) : null}
+				<div>更新 {formatDate(item.updatedAt?.toString() ?? '')}</div>
 			</div>
 		</div>
 	);
@@ -100,19 +117,99 @@ const KnowledgeList: React.FC<IProps> = observer(
 
 		const [deleteLocalOpen, setDeleteLocalOpen] = useState(false);
 		const [deleteLocalPath, setDeleteLocalPath] = useState('');
+		/** 仅删本地浏览列表中的文件，不走数据库 */
+		const [localFileDeleteOnly, setLocalFileDeleteOnly] = useState(false);
 		/** 本地无文件或非 Tauri：仅删除数据库记录 */
 		const [deleteRecordOnlyOpen, setDeleteRecordOnlyOpen] = useState(false);
 		const [selectKnowledge, setSelectKnowledge] =
 			useState<KnowledgeListItem | null>(null);
 
-		useEffect(() => {
-			if (open) {
-				void knowledgeStore.refreshList();
+		/** false：云端列表；true：递归扫描本地文件夹中的 .md */
+		const [useLocalFolder, setUseLocalFolder] = useState(false);
+		const [localFolderPath, setLocalFolderPath] = useState(TAURI_KNOWLEDGE_DIR);
+		const [localList, setLocalList] = useState<KnowledgeListItem[]>([]);
+		const [localLoading, setLocalLoading] = useState(false);
+
+		const loadLocalMarkdownList = useCallback(async () => {
+			if (!isTauriRuntime()) return;
+			setLocalLoading(true);
+			try {
+				const entries = await invokeListKnowledgeMarkdownFiles({
+					dirPath: localFolderPath.trim() || undefined,
+				});
+				setLocalList(
+					entries.map((e) => ({
+						id: `${KNOWLEDGE_LOCAL_MD_ID_PREFIX}${encodeURIComponent(e.path)}`,
+						title: e.title,
+						author: null,
+						authorId: null,
+						updatedAt: new Date(e.updatedAtMs).toISOString(),
+						localAbsolutePath: e.path,
+					})),
+				);
+			} catch (e) {
+				Toast({
+					type: 'error',
+					title: '加载本地列表失败',
+					message: formatTauriInvokeError(e),
+				});
+				setLocalList([]);
+			} finally {
+				setLocalLoading(false);
 			}
-		}, [open, knowledgeStore]);
+		}, [localFolderPath]);
+
+		useEffect(() => {
+			if (!open) return;
+			if (useLocalFolder) return;
+			void knowledgeStore.refreshList();
+		}, [open, useLocalFolder, knowledgeStore]);
+
+		useEffect(() => {
+			if (!open || !useLocalFolder || !isTauriRuntime()) return;
+			void loadLocalMarkdownList();
+		}, [open, useLocalFolder, loadLocalMarkdownList]);
+
+		const pickLocalFolder = useCallback(async () => {
+			try {
+				const { invoke } = await import('@tauri-apps/api/core');
+				const dir = await invoke<string>('select_directory');
+				setLocalFolderPath(dir);
+			} catch (e) {
+				const msg = formatTauriInvokeError(e);
+				if (msg === '未选择目录') return;
+				Toast({ type: 'error', title: msg });
+			}
+		}, []);
 
 		const handleRowClick = useCallback(
 			async (item: KnowledgeListItem) => {
+				if (item.localAbsolutePath) {
+					try {
+						const content = await invokeReadKnowledgeMarkdownFile(
+							item.localAbsolutePath,
+						);
+						const dir = dirnameFs(item.localAbsolutePath);
+						const record: KnowledgeRecord = {
+							id: item.id,
+							title: item.title,
+							content,
+							author: null,
+							authorId: null,
+							updatedAt: item.updatedAt,
+							localDirPath: dir,
+						};
+						await onPick?.(record);
+						onOpenChange(false);
+					} catch (e) {
+						Toast({
+							type: 'error',
+							title: '读取失败',
+							message: formatTauriInvokeError(e),
+						});
+					}
+					return;
+				}
 				const detail = await knowledgeStore.fetchDetail(item.id);
 				if (!detail) {
 					Toast({
@@ -151,6 +248,14 @@ const KnowledgeList: React.FC<IProps> = observer(
 		 * 浏览器：仅弹「删数据库」。
 		 */
 		const openDeleteFlow = useCallback(async (knowledge: KnowledgeListItem) => {
+			setLocalFileDeleteOnly(false);
+			if (knowledge.localAbsolutePath && isTauriRuntime()) {
+				setSelectKnowledge(knowledge);
+				setDeleteLocalPath(knowledge.localAbsolutePath);
+				setLocalFileDeleteOnly(true);
+				setDeleteLocalOpen(true);
+				return;
+			}
 			if (!isTauriRuntime()) {
 				setDeleteRecordOnlyOpen(true);
 				return;
@@ -175,9 +280,35 @@ const KnowledgeList: React.FC<IProps> = observer(
 			}
 		}, []);
 
-		/** 确认删除：先删数据库记录（若有选中项），再删本地 Markdown */
+		/** 确认删除：先删数据库记录（若有选中项），再删本地 Markdown；或仅删本地浏览中的文件 */
 		const onConfirmDeleteLocal = useCallback(async () => {
 			try {
+				if (localFileDeleteOnly && selectKnowledge?.localAbsolutePath) {
+					const result = await invokeDeleteKnowledgeMarkdown({
+						title: selectKnowledge.title ?? '',
+						filePath: deleteLocalPath,
+					});
+					if (result.success === 'success') {
+						Toast({
+							type: 'success',
+							title: '文件已删除',
+							message: result.filePath ? `${result.filePath}` : undefined,
+						});
+						setDeleteLocalOpen(false);
+						setDeleteLocalPath('');
+						setLocalFileDeleteOnly(false);
+						onAfterLocalDelete?.(selectKnowledge.id);
+						setSelectKnowledge(null);
+						await loadLocalMarkdownList();
+					} else {
+						Toast({
+							type: 'error',
+							title: '删除失败',
+							message: result.message,
+						});
+					}
+					return;
+				}
 				if (selectKnowledge) {
 					const dbOk = await handleDeleteApi(selectKnowledge);
 					if (!dbOk) return;
@@ -194,6 +325,7 @@ const KnowledgeList: React.FC<IProps> = observer(
 					});
 					setDeleteLocalOpen(false);
 					setDeleteLocalPath('');
+					setLocalFileDeleteOnly(false);
 					onAfterLocalDelete?.(selectKnowledge?.id ?? '');
 					setSelectKnowledge(null);
 				} else {
@@ -209,7 +341,14 @@ const KnowledgeList: React.FC<IProps> = observer(
 					title: formatTauriInvokeError(e),
 				});
 			}
-		}, [handleDeleteApi, onAfterLocalDelete, selectKnowledge]);
+		}, [
+			deleteLocalPath,
+			handleDeleteApi,
+			loadLocalMarkdownList,
+			localFileDeleteOnly,
+			onAfterLocalDelete,
+			selectKnowledge,
+		]);
 
 		const onConfirmDeleteRecordOnly = useCallback(async () => {
 			if (!selectKnowledge) return;
@@ -233,9 +372,14 @@ const KnowledgeList: React.FC<IProps> = observer(
 			deleteLocalPath.split(/[/\\]/).filter(Boolean).pop() ?? deleteLocalPath;
 
 		const { loading, loadingMore, list } = knowledgeStore;
-		const showInitialPlaceholder = loading && list.length === 0;
-		const showLoadMoreHint = loadingMore;
-		const showEmptyHint = !loading && list.length === 0 && !loadingMore;
+		const displayList = useLocalFolder ? localList : list;
+		const displayLoading = useLocalFolder ? localLoading : loading;
+		const showInitialPlaceholder = displayLoading && displayList.length === 0;
+		const showLoadMoreHint = !useLocalFolder && loadingMore;
+		const showEmptyHint =
+			!displayLoading &&
+			displayList.length === 0 &&
+			(!useLocalFolder ? !loadingMore : true);
 
 		const deleteRecordTitle = selectKnowledge?.title?.trim() || '未命名';
 
@@ -269,12 +413,20 @@ const KnowledgeList: React.FC<IProps> = observer(
 					open={deleteLocalOpen}
 					onOpenChange={(v) => {
 						setDeleteLocalOpen(v);
-						if (!v) setDeleteLocalPath('');
+						if (!v) {
+							setDeleteLocalPath('');
+							setLocalFileDeleteOnly(false);
+						}
 					}}
 					title="删除本地文件？"
 					description={
 						<>
-							确定要删除「{deleteLocalFileName}」吗？此操作不可撤销。
+							{localFileDeleteOnly
+								? '将仅从磁盘删除该 Markdown 文件，不涉及云端知识库记录。'
+								: '将同时移除数据库条目与本地同名文件。'}
+							<div className="mt-2 font-medium text-base wrap-anywhere">
+								「{deleteLocalFileName}」
+							</div>
 							<div className="mt-2 block break-all text-sm opacity-80">
 								{deleteLocalPath}
 							</div>
@@ -288,40 +440,101 @@ const KnowledgeList: React.FC<IProps> = observer(
 				/>
 
 				<Drawer title="知识库" open={open} onOpenChange={onOpenChange}>
-					<ScrollArea
-						className="h-full overflow-y-auto pr-4 box-border"
-						onScroll={knowledgeStore.onListViewportScroll}
-					>
-						<div className="flex flex-col gap-2">
-							{showInitialPlaceholder ? (
-								<div className="text-sm text-textcolor/60 py-6 text-center">
-									加载中…
+					<div className="flex h-full min-h-0 flex-col">
+						<div className="flex shrink-0 flex-col gap-3 pr-4 pb-3">
+							<div className="flex flex-wrap items-center justify-between gap-2">
+								<span className="text-sm text-textcolor/80">数据来源</span>
+								<div className="flex items-center gap-2">
+									<span
+										className={cn(
+											'text-xs',
+											!useLocalFolder && 'font-medium text-textcolor',
+										)}
+									>
+										数据库
+									</span>
+									<Switch
+										id="knowledge-drawer-local-source"
+										checked={useLocalFolder}
+										disabled={!isTauriRuntime()}
+										onCheckedChange={(v) => setUseLocalFolder(!!v)}
+										size="sm"
+									/>
+									<span
+										className={cn(
+											'text-xs',
+											useLocalFolder && 'font-medium text-textcolor',
+										)}
+									>
+										本地文件夹
+									</span>
+								</div>
+							</div>
+							{useLocalFolder && isTauriRuntime() ? (
+								<div className="flex flex-col gap-2">
+									<div className="flex items-center gap-2">
+										<Button
+											variant="link"
+											size="sm"
+											className="shrink-0 p-0 text-teal-400"
+											onClick={() => void pickLocalFolder()}
+										>
+											选择文件夹
+										</Button>
+										<span
+											className="min-w-0 flex-1 truncate text-xs text-textcolor/50"
+											title={localFolderPath}
+										>
+											{localFolderPath}
+										</span>
+									</div>
 								</div>
 							) : null}
-							{list.map((knowledge) => (
-								<KnowledgeListRow
-									key={knowledge.id}
-									item={knowledge}
-									selected={
-										editingKnowledgeId != null &&
-										editingKnowledgeId === knowledge.id
-									}
-									onActivate={handleRowClick}
-									onTrashClick={onTrashClick}
-								/>
-							))}
-							{showLoadMoreHint ? (
-								<div className="text-xs text-textcolor/50 py-2 text-center">
-									加载更多…
-								</div>
-							) : null}
-							{showEmptyHint ? (
-								<div className="text-sm text-textcolor/60 py-8 text-center">
-									暂无知识库条目
-								</div>
+							{!isTauriRuntime() ? (
+								<p className="text-xs text-textcolor/50">
+									本地文件夹列表仅在桌面端（Tauri）可用。
+								</p>
 							) : null}
 						</div>
-					</ScrollArea>
+						<ScrollArea
+							className="min-h-0 flex-1 overflow-y-auto pr-4 box-border"
+							onScroll={
+								useLocalFolder ? undefined : knowledgeStore.onListViewportScroll
+							}
+						>
+							<div className="flex flex-col gap-2">
+								{showInitialPlaceholder ? (
+									<div className="text-sm text-textcolor/60 py-6 text-center">
+										加载中…
+									</div>
+								) : null}
+								{displayList.map((knowledge) => (
+									<KnowledgeListRow
+										key={knowledge.id}
+										item={knowledge}
+										selected={
+											editingKnowledgeId != null &&
+											editingKnowledgeId === knowledge.id
+										}
+										onActivate={handleRowClick}
+										onTrashClick={onTrashClick}
+									/>
+								))}
+								{showLoadMoreHint ? (
+									<div className="text-xs text-textcolor/50 py-2 text-center">
+										加载更多…
+									</div>
+								) : null}
+								{showEmptyHint ? (
+									<div className="text-sm text-textcolor/60 py-8 text-center">
+										{useLocalFolder
+											? '该文件夹下暂无 .md 文件'
+											: '暂无知识库条目'}
+									</div>
+								) : null}
+							</div>
+						</ScrollArea>
+					</div>
 				</Drawer>
 			</>
 		);

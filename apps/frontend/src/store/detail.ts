@@ -39,6 +39,12 @@ class DetailStore {
 	/** 桌面端：打开该条时的原标题，用于本地 .md 重命名 */
 	knowledgeLocalDiskTitle: string | null = null;
 
+	/**
+	 * 从本地文件夹列表打开时：保存/解析冲突时使用的目录（该文件所在目录）；
+	 * 云端条目为 null，沿用 TAURI_KNOWLEDGE_DIR
+	 */
+	knowledgeLocalDirPath: string | null = null;
+
 	/** 上次成功保存或载入后的标题 trim + 正文 */
 	knowledgePersistedSnapshot: KnowledgePersistedSnapshot = {
 		title: '',
@@ -66,6 +72,10 @@ class DetailStore {
 
 	setKnowledgeLocalDiskTitle(value: string | null) {
 		this.knowledgeLocalDiskTitle = value;
+	}
+
+	setKnowledgeLocalDirPath(value: string | null) {
+		this.knowledgeLocalDirPath = value;
 	}
 
 	setKnowledgePersistedSnapshot(snapshot: KnowledgePersistedSnapshot) {
@@ -96,6 +106,7 @@ class DetailStore {
 		this.knowledgeTitle = '';
 		this.knowledgeEditingKnowledgeId = null;
 		this.knowledgeLocalDiskTitle = null;
+		this.knowledgeLocalDirPath = null;
 		this.knowledgePersistedSnapshot = { title: '', content: '' };
 		this.markdown = '';
 		this.knowledgeOverwriteOpen = false;
@@ -113,6 +124,7 @@ class DetailStore {
 		this.setKnowledgeOverwriteOpen(false);
 		this.knowledgeEditingKnowledgeId = null;
 		this.knowledgeLocalDiskTitle = null;
+		this.knowledgeLocalDirPath = null;
 		this.markdown = body;
 		this.knowledgeTitle = deriveKnowledgeTitleFromMarkdown(body);
 		// 空快照：与当前内容不一致，展示未保存标识并允许保存

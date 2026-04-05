@@ -347,7 +347,7 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 						type="button"
 						className={cn(
 							// 与 ChatControls 滚动按钮一致，并加轻量 backdrop 滤镜（同 glassChip 的 blur）
-							'absolute bottom-2 right-2 z-99 flex h-8.5 w-8.5 cursor-pointer items-center justify-center rounded-full border border-theme/5 bg-theme/5 text-textcolor/90 backdrop-blur-[2px] hover:bg-theme/15',
+							'absolute bottom-2 right-2 z-10 flex h-8.5 w-8.5 cursor-pointer items-center justify-center rounded-full border border-theme/5 bg-theme/5 text-textcolor/90 backdrop-blur-[2px] hover:bg-theme/15',
 							'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme/40',
 						)}
 						aria-label={
@@ -389,6 +389,8 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	const valueFromPropsRef = useRef(value);
 	const lastEmittedRef = useRef(normalizeMonacoEol(value));
 	const prevDocumentIdentityRef = useRef(documentIdentity);
+	/** 用于 value 同步：换篇（documentIdentity 变）时即使编辑器有焦点也允许 setValue */
+	const prevIdentityForValueSyncRef = useRef(documentIdentity);
 	const [viewMode, setViewMode] = useState<MarkdownViewMode>('edit');
 	const [splitScrollFollowMode, setSplitScrollFollowMode] =
 		useState<MarkdownSplitScrollFollowMode>('none');
@@ -492,22 +494,30 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 		}
 	}, [documentIdentity]);
 
-	/** 不向 Editor 传受控 value；仅在外部正文变化且非 IME、无焦点内落后回写时 setValue */
+	/**
+	 * 不向 Editor 传受控 value；外部正文与模型不一致时 setValue。
+	 * 有焦点时若父组件 value 因 RAF 合并略滞后于编辑器，不可覆盖正在输入的内容；
+	 * 但「清空」或「换篇」（documentIdentity 变化）必须写入。
+	 */
 	useEffect(() => {
 		const ed = editorRef.current;
 		if (!ed || imeComposingRef.current || ed.inComposition) return;
 		const next = normalizeMonacoEol(value ?? '');
-		if (next === lastEmittedRef.current) return;
 		const cur = normalizeMonacoEol(ed.getValue());
+		const identityChanged =
+			prevIdentityForValueSyncRef.current !== documentIdentity;
 		if (cur === next) {
 			lastEmittedRef.current = next;
+			prevIdentityForValueSyncRef.current = documentIdentity;
 			return;
 		}
-		if (ed.hasTextFocus()) return;
+		const clearing = next === '';
+		if (ed.hasTextFocus() && !clearing && !identityChanged) return;
+		prevIdentityForValueSyncRef.current = documentIdentity;
 		lastEmittedRef.current = next;
 		ed.setValue(next);
 		ed.updateOptions({ placeholder: next.trim() ? '' : placeholder });
-	}, [value, placeholder]);
+	}, [value, placeholder, documentIdentity]);
 
 	const rebuildHeadingPreviewScrollCache = useCallback(() => {
 		const vp = previewViewportRef.current;

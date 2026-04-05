@@ -74,7 +74,14 @@ export type KnowledgeRecord = {
 	authorId: number | null;
 	createdAt?: string;
 	updatedAt?: string;
+	/**
+	 * 从本地文件夹打开时：保存到磁盘应使用的目录（一般为该文件所在目录），与默认知识库目录互斥
+	 */
+	localDirPath?: string;
 };
 
 /** 列表项（无正文大字段） */
-export type KnowledgeListItem = Omit<KnowledgeRecord, 'content'>;
+export type KnowledgeListItem = Omit<KnowledgeRecord, 'content'> & {
+	/** 本地浏览模式下列表项对应的 `.md` 绝对路径 */
+	localAbsolutePath?: string;
+};

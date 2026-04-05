@@ -253,3 +253,116 @@ pub async fn delete_knowledge_markdown(
 		message: format!("已删除 {}", path.display()),
 	})
 }
+
+/// 递归收集目录下（含子目录）的 `.md` 文件路径
+fn collect_md_files(dir: &Path, out: &mut Vec<PathBuf>) -> Result<(), String> {
+	let rd = fs::read_dir(dir).map_err(|e| e.to_string())?;
+	for ent in rd {
+		let ent = ent.map_err(|e| e.to_string())?;
+		let name = ent.file_name();
+		if name.to_string_lossy().starts_with('.') {
+			continue;
+		}
+		let p = ent.path();
+		let meta = ent.metadata().map_err(|e| e.to_string())?;
+		if meta.is_dir() {
+			collect_md_files(&p, out)?;
+		} else if meta.is_file() && is_md_file_path(&p) {
+			out.push(p);
+		}
+	}
+	Ok(())
+}
+
+/// 列出指定目录（或默认知识库目录）下所有 Markdown 文件
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ListKnowledgeMarkdownInput {
+	#[serde(default)]
+	pub dir_path: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct KnowledgeMarkdownFileEntry {
+	pub path: String,
+	pub title: String,
+	pub updated_at_ms: u64,
+}
+
+#[tauri::command]
+pub async fn list_knowledge_markdown_files(
+	app: AppHandle,
+	input: ListKnowledgeMarkdownInput,
+) -> Result<Vec<KnowledgeMarkdownFileEntry>, String> {
+	let dir = match input.dir_path.as_ref().map(|s| s.trim()).filter(|s| !s.is_empty()) {
+		Some(d) => PathBuf::from(d),
+		None => resolve_knowledge_dir(&app).await?,
+	};
+	if !dir.exists() {
+		return Err(format!("目录不存在：{}", dir.display()));
+	}
+	let meta = fs::metadata(&dir).map_err(|e| e.to_string())?;
+	if !meta.is_dir() {
+		return Err("路径不是目录".to_string());
+	}
+	let mut paths: Vec<PathBuf> = Vec::new();
+	collect_md_files(&dir, &mut paths)?;
+	paths.sort_by(|a, b| {
+		let ta = fs::metadata(a).and_then(|m| m.modified()).ok();
+		let tb = fs::metadata(b).and_then(|m| m.modified()).ok();
+		tb.cmp(&ta)
+	});
+	let mut out = Vec::with_capacity(paths.len());
+	for p in paths {
+		let title = p
+			.file_stem()
+			.and_then(|s| s.to_str())
+			.unwrap_or("未命名")
+			.to_string();
+		let updated_at_ms = fs::metadata(&p)
+			.ok()
+			.and_then(|m| m.modified().ok())
+			.and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+			.map(|d| d.as_millis() as u64)
+			.unwrap_or(0);
+		out.push(KnowledgeMarkdownFileEntry {
+			path: p.to_string_lossy().to_string(),
+			title,
+			updated_at_ms,
+		});
+	}
+	Ok(out)
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReadKnowledgeMarkdownFileInput {
+	pub file_path: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReadKnowledgeMarkdownFileResult {
+	pub content: String,
+}
+
+/// 读取单个 `.md` 文件正文（UTF-8）
+#[tauri::command]
+pub fn read_knowledge_markdown_file(
+	input: ReadKnowledgeMarkdownFileInput,
+) -> Result<ReadKnowledgeMarkdownFileResult, String> {
+	let trimmed = input.file_path.trim();
+	if trimmed.is_empty() {
+		return Err("filePath 不能为空".to_string());
+	}
+	let p = PathBuf::from(trimmed);
+	if !p.exists() || !p.is_file() {
+		return Err("文件不存在或不是普通文件".to_string());
+	}
+	if !is_md_file_path(&p) {
+		return Err("仅允许读取 .md 文件".to_string());
+	}
+	let content = fs::read_to_string(&p).map_err(|e| e.to_string())?;
+	Ok(ReadKnowledgeMarkdownFileResult { content })
+}

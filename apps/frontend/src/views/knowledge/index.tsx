@@ -18,7 +18,11 @@ import {
 	invokeSaveKnowledgeMarkdown,
 	type SaveKnowledgeMarkdownPayload,
 } from '@/utils/knowledge-save';
-import { EDITOR_HEIGHT, TAURI_KNOWLEDGE_DIR } from './constants';
+import {
+	EDITOR_HEIGHT,
+	isKnowledgeLocalMarkdownId,
+	TAURI_KNOWLEDGE_DIR,
+} from './constants';
 import KnowledgeList from './KnowledgeList';
 
 /** 根据标题扩展名选择 Monaco language，CSS 等才能走对应 Prettier parser */
@@ -177,6 +181,10 @@ const Knowledge = observer(() => {
 		const base = { title: trimmedTitle, content: markdown };
 		const meta = buildAuthorMeta(getUserInfo);
 		const editingId = detailStore.knowledgeEditingKnowledgeId;
+		/** 本地文件夹打开的条目仅写磁盘，不同步云端 */
+		if (isKnowledgeLocalMarkdownId(editingId)) {
+			return;
+		}
 		if (editingId) {
 			const row = await knowledgeStore.updateItem(editingId, {
 				...base,
@@ -231,10 +239,15 @@ const Knowledge = observer(() => {
 					diskTitle !== trimmedTitle
 						? diskTitle
 						: undefined;
+				const tauriBaseDir = isKnowledgeLocalMarkdownId(
+					detailStore.knowledgeEditingKnowledgeId,
+				)
+					? detailStore.knowledgeLocalDirPath?.trim() || TAURI_KNOWLEDGE_DIR
+					: TAURI_KNOWLEDGE_DIR;
 				const payload: SaveKnowledgeMarkdownPayload = {
 					title: trimmedTitle,
 					content: markdown,
-					filePath: TAURI_KNOWLEDGE_DIR,
+					filePath: tauriBaseDir,
 					...(previousTitle ? { previousTitle } : {}),
 				};
 				const target = await invokeResolveKnowledgeMarkdownTarget(payload);
@@ -323,6 +336,7 @@ const Knowledge = observer(() => {
 		(record: KnowledgeRecord) => {
 			detailStore.setKnowledgeOverwriteOpen(false);
 			detailStore.setKnowledgeEditingKnowledgeId(record.id);
+			detailStore.setKnowledgeLocalDirPath(record.localDirPath ?? null);
 			const t = (record.title ?? '').trim();
 			detailStore.setKnowledgeLocalDiskTitle(t || null);
 			const content = record.content ?? '';

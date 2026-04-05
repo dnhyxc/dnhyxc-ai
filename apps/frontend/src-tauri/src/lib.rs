@@ -29,7 +29,8 @@ use command::download::{
     download_blob, download_file, download_files, get_file_info, save_file_with_picker,
 };
 use command::knowledge::{
-    delete_knowledge_markdown, resolve_knowledge_markdown_target, save_knowledge_markdown,
+    delete_knowledge_markdown, list_knowledge_markdown_files, read_knowledge_markdown_file,
+    resolve_knowledge_markdown_target, save_knowledge_markdown,
 };
 
 /// 移动端入口属性宏：当编译目标为移动平台时，自动标记该函数为 Tauri 移动端入口
@@ -67,6 +68,8 @@ pub fn run() {
             resolve_knowledge_markdown_target, // 知识保存：解析目标路径、是否已存在
             save_knowledge_markdown, // 知识页 Markdown 写入
             delete_knowledge_markdown, // 知识页 Markdown 删除
+            list_knowledge_markdown_files, // 列出目录下所有 Markdown
+            read_knowledge_markdown_file, // 读取单个 Markdown 文件
             download_file,         // 通用下载
             download_files,        // 批量下载
             get_file_info,         // 获取文件信息

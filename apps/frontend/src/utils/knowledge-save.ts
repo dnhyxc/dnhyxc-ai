@@ -111,3 +111,44 @@ export async function invokeDeleteKnowledgeMarkdown(
 		input: buildDeleteInvokeInput(payload),
 	});
 }
+
+/** `list_knowledge_markdown_files` 入参 */
+export type ListKnowledgeMarkdownInput = {
+	/** 为空时使用应用默认知识库目录 */
+	dirPath?: string;
+};
+
+/** 目录下列出的单条 Markdown 元信息 */
+export type KnowledgeMarkdownFileEntry = {
+	path: string;
+	title: string;
+	updatedAtMs: number;
+};
+
+/** 递归列出目录下所有 `.md` 文件（按修改时间新→旧排序） */
+export async function invokeListKnowledgeMarkdownFiles(
+	input: ListKnowledgeMarkdownInput,
+): Promise<KnowledgeMarkdownFileEntry[]> {
+	const { invoke } = await import('@tauri-apps/api/core');
+	return invoke<KnowledgeMarkdownFileEntry[]>('list_knowledge_markdown_files', {
+		input: {
+			...(input.dirPath != null && input.dirPath !== ''
+				? { dirPath: input.dirPath }
+				: {}),
+		},
+	});
+}
+
+/** 读取单个 Markdown 文件正文 */
+export async function invokeReadKnowledgeMarkdownFile(
+	filePath: string,
+): Promise<string> {
+	const { invoke } = await import('@tauri-apps/api/core');
+	const res = await invoke<{ content: string }>(
+		'read_knowledge_markdown_file',
+		{
+			input: { filePath },
+		},
+	);
+	return res.content;
+}
