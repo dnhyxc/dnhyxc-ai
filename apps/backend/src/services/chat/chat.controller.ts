@@ -8,9 +8,11 @@ import {
 	Post,
 	Query,
 	Sse,
+	UseGuards,
 	UseInterceptors,
 } from '@nestjs/common';
 import { catchError, concat, map, Observable, of } from 'rxjs';
+import { JwtGuard } from 'src/guards/jwt.guard';
 import { ChatService } from './chat.service';
 import { ChatContinueDto } from './dto/chat-continue.dto';
 import { ChatRequestDto, CreateSessionDto } from './dto/chat-request.dto';
@@ -20,8 +22,9 @@ import { UpdateChatDto } from './dto/update-chat.dto';
 import { GlmChatService } from './glm.service';
 import { MessageService } from './message.service';
 
-@UseInterceptors(ClassSerializerInterceptor)
 @Controller('chat')
+@UseInterceptors(ClassSerializerInterceptor)
+@UseGuards(JwtGuard)
 export class ChatController {
 	constructor(
 		private readonly chatService: ChatService,

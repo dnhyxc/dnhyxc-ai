@@ -1,5 +1,6 @@
 import {
 	Body,
+	ClassSerializerInterceptor,
 	Controller,
 	Delete,
 	Get,
@@ -8,8 +9,10 @@ import {
 	Post,
 	Put,
 	Query,
+	UseGuards,
 	UseInterceptors,
 } from '@nestjs/common';
+import { JwtGuard } from 'src/guards/jwt.guard';
 import { ResponseInterceptor } from '../../interceptors/response.interceptor';
 import { QueryKnowledgeDto } from './dto/query-knowledge.dto';
 import { SaveKnowledgeDto } from './dto/save-knowledge.dto';
@@ -17,7 +20,8 @@ import { UpdateKnowledgeDto } from './dto/update-knowledge.dto';
 import { KnowledgeService } from './knowledge.service';
 
 @Controller('knowledge')
-@UseInterceptors(ResponseInterceptor)
+@UseInterceptors(ClassSerializerInterceptor, ResponseInterceptor)
+@UseGuards(JwtGuard)
 export class KnowledgeController {
 	constructor(private readonly knowledgeService: KnowledgeService) {}
 

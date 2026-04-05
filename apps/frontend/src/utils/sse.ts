@@ -56,8 +56,11 @@ export const streamFetch = async ({
 		});
 
 		if (!response.ok) {
-			console.error('HTTP error! status:', response.statusText);
-			throw new Error(`HTTP error! status: ${response.status}`);
+			if (response.status === 401) {
+				throw new Error('请先登录后再试');
+			} else {
+				throw new Error(`HTTP error! status: ${response.statusText}`);
+			}
 		}
 
 		const reader = response.body?.getReader();
