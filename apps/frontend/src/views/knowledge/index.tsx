@@ -162,7 +162,7 @@ function KnowledgeEditorToolbar(props: {
 		shortcutHintOpenLibrary,
 	} = props;
 	const linkBtn =
-		'flex items-center gap-1 px-0 has-[>svg]:px-0 disabled:hover:text-textcolor' as const;
+		'lucide-stroke-draw-hover flex items-center gap-1 px-0 has-[>svg]:px-0 disabled:hover:text-textcolor' as const;
 	return (
 		<div className="flex items-center pr-3 gap-4">
 			<Tooltip

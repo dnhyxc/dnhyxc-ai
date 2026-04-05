@@ -896,6 +896,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 									aria-expanded={markdownBottomBarOpen}
 									aria-controls={markdownBottomBarId}
 									onClick={toggleMarkdownBottomBar}
+									className="lucide-stroke-draw-hover"
 								>
 									<div className="flex items-center gap-1">
 										{markdownBottomBarOpen ? (
