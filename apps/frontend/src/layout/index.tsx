@@ -9,10 +9,11 @@
 import Header from '@design/Header';
 import Sidebar from '@design/Sidebar';
 import { TooltipProvider } from '@ui/index';
-import { useEffect, useState } from 'react';
-import { Outlet } from 'react-router';
+import { useEffect, useLayoutEffect, useState } from 'react';
+import { Outlet, useLocation, useNavigate } from 'react-router';
 import { ChatCoreProvider } from '@/contexts';
 import { useTheme } from '@/hooks';
+import { hasValidAuthToken, requiresAuthForPath } from '@/router/authPaths';
 
 /** 距容器中心归一化：中心 0、四角约 1，用于光圈随位置缩放 */
 function pointerEdge01(xPct: number, yPct: number) {
@@ -22,6 +23,8 @@ function pointerEdge01(xPct: number, yPct: number) {
 }
 
 const Layout = () => {
+	const location = useLocation();
+	const navigate = useNavigate();
 	const [mousePosition, setMousePosition] = useState({
 		x: 50,
 		y: 50,
@@ -30,6 +33,17 @@ const Layout = () => {
 	const { x, y, scale } = mousePosition;
 
 	useTheme();
+
+	const needAuth = requiresAuthForPath(location.pathname);
+	const authed = hasValidAuthToken();
+
+	useLayoutEffect(() => {
+		if (!needAuth || authed) return;
+		navigate('/login', {
+			replace: true,
+			state: { from: `${location.pathname}${location.search}` },
+		});
+	}, [needAuth, authed, location.pathname, location.search, navigate]);
 
 	useEffect(() => {
 		const handleMouseMove = (e: MouseEvent) => {
@@ -79,7 +93,7 @@ const Layout = () => {
 							/>
 							<Header />
 							<div className="box-border h-[calc(100%-3.25rem)] min-h-0 min-w-0 w-full max-w-full overflow-x-hidden overflow-y-auto">
-								<Outlet />
+								{needAuth && !authed ? null : <Outlet />}
 							</div>
 						</div>
 					</div>

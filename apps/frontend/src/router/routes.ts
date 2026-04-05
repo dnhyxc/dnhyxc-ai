@@ -1,3 +1,7 @@
+/**
+ * 路由表。鉴权白名单（未登录可访问）见 `@/router/authPaths` 的 `isPublicPath`：
+ * 首页 `/`、`/login`、`/win`、`/about`、`/share/:shareId`、`/setting` 及其子路径。
+ */
 import React from 'react';
 import Layout from '@/layout';
 import NotFound from '@/views/404';

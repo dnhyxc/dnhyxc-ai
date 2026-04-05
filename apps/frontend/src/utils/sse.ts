@@ -1,7 +1,8 @@
 import { Toast } from '@ui/index';
 import { BASE_URL } from '@/constant';
+import { notifyUnauthorized } from '@/router/authSession';
 import { FinishInfo, SearchOrganic, SearchOrganicItem } from '@/types/chat';
-import { getPlatformFetch } from '@/utils/fetch';
+import { getPlatformFetch, http } from '@/utils/fetch';
 
 function readToken(): string {
 	if (typeof window === 'undefined') {
@@ -57,6 +58,8 @@ export const streamFetch = async ({
 
 		if (!response.ok) {
 			if (response.status === 401) {
+				http.setAuthToken('');
+				notifyUnauthorized();
 				throw new Error('请先登录后再试');
 			} else {
 				throw new Error(`HTTP error! status: ${response.statusText}`);

@@ -1,5 +1,6 @@
 import { Toast } from '@ui/sonner';
 import { BASE_URL } from '@/constant';
+import { notifyUnauthorized } from '@/router/authSession';
 import { isTauriRuntime } from './runtime';
 
 function readAuthTokenFromLocal(): string {
@@ -433,15 +434,22 @@ class HttpClient {
 				requestError = this.handleNetworkError(error);
 			}
 
-			// 显示错误提示
-			Toast({
-				type: 'error',
-				title:
-					requestError?.data?.data?.error?.message ||
-					requestError?.data?.data?.message ||
-					requestError.message ||
-					'请求接口异常',
-			});
+			const isUnauthorized =
+				response?.status === 401 || requestError.code === 401;
+
+			if (isUnauthorized) {
+				this.setAuthToken('');
+				notifyUnauthorized();
+			} else {
+				Toast({
+					type: 'error',
+					title:
+						requestError?.data?.data?.error?.message ||
+						requestError?.data?.data?.message ||
+						requestError.message ||
+						'请求接口异常',
+				});
+			}
 
 			// 抛出错误
 			throw requestError.data?.data || requestError;
