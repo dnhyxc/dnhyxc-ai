@@ -18,6 +18,7 @@ import { CircleArrowUp, Download, Info } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import Icon from '@/assets/icon.png';
 import { useGetVersion, useStorageInfo } from '@/hooks';
+import { cn } from '@/lib/utils';
 import {
 	checkForUpdates,
 	checkVersion,
@@ -187,30 +188,41 @@ const SettingAbout = () => {
 						<div className="flex items-center">
 							<Button
 								size="sm"
-								className="cursor-pointer min-w-30"
+								className={cn(
+									'cursor-pointer min-w-30',
+									// disabled:opacity-50 易让 svg 与文字分层合成，WebView 下底部偶发灰带
+									checkLoading && 'disabled:opacity-100',
+								)}
 								disabled={checkLoading}
 								onClick={onCheckUpdate}
 							>
-								{checkLoading ? (
-									<Spinner />
-								) : (
-									<CircleArrowUp className="mt-0.5 mr-1" />
-								)}
+								<span className="inline-flex size-5 shrink-0 items-center justify-center">
+									{checkLoading ? (
+										<Spinner className="size-4" />
+									) : (
+										<CircleArrowUp className="size-4" />
+									)}
+								</span>
 								检查更新
 							</Button>
 							{storageInfo?.version || updateInfo ? (
 								<>
 									<Button
 										size="sm"
-										className="cursor-pointer min-w-24 ml-5"
+										className={cn(
+											'cursor-pointer min-w-24 ml-5',
+											downloading && 'disabled:opacity-100',
+										)}
 										disabled={downloading}
 										onClick={onDownloadAndInstall}
 									>
-										{downloading ? (
-											<Spinner />
-										) : (
-											<Download className="mt-0.5 mr-1" />
-										)}
+										<span className="inline-flex size-5 shrink-0 items-center justify-center">
+											{downloading ? (
+												<Spinner className="size-4" />
+											) : (
+												<Download className="size-4" />
+											)}
+										</span>
 										更新并重启
 									</Button>
 									<Button
