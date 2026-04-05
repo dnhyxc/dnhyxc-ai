@@ -1,7 +1,7 @@
 import * as AlertDialogPrimitive from '@radix-ui/react-alert-dialog';
 import type { ReactNode } from 'react';
 import { useCallback, useEffect } from 'react';
-import { buttonVariants } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 interface ConfirmProps {
@@ -24,6 +24,9 @@ interface ConfirmProps {
 	 */
 	confirmOnEnter?: boolean;
 	onConfirm: () => void;
+	/** 可选第三钮（如「另存为」），样式为 outline，位于取消与确认之间 */
+	secondaryActionText?: string;
+	onSecondaryAction?: () => void | Promise<void>;
 	onCancel?: () => void;
 	className?: string;
 }
@@ -40,6 +43,8 @@ const Confirm = ({
 	closeOnConfirm = true,
 	confirmOnEnter = false,
 	onConfirm,
+	secondaryActionText,
+	onSecondaryAction,
 	onCancel,
 	className,
 }: ConfirmProps) => {
@@ -111,6 +116,15 @@ const Confirm = ({
 						>
 							{cancelText}
 						</AlertDialogPrimitive.Cancel>
+						{secondaryActionText && onSecondaryAction ? (
+							<Button
+								type="button"
+								variant="outline"
+								onClick={() => void onSecondaryAction()}
+							>
+								{secondaryActionText}
+							</Button>
+						) : null}
 						<AlertDialogPrimitive.Action
 							onClick={handleConfirm}
 							className={cn(buttonVariants({ variant: confirmVariant }))}

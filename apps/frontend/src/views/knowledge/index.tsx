@@ -21,9 +21,60 @@ import {
 import {
 	EDITOR_HEIGHT,
 	isKnowledgeLocalMarkdownId,
+	KNOWLEDGE_LOCAL_MD_ID_PREFIX,
 	TAURI_KNOWLEDGE_DIR,
 } from './constants';
 import KnowledgeList from './KnowledgeList';
+
+/** 保存路径解析用：从绝对路径取父目录 */
+function dirnameFs(filePath: string): string {
+	const n = filePath.replace(/[/\\]+$/, '');
+	const i = Math.max(n.lastIndexOf('/'), n.lastIndexOf('\\'));
+	if (i <= 0) return n;
+	return n.slice(0, i);
+}
+
+/** 拆分标题中的主名与扩展（无扩展时默认 `.md`） */
+function splitKnowledgeTitleStemAndExt(title: string): {
+	stem: string;
+	ext: string;
+} {
+	const t = title.trim() || '未命名';
+	const lower = t.toLowerCase();
+	for (const ext of ['.md', '.markdown', '.mdx'] as const) {
+		if (lower.endsWith(ext)) {
+			return { stem: t.slice(0, -ext.length), ext };
+		}
+	}
+	return { stem: t, ext: '.md' };
+}
+
+/**
+ * 另存为专用：仅用于 Tauri 落盘文件名，**不修改编辑器标题**。
+ * 后缀为 `_年-月-日-时:分:秒`（如 `_2026-04-01-15:30:45`）；Rust 侧 sanitize 会把 `:` 换成 `-` 以兼容 Windows。
+ * 仍冲突则再追加 `_2`、`_3`…
+ */
+async function pickNonConflictingDiskFileTitle(
+	seedTitle: string,
+	pending: SaveKnowledgeMarkdownPayload,
+): Promise<string> {
+	const d = new Date();
+	const pad = (n: number) => String(n).padStart(2, '0');
+	const timeStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}-${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+	const { stem, ext } = splitKnowledgeTitleStemAndExt(seedTitle);
+	for (let n = 0; n < 50; n++) {
+		const mid = n === 0 ? `_${timeStr}` : `_${timeStr}_${n + 1}`;
+		const candidate = `${stem}${mid}${ext}`;
+		const target = await invokeResolveKnowledgeMarkdownTarget({
+			...pending,
+			title: candidate,
+			content: '',
+			overwrite: false,
+		});
+		if (!target.exists) return candidate;
+	}
+	throw new Error('无法找到可用文件名');
+}
 
 /** 根据标题扩展名选择 Monaco language，CSS 等才能走对应 Prettier parser */
 function monacoLanguageFromKnowledgeTitle(title: string): string {
@@ -170,6 +221,7 @@ const Knowledge = observer(() => {
 			} else {
 				Toast({ type: 'error', title: '保存失败', message: result.message });
 			}
+			return result;
 		},
 		[],
 	);
@@ -210,6 +262,36 @@ const Knowledge = observer(() => {
 			}
 		}
 	}, [knowledgeStore, getUserInfo]);
+
+	/**
+	 * 另存为：始终新建云端记录（不更新当前 id），本地扫描打开的条目仍不写库。
+	 * @param apiTitle 与编辑器展示一致，写入接口的标题（可与本地磁盘文件名不同）
+	 */
+	const persistKnowledgeApiSaveAs = useCallback(
+		async (apiTitle: string) => {
+			const markdown = knowledgeStore.markdown ?? '';
+			const meta = buildAuthorMeta(getUserInfo);
+			const editingId = knowledgeStore.knowledgeEditingKnowledgeId;
+			if (isKnowledgeLocalMarkdownId(editingId)) {
+				return;
+			}
+			const res = await saveKnowledge({
+				title: apiTitle,
+				content: markdown,
+				...meta,
+			} as Omit<KnowledgeRecord, 'id'>);
+			if (!res.success || !res.data?.id) {
+				Toast({
+					type: 'error',
+					title: '保存失败',
+					message: res.message || '新建知识失败，请稍后重试',
+				});
+				throw new Error('saveKnowledge save-as failed');
+			}
+			knowledgeStore.setKnowledgeEditingKnowledgeId(res.data.id);
+		},
+		[knowledgeStore, getUserInfo],
+	);
 
 	const syncSnapshotAfterPersist = useCallback(
 		(trimmedTitle: string, markdown: string) => {
@@ -325,6 +407,57 @@ const Knowledge = observer(() => {
 		syncSnapshotAfterPersist,
 	]);
 
+	/** 覆盖弹窗：另存为——仅本地文件名带 `_时间`；编辑器标题与接口标题保持当前展示名 */
+	const onSaveAsFromOverwrite = useCallback(async () => {
+		const pending = knowledgeStore.knowledgePendingSavePayload;
+		if (!pending) return;
+		const markdown = knowledgeStore.markdown ?? '';
+		const displayTitle =
+			knowledgeStore.knowledgeTitle.trim() || pending.title.trim();
+		const wasLocalOnly = isKnowledgeLocalMarkdownId(
+			knowledgeStore.knowledgeEditingKnowledgeId,
+		);
+		const pendingBase: SaveKnowledgeMarkdownPayload = { ...pending };
+		delete pendingBase.previousTitle;
+		knowledgeStore.setKnowledgeOverwriteOpen(false);
+		setSaveLoading(true);
+		try {
+			const diskTitle = await pickNonConflictingDiskFileTitle(
+				displayTitle,
+				pendingBase,
+			);
+			const savePayload: SaveKnowledgeMarkdownPayload = {
+				...pendingBase,
+				title: diskTitle,
+				content: markdown,
+				overwrite: false,
+			};
+			await persistKnowledgeApiSaveAs(displayTitle);
+			const tauriRes = await runTauriSave(savePayload);
+			if (tauriRes.success !== 'success') return;
+			knowledgeStore.setKnowledgeLocalDiskTitle(diskTitle);
+			syncSnapshotAfterPersist(displayTitle, markdown);
+			if (wasLocalOnly && tauriRes.filePath && tauriRes.filePath.length > 0) {
+				knowledgeStore.setKnowledgeEditingKnowledgeId(
+					`${KNOWLEDGE_LOCAL_MD_ID_PREFIX}${encodeURIComponent(tauriRes.filePath)}`,
+				);
+				knowledgeStore.setKnowledgeLocalDirPath(dirnameFs(tauriRes.filePath));
+			}
+		} catch (e) {
+			Toast({
+				type: 'error',
+				title: formatTauriInvokeError(e),
+			});
+		} finally {
+			setSaveLoading(false);
+		}
+	}, [
+		knowledgeStore,
+		persistKnowledgeApiSaveAs,
+		runTauriSave,
+		syncSnapshotAfterPersist,
+	]);
+
 	const handleOverwriteOpenChange = useCallback(
 		(open: boolean) => {
 			knowledgeStore.setKnowledgeOverwriteOpen(open);
@@ -391,13 +524,19 @@ const Knowledge = observer(() => {
 						<div className="mt-2 block break-all text-xs opacity-80">
 							{overwriteTargetPath}
 						</div>
+						<p className="mt-3 text-sm text-textcolor/80">
+							也可选择「另存为」将文件保存为新文件
+						</p>
 					</>
 				}
 				descriptionClassName="text-left"
 				confirmText="覆盖保存"
 				confirmVariant="destructive"
+				cancelText="取消保存"
 				closeOnConfirm={false}
 				confirmOnEnter
+				secondaryActionText="另存为"
+				onSecondaryAction={onSaveAsFromOverwrite}
 				onConfirm={onConfirmOverwrite}
 			/>
 
