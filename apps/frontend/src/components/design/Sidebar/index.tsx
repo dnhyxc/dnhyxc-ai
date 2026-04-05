@@ -79,7 +79,7 @@ const Sidebar = () => {
 							key={item.path}
 							role="button"
 							tabIndex={0}
-							className="sidebar-nav-btn group text-theme mb-4 flex h-11 w-11 cursor-pointer items-center justify-center rounded-md bg-theme-secondary transition-[color,background-color] duration-200 ease-linear hover:bg-theme/12 hover:text-teal-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/50"
+							className="lucide-stroke-draw-hover group text-theme mb-4 flex h-11 w-11 cursor-pointer items-center justify-center rounded-md bg-theme-secondary transition-[color,background-color] duration-200 ease-linear hover:bg-theme/12 hover:text-teal-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/50"
 							onClick={item.onClick}
 						>
 							<span className="flex size-full items-center justify-center [&>svg]:size-[22px] [&>svg]:shrink-0 [&>svg]:overflow-visible">
@@ -92,7 +92,7 @@ const Sidebar = () => {
 					{storageInfo?.access_token ? (
 						<DropdownMenu>
 							<DropdownMenuTrigger asChild>
-								<div className="sidebar-nav-btn group text-theme flex h-11 w-11 cursor-pointer items-center justify-center rounded-md bg-theme-secondary transition-[color,background-color] duration-200 ease-linear hover:bg-theme/12 hover:text-teal-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/50">
+								<div className="lucide-stroke-draw-hover group text-theme flex h-11 w-11 cursor-pointer items-center justify-center rounded-md bg-theme-secondary transition-[color,background-color] duration-200 ease-linear hover:bg-theme/12 hover:text-teal-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/50">
 									<CircleUserRound className="size-[22px] shrink-0 overflow-visible" />
 								</div>
 							</DropdownMenuTrigger>
@@ -136,7 +136,7 @@ const Sidebar = () => {
 						<div
 							role="button"
 							tabIndex={0}
-							className="sidebar-nav-btn group text-theme flex h-11 w-11 cursor-pointer items-center justify-center rounded-md bg-theme-secondary transition-[color,background-color] duration-200 ease-linear hover:bg-theme/12 hover:text-teal-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/50"
+							className="lucide-stroke-draw-hover group text-theme flex h-11 w-11 cursor-pointer items-center justify-center rounded-md bg-theme-secondary transition-[color,background-color] duration-200 ease-linear hover:bg-theme/12 hover:text-teal-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/50"
 							onClick={() => onJump('/login')}
 						>
 							<CircleUserRound className="size-[22px] shrink-0 overflow-visible" />

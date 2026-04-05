@@ -230,7 +230,7 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 								{clearChat && (
 									<Button
 										variant="ghost"
-										className="flex items-center text-sm bg-theme/5 mb-1 h-8 rounded-md"
+										className="lucide-stroke-draw-hover flex items-center text-sm bg-theme/5 mb-1 h-8 rounded-md [&_svg]:overflow-visible"
 										onClick={clearChat}
 									>
 										<CirclePlus className="w-4 h-4" />
@@ -239,7 +239,9 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 								)}
 								<Upload
 									uploadType="button"
-									className="w-auto h-auto"
+									className={cn(
+										'w-auto h-auto lucide-stroke-draw-hover [&_svg]:overflow-visible',
+									)}
 									maxSize={20 * 1024 * 1024}
 									multiple
 									countValidText="最多只能支持 5 个文件"
@@ -272,7 +274,7 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 										disabled={loading}
 										onClick={() => onWebSearchEnabledChange(!webSearchEnabled)}
 										className={cn(
-											'mb-1 h-8 shrink-0 gap-1.5 rounded-md px-2.5 text-sm',
+											'lucide-stroke-draw-hover mb-1 h-8 shrink-0 gap-1.5 rounded-md px-2.5 text-sm [&_svg]:overflow-visible',
 											webSearchEnabled
 												? 'border border-teal-600/50 bg-teal-600/20 text-teal-400 hover:bg-teal-600/30'
 												: 'border border-transparent bg-theme/5 text-textcolor',
@@ -293,7 +295,7 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 									<Button
 										variant="ghost"
 										onClick={() => stopGenerating?.()}
-										className="p-0 h-8 w-8 flex items-center justify-center rounded-full border border-red-500/30 bg-red-500/20 text-red-500 hover:bg-red-500/30 hover:text-red-500 shadow-none"
+										className="lucide-stroke-draw-hover p-0 h-8 w-8 flex items-center justify-center rounded-full border border-red-500/30 bg-red-500/20 text-red-500 hover:bg-red-500/30 hover:text-red-500 shadow-none [&_svg]:overflow-visible"
 									>
 										<Target
 											className={cn(
@@ -311,7 +313,7 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 										chatInputRef?.current?.focus();
 									}}
 									disabled={!input.trim()}
-									className="h-8 w-8 mb-1 flex items-center justify-center rounded-full bg-linear-to-r from-teal-500 to-cyan-600"
+									className="lucide-stroke-draw-hover h-8 w-8 mb-1 flex items-center justify-center rounded-full bg-linear-to-r from-teal-500 to-cyan-600 [&_svg]:overflow-visible"
 								>
 									<Rocket className="-rotate-45" />
 								</Button>

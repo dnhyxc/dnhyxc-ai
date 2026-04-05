@@ -912,23 +912,23 @@ body.theme-beige {
 	}
 }
 
-/* 侧栏导航（.sidebar-nav-btn）：hover 时 Lucide 描边图标线性「画线」（stroke-dashoffset） */
-@keyframes sidebar-nav-icon-draw {
+/* Lucide 描边图标：hover 时子级 SVG 线性「画线」（stroke-dashoffset）；侧栏、聊天输入条等共用 */
+@keyframes lucide-stroke-draw {
 	to {
 		stroke-dashoffset: 0;
 	}
 }
 
 @media (prefers-reduced-motion: no-preference) {
-	.sidebar-nav-btn:hover svg path,
-	.sidebar-nav-btn:hover svg line,
-	.sidebar-nav-btn:hover svg circle,
-	.sidebar-nav-btn:hover svg polyline,
-	.sidebar-nav-btn:hover svg rect,
-	.sidebar-nav-btn:hover svg ellipse {
+	.lucide-stroke-draw-hover:hover svg path,
+	.lucide-stroke-draw-hover:hover svg line,
+	.lucide-stroke-draw-hover:hover svg circle,
+	.lucide-stroke-draw-hover:hover svg polyline,
+	.lucide-stroke-draw-hover:hover svg rect,
+	.lucide-stroke-draw-hover:hover svg ellipse {
 		stroke-dasharray: 72;
 		stroke-dashoffset: 72;
-		animation: sidebar-nav-icon-draw 0.5s linear forwards;
+		animation: lucide-stroke-draw 0.5s linear forwards;
 	}
 }
 

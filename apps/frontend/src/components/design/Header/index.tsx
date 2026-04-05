@@ -89,13 +89,13 @@ const Header: React.FC<Iprops> = ({ actions = true, ccustomActions }) => {
 						{
 							<div className="flex items-center h-full">
 								<div
-									className="h-full w-8 flex justify-center items-center hover:text-theme/80 cursor-pointer"
+									className="lucide-stroke-draw-hover h-full w-8 flex cursor-pointer items-center justify-center hover:text-teal-500 [&_svg]:overflow-visible"
 									onClick={() => navigate('/setting/theme')}
 								>
 									<Shirt className="w-5 h-4.5" />
 								</div>
 								<div
-									className="relative h-full w-8 flex justify-center items-center hover:text-theme/80 cursor-pointer"
+									className="lucide-stroke-draw-hover relative flex h-full w-8 cursor-pointer items-center justify-center hover:text-teal-500 [&_svg]:overflow-visible"
 									onClick={toSetting}
 								>
 									<Settings className="w-5 h-5" />
