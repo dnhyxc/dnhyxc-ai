@@ -498,7 +498,7 @@ const KnowledgeList: React.FC<IProps> = observer(
 
 				<Drawer title="知识库" open={open} onOpenChange={onOpenChange}>
 					<div className="flex h-full min-h-0 flex-col">
-						<div className="flex shrink-0 flex-col gap-3 pr-4 pb-3">
+						<div className="flex shrink-0 flex-col gap-0.5 pr-4 pl-2.5 pb-0.5">
 							<div className="flex flex-wrap items-center justify-between gap-2">
 								<span className="text-sm text-textcolor/80">数据来源</span>
 								<div className="flex items-center gap-2">
@@ -538,23 +538,32 @@ const KnowledgeList: React.FC<IProps> = observer(
 										>
 											选择文件夹
 										</Button>
-										<span
-											className="min-w-0 flex-1 truncate text-xs text-textcolor/50"
-											title={localFolderPath}
-										>
-											{localFolderPath}
-										</span>
+										<Tooltip side="top" content={localFolderPath}>
+											<span className="min-w-0 flex-1 truncate text-xs text-textcolor/50">
+												{localFolderPath}
+											</span>
+										</Tooltip>
 									</div>
 								</div>
 							) : null}
 							{!isTauriRuntime() ? (
-								<p className="text-xs text-textcolor/50">
+								<div className="text-xs text-textcolor/50">
 									本地文件夹列表仅在桌面端（Tauri）可用。
-								</p>
+								</div>
 							) : null}
+							<div
+								className={cn(
+									'text-xs text-textcolor/50',
+									useLocalFolder ? 'mb-0.5' : 'mb-0.5 mt-2',
+								)}
+							>
+								{useLocalFolder
+									? '该列表的数据操作仅支持本地文件夹'
+									: '该列表的数据操作支持本地与数据库同步'}
+							</div>
 						</div>
 						<ScrollArea
-							className="min-h-0 flex-1 overflow-y-auto pr-4 box-border"
+							className="min-h-0 flex-1 overflow-y-auto pr-1.5 box-border"
 							onScroll={
 								useLocalFolder ? undefined : knowledgeStore.onListViewportScroll
 							}

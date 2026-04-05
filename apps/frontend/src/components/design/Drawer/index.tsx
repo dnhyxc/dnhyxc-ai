@@ -104,13 +104,16 @@ export function Drawer({
 				)}
 
 				<div
-					className={cn('flex-1 overflow-hidden px-4 pr-0 py-4', bodyClassName)}
+					className={cn(
+						'flex-1 overflow-hidden pl-1.5 pr-0 py-4',
+						bodyClassName,
+					)}
 				>
 					{children}
 				</div>
 
 				{footer && (
-					<SheetFooter className="px-4 py-4 border-t shrink-0 bg-background">
+					<SheetFooter className="pl-1.5 pt-3.5 pb-4 border-t shrink-0 bg-background">
 						{footer}
 					</SheetFooter>
 				)}

@@ -156,7 +156,7 @@ const SessionItem = memo<SessionItemProps>(
 				) : (
 					<div className="flex flex-col mt-1">
 						<div
-							className="line-clamp-1 max-w-82.5 flex-1 text-sm [&_.markdown-body]:text-textcolor!"
+							className="line-clamp-1 max-w-85 flex-1 text-sm [&_.markdown-body]:text-textcolor!"
 							dangerouslySetInnerHTML={{
 								__html: parser.render(
 									item?.title || item.messages?.[0]?.content || '新对话',
@@ -340,7 +340,7 @@ const SessionList = observer(({ open, onOpenChange }: IProps) => {
 	return (
 		<Drawer title="历史对话" open={open} onOpenChange={onOpenChange}>
 			<ScrollArea
-				className="h-full overflow-y-auto pr-4 box-border"
+				className="h-full overflow-y-auto pr-2 box-border"
 				onScroll={chatStore.onHistorySessionViewportScroll}
 			>
 				<div className="flex flex-col gap-0">
