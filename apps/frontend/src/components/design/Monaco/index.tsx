@@ -110,6 +110,13 @@ interface MarkdownEditorProps {
 	wordWrapColumn?: number;
 	/** 是否显示编辑/预览/分屏切换的 tab 栏；默认 true */
 	showTabBar?: boolean;
+	/**
+	 * Markdown 底部操作栏是否展开；与 onMarkdownBottomBarOpenChange 同时传入时为受控模式。
+	 */
+	markdownBottomBarOpen?: boolean;
+	onMarkdownBottomBarOpenChange?: (open: boolean) => void;
+	/** 「操作栏」按钮 Tooltip 中的快捷键说明 */
+	markdownBottomBarShortcutHint?: string;
 }
 
 /**
@@ -385,6 +392,9 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	wordWrap = 'bounded',
 	wordWrapColumn = MARKDOWN_EDITOR_WORD_WRAP_COLUMN,
 	showTabBar = true,
+	markdownBottomBarOpen: markdownBottomBarOpenProp,
+	onMarkdownBottomBarOpenChange,
+	markdownBottomBarShortcutHint,
 }) => {
 	const editorRef = useRef<MonacoEditorInstance | null>(null);
 	const imeComposingRef = useRef(false);
@@ -397,8 +407,26 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	const [viewMode, setViewMode] = useState<MarkdownViewMode>('edit');
 	const [splitScrollFollowMode, setSplitScrollFollowMode] =
 		useState<MarkdownSplitScrollFollowMode>('none');
-	/** 底部 Markdown 操作条是否展开（由顶栏 toolbar 区域按钮切换） */
-	const [markdownBottomBarOpen, setMarkdownBottomBarOpen] = useState(false);
+	/** 底部 Markdown 操作条是否展开（受控或未传 props 时内部 state） */
+	const [internalMarkdownBottomBarOpen, setInternalMarkdownBottomBarOpen] =
+		useState(false);
+	const bottomBarControlled =
+		markdownBottomBarOpenProp !== undefined &&
+		onMarkdownBottomBarOpenChange !== undefined;
+	const markdownBottomBarOpen = bottomBarControlled
+		? markdownBottomBarOpenProp
+		: internalMarkdownBottomBarOpen;
+	const toggleMarkdownBottomBar = useCallback(() => {
+		if (bottomBarControlled && onMarkdownBottomBarOpenChange) {
+			onMarkdownBottomBarOpenChange(!markdownBottomBarOpenProp);
+		} else {
+			setInternalMarkdownBottomBarOpen((o) => !o);
+		}
+	}, [
+		bottomBarControlled,
+		markdownBottomBarOpenProp,
+		onMarkdownBottomBarOpenChange,
+	]);
 	const viewModeRef = useRef(viewMode);
 	viewModeRef.current = viewMode;
 	const splitScrollFollowModeRef = useRef(splitScrollFollowMode);
@@ -854,7 +882,10 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 					<div className="min-w-0 flex-1">{title}</div>
 					<div className="flex min-w-0 shrink-0 items-center justify-end">
 						{showTabBar && isMarkdown ? (
-							<Tooltip side="top" content="Command/Ctrl + Control + B">
+							<Tooltip
+								side="top"
+								content={markdownBottomBarShortcutHint ?? 'Meta + Shift + B'}
+							>
 								<Button
 									variant="link"
 									aria-label={
@@ -864,7 +895,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 									}
 									aria-expanded={markdownBottomBarOpen}
 									aria-controls={markdownBottomBarId}
-									onClick={() => setMarkdownBottomBarOpen((o) => !o)}
+									onClick={toggleMarkdownBottomBar}
 								>
 									<div className="flex items-center gap-1">
 										{markdownBottomBarOpen ? (

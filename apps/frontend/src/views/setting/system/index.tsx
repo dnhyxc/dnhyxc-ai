@@ -5,8 +5,9 @@ import { toast } from '@ui/sonner';
 import { useCallback, useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { capitalizeWords, getValue, setValue } from '@/utils';
+import { KNOWLEDGE_SHORTCUTS_CHANGED_EVENT } from '@/utils/knowledge-shortcuts';
 import { isTauriRuntime } from '@/utils/runtime';
-import { DEFAULT_INFO } from './config';
+import { DEFAULT_INFO, type ShortcutSettingItem } from './config';
 
 /** 仅在桌面壳内调用 Rust 命令 */
 async function desktopInvoke<T>(
@@ -22,22 +23,30 @@ const System = () => {
 	const [startType, setStartType] = useState('1');
 	const [closeType, setCloseType] = useState('1');
 	const [checkShortcut, setCheckShortcut] = useState<number | null>(null);
-	const [shortcutInfo, setShortcutInfo] = useState(DEFAULT_INFO);
+	const [shortcutInfo, setShortcutInfo] = useState<ShortcutSettingItem[]>(() =>
+		DEFAULT_INFO.map((i) => ({ ...i })),
+	);
 
-	const getShortCutInfo = () => {
-		DEFAULT_INFO.map(async (i) => {
-			i.defaultShortcut =
-				(await getValue(`shortcut_${i.key}`)) || i.defaultShortcut;
-		});
-		setShortcutInfo(DEFAULT_INFO);
-	};
+	const getShortCutInfo = useCallback(async () => {
+		const next = await Promise.all(
+			DEFAULT_INFO.map(async (i) => {
+				const stored = await getValue<string>(`shortcut_${i.key}`);
+				const resolved =
+					stored != null && String(stored).trim() !== ''
+						? String(stored).trim()
+						: i.defaultShortcut;
+				return { ...i, shortcut: '', defaultShortcut: resolved };
+			}),
+		);
+		setShortcutInfo(next);
+	}, []);
 
 	useEffect(() => {
 		getSavePath();
 		getCloseType();
 		checkStartType();
-		getShortCutInfo();
-	}, []);
+		void getShortCutInfo();
+	}, [getShortCutInfo]);
 
 	useEffect(() => {
 		window.addEventListener('keydown', onKeydown, true);
@@ -95,6 +104,25 @@ const System = () => {
 			if (!info?.key || !info.shortcut) return;
 
 			const shortcuts = info.shortcut;
+			const pageOnly = info.registerGlobally === false;
+
+			/** 知识库等：只写 store，由页面内 keydown 响应，不占用全局快捷键 */
+			if (pageOnly) {
+				void (async () => {
+					await setValue(`shortcut_${info.key}`, shortcuts);
+					setShortcutInfo((prev) =>
+						prev.map((item) =>
+							item.key === checkShortcut
+								? { ...item, shortcut: shortcuts, defaultShortcut: shortcuts }
+								: item,
+						),
+					);
+					window.dispatchEvent(
+						new CustomEvent(KNOWLEDGE_SHORTCUTS_CHANGED_EVENT),
+					);
+				})();
+				return;
+			}
 
 			if (!isTauriRuntime()) {
 				toast.info('全局快捷键仅在桌面客户端可用');
@@ -109,16 +137,14 @@ const System = () => {
 					setShortcutInfo((prev) =>
 						prev.map((item) => {
 							if (item.key === checkShortcut) {
-								setValue(`shortcut_${item.key}`, shortcuts);
-								// invoke('reload_all_shortcuts');
+								void setValue(`shortcut_${item.key}`, shortcuts);
 								return {
 									...item,
 									shortcut: shortcuts,
 									defaultShortcut: shortcuts,
 								};
-							} else {
-								return item;
 							}
+							return item;
 						}),
 					);
 				})
@@ -194,7 +220,9 @@ const System = () => {
 			),
 		);
 		setCheckShortcut(value);
-		if (isTauriRuntime()) {
+		const item = DEFAULT_INFO.find((i) => i.key === value);
+		const isGlobal = item?.registerGlobally !== false;
+		if (isGlobal && isTauriRuntime()) {
 			await desktopInvoke('clear_all_shortcuts');
 		}
 	};
@@ -265,22 +293,25 @@ const System = () => {
 			</div>
 			<div className="mt-3.5 pb-4.5 min-w-[610px]">
 				<div className="text-md font-bold">快捷键设置</div>
+				<p className="mt-1 px-8.5 text-xs text-textcolor/55">
+					「知识库」相关快捷键仅在知识库页面内生效，不会注册为系统全局快捷键；其余项在桌面端为全局快捷键。
+				</p>
 				<div className="flex flex-col items-center mt-2 px-8.5 text-sm">
-					<div className="grid grid-cols-2 w-full">
+					<div className="grid grid-cols-2 w-full gap-y-1">
 						{shortcutInfo.map((i) => {
 							return (
-								<div key={i.key} className="flex items-center">
-									<span>{i.label}</span>
+								<div key={i.key} className="flex items-center min-w-0">
+									<span className="shrink-0">{i.label}</span>
 									<Button
 										variant="link"
 										id={i.id}
 										className={cn(
-											'cursor-pointer text-md mt-1',
+											'cursor-pointer text-md mt-1 min-w-0 truncate',
 											checkShortcut === i.key && !i.shortcut
 												? 'text-textcolor/70'
 												: 'text-textcolor',
 										)}
-										onClick={() => onChangeShortCut(i.key)}
+										onClick={() => void onChangeShortCut(i.key)}
 									>
 										{checkShortcut === i.key
 											? i.shortcut || '按键盘输入快捷键'

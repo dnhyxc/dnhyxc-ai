@@ -20,6 +20,12 @@ import {
 	type SaveKnowledgeMarkdownPayload,
 } from '@/utils/knowledge-save';
 import {
+	chordMatchesStored,
+	KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS,
+	KNOWLEDGE_SHORTCUTS_CHANGED_EVENT,
+	loadKnowledgeShortcutChords,
+} from '@/utils/knowledge-shortcuts';
+import {
 	EDITOR_HEIGHT,
 	isKnowledgeLocalMarkdownId,
 	KNOWLEDGE_LOCAL_MD_ID_PREFIX,
@@ -141,13 +147,28 @@ function KnowledgeEditorToolbar(props: {
 	onSave: () => void;
 	/** 保存请求进行中：禁用保存按钮 */
 	saveLoading?: boolean;
+	/** 系统设置中配置的快捷键文案（用于 Tooltip） */
+	shortcutHintSave?: string;
+	shortcutHintClear?: string;
+	shortcutHintOpenLibrary?: string;
 }) {
-	const { onOpenLibrary, onNewDraft, onSave, saveLoading = false } = props;
+	const {
+		onOpenLibrary,
+		onNewDraft,
+		onSave,
+		saveLoading = false,
+		shortcutHintSave,
+		shortcutHintClear,
+		shortcutHintOpenLibrary,
+	} = props;
 	const linkBtn =
 		'flex items-center gap-1 px-0 has-[>svg]:px-0 disabled:hover:text-textcolor' as const;
 	return (
 		<div className="flex items-center pr-3 gap-4">
-			<Tooltip side="top" content="Command/Ctrl + S">
+			<Tooltip
+				side="top"
+				content={shortcutHintSave ?? 'Meta + S / Control + S'}
+			>
 				<Button
 					variant="link"
 					className={linkBtn}
@@ -159,7 +180,7 @@ function KnowledgeEditorToolbar(props: {
 					<span className="mt-0.5">保存</span>
 				</Button>
 			</Tooltip>
-			<Tooltip side="top" content="Command/Ctrl + Control + D">
+			<Tooltip side="top" content={shortcutHintClear ?? 'Meta + Shift + D'}>
 				<Button
 					variant="link"
 					className={cn(linkBtn, 'hover:text-orange-500')}
@@ -169,7 +190,10 @@ function KnowledgeEditorToolbar(props: {
 					<span className="mt-0.5">清空</span>
 				</Button>
 			</Tooltip>
-			<Tooltip side="top" content="Command/Ctrl + Control + L">
+			<Tooltip
+				side="top"
+				content={shortcutHintOpenLibrary ?? 'Meta + Shift + L'}
+			>
 				<Button variant="link" className={linkBtn} onClick={onOpenLibrary}>
 					<LibraryBig className="mt-0.5" />
 					<span className="mt-0.5">知识库</span>
@@ -186,6 +210,24 @@ const Knowledge = observer(() => {
 
 	const [listOpen, setListOpen] = useState(false);
 	const [saveLoading, setSaveLoading] = useState(false);
+	const [markdownBottomBarOpen, setMarkdownBottomBarOpen] = useState(false);
+	const [knowledgeChords, setKnowledgeChords] = useState<{
+		save: string;
+		clear: string;
+		openLibrary: string;
+		toggleMarkdownBottomBar: string;
+	}>({
+		save: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.save,
+		clear: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.clear,
+		openLibrary: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.openLibrary,
+		toggleMarkdownBottomBar:
+			KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.toggleMarkdownBottomBar,
+	});
+
+	const reloadKnowledgeChords = useCallback(async () => {
+		const c = await loadKnowledgeShortcutChords();
+		setKnowledgeChords(c);
+	}, []);
 
 	/** 与 localStorage 脱钩，统一从 userStore 取（刷新后由 store 从缓存恢复） */
 	const getUserInfo = useMemo((): StoredUserInfo => {
@@ -205,6 +247,23 @@ const Knowledge = observer(() => {
 	const resetEditorToNewDraft = useCallback(() => {
 		knowledgeStore.clearKnowledgeDraft();
 	}, [knowledgeStore]);
+
+	// 快捷键监听
+	useEffect(() => {
+		void reloadKnowledgeChords();
+		const onShortcutsChanged = () => void reloadKnowledgeChords();
+		// 系统设置中快捷键变化时重新加载快捷键
+		window.addEventListener(
+			KNOWLEDGE_SHORTCUTS_CHANGED_EVENT,
+			onShortcutsChanged,
+		);
+		return () => {
+			window.removeEventListener(
+				KNOWLEDGE_SHORTCUTS_CHANGED_EVENT,
+				onShortcutsChanged,
+			);
+		};
+	}, [reloadKnowledgeChords]);
 
 	const handleMarkdownChange = useCallback(
 		(value: string) => {
@@ -363,17 +422,43 @@ const Knowledge = observer(() => {
 		syncSnapshotAfterPersist,
 	]);
 
-	/** Command/Ctrl + S：与工具栏保存一致（捕获阶段优先于 Monaco 默认行为） */
+	/**
+	 * 知识库快捷键：组合键在系统设置中配置（shortcut_6/7/8/9），仅在本页捕获执行；
+	 * 捕获阶段优先于 Monaco 默认行为。
+	 */
 	useEffect(() => {
 		const onKeyDown = (e: KeyboardEvent) => {
-			if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 's') return;
-			e.preventDefault();
 			if (saveLoading || knowledgeStore.knowledgeOverwriteOpen) return;
-			void onSave();
+			if (chordMatchesStored(knowledgeChords.save, e)) {
+				e.preventDefault();
+				void onSave();
+				return;
+			}
+			if (chordMatchesStored(knowledgeChords.clear, e)) {
+				e.preventDefault();
+				resetEditorToNewDraft();
+				return;
+			}
+			if (chordMatchesStored(knowledgeChords.openLibrary, e)) {
+				e.preventDefault();
+				setListOpen((open) => !open);
+				return;
+			}
+			if (chordMatchesStored(knowledgeChords.toggleMarkdownBottomBar, e)) {
+				e.preventDefault();
+				setMarkdownBottomBarOpen((open) => !open);
+				return;
+			}
 		};
 		window.addEventListener('keydown', onKeyDown, true);
 		return () => window.removeEventListener('keydown', onKeyDown, true);
-	}, [onSave, saveLoading, knowledgeStore]);
+	}, [
+		knowledgeChords,
+		onSave,
+		saveLoading,
+		knowledgeStore.knowledgeOverwriteOpen,
+		resetEditorToNewDraft,
+	]);
 
 	const onConfirmOverwrite = useCallback(async () => {
 		const pending = knowledgeStore.knowledgePendingSavePayload;
@@ -558,12 +643,20 @@ const Knowledge = observer(() => {
 					}
 					value={knowledgeStore.markdown}
 					onChange={handleMarkdownChange}
+					markdownBottomBarOpen={markdownBottomBarOpen}
+					onMarkdownBottomBarOpenChange={setMarkdownBottomBarOpen}
+					markdownBottomBarShortcutHint={
+						knowledgeChords.toggleMarkdownBottomBar
+					}
 					toolbar={
 						<KnowledgeEditorToolbar
 							onOpenLibrary={() => setListOpen(true)}
 							onNewDraft={resetEditorToNewDraft}
 							onSave={onSave}
 							saveLoading={saveLoading}
+							shortcutHintSave={knowledgeChords.save}
+							shortcutHintClear={knowledgeChords.clear}
+							shortcutHintOpenLibrary={knowledgeChords.openLibrary}
 						/>
 					}
 					title={
