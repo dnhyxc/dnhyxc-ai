@@ -1,6 +1,7 @@
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
@@ -365,4 +366,172 @@ pub fn read_knowledge_markdown_file(
 	}
 	let content = fs::read_to_string(&p).map_err(|e| e.to_string())?;
 	Ok(ReadKnowledgeMarkdownFileResult { content })
+}
+
+// —— 本地 .md 用 Cursor / Trae（用户所称 tare）打开 ——
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DetectedMarkdownEditor {
+	Cursor,
+	Trae,
+}
+
+#[cfg(target_os = "macos")]
+fn frontmost_application_name() -> Option<String> {
+	let script =
+		r#"tell application "System Events" to get name of first application process whose frontmost is true"#;
+	let output = Command::new("osascript").args(["-e", script]).output().ok()?;
+	if !output.status.success() {
+		return None;
+	}
+	let s = String::from_utf8(output.stdout).ok()?;
+	let t = s.trim();
+	if t.is_empty() {
+		None
+	} else {
+		Some(t.to_string())
+	}
+}
+
+/// Windows：前台窗口所属进程名（小写），失败则 None
+#[cfg(target_os = "windows")]
+fn frontmost_application_name() -> Option<String> {
+	let ps = concat!(
+		"$pid = [uint32]0; ",
+		"Add-Type -MemberDefinition '[DllImport(\"user32.dll\")]public static extern System.IntPtr GetForegroundWindow();",
+		"[DllImport(\"user32.dll\")]public static extern uint GetWindowThreadProcessId(System.IntPtr h,out uint p);' ",
+		"-Name U -Namespace W; ",
+		"[void][W.U]::GetWindowThreadProcessId([W.U]::GetForegroundWindow(),[ref]$pid); ",
+		"(Get-Process -Id $pid -ErrorAction SilentlyContinue).ProcessName",
+	);
+	let output = Command::new("powershell")
+		.args(["-NoProfile", "-STA", "-Command", ps])
+		.output()
+		.ok()?;
+	if !output.status.success() {
+		return None;
+	}
+	let s = String::from_utf8(output.stdout).ok()?;
+	let t = s.trim().to_lowercase();
+	if t.is_empty() {
+		None
+	} else {
+		Some(t)
+	}
+}
+
+#[cfg(all(unix, not(target_os = "macos")))]
+fn frontmost_application_name() -> Option<String> {
+	None
+}
+
+fn detect_editor_from_frontmost() -> DetectedMarkdownEditor {
+	let Some(name) = frontmost_application_name() else {
+		return DetectedMarkdownEditor::Trae;
+	};
+	let lower = name.to_lowercase();
+	// 前台为 Cursor（进程名常见为 Cursor，macOS 显示名亦含 cursor）
+	if lower.contains("cursor") {
+		return DetectedMarkdownEditor::Cursor;
+	}
+	// Trae（字节）在 macOS 可能显示为 Trae / Trae CN 等
+	if lower.contains("trae") {
+		return DetectedMarkdownEditor::Trae;
+	}
+	// 当前不在上述编辑器内（含本应用前台）：默认用 Trae 打开
+	DetectedMarkdownEditor::Trae
+}
+
+#[cfg(target_os = "macos")]
+fn spawn_open_editor(app_bundle_name: &str, path: &Path) -> Result<(), String> {
+	let path_str = path.to_str().ok_or("路径包含无效字符")?;
+	let status = Command::new("open")
+		.args(["-a", app_bundle_name, "--", path_str])
+		.status()
+		.map_err(|e| format!("无法启动 {app_bundle_name}: {e}"))?;
+	if status.success() {
+		Ok(())
+	} else {
+		Err(format!("open -a {app_bundle_name} 退出码非 0"))
+	}
+}
+
+#[cfg(not(target_os = "macos"))]
+fn spawn_open_editor(cli_name: &str, path: &Path) -> Result<(), String> {
+	let path_str = path.to_str().ok_or("路径包含无效字符")?;
+	Command::new(cli_name)
+		.arg(path_str)
+		.spawn()
+		.map_err(|e| format!("无法启动 {cli_name}: {e}"))?;
+	Ok(())
+}
+
+fn open_markdown_with_detected_editor(path: &Path) -> Result<DetectedMarkdownEditor, String> {
+	let kind = detect_editor_from_frontmost();
+	match kind {
+		DetectedMarkdownEditor::Cursor => {
+			#[cfg(target_os = "macos")]
+			{
+				spawn_open_editor("Cursor", path)?;
+			}
+			#[cfg(not(target_os = "macos"))]
+			{
+				spawn_open_editor("cursor", path)?;
+			}
+			Ok(DetectedMarkdownEditor::Cursor)
+		}
+		DetectedMarkdownEditor::Trae => {
+			#[cfg(target_os = "macos")]
+			{
+				if spawn_open_editor("Trae", path).is_err() {
+					// 部分安装为「Trae CN」等显示名
+					spawn_open_editor("Trae CN", path)?;
+				}
+			}
+			#[cfg(not(target_os = "macos"))]
+			{
+				spawn_open_editor("trae", path)?;
+			}
+			Ok(DetectedMarkdownEditor::Trae)
+		}
+	}
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OpenKnowledgeMarkdownInEditorInput {
+	pub file_path: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OpenKnowledgeMarkdownInEditorResult {
+	/// 实际用于打开的编辑器：`Cursor` 或 `Trae`
+	pub opened_with: String,
+}
+
+/// 在检测到的编辑器中打开本地 `.md`：前台为 Cursor 则用 Cursor，为 Trae 则用 Trae，否则默认 Trae（macOS 下 Trae 失败时尝试 Trae CN）
+#[tauri::command]
+pub fn open_knowledge_markdown_in_editor(
+	input: OpenKnowledgeMarkdownInEditorInput,
+) -> Result<OpenKnowledgeMarkdownInEditorResult, String> {
+	let trimmed = input.file_path.trim();
+	if trimmed.is_empty() {
+		return Err("filePath 不能为空".to_string());
+	}
+	let p = PathBuf::from(trimmed);
+	if !p.exists() || !p.is_file() {
+		return Err("文件不存在或不是普通文件".to_string());
+	}
+	if !is_md_file_path(&p) {
+		return Err("仅允许打开 .md 文件".to_string());
+	}
+	let used = open_markdown_with_detected_editor(&p)?;
+	let opened_with = match used {
+		DetectedMarkdownEditor::Cursor => "Cursor",
+		DetectedMarkdownEditor::Trae => "Trae",
+	};
+	Ok(OpenKnowledgeMarkdownInEditorResult {
+		opened_with: opened_with.to_string(),
+	})
 }

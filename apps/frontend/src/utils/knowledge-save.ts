@@ -152,3 +152,13 @@ export async function invokeReadKnowledgeMarkdownFile(
 	);
 	return res.content;
 }
+
+/** 在检测到的编辑器中打开本地 .md（前台为 Cursor 用 Cursor，否则默认 Trae；见 Tauri `open_knowledge_markdown_in_editor`） */
+export async function invokeOpenKnowledgeMarkdownInEditor(
+	filePath: string,
+): Promise<{ openedWith: string }> {
+	const { invoke } = await import('@tauri-apps/api/core');
+	return invoke<{ openedWith: string }>('open_knowledge_markdown_in_editor', {
+		input: { filePath },
+	});
+}

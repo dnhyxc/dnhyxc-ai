@@ -4,7 +4,7 @@ import { Button } from '@ui/button';
 import { ScrollArea } from '@ui/index';
 import { Toast } from '@ui/sonner';
 import { Switch } from '@ui/switch';
-import { Trash2 } from 'lucide-react';
+import { Code2, Trash2 } from 'lucide-react';
 import { observer } from 'mobx-react';
 import { useCallback, useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
@@ -16,6 +16,7 @@ import {
 	formatTauriInvokeError,
 	invokeDeleteKnowledgeMarkdown,
 	invokeListKnowledgeMarkdownFiles,
+	invokeOpenKnowledgeMarkdownInEditor,
 	invokeReadKnowledgeMarkdownFile,
 	invokeResolveKnowledgeMarkdownTarget,
 } from '@/utils/knowledge-save';
@@ -50,8 +51,21 @@ function KnowledgeListRow(props: {
 	selected: boolean;
 	onActivate: (item: KnowledgeListItem) => void;
 	onTrashClick: (e: React.MouseEvent, item: KnowledgeListItem) => void;
+	/** 本地文件夹模式：在 Cursor / Trae 中打开（按钮在删除左侧） */
+	showOpenInExternalEditor?: boolean;
+	onOpenInExternalEditorClick?: (
+		e: React.MouseEvent,
+		item: KnowledgeListItem,
+	) => void;
 }) {
-	const { item, selected, onActivate, onTrashClick } = props;
+	const {
+		item,
+		selected,
+		onActivate,
+		onTrashClick,
+		showOpenInExternalEditor = false,
+		onOpenInExternalEditorClick,
+	} = props;
 
 	const onKeyDown = (e: React.KeyboardEvent) => {
 		if (e.key === 'Enter' || e.key === ' ') {
@@ -76,22 +90,45 @@ function KnowledgeListRow(props: {
 				<div className="flow-root flex-1 min-w-0 max-w-full font-medium wrap-anywhere">
 					{item.title?.trim() || '未命名'}
 				</div>
-				<button
-					type="button"
-					aria-label={
-						item.localAbsolutePath ? '删除本地 Markdown 文件' : '从知识库删除'
-					}
-					className={cn(
-						'cursor-pointer shrink-0 p-1 rounded-md text-textcolor/80 transition-opacity duration-150',
-						'opacity-0 pointer-events-none',
-						'hover:text-destructive hover:bg-destructive/10',
-						/* 仅 hover 显示：勿用 focus-within，否则抽屉打开时焦点落在首行会导致第一个删除钮常显 */
-						'group-hover:opacity-100 group-hover:pointer-events-auto',
-					)}
-					onClick={(e) => onTrashClick(e, item)}
-				>
-					<Trash2 size={16} />
-				</button>
+				<div className="flex shrink-0 items-start gap-0.5">
+					{showOpenInExternalEditor &&
+					item.localAbsolutePath &&
+					onOpenInExternalEditorClick ? (
+						<button
+							type="button"
+							aria-label="在 Cursor 或 Trae 中打开"
+							title="根据当前前台应用选择：前台为 Cursor 则用 Cursor，否则用 Trae 打开"
+							className={cn(
+								'cursor-pointer shrink-0 p-1 rounded-md text-textcolor/80 transition-opacity duration-150',
+								'opacity-0 pointer-events-none',
+								'hover:text-teal-400 hover:bg-theme/10',
+								'group-hover:opacity-100 group-hover:pointer-events-auto',
+							)}
+							onClick={(e) => {
+								e.stopPropagation();
+								onOpenInExternalEditorClick(e, item);
+							}}
+						>
+							<Code2 size={16} />
+						</button>
+					) : null}
+					<button
+						type="button"
+						aria-label={
+							item.localAbsolutePath ? '删除本地 Markdown 文件' : '从知识库删除'
+						}
+						className={cn(
+							'cursor-pointer shrink-0 p-1 rounded-md text-textcolor/80 transition-opacity duration-150',
+							'opacity-0 pointer-events-none',
+							'hover:text-destructive hover:bg-destructive/10',
+							/* 仅 hover 显示：勿用 focus-within，否则抽屉打开时焦点落在首行会导致第一个删除钮常显 */
+							'group-hover:opacity-100 group-hover:pointer-events-auto',
+						)}
+						onClick={(e) => onTrashClick(e, item)}
+					>
+						<Trash2 size={16} />
+					</button>
+				</div>
 			</div>
 			<div className="text-xs text-textcolor/50 space-y-0.5">
 				更新 {formatDate(item.updatedAt?.toString() ?? '')}
@@ -365,6 +402,30 @@ const KnowledgeList: React.FC<IProps> = observer(
 			[openDeleteFlow],
 		);
 
+		/** 本地列表：在 Cursor / Trae 中打开（由 Rust 根据前台进程名判定，默认 Trae） */
+		const onOpenInExternalEditorClick = useCallback(
+			async (_e: React.MouseEvent, knowledge: KnowledgeListItem) => {
+				const p = knowledge.localAbsolutePath;
+				if (!p) return;
+				try {
+					const { openedWith } = await invokeOpenKnowledgeMarkdownInEditor(p);
+					Toast({
+						type: 'success',
+						title: '已在外部编辑器打开',
+						message: `使用 ${openedWith} 打开文件`,
+						duration: 2000,
+					});
+				} catch (err) {
+					Toast({
+						type: 'error',
+						title: '打开失败',
+						message: formatTauriInvokeError(err),
+					});
+				}
+			},
+			[],
+		);
+
 		const deleteLocalFileName =
 			deleteLocalPath.split(/[/\\]/).filter(Boolean).pop() ?? deleteLocalPath;
 
@@ -515,6 +576,10 @@ const KnowledgeList: React.FC<IProps> = observer(
 										}
 										onActivate={handleRowClick}
 										onTrashClick={onTrashClick}
+										showOpenInExternalEditor={
+											useLocalFolder && isTauriRuntime()
+										}
+										onOpenInExternalEditorClick={onOpenInExternalEditorClick}
 									/>
 								))}
 								{showLoadMoreHint ? (
