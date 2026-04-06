@@ -9,12 +9,12 @@ Monorepo 内的 Markdown 工具包，**功能一览**：
 | 代码高亮（highlight.js） | 围栏语言名 + **`highlightTheme` / `highlightThemeCss`** 或手动 import hljs CSS。 |
 | GFM 待办列表 | 内置，无需开关；样式依赖 **github-markdown-css**。 |
 | 聊天围栏工具栏 | `enableChatCodeFenceToolbar: true`，宿主处理按钮事件。 |
-| Mermaid 占位 + 浏览器渲染 | `enableMermaid`（默认开）+ **`@dnhyxc-ai/tools/react`**；流式整段 innerHTML 见 **`docs/tools.md` §11.9**。 |
+| Mermaid 占位 + 浏览器渲染 | `enableMermaid`（默认开）+ **`@dnhyxc-ai/tools/react`**；流式聊天拆块示例见 **README §4.6**，架构说明见 **`docs/tools.md` §11.9**。 |
 | 标题行号 / 锚点 id | `enableHeadingSourceLineAttr` / `enableHeadingAnchorIds`。 |
 | 主题 CDN / 内联 / 清除 | `applyHighlightJsTheme`、`clearAppliedHighlightJsTheme`、`resolveHighlightJsThemeSpecifier`。 |
 | 样式一键引入 / 按文件引入 | `styles.css`、`markdown-base.css`、`styles/hljs/*.min.css`。 |
 
-**更完整的架构说明、边界行为、流式聊天 Mermaid 与故障排查见 [`docs/tools.md`](../../docs/tools.md)。**
+**更完整的架构说明、边界行为、流式聊天 Mermaid 与故障排查见 [`docs/tools.md`](../../docs/tools.md)。** 与本仓库 **`apps/frontend/src`** 一致的调用方式见 **§4**。
 
 ---
 
@@ -181,13 +181,432 @@ export function Preview({ md, preferDark }: { md: string; preferDark: boolean })
 ```
 
 - **`runMermaidInMarkdownRoot(root, { preferDark?, suppressErrors? })`**：非 React 环境可自行调度调用（从同一子路径导出）。
-- **流式聊天**若对**整段正文**高频 `dangerouslySetInnerHTML`，会反复冲掉 Mermaid 的 SVG；本仓库助手消息采用 **围栏拆分 + 独立岛**（见 **`docs/tools.md` §11.9**），**不是**单靠本 hook 能根治的场景。
+- **流式聊天**若对**整段正文**高频 `dangerouslySetInnerHTML`，会反复冲掉 Mermaid 的 SVG；本仓库助手消息采用 **围栏拆分 + 独立岛**（实现示例见 **README §4.6**，原理见 **`docs/tools.md` §11.9**），**不是**单靠本 hook 能根治的场景。
 
 依赖：**`mermaid`** 已由本包 **`dependencies`** 声明；打包器需能解析 `import 'mermaid'`（Vite 可将 `@dnhyxc-ai/tools/react` 与 `mermaid` 列入 `optimizeDeps.include`）。
 
 ---
 
-## 4. 聊天代码块工具栏（`enableChatCodeFenceToolbar`）
+## 4. 与 `apps/frontend/src` 用法对照（示例代码）
+
+以下片段与本仓库前端实际用法一致，可直接对照 [`apps/frontend`](../../apps/frontend/src) 源码；其中 **`getChatMarkdownHighlightTheme`** 等为应用侧封装，示例内用占位说明。
+
+### 4.1 主题 id：`HighlightJsThemeId` 与亮色/暗色映射
+
+[`apps/frontend/src/constant/index.ts`](../../apps/frontend/src/constant/index.ts)：
+
+```ts
+import type { HighlightJsThemeId } from '@dnhyxc-ai/tools';
+
+/** Chat / 文档等 MarkdownParser 的 highlight.js 主题：暗色 UI 用暗色高亮，否则亮色高亮。 */
+export function getChatMarkdownHighlightTheme(themeName: 'black' | 'light'): HighlightJsThemeId {
+	return themeName === 'black' ? 'atom-one-dark' : 'atom-one-light';
+}
+```
+
+### 4.2 用户消息：整段 `render` + `dangerouslySetInnerHTML`
+
+[`apps/frontend/src/components/design/ChatUserMessage/index.tsx`](../../apps/frontend/src/components/design/ChatUserMessage/index.tsx)（节选）：
+
+```tsx
+import { MarkdownParser } from '@dnhyxc-ai/tools';
+import { useMemo } from 'react';
+
+function ChatUserMessage({ message, appTheme }: { message: { content: string }; appTheme: 'black' | 'light' }) {
+	const parser = useMemo(
+		() =>
+			new MarkdownParser({
+				highlightTheme: getChatMarkdownHighlightTheme(appTheme),
+			}),
+		[appTheme],
+	);
+
+	return (
+		<div
+			className="max-w-none text-left [&_.markdown-body]:text-textcolor/90!"
+			dangerouslySetInnerHTML={{ __html: parser.render(message.content) }}
+		/>
+	);
+}
+```
+
+### 4.3 历史会话列表：父级共享一个 `MarkdownParser` 下发子项
+
+[`apps/frontend/src/views/chat/session-list/index.tsx`](../../apps/frontend/src/views/chat/session-list/index.tsx)（节选）：
+
+```tsx
+import { MarkdownParser } from '@dnhyxc-ai/tools';
+import { memo, useMemo } from 'react';
+
+const SessionItem = memo(function SessionItem({
+	item,
+	parser,
+}: {
+	item: { title?: string; messages?: { content: string }[] };
+	parser: MarkdownParser;
+}) {
+	return (
+		<div
+			className="line-clamp-1 text-sm [&_.markdown-body]:text-textcolor!"
+			dangerouslySetInnerHTML={{
+				__html: parser.render(item?.title || item.messages?.[0]?.content || '新对话'),
+			}}
+		/>
+	);
+});
+
+function SessionList({ appTheme }: { appTheme: 'black' | 'light' }) {
+	const parser = useMemo(
+		() =>
+			new MarkdownParser({
+				highlightTheme: getChatMarkdownHighlightTheme(appTheme),
+			}),
+		[appTheme],
+	);
+
+	return (
+		<>
+			{/* 列表项传入同一 parser，避免每条新建解析器 */}
+			<SessionItem item={/* ... */} parser={parser} />
+		</>
+	);
+}
+```
+
+### 4.4 文档处理页：合并样式 + `useMermaidInMarkdownRoot` + `trigger` 驱动重绘
+
+[`apps/frontend/src/views/document/index.tsx`](../../apps/frontend/src/views/document/index.tsx)（节选）：
+
+```tsx
+import { MarkdownParser } from '@dnhyxc-ai/tools';
+import { useMermaidInMarkdownRoot } from '@dnhyxc-ai/tools/react';
+import '@dnhyxc-ai/tools/styles.css';
+import { useMemo, useRef } from 'react';
+
+function DocumentAnalysisPreview({ content, appTheme }: { content: string; appTheme: 'black' | 'light' }) {
+	const analysisMarkdownRef = useRef<HTMLDivElement>(null);
+
+	const parser = useMemo(
+		() =>
+			new MarkdownParser({
+				highlightTheme: getChatMarkdownHighlightTheme(appTheme),
+			}),
+		[appTheme],
+	);
+
+	useMermaidInMarkdownRoot({
+		rootRef: analysisMarkdownRef,
+		preferDark: appTheme === 'black',
+		trigger: content,
+		parser,
+	});
+
+	return (
+		<div
+			ref={analysisMarkdownRef}
+			dangerouslySetInnerHTML={{ __html: parser.render(content) }}
+		/>
+	);
+}
+```
+
+### 4.5 Monaco Markdown 预览：`useMemo(html)` + 与 `innerHTML` 同层的 ref + 可关 Mermaid
+
+[`apps/frontend/src/components/design/Monaco/index.tsx`](../../apps/frontend/src/components/design/Monaco/index.tsx) 中 `ParserMarkdownPreviewPane`（节选）：预览根节点与 `dangerouslySetInnerHTML` **同层**，`trigger` 用预计算的 **`html`**，避免 Mermaid 扫描早于 DOM 写入。
+
+```tsx
+import { MarkdownParser } from '@dnhyxc-ai/tools';
+import { useMermaidInMarkdownRoot } from '@dnhyxc-ai/tools/react';
+import { useMemo, useRef } from 'react';
+
+function ParserMarkdownPreviewPane({
+	markdown,
+	appTheme,
+	enableMermaid = true,
+}: {
+	markdown: string;
+	appTheme: 'black' | 'light';
+	enableMermaid?: boolean;
+}) {
+	const previewHtmlRootRef = useRef<HTMLDivElement>(null);
+
+	const parser = useMemo(
+		() =>
+			new MarkdownParser({
+				highlightTheme: getChatMarkdownHighlightTheme(appTheme),
+				enableChatCodeFenceToolbar: true,
+				enableHeadingSourceLineAttr: true,
+				enableHeadingAnchorIds: true,
+				enableMermaid,
+			}),
+		[appTheme, enableMermaid],
+	);
+
+	const html = useMemo(() => parser.render(markdown), [parser, markdown]);
+
+	useMermaidInMarkdownRoot({
+		rootRef: previewHtmlRootRef,
+		preferDark: appTheme === 'black',
+		trigger: html,
+		parser,
+	});
+
+	return (
+		<div className="markdown-preview-shell">
+			<div ref={previewHtmlRootRef} dangerouslySetInnerHTML={{ __html: html }} />
+		</div>
+	);
+}
+```
+
+### 4.6 助手消息流式：`enableMermaid: false` + 围栏拆块 + `runMermaidInMarkdownRoot`
+
+[`apps/frontend/src/components/design/ChatAssistantMessage/index.tsx`](../../apps/frontend/src/components/design/ChatAssistantMessage/index.tsx) 使用 **`enableMermaid: false`** 的解析器，避免与 Mermaid 岛重复；正文由 [`StreamingMarkdownBody`](../../apps/frontend/src/components/design/ChatAssistantMessage/StreamingMarkdownBody.tsx) 按围栏切分，岛内调用 **`runMermaidInMarkdownRoot`**。仓库内实现文件为 [`splitMarkdownFences.ts`](../../apps/frontend/src/utils/splitMarkdownFences.ts)；**下方贴出与该文件一致的完整源码**（前端可用路径别名 `@/utils/splitMarkdownFences` 引用同内容）。
+
+**`splitMarkdownFences` 完整实现：**
+
+```ts
+/**
+ * 按顶格代码围栏拆分 Markdown，将 mermaid 与其它内容分离。
+ * 用于聊天流式：Mermaid 单独 React 岛渲染，避免整段 dangerouslySetInnerHTML 冲掉已生成的 SVG。
+ */
+
+export type MarkdownFencePart =
+	| { type: 'markdown'; text: string }
+	| { type: 'mermaid'; text: string; complete: boolean };
+
+function coalesceMarkdownParts(
+	parts: MarkdownFencePart[],
+): MarkdownFencePart[] {
+	const out: MarkdownFencePart[] = [];
+	for (const p of parts) {
+		if (p.type === 'markdown' && p.text === '') continue;
+		const last = out[out.length - 1];
+		if (p.type === 'markdown' && last?.type === 'markdown') {
+			last.text += p.text;
+		} else {
+			out.push(
+				p.type === 'markdown' ? { type: 'markdown', text: p.text } : { ...p },
+			);
+		}
+	}
+	return out;
+}
+
+/**
+ * 扫描 ```lang 围栏；mermaid 且未闭合时 `complete: false`（流式尾部）。
+ */
+export function splitMarkdownByCodeFences(source: string): MarkdownFencePart[] {
+	const out: MarkdownFencePart[] = [];
+	let i = 0;
+	const n = source.length;
+
+	while (i < n) {
+		const fenceStart = source.indexOf('```', i);
+		if (fenceStart === -1) {
+			const tail = source.slice(i);
+			if (tail) out.push({ type: 'markdown', text: tail });
+			break;
+		}
+		if (fenceStart > i) {
+			out.push({ type: 'markdown', text: source.slice(i, fenceStart) });
+		}
+		const langEnd = source.indexOf('\n', fenceStart + 3);
+		if (langEnd === -1) {
+			out.push({ type: 'markdown', text: source.slice(fenceStart) });
+			break;
+		}
+		const lang = source
+			.slice(fenceStart + 3, langEnd)
+			.trim()
+			.toLowerCase();
+		const bodyStart = langEnd + 1;
+		const closeIdx = source.indexOf('```', bodyStart);
+		if (closeIdx === -1) {
+			if (lang === 'mermaid') {
+				out.push({
+					type: 'mermaid',
+					text: source.slice(bodyStart),
+					complete: false,
+				});
+			} else {
+				out.push({ type: 'markdown', text: source.slice(fenceStart) });
+			}
+			break;
+		}
+		const body = source.slice(bodyStart, closeIdx);
+		if (lang === 'mermaid') {
+			out.push({ type: 'mermaid', text: body, complete: true });
+		} else {
+			out.push({
+				type: 'markdown',
+				text: source.slice(fenceStart, closeIdx + 3),
+			});
+		}
+		i = closeIdx + 3;
+	}
+
+	if (out.length === 0 && source) {
+		out.push({ type: 'markdown', text: source });
+	}
+	return coalesceMarkdownParts(out);
+}
+
+function escapeHtml(s: string): string {
+	return s
+		.replace(/&/g, '&amp;')
+		.replace(/</g, '&lt;')
+		.replace(/>/g, '&gt;')
+		.replace(/"/g, '&quot;');
+}
+
+/** 未闭合 mermaid 围栏：纯代码预览（不跑 Mermaid，避免语法不完整报错与整页重绘） */
+export function mermaidStreamingFallbackHtml(code: string): string {
+	const esc = escapeHtml(code);
+	return `<div class="markdown-body"><pre class="chat-md-mermaid-streaming"><code class="language-mermaid">${esc}</code></pre></div>`;
+}
+```
+
+**解析器 + 宿主点击工具栏（节选）：**
+
+```tsx
+import { MarkdownParser } from '@dnhyxc-ai/tools';
+import { useEffect, useMemo, useRef } from 'react';
+
+function AssistantMessageShell({ appTheme }: { appTheme: 'black' | 'light' }) {
+	const shellRef = useRef<HTMLDivElement>(null);
+
+	const chatMdParser = useMemo(
+		() =>
+			new MarkdownParser({
+				enableChatCodeFenceToolbar: true,
+				enableMermaid: false,
+				highlightTheme: getChatMarkdownHighlightTheme(appTheme),
+			}),
+		[appTheme],
+	);
+
+	useEffect(() => {
+		const el = shellRef.current;
+		if (!el) return;
+		const onClick = (e: MouseEvent) => {
+			const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-chat-code-action]');
+			if (!btn || !el.contains(btn)) return;
+			// 复制 / 下载：见应用侧 chatCodeToolbar
+		};
+		el.addEventListener('click', onClick);
+		return () => el.removeEventListener('click', onClick);
+	}, []);
+
+	return <div ref={shellRef}>{/* StreamingMarkdownBody … */}</div>;
+}
+```
+
+**流式正文组件（与仓库一致的核心结构）：**（与上文 `splitMarkdownFences` 同目录时可 `import … from './splitMarkdownFences'`；本仓库前端为 `import … from '@/utils/splitMarkdownFences'`。）
+
+```tsx
+import type { MarkdownParser } from '@dnhyxc-ai/tools';
+import { runMermaidInMarkdownRoot } from '@dnhyxc-ai/tools/react';
+import { memo, type RefObject, useLayoutEffect, useMemo, useRef } from 'react';
+import {
+	mermaidStreamingFallbackHtml,
+	splitMarkdownByCodeFences,
+} from './splitMarkdownFences';
+
+const MermaidIsland = memo(function MermaidIsland({
+	code,
+	preferDark,
+	isStreaming,
+}: {
+	code: string;
+	preferDark: boolean;
+	isStreaming: boolean;
+}) {
+	const hostRef = useRef<HTMLDivElement>(null);
+	const genRef = useRef(0);
+	/** 不参与 effect 依赖，避免停流时整岛 innerHTML 重跑导致闪屏 */
+	const isStreamingRef = useRef(isStreaming);
+	isStreamingRef.current = isStreaming;
+
+	useLayoutEffect(() => {
+		const host = hostRef.current;
+		if (!host) return;
+		host.innerHTML =
+			'<div class="markdown-mermaid-wrap" data-mermaid="1"><div class="mermaid"></div></div>';
+		const inner = host.querySelector('.mermaid') as HTMLElement | null;
+		if (!inner) return;
+		inner.textContent = code;
+
+		const runId = ++genRef.current;
+		requestAnimationFrame(() => {
+			requestAnimationFrame(() => {
+				if (runId !== genRef.current) return;
+				void runMermaidInMarkdownRoot(host, {
+					preferDark,
+					suppressErrors: isStreamingRef.current,
+				});
+			});
+		});
+	}, [code, preferDark]);
+
+	return <div ref={hostRef} className="mermaid-island-root w-full" />;
+});
+
+export function StreamingMarkdownBody({
+	markdown,
+	parser,
+	preferDark,
+	isStreaming,
+	containerRef,
+}: {
+	markdown: string;
+	parser: MarkdownParser;
+	preferDark: boolean;
+	isStreaming: boolean;
+	containerRef?: RefObject<HTMLDivElement | null>;
+}) {
+	const parts = useMemo(() => splitMarkdownByCodeFences(markdown), [markdown]);
+
+	return (
+		<div ref={containerRef} className="streaming-md-body">
+			{parts.map((part, i) => {
+				if (part.type === 'markdown') {
+					return (
+						<div key={`md-${i}`} dangerouslySetInnerHTML={{ __html: parser.render(part.text) }} />
+					);
+				}
+				if (!part.complete) {
+					return (
+						<div
+							key={`mm-open-${i}`}
+							dangerouslySetInnerHTML={{ __html: mermaidStreamingFallbackHtml(part.text) }}
+						/>
+					);
+				}
+				return (
+					<MermaidIsland key={`mm-done-${i}`} code={part.text} preferDark={preferDark} isStreaming={isStreaming} />
+				);
+			})}
+		</div>
+	);
+}
+```
+
+**使用处（节选）：**
+
+```tsx
+<StreamingMarkdownBody
+	containerRef={bodyMarkdownRef}
+	markdown={bodyText}
+	parser={chatMdParser}
+	preferDark={appTheme === 'black'}
+	isStreaming={!!message.isStreaming}
+/>
+```
+
+---
+
+## 5. 聊天代码块工具栏（`enableChatCodeFenceToolbar`）
 
 开启后，围栏会输出带 **`data-chat-code-action`**、**`data-chat-code-block`** 等属性的 DOM；**复制/下载逻辑与样式由应用实现**（可参考本仓库 `apps/frontend` 内 `chatCodeToolbar` 与 `index.css`）。
 
@@ -200,7 +619,7 @@ const parser = new MarkdownParser({
 
 ---
 
-## 5. Mermaid 围栏与占位 HTML
+## 6. Mermaid 围栏与占位 HTML
 
 `enableMermaid !== false` 时，` ```mermaid ` 会生成：
 
@@ -214,7 +633,7 @@ const parser = new MarkdownParser({
 
 ---
 
-## 6. 开发与发布提示
+## 7. 开发与发布提示
 
 - 修改 **`markdown-parser.ts`**、主题注入等：执行 **`pnpm --filter @dnhyxc-ai/tools run build`**。
 - 修改 **`scripts/build-mk-css.js`** 或升级 **highlight.js**：需 **`build:css`**（会刷新 `src/generated/highlight-js-theme-ids.ts`），再 **`tsup`**。
@@ -222,4 +641,4 @@ const parser = new MarkdownParser({
 
 ---
 
-**细节与逐段源码说明仍以 [`docs/tools.md`](../../docs/tools.md) 为准；本 README 侧重「怎么用」。**
+**细节与逐段源码说明仍以 [`docs/tools.md`](../../docs/tools.md) 为准；本 README 侧重「怎么用」，与前端目录对照的完整示例见 §4。**
