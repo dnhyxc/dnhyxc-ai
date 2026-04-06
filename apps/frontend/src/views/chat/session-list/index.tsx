@@ -154,7 +154,7 @@ const SessionItem = memo<SessionItemProps>(
 						/>
 					</div>
 				) : (
-					<div className="flex flex-col mt-1">
+					<div className="flex-1 flex flex-col mt-1">
 						<div
 							className="line-clamp-1 max-w-85 flex-1 text-sm [&_.markdown-body]:text-textcolor!"
 							dangerouslySetInnerHTML={{

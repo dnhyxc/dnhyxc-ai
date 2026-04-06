@@ -926,8 +926,18 @@ body.theme-beige {
 	.lucide-stroke-draw-hover:hover svg polyline,
 	.lucide-stroke-draw-hover:hover svg rect,
 	.lucide-stroke-draw-hover:hover svg ellipse {
-		stroke-dasharray: 72;
-		stroke-dashoffset: 72;
+		/*
+			实现 Lucide 图标「线性画线」动画（stroke-dashoffset）：
+			- dash 与 gap 取同一足够大的长度，使整条路径落在「一段实线」内，避免结束时仍落在 gap 上导致「差一点没闭合」
+			- 800 可覆盖常见 24px Lucide 单路径周长；仍不足的图标可再略调大
+			- linecap/linejoin 圆角可减轻端点与拐角处的细缝感
+		*/
+		stroke-linecap: round;
+		stroke-linejoin: round;
+		stroke-dasharray: 80;
+		stroke-dashoffset: 80;
+		/* stroke-dasharray: 800 800;
+		stroke-dashoffset: 800; */
 		animation: lucide-stroke-draw 0.5s linear forwards;
 	}
 }
