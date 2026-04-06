@@ -39,6 +39,10 @@ import {
 	ChatCodeFloatingToolbar,
 	useChatCodeFloatingToolbar,
 } from '@/hooks/useChatCodeFloatingToolbar';
+import {
+	useMermaidDiagramClickPreview,
+	useMermaidImagePreview,
+} from '@/hooks/useMermaidImagePreview';
 import { cn } from '@/lib/utils';
 import {
 	downloadChatCodeBlock,
@@ -188,6 +192,16 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 		trigger: html,
 		parser,
 	});
+
+	const { openMermaidPreview, mermaidImagePreviewModal } =
+		useMermaidImagePreview();
+
+	useMermaidDiagramClickPreview(
+		previewHtmlRootRef,
+		openMermaidPreview,
+		enableMermaid,
+		html,
+	);
 
 	const refreshPreviewScrollFab = useCallback(() => {
 		if (!showPreviewScrollCornerFab) {
@@ -361,7 +375,11 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 				<div className="box-border min-w-0 max-w-full w-full p-3">
 					<div
 						ref={previewHtmlRootRef}
-						className="[&_.markdown-body]:min-w-0 [&_.markdown-body]:max-w-none [&_.markdown-body]:wrap-break-word [&_.markdown-body]:overflow-x-auto [&_.markdown-body]:bg-transparent! [&_.markdown-body]:text-textcolor/90! [&_.markdown-body_:is(h1,h2,h3,h4,h5,h6)]:scroll-mt-3 [&_.markdown-body_pre]:max-w-full [&_.markdown-body_pre]:overflow-x-auto [&_.markdown-body_table]:block [&_.markdown-body_table]:max-w-full [&_.markdown-body_table]:overflow-x-auto"
+						className={cn(
+							'[&_.markdown-body]:min-w-0 [&_.markdown-body]:max-w-none [&_.markdown-body]:wrap-break-word [&_.markdown-body]:overflow-x-auto [&_.markdown-body]:bg-transparent! [&_.markdown-body]:text-textcolor/90! [&_.markdown-body_:is(h1,h2,h3,h4,h5,h6)]:scroll-mt-3 [&_.markdown-body_pre]:max-w-full [&_.markdown-body_pre]:overflow-x-auto [&_.markdown-body_table]:block [&_.markdown-body_table]:max-w-full [&_.markdown-body_table]:overflow-x-auto',
+							enableMermaid &&
+								'[&_.markdown-mermaid-wrap_.mermaid]:cursor-zoom-in',
+						)}
 						dangerouslySetInnerHTML={{ __html: html }}
 					/>
 				</div>
@@ -392,6 +410,7 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 					</button>
 				</Tooltip>
 			) : null}
+			{mermaidImagePreviewModal}
 		</div>
 	);
 });

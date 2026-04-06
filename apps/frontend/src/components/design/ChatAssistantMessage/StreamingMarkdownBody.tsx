@@ -6,6 +6,10 @@
 import type { MarkdownParser } from '@dnhyxc-ai/tools';
 import { runMermaidInMarkdownRoot } from '@dnhyxc-ai/tools/react';
 import { memo, type RefObject, useLayoutEffect, useMemo, useRef } from 'react';
+import {
+	useMermaidDiagramClickPreview,
+	useMermaidImagePreview,
+} from '@/hooks/useMermaidImagePreview';
 import { cn } from '@/lib/utils';
 import {
 	mermaidStreamingFallbackHtml,
@@ -16,18 +20,24 @@ type MermaidIslandProps = {
 	code: string;
 	preferDark: boolean;
 	isStreaming: boolean;
+	openMermaidPreview?: (dataUrl: string) => void;
 };
+
+const noopOpenPreview = (_dataUrl: string) => {};
 
 const MermaidIsland = memo(function MermaidIsland({
 	code,
 	preferDark,
 	isStreaming,
+	openMermaidPreview,
 }: MermaidIslandProps) {
 	const hostRef = useRef<HTMLDivElement>(null);
 	const genRef = useRef(0);
 	/** 不参与 effect 依赖，避免停流时整岛 innerHTML 重跑导致闪屏 */
 	const isStreamingRef = useRef(isStreaming);
 	isStreamingRef.current = isStreaming;
+
+	const previewEnabled = Boolean(openMermaidPreview);
 
 	useLayoutEffect(() => {
 		const host = hostRef.current;
@@ -50,7 +60,22 @@ const MermaidIsland = memo(function MermaidIsland({
 		});
 	}, [code, preferDark]);
 
-	return <div ref={hostRef} className="mermaid-island-root w-full" />;
+	useMermaidDiagramClickPreview(
+		hostRef,
+		openMermaidPreview ?? noopOpenPreview,
+		previewEnabled,
+		code,
+	);
+
+	return (
+		<div
+			ref={hostRef}
+			className={cn(
+				'mermaid-island-root w-full',
+				previewEnabled && '[&_.markdown-mermaid-wrap_.mermaid]:cursor-zoom-in',
+			)}
+		/>
+	);
 });
 
 export type StreamingMarkdownBodyProps = {
@@ -71,6 +96,8 @@ export function StreamingMarkdownBody({
 	containerRef,
 }: StreamingMarkdownBodyProps) {
 	const parts = useMemo(() => splitMarkdownByCodeFences(markdown), [markdown]);
+	const { openMermaidPreview, mermaidImagePreviewModal } =
+		useMermaidImagePreview();
 
 	return (
 		<div ref={containerRef} className={cn('streaming-md-body', className)}>
@@ -99,9 +126,11 @@ export function StreamingMarkdownBody({
 						code={part.text}
 						preferDark={preferDark}
 						isStreaming={isStreaming}
+						openMermaidPreview={openMermaidPreview}
 					/>
 				);
 			})}
+			{mermaidImagePreviewModal}
 		</div>
 	);
 }
