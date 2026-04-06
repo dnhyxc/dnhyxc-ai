@@ -174,12 +174,15 @@ body {
 		overflow-x: auto;
 	}
 
-	.markdown-body .markdown-mermaid-wrap {
-		margin: 1rem 0;
+	/* Mermaid 块：上下各 10px 间距（含 .markdown-body 内与 mermaid 岛宿主内） */
+	.markdown-body .markdown-mermaid-wrap,
+	.mermaid-island-root .markdown-mermaid-wrap {
+		margin: 10px 0;
 		max-width: 100%;
 		overflow-x: auto;
 	}
-	.markdown-body .markdown-mermaid-wrap svg {
+	.markdown-body .markdown-mermaid-wrap svg,
+	.mermaid-island-root .markdown-mermaid-wrap svg {
 		display: block;
 		max-width: 100%;
 		height: auto;

@@ -179,6 +179,7 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 		() => splitMarkdownByCodeFences(markdown),
 		[markdown],
 	);
+
 	const hasMermaidIslandLayout = Boolean(
 		enableMermaid && fenceParts.some((p) => p.type === 'mermaid'),
 	);
