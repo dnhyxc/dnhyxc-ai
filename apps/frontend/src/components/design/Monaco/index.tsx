@@ -38,6 +38,7 @@ import {
 	ChatCodeFloatingToolbar,
 	useChatCodeFloatingToolbar,
 } from '@/hooks/useChatCodeFloatingToolbar';
+import { useMermaidInMarkdownRoot } from '@/hooks/useMermaidInMarkdownRoot';
 import { cn } from '@/lib/utils';
 import {
 	downloadChatCodeBlock,
@@ -169,6 +170,8 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 	);
 
 	const html = useMemo(() => parser.render(markdown), [parser, markdown]);
+
+	useMermaidInMarkdownRoot(markdownRef, theme === 'black', html);
 
 	const refreshPreviewScrollFab = useCallback(() => {
 		if (!showPreviewScrollCornerFab) {

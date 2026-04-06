@@ -24,6 +24,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { getChatMarkdownHighlightTheme } from '@/constant';
 import { useTheme } from '@/hooks/theme';
+import { useMermaidInMarkdownRoot } from '@/hooks/useMermaidInMarkdownRoot';
 import { uploadFile } from '@/service';
 import { isValidImageUrl } from '@/utils';
 import { streamFetch } from '@/utils/sse';
@@ -55,6 +56,7 @@ const DocumentProcessor = () => {
 	const dragUploadRef = useRef<{ onClear: () => void } | null>(null);
 	const imageRef = useRef<{ onPreview: () => void }>(null);
 	const scrollContainerRef = useRef<HTMLDivElement>(null);
+	const analysisMarkdownRef = useRef<HTMLDivElement>(null);
 
 	let timer: ReturnType<typeof setTimeout> | null = null;
 
@@ -64,6 +66,8 @@ const DocumentProcessor = () => {
 			highlightTheme: getChatMarkdownHighlightTheme(appTheme),
 		});
 	}, [appTheme]);
+
+	useMermaidInMarkdownRoot(analysisMarkdownRef, appTheme === 'black', content);
 
 	useEffect(() => {
 		return () => {
@@ -417,6 +421,7 @@ const DocumentProcessor = () => {
 											</motion.button>
 										</div>
 										<div
+											ref={analysisMarkdownRef}
 											className="p-3"
 											dangerouslySetInnerHTML={{
 												__html: parser.render(content),

@@ -179,6 +179,9 @@ class MarkdownParser {
 			this.patchHeadingPreviewAttrs(options);
 		}
 
+		// ```mermaid 围栏：输出供前端 Mermaid 运行时渲染的占位结构（highlight.js 无 mermaid 语言）
+		this.patchMermaidFence();
+
 		const shouldInject = options.injectHighlightTheme !== false;
 		if (shouldInject) {
 			applyHighlightJsTheme({
@@ -272,6 +275,33 @@ class MarkdownParser {
 				highlighted +
 				'</code></pre></div>\n'
 			);
+		};
+	}
+
+	/**
+	 * 包裹现有 fence 规则：语言为 mermaid 时输出 `.markdown-mermaid-wrap` + `.mermaid`，
+	 * 由应用侧在插入 DOM 后调用 `mermaid.run`（见前端 `runMermaidInMarkdownRoot`）。
+	 */
+	private patchMermaidFence(): void {
+		const md = this.md;
+		const prev = md.renderer.rules.fence;
+		if (!prev) return;
+		md.renderer.rules.fence = (tokens, idx, options, env, self) => {
+			const token = tokens[idx];
+			const info = token.info
+				? md.utils.unescapeAll(String(token.info)).trim()
+				: '';
+			const langName = info.split(/\s+/g)[0] || '';
+			if (langName.toLowerCase() === 'mermaid') {
+				const body = md.utils.escapeHtml(token.content);
+				return (
+					'<div class="markdown-mermaid-wrap" data-mermaid="1">' +
+					'<div class="mermaid">' +
+					body +
+					'</div></div>\n'
+				);
+			}
+			return prev(tokens, idx, options, env, self);
 		};
 	}
 

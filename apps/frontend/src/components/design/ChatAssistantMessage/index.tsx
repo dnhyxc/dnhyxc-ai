@@ -18,6 +18,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { getChatMarkdownHighlightTheme } from '@/constant';
 import { useTheme } from '@/hooks/theme';
+import { useMermaidInMarkdownRoot } from '@/hooks/useMermaidInMarkdownRoot';
 import { cn } from '@/lib/utils';
 import { Message, SearchOrganicItem } from '@/types/chat';
 import {
@@ -157,6 +158,12 @@ function ChatAssistantMessageInner({
 		}
 		return applyOrganicCitationAnchors(raw, org);
 	}, [message.content, message.thinkContent, message.searchOrganic]);
+
+	useMermaidInMarkdownRoot(
+		shellRef,
+		appTheme === 'black',
+		`${bodyText}\0${message.thinkContent ?? ''}\0${String(isShowThinkContent)}`,
+	);
 
 	useEffect(() => {
 		const el = shellRef.current;

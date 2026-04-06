@@ -1,8 +1,9 @@
 import ChatTextArea from '@design/ChatTextArea';
 import { MarkdownParser } from '@dnhyxc-ai/tools';
-import { useMemo } from 'react';
+import { useMemo, useRef } from 'react';
 import { getChatMarkdownHighlightTheme } from '@/constant';
 import { useTheme } from '@/hooks/theme';
+import { useMermaidInMarkdownRoot } from '@/hooks/useMermaidInMarkdownRoot';
 import { cn } from '@/lib/utils';
 import { UploadedFile } from '@/types';
 import { Message } from '@/types/chat';
@@ -50,6 +51,13 @@ const ChatUserMessage = ({
 		[appTheme],
 	);
 
+	const markdownRootRef = useRef<HTMLDivElement>(null);
+	useMermaidInMarkdownRoot(
+		markdownRootRef,
+		appTheme === 'black',
+		message.content,
+	);
+
 	return (
 		<>
 			{isEditing ? (
@@ -66,6 +74,7 @@ const ChatUserMessage = ({
 				/>
 			) : (
 				<div
+					ref={markdownRootRef}
 					className={cn(
 						`max-w-none text-left [&_.markdown-body]:text-textcolor/90!`,
 						className,

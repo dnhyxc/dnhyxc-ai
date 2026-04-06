@@ -173,6 +173,18 @@ body {
 		overflow-x: auto;
 	}
 
+	/* MarkdownParser 输出的 Mermaid 占位：渲染后内含 SVG */
+	.markdown-body .markdown-mermaid-wrap {
+		margin: 1rem 0;
+		max-width: 100%;
+		overflow-x: auto;
+	}
+	.markdown-body .markdown-mermaid-wrap svg {
+		max-width: 100%;
+		height: auto;
+		display: block;
+	}
+
 	.md-editor-dark,
 	.md-editor-modal-container[data-theme="dark"] {
 		--md-color: var(--theme-textcolor);
