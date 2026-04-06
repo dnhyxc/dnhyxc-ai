@@ -58,6 +58,59 @@ export interface ImagePreviewHandle {
 	setImage: (image: SelectedImage) => void;
 }
 
+/** 根据容器与图片（已含 scale、rotate 后的外包矩形）计算平移允许范围，padding 为贴边留白 */
+function getDragBounds(
+	containerW: number,
+	containerH: number,
+	imgLayoutW: number,
+	imgLayoutH: number,
+	scale: number,
+	rotateDeg: number,
+	padding: number,
+): { minX: number; maxX: number; minY: number; maxY: number } {
+	if (containerW <= 0 || containerH <= 0) {
+		return { minX: 0, maxX: 0, minY: 0, maxY: 0 };
+	}
+	const r = (rotateDeg * Math.PI) / 180;
+	const w = imgLayoutW * scale;
+	const h = imgLayoutH * scale;
+	const effW = Math.abs(w * Math.cos(r)) + Math.abs(h * Math.sin(r));
+	const effH = Math.abs(w * Math.sin(r)) + Math.abs(h * Math.cos(r));
+	const halfCW = containerW / 2;
+	const halfCH = containerH / 2;
+	const halfIW = effW / 2;
+	const halfIH = effH / 2;
+	const rangeX = Math.max(0, halfIW - halfCW + padding);
+	const rangeY = Math.max(0, halfIH - halfCH + padding);
+	return { minX: -rangeX, maxX: rangeX, minY: -rangeY, maxY: rangeY };
+}
+
+/** 将屏幕坐标系下的位移转到与 `translate(...) rotate(...) scale(...)` 中 translate 一致的轴向（先于 rotate 生效的平移量） */
+function screenDeltaToTranslateDelta(
+	dxScreen: number,
+	dyScreen: number,
+	rotateDeg: number,
+): { dx: number; dy: number } {
+	const rad = (-rotateDeg * Math.PI) / 180;
+	const cos = Math.cos(rad);
+	const sin = Math.sin(rad);
+	return {
+		dx: dxScreen * cos - dyScreen * sin,
+		dy: dxScreen * sin + dyScreen * cos,
+	};
+}
+
+/** 将角度归一到 [0, 360)，用于判断是否与 0° 等价（含 360、720 等） */
+function normalizeRotationDeg(deg: number): number {
+	const x = deg % 360;
+	return x < 0 ? x + 360 : x;
+}
+
+function isRotationIdentity(deg: number, eps = 1e-6): boolean {
+	const n = normalizeRotationDeg(deg);
+	return n < eps || Math.abs(n - 360) < eps;
+}
+
 const ImagePreview = forwardRef<ImagePreviewHandle, ImagePreviewProps>(
 	(
 		{
@@ -99,9 +152,11 @@ const ImagePreview = forwardRef<ImagePreviewHandle, ImagePreviewProps>(
 		});
 		const [position, setPosition] = useState({ x: 0, y: 0 });
 		const [isDragging, setIsDragging] = useState(false);
-		const dragStartPos = useRef({ x: 0, y: 0 });
+		const draggingRef = useRef(false);
+		const lastPointerRef = useRef({ x: 0, y: 0 });
 		const imgRef = useRef<HTMLImageElement>(null);
 		const containerRef = useRef<HTMLDivElement>(null);
+		const layoutSizeRef = useRef({ w: 0, h: 0 });
 
 		useImperativeHandle(ref, () => ({
 			setImage: (image: SelectedImage) => {
@@ -163,7 +218,10 @@ const ImagePreview = forwardRef<ImagePreviewHandle, ImagePreviewProps>(
 		useEffect(() => {
 			const img = imgRef.current;
 			if (img) {
-				if (actualTransform.scale !== 1 || actualTransform.rotate !== 0) {
+				if (
+					actualTransform.scale !== 1 ||
+					!isRotationIdentity(actualTransform.rotate)
+				) {
 					img.style.cursor = 'move';
 				} else {
 					img.style.cursor = 'default';
@@ -175,64 +233,206 @@ const ImagePreview = forwardRef<ImagePreviewHandle, ImagePreviewProps>(
 			showOtherModel?.();
 		}, [showOtherModel]);
 
-		const onWheel = useCallback((e: React.WheelEvent<HTMLImageElement>) => {
-			if (e.deltaY < 0) {
-				onScaleMax(0.05);
-			} else {
-				onScaleMin(0.05);
-			}
-		}, []);
-
-		const onScaleMax = useCallback(
-			(scale?: number) => {
-				if (transformInfo.scale >= 5) {
-					setIsMaxed(true);
-					return;
-				}
-				setIsMined(false);
-				const newScale = transformInfo.scale + (scale || 0.2);
-				setTransformInfo((prev) => ({
-					...prev,
-					scale: newScale,
-					imgWidth: Math.round((imgRef.current?.width || 0) * newScale),
-					imgHeight: Math.round((imgRef.current?.height || 0) * newScale),
-				}));
+		const clampPositionToBounds = useCallback(
+			(
+				pos: { x: number; y: number },
+				scale: number,
+				rotate: number,
+			): { x: number; y: number } => {
+				const container = containerRef.current;
+				const img = imgRef.current;
+				if (!container || !img) return pos;
+				const cr = container.getBoundingClientRect();
+				const lw = layoutSizeRef.current.w || img.offsetWidth;
+				const lh = layoutSizeRef.current.h || img.offsetHeight;
+				const { minX, maxX, minY, maxY } = getDragBounds(
+					cr.width,
+					cr.height,
+					lw,
+					lh,
+					scale,
+					rotate,
+					24,
+				);
+				return {
+					x: Math.min(maxX, Math.max(minX, pos.x)),
+					y: Math.min(maxY, Math.max(minY, pos.y)),
+				};
 			},
-			[transformInfo.scale],
+			[],
 		);
 
-		const onScaleMin = useCallback(
-			(scale?: number) => {
-				if (transformInfo.scale <= 1.2) {
-					setPosition({ x: 0, y: 0 });
+		const onScaleMax = useCallback((delta = 0.2) => {
+			setTransformInfo((prev) => {
+				if (prev.scale >= 5) {
+					return prev;
 				}
-				if (transformInfo.scale <= 0.4) {
-					setIsMined(true);
-					return;
-				}
-				setIsMaxed(false);
-				const newScale = transformInfo.scale - (scale || 0.2);
-				setTransformInfo((prev) => ({
+				const newScale = Math.min(5, prev.scale + delta);
+				const img = imgRef.current;
+				const nw = img?.naturalWidth || 0;
+				const nh = img?.naturalHeight || 0;
+				return {
 					...prev,
 					scale: newScale,
-					imgWidth: Math.round((imgRef.current?.width || 0) * newScale),
-					imgHeight: Math.round((imgRef.current?.height || 0) * newScale),
-				}));
+					imgWidth: Math.round(nw * newScale),
+					imgHeight: Math.round(nh * newScale),
+				};
+			});
+		}, []);
+
+		const onScaleMin = useCallback((delta = 0.2) => {
+			setTransformInfo((prev) => {
+				if (prev.scale <= 0.4) {
+					return prev;
+				}
+				const newScale = Math.max(0.4, prev.scale - delta);
+				const img = imgRef.current;
+				const nw = img?.naturalWidth || 0;
+				const nh = img?.naturalHeight || 0;
+				return {
+					...prev,
+					scale: newScale,
+					imgWidth: Math.round(nw * newScale),
+					imgHeight: Math.round(nh * newScale),
+				};
+			});
+		}, []);
+
+		useEffect(() => {
+			setIsMaxed(transformInfo.scale >= 5 - 1e-9);
+			setIsMined(transformInfo.scale <= 0.4 + 1e-9);
+		}, [transformInfo.scale]);
+
+		useEffect(() => {
+			if (
+				actualTransform.scale <= 1.001 &&
+				isRotationIdentity(actualTransform.rotate)
+			) {
+				setPosition({ x: 0, y: 0 });
+				return;
+			}
+			setPosition((p) => {
+				const c = clampPositionToBounds(
+					p,
+					actualTransform.scale,
+					actualTransform.rotate,
+				);
+				if (c.x === p.x && c.y === p.y) return p;
+				return c;
+			});
+		}, [actualTransform.scale, actualTransform.rotate, clampPositionToBounds]);
+
+		const onWheel = useCallback(
+			(e: React.WheelEvent<HTMLImageElement>) => {
+				e.preventDefault();
+				e.stopPropagation();
+				if (e.deltaY < 0) {
+					onScaleMax(0.05);
+				} else {
+					onScaleMin(0.05);
+				}
 			},
-			[transformInfo.scale],
+			[onScaleMax, onScaleMin],
 		);
 
 		const onRotate = useCallback(() => {
-			if (transformInfo.rotate >= 315) {
-				setTransformInfo((prev) => ({ ...prev, rotate: 0 }));
-				setPosition({ x: 0, y: 0 });
-			} else {
-				setTransformInfo((prev) => ({
-					...prev,
-					rotate: prev.rotate + 45,
-				}));
-			}
-		}, [transformInfo.rotate]);
+			setTransformInfo((prev) => ({
+				...prev,
+				// 始终 +45°，不归零：315→360 与 0° 视觉一致，且 transition 保持正向，避免 315→0 反向插值
+				rotate: prev.rotate + 45,
+			}));
+		}, []);
+
+		const handleImgLoad = useCallback(() => {
+			const img = imgRef.current;
+			if (!img) return;
+			requestAnimationFrame(() => {
+				layoutSizeRef.current = {
+					w: img.offsetWidth,
+					h: img.offsetHeight,
+				};
+			});
+		}, []);
+
+		const handlePointerDown = useCallback(
+			(e: React.PointerEvent<HTMLImageElement>) => {
+				if (
+					actualTransform.scale === 1 &&
+					isRotationIdentity(actualTransform.rotate)
+				) {
+					return;
+				}
+				if (e.button !== 0) return;
+				e.preventDefault();
+				e.currentTarget.setPointerCapture(e.pointerId);
+				draggingRef.current = true;
+				setIsDragging(true);
+				lastPointerRef.current = { x: e.clientX, y: e.clientY };
+			},
+			[actualTransform.scale, actualTransform.rotate],
+		);
+
+		const handlePointerMove = useCallback(
+			(e: React.PointerEvent<HTMLImageElement>) => {
+				if (!draggingRef.current) return;
+
+				const container = containerRef.current;
+				const img = imgRef.current;
+				if (!container || !img) return;
+
+				const dcx = e.clientX - lastPointerRef.current.x;
+				const dcy = e.clientY - lastPointerRef.current.y;
+				lastPointerRef.current = { x: e.clientX, y: e.clientY };
+
+				if (dcx === 0 && dcy === 0) return;
+
+				const { dx, dy } = screenDeltaToTranslateDelta(
+					dcx,
+					dcy,
+					actualTransform.rotate,
+				);
+
+				setPosition((prev) => {
+					const next = { x: prev.x + dx, y: prev.y + dy };
+					const cr = container.getBoundingClientRect();
+					const lw = layoutSizeRef.current.w || img.offsetWidth;
+					const lh = layoutSizeRef.current.h || img.offsetHeight;
+					const { minX, maxX, minY, maxY } = getDragBounds(
+						cr.width,
+						cr.height,
+						lw,
+						lh,
+						actualTransform.scale,
+						actualTransform.rotate,
+						24,
+					);
+					return {
+						x: Math.min(maxX, Math.max(minX, next.x)),
+						y: Math.min(maxY, Math.max(minY, next.y)),
+					};
+				});
+			},
+			[actualTransform.scale, actualTransform.rotate],
+		);
+
+		const endPointerDrag = useCallback(
+			(e: React.PointerEvent<HTMLImageElement>) => {
+				if (!draggingRef.current) return;
+				draggingRef.current = false;
+				setIsDragging(false);
+				try {
+					e.currentTarget.releasePointerCapture(e.pointerId);
+				} catch {
+					// 已释放或非当前 capture
+				}
+			},
+			[],
+		);
+
+		const handleLostPointerCapture = useCallback(() => {
+			draggingRef.current = false;
+			setIsDragging(false);
+		}, []);
 
 		const onDownload = useCallback(() => {
 			if (download) {
@@ -280,83 +480,6 @@ const ImagePreview = forwardRef<ImagePreviewHandle, ImagePreviewProps>(
 			setCurrentImage(nextImage);
 			onComputedImgSize(nextImage.url, nextImage?.size);
 		}, [prevImages, getCurrentImageIndex, onRefresh, onComputedImgSize]);
-
-		const handleMouseDown = useCallback(
-			(e: React.MouseEvent<HTMLImageElement>) => {
-				if (actualTransform.scale === 1 && actualTransform.rotate === 0) {
-					return;
-				}
-				e.preventDefault();
-				setIsDragging(true);
-				dragStartPos.current = {
-					x: e.clientX - position.x,
-					y: e.clientY - position.y,
-				};
-			},
-			[actualTransform.scale, actualTransform.rotate, position],
-		);
-
-		const handleMouseMove = useCallback(
-			(e: MouseEvent) => {
-				if (!isDragging) return;
-
-				const container = containerRef.current;
-				if (!container) return;
-
-				const img = imgRef.current;
-				if (!img) return;
-
-				const containerRect = container.getBoundingClientRect();
-				const pw = containerRect.width;
-				const ph = containerRect.height;
-				const imgWidth = transformInfo.imgWidth || img.width;
-				const imgHeight = transformInfo.imgHeight || img.height;
-
-				// 计算最大移动距离 (Vue指令中的逻辑)
-				const maxWidth = Math.abs(pw - imgWidth) / 2;
-				const maxHeight = Math.abs(ph - imgHeight) / 2;
-				const maxX = maxWidth + pw - 60;
-				const maxY = maxHeight + ph - 60;
-				const minX = -(maxWidth + pw - 60);
-				const minY = -(maxHeight + ph - 60);
-
-				const newX = e.clientX - dragStartPos.current.x;
-				const newY = e.clientY - dragStartPos.current.y;
-
-				// 图片大小小于1倍时，禁止拖动
-				if (actualTransform.scale === 1 && actualTransform.rotate === 0) {
-					return;
-				}
-
-				// 边界控制
-				const clampedX = Math.max(minX, Math.min(maxX, newX));
-				const clampedY = Math.max(minY, Math.min(maxY, newY));
-
-				setPosition({ x: clampedX, y: clampedY });
-			},
-			[
-				isDragging,
-				actualTransform.scale,
-				actualTransform.rotate,
-				transformInfo.imgWidth,
-				transformInfo.imgHeight,
-			],
-		);
-
-		const handleMouseUp = useCallback(() => {
-			setIsDragging(false);
-		}, []);
-
-		useEffect(() => {
-			if (isDragging) {
-				document.addEventListener('mousemove', handleMouseMove);
-				document.addEventListener('mouseup', handleMouseUp);
-				return () => {
-					document.removeEventListener('mousemove', handleMouseMove);
-					document.removeEventListener('mouseup', handleMouseUp);
-				};
-			}
-		}, [isDragging, handleMouseMove, handleMouseUp]);
 
 		return (
 			<div>
@@ -473,12 +596,22 @@ const ImagePreview = forwardRef<ImagePreviewHandle, ImagePreviewProps>(
 							ref={imgRef}
 							src={currentImage.url}
 							alt=""
-							className="max-w-full max-h-full object-contain transition-transform duration-300 cursor-default select-none"
+							className={
+								isDragging
+									? 'max-w-full max-h-full object-contain cursor-default select-none'
+									: 'max-w-full max-h-full object-contain transition-transform duration-300 cursor-default select-none'
+							}
 							style={{
+								touchAction: 'none',
 								transform: `translate(${position.x}px, ${position.y}px) rotate(${actualTransform.rotate}deg) scale(${actualTransform.scale})`,
 							}}
 							onWheel={onWheel}
-							onMouseDown={handleMouseDown}
+							onLoad={handleImgLoad}
+							onPointerDown={handlePointerDown}
+							onPointerMove={handlePointerMove}
+							onPointerUp={endPointerDrag}
+							onPointerCancel={endPointerDrag}
+							onLostPointerCapture={handleLostPointerCapture}
 						/>
 					</div>
 				</Model>
