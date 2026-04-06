@@ -53,7 +53,7 @@
 
 - **开关**：`enableMermaid` 默认 `true`；`false` 时 ` ```mermaid ` 按普通代码块处理。
 - **解析**：`patchMermaidFence()` 输出占位 DOM；**运行时**由 **`@dnhyxc-ai/tools/react`** 的 **`useMermaidInMarkdownRoot`**（或 **`runMermaidInMarkdownRoot`**）调用 Mermaid API 生成 SVG。
-- **细节**：与聊天围栏的链式 `fence`、打包 external、宿主 `ref`/`trigger` 约定等见 **§11**。
+- **细节**：与聊天围栏的链式 `fence`、打包 external、宿主 `ref`/`trigger` 约定等见 **§11**。**助手消息流式**正文见 **§11.9**（围栏拆分 + 岛，非整段 `useMermaidInMarkdownRoot`）。
 
 ### 2.6 样式产物（`build-mk-css.js`）
 
@@ -219,9 +219,9 @@ const parser = new MarkdownParser({ highlightTheme: "atom-one-dark" });
 
 | 区域                              | 方式                                                                                                                                                  |
 | --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ChatAssistantMessage`            | `enableChatCodeFenceToolbar: true` + `highlightTheme` + **`useMermaidInMarkdownRoot`**（`@dnhyxc-ai/tools/react`）                                                                 |
-| `ChatUserMessage`、`session-list` | `highlightTheme` + 同上 Mermaid hook（若该处渲染 Markdown）                                                                                                                        |
-| `editor`、`document`              | `import styles.css` + `highlightTheme` + 同上 Mermaid hook（见 §11）                                                                                                                  |
+| `ChatAssistantMessage`            | **`StreamingMarkdownBody`**（`enableMermaid: false` 的 `MarkdownParser` + **`runMermaidInMarkdownRoot`** 独立岛）+ `highlightTheme`；**不**再对整条助手消息使用 **`useMermaidInMarkdownRoot`**（见 **§11.9**）。 |
+| `ChatUserMessage`、`session-list` | `highlightTheme`；若渲染含 Mermaid 的 Markdown 且存在流式整段 innerHTML，可复用 **§11.9** 模式或 **`useMermaidInMarkdownRoot`**（无流式时）。                                                                 |
+| `editor`、`document`              | `import styles.css` + `highlightTheme` + **`useMermaidInMarkdownRoot`**（见 §11）                                                                                                                         |
 | 主题常量                          | `apps/frontend/src/constant/index.ts` 中 `CHAT_MARKDOWN_HIGHLIGHT_THEME: HighlightJsThemeId`                                                          |
 
 聊天区若未全局引入 tools 的合并 CSS，仍可能依赖 **`apps/frontend/src/index.css`** 内对 `.markdown-body`、`.chat-md-code-block` 等的定制；与「完整 GitHub Markdown + KaTeX + hljs」并存时，以实际 import 为准。
@@ -320,7 +320,7 @@ const parser = new MarkdownParser({ highlightTheme: "atom-one-dark" });
 
 ## 11. Mermaid 图表渲染（完整思路、依赖与逐行说明）
 
-本节描述：**Markdown 中 ` ```mermaid ` 围栏** 如何变成 **可执行占位 DOM**，以及 **React 宿主在何时、如何调用 Mermaid API** 完成 SVG 渲染。实现拆在 **`MarkdownParser`（主包）** 与 **`@dnhyxc-ai/tools/react`（子路径）** 两处，**业务侧不写 `mermaid.initialize` / `mermaid.run`**，只挂 **`useMermaidInMarkdownRoot`** 并传入 **`rootRef` / `parser` / `trigger` / `preferDark`**。
+本节描述：**Markdown 中 ` ```mermaid ` 围栏** 如何变成 **可执行占位 DOM**，以及 **React 宿主在何时、如何调用 Mermaid API** 完成 SVG 渲染。实现拆在 **`MarkdownParser`（主包）** 与 **`@dnhyxc-ai/tools/react`（子路径）** 两处。**常规页面**可 **`useMermaidInMarkdownRoot`** + 单次/低频 **`dangerouslySetInnerHTML`**。**流式聊天**若对**整条正文**高频整段替换 innerHTML，会反复冲掉 Mermaid 已生成的 SVG，仅靠 hook 节流/防抖难以根治，本仓库采用 **§11.9 围栏拆分 + Mermaid 岛** 方案。
 
 ### 11.1 整体设计（数据流）
 
@@ -365,6 +365,7 @@ const parser = new MarkdownParser({ highlightTheme: "atom-one-dark" });
 | **`parser`** | 传入 **`MarkdownParser` 实例**（或至少含 **`enableMermaid`** 的对象）；为 **`false`** 时 hook **直接 return**，不调 Mermaid。 |
 | **`trigger`** | 任意在「HTML 字符串更新」时会变的值（如 **`html` 字符串、`content`、版本号**），列入 `useLayoutEffect` 依赖，保证替换 innerHTML 后会 **重新跑** 一轮渲染。 |
 | **`preferDark`** | 传入 **`mermaid.initialize({ theme: 'dark' | 'default' })`**；随主题切换更新。 |
+| **`throttleMs`**（可选） | 在 **仍使用** **`useMermaidInMarkdownRoot` + 单容器 innerHTML** 的前提下，用 **200～400ms** **节流**缓解 rAF 饿死与「防抖反复清定时器」；**聊天助手正文流式**已改 **§11.9**，**不再**依赖本项。已废弃别名 **`debounceMs`**（语义同 **`throttleMs`**）。 |
 
 非 React 环境可 **`import { runMermaidInMarkdownRoot } from '@dnhyxc-ai/tools/react'`**，在合适时机自行调用（仍需已挂载占位 DOM）。
 
@@ -374,8 +375,8 @@ Mermaid 输出以 **SVG** 为主。本仓库前端在 **`apps/frontend/src/index
 
 ### 11.7 故障排查
 
-- **控制台**出现 **`[mermaid-in-markdown]`**：当前实现使用 **`suppressErrors: false`**，语法错误或 Mermaid 内部错误会抛出并在 **`catch` 中 `console.warn`**。
-- **有占位无图**：检查 **`rootRef`** 是否对准 **innerHTML 容器**；在 DevTools 中确认是否存在 **`.markdown-mermaid-wrap[data-mermaid="1"] .mermaid`**。
+- **控制台**出现 **`[mermaid-in-markdown]`**：默认 **`suppressErrors: false`** 时语法错误等会反映到 **`catch` + `console.warn`**；**`runMermaidInMarkdownRoot(..., { suppressErrors: true })`**（如 **§11.9** 流式岛）则抑制 **`mermaid.run`** 内错误展示。
+- **有占位无图**：检查 **`rootRef`** 是否对准 **innerHTML 容器**；在 DevTools 中确认是否存在 **`.markdown-mermaid-wrap[data-mermaid="1"] .mermaid`**。**流式 + 整段 innerHTML**：若出现「停流才出图」或整屏闪烁，优先采用 **§11.9 围栏拆分**；**`throttleMs`** 仅缓解 **`useMermaidInMarkdownRoot`** 的调度，**不能**阻止 innerHTML 替换掉已渲染的 SVG。非流式仍可调 **`throttleMs`** 或确认 **`trigger` 是否在变**。
 - **构建失败且与 `crypto` 相关**：勿将 **`mermaid` 再 bundle 进** 工具包 react 入口；保持 **external**。
 
 ### 11.8 源码逐行说明
@@ -388,40 +389,26 @@ Mermaid 输出以 **SVG** 为主。本仓库前端在 **`apps/frontend/src/index
 | ---- | ---- | ---- |
 | 1 | `import mermaid from 'mermaid'` | 引入 Mermaid 运行时（由应用打包器从 `node_modules` 解析，见 §11.4）。 |
 | 3–4 | `let runQueue = Promise.resolve()` | **模块级串行队列**：多次调用 `runMermaidInMarkdownRoot` 时通过 `.then` 链排队，避免并行 `mermaid.run`。 |
-| 6–9 | `export type RunMermaidInMarkdownOptions` | 对外可选配置；目前仅 **`preferDark`**，用于选 **dark / default** 主题。 |
-| 11–14 | JSDoc | 说明函数职责及与 `@dnhyxc-ai/tools/react`、**external `mermaid`** 的关系（详见 §11.4）。 |
-| 15–18 | `export async function runMermaidInMarkdownRoot(...)` | 入口：`root` 可为 `null`/`undefined`，直接返回。 |
-| 19 | `if (!root) return` | 无 DOM 根则跳过。 |
-| 21 | `const task = async () => { ... }` | 真正工作放在 **微任务/队列** 里的异步函数，便于串行。 |
-| 22–24 | `const scope = root.classList.contains('markdown-body') ? ...` | **作用域根节点**：若 `root` 自身带 **`markdown-body`** 则以其为 scope；否则优先 **`root.querySelector('.markdown-body')`**，再回退 **`root`**。避免 ref 挂在外层 wrapper 时选不到内层正文里的图。 |
-| 25–27 | `querySelectorAll('.markdown-mermaid-wrap[data-mermaid="1"] .mermaid')` | 只处理本包 **`patchMermaidFence`** 产出的结构，避免误处理其它 `.mermaid` 节点。 |
-| 28 | `if (nodes.length === 0) return` | 无占位则不调 Mermaid，减少开销。 |
-| 30–35 | `mermaid.initialize({ ... })` | **`startOnLoad: false`**：禁止自动扫描全页；**`theme`** 随 **`preferDark`**；**`securityLevel: 'loose'`**：在受控内容场景下减少安全策略对解析的限制（宿主应保证 Markdown 来源可信）。 |
-| 36–39 | `await mermaid.run({ nodes, suppressErrors: false })` | 对 **指定节点** 渲染；**不抑制错误**，便于开发期发现问题。 |
-| 40–44 | `catch` + `console.warn` | 统一前缀 **`[mermaid-in-markdown]`**，避免静默失败。 |
-| 47 | `runQueue = runQueue.then(task).catch(() => {})` | 入队；**`.catch` 吞掉 reject** 防止队列断裂，单次失败不阻塞后续任务。 |
-| 48 | `await runQueue` | 调用方 `await` 时等待当前任务链进度（多用于测试或顺序控制）。 |
+| 20–25 | `export type RunMermaidInMarkdownOptions` | **`preferDark`**、可选 **`suppressErrors`**（显式 **`true`** 时传入 **`mermaid.run`**，流式岛等场景用）。 |
+| 27–30 | JSDoc | 说明函数职责及与 `@dnhyxc-ai/tools/react`、**external `mermaid`** 的关系（详见 §11.4）。 |
+| 31–34 | `export async function runMermaidInMarkdownRoot(...)` | 异步入口函数声明与参数。 |
+| 35 | `if (!root) return` | 无 DOM 根则跳过。 |
+| 37 | `const task = async () => { ... }` | 真正工作放在 **串行队列** 的异步函数内。 |
+| （模块级） | `ensureMermaidInitialized` / `lastMermaidInitSignature` | **仅在主题签名变化时**调用 **`mermaid.initialize`**，避免每次 `run` 重置内部状态导致闪烁。 |
+| 38–42 | `root.querySelectorAll('.markdown-mermaid-wrap…')` | 在 **`root` 整棵子树**上收集占位节点（多 **`.markdown-body`**、**Mermaid 岛宿主** 均适用）。 |
+| 42 | `if (nodes.length === 0) return` | 无占位则不调 Mermaid，减少开销。 |
+| 44–49 | `ensureMermaidInitialized` + `mermaid.run` | **`suppressErrors: options?.suppressErrors === true`**：仅显式传 **`true`** 时抑制错误（流式岛场景）；默认 **`false`**。 |
+| 50–54 | `catch` / `runQueue` | 错误日志与串行队列语义不变。 |
 
 #### 11.8.2 `src/react/use-mermaid-in-markdown-root.ts`
 
-| 行号 | 代码 | 说明 |
-| ---- | ---- | ---- |
-| 1 | `import { ... } from 'react'` | 使用 **`useLayoutEffect`**（DOM 提交后同步布局前执行，早于 paint，适合读布局/写第三方 DOM）。 |
-| 2 | `import { runMermaidInMarkdownRoot } from '../mermaid-in-markdown.js'` | **`.js` 后缀**与 tsup/ESM 解析一致，指向同包内实现。 |
-| 4–7 | `MermaidMarkdownParserLike` | 最小接口，仅需 **`enableMermaid`**，与 **`MarkdownParser`** 实例兼容。 |
-| 9–16 | `UseMermaidInMarkdownRootParams` | Hook 入参类型：`rootRef`、`preferDark`、`trigger`、`parser`。 |
-| 18–20 | JSDoc | 强调：在 **HTML 插入 DOM 之后** 才渲染。 |
-| 21–23 | `export function useMermaidInMarkdownRoot` | Hook 本体。 |
-| 24 | 解构 `params` | 取四个字段。 |
-| 25–27 | `preferDarkRef` | **Ref 保存最新 `preferDark`**，避免 effect 闭包读到旧主题；每次渲染同步 **`.current`**。 |
-| 29 | `useLayoutEffect` | 在浏览器提交 DOM 后立即调度。 |
-| 30 | `if (!parser.enableMermaid) return` | 关闭 Mermaid 时 **零成本**（不调度 rAF、不调库）。 |
-| 31–32 | `rootRef.current` | 无元素则返回。 |
-| 34–36 | `cancelled` / `raf1` / `raf2` | 支持 **cleanup**：依赖变化或卸载时取消尚未执行的 rAF，避免 **已卸载 DOM** 上调用 Mermaid。 |
-| 37 | 注释 | **双 rAF**：等布局与 ScrollArea 等子树稳定；**单次调度** 避免同帧多次 `run`。 |
-| 38–45 | 嵌套 `requestAnimationFrame` | 第一帧后若未取消，再排第二帧，然后调用 **`runMermaidInMarkdownRoot(el, { preferDark: preferDarkRef.current })`**。 |
-| 48–52 | cleanup | 置 **`cancelled`**、`cancelAnimationFrame` 两个 id。 |
-| 53 | 依赖数组 | **`enableMermaid`、`preferDark`、`trigger`、`rootRef`** 变化时重新 effect；**`rootRef` 对象引用稳定**，变的是 **`.current`**，故必须用 **`trigger`** 驱动「内容已换」的重新渲染。 |
+| 片段 | 说明 |
+| ---- | ---- |
+| **`UseMermaidInMarkdownRootParams`** | 含可选 **`throttleMs`**（及已废弃别名 **`debounceMs`**）。 |
+| **`generationRef`** | 双 rAF 内若代数已变则 **return**；**不在 cleanup 里 `cancelAnimationFrame`**。 |
+| **`throttleMs > 0`** | **节流**：`lastInvoke` + **挂起中的 `setTimeout` 不在每次 effect 清理**（仅卸载或 `throttleMs` 改 0 / 关闭 Mermaid 时清理）；到点 **`invoke`** 读最新 **`rootRef`**。节流期间 **`runMermaidInMarkdownRoot`** 传 **`suppressErrors: true`** 减轻不完整 DSL 闪烁。 |
+| **`throttleMs === 0`** | 清除挂起 timeout 后 **`runAfterLayout()`**；**`suppressErrors: false`**。 |
+| **依赖数组** | 含 **`throttleMs`**。 |
 
 #### 11.8.3 `src/react/index.ts`
 
@@ -445,6 +432,112 @@ Mermaid 输出以 **SVG** 为主。本仓库前端在 **`apps/frontend/src/index
 | 307–310 | 外层 **`markdown-mermaid-wrap`** + **`data-mermaid="1"`** | 与 **`runMermaidInMarkdownRoot`** 的 **选择器** 一致；内层 **`class="mermaid"`** 为 Mermaid 约定入口。 |
 | 313 | `return prev(...)` | 非 mermaid 走原规则（默认高亮或聊天块等）。 |
 
+### 11.9 流式聊天场景（本仓库前端）：围栏拆分与 Mermaid 岛
+
+本节记录 **助手消息流式输出** 时 Mermaid **无法稳定显示**、**全文闪烁** 的成因与落地实现。代码位于 **`apps/frontend/`**（非 `packages/tools`），但与 **`MarkdownParser`、`runMermaidInMarkdownRoot`** 紧密配合，故写入本文档便于对照。
+
+#### 11.9.1 根因（为何节流/防抖不够）
+
+1. **整段 `dangerouslySetInnerHTML`**：每来一段 token，React 用**新 HTML 字符串整体替换**容器子树，此前由 **`mermaid.run`** 写入的 **SVG 与内部 DOM 修改** 一并被销毁。
+2. **与 `useMermaidInMarkdownRoot` 叠加**：即使 **`throttleMs`** 节流调度，**下一次 innerHTML 仍会在节流间隔后到来**，图仍会被冲掉；**防抖 + effect cleanup 清定时器** 还会在 chunk 极密时导致 **长时间不触发 `mermaid.run`**（表现为「停流才出图」）。
+3. **结论**：流式下若坚持 **单容器整段 render**，Mermaid 与 React 的 DOM 所有权冲突难以从 hook 层彻底消除，需 **缩小 innerHTML 的替换范围** 或 **把 Mermaid 挂到不受该次替换影响的节点上**。
+
+#### 11.9.2 方案概要（围栏拆分 + 独立岛）
+
+| 步骤 | 做法 |
+| ---- | ---- |
+| 1 | 对原始 Markdown 字符串做 **线性扫描**，按顶格 **\`\`\`** 围栏切成多段：**普通文本**、**已闭合 mermaid**、**未闭合 mermaid**（流式尾部）。 |
+| 2 | **普通段**：仍用 **`MarkdownParser.render`** + **`dangerouslySetInnerHTML`**；解析器设 **`enableMermaid: false`**，避免围栏内 mermaid 再被转成占位（与手工拆块重复）。 |
+| 3 | **未闭合 mermaid**：**不**调用 Mermaid，只输出带 **`language-mermaid`** 的 **`<pre><code>`** 预览（转义 HTML），避免不完整 DSL 报错与无意义重绘。 |
+| 4 | **已闭合 mermaid**：每个块对应一个 React 子树 **`MermaidIsland`**：外层 **`div`** 由 React 持有 **`ref`**，在 **`useLayoutEffect`** 内 **命令式** 写入 **`markdown-mermaid-wrap > .mermaid`**，再调用 **`runMermaidInMarkdownRoot(host, { preferDark, suppressErrors })`**（由 **`@dnhyxc-ai/tools/react`** 导出）。 |
+| 5 | **流式追加**通常只改变 **最后一个 Markdown 段** 或 **开放中的 mermaid 预览段**；**更早的已闭合 Mermaid 岛** **`code` prop 不变** 时 **不**重跑 effect，**SVG 不被后续 chunk 的 innerHTML 清掉**。 |
+
+#### 11.9.3 与 `@dnhyxc-ai/tools` 的分工
+
+| 组件 | 职责 |
+| ---- | ---- |
+| **`MarkdownParser`（`enableMermaid: false`）** | 渲染非 mermaid 围栏的 Markdown（含聊天代码块工具栏等）。 |
+| **`runMermaidInMarkdownRoot`** | 在 **岛宿主节点** 子树内查找 **`.markdown-mermaid-wrap[data-mermaid="1"] .mermaid`** 并 **`mermaid.run`**；与包内 **`patchMermaidFence`** 产出的 **class / data 属性** 一致。 |
+| **`useMermaidInMarkdownRoot`** | **本场景不再用于** `ChatAssistantMessage` 整条气泡；仍适用于 **Monaco / 文档** 等 **非「整段正文流式 innerHTML」** 的页面。 |
+
+#### 11.9.4 文件与入口
+
+| 路径 | 角色 |
+| ---- | ---- |
+| **`apps/frontend/src/utils/splitMarkdownFences.ts`** | **`splitMarkdownByCodeFences`**、**`mermaidStreamingFallbackHtml`**、类型 **`MarkdownFencePart`**。 |
+| **`apps/frontend/src/components/design/ChatAssistantMessage/StreamingMarkdownBody.tsx`** | **`StreamingMarkdownBody`**、内部 **`MermaidIsland`**。 |
+| **`apps/frontend/src/components/design/ChatAssistantMessage/index.tsx`** | 构造 **`chatMdParser`（`enableMermaid: false`）**，正文与思考区挂载 **`StreamingMarkdownBody`**，**`bodyMarkdownRef`** 传给 **`containerRef`** 以兼容 Serper 角标等逻辑。 |
+
+#### 11.9.5 `splitMarkdownFences.ts` 逐行说明
+
+| 行号 | 代码 / 构造 | 说明 |
+| ---- | ----------- | ---- |
+| 1–4 | 文件头注释 | 说明用途：**按围栏拆分**，供聊天流式 **Mermaid 岛** 使用，避免整段 innerHTML 冲掉 SVG。 |
+| 6–8 | `MarkdownFencePart` | 联合类型：**`markdown`** 段原始文本；**`mermaid`** 段 DSL 文本 + **`complete`**（是否已出现闭合 **\`\`\`**）。 |
+| 10–23 | `coalesceMarkdownParts` | 合并**相邻**的 **`markdown`** 片段，减少 React 子节点数量与 innerHTML 块数；跳过空 **`markdown`** 文本。 |
+| 12–13 | `if (p.type === 'markdown' && p.text === '') continue` | 不向结果集推入空 markdown，避免多余空 div。 |
+| 14–16 | `last?.type === 'markdown'` | 与前一段同为 markdown 则 **拼接 `text`**，否则 **push** 新元素。 |
+| 18–20 | `out.push(...)` | markdown 浅拷贝文本；mermaid 用展开拷贝，保留 **`complete`**。 |
+| 26–28 | `splitMarkdownByCodeFences` 注释 | 约定：扫描 **\`\`\`lang**；mermaid **未闭合** 时 **`complete: false`**。 |
+| 29–32 | `out` / `i` / `n` | 输出数组、扫描指针、源长度。 |
+| 34–40 | `while` 内 `indexOf('```', i)` | 找下一围栏起点；**无**则把 **`i` 起至末尾** 作为 markdown 并 **break**。 |
+| 41–43 | `fenceStart > i` | 围栏前有普通正文则先入栈一段 **markdown**。 |
+| 44–48 | `langEnd` | 取 **\`\`\` 后第一行换行** 作为语言行结束；**无换行** 则整段从 **\`\`\`** 起视为无法解析的 markdown，**break**。 |
+| 49–53 | `lang` | 语言名 **trim + toLowerCase**，与解析器惯例一致。 |
+| 53–54 | `bodyStart` | 围栏正文从 **换行后** 开始。 |
+| 54–65 | `closeIdx` | 查找闭合 **\`\`\`**；**不存在** 时：若 **`lang === 'mermaid'`** 则 **开放 mermaid** 段，否则把从 **\`\`\`** 起的剩余都当作 **markdown**（避免半段其它语言误拆）。 |
+| 67–75 | 闭合分支 | 取出 **body**；**mermaid** → **`complete: true`**；否则整段围栏（含标记）作为 **markdown** 交给 **`MarkdownParser`**。 |
+| 76 | `i = closeIdx + 3` | 跳过闭合围栏，继续向后扫描。 |
+| 79–81 | 空结果兜底 | 源非空却未产生片段时，整源作为 **markdown**（如无任何围栏）。 |
+| 82 | `return coalesceMarkdownParts` | 返回合并后的片段列表。 |
+| 85–91 | `escapeHtml` | 将 **& < > "** 转为实体，供未跑 Mermaid 时的 **纯文本** 安全插入 HTML。 |
+| 93–97 | `mermaidStreamingFallbackHtml` | **未闭合** mermaid 的占位：**`markdown-body`** 包裹 **`<pre class="chat-md-mermaid-streaming">`**，内层 **`code.language-mermaid`** 写入转义后的 **DSL**。 |
+
+**局限**：仅识别 **顶格 \`\`\`**；**缩进围栏、~~~、围栏内嵌未转义 \`\`\`** 等边界与通用 Markdown 一致地可能误切，聊天场景通常可接受。
+
+#### 11.9.6 `StreamingMarkdownBody.tsx` 逐行说明
+
+| 行号 | 代码 / 构造 | 说明 |
+| ---- | ----------- | ---- |
+| 1–4 | 文件头注释 | **拆块渲染**：普通 md 用 innerHTML，mermaid 用 **岛 + `runMermaidInMarkdownRoot`**。 |
+| 6–7 | `MarkdownParser` / `runMermaidInMarkdownRoot` | 类型来自 **`@dnhyxc-ai/tools`**，运行时 API 来自 **`@dnhyxc-ai/tools/react`**。 |
+| 9–14 | React 导入 | **`memo`/`useLayoutEffect`/`useMemo`/`useRef`/`RefObject`**。 |
+| 15 | `cn` | 合并 **容器** class。 |
+| 16–19 | `splitMarkdownFences` 工具导入 | 拆分与 fallback HTML。 |
+| 21–25 | `MermaidIslandProps` | **`code`**：闭合围栏内 DSL；**`preferDark`**：主题；**`isStreaming`**：是否仍处流式（经 ref 参与 **`suppressErrors`**）。 |
+| 27 | `memo(MermaidIsland)` | 避免父级无关重渲染时无谓刷新（**`code`/`preferDark` 不变** 则跳过）。 |
+| 32–33 | `hostRef` / `genRef` | 岛 **DOM 宿主**；**代数** 丢弃过期的双 **rAF** 回调。 |
+| 34–36 | `isStreamingRef` | **每轮 render 同步** **`isStreaming`**；**不**放入 **`useLayoutEffect` 依赖**，避免 **停流** 时仅为改 **`suppressErrors`** 再 **整岛 innerHTML** 闪屏。 |
+| 38–45 | `useLayoutEffect` 主体（DOM） | 取 **host**；写入与 **`patchMermaidFence`** 一致的 **wrap + .mermaid** 结构；**`textContent = code`** 避免 React 子节点与 Mermaid 改 DOM 冲突。 |
+| 47–56 | 双 **rAF** + **`runMermaidInMarkdownRoot`** | 与 hook 策略一致，等布局后再跑；**`suppressErrors: isStreamingRef.current`**：流式过程中为 **true** 时压制不完整图的错误 UI（由 **`mermaid-in-markdown`** 传给 **`mermaid.run`**）。 |
+| 57 | 依赖 **`[code, preferDark]`** | **仅** DSL 或主题变时重建岛内部并重跑 Mermaid。 |
+| 59 | `return <div ref={hostRef} ...>` | React 只稳定持有 **外层宿主**，内层由 effect 管理。 |
+| 62–68 | `StreamingMarkdownBodyProps` | **`markdown`** 全文；**`parser`**（应 **`enableMermaid: false`**）；**`containerRef`** 供父级 **Serper 角标** 等挂 ref。 |
+| 79–82 | `useMemo(split...)` | **`markdown` 变** 才重新拆分，避免每 render 重复扫描。 |
+| 85 | 根 **`div`** | **`containerRef`** + **`streaming-md-body`** + 传入 **className**。 |
+| 86–113 | `parts.map` | 按片段类型分支渲染。 |
+| 87–93 | **`markdown`** | **`key={md-${i}}`**；**`parser.render(part.text)`** 写 **innerHTML**（多段 **`.markdown-body`** 并列，样式仍由宿主 CSS 命中）。 |
+| 95–103 | **`mermaid` 且 `!complete`** | **`key={mm-open-${i}}`**；**`mermaidStreamingFallbackHtml`** 注入 **代码预览**。 |
+| 105–112 | **`mermaid` 且 `complete`** | **`MermaidIsland`**，**`key={mm-done-${i}}`**；**`isStreaming`** 传入供 ref 读取。 |
+
+#### 11.9.7 `ChatAssistantMessage/index.tsx` 接入片段（逐行）
+
+| 行号（约） | 代码 | 说明 |
+| ---------- | ---- | ---- |
+| 35 | `import { StreamingMarkdownBody } from './StreamingMarkdownBody'` | 引入拆块正文组件。 |
+| 143–151 | `chatMdParser` **`useMemo`** | **`enableMermaid: false`**：**mermaid 围栏** 由拆分器抽出，**不得**再让解析器生成 **`markdown-mermaid-wrap`**，否则重复。 |
+| 154–162 | `bodyText` **`useMemo`** | 与原先一致：正文 + **Serper 角标** 替换等。 |
+| （移除） | 原 **`useMermaidInMarkdownRoot`** | 整条气泡 **不再**用 hook 扫 **shellRef**，避免与 **多段 innerHTML** 逻辑重复且无法解决 **整段替换** 问题。 |
+| 思考区 JSX | **`<StreamingMarkdownBody markdown={message.thinkContent} ... />`** | 思考内容若含 mermaid，与正文同一套拆块策略；**`isStreaming={!!message.isStreaming}`**。 |
+| 正文 JSX | **`<StreamingMarkdownBody containerRef={bodyMarkdownRef} markdown={bodyText} ... />`** | **角标** 等依赖 **`bodyMarkdownRef`** 的监听仍挂在 **外层容器** 上。 |
+
+#### 11.9.8 复制该模式时的检查清单
+
+- 解析器 **`enableMermaid: false`** 与 **手工拆分** 二选一配套，勿双重输出 mermaid 占位。
+- **岛的 `host`** 传给 **`runMermaidInMarkdownRoot`** 的节点应 **包含** **`.markdown-mermaid-wrap`** 子树（与工具包选择器一致）。
+- **开放围栏** 仅用 **fallback**，待 **闭合 \`\`\`** 出现后片段变为 **`complete: true`**，React **key** 从 **`mm-open-*`** 变为 **`mm-done-*`**，会 **卸载预览、挂载岛**，属预期一次切换。
+- 若需 **严格** 在停流后暴露 Mermaid 语法错误，可在 **`isStreaming` 变为 false** 后增加 **仅针对岛的补跑**（当前实现依赖 **`code` 不变** 则不再跑 effect；一般最终图已在流式过程中画出，**`suppressErrors`** 仅影响报错展示）。
+
 ---
 
-_文档与 `packages/tools` 当前实现对齐；升级 `highlight.js` 后请同步更新 `inject-highlight-theme.ts` 内 `HLJS_CDN_VERSION` 并重新执行 `build:css`。_
+_文档与 `packages/tools` 及本仓库 `apps/frontend` 当前实现对齐；升级 `highlight.js` 后请同步更新 `inject-highlight-theme.ts` 内 `HLJS_CDN_VERSION` 并重新执行 `build:css`。_

@@ -5,7 +5,6 @@
  */
 
 import { MarkdownParser } from '@dnhyxc-ai/tools';
-import { useMermaidInMarkdownRoot } from '@dnhyxc-ai/tools/react';
 import { Button, Spinner } from '@ui/index';
 import {
 	ChevronDown,
@@ -33,6 +32,7 @@ import {
 	resolveSearchOrganicFromCitationAnchor,
 } from '@/utils/organicCitation';
 import SearchOrganics from './SearchOrganics';
+import { StreamingMarkdownBody } from './StreamingMarkdownBody';
 
 /** 角标矩形快照（仅存数值，避免持有 DOMRect 引用） */
 type OrganicAnchorRect = Pick<
@@ -140,10 +140,12 @@ function ChatAssistantMessageInner({
 		anchorRect: OrganicAnchorRect;
 	} | null>(null);
 
-	const parser = useMemo(
+	// Mermaid 由 StreamingMarkdownBody 内独立岛渲染；此处关闭避免围栏重复解析
+	const chatMdParser = useMemo(
 		() =>
 			new MarkdownParser({
 				enableChatCodeFenceToolbar: true,
+				enableMermaid: false,
 				highlightTheme: getChatMarkdownHighlightTheme(appTheme),
 			}),
 		[appTheme],
@@ -158,13 +160,6 @@ function ChatAssistantMessageInner({
 		}
 		return applyOrganicCitationAnchors(raw, org);
 	}, [message.content, message.thinkContent, message.searchOrganic]);
-
-	useMermaidInMarkdownRoot({
-		rootRef: shellRef,
-		preferDark: appTheme === 'black',
-		trigger: `${bodyText}\0${message.thinkContent ?? ''}\0${String(isShowThinkContent)}`,
-		parser,
-	});
 
 	useEffect(() => {
 		const el = shellRef.current;
@@ -366,17 +361,21 @@ function ChatAssistantMessageInner({
 				) : null}
 				{/* 思考展开且存在 thinkContent：richReady 前纯文本，就绪后 MdPreview */}
 				{message.thinkContent && isShowThinkContent ? (
-					<div
-						dangerouslySetInnerHTML={{
-							__html: parser.render(message.thinkContent),
-						}}
+					<StreamingMarkdownBody
+						markdown={message.thinkContent}
+						parser={chatMdParser}
+						preferDark={appTheme === 'black'}
+						isStreaming={!!message.isStreaming}
 						className={cn(`[&_.markdown-body]:text-textcolor/90!`, className)}
 					/>
 				) : null}
 			</div>
-			<div
-				ref={bodyMarkdownRef}
-				dangerouslySetInnerHTML={{ __html: parser.render(bodyText) }}
+			<StreamingMarkdownBody
+				containerRef={bodyMarkdownRef}
+				markdown={bodyText}
+				parser={chatMdParser}
+				preferDark={appTheme === 'black'}
+				isStreaming={!!message.isStreaming}
 				className={cn(`[&_.markdown-body]:text-textcolor/90!`, className)}
 			/>
 			{message.isStreaming && (
