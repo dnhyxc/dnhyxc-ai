@@ -1,4 +1,5 @@
 import { MarkdownParser } from '@dnhyxc-ai/tools';
+import { useMermaidInMarkdownRoot } from '@dnhyxc-ai/tools/react';
 import '@dnhyxc-ai/tools/styles.css';
 import DragUpload from '@design/DragUpload';
 import Image from '@design/Image';
@@ -55,6 +56,7 @@ const DocumentProcessor = () => {
 	const dragUploadRef = useRef<{ onClear: () => void } | null>(null);
 	const imageRef = useRef<{ onPreview: () => void }>(null);
 	const scrollContainerRef = useRef<HTMLDivElement>(null);
+	const analysisMarkdownRef = useRef<HTMLDivElement>(null);
 
 	let timer: ReturnType<typeof setTimeout> | null = null;
 
@@ -64,6 +66,13 @@ const DocumentProcessor = () => {
 			highlightTheme: getChatMarkdownHighlightTheme(appTheme),
 		});
 	}, [appTheme]);
+
+	useMermaidInMarkdownRoot({
+		rootRef: analysisMarkdownRef,
+		preferDark: appTheme === 'black',
+		trigger: content,
+		parser,
+	});
 
 	useEffect(() => {
 		return () => {
@@ -417,6 +426,7 @@ const DocumentProcessor = () => {
 											</motion.button>
 										</div>
 										<div
+											ref={analysisMarkdownRef}
 											className="p-3"
 											dangerouslySetInnerHTML={{
 												__html: parser.render(content),

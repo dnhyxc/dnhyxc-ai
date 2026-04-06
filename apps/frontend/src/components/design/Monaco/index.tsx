@@ -1,5 +1,6 @@
 import Tooltip from '@design/Tooltip';
 import { MarkdownParser } from '@dnhyxc-ai/tools';
+import { useMermaidInMarkdownRoot } from '@dnhyxc-ai/tools/react';
 import Editor, { type BeforeMount, type OnMount } from '@monaco-editor/react';
 import { Button, ScrollArea } from '@ui/index';
 import {
@@ -117,6 +118,11 @@ interface MarkdownEditorProps {
 	onMarkdownBottomBarOpenChange?: (open: boolean) => void;
 	/** 「操作栏」按钮 Tooltip 中的快捷键说明 */
 	markdownBottomBarShortcutHint?: string;
+	/**
+	 * Markdown 预览是否解析并渲染 ```mermaid 围栏（与 MarkdownParser `enableMermaid` 一致）。
+	 * @default true
+	 */
+	markdownEnableMermaid?: boolean;
 }
 
 /**
@@ -129,6 +135,7 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 	documentIdentity,
 	onViewportScrollFollow,
 	showPreviewScrollCornerFab = false,
+	enableMermaid = true,
 }: {
 	markdown: string;
 	/** 分屏同步滚动：指向 ScrollArea 的 Viewport（Radix ref 落在 viewport 上） */
@@ -139,8 +146,12 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 	onViewportScrollFollow?: () => void;
 	/** 纯预览模式：右下角置底 / 触底后置顶浮动按钮 */
 	showPreviewScrollCornerFab?: boolean;
+	/** 是否启用 Mermaid 围栏解析与前端渲染 */
+	enableMermaid?: boolean;
 }) {
 	const markdownRef = useRef<HTMLDivElement>(null);
+	/** 与 `dangerouslySetInnerHTML` 同层，保证 Mermaid 在内容写入后再扫描节点 */
+	const previewHtmlRootRef = useRef<HTMLDivElement>(null);
 	const localViewportRef = useRef<HTMLDivElement | null>(null);
 	const [previewScrollFabMode, setPreviewScrollFabMode] =
 		useState<PreviewScrollCornerFabMode>('hidden');
@@ -164,11 +175,19 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 				enableHeadingSourceLineAttr: true,
 				// 目录 / `[文字](#slug)` 跳转：标题生成 id，点击在 ScrollArea 内 scrollIntoView
 				enableHeadingAnchorIds: true,
+				enableMermaid,
 			}),
-		[theme],
+		[theme, enableMermaid],
 	);
 
 	const html = useMemo(() => parser.render(markdown), [parser, markdown]);
+
+	useMermaidInMarkdownRoot({
+		rootRef: previewHtmlRootRef,
+		preferDark: theme === 'black',
+		trigger: html,
+		parser,
+	});
 
 	const refreshPreviewScrollFab = useCallback(() => {
 		if (!showPreviewScrollCornerFab) {
@@ -341,6 +360,7 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 			>
 				<div className="box-border min-w-0 max-w-full w-full p-3">
 					<div
+						ref={previewHtmlRootRef}
 						className="[&_.markdown-body]:min-w-0 [&_.markdown-body]:max-w-none [&_.markdown-body]:wrap-break-word [&_.markdown-body]:overflow-x-auto [&_.markdown-body]:bg-transparent! [&_.markdown-body]:text-textcolor/90! [&_.markdown-body_:is(h1,h2,h3,h4,h5,h6)]:scroll-mt-3 [&_.markdown-body_pre]:max-w-full [&_.markdown-body_pre]:overflow-x-auto [&_.markdown-body_table]:block [&_.markdown-body_table]:max-w-full [&_.markdown-body_table]:overflow-x-auto"
 						dangerouslySetInnerHTML={{ __html: html }}
 					/>
@@ -395,6 +415,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	markdownBottomBarOpen: markdownBottomBarOpenProp,
 	onMarkdownBottomBarOpenChange,
 	markdownBottomBarShortcutHint,
+	markdownEnableMermaid = true,
 }) => {
 	const editorRef = useRef<MonacoEditorInstance | null>(null);
 	const imeComposingRef = useRef(false);
@@ -938,6 +959,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 								markdown={deferredPreviewMarkdown}
 								documentIdentity={documentIdentity}
 								showPreviewScrollCornerFab
+								enableMermaid={markdownEnableMermaid}
 							/>
 						</div>
 					) : null}
@@ -983,6 +1005,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 												? dispatchViewportScrollFollow
 												: undefined
 										}
+										enableMermaid={markdownEnableMermaid}
 									/>
 								</div>
 							</ResizablePanel>

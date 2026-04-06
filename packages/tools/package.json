@@ -28,7 +28,15 @@
 		"./styles/hljs/*": "./dist/styles/hljs/*",
 		"./styles.css": "./dist/styles/markdown-styles.css",
 		"./markdown-styles.css": "./dist/styles/markdown-styles.css",
-		"./markdown-base.css": "./dist/styles/markdown-base.css"
+		"./markdown-base.css": "./dist/styles/markdown-base.css",
+		"./react": {
+			"types": "./dist/react/index.d.ts",
+			"import": "./dist/react/index.js",
+			"require": "./dist/react/index.cjs"
+		}
+	},
+	"peerDependencies": {
+		"react": ">=18.0.0"
 	},
 	"dependencies": {
 		"github-markdown-css": "^5.8.1",
@@ -36,12 +44,15 @@
 		"katex": "^0.16.28",
 		"markdown-it": "^14.1.0",
 		"markdown-it-katex": "^2.0.3",
-		"markdown-it-task-lists": "^2.1.1"
+		"markdown-it-task-lists": "^2.1.1",
+		"mermaid": "^11.14.0"
 	},
 	"devDependencies": {
 		"@types/highlight.js": "^10.1.0",
 		"@types/katex": "^0.16.8",
 		"@types/markdown-it": "^14.1.2",
+		"@types/react": "^19.1.8",
+		"react": "^19.1.0",
 		"tsup": "^8.5.1"
 	}
 }

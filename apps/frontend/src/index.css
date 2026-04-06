@@ -173,6 +173,17 @@ body {
 		overflow-x: auto;
 	}
 
+	.markdown-body .markdown-mermaid-wrap {
+		margin: 1rem 0;
+		max-width: 100%;
+		overflow-x: auto;
+	}
+	.markdown-body .markdown-mermaid-wrap svg {
+		display: block;
+		max-width: 100%;
+		height: auto;
+	}
+
 	.md-editor-dark,
 	.md-editor-modal-container[data-theme="dark"] {
 		--md-color: var(--theme-textcolor);

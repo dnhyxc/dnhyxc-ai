@@ -117,14 +117,23 @@ export interface MarkdownParserOptions {
 	 * 需与 `render` 传入的 **env** 配合（本类 `render()` 已内置）；默认 false。
 	 */
 	enableHeadingAnchorIds?: boolean;
+	/**
+	 * 是否将 ```mermaid 围栏解析为 Mermaid 占位 DOM。
+	 * 为 false 时按普通代码块展示；实例字段 `enableMermaid` 与之一致，配合 `@dnhyxc-ai/tools/react` 的 `useMermaidInMarkdownRoot`。
+	 * @default true
+	 */
+	enableMermaid?: boolean;
 }
 
 class MarkdownParser {
+	/** 与构造参数 `enableMermaid` 一致（默认 true） */
+	readonly enableMermaid: boolean;
 	private md;
 	private containerClass: string;
 	private onError?: (error: unknown) => void;
 
 	constructor(options: MarkdownParserOptions = {}) {
+		this.enableMermaid = options.enableMermaid !== false;
 		this.containerClass = options.containerClass || 'markdown-body';
 		this.onError = options.onError;
 
@@ -177,6 +186,10 @@ class MarkdownParser {
 
 		if (options.enableHeadingSourceLineAttr || options.enableHeadingAnchorIds) {
 			this.patchHeadingPreviewAttrs(options);
+		}
+
+		if (this.enableMermaid) {
+			this.patchMermaidFence();
 		}
 
 		const shouldInject = options.injectHighlightTheme !== false;
@@ -272,6 +285,32 @@ class MarkdownParser {
 				highlighted +
 				'</code></pre></div>\n'
 			);
+		};
+	}
+
+	/**
+	 * 包裹 fence：语言为 mermaid 时输出占位结构，插入 DOM 后由 `@dnhyxc-ai/tools/react` 的 `useMermaidInMarkdownRoot` 渲染。
+	 */
+	private patchMermaidFence(): void {
+		const md = this.md;
+		const prev = md.renderer.rules.fence;
+		if (!prev) return;
+		md.renderer.rules.fence = (tokens, idx, options, env, self) => {
+			const token = tokens[idx];
+			const info = token.info
+				? md.utils.unescapeAll(String(token.info)).trim()
+				: '';
+			const langName = info.split(/\s+/g)[0] || '';
+			if (langName.toLowerCase() === 'mermaid') {
+				const body = md.utils.escapeHtml(token.content);
+				return (
+					'<div class="markdown-mermaid-wrap" data-mermaid="1">' +
+					'<div class="mermaid">' +
+					body +
+					'</div></div>\n'
+				);
+			}
+			return prev(tokens, idx, options, env, self);
 		};
 	}
 

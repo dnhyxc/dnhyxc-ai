@@ -5,6 +5,7 @@
  */
 
 import { MarkdownParser } from '@dnhyxc-ai/tools';
+import { useMermaidInMarkdownRoot } from '@dnhyxc-ai/tools/react';
 import { Button, Spinner } from '@ui/index';
 import {
 	ChevronDown,
@@ -157,6 +158,13 @@ function ChatAssistantMessageInner({
 		}
 		return applyOrganicCitationAnchors(raw, org);
 	}, [message.content, message.thinkContent, message.searchOrganic]);
+
+	useMermaidInMarkdownRoot({
+		rootRef: shellRef,
+		preferDark: appTheme === 'black',
+		trigger: `${bodyText}\0${message.thinkContent ?? ''}\0${String(isShowThinkContent)}`,
+		parser,
+	});
 
 	useEffect(() => {
 		const el = shellRef.current;

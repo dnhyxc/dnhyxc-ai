@@ -16,6 +16,8 @@ export default defineConfig(async () => ({
 	},
 	optimizeDeps: {
 		include: [
+			'@dnhyxc-ai/tools/react',
+			'mermaid',
 			'monaco-editor',
 			'prettier/standalone',
 			'prettier/plugins/babel',
