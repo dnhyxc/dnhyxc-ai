@@ -10,7 +10,10 @@ export type {
 	MarkdownParserOptions,
 	MarkdownRenderEnv,
 } from './markdown-parser.js';
-export { default as MarkdownParser } from './markdown-parser.js';
+export {
+	default as MarkdownParser,
+	normalizeMermaidFenceBody,
+} from './markdown-parser.js';
 export {
 	defaultHighlightJsThemeId,
 	highlightJsThemeIds,

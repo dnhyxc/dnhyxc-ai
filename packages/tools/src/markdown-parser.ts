@@ -74,6 +74,78 @@ function nextHeadingAnchorId(base: string, env: MarkdownRenderEnv): string {
 	return n === 1 ? base : `${base}-${n - 1}`;
 }
 
+/** 梯形等节点：[/.../]，勿对其中的 / 做自动加引号 */
+function mermaidBracketLabelLooksTrapezoid(label: string): boolean {
+	const t = label.trim();
+	return t.length >= 3 && t.startsWith('/') && t.endsWith('/');
+}
+
+const MERMAID_FLOWCHART_ID_SKIP = new Set([
+	'subgraph',
+	'end',
+	'flowchart',
+	'graph',
+	'direction',
+	'classDef',
+	'class',
+	'linkStyle',
+	'click',
+	'style',
+	'break',
+	'continue',
+]);
+
+function escapeMermaidDoubleQuotedLabelInner(raw: string): string {
+	return raw.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+}
+
+/**
+ * 为未加引号且含 / 或 + 的方括号文案补双引号，减轻 Mermaid 解析失败（预览区只剩 DSL 文本）。
+ * 不改变已带引号的片段；跳过梯形 [/.../]。
+ */
+function relaxMermaidBracketLabels(body: string): string {
+	let text = body;
+	text = text.replace(
+		/(^|\n)([\t ]*subgraph\s+\S+\s+)\[([^\]\r\n]+)\]/g,
+		(full, lead, pre, title) => {
+			const raw = title as string;
+			const t = raw.trim();
+			if (t.startsWith('"') || mermaidBracketLabelLooksTrapezoid(raw)) {
+				return full;
+			}
+			if (t.includes('/') || t.includes('+')) {
+				return `${lead}${pre}["${escapeMermaidDoubleQuotedLabelInner(raw)}"]`;
+			}
+			return full;
+		},
+	);
+	text = text.replace(
+		/\b([A-Za-z_][\w]*)\[([^\]\r\n]*)\]/g,
+		(full, id, label) => {
+			if (MERMAID_FLOWCHART_ID_SKIP.has(id)) return full;
+			const raw = label as string;
+			const t = raw.trim();
+			if (t.startsWith('"') || mermaidBracketLabelLooksTrapezoid(raw)) {
+				return full;
+			}
+			if (t.includes('/') || t.includes('+')) {
+				return `${id}["${escapeMermaidDoubleQuotedLabelInner(raw)}"]`;
+			}
+			return full;
+		},
+	);
+	return text;
+}
+
+/**
+ * Mermaid 围栏源码预处理：统一换行，并对含 /、+ 的未加引号方括号文案补引号。
+ * 供 MarkdownParser 与流式 Mermaid 岛等共用。
+ */
+export function normalizeMermaidFenceBody(body: string): string {
+	const eol = body.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+	return relaxMermaidBracketLabels(eol);
+}
+
 // 正文/公式样式仍建议 import '@dnhyxc-ai/tools/styles.css' 或 markdown-base.css。
 // 代码块主题可通过构造参数 highlightTheme（CDN）或 highlightThemeCss（内联）注入，亦可继续用手动 import。
 
@@ -302,7 +374,9 @@ class MarkdownParser {
 				: '';
 			const langName = info.split(/\s+/g)[0] || '';
 			if (langName.toLowerCase() === 'mermaid') {
-				const body = md.utils.escapeHtml(token.content);
+				const body = md.utils.escapeHtml(
+					normalizeMermaidFenceBody(token.content),
+				);
 				return (
 					'<div class="markdown-mermaid-wrap" data-mermaid="1">' +
 					'<div class="mermaid">' +

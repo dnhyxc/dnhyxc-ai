@@ -1,3 +1,4 @@
+import { MermaidFenceIsland } from '@design/MermaidFenceIsland';
 import Tooltip from '@design/Tooltip';
 import { MarkdownParser } from '@dnhyxc-ai/tools';
 import { useMermaidInMarkdownRoot } from '@dnhyxc-ai/tools/react';
@@ -48,6 +49,10 @@ import {
 	downloadChatCodeBlock,
 	getChatCodeBlockPlainText,
 } from '@/utils/chatCodeToolbar';
+import {
+	mermaidStreamingFallbackHtml,
+	splitMarkdownByCodeFences,
+} from '@/utils/splitMarkdownFences';
 import Loading from '../Loading';
 import { registerPrettierFormatProviders } from './format';
 import { GLASS_THEME_BY_UI, registerMonacoGlassThemes } from './glassTheme';
@@ -170,6 +175,14 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 		[viewportRef],
 	);
 
+	const fenceParts = useMemo(
+		() => splitMarkdownByCodeFences(markdown),
+		[markdown],
+	);
+	const hasMermaidIslandLayout = Boolean(
+		enableMermaid && fenceParts.some((p) => p.type === 'mermaid'),
+	);
+
 	const parser = useMemo(
 		() =>
 			new MarkdownParser({
@@ -184,13 +197,36 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 		[theme, enableMermaid],
 	);
 
-	const html = useMemo(() => parser.render(markdown), [parser, markdown]);
+	const parserNoMermaid = useMemo(
+		() =>
+			new MarkdownParser({
+				highlightTheme: getChatMarkdownHighlightTheme(theme),
+				enableChatCodeFenceToolbar: true,
+				enableHeadingSourceLineAttr: true,
+				enableHeadingAnchorIds: true,
+				enableMermaid: false,
+			}),
+		[theme],
+	);
+
+	const html = useMemo(() => {
+		if (hasMermaidIslandLayout) return '';
+		return parser.render(markdown);
+	}, [hasMermaidIslandLayout, parser, markdown]);
+
+	/** 含 Mermaid 岛时不在整段 HTML 上跑 run（岛内自渲染），否则与聊天流一致扫描 .mermaid */
+	const mermaidRootScanParser = useMemo(
+		() => ({
+			enableMermaid: enableMermaid && !hasMermaidIslandLayout,
+		}),
+		[enableMermaid, hasMermaidIslandLayout],
+	);
 
 	useMermaidInMarkdownRoot({
 		rootRef: previewHtmlRootRef,
 		preferDark: theme === 'black',
-		trigger: html,
-		parser,
+		trigger: hasMermaidIslandLayout ? markdown : html,
+		parser: mermaidRootScanParser,
 	});
 
 	const { openMermaidPreview, mermaidImagePreviewModal } =
@@ -200,7 +236,7 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 		previewHtmlRootRef,
 		openMermaidPreview,
 		enableMermaid,
-		html,
+		hasMermaidIslandLayout ? markdown : html,
 	);
 
 	const refreshPreviewScrollFab = useCallback(() => {
@@ -380,8 +416,42 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 							enableMermaid &&
 								'[&_.markdown-mermaid-wrap_.mermaid]:cursor-zoom-in',
 						)}
-						dangerouslySetInnerHTML={{ __html: html }}
-					/>
+					>
+						{hasMermaidIslandLayout ? (
+							fenceParts.map((part, i) => {
+								if (part.type === 'markdown') {
+									return (
+										<div
+											key={`pv-${i}`}
+											dangerouslySetInnerHTML={{
+												__html: parserNoMermaid.render(part.text),
+											}}
+										/>
+									);
+								}
+								if (!part.complete) {
+									return (
+										<div
+											key={`pv-${i}`}
+											dangerouslySetInnerHTML={{
+												__html: mermaidStreamingFallbackHtml(part.text),
+											}}
+										/>
+									);
+								}
+								return (
+									<MermaidFenceIsland
+										key={`pv-${i}`}
+										code={part.text}
+										preferDark={theme === 'black'}
+										openMermaidPreview={openMermaidPreview}
+									/>
+								);
+							})
+						) : (
+							<div dangerouslySetInnerHTML={{ __html: html }} />
+						)}
+					</div>
 				</div>
 			</ScrollArea>
 			{showPreviewScrollCornerFab && previewScrollFabMode !== 'hidden' ? (
