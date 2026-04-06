@@ -10,6 +10,7 @@ body {
 	height: 100%;
 	width: 100%;
 	overscroll-behavior: none;
+	overflow: hidden;
 	/* find 样式关闭按钮样式 */
 	.monaco-editor .find-widget > .button.codicon-widget-close {
 		top: 8px;
