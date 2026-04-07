@@ -6,6 +6,22 @@ function isFocusInsideCodeMirror(): boolean {
 	return el instanceof Element && Boolean(el.closest('.cm-editor'));
 }
 
+/** 焦点在 Monaco 编辑区内时不拦截：其选区在隐藏 textarea 上，window.getSelection() 不可靠 */
+function isFocusInsideMonacoEditor(): boolean {
+	const el = document.activeElement;
+	return (
+		el instanceof Element &&
+		Boolean(el.closest('.monaco-editor, .monaco-diff-editor'))
+	);
+}
+
+/** 使用自管选区/剪贴板的编辑器：勿用全局 getSelection + preventDefault 顶替系统行为 */
+function shouldLetEditorHandleModChord(event: KeyboardEvent): boolean {
+	const k = event.key.toLowerCase();
+	if (!['a', 'c', 'v', 'x', 'z'].includes(k)) return false;
+	return isFocusInsideCodeMirror() || isFocusInsideMonacoEditor();
+}
+
 async function writeClipText(text: string): Promise<void> {
 	if (isTauriRuntime()) {
 		const { writeText } = await import('@tauri-apps/plugin-clipboard-manager');
@@ -35,11 +51,7 @@ export const clipboard = async (event: KeyboardEvent) => {
 	// 检查是否按下了Command（Mac）或Control（Windows/Linux）
 	const isMod = event.metaKey || event.ctrlKey;
 
-	if (
-		isMod &&
-		isFocusInsideCodeMirror() &&
-		['a', 'c', 'v', 'x', 'z'].includes(event.key)
-	) {
+	if (isMod && shouldLetEditorHandleModChord(event)) {
 		return;
 	}
 
