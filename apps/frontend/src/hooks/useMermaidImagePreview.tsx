@@ -31,14 +31,6 @@ export function useMermaidImagePreview(): UseMermaidImagePreviewResult {
 		if (!visible) setPreviewUrl(null);
 	}, []);
 
-	const onDownload = useCallback((image: { url: string }) => {
-		const a = document.createElement('a');
-		a.href = image.url;
-		a.download = 'mermaid-diagram.svg';
-		a.rel = 'noopener';
-		a.click();
-	}, []);
-
 	const mermaidImagePreviewModal = (
 		<ImagePreview
 			visible={previewUrl !== null}
@@ -46,7 +38,6 @@ export function useMermaidImagePreview(): UseMermaidImagePreviewResult {
 			onVisibleChange={onPreviewVisibleChange}
 			title="Mermaid 图表预览"
 			showPrevAndNext={false}
-			download={onDownload}
 		/>
 	);
 

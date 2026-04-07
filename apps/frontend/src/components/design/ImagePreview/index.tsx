@@ -521,7 +521,7 @@ const ImagePreview = forwardRef<ImagePreviewHandle, ImagePreviewProps>(
 										<RotateCw size={22} className="text-textcolor" />
 									</span>
 								)}
-								{(download || showZoomIn) && (
+								{download && (
 									<span
 										className="flex items-center justify-center w-9 h-9 rounded-md bg-transparent text-foreground cursor-pointer transition-all duration-200 hover:bg-theme/10"
 										onClick={onDownload}
