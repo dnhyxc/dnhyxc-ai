@@ -2,7 +2,7 @@ import { Toaster } from '@ui/sonner';
 import { useEffect } from 'react';
 import { createBrowserRouter, RouteObject } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
-import { clipboard, getValue, onCreateWindow, removeStorage } from '@/utils';
+import { getValue, onCreateWindow, removeStorage } from '@/utils';
 import { http } from '@/utils/fetch';
 import { isTauriRuntime } from '@/utils/runtime';
 import routes from './routes';
@@ -46,14 +46,11 @@ const App = () => {
 			}
 		})();
 
-		document.addEventListener('keydown', clipboard);
-
 		return () => {
 			cancelled = true;
 			for (const u of unlistenFns) {
 				u();
 			}
-			document.removeEventListener('keydown', clipboard);
 		};
 	}, []);
 

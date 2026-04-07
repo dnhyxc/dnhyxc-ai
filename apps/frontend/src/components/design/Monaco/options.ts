@@ -54,4 +54,11 @@ export const options: any = {
 	glyphMargin: false,
 	accessibilitySupport: 'off' as const,
 	cursorBlinking: 'solid' as const,
+	/**
+	 * 关闭 Monaco 的 Paste As 管线（CopyPasteController 在捕获阶段拦截 paste，
+	 * 聚合 text/html、路径等 documentPasteEditProvider，再 preventDefault）。
+	 * 启用时从网页/Office 粘贴易选到非纯文本编辑，导致 Markdown 多行、缩进、围栏错位。
+	 * 关闭后走浏览器默认粘贴，以 text/plain 为主，格式与常见编辑器一致。
+	 */
+	pasteAs: { enabled: false },
 };

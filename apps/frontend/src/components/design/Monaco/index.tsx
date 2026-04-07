@@ -49,6 +49,7 @@ import {
 	downloadChatCodeBlock,
 	getChatCodeBlockPlainText,
 } from '@/utils/chatCodeToolbar';
+import { copyToClipboard, pasteFromClipboard } from '@/utils/clipboard';
 import {
 	mermaidStreamingFallbackHtml,
 	splitMarkdownByCodeFences,
@@ -855,6 +856,63 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 
 			editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyB, () => {
 				editor.trigger('keyboard', 'editor.action.commentLine', null);
+			});
+
+			/** 从模型选区取待复制文本；空选区时复制当前行（与常见编辑器一致） */
+			const getCopyTextFromSelections = (): string => {
+				const model = editor.getModel();
+				if (!model) return '';
+				const sels = editor.getSelections();
+				if (!sels?.length) return '';
+				const eol = model.getEOL();
+				return sels
+					.map((sel) => {
+						if (
+							sel.startLineNumber === sel.endLineNumber &&
+							sel.startColumn === sel.endColumn
+						) {
+							return model.getLineContent(sel.startLineNumber) + eol;
+						}
+						return model.getValueInRange(sel);
+					})
+					.join(eol);
+			};
+
+			// WebView/Tauri 下系统默认复制常失败：用模型选区 + 统一剪贴板 API（含 Tauri 插件）
+			editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyC, () => {
+				const text = getCopyTextFromSelections();
+				if (!text) return;
+				void copyToClipboard(text);
+			});
+
+			editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyX, () => {
+				if (editor.getOption(monaco.editor.EditorOption.readOnly)) return;
+				void (async () => {
+					const text = getCopyTextFromSelections();
+					if (!text) return;
+					await copyToClipboard(text);
+					const sels = editor.getSelections();
+					if (!sels?.length) return;
+					editor.executeEdits(
+						'cut',
+						sels.map((sel) => ({ range: sel, text: '' })),
+					);
+				})();
+			});
+
+			editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyV, () => {
+				if (editor.getOption(monaco.editor.EditorOption.readOnly)) return;
+				if (editor.inComposition || imeComposingRef.current) return;
+				void (async () => {
+					const text = await pasteFromClipboard();
+					if (!text) return;
+					const sels = editor.getSelections();
+					if (!sels?.length) return;
+					editor.executeEdits(
+						'paste',
+						sels.map((sel) => ({ range: sel, text })),
+					);
+				})();
 			});
 
 			const pushToParent = (raw: string) => {
