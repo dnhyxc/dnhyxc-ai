@@ -35,6 +35,8 @@ function deriveKnowledgeTitleFromMarkdown(markdown: string): string {
 }
 
 class KnowledgeStore {
+	private readonly overwriteSaveEnabledStorageKey =
+		'dnhyxc-ai.knowledge.overwriteSaveEnabled';
 	// —— 云端列表分页 ——
 	/** 当前列表（分页累积） */
 	list: KnowledgeListItem[] = [];
@@ -79,8 +81,25 @@ class KnowledgeStore {
 
 	knowledgePendingSavePayload: SaveKnowledgeMarkdownPayload | null = null;
 
+	/**
+	 * 桌面端：开启后保存遇到同名文件时不弹确认，直接覆盖保存。
+	 * 仅影响本地文件写入；云端保存仍按原逻辑更新/新建。
+	 */
+	knowledgeOverwriteSaveEnabled = false;
+
 	constructor() {
 		makeAutoObservable(this);
+		// 读取本地偏好（不依赖后端；异常时保持默认 false）
+		try {
+			if (typeof window !== 'undefined') {
+				const raw = window.localStorage.getItem(
+					this.overwriteSaveEnabledStorageKey,
+				);
+				if (raw === '1') this.knowledgeOverwriteSaveEnabled = true;
+			}
+		} catch {
+			// 忽略：隐私模式/禁用存储等场景
+		}
 	}
 
 	get hasMore(): boolean {
@@ -127,6 +146,20 @@ class KnowledgeStore {
 		if (!open) {
 			this.knowledgeOverwriteTargetPath = '';
 			this.knowledgePendingSavePayload = null;
+		}
+	}
+
+	setKnowledgeOverwriteSaveEnabled(enabled: boolean) {
+		this.knowledgeOverwriteSaveEnabled = enabled;
+		try {
+			if (typeof window !== 'undefined') {
+				window.localStorage.setItem(
+					this.overwriteSaveEnabledStorageKey,
+					enabled ? '1' : '0',
+				);
+			}
+		} catch {
+			// 忽略：同 constructor
 		}
 	}
 

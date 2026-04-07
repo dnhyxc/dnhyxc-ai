@@ -12,6 +12,7 @@ import {
 	BetweenVerticalEnd,
 	Columns2,
 	Eye,
+	FileInput,
 	FilePenLine,
 	PanelTopClose,
 	PanelTopOpen,
@@ -136,6 +137,12 @@ interface MarkdownEditorProps {
 	 * @default true
 	 */
 	markdownEnableMermaid?: boolean;
+	/**
+	 * 覆盖保存开关（由外部业务决定含义；知识库场景用于“同名文件直接覆盖保存”）。
+	 * 仅在同时传入 onOverwriteSaveEnabledChange 时显示在 Markdown 底部操作栏。
+	 */
+	overwriteSaveEnabled?: boolean;
+	onOverwriteSaveEnabledChange?: (enabled: boolean) => void;
 }
 
 /**
@@ -510,6 +517,8 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	onMarkdownBottomBarOpenChange,
 	markdownBottomBarShortcutHint,
 	markdownEnableMermaid = true,
+	overwriteSaveEnabled = false,
+	onOverwriteSaveEnabledChange,
 }) => {
 	const editorRef = useRef<MonacoEditorInstance | null>(null);
 	/** 包裹 Editor 的宿主，用于测量 client 尺寸并显式 layout（Tauri 全屏恢复后避免沿用旧宽度） */
@@ -546,6 +555,8 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 		markdownBottomBarOpenProp,
 		onMarkdownBottomBarOpenChange,
 	]);
+
+	const showOverwriteSaveToggle = Boolean(onOverwriteSaveEnabledChange);
 	const viewModeRef = useRef(viewMode);
 	viewModeRef.current = viewMode;
 	const splitScrollFollowModeRef = useRef(splitScrollFollowMode);
@@ -1405,6 +1416,31 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 								</>
 							)}
 						</div>
+						{showOverwriteSaveToggle ? (
+							<div className="flex shrink-0 items-center gap-1 pl-2">
+								<Tooltip
+									content={
+										overwriteSaveEnabled
+											? '已开启覆盖保存：同名文件将直接覆盖写入'
+											: '开启覆盖保存：同名文件不再弹窗确认，直接覆盖写入'
+									}
+								>
+									<button
+										type="button"
+										className={markdownBarIconBtnClass(overwriteSaveEnabled)}
+										aria-pressed={overwriteSaveEnabled}
+										aria-label={
+											overwriteSaveEnabled ? '关闭覆盖保存' : '开启覆盖保存'
+										}
+										onClick={() =>
+											onOverwriteSaveEnabledChange?.(!overwriteSaveEnabled)
+										}
+									>
+										<FileInput size={18} strokeWidth={1.75} aria-hidden />
+									</button>
+								</Tooltip>
+							</div>
+						) : null}
 					</div>
 				</div>
 			) : null}

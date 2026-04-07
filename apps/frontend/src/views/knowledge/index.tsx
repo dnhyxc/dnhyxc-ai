@@ -405,7 +405,15 @@ const Knowledge = observer(() => {
 					knowledgeStore.setKnowledgeLocalDiskTitle(trimmedTitle);
 					syncSnapshotAfterPersist(trimmedTitle, markdown);
 				} else {
-					knowledgeStore.openKnowledgeOverwriteConfirm(target.path, payload);
+					if (knowledgeStore.knowledgeOverwriteSaveEnabled) {
+						await persistKnowledgeApi();
+						const merged = { ...payload, overwrite: true };
+						await runTauriSave(merged);
+						knowledgeStore.setKnowledgeLocalDiskTitle(trimmedTitle);
+						syncSnapshotAfterPersist(trimmedTitle, markdown);
+					} else {
+						knowledgeStore.openKnowledgeOverwriteConfirm(target.path, payload);
+					}
 				}
 			} else {
 				await persistKnowledgeApi();
@@ -647,6 +655,10 @@ const Knowledge = observer(() => {
 					onMarkdownBottomBarOpenChange={setMarkdownBottomBarOpen}
 					markdownBottomBarShortcutHint={
 						knowledgeChords.toggleMarkdownBottomBar
+					}
+					overwriteSaveEnabled={knowledgeStore.knowledgeOverwriteSaveEnabled}
+					onOverwriteSaveEnabledChange={(enabled) =>
+						knowledgeStore.setKnowledgeOverwriteSaveEnabled(enabled)
 					}
 					toolbar={
 						<KnowledgeEditorToolbar
