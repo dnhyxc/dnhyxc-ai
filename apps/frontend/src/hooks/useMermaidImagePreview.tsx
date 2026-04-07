@@ -7,7 +7,10 @@ import {
 	useRef,
 	useState,
 } from 'react';
-import { mermaidSvgToPreviewDataUrl } from '@/utils/mermaidImagePreview';
+import {
+	downloadMermaidPreviewSvg,
+	mermaidSvgToPreviewDataUrl,
+} from '@/utils/mermaidImagePreview';
 
 export type UseMermaidImagePreviewResult = {
 	/** 打开预览（传入 {@link mermaidSvgToPreviewDataUrl} 或等价的 data URL） */
@@ -31,13 +34,21 @@ export function useMermaidImagePreview(): UseMermaidImagePreviewResult {
 		if (!visible) setPreviewUrl(null);
 	}, []);
 
+	const onDownload = useCallback(
+		({ url }: { id?: string; url: string; size?: number }) => {
+			void downloadMermaidPreviewSvg(url);
+		},
+		[],
+	);
+
 	const mermaidImagePreviewModal = (
 		<ImagePreview
 			visible={previewUrl !== null}
 			selectedImage={previewUrl ? { url: previewUrl } : { url: '' }}
 			onVisibleChange={onPreviewVisibleChange}
 			title="Mermaid 图表预览"
-			showPrevAndNext={false}
+			showDownload
+			download={onDownload}
 		/>
 	);
 

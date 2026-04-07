@@ -38,6 +38,7 @@ export interface ImagePreviewOptions {
 	showZoomOut?: boolean;
 	showRotate?: boolean;
 	showReset?: boolean;
+	showDownload?: boolean;
 	showPrevAndNext?: boolean;
 	closeOnClickModal?: boolean;
 	showClose?: boolean;
@@ -125,6 +126,7 @@ const ImagePreview = forwardRef<ImagePreviewHandle, ImagePreviewProps>(
 			showZoomOut = true,
 			showRotate = true,
 			showReset = true,
+			showDownload = true,
 			showPrevAndNext = true,
 			showClose = true,
 			showOtherModel,
@@ -521,7 +523,7 @@ const ImagePreview = forwardRef<ImagePreviewHandle, ImagePreviewProps>(
 										<RotateCw size={22} className="text-textcolor" />
 									</span>
 								)}
-								{download && (
+								{showDownload && (
 									<span
 										className="flex items-center justify-center w-9 h-9 rounded-md bg-transparent text-foreground cursor-pointer transition-all duration-200 hover:bg-theme/10"
 										onClick={onDownload}
