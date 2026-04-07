@@ -512,6 +512,10 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	markdownEnableMermaid = true,
 }) => {
 	const editorRef = useRef<MonacoEditorInstance | null>(null);
+	/** 包裹 Editor 的宿主，用于测量 client 尺寸并显式 layout（Tauri 全屏恢复后避免沿用旧宽度） */
+	const editorHostRef = useRef<HTMLDivElement | null>(null);
+	/** onMount 内赋值，供 useLayoutEffect 在 height / 视图切换后触发与挂载时相同的 layout 逻辑 */
+	const applyEditorLayoutRef = useRef<(() => void) | null>(null);
 	const imeComposingRef = useRef(false);
 	const onChangeRef = useRef(onChange);
 	const valueFromPropsRef = useRef(value);
@@ -582,7 +586,8 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	const effectivePlaceholder = hasEditorBody ? '' : placeholder;
 
 	const mergedEditorOptions = useMemo(() => {
-		const base = { ...options, readOnly };
+		// 关闭 automaticLayout：WebView/Tauri 全屏→窗口化时内部 ResizeObserver 易滞后，改由宿主显式喂宽高
+		const base = { ...options, readOnly, automaticLayout: false as const };
 		if (language === 'markdown') {
 			return {
 				...base,
@@ -639,6 +644,15 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 			ed.setScrollLeft(0);
 		}
 	}, [documentIdentity]);
+
+	// 容器高度或 Markdown 视图切换后强制按宿主尺寸 layout（与 onMount 内 ResizeObserver 互补）
+	useLayoutEffect(() => {
+		const run = () => {
+			applyEditorLayoutRef.current?.();
+			requestAnimationFrame(() => applyEditorLayoutRef.current?.());
+		};
+		queueMicrotask(run);
+	}, [height, viewMode, isMarkdown]);
 
 	/**
 	 * 不向 Editor 传受控 value；外部正文与模型不一致时 setValue。
@@ -850,6 +864,52 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 		(editor, monaco) => {
 			editorRef.current = editor;
 
+			/** 按宿主 DOM 的 client 尺寸显式 layout，避免 Monaco 在全屏恢复后仍使用过大布局宽度 */
+			const applyEditorLayoutFromHost = () => {
+				const host =
+					editorHostRef.current ??
+					(editor.getDomNode()?.parentElement as HTMLElement | null);
+				if (!host) {
+					editor.layout();
+					return;
+				}
+				const w = Math.floor(host.clientWidth);
+				const h = Math.floor(host.clientHeight);
+				if (w > 0 && h > 0) {
+					editor.layout({ width: w, height: h });
+				} else {
+					editor.layout();
+				}
+			};
+			applyEditorLayoutRef.current = applyEditorLayoutFromHost;
+
+			let layoutRaf = 0;
+			const scheduleEditorLayout = () => {
+				cancelAnimationFrame(layoutRaf);
+				layoutRaf = requestAnimationFrame(() => {
+					layoutRaf = 0;
+					applyEditorLayoutFromHost();
+					// 再等一帧：部分 WebView 在窗口动画结束后尺寸才稳定
+					requestAnimationFrame(() => applyEditorLayoutFromHost());
+				});
+			};
+
+			const layoutHost =
+				editorHostRef.current ??
+				(editor.getDomNode()?.parentElement as HTMLElement | null);
+			let layoutObserver: ResizeObserver | null = null;
+			if (typeof ResizeObserver !== 'undefined' && layoutHost) {
+				layoutObserver = new ResizeObserver(scheduleEditorLayout);
+				layoutObserver.observe(layoutHost);
+			}
+			const onWindowResize = () => scheduleEditorLayout();
+			window.addEventListener('resize', onWindowResize);
+			const vv = window.visualViewport;
+			const onVvResize = () => scheduleEditorLayout();
+			vv?.addEventListener('resize', onVvResize);
+			const onFullscreenChange = () => scheduleEditorLayout();
+			document.addEventListener('fullscreenchange', onFullscreenChange);
+
 			editor.addCommand(
 				monaco.KeyMod.Shift | monaco.KeyMod.Alt | monaco.KeyCode.KeyF,
 				() => {
@@ -937,7 +997,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 				onChangeRef.current?.(v);
 			};
 
-			/** 换行等变更与下一键同帧时合并上报，减少与 automaticLayout 打架 */
+			/** 换行等变更与下一键同帧时合并上报 */
 			let pushRaf = 0;
 			const queuePushFromModel = () => {
 				if (imeComposingRef.current || editor.inComposition) return;
@@ -964,8 +1024,8 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 					queueMicrotask(() => {
 						pushToParent(editor.getValue());
 						requestAnimationFrame(() => {
-							editor.layout();
-							requestAnimationFrame(() => editor.layout());
+							applyEditorLayoutFromHost();
+							requestAnimationFrame(() => applyEditorLayoutFromHost());
 						});
 					});
 				}),
@@ -1010,8 +1070,21 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 				});
 			}
 
+			const layoutCleanup: { dispose: () => void } = {
+				dispose: () => {
+					layoutObserver?.disconnect();
+					window.removeEventListener('resize', onWindowResize);
+					vv?.removeEventListener('resize', onVvResize);
+					document.removeEventListener('fullscreenchange', onFullscreenChange);
+					cancelAnimationFrame(layoutRaf);
+				},
+			};
+			disposables.push(layoutCleanup);
+
 			editor.onDidDispose(() => {
+				applyEditorLayoutRef.current = null;
 				cancelAnimationFrame(pushRaf);
+				cancelAnimationFrame(layoutRaf);
 				cancelAnimationFrame(scrollSyncRafRef.current);
 				scrollSyncRafRef.current = 0;
 				cancelAnimationFrame(previewToEditorRafRef.current);
@@ -1034,6 +1107,11 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 			// 与 mergedEditorOptions 一致：有正文时清空 placeholder，避免挂载帧仍叠画占位 ghost
 			editor.updateOptions({
 				placeholder: initial.trim() ? '' : placeholder,
+			});
+
+			queueMicrotask(() => {
+				applyEditorLayoutFromHost();
+				requestAnimationFrame(() => applyEditorLayoutFromHost());
 			});
 
 			editor.focus();
@@ -1103,18 +1181,24 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 					style={{ height }}
 				>
 					{!isMarkdown || viewMode === 'edit' ? (
-						<Editor
-							// key={monacoModelPath}
-							height={height}
-							language={language}
-							path={monacoModelPath}
-							defaultValue={editorBootstrapTextRef.current}
-							beforeMount={handleMonacoBeforeMount}
-							theme={glassThemeId}
-							onMount={handleEditorMount}
-							options={mergedEditorOptions}
-							loading={<Loading text="正在加载编辑器..." />}
-						/>
+						<div
+							ref={editorHostRef}
+							className="box-border h-full min-h-0 min-w-0 max-w-full w-full overflow-hidden contain-[inline-size]"
+						>
+							<Editor
+								// key={monacoModelPath}
+								height={height}
+								width="100%"
+								language={language}
+								path={monacoModelPath}
+								defaultValue={editorBootstrapTextRef.current}
+								beforeMount={handleMonacoBeforeMount}
+								theme={glassThemeId}
+								onMount={handleEditorMount}
+								options={mergedEditorOptions}
+								loading={<Loading text="正在加载编辑器..." />}
+							/>
+						</div>
 					) : null}
 
 					{isMarkdown && viewMode === 'preview' ? (
@@ -1139,18 +1223,24 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 								className="min-h-0 min-w-0"
 							>
 								<div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden border-r border-theme/10">
-									<Editor
-										// key={monacoModelPath}
-										height="100%"
-										language={language}
-										path={monacoModelPath}
-										defaultValue={editorBootstrapTextRef.current}
-										beforeMount={handleMonacoBeforeMount}
-										theme={glassThemeId}
-										onMount={handleEditorMount}
-										options={mergedEditorOptions}
-										loading={<Loading text="正在加载编辑器..." />}
-									/>
+									<div
+										ref={editorHostRef}
+										className="box-border h-full min-h-0 min-w-0 max-w-full w-full overflow-hidden contain-[inline-size]"
+									>
+										<Editor
+											// key={monacoModelPath}
+											height="100%"
+											width="100%"
+											language={language}
+											path={monacoModelPath}
+											defaultValue={editorBootstrapTextRef.current}
+											beforeMount={handleMonacoBeforeMount}
+											theme={glassThemeId}
+											onMount={handleEditorMount}
+											options={mergedEditorOptions}
+											loading={<Loading text="正在加载编辑器..." />}
+										/>
+									</div>
 								</div>
 							</ResizablePanel>
 							<ResizableHandle withHandle />
