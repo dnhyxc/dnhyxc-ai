@@ -1,35 +1,38 @@
-# Monaco 剪贴板：全局劫持已移除 + 编辑器内显式绑定
+# 剪贴板：Monaco 显式绑定 + Tauri 普通输入框
 
-## 问题
+## 背景
 
-在 Monaco 中无法复制选区，或无法粘贴（Tauri WebView / 部分环境下系统默认快捷键不可靠）。
+Tauri WebView 内系统级复制/粘贴对 **Monaco** 与普通 **`<input>` / `<textarea>`** 常不可靠。若在 `document` 上用 **`getSelection()`** 统一劫持 **Cmd+C**，又会破坏 Monaco（选区在模型内）。
 
-## 已废弃的做法
+## 现行方案（三层）
 
-在 `document` 上监听 `keydown`，对 Cmd/Ctrl+C 使用 `preventDefault` + `window.getSelection()` 会与 Monaco 冲突（选区在模型与隐藏 textarea 上，`getSelection()` 常为空）。
+### 1. 不再使用「全 document + getSelection」的旧 `clipboard` 键盘函数
 
-## 现行方案（两层）
+避免与富编辑器冲突；不再导出该处理器。
 
-### 1. 不再注册全局剪贴板 `keydown`
+### 2. Monaco：`onMount` 中 `addCommand` 绑定 C / X / V
 
-`apps/frontend/src/router/index.tsx` **不**再 `addEventListener('keydown', clipboard)`。
+`apps/frontend/src/components/design/Monaco/index.tsx`：用模型选区 + `copyToClipboard` / `pasteFromClipboard`（Tauri 走插件）。
 
-`apps/frontend/src/utils/clipboard.ts` 仅导出 **`copyToClipboard` / `pasteFromClipboard`**（内部在 Tauri 下走 **clipboard 插件**，浏览器走 `navigator.clipboard`），供按钮或编辑器显式调用。
+### 3. Tauri：仅对普通 `input` / `textarea` 注册窄范围快捷键
 
-### 2. Monaco `onMount` 中绑定 Cmd/Ctrl+C / X / V
+`apps/frontend/src/utils/clipboard.ts` 导出 **`attachTauriPlainFieldClipboardShortcuts()`**，在 `router` 的 `useEffect` 中挂载：
 
-在 `apps/frontend/src/components/design/Monaco/index.tsx` 的 `handleEditorMount` 中：
+- **Cmd/Ctrl+A**：`select()` 全选。
+- **Cmd/Ctrl+C**：`selectionStart` / `selectionEnd` 切片 + `writeClipText`。
+- **Cmd/Ctrl+X**：同上复制后删区并派发 `input`（只读/禁用跳过）。
+- **Cmd/Ctrl+V**：`readClipText` 后插入并派发 `input`（只读跳过）。
+- **Cmd/Ctrl+Z**：**不拦截**，保留 WebView 原生撤销。
+- **跳过**：`.monaco-editor` / `.monaco-diff-editor` / `.cm-editor` / `native-edit-context` / `textarea.inputarea`（Monaco）。
+- **受控 Input**：通过 **`HTMLInputElement.prototype` 的 `value` setter** 写值并派发 **`InputEvent('input', …)`**，与 React 受控组件兼容。
 
-- **复制**：从 `editor.getModel()` + `getSelections()` 取文本（空选区时复制**当前行**），再 `copyToClipboard`。
-- **剪切**：只读时忽略；否则复制后 `executeEdits` 清空各选区。
-- **粘贴**：只读或 IME 合成中忽略；否则 `pasteFromClipboard` 后对每个选区 `executeEdits` 写入（多光标时每处插入相同剪贴板内容）。
-
-这样不依赖 WebView 是否把系统复制事件传到隐藏 textarea，**与 Tauri 插件剪贴板一致**。
+非 Tauri 环境该函数为空操作，**浏览器**仍使用原生快捷键。
 
 ## 相关文件
 
 | 文件 | 说明 |
 |------|------|
-| `apps/frontend/src/router/index.tsx` | 无全局剪贴板 keydown |
-| `apps/frontend/src/utils/clipboard.ts` | `copyToClipboard` / `pasteFromClipboard` |
-| `apps/frontend/src/components/design/Monaco/index.tsx` | `addCommand` 绑定 C / X / V |
+| `apps/frontend/src/router/index.tsx` | 调用 `attachTauriPlainFieldClipboardShortcuts`，卸载时 detach |
+| `apps/frontend/src/utils/clipboard.ts` | `copyToClipboard`、`pasteFromClipboard`、Tauri 普通字段快捷键 |
+| `apps/frontend/src/components/design/Monaco/index.tsx` | Monaco C/X/V |
+| `apps/frontend/src/components/ui/input.tsx` | 无逻辑变更；在 Tauri 下由上述快捷键处理 |

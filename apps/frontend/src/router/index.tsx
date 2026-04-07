@@ -2,7 +2,12 @@ import { Toaster } from '@ui/sonner';
 import { useEffect } from 'react';
 import { createBrowserRouter, RouteObject } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
-import { getValue, onCreateWindow, removeStorage } from '@/utils';
+import {
+	attachTauriPlainFieldClipboardShortcuts,
+	getValue,
+	onCreateWindow,
+	removeStorage,
+} from '@/utils';
 import { http } from '@/utils/fetch';
 import { isTauriRuntime } from '@/utils/runtime';
 import routes from './routes';
@@ -46,8 +51,11 @@ const App = () => {
 			}
 		})();
 
+		const detachPlainFieldClipboard = attachTauriPlainFieldClipboardShortcuts();
+
 		return () => {
 			cancelled = true;
+			detachPlainFieldClipboard();
 			for (const u of unlistenFns) {
 				u();
 			}
