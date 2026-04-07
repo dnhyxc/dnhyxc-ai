@@ -154,8 +154,19 @@ const ImagePreview = forwardRef<ImagePreviewHandle, ImagePreviewProps>(
 		});
 		const [position, setPosition] = useState({ x: 0, y: 0 });
 		const [isDragging, setIsDragging] = useState(false);
+		const [isWheeling, setIsWheeling] = useState(false);
+		const isWheelingRef = useRef(false);
 		const draggingRef = useRef(false);
 		const lastPointerRef = useRef({ x: 0, y: 0 });
+		const wheelingTimeoutRef = useRef<number | null>(null);
+		const wheelRafRef = useRef(0);
+		const wheelAccRef = useRef({
+			/** 以指数缩放的对数累计：scale *= exp(-deltaY * k) */
+			logFactor: 0,
+			/** 最后一次滚轮事件的鼠标坐标（用于锚点缩放） */
+			clientX: 0,
+			clientY: 0,
+		});
 		const imgRef = useRef<HTMLImageElement>(null);
 		const containerRef = useRef<HTMLDivElement>(null);
 		const layoutSizeRef = useRef({ w: 0, h: 0 });
@@ -270,14 +281,9 @@ const ImagePreview = forwardRef<ImagePreviewHandle, ImagePreviewProps>(
 					return prev;
 				}
 				const newScale = Math.min(5, prev.scale + delta);
-				const img = imgRef.current;
-				const nw = img?.naturalWidth || 0;
-				const nh = img?.naturalHeight || 0;
 				return {
 					...prev,
 					scale: newScale,
-					imgWidth: Math.round(nw * newScale),
-					imgHeight: Math.round(nh * newScale),
 				};
 			});
 		}, []);
@@ -288,14 +294,9 @@ const ImagePreview = forwardRef<ImagePreviewHandle, ImagePreviewProps>(
 					return prev;
 				}
 				const newScale = Math.max(0.4, prev.scale - delta);
-				const img = imgRef.current;
-				const nw = img?.naturalWidth || 0;
-				const nh = img?.naturalHeight || 0;
 				return {
 					...prev,
 					scale: newScale,
-					imgWidth: Math.round(nw * newScale),
-					imgHeight: Math.round(nh * newScale),
 				};
 			});
 		}, []);
@@ -326,15 +327,79 @@ const ImagePreview = forwardRef<ImagePreviewHandle, ImagePreviewProps>(
 
 		const onWheel = useCallback(
 			(e: React.WheelEvent<HTMLImageElement>) => {
+				// 重要：阻止页面滚动，并把缩放更新合并到 rAF，避免每个 wheel 事件都触发 React 重渲染
 				e.preventDefault();
 				e.stopPropagation();
-				if (e.deltaY < 0) {
-					onScaleMax(0.05);
-				} else {
-					onScaleMin(0.05);
+
+				if (wheelingTimeoutRef.current) {
+					window.clearTimeout(wheelingTimeoutRef.current);
+					wheelingTimeoutRef.current = null;
 				}
+				if (!isWheelingRef.current) setIsWheeling(true);
+				wheelingTimeoutRef.current = window.setTimeout(() => {
+					setIsWheeling(false);
+					wheelingTimeoutRef.current = null;
+				}, 140);
+
+				// 统一 deltaY：deltaMode 为行/页时折算到像素级，避免某些触控板/鼠标步进过大
+				const mode = e.deltaMode;
+				const lineHeight = 16;
+				const pageHeight = 800;
+				const dy =
+					mode === 1
+						? e.deltaY * lineHeight
+						: mode === 2
+							? e.deltaY * pageHeight
+							: e.deltaY;
+
+				// 缩放灵敏度：越小越“细腻”，并用指数曲线保证大比例下仍可微调
+				const k = e.ctrlKey ? 0.0022 : 0.0016;
+				wheelAccRef.current.logFactor += -dy * k;
+				wheelAccRef.current.clientX = e.clientX;
+				wheelAccRef.current.clientY = e.clientY;
+
+				if (wheelRafRef.current) return;
+				wheelRafRef.current = requestAnimationFrame(() => {
+					wheelRafRef.current = 0;
+					const { logFactor, clientX, clientY } = wheelAccRef.current;
+					wheelAccRef.current.logFactor = 0;
+					if (logFactor === 0) return;
+
+					const container = containerRef.current;
+					const img = imgRef.current;
+					if (!container || !img) return;
+					const cr = container.getBoundingClientRect();
+
+					// 鼠标在容器中的相对坐标（以中心为原点），用于“锚点缩放”
+					const px = clientX - (cr.left + cr.width / 2);
+					const py = clientY - (cr.top + cr.height / 2);
+
+					// 注意：当前 transform 顺序是 translate → rotate → scale
+					// 锚点缩放在 rotate 非 0 时会更复杂（需做旋转坐标变换），这里先在非旋转时启用锚点缩放
+					setTransformInfo((prev) => {
+						const prevScale = prev.scale;
+						const factor = Math.exp(logFactor);
+						const nextScale = Math.min(5, Math.max(0.4, prevScale * factor));
+						if (Math.abs(nextScale - prevScale) < 1e-6) return prev;
+
+						// 同帧修正平移：让鼠标点下的内容保持“相对不动”（仅在未旋转时）
+						const rotate = actualTransform.rotate;
+						if (isRotationIdentity(rotate)) {
+							setPosition((posPrev) => {
+								const s = nextScale / prevScale;
+								const nextPos = {
+									x: posPrev.x + px * (1 - s),
+									y: posPrev.y + py * (1 - s),
+								};
+								return clampPositionToBounds(nextPos, nextScale, rotate);
+							});
+						}
+
+						return { ...prev, scale: nextScale };
+					});
+				});
 			},
-			[onScaleMax, onScaleMin],
+			[actualTransform.rotate, clampPositionToBounds],
 		);
 
 		const onRotate = useCallback(() => {
@@ -434,6 +499,23 @@ const ImagePreview = forwardRef<ImagePreviewHandle, ImagePreviewProps>(
 		const handleLostPointerCapture = useCallback(() => {
 			draggingRef.current = false;
 			setIsDragging(false);
+		}, []);
+
+		useEffect(() => {
+			isWheelingRef.current = isWheeling;
+		}, [isWheeling]);
+
+		useEffect(() => {
+			return () => {
+				if (wheelingTimeoutRef.current) {
+					window.clearTimeout(wheelingTimeoutRef.current);
+					wheelingTimeoutRef.current = null;
+				}
+				if (wheelRafRef.current) {
+					cancelAnimationFrame(wheelRafRef.current);
+					wheelRafRef.current = 0;
+				}
+			};
 		}, []);
 
 		const onDownload = useCallback(() => {
@@ -599,7 +681,7 @@ const ImagePreview = forwardRef<ImagePreviewHandle, ImagePreviewProps>(
 							src={currentImage.url}
 							alt=""
 							className={
-								isDragging
+								isDragging || isWheeling
 									? 'max-w-full max-h-full object-contain cursor-default select-none'
 									: 'max-w-full max-h-full object-contain transition-transform duration-300 cursor-default select-none'
 							}
