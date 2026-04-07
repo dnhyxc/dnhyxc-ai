@@ -55,7 +55,10 @@ import {
 	splitMarkdownByCodeFences,
 } from '@/utils/splitMarkdownFences';
 import Loading from '../Loading';
-import { registerPrettierFormatProviders } from './format';
+import {
+	registerPrettierFormatProviders,
+	safeFormatMarkdownValue,
+} from './format';
 import { GLASS_THEME_BY_UI, registerMonacoGlassThemes } from './glassTheme';
 import { MARKDOWN_EDITOR_WORD_WRAP_COLUMN, options } from './options';
 import {
@@ -850,6 +853,19 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 			editor.addCommand(
 				monaco.KeyMod.Shift | monaco.KeyMod.Alt | monaco.KeyCode.KeyF,
 				() => {
+					const model = editor.getModel();
+					if (!model) return;
+					if (model.getLanguageId() === 'markdown') {
+						if (editor.getOption(monaco.editor.EditorOption.readOnly)) return;
+						const next = safeFormatMarkdownValue(model.getValue());
+						if (next == null) return;
+						editor.pushUndoStop();
+						editor.executeEdits('dnhyxc-markdown-safe-format', [
+							{ range: model.getFullModelRange(), text: next },
+						]);
+						editor.pushUndoStop();
+						return;
+					}
 					editor.trigger('keyboard', 'editor.action.formatDocument', null);
 				},
 			);

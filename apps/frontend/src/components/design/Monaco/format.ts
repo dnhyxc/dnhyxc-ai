@@ -3,13 +3,15 @@ import type { Plugin } from 'prettier';
 import * as babelPluginMod from 'prettier/plugins/babel';
 import * as estreePluginMod from 'prettier/plugins/estree';
 import * as htmlPluginMod from 'prettier/plugins/html';
-import * as markdownPluginMod from 'prettier/plugins/markdown';
 import * as postcssPluginMod from 'prettier/plugins/postcss';
 import * as typescriptPluginMod from 'prettier/plugins/typescript';
 import * as yamlPluginMod from 'prettier/plugins/yaml';
 import { format } from 'prettier/standalone';
 
-import { MONACO_TAB_SIZE } from './options';
+import {
+	joinMarkdownSegments,
+	splitMarkdownFencedBlocks,
+} from '@/utils/markdownFenceLineParser';
 
 /** 与 pangu 一致的 CJK Unicode 块，用于轻量「盘古之白」 */
 const PANGU_CJK =
@@ -24,11 +26,10 @@ function asPrettierPlugin(mod: unknown): Plugin {
 }
 
 /**
- * 与参考代码一致：一次性传入 markdown / babel / ts / html / postcss / yaml 等插件。
+ * Markdown 不走 Prettier，故不加载 markdown 插件。
  * 浏览器端使用 standalone 的 format，不可用主包 `import prettier from 'prettier'`（依赖 Node）。
  */
 const PRETTIER_PLUGINS: Plugin[] = [
-	asPrettierPlugin(markdownPluginMod),
 	asPrettierPlugin(babelPluginMod),
 	asPrettierPlugin(estreePluginMod),
 	asPrettierPlugin(typescriptPluginMod),
@@ -51,13 +52,10 @@ const documentFormatterDisposables = new Map<string, { dispose: () => void }>();
 const rangeFormatterDisposables = new Map<string, { dispose: () => void }>();
 
 /**
- * Monaco languageId -> Prettier parser 名。
- * Prettier 3 中 CSS 系由 postcss 插件提供，解析器名为 css / scss / less（对应旧版 postcss 插件 + parser: 'postcss' 场景）。
+ * Monaco languageId -> Prettier parser 名（不含 markdown）。
  */
 function prettierParserForMonacoLanguage(languageId: string): string | null {
 	switch (languageId) {
-		case 'markdown':
-			return 'markdown';
 		case 'javascript':
 		case 'javascriptreact':
 			return 'babel';
@@ -81,32 +79,31 @@ function prettierParserForMonacoLanguage(languageId: string): string | null {
 	}
 }
 
-/**
- * 仅在 CJK 与 ASCII 字母数字交界处插入空格（精简版盘古之白）。
- * 不使用 pangu.spacingText：其会在标点、括号、引号、运算符等与文字之间也加空格，易破坏 Markdown/排版。
- */
 function spacingMarkdownProse(markdown: string): string {
 	const cjkThenAlnum = new RegExp(`([${PANGU_CJK}])([A-Za-z0-9])`, 'g');
 	const alnumThenCjk = new RegExp(`([A-Za-z0-9])([${PANGU_CJK}])`, 'g');
-	const outsideFences = markdown.split(/(```[\s\S]*?```)/g);
-	return outsideFences
-		.map((chunk) => {
-			if (chunk.startsWith('```')) {
-				return chunk;
-			}
-			return chunk
-				.split(/(`[^`\n]*`)/g)
-				.map((part) => {
-					if (part.startsWith('`') && part.endsWith('`')) {
-						return part;
-					}
-					return part
-						.replace(cjkThenAlnum, '$1 $2')
-						.replace(alnumThenCjk, '$1 $2');
-				})
-				.join('');
-		})
-		.join('');
+	const spaced = splitMarkdownFencedBlocks(markdown).map((seg) => {
+		if (seg.fenced) return seg.text;
+		const { text } = seg;
+		return text
+			.split(/(`[^`\n]*`)/g)
+			.map((part) => {
+				if (part.startsWith('`') && part.endsWith('`')) return part;
+				return part
+					.replace(cjkThenAlnum, '$1 $2')
+					.replace(alnumThenCjk, '$1 $2');
+			})
+			.join('');
+	});
+	return joinMarkdownSegments(spaced);
+}
+
+/**
+ * Markdown 安全「格式化」：仅围栏外盘古空格，围栏原样；无变更时返回 null。
+ */
+export function safeFormatMarkdownValue(value: string): string | null {
+	const out = spacingMarkdownProse(value);
+	return out === value ? null : out;
 }
 
 async function formatWithPrettierForModel(model: {
@@ -127,19 +124,9 @@ async function formatWithPrettierForModel(model: {
 			parser,
 			plugins: PRETTIER_PLUGINS,
 			...PRETTIER_BASE_OPTIONS,
-			...(parser === 'markdown'
-				? {
-						useTabs: false,
-						tabWidth: MONACO_TAB_SIZE,
-						proseWrap: 'preserve' as const,
-					}
-				: {
-						useTabs: true,
-					}),
+			useTabs: true,
 		});
-		const out =
-			language === 'markdown' ? spacingMarkdownProse(formatted) : formatted;
-		return out === text ? null : out;
+		return formatted === text ? null : formatted;
 	} catch (err) {
 		if (import.meta.env.DEV) {
 			console.warn(`[Monaco Prettier] 格式化失败 (${language}):`, err);
@@ -200,9 +187,10 @@ function createRangeFormattingProvider() {
 	};
 }
 
-/** 与参考 registerDocumentFormatInfo 一致：按语言注册同一套 Provider，内部用 getLanguageId 选 parser */
+/**
+ * 不含 markdown：Markdown 由编辑器快捷键调用 safeFormatMarkdownValue，避免 DocumentFormat 管线问题。
+ */
 const LANGUAGES_WITH_FORMAT: string[] = [
-	'markdown',
 	'javascript',
 	'javascriptreact',
 	'typescript',

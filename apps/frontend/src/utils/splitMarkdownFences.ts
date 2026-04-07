@@ -1,7 +1,12 @@
 /**
  * 按顶格代码围栏拆分 Markdown，将 mermaid 与其它内容分离。
  * 用于聊天流式：Mermaid 单独 React 岛渲染，避免整段 dangerouslySetInnerHTML 冲掉已生成的 SVG。
+ *
+ * 闭合围栏须按行匹配（与 markdownFenceLineParser 一致），禁止对正文用 indexOf('```')，
+ * 否则注释/JSDoc 中的 ```mermaid 等会误当成围栏结束。
  */
+
+import { splitMarkdownFencedBlocks } from '@/utils/markdownFenceLineParser';
 
 export type MarkdownFencePart =
 	| { type: 'markdown'; text: string }
@@ -29,57 +34,30 @@ function coalesceMarkdownParts(
  * 扫描 ```lang 围栏；mermaid 且未闭合时 `complete: false`（流式尾部）。
  */
 export function splitMarkdownByCodeFences(source: string): MarkdownFencePart[] {
+	const normalized = source.replace(/\r\n/g, '\n');
+	const segments = splitMarkdownFencedBlocks(normalized);
 	const out: MarkdownFencePart[] = [];
-	let i = 0;
-	const n = source.length;
-
-	while (i < n) {
-		const fenceStart = source.indexOf('```', i);
-		if (fenceStart === -1) {
-			const tail = source.slice(i);
-			if (tail) out.push({ type: 'markdown', text: tail });
-			break;
+	for (const seg of segments) {
+		if (!seg.fenced) {
+			if (seg.text !== '') out.push({ type: 'markdown', text: seg.text });
+			continue;
 		}
-		if (fenceStart > i) {
-			out.push({ type: 'markdown', text: source.slice(i, fenceStart) });
-		}
-		const langEnd = source.indexOf('\n', fenceStart + 3);
-		if (langEnd === -1) {
-			out.push({ type: 'markdown', text: source.slice(fenceStart) });
-			break;
-		}
-		const lang = source
-			.slice(fenceStart + 3, langEnd)
-			.trim()
-			.toLowerCase();
-		const bodyStart = langEnd + 1;
-		const closeIdx = source.indexOf('```', bodyStart);
-		if (closeIdx === -1) {
-			if (lang === 'mermaid') {
-				out.push({
-					type: 'mermaid',
-					text: source.slice(bodyStart),
-					complete: false,
-				});
-			} else {
-				out.push({ type: 'markdown', text: source.slice(fenceStart) });
-			}
-			break;
-		}
-		const body = source.slice(bodyStart, closeIdx);
+		const lines = seg.text.split('\n');
+		const firstLine = lines[0] ?? '';
+		const openMatch = /^(\s*)(`{3,})([^`]*)$/.exec(firstLine.trimEnd());
+		const lang = (openMatch?.[3] ?? '').trim().toLowerCase();
+		const body =
+			seg.complete && lines.length >= 2
+				? lines.slice(1, -1).join('\n')
+				: lines.slice(1).join('\n');
 		if (lang === 'mermaid') {
-			out.push({ type: 'mermaid', text: body, complete: true });
+			out.push({ type: 'mermaid', text: body, complete: seg.complete });
 		} else {
-			out.push({
-				type: 'markdown',
-				text: source.slice(fenceStart, closeIdx + 3),
-			});
+			out.push({ type: 'markdown', text: seg.text });
 		}
-		i = closeIdx + 3;
 	}
-
 	if (out.length === 0 && source) {
-		out.push({ type: 'markdown', text: source });
+		out.push({ type: 'markdown', text: normalized });
 	}
 	return coalesceMarkdownParts(out);
 }
