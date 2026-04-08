@@ -4,7 +4,7 @@ import { ScrollArea } from '@ui/scroll-area';
 import { Toast } from '@ui/sonner';
 import { LayersPlus, LibraryBig, NotebookPen, OctagonX } from 'lucide-react';
 import { observer } from 'mobx-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import MarkdownEditor from '@/components/design/Monaco';
 import { Button, Input } from '@/components/ui';
 import { useTheme } from '@/hooks';
@@ -211,6 +211,8 @@ const Knowledge = observer(() => {
 	const [listOpen, setListOpen] = useState(false);
 	const [saveLoading, setSaveLoading] = useState(false);
 	const [markdownBottomBarOpen, setMarkdownBottomBarOpen] = useState(false);
+	/** 保存前从 Monaco 同步正文，避免 onChange 经 rAF 合并时 store 滞后导致脏检查误判 */
+	const getMarkdownFromEditorRef = useRef<(() => string) | null>(null);
 	const [knowledgeChords, setKnowledgeChords] = useState<{
 		save: string;
 		clear: string;
@@ -271,6 +273,18 @@ const Knowledge = observer(() => {
 		},
 		[knowledgeStore],
 	);
+
+	// 约束：未开启覆盖保存时，不展示也不允许开启自动保存（避免后台定时保存触发冲突/弹窗逻辑分支）
+	useEffect(() => {
+		if (knowledgeStore.knowledgeOverwriteSaveEnabled) return;
+		if (knowledgeStore.knowledgeAutoSaveEnabled) {
+			knowledgeStore.setKnowledgeAutoSaveEnabled(false);
+		}
+	}, [
+		knowledgeStore,
+		knowledgeStore.knowledgeOverwriteSaveEnabled,
+		knowledgeStore.knowledgeAutoSaveEnabled,
+	]);
 
 	const runTauriSave = useCallback(
 		async (payload: SaveKnowledgeMarkdownPayload) => {
@@ -369,16 +383,38 @@ const Knowledge = observer(() => {
 		[knowledgeStore],
 	);
 
-	const onSave = useCallback(async () => {
-		const markdown = knowledgeStore.markdown ?? '';
-		const trimmedTitle = knowledgeStore.knowledgeTitle.trim();
-		if (!trimmedTitle)
-			return Toast({ type: 'warning', title: '请先输入文件名「标题」' });
-		if (!markdown) return Toast({ type: 'warning', title: '请先输入内容' });
-		const snap = knowledgeStore.knowledgePersistedSnapshot;
-		if (snap.title === trimmedTitle && snap.content === markdown) return;
-		setSaveLoading(true);
-		try {
+	type KnowledgeSaveMode = 'normal' | 'auto';
+
+	/**
+	 * 统一保存入口。
+	 * - normal：缺标题/正文会 Toast；Tauri 同名冲突且未开覆盖保存时弹确认框。
+	 * - auto：缺标题/正文静默跳过；冲突时静默跳过（不弹窗），避免定时保存打断编辑。
+	 */
+	const performSave = useCallback(
+		async (mode: KnowledgeSaveMode) => {
+			const markdown =
+				getMarkdownFromEditorRef.current?.() ?? knowledgeStore.markdown ?? '';
+			const trimmedTitle = knowledgeStore.knowledgeTitle.trim();
+			if (!trimmedTitle) {
+				if (mode === 'normal') {
+					Toast({ type: 'warning', title: '请先输入文件名「标题」' });
+				}
+				return;
+			}
+			if (!markdown) {
+				if (mode === 'normal') {
+					Toast({ type: 'warning', title: '请先输入内容' });
+				}
+				return;
+			}
+			const snap = knowledgeStore.knowledgePersistedSnapshot;
+			if (snap.title === trimmedTitle && snap.content === markdown) {
+				return;
+			}
+
+			let tauriPayload: SaveKnowledgeMarkdownPayload | undefined;
+			let tauriTargetExists = false;
+
 			if (isTauriRuntime()) {
 				const diskTitle = knowledgeStore.knowledgeLocalDiskTitle;
 				const previousTitle =
@@ -392,42 +428,107 @@ const Knowledge = observer(() => {
 				)
 					? knowledgeStore.knowledgeLocalDirPath?.trim() || TAURI_KNOWLEDGE_DIR
 					: TAURI_KNOWLEDGE_DIR;
-				const payload: SaveKnowledgeMarkdownPayload = {
+				tauriPayload = {
 					title: trimmedTitle,
 					content: markdown,
 					filePath: tauriBaseDir,
 					...(previousTitle ? { previousTitle } : {}),
 				};
-				const target = await invokeResolveKnowledgeMarkdownTarget(payload);
-				if (!target.exists) {
+				const target = await invokeResolveKnowledgeMarkdownTarget(tauriPayload);
+				tauriTargetExists = target.exists;
+				if (target.exists && !knowledgeStore.knowledgeOverwriteSaveEnabled) {
+					if (mode === 'auto') {
+						return;
+					}
+					knowledgeStore.openKnowledgeOverwriteConfirm(
+						target.path,
+						tauriPayload,
+					);
+					return;
+				}
+			}
+
+			setSaveLoading(true);
+			try {
+				if (isTauriRuntime() && tauriPayload) {
 					await persistKnowledgeApi();
-					await runTauriSave(payload);
+					const toWrite = tauriTargetExists
+						? { ...tauriPayload, overwrite: true as const }
+						: tauriPayload;
+					await runTauriSave(toWrite);
 					knowledgeStore.setKnowledgeLocalDiskTitle(trimmedTitle);
 					syncSnapshotAfterPersist(trimmedTitle, markdown);
 				} else {
-					if (knowledgeStore.knowledgeOverwriteSaveEnabled) {
-						await persistKnowledgeApi();
-						const merged = { ...payload, overwrite: true };
-						await runTauriSave(merged);
-						knowledgeStore.setKnowledgeLocalDiskTitle(trimmedTitle);
-						syncSnapshotAfterPersist(trimmedTitle, markdown);
-					} else {
-						knowledgeStore.openKnowledgeOverwriteConfirm(target.path, payload);
-					}
+					await persistKnowledgeApi();
+					knowledgeStore.setKnowledgeLocalDiskTitle(trimmedTitle);
+					syncSnapshotAfterPersist(trimmedTitle, markdown);
 				}
-			} else {
-				await persistKnowledgeApi();
-				knowledgeStore.setKnowledgeLocalDiskTitle(trimmedTitle);
-				syncSnapshotAfterPersist(trimmedTitle, markdown);
+			} finally {
+				setSaveLoading(false);
 			}
-		} finally {
-			setSaveLoading(false);
+		},
+		[
+			knowledgeStore,
+			persistKnowledgeApi,
+			runTauriSave,
+			syncSnapshotAfterPersist,
+		],
+	);
+
+	const onSave = useCallback(() => {
+		void performSave('normal');
+	}, [performSave]);
+
+	const saveLoadingRef = useRef(saveLoading);
+	saveLoadingRef.current = saveLoading;
+	const knowledgeStoreRef = useRef(knowledgeStore);
+	knowledgeStoreRef.current = knowledgeStore;
+	const performSaveRef = useRef(performSave);
+	performSaveRef.current = performSave;
+	const autoSaveTimeoutRef = useRef<number | null>(null);
+
+	useEffect(() => {
+		// 编辑防抖自动保存：每次标题/正文变化都重置计时器，停止编辑超过间隔后才保存
+		if (autoSaveTimeoutRef.current) {
+			window.clearTimeout(autoSaveTimeoutRef.current);
+			autoSaveTimeoutRef.current = null;
 		}
+		// 约束：未开启覆盖保存时，不允许开启自动保存（上游会强制关，这里只做兜底）
+		if (
+			!knowledgeStore.knowledgeAutoSaveEnabled ||
+			!knowledgeStore.knowledgeOverwriteSaveEnabled
+		) {
+			return;
+		}
+		// 没有内容变更时，不启动计时器
+		const markdownNow = knowledgeStore.markdown ?? '';
+		const titleNow = knowledgeStore.knowledgeTitle.trim();
+		const snap = knowledgeStore.knowledgePersistedSnapshot;
+		if (snap.title === titleNow && snap.content === markdownNow) {
+			return;
+		}
+		const sec = knowledgeStore.knowledgeAutoSaveIntervalSec;
+		const waitMs = Math.min(3_600_000, Math.max(10_000, sec * 1000));
+		autoSaveTimeoutRef.current = window.setTimeout(() => {
+			autoSaveTimeoutRef.current = null;
+			if (saveLoadingRef.current) return;
+			if (knowledgeStoreRef.current.knowledgeOverwriteOpen) return;
+			void performSaveRef.current('auto');
+		}, waitMs);
+		return () => {
+			if (autoSaveTimeoutRef.current) {
+				window.clearTimeout(autoSaveTimeoutRef.current);
+				autoSaveTimeoutRef.current = null;
+			}
+		};
 	}, [
-		knowledgeStore,
-		persistKnowledgeApi,
-		runTauriSave,
-		syncSnapshotAfterPersist,
+		knowledgeStore.knowledgeAutoSaveEnabled,
+		knowledgeStore.knowledgeAutoSaveIntervalSec,
+		knowledgeStore.knowledgeOverwriteSaveEnabled,
+		knowledgeStore.knowledgeTitle,
+		knowledgeStore.markdown,
+		knowledgeStore.knowledgePersistedSnapshot.title,
+		knowledgeStore.knowledgePersistedSnapshot.content,
 	]);
 
 	/**
@@ -651,6 +752,7 @@ const Knowledge = observer(() => {
 					}
 					value={knowledgeStore.markdown}
 					onChange={handleMarkdownChange}
+					getMarkdownFromEditorRef={getMarkdownFromEditorRef}
 					markdownBottomBarOpen={markdownBottomBarOpen}
 					onMarkdownBottomBarOpenChange={setMarkdownBottomBarOpen}
 					markdownBottomBarShortcutHint={
@@ -659,6 +761,22 @@ const Knowledge = observer(() => {
 					overwriteSaveEnabled={knowledgeStore.knowledgeOverwriteSaveEnabled}
 					onOverwriteSaveEnabledChange={(enabled) =>
 						knowledgeStore.setKnowledgeOverwriteSaveEnabled(enabled)
+					}
+					autoSaveEnabled={
+						knowledgeStore.knowledgeOverwriteSaveEnabled
+							? knowledgeStore.knowledgeAutoSaveEnabled
+							: false
+					}
+					onAutoSaveEnabledChange={
+						knowledgeStore.knowledgeOverwriteSaveEnabled
+							? (enabled) => knowledgeStore.setKnowledgeAutoSaveEnabled(enabled)
+							: undefined
+					}
+					autoSaveIntervalSec={knowledgeStore.knowledgeAutoSaveIntervalSec}
+					onAutoSaveIntervalSecChange={
+						knowledgeStore.knowledgeOverwriteSaveEnabled
+							? (sec) => knowledgeStore.setKnowledgeAutoSaveIntervalSec(sec)
+							: undefined
 					}
 					toolbar={
 						<KnowledgeEditorToolbar

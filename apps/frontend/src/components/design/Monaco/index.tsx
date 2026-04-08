@@ -16,8 +16,10 @@ import {
 	FilePenLine,
 	PanelTopClose,
 	PanelTopOpen,
+	Timer,
 } from 'lucide-react';
 import {
+	type MutableRefObject,
 	memo,
 	type RefObject,
 	type UIEvent,
@@ -84,6 +86,15 @@ type MarkdownSplitScrollFollowMode =
 	| 'editorFollowsPreview'
 	| 'bidirectional';
 
+/** 知识库自动保存间隔候选项（秒） */
+const KNOWLEDGE_AUTO_SAVE_INTERVAL_PRESETS = [30, 60, 120, 300, 600] as const;
+
+function formatKnowledgeAutoSaveIntervalLabel(sec: number): string {
+	if (sec < 60) return `${sec} 秒`;
+	if (sec % 60 === 0) return `${sec / 60} 分钟`;
+	return `${sec} 秒`;
+}
+
 function normalizeMonacoEol(text: string): string {
 	return text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 }
@@ -143,6 +154,19 @@ interface MarkdownEditorProps {
 	 */
 	overwriteSaveEnabled?: boolean;
 	onOverwriteSaveEnabledChange?: (enabled: boolean) => void;
+	/**
+	 * 定时自动保存：需同时传入 onAutoSaveEnabledChange 与 onAutoSaveIntervalSecChange 才在底部栏显示。
+	 * 实际定时逻辑由业务页（如知识库）实现。
+	 */
+	autoSaveEnabled?: boolean;
+	onAutoSaveEnabledChange?: (enabled: boolean) => void;
+	autoSaveIntervalSec?: number;
+	onAutoSaveIntervalSecChange?: (sec: number) => void;
+	/**
+	 * 保存前取编辑器当前全文并同步触发 onChange（消除 rAF 合并导致父状态滞后）。
+	 * 知识库自动保存依赖此 ref，否则脏检查会一直认为「与快照一致」而跳过。
+	 */
+	getMarkdownFromEditorRef?: MutableRefObject<(() => string) | null>;
 }
 
 /**
@@ -519,6 +543,11 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	markdownEnableMermaid = true,
 	overwriteSaveEnabled = false,
 	onOverwriteSaveEnabledChange,
+	autoSaveEnabled = false,
+	onAutoSaveEnabledChange,
+	autoSaveIntervalSec = 60,
+	onAutoSaveIntervalSecChange,
+	getMarkdownFromEditorRef,
 }) => {
 	const editorRef = useRef<MonacoEditorInstance | null>(null);
 	/** 包裹 Editor 的宿主，用于测量 client 尺寸并显式 layout（Tauri 全屏恢复后避免沿用旧宽度） */
@@ -557,6 +586,17 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	]);
 
 	const showOverwriteSaveToggle = Boolean(onOverwriteSaveEnabledChange);
+	const showAutoSaveControls = Boolean(
+		onAutoSaveEnabledChange && onAutoSaveIntervalSecChange,
+	);
+
+	const autoSaveIntervalOptions = useMemo(() => {
+		const presets: number[] = [...KNOWLEDGE_AUTO_SAVE_INTERVAL_PRESETS];
+		if (!presets.includes(autoSaveIntervalSec)) {
+			presets.push(autoSaveIntervalSec);
+		}
+		return presets.sort((a, b) => a - b);
+	}, [autoSaveIntervalSec]);
 	const viewModeRef = useRef(viewMode);
 	viewModeRef.current = viewMode;
 	const splitScrollFollowModeRef = useRef(splitScrollFollowMode);
@@ -1092,7 +1132,19 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 			};
 			disposables.push(layoutCleanup);
 
+			if (getMarkdownFromEditorRef) {
+				getMarkdownFromEditorRef.current = () => {
+					const v = normalizeMonacoEol(editor.getValue());
+					lastEmittedRef.current = v;
+					onChangeRef.current?.(v);
+					return v;
+				};
+			}
+
 			editor.onDidDispose(() => {
+				if (getMarkdownFromEditorRef) {
+					getMarkdownFromEditorRef.current = null;
+				}
 				applyEditorLayoutRef.current = null;
 				cancelAnimationFrame(pushRaf);
 				cancelAnimationFrame(layoutRaf);
@@ -1127,8 +1179,16 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 
 			editor.focus();
 		},
-		[syncPreviewFromEditor, placeholder],
+		[getMarkdownFromEditorRef, syncPreviewFromEditor, placeholder],
 	);
+
+	useEffect(() => {
+		return () => {
+			if (getMarkdownFromEditorRef) {
+				getMarkdownFromEditorRef.current = null;
+			}
+		};
+	}, [getMarkdownFromEditorRef]);
 
 	const focusEditor = useCallback(() => {
 		editorRef.current?.focus();
@@ -1416,29 +1476,80 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 								</>
 							)}
 						</div>
-						{showOverwriteSaveToggle ? (
-							<div className="flex shrink-0 items-center gap-1 pl-2">
-								<Tooltip
-									content={
-										overwriteSaveEnabled
-											? '已开启覆盖保存：同名文件将直接覆盖写入'
-											: '开启覆盖保存：同名文件不再弹窗确认，直接覆盖写入'
-									}
-								>
-									<button
-										type="button"
-										className={markdownBarIconBtnClass(overwriteSaveEnabled)}
-										aria-pressed={overwriteSaveEnabled}
-										aria-label={
-											overwriteSaveEnabled ? '关闭覆盖保存' : '开启覆盖保存'
-										}
-										onClick={() =>
-											onOverwriteSaveEnabledChange?.(!overwriteSaveEnabled)
+						{showOverwriteSaveToggle || showAutoSaveControls ? (
+							<div className="flex shrink-0 items-center gap-1.5 pl-2">
+								{showOverwriteSaveToggle ? (
+									<Tooltip
+										content={
+											overwriteSaveEnabled
+												? '已开启覆盖保存：同名文件将直接覆盖写入'
+												: '开启覆盖保存：同名文件不再弹窗确认，直接覆盖写入'
 										}
 									>
-										<FileInput size={18} strokeWidth={1.75} aria-hidden />
-									</button>
-								</Tooltip>
+										<button
+											type="button"
+											className={markdownBarIconBtnClass(overwriteSaveEnabled)}
+											aria-pressed={overwriteSaveEnabled}
+											aria-label={
+												overwriteSaveEnabled ? '关闭覆盖保存' : '开启覆盖保存'
+											}
+											onClick={() =>
+												onOverwriteSaveEnabledChange?.(!overwriteSaveEnabled)
+											}
+										>
+											<FileInput size={18} strokeWidth={1.75} aria-hidden />
+										</button>
+									</Tooltip>
+								) : null}
+								{showAutoSaveControls ? (
+									<>
+										<Tooltip
+											content={
+												autoSaveEnabled
+													? '已开启自动保存：按所选间隔在有修改时保存'
+													: '开启自动保存：按间隔自动保存（无标题/正文或同名冲突未开覆盖时会静默跳过）'
+											}
+										>
+											<button
+												type="button"
+												className={markdownBarIconBtnClass(autoSaveEnabled)}
+												aria-pressed={autoSaveEnabled}
+												aria-label={
+													autoSaveEnabled ? '关闭自动保存' : '开启自动保存'
+												}
+												onClick={() =>
+													onAutoSaveEnabledChange?.(!autoSaveEnabled)
+												}
+											>
+												<Timer size={18} strokeWidth={1.75} aria-hidden />
+											</button>
+										</Tooltip>
+										<label
+											className="sr-only"
+											htmlFor="markdown-auto-save-interval"
+										>
+											自动保存间隔
+										</label>
+										<select
+											id="markdown-auto-save-interval"
+											className={cn(
+												'h-7 max-w-26 shrink-0 rounded-md border border-theme/15 bg-transparent px-1 text-xs text-textcolor outline-none focus-visible:ring-2 focus-visible:ring-theme/40 disabled:cursor-not-allowed disabled:opacity-45',
+											)}
+											disabled={!autoSaveEnabled}
+											value={String(autoSaveIntervalSec)}
+											aria-label="自动保存间隔"
+											onChange={(e) =>
+												onAutoSaveIntervalSecChange?.(Number(e.target.value))
+											}
+										>
+											{autoSaveIntervalOptions.map((sec) => (
+												<option key={sec} value={String(sec)}>
+													{formatKnowledgeAutoSaveIntervalLabel(sec)}
+												</option>
+											))}
+										</select>
+									</>
+								) : null}
 							</div>
 						) : null}
 					</div>

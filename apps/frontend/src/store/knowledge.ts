@@ -37,6 +37,10 @@ function deriveKnowledgeTitleFromMarkdown(markdown: string): string {
 class KnowledgeStore {
 	private readonly overwriteSaveEnabledStorageKey =
 		'dnhyxc-ai.knowledge.overwriteSaveEnabled';
+	private readonly autoSaveEnabledStorageKey =
+		'dnhyxc-ai.knowledge.autoSave.enabled';
+	private readonly autoSaveIntervalStorageKey =
+		'dnhyxc-ai.knowledge.autoSave.intervalSec';
 	// —— 云端列表分页 ——
 	/** 当前列表（分页累积） */
 	list: KnowledgeListItem[] = [];
@@ -87,6 +91,14 @@ class KnowledgeStore {
 	 */
 	knowledgeOverwriteSaveEnabled = false;
 
+	/**
+	 * 知识编辑页：定时自动保存（由页面 `setInterval` 触发；默认关闭）。
+	 */
+	knowledgeAutoSaveEnabled = false;
+
+	/** 自动保存间隔（秒），有效范围 10～3600，默认 60 */
+	knowledgeAutoSaveIntervalSec = 60;
+
 	constructor() {
 		makeAutoObservable(this);
 		// 读取本地偏好（不依赖后端；异常时保持默认 false）
@@ -96,6 +108,21 @@ class KnowledgeStore {
 					this.overwriteSaveEnabledStorageKey,
 				);
 				if (raw === '1') this.knowledgeOverwriteSaveEnabled = true;
+
+				const autoRaw = window.localStorage.getItem(
+					this.autoSaveEnabledStorageKey,
+				);
+				if (autoRaw === '1') this.knowledgeAutoSaveEnabled = true;
+
+				const intervalRaw = window.localStorage.getItem(
+					this.autoSaveIntervalStorageKey,
+				);
+				if (intervalRaw != null && intervalRaw !== '') {
+					const n = Number.parseInt(intervalRaw, 10);
+					if (Number.isFinite(n)) {
+						this.knowledgeAutoSaveIntervalSec = Math.min(3600, Math.max(10, n));
+					}
+				}
 			}
 		} catch {
 			// 忽略：隐私模式/禁用存储等场景
@@ -156,6 +183,35 @@ class KnowledgeStore {
 				window.localStorage.setItem(
 					this.overwriteSaveEnabledStorageKey,
 					enabled ? '1' : '0',
+				);
+			}
+		} catch {
+			// 忽略：同 constructor
+		}
+	}
+
+	setKnowledgeAutoSaveEnabled(enabled: boolean) {
+		this.knowledgeAutoSaveEnabled = enabled;
+		try {
+			if (typeof window !== 'undefined') {
+				window.localStorage.setItem(
+					this.autoSaveEnabledStorageKey,
+					enabled ? '1' : '0',
+				);
+			}
+		} catch {
+			// 忽略：同 constructor
+		}
+	}
+
+	setKnowledgeAutoSaveIntervalSec(sec: number) {
+		const next = Math.min(3600, Math.max(10, Math.round(sec)));
+		this.knowledgeAutoSaveIntervalSec = next;
+		try {
+			if (typeof window !== 'undefined') {
+				window.localStorage.setItem(
+					this.autoSaveIntervalStorageKey,
+					String(next),
 				);
 			}
 		} catch {
