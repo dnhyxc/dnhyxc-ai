@@ -531,9 +531,9 @@ const Knowledge = observer(() => {
 			knowledgeStore.setKnowledgeEditingKnowledgeId(null);
 			knowledgeStore.setKnowledgeLocalDirPath(null);
 			knowledgeStore.setKnowledgeLocalDiskTitle(null);
-			const t = (record.title ?? '').trim();
 			const content = record.content ?? '';
-			knowledgeStore.setKnowledgePersistedSnapshot({ title: t, content });
+			// 从回收站打开应视为“新草稿”：打开后即可直接保存（不要求先编辑产生脏）
+			knowledgeStore.setKnowledgePersistedSnapshot({ title: '', content: '' });
 			knowledgeStore.setKnowledgeTitle(record.title ?? '');
 			knowledgeStore.setMarkdown(content);
 		},
