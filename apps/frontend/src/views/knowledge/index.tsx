@@ -545,6 +545,8 @@ const Knowledge = observer(() => {
 			if (knowledgeStore.knowledgeEditingKnowledgeId === id) {
 				resetEditorToNewDraft();
 			}
+			// 删除后直接重拉列表，避免分页/滚动边界状态导致无法继续加载
+			void knowledgeStore.refreshList();
 		},
 		[knowledgeStore, resetEditorToNewDraft],
 	);
@@ -556,6 +558,8 @@ const Knowledge = observer(() => {
 			if (knowledgeStore.knowledgeEditingKnowledgeId === deletedKnowledgeId) {
 				resetEditorToNewDraft();
 			}
+			// 删除后直接重拉列表，保持列表数据与服务端同步
+			void knowledgeStore.refreshList();
 		},
 		[knowledgeStore, resetEditorToNewDraft],
 	);

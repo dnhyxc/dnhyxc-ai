@@ -243,6 +243,8 @@ const KnowledgeTrashList: React.FC<Props> = observer(
 						message: `已删除 ${res.data?.affected ?? 0} 条`,
 					});
 				}
+				// 删除后直接重拉列表，保证分页/total 与服务端一致（避免本地减 total 造成边界问题）
+				void knowledgeStore.refreshTrashList();
 				setConfirmOpen(false);
 				setPendingDeleteIds([]);
 				setPendingDeleteLabel('');
