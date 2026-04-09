@@ -35,12 +35,9 @@ function deriveKnowledgeTitleFromMarkdown(markdown: string): string {
 }
 
 class KnowledgeStore {
-	private readonly overwriteSaveEnabledStorageKey =
-		'dnhyxc-ai.knowledge.overwriteSaveEnabled';
-	private readonly autoSaveEnabledStorageKey =
-		'dnhyxc-ai.knowledge.autoSave.enabled';
-	private readonly autoSaveIntervalStorageKey =
-		'dnhyxc-ai.knowledge.autoSave.intervalSec';
+	overwriteSaveEnabledStorageKey = 'dnhyxc-ai.knowledge.overwriteSaveEnabled';
+	autoSaveEnabledStorageKey = 'dnhyxc-ai.knowledge.autoSave.enabled';
+	autoSaveIntervalStorageKey = 'dnhyxc-ai.knowledge.autoSave.intervalSec';
 	// —— 云端列表分页 ——
 	/** 当前列表（分页累积） */
 	list: KnowledgeListItem[] = [];
