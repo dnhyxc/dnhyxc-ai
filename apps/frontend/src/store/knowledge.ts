@@ -1,3 +1,4 @@
+import { Toast } from '@ui/index';
 import { makeAutoObservable, runInAction } from 'mobx';
 import type { UIEventHandler } from 'react';
 import {
@@ -13,6 +14,7 @@ import type {
 	KnowledgeTrashListItem,
 } from '@/types';
 import type { SaveKnowledgeMarkdownPayload } from '@/utils/knowledge-save';
+import userStore from './user';
 
 const DEFAULT_PAGE_SIZE = 20;
 /** 距底部小于该像素时触发加载下一页 */
@@ -318,6 +320,12 @@ class KnowledgeStore {
 	};
 
 	async fetchPage(page: number, append: boolean): Promise<void> {
+		if (!userStore.userInfo.id) {
+			return Toast({
+				type: 'error',
+				title: '请先登录',
+			});
+		}
 		if (append) {
 			this.loadingMore = true;
 		} else {
@@ -328,6 +336,7 @@ class KnowledgeStore {
 				pageNo: page,
 				pageSize: this.pageSize,
 				title: this.titleKeyword.trim() || undefined,
+				authorId: userStore.userInfo.id,
 			});
 			if (!res.success || !res.data) {
 				return;
@@ -351,6 +360,12 @@ class KnowledgeStore {
 	}
 
 	async fetchTrashPage(page: number, append: boolean): Promise<void> {
+		if (!userStore.userInfo.id) {
+			return Toast({
+				type: 'error',
+				title: '请先登录',
+			});
+		}
 		if (append) {
 			this.trashLoadingMore = true;
 		} else {
@@ -361,6 +376,7 @@ class KnowledgeStore {
 				pageNo: page,
 				pageSize: this.trashPageSize,
 				title: this.trashTitleKeyword.trim() || undefined,
+				authorId: userStore.userInfo.id,
 			});
 			if (!res.success || !res.data) {
 				return;

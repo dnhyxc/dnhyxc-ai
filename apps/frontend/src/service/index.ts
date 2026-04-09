@@ -327,6 +327,7 @@ export const getKnowledgeList = async (params?: {
 	pageNo?: number;
 	pageSize?: number;
 	title?: string;
+	authorId?: number;
 }) => {
 	return await http.get<{ list: KnowledgeListItem[]; total: number }>(
 		KNOWLEDGE_LIST,
@@ -335,6 +336,7 @@ export const getKnowledgeList = async (params?: {
 				pageNo: params?.pageNo,
 				pageSize: params?.pageSize,
 				title: params?.title,
+				authorId: params?.authorId,
 			},
 		},
 	);
@@ -390,6 +392,7 @@ export const getKnowledgeTrashList = async (params?: {
 	pageNo?: number;
 	pageSize?: number;
 	title?: string;
+	authorId?: number;
 }) => {
 	return await http.get<{ list: KnowledgeTrashListItem[]; total: number }>(
 		KNOWLEDGE_TRASH_LIST,
@@ -398,6 +401,7 @@ export const getKnowledgeTrashList = async (params?: {
 				pageNo: params?.pageNo,
 				pageSize: params?.pageSize,
 				title: params?.title,
+				authorId: params?.authorId,
 			},
 		},
 	);

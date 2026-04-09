@@ -105,6 +105,11 @@ export class KnowledgeService {
 		const take = pageSize;
 		const skip = (pageNo - 1) * take;
 		const title = query.title?.trim();
+		const authorId = query.authorId;
+
+		const where: Record<string, unknown> = {};
+		if (title) where.title = Like(`%${title}%`);
+		if (authorId != null) where.authorId = authorId;
 
 		const [list, total] = await this.knowledgeRepository.findAndCount({
 			select: {
@@ -115,7 +120,7 @@ export class KnowledgeService {
 				createdAt: true,
 				updatedAt: true,
 			},
-			where: title ? { title: Like(`%${title}%`) } : {},
+			where,
 			order: { updatedAt: 'DESC' },
 			take,
 			skip,
@@ -142,6 +147,11 @@ export class KnowledgeService {
 		const take = pageSize;
 		const skip = (pageNo - 1) * take;
 		const title = query.title?.trim();
+		const authorId = query.authorId;
+
+		const where: Record<string, unknown> = {};
+		if (title) where.title = Like(`%${title}%`);
+		if (authorId != null) where.authorId = authorId;
 
 		const [list, total] = await this.knowledgeTrashRepository.findAndCount({
 			select: {
@@ -152,7 +162,7 @@ export class KnowledgeService {
 				authorId: true,
 				deletedAt: true,
 			},
-			where: title ? { title: Like(`%${title}%`) } : {},
+			where,
 			order: { deletedAt: 'DESC' },
 			take,
 			skip,

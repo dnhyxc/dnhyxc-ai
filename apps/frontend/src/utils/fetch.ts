@@ -3,6 +3,41 @@ import { BASE_URL } from '@/constant';
 import { notifyUnauthorized } from '@/router/authSession';
 import { isTauriRuntime } from './runtime';
 
+type UnknownErrorMessage =
+	| string
+	| string[]
+	| { message?: unknown }
+	| Array<{ message?: unknown }>
+	| null
+	| undefined;
+
+function normalizeErrorMessage(input: UnknownErrorMessage): string | null {
+	if (typeof input === 'string') {
+		const t = input.trim();
+		return t ? t : null;
+	}
+	if (Array.isArray(input)) {
+		const flat = input
+			.map((x) => {
+				if (typeof x === 'string') return x;
+				if (x && typeof x === 'object' && 'message' in x) {
+					const m = (x as { message?: unknown }).message;
+					return typeof m === 'string' ? m : null;
+				}
+				return null;
+			})
+			.filter(Boolean) as string[];
+		if (flat.length === 0) return null;
+		// 避免 Toast 过长：最多展示前三条
+		return flat.slice(0, 3).join('；');
+	}
+	if (input && typeof input === 'object' && 'message' in input) {
+		const m = (input as { message?: unknown }).message;
+		return typeof m === 'string' ? m : null;
+	}
+	return null;
+}
+
 function readAuthTokenFromLocal(): string {
 	if (typeof window === 'undefined') {
 		return '';
@@ -441,13 +476,19 @@ class HttpClient {
 				this.setAuthToken('');
 				notifyUnauthorized();
 			} else {
+				console.log('requestError', requestError);
+				const title =
+					normalizeErrorMessage(
+						requestError?.data?.data?.error?.message as UnknownErrorMessage,
+					) ||
+					normalizeErrorMessage(
+						requestError?.data?.data?.message as UnknownErrorMessage,
+					) ||
+					normalizeErrorMessage(requestError.message) ||
+					'请求接口异常';
 				Toast({
 					type: 'error',
-					title:
-						requestError?.data?.data?.error?.message ||
-						requestError?.data?.data?.message ||
-						requestError.message ||
-						'请求接口异常',
+					title,
 				});
 			}
 
