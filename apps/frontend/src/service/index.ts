@@ -24,6 +24,10 @@ import {
 	KNOWLEDGE_DETAIL,
 	KNOWLEDGE_LIST,
 	KNOWLEDGE_SAVE,
+	KNOWLEDGE_TRASH_DELETE,
+	KNOWLEDGE_TRASH_DELETE_BATCH,
+	KNOWLEDGE_TRASH_DETAIL,
+	KNOWLEDGE_TRASH_LIST,
 	KNOWLEDGE_UPDATE,
 	LOGIN,
 	LOGIN_BY_EMAIL,
@@ -361,5 +365,61 @@ export const updateKnowledge = async (
 export const deleteKnowledge = async (id: string) => {
 	return await http.delete<{ id: string }>(KNOWLEDGE_DELETE, {
 		params: [id],
+	});
+};
+
+// ---------- 知识库回收站（knowledge.controller）----------
+
+export type KnowledgeTrashListItem = {
+	id: string;
+	originalId: string;
+	title: string | null;
+	author: string | null;
+	authorId: number | null;
+	deletedAt?: string;
+};
+
+export type KnowledgeTrashRecord = KnowledgeTrashListItem & {
+	content: string | null;
+	sourceCreatedAt?: string | null;
+	sourceUpdatedAt?: string | null;
+};
+
+/** GET /knowledge/trash/list：分页列表 */
+export const getKnowledgeTrashList = async (params?: {
+	pageNo?: number;
+	pageSize?: number;
+	title?: string;
+}) => {
+	return await http.get<{ list: KnowledgeTrashListItem[]; total: number }>(
+		KNOWLEDGE_TRASH_LIST,
+		{
+			querys: {
+				pageNo: params?.pageNo,
+				pageSize: params?.pageSize,
+				title: params?.title,
+			},
+		},
+	);
+};
+
+/** GET /knowledge/trash/detail/:id */
+export const getKnowledgeTrashDetail = async (id: string) => {
+	return await http.get<KnowledgeTrashRecord>(KNOWLEDGE_TRASH_DETAIL, {
+		params: [id],
+	});
+};
+
+/** DELETE /knowledge/trash/delete/:id */
+export const deleteKnowledgeTrash = async (id: string) => {
+	return await http.delete<{ id: string }>(KNOWLEDGE_TRASH_DELETE, {
+		params: [id],
+	});
+};
+
+/** POST /knowledge/trash/delete-batch */
+export const deleteKnowledgeTrashBatch = async (ids: string[]) => {
+	return await http.post<{ affected: number }>(KNOWLEDGE_TRASH_DELETE_BATCH, {
+		ids,
 	});
 };

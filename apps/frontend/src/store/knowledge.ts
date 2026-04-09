@@ -4,9 +4,14 @@ import {
 	deleteKnowledge,
 	getKnowledgeDetail,
 	getKnowledgeList,
+	getKnowledgeTrashList,
 	updateKnowledge,
 } from '@/service';
-import type { KnowledgeListItem, KnowledgeRecord } from '@/types';
+import type {
+	KnowledgeListItem,
+	KnowledgeRecord,
+	KnowledgeTrashListItem,
+} from '@/types';
 import type { SaveKnowledgeMarkdownPayload } from '@/utils/knowledge-save';
 
 const DEFAULT_PAGE_SIZE = 20;
@@ -50,6 +55,15 @@ class KnowledgeStore {
 	titleKeyword = '';
 	loading = false;
 	loadingMore = false;
+
+	// —— 回收站列表分页 ——
+	trashList: KnowledgeTrashListItem[] = [];
+	trashTotal = 0;
+	trashPageNo = 1;
+	trashPageSize = DEFAULT_PAGE_SIZE;
+	trashTitleKeyword = '';
+	trashLoading = false;
+	trashLoadingMore = false;
 
 	// —— 知识页编辑器草稿（与列表同属知识域，离开路由不丢）——
 	markdown = '';
@@ -128,6 +142,10 @@ class KnowledgeStore {
 
 	get hasMore(): boolean {
 		return this.list.length < this.total;
+	}
+
+	get trashHasMore(): boolean {
+		return this.trashList.length < this.trashTotal;
 	}
 
 	setMarkdown(value: string) {
@@ -257,6 +275,29 @@ class KnowledgeStore {
 		await this.fetchPage(1, false);
 	}
 
+	/** 回收站：从第一页重拉 */
+	async refreshTrashList(keyword?: string): Promise<void> {
+		if (keyword !== undefined) {
+			this.trashTitleKeyword = keyword;
+		}
+		await this.fetchTrashPage(1, false);
+	}
+
+	async loadTrashMore(): Promise<void> {
+		if (!this.trashHasMore || this.trashLoading || this.trashLoadingMore) {
+			return;
+		}
+		await this.fetchTrashPage(this.trashPageNo + 1, true);
+	}
+
+	onTrashListViewportScroll: UIEventHandler<HTMLDivElement> = (e) => {
+		const el = e.currentTarget;
+		const rest = el.scrollHeight - el.scrollTop - el.clientHeight;
+		if (rest < SCROLL_LOAD_THRESHOLD_PX) {
+			void this.loadTrashMore();
+		}
+	};
+
 	/** 加载下一页（滚动触底调用） */
 	async loadMore(): Promise<void> {
 		if (!this.hasMore || this.loading || this.loadingMore) {
@@ -307,6 +348,49 @@ class KnowledgeStore {
 				this.loadingMore = false;
 			});
 		}
+	}
+
+	async fetchTrashPage(page: number, append: boolean): Promise<void> {
+		if (append) {
+			this.trashLoadingMore = true;
+		} else {
+			this.trashLoading = true;
+		}
+		try {
+			const res = await getKnowledgeTrashList({
+				pageNo: page,
+				pageSize: this.trashPageSize,
+				title: this.trashTitleKeyword.trim() || undefined,
+			});
+			if (!res.success || !res.data) {
+				return;
+			}
+			runInAction(() => {
+				const { list: chunk, total } = res.data;
+				this.trashTotal = total;
+				this.trashPageNo = page;
+				if (append) {
+					this.trashList = [...this.trashList, ...chunk];
+				} else {
+					this.trashList = chunk;
+				}
+			});
+		} finally {
+			runInAction(() => {
+				this.trashLoading = false;
+				this.trashLoadingMore = false;
+			});
+		}
+	}
+
+	removeTrashFromLocalList(ids: string[]): void {
+		const s = new Set(ids);
+		runInAction(() => {
+			const before = this.trashList.length;
+			this.trashList = this.trashList.filter((x) => !s.has(x.id));
+			const removed = before - this.trashList.length;
+			this.trashTotal = Math.max(0, this.trashTotal - removed);
+		});
 	}
 
 	/** 拉取单条详情（含正文），用于点击列表进入编辑 */

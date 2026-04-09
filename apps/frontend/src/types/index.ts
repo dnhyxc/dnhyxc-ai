@@ -85,3 +85,13 @@ export type KnowledgeListItem = Omit<KnowledgeRecord, 'content'> & {
 	/** 本地浏览模式下列表项对应的 `.md` 绝对路径 */
 	localAbsolutePath?: string;
 };
+
+/** 知识库回收站列表项（与后端 KnowledgeTrashListItem 对齐） */
+export type KnowledgeTrashListItem = {
+	id: string;
+	originalId: string;
+	title: string | null;
+	author: string | null;
+	authorId: number | null;
+	deletedAt?: string;
+};

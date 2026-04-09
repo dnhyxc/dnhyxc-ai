@@ -85,3 +85,8 @@ export const KNOWLEDGE_LIST = '/knowledge/list';
 export const KNOWLEDGE_DETAIL = '/knowledge/detail';
 export const KNOWLEDGE_UPDATE = '/knowledge/update';
 export const KNOWLEDGE_DELETE = '/knowledge/delete';
+// 知识库回收站
+export const KNOWLEDGE_TRASH_LIST = '/knowledge/trash/list';
+export const KNOWLEDGE_TRASH_DETAIL = '/knowledge/trash/detail';
+export const KNOWLEDGE_TRASH_DELETE = '/knowledge/trash/delete';
+export const KNOWLEDGE_TRASH_DELETE_BATCH = '/knowledge/trash/delete-batch';

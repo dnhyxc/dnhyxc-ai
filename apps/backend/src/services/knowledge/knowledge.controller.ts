@@ -14,7 +14,9 @@ import {
 } from '@nestjs/common';
 import { JwtGuard } from 'src/guards/jwt.guard';
 import { ResponseInterceptor } from '../../interceptors/response.interceptor';
+import { DeleteKnowledgeTrashBatchDto } from './dto/delete-knowledge-trash-batch.dto';
 import { QueryKnowledgeDto } from './dto/query-knowledge.dto';
+import { QueryKnowledgeTrashDto } from './dto/query-knowledge-trash.dto';
 import { SaveKnowledgeDto } from './dto/save-knowledge.dto';
 import { UpdateKnowledgeDto } from './dto/update-knowledge.dto';
 import { KnowledgeService } from './knowledge.service';
@@ -49,5 +51,28 @@ export class KnowledgeController {
 	async remove(@Param('id', ParseUUIDPipe) id: string) {
 		await this.knowledgeService.remove(id);
 		return { id };
+	}
+
+	// ---------------- 回收站 ----------------
+
+	@Get('trash/list')
+	async trashList(@Query() query: QueryKnowledgeTrashDto) {
+		return this.knowledgeService.findTrashPage(query);
+	}
+
+	@Get('trash/detail/:id')
+	async trashOne(@Param('id', ParseUUIDPipe) id: string) {
+		return this.knowledgeService.findTrashOneById(id);
+	}
+
+	@Delete('trash/delete/:id')
+	async trashRemove(@Param('id', ParseUUIDPipe) id: string) {
+		await this.knowledgeService.removeTrash(id);
+		return { id };
+	}
+
+	@Post('trash/delete-batch')
+	async trashRemoveBatch(@Body() dto: DeleteKnowledgeTrashBatchDto) {
+		return this.knowledgeService.removeTrashBatch(dto.ids);
 	}
 }

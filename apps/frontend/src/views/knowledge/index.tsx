@@ -34,6 +34,7 @@ import {
 	TAURI_KNOWLEDGE_DIR,
 } from './constants';
 import KnowledgeList from './KnowledgeList';
+import KnowledgeTrashList from './KnowledgeTrashList';
 import KnowledgeEditorToolbar from './toolbar';
 
 /** 知识编辑页：正文与标题等草稿存于 knowledgeStore，聊天助手条「保存到知识库」会写入同一份草稿并跳转至此 */
@@ -42,6 +43,7 @@ const Knowledge = observer(() => {
 	const { theme } = useTheme();
 
 	const [listOpen, setListOpen] = useState(false);
+	const [trashOpen, setTrashOpen] = useState(false);
 	const [saveLoading, setSaveLoading] = useState(false);
 	const [markdownBottomBarOpen, setMarkdownBottomBarOpen] = useState(false);
 	/** 保存前从 Monaco 同步正文，避免 onChange 经 rAF 合并时 store 滞后导致脏检查误判 */
@@ -517,6 +519,27 @@ const Knowledge = observer(() => {
 		[knowledgeStore],
 	);
 
+	/**
+	 * 从回收站打开：仅用于展示到编辑器。
+	 * 为避免把“已删除的 originalId”当作可更新条目，这里按“新草稿”处理：
+	 * - editingKnowledgeId 置空（保存会走新建）
+	 * - snapshot 设为当前内容（打开时不显示脏点）
+	 */
+	const handlePickTrashRecord = useCallback(
+		(record: { title: string | null; content: string }) => {
+			knowledgeStore.setKnowledgeOverwriteOpen(false);
+			knowledgeStore.setKnowledgeEditingKnowledgeId(null);
+			knowledgeStore.setKnowledgeLocalDirPath(null);
+			knowledgeStore.setKnowledgeLocalDiskTitle(null);
+			const t = (record.title ?? '').trim();
+			const content = record.content ?? '';
+			knowledgeStore.setKnowledgePersistedSnapshot({ title: t, content });
+			knowledgeStore.setKnowledgeTitle(record.title ?? '');
+			knowledgeStore.setMarkdown(content);
+		},
+		[knowledgeStore],
+	);
+
 	const handleDeletedRecord = useCallback(
 		(id: string) => {
 			if (knowledgeStore.knowledgeEditingKnowledgeId === id) {
@@ -617,6 +640,7 @@ const Knowledge = observer(() => {
 					toolbar={
 						<KnowledgeEditorToolbar
 							onOpenLibrary={() => setListOpen(true)}
+							onOpenTrash={() => setTrashOpen(true)}
 							onNewDraft={resetEditorToNewDraft}
 							onSave={onSave}
 							saveLoading={saveLoading}
@@ -662,6 +686,11 @@ const Knowledge = observer(() => {
 				onAfterLocalDelete={handleAfterLocalDelete}
 				onDeletedRecord={handleDeletedRecord}
 				onPick={handlePickRecord}
+			/>
+			<KnowledgeTrashList
+				open={trashOpen}
+				onOpenChange={setTrashOpen}
+				onPick={handlePickTrashRecord}
 			/>
 		</div>
 	);

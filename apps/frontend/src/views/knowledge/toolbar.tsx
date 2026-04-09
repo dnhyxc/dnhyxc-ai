@@ -1,11 +1,12 @@
 import Tooltip from '@design/Tooltip';
 import { Button } from '@ui/index';
-import { LayersPlus, LibraryBig, OctagonX } from 'lucide-react';
+import { LayersPlus, LibraryBig, OctagonX, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 /** 编辑器顶栏：知识库 / 草稿 / 保存 */
 const KnowledgeEditorToolbar = (props: {
 	onOpenLibrary: () => void;
+	onOpenTrash: () => void;
 	onNewDraft: () => void;
 	onSave: () => void;
 	/** 保存请求进行中：禁用保存按钮 */
@@ -17,6 +18,7 @@ const KnowledgeEditorToolbar = (props: {
 }) => {
 	const {
 		onOpenLibrary,
+		onOpenTrash,
 		onNewDraft,
 		onSave,
 		saveLoading = false,
@@ -60,6 +62,12 @@ const KnowledgeEditorToolbar = (props: {
 				<Button variant="link" className={linkBtn} onClick={onOpenLibrary}>
 					<LibraryBig className="mt-0.5" />
 					<span className="mt-0.5">知识库</span>
+				</Button>
+			</Tooltip>
+			<Tooltip side="bottom" content="回收站">
+				<Button variant="link" className={linkBtn} onClick={onOpenTrash}>
+					<Trash2 className="mt-0.5" />
+					<span className="mt-0.5">回收站</span>
 				</Button>
 			</Tooltip>
 		</div>
