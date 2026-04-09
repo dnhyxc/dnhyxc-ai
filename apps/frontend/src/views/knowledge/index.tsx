@@ -508,7 +508,7 @@ const Knowledge = observer(() => {
 			return;
 		}
 		const sec = knowledgeStore.knowledgeAutoSaveIntervalSec;
-		const waitMs = Math.min(3_600_000, Math.max(10_000, sec * 1000));
+		const waitMs = Math.min(3_600_000, Math.max(5_000, sec * 1000));
 		autoSaveTimeoutRef.current = window.setTimeout(() => {
 			autoSaveTimeoutRef.current = null;
 			if (saveLoadingRef.current) return;

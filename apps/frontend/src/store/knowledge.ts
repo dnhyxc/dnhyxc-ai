@@ -93,8 +93,8 @@ class KnowledgeStore {
 	 */
 	knowledgeAutoSaveEnabled = false;
 
-	/** 自动保存间隔（秒），有效范围 10～3600，默认 60 */
-	knowledgeAutoSaveIntervalSec = 60;
+	/** 自动保存间隔（秒），有效范围 5～3600，默认 30 */
+	knowledgeAutoSaveIntervalSec = 30;
 
 	constructor() {
 		makeAutoObservable(this);
@@ -117,7 +117,7 @@ class KnowledgeStore {
 				if (intervalRaw != null && intervalRaw !== '') {
 					const n = Number.parseInt(intervalRaw, 10);
 					if (Number.isFinite(n)) {
-						this.knowledgeAutoSaveIntervalSec = Math.min(3600, Math.max(10, n));
+						this.knowledgeAutoSaveIntervalSec = Math.min(3600, Math.max(5, n));
 					}
 				}
 			}
@@ -202,7 +202,7 @@ class KnowledgeStore {
 	}
 
 	setKnowledgeAutoSaveIntervalSec(sec: number) {
-		const next = Math.min(3600, Math.max(10, Math.round(sec)));
+		const next = Math.min(3600, Math.max(5, Math.round(sec)));
 		this.knowledgeAutoSaveIntervalSec = next;
 		try {
 			if (typeof window !== 'undefined') {

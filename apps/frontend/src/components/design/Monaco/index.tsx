@@ -87,7 +87,9 @@ type MarkdownSplitScrollFollowMode =
 	| 'bidirectional';
 
 /** 知识库自动保存间隔候选项（秒） */
-const KNOWLEDGE_AUTO_SAVE_INTERVAL_PRESETS = [30, 60, 120, 300, 600] as const;
+const KNOWLEDGE_AUTO_SAVE_INTERVAL_PRESETS = [
+	5, 10, 20, 30, 60, 120, 300, 600,
+] as const;
 
 function formatKnowledgeAutoSaveIntervalLabel(sec: number): string {
 	if (sec < 60) return `${sec} 秒`;
