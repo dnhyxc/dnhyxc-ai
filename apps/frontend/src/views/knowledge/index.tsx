@@ -1,22 +1,24 @@
 import Confirm from '@design/Confirm';
-import Tooltip from '@design/Tooltip';
 import { ScrollArea } from '@ui/scroll-area';
 import { Toast } from '@ui/sonner';
-import { LayersPlus, LibraryBig, NotebookPen, OctagonX } from 'lucide-react';
+import { NotebookPen } from 'lucide-react';
 import { observer } from 'mobx-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import MarkdownEditor from '@/components/design/Monaco';
-import { Button, Input } from '@/components/ui';
+import { Input } from '@/components/ui';
 import { useTheme } from '@/hooks';
-import { cn } from '@/lib/utils';
 import { saveKnowledge } from '@/service';
 import useStore from '@/store';
 import { KnowledgeRecord } from '@/types';
 import { isTauriRuntime } from '@/utils';
 import {
+	buildAuthorMeta,
+	dirnameFs,
 	formatTauriInvokeError,
 	invokeResolveKnowledgeMarkdownTarget,
 	invokeSaveKnowledgeMarkdown,
+	monacoLanguageFromKnowledgeTitle,
+	pickNonConflictingDiskFileTitle,
 	type SaveKnowledgeMarkdownPayload,
 } from '@/utils/knowledge-save';
 import {
@@ -32,176 +34,7 @@ import {
 	TAURI_KNOWLEDGE_DIR,
 } from './constants';
 import KnowledgeList from './KnowledgeList';
-
-/** 保存路径解析用：从绝对路径取父目录 */
-function dirnameFs(filePath: string): string {
-	const n = filePath.replace(/[/\\]+$/, '');
-	const i = Math.max(n.lastIndexOf('/'), n.lastIndexOf('\\'));
-	if (i <= 0) return n;
-	return n.slice(0, i);
-}
-
-/** 拆分标题中的主名与扩展（无扩展时默认 `.md`） */
-function splitKnowledgeTitleStemAndExt(title: string): {
-	stem: string;
-	ext: string;
-} {
-	const t = title.trim() || '未命名';
-	const lower = t.toLowerCase();
-	for (const ext of ['.md', '.markdown', '.mdx'] as const) {
-		if (lower.endsWith(ext)) {
-			return { stem: t.slice(0, -ext.length), ext };
-		}
-	}
-	return { stem: t, ext: '.md' };
-}
-
-/**
- * 另存为专用：仅用于 Tauri 落盘文件名，**不修改编辑器标题**。
- * 后缀为 `_年-月-日-时:分:秒`（如 `_2026-04-01-15:30:45`）；Rust 侧 sanitize 会把 `:` 换成 `-` 以兼容 Windows。
- * 仍冲突则再追加 `_2`、`_3`…
- */
-async function pickNonConflictingDiskFileTitle(
-	seedTitle: string,
-	pending: SaveKnowledgeMarkdownPayload,
-): Promise<string> {
-	const d = new Date();
-	const pad = (n: number) => String(n).padStart(2, '0');
-	const timeStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}-${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-	const { stem, ext } = splitKnowledgeTitleStemAndExt(seedTitle);
-	for (let n = 0; n < 50; n++) {
-		const mid = n === 0 ? `_${timeStr}` : `_${timeStr}_${n + 1}`;
-		const candidate = `${stem}${mid}${ext}`;
-		const target = await invokeResolveKnowledgeMarkdownTarget({
-			...pending,
-			title: candidate,
-			content: '',
-			overwrite: false,
-		});
-		if (!target.exists) return candidate;
-	}
-	throw new Error('无法找到可用文件名');
-}
-
-/** 根据标题扩展名选择 Monaco language，CSS 等才能走对应 Prettier parser */
-function monacoLanguageFromKnowledgeTitle(title: string): string {
-	const t = title.trim().toLowerCase();
-	const dot = t.lastIndexOf('.');
-	if (dot < 0) return 'markdown';
-	const ext = t.slice(dot + 1);
-	switch (ext) {
-		case 'css':
-			return 'css';
-		case 'scss':
-		case 'sass':
-			return 'scss';
-		case 'less':
-			return 'less';
-		case 'json':
-			return 'json';
-		case 'html':
-		case 'htm':
-			return 'html';
-		case 'ts':
-			return 'typescript';
-		case 'tsx':
-			return 'typescriptreact';
-		case 'jsx':
-			return 'javascriptreact';
-		case 'js':
-		case 'mjs':
-		case 'cjs':
-			return 'javascript';
-		case 'yaml':
-		case 'yml':
-			return 'yaml';
-		case 'md':
-		case 'markdown':
-		case 'mdx':
-			return 'markdown';
-		default:
-			return 'markdown';
-	}
-}
-
-type StoredUserInfo = { username?: unknown; id?: unknown } | null;
-
-/** 与原先 persist 内联逻辑一致：仅有 username / id 时写入 author / authorId */
-function buildAuthorMeta(user: StoredUserInfo): {
-	author?: string;
-	authorId?: number;
-} {
-	if (!user || (user.username == null && user.id == null)) {
-		return {};
-	}
-	return {
-		...(user.username != null ? { author: user.username as string } : {}),
-		...(user.id != null ? { authorId: user.id as number } : {}),
-	};
-}
-
-/** 编辑器顶栏：知识库 / 草稿 / 保存 */
-function KnowledgeEditorToolbar(props: {
-	onOpenLibrary: () => void;
-	onNewDraft: () => void;
-	onSave: () => void;
-	/** 保存请求进行中：禁用保存按钮 */
-	saveLoading?: boolean;
-	/** 系统设置中配置的快捷键文案（用于 Tooltip） */
-	shortcutHintSave?: string;
-	shortcutHintClear?: string;
-	shortcutHintOpenLibrary?: string;
-}) {
-	const {
-		onOpenLibrary,
-		onNewDraft,
-		onSave,
-		saveLoading = false,
-		shortcutHintSave,
-		shortcutHintClear,
-		shortcutHintOpenLibrary,
-	} = props;
-	const linkBtn =
-		'lucide-stroke-draw-hover flex items-center gap-1 px-0 has-[>svg]:px-0 disabled:hover:text-textcolor' as const;
-	return (
-		<div className="flex items-center pr-3 gap-4">
-			<Tooltip
-				side="top"
-				content={shortcutHintSave ?? 'Meta + S / Control + S'}
-			>
-				<Button
-					variant="link"
-					className={linkBtn}
-					onClick={onSave}
-					disabled={saveLoading}
-					aria-busy={saveLoading}
-				>
-					<LayersPlus className="mt-0.5" />
-					<span className="mt-0.5">保存</span>
-				</Button>
-			</Tooltip>
-			<Tooltip side="top" content={shortcutHintClear ?? 'Meta + Shift + D'}>
-				<Button
-					variant="link"
-					className={cn(linkBtn, 'hover:text-orange-500')}
-					onClick={onNewDraft}
-				>
-					<OctagonX className="mt-0.5" />
-					<span className="mt-0.5">清空</span>
-				</Button>
-			</Tooltip>
-			<Tooltip
-				side="top"
-				content={shortcutHintOpenLibrary ?? 'Meta + Shift + L'}
-			>
-				<Button variant="link" className={linkBtn} onClick={onOpenLibrary}>
-					<LibraryBig className="mt-0.5" />
-					<span className="mt-0.5">知识库</span>
-				</Button>
-			</Tooltip>
-		</div>
-	);
-}
+import KnowledgeEditorToolbar from './toolbar';
 
 /** 知识编辑页：正文与标题等草稿存于 knowledgeStore，聊天助手条「保存到知识库」会写入同一份草稿并跳转至此 */
 const Knowledge = observer(() => {
@@ -232,7 +65,10 @@ const Knowledge = observer(() => {
 	}, []);
 
 	/** 与 localStorage 脱钩，统一从 userStore 取（刷新后由 store 从缓存恢复） */
-	const getUserInfo = useMemo((): StoredUserInfo => {
+	const getUserInfo = useMemo((): {
+		username?: unknown;
+		id?: unknown;
+	} | null => {
 		const u = userStore.userInfo;
 		if (u.id === 0 && !String(u.username ?? '').trim()) return null;
 		return { id: u.id, username: u.username };

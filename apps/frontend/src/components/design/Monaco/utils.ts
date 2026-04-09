@@ -275,3 +275,13 @@ export function syncEditorScrollFromPreviewByHeadings(
 	);
 	editor.revealLineNearTop(Math.round(lineF));
 }
+
+export function formatKnowledgeAutoSaveIntervalLabel(sec: number): string {
+	if (sec < 60) return `${sec} 秒`;
+	if (sec % 60 === 0) return `${sec / 60} 分钟`;
+	return `${sec} 秒`;
+}
+
+export function normalizeMonacoEol(text: string): string {
+	return text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+}

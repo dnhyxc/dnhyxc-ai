@@ -7,6 +7,11 @@ export const MONACO_TAB_SIZE = 2;
 /** Markdown 编辑区：折行上限（列），与 `wordWrap: bounded` 配合；窄于此时按视口宽度折行 */
 export const MARKDOWN_EDITOR_WORD_WRAP_COLUMN = 120;
 
+/** 知识库自动保存间隔候选项（秒） */
+export const KNOWLEDGE_AUTO_SAVE_INTERVAL_PRESETS = [
+	5, 10, 20, 30, 60, 120, 300, 600,
+] as const;
+
 export const options: any = {
 	minimap: { enabled: false },
 	fontSize: 14,

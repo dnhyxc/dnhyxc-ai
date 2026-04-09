@@ -162,3 +162,110 @@ export async function invokeOpenKnowledgeMarkdownInEditor(
 		input: { filePath },
 	});
 }
+
+/** 保存路径解析用：从绝对路径取父目录 */
+export function dirnameFs(filePath: string): string {
+	const n = filePath.replace(/[/\\]+$/, '');
+	const i = Math.max(n.lastIndexOf('/'), n.lastIndexOf('\\'));
+	if (i <= 0) return n;
+	return n.slice(0, i);
+}
+
+/** 拆分标题中的主名与扩展（无扩展时默认 `.md`） */
+export function splitKnowledgeTitleStemAndExt(title: string): {
+	stem: string;
+	ext: string;
+} {
+	const t = title.trim() || '未命名';
+	const lower = t.toLowerCase();
+	for (const ext of ['.md', '.markdown', '.mdx'] as const) {
+		if (lower.endsWith(ext)) {
+			return { stem: t.slice(0, -ext.length), ext };
+		}
+	}
+	return { stem: t, ext: '.md' };
+}
+
+/**
+ * 另存为专用：仅用于 Tauri 落盘文件名，**不修改编辑器标题**。
+ * 后缀为 `_年-月-日-时:分:秒`（如 `_2026-04-01-15:30:45`）；Rust 侧 sanitize 会把 `:` 换成 `-` 以兼容 Windows。
+ * 仍冲突则再追加 `_2`、`_3`…
+ */
+export async function pickNonConflictingDiskFileTitle(
+	seedTitle: string,
+	pending: SaveKnowledgeMarkdownPayload,
+): Promise<string> {
+	const d = new Date();
+	const pad = (n: number) => String(n).padStart(2, '0');
+	const timeStr = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}-${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+	const { stem, ext } = splitKnowledgeTitleStemAndExt(seedTitle);
+	for (let n = 0; n < 50; n++) {
+		const mid = n === 0 ? `_${timeStr}` : `_${timeStr}_${n + 1}`;
+		const candidate = `${stem}${mid}${ext}`;
+		const target = await invokeResolveKnowledgeMarkdownTarget({
+			...pending,
+			title: candidate,
+			content: '',
+			overwrite: false,
+		});
+		if (!target.exists) return candidate;
+	}
+	throw new Error('无法找到可用文件名');
+}
+
+/** 根据标题扩展名选择 Monaco language，CSS 等才能走对应 Prettier parser */
+export function monacoLanguageFromKnowledgeTitle(title: string): string {
+	const t = title.trim().toLowerCase();
+	const dot = t.lastIndexOf('.');
+	if (dot < 0) return 'markdown';
+	const ext = t.slice(dot + 1);
+	switch (ext) {
+		case 'css':
+			return 'css';
+		case 'scss':
+		case 'sass':
+			return 'scss';
+		case 'less':
+			return 'less';
+		case 'json':
+			return 'json';
+		case 'html':
+		case 'htm':
+			return 'html';
+		case 'ts':
+			return 'typescript';
+		case 'tsx':
+			return 'typescriptreact';
+		case 'jsx':
+			return 'javascriptreact';
+		case 'js':
+		case 'mjs':
+		case 'cjs':
+			return 'javascript';
+		case 'yaml':
+		case 'yml':
+			return 'yaml';
+		case 'md':
+		case 'markdown':
+		case 'mdx':
+			return 'markdown';
+		default:
+			return 'markdown';
+	}
+}
+
+/** 与原先 persist 内联逻辑一致：仅有 username / id 时写入 author / authorId */
+export function buildAuthorMeta(
+	user: { username?: unknown; id?: unknown } | null,
+): {
+	author?: string;
+	authorId?: number;
+} {
+	if (!user || (user.username == null && user.id == null)) {
+		return {};
+	}
+	return {
+		...(user.username != null ? { author: user.username as string } : {}),
+		...(user.id != null ? { authorId: user.id as number } : {}),
+	};
+}

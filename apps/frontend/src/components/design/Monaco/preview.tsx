@@ -1,0 +1,395 @@
+import { MermaidFenceIsland } from '@design/MermaidFenceIsland';
+import Tooltip from '@design/Tooltip';
+import { MarkdownParser } from '@dnhyxc-ai/tools';
+import { useMermaidInMarkdownRoot } from '@dnhyxc-ai/tools/react';
+import { ScrollArea } from '@ui/index';
+import { ArrowDown, ArrowUp } from 'lucide-react';
+import {
+	memo,
+	type RefObject,
+	type UIEvent,
+	useCallback,
+	useEffect,
+	useLayoutEffect,
+	useMemo,
+	useRef,
+	useState,
+} from 'react';
+import { getChatMarkdownHighlightTheme } from '@/constant';
+import {
+	useMermaidDiagramClickPreview,
+	useMermaidImagePreview,
+	useTheme,
+} from '@/hooks';
+import {
+	ChatCodeFloatingToolbar,
+	useChatCodeFloatingToolbar,
+} from '@/hooks/useChatCodeFloatingToolbar';
+import { cn } from '@/lib/utils';
+import {
+	downloadChatCodeBlock,
+	getChatCodeBlockPlainText,
+} from '@/utils/chatCodeToolbar';
+import {
+	mermaidStreamingFallbackHtml,
+	splitMarkdownByCodeFences,
+} from '@/utils/splitMarkdownFences';
+
+/** 纯预览模式右下角：可滚动时显示置底，触底后切换为置顶 */
+type PreviewScrollCornerFabMode = 'hidden' | 'toBottom' | 'toTop';
+
+interface ParserMarkdownPreviewPaneProps {
+	markdown: string;
+	/** 分屏同步滚动：指向 ScrollArea 的 Viewport（Radix ref 落在 viewport 上） */
+	viewportRef?: RefObject<HTMLDivElement | null>;
+	/** 逻辑文档切换时重置预览滚动，避免沿用上一篇的 scrollTop */
+	documentIdentity?: string;
+	/** 分屏且开启跟随时：预览滚动时驱动编辑器对齐 */
+	onViewportScrollFollow?: () => void;
+	/** 纯预览模式：右下角置底 / 触底后置顶浮动按钮 */
+	showPreviewScrollCornerFab?: boolean;
+	/** 是否启用 Mermaid 围栏解析与前端渲染 */
+	enableMermaid?: boolean;
+}
+
+/**
+ * 使用 @dnhyxc-ai/tools 的 MarkdownParser 渲染预览（与文档处理等页一致）
+ * 知识库预览不需要聊天代码块吸顶工具栏，故关闭 enableChatCodeFenceToolbar
+ */
+const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
+	markdown,
+	viewportRef,
+	documentIdentity,
+	onViewportScrollFollow,
+	showPreviewScrollCornerFab = false,
+	enableMermaid = true,
+}: ParserMarkdownPreviewPaneProps) {
+	const markdownRef = useRef<HTMLDivElement>(null);
+	/** 与 `dangerouslySetInnerHTML` 同层，保证 Mermaid 在内容写入后再扫描节点 */
+	const previewHtmlRootRef = useRef<HTMLDivElement>(null);
+	const localViewportRef = useRef<HTMLDivElement | null>(null);
+	const [previewScrollFabMode, setPreviewScrollFabMode] =
+		useState<PreviewScrollCornerFabMode>('hidden');
+
+	const { theme } = useTheme();
+
+	const assignViewportRef = useCallback(
+		(node: HTMLDivElement | null) => {
+			localViewportRef.current = node;
+			if (viewportRef) viewportRef.current = node;
+		},
+		[viewportRef],
+	);
+
+	const fenceParts = useMemo(
+		() => splitMarkdownByCodeFences(markdown),
+		[markdown],
+	);
+
+	const hasMermaidIslandLayout = Boolean(
+		enableMermaid && fenceParts.some((p) => p.type === 'mermaid'),
+	);
+
+	const parser = useMemo(
+		() =>
+			new MarkdownParser({
+				highlightTheme: getChatMarkdownHighlightTheme(theme),
+				enableChatCodeFenceToolbar: true,
+				// 分屏跟随滚动：预览标题带源码行号，与编辑器按标题区间对齐
+				enableHeadingSourceLineAttr: true,
+				// 目录 / `[文字](#slug)` 跳转：标题生成 id，点击在 ScrollArea 内 scrollIntoView
+				enableHeadingAnchorIds: true,
+				enableMermaid,
+			}),
+		[theme, enableMermaid],
+	);
+
+	const parserNoMermaid = useMemo(
+		() =>
+			new MarkdownParser({
+				highlightTheme: getChatMarkdownHighlightTheme(theme),
+				enableChatCodeFenceToolbar: true,
+				enableHeadingSourceLineAttr: true,
+				enableHeadingAnchorIds: true,
+				enableMermaid: false,
+			}),
+		[theme],
+	);
+
+	const html = useMemo(() => {
+		if (hasMermaidIslandLayout) return '';
+		return parser.render(markdown);
+	}, [hasMermaidIslandLayout, parser, markdown]);
+
+	/** 含 Mermaid 岛时不在整段 HTML 上跑 run（岛内自渲染），否则与聊天流一致扫描 .mermaid */
+	const mermaidRootScanParser = useMemo(
+		() => ({
+			enableMermaid: enableMermaid && !hasMermaidIslandLayout,
+		}),
+		[enableMermaid, hasMermaidIslandLayout],
+	);
+
+	useMermaidInMarkdownRoot({
+		rootRef: previewHtmlRootRef,
+		preferDark: theme === 'black',
+		trigger: hasMermaidIslandLayout ? markdown : html,
+		parser: mermaidRootScanParser,
+	});
+
+	const { openMermaidPreview, mermaidImagePreviewModal } =
+		useMermaidImagePreview();
+
+	useMermaidDiagramClickPreview(
+		previewHtmlRootRef,
+		openMermaidPreview,
+		enableMermaid,
+		hasMermaidIslandLayout ? markdown : html,
+	);
+
+	const refreshPreviewScrollFab = useCallback(() => {
+		if (!showPreviewScrollCornerFab) {
+			setPreviewScrollFabMode('hidden');
+			return;
+		}
+		const vp = localViewportRef.current;
+		if (!vp) return;
+		const { scrollTop, scrollHeight, clientHeight } = vp;
+		const maxScroll = scrollHeight - clientHeight;
+		if (maxScroll <= 4) {
+			setPreviewScrollFabMode('hidden');
+			return;
+		}
+		const threshold = 8;
+		setPreviewScrollFabMode(
+			scrollTop >= maxScroll - threshold ? 'toTop' : 'toBottom',
+		);
+	}, [showPreviewScrollCornerFab]);
+
+	useLayoutEffect(() => {
+		const vp = localViewportRef.current;
+		if (vp) {
+			vp.scrollTop = 0;
+			vp.scrollLeft = 0;
+		}
+	}, [documentIdentity]);
+
+	// 换篇或开启角标后更新「置底/置顶」状态（勿与上一段合并，避免 refresh 回调变动时误重置滚动）
+	useLayoutEffect(() => {
+		if (!showPreviewScrollCornerFab) return;
+		requestAnimationFrame(() => refreshPreviewScrollFab());
+	}, [documentIdentity, showPreviewScrollCornerFab, refreshPreviewScrollFab]);
+
+	useEffect(() => {
+		const el = markdownRef.current;
+		if (!el) return;
+		const onClick = (e: MouseEvent) => {
+			const target = e.target as HTMLElement;
+			if (!el.contains(target)) return;
+
+			// 页内锚点：预览在 Radix ScrollArea 内，默认 hash 跳转无效，改为在视口内 scrollIntoView
+			const link = target.closest<HTMLAnchorElement>('a[href^="#"]');
+			if (link) {
+				const href = link.getAttribute('href');
+				if (href && href.length > 1) {
+					const raw = href.slice(1);
+					const id = decodeURIComponent(raw.replace(/\+/g, ' '));
+					if (id) {
+						const root = el.querySelector('.markdown-body') ?? el;
+						let dest: Element | null = null;
+						try {
+							dest = root.querySelector(`#${CSS.escape(id)}`);
+						} catch {
+							dest = null;
+						}
+						if (dest instanceof HTMLElement) {
+							e.preventDefault();
+							dest.scrollIntoView({ behavior: 'smooth', block: 'start' });
+							return;
+						}
+					}
+				}
+			}
+
+			const btn = target.closest<HTMLButtonElement>('[data-chat-code-action]');
+			if (!btn || !el.contains(btn)) return;
+			const action = btn.getAttribute('data-chat-code-action');
+			const block = btn.closest<HTMLElement>('[data-chat-code-block]');
+			if (!block) return;
+			if (action === 'copy') {
+				void navigator.clipboard.writeText(getChatCodeBlockPlainText(block));
+				const prev = btn.textContent;
+				btn.textContent = '已复制';
+				window.setTimeout(() => {
+					btn.textContent = prev;
+				}, 1500);
+				return;
+			}
+			if (action === 'download') {
+				const lang = btn.getAttribute('data-chat-code-lang') || 'text';
+				downloadChatCodeBlock(block, lang);
+			}
+		};
+		el.addEventListener('click', onClick);
+		return () => el.removeEventListener('click', onClick);
+	}, []);
+
+	const { relayout: relayoutCodeToolbar } = useChatCodeFloatingToolbar(
+		localViewportRef,
+		{ layoutDeps: [markdown] },
+	);
+
+	const syncScrollMetrics = useCallback(() => {
+		const el = localViewportRef.current;
+		if (!el) return;
+		relayoutCodeToolbar();
+	}, [relayoutCodeToolbar]);
+
+	const handleViewportScroll = useCallback(
+		(_e: UIEvent<HTMLDivElement>) => {
+			syncScrollMetrics();
+			onViewportScrollFollow?.();
+			if (showPreviewScrollCornerFab) refreshPreviewScrollFab();
+		},
+		[
+			syncScrollMetrics,
+			onViewportScrollFollow,
+			showPreviewScrollCornerFab,
+			refreshPreviewScrollFab,
+		],
+	);
+
+	useEffect(() => {
+		syncScrollMetrics();
+		const id = requestAnimationFrame(() => syncScrollMetrics());
+		return () => cancelAnimationFrame(id);
+	}, [markdown, syncScrollMetrics]);
+
+	// 正文变化 / 视口尺寸变化时更新「是否可滚、是否触底」
+	useEffect(() => {
+		if (!showPreviewScrollCornerFab) {
+			setPreviewScrollFabMode('hidden');
+			return;
+		}
+		let ro: ResizeObserver | null = null;
+		const tid = window.setTimeout(() => {
+			refreshPreviewScrollFab();
+			requestAnimationFrame(() => refreshPreviewScrollFab());
+			const vp = localViewportRef.current;
+			if (vp) {
+				ro = new ResizeObserver(() => refreshPreviewScrollFab());
+				ro.observe(vp);
+			}
+		}, 0);
+		return () => {
+			window.clearTimeout(tid);
+			ro?.disconnect();
+		};
+	}, [markdown, html, showPreviewScrollCornerFab, refreshPreviewScrollFab]);
+
+	const onPreviewScrollCornerFabClick = useCallback(() => {
+		const vp = localViewportRef.current;
+		if (!vp) return;
+		if (previewScrollFabMode === 'toBottom') {
+			vp.scrollTo({
+				top: vp.scrollHeight - vp.clientHeight,
+				behavior: 'smooth',
+			});
+		} else if (previewScrollFabMode === 'toTop') {
+			vp.scrollTo({ top: 0, behavior: 'smooth' });
+		}
+	}, [previewScrollFabMode]);
+
+	return (
+		<div
+			ref={markdownRef}
+			className="relative h-full min-h-0 min-w-0 max-w-full w-full overflow-hidden contain-[inline-size]"
+		>
+			<ChatCodeFloatingToolbar />
+			<ScrollArea
+				ref={assignViewportRef}
+				scrollbars="both"
+				onScroll={handleViewportScroll}
+				className={cn(
+					'h-full min-h-0 min-w-0 max-w-full w-full bg-transparent',
+				)}
+				// 覆盖 Radix 内层 display:table + minWidth:100%，否则 table 会按内容扩宽并顶破分栏
+				viewportClassName="[&>div]:!box-border [&>div]:!block [&>div]:!w-full [&>div]:!min-w-0 [&>div]:!max-w-full"
+			>
+				<div className="box-border min-w-0 max-w-full w-full p-3">
+					<div
+						ref={previewHtmlRootRef}
+						className={cn(
+							'[&_.markdown-body]:min-w-0 [&_.markdown-body]:max-w-none [&_.markdown-body]:wrap-break-word [&_.markdown-body]:overflow-x-auto [&_.markdown-body]:bg-transparent! [&_.markdown-body]:text-textcolor/90! [&_.markdown-body_:is(h1,h2,h3,h4,h5,h6)]:scroll-mt-3 [&_.markdown-body_pre]:max-w-full [&_.markdown-body_pre]:overflow-x-auto [&_.markdown-body_table]:block [&_.markdown-body_table]:max-w-full [&_.markdown-body_table]:overflow-x-auto',
+							enableMermaid &&
+								'[&_.markdown-mermaid-wrap_.mermaid]:cursor-zoom-in',
+						)}
+					>
+						{hasMermaidIslandLayout ? (
+							fenceParts.map((part, i) => {
+								if (part.type === 'markdown') {
+									return (
+										<div
+											key={`pv-${i}`}
+											dangerouslySetInnerHTML={{
+												__html: parserNoMermaid.render(part.text),
+											}}
+										/>
+									);
+								}
+								if (!part.complete) {
+									return (
+										<div
+											key={`pv-${i}`}
+											dangerouslySetInnerHTML={{
+												__html: mermaidStreamingFallbackHtml(part.text),
+											}}
+										/>
+									);
+								}
+								return (
+									<MermaidFenceIsland
+										key={`pv-${i}`}
+										code={part.text}
+										preferDark={theme === 'black'}
+										openMermaidPreview={openMermaidPreview}
+									/>
+								);
+							})
+						) : (
+							<div dangerouslySetInnerHTML={{ __html: html }} />
+						)}
+					</div>
+				</div>
+			</ScrollArea>
+			{showPreviewScrollCornerFab && previewScrollFabMode !== 'hidden' ? (
+				<Tooltip
+					content={
+						previewScrollFabMode === 'toBottom' ? '滚动到底部' : '滚动到顶部'
+					}
+				>
+					<button
+						type="button"
+						className={cn(
+							// 与 ChatControls 滚动按钮一致，并加轻量 backdrop 滤镜（同 glassChip 的 blur）
+							'absolute bottom-2 right-2 z-10 flex h-8.5 w-8.5 cursor-pointer items-center justify-center rounded-full border border-theme/5 bg-theme/5 text-textcolor/90 backdrop-blur-[2px] hover:bg-theme/15',
+							'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme/40',
+						)}
+						aria-label={
+							previewScrollFabMode === 'toBottom' ? '滚动到底部' : '滚动到顶部'
+						}
+						onClick={onPreviewScrollCornerFabClick}
+					>
+						{previewScrollFabMode === 'toBottom' ? (
+							<ArrowDown aria-hidden />
+						) : (
+							<ArrowUp aria-hidden />
+						)}
+					</button>
+				</Tooltip>
+			) : null}
+			{mermaidImagePreviewModal}
+		</div>
+	);
+});
+
+export default ParserMarkdownPreviewPane;
