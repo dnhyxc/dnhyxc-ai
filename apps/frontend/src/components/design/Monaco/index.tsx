@@ -810,7 +810,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	/** 底部操作栏内图标按钮（与「跟随滚动」一致） */
 	const markdownBarIconBtnClass = (active: boolean) =>
 		cn(
-			'flex size-7 cursor-pointer items-center justify-center rounded-md p-1 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-theme/40',
+			'lucide-stroke-draw-hover flex size-7 cursor-pointer items-center justify-center rounded-md p-1 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-theme/40',
 			active
 				? 'bg-theme/25 text-textcolor'
 				: 'text-textcolor/80 hover:bg-theme/10 hover:text-textcolor',

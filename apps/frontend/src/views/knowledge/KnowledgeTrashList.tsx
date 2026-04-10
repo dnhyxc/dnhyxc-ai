@@ -301,10 +301,17 @@ const KnowledgeTrashList: React.FC<Props> = observer(
 					<div className="flex h-full min-h-0 flex-col">
 						<div className="flex items-center justify-between gap-2 pl-0.5 pr-4">
 							<div className="flex items-center gap-2 text-sm text-textcolor/70">
-								<button
-									type="button"
+								<div
+									role="button"
+									tabIndex={0}
 									className="cursor-pointer flex items-center gap-2 rounded-md px-2 py-1 hover:bg-theme/10"
 									onClick={toggleAll}
+									onKeyDown={(e) => {
+										if (e.key === 'Enter' || e.key === ' ') {
+											e.preventDefault();
+											toggleAll();
+										}
+									}}
 								>
 									<Checkbox
 										checked={
@@ -321,7 +328,7 @@ const KnowledgeTrashList: React.FC<Props> = observer(
 									>
 										全选
 									</span>
-								</button>
+								</div>
 								<span className="text-xs text-textcolor/50">
 									已选 {selectedIds.length} / {trashList.length}
 								</span>
