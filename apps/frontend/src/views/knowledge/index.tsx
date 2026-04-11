@@ -76,6 +76,9 @@ const Knowledge = observer(() => {
 		return { id: u.id, username: u.username };
 	}, [userStore.userInfo]);
 
+	/** 与 knowledgeStore.fetchPage 一致：无有效用户 id 时不走任何云端知识库接口 */
+	const isCloudLoggedIn = Boolean(userStore.userInfo.id);
+
 	const monacoTheme = theme === 'black' ? 'vs-dark' : 'vs';
 
 	const monacoLanguage = useMemo(
@@ -104,6 +107,13 @@ const Knowledge = observer(() => {
 			);
 		};
 	}, [reloadKnowledgeChords]);
+
+	// 未登录时关闭回收站抽屉，避免误触已隐藏的入口后仍请求云端
+	useEffect(() => {
+		if (!isCloudLoggedIn) {
+			setTrashOpen(false);
+		}
+	}, [isCloudLoggedIn]);
 
 	const handleMarkdownChange = useCallback(
 		(value: string) => {
@@ -155,6 +165,10 @@ const Knowledge = observer(() => {
 		if (isKnowledgeLocalMarkdownId(editingId)) {
 			return;
 		}
+		/** 未登录：不调创建/更新接口（桌面端仅写本地文件由 performSave 中 Tauri 分支处理） */
+		if (!isCloudLoggedIn) {
+			return;
+		}
 		if (editingId) {
 			const row = await knowledgeStore.updateItem(editingId, {
 				...base,
@@ -179,7 +193,7 @@ const Knowledge = observer(() => {
 				knowledgeStore.setKnowledgeLocalDiskTitle(trimmedTitle);
 			}
 		}
-	}, [knowledgeStore, getUserInfo]);
+	}, [knowledgeStore, getUserInfo, isCloudLoggedIn]);
 
 	/**
 	 * 另存为：始终新建云端记录（不更新当前 id），本地扫描打开的条目仍不写库。
@@ -191,6 +205,9 @@ const Knowledge = observer(() => {
 			const meta = buildAuthorMeta(getUserInfo);
 			const editingId = knowledgeStore.knowledgeEditingKnowledgeId;
 			if (isKnowledgeLocalMarkdownId(editingId)) {
+				return;
+			}
+			if (!isCloudLoggedIn) {
 				return;
 			}
 			const res = await saveKnowledge({
@@ -208,7 +225,7 @@ const Knowledge = observer(() => {
 			}
 			knowledgeStore.setKnowledgeEditingKnowledgeId(res.data.id);
 		},
-		[knowledgeStore, getUserInfo],
+		[knowledgeStore, getUserInfo, isCloudLoggedIn],
 	);
 
 	const syncSnapshotAfterPersist = useCallback(
@@ -247,6 +264,18 @@ const Knowledge = observer(() => {
 			}
 			const snap = knowledgeStore.knowledgePersistedSnapshot;
 			if (snap.title === trimmedTitle && snap.content === markdown) {
+				return;
+			}
+
+			// 浏览器端未登录：无法写云端也无 Tauri 本地写入，避免仅更新快照造成「已保存」假象
+			if (!isTauriRuntime() && !isCloudLoggedIn) {
+				if (mode === 'normal') {
+					Toast({
+						type: 'warning',
+						title: '未登录',
+						message: '请登录后保存到云端知识库，或使用桌面端保存到本地文件夹。',
+					});
+				}
 				return;
 			}
 
@@ -307,6 +336,7 @@ const Knowledge = observer(() => {
 		},
 		[
 			knowledgeStore,
+			isCloudLoggedIn,
 			persistKnowledgeApi,
 			runTauriSave,
 			syncSnapshotAfterPersist,
@@ -471,12 +501,18 @@ const Knowledge = observer(() => {
 				content: markdown,
 				overwrite: false,
 			};
-			await persistKnowledgeApiSaveAs(displayTitle);
+			if (isCloudLoggedIn) {
+				await persistKnowledgeApiSaveAs(displayTitle);
+			}
 			const tauriRes = await runTauriSave(savePayload);
 			if (tauriRes.success !== 'success') return;
 			knowledgeStore.setKnowledgeLocalDiskTitle(diskTitle);
 			syncSnapshotAfterPersist(displayTitle, markdown);
-			if (wasLocalOnly && tauriRes.filePath && tauriRes.filePath.length > 0) {
+			if (
+				(wasLocalOnly || !isCloudLoggedIn) &&
+				tauriRes.filePath &&
+				tauriRes.filePath.length > 0
+			) {
 				knowledgeStore.setKnowledgeEditingKnowledgeId(
 					`${KNOWLEDGE_LOCAL_MD_ID_PREFIX}${encodeURIComponent(tauriRes.filePath)}`,
 				);
@@ -492,6 +528,7 @@ const Knowledge = observer(() => {
 		}
 	}, [
 		knowledgeStore,
+		isCloudLoggedIn,
 		persistKnowledgeApiSaveAs,
 		runTauriSave,
 		syncSnapshotAfterPersist,
@@ -545,10 +582,11 @@ const Knowledge = observer(() => {
 			if (knowledgeStore.knowledgeEditingKnowledgeId === id) {
 				resetEditorToNewDraft();
 			}
-			// 删除后直接重拉列表，避免分页/滚动边界状态导致无法继续加载
-			void knowledgeStore.refreshList();
+			if (isCloudLoggedIn) {
+				void knowledgeStore.refreshList();
+			}
 		},
-		[knowledgeStore, resetEditorToNewDraft],
+		[knowledgeStore, isCloudLoggedIn, resetEditorToNewDraft],
 	);
 
 	/** 仅当删除的是当前正在编辑的条目时才清空标题与正文（本地文件删成功后的回调） */
@@ -558,10 +596,11 @@ const Knowledge = observer(() => {
 			if (knowledgeStore.knowledgeEditingKnowledgeId === deletedKnowledgeId) {
 				resetEditorToNewDraft();
 			}
-			// 删除后直接重拉列表，保持列表数据与服务端同步
-			void knowledgeStore.refreshList();
+			if (isCloudLoggedIn) {
+				void knowledgeStore.refreshList();
+			}
 		},
-		[knowledgeStore, resetEditorToNewDraft],
+		[knowledgeStore, isCloudLoggedIn, resetEditorToNewDraft],
 	);
 
 	const overwriteTargetPath = knowledgeStore.knowledgeOverwriteTargetPath;
@@ -648,6 +687,7 @@ const Knowledge = observer(() => {
 							onNewDraft={resetEditorToNewDraft}
 							onSave={onSave}
 							saveLoading={saveLoading}
+							showTrash={isCloudLoggedIn}
 							shortcutHintSave={knowledgeChords.save}
 							shortcutHintClear={knowledgeChords.clear}
 							shortcutHintOpenLibrary={knowledgeChords.openLibrary}
@@ -685,17 +725,20 @@ const Knowledge = observer(() => {
 			<KnowledgeList
 				open={listOpen}
 				onOpenChange={setListOpen}
+				allowCloudList={isCloudLoggedIn}
 				currentTitle={knowledgeStore.knowledgeTitle}
 				editingKnowledgeId={knowledgeStore.knowledgeEditingKnowledgeId}
 				onAfterLocalDelete={handleAfterLocalDelete}
 				onDeletedRecord={handleDeletedRecord}
 				onPick={handlePickRecord}
 			/>
-			<KnowledgeTrashList
-				open={trashOpen}
-				onOpenChange={setTrashOpen}
-				onPick={handlePickTrashRecord}
-			/>
+			{isCloudLoggedIn ? (
+				<KnowledgeTrashList
+					open={trashOpen}
+					onOpenChange={setTrashOpen}
+					onPick={handlePickTrashRecord}
+				/>
+			) : null}
 		</div>
 	);
 });

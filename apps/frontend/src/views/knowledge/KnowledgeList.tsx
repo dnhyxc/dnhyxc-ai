@@ -41,6 +41,10 @@ interface IProps {
 	onDeletedRecord?: (id: string) => void;
 	/** 当前在编辑器中打开的条目 id，用于列表行高亮 */
 	editingKnowledgeId?: string | null;
+	/**
+	 * 是否允许云端列表（未登录时应为 false：不调列表接口，默认本地文件夹，且不可切到数据库）
+	 */
+	allowCloudList?: boolean;
 }
 
 /** 单行：点击打开详情；删除图标与数据库列表一致，仅行 hover 时显示 */
@@ -145,8 +149,9 @@ const KnowledgeList: React.FC<IProps> = observer(
 		onAfterLocalDelete,
 		onDeletedRecord,
 		editingKnowledgeId = null,
+		allowCloudList = true,
 	}) => {
-		const { knowledgeStore } = useStore();
+		const { knowledgeStore, userStore } = useStore();
 
 		const [deleteLocalOpen, setDeleteLocalOpen] = useState(false);
 		const [deleteLocalPath, setDeleteLocalPath] = useState('');
@@ -158,7 +163,7 @@ const KnowledgeList: React.FC<IProps> = observer(
 			useState<KnowledgeListItem | null>(null);
 
 		/** false：云端列表；true：递归扫描本地文件夹中的 .md */
-		const [useLocalFolder, setUseLocalFolder] = useState(false);
+		const [useLocalFolder, setUseLocalFolder] = useState(!allowCloudList);
 		const [localFolderPath, setLocalFolderPath] = useState(TAURI_KNOWLEDGE_DIR);
 		const [localList, setLocalList] = useState<KnowledgeListItem[]>([]);
 		const [localLoading, setLocalLoading] = useState(false);
@@ -192,11 +197,18 @@ const KnowledgeList: React.FC<IProps> = observer(
 			}
 		}, [localFolderPath]);
 
+		// 未登录：固定使用本地文件夹模式，避免请求云端列表
+		useEffect(() => {
+			if (!allowCloudList) {
+				setUseLocalFolder(true);
+			}
+		}, [allowCloudList]);
+
 		useEffect(() => {
 			if (!open) return;
-			if (useLocalFolder) return;
+			if (useLocalFolder || !allowCloudList) return;
 			void knowledgeStore.refreshList();
-		}, [open, useLocalFolder, knowledgeStore]);
+		}, [open, useLocalFolder, allowCloudList, knowledgeStore]);
 
 		useEffect(() => {
 			if (!open || !useLocalFolder || !isTauriRuntime()) return;
@@ -243,6 +255,14 @@ const KnowledgeList: React.FC<IProps> = observer(
 					}
 					return;
 				}
+				if (!userStore.userInfo.id) {
+					Toast({
+						type: 'warning',
+						title: '请先登录',
+						message: '登录后可从云端知识库打开条目',
+					});
+					return;
+				}
 				const detail = await knowledgeStore.fetchDetail(item.id);
 				if (!detail) {
 					Toast({
@@ -255,11 +275,19 @@ const KnowledgeList: React.FC<IProps> = observer(
 				await onPick?.(detail);
 				onOpenChange(false);
 			},
-			[knowledgeStore, onPick, onOpenChange],
+			[knowledgeStore, userStore.userInfo.id, onPick, onOpenChange],
 		);
 
 		const handleDeleteApi = useCallback(
 			async (item: KnowledgeListItem): Promise<boolean> => {
+				if (!userStore.userInfo.id) {
+					Toast({
+						type: 'warning',
+						title: '请先登录',
+						message: '未登录时无法删除云端知识库记录',
+					});
+					return false;
+				}
 				const res = await deleteKnowledge(item.id);
 				if (!res.success) {
 					Toast({
@@ -273,7 +301,7 @@ const KnowledgeList: React.FC<IProps> = observer(
 				onDeletedRecord?.(item.id);
 				return true;
 			},
-			[knowledgeStore, onDeletedRecord],
+			[knowledgeStore, userStore.userInfo.id, onDeletedRecord],
 		);
 
 		/**
@@ -505,7 +533,9 @@ const KnowledgeList: React.FC<IProps> = observer(
 									<span
 										className={cn(
 											'text-xs',
-											!useLocalFolder && 'font-medium text-textcolor',
+											!useLocalFolder &&
+												allowCloudList &&
+												'font-medium text-textcolor',
 										)}
 									>
 										数据库
@@ -513,8 +543,11 @@ const KnowledgeList: React.FC<IProps> = observer(
 									<Switch
 										id="knowledge-drawer-local-source"
 										checked={useLocalFolder}
-										disabled={!isTauriRuntime()}
-										onCheckedChange={(v) => setUseLocalFolder(!!v)}
+										disabled={!isTauriRuntime() || !allowCloudList}
+										onCheckedChange={(v) => {
+											if (!allowCloudList) return;
+											setUseLocalFolder(!!v);
+										}}
 										size="sm"
 									/>
 									<span
@@ -557,9 +590,11 @@ const KnowledgeList: React.FC<IProps> = observer(
 									useLocalFolder ? 'mb-0.5' : 'mb-0.5 mt-2',
 								)}
 							>
-								{useLocalFolder
-									? '该列表的数据操作仅支持本地文件夹'
-									: '该列表的数据操作支持本地与数据库同步'}
+								{!allowCloudList
+									? '未登录：仅可使用本地文件夹（不请求云端）'
+									: useLocalFolder
+										? '该列表的数据操作仅支持本地文件夹'
+										: '该列表的数据操作支持本地与数据库同步'}
 							</div>
 						</div>
 						<ScrollArea

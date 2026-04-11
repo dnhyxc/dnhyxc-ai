@@ -11,6 +11,8 @@ const KnowledgeEditorToolbar = (props: {
 	onSave: () => void;
 	/** 保存请求进行中：禁用保存按钮 */
 	saveLoading?: boolean;
+	/** 未登录等场景隐藏回收站入口 */
+	showTrash?: boolean;
 	/** 系统设置中配置的快捷键文案（用于 Tooltip） */
 	shortcutHintSave?: string;
 	shortcutHintClear?: string;
@@ -22,6 +24,7 @@ const KnowledgeEditorToolbar = (props: {
 		onNewDraft,
 		onSave,
 		saveLoading = false,
+		showTrash = true,
 		shortcutHintSave,
 		shortcutHintClear,
 		shortcutHintOpenLibrary,
@@ -64,12 +67,14 @@ const KnowledgeEditorToolbar = (props: {
 					<span className="mt-0.5">知识库</span>
 				</Button>
 			</Tooltip>
-			<Tooltip side="bottom" content="回收站">
-				<Button variant="link" className={linkBtn} onClick={onOpenTrash}>
-					<Trash2 className="mt-0.5" />
-					<span className="mt-0.5">回收站</span>
-				</Button>
-			</Tooltip>
+			{showTrash ? (
+				<Tooltip side="bottom" content="回收站">
+					<Button variant="link" className={linkBtn} onClick={onOpenTrash}>
+						<Trash2 className="mt-0.5" />
+						<span className="mt-0.5">回收站</span>
+					</Button>
+				</Tooltip>
+			) : null}
 		</div>
 	);
 };

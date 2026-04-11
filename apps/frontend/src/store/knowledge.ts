@@ -411,6 +411,9 @@ class KnowledgeStore {
 
 	/** 拉取单条详情（含正文），用于点击列表进入编辑 */
 	async fetchDetail(id: string): Promise<KnowledgeRecord | null> {
+		if (!userStore.userInfo.id) {
+			return null;
+		}
 		const res = await getKnowledgeDetail(id);
 		if (!res.success || !res.data) {
 			return null;
