@@ -14,7 +14,8 @@ export class Knowledge {
 	@Column('text', { nullable: true })
 	title: string | null;
 
-	@Column('text', { nullable: true })
+	/** longtext：避免正文超过 MySQL TEXT（约 64KB）时出现 Data too long for column 'content' */
+	@Column({ type: 'longtext', nullable: true })
 	content: string;
 
 	@Column('varchar', { nullable: true })

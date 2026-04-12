@@ -21,7 +21,8 @@ export class KnowledgeTrash {
 	@Column('text', { nullable: true })
 	title: string | null;
 
-	@Column('text', { nullable: true })
+	/** 与 knowledge.content 一致，使用 longtext 存完整快照 */
+	@Column({ type: 'longtext', nullable: true })
 	content: string | null;
 
 	@Column('varchar', { nullable: true })
