@@ -408,7 +408,7 @@ function ChatAssistantMessageInner({
 								{message.searchOrganic?.length} 个网页
 							</Button>
 						)}
-					{!isStopped && (
+					{isStopped && (
 						<Button
 							variant="dynamic"
 							className="border border-theme/10 h-8.5 flex items-center ml-3 cursor-pointer text-sm text-teal-400 hover:text-teal-300 select-none bg-theme/5 hover:bg-theme/10 py-1.5 px-3 rounded-md"

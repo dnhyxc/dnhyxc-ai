@@ -37,7 +37,7 @@ const ChatControls = ({
 		(!isLatestBranch && messagesLength > 0);
 
 	return (
-		<div className="absolute right-[max(calc((100%-48rem)/2),0rem)] bottom-3.5 mx-auto">
+		<div className="absolute right-[max(calc((100%-48rem)/2),0rem)] bottom-3 mx-auto">
 			<div className="flex justify-end">
 				{/* 分支切换按钮组 */}
 				{showBranchButtons && (
