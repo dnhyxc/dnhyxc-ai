@@ -140,7 +140,8 @@ function ChatAssistantMessageInner({
 		anchorRect: OrganicAnchorRect;
 	} | null>(null);
 
-	// Mermaid 由 StreamingMarkdownBody 内独立岛渲染；此处关闭避免围栏重复解析
+	// 拆 mermaid 用 `splitForMermaidIslands`（与 enableMermaid 无关）；render 关 Mermaid，避免围栏补丁
+	// 与普通代码块（尤其列表内 ```）互相干扰；mermaid 正文由 StreamingMarkdownBody 的岛单独跑图。
 	const chatMdParser = useMemo(
 		() =>
 			new MarkdownParser({

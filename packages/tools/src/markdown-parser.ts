@@ -149,6 +149,11 @@ export function normalizeMermaidFenceBody(body: string): string {
 // 正文/公式样式仍建议 import '@dnhyxc-ai/tools/styles.css' 或 markdown-base.css。
 // 代码块主题可通过构造参数 highlightTheme（CDN）或 highlightThemeCss（内联）注入，亦可继续用手动 import。
 
+/** 流式 / 预览：Markdown 段与 Mermaid 岛交替（与 `splitForMermaidIslands` 返回一致） */
+export type MarkdownMermaidSplitPart =
+	| { type: 'markdown'; text: string }
+	| { type: 'mermaid'; text: string; complete: boolean };
+
 export interface MarkdownParserOptions {
 	html?: boolean;
 	linkify?: boolean;
@@ -416,6 +421,96 @@ class MarkdownParser {
 			}
 			return self.renderToken(tokens, idx, opt);
 		};
+	}
+
+	private static coalesceMarkdownMermaidParts(
+		parts: MarkdownMermaidSplitPart[],
+	): MarkdownMermaidSplitPart[] {
+		const out: MarkdownMermaidSplitPart[] = [];
+		for (const p of parts) {
+			if (p.type === 'markdown' && p.text === '') continue;
+			const last = out[out.length - 1];
+			if (p.type === 'markdown' && last?.type === 'markdown') {
+				last.text += p.text;
+			} else {
+				out.push(p.type === 'markdown' ? { ...p } : { ...p });
+			}
+		}
+		return out;
+	}
+
+	/**
+	 * 用与 `render` 相同的 markdown-it 语法树切分：仅把 ```mermaid 段拆成独立岛，其余保持 Markdown 源码再 render。
+	 * 替代手写按行扫 ``` 的方式，使列表内代码块、与开头缩进不一致的闭合行等与渲染器一致，避免拆块错位。
+	 *
+	 * **与 `enableMermaid` 解耦**：`md.parse` 识别围栏不依赖渲染期 Mermaid 补丁；即使实例为
+	 * `enableMermaid: false`（聊天里用其 `render` 普通代码块），仍可按令牌拆出 mermaid 段交给独立岛。
+	 */
+	public splitForMermaidIslands(source: string): MarkdownMermaidSplitPart[] {
+		const normalized = source.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+		const lines = normalized.split('\n');
+		const lineCount = lines.length;
+		/**
+		 * 按行号截取原文行块。若后面还有行（b < lineCount），在段末补一个 `\n`：
+		 * `lines.slice(a,b).join('\n')` 只有「行与行之间」的换行，缺少「最后一段行末」与「下一段首行」之间的换行，
+		 * 与下一段拼接会变成 `### 标题` + `` ```ts ``，围栏无法识别（Mermaid 段用 token.content 不受影响）。
+		 */
+		const sliceLines = (a: number, b: number) => {
+			const lo = Math.max(0, a);
+			const hi = Math.min(b, lineCount);
+			if (lo >= hi) return '';
+			const body = lines.slice(lo, hi).join('\n');
+			return hi < lineCount ? `${body}\n` : body;
+		};
+
+		const tokens = this.md.parse(normalized, {});
+		const raw: MarkdownMermaidSplitPart[] = [];
+		let lastLine = 0;
+
+		for (const t of tokens) {
+			if (t.type !== 'fence' || t.map == null) continue;
+			const [start, end] = t.map;
+			if (start < lastLine) continue;
+			if (start > lastLine) {
+				const prose = sliceLines(lastLine, start);
+				if (prose !== '') raw.push({ type: 'markdown', text: prose });
+			}
+
+			const rawFence = sliceLines(start, end);
+			const info = t.info ? (String(t.info).trim().split(/\s+/)[0] ?? '') : '';
+			const lang = info.toLowerCase();
+			const body = t.content ?? '';
+
+			// 列表内顶格闭合时 markdown-it 可能多出一个无 info、无正文的 fence 令牌（空 <pre>）；跳过且不丢行号
+			const fenceOnly = rawFence.replace(/\n+$/u, '').trim();
+			const orphanCloser =
+				!lang &&
+				!body.trim() &&
+				/^`{3,}\s*$/u.test(fenceOnly.replace(/^[ \t]*/u, ''));
+
+			if (orphanCloser) {
+				lastLine = end;
+				continue;
+			}
+
+			if (lang === 'mermaid') {
+				raw.push({ type: 'mermaid', text: body, complete: true });
+			} else if (rawFence !== '') {
+				raw.push({ type: 'markdown', text: rawFence });
+			}
+			lastLine = end;
+		}
+
+		if (lastLine < lineCount) {
+			const tail = sliceLines(lastLine, lineCount);
+			if (tail !== '') raw.push({ type: 'markdown', text: tail });
+		}
+
+		const merged = MarkdownParser.coalesceMarkdownMermaidParts(raw);
+		if (merged.length === 0 && normalized) {
+			return [{ type: 'markdown', text: normalized }];
+		}
+		return merged;
 	}
 
 	/**

@@ -1,6 +1,9 @@
 /**
  * 按顶格代码围栏拆分 Markdown，将 mermaid 与其它内容分离。
- * 用于聊天流式：Mermaid 单独 React 岛渲染，避免整段 dangerouslySetInnerHTML 冲掉已生成的 SVG。
+ *
+ * **推荐**：聊天 / Monaco 预览已改用 `MarkdownParser.splitForMermaidIslands`（与 markdown-it
+ * 同源），列表内代码块等边界与 `render` 一致。本文件仍保留 `splitMarkdownByCodeFences` 供
+ * 仅需纯函数、不持有 Parser 实例的旧用法及 `mermaidStreamingFallbackHtml`。
  *
  * 闭合围栏须按行匹配（与 markdownFenceLineParser 一致），禁止对正文用 indexOf('```')，
  * 否则注释/JSDoc 中的 ```mermaid 等会误当成围栏结束。

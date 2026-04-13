@@ -1,6 +1,9 @@
 import { MermaidFenceIsland } from '@design/MermaidFenceIsland';
 import Tooltip from '@design/Tooltip';
-import { MarkdownParser } from '@dnhyxc-ai/tools';
+import {
+	type MarkdownMermaidSplitPart,
+	MarkdownParser,
+} from '@dnhyxc-ai/tools';
 import { useMermaidInMarkdownRoot } from '@dnhyxc-ai/tools/react';
 import { ScrollArea } from '@ui/index';
 import { ArrowDown, ArrowUp } from 'lucide-react';
@@ -30,10 +33,7 @@ import {
 	downloadChatCodeBlock,
 	getChatCodeBlockPlainText,
 } from '@/utils/chatCodeToolbar';
-import {
-	mermaidStreamingFallbackHtml,
-	splitMarkdownByCodeFences,
-} from '@/utils/splitMarkdownFences';
+import { mermaidStreamingFallbackHtml } from '@/utils/splitMarkdownFences';
 
 /** 纯预览模式右下角：可滚动时显示置底，触底后切换为置顶 */
 type PreviewScrollCornerFabMode = 'hidden' | 'toBottom' | 'toTop';
@@ -81,15 +81,6 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 		[viewportRef],
 	);
 
-	const fenceParts = useMemo(
-		() => splitMarkdownByCodeFences(markdown),
-		[markdown],
-	);
-
-	const hasMermaidIslandLayout = Boolean(
-		enableMermaid && fenceParts.some((p) => p.type === 'mermaid'),
-	);
-
 	const parser = useMemo(
 		() =>
 			new MarkdownParser({
@@ -102,6 +93,16 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 				enableMermaid,
 			}),
 		[theme, enableMermaid],
+	);
+
+	const fenceParts = useMemo(
+		() => parser.splitForMermaidIslands(markdown),
+		[markdown, parser],
+	);
+
+	const hasMermaidIslandLayout = Boolean(
+		enableMermaid &&
+			fenceParts.some((p: MarkdownMermaidSplitPart) => p.type === 'mermaid'),
 	);
 
 	const parserNoMermaid = useMemo(
@@ -325,7 +326,7 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 						)}
 					>
 						{hasMermaidIslandLayout ? (
-							fenceParts.map((part, i) => {
+							fenceParts.map((part: MarkdownMermaidSplitPart, i: number) => {
 								if (part.type === 'markdown') {
 									return (
 										<div

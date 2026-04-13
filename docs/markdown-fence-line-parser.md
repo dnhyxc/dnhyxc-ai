@@ -34,7 +34,7 @@
 2. **围栏行的判定规则（与 CommonMark 常见写法对齐，并偏保守）**  
    - **开头行**：`trimEnd` 后匹配「可选缩进 + 至少 3 个反引号 + info（无反引号）直到行尾」。  
    - **缩进**：仅允许 **空格且长度 ≤ 3**，**不允许 Tab**（避免内嵌源码里 `Tab + 单独一行 \`\`\`` 被当成围栏边界）。  
-   - **闭合行**：`trimEnd` 后仅为「缩进 + 至少与开头等长的反引号 + 可选尾部空白」；且缩进须与 `fenceClosingIndentMatchesOpen` 一致（开头无缩进时允许 0～3 个空格的闭合行）。
+   - **闭合行**：`trimEnd` 后仅为「缩进 + 至少与开头等长的反引号 + 可选尾部空白」；缩进由 `fenceClosingIndentMatchesOpen` 判定：除「开闭完全一致」「顶格开头允许 0～3 空格闭合」外，**允许开头有缩进时顶格或少于开头的空格缩进闭合**（列表里 `   ```ts` 与顶格 ` ``` ` 常见配对）。
 
 3. **未闭合围栏**  
    `splitMarkdownFencedBlocks` 在遇到合法开头但未找到合法闭合时，产出 `fenced: true, complete: false`，供流式 Mermaid 等场景。
@@ -80,51 +80,21 @@ markdownFenceLineParser.ts
 | 10 | `export function isPlausibleMarkdownFenceIndent` | 导出缩进校验，供开闭行共用。 |
 | 11 | `if (indent.includes('\t')) return false` | Tab 一律不视为 Markdown 围栏行的合法缩进。 |
 | 12 | `return /^ {0,3}$/.test(indent)` | 仅 0～3 个普通空格（U+0020）。 |
-| 15–17 | `fenceClosingIndentMatchesOpen` 注释 | 闭合缩进与开头对齐；顶格开头时允许 CM 常见的有限空格闭合。 |
-| 18–21 | 函数签名 | `openIndent` / `closeIndent` 为围栏行正则捕获的缩进子串。 |
-| 22 | `if (!isPlausibleMarkdownFenceIndent(closeIndent))` | 闭合行缩进也必须通过「无 Tab、≤3 空格」。 |
-| 23 | `if (openIndent === closeIndent) return true` | 最常见：开闭缩进完全一致。 |
-| 24 | `if (openIndent === '' && /^ {0,3}$/.test(closeIndent))` | 顶格围栏允许 0～3 空格缩进的闭合行。 |
-| 25 | `return false` | 其它情况不算合法闭合配对。 |
-| 28–30 | `MarkdownFenceSegment` 联合类型 | 非围栏段只有 `text`；围栏段额外带 `complete`（是否遇到合法闭合）。 |
-| 32–35 | `splitMarkdownFencedBlocks` 注释 | 切段策略与 `complete: false` 含义。 |
-| 36 | `export function splitMarkdownFencedBlocks` | 导出入口。 |
-| 37 | `replace(/\r\n/g, '\n').split('\n')` | 统一换行再按行处理。 |
-| 38 | `parts` | 累积输出段。 |
-| 39 | `let i = 0` | 当前扫描行下标。 |
-| 40 | `while (i < lines.length)` | 主循环直到耗尽所有行。 |
-| 41 | `const line = lines[i]` | 当前行原文（保留行首缩进等）。 |
-| 42 | `openMatch = /^(\s*)(`{3,})([^`]*)$/.exec(line.trimEnd())` | 从行尾去掉空白后匹配：整行是否为「缩进+反引号+info」；`[^`]*` 保证 info 内不能再含反引号。 |
-| 43 | `if (openMatch && isPlausibleMarkdownFenceIndent(openMatch[1]))` | 同时满足语法与缩进策略才视为**围栏开始**。 |
-| 44 | `openIndent = openMatch[1]` | 记下开头缩进，供闭合比对。 |
-| 45 | `tickLen = openMatch[2].length` | 开头反引号个数（支持 4+ 反引号围栏）。 |
-| 46 | `fenceLines = [line]` | 围栏累积从首行开始。 |
-| 47 | `i++` | 移向围栏内第一行正文。 |
-| 48 | `let closed = false` | 是否已找到合法闭合。 |
-| 49 | `while (i < lines.length)` | 在内层扫描直至闭合或 EOF。 |
-| 50 | `cur = lines[i]` | 当前候选行。 |
-| 51 | `fenceLines.push(cur)` | 先纳入围栏文本（闭合行也暂存，最后整块输出）。 |
-| 52 | `closeMatch = /^(\s*)(`{3,})\s*$/.exec(cur.trimEnd())` | 闭合行：除缩进外**只有**反引号（长度可 ≥ 开头）。 |
-| 53–57 | `if (closeMatch && ...)` | 反引号个数不少于开头，且缩进对与 `fenceClosingIndentMatchesOpen` 通过。 |
-| 58 | `closed = true` | 标记已闭合。 |
-| 59 | `i++` | 消费闭合行，游标移到围栏外下一行。 |
-| 60 | `break` | 结束内层循环。 |
-| 61 | `i++` | 非闭合行：继续向下扫。 |
-| 64–68 | `parts.push({ fenced: true, text, complete })` | 输出一整段围栏；`complete` 反映是否找到闭合。 |
-| 69 | `if (!closed) break` | 未闭合则不再解析后续（剩余内容已都在 `fenceLines` 内）。 |
-| 70 | `continue` | 闭合则回到外层，继续从当前 `i` 解析下一段。 |
-| 72 | `proseStart = i` | 非围栏起始：准备收一段正文。 |
-| 73 | `while (i < lines.length)` | 向后吞行直到下一行「像围栏开头」。 |
-| 74 | `peek = ...exec(lines[i].trimEnd())` | 与开头行同一套 open 正则。 |
-| 75 | `if (peek && isPlausibleMarkdownFenceIndent(peek[1])) break` | 遇到合法围栏开头则停止吞正文。 |
-| 76 | `i++` | 否则本行属于正文。 |
-| 78–81 | `parts.push({ fenced: false, text })` | 输出正文段。 |
-| 83 | `return parts` | 返回交替的围栏/正文段列表。 |
-| 86 | `export function joinMarkdownSegments` | 将处理后的各段用 `\n` 拼回（避免段边界粘行）。 |
-| 87 | `let acc = ''` | 拼接累加器。 |
-| 88 | `for (const text of segments)` | 逐段连接。 |
-| 89–90 | `if (acc === '') acc = text else acc = \`\n\${text}\`` | 首段无前导换行；之后段前加 `\n`。 |
-| 92 | `return acc` | 还原为完整字符串。 |
+| 15–21 | `fenceClosingIndentMatchesOpen` 注释 | 闭合缩进规则：见源码（含列表内顶格闭合）。 |
+| 22–38 | `fenceClosingIndentMatchesOpen` 实现 | `openIndent` / `closeIndent` 为围栏行捕获的缩进；除完全一致、顶格开+≤3 空闭外，**开头有缩进时允许顶格或更短空格前缀闭合**。 |
+| 41–43 | `MarkdownFenceSegment` 联合类型 | 非围栏段只有 `text`；围栏段额外带 `complete`。 |
+| 45–48 | `splitMarkdownFencedBlocks` 注释与签名 | 切段策略与 `complete: false` 含义。 |
+| 49–54 | `splitMarkdownFencedBlocks` 初始化 | 统一换行、累积 `parts`、`i` 游标。 |
+| 55 | `while (i < lines.length)` | 主循环直到耗尽所有行。 |
+| 56–57 | `openMatch` | 从行尾 trim 后匹配围栏开头行。 |
+| 58 | `if (openMatch && isPlausibleMarkdownFenceIndent(...))` | 同时满足语法与缩进才视为围栏开始。 |
+| 59–60 | `openIndent` / `tickLen` | 记下开头缩进与反引号个数。 |
+| 61–63 | `fenceLines` / `i++` / `closed` | 开始累积围栏正文行。 |
+| 64–78 | 内层 `while` | 扫描直至闭合或 EOF；`closeMatch` + `fenceClosingIndentMatchesOpen` 判定闭合。 |
+| 79–85 | `parts.push` / `if (!closed) break` / `continue` | 输出围栏段；未闭合则停止解析后续。 |
+| 87–97 | 正文段收集 | `proseStart` 起吞行直到下一围栏开头。 |
+| 98 | `return parts` | 返回围栏/正文交替列表。 |
+| 101–107 | `joinMarkdownSegments` | 各段用 `\n` 拼回。 |
 
 ---
 

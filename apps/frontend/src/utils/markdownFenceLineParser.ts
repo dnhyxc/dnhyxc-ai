@@ -13,7 +13,11 @@ export function isPlausibleMarkdownFenceIndent(indent: string): boolean {
 }
 
 /**
- * 闭合行缩进须与开头一致；开头无缩进时允许 0～3 个空格。
+ * 闭合行缩进与开头的匹配规则（对齐 CommonMark 常见行为）：
+ * - 开头与闭合缩进完全一致 → 通过；
+ * - 开头无缩进 → 闭合允许 0～3 个空格；
+ * - 开头有缩进（常见于列表续行里的 ```）→ 闭合允许**顶格或少于开头的空格缩进**，
+ *   避免「`   ```ts` 开头、` ``` ` 顶格闭合」被误判为未闭合，导致整段后续正文被吞进围栏、MdPreview 错乱。
  */
 export function fenceClosingIndentMatchesOpen(
 	openIndent: string,
@@ -22,6 +26,15 @@ export function fenceClosingIndentMatchesOpen(
 	if (!isPlausibleMarkdownFenceIndent(closeIndent)) return false;
 	if (openIndent === closeIndent) return true;
 	if (openIndent === '' && /^ {0,3}$/.test(closeIndent)) return true;
+	if (openIndent !== '') {
+		if (closeIndent === '') return true;
+		if (
+			closeIndent.length < openIndent.length &&
+			openIndent.startsWith(closeIndent)
+		) {
+			return true;
+		}
+	}
 	return false;
 }
 
