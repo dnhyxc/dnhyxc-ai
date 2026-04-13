@@ -18,56 +18,12 @@ import { useMermaidImagePreview } from '@/hooks/useMermaidImagePreview';
 import { cn } from '@/lib/utils';
 import { copyToClipboard } from '@/utils/clipboard';
 import {
-	fenceClosingIndentMatchesOpen,
-	isPlausibleMarkdownFenceIndent,
-} from '@/utils/markdownFenceLineParser';
-import { mermaidStreamingFallbackHtml } from '@/utils/splitMarkdownFences';
+	hashText,
+	mermaidStreamingFallbackHtml,
+	splitOpenMermaidTail,
+} from '@/utils/splitMarkdownFences';
 
-function splitOpenMermaidTail(
-	source: string,
-): { prefix: string; body: string; openLine: number } | null {
-	const normalized = source.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-	const lines = normalized.split('\n');
-
-	for (let i = 0; i < lines.length; i++) {
-		const line = lines[i];
-		const openMatch = /^(\s*)(`{3,})([^`]*)$/.exec(line.trimEnd());
-		if (!openMatch) continue;
-		const openIndent = openMatch[1] ?? '';
-		const tickLen = openMatch[2]?.length ?? 3;
-		const lang = (openMatch[3] ?? '').trim().split(/\s+/)[0]?.toLowerCase();
-		if (!isPlausibleMarkdownFenceIndent(openIndent)) continue;
-		if (lang !== 'mermaid') continue;
-
-		let j = i + 1;
-		let closed = false;
-		while (j < lines.length) {
-			const cur = lines[j];
-			const closeMatch = /^(\s*)(`{3,})\s*$/.exec(cur.trimEnd());
-			if (
-				closeMatch &&
-				(closeMatch[2]?.length ?? 0) >= tickLen &&
-				fenceClosingIndentMatchesOpen(openIndent, closeMatch[1] ?? '')
-			) {
-				closed = true;
-				break;
-			}
-			j++;
-		}
-
-		if (closed) {
-			i = j;
-			continue;
-		}
-
-		// prefix 必须保留行末换行：否则下一段以 ``` 开头时会被拼成 `上一行内容```lang`，围栏失效。
-		const prefixLines = lines.slice(0, i);
-		const prefix = prefixLines.length > 0 ? `${prefixLines.join('\n')}\n` : '';
-		const body = lines.slice(i + 1).join('\n');
-		return { prefix, body, openLine: i };
-	}
-	return null;
-}
+const COPY_FEEDBACK_MS = 1600;
 
 export type StreamingMarkdownBodyProps = {
 	markdown: string;
@@ -80,15 +36,6 @@ export type StreamingMarkdownBodyProps = {
 	containerRef?: RefObject<HTMLDivElement | null>;
 };
 
-function hashText(s: string): string {
-	// 简单稳定 hash（djb2），用于给“同一块 mermaid”生成稳定 id
-	let h = 5381;
-	for (let i = 0; i < s.length; i++) {
-		h = (h * 33) ^ s.charCodeAt(i);
-	}
-	return (h >>> 0).toString(36);
-}
-
 export function StreamingMarkdownBody({
 	markdown,
 	parser,
@@ -98,11 +45,11 @@ export function StreamingMarkdownBody({
 	defaultMermaidViewMode = 'diagram',
 	containerRef,
 }: StreamingMarkdownBodyProps) {
-	const openMermaidId = useMemo(() => {
-		if (!isStreaming) return null;
-		const openTail = splitOpenMermaidTail(markdown);
-		return openTail ? `mmd-open-line-${openTail.openLine}` : null;
-	}, [markdown, isStreaming]);
+	const openTail = useMemo(
+		() => (isStreaming ? splitOpenMermaidTail(markdown) : null),
+		[markdown, isStreaming],
+	);
+	const openMermaidId = openTail ? `mmd-open-line-${openTail.openLine}` : null;
 
 	// 每块 Mermaid 独立切换：blockId -> mode
 	const [mermaidModeById, setMermaidModeById] = useState<
@@ -116,7 +63,6 @@ export function StreamingMarkdownBody({
 		if (!isStreaming) {
 			return parser.splitForMermaidIslands(markdown);
 		}
-		const openTail = splitOpenMermaidTail(markdown);
 		if (!openTail) {
 			return parser.splitForMermaidIslands(markdown);
 		}
@@ -125,9 +71,19 @@ export function StreamingMarkdownBody({
 			...headParts,
 			{ type: 'mermaid', text: openTail.body, complete: false },
 		];
-	}, [markdown, parser, isStreaming]);
+	}, [markdown, parser, isStreaming, openTail]);
+
 	const { openMermaidPreview, mermaidImagePreviewModal } =
 		useMermaidImagePreview();
+
+	const markCopied = (blockId: string) => {
+		const prevTid = copiedTimersRef.current[blockId];
+		if (prevTid) window.clearTimeout(prevTid);
+		setCopiedById((prev) => ({ ...prev, [blockId]: true }));
+		copiedTimersRef.current[blockId] = window.setTimeout(() => {
+			setCopiedById((prev) => ({ ...prev, [blockId]: false }));
+		}, COPY_FEEDBACK_MS);
+	};
 
 	return (
 		<div ref={containerRef} className={cn('streaming-md-body', className)}>
@@ -156,12 +112,7 @@ export function StreamingMarkdownBody({
 				const onCopy = () => {
 					void (async () => {
 						await copyToClipboard(`\`\`\`mermaid\n${part.text}\n\`\`\``);
-						const prevTid = copiedTimersRef.current[blockId];
-						if (prevTid) window.clearTimeout(prevTid);
-						setCopiedById((prev) => ({ ...prev, [blockId]: true }));
-						copiedTimersRef.current[blockId] = window.setTimeout(() => {
-							setCopiedById((prev) => ({ ...prev, [blockId]: false }));
-						}, 1600);
+						markCopied(blockId);
 					})();
 				};
 

@@ -1065,6 +1065,71 @@ mutationObserverRef.current.observe(contentArea, {
 });
 ```
 
+---
+
+### 7.3.3 本次实现更新：每个 Mermaid 块独立「图/代码」切换 + 复制反馈
+
+位置：`apps/frontend/src/components/design/ChatAssistantMessage/StreamingMarkdownBody.tsx`
+
+诉求：
+
+- **同一条消息里多个 Mermaid**：每块都可以独立切换「显示图」或「显示 markdown 代码」；
+- **不影响 Mermaid 流式防闪**：切到“图”仍走 `MermaidFenceIsland`（离屏渲染 + 成功才提交）；
+- **复制交互反馈**：点击“复制”后按钮图标切换为 `CheckCircle`，颜色为 `text-teal-400`，短暂后自动恢复；
+- **流式不闪**：尾部未闭合 Mermaid 的 key 必须稳定，否则 remount 会导致闪烁。
+
+实现要点：
+
+1. **为每块 Mermaid 生成稳定 blockId**：
+   - 已闭合块：`mmd-${hashText(part.text)}`（内容 hash，稳定）
+   - 尾部开放块：`mmd-open-line-${openLine}`（开围栏行号稳定；不要用数组索引 `i`）
+
+2. **组件内维护两张表**：
+   - `mermaidModeById[blockId] = 'diagram' | 'code'`
+   - `copiedById[blockId] = boolean`（并用 timer 自动回退）
+
+3. **渲染分支**：
+   - `mode === 'code'`：`mermaidStreamingFallbackHtml(part.text)`（仅展示 DSL，不跑 Mermaid）
+   - `mode === 'diagram'`：`MermaidFenceIsland`（仍可流式出图、且由岛内策略防闪）
+
+关键代码（逐行注释摘录）：
+
+```typescript
+const COPY_FEEDBACK_MS = 1600;
+
+// 尾部开放 mermaid：用开围栏行号做稳定 id，避免流式过程中 key 漂移导致 remount 闪烁
+const openTail = useMemo(
+  () => (isStreaming ? splitOpenMermaidTail(markdown) : null),
+  [markdown, isStreaming],
+);
+const openMermaidId = openTail ? `mmd-open-line-${openTail.openLine}` : null;
+
+// 每块 Mermaid 独立切换/复制反馈
+const [mermaidModeById, setMermaidModeById] = useState<Record<string, 'diagram' | 'code'>>({});
+const [copiedById, setCopiedById] = useState<Record<string, boolean>>({});
+const copiedTimersRef = useRef<Record<string, number>>({});
+
+const markCopied = (blockId: string) => {
+  const prevTid = copiedTimersRef.current[blockId];
+  if (prevTid) window.clearTimeout(prevTid);
+  setCopiedById((prev) => ({ ...prev, [blockId]: true }));
+  copiedTimersRef.current[blockId] = window.setTimeout(() => {
+    setCopiedById((prev) => ({ ...prev, [blockId]: false }));
+  }, COPY_FEEDBACK_MS);
+};
+
+// map 内：blockId = complete ? hash : openLine
+const blockId = part.complete ? `mmd-${hashText(part.text)}` : (openMermaidId ?? `mmd-open-${i}`);
+const mode = mermaidModeById[blockId] ?? defaultMermaidViewMode;
+const copied = copiedById[blockId] === true;
+
+// 复制按钮：成功后切换图标与颜色（不使用 Toast）
+const onCopy = async () => {
+  await copyToClipboard(`\`\`\`mermaid\n${part.text}\n\`\`\``);
+  markCopied(blockId);
+};
+```
+
 ### 7.4 `normalizeMermaidFenceBody` 与 `patchMermaidFence`（`packages/tools/src/markdown-parser.ts`）
 
 - **`normalizeMermaidFenceBody`**：导出函数；`\r\n`/`\r` → `\n`；对 **未加引号** 且含 **`/`** 或 **`+`** 的 `subgraph … […]` / `nodeId[…]` 自动包一层双引号（跳过 `[/…/]` 梯形节点外观）。降低 Mermaid 解析失败导致预览只剩 DSL 文本的概率。

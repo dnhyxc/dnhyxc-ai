@@ -6,7 +6,11 @@
  * 否则注释/JSDoc 中的 ```mermaid 等会误当成围栏结束。
  */
 
-import { splitMarkdownFencedBlocks } from '@/utils/markdownFenceLineParser';
+import {
+	fenceClosingIndentMatchesOpen,
+	isPlausibleMarkdownFenceIndent,
+	splitMarkdownFencedBlocks,
+} from '@/utils/markdownFenceLineParser';
 
 export type MarkdownFencePart =
 	| { type: 'markdown'; text: string }
@@ -74,4 +78,59 @@ function escapeHtml(s: string): string {
 export function mermaidStreamingFallbackHtml(code: string): string {
 	const esc = escapeHtml(code);
 	return `<div class="markdown-body"><pre class="chat-md-mermaid-streaming"><code class="language-mermaid">${esc}</code></pre></div>`;
+}
+
+export function splitOpenMermaidTail(
+	source: string,
+): { prefix: string; body: string; openLine: number } | null {
+	const normalized = source.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+	const lines = normalized.split('\n');
+
+	for (let i = 0; i < lines.length; i++) {
+		const line = lines[i];
+		const openMatch = /^(\s*)(`{3,})([^`]*)$/.exec(line.trimEnd());
+		if (!openMatch) continue;
+		const openIndent = openMatch[1] ?? '';
+		const tickLen = openMatch[2]?.length ?? 3;
+		const lang = (openMatch[3] ?? '').trim().split(/\s+/)[0]?.toLowerCase();
+		if (!isPlausibleMarkdownFenceIndent(openIndent)) continue;
+		if (lang !== 'mermaid') continue;
+
+		let j = i + 1;
+		let closed = false;
+		while (j < lines.length) {
+			const cur = lines[j];
+			const closeMatch = /^(\s*)(`{3,})\s*$/.exec(cur.trimEnd());
+			if (
+				closeMatch &&
+				(closeMatch[2]?.length ?? 0) >= tickLen &&
+				fenceClosingIndentMatchesOpen(openIndent, closeMatch[1] ?? '')
+			) {
+				closed = true;
+				break;
+			}
+			j++;
+		}
+
+		if (closed) {
+			i = j;
+			continue;
+		}
+
+		// prefix 必须保留行末换行：否则下一段以 ``` 开头时会被拼成 `上一行内容```lang`，围栏失效。
+		const prefixLines = lines.slice(0, i);
+		const prefix = prefixLines.length > 0 ? `${prefixLines.join('\n')}\n` : '';
+		const body = lines.slice(i + 1).join('\n');
+		return { prefix, body, openLine: i };
+	}
+	return null;
+}
+
+export function hashText(s: string): string {
+	// 简单稳定 hash（djb2），用于给“同一块 mermaid”生成稳定 id
+	let h = 5381;
+	for (let i = 0; i < s.length; i++) {
+		h = (h * 33) ^ s.charCodeAt(i);
+	}
+	return (h >>> 0).toString(36);
 }
