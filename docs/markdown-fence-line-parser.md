@@ -31,6 +31,22 @@
    - `format.ts`（盘古空格 / `safeFormatMarkdownValue`）
    - `splitMarkdownFences.ts`（`splitMarkdownByCodeFences`，预览与 Mermaid 岛）
 
+2. **重要演进（2026-04）：拆 Mermaid 的“主路径”迁移到 markdown-it parse**  
+   过去聊天/预览为了把 ` ```mermaid ` 拆成独立岛，使用 `splitMarkdownByCodeFences`（纯函数按行扫围栏）。  
+   该实现虽能规避 `indexOf('```')` 的误截断，但在以下场景仍会把**普通代码块**拆坏（导致“代码块无法渲染”）：
+   - 列表内代码块：开头行与闭合行缩进不一致（例如开头 `   ```ts`，闭合顶格 ```）；
+   - 拆分后拼接丢失段末换行：`### 标题\n` 与下一段 ```lang 粘连成同一行，围栏失效；
+   - 与渲染器（markdown-it）解析边界不一致：拆分认为是 fence，渲染器认为不是（或反之）。
+   
+   当前仓库在 `packages/tools/src/markdown-parser.ts` 中新增 `MarkdownParser.splitForMermaidIslands`：
+   - **始终使用 `markdown-it` 的 `parse()`** 得到 fence token；
+   - 仅把 ` ```mermaid ` fence 拆成 `type:'mermaid'` 岛，其它 fence 原文保持为 markdown 段交给 `render()`；
+   - 切片时**保留段末换行**，避免围栏粘连。
+   
+   因此：  
+   - **普通代码块渲染稳定性**：由 `splitForMermaidIslands` 保障（与渲染器同源）；  
+   - **`markdownFenceLineParser.ts` 仍保留价值**：用于“流式尾部未闭合 mermaid 围栏”的**按行探测**（见下文 §5.2），以及盘古空格/安全格式化。
+
 2. **围栏行的判定规则（与 CommonMark 常见写法对齐，并偏保守）**  
    - **开头行**：`trimEnd` 后匹配「可选缩进 + 至少 3 个反引号 + info（无反引号）直到行尾」。  
    - **缩进**：仅允许 **空格且长度 ≤ 3**，**不允许 Tab**（避免内嵌源码里 `Tab + 单独一行 \`\`\`` 被当成围栏边界）。  
@@ -56,8 +72,13 @@ markdownFenceLineParser.ts
     │     （Monaco index.tsx 快捷键）
     │
     └── splitMarkdownFences.ts
-          splitMarkdownByCodeFences
-          （ParserMarkdownPreviewPane、聊天流等）
+          splitMarkdownByCodeFences（历史主拆分器；仍保留 fallback 与工具函数）
+          splitOpenMermaidTail（流式尾部开放 mermaid 探测：只对尾部做按行扫描）
+          （聊天 StreamingMarkdownBody、Monaco/preview.tsx 使用：闭合 fence 交给 splitForMermaidIslands）
+
+packages/tools/src/markdown-parser.ts
+    └── MarkdownParser.splitForMermaidIslands（markdown-it parse，同源拆分；保障普通代码块渲染）
+          （聊天 StreamingMarkdownBody、Monaco/preview.tsx）
 ```
 
 路径速查：
@@ -152,6 +173,29 @@ markdownFenceLineParser.ts
 | 59–61 | 空输入兜底。 |
 | 62 | `coalesceMarkdownParts` 归并。 |
 
+### 5.2 本次新增：`splitOpenMermaidTail`（仅探测流式尾部未闭合 mermaid）
+
+位置：`apps/frontend/src/utils/splitMarkdownFences.ts`
+
+用途：
+
+- `markdown-it` 在围栏未闭合时不会产出 fence token，因此 `splitForMermaidIslands` 无法识别“尾部开放 mermaid”；
+- 聊天/预览在编辑或流式过程中，仍希望“边输出边渲染 Mermaid”（或至少展示 DSL），就需要一个**只对尾部开放围栏**的按行探测器；
+- 该探测器必须**不破坏普通代码块**：因此仅在“找到 ` ```mermaid` 且未找到闭合行”的情况下返回 `{ prefix, body, openLine }`：
+  - `prefix`：围栏开头之前的正文（并强制补上行末 `\n`，避免下一段 fence 粘连）
+  - `body`：围栏内 DSL（到 EOF）
+  - `openLine`：开围栏所在行号，用于生成稳定 key，避免流式过程中 remount 引发闪烁
+
+关键片段（示意，行尾中文注释说明意图）：
+
+```typescript
+// prefix 必须保留行末换行：否则下一段以 ``` 开头时会被拼成 `上一行内容```lang`，围栏失效
+const prefixLines = lines.slice(0, i);
+const prefix = prefixLines.length > 0 ? `${prefixLines.join('\n')}\n` : '';
+const body = lines.slice(i + 1).join('\n');
+return { prefix, body, openLine: i };
+```
+
 ---
 
 ## 6. `format.ts` 中与本次相关的逐行说明
@@ -198,4 +242,7 @@ markdownFenceLineParser.ts
 - **根因**：正文中的 \`\`\` 子串（如注释里的 \`\`\`mermaid）被 **非贪婪正则** 或 **`indexOf('```')`** 误判为围栏边界。  
 - **做法**：**按行**识别围栏，**收紧**开闭行缩进；**共享** `markdownFenceLineParser.ts`；**拆分 Mermaid** 与 **盘古空格** 同逻辑；**Markdown** 不走 Prettier 文档格式化，**快捷键**走 `safeFormatMarkdownValue`。
 
-以上与当前代码保持一致；若迁移或重构，请同步更新本文档中的行号与路径。
+以上与当前代码保持一致；若迁移或重构，请同步更新本文档中的行号与路径，尤其注意：
+
+- 聊天/预览拆 Mermaid 的主路径为 `MarkdownParser.splitForMermaidIslands`（markdown-it parse）；
+- `markdownFenceLineParser.ts` 仍用于安全格式化与“尾部开放 mermaid”探测（`splitOpenMermaidTail`）。

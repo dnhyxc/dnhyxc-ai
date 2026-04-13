@@ -1,6 +1,9 @@
 import { MermaidFenceIsland } from '@design/MermaidFenceIsland';
 import Tooltip from '@design/Tooltip';
-import { MarkdownParser } from '@dnhyxc-ai/tools';
+import {
+	type MarkdownMermaidSplitPart,
+	MarkdownParser,
+} from '@dnhyxc-ai/tools';
 import { useMermaidInMarkdownRoot } from '@dnhyxc-ai/tools/react';
 import { ScrollArea } from '@ui/index';
 import { ArrowDown, ArrowUp } from 'lucide-react';
@@ -32,7 +35,7 @@ import {
 } from '@/utils/chatCodeToolbar';
 import {
 	mermaidStreamingFallbackHtml,
-	splitMarkdownByCodeFences,
+	splitOpenMermaidTail,
 } from '@/utils/splitMarkdownFences';
 
 /** 纯预览模式右下角：可滚动时显示置底，触底后切换为置顶 */
@@ -72,79 +75,6 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 		useState<PreviewScrollCornerFabMode>('hidden');
 
 	const { theme } = useTheme();
-
-	const assignViewportRef = useCallback(
-		(node: HTMLDivElement | null) => {
-			localViewportRef.current = node;
-			if (viewportRef) viewportRef.current = node;
-		},
-		[viewportRef],
-	);
-
-	const fenceParts = useMemo(
-		() => splitMarkdownByCodeFences(markdown),
-		[markdown],
-	);
-
-	const hasMermaidIslandLayout = Boolean(
-		enableMermaid && fenceParts.some((p) => p.type === 'mermaid'),
-	);
-
-	const parser = useMemo(
-		() =>
-			new MarkdownParser({
-				highlightTheme: getChatMarkdownHighlightTheme(theme),
-				enableChatCodeFenceToolbar: true,
-				// 分屏跟随滚动：预览标题带源码行号，与编辑器按标题区间对齐
-				enableHeadingSourceLineAttr: true,
-				// 目录 / `[文字](#slug)` 跳转：标题生成 id，点击在 ScrollArea 内 scrollIntoView
-				enableHeadingAnchorIds: true,
-				enableMermaid,
-			}),
-		[theme, enableMermaid],
-	);
-
-	const parserNoMermaid = useMemo(
-		() =>
-			new MarkdownParser({
-				highlightTheme: getChatMarkdownHighlightTheme(theme),
-				enableChatCodeFenceToolbar: true,
-				enableHeadingSourceLineAttr: true,
-				enableHeadingAnchorIds: true,
-				enableMermaid: false,
-			}),
-		[theme],
-	);
-
-	const html = useMemo(() => {
-		if (hasMermaidIslandLayout) return '';
-		return parser.render(markdown);
-	}, [hasMermaidIslandLayout, parser, markdown]);
-
-	/** 含 Mermaid 岛时不在整段 HTML 上跑 run（岛内自渲染），否则与聊天流一致扫描 .mermaid */
-	const mermaidRootScanParser = useMemo(
-		() => ({
-			enableMermaid: enableMermaid && !hasMermaidIslandLayout,
-		}),
-		[enableMermaid, hasMermaidIslandLayout],
-	);
-
-	useMermaidInMarkdownRoot({
-		rootRef: previewHtmlRootRef,
-		preferDark: theme === 'black',
-		trigger: hasMermaidIslandLayout ? markdown : html,
-		parser: mermaidRootScanParser,
-	});
-
-	const { openMermaidPreview, mermaidImagePreviewModal } =
-		useMermaidImagePreview();
-
-	useMermaidDiagramClickPreview(
-		previewHtmlRootRef,
-		openMermaidPreview,
-		enableMermaid,
-		hasMermaidIslandLayout ? markdown : html,
-	);
 
 	const refreshPreviewScrollFab = useCallback(() => {
 		if (!showPreviewScrollCornerFab) {
@@ -232,6 +162,101 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 		el.addEventListener('click', onClick);
 		return () => el.removeEventListener('click', onClick);
 	}, []);
+
+	const assignViewportRef = useCallback(
+		(node: HTMLDivElement | null) => {
+			localViewportRef.current = node;
+			if (viewportRef) viewportRef.current = node;
+		},
+		[viewportRef],
+	);
+
+	// 先构造 parserNoMermaid（供 fenceParts 拆分与 markdown 段 render 使用）
+	const parserNoMermaid = useMemo(
+		() =>
+			new MarkdownParser({
+				highlightTheme: getChatMarkdownHighlightTheme(theme),
+				enableChatCodeFenceToolbar: true,
+				enableHeadingSourceLineAttr: true,
+				enableHeadingAnchorIds: true,
+				enableMermaid: false,
+			}),
+		[theme],
+	);
+
+	const openTail = useMemo(
+		() => (enableMermaid ? splitOpenMermaidTail(markdown) : null),
+		[markdown, enableMermaid],
+	);
+
+	const openMermaidId = openTail
+		? `pv-mmd-open-line-${openTail.openLine}`
+		: null;
+
+	const fenceParts = useMemo<MarkdownMermaidSplitPart[]>(() => {
+		if (!enableMermaid) {
+			return parserNoMermaid.splitForMermaidIslands(markdown);
+		}
+		if (!openTail) {
+			return parserNoMermaid.splitForMermaidIslands(markdown);
+		}
+		// prefix 交给 markdown-it token.map 拆分闭合围栏；尾部开放 mermaid 单独追加（complete:false）
+		const headParts = parserNoMermaid.splitForMermaidIslands(openTail.prefix);
+		const tail: MarkdownMermaidSplitPart = {
+			type: 'mermaid',
+			text: openTail.body,
+			complete: false,
+		};
+		return [...headParts, tail];
+	}, [markdown, enableMermaid, openTail, parserNoMermaid]);
+
+	const hasMermaidIslandLayout = Boolean(
+		enableMermaid && fenceParts.some((p) => p.type === 'mermaid'),
+	);
+
+	const parser = useMemo(
+		() =>
+			new MarkdownParser({
+				highlightTheme: getChatMarkdownHighlightTheme(theme),
+				enableChatCodeFenceToolbar: true,
+				// 分屏跟随滚动：预览标题带源码行号，与编辑器按标题区间对齐
+				enableHeadingSourceLineAttr: true,
+				// 目录 / `[文字](#slug)` 跳转：标题生成 id，点击在 ScrollArea 内 scrollIntoView
+				enableHeadingAnchorIds: true,
+				enableMermaid,
+			}),
+		[theme, enableMermaid],
+	);
+
+	const html = useMemo(() => {
+		if (hasMermaidIslandLayout) return '';
+		return parser.render(markdown);
+	}, [hasMermaidIslandLayout, parser, markdown]);
+
+	/** 含 Mermaid 岛时不在整段 HTML 上跑 run（岛内自渲染），否则与聊天流一致扫描 .mermaid */
+	const mermaidRootScanParser = useMemo(
+		() => ({
+			enableMermaid: enableMermaid && !hasMermaidIslandLayout,
+		}),
+		[enableMermaid, hasMermaidIslandLayout],
+	);
+
+	useMermaidInMarkdownRoot({
+		rootRef: previewHtmlRootRef,
+		preferDark: theme === 'black',
+		trigger: hasMermaidIslandLayout ? markdown : html,
+		parser: mermaidRootScanParser,
+	});
+
+	const { openMermaidPreview, mermaidImagePreviewModal } =
+		useMermaidImagePreview();
+
+	useMermaidDiagramClickPreview(
+		previewHtmlRootRef,
+		openMermaidPreview,
+		enableMermaid,
+		hasMermaidIslandLayout ? markdown : html,
+	);
 
 	const { relayout: relayoutCodeToolbar } = useChatCodeFloatingToolbar(
 		localViewportRef,
@@ -339,7 +364,7 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 								if (!part.complete) {
 									return (
 										<div
-											key={`pv-${i}`}
+											key={openMermaidId ?? `pv-${i}`}
 											dangerouslySetInnerHTML={{
 												__html: mermaidStreamingFallbackHtml(part.text),
 											}}
@@ -351,6 +376,7 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 										key={`pv-${i}`}
 										code={part.text}
 										preferDark={theme === 'black'}
+										isStreaming={false}
 										openMermaidPreview={openMermaidPreview}
 									/>
 								);
