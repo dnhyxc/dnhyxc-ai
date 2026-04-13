@@ -88,6 +88,13 @@ body {
 		background-color: var(--theme-muted);
 	}
 
+	/* 流式聊天图表 code 样式 */
+	.markdown-body {
+		.chat-md-mermaid-streaming {
+			margin-bottom: 18px !important;
+		}
+	}
+
 	/* 助手 Markdown 围栏代码：工具栏由 MarkdownParser(enableChatCodeFenceToolbar) 输出，位移由 chatCodeToolbar 滚动同步 */
 	.chat-md-code-block {
 		position: relative;
