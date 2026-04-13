@@ -28,18 +28,18 @@ useMermaidDiagramClickPreview：点击 SVG → data URL → ImagePreview
 
 ### 路径 B：围栏拆分 + Mermaid 岛（聊天流式、Monaco 含 mermaid 时）
 
-适用于 **助手消息流式**（`StreamingMarkdownBody`）以及 **Monaco `ParserMarkdownPreviewPane`** 在 `enableMermaid === true` 且 `splitMarkdownByCodeFences` 检出 mermaid 段时。动机是避免 **整段 `innerHTML` 替换** 冲掉已渲染的 SVG，或与 `mermaid.run` 的时序竞态。
+适用于 **助手消息流式**（`StreamingMarkdownBody`）以及 **Monaco `ParserMarkdownPreviewPane`** 在正文含 ` ```mermaid ` 围栏时。动机是避免 **整段 `innerHTML` 替换** 冲掉已渲染的 SVG，或与 `mermaid.run` 的时序竞态；同时保证普通代码块（尤其列表内 ` ```ts`）在拆分后仍能被稳定渲染。
 
 ```text
 Markdown 源码
     ↓
-splitMarkdownByCodeFences → 交替的 { markdown 段 | mermaid 段 }
+MarkdownParser.splitForMermaidIslands（markdown-it parse）→ 交替的 { markdown 段 | mermaid 岛 }
     ↓
 markdown 段：MarkdownParser（enableMermaid: false）→ 小段 innerHTML（无 mermaid 占位）
     ↓
-mermaid 段（已闭合）：MermaidFenceIsland → 岛内写入占位 DOM → runMermaidInMarkdownRoot
+mermaid 段：MermaidFenceIsland → 离屏渲染（可测量）→ 成功才提交 SVG（避免“错误 SVG”闪烁）
     ↓
-mermaid 段（流式未闭合）：mermaidStreamingFallbackHtml → 仅代码高亮样式，不执行 mermaid.run
+流式尾部未闭合 mermaid：按行规则仅探测“尾部开放 mermaid” → MermaidFenceIsland（节流 + 成功才提交）
     ↓
 useMermaidDiagramClickPreview（岛 host 或预览根）：点击 SVG → ImagePreview
 ```
@@ -540,15 +540,31 @@ export function useMermaidDiagramClickPreview(
 
 - 避免父级频繁 `dangerouslySetInnerHTML` **整段替换**导致已生成的 SVG 被清空或闪烁；
 - 让每一块图的 **DSL 变更** 只触发 **本岛** 的 `useLayoutEffect`，与 `useMermaidInMarkdownRoot` 的全局扫描解耦；
-- **未闭合** 的 mermaid 围栏（流式尾部）只显示静态代码，不调用 `mermaid.run`。
+- **未闭合** 的 mermaid 围栏（流式尾部）只显示静态代码（`mermaidStreamingFallbackHtml`），不调用 `mermaid.run`，避免半成品 DSL 反复报错与闪烁。
 
-**模块关系**：`splitMarkdownByCodeFences`（纯函数拆分）→ `StreamingMarkdownBody` / `ParserMarkdownPreviewPane`（按段渲染）→ `MermaidFenceIsland`（单块图）→ `normalizeMermaidFenceBody`（DSL 预处理）→ `runMermaidInMarkdownRoot` → `mermaid.run`。
+**模块关系（更新版）**：
+
+```text
+MarkdownParser.splitForMermaidIslands（markdown-it parse）
+  → StreamingMarkdownBody（聊天按段渲染）
+    → MermaidFenceIsland（单块图：离屏渲染 + 成功才提交）
+      → normalizeMermaidFenceBody（DSL 预处理）
+      → runMermaidInMarkdownRoot（内部 mermaid.run + 串行队列）
+```
 
 ---
 
 ### 7.1 `splitMarkdownByCodeFences`（`apps/frontend/src/utils/splitMarkdownFences.ts`）
 
 仅识别 **顶格** ` ``` ` 围栏（与 markdown-it 常见写法一致）。`mermaid` 且缺少闭合围栏时，`complete: false`。
+
+> **重要更新（2026-04）**：聊天流式正文已不再依赖本节的 `splitMarkdownByCodeFences` 作为主拆分器。
+> 原因是它属于“按行扫描围栏”的纯函数实现，遇到 **列表内代码块**、**闭合行缩进不一致**、或 **段与段拼接丢失换行** 时，
+> 容易把 ` ```typescript ` 等普通代码块拆坏，表现为“代码块无法渲染/后续正文被吞进围栏”。
+>
+> 目前聊天采用 `MarkdownParser.splitForMermaidIslands`（见下节 **§7.1.1**），本文件主要保留：
+> - `mermaidStreamingFallbackHtml`（流式尾部 DSL 预览）
+> - 旧页面/工具函数兼容入口（可逐步迁移）
 
 ```typescript
 /**
@@ -654,9 +670,37 @@ export function mermaidStreamingFallbackHtml(code: string): string {
 
 ---
 
-### 7.2 `MermaidFenceIsland`（`apps/frontend/src/components/design/MermaidFenceIsland.tsx`）
+### 7.1.1 `MarkdownParser.splitForMermaidIslands`：与渲染器同源的拆分（推荐）
 
-单块闭合 mermaid 的 **宿主 div**：在 `useLayoutEffect` 内写入与 `patchMermaidFence` **同构**的最简占位 HTML，再用 **`textContent`** 写入预处理后的 DSL（避免 XSS），最后 **双 `requestAnimationFrame`** 后调用 `runMermaidInMarkdownRoot(host)`，与 `useMermaidInMarkdownRoot` 的节拍一致。
+位置：`packages/tools/src/markdown-parser.ts`
+
+实现要点：
+
+- **使用 markdown-it 的 `parse()`** 获取 fence token，再按 `token.map` 从源码切片，保证拆分边界与 `render()` 一致；
+- **切片必须保留“段末换行”**：否则 `### 标题\n` 与下一段 ```lang 会粘连成同一行，围栏失效（普通代码块不渲染）。
+
+摘录（示意）：
+
+```typescript
+// 按行号截取原文行块；若后面还有行（b < lineCount），段末补一个 \n
+const sliceLines = (a: number, b: number) => {
+  const body = lines.slice(a, b).join('\n');
+  return b < lineCount ? `${body}\n` : body;
+};
+
+// fence token.map 的 [startLine, endLine) 与 sliceLines 对齐：
+// - lang === 'mermaid' → 输出 { type:'mermaid', text: token.content, complete:true }
+// - 其它 fence → 输出 { type:'markdown', text: rawFence } 交给 parser.render
+```
+
+### 7.2 `MermaidFenceIsland`（`apps/frontend/src/components/design/MermaidFenceIsland/index.tsx`）
+
+单块 mermaid 的 **宿主 div**：当前仓库采用“**离屏渲染 + 成功才提交**”方案，满足：
+
+- **流式边输出边出图**：DSL 逐步完善时持续尝试渲染；
+- **不闪烁**：遇到“错误提示 SVG”（如 `Syntax error in text`）不提交到真实 DOM，保留上一帧；
+- **类图/甘特图可渲染**：离屏容器必须可测量（`opacity:0` 且有足够宽高），避免 bbox 为 0；
+- **不影响普通代码块**：本组件只处理 Mermaid 岛，不触达 markdown 段的 `parser.render`。
 
 ```typescript
 /**
@@ -665,7 +709,7 @@ export function mermaidStreamingFallbackHtml(code: string): string {
  */
 
 import { normalizeMermaidFenceBody } from '@dnhyxc-ai/tools'; // DSL 预处理（换行、部分方括号补引号）
-import { runMermaidInMarkdownRoot } from '@dnhyxc-ai/tools/react'; // 在 host 子树内 mermaid.run
+import { runMermaidInMarkdownRoot } from '@dnhyxc-ai/tools/react'; // 在 host 子树内 mermaid.run（内部有串行队列）
 import { memo, useLayoutEffect, useRef } from 'react';
 import { useMermaidDiagramClickPreview } from '@/hooks/useMermaidImagePreview'; // 点击 SVG → 大图预览
 import { cn } from '@/lib/utils';
@@ -686,34 +730,129 @@ export const MermaidFenceIsland = memo(function MermaidFenceIsland({
 	isStreaming = false,
 	openMermaidPreview,
 }: MermaidFenceIslandProps) {
-	const hostRef = useRef<HTMLDivElement>(null); // 外层宿主，innerHTML 重建 wrap
-	const genRef = useRef(0); // 代数，用于作废过期的 rAF 回调
-	/** 不参与 effect 依赖，避免停流时整岛 innerHTML 重跑导致闪屏 */
-	const isStreamingRef = useRef(isStreaming);
-	isStreamingRef.current = isStreaming; // 每次渲染同步最新流式标志
+	const hostRef = useRef<HTMLDivElement>(null); // 外层宿主（稳定 ref）
+	const genRef = useRef(0); // 代数：作废过期渲染
+	const lastRunAtRef = useRef(0); // 节流：上次 run 时间戳
+	const throttleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null); // 节流定时器
+	const hasEverRenderedRef = useRef(false); // 是否曾成功出过图（失败时决定是否展示 DSL 文本兜底）
+	const lastCommittedSvgRef = useRef<string>(''); // 相同 SVG 跳过提交
 
 	const previewEnabled = Boolean(openMermaidPreview); // 是否注册点击预览
 
 	useLayoutEffect(() => {
 		const host = hostRef.current;
 		if (!host) return;
-		host.innerHTML =
-			'<div class="markdown-mermaid-wrap" data-mermaid="1"><div class="mermaid"></div></div>'; // 与 MarkdownParser 占位一致
-		const inner = host.querySelector('.mermaid') as HTMLElement | null;
-		if (!inner) return;
-		inner.textContent = normalizeMermaidFenceBody(code); // 文本节点写入 DSL
 
+		// 真实 DOM：只创建一次 wrap，后续仅更新 .mermaid 内容
+		let wrap = host.querySelector(
+			'.markdown-mermaid-wrap[data-mermaid="1"]',
+		) as HTMLElement | null;
+		if (!wrap) {
+			host.innerHTML =
+				'<div class="markdown-mermaid-wrap" data-mermaid="1"><div class="mermaid"></div></div>';
+			wrap = host.querySelector(
+				'.markdown-mermaid-wrap[data-mermaid="1"]',
+			) as HTMLElement | null;
+		}
+		const inner = wrap?.querySelector('.mermaid') as HTMLElement | null;
+		if (!wrap || !inner) return;
+
+		const dsl = normalizeMermaidFenceBody(code);
 		const runId = ++genRef.current;
-		requestAnimationFrame(() => {
-			requestAnimationFrame(() => {
-				if (runId !== genRef.current) return; // 快速连续更新时只保留最后一次
-				void runMermaidInMarkdownRoot(host, {
+
+		// 离屏根节点：不可见但可测量（类图/甘特图需要文本测量）
+		const stageRoot = ensureMermaidStageRoot();
+		if (!stageRoot) return;
+
+		// 清理节流
+		const flushTimer = () => {
+			if (throttleTimerRef.current) {
+				clearTimeout(throttleTimerRef.current);
+				throttleTimerRef.current = null;
+			}
+		};
+
+		const looksLikeErrorSvg = (node: SVGElement | null): boolean => {
+			if (!node) return true;
+			const t = (node.textContent || '').toLowerCase();
+			const aria = (node.getAttribute('aria-label') || '').toLowerCase();
+			// 错误图的特征组合：Syntax error in text + mermaid version
+			const looksLikeSyntax =
+				t.includes('syntax error in text') ||
+				aria.includes('syntax error in text');
+			const looksLikeMermaidVersion =
+				t.includes('mermaid version') || aria.includes('mermaid version');
+			return looksLikeSyntax && looksLikeMermaidVersion;
+		};
+
+		const commitSvgIfOk = async () => {
+			if (runId !== genRef.current) return;
+
+			// 离屏渲染：把 DSL 写到 stageHost，跑完后检查是否生成有效 SVG
+			const stageHost = document.createElement('div');
+			stageHost.innerHTML =
+				'<div class="markdown-mermaid-wrap" data-mermaid="1"><div class="mermaid"></div></div>';
+			const stageInner = stageHost.querySelector('.mermaid') as HTMLElement | null;
+			if (!stageInner) return;
+			stageInner.textContent = dsl;
+
+			stageRoot.appendChild(stageHost);
+			try {
+				await runMermaidInMarkdownRoot(stageHost, {
 					preferDark,
-					suppressErrors: isStreamingRef.current, // 流式 true 时抑制错误占位闪烁
+					suppressErrors: isStreaming,
 				});
-			});
-		});
-	}, [code, preferDark]);
+			} finally {
+				stageHost.remove();
+			}
+
+			if (runId !== genRef.current) return;
+			const svg = stageInner.querySelector('svg');
+			if (!svg || looksLikeErrorSvg(svg)) {
+				// 不提交错误 SVG：保留上一帧，避免闪烁；首次无图时以 DSL 文本兜底
+				if (!hasEverRenderedRef.current) inner.textContent = dsl;
+				return;
+			}
+
+			const nextSvgHtml = stageInner.innerHTML;
+			if (nextSvgHtml === lastCommittedSvgRef.current) return;
+			lastCommittedSvgRef.current = nextSvgHtml;
+
+			// 原子替换：避免同时存在两份 SVG 导致 id/url(#id) 冲突
+			inner.innerHTML = nextSvgHtml;
+			hasEverRenderedRef.current = true;
+		};
+
+		const schedule = () => {
+			flushTimer();
+			const now = Date.now();
+			if (!isStreaming) {
+				lastRunAtRef.current = now;
+				void commitSvgIfOk();
+				return;
+			}
+			if (lastRunAtRef.current === 0) {
+				lastRunAtRef.current = now;
+				void commitSvgIfOk();
+				return;
+			}
+			const since = now - lastRunAtRef.current;
+			if (since >= 200) {
+				lastRunAtRef.current = now;
+				void commitSvgIfOk();
+				return;
+			}
+			throttleTimerRef.current = setTimeout(() => {
+				throttleTimerRef.current = null;
+				lastRunAtRef.current = Date.now();
+				void commitSvgIfOk();
+			}, 200 - since);
+		};
+
+		if (!isStreaming) lastRunAtRef.current = 0;
+		schedule();
+		return () => flushTimer();
+	}, [code, preferDark, isStreaming]);
 
 	useMermaidDiagramClickPreview(
 		hostRef,
@@ -734,6 +873,30 @@ export const MermaidFenceIsland = memo(function MermaidFenceIsland({
 });
 ```
 
+### 7.2.1 本次实现更新（防闪烁、类图/甘特图兼容、不中断代码块）
+
+当前仓库中的 `MermaidFenceIsland` 已演进为“**离屏渲染 + 成功才提交**”方案（实现位置：`apps/frontend/src/components/design/MermaidFenceIsland/index.tsx`），以同时满足：
+
+- **流式过程中不闪烁**：Mermaid 可能返回“错误提示 SVG”（例如 `Syntax error in text`），此时不提交，保留上一帧；
+- **类图/甘特图可渲染**：离屏容器必须 **可测量**（`opacity:0` 且有足够宽高），避免 bbox/布局为 0；
+- **不影响普通代码块**：岛仅负责 Mermaid，本段落不触达 markdown 段的 `parser.render`。
+
+关键点摘录（示意）：
+
+```typescript
+// 1) document.body 下的离屏根节点：不可见但可测量（不要用 visibility:hidden + 1px）
+el.style.left = '-99999px';
+el.style.width = '2000px';
+el.style.minHeight = '1200px';
+el.style.opacity = '0';
+
+// 2) 每次更新：在离屏 stageHost 上 runMermaidInMarkdownRoot，只有成功且非“错误 SVG”才提交
+await runMermaidInMarkdownRoot(stageHost, { preferDark, suppressErrors: isStreaming });
+const svg = stageInner.querySelector('svg');
+if (!svg || looksLikeErrorSvg(svg)) return; // 保留上一帧，避免闪
+inner.innerHTML = stageInner.innerHTML; // 原子替换：避免同时存在两份 SVG 导致 id 冲突
+```
+
 ---
 
 ### 7.3 `StreamingMarkdownBody`（`apps/frontend/src/components/design/ChatAssistantMessage/StreamingMarkdownBody.tsx`）
@@ -742,19 +905,63 @@ export const MermaidFenceIsland = memo(function MermaidFenceIsland({
 
 ```typescript
 /**
- * 将正文按围栏拆块：普通 Markdown 仍用 innerHTML，mermaid 用独立 DOM 岛 + runMermaidInMarkdownRoot，
- * 避免流式时整段替换冲掉 SVG、造成全文闪烁。
+ * 聊天流式正文：主拆分器使用 `parser.splitForMermaidIslands`（markdown-it parse），保证普通代码块边界稳定；
+ * 仅对“流式尾部未闭合 mermaid 围栏”做额外探测，将其从 markdown 段剥离出来交给 MermaidFenceIsland。
  */
 
-import { MermaidFenceIsland } from '@design/MermaidFenceIsland'; // 共享岛组件
-import type { MarkdownParser } from '@dnhyxc-ai/tools';
+import { MermaidFenceIsland } from '@design/MermaidFenceIsland';
+import type { MarkdownMermaidSplitPart, MarkdownParser } from '@dnhyxc-ai/tools';
 import { type RefObject, useMemo } from 'react';
 import { useMermaidImagePreview } from '@/hooks/useMermaidImagePreview';
 import { cn } from '@/lib/utils';
+import { mermaidStreamingFallbackHtml } from '@/utils/splitMarkdownFences';
 import {
-	mermaidStreamingFallbackHtml,
-	splitMarkdownByCodeFences,
-} from '@/utils/splitMarkdownFences';
+	fenceClosingIndentMatchesOpen,
+	isPlausibleMarkdownFenceIndent,
+} from '@/utils/markdownFenceLineParser';
+
+function splitOpenMermaidTail(source: string): { prefix: string; body: string } | null {
+	const normalized = source.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+	const lines = normalized.split('\n');
+	for (let i = 0; i < lines.length; i++) {
+		const line = lines[i];
+		const openMatch = /^(\s*)(`{3,})([^`]*)$/.exec(line.trimEnd());
+		if (!openMatch) continue;
+		const openIndent = openMatch[1] ?? '';
+		const tickLen = openMatch[2]?.length ?? 3;
+		const lang = (openMatch[3] ?? '').trim().split(/\s+/)[0]?.toLowerCase();
+		if (!isPlausibleMarkdownFenceIndent(openIndent)) continue;
+		if (lang !== 'mermaid') continue;
+
+		// 找闭合：若找不到 → 认为是“尾部开放 mermaid”
+		let j = i + 1;
+		let closed = false;
+		while (j < lines.length) {
+			const cur = lines[j];
+			const closeMatch = /^(\s*)(`{3,})\s*$/.exec(cur.trimEnd());
+			if (
+				closeMatch &&
+				(closeMatch[2]?.length ?? 0) >= tickLen &&
+				fenceClosingIndentMatchesOpen(openIndent, closeMatch[1] ?? '')
+			) {
+				closed = true;
+				break;
+			}
+			j++;
+		}
+		if (closed) {
+			i = j;
+			continue;
+		}
+
+		// 关键：prefix 必须保留行末换行，否则下一段 ```lang 会粘连导致围栏失效
+		const prefixLines = lines.slice(0, i);
+		const prefix = prefixLines.length > 0 ? `${prefixLines.join('\n')}\n` : '';
+		const body = lines.slice(i + 1).join('\n');
+		return { prefix, body };
+	}
+	return null;
+}
 
 export type StreamingMarkdownBodyProps = {
 	markdown: string;
@@ -773,13 +980,19 @@ export function StreamingMarkdownBody({
 	isStreaming,
 	containerRef,
 }: StreamingMarkdownBodyProps) {
-	const parts = useMemo(() => splitMarkdownByCodeFences(markdown), [markdown]); // 拆块结果缓存
-	const { openMermaidPreview, mermaidImagePreviewModal } =
-		useMermaidImagePreview(); // 单条消息一个 ImagePreview 弹层
+	const parts = useMemo<MarkdownMermaidSplitPart[]>(() => {
+		if (!isStreaming) return parser.splitForMermaidIslands(markdown);
+		const openTail = splitOpenMermaidTail(markdown);
+		if (!openTail) return parser.splitForMermaidIslands(markdown);
+		const headParts = parser.splitForMermaidIslands(openTail.prefix);
+		return [...headParts, { type: 'mermaid', text: openTail.body, complete: false }];
+	}, [markdown, parser, isStreaming]);
+
+	const { openMermaidPreview, mermaidImagePreviewModal } = useMermaidImagePreview();
 
 	return (
 		<div ref={containerRef} className={cn('streaming-md-body', className)}>
-			{parts.map((part, i) => {
+			{parts.map((part: MarkdownMermaidSplitPart, i: number) => {
 				if (part.type === 'markdown') {
 					return (
 						<div
@@ -814,7 +1027,43 @@ export function StreamingMarkdownBody({
 }
 ```
 
+### 7.3.1 本次实现更新（代码块稳定 + Mermaid 不串扰）
+
+聊天流式正文已从 `splitMarkdownByCodeFences` 迁移到 `parser.splitForMermaidIslands`（markdown-it parse），根因与修复点：
+
+- **根因**：纯函数按行扫围栏在“列表内代码块、闭合缩进不一致、段末换行丢失”等边界下容易拆坏普通代码块；
+- **修复**：用 markdown-it token.map 切片源码，拆分与 `render()` 同源；并在流式尾部探测开放 mermaid 时确保 `prefix` 带行末 `\n`，避免 `上一行内容```typescript` 粘连造成围栏失效。
+
+```typescript
+// prefix 必须保留行末换行：否则下一段以 ``` 开头时会被拼成 `上一行内容```lang`
+const prefix = prefixLines.length > 0 ? `${prefixLines.join('\n')}\n` : '';
+```
+
 ---
+
+### 7.3.2 ChatBotView：避免 Mermaid DOM 变更风暴影响代码块
+
+Mermaid 渲染会在 SVG 子树内产生大量 DOM 变更。若聊天视图对 `#message-container` 使用
+`MutationObserver({ subtree:true, characterData:true })`，会触发观察风暴，导致滚动同步与代码块工具栏布局反复重算，
+进而影响代码块渲染稳定性。
+
+本次修复（位置：`apps/frontend/src/components/design/ChatBot/ChatBotView.tsx`）：
+
+- 仅监听消息行增删：`childList: true, subtree: false`
+- 用 `requestAnimationFrame` 合并回调，降低抖动
+
+关键代码（逐行注释摘录）：
+
+```typescript
+// ⚠️ 不能 observe subtree/characterData：Mermaid 渲染会在 SVG 子树内产生大量 DOM 变更，
+// 会触发 MutationObserver 风暴，导致滚动同步/代码块工具栏布局反复重算，进而影响代码块渲染稳定性。
+// 这里仅监听“消息行增删”（childList），并用 rAF 合并。
+mutationObserverRef.current = new MutationObserver(() => schedule());
+mutationObserverRef.current.observe(contentArea, {
+  childList: true,
+  subtree: false,
+});
+```
 
 ### 7.4 `normalizeMermaidFenceBody` 与 `patchMermaidFence`（`packages/tools/src/markdown-parser.ts`）
 
