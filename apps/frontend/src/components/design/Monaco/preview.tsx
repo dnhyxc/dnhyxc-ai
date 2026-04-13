@@ -1,9 +1,6 @@
 import { MermaidFenceIsland } from '@design/MermaidFenceIsland';
 import Tooltip from '@design/Tooltip';
-import {
-	type MarkdownMermaidSplitPart,
-	MarkdownParser,
-} from '@dnhyxc-ai/tools';
+import { MarkdownParser } from '@dnhyxc-ai/tools';
 import { useMermaidInMarkdownRoot } from '@dnhyxc-ai/tools/react';
 import { ScrollArea } from '@ui/index';
 import { ArrowDown, ArrowUp } from 'lucide-react';
@@ -36,7 +33,7 @@ import {
 import { attachExternalLinkClickInterceptor } from '@/utils/external-link-click';
 import {
 	mermaidStreamingFallbackHtml,
-	splitOpenMermaidTail,
+	splitForMermaidIslandsWithOpenTail,
 } from '@/utils/splitMarkdownFences';
 
 /** 纯预览模式右下角：可滚动时显示置底，触底后切换为置顶 */
@@ -197,31 +194,18 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 		[theme],
 	);
 
-	const openTail = useMemo(
-		() => (enableMermaid ? splitOpenMermaidTail(markdown) : null),
-		[markdown, enableMermaid],
+	const { parts: fenceParts, openMermaidId } = useMemo(
+		() =>
+			// 使用 splitForMermaidIslandsWithOpenTail 拆分 markdown，将 mermaid 围栏（包括尾部未闭合的 mermaid 代码块）单独提取成岛（parts）。
+			// 这样能够支持 Monaco 预览时的流式 mermaid 渲染，即使 mermaid 块未闭合依然能够单独处理与展示。
+			splitForMermaidIslandsWithOpenTail({
+				markdown,
+				parser: parserNoMermaid,
+				enableOpenTail: enableMermaid, // 仅启用时检测尾部未闭合的 mermaid 围栏
+				openMermaidIdPrefix: 'pv-mmd-open-line-', // 生成未闭合 mermaid 块的唯一 key 前缀
+			}),
+		[markdown, parserNoMermaid, enableMermaid],
 	);
-
-	const openMermaidId = openTail
-		? `pv-mmd-open-line-${openTail.openLine}`
-		: null;
-
-	const fenceParts = useMemo<MarkdownMermaidSplitPart[]>(() => {
-		if (!enableMermaid) {
-			return parserNoMermaid.splitForMermaidIslands(markdown);
-		}
-		if (!openTail) {
-			return parserNoMermaid.splitForMermaidIslands(markdown);
-		}
-		// prefix 交给 markdown-it token.map 拆分闭合围栏；尾部开放 mermaid 单独追加（complete:false）
-		const headParts = parserNoMermaid.splitForMermaidIslands(openTail.prefix);
-		const tail: MarkdownMermaidSplitPart = {
-			type: 'mermaid',
-			text: openTail.body,
-			complete: false,
-		};
-		return [...headParts, tail];
-	}, [markdown, enableMermaid, openTail, parserNoMermaid]);
 
 	const hasMermaidIslandLayout = Boolean(
 		enableMermaid && fenceParts.some((p) => p.type === 'mermaid'),

@@ -20,7 +20,7 @@ import { copyToClipboard } from '@/utils/clipboard';
 import {
 	hashText,
 	mermaidStreamingFallbackHtml,
-	splitOpenMermaidTail,
+	splitForMermaidIslandsWithOpenTail,
 } from '@/utils/splitMarkdownFences';
 
 const COPY_FEEDBACK_MS = 1600;
@@ -45,11 +45,16 @@ export function StreamingMarkdownBody({
 	defaultMermaidViewMode = 'diagram',
 	containerRef,
 }: StreamingMarkdownBodyProps) {
-	const openTail = useMemo(
-		() => (isStreaming ? splitOpenMermaidTail(markdown) : null),
-		[markdown, isStreaming],
+	const { parts, openMermaidId } = useMemo(
+		() =>
+			splitForMermaidIslandsWithOpenTail({
+				markdown,
+				parser,
+				enableOpenTail: isStreaming,
+				openMermaidIdPrefix: 'mmd-open-line-',
+			}),
+		[markdown, parser, isStreaming],
 	);
-	const openMermaidId = openTail ? `mmd-open-line-${openTail.openLine}` : null;
 
 	// 每块 Mermaid 独立切换：blockId -> mode
 	const [mermaidModeById, setMermaidModeById] = useState<
@@ -58,20 +63,6 @@ export function StreamingMarkdownBody({
 	// 每块 Mermaid 独立复制反馈：blockId -> copied
 	const [copiedById, setCopiedById] = useState<Record<string, boolean>>({});
 	const copiedTimersRef = useRef<Record<string, number>>({});
-
-	const parts = useMemo<MarkdownMermaidSplitPart[]>(() => {
-		if (!isStreaming) {
-			return parser.splitForMermaidIslands(markdown);
-		}
-		if (!openTail) {
-			return parser.splitForMermaidIslands(markdown);
-		}
-		const headParts = parser.splitForMermaidIslands(openTail.prefix);
-		return [
-			...headParts,
-			{ type: 'mermaid', text: openTail.body, complete: false },
-		];
-	}, [markdown, parser, isStreaming, openTail]);
 
 	const { openMermaidPreview, mermaidImagePreviewModal } =
 		useMermaidImagePreview();

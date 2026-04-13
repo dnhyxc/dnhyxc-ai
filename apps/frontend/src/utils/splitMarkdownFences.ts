@@ -6,6 +6,10 @@
  * 否则注释/JSDoc 中的 ```mermaid 等会误当成围栏结束。
  */
 
+import type {
+	MarkdownMermaidSplitPart,
+	MarkdownParser,
+} from '@dnhyxc-ai/tools';
 import {
 	fenceClosingIndentMatchesOpen,
 	isPlausibleMarkdownFenceIndent,
@@ -80,6 +84,26 @@ export function mermaidStreamingFallbackHtml(code: string): string {
 	return `<div class="markdown-body"><pre class="chat-md-mermaid-streaming"><code class="language-mermaid">${esc}</code></pre></div>`;
 }
 
+/**
+ * splitOpenMermaidTail 的作用是：
+ *
+ * 在给定的 markdown 文本中，检测是否存在“未闭合的 mermaid 代码块”（即以 ```mermaid 开头却没有相应结束围栏的片段），如果存在就将其拆分成前缀 prefix（所有未进围栏之前的内容）和 body（未闭合 mermaid 围栏之后至结尾所有内容），以及其起始的行号 openLine。
+ *
+ * 工作原理详解如下：
+ *
+ * 1. 首先规范化输入，将所有行结尾统一为 '\n'。
+ * 2. 逐行遍历，查找以 ```（数量>=3的反引号）标记且指定语言为 mermaid 的围栏起始行，同时要求缩进是符合 markdown 代码围栏规范的。
+ * 3. 如果找到 mermaid 围栏开头，向下查找是否有闭合对应数量反引号的围栏结束（且缩进与开头一致，严格要求闭合）。
+ * 4. 如果找到了闭合（正常 ```mermaid ... ```），跳过该块，继续查找下一个。
+ * 5. 如果没找到闭合（即 mermaid 围栏未闭合），则：
+ *    - prefix：取所有该围栏开头（不含）之前的全部内容（并保留换行），确保 markdown 连续性不被破坏。
+ *    - body：取围栏内内容（即 mermaid 围栏开头下一行起，直至全文结束），即为未闭合的 mermaid 代码段。
+ *    - openLine：记录未闭合 mermaid 围栏开头的行号。
+ *    - 立即返回这三个信息的对象。
+ * 6. 若找遍全文都没检测到未闭合的 mermaid 围栏，则返回 null。
+ *
+ * 这种分析手段主要用于流式渲染场景：可以在 mermaid 代码还没闭合时，拆出流式片段单独显示与处理，避免因围栏未闭合而导致整体 markdown 解析混乱。
+ */
 export function splitOpenMermaidTail(
 	source: string,
 ): { prefix: string; body: string; openLine: number } | null {
@@ -88,6 +112,7 @@ export function splitOpenMermaidTail(
 
 	for (let i = 0; i < lines.length; i++) {
 		const line = lines[i];
+		// 尝试匹配形如 ```mermaid 的代码围栏起始行
 		const openMatch = /^(\s*)(`{3,})([^`]*)$/.exec(line.trimEnd());
 		if (!openMatch) continue;
 		const openIndent = openMatch[1] ?? '';
@@ -96,6 +121,7 @@ export function splitOpenMermaidTail(
 		if (!isPlausibleMarkdownFenceIndent(openIndent)) continue;
 		if (lang !== 'mermaid') continue;
 
+		// 找到 ```mermaid 后，向下查找是否有对应的围栏结束（闭合）
 		let j = i + 1;
 		let closed = false;
 		while (j < lines.length) {
@@ -113,17 +139,84 @@ export function splitOpenMermaidTail(
 		}
 
 		if (closed) {
-			i = j;
+			i = j; // 跳过完整闭合的代码块，继续向后搜寻
 			continue;
 		}
 
-		// prefix 必须保留行末换行：否则下一段以 ``` 开头时会被拼成 `上一行内容```lang`，围栏失效。
+		// 如果没闭合，则此处为 open tail
+		// prefix 需带末尾换行，避免下个 ``` 被错误拼接在 prefix 行尾
 		const prefixLines = lines.slice(0, i);
 		const prefix = prefixLines.length > 0 ? `${prefixLines.join('\n')}\n` : '';
 		const body = lines.slice(i + 1).join('\n');
 		return { prefix, body, openLine: i };
 	}
 	return null;
+}
+
+/**
+ * 按 mermaid 围栏将 markdown 拆分为多个区块（普通文本/mermaid 块），支持特殊处理尾部“未闭合 mermaid 围栏”。
+ *
+ * - 若开启 enableOpenTail，则会检测 markdown 尾部是否存在未闭合的 mermaid 围栏块，
+ *   并将其提取为独立的 mermaid 片段（通常用于流式渲染阶段，实现未闭合也能实时渲染 mermaid）。
+ *   此时返回的 parts 最后一个元素 type='mermaid' 且 complete=false，其余部分正常拆分。
+ * - 未开启 enableOpenTail 时，与 parser.splitForMermaidIslands 原始行为一致。
+ * - openMermaidIdPrefix 用于为未闭合 mermaid 块生成唯一标识（建议用行号区分）。
+ *
+ * @param args
+ *   - markdown：原始 markdown 字符串内容
+ *   - parser：MarkdownParser 实例，用于常规 mermaid 块分割
+ *   - enableOpenTail：是否启用尾部未闭合 mermaid 围栏检测（按场景建议开启/关闭）
+ *   - openMermaidIdPrefix：未闭合 mermaid 围栏唯一 key 的前缀（后拼 openLine 行号）
+ * @returns
+ *   - parts：区块分割结果，普通 markdown 段和 mermaid 块聚合（未闭合时最后一块为 mermaid, complete=false）
+ *   - openTail：若检测到未闭合 mermaid，描述其内容的对象（prefix, body, openLine），否则为 null
+ *   - openMermaidId：未闭合 mermaid 围栏块的唯一 key（`${openMermaidIdPrefix}${openLine}`），否则为 null
+ */
+export function splitForMermaidIslandsWithOpenTail(args: {
+	markdown: string;
+	parser: MarkdownParser;
+	/**
+	 * 是否启用“尾部未闭合 Mermaid 围栏”的探测。
+	 * - 聊天：仅流式阶段启用
+	 * - Monaco 预览：仅 enableMermaid 时启用
+	 */
+	enableOpenTail: boolean;
+	/** 未闭合 Mermaid 围栏对应的稳定 key 前缀（拼接 openLine） */
+	openMermaidIdPrefix: string;
+}): {
+	parts: MarkdownMermaidSplitPart[];
+	openTail: { prefix: string; body: string; openLine: number } | null;
+	openMermaidId: string | null;
+} {
+	const { markdown, parser, enableOpenTail, openMermaidIdPrefix } = args;
+
+	if (!enableOpenTail) {
+		return {
+			parts: parser.splitForMermaidIslands(markdown),
+			openTail: null,
+			openMermaidId: null,
+		};
+	}
+
+	const openTail = splitOpenMermaidTail(markdown);
+	if (!openTail) {
+		return {
+			parts: parser.splitForMermaidIslands(markdown),
+			openTail: null,
+			openMermaidId: null,
+		};
+	}
+
+	const headParts = parser.splitForMermaidIslands(openTail.prefix);
+	const parts: MarkdownMermaidSplitPart[] = [
+		...headParts,
+		{ type: 'mermaid', text: openTail.body, complete: false },
+	];
+	return {
+		parts,
+		openTail,
+		openMermaidId: `${openMermaidIdPrefix}${openTail.openLine}`,
+	};
 }
 
 export function hashText(s: string): string {
