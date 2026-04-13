@@ -85,6 +85,83 @@ export function StreamingMarkdownBody({
 		}, COPY_FEEDBACK_MS);
 	};
 
+	const renderMermaidPart = (
+		part: Extract<MarkdownMermaidSplitPart, { type: 'mermaid' }>,
+		i: number,
+	) => {
+		// Mermaid：每块独立切换（图/代码）
+		const blockId = part.complete
+			? `mmd-${hashText(part.text)}`
+			: (openMermaidId ?? `mmd-open-${i}`);
+		const mode = mermaidModeById[blockId] ?? defaultMermaidViewMode;
+		const toggle = () => {
+			setMermaidModeById((prev) => ({
+				...prev,
+				[blockId]: mode === 'diagram' ? 'code' : 'diagram',
+			}));
+		};
+		const copied = copiedById[blockId] === true;
+		const onCopy = () => {
+			void (async () => {
+				await copyToClipboard(`\`\`\`mermaid\n${part.text}\n\`\`\``);
+				markCopied(blockId);
+			})();
+		};
+
+		const header = (
+			<div className="flex items-center justify-end gap-2 my-1.5 select-none">
+				<Button
+					variant="dynamic"
+					size="sm"
+					className="h-7 px-2 bg-theme/5 hover:bg-theme/10 border border-theme/10"
+					onClick={onCopy}
+				>
+					{copied ? (
+						<CheckCircle size={15} className="text-teal-400" />
+					) : (
+						<Copy size={15} />
+					)}
+					<span className={copied ? 'text-teal-400' : ''}>复制</span>
+				</Button>
+				<Button
+					variant="dynamic"
+					size="sm"
+					className="h-7 px-2 bg-theme/5 hover:bg-theme/10 border border-theme/10"
+					onClick={toggle}
+				>
+					{mode === 'diagram' ? <Code2 size={16} /> : <Waypoints size={16} />}
+					<span>{mode === 'diagram' ? '代码' : '图表'}</span>
+				</Button>
+			</div>
+		);
+
+		if (mode === 'code') {
+			return (
+				<div key={`mm-wrap-${blockId}`}>
+					{header}
+					<div
+						dangerouslySetInnerHTML={{
+							__html: mermaidStreamingFallbackHtml(part.text),
+						}}
+					/>
+				</div>
+			);
+		}
+
+		// diagram 模式：闭合/未闭合都交给 MermaidFenceIsland；岛内“成功才提交”避免流式错误 SVG 闪烁
+		return (
+			<div key={`mm-wrap-${blockId}`}>
+				{header}
+				<MermaidFenceIsland
+					code={part.text}
+					preferDark={preferDark}
+					isStreaming={isStreaming || !part.complete}
+					openMermaidPreview={openMermaidPreview}
+				/>
+			</div>
+		);
+	};
+
 	return (
 		<div ref={containerRef} className={cn('streaming-md-body', className)}>
 			{parts.map((part: MarkdownMermaidSplitPart, i: number) => {
@@ -96,82 +173,7 @@ export function StreamingMarkdownBody({
 						/>
 					);
 				}
-
-				// Mermaid：每块独立切换（图/代码）
-				const blockId = part.complete
-					? `mmd-${hashText(part.text)}`
-					: (openMermaidId ?? `mmd-open-${i}`);
-				const mode = mermaidModeById[blockId] ?? defaultMermaidViewMode;
-				const toggle = () => {
-					setMermaidModeById((prev) => ({
-						...prev,
-						[blockId]: mode === 'diagram' ? 'code' : 'diagram',
-					}));
-				};
-				const copied = copiedById[blockId] === true;
-				const onCopy = () => {
-					void (async () => {
-						await copyToClipboard(`\`\`\`mermaid\n${part.text}\n\`\`\``);
-						markCopied(blockId);
-					})();
-				};
-
-				const header = (
-					<div className="flex items-center justify-end gap-2 my-1.5 select-none">
-						<Button
-							variant="dynamic"
-							size="sm"
-							className="h-7 px-2 bg-theme/5 hover:bg-theme/10 border border-theme/10"
-							onClick={onCopy}
-						>
-							{copied ? (
-								<CheckCircle size={15} className="text-teal-400" />
-							) : (
-								<Copy size={15} />
-							)}
-							<span className={copied ? 'text-teal-400' : ''}>复制</span>
-						</Button>
-						<Button
-							variant="dynamic"
-							size="sm"
-							className="h-7 px-2 bg-theme/5 hover:bg-theme/10 border border-theme/10"
-							onClick={toggle}
-						>
-							{mode === 'diagram' ? (
-								<Code2 size={16} />
-							) : (
-								<Waypoints size={16} />
-							)}
-							<span>{mode === 'diagram' ? '代码' : '图表'}</span>
-						</Button>
-					</div>
-				);
-
-				if (mode === 'code') {
-					return (
-						<div key={`mm-wrap-${blockId}`}>
-							{header}
-							<div
-								dangerouslySetInnerHTML={{
-									__html: mermaidStreamingFallbackHtml(part.text),
-								}}
-							/>
-						</div>
-					);
-				}
-
-				// diagram 模式：闭合/未闭合都交给 MermaidFenceIsland；岛内“成功才提交”避免流式错误 SVG 闪烁
-				return (
-					<div key={`mm-wrap-${blockId}`}>
-						{header}
-						<MermaidFenceIsland
-							code={part.text}
-							preferDark={preferDark}
-							isStreaming={isStreaming || !part.complete}
-							openMermaidPreview={openMermaidPreview}
-						/>
-					</div>
-				);
+				return renderMermaidPart(part, i);
 			})}
 			{mermaidImagePreviewModal}
 		</div>
