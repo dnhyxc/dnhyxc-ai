@@ -12,11 +12,18 @@ import type {
 	MarkdownParser,
 } from '@dnhyxc-ai/tools';
 import { Button } from '@ui/index';
-import { CheckCircle, Code2, Copy, Waypoints } from 'lucide-react';
-import { type RefObject, useMemo, useRef, useState } from 'react';
+import { CheckCircle, Code2, Copy, Eye } from 'lucide-react';
+import {
+	type MouseEvent as ReactMouseEvent,
+	type RefObject,
+	useMemo,
+	useRef,
+	useState,
+} from 'react';
 import { useMermaidImagePreview } from '@/hooks/useMermaidImagePreview';
 import { cn } from '@/lib/utils';
 import { copyToClipboard } from '@/utils/clipboard';
+import { mermaidSvgToPreviewDataUrl } from '@/utils/mermaidImagePreview';
 import {
 	hashText,
 	mermaidStreamingFallbackHtml,
@@ -99,10 +106,22 @@ export function StreamingMarkdownBody({
 			})();
 		};
 
+		const onPreview = (e: ReactMouseEvent<HTMLButtonElement>) => {
+			const btn = e.currentTarget;
+			const scope = btn.closest<HTMLElement>(
+				`[data-mermaid-preview-scope="${blockId}"]`,
+			);
+			if (!scope) return;
+			const svg = scope.querySelector('.markdown-mermaid-wrap .mermaid svg');
+			if (!(svg instanceof SVGElement)) return;
+			const url = mermaidSvgToPreviewDataUrl(svg);
+			if (url) openMermaidPreview(url);
+		};
+
 		const header = (
 			<div className="flex items-center justify-between gap-2 mt-4.5 select-none bg-theme-background/50 rounded-t-md h-8">
 				<Button variant="link" size="sm" className="h-7 px-2" onClick={toggle}>
-					{mode === 'diagram' ? <Code2 /> : <Waypoints />}
+					<Code2 size={16} />
 					<span>{mode === 'diagram' ? '代码' : '图表'}</span>
 				</Button>
 				<div className="flex items-center justify-end">
@@ -112,13 +131,22 @@ export function StreamingMarkdownBody({
 							{copied ? '已复制' : '复制'}
 						</span>
 					</Button>
+					<Button
+						variant="link"
+						size="sm"
+						onClick={onPreview}
+						disabled={mode !== 'diagram'}
+					>
+						<Eye size={16} />
+						<span className="text-sm">预览</span>
+					</Button>
 				</div>
 			</div>
 		);
 
 		if (mode === 'code') {
 			return (
-				<div key={`mm-wrap-${blockId}`}>
+				<div key={`mm-wrap-${blockId}`} data-mermaid-preview-scope={blockId}>
 					{header}
 					<div
 						dangerouslySetInnerHTML={{
@@ -131,7 +159,7 @@ export function StreamingMarkdownBody({
 
 		// diagram 模式：闭合/未闭合都交给 MermaidFenceIsland；岛内“成功才提交”避免流式错误 SVG 闪烁
 		return (
-			<div key={`mm-wrap-${blockId}`}>
+			<div key={`mm-wrap-${blockId}`} data-mermaid-preview-scope={blockId}>
 				{header}
 				<MermaidFenceIsland
 					code={part.text}
