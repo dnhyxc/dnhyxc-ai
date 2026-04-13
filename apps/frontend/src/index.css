@@ -68,18 +68,7 @@ body {
 			}
 		}
 
-		/* 助手气泡内：仅联网搜索消息禁止角标/正文链接响应点击（避免 WebView 内跳转） */
-		[data-chat-assistant-shell]
-			.streaming-md-body.__md-search-enabled__
-			.markdown-body
-			a[data-organic-cite],
-		[data-chat-assistant-shell]
-			.streaming-md-body.__md-search-enabled__
-			.markdown-body
-			a.__md-search-organic__ {
-			pointer-events: none !important;
-			cursor: default !important;
-		}
+		/* 助手气泡内：链接点击由前端统一接管（Tauri 下用默认浏览器打开） */
 	}
 
 	#__session-item-title__ {

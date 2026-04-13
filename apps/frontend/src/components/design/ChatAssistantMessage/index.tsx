@@ -24,6 +24,7 @@ import {
 	downloadChatCodeBlock,
 	getChatCodeBlockPlainText,
 } from '@/utils/chatCodeToolbar';
+import { attachExternalLinkClickInterceptor } from '@/utils/external-link-click';
 import { openExternalUrl } from '@/utils/open-external';
 import {
 	applyOrganicCitationAnchors,
@@ -166,6 +167,14 @@ function ChatAssistantMessageInner({
 	useEffect(() => {
 		const el = shellRef.current;
 		if (!el) return;
+		const detachExternalLinkInterceptor = attachExternalLinkClickInterceptor(
+			el,
+			{
+				anchorSelector: '.markdown-body a',
+				skipHashAnchors: true,
+				stopPropagation: true,
+			},
+		);
 		const onClick = (e: MouseEvent) => {
 			const target = e.target as HTMLElement;
 			const btn = target.closest<HTMLButtonElement>('[data-chat-code-action]');
@@ -188,7 +197,10 @@ function ChatAssistantMessageInner({
 			}
 		};
 		el.addEventListener('click', onClick);
-		return () => el.removeEventListener('click', onClick);
+		return () => {
+			detachExternalLinkInterceptor();
+			el.removeEventListener('click', onClick);
+		};
 	}, []);
 
 	const clearOrganicPreviewLeaveTimer = useCallback(() => {

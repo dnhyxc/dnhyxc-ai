@@ -100,7 +100,50 @@
 | `src/views/setting/about/index.tsx` | 同上；`查看更新内容` 使用 `openExternalUrl` |
 | `src/components/design/ChatAssistantMessage/SearchOrganics.tsx` | 搜索结果外链使用 `openExternalUrl` |
 
-### 4.5 未改但已兼容的说明
+### 4.5 Markdown 区域链接：禁止在 WebView 内跳转，改为默认浏览器打开
+
+#### 4.5.1 背景
+
+在 **Tauri WebView** 中点击 Markdown 渲染出的 `<a>`，默认会尝试在 WebView 内部导航：
+
+- 可能破坏应用路由状态或触发白屏
+- 与「外链统一由系统默认浏览器打开」的产品预期不一致
+
+因此需要对 Markdown 预览/消息正文中的链接点击做统一接管。
+
+#### 4.5.2 设计要点
+
+- **统一出口**：仍使用 `openExternalUrl(url)`  
+  - Tauri：`@tauri-apps/plugin-opener` → 系统默认浏览器  
+  - Web：`window.open(url, '_blank', 'noopener,noreferrer')`
+- **捕获阶段拦截**：在容器上注册 `click` 的 capture listener，保证即使事件来自 `<a>` 内部子节点（如 `<span>`）也能命中。
+- **跳过页内锚点**：`href` 以 `#` 开头的链接不作为外链打开，交给宿主自己的滚动/定位逻辑处理（例如 Monaco 预览在 `ScrollArea` 内的 `scrollIntoView`）。
+
+#### 4.5.3 公共封装
+
+新增工具函数：`apps/frontend/src/utils/external-link-click.ts`
+
+```ts
+export function attachExternalLinkClickInterceptor(
+  container: HTMLElement,
+  opts?: {
+    anchorSelector?: string;      // 默认 '.markdown-body a'
+    skipHashAnchors?: boolean;    // 默认 true
+    stopPropagation?: boolean;    // 默认 true
+  }
+): () => void
+```
+
+返回值为卸载函数，便于在 `useEffect` cleanup 中释放监听。
+
+#### 4.5.4 应用位置
+
+| 文件 | 说明 |
+|------|------|
+| `apps/frontend/src/components/design/ChatAssistantMessage/index.tsx` | 在消息气泡根容器上接管 `.markdown-body a` 点击，避免聊天消息内外链在 WebView 内打开 |
+| `apps/frontend/src/components/design/Monaco/preview.tsx` | 在预览容器上接管 `.markdown-body a` 点击；同时保留原有 `a[href^="#"]` 的页内锚点滚动逻辑 |
+
+### 4.6 未改但已兼容的说明
 
 - `src/utils/knowledge-save.ts`：仍为动态 `import('@tauri-apps/api/core')`；知识库页在保存路径上已用 `isTauriRuntime` 分支，浏览器走 HTTP 接口。
 - `src/views/coding/tauriSandpackClipboard.ts`：原有 `navigator.clipboard` 回退，与本次剪贴板策略一致。

@@ -33,6 +33,7 @@ import {
 	downloadChatCodeBlock,
 	getChatCodeBlockPlainText,
 } from '@/utils/chatCodeToolbar';
+import { attachExternalLinkClickInterceptor } from '@/utils/external-link-click';
 import {
 	mermaidStreamingFallbackHtml,
 	splitOpenMermaidTail,
@@ -112,6 +113,15 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 	useEffect(() => {
 		const el = markdownRef.current;
 		if (!el) return;
+		const detachExternalLinkInterceptor = attachExternalLinkClickInterceptor(
+			el,
+			{
+				anchorSelector: '.markdown-body a',
+				// 页内锚点交给下方逻辑在 ScrollArea 内 scrollIntoView
+				skipHashAnchors: true,
+				stopPropagation: true,
+			},
+		);
 		const onClick = (e: MouseEvent) => {
 			const target = e.target as HTMLElement;
 			if (!el.contains(target)) return;
@@ -160,7 +170,10 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 			}
 		};
 		el.addEventListener('click', onClick);
-		return () => el.removeEventListener('click', onClick);
+		return () => {
+			detachExternalLinkInterceptor();
+			el.removeEventListener('click', onClick);
+		};
 	}, []);
 
 	const assignViewportRef = useCallback(
