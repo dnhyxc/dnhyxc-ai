@@ -36,34 +36,47 @@ body {
 			h1 {
 				border: none;
 			}
+		}
 
-			a {
-				display: inline-block;
-				text-align: center;
-				cursor: pointer !important;
-				margin-left: 4px;
-				border-block-end: none !important;
-				border-radius: 100%;
-				background-color: var(--theme-secondary);
-				width: 18px;
-				height: 18px;
-				font-size: 12px;
-				vertical-align: text-top;
-				color: var(--theme-textcolor);
-				overflow: hidden;
+		/* 仅当该条消息开启“联网搜索”时，才把引用角标渲染成圆形样式（不影响普通消息内链接） */
+		.streaming-md-body.__md-search-enabled__ {
+			.markdown-body {
+				a[data-organic-cite],
+				a.__md-search-organic__ {
+					display: inline-block;
+					text-align: center;
+					cursor: pointer !important;
+					margin-left: 4px;
+					border-block-end: none !important;
+					border-radius: 100%;
+					background-color: var(--theme-secondary);
+					width: 18px;
+					height: 18px;
+					font-size: 12px;
+					vertical-align: text-top;
+					color: var(--theme-textcolor);
+					overflow: hidden;
 
-				&:hover {
-					background-color: var(--theme-background);
-				}
+					&:hover {
+						background-color: var(--theme-background);
+					}
 
-				&::after {
-					content: none !important;
+					&::after {
+						content: none !important;
+					}
 				}
 			}
 		}
 
-		/* 助手气泡内：与上列 a 样式同源，禁止角标/正文链接响应点击（避免 WebView 内跳转） */
-		[data-chat-assistant-shell] .markdown-body a {
+		/* 助手气泡内：仅联网搜索消息禁止角标/正文链接响应点击（避免 WebView 内跳转） */
+		[data-chat-assistant-shell]
+			.streaming-md-body.__md-search-enabled__
+			.markdown-body
+			a[data-organic-cite],
+		[data-chat-assistant-shell]
+			.streaming-md-body.__md-search-enabled__
+			.markdown-body
+			a.__md-search-organic__ {
 			pointer-events: none !important;
 			cursor: default !important;
 		}

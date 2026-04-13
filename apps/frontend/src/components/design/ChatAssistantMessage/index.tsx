@@ -161,6 +161,8 @@ function ChatAssistantMessageInner({
 		return applyOrganicCitationAnchors(raw, org);
 	}, [message.content, message.thinkContent, message.searchOrganic]);
 
+	const isSearchOrganicEnabled = (message.searchOrganic?.length ?? 0) > 0;
+
 	useEffect(() => {
 		const el = shellRef.current;
 		if (!el) return;
@@ -376,7 +378,11 @@ function ChatAssistantMessageInner({
 				parser={chatMdParser}
 				preferDark={appTheme === 'black'}
 				isStreaming={!!message.isStreaming}
-				className={cn(`[&_.markdown-body]:text-textcolor/90!`, className)}
+				className={cn(
+					`[&_.markdown-body]:text-textcolor/90!`,
+					isSearchOrganicEnabled && '__md-search-enabled__',
+					className,
+				)}
 			/>
 			{message.isStreaming && (
 				<div className="mt-2.5 flex items-center">
