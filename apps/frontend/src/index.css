@@ -90,13 +90,6 @@ body {
 		background-color: var(--theme-muted);
 	}
 
-	/* 流式聊天图表 code 样式 */
-	.markdown-body {
-		.chat-md-mermaid-streaming {
-			margin-bottom: 18px !important;
-		}
-	}
-
 	/* 助手 Markdown 围栏代码：工具栏由 MarkdownParser(enableChatCodeFenceToolbar) 输出，位移由 chatCodeToolbar 滚动同步 */
 	.chat-md-code-block {
 		position: relative;
@@ -142,7 +135,7 @@ body {
 	}
 
 	.chat-md-code-lang {
-		font-size: 0.75rem;
+		font-size: 14px;
 		line-height: 1.25;
 		color: var(--theme-textcolor);
 		opacity: 0.72;
@@ -156,8 +149,8 @@ body {
 	}
 
 	.chat-md-code-btn {
-		font-size: 12px;
-		width: 44px;
+		font-size: 14px;
+		width: 50px;
 		height: 24px;
 		border-radius: 5px;
 		border: none;
@@ -186,15 +179,32 @@ body {
 	/* Mermaid 块：上下各 10px 间距（含 .markdown-body 内与 mermaid 岛宿主内） */
 	.markdown-body .markdown-mermaid-wrap,
 	.mermaid-island-root .markdown-mermaid-wrap {
-		margin: 10px 0;
+		margin-bottom: 10px;
 		max-width: 100%;
 		overflow-x: auto;
+		background: color-mix(in oklch, var(--theme-background) 18%, transparent);
 	}
 	.markdown-body .markdown-mermaid-wrap svg,
 	.mermaid-island-root .markdown-mermaid-wrap svg {
 		display: block;
 		max-width: 100%;
 		height: auto;
+	}
+	.markdown-mermaid-wrap {
+		border-radius: 0 0 0.5rem 0.5rem;
+		margin-bottom: 20px !important;
+	}
+	/* 流式聊天图表 code 样式 */
+	.markdown-body {
+		.chat-md-mermaid-streaming {
+			border-radius: 0 0 0.5rem 0.5rem;
+			margin-bottom: 20px !important;
+			background: color-mix(in oklch, var(--theme-background) 18%, transparent);
+			color: var(--theme-textcolor);
+		}
+	}
+	.monaco-preview-mode-mermaid {
+		margin: 18px 0;
 	}
 
 	.md-editor-dark,

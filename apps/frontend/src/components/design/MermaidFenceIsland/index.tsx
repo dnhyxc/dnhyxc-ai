@@ -23,6 +23,7 @@ export type MermaidFenceIslandProps = {
 	/** 流式中间态时抑制 Mermaid 报错闪烁 */
 	isStreaming?: boolean;
 	openMermaidPreview?: (dataUrl: string) => void;
+	className?: string;
 };
 
 const noopOpenPreview = (_dataUrl: string) => {};
@@ -60,6 +61,7 @@ export const MermaidFenceIsland = memo(function MermaidFenceIsland({
 	preferDark,
 	isStreaming = false,
 	openMermaidPreview,
+	className,
 }: MermaidFenceIslandProps) {
 	const hostRef = useRef<HTMLDivElement>(null);
 	const genRef = useRef(0); // 代数：作废过期渲染
@@ -221,6 +223,7 @@ export const MermaidFenceIsland = memo(function MermaidFenceIsland({
 			className={cn(
 				'mermaid-island-root w-full',
 				previewEnabled && '[&_.markdown-mermaid-wrap_.mermaid]:cursor-zoom-in',
+				className,
 			)}
 		/>
 	);

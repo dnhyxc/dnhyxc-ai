@@ -375,6 +375,7 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 										preferDark={theme === 'black'}
 										isStreaming={false}
 										openMermaidPreview={openMermaidPreview}
+										className="monaco-preview-mode-mermaid"
 									/>
 								);
 							})

@@ -100,29 +100,19 @@ export function StreamingMarkdownBody({
 		};
 
 		const header = (
-			<div className="flex items-center justify-end gap-2 my-1.5 select-none">
-				<Button
-					variant="dynamic"
-					size="sm"
-					className="h-7 px-2 bg-theme/5 hover:bg-theme/10 border border-theme/10"
-					onClick={onCopy}
-				>
-					{copied ? (
-						<CheckCircle size={15} className="text-teal-400" />
-					) : (
-						<Copy size={15} />
-					)}
-					<span className={copied ? 'text-teal-400' : ''}>复制</span>
-				</Button>
-				<Button
-					variant="dynamic"
-					size="sm"
-					className="h-7 px-2 bg-theme/5 hover:bg-theme/10 border border-theme/10"
-					onClick={toggle}
-				>
-					{mode === 'diagram' ? <Code2 size={16} /> : <Waypoints size={16} />}
+			<div className="flex items-center justify-between gap-2 mt-4.5 select-none bg-theme-background/50 rounded-t-md h-8">
+				<Button variant="link" size="sm" className="h-7 px-2" onClick={toggle}>
+					{mode === 'diagram' ? <Code2 /> : <Waypoints />}
 					<span>{mode === 'diagram' ? '代码' : '图表'}</span>
 				</Button>
+				<div className="flex items-center justify-end">
+					<Button variant="link" size="sm" onClick={onCopy}>
+						{copied ? <CheckCircle className="text-teal-400" /> : <Copy />}
+						<span className={cn(copied ? 'text-teal-400' : '', 'text-sm')}>
+							{copied ? '已复制' : '复制'}
+						</span>
+					</Button>
+				</div>
 			</div>
 		);
 

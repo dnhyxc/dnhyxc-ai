@@ -196,6 +196,34 @@ const body = lines.slice(i + 1).join('\n');
 return { prefix, body, openLine: i };
 ```
 
+### 5.3 本次优化：抽取公共拆分方法 `splitForMermaidIslandsWithOpenTail`（避免两处维护）
+
+位置：`apps/frontend/src/utils/splitMarkdownFences.ts`
+
+动机：
+
+- `StreamingMarkdownBody.tsx` 与 `Monaco/preview.tsx` 都需要同一套逻辑：
+  - “闭合围栏”交给 `MarkdownParser.splitForMermaidIslands`
+  - “尾部未闭合 mermaid 围栏”用 `splitOpenMermaidTail` 只探测尾部开放围栏
+  - 生成稳定 `openMermaidId`（基于 `openLine`），避免流式/编辑过程中 React remount 引发闪烁
+- 若两处各自维护，很容易出现边界差异（比如 `prefix` 是否补 `\n`、key 前缀是否一致）。
+
+做法：
+
+- 在 `splitMarkdownFences.ts` 新增组合函数 `splitForMermaidIslandsWithOpenTail`，把上述“组合 + 兜底策略”集中到一处：
+  - `enableOpenTail=false`：直接返回 `parser.splitForMermaidIslands(markdown)`（不探测尾部开放围栏）
+  - `enableOpenTail=true` 且存在 openTail：对 `openTail.prefix` 做 `splitForMermaidIslands`，并追加一个 `{ type:'mermaid', complete:false }` 尾段
+  - `openMermaidId = openMermaidIdPrefix + openLine`，前缀由调用方决定（聊天/预览互不冲突）
+
+调用方：
+
+- `apps/frontend/src/components/design/ChatAssistantMessage/StreamingMarkdownBody.tsx`
+  - `enableOpenTail = isStreaming`
+  - `openMermaidIdPrefix = 'mmd-open-line-'`
+- `apps/frontend/src/components/design/Monaco/preview.tsx`
+  - `enableOpenTail = enableMermaid`
+  - `openMermaidIdPrefix = 'pv-mmd-open-line-'`
+
 ---
 
 ## 6. `format.ts` 中与本次相关的逐行说明
