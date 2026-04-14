@@ -1,11 +1,14 @@
 import { Button } from '@ui/button';
+import { Toast } from '@ui/index';
 import { Label } from '@ui/label';
 import { RadioGroup, RadioGroupItem } from '@ui/radio-group';
-import { toast } from '@ui/sonner';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { capitalizeWords, getValue, setValue } from '@/utils';
-import { KNOWLEDGE_SHORTCUTS_CHANGED_EVENT } from '@/utils/knowledge-shortcuts';
+import {
+	chordStringsSemanticallyEqual,
+	KNOWLEDGE_SHORTCUTS_CHANGED_EVENT,
+} from '@/utils/knowledge-shortcuts';
 import { isTauriRuntime } from '@/utils/runtime';
 import { DEFAULT_INFO, type ShortcutSettingItem } from './config';
 
@@ -26,6 +29,10 @@ const System = () => {
 	const [shortcutInfo, setShortcutInfo] = useState<ShortcutSettingItem[]>(() =>
 		DEFAULT_INFO.map((i) => ({ ...i })),
 	);
+	const shortcutInfoRef = useRef(shortcutInfo);
+	shortcutInfoRef.current = shortcutInfo;
+	const checkShortcutRef = useRef(checkShortcut);
+	checkShortcutRef.current = checkShortcut;
 
 	const getShortCutInfo = useCallback(async () => {
 		const next = await Promise.all(
@@ -98,68 +105,93 @@ const System = () => {
 		[shortcutInfo, checkShortcut],
 	);
 
-	const onKeyup = useCallback(
-		(_e: KeyboardEvent) => {
-			const info = shortcutInfo.find((item) => item.key === checkShortcut);
-			if (!info?.key || !info.shortcut) return;
+	const onKeyup = useCallback((_e: KeyboardEvent) => {
+		const activeKey = checkShortcutRef.current;
+		const info = shortcutInfoRef.current.find((item) => item.key === activeKey);
+		if (!info?.key || !info.shortcut) return;
 
-			const shortcuts = info.shortcut;
-			const pageOnly = info.registerGlobally === false;
+		const shortcuts = info.shortcut;
+		const pageOnly = info.registerGlobally === false;
 
-			/** 知识库等：只写 store，由页面内 keydown 响应，不占用全局快捷键 */
-			if (pageOnly) {
-				void (async () => {
-					await setValue(`shortcut_${info.key}`, shortcuts);
-					setShortcutInfo((prev) =>
-						prev.map((item) =>
-							item.key === checkShortcut
-								? { ...item, shortcut: shortcuts, defaultShortcut: shortcuts }
-								: item,
-						),
-					);
-					window.dispatchEvent(
-						new CustomEvent(KNOWLEDGE_SHORTCUTS_CHANGED_EVENT),
-					);
-				})();
-				return;
+		const list = shortcutInfoRef.current;
+		const conflict = list.find(
+			(item) =>
+				item.key !== activeKey &&
+				chordStringsSemanticallyEqual(
+					shortcuts,
+					item.shortcut.trim() || item.defaultShortcut,
+				),
+		);
+		if (conflict) {
+			Toast({
+				type: 'error',
+				title: '快捷键冲突',
+				message: `该快捷键与「${conflict.label}」冲突，请更换其他组合`,
+			});
+			setShortcutInfo((prev) =>
+				prev.map((item) =>
+					item.key === activeKey ? { ...item, shortcut: '' } : item,
+				),
+			);
+			setCheckShortcut(null);
+			if (!pageOnly && isTauriRuntime()) {
+				void desktopInvoke('reload_all_shortcuts');
 			}
+			return;
+		}
 
-			if (!isTauriRuntime()) {
-				toast.info('全局快捷键仅在桌面客户端可用');
-				return;
-			}
+		/** 知识库等：只写 store，由页面内 keydown 响应，不占用全局快捷键 */
+		if (pageOnly) {
+			void (async () => {
+				await setValue(`shortcut_${info.key}`, shortcuts);
+				setShortcutInfo((prev) =>
+					prev.map((item) =>
+						item.key === activeKey
+							? { ...item, shortcut: shortcuts, defaultShortcut: shortcuts }
+							: item,
+					),
+				);
+				window.dispatchEvent(
+					new CustomEvent(KNOWLEDGE_SHORTCUTS_CHANGED_EVENT),
+				);
+			})();
+			return;
+		}
 
-			desktopInvoke('register_shortcut', {
-				shortcutStr: shortcuts,
-				currentKey: checkShortcut,
+		if (!isTauriRuntime()) {
+			Toast({ type: 'info', title: '全局快捷键仅在桌面客户端可用' });
+			return;
+		}
+
+		desktopInvoke('register_shortcut', {
+			shortcutStr: shortcuts,
+			currentKey: activeKey,
+		})
+			.then(() => {
+				setShortcutInfo((prev) =>
+					prev.map((item) => {
+						if (item.key === activeKey) {
+							void setValue(`shortcut_${item.key}`, shortcuts);
+							return {
+								...item,
+								shortcut: shortcuts,
+								defaultShortcut: shortcuts,
+							};
+						}
+						return item;
+					}),
+				);
 			})
-				.then(() => {
-					setShortcutInfo((prev) =>
-						prev.map((item) => {
-							if (item.key === checkShortcut) {
-								void setValue(`shortcut_${item.key}`, shortcuts);
-								return {
-									...item,
-									shortcut: shortcuts,
-									defaultShortcut: shortcuts,
-								};
-							}
-							return item;
-						}),
-					);
-				})
-				.catch((error: string) => {
-					toast.error(error);
-					console.error(error, 'error');
-					setShortcutInfo((prev) =>
-						prev.map((item) =>
-							item.key === checkShortcut ? { ...item, shortcut: '' } : item,
-						),
-					);
-				});
-		},
-		[shortcutInfo, checkShortcut],
-	);
+			.catch((error: string) => {
+				Toast({ type: 'error', title: '全局快捷键注册失败', message: error });
+				console.error(error, 'error');
+				setShortcutInfo((prev) =>
+					prev.map((item) =>
+						item.key === activeKey ? { ...item, shortcut: '' } : item,
+					),
+				);
+			});
+	}, []);
 
 	const checkStartType = async () => {
 		if (!isTauriRuntime()) {
@@ -182,7 +214,7 @@ const System = () => {
 
 	const changeDir = async () => {
 		if (!isTauriRuntime()) {
-			toast.info('选择存储目录仅在桌面客户端可用');
+			Toast({ type: 'info', title: '选择存储目录仅在桌面客户端可用' });
 			return;
 		}
 		const path: string = await desktopInvoke<string>('select_directory');
@@ -192,7 +224,7 @@ const System = () => {
 
 	const onChangeAutoStart = async (value: string) => {
 		if (!isTauriRuntime()) {
-			toast.info('开机自启仅在桌面客户端可用');
+			Toast({ type: 'info', title: '开机自启仅在桌面客户端可用' });
 			return;
 		}
 		if (value === '2' && startType === '1') {

@@ -69,6 +69,23 @@ function parseChordString(raw: string | undefined | null): ParsedChord | null {
 	return { meta, control, alt, shift, key: keyNorm };
 }
 
+/** 判断两条快捷键存储串是否语义相同（忽略 Command/Meta、Ctrl/Control 等写法差异） */
+export function chordStringsSemanticallyEqual(
+	a: string | undefined | null,
+	b: string | undefined | null,
+): boolean {
+	const pa = parseChordString(a);
+	const pb = parseChordString(b);
+	if (!pa || !pb) return false;
+	return (
+		pa.meta === pb.meta &&
+		pa.control === pb.control &&
+		pa.alt === pb.alt &&
+		pa.shift === pb.shift &&
+		pa.key === pb.key
+	);
+}
+
 function eventPrimaryKeyNormalized(e: KeyboardEvent): string | null {
 	const k = e.key;
 	if (['Control', 'Alt', 'Shift', 'Meta'].includes(k)) return null;
