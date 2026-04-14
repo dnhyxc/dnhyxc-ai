@@ -185,8 +185,10 @@ function ChatAssistantMessageInner({
 			if (action === 'copy') {
 				void navigator.clipboard.writeText(getChatCodeBlockPlainText(block));
 				const prev = btn.textContent;
+				btn.setAttribute('data-chat-code-copied', '1');
 				btn.textContent = '已复制';
 				window.setTimeout(() => {
+					btn.removeAttribute('data-chat-code-copied');
 					btn.textContent = prev;
 				}, 1500);
 				return;

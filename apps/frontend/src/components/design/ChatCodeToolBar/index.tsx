@@ -1,3 +1,4 @@
+import { CheckCircle, Copy, Download } from 'lucide-react';
 import { useCallback, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui';
@@ -48,7 +49,7 @@ export default function ChatCodeToolbarFloating() {
 
 	const node = (
 		<div
-			className="flex items-center justify-between gap-2 pl-3 pr-px h-8.5 rounded-md bg-theme-background/50 shadow-[0_4px_10px_-4px_color-mix(in_oklch,var(--theme-background)_40%,black)] backdrop-blur-[2px]"
+			className="flex items-center justify-between gap-2 pl-3 h-8.5 rounded-md bg-theme-background/50 shadow-[0_4px_10px_-4px_color-mix(in_oklch,var(--theme-background)_40%,black)] backdrop-blur-[2px]"
 			style={{
 				position: 'fixed',
 				top: state.top,
@@ -65,17 +66,25 @@ export default function ChatCodeToolbarFloating() {
 			<div className="flex items-center h-8">
 				<Button
 					variant="link"
-					className="p-0 w-12.5 text-sm h-6text-textcolor/80"
+					className="text-sm h-6 text-textcolor/80"
 					onClick={onCopy}
 				>
-					{copied ? '已复制' : '复制'}
+					{copied ? (
+						<CheckCircle size={16} className="text-teal-500" />
+					) : (
+						<Copy size={16} />
+					)}
+					<span className={copied ? 'text-teal-500' : ''}>
+						{copied ? '已复制' : '复制'}
+					</span>
 				</Button>
 				<Button
 					variant="link"
-					className="p-0 w-12.5 text-sm h-6 text-textcolor/80"
+					className="text-sm h-6 text-textcolor/80"
 					onClick={onDownload}
 				>
-					下载
+					<Download size={16} />
+					<span>下载</span>
 				</Button>
 			</div>
 		</div>

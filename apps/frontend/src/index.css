@@ -112,7 +112,8 @@ body {
 		align-items: center;
 		justify-content: space-between;
 		gap: 0.5rem;
-		padding: 0.28rem 0 0.32rem 0.72rem;
+		/* 对齐吸顶浮动条：`pl-3 pr-px h-8.5` 的视觉节奏 */
+		padding: 0.28rem 1px 0.32rem 0.72rem;
 		border-radius: 0.5rem 0.5rem 0 0;
 		background: color-mix(in oklch, var(--theme-background) 50%, transparent);
 		backdrop-filter: blur(8px);
@@ -147,11 +148,18 @@ body {
 		display: flex;
 		align-items: center;
 		flex-shrink: 0;
+		padding-right: 10px;
 	}
 
 	.chat-md-code-btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 6px;
 		font-size: 14px;
-		width: 50px;
+		/* line-height: 1.25; */
+		/* 与吸顶浮动条按钮 `w-16`（64px）对齐，避免图标+文案挤压 */
+		/* width: 64px; */
 		height: 24px;
 		border-radius: 5px;
 		border: none;
@@ -164,6 +172,51 @@ body {
 		transition:
 			opacity 0.15s ease,
 			background-color 0.15s ease;
+		&:last-child {
+			margin-left: 24px;
+		}
+	}
+
+	.chat-md-code-btn::before {
+		content: "";
+		display: inline-block;
+		flex-shrink: 0;
+		width: 16px;
+		height: 16px;
+		background-color: currentColor;
+		/* 视觉微调：与文字基线更一致 */
+		transform: translateY(0.5px);
+		/* 使用 mask 渲染单色图标：颜色跟随 currentColor */
+		-webkit-mask-repeat: no-repeat;
+		-webkit-mask-position: center;
+		-webkit-mask-size: 16px 16px;
+		mask-repeat: no-repeat;
+		mask-position: center;
+		mask-size: 16px 16px;
+		margin-right: 2px;
+		margin-bottom: 1px;
+	}
+
+	/* 默认：copy/download 图标（lucide） */
+	.chat-md-code-btn[data-chat-code-action="copy"]::before {
+		-webkit-mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22currentColor%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20class%3D%22lucide%20lucide-copy-icon%20lucide-copy%22%3E%3Crect%20width%3D%2214%22%20height%3D%2214%22%20x%3D%228%22%20y%3D%228%22%20rx%3D%222%22%20ry%3D%222%22%2F%3E%3Cpath%20d%3D%22M4%2016c-1.1%200-2-.9-2-2V4c0-1.1.9-2%202-2h10c1.1%200%202%20.9%202%202%22%2F%3E%3C%2Fsvg%3E");
+		mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22currentColor%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20class%3D%22lucide%20lucide-copy-icon%20lucide-copy%22%3E%3Crect%20width%3D%2214%22%20height%3D%2214%22%20x%3D%228%22%20y%3D%228%22%20rx%3D%222%22%20ry%3D%222%22%2F%3E%3Cpath%20d%3D%22M4%2016c-1.1%200-2-.9-2-2V4c0-1.1.9-2%202-2h10c1.1%200%202%20.9%202%202%22%2F%3E%3C%2Fsvg%3E");
+	}
+
+	.chat-md-code-btn[data-chat-code-action="download"]::before {
+		-webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4'/%3E%3Cpolyline points='7 10 12 15 17 10'/%3E%3Cline x1='12' y1='15' x2='12' y2='3'/%3E%3C/svg%3E");
+		mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4'/%3E%3Cpolyline points='7 10 12 15 17 10'/%3E%3Cline x1='12' y1='15' x2='12' y2='3'/%3E%3C/svg%3E");
+	}
+
+	/* 已复制态：切换为对勾图标 + 主题色 */
+	.chat-md-code-btn[data-chat-code-action="copy"][data-chat-code-copied="1"] {
+		color: var(--color-teal-500);
+		opacity: 1;
+	}
+
+	.chat-md-code-btn[data-chat-code-action="copy"][data-chat-code-copied="1"]::before {
+		-webkit-mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22currentColor%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20class%3D%22lucide%20lucide-circle-check-big-icon%20lucide-circle-check-big%22%3E%3Cpath%20d%3D%22M21.801%2010A10%2010%200%201%201%2017%203.335%22%2F%3E%3Cpath%20d%3D%22m9%2011%203%203L22%204%22%2F%3E%3C%2Fsvg%3E");
+		mask-image: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%2224%22%20height%3D%2224%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22currentColor%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%20class%3D%22lucide%20lucide-circle-check-big-icon%20lucide-circle-check-big%22%3E%3Cpath%20d%3D%22M21.801%2010A10%2010%200%201%201%2017%203.335%22%2F%3E%3Cpath%20d%3D%22m9%2011%203%203L22%204%22%2F%3E%3C%2Fsvg%3E");
 	}
 
 	.chat-md-code-btn:hover {
