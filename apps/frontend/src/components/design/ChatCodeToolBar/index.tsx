@@ -1,5 +1,6 @@
 import { useCallback, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
+import { Button } from '@/components/ui';
 import {
 	downloadChatCodeBlock,
 	getChatCodeBlockPlainText,
@@ -47,7 +48,7 @@ export default function ChatCodeToolbarFloating() {
 
 	const node = (
 		<div
-			className="flex items-center justify-between gap-2 pl-3 h-8.5 rounded-md bg-theme-background/50 shadow-[0_4px_10px_-4px_color-mix(in_oklch,var(--theme-background)_40%,black)] backdrop-blur-[2px]"
+			className="flex items-center justify-between gap-2 pl-3 pr-px h-8.5 rounded-md bg-theme-background/50 shadow-[0_4px_10px_-4px_color-mix(in_oklch,var(--theme-background)_40%,black)] backdrop-blur-[2px]"
 			style={{
 				position: 'fixed',
 				top: state.top,
@@ -62,20 +63,20 @@ export default function ChatCodeToolbarFloating() {
 		>
 			<span className="text-sm text-textcolor/80">{state.lang}</span>
 			<div className="flex items-center h-8">
-				<button
-					type="button"
-					className="p-0 text-sm rounded-[5px] h-6 w-12.5 cursor-pointer text-textcolor/80 hover:text-teal-500"
+				<Button
+					variant="link"
+					className="p-0 w-12.5 text-sm h-6text-textcolor/80"
 					onClick={onCopy}
 				>
 					{copied ? '已复制' : '复制'}
-				</button>
-				<button
-					type="button"
-					className="p-0 text-sm rounded-[5px] h-6 w-12.5 cursor-pointer text-textcolor/80 hover:text-teal-500"
+				</Button>
+				<Button
+					variant="link"
+					className="p-0 w-12.5 text-sm h-6 text-textcolor/80"
 					onClick={onDownload}
 				>
 					下载
-				</button>
+				</Button>
 			</div>
 		</div>
 	);

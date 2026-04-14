@@ -138,7 +138,8 @@ body {
 		font-size: 14px;
 		line-height: 1.25;
 		color: var(--theme-textcolor);
-		opacity: 0.72;
+		opacity: 0.8;
+		font-family: var(--font-family);
 		font-variant-numeric: tabular-nums;
 	}
 
