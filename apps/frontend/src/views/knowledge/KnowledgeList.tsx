@@ -571,7 +571,7 @@ const KnowledgeList: React.FC<IProps> = observer(
 										>
 											选择文件夹
 										</Button>
-										<Tooltip side="top" content={localFolderPath}>
+										<Tooltip side="bottom" content={localFolderPath}>
 											<span className="min-w-0 flex-1 truncate text-xs text-textcolor/50">
 												{localFolderPath}
 											</span>
