@@ -34,6 +34,19 @@ export type MarkdownRenderEnv = {
 	headingSlugCounts?: Record<string, number>;
 };
 
+/**
+ * 流式 / 分屏预览：Markdown 段与 Mermaid 岛交替。
+ * `markdown` 段带 `lineBase0`：整篇源（已把 \\r\\n 规范为 \\n）中该段**首行**的 0-based 行下标，
+ * 用于把分段 `render` 得到的 `data-md-heading-line` 还原为与 Monaco 一致的全文行号。
+ */
+export type MarkdownMermaidSplitPart =
+	| {
+			type: 'markdown';
+			text: string;
+			lineBase0: number;
+	  }
+	| { type: 'mermaid'; text: string; complete: boolean };
+
 /** 从 heading 后的 inline token 抽纯文本，用于生成与目录链接一致的 slug */
 function headingPlainTextFromInline(inlineToken: Token | undefined): string {
 	if (!inlineToken || inlineToken.type !== 'inline' || !inlineToken.content) {
@@ -416,6 +429,86 @@ class MarkdownParser {
 			}
 			return self.renderToken(tokens, idx, opt);
 		};
+	}
+
+	private static coalesceMarkdownMermaidParts(
+		parts: MarkdownMermaidSplitPart[],
+	): MarkdownMermaidSplitPart[] {
+		const out: MarkdownMermaidSplitPart[] = [];
+		for (const p of parts) {
+			if (p.type === 'markdown' && p.text === '') continue;
+			const last = out[out.length - 1];
+			if (p.type === 'markdown' && last?.type === 'markdown') {
+				last.text += p.text;
+			} else {
+				out.push(p.type === 'markdown' ? { ...p } : { ...p });
+			}
+		}
+		return out;
+	}
+
+	/**
+	 * 用与 `render` 相同的 markdown-it 语法树切分：仅把 ```mermaid 段拆成独立岛，其余保持 Markdown 源码再 render。
+	 * 与 `enableMermaid` 解耦：`md.parse` 识别围栏不依赖渲染期 Mermaid 补丁。
+	 */
+	public splitForMermaidIslands(source: string): MarkdownMermaidSplitPart[] {
+		const normalized = source.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+		const lines = normalized.split('\n');
+		const lineCount = lines.length;
+		const sliceLines = (a: number, b: number) => {
+			const lo = Math.max(0, a);
+			const hi = Math.min(b, lineCount);
+			if (lo >= hi) return '';
+			const body = lines.slice(lo, hi).join('\n');
+			return hi < lineCount ? `${body}\n` : body;
+		};
+		const tokens = this.md.parse(normalized, {});
+		const raw: MarkdownMermaidSplitPart[] = [];
+		let lastLine = 0;
+		for (const t of tokens) {
+			if (t.type !== 'fence' || t.map == null) continue;
+			const [start, end] = t.map;
+			if (start < lastLine) continue;
+			if (start > lastLine) {
+				const prose = sliceLines(lastLine, start);
+				if (prose !== '') {
+					raw.push({ type: 'markdown', text: prose, lineBase0: lastLine });
+				}
+			}
+			const rawFence = sliceLines(start, end);
+			const info = t.info
+				? (this.md.utils.unescapeAll(String(t.info).trim()).split(/\s+/)[0] ??
+					'')
+				: '';
+			const lang = info.toLowerCase();
+			const body = t.content ?? '';
+			const fenceOnly = rawFence.replace(/\n+$/u, '').trim();
+			const orphanCloser =
+				!lang &&
+				!body.trim() &&
+				/^`{3,}\s*$/u.test(fenceOnly.replace(/^[ \t]*/u, ''));
+			if (orphanCloser) {
+				lastLine = end;
+				continue;
+			}
+			if (lang === 'mermaid') {
+				raw.push({ type: 'mermaid', text: body, complete: true });
+			} else if (rawFence !== '') {
+				raw.push({ type: 'markdown', text: rawFence, lineBase0: start });
+			}
+			lastLine = end;
+		}
+		if (lastLine < lineCount) {
+			const tail = sliceLines(lastLine, lineCount);
+			if (tail !== '') {
+				raw.push({ type: 'markdown', text: tail, lineBase0: lastLine });
+			}
+		}
+		const merged = MarkdownParser.coalesceMarkdownMermaidParts(raw);
+		if (merged.length === 0 && normalized) {
+			return [{ type: 'markdown', text: normalized, lineBase0: 0 }];
+		}
+		return merged;
 	}
 
 	/**

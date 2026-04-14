@@ -7,6 +7,7 @@ export {
 	clearAppliedHighlightJsTheme,
 } from './inject-highlight-theme.js';
 export type {
+	MarkdownMermaidSplitPart,
 	MarkdownParserOptions,
 	MarkdownRenderEnv,
 } from './markdown-parser.js';

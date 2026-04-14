@@ -2,6 +2,8 @@
 
 本文记录知识库等页面使用 `@monaco-editor/react` + 透明主题编辑 Markdown 时，**中文输入法（IME）** 出现**重影、拼音与汉字叠画、仅首行正常换行后必现**等问题的**成因**与**最终解决办法**；并单独说明与 IME 缓解方案相关的 **Tab / 缩进（`tabSize`）** 问题及处理（**§4**）；以及分屏模式下 **「跟随滚动」** 如何按**标题锚点**与源码行号对齐预览，并支持 **单向 / 双边** 三种跟滚模式与 **React `memo` 集成**（**§5**、**§5.11**）。**§2.8** 将根因、设计取舍与 **§3–§5** 的落代码方式串成**实现思路**，便于后续维护与排查。
 
+**分屏跟随滚动（算法与拆岛行号）** 已演进为 **`MarkdownScrollSyncSnapshot` + `getScrollTop()` 折线插值** 与 **`lineBase0` 全文行号修正**；**以当前源码为准的完整说明**见 **`docs/monaco-markdown-split-scroll-sync.md`**。本文 **§5** 中若仍出现旧符号（如 `HeadingScrollCache`、`sync*ByHeadings`），视为历史叙述，维护时请以前述专文与 `apps/frontend/src/components/design/Monaco/utils.ts` 为准。
+
 ---
 
 ## 1. 现象归纳

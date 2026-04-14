@@ -39,6 +39,21 @@ import {
 	splitForMermaidIslandsWithOpenTail,
 } from '@/utils/splitMarkdownFences';
 
+/**
+ * 分段 `render` 时标题 `data-md-heading-line` 为片段内 1-based；
+ * 加上 `lineBase0`（整篇 normalized 源里该段首行的 0-based 行下标）得到与 Monaco 一致的全文 1-based 行号。
+ */
+function shiftMarkdownPreviewHeadingLineAttrs(
+	html: string,
+	lineBase0: number,
+): string {
+	if (!lineBase0) return html;
+	return html.replace(
+		/data-md-heading-line="(\d+)"/g,
+		(_, d) => `data-md-heading-line="${lineBase0 + Number.parseInt(d, 10)}"`,
+	);
+}
+
 /** 纯预览模式右下角：可滚动时显示置底，触底后切换为置顶 */
 type PreviewScrollCornerFabMode = 'hidden' | 'toBottom' | 'toTop';
 
@@ -395,11 +410,15 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 						{hasMermaidIslandLayout ? (
 							fenceParts.map((part, i) => {
 								if (part.type === 'markdown') {
+									const rawHtml = parserNoMermaid.render(part.text);
 									return (
 										<div
 											key={`pv-${i}`}
 											dangerouslySetInnerHTML={{
-												__html: parserNoMermaid.render(part.text),
+												__html: shiftMarkdownPreviewHeadingLineAttrs(
+													rawHtml,
+													part.lineBase0,
+												),
 											}}
 										/>
 									);
