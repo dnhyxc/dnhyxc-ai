@@ -13,7 +13,7 @@ dotenv.config();
 const TOKEN = process.env.GITHUB_TOKEN;
 
 /**
- * 目标：将 docs/product-guide.md 推送到 dnhyxc-ai-app 的 GitHub Wiki 页面。
+ * 目标：将 docs/PROJECT-GUIDE.md 推送到 dnhyxc-ai-app 的 GitHub Wiki 页面。
  *
  * Wiki 页面 URL（slug）：
  *   dnhyxc‐ai-项目介绍
@@ -27,7 +27,7 @@ const OWNER = process.env.WIKI_APP_OWNER ?? 'dnhyxc';
 const REPO = process.env.WIKI_APP_REPO ?? 'dnhyxc-ai-app';
 const WIKI_PAGE_FILE =
 	process.env.WIKI_APP_INTRO_FILE ?? 'dnhyxc‐ai-项目介绍.md';
-const SOURCE_MD = path.resolve(_dirname, '../../docs/product-guide.md');
+const SOURCE_MD = path.resolve(_dirname, '../../docs/PROJECT-GUIDE.md');
 
 function runGit(
 	cwd: string,
@@ -136,7 +136,7 @@ function main(): number {
 				`user.email=${authorEmail}`,
 				'commit',
 				'-m',
-				'docs: 同步产品功能与使用教程（product-guide）',
+				'docs: 同步产品功能与使用教程（PROJECT-GUIDE）',
 			],
 			{
 				GIT_AUTHOR_NAME: authorName,
