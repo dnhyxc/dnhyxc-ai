@@ -3,6 +3,7 @@ import type { Plugin } from 'prettier';
 import * as babelPluginMod from 'prettier/plugins/babel';
 import * as estreePluginMod from 'prettier/plugins/estree';
 import * as htmlPluginMod from 'prettier/plugins/html';
+import * as markdownPluginMod from 'prettier/plugins/markdown';
 import * as postcssPluginMod from 'prettier/plugins/postcss';
 import * as typescriptPluginMod from 'prettier/plugins/typescript';
 import * as yamlPluginMod from 'prettier/plugins/yaml';
@@ -25,15 +26,13 @@ function asPrettierPlugin(mod: unknown): Plugin {
 	return (m?.default ?? mod) as Plugin;
 }
 
-/**
- * Markdown 不走 Prettier，故不加载 markdown 插件。
- * 浏览器端使用 standalone 的 format，不可用主包 `import prettier from 'prettier'`（依赖 Node）。
- */
+/** 浏览器端使用 standalone 的 format，不可用主包 `import prettier from 'prettier'`（依赖 Node）。 */
 const PRETTIER_PLUGINS: Plugin[] = [
 	asPrettierPlugin(babelPluginMod),
 	asPrettierPlugin(estreePluginMod),
 	asPrettierPlugin(typescriptPluginMod),
 	asPrettierPlugin(htmlPluginMod),
+	asPrettierPlugin(markdownPluginMod),
 	asPrettierPlugin(postcssPluginMod),
 	asPrettierPlugin(yamlPluginMod),
 ];
@@ -56,6 +55,8 @@ const rangeFormatterDisposables = new Map<string, { dispose: () => void }>();
  */
 function prettierParserForMonacoLanguage(languageId: string): string | null {
 	switch (languageId) {
+		case 'markdown':
+			return 'markdown';
 		case 'javascript':
 		case 'javascriptreact':
 			return 'babel';
@@ -99,11 +100,27 @@ function spacingMarkdownProse(markdown: string): string {
 }
 
 /**
- * Markdown 安全「格式化」：仅围栏外盘古空格，围栏原样；无变更时返回 null。
+ * Markdown 格式化（Prettier）：尽量与编辑器「格式化文档」一致，包含 fenced code block 的内嵌格式化。
+ * 若 Prettier 失败，则降级为“围栏外盘古空格、围栏原样”的安全处理。
  */
-export function safeFormatMarkdownValue(value: string): string | null {
-	const out = spacingMarkdownProse(value);
-	return out === value ? null : out;
+export async function safeFormatMarkdownValue(
+	value: string,
+): Promise<string | null> {
+	try {
+		const formatted = await format(value, {
+			parser: 'markdown',
+			plugins: PRETTIER_PLUGINS,
+			...PRETTIER_BASE_OPTIONS,
+			useTabs: true,
+			// 显式开启嵌入语言格式化：确保 fenced code block 内的 JS/CSS 等也走对应 parser
+			embeddedLanguageFormatting: 'auto',
+		});
+		return formatted === value ? null : formatted;
+	} catch (_err) {
+		// 这里如果失败，会降级为“围栏外盘古空格、围栏原样”，表现就是 fenced code block 不会被格式化
+		const out = spacingMarkdownProse(value);
+		return out === value ? null : out;
+	}
 }
 
 async function formatWithPrettierForModel(model: {
@@ -125,6 +142,7 @@ async function formatWithPrettierForModel(model: {
 			plugins: PRETTIER_PLUGINS,
 			...PRETTIER_BASE_OPTIONS,
 			useTabs: true,
+			embeddedLanguageFormatting: 'auto',
 		});
 		return formatted === text ? null : formatted;
 	} catch (err) {
@@ -187,10 +205,8 @@ function createRangeFormattingProvider() {
 	};
 }
 
-/**
- * 不含 markdown：Markdown 由编辑器快捷键调用 safeFormatMarkdownValue，避免 DocumentFormat 管线问题。
- */
 const LANGUAGES_WITH_FORMAT: string[] = [
+	'markdown',
 	'javascript',
 	'javascriptreact',
 	'typescript',
