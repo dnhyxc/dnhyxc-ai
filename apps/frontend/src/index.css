@@ -496,7 +496,8 @@ body {
 	 * 深色锚点 + 极少掺白：卡片/光晕只做极弱层次，避免整体发灰发亮。
 	 * 仍从单一 --theme-seed 用 color-mix 衍生，与 THEMES.black 气质一致。
 	 */
-	--theme-seed: oklch(0.152 0.011 272);
+	/* 深色背景太黑时：优先抬高 L（亮度）而不加灰 */
+	--theme-seed: oklch(0.125 0.011 272);
 	--theme-background: var(--theme-seed);
 	--theme-card: color-mix(in oklch, var(--theme-seed) 94%, white);
 	--theme-muted: color-mix(in oklch, var(--theme-seed) 90%, white);
@@ -516,12 +517,17 @@ body {
 	--theme-secondary: color-mix(in oklch, var(--theme-seed) 92%, white);
 	--theme-sidebar: color-mix(in oklch, var(--theme-seed) 95%, white);
 	--theme-active-color: color-mix(in oklch, var(--theme-seed) 82%, white);
-	--theme-color: color-mix(in oklch, white 90%, var(--theme-seed));
+	/* 主题强调色：青色高光（oklch + 轻微透明） */
+	/* 降低亮度，避免过亮刺眼 */
+	/* 偏白一点：提高亮度、降低饱和度，保留同色相 */
+	/* 再偏白一点：略提亮并降低饱和度 */
+	--theme-color: oklch(0.99 0.06 250.85 / 0.89);
 	--theme-from: color-mix(in oklch, var(--theme-seed) 88%, white);
 	--theme-via: color-mix(in oklch, var(--theme-seed) 92%, white);
 	--theme-to: color-mix(in oklch, var(--theme-seed) 86%, white);
 	--theme-text-from: var(--theme-color);
-	--theme-text-to: color-mix(in oklch, white 82%, var(--theme-seed));
+	/* 渐变文字补一端白色（oklch + 轻微透明） */
+	--theme-text-to: oklch(1 0 0 / 0.9);
 	/* 黑色：光圈保持克制；浅色主题在各自块里单独加浓 */
 	--theme-light: color-mix(in oklch, var(--theme-color) 15%, transparent);
 	--theme-pointer-core: 5%;
