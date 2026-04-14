@@ -516,7 +516,7 @@ body {
 	--theme-secondary: color-mix(in oklch, var(--theme-seed) 92%, white);
 	--theme-sidebar: color-mix(in oklch, var(--theme-seed) 95%, white);
 	--theme-active-color: color-mix(in oklch, var(--theme-seed) 82%, white);
-	--theme-color: color-mix(in oklch, white 84%, var(--theme-seed));
+	--theme-color: color-mix(in oklch, white 90%, var(--theme-seed));
 	--theme-from: color-mix(in oklch, var(--theme-seed) 88%, white);
 	--theme-via: color-mix(in oklch, var(--theme-seed) 92%, white);
 	--theme-to: color-mix(in oklch, var(--theme-seed) 86%, white);
