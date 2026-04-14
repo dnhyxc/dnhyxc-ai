@@ -30,7 +30,6 @@ export type StreamingMarkdownBodyProps = {
 	/** 每块 Mermaid 的默认展示模式（不传则默认图）；每块仍可独立切换 */
 	defaultMermaidViewMode?: 'diagram' | 'code';
 	containerRef?: RefObject<HTMLDivElement | null>;
-	isSharing?: boolean;
 };
 
 export function StreamingMarkdownBody({
@@ -41,7 +40,6 @@ export function StreamingMarkdownBody({
 	isStreaming,
 	defaultMermaidViewMode = 'diagram',
 	containerRef,
-	isSharing,
 }: StreamingMarkdownBodyProps) {
 	const { parts, openMermaidId } = useMemo(
 		() =>
@@ -74,7 +72,6 @@ export function StreamingMarkdownBody({
 				mermaidCode={part.text}
 				openMermaidPreview={openMermaidPreview}
 				defaultViewMode={defaultMermaidViewMode}
-				isSharing={isSharing}
 			>
 				{(mode) =>
 					mode === 'code' ? (

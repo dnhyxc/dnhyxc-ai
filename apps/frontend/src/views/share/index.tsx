@@ -180,12 +180,12 @@ const SessionShare = () => {
 			<ScrollArea
 				ref={scrollViewportRef}
 				className="min-h-0 flex-1"
-				viewportClassName="pt-10 pb-1"
+				viewportClassName="pb-1"
 				onScroll={syncScrollMetrics}
 			>
 				<div
 					className={cn(
-						'max-w-208 mx-auto relative flex w-full flex-col select-none px-4',
+						'mt-2.5 max-w-208 mx-auto relative flex w-full flex-col select-none px-4',
 					)}
 				>
 					{chatData?.messages.map((message, index) => (
@@ -221,7 +221,7 @@ const SessionShare = () => {
 								{message.role === 'user' ? (
 									<ChatUserMessage message={message} />
 								) : (
-									<ChatAssistantMessage message={message} isSharing={true} />
+									<ChatAssistantMessage message={message} />
 								)}
 
 								<div
