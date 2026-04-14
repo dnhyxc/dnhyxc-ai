@@ -7,6 +7,7 @@
  */
 
 import { MermaidFenceIsland } from '@design/MermaidFenceIsland';
+import { MermaidFenceToolbar } from '@design/MermaidFenceToolbar';
 import type {
 	MarkdownMermaidSplitPart,
 	MarkdownParser,
@@ -118,8 +119,9 @@ export function StreamingMarkdownBody({
 			if (url) openMermaidPreview(url);
 		};
 
+		// Mermaid 工具条：独立组件内 sticky + 粘顶双态样式，不包裹 MermaidFenceIsland，避免影响流式/离屏渲染（见 docs/mermaid-fence-toolbar-sticky.md）
 		const header = (
-			<div className="flex items-center justify-between gap-2 mt-4.5 select-none bg-theme-background/50 rounded-t-md h-8">
+			<MermaidFenceToolbar blockId={blockId}>
 				<Button variant="link" size="sm" className="h-7 px-2" onClick={toggle}>
 					<Code2 size={16} />
 					<span>{mode === 'diagram' ? '代码' : '图表'}</span>
@@ -141,12 +143,16 @@ export function StreamingMarkdownBody({
 						<span className="text-sm">预览</span>
 					</Button>
 				</div>
-			</div>
+			</MermaidFenceToolbar>
 		);
 
 		if (mode === 'code') {
 			return (
-				<div key={`mm-wrap-${blockId}`} data-mermaid-preview-scope={blockId}>
+				<div
+					key={`mm-wrap-${blockId}`}
+					data-mermaid-preview-scope={blockId}
+					className="mt-4.5"
+				>
 					{header}
 					<div
 						dangerouslySetInnerHTML={{
@@ -159,7 +165,11 @@ export function StreamingMarkdownBody({
 
 		// diagram 模式：闭合/未闭合都交给 MermaidFenceIsland；岛内“成功才提交”避免流式错误 SVG 闪烁
 		return (
-			<div key={`mm-wrap-${blockId}`} data-mermaid-preview-scope={blockId}>
+			<div
+				key={`mm-wrap-${blockId}`}
+				data-mermaid-preview-scope={blockId}
+				className="mt-4.5"
+			>
 				{header}
 				<MermaidFenceIsland
 					code={part.text}
