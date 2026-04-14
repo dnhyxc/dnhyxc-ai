@@ -124,7 +124,7 @@ const System = () => {
 		);
 		if (conflict) {
 			Toast({
-				type: 'error',
+				type: 'info',
 				title: '快捷键冲突',
 				message: `该快捷键与「${conflict.label}」冲突，请更换其他组合`,
 			});
@@ -329,30 +329,94 @@ const System = () => {
 					「知识库」相关快捷键仅在知识库页面内生效，不会注册为系统全局快捷键；其余项在桌面端为全局快捷键。
 				</p>
 				<div className="flex flex-col items-center mt-2 px-8.5 text-sm">
-					<div className="grid grid-cols-2 w-full gap-y-1">
-						{shortcutInfo.map((i) => {
-							return (
-								<div key={i.key} className="flex items-center min-w-0">
-									<span className="shrink-0">{i.label}</span>
-									<Button
-										variant="link"
-										id={i.id}
-										className={cn(
-											'cursor-pointer text-md mt-1 min-w-0 truncate',
-											checkShortcut === i.key && !i.shortcut
-												? 'text-textcolor/70'
-												: 'text-textcolor',
-										)}
-										onClick={() => void onChangeShortCut(i.key)}
-									>
-										{checkShortcut === i.key
-											? i.shortcut || '按键盘输入快捷键'
-											: i.shortcut || i.defaultShortcut}
-									</Button>
+					{(() => {
+						type Group = {
+							title: string;
+							items: Array<ShortcutSettingItem & { displayLabel: string }>;
+						};
+
+						const groups = new Map<string, Group>();
+						for (const i of shortcutInfo) {
+							const parts = i.label.split('：').map((p) => p.trim());
+							const first = parts[0] || '其他';
+
+							// 手动归类：应用显示/刷新相关放在一起
+							const appVisibilityActions = new Set([
+								'hide',
+								'hideOrShowApp',
+								'reload',
+							]);
+							if (appVisibilityActions.has(i.action)) {
+								const groupTitle = '应用显示/刷新';
+								const g = groups.get(groupTitle) ?? {
+									title: groupTitle,
+									items: [],
+								};
+								g.items.push({ ...i, displayLabel: i.label });
+								groups.set(groupTitle, g);
+								continue;
+							}
+
+							// 约定：label 形如「知识库：保存」；若存在两级（如「知识库：产品：保存」），则按「知识库：产品」再细分
+							const groupTitle =
+								first === '知识库' && parts.length >= 3
+									? `知识库：${parts[1]}`
+									: first;
+							const dropCount =
+								first === '知识库' && parts.length >= 3
+									? 2
+									: parts.length >= 2
+										? 1
+										: 0;
+							const displayLabel =
+								dropCount > 0 ? parts.slice(dropCount).join('：') : i.label;
+
+							const g = groups.get(groupTitle) ?? {
+								title: groupTitle,
+								items: [],
+							};
+							g.items.push({ ...i, displayLabel });
+							groups.set(groupTitle, g);
+						}
+
+						return Array.from(groups.values()).map((g) => (
+							<div
+								key={g.title}
+								className={cn(
+									'w-full',
+									'rounded-md border border-theme/15',
+									'px-3 py-2',
+									'not-first:mt-2',
+								)}
+							>
+								<div className="text-xs font-semibold text-textcolor/70 mb-1">
+									{g.title}
 								</div>
-							);
-						})}
-					</div>
+								<div className="grid grid-cols-2 w-full gap-y-1">
+									{g.items.map((i) => (
+										<div key={i.key} className="flex items-center min-w-0">
+											<span className="shrink-0">{i.displayLabel}</span>
+											<Button
+												variant="link"
+												id={i.id}
+												className={cn(
+													'cursor-pointer text-md mt-1 min-w-0 truncate',
+													checkShortcut === i.key && !i.shortcut
+														? 'text-textcolor/70'
+														: 'text-textcolor',
+												)}
+												onClick={() => void onChangeShortCut(i.key)}
+											>
+												{checkShortcut === i.key
+													? i.shortcut || '按键盘输入快捷键'
+													: i.shortcut || i.defaultShortcut}
+											</Button>
+										</div>
+									))}
+								</div>
+							</div>
+						));
+					})()}
 				</div>
 			</div>
 		</div>
