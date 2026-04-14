@@ -17,6 +17,7 @@ const KnowledgeEditorToolbar = (props: {
 	shortcutHintSave?: string;
 	shortcutHintClear?: string;
 	shortcutHintOpenLibrary?: string;
+	shortcutHintOpenTrash?: string;
 }) => {
 	const {
 		onOpenLibrary,
@@ -28,6 +29,7 @@ const KnowledgeEditorToolbar = (props: {
 		shortcutHintSave,
 		shortcutHintClear,
 		shortcutHintOpenLibrary,
+		shortcutHintOpenTrash,
 	} = props;
 	const linkBtn =
 		'lucide-stroke-draw-hover flex items-center gap-1 px-0 has-[>svg]:px-0 disabled:hover:text-textcolor' as const;
@@ -68,7 +70,10 @@ const KnowledgeEditorToolbar = (props: {
 				</Button>
 			</Tooltip>
 			{showTrash ? (
-				<Tooltip side="bottom" content="回收站">
+				<Tooltip
+					side="bottom"
+					content={shortcutHintOpenTrash ?? 'Meta + Shift + T'}
+				>
 					<Button variant="link" className={linkBtn} onClick={onOpenTrash}>
 						<Trash2 className="mt-0.5" />
 						<span className="mt-0.5">回收站</span>

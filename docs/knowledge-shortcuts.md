@@ -45,6 +45,7 @@ flowchart LR
 | 知识库：清空草稿 | 7 | `shortcut_7` | `Meta + Shift + D` |
 | 知识库：打开列表 | 8 | `shortcut_8` | `Meta + Shift + L` |
 | 知识库：切换操作栏 | 9 | `shortcut_9` | `Meta + Shift + B` |
+| 知识库：打开回收站 | 10 | `shortcut_10` | `Meta + Shift + T` |
 
 常量定义见 `apps/frontend/src/utils/knowledge-shortcuts.ts` 中的 `KNOWLEDGE_SHORTCUT_KEY_IDS` 与 `KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS`；设置列表见 `apps/frontend/src/views/setting/system/config.ts` 的 `DEFAULT_INFO`。
 
@@ -131,6 +132,17 @@ const onKeyup = useCallback(
 
 `getShortCutInfo`：进入设置页时对 `DEFAULT_INFO` 每一项 `getValue('shortcut_${i.key}')`，有值则用存储值作为展示用的 `defaultShortcut`，否则用配置里的默认串。
 
+### 2.1 新增「回收站」快捷键的接入点
+
+本次新增回收站快捷键遵循同一套“仅页面”快捷键规则：
+
+- **设置项**：`apps/frontend/src/views/setting/system/config.ts` 的 `DEFAULT_INFO` 增加一项：
+  - `label: '知识库：打开回收站'`
+  - `key: 10`（即 `shortcut_10`）
+  - `registerGlobally: false`（不走 Tauri 全局注册）
+  - `defaultShortcut: 'Meta + Shift + T'`
+- **通知机制**：设置页保存后仍使用既有 `KNOWLEDGE_SHORTCUTS_CHANGED_EVENT`，知识页收到后 `reloadKnowledgeChords()` 重新加载即可，无需新增事件类型。
+
 ---
 
 ## 3. 工具模块：`knowledge-shortcuts.ts` 逐段说明
@@ -149,7 +161,7 @@ const onKeyup = useCallback(
 | `eventKeyMatchesChord` | 比较事件主键与解析结果；`e.key` 优先，`e.code` 兜底字母与数字 |
 | `chordMatchesStored`（导出） | 将 store 里的字符串解析后，与当前 `KeyboardEvent` 的修饰键 + 主键比较 |
 | `normalizeLegacyClearChord` 等 | 读到历史错误默认时迁移并返回是否需写回 store |
-| `loadKnowledgeShortcutChords`（导出） | `Promise.all` 读 `shortcut_6..9`，跑迁移，返回四个最终字符串 |
+| `loadKnowledgeShortcutChords`（导出） | `Promise.all` 读 `shortcut_6..10`，跑迁移（若有），返回最终字符串集合 |
 | `KNOWLEDGE_SHORTCUTS_CHANGED_EVENT`（导出） | 自定义事件名常量，设置页派发、知识页监听 |
 
 **`chordMatchesStored` 逐行逻辑注释版**（教学用，与实现等价）：
@@ -177,15 +189,17 @@ export async function loadKnowledgeShortcutChords(): Promise<{
   clear: string;
   openLibrary: string;
   toggleMarkdownBottomBar: string;
+  openTrash: string;
 }> {
   // 并行读取四条 shortcut，减少异步等待
-  const [s, c, o, b] = await Promise.all([
+  const [s, c, o, b, t] = await Promise.all([
     getValue<string>(`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.save}`),
     getValue<string>(`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.clear}`),
     getValue<string>(`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.openLibrary}`),
     getValue<string>(
       `shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.toggleMarkdownBottomBar}`,
     ),
+    getValue<string>(`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.openTrash}`),
   ]);
   // 清空：若仍是旧版 Meta+Control+D，写回 Meta+Shift+D
   const { value: clear, didMigrate: clearMigrated } =
@@ -219,6 +233,7 @@ export async function loadKnowledgeShortcutChords(): Promise<{
     clear,
     openLibrary,
     toggleMarkdownBottomBar,
+    openTrash: t?.trim() || KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.openTrash,
   };
 }
 ```
@@ -231,8 +246,9 @@ export async function loadKnowledgeShortcutChords(): Promise<{
 
 ### 4.1 状态
 
-- `knowledgeChords`：四个字符串，来自 `loadKnowledgeShortcutChords()`，用于 `chordMatchesStored` 与 Toolbar Tooltip。
+- `knowledgeChords`：多个字符串（保存/清空/列表/操作栏/回收站），来自 `loadKnowledgeShortcutChords()`，用于 `chordMatchesStored` 与 Toolbar Tooltip。
 - `markdownBottomBarOpen`：底部操作栏开闭；快捷键与 Monaco「操作栏」按钮都改这份状态。
+- `trashOpen`：回收站抽屉开闭；快捷键与 Toolbar「回收站」按钮都改这份状态。
 
 ### 4.2 重载 chord 的 effect
 
@@ -287,6 +303,13 @@ useEffect(() => {
       setMarkdownBottomBarOpen((open) => !open);
       return;
     }
+    if (chordMatchesStored(knowledgeChords.openTrash, e)) {
+      // 未登录时回收站入口隐藏（不应响应），避免误触后仍请求云端
+      if (!isCloudLoggedIn) return;
+      e.preventDefault();
+      setTrashOpen((open) => !open); // 回收站抽屉开关：再次按快捷键可关闭
+      return;
+    }
   };
   // 第三个参数 true：捕获阶段，优先于 Monaco 等目标阶段处理
   window.addEventListener('keydown', onKeyDown, true);
@@ -297,6 +320,7 @@ useEffect(() => {
   saveLoading,
   knowledgeStore.knowledgeOverwriteOpen,
   resetEditorToNewDraft,
+  isCloudLoggedIn,
 ]);
 ```
 
@@ -331,7 +355,7 @@ useEffect(() => {
 1. 在 `KNOWLEDGE_SHORTCUT_KEY_IDS` 增加未占用的数字 `key`，并在 `KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS` 写默认串。
 2. 在 `config.ts` 的 `DEFAULT_INFO` 增加一项，`registerGlobally: false`，`defaultShortcut` 引用常量。
 3. 在 `loadKnowledgeShortcutChords` 中 `getValue` / 返回值对象中增加字段；如有旧键迁移需求，增加 `normalizeLegacy*`。
-4. 在 `knowledge/index.tsx` 的 `knowledgeChords` 类型、初始 state、`onKeyDown` 分支中接入；若需 UI 联动，给子组件传 props。
+4. 在 `knowledge/index.tsx` 的 `knowledgeChords` 类型、初始 state、`onKeyDown` 分支中接入；若是抽屉/弹层类动作，优先用 `setXOpen((o) => !o)` 支持同键 toggle。
 5. 确认设置页 `onKeyup` 的 `pageOnly` 分支已覆盖所有 `registerGlobally: false` 项（无需改分支逻辑，只要 `DEFAULT_INFO` 配对正确）。
 6. 运行 `biome check` 与 `tsc`，手动在知识页验证 chord 与 Tooltip。
 

@@ -109,4 +109,14 @@ export const DEFAULT_INFO: ShortcutSettingItem[] = [
 		action: 'knowledge_toggle_markdown_bottom_bar',
 		registerGlobally: false,
 	},
+	{
+		label: '知识库：打开回收站',
+		key: KNOWLEDGE_SHORTCUT_KEY_IDS.openTrash,
+		id: 'shortcut',
+		shortcut: '',
+		defaultShortcut: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.openTrash,
+		placeholder: '按键盘输入快捷键',
+		action: 'knowledge_open_trash',
+		registerGlobally: false,
+	},
 ];

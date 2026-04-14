@@ -53,12 +53,14 @@ const Knowledge = observer(() => {
 		clear: string;
 		openLibrary: string;
 		toggleMarkdownBottomBar: string;
+		openTrash: string;
 	}>({
 		save: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.save,
 		clear: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.clear,
 		openLibrary: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.openLibrary,
 		toggleMarkdownBottomBar:
 			KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.toggleMarkdownBottomBar,
+		openTrash: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.openTrash,
 	});
 
 	const reloadKnowledgeChords = useCallback(async () => {
@@ -426,6 +428,12 @@ const Knowledge = observer(() => {
 				setMarkdownBottomBarOpen((open) => !open);
 				return;
 			}
+			if (chordMatchesStored(knowledgeChords.openTrash, e)) {
+				if (!isCloudLoggedIn) return;
+				e.preventDefault();
+				setTrashOpen((open) => !open);
+				return;
+			}
 		};
 		window.addEventListener('keydown', onKeyDown, true);
 		return () => window.removeEventListener('keydown', onKeyDown, true);
@@ -435,6 +443,7 @@ const Knowledge = observer(() => {
 		saveLoading,
 		knowledgeStore.knowledgeOverwriteOpen,
 		resetEditorToNewDraft,
+		isCloudLoggedIn,
 	]);
 
 	const onConfirmOverwrite = useCallback(async () => {
@@ -691,6 +700,7 @@ const Knowledge = observer(() => {
 							shortcutHintSave={knowledgeChords.save}
 							shortcutHintClear={knowledgeChords.clear}
 							shortcutHintOpenLibrary={knowledgeChords.openLibrary}
+							shortcutHintOpenTrash={knowledgeChords.openTrash}
 						/>
 					}
 					title={
