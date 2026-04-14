@@ -112,7 +112,7 @@ body {
 		align-items: center;
 		justify-content: space-between;
 		gap: 0.5rem;
-		padding: 0.28rem 0.2rem 0.32rem 0.9rem;
+		padding: 0.28rem 0 0.32rem 0.72rem;
 		border-radius: 0.5rem 0.5rem 0 0;
 		background: color-mix(in oklch, var(--theme-background) 50%, transparent);
 		backdrop-filter: blur(8px);
@@ -156,8 +156,10 @@ body {
 		border: none;
 		background: transparent;
 		color: var(--theme-textcolor);
-		opacity: 0.85;
+		opacity: 0.8;
+		font-weight: normal;
 		cursor: pointer;
+		font-family: var(--font-family);
 		transition:
 			opacity 0.15s ease,
 			background-color 0.15s ease;
@@ -165,7 +167,8 @@ body {
 
 	.chat-md-code-btn:hover {
 		opacity: 1;
-		background: color-mix(in oklch, var(--theme-textcolor) 8%, transparent);
+		color: var(--color-teal-500);
+		/* background: color-mix(in oklch, var(--theme-textcolor) 8%, transparent); */
 	}
 
 	.chat-md-code-block pre {
@@ -202,9 +205,6 @@ body {
 			background: color-mix(in oklch, var(--theme-background) 18%, transparent);
 			color: var(--theme-textcolor);
 		}
-	}
-	.monaco-preview-mode-mermaid {
-		margin: 18px 0;
 	}
 
 	.md-editor-dark,

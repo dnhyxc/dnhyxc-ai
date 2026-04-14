@@ -122,20 +122,31 @@ export function StreamingMarkdownBody({
 		// Mermaid 工具条：独立组件内 sticky + 粘顶双态样式，不包裹 MermaidFenceIsland，避免影响流式/离屏渲染（见 docs/mermaid-fence-toolbar-sticky.md）
 		const header = (
 			<MermaidFenceToolbar blockId={blockId}>
-				<Button variant="link" size="sm" className="h-7 px-2" onClick={toggle}>
+				<Button
+					variant="link"
+					size="sm"
+					className="h-7 px-2 text-textcolor/80"
+					onClick={toggle}
+				>
 					<Code2 size={16} />
 					<span>{mode === 'diagram' ? '代码' : '图表'}</span>
 				</Button>
 				<div className="flex items-center justify-end">
-					<Button variant="link" size="sm" onClick={onCopy}>
-						{copied ? <CheckCircle className="text-teal-400" /> : <Copy />}
-						<span className={cn(copied ? 'text-teal-400' : '', 'text-sm')}>
+					<Button
+						variant="link"
+						className="text-textcolor/80"
+						size="sm"
+						onClick={onCopy}
+					>
+						{copied ? <CheckCircle className="text-teal-500" /> : <Copy />}
+						<span className={cn(copied ? 'text-teal-500' : '', 'text-sm')}>
 							{copied ? '已复制' : '复制'}
 						</span>
 					</Button>
 					<Button
 						variant="link"
 						size="sm"
+						className="text-textcolor/80"
 						onClick={onPreview}
 						disabled={mode !== 'diagram'}
 					>

@@ -44,7 +44,7 @@ mermaid 段：MermaidFenceIsland → 离屏渲染（可测量）→ 成功才提
 useMermaidDiagramClickPreview（岛 host 或预览根）：点击 SVG → ImagePreview
 ```
 
-**Mermaid 围栏顶栏（sticky + 粘顶双态样式）**：见独立说明 [mermaid-fence-toolbar-sticky.md](./mermaid-fence-toolbar-sticky.md)（`MermaidFenceToolbar` + `StreamingMarkdownBody`）。
+**Mermaid 围栏顶栏（sticky + 粘顶双态样式）**：见独立说明 [mermaid-fence-toolbar-sticky.md](./mermaid-fence-toolbar-sticky.md)（`MermaidFenceToolbar` + `StreamingMarkdownBody`；Monaco / 知识库预览见该文档 **§12**）。
 
 - **渲染入口（路径 A）**：`MarkdownParser` 在 `enableMermaid !== false` 时对 ` ```mermaid ` 输出占位节点；`escapeHtml` 之前经 **`normalizeMermaidFenceBody`** 做换行统一与部分方括号文案补引号（见 **§7.5**）。
 - **渲染入口（路径 B）**：岛内用 **`textContent = normalizeMermaidFenceBody(code)`** 写入 DSL，再 **`runMermaidInMarkdownRoot(host)`**；根节点上的 **`useMermaidInMarkdownRoot` 通过 `parser.enableMermaid: false` 关闭**，避免重复扫描。

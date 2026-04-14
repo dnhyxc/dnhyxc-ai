@@ -47,7 +47,7 @@ export default function ChatCodeToolbarFloating() {
 
 	const node = (
 		<div
-			className="flex items-center justify-between gap-2 pl-3.5 pr-1 rounded-md bg-theme-background/50 shadow-[0_4px_10px_-4px_color-mix(in_oklch,var(--theme-background)_40%,black)] backdrop-blur-[2px]"
+			className="flex items-center justify-between gap-2 pl-3 h-8.5 rounded-md bg-theme-background/50 shadow-[0_4px_10px_-4px_color-mix(in_oklch,var(--theme-background)_40%,black)] backdrop-blur-[2px]"
 			style={{
 				position: 'fixed',
 				top: state.top,
@@ -55,6 +55,7 @@ export default function ChatCodeToolbarFloating() {
 				width: state.width,
 				zIndex: 1,
 				boxSizing: 'border-box',
+				fontFamily: 'var(--font-family)',
 			}}
 			role="toolbar"
 			aria-label="代码块工具栏"
@@ -63,14 +64,14 @@ export default function ChatCodeToolbarFloating() {
 			<div className="flex items-center h-8">
 				<button
 					type="button"
-					className="p-0 text-sm rounded-[5px] h-6 w-11 hover:bg-theme/10 cursor-pointer text-textcolor/80 hover:text-textcolor"
+					className="p-0 text-sm rounded-[5px] h-6 w-12.5 cursor-pointer text-textcolor/80 hover:text-teal-500"
 					onClick={onCopy}
 				>
 					{copied ? '已复制' : '复制'}
 				</button>
 				<button
 					type="button"
-					className="p-0 text-sm rounded-[5px] h-6 w-11 hover:bg-theme/10 cursor-pointer text-textcolor/80 hover:text-textcolor"
+					className="p-0 text-sm rounded-[5px] h-6 w-12.5 cursor-pointer text-textcolor/80 hover:text-teal-500"
 					onClick={onDownload}
 				>
 					下载

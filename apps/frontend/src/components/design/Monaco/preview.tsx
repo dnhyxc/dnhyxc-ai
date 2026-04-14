@@ -1,11 +1,21 @@
 import { MermaidFenceIsland } from '@design/MermaidFenceIsland';
+import { MermaidFenceToolbar } from '@design/MermaidFenceToolbar';
 import Tooltip from '@design/Tooltip';
+import type { MarkdownMermaidSplitPart } from '@dnhyxc-ai/tools';
 import { MarkdownParser } from '@dnhyxc-ai/tools';
 import { useMermaidInMarkdownRoot } from '@dnhyxc-ai/tools/react';
-import { ScrollArea } from '@ui/index';
-import { ArrowDown, ArrowUp } from 'lucide-react';
+import { Button, ScrollArea } from '@ui/index';
+import {
+	ArrowDown,
+	ArrowUp,
+	CheckCircle,
+	Code2,
+	Copy,
+	Eye,
+} from 'lucide-react';
 import {
 	memo,
+	type MouseEvent as ReactMouseEvent,
 	type RefObject,
 	type UIEvent,
 	useCallback,
@@ -30,11 +40,16 @@ import {
 	downloadChatCodeBlock,
 	getChatCodeBlockPlainText,
 } from '@/utils/chatCodeToolbar';
+import { copyToClipboard } from '@/utils/clipboard';
 import { attachExternalLinkClickInterceptor } from '@/utils/external-link-click';
+import { mermaidSvgToPreviewDataUrl } from '@/utils/mermaidImagePreview';
 import {
+	hashText,
 	mermaidStreamingFallbackHtml,
 	splitForMermaidIslandsWithOpenTail,
 } from '@/utils/splitMarkdownFences';
+
+const COPY_FEEDBACK_MS = 1600;
 
 /** 纯预览模式右下角：可滚动时显示置底，触底后切换为置顶 */
 type PreviewScrollCornerFabMode = 'hidden' | 'toBottom' | 'toTop';
@@ -54,8 +69,8 @@ interface ParserMarkdownPreviewPaneProps {
 }
 
 /**
- * 使用 @dnhyxc-ai/tools 的 MarkdownParser 渲染预览（与文档处理等页一致）
- * 知识库预览不需要聊天代码块吸顶工具栏，故关闭 enableChatCodeFenceToolbar
+ * 使用 @dnhyxc-ai/tools 的 MarkdownParser 渲染预览（与文档处理等页一致）。
+ * 知识库等场景仍启用围栏代码块内联工具栏；Mermaid 岛与 `StreamingMarkdownBody` 一致带顶栏与 sticky 吸顶（`MermaidFenceToolbar`）。
  */
 const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 	markdown,
@@ -248,6 +263,147 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 	const { openMermaidPreview, mermaidImagePreviewModal } =
 		useMermaidImagePreview();
 
+	// 与 StreamingMarkdownBody 一致：每块 mermaid 独立图/代码模式与复制反馈
+	const [mermaidModeById, setMermaidModeById] = useState<
+		Record<string, 'diagram' | 'code'>
+	>({});
+	const [copiedById, setCopiedById] = useState<Record<string, boolean>>({});
+	const copiedTimersRef = useRef<Record<string, number>>({});
+
+	const markCopied = useCallback((blockId: string) => {
+		const prevTid = copiedTimersRef.current[blockId];
+		if (prevTid) window.clearTimeout(prevTid);
+		setCopiedById((prev) => ({ ...prev, [blockId]: true }));
+		copiedTimersRef.current[blockId] = window.setTimeout(() => {
+			setCopiedById((prev) => ({ ...prev, [blockId]: false }));
+		}, COPY_FEEDBACK_MS);
+	}, []);
+
+	// 切换知识库文档等逻辑文档时清空，避免沿用上一条的切换/复制态
+	useEffect(() => {
+		setMermaidModeById({});
+		setCopiedById({});
+		for (const k of Object.keys(copiedTimersRef.current)) {
+			window.clearTimeout(copiedTimersRef.current[k]);
+		}
+		copiedTimersRef.current = {};
+	}, [documentIdentity]);
+
+	const renderMermaidPreviewPart = useCallback(
+		(
+			part: Extract<MarkdownMermaidSplitPart, { type: 'mermaid' }>,
+			i: number,
+		) => {
+			const blockId = part.complete
+				? `mmd-${hashText(part.text)}`
+				: (openMermaidId ?? `mmd-open-${i}`);
+			const mode = mermaidModeById[blockId] ?? 'diagram';
+			const toggle = () => {
+				setMermaidModeById((prev) => ({
+					...prev,
+					[blockId]: mode === 'diagram' ? 'code' : 'diagram',
+				}));
+			};
+			const copied = copiedById[blockId] === true;
+			const onCopy = () => {
+				void (async () => {
+					await copyToClipboard(`\`\`\`mermaid\n${part.text}\n\`\`\``);
+					markCopied(blockId);
+				})();
+			};
+			const onPreview = (e: ReactMouseEvent<HTMLButtonElement>) => {
+				const btn = e.currentTarget;
+				const scope = btn.closest<HTMLElement>(
+					`[data-mermaid-preview-scope="${blockId}"]`,
+				);
+				if (!scope) return;
+				const svg = scope.querySelector('.markdown-mermaid-wrap .mermaid svg');
+				if (!(svg instanceof SVGElement)) return;
+				const url = mermaidSvgToPreviewDataUrl(svg);
+				if (url) openMermaidPreview(url);
+			};
+
+			const header = (
+				<MermaidFenceToolbar blockId={blockId}>
+					<Button
+						variant="link"
+						size="sm"
+						className="h-8 px-2 text-textcolor/80"
+						onClick={toggle}
+					>
+						<Code2 size={16} />
+						<span>{mode === 'diagram' ? '代码' : '图表'}</span>
+					</Button>
+					<div className="flex items-center justify-end">
+						<Button
+							variant="link"
+							className="text-textcolor/80"
+							size="sm"
+							onClick={onCopy}
+						>
+							{copied ? <CheckCircle className="text-teal-500" /> : <Copy />}
+							<span className={cn(copied ? 'text-teal-500' : '', 'text-sm')}>
+								{copied ? '已复制' : '复制'}
+							</span>
+						</Button>
+						<Button
+							variant="link"
+							size="sm"
+							className="text-textcolor/80"
+							onClick={onPreview}
+							disabled={mode !== 'diagram'}
+						>
+							<Eye size={16} />
+							<span className="text-sm">预览</span>
+						</Button>
+					</div>
+				</MermaidFenceToolbar>
+			);
+
+			if (mode === 'code') {
+				return (
+					<div
+						key={`pv-mm-wrap-${blockId}`}
+						data-mermaid-preview-scope={blockId}
+						className="mt-4.5"
+					>
+						{header}
+						<div
+							dangerouslySetInnerHTML={{
+								__html: mermaidStreamingFallbackHtml(part.text),
+							}}
+						/>
+					</div>
+				);
+			}
+
+			return (
+				<div
+					key={`pv-mm-wrap-${blockId}`}
+					data-mermaid-preview-scope={blockId}
+					className="mt-4.5"
+				>
+					{header}
+					<MermaidFenceIsland
+						code={part.text}
+						preferDark={theme === 'black'}
+						isStreaming={!part.complete}
+						openMermaidPreview={openMermaidPreview}
+						className="monaco-preview-mode-mermaid"
+					/>
+				</div>
+			);
+		},
+		[
+			copiedById,
+			markCopied,
+			mermaidModeById,
+			openMermaidId,
+			openMermaidPreview,
+			theme,
+		],
+	);
+
 	useMermaidDiagramClickPreview(
 		previewHtmlRootRef,
 		openMermaidPreview,
@@ -358,26 +514,7 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 										/>
 									);
 								}
-								if (!part.complete) {
-									return (
-										<div
-											key={openMermaidId ?? `pv-${i}`}
-											dangerouslySetInnerHTML={{
-												__html: mermaidStreamingFallbackHtml(part.text),
-											}}
-										/>
-									);
-								}
-								return (
-									<MermaidFenceIsland
-										key={`pv-${i}`}
-										code={part.text}
-										preferDark={theme === 'black'}
-										isStreaming={false}
-										openMermaidPreview={openMermaidPreview}
-										className="monaco-preview-mode-mermaid"
-									/>
-								);
+								return renderMermaidPreviewPart(part, i);
 							})
 						) : (
 							<div dangerouslySetInnerHTML={{ __html: html }} />

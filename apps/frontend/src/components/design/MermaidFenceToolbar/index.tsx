@@ -57,7 +57,7 @@ export function MermaidFenceToolbar({
 			/>
 			<div
 				className={cn(
-					'sticky top-0 z-10 flex h-8 select-none items-center justify-between gap-2',
+					'px-px sticky top-0 z-10 flex h-8.5 select-none items-center justify-between gap-2',
 					isPinned
 						? MERMAID_TOOLBAR_PINNED_CHROME
 						: MERMAID_TOOLBAR_RESTING_CHROME,
