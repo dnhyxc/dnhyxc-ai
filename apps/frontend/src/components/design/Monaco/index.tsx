@@ -37,6 +37,7 @@ import {
 	safeFormatMarkdownValue,
 } from './format';
 import { GLASS_THEME_BY_UI, registerMonacoGlassThemes } from './glassTheme';
+import { registerMarkdownFenceEmbeddedHighlight } from './markdownTokens';
 import {
 	KNOWLEDGE_AUTO_SAVE_INTERVAL_PRESETS,
 	MARKDOWN_EDITOR_WORD_WRAP_COLUMN,
@@ -270,6 +271,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	const handleMonacoBeforeMount: BeforeMount = useCallback((monaco) => {
 		registerMonacoGlassThemes(monaco);
 		registerPrettierFormatProviders(monaco);
+		registerMarkdownFenceEmbeddedHighlight(monaco);
 	}, []);
 
 	/** 仅换 path 时更新，避免 defaultValue 每键变化导致 memo(Editor) 重渲染与 IME 叠字 */
