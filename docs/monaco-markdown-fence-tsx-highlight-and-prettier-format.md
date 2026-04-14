@@ -17,6 +17,10 @@
   - Prettier 格式化（markdown + embedded language formatting）
   - Markdown 围栏反引号数量的“安全降级”（```` → ```）
 
+补充：若你想了解“代码块按 Prettier 格式化”的完整链路（快捷键入口 + Provider 入口 + 回退策略），详见：
+
+- `docs/monaco-markdown-codeblock-prettier-format.md`
+
 ---
 
 ## 2. 问题 A：为什么 ```tsx 会“全白”
