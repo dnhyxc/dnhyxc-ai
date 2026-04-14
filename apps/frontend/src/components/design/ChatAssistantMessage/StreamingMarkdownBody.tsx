@@ -14,14 +14,22 @@ import type {
 import { Button } from '@ui/index';
 import { CheckCircle, Code2, Copy, Eye } from 'lucide-react';
 import {
+	Fragment,
 	type MouseEvent as ReactMouseEvent,
 	type RefObject,
+	useCallback,
+	useEffect,
 	useMemo,
 	useRef,
 	useState,
 } from 'react';
 import { useMermaidImagePreview } from '@/hooks/useMermaidImagePreview';
 import { cn } from '@/lib/utils';
+import {
+	MERMAID_TOOLBAR_COPY_EVENT,
+	MERMAID_TOOLBAR_PREVIEW_EVENT,
+	MERMAID_TOOLBAR_TOGGLE_EVENT,
+} from '@/utils/chatCodeToolbar';
 import { copyToClipboard } from '@/utils/clipboard';
 import { mermaidSvgToPreviewDataUrl } from '@/utils/mermaidImagePreview';
 import {
@@ -31,6 +39,13 @@ import {
 } from '@/utils/splitMarkdownFences';
 
 const COPY_FEEDBACK_MS = 1600;
+
+function utf8ToBase64Utf8(text: string): string {
+	const bytes = new TextEncoder().encode(text);
+	let bin = '';
+	for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]!);
+	return btoa(bin);
+}
 
 export type StreamingMarkdownBodyProps = {
 	markdown: string;
@@ -74,14 +89,97 @@ export function StreamingMarkdownBody({
 	const { openMermaidPreview, mermaidImagePreviewModal } =
 		useMermaidImagePreview();
 
-	const markCopied = (blockId: string) => {
+	const markCopied = useCallback((blockId: string) => {
 		const prevTid = copiedTimersRef.current[blockId];
 		if (prevTid) window.clearTimeout(prevTid);
 		setCopiedById((prev) => ({ ...prev, [blockId]: true }));
 		copiedTimersRef.current[blockId] = window.setTimeout(() => {
 			setCopiedById((prev) => ({ ...prev, [blockId]: false }));
 		}, COPY_FEEDBACK_MS);
-	};
+	}, []);
+
+	// Portal 吸顶浮动条：通过自定义事件回写 React 状态（与 ChatCodeToolbarFloating 机制一致）
+	useEffect(() => {
+		const onToggle = (e: Event) => {
+			const ce = e as CustomEvent<{ blockId?: string }>;
+			const blockId = ce.detail?.blockId;
+			if (!blockId) return;
+			setMermaidModeById((prev) => {
+				const cur = prev[blockId] ?? defaultMermaidViewMode;
+				return {
+					...prev,
+					[blockId]: cur === 'diagram' ? 'code' : 'diagram',
+				};
+			});
+		};
+
+		const onCopyEvt = (e: Event) => {
+			const ce = e as CustomEvent<{ blockId?: string }>;
+			const blockId = ce.detail?.blockId;
+			if (!blockId) return;
+			const root = containerRef?.current ?? document;
+			const fence = root.querySelector<HTMLElement>(
+				`[data-chat-mermaid-block="${CSS.escape(blockId)}"] [data-chat-mermaid-fence-text]`,
+			);
+			const b64 = fence?.getAttribute('data-chat-mermaid-fence-text') ?? '';
+			if (!b64) return;
+			let text = '';
+			try {
+				const bin = atob(b64);
+				const bytes = new Uint8Array(bin.length);
+				for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+				text = new TextDecoder().decode(bytes);
+			} catch {
+				return;
+			}
+			void (async () => {
+				await copyToClipboard(`\`\`\`mermaid\n${text}\n\`\`\``);
+				markCopied(blockId);
+			})();
+		};
+
+		const onPreviewEvt = (e: Event) => {
+			const ce = e as CustomEvent<{ blockId?: string }>;
+			const blockId = ce.detail?.blockId;
+			if (!blockId) return;
+			const root = containerRef?.current ?? document;
+			const scope = root.querySelector<HTMLElement>(
+				`[data-mermaid-preview-scope="${CSS.escape(blockId)}"]`,
+			);
+			if (!scope) return;
+			const svg = scope.querySelector('.markdown-mermaid-wrap .mermaid svg');
+			if (!(svg instanceof SVGElement)) return;
+			const url = mermaidSvgToPreviewDataUrl(svg);
+			if (url) openMermaidPreview(url);
+		};
+
+		window.addEventListener(
+			MERMAID_TOOLBAR_TOGGLE_EVENT,
+			onToggle as EventListener,
+		);
+		window.addEventListener(
+			MERMAID_TOOLBAR_COPY_EVENT,
+			onCopyEvt as EventListener,
+		);
+		window.addEventListener(
+			MERMAID_TOOLBAR_PREVIEW_EVENT,
+			onPreviewEvt as EventListener,
+		);
+		return () => {
+			window.removeEventListener(
+				MERMAID_TOOLBAR_TOGGLE_EVENT,
+				onToggle as EventListener,
+			);
+			window.removeEventListener(
+				MERMAID_TOOLBAR_COPY_EVENT,
+				onCopyEvt as EventListener,
+			);
+			window.removeEventListener(
+				MERMAID_TOOLBAR_PREVIEW_EVENT,
+				onPreviewEvt as EventListener,
+			);
+		};
+	}, [containerRef, defaultMermaidViewMode, openMermaidPreview, markCopied]);
 
 	const renderMermaidPart = (
 		part: Extract<MarkdownMermaidSplitPart, { type: 'mermaid' }>,
@@ -119,7 +217,7 @@ export function StreamingMarkdownBody({
 		};
 
 		const header = (
-			<div className="flex items-center justify-between gap-2 mt-4.5 select-none bg-theme-background/50 rounded-t-md h-8">
+			<div className="chat-md-mermaid-toolbar flex items-center justify-between gap-2 select-none h-8">
 				<Button variant="link" size="sm" className="h-7 px-2" onClick={toggle}>
 					<Code2 size={16} />
 					<span>{mode === 'diagram' ? '代码' : '图表'}</span>
@@ -144,10 +242,24 @@ export function StreamingMarkdownBody({
 			</div>
 		);
 
+		/** 与 `chat-md-code-block` 一致：工具栏放在 slot 内，吸顶时 `minHeight` 写在 slot 上不会额外顶出一行空白 */
+		const toolbarShell = (
+			<div className="chat-md-mermaid-toolbar-slot">{header}</div>
+		);
+
 		if (mode === 'code') {
 			return (
-				<div key={`mm-wrap-${blockId}`} data-mermaid-preview-scope={blockId}>
-					{header}
+				<div
+					key={`mm-wrap-${blockId}`}
+					className="chat-md-mermaid-block"
+					data-chat-mermaid-block={blockId}
+					data-mermaid-preview-scope={blockId}
+				>
+					{toolbarShell}
+					<div
+						hidden
+						data-chat-mermaid-fence-text={utf8ToBase64Utf8(part.text)}
+					/>
 					<div
 						dangerouslySetInnerHTML={{
 							__html: mermaidStreamingFallbackHtml(part.text),
@@ -159,13 +271,23 @@ export function StreamingMarkdownBody({
 
 		// diagram 模式：闭合/未闭合都交给 MermaidFenceIsland；岛内“成功才提交”避免流式错误 SVG 闪烁
 		return (
-			<div key={`mm-wrap-${blockId}`} data-mermaid-preview-scope={blockId}>
-				{header}
+			<div
+				key={`mm-wrap-${blockId}`}
+				className="chat-md-mermaid-block"
+				data-chat-mermaid-block={blockId}
+				data-mermaid-preview-scope={blockId}
+			>
+				{toolbarShell}
+				<div
+					hidden
+					data-chat-mermaid-fence-text={utf8ToBase64Utf8(part.text)}
+				/>
 				<MermaidFenceIsland
 					code={part.text}
 					preferDark={preferDark}
 					isStreaming={isStreaming || !part.complete}
 					openMermaidPreview={openMermaidPreview}
+					flattenDom
 				/>
 			</div>
 		);
@@ -182,7 +304,14 @@ export function StreamingMarkdownBody({
 						/>
 					);
 				}
-				return renderMermaidPart(part, i);
+				return (
+					<Fragment key={`mm-frag-${i}`}>
+						{i > 0 ? (
+							<div className="h-4.5 shrink-0" aria-hidden key={`mm-gap-${i}`} />
+						) : null}
+						{renderMermaidPart(part, i)}
+					</Fragment>
+				);
 			})}
 			{mermaidImagePreviewModal}
 		</div>

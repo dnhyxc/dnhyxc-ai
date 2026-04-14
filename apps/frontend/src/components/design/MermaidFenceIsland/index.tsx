@@ -24,6 +24,11 @@ export type MermaidFenceIslandProps = {
 	isStreaming?: boolean;
 	openMermaidPreview?: (dataUrl: string) => void;
 	className?: string;
+	/**
+	 * 扁平 DOM：宿主自身即为 `.markdown-mermaid-wrap`（用于聊天里 `slot + toolbar + wrap` 与 code fence 同构）。
+	 * 默认 false：宿主内再包一层 wrap（兼容 Monaco 预览等场景）。
+	 */
+	flattenDom?: boolean;
 };
 
 const noopOpenPreview = (_dataUrl: string) => {};
@@ -62,6 +67,7 @@ export const MermaidFenceIsland = memo(function MermaidFenceIsland({
 	isStreaming = false,
 	openMermaidPreview,
 	className,
+	flattenDom = false,
 }: MermaidFenceIslandProps) {
 	const hostRef = useRef<HTMLDivElement>(null);
 	const genRef = useRef(0); // 代数：作废过期渲染
@@ -85,11 +91,18 @@ export const MermaidFenceIsland = memo(function MermaidFenceIsland({
 			'.markdown-mermaid-wrap[data-mermaid="1"]',
 		) as HTMLElement | null;
 		if (!wrap) {
-			host.innerHTML =
-				'<div class="markdown-mermaid-wrap" data-mermaid="1"><div class="mermaid"></div></div>';
-			wrap = host.querySelector(
-				'.markdown-mermaid-wrap[data-mermaid="1"]',
-			) as HTMLElement | null;
+			if (flattenDom) {
+				host.innerHTML = '<div class="mermaid"></div>';
+				host.classList.add('markdown-mermaid-wrap');
+				host.setAttribute('data-mermaid', '1');
+				wrap = host;
+			} else {
+				host.innerHTML =
+					'<div class="markdown-mermaid-wrap" data-mermaid="1"><div class="mermaid"></div></div>';
+				wrap = host.querySelector(
+					'.markdown-mermaid-wrap[data-mermaid="1"]',
+				) as HTMLElement | null;
+			}
 		}
 		const inner = wrap?.querySelector('.mermaid') as HTMLElement | null;
 		if (!wrap || !inner) return;
@@ -208,7 +221,7 @@ export const MermaidFenceIsland = memo(function MermaidFenceIsland({
 
 		schedule();
 		return () => flushTimer();
-	}, [code, preferDark, isStreaming]);
+	}, [code, preferDark, isStreaming, flattenDom]);
 
 	useMermaidDiagramClickPreview(
 		hostRef,
@@ -221,8 +234,11 @@ export const MermaidFenceIsland = memo(function MermaidFenceIsland({
 		<div
 			ref={hostRef}
 			className={cn(
-				'mermaid-island-root w-full',
-				previewEnabled && '[&_.markdown-mermaid-wrap_.mermaid]:cursor-zoom-in',
+				!flattenDom && 'mermaid-island-root w-full',
+				previewEnabled &&
+					(flattenDom
+						? '[&_.mermaid]:cursor-zoom-in'
+						: '[&_.markdown-mermaid-wrap_.mermaid]:cursor-zoom-in'),
 				className,
 			)}
 		/>

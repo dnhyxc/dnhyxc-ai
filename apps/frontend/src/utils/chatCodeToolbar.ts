@@ -12,8 +12,12 @@ export type ChatCodeFloatingToolbarState = {
 	top: number;
 	left: number;
 	width: number;
+	/** 浮动条类型：代码块语言栏 / Mermaid 顶栏 */
+	kind: 'code' | 'mermaid';
 	lang: string;
 	pinId: number;
+	/** Mermaid：用于浮动条与正文联动的稳定 id（与 React state key 对齐） */
+	mermaidBlockId?: string;
 };
 
 const HIDDEN: ChatCodeFloatingToolbarState = {
@@ -21,8 +25,10 @@ const HIDDEN: ChatCodeFloatingToolbarState = {
 	top: 0,
 	left: 0,
 	width: 0,
+	kind: 'code',
 	lang: '',
 	pinId: -1,
+	mermaidBlockId: undefined,
 };
 
 let state: ChatCodeFloatingToolbarState = HIDDEN;
@@ -30,6 +36,11 @@ const listeners = new Set<() => void>();
 let pinSession = 0;
 
 const PIN_ATTR = 'data-chat-toolbar-pin';
+
+/** Mermaid 吸顶浮动条与正文 React 状态联动（Portal 内无法直接调用 setState） */
+export const MERMAID_TOOLBAR_COPY_EVENT = 'dnhyxc:mermaid-toolbar-copy';
+export const MERMAID_TOOLBAR_TOGGLE_EVENT = 'dnhyxc:mermaid-toolbar-toggle';
+export const MERMAID_TOOLBAR_PREVIEW_EVENT = 'dnhyxc:mermaid-toolbar-preview';
 
 function emit(): void {
 	for (const fn of listeners) {
@@ -55,6 +66,12 @@ function resetFloatingMarkersInViewport(viewport: HTMLElement): void {
 		tb.classList.remove('chat-md-code-toolbar--replaced-by-float');
 	});
 	viewport.querySelectorAll('.chat-md-code-toolbar-slot').forEach((slot) => {
+		(slot as HTMLElement).style.minHeight = '';
+	});
+	viewport.querySelectorAll('.chat-md-mermaid-toolbar').forEach((tb) => {
+		tb.classList.remove('chat-md-mermaid-toolbar--replaced-by-float');
+	});
+	viewport.querySelectorAll('.chat-md-mermaid-toolbar-slot').forEach((slot) => {
 		(slot as HTMLElement).style.minHeight = '';
 	});
 }
@@ -91,19 +108,24 @@ export function layoutChatCodeToolbars(viewport: HTMLElement | null): void {
 	const vpRect = viewport.getBoundingClientRect();
 	resetFloatingMarkersInViewport(viewport);
 
-	const blocks = viewport.querySelectorAll<HTMLElement>(
+	const codeBlocks = viewport.querySelectorAll<HTMLElement>(
 		'[data-chat-code-block]',
 	);
+	const mermaidBlocks = viewport.querySelectorAll<HTMLElement>(
+		'[data-chat-mermaid-block]',
+	);
 	type Scored = {
+		kind: 'code' | 'mermaid';
 		block: HTMLElement;
 		br: DOMRect;
 		shell: HTMLElement;
 		toolbar: HTMLElement;
 		slot: HTMLElement;
+		mermaidBlockId?: string;
 	};
 	const scored: Scored[] = [];
 
-	for (const block of blocks) {
+	for (const block of codeBlocks) {
 		const toolbar = block.querySelector<HTMLElement>('.chat-md-code-toolbar');
 		const slot = block.querySelector<HTMLElement>('.chat-md-code-toolbar-slot');
 		// 聊天气泡内有 data-chat-assistant-shell；知识库/独立 Markdown 预览无该节点，用滚动视口作水平参照
@@ -111,11 +133,34 @@ export function layoutChatCodeToolbars(viewport: HTMLElement | null): void {
 			block.closest<HTMLElement>('[data-chat-assistant-shell]') ?? viewport;
 		if (!toolbar || !slot) continue;
 		scored.push({
+			kind: 'code',
 			block,
 			br: block.getBoundingClientRect(),
 			shell,
 			toolbar,
 			slot,
+		});
+	}
+
+	for (const block of mermaidBlocks) {
+		const toolbar = block.querySelector<HTMLElement>(
+			'.chat-md-mermaid-toolbar',
+		);
+		const slot = block.querySelector<HTMLElement>(
+			'.chat-md-mermaid-toolbar-slot',
+		);
+		const shell =
+			block.closest<HTMLElement>('[data-chat-assistant-shell]') ?? viewport;
+		if (!toolbar || !slot) continue;
+		const mermaidBlockId = block.getAttribute('data-chat-mermaid-block') ?? '';
+		scored.push({
+			kind: 'mermaid',
+			block,
+			br: block.getBoundingClientRect(),
+			shell,
+			toolbar,
+			slot,
+			mermaidBlockId: mermaidBlockId || undefined,
 		});
 	}
 
@@ -134,22 +179,31 @@ export function layoutChatCodeToolbars(viewport: HTMLElement | null): void {
 	const winner = candidates.reduce((a, b) => (a.br.top > b.br.top ? a : b));
 	const pinId = ++pinSession;
 	winner.block.setAttribute(PIN_ATTR, String(pinId));
-	winner.toolbar.classList.add('chat-md-code-toolbar--replaced-by-float');
+	if (winner.kind === 'code') {
+		winner.toolbar.classList.add('chat-md-code-toolbar--replaced-by-float');
+	} else {
+		winner.toolbar.classList.add('chat-md-mermaid-toolbar--replaced-by-float');
+	}
 	const th = winner.toolbar.offsetHeight || 36;
 	winner.slot.style.minHeight = `${th}px`;
 
 	const shellRect = winner.shell.getBoundingClientRect();
 	const { left, width } = computePinnedBarBox(shellRect, winner.br, vpRect);
 	const langSpan = winner.block.querySelector('.chat-md-code-lang');
-	const lang = langSpan?.textContent?.trim() || 'text';
+	const lang =
+		winner.kind === 'code'
+			? langSpan?.textContent?.trim() || 'text'
+			: 'mermaid';
 
 	state = {
 		visible: true,
 		top: vpRect.top,
 		left,
 		width,
+		kind: winner.kind,
 		lang,
 		pinId,
+		mermaidBlockId: winner.mermaidBlockId,
 	};
 	emit();
 }

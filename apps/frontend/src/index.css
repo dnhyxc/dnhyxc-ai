@@ -119,6 +119,44 @@ body {
 		-webkit-backdrop-filter: blur(8px);
 	}
 
+	/* Mermaid 顶栏：与代码块工具栏同一套「slot + 占位高度 + Portal 吸顶」机制 */
+	.chat-md-mermaid-toolbar-slot {
+		flex-shrink: 0;
+	}
+
+	.chat-md-mermaid-toolbar {
+		position: relative;
+		z-index: 1;
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		gap: 0.5rem;
+		border-radius: 0.5rem 0.5rem 0 0;
+		background: color-mix(in oklch, var(--theme-background) 50%, transparent);
+		backdrop-filter: blur(8px);
+		-webkit-backdrop-filter: blur(8px);
+	}
+
+	/* 聊天 Mermaid：slot 与图表区之间夹了 hidden 节点，用「slot 之后」的兄弟选择器清 margin-top，避免与吸顶条错位 */
+	[data-chat-mermaid-block]
+		.chat-md-mermaid-toolbar-slot
+		~ .markdown-mermaid-wrap,
+	[data-chat-mermaid-block]
+		.chat-md-mermaid-toolbar-slot
+		~ .mermaid-island-root
+		.markdown-mermaid-wrap,
+	[data-chat-mermaid-block]
+		.chat-md-mermaid-toolbar-slot
+		~ .markdown-body
+		.chat-md-mermaid-streaming {
+		margin-top: 0 !important;
+	}
+
+	.chat-md-mermaid-toolbar--replaced-by-float {
+		visibility: hidden;
+		pointer-events: none;
+	}
+
 	.chat-md-code-toolbar--replaced-by-float {
 		visibility: hidden;
 		pointer-events: none;
@@ -193,6 +231,7 @@ body {
 	.markdown-mermaid-wrap {
 		border-radius: 0 0 0.5rem 0.5rem;
 		margin-bottom: 20px !important;
+		background: color-mix(in oklch, var(--theme-background) 18%, transparent);
 	}
 	/* 流式聊天图表 code 样式 */
 	.markdown-body {
