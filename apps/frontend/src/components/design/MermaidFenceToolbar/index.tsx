@@ -4,7 +4,7 @@
  * `docs/mermaid-fence-toolbar-sticky.md`
  */
 import { Button } from '@ui/index';
-import { CheckCircle, Code2, Copy, Eye } from 'lucide-react';
+import { CheckCircle, Code2, Copy, Download, Eye } from 'lucide-react';
 import {
 	type MouseEvent as ReactMouseEvent,
 	type ReactNode,
@@ -15,8 +15,12 @@ import {
 	useState,
 } from 'react';
 import { cn } from '@/lib/utils';
+import { downloadBlob } from '@/utils';
 import { copyToClipboard } from '@/utils/clipboard';
-import { mermaidSvgToPreviewDataUrl } from '@/utils/mermaidImagePreview';
+import {
+	downloadMermaidPreviewSvg,
+	mermaidSvgToPreviewDataUrl,
+} from '@/utils/mermaidImagePreview';
 
 const COPY_FEEDBACK_MS = 1600;
 
@@ -84,7 +88,7 @@ export function MermaidFenceToolbar({
 }
 
 /**
- * 与 `StreamingMarkdownBody` / Monaco 预览共用：顶栏内维护图/代码切换、复制、预览逻辑；
+ * 与 `StreamingMarkdownBody` / Monaco 预览共用：顶栏内维护图/代码切换、复制、预览、下载逻辑；
  * 宿主通过 `children(mode)` 渲染工具条下方的代码块或 `MermaidFenceIsland`。
  */
 export type MermaidFenceToolbarActionsProps = {
@@ -100,7 +104,7 @@ export type MermaidFenceToolbarActionsProps = {
 };
 
 /**
- * sticky 吸顶条 + 按钮逻辑 + `data-mermaid-preview-scope` 包裹层（预览按钮 `closest` 依赖）。
+ * sticky 吸顶条 + 按钮逻辑 + `data-mermaid-preview-scope` 包裹层（预览 / 下载图表时 `closest` 依赖）。
  */
 export function MermaidFenceToolbarActions({
 	blockId,
@@ -154,6 +158,43 @@ export function MermaidFenceToolbarActions({
 		[blockId, openMermaidPreview],
 	);
 
+	/**
+	 * 下载：与当前 `mode` 一致。
+	 * - diagram：与 `onPreview` 相同路径取 SVG → `mermaidSvgToPreviewDataUrl` → `downloadMermaidPreviewSvg`（Web/Tauri 统一 `downloadBlob`）。
+	 * - code：仅 DSL 文本，扩展名 `.mmd` 表示单文件 Mermaid 源码（见 `docs/mermaid-fence-toolbar-sticky.md` §13.2）。
+	 */
+	const onDownload = useCallback(
+		async (e: ReactMouseEvent<HTMLButtonElement>) => {
+			const stamp = Date.now();
+			if (mode === 'diagram') {
+				const btn = e.currentTarget;
+				const scope = btn.closest<HTMLElement>(
+					`[data-mermaid-preview-scope="${blockId}"]`,
+				);
+				if (!scope) return;
+				const svg = scope.querySelector('.markdown-mermaid-wrap .mermaid svg');
+				if (!(svg instanceof SVGElement)) return;
+				const url = mermaidSvgToPreviewDataUrl(svg);
+				if (!url) return;
+				await downloadMermaidPreviewSvg(url, `mermaid-${stamp}.svg`);
+				return;
+			}
+			// 代码模式：与「复制」不同，此处只存围栏内正文，便于直接粘贴进 Mermaid Live / 编辑器
+			const blob = new Blob([mermaidCode], {
+				type: 'text/plain;charset=utf-8',
+			});
+			await downloadBlob(
+				{
+					file_name: `mermaid-${stamp}.mmd`,
+					id: `mermaid-md-${stamp}`,
+					overwrite: true,
+				},
+				blob,
+			);
+		},
+		[blockId, mode, mermaidCode],
+	);
+
 	return (
 		<div data-mermaid-preview-scope={blockId} className="mt-4.5">
 			<MermaidFenceToolbar blockId={blockId}>
@@ -187,6 +228,17 @@ export function MermaidFenceToolbarActions({
 					>
 						<Eye size={16} />
 						<span className="text-sm">预览</span>
+					</Button>
+					{/* void：忽略 async onDownload 返回的 Promise */}
+					<Button
+						variant="link"
+						size="sm"
+						className="text-textcolor/80"
+						type="button"
+						onClick={(e) => void onDownload(e)}
+					>
+						<Download size={16} />
+						<span className="text-sm">下载</span>
 					</Button>
 				</div>
 			</MermaidFenceToolbar>
