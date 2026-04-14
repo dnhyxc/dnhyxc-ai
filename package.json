@@ -5,7 +5,7 @@
 	"type": "module",
 	"scripts": {
 		"dev": "pnpm -C apps/frontend tauri dev",
-		"build": "eval $(pnpm --filter @dnhyxc-ai/scripts --silent export) && pnpm --filter @dnhyxc-ai/scripts bump-version && pnpm -C apps/frontend tauri build && pnpm --filter @dnhyxc-ai/scripts update-latest && pnpm --filter @dnhyxc-ai/scripts upload-to-release",
+		"build": "eval $(pnpm --filter @dnhyxc-ai/scripts --silent export) && pnpm --filter @dnhyxc-ai/scripts bump-version && pnpm -C apps/frontend tauri build && pnpm --filter @dnhyxc-ai/scripts update-latest && pnpm --filter @dnhyxc-ai/scripts upload-to-release && pnpm --filter @dnhyxc-ai/scripts sync-wiki-update-info",
 		"server:dev": "pnpm -C apps/backend start:dev",
 		"server:start": "pnpm -C apps/backend start",
 		"server:debug": "pnpm -C apps/backend start:debug",
@@ -19,7 +19,8 @@
 		"commit": "git-cz",
 		"version": "pnpm --filter @dnhyxc-ai/scripts bump-version",
 		"latest": "pnpm --filter @dnhyxc-ai/scripts update-latest",
-		"upload": "pnpm --filter @dnhyxc-ai/scripts upload-to-release"
+		"upload": "pnpm --filter @dnhyxc-ai/scripts upload-to-release",
+		"sync-wiki": "pnpm --filter @dnhyxc-ai/scripts sync-wiki-update-info"
 	},
 	"keywords": [],
 	"author": "dnhyxc",
