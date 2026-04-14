@@ -601,30 +601,6 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 				},
 			);
 
-			// 兼容：用户常用 Shift + Ctrl + F（mac: Control；Win/Linux: Ctrl）
-			// 注意：CtrlCmd 在 mac 上是 Command，WinCtrl 在 mac 上是 Control
-			editor.addCommand(
-				monaco.KeyMod.Shift | monaco.KeyMod.WinCtrl | monaco.KeyCode.KeyF,
-				() => {
-					const model = editor.getModel();
-					if (!model) return;
-					if (model.getLanguageId() === 'markdown') {
-						if (editor.getOption(monaco.editor.EditorOption.readOnly)) return;
-						void (async () => {
-							const next = await safeFormatMarkdownValue(model.getValue());
-							if (next == null) return;
-							editor.pushUndoStop();
-							editor.executeEdits('dnhyxc-markdown-safe-format', [
-								{ range: model.getFullModelRange(), text: next },
-							]);
-							editor.pushUndoStop();
-						})();
-						return;
-					}
-					editor.trigger('keyboard', 'editor.action.formatDocument', null);
-				},
-			);
-
 			editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyB, () => {
 				editor.trigger('keyboard', 'editor.action.commentLine', null);
 			});
