@@ -99,6 +99,63 @@ function spacingMarkdownProse(markdown: string): string {
 	return joinMarkdownSegments(spaced);
 }
 
+function isPlausibleMarkdownFenceIndent(indent: string): boolean {
+	if (indent.includes('\t')) return false;
+	return /^ {0,3}$/.test(indent);
+}
+
+/**
+ * Prettier 在 Markdown 中遇到 fenced code block 内容包含 ``` 字面量时，
+ * 可能会把外层围栏升级成 ````（更长的反引号序列）。
+ *
+ * 但按 CommonMark 规则，只有形如 `^\s{0,3}```\s*$` 的行才会闭合 ``` 围栏；
+ * 类似 “```mermaid” 并不会闭合围栏，因此很多情况下外层保持 ``` 完全安全。
+ *
+ * 这里做一个“仅在可证明安全时”的后处理：
+ * - 只处理外层为 4+ 反引号的围栏
+ * - 若围栏内容中不存在任何 `^\s{0,3}```\s*$` 的行，则把外层降回三反引号
+ *
+ * 目标：满足“格式化后仍保持 ```tsx ... ```”的可读性要求，不影响语义正确性。
+ */
+function downgradeLongBacktickFencesWhenSafe(markdown: string): string {
+	const lines = markdown.replace(/\r\n/g, '\n').split('\n');
+	for (let i = 0; i < lines.length; i++) {
+		const open = /^(\s*)(`{4,})([^`]*)$/.exec(lines[i].trimEnd());
+		if (!open) continue;
+		const indent = open[1] ?? '';
+		if (!isPlausibleMarkdownFenceIndent(indent)) continue;
+		const tickLen = (open[2] ?? '').length;
+
+		// 找闭合围栏：缩进匹配 + 反引号长度 >= 开头
+		let j = i + 1;
+		for (; j < lines.length; j++) {
+			const close = /^(\s*)(`{4,})\s*$/.exec(lines[j].trimEnd());
+			if (!close) continue;
+			const closeIndent = close[1] ?? '';
+			const closeLen = (close[2] ?? '').length;
+			if (closeLen < tickLen) continue;
+			if (
+				indent !== closeIndent &&
+				!(indent === '' && /^ {0,3}$/.test(closeIndent))
+			)
+				continue;
+
+			const body = lines.slice(i + 1, j);
+			const hasTripleBacktickClosingLine = body.some((l) =>
+				/^ {0,3}```\s*$/.test(l.trimEnd()),
+			);
+			if (!hasTripleBacktickClosingLine) {
+				const info = (open[3] ?? '').trimEnd();
+				lines[i] = `${indent}\`\`\`${info}`;
+				lines[j] = `${closeIndent}\`\`\``;
+			}
+			i = j;
+			break;
+		}
+	}
+	return lines.join('\n');
+}
+
 /**
  * Markdown 格式化（Prettier）：尽量与编辑器「格式化文档」一致，包含 fenced code block 的内嵌格式化。
  * 若 Prettier 失败，则降级为“围栏外盘古空格、围栏原样”的安全处理。
@@ -115,7 +172,8 @@ export async function safeFormatMarkdownValue(
 			// 显式开启嵌入语言格式化：确保 fenced code block 内的 JS/CSS 等也走对应 parser
 			embeddedLanguageFormatting: 'auto',
 		});
-		return formatted === value ? null : formatted;
+		const post = downgradeLongBacktickFencesWhenSafe(formatted);
+		return post === value ? null : post;
 	} catch (_err) {
 		// 这里如果失败，会降级为“围栏外盘古空格、围栏原样”，表现就是 fenced code block 不会被格式化
 		const out = spacingMarkdownProse(value);
@@ -144,6 +202,10 @@ async function formatWithPrettierForModel(model: {
 			useTabs: true,
 			embeddedLanguageFormatting: 'auto',
 		});
+		if (language === 'markdown') {
+			const post = downgradeLongBacktickFencesWhenSafe(formatted);
+			return post === text ? null : post;
+		}
 		return formatted === text ? null : formatted;
 	} catch (err) {
 		if (import.meta.env.DEV) {

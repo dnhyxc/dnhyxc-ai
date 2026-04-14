@@ -222,6 +222,7 @@
 - 检查代码块围栏是否闭合
 - Mermaid/公式是否符合语法
 - 尝试将内容拆成更小段落排查
+- 如果你在知识库编辑器里粘贴了大段 ` ```tsx`，并且围栏内容包含 “```mermaid” 等字面量，格式化时可能会出现围栏反引号数量变化；相关实现说明见 `docs/monaco-markdown-fence-tsx-highlight-and-prettier-format.md`
 
 ### 9.3 如何把对话结论沉淀成可复用的知识？
 

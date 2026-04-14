@@ -2,6 +2,10 @@
 
 本文说明：为何在「Markdown 中嵌入大段 TS/注释含 \`\`\`」时会出现围栏被破坏、预览错位等问题；仓库采用的**完整实现思路**；相关源文件职责；核心代码的**逐行含义**（与当前实现对齐）。
 
+补充（2026-04）：Monaco 侧新增了「Markdown 围栏内嵌语言高亮（含 tsx）」与「Prettier Markdown 格式化后围栏反引号数量安全降级（```` → ```）」两项增强，详见：
+
+- `docs/monaco-markdown-fence-tsx-highlight-and-prettier-format.md`
+
 ---
 
 ## 1. 背景与问题分层
@@ -235,8 +239,8 @@ return { prefix, body, openLine: i };
 | 82–98 | `spacingMarkdownProse`：对 `splitMarkdownFencedBlocks` 的每个段，围栏原样返回；正文段再按行内单引号 `` `...` `` 保护后做 CJK 替换，最后 `joinMarkdownSegments`。 |
 | 101–107 | `safeFormatMarkdownValue`：对外 API；无变化返回 `null`，供调用方跳过 `executeEdits`。 |
 | 109–136 | `formatWithPrettierForModel`：**不包含** markdown 分支（markdown 不在下方列表中）。 |
-| 190–204 | `LANGUAGES_WITH_FORMAT`：**不含** `'markdown'`。 |
-| 206–227 | 仅为所列语言注册 Prettier 文档/选区格式化。 |
+| 190–204 | `LANGUAGES_WITH_FORMAT`：包含 `'markdown'` 时，会让 Monaco 的「格式化文档」走 Provider 管线；若你希望 Markdown 始终走自定义安全逻辑，需要额外约束（见上方补充文档）。 |
+| 206–227 | 为所列语言注册 Prettier 文档/选区格式化；Markdown 会在 Provider 中额外做围栏降级后处理（```` → ```）。 |
 
 ---
 
@@ -261,7 +265,7 @@ return { prefix, body, openLine: i };
 
 - **列表内多层缩进围栏**：当前对缩进采取「≤3 空格、无 Tab」的保守策略；若未来需要更贴近完整 CommonMark 的列表嵌套，可在 `isPlausibleMarkdownFenceIndent` / `fenceClosingIndentMatchesOpen` 上扩展，并与 `splitMarkdownFencedBlocks` 联调。
 - **顶格围栏 + 2 空格闭合**：由 `openIndent === ''` 时对 `closeIndent` 的 `^ {0,3}$` 分支支持；若开头条有缩进，则要求开闭缩进**字符串完全一致**。
-- **命令面板「格式化文档」**：Markdown 未注册 Provider 时可能无操作；Markdown 格式化依赖 **Shift+Alt+F**（或后续若单独注册仅调用 `safeFormatMarkdownValue` 的 Provider）。
+- **命令面板「格式化文档」**：Markdown 注册 Provider 后会生效；为了避免 ```` 围栏可读性问题，Provider 内对 Markdown 也会做“安全降级”后处理（详见补充文档）。
 
 ---
 
