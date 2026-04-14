@@ -1,163 +1,77 @@
-# 项目功能与文档总览
+# 更新信息
 
-本文是 **`docs/` 目录下各专题文档的汇总索引**，并用一条主线说明本仓库**已实现的主要产品能力**与对应文档入口。  
-**细节实现、逐行代码走读仍以各专文为准**；若专文与源码冲突，以源码为单一事实来源。
-
----
-
-## 1. 仓库与包（便于对照文档路径）
-
-| 区域 | 说明 |
-|------|------|
-| `apps/frontend` | React + Vite 前端；知识库、聊天、设置、路由与 Tauri/Web 双端适配 |
-| `apps/backend` | NestJS 后端；会话、流式对话、队列落库等（见 `chatbot.md`） |
-| `apps/frontend/src-tauri` | Tauri 2 桌面壳；知识库本地目录、系统命令等 |
-| `packages/tools` | 发布为 `@dnhyxc-ai/tools`：Markdown 解析、样式、Mermaid React 辅助等 |
+这里汇总了本项目目前已具备的核心能力与近期更新点，方便你快速了解“新增/优化了什么”。以下内容为产品级说明，强调可感知的功能与体验提升。
 
 ---
 
-## 2. 功能总览（按产品 / 技术域）
+## 1. 发布与更新
 
-### 2.1 用户与访问控制
-
-- **路由级登录守卫**：无有效 token 时，非公开路径进入主布局前跳转登录页。
-- **HTTP 401 统一处理**：清会话、按需整页回登录，与路由守卫互补。
-- **公开路径白名单**：首页、登录、关于、分享页、设置等可未登录访问。
-
-**文档**：[`frontend-route-auth.md`](./frontend-route-auth.md)
+- **发布后自动更新公开更新页**（更新：2026-04-14，待提交）：完成打包发布后，更新信息页会自动刷新到最新内容，减少手动维护与遗漏；本地仅验证时可通过开关跳过同步步骤。
 
 ---
 
-### 2.2 桌面（Tauri）与浏览器双端
+## 2. 账号与访问控制
 
-- **同一套前端**在 Tauri WebView 与独立浏览器中运行；运行时检测 `isTauriRuntime()`。
-- **网络 / 存储 / 剪贴板 / 下载 / 更新器**等在非 Tauri 环境降级为 Web API 或提示。
-- **避免入口链顶层 await 调 Tauri**，防止浏览器白屏。
-
-**文档**：[`frontend-tauri-browser.md`](./frontend-tauri-browser.md)
+- **路由级登录守卫**（更新：2026-04-05）：未登录时，访问受保护页面会被引导到登录页；公开页面不受影响。
+- **鉴权失效收敛**（更新：2026-04-05）：接口返回 401（未授权）时统一清理会话并触发重新登录，避免“看似已登录但实际已过期”的状态漂移。
 
 ---
 
-### 2.3 对话（Chatbot）
+## 3. 桌面端与浏览器双端体验
 
-- **后端**：会话创建、SSE 流式、停止/续写、智谱并行路线、Serper 联网与引用锚点、附件与 OCR、BullMQ 异步落库等。
-- **前端**：MobX `chatStore`、`useChatCore`、连接层与 **`ChatBotView`** 纯 UI 分离、SSE JSON 解析、分支对话、滚动与锚点导航等。
-
-**文档**：[`chatbot.md`](./chatbot.md)（架构与 API 说明）  
-**近期改动详录**（偏更新日志 + 大段注释摘录）：[`update.md`](./update.md)
+- **同一套前端双端运行**（更新：2026-04-13）：桌面端（Tauri，桌面壳）与独立浏览器均可运行同一套前端应用。
+- **能力降级与提示**（更新：2026-04-13）：在浏览器环境中，目录选择、开机自启、全局快捷键等仅桌面端能力会自动降级为提示，不会导致页面崩溃或白屏。
+- **外链打开策略统一**（更新：2026-04-13）：外链打开行为在不同运行环境下保持一致与安全（避免不必要的权限与上下文泄露）。
 
 ---
 
-### 2.4 Markdown 工具包（`@dnhyxc-ai/tools`）
+## 4. 对话（Chatbot）
 
-- **`MarkdownParser`**：`MarkdownIt` + KaTeX + GFM 待办补丁 + highlight.js；可选聊天围栏工具栏、Mermaid 占位、标题行号 `data-md-heading-line`、拆岛 **`splitForMermaidIslands`**（含 **`lineBase0`** 全文行号语义）等。
-- **样式产物**：`github-markdown`、KaTeX、全量 hljs 主题映射与类型安全 id。
-- **运行时主题注入**：CDN 或内联 CSS。
-- **React 子路径**：`useMermaidInMarkdownRoot` 等。
-
-**文档**：[`tools.md`](./tools.md)
-
----
-
-### 2.5 知识库（Markdown 编辑与列表）
-
-- **云端列表 / 详情 / 保存**：与登录态、Store 分页配合。
-- **未登录**：不调云端知识库接口；默认本地文件夹模式；隐藏回收站等。
-
-**文档**：[`knowledge-unauthenticated-local-only.md`](./knowledge-unauthenticated-local-only.md)
-
-- **本地文件夹**：递归 `.md`、读盘写盘、合成 id、与云端保存分支；**在外部编辑器打开**（Cursor / Trae 等）；Monaco 清空与父状态对齐。
-
-**文档**：[`knowledge-local-folder-and-monaco-sync.md`](./knowledge-local-folder-and-monaco-sync.md)
-
-- **自动保存**：防抖、与「覆盖保存」绑定、静默策略、保存前从编辑器取最新正文等。
-
-**文档**：[`knowledge-auto-save.md`](./knowledge-auto-save.md)
-
-- **页面内快捷键（chord）**：仅知识库生效、系统设置录制、捕获阶段与 Monaco 共存、`MarkdownEditor` 底部栏受控等。
-
-**文档**：[`knowledge-shortcuts.md`](./knowledge-shortcuts.md)
+- **流式对话（SSE，服务端事件）**（更新：2026-04-02）：支持流式生成、停止生成与续写，提升交互连续性。
+- **会话与历史管理**（更新：2026-04-02）：支持会话创建、列表与历史查询、会话更新与删除等。
+- **联网检索与引用**（更新：2026-04-02）：支持联网检索并在输出中携带引用信息，便于溯源与复核。
+- **附件与 OCR**（更新：2026-04-02）：支持附件处理与 OCR（光学字符识别）增强，提升多模态输入的可用性。
+- **异步落库与可靠性**（更新：2026-04-02）：通过队列（BullMQ）等机制提高消息持久化的可靠性与可扩展性。
 
 ---
 
-### 2.6 Monaco Markdown 编辑器（知识库等复用）
+## 5. Markdown 工具包与渲染能力
 
-- **中文 IME 重影 / 叠字**：受控 value、透明主题、占位与多行折行等成因与缓解（含 Tab/缩进说明）；**分屏跟滚**历史叙述见该文 §5，**现行算法**以下文专文为准。
-
-**文档**：[`monaco-markdown-ime-ghosting.md`](./monaco-markdown-ime-ghosting.md)
-
-- **分屏跟随滚动（现行）**：`MarkdownScrollSyncSnapshot` 单调折线、`getScrollTop()` 插值、标题 DOM 与 `getTopForLineNumber` 对齐；**Mermaid 分段渲染**下 `lineBase0` + HTML 行号平移；`splitPaneMarkdown`、`scrollTopChanged`、回声抑制与快照重建时机。
-
-**文档**：[`monaco-markdown-split-scroll-sync.md`](./monaco-markdown-split-scroll-sync.md)
-
-- **Tauri / WebView 下布局**：关闭 `automaticLayout`，宿主测量 + 显式 `layout()`、ResizeObserver / rAF、flex 约束等。
-
-**文档**：[`monaco-editor-tauri-layout.md`](./monaco-editor-tauri-layout.md)
-
-- **剪贴板**：Monaco 内 `addCommand` 绑定 C/X/V；普通 input/textarea 在 Tauri 下窄范围快捷键，避免与 Monaco 选区冲突。
-
-**文档**：[`monaco-clipboard-global-handler-bypass.md`](./monaco-clipboard-global-handler-bypass.md)
+- **Markdown 渲染**（更新：2026-04-06）：支持常见 Markdown 语法与富文本输出，兼顾容错与稳定性。
+- **数学公式**（更新：2026-04-06）：支持 KaTeX（数学公式渲染），并在错误情况下尽量不影响整页显示。
+- **代码高亮与主题**（更新：2026-04-06）：支持 highlight.js（代码高亮）与主题切换，满足不同阅读偏好。
+- **任务列表**（更新：2026-04-06）：支持 GFM（GitHub Flavored Markdown，GitHub 风格 Markdown）任务列表展示。
+- **Mermaid 图表**（更新：2026-04-14）：支持 Mermaid（图表语法）渲染与运行时处理，提升文档表达能力。
 
 ---
 
-### 2.7 Markdown 围栏、格式化与 Mermaid 呈现
+## 6. 知识库（编辑、列表与本地模式）
 
-- **按行围栏解析**：避免注释/JSDoc 内 \`\`\` 误匹配；供安全格式化、尾部开放 mermaid 探测等；与 **markdown-it `splitForMermaidIslands`** 主路径的关系。
-
-**文档**：[`markdown-fence-line-parser.md`](./markdown-fence-line-parser.md)
-
-- **Mermaid 在正文中的两条路径**：整段 HTML + 根扫描 vs 拆岛 + 流式；缩放/平移、点击大图预览、与预览/聊天宿主的约定。
-
-**文档**：[`mermaid-markdown-zoom-and-preview.md`](./mermaid-markdown-zoom-and-preview.md)
-
-- **Mermaid 围栏工具条**：`sticky` + 哨兵 `IntersectionObserver` 双态样式；与代码块 Portal 吸顶方案差异；下载 SVG/DSL；Monaco 预览侧对齐。
-
-**文档**：[`mermaid-fence-toolbar-sticky.md`](./mermaid-fence-toolbar-sticky.md)
+- **云端与本地双模式**（更新：2026-04-05）：支持云端知识条目管理，也支持本地文件夹作为知识库来源。
+- **未登录仅本地**（更新：2026-04-11）：未登录时默认使用本地模式，不会触发云端接口；并隐藏不适用的入口（如回收站）。
+- **本地文件夹管理**（更新：2026-04-05）：支持递归扫描 Markdown 文件、读取/保存/删除，并支持在外部编辑器中打开进行编辑。
+- **自动保存（防抖）**（更新：2026-04-08）：提供自动保存能力（Debounce，防抖），避免频繁写入；并与“覆盖保存”语义联动，减少误覆盖与打断编辑。
+- **页面内快捷键（Chord，和弦快捷键）**（更新：2026-04-14）：支持在知识库页面内使用组合快捷键完成保存、清空、打开列表、切换操作栏等，提高编辑效率。
 
 ---
 
-### 2.8 聊天 Markdown 中的代码块吸顶工具条
+## 7. Monaco 编辑器体验优化
 
-- **`useChatCodeFloatingToolbar`**：在 ScrollArea viewport 上绑定 resize/scroll/ResizeObserver，调用 **`layoutChatCodeToolbars`**，由 Portal 浮动层展示吸顶工具栏。
-- **`useSyncExternalStore`**：与 `ChatCodeToolbarFloating`、模块级布局 store 的配合说明。
-
-**文档**：[`use-chat-code-floating-toolbar.md`](./use-chat-code-floating-toolbar.md)、[`useSyncExternalStore.md`](./useSyncExternalStore.md)
-
----
-
-## 3. `docs/` 文档目录（全量索引）
-
-| 文档 | 一句话说明 |
-|------|------------|
-| [README.md](./README.md) | 进入 `docs/` 时的导航：指向本总览 |
-| [project-features-handbook.md](./project-features-handbook.md) | **本文**：项目功能总览 + 全部文档索引 |
-| [chatbot.md](./chatbot.md) | Chatbot 前后端架构、路由、流式、联网、落库 |
-| [update.md](./update.md) | ChatBot 相关近期提交与代码级改动摘录（更新日志向） |
-| [tools.md](./tools.md) | `@dnhyxc-ai/tools` 包能力、构建、样式与 MarkdownParser |
-| [frontend-route-auth.md](./frontend-route-auth.md) | 前端路由守卫与 401 鉴权收口 |
-| [frontend-tauri-browser.md](./frontend-tauri-browser.md) | Tauri / 浏览器双端运行改造 |
-| [knowledge-auto-save.md](./knowledge-auto-save.md) | 知识库自动保存（防抖）与保存语义 |
-| [knowledge-shortcuts.md](./knowledge-shortcuts.md) | 知识库页面内快捷键与设置联动 |
-| [knowledge-unauthenticated-local-only.md](./knowledge-unauthenticated-local-only.md) | 未登录仅本地、隐藏回收站等 |
-| [knowledge-local-folder-and-monaco-sync.md](./knowledge-local-folder-and-monaco-sync.md) | 本地文件夹列表、Rust 命令、Monaco 清空同步 |
-| [monaco-markdown-ime-ghosting.md](./monaco-markdown-ime-ghosting.md) | Monaco Markdown IME 重影与分屏相关历史说明 |
-| [monaco-markdown-split-scroll-sync.md](./monaco-markdown-split-scroll-sync.md) | **现行**分屏跟随滚动算法与拆岛行号 |
-| [monaco-editor-tauri-layout.md](./monaco-editor-tauri-layout.md) | Monaco 在 Tauri 下的显式布局 |
-| [monaco-clipboard-global-handler-bypass.md](./monaco-clipboard-global-handler-bypass.md) | Monaco 与普通输入框剪贴板策略 |
-| [markdown-fence-line-parser.md](./markdown-fence-line-parser.md) | 围栏按行解析与安全格式化 |
-| [mermaid-markdown-zoom-and-preview.md](./mermaid-markdown-zoom-and-preview.md) | Mermaid 缩放、预览路径与数据流 |
-| [mermaid-fence-toolbar-sticky.md](./mermaid-fence-toolbar-sticky.md) | Mermaid 围栏工具条吸顶与下载 |
-| [use-chat-code-floating-toolbar.md](./use-chat-code-floating-toolbar.md) | 聊天代码块浮动工具条 Hook 走读 |
-| [useSyncExternalStore.md](./useSyncExternalStore.md) | useSyncExternalStore 与浮动工具栏 store |
+- **中文输入法（IME，输入法编辑器）兼容**（更新：2026-04-14）：针对中文输入法可能出现的重影/叠字等问题提供缓解策略与实践经验。
+- **分屏预览跟随滚动**（更新：2026-04-14）：支持编辑区与预览区滚动同步，并兼容图表分段渲染等复杂场景。
+- **桌面端布局稳定性**（更新：2026-04-07）：在桌面端 WebView 环境下优化布局测量与重排策略，减少抖动与错位。
+- **剪贴板与快捷键策略**（更新：2026-04-07）：避免编辑器快捷键与普通输入框冲突，保证复制/剪切/粘贴一致可用。
 
 ---
 
-## 4. 维护约定（给后续贡献者）
+## 8. 图表与代码块交互体验
 
-1. **新增专题**：在 `docs/` 下新增 `.md` 后，**请在本手册 §3 表格中增加一行**，并在 §2 对应小节补一句交叉引用（若开新域则加新小节）。
-2. **大功能迁移**（例如跟滚算法换代）：专文写清「现行实现」；旧文可在开篇增加「参见 xxx」避免双套叙述（参考 `monaco-markdown-ime-ghosting.md` 与 `monaco-markdown-split-scroll-sync.md` 的关系）。
-3. **产品功能清单**：以本手册 §2 为**入口**；实现细节与文件路径以各专文内的表格与代码摘录为准。
+- **Mermaid 交互**（更新：2026-04-14）：支持图表缩放、预览等能力，提升复杂内容的可读性。
+- **代码块工具条**（更新：2026-04-02）：在聊天等场景中为代码块提供更友好的操作（如复制、下载等），并优化滚动容器内的工具条布局体验。
 
 ---
 
-*文档生成说明：根据当前 `docs/` 目录下全部专题文档归纳；若仓库新增页面或包，请同步更新 §2 / §3。*
+## 9. 系统设置与可用性
+
+- **快捷键冲突保护**（更新：2026-04-14，待提交）：在系统设置中录制快捷键时，如果与现有快捷键冲突，将禁止保存并提示冲突项；冲突判定按“实际按键组合”识别，不受不同写法影响（例如 Command/Meta）。
+- **系统提示统一**（更新：2026-04-14，待提交）：提示样式与交互统一，错误与信息提示更清晰一致。
