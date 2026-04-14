@@ -20,7 +20,8 @@
 		"version": "pnpm --filter @dnhyxc-ai/scripts bump-version",
 		"latest": "pnpm --filter @dnhyxc-ai/scripts update-latest",
 		"upload": "pnpm --filter @dnhyxc-ai/scripts upload-to-release",
-		"sync-wiki": "pnpm --filter @dnhyxc-ai/scripts sync-wiki-update-info"
+		"update-wiki": "pnpm --filter @dnhyxc-ai/scripts sync-wiki-update-info",
+		"guide-wiki": "pnpm --filter @dnhyxc-ai/scripts sync-wiki-product-guide"
 	},
 	"keywords": [],
 	"author": "dnhyxc",

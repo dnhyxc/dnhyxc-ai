@@ -7,13 +7,15 @@
 		"update-latest": "tsx update-latest.ts",
 		"upload-to-release": "tsx upload-to-release.ts",
 		"sync-wiki-update-info": "tsx sync-wiki-update-info.ts",
+		"sync-wiki-product-guide": "tsx sync-wiki-product-guide.ts",
 		"export": "./export.sh --print"
 	},
 	"exports": {
 		"./bump-version": "./bump-version.ts",
 		"./update-latest": "./update-latest.ts",
 		"./upload-to-release": "./upload-to-release.ts",
-		"./sync-wiki-update-info": "./sync-wiki-update-info.ts"
+		"./sync-wiki-update-info": "./sync-wiki-update-info.ts",
+		"./sync-wiki-product-guide": "./sync-wiki-product-guide.ts"
 	},
 	"dependencies": {
 		"dotenv": "^17.2.3"
