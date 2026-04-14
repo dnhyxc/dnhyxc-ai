@@ -114,6 +114,7 @@ interface AssistantMessageProps {
 	 */
 	scrollViewportRef?: React.RefObject<HTMLElement | null>;
 	className?: string;
+	isSharing?: boolean;
 }
 
 function ChatAssistantMessageInner({
@@ -125,6 +126,7 @@ function ChatAssistantMessageInner({
 	isStopped,
 	// scrollViewportRef,
 	className,
+	isSharing,
 }: AssistantMessageProps) {
 	const { theme: appTheme } = useTheme();
 	// 挂在外层 div，作为 IntersectionObserver 的 observe 目标，覆盖整条助手气泡
@@ -383,6 +385,7 @@ function ChatAssistantMessageInner({
 						preferDark={appTheme === 'black'}
 						isStreaming={!!message.isStreaming}
 						className={cn(`[&_.markdown-body]:text-textcolor/90!`, className)}
+						isSharing={isSharing}
 					/>
 				) : null}
 			</div>
@@ -397,6 +400,7 @@ function ChatAssistantMessageInner({
 					isSearchOrganicEnabled && '__md-search-enabled__',
 					className,
 				)}
+				isSharing={isSharing}
 			/>
 			{message.isStreaming && (
 				<div className="mt-2.5 flex items-center">

@@ -1,5 +1,5 @@
 import { Button, ScrollArea } from '@ui/index';
-import { ArrowDownToLine, ArrowUpToLine } from 'lucide-react';
+import { ArrowDownToLine, ArrowUpToLine, CircleAlert } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router';
 import ChatAssistantMessage from '@/components/design/ChatAssistantMessage';
@@ -170,6 +170,13 @@ const SessionShare = () => {
 	return (
 		<div className="relative flex h-dvh w-full flex-col overflow-hidden bg-theme-background">
 			<ChatCodeFloatingToolbar />
+			<div className="flex items-center justify-between px-4 h-12.5 border border-b-theme/20">
+				<div className="text-base font-bold">分享对话内容</div>
+				<div className="flex items-center gap-1 text-sm text-textcolor/80">
+					<CircleAlert size={17} className="text-textcolor/65" />
+					该对话来自分享，由 AI 生成，请仔细甄别
+				</div>
+			</div>
 			<ScrollArea
 				ref={scrollViewportRef}
 				className="min-h-0 flex-1"
@@ -214,7 +221,7 @@ const SessionShare = () => {
 								{message.role === 'user' ? (
 									<ChatUserMessage message={message} />
 								) : (
-									<ChatAssistantMessage message={message} />
+									<ChatAssistantMessage message={message} isSharing={true} />
 								)}
 
 								<div

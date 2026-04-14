@@ -35,6 +35,7 @@ export type MermaidFenceToolbarProps = {
 	/** 用于 Observer 在 block 切换时重建 */
 	blockId: string;
 	children: ReactNode;
+	isSharing?: boolean;
 };
 
 /**
@@ -43,6 +44,7 @@ export type MermaidFenceToolbarProps = {
 export function MermaidFenceToolbar({
 	blockId,
 	children,
+	isSharing,
 }: MermaidFenceToolbarProps) {
 	const sentinelRef = useRef<HTMLDivElement>(null);
 	const [isPinned, setIsPinned] = useState(false);
@@ -79,6 +81,7 @@ export function MermaidFenceToolbar({
 					isPinned
 						? MERMAID_TOOLBAR_PINNED_CHROME
 						: MERMAID_TOOLBAR_RESTING_CHROME,
+					isSharing ? '-top-10' : 'top-0',
 				)}
 			>
 				{children}
@@ -101,6 +104,8 @@ export type MermaidFenceToolbarActionsProps = {
 	/** 变化时重置模式与复制反馈（如 Monaco `documentIdentity`） */
 	resetKey?: string | number;
 	children: (mode: 'diagram' | 'code') => ReactNode;
+	/** 是否在分享页面，如果是要将 sticky 吸顶改为 -top-10 */
+	isSharing?: boolean;
 };
 
 /**
@@ -113,6 +118,7 @@ export function MermaidFenceToolbarActions({
 	defaultViewMode = 'diagram',
 	resetKey,
 	children,
+	isSharing,
 }: MermaidFenceToolbarActionsProps) {
 	const [mode, setMode] = useState<'diagram' | 'code'>(defaultViewMode);
 	const [copied, setCopied] = useState(false);
@@ -197,7 +203,7 @@ export function MermaidFenceToolbarActions({
 
 	return (
 		<div data-mermaid-preview-scope={blockId} className="mt-4.5">
-			<MermaidFenceToolbar blockId={blockId}>
+			<MermaidFenceToolbar isSharing={isSharing} blockId={blockId}>
 				<Button
 					variant="link"
 					size="sm"
