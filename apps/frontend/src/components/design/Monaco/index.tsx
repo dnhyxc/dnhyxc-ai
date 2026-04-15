@@ -14,7 +14,7 @@ import {
 	Timer,
 } from 'lucide-react';
 import {
-	type MutableRefObject,
+	type RefObject,
 	useCallback,
 	useDeferredValue,
 	useEffect,
@@ -132,7 +132,7 @@ interface MarkdownEditorProps {
 	 * 保存前取编辑器当前全文并同步触发 onChange（消除 rAF 合并导致父状态滞后）。
 	 * 知识库自动保存依赖此 ref，否则脏检查会一直认为「与快照一致」而跳过。
 	 */
-	getMarkdownFromEditorRef?: MutableRefObject<(() => string) | null>;
+	getMarkdownFromEditorRef?: RefObject<(() => string) | null>;
 }
 
 const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
