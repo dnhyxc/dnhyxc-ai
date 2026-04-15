@@ -107,8 +107,8 @@ const Share: React.FC<ShareProps> = ({
 						{/* 外部滤镜容器 */}
 						<div className=" h-full">
 							<Button
-								variant="outline"
-								className="rounded-none rounded-r-md border-none h-full w-25 bg-linear-to-r from-teal-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-600 "
+								variant="dynamic"
+								className="text-white rounded-none rounded-r-md border-none h-full w-25 bg-linear-to-r from-teal-500 to-cyan-600"
 								disabled={copied}
 								onClick={() => onCopy(shareInfo.shareUrl)}
 							>
@@ -128,8 +128,8 @@ const Share: React.FC<ShareProps> = ({
 					</div>
 				) : (
 					<Button
-						variant="outline"
-						className="border-textcolor/30 w-full bg-transparent hover:bg-transparent bg-linear-to-r from-teal-500/80 to-cyan-600/80 hover:from-teal-500 hover:to-cyan-600"
+						variant="dynamic"
+						className="text-white border-textcolor/30 w-full bg-transparent hover:bg-transparent bg-linear-to-r from-teal-500/80 to-cyan-600/80 hover:from-teal-500 hover:to-cyan-600"
 						disabled={loading}
 						onClick={onCreateShare}
 					>
