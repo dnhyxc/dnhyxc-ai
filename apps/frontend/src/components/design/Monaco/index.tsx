@@ -627,6 +627,39 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 					.join(eol);
 			};
 
+			/**
+			 * 剪切时使用的范围：与 VS Code 一致，**空选区（仅光标）**表示「当前逻辑行」。
+			 * - 非最后一行：删除 (line,1)～(line+1,1)，去掉该行及行尾换行
+			 * - 最后一行且上文还有行：从上一行末尾到本行末尾，一并去掉行间换行
+			 * - 仅一行：删本行内容
+			 */
+			const rangeForCutWhenCursorOnly = (
+				sel: NonNullable<
+					ReturnType<MonacoEditorInstance['getSelections']>
+				>[number],
+			) => {
+				const model = editor.getModel();
+				if (!model) return sel;
+				const isCursor =
+					sel.startLineNumber === sel.endLineNumber &&
+					sel.startColumn === sel.endColumn;
+				if (!isCursor) return sel;
+				const line = sel.startLineNumber;
+				const lineCount = model.getLineCount();
+				if (line < lineCount) {
+					return new monaco.Range(line, 1, line + 1, 1);
+				}
+				if (line > 1) {
+					return new monaco.Range(
+						line - 1,
+						model.getLineMaxColumn(line - 1),
+						line,
+						model.getLineMaxColumn(line),
+					);
+				}
+				return new monaco.Range(1, 1, 1, model.getLineMaxColumn(1));
+			};
+
 			// WebView/Tauri 下系统默认复制常失败：用模型选区 + 统一剪贴板 API（含 Tauri 插件）
 			editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyC, () => {
 				const text = getCopyTextFromSelections();
@@ -644,7 +677,10 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 					if (!sels?.length) return;
 					editor.executeEdits(
 						'cut',
-						sels.map((sel) => ({ range: sel, text: '' })),
+						sels.map((sel) => ({
+							range: rangeForCutWhenCursorOnly(sel),
+							text: '',
+						})),
 					);
 				})();
 			});

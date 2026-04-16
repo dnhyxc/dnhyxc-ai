@@ -14,6 +14,8 @@ Tauri WebView 内系统级复制/粘贴对 **Monaco** 与普通 **`<input>` / `<
 
 `apps/frontend/src/components/design/Monaco/index.tsx`：用模型选区 + `copyToClipboard` / `pasteFromClipboard`（Tauri 走插件）。
 
+**无选区剪切整行（Cmd/Ctrl + X）**：与 VS Code 一致的光标行删除范围（`rangeForCutWhenCursorOnly`）见 **`docs/monaco-cut-line-without-selection-cmd-x.md`**。
+
 ### 3. Tauri：仅对普通 `input` / `textarea` 注册窄范围快捷键
 
 `apps/frontend/src/utils/clipboard.ts` 导出 **`attachTauriPlainFieldClipboardShortcuts()`**，在 `router` 的 `useEffect` 中挂载：
@@ -34,5 +36,5 @@ Tauri WebView 内系统级复制/粘贴对 **Monaco** 与普通 **`<input>` / `<
 |------|------|
 | `apps/frontend/src/router/index.tsx` | 调用 `attachTauriPlainFieldClipboardShortcuts`，卸载时 detach |
 | `apps/frontend/src/utils/clipboard.ts` | `copyToClipboard`、`pasteFromClipboard`、Tauri 普通字段快捷键 |
-| `apps/frontend/src/components/design/Monaco/index.tsx` | Monaco C/X/V |
+| `apps/frontend/src/components/design/Monaco/index.tsx` | Monaco C/X/V；无选区 X 整行见 `docs/monaco-cut-line-without-selection-cmd-x.md` |
 | `apps/frontend/src/components/ui/input.tsx` | 无逻辑变更；在 Tauri 下由上述快捷键处理 |
