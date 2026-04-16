@@ -82,6 +82,14 @@ export type MarkdownEditorWordWrap =
 	| 'wordWrapColumn'
 	| 'bounded';
 
+/**
+ * Diff 对照基线来源（baseline source，基线来源）：
+ * - current：以“点击开启对照瞬间”的当前正文为基线（更像 VS Code 里临时对照）
+ * - persisted：以外部传入的“进入编辑器时的内容”（如知识库/回收站打开时的快照）为基线
+ * - empty：以空内容为基线（适合新建草稿：当前内容 vs 空）
+ */
+export type MarkdownDiffBaselineSource = 'current' | 'persisted' | 'empty';
+
 interface MarkdownEditorProps {
 	value?: string;
 	onChange?: (value: string) => void;
@@ -154,6 +162,20 @@ interface MarkdownEditorProps {
 	 * @default true（与 `options.ts` 当前默认一致）
 	 */
 	stickyScrollScrollWithEditor?: boolean;
+	/**
+	 * 分屏对照（Diff）基线来源：
+	 * - 知识库/回收站打开：用 `persisted`，并传 `diffBaselineText` 为打开时的正文快照
+	 * - 新建草稿：用 `empty`，表示当前正文与空内容对比
+	 * - 其它场景：可用 `current`（默认），表示与“点击开启对照瞬间”的正文对比
+	 *
+	 * @default 'current'
+	 */
+	diffBaselineSource?: MarkdownDiffBaselineSource;
+	/**
+	 * 当 `diffBaselineSource === 'persisted'` 时使用的基线正文（建议为打开编辑器时的内容快照）。
+	 * 该值用于生成 Diff 左侧（original）。
+	 */
+	diffBaselineText?: string;
 }
 
 const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
@@ -185,6 +207,8 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	getMarkdownFromEditorRef,
 	stickyScrollEnabled = true,
 	stickyScrollScrollWithEditor = true,
+	diffBaselineSource = 'current',
+	diffBaselineText,
 }) => {
 	const editorRef = useRef<MonacoEditorInstance | null>(null);
 	/** 包裹 Editor 的宿主，用于测量 client 尺寸并显式 layout（Tauri 全屏恢复后避免沿用旧宽度） */
@@ -1033,13 +1057,32 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 			queueMicrotask(focusEditor);
 			return;
 		}
-		const base = normalizeMonacoEol(
-			editorRef.current?.getValue() ?? valueFromPropsRef.current ?? '',
-		);
+		/**
+		 * baseline 必须与「当前正文」同源，否则 Diff 会出现整体偏移（例如顶部多出空行导致全量变更）。
+		 *
+		 * 注意：处于 `preview` 视图时主编辑器可能已卸载（unmount），`editorRef.current` 可能残留旧实例引用；
+		 * 这时优先用 `valueFromPropsRef`（受控源）作为快照，避免读到被释放/陈旧的模型文本。
+		 *
+		 * 处于可编辑视图时，为避免父级 onChange rAF 合并导致的 value 滞后，优先读编辑器当前模型。
+		 */
+		const ed = editorRef.current;
+		let raw = '';
+		if (diffBaselineSource === 'empty') {
+			raw = '';
+		} else if (diffBaselineSource === 'persisted') {
+			raw = diffBaselineText ?? '';
+		} else {
+			// current：优先读编辑器当前模型（避免父级 value rAF 合并滞后），否则用受控源兜底（preview 下更可靠）
+			raw =
+				ed?.getModel?.() != null
+					? ed.getValue()
+					: (valueFromPropsRef.current ?? '');
+		}
+		const base = normalizeMonacoEol(raw);
 		setDiffBaselineOriginal(base);
 		setViewMode('splitDiff');
 		queueMicrotask(focusEditor);
-	}, [viewMode, focusEditor]);
+	}, [viewMode, focusEditor, diffBaselineSource, diffBaselineText]);
 
 	/** 底部操作栏内图标按钮（与「跟随滚动」一致） */
 	const markdownBarIconBtnClass = (active: boolean) =>

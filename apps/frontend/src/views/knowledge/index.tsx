@@ -46,6 +46,12 @@ const Knowledge = observer(() => {
 	const [trashOpen, setTrashOpen] = useState(false);
 	const [saveLoading, setSaveLoading] = useState(false);
 	const [markdownBottomBarOpen, setMarkdownBottomBarOpen] = useState(false);
+	/**
+	 * 回收站打开时强制让 Monaco 视为“新文档”：
+	 * - 解决：从回收站进入时 documentIdentity 可能恒为 'draft-new'，导致 MarkdownEditor 内部 viewMode 不重置（仍停留在 splitDiff）
+	 * - 策略：每次从回收站 pick 时递增 nonce，拼到 documentIdentity 上，触发 MarkdownEditor 的 documentIdentity 变更链路
+	 */
+	const [trashOpenNonce, setTrashOpenNonce] = useState(0);
 	/** 保存前从 Monaco 同步正文，避免 onChange 经 rAF 合并时 store 滞后导致脏检查误判 */
 	const getMarkdownFromEditorRef = useRef<(() => string) | null>(null);
 	const [knowledgeChords, setKnowledgeChords] = useState<{
@@ -91,6 +97,8 @@ const Knowledge = observer(() => {
 	/** 清空标题与正文（store 级草稿，与 markdown 一并清除） */
 	const resetEditorToNewDraft = useCallback(() => {
 		knowledgeStore.clearKnowledgeDraft();
+		// 清空时也强制触发一次 documentIdentity 变化，确保 MarkdownEditor 的视图状态（如 splitDiff）重置到 edit
+		setTrashOpenNonce((n) => n + 1);
 	}, [knowledgeStore]);
 
 	// 快捷键监听
@@ -573,13 +581,15 @@ const Knowledge = observer(() => {
 	 */
 	const handlePickTrashRecord = useCallback(
 		(record: { title: string | null; content: string }) => {
+			setTrashOpenNonce((n) => n + 1);
 			knowledgeStore.setKnowledgeOverwriteOpen(false);
 			knowledgeStore.setKnowledgeEditingKnowledgeId(null);
 			knowledgeStore.setKnowledgeLocalDirPath(null);
 			knowledgeStore.setKnowledgeLocalDiskTitle(null);
 			const content = record.content ?? '';
 			// 从回收站打开应视为“新草稿”：打开后即可直接保存（不要求先编辑产生脏）
-			knowledgeStore.setKnowledgePersistedSnapshot({ title: '', content: '' });
+			// 但 diff / 脏检查应以“打开时的内容”为基线：保持快照为当前内容，避免一打开就全量变化
+			knowledgeStore.setKnowledgePersistedSnapshot({ title: '', content });
 			knowledgeStore.setKnowledgeTitle(record.title ?? '');
 			knowledgeStore.setMarkdown(content);
 		},
@@ -657,12 +667,14 @@ const Knowledge = observer(() => {
 					className="h-full min-w-0 max-w-full w-full"
 					stickyScrollEnabled={false}
 					stickyScrollScrollWithEditor={false}
+					// Diff 基线：知识库/回收站均以“打开时的快照”为主；新草稿快照为空则等价于“当前 vs 空”
+					diffBaselineSource="persisted"
+					diffBaselineText={knowledgeStore.knowledgePersistedSnapshot.content}
 					height={EDITOR_HEIGHT}
 					theme={monacoTheme}
 					language={monacoLanguage}
-					documentIdentity={
-						knowledgeStore.knowledgeEditingKnowledgeId ?? 'draft-new'
-					}
+					// 回收站入口：documentIdentity 拼接 nonce，确保每次 pick/clear 都会触发组件内部重置到 edit，不重置会导致 diff 内容出现问题
+					documentIdentity={`${knowledgeStore.knowledgeEditingKnowledgeId ?? 'draft-new'}__trash-${trashOpenNonce}`}
 					value={knowledgeStore.markdown}
 					onChange={handleMarkdownChange}
 					getMarkdownFromEditorRef={getMarkdownFromEditorRef}

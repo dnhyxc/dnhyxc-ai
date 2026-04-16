@@ -21,7 +21,7 @@
 | 可编辑性 | **仅左侧主编辑器**可编辑；Diff 区域整体 **只读**（不在 Diff 内改正文）。 |
 | 与「分屏」关系 | **「分屏」（左编右预览）**与**「分屏对照」（左编右 Diff）**在视图状态上 **互斥**：不会同时高亮「分屏」Tab 与对照模式；进入对照即离开「纯分屏+预览」语义。 |
 | 基线（baseline）来源 | 当前实现：用户**开启对照瞬间**，从主编辑器（或兜底 `value`）读取全文并 `normalizeMonacoEol` 后写入快照；**非**磁盘上次保存（若需要可由业务传入并替换该快照逻辑）。 |
-| 粘性滚动（sticky scroll） | 由外部参数控制是否开启；**主编辑器与 Diff 两侧**同步使用同一组参数（见 §13.5）。 |
+| 粘性滚动（sticky scroll） | 由外部参数控制是否开启；**主编辑器与 Diff 两侧**同步使用同一组参数（见 §14.5）。 |
 
 底部操作栏：在「预览」左侧增加 `GitCompare` 按钮，用于进入/退出 `splitDiff`。
 
@@ -76,6 +76,22 @@ const splitDiffModifiedText =
 ```
 
 左侧主编辑器仍通过既有 `onChange` / `setValue` 同步逻辑与父组件一致；**不在 Diff 内**写回 modified，避免双源编辑。
+
+### 3.4 Diff 基线来源（知识库 / 回收站 / 新建草稿）
+
+本组件支持由外部传入“Diff 基线来源”，以满足不同业务入口的对照语义：
+
+| 场景 | 期望对照 | 推荐配置 |
+|------|----------|----------|
+| 知识库打开既有条目 | “打开时的内容” vs 当前修改 | `diffBaselineSource="persisted"` + `diffBaselineText=knowledgePersistedSnapshot.content` |
+| 回收站打开（按新草稿展示） | “打开时的内容” vs 当前修改 | 同上：`persisted` + `diffBaselineText` 为打开时内容（回收站入口已将 snapshot 设为打开时内容） |
+| 新建草稿 | 空内容 vs 当前正文 | `diffBaselineSource="empty"`（或 `persisted` 且 `diffBaselineText=''` 也等价） |
+
+实现上，点击开启对照时会按 `diffBaselineSource` 决定 `original`：
+
+- `persisted`：使用 `diffBaselineText`（建议传“进入编辑器时的快照”）
+- `empty`：使用空字符串
+- `current`：使用“点击瞬间”的当前正文（优先读编辑器模型，preview 下用受控 `value` 兜底）
 
 ---
 
@@ -140,6 +156,18 @@ useEffect(() => {
 
 其它模式（如 `split`）保持不变；`splitDiff` 强制回到 `edit`，再由 `viewMode` 的 `useEffect` 清空 `diffBaselineOriginal`。
 
+### 6.1 回收站入口：为何要“强制变更 documentIdentity”
+
+知识库打开既有条目时，`documentIdentity` 通常是条目 id，因此每次 pick 都会变化，`MarkdownEditor` 能稳定重置视图回 `edit`。
+
+回收站打开按“新草稿”展示时，业务层往往会把 `editingKnowledgeId` 置空，若直接传 `documentIdentity="draft-new"`，则：
+
+- 用户上一次可能停留在 `splitDiff`（底部栏仍是 Diff 状态）
+- 再次从回收站 pick 时 `documentIdentity` 不变，组件不会触发“换篇重置”
+- 结果：底部操作栏/右侧 Diff 状态可能残留
+
+因此知识库页采用 **nonce 拼接** 方式：回收站 pick / 清空草稿时递增一个计数，把它拼到 `documentIdentity` 上，保证每次都触发组件内部“换篇重置”。对应实现见 `apps/frontend/src/views/knowledge/index.tsx`。
+
 ---
 
 ## 7. 关键代码位置索引（便于跳转）
@@ -193,7 +221,7 @@ const splitPreviewScrollSyncEligible =
 /**
  * 分屏对照开关（与「分屏」Tab 互斥）：
  * - 已在 splitDiff：回到 edit 单栏
- * - 否则：快照当前正文为 original，进入 splitDiff（左编 + 右 Diff）
+ * - 否则：按 diffBaselineSource 选择 baseline（original），进入 splitDiff（左编 + 右 Diff）
  */
 const toggleMarkdownSplitDiffCompare = useCallback(() => {
   if (viewMode === 'splitDiff') {
@@ -201,13 +229,30 @@ const toggleMarkdownSplitDiffCompare = useCallback(() => {
     queueMicrotask(focusEditor);
     return;
   }
-  const base = normalizeMonacoEol(
-    editorRef.current?.getValue() ?? valueFromPropsRef.current ?? '',
-  );
+  /**
+   * baseline 必须与「当前正文」同源，否则 Diff 会出现整体偏移（例如顶部多出空行导致全量变更）。
+   *
+   * - current：优先读编辑器模型（避免父级 value 因 rAF 合并略滞后），preview 下用受控 value 兜底
+   * - persisted：用外部传入的 diffBaselineText（用于知识库/回收站“打开时内容为基线”）
+   * - empty：与空内容对照（新建草稿：当前 vs 空）
+   */
+  const ed = editorRef.current;
+  let raw = '';
+  if (diffBaselineSource === 'empty') {
+    raw = '';
+  } else if (diffBaselineSource === 'persisted') {
+    raw = diffBaselineText ?? '';
+  } else {
+    raw =
+      ed?.getModel?.() != null
+        ? ed.getValue()
+        : valueFromPropsRef.current ?? '';
+  }
+  const base = normalizeMonacoEol(raw);
   setDiffBaselineOriginal(base);
   setViewMode('splitDiff');
   queueMicrotask(focusEditor);
-}, [viewMode, focusEditor]);
+}, [viewMode, focusEditor, diffBaselineSource, diffBaselineText]);
 ```
 
 ---
@@ -242,7 +287,42 @@ const toggleMarkdownSplitDiffCompare = useCallback(() => {
 
 ---
 
-## 11. 后续扩展建议
+## 11. 摘录：知识库/回收站接入（基线与重置）
+
+以下摘录来自 `apps/frontend/src/views/knowledge/index.tsx`，展示知识库页如何把“入口语义”传给 `MarkdownEditor`：
+
+```tsx
+<MarkdownEditor
+  // 1) Diff 基线：始终以“打开时的快照”为主（知识库/回收站一致）
+  diffBaselineSource="persisted"
+  diffBaselineText={knowledgeStore.knowledgePersistedSnapshot.content}
+
+  // 2) 回收站入口：documentIdentity 拼接 nonce，确保每次 pick/clear 都会触发组件内部重置到 edit
+  documentIdentity={`${knowledgeStore.knowledgeEditingKnowledgeId ?? 'draft-new'}__trash-${trashOpenNonce}`}
+/>
+```
+
+回收站 pick 时将 `knowledgePersistedSnapshot.content` 设为“打开时内容”，确保清空/编辑时 Diff 以该内容为基线：
+
+```ts
+// 从回收站打开：按“新草稿”保存，但 Diff/脏检查基线用打开时内容
+const content = record.content ?? '';
+knowledgeStore.setKnowledgePersistedSnapshot({ title: '', content });
+knowledgeStore.setMarkdown(content);
+```
+
+清空草稿时递增 nonce，避免残留在 splitDiff：
+
+```ts
+const resetEditorToNewDraft = () => {
+  knowledgeStore.clearKnowledgeDraft();
+  setTrashOpenNonce((n) => n + 1);
+};
+```
+
+---
+
+## 12. 后续扩展建议
 
 1. **基线来自已保存版本**：增加可选 prop（如 `diffCompareBaseline?: string`），在开启 `splitDiff` 时优先用该字符串作为 `original`，无则仍用当前「点击瞬间快照」。
 2. **重新对齐基线**：在 `splitDiff` 工具栏增加「以当前内容为新的对照基准」按钮，仅更新 `diffBaselineOriginal` 而不退出模式。
@@ -250,7 +330,7 @@ const toggleMarkdownSplitDiffCompare = useCallback(() => {
 
 ---
 
-## 12. 小结
+## 13. 小结
 
 - 用 **`splitDiff` 独立视图**表达「分屏对照」，与 **`split`（左编右预览）** 在状态机层面互斥，避免 Tab 语义与条件分支纠缠。
 - Diff 使用 **`DiffEditor` + `readOnly` + 外层宿主显式 layout**，与主编辑器 Tauri/WebView 布局策略一致。
@@ -258,11 +338,11 @@ const toggleMarkdownSplitDiffCompare = useCallback(() => {
 
 ---
 
-## 13. 粘性滚动条（sticky scroll）背景与 CSS 覆盖
+## 14. 粘性滚动条（sticky scroll）背景与 CSS 覆盖
 
 本节说明：**为何**在玻璃主题 `defineTheme` 里直接写 `var()` / `color-mix` 或误用 `--theme-color` 会导致粘性条异常色；**最终方案**（`glassTheme.ts` + `index.css`）；以及与 **Diff 分栏内嵌双编辑器** 的关系。普通 Markdown 单栏编辑与 **splitDiff** 下 Diff 两侧子编辑器 **共用** 同一套全局 CSS，维护时一并考虑。
 
-### 13.1 什么是粘性滚动
+### 14.1 什么是粘性滚动
 
 在 Monaco（与 VS Code 同源）中，**粘性滚动（sticky scroll）** 指编辑长文件时，在视口顶部「钉住」当前所在的**外层语法块标题行**（如类名、函数名），便于始终知道上下文。对应 DOM 上常见类名为 **`.sticky-widget`**，主题里对应颜色键为：
 
@@ -273,31 +353,31 @@ const toggleMarkdownSplitDiffCompare = useCallback(() => {
 
 Monaco 会把主题中的颜色写入编辑器 DOM 上的 **`--vscode-editorStickyScroll-background`** 等变量，由内部样式消费。
 
-### 13.2 本仓库中的目标
+### 14.2 本仓库中的目标
 
 - 编辑区整体为 **玻璃效果**（`editor.background` 等透明，透出外层 `bg-theme/5`），见 `glassTheme.ts`。
 - 粘性条需要 **与产品主题协调** 的可读底色，且随 **`body` / `.dark` 与各主题预设** 下的 CSS 变量变化。
 - **分屏 Diff**（`DiffEditor`）内左右各有一个内嵌 **`.monaco-editor`**，样式必须 **一并命中**（见下文 `index.css` 选择器），否则只有普通编辑器生效。
 
-### 13.3 走过的弯路（为何不要用 `defineTheme` 写 `var()` / `--theme-color`）
+### 14.3 走过的弯路（为何不要用 `defineTheme` 写 `var()` / `--theme-color`）
 
-#### 13.3.1 在 `defineTheme({ colors })` 里写 `var(--theme-color)` 或 `color-mix(...)`
+#### 14.3.1 在 `defineTheme({ colors })` 里写 `var(--theme-color)` 或 `color-mix(...)`
 
 `monaco.editor.defineTheme` 的 `colors` 值在很多版本里会走 **Monaco 自己的颜色解析管线**（用于与内置主题合并、生成内部 token）。**并非所有值都会原样变成浏览器里的 CSS**：
 
 - 若解析失败或走兜底路径，可能落到 **与预期不符的默认色**（实践中出现过 **偏红** 等与当前主题无关的观感）。
 - 因此：**不要把依赖「运行时 CSS 变量」的复杂字符串，当作唯一手段写在 `glassTheme` 的粘性键上**。
 
-#### 13.3.2 误用 `--theme-color` 作为「背景色」
+#### 14.3.2 误用 `--theme-color` 作为「背景色」
 
 在本项目 `index.css` 中，`--theme-color` 在**不同主题预设**下表示 **强调 / 品牌色**（高饱和、色相随主题变化），**不是**页面大面的「背景灰/底」。
 
 - 若粘性条大面积使用 `--theme-color`，在部分主题下会呈现 **明显偏红或其它高饱和色**，与「跟页面背景一致」的预期不符。
 - **背景系**应优先使用：`--theme-background`、`--theme-muted`、`--theme-secondary`、`--theme-card` 等（语义以 `index.css` 为准）。
 
-### 13.4 最终方案（双轨）
+### 14.4 最终方案（双轨）
 
-#### 13.4.1 `glassTheme.ts`：粘性键保持「可解析的透明实色」
+#### 14.4.1 `glassTheme.ts`：粘性键保持「可解析的透明实色」
 
 - **`editorStickyScroll.background` / `editorStickyScrollHover.background`** 设为 **`#00000000`（全透明）**。
 - 目的：与玻璃编辑区一致；**不在主题层引入不可解析字符串**；真实可见背景交给 **`index.css`**，由浏览器解析 `var()` / `color-mix`。
@@ -319,7 +399,7 @@ const GLASS_CHROME: Record<string, string> = {
 };
 ```
 
-#### 13.4.2 `index.css`：覆盖语义变量 + `.sticky-widget` 实背景
+#### 14.4.2 `index.css`：覆盖语义变量 + `.sticky-widget` 实背景
 
 文件：`apps/frontend/src/index.css`（挂在 `html, body { ... }` 内，与 `.monaco-editor .find-widget` 等同级）
 
@@ -382,11 +462,11 @@ const GLASS_CHROME: Record<string, string> = {
 }
 ```
 
-### 13.5 与 `options.ts` 的关系
+### 14.5 与 `options.ts` 的关系
 
 文件：`apps/frontend/src/components/design/Monaco/options.ts`
 
-#### 13.5.1 默认值 vs 组件外部覆盖
+#### 14.5.1 默认值 vs 组件外部覆盖
 
 - **`options.ts`** 提供 Monaco 通用默认配置，其中包含：
   - `stickyScroll: { enabled: true, scrollWithEditor: true }`
@@ -397,14 +477,14 @@ const GLASS_CHROME: Record<string, string> = {
   - 主编辑器：在 `mergedEditorOptions` 中覆盖 `stickyScroll`
   - Diff 编辑器：在 `mergedDiffEditorOptions` 中同步 `stickyScroll`，并对 `originalEditor` / `modifiedEditor` 两侧子编辑器显式同步，避免部分版本仅对顶层生效
 
-#### 13.5.2 背景色与开关的分离
+#### 14.5.2 背景色与开关的分离
 
 - **开关**由 `stickyScrollEnabled` 等 props / `stickyScroll` options 控制。
-- **背景色**由「主题透明 + `index.css` 覆盖 `--vscode-editorStickyScroll-*` / `.sticky-widget`」完成（见 §13.4）。
+- **背景色**由「主题透明 + `index.css` 覆盖 `--vscode-editorStickyScroll-*` / `.sticky-widget`」完成（见 §14.4）。
 
 若需关闭粘性滚动以规避极端场景 bug，可改 `enabled: false`；详见 `docs/monaco-markdown-ime-ghosting.md`。
 
-### 13.6 维护清单（粘性条）
+### 14.6 维护清单（粘性条）
 
 | 操作 | 建议 |
 |------|------|
@@ -413,7 +493,7 @@ const GLASS_CHROME: Record<string, string> = {
 | 升级 Monaco 大版本 | 抽查 DOM 是否仍使用 `.sticky-widget` 与 `--vscode-editorStickyScroll-*`。 |
 | 排查「仍是红/异常色」 | 查是否有别处对 `.sticky-widget` 或 `--vscode-editorStickyScroll-*` 更高优先级覆盖；用开发者工具看**计算后的 background**。 |
 
-### 13.7 小结（粘性条）
+### 14.7 小结（粘性条）
 
 - **`defineTheme` 的 `colors`**：粘性键用 **`#00000000`** 占位，**不写**依赖运行时 CSS 变量的字符串。  
 - **全局 CSS**：在 **`.monaco-editor` / `.monaco-diff-editor .monaco-editor`** 上覆盖 **`--vscode-editorStickyScroll-*`**，并给 **`.sticky-widget`** 写 **`background-color`**。  
@@ -421,7 +501,7 @@ const GLASS_CHROME: Record<string, string> = {
 
 ---
 
-## 14. 扩展阅读
+## 15. 扩展阅读
 
 - 分屏跟滚：`docs/monaco-markdown-split-scroll-sync.md`
 - Tauri / WebView 下 Monaco 显式布局：`docs/monaco-editor-tauri-layout.md`
