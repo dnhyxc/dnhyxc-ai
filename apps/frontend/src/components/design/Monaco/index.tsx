@@ -140,6 +140,20 @@ interface MarkdownEditorProps {
 	 * 知识库自动保存依赖此 ref，否则脏检查会一直认为「与快照一致」而跳过。
 	 */
 	getMarkdownFromEditorRef?: RefObject<(() => string) | null>;
+	/**
+	 * Monaco 粘性滚动（sticky scroll）开关：
+	 * - true：启用粘性条（顶部钉住外层语法块行）
+	 * - false：关闭粘性条（减少装饰层，Diff 模式也更干净）
+	 *
+	 * @default true（与 `options.ts` 当前默认一致）
+	 */
+	stickyScrollEnabled?: boolean;
+	/**
+	 * 粘性条是否跟随编辑器横向滚动（scrollWithEditor，随编辑器水平滚动）。
+	 *
+	 * @default true（与 `options.ts` 当前默认一致）
+	 */
+	stickyScrollScrollWithEditor?: boolean;
 }
 
 const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
@@ -169,6 +183,8 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	autoSaveIntervalSec = 60,
 	onAutoSaveIntervalSecChange,
 	getMarkdownFromEditorRef,
+	stickyScrollEnabled = true,
+	stickyScrollScrollWithEditor = true,
 }) => {
 	const editorRef = useRef<MonacoEditorInstance | null>(null);
 	/** 包裹 Editor 的宿主，用于测量 client 尺寸并显式 layout（Tauri 全屏恢复后避免沿用旧宽度） */
@@ -278,7 +294,16 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 
 	const mergedEditorOptions = useMemo(() => {
 		// 关闭 automaticLayout：WebView/Tauri 全屏→窗口化时内部 ResizeObserver 易滞后，改由宿主显式喂宽高
-		const base = { ...options, readOnly, automaticLayout: false as const };
+		const base = {
+			...options,
+			readOnly,
+			automaticLayout: false as const,
+			// 由外部参数控制是否开启粘性滚动（覆盖 options.ts 的默认）
+			stickyScroll: {
+				enabled: stickyScrollEnabled,
+				scrollWithEditor: stickyScrollScrollWithEditor,
+			},
+		};
 		if (language === 'markdown') {
 			return {
 				...base,
@@ -289,7 +314,15 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 			};
 		}
 		return { ...base, placeholder: effectivePlaceholder };
-	}, [readOnly, effectivePlaceholder, language, wordWrap, wordWrapColumn]);
+	}, [
+		readOnly,
+		effectivePlaceholder,
+		language,
+		wordWrap,
+		wordWrapColumn,
+		stickyScrollEnabled,
+		stickyScrollScrollWithEditor,
+	]);
 
 	/** 分屏 Diff：两侧只读，编辑仅在左侧主编辑器 */
 	const mergedDiffEditorOptions = useMemo(() => {
@@ -298,12 +331,36 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 			automaticLayout: false as const,
 			renderSideBySide: true,
 			enableSplitViewResizing: true,
+			// 与主编辑器保持一致：由外部参数控制是否启用粘性滚动（sticky scroll）
+			stickyScroll: {
+				enabled: stickyScrollEnabled,
+				scrollWithEditor: stickyScrollScrollWithEditor,
+			},
+			// Diff 两侧子编辑器也需要同步（避免只对顶层生效）
+			originalEditor: {
+				stickyScroll: {
+					enabled: stickyScrollEnabled,
+					scrollWithEditor: stickyScrollScrollWithEditor,
+				},
+			},
+			modifiedEditor: {
+				stickyScroll: {
+					enabled: stickyScrollEnabled,
+					scrollWithEditor: stickyScrollScrollWithEditor,
+				},
+			},
 		};
 		if (language === 'markdown') {
 			return { ...base, wordWrap, wordWrapColumn };
 		}
 		return { ...base, wordWrap: 'on' as const };
-	}, [language, wordWrap, wordWrapColumn]);
+	}, [
+		language,
+		wordWrap,
+		wordWrapColumn,
+		stickyScrollEnabled,
+		stickyScrollScrollWithEditor,
+	]);
 
 	const glassThemeId = GLASS_THEME_BY_UI[theme];
 

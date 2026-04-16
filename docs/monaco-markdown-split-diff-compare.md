@@ -8,6 +8,7 @@
 - 换行归一化等工具：`apps/frontend/src/components/design/Monaco/utils.ts`（`normalizeMonacoEol` 等）
 - 玻璃主题（含粘性条占位透明）：`apps/frontend/src/components/design/Monaco/glassTheme.ts`
 - 全局粘性条样式覆盖：`apps/frontend/src/index.css`（`html, body` 内 `.monaco-editor` / `.sticky-widget` 等）
+- Monaco 默认 options（stickyScroll 默认值会被组件 props 覆盖）：`apps/frontend/src/components/design/Monaco/options.ts`
 - 分屏跟滚（与本文模式互斥的预览侧逻辑）：`docs/monaco-markdown-split-scroll-sync.md`
 
 ---
@@ -20,6 +21,7 @@
 | 可编辑性 | **仅左侧主编辑器**可编辑；Diff 区域整体 **只读**（不在 Diff 内改正文）。 |
 | 与「分屏」关系 | **「分屏」（左编右预览）**与**「分屏对照」（左编右 Diff）**在视图状态上 **互斥**：不会同时高亮「分屏」Tab 与对照模式；进入对照即离开「纯分屏+预览」语义。 |
 | 基线（baseline）来源 | 当前实现：用户**开启对照瞬间**，从主编辑器（或兜底 `value`）读取全文并 `normalizeMonacoEol` 后写入快照；**非**磁盘上次保存（若需要可由业务传入并替换该快照逻辑）。 |
+| 粘性滚动（sticky scroll） | 由外部参数控制是否开启；**主编辑器与 Diff 两侧**同步使用同一组参数（见 §13.5）。 |
 
 底部操作栏：在「预览」左侧增加 `GitCompare` 按钮，用于进入/退出 `splitDiff`。
 
@@ -94,6 +96,7 @@ const splitDiffModifiedText =
 - `readOnly: true`：整块 Diff **两侧均不可编辑**（满足「仅左侧主编辑器可改」）。
 - `automaticLayout: false`：与主编辑器一致，**由宿主测量后显式 `layout()`**，减少 Tauri / WebView 全屏切换后尺寸陈旧问题（见 `docs/monaco-editor-tauri-layout.md`）。
 - Markdown 时传入与主编辑器一致的 `wordWrap` / `wordWrapColumn`。
+- `stickyScroll`：与主编辑器一致，**由外部 props**（`stickyScrollEnabled` / `stickyScrollScrollWithEditor`）控制；为避免 Diff 两侧子编辑器不继承顶层配置，`originalEditor` / `modifiedEditor` 也显式同步（见源码 `mergedDiffEditorOptions`）。
 
 ### 4.4 Diff 的 `layout`（类型限制）
 
@@ -383,8 +386,21 @@ const GLASS_CHROME: Record<string, string> = {
 
 文件：`apps/frontend/src/components/design/Monaco/options.ts`
 
-- **`stickyScroll: { enabled: true, scrollWithEditor: true }`**：控制**功能是否开启**（与背景色无关）。
-- 背景色由 **主题透明 + `index.css` 覆盖** 完成。
+#### 13.5.1 默认值 vs 组件外部覆盖
+
+- **`options.ts`** 提供 Monaco 通用默认配置，其中包含：
+  - `stickyScroll: { enabled: true, scrollWithEditor: true }`
+- **`MarkdownEditor`** 会在运行时用外部 props 覆盖该默认值，使业务层可控：
+  - `stickyScrollEnabled?: boolean`：是否开启粘性滚动（默认 `true`）
+  - `stickyScrollScrollWithEditor?: boolean`：粘性条是否跟随横向滚动（默认 `true`）
+- **覆盖范围**：
+  - 主编辑器：在 `mergedEditorOptions` 中覆盖 `stickyScroll`
+  - Diff 编辑器：在 `mergedDiffEditorOptions` 中同步 `stickyScroll`，并对 `originalEditor` / `modifiedEditor` 两侧子编辑器显式同步，避免部分版本仅对顶层生效
+
+#### 13.5.2 背景色与开关的分离
+
+- **开关**由 `stickyScrollEnabled` 等 props / `stickyScroll` options 控制。
+- **背景色**由「主题透明 + `index.css` 覆盖 `--vscode-editorStickyScroll-*` / `.sticky-widget`」完成（见 §13.4）。
 
 若需关闭粘性滚动以规避极端场景 bug，可改 `enabled: false`；详见 `docs/monaco-markdown-ime-ghosting.md`。
 

@@ -65,9 +65,6 @@ export const options: any = {
 	 * 关闭后走浏览器默认粘贴，以 text/plain 为主，格式与常见编辑器一致。
 	 */
 	pasteAs: { enabled: false },
-	// 开启粘性滚动，确保 Diff 两侧子编辑器也启用
+	// stickyScroll 由组件外部参数控制（见 Monaco/index.tsx 的 stickyScrollEnabled 等 props）
 	stickyScroll: { enabled: true, scrollWithEditor: true },
-	// 开启 Diff 两侧子编辑器的粘性滚动
-	originalEditor: { enabled: true, scrollWithEditor: true },
-	modifiedEditor: { enabled: true, scrollWithEditor: true },
 };

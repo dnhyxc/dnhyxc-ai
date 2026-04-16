@@ -655,6 +655,8 @@ const Knowledge = observer(() => {
 			<ScrollArea className="h-full min-w-0 w-full overflow-y-auto p-5 pt-0 rounded-none">
 				<MarkdownEditor
 					className="h-full min-w-0 max-w-full w-full"
+					stickyScrollEnabled={false}
+					stickyScrollScrollWithEditor={false}
 					height={EDITOR_HEIGHT}
 					theme={monacoTheme}
 					language={monacoLanguage}
