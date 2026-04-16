@@ -145,6 +145,8 @@ function ChatAssistantMessageInner({
 	const chatMdParser = useMemo(
 		() =>
 			new MarkdownParser({
+				// 安全：禁用 raw HTML（例如 <script>），避免 innerHTML 挂载引入 XSS
+				html: false,
 				enableChatCodeFenceToolbar: true,
 				enableMermaid: false,
 				highlightTheme: getChatMarkdownHighlightTheme(appTheme),

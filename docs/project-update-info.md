@@ -42,6 +42,7 @@
 - **代码高亮与主题**（更新：2026-04-06）：支持 highlight.js（代码高亮）与主题切换，满足不同阅读偏好。
 - **任务列表**（更新：2026-04-06）：支持 GFM（GitHub Flavored Markdown，GitHub 风格 Markdown）任务列表展示。
 - **Mermaid 图表**（更新：2026-04-14）：支持 Mermaid（图表语法）渲染与运行时处理，提升文档表达能力。
+- **Markdown 渲染安全加固**（更新：2026-04-16）：默认禁用 raw HTML（例如 `<script>`），降低 `innerHTML`/`dangerouslySetInnerHTML` 挂载时的 XSS（跨站脚本攻击）风险；项目内各入口显式配置 `html: false`，避免未来默认值变更导致行为漂移。
 
 ---
 

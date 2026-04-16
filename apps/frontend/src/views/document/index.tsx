@@ -63,6 +63,8 @@ const DocumentProcessor = () => {
 	// 1. 初始化解析器
 	const parser = useMemo(() => {
 		return new MarkdownParser({
+			// 安全：禁用 raw HTML（例如 <script>），避免 innerHTML 挂载引入 XSS
+			html: false,
 			highlightTheme: getChatMarkdownHighlightTheme(appTheme),
 		});
 	}, [appTheme]);

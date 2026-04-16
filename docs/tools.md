@@ -28,10 +28,37 @@
 
 ### 2.1 Markdown 渲染与容器
 
-- **实现**：`MarkdownIt` 实例，默认 `html/linkify/typographer/breaks` 与项目需求对齐。
+- **实现**：`MarkdownIt` 实例，默认 `linkify/typographer/breaks` 与项目需求对齐；出于安全考虑 **`html`（raw HTML）默认关闭**（避免 `<script>` 等被原样输出，宿主 `innerHTML` 挂载时引入 XSS 面）。
 - **GFM 待办**：在 KaTeX 之后注册 `markdown-it-task-lists`，再注册自研 `patchGfmTaskListBareMarkers`（见 **§10**）。有序 / 无序列表中的 `- [ ] foo`、`- [x] bar`、`1. [ ]` 等会输出带 `contains-task-list`、`task-list-item`、`task-list-item-checkbox` 的 HTML，与 `github-markdown-css` 中任务列表样式一致。
 - **输出**：`render(text)` 内先对 `\text{○}` 做替换以规避 KaTeX 度量问题，再 `md.render`，外层包 `<div class="${containerClass}">`（默认 `markdown-body`），便于配合 `github-markdown-css`。
 - **错误**：`try/catch` 中调用可选 `onError`，失败时仍包容器并回退为转义前的原文占位。
+
+#### 2.1.1 安全设计：为什么默认关闭 `html`
+
+**背景**：Markdown 渲染通常会把输出 HTML 字符串交给宿主通过 `innerHTML`（原生）或 `dangerouslySetInnerHTML`（React）挂载。若解析器允许 raw HTML，用户只要输入如下内容：
+
+```html
+<script>alert("XSS Attack! Your cookie is: " + document.cookie)</script>
+```
+
+就可能在挂载时触发 **XSS（跨站脚本攻击）**。
+
+**策略**：本项目将 `MarkdownIt({ html })` 的默认值调整为 `false`，让 raw HTML 一律被转义为文本（例如输出 `&lt;script&gt;...`），从源头收敛风险面。
+
+**注意**：
+
+- 若业务确实需要少量 HTML（例如 `details/summary`），请显式传 `new MarkdownParser({ html: true })`，并在宿主侧对输出做 **sanitize（清洗）**（建议白名单，仅放行必要标签/属性）。
+- 仅开启 `html: true` 但不做清洗，在任何使用 `innerHTML` 的界面都是高风险配置。
+
+#### 2.1.2 本仓库落地：所有调用点显式 `html: false`
+
+为了避免未来默认值被误改回 `true`、或外部引用旧版本工具包造成行为漂移，本仓库在所有 `new MarkdownParser({...})` 的调用点都显式写入：
+
+```ts
+html: false
+```
+
+典型入口包括：聊天消息（助手/用户/会话列表）、文档页、Monaco Markdown 预览等（见 `apps/frontend/src/components/design/**` 与 `apps/frontend/src/views/**`）。
 
 ### 2.2 代码高亮（highlight.js）
 

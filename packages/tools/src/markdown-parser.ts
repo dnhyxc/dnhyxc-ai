@@ -163,6 +163,18 @@ export function normalizeMermaidFenceBody(body: string): string {
 // 代码块主题可通过构造参数 highlightTheme（CDN）或 highlightThemeCss（内联）注入，亦可继续用手动 import。
 
 export interface MarkdownParserOptions {
+	/**
+	 * 是否允许渲染 Markdown 源码中的原始 HTML（raw HTML）。
+	 *
+	 * 安全提示：
+	 * - 开启后（true）会把诸如 `<script>...</script>` 这类标签直接输出到 HTML 字符串中；
+	 * - 若宿主使用 `innerHTML` 挂载且未做额外清洗（sanitize，清洗），将存在 XSS（跨站脚本攻击）风险。
+	 *
+	 * 建议：
+	 * - 默认保持关闭（false）；如确需支持少量 HTML，请在宿主侧对白名单标签/属性做严格清洗后再挂载。
+	 *
+	 * @default false
+	 */
 	html?: boolean;
 	linkify?: boolean;
 	typographer?: boolean;
@@ -223,8 +235,8 @@ class MarkdownParser {
 		this.onError = options.onError;
 
 		this.md = new MarkdownIt({
-			// 允许渲染原生 HTML 标签
-			html: options.html ?? true,
+			// 默认禁用 raw HTML，避免宿主 innerHTML 挂载时引入 XSS 面
+			html: options.html ?? false,
 			// 自动识别并转换 URL 为可点击链接
 			linkify: options.linkify ?? true,
 			// 启用智能排版，如引号、破折号优化
