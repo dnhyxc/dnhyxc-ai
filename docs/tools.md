@@ -50,15 +50,14 @@
 - 若业务确实需要少量 HTML（例如 `details/summary`），请显式传 `new MarkdownParser({ html: true })`，并在宿主侧对输出做 **sanitize（清洗）**（建议白名单，仅放行必要标签/属性）。
 - 仅开启 `html: true` 但不做清洗，在任何使用 `innerHTML` 的界面都是高风险配置。
 
-#### 2.1.2 本仓库落地：所有调用点显式 `html: false`
+#### 2.1.2 落地建议：按业务需要显式配置 `html`
 
-为了避免未来默认值被误改回 `true`、或外部引用旧版本工具包造成行为漂移，本仓库在所有 `new MarkdownParser({...})` 的调用点都显式写入：
+本工具包默认 `html: false`（raw HTML 作为文本转义输出）。因此多数业务场景**无需显式传 `html: false`** 也能保持安全默认。
 
-```ts
-html: false
-```
+如确需支持少量 HTML（例如 `details/summary`），再显式传 `new MarkdownParser({ html: true })`，并强烈建议在宿主侧做 **sanitize（清洗）** 白名单。
 
-典型入口包括：聊天消息（助手/用户/会话列表）、文档页、Monaco Markdown 预览等（见 `apps/frontend/src/components/design/**` 与 `apps/frontend/src/views/**`）。
+> 重要：本仓库 `@dnhyxc-ai/tools` 通过 `tsup` 构建输出 `dist/`，前端运行时消费的是 `dist` 产物。  
+> 因此若你修改了 `packages/tools/src/markdown-parser.ts` 的默认行为，需要执行 `pnpm --filter @dnhyxc-ai/tools run build` 让 `dist` 刷新，否则应用可能仍使用旧逻辑。
 
 ### 2.2 代码高亮（highlight.js）
 

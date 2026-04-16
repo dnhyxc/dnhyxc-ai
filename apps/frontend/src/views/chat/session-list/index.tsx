@@ -221,8 +221,6 @@ const SessionList = observer(({ open, onOpenChange }: IProps) => {
 	const parser = useMemo(
 		() =>
 			new MarkdownParser({
-				// 安全：禁用 raw HTML（例如 <script>），避免 innerHTML 挂载引入 XSS
-				html: false,
 				highlightTheme: getChatMarkdownHighlightTheme(appTheme),
 			}),
 		[appTheme],

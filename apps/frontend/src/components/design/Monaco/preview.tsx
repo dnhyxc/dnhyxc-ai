@@ -205,8 +205,6 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 	const parserNoMermaid = useMemo(
 		() =>
 			new MarkdownParser({
-				// 安全：禁用 raw HTML（例如 <script>），避免 innerHTML 挂载引入 XSS
-				html: false,
 				highlightTheme: getChatMarkdownHighlightTheme(theme),
 				enableChatCodeFenceToolbar: true,
 				enableHeadingSourceLineAttr: true,
@@ -237,7 +235,7 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 		() =>
 			new MarkdownParser({
 				// 安全：禁用 raw HTML（例如 <script>），避免 innerHTML 挂载引入 XSS
-				html: false,
+				// html: false,
 				highlightTheme: getChatMarkdownHighlightTheme(theme),
 				enableChatCodeFenceToolbar: true,
 				// 分屏跟随滚动：预览标题带源码行号，与编辑器按标题区间对齐
