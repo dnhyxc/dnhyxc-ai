@@ -201,14 +201,13 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 		[viewportRef],
 	);
 
-	// 先构造 parserNoMermaid（供 fenceParts 拆分与 markdown 段 render 使用）
-	const parserNoMermaid = useMemo(
+	// 单例 parser：是否输出 Mermaid 占位 DOM 由 render() 的参数控制（避免 new 两次）
+	const parser = useMemo(
 		() =>
 			new MarkdownParser({
 				highlightTheme: getChatMarkdownHighlightTheme(theme),
 				enableChatCodeFenceToolbar: true,
 				enableHeadingSourceLineAttr: true,
-				enableMermaid: false,
 			}),
 		[theme],
 	);
@@ -219,33 +218,21 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 			// 这样能够支持 Monaco 预览时的流式 mermaid 渲染，即使 mermaid 块未闭合依然能够单独处理与展示。
 			splitForMermaidIslandsWithOpenTail({
 				markdown,
-				parser: parserNoMermaid,
+				parser,
 				enableOpenTail: enableMermaid, // 仅启用时检测尾部未闭合的 mermaid 围栏
 				openMermaidIdPrefix: 'pv-mmd-open-line-', // 生成未闭合 mermaid 块的唯一 key 前缀
 			}),
-		[markdown, parserNoMermaid, enableMermaid],
+		[markdown, parser, enableMermaid],
 	);
 
 	const hasMermaidIslandLayout = Boolean(
 		enableMermaid && fenceParts.some((p) => p.type === 'mermaid'),
 	);
 
-	const parser = useMemo(
-		() =>
-			new MarkdownParser({
-				highlightTheme: getChatMarkdownHighlightTheme(theme),
-				enableChatCodeFenceToolbar: true,
-				// 分屏跟随滚动：预览标题带源码行号，与编辑器按标题区间对齐
-				enableHeadingSourceLineAttr: true,
-				enableMermaid,
-			}),
-		[theme, enableMermaid],
-	);
-
 	const html = useMemo(() => {
 		if (hasMermaidIslandLayout) return '';
-		return parser.render(markdown);
-	}, [hasMermaidIslandLayout, parser, markdown]);
+		return parser.render(markdown, { enableMermaid });
+	}, [hasMermaidIslandLayout, parser, markdown, enableMermaid]);
 
 	/** 含 Mermaid 岛时不在整段 HTML 上跑 run（岛内自渲染），否则与聊天流一致扫描 .mermaid */
 	const mermaidRootScanParser = useMemo(
@@ -407,7 +394,9 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 						{hasMermaidIslandLayout ? (
 							fenceParts.map((part, i) => {
 								if (part.type === 'markdown') {
-									const rawHtml = parserNoMermaid.render(part.text);
+									const rawHtml = parser.render(part.text, {
+										enableMermaid: false,
+									});
 									return (
 										<div
 											key={`pv-${i}`}

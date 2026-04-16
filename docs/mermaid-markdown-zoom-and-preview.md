@@ -1258,7 +1258,7 @@ private patchMermaidFence(): void {
 
 - **`fenceParts`**：`splitMarkdownByCodeFences(markdown)`。
 - **`hasMermaidIslandLayout`**：`enableMermaid && fenceParts` 中存在 `type === 'mermaid'`。为 true 时走 **路径 B**（与聊天一致：按段 map + `MermaidFenceIsland`）；为 false 时走 **路径 A**（整段 `parser.render` + 子节点单层 `dangerouslySetInnerHTML`）。
-- **`parserNoMermaid`**：`enableMermaid: false`，仅用于 **路径 B** 下的 markdown 段，避免围栏内再输出 mermaid 占位（围栏已被拆出）。
+- **`parser`**：仅构造一次；在 **路径 B** 的 markdown 段用 `parser.render(part.text, { enableMermaid: false })` 禁用 Mermaid 占位（围栏已被拆出），避免重复渲染。
 - **`html`**：路径 B 时为 `''`（占位，避免无意义全量 render）；路径 A 时为 `parser.render(markdown)`。
 - **`mermaidRootScanParser`**：`{ enableMermaid: enableMermaid && !hasMermaidIslandLayout }`。路径 B 下为 false，`useMermaidInMarkdownRoot` 早退，**不在预览根上重复** `mermaid.run`。
 - **`useMermaidInMarkdownRoot`**：`trigger` 在路径 B 用 **`markdown`**（内容变则 effect 依赖仍更新），路径 A 用 **`html`**。
@@ -1268,7 +1268,7 @@ private patchMermaidFence(): void {
 
 ### 8.2 关键代码（逐行注释摘录）
 
-下列从 `ParserMarkdownPreviewPane` 内部截取 **围栏判定、双 parser、hook 与 JSX 分支**，行尾注释说明意图。
+下列从 `ParserMarkdownPreviewPane` 内部截取 **围栏判定、单 parser、hook 与 JSX 分支**，行尾注释说明意图。
 
 ```typescript
 const fenceParts = useMemo(
@@ -1285,26 +1285,14 @@ const parser = useMemo(
 			highlightTheme: getChatMarkdownHighlightTheme(theme),
 			enableChatCodeFenceToolbar: true,
 			enableHeadingSourceLineAttr: true,
-			enableMermaid,
-		}),
-	[theme, enableMermaid],
-);
-
-const parserNoMermaid = useMemo(
-	() =>
-		new MarkdownParser({
-			highlightTheme: getChatMarkdownHighlightTheme(theme),
-			enableChatCodeFenceToolbar: true,
-			enableHeadingSourceLineAttr: true,
-			enableMermaid: false,
 		}),
 	[theme],
 );
 
 const html = useMemo(() => {
 	if (hasMermaidIslandLayout) return '';
-	return parser.render(markdown);
-}, [hasMermaidIslandLayout, parser, markdown]);
+	return parser.render(markdown, { enableMermaid });
+}, [hasMermaidIslandLayout, parser, markdown, enableMermaid]);
 
 const mermaidRootScanParser = useMemo(
 	() => ({
@@ -1340,7 +1328,7 @@ useMermaidDiagramClickPreview(
 					<div
 						key={`pv-${i}`}
 						dangerouslySetInnerHTML={{
-							__html: parserNoMermaid.render(part.text),
+							__html: parser.render(part.text, { enableMermaid: false }),
 						}}
 					/>
 				);

@@ -451,12 +451,50 @@ Mermaid 输出以 **SVG** 为主。本仓库前端在 **`apps/frontend/src/index
 | 121–125 | `MarkdownParserOptions` 内 `enableMermaid?` 与 JSDoc | 对外文档化：与 **`useMermaidInMarkdownRoot`** 配合。 |
 | 129–130 | `readonly enableMermaid` | 实例只读字段，供 hook 读取。 |
 | 136 | `this.enableMermaid = options.enableMermaid !== false` | **默认开启**；仅 **`=== false`** 时关闭。 |
-| 191–193 | `if (this.enableMermaid) { this.patchMermaidFence(); }` | 构造末尾注册 fence 包装。 |
+| 191–193 | `this.patchMermaidFence()` | 始终注册 fence 包装；是否生效由 `render(env)` 控制（见下节）。 |
 | 294–297 | `patchMermaidFence`：保存 `prev` | **链式装饰**：保留原 `fence` 行为给非 mermaid 语言。 |
-| 298–303 | 新 `fence`：解析 `token.info` 得 `langName` | 与 highlight、聊天 fence 一致：取 info 第一段为语言名。 |
-| 304–311 | `langName.toLowerCase() === 'mermaid'` 分支 | **DSL** 使用 **`escapeHtml(token.content)`** 再写入 innerHTML 安全文本节点路径（浏览器解析后内容为纯文本，Mermaid 读取文本）。 |
+| 298–303 | 新 `fence`：读取 `env.enableMermaid ?? this.enableMermaid` | **渲染期可控**：同一实例可按“本次渲染”开关 Mermaid，占位 DOM 输出与否不再只能在构造时决定。 |
+| 304–309 | 解析 `token.info` 得 `langName` | 与 highlight、聊天 fence 一致：取 info 第一段为语言名。 |
+| 310–317 | `langName.toLowerCase() === 'mermaid'` 分支 | **DSL** 使用 **`escapeHtml(token.content)`** 再写入 innerHTML 安全文本节点路径（浏览器解析后内容为纯文本，Mermaid 读取文本）。 |
 | 307–310 | 外层 **`markdown-mermaid-wrap`** + **`data-mermaid="1"`** | 与 **`runMermaidInMarkdownRoot`** 的 **选择器** 一致；内层 **`class="mermaid"`** 为 Mermaid 约定入口。 |
 | 313 | `return prev(...)` | 非 mermaid 走原规则（默认高亮或聊天块等）。 |
+
+#### 11.8.5 本轮补充：`render(text, { enableMermaid })`（避免重复 new parser）
+
+**动机**：
+
+- 宿主（如 Monaco 预览）经常需要同时满足两类渲染：
+  - **整段预览**：允许把 ```mermaid 输出为占位 DOM，随后由 `useMermaidInMarkdownRoot` 扫描并渲染 SVG；
+  - **Mermaid 岛布局**：Markdown 文本段需要 **禁用 Mermaid 占位**（否则会与“拆分成岛”的 Mermaid 渲染重复）。
+- 旧做法只能通过 **构造参数**决定 `enableMermaid`，因此宿主往往被迫 **new 两个 `MarkdownParser`**（一个开、一个关），成本与维护复杂度都更高。
+
+**方案**：
+
+- 保留实例级默认（构造参数 `enableMermaid`），同时让 `render()` 接收可选覆盖项：
+  - `render(text)`：完全兼容旧调用；
+  - `render(text, { enableMermaid: false })`：仅本次渲染禁用 Mermaid 占位 DOM。
+
+关键代码（与仓库一致）：
+
+```ts
+// packages/tools/src/markdown-parser.ts
+export type MarkdownRenderOptions = {
+	/** 本次渲染是否启用 Mermaid 占位 DOM 输出（未提供则回退实例默认） */
+	enableMermaid?: boolean;
+};
+
+public render(text: string, renderOptions: MarkdownRenderOptions = {}): string {
+	const env: MarkdownRenderEnv = {
+		enableMermaid: renderOptions.enableMermaid ?? this.enableMermaid,
+	};
+	return `<div class="${this.containerClass}">${this.md.render(text, env)}</div>`;
+}
+```
+
+**兼容性边界**：
+
+- **不会影响**所有旧调用点：`parser.render(text)` 仍然按实例默认工作；
+- Mermaid fence 的“是否生效”变为 **渲染期判断**：只有当 `env.enableMermaid === true` 时才输出 `.markdown-mermaid-wrap`；否则回退到 `prev`（普通代码块路径）。
 
 ### 11.9 流式聊天场景（本仓库前端）：围栏拆分与 Mermaid 岛
 

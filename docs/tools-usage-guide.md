@@ -290,7 +290,7 @@ const parser = new MarkdownParser({
 });
 ```
 
-### 7.5 需要聊天代码块工具栏
+### 7.6 需要聊天代码块工具栏
 
 ```ts
 const parser = new MarkdownParser({
@@ -377,6 +377,31 @@ export function MarkdownWithCodeToolbar({ markdown }: { markdown: string }) {
 实现要点：
 
 - 按钮由 `enableChatCodeFenceToolbar: true` 生成，内部会带 `data-chat-code-action="copy|download"`。
+
+---
+
+## 7.x 本轮补充：避免为 `enableMermaid` 重复 new parser
+
+在一些页面（例如 Monaco 预览）你可能既需要：
+
+- **整段渲染时**允许把 ```mermaid 输出为占位 DOM（给 `useMermaidInMarkdownRoot` 扫描渲染 SVG）
+- **拆分 Mermaid 岛布局时**对 markdown 段禁用 Mermaid 占位（避免重复渲染）
+
+此时不建议 `new MarkdownParser()` 两次。你可以只保留一个实例，并在本次 `render()` 时覆盖：
+
+```ts
+const parser = new MarkdownParser({
+	// 这里放“稳定配置”：主题、工具栏、标题行号等
+	enableChatCodeFenceToolbar: true,
+	enableHeadingSourceLineAttr: true,
+});
+
+// 整段渲染：本次允许 Mermaid
+const htmlAll = parser.render(markdown, { enableMermaid: true });
+
+// 拆分布局下的 markdown 段：本次禁用 Mermaid
+const htmlPart = parser.render(partMarkdown, { enableMermaid: false });
+```
 - 外层代码块容器带 `data-chat-code-block`，可以据此向上查找，再从 `pre code` 里取源码文本。
 - 下载文件名可按语言动态生成，例如：
   - `ts` → `code.ts`

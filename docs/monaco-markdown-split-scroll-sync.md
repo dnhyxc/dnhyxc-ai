@@ -135,10 +135,15 @@
 3. **预览侧**（`apps/frontend/src/components/design/Monaco/preview.tsx`）  
    岛布局下对每个片段：
 
-   - `rawHtml = parserNoMermaid.render(part.text)`  
+   - `rawHtml = parser.render(part.text, { enableMermaid: false })`  
    - `__html = shiftMarkdownPreviewHeadingLineAttrs(rawHtml, part.lineBase0)`  
 
    其中替换规则：**全文 1-based 行号 = `lineBase0` + 片段内 `data-md-heading-line` 的数值**（片段内值本身已是「片段内 1-based」，故等价于 `lineBase0 + parseInt(...)`）。`lineBase0 === 0` 的首段可跳过替换。
+
+补充说明（本轮优化点）：
+
+- 过去预览为了“同一处既要开 Mermaid、又要关 Mermaid”只能 `new MarkdownParser` 两次（一个 `enableMermaid: true`、一个 `false`）。
+- 现在 `@dnhyxc-ai/tools` 的 `MarkdownParser.render()` 支持 `render(text, { enableMermaid })`，因此 `preview.tsx` 可以只保留一个 parser，通过渲染参数按需禁用 Mermaid，占位 DOM 不会与 Mermaid 岛重复。
 
 ### 4.4 与 `splitForMermaidIslandsWithOpenTail` 的关系
 
@@ -258,7 +263,7 @@ function shiftMarkdownPreviewHeadingLineAttrs(html: string, lineBase0: number): 
 }
 
 // fenceParts.map 内：
-const rawHtml = parserNoMermaid.render(part.text);
+const rawHtml = parser.render(part.text, { enableMermaid: false });
 __html: shiftMarkdownPreviewHeadingLineAttrs(rawHtml, part.lineBase0),
 ```
 

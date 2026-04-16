@@ -32,6 +32,19 @@ function taskListParentTokenIndex(tokens: Token[], index: number): number {
 /** markdown-it render(env) 上挂标题 slug 计数，供锚点 id 去重 */
 export type MarkdownRenderEnv = {
 	headingSlugCounts?: Record<string, number>;
+	/**
+	 * 渲染期开关：是否把 ```mermaid 围栏输出为 Mermaid 占位 DOM。
+	 * - 未提供时回退为实例级默认（构造参数 `enableMermaid`，默认 true）
+	 */
+	enableMermaid?: boolean;
+};
+
+export type MarkdownRenderOptions = {
+	/**
+	 * 本次渲染是否启用 Mermaid 占位 DOM 输出。
+	 * - 未提供时使用实例级默认（构造参数 `enableMermaid`）
+	 */
+	enableMermaid?: boolean;
 };
 
 /**
@@ -315,9 +328,8 @@ class MarkdownParser {
 			this.patchHeadingPreviewAttrs(options);
 		}
 
-		if (this.enableMermaid) {
-			this.patchMermaidFence();
-		}
+		// Mermaid fence 是否生效由 render(env) 控制；始终安装补丁以支持“同一实例按需开关 Mermaid”
+		this.patchMermaidFence();
 
 		const shouldInject = options.injectHighlightTheme !== false;
 		if (shouldInject) {
@@ -429,6 +441,11 @@ class MarkdownParser {
 		const prev = md.renderer.rules.fence;
 		if (!prev) return;
 		md.renderer.rules.fence = (tokens, idx, options, env, self) => {
+			const renderEnv = (env ?? {}) as MarkdownRenderEnv;
+			const wantMermaid = renderEnv.enableMermaid ?? this.enableMermaid;
+			if (!wantMermaid) {
+				return prev(tokens, idx, options, env, self);
+			}
 			const token = tokens[idx];
 			const info = token.info
 				? md.utils.unescapeAll(String(token.info)).trim()
@@ -562,9 +579,13 @@ class MarkdownParser {
 	/**
 	 * 解析 Markdown 并自动包裹样式容器
 	 * @param text Markdown 文本
+	 * @param renderOptions 可选：本次渲染覆盖项（如按需开关 Mermaid）
 	 * @returns 带有样式容器的 HTML 字符串
 	 */
-	public render(text: string): string {
+	public render(
+		text: string,
+		renderOptions: MarkdownRenderOptions = {},
+	): string {
 		if (!text) return '';
 
 		// Replace \text{○} with \circ to avoid KaTeX missing character metrics
@@ -573,7 +594,9 @@ class MarkdownParser {
 		const processedText = text.replace(/\\text{○}/g, '\\circ');
 
 		try {
-			const env: MarkdownRenderEnv = {};
+			const env: MarkdownRenderEnv = {
+				enableMermaid: renderOptions.enableMermaid ?? this.enableMermaid,
+			};
 			const rawHtml = this.md.render(processedText, env);
 			// 关键：自动包裹一层 div，带上类名，让 github-markdown-css 生效
 			return `<div class="${this.containerClass}">${rawHtml}</div>`;
