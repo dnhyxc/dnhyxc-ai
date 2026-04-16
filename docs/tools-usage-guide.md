@@ -277,6 +277,19 @@ const parser = new MarkdownParser({
 });
 ```
 
+### 7.5 需要统一代码块缩进（Tab 展开）
+
+默认会把代码块里的 `\t`（Tab，制表符）展开为 **2 个空格**，一般可不传参数。
+
+如果你希望改成 4 个空格，或完全保留 Tab：
+
+```ts
+const parser = new MarkdownParser({
+	codeBlockTabSize: 4, // 每个 \t -> 4 个空格
+	// codeBlockTabSize: 0, // 保留 \t，不展开
+});
+```
+
 ### 7.5 需要聊天代码块工具栏
 
 ```ts

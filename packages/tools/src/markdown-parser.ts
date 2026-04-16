@@ -184,6 +184,20 @@ export interface MarkdownParserOptions {
 	// 可选：自定义错误处理函数
 	onError?: (error: unknown) => void;
 	/**
+	 * 代码块缩进（indentation，缩进）控制：将围栏代码块中的 `\t`（Tab，制表符）展开为空格。
+	 *
+	 * 背景：
+	 * - 不同环境对 Tab 的显示宽度可能不一致（2/4/8 列），会导致代码对齐与复制体验不稳定
+	 * - 展开为固定空格宽度可使「显示、复制、下载」三者一致
+	 *
+	 * 规则：
+	 * - `2`：每个 `\t` 替换为 2 个空格（默认）
+	 * - `0`：不做替换（保留 Tab）
+	 *
+	 * @default 2
+	 */
+	codeBlockTabSize?: number;
+	/**
 	 * 为围栏代码块输出带工具栏的 DOM（语言 / 复制 / 下载），供聊天等场景配合滚动同步贴顶。
 	 * 默认 false，避免会话列表、编辑器等处的代码块出现多余按钮。
 	 */
@@ -228,11 +242,23 @@ class MarkdownParser {
 	private md;
 	private containerClass: string;
 	private onError?: (error: unknown) => void;
+	private codeBlockTabSize: number;
 
 	constructor(options: MarkdownParserOptions = {}) {
 		this.enableMermaid = options.enableMermaid !== false;
 		this.containerClass = options.containerClass || 'markdown-body';
 		this.onError = options.onError;
+		this.codeBlockTabSize = Math.max(
+			0,
+			Math.floor(options.codeBlockTabSize ?? 2),
+		);
+
+		const expandCodeTabs = (s: string): string => {
+			if (!s) return '';
+			const n = this.codeBlockTabSize;
+			if (n <= 0) return s;
+			return s.replace(/\t/g, ' '.repeat(n));
+		};
 
 		this.md = new MarkdownIt({
 			// 默认禁用 raw HTML，避免宿主 innerHTML 挂载时引入 XSS 面
@@ -244,9 +270,10 @@ class MarkdownParser {
 			// 将单个换行符转换为 <br> 标签
 			breaks: options.breaks ?? true,
 			highlight: (str: string, lang: string): string => {
+				const normalized = expandCodeTabs(str);
 				if (lang && hljs.getLanguage(lang)) {
 					try {
-						return hljs.highlight(str, { language: lang }).value;
+						return hljs.highlight(normalized, { language: lang }).value;
 					} catch (__) {}
 				}
 				return '';
@@ -355,12 +382,18 @@ class MarkdownParser {
 				? md.utils.unescapeAll(String(token.info)).trim()
 				: '';
 			const langName = info.split(/\s+/g)[0] || '';
+			const codeText =
+				this.codeBlockTabSize > 0
+					? token.content.replace(/\t/g, ' '.repeat(this.codeBlockTabSize))
+					: token.content;
 			let highlighted = '';
 			if (options.highlight) {
+				// highlight 回调内部也会应用相同的 Tab 展开；这里传原文即可
 				highlighted = options.highlight(token.content, langName, '') || '';
 			}
 			if (!highlighted) {
-				highlighted = md.utils.escapeHtml(token.content);
+				// 未高亮回退时也要保持与高亮分支一致的缩进表现
+				highlighted = md.utils.escapeHtml(codeText);
 			}
 			const escapedLangLabel = md.utils.escapeHtml(langName || 'text');
 			const codeClass = langName
