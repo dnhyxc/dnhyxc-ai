@@ -96,6 +96,9 @@ const Knowledge = observer(() => {
 
 	/** 清空标题与正文（store 级草稿，与 markdown 一并清除） */
 	const resetEditorToNewDraft = useCallback(() => {
+		// 与「从列表打开条目」类似：editingId 从有值变 null 会改变 documentIdentity，从而触发 MarkdownEditor 换篇并退出 splitDiff。
+		// 从回收站打开时 id 本就为 null，仅靠 id 不会变；递增 nonce 才能让 documentIdentity 变化，避免清空后仍卡在 Diff。
+		setTrashOpenNonce((n) => n + 1);
 		knowledgeStore.clearKnowledgeDraft();
 	}, [knowledgeStore]);
 
@@ -585,9 +588,12 @@ const Knowledge = observer(() => {
 			knowledgeStore.setKnowledgeLocalDirPath(null);
 			knowledgeStore.setKnowledgeLocalDiskTitle(null);
 			const content = record.content ?? '';
-			// 从回收站打开应视为“新草稿”：打开后即可直接保存（不要求先编辑产生脏）
-			// 但 diff / 脏检查应以“打开时的内容”为基线：保持快照为当前内容，避免一打开就全量变化
-			knowledgeStore.setKnowledgePersistedSnapshot({ title: '', content });
+			const trimmedTitle = (record.title ?? '').trim();
+			// 从回收站打开按新草稿处理（保存走新建），Diff / 脏检查基线仍为「打开时正文/标题」（与列表 pick 一致）
+			knowledgeStore.setKnowledgePersistedSnapshot({
+				title: trimmedTitle,
+				content,
+			});
 			knowledgeStore.setKnowledgeTitle(record.title ?? '');
 			knowledgeStore.setMarkdown(content);
 		},

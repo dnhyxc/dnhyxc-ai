@@ -533,3 +533,45 @@ export function formatKnowledgeAutoSaveIntervalLabel(sec: number): string {
 export function normalizeMonacoEol(text: string): string {
 	return text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 }
+
+/**
+ * Diff 对照基线来源（baseline source，基线来源）：
+ * - current：以“点击开启对照瞬间”的当前正文为基线（更像 VS Code 里临时对照）
+ * - persisted：以外部传入的“进入编辑器时的内容”（如知识库/回收站打开时的快照）为基线
+ * - empty：以空内容为基线（适合新建草稿：当前内容 vs 空）
+ */
+export type MarkdownDiffBaselineSource = 'current' | 'persisted' | 'empty';
+
+/**
+ * 判断是否允许进入 Markdown 分屏 Diff（避免无意义的“空对空”对照）。
+ *
+ * 规则（与 `MarkdownEditor` 底部栏禁用逻辑一致）：
+ * - 当前正文（trim 后）非空：允许
+ * - 否则仅当 `diffBaselineSource === 'persisted'` 且外部基线（trim 后）非空：允许（用于展示“全量删除”）
+ */
+export function isMarkdownDiffEntryEligible(
+	editorValue: string,
+	diffBaselineSource: MarkdownDiffBaselineSource,
+	diffBaselineText?: string,
+): boolean {
+	const curTrimmed = normalizeMonacoEol(editorValue ?? '').trim();
+	if (curTrimmed.length > 0) return true;
+	if (diffBaselineSource !== 'persisted') return false;
+	const baselineTrimmed = normalizeMonacoEol(diffBaselineText ?? '').trim();
+	return baselineTrimmed.length > 0;
+}
+
+/**
+ * Markdown 底部栏「Diff 对照」按钮是否应禁用（与 `isMarkdownDiffEntryEligible` 互斥）。
+ */
+export function isMarkdownDiffToolbarDisabled(
+	editorValue: string,
+	diffBaselineSource: MarkdownDiffBaselineSource,
+	diffBaselineText?: string,
+): boolean {
+	return !isMarkdownDiffEntryEligible(
+		editorValue,
+		diffBaselineSource,
+		diffBaselineText,
+	);
+}

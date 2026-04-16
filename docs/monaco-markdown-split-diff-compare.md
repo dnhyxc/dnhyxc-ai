@@ -5,7 +5,7 @@
 相关代码文件：
 
 - 主实现：`apps/frontend/src/components/design/Monaco/index.tsx`
-- 换行归一化等工具：`apps/frontend/src/components/design/Monaco/utils.ts`（`normalizeMonacoEol` 等）
+- 换行归一化、Diff 准入判定等工具：`apps/frontend/src/components/design/Monaco/utils.ts`（`normalizeMonacoEol`、`isMarkdownDiffEntryEligible`、`MarkdownDiffBaselineSource` 等）
 - 玻璃主题（含粘性条占位透明）：`apps/frontend/src/components/design/Monaco/glassTheme.ts`
 - 全局粘性条样式覆盖：`apps/frontend/src/index.css`（`html, body` 内 `.monaco-editor` / `.sticky-widget` 等）
 - Monaco 默认 options（stickyScroll 默认值会被组件 props 覆盖）：`apps/frontend/src/components/design/Monaco/options.ts`
@@ -557,7 +557,228 @@ const GLASS_CHROME: Record<string, string> = {
 
 ---
 
-## 16. 扩展阅读
+## 16. 本轮补充：Diff 准入判定抽取、清空/换篇与回收站一致性
+
+本节记录**近期实现**中与本 Diff 能力强相关的两处改动思路，便于以后排查「按钮禁用与 toggle 不一致」「回收站清空仍卡在 splitDiff」等问题。
+
+### 16.1 背景问题（为什么要动）
+
+1. **准入逻辑重复**  
+   「是否允许进入 `splitDiff`」与底部栏 `GitCompare` 是否 `disabled` 若在 JSX 与 `toggle` 回调里各写一遍，容易出现**条件漂移**（一边允许点、一边点了无效，或反之）。
+
+2. **回收站清空不退出 Diff、知识库清空却可以**  
+   根因通常**不在** `splitDiff` 内部「正文清空」那条 `useEffect` 本身，而在**知识库页**拼出来的 `documentIdentity`：  
+   - 从**知识库列表**打开既有条目时，`knowledgeEditingKnowledgeId` 有值；用户执行「清空/新建草稿」后 id 变为 `null`，`documentIdentity` 字符串变化，会触发 `MarkdownEditor` 里「换篇退出 splitDiff」的链路。  
+   - 从**回收站**打开时，业务上按「新草稿」处理，`knowledgeEditingKnowledgeId` **本来就是** `null`；清空后 id 仍为 `null`，若 `documentIdentity` 仅依赖 id，则**字符串不变**，`MarkdownEditor` 收不到「换篇」信号，**可能仍停留在 `splitDiff`**（与列表入口行为不一致）。
+
+### 16.2 实现思路一：把「能否进入 Diff」抽成纯函数（单源规则）
+
+**目标**：同一套布尔规则驱动 **底部栏禁用** 与 **`toggleMarkdownSplitDiffCompare` 早退**，并可在业务页按需复用（不依赖 React）。
+
+**落点文件**：`apps/frontend/src/components/design/Monaco/utils.ts`
+
+- 将 `MarkdownDiffBaselineSource` 与判定函数放在工具模块，避免 `index.tsx` 内联重复。  
+- 判定前先 `normalizeMonacoEol`，再 `trim`，与编辑器/父组件对「空」的感知一致。
+
+**规则（与组件行为一致，注释已写在源码）**：
+
+- 当前正文（`trim` 后）非空 → **允许**进入 Diff。  
+- 否则，仅当 `diffBaselineSource === 'persisted'` 且外部传入的 `diffBaselineText`（`trim` 后）非空 → **允许**（用于「打开时有内容、当前删光」的**全量删除**对照）。  
+- 其它情况 → **不允许**（避免无意义的「空对空」）。
+
+对应实现（节选，完整以仓库为准）。
+
+**位置**：`apps/frontend/src/components/design/Monaco/utils.ts`（约第 `537`–`577` 行，随仓库版本可能略有偏移）
+
+```ts
+export type MarkdownDiffBaselineSource = 'current' | 'persisted' | 'empty';
+
+export function isMarkdownDiffEntryEligible(
+	editorValue: string,
+	diffBaselineSource: MarkdownDiffBaselineSource,
+	diffBaselineText?: string,
+): boolean {
+	const curTrimmed = normalizeMonacoEol(editorValue ?? '').trim();
+	if (curTrimmed.length > 0) return true;
+	if (diffBaselineSource !== 'persisted') return false;
+	const baselineTrimmed = normalizeMonacoEol(diffBaselineText ?? '').trim();
+	return baselineTrimmed.length > 0;
+}
+
+export function isMarkdownDiffToolbarDisabled(
+	editorValue: string,
+	diffBaselineSource: MarkdownDiffBaselineSource,
+	diffBaselineText?: string,
+): boolean {
+	return !isMarkdownDiffEntryEligible(
+		editorValue,
+		diffBaselineSource,
+		diffBaselineText,
+	);
+}
+```
+
+**`MarkdownEditor` 内用法（要点）**：
+
+- 用 `useMemo` 计算一次 `markdownDiffEntryEligible`，再派生 `markdownDiffToolbarDisabled = !markdownDiffEntryEligible`。  
+- `toggleMarkdownSplitDiffCompare` 在「进入」分支里仅判断 `if (!markdownDiffEntryEligible) return;`，与按钮 `disabled` 同源。  
+- 底部栏 `GitCompare` 不再包一层 IIFE 重复计算。
+
+节选。
+
+**位置**：`apps/frontend/src/components/design/Monaco/index.tsx`（约第 `297`–`302` 行）
+
+```tsx
+	const markdownDiffEntryEligible = useMemo(
+		() =>
+			isMarkdownDiffEntryEligible(value, diffBaselineSource, diffBaselineText),
+		[value, diffBaselineSource, diffBaselineText],
+	);
+	const markdownDiffToolbarDisabled = !markdownDiffEntryEligible;
+```
+
+**位置**：`apps/frontend/src/components/design/Monaco/index.tsx`（约第 `1116`–`1156` 行）
+
+```tsx
+	const toggleMarkdownSplitDiffCompare = useCallback(() => {
+		if (viewMode === 'splitDiff') {
+			setViewMode('edit');
+			queueMicrotask(focusEditor);
+			return;
+		}
+		if (!markdownDiffEntryEligible) return;
+		// ...
+	}, [
+		viewMode,
+		focusEditor,
+		markdownDiffEntryEligible,
+		diffBaselineSource,
+		diffBaselineText,
+	]);
+```
+
+### 16.3 实现思路二：知识库页用 `trashOpenNonce` 制造「会话级 documentIdentity」
+
+**目标**：在「`editingKnowledgeId` 恒为 `draft-new`」这类场景下，仍能**可靠触发** `MarkdownEditor` 的 `documentIdentity` 变更链路（换篇重置视图、退出 `splitDiff`、避免 Diff 模型路径复用带来的陈旧内容）。
+
+**落点文件**：`apps/frontend/src/views/knowledge/index.tsx`
+
+#### 16.3.1 `MarkdownEditor` 侧：换篇即退出对照
+
+`documentIdentity` 变化时，强制把 `splitDiff` 收敛回 `edit`，避免沿用上一篇快照。
+
+**位置**：`apps/frontend/src/components/design/Monaco/index.tsx`（约第 `485`–`488` 行）
+
+```tsx
+	// 换篇时退出分屏对照，避免沿用上一篇快照
+	useEffect(() => {
+		setViewMode((vm) => (vm === 'splitDiff' ? 'edit' : vm));
+	}, [documentIdentity]);
+```
+
+因此：**只要业务层能让 `documentIdentity` 在「应视为换篇」时变化**，就能统一处理「退出 Diff / 不串篇」问题，而不必在 `MarkdownEditor` 里写死「是否回收站」等业务判断。
+
+#### 16.3.2 知识库页：`documentIdentity` 拼接 `__trash-${nonce}`
+
+知识库页把 `trashOpenNonce` 拼进 `documentIdentity`，并在**回收站 pick**时递增（见下节）。`MarkdownEditor` 上相关注释意图是：**pick / clear 都应 bump**，从而触发上述 effect。
+
+节选。
+
+**位置**：`apps/frontend/src/views/knowledge/index.tsx`（约第 `680`–`681` 行）
+
+```tsx
+					// 回收站入口：documentIdentity 拼接 nonce，确保每次 pick/clear 都会触发组件内部重置到 edit，不重置会导致 diff 内容出现问题
+					documentIdentity={`${knowledgeStore.knowledgeEditingKnowledgeId ?? 'draft-new'}__trash-${trashOpenNonce}`}
+```
+
+#### 16.3.3 清空草稿时递增 `trashOpenNonce`（修复「回收站清空不退出 Diff」）
+
+`resetEditorToNewDraft` 在调用 `clearKnowledgeDraft()` **之前**执行 `setTrashOpenNonce((n) => n + 1)`：
+
+- **从列表打开的云端条目**清空：`editingKnowledgeId` 从有值变 `null`，`documentIdentity` 前缀会变；**再**加 nonce 递增属于「双保险」，副作用主要是 Monaco 视为新会话（通常可接受）。  
+- **从回收站打开的新草稿**清空：`editingKnowledgeId` 本来就是 `null`，若仅清空 store 而不改 nonce，`documentIdentity` 可能完全不变 → **不会**触发 `MarkdownEditor` 的换篇退出；这就是要补 nonce 的原因。
+
+节选。
+
+**位置**：`apps/frontend/src/views/knowledge/index.tsx`（约第 `97`–`103` 行）
+
+```tsx
+	const resetEditorToNewDraft = useCallback(() => {
+		// 与「从列表打开条目」类似：editingId 从有值变 null 会改变 documentIdentity，从而触发 MarkdownEditor 换篇并退出 splitDiff。
+		// 从回收站打开时 id 本就为 null，仅靠 id 不会变；递增 nonce 才能让 documentIdentity 变化，避免清空后仍卡在 Diff。
+		setTrashOpenNonce((n) => n + 1);
+		knowledgeStore.clearKnowledgeDraft();
+	}, [knowledgeStore]);
+```
+
+#### 16.3.4 回收站 pick：persisted 快照必须与「打开时正文」一致
+
+`diffBaselineText` 来自 `knowledgePersistedSnapshot.content`。若回收站打开时把快照误写成空串，会导致：
+
+- Diff 左侧基线（`persisted`）与真实「打开时内容」不一致；  
+- 「全量删除」语义与按钮禁用逻辑出现难以排查的组合问题。
+
+因此 `handlePickTrashRecord` 在仍按「新草稿」处理 `editingKnowledgeId` 的前提下，将快照设为**打开时的标题/正文**（与列表 `handlePickRecord` 一致）。
+
+**位置**：`apps/frontend/src/views/knowledge/index.tsx`（约第 `583`–`599` 行）
+
+```tsx
+	const handlePickTrashRecord = useCallback(
+		(record: { title: string | null; content: string }) => {
+			setTrashOpenNonce((n) => n + 1);
+			// ...
+			const content = record.content ?? '';
+			const trimmedTitle = (record.title ?? '').trim();
+			// 从回收站打开按新草稿处理（保存走新建），Diff / 脏检查基线仍为「打开时正文/标题」（与列表 pick 一致）
+			knowledgeStore.setKnowledgePersistedSnapshot({
+				title: trimmedTitle,
+				content,
+			});
+			knowledgeStore.setKnowledgeTitle(record.title ?? '');
+			knowledgeStore.setMarkdown(content);
+		},
+		[knowledgeStore],
+	);
+```
+
+### 16.4 与「正文清空」组件内 effect 的关系（不要混淆两条路径）
+
+`MarkdownEditor` 另有一条**仅依赖正文与内存基线**的自动退出逻辑：当 `splitDiff` 且受控 `value` 已空，且 **`diffBaselineOriginal`（进入 Diff 时写入的快照）也为空**时，回到 `edit`，用于避免「空对空」无意义对照；若 `diffBaselineOriginal` 非空（典型：`persisted` 基线有内容、当前删光），则**不退出**，用于展示全量删除。
+
+节选。
+
+**位置**：`apps/frontend/src/components/design/Monaco/index.tsx`（约第 `423`–`430` 行）
+
+```tsx
+	// 清空正文时：仅在“没有任何可对照基线”时退出 Diff，避免无意义的空对空对照；
+	// 若基线不为空（如知识库/回收站：打开时内容 vs 当前清空），应允许保留 Diff 来展示“全量删除”。
+	useEffect(() => {
+		if (viewMode !== 'splitDiff') return;
+		if (normalizeMonacoEol(value ?? '') !== '') return;
+		if (diffBaselineOriginal.trim() !== '') return;
+		setViewMode('edit');
+	}, [viewMode, value, diffBaselineOriginal]);
+```
+
+**与上文 16.3 节的分工**：
+
+- **16.3 节**：业务层通过 `documentIdentity` 表达「换篇 / 换会话」，**强制**退出 `splitDiff`（更偏全局重置）。  
+- **16.4 节**：组件内根据「当前是否还能构成有意义的 Diff」自动退出（更偏编辑态细节）。
+
+回收站「清空仍卡在 Diff」这类问题，在已引入 persisted 全量删除语义后，**优先检查 16.3 节所述 identity 是否变化**；不要误以为仅靠 16.4 节的 effect 就能覆盖所有业务入口。
+
+### 16.5 维护清单（本节选相关）
+
+| 现象 | 优先排查 |
+|------|----------|
+| Diff 按钮可点但 toggle 不进 / 行为与禁用态不一致 | `index.tsx` 是否仍复用同一 `markdownDiffEntryEligible`；`utils.ts` 规则是否被改坏。 |
+| 回收站清空不退出 Diff | `knowledge/index.tsx` 的 `resetEditorToNewDraft` 是否在清 store 前递增 `trashOpenNonce`；`documentIdentity` 是否仍拼接 nonce。 |
+| 回收站 Diff 左侧基线不对 | `handlePickTrashRecord` 写入的 `knowledgePersistedSnapshot` 是否与打开时 `content` 一致；`MarkdownEditor` 的 `diffBaselineText` 绑定是否仍指向 snapshot。 |
+| 业务侧想预判断能否开 Diff | 直接调用 `isMarkdownDiffEntryEligible`（或 `isMarkdownDiffToolbarDisabled`），传入与编辑器一致的 `normalizeMonacoEol` 前原文即可（函数内部会归一化）。 |
+
+---
+
+## 17. 扩展阅读
 
 - 分屏跟滚：`docs/monaco-markdown-split-scroll-sync.md`
 - Tauri / WebView 下 Monaco 显式布局：`docs/monaco-editor-tauri-layout.md`

@@ -54,6 +54,8 @@ import ParserMarkdownPreviewPane from './preview';
 import {
 	buildMarkdownScrollSyncSnapshot,
 	formatKnowledgeAutoSaveIntervalLabel,
+	isMarkdownDiffEntryEligible,
+	type MarkdownDiffBaselineSource,
 	type MarkdownScrollSyncSnapshot,
 	type MonacoEditorInstance,
 	normalizeMonacoEol,
@@ -82,14 +84,6 @@ export type MarkdownEditorWordWrap =
 	| 'on'
 	| 'wordWrapColumn'
 	| 'bounded';
-
-/**
- * Diff 对照基线来源（baseline source，基线来源）：
- * - current：以“点击开启对照瞬间”的当前正文为基线（更像 VS Code 里临时对照）
- * - persisted：以外部传入的“进入编辑器时的内容”（如知识库/回收站打开时的快照）为基线
- * - empty：以空内容为基线（适合新建草稿：当前内容 vs 空）
- */
-export type MarkdownDiffBaselineSource = 'current' | 'persisted' | 'empty';
 
 interface MarkdownEditorProps {
 	value?: string;
@@ -300,6 +294,13 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 
 	valueFromPropsRef.current = value;
 
+	const markdownDiffEntryEligible = useMemo(
+		() =>
+			isMarkdownDiffEntryEligible(value, diffBaselineSource, diffBaselineText),
+		[value, diffBaselineSource, diffBaselineText],
+	);
+	const markdownDiffToolbarDisabled = !markdownDiffEntryEligible;
+
 	const monacoModelPath = useMemo(() => {
 		const lang = language.replace(/[^a-zA-Z0-9_-]/g, '_');
 		const id = String(documentIdentity).replace(/[^a-zA-Z0-9_-]/g, '_');
@@ -419,13 +420,14 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 		onChangeRef.current = onChange;
 	}, [onChange]);
 
-	// 清空正文时强制退出 Diff：避免 Diff 模式下“已清空但仍停留在对照视图”的残留体验，
-	// 同时降低 DiffEditor 卸载时 model dispose / reset 的竞态概率（monaco 0.55.1 可见报错）。
+	// 清空正文时：仅在“没有任何可对照基线”时退出 Diff，避免无意义的空对空对照；
+	// 若基线不为空（如知识库/回收站：打开时内容 vs 当前清空），应允许保留 Diff 来展示“全量删除”。
 	useEffect(() => {
 		if (viewMode !== 'splitDiff') return;
 		if (normalizeMonacoEol(value ?? '') !== '') return;
+		if (diffBaselineOriginal.trim() !== '') return;
 		setViewMode('edit');
-	}, [viewMode, value]);
+	}, [viewMode, value, diffBaselineOriginal]);
 
 	// 离开 splitDiff 时清空 baseline，避免残留到其它模式
 	useEffect(() => {
@@ -1117,6 +1119,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 			queueMicrotask(focusEditor);
 			return;
 		}
+		if (!markdownDiffEntryEligible) return;
 		// 每次进入 Diff 都开一个新的 session：避免 keepCurrent*Model 复用上一轮的 TextModel 导致内容残留
 		setDiffSessionId((s) => s + 1);
 		/**
@@ -1144,7 +1147,13 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 		setDiffBaselineOriginal(base);
 		setViewMode('splitDiff');
 		queueMicrotask(focusEditor);
-	}, [viewMode, focusEditor, diffBaselineSource, diffBaselineText]);
+	}, [
+		viewMode,
+		focusEditor,
+		markdownDiffEntryEligible,
+		diffBaselineSource,
+		diffBaselineText,
+	]);
 
 	/** 底部操作栏内图标按钮（与「跟随滚动」一致） */
 	const markdownBarIconBtnClass = (active: boolean) =>
@@ -1350,10 +1359,23 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 									<FilePenLine size={18} strokeWidth={1.75} />
 								</button>
 							</Tooltip>
-							<Tooltip content="分屏对照修改：左编右只读 Diff">
+							<Tooltip
+								content={
+									markdownDiffToolbarDisabled
+										? '正文为空且无对照基线：无法进入修改对照（Diff）'
+										: '分屏对照修改：左编右只读 Diff'
+								}
+							>
 								<button
 									type="button"
-									className={markdownBarIconBtnClass(viewMode === 'splitDiff')}
+									disabled={markdownDiffToolbarDisabled}
+									aria-disabled={markdownDiffToolbarDisabled}
+									className={cn(
+										markdownBarIconBtnClass(viewMode === 'splitDiff'),
+										markdownDiffToolbarDisabled
+											? 'cursor-not-allowed opacity-45'
+											: undefined,
+									)}
 									aria-pressed={viewMode === 'splitDiff'}
 									aria-label="开关分屏 Markdown 修改对照（Diff）"
 									onClick={toggleMarkdownSplitDiffCompare}
