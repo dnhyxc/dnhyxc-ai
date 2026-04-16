@@ -143,7 +143,7 @@ MobX/React 回显时，若 `value` 与编辑器当前内容一致但仍是「父
 - `apps/frontend/src/components/design/Monaco/utils.ts` — **`syncPreviewScrollFromMarkdownEditorByHeadings`**、**`syncEditorScrollFromPreviewByHeadings`**、**`buildHeadingScrollCache`**、**`HeadingScrollCache`**，及比例回退 **`editorVerticalScrollRatio` / `setPreviewVerticalScrollRatio`**（详见 **§5**、**§5.8**、**§5.9**）  
 - `apps/frontend/src/components/design/Monaco/glassTheme.ts` — 继承内置主题的透明 chrome 主题注册  
 - `apps/frontend/src/components/design/Monaco/options.ts` — 全局默认编辑器选项（Markdown 在 index 内再覆盖一部分）  
-- `packages/tools/src/markdown-parser.ts` — **`MarkdownParser`**；**`enableHeadingSourceLineAttr`** 为预览标题注入 **`data-md-heading-line`**（详见 **§5**）  
+- `packages/tools/src/markdown-parser.ts` — **`MarkdownParser`**；默认开启 **`enableHeadingAnchorIds`** 提供标题 `id`，**`enableHeadingSourceLineAttr`** 为预览标题注入 **`data-md-heading-line`**（详见 **§5**）
 - `apps/frontend/src/views/knowledge/index.tsx` — 传入 **`documentIdentity`**，保证换篇时 model 与引导文本一致  
 
 ### 3.1 数据流（概念）
@@ -470,7 +470,7 @@ Monaco 在插入 Tab 时，`CursorConfiguration` 使用 **`model.getOptions()`**
 #### 5.10.6 `packages/tools/src/markdown-parser.ts`（与锚点相关的渲染钩子）
 
 - **`render(text)`** 内 **`const env: MarkdownRenderEnv = {}`**，**`this.md.render(processedText, env)`**，为标题 **`id`** 去重提供 **`env.headingSlugCounts`**（目录功能）；与 **`data-md-heading-line`** 独立但同在 **`patchHeadingPreviewAttrs`** 的 **`heading_open`** 包装里写入属性。  
-- **`patchHeadingPreviewAttrs`**：保存原 **`heading_open`** 规则；新规则里若 **`token.map` 存在**：按需 **`taskListAttrSet(..., 'data-md-heading-line', String(map[0]+1))`**；若 **`enableHeadingAnchorIds`**：从 **`tokens[idx+1]`** 内联 token 抽纯文本 → **`slugifyHeadingText` / `nextHeadingAnchorId`** → **`taskListAttrSet(..., 'id', id)`**；最后 **`prev(...)` 或 `self.renderToken`**。
+- **`patchHeadingPreviewAttrs`**：保存原 **`heading_open`** 规则；新规则里若 **`token.map` 存在**：当 **`enableHeadingSourceLineAttr === true`** 时写 **`taskListAttrSet(..., 'data-md-heading-line', String(map[0]+1))`**；当 **`enableHeadingAnchorIds !== false`** 时，从 **`tokens[idx+1]`** 内联 token 抽纯文本 → **`slugifyHeadingText` / `nextHeadingAnchorId`** → **`taskListAttrSet(..., 'id', id)`**；最后 **`prev(...)` 或 `self.renderToken`**。
 
 ### 5.11 跟滚模式、实现思路与 React 集成（详细）
 

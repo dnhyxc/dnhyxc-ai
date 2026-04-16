@@ -211,7 +211,7 @@ export interface MarkdownParserOptions {
 	enableHeadingSourceLineAttr?: boolean;
 	/**
 	 * 为标题写入 `id`（由标题纯文本 slug 化 + 重复时 `-1`、`-2`），供 `[目录](#xxx)` 页内跳转。
-	 * 需与 `render` 传入的 **env** 配合（本类 `render()` 已内置）；默认 false。
+	 * 需与 `render` 传入的 **env** 配合（本类 `render()` 已内置）；默认 true。
 	 */
 	enableHeadingAnchorIds?: boolean;
 	/**
@@ -281,7 +281,10 @@ class MarkdownParser {
 			this.patchChatCodeFenceRenderer();
 		}
 
-		if (options.enableHeadingSourceLineAttr || options.enableHeadingAnchorIds) {
+		if (
+			options.enableHeadingSourceLineAttr === true ||
+			options.enableHeadingAnchorIds !== false
+		) {
 			this.patchHeadingPreviewAttrs(options);
 		}
 
@@ -417,8 +420,8 @@ class MarkdownParser {
 	 * 为 heading_open 注入 `data-md-heading-line`、可选 `id`（目录锚点），与 markdown-it 的 token.map 一致。
 	 */
 	private patchHeadingPreviewAttrs(options: MarkdownParserOptions): void {
-		const wantLine = !!options.enableHeadingSourceLineAttr;
-		const wantId = !!options.enableHeadingAnchorIds;
+		const wantLine = options.enableHeadingSourceLineAttr === true;
+		const wantId = options.enableHeadingAnchorIds !== false;
 		const md = this.md;
 		const prev = md.renderer.rules.heading_open;
 		md.renderer.rules.heading_open = (tokens, idx, opt, env, self) => {

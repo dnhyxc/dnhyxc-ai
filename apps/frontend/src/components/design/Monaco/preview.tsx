@@ -208,7 +208,6 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 				highlightTheme: getChatMarkdownHighlightTheme(theme),
 				enableChatCodeFenceToolbar: true,
 				enableHeadingSourceLineAttr: true,
-				enableHeadingAnchorIds: true,
 				enableMermaid: false,
 			}),
 		[theme],
@@ -234,14 +233,10 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 	const parser = useMemo(
 		() =>
 			new MarkdownParser({
-				// 安全：禁用 raw HTML（例如 <script>），避免 innerHTML 挂载引入 XSS
-				// html: false,
 				highlightTheme: getChatMarkdownHighlightTheme(theme),
 				enableChatCodeFenceToolbar: true,
 				// 分屏跟随滚动：预览标题带源码行号，与编辑器按标题区间对齐
 				enableHeadingSourceLineAttr: true,
-				// 目录 / `[文字](#slug)` 跳转：标题生成 id，点击在 ScrollArea 内 scrollIntoView
-				enableHeadingAnchorIds: true,
 				enableMermaid,
 			}),
 		[theme, enableMermaid],
