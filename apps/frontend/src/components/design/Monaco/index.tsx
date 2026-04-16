@@ -1,5 +1,10 @@
 import Tooltip from '@design/Tooltip';
-import Editor, { type BeforeMount, type OnMount } from '@monaco-editor/react';
+import Editor, {
+	type BeforeMount,
+	DiffEditor,
+	type DiffOnMount,
+	type OnMount,
+} from '@monaco-editor/react';
 import { Button } from '@ui/index';
 import {
 	BetweenHorizontalEnd,
@@ -9,6 +14,7 @@ import {
 	Eye,
 	FileInput,
 	FilePenLine,
+	GitCompare,
 	PanelTopClose,
 	PanelTopOpen,
 	Timer,
@@ -54,7 +60,8 @@ import {
 	syncPreviewScrollFromMarkdownEditor,
 } from './utils';
 
-type MarkdownViewMode = 'edit' | 'preview' | 'split';
+/** `split`：左编右预览；`splitDiff`：左编右只读 Diff（与 `split` 互斥） */
+type MarkdownViewMode = 'edit' | 'preview' | 'split' | 'splitDiff';
 
 /**
  * 分屏跟滚（一次只开一种）：
@@ -178,6 +185,8 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	const [viewMode, setViewMode] = useState<MarkdownViewMode>('edit');
 	const [splitScrollFollowMode, setSplitScrollFollowMode] =
 		useState<MarkdownSplitScrollFollowMode>('none');
+	/** Diff 左侧（original）对照文本：进入 splitDiff 时从当前编辑器快照 */
+	const [diffBaselineOriginal, setDiffBaselineOriginal] = useState('');
 	/** 底部 Markdown 操作条是否展开（受控或未传 props 时内部 state） */
 	const [internalMarkdownBottomBarOpen, setInternalMarkdownBottomBarOpen] =
 		useState(false);
@@ -222,6 +231,9 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 		splitScrollFollowMode === 'editorFollowsPreview' ||
 		splitScrollFollowMode === 'bidirectional';
 	const previewViewportRef = useRef<HTMLDivElement | null>(null);
+	/** 包裹 DiffEditor 的宿主，用于显式 layout（与主编辑器一致） */
+	const diffEditorHostRef = useRef<HTMLDivElement | null>(null);
+	const applyDiffEditorLayoutRef = useRef<(() => void) | null>(null);
 	/** 分屏跟滚布局快照：正文/布局变化时重建；滚动时仅在折线上插值 */
 	const markdownScrollSyncSnapshotRef =
 		useRef<MarkdownScrollSyncSnapshot | null>(null);
@@ -238,6 +250,9 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	const markdownBottomBarId = useId();
 
 	const isMarkdown = language === 'markdown' && enableMarkdownPreview;
+	/** 分屏右侧为 Markdown 预览且启用跟滚时，才做左右滚动同步（Diff 模式下右侧无预览 DOM） */
+	const splitPreviewScrollSyncEligible =
+		viewMode === 'split' && scrollFollowActive && isMarkdown;
 
 	valueFromPropsRef.current = value;
 
@@ -246,6 +261,16 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 		const id = String(documentIdentity).replace(/[^a-zA-Z0-9_-]/g, '_');
 		return `dnhyxc-editor-${lang}__${id}`;
 	}, [language, documentIdentity]);
+
+	const diffOriginalModelPath = useMemo(() => {
+		const id = String(documentIdentity).replace(/[^a-zA-Z0-9_-]/g, '_');
+		return `dnhyxc-md-diff-original__${id}`;
+	}, [documentIdentity]);
+
+	const diffModifiedModelPath = useMemo(() => {
+		const id = String(documentIdentity).replace(/[^a-zA-Z0-9_-]/g, '_');
+		return `dnhyxc-md-diff-modified__${id}`;
+	}, [documentIdentity]);
 
 	/** 有正文时勿传占位文案，否则部分 Monaco 版本在失焦或未编辑时仍叠画「# 输入内容...」 */
 	const hasEditorBody = normalizeMonacoEol(value ?? '').trim().length > 0;
@@ -266,6 +291,20 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 		return { ...base, placeholder: effectivePlaceholder };
 	}, [readOnly, effectivePlaceholder, language, wordWrap, wordWrapColumn]);
 
+	/** 分屏 Diff：两侧只读，编辑仅在左侧主编辑器 */
+	const mergedDiffEditorOptions = useMemo(() => {
+		const base = {
+			readOnly: true,
+			automaticLayout: false as const,
+			renderSideBySide: true,
+			enableSplitViewResizing: true,
+		};
+		if (language === 'markdown') {
+			return { ...base, wordWrap, wordWrapColumn };
+		}
+		return { ...base, wordWrap: 'on' as const };
+	}, [language, wordWrap, wordWrapColumn]);
+
 	const glassThemeId = GLASS_THEME_BY_UI[theme];
 
 	const handleMonacoBeforeMount: BeforeMount = useCallback((monaco) => {
@@ -285,10 +324,25 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	const deferredPreviewMarkdown = useDeferredValue(value);
 	/** 分屏下用即时正文，避免 deferred 滞后导致预览 DOM 与编辑器 scroll 不同步 */
 	const splitPaneMarkdown = viewMode === 'split' ? (value ?? '') : '';
+	/** Diff 右侧（modified）与主编辑器正文同步 */
+	const splitDiffModifiedText =
+		viewMode === 'splitDiff' ? normalizeMonacoEol(value ?? '') : '';
 
 	useEffect(() => {
 		onChangeRef.current = onChange;
 	}, [onChange]);
+
+	// 离开 splitDiff 时清空 baseline，避免残留到其它模式
+	useEffect(() => {
+		if (viewMode !== 'splitDiff') {
+			setDiffBaselineOriginal('');
+		}
+	}, [viewMode]);
+
+	// 换篇时退出分屏对照，避免沿用上一篇快照
+	useEffect(() => {
+		setViewMode((vm) => (vm === 'splitDiff' ? 'edit' : vm));
+	}, [documentIdentity]);
 
 	useEffect(() => {
 		if (prevDocumentIdentityRef.current !== documentIdentity) {
@@ -377,6 +431,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 
 	/** 按编辑器首可见行写预览 scrollTop（带预览侧回声抑制） */
 	const flushEditorScrollToPreviewSync = useCallback(() => {
+		if (viewModeRef.current === 'splitDiff') return;
 		const editor = editorRef.current;
 		const vp = previewViewportRef.current;
 		if (!editor || !vp) return;
@@ -398,6 +453,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	}, [flushEditorScrollToPreviewSync]);
 
 	const syncEditorFromPreview = useCallback(() => {
+		if (viewModeRef.current === 'splitDiff') return;
 		if (suppressPreviewScrollEchoRef.current) return;
 		const mode = splitScrollFollowModeRef.current;
 		if (
@@ -441,7 +497,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 
 	// 预览 HTML / 分屏开关变化后同步测量锚点；hljs 等异步增高后再测一帧
 	useLayoutEffect(() => {
-		if (viewMode !== 'split' || !scrollFollowActive || !isMarkdown) {
+		if (!splitPreviewScrollSyncEligible) {
 			markdownScrollSyncSnapshotRef.current = null;
 			return;
 		}
@@ -465,15 +521,14 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 		splitPaneMarkdown,
 		viewMode,
 		splitScrollFollowMode,
-		scrollFollowActive,
-		isMarkdown,
+		splitPreviewScrollSyncEligible,
 		rebuildMarkdownScrollSyncSnapshot,
 		alignPreviewScrollToEditor,
 	]);
 
 	// 分栏拖拽改变预览宽度时重建锚点并跟手对齐（rAF 合并，避免连续 resize 多次全量测量）
 	useEffect(() => {
-		if (viewMode !== 'split' || !scrollFollowActive || !isMarkdown) {
+		if (!splitPreviewScrollSyncEligible) {
 			return;
 		}
 		const vp = previewViewportRef.current;
@@ -504,15 +559,13 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 			previewResizeRafRef.current = 0;
 		};
 	}, [
-		viewMode,
-		splitScrollFollowMode,
-		scrollFollowActive,
-		isMarkdown,
+		splitPreviewScrollSyncEligible,
 		rebuildMarkdownScrollSyncSnapshot,
 		flushEditorScrollToPreviewSync,
 	]);
 
 	const syncPreviewFromEditor = useCallback(() => {
+		if (viewModeRef.current === 'splitDiff') return;
 		if (suppressEditorScrollEchoRef.current) return;
 		const mode = splitScrollFollowModeRef.current;
 		if (
@@ -530,6 +583,69 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 			flushEditorScrollToPreviewSync();
 		});
 	}, [flushEditorScrollToPreviewSync]);
+
+	const handleDiffEditorMount = useCallback<DiffOnMount>((diffEd) => {
+		const applyDiffLayoutFromHost = () => {
+			// DiffEditor 类型无 getDomNode，尺寸一律由外层宿主测量（与主编辑器一致）
+			const host = diffEditorHostRef.current;
+			if (!host) {
+				diffEd.layout();
+				return;
+			}
+			const w = Math.floor(host.clientWidth);
+			const h = Math.floor(host.clientHeight);
+			if (w > 0 && h > 0) {
+				diffEd.layout({ width: w, height: h });
+			} else {
+				diffEd.layout();
+			}
+		};
+		applyDiffEditorLayoutRef.current = applyDiffLayoutFromHost;
+
+		let layoutRaf = 0;
+		const scheduleDiffLayout = () => {
+			cancelAnimationFrame(layoutRaf);
+			layoutRaf = requestAnimationFrame(() => {
+				layoutRaf = 0;
+				applyDiffLayoutFromHost();
+				requestAnimationFrame(() => applyDiffLayoutFromHost());
+			});
+		};
+
+		const layoutHost = diffEditorHostRef.current;
+		let layoutObserver: ResizeObserver | null = null;
+		if (typeof ResizeObserver !== 'undefined' && layoutHost) {
+			layoutObserver = new ResizeObserver(scheduleDiffLayout);
+			layoutObserver.observe(layoutHost);
+		}
+		const onWindowResize = () => scheduleDiffLayout();
+		window.addEventListener('resize', onWindowResize);
+		const vv = window.visualViewport;
+		const onVvResize = () => scheduleDiffLayout();
+		vv?.addEventListener('resize', onVvResize);
+		const onFullscreenChange = () => scheduleDiffLayout();
+		document.addEventListener('fullscreenchange', onFullscreenChange);
+
+		const layoutCleanup: { dispose: () => void } = {
+			dispose: () => {
+				layoutObserver?.disconnect();
+				window.removeEventListener('resize', onWindowResize);
+				vv?.removeEventListener('resize', onVvResize);
+				document.removeEventListener('fullscreenchange', onFullscreenChange);
+				cancelAnimationFrame(layoutRaf);
+			},
+		};
+
+		diffEd.onDidDispose(() => {
+			applyDiffEditorLayoutRef.current = null;
+			layoutCleanup.dispose();
+		});
+
+		queueMicrotask(() => {
+			applyDiffLayoutFromHost();
+			requestAnimationFrame(() => applyDiffLayoutFromHost());
+		});
+	}, []);
 
 	const handleEditorMount = useCallback<OnMount>(
 		(editor, monaco) => {
@@ -853,6 +969,21 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 		editorRef.current?.focus();
 	}, []);
 
+	/** 与「分屏」互斥：进入 splitDiff；再次点击回到编辑 */
+	const toggleMarkdownSplitDiffCompare = useCallback(() => {
+		if (viewMode === 'splitDiff') {
+			setViewMode('edit');
+			queueMicrotask(focusEditor);
+			return;
+		}
+		const base = normalizeMonacoEol(
+			editorRef.current?.getValue() ?? valueFromPropsRef.current ?? '',
+		);
+		setDiffBaselineOriginal(base);
+		setViewMode('splitDiff');
+		queueMicrotask(focusEditor);
+	}, [viewMode, focusEditor]);
+
 	/** 底部操作栏内图标按钮（与「跟随滚动」一致） */
 	const markdownBarIconBtnClass = (active: boolean) =>
 		cn(
@@ -942,7 +1073,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 						</div>
 					) : null}
 
-					{isMarkdown && viewMode === 'split' ? (
+					{isMarkdown && (viewMode === 'split' || viewMode === 'splitDiff') ? (
 						<ResizablePanelGroup
 							orientation="horizontal"
 							className="h-full min-h-0 min-w-0 max-w-full"
@@ -980,17 +1111,40 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 								className="min-h-0 min-w-0"
 							>
 								<div className="h-full min-h-0 min-w-0 overflow-hidden contain-[inline-size]">
-									<ParserMarkdownPreviewPane
-										markdown={splitPaneMarkdown}
-										documentIdentity={documentIdentity}
-										viewportRef={previewViewportRef}
-										onViewportScrollFollow={
-											editorFollowsPreviewActive
-												? dispatchViewportScrollFollow
-												: undefined
-										}
-										enableMermaid={markdownEnableMermaid}
-									/>
+									{viewMode === 'splitDiff' ? (
+										<div
+											ref={diffEditorHostRef}
+											className="box-border h-full min-h-0 min-w-0 max-w-full w-full overflow-hidden contain-[inline-size]"
+										>
+											<DiffEditor
+												key={diffModifiedModelPath}
+												height="100%"
+												width="100%"
+												language={language}
+												original={diffBaselineOriginal}
+												modified={splitDiffModifiedText}
+												originalModelPath={diffOriginalModelPath}
+												modifiedModelPath={diffModifiedModelPath}
+												beforeMount={handleMonacoBeforeMount}
+												theme={glassThemeId}
+												onMount={handleDiffEditorMount}
+												options={mergedDiffEditorOptions}
+												loading={<Loading text="正在加载对照编辑器..." />}
+											/>
+										</div>
+									) : (
+										<ParserMarkdownPreviewPane
+											markdown={splitPaneMarkdown}
+											documentIdentity={documentIdentity}
+											viewportRef={previewViewportRef}
+											onViewportScrollFollow={
+												editorFollowsPreviewActive
+													? dispatchViewportScrollFollow
+													: undefined
+											}
+											enableMermaid={markdownEnableMermaid}
+										/>
+									)}
 								</div>
 							</ResizablePanel>
 						</ResizablePanelGroup>
@@ -1029,6 +1183,17 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 									}}
 								>
 									<FilePenLine size={18} strokeWidth={1.75} />
+								</button>
+							</Tooltip>
+							<Tooltip content="分屏对照修改：左编右只读 Diff">
+								<button
+									type="button"
+									className={markdownBarIconBtnClass(viewMode === 'splitDiff')}
+									aria-pressed={viewMode === 'splitDiff'}
+									aria-label="开关分屏 Markdown 修改对照（Diff）"
+									onClick={toggleMarkdownSplitDiffCompare}
+								>
+									<GitCompare size={18} strokeWidth={1.75} aria-hidden />
 								</button>
 							</Tooltip>
 							<Tooltip content="预览渲染">
