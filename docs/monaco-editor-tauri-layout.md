@@ -151,3 +151,9 @@ const base = { ...options, readOnly, automaticLayout: false as const };
 - **配套**：宿主 **ref + CSS（min-w-0、max-w-full、overflow-hidden、contain-inline-size）** + **`Editor` `width="100%"`**。
 
 以上与当前 `Monaco/index.tsx` 实现一致；若后续改动布局策略，请同步更新本文档。
+
+---
+
+## 10. 参见
+
+- **粘性滚动条背景**（`defineTheme` 与全局 CSS、`--theme-color` 与背景 token、Diff 内嵌编辑器）：[`monaco-markdown-split-diff-compare.md`](./monaco-markdown-split-diff-compare.md) 第 **13** 节

@@ -6,6 +6,8 @@
 
 - 主实现：`apps/frontend/src/components/design/Monaco/index.tsx`
 - 换行归一化等工具：`apps/frontend/src/components/design/Monaco/utils.ts`（`normalizeMonacoEol` 等）
+- 玻璃主题（含粘性条占位透明）：`apps/frontend/src/components/design/Monaco/glassTheme.ts`
+- 全局粘性条样式覆盖：`apps/frontend/src/index.css`（`html, body` 内 `.monaco-editor` / `.sticky-widget` 等）
 - 分屏跟滚（与本文模式互斥的预览侧逻辑）：`docs/monaco-markdown-split-scroll-sync.md`
 
 ---
@@ -250,3 +252,161 @@ const toggleMarkdownSplitDiffCompare = useCallback(() => {
 - 用 **`splitDiff` 独立视图**表达「分屏对照」，与 **`split`（左编右预览）** 在状态机层面互斥，避免 Tab 语义与条件分支纠缠。
 - Diff 使用 **`DiffEditor` + `readOnly` + 外层宿主显式 layout**，与主编辑器 Tauri/WebView 布局策略一致。
 - **预览跟滚**严格限制在 `viewMode === 'split'`，并在滚动相关回调里对 **`splitDiff` 早退**，避免空 `viewportRef` 与无效同步。
+
+---
+
+## 13. 粘性滚动条（sticky scroll）背景与 CSS 覆盖
+
+本节说明：**为何**在玻璃主题 `defineTheme` 里直接写 `var()` / `color-mix` 或误用 `--theme-color` 会导致粘性条异常色；**最终方案**（`glassTheme.ts` + `index.css`）；以及与 **Diff 分栏内嵌双编辑器** 的关系。普通 Markdown 单栏编辑与 **splitDiff** 下 Diff 两侧子编辑器 **共用** 同一套全局 CSS，维护时一并考虑。
+
+### 13.1 什么是粘性滚动
+
+在 Monaco（与 VS Code 同源）中，**粘性滚动（sticky scroll）** 指编辑长文件时，在视口顶部「钉住」当前所在的**外层语法块标题行**（如类名、函数名），便于始终知道上下文。对应 DOM 上常见类名为 **`.sticky-widget`**，主题里对应颜色键为：
+
+| 颜色键（Monaco `colors` / CSS 变量） | 含义 |
+|--------------------------------------|------|
+| `editorStickyScroll.background` | 常态背景 |
+| `editorStickyScrollHover.background` | 悬停背景 |
+
+Monaco 会把主题中的颜色写入编辑器 DOM 上的 **`--vscode-editorStickyScroll-background`** 等变量，由内部样式消费。
+
+### 13.2 本仓库中的目标
+
+- 编辑区整体为 **玻璃效果**（`editor.background` 等透明，透出外层 `bg-theme/5`），见 `glassTheme.ts`。
+- 粘性条需要 **与产品主题协调** 的可读底色，且随 **`body` / `.dark` 与各主题预设** 下的 CSS 变量变化。
+- **分屏 Diff**（`DiffEditor`）内左右各有一个内嵌 **`.monaco-editor`**，样式必须 **一并命中**（见下文 `index.css` 选择器），否则只有普通编辑器生效。
+
+### 13.3 走过的弯路（为何不要用 `defineTheme` 写 `var()` / `--theme-color`）
+
+#### 13.3.1 在 `defineTheme({ colors })` 里写 `var(--theme-color)` 或 `color-mix(...)`
+
+`monaco.editor.defineTheme` 的 `colors` 值在很多版本里会走 **Monaco 自己的颜色解析管线**（用于与内置主题合并、生成内部 token）。**并非所有值都会原样变成浏览器里的 CSS**：
+
+- 若解析失败或走兜底路径，可能落到 **与预期不符的默认色**（实践中出现过 **偏红** 等与当前主题无关的观感）。
+- 因此：**不要把依赖「运行时 CSS 变量」的复杂字符串，当作唯一手段写在 `glassTheme` 的粘性键上**。
+
+#### 13.3.2 误用 `--theme-color` 作为「背景色」
+
+在本项目 `index.css` 中，`--theme-color` 在**不同主题预设**下表示 **强调 / 品牌色**（高饱和、色相随主题变化），**不是**页面大面的「背景灰/底」。
+
+- 若粘性条大面积使用 `--theme-color`，在部分主题下会呈现 **明显偏红或其它高饱和色**，与「跟页面背景一致」的预期不符。
+- **背景系**应优先使用：`--theme-background`、`--theme-muted`、`--theme-secondary`、`--theme-card` 等（语义以 `index.css` 为准）。
+
+### 13.4 最终方案（双轨）
+
+#### 13.4.1 `glassTheme.ts`：粘性键保持「可解析的透明实色」
+
+- **`editorStickyScroll.background` / `editorStickyScrollHover.background`** 设为 **`#00000000`（全透明）**。
+- 目的：与玻璃编辑区一致；**不在主题层引入不可解析字符串**；真实可见背景交给 **`index.css`**，由浏览器解析 `var()` / `color-mix`。
+
+```typescript
+/**
+ * 继承内置主题语法高亮，仅把编辑区相关层改为透明，透出外层 bg-theme/5。
+ * 粘性滚动条背景勿在此写 var()/color-mix：Monaco defineTheme 解析失败易偏色；
+ * 由 `index.css` 中 `--vscode-editorStickyScroll-*` 与 `.sticky-widget` 覆盖为应用主题变量。
+ */
+const GLASS_CHROME: Record<string, string> = {
+	'editor.background': '#00000000',
+	'editorGutter.background': '#00000000',
+	'minimap.background': '#00000000',
+	'editorOverviewRuler.background': '#00000000',
+	// 全透明占位：实际底色见 index.css，避免 defineTheme 解析 var/color-mix 异常
+	'editorStickyScroll.background': '#00000000',
+	'editorStickyScrollHover.background': '#00000000',
+};
+```
+
+#### 13.4.2 `index.css`：覆盖语义变量 + `.sticky-widget` 实背景
+
+文件：`apps/frontend/src/index.css`（挂在 `html, body { ... }` 内，与 `.monaco-editor .find-widget` 等同级）
+
+**两层：**
+
+1. **在 `.monaco-editor` 上重写 VS Code 语义变量**  
+   Monaco 内部仍读 `--vscode-editorStickyScroll-background`，值由我们提供；**浏览器原生**解析 `color-mix` 与 `var(--theme-secondary)`，不经过 Monaco 颜色解析器。
+
+2. **直接给 `.sticky-widget` 写 `background-color`**  
+   防止子层仍用旧背景；使用 **`!important`** 覆盖内联或主题注入。
+
+**选择器为何带 `.monaco-diff-editor .monaco-editor`？**
+
+- **Diff 分栏**：根节点多为 **`.monaco-diff-editor`**，左右各嵌 **`.monaco-editor`**；显式写出可让代码审查时意图清晰，并与部分 DOM 变体兼容。
+
+**当前仓库中的颜色（以 `index.css` 为准，可按产品调）**：
+
+- 使用 **`color-mix(in oklch, var(--theme-secondary) 80%, transparent)`** 作为粘性条与悬停底色（偏浅玻璃条）。
+- 若需 **更贴近整页底**：可把 `var(--theme-secondary)` 改为 **`var(--theme-background)`** 或 **`var(--theme-muted)`**。
+
+```css
+/*
+ * Monaco 粘性滚动（sticky scroll）：
+ * 1）defineTheme 里写 var()/color-mix 易解析失败 → 异常色；
+ * 2）此处由浏览器解析，并覆盖 --vscode-* 与 .sticky-widget；
+ * 3）Diff 内嵌多实例 .monaco-editor，选择器需命中。
+ */
+.monaco-editor,
+.monaco-diff-editor .monaco-editor {
+	/* Monaco 内部消费：主题次要底 + 透明混合，避免误用 --theme-color（强调色） */
+	--vscode-editorStickyScroll-background: color-mix(
+		in oklch,
+		var(--theme-secondary) 80%,
+		transparent
+	) !important;
+	--vscode-editorStickyScrollHover-background: color-mix(
+		in oklch,
+		var(--theme-secondary) 80%,
+		transparent
+	) !important;
+}
+
+.monaco-editor .sticky-widget,
+.monaco-diff-editor .monaco-editor .sticky-widget {
+	background-color: color-mix(
+		in oklch,
+		var(--theme-secondary) 80%,
+		transparent
+	) !important;
+}
+
+.monaco-editor .sticky-widget:hover,
+.monaco-diff-editor .monaco-editor .sticky-widget:hover {
+	/* 悬停可与常态相同，或改为更高比例的 theme-muted / theme-background */
+	background-color: color-mix(
+		in oklch,
+		var(--theme-secondary) 80%,
+		transparent
+	) !important;
+}
+```
+
+### 13.5 与 `options.ts` 的关系
+
+文件：`apps/frontend/src/components/design/Monaco/options.ts`
+
+- **`stickyScroll: { enabled: true, scrollWithEditor: true }`**：控制**功能是否开启**（与背景色无关）。
+- 背景色由 **主题透明 + `index.css` 覆盖** 完成。
+
+若需关闭粘性滚动以规避极端场景 bug，可改 `enabled: false`；详见 `docs/monaco-markdown-ime-ghosting.md`。
+
+### 13.6 维护清单（粘性条）
+
+| 操作 | 建议 |
+|------|------|
+| 改粘性条颜色 | 优先改 **`index.css`** 中 `color-mix` 与变量名；**避免**在 `glassTheme.ts` 的粘性键上写 `var()`。 |
+| 换主题 token 命名 | 同步检查 `index.css` 里 `--theme-*` 是否仍存在于 `:root` / `.dark` / `body.theme-*`。 |
+| 升级 Monaco 大版本 | 抽查 DOM 是否仍使用 `.sticky-widget` 与 `--vscode-editorStickyScroll-*`。 |
+| 排查「仍是红/异常色」 | 查是否有别处对 `.sticky-widget` 或 `--vscode-editorStickyScroll-*` 更高优先级覆盖；用开发者工具看**计算后的 background**。 |
+
+### 13.7 小结（粘性条）
+
+- **`defineTheme` 的 `colors`**：粘性键用 **`#00000000`** 占位，**不写**依赖运行时 CSS 变量的字符串。  
+- **全局 CSS**：在 **`.monaco-editor` / `.monaco-diff-editor .monaco-editor`** 上覆盖 **`--vscode-editorStickyScroll-*`**，并给 **`.sticky-widget`** 写 **`background-color`**。  
+- **语义**：**`--theme-color` 为强调色**，勿作大面积粘性条底；背景系用 **`--theme-background` / `--theme-muted` / `--theme-secondary`** 等。
+
+---
+
+## 14. 扩展阅读
+
+- 分屏跟滚：`docs/monaco-markdown-split-scroll-sync.md`
+- Tauri / WebView 下 Monaco 显式布局：`docs/monaco-editor-tauri-layout.md`
+- Markdown IME 与装饰层（含 sticky 开关讨论）：`docs/monaco-markdown-ime-ghosting.md`

@@ -16,6 +16,43 @@ body {
 		top: 8px;
 	}
 
+	/*
+	 * Monaco 粘性滚动（sticky scroll）：在 defineTheme 的 colors 里写 var()/color-mix 时，
+	 * 部分版本解析失败会落到异常色（例如偏红）。此处直接覆盖 VS Code 语义变量 + 层背景。
+	 * Diff 分栏内左右各有一个 .monaco-editor，需一并命中。
+	 */
+	.monaco-editor,
+	.monaco-diff-editor .monaco-editor {
+		--vscode-editorStickyScroll-background: color-mix(
+			in oklch,
+			var(--theme-secondary) 80%,
+			transparent
+		) !important;
+		--vscode-editorStickyScrollHover-background: color-mix(
+			in oklch,
+			var(--theme-secondary) 80%,
+			transparent
+		) !important;
+	}
+
+	.monaco-editor .sticky-widget,
+	.monaco-diff-editor .monaco-editor .sticky-widget {
+		background-color: color-mix(
+			in oklch,
+			var(--theme-secondary) 80%,
+			transparent
+		) !important;
+	}
+
+	.monaco-editor .sticky-widget:hover,
+	.monaco-diff-editor .monaco-editor .sticky-widget:hover {
+		background-color: color-mix(
+			in oklch,
+			var(--theme-secondary) 80%,
+			transparent
+		) !important;
+	}
+
 	ol,
 	ul,
 	menu {
