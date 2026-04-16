@@ -21,7 +21,7 @@
 | 可编辑性 | **仅左侧主编辑器**可编辑；Diff 区域整体 **只读**（不在 Diff 内改正文）。 |
 | 与「分屏」关系 | **「分屏」（左编右预览）**与**「分屏对照」（左编右 Diff）**在视图状态上 **互斥**：不会同时高亮「分屏」Tab 与对照模式；进入对照即离开「纯分屏+预览」语义。 |
 | 基线（baseline）来源 | 当前实现：用户**开启对照瞬间**，从主编辑器（或兜底 `value`）读取全文并 `normalizeMonacoEol` 后写入快照；**非**磁盘上次保存（若需要可由业务传入并替换该快照逻辑）。 |
-| 粘性滚动（sticky scroll） | 由外部参数控制是否开启；**主编辑器与 Diff 两侧**同步使用同一组参数（见 §14.5）。 |
+| 粘性滚动（sticky scroll） | 由外部参数控制是否开启；**主编辑器与 Diff 两侧**同步使用同一组参数（见 §15.5）。 |
 
 底部操作栏：在「预览」左侧增加 `GitCompare` 按钮，用于进入/退出 `splitDiff`。
 
@@ -269,10 +269,15 @@ const toggleMarkdownSplitDiffCompare = useCallback(() => {
       {viewMode === 'splitDiff' ? (
         <div ref={diffEditorHostRef}>
           <DiffEditor
+            // 关键：Diff 以 sessionId 组成独立 modelPath，避免 keepCurrent*Model 复用旧 TextModel 内容
+            key={`${diffModifiedModelPath}__${diffSessionId}`}
             original={diffBaselineOriginal}
             modified={splitDiffModifiedText}
             originalModelPath={diffOriginalModelPath}
             modifiedModelPath={diffModifiedModelPath}
+            // 关键：避免 monaco 0.55.1 下卸载时模型先 dispose、DiffEditorWidget 后 reset 的竞态报错
+            keepCurrentOriginalModel
+            keepCurrentModifiedModel
             options={mergedDiffEditorOptions} // readOnly: true 等
             onMount={handleDiffEditorMount}
           />
@@ -297,7 +302,7 @@ const toggleMarkdownSplitDiffCompare = useCallback(() => {
   diffBaselineSource="persisted"
   diffBaselineText={knowledgeStore.knowledgePersistedSnapshot.content}
 
-  // 2) 回收站入口：documentIdentity 拼接 nonce，确保每次 pick/clear 都会触发组件内部重置到 edit
+  // 2) 回收站入口：documentIdentity 拼接 nonce，确保每次 pick 都会触发组件内部重置到 edit
   documentIdentity={`${knowledgeStore.knowledgeEditingKnowledgeId ?? 'draft-new'}__trash-${trashOpenNonce}`}
 />
 ```
@@ -311,18 +316,69 @@ knowledgeStore.setKnowledgePersistedSnapshot({ title: '', content });
 knowledgeStore.setMarkdown(content);
 ```
 
-清空草稿时递增 nonce，避免残留在 splitDiff：
+清空草稿时无需再额外递增 nonce：
 
-```ts
-const resetEditorToNewDraft = () => {
-  knowledgeStore.clearKnowledgeDraft();
-  setTrashOpenNonce((n) => n + 1);
-};
-```
+- 组件内部在 `value === ''` 且处于 `splitDiff` 时会自动切回 `edit`（见 §12.4）
+- 同时 Diff 使用 session 化模型路径，不会因 keepCurrent*Model 复用旧内容（见 §12.3）
 
 ---
 
-## 12. 后续扩展建议
+## 12. Diff 清空时报错与“内容残留”的最终解法（monaco 0.55.1）
+
+### 12.1 现象
+
+在 `splitDiff` 模式下清空正文（例如知识库/回收站里点“清空”）时，部分场景会出现控制台报错：
+
+> `TextModel got disposed before DiffEditorWidget model got reset`
+
+同时，如果为规避报错而简单开启 `keepCurrentOriginalModel/keepCurrentModifiedModel`，又可能出现：
+
+- 清空后退出 Diff，再次进入 Diff：仍复用上一轮的 TextModel，导致 **Diff 内容残留/不正确**（尤其是回收站 `documentIdentity` 不变时更明显）
+
+### 12.2 根因（竞态 + 模型复用）
+
+- `@monaco-editor/react` 的 `DiffEditor` 在卸载（unmount）时默认可能 dispose 它创建/使用的 TextModel
+- Monaco 内部 `DiffEditorWidget` 存在异步的 model reset 流程
+- 当卸载与 reset 的时序交错：**模型先被 dispose**，而 widget 还没 reset → 抛错
+
+若开启 keepCurrent*Model：卸载时不 dispose，避免报错；但也因此 **同一 modelPath** 下的模型会被复用，造成“下一次进入 Diff 仍是旧内容”。
+
+### 12.3 最终策略：Diff 会话（session）+ 延迟 dispose
+
+本组件采用两步组合拳，保证“无报错 + 不残留 + 不泄漏内存”：
+
+1. **Diff 会话化（sessionId）**：每次进入 `splitDiff` 都 `diffSessionId + 1`，并把它拼进 `diffOriginalModelPath/diffModifiedModelPath`（`__s${diffSessionId}`），确保每次进入 Diff 都是全新 model。
+2. **keepCurrent*Model + 退出后双 rAF dispose**：保留 keepCurrent*Model 避免卸载竞态；退出 `splitDiff` 后用双 `requestAnimationFrame` 延迟 dispose 当次 session 的 original/modified model，等待 `DiffEditorWidget` 完成内部 reset 再释放。
+
+对应关键实现（伪码级摘录，语义与源码一致）：
+
+```ts
+// 进入 Diff：开启新 session，生成新的 modelPath，避免复用旧 TextModel
+setDiffSessionId((s) => s + 1);
+
+// modelPath = documentIdentity + sessionId
+const diffOriginalModelPath = `...__s${diffSessionId}`;
+const diffModifiedModelPath = `...__s${diffSessionId}`;
+
+// 卸载时保留模型，避免 dispose/reset 竞态
+<DiffEditor keepCurrentOriginalModel keepCurrentModifiedModel ... />
+
+// 退出 Diff：双 rAF 后 dispose 当次 session 的两个 model
+requestAnimationFrame(() => {
+  requestAnimationFrame(() => {
+    monaco.editor.getModel(Uri.parse(diffOriginalModelPath))?.dispose();
+    monaco.editor.getModel(Uri.parse(diffModifiedModelPath))?.dispose();
+  });
+});
+```
+
+### 12.4 额外体验：清空正文时强制退出 Diff
+
+为了让“清空”行为与知识库编辑器预期一致，组件内部在 `value === ''` 且处于 `splitDiff` 时会自动切回 `edit`。
+
+---
+
+## 13. 后续扩展建议
 
 1. **基线来自已保存版本**：增加可选 prop（如 `diffCompareBaseline?: string`），在开启 `splitDiff` 时优先用该字符串作为 `original`，无则仍用当前「点击瞬间快照」。
 2. **重新对齐基线**：在 `splitDiff` 工具栏增加「以当前内容为新的对照基准」按钮，仅更新 `diffBaselineOriginal` 而不退出模式。
@@ -330,7 +386,7 @@ const resetEditorToNewDraft = () => {
 
 ---
 
-## 13. 小结
+## 14. 小结
 
 - 用 **`splitDiff` 独立视图**表达「分屏对照」，与 **`split`（左编右预览）** 在状态机层面互斥，避免 Tab 语义与条件分支纠缠。
 - Diff 使用 **`DiffEditor` + `readOnly` + 外层宿主显式 layout**，与主编辑器 Tauri/WebView 布局策略一致。
@@ -338,11 +394,11 @@ const resetEditorToNewDraft = () => {
 
 ---
 
-## 14. 粘性滚动条（sticky scroll）背景与 CSS 覆盖
+## 15. 粘性滚动条（sticky scroll）背景与 CSS 覆盖
 
 本节说明：**为何**在玻璃主题 `defineTheme` 里直接写 `var()` / `color-mix` 或误用 `--theme-color` 会导致粘性条异常色；**最终方案**（`glassTheme.ts` + `index.css`）；以及与 **Diff 分栏内嵌双编辑器** 的关系。普通 Markdown 单栏编辑与 **splitDiff** 下 Diff 两侧子编辑器 **共用** 同一套全局 CSS，维护时一并考虑。
 
-### 14.1 什么是粘性滚动
+### 15.1 什么是粘性滚动
 
 在 Monaco（与 VS Code 同源）中，**粘性滚动（sticky scroll）** 指编辑长文件时，在视口顶部「钉住」当前所在的**外层语法块标题行**（如类名、函数名），便于始终知道上下文。对应 DOM 上常见类名为 **`.sticky-widget`**，主题里对应颜色键为：
 
@@ -353,31 +409,31 @@ const resetEditorToNewDraft = () => {
 
 Monaco 会把主题中的颜色写入编辑器 DOM 上的 **`--vscode-editorStickyScroll-background`** 等变量，由内部样式消费。
 
-### 14.2 本仓库中的目标
+### 15.2 本仓库中的目标
 
 - 编辑区整体为 **玻璃效果**（`editor.background` 等透明，透出外层 `bg-theme/5`），见 `glassTheme.ts`。
 - 粘性条需要 **与产品主题协调** 的可读底色，且随 **`body` / `.dark` 与各主题预设** 下的 CSS 变量变化。
 - **分屏 Diff**（`DiffEditor`）内左右各有一个内嵌 **`.monaco-editor`**，样式必须 **一并命中**（见下文 `index.css` 选择器），否则只有普通编辑器生效。
 
-### 14.3 走过的弯路（为何不要用 `defineTheme` 写 `var()` / `--theme-color`）
+### 15.3 走过的弯路（为何不要用 `defineTheme` 写 `var()` / `--theme-color`）
 
-#### 14.3.1 在 `defineTheme({ colors })` 里写 `var(--theme-color)` 或 `color-mix(...)`
+#### 15.3.1 在 `defineTheme({ colors })` 里写 `var(--theme-color)` 或 `color-mix(...)`
 
 `monaco.editor.defineTheme` 的 `colors` 值在很多版本里会走 **Monaco 自己的颜色解析管线**（用于与内置主题合并、生成内部 token）。**并非所有值都会原样变成浏览器里的 CSS**：
 
 - 若解析失败或走兜底路径，可能落到 **与预期不符的默认色**（实践中出现过 **偏红** 等与当前主题无关的观感）。
 - 因此：**不要把依赖「运行时 CSS 变量」的复杂字符串，当作唯一手段写在 `glassTheme` 的粘性键上**。
 
-#### 14.3.2 误用 `--theme-color` 作为「背景色」
+#### 15.3.2 误用 `--theme-color` 作为「背景色`
 
 在本项目 `index.css` 中，`--theme-color` 在**不同主题预设**下表示 **强调 / 品牌色**（高饱和、色相随主题变化），**不是**页面大面的「背景灰/底」。
 
 - 若粘性条大面积使用 `--theme-color`，在部分主题下会呈现 **明显偏红或其它高饱和色**，与「跟页面背景一致」的预期不符。
 - **背景系**应优先使用：`--theme-background`、`--theme-muted`、`--theme-secondary`、`--theme-card` 等（语义以 `index.css` 为准）。
 
-### 14.4 最终方案（双轨）
+### 15.4 最终方案（双轨）
 
-#### 14.4.1 `glassTheme.ts`：粘性键保持「可解析的透明实色」
+#### 15.4.1 `glassTheme.ts`：粘性键保持「可解析的透明实色」
 
 - **`editorStickyScroll.background` / `editorStickyScrollHover.background`** 设为 **`#00000000`（全透明）**。
 - 目的：与玻璃编辑区一致；**不在主题层引入不可解析字符串**；真实可见背景交给 **`index.css`**，由浏览器解析 `var()` / `color-mix`。
@@ -399,7 +455,7 @@ const GLASS_CHROME: Record<string, string> = {
 };
 ```
 
-#### 14.4.2 `index.css`：覆盖语义变量 + `.sticky-widget` 实背景
+#### 15.4.2 `index.css`：覆盖语义变量 + `.sticky-widget` 实背景
 
 文件：`apps/frontend/src/index.css`（挂在 `html, body { ... }` 内，与 `.monaco-editor .find-widget` 等同级）
 
@@ -462,11 +518,11 @@ const GLASS_CHROME: Record<string, string> = {
 }
 ```
 
-### 14.5 与 `options.ts` 的关系
+### 15.5 与 `options.ts` 的关系
 
 文件：`apps/frontend/src/components/design/Monaco/options.ts`
 
-#### 14.5.1 默认值 vs 组件外部覆盖
+#### 15.5.1 默认值 vs 组件外部覆盖
 
 - **`options.ts`** 提供 Monaco 通用默认配置，其中包含：
   - `stickyScroll: { enabled: true, scrollWithEditor: true }`
@@ -477,14 +533,14 @@ const GLASS_CHROME: Record<string, string> = {
   - 主编辑器：在 `mergedEditorOptions` 中覆盖 `stickyScroll`
   - Diff 编辑器：在 `mergedDiffEditorOptions` 中同步 `stickyScroll`，并对 `originalEditor` / `modifiedEditor` 两侧子编辑器显式同步，避免部分版本仅对顶层生效
 
-#### 14.5.2 背景色与开关的分离
+#### 15.5.2 背景色与开关的分离
 
 - **开关**由 `stickyScrollEnabled` 等 props / `stickyScroll` options 控制。
-- **背景色**由「主题透明 + `index.css` 覆盖 `--vscode-editorStickyScroll-*` / `.sticky-widget`」完成（见 §14.4）。
+- **背景色**由「主题透明 + `index.css` 覆盖 `--vscode-editorStickyScroll-*` / `.sticky-widget`」完成（见 §15.4）。
 
 若需关闭粘性滚动以规避极端场景 bug，可改 `enabled: false`；详见 `docs/monaco-markdown-ime-ghosting.md`。
 
-### 14.6 维护清单（粘性条）
+### 15.6 维护清单（粘性条）
 
 | 操作 | 建议 |
 |------|------|
@@ -493,7 +549,7 @@ const GLASS_CHROME: Record<string, string> = {
 | 升级 Monaco 大版本 | 抽查 DOM 是否仍使用 `.sticky-widget` 与 `--vscode-editorStickyScroll-*`。 |
 | 排查「仍是红/异常色」 | 查是否有别处对 `.sticky-widget` 或 `--vscode-editorStickyScroll-*` 更高优先级覆盖；用开发者工具看**计算后的 background**。 |
 
-### 14.7 小结（粘性条）
+### 15.7 小结（粘性条）
 
 - **`defineTheme` 的 `colors`**：粘性键用 **`#00000000`** 占位，**不写**依赖运行时 CSS 变量的字符串。  
 - **全局 CSS**：在 **`.monaco-editor` / `.monaco-diff-editor .monaco-editor`** 上覆盖 **`--vscode-editorStickyScroll-*`**，并给 **`.sticky-widget`** 写 **`background-color`**。  
@@ -501,7 +557,7 @@ const GLASS_CHROME: Record<string, string> = {
 
 ---
 
-## 15. 扩展阅读
+## 16. 扩展阅读
 
 - 分屏跟滚：`docs/monaco-markdown-split-scroll-sync.md`
 - Tauri / WebView 下 Monaco 显式布局：`docs/monaco-editor-tauri-layout.md`

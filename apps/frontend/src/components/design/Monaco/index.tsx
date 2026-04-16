@@ -4,6 +4,7 @@ import Editor, {
 	DiffEditor,
 	type DiffOnMount,
 	type OnMount,
+	useMonaco,
 } from '@monaco-editor/react';
 import { Button } from '@ui/index';
 import {
@@ -227,6 +228,9 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 		useState<MarkdownSplitScrollFollowMode>('none');
 	/** Diff 左侧（original）对照文本：进入 splitDiff 时从当前编辑器快照 */
 	const [diffBaselineOriginal, setDiffBaselineOriginal] = useState('');
+	/** Diff 会话 id：每次进入 splitDiff +1，用于生成独立模型路径，避免 keepCurrent*Model 复用陈旧文本 */
+	const [diffSessionId, setDiffSessionId] = useState(0);
+	const activeDiffSessionRef = useRef(0);
 	/** 底部 Markdown 操作条是否展开（受控或未传 props 时内部 state） */
 	const [internalMarkdownBottomBarOpen, setInternalMarkdownBottomBarOpen] =
 		useState(false);
@@ -304,13 +308,15 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 
 	const diffOriginalModelPath = useMemo(() => {
 		const id = String(documentIdentity).replace(/[^a-zA-Z0-9_-]/g, '_');
-		return `dnhyxc-md-diff-original__${id}`;
-	}, [documentIdentity]);
+		return `dnhyxc-md-diff-original__${id}__s${diffSessionId}`;
+	}, [documentIdentity, diffSessionId]);
 
 	const diffModifiedModelPath = useMemo(() => {
 		const id = String(documentIdentity).replace(/[^a-zA-Z0-9_-]/g, '_');
-		return `dnhyxc-md-diff-modified__${id}`;
-	}, [documentIdentity]);
+		return `dnhyxc-md-diff-modified__${id}__s${diffSessionId}`;
+	}, [documentIdentity, diffSessionId]);
+
+	const monaco = useMonaco();
 
 	/** 有正文时勿传占位文案，否则部分 Monaco 版本在失焦或未编辑时仍叠画「# 输入内容...」 */
 	const hasEditorBody = normalizeMonacoEol(value ?? '').trim().length > 0;
@@ -413,12 +419,66 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 		onChangeRef.current = onChange;
 	}, [onChange]);
 
+	// 清空正文时强制退出 Diff：避免 Diff 模式下“已清空但仍停留在对照视图”的残留体验，
+	// 同时降低 DiffEditor 卸载时 model dispose / reset 的竞态概率（monaco 0.55.1 可见报错）。
+	useEffect(() => {
+		if (viewMode !== 'splitDiff') return;
+		if (normalizeMonacoEol(value ?? '') !== '') return;
+		setViewMode('edit');
+	}, [viewMode, value]);
+
 	// 离开 splitDiff 时清空 baseline，避免残留到其它模式
 	useEffect(() => {
 		if (viewMode !== 'splitDiff') {
 			setDiffBaselineOriginal('');
 		}
 	}, [viewMode]);
+
+	/**
+	 * Diff 退出后延迟 dispose 上一会话的模型：
+	 * - 由于 DiffEditor 传了 keepCurrent*Model，会保留原/改两个 TextModel，避免卸载竞态报错
+	 * - 但若不手动释放，会导致下一次进入 Diff 复用旧 model（内容残留）或长期累积内存
+	 *
+	 * 处理方式：
+	 * - 进入 splitDiff 时记录 activeDiffSessionRef
+	 * - 退出 splitDiff 时 capture 当次 session 的 modelPath，并在双 rAF 后 dispose
+	 */
+	const prevViewModeRef = useRef<MarkdownViewMode>(viewMode);
+	useEffect(() => {
+		const prev = prevViewModeRef.current;
+		prevViewModeRef.current = viewMode;
+
+		if (viewMode === 'splitDiff') {
+			activeDiffSessionRef.current = diffSessionId;
+			return;
+		}
+		if (prev !== 'splitDiff') return;
+		if (!monaco) return;
+
+		const sessionId = activeDiffSessionRef.current;
+		const originalPath = diffOriginalModelPath;
+		const modifiedPath = diffModifiedModelPath;
+		// 双 rAF：等 DiffEditorWidget 完成内部 reset，再 dispose，避免 “disposed before reset” 竞态
+		requestAnimationFrame(() => {
+			requestAnimationFrame(() => {
+				if (activeDiffSessionRef.current !== sessionId) return;
+				try {
+					const o = monaco.editor.getModel(monaco.Uri.parse(originalPath));
+					const m = monaco.editor.getModel(monaco.Uri.parse(modifiedPath));
+					o?.dispose();
+					m?.dispose();
+				} catch {
+					// 忽略：路径解析或模型不存在时无需处理
+				}
+			});
+		});
+	}, [
+		viewMode,
+		monaco,
+		diffSessionId,
+		diffOriginalModelPath,
+		diffModifiedModelPath,
+	]);
 
 	// 换篇时退出分屏对照，避免沿用上一篇快照
 	useEffect(() => {
@@ -1057,6 +1117,8 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 			queueMicrotask(focusEditor);
 			return;
 		}
+		// 每次进入 Diff 都开一个新的 session：避免 keepCurrent*Model 复用上一轮的 TextModel 导致内容残留
+		setDiffSessionId((s) => s + 1);
 		/**
 		 * baseline 必须与「当前正文」同源，否则 Diff 会出现整体偏移（例如顶部多出空行导致全量变更）。
 		 *
@@ -1217,7 +1279,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 											className="box-border h-full min-h-0 min-w-0 max-w-full w-full overflow-hidden contain-[inline-size]"
 										>
 											<DiffEditor
-												key={diffModifiedModelPath}
+												key={`${diffModifiedModelPath}__${diffSessionId}`}
 												height="100%"
 												width="100%"
 												language={language}
@@ -1225,6 +1287,9 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 												modified={splitDiffModifiedText}
 												originalModelPath={diffOriginalModelPath}
 												modifiedModelPath={diffModifiedModelPath}
+												// 避免 DiffEditorWidget 在异步 reset 模型时，模型已先被 dispose（monaco 0.55.1 可见报错）
+												keepCurrentOriginalModel
+												keepCurrentModifiedModel
 												beforeMount={handleMonacoBeforeMount}
 												theme={glassThemeId}
 												onMount={handleDiffEditorMount}

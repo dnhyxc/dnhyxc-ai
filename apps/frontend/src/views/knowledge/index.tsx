@@ -97,8 +97,6 @@ const Knowledge = observer(() => {
 	/** 清空标题与正文（store 级草稿，与 markdown 一并清除） */
 	const resetEditorToNewDraft = useCallback(() => {
 		knowledgeStore.clearKnowledgeDraft();
-		// 清空时也强制触发一次 documentIdentity 变化，确保 MarkdownEditor 的视图状态（如 splitDiff）重置到 edit
-		setTrashOpenNonce((n) => n + 1);
 	}, [knowledgeStore]);
 
 	// 快捷键监听
