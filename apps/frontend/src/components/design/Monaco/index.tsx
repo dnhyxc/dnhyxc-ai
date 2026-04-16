@@ -299,7 +299,9 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 			isMarkdownDiffEntryEligible(value, diffBaselineSource, diffBaselineText),
 		[value, diffBaselineSource, diffBaselineText],
 	);
-	const markdownDiffToolbarDisabled = !markdownDiffEntryEligible;
+	/** 底部栏 Diff：可进入时显示；已进入 splitDiff 时也必须显示（用于退出对照） */
+	const markdownDiffBottomBarVisible =
+		markdownDiffEntryEligible || viewMode === 'splitDiff';
 
 	const monacoModelPath = useMemo(() => {
 		const lang = language.replace(/[^a-zA-Z0-9_-]/g, '_');
@@ -1359,30 +1361,27 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 									<FilePenLine size={18} strokeWidth={1.75} />
 								</button>
 							</Tooltip>
-							<Tooltip
-								content={
-									markdownDiffToolbarDisabled
-										? '正文为空且无对照基线：无法进入修改对照（Diff）'
-										: '分屏对照修改：左编右只读 Diff'
-								}
-							>
-								<button
-									type="button"
-									disabled={markdownDiffToolbarDisabled}
-									aria-disabled={markdownDiffToolbarDisabled}
-									className={cn(
-										markdownBarIconBtnClass(viewMode === 'splitDiff'),
-										markdownDiffToolbarDisabled
-											? 'cursor-not-allowed opacity-45'
-											: undefined,
-									)}
-									aria-pressed={viewMode === 'splitDiff'}
-									aria-label="开关分屏 Markdown 修改对照（Diff）"
-									onClick={toggleMarkdownSplitDiffCompare}
+							{markdownDiffBottomBarVisible ? (
+								<Tooltip
+									content={
+										viewMode === 'splitDiff'
+											? '关闭分屏对照：回到单栏编辑'
+											: '分屏对照修改：左编右只读 Diff'
+									}
 								>
-									<GitCompare size={18} strokeWidth={1.75} aria-hidden />
-								</button>
-							</Tooltip>
+									<button
+										type="button"
+										className={markdownBarIconBtnClass(
+											viewMode === 'splitDiff',
+										)}
+										aria-pressed={viewMode === 'splitDiff'}
+										aria-label="开关分屏 Markdown 修改对照（Diff）"
+										onClick={toggleMarkdownSplitDiffCompare}
+									>
+										<GitCompare size={18} strokeWidth={1.75} aria-hidden />
+									</button>
+								</Tooltip>
+							) : null}
 							<Tooltip content="预览渲染">
 								<button
 									type="button"

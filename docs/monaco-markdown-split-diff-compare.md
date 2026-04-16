@@ -23,7 +23,7 @@
 | 基线（baseline）来源 | 当前实现：用户**开启对照瞬间**，从主编辑器（或兜底 `value`）读取全文并 `normalizeMonacoEol` 后写入快照；**非**磁盘上次保存（若需要可由业务传入并替换该快照逻辑）。 |
 | 粘性滚动（sticky scroll） | 由外部参数控制是否开启；**主编辑器与 Diff 两侧**同步使用同一组参数（见 §15.5）。 |
 
-底部操作栏：在「预览」左侧增加 `GitCompare` 按钮，用于进入/退出 `splitDiff`。
+底部操作栏：在「预览」左侧提供 `GitCompare` 按钮，用于进入/退出 `splitDiff`；**仅当允许进入对照**（与 `isMarkdownDiffEntryEligible` 一致）**或当前已在 `splitDiff`** 时显示，否则隐藏（避免灰显禁用态）。
 
 ---
 
@@ -559,12 +559,12 @@ const GLASS_CHROME: Record<string, string> = {
 
 ## 16. 本轮补充：Diff 准入判定抽取、清空/换篇与回收站一致性
 
-本节记录**近期实现**中与本 Diff 能力强相关的两处改动思路，便于以后排查「按钮禁用与 toggle 不一致」「回收站清空仍卡在 splitDiff」等问题。
+本节记录**近期实现**中与本 Diff 能力强相关的两处改动思路，便于以后排查「底部栏显示与 toggle 不一致」「回收站清空仍卡在 splitDiff」等问题。
 
 ### 16.1 背景问题（为什么要动）
 
 1. **准入逻辑重复**  
-   「是否允许进入 `splitDiff`」与底部栏 `GitCompare` 是否 `disabled` 若在 JSX 与 `toggle` 回调里各写一遍，容易出现**条件漂移**（一边允许点、一边点了无效，或反之）。
+   「是否允许进入 `splitDiff`」与底部栏是否展示 `GitCompare`、以及 `toggle` 早退若在多处各写一遍，容易出现**条件漂移**（例如应隐藏却仍响应快捷键等边界）。
 
 2. **回收站清空不退出 Diff、知识库清空却可以**  
    根因通常**不在** `splitDiff` 内部「正文清空」那条 `useEffect` 本身，而在**知识库页**拼出来的 `documentIdentity`：  
@@ -573,7 +573,7 @@ const GLASS_CHROME: Record<string, string> = {
 
 ### 16.2 实现思路一：把「能否进入 Diff」抽成纯函数（单源规则）
 
-**目标**：同一套布尔规则驱动 **底部栏禁用** 与 **`toggleMarkdownSplitDiffCompare` 早退**，并可在业务页按需复用（不依赖 React）。
+**目标**：同一套布尔规则驱动 **底部栏 Diff 是否展示**（可进入对照或已在 `splitDiff` 时展示）与 **`toggleMarkdownSplitDiffCompare` 早退**，并可在业务页按需复用（不依赖 React）。
 
 **落点文件**：`apps/frontend/src/components/design/Monaco/utils.ts`
 
@@ -620,8 +620,8 @@ export function isMarkdownDiffToolbarDisabled(
 
 **`MarkdownEditor` 内用法（要点）**：
 
-- 用 `useMemo` 计算一次 `markdownDiffEntryEligible`，再派生 `markdownDiffToolbarDisabled = !markdownDiffEntryEligible`。  
-- `toggleMarkdownSplitDiffCompare` 在「进入」分支里仅判断 `if (!markdownDiffEntryEligible) return;`，与按钮 `disabled` 同源。  
+- 用 `useMemo` 计算一次 `markdownDiffEntryEligible`；底部栏用 `markdownDiffEntryEligible || viewMode === 'splitDiff'` 控制 **是否渲染** `GitCompare`（已在对照时必须保留按钮以便退出）。  
+- `toggleMarkdownSplitDiffCompare` 在「进入」分支里仅判断 `if (!markdownDiffEntryEligible) return;`，与展示条件同源。  
 - 底部栏 `GitCompare` 不再包一层 IIFE 重复计算。
 
 节选。
@@ -771,7 +771,7 @@ export function isMarkdownDiffToolbarDisabled(
 
 | 现象 | 优先排查 |
 |------|----------|
-| Diff 按钮可点但 toggle 不进 / 行为与禁用态不一致 | `index.tsx` 是否仍复用同一 `markdownDiffEntryEligible`；`utils.ts` 规则是否被改坏。 |
+| Diff 按钮显示与 toggle 行为不一致 | `index.tsx` 是否仍用同一 `markdownDiffEntryEligible`，且 `markdownDiffBottomBarVisible` 是否包含 `viewMode === 'splitDiff'`；`utils.ts` 规则是否被改坏。 |
 | 回收站清空不退出 Diff | `knowledge/index.tsx` 的 `resetEditorToNewDraft` 是否在清 store 前递增 `trashOpenNonce`；`documentIdentity` 是否仍拼接 nonce。 |
 | 回收站 Diff 左侧基线不对 | `handlePickTrashRecord` 写入的 `knowledgePersistedSnapshot` 是否与打开时 `content` 一致；`MarkdownEditor` 的 `diffBaselineText` 绑定是否仍指向 snapshot。 |
 | 业务侧想预判断能否开 Diff | 直接调用 `isMarkdownDiffEntryEligible`（或 `isMarkdownDiffToolbarDisabled`），传入与编辑器一致的 `normalizeMonacoEol` 前原文即可（函数内部会归一化）。 |
