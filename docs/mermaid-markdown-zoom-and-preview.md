@@ -2,6 +2,23 @@
 
 本文说明在应用内渲染 `mermaid` 围栏后，**工具栏缩放 / 平移**（可选模块）与**点击弹出 ImagePreview 大图预览**（当前前端已接入）的完整思路、DOM 约定、数据流与代码级注释。
 
+### 维护性补充：DOM 契约集中在 `@dnhyxc-ai/tools`
+
+**问题**：占位结构由 `MarkdownParser` 输出，但「取 SVG / closest wrap / 岛内写空壳 HTML / Tailwind 任意选择器」等逻辑历史上分散在前端与工具包各处；若用复制粘贴的 `querySelector('.markdown-mermaid-wrap …')` 字符串，**解析器一改 DOM**，很容易出现 **漏改**。
+
+**现状（与仓库实现一致）**：在 `packages/tools/src/mermaid-markdown-selectors.ts` 维护 **单一真源**，并由 `@dnhyxc-ai/tools` 主入口导出，例如：
+
+- **扫描渲染入口**：`MERMAID_MARKDOWN_ENTRY_SELECTOR`（供 `runMermaidInMarkdownRoot` 内部 `querySelectorAll` 使用）
+- **读已渲染 SVG**：`MERMAID_MARKDOWN_SVG_SELECTOR`（预览/下载）
+- **向上定位 wrap**：`closestMermaidMarkdownWrap`（点击委托；要求 **`data-mermaid="1"`**，比只匹配 class 更严格）
+- **空壳 HTML**：`MARKDOWN_MERMAID_PLACEHOLDER_HTML`（`MermaidFenceIsland` 离屏/宿主初始化）
+- **Tailwind**：`MARKDOWN_MERMAID_TAILWIND_CURSOR_ZOOM_IN_CLASS`（Monaco 预览 / 岛内 hover 光标）
+
+**文档入口**：更系统的 API 表与动机见 `docs/tools.md` **§11.2.1**；使用者速查见 `docs/tools-usage-guide.md` **§8.5**。
+
+**实现源码（每行行尾 `//` 中文注释）**：完整契约模块、`runMermaidInMarkdownRoot`、`patchMermaidFence` 节选、岛/Hook/工具栏节选，统一收录在 `docs/tools.md` **§11.2.2**。  
+下文 **§6** 的 Hook 示例块也已改为「行尾注释风格」，便于与 `apps/frontend/src/hooks/useMermaidImagePreview.tsx` 对照阅读。
+
 ---
 
 ## 1. 总体架构
@@ -15,7 +32,7 @@
 ```text
 Markdown 源码
     ↓
-MarkdownParser.patchMermaidFence → 占位 HTML（.markdown-mermaid-wrap + .mermaid）
+MarkdownParser.patchMermaidFence → 占位 HTML（wrap + `data-mermaid="1"` + `.mermaid`；契约常量见 `mermaid-markdown-selectors.ts`）
     ↓
 dangerouslySetInnerHTML 写入预览根节点
     ↓
@@ -450,16 +467,20 @@ export function mermaidSvgToPreviewDataUrl(svg: SVGElement): string | null {
 ## 6. Hooks：`useMermaidImagePreview` / `useMermaidDiagramClickPreview`（仓库：`apps/frontend/src/hooks/useMermaidImagePreview.tsx`）
 
 ```typescript
-import ImagePreview from '@design/ImagePreview'; // 全屏/弹层图片预览组件
+import ImagePreview from '@design/ImagePreview'; // 全屏/弹层图片预览组件（宿主 UI）
 import {
-	type ReactNode, // 模态节点类型
-	type RefObject, // React ref 类型
-	useCallback, // 稳定回调引用
-	useEffect, // 浏览器端绑定 click
-	useRef, // 保存最新 open 函数，避免 effect 频繁依赖变化
-	useState, // 预览用 data URL
+	closestMermaidMarkdownWrap, // 向上查找契约 wrap：含 data-mermaid="1"，避免仅 class 误匹配
+	MERMAID_ENTRY_SELECTOR, // `.mermaid`：拼接 `${MERMAID_ENTRY_SELECTOR} svg` 取主 SVG
+} from '@dnhyxc-ai/tools'; // 工具包主入口：与 MarkdownParser / mermaid-in-markdown 同源契约
+import {
+	type ReactNode, // 模态节点类型：ImagePreview 作为 ReactNode 挂到树中
+	type RefObject, // React ref 类型：委托根的 ref
+	useCallback, // 稳定回调引用：减少子组件不必要渲染
+	useEffect, // 浏览器端绑定 click：仅在 enabled 时注册
+	useRef, // 保存最新 open 函数：避免 effect 依赖 open 导致频繁解绑
+	useState, // 预览用 data URL：null 表示关闭
 } from 'react';
-import { mermaidSvgToPreviewDataUrl } from '@/utils/mermaidImagePreview'; // SVG → data URL
+import { mermaidSvgToPreviewDataUrl } from '@/utils/mermaidImagePreview'; // SVG → data URL：与下载管线复用序列化逻辑
 
 export type UseMermaidImagePreviewResult = {
 	openMermaidPreview: (dataUrl: string) => void; // 外部或委托逻辑调用以打开弹层
@@ -467,32 +488,32 @@ export type UseMermaidImagePreviewResult = {
 };
 
 export function useMermaidImagePreview(): UseMermaidImagePreviewResult {
-	const [previewUrl, setPreviewUrl] = useState<string | null>(null); // null 表示关闭
+	const [previewUrl, setPreviewUrl] = useState<string | null>(null); // null：弹层关闭；非 null：当前预览 data URL
 
 	const openMermaidPreview = useCallback((dataUrl: string) => {
-		setPreviewUrl(dataUrl); // 写入当前预览图 URL
-	}, []);
+		setPreviewUrl(dataUrl); // 外部（点击委托/工具栏）调用：写入预览 URL
+	}, []); // 无依赖：setState 稳定
 
 	const onPreviewVisibleChange = useCallback((visible: boolean) => {
-		if (!visible) setPreviewUrl(null); // 关闭时释放 URL，避免残留状态
+		if (!visible) setPreviewUrl(null); // 弹层关闭：清空 URL，避免下次打开残留旧图
 	}, []);
 
 	const onDownload = useCallback((image: { url: string }) => {
-		const a = document.createElement('a'); // 触发浏览器下载
-		a.href = image.url; // data URL 亦可下载为文件
-		a.download = 'mermaid-diagram.svg'; // 建议文件名
-		a.rel = 'noopener';
-		a.click();
+		const a = document.createElement('a'); // 传统下载触发器：兼容 Web 环境
+		a.href = image.url; // href 可为 data URL：浏览器会按 download 文件名落盘
+		a.download = 'mermaid-diagram.svg'; // 默认文件名：产品可改为带时间戳
+		a.rel = 'noopener'; // 安全：避免 target=_blank 类问题（此处虽为 download，仍保持习惯）
+		a.click(); // 程序化点击：立即触发下载
 	}, []);
 
 	const mermaidImagePreviewModal = (
 		<ImagePreview
-			visible={previewUrl !== null} // 有 URL 即显示
-			selectedImage={previewUrl ? { url: previewUrl } : { url: '' }} // 组件内部需非 undefined 时可给空串
-			onVisibleChange={onPreviewVisibleChange} // 与 Model 关闭联动
-			title="Mermaid 图表预览" // 标题文案
-			showPrevAndNext={false} // 单图无需切换
-			download={onDownload} // 使用 SVG 友好文件名
+			visible={previewUrl !== null} // 有 URL 即显示弹层
+			selectedImage={previewUrl ? { url: previewUrl } : { url: '' }} // ImagePreview 需要对象形态：无选中时给空串占位
+			onVisibleChange={onPreviewVisibleChange} // 弹层显隐：关闭时同步清空 previewUrl
+			title="Mermaid 图表预览" // 弹层标题：产品文案
+			showDownload // 展示下载按钮：走 onDownload（仓库实现内接 downloadMermaidPreviewSvg）
+			download={onDownload} // 下载回调：入参含 url（data URL / https 等）
 		/>
 	);
 
@@ -500,37 +521,39 @@ export function useMermaidImagePreview(): UseMermaidImagePreviewResult {
 }
 
 export function useMermaidDiagramClickPreview(
-	rootRef: RefObject<HTMLElement | null>, // 委托根：Monaco 预览 div 或 Mermaid 岛 host
-	openMermaidPreview: (dataUrl: string) => void, // 来自 useMermaidImagePreview
-	enabled: boolean, // 是否启用（如 enableMermaid）
-	rebindWhen: unknown, // html / code 等变化时重新绑定，确保 innerHTML 刷新后监听仍有效
+	rootRef: RefObject<HTMLElement | null>, // 委托根：Monaco 预览容器或 MermaidFenceIsland 的 host
+	openMermaidPreview: (dataUrl: string) => void, // 打开预览：通常来自 useMermaidImagePreview
+	enabled: boolean, // 是否启用点击预览：与 enableMermaid 等产品开关对齐
+	rebindWhen: unknown, // 重新绑定触发器：html/code 变化时 effect 重跑，避免旧监听挂在被替换 DOM 上
 ): void {
-	const openRef = useRef(openMermaidPreview);
-	openRef.current = openMermaidPreview; // 始终调用最新 open，无需把 open 放进 effect 依赖
+	const openRef = useRef(openMermaidPreview); // ref 保存最新回调：避免 effect 依赖 open 造成频繁解绑
+	openRef.current = openMermaidPreview; // 每次 render 写入最新函数指针
 
 	useEffect(() => {
-		if (!enabled) return; // 未启用 Mermaid 则不监听
-		const root = rootRef.current;
-		if (!root) return; // ref 未挂载
+		if (!enabled) return; // 未启用：不注册监听，避免无意义开销
+		const root = rootRef.current; // 取出当前委托根（可能随渲染变化）
+		if (!root) return; // ref 尚未挂载：跳过
 
 		const onClick = (e: MouseEvent) => {
-			const el = e.target as HTMLElement | null;
-			if (!el) return;
-			if (el.closest('.markdown-mermaid-zoom-chrome')) return; // 缩放工具栏点击不打开 ImagePreview
+			const el = e.target as HTMLElement | null; // 事件目标：可能是 svg/path/text 等
+			if (!el) return; // 无目标：忽略
+			if (el.closest('.markdown-mermaid-zoom-chrome')) return; // 缩放条区域：避免与预览手势冲突
 
-			const wrap = el.closest('.markdown-mermaid-wrap'); // 多图时定位到当前块
-			if (!wrap) return;
+			const wrap = closestMermaidMarkdownWrap(el); // 命中契约 wrap：同屏多图时定位到当前块
+			if (!wrap) return; // 不在 Mermaid 块内：忽略普通点击
 
-			const svg = wrap.querySelector('.mermaid svg') as SVGSVGElement | null; // Mermaid 输出多为 svg
-			if (!svg || !svg.contains(el)) return; // 必须点在 SVG 子树上
+			const svg = wrap.querySelector(
+				`${MERMAID_ENTRY_SELECTOR} svg`,
+			) as SVGSVGElement | null; // 取该块主 SVG：与 MERMAID_MARKDOWN_SVG_SELECTOR 等价（wrap 已确定）
+			if (!svg || !svg.contains(el)) return; // 必须点击发生在 SVG 子树：避免点到 wrap 空白触发预览
 
-			const url = mermaidSvgToPreviewDataUrl(svg);
-			if (url) openRef.current(url);
+			const url = mermaidSvgToPreviewDataUrl(svg); // 序列化为 data URL
+			if (url) openRef.current(url); // 打开弹层预览
 		};
 
-		root.addEventListener('click', onClick);
-		return () => root.removeEventListener('click', onClick);
-	}, [enabled, rebindWhen, rootRef]);
+		root.addEventListener('click', onClick); // 捕获阶段默认 false：在冒泡阶段处理即可
+		return () => root.removeEventListener('click', onClick); // 卸载或依赖变化：移除监听，防泄漏
+	}, [enabled, rebindWhen, rootRef]); // 依赖：enabled/rebind 变化需要重绑；rootRef 对象 identity 稳定即可
 }
 ```
 

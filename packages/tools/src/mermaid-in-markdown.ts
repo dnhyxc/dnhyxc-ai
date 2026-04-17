@@ -1,4 +1,5 @@
 import mermaid from 'mermaid';
+import { queryMermaidMarkdownEntryNodes } from './mermaid-markdown-selectors.js';
 
 /** 避免多处同时 `mermaid.run` 打乱内部状态 */
 let runQueue: Promise<void> = Promise.resolve();
@@ -36,9 +37,7 @@ export async function runMermaidInMarkdownRoot(
 
 	const task = async (): Promise<void> => {
 		// 从 root 全子树收集，避免 shell 内多个 `.markdown-body`（正文 + 思考区）时只命中第一个
-		const nodes = root.querySelectorAll<HTMLElement>(
-			'.markdown-mermaid-wrap[data-mermaid="1"] .mermaid',
-		);
+		const nodes = queryMermaidMarkdownEntryNodes(root);
 		if (nodes.length === 0) return;
 
 		try {

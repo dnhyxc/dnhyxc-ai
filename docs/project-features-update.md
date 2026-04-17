@@ -110,6 +110,10 @@
 
 **文档**：[`mermaid-markdown-zoom-and-preview.md`](./mermaid-markdown-zoom-and-preview.md)
 
+- **Mermaid 占位 DOM 契约（选择器/HTML 片段）收口**：`packages/tools/src/mermaid-markdown-selectors.ts` 集中导出 **`MERMAID_MARKDOWN_*`**、`closestMermaidMarkdownWrap`、`MARKDOWN_MERMAID_PLACEHOLDER_HTML` 等，与 **`MarkdownParser.patchMermaidFence`**、**`runMermaidInMarkdownRoot`**、前端岛/工具栏/预览 **同源**，避免业务侧散落 `.markdown-mermaid-wrap` 字符串难维护。
+
+**文档**：[`tools.md`](./tools.md) **§11.2.1**（动机与 API 表）、**§11.2.2**（**带行尾 `//` 中文注释** 的实现源码摘录：契约模块 / `runMermaidInMarkdownRoot` / `patchMermaidFence` 节选 / 岛与 Hook 与工具栏节选）；[`tools-usage-guide.md`](./tools-usage-guide.md) **§8.5**（使用者示例，同样行尾注释）
+
 - **Mermaid 围栏工具条**：`sticky` + 哨兵 `IntersectionObserver` 双态样式；与代码块 Portal 吸顶方案差异；下载 SVG/DSL；Monaco 预览侧对齐。
 
 **文档**：[`mermaid-fence-toolbar-sticky.md`](./mermaid-fence-toolbar-sticky.md)

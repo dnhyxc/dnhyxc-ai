@@ -54,7 +54,7 @@ pnpm --filter @dnhyxc-ai/tools run build
 
 | 导入路径                                       | 用途                                                                          |
 | ---------------------------------------------- | ----------------------------------------------------------------------------- |
-| `@dnhyxc-ai/tools`                             | 主入口：`MarkdownParser`、主题 API、样式元数据                                |
+| `@dnhyxc-ai/tools`                             | 主入口：`MarkdownParser`、主题 API、样式元数据；以及 **Mermaid 占位 DOM 契约**相关常量/helper（如 `MERMAID_MARKDOWN_ENTRY_SELECTOR`、`closestMermaidMarkdownWrap` 等，见 **§8.5**） |
 | `@dnhyxc-ai/tools/react`                       | React 侧 Mermaid 渲染：`useMermaidInMarkdownRoot`、`runMermaidInMarkdownRoot` |
 | `@dnhyxc-ai/tools/styles.css`                  | 一次引入正文 + KaTeX + 默认高亮主题                                           |
 | `@dnhyxc-ai/tools/markdown-base.css`           | 仅正文 + KaTeX，不含完整 hljs 配色                                            |
@@ -497,6 +497,44 @@ await runMermaidInMarkdownRoot(document.getElementById("preview-root"), {
 - 或本仓库中的 `splitMarkdownFences` + `StreamingMarkdownBody` 方案
 
 更完整说明见 `docs/tools.md`。
+
+### 8.5 Mermaid：不要手写 `.markdown-mermaid-wrap …` 选择器（推荐）
+
+**背景**：Mermaid 占位结构由 `MarkdownParser` / 前端岛共同约定（wrap + `data-mermaid="1"` + 内层 `.mermaid`）。若业务代码到处 `querySelector('.markdown-mermaid-wrap .mermaid')`，未来调整 DOM 时很容易漏改。
+
+**推荐做法**：从 **`@dnhyxc-ai/tools`** 直接 import 契约常量/helper（与解析器、运行时扫描 **同源**）。
+
+**完整实现源码（每行行尾 `//` 中文注释）**：见 `docs/tools.md` **§11.2.2**（工具包 + 前端岛 + Hook + 工具栏节选）。
+
+下面示例同样采用 **行尾注释**（便于复制到业务代码后仍可读）：
+
+```ts
+import {
+	MERMAID_MARKDOWN_SVG_SELECTOR, // 已渲染 SVG：`.markdown-mermaid-wrap[data-mermaid="1"] .mermaid svg`
+	MERMAID_MARKDOWN_ENTRY_SELECTOR, // mermaid.run 扫描入口选择器字符串（调试用 / 动态样式等）
+	closestMermaidMarkdownWrap, // 从任意元素向上找契约 wrap（含 data-mermaid="1"）
+	MERMAID_ENTRY_SELECTOR, // `.mermaid`：用于在已知 wrap 内拼 `${MERMAID_ENTRY_SELECTOR} svg`
+	MARKDOWN_MERMAID_PLACEHOLDER_HTML, // 空壳占位 HTML：与解析器输出同构
+	MARKDOWN_MERMAID_TAILWIND_CURSOR_ZOOM_IN_CLASS, // Tailwind arbitrary class：cursor-zoom-in
+} from "@dnhyxc-ai/tools"; // 主入口聚合导出：避免业务侧散落选择器字符串
+
+// 示例 1：在某个 scope 根下取已渲染 SVG（预览/下载）
+const svg = scope.querySelector(MERMAID_MARKDOWN_SVG_SELECTOR); // 等价于手写长选择器，但随工具包契约自动更新
+
+// 示例 2：点击委托：从事件目标向上找 wrap（要求带 data-mermaid="1"）
+const wrap = closestMermaidMarkdownWrap(target); // 比 closest('.markdown-mermaid-wrap') 更严格，避免误命中半截 DOM
+const svg2 = wrap?.querySelector(`${MERMAID_ENTRY_SELECTOR} svg`); // 在 wrap 内取 svg：与 MERMAID_MARKDOWN_SVG_SELECTOR 语义一致（仅前缀不同）
+
+// 示例 3：初始化空壳 DOM（岛内/离屏），避免手写 HTML 字符串
+host.innerHTML = MARKDOWN_MERMAID_PLACEHOLDER_HTML; // innerHTML 一次性写入 wrap>.mermaid 结构
+
+// 示例 4：Tailwind 任意选择器（cursor），避免手写 [&_.…_.…] 拼错
+const cls = MARKDOWN_MERMAID_TAILWIND_CURSOR_ZOOM_IN_CLASS; // 直接拼进 className={cn(...)} 即可
+```
+
+**边界**：若你自行拼接 Mermaid DOM，请确保与 **`MERMAID_MARKDOWN_ENTRY_SELECTOR`** 一致；尤其是 **`data-mermaid="1"`** 缺失会导致扫描/预览取图失败。
+
+**更完整的架构说明**：`docs/tools.md` **§11.2.1**、`docs/mermaid-markdown-zoom-and-preview.md`。
 
 ---
 

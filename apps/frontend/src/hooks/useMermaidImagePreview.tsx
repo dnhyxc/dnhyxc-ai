@@ -1,5 +1,9 @@
 import ImagePreview from '@design/ImagePreview';
 import {
+	closestMermaidMarkdownWrap,
+	MERMAID_ENTRY_SELECTOR,
+} from '@dnhyxc-ai/tools';
+import {
 	type ReactNode,
 	type RefObject,
 	useCallback,
@@ -56,8 +60,8 @@ export function useMermaidImagePreview(): UseMermaidImagePreviewResult {
 }
 
 /**
- * 在 `root` 子树内委托点击：命中某块 `.markdown-mermaid-wrap` 内的 SVG 时打开预览。
- * 使用 `closest('.markdown-mermaid-wrap')`，同一根下多块 Mermaid 也能区分。
+ * 在 `root` 子树内委托点击：命中某块 Mermaid 包裹容器（wrap）内的 SVG 时打开预览。
+ * 使用 {@link closestMermaidMarkdownWrap}，同一根下多块 Mermaid 也能区分。
  *
  * @param rebindWhen 变化时重新绑定（如预览 html、岛 code），避免 ref 或 innerHTML 更新后未挂上监听
  */
@@ -80,10 +84,12 @@ export function useMermaidDiagramClickPreview(
 			if (!el) return;
 			if (el.closest('.markdown-mermaid-zoom-chrome')) return;
 
-			const wrap = el.closest('.markdown-mermaid-wrap');
+			const wrap = closestMermaidMarkdownWrap(el);
 			if (!wrap) return;
 
-			const svg = wrap.querySelector('.mermaid svg') as SVGSVGElement | null;
+			const svg = wrap.querySelector(
+				`${MERMAID_ENTRY_SELECTOR} svg`,
+			) as SVGSVGElement | null;
 			if (!svg || !svg.contains(el)) return;
 
 			const url = mermaidSvgToPreviewDataUrl(svg);

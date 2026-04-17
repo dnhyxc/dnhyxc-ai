@@ -7,6 +7,7 @@
 import {
 	createMarkdownCodeFenceInfo,
 	downloadMarkdownCodeFenceWith,
+	MERMAID_MARKDOWN_SVG_SELECTOR,
 } from '@dnhyxc-ai/tools';
 import { Button } from '@ui/index';
 import { CheckCircle, Code2, Copy, Download, Eye } from 'lucide-react';
@@ -155,7 +156,7 @@ export function MermaidFenceToolbarActions({
 				`[data-mermaid-preview-scope="${blockId}"]`,
 			);
 			if (!scope) return;
-			const svg = scope.querySelector('.markdown-mermaid-wrap .mermaid svg');
+			const svg = scope.querySelector(MERMAID_MARKDOWN_SVG_SELECTOR);
 			if (!(svg instanceof SVGElement)) return;
 			const url = mermaidSvgToPreviewDataUrl(svg);
 			if (url) openMermaidPreview(url);
@@ -177,7 +178,7 @@ export function MermaidFenceToolbarActions({
 					`[data-mermaid-preview-scope="${blockId}"]`,
 				);
 				if (!scope) return;
-				const svg = scope.querySelector('.markdown-mermaid-wrap .mermaid svg');
+				const svg = scope.querySelector(MERMAID_MARKDOWN_SVG_SELECTOR);
 				if (!(svg instanceof SVGElement)) return;
 				const url = mermaidSvgToPreviewDataUrl(svg);
 				if (!url) return;

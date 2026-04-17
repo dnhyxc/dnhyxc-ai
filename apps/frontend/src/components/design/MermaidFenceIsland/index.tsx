@@ -11,7 +11,13 @@
  * - 流式阶段对提交做强合并（节流 + 字符增量阈值 + 最大等待），减少频繁替换 SVG 带来的闪烁感
  */
 
-import { normalizeMermaidFenceBody } from '@dnhyxc-ai/tools';
+import {
+	MARKDOWN_MERMAID_PLACEHOLDER_HTML,
+	MARKDOWN_MERMAID_TAILWIND_CURSOR_ZOOM_IN_CLASS,
+	MERMAID_ENTRY_SELECTOR,
+	normalizeMermaidFenceBody,
+	queryFirstMermaidMarkdownWrap,
+} from '@dnhyxc-ai/tools';
 import { runMermaidInMarkdownRoot } from '@dnhyxc-ai/tools/react';
 import { memo, useLayoutEffect, useRef } from 'react';
 import { useMermaidDiagramClickPreview } from '@/hooks/useMermaidImagePreview';
@@ -80,18 +86,15 @@ export const MermaidFenceIsland = memo(function MermaidFenceIsland({
 		const host = hostRef.current;
 		if (!host) return;
 
-		// 真实 DOM：只创建一次 wrap，后续仅替换 .mermaid 内容
-		let wrap = host.querySelector(
-			'.markdown-mermaid-wrap[data-mermaid="1"]',
-		) as HTMLElement | null;
+		// 真实 DOM：只创建一次 wrap，后续仅替换 `.mermaid`（Mermaid 入口）内容
+		let wrap = queryFirstMermaidMarkdownWrap(host);
 		if (!wrap) {
-			host.innerHTML =
-				'<div class="markdown-mermaid-wrap" data-mermaid="1"><div class="mermaid"></div></div>';
-			wrap = host.querySelector(
-				'.markdown-mermaid-wrap[data-mermaid="1"]',
-			) as HTMLElement | null;
+			host.innerHTML = MARKDOWN_MERMAID_PLACEHOLDER_HTML;
+			wrap = queryFirstMermaidMarkdownWrap(host);
 		}
-		const inner = wrap?.querySelector('.mermaid') as HTMLElement | null;
+		const inner = wrap?.querySelector(
+			MERMAID_ENTRY_SELECTOR,
+		) as HTMLElement | null;
 		if (!wrap || !inner) return;
 
 		const dsl = normalizeMermaidFenceBody(code);
@@ -125,10 +128,9 @@ export const MermaidFenceIsland = memo(function MermaidFenceIsland({
 			if (runId !== genRef.current) return;
 
 			const stageHost = document.createElement('div');
-			stageHost.innerHTML =
-				'<div class="markdown-mermaid-wrap" data-mermaid="1"><div class="mermaid"></div></div>';
+			stageHost.innerHTML = MARKDOWN_MERMAID_PLACEHOLDER_HTML;
 			const stageInner = stageHost.querySelector(
-				'.mermaid',
+				MERMAID_ENTRY_SELECTOR,
 			) as HTMLElement | null;
 			if (!stageInner) return;
 			stageInner.textContent = dsl;
@@ -222,7 +224,7 @@ export const MermaidFenceIsland = memo(function MermaidFenceIsland({
 			ref={hostRef}
 			className={cn(
 				'mermaid-island-root w-full',
-				previewEnabled && '[&_.markdown-mermaid-wrap_.mermaid]:cursor-zoom-in',
+				previewEnabled && MARKDOWN_MERMAID_TAILWIND_CURSOR_ZOOM_IN_CLASS,
 				className,
 			)}
 		/>

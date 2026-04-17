@@ -8,6 +8,12 @@ import markdownItKatex from 'markdown-it-katex';
 import markdownItTaskLists from 'markdown-it-task-lists';
 import type { HighlightJsThemeId } from './generated/highlight-js-theme-ids.js';
 import { applyHighlightJsTheme } from './inject-highlight-theme.js';
+import {
+	MARKDOWN_MERMAID_WRAP_CLASS,
+	MARKDOWN_MERMAID_WRAP_DATA_ATTR,
+	MARKDOWN_MERMAID_WRAP_DATA_VALUE,
+	MERMAID_ENTRY_CLASS,
+} from './mermaid-markdown-selectors.js';
 
 function taskListAttrSet(token: Token, name: string, value: string): void {
 	const index = token.attrIndex(name);
@@ -456,8 +462,8 @@ class MarkdownParser {
 					normalizeMermaidFenceBody(token.content),
 				);
 				return (
-					'<div class="markdown-mermaid-wrap" data-mermaid="1">' +
-					'<div class="mermaid">' +
+					`<div class="${MARKDOWN_MERMAID_WRAP_CLASS}" ${MARKDOWN_MERMAID_WRAP_DATA_ATTR}="${MARKDOWN_MERMAID_WRAP_DATA_VALUE}">` +
+					`<div class="${MERMAID_ENTRY_CLASS}">` +
 					body +
 					'</div></div>\n'
 				);

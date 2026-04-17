@@ -36,6 +36,22 @@ export {
 	normalizeMermaidFenceBody,
 } from './markdown-parser.js';
 export {
+	closestMermaidMarkdownWrap,
+	MARKDOWN_MERMAID_PLACEHOLDER_HTML,
+	MARKDOWN_MERMAID_TAILWIND_CURSOR_ZOOM_IN_CLASS,
+	MARKDOWN_MERMAID_WRAP_CLASS,
+	MARKDOWN_MERMAID_WRAP_DATA_ATTR,
+	MARKDOWN_MERMAID_WRAP_DATA_VALUE,
+	MARKDOWN_MERMAID_WRAP_SELECTOR,
+	MERMAID_ENTRY_CLASS,
+	MERMAID_ENTRY_SELECTOR,
+	MERMAID_MARKDOWN_ENTRY_SELECTOR,
+	MERMAID_MARKDOWN_SVG_SELECTOR,
+	queryFirstMermaidMarkdownEntryNode,
+	queryFirstMermaidMarkdownWrap,
+	queryMermaidMarkdownEntryNodes,
+} from './mermaid-markdown-selectors.js';
+export {
 	defaultHighlightJsThemeId,
 	highlightJsThemeIds,
 	highlightJsThemes,

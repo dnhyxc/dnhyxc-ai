@@ -28,7 +28,7 @@ Mermaid 工具条**没有**复用该套机制，主要考虑：
 
 1. **注册成本**：Portal 方案需要把每块 mermaid 纳入同一套 pin/slot 布局或另开一套 store；Mermaid 块无 **`data-chat-code-block`** 结构，硬接会扩大 `chatCodeToolbar` 职责。
 2. **sticky 在 Viewport 内可用**：聊天列表的滚动节点是 Radix **`ScrollAreaPrimitive.Viewport`**（`data-slot="scroll-area-viewport"`）。**`sticky`** 的滚动容器正是该 viewport 时，**在滚动子树内即可正确粘顶**，无需挂 body。
-3. **流式与预览 DOM**：预览按钮依赖 **`data-mermaid-preview-scope`** 下 **`.markdown-mermaid-wrap .mermaid svg`**。工具条留在同一 React 子树内，**`closest` 查询范围不变**；若改为独立 Portal，需额外传 ref/坐标，易错。
+3. **流式与预览 DOM**：预览/下载在 **`data-mermaid-preview-scope`** 作用域内，通过 **`MERMAID_MARKDOWN_SVG_SELECTOR`**（由 **`@dnhyxc-ai/tools`** 的 **`mermaid-markdown-selectors.ts`** 统一导出，等价于 **`.markdown-mermaid-wrap[data-mermaid="1"] .mermaid svg`**）定位已渲染 SVG。工具条留在同一 React 子树内，**`closest` 查询范围不变**；若改为独立 Portal，需额外传 ref/坐标，易错。
 
 因此采用 **纯 CSS `sticky` + 轻量 JS 仅用于切换 class**，与 **`MermaidFenceIsland`** 解耦。
 
@@ -120,6 +120,7 @@ children(mode)：图表模式 → MermaidFenceIsland（code / isStreaming 由宿
 | `apps/frontend/src/utils/index.ts`（`downloadBlob`）                                 | 代码模式导出纯文本；与 Tauri / Web 下载管线一致。                                                                                                       |
 | `apps/frontend/src/components/design/ChatAssistantMessage/StreamingMarkdownBody.tsx` | `renderMermaidPart` 内 **`MermaidFenceToolbarActions`** + **`children(mode)`** 挂载 Island / fallback。                                                 |
 | `apps/frontend/src/components/design/MermaidFenceIsland/index.tsx`                   | 离屏渲染与流式提交逻辑（本功能未改其行为）。                                                                                                            |
+| `packages/tools/src/mermaid-markdown-selectors.ts`                                   | **Mermaid 占位 DOM 契约**：wrap / `data-mermaid` / `.mermaid` / SVG 选择器等 **集中导出**；解析器、**`runMermaidInMarkdownRoot`**、前端岛/工具栏/预览 **同源**（详见 `docs/tools.md` **§11.2.1**）。 |
 | `apps/frontend/src/components/design/ChatCodeToolBar/index.tsx`                      | 浮动代码条样式参照。                                                                                                                                    |
 | `apps/frontend/src/components/ui/scroll-area.tsx`                                    | Viewport 上 `data-slot="scroll-area-viewport"` 与 ref 转发。                                                                                            |
 | `apps/frontend/src/components/design/Monaco/preview.tsx`                             | `ParserMarkdownPreviewPane`：`renderMermaidPreviewPart` 与聊天侧一致组装 **`MermaidFenceToolbarActions`** + **`children(mode)`**（知识库 / 分屏预览）。 |
@@ -128,7 +129,8 @@ children(mode)：图表模式 → MermaidFenceIsland（code / isStreaming 由宿
 
 ## 9. 完整实现代码（`MermaidFenceToolbar/index.tsx`）
 
-> **与仓库对齐**：以下 **§9.1** 为 **`MermaidFenceToolbar` + `MermaidFenceToolbarActions`** 单文件全文。若与当前分支不一致，以 **`apps/frontend/src/components/design/MermaidFenceToolbar/index.tsx`** 为准。
+> **与仓库对齐**：以下 **§9.1** 为 **`MermaidFenceToolbar` + `MermaidFenceToolbarActions`** 单文件全文。若与当前分支不一致，以 **`apps/frontend/src/components/design/MermaidFenceToolbar/index.tsx`** 为准。  
+> **维护提示**：Mermaid 相关 **`querySelector` 选择器字符串** 已收口到 **`@dnhyxc-ai/tools`**（如 **`MERMAID_MARKDOWN_SVG_SELECTOR`**）；本文摘录若与源码有细微差异，**一律以源码 + `docs/tools.md` §11.2.1 为准**。
 
 ### 9.1 源文件全文
 
@@ -138,6 +140,11 @@ children(mode)：图表模式 → MermaidFenceIsland（code / isStreaming 由宿
  * 设计背景、哨兵 + IntersectionObserver 约定及与 Portal 方案对比见仓库根目录文档：
  * `docs/mermaid-fence-toolbar-sticky.md`
  */
+import {
+	createMarkdownCodeFenceInfo,
+	downloadMarkdownCodeFenceWith,
+	MERMAID_MARKDOWN_SVG_SELECTOR,
+} from "@dnhyxc-ai/tools";
 import { Button } from "@ui/index";
 import { CheckCircle, Code2, Copy, Download, Eye } from "lucide-react";
 import {
@@ -285,7 +292,7 @@ export function MermaidFenceToolbarActions({
 				`[data-mermaid-preview-scope="${blockId}"]`,
 			);
 			if (!scope) return;
-			const svg = scope.querySelector(".markdown-mermaid-wrap .mermaid svg");
+			const svg = scope.querySelector(MERMAID_MARKDOWN_SVG_SELECTOR);
 			if (!(svg instanceof SVGElement)) return;
 			const url = mermaidSvgToPreviewDataUrl(svg);
 			if (url) openMermaidPreview(url);
@@ -296,7 +303,7 @@ export function MermaidFenceToolbarActions({
 	/**
 	 * 下载：与当前 `mode` 一致。
 	 * - diagram：与 `onPreview` 相同路径取 SVG → `mermaidSvgToPreviewDataUrl` → `downloadMermaidPreviewSvg`（Web/Tauri 统一 `downloadBlob`）。
-	 * - code：仅 DSL 文本，扩展名 `.mmd` 表示单文件 Mermaid 源码（见 `docs/mermaid-fence-toolbar-sticky.md` §13.2）。
+	 * - code：仅 DSL 文本，扩展名 `.mmd` 表示单文件 Mermaid 源码（见 `docs/mermaid-fence-toolbar-sticky.md` §13.2）；走 **`createMarkdownCodeFenceInfo` + `downloadMarkdownCodeFenceWith`** 与代码块下载管线对齐。
 	 */
 	const onDownload = useCallback(
 		async (e: ReactMouseEvent<HTMLButtonElement>) => {
@@ -307,7 +314,7 @@ export function MermaidFenceToolbarActions({
 					`[data-mermaid-preview-scope="${blockId}"]`,
 				);
 				if (!scope) return;
-				const svg = scope.querySelector(".markdown-mermaid-wrap .mermaid svg");
+				const svg = scope.querySelector(MERMAID_MARKDOWN_SVG_SELECTOR);
 				if (!(svg instanceof SVGElement)) return;
 				const url = mermaidSvgToPreviewDataUrl(svg);
 				if (!url) return;
@@ -315,17 +322,21 @@ export function MermaidFenceToolbarActions({
 				return;
 			}
 			// 代码模式：与「复制」不同，此处只存围栏内正文，便于直接粘贴进 Mermaid Live / 编辑器
-			const blob = new Blob([mermaidCode], {
-				type: "text/plain;charset=utf-8",
+			const info = createMarkdownCodeFenceInfo({
+				code: mermaidCode,
+				lang: "mermaid",
+				filename: `mermaid-${stamp}.mmd`,
 			});
-			await downloadBlob(
-				{
-					file_name: `mermaid-${stamp}.mmd`,
-					id: `mermaid-md-${stamp}`,
-					overwrite: true,
-				},
-				blob,
-			);
+			await downloadMarkdownCodeFenceWith(info, async (task) => {
+				await downloadBlob(
+					{
+						file_name: task.filename,
+						id: `mermaid-md-${stamp}`,
+						overwrite: true,
+					},
+					task.blob,
+				);
+			});
 		},
 		[blockId, mode, mermaidCode],
 	);
@@ -404,7 +415,7 @@ export function MermaidFenceToolbarActions({
 | 90–104  | 类型与 JSDoc                             | **`children: (mode) => ReactNode`**：宿主只根据 \*\*`diagram                                                                                                                                                                                                           | code`** 渲染岛或 fallback HTML；**`resetKey`**：Monaco 换篇时复位 **`mode`/`copied`\*\*。 |
 | 117–128 | `useEffect([resetKey, defaultViewMode])` | 与 **`openMermaidPreview`** 无关的重置：避免上一文档的复制态泄漏。                                                                                                                                                                                                     |
 | 130–144 | `toggle` / `onCopy`                      | **`onCopy`** 用 **` ```mermaid `** 包裹 DSL；**`void (async () => { … })()`** 显式忽略 Promise；定时器清 **`copied`**。                                                                                                                                                |
-| 146–159 | `onPreview`                              | 自 **`e.currentTarget`** **`closest`** 到 **`data-mermaid-preview-scope="${blockId}"`**，再 **`querySelector('.markdown-mermaid-wrap .mermaid svg')`**；**`mermaidSvgToPreviewDataUrl`** → **`openMermaidPreview`**。                                                  |
+| 146–159 | `onPreview`                              | 自 **`e.currentTarget`** **`closest`** 到 **`data-mermaid-preview-scope="${blockId}"`**，再 **`scope.querySelector(MERMAID_MARKDOWN_SVG_SELECTOR)`**（**`@dnhyxc-ai/tools`** 导出，等价历史 **`.markdown-mermaid-wrap[data-mermaid="1"] .mermaid svg`**）；**`mermaidSvgToPreviewDataUrl`** → **`openMermaidPreview`**。 |
 | 161–194 | `onDownload` JSDoc + 实现                | **diagram**：与预览同路径取 SVG → **`downloadMermaidPreviewSvg`**；**code**：**`Blob`** + **`downloadBlob`**，文件名 **`mermaid-${stamp}.mmd`**（约定见 **§13.2**）。                                                                                                  |
 | 197–244 | JSX                                      | 根 **`data-mermaid-preview-scope`** + **`mt-4.5`**；内层 **`MermaidFenceToolbar`**；预览钮 **`disabled={mode !== 'diagram'}`**；下载钮 **`onClick={(e) => void onDownload(e)}`** 满足 **`async`** 处理器且避免 floating promise 告警；**`{/* void：… */}`** 说明意图。 |
 | 243     | `{children(mode)}`                       | 与工具条 **同 scope 兄弟**，保证预览/下载在 diagram 模式下能查到已挂载的 SVG。                                                                                                                                                                                         |
@@ -702,9 +713,9 @@ mermaid 段 → renderMermaidPreviewPart → MermaidFenceToolbarActions（内含
 | 规则               | 说明                                                                                                                                                                                                                                                                                   |
 | ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 与展示模式绑定     | **`mode === 'diagram'`**（用户看到的是图表 / SVG）时，下载 **当前 DOM 中已渲染的 SVG**；**`mode === 'code'`** 时，下载 **围栏内 DSL 字符串**（与 prop **`mermaidCode`** 一致，即未包围栏的纯 DSL）。                                                                                   |
-| DOM 查找与预览一致 | 与 **`onPreview`** 相同：从点击按钮 **`e.currentTarget`** **`closest`** 到 **`[data-mermaid-preview-scope="${blockId}"]`**，再 **`querySelector('.markdown-mermaid-wrap .mermaid svg')`**。保证下载的是与预览同一颗 SVG。                                                              |
+| DOM 查找与预览一致 | 与 **`onPreview`** 相同：从点击按钮 **`e.currentTarget`** **`closest`** 到 **`[data-mermaid-preview-scope="${blockId}"]`**，再 **`querySelector(MERMAID_MARKDOWN_SVG_SELECTOR)`**。保证下载的是与预览同一颗 SVG。 |
 | 图表 → 文件管线    | **`mermaidSvgToPreviewDataUrl(svg)`** 将 SVG 克隆并序列化为 **`data:image/svg+xml`** URL；**`downloadMermaidPreviewSvg(url, fileName)`**（**`@/utils/mermaidImagePreview`**）内部 **`svgImageDataUrlToBlob`** + **`downloadBlob`**，与 **ImagePreview 大图下载**、Tauri/Web 行为对齐。 |
-| 代码 → 文件管线    | **`new Blob([mermaidCode], { type: 'text/plain;charset=utf-8' })`** + **`downloadBlob`**，文件名 **`mermaid-{timestamp}.mmd`**。                                                                                                                                                       |
+| 代码 → 文件管线    | **`createMarkdownCodeFenceInfo`**（**`@dnhyxc-ai/tools`**）描述 **DSL / 语言 / 文件名**，再由 **`downloadMarkdownCodeFenceWith`** 生成 **`Blob`** 并交给 **`downloadBlob`** 落盘；与聊天代码块下载抽象一致。 |
 | 无 SVG 时          | 图表模式若尚未渲染出 SVG（流式中间态等），**`querySelector` 为空**则直接 **`return`**，与预览按钮「点了没反应」一致，不弹错。                                                                                                                                                          |
 | 单按钮             | **「下载」** 不拆成两个按钮：由 **`mode`** 在 **`onDownload`** 内分支，减少 UI 与宿主状态。                                                                                                                                                                                            |
 
@@ -718,7 +729,9 @@ mermaid 段 → renderMermaidPreviewPart → MermaidFenceToolbarActions（内含
 | ----------------------------------- | --------------------------------------------------------------------------------------------------------- |
 | **`downloadMermaidPreviewSvg`**     | 将 data URL 转 Blob 并 **`downloadBlob`**，默认文件名 **`mermaid-{stamp}.svg`**（可传入第二个参数覆盖）。 |
 | **`mermaidSvgToPreviewDataUrl`**    | 与 **`onPreview`** 共用，保证下载与预览像素源一致。                                                       |
-| **`downloadBlob`**（**`@/utils`**） | 代码模式纯文本下载；与 **`downloadChatCodeBlock`**（`chatCodeToolbar.ts`）同一套 Tauri/Web 下载抽象。     |
+| **`downloadBlob`**（**`@/utils`**） | 代码模式经 **`downloadMarkdownCodeFenceWith`** 回调落盘；与 **`downloadChatCodeBlock`**（`chatCodeToolbar.ts`）同一套 Tauri/Web 下载抽象。     |
+| **`createMarkdownCodeFenceInfo` / `downloadMarkdownCodeFenceWith`**（**`@dnhyxc-ai/tools`**） | 代码模式：统一拼装 **`.mmd`** 下载任务，避免业务侧手写 **`Blob`** 细节不一致。 |
+| **`MERMAID_MARKDOWN_SVG_SELECTOR`**（**`@dnhyxc-ai/tools`**） | 图表模式：与 **`runMermaidInMarkdownRoot`** 扫描入口 **同源** 的 SVG 选择器，避免散落字符串。 |
 | **`Download`**（`lucide-react`）    | 工具条图标。                                                                                              |
 
 ### 13.4 `onDownload` 与「下载」按钮：逐行注释表
@@ -728,7 +741,7 @@ mermaid 段 → renderMermaidPreviewPart → MermaidFenceToolbarActions（内含
 | 161        | JSDoc「图表模式…」                          | 概括 **`onDownload`** 两分支职责，便于在 IDE 折叠外快速理解。                                                                                                  |
 | 162–189    | **`useCallback(onDownload)`**               | **`stamp = Date.now()`** 避免同毫秒多次下载文件名冲突（概率极低但成本低）。                                                                                    |
 | 165–176    | **`mode === 'diagram'`**                    | 与 **`onPreview`** 相同的 **scope / svg** 获取路径；**`mermaidSvgToPreviewDataUrl`** 失败则 **`return`**；**`await downloadMermaidPreviewSvg`** 处理异步落盘。 |
-| 178–186    | **`else`（代码模式）**                      | **`Blob`** 仅含 **`mermaidCode`**，MIME **`text/plain`**；**`id`** 传给 **`downloadBlob`** 供 Tauri 侧去重/覆盖策略与现有下载一致。                            |
+| 178–186（约） | **`else`（代码模式）**                 | **`createMarkdownCodeFenceInfo`** + **`downloadMarkdownCodeFenceWith`**：由工具包生成 **`task.blob` / `task.filename`**，宿主 **`downloadBlob`** 只负责落盘。 |
 | 188        | 依赖数组 **`[blockId, mode, mermaidCode]`** | **`mode`** 变化时更新回调，保证分支正确；**`mermaidCode`** 流式变长时下载最新 DSL。                                                                            |
 | 225–234    | **「下载」`Button`**                        | **`type="button"`** 防止在极少数表单上下文中误提交；**`onClick={(e) => void onDownload(e)}`** 显式忽略 **`Promise`**，避免 React 对 async 处理器告警。         |
 
@@ -745,22 +758,28 @@ const onDownload = useCallback(
 				`[data-mermaid-preview-scope="${blockId}"]`,
 			);
 			if (!scope) return;
-			const svg = scope.querySelector(".markdown-mermaid-wrap .mermaid svg");
+			const svg = scope.querySelector(MERMAID_MARKDOWN_SVG_SELECTOR);
 			if (!(svg instanceof SVGElement)) return;
 			const url = mermaidSvgToPreviewDataUrl(svg);
 			if (!url) return;
 			await downloadMermaidPreviewSvg(url, `mermaid-${stamp}.svg`);
 			return;
 		}
-		const blob = new Blob([mermaidCode], { type: "text/plain;charset=utf-8" });
-		await downloadBlob(
-			{
-				file_name: `mermaid-${stamp}.mmd`,
-				id: `mermaid-md-${stamp}`,
-				overwrite: true,
-			},
-			blob,
-		);
+		const info = createMarkdownCodeFenceInfo({
+			code: mermaidCode,
+			lang: "mermaid",
+			filename: `mermaid-${stamp}.mmd`,
+		});
+		await downloadMarkdownCodeFenceWith(info, async (task) => {
+			await downloadBlob(
+				{
+					file_name: task.filename,
+					id: `mermaid-md-${stamp}`,
+					overwrite: true,
+				},
+				task.blob,
+			);
+		});
 	},
 	[blockId, mode, mermaidCode],
 );
@@ -778,3 +797,30 @@ const onDownload = useCallback(
 ```
 
 > 完整文件仍以仓库 **`MermaidFenceToolbar/index.tsx`** 为准；上表与摘录用于对照 **§13** 与行号漂移后的维护。
+
+---
+
+## 14. 契约模块与「预览 / 下载取 SVG」（行尾注释摘录）
+
+**完整带注释源码（工具包 + 解析器节选 + 本组件 import + `onPreview`/`onDownload` 关键路径）**：统一维护在 **`docs/tools.md` §11.2.2**（其中 **§11.2.2.F** 对应本文件 `MermaidFenceToolbarActions` 节选）。
+
+下面仅保留 **`onPreview`** 一段「最常对照 DOM」的行尾注释版（与 **`data-mermaid-preview-scope`** 配合阅读）：
+
+```tsx
+import { MERMAID_MARKDOWN_SVG_SELECTOR } from "@dnhyxc-ai/tools"; // 与 MarkdownParser / runMermaidInMarkdownRoot 同源的「已渲染 svg」选择器
+
+const onPreview = useCallback(
+	(e: ReactMouseEvent<HTMLButtonElement>) => {
+		const btn = e.currentTarget; // 预览按钮自身：作为 closest 起点，避免 target 落在子节点导致查找失败
+		const scope = btn.closest<HTMLElement>(
+			`[data-mermaid-preview-scope="${blockId}"]`, // 仅在本 mermaid 块包裹层内查找，避免多块图互相命中
+		);
+		if (!scope) return; // 结构异常：直接退出（不弹错，符合「无 SVG 则无反馈」策略）
+		const svg = scope.querySelector(MERMAID_MARKDOWN_SVG_SELECTOR); // 契约选择器：要求 wrap 带 data-mermaid="1"
+		if (!(svg instanceof SVGElement)) return; // 图表尚未渲染/模式为 code：不打开预览
+		const url = mermaidSvgToPreviewDataUrl(svg); // 与下载共用：保证预览像素源与导出一致
+		if (url) openMermaidPreview(url); // 交给宿主 ImagePreview 弹层
+	},
+	[blockId, openMermaidPreview], // blockId 变化：scope 属性选择器需更新；open 变化：保持最新回调
+);
+```

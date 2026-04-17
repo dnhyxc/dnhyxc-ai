@@ -18,6 +18,7 @@
 | `scripts/build-mk-css.js`                 | 复制 CSS/字体、写合并文件、写 `dist/styles.js` / `styles.d.ts` / `src/styles.ts`、写 `highlight-js-theme-ids.ts`。      |
 | `tsup.config.ts`                          | 打 `dist/index.{js,cjs}` + `d.ts`；**第二入口** `dist/react/index.{js,cjs}`（Mermaid + React hook）；`noExternal` 打入 `highlight.js` / `markdown-it` / `markdown-it-katex` / `katex`；**`markdown-it-task-lists` 保持外部 import**（见 §6.3、§10）；**`mermaid` 在 react 入口为 external**（见 §11）。 |
 | `src/mermaid-in-markdown.ts`              | 浏览器内对占位 DOM 调用 `mermaid.initialize` / `mermaid.run`，串行队列防并发。                                                                 |
+| `src/mermaid-markdown-selectors.ts`       | **Mermaid 占位 DOM 契约（contract，契约）**：`class` / `data-mermaid` / `querySelector` 选择器 / 空壳 `innerHTML` / Tailwind 任意选择器类名等 **集中导出**；与 `MarkdownParser.patchMermaidFence`、`runMermaidInMarkdownRoot`、前端岛与预览 **同源**，避免解析器改 DOM 时业务侧多处硬编码不同步。 |
 | `src/react/use-mermaid-in-markdown-root.ts` | React：`useLayoutEffect` + 双 `requestAnimationFrame` 后调用上述函数。                                                                        |
 | `src/react/index.ts`                      | 子路径 **`@dnhyxc-ai/tools/react`**：导出 `useMermaidInMarkdownRoot`、`runMermaidInMarkdownRoot` 及类型。                                      |
 | `dist/styles/**`                          | 运行时样式产物（`dist/` 默认不提交，由 CI/本地 `pnpm build` 生成）。                                                    |
@@ -79,6 +80,7 @@
 
 - **开关**：`enableMermaid` 默认 `true`；`false` 时 ` ```mermaid ` 按普通代码块处理。
 - **解析**：`patchMermaidFence()` 输出占位 DOM；**运行时**由 **`@dnhyxc-ai/tools/react`** 的 **`useMermaidInMarkdownRoot`**（或 **`runMermaidInMarkdownRoot`**）调用 Mermaid API 生成 SVG。
+- **DOM 契约**：wrap / `data-mermaid="1"` / `.mermaid` 及派生选择器由 **`mermaid-markdown-selectors.ts`** 统一维护，并从 **`@dnhyxc-ai/tools`** 导出；宿主自定义预览/取 SVG 时 **优先 import 常量/helper**，见 **§11.2.1**。
 - **细节**：与聊天围栏的链式 `fence`、打包 external、宿主 `ref`/`trigger` 约定等见 **§11**。**助手消息流式**正文见 **§11.9**（围栏拆分 + 岛，非整段 `useMermaidInMarkdownRoot`）。
 
 ### 2.6 样式产物（`build-mk-css.js`）
@@ -365,6 +367,224 @@ const parser = new MarkdownParser({ highlightTheme: "atom-one-dark" });
 | **输出 HTML** | 每条 mermaid 围栏对应：`<div class="markdown-mermaid-wrap" data-mermaid="1"><div class="mermaid">…转义后的 DSL…</div></div>`；**DSL 经 `escapeHtml`**，避免注入 HTML，由 Mermaid 再解析文本。 |
 | **外层容器** | `render()` 仍包裹 **`<div class="${containerClass}">`**（默认 **`markdown-body`**），与 github-markdown-css 一致。 |
 
+### 11.2.1 DOM 契约与选择器 API（`mermaid-markdown-selectors.ts`）
+
+**动机（为什么要单独一个模块）**：
+
+- `MarkdownParser` 会输出 **固定结构** 的 Mermaid 占位 HTML；`runMermaidInMarkdownRoot` 需要在 `root` 子树内 **稳定地找到** 这些节点并调用 `mermaid.run`。
+- 前端还有 **围栏拆分 + Mermaid 岛**、**工具栏预览/下载取 SVG**、**点击委托预览**、**Monaco 预览里 Tailwind 任意选择器**等路径，历史上都会在业务代码里手写 `.markdown-mermaid-wrap ... .mermaid` 之类的字符串。
+- 一旦未来调整占位 DOM（例如改名、增加包裹层、调整 `data-*`），散落字符串很容易出现 **漏改/半改**，表现为「有占位但跑不出图」「预览点不到」等难排查问题。
+
+**方案（集中管理 + 从主包导出）**：
+
+- 在 `packages/tools/src/mermaid-markdown-selectors.ts` 维护 **唯一真源（single source of truth）**：class 常量、派生选择器、常用 `querySelector`/`closest` helper、以及 **空壳占位 HTML**（与 `patchMermaidFence` 结构对齐）。
+- 通过 `@dnhyxc-ai/tools` 主入口 **导出**（见 `packages/tools/src/index.ts`），业务侧只 import 常量/函数，不再复制粘贴选择器字符串。
+
+**常用导出（名称以源码为准）**：
+
+| 导出 | 用途 |
+| ---- | ---- |
+| `MARKDOWN_MERMAID_WRAP_CLASS` / `MERMAID_ENTRY_CLASS` | 外层 wrap、内层 Mermaid 入口的 class 文本（可用于拼接或日志） |
+| `MARKDOWN_MERMAID_WRAP_SELECTOR` | 外层精确选择器：`.markdown-mermaid-wrap[data-mermaid="1"]` |
+| `MERMAID_MARKDOWN_ENTRY_SELECTOR` | `mermaid.run` 扫描入口：`.markdown-mermaid-wrap[data-mermaid="1"] .mermaid` |
+| `MERMAID_MARKDOWN_SVG_SELECTOR` | 读已渲染 SVG：`... .mermaid svg`（预览/下载等） |
+| `MARKDOWN_MERMAID_PLACEHOLDER_HTML` | 空 DSL 壳（岛内/离屏 stage 初始化 `innerHTML`） |
+| `MARKDOWN_MERMAID_TAILWIND_CURSOR_ZOOM_IN_CLASS` | Tailwind arbitrary class：`[&_.markdown-mermaid-wrap_.mermaid]:cursor-zoom-in`（由常量模板拼接，避免手写出错） |
+| `queryMermaidMarkdownEntryNodes` / `queryFirstMermaidMarkdownWrap` / `closestMermaidMarkdownWrap` | 统一查询语义，减少业务侧 `querySelector` 拼写差异 |
+
+**对应实现代码（每行行尾 `//` 中文注释）**：见 **§11.2.2**（含 `mermaid-markdown-selectors.ts`、`mermaid-in-markdown.ts`、`patchMermaidFence` 节选与前端调用节选）。
+
+**兼容性注意（行为可能变严格的边界）**：
+
+- 旧代码若仅 `closest('.markdown-mermaid-wrap')` 或 `.markdown-mermaid-wrap .mermaid svg`，**可能**命中「缺少 `data-mermaid="1"`」的自定义 DOM。
+- 现在统一以 **`MARKDOWN_MERMAID_WRAP_SELECTOR`**（包含 `data-mermaid="1"`）为契约；**本仓库正规路径**（`patchMermaidFence` / 占位 HTML 常量）不受影响，但 **手写半截结构** 的集成需要补齐属性。
+
+更偏「产品侧数据流/交互」的补充说明见：`docs/mermaid-markdown-zoom-and-preview.md`（路径 A/B）与 `docs/mermaid-fence-toolbar-sticky.md`（工具条预览/下载取图）。
+
+### 11.2.2 实现源码摘录（代码块内行尾中文注释）
+
+> **维护约定**：下列代码块为「教学式」**行尾 `//` 中文注释**摘录，**逻辑须与仓库源码一致**；若你修改了 `packages/tools/src/mermaid-markdown-selectors.ts` 等实现，请同步更新本节（行号/变量名以 **`packages/tools/src/**` 与 `apps/frontend/src/**` 为准**）。
+
+#### A. `packages/tools/src/mermaid-markdown-selectors.ts`（契约真源）
+
+```typescript
+// 源路径：packages/tools/src/mermaid-markdown-selectors.ts
+// 作用：集中导出 Mermaid 占位 DOM 的 class、data-*、派生选择器、空壳 HTML、Tailwind 任意类名及查询 helper
+
+export const MARKDOWN_MERMAID_WRAP_CLASS = 'markdown-mermaid-wrap'; // 外层包裹容器 class（与 MarkdownParser.patchMermaidFence 输出一致）
+export const MERMAID_ENTRY_CLASS = 'mermaid'; // Mermaid 官方约定：run 时往该 class 的节点内写入 SVG
+export const MERMAID_ENTRY_SELECTOR = `.${MERMAID_ENTRY_CLASS}`; // 拼出 `.mermaid`，供 querySelector / 拼接 `${MERMAID_ENTRY_SELECTOR} svg` 等
+export const MARKDOWN_MERMAID_WRAP_DATA_ATTR = 'data-mermaid'; // 外层标记属性名：用于选择器与扫描，避免仅靠 class 误匹配
+export const MARKDOWN_MERMAID_WRAP_DATA_VALUE = '1'; // 外层标记属性值：表示该节点为「本包约定的 Mermaid 占位块」
+export const MARKDOWN_MERMAID_WRAP_SELECTOR = `.${MARKDOWN_MERMAID_WRAP_CLASS}[${MARKDOWN_MERMAID_WRAP_DATA_ATTR}="${MARKDOWN_MERMAID_WRAP_DATA_VALUE}"]`; // 外层精确选择器：必须同时命中 class 与 data-mermaid="1"
+export const MERMAID_MARKDOWN_ENTRY_SELECTOR = `${MARKDOWN_MERMAID_WRAP_SELECTOR} .${MERMAID_ENTRY_CLASS}`; // mermaid.run 扫描入口：wrap 内的 .mermaid
+export const MERMAID_MARKDOWN_SVG_SELECTOR = `${MERMAID_MARKDOWN_ENTRY_SELECTOR} svg`; // 读已渲染结果：预览/下载等「取图」路径使用
+export const MARKDOWN_MERMAID_TAILWIND_CURSOR_ZOOM_IN_CLASS = `[&_.${MARKDOWN_MERMAID_WRAP_CLASS}_.${MERMAID_ENTRY_CLASS}]:cursor-zoom-in`; // Tailwind：空格改 `_`，用常量模板避免手写 arbitrary class 拼错
+
+export function queryMermaidMarkdownEntryNodes(root: ParentNode): NodeListOf<HTMLElement> {
+	return root.querySelectorAll<HTMLElement>(MERMAID_MARKDOWN_ENTRY_SELECTOR); // 收集 root 子树内所有待渲染入口（正文多 .markdown-body 时仍从 root 向下扫）
+}
+
+export function queryFirstMermaidMarkdownEntryNode(root: ParentNode): HTMLElement | null {
+	return root.querySelector<HTMLElement>(MERMAID_MARKDOWN_ENTRY_SELECTOR); // 取第一个入口节点（少用：多数场景用 queryAll 或只取 wrap）
+}
+
+export function queryFirstMermaidMarkdownWrap(root: ParentNode): HTMLElement | null {
+	return root.querySelector<HTMLElement>(MARKDOWN_MERMAID_WRAP_SELECTOR); // 取第一个外层 wrap（岛内：判断宿主是否已写入占位结构）
+}
+
+export function closestMermaidMarkdownWrap(el: Element | null | undefined): HTMLElement | null {
+	if (!el) return null; // 无起点元素则无法向上查找
+	return el.closest<HTMLElement>(MARKDOWN_MERMAID_WRAP_SELECTOR); // 与「仅 class」相比：强制要求 data-mermaid="1"，契约更严格
+}
+
+export const MARKDOWN_MERMAID_PLACEHOLDER_HTML =
+	`<div class="${MARKDOWN_MERMAID_WRAP_CLASS}" ${MARKDOWN_MERMAID_WRAP_DATA_ATTR}="${MARKDOWN_MERMAID_WRAP_DATA_VALUE}">` + // 外层 div：带 data 标记，便于与 MERMAID_MARKDOWN_ENTRY_SELECTOR 对齐
+	`<div class="${MERMAID_ENTRY_CLASS}">` + // 内层空壳：后续写入 DSL 文本或提交渲染后的 SVG innerHTML
+	`</div></div>`; // 闭合标签：与 patchMermaidFence 层级一致（无换行后缀，调用方可自行加 \n）
+```
+
+#### B. `packages/tools/src/mermaid-in-markdown.ts`（运行时扫描 + `mermaid.run`）
+
+```typescript
+// 源路径：packages/tools/src/mermaid-in-markdown.ts
+// 作用：在已挂载 DOM 上串行执行 mermaid.initialize / mermaid.run，避免并发 run 破坏 Mermaid 内部状态
+
+import mermaid from 'mermaid'; // Mermaid 运行时：在 react 入口被标记为 external，由宿主打包器解析
+import { queryMermaidMarkdownEntryNodes } from './mermaid-markdown-selectors.js'; // 统一入口查询：避免本文件硬编码选择器字符串
+
+let runQueue: Promise<void> = Promise.resolve(); // 模块级 Promise 链：把多次 run 串行化
+let lastMermaidInitSignature = ''; // 记录上次 initialize 的「主题签名」，避免每次 run 都 initialize
+
+function ensureMermaidInitialized(preferDark?: boolean): void {
+	const signature = preferDark ? 'dark' : 'default'; // 用简单签名区分亮/暗两套初始化参数
+	if (lastMermaidInitSignature === signature) return; // 签名未变：跳过重复 initialize，减少闪烁与状态抖动
+	lastMermaidInitSignature = signature; // 更新签名：后续若主题切换会触发重新 initialize
+	mermaid.initialize({
+		startOnLoad: false, // 由本包显式 run：禁止 Mermaid 默认「页面加载自动跑」与本包调度打架
+		theme: preferDark ? 'dark' : 'default', // 主题：随宿主暗色模式切换
+		securityLevel: 'loose', // 与历史行为一致：更宽松（具体风险面由宿主内容信任模型决定）
+	});
+}
+
+export type RunMermaidInMarkdownOptions = {
+	preferDark?: boolean; // 是否偏好暗色 Mermaid 主题
+	suppressErrors?: boolean; // 流式岛等：true 时把错误抑制在 mermaid.run 内，减少半成品 DSL 的 UI 闪烁
+};
+
+export async function runMermaidInMarkdownRoot(
+	root: HTMLElement | null | undefined,
+	options?: RunMermaidInMarkdownOptions,
+): Promise<void> {
+	if (!root) return; // 无根节点：直接返回，避免 querySelectorAll 抛错或空扫
+
+	const task = async (): Promise<void> => {
+		// 从 root 全子树收集：避免 shell 内多个 .markdown-body（正文 + 思考区）时只命中第一个容器
+		const nodes = queryMermaidMarkdownEntryNodes(root); // 统一选择器：见 mermaid-markdown-selectors.ts
+		if (nodes.length === 0) return; // 无入口节点：不调用 mermaid.run，减少无意义工作
+
+		try {
+			ensureMermaidInitialized(options?.preferDark); // 先确保主题/初始化就绪
+			await mermaid.run({
+				nodes: Array.from(nodes), // Mermaid API：对指定节点批量渲染（StaticArray 转数组以兼容类型）
+				suppressErrors: options?.suppressErrors === true, // 仅显式 true 才抑制：默认仍暴露错误便于排查
+			});
+		} catch (err) {
+			if (typeof console !== 'undefined' && console.warn) {
+				console.warn('[mermaid-in-markdown]', err); // 统一日志前缀：宿主可按关键字过滤
+			}
+		}
+	};
+
+	runQueue = runQueue.then(task).catch(() => {}); // 入队：吞掉 task 内未捕获的 Promise 拒绝，避免队列断裂
+	await runQueue; // 等待队列执行到本次 task 完成：保证外部 await 时序可预期
+}
+```
+
+#### C. `packages/tools/src/markdown-parser.ts`：`patchMermaidFence` 的 mermaid 分支（节选）
+
+> 说明：文件顶部需已从 `./mermaid-markdown-selectors.js` 引入 `MARKDOWN_MERMAID_WRAP_CLASS` / `MARKDOWN_MERMAID_WRAP_DATA_ATTR` / `MARKDOWN_MERMAID_WRAP_DATA_VALUE` / `MERMAID_ENTRY_CLASS`；并与 `normalizeMermaidFenceBody`、`escapeHtml` 配合。
+
+```typescript
+// 节选：md.renderer.rules.fence 内 langName.toLowerCase() === 'mermaid' 分支的 return
+const body = md.utils.escapeHtml(normalizeMermaidFenceBody(token.content)); // 先规范化 DSL，再 escapeHtml：防 XSS，保证写入 DOM 为安全文本
+return (
+	`<div class="${MARKDOWN_MERMAID_WRAP_CLASS}" ${MARKDOWN_MERMAID_WRAP_DATA_ATTR}="${MARKDOWN_MERMAID_WRAP_DATA_VALUE}">` + // 外层：契约 wrap + data 标记
+	`<div class="${MERMAID_ENTRY_CLASS}">` + // 内层：Mermaid 入口
+	body + // 已转义 DSL：浏览器解析后多为纯文本节点，供 Mermaid 读取
+	'</div></div>\n' // 闭合：末尾 \n 与 markdown-it fence 输出风格对齐
+);
+```
+
+#### D. `apps/frontend/src/components/design/MermaidFenceIsland/index.tsx`：契约 import 与宿主初始化（节选）
+
+```typescript
+// 源路径：apps/frontend/src/components/design/MermaidFenceIsland/index.tsx（节选：import + useLayoutEffect 开头）
+import {
+	MARKDOWN_MERMAID_PLACEHOLDER_HTML, // 空壳 HTML：与解析器占位同构，避免手写字符串漂移
+	MARKDOWN_MERMAID_TAILWIND_CURSOR_ZOOM_IN_CLASS, // Tailwind：cursor-zoom-in 的 arbitrary class
+	MERMAID_ENTRY_SELECTOR, // `.mermaid`：在已找到的 wrap 内定位入口节点
+	normalizeMermaidFenceBody, // DSL 规范化：与解析器侧一致
+	queryFirstMermaidMarkdownWrap, // 查询第一个 wrap：优先复用宿主已有结构
+} from '@dnhyxc-ai/tools';
+import { runMermaidInMarkdownRoot } from '@dnhyxc-ai/tools/react'; // 岛场景：命令式触发 Mermaid 渲染
+
+// ... useLayoutEffect 内（节选）
+const host = hostRef.current; // React ref：岛组件根节点，runMermaidInMarkdownRoot 的扫描根
+if (!host) return; // ref 未挂载：跳过
+
+let wrap = queryFirstMermaidMarkdownWrap(host); // 尝试找到已存在的 wrap（幂等：多次 effect 复用同一 wrap）
+if (!wrap) {
+	host.innerHTML = MARKDOWN_MERMAID_PLACEHOLDER_HTML; // 无 wrap：写入契约空壳，后续再 query
+	wrap = queryFirstMermaidMarkdownWrap(host); // 写入后重新获取 wrap 引用
+}
+const inner = wrap?.querySelector(MERMAID_ENTRY_SELECTOR) as HTMLElement | null; // 定位 .mermaid 入口节点
+if (!wrap || !inner) return; // 结构不完整：防御式退出，避免后续 run 空指针
+```
+
+#### E. `apps/frontend/src/hooks/useMermaidImagePreview.tsx`：点击委托取 SVG（节选）
+
+```typescript
+// 源路径：apps/frontend/src/hooks/useMermaidImagePreview.tsx（节选：工具包契约 + onClick）
+import { closestMermaidMarkdownWrap, MERMAID_ENTRY_SELECTOR } from '@dnhyxc-ai/tools'; // 统一 wrap 定位与 `.mermaid` 选择器，避免手写 closest('.markdown-mermaid-wrap')
+
+const onClick = (e: MouseEvent) => {
+	const el = e.target as HTMLElement | null; // 事件目标可能是 SVG 子元素：需要向上找 wrap
+	if (!el) return; // 无目标：忽略
+	if (el.closest('.markdown-mermaid-zoom-chrome')) return; // 缩放工具条区域：避免误触打开预览
+
+	const wrap = closestMermaidMarkdownWrap(el); // 命中契约 wrap（含 data-mermaid="1"）
+	if (!wrap) return; // 不在 Mermaid 块内：忽略
+
+	const svg = wrap.querySelector(`${MERMAID_ENTRY_SELECTOR} svg`) as SVGSVGElement | null; // 取块内主 SVG（与工具栏 MERMAID_MARKDOWN_SVG_SELECTOR 语义一致）
+	if (!svg || !svg.contains(el)) return; // 必须点到 SVG 子树：避免点到 wrap 空白区误开预览
+
+	const url = mermaidSvgToPreviewDataUrl(svg); // SVG → data URL：交给 ImagePreview
+	if (url) openRef.current(url); // 打开预览弹层
+};
+```
+
+#### F. `apps/frontend/src/components/design/MermaidFenceToolbar/index.tsx`：预览 / 下载（diagram）取 SVG（节选）
+
+```typescript
+// 源路径：apps/frontend/src/components/design/MermaidFenceToolbar/index.tsx（节选）
+import {
+	createMarkdownCodeFenceInfo, // 代码模式：拼装围栏信息，交给 downloadMarkdownCodeFenceWith
+	downloadMarkdownCodeFenceWith, // 代码模式：统一生成 Blob/文件名，宿主只负责 downloadBlob
+	MERMAID_MARKDOWN_SVG_SELECTOR, // 图表模式：与 mermaid.run 扫描入口同源的「已渲染 svg」选择器
+} from '@dnhyxc-ai/tools';
+import { mermaidSvgToPreviewDataUrl } from '@/utils/mermaidImagePreview'; // SVG → data URL（预览/下载共用）
+
+// onPreview（节选）：从按钮向上找到本块 scope，再取 SVG
+const btn = e.currentTarget; // 预览按钮自身：作为 closest 起点，避免点到子节点导致起点漂移
+const scope = btn.closest<HTMLElement>(`[data-mermaid-preview-scope="${blockId}"]`); // 限定在本 mermaid 工具条包裹的子树，避免多块图串扰
+if (!scope) return; // 找不到 scope：结构异常或 blockId 不匹配，直接退出
+const svg = scope.querySelector(MERMAID_MARKDOWN_SVG_SELECTOR); // 用契约选择器取「当前块」的 svg（要求 wrap 带 data-mermaid="1"）
+if (!(svg instanceof SVGElement)) return; // 类型收窄：避免把非 SVG 当图处理
+const url = mermaidSvgToPreviewDataUrl(svg); // 生成预览用 data URL
+if (url) openMermaidPreview(url); // 打开 ImagePreview
+```
+
 ### 11.3 与「聊天围栏工具栏」的共存关系
 
 构造函数中的顺序为：**若** `enableChatCodeFenceToolbar` **则先** `patchChatCodeFenceRenderer()`（完全覆盖 `md.renderer.rules.fence`），**再若** `enableMermaid` **则** `patchMermaidFence()`。
@@ -387,7 +607,7 @@ const parser = new MarkdownParser({ highlightTheme: "atom-one-dark" });
 
 | 参数 | 作用 |
 | ---- | ---- |
-| **`rootRef`** | 必须指向 **已写入 `parser.render()` 产出 HTML** 的 DOM 节点（常为 **`dangerouslySetInnerHTML` 所在的那层 `div`**）。`querySelector` 从该节点向下查找占位块；若 ref 挂在外层而 HTML 在内层，可能 **选不到** `.markdown-mermaid-wrap`。 |
+| **`rootRef`** | 必须指向 **已写入 `parser.render()` 产出 HTML** 的 DOM 节点（常为 **`dangerouslySetInnerHTML` 所在的那层 `div`**）。`runMermaidInMarkdownRoot` 从该节点向下查找占位块；若 ref 挂在外层而 HTML 在内层，可能 **选不到** wrap（见 **§11.2.1** 的 `MARKDOWN_MERMAID_WRAP_SELECTOR` / `MERMAID_MARKDOWN_ENTRY_SELECTOR`）。 |
 | **`parser`** | 传入 **`MarkdownParser` 实例**（或至少含 **`enableMermaid`** 的对象）；为 **`false`** 时 hook **直接 return**，不调 Mermaid。 |
 | **`trigger`** | 任意在「HTML 字符串更新」时会变的值（如 **`html` 字符串、`content`、版本号**），列入 `useLayoutEffect` 依赖，保证替换 innerHTML 后会 **重新跑** 一轮渲染。 |
 | **`preferDark`** | 传入 **`mermaid.initialize({ theme: 'dark' | 'default' })`**；随主题切换更新。 |
@@ -402,29 +622,44 @@ Mermaid 输出以 **SVG** 为主。本仓库前端在 **`apps/frontend/src/index
 ### 11.7 故障排查
 
 - **控制台**出现 **`[mermaid-in-markdown]`**：默认 **`suppressErrors: false`** 时语法错误等会反映到 **`catch` + `console.warn`**；**`runMermaidInMarkdownRoot(..., { suppressErrors: true })`**（如 **§11.9** 流式岛）则抑制 **`mermaid.run`** 内错误展示。
-- **有占位无图**：检查 **`rootRef`** 是否对准 **innerHTML 容器**；在 DevTools 中确认是否存在 **`.markdown-mermaid-wrap[data-mermaid="1"] .mermaid`**。**流式 + 整段 innerHTML**：若出现「停流才出图」或整屏闪烁，优先采用 **§11.9 围栏拆分**；**`throttleMs`** 仅缓解 **`useMermaidInMarkdownRoot`** 的调度，**不能**阻止 innerHTML 替换掉已渲染的 SVG。非流式仍可调 **`throttleMs`** 或确认 **`trigger` 是否在变**。
+- **有占位无图**：检查 **`rootRef`** 是否对准 **innerHTML 容器**；在 DevTools 中确认是否存在 **`MERMAID_MARKDOWN_ENTRY_SELECTOR` 对应的 DOM**（等价于历史文档里的 **`.markdown-mermaid-wrap[data-mermaid="1"] .mermaid`**）。**流式 + 整段 innerHTML**：若出现「停流才出图」或整屏闪烁，优先采用 **§11.9 围栏拆分**；**`throttleMs`** 仅缓解 **`useMermaidInMarkdownRoot`** 的调度，**不能**阻止 innerHTML 替换掉已渲染的 SVG。非流式仍可调 **`throttleMs`** 或确认 **`trigger` 是否在变**。
 - **构建失败且与 `crypto` 相关**：勿将 **`mermaid` 再 bundle 进** 工具包 react 入口；保持 **external**。
 
 ### 11.8 源码逐行说明
 
 以下与仓库 **`packages/tools/src/`** 中当前实现 **一一对应**（行号随文件演进可能漂移，以源码为准）。
 
+#### 11.8.0 `src/mermaid-markdown-selectors.ts`（契约模块）
+
+| 片段 | 说明 |
+| ---- | ---- |
+| 文件头注释 | 解释 **为何**要把 wrap / `.mermaid` / `data-mermaid` / 选择器 **集中**：解析器、运行时扫描、前端岛/预览 **必须同源**，否则改 DOM 结构时容易漏改。 |
+| `MARKDOWN_MERMAID_*` / `MERMAID_*_SELECTOR` | **字符串常量**：外层精确选择器必须带 **`data-mermaid="1"`**，避免误命中其它同名 class。 |
+| `queryMermaidMarkdownEntryNodes` 等 | **查询 helper**：把 `querySelector`/`closest` 的语义固定下来，减少业务侧复制粘贴差异。 |
+| `MARKDOWN_MERMAID_PLACEHOLDER_HTML` | **空壳 HTML**：与 `patchMermaidFence` 的 **标签层级**一致（无 DSL 正文），供 `MermaidFenceIsland` 离屏/宿主初始化。 |
+| `MARKDOWN_MERMAID_TAILWIND_CURSOR_ZOOM_IN_CLASS` | **Tailwind arbitrary class**：用模板拼接 `[&_.wrap_.mermaid]:...`，避免手写 `_` 规则时与真实 class 不一致。 |
+
+**带行尾注释的完整摘录**：见 **§11.2.2 节 A**（与仓库源码对齐维护）。
+
 #### 11.8.1 `src/mermaid-in-markdown.ts`
 
 | 行号 | 代码 | 说明 |
 | ---- | ---- | ---- |
 | 1 | `import mermaid from 'mermaid'` | 引入 Mermaid 运行时（由应用打包器从 `node_modules` 解析，见 §11.4）。 |
-| 3–4 | `let runQueue = Promise.resolve()` | **模块级串行队列**：多次调用 `runMermaidInMarkdownRoot` 时通过 `.then` 链排队，避免并行 `mermaid.run`。 |
-| 20–25 | `export type RunMermaidInMarkdownOptions` | **`preferDark`**、可选 **`suppressErrors`**（显式 **`true`** 时传入 **`mermaid.run`**，流式岛等场景用）。 |
-| 27–30 | JSDoc | 说明函数职责及与 `@dnhyxc-ai/tools/react`、**external `mermaid`** 的关系（详见 §11.4）。 |
-| 31–34 | `export async function runMermaidInMarkdownRoot(...)` | 异步入口函数声明与参数。 |
-| 35 | `if (!root) return` | 无 DOM 根则跳过。 |
-| 37 | `const task = async () => { ... }` | 真正工作放在 **串行队列** 的异步函数内。 |
+| 2 | `import { queryMermaidMarkdownEntryNodes } from './mermaid-markdown-selectors.js'` | 从 **`mermaid-markdown-selectors.ts`** 引入统一查询；**避免**在本文件硬编码 `.markdown-mermaid-wrap…` 选择器字符串（见 **§11.2.1**）。 |
+| 4–5 | `let runQueue = Promise.resolve()` | **模块级串行队列**：多次调用 `runMermaidInMarkdownRoot` 时通过 `.then` 链排队，避免并行 `mermaid.run`。 |
+| 21–26 | `export type RunMermaidInMarkdownOptions` | **`preferDark`**、可选 **`suppressErrors`**（显式 **`true`** 时传入 **`mermaid.run`**，流式岛等场景用）。 |
+| 28–31 | JSDoc | 说明函数职责及与 `@dnhyxc-ai/tools/react`、**external `mermaid`** 的关系（详见 §11.4）。 |
+| 32–35 | `export async function runMermaidInMarkdownRoot(...)` | 异步入口函数声明与参数。 |
+| 36 | `if (!root) return` | 无 DOM 根则跳过。 |
+| 38 | `const task = async () => { ... }` | 真正工作放在 **串行队列** 的异步函数内。 |
 | （模块级） | `ensureMermaidInitialized` / `lastMermaidInitSignature` | **仅在主题签名变化时**调用 **`mermaid.initialize`**，避免每次 `run` 重置内部状态导致闪烁。 |
-| 38–42 | `root.querySelectorAll('.markdown-mermaid-wrap…')` | 在 **`root` 整棵子树**上收集占位节点（多 **`.markdown-body`**、**Mermaid 岛宿主** 均适用）。 |
-| 42 | `if (nodes.length === 0) return` | 无占位则不调 Mermaid，减少开销。 |
-| 44–49 | `ensureMermaidInitialized` + `mermaid.run` | **`suppressErrors: options?.suppressErrors === true`**：仅显式传 **`true`** 时抑制错误（流式岛场景）；默认 **`false`**。 |
-| 50–54 | `catch` / `runQueue` | 错误日志与串行队列语义不变。 |
+| 39–41 | 注释 + `queryMermaidMarkdownEntryNodes(root)` + `nodes.length` 判断 | 在 **`root` 整棵子树**上收集 Mermaid 入口节点；选择器由 **`mermaid-markdown-selectors.ts`** 统一维护。 |
+| 43–48 | `ensureMermaidInitialized` + `mermaid.run` | **`suppressErrors: options?.suppressErrors === true`**：仅显式传 **`true`** 时抑制错误（流式岛场景）；默认 **`false`**。 |
+| 49–53 | `catch` + `console.warn` | 将 Mermaid 运行期错误降级为 **`[mermaid-in-markdown]`** 警告，避免静默失败难排查。 |
+| 56–57 | `runQueue` 链式 + `await runQueue` | 串行队列：**本次 task 入队**并 **await** 至完成，保证多次触发时顺序执行。 |
+
+**与 §11.2.2 的关系**：上表为「索引式逐行说明」；若你需要 **可直接复制对照仓库** 的 **行尾 `//` 中文注释版全文**，请优先阅读 **§11.2.2 节 B**（与源码同步维护）。
 
 #### 11.8.2 `src/react/use-mermaid-in-markdown-root.ts`
 
@@ -456,7 +691,7 @@ Mermaid 输出以 **SVG** 为主。本仓库前端在 **`apps/frontend/src/index
 | 298–303 | 新 `fence`：读取 `env.enableMermaid ?? this.enableMermaid` | **渲染期可控**：同一实例可按“本次渲染”开关 Mermaid，占位 DOM 输出与否不再只能在构造时决定。 |
 | 304–309 | 解析 `token.info` 得 `langName` | 与 highlight、聊天 fence 一致：取 info 第一段为语言名。 |
 | 310–317 | `langName.toLowerCase() === 'mermaid'` 分支 | **DSL** 使用 **`escapeHtml(token.content)`** 再写入 innerHTML 安全文本节点路径（浏览器解析后内容为纯文本，Mermaid 读取文本）。 |
-| 307–310 | 外层 **`markdown-mermaid-wrap`** + **`data-mermaid="1"`** | 与 **`runMermaidInMarkdownRoot`** 的 **选择器** 一致；内层 **`class="mermaid"`** 为 Mermaid 约定入口。 |
+| 307–310（约） | 外层 **`markdown-mermaid-wrap`** + **`data-mermaid="1"`** | 与 **`runMermaidInMarkdownRoot`** / **`MERMAID_MARKDOWN_ENTRY_SELECTOR`** 一致；实现上由 **`mermaid-markdown-selectors.ts`** 的常量拼接生成，避免 class/`data-*` 与扫描逻辑漂移。内层 **`class="mermaid"`** 为 Mermaid 约定入口。 |
 | 313 | `return prev(...)` | 非 mermaid 走原规则（默认高亮或聊天块等）。 |
 
 #### 11.8.5 本轮补充：`render(text, { enableMermaid })`（避免重复 new parser）
@@ -669,7 +904,7 @@ await downloadMarkdownCodeFenceWith(info, (task) =>
 | 1 | 对原始 Markdown 字符串做 **线性扫描**，按顶格 **\`\`\`** 围栏切成多段：**普通文本**、**已闭合 mermaid**、**未闭合 mermaid**（流式尾部）。 |
 | 2 | **普通段**：仍用 **`MarkdownParser.render`** + **`dangerouslySetInnerHTML`**；解析器设 **`enableMermaid: false`**，避免围栏内 mermaid 再被转成占位（与手工拆块重复）。 |
 | 3 | **未闭合 mermaid**：**不**调用 Mermaid，只输出带 **`language-mermaid`** 的 **`<pre><code>`** 预览（转义 HTML），避免不完整 DSL 报错与无意义重绘。 |
-| 4 | **已闭合 mermaid**：每个块对应一个 React 子树 **`MermaidIsland`**：外层 **`div`** 由 React 持有 **`ref`**，在 **`useLayoutEffect`** 内 **命令式** 写入 **`markdown-mermaid-wrap > .mermaid`**，再调用 **`runMermaidInMarkdownRoot(host, { preferDark, suppressErrors })`**（由 **`@dnhyxc-ai/tools/react`** 导出）。 |
+| 4 | **已闭合 mermaid**：每个块对应一个 React 子树 **`MermaidIsland`**：外层 **`div`** 由 React 持有 **`ref`**，在 **`useLayoutEffect`** 内 **命令式** 写入 **`MARKDOWN_MERMAID_PLACEHOLDER_HTML`**（与 **`patchMermaidFence`** 同构的 **wrap > .mermaid**），再调用 **`runMermaidInMarkdownRoot(host, { preferDark, suppressErrors })`**（由 **`@dnhyxc-ai/tools/react`** 导出）。 |
 | 5 | **流式追加**通常只改变 **最后一个 Markdown 段** 或 **开放中的 mermaid 预览段**；**更早的已闭合 Mermaid 岛** **`code` prop 不变** 时 **不**重跑 effect，**SVG 不被后续 chunk 的 innerHTML 清掉**。 |
 
 #### 11.9.3 与 `@dnhyxc-ai/tools` 的分工
@@ -677,7 +912,7 @@ await downloadMarkdownCodeFenceWith(info, (task) =>
 | 组件 | 职责 |
 | ---- | ---- |
 | **`MarkdownParser`（`enableMermaid: false`）** | 渲染非 mermaid 围栏的 Markdown（含聊天代码块工具栏等）。 |
-| **`runMermaidInMarkdownRoot`** | 在 **岛宿主节点** 子树内查找 **`.markdown-mermaid-wrap[data-mermaid="1"] .mermaid`** 并 **`mermaid.run`**；与包内 **`patchMermaidFence`** 产出的 **class / data 属性** 一致。 |
+| **`runMermaidInMarkdownRoot`** | 在 **岛宿主节点** 子树内查找 **`MERMAID_MARKDOWN_ENTRY_SELECTOR`** 对应节点并 **`mermaid.run`**；与包内 **`patchMermaidFence`** / **`MARKDOWN_MERMAID_PLACEHOLDER_HTML`** 的 **class / data 属性** 同源。 |
 | **`useMermaidInMarkdownRoot`** | **本场景不再用于** `ChatAssistantMessage` 整条气泡；仍适用于 **Monaco / 文档** 等 **非「整段正文流式 innerHTML」** 的页面。 |
 
 #### 11.9.4 文件与入口
@@ -728,7 +963,7 @@ await downloadMarkdownCodeFenceWith(info, (task) =>
 | 27 | `memo(MermaidIsland)` | 避免父级无关重渲染时无谓刷新（**`code`/`preferDark` 不变** 则跳过）。 |
 | 32–33 | `hostRef` / `genRef` | 岛 **DOM 宿主**；**代数** 丢弃过期的双 **rAF** 回调。 |
 | 34–36 | `isStreamingRef` | **每轮 render 同步** **`isStreaming`**；**不**放入 **`useLayoutEffect` 依赖**，避免 **停流** 时仅为改 **`suppressErrors`** 再 **整岛 innerHTML** 闪屏。 |
-| 38–45 | `useLayoutEffect` 主体（DOM） | 取 **host**；写入与 **`patchMermaidFence`** 一致的 **wrap + .mermaid** 结构；**`textContent = code`** 避免 React 子节点与 Mermaid 改 DOM 冲突。 |
+| 38–45 | `useLayoutEffect` 主体（DOM） | 取 **host**；优先 **`queryFirstMermaidMarkdownWrap`**，否则写入 **`MARKDOWN_MERMAID_PLACEHOLDER_HTML`**；**`textContent = code`** 避免 React 子节点与 Mermaid 改 DOM 冲突（实现以 `MermaidFenceIsland` 为准）。 |
 | 47–56 | 双 **rAF** + **`runMermaidInMarkdownRoot`** | 与 hook 策略一致，等布局后再跑；**`suppressErrors: isStreamingRef.current`**：流式过程中为 **true** 时压制不完整图的错误 UI（由 **`mermaid-in-markdown`** 传给 **`mermaid.run`**）。 |
 | 57 | 依赖 **`[code, preferDark]`** | **仅** DSL 或主题变时重建岛内部并重跑 Mermaid。 |
 | 59 | `return <div ref={hostRef} ...>` | React 只稳定持有 **外层宿主**，内层由 effect 管理。 |
@@ -754,7 +989,7 @@ await downloadMarkdownCodeFenceWith(info, (task) =>
 #### 11.9.8 复制该模式时的检查清单
 
 - 解析器 **`enableMermaid: false`** 与 **手工拆分** 二选一配套，勿双重输出 mermaid 占位。
-- **岛的 `host`** 传给 **`runMermaidInMarkdownRoot`** 的节点应 **包含** **`.markdown-mermaid-wrap`** 子树（与工具包选择器一致）。
+- **岛的 `host`** 传给 **`runMermaidInMarkdownRoot`** 的节点应 **包含** **`MERMAID_MARKDOWN_ENTRY_SELECTOR`** 可命中的子树（等价描述：**`.markdown-mermaid-wrap[data-mermaid="1"]` 下有 `.mermaid`**）。
 - **开放围栏** 仅用 **fallback**，待 **闭合 \`\`\`** 出现后片段变为 **`complete: true`**，React **key** 从 **`mm-open-*`** 变为 **`mm-done-*`**，会 **卸载预览、挂载岛**，属预期一次切换。
 - 若需 **严格** 在停流后暴露 Mermaid 语法错误，可在 **`isStreaming` 变为 false** 后增加 **仅针对岛的补跑**（当前实现依赖 **`code` 不变** 则不再跑 effect；一般最终图已在流式过程中画出，**`suppressErrors`** 仅影响报错展示）。
 
