@@ -1,4 +1,4 @@
-import type { HighlightJsThemeId } from './generated/highlight-js-theme-ids.js';
+import type { HighlightJsThemeId } from '../generated/highlight-js-theme-ids.js';
 import { highlightJsThemes } from './styles.js';
 
 /**

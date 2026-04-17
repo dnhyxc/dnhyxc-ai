@@ -6,8 +6,14 @@ import type Token from 'markdown-it/lib/token.mjs';
 import markdownItKatex from 'markdown-it-katex';
 // CJS 包，无官方类型
 import markdownItTaskLists from 'markdown-it-task-lists';
-import type { HighlightJsThemeId } from './generated/highlight-js-theme-ids.js';
-import { applyHighlightJsTheme } from './inject-highlight-theme.js';
+import type { HighlightJsThemeId } from '../generated/highlight-js-theme-ids.js';
+import { applyHighlightJsTheme } from '../highlight/inject-theme.js';
+import {
+	MARKDOWN_MERMAID_WRAP_CLASS,
+	MARKDOWN_MERMAID_WRAP_DATA_ATTR,
+	MARKDOWN_MERMAID_WRAP_DATA_VALUE,
+	MERMAID_ENTRY_CLASS,
+} from '../mermaid/markdown-selectors.js';
 import {
 	MARKDOWN_CODE_FENCE_BLOCK_ROOT_ATTR,
 	MARKDOWN_CODE_FENCE_BLOCK_WRAPPER_CLASS,
@@ -18,13 +24,7 @@ import {
 	MARKDOWN_CODE_FENCE_TOOLBAR_CLASS,
 	MARKDOWN_CODE_FENCE_TOOLBAR_LANG_CLASS,
 	MARKDOWN_CODE_FENCE_TOOLBAR_SLOT_CLASS,
-} from './markdown-code-fence-dom.js';
-import {
-	MARKDOWN_MERMAID_WRAP_CLASS,
-	MARKDOWN_MERMAID_WRAP_DATA_ATTR,
-	MARKDOWN_MERMAID_WRAP_DATA_VALUE,
-	MERMAID_ENTRY_CLASS,
-} from './mermaid-markdown-selectors.js';
+} from './code-fence-dom.js';
 
 function taskListAttrSet(token: Token, name: string, value: string): void {
 	const index = token.attrIndex(name);

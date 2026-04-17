@@ -8,18 +8,18 @@
 
 | 路径                                      | 角色                                                                                                                    |
 | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `src/markdown-parser.ts`                  | `MarkdownIt` + `markdown-it-katex` + **`markdown-it-task-lists`（GFM 待办）** + 自研「纯 `[x]`/`[ ]`」补丁 + `highlight.js` 高亮；可选围栏工具栏；构造末尾调用主题注入。 |
-| `src/markdown-code-fence-dom.ts`          | **Markdown 围栏代码块（带工具栏）DOM 契约**：`class` / `data-*` / 派生选择器、`queryMarkdownCodeFenceBlockRoots`；与 **`patchChatCodeFenceRenderer`**、**`markdown-code-fence-actions.ts`**、宿主 **`layoutChatCodeToolbars`** **同源**，避免业务侧散落 `[data-chat-code-block]` 等字符串。 |
+| `src/markdown/parser.ts`                  | `MarkdownIt` + `markdown-it-katex` + **`markdown-it-task-lists`（GFM 待办）** + 自研「纯 `[x]`/`[ ]`」补丁 + `highlight.js` 高亮；可选围栏工具栏；构造末尾调用主题注入。 |
+| `src/markdown/code-fence-dom.ts`          | **Markdown 围栏代码块（带工具栏）DOM 契约**：`class` / `data-*` / 派生选择器、`queryMarkdownCodeFenceBlockRoots`；与 **`patchChatCodeFenceRenderer`**、**`markdown/code-fence-actions.ts`**、宿主 **`layoutChatCodeToolbars`** **同源**，避免业务侧散落 `[data-chat-code-block]` 等字符串。 |
 | `src/types.d.ts`                          | 为无官方类型的依赖补充 `declare module`（如 `markdown-it-katex`、`markdown-it-task-lists`）。                         |
-| `src/inject-highlight-theme.ts`           | `applyHighlightJsTheme` / `clearAppliedHighlightJsTheme`：向 `document.head` 注入 `<link>`（CDN）或 `<style>`（内联）。 |
-| `src/highlight-theme-import.ts`           | `resolveHighlightJsThemeSpecifier`：把主题 id 转成 `@dnhyxc-ai/tools/styles/hljs/...` 包内说明符。                      |
+| `src/highlight/inject-theme.ts`           | `applyHighlightJsTheme` / `clearAppliedHighlightJsTheme`：向 `document.head` 注入 `<link>`（CDN）或 `<style>`（内联）。 |
+| `src/highlight/theme-import.ts`           | `resolveHighlightJsThemeSpecifier`：把主题 id 转成 `@dnhyxc-ai/tools/styles/hljs/...` 包内说明符。                      |
 | `src/generated/highlight-js-theme-ids.ts` | **构建生成**：`HighlightJsThemeId` 字面量联合，与 `dist/styles/hljs` 下文件一一对应。                                   |
-| `src/styles.ts`                           | **构建生成**：`highlightJsThemes`、`highlightJsThemeIds`、`styleContents`、`styles` 等（`pnpm clean` 会删，勿手改）。   |
+| `src/highlight/styles.ts`                           | **构建生成**：`highlightJsThemes`、`highlightJsThemeIds`、`styleContents`、`styles` 等（`pnpm clean` 会删，勿手改）。   |
 | `src/index.ts`                            | 包入口：聚合导出类型与函数。                                                                                            |
-| `scripts/build-mk-css.js`                 | 复制 CSS/字体、写合并文件、写 `dist/styles.js` / `styles.d.ts` / `src/styles.ts`、写 `highlight-js-theme-ids.ts`。      |
+| `scripts/build-mk-css.js`                 | 复制 CSS/字体、写合并文件、写 `dist/styles.js` / `styles.d.ts` / `src/highlight/styles.ts`、写 `highlight-js-theme-ids.ts`。      |
 | `tsup.config.ts`                          | 打 `dist/index.{js,cjs}` + `d.ts`；**第二入口** `dist/react/index.{js,cjs}`（Mermaid + React hook）；`noExternal` 打入 `highlight.js` / `markdown-it` / `markdown-it-katex` / `katex`；**`markdown-it-task-lists` 保持外部 import**（见 §6.3、§10）；**`mermaid` 在 react 入口为 external**（见 §11）。 |
-| `src/mermaid-in-markdown.ts`              | 浏览器内对占位 DOM 调用 `mermaid.initialize` / `mermaid.run`，串行队列防并发。                                                                 |
-| `src/mermaid-markdown-selectors.ts`       | **Mermaid 占位 DOM 契约（contract，契约）**：`class` / `data-mermaid` / `querySelector` 选择器 / 空壳 `innerHTML` / Tailwind 任意选择器类名等 **集中导出**；与 `MarkdownParser.patchMermaidFence`、`runMermaidInMarkdownRoot`、前端岛与预览 **同源**，避免解析器改 DOM 时业务侧多处硬编码不同步。 |
+| `src/mermaid/in-markdown.ts`              | 浏览器内对占位 DOM 调用 `mermaid.initialize` / `mermaid.run`，串行队列防并发。                                                                 |
+| `src/mermaid/markdown-selectors.ts`       | **Mermaid 占位 DOM 契约（contract，契约）**：`class` / `data-mermaid` / `querySelector` 选择器 / 空壳 `innerHTML` / Tailwind 任意选择器类名等 **集中导出**；与 `MarkdownParser.patchMermaidFence`、`runMermaidInMarkdownRoot`、前端岛与预览 **同源**，避免解析器改 DOM 时业务侧多处硬编码不同步。 |
 | `src/react/use-mermaid-in-markdown-root.ts` | React：`useLayoutEffect` + 双 `requestAnimationFrame` 后调用上述函数。                                                                        |
 | `src/react/index.ts`                      | 子路径 **`@dnhyxc-ai/tools/react`**：导出 `useMermaidInMarkdownRoot`、`runMermaidInMarkdownRoot` 及类型。                                      |
 | `dist/styles/**`                          | 运行时样式产物（`dist/` 默认不提交，由 CI/本地 `pnpm build` 生成）。                                                    |
@@ -59,7 +59,7 @@
 如确需支持少量 HTML（例如 `details/summary`），再显式传 `new MarkdownParser({ html: true })`，并强烈建议在宿主侧做 **sanitize（清洗）** 白名单。
 
 > 重要：本仓库 `@dnhyxc-ai/tools` 通过 `tsup` 构建输出 `dist/`，前端运行时消费的是 `dist` 产物。  
-> 因此若你修改了 `packages/tools/src/markdown-parser.ts` 的默认行为，需要执行 `pnpm --filter @dnhyxc-ai/tools run build` 让 `dist` 刷新，否则应用可能仍使用旧逻辑。
+> 因此若你修改了 `packages/tools/src/markdown/parser.ts` 的默认行为，需要执行 `pnpm --filter @dnhyxc-ai/tools run build` 让 `dist` 刷新，否则应用可能仍使用旧逻辑。
 
 ### 2.2 代码高亮（highlight.js）
 
@@ -74,7 +74,7 @@
 ### 2.4 聊天围栏代码块工具栏（可选）
 
 - **开关**：`enableChatCodeFenceToolbar: true`。
-- **实现**：覆盖 `md.renderer.rules.fence`，输出固定结构：`chat-md-code-block`、`chat-md-code-toolbar-slot`、`data-chat-code-action="copy|download"`、`data-chat-code-lang` 等；高亮逻辑与默认 `highlight` 回调一致；**DOM 字面量**由 **`markdown-code-fence-dom.ts`** 常量驱动，与 **`markdown-code-fence-actions.ts`**、宿主 **`chatCodeToolbar.ts`** 共用同一套 **TypeScript 公共标识符**（`MARKDOWN_CODE_FENCE_*`）。
+- **实现**：覆盖 `md.renderer.rules.fence`，输出固定结构：`chat-md-code-block`、`chat-md-code-toolbar-slot`、`data-chat-code-action="copy|download"`、`data-chat-code-lang` 等；高亮逻辑与默认 `highlight` 回调一致；**DOM 字面量**由 **`markdown/code-fence-dom.ts`** 常量驱动，与 **`markdown/code-fence-actions.ts`**、宿主 **`chatCodeToolbar.ts`** 共用同一套 **TypeScript 公共标识符**（`MARKDOWN_CODE_FENCE_*`）。
 - **样式与交互**：包内**不**包含工具栏视觉与点击逻辑；宿主（如本仓库 `ChatAssistantMessage` + `index.css` + `chatCodeToolbar`）负责布局与事件。
 - **行尾注释源码摘录**：见 **第 11.8.6.0 小节**。
 
@@ -82,7 +82,7 @@
 
 - **开关**：`enableMermaid` 默认 `true`；`false` 时 ` ```mermaid ` 按普通代码块处理。
 - **解析**：`patchMermaidFence()` 输出占位 DOM；**运行时**由 **`@dnhyxc-ai/tools/react`** 的 **`useMermaidInMarkdownRoot`**（或 **`runMermaidInMarkdownRoot`**）调用 Mermaid API 生成 SVG。
-- **DOM 契约**：wrap / `data-mermaid="1"` / `.mermaid` 及派生选择器由 **`mermaid-markdown-selectors.ts`** 统一维护，并从 **`@dnhyxc-ai/tools`** 导出；宿主自定义预览/取 SVG 时 **优先 import 常量/helper**，见 **§11.2.1**。
+- **DOM 契约**：wrap / `data-mermaid="1"` / `.mermaid` 及派生选择器由 **`mermaid/markdown-selectors.ts`** 统一维护，并从 **`@dnhyxc-ai/tools`** 导出；宿主自定义预览/取 SVG 时 **优先 import 常量/helper**，见 **§11.2.1**。
 - **细节**：与聊天围栏的链式 `fence`、打包 external、宿主 `ref`/`trigger` 约定等见 **§11**。**助手消息流式**正文见 **§11.9**（围栏拆分 + 岛，非整段 `useMermaidInMarkdownRoot`）。
 
 ### 2.6 样式产物（`build-mk-css.js`）
@@ -92,10 +92,10 @@
 3. **KaTeX 字体**：`katex/dist/fonts` → `dist/styles/fonts/`，保证 `katex.min.css` 内相对 `url(fonts/...)` 可解析。
 4. **`markdown-base.css`**：`github-markdown` + `katex` + 脚本内嵌的 **KaTeX 间距补丁**（**不含** highlight.js）。
 5. **`markdown-styles.css`**：上述基础 + **github-dark** + 间距补丁（历史默认「一键全量」）。
-6. **元数据**：根据磁盘上的 hljs 文件生成 `highlightJsThemes`（id → `./styles/hljs/...`）、`highlightJsThemeIds` 数组；写入 `dist/styles.js`、`dist/styles.d.ts`、`src/styles.ts`。
+6. **元数据**：根据磁盘上的 hljs 文件生成 `highlightJsThemes`（id → `./styles/hljs/...`）、`highlightJsThemeIds` 数组；写入 `dist/styles.js`、`dist/styles.d.ts`、`src/highlight/styles.ts`。
 7. **`HighlightJsThemeId` 类型**：根据排序后的 `themeIds` 生成 `src/generated/highlight-js-theme-ids.ts` 中的 **`export type HighlightJsThemeId = | "..." | ...`**，供 TS 补全与 `MarkdownParserOptions.highlightTheme` 使用。
 
-### 2.7 运行时主题注入（`inject-highlight-theme.ts`）
+### 2.7 运行时主题注入（`highlight/inject-theme.ts`）
 
 - **入口**：`applyHighlightJsTheme({ themeId?, themeCss?, onError? })`。
 - **全局单例 DOM**：固定 `id="dnhyxc-ai-tools-hljs-theme"`，每次应用前 `remove()` 旧节点，保证全页**只有一条**由本包管理的主题样式。
@@ -107,7 +107,7 @@
 - **SSR**：无 `document` 时直接 return。
 - **`MarkdownParser` 构造**：若 `injectHighlightTheme !== false`，将 `highlightTheme` / `highlightThemeCss` / `onError` 转给 `applyHighlightJsTheme`。
 
-### 2.8 包说明符解析（`highlight-theme-import.ts`）
+### 2.8 包说明符解析（`highlight/theme-import.ts`）
 
 - **实现**：`highlightJsThemes[themeId]` 取相对路径，去掉 leading `./`，前缀 `@dnhyxc-ai/tools/`，得到例如 `@dnhyxc-ai/tools/styles/hljs/atom-one-dark.min.css`。
 - **类型**：参数为 `HighlightJsThemeId`，非法 id 在运行期抛错。
@@ -215,14 +215,14 @@ const parser = new MarkdownParser({ highlightTheme: "atom-one-dark" });
 
 | 命令                                           | 作用                                                                                                           |
 | ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `pnpm --filter @dnhyxc-ai/tools run clean`     | 删除 `dist/`、`src/styles.ts`（**不删** `src/generated/highlight-js-theme-ids.ts`，由下次 `build:css` 覆盖）。 |
+| `pnpm --filter @dnhyxc-ai/tools run clean`     | 删除 `dist/`、`src/highlight/styles.ts`（**不删** `src/generated/highlight-js-theme-ids.ts`，由下次 `build:css` 覆盖）。 |
 | `pnpm --filter @dnhyxc-ai/tools run build:css` | 跑 `scripts/build-mk-css.js`。                                                                                 |
 | `pnpm --filter @dnhyxc-ai/tools run build`     | `clean` → `build:css` → `tsup`。                                                                               |
 | `prepack`                                      | 等价于 `pnpm build`，发包前保证产物完整。                                                                      |
 
 ### 6.2 修改代码后何时要 build
 
-- 改了 **`markdown-parser.ts`**、**`inject-highlight-theme.ts`**、**`highlight-theme-import.ts`**、**`index.ts`**：至少 **`pnpm build`**（或仅 `tsup` 若 styles 未变）。
+- 改了 **`markdown/parser.ts`**、**`highlight/inject-theme.ts`**、**`highlight/theme-import.ts`**、**`index.ts`**：至少 **`pnpm build`**（或仅 `tsup` 若 styles 未变）。
 - 改了 **`build-mk-css.js`** 或升级 **`highlight.js`**：必须 **`build:css`**（会刷新 `hljs` 文件与 **`highlight-js-theme-ids.ts`**），再 **`tsup`**。
 - **`src/generated/highlight-js-theme-ids.ts`**：应**提交仓库**，这样他人未先 build tools 也能获得正确类型；升级 hljs 后记得重新生成并提交。
 
@@ -290,7 +290,7 @@ const parser = new MarkdownParser({ highlightTheme: "atom-one-dark" });
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
 | **依赖**       | `package.json` 增加 **`markdown-it-task-lists`**（运行时依赖，见 §6.3）。                                                            |
 | **类型**       | `src/types.d.ts` 增加 **`declare module 'markdown-it-task-lists'`**，便于 TypeScript 识别默认导出插件函数。                          |
-| **解析逻辑**   | `src/markdown-parser.ts`：`md.use(markdownItTaskLists, { enabled: false })` + 私有方法 **`patchGfmTaskListBareMarkers()`** + 模块级辅助函数。 |
+| **解析逻辑**   | `src/markdown/parser.ts`：`md.use(markdownItTaskLists, { enabled: false })` + 私有方法 **`patchGfmTaskListBareMarkers()`** + 模块级辅助函数。 |
 | **对外 API**   | **无新增构造参数**；`render()` 签名与选项对象与改动前一致。                                                                          |
 | **样式**       | 仍依赖宿主引入的 **`github-markdown-css`**（如 `styles.css` / `markdown-base.css`）中的 `.contains-task-list`、`.task-list-item-checkbox` 等；本包未新增独立 CSS 文件。 |
 
@@ -369,7 +369,7 @@ const parser = new MarkdownParser({ highlightTheme: "atom-one-dark" });
 | **输出 HTML** | 每条 mermaid 围栏对应：`<div class="markdown-mermaid-wrap" data-mermaid="1"><div class="mermaid">…转义后的 DSL…</div></div>`；**DSL 经 `escapeHtml`**，避免注入 HTML，由 Mermaid 再解析文本。 |
 | **外层容器** | `render()` 仍包裹 **`<div class="${containerClass}">`**（默认 **`markdown-body`**），与 github-markdown-css 一致。 |
 
-### 11.2.1 DOM 契约与选择器 API（`mermaid-markdown-selectors.ts`）
+### 11.2.1 DOM 契约与选择器 API（`mermaid/markdown-selectors.ts`）
 
 **动机（为什么要单独一个模块）**：
 
@@ -379,7 +379,7 @@ const parser = new MarkdownParser({ highlightTheme: "atom-one-dark" });
 
 **方案（集中管理 + 从主包导出）**：
 
-- 在 `packages/tools/src/mermaid-markdown-selectors.ts` 维护 **唯一真源（single source of truth）**：class 常量、派生选择器、常用 `querySelector`/`closest` helper、以及 **空壳占位 HTML**（与 `patchMermaidFence` 结构对齐）。
+- 在 `packages/tools/src/mermaid/markdown-selectors.ts` 维护 **唯一真源（single source of truth）**：class 常量、派生选择器、常用 `querySelector`/`closest` helper、以及 **空壳占位 HTML**（与 `patchMermaidFence` 结构对齐）。
 - 通过 `@dnhyxc-ai/tools` 主入口 **导出**（见 `packages/tools/src/index.ts`），业务侧只 import 常量/函数，不再复制粘贴选择器字符串。
 
 **常用导出（名称以源码为准）**：
@@ -394,7 +394,7 @@ const parser = new MarkdownParser({ highlightTheme: "atom-one-dark" });
 | `MARKDOWN_MERMAID_TAILWIND_CURSOR_ZOOM_IN_CLASS` | Tailwind arbitrary class：`[&_.markdown-mermaid-wrap_.mermaid]:cursor-zoom-in`（由常量模板拼接，避免手写出错） |
 | `queryMermaidMarkdownEntryNodes` / `queryFirstMermaidMarkdownWrap` / `closestMermaidMarkdownWrap` | 统一查询语义，减少业务侧 `querySelector` 拼写差异 |
 
-**对应实现代码（每行行尾 `//` 中文注释）**：见 **§11.2.2**（含 `mermaid-markdown-selectors.ts`、`mermaid-in-markdown.ts`、`patchMermaidFence` 节选与前端调用节选）。
+**对应实现代码（每行行尾 `//` 中文注释）**：见 **§11.2.2**（含 `mermaid/markdown-selectors.ts`、`mermaid/in-markdown.ts`、`patchMermaidFence` 节选与前端调用节选）。
 
 **兼容性注意（行为可能变严格的边界）**：
 
@@ -405,12 +405,12 @@ const parser = new MarkdownParser({ highlightTheme: "atom-one-dark" });
 
 ### 11.2.2 实现源码摘录（代码块内行尾中文注释）
 
-> **维护约定**：下列代码块为「教学式」**行尾 `//` 中文注释**摘录，**逻辑须与仓库源码一致**；若你修改了 `packages/tools/src/mermaid-markdown-selectors.ts` 等实现，请同步更新本节（行号/变量名以 **`packages/tools/src/**` 与 `apps/frontend/src/**` 为准**）。
+> **维护约定**：下列代码块为「教学式」**行尾 `//` 中文注释**摘录，**逻辑须与仓库源码一致**；若你修改了 `packages/tools/src/mermaid/markdown-selectors.ts` 等实现，请同步更新本节（行号/变量名以 **`packages/tools/src/**` 与 `apps/frontend/src/**` 为准**）。
 
-#### A. `packages/tools/src/mermaid-markdown-selectors.ts`（契约真源）
+#### A. `packages/tools/src/mermaid/markdown-selectors.ts`（契约真源）
 
 ```typescript
-// 源路径：packages/tools/src/mermaid-markdown-selectors.ts
+// 源路径：packages/tools/src/mermaid/markdown-selectors.ts
 // 作用：集中导出 Mermaid 占位 DOM 的 class、data-*、派生选择器、空壳 HTML、Tailwind 任意类名及查询 helper
 
 export const MARKDOWN_MERMAID_WRAP_CLASS = 'markdown-mermaid-wrap'; // 外层包裹容器 class（与 MarkdownParser.patchMermaidFence 输出一致）
@@ -446,14 +446,14 @@ export const MARKDOWN_MERMAID_PLACEHOLDER_HTML =
 	`</div></div>`; // 闭合标签：与 patchMermaidFence 层级一致（无换行后缀，调用方可自行加 \n）
 ```
 
-#### B. `packages/tools/src/mermaid-in-markdown.ts`（运行时扫描 + `mermaid.run`）
+#### B. `packages/tools/src/mermaid/in-markdown.ts`（运行时扫描 + `mermaid.run`）
 
 ```typescript
-// 源路径：packages/tools/src/mermaid-in-markdown.ts
+// 源路径：packages/tools/src/mermaid/in-markdown.ts
 // 作用：在已挂载 DOM 上串行执行 mermaid.initialize / mermaid.run，避免并发 run 破坏 Mermaid 内部状态
 
 import mermaid from 'mermaid'; // Mermaid 运行时：在 react 入口被标记为 external，由宿主打包器解析
-import { queryMermaidMarkdownEntryNodes } from './mermaid-markdown-selectors.js'; // 统一入口查询：避免本文件硬编码选择器字符串
+import { queryMermaidMarkdownEntryNodes } from './markdown-selectors.js'; // 统一入口查询：避免本文件硬编码选择器字符串
 
 let runQueue: Promise<void> = Promise.resolve(); // 模块级 Promise 链：把多次 run 串行化
 let lastMermaidInitSignature = ''; // 记录上次 initialize 的「主题签名」，避免每次 run 都 initialize
@@ -482,7 +482,7 @@ export async function runMermaidInMarkdownRoot(
 
 	const task = async (): Promise<void> => {
 		// 从 root 全子树收集：避免 shell 内多个 .markdown-body（正文 + 思考区）时只命中第一个容器
-		const nodes = queryMermaidMarkdownEntryNodes(root); // 统一选择器：见 mermaid-markdown-selectors.ts
+		const nodes = queryMermaidMarkdownEntryNodes(root); // 统一选择器：见 mermaid/markdown-selectors.ts
 		if (nodes.length === 0) return; // 无入口节点：不调用 mermaid.run，减少无意义工作
 
 		try {
@@ -503,9 +503,9 @@ export async function runMermaidInMarkdownRoot(
 }
 ```
 
-#### C. `packages/tools/src/markdown-parser.ts`：`patchMermaidFence` 的 mermaid 分支（节选）
+#### C. `packages/tools/src/markdown/parser.ts`：`patchMermaidFence` 的 mermaid 分支（节选）
 
-> 说明：文件顶部需已从 `./mermaid-markdown-selectors.js` 引入 `MARKDOWN_MERMAID_WRAP_CLASS` / `MARKDOWN_MERMAID_WRAP_DATA_ATTR` / `MARKDOWN_MERMAID_WRAP_DATA_VALUE` / `MERMAID_ENTRY_CLASS`；并与 `normalizeMermaidFenceBody`、`escapeHtml` 配合。
+> 说明：文件顶部需已从 **`../mermaid/markdown-selectors.js`**（源码为 `markdown/parser.ts` 同级的 `mermaid/markdown-selectors.ts`）引入 `MARKDOWN_MERMAID_WRAP_CLASS` / `MARKDOWN_MERMAID_WRAP_DATA_ATTR` / `MARKDOWN_MERMAID_WRAP_DATA_VALUE` / `MERMAID_ENTRY_CLASS`；并与 `normalizeMermaidFenceBody`、`escapeHtml` 配合。
 
 ```typescript
 // 节选：md.renderer.rules.fence 内 langName.toLowerCase() === 'mermaid' 分支的 return
@@ -631,7 +631,7 @@ Mermaid 输出以 **SVG** 为主。本仓库前端在 **`apps/frontend/src/index
 
 以下与仓库 **`packages/tools/src/`** 中当前实现 **一一对应**（行号随文件演进可能漂移，以源码为准）。
 
-#### 11.8.0 `src/mermaid-markdown-selectors.ts`（契约模块）
+#### 11.8.0 `src/mermaid/markdown-selectors.ts`（契约模块）
 
 | 片段 | 说明 |
 | ---- | ---- |
@@ -643,12 +643,12 @@ Mermaid 输出以 **SVG** 为主。本仓库前端在 **`apps/frontend/src/index
 
 **带行尾注释的完整摘录**：见 **§11.2.2 节 A**（与仓库源码对齐维护）。
 
-#### 11.8.1 `src/mermaid-in-markdown.ts`
+#### 11.8.1 `src/mermaid/in-markdown.ts`
 
 | 行号 | 代码 | 说明 |
 | ---- | ---- | ---- |
 | 1 | `import mermaid from 'mermaid'` | 引入 Mermaid 运行时（由应用打包器从 `node_modules` 解析，见 §11.4）。 |
-| 2 | `import { queryMermaidMarkdownEntryNodes } from './mermaid-markdown-selectors.js'` | 从 **`mermaid-markdown-selectors.ts`** 引入统一查询；**避免**在本文件硬编码 `.markdown-mermaid-wrap…` 选择器字符串（见 **§11.2.1**）。 |
+| 2 | `import { queryMermaidMarkdownEntryNodes } from './markdown-selectors.js'` | 从 **`mermaid/markdown-selectors.ts`** 引入统一查询；**避免**在本文件硬编码 `.markdown-mermaid-wrap…` 选择器字符串（见 **§11.2.1**）。 |
 | 4–5 | `let runQueue = Promise.resolve()` | **模块级串行队列**：多次调用 `runMermaidInMarkdownRoot` 时通过 `.then` 链排队，避免并行 `mermaid.run`。 |
 | 21–26 | `export type RunMermaidInMarkdownOptions` | **`preferDark`**、可选 **`suppressErrors`**（显式 **`true`** 时传入 **`mermaid.run`**，流式岛等场景用）。 |
 | 28–31 | JSDoc | 说明函数职责及与 `@dnhyxc-ai/tools/react`、**external `mermaid`** 的关系（详见 §11.4）。 |
@@ -656,7 +656,7 @@ Mermaid 输出以 **SVG** 为主。本仓库前端在 **`apps/frontend/src/index
 | 36 | `if (!root) return` | 无 DOM 根则跳过。 |
 | 38 | `const task = async () => { ... }` | 真正工作放在 **串行队列** 的异步函数内。 |
 | （模块级） | `ensureMermaidInitialized` / `lastMermaidInitSignature` | **仅在主题签名变化时**调用 **`mermaid.initialize`**，避免每次 `run` 重置内部状态导致闪烁。 |
-| 39–41 | 注释 + `queryMermaidMarkdownEntryNodes(root)` + `nodes.length` 判断 | 在 **`root` 整棵子树**上收集 Mermaid 入口节点；选择器由 **`mermaid-markdown-selectors.ts`** 统一维护。 |
+| 39–41 | 注释 + `queryMermaidMarkdownEntryNodes(root)` + `nodes.length` 判断 | 在 **`root` 整棵子树**上收集 Mermaid 入口节点；选择器由 **`mermaid/markdown-selectors.ts`** 统一维护。 |
 | 43–48 | `ensureMermaidInitialized` + `mermaid.run` | **`suppressErrors: options?.suppressErrors === true`**：仅显式传 **`true`** 时抑制错误（流式岛场景）；默认 **`false`**。 |
 | 49–53 | `catch` + `console.warn` | 将 Mermaid 运行期错误降级为 **`[mermaid-in-markdown]`** 警告，避免静默失败难排查。 |
 | 56–57 | `runQueue` 链式 + `await runQueue` | 串行队列：**本次 task 入队**并 **await** 至完成，保证多次触发时顺序执行。 |
@@ -681,7 +681,7 @@ Mermaid 输出以 **SVG** 为主。本仓库前端在 **`apps/frontend/src/index
 | 3–7 | 类型再导出 | 供 TypeScript 用户引用 **`UseMermaidInMarkdownRootParams`** 等。 |
 | 7 | `useMermaidInMarkdownRoot` | React 集成主入口。 |
 
-#### 11.8.4 `src/markdown-parser.ts`（Mermaid 相关片段）
+#### 11.8.4 `src/markdown/parser.ts`（Mermaid 相关片段）
 
 | 行号（约） | 代码 | 说明 |
 | ---------- | ---- | ---- |
@@ -693,7 +693,7 @@ Mermaid 输出以 **SVG** 为主。本仓库前端在 **`apps/frontend/src/index
 | 298–303 | 新 `fence`：读取 `env.enableMermaid ?? this.enableMermaid` | **渲染期可控**：同一实例可按“本次渲染”开关 Mermaid，占位 DOM 输出与否不再只能在构造时决定。 |
 | 304–309 | 解析 `token.info` 得 `langName` | 与 highlight、聊天 fence 一致：取 info 第一段为语言名。 |
 | 310–317 | `langName.toLowerCase() === 'mermaid'` 分支 | **DSL** 使用 **`escapeHtml(token.content)`** 再写入 innerHTML 安全文本节点路径（浏览器解析后内容为纯文本，Mermaid 读取文本）。 |
-| 307–310（约） | 外层 **`markdown-mermaid-wrap`** + **`data-mermaid="1"`** | 与 **`runMermaidInMarkdownRoot`** / **`MERMAID_MARKDOWN_ENTRY_SELECTOR`** 一致；实现上由 **`mermaid-markdown-selectors.ts`** 的常量拼接生成，避免 class/`data-*` 与扫描逻辑漂移。内层 **`class="mermaid"`** 为 Mermaid 约定入口。 |
+| 307–310（约） | 外层 **`markdown-mermaid-wrap`** + **`data-mermaid="1"`** | 与 **`runMermaidInMarkdownRoot`** / **`MERMAID_MARKDOWN_ENTRY_SELECTOR`** 一致；实现上由 **`mermaid/markdown-selectors.ts`** 的常量拼接生成，避免 class/`data-*` 与扫描逻辑漂移。内层 **`class="mermaid"`** 为 Mermaid 约定入口。 |
 | 313 | `return prev(...)` | 非 mermaid 走原规则（默认高亮或聊天块等）。 |
 
 #### 11.8.5 本轮补充：`render(text, { enableMermaid })`（避免重复 new parser）
@@ -714,7 +714,7 @@ Mermaid 输出以 **SVG** 为主。本仓库前端在 **`apps/frontend/src/index
 关键代码（与仓库一致）：
 
 ```ts
-// packages/tools/src/markdown-parser.ts
+// packages/tools/src/markdown/parser.ts
 export type MarkdownRenderOptions = {
 	/** 本次渲染是否启用 Mermaid 占位 DOM 输出（未提供则回退实例默认） */
 	enableMermaid?: boolean;
@@ -735,7 +735,7 @@ public render(text: string, renderOptions: MarkdownRenderOptions = {}): string {
 
 ---
 
-#### 11.8.6 本轮补充：代码块复制/下载动作下沉（`markdown-code-fence-actions.ts`）
+#### 11.8.6 本轮补充：代码块复制/下载动作下沉（`markdown/code-fence-actions.ts`）
 
 **动机**：
 
@@ -748,7 +748,7 @@ public render(text: string, renderOptions: MarkdownRenderOptions = {}): string {
 
 **方案**：将“解析点击目标 → 提取代码块文本/语言/文件名 → 分发动作”的逻辑做成工具层 API。
 
-工具侧核心导出（见 `packages/tools/src/markdown-code-fence-actions.ts`）：
+工具侧核心导出（见 `packages/tools/src/markdown/code-fence-actions.ts`）：
 
 - `bindMarkdownCodeFenceActions(root, options)`：绑定点击事件并分发 `copy/download`
   - **默认 copy**：`enableDefaultCopy !== false` 时调用 `navigator.clipboard.writeText(code)`
@@ -757,28 +757,28 @@ public render(text: string, renderOptions: MarkdownRenderOptions = {}): string {
 - `downloadMarkdownCodeFenceWith(info, download)`：把 `code` 转为 `Blob` 并交给宿主的下载器执行（Web/Tauri/Electron 统一入口）
 - `createMarkdownCodeFenceInfo({ code, lang, filename })`：不依赖 DOM 构造下载信息（适用于 Mermaid 代码模式等“只有文本”的场景）
 
-#### 11.8.6.0 Markdown 围栏代码块 DOM 契约（`markdown-code-fence-dom.ts` + 行尾注释摘录）
+#### 11.8.6.0 Markdown 围栏代码块 DOM 契约（`markdown/code-fence-dom.ts` + 行尾注释摘录）
 
 **动机**：
 
-- `MarkdownParser` 与 **`markdown-code-fence-actions.ts`**、前端 **`layoutChatCodeToolbars`** 历史上各自手写 **`[data-chat-code-block]`**、**`.chat-md-code-toolbar`**、**`pre code`** 等字符串；解析器若调整占位结构，容易出现 **漏改/半改**。
+- `MarkdownParser` 与 **`markdown/code-fence-actions.ts`**、前端 **`layoutChatCodeToolbars`** 历史上各自手写 **`[data-chat-code-block]`**、**`.chat-md-code-toolbar`**、**`pre code`** 等字符串；解析器若调整占位结构，容易出现 **漏改/半改**。
 - 与 **§11.2.1 / §11.2.2（Mermaid 契约）** 同理：把「**可被 `querySelector` 复用的契约**」收口到 **单一模块**，由 **`@dnhyxc-ai/tools`** 导出 **公共标识符**（`MARKDOWN_CODE_FENCE_*`），避免命名像「仅聊天场景」导致误读。
 
 **方案**：
 
-1. **`packages/tools/src/markdown-code-fence-dom.ts`**：维护 **class / `data-*` 字面量** 与 **派生选择器**、**`queryMarkdownCodeFenceBlockRoots`**。
+1. **`packages/tools/src/markdown/code-fence-dom.ts`**：维护 **class / `data-*` 字面量** 与 **派生选择器**、**`queryMarkdownCodeFenceBlockRoots`**。
 2. **`MarkdownParser.patchChatCodeFenceRenderer`**：HTML 模板字符串 **只拼接上述常量**，保证输出与契约 **字节级一致**。
-3. **`markdown-code-fence-actions.ts`**：`getMarkdownCodeFencePlainText` / `resolveMarkdownCodeFenceActionPayload` / `showMarkdownCodeFenceCopiedFeedback` 默认属性名 **全部引用该模块**。
+3. **`markdown/code-fence-actions.ts`**：`getMarkdownCodeFencePlainText` / `resolveMarkdownCodeFenceActionPayload` / `showMarkdownCodeFenceCopiedFeedback` 默认属性名 **全部引用该模块**。
 4. **`apps/frontend/src/utils/chatCodeToolbar.ts`**：浮动吸顶布局 **import 同一套选择器**；**`[data-chat-assistant-shell]`** 为 **宿主消息壳**（非解析器输出），保留为 **`CHAT_ASSISTANT_SHELL_SELECTOR`** 常量 + 注释，由前端维护。
 
-**维护约定**：修改围栏 DOM 时，**必须**同步更新 **`markdown-code-fence-dom.ts`** 与 **`markdown-parser.ts`** 模板；宿主若改消息壳属性名，只改 **`chatCodeToolbar.ts`** 顶部常量。
+**维护约定**：修改围栏 DOM 时，**必须**同步更新 **`markdown/code-fence-dom.ts`** 与 **`markdown/parser.ts`** 模板；宿主若改消息壳属性名，只改 **`chatCodeToolbar.ts`** 顶部常量。
 
 ---
 
-##### A. `packages/tools/src/markdown-code-fence-dom.ts`（全文：行尾 `//` 中文注释）
+##### A. `packages/tools/src/markdown/code-fence-dom.ts`（全文：行尾 `//` 中文注释）
 
 ```typescript
-// 源路径：packages/tools/src/markdown-code-fence-dom.ts
+// 源路径：packages/tools/src/markdown/code-fence-dom.ts
 // 作用：Markdown 围栏「带复制/下载工具栏」输出的 DOM 契约（公共导出，非仅聊天）
 
 export const MARKDOWN_CODE_FENCE_BLOCK_WRAPPER_CLASS = 'chat-md-code-block'; // 外层包裹 class：历史名保留，兼容 index.css
@@ -805,7 +805,7 @@ export function queryMarkdownCodeFenceBlockRoots(root: ParentNode): NodeListOf<H
 }
 ```
 
-##### B. `packages/tools/src/markdown-parser.ts`：`patchChatCodeFenceRenderer` 的 `return`（节选，行尾注释）
+##### B. `packages/tools/src/markdown/parser.ts`：`patchChatCodeFenceRenderer` 的 `return`（节选，行尾注释）
 
 ```typescript
 // 节选：仅展示拼接 HTML 的 return；前后 token/highlight 逻辑见源码
@@ -830,17 +830,17 @@ return (
 );
 ```
 
-##### C. `packages/tools/src/markdown-code-fence-actions.ts`（节选：查询与复制状态，行尾注释）
+##### C. `packages/tools/src/markdown/code-fence-actions.ts`（节选：查询与复制状态，行尾注释）
 
 ```typescript
-// 节选：import 自 markdown-code-fence-dom.js（路径以 tsup 编译为准）
+// 节选：import 自同目录 code-fence-dom.js（路径以 tsup 编译为准）
 import {
 	MARKDOWN_CODE_FENCE_ACTION_BUTTON_SELECTOR, // [data-chat-code-action]
 	MARKDOWN_CODE_FENCE_BLOCK_ROOT_SELECTOR, // [data-chat-code-block]
 	MARKDOWN_CODE_FENCE_DATA_COPY_STATE_ATTR, // data-chat-code-copied
 	MARKDOWN_CODE_FENCE_SOURCE_CODE_SELECTOR, // pre code
 	MARKDOWN_CODE_FENCE_TOOLBAR_LANG_SELECTOR, // .chat-md-code-lang
-} from './markdown-code-fence-dom.js';
+} from './code-fence-dom.js';
 
 export function getMarkdownCodeFencePlainText(block: HTMLElement): string {
 	const code = block.querySelector(MARKDOWN_CODE_FENCE_SOURCE_CODE_SELECTOR); // 取源码：textContent 避免 hljs span 干扰“复制纯文本”语义
@@ -886,12 +886,12 @@ const langSpan = winner.block.querySelector(MARKDOWN_CODE_FENCE_TOOLBAR_LANG_SEL
 工具侧通过 `closest(...)` 自底向上定位按钮与代码块，再统一提取代码文本/语言/文件名：
 
 ```ts
-// packages/tools/src/markdown-code-fence-actions.ts（核心逻辑摘录；与实现一致：选择器来自 markdown-code-fence-dom）
+// packages/tools/src/markdown/code-fence-actions.ts（核心逻辑摘录；与实现一致：选择器来自 code-fence-dom）
 import {
 	MARKDOWN_CODE_FENCE_ACTION_BUTTON_SELECTOR,
 	MARKDOWN_CODE_FENCE_BLOCK_ROOT_SELECTOR,
 	MARKDOWN_CODE_FENCE_DATA_ACTION_ATTR,
-} from './markdown-code-fence-dom.js';
+} from './code-fence-dom.js';
 
 export function resolveMarkdownCodeFenceActionPayload(target, root, options) {
 	// 1) 找按钮：允许点在 <span>/<svg> 等子节点上，统一向上找最近的 action 按钮
@@ -917,8 +917,8 @@ export function resolveMarkdownCodeFenceActionPayload(target, root, options) {
 - 文件名：默认 `code.<ext>`，也允许宿主通过 `getFilename(...)` 自定义
 
 ```ts
-// packages/tools/src/markdown-code-fence-actions.ts（核心逻辑摘录；与实现一致）
-import { MARKDOWN_CODE_FENCE_TOOLBAR_LANG_SELECTOR } from './markdown-code-fence-dom.js';
+// packages/tools/src/markdown/code-fence-actions.ts（核心逻辑摘录；与实现一致）
+import { MARKDOWN_CODE_FENCE_TOOLBAR_LANG_SELECTOR } from './code-fence-dom.js';
 
 export function getMarkdownCodeFenceInfo(block, { getFilename } = {}) {
 	const code = getMarkdownCodeFencePlainText(block);
@@ -945,7 +945,7 @@ export function getMarkdownCodeFenceInfo(block, { getFilename } = {}) {
   - 约 1.5s 后恢复原文案
 
 ```ts
-// packages/tools/src/markdown-code-fence-actions.ts（核心逻辑摘录）
+// packages/tools/src/markdown/code-fence-actions.ts（核心逻辑摘录）
 if (payload.action === 'copy') {
 	if (options.onCopy) {
 		await options.onCopy(payload);
@@ -963,7 +963,7 @@ if (payload.action === 'copy') {
 下载在不同平台差异很大（Web / Tauri / Electron），所以工具包不强行决定怎么写文件，而是把“下载任务”结构化后交给宿主：
 
 ```ts
-// packages/tools/src/markdown-code-fence-actions.ts（核心逻辑摘录）
+// packages/tools/src/markdown/code-fence-actions.ts（核心逻辑摘录）
 export async function downloadMarkdownCodeFenceWith(info, download) {
 	const blob = new Blob([info.code], { type: 'text/plain;charset=utf-8' });
 	await download({
@@ -1124,4 +1124,4 @@ await downloadMarkdownCodeFenceWith(info, (task) =>
 
 ---
 
-_文档与 `packages/tools` 及本仓库 `apps/frontend` 当前实现对齐；升级 `highlight.js` 后请同步更新 `inject-highlight-theme.ts` 内 `HLJS_CDN_VERSION` 并重新执行 `build:css`。_
+_文档与 `packages/tools` 及本仓库 `apps/frontend` 当前实现对齐；升级 `highlight.js` 后请同步更新 `highlight/inject-theme.ts` 内 `HLJS_CDN_VERSION` 并重新执行 `build:css`。_

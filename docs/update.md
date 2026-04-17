@@ -1306,7 +1306,7 @@ git diff ba10fff^...HEAD -- \
 
 | 文件 | 改动性质 |
 |------|----------|
-| `packages/tools/src/markdown-parser.ts` | fence HTML 增加外层 `chat-md-code-toolbar-slot`（改后需 `pnpm --filter @dnhyxc-ai/tools build`）。 |
+| `packages/tools/src/markdown/parser.ts` | fence HTML 增加外层 `chat-md-code-toolbar-slot`（改后需 `pnpm --filter @dnhyxc-ai/tools build`）。 |
 | `apps/frontend/src/utils/chatCodeToolbar.ts` | 新增/替换为 store + `layoutChatCodeToolbars` + `getPinnedChatCodeBlock` 等；移除旧的 `subscribe`/`notify`/`updateChatCodeToolbarsInShell`（若仍有引用需删）。 |
 | `apps/frontend/src/components/design/ChatCodeToolBar/index.tsx` | 浮动工具栏组件（默认导出；`ChatBotView` 从 `@design/ChatCodeToolBar` 引入）。 |
 | `apps/frontend/src/components/design/ChatAssistantMessage/index.tsx` | 根节点 `data-chat-assistant-shell`；移除对 `subscribeChatCodeToolbarScrollSync` / `notify` / `updateChatCodeToolbarsInShell` 的 effect；保留内联按钮事件委托。 |
@@ -1315,7 +1315,7 @@ git diff ba10fff^...HEAD -- \
 
 ---
 
-### 9.3 `packages/tools/src/markdown-parser.ts`（fence 模板）
+### 9.3 `packages/tools/src/markdown/parser.ts`（fence 模板）
 
 **功能点**：仅在 `options.enableChatCodeFenceToolbar === true` 时 `patchChatCodeFenceRenderer()` 覆盖 `md.renderer.rules.fence`。
 
@@ -1497,7 +1497,7 @@ flowchart LR
 ### 9.10 构建与联调命令
 
 ```bash
-# 修改 markdown-parser 后必做
+# 修改 packages/tools/src/markdown/parser.ts 后必做
 pnpm --filter @dnhyxc-ai/tools run build
 
 # 前端类型检查

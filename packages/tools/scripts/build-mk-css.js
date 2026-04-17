@@ -331,8 +331,14 @@ export declare const styleContents: {
 `;
 fs.writeFileSync(stylesDtsPath, stylesDtsContent);
 
-// 创建 src/styles.ts 文件，用于 TypeScript 类型和开发环境（tsup 打包）
-const srcStylesPath = path.join(__dirname, '..', 'src', 'styles.ts');
+// 创建 src/highlight/styles.ts，用于 TypeScript 类型和开发环境（tsup 打包）
+const srcStylesPath = path.join(
+	__dirname,
+	'..',
+	'src',
+	'highlight',
+	'styles.ts',
+);
 const srcStylesContent = `// 由 scripts/build-mk-css.js 生成，请勿手改
 
 /** 与 highlightJsThemeIds 中每一项对应，键含 base16/ 等子路径时用斜杠 */

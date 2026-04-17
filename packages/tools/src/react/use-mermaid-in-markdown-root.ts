@@ -1,5 +1,5 @@
 import { type RefObject, useEffect, useLayoutEffect, useRef } from 'react';
-import { runMermaidInMarkdownRoot } from '../mermaid-in-markdown.js';
+import { runMermaidInMarkdownRoot } from '../mermaid/in-markdown.js';
 
 /** 与 `MarkdownParser` 实例兼容，仅需 `enableMermaid`（与构造选项 `enableMermaid` 一致） */
 export type MermaidMarkdownParserLike = {

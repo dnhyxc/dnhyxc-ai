@@ -1,5 +1,5 @@
 import mermaid from 'mermaid';
-import { queryMermaidMarkdownEntryNodes } from './mermaid-markdown-selectors.js';
+import { queryMermaidMarkdownEntryNodes } from './markdown-selectors.js';
 
 /** 避免多处同时 `mermaid.run` 打乱内部状态 */
 let runQueue: Promise<void> = Promise.resolve();

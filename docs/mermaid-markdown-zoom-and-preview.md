@@ -6,7 +6,7 @@
 
 **问题**：占位结构由 `MarkdownParser` 输出，但「取 SVG / closest wrap / 岛内写空壳 HTML / Tailwind 任意选择器」等逻辑历史上分散在前端与工具包各处；若用复制粘贴的 `querySelector('.markdown-mermaid-wrap …')` 字符串，**解析器一改 DOM**，很容易出现 **漏改**。
 
-**现状（与仓库实现一致）**：在 `packages/tools/src/mermaid-markdown-selectors.ts` 维护 **单一真源**，并由 `@dnhyxc-ai/tools` 主入口导出，例如：
+**现状（与仓库实现一致）**：在 `packages/tools/src/mermaid/markdown-selectors.ts` 维护 **单一真源**，并由 `@dnhyxc-ai/tools` 主入口导出，例如：
 
 - **扫描渲染入口**：`MERMAID_MARKDOWN_ENTRY_SELECTOR`（供 `runMermaidInMarkdownRoot` 内部 `querySelectorAll` 使用）
 - **读已渲染 SVG**：`MERMAID_MARKDOWN_SVG_SELECTOR`（预览/下载）
@@ -32,7 +32,7 @@
 ```text
 Markdown 源码
     ↓
-MarkdownParser.patchMermaidFence → 占位 HTML（wrap + `data-mermaid="1"` + `.mermaid`；契约常量见 `mermaid-markdown-selectors.ts`）
+MarkdownParser.patchMermaidFence → 占位 HTML（wrap + `data-mermaid="1"` + `.mermaid`；契约常量见 `mermaid/markdown-selectors.ts`）
     ↓
 dangerouslySetInnerHTML 写入预览根节点
     ↓
@@ -65,11 +65,11 @@ useMermaidDiagramClickPreview（岛 host 或预览根）：点击 SVG → ImageP
 
 - **渲染入口（路径 A）**：`MarkdownParser` 在 `enableMermaid !== false` 时对 ` ```mermaid ` 输出占位节点；`escapeHtml` 之前经 **`normalizeMermaidFenceBody`** 做换行统一与部分方括号文案补引号（见 **§7.5**）。
 - **渲染入口（路径 B）**：岛内用 **`textContent = normalizeMermaidFenceBody(code)`** 写入 DSL，再 **`runMermaidInMarkdownRoot(host)`**；根节点上的 **`useMermaidInMarkdownRoot` 通过 `parser.enableMermaid: false` 关闭**，避免重复扫描。
-- **全局队列**：`mermaid-in-markdown.ts` 内 `runQueue` 串行化 `mermaid.run`。
+- **全局队列**：`mermaid/in-markdown.ts` 内 `runQueue` 串行化 `mermaid.run`。
 - **缩放（可选）**：见 **§3、§4** 参考实现（带缩放壳 DOM）。
 - **预览（当前仓库）**：`mermaidSvgToPreviewDataUrl` + `ImagePreview`；点击委托忽略 `.markdown-mermaid-zoom-chrome`（**§6**）。
 
-> **与当前仓库对齐**：`packages/tools` 为「单层 `wrap` + `.mermaid`」的 `patchMermaidFence` + `normalizeMermaidFenceBody`；`mermaid-in-markdown.ts` 为精简版。**§3、§4** 为「带缩放壳」的参考实现。**§7** 描述 **围栏拆分 + `MermaidFenceIsland`** 的完整实现与逐行注释代码。**§8** 描述 **Monaco `ParserMarkdownPreviewPane`** 如何在路径 A / B 间切换。
+> **与当前仓库对齐**：`packages/tools` 为「单层 `wrap` + `.mermaid`」的 `patchMermaidFence` + `normalizeMermaidFenceBody`；`mermaid/in-markdown.ts` 为精简版。**§3、§4** 为「带缩放壳」的参考实现。**§7** 描述 **围栏拆分 + `MermaidFenceIsland`** 的完整实现与逐行注释代码。**§8** 描述 **Monaco `ParserMarkdownPreviewPane`** 如何在路径 A / B 间切换。
 
 ---
 
@@ -697,7 +697,7 @@ export function mermaidStreamingFallbackHtml(code: string): string {
 
 ### 7.1.1 `MarkdownParser.splitForMermaidIslands`：与渲染器同源的拆分（推荐）
 
-位置：`packages/tools/src/markdown-parser.ts`
+位置：`packages/tools/src/markdown/parser.ts`
 
 实现要点：
 
@@ -1165,7 +1165,7 @@ const onCopy = async () => {
 };
 ```
 
-### 7.4 `normalizeMermaidFenceBody` 与 `patchMermaidFence`（`packages/tools/src/markdown-parser.ts`）
+### 7.4 `normalizeMermaidFenceBody` 与 `patchMermaidFence`（`packages/tools/src/markdown/parser.ts`）
 
 - **`normalizeMermaidFenceBody`**：导出函数；`\r\n`/`\r` → `\n`；对 **未加引号** 且含 **`/`** 或 **`+`** 的 `subgraph … […]` / `nodeId[…]` 自动包一层双引号（跳过 `[/…/]` 梯形节点外观）。降低 Mermaid 解析失败导致预览只剩 DSL 文本的概率。
 - **`patchMermaidFence`**：在 `escapeHtml` **之前**调用 `normalizeMermaidFenceBody(token.content)`，再写入占位 div（**路径 A** 的 HTML 输出与岛内 `textContent` 使用同一套预处理）。
@@ -1397,9 +1397,9 @@ useMermaidDiagramClickPreview(
 
 | 能力                       | 典型路径                                                                                               |
 | -------------------------- | ------------------------------------------------------------------------------------------------------ |
-| Fence 占位 + DSL 预处理    | `packages/tools/src/markdown-parser.ts`（`patchMermaidFence`、`normalizeMermaidFenceBody` 等）        |
+| Fence 占位 + DSL 预处理    | `packages/tools/src/markdown/parser.ts`（`patchMermaidFence`、`normalizeMermaidFenceBody` 等）        |
 | `normalizeMermaidFenceBody` 导出 | `packages/tools/src/index.ts`（再导出供前端 `@dnhyxc-ai/tools` 引用）                             |
-| `mermaid.run` 与队列       | `packages/tools/src/mermaid-in-markdown.ts`                                                            |
+| `mermaid.run` 与队列       | `packages/tools/src/mermaid/in-markdown.ts`                                                            |
 | React 调度                 | `packages/tools/src/react/use-mermaid-in-markdown-root.ts`                                             |
 | 按围栏拆分                 | `apps/frontend/src/utils/splitMarkdownFences.ts`                                                       |
 | 单块 Mermaid 岛            | `apps/frontend/src/components/design/MermaidFenceIsland.tsx`                                           |

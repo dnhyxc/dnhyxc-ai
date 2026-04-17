@@ -42,7 +42,7 @@
    - 拆分后拼接丢失段末换行：`### 标题\n` 与下一段 ```lang 粘连成同一行，围栏失效；
    - 与渲染器（markdown-it）解析边界不一致：拆分认为是 fence，渲染器认为不是（或反之）。
    
-   当前仓库在 `packages/tools/src/markdown-parser.ts` 中新增 `MarkdownParser.splitForMermaidIslands`：
+   当前仓库在 `packages/tools/src/markdown/parser.ts` 中新增 `MarkdownParser.splitForMermaidIslands`：
    - **始终使用 `markdown-it` 的 `parse()`** 得到 fence token；
    - 仅把 ` ```mermaid ` fence 拆成 `type:'mermaid'` 岛，其它 fence 原文保持为 markdown 段交给 `render()`；
    - 切片时**保留段末换行**，避免围栏粘连。
@@ -80,7 +80,7 @@ markdownFenceLineParser.ts
           splitOpenMermaidTail（流式尾部开放 mermaid 探测：只对尾部做按行扫描）
           （聊天 StreamingMarkdownBody、Monaco/preview.tsx 使用：闭合 fence 交给 splitForMermaidIslands）
 
-packages/tools/src/markdown-parser.ts
+packages/tools/src/markdown/parser.ts
     └── MarkdownParser.splitForMermaidIslands（markdown-it parse，同源拆分；保障普通代码块渲染）
           （聊天 StreamingMarkdownBody、Monaco/preview.tsx）
 ```

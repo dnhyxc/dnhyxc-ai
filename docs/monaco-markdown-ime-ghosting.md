@@ -143,7 +143,7 @@ MobX/React 回显时，若 `value` 与编辑器当前内容一致但仍是「父
 - `apps/frontend/src/components/design/Monaco/utils.ts` — **`syncPreviewScrollFromMarkdownEditorByHeadings`**、**`syncEditorScrollFromPreviewByHeadings`**、**`buildHeadingScrollCache`**、**`HeadingScrollCache`**，及比例回退 **`editorVerticalScrollRatio` / `setPreviewVerticalScrollRatio`**（详见 **§5**、**§5.8**、**§5.9**）  
 - `apps/frontend/src/components/design/Monaco/glassTheme.ts` — 继承内置主题的透明 chrome 主题注册  
 - `apps/frontend/src/components/design/Monaco/options.ts` — 全局默认编辑器选项（Markdown 在 index 内再覆盖一部分）  
-- `packages/tools/src/markdown-parser.ts` — **`MarkdownParser`**；默认开启 **`enableHeadingAnchorIds`** 提供标题 `id`，**`enableHeadingSourceLineAttr`** 为预览标题注入 **`data-md-heading-line`**（详见 **§5**）
+- `packages/tools/src/markdown/parser.ts` — **`MarkdownParser`**；默认开启 **`enableHeadingAnchorIds`** 提供标题 `id`，**`enableHeadingSourceLineAttr`** 为预览标题注入 **`data-md-heading-line`**（详见 **§5**）
 - `apps/frontend/src/views/knowledge/index.tsx` — 传入 **`documentIdentity`**，保证换篇时 model 与引导文本一致  
 
 ### 3.1 数据流（概念）
@@ -271,7 +271,7 @@ Monaco 在插入 Tab 时，`CursorConfiguration` 使用 **`model.getOptions()`**
 - **ATX（`#`）与 Setext（下划线标题）** 只要解析为 `heading_open`，都会带该属性；**围栏代码块内**不会出现标题 token，因此不会误标。
 - 知识库 Monaco 内嵌的 **`ParserMarkdownPreviewPane`** 构造解析器时显式传入 **`enableHeadingSourceLineAttr: true`**（与 `enableChatCodeFenceToolbar` 等并列）；其它场景（如仅会话列表缩略预览）若未开启，则预览 HTML 无该属性，同步逻辑会走回退（见 5.5）。
 
-实现位置：`packages/tools/src/markdown-parser.ts` 中 **`patchHeadingPreviewAttrs`**（包装 `renderer.rules.heading_open`：在调用链前对 token 写入 **`data-md-heading-line`**；若同时开启 **`enableHeadingAnchorIds`** 则还写入 **`id`**，见目录锚点功能，与跟随滚动共用标题 DOM）。
+实现位置：`packages/tools/src/markdown/parser.ts` 中 **`patchHeadingPreviewAttrs`**（包装 `renderer.rules.heading_open`：在调用链前对 token 写入 **`data-md-heading-line`**；若同时开启 **`enableHeadingAnchorIds`** 则还写入 **`id`**，见目录锚点功能，与跟随滚动共用标题 DOM）。
 
 ### 5.2 编辑器侧：用「首可见行」代表当前阅读位置
 
@@ -467,7 +467,7 @@ Monaco 在插入 Tab 时，`CursorConfiguration` 使用 **`model.getOptions()`**
 - **`useLayoutEffect([documentIdentity])`**：换篇时 **`localViewportRef` 滚到顶**，与父级对 **`previewViewportRef`** 的换篇逻辑一致（分屏时实为同一节点）。  
 - **`ScrollArea`**（`@ui/scroll-area`）把 **`ref` 与 `onScroll` 挂在 Radix `Viewport`** 上，因此 **`scrollTop`**、**`scrollHeight`**、**`clientHeight`** 均针对该可滚层，与 **`buildHeadingScrollCache` 的 `querySelectorAll` 作用域**一致。
 
-#### 5.10.6 `packages/tools/src/markdown-parser.ts`（与锚点相关的渲染钩子）
+#### 5.10.6 `packages/tools/src/markdown/parser.ts`（与锚点相关的渲染钩子）
 
 - **`render(text)`** 内 **`const env: MarkdownRenderEnv = {}`**，**`this.md.render(processedText, env)`**，为标题 **`id`** 去重提供 **`env.headingSlugCounts`**（目录功能）；与 **`data-md-heading-line`** 独立但同在 **`patchHeadingPreviewAttrs`** 的 **`heading_open`** 包装里写入属性。  
 - **`patchHeadingPreviewAttrs`**：保存原 **`heading_open`** 规则；新规则里若 **`token.map` 存在**：当 **`enableHeadingSourceLineAttr === true`** 时写 **`taskListAttrSet(..., 'data-md-heading-line', String(map[0]+1))`**；当 **`enableHeadingAnchorIds !== false`** 时，从 **`tokens[idx+1]`** 内联 token 抽纯文本 → **`slugifyHeadingText` / `nextHeadingAnchorId`** → **`taskListAttrSet(..., 'id', id)`**；最后 **`prev(...)` 或 `self.renderToken`**。
@@ -565,7 +565,7 @@ type MarkdownSplitScrollFollowMode =
 - 增补 **§5**：分屏「跟随滚动」按标题锚点与源码行号插值同步的实现说明（`MarkdownParser.enableHeadingSourceLineAttr`、`utils.ts` 插值、`index.tsx` 时序）；原 **§5–§7** 顺延为 **§6–§8**；**§7**（回归）增补跟随滚动检查项。  
 - 增补 **§5.8** 与 **§5.6** 修订：**`HeadingScrollCache`**、**`buildHeadingScrollCache`**、滚动热路径与冷路径；**`useLayoutEffect` + 双 rAF** 重建锚点；**`ResizeObserver` + `previewResizeRafRef`** 合并 resize；解决跟随滚动时每帧全量 DOM 测量导致的卡顿感。  
 - 增补 **§5.9**：预览 → 编辑器的 **`interpolateLineFromPreviewScroll`**、**`syncEditorScrollFromPreviewByHeadings`**（**`revealLineNearTop`**）、**`suppressPreviewScrollEchoRef` / `suppressEditorScrollEchoRef`** 与 **`flushEditorScrollToPreviewSync`**；**§5** 开篇与 **§5.6** 接线改为双向跟随表述；**§3**、**§7** 相应补充。  
-- 增补 **§5.10**：按 **`utils.ts` / `index.tsx` / `markdown-parser.ts`** 的**函数表、ref 表、用户滚编辑器/预览的调用链**与 **`ParserMarkdownPreviewPane` ref** 做代码级走读；**§5.1** 实现处更正为 **`patchHeadingPreviewAttrs`**。  
+- 增补 **§5.10**：按 **`utils.ts` / `index.tsx` / `markdown/parser.ts`** 的**函数表、ref 表、用户滚编辑器/预览的调用链**与 **`ParserMarkdownPreviewPane` ref** 做代码级走读；**§5.1** 实现处更正为 **`patchHeadingPreviewAttrs`**。  
 - **§5** 开篇增加「与源码逐行对照见 **§5.10**」；**§5.4** 插值步骤合并重复条目，编号为 1–3。  
 - 增补 **§2.8**：从根因到代码的**实现思路**（分层原则、IME 根因—思路—落点表、Markdown 选项动机、跟滚建模与锚点/缓存/回声取舍、预览 defer、阅读地图）。  
 - 增补 **§5.11**：**`MarkdownSplitScrollFollowMode`**（**`none` / 右跟左 / 左跟右 / 双边**）语义与底部栏三按钮；**派生标志**与 **门控表**；**`dispatchViewportScrollFollow` + `syncEditorFromPreviewRef`** 解决 **`memo(ParserMarkdownPreviewPane)`** 下双边不生效；**render 内同步 `viewModeRef` / `splitScrollFollowModeRef`** 的时序原因。同步修订 **§5** 开篇、**§5.6**、**§5.8** 缓存触发描述、**§5.9.3**、**§5.10.2–5.10.4**、**§2.8.4**、**§7** 回归项与引言。

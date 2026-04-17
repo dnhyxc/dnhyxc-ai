@@ -1,5 +1,5 @@
-export type { RunMermaidInMarkdownOptions } from '../mermaid-in-markdown.js';
-export { runMermaidInMarkdownRoot } from '../mermaid-in-markdown.js';
+export type { RunMermaidInMarkdownOptions } from '../mermaid/in-markdown.js';
+export { runMermaidInMarkdownRoot } from '../mermaid/in-markdown.js';
 export type {
 	MermaidMarkdownParserLike,
 	UseMermaidInMarkdownRootParams,

@@ -28,7 +28,7 @@ Mermaid 工具条**没有**复用该套机制，主要考虑：
 
 1. **注册成本**：Portal 方案需要把每块 mermaid 纳入同一套 pin/slot 布局或另开一套 store；Mermaid 块无 **`data-chat-code-block`** 结构，硬接会扩大 `chatCodeToolbar` 职责。
 2. **sticky 在 Viewport 内可用**：聊天列表的滚动节点是 Radix **`ScrollAreaPrimitive.Viewport`**（`data-slot="scroll-area-viewport"`）。**`sticky`** 的滚动容器正是该 viewport 时，**在滚动子树内即可正确粘顶**，无需挂 body。
-3. **流式与预览 DOM**：预览/下载在 **`data-mermaid-preview-scope`** 作用域内，通过 **`MERMAID_MARKDOWN_SVG_SELECTOR`**（由 **`@dnhyxc-ai/tools`** 的 **`mermaid-markdown-selectors.ts`** 统一导出，等价于 **`.markdown-mermaid-wrap[data-mermaid="1"] .mermaid svg`**）定位已渲染 SVG。工具条留在同一 React 子树内，**`closest` 查询范围不变**；若改为独立 Portal，需额外传 ref/坐标，易错。
+3. **流式与预览 DOM**：预览/下载在 **`data-mermaid-preview-scope`** 作用域内，通过 **`MERMAID_MARKDOWN_SVG_SELECTOR`**（由 **`@dnhyxc-ai/tools`** 的 **`mermaid/markdown-selectors.ts`** 统一导出，等价于 **`.markdown-mermaid-wrap[data-mermaid="1"] .mermaid svg`**）定位已渲染 SVG。工具条留在同一 React 子树内，**`closest` 查询范围不变**；若改为独立 Portal，需额外传 ref/坐标，易错。
 
 因此采用 **纯 CSS `sticky` + 轻量 JS 仅用于切换 class**，与 **`MermaidFenceIsland`** 解耦。
 
@@ -120,7 +120,7 @@ children(mode)：图表模式 → MermaidFenceIsland（code / isStreaming 由宿
 | `apps/frontend/src/utils/index.ts`（`downloadBlob`）                                 | 代码模式导出纯文本；与 Tauri / Web 下载管线一致。                                                                                                       |
 | `apps/frontend/src/components/design/ChatAssistantMessage/StreamingMarkdownBody.tsx` | `renderMermaidPart` 内 **`MermaidFenceToolbarActions`** + **`children(mode)`** 挂载 Island / fallback。                                                 |
 | `apps/frontend/src/components/design/MermaidFenceIsland/index.tsx`                   | 离屏渲染与流式提交逻辑（本功能未改其行为）。                                                                                                            |
-| `packages/tools/src/mermaid-markdown-selectors.ts`                                   | **Mermaid 占位 DOM 契约**：wrap / `data-mermaid` / `.mermaid` / SVG 选择器等 **集中导出**；解析器、**`runMermaidInMarkdownRoot`**、前端岛/工具栏/预览 **同源**（详见 `docs/tools.md` **§11.2.1**）。 |
+| `packages/tools/src/mermaid/markdown-selectors.ts`                                   | **Mermaid 占位 DOM 契约**：wrap / `data-mermaid` / `.mermaid` / SVG 选择器等 **集中导出**；解析器、**`runMermaidInMarkdownRoot`**、前端岛/工具栏/预览 **同源**（详见 `docs/tools.md` **§11.2.1**）。 |
 | `apps/frontend/src/components/design/ChatCodeToolBar/index.tsx`                      | 浮动代码条样式参照。                                                                                                                                    |
 | `apps/frontend/src/components/ui/scroll-area.tsx`                                    | Viewport 上 `data-slot="scroll-area-viewport"` 与 ref 转发。                                                                                            |
 | `apps/frontend/src/components/design/Monaco/preview.tsx`                             | `ParserMarkdownPreviewPane`：`renderMermaidPreviewPart` 与聊天侧一致组装 **`MermaidFenceToolbarActions`** + **`children(mode)`**（知识库 / 分屏预览）。 |

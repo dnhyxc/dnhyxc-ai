@@ -5,7 +5,7 @@ import {
 	MARKDOWN_CODE_FENCE_DATA_COPY_STATE_ATTR,
 	MARKDOWN_CODE_FENCE_SOURCE_CODE_SELECTOR,
 	MARKDOWN_CODE_FENCE_TOOLBAR_LANG_SELECTOR,
-} from './markdown-code-fence-dom.js';
+} from './code-fence-dom.js';
 
 export type MarkdownCodeFenceAction = 'copy' | 'download';
 

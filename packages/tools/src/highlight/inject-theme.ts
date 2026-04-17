@@ -1,4 +1,4 @@
-import type { HighlightJsThemeId } from './generated/highlight-js-theme-ids.js';
+import type { HighlightJsThemeId } from '../generated/highlight-js-theme-ids.js';
 import { highlightJsThemes } from './styles.js';
 
 /** 与 package.json 中 highlight.js 版本对齐，用于 jsDelivr CDN 路径 */

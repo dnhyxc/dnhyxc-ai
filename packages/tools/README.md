@@ -16,6 +16,17 @@ Monorepo 内的 Markdown 工具包，**功能一览**：
 
 **更完整的架构说明、边界行为、流式聊天 Mermaid 与故障排查见 [`docs/tools.md`](../../docs/tools.md)。** 与本仓库 **`apps/frontend/src`** 一致的调用方式见 **§4**。
 
+### 源码目录（`packages/tools/src/`）
+
+| 路径 | 职责 |
+| --- | --- |
+| `markdown/` | `MarkdownParser`（`parser.ts`）、围栏代码块 DOM 契约（`code-fence-dom.ts`）、复制/下载动作（`code-fence-actions.ts`） |
+| `mermaid/` | Mermaid 占位 DOM 契约与查询（`markdown-selectors.ts`）、浏览器内 `mermaid.run` 队列（`in-markdown.ts`） |
+| `highlight/` | hljs 主题注入（`inject-theme.ts`）、主题 import 说明符（`theme-import.ts`）、**由 `build:css` 生成**的 `styles.ts` |
+| `generated/` | **构建生成**：`HighlightJsThemeId` 等与 `dist/styles/hljs` 对齐 |
+| `react/` | 第二入口：`useMermaidInMarkdownRoot` 等（依赖 peer `react`） |
+| `index.ts` | 主入口：聚合导出（对外路径不变，仍从 `@dnhyxc-ai/tools` import） |
+
 ---
 
 ## 安装与构建
@@ -649,9 +660,9 @@ const parser = new MarkdownParser({
 
 ## 7. 开发与发布提示
 
-- 修改 **`markdown-parser.ts`**、主题注入等：执行 **`pnpm --filter @dnhyxc-ai/tools run build`**。
+- 修改 **`markdown/parser.ts`**、主题注入等：执行 **`pnpm --filter @dnhyxc-ai/tools run build`**。
 - 修改 **`scripts/build-mk-css.js`** 或升级 **highlight.js**：需 **`build:css`**（会刷新 `src/generated/highlight-js-theme-ids.ts`），再 **`tsup`**。
-- **`inject-highlight-theme.ts`** 内 **`HLJS_CDN_VERSION`** 应与 **`highlight.js` 大版本**一致（见 `docs/tools.md`）。
+- **`highlight/inject-theme.ts`** 内 **`HLJS_CDN_VERSION`** 应与 **`highlight.js` 大版本**一致（见 `docs/tools.md`）。
 
 ---
 

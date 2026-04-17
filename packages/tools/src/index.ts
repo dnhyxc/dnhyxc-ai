@@ -1,11 +1,19 @@
 export type { HighlightJsThemeId } from './generated/highlight-js-theme-ids.js';
-// 样式导出（含 highlight.js 多主题映射，见 docs/tools.md）
-export { resolveHighlightJsThemeSpecifier } from './highlight-theme-import.js';
-export type { ApplyHighlightJsThemeOptions } from './inject-highlight-theme.js';
+export type { ApplyHighlightJsThemeOptions } from './highlight/inject-theme.js';
 export {
 	applyHighlightJsTheme,
 	clearAppliedHighlightJsTheme,
-} from './inject-highlight-theme.js';
+} from './highlight/inject-theme.js';
+export {
+	defaultHighlightJsThemeId,
+	highlightJsThemeIds,
+	highlightJsThemes,
+	styleContents,
+	styles,
+	styleUrls,
+} from './highlight/styles.js';
+// 样式导出（含 highlight.js 多主题映射，见 docs/tools.md）
+export { resolveHighlightJsThemeSpecifier } from './highlight/theme-import.js';
 export type {
 	BindMarkdownCodeFenceActionsOptions,
 	MarkdownCodeFenceAction,
@@ -14,7 +22,7 @@ export type {
 	MarkdownCodeFenceDownloadTask,
 	MarkdownCodeFenceInfo,
 	MarkdownCodeFenceTextInit,
-} from './markdown-code-fence-actions.js';
+} from './markdown/code-fence-actions.js';
 export {
 	bindMarkdownCodeFenceActions,
 	copyMarkdownCodeFence,
@@ -25,7 +33,7 @@ export {
 	markdownCodeFenceFileExtension,
 	resolveMarkdownCodeFenceActionPayload,
 	showMarkdownCodeFenceCopiedFeedback,
-} from './markdown-code-fence-actions.js';
+} from './markdown/code-fence-actions.js';
 export {
 	MARKDOWN_CODE_FENCE_ACTION_BUTTON_SELECTOR,
 	MARKDOWN_CODE_FENCE_BLOCK_ROOT_ATTR,
@@ -45,16 +53,16 @@ export {
 	MARKDOWN_CODE_FENCE_TOOLBAR_SLOT_CLASS,
 	MARKDOWN_CODE_FENCE_TOOLBAR_SLOT_SELECTOR,
 	queryMarkdownCodeFenceBlockRoots,
-} from './markdown-code-fence-dom.js';
+} from './markdown/code-fence-dom.js';
 export type {
 	MarkdownMermaidSplitPart,
 	MarkdownParserOptions,
 	MarkdownRenderEnv,
-} from './markdown-parser.js';
+} from './markdown/parser.js';
 export {
 	default as MarkdownParser,
 	normalizeMermaidFenceBody,
-} from './markdown-parser.js';
+} from './markdown/parser.js';
 export {
 	closestMermaidMarkdownWrap,
 	MARKDOWN_MERMAID_PLACEHOLDER_HTML,
@@ -70,12 +78,4 @@ export {
 	queryFirstMermaidMarkdownEntryNode,
 	queryFirstMermaidMarkdownWrap,
 	queryMermaidMarkdownEntryNodes,
-} from './mermaid-markdown-selectors.js';
-export {
-	defaultHighlightJsThemeId,
-	highlightJsThemeIds,
-	highlightJsThemes,
-	styleContents,
-	styles,
-	styleUrls,
-} from './styles.js';
+} from './mermaid/markdown-selectors.js';

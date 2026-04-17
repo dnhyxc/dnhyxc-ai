@@ -7,7 +7,7 @@
  *
  * 背景：
  * - `MarkdownParser.patchChatCodeFenceRenderer` 输出固定结构
- * - `markdown-code-fence-actions.ts`、宿主（聊天/预览等）需与之同源查询
+ * - `markdown/code-fence-actions.ts`、宿主（聊天/预览等）需与之同源查询
  */
 
 /** 围栏代码块外层包裹 class（与 `patchChatCodeFenceRenderer` 输出一致） */

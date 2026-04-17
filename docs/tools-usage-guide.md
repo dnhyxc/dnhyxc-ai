@@ -630,7 +630,7 @@ export function MarkdownWithCodeToolbar({ markdown }: { markdown: string }) {
 
 ### 7.6.0 Markdown 围栏代码块 DOM 契约（`MARKDOWN_CODE_FENCE_*`）
 
-若你在 **聊天 / 知识库 / 自定义预览** 里用 `querySelector` 或浮动布局去碰 **`[data-chat-code-block]`**、**`.chat-md-code-toolbar`** 等，请优先从 **`@dnhyxc-ai/tools`** 引用 **`markdown-code-fence-dom`** 导出的 **`MARKDOWN_CODE_FENCE_*`**，与 **`MarkdownParser`**、**`bindMarkdownCodeFenceActions`** **同源**，避免解析器改占位后漏改宿主。
+若你在 **聊天 / 知识库 / 自定义预览** 里用 `querySelector` 或浮动布局去碰 **`[data-chat-code-block]`**、**`.chat-md-code-toolbar`** 等，请优先从 **`@dnhyxc-ai/tools`** 引用（实现位于 **`markdown/code-fence-dom.ts`**）导出的 **`MARKDOWN_CODE_FENCE_*`**，与 **`MarkdownParser`**、**`bindMarkdownCodeFenceActions`** **同源**，避免解析器改占位后漏改宿主。
 
 ```ts
 import {

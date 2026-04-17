@@ -127,7 +127,7 @@ function computePinnedBarBox(
 /**
  * 在滚动视口内选出「跨越视口顶边」的代码块中顶边最靠下者，将浮动工具栏固定到视口顶。
  *
- * 关键约定（DOM 契约由 `@dnhyxc-ai/tools` 的 `markdown-code-fence-dom.ts` 与 `MarkdownParser` 同源维护）：
+ * 关键约定（DOM 契约由 `@dnhyxc-ai/tools` 的 `markdown/code-fence-dom` 与 `MarkdownParser` 同源维护）：
  * - 代码块根：`queryMarkdownCodeFenceBlockRoots` / `MARKDOWN_CODE_FENCE_BLOCK_ROOT_SELECTOR`
  * - 行内工具栏：`MARKDOWN_CODE_FENCE_TOOLBAR_SELECTOR`
  * - 占位槽：`MARKDOWN_CODE_FENCE_TOOLBAR_SLOT_SELECTOR`

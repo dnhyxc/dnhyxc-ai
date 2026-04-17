@@ -125,7 +125,7 @@
 
 ### 4.3 修复：`lineBase0` + `shiftMarkdownPreviewHeadingLineAttrs`
 
-1. **`MarkdownParser.splitForMermaidIslands`**（`packages/tools/src/markdown-parser.ts`）  
+1. **`MarkdownParser.splitForMermaidIslands`**（`packages/tools/src/markdown/parser.ts`）  
    与 `render` 同源用 `md.parse` 切分；每个 `markdown` 段附带 **`lineBase0`**：整篇源在 **`\r\n`/`\r` 规范为 `\n` 后**，该段**首行**的 **0-based** 行下标。
 
 2. **`MarkdownMermaidSplitPart` 类型**（同文件导出）  
@@ -267,10 +267,10 @@ const rawHtml = parser.render(part.text, { enableMermaid: false });
 __html: shiftMarkdownPreviewHeadingLineAttrs(rawHtml, part.lineBase0),
 ```
 
-### 5.6 拆岛类型与 `lineBase0` 语义（`markdown-parser.ts`）
+### 5.6 拆岛类型与 `lineBase0` 语义（`markdown/parser.ts`）
 
 ```typescript
-// packages/tools/src/markdown-parser.ts
+// packages/tools/src/markdown/parser.ts
 
 /**
  * markdown 段带 lineBase0：整篇源（\r\n 已规范为 \n）中该段首行的 0-based 行下标，
@@ -303,7 +303,7 @@ export type MarkdownMermaidSplitPart =
 | `apps/frontend/src/components/design/Monaco/index.tsx` | 分屏模式、快照生命周期、回声抑制、Monaco/预览事件 |
 | `apps/frontend/src/components/design/Monaco/preview.tsx` | 预览 DOM、拆岛渲染、行号平移 |
 | `apps/frontend/src/utils/splitMarkdownFences.ts` | `splitForMermaidIslandsWithOpenTail` 组合开放尾围栏 |
-| `packages/tools/src/markdown-parser.ts` | `splitForMermaidIslands`、`data-md-heading-line`、`MarkdownMermaidSplitPart` |
+| `packages/tools/src/markdown/parser.ts` | `splitForMermaidIslands`、`data-md-heading-line`、`MarkdownMermaidSplitPart` |
 | `packages/tools/src/index.ts` | 导出 `MarkdownMermaidSplitPart` 等 |
 
 ---
@@ -314,4 +314,4 @@ export type MarkdownMermaidSplitPart =
 
 ---
 
-*文档版本：与仓库当前分屏跟滚实现同步；修改 `utils.ts` / `index.tsx` / `preview.tsx` / `markdown-parser.ts` 时请同步更新本节与摘录。*
+*文档版本：与仓库当前分屏跟滚实现同步；修改 `utils.ts` / `index.tsx` / `preview.tsx` / `markdown/parser.ts` 时请同步更新本节与摘录。*
