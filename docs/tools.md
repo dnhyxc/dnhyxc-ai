@@ -9,6 +9,7 @@
 | 路径                                      | 角色                                                                                                                    |
 | ----------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
 | `src/markdown-parser.ts`                  | `MarkdownIt` + `markdown-it-katex` + **`markdown-it-task-lists`（GFM 待办）** + 自研「纯 `[x]`/`[ ]`」补丁 + `highlight.js` 高亮；可选围栏工具栏；构造末尾调用主题注入。 |
+| `src/markdown-code-fence-dom.ts`          | **Markdown 围栏代码块（带工具栏）DOM 契约**：`class` / `data-*` / 派生选择器、`queryMarkdownCodeFenceBlockRoots`；与 **`patchChatCodeFenceRenderer`**、**`markdown-code-fence-actions.ts`**、宿主 **`layoutChatCodeToolbars`** **同源**，避免业务侧散落 `[data-chat-code-block]` 等字符串。 |
 | `src/types.d.ts`                          | 为无官方类型的依赖补充 `declare module`（如 `markdown-it-katex`、`markdown-it-task-lists`）。                         |
 | `src/inject-highlight-theme.ts`           | `applyHighlightJsTheme` / `clearAppliedHighlightJsTheme`：向 `document.head` 注入 `<link>`（CDN）或 `<style>`（内联）。 |
 | `src/highlight-theme-import.ts`           | `resolveHighlightJsThemeSpecifier`：把主题 id 转成 `@dnhyxc-ai/tools/styles/hljs/...` 包内说明符。                      |
@@ -73,8 +74,9 @@
 ### 2.4 聊天围栏代码块工具栏（可选）
 
 - **开关**：`enableChatCodeFenceToolbar: true`。
-- **实现**：覆盖 `md.renderer.rules.fence`，输出固定结构：`chat-md-code-block`、`chat-md-code-toolbar-slot`、`data-chat-code-action="copy|download"`、`data-chat-code-lang` 等；高亮逻辑与默认 `highlight` 回调一致。
+- **实现**：覆盖 `md.renderer.rules.fence`，输出固定结构：`chat-md-code-block`、`chat-md-code-toolbar-slot`、`data-chat-code-action="copy|download"`、`data-chat-code-lang` 等；高亮逻辑与默认 `highlight` 回调一致；**DOM 字面量**由 **`markdown-code-fence-dom.ts`** 常量驱动，与 **`markdown-code-fence-actions.ts`**、宿主 **`chatCodeToolbar.ts`** 共用同一套 **TypeScript 公共标识符**（`MARKDOWN_CODE_FENCE_*`）。
 - **样式与交互**：包内**不**包含工具栏视觉与点击逻辑；宿主（如本仓库 `ChatAssistantMessage` + `index.css` + `chatCodeToolbar`）负责布局与事件。
+- **行尾注释源码摘录**：见 **第 11.8.6.0 小节**。
 
 ### 2.5 Mermaid 图表（可选）
 
@@ -755,24 +757,149 @@ public render(text: string, renderOptions: MarkdownRenderOptions = {}): string {
 - `downloadMarkdownCodeFenceWith(info, download)`：把 `code` 转为 `Blob` 并交给宿主的下载器执行（Web/Tauri/Electron 统一入口）
 - `createMarkdownCodeFenceInfo({ code, lang, filename })`：不依赖 DOM 构造下载信息（适用于 Mermaid 代码模式等“只有文本”的场景）
 
+#### 11.8.6.0 Markdown 围栏代码块 DOM 契约（`markdown-code-fence-dom.ts` + 行尾注释摘录）
+
+**动机**：
+
+- `MarkdownParser` 与 **`markdown-code-fence-actions.ts`**、前端 **`layoutChatCodeToolbars`** 历史上各自手写 **`[data-chat-code-block]`**、**`.chat-md-code-toolbar`**、**`pre code`** 等字符串；解析器若调整占位结构，容易出现 **漏改/半改**。
+- 与 **§11.2.1 / §11.2.2（Mermaid 契约）** 同理：把「**可被 `querySelector` 复用的契约**」收口到 **单一模块**，由 **`@dnhyxc-ai/tools`** 导出 **公共标识符**（`MARKDOWN_CODE_FENCE_*`），避免命名像「仅聊天场景」导致误读。
+
+**方案**：
+
+1. **`packages/tools/src/markdown-code-fence-dom.ts`**：维护 **class / `data-*` 字面量** 与 **派生选择器**、**`queryMarkdownCodeFenceBlockRoots`**。
+2. **`MarkdownParser.patchChatCodeFenceRenderer`**：HTML 模板字符串 **只拼接上述常量**，保证输出与契约 **字节级一致**。
+3. **`markdown-code-fence-actions.ts`**：`getMarkdownCodeFencePlainText` / `resolveMarkdownCodeFenceActionPayload` / `showMarkdownCodeFenceCopiedFeedback` 默认属性名 **全部引用该模块**。
+4. **`apps/frontend/src/utils/chatCodeToolbar.ts`**：浮动吸顶布局 **import 同一套选择器**；**`[data-chat-assistant-shell]`** 为 **宿主消息壳**（非解析器输出），保留为 **`CHAT_ASSISTANT_SHELL_SELECTOR`** 常量 + 注释，由前端维护。
+
+**维护约定**：修改围栏 DOM 时，**必须**同步更新 **`markdown-code-fence-dom.ts`** 与 **`markdown-parser.ts`** 模板；宿主若改消息壳属性名，只改 **`chatCodeToolbar.ts`** 顶部常量。
+
+---
+
+##### A. `packages/tools/src/markdown-code-fence-dom.ts`（全文：行尾 `//` 中文注释）
+
+```typescript
+// 源路径：packages/tools/src/markdown-code-fence-dom.ts
+// 作用：Markdown 围栏「带复制/下载工具栏」输出的 DOM 契约（公共导出，非仅聊天）
+
+export const MARKDOWN_CODE_FENCE_BLOCK_WRAPPER_CLASS = 'chat-md-code-block'; // 外层包裹 class：历史名保留，兼容 index.css
+export const MARKDOWN_CODE_FENCE_BLOCK_ROOT_ATTR = 'data-chat-code-block'; // 根标记属性：HTML 中写作无值 boolean 属性
+export const MARKDOWN_CODE_FENCE_TOOLBAR_SLOT_CLASS = 'chat-md-code-toolbar-slot'; // 占位槽 class：浮动条替换时写 minHeight
+export const MARKDOWN_CODE_FENCE_TOOLBAR_CLASS = 'chat-md-code-toolbar'; // 行内工具栏容器 class
+export const MARKDOWN_CODE_FENCE_TOOLBAR_FLOAT_REPLACED_CLASS = 'chat-md-code-toolbar--replaced-by-float'; // 原位工具栏被 Portal 浮动条替代时的样式类
+export const MARKDOWN_CODE_FENCE_TOOLBAR_LANG_CLASS = 'chat-md-code-lang'; // 语言展示标签 class
+export const MARKDOWN_CODE_FENCE_TOOLBAR_ACTIONS_CLASS = 'chat-md-code-actions'; // 复制/下载按钮组外层 class
+export const MARKDOWN_CODE_FENCE_TOOLBAR_BTN_CLASS = 'chat-md-code-btn'; // 单个按钮 class
+export const MARKDOWN_CODE_FENCE_DATA_ACTION_ATTR = 'data-chat-code-action'; // 按钮动作属性名
+export const MARKDOWN_CODE_FENCE_DATA_BUTTON_LANG_ATTR = 'data-chat-code-lang'; // 下载按钮附带语言属性名
+export const MARKDOWN_CODE_FENCE_DATA_COPY_STATE_ATTR = 'data-chat-code-copied'; // 复制反馈临时状态属性名
+
+export const MARKDOWN_CODE_FENCE_BLOCK_ROOT_SELECTOR = `[${MARKDOWN_CODE_FENCE_BLOCK_ROOT_ATTR}]`; // 根选择器：收集所有代码块根
+export const MARKDOWN_CODE_FENCE_TOOLBAR_SELECTOR = `.${MARKDOWN_CODE_FENCE_TOOLBAR_CLASS}`; // 工具栏选择器
+export const MARKDOWN_CODE_FENCE_TOOLBAR_SLOT_SELECTOR = `.${MARKDOWN_CODE_FENCE_TOOLBAR_SLOT_CLASS}`; // 占位槽选择器
+export const MARKDOWN_CODE_FENCE_TOOLBAR_LANG_SELECTOR = `.${MARKDOWN_CODE_FENCE_TOOLBAR_LANG_CLASS}`; // 语言标签选择器
+export const MARKDOWN_CODE_FENCE_SOURCE_CODE_SELECTOR = 'pre code'; // 源码文本节点：与 fence 输出 <pre><code> 一致
+export const MARKDOWN_CODE_FENCE_ACTION_BUTTON_SELECTOR = `[${MARKDOWN_CODE_FENCE_DATA_ACTION_ATTR}]`; // 事件委托：定位 action 按钮
+
+export function queryMarkdownCodeFenceBlockRoots(root: ParentNode): NodeListOf<HTMLElement> {
+	return root.querySelectorAll<HTMLElement>(MARKDOWN_CODE_FENCE_BLOCK_ROOT_SELECTOR); // 等价于手写 querySelectorAll('[data-chat-code-block]')
+}
+```
+
+##### B. `packages/tools/src/markdown-parser.ts`：`patchChatCodeFenceRenderer` 的 `return`（节选，行尾注释）
+
+```typescript
+// 节选：仅展示拼接 HTML 的 return；前后 token/highlight 逻辑见源码
+return (
+	`<div class="${MARKDOWN_CODE_FENCE_BLOCK_WRAPPER_CLASS}" ${MARKDOWN_CODE_FENCE_BLOCK_ROOT_ATTR}>` + // 根：class + 无值 data 属性
+	`<div class="${MARKDOWN_CODE_FENCE_TOOLBAR_SLOT_CLASS}">` + // 占位槽：先于 pre，保证工具栏在上
+	`<div class="${MARKDOWN_CODE_FENCE_TOOLBAR_CLASS}">` + // 行内工具栏容器
+	`<span class="${MARKDOWN_CODE_FENCE_TOOLBAR_LANG_CLASS}">` + // 语言标签：escapedLangLabel 已 escapeHtml
+	escapedLangLabel + // 语言文本：供 UI 展示，也为下载侧提供可读标签来源
+	'</span>' + // 闭合语言标签
+	`<div class="${MARKDOWN_CODE_FENCE_TOOLBAR_ACTIONS_CLASS}">` + // 按钮组容器
+	`<button type="button" class="${MARKDOWN_CODE_FENCE_TOOLBAR_BTN_CLASS}" ${MARKDOWN_CODE_FENCE_DATA_ACTION_ATTR}="copy">复制</button>` + // 复制：事件委托读 action 属性
+	`<button type="button" class="${MARKDOWN_CODE_FENCE_TOOLBAR_BTN_CLASS}" ${MARKDOWN_CODE_FENCE_DATA_ACTION_ATTR}="download" ${MARKDOWN_CODE_FENCE_DATA_BUTTON_LANG_ATTR}="` + // 下载：附带 lang 供解析兜底
+	escapedLangLabel + // 与展示语言一致
+	'">下载</button>' + // 闭合下载按钮
+	'</div></div></div>' + // 依次闭合 actions / toolbar / slot
+	'<pre><code class="' + // pre/code：高亮 HTML 注入点
+	codeClass + // hljs + language-xxx
+	'">' +
+	highlighted + // 高亮结果或 escapeHtml 回退
+	'</code></pre></div>\n' // 闭合 code/pre/最外层 block
+);
+```
+
+##### C. `packages/tools/src/markdown-code-fence-actions.ts`（节选：查询与复制状态，行尾注释）
+
+```typescript
+// 节选：import 自 markdown-code-fence-dom.js（路径以 tsup 编译为准）
+import {
+	MARKDOWN_CODE_FENCE_ACTION_BUTTON_SELECTOR, // [data-chat-code-action]
+	MARKDOWN_CODE_FENCE_BLOCK_ROOT_SELECTOR, // [data-chat-code-block]
+	MARKDOWN_CODE_FENCE_DATA_COPY_STATE_ATTR, // data-chat-code-copied
+	MARKDOWN_CODE_FENCE_SOURCE_CODE_SELECTOR, // pre code
+	MARKDOWN_CODE_FENCE_TOOLBAR_LANG_SELECTOR, // .chat-md-code-lang
+} from './markdown-code-fence-dom.js';
+
+export function getMarkdownCodeFencePlainText(block: HTMLElement): string {
+	const code = block.querySelector(MARKDOWN_CODE_FENCE_SOURCE_CODE_SELECTOR); // 取源码：textContent 避免 hljs span 干扰“复制纯文本”语义
+	return code?.textContent ?? ''; // 无 code 节点：回退空串
+}
+
+// resolveMarkdownCodeFenceActionPayload 内（节选）
+const button = el?.closest<HTMLButtonElement>(MARKDOWN_CODE_FENCE_ACTION_BUTTON_SELECTOR); // 从点击目标向上找按钮
+const block = button.closest<HTMLElement>(MARKDOWN_CODE_FENCE_BLOCK_ROOT_SELECTOR); // 再向上找代码块根：限定一次操作的作用域
+
+// showMarkdownCodeFenceCopiedFeedback 内（节选）
+const stateAttrName = options.stateAttrName ?? MARKDOWN_CODE_FENCE_DATA_COPY_STATE_ATTR; // 默认复制态属性名与解析器输出按钮兼容
+```
+
+##### D. `apps/frontend/src/utils/chatCodeToolbar.ts`（节选：import + `layoutChatCodeToolbars` 主路径，行尾注释）
+
+```typescript
+// 源路径：apps/frontend/src/utils/chatCodeToolbar.ts（节选）
+import {
+	MARKDOWN_CODE_FENCE_TOOLBAR_FLOAT_REPLACED_CLASS, // 原位工具栏被浮动条替换时的 class
+	MARKDOWN_CODE_FENCE_TOOLBAR_LANG_SELECTOR, // 读取语言展示文本
+	MARKDOWN_CODE_FENCE_TOOLBAR_SELECTOR, // 定位行内工具栏
+	MARKDOWN_CODE_FENCE_TOOLBAR_SLOT_SELECTOR, // 定位占位槽，写 minHeight
+	queryMarkdownCodeFenceBlockRoots, // 收集 viewport 子树内所有代码块根（与解析器同源）
+	getMarkdownCodeFencePlainText, // 与工具包一致：取 pre code 文本（本文件对外 API 再包一层亦可）
+} from '@dnhyxc-ai/tools';
+
+const CHAT_ASSISTANT_SHELL_SELECTOR = '[data-chat-assistant-shell]'; // 宿主消息壳：非解析器契约，故不进 tools 包
+
+// layoutChatCodeToolbars 内（节选）
+const blocks = queryMarkdownCodeFenceBlockRoots(viewport); // 等价 querySelectorAll('[data-chat-code-block]')，但随契约更新
+const toolbar = block.querySelector<HTMLElement>(MARKDOWN_CODE_FENCE_TOOLBAR_SELECTOR); // 取行内工具栏节点
+const slot = block.querySelector<HTMLElement>(MARKDOWN_CODE_FENCE_TOOLBAR_SLOT_SELECTOR); // 取占位槽：用于防抖跳动
+const shell = block.closest<HTMLElement>(CHAT_ASSISTANT_SHELL_SELECTOR) ?? viewport; // 水平参照：聊天有壳，其它场景退回 viewport
+winner.toolbar.classList.add(MARKDOWN_CODE_FENCE_TOOLBAR_FLOAT_REPLACED_CLASS); // 隐藏原位条：浮动条接管交互
+const langSpan = winner.block.querySelector(MARKDOWN_CODE_FENCE_TOOLBAR_LANG_SELECTOR); // 与 getMarkdownCodeFenceInfo 同源读语言
+```
+
 ##### 11.8.6.1 事件解析：从点击目标定位到“当前代码块”
 
-代码块工具栏的按钮由 `MarkdownParser` 输出，带有稳定的 `data-*` 约定：
-
-- `data-chat-code-action="copy|download"`：表示点击意图
-- 代码块根：`[data-chat-code-block]`
+代码块工具栏的按钮由 `MarkdownParser` 输出，带有稳定的 `data-*` 约定（**字面量**见 **`MARKDOWN_CODE_FENCE_DATA_ACTION_ATTR`** / **`MARKDOWN_CODE_FENCE_BLOCK_ROOT_ATTR`**，**§11.8.6.0**）。
 
 工具侧通过 `closest(...)` 自底向上定位按钮与代码块，再统一提取代码文本/语言/文件名：
 
 ```ts
-// packages/tools/src/markdown-code-fence-actions.ts（核心逻辑摘录）
+// packages/tools/src/markdown-code-fence-actions.ts（核心逻辑摘录；与实现一致：选择器来自 markdown-code-fence-dom）
+import {
+	MARKDOWN_CODE_FENCE_ACTION_BUTTON_SELECTOR,
+	MARKDOWN_CODE_FENCE_BLOCK_ROOT_SELECTOR,
+	MARKDOWN_CODE_FENCE_DATA_ACTION_ATTR,
+} from './markdown-code-fence-dom.js';
+
 export function resolveMarkdownCodeFenceActionPayload(target, root, options) {
 	// 1) 找按钮：允许点在 <span>/<svg> 等子节点上，统一向上找最近的 action 按钮
-	const button = el?.closest('[data-chat-code-action]');
+	const button = el?.closest<HTMLButtonElement>(MARKDOWN_CODE_FENCE_ACTION_BUTTON_SELECTOR);
 	// 2) action：只放行 copy/download，其它字符串直接忽略
-	const action = button.getAttribute('data-chat-code-action');
+	const action = button.getAttribute(MARKDOWN_CODE_FENCE_DATA_ACTION_ATTR);
 	// 3) 找代码块容器：保证 copy/download 操作总是作用于“就近代码块”
-	const block = button.closest('[data-chat-code-block]');
+	const block = button.closest<HTMLElement>(MARKDOWN_CODE_FENCE_BLOCK_ROOT_SELECTOR);
 	// 4) 安全边界：按钮/代码块必须属于 root（避免跨容器串扰）
 	if (!root.contains(button) || !root.contains(block)) return null;
 	// 5) 结构化 payload：把业务方最关心的信息一次性准备好
@@ -784,17 +911,19 @@ export function resolveMarkdownCodeFenceActionPayload(target, root, options) {
 
 业务侧最容易写散的地方是“从 DOM 里取代码文本 / 语言名”。工具侧统一约定：
 
-- 代码文本：`pre code` 的 `textContent`
-- 语言名：`.chat-md-code-lang` 的文本（由解析器输出）
+- 代码文本：**`MARKDOWN_CODE_FENCE_SOURCE_CODE_SELECTOR`**（`pre code`）的 `textContent`（经 **`getMarkdownCodeFencePlainText`**）
+- 语言名：**`MARKDOWN_CODE_FENCE_TOOLBAR_LANG_SELECTOR`**（`.chat-md-code-lang`）的文本（由解析器输出）
 - 扩展名：语言到扩展名的映射（未知语言做安全回退）
 - 文件名：默认 `code.<ext>`，也允许宿主通过 `getFilename(...)` 自定义
 
 ```ts
-// packages/tools/src/markdown-code-fence-actions.ts（核心逻辑摘录）
+// packages/tools/src/markdown-code-fence-actions.ts（核心逻辑摘录；与实现一致）
+import { MARKDOWN_CODE_FENCE_TOOLBAR_LANG_SELECTOR } from './markdown-code-fence-dom.js';
+
 export function getMarkdownCodeFenceInfo(block, { getFilename } = {}) {
 	const code = getMarkdownCodeFencePlainText(block);
 	const lang =
-		block.querySelector('.chat-md-code-lang')?.textContent?.trim()?.toLowerCase() ||
+		block.querySelector(MARKDOWN_CODE_FENCE_TOOLBAR_LANG_SELECTOR)?.textContent?.trim()?.toLowerCase() ||
 		'text';
 	const fileExtension = markdownCodeFenceFileExtension(lang);
 	const baseInfo = { block, code, lang, fileExtension };

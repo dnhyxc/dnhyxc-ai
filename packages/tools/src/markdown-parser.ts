@@ -9,6 +9,17 @@ import markdownItTaskLists from 'markdown-it-task-lists';
 import type { HighlightJsThemeId } from './generated/highlight-js-theme-ids.js';
 import { applyHighlightJsTheme } from './inject-highlight-theme.js';
 import {
+	MARKDOWN_CODE_FENCE_BLOCK_ROOT_ATTR,
+	MARKDOWN_CODE_FENCE_BLOCK_WRAPPER_CLASS,
+	MARKDOWN_CODE_FENCE_DATA_ACTION_ATTR,
+	MARKDOWN_CODE_FENCE_DATA_BUTTON_LANG_ATTR,
+	MARKDOWN_CODE_FENCE_TOOLBAR_ACTIONS_CLASS,
+	MARKDOWN_CODE_FENCE_TOOLBAR_BTN_CLASS,
+	MARKDOWN_CODE_FENCE_TOOLBAR_CLASS,
+	MARKDOWN_CODE_FENCE_TOOLBAR_LANG_CLASS,
+	MARKDOWN_CODE_FENCE_TOOLBAR_SLOT_CLASS,
+} from './markdown-code-fence-dom.js';
+import {
 	MARKDOWN_MERMAID_WRAP_CLASS,
 	MARKDOWN_MERMAID_WRAP_DATA_ATTR,
 	MARKDOWN_MERMAID_WRAP_DATA_VALUE,
@@ -418,15 +429,15 @@ class MarkdownParser {
 				? `language-${md.utils.escapeHtml(langName)} hljs`
 				: 'hljs';
 			return (
-				'<div class="chat-md-code-block" data-chat-code-block>' +
-				'<div class="chat-md-code-toolbar-slot">' +
-				'<div class="chat-md-code-toolbar">' +
-				'<span class="chat-md-code-lang">' +
+				`<div class="${MARKDOWN_CODE_FENCE_BLOCK_WRAPPER_CLASS}" ${MARKDOWN_CODE_FENCE_BLOCK_ROOT_ATTR}>` +
+				`<div class="${MARKDOWN_CODE_FENCE_TOOLBAR_SLOT_CLASS}">` +
+				`<div class="${MARKDOWN_CODE_FENCE_TOOLBAR_CLASS}">` +
+				`<span class="${MARKDOWN_CODE_FENCE_TOOLBAR_LANG_CLASS}">` +
 				escapedLangLabel +
 				'</span>' +
-				'<div class="chat-md-code-actions">' +
-				'<button type="button" class="chat-md-code-btn" data-chat-code-action="copy">复制</button>' +
-				'<button type="button" class="chat-md-code-btn" data-chat-code-action="download" data-chat-code-lang="' +
+				`<div class="${MARKDOWN_CODE_FENCE_TOOLBAR_ACTIONS_CLASS}">` +
+				`<button type="button" class="${MARKDOWN_CODE_FENCE_TOOLBAR_BTN_CLASS}" ${MARKDOWN_CODE_FENCE_DATA_ACTION_ATTR}="copy">复制</button>` +
+				`<button type="button" class="${MARKDOWN_CODE_FENCE_TOOLBAR_BTN_CLASS}" ${MARKDOWN_CODE_FENCE_DATA_ACTION_ATTR}="download" ${MARKDOWN_CODE_FENCE_DATA_BUTTON_LANG_ATTR}="` +
 				escapedLangLabel +
 				'">下载</button>' +
 				'</div></div></div>' +

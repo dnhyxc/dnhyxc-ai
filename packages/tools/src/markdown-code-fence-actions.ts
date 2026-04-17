@@ -1,3 +1,12 @@
+import {
+	MARKDOWN_CODE_FENCE_ACTION_BUTTON_SELECTOR,
+	MARKDOWN_CODE_FENCE_BLOCK_ROOT_SELECTOR,
+	MARKDOWN_CODE_FENCE_DATA_ACTION_ATTR,
+	MARKDOWN_CODE_FENCE_DATA_COPY_STATE_ATTR,
+	MARKDOWN_CODE_FENCE_SOURCE_CODE_SELECTOR,
+	MARKDOWN_CODE_FENCE_TOOLBAR_LANG_SELECTOR,
+} from './markdown-code-fence-dom.js';
+
 export type MarkdownCodeFenceAction = 'copy' | 'download';
 
 export type MarkdownCodeFenceCopyFeedbackOptions = {
@@ -78,7 +87,7 @@ export function markdownCodeFenceFileExtension(lang: string): string {
 }
 
 export function getMarkdownCodeFencePlainText(block: HTMLElement): string {
-	const code = block.querySelector('pre code');
+	const code = block.querySelector(MARKDOWN_CODE_FENCE_SOURCE_CODE_SELECTOR);
 	return code?.textContent ?? '';
 }
 
@@ -89,7 +98,7 @@ export function getMarkdownCodeFenceInfo(
 	const code = getMarkdownCodeFencePlainText(block);
 	const lang =
 		block
-			.querySelector('.chat-md-code-lang')
+			.querySelector(MARKDOWN_CODE_FENCE_TOOLBAR_LANG_SELECTOR)
 			?.textContent?.trim()
 			?.toLowerCase() || 'text';
 	const fileExtension = markdownCodeFenceFileExtension(lang);
@@ -127,13 +136,17 @@ export function resolveMarkdownCodeFenceActionPayload(
 			: target instanceof Node
 				? target.parentElement
 				: null;
-	const button = el?.closest<HTMLButtonElement>('[data-chat-code-action]');
+	const button = el?.closest<HTMLButtonElement>(
+		MARKDOWN_CODE_FENCE_ACTION_BUTTON_SELECTOR,
+	);
 	if (!button || !root.contains(button)) return null;
 	const action = button.getAttribute(
-		'data-chat-code-action',
+		MARKDOWN_CODE_FENCE_DATA_ACTION_ATTR,
 	) as MarkdownCodeFenceAction | null;
 	if (action !== 'copy' && action !== 'download') return null;
-	const block = button.closest<HTMLElement>('[data-chat-code-block]');
+	const block = button.closest<HTMLElement>(
+		MARKDOWN_CODE_FENCE_BLOCK_ROOT_SELECTOR,
+	);
 	if (!block || !root.contains(block)) return null;
 	return {
 		action,
@@ -175,7 +188,8 @@ export function showMarkdownCodeFenceCopiedFeedback(
 ): void {
 	const copiedText = options.copiedText ?? '已复制';
 	const resetAfterMs = options.resetAfterMs ?? 1500;
-	const stateAttrName = options.stateAttrName ?? 'data-chat-code-copied';
+	const stateAttrName =
+		options.stateAttrName ?? MARKDOWN_CODE_FENCE_DATA_COPY_STATE_ATTR;
 	const prev = button.textContent;
 	button.setAttribute(stateAttrName, '1');
 	button.textContent = copiedText;

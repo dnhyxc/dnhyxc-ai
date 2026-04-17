@@ -350,6 +350,24 @@ export function MarkdownWithCodeToolbar({ markdown }: { markdown: string }) {
 - 业务方通常只需要关心 `onDownload(payload)`，不再需要自己手动查找 `pre code`。
 - 也支持 `bindMarkdownCodeFenceActions(options)`（省略 root）：会默认绑定到 `document`。**仅建议在你明确只有一个宿主容器、且不会出现多个实例并存的页面使用**。
 
+### 7.6.0 Markdown 围栏代码块 DOM 契约（`MARKDOWN_CODE_FENCE_*`）
+
+若你在 **聊天 / 知识库 / 自定义预览** 里用 `querySelector` 或浮动布局去碰 **`[data-chat-code-block]`**、**`.chat-md-code-toolbar`** 等，请优先从 **`@dnhyxc-ai/tools`** 引用 **`markdown-code-fence-dom`** 导出的 **`MARKDOWN_CODE_FENCE_*`**，与 **`MarkdownParser`**、**`bindMarkdownCodeFenceActions`** **同源**，避免解析器改占位后漏改宿主。
+
+```ts
+import {
+	MARKDOWN_CODE_FENCE_BLOCK_ROOT_SELECTOR, // 根：`[data-chat-code-block]`
+	MARKDOWN_CODE_FENCE_TOOLBAR_SELECTOR, // 行内工具栏：`.chat-md-code-toolbar`
+	queryMarkdownCodeFenceBlockRoots, // 在容器子树内收集所有根节点
+} from '@dnhyxc-ai/tools';
+
+function scanFenceRoots(container: HTMLElement) {
+	return queryMarkdownCodeFenceBlockRoots(container); // 等价于手写 querySelectorAll(MARKDOWN_CODE_FENCE_BLOCK_ROOT_SELECTOR)
+}
+```
+
+**实现思路、维护约定、带行尾 `//` 注释的源码摘录（含 `markdown-parser` / `chatCodeToolbar` 节选）**：见 [`tools.md`](./tools.md) **第 11.8.6.0 小节**。
+
 ### 7.6.1 下载逻辑：推荐把“落盘”交给宿主，把“内容/文件名”交给工具包
 
 很多项目的下载实现不一致（Web / Tauri / Electron），因此工具包提供 `downloadMarkdownCodeFenceWith`：

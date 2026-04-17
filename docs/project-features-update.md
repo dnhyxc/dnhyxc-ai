@@ -114,6 +114,10 @@
 
 **文档**：[`tools.md`](./tools.md) **§11.2.1**（动机与 API 表）、**§11.2.2**（**带行尾 `//` 中文注释** 的实现源码摘录：契约模块 / `runMermaidInMarkdownRoot` / `patchMermaidFence` 节选 / 岛与 Hook 与工具栏节选）；[`tools-usage-guide.md`](./tools-usage-guide.md) **§8.5**（使用者示例，同样行尾注释）
 
+- **Markdown 围栏代码块（复制/下载工具栏）DOM 契约**：`packages/tools/src/markdown-code-fence-dom.ts` 集中导出 **`MARKDOWN_CODE_FENCE_*`**、`queryMarkdownCodeFenceBlockRoots`；与 **`MarkdownParser.patchChatCodeFenceRenderer`**、**`markdown-code-fence-actions.ts`**、前端 **`layoutChatCodeToolbars`** **同源**，避免业务侧散落 `[data-chat-code-block]` 等字符串。
+
+**文档**：[`tools.md`](./tools.md) **第 11.8.6.0 小节**（动机、方案、维护约定、**带行尾 `//` 中文注释** 的源码摘录）；[`tools-usage-guide.md`](./tools-usage-guide.md) **第 7.6.0 小节**（从包内 import 的短示例）
+
 - **Mermaid 围栏工具条**：`sticky` + 哨兵 `IntersectionObserver` 双态样式；与代码块 Portal 吸顶方案差异；下载 SVG/DSL；Monaco 预览侧对齐。
 
 **文档**：[`mermaid-fence-toolbar-sticky.md`](./mermaid-fence-toolbar-sticky.md)

@@ -8,8 +8,20 @@
 import {
 	downloadMarkdownCodeFenceWith,
 	getMarkdownCodeFenceInfo,
+	getMarkdownCodeFencePlainText,
+	MARKDOWN_CODE_FENCE_TOOLBAR_FLOAT_REPLACED_CLASS,
+	MARKDOWN_CODE_FENCE_TOOLBAR_LANG_SELECTOR,
+	MARKDOWN_CODE_FENCE_TOOLBAR_SELECTOR,
+	MARKDOWN_CODE_FENCE_TOOLBAR_SLOT_SELECTOR,
+	queryMarkdownCodeFenceBlockRoots,
 } from '@dnhyxc-ai/tools';
 import { downloadBlob } from '.';
+
+/**
+ * 宿主（聊天）消息气泡壳：用于浮动条水平对齐参照。
+ * 说明：**非** `MarkdownParser` 输出；由前端消息布局约定，故保留在本文件而非 `@dnhyxc-ai/tools`。
+ */
+const CHAT_ASSISTANT_SHELL_SELECTOR = '[data-chat-assistant-shell]';
 
 export type ChatCodeFloatingToolbarState = {
 	visible: boolean;
@@ -68,19 +80,23 @@ export function getChatCodeFloatingToolbarSnapshot(): ChatCodeFloatingToolbarSta
  *
  * 清理内容包括：
  * - `PIN_ATTR`：标记“当前 pinned 的代码块”
- * - `.chat-md-code-toolbar--replaced-by-float`：让原 toolbar 隐形/让位给浮动条的 class
- * - `.chat-md-code-toolbar-slot` 的 `minHeight`：用于占位，防止原 toolbar 被浮动条替换后导致布局跳动
+ * - `MARKDOWN_CODE_FENCE_TOOLBAR_FLOAT_REPLACED_CLASS`：让原 toolbar 隐形/让位给浮动条的 class（与 `@dnhyxc-ai/tools` 导出一致）
+ * - 占位槽 `MARKDOWN_CODE_FENCE_TOOLBAR_SLOT_SELECTOR` 的 `minHeight`：用于占位，防止原 toolbar 被浮动条替换后导致布局跳动
  */
 function resetFloatingMarkersInViewport(viewport: HTMLElement): void {
 	viewport.querySelectorAll(`[${PIN_ATTR}]`).forEach((el) => {
 		el.removeAttribute(PIN_ATTR);
 	});
-	viewport.querySelectorAll('.chat-md-code-toolbar').forEach((tb) => {
-		tb.classList.remove('chat-md-code-toolbar--replaced-by-float');
-	});
-	viewport.querySelectorAll('.chat-md-code-toolbar-slot').forEach((slot) => {
-		(slot as HTMLElement).style.minHeight = '';
-	});
+	viewport
+		.querySelectorAll(MARKDOWN_CODE_FENCE_TOOLBAR_SELECTOR)
+		.forEach((tb) => {
+			tb.classList.remove(MARKDOWN_CODE_FENCE_TOOLBAR_FLOAT_REPLACED_CLASS);
+		});
+	viewport
+		.querySelectorAll(MARKDOWN_CODE_FENCE_TOOLBAR_SLOT_SELECTOR)
+		.forEach((slot) => {
+			(slot as HTMLElement).style.minHeight = '';
+		});
 }
 
 /**
@@ -111,10 +127,11 @@ function computePinnedBarBox(
 /**
  * 在滚动视口内选出「跨越视口顶边」的代码块中顶边最靠下者，将浮动工具栏固定到视口顶。
  *
- * 关键约定：
- * - 代码块容器：`[data-chat-code-block]`（由 `MarkdownParser.enableChatCodeFenceToolbar` 输出）
- * - 原工具栏：`.chat-md-code-toolbar`
- * - 占位槽：`.chat-md-code-toolbar-slot`
+ * 关键约定（DOM 契约由 `@dnhyxc-ai/tools` 的 `markdown-code-fence-dom.ts` 与 `MarkdownParser` 同源维护）：
+ * - 代码块根：`queryMarkdownCodeFenceBlockRoots` / `MARKDOWN_CODE_FENCE_BLOCK_ROOT_SELECTOR`
+ * - 行内工具栏：`MARKDOWN_CODE_FENCE_TOOLBAR_SELECTOR`
+ * - 占位槽：`MARKDOWN_CODE_FENCE_TOOLBAR_SLOT_SELECTOR`
+ * - 气泡水平参照：`CHAT_ASSISTANT_SHELL_SELECTOR`（仅聊天；见本文件常量注释）
  *
  * 选择规则（为什么要选“顶边最靠下”的那个）：
  * - 当视口顶边同时落在多个代码块内部（例如连续多个短代码块）时，
@@ -140,10 +157,8 @@ export function layoutChatCodeToolbars(viewport: HTMLElement | null): void {
 	// 清掉上一次 pinned 标记与占位，避免滚动/重算后残留旧状态
 	resetFloatingMarkersInViewport(viewport);
 
-	// 收集 viewport 内所有代码块容器（由 MarkdownParser 输出 data-chat-code-block）
-	const blocks = viewport.querySelectorAll<HTMLElement>(
-		'[data-chat-code-block]',
-	);
+	// 收集 viewport 内所有代码块容器（与 MarkdownParser.patchChatCodeFenceRenderer 输出一致）
+	const blocks = queryMarkdownCodeFenceBlockRoots(viewport);
 	// 评分结构：把每个代码块参与决策所需信息一次性取齐（避免后面反复查询 DOM）
 	type Scored = {
 		// 代码块容器节点
@@ -162,14 +177,18 @@ export function layoutChatCodeToolbars(viewport: HTMLElement | null): void {
 
 	// 遍历每个代码块，抽取工具栏、占位槽、几何与壳节点
 	for (const block of blocks) {
-		// 代码块内原始工具栏（解析器输出）
-		const toolbar = block.querySelector<HTMLElement>('.chat-md-code-toolbar');
-		// 工具栏占位槽（解析器输出）
-		const slot = block.querySelector<HTMLElement>('.chat-md-code-toolbar-slot');
-		// 聊天气泡内有 data-chat-assistant-shell；知识库/独立 Markdown 预览无该节点，用滚动视口作水平参照
+		// 代码块内原始工具栏（与工具包契约一致）
+		const toolbar = block.querySelector<HTMLElement>(
+			MARKDOWN_CODE_FENCE_TOOLBAR_SELECTOR,
+		);
+		// 工具栏占位槽（与工具包契约一致）
+		const slot = block.querySelector<HTMLElement>(
+			MARKDOWN_CODE_FENCE_TOOLBAR_SLOT_SELECTOR,
+		);
+		// 聊天气泡壳（宿主布局）：知识库/独立 Markdown 预览无该节点，用滚动视口作水平参照
 		// shell：用于水平对齐的参照容器（优先消息气泡壳，否则用 viewport）
 		const shell =
-			block.closest<HTMLElement>('[data-chat-assistant-shell]') ?? viewport;
+			block.closest<HTMLElement>(CHAT_ASSISTANT_SHELL_SELECTOR) ?? viewport;
 		// 缺少关键节点则跳过（不参与吸顶）
 		if (!toolbar || !slot) continue;
 		// 记录本代码块的评分信息
@@ -212,7 +231,9 @@ export function layoutChatCodeToolbars(viewport: HTMLElement | null): void {
 	// 在 winner 代码块上打标：方便浮动工具栏通过 pinId 反查对应 block
 	winner.block.setAttribute(PIN_ATTR, String(pinId));
 	// 标记原工具栏“已被浮动条替换”：通常用于样式隐藏/占位切换
-	winner.toolbar.classList.add('chat-md-code-toolbar--replaced-by-float');
+	winner.toolbar.classList.add(
+		MARKDOWN_CODE_FENCE_TOOLBAR_FLOAT_REPLACED_CLASS,
+	);
 	// 读取原工具栏高度：用于设置 slot 的占位高度，避免内容突然上跳
 	const th = winner.toolbar.offsetHeight || 36;
 	// 写入占位高度：原工具栏被“替换”后仍保持同等高度的空位
@@ -223,7 +244,9 @@ export function layoutChatCodeToolbars(viewport: HTMLElement | null): void {
 	// 计算浮动条在视口内的水平位置与宽度（优先对齐代码块可见区间）
 	const { left, width } = computePinnedBarBox(shellRect, winner.br, vpRect);
 	// 从代码块里读语言标签：用于浮动工具栏显示（不作为下载真实语言源）
-	const langSpan = winner.block.querySelector('.chat-md-code-lang');
+	const langSpan = winner.block.querySelector(
+		MARKDOWN_CODE_FENCE_TOOLBAR_LANG_SELECTOR,
+	);
 	// 语言文本：空值回退为 text
 	const lang = langSpan?.textContent?.trim() || 'text';
 
@@ -285,16 +308,13 @@ export function fileExtension(lang: string): string {
 /**
  * 从一个代码块根节点中提取纯文本源码。
  *
- * 约定结构（由解析器输出）：
- * - 外层：`[data-chat-code-block]`
- * - 内层：`<pre><code>...</code></pre>`
+ * 约定结构：与 `MarkdownParser.patchChatCodeFenceRenderer`、`getMarkdownCodeFencePlainText`（工具包内 `MARKDOWN_CODE_FENCE_SOURCE_CODE_SELECTOR`）一致。
  *
  * 注意：这里取的是 `textContent`，用于复制/下载时确保拿到“用户看到的纯文本”，
  * 不依赖 highlight.js 输出的 HTML（避免夹带标签）。
  */
 export function getChatCodeBlockPlainText(block: HTMLElement): string {
-	const code = block.querySelector('pre code');
-	return code?.textContent ?? '';
+	return getMarkdownCodeFencePlainText(block);
 }
 
 /**
@@ -320,7 +340,7 @@ export function getPinnedChatCodeBlock(pinId: number): HTMLElement | null {
  * - **宿主负责**：用项目统一的下载能力 `downloadBlob(...)` 完成落盘（Web/Tauri/Electron 等）
  *
  * 说明：
- * - `_lang` 参数保留是为了兼容旧调用签名；实际下载使用 DOM 内 `.chat-md-code-lang` 的文本作为语言来源
+ * - `_lang` 参数保留是为了兼容旧调用签名；实际语言以 `getMarkdownCodeFenceInfo` 从 DOM（`MARKDOWN_CODE_FENCE_TOOLBAR_LANG_SELECTOR`）解析为准
  * - 文件名策略：`code_<时间戳>.<ext>`
  */
 export async function downloadChatCodeBlock(block: HTMLElement, _lang: string) {
