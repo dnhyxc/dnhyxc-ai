@@ -4,7 +4,7 @@
  * 避免分支切换时数百条编辑器同步初始化卡死主线程（非虚拟列表，DOM 仍保留）。
  */
 
-import { MarkdownParser } from '@dnhyxc-ai/tools';
+import { bindMarkdownCodeFenceActions, MarkdownParser } from '@dnhyxc-ai/tools';
 import { Button, Spinner } from '@ui/index';
 import {
 	ChevronDown,
@@ -20,10 +20,7 @@ import { getChatMarkdownHighlightTheme } from '@/constant';
 import { useTheme } from '@/hooks/theme';
 import { cn } from '@/lib/utils';
 import { Message, SearchOrganicItem } from '@/types/chat';
-import {
-	downloadChatCodeBlock,
-	getChatCodeBlockPlainText,
-} from '@/utils/chatCodeToolbar';
+import { downloadChatCodeBlock } from '@/utils/chatCodeToolbar';
 import { attachExternalLinkClickInterceptor } from '@/utils/external-link-click';
 import { openExternalUrl } from '@/utils/open-external';
 import {
@@ -175,33 +172,14 @@ function ChatAssistantMessageInner({
 				stopPropagation: true,
 			},
 		);
-		const onClick = (e: MouseEvent) => {
-			const target = e.target as HTMLElement;
-			const btn = target.closest<HTMLButtonElement>('[data-chat-code-action]');
-			if (!btn || !el.contains(btn)) return;
-			const action = btn.getAttribute('data-chat-code-action');
-			const block = btn.closest<HTMLElement>('[data-chat-code-block]');
-			if (!block) return;
-			if (action === 'copy') {
-				void navigator.clipboard.writeText(getChatCodeBlockPlainText(block));
-				const prev = btn.textContent;
-				btn.setAttribute('data-chat-code-copied', '1');
-				btn.textContent = '已复制';
-				window.setTimeout(() => {
-					btn.removeAttribute('data-chat-code-copied');
-					btn.textContent = prev;
-				}, 1500);
-				return;
-			}
-			if (action === 'download') {
-				const lang = btn.getAttribute('data-chat-code-lang') || 'text';
-				downloadChatCodeBlock(block, lang);
-			}
-		};
-		el.addEventListener('click', onClick);
+		const detachCodeFenceActions = bindMarkdownCodeFenceActions(el, {
+			onDownload(payload) {
+				void downloadChatCodeBlock(payload.block, payload.lang);
+			},
+		});
 		return () => {
 			detachExternalLinkInterceptor();
-			el.removeEventListener('click', onClick);
+			detachCodeFenceActions();
 		};
 	}, []);
 

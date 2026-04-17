@@ -301,23 +301,16 @@ const parser = new MarkdownParser({
 注意：
 
 - 这只会输出工具栏 DOM
-- 真正的复制/下载按钮点击逻辑要由宿主自己写
+- 但现在推荐直接配合 `bindMarkdownCodeFenceActions(...)`，无需宿主自己手写 `querySelector('pre code')`
 
-下面是一种常见实现方式：在外层容器上做**事件委托**，统一处理工具栏按钮点击。
+下面是**推荐写法**：直接使用工具包内置的代码块动作绑定器。
 
 ```tsx
 import { useEffect, useRef } from 'react';
-import { MarkdownParser } from '@dnhyxc-ai/tools';
-
-function downloadTextFile(text: string, filename: string) {
-	const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
-	const url = URL.createObjectURL(blob);
-	const a = document.createElement('a');
-	a.href = url;
-	a.download = filename;
-	a.click();
-	URL.revokeObjectURL(url);
-}
+import {
+	bindMarkdownCodeFenceActions,
+	MarkdownParser,
+} from '@dnhyxc-ai/tools';
 
 export function MarkdownWithCodeToolbar({ markdown }: { markdown: string }) {
 	const rootRef = useRef<HTMLDivElement>(null);
@@ -328,41 +321,14 @@ export function MarkdownWithCodeToolbar({ markdown }: { markdown: string }) {
 	useEffect(() => {
 		const root = rootRef.current;
 		if (!root) return;
-
-		const onClick = async (e: MouseEvent) => {
-			const target = e.target as HTMLElement | null;
-			const btn = target?.closest<HTMLElement>('[data-chat-code-action]');
-			if (!btn) return;
-
-			const action = btn.getAttribute('data-chat-code-action');
-			const block = btn.closest<HTMLElement>('[data-chat-code-block]');
-			const codeEl = block?.querySelector('pre code');
-			const code = codeEl?.textContent ?? '';
-			const lang = btn.getAttribute('data-chat-code-lang') || 'text';
-
-			if (!code) return;
-
-			if (action === 'copy') {
-				try {
-					await navigator.clipboard.writeText(code);
-					btn.textContent = '已复制';
-					window.setTimeout(() => {
-						btn.textContent = '复制';
-					}, 1500);
-				} catch (error) {
-					console.error('复制失败', error);
-				}
-				return;
-			}
-
-			if (action === 'download') {
-				const safeExt = lang.toLowerCase().replace(/[^a-z0-9_-]/g, '') || 'txt';
-				downloadTextFile(code, `code.${safeExt}`);
-			}
-		};
-
-		root.addEventListener('click', onClick);
-		return () => root.removeEventListener('click', onClick);
+		// 推荐：显式传 root，把事件作用域限制在当前容器内，避免跨页面/跨组件串扰
+		const dispose = bindMarkdownCodeFenceActions(root, {
+			onDownload(payload) {
+				// 工具内部已经帮你拿到代码内容、语言、文件名建议
+				console.log(payload.code, payload.lang, payload.filename);
+			},
+		});
+		return dispose;
 	}, []);
 
 	return (
@@ -377,6 +343,37 @@ export function MarkdownWithCodeToolbar({ markdown }: { markdown: string }) {
 实现要点：
 
 - 按钮由 `enableChatCodeFenceToolbar: true` 生成，内部会带 `data-chat-code-action="copy|download"`。
+- `bindMarkdownCodeFenceActions(root, options)` 是现在的**推荐用法**：把监听限制在当前渲染容器，避免不同页面/组件都绑到 `document` 后互相“抢处理”。
+- 默认会处理：
+  - 复制到剪贴板
+  - 按钮切换为 `已复制`，并在短暂延迟后恢复
+- 业务方通常只需要关心 `onDownload(payload)`，不再需要自己手动查找 `pre code`。
+- 也支持 `bindMarkdownCodeFenceActions(options)`（省略 root）：会默认绑定到 `document`。**仅建议在你明确只有一个宿主容器、且不会出现多个实例并存的页面使用**。
+
+### 7.6.1 下载逻辑：推荐把“落盘”交给宿主，把“内容/文件名”交给工具包
+
+很多项目的下载实现不一致（Web / Tauri / Electron），因此工具包提供 `downloadMarkdownCodeFenceWith`：
+
+- 工具包负责：把 `payload.code` 组装为 `Blob`，并给出 `filename`、`lang` 等元信息
+- 宿主负责：用自己的下载器把 `Blob` 写出去（例如 `downloadBlob`、原生文件 API 等）
+
+示例（伪代码，按你项目的 `downloadBlob` 替换即可）：
+
+```ts
+import {
+	bindMarkdownCodeFenceActions,
+	downloadMarkdownCodeFenceWith,
+} from "@dnhyxc-ai/tools";
+
+bindMarkdownCodeFenceActions(root, {
+	onDownload(payload) {
+		void downloadMarkdownCodeFenceWith(payload, async (task) => {
+			// task.blob / task.filename 已准备好，宿主只负责“怎么保存”
+			console.log(task.filename, task.blob.size);
+		});
+	},
+});
+```
 
 ---
 

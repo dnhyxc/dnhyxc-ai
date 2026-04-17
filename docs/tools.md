@@ -496,6 +496,162 @@ public render(text: string, renderOptions: MarkdownRenderOptions = {}): string {
 - **不会影响**所有旧调用点：`parser.render(text)` 仍然按实例默认工作；
 - Mermaid fence 的“是否生效”变为 **渲染期判断**：只有当 `env.enableMermaid === true` 时才输出 `.markdown-mermaid-wrap`；否则回退到 `prev`（普通代码块路径）。
 
+---
+
+#### 11.8.6 本轮补充：代码块复制/下载动作下沉（`markdown-code-fence-actions.ts`）
+
+**动机**：
+
+- `MarkdownParser` 在 `enableChatCodeFenceToolbar: true` 时会为围栏代码块输出工具栏 DOM（复制/下载按钮），但若每个业务方都手写：
+  - `closest('[data-chat-code-block]')`
+  - `querySelector('pre code')`
+  - `navigator.clipboard.writeText(...)`
+  - “已复制”按钮文案切换 + 定时恢复
+  会造成重复实现与行为不一致。
+
+**方案**：将“解析点击目标 → 提取代码块文本/语言/文件名 → 分发动作”的逻辑做成工具层 API。
+
+工具侧核心导出（见 `packages/tools/src/markdown-code-fence-actions.ts`）：
+
+- `bindMarkdownCodeFenceActions(root, options)`：绑定点击事件并分发 `copy/download`
+  - **默认 copy**：`enableDefaultCopy !== false` 时调用 `navigator.clipboard.writeText(code)`
+  - **默认 copy 反馈**：`copyFeedback !== false` 时按钮显示 `已复制` 并在短暂延迟后恢复
+- `getMarkdownCodeFenceInfo(block)`：从 DOM 提取 `{ code, lang, filename, ... }`
+- `downloadMarkdownCodeFenceWith(info, download)`：把 `code` 转为 `Blob` 并交给宿主的下载器执行（Web/Tauri/Electron 统一入口）
+- `createMarkdownCodeFenceInfo({ code, lang, filename })`：不依赖 DOM 构造下载信息（适用于 Mermaid 代码模式等“只有文本”的场景）
+
+##### 11.8.6.1 事件解析：从点击目标定位到“当前代码块”
+
+代码块工具栏的按钮由 `MarkdownParser` 输出，带有稳定的 `data-*` 约定：
+
+- `data-chat-code-action="copy|download"`：表示点击意图
+- 代码块根：`[data-chat-code-block]`
+
+工具侧通过 `closest(...)` 自底向上定位按钮与代码块，再统一提取代码文本/语言/文件名：
+
+```ts
+// packages/tools/src/markdown-code-fence-actions.ts（核心逻辑摘录）
+export function resolveMarkdownCodeFenceActionPayload(target, root, options) {
+	// 1) 找按钮：允许点在 <span>/<svg> 等子节点上，统一向上找最近的 action 按钮
+	const button = el?.closest('[data-chat-code-action]');
+	// 2) action：只放行 copy/download，其它字符串直接忽略
+	const action = button.getAttribute('data-chat-code-action');
+	// 3) 找代码块容器：保证 copy/download 操作总是作用于“就近代码块”
+	const block = button.closest('[data-chat-code-block]');
+	// 4) 安全边界：按钮/代码块必须属于 root（避免跨容器串扰）
+	if (!root.contains(button) || !root.contains(block)) return null;
+	// 5) 结构化 payload：把业务方最关心的信息一次性准备好
+	return { action, button, root, ...getMarkdownCodeFenceInfo(block, options) };
+}
+```
+
+##### 11.8.6.2 信息提取：`getMarkdownCodeFenceInfo(block)` 负责统一“取文本/语言/文件名”
+
+业务侧最容易写散的地方是“从 DOM 里取代码文本 / 语言名”。工具侧统一约定：
+
+- 代码文本：`pre code` 的 `textContent`
+- 语言名：`.chat-md-code-lang` 的文本（由解析器输出）
+- 扩展名：语言到扩展名的映射（未知语言做安全回退）
+- 文件名：默认 `code.<ext>`，也允许宿主通过 `getFilename(...)` 自定义
+
+```ts
+// packages/tools/src/markdown-code-fence-actions.ts（核心逻辑摘录）
+export function getMarkdownCodeFenceInfo(block, { getFilename } = {}) {
+	const code = getMarkdownCodeFencePlainText(block);
+	const lang =
+		block.querySelector('.chat-md-code-lang')?.textContent?.trim()?.toLowerCase() ||
+		'text';
+	const fileExtension = markdownCodeFenceFileExtension(lang);
+	const baseInfo = { block, code, lang, fileExtension };
+	return {
+		...baseInfo,
+		filename: getFilename?.(baseInfo) ?? `code.${fileExtension}`,
+	};
+}
+```
+
+##### 11.8.6.3 默认复制与复制反馈：让业务方不必每处都写 “已复制” 定时恢复
+
+`bindMarkdownCodeFenceActions` 的 **copy 默认行为**：
+
+- 未传 `onCopy` 时，走工具内置 `navigator.clipboard.writeText(code)`
+- copy 成功后默认调用 `showMarkdownCodeFenceCopiedFeedback(button)`：
+  - 写 `data-chat-code-copied="1"`
+  - 按钮文案切换为 `已复制`
+  - 约 1.5s 后恢复原文案
+
+```ts
+// packages/tools/src/markdown-code-fence-actions.ts（核心逻辑摘录）
+if (payload.action === 'copy') {
+	if (options.onCopy) {
+		await options.onCopy(payload);
+	} else if (options.enableDefaultCopy !== false) {
+		await copyMarkdownCodeFence(payload); // navigator.clipboard.writeText(payload.code)
+		if (options.copyFeedback !== false) {
+			showMarkdownCodeFenceCopiedFeedback(payload.button);
+		}
+	}
+}
+```
+
+##### 11.8.6.4 下载：`downloadMarkdownCodeFenceWith(info, download)` 让“落盘”交给宿主
+
+下载在不同平台差异很大（Web / Tauri / Electron），所以工具包不强行决定怎么写文件，而是把“下载任务”结构化后交给宿主：
+
+```ts
+// packages/tools/src/markdown-code-fence-actions.ts（核心逻辑摘录）
+export async function downloadMarkdownCodeFenceWith(info, download) {
+	const blob = new Blob([info.code], { type: 'text/plain;charset=utf-8' });
+	await download({
+		code: info.code,
+		lang: info.lang,
+		fileExtension: info.fileExtension,
+		filename: info.filename,
+		blob,
+	});
+}
+```
+
+仓库内落地示例（前端侧统一走 `downloadBlob`）：
+
+```ts
+// apps/frontend/src/utils/chatCodeToolbar.ts（逻辑摘录）
+const info = getMarkdownCodeFenceInfo(block, {
+	getFilename(base) {
+		return `code_${Date.now()}.${base.fileExtension}`;
+	},
+});
+await downloadMarkdownCodeFenceWith(info, (task) =>
+	downloadBlob({ file_name: task.filename, id: Date.now().toString(), overwrite: true }, task.blob)
+);
+```
+
+##### 11.8.6.5 非标准代码块场景：`createMarkdownCodeFenceInfo`（Mermaid 代码模式）
+
+有些下载不来自“标准 code block DOM”（例如 Mermaid 顶栏的代码模式下载 `.mmd`），此时用 `createMarkdownCodeFenceInfo` 直接从文本构造下载信息：
+
+```ts
+// apps/frontend/src/components/design/MermaidFenceToolbar/index.tsx（逻辑摘录）
+const info = createMarkdownCodeFenceInfo({
+	code: mermaidCode,
+	lang: 'mermaid',
+	filename: `mermaid-${Date.now()}.mmd`,
+});
+await downloadMarkdownCodeFenceWith(info, (task) =>
+	downloadBlob({ file_name: task.filename, id: `mermaid-md-${Date.now()}`, overwrite: true }, task.blob)
+);
+```
+
+**关于作用域（非常重要）**：
+
+- 推荐使用 `bindMarkdownCodeFenceActions(root, options)` 显式传入根容器，把事件作用域限制在当前渲染区域。
+- 也支持 `bindMarkdownCodeFenceActions(options)` 省略 root（默认绑定到 `document`），但当页面存在多个实例（如聊天列表 + Monaco 预览同时挂载）时可能出现“不同实例抢同一个按钮点击”的串扰。
+
+仓库落地点（`apps/frontend`）：
+
+- `ChatCodeToolBar/index.tsx`：复制走 `copyMarkdownCodeFence(getMarkdownCodeFenceInfo(block))`；下载走业务侧落盘函数，但内容/文件名由工具层统一提供。
+- `MermaidFenceToolbar/index.tsx`：图表模式下载 SVG 仍走现有 SVG 导出；代码模式下载 `.mmd` 则用 `createMarkdownCodeFenceInfo` + `downloadMarkdownCodeFenceWith` 统一落盘路径。
+
 ### 11.9 流式聊天场景（本仓库前端）：围栏拆分与 Mermaid 岛
 
 本节记录 **助手消息流式输出** 时 Mermaid **无法稳定显示**、**全文闪烁** 的成因与落地实现。代码位于 **`apps/frontend/`**（非 `packages/tools`），但与 **`MarkdownParser`、`runMermaidInMarkdownRoot`** 紧密配合，故写入本文档便于对照。

@@ -3,6 +3,11 @@
  * 设计背景、哨兵 + IntersectionObserver 约定及与 Portal 方案对比见仓库根目录文档：
  * `docs/mermaid-fence-toolbar-sticky.md`
  */
+
+import {
+	createMarkdownCodeFenceInfo,
+	downloadMarkdownCodeFenceWith,
+} from '@dnhyxc-ai/tools';
 import { Button } from '@ui/index';
 import { CheckCircle, Code2, Copy, Download, Eye } from 'lucide-react';
 import {
@@ -180,17 +185,21 @@ export function MermaidFenceToolbarActions({
 				return;
 			}
 			// 代码模式：与「复制」不同，此处只存围栏内正文，便于直接粘贴进 Mermaid Live / 编辑器
-			const blob = new Blob([mermaidCode], {
-				type: 'text/plain;charset=utf-8',
+			const info = createMarkdownCodeFenceInfo({
+				code: mermaidCode,
+				lang: 'mermaid',
+				filename: `mermaid-${stamp}.mmd`,
 			});
-			await downloadBlob(
-				{
-					file_name: `mermaid-${stamp}.mmd`,
-					id: `mermaid-md-${stamp}`,
-					overwrite: true,
-				},
-				blob,
-			);
+			await downloadMarkdownCodeFenceWith(info, async (task) => {
+				await downloadBlob(
+					{
+						file_name: task.filename,
+						id: `mermaid-md-${stamp}`,
+						overwrite: true,
+					},
+					task.blob,
+				);
+			});
 		},
 		[blockId, mode, mermaidCode],
 	);

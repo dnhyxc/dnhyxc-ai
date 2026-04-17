@@ -7,6 +7,26 @@ export {
 	clearAppliedHighlightJsTheme,
 } from './inject-highlight-theme.js';
 export type {
+	BindMarkdownCodeFenceActionsOptions,
+	MarkdownCodeFenceAction,
+	MarkdownCodeFenceActionPayload,
+	MarkdownCodeFenceCopyFeedbackOptions,
+	MarkdownCodeFenceDownloadTask,
+	MarkdownCodeFenceInfo,
+	MarkdownCodeFenceTextInit,
+} from './markdown-code-fence-actions.js';
+export {
+	bindMarkdownCodeFenceActions,
+	copyMarkdownCodeFence,
+	createMarkdownCodeFenceInfo,
+	downloadMarkdownCodeFenceWith,
+	getMarkdownCodeFenceInfo,
+	getMarkdownCodeFencePlainText,
+	markdownCodeFenceFileExtension,
+	resolveMarkdownCodeFenceActionPayload,
+	showMarkdownCodeFenceCopiedFeedback,
+} from './markdown-code-fence-actions.js';
+export type {
 	MarkdownMermaidSplitPart,
 	MarkdownParserOptions,
 	MarkdownRenderEnv,

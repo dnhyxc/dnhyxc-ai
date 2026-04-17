@@ -1,8 +1,11 @@
 import { MermaidFenceIsland } from '@design/MermaidFenceIsland';
 import { MermaidFenceToolbarActions } from '@design/MermaidFenceToolbar';
 import Tooltip from '@design/Tooltip';
-import type { MarkdownMermaidSplitPart } from '@dnhyxc-ai/tools';
-import { MarkdownParser } from '@dnhyxc-ai/tools';
+import {
+	bindMarkdownCodeFenceActions,
+	type MarkdownMermaidSplitPart,
+	MarkdownParser,
+} from '@dnhyxc-ai/tools';
 import { useMermaidInMarkdownRoot } from '@dnhyxc-ai/tools/react';
 import { ScrollArea } from '@ui/index';
 import { ArrowDown, ArrowUp } from 'lucide-react';
@@ -28,10 +31,7 @@ import {
 	useChatCodeFloatingToolbar,
 } from '@/hooks/useChatCodeFloatingToolbar';
 import { cn } from '@/lib/utils';
-import {
-	downloadChatCodeBlock,
-	getChatCodeBlockPlainText,
-} from '@/utils/chatCodeToolbar';
+import { downloadChatCodeBlock } from '@/utils/chatCodeToolbar';
 import { attachExternalLinkClickInterceptor } from '@/utils/external-link-click';
 import {
 	hashText,
@@ -164,31 +164,16 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 					}
 				}
 			}
-
-			const btn = target.closest<HTMLButtonElement>('[data-chat-code-action]');
-			if (!btn || !el.contains(btn)) return;
-			const action = btn.getAttribute('data-chat-code-action');
-			const block = btn.closest<HTMLElement>('[data-chat-code-block]');
-			if (!block) return;
-			if (action === 'copy') {
-				void navigator.clipboard.writeText(getChatCodeBlockPlainText(block));
-				const prev = btn.textContent;
-				btn.setAttribute('data-chat-code-copied', '1');
-				btn.textContent = '已复制';
-				window.setTimeout(() => {
-					btn.removeAttribute('data-chat-code-copied');
-					btn.textContent = prev;
-				}, 1500);
-				return;
-			}
-			if (action === 'download') {
-				const lang = btn.getAttribute('data-chat-code-lang') || 'text';
-				downloadChatCodeBlock(block, lang);
-			}
 		};
+		const detachCodeFenceActions = bindMarkdownCodeFenceActions(el, {
+			onDownload(payload) {
+				void downloadChatCodeBlock(payload.block, payload.lang);
+			},
+		});
 		el.addEventListener('click', onClick);
 		return () => {
 			detachExternalLinkInterceptor();
+			detachCodeFenceActions();
 			el.removeEventListener('click', onClick);
 		};
 	}, []);

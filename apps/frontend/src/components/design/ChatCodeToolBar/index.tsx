@@ -1,10 +1,13 @@
+import {
+	copyMarkdownCodeFence,
+	getMarkdownCodeFenceInfo,
+} from '@dnhyxc-ai/tools';
 import { CheckCircle, Copy, Download } from 'lucide-react';
 import { useCallback, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui';
 import {
 	downloadChatCodeBlock,
-	getChatCodeBlockPlainText,
 	getChatCodeFloatingToolbarSnapshot,
 	getPinnedChatCodeBlock,
 	subscribeChatCodeFloatingToolbar,
@@ -32,7 +35,7 @@ export default function ChatCodeToolbarFloating() {
 	const onCopy = useCallback(() => {
 		const block = getPinnedChatCodeBlock(state.pinId);
 		if (!block) return;
-		void navigator.clipboard.writeText(getChatCodeBlockPlainText(block));
+		void copyMarkdownCodeFence(getMarkdownCodeFenceInfo(block));
 		setCopied(true);
 		window.setTimeout(() => setCopied(false), 1500);
 	}, [state.pinId]);
