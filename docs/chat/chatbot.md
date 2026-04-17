@@ -249,7 +249,7 @@
 | 组件 | 路径 | 作用摘要 |
 |------|------|----------|
 | `ChatAssistantMessage` | `apps/frontend/src/components/design/ChatAssistantMessage/index.tsx` | 助手气泡：Markdown、思考内容、联网引用区、与代码块工具条滚动联动等 |
-| `ChatCodeToolBar` | `apps/frontend/src/components/design/ChatCodeToolBar/index.tsx` | 代码块浮动工具条；布局逻辑与 `layoutChatCodeToolbars` 配合；**Hook 与逐行说明见 [use-chat-code-floating-toolbar.md](./use-chat-code-floating-toolbar.md)** |
+| `ChatCodeToolBar` | `apps/frontend/src/components/design/ChatCodeToolBar/index.tsx` | 代码块浮动工具条；布局逻辑与 `layoutChatCodeToolbars` 配合；**Hook 与逐行说明见 [react/use-chat-code-floating-toolbar.md](../react/use-chat-code-floating-toolbar.md)** |
 | `ChatControls` | `apps/frontend/src/components/design/ChatControls/index.tsx` | 底栏控制（停止、滚动位置指示等，随项目配置） |
 | `ChatEntry` | `apps/frontend/src/components/design/ChatEntry/index.tsx` | 输入区、上传、发送 |
 | 聊天页 | `apps/frontend/src/views/chat/index.tsx` | 再包一层 `useChatCore`（与 `ChatBot` 共享 Context）、会话列表、分享、上传接口 |

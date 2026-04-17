@@ -4,8 +4,8 @@
 
 相关文档：
 
-- 代码块全局浮动吸顶（Portal + 几何计算）：[`use-chat-code-floating-toolbar.md`](./use-chat-code-floating-toolbar.md)、[`@/utils/chatCodeToolbar`](../apps/frontend/src/utils/chatCodeToolbar.ts)
-- Mermaid 岛与流式渲染总览：[`mermaid-markdown-zoom-and-preview.md`](./mermaid-markdown-zoom-and-preview.md) 路径 B
+- 代码块全局浮动吸顶（Portal + 几何计算）：[`react/use-chat-code-floating-toolbar.md`](../react/use-chat-code-floating-toolbar.md)、[`@/utils/chatCodeToolbar`](../apps/frontend/src/utils/chatCodeToolbar.ts)
+- Mermaid 岛与流式渲染总览：[`markdown-zoom-and-preview.md`](./markdown-zoom-and-preview.md) 路径 B
 
 ---
 
@@ -120,7 +120,7 @@ children(mode)：图表模式 → MermaidFenceIsland（code / isStreaming 由宿
 | `apps/frontend/src/utils/index.ts`（`downloadBlob`）                                 | 代码模式导出纯文本；与 Tauri / Web 下载管线一致。                                                                                                       |
 | `apps/frontend/src/components/design/ChatAssistantMessage/StreamingMarkdownBody.tsx` | `renderMermaidPart` 内 **`MermaidFenceToolbarActions`** + **`children(mode)`** 挂载 Island / fallback。                                                 |
 | `apps/frontend/src/components/design/MermaidFenceIsland/index.tsx`                   | 离屏渲染与流式提交逻辑（本功能未改其行为）。                                                                                                            |
-| `packages/tools/src/mermaid/markdown-selectors.ts`                                   | **Mermaid 占位 DOM 契约**：wrap / `data-mermaid` / `.mermaid` / SVG 选择器等 **集中导出**；解析器、**`runMermaidInMarkdownRoot`**、前端岛/工具栏/预览 **同源**（详见 `docs/tools.md` **§11.2.1**）。 |
+| `packages/tools/src/mermaid/markdown-selectors.ts`                                   | **Mermaid 占位 DOM 契约**：wrap / `data-mermaid` / `.mermaid` / SVG 选择器等 **集中导出**；解析器、**`runMermaidInMarkdownRoot`**、前端岛/工具栏/预览 **同源**（详见 `docs/tools/index.md` **§11.2.1**）。 |
 | `apps/frontend/src/components/design/ChatCodeToolBar/index.tsx`                      | 浮动代码条样式参照。                                                                                                                                    |
 | `apps/frontend/src/components/ui/scroll-area.tsx`                                    | Viewport 上 `data-slot="scroll-area-viewport"` 与 ref 转发。                                                                                            |
 | `apps/frontend/src/components/design/Monaco/preview.tsx`                             | `ParserMarkdownPreviewPane`：`renderMermaidPreviewPart` 与聊天侧一致组装 **`MermaidFenceToolbarActions`** + **`children(mode)`**（知识库 / 分屏预览）。 |
@@ -130,7 +130,7 @@ children(mode)：图表模式 → MermaidFenceIsland（code / isStreaming 由宿
 ## 9. 完整实现代码（`MermaidFenceToolbar/index.tsx`）
 
 > **与仓库对齐**：以下 **§9.1** 为 **`MermaidFenceToolbar` + `MermaidFenceToolbarActions`** 单文件全文。若与当前分支不一致，以 **`apps/frontend/src/components/design/MermaidFenceToolbar/index.tsx`** 为准。  
-> **维护提示**：Mermaid 相关 **`querySelector` 选择器字符串** 已收口到 **`@dnhyxc-ai/tools`**（如 **`MERMAID_MARKDOWN_SVG_SELECTOR`**）；本文摘录若与源码有细微差异，**一律以源码 + `docs/tools.md` §11.2.1 为准**。
+> **维护提示**：Mermaid 相关 **`querySelector` 选择器字符串** 已收口到 **`@dnhyxc-ai/tools`**（如 **`MERMAID_MARKDOWN_SVG_SELECTOR`**）；本文摘录若与源码有细微差异，**一律以源码 + `docs/tools/index.md` §11.2.1 为准**。
 
 ### 9.1 源文件全文
 
@@ -138,7 +138,7 @@ children(mode)：图表模式 → MermaidFenceIsland（code / isStreaming 由宿
 /**
  * Mermaid 围栏顶栏：在 ScrollArea viewport 内 `sticky` 吸顶；粘顶后与代码块浮动工具条视觉对齐。
  * 设计背景、哨兵 + IntersectionObserver 约定及与 Portal 方案对比见仓库根目录文档：
- * `docs/mermaid-fence-toolbar-sticky.md`
+ * `docs/mermaid/fence-toolbar-sticky.md`
  */
 import {
 	createMarkdownCodeFenceInfo,
@@ -303,7 +303,7 @@ export function MermaidFenceToolbarActions({
 	/**
 	 * 下载：与当前 `mode` 一致。
 	 * - diagram：与 `onPreview` 相同路径取 SVG → `mermaidSvgToPreviewDataUrl` → `downloadMermaidPreviewSvg`（Web/Tauri 统一 `downloadBlob`）。
-	 * - code：仅 DSL 文本，扩展名 `.mmd` 表示单文件 Mermaid 源码（见 `docs/mermaid-fence-toolbar-sticky.md` §13.2）；走 **`createMarkdownCodeFenceInfo` + `downloadMarkdownCodeFenceWith`** 与代码块下载管线对齐。
+	 * - code：仅 DSL 文本，扩展名 `.mmd` 表示单文件 Mermaid 源码（见 `docs/mermaid/fence-toolbar-sticky.md` §13.2）；走 **`createMarkdownCodeFenceInfo` + `downloadMarkdownCodeFenceWith`** 与代码块下载管线对齐。
 	 */
 	const onDownload = useCallback(
 		async (e: ReactMouseEvent<HTMLButtonElement>) => {
@@ -802,7 +802,7 @@ const onDownload = useCallback(
 
 ## 14. 契约模块与「预览 / 下载取 SVG」（行尾注释摘录）
 
-**完整带注释源码（工具包 + 解析器节选 + 本组件 import + `onPreview`/`onDownload` 关键路径）**：统一维护在 **`docs/tools.md` §11.2.2**（其中 **§11.2.2.F** 对应本文件 `MermaidFenceToolbarActions` 节选）。
+**完整带注释源码（工具包 + 解析器节选 + 本组件 import + `onPreview`/`onDownload` 关键路径）**：统一维护在 **`docs/tools/index.md` §11.2.2**（其中 **§11.2.2.F** 对应本文件 `MermaidFenceToolbarActions` 节选）。
 
 下面仅保留 **`onPreview`** 一段「最常对照 DOM」的行尾注释版（与 **`data-mermaid-preview-scope`** 配合阅读）：
 

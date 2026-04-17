@@ -365,7 +365,7 @@ useEffect(() => {
 
 ## 5. 与既有文档的关系
 
-- 本地合成 id、仅写磁盘不写库等基础约定见：[knowledge-local-folder-and-monaco-sync.md](./knowledge-local-folder-and-monaco-sync.md)。
+- 本地合成 id、仅写磁盘不写库等基础约定见：[local-folder-and-monaco-sync.md](./local-folder-and-monaco-sync.md)。
 - 本文在其上增加**未登录维度的路由与 API 门禁**，不改变本地/云端 id 编码规则。
 
 ---

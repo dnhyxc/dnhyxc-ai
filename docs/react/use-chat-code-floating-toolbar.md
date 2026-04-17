@@ -141,6 +141,6 @@
 | --------------------------------------------------------------- | ----------------------------------------------------------------------- |
 | `apps/frontend/src/utils/chatCodeToolbar.ts`                    | `layoutChatCodeToolbars`、浮动条全局状态、复制/下载辅助函数             |
 | `apps/frontend/src/components/design/ChatCodeToolBar/index.tsx` | `ChatCodeToolbarFloating` 实现                                          |
-| `docs/tools.md` §10                                             | `@dnhyxc-ai/tools` 侧 GFM/代码块工具栏 HTML 契约（与本文 DOM 约定相关） |
+| `docs/tools/index.md` §10                                       | `@dnhyxc-ai/tools` 侧 GFM/代码块工具栏 HTML 契约（与本文 DOM 约定相关） |
 
 _文档与 `useChatCodeFloatingToolbar.tsx` 当前实现对齐。_

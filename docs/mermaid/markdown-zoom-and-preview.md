@@ -14,9 +14,9 @@
 - **空壳 HTML**：`MARKDOWN_MERMAID_PLACEHOLDER_HTML`（`MermaidFenceIsland` 离屏/宿主初始化）
 - **Tailwind**：`MARKDOWN_MERMAID_TAILWIND_CURSOR_ZOOM_IN_CLASS`（Monaco 预览 / 岛内 hover 光标）
 
-**文档入口**：更系统的 API 表与动机见 `docs/tools.md` **§11.2.1**；使用者速查见 `docs/tools-usage-guide.md` **§8.5**。
+**文档入口**：更系统的 API 表与动机见 `docs/tools/index.md` **§11.2.1**；使用者速查见 `docs/tools/usage-guide.md` **§8.5**。
 
-**实现源码（每行行尾 `//` 中文注释）**：完整契约模块、`runMermaidInMarkdownRoot`、`patchMermaidFence` 节选、岛/Hook/工具栏节选，统一收录在 `docs/tools.md` **§11.2.2**。  
+**实现源码（每行行尾 `//` 中文注释）**：完整契约模块、`runMermaidInMarkdownRoot`、`patchMermaidFence` 节选、岛/Hook/工具栏节选，统一收录在 `docs/tools/index.md` **§11.2.2**。
 下文 **§6** 的 Hook 示例块也已改为「行尾注释风格」，便于与 `apps/frontend/src/hooks/useMermaidImagePreview.tsx` 对照阅读。
 
 ---
@@ -61,7 +61,7 @@ mermaid 段：MermaidFenceIsland → 离屏渲染（可测量）→ 成功才提
 useMermaidDiagramClickPreview（岛 host 或预览根）：点击 SVG → ImagePreview
 ```
 
-**Mermaid 围栏顶栏（sticky + 粘顶双态样式 + 下载）**：见独立说明 [mermaid-fence-toolbar-sticky.md](./mermaid-fence-toolbar-sticky.md)（`MermaidFenceToolbar` + `StreamingMarkdownBody`；Monaco / 知识库预览见 **§12**；**下载**见 **§13**）。
+**Mermaid 围栏顶栏（sticky + 粘顶双态样式 + 下载）**：见独立说明 [fence-toolbar-sticky.md](./fence-toolbar-sticky.md)（`MermaidFenceToolbar` + `StreamingMarkdownBody`；Monaco / 知识库预览见 **§12**；**下载**见 **§13**）。
 
 - **渲染入口（路径 A）**：`MarkdownParser` 在 `enableMermaid !== false` 时对 ` ```mermaid ` 输出占位节点；`escapeHtml` 之前经 **`normalizeMermaidFenceBody`** 做换行统一与部分方括号文案补引号（见 **§7.5**）。
 - **渲染入口（路径 B）**：岛内用 **`textContent = normalizeMermaidFenceBody(code)`** 写入 DSL，再 **`runMermaidInMarkdownRoot(host)`**；根节点上的 **`useMermaidInMarkdownRoot` 通过 `parser.enableMermaid: false` 关闭**，避免重复扫描。

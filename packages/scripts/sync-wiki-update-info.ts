@@ -15,7 +15,7 @@ const OWNER = process.env.WIKI_OWNER ?? process.env.OWNER ?? 'dnhyxc';
 const REPO = process.env.WIKI_REPO ?? process.env.APP_REPO ?? 'dnhyxc-ai';
 /** Wiki 页面 slug 为 Update-Info 时对应的文件名 */
 const WIKI_PAGE_FILE = process.env.WIKI_UPDATE_INFO_FILE ?? 'Update-Info.md';
-const SOURCE_MD = path.resolve(_dirname, '../../docs/PROJECT-UPDATE-INFO.md');
+const SOURCE_MD = path.resolve(_dirname, '../../docs/project-update-info.md');
 
 function runGit(
 	cwd: string,
@@ -70,7 +70,7 @@ function main(): number {
 
 	try {
 		console.log('');
-		console.log('📚 同步 Wiki：Update-Info ← docs/PROJECT-UPDATE-INFO.md');
+		console.log('📚 同步 Wiki：Update-Info ← docs/project-update-info.md');
 		console.log(`   仓库: ${OWNER}/${REPO}.wiki`);
 		console.log('');
 
@@ -123,7 +123,7 @@ function main(): number {
 				`user.email=${authorEmail}`,
 				'commit',
 				'-m',
-				'docs: 同步项目更新总览（PROJECT-UPDATE-INFO.md）',
+				'docs: 同步项目更新总览（project-update-info.md）',
 			],
 			{
 				GIT_AUTHOR_NAME: authorName,

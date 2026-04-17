@@ -449,7 +449,7 @@ const parser = new MarkdownParser({ highlightTheme: "atom-one-dark" });
 - 旧代码若仅 `closest('.markdown-mermaid-wrap')` 或 `.markdown-mermaid-wrap .mermaid svg`，**可能**命中「缺少 `data-mermaid="1"`」的自定义 DOM。
 - 现在统一以 **`MARKDOWN_MERMAID_WRAP_SELECTOR`**（包含 `data-mermaid="1"`）为契约；**本仓库正规路径**（`patchMermaidFence` / 占位 HTML 常量）不受影响，但 **手写半截结构** 的集成需要补齐属性。
 
-更偏「产品侧数据流/交互」的补充说明见：`docs/mermaid-markdown-zoom-and-preview.md`（路径 A/B）与 `docs/mermaid-fence-toolbar-sticky.md`（工具条预览/下载取图）。
+更偏「产品侧数据流/交互」的补充说明见：`docs/mermaid/markdown-zoom-and-preview.md`（路径 A/B）与 `docs/mermaid/fence-toolbar-sticky.md`（工具条预览/下载取图）。
 
 ### 11.2.2 实现源码摘录（代码块内行尾中文注释）
 

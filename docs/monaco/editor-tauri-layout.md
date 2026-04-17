@@ -156,4 +156,4 @@ const base = { ...options, readOnly, automaticLayout: false as const };
 
 ## 10. 参见
 
-- **粘性滚动条背景**（`defineTheme` 与全局 CSS、`--theme-color` 与背景 token、Diff 内嵌编辑器）：[`monaco-markdown-split-diff-compare.md`](./monaco-markdown-split-diff-compare.md) 第 **13** 节
+- **粘性滚动条背景**（`defineTheme` 与全局 CSS、`--theme-color` 与背景 token、Diff 内嵌编辑器）：[`markdown-split-diff-compare.md`](./markdown-split-diff-compare.md) 第 **13** 节

@@ -6,7 +6,7 @@
 2. 我应该怎么接入？
 3. 不同场景下该怎么选参数与导入方式？
 
-如果你想看内部实现、边界行为、构建与源码结构，请再阅读 `docs/tools.md`；如果你只想“像用 npm 包一样快速上手”，看本文即可。
+如果你想看内部实现、边界行为、构建与源码结构，请再阅读 `docs/tools/index.md`；如果你只想“像用 npm 包一样快速上手”，看本文即可。
 
 ---
 
@@ -248,7 +248,7 @@ const parser = new MarkdownParser({
 | 页内锚点 | 外链拦截器跳过 `#`；另用 **冒泡阶段** 在滚动容器内 **`scrollIntoView`**（与 `Monaco/preview` 思路一致） |
 | 代码块工具栏 | `enableChatCodeFenceToolbar` + **`bindMarkdownCodeFenceActions`** + **`downloadMarkdownCodeFenceWith`** 落盘示例 |
 
-桌面端将 `openExternalUrl` 换成 Tauri `plugin-opener` 即可（见 [`frontend-tauri-browser.md`](./frontend-tauri-browser.md)）。本仓库等价实现：`apps/frontend/src/utils/external-link-click.ts`、`open-external.ts`，在 `ChatAssistantMessage`、`Monaco/preview` 已接入。
+桌面端将 `openExternalUrl` 换成 Tauri `plugin-opener` 即可（见 [`frontend/tauri-browser.md`](../frontend/tauri-browser.md)）。本仓库等价实现：`apps/frontend/src/utils/external-link-click.ts`、`open-external.ts`，在 `ChatAssistantMessage`、`Monaco/preview` 已接入。
 
 #### 建议文件布局
 
@@ -644,7 +644,7 @@ function scanFenceRoots(container: HTMLElement) {
 }
 ```
 
-**实现思路、维护约定、带行尾 `//` 注释的源码摘录（含 `markdown-parser` / `chatCodeToolbar` 节选）**：见 [`tools.md`](./tools.md) **第 11.8.6.0 小节**。
+**实现思路、维护约定、带行尾 `//` 注释的源码摘录（含 `markdown-parser` / `chatCodeToolbar` 节选）**：见 [`tools/index.md`](./index.md) **第 11.8.6.0 小节**。
 
 ### 7.6.1 下载逻辑：推荐把“落盘”交给宿主，把“内容/文件名”交给工具包
 
@@ -734,7 +734,7 @@ export function PreviewWithFloatingCodeToolbar(props: { markdown: string }) {
 }
 ```
 
-**深入说明与边界**：[`use-chat-code-floating-toolbar.md`](./use-chat-code-floating-toolbar.md)。核心实现：[`apps/frontend/src/utils/chatCodeToolbar.ts`](../apps/frontend/src/utils/chatCodeToolbar.ts)、[`apps/frontend/src/components/design/ChatCodeToolBar/index.tsx`](../apps/frontend/src/components/design/ChatCodeToolBar/index.tsx)。
+**深入说明与边界**：[`react/use-chat-code-floating-toolbar.md`](../react/use-chat-code-floating-toolbar.md)。核心实现：[`apps/frontend/src/utils/chatCodeToolbar.ts`](../apps/frontend/src/utils/chatCodeToolbar.ts)、[`apps/frontend/src/components/design/ChatCodeToolBar/index.tsx`](../apps/frontend/src/components/design/ChatCodeToolBar/index.tsx)。
 
 ---
 
@@ -857,7 +857,7 @@ await runMermaidInMarkdownRoot(document.getElementById("preview-root"), {
 - Mermaid 独立岛
 - 或本仓库中的 `splitMarkdownFences` + `StreamingMarkdownBody` 方案
 
-更完整说明见 `docs/tools.md`。
+更完整说明见 `docs/tools/index.md`。
 
 ### 8.5 Mermaid：不要手写 `.markdown-mermaid-wrap …` 选择器（推荐）
 
@@ -865,7 +865,7 @@ await runMermaidInMarkdownRoot(document.getElementById("preview-root"), {
 
 **推荐做法**：从 **`@dnhyxc-ai/tools`** 直接 import 契约常量/helper（与解析器、运行时扫描 **同源**）。
 
-**完整实现源码（每行行尾 `//` 中文注释）**：见 `docs/tools.md` **§11.2.2**（工具包 + 前端岛 + Hook + 工具栏节选）。
+**完整实现源码（每行行尾 `//` 中文注释）**：见 `docs/tools/index.md` **§11.2.2**（工具包 + 前端岛 + Hook + 工具栏节选）。
 
 下面示例同样采用 **行尾注释**（便于复制到业务代码后仍可读）：
 
@@ -895,7 +895,7 @@ const cls = MARKDOWN_MERMAID_TAILWIND_CURSOR_ZOOM_IN_CLASS; // 直接拼进 clas
 
 **边界**：若你自行拼接 Mermaid DOM，请确保与 **`MERMAID_MARKDOWN_ENTRY_SELECTOR`** 一致；尤其是 **`data-mermaid="1"`** 缺失会导致扫描/预览取图失败。
 
-**更完整的架构说明**：`docs/tools.md` **§11.2.1**、`docs/mermaid-markdown-zoom-and-preview.md`。
+**更完整的架构说明**：`docs/tools/index.md` **§11.2.1**、`docs/mermaid/markdown-zoom-and-preview.md`。
 
 ### 8.6 Mermaid 围栏顶栏（MermaidToolbar：`MermaidFenceToolbar` + `MermaidFenceToolbarActions`）
 
@@ -953,7 +953,7 @@ function renderMermaidPart(
 }
 ```
 
-**ScrollArea 约定**：当前 **`MermaidFenceToolbar`** 用 **`[data-slot="scroll-area-viewport"]`** 查找滚动根。若你的页面只有原生 **`overflow: auto`** 而没有该节点，粘顶判定会回退到「视口为 root」，可能与预期不符；可包一层与 Radix 相同 `data-slot` 的 viewport，或按 [`mermaid-fence-toolbar-sticky.md`](./mermaid-fence-toolbar-sticky.md) 调整 **`root`** 选择逻辑。
+**ScrollArea 约定**：当前 **`MermaidFenceToolbar`** 用 **`[data-slot="scroll-area-viewport"]`** 查找滚动根。若你的页面只有原生 **`overflow: auto`** 而没有该节点，粘顶判定会回退到「视口为 root」，可能与预期不符；可包一层与 Radix 相同 `data-slot` 的 viewport，或按 [`mermaid/fence-toolbar-sticky.md`](../mermaid/fence-toolbar-sticky.md) 调整 **`root`** 选择逻辑。
 
 **真实装配参考**：[`StreamingMarkdownBody.tsx`](../apps/frontend/src/components/design/ChatAssistantMessage/StreamingMarkdownBody.tsx)、[`Monaco/preview.tsx`](../apps/frontend/src/components/design/Monaco/preview.tsx)。
 
@@ -1041,7 +1041,7 @@ const parser = new MarkdownParser({
 
 1. 本文：先跑通最小示例
 2. `packages/tools/README.md`：看参数与完整代码示例
-3. `docs/tools.md`：看实现原理、架构、边界行为、流式 Mermaid 方案
+3. `docs/tools/index.md`：看实现原理、架构、边界行为、流式 Mermaid 方案
 
 ---
 

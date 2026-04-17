@@ -2,7 +2,7 @@
 
 本文说明：在系统设置页（`views/setting/system`）录制快捷键时，如何检测与现有快捷键冲突并禁止保存，同时统一使用 `Toast`（提示组件）显示反馈。
 
-相关专文：知识库页面内 chord（和全局快捷键的差异、数据流）仍以 [`knowledge-shortcuts.md`](./knowledge-shortcuts.md) 为主；本文聚焦“**跨项冲突检测**”与“**Toast 统一**”。
+相关专文：知识库页面内 chord（和全局快捷键的差异、数据流）仍以 [`knowledge/shortcuts.md`](../knowledge/shortcuts.md) 为主；本文聚焦“**跨项冲突检测**”与“**Toast 统一**”。
 
 ---
 
