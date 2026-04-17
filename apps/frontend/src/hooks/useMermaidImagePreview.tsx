@@ -82,6 +82,7 @@ export function useMermaidDiagramClickPreview(
 		const onClick = (e: MouseEvent) => {
 			const el = e.target as HTMLElement | null;
 			if (!el) return;
+			// 可选缩放壳（见 docs/mermaid-markdown-zoom-and-preview.md）：当前正文未生成该节点，命中恒为 false；若将来接入缩放条，可避免点「−/+/恢复」误触大图预览
 			if (el.closest('.markdown-mermaid-zoom-chrome')) return;
 
 			const wrap = closestMermaidMarkdownWrap(el);
