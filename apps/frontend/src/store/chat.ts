@@ -14,7 +14,7 @@ const HISTORY_SESSION_LIST_PAGE_SIZE = 20;
 /** 距底部小于该像素时触发加载下一页（与 knowledgeStore 一致） */
 const HISTORY_SESSION_SCROLL_THRESHOLD_PX = 72;
 
-class ChatStore {
+export class ChatStore {
 	constructor() {
 		makeAutoObservable(this, {
 			// 纯查询，不包成 action，避免在 computed 等上下文中误用 action 语义

@@ -5,6 +5,7 @@ import type {
 	RefObject,
 	SetStateAction,
 } from 'react';
+import type { ChatStore } from '@/store/chat';
 import { UploadedFile } from '@/types';
 
 export interface Session {
@@ -167,6 +168,8 @@ export interface ChatBotViewChatControlsContext {
  */
 export interface ChatBotViewProps {
 	className?: string;
+	/** 消息容器包裹类 */
+	msgWrapClassName?: string;
 	showAvatar?: boolean;
 	onBranchChange?: (msgId: string, direction: 'prev' | 'next') => void;
 
@@ -273,8 +276,37 @@ export type ChatBotSimpleViewProps = Omit<
 /** 连接层 ChatBot 与 ChatBotView 共用的业务入口 props（含可选插槽）。 */
 export interface ChatBotProps {
 	className?: string;
+	msgWrapClassName?: string;
+	entryClassName?: string;
 	initialMessages?: Message[];
+	/**
+	 * SSE 发送入口（默认 `/chat/sse`）。
+	 * 用于在不同业务页复用 ChatBot 但接入不同后端路径（例如 `/deepseek-chat/sse`）。
+	 */
 	apiEndpoint?: string;
+	/** 创建会话入口（默认 `/chat/createSession`） */
+	createSessionEndpoint?: string;
+	/** 停止流式入口（默认 `/chat/stopSse`） */
+	stopEndpoint?: string;
+	/** 续写入口（默认 `/chat/continueSse`） */
+	continueEndpoint?: string;
+	/**
+	 * 是否渲染底部输入区（ChatEntry）。
+	 * - 主聊天页通常自己渲染输入区，因此默认 false，避免重复。
+	 * - 嵌入到知识库右侧面板时可开启，保证可直接对话。
+	 */
+	showEntry?: boolean;
+	/** 发送消息时是否自动跳转到 chat 会话页（默认 true；知识库嵌入时应关闭） */
+	navigateToChatOnSend?: boolean;
+	/** 输入区是否展示上传附件（默认 true；知识库嵌入建议 false） */
+	entryShowUpload?: boolean;
+	/** 输入区是否展示联网搜索开关（默认 true；知识库嵌入建议 false） */
+	entryShowWebSearchToggle?: boolean;
+	/**
+	 * 覆盖 ChatBot 使用的 chatStore（默认使用全局 RootStore.chatStore）。
+	 * 用于在同一页面挂载多个 ChatBot 时隔离消息/会话，避免互相串数据。
+	 */
+	chatStore?: ChatStore;
 	maxHistory?: number;
 	showAvatar?: boolean;
 	onBranchChange?: (msgId: string, direction: 'prev' | 'next') => void;

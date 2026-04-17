@@ -119,6 +119,16 @@ interface MarkdownEditorProps {
 	onMarkdownBottomBarOpenChange?: (open: boolean) => void;
 	/** 「操作栏」按钮 Tooltip 中的快捷键说明 */
 	markdownBottomBarShortcutHint?: string;
+	/** Markdown 底部操作栏右侧扩展区（由业务页注入，例如“对话”开关）。 */
+	markdownBottomBarExtra?: React.ReactNode;
+	/**
+	 * 强制 Markdown 视图模式（仅 markdown 生效）：
+	 * - 例如知识库开启“对话”时强制进入 split，把右侧面板用于 Chatbot。
+	 * - 关闭强制后会恢复到进入强制前的模式。
+	 */
+	markdownForceViewMode?: MarkdownViewMode;
+	/** split 模式下的右侧面板覆盖内容；不传则仍渲染 Markdown 预览。 */
+	markdownSplitRightPane?: React.ReactNode;
 	/**
 	 * Markdown 预览是否解析并渲染 ```mermaid 围栏（与 MarkdownParser `enableMermaid` 一致）。
 	 * @default true
@@ -192,6 +202,9 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	markdownBottomBarOpen: markdownBottomBarOpenProp,
 	onMarkdownBottomBarOpenChange,
 	markdownBottomBarShortcutHint,
+	markdownBottomBarExtra,
+	markdownForceViewMode,
+	markdownSplitRightPane,
 	markdownEnableMermaid = true,
 	overwriteSaveEnabled = false,
 	onOverwriteSaveEnabledChange,
@@ -218,6 +231,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	/** 用于 value 同步：换篇（documentIdentity 变）时即使编辑器有焦点也允许 setValue */
 	const prevIdentityForValueSyncRef = useRef(documentIdentity);
 	const [viewMode, setViewMode] = useState<MarkdownViewMode>('edit');
+	const viewModeBeforeForceRef = useRef<MarkdownViewMode | null>(null);
 	const [splitScrollFollowMode, setSplitScrollFollowMode] =
 		useState<MarkdownSplitScrollFollowMode>('none');
 	/** Diff 左侧（original）对照文本：进入 splitDiff 时从当前编辑器快照 */
@@ -1110,6 +1124,26 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 		};
 	}, [getMarkdownFromEditorRef]);
 
+	// 外部强制 viewMode（知识库对话面板需要占用 split 右侧面板）
+	useEffect(() => {
+		if (!isMarkdown) return;
+		if (!markdownForceViewMode) {
+			if (viewModeBeforeForceRef.current) {
+				const prev = viewModeBeforeForceRef.current;
+				viewModeBeforeForceRef.current = null;
+				setViewMode(prev);
+			}
+			return;
+		}
+
+		if (viewModeBeforeForceRef.current == null) {
+			viewModeBeforeForceRef.current = viewMode;
+		}
+		if (viewMode !== markdownForceViewMode) {
+			setViewMode(markdownForceViewMode);
+		}
+	}, [isMarkdown, markdownForceViewMode, viewMode]);
+
 	const focusEditor = useCallback(() => {
 		editorRef.current?.focus();
 	}, []);
@@ -1309,17 +1343,19 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 											/>
 										</div>
 									) : (
-										<ParserMarkdownPreviewPane
-											markdown={splitPaneMarkdown}
-											documentIdentity={documentIdentity}
-											viewportRef={previewViewportRef}
-											onViewportScrollFollow={
-												editorFollowsPreviewActive
-													? dispatchViewportScrollFollow
-													: undefined
-											}
-											enableMermaid={markdownEnableMermaid}
-										/>
+										(markdownSplitRightPane ?? (
+											<ParserMarkdownPreviewPane
+												markdown={splitPaneMarkdown}
+												documentIdentity={documentIdentity}
+												viewportRef={previewViewportRef}
+												onViewportScrollFollow={
+													editorFollowsPreviewActive
+														? dispatchViewportScrollFollow
+														: undefined
+												}
+												enableMermaid={markdownEnableMermaid}
+											/>
+										))
 									)}
 								</div>
 							</ResizablePanel>
@@ -1486,8 +1522,15 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 								</>
 							)}
 						</div>
-						{showOverwriteSaveToggle || showAutoSaveControls ? (
+						{markdownBottomBarExtra ||
+						showOverwriteSaveToggle ||
+						showAutoSaveControls ? (
 							<div className="flex shrink-0 items-center gap-1.5 pl-2">
+								{markdownBottomBarExtra ? (
+									<div className="flex items-center gap-1.5 pr-1">
+										{markdownBottomBarExtra}
+									</div>
+								) : null}
 								{showOverwriteSaveToggle ? (
 									<Tooltip
 										content={

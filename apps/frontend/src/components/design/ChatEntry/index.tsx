@@ -44,6 +44,10 @@ interface ChatEntryProps {
 	/** 是否启用 Serper 联网搜索（由后端注入检索上下文） */
 	webSearchEnabled?: boolean;
 	onWebSearchEnabledChange?: (enabled: boolean) => void;
+	/** 是否展示上传附件入口（默认 true） */
+	showUpload?: boolean;
+	/** 是否展示联网搜索开关（默认 true） */
+	showWebSearchToggle?: boolean;
 }
 
 const ChatEntry: React.FC<ChatEntryProps> = ({
@@ -65,6 +69,8 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 	uploadLoading,
 	webSearchEnabled = false,
 	onWebSearchEnabledChange,
+	showUpload = true,
+	showWebSearchToggle = true,
 }) => {
 	const scrollContainer = useRef<HTMLDivElement>(null);
 	const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -237,35 +243,37 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 										新对话
 									</Button>
 								)}
-								<Upload
-									uploadType="button"
-									className={cn(
-										'w-auto h-auto lucide-stroke-draw-hover [&_svg]:overflow-visible',
-									)}
-									maxSize={20 * 1024 * 1024}
-									multiple
-									countValidText="最多只能支持 5 个文件"
-									uploadedCount={uploadedFiles?.length}
-									disabled={uploadedFiles?.length >= 5 || uploadLoading}
-									loading={uploadLoading}
-									validTypes={CHAT_VALIDTYPES}
-									showTooltip
-									tooltipContent={
-										<div className="flex flex-col gap-1.5">
-											<div>
-												仅支持 PDF、DOCX、XLSX、PNG、JPG、JPEG、WEBP 格式！
+								{showUpload ? (
+									<Upload
+										uploadType="button"
+										className={cn(
+											'w-auto h-auto lucide-stroke-draw-hover [&_svg]:overflow-visible',
+										)}
+										maxSize={20 * 1024 * 1024}
+										multiple
+										countValidText="最多只能支持 5 个文件"
+										uploadedCount={uploadedFiles?.length}
+										disabled={uploadedFiles?.length >= 5 || uploadLoading}
+										loading={uploadLoading}
+										validTypes={CHAT_VALIDTYPES}
+										showTooltip
+										tooltipContent={
+											<div className="flex flex-col gap-1.5">
+												<div>
+													仅支持 PDF、DOCX、XLSX、PNG、JPG、JPEG、WEBP 格式！
+												</div>
+												<div>最多同时支持 5 个文件，每个文件最大 20 MB！</div>
 											</div>
-											<div>最多同时支持 5 个文件，每个文件最大 20 MB！</div>
+										}
+										onUpload={onUploadFile}
+									>
+										<div className="flex items-center">
+											<Link className="w-4 h-4 mr-2" />
+											上传附件
 										</div>
-									}
-									onUpload={onUploadFile}
-								>
-									<div className="flex items-center">
-										<Link className="w-4 h-4 mr-2" />
-										上传附件
-									</div>
-								</Upload>
-								{onWebSearchEnabledChange ? (
+									</Upload>
+								) : null}
+								{showWebSearchToggle && onWebSearchEnabledChange ? (
 									<Button
 										type="button"
 										variant="ghost"

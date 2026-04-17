@@ -222,15 +222,21 @@ export const imageOcr = async (url?: string, prompt?: string) => {
 };
 
 // 创建 session
-export const createSession = async (sessionId?: string) => {
-	return await http.post(CREATE_SESSION, {
+export const createSession = async (
+	sessionId?: string,
+	options?: { endpoint?: string },
+) => {
+	return await http.post(options?.endpoint ?? CREATE_SESSION, {
 		sessionId,
 	});
 };
 
 // 停止大模型调用
-export const stopSse = async (sessionId: string) => {
-	return await http.post(STOP_SSE, {
+export const stopSse = async (
+	sessionId: string,
+	options?: { endpoint?: string },
+) => {
+	return await http.post(options?.endpoint ?? STOP_SSE, {
 		sessionId,
 	});
 };

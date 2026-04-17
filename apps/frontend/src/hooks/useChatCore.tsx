@@ -11,6 +11,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { useChatCoreContext } from '@/contexts';
 import { createSession, stopSse } from '@/service';
 import useStore from '@/store';
+import type { ChatStore } from '@/store/chat';
 import { UploadedFile } from '@/types';
 import {
 	ChatRequestParams,
@@ -23,6 +24,17 @@ import { useMessageTools } from './useMessageTools';
 
 interface UseChatCoreOptions {
 	apiEndpoint?: string;
+	createSessionEndpoint?: string;
+	stopEndpoint?: string;
+	continueEndpoint?: string;
+	/** 覆盖使用的 chatStore；用于多实例隔离 */
+	chatStore?: ChatStore;
+	/**
+	 * 发送消息时如果属于“新会话”，是否自动跳转到 `/chat/c/:sessionId`。
+	 * - 聊天页需要（保持原行为）：默认 true
+	 * - 知识库右侧嵌入 Chatbot 需要：传 false，避免跳页
+	 */
+	navigateToChatOnSend?: boolean;
 	onScrollTo?: (position: string, behavior?: 'smooth' | 'auto') => void;
 }
 
@@ -72,8 +84,16 @@ export const useChatCore = (
 	options: UseChatCoreOptions = {},
 ): UseChatCoreReturn => {
 	// /chat/glm-stream /chat/sse
-	const { apiEndpoint = '/chat/sse', onScrollTo: onScrollToProp } = options;
-	const { chatStore } = useStore();
+	const {
+		apiEndpoint = '/chat/sse',
+		createSessionEndpoint = '/chat/createSession',
+		stopEndpoint = '/chat/stopSse',
+		continueEndpoint = '/chat/continueSse',
+		navigateToChatOnSend = true,
+		onScrollTo: onScrollToProp,
+	} = options;
+	const rootStore = useStore();
+	const chatStore = options.chatStore ?? rootStore.chatStore;
 
 	// 从 Context 获取共享的 Refs
 	const {
@@ -169,12 +189,14 @@ export const useChatCore = (
 
 	// 获取会话信息
 	const getSessionInfo = useCallback(async () => {
-		const res = await createSession(chatStore.activeSessionId);
+		const res = await createSession(chatStore.activeSessionId, {
+			endpoint: createSessionEndpoint,
+		});
 		if (res.success) {
 			chatStore.setActiveSessionId(res.data);
 		}
 		return res.data;
-	}, [chatStore]);
+	}, [chatStore, createSessionEndpoint]);
 
 	// 流式处理器 - 优化版本
 	const onSseFetch = useCallback(
@@ -202,7 +224,7 @@ export const useChatCore = (
 			}
 
 			// 判断是否是新对话，如果是则发送消息时需要跳转
-			if (to) {
+			if (to && navigateToChatOnSend) {
 				navigate(`/chat/c/${sessionId}`);
 			}
 
@@ -466,7 +488,7 @@ export const useChatCore = (
 				assistantMessage,
 				false,
 				newSelectedChildMap,
-				true,
+				navigateToChatOnSend,
 				role,
 				systemMessage,
 				webSearchEnabled,
@@ -484,6 +506,7 @@ export const useChatCore = (
 			updateParentChildrenIds,
 			onSseFetch,
 			apiEndpoint,
+			navigateToChatOnSend,
 			requestSnapshotMapRef,
 			navigate,
 			webSearchEnabled,
@@ -734,17 +757,17 @@ export const useChatCore = (
 		if (lastMsgId) {
 			if (userMsgForApi && assistantMsgForApi) {
 				onSseFetch(
-					'/chat/continueSse',
+					continueEndpoint,
 					lastMsgId,
 					userMsgForApi,
 					assistantMsgForApi,
 					false,
 				);
 			} else {
-				onSseFetch('/chat/continueSse', lastMsgId, undefined, undefined, false);
+				onSseFetch(continueEndpoint, lastMsgId, undefined, undefined, false);
 			}
 		}
-	}, [getDisplayMessages, chatStore, onSseFetch]);
+	}, [getDisplayMessages, chatStore, onSseFetch, continueEndpoint]);
 
 	// 接着回答（因长度限制停止后继续）
 	const onContinueAnswering = useCallback(
@@ -809,7 +832,7 @@ export const useChatCore = (
 			const stopFn = stopRequestMapRef.current.get(session_id);
 
 			if (stopFn) {
-				await stopSse(session_id);
+				await stopSse(session_id, { endpoint: stopEndpoint });
 				stopFn();
 				stopRequestMapRef.current.delete(session_id);
 			}
@@ -940,6 +963,7 @@ export const useChatCore = (
 			requestSnapshotMapRef,
 			hasReceivedStreamDataMapRef,
 			currentAssistantMessageMapRef,
+			stopEndpoint,
 		],
 	);
 

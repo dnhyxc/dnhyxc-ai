@@ -1,14 +1,18 @@
 import Confirm from '@design/Confirm';
+import Tooltip from '@design/Tooltip';
 import { ScrollArea } from '@ui/scroll-area';
 import { Toast } from '@ui/sonner';
-import { NotebookPen } from 'lucide-react';
+import { MessageSquareText, NotebookPen } from 'lucide-react';
 import { observer } from 'mobx-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import ChatBot from '@/components/design/ChatBot';
 import MarkdownEditor from '@/components/design/Monaco';
 import { Input } from '@/components/ui';
+import { ChatCoreProvider } from '@/contexts';
 import { useTheme } from '@/hooks';
 import { saveKnowledge } from '@/service';
 import useStore from '@/store';
+import { ChatStore } from '@/store/chat';
 import { KnowledgeRecord } from '@/types';
 import { isTauriRuntime } from '@/utils';
 import {
@@ -46,6 +50,16 @@ const Knowledge = observer(() => {
 	const [trashOpen, setTrashOpen] = useState(false);
 	const [saveLoading, setSaveLoading] = useState(false);
 	const [markdownBottomBarOpen, setMarkdownBottomBarOpen] = useState(false);
+	const [chatbotOpen, setChatbotOpen] = useState<boolean>(() => {
+		try {
+			return localStorage.getItem('knowledge_chatbot_open') === '1';
+		} catch {
+			return false;
+		}
+	});
+
+	// 知识库页内嵌 Chatbot：独立 chatStore，避免与 /chat 页串会话与消息
+	const knowledgeChatStore = useMemo(() => new ChatStore(), []);
 	/**
 	 * 回收站打开时强制让 Monaco 视为“新文档”：
 	 * - 解决：从回收站进入时 documentIdentity 可能恒为 'draft-new'，导致 MarkdownEditor 内部 viewMode 不重置（仍停留在 splitDiff）
@@ -73,6 +87,14 @@ const Knowledge = observer(() => {
 		const c = await loadKnowledgeShortcutChords();
 		setKnowledgeChords(c);
 	}, []);
+
+	useEffect(() => {
+		try {
+			localStorage.setItem('knowledge_chatbot_open', chatbotOpen ? '1' : '0');
+		} catch {
+			// 忽略：可能没有 localStorage（或被禁用）
+		}
+	}, [chatbotOpen]);
 
 	/** 与 localStorage 脱钩，统一从 userStore 取（刷新后由 store 从缓存恢复） */
 	const getUserInfo = useMemo((): {
@@ -686,6 +708,54 @@ const Knowledge = observer(() => {
 					onMarkdownBottomBarOpenChange={setMarkdownBottomBarOpen}
 					markdownBottomBarShortcutHint={
 						knowledgeChords.toggleMarkdownBottomBar
+					}
+					markdownForceViewMode={chatbotOpen ? 'split' : undefined}
+					markdownSplitRightPane={
+						chatbotOpen ? (
+							<div className="h-full overflow-hidden contain-[inline-size]">
+								<ChatCoreProvider>
+									<ChatBot
+										className="h-full"
+										msgWrapClassName="pl-2.5 pr-3 pt-3"
+										entryClassName="pl-3 pr-3.5 pb-3.5"
+										apiEndpoint="/knowledge-chat/sse"
+										createSessionEndpoint="/knowledge-chat/createSession"
+										stopEndpoint="/knowledge-chat/stopSse"
+										continueEndpoint="/knowledge-chat/continueSse"
+										showEntry
+										navigateToChatOnSend={false}
+										entryShowUpload={false}
+										entryShowWebSearchToggle={false}
+										chatStore={knowledgeChatStore}
+										showAvatar={false}
+										showAnchorNav={false}
+									/>
+								</ChatCoreProvider>
+							</div>
+						) : undefined
+					}
+					markdownBottomBarExtra={
+						<div className="flex items-center gap-2">
+							<Tooltip
+								side="top"
+								content={chatbotOpen ? '关闭对话面板' : '开启对话面板'}
+							>
+								<button
+									type="button"
+									className={[
+										'lucide-stroke-draw-hover flex size-7 cursor-pointer items-center justify-center rounded-md p-1 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-theme/40',
+										chatbotOpen
+											? 'bg-theme/25 text-textcolor'
+											: 'text-textcolor/80 hover:bg-theme/10 hover:text-textcolor',
+									].join(' ')}
+									aria-pressed={chatbotOpen}
+									aria-label={chatbotOpen ? '关闭对话面板' : '开启对话面板'}
+									onClick={() => setChatbotOpen((v) => !v)}
+								>
+									<MessageSquareText size={18} strokeWidth={1.75} aria-hidden />
+								</button>
+							</Tooltip>
+						</div>
 					}
 					overwriteSaveEnabled={knowledgeStore.knowledgeOverwriteSaveEnabled}
 					onOverwriteSaveEnabledChange={(enabled) =>

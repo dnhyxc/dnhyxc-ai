@@ -95,6 +95,7 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 			renderAnchorNav,
 			renderChatControls,
 			onSaveToKnowledge,
+			msgWrapClassName,
 		} = props;
 
 		const { buildMessageList, getFormatMessages, findSiblings } =
@@ -772,11 +773,11 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 					'flex-1 rounded-md p-3 select-auto',
 					message.role === 'user'
 						? `bg-blue-500/10 border border-blue-500/20 text-end pt-2 pb-2.5 px-3 ${isEdit ? 'p-0 pr-2.5 pb-2.5' : ''}`
-						: 'bg-theme/5 border border-theme-white/10',
+						: 'bg-theme/5 border border-theme-white/5',
 					showAvatar
 						? 'max-w-[calc(768px-105px)]'
 						: isEdit
-							? 'w-full bg-theme/5 border-theme-white/10'
+							? 'w-full bg-theme/5 border-theme-white/5'
 							: 'w-auto',
 					isSharing ? 'cursor-pointer' : '',
 					checkedMessages.has(message.chatId) ? 'bg-theme-background/5' : '',
@@ -839,7 +840,10 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 					className="flex-1 overflow-hidden w-full backdrop-blur-sm pb-5"
 					onScroll={handleScroll}
 				>
-					<div id="message-container" className="max-w-3xl m-auto min-w-0">
+					<div
+						id="message-container"
+						className={cn('max-w-3xl m-auto min-w-0', msgWrapClassName)}
+					>
 						<div id="message-content" className="space-y-6 min-w-0">
 							{!messages.length
 								? // emptyState 可选：嵌入方自定义欢迎页；默认保持原 ChatNewSession，避免行为变化。

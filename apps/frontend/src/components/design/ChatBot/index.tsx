@@ -1,3 +1,4 @@
+import ChatEntry from '@design/ChatEntry';
 import { Toast } from '@ui/sonner';
 import * as mobx from 'mobx';
 import { observer } from 'mobx-react';
@@ -9,10 +10,15 @@ import React, {
 	useState,
 } from 'react';
 import { useNavigate } from 'react-router';
+import { v4 as uuidv4 } from 'uuid';
 import { useChatCoreContext } from '@/contexts';
 import { findLatestBranchSelection } from '@/hooks/useBranchManage';
 import { useChatCore } from '@/hooks/useChatCore';
+import { cn } from '@/lib/utils';
+import { uploadFiles } from '@/service';
 import useStore from '@/store';
+import type { ChatStore } from '@/store/chat';
+import { FileWithPreview, UploadedFile } from '@/types';
 import { ChatBotProps, ChatBotRef, Message } from '@/types/chat';
 import ChatBotView from './ChatBotView';
 
@@ -42,7 +48,17 @@ const ChatBot = observer(
 	forwardRef<ChatBotRef, ChatBotProps>(function ChatBot(props, ref) {
 		const {
 			className,
+			msgWrapClassName,
+			entryClassName,
 			apiEndpoint = '/chat/sse',
+			createSessionEndpoint = '/chat/createSession',
+			stopEndpoint = '/chat/stopSse',
+			continueEndpoint = '/chat/continueSse',
+			showEntry = false,
+			navigateToChatOnSend = true,
+			entryShowUpload = true,
+			entryShowWebSearchToggle = true,
+			chatStore: chatStoreOverride,
 			showAvatar = false,
 			onBranchChange,
 			showMessageActions,
@@ -55,7 +71,8 @@ const ChatBot = observer(
 		} = props;
 
 		const navigate = useNavigate();
-		const { chatStore, knowledgeStore } = useStore();
+		const { chatStore: rootChatStore, knowledgeStore } = useStore();
+		const chatStore = (chatStoreOverride ?? rootChatStore) as ChatStore;
 		const {
 			onScrollToRef,
 			isSharing,
@@ -107,6 +124,7 @@ const ChatBot = observer(
 		const {
 			input,
 			setInput,
+			uploadedFiles,
 			setUploadedFiles,
 			editMessage,
 			setEditMessage,
@@ -116,9 +134,43 @@ const ChatBot = observer(
 			handleEditChange,
 			onContinue,
 			onContinueAnswering,
+			setWebSearchEnabled,
 		} = useChatCore({
 			apiEndpoint,
+			createSessionEndpoint,
+			stopEndpoint,
+			continueEndpoint,
+			navigateToChatOnSend,
+			chatStore,
 		});
+
+		const [uploadLoading, setUploadLoading] = useState(false);
+		const chatInputRef = React.useRef<HTMLTextAreaElement | null>(null);
+
+		const onUploadFile = useCallback(
+			async (data: FileWithPreview | FileWithPreview[]) => {
+				try {
+					setUploadLoading(true);
+					const files = Array.isArray(data) ? data : [data];
+					const fileList = files.map((item) => item.file);
+					const res = await uploadFiles(fileList);
+					if (res.success) {
+						setUploadedFiles((prev) => [
+							...prev,
+							...res.data.map((item: UploadedFile) => ({
+								...item,
+								path: import.meta.env.VITE_DEV_DOMAIN + item.path,
+								uuid: uuidv4(),
+							})),
+						]);
+						chatInputRef.current?.focus();
+					}
+				} finally {
+					setUploadLoading(false);
+				}
+			},
+			[setUploadedFiles],
+		);
 
 		// 与拆分前相同：用 reaction 把可观察数组拷贝到 React state，保证下游 effect 依赖的是快照而非直接持有 observable 引用链。
 		useEffect(() => {
@@ -213,43 +265,70 @@ const ChatBot = observer(
 		const onSaveToKnowledge = onSaveToKnowledgeProp ?? defaultSaveToKnowledge;
 
 		return (
-			<ChatBotView
-				ref={ref}
-				className={className}
-				showAvatar={showAvatar}
-				onBranchChange={onBranchChange}
-				flatMessages={allMessages}
-				selectedChildMap={selectedChildMap}
-				onSelectedChildMapChange={setSelectedChildMap}
-				activeSessionId={chatStore.activeSessionId ?? null}
-				onPersistSessionBranchSelection={onPersistSessionBranchSelection}
-				streamingBranchSource={streamingBranchSource}
-				input={input}
-				setInput={setInput}
-				editMessage={editMessage}
-				setEditMessage={setEditMessage}
-				sendMessage={sendMessage}
-				clearChat={clearChat}
-				stopGenerating={stopGenerating}
-				handleEditChange={handleEditChange}
-				onContinue={onContinue}
-				onContinueAnswering={onContinueAnswering}
-				isCurrentSessionLoading={chatStore.isCurrentSessionLoading}
-				isMessageStopped={(id) => chatStore.isMessageStopped(id)}
-				isSharing={isSharing}
-				setIsSharing={setIsSharing}
-				checkedMessages={checkedMessages}
-				setCheckedMessage={setCheckedMessage}
-				onScrollToRegister={handleScrollToRegister}
-				webSearchEnabled={webSearchEnabled}
-				showMessageActions={showMessageActions}
-				showAnchorNav={showAnchorNav}
-				showChatControls={showChatControls}
-				renderMessageActions={renderMessageActions}
-				renderAnchorNav={renderAnchorNav}
-				renderChatControls={renderChatControls}
-				onSaveToKnowledge={onSaveToKnowledge}
-			/>
+			<div className={cn('h-full min-h-0 w-full flex flex-col', className)}>
+				<ChatBotView
+					ref={ref}
+					className="min-h-0 flex-1"
+					msgWrapClassName={msgWrapClassName}
+					showAvatar={showAvatar}
+					onBranchChange={onBranchChange}
+					flatMessages={allMessages}
+					selectedChildMap={selectedChildMap}
+					onSelectedChildMapChange={setSelectedChildMap}
+					activeSessionId={chatStore.activeSessionId ?? null}
+					onPersistSessionBranchSelection={onPersistSessionBranchSelection}
+					streamingBranchSource={streamingBranchSource}
+					input={input}
+					setInput={setInput}
+					editMessage={editMessage}
+					setEditMessage={setEditMessage}
+					sendMessage={sendMessage}
+					clearChat={clearChat}
+					stopGenerating={stopGenerating}
+					handleEditChange={handleEditChange}
+					onContinue={onContinue}
+					onContinueAnswering={onContinueAnswering}
+					isCurrentSessionLoading={chatStore.isCurrentSessionLoading}
+					isMessageStopped={(id) => chatStore.isMessageStopped(id)}
+					isSharing={isSharing}
+					setIsSharing={setIsSharing}
+					checkedMessages={checkedMessages}
+					setCheckedMessage={setCheckedMessage}
+					onScrollToRegister={handleScrollToRegister}
+					webSearchEnabled={webSearchEnabled}
+					showMessageActions={showMessageActions}
+					showAnchorNav={showAnchorNav}
+					showChatControls={showChatControls}
+					renderMessageActions={renderMessageActions}
+					renderAnchorNav={renderAnchorNav}
+					renderChatControls={renderChatControls}
+					onSaveToKnowledge={onSaveToKnowledge}
+				/>
+
+				{showEntry ? (
+					<ChatEntry
+						chatInputRef={chatInputRef}
+						className={entryClassName}
+						input={input}
+						setInput={setInput}
+						uploadedFiles={uploadedFiles}
+						uploadLoading={uploadLoading}
+						setUploadedFiles={setUploadedFiles}
+						loading={chatStore.isCurrentSessionLoading}
+						editMessage={editMessage}
+						setEditMessage={setEditMessage}
+						handleEditChange={handleEditChange}
+						sendMessage={sendMessage}
+						onUploadFile={onUploadFile}
+						clearChat={clearChat}
+						stopGenerating={() => void stopGenerating()}
+						webSearchEnabled={webSearchEnabled}
+						onWebSearchEnabledChange={setWebSearchEnabled}
+						showUpload={entryShowUpload}
+						showWebSearchToggle={entryShowWebSearchToggle}
+					/>
+				) : null}
+			</div>
 		);
 	}),
 );
