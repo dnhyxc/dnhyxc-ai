@@ -118,6 +118,10 @@
 
 **文档**：[`tools.md`](./tools.md) **第 11.8.6.0 小节**（动机、方案、维护约定、**带行尾 `//` 中文注释** 的源码摘录）；[`tools-usage-guide.md`](./tools-usage-guide.md) **第 7.6.0 小节**（从包内 import 的短示例）
 
+- **`packages/tools/src` 源码按功能分目录（重组，不改变对外 API）**：将 Markdown / Mermaid / highlight.js 相关源码分别归入 `markdown/`、`mermaid/`、`highlight/`；仅调整内部相对 import 与构建脚本生成路径，**使用方仍从 `@dnhyxc-ai/tools` / `@dnhyxc-ai/tools/react` 导入**，不需要变更业务侧 import。
+
+**文档**：[`tools.md`](./tools.md) **第 1.1 小节**（完整实现思路：约束、目录规划、迁移步骤、验证与常见误区）
+
 - **Mermaid 围栏工具条**：`sticky` + 哨兵 `IntersectionObserver` 双态样式；与代码块 Portal 吸顶方案差异；下载 SVG/DSL；Monaco 预览侧对齐。
 
 **文档**：[`mermaid-fence-toolbar-sticky.md`](./mermaid-fence-toolbar-sticky.md)

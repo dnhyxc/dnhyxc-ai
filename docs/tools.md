@@ -26,6 +26,54 @@
 
 ---
 
+### 1.1 本次实现思路：将 `src/` 按功能分目录（不改变对外 API）
+
+本次调整的目标是：把 `packages/tools/src` 下的 `.ts` 文件按职责收拢到 `markdown/`、`mermaid/`、`highlight/` 等目录，降低“同一层级文件过多”带来的定位成本，同时保持 **对外导出（`@dnhyxc-ai/tools` / `@dnhyxc-ai/tools/react`）完全不变**。
+
+#### 1.1.1 约束与边界（必须满足）
+
+- **对外 import 路径不变**：使用方仍从 `@dnhyxc-ai/tools` 与 `@dnhyxc-ai/tools/react` 导入，不引入任何新的子路径（避免 breaking change）。
+- **运行时产物结构不变**：`dist/index.*`、`dist/react/index.*`、`dist/styles/**` 的产物路径与 `package.json.exports` 契约不受影响。
+- **仅重排源码物理位置**：只改内部相对 import、构建脚本输出位置、文档路径引用；不改变行为逻辑。
+
+#### 1.1.2 目录规划（为什么这样分）
+
+- **`markdown/`**：解析器本体 + 围栏代码块契约与动作属于同一“Markdown 域”，内部互相引用频繁（`parser.ts` 依赖 `code-fence-dom.ts`，`code-fence-actions.ts` 也依赖契约）。
+- **`mermaid/`**：Mermaid 占位 DOM 契约（选择器/HTML 片段）与 `mermaid.run` 队列天然一组；同时 React 侧 hook 仍放在 `react/` 子入口，避免把 React 变成主入口依赖。
+- **`highlight/`**：主题注入、主题说明符解析、以及构建生成的样式元数据（`styles.ts`）都属于“高亮主题域”，并且 `styles.ts` 会被 `pnpm clean` 删除再由 `build:css` 重建，把它放在 `highlight/` 更符合直觉。
+
+#### 1.1.3 迁移步骤（可复现）
+
+1. **创建目录并做 `git mv`**（保留历史，减少 diff 噪声）：
+   - `markdown-parser.ts` → `markdown/parser.ts`
+   - `markdown-code-fence-dom.ts` → `markdown/code-fence-dom.ts`
+   - `markdown-code-fence-actions.ts` → `markdown/code-fence-actions.ts`
+   - `mermaid-markdown-selectors.ts` → `mermaid/markdown-selectors.ts`
+   - `mermaid-in-markdown.ts` → `mermaid/in-markdown.ts`
+   - `inject-highlight-theme.ts` → `highlight/inject-theme.ts`
+   - `highlight-theme-import.ts` → `highlight/theme-import.ts`
+   - 构建生成的 `styles.ts` 位置调整为 `highlight/styles.ts`
+2. **更新内部相对 import**：
+   - `markdown/parser.ts`：引用 `../highlight/inject-theme.js`、`../mermaid/markdown-selectors.js`、`../generated/*` 等
+   - `react/*`：`runMermaidInMarkdownRoot` 改为从 `../mermaid/in-markdown.js` 引入
+3. **保持入口聚合导出稳定**：
+   - 只改 `src/index.ts` 内部 re-export 的“源文件路径”，导出符号名保持不变。
+4. **同步构建脚本与清理脚本**：
+   - `scripts/build-mk-css.js`：生成 `src/highlight/styles.ts`（用于开发时类型/映射）与 `dist/styles.{js,d.ts}`（供运行时 `@dnhyxc-ai/tools/styles` 消费）。
+   - `package.json` 的 `clean`：删除 `src/highlight/styles.ts`（而非旧的 `src/styles.ts`）。
+5. **更新文档中“源码路径”引用**：
+   - 将 `packages/tools/src/*.ts` 的旧路径替换为新的分目录路径（本文件、使用指南、Monaco 相关文档等）。
+6. **验证**：
+   - `pnpm --filter @dnhyxc-ai/tools run build`
+   - `pnpm -C apps/frontend exec tsc --noEmit`
+
+#### 1.1.4 常见误区（避免“改了不生效”）
+
+- **误区**：使用方从 `packages/tools/src/...` 直接 import（绕过 `dist/`）。
+  - **结论**：本仓库使用方均通过 `@dnhyxc-ai/tools` 导入；若你在其它项目中有深链到 `src/`，需要改为包入口导入，或同步更新为新的目录路径。
+- **误区**：只改源码不 build。
+  - **结论**：前端运行时消费 `dist/`；修改 `src/**` 后必须执行 `pnpm --filter @dnhyxc-ai/tools run build`。
+
 ## 2. 功能清单与实现方式
 
 ### 2.1 Markdown 渲染与容器
