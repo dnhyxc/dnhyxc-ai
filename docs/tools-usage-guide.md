@@ -55,7 +55,7 @@ pnpm --filter @dnhyxc-ai/tools run build
 | 导入路径                                       | 用途                                                                          |
 | ---------------------------------------------- | ----------------------------------------------------------------------------- |
 | `@dnhyxc-ai/tools`                             | 主入口：`MarkdownParser`、主题 API、样式元数据；以及 **Mermaid 占位 DOM 契约**相关常量/helper（如 `MERMAID_MARKDOWN_ENTRY_SELECTOR`、`closestMermaidMarkdownWrap` 等，见 **§8.5**） |
-| `@dnhyxc-ai/tools/react`                       | React 侧 Mermaid 渲染：`useMermaidInMarkdownRoot`、`runMermaidInMarkdownRoot` |
+| `@dnhyxc-ai/tools/react`                       | React 侧 Mermaid 渲染：`useMermaidInMarkdownRoot`、`runMermaidInMarkdownRoot`；**Mermaid 顶栏 / 代码块 Portal 吸顶条** 在本仓库 `apps/frontend`（见 **第 7.6.2、8.6 小节**），不在此子路径导出 |
 | `@dnhyxc-ai/tools/styles.css`                  | 一次引入正文 + KaTeX + 默认高亮主题                                           |
 | `@dnhyxc-ai/tools/markdown-base.css`           | 仅正文 + KaTeX，不含完整 hljs 配色                                            |
 | `@dnhyxc-ai/tools/styles/hljs/<theme>.min.css` | 单个 highlight.js 主题文件                                                    |
@@ -231,6 +231,284 @@ const parser = new MarkdownParser({
 });
 ```
 
+### 7.2.1 外链（external link）：解析 `href` 并统一打开（完整参考实现）
+
+（说明：口语或输入法里偶将 **外链** 写作「外证」，本节均指 **Markdown 中的外站 / 可导航链接**。）
+
+`linkify: true`（默认）时，裸 URL 与 Markdown 链接都会变成 **`.markdown-body a[href]`**。在 **聊天 WebView、Tauri WebView、内嵌预览** 等场景里，若不做处理，点击可能在内嵌环境打开页面，与产品预期不符。
+
+下面是一套**尽量贴近真实业务**、仍可独立复制的示例，覆盖：
+
+| 能力 | 说明 |
+| --- | --- |
+| Markdown 渲染 | `MarkdownParser` + `styles.css` |
+| 外链统一打开 | 捕获阶段拦截 + `getAttribute('href')` + 可选 **绝对 URL** 解析 |
+| 安全 | 拒绝 `javascript:`、`vbscript:` 等危险协议 |
+| 交互细节 | 仅 **主键左键**；**Ctrl / ⌘ / Shift / Alt** 时不拦截，保留浏览器默认（新标签等） |
+| 页内锚点 | 外链拦截器跳过 `#`；另用 **冒泡阶段** 在滚动容器内 **`scrollIntoView`**（与 `Monaco/preview` 思路一致） |
+| 代码块工具栏 | `enableChatCodeFenceToolbar` + **`bindMarkdownCodeFenceActions`** + **`downloadMarkdownCodeFenceWith`** 落盘示例 |
+
+桌面端将 `openExternalUrl` 换成 Tauri `plugin-opener` 即可（见 [`frontend-tauri-browser.md`](./frontend-tauri-browser.md)）。本仓库等价实现：`apps/frontend/src/utils/external-link-click.ts`、`open-external.ts`，在 `ChatAssistantMessage`、`Monaco/preview` 已接入。
+
+#### 建议文件布局
+
+```text
+your-app/
+├── package.json                 # 依赖 react、@dnhyxc-ai/tools
+├── src/
+│   ├── external-link-open.ts    # 打开 + 捕获拦截（本节全文）
+│   └── MarkdownPreviewHost.tsx  # 预览壳：渲染 + 外链 + 锚点 + 代码块动作
+```
+
+#### `package.json`（依赖片段）
+
+```json
+{
+	"dependencies": {
+		"@dnhyxc-ai/tools": "workspace:*",
+		"react": "^19.0.0",
+		"react-dom": "^19.0.0"
+	}
+}
+```
+
+（若包发布在 npm，把 `@dnhyxc-ai/tools` 换成实际版本号即可。）
+
+#### `src/external-link-open.ts`（宿主侧外链模块，带安全与按键策略）
+
+```ts
+/** 拒绝在 href 中执行的脚本类协议（防 XSS 误用） */
+const BLOCKED_HREF_PREFIXES = ['javascript:', 'vbscript:'] as const;
+
+export async function openExternalUrl(url: string): Promise<void> {
+	if (!url) return;
+	// Web：新标签打开；Tauri 可改为 await import('@tauri-apps/plugin-opener').then(m => m.openUrl(url))
+	window.open(url, '_blank', 'noopener,noreferrer');
+}
+
+/**
+ * 将作者写的相对路径、省略协议的 URL 转为绝对地址，便于 window.open / opener。
+ * 页内纯 `#id` 返回 null，由锚点逻辑处理。
+ */
+export function resolveMarkdownAnchorHref(
+	raw: string,
+	baseUrl: string = typeof window !== 'undefined' ? window.location.href : 'https://example.invalid/',
+): string | null {
+	const t = raw.trim();
+	if (!t) return null;
+	if (t.startsWith('#')) return null;
+
+	const lower = t.toLowerCase();
+	if (BLOCKED_HREF_PREFIXES.some((p) => lower.startsWith(p))) return null;
+
+	try {
+		return new URL(t, baseUrl).href;
+	} catch {
+		return null;
+	}
+}
+
+export type AttachExternalLinkClickOptions = {
+	anchorSelector?: string;
+	skipHashAnchors?: boolean;
+	stopPropagation?: boolean;
+	/** 为 true（默认）时：按住 Ctrl/⌘/Shift/Alt 不拦截，交给浏览器默认行为 */
+	passThroughModifierClicks?: boolean;
+	/** 解析相对 URL 的基地址；默认当前页 location.href */
+	baseUrl?: string;
+};
+
+export function attachExternalLinkClickInterceptor(
+	container: HTMLElement,
+	opts: AttachExternalLinkClickOptions = {},
+): () => void {
+	const {
+		anchorSelector = '.markdown-body a',
+		skipHashAnchors = true,
+		stopPropagation = true,
+		passThroughModifierClicks = true,
+		baseUrl,
+	} = opts;
+
+	const onClickCapture = (e: MouseEvent) => {
+		if (e.defaultPrevented) return;
+		if (e.button !== 0) return;
+		if (passThroughModifierClicks && (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey)) {
+			return;
+		}
+
+		const target = e.target as HTMLElement | null;
+		if (!target) return;
+		const a = target.closest<HTMLAnchorElement>(anchorSelector);
+		if (!a || !container.contains(a)) return;
+
+		const raw = a.getAttribute('href')?.trim() ?? '';
+		if (!raw) return;
+		if (skipHashAnchors && raw.startsWith('#')) return;
+
+		const absolute = resolveMarkdownAnchorHref(raw, baseUrl);
+		if (!absolute) return;
+
+		e.preventDefault();
+		if (stopPropagation) e.stopPropagation();
+		void openExternalUrl(absolute);
+	};
+
+	container.addEventListener('click', onClickCapture, true);
+	return () => container.removeEventListener('click', onClickCapture, true);
+}
+```
+
+#### `src/MarkdownPreviewHost.tsx`（渲染 + 外链 + 滚动容器内锚点 + 代码块复制/下载）
+
+```tsx
+import {
+	bindMarkdownCodeFenceActions,
+	downloadMarkdownCodeFenceWith,
+	MarkdownParser,
+} from '@dnhyxc-ai/tools';
+import '@dnhyxc-ai/tools/styles.css';
+import { useEffect, useMemo, useRef } from 'react';
+import {
+	attachExternalLinkClickInterceptor,
+} from './external-link-open';
+
+type MarkdownPreviewHostProps = {
+	markdown: string;
+	/** 与聊天一致：输出复制/下载工具栏 DOM 并绑定点击 */
+	enableChatCodeFenceToolbar?: boolean;
+	className?: string;
+};
+
+/** 演示用 Markdown：裸链、显式链接、标题锚点、代码块 */
+export const DEMO_MARKDOWN_FOR_LINKS = [
+	'## 外链与工具栏演示',
+	'',
+	'裸链：<https://example.com> 与行内 [Example](https://example.com/path)。',
+	'',
+	'跳到 [本页二级标题](#二级标题)。',
+	'',
+	'### 二级标题',
+	'',
+	'```ts',
+	'export const x = 1;',
+	'```',
+	'',
+].join('\n');
+
+export function MarkdownPreviewHost({
+	markdown,
+	enableChatCodeFenceToolbar = true,
+	className,
+}: MarkdownPreviewHostProps) {
+	const shellRef = useRef<HTMLDivElement>(null);
+
+	const parser = useMemo(
+		() =>
+			new MarkdownParser({
+				injectHighlightTheme: false,
+				linkify: true,
+				html: false,
+				enableChatCodeFenceToolbar,
+			}),
+		[enableChatCodeFenceToolbar],
+	);
+
+	const html = useMemo(() => parser.render(markdown), [parser, markdown]);
+
+	// 1) 外链：捕获阶段，早于默认导航
+	useEffect(() => {
+		const el = shellRef.current;
+		if (!el) return;
+		return attachExternalLinkClickInterceptor(el, {
+			anchorSelector: '.markdown-body a',
+			skipHashAnchors: true,
+			stopPropagation: true,
+			passThroughModifierClicks: true,
+		});
+	}, []);
+
+	// 2) 代码块：复制默认行为 + 下载交给宿主（此处用浏览器 a[download] 落盘）
+	useEffect(() => {
+		const el = shellRef.current;
+		if (!el || !enableChatCodeFenceToolbar) return;
+		return bindMarkdownCodeFenceActions(el, {
+			onDownload(payload) {
+				void downloadMarkdownCodeFenceWith(payload, async (task) => {
+					const a = document.createElement('a');
+					a.href = URL.createObjectURL(task.blob);
+					a.download = task.filename;
+					a.rel = 'noopener';
+					a.click();
+					URL.revokeObjectURL(a.href);
+				});
+			},
+		});
+	}, [enableChatCodeFenceToolbar]);
+
+	// 3) 页内锚点：在 overflow 容器内默认 hash 无效，冒泡阶段 scrollIntoView（与仓库 Monaco 预览同思路）
+	useEffect(() => {
+		const shell = shellRef.current;
+		if (!shell) return;
+
+		const onClickBubble = (e: MouseEvent) => {
+			if (e.defaultPrevented) return;
+			const target = e.target as HTMLElement | null;
+			if (!target || !shell.contains(target)) return;
+
+			const link = target.closest<HTMLAnchorElement>('a[href^="#"]');
+			if (!link) return;
+			const href = link.getAttribute('href');
+			if (!href || href.length <= 1) return;
+
+			const id = decodeURIComponent(href.slice(1).replace(/\+/g, ' '));
+			if (!id) return;
+
+			const root = shell.querySelector('.markdown-body') ?? shell;
+			let dest: Element | null = null;
+			try {
+				dest = root.querySelector(`#${CSS.escape(id)}`);
+			} catch {
+				dest = null;
+			}
+			if (dest instanceof HTMLElement) {
+				e.preventDefault();
+				dest.scrollIntoView({ behavior: 'smooth', block: 'start' });
+			}
+		};
+
+		shell.addEventListener('click', onClickBubble, false);
+		return () => shell.removeEventListener('click', onClickBubble, false);
+	}, []);
+
+	return (
+		<div ref={shellRef} className={className}>
+			<div
+				style={{ maxHeight: 360, overflow: 'auto' }}
+				dangerouslySetInnerHTML={{ __html: html }}
+			/>
+		</div>
+	);
+}
+
+/** 便于 Storybook / 路由页直接挂载 */
+export function MarkdownPreviewHostDemo() {
+	return (
+		<main style={{ padding: 16 }}>
+			<h1 style={{ fontSize: 18, marginBottom: 12 }}>Markdown 预览（外链 + 锚点 + 代码块）</h1>
+			<MarkdownPreviewHost markdown={DEMO_MARKDOWN_FOR_LINKS} />
+		</main>
+	);
+}
+```
+
+#### 接入检查清单
+
+1. **样式**：必须引入 `@dnhyxc-ai/tools/styles.css`（或 `markdown-base.css` + 自行 hljs），否则 `.markdown-body` 与代码块样式不完整。
+2. **根节点**：`attachExternalLinkClickInterceptor` 绑在 **包住 `.markdown-body` 的壳**上即可（`parser.render` 已自带外层 `markdown-body`）。
+3. **多实例**：每个预览容器单独 `bind` / `attach`，不要重复绑到 `document`，避免事件串扰（与上文 **第 7.6 小节「需要聊天代码块工具栏」** 的约定一致）。
+4. **Tauri**：把 `openExternalUrl` 换成 opener 插件后，`resolveMarkdownAnchorHref` 仍可复用。
+
 ### 7.3 需要目录锚点 / 标题跳转
 
 ```ts
@@ -393,6 +671,71 @@ bindMarkdownCodeFenceActions(root, {
 });
 ```
 
+### 7.6.2 代码块吸顶浮动工具栏（CodeToolbar：`ChatCodeFloatingToolbar` + `useChatCodeFloatingToolbar`）
+
+**定位**：**吸顶浮动条**与 **`layoutChatCodeToolbars`** 的模块级状态 **不在** `@dnhyxc-ai/tools` 内，而在本仓库 **`apps/frontend`**（避免把 Portal / 主题 Button 绑进通用工具包）。
+
+**与工具包如何配合**：
+
+| 层级 | 职责 |
+| --- | --- |
+| `@dnhyxc-ai/tools` | `MarkdownParser({ enableChatCodeFenceToolbar: true })` 输出 **行内** `.chat-md-code-toolbar`；`bindMarkdownCodeFenceActions(root)` 处理行内 **复制 / 下载**（仍建议保留）。 |
+| 前端 `chatCodeToolbar.ts` | 在 **滚动 viewport** 上根据几何选中「当前应吸顶」的代码块，给行内条加 **`chat-md-code-toolbar--replaced-by-float`**，并通过 **`subscribeChatCodeFloatingToolbar`** 把 **fixed** 条的位置同步到 Portal。 |
+| `ChatCodeToolbarFloating` | **`createPortal(..., document.body)`** 绘制浮动条；复制/下载通过 **`getPinnedChatCodeBlock(state.pinId)`** 取当前块，内部仍调用 **`copyMarkdownCodeFence` / `getMarkdownCodeFenceInfo`**（来自 `@dnhyxc-ai/tools`）。 |
+
+**为何需要**：Markdown 在 **Radix ScrollArea、任意 `overflow` 裁剪层** 内时，行内 `position: sticky` / `fixed` 的参照系易错；Portal 到 **`document.body`** 后由 **`layoutChatCodeToolbars(viewport)`** 用视口坐标定位，才能与聊天/Monaco 预览一致。
+
+**推荐接入（与本仓库 `ChatBotView`、`Monaco/preview.tsx` 同构）**：
+
+1. **`viewportRef`** 必须指向 **真正发生 `scrollTop` 变化的 DOM**（本仓库里多为 ScrollArea **viewport**；`ChatBotView` 把 `ref` 绑在转发到 viewport 的 ref 上）。
+2. 调用 **`useChatCodeFloatingToolbar(viewportRef, options)`**，至少传入稳定的 **`layoutDeps`**（例如 `[markdown]`、`[messages]`），内容或会话切换后才会重算布局。
+3. 在 **`onScroll`**（以及你认为「视口几何可能变了」的时机）里调用返回的 **`relayout()`**；聊天列表还常开 **`passiveScrollLayout: true`** 并配 **`passiveScrollDeps`**，用 passive 的 `scroll` 再补一帧布局（见 Hook 注释）。
+4. 在滚动区域 **同一相对定位祖先** 下渲染 **一次** **`<ChatCodeFloatingToolbar />`**（与 viewport **同级**即可，如 `preview.tsx` 中放在 `ScrollArea` 上方）。
+5. **不要**忘记在 Markdown 宿主根上 **`bindMarkdownCodeFenceActions`**：未触发浮动替换时，用户仍点击行内条；浮动条与行内条语义一致。
+
+```tsx
+import {
+	ChatCodeFloatingToolbar,
+	useChatCodeFloatingToolbar,
+} from '@/hooks/useChatCodeFloatingToolbar';
+import { useCallback, useRef } from 'react';
+import type { UIEvent } from 'react';
+
+export function PreviewWithFloatingCodeToolbar(props: { markdown: string }) {
+	const viewportRef = useRef<HTMLDivElement>(null);
+	const { markdown } = props;
+
+	const { relayout: relayoutCodeToolbar } = useChatCodeFloatingToolbar(viewportRef, {
+		layoutDeps: [markdown],
+		passiveScrollLayout: true,
+		passiveScrollDeps: [markdown.length],
+	});
+
+	const onScroll = useCallback(
+		(_e: UIEvent<HTMLDivElement>) => {
+			relayoutCodeToolbar();
+		},
+		[relayoutCodeToolbar],
+	);
+
+	return (
+		<div className="relative h-full min-h-0">
+			<ChatCodeFloatingToolbar />
+			{/* 若用 Radix ScrollArea：请把 ref 落到 viewport，或沿用本仓库 ScrollArea 封装上的 ref 转发 */}
+			<div
+				ref={viewportRef}
+				className="h-full overflow-auto"
+				onScroll={onScroll}
+			>
+				{/* 此处放 dangerouslySetInnerHTML(parser.render(...)) 等 */}
+			</div>
+		</div>
+	);
+}
+```
+
+**深入说明与边界**：[`use-chat-code-floating-toolbar.md`](./use-chat-code-floating-toolbar.md)。核心实现：[`apps/frontend/src/utils/chatCodeToolbar.ts`](../apps/frontend/src/utils/chatCodeToolbar.ts)、[`apps/frontend/src/components/design/ChatCodeToolBar/index.tsx`](../apps/frontend/src/components/design/ChatCodeToolBar/index.tsx)。
+
 ---
 
 ## 7.x 本轮补充：避免为 `enableMermaid` 重复 new parser
@@ -554,6 +897,68 @@ const cls = MARKDOWN_MERMAID_TAILWIND_CURSOR_ZOOM_IN_CLASS; // 直接拼进 clas
 
 **更完整的架构说明**：`docs/tools.md` **§11.2.1**、`docs/mermaid-markdown-zoom-and-preview.md`。
 
+### 8.6 Mermaid 围栏顶栏（MermaidToolbar：`MermaidFenceToolbar` + `MermaidFenceToolbarActions`）
+
+**定位**：Mermaid 围栏的 **sticky 顶栏**（图/代码切换、复制、预览、下载）在 **`apps/frontend/src/components/design/MermaidFenceToolbar/index.tsx`**，**不是** `@dnhyxc-ai/tools` 的导出。工具包提供的是 **`MERMAID_MARKDOWN_SVG_SELECTOR`**、`createMarkdownCodeFenceInfo`、`downloadMarkdownCodeFenceWith` 等 **契约与下载拼装**；顶栏 UI 与 **`IntersectionObserver`（IntersectionObserver，交叉观察）** 哨兵逻辑由前端维护。
+
+**两个导出怎么用**：
+
+| 组件 | 作用 |
+| --- | --- |
+| **`MermaidFenceToolbar`** | 接收 **`blockId`**（用于 `useLayoutEffect` 依赖，Observer 重建）与 **`children`**（左侧/右侧按钮由外层传入）。内部：**1px 高哨兵** + **`sticky top-0`** 容器；`sentinel.closest('[data-slot="scroll-area-viewport"]')` 作为 **Observer 的 `root`**，粘顶后切换为与 **§7.6.2** 浮动代码条一致的视觉（毛玻璃 + 阴影）。 |
+| **`MermaidFenceToolbarActions`** | 在 **`MermaidFenceToolbar`** 外包一层 **`data-mermaid-preview-scope={blockId}`**（预览/下载时 **`closest`** 依赖）。维护 **diagram / code** 模式、`resetKey` 重置；子节点由 **`children(mode)`** 渲染：**`diagram`** → **`MermaidFenceIsland`**（`@dnhyxc-ai/tools/react` 离屏/提交 SVG）；**`code`** → **`mermaidStreamingFallbackHtml`** 高亮 DSL。 |
+
+**与流式拆岛（与本仓库 `StreamingMarkdownBody` 一致）**：先用工具包 **`MarkdownParser.splitForMermaidIslands`**（或本仓库封装的 **`splitForMermaidIslandsWithOpenTail`**，含尾部未闭合 mermaid）拆成 **`markdown` / `mermaid` 段**；**普通段** `parser.render(part.text, { enableMermaid: false })`，**mermaid 段** 用下面结构包一层，避免整段 `innerHTML` 冲掉已渲染 SVG。
+
+```tsx
+import { MermaidFenceIsland } from '@design/MermaidFenceIsland';
+import { MermaidFenceToolbarActions } from '@design/MermaidFenceToolbar';
+import type { MarkdownMermaidSplitPart } from '@dnhyxc-ai/tools';
+import { mermaidStreamingFallbackHtml } from '@/utils/splitMarkdownFences';
+
+function renderMermaidPart(
+	part: Extract<MarkdownMermaidSplitPart, { type: 'mermaid' }>,
+	blockId: string,
+	preferDark: boolean,
+	isStreaming: boolean,
+	openMermaidPreview: (url: string) => void,
+) {
+	return (
+		<MermaidFenceToolbarActions
+			key={blockId}
+			blockId={blockId}
+			mermaidCode={part.text}
+			openMermaidPreview={openMermaidPreview}
+			defaultViewMode="diagram"
+			resetKey={blockId}
+		>
+			{(mode) =>
+				mode === 'code' ? (
+					<div
+						dangerouslySetInnerHTML={{
+							__html: mermaidStreamingFallbackHtml(part.text),
+						}}
+					/>
+				) : (
+					<MermaidFenceIsland
+						code={part.text}
+						preferDark={preferDark}
+						isStreaming={isStreaming || !part.complete}
+						openMermaidPreview={openMermaidPreview}
+					/>
+				)
+			}
+		</MermaidFenceToolbarActions>
+	);
+}
+```
+
+**ScrollArea 约定**：当前 **`MermaidFenceToolbar`** 用 **`[data-slot="scroll-area-viewport"]`** 查找滚动根。若你的页面只有原生 **`overflow: auto`** 而没有该节点，粘顶判定会回退到「视口为 root」，可能与预期不符；可包一层与 Radix 相同 `data-slot` 的 viewport，或按 [`mermaid-fence-toolbar-sticky.md`](./mermaid-fence-toolbar-sticky.md) 调整 **`root`** 选择逻辑。
+
+**真实装配参考**：[`StreamingMarkdownBody.tsx`](../apps/frontend/src/components/design/ChatAssistantMessage/StreamingMarkdownBody.tsx)、[`Monaco/preview.tsx`](../apps/frontend/src/components/design/Monaco/preview.tsx)。
+
+**同一预览里与代码块浮动条并存**：`Monaco/preview.tsx` 在 **`ScrollArea` 外** 渲染 **`<ChatCodeFloatingToolbar />`**，在 **`fenceParts.map`** 里对 mermaid 段使用 **`MermaidFenceToolbarActions`**；两者分别服务 **普通代码围栏** 与 **Mermaid 围栏**。
+
 ---
 
 ## 9. 主题相关 API 怎么用
@@ -659,3 +1064,5 @@ const parser = new MarkdownParser({
 - 会话列表摘要渲染
 - Mermaid 在文档页与 Monaco 中的接入
 - 流式 Mermaid 的拆块与独立岛方案
+- **代码块吸顶浮动条**：`useChatCodeFloatingToolbar` + `<ChatCodeFloatingToolbar />`（见上文 **第 7.6.2 小节**；`ChatBotView`、`Monaco/preview.tsx`）
+- **Mermaid 围栏顶栏**：`MermaidFenceToolbar` / `MermaidFenceToolbarActions`（见上文 **第 8.6 小节**；`StreamingMarkdownBody.tsx`、`Monaco/preview.tsx`）
