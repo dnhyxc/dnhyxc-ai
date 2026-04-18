@@ -11,6 +11,7 @@ import {
 	BetweenHorizontalEnd,
 	BetweenHorizontalStart,
 	BetweenVerticalEnd,
+	Bot,
 	Columns2,
 	Eye,
 	FileInput,
@@ -98,6 +99,13 @@ interface MarkdownEditorProps {
 	language?: string;
 	toolbar: React.ReactNode;
 	title?: React.ReactNode;
+	chatNode?: React.ReactNode;
+	/**
+	 * Markdown 右侧 AI 助手面板是否展开；与 onMarkdownAssistantOpenChange 同时传入时为受控模式。
+	 * 开启后分屏右侧展示 `chatNode`（与预览 / Diff 互斥）；仅在传入 `chatNode` 时底部栏显示开关。
+	 */
+	markdownAssistantOpen?: boolean;
+	onMarkdownAssistantOpenChange?: (open: boolean) => void;
 	/** 为 markdown 时是否显示编辑/预览/分屏切换；默认 true */
 	enableMarkdownPreview?: boolean;
 	/**
@@ -185,6 +193,9 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	language = 'markdown',
 	toolbar,
 	title,
+	chatNode,
+	markdownAssistantOpen: markdownAssistantOpenProp,
+	onMarkdownAssistantOpenChange,
 	enableMarkdownPreview = true,
 	wordWrap = 'bounded',
 	wordWrapColumn = MARKDOWN_EDITOR_WORD_WRAP_COLUMN,
@@ -246,6 +257,38 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 		onMarkdownBottomBarOpenChange,
 	]);
 
+	const [internalMarkdownAssistantOpen, setInternalMarkdownAssistantOpen] =
+		useState(false);
+	const assistantPanelControlled =
+		markdownAssistantOpenProp !== undefined &&
+		onMarkdownAssistantOpenChange !== undefined;
+	const markdownAssistantOpen = assistantPanelControlled
+		? Boolean(markdownAssistantOpenProp)
+		: internalMarkdownAssistantOpen;
+	const toggleMarkdownAssistant = useCallback(() => {
+		if (!chatNode) return;
+		const next = !markdownAssistantOpen;
+		if (assistantPanelControlled && onMarkdownAssistantOpenChange) {
+			onMarkdownAssistantOpenChange(next);
+		} else {
+			setInternalMarkdownAssistantOpen(next);
+		}
+	}, [
+		chatNode,
+		markdownAssistantOpen,
+		assistantPanelControlled,
+		onMarkdownAssistantOpenChange,
+	]);
+
+	/** 关闭右侧 AI 助手（编辑/预览/分屏/Diff 切换时调用） */
+	const closeMarkdownAssistant = useCallback(() => {
+		if (assistantPanelControlled && onMarkdownAssistantOpenChange) {
+			onMarkdownAssistantOpenChange(false);
+		} else {
+			setInternalMarkdownAssistantOpen(false);
+		}
+	}, [assistantPanelControlled, onMarkdownAssistantOpenChange]);
+
 	const showOverwriteSaveToggle = Boolean(onOverwriteSaveEnabledChange);
 	const showAutoSaveControls = Boolean(
 		onAutoSaveEnabledChange && onAutoSaveIntervalSecChange,
@@ -288,9 +331,14 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	const markdownBottomBarId = useId();
 
 	const isMarkdown = language === 'markdown' && enableMarkdownPreview;
+	/** 右侧栏是否为 AI 助手（非预览）：此时不按「左编右预览」处理分屏选中与跟滚 */
+	const assistantRightPaneActive = Boolean(chatNode && markdownAssistantOpen);
 	/** 分屏右侧为 Markdown 预览且启用跟滚时，才做左右滚动同步（Diff 模式下右侧无预览 DOM） */
 	const splitPreviewScrollSyncEligible =
-		viewMode === 'split' && scrollFollowActive && isMarkdown;
+		viewMode === 'split' &&
+		scrollFollowActive &&
+		isMarkdown &&
+		!assistantRightPaneActive;
 
 	valueFromPropsRef.current = value;
 
@@ -488,6 +536,30 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	useEffect(() => {
 		setViewMode((vm) => (vm === 'splitDiff' ? 'edit' : vm));
 	}, [documentIdentity]);
+
+	// 换篇时关闭右侧 AI 助手（受控模式由外部自行同步）
+	useEffect(() => {
+		if (assistantPanelControlled) return;
+		setInternalMarkdownAssistantOpen(false);
+	}, [documentIdentity, assistantPanelControlled]);
+
+	// 外部不再传入 chatNode 时，内部开关复位
+	useEffect(() => {
+		if (chatNode || assistantPanelControlled) return;
+		setInternalMarkdownAssistantOpen(false);
+	}, [chatNode, assistantPanelControlled]);
+
+	// 开启助手后需有右侧栏位：从纯编辑 / 纯预览 / 分屏 Diff 进入「左编 + 右侧助手」
+	useEffect(() => {
+		if (!markdownAssistantOpen || !chatNode) return;
+		setViewMode((vm) =>
+			vm === 'split'
+				? vm
+				: vm === 'splitDiff' || vm === 'edit' || vm === 'preview'
+					? 'split'
+					: vm,
+		);
+	}, [markdownAssistantOpen, chatNode]);
 
 	useEffect(() => {
 		if (prevDocumentIdentityRef.current !== documentIdentity) {
@@ -1117,11 +1189,13 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	/** 与「分屏」互斥：进入 splitDiff；再次点击回到编辑 */
 	const toggleMarkdownSplitDiffCompare = useCallback(() => {
 		if (viewMode === 'splitDiff') {
+			closeMarkdownAssistant();
 			setViewMode('edit');
 			queueMicrotask(focusEditor);
 			return;
 		}
 		if (!markdownDiffEntryEligible) return;
+		closeMarkdownAssistant();
 		// 每次进入 Diff 都开一个新的 session：避免 keepCurrent*Model 复用上一轮的 TextModel 导致内容残留
 		setDiffSessionId((s) => s + 1);
 		/**
@@ -1155,6 +1229,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 		markdownDiffEntryEligible,
 		diffBaselineSource,
 		diffBaselineText,
+		closeMarkdownAssistant,
 	]);
 
 	/** 底部操作栏内图标按钮（与「跟随滚动」一致） */
@@ -1284,7 +1359,13 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 								className="min-h-0 min-w-0"
 							>
 								<div className="h-full min-h-0 min-w-0 overflow-hidden contain-[inline-size]">
-									{viewMode === 'splitDiff' ? (
+									{markdownAssistantOpen && chatNode ? (
+										<div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
+											<div className="min-h-0 flex-1 overflow-auto">
+												{chatNode}
+											</div>
+										</div>
+									) : viewMode === 'splitDiff' ? (
 										<div
 											ref={diffEditorHostRef}
 											className="box-border h-full min-h-0 min-w-0 max-w-full w-full overflow-hidden contain-[inline-size]"
@@ -1354,6 +1435,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 									className={markdownBarIconBtnClass(viewMode === 'edit')}
 									aria-label="编辑源码"
 									onClick={() => {
+										closeMarkdownAssistant();
 										setViewMode('edit');
 										queueMicrotask(focusEditor);
 									}}
@@ -1372,9 +1454,11 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 									<button
 										type="button"
 										className={markdownBarIconBtnClass(
-											viewMode === 'splitDiff',
+											viewMode === 'splitDiff' && !assistantRightPaneActive,
 										)}
-										aria-pressed={viewMode === 'splitDiff'}
+										aria-pressed={
+											viewMode === 'splitDiff' && !assistantRightPaneActive
+										}
 										aria-label="开关分屏 Markdown 修改对照（Diff）"
 										onClick={toggleMarkdownSplitDiffCompare}
 									>
@@ -1389,19 +1473,44 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 									aria-selected={viewMode === 'preview'}
 									className={markdownBarIconBtnClass(viewMode === 'preview')}
 									aria-label="预览渲染"
-									onClick={() => setViewMode('preview')}
+									onClick={() => {
+										closeMarkdownAssistant();
+										setViewMode('preview');
+									}}
 								>
 									<Eye size={18} strokeWidth={1.75} />
 								</button>
 							</Tooltip>
+							{chatNode ? (
+								<Tooltip
+									content={
+										markdownAssistantOpen ? '关闭 AI 助手' : '开启 AI 助手'
+									}
+								>
+									<button
+										type="button"
+										className={markdownBarIconBtnClass(markdownAssistantOpen)}
+										aria-pressed={markdownAssistantOpen}
+										aria-label="开关 Markdown 右侧 AI 助手"
+										onClick={toggleMarkdownAssistant}
+									>
+										<Bot size={18} strokeWidth={1.75} aria-hidden />
+									</button>
+								</Tooltip>
+							) : null}
 							<Tooltip content="分屏：左编辑右预览">
 								<button
 									type="button"
 									role="tab"
-									aria-selected={viewMode === 'split'}
-									className={markdownBarIconBtnClass(viewMode === 'split')}
+									aria-selected={
+										viewMode === 'split' && !assistantRightPaneActive
+									}
+									className={markdownBarIconBtnClass(
+										viewMode === 'split' && !assistantRightPaneActive,
+									)}
 									aria-label="分屏：左编辑右预览"
 									onClick={() => {
+										closeMarkdownAssistant();
 										setViewMode('split');
 										queueMicrotask(focusEditor);
 									}}
@@ -1409,7 +1518,8 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 									<Columns2 size={18} strokeWidth={1.75} />
 								</button>
 							</Tooltip>
-							{viewMode === 'split' && (
+
+							{viewMode === 'split' && !assistantRightPaneActive && (
 								<>
 									<Tooltip content="双边跟随：编辑区与预览区双向同步滚动">
 										<button

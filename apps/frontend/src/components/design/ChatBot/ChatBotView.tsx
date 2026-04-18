@@ -771,12 +771,12 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 				return cn(
 					'flex-1 rounded-md p-3 select-auto',
 					message.role === 'user'
-						? `bg-blue-500/10 border border-blue-500/20 text-end pt-2 pb-2.5 px-3 ${isEdit ? 'p-0 pr-2.5 pb-2.5' : ''}`
-						: 'bg-theme/5 border border-theme-white/10',
+						? `bg-teal-600/10 border border-teal-600/20 text-end pt-2 pb-2.5 px-3 ${isEdit ? 'p-0 pr-2.5 pb-2.5' : ''}`
+						: 'bg-theme/5 border border-theme/10',
 					showAvatar
 						? 'max-w-[calc(768px-105px)]'
 						: isEdit
-							? 'w-full bg-theme/5 border-theme-white/10'
+							? 'w-full bg-theme/5 border-theme/10'
 							: 'w-auto',
 					isSharing ? 'cursor-pointer' : '',
 					checkedMessages.has(message.chatId) ? 'bg-theme-background/5' : '',

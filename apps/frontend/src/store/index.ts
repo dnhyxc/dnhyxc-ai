@@ -7,6 +7,7 @@
  * @LastEditTime: 2022-06-10 14:52:26
  */
 import { createContext, useContext } from 'react';
+import AssistantStore from './assistant';
 import AuthStore from './auth';
 import ChatStore from './chat';
 import KnowledgeStore from './knowledge';
@@ -17,6 +18,7 @@ class RootStore {
 	userStore = UserStore;
 	chatStore = ChatStore;
 	knowledgeStore = KnowledgeStore;
+	assistantStore = AssistantStore;
 }
 
 const store = new RootStore();

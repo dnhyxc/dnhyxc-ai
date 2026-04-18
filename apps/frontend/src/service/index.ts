@@ -5,6 +5,8 @@ import {
 } from '@/types';
 import { http } from '@/utils/fetch';
 import {
+	ASSISTANT_SESSION,
+	ASSISTANT_STOP,
 	CREATE_CHECKOUT_SESSION,
 	CREATE_SESSION,
 	CREATE_SHARE,
@@ -233,6 +235,43 @@ export const stopSse = async (sessionId: string) => {
 	return await http.post(STOP_SSE, {
 		sessionId,
 	});
+};
+
+/** 创建助手会话（空会话，多轮传 sessionId） */
+export const createAssistantSession = async (payload?: { title?: string }) => {
+	return await http.post<{ sessionId: string; title: string | null }>(
+		ASSISTANT_SESSION,
+		payload ?? {},
+	);
+};
+
+/** 拉取助手会话详情与消息（时间正序） */
+export const getAssistantSessionDetail = async (sessionId: string) => {
+	return await http.get<{
+		session: {
+			sessionId: string;
+			title: string | null;
+			createdAt: string;
+			updatedAt: string;
+		};
+		messages: Array<{
+			id: string;
+			turnId: string | null;
+			role: string;
+			content: string;
+			createdAt: string;
+		}>;
+	}>(ASSISTANT_SESSION, {
+		params: [sessionId],
+	});
+};
+
+/** 停止助手当前会话的流式生成 */
+export const stopAssistantStream = async (sessionId: string) => {
+	return await http.post<{ success: boolean; message: string }>(
+		ASSISTANT_STOP,
+		{ sessionId },
+	);
 };
 
 export const getSession = async (sessionId: string) => {

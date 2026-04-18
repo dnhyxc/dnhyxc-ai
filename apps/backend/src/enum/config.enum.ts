@@ -56,6 +56,18 @@ export enum ModelEnum {
 	ZHIPU_API_KEY = 'ZHIPU_API_KEY',
 	ZHIPU_MODEL_NAME = 'ZHIPU_MODEL_NAME',
 	ZHIPU_BASE_URL = 'ZHIPU_BASE_URL',
+	/** 助手模块专用 GLM 模型名，未配置时回退 ZHIPU_MODEL_NAME 或 glm-4.7 */
+	ASSISTANT_GLM_MODEL_NAME = 'ASSISTANT_GLM_MODEL_NAME',
+	/**
+	 * 当前助手所用大模型的「单请求最大输入上下文」token 上限（与智谱文档一致时可不填）。
+	 * 未配置时按 ASSISTANT_GLM_MODEL_NAME 推断（如 glm-4.7 默认 200000）。
+	 */
+	ASSISTANT_MODEL_MAX_INPUT_TOKENS = 'ASSISTANT_MODEL_MAX_INPUT_TOKENS',
+	/**
+	 * 可选：在不超过模型官方上限的前提下，再收紧「可用于历史+system」的输入预算（降本/限流）。
+	 * 不填则完全按模型最大输入 − max_tokens − 结构预留计算。
+	 */
+	ASSISTANT_MAX_CONTEXT_TOKENS = 'ASSISTANT_MAX_CONTEXT_TOKENS',
 	/** Serper.dev 联网搜索（用于 Chat 注入检索上下文） */
 	SERPER_API_KEY = 'SERPER_API_KEY',
 	SERPER_SEARCH_URL = 'SERPER_SEARCH_URL',

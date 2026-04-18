@@ -90,3 +90,8 @@ export const KNOWLEDGE_TRASH_LIST = '/knowledge/trash/list';
 export const KNOWLEDGE_TRASH_DETAIL = '/knowledge/trash/detail';
 export const KNOWLEDGE_TRASH_DELETE = '/knowledge/trash/delete';
 export const KNOWLEDGE_TRASH_DELETE_BATCH = '/knowledge/trash/delete-batch';
+
+/** 通用助手（智谱 GLM，多轮 session） */
+export const ASSISTANT_SESSION = '/assistant/session';
+export const ASSISTANT_SSE = '/assistant/sse';
+export const ASSISTANT_STOP = '/assistant/stop';

@@ -20,12 +20,12 @@ import { Message } from '@/types/chat';
 interface ChatEntryProps {
 	input: string;
 	setInput: (val: string) => void;
-	uploadedFiles: UploadedFile[];
-	setUploadedFiles: React.Dispatch<React.SetStateAction<UploadedFile[]>>;
-	loading: boolean;
-	editMessage: Message | null;
-	setEditMessage: (msg: Message | null) => void;
-	handleEditChange: (
+	uploadedFiles?: UploadedFile[];
+	setUploadedFiles?: React.Dispatch<React.SetStateAction<UploadedFile[]>>;
+	loading?: boolean;
+	editMessage?: Message | null;
+	setEditMessage?: (msg: Message | null) => void;
+	handleEditChange?: (
 		e: React.ChangeEvent<HTMLTextAreaElement> | string,
 	) => void;
 	sendMessage: (
@@ -34,7 +34,7 @@ interface ChatEntryProps {
 		isEdit?: boolean,
 		attachments?: any,
 	) => void;
-	onUploadFile: (data: FileWithPreview | FileWithPreview[]) => Promise<void>;
+	onUploadFile?: (data: FileWithPreview | FileWithPreview[]) => Promise<void>;
 	clearChat?: () => void;
 	stopGenerating?: () => void;
 	chatInputRef?: React.RefObject<HTMLTextAreaElement | null>; // 新增
@@ -44,6 +44,8 @@ interface ChatEntryProps {
 	/** 是否启用 Serper 联网搜索（由后端注入检索上下文） */
 	webSearchEnabled?: boolean;
 	onWebSearchEnabledChange?: (enabled: boolean) => void;
+	/** 文本域样式 */
+	textareaClassName?: string;
 }
 
 const ChatEntry: React.FC<ChatEntryProps> = ({
@@ -65,6 +67,7 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 	uploadLoading,
 	webSearchEnabled = false,
 	onWebSearchEnabledChange,
+	textareaClassName,
 }) => {
 	const scrollContainer = useRef<HTMLDivElement>(null);
 	const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -152,8 +155,8 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 			<div className="max-w-3xl mx-auto flex">
 				<div className="flex-1 relative">
 					{children}
-					<div className="max-w-3xl flex flex-col overflow-y-auto rounded-md bg-theme/2 border border-theme-white/5">
-						{uploadedFiles?.length > 0 ? (
+					<div className="max-w-3xl flex flex-col overflow-y-auto rounded-md bg-theme/2 border border-theme/10">
+						{uploadedFiles && uploadedFiles?.length > 0 ? (
 							<div className="flex flex-1 flex-col rounded-md">
 								<div className="flex justify-between items-center mt-2.5 mb-0.5 px-3 text-sm text-textcolor/70">
 									只识别附件中的文字
@@ -223,6 +226,7 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 							loading={loading}
 							handleEditChange={handleEditChange}
 							sendMessage={sendMessage}
+							textareaClassName={textareaClassName}
 						/>
 
 						<div className="flex items-center justify-between h-10 p-2.5 mb-1 mt-2.5">
@@ -237,34 +241,39 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 										新对话
 									</Button>
 								)}
-								<Upload
-									uploadType="button"
-									className={cn(
-										'w-auto h-auto lucide-stroke-draw-hover [&_svg]:overflow-visible',
-									)}
-									maxSize={20 * 1024 * 1024}
-									multiple
-									countValidText="最多只能支持 5 个文件"
-									uploadedCount={uploadedFiles?.length}
-									disabled={uploadedFiles?.length >= 5 || uploadLoading}
-									loading={uploadLoading}
-									validTypes={CHAT_VALIDTYPES}
-									showTooltip
-									tooltipContent={
-										<div className="flex flex-col gap-1.5">
-											<div>
-												仅支持 PDF、DOCX、XLSX、PNG、JPG、JPEG、WEBP 格式！
+								{onUploadFile && (
+									<Upload
+										uploadType="button"
+										className={cn(
+											'w-auto h-auto lucide-stroke-draw-hover [&_svg]:overflow-visible',
+										)}
+										maxSize={20 * 1024 * 1024}
+										multiple
+										countValidText="最多只能支持 5 个文件"
+										uploadedCount={uploadedFiles?.length}
+										disabled={
+											(uploadedFiles && uploadedFiles?.length >= 5) ||
+											uploadLoading
+										}
+										loading={uploadLoading}
+										validTypes={CHAT_VALIDTYPES}
+										showTooltip
+										tooltipContent={
+											<div className="flex flex-col gap-1.5">
+												<div>
+													仅支持 PDF、DOCX、XLSX、PNG、JPG、JPEG、WEBP 格式！
+												</div>
+												<div>最多同时支持 5 个文件，每个文件最大 20 MB！</div>
 											</div>
-											<div>最多同时支持 5 个文件，每个文件最大 20 MB！</div>
+										}
+										onUpload={onUploadFile}
+									>
+										<div className="flex items-center">
+											<Link className="w-4 h-4 mr-2" />
+											上传附件
 										</div>
-									}
-									onUpload={onUploadFile}
-								>
-									<div className="flex items-center">
-										<Link className="w-4 h-4 mr-2" />
-										上传附件
-									</div>
-								</Upload>
+									</Upload>
+								)}
 								{onWebSearchEnabledChange ? (
 									<Button
 										type="button"

@@ -10,6 +10,7 @@ import { TypeOrmDestroyService } from './database/typeorm-destroy.service';
 import { appConfig } from './factorys/app-config.factory';
 import { createBullRedisConnectionOptions } from './factorys/bull-redis-connection.factory';
 import { RedisConfigFactory } from './factorys/redis-config.factory';
+import { AssistantModule } from './services/assistant/assistant.module';
 // 业务模块
 import { AuthModule } from './services/auth/auth.module';
 import { ChatModule } from './services/chat/chat.module';
@@ -84,6 +85,7 @@ const connections = new Map();
 		KnowledgeModule,
 		ShareModule,
 		PayModule,
+		AssistantModule,
 	],
 	controllers: [],
 	providers: [

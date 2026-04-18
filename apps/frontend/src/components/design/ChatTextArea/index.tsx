@@ -3,6 +3,7 @@
 import { Button, ScrollArea, Textarea } from '@ui/index';
 import React, { forwardRef, useRef } from 'react';
 import { useEntry } from '@/hooks/useEntry'; // 根据实际路径调整
+import { cn } from '@/lib/utils';
 import { Message } from '@/types/chat'; // 根据实际路径调整
 
 interface ChatTextAreaProps {
@@ -23,13 +24,13 @@ interface ChatTextAreaProps {
 		isEdit?: boolean,
 		attachments?: any,
 	) => void;
-
 	// 模式：'chat' (底部输入框) | 'edit' (消息编辑模式)
 	mode?: 'chat' | 'edit';
-
 	// 样式
 	className?: string;
 	placeholder?: string;
+	/** 文本域样式 */
+	textareaClassName?: string;
 }
 
 const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
@@ -45,6 +46,7 @@ const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 			mode,
 			className,
 			placeholder = '请输入您的问题',
+			textareaClassName,
 		},
 		ref,
 	) => {
@@ -96,7 +98,10 @@ const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 					onCompositionEnd={handleCompositionEnd}
 					placeholder={placeholder}
 					spellCheck={false}
-					className="flex-1 min-h-16 resize-none border-none shadow-none focus-visible:ring-transparent"
+					className={cn(
+						'flex-1 min-h-16 resize-none border-none shadow-none focus-visible:ring-transparent',
+						textareaClassName,
+					)}
 					disabled={loading}
 				/>
 

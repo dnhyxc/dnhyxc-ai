@@ -33,6 +33,7 @@ import {
 	KNOWLEDGE_LOCAL_MD_ID_PREFIX,
 	TAURI_KNOWLEDGE_DIR,
 } from './constants';
+import KnowledgeAssistant from './KnowledgeAssistant';
 import KnowledgeList from './KnowledgeList';
 import KnowledgeTrashList from './KnowledgeTrashList';
 import KnowledgeEditorToolbar from './toolbar';
@@ -747,6 +748,11 @@ const Knowledge = observer(() => {
 								className="md:text-base h-full border-0 bg-transparent pr-2 text-textcolor shadow-none placeholder:text-sm placeholder:text-textcolor/60 focus-visible:border-0 focus-visible:ring-0"
 							/>
 						</div>
+					}
+					chatNode={
+						<KnowledgeAssistant
+							documentKey={`${knowledgeStore.knowledgeEditingKnowledgeId ?? 'draft-new'}__trash-${trashOpenNonce}`}
+						/>
 					}
 				/>
 			</ScrollArea>
