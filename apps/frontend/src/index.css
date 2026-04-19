@@ -3,6 +3,19 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/*
+ * Radix ScrollArea：Viewport 内用 `display: table` + `minWidth: 100%` 包一层子节点（见 node_modules 实现），
+ * 表格最小宽度会跟随「最宽子内容」变宽，在 flex 侧栏里会把整列撑出视口；写死 w-* 能压住正是因为给了明确宽度。
+ * 将内层限制在视口宽度内，宽代码仍由 `.chat-md-code-block pre { overflow-x: auto }` 横向滚动。
+ */
+[data-radix-scroll-area-viewport] > div {
+	box-sizing: border-box;
+	width: 100%;
+	max-width: 100%;
+	min-width: 0 !important;
+	table-layout: fixed;
+}
+
 html,
 body {
 	margin: 0;
@@ -67,8 +80,16 @@ body {
 
 	/* 消息 Markdown */
 	#message-md-wrap {
+		/* 与 flex 子项 min-w-0 配合：Markdown 根层不成为「不可收缩」的宽度源 */
+		.streaming-md-body {
+			min-width: 0;
+			max-width: 100%;
+		}
+
 		.markdown-body {
 			background-color: transparent;
+			min-width: 0;
+			max-width: 100%;
 
 			h1 {
 				border: none;
@@ -135,6 +156,10 @@ body {
 		border-radius: 0.5rem;
 		background: color-mix(in oklch, var(--theme-secondary) 55%, transparent);
 		user-select: text;
+		/* 窄列 / flex 布局下防止整块随长行无限变宽撑破父级；横向滚动交给内部 pre */
+		max-width: 100%;
+		min-width: 0;
+		box-sizing: border-box;
 	}
 
 	/* 占位：吸顶时内联工具栏 visibility:hidden，高度由 JS 写 min-height，避免正文跳动 */

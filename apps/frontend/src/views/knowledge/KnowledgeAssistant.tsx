@@ -66,7 +66,8 @@ const KnowledgeAssistantMessageBubble = observer(
 		return (
 			<div
 				className={cn(
-					'relative flex-1 flex flex-col gap-1 pb-10 w-full group last:pb-0',
+					// min-w-0：flex 子项默认可缩到小于内容宽，避免代码块/长行把整列撑出 ScrollArea
+					'relative flex min-w-0 max-w-full flex-1 flex-col gap-1 pb-10 w-full group last:pb-0',
 					message.role === 'user' ? 'items-end' : '',
 				)}
 				data-msg-rev={streamRev}
@@ -74,7 +75,7 @@ const KnowledgeAssistantMessageBubble = observer(
 				<div
 					id="message-md-wrap"
 					className={cn(
-						'relative flex-1 rounded-md p-3 select-auto text-textcolor mb-5',
+						'relative flex min-w-0 max-w-full flex-1 rounded-md p-3 select-auto text-textcolor mb-5',
 						message.role === 'user'
 							? 'bg-teal-600/10 border border-teal-600/20 text-end pt-2 pb-2.5 px-3'
 							: 'bg-theme/5 border border-theme/20',
@@ -240,7 +241,8 @@ const KnowledgeAssistant = observer(
 					>
 						<div
 							className={cn(
-								'pt-4 max-w-208 mx-auto relative flex w-full flex-col select-none pr-4 pl-3.5',
+								// 仅加 min-w-0：勿再写 max-w-full，否则会覆盖 max-w-208 的栏宽上限
+								'pt-4 max-w-208 mx-auto relative flex w-full min-w-0 flex-col select-none pr-4 pl-3.5',
 							)}
 						>
 							{messages.map((message, index) => (
