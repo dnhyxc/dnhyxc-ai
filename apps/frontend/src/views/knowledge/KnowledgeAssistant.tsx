@@ -6,6 +6,7 @@ import ChatEntry from '@/components/design/ChatEntry';
 import ChatMessageActions from '@/components/design/ChatMessageActions';
 import ChatUserMessage from '@/components/design/ChatUserMessage';
 import { ScrollArea } from '@/components/ui';
+import { useStickToBottomScroll } from '@/hooks';
 import { cn } from '@/lib/utils';
 import useStore from '@/store';
 import assistantStore from '@/store/assistant';
@@ -98,7 +99,6 @@ const KnowledgeAssistant = observer(
 		const [input, setInput] = useState('');
 		const [isCopyedId, setIsCopyedId] = useState('');
 
-		const scrollViewportRef = useRef<HTMLDivElement>(null);
 		const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
 		const isLoggedIn = Boolean(userStore.userInfo?.id);
@@ -115,10 +115,6 @@ const KnowledgeAssistant = observer(
 			if (!documentKey) return;
 			void assistantStore.activateForDocument(documentKey);
 		}, [documentKey]);
-
-		const syncScrollMetrics = useCallback(() => {
-			// 预留：与主 Chat 一致的底部滚动区度量
-		}, []);
 
 		const onSaveToKnowledge = useCallback(
 			(message: Message) => {
@@ -143,6 +139,24 @@ const KnowledgeAssistant = observer(
 			}, 500);
 		}, []);
 
+		const messages = assistantStore.messages;
+
+		const lastMsg = messages[messages.length - 1];
+		const streamScrollTick =
+			lastMsg != null
+				? `${messages.length}:${lastMsg.chatId}:${lastMsg.content.length}:${lastMsg.thinkContent?.length ?? 0}:${lastMsg.isStreaming ? 1 : 0}`
+				: String(messages.length);
+
+		const {
+			viewportRef: scrollViewportRef,
+			scrollViewportHandlers,
+			enableStickToBottom: enableStreamStickToBottom,
+		} = useStickToBottomScroll({
+			isStreaming: assistantStore.isStreaming,
+			contentRevision: streamScrollTick,
+			resetKey: documentKey || undefined,
+		});
+
 		const sendMessage = useCallback(
 			async (content?: string) => {
 				const text = (content ?? input).trim();
@@ -152,16 +166,15 @@ const KnowledgeAssistant = observer(
 					return;
 				}
 				setInput('');
+				enableStreamStickToBottom();
 				await assistantStore.sendMessage(text);
 			},
-			[input, isLoggedIn],
+			[input, isLoggedIn, enableStreamStickToBottom],
 		);
 
 		const stopGenerating = useCallback(() => {
 			void assistantStore.stopGenerating();
 		}, []);
-
-		const messages = assistantStore.messages;
 
 		return (
 			<div className="relative flex h-full w-full flex-col overflow-hidden">
@@ -178,7 +191,7 @@ const KnowledgeAssistant = observer(
 						ref={scrollViewportRef}
 						className="min-h-0 flex-1"
 						viewportClassName="pb-1"
-						onScroll={syncScrollMetrics}
+						{...scrollViewportHandlers}
 					>
 						<div
 							className={cn(
@@ -197,7 +210,6 @@ const KnowledgeAssistant = observer(
 								/>
 							))}
 						</div>
-						<div className="mt-2">loading...</div>
 					</ScrollArea>
 				)}
 				{isLoggedIn ? (

@@ -4,6 +4,7 @@ import { isTauriRuntime } from '@/utils/runtime';
 
 export * from './theme';
 export * from './useMermaidImagePreview';
+export * from './useStickToBottomScroll';
 
 export const useCountdown = (initialTime = 60, storageKey = 'countdown') => {
 	const [timeLeft, setTimeLeft] = useState(() => {
