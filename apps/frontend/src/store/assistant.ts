@@ -1,6 +1,6 @@
 /**
  * 知识库右侧助手状态：含「未保存草稿 ephemeral / 保存后迁入 import-transcript / 清空草稿联动」等逻辑。
- * 设计说明：`docs/knowledge/knowledge-assistant-ephemeral-persistence.md`。
+ * 完整设计文档：`docs/knowledge/knowledge-assistant-complete.md`；持久化专题：`docs/knowledge/knowledge-assistant-ephemeral-persistence.md`。
  */
 import { Toast } from '@ui/index';
 import { makeAutoObservable, runInAction } from 'mobx';

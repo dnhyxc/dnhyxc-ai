@@ -1,6 +1,6 @@
 /**
  * 知识库「草稿阶段」助手对话迁入正式条目后的落库契约（对应 `POST assistant/session/import-transcript`）。
- * 设计说明见仓库文档：`docs/knowledge/knowledge-assistant-ephemeral-persistence.md`。
+ * 设计说明见：`docs/knowledge/knowledge-assistant-complete.md`（总览）、`knowledge-assistant-ephemeral-persistence.md`（持久化专题）。
  */
 import { Type } from 'class-transformer';
 import {

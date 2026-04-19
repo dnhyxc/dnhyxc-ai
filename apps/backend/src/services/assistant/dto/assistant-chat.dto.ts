@@ -28,7 +28,7 @@ export class AssistantContextTurnDto {
 
 /**
  * 助手发送一条用户消息并流式返回（持久化模式多轮依赖 `sessionId`）。
- * `ephemeral` + `contextTurns` 用于知识未保存草稿：见 `docs/knowledge/knowledge-assistant-ephemeral-persistence.md`。
+ * `ephemeral` + `contextTurns` 用于知识未保存草稿：见 `docs/knowledge/knowledge-assistant-complete.md` §4。
  */
 export class AssistantChatDto {
 	@IsOptional()

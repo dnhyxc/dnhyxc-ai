@@ -186,7 +186,7 @@ const Knowledge = observer(() => {
 
 	/**
 	 * 写入后端：有 knowledgeEditingKnowledgeId 则更新，否则新建并刷新列表。
-	 * 新建成功时助手草稿迁入顺序见 `docs/knowledge/knowledge-assistant-ephemeral-persistence.md`（须先于 setEditingId 调用 flush）。
+	 * 新建成功时助手草稿迁入顺序见 `docs/knowledge/knowledge-assistant-complete.md` §10.1（须先于 setEditingId 调用 flush）。
 	 */
 	const persistKnowledgeApi = useCallback(async () => {
 		const markdown = knowledgeStore.markdown ?? '';

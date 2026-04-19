@@ -1,6 +1,6 @@
 /**
  * 知识库右侧通用助手：维护 `knowledgeAssistantPersistenceAllowed` 与 `documentKey` 驱动的 `activateForDocument`。
- * 行为说明见 `docs/knowledge/knowledge-assistant-ephemeral-persistence.md`。
+ * 完整设计文档：`docs/knowledge/knowledge-assistant-complete.md`。
  */
 import { Toast } from '@ui/index';
 import { observer } from 'mobx-react';
