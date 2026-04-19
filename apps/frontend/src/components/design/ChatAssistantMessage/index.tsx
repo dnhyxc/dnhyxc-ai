@@ -482,22 +482,40 @@ function ChatAssistantMessageInner({
 	);
 }
 
-// 全为 true 则跳过渲染：减列表 reconcile、避免 MdPreview 子树反复卸载/重建
-const ChatAssistantMessage = memo(
-	ChatAssistantMessageInner,
-	(prev, next) =>
-		prev.message.chatId === next.message.chatId &&
-		prev.message.content === next.message.content && // 正文未变 → 子 Markdown memo 也可跳过
-		(prev.message.thinkContent ?? '') === (next.message.thinkContent ?? '') &&
-		prev.message.searchOrganic === next.message.searchOrganic &&
-		prev.message.isStreaming === next.message.isStreaming && // 懒加载分支 + 底部「正在生成…」
-		prev.message.finishReason === next.message.finishReason &&
+/**
+ * `memo` 第二参数：返回 **true** 表示前后 props 相等 → **跳过**子组件渲染（省 reconcile / MdPreview 成本）。
+ * 当 `message` 为同一引用且被 MobX 等就地 mutate 时，对字段两读会得到同一「当前值」，不能据此跳过，须返回 false 强制更新（例如停止流式后收起「正在生成中…」）。
+ */
+function areChatAssistantMessageMemoPropsEqual(
+	prev: Readonly<AssistantMessageProps>,
+	next: Readonly<AssistantMessageProps>,
+): boolean {
+	// 同一 message 引用：下方 `pm.xxx === nm.xxx` 会读到同一对象上的「当前值」，无法区分前后两次渲染，易误判为未变。
+	// 返回 false → 不跳过渲染，避免就地更新（如 isStreaming）后 UI 仍停在旧状态（例：「正在生成中…」不消失）。
+	if (prev.message === next.message) {
+		return false;
+	}
+	const pm = prev.message;
+	const nm = next.message;
+	return (
+		pm.chatId === nm.chatId &&
+		pm.content === nm.content &&
+		(pm.thinkContent ?? '') === (nm.thinkContent ?? '') &&
+		pm.searchOrganic === nm.searchOrganic &&
+		pm.isStreaming === nm.isStreaming &&
+		pm.finishReason === nm.finishReason &&
 		prev.isShowThinkContent === next.isShowThinkContent &&
 		prev.isStopped === next.isStopped &&
-		prev.scrollViewportRef === next.scrollViewportRef && // ref 变须重绑 IntersectionObserver
-		prev.onToggleThinkContent === next.onToggleThinkContent && // 回调引用稳定，避免闭包过期
+		prev.scrollViewportRef === next.scrollViewportRef &&
+		prev.onToggleThinkContent === next.onToggleThinkContent &&
 		prev.onContinue === next.onContinue &&
-		prev.onContinueAnswering === next.onContinueAnswering,
+		prev.onContinueAnswering === next.onContinueAnswering
+	);
+}
+
+const ChatAssistantMessage = memo(
+	ChatAssistantMessageInner,
+	areChatAssistantMessageMemoPropsEqual,
 );
 
 export default ChatAssistantMessage;

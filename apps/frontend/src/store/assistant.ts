@@ -267,12 +267,7 @@ class AssistantStore {
 	}
 
 	async stopGenerating(): Promise<void> {
-		if (!this.sessionId) return;
-		try {
-			await stopAssistantStream(this.sessionId);
-		} catch {
-			// 无进行中时后端返回失败，忽略
-		}
+		// 先断 SSE：若先 await 网关，期间 delta 仍会 apply，`...prev` 会保持 isStreaming=true
 		this.abortStream?.();
 		this.abortStream = null;
 		runInAction(() => {
@@ -284,6 +279,13 @@ class AssistantStore {
 				}
 			}
 		});
+		const sid = this.sessionId;
+		if (!sid) return;
+		try {
+			await stopAssistantStream(sid);
+		} catch {
+			// 无进行中时后端返回失败，忽略
+		}
 	}
 }
 

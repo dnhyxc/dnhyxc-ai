@@ -85,6 +85,20 @@ export class AssistantService {
 		);
 	}
 
+	/**
+	 * 用户调用 stopStream 后读循环里会 `abortController.abort()`，fetch/read 抛 AbortError（或 cause 链上为 AbortError），属预期中断，不应打 error 日志。
+	 */
+	private isAssistantChatStreamUserAbortError(err: unknown): boolean {
+		let cur: unknown = err;
+		for (let i = 0; i < 8 && cur != null && typeof cur === 'object'; i++) {
+			const o = cur as { name?: string; code?: unknown; cause?: unknown };
+			if (o.name === 'AbortError') return true;
+			if (o.code === 'ABORT_ERR' || o.code === 20) return true;
+			cur = o.cause;
+		}
+		return false;
+	}
+
 	private getGlmModelName(): string {
 		return (
 			this.configService.get<string>(ModelEnum.ASSISTANT_GLM_MODEL_NAME) ||
@@ -587,10 +601,12 @@ export class AssistantService {
 						reader.releaseLock();
 					}
 				} catch (err: any) {
-					this.logger.error?.('[AssistantService] chatStream failed', {
-						message: err?.message,
-						stack: err?.stack,
-					});
+					if (!this.isAssistantChatStreamUserAbortError(err)) {
+						this.logger.error?.('[AssistantService] chatStream failed', {
+							message: err?.message,
+							stack: err?.stack,
+						});
+					}
 					await cleanupTurnOnFailure();
 					subscriber.error(err);
 				} finally {

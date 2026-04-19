@@ -81,15 +81,17 @@ export class AssistantController {
 			});
 		}
 		const source$ = this.assistantService.chatStream(userId, dto).pipe(
-			map((chunk) => ({
-				data: {
-					type: chunk.type,
-					// 兼容只读 content 的前端：正文仍放在 content
-					content: chunk.type === 'content' ? chunk.data : undefined,
-					raw: chunk.type !== 'content' ? chunk.data : undefined,
-					done: false,
-				},
-			})),
+			map((chunk) => {
+				return {
+					data: {
+						type: chunk.type,
+						// 兼容只读 content 的前端：正文仍放在 content
+						content: chunk.type === 'content' ? chunk.data : undefined,
+						raw: chunk.type !== 'content' ? chunk.data : undefined,
+						done: false,
+					},
+				};
+			}),
 		);
 		const done$ = of({ data: { done: true } });
 		return concat(source$, done$).pipe(
