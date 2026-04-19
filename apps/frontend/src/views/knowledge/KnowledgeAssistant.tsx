@@ -1,12 +1,24 @@
 import { Toast } from '@ui/index';
 import { observer } from 'mobx-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+	type RefObject,
+	type UIEvent,
+	useCallback,
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+} from 'react';
 import ChatAssistantMessage from '@/components/design/ChatAssistantMessage';
 import ChatEntry from '@/components/design/ChatEntry';
 import ChatMessageActions from '@/components/design/ChatMessageActions';
 import ChatUserMessage from '@/components/design/ChatUserMessage';
 import { ScrollArea } from '@/components/ui';
 import { useStickToBottomScroll } from '@/hooks';
+import {
+	ChatCodeFloatingToolbar,
+	useChatCodeFloatingToolbar,
+} from '@/hooks/useChatCodeFloatingToolbar';
 import { cn } from '@/lib/utils';
 import useStore from '@/store';
 import assistantStore from '@/store/assistant';
@@ -24,6 +36,8 @@ interface KnowledgeAssistantMessageBubbleProps {
 	isCopyedId: string;
 	onCopy: (content: string, chatId: string) => void;
 	onSaveToKnowledge: (message: Message) => void;
+	/** 与 ScrollArea Viewport ref 一致，供助手消息内代码块吸顶条与 MdPreview 懒挂载 */
+	scrollViewportRef: RefObject<HTMLElement | null>;
 }
 
 /**
@@ -39,6 +53,7 @@ const KnowledgeAssistantMessageBubble = observer(
 		isCopyedId,
 		onCopy,
 		onSaveToKnowledge,
+		scrollViewportRef,
 	}: KnowledgeAssistantMessageBubbleProps) {
 		const message = assistantStore.messages.find((m) => m.chatId === chatId);
 		if (!message) return null;
@@ -68,7 +83,10 @@ const KnowledgeAssistantMessageBubble = observer(
 					{message.role === 'user' ? (
 						<ChatUserMessage message={message} />
 					) : (
-						<ChatAssistantMessage message={message} />
+						<ChatAssistantMessage
+							message={message}
+							scrollViewportRef={scrollViewportRef}
+						/>
 					)}
 
 					<div
@@ -157,6 +175,32 @@ const KnowledgeAssistant = observer(
 			resetKey: documentKey || undefined,
 		});
 
+		const { relayout: relayoutCodeToolbar } = useChatCodeFloatingToolbar(
+			scrollViewportRef as RefObject<HTMLElement | null>,
+			{
+				// 助手正文 / 流式增量会变高，须触发 `layoutChatCodeToolbars`（勿仅用 knowledgeStore.markdown）
+				layoutDeps: [streamScrollTick, documentKey, messages.length],
+				passiveScrollLayout: true,
+				passiveScrollDeps: [
+					documentKey,
+					messages.length,
+					streamScrollTick,
+					assistantStore.isStreaming,
+				],
+			},
+		);
+
+		const scrollAreaHandlers = useMemo(() => {
+			const { onScroll: onViewportScroll, ...rest } = scrollViewportHandlers;
+			return {
+				...rest,
+				onScroll: (e: UIEvent<HTMLDivElement>) => {
+					onViewportScroll(e);
+					relayoutCodeToolbar();
+				},
+			};
+		}, [scrollViewportHandlers, relayoutCodeToolbar]);
+
 		const sendMessage = useCallback(
 			async (content?: string) => {
 				const text = (content ?? input).trim();
@@ -178,6 +222,7 @@ const KnowledgeAssistant = observer(
 
 		return (
 			<div className="relative flex h-full w-full flex-col overflow-hidden">
+				<ChatCodeFloatingToolbar />
 				{!isLoggedIn ? (
 					<div className="text-textcolor/70 flex flex-1 items-center justify-center px-4 text-center text-sm">
 						登录后可在此与 AI 助手对话，会话按当前知识文档分别保存。
@@ -190,8 +235,8 @@ const KnowledgeAssistant = observer(
 					<ScrollArea
 						ref={scrollViewportRef}
 						className="min-h-0 flex-1"
-						viewportClassName="pb-1"
-						{...scrollViewportHandlers}
+						viewportClassName="pb-1 [overflow-anchor:none]"
+						{...scrollAreaHandlers}
 					>
 						<div
 							className={cn(
@@ -207,6 +252,9 @@ const KnowledgeAssistant = observer(
 									isCopyedId={isCopyedId}
 									onCopy={onCopy}
 									onSaveToKnowledge={onSaveToKnowledge}
+									scrollViewportRef={
+										scrollViewportRef as RefObject<HTMLElement | null>
+									}
 								/>
 							))}
 						</div>
