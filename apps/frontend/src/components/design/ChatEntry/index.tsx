@@ -46,6 +46,9 @@ interface ChatEntryProps {
 	onWebSearchEnabledChange?: (enabled: boolean) => void;
 	/** 文本域样式 */
 	textareaClassName?: string;
+	/** 为 true 时禁用底部输入框（知识库：左侧编辑器无正文时禁止在助手框输入） */
+	disableTextInput?: boolean;
+	placeholder?: string;
 }
 
 const ChatEntry: React.FC<ChatEntryProps> = ({
@@ -68,6 +71,8 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 	webSearchEnabled = false,
 	onWebSearchEnabledChange,
 	textareaClassName,
+	disableTextInput = false,
+	placeholder = '请输入您的问题',
 }) => {
 	const scrollContainer = useRef<HTMLDivElement>(null);
 	const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -219,6 +224,7 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 						<ChatTextArea
 							ref={chatInputRef}
 							mode="chat"
+							placeholder={placeholder}
 							input={input}
 							setInput={setInput}
 							editMessage={editMessage}
@@ -227,6 +233,7 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 							handleEditChange={handleEditChange}
 							sendMessage={sendMessage}
 							textareaClassName={textareaClassName}
+							disableTextInput={disableTextInput}
 						/>
 
 						<div className="flex items-center justify-between h-10 p-2.5 mb-1 mt-2.5">

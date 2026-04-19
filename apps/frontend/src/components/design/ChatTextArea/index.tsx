@@ -31,6 +31,8 @@ interface ChatTextAreaProps {
 	placeholder?: string;
 	/** 文本域样式 */
 	textareaClassName?: string;
+	/** 为 true 时禁用输入（仅 chat 模式；如知识库要求左侧编辑器先有正文） */
+	disableTextInput?: boolean;
 }
 
 const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
@@ -47,6 +49,7 @@ const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 			className,
 			placeholder = '请输入您的问题',
 			textareaClassName,
+			disableTextInput = false,
 		},
 		ref,
 	) => {
@@ -73,6 +76,8 @@ const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 
 		const isEditMode = mode === 'edit';
 		const value = isEditMode ? editMessage?.content || '' : input;
+		const chatInputDisabled =
+			!isEditMode && (Boolean(loading) || Boolean(disableTextInput));
 
 		const onScrollTo = () => {
 			scrollRef.current?.scrollTo({
@@ -102,7 +107,7 @@ const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 						'flex-1 min-h-16 resize-none border-none shadow-none focus-visible:ring-transparent',
 						textareaClassName,
 					)}
-					disabled={loading}
+					disabled={isEditMode ? Boolean(loading) : chatInputDisabled}
 				/>
 
 				{isEditMode && (

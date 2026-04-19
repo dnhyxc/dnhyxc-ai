@@ -121,6 +121,7 @@ const KnowledgeAssistant = observer(
 		const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
 		const isLoggedIn = Boolean(userStore.userInfo?.id);
+		const editorHasBody = Boolean((knowledgeStore.markdown ?? '').trim());
 
 		useEffect(() => {
 			return () => {
@@ -134,6 +135,13 @@ const KnowledgeAssistant = observer(
 			if (!documentKey) return;
 			void assistantStore.activateForDocument(documentKey);
 		}, [documentKey]);
+
+		// 左侧编辑器被清空时，同步清空助手输入框，避免禁用输入后仍残留未发送草稿
+		useEffect(() => {
+			if (!(knowledgeStore.markdown ?? '').trim()) {
+				setInput('');
+			}
+		}, [knowledgeStore.markdown]);
 
 		const onSaveToKnowledge = useCallback(
 			(message: Message) => {
@@ -270,6 +278,12 @@ const KnowledgeAssistant = observer(
 							className="max-w-3xl pl-4 pr-4.5 pb-4.5 border-theme/10"
 							textareaClassName="min-h-9"
 							sendMessage={sendMessage}
+							placeholder={
+								editorHasBody
+									? '请输入您的问题'
+									: '请先在左侧编辑器输入正文后再向我提问'
+							}
+							disableTextInput={!editorHasBody}
 							loading={
 								assistantStore.isSending || assistantStore.isHistoryLoading
 							}
