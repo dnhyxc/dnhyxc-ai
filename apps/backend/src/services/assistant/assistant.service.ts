@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { Cache } from '@nestjs/cache-manager';
 import {
+	BadRequestException,
 	HttpException,
 	HttpStatus,
 	Inject,
@@ -11,7 +12,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
-import { Observable } from 'rxjs';
+import { Observable, type Subscriber } from 'rxjs';
 import { ModelEnum } from 'src/enum/config.enum';
 import { DataSource, Repository } from 'typeorm';
 import { ZhipuStreamData } from '../chat/dto/zhipu-stream-data.dto';
@@ -29,6 +30,7 @@ import { AssistantSession } from './assistant-session.entity';
 import { AssistantChatDto } from './dto/assistant-chat.dto';
 import { AssistantSessionListDto } from './dto/assistant-session-list.dto';
 import { CreateAssistantSessionDto } from './dto/create-assistant-session.dto';
+import { ImportAssistantTranscriptDto } from './dto/import-assistant-transcript.dto';
 
 const DEFAULT_SYSTEM_PROMPT = `你是一个通用智能助手，基于智谱 GLM 模型回答用户问题。请做到：准确、有条理、礼貌；不确定时请说明不确定；不要编造事实。`;
 
@@ -291,8 +293,9 @@ export class AssistantService {
 			where: { id: sessionId, userId },
 			select: ['id', 'userId', 'title', 'createdAt', 'updatedAt'],
 		});
+		// 知识删除会级联清理助手会话；前端可能仍持旧 sessionId 拉取详情，勿抛 404 以免全局 Toast 打扰用户
 		if (!session) {
-			throw new NotFoundException('会话不存在');
+			return { session: null, messages: [] };
 		}
 		const messages = await this.messageRepo.find({
 			where: { session: { id: sessionId } },
@@ -445,6 +448,206 @@ export class AssistantService {
 		}
 	}
 
+	private buildEphemeralTurns(dto: AssistantChatDto): AssistantChatTurn[] {
+		const turns: AssistantChatTurn[] = [];
+		for (const r of dto.contextTurns ?? []) {
+			if (r.role !== 'user' && r.role !== 'assistant') continue;
+			turns.push({ role: r.role, content: r.content ?? '' });
+		}
+		turns.push({ role: 'user', content: dto.content.trim() });
+		return turns;
+	}
+
+	/** 不落库：仅智谱流式输出（知识库未保存草稿） */
+	private async runEphemeralChatStream(
+		subscriber: Subscriber<ZhipuStreamData>,
+		dto: AssistantChatDto,
+	): Promise<void> {
+		const allTurns = this.buildEphemeralTurns(dto);
+		const budget = this.getHistoryTurnBudgetTokens(dto);
+		let contextTurns = takeRecentMessagesWithinTokenBudget(allTurns, budget);
+		if (contextTurns.length === 0 && allTurns.length > 0) {
+			const last = allTurns[allTurns.length - 1]!;
+			contextTurns = [
+				{
+					role: last.role,
+					content: truncateContentToMaxTokens(last.content, budget - 16),
+				},
+			];
+		}
+		const requestMessages = [
+			{ role: 'system' as const, content: DEFAULT_SYSTEM_PROMPT },
+			...contextTurns.map((t) => ({
+				role: t.role,
+				content: t.content,
+			})),
+		];
+
+		const apiKey = this.configService.get<string>(ModelEnum.ZHIPU_API_KEY);
+		const baseURL =
+			this.configService.get<string>(ModelEnum.ZHIPU_BASE_URL) ||
+			'https://open.bigmodel.cn/api/paas/v4';
+		if (!apiKey) {
+			throw new HttpException(
+				'智谱 API 密钥未配置（ZHIPU_API_KEY）',
+				HttpStatus.SERVICE_UNAVAILABLE,
+			);
+		}
+		const modelName = this.getGlmModelName();
+		const abortController = new AbortController();
+		const url = `${baseURL.replace(/\/$/, '')}/chat/completions`;
+		const response = await fetch(url, {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				Authorization: `Bearer ${apiKey}`,
+			},
+			body: JSON.stringify({
+				model: modelName,
+				messages: requestMessages,
+				thinking: { type: 'disabled' },
+				stream: true,
+				max_tokens: dto.maxTokens ?? 4096,
+				temperature: dto.temperature ?? 0.3,
+			}),
+			signal: abortController.signal,
+		});
+		if (!response.ok) {
+			const errText = await response.text();
+			throw new HttpException(
+				`智谱 API 请求失败：${response.status} ${errText}`,
+				response.status,
+			);
+		}
+		const reader = response.body?.getReader();
+		if (!reader) {
+			throw new HttpException(
+				'无法读取响应流',
+				HttpStatus.INTERNAL_SERVER_ERROR,
+			);
+		}
+		const decoder = new TextDecoder('utf-8');
+		let buffer = '';
+		try {
+			while (true) {
+				const { done, value } = await reader.read();
+				if (done) break;
+				const chunk = decoder.decode(value, { stream: true });
+				buffer += chunk;
+				const lines = buffer.split('\n');
+				buffer = lines.pop() || '';
+				for (const line of lines) {
+					const trimmed = line.trim();
+					if (!trimmed || !trimmed.startsWith('data:')) continue;
+					const dataStr = trimmed.slice(5).trim();
+					if (dataStr === '[DONE]') {
+						subscriber.complete();
+						return;
+					}
+					const streamData = this.parseGlmStreamData(dataStr);
+					if (streamData) {
+						subscriber.next(streamData);
+					}
+				}
+			}
+			if (buffer.trim().startsWith('data:')) {
+				const dataStr = buffer.trim().slice(5).trim();
+				if (dataStr !== '[DONE]') {
+					const streamData = this.parseGlmStreamData(dataStr);
+					if (streamData) {
+						subscriber.next(streamData);
+					}
+				}
+			}
+			subscriber.complete();
+		} finally {
+			reader.releaseLock();
+		}
+	}
+
+	/**
+	 * 将草稿阶段对话迁入已绑定知识条目的会话（用于首次保存后落库）。
+	 */
+	async importTranscript(
+		userId: number,
+		dto: ImportAssistantTranscriptDto,
+	): Promise<{ sessionId: string; inserted: number }> {
+		const articleId = dto.knowledgeArticleId.trim();
+		let sessionId = await this.findLatestSessionIdByKnowledgeArticle(
+			userId,
+			articleId,
+		);
+		if (!sessionId) {
+			const id = randomUUID();
+			await this.sessionRepo.save(
+				this.sessionRepo.create({
+					id,
+					userId,
+					title: null,
+					knowledgeArticleId: articleId,
+				}),
+			);
+			sessionId = id;
+		} else {
+			await this.assertSessionOwned(userId, sessionId);
+			await this.messageRepo
+				.createQueryBuilder()
+				.delete()
+				.from(AssistantMessage)
+				.where('session_id = :sid', { sid: sessionId })
+				.execute();
+		}
+
+		const session = await this.assertSessionOwned(userId, sessionId);
+		let inserted = 0;
+		let titleFromFirstUser: string | null = null;
+		let i = 0;
+		while (i < dto.lines.length) {
+			const u = dto.lines[i];
+			i++;
+			if (u.role !== 'user') {
+				continue;
+			}
+			if (!titleFromFirstUser && (u.content ?? '').trim()) {
+				titleFromFirstUser = (u.content ?? '').trim().slice(0, 60);
+			}
+			const turnId = randomUUID();
+			await this.messageRepo.save(
+				this.messageRepo.create({
+					session,
+					role: AssistantMessageRole.USER,
+					content: u.content ?? '',
+					turnId,
+				}),
+			);
+			inserted++;
+			const next = dto.lines[i];
+			const assistantContent =
+				next?.role === 'assistant' ? (next.content ?? '') : '';
+			if (next?.role === 'assistant') {
+				i++;
+			}
+			await this.messageRepo.save(
+				this.messageRepo.create({
+					session,
+					role: AssistantMessageRole.ASSISTANT,
+					content: assistantContent,
+					turnId,
+				}),
+			);
+			inserted++;
+		}
+		const now = new Date();
+		await this.sessionRepo.update(
+			{ id: sessionId, userId },
+			{
+				title: titleFromFirstUser,
+				updatedAt: now,
+			},
+		);
+		return { sessionId, inserted };
+	}
+
 	/**
 	 * 流式问答：用户与助手占位在同一事务落库并关联 turnId；成功后 UPDATE 助手正文；
 	 * 模型/流异常时删除该 turn 成对记录；用户主动中止且有已生成片段则写入部分内容。
@@ -506,6 +709,18 @@ export class AssistantService {
 				};
 
 				try {
+					if (dto.ephemeral === true) {
+						if (dto.sessionId) {
+							throw new BadRequestException('ephemeral 模式下请勿传 sessionId');
+						}
+						if (dto.knowledgeArticleId?.trim()) {
+							throw new BadRequestException(
+								'ephemeral 模式下请勿传 knowledgeArticleId',
+							);
+						}
+						await this.runEphemeralChatStream(subscriber, dto);
+						return;
+					}
 					if (sessionId) {
 						session = await this.assertSessionOwned(userId, sessionId);
 					} else {
@@ -702,7 +917,14 @@ export class AssistantService {
 	}
 
 	async stopStream(sessionId: string, userId: number) {
-		await this.assertSessionOwned(userId, sessionId);
+		const owned = await this.sessionRepo.findOne({
+			where: { id: sessionId, userId },
+			select: ['id'],
+		});
+		// 删除知识时已物理删除会话；此时停止流式应幂等成功，避免「会话不存在」
+		if (!owned) {
+			return { success: true, message: '会话已不存在，无需停止' };
+		}
 		const busy = await this.cache.get(this.streamBusyKey(sessionId));
 		if (!busy) {
 			return { success: false, message: '当前无进行中的生成' };

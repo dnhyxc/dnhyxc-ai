@@ -6,6 +6,7 @@ import {
 import { http } from '@/utils/fetch';
 import {
 	ASSISTANT_SESSION,
+	ASSISTANT_SESSION_IMPORT_TRANSCRIPT,
 	ASSISTANT_STOP,
 	CREATE_CHECKOUT_SESSION,
 	CREATE_SESSION,
@@ -239,12 +240,13 @@ export const stopSse = async (sessionId: string) => {
 
 /** 助手会话详情（与 getAssistantSessionDetail / 按知识条目查询 结构一致） */
 export type AssistantSessionDetailPayload = {
+	/** 会话已删除（如删除知识时级联清理）时为 null，此时 messages 为空数组 */
 	session: {
 		sessionId: string;
 		title: string | null;
 		createdAt: string;
 		updatedAt: string;
-	};
+	} | null;
 	messages: Array<{
 		id: string;
 		turnId: string | null;
@@ -291,6 +293,17 @@ export const patchAssistantSessionKnowledgeArticle = async (
 		sessionId: string;
 		knowledgeArticleId: string;
 	}>(`${ASSISTANT_SESSION}/${sessionId}/knowledge-article`, body);
+};
+
+/** 首次保存后将草稿阶段助手对话迁入数据库（与后端 import-transcript 对齐） */
+export const importAssistantTranscript = async (body: {
+	knowledgeArticleId: string;
+	lines: Array<{ role: 'user' | 'assistant'; content: string }>;
+}) => {
+	return await http.post<{ sessionId: string; inserted: number }>(
+		ASSISTANT_SESSION_IMPORT_TRANSCRIPT,
+		body,
+	);
 };
 
 /** 停止助手当前会话的流式生成 */

@@ -1,3 +1,7 @@
+/**
+ * 知识库右侧助手状态：含「未保存草稿 ephemeral / 保存后迁入 import-transcript / 清空草稿联动」等逻辑。
+ * 设计说明：`docs/knowledge/knowledge-assistant-ephemeral-persistence.md`。
+ */
 import { Toast } from '@ui/index';
 import { makeAutoObservable, runInAction } from 'mobx';
 import { v4 as uuidv4 } from 'uuid';
@@ -5,6 +9,7 @@ import {
 	createAssistantSession,
 	getAssistantSessionByKnowledgeArticle,
 	getAssistantSessionDetail,
+	importAssistantTranscript,
 	patchAssistantSessionKnowledgeArticle,
 	stopAssistantStream,
 } from '@/service';
@@ -49,6 +54,33 @@ function knowledgeArticleBindingFromDocumentKey(documentKey: string): string {
 	return (i >= 0 ? documentKey.slice(0, i) : documentKey).trim();
 }
 
+/** 将当前内存消息转为后端 `import-transcript` 所需的行序列（含未结束流式时的已生成片段） */
+function buildImportTranscriptLinesFromMessages(
+	messages: Message[],
+): Array<{ role: 'user' | 'assistant'; content: string }> {
+	const lines: Array<{ role: 'user' | 'assistant'; content: string }> = [];
+	for (const m of messages) {
+		if (m.role !== 'user' && m.role !== 'assistant') continue;
+		lines.push({ role: m.role, content: m.content ?? '' });
+	}
+	return lines.slice(0, 200);
+}
+
+/** 不落库多轮：已进入 UI 的轮次（排除末尾空占位助手） */
+function buildEphemeralContextTurnsFromMessages(
+	messages: Message[],
+): Array<{ role: 'user' | 'assistant'; content: string }> {
+	const out: Array<{ role: 'user' | 'assistant'; content: string }> = [];
+	for (const m of messages) {
+		if (m.role !== 'user' && m.role !== 'assistant') continue;
+		if (m.role === 'assistant' && m.isStreaming && !(m.content ?? '').trim()) {
+			continue;
+		}
+		out.push({ role: m.role, content: m.content ?? '' });
+	}
+	return out.slice(-120);
+}
+
 /**
  * 知识库右侧「通用助手」：与后端 `AssistantController` 对齐，按文档维度缓存 sessionId。
  */
@@ -66,8 +98,43 @@ class AssistantStore {
 	/** 文档 key → 已创建的助手 sessionId（内存级，换篇后仍保留映射） */
 	sessionByDocument: Record<string, string> = {};
 
+	/**
+	 * 知识库：是否允许助手会话写入后端（已保存云端 id / 本地文件 / 回收站预览为 true；新建未保存云端草稿为 false）。
+	 * 为 false 时使用 ephemeral SSE，不落库；首次保存后由 `flushEphemeralTranscriptIfNeeded` 迁入。
+	 */
+	knowledgeAssistantPersistenceAllowed = true;
+
 	constructor() {
 		makeAutoObservable(this);
+	}
+
+	setKnowledgeAssistantPersistenceAllowed(allowed: boolean): void {
+		runInAction(() => {
+			this.knowledgeAssistantPersistenceAllowed = allowed;
+		});
+	}
+
+	/**
+	 * 知识编辑区执行「清空 / 新建草稿」时：中断流式、清空当前文档下的内存对话与 session 映射。
+	 * 用于未保存云端草稿等 `documentKey` 不变、不会再次触发 `activateForDocument` 的场景，避免助手气泡残留。
+	 */
+	clearAssistantStateOnKnowledgeDraftReset(): void {
+		const prevSid = this.sessionId;
+		this.abortStream?.();
+		this.abortStream = null;
+		runInAction(() => {
+			this.messages = [];
+			this.sessionId = null;
+			this.isSending = false;
+			this.loadError = null;
+			const key = this.activeDocumentKey;
+			if (key) {
+				delete this.sessionByDocument[key];
+			}
+		});
+		if (prevSid) {
+			void stopAssistantStream(prevSid).catch(() => {});
+		}
 	}
 
 	get isStreaming(): boolean {
@@ -85,6 +152,10 @@ class AssistantStore {
 			this.sessionId = null;
 			this.loadError = null;
 		});
+
+		if (!this.knowledgeAssistantPersistenceAllowed) {
+			return;
+		}
 
 		if (!readToken()) {
 			return;
@@ -186,14 +257,61 @@ class AssistantStore {
 		if (!this.sessionId) return;
 		const res = await getAssistantSessionDetail(this.sessionId);
 		const payload = res.data;
-		if (!payload?.messages) return;
+		// 后端在会话已删除时返回 session: null（避免 404）；同步清掉本地缓存的旧 sessionId
+		if (!payload?.session) {
+			runInAction(() => {
+				const key = this.activeDocumentKey;
+				if (key) {
+					delete this.sessionByDocument[key];
+				}
+				this.sessionId = null;
+				this.messages = [];
+			});
+			return;
+		}
+		if (!payload.messages) return;
 		runInAction(() => {
 			this.messages = mapApiMessagesToUi(payload.messages);
 		});
 	}
 
+	/**
+	 * 新建云端知识首次保存成功时：把草稿阶段助手对话写入该条目对应会话。
+	 * 须在将编辑态切到正式 `knowledgeArticleId` 之前调用，避免 `activate` 先拉空库覆盖界面。
+	 */
+	async flushEphemeralTranscriptIfNeeded(
+		cloudArticleId: string,
+		fromDocumentKey: string,
+		toDocumentKey: string,
+	): Promise<void> {
+		if (!readToken()) return;
+		const lines = buildImportTranscriptLinesFromMessages(this.messages);
+		if (lines.length === 0) return;
+		try {
+			const res = await importAssistantTranscript({
+				knowledgeArticleId: cloudArticleId,
+				lines,
+			});
+			const sid = res.data?.sessionId;
+			if (!sid) return;
+			runInAction(() => {
+				delete this.sessionByDocument[fromDocumentKey];
+				this.sessionByDocument[toDocumentKey] = sid;
+				this.sessionId = sid;
+				if (this.activeDocumentKey === fromDocumentKey) {
+					this.activeDocumentKey = toDocumentKey;
+				}
+			});
+		} catch {
+			// Toast 由 http 层处理
+		}
+	}
+
 	/** 确保当前文档已有 sessionId（首轮发送时创建） */
 	async ensureSessionForCurrentDocument(): Promise<string | null> {
+		if (!this.knowledgeAssistantPersistenceAllowed) {
+			return null;
+		}
 		if (!readToken()) {
 			Toast({ type: 'warning', title: '请先登录后再使用助手' });
 			return null;
@@ -230,8 +348,25 @@ class AssistantStore {
 		const text = (raw ?? '').trim();
 		if (!text || this.isSending || this.isHistoryLoading) return;
 
-		const sid = await this.ensureSessionForCurrentDocument();
-		if (!sid) return;
+		const ephemeral = !this.knowledgeAssistantPersistenceAllowed;
+		let sid: string | null = null;
+		if (!ephemeral) {
+			sid = await this.ensureSessionForCurrentDocument();
+			if (!sid) return;
+		} else {
+			if (!readToken()) {
+				Toast({ type: 'warning', title: '请先登录后再使用助手' });
+				return;
+			}
+			if (!this.activeDocumentKey) {
+				Toast({ type: 'warning', title: '文档未就绪' });
+				return;
+			}
+		}
+
+		const contextTurns = ephemeral
+			? buildEphemeralContextTurnsFromMessages(this.messages)
+			: undefined;
 
 		this.abortStream?.();
 		runInAction(() => {
@@ -282,10 +417,16 @@ class AssistantStore {
 
 		try {
 			const abort = await streamAssistantSse({
-				body: {
-					sessionId: sid,
-					content: text,
-				},
+				body: ephemeral
+					? {
+							ephemeral: true,
+							content: text,
+							contextTurns,
+						}
+					: {
+							sessionId: sid,
+							content: text,
+						},
 				callbacks: {
 					onDelta: (d) => applyAssistantPatch(d),
 					onThinking: (t) => applyAssistantPatch('', t),
@@ -305,7 +446,7 @@ class AssistantStore {
 							}
 						});
 						this.abortStream = null;
-						if (!err) {
+						if (!err && !ephemeral) {
 							try {
 								await this.fetchSessionMessages();
 							} catch {

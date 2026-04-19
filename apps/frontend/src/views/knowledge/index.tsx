@@ -117,6 +117,8 @@ const Knowledge = observer(() => {
 		// 从回收站打开时 id 可能恒为 null：仅靠 editingId 无法区分「清空前后」；需让编辑器 identity 变化以退出 splitDiff，由 clearDocumentNonce 承担
 		setClearDocumentNonce((n) => n + 1);
 		knowledgeStore.clearKnowledgeDraft();
+		// 未保存草稿下 documentKey 常为 `draft-new__trash-*` 不变，须显式清空助手内存态（含不落库的 ephemeral 对话）
+		assistantStore.clearAssistantStateOnKnowledgeDraftReset();
 	}, [knowledgeStore]);
 
 	// 快捷键监听
@@ -182,7 +184,10 @@ const Knowledge = observer(() => {
 		[],
 	);
 
-	/** 写入后端：有 knowledgeEditingKnowledgeId 则更新，否则新建并刷新列表 */
+	/**
+	 * 写入后端：有 knowledgeEditingKnowledgeId 则更新，否则新建并刷新列表。
+	 * 新建成功时助手草稿迁入顺序见 `docs/knowledge/knowledge-assistant-ephemeral-persistence.md`（须先于 setEditingId 调用 flush）。
+	 */
 	const persistKnowledgeApi = useCallback(async () => {
 		const markdown = knowledgeStore.markdown ?? '';
 		const trimmedTitle = knowledgeStore.knowledgeTitle.trim();
@@ -223,6 +228,13 @@ const Knowledge = observer(() => {
 						: (editingId ?? 'draft-new');
 				const fromKey = `${articleBase}__trash-${trashOpenNonce}`;
 				const toKey = `${res.data.id}__trash-${trashOpenNonce}`;
+				if (!assistantStore.knowledgeAssistantPersistenceAllowed) {
+					await assistantStore.flushEphemeralTranscriptIfNeeded(
+						res.data.id,
+						fromKey,
+						toKey,
+					);
+				}
 				assistantStore.remapAssistantSessionDocumentKey(fromKey, toKey);
 				knowledgeStore.setKnowledgeEditingKnowledgeId(res.data.id);
 				knowledgeStore.setKnowledgeLocalDiskTitle(trimmedTitle);
@@ -264,9 +276,23 @@ const Knowledge = observer(() => {
 				});
 				throw new Error('saveKnowledge save-as failed');
 			}
+			const articleBase =
+				knowledgeStore.knowledgeTrashPreviewId != null
+					? `__knowledge_trash__:${knowledgeStore.knowledgeTrashPreviewId}`
+					: (editingId ?? 'draft-new');
+			const fromKey = `${articleBase}__trash-${trashOpenNonce}`;
+			const toKey = `${res.data.id}__trash-${trashOpenNonce}`;
+			if (!assistantStore.knowledgeAssistantPersistenceAllowed) {
+				await assistantStore.flushEphemeralTranscriptIfNeeded(
+					res.data.id,
+					fromKey,
+					toKey,
+				);
+			}
+			assistantStore.remapAssistantSessionDocumentKey(fromKey, toKey);
 			knowledgeStore.setKnowledgeEditingKnowledgeId(res.data.id);
 		},
-		[knowledgeStore, getUserInfo, isCloudLoggedIn],
+		[knowledgeStore, getUserInfo, isCloudLoggedIn, trashOpenNonce],
 	);
 
 	const syncSnapshotAfterPersist = useCallback(

@@ -21,6 +21,7 @@ import { AssistantSessionForKnowledgeDto } from './dto/assistant-session-for-kno
 import { AssistantSessionListDto } from './dto/assistant-session-list.dto';
 import { AssistantStopDto } from './dto/assistant-stop.dto';
 import { CreateAssistantSessionDto } from './dto/create-assistant-session.dto';
+import { ImportAssistantTranscriptDto } from './dto/import-assistant-transcript.dto';
 import { UpdateAssistantSessionKnowledgeDto } from './dto/update-assistant-session-knowledge.dto';
 
 type AuthedRequest = Request & { user?: { userId: number } };
@@ -42,6 +43,20 @@ export class AssistantController {
 			return { success: false, message: '未登录' };
 		}
 		return this.assistantService.createSession(userId, dto);
+	}
+
+	/** 将草稿阶段对话迁入已保存知识条目（须在 `session/:id` 之前注册） */
+	@Post('session/import-transcript')
+	async importTranscript(
+		@Req() req: AuthedRequest,
+		@Body() dto: ImportAssistantTranscriptDto,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			return { success: false, message: '未登录' };
+		}
+		const data = await this.assistantService.importTranscript(userId, dto);
+		return { success: true, data };
 	}
 
 	/** 分页：当前用户的助手会话列表 */

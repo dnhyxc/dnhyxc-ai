@@ -1,3 +1,7 @@
+/**
+ * 知识库右侧通用助手：维护 `knowledgeAssistantPersistenceAllowed` 与 `documentKey` 驱动的 `activateForDocument`。
+ * 行为说明见 `docs/knowledge/knowledge-assistant-ephemeral-persistence.md`。
+ */
 import { Toast } from '@ui/index';
 import { observer } from 'mobx-react';
 import {
@@ -23,6 +27,8 @@ import { cn } from '@/lib/utils';
 import useStore from '@/store';
 import assistantStore from '@/store/assistant';
 import type { Message } from '@/types/chat';
+
+import { isKnowledgeLocalMarkdownId } from './constants';
 
 interface KnowledgeAssistantProps {
 	/** 与 MarkdownEditor `documentIdentity` 一致，用于绑定助手多轮会话 */
@@ -135,6 +141,26 @@ const KnowledgeAssistant = observer(
 			if (!documentKey) return;
 			void assistantStore.activateForDocument(documentKey);
 		}, [documentKey]);
+
+		const assistantPersistenceAllowed = useMemo(() => {
+			if (knowledgeStore.knowledgeTrashPreviewId != null) return true;
+			const editingId = knowledgeStore.knowledgeEditingKnowledgeId;
+			if (isKnowledgeLocalMarkdownId(editingId)) return true;
+			if (editingId) return true;
+			return false;
+		}, [
+			knowledgeStore.knowledgeTrashPreviewId,
+			knowledgeStore.knowledgeEditingKnowledgeId,
+		]);
+
+		useEffect(() => {
+			assistantStore.setKnowledgeAssistantPersistenceAllowed(
+				assistantPersistenceAllowed,
+			);
+			return () => {
+				assistantStore.setKnowledgeAssistantPersistenceAllowed(true);
+			};
+		}, [assistantPersistenceAllowed]);
 
 		// 左侧编辑器被清空时，同步清空助手输入框，避免禁用输入后仍残留未发送草稿
 		useEffect(() => {

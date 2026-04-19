@@ -93,5 +93,8 @@ export const KNOWLEDGE_TRASH_DELETE_BATCH = '/knowledge/trash/delete-batch';
 
 /** 通用助手（智谱 GLM，多轮 session） */
 export const ASSISTANT_SESSION = '/assistant/session';
+/** 草稿对话迁入已保存知识条目 */
+export const ASSISTANT_SESSION_IMPORT_TRANSCRIPT =
+	'/assistant/session/import-transcript';
 export const ASSISTANT_SSE = '/assistant/sse';
 export const ASSISTANT_STOP = '/assistant/stop';
