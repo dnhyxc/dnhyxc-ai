@@ -9,6 +9,7 @@ import { Input } from '@/components/ui';
 import { useTheme } from '@/hooks';
 import { saveKnowledge } from '@/service';
 import useStore from '@/store';
+import assistantStore from '@/store/assistant';
 import { KnowledgeRecord } from '@/types';
 import { isTauriRuntime } from '@/utils';
 import {
@@ -53,6 +54,10 @@ const Knowledge = observer(() => {
 	 * - 策略：每次从回收站 pick 时递增 nonce，拼到 documentIdentity 上，触发 MarkdownEditor 的 documentIdentity 变更链路
 	 */
 	const [trashOpenNonce, setTrashOpenNonce] = useState(0);
+	/** 仅用于 Monaco `documentIdentity`：清空草稿时递增，与助手 `documentKey` 解耦，避免清空后助手会话被重置 */
+	const [clearDocumentNonce, setClearDocumentNonce] = useState(0);
+	/** 受控：避免 `documentIdentity` 因清空而变时 Monaco 内部把助手关掉并切回「纯分屏预览」 */
+	const [markdownAssistantOpen, setMarkdownAssistantOpen] = useState(false);
 	/** 保存前从 Monaco 同步正文，避免 onChange 经 rAF 合并时 store 滞后导致脏检查误判 */
 	const getMarkdownFromEditorRef = useRef<(() => string) | null>(null);
 	const [knowledgeChords, setKnowledgeChords] = useState<{
@@ -97,9 +102,9 @@ const Knowledge = observer(() => {
 
 	/** 清空标题与正文（store 级草稿，与 markdown 一并清除） */
 	const resetEditorToNewDraft = useCallback(() => {
-		// 与「从列表打开条目」类似：editingId 从有值变 null 会改变 documentIdentity，从而触发 MarkdownEditor 换篇并退出 splitDiff。
-		// 从回收站打开时 id 本就为 null，仅靠 id 不会变；递增 nonce 才能让 documentIdentity 变化，避免清空后仍卡在 Diff。
-		setTrashOpenNonce((n) => n + 1);
+		// 仅递增 clearDocumentNonce 驱动 Monaco 的 documentIdentity，勿动 trashOpenNonce（否则与助手 documentKey 联动，会清空会话并触发内部关助手）
+		// 从回收站打开时 id 可能恒为 null：仅靠 editingId 无法区分「清空前后」；需让编辑器 identity 变化以退出 splitDiff，由 clearDocumentNonce 承担
+		setClearDocumentNonce((n) => n + 1);
 		knowledgeStore.clearKnowledgeDraft();
 	}, [knowledgeStore]);
 
@@ -508,6 +513,7 @@ const Knowledge = observer(() => {
 		const pendingBase: SaveKnowledgeMarkdownPayload = { ...pending };
 		delete pendingBase.previousTitle;
 		knowledgeStore.setKnowledgeOverwriteOpen(false);
+		const prevEditingId = knowledgeStore.knowledgeEditingKnowledgeId;
 		setSaveLoading(true);
 		try {
 			const diskTitle = await pickNonConflictingDiskFileTitle(
@@ -532,9 +538,11 @@ const Knowledge = observer(() => {
 				tauriRes.filePath &&
 				tauriRes.filePath.length > 0
 			) {
-				knowledgeStore.setKnowledgeEditingKnowledgeId(
-					`${KNOWLEDGE_LOCAL_MD_ID_PREFIX}${encodeURIComponent(tauriRes.filePath)}`,
-				);
+				const newEditingId = `${KNOWLEDGE_LOCAL_MD_ID_PREFIX}${encodeURIComponent(tauriRes.filePath)}`;
+				const fromKey = `${prevEditingId ?? 'draft-new'}__trash-${trashOpenNonce}`;
+				const toKey = `${newEditingId}__trash-${trashOpenNonce}`;
+				assistantStore.remapAssistantSessionDocumentKey(fromKey, toKey);
+				knowledgeStore.setKnowledgeEditingKnowledgeId(newEditingId);
 				knowledgeStore.setKnowledgeLocalDirPath(dirnameFs(tauriRes.filePath));
 			}
 		} catch (e) {
@@ -551,6 +559,7 @@ const Knowledge = observer(() => {
 		persistKnowledgeApiSaveAs,
 		runTauriSave,
 		syncSnapshotAfterPersist,
+		trashOpenNonce,
 	]);
 
 	const handleOverwriteOpenChange = useCallback(
@@ -678,8 +687,10 @@ const Knowledge = observer(() => {
 					height={EDITOR_HEIGHT}
 					theme={monacoTheme}
 					language={monacoLanguage}
-					// 回收站入口：documentIdentity 拼接 nonce，确保每次 pick/clear 都会触发组件内部重置到 edit，不重置会导致 diff 内容出现问题
-					documentIdentity={`${knowledgeStore.knowledgeEditingKnowledgeId ?? 'draft-new'}__trash-${trashOpenNonce}`}
+					// trashOpenNonce：回收站 pick 等与助手会话对齐；clearDocumentNonce：仅清空草稿时 bump，驱动 Monaco 换篇且不重置助手
+					documentIdentity={`${knowledgeStore.knowledgeEditingKnowledgeId ?? 'draft-new'}__trash-${trashOpenNonce}__clear-${clearDocumentNonce}`}
+					markdownAssistantOpen={markdownAssistantOpen}
+					onMarkdownAssistantOpenChange={setMarkdownAssistantOpen}
 					value={knowledgeStore.markdown}
 					onChange={handleMarkdownChange}
 					getMarkdownFromEditorRef={getMarkdownFromEditorRef}

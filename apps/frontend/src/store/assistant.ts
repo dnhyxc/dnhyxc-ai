@@ -107,6 +107,23 @@ class AssistantStore {
 		}
 	}
 
+	/**
+	 * 文档维度 key 变更时（如草稿首次保存得到真实 id、本地首次落盘），迁移 session 映射，避免助手历史丢失。
+	 */
+	remapAssistantSessionDocumentKey(fromKey: string, toKey: string): void {
+		if (!fromKey || !toKey || fromKey === toKey) return;
+		runInAction(() => {
+			const sid = this.sessionByDocument[fromKey];
+			if (sid) {
+				this.sessionByDocument[toKey] = sid;
+				delete this.sessionByDocument[fromKey];
+			}
+			if (this.activeDocumentKey === fromKey) {
+				this.activeDocumentKey = toKey;
+			}
+		});
+	}
+
 	async fetchSessionMessages(): Promise<void> {
 		if (!this.sessionId) return;
 		const res = await getAssistantSessionDetail(this.sessionId);

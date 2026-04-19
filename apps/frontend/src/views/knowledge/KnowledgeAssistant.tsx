@@ -77,8 +77,8 @@ const KnowledgeAssistantMessageBubble = observer(
 					className={cn(
 						'relative flex min-w-0 max-w-full flex-1 rounded-md p-3 select-auto text-textcolor mb-5',
 						message.role === 'user'
-							? 'bg-teal-600/10 border border-teal-600/20 text-end pt-2 pb-2.5 px-3'
-							: 'bg-theme/5 border border-theme/20',
+							? 'bg-teal-600/10 border border-teal-600/10 text-end pt-2 pb-2.5 px-3'
+							: 'bg-theme/5 border border-theme/10',
 					)}
 				>
 					{message.role === 'user' ? (
@@ -241,8 +241,8 @@ const KnowledgeAssistant = observer(
 					>
 						<div
 							className={cn(
-								// 仅加 min-w-0：勿再写 max-w-full，否则会覆盖 max-w-208 的栏宽上限
-								'pt-4 max-w-208 mx-auto relative flex w-full min-w-0 flex-col select-none pr-4 pl-3.5',
+								// 仅加 min-w-0：勿再写 max-w-full，否则会覆盖 max-w-3xl 的栏宽上限
+								'pt-4 max-w-3xl mx-auto relative flex w-full min-w-0 flex-col select-none pr-4 pl-3.5',
 							)}
 						>
 							{messages.map((message, index) => (
@@ -263,11 +263,11 @@ const KnowledgeAssistant = observer(
 					</ScrollArea>
 				)}
 				{isLoggedIn ? (
-					<div className="mt-4">
+					<div className="mt-4 flex items-center justify-center">
 						<ChatEntry
 							input={input}
 							setInput={setInput}
-							className="pl-4 pr-4.5 pb-4.5 border-theme/10"
+							className="max-w-3xl pl-4 pr-4.5 pb-4.5 border-theme/10"
 							textareaClassName="min-h-9"
 							sendMessage={sendMessage}
 							loading={
