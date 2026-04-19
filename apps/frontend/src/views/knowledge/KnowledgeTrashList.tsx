@@ -17,10 +17,11 @@ import { formatDate } from '@/utils';
 interface Props {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
-	/** 点击某条后回填编辑器 */
+	/** 点击某条后回填编辑器（含回收站行 id，供助手会话与列表草稿区分） */
 	onPick?: (record: {
 		title: string | null;
 		content: string;
+		trashItemId: string;
 	}) => void | Promise<void>;
 }
 
@@ -181,6 +182,7 @@ const KnowledgeTrashList: React.FC<Props> = observer(
 					await onPick?.({
 						title: res.data.title ?? null,
 						content: res.data.content ?? '',
+						trashItemId: item.id,
 					});
 					onOpenChange(false);
 				} finally {

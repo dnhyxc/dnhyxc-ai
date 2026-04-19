@@ -4,6 +4,7 @@ import {
 	Controller,
 	Get,
 	Param,
+	Patch,
 	Post,
 	Query,
 	Req,
@@ -16,9 +17,11 @@ import { catchError, concat, map, Observable, of } from 'rxjs';
 import { JwtGuard } from 'src/guards/jwt.guard';
 import { AssistantService } from './assistant.service';
 import { AssistantChatDto } from './dto/assistant-chat.dto';
+import { AssistantSessionForKnowledgeDto } from './dto/assistant-session-for-knowledge.dto';
 import { AssistantSessionListDto } from './dto/assistant-session-list.dto';
 import { AssistantStopDto } from './dto/assistant-stop.dto';
 import { CreateAssistantSessionDto } from './dto/create-assistant-session.dto';
+import { UpdateAssistantSessionKnowledgeDto } from './dto/update-assistant-session-knowledge.dto';
 
 type AuthedRequest = Request & { user?: { userId: number } };
 
@@ -54,6 +57,27 @@ export class AssistantController {
 		return this.assistantService.listSessions(userId, query);
 	}
 
+	/** 按知识条目标识拉取最近绑定的会话及消息（须在 `session/:id` 之前注册） */
+	@Get('session/for-knowledge')
+	async getSessionForKnowledge(
+		@Req() req: AuthedRequest,
+		@Query() query: AssistantSessionForKnowledgeDto,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			return { success: false, message: '未登录' };
+		}
+		const detail =
+			await this.assistantService.getSessionDetailByKnowledgeArticle(
+				userId,
+				query.knowledgeArticleId,
+			);
+		if (!detail) {
+			return { success: true, data: null };
+		}
+		return { success: true, data: detail };
+	}
+
 	/** 按 sessionId 拉取会话详情及全部消息（时间正序） */
 	@Get('session/:sessionId')
 	async getSessionDetail(
@@ -65,6 +89,25 @@ export class AssistantController {
 			return { success: false, message: '未登录' };
 		}
 		return this.assistantService.getSessionDetail(userId, sessionId);
+	}
+
+	/** 将会话改绑到新的知识条目标识（如草稿保存后 id 变更） */
+	@Patch('session/:sessionId/knowledge-article')
+	async patchSessionKnowledgeArticle(
+		@Req() req: AuthedRequest,
+		@Param('sessionId') sessionId: string,
+		@Body() body: UpdateAssistantSessionKnowledgeDto,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			return { success: false, message: '未登录' };
+		}
+		const data = await this.assistantService.updateSessionKnowledgeArticleId(
+			userId,
+			sessionId,
+			body.knowledgeArticleId,
+		);
+		return { success: true, data };
 	}
 
 	/** GLM 流式问答（body 可不带 sessionId，将自动新建会话） */

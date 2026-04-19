@@ -16,6 +16,12 @@ export class AssistantChatDto {
 	@IsUUID()
 	sessionId?: string;
 
+	/** 无 sessionId 时按知识条目复用或创建会话（与知识库编辑器绑定） */
+	@IsOptional()
+	@IsString()
+	@MaxLength(1024)
+	knowledgeArticleId?: string;
+
 	@IsString()
 	@IsNotEmpty()
 	@MaxLength(100_000)

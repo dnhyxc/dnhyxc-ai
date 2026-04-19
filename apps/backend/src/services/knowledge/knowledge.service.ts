@@ -5,12 +5,20 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Like, Repository } from 'typeorm';
+import { AssistantSession } from '../assistant/assistant-session.entity';
 import { QueryKnowledgeDto } from './dto/query-knowledge.dto';
 import { QueryKnowledgeTrashDto } from './dto/query-knowledge-trash.dto';
 import { SaveKnowledgeDto } from './dto/save-knowledge.dto';
 import { UpdateKnowledgeDto } from './dto/update-knowledge.dto';
 import { Knowledge } from './knowledge.entity';
 import { KnowledgeTrash } from './knowledge-trash.entity';
+
+/** 与前端知识库回收站预览的 `knowledgeArticleId` 前缀一致 */
+const ASSISTANT_KNOWLEDGE_TRASH_PREFIX = '__knowledge_trash__:';
+
+function assistantArticleIdForTrashRow(trashRowId: string): string {
+	return `${ASSISTANT_KNOWLEDGE_TRASH_PREFIX}${trashRowId}`;
+}
 
 /** 列表项：不含大字段 content，减轻列表接口体积 */
 export type KnowledgeListItem = Pick<
@@ -73,6 +81,7 @@ export class KnowledgeService {
 		await this.knowledgeRepository.manager.transaction(async (manager) => {
 			const knowledgeRepo = manager.getRepository(Knowledge);
 			const trashRepo = manager.getRepository(KnowledgeTrash);
+			const assistantSessionRepo = manager.getRepository(AssistantSession);
 
 			const row = await knowledgeRepo.findOne({ where: { id } });
 			if (!row) {
@@ -90,6 +99,8 @@ export class KnowledgeService {
 			} satisfies Partial<KnowledgeTrash>);
 
 			await trashRepo.save(trash);
+			// 助手会话按知识条目 uuid 绑定，主表删除前一并清理（消息随 session CASCADE）
+			await assistantSessionRepo.delete({ knowledgeArticleId: row.id });
 			await knowledgeRepo.delete({ id });
 		});
 	}
@@ -172,10 +183,16 @@ export class KnowledgeService {
 
 	/** 回收站单条物理删除 */
 	async removeTrash(id: string): Promise<void> {
-		const res = await this.knowledgeTrashRepository.delete({ id });
-		if (!res.affected) {
-			throw new NotFoundException('回收站条目不存在');
-		}
+		await this.knowledgeTrashRepository.manager.transaction(async (manager) => {
+			const trashRepo = manager.getRepository(KnowledgeTrash);
+			const assistantSessionRepo = manager.getRepository(AssistantSession);
+			const articleId = assistantArticleIdForTrashRow(id);
+			await assistantSessionRepo.delete({ knowledgeArticleId: articleId });
+			const res = await trashRepo.delete({ id });
+			if (!res.affected) {
+				throw new NotFoundException('回收站条目不存在');
+			}
+		});
 	}
 
 	/** 回收站单条详情（含正文） */
@@ -193,8 +210,19 @@ export class KnowledgeService {
 		if (uniq.length === 0) {
 			throw new BadRequestException('请至少提供一条要删除的回收站 id');
 		}
-		const res = await this.knowledgeTrashRepository.delete({ id: In(uniq) });
-		return { affected: res.affected ?? 0 };
+		return await this.knowledgeTrashRepository.manager.transaction(
+			async (manager) => {
+				const trashRepo = manager.getRepository(KnowledgeTrash);
+				const assistantSessionRepo = manager.getRepository(AssistantSession);
+				for (const tid of uniq) {
+					await assistantSessionRepo.delete({
+						knowledgeArticleId: assistantArticleIdForTrashRow(tid),
+					});
+				}
+				const res = await trashRepo.delete({ id: In(uniq) });
+				return { affected: res.affected ?? 0 };
+			},
+		);
 	}
 
 	private async requireById(id: string): Promise<Knowledge> {

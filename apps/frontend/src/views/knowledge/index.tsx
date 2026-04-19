@@ -100,6 +100,17 @@ const Knowledge = observer(() => {
 		[knowledgeStore.knowledgeTitle],
 	);
 
+	/** 助手 / Monaco 文档维度的条目标识：回收站预览用独立前缀，避免多条均落在 draft-new 下同一会话 */
+	const assistantArticleBinding = useMemo(() => {
+		if (knowledgeStore.knowledgeTrashPreviewId != null) {
+			return `__knowledge_trash__:${knowledgeStore.knowledgeTrashPreviewId}`;
+		}
+		return knowledgeStore.knowledgeEditingKnowledgeId ?? 'draft-new';
+	}, [
+		knowledgeStore.knowledgeTrashPreviewId,
+		knowledgeStore.knowledgeEditingKnowledgeId,
+	]);
+
 	/** 清空标题与正文（store 级草稿，与 markdown 一并清除） */
 	const resetEditorToNewDraft = useCallback(() => {
 		// 仅递增 clearDocumentNonce 驱动 Monaco 的 documentIdentity，勿动 trashOpenNonce（否则与助手 documentKey 联动，会清空会话并触发内部关助手）
@@ -206,11 +217,24 @@ const Knowledge = observer(() => {
 			} as Omit<KnowledgeRecord, 'id'>);
 			// 新建成功后必须记下 id，否则删除本条时 id 仍为 null，无法清空编辑器
 			if (res.success && res.data?.id) {
+				const articleBase =
+					knowledgeStore.knowledgeTrashPreviewId != null
+						? `__knowledge_trash__:${knowledgeStore.knowledgeTrashPreviewId}`
+						: (editingId ?? 'draft-new');
+				const fromKey = `${articleBase}__trash-${trashOpenNonce}`;
+				const toKey = `${res.data.id}__trash-${trashOpenNonce}`;
+				assistantStore.remapAssistantSessionDocumentKey(fromKey, toKey);
 				knowledgeStore.setKnowledgeEditingKnowledgeId(res.data.id);
 				knowledgeStore.setKnowledgeLocalDiskTitle(trimmedTitle);
+				const sid = assistantStore.getSessionIdForDocumentKey(toKey);
+				if (sid) {
+					void assistantStore
+						.persistKnowledgeArticleBindingOnServer(sid, res.data.id)
+						.catch(() => {});
+				}
 			}
 		}
-	}, [knowledgeStore, getUserInfo, isCloudLoggedIn]);
+	}, [knowledgeStore, getUserInfo, isCloudLoggedIn, trashOpenNonce]);
 
 	/**
 	 * 另存为：始终新建云端记录（不更新当前 id），本地扫描打开的条目仍不写库。
@@ -514,6 +538,7 @@ const Knowledge = observer(() => {
 		delete pendingBase.previousTitle;
 		knowledgeStore.setKnowledgeOverwriteOpen(false);
 		const prevEditingId = knowledgeStore.knowledgeEditingKnowledgeId;
+		const prevTrashPreviewId = knowledgeStore.knowledgeTrashPreviewId;
 		setSaveLoading(true);
 		try {
 			const diskTitle = await pickNonConflictingDiskFileTitle(
@@ -539,9 +564,19 @@ const Knowledge = observer(() => {
 				tauriRes.filePath.length > 0
 			) {
 				const newEditingId = `${KNOWLEDGE_LOCAL_MD_ID_PREFIX}${encodeURIComponent(tauriRes.filePath)}`;
-				const fromKey = `${prevEditingId ?? 'draft-new'}__trash-${trashOpenNonce}`;
+				const articleBase =
+					prevTrashPreviewId != null
+						? `__knowledge_trash__:${prevTrashPreviewId}`
+						: (prevEditingId ?? 'draft-new');
+				const fromKey = `${articleBase}__trash-${trashOpenNonce}`;
 				const toKey = `${newEditingId}__trash-${trashOpenNonce}`;
 				assistantStore.remapAssistantSessionDocumentKey(fromKey, toKey);
+				const sid = assistantStore.getSessionIdForDocumentKey(toKey);
+				if (sid) {
+					void assistantStore
+						.persistKnowledgeArticleBindingOnServer(sid, newEditingId)
+						.catch(() => {});
+				}
 				knowledgeStore.setKnowledgeEditingKnowledgeId(newEditingId);
 				knowledgeStore.setKnowledgeLocalDirPath(dirnameFs(tauriRes.filePath));
 			}
@@ -588,13 +623,19 @@ const Knowledge = observer(() => {
 	 * 从回收站打开：仅用于展示到编辑器。
 	 * 为避免把“已删除的 originalId”当作可更新条目，这里按“新草稿”处理：
 	 * - editingKnowledgeId 置空（保存会走新建）
+	 * - knowledgeTrashPreviewId 记录回收站行 id，使助手会话按预览条目隔离
 	 * - snapshot 设为当前内容（打开时不显示脏点）
 	 */
 	const handlePickTrashRecord = useCallback(
-		(record: { title: string | null; content: string }) => {
+		(record: {
+			title: string | null;
+			content: string;
+			trashItemId: string;
+		}) => {
 			setTrashOpenNonce((n) => n + 1);
 			knowledgeStore.setKnowledgeOverwriteOpen(false);
 			knowledgeStore.setKnowledgeEditingKnowledgeId(null);
+			knowledgeStore.setKnowledgeTrashPreviewId(record.trashItemId);
 			knowledgeStore.setKnowledgeLocalDirPath(null);
 			knowledgeStore.setKnowledgeLocalDiskTitle(null);
 			const content = record.content ?? '';
@@ -688,7 +729,7 @@ const Knowledge = observer(() => {
 					theme={monacoTheme}
 					language={monacoLanguage}
 					// trashOpenNonce：回收站 pick 等与助手会话对齐；clearDocumentNonce：仅清空草稿时 bump，驱动 Monaco 换篇且不重置助手
-					documentIdentity={`${knowledgeStore.knowledgeEditingKnowledgeId ?? 'draft-new'}__trash-${trashOpenNonce}__clear-${clearDocumentNonce}`}
+					documentIdentity={`${assistantArticleBinding}__trash-${trashOpenNonce}__clear-${clearDocumentNonce}`}
 					markdownAssistantOpen={markdownAssistantOpen}
 					onMarkdownAssistantOpenChange={setMarkdownAssistantOpen}
 					value={knowledgeStore.markdown}
@@ -762,7 +803,7 @@ const Knowledge = observer(() => {
 					}
 					chatNode={
 						<KnowledgeAssistant
-							documentKey={`${knowledgeStore.knowledgeEditingKnowledgeId ?? 'draft-new'}__trash-${trashOpenNonce}`}
+							documentKey={`${assistantArticleBinding}__trash-${trashOpenNonce}`}
 						/>
 					}
 				/>

@@ -76,6 +76,12 @@ class KnowledgeStore {
 	/** 正在编辑的云端知识 id；null 表示新建草稿 */
 	knowledgeEditingKnowledgeId: string | null = null;
 
+	/**
+	 * 从回收站仅预览打开时：回收站行 id（与云端知识 id 不同），用于助手按「预览条目」隔离会话；
+	 * 从列表打开正式条目或非回收站场景时应为 null。
+	 */
+	knowledgeTrashPreviewId: string | null = null;
+
 	/** 桌面端：打开该条时的原标题，用于本地 .md 重命名 */
 	knowledgeLocalDiskTitle: string | null = null;
 
@@ -160,6 +166,14 @@ class KnowledgeStore {
 
 	setKnowledgeEditingKnowledgeId(id: string | null) {
 		this.knowledgeEditingKnowledgeId = id;
+		// 已绑定正式/本地知识条目时，退出回收站预览态，避免助手仍按回收站 key 存会话
+		if (id != null && id !== '') {
+			this.knowledgeTrashPreviewId = null;
+		}
+	}
+
+	setKnowledgeTrashPreviewId(id: string | null) {
+		this.knowledgeTrashPreviewId = id;
 	}
 
 	setKnowledgeLocalDiskTitle(value: string | null) {
@@ -240,6 +254,7 @@ class KnowledgeStore {
 	clearKnowledgeDraft() {
 		this.knowledgeTitle = '';
 		this.knowledgeEditingKnowledgeId = null;
+		this.knowledgeTrashPreviewId = null;
 		this.knowledgeLocalDiskTitle = null;
 		this.knowledgeLocalDirPath = null;
 		this.knowledgePersistedSnapshot = { title: '', content: '' };
@@ -258,6 +273,7 @@ class KnowledgeStore {
 		if (!body) return;
 		this.setKnowledgeOverwriteOpen(false);
 		this.knowledgeEditingKnowledgeId = null;
+		this.knowledgeTrashPreviewId = null;
 		this.knowledgeLocalDiskTitle = null;
 		this.knowledgeLocalDirPath = null;
 		this.markdown = body;

@@ -237,8 +237,28 @@ export const stopSse = async (sessionId: string) => {
 	});
 };
 
-/** 创建助手会话（空会话，多轮传 sessionId） */
-export const createAssistantSession = async (payload?: { title?: string }) => {
+/** 助手会话详情（与 getAssistantSessionDetail / 按知识条目查询 结构一致） */
+export type AssistantSessionDetailPayload = {
+	session: {
+		sessionId: string;
+		title: string | null;
+		createdAt: string;
+		updatedAt: string;
+	};
+	messages: Array<{
+		id: string;
+		turnId: string | null;
+		role: string;
+		content: string;
+		createdAt: string;
+	}>;
+};
+
+/** 创建助手会话（空会话，多轮传 sessionId）；可传 knowledgeArticleId 与知识条目绑定并复用已有会话 */
+export const createAssistantSession = async (payload?: {
+	title?: string;
+	knowledgeArticleId?: string;
+}) => {
 	return await http.post<{ sessionId: string; title: string | null }>(
 		ASSISTANT_SESSION,
 		payload ?? {},
@@ -247,23 +267,30 @@ export const createAssistantSession = async (payload?: { title?: string }) => {
 
 /** 拉取助手会话详情与消息（时间正序） */
 export const getAssistantSessionDetail = async (sessionId: string) => {
-	return await http.get<{
-		session: {
-			sessionId: string;
-			title: string | null;
-			createdAt: string;
-			updatedAt: string;
-		};
-		messages: Array<{
-			id: string;
-			turnId: string | null;
-			role: string;
-			content: string;
-			createdAt: string;
-		}>;
-	}>(ASSISTANT_SESSION, {
+	return await http.get<AssistantSessionDetailPayload>(ASSISTANT_SESSION, {
 		params: [sessionId],
 	});
+};
+
+/** 按知识条目标识拉取最近绑定的会话及消息（无则 data 为 null） */
+export const getAssistantSessionByKnowledgeArticle = async (
+	knowledgeArticleId: string,
+) => {
+	return await http.get<AssistantSessionDetailPayload | null>(
+		`${ASSISTANT_SESSION}/for-knowledge`,
+		{ querys: { knowledgeArticleId } },
+	);
+};
+
+/** 将会话改绑到新的知识条目标识（如草稿保存后 id 变更） */
+export const patchAssistantSessionKnowledgeArticle = async (
+	sessionId: string,
+	body: { knowledgeArticleId: string },
+) => {
+	return await http.patch<{
+		sessionId: string;
+		knowledgeArticleId: string;
+	}>(`${ASSISTANT_SESSION}/${sessionId}/knowledge-article`, body);
 };
 
 /** 停止助手当前会话的流式生成 */

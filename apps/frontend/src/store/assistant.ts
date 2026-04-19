@@ -3,7 +3,9 @@ import { makeAutoObservable, runInAction } from 'mobx';
 import { v4 as uuidv4 } from 'uuid';
 import {
 	createAssistantSession,
+	getAssistantSessionByKnowledgeArticle,
 	getAssistantSessionDetail,
+	patchAssistantSessionKnowledgeArticle,
 	stopAssistantStream,
 } from '@/service';
 import type { Message } from '@/types/chat';
@@ -40,6 +42,13 @@ function mapApiMessagesToUi(
 	return out;
 }
 
+/** 从与编辑器一致的 documentKey 解析知识条目标识（去掉 `__trash-*` 等与回收站分栏相关的后缀） */
+function knowledgeArticleBindingFromDocumentKey(documentKey: string): string {
+	const sep = '__trash-';
+	const i = documentKey.indexOf(sep);
+	return (i >= 0 ? documentKey.slice(0, i) : documentKey).trim();
+}
+
 /**
  * 知识库右侧「通用助手」：与后端 `AssistantController` 对齐，按文档维度缓存 sessionId。
  */
@@ -65,7 +74,7 @@ class AssistantStore {
 		return this.messages.some((m) => m.isStreaming);
 	}
 
-	/** 切换知识条目时调用：有已绑定 session 则拉历史，否则清空待首轮发送再建会话 */
+	/** 切换知识条目时调用：内存映射或服务端按条目标识拉取历史，无则保持空会话待首轮发送 */
 	async activateForDocument(documentKey: string): Promise<void> {
 		this.abortStream?.();
 		this.abortStream = null;
@@ -81,8 +90,41 @@ class AssistantStore {
 			return;
 		}
 
-		const sid = this.sessionByDocument[documentKey];
+		let sid = this.sessionByDocument[documentKey] ?? null;
+		let hydratedFromArticleApi = false;
+
 		if (!sid) {
+			const bindingId = knowledgeArticleBindingFromDocumentKey(documentKey);
+			if (bindingId) {
+				runInAction(() => {
+					this.isHistoryLoading = true;
+				});
+				try {
+					const res = await getAssistantSessionByKnowledgeArticle(bindingId);
+					const data = res.data;
+					if (data?.session?.sessionId) {
+						sid = data.session.sessionId;
+						runInAction(() => {
+							this.sessionByDocument[documentKey] = sid!;
+							this.sessionId = sid!;
+							this.messages = mapApiMessagesToUi(data.messages ?? []);
+						});
+						hydratedFromArticleApi = true;
+					}
+				} catch {
+					// Toast 由 http 层处理
+				} finally {
+					runInAction(() => {
+						this.isHistoryLoading = false;
+					});
+				}
+			}
+		}
+
+		if (!sid) {
+			return;
+		}
+		if (hydratedFromArticleApi) {
 			return;
 		}
 
@@ -124,6 +166,22 @@ class AssistantStore {
 		});
 	}
 
+	/** 当前 documentKey 在内存中的 sessionId（供保存后改绑服务端条目标识等场景） */
+	getSessionIdForDocumentKey(documentKey: string): string | null {
+		return this.sessionByDocument[documentKey] ?? null;
+	}
+
+	/** 同步更新服务端「会话 ↔ 知识条目」绑定（草稿保存为正式 id、本地路径变更等） */
+	async persistKnowledgeArticleBindingOnServer(
+		sessionId: string,
+		knowledgeArticleId: string,
+	): Promise<void> {
+		if (!readToken()) return;
+		await patchAssistantSessionKnowledgeArticle(sessionId, {
+			knowledgeArticleId,
+		});
+	}
+
 	async fetchSessionMessages(): Promise<void> {
 		if (!this.sessionId) return;
 		const res = await getAssistantSessionDetail(this.sessionId);
@@ -152,7 +210,10 @@ class AssistantStore {
 			});
 			return existing;
 		}
-		const res = await createAssistantSession({});
+		const binding = knowledgeArticleBindingFromDocumentKey(key);
+		const res = await createAssistantSession(
+			binding ? { knowledgeArticleId: binding } : {},
+		);
 		const created = (res.data as { sessionId?: string })?.sessionId;
 		if (!created) {
 			Toast({ type: 'error', title: '创建助手会话失败' });

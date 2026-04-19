@@ -185,15 +185,82 @@ export class AssistantService {
 		}
 	}
 
+	private async findLatestSessionIdByKnowledgeArticle(
+		userId: number,
+		knowledgeArticleId: string,
+	): Promise<string | null> {
+		const row = await this.sessionRepo.findOne({
+			where: { userId, knowledgeArticleId },
+			order: { updatedAt: 'DESC' },
+			select: ['id'],
+		});
+		return row?.id ?? null;
+	}
+
 	async createSession(userId: number, dto?: CreateAssistantSessionDto) {
+		const articleId = dto?.knowledgeArticleId?.trim();
+		if (articleId) {
+			const existingId = await this.findLatestSessionIdByKnowledgeArticle(
+				userId,
+				articleId,
+			);
+			if (existingId) {
+				const existing = await this.sessionRepo.findOne({
+					where: { id: existingId, userId },
+					select: ['id', 'title'],
+				});
+				if (existing) {
+					return { sessionId: existing.id, title: existing.title };
+				}
+			}
+		}
 		const id = randomUUID();
 		const session = this.sessionRepo.create({
 			id,
 			userId,
 			title: dto?.title?.trim() || null,
+			knowledgeArticleId: articleId || null,
 		});
 		await this.sessionRepo.save(session);
 		return { sessionId: id, title: session.title };
+	}
+
+	/**
+	 * 按知识条目标识取「最近活跃」的助手会话及消息（用于切换文章时恢复历史）
+	 */
+	async getSessionDetailByKnowledgeArticle(
+		userId: number,
+		knowledgeArticleId: string,
+	) {
+		const sid = await this.findLatestSessionIdByKnowledgeArticle(
+			userId,
+			knowledgeArticleId.trim(),
+		);
+		if (!sid) {
+			return null;
+		}
+		return this.getSessionDetail(userId, sid);
+	}
+
+	/** 草稿保存为正式条目等场景：将会话改绑到新的条目标识 */
+	async updateSessionKnowledgeArticleId(
+		userId: number,
+		sessionId: string,
+		knowledgeArticleId: string,
+	): Promise<{ sessionId: string; knowledgeArticleId: string }> {
+		const session = await this.sessionRepo.findOne({
+			where: { id: sessionId, userId },
+			select: ['id'],
+		});
+		if (!session) {
+			throw new NotFoundException('会话不存在');
+		}
+		const next = knowledgeArticleId.trim();
+		await this.sessionRepo.update(
+			{ id: sessionId, userId },
+			{ knowledgeArticleId: next },
+		);
+		return { sessionId, knowledgeArticleId: next };
 	}
 
 	async listSessions(userId: number, query: AssistantSessionListDto) {
@@ -389,7 +456,8 @@ export class AssistantService {
 		return new Observable<ZhipuStreamData>((subscriber) => {
 			(async () => {
 				let sessionId = dto.sessionId;
-				let session: AssistantSession;
+				// 各分支在发起流式请求前均会赋值；占位满足 TS 对闭包内引用的检查
+				let session!: AssistantSession;
 				let accumulated = '';
 				let assistantMessageId: string | undefined;
 				let activeTurnId: string | undefined;
@@ -441,14 +509,29 @@ export class AssistantService {
 					if (sessionId) {
 						session = await this.assertSessionOwned(userId, sessionId);
 					} else {
-						const id = randomUUID();
-						session = this.sessionRepo.create({
-							id,
-							userId,
-							title: null,
-						});
-						await this.sessionRepo.save(session);
-						sessionId = id;
+						const articleId = dto.knowledgeArticleId?.trim();
+						if (articleId) {
+							const existingId =
+								await this.findLatestSessionIdByKnowledgeArticle(
+									userId,
+									articleId,
+								);
+							if (existingId) {
+								session = await this.assertSessionOwned(userId, existingId);
+								sessionId = session.id;
+							}
+						}
+						if (!sessionId) {
+							const id = randomUUID();
+							session = this.sessionRepo.create({
+								id,
+								userId,
+								title: null,
+								knowledgeArticleId: articleId || null,
+							});
+							await this.sessionRepo.save(session);
+							sessionId = id;
+						}
 					}
 					streamSessionId = sessionId!;
 
