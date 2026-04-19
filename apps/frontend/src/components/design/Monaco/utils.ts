@@ -139,6 +139,21 @@ function scrollTopToAlignHeadingTop(
 }
 
 /**
+ * 仅在预览 Radix ScrollArea viewport 内滚动。
+ * 禁止使用 `Element.scrollIntoView`：其会沿滚动链滚动**所有**可滚动祖先（含布局里 `overflow-y-auto` 的 Outlet 容器），导致整页内容上移。
+ */
+export function scrollPreviewViewportToRevealElement(
+	viewport: HTMLElement,
+	el: HTMLElement,
+	options?: { behavior?: ScrollBehavior },
+): void {
+	const rawTop = scrollTopToAlignHeadingTop(viewport, el);
+	const maxScroll = Math.max(0, viewport.scrollHeight - viewport.clientHeight);
+	const top = Math.max(0, Math.min(maxScroll, rawTop));
+	viewport.scrollTo({ top, behavior: options?.behavior ?? 'smooth' });
+}
+
+/**
  * Markdown 分屏滚动同步的快照结构（snapshot，快照）。
  *
  * 设计目标：

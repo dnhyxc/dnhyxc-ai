@@ -8,6 +8,10 @@ export type AttachExternalLinkClickOptions = {
 	anchorSelector?: string;
 	/**
 	 * 是否跳过页内锚点 `#xxx`（默认跳过，交给本地滚动/定位逻辑处理）。
+	 *
+	 * 为 true 且 `href` 以 `#` 开头时：拦截器会在捕获阶段调用 **`preventDefault()`**，
+	 * 以阻止浏览器的「片段导航」去滚动错误的滚动祖先（例如 Layout 里包裹 Outlet 的 `overflow-y-auto`）。
+	 * 此分支**不会** `stopPropagation`，以便同一容器上的冒泡监听仍能完成「仅滚预览 Viewport」等逻辑。
 	 */
 	skipHashAnchors?: boolean;
 	/**
@@ -22,6 +26,8 @@ export type AttachExternalLinkClickOptions = {
  * 说明：
  * - Tauri：`openExternalUrl` 内部走 opener 插件（系统默认浏览器）。
  * - Web：`openExternalUrl` 内部走 window.open 新标签页。
+ *
+ * 页内锚点（`skipHashAnchors`）：见类型字段说明；实录见 `docs/monaco/markdown-preview-toc-hash-navigation.md`。
  */
 export function attachExternalLinkClickInterceptor(
 	container: HTMLElement,
@@ -41,7 +47,12 @@ export function attachExternalLinkClickInterceptor(
 
 		const href = a.getAttribute('href')?.trim() ?? '';
 		if (!href) return;
-		if (skipHashAnchors && href.startsWith('#')) return;
+		// 仅取消默认，不 stopPropagation：冒泡阶段由宿主（如 Monaco preview）在预览 Viewport 上写入 scrollTop
+		// 若此处不 preventDefault，浏览器仍会做片段导航并滚动「最近可滚动祖先」（含 Layout 的 Outlet）
+		if (skipHashAnchors && href.startsWith('#')) {
+			e.preventDefault();
+			return;
+		}
 
 		e.preventDefault();
 		if (stopPropagation) e.stopPropagation();

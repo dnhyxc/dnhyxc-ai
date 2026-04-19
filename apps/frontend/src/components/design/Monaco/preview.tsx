@@ -40,6 +40,8 @@ import {
 	splitForMermaidIslandsWithOpenTail,
 } from '@/utils/splitMarkdownFences';
 
+import { scrollPreviewViewportToRevealElement } from './utils';
+
 /**
  * 分段 `render` 时标题 `data-md-heading-line` 为片段内 1-based；
  * 加上 `lineBase0`（整篇 normalized 源里该段首行的 0-based 行下标）得到与 Monaco 一致的全文 1-based 行号。
@@ -126,6 +128,13 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 		requestAnimationFrame(() => refreshPreviewScrollFab());
 	}, [documentIdentity, showPreviewScrollCornerFab, refreshPreviewScrollFab]);
 
+	/**
+	 * 预览内链接点击（与 `docs/monaco/markdown-preview-toc-hash-navigation.md` 对齐）：
+	 *
+	 * 1. **捕获**：`attachExternalLinkClickInterceptor` 对 `href^="#"` 执行 `preventDefault()`，禁止浏览器片段导航误滚 Layout。
+	 * 2. **冒泡**：本 `onClick` 在整棵 `el`（markdownRef）子树内用 `#id` 查找目标标题；禁止只用首个 `.markdown-body`，否则 Mermaid 拆岛时目录与标题分居不同段会找不到节点。
+	 * 3. **滚动**：仅对 Radix `ScrollArea` 的 Viewport（`localViewportRef`）调用 `scrollPreviewViewportToRevealElement`，禁止对标题 `scrollIntoView`。
+	 */
 	useEffect(() => {
 		const el = markdownRef.current;
 		if (!el) return;
@@ -133,7 +142,7 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 			el,
 			{
 				anchorSelector: '.markdown-body a',
-				// 页内锚点交给下方逻辑在 ScrollArea 内 scrollIntoView
+				// 页内 # 交给下方 onClick：只滚预览 viewport；外链仍 preventDefault + stopPropagation + openExternalUrl
 				skipHashAnchors: true,
 				stopPropagation: true,
 			},
@@ -142,7 +151,6 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 			const target = e.target as HTMLElement;
 			if (!el.contains(target)) return;
 
-			// 页内锚点：预览在 Radix ScrollArea 内，默认 hash 跳转无效，改为在视口内 scrollIntoView
 			const link = target.closest<HTMLAnchorElement>('a[href^="#"]');
 			if (link) {
 				const href = link.getAttribute('href');
@@ -150,16 +158,23 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 					const raw = href.slice(1);
 					const id = decodeURIComponent(raw.replace(/\+/g, ' '));
 					if (id) {
-						const root = el.querySelector('.markdown-body') ?? el;
+						// 在整块预览根 `el` 下查找，覆盖多个 `.markdown-body`（Mermaid 岛分段渲染）
 						let dest: Element | null = null;
 						try {
-							dest = root.querySelector(`#${CSS.escape(id)}`);
+							dest = el.querySelector(`#${CSS.escape(id)}`);
 						} catch {
 							dest = null;
 						}
 						if (dest instanceof HTMLElement) {
 							e.preventDefault();
-							dest.scrollIntoView({ behavior: 'smooth', block: 'start' });
+							e.stopPropagation();
+							link.blur();
+							const vp = localViewportRef.current;
+							if (vp) {
+								scrollPreviewViewportToRevealElement(vp, dest, {
+									behavior: 'smooth',
+								});
+							}
 							return;
 						}
 					}
@@ -366,7 +381,7 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 					'h-full min-h-0 min-w-0 max-w-full w-full bg-transparent',
 				)}
 				// 覆盖 Radix 内层 display:table + minWidth:100%，否则 table 会按内容扩宽并顶破分栏
-				viewportClassName="[&>div]:!box-border [&>div]:!block [&>div]:!w-full [&>div]:!min-w-0 [&>div]:!max-w-full"
+				viewportClassName="overscroll-y-contain [&>div]:!box-border [&>div]:!block [&>div]:!w-full [&>div]:!min-w-0 [&>div]:!max-w-full"
 			>
 				<div className="box-border min-w-0 max-w-full w-full p-3">
 					<div

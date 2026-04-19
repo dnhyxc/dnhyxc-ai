@@ -117,7 +117,7 @@
   - Tauri：`@tauri-apps/plugin-opener` → 系统默认浏览器  
   - Web：`window.open(url, '_blank', 'noopener,noreferrer')`
 - **捕获阶段拦截**：在容器上注册 `click` 的 capture listener，保证即使事件来自 `<a>` 内部子节点（如 `<span>`）也能命中。
-- **跳过页内锚点**：`href` 以 `#` 开头的链接不作为外链打开，交给宿主自己的滚动/定位逻辑处理（例如 Monaco 预览在 `ScrollArea` 内的 `scrollIntoView`）。
+- **跳过页内锚点**：`href` 以 `#` 开头的链接不作为外链打开；拦截器对该类链接 **`preventDefault()`** 以禁止浏览器片段导航，再由宿主（如 Monaco 预览）在 **Radix `ScrollArea` Viewport** 上调用 `scrollPreviewViewportToRevealElement` 等逻辑定位，**禁止**对标题直接使用 `scrollIntoView`（会连锁滚动 Layout）。详见 `docs/monaco/markdown-preview-toc-hash-navigation.md`。
 
 #### 4.5.3 公共封装
 
@@ -128,8 +128,8 @@ export function attachExternalLinkClickInterceptor(
   container: HTMLElement,
   opts?: {
     anchorSelector?: string;      // 默认 '.markdown-body a'
-    skipHashAnchors?: boolean;    // 默认 true
-    stopPropagation?: boolean;    // 默认 true
+    skipHashAnchors?: boolean;    // 默认 true；为 true 且 href 以 # 开头时会 preventDefault，禁止片段导航
+    stopPropagation?: boolean;    // 默认 true（仅外链分支；# 分支不冒泡截断，见 toc-hash 文档）
   }
 ): () => void
 ```
@@ -142,6 +142,8 @@ export function attachExternalLinkClickInterceptor(
 |------|------|
 | `apps/frontend/src/components/design/ChatAssistantMessage/index.tsx` | 在消息气泡根容器上接管 `.markdown-body a` 点击，避免聊天消息内外链在 WebView 内打开 |
 | `apps/frontend/src/components/design/Monaco/preview.tsx` | 在预览容器上接管 `.markdown-body a` 点击；同时保留原有 `a[href^="#"]` 的页内锚点滚动逻辑 |
+
+当 `skipHashAnchors: true`（默认）且 `href` 以 `#` 开头时，拦截器会 **`preventDefault()`** 以禁止浏览器**片段导航**误滚 Layout；预览侧再在 **Radix ScrollArea Viewport** 上显式滚动。设计背景、事件顺序与多 `.markdown-body` 拆岛场景见 **`docs/monaco/markdown-preview-toc-hash-navigation.md`**。
 
 ### 4.6 未改但已兼容的说明
 

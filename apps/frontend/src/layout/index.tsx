@@ -75,7 +75,7 @@ const Layout = () => {
 				<TooltipProvider>
 					<div
 						data-tauri-drag-region
-						className={`box-border flex h-full w-full min-w-0 max-w-full flex-1 flex-col rounded-md px-7 py-7 pl-0`}
+						className="box-border flex h-full w-full min-w-0 max-w-full flex-1 flex-col rounded-md py-7 pr-7"
 					>
 						<div className="relative h-full w-full min-w-0 max-w-full rounded-md bg-theme-secondary">
 							<div

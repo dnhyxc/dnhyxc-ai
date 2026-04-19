@@ -301,7 +301,8 @@ export type MarkdownMermaidSplitPart =
 |------|------|
 | `apps/frontend/src/components/design/Monaco/utils.ts` | 快照构建、插值、比例回退、死区 |
 | `apps/frontend/src/components/design/Monaco/index.tsx` | 分屏模式、快照生命周期、回声抑制、Monaco/预览事件 |
-| `apps/frontend/src/components/design/Monaco/preview.tsx` | 预览 DOM、拆岛渲染、行号平移 |
+| `apps/frontend/src/components/design/Monaco/preview.tsx` | 预览 DOM、拆岛渲染、行号平移；**TOC `#` 锚点**见 `markdown-preview-toc-hash-navigation.md` |
+| `apps/frontend/src/utils/external-link-click.ts` | 捕获阶段接管链接；**`#` + `skipHashAnchors` 须 `preventDefault`**，与预览内滚动配合 |
 | `apps/frontend/src/utils/splitMarkdownFences.ts` | `splitForMermaidIslandsWithOpenTail` 组合开放尾围栏 |
 | `packages/tools/src/markdown/parser.ts` | `splitForMermaidIslands`、`data-md-heading-line`、`MarkdownMermaidSplitPart` |
 | `packages/tools/src/index.ts` | 导出 `MarkdownMermaidSplitPart` 等 |
@@ -311,6 +312,14 @@ export type MarkdownMermaidSplitPart =
 ## 8. 与既有文档的关系
 
 - `docs/monaco-markdown-ime-ghosting.md`：侧重 Monaco Markdown **IME / 占位 / 分屏交互** 等；其中若仍有「按首可见行 / HeadingScrollCache」等旧描述，请以本文 **§2–§4** 的实现为准逐步修订，避免双套叙述冲突。
+
+---
+
+## 9. 预览目录锚点（`#fragment`）与 Layout 误滚（关联文档）
+
+分屏「跟滚」与快照解决的是**左右同步**；**点击预览区 TOC / `href="#..."`** 时若处理不当，会触发浏览器**片段导航**或 `scrollIntoView` 的**滚动链**，导致 **Layout 主内容区（`Outlet` 外包 `overflow-y-auto`）被误滚**。该问题与拆岛渲染下**多个 `.markdown-body`** 的 DOM 结构相关，实录与带注释的参考代码见：
+
+- **`docs/monaco/markdown-preview-toc-hash-navigation.md`**
 
 ---
 
