@@ -4,7 +4,7 @@
  */
 
 import Loading from '@design/Loading';
-import { Toast } from '@ui/index';
+import { Button, Toast } from '@ui/index';
 import { Sparkles } from 'lucide-react';
 import { observer } from 'mobx-react';
 import {
@@ -12,6 +12,7 @@ import {
 	type UIEvent,
 	useCallback,
 	useEffect,
+	useLayoutEffect,
 	useMemo,
 	useRef,
 	useState,
@@ -79,7 +80,7 @@ const KnowledgeAssistantMessageBubble = observer(
 			<div
 				className={cn(
 					// min-w-0：flex 子项默认可缩到小于内容宽，避免代码块/长行把整列撑出 ScrollArea
-					'relative flex min-w-0 max-w-full flex-1 flex-col gap-1 pb-10 w-full group last:pb-0',
+					'relative flex min-w-0 max-w-full flex-1 flex-col gap-1 pb-10 w-full group last:pb-8.5',
 					message.role === 'user' ? 'items-end' : '',
 				)}
 				data-msg-rev={streamRev}
@@ -215,11 +216,28 @@ const KnowledgeAssistant = observer(
 			viewportRef: scrollViewportRef,
 			scrollViewportHandlers,
 			enableStickToBottom: enableStreamStickToBottom,
+			flushScrollToBottom,
 		} = useStickToBottomScroll({
 			isStreaming: assistantStore.isStreaming,
 			contentRevision: streamScrollTick,
 			resetKey: documentKey || undefined,
 		});
+
+		/** 流式/发送结束后展示「重新总结/润色」条带（跟在消息后，见下方 ScrollArea 内渲染） */
+		const showPostStreamActions =
+			isLoggedIn &&
+			messages.length > 0 &&
+			editorHasBody &&
+			!assistantStore.isHistoryLoading &&
+			!assistantStore.isSending &&
+			!assistantStore.isStreaming;
+
+		// 条带插入后 scrollHeight 变化，须在布局后贴底，否则用户仍停在旧滚动位置
+		useLayoutEffect(() => {
+			if (!showPostStreamActions) return;
+			flushScrollToBottom();
+			requestAnimationFrame(() => flushScrollToBottom());
+		}, [showPostStreamActions, flushScrollToBottom]);
 
 		const { relayout: relayoutCodeToolbar } = useChatCodeFloatingToolbar(
 			scrollViewportRef as RefObject<HTMLElement | null>,
@@ -320,7 +338,7 @@ const KnowledgeAssistant = observer(
 											key={item.kind}
 											type="button"
 											className={cn(
-												'flex-1 flex items-start gap-2 border border-theme/10 bg-theme/10 text-textcolor hover:bg-theme/15 py-2 pl-2 pr-2.5 rounded-md cursor-pointer text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-theme/40',
+												'flex-1 flex items-start gap-2 border border-theme/10 bg-theme/5 text-textcolor hover:bg-theme/15 py-2 pl-2 pr-2.5 rounded-md cursor-pointer text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-theme/40',
 												(assistantStore.isSending ||
 													assistantStore.isHistoryLoading ||
 													assistantStore.isStreaming) &&
@@ -377,11 +395,25 @@ const KnowledgeAssistant = observer(
 									}
 								/>
 							))}
+							{showPostStreamActions ? (
+								<div className="flex w-full min-w-0 flex-wrap gap-3.5 mb-3">
+									{KNOWLEDGE_ASSISTANT_PROMPTS.map((item) => (
+										<Button
+											key={item.kind}
+											variant="dynamic"
+											className="w-fit rounded-md border border-theme/10 bg-theme/5 p-2 text-left text-sm text-textcolor/70 transition-colors hover:border-theme/20 hover:text-textcolor"
+											onClick={() => void sendKnowledgePromptCard(item.kind)}
+										>
+											{item.title}
+										</Button>
+									))}
+								</div>
+							) : null}
 						</div>
 					</ScrollArea>
 				)}
 				{isLoggedIn ? (
-					<div className="w-full mt-4 flex items-center justify-center">
+					<div className="w-full flex items-center justify-center">
 						<ChatEntry
 							input={input}
 							setInput={setInput}

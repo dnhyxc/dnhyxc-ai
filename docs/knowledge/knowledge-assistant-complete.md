@@ -354,12 +354,111 @@ useEffect(() => {
 
 ### 8.3 滚动与代码块工具栏
 
-- **`useStickToBottomScroll`**：`isStreaming` + `streamScrollTick` + `resetKey: documentKey`。  
+- **`useStickToBottomScroll`**（`apps/frontend/src/hooks/useStickToBottomScroll.ts`）：`isStreaming` + `streamScrollTick` + `resetKey: documentKey`；除 `enableStickToBottom` 外，暴露 **`flushScrollToBottom`**（单次 `scrollTop = scrollHeight`，不改变内部「是否跟底」状态），供 §8.5 在条带插入 DOM 后强制贴底。  
 - **`useChatCodeFloatingToolbar`**：`layoutDeps` 含 `streamScrollTick`，避免仅依赖 `markdown` 导致助手区代码块工具条不重排。
 
 ### 8.4 首页快捷卡片（润色 / 总结）
 
 当 `messages.length === 0` 且左侧编辑器已有正文时，展示 `KNOWLEDGE_ASSISTANT_PROMPTS` 卡片；点击后走 **`sendKnowledgePromptCard`**，经 `buildKnowledgeAssistantDocumentMessage` 拆成 **短 `userMessageShort` + `extraUserContentForModel`**，调用 `assistantStore.sendMessage`。**完整契约、后端拼接顺序与回归注意** 见 **§13**。
+
+### 8.5 流式结束后的快捷条（跟在消息流末尾 + 贴底滚动）
+
+#### 8.5.1 产品语义
+
+- **与 §8.4 区分**：§8.4 是 **空会话**（无气泡）时的首屏大卡片；本节是 **已有对话** 且 **当前轮发送与流式均已结束** 时，在 **最新消息气泡之后**、仍在 **`ScrollArea` 可滚动内容内** 展示的一排与 **`KNOWLEDGE_ASSISTANT_PROMPTS` 同源** 的快捷入口（再次调用 `sendKnowledgePromptCard`）。  
+- **不固定在输入框上方**：条带作为消息列的「尾部块」，随长对话一起滚动；用户上滑阅读历史时，条带在列表底部而非盖住输入区。  
+- **出现后视口贴底**：条带挂载会使 `scrollHeight` 增大；若不在布局后把视口滚到底，用户可能仍停留在旧 `scrollTop`，看不到新按钮。因此需在 **`showPostStreamActions` 变为 `true`** 时主动 **`flushScrollToBottom`**，并用 **`requestAnimationFrame` 再执行一次**，缓解 Radix `ScrollArea` 内层高度晚一帧才稳定的情况。
+
+#### 8.5.2 显示条件（`showPostStreamActions`）
+
+须 **同时** 满足：
+
+| 条件 | 含义 |
+| --- | --- |
+| `isLoggedIn` | 已登录 |
+| `messages.length > 0` | 已进入对话列表 |
+| `editorHasBody` | 左侧编辑器有正文，润色/总结才有文档可带给模型 |
+| `!isHistoryLoading` | 不在拉取历史 |
+| `!isSending` | 不在发送请求生命周期内（含等待首包） |
+| `!isStreaming` | 无助手气泡处于流式中 |
+
+流式或发送中为 `false`，条带卸载，避免与进行中回复抢交互。
+
+#### 8.5.3 实现要点（逐条）
+
+1. 从 **`useStickToBottomScroll`** 解构 **`flushScrollToBottom`**，与既有 `enableStreamStickToBottom` 并存。  
+2. 定义布尔 **`showPostStreamActions`**（上表条件合成），供 JSX 与 `useLayoutEffect` 共用。  
+3. **`useLayoutEffect`** 依赖 **`[showPostStreamActions, flushScrollToBottom]`**：当 `showPostStreamActions === true` 时调用 **`flushScrollToBottom()`**，并在 **`requestAnimationFrame`** 内再调用一次；`false` 时不做事。  
+4. **渲染位置**：在 **`ScrollArea`** 内、`messages.map(...)` **之后**，与气泡同一 **`max-w-3xl mx-auto`** 列容器内；条带内 **`KNOWLEDGE_ASSISTANT_PROMPTS.map`** 渲染按钮（与首屏卡片同源 `kind` / 标题，避免文案分叉）。  
+5. **与流式跟底的关系**：流式阶段仍由 `useStickToBottomScroll` 根据 `isStreaming` / `contentRevision` 跟底；条带仅在 idle 出现，**贴底由本节 `useLayoutEffect` 补偿**，二者职责不重复。
+
+#### 8.5.4 代码摘录（含源码注释）
+
+```tsx
+// 文件：apps/frontend/src/views/knowledge/KnowledgeAssistant.tsx（节选 + 与源码一致的注释）
+
+const {
+	viewportRef: scrollViewportRef,
+	scrollViewportHandlers,
+	enableStickToBottom: enableStreamStickToBottom,
+	flushScrollToBottom,
+} = useStickToBottomScroll({
+	isStreaming: assistantStore.isStreaming,
+	contentRevision: streamScrollTick,
+	resetKey: documentKey || undefined,
+});
+
+/** 流式/发送结束后展示「重新总结/润色」条带（跟在消息后，见下方 ScrollArea 内渲染） */
+const showPostStreamActions =
+	isLoggedIn &&
+	messages.length > 0 &&
+	editorHasBody &&
+	!assistantStore.isHistoryLoading &&
+	!assistantStore.isSending &&
+	!assistantStore.isStreaming;
+
+// 条带插入后 scrollHeight 变化，须在布局后贴底，否则用户仍停在旧滚动位置
+useLayoutEffect(() => {
+	if (!showPostStreamActions) return;
+	flushScrollToBottom();
+	requestAnimationFrame(() => flushScrollToBottom());
+}, [showPostStreamActions, flushScrollToBottom]);
+```
+
+```tsx
+// 同一文件：ScrollArea 内消息列表末尾（节选）
+{messages.map((message, index) => (
+	<KnowledgeAssistantMessageBubble key={message.chatId} /* ... */ />
+))}
+{showPostStreamActions ? (
+	<div className="flex w-full min-w-0 flex-wrap gap-3.5 mb-3">
+		{KNOWLEDGE_ASSISTANT_PROMPTS.map((item) => (
+			<Button
+				key={item.kind}
+				variant="dynamic"
+				className="w-fit rounded-md border border-theme/10 bg-theme/5 p-2 text-left text-sm text-textcolor/70 transition-colors hover:border-theme/20 hover:text-textcolor"
+				onClick={() => void sendKnowledgePromptCard(item.kind)}
+			>
+				{item.title}
+			</Button>
+		))}
+	</div>
+) : null}
+```
+
+#### 8.5.5 Hook 侧：`flushScrollToBottom` 语义（摘录）
+
+```typescript
+// 文件：apps/frontend/src/hooks/useStickToBottomScroll.ts（节选 + 接口注释）
+/** 单次滚到物理底部，不修改是否跟底的内部状态 */
+flushScrollToBottom: () => void;
+
+const flushScrollToBottom = useCallback(() => {
+	const vp = viewportRef.current;
+	if (!vp) return;
+	vp.scrollTop = vp.scrollHeight;
+}, []);
+```
 
 ---
 
@@ -625,7 +724,8 @@ async sendMessage(
 
 - **`activateForDocument`**：`documentKey` 非空即调用（含 `draft-new*`），保证 **`activeDocumentKey`** 就绪。  
 - **`sendKnowledgePromptCard`**：校验登录、左侧有正文、非发送/加载/流式中；调用 `buildKnowledgeAssistantDocumentMessage`，再 `sendMessage(userMessageShort, { extraUserContentForModel })`。  
-- **首页卡片**：`button` + `onClick`；进行中时 `pointer-events-none opacity-50`。
+- **首页卡片**（空会话）：`KNOWLEDGE_ASSISTANT_PROMPTS` + `button`（或 `Button` 封装，以仓库为准）；进行中时 `pointer-events-none opacity-50`。  
+- **流式结束后的快捷条**（有会话）、**`flushScrollToBottom` 贴底**：见 **§8.5**（与首屏卡片同源 `kind`，避免重复维护文案）。
 
 ```tsx
 // 文件：apps/frontend/src/views/knowledge/KnowledgeAssistant.tsx（节选 + 注释）
@@ -667,7 +767,8 @@ const sendKnowledgePromptCard = useCallback(
 - [ ] 清空草稿：助手气泡与映射清空。  
 - [ ] 删除当前知识：无「会话不存在」误报；助手状态可恢复。  
 - [ ] 另存为：与新建类似的 flush 顺序。  
-- [ ] 快捷卡片（润色/总结）：DB user 行仅为短标题；SSE 可选 `extraUserContentForModel` 时智谱侧 user 含文档围栏（§13）。
+- [ ] 快捷卡片（润色/总结）：DB user 行仅为短标题；SSE 可选 `extraUserContentForModel` 时智谱侧 user 含文档围栏（§13）。  
+- [ ] 有对话且流式结束后：消息列表底部出现与 `KNOWLEDGE_ASSISTANT_PROMPTS` 同源的快捷条，且视口自动贴底（§8.5）。
 
 ---
 
