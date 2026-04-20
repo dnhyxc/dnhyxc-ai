@@ -22,6 +22,7 @@
 | UI 原语 | `apps/frontend/src/components/ui/context-menu.tsx` | Radix（`radix-ui`）+ Tailwind，**单一事实来源**的样式与无障碍行为；**业务与 Monaco 不直接改此文件**。 |
 | Design 二次封装 | `apps/frontend/src/components/design/ContextMenu/` | 在 UI 之上 `memo`、声明式 `QuickContextMenu`、`ContextMenuUi` 命名空间导出等，见该目录 `index.tsx` 顶部说明。 |
 | Monaco 菜单模块 | `apps/frontend/src/components/design/Monaco/contextMenu.ts` | 菜单项生成（纯函数）+ 动作注入（与 `addCommand` 同源）；把右键菜单从 `index.tsx` 中拆出，便于复用与单点优化。 |
+| Monaco 快捷键命令 | `apps/frontend/src/components/design/Monaco/commands.ts` | **集中注册** `editor.addCommand(...)`：把快捷键（格式化/注释/复制/剪切/粘贴/发送选区到助手）从 `index.tsx` 抽离，减少 `onMount` 体积并统一语义。 |
 | Monaco 宿主 | `apps/frontend/src/components/design/Monaco/index.tsx` | 用 **`QuickContextMenu`** 包住带 **`editorHostRef`** 的宿主 `div`，菜单 **`items`** 来自 `contextMenu.ts`，`onMount` 通过注入函数绑定动作。 |
 
 依赖方向：**Monaco → Design ContextMenu → UI context-menu**（单向，无循环引用）。
@@ -66,7 +67,14 @@
 
 ```typescript
 // apps/frontend/src/components/design/Monaco/options.ts
-// 关闭 Monaco 自带右键菜单，便于外层 Radix ContextMenu 接收 contextmenu 事件
+// 关闭 Monaco 自带右键菜单，便于外层 Radix ContextMenu 接收 `contextmenu` 事件。
+//
+// 为什么要关：
+// - Monaco 内置菜单会抢占右键事件，并可能 `preventDefault`，导致外层 Radix 菜单无法弹出
+// - 我们希望“右键菜单动作”与“快捷键动作”同源（统一剪贴板/安全格式化/发送选区到助手）
+//
+// 影响范围：
+// - 只影响编辑器内的右键菜单“显示”，不影响复制/剪切/粘贴等命令本身（命令由 addCommand/注入动作接管）
 export const options: any = {
 	// ...其它选项
 	contextmenu: false,
@@ -121,8 +129,11 @@ const editorHostRef = useRef<HTMLDivElement | null>(null);
 const editorContextMenuItems = useMemo(
 	() =>
 		buildMonacoEditorContextMenuItems({
+			// 只读模式下：菜单会隐藏剪切/粘贴/格式化等“会修改内容”的条目
 			readOnly,
+			// 不同语言可能有不同菜单策略（例如 markdown 的安全格式化）
 			language,
+			// 菜单条目点击时通过 ref 调用动作，避免把 editor 实例塞进 useMemo 依赖导致频繁重建
 			actionsRef: editorContextActionsRef,
 			// 外部传了回调才展示该菜单项，避免“点了无效果”
 			enableSendSelectionToAssistant:
@@ -134,27 +145,156 @@ const editorContextMenuItems = useMemo(
 
 ### 5.2 `onMount`：注入与 `onDidDispose` 清理
 
-**注释要点**：与 **`addCommand(C/V/X)`** 之后紧接着赋值，保证剪贴板、无选区剪切、`safeFormatMarkdownValue` 与快捷键完全一致。
+**注释要点**：在 `onMount` 中完成两件事，并保持顺序清晰：
+
+- **先注入右键动作**：`injectMonacoEditorContextActions(...)` 将 copy/cut/paste/format/sendToAssistant 等动作写入 `editorContextActionsRef`，供右键菜单与其它入口复用
+- **再集中注册快捷键命令**：`registerMonacoEditorCommands(...)` 在同一处把 `editor.addCommand(...)` 全部注册完成，避免 `handleEditorMount` 过长且减少维护成本
 
 ```typescript
-// handleEditorMount 内，在 Ctrl/⌘+V 的 addCommand 之后：
+// handleEditorMount 内（节选）：
 
+/**
+ * ① 注入右键菜单动作（写入 ref）
+ *
+ * 说明：
+ * - 右键菜单本身是声明式渲染（items），但“点击后执行什么”需要在 onMount 拿到 editor 实例后才能绑定
+ * - 因此这里把 copy/cut/paste/format/发送选区到助手 等动作注入到 `editorContextActionsRef`
+ * - 之后无论是右键菜单点击还是快捷键触发，都可以复用同一套动作，保证语义一致
+ */
 injectMonacoEditorContextActions({
+	/** Monaco 编辑器实例：读取选区/模型、执行编辑（executeEdits）、触发内置 action 等 */
 	editor,
+	/** Monaco 命名空间：Range/KeyMod/KeyCode/editor option 等能力来源 */
 	monaco,
+	/** IME（输入法，Input Method Editor）合成态 ref：合成期间避免执行自定义粘贴等动作 */
 	imeComposingRef,
+	/**
+	 * 输出参数：动作注入目标 ref
+	 * - `injectMonacoEditorContextActions` 会把实现写入该 ref（例如 `copy()`/`paste()`/`sendSelectionToAssistant()`）
+	 * - 右键菜单 items 的 onSelect 只需要调用 `ref.current?.xxx?.()`，避免闭包与依赖膨胀
+	 */
 	actionsRef: editorContextActionsRef,
+	/**
+	 * Copy 语义：获取“应该复制”的文本
+	 * - 有选区：复制选区
+	 * - 无选区（仅光标）：复制当前行（与常见编辑器一致）
+	 */
 	getCopyTextFromSelections,
+	/**
+	 * Selection 语义：仅返回“真实选区文本”
+	 * - 无选区（仅光标）返回空串（不降级整行）
+	 * - 专用于“发送到助手输入框”，避免误把整行作为对话草稿
+	 */
 	getSelectedTextOnlyFromSelections,
+	/**
+	 * 外部接入：将选区写入助手输入框
+	 * - 具体如何写入（覆盖/追加/是否自动展开助手）由知识库页面决定
+	 */
 	onInsertSelectionToAssistant,
+	/**
+	 * Cut 语义：无选区剪切时的删除范围
+	 * - 尽量对齐 VS Code：光标处剪切整行并处理换行
+	 */
 	rangeForCutWhenCursorOnly,
+	/** 统一剪贴板写入：适配 WebView/Tauri 下系统复制不稳定的问题 */
 	copyToClipboard,
+	/** 统一剪贴板读取：用于右键菜单“粘贴”动作 */
 	pasteFromClipboard,
+	/**
+	 * Markdown 安全格式化（safe format/安全格式化）：
+	 * - markdown 下避免围栏反引号/缩进等被不安全 formatter 破坏
+	 * - 其它语言可回落到 Monaco 内置格式化
+	 */
 	safeFormatMarkdownValue,
+});
+
+/**
+ * ② 集中注册快捷键命令（editor.addCommand）
+ *
+ * 说明：
+ * - 把 `editor.addCommand(...)` 从 `index.tsx` 抽离到 `commands.ts`，降低 `handleEditorMount` 复杂度
+ * - 依赖全部通过参数注入：便于复用/测试，也避免把业务逻辑写死在命令注册中
+ */
+registerMonacoEditorCommands({
+	/** Monaco 编辑器实例 */
+	editor,
+	/** Monaco 命名空间（用于 KeyMod/KeyCode 等） */
+	monaco,
+	/** IME 合成态 ref：粘贴命令在合成期间跳过 */
+	imeComposingRef,
+	/**
+	 * 右键菜单动作 ref：
+	 * - `Ctrl/⌘+Shift+V`（发送选区到助手）优先复用 `sendSelectionToAssistant`，与右键点击保持一致
+	 */
+	editorContextActionsRef,
+	/** Copy 语义文本获取：用于 Ctrl/⌘+C、Ctrl/⌘+X（先复制再删） */
+	getCopyTextFromSelections,
+	/** Cut 语义删除范围：用于 Ctrl/⌘+X 无选区剪切整行 */
+	rangeForCutWhenCursorOnly,
+	/** 统一剪贴板写入：用于复制/剪切 */
+	copyToClipboard,
+	/** 统一剪贴板读取：用于粘贴 */
+	pasteFromClipboard,
+	/** Shift+Alt+F：markdown 走 safeFormat，其它走 Monaco formatDocument */
+	safeFormatMarkdownValue,
+	/** “真实选区”获取：用于 Ctrl/⌘+Shift+V（无选区不触发） */
+	getSelectedTextOnlyFromSelections,
+	/** 外部接入：写入助手输入框（知识库页面负责拼接与自动展开） */
+	onInsertSelectionToAssistant,
+	flushEditorValueToParent: () => {
+		/**
+		 * 在触发可能导致 UI 变化（例如自动打开助手）之前，先把 editor 当前值同步到父级：
+		 * - 避免后续视图切换/重挂载瞬态时出现“编辑器内容被清空”的观感
+		 */
+		const v = normalizeMonacoEol(editor.getValue());
+		lastEmittedRef.current = v;
+		onChangeRef.current?.(v);
+	},
 });
 
 // editor.onDidDispose 开头：
 editorContextActionsRef.current = null;
+```
+
+#### 5.2.1 快捷键命令抽离：`commands.ts`
+
+本次将 `editor.addCommand(...)` 的实现从 `index.tsx` 抽离到 **`apps/frontend/src/components/design/Monaco/commands.ts`**，原因与收益如下：
+
+- **降低 `onMount` 复杂度**：`handleEditorMount` 同时包含 layout 测量、订阅清理、IME 状态同步、右键动作注入、快捷键注册等，抽离后更易维护
+- **语义一致**：快捷键与右键菜单共享同一套“动作/规则”，减少两处实现漂移
+- **不影响现有功能与布局**：仅迁移代码位置与调用方式，UI 结构、面板布局、monaco 选项不变
+
+`commands.ts` 内部集中注册的快捷键清单（与之前保持一致）：
+
+- `Shift + Alt + F`：格式化（markdown 走 `safeFormatMarkdownValue`，其它语言触发 Monaco `editor.action.formatDocument`）
+- `Ctrl/⌘ + B`：注释当前行（触发 Monaco `editor.action.commentLine`）
+- `Ctrl/⌘ + C`：复制（走统一剪贴板封装，支持“无选区复制整行”）
+- `Ctrl/⌘ + X`：剪切（先复制再删；无选区剪切整行，范围由 `rangeForCutWhenCursorOnly` 计算）
+- `Ctrl/⌘ + V`：粘贴（走统一剪贴板封装；IME 合成态跳过）
+- `Ctrl/⌘ + Shift + V`：发送“真实选区”到助手输入框（无选区不触发）
+
+##### 5.2.2 修复：发送选区到助手时重复写入输入框
+
+抽离后曾出现“内容写入 assistant 输入框重复追加”的问题，根因是同一快捷键同时走了两条写入链路：
+
+- 直接调用 `onInsertSelectionToAssistant(selected)`
+- 同时调用 `editorContextActionsRef.current?.sendSelectionToAssistant?.()`（该动作内部也会调用 `onInsertSelectionToAssistant`）
+
+修复原则：**同一个触发点只走一条写入链路**。当前策略为：
+
+- **优先**复用右键菜单动作 `sendSelectionToAssistant`（与右键点击一致）
+- **兜底**：若该动作未注入，再直接调用 `onInsertSelectionToAssistant(selected)`
+
+对应代码形态：
+
+```typescript
+// apps/frontend/src/components/design/Monaco/commands.ts（节选）
+const action = editorContextActionsRef.current?.sendSelectionToAssistant;
+if (action) {
+	action();
+	return;
+}
+onInsertSelectionToAssistant?.(selected);
 ```
 
 组件卸载时同样清空 ref（与 `getMarkdownFromEditorRef` 清理并列）：
@@ -179,6 +319,9 @@ useEffect(() => {
 <QuickContextMenu items={editorContextMenuItems} triggerAsChild>
 	<div
 		ref={editorHostRef}
+		// 该 div 是“右键触发区域 + layout 测量宿主”：
+		// - 不能多包一层会影响尺寸计算/contain/overflow 的 DOM
+		// - triggerAsChild 保证 Radix Trigger 不额外插入 DOM，避免破坏现有布局
 		className="box-border h-full min-h-0 min-w-0 max-w-full w-full overflow-hidden contain-[inline-size]"
 	>
 		<Editor
@@ -193,6 +336,7 @@ useEffect(() => {
 <QuickContextMenu items={editorContextMenuItems} triggerAsChild>
 	<div
 		ref={editorHostRef}
+		// 同一宿主策略：保证 split 模式下右键行为与单栏编辑一致
 		className="box-border h-full min-h-0 min-w-0 max-w-full w-full overflow-hidden contain-[inline-size]"
 	>
 		<Editor height="100%" width="100%" /* ... */ />
@@ -212,11 +356,19 @@ useEffect(() => {
 ```typescript
 // QuickContextMenuProps（节选，注释与源码一致）
 export interface QuickContextMenuProps {
-	/** 右键/长按触发区域；默认 `triggerAsChild` 为 true 时需为单个可合并 props 的子元素 */
+	/**
+	 * 右键/长按触发区域：
+	 * - `triggerAsChild=true` 时必须提供“单个可合并 props 的子元素”（与 Radix Trigger 约束一致）
+	 * - 这样可以复用现有 DOM 作为触发器，避免插入额外 wrapper 影响布局/测量
+	 */
 	children: React.ReactNode;
-	/** 菜单结构（建议调用方用 `useMemo` 稳定引用以减少子树重渲染） */
+	/**
+	 * 菜单结构（声明式数据）：
+	 * - 建议调用方用 `useMemo` 稳定引用，减少 `QuickMenuEntries` 递归渲染的开销
+	 * - 条目点击最终只会调用 `actionsRef.current?.xxx?.()`，避免把业务逻辑写进菜单渲染层
+	 */
 	items: readonly QuickContextMenuEntry[];
-	/** 与 Radix Trigger 一致：为 true 时不包裹额外 DOM */
+	/** 与 Radix Trigger 一致：为 true 时不包裹额外 DOM（布局零侵入） */
 	triggerAsChild?: boolean;
 	// ...
 }
@@ -237,6 +389,10 @@ interface KnowledgeAssistantProps {
 	/**
 	 * 外部受控输入框（可选）：用于从编辑器右键菜单等外部入口写入草稿。
 	 * 若不传则组件内部维护 input state。
+	 *
+	 * 设计目的：
+	 * - “编辑器→助手输入框”属于跨组件写入，需要把输入框状态上移到父级（知识库页面）
+	 * - 受控模式可确保：即使助手面板当前未展开，写入也不会丢失（展开后能看到已写入的草稿）
 	 */
 	input?: string;
 	setInput?: (value: string) => void;
@@ -265,13 +421,16 @@ const [assistantInput, setAssistantInput] = useState('');
 		 * - 编辑器看起来“被清空”
 		 * - KnowledgeAssistant 的输入框清空逻辑抢先执行，刚写入的草稿被清掉
 		 */
+		// ① 先同步正文：避免 viewMode/面板切换过程出现“父级 markdown 短暂为空”的瞬态
 		getMarkdownFromEditorRef.current?.();
+		// ② 再写入草稿：非空选区才会调用到这里；此处采用“追加”而非“覆盖”
 		setAssistantInput((prev) => {
 			const next = (text ?? '').trim();
 			if (!next) return prev;
 			const cur = (prev ?? '').trim();
 			return cur ? `${cur}\n\n${next}` : next;
 		});
+		// ③ 最后再展开助手：用 microtask 延后，避免与同帧的编辑器事件/布局更新互相打架
 		if (!markdownAssistantOpen) {
 			queueMicrotask(() => setMarkdownAssistantOpen(true));
 		}
@@ -303,20 +462,19 @@ const [assistantInput, setAssistantInput] = useState('');
 - `apps/frontend/src/components/design/Monaco/index.tsx`：Monaco 内部注册 `Ctrl/⌘ + Shift + V`，触发 `sendSelectionToAssistant`
 - `apps/frontend/src/components/design/Monaco/contextMenu.ts`：菜单项展示 `Ctrl/⌘+Shift+V`，并通过注入动作实现“只在非空选区时写入”
 
-核心代码形态如下：
+核心代码形态如下（快捷键注册已抽离到 `commands.ts`，`index.tsx` 只负责调用注册函数）：
 
-```tsx
+```typescript
 // apps/frontend/src/components/design/Monaco/index.tsx（节选）
-editor.addCommand(
-	monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyV,
-	() => {
-		// 先取“真实选区”：无选区直接 return，避免无意义的视图切换与闪断
-		const selected = getSelectedTextOnlyFromSelections();
-		if (!selected.trim()) return;
-		// 直接调用外部回调（知识库侧会写入输入框并自动打开助手）
-		onInsertSelectionToAssistant?.(selected);
+registerMonacoEditorCommands({
+	// ...省略：editor/monaco/剪贴板/选区等依赖注入
+	onInsertSelectionToAssistant,
+	flushEditorValueToParent: () => {
+		const v = normalizeMonacoEol(editor.getValue());
+		lastEmittedRef.current = v;
+		onChangeRef.current?.(v);
 	},
-);
+});
 ```
 
 ---
@@ -329,6 +487,9 @@ editor.addCommand(
 // apps/frontend/src/components/design/Monaco/index.tsx（节选）
 <Editor
 	path={monacoModelPath}
+	// 保留当前 TextModel：
+	// - 避免组件卸载/重挂载时 dispose model 导致正文回退/选区丢失
+	// - 配合 “edit/split 复用同一棵面板树” 可显著降低打开助手时的闪断与 loading 观感
 	keepCurrentModel
 	defaultValue={editorBootstrapTextRef.current}
 	// ...
@@ -343,11 +504,16 @@ const panelGroupRef = useRef<GroupImperativeHandle | null>(null);
 const lastSplitLayoutRef = useRef<Layout>({ editor: 50, right: 50 });
 
 useEffect(() => {
+	// viewMode 变化时用命令式布局同步面板宽度：
+	// - `defaultSize` 只在首次挂载生效，后续切换模式不会自动“恢复”右侧宽度
+	// - 因此需要 `groupRef.setLayout(...)` 显式设置 editor/right 的百分比
 	if (viewMode === 'edit') {
+		// 纯编辑模式：右侧收起到 0（但不卸载右侧面板，避免 Editor 重挂载）
 		panelGroupRef.current?.setLayout({ editor: 100, right: 0 });
 		return;
 	}
 	if (viewMode === 'split' || viewMode === 'splitDiff') {
+		// 分屏模式：恢复用户上一次拖拽后的布局比例
 		panelGroupRef.current?.setLayout(lastSplitLayoutRef.current);
 	}
 }, [viewMode]);
@@ -356,6 +522,7 @@ useEffect(() => {
 	orientation="horizontal"
 	groupRef={panelGroupRef}
 	onLayoutChanged={(layout) => {
+		// 仅在分屏态持久化布局，避免 edit 模式下 100/0 覆盖用户偏好
 		if (viewMode === 'split' || viewMode === 'splitDiff') {
 			lastSplitLayoutRef.current = layout;
 		}

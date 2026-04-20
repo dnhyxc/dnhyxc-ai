@@ -42,6 +42,7 @@ import {
 import { cn } from '@/lib/utils';
 import { copyToClipboard, pasteFromClipboard } from '@/utils/clipboard';
 import Loading from '../Loading';
+import { registerMonacoEditorCommands } from './commands';
 import {
 	buildMonacoEditorContextMenuItems,
 	injectMonacoEditorContextActions,
@@ -966,32 +967,6 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 			const onFullscreenChange = () => scheduleEditorLayout();
 			document.addEventListener('fullscreenchange', onFullscreenChange);
 
-			editor.addCommand(
-				monaco.KeyMod.Shift | monaco.KeyMod.Alt | monaco.KeyCode.KeyF,
-				() => {
-					const model = editor.getModel();
-					if (!model) return;
-					if (model.getLanguageId() === 'markdown') {
-						if (editor.getOption(monaco.editor.EditorOption.readOnly)) return;
-						void (async () => {
-							const next = await safeFormatMarkdownValue(model.getValue());
-							if (next == null) return;
-							editor.pushUndoStop();
-							editor.executeEdits('dnhyxc-markdown-safe-format', [
-								{ range: model.getFullModelRange(), text: next },
-							]);
-							editor.pushUndoStop();
-						})();
-						return;
-					}
-					editor.trigger('keyboard', 'editor.action.formatDocument', null);
-				},
-			);
-
-			editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyB, () => {
-				editor.trigger('keyboard', 'editor.action.commentLine', null);
-			});
-
 			/** 从模型选区取待复制文本；空选区时复制当前行（与常见编辑器一致） */
 			const getCopyTextFromSelections = (): string => {
 				const model = editor.getModel();
@@ -1070,70 +1045,125 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 				return new monaco.Range(1, 1, 1, model.getLineMaxColumn(1));
 			};
 
-			// WebView/Tauri 下系统默认复制常失败：用模型选区 + 统一剪贴板 API（含 Tauri 插件）
-			editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyC, () => {
-				const text = getCopyTextFromSelections();
-				if (!text) return;
-				void copyToClipboard(text);
-			});
-
-			editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyX, () => {
-				if (editor.getOption(monaco.editor.EditorOption.readOnly)) return;
-				void (async () => {
-					const text = getCopyTextFromSelections();
-					if (!text) return;
-					await copyToClipboard(text);
-					const sels = editor.getSelections();
-					if (!sels?.length) return;
-					editor.executeEdits(
-						'cut',
-						sels.map((sel) => ({
-							range: rangeForCutWhenCursorOnly(sel),
-							text: '',
-						})),
-					);
-				})();
-			});
-
-			editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyV, () => {
-				if (editor.getOption(monaco.editor.EditorOption.readOnly)) return;
-				if (editor.inComposition || imeComposingRef.current) return;
-				void (async () => {
-					const text = await pasteFromClipboard();
-					if (!text) return;
-					const sels = editor.getSelections();
-					if (!sels?.length) return;
-					editor.executeEdits(
-						'paste',
-						sels.map((sel) => ({ range: sel, text })),
-					);
-				})();
-			});
-
-			/**
-			 * 知识库助手：将“当前非空选区”送入助手输入框（不降级为整行）。
-			 * - 与知识库页面快捷键（Meta+Shift+V）语义一致
-			 * - 由 `sendSelectionToAssistant` 内部保证“无选区则不写入”
-			 */
-			editor.addCommand(
-				monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyV,
-				() => {
-					editorContextActionsRef.current?.sendSelectionToAssistant?.();
-				},
-			);
-
 			injectMonacoEditorContextActions({
+				/** Monaco 编辑器实例：用于读取选区/模型、执行复制剪切粘贴、触发内置 action 等 */
 				editor,
+				/** Monaco 命名空间：用于构造 `Range`、组合快捷键常量、访问 editor option 等 */
 				monaco,
+				/**
+				 * IME（输入法，Input Method Editor）合成态标记：
+				 * - 右键菜单的“粘贴”等动作在合成期间应避免执行，防止打断输入法流程
+				 */
 				imeComposingRef,
+				/**
+				 * 输出参数：注入后的“编辑器上下文动作”会写入该 ref
+				 * - 供右键菜单条目点击时调用（例如 copy/cut/paste/format/sendToAssistant）
+				 * - 也供快捷键等其它入口复用同一套实现，保证行为一致
+				 */
 				actionsRef: editorContextActionsRef,
+				/**
+				 * Copy 语义：获取“应该复制”的文本
+				 * - 有选区：复制选区
+				 * - 无选区：复制当前行（与常见编辑器一致）
+				 */
 				getCopyTextFromSelections,
+				/**
+				 * Selection 语义：仅返回“真实选区文本”
+				 * - 无选区（仅光标）返回空串
+				 * - 专用于“发送选区到外部输入框”（避免误把整行作为对话草稿）
+				 */
 				getSelectedTextOnlyFromSelections,
+				/**
+				 * 外部接入回调：把选区写入助手输入框（知识库页面负责是否自动展开助手）
+				 * - 若不传，则右键菜单不会出现“发送到助手”的动作/或该动作为空实现
+				 */
 				onInsertSelectionToAssistant,
+				/**
+				 * Cut 语义：无选区剪切时的删除范围
+				 * - 尽量对齐 VS Code：光标处剪切整行（含换行处理）
+				 */
 				rangeForCutWhenCursorOnly,
+				/** 统一剪贴板写入：用于右键菜单的“复制/剪切”动作（适配 WebView/Tauri） */
 				copyToClipboard,
+				/** 统一剪贴板读取：用于右键菜单的“粘贴”动作（适配 WebView/Tauri） */
 				pasteFromClipboard,
+				/**
+				 * Markdown 安全格式化：
+				 * - 右键菜单“格式化”在 markdown 下走 safeFormat，避免围栏反引号等被破坏
+				 * - 非 markdown 下仍可回落到 Monaco 内置格式化
+				 */
 				safeFormatMarkdownValue,
+			});
+
+			registerMonacoEditorCommands({
+				/** Monaco 编辑器实例：用于注册快捷键、读取选区/模型、执行编辑操作（executeEdits）等 */
+				editor,
+				/** Monaco 命名空间：提供 KeyMod/KeyCode/Range 等类型与常量，用于组合快捷键与构造范围 */
+				monaco,
+				/**
+				 * IME（输入法，Input Method Editor）合成态标记：
+				 * - 合成期间不应执行自定义粘贴等命令，否则会打断输入法候选/上屏流程
+				 * - 这里传 ref 以便跨回调读取最新状态，避免闭包过期
+				 */
+				imeComposingRef,
+				/**
+				 * 右键菜单动作集合的 ref（由 `injectMonacoEditorContextActions` 注入）：
+				 * - 给某些快捷键复用同一套动作实现（例如“发送选区到助手”）
+				 * - 用 ref 避免把一堆 handler 作为依赖导致 mount 逻辑抖动
+				 */
+				editorContextActionsRef,
+				/**
+				 * 复制文本获取函数（Copy 语义）：
+				 * - 有选区：复制选区内容
+				 * - 无选区（仅光标）：复制当前行（与常见编辑器一致）
+				 * - 用于 Ctrl/⌘+C、Ctrl/⌘+X（先复制再删）
+				 */
+				getCopyTextFromSelections,
+				/**
+				 * 剪切时的删除范围计算（Cut 语义）：
+				 * - 有选区：删除选区
+				 * - 无选区（仅光标）：删除当前逻辑行（尽量对齐 VS Code 行为）
+				 * - 返回 `monaco.Range` 供 `executeEdits` 使用
+				 */
+				rangeForCutWhenCursorOnly,
+				/**
+				 * 统一剪贴板写入（Clipboard API/tauri 插件封装）：
+				 * - WebView/Tauri 场景系统默认复制可能失败，因此强制走此实现
+				 */
+				copyToClipboard,
+				/**
+				 * 统一剪贴板读取（Clipboard API/tauri 插件封装）：
+				 * - 用于 Ctrl/⌘+V 自定义粘贴，把文本注入当前选区/光标位置
+				 */
+				pasteFromClipboard,
+				/**
+				 * Markdown 安全格式化（safe format）：
+				 * - 用于 Shift+Alt+F：当语言是 markdown 时走“安全格式化”，避免围栏反引号/缩进等被错误破坏
+				 * - 非 markdown 时回落到 Monaco 默认 `editor.action.formatDocument`
+				 */
+				safeFormatMarkdownValue,
+				/**
+				 * 仅返回“真实选区文本”（Selection 语义）：
+				 * - 无选区（仅光标）时返回空串（不降级为整行）
+				 * - 专用于“发送选区到外部输入框”（如知识库助手），避免误把整行塞进对话草稿
+				 */
+				getSelectedTextOnlyFromSelections,
+				/**
+				 * 外部接入回调：把选区写入“助手输入框”
+				 * - 由知识库页面决定如何拼接/是否自动展开助手面板
+				 * - Monaco 侧只负责提供选区文本与触发时机
+				 */
+				onInsertSelectionToAssistant,
+				flushEditorValueToParent: () => {
+					/**
+					 * 将 Monaco 当前值同步到父级（受控 value/onChange）：
+					 * - 用于“发送选区到助手”这类会触发 UI 切换的场景
+					 * - 先把最新内容推到父级，避免后续视图切换/重挂载期间出现短暂空串导致“编辑器内容被清空”的观感
+					 */
+					const v = normalizeMonacoEol(editor.getValue());
+					lastEmittedRef.current = v;
+					onChangeRef.current?.(v);
+				},
 			});
 
 			const pushToParent = (raw: string) => {
