@@ -23,6 +23,7 @@ import {
 } from 'react';
 import { getChatMarkdownHighlightTheme } from '@/constant';
 import {
+	useMarkdownHashLinkViewportScroll,
 	useMermaidDiagramClickPreview,
 	useMermaidImagePreview,
 	useTheme,
@@ -33,14 +34,11 @@ import {
 } from '@/hooks/useChatCodeFloatingToolbar';
 import { cn } from '@/lib/utils';
 import { downloadChatCodeBlock } from '@/utils/chatCodeToolbar';
-import { attachExternalLinkClickInterceptor } from '@/utils/external-link-click';
 import {
 	hashText,
 	mermaidStreamingFallbackHtml,
 	splitForMermaidIslandsWithOpenTail,
 } from '@/utils/splitMarkdownFences';
-
-import { scrollPreviewViewportToRevealElement } from './utils';
 
 /**
  * 分段 `render` 时标题 `data-md-heading-line` 为片段内 1-based；
@@ -128,70 +126,22 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 		requestAnimationFrame(() => refreshPreviewScrollFab());
 	}, [documentIdentity, showPreviewScrollCornerFab, refreshPreviewScrollFab]);
 
-	/**
-	 * 预览内链接点击（与 `docs/monaco/markdown-preview-toc-hash-navigation.md` 对齐）：
-	 *
-	 * 1. **捕获**：`attachExternalLinkClickInterceptor` 对 `href^="#"` 执行 `preventDefault()`，禁止浏览器片段导航误滚 Layout。
-	 * 2. **冒泡**：本 `onClick` 在整棵 `el`（markdownRef）子树内用 `#id` 查找目标标题；禁止只用首个 `.markdown-body`，否则 Mermaid 拆岛时目录与标题分居不同段会找不到节点。
-	 * 3. **滚动**：仅对 Radix `ScrollArea` 的 Viewport（`localViewportRef`）调用 `scrollPreviewViewportToRevealElement`，禁止对标题 `scrollIntoView`。
-	 */
+	// 目录 / 页内 #：与聊天共用 `useMarkdownHashLinkViewportScroll`（实录见 docs/monaco/markdown-preview-toc-hash-navigation.md §9）
+	const getMarkdownHashScrollViewport = useCallback(
+		() => localViewportRef.current,
+		[],
+	);
+	useMarkdownHashLinkViewportScroll(markdownRef, getMarkdownHashScrollViewport);
+
 	useEffect(() => {
 		const el = markdownRef.current;
 		if (!el) return;
-		const detachExternalLinkInterceptor = attachExternalLinkClickInterceptor(
-			el,
-			{
-				anchorSelector: '.markdown-body a',
-				// 页内 # 交给下方 onClick：只滚预览 viewport；外链仍 preventDefault + stopPropagation + openExternalUrl
-				skipHashAnchors: true,
-				stopPropagation: true,
-			},
-		);
-		const onClick = (e: MouseEvent) => {
-			const target = e.target as HTMLElement;
-			if (!el.contains(target)) return;
-
-			const link = target.closest<HTMLAnchorElement>('a[href^="#"]');
-			if (link) {
-				const href = link.getAttribute('href');
-				if (href && href.length > 1) {
-					const raw = href.slice(1);
-					const id = decodeURIComponent(raw.replace(/\+/g, ' '));
-					if (id) {
-						// 在整块预览根 `el` 下查找，覆盖多个 `.markdown-body`（Mermaid 岛分段渲染）
-						let dest: Element | null = null;
-						try {
-							dest = el.querySelector(`#${CSS.escape(id)}`);
-						} catch {
-							dest = null;
-						}
-						if (dest instanceof HTMLElement) {
-							e.preventDefault();
-							e.stopPropagation();
-							link.blur();
-							const vp = localViewportRef.current;
-							if (vp) {
-								scrollPreviewViewportToRevealElement(vp, dest, {
-									behavior: 'smooth',
-								});
-							}
-							return;
-						}
-					}
-				}
-			}
-		};
 		const detachCodeFenceActions = bindMarkdownCodeFenceActions(el, {
 			onDownload(payload) {
 				void downloadChatCodeBlock(payload.block, payload.lang);
 			},
 		});
-		el.addEventListener('click', onClick);
-		return () => {
-			detachExternalLinkInterceptor();
-			detachCodeFenceActions();
-			el.removeEventListener('click', onClick);
-		};
+		return () => detachCodeFenceActions();
 	}, []);
 
 	const assignViewportRef = useCallback(

@@ -3,6 +3,7 @@ import { getStorage as getLocalStorage, setStorage } from '@/utils';
 import { isTauriRuntime } from '@/utils/runtime';
 
 export * from './theme';
+export * from './useMarkdownHashLinkViewportScroll';
 export * from './useMermaidImagePreview';
 export * from './useStickToBottomScroll';
 

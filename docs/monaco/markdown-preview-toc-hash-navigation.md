@@ -1,6 +1,6 @@
 # Monaco Markdown 预览：目录锚点（`#fragment`）滚动与 Layout 误滚治理
 
-本文记录**知识库 / Monaco 分屏预览**中，点击目录或正文内 **`href="#..."` 页内锚点**时的完整实现实录：为何曾出现「整页主内容上移」、为何在治理后又出现「点击目录无法跳转」，以及当前代码如何同时满足**只滚预览视口**与**锚点必达**。
+本文记录**知识库 / Monaco 分屏预览**与 **ChatBot 助手气泡**中，点击目录或正文内 **`href="#..."` 页内锚点**时的完整实现实录：为何曾出现「整页主内容上移」、为何在治理后又出现「点击目录无法跳转」，以及当前代码如何同时满足**只滚正确视口**与**锚点必达**。公共逻辑已收敛至 **`useMarkdownHashLinkViewportScroll` / `attachMarkdownHashLinkNavigation`**（详见 **§9**）。
 
 ---
 
@@ -90,14 +90,19 @@ sequenceDiagram
 | 路径 | 职责 |
 |------|------|
 | `apps/frontend/src/utils/external-link-click.ts` | 在容器上以 **capture** 监听 `click`；外链 `preventDefault` + `openExternalUrl`；对 **`#` 且 `skipHashAnchors`**：`preventDefault` 后返回 |
-| `apps/frontend/src/components/design/Monaco/preview.tsx` | 注册拦截器 + **bubble** `onClick`：解析 `href`、在 **`el` 整子树** 查找目标、`scrollPreviewViewportToRevealElement` |
+| `apps/frontend/src/components/design/Monaco/preview.tsx` | 调用 **`useMarkdownHashLinkViewportScroll`**；围栏 **`bindMarkdownCodeFenceActions`** 仍单独 `useEffect` |
 | `apps/frontend/src/components/design/Monaco/utils.ts` | `scrollPreviewViewportToRevealElement` / `scrollTopToAlignHeadingTop`：只操作传入的 Viewport |
 | `apps/frontend/src/components/ui/scroll-area.tsx` | `forwardRef` 指向 **Viewport**，保证 `localViewportRef` 与真实滚动节点一致 |
-| `apps/frontend/src/components/design/ChatAssistantMessage/index.tsx` | 同样挂载 `attachExternalLinkClickInterceptor`；正文内 `#` 默认不再触发浏览器片段导航（一般无独立 Viewport 滚动需求） |
+| `apps/frontend/src/hooks/useMarkdownHashLinkViewportScroll.ts` | 公共 **`attachMarkdownHashLinkNavigation`** + **`useMarkdownHashLinkViewportScroll`**：`preview.tsx` 与 `ChatAssistantMessage` 共用 |
+| `apps/frontend/src/components/design/ChatAssistantMessage/index.tsx` | 调用上述 Hook；`getViewport` 内优先 `scrollViewportRef`，否则 `closest('[data-slot="scroll-area-viewport"]')` |
 
 ---
 
 ## 5. 实现实录（按模块）
+
+### 5.0 `useMarkdownHashLinkViewportScroll.ts`（推荐入口）
+
+页内锚点与外链 `#` 的 **`preventDefault`**、冒泡点击、`#id` 在整棵宿主子树内解析、以及 **`scrollPreviewViewportToRevealElement`** 均集中在本模块；宿主仅提供 **`containerRef`** 与 **`getViewport()`**（及可选 `scrollBehavior` / `anchorSelector`）。非 React 场景可只调用 **`attachMarkdownHashLinkNavigation(host, getViewport, options)`**。
 
 ### 5.1 `external-link-click.ts`：`#` 必须 `preventDefault`
 
@@ -169,58 +174,7 @@ export function attachExternalLinkClickInterceptor(
 
 ### 6.2 预览：`#` 锚点只滚 Radix Viewport
 
-文件：`apps/frontend/src/components/design/Monaco/preview.tsx`（逻辑位于 `useEffect` 内）
-
-```typescript
-// markdownRef：包住 ScrollArea 与内部 HTML 的根节点，作为事件委托根与 DOM 查询根
-const el = markdownRef.current;
-if (!el) return;
-
-const detachExternalLinkInterceptor = attachExternalLinkClickInterceptor(el, {
-	anchorSelector: '.markdown-body a',
-	skipHashAnchors: true,
-	stopPropagation: true, // 仅对外链分支生效；# 分支见上文
-});
-
-const onClick = (e: MouseEvent) => {
-	const target = e.target as HTMLElement;
-	if (!el.contains(target)) return;
-
-	const link = target.closest<HTMLAnchorElement>('a[href^="#"]');
-	if (!link) return;
-
-	const href = link.getAttribute('href');
-	if (!href || href.length <= 1) return;
-
-	// 去掉 "#"，decodeURIComponent：兼容 %E4%B8%AD 等编码；+ 视作空格与常见 form 语义对齐
-	const raw = href.slice(1);
-	const id = decodeURIComponent(raw.replace(/\+/g, ' '));
-	if (!id) return;
-
-	let dest: Element | null = null;
-	try {
-		// 必须在整块预览子树 el 内查找：
-		// - Mermaid 岛穿插时存在多个 .markdown-body，只查第一个会漏掉标题
-		// - el.querySelector 会遍历所有后代，覆盖所有分段
-		dest = el.querySelector(`#${CSS.escape(id)}`);
-	} catch {
-		dest = null;
-	}
-
-	if (!(dest instanceof HTMLElement)) return;
-
-	e.preventDefault();
-	e.stopPropagation(); // 避免其它全局 click 逻辑误处理
-	link.blur(); // 降低 :focus-visible 与键盘滚动副作用
-
-	const vp = localViewportRef.current; // Radix ScrollArea Viewport 节点
-	if (!vp) return;
-
-	scrollPreviewViewportToRevealElement(vp, dest, { behavior: 'smooth' });
-};
-
-el.addEventListener('click', onClick);
-```
+**说明**：原先内联在 `preview.tsx` 的 `useEffect` 中的逻辑已 **抽离** 至 **`useMarkdownHashLinkViewportScroll`**（见 **§9**）。下列代码块为**等价语义**的归档说明；维护时以 Hook 源文件为准。
 
 ### 6.3 仅滚 Viewport：`scrollPreviewViewportToRevealElement`
 
@@ -268,4 +222,198 @@ export function scrollPreviewViewportToRevealElement(
 
 ---
 
-*文档版本：与仓库中 `external-link-click.ts`、`Monaco/preview.tsx`、`Monaco/utils.ts`（`scrollPreviewViewportToRevealElement`）当前实现对齐；修改上述实现时请同步更新本文 §5–§6。*
+## 9. 公共 Hook 抽取：`useMarkdownHashLinkViewportScroll`（实现思路详录）
+
+本节记录 **为何抽**、**抽什么**、**不抽什么**、**宿主如何接**，并附 **带中文行内注释的参考代码**（与 `apps/frontend/src/hooks/useMarkdownHashLinkViewportScroll.ts` 语义一致）。
+
+### 9.1 动机与问题域
+
+1. **双宿主重复**：`ParserMarkdownPreviewPane`（Monaco 预览）与 `ChatAssistantMessage`（ChatBot / 知识库助手等）均需：  
+   - 对 `.markdown-body a` 挂载 **`attachExternalLinkClickInterceptor`**（`#` 须 `preventDefault`）；  
+   - 冒泡 **`click`** 解析 `href="#..."`，在**整棵宿主子树**内查找 `#id`，调用 **`scrollPreviewViewportToRevealElement`**。  
+2. **复制粘贴风险**：两处手写若只改一处，易出现「预览已修、聊天仍误滚」或「拦截器已加 `preventDefault`、冒泡未滚」等分叉。  
+3. **滚动写入口不同**：预览用 **`localViewportRef`**（Radix Viewport）；聊天优先 **`scrollViewportRef`**（ChatBot 传入），否则 **`closest('[data-slot="scroll-area-viewport"]')`** 回退到外层会话 `ScrollArea`。抽象为 **`getViewport(): HTMLElement | null`**，由宿主在**每次点击**时返回当前有效节点。
+
+### 9.2 设计边界（刻意不合并的部分）
+
+| 能力 | 是否放入公共模块 | 说明 |
+|------|------------------|------|
+| 外链 `#` + 拦截器 + 冒泡锚点滚动 | **是** | `attachMarkdownHashLinkNavigation` / Hook |
+| `bindMarkdownCodeFenceActions`（复制/下载围栏） | **否** | 与目录锚点正交；各宿主 **`useEffect` 单独绑定**，避免 Hook 参数膨胀与下载回调耦合 |
+
+### 9.3 两层 API
+
+1. **`attachMarkdownHashLinkNavigation(host, getViewport, options?)`**  
+   - **纯函数**，返回 `() => void` 卸载。适合非 React、或与其它命令式逻辑在同一 `useEffect` 内拼合。  
+2. **`useMarkdownHashLinkViewportScroll(containerRef, getViewport, options?)`**  
+   - 内部 `useEffect`：在 `containerRef.current` 上调用 `attach`，依赖 **`containerRef`、`getViewport`、`enabled`、`anchorSelector`、`scrollBehavior`**。
+
+### 9.4 `getViewport` 必须是「回调」的原因
+
+- Ref 的 **`.current` 在挂载前后会变化**；若在 `attach` 时快照一次，可能仍为 `null`。  
+- **每次点击**再调用 `getViewport()`，保证拿到「当前」的 Radix Viewport（预览）或聊天列表 Viewport（含回退）。
+
+### 9.5 参考实现：公共模块（带详细注释）
+
+文件：`apps/frontend/src/hooks/useMarkdownHashLinkViewportScroll.ts`
+
+```typescript
+import type { RefObject } from 'react';
+import { useEffect } from 'react';
+import { scrollPreviewViewportToRevealElement } from '@/components/design/Monaco/utils';
+import { attachExternalLinkClickInterceptor } from '@/utils/external-link-click';
+
+const DEFAULT_ANCHOR_SELECTOR = '.markdown-body a';
+
+export type AttachMarkdownHashLinkNavigationOptions = {
+	anchorSelector?: string;
+	scrollBehavior?: ScrollBehavior;
+};
+
+/**
+ * 命令式入口：在 host 上同时完成
+ * 1) 捕获阶段外链拦截（# 仅 preventDefault，不 stopPropagation）
+ * 2) 冒泡阶段目录点击 → 仅滚 getViewport() 返回的容器
+ */
+export function attachMarkdownHashLinkNavigation(
+	host: HTMLElement,
+	// 每次点击调用：返回实际要写 scrollTop 的节点（如 Radix ScrollArea Viewport）
+	getViewport: () => HTMLElement | null,
+	options?: AttachMarkdownHashLinkNavigationOptions,
+): () => void {
+	const anchorSelector = options?.anchorSelector ?? DEFAULT_ANCHOR_SELECTOR;
+	const behavior = options?.scrollBehavior ?? 'smooth';
+
+	// 与 §6.1 一致：skipHashAnchors 为 true 且 href 以 # 开头时必须 preventDefault
+	const detachInterceptor = attachExternalLinkClickInterceptor(host, {
+		anchorSelector,
+		skipHashAnchors: true,
+		stopPropagation: true,
+	});
+
+	const onClick = (e: MouseEvent) => {
+		const target = e.target as HTMLElement;
+		if (!host.contains(target)) return;
+
+		const link = target.closest<HTMLAnchorElement>('a[href^="#"]');
+		if (!link) return;
+		const href = link.getAttribute('href');
+		if (!href || href.length <= 1) return;
+
+		const raw = href.slice(1);
+		const id = decodeURIComponent(raw.replace(/\+/g, ' '));
+		if (!id) return;
+
+		let dest: Element | null = null;
+		try {
+			// 关键：在 host 根上 querySelector，覆盖多块 .markdown-body（Mermaid 拆岛）
+			dest = host.querySelector(`#${CSS.escape(id)}`);
+		} catch {
+			dest = null;
+		}
+		if (!(dest instanceof HTMLElement)) return;
+
+		e.preventDefault();
+		e.stopPropagation();
+		link.blur();
+
+		const vp = getViewport();
+		if (vp) {
+			// 只改 vp.scrollTop，禁止 dest.scrollIntoView()
+			scrollPreviewViewportToRevealElement(vp, dest, { behavior });
+		}
+	};
+
+	host.addEventListener('click', onClick);
+	return () => {
+		detachInterceptor();
+		host.removeEventListener('click', onClick);
+	};
+}
+
+export function useMarkdownHashLinkViewportScroll(
+	containerRef: RefObject<HTMLElement | null>,
+	getViewport: () => HTMLElement | null,
+	options?: { enabled?: boolean } & AttachMarkdownHashLinkNavigationOptions,
+): void {
+	const { enabled = true, anchorSelector, scrollBehavior } = options ?? {};
+	useEffect(() => {
+		if (!enabled) return;
+		const el = containerRef.current;
+		if (!el) return;
+		return attachMarkdownHashLinkNavigation(el, getViewport, {
+			anchorSelector,
+			scrollBehavior,
+		});
+	}, [containerRef, getViewport, enabled, anchorSelector, scrollBehavior]);
+}
+```
+
+### 9.6 宿主一：`Monaco/preview.tsx`
+
+- **`containerRef`**：`markdownRef`（包住 `ScrollArea` 与 `dangerouslySetInnerHTML` 的根，与拆岛后多段 HTML 同树）。  
+- **`getViewport`**：`() => localViewportRef.current`（`ScrollArea` 的 `ref` 回调写入的 Viewport）。  
+- **围栏**：**另一个** `useEffect` 仅 `bindMarkdownCodeFenceActions`，避免与 Hook 抢同一卸载职责。
+
+```typescript
+import { useMarkdownHashLinkViewportScroll } from '@/hooks';
+
+// …组件内 …
+const getMarkdownHashScrollViewport = useCallback(
+	() => localViewportRef.current,
+	[],
+);
+useMarkdownHashLinkViewportScroll(markdownRef, getMarkdownHashScrollViewport);
+
+useEffect(() => {
+	const el = markdownRef.current;
+	if (!el) return;
+	const detachCodeFenceActions = bindMarkdownCodeFenceActions(el, {
+		onDownload(payload) {
+			void downloadChatCodeBlock(payload.block, payload.lang);
+		},
+	});
+	return () => detachCodeFenceActions();
+}, []);
+```
+
+### 9.7 宿主二：`ChatAssistantMessage/index.tsx`
+
+- **`containerRef`**：`shellRef`（整条助手气泡：思考区 + 正文 `StreamingMarkdownBody`，保证 TOC 与标题在同一查询根下）。  
+- **`getViewport`**：优先 **`scrollViewportRef?.current`**（ChatBot 传入的会话 `ScrollArea` Viewport）；否则用 **`shellRef.current?.closest('[data-slot="scroll-area-viewport"]')`**，兼容未传 ref 的用户消息气泡等。
+
+```typescript
+import { useMarkdownHashLinkViewportScroll } from '@/hooks';
+
+const getMarkdownHashScrollViewport = useCallback(() => {
+	const shell = shellRef.current;
+	return (
+		scrollViewportRef?.current ??
+		(shell?.closest(
+			'[data-slot="scroll-area-viewport"]',
+		) as HTMLElement | null) ??
+		null
+	);
+}, [scrollViewportRef]);
+
+useMarkdownHashLinkViewportScroll(shellRef, getMarkdownHashScrollViewport);
+
+useEffect(() => {
+	const el = shellRef.current;
+	if (!el) return;
+	const detachCodeFenceActions = bindMarkdownCodeFenceActions(el, {
+		onDownload(payload) {
+			void downloadChatCodeBlock(payload.block, payload.lang);
+		},
+	});
+	return () => detachCodeFenceActions();
+}, []);
+```
+
+### 9.8 导出与发现路径
+
+- **`export * from './useMarkdownHashLinkViewportScroll'`** 已加入 `apps/frontend/src/hooks/index.ts`，业务可 **`import { useMarkdownHashLinkViewportScroll } from '@/hooks'`**。
+
+---
+
+*文档版本：与仓库中 `external-link-click.ts`、`hooks/useMarkdownHashLinkViewportScroll.ts`、`Monaco/preview.tsx`、`ChatAssistantMessage/index.tsx`、`Monaco/utils.ts`（`scrollPreviewViewportToRevealElement`）当前实现对齐；修改上述实现时请同步更新本文 §5–§6 与 **§9**。*

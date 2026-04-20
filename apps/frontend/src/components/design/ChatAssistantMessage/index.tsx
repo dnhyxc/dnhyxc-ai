@@ -17,11 +17,11 @@ import {
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { getChatMarkdownHighlightTheme } from '@/constant';
+import { useMarkdownHashLinkViewportScroll } from '@/hooks';
 import { useTheme } from '@/hooks/theme';
 import { cn } from '@/lib/utils';
 import { Message, SearchOrganicItem } from '@/types/chat';
 import { downloadChatCodeBlock } from '@/utils/chatCodeToolbar';
-import { attachExternalLinkClickInterceptor } from '@/utils/external-link-click';
 import { openExternalUrl } from '@/utils/open-external';
 import {
 	applyOrganicCitationAnchors,
@@ -120,7 +120,7 @@ function ChatAssistantMessageInner({
 	onContinue,
 	onContinueAnswering,
 	isStopped,
-	// scrollViewportRef,
+	scrollViewportRef,
 	className,
 }: AssistantMessageProps) {
 	const { theme: appTheme } = useTheme();
@@ -161,26 +161,28 @@ function ChatAssistantMessageInner({
 
 	const isSearchOrganicEnabled = (message.searchOrganic?.length ?? 0) > 0;
 
+	// 目录 / 页内 #：与 Monaco 预览共用 Hook（实录见 docs/monaco/markdown-preview-toc-hash-navigation.md §9）
+	const getMarkdownHashScrollViewport = useCallback(() => {
+		const shell = shellRef.current;
+		return (
+			scrollViewportRef?.current ??
+			(shell?.closest(
+				'[data-slot="scroll-area-viewport"]',
+			) as HTMLElement | null) ??
+			null
+		);
+	}, [scrollViewportRef]);
+	useMarkdownHashLinkViewportScroll(shellRef, getMarkdownHashScrollViewport);
+
 	useEffect(() => {
 		const el = shellRef.current;
 		if (!el) return;
-		const detachExternalLinkInterceptor = attachExternalLinkClickInterceptor(
-			el,
-			{
-				anchorSelector: '.markdown-body a',
-				skipHashAnchors: true,
-				stopPropagation: true,
-			},
-		);
 		const detachCodeFenceActions = bindMarkdownCodeFenceActions(el, {
 			onDownload(payload) {
 				void downloadChatCodeBlock(payload.block, payload.lang);
 			},
 		});
-		return () => {
-			detachExternalLinkInterceptor();
-			detachCodeFenceActions();
-		};
+		return () => detachCodeFenceActions();
 	}, []);
 
 	const clearOrganicPreviewLeaveTimer = useCallback(() => {
