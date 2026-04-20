@@ -1,8 +1,5 @@
+import ChatAssistantMessage from '@design/ChatAssistantMessage';
 import ChatTextArea from '@design/ChatTextArea';
-import { MarkdownParser } from '@dnhyxc-ai/tools';
-import { useMemo } from 'react';
-import { getChatMarkdownHighlightTheme } from '@/constant';
-import { useTheme } from '@/hooks/theme';
 import { cn } from '@/lib/utils';
 import { UploadedFile } from '@/types';
 import { Message } from '@/types/chat';
@@ -39,19 +36,11 @@ const ChatUserMessage = ({
 	sendMessage,
 	className,
 }: UserMessageProps) => {
-	const { theme: appTheme } = useTheme();
 	const isEditing = editMessage?.chatId === message.chatId;
 
-	const parser = useMemo(
-		() =>
-			new MarkdownParser({
-				highlightTheme: getChatMarkdownHighlightTheme(appTheme),
-			}),
-		[appTheme],
-	);
-
 	return (
-		<>
+		// 与 Label 上 w-fit 一致：随 Markdown 内容变宽，max-w-full 继承会话列上限，min-w-0 便于长行在气泡内横向滚动
+		<div className="w-fit min-w-0 max-w-full">
 			{isEditing ? (
 				<ChatTextArea
 					ref={editInputRef}
@@ -65,17 +54,15 @@ const ChatUserMessage = ({
 					sendMessage={sendMessage}
 				/>
 			) : (
-				<div
+				<ChatAssistantMessage
+					message={message}
 					className={cn(
-						`max-w-none text-left [&_.markdown-body]:text-textcolor/90!`,
+						'text-left min-w-0 max-w-full [&_.markdown-body]:min-w-0 [&_.markdown-body]:max-w-full [&_.markdown-body]:overflow-x-auto [&_.markdown-body]:text-textcolor/90!',
 						className,
 					)}
-					dangerouslySetInnerHTML={{
-						__html: parser.render(message.content),
-					}}
 				/>
 			)}
-		</>
+		</div>
 	);
 };
 

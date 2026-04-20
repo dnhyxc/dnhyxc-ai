@@ -16,7 +16,6 @@ import {
 import ChatAssistantMessage from '@/components/design/ChatAssistantMessage';
 import ChatEntry from '@/components/design/ChatEntry';
 import ChatMessageActions from '@/components/design/ChatMessageActions';
-import ChatUserMessage from '@/components/design/ChatUserMessage';
 import { ScrollArea } from '@/components/ui';
 import { useStickToBottomScroll } from '@/hooks';
 import {
@@ -81,14 +80,17 @@ const KnowledgeAssistantMessageBubble = observer(
 				<div
 					id="message-md-wrap"
 					className={cn(
-						'relative flex min-w-0 max-w-full flex-1 rounded-md p-3 select-auto text-textcolor mb-5',
+						'relative flex min-w-0 max-w-full rounded-md p-3 select-auto text-textcolor mb-5',
 						message.role === 'user'
-							? 'bg-teal-600/10 border border-teal-600/10 text-end pt-2 pb-2.5 px-3'
-							: 'bg-theme/5 border border-theme/10',
+							? 'w-fit max-w-full self-end bg-teal-600/5 border border-teal-500/15 text-end pt-2 pb-2.5 px-3'
+							: 'flex-1 bg-theme/5 border border-theme/10',
 					)}
 				>
 					{message.role === 'user' ? (
-						<ChatUserMessage message={message} />
+						<ChatAssistantMessage
+							message={message}
+							className="text-left min-w-0 max-w-full [&_.markdown-body]:min-w-0 [&_.markdown-body]:max-w-full [&_.markdown-body]:overflow-x-auto"
+						/>
 					) : (
 						<ChatAssistantMessage
 							message={message}

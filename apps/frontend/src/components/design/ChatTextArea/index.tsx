@@ -86,37 +86,43 @@ const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 		};
 
 		return (
-			<ScrollArea
-				ref={scrollRef}
-				className={`flex flex-col w-full max-h-35 overflow-y-auto ${className || ''}`}
-			>
-				<Textarea
-					ref={ref}
-					value={value}
-					onChange={
-						isEditMode ? handleEditChange : (e) => setInput?.(e.target.value)
-					}
-					onKeyDown={(e) =>
-						handleKeyDown(e, isEditMode ? editMessage : null, onScrollTo)
-					}
-					onCompositionStart={handleCompositionStart}
-					onCompositionEnd={handleCompositionEnd}
-					placeholder={placeholder}
-					spellCheck={false}
-					className={cn(
-						'flex-1 min-h-16 resize-none border-none shadow-none focus-visible:ring-transparent',
-						textareaClassName,
-					)}
-					disabled={isEditMode ? Boolean(loading) : chatInputDisabled}
-				/>
-
+			<>
+				<ScrollArea
+					ref={scrollRef}
+					className={`flex flex-col w-full max-h-35 overflow-y-auto ${className || ''}`}
+				>
+					<Textarea
+						ref={ref}
+						value={value}
+						onChange={
+							isEditMode ? handleEditChange : (e) => setInput?.(e.target.value)
+						}
+						onKeyDown={(e) =>
+							handleKeyDown(e, isEditMode ? editMessage : null, onScrollTo)
+						}
+						onCompositionStart={handleCompositionStart}
+						onCompositionEnd={handleCompositionEnd}
+						placeholder={placeholder}
+						spellCheck={false}
+						className={cn(
+							'flex-1 min-h-16 resize-none border-none shadow-none focus-visible:ring-transparent',
+							textareaClassName,
+						)}
+						disabled={isEditMode ? Boolean(loading) : chatInputDisabled}
+					/>
+				</ScrollArea>
 				{isEditMode && (
 					<div className="flex justify-end gap-2 mt-2">
-						<Button variant="secondary" onClick={() => setEditMessage?.(null)}>
+						<Button
+							size="sm"
+							variant="outline"
+							onClick={() => setEditMessage?.(null)}
+						>
 							取消
 						</Button>
 						<Button
-							variant="secondary"
+							size="sm"
+							variant="default"
 							onClick={() =>
 								sendMessage?.(
 									editMessage?.content || undefined,
@@ -131,7 +137,7 @@ const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 						</Button>
 					</div>
 				)}
-			</ScrollArea>
+			</>
 		);
 	},
 );

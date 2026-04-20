@@ -224,7 +224,7 @@ const ChatAnchorNav = ({
 		currentIndex === -1 || currentIndex >= userMessages.length - 1;
 
 	return (
-		<div className="group absolute right-[max(calc((100%-48rem)/2-3rem),0rem)] top-1/2 -translate-y-1/2 z-20">
+		<div className="w-10 group absolute right-[max(calc((100%-48rem)/2-3rem),0rem)] top-1/2 -translate-y-1/2 z-20">
 			<div className="relative flex flex-col items-center">
 				{/* 上翻按钮 */}
 				<div className="opacity-0 group-hover:opacity-100 mb-0.5">
@@ -264,10 +264,10 @@ const ChatAnchorNav = ({
 											}}
 											className={cn(
 												'relative w-2 h-2 my-[5px] cursor-pointer rounded-full',
-												'hover:scale-145 active:scale-145 transition-all duration-300',
+												'hover:scale-145 active:scale-145',
 												activeAnchor === msg.chatId
-													? 'bg-blue-500 scale-145 shadow-[0_0_5px_rgba(59,130,246,0.6)]'
-													: 'bg-theme/20 hover:bg-blue-500',
+													? 'bg-teal-600 scale-145 shadow-[0_0_5px_rgba(59,130,246,0.6)]'
+													: 'bg-theme/20 hover:bg-teal-600',
 											)}
 											onClick={() => scrollToMessage(msg.chatId)}
 										/>

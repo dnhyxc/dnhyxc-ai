@@ -768,16 +768,23 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 		const getMessageClassName = useCallback(
 			(message: Message) => {
 				const isEdit = editMessage?.chatId === message.chatId;
+				const isUser = message.role === 'user';
+				// 用户：随内容变宽（w-fit），上限为会话列（max-w-full）或带头像时的历史上限；助手：仍占满可用宽便于长文/代码块
+				const widthCls = isUser
+					? isEdit
+						? 'w-full min-w-0 bg-theme/5 border-theme/10'
+						: showAvatar
+							? 'w-fit max-w-full min-w-0 max-w-[calc(768px-105px)]'
+							: 'w-fit max-w-full min-w-0'
+					: showAvatar
+						? 'w-full min-w-0 max-w-[calc(768px-105px)]'
+						: 'w-full min-w-0 max-w-full';
 				return cn(
 					'flex-1 rounded-md p-3 select-auto',
-					message.role === 'user'
-						? `bg-teal-600/10 border border-teal-600/20 text-end pt-2 pb-2.5 px-3 ${isEdit ? 'p-0 pr-2.5 pb-2.5' : ''}`
-						: 'bg-theme/5 border border-theme/10',
-					showAvatar
-						? 'max-w-[calc(768px-105px)]'
-						: isEdit
-							? 'w-full bg-theme/5 border-theme/10'
-							: 'w-auto',
+					isUser
+						? `bg-teal-600/5 border-1 border-teal-500/15 text-end pt-2 pb-2.5 px-3 ${isEdit ? 'p-0 pr-2.5 pb-2.5' : ''}`
+						: 'bg-theme/5 border-1 border-theme/10',
+					widthCls,
 					isSharing ? 'cursor-pointer' : '',
 					checkedMessages.has(message.chatId) ? 'bg-theme-background/5' : '',
 				);
