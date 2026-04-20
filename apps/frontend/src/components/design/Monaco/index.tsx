@@ -32,6 +32,7 @@ import {
 	useRef,
 	useState,
 } from 'react';
+import type { GroupImperativeHandle, Layout } from 'react-resizable-panels';
 import { QuickContextMenu } from '@/components/design/ContextMenu';
 import {
 	ResizableHandle,
@@ -250,6 +251,9 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	const [viewMode, setViewMode] = useState<MarkdownViewMode>('edit');
 	const [splitScrollFollowMode, setSplitScrollFollowMode] =
 		useState<MarkdownSplitScrollFollowMode>('none');
+	/** ResizablePanelGroup 的命令式句柄：用于在 edit/split 间切换时恢复布局，避免右侧宽度卡死 */
+	const panelGroupRef = useRef<GroupImperativeHandle | null>(null);
+	const lastSplitLayoutRef = useRef<Layout>({ editor: 50, right: 50 });
 	/** Diff 左侧（original）对照文本：进入 splitDiff 时从当前编辑器快照 */
 	const [diffBaselineOriginal, setDiffBaselineOriginal] = useState('');
 	/** Diff 会话 id：每次进入 splitDiff +1，用于生成独立模型路径，避免 keepCurrent*Model 复用陈旧文本 */
@@ -596,6 +600,18 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 					: vm,
 		);
 	}, [markdownAssistantOpen, chatNode]);
+
+	// viewMode 在 edit ↔ split* 切换时同步 splitLayout，避免右侧面板保持 0 导致无法撑开
+	useEffect(() => {
+		// 仅对 Markdown 双栏骨架生效：preview 不渲染 panel group
+		if (viewMode === 'edit') {
+			panelGroupRef.current?.setLayout({ editor: 100, right: 0 });
+			return;
+		}
+		if (viewMode === 'split' || viewMode === 'splitDiff') {
+			panelGroupRef.current?.setLayout(lastSplitLayoutRef.current);
+		}
+	}, [viewMode]);
 
 	useEffect(() => {
 		if (prevDocumentIdentityRef.current !== documentIdentity) {
@@ -1378,7 +1394,8 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 					className="box-border min-h-0 min-w-0 max-w-full overflow-hidden"
 					style={{ height }}
 				>
-					{!isMarkdown || viewMode === 'edit' ? (
+					{/* 非 Markdown：保持单栏编辑器渲染 */}
+					{!isMarkdown ? (
 						<QuickContextMenu items={editorContextMenuItems} triggerAsChild>
 							<div
 								ref={editorHostRef}
@@ -1402,6 +1419,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 						</QuickContextMenu>
 					) : null}
 
+					{/* Markdown：preview 仍为纯预览；其余模式统一用“双栏骨架”，避免 edit→split 时 Editor 卸载/重挂载造成闪断 */}
 					{isMarkdown && viewMode === 'preview' ? (
 						<div className="h-full min-h-0 min-w-0 max-w-full w-full overflow-hidden contain-[inline-size]">
 							<ParserMarkdownPreviewPane
@@ -1413,17 +1431,30 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 						</div>
 					) : null}
 
-					{isMarkdown && (viewMode === 'split' || viewMode === 'splitDiff') ? (
+					{isMarkdown && viewMode !== 'preview' ? (
 						<ResizablePanelGroup
 							orientation="horizontal"
 							className="h-full min-h-0 min-w-0 max-w-full"
+							groupRef={panelGroupRef}
+							onLayoutChanged={(layout) => {
+								// 仅在分屏状态下记忆用户拖拽后的布局（edit 状态的 100/0 不需要记）
+								if (viewMode === 'split' || viewMode === 'splitDiff') {
+									lastSplitLayoutRef.current = layout;
+								}
+							}}
 						>
 							<ResizablePanel
+								id="editor"
 								defaultSize={50}
 								minSize={20}
 								className="min-h-0 min-w-0"
 							>
-								<div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden border-r border-theme/10">
+								<div
+									className={cn(
+										'flex h-full min-h-0 min-w-0 flex-col overflow-hidden',
+										viewMode === 'edit' ? '' : 'border-r border-theme/10',
+									)}
+								>
 									<QuickContextMenu
 										items={editorContextMenuItems}
 										triggerAsChild
@@ -1450,11 +1481,24 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 									</QuickContextMenu>
 								</div>
 							</ResizablePanel>
-							<ResizableHandle withHandle />
+							<ResizableHandle
+								withHandle
+								className={cn(
+									viewMode === 'edit'
+										? 'pointer-events-none opacity-0'
+										: 'pointer-events-auto opacity-100',
+								)}
+							/>
 							<ResizablePanel
+								id="right"
 								defaultSize={50}
-								minSize={20}
-								className="min-h-0 min-w-0"
+								minSize={0}
+								className={cn(
+									'min-h-0 min-w-0',
+									viewMode === 'edit'
+										? 'pointer-events-none opacity-0'
+										: 'pointer-events-auto opacity-100',
+								)}
 							>
 								<div className="h-full min-h-0 min-w-0 overflow-hidden contain-[inline-size]">
 									{markdownAssistantOpen && chatNode ? (

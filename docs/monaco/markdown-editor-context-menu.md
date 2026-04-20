@@ -51,6 +51,13 @@
    - Monaco 侧只负责：读取**非空选区**、调用回调、并在右键菜单中暴露入口。  
    - 知识库侧负责：如何写入输入框（覆盖/追加/是否自动展开助手）与输入框的受控状态管理。  
 
+7. **避免“打开助手导致编辑器重载（loading）”**  
+   在旧实现里，Markdown `edit ↔ split` 之间渲染了两套不同的 `<Editor />` 分支；当“未开启助手时复制选区 → 自动打开助手”触发 `edit→split`，编辑器会卸载/重挂载，出现明显的 loading。  
+   解决方案是：  
+   - **保持同一个 Monaco TextModel**：给 `Editor` 传 `keepCurrentModel`，避免卸载时 dispose model。  
+   - **保持同一棵面板树**：Markdown 非 preview 模式统一走 `ResizablePanelGroup`，在 `edit` 时把右侧面板布局设为 0，但不从 DOM 树移除（避免重挂载）。  
+   - **命令式恢复布局**：`react-resizable-panels` 的 `defaultSize` 只在首次挂载生效，切换回 split 时需要 `groupRef.setLayout(...)` 恢复右侧宽度，否则会出现“右侧无法撑开”。  
+
 ---
 
 ## 4. 先决条件：`contextmenu: false`
@@ -250,14 +257,24 @@ const [assistantInput, setAssistantInput] = useState('');
 <MarkdownEditor
 	// ...其它 props
 	onInsertSelectionToAssistant={(text) => {
-		// 右键菜单：将编辑器选区写入助手输入框，并自动展开助手面板
-		setMarkdownAssistantOpen(true);
+		/**
+		 * 将编辑器选区写入助手输入框，并在未打开时自动展开助手面板。
+		 *
+		 * 关键：先把 Monaco 当前正文同步到 store，再写入输入框，最后再打开助手。
+		 * 否则开启助手触发 edit→split 重挂载期间，父级 markdown 可能短暂为空，导致：
+		 * - 编辑器看起来“被清空”
+		 * - KnowledgeAssistant 的输入框清空逻辑抢先执行，刚写入的草稿被清掉
+		 */
+		getMarkdownFromEditorRef.current?.();
 		setAssistantInput((prev) => {
 			const next = (text ?? '').trim();
 			if (!next) return prev;
 			const cur = (prev ?? '').trim();
 			return cur ? `${cur}\n\n${next}` : next;
 		});
+		if (!markdownAssistantOpen) {
+			queueMicrotask(() => setMarkdownAssistantOpen(true));
+		}
 	}}
 	chatNode={
 		<KnowledgeAssistant
@@ -293,10 +310,61 @@ const [assistantInput, setAssistantInput] = useState('');
 editor.addCommand(
 	monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyV,
 	() => {
-		// 无选区时 sendSelectionToAssistant 内部会直接 return，不会写入输入框
-		editorContextActionsRef.current?.sendSelectionToAssistant?.();
+		// 先取“真实选区”：无选区直接 return，避免无意义的视图切换与闪断
+		const selected = getSelectedTextOnlyFromSelections();
+		if (!selected.trim()) return;
+		// 直接调用外部回调（知识库侧会写入输入框并自动打开助手）
+		onInsertSelectionToAssistant?.(selected);
 	},
 );
+```
+
+---
+
+## 9. Markdown 编辑器：避免 edit→split 的 Editor 重挂载
+
+### 9.1 `keepCurrentModel`：保留 TextModel，避免卸载导致正文回退
+
+```tsx
+// apps/frontend/src/components/design/Monaco/index.tsx（节选）
+<Editor
+	path={monacoModelPath}
+	keepCurrentModel
+	defaultValue={editorBootstrapTextRef.current}
+	// ...
+/>
+```
+
+### 9.2 `react-resizable-panels`：用 `groupRef.setLayout` 恢复右侧宽度
+
+```tsx
+// apps/frontend/src/components/design/Monaco/index.tsx（节选）
+const panelGroupRef = useRef<GroupImperativeHandle | null>(null);
+const lastSplitLayoutRef = useRef<Layout>({ editor: 50, right: 50 });
+
+useEffect(() => {
+	if (viewMode === 'edit') {
+		panelGroupRef.current?.setLayout({ editor: 100, right: 0 });
+		return;
+	}
+	if (viewMode === 'split' || viewMode === 'splitDiff') {
+		panelGroupRef.current?.setLayout(lastSplitLayoutRef.current);
+	}
+}, [viewMode]);
+
+<ResizablePanelGroup
+	orientation="horizontal"
+	groupRef={panelGroupRef}
+	onLayoutChanged={(layout) => {
+		if (viewMode === 'split' || viewMode === 'splitDiff') {
+			lastSplitLayoutRef.current = layout;
+		}
+	}}
+>
+	<ResizablePanel id="editor" defaultSize={50} minSize={20}>{/* Editor */}</ResizablePanel>
+	<ResizableHandle withHandle />
+	<ResizablePanel id="right" defaultSize={50} minSize={0}>{/* chat/preview/diff */}</ResizablePanel>
+</ResizablePanelGroup>
 ```
 
 ---
