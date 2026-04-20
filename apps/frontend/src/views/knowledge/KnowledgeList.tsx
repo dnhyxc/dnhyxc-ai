@@ -1,5 +1,6 @@
 import Confirm from '@design/Confirm';
 import { Drawer } from '@design/Drawer';
+import Loading from '@design/Loading';
 import Tooltip from '@design/Tooltip';
 import { Button, ScrollArea, Switch, Toast } from '@ui/index';
 import { Code2, Trash2 } from 'lucide-react';
@@ -598,15 +599,15 @@ const KnowledgeList: React.FC<IProps> = observer(
 							</div>
 						</div>
 						<ScrollArea
-							className="min-h-0 flex-1 overflow-y-auto pr-1.5 box-border"
+							className="flex min-h-0 flex-1 flex-col pr-1.5 box-border"
 							onScroll={
 								useLocalFolder ? undefined : knowledgeStore.onListViewportScroll
 							}
 						>
-							<div className="flex flex-col gap-2">
+							<div className="flex min-h-0 w-full flex-1 flex-col gap-2">
 								{showInitialPlaceholder ? (
-									<div className="text-sm text-textcolor/60 py-6 text-center">
-										加载中…
+									<div className="flex flex-1 flex-col items-center justify-center py-6 text-center text-sm text-textcolor/60">
+										<Loading text="加载中…" />
 									</div>
 								) : null}
 								{displayList.map((knowledge) => (
