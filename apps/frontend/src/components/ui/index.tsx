@@ -3,6 +3,7 @@ export * from './button';
 export * from './card';
 export * from './carousel';
 export * from './checkbox';
+export * from './context-menu';
 export * from './dialog';
 export * from './dropdown-menu';
 export * from './dropdown-menu';
