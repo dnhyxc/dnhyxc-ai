@@ -119,4 +119,14 @@ export const DEFAULT_INFO: ShortcutSettingItem[] = [
 		action: 'knowledge_open_trash',
 		registerGlobally: false,
 	},
+	{
+		label: '知识库：发送选中内容到助手输入框',
+		key: KNOWLEDGE_SHORTCUT_KEY_IDS.pasteToAssistant,
+		id: 'shortcut',
+		shortcut: '',
+		defaultShortcut: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.pasteToAssistant,
+		placeholder: '按键盘输入快捷键',
+		action: 'knowledge_send_selection_to_assistant',
+		registerGlobally: false,
+	},
 ];

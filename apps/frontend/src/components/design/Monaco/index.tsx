@@ -1094,6 +1094,18 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 				})();
 			});
 
+			/**
+			 * 知识库助手：将“当前非空选区”送入助手输入框（不降级为整行）。
+			 * - 与知识库页面快捷键（Meta+Shift+V）语义一致
+			 * - 由 `sendSelectionToAssistant` 内部保证“无选区则不写入”
+			 */
+			editor.addCommand(
+				monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyV,
+				() => {
+					editorContextActionsRef.current?.sendSelectionToAssistant?.();
+				},
+			);
+
 			injectMonacoEditorContextActions({
 				editor,
 				monaco,

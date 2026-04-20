@@ -9,6 +9,8 @@ export const KNOWLEDGE_SHORTCUT_KEY_IDS = {
 	toggleMarkdownBottomBar: 9,
 	/** 打开回收站 */
 	openTrash: 10,
+	/** 将编辑器选中的内容发送到助手输入框 */
+	pasteToAssistant: 11,
 } as const;
 
 /** 与 `views/setting/system/config.ts` 中默认值保持一致 */
@@ -22,6 +24,8 @@ export const KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS = {
 	toggleMarkdownBottomBar: 'Meta + Shift + B',
 	/** Command（Meta）+ Shift + T：打开回收站 */
 	openTrash: 'Meta + Shift + T',
+	/** Command（Meta）+ Shift + V：将编辑器选中的内容发送到助手输入框 */
+	pasteToAssistant: 'Meta + Shift + V',
 } as const;
 
 type ParsedChord = {
@@ -209,8 +213,9 @@ export async function loadKnowledgeShortcutChords(): Promise<{
 	openLibrary: string;
 	toggleMarkdownBottomBar: string;
 	openTrash: string;
+	pasteToAssistant: string;
 }> {
-	const [s, c, o, b, t] = await Promise.all([
+	const [s, c, o, b, t, v] = await Promise.all([
 		getValue<string>(`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.save}`),
 		getValue<string>(`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.clear}`),
 		getValue<string>(`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.openLibrary}`),
@@ -218,6 +223,7 @@ export async function loadKnowledgeShortcutChords(): Promise<{
 			`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.toggleMarkdownBottomBar}`,
 		),
 		getValue<string>(`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.openTrash}`),
+		getValue<string>(`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.pasteToAssistant}`),
 	]);
 	const { value: clear, didMigrate: clearMigrated } =
 		normalizeLegacyClearChord(c);
@@ -249,6 +255,8 @@ export async function loadKnowledgeShortcutChords(): Promise<{
 		openLibrary,
 		toggleMarkdownBottomBar,
 		openTrash: t?.trim() || KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.openTrash,
+		pasteToAssistant:
+			v?.trim() || KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.pasteToAssistant,
 	};
 }
 

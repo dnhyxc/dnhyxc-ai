@@ -274,6 +274,31 @@ const [assistantInput, setAssistantInput] = useState('');
 - **复制（Copy）**：允许空选区复制整行（编辑器常见行为）。  
 - **送入助手输入框**：只处理非空选区，避免用户只是点了一下光标就把整行/整段写入对话草稿，造成误操作与噪声。
 
+### 6.4 知识库快捷键：Command + Shift + V（发送选区到助手输入框）
+
+除右键菜单外，知识库还支持通过快捷键把**编辑器当前非空选区**写入助手输入框。  
+该快捷键在系统设置里配置（默认 **`Meta + Shift + V`**，即 macOS 的 **Command + Shift + V**），由 **Monaco 编辑器内部**处理（仅在编辑器聚焦时生效），并且**无选区时不会写入**。
+
+涉及文件：
+
+- `apps/frontend/src/utils/knowledge-shortcuts.ts`：新增 `pasteToAssistant` 的 key id 与默认 chord
+- `apps/frontend/src/views/setting/system/config.ts`：系统设置里新增「知识库：发送选中内容到助手输入框」
+- `apps/frontend/src/components/design/Monaco/index.tsx`：Monaco 内部注册 `Ctrl/⌘ + Shift + V`，触发 `sendSelectionToAssistant`
+- `apps/frontend/src/components/design/Monaco/contextMenu.ts`：菜单项展示 `Ctrl/⌘+Shift+V`，并通过注入动作实现“只在非空选区时写入”
+
+核心代码形态如下：
+
+```tsx
+// apps/frontend/src/components/design/Monaco/index.tsx（节选）
+editor.addCommand(
+	monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyV,
+	() => {
+		// 无选区时 sendSelectionToAssistant 内部会直接 return，不会写入输入框
+		editorContextActionsRef.current?.sendSelectionToAssistant?.();
+	},
+);
+```
+
 ---
 
 ## 7. 相关文件索引

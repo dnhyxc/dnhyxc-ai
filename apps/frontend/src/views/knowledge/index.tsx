@@ -43,6 +43,19 @@ import {
 	knowledgeAssistantDocumentKey,
 } from './utils';
 
+/** 事件是否发生在 Monaco 富编辑器内（用于让 Monaco 自己处理快捷键） */
+function isMonacoInEventPath(e: KeyboardEvent): boolean {
+	for (const n of e.composedPath()) {
+		if (!(n instanceof Element)) continue;
+		if (n.closest?.('.monaco-editor, .monaco-diff-editor')) return true;
+		// Monaco 隐藏 inputarea：保险兜底（避免 composedPath 不含外层容器时误判）
+		if (n instanceof HTMLTextAreaElement && n.classList.contains('inputarea')) {
+			return true;
+		}
+	}
+	return false;
+}
+
 /** 知识编辑页：正文与标题等草稿存于 knowledgeStore，聊天助手条「保存到知识库」会写入同一份草稿并跳转至此 */
 const Knowledge = observer(() => {
 	const { knowledgeStore, userStore } = useStore();
@@ -71,6 +84,7 @@ const Knowledge = observer(() => {
 		openLibrary: string;
 		toggleMarkdownBottomBar: string;
 		openTrash: string;
+		pasteToAssistant: string;
 	}>({
 		save: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.save,
 		clear: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.clear,
@@ -78,6 +92,7 @@ const Knowledge = observer(() => {
 		toggleMarkdownBottomBar:
 			KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.toggleMarkdownBottomBar,
 		openTrash: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.openTrash,
+		pasteToAssistant: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.pasteToAssistant,
 	});
 
 	const reloadKnowledgeChords = useCallback(async () => {
@@ -522,6 +537,18 @@ const Knowledge = observer(() => {
 				if (!isCloudLoggedIn) return;
 				e.preventDefault();
 				setTrashOpen((open) => !open);
+				return;
+			}
+			if (chordMatchesStored(knowledgeChords.pasteToAssistant, e)) {
+				/**
+				 * 语义：将“编辑器当前非空选区”送入助手输入框。
+				 * - 若事件来自 Monaco：放行，由 Monaco 内部 addCommand 处理（避免捕获阶段拦截）。
+				 * - 若不在 Monaco：不做兜底粘贴（避免无选区时也把剪贴板塞进输入框，造成误触）。
+				 */
+				if (isMonacoInEventPath(e)) {
+					return;
+				}
+				e.preventDefault();
 				return;
 			}
 		};

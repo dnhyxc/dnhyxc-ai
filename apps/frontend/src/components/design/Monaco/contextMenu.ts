@@ -1,5 +1,14 @@
 import type { OnMount } from '@monaco-editor/react';
 import type { QuickContextMenuEntry } from '@/components/design/ContextMenu';
+import { isMacLike } from '@/utils';
+
+function shortcutHintCtrlOrCmdShiftV(): string {
+	return isMacLike() ? '⌘+Shift+V' : 'Ctrl+Shift+V';
+}
+
+function shortcutHintCtrlOrCmd(key: string): string {
+	return isMacLike() ? `⌘+${key}` : `Ctrl+${key}`;
+}
 
 export type MonacoEditorContextActions = {
 	copy: () => void;
@@ -41,7 +50,7 @@ export function buildMonacoEditorContextMenuItems(input: {
 			type: 'item',
 			id: 'cut',
 			label: '剪切',
-			shortcut: 'Ctrl/⌘+X',
+			shortcut: shortcutHintCtrlOrCmd('X'),
 			onSelect: () => actionsRef.current?.cut(),
 		});
 	}
@@ -50,7 +59,7 @@ export function buildMonacoEditorContextMenuItems(input: {
 		type: 'item',
 		id: 'copy',
 		label: '复制',
-		shortcut: 'Ctrl/⌘+C',
+		shortcut: shortcutHintCtrlOrCmd('C'),
 		onSelect: () => actionsRef.current?.copy(),
 	});
 
@@ -59,7 +68,7 @@ export function buildMonacoEditorContextMenuItems(input: {
 			type: 'item',
 			id: 'paste',
 			label: '粘贴',
-			shortcut: 'Ctrl/⌘+V',
+			shortcut: shortcutHintCtrlOrCmd('V'),
 			onSelect: () => actionsRef.current?.paste(),
 		});
 	}
@@ -70,7 +79,7 @@ export function buildMonacoEditorContextMenuItems(input: {
 		type: 'item',
 		id: 'selectAll',
 		label: '全选',
-		shortcut: 'Ctrl/⌘+A',
+		shortcut: shortcutHintCtrlOrCmd('A'),
 		onSelect: () => actionsRef.current?.selectAll(),
 	});
 
@@ -79,8 +88,8 @@ export function buildMonacoEditorContextMenuItems(input: {
 		items.push({
 			type: 'item',
 			id: 'sendSelectionToAssistant',
-			label: '发送选中内容到助手输入框',
-			shortcut: '—',
+			label: '复制选中内容到助手',
+			shortcut: shortcutHintCtrlOrCmdShiftV(),
 			onSelect: () => actionsRef.current?.sendSelectionToAssistant?.(),
 		});
 	}

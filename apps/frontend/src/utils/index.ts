@@ -21,6 +21,25 @@ export * from './store';
 export * from './tauri';
 export * from './updater';
 
+/**
+ * 是否为 macOS / iOS 等「Command（⌘）」平台。
+ *
+ * 用途：
+ * - 仅用于前端快捷键提示文案（⌘ vs Ctrl），不用于权限/能力判断。
+ * - iPadOS 可能以 MacIntel 上报，按 mac 处理更符合用户预期。
+ */
+export function isMacLike(): boolean {
+	if (typeof navigator === 'undefined') return false;
+	const platform = (navigator.platform || '').toLowerCase();
+	const ua = (navigator.userAgent || '').toLowerCase();
+	return (
+		platform.includes('mac') ||
+		ua.includes('mac os') ||
+		ua.includes('iphone') ||
+		ua.includes('ipad')
+	);
+}
+
 export const setStorage = (key: string, value: string) => {
 	localStorage.setItem(key, value);
 	window.dispatchEvent(new Event(`${key}Changed`));
