@@ -130,7 +130,7 @@ export const DEFAULT_INFO: ShortcutSettingItem[] = [
 		registerGlobally: false,
 	},
 	{
-		label: '知识库：操作栏：编辑源码（⌘+1）',
+		label: '知识库：操作栏：编辑源码',
 		key: KNOWLEDGE_SHORTCUT_KEY_IDS.markdownBarAction1,
 		id: 'shortcut',
 		shortcut: '',
@@ -140,7 +140,7 @@ export const DEFAULT_INFO: ShortcutSettingItem[] = [
 		registerGlobally: false,
 	},
 	{
-		label: '知识库：操作栏：分屏对照（Diff）（⌘+2）',
+		label: '知识库：操作栏：分屏对照（Diff）',
 		key: KNOWLEDGE_SHORTCUT_KEY_IDS.markdownBarAction2,
 		id: 'shortcut',
 		shortcut: '',
@@ -150,7 +150,7 @@ export const DEFAULT_INFO: ShortcutSettingItem[] = [
 		registerGlobally: false,
 	},
 	{
-		label: '知识库：操作栏：预览渲染（⌘+3）',
+		label: '知识库：操作栏：预览渲染',
 		key: KNOWLEDGE_SHORTCUT_KEY_IDS.markdownBarAction3,
 		id: 'shortcut',
 		shortcut: '',
@@ -160,7 +160,7 @@ export const DEFAULT_INFO: ShortcutSettingItem[] = [
 		registerGlobally: false,
 	},
 	{
-		label: '知识库：操作栏：开关 AI 助手（⌘+4）',
+		label: '知识库：操作栏：开关 AI 助手',
 		key: KNOWLEDGE_SHORTCUT_KEY_IDS.markdownBarAction4,
 		id: 'shortcut',
 		shortcut: '',
@@ -170,7 +170,7 @@ export const DEFAULT_INFO: ShortcutSettingItem[] = [
 		registerGlobally: false,
 	},
 	{
-		label: '知识库：操作栏：分屏预览（⌘+5）',
+		label: '知识库：操作栏：分屏预览',
 		key: KNOWLEDGE_SHORTCUT_KEY_IDS.markdownBarAction5,
 		id: 'shortcut',
 		shortcut: '',
@@ -180,7 +180,7 @@ export const DEFAULT_INFO: ShortcutSettingItem[] = [
 		registerGlobally: false,
 	},
 	{
-		label: '知识库：操作栏：双边跟随（⌘+6）',
+		label: '知识库：操作栏：双边跟随',
 		key: KNOWLEDGE_SHORTCUT_KEY_IDS.markdownBarAction6,
 		id: 'shortcut',
 		shortcut: '',
@@ -190,7 +190,7 @@ export const DEFAULT_INFO: ShortcutSettingItem[] = [
 		registerGlobally: false,
 	},
 	{
-		label: '知识库：操作栏：右边跟随左边（⌘+7）',
+		label: '知识库：操作栏：右边跟随左边',
 		key: KNOWLEDGE_SHORTCUT_KEY_IDS.markdownBarAction7,
 		id: 'shortcut',
 		shortcut: '',
@@ -200,7 +200,7 @@ export const DEFAULT_INFO: ShortcutSettingItem[] = [
 		registerGlobally: false,
 	},
 	{
-		label: '知识库：操作栏：左边跟随右边（⌘+8）',
+		label: '知识库：操作栏：左边跟随右边',
 		key: KNOWLEDGE_SHORTCUT_KEY_IDS.markdownBarAction8,
 		id: 'shortcut',
 		shortcut: '',
@@ -210,7 +210,7 @@ export const DEFAULT_INFO: ShortcutSettingItem[] = [
 		registerGlobally: false,
 	},
 	{
-		label: '知识库：操作栏：开关覆盖保存（⌘+9）',
+		label: '知识库：操作栏：开关覆盖保存',
 		key: KNOWLEDGE_SHORTCUT_KEY_IDS.markdownBarAction9,
 		id: 'shortcut',
 		shortcut: '',
@@ -220,7 +220,7 @@ export const DEFAULT_INFO: ShortcutSettingItem[] = [
 		registerGlobally: false,
 	},
 	{
-		label: '知识库：操作栏：开关自动保存（⌘+0）',
+		label: '知识库：操作栏：开关自动保存',
 		key: KNOWLEDGE_SHORTCUT_KEY_IDS.markdownBarAction0,
 		id: 'shortcut',
 		shortcut: '',

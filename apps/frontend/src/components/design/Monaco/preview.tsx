@@ -9,7 +9,7 @@ import {
 } from '@dnhyxc-ai/tools';
 import { useMermaidInMarkdownRoot } from '@dnhyxc-ai/tools/react';
 import { ScrollArea } from '@ui/index';
-import { ArrowDown, ArrowUp } from 'lucide-react';
+import { ArrowDown, ArrowUp, Component } from 'lucide-react';
 import {
 	memo,
 	type RefObject,
@@ -323,50 +323,57 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 			className="relative h-full min-h-0 min-w-0 max-w-full w-full overflow-hidden contain-[inline-size]"
 		>
 			<ChatCodeFloatingToolbar />
-			<ScrollArea
-				ref={assignViewportRef}
-				scrollbars="both"
-				onScroll={handleViewportScroll}
-				className={cn(
-					'h-full min-h-0 min-w-0 max-w-full w-full bg-transparent',
-				)}
-				// 覆盖 Radix 内层 display:table + minWidth:100%，否则 table 会按内容扩宽并顶破分栏
-				viewportClassName="overscroll-y-contain [&>div]:!box-border [&>div]:!block [&>div]:!w-full [&>div]:!min-w-0 [&>div]:!max-w-full"
-			>
-				<div className="box-border min-w-0 max-w-full w-full p-3">
-					<div
-						ref={previewHtmlRootRef}
-						className={cn(
-							'[&_.markdown-body]:min-w-0 [&_.markdown-body]:max-w-none [&_.markdown-body]:wrap-break-word [&_.markdown-body]:overflow-x-auto [&_.markdown-body]:bg-transparent! [&_.markdown-body]:text-textcolor/90! [&_.markdown-body_:is(h1,h2,h3,h4,h5,h6)]:scroll-mt-3 [&_.markdown-body_pre]:max-w-full [&_.markdown-body_pre]:overflow-x-auto [&_.markdown-body_table]:block [&_.markdown-body_table]:max-w-full [&_.markdown-body_table]:overflow-x-auto',
-							enableMermaid && MARKDOWN_MERMAID_TAILWIND_CURSOR_ZOOM_IN_CLASS,
-						)}
-					>
-						{hasMermaidIslandLayout ? (
-							fenceParts.map((part, i) => {
-								if (part.type === 'markdown') {
-									const rawHtml = parser.render(part.text, {
-										enableMermaid: false,
-									});
-									return (
-										<div
-											key={`pv-${i}`}
-											dangerouslySetInnerHTML={{
-												__html: shiftMarkdownPreviewHeadingLineAttrs(
-													rawHtml,
-													part.lineBase0,
-												),
-											}}
-										/>
-									);
-								}
-								return renderMermaidPreviewPart(part, i);
-							})
-						) : (
-							<div dangerouslySetInnerHTML={{ __html: html }} />
-						)}
+			{markdown ? (
+				<ScrollArea
+					ref={assignViewportRef}
+					scrollbars="both"
+					onScroll={handleViewportScroll}
+					className={cn(
+						'h-full min-h-0 min-w-0 max-w-full w-full bg-transparent',
+					)}
+					// 覆盖 Radix 内层 display:table + minWidth:100%，否则 table 会按内容扩宽并顶破分栏
+					viewportClassName="overscroll-y-contain [&>div]:!box-border [&>div]:!block [&>div]:!w-full [&>div]:!min-w-0 [&>div]:!max-w-full"
+				>
+					<div className="box-border min-w-0 max-w-full w-full p-3">
+						<div
+							ref={previewHtmlRootRef}
+							className={cn(
+								'[&_.markdown-body]:min-w-0 [&_.markdown-body]:max-w-none [&_.markdown-body]:wrap-break-word [&_.markdown-body]:overflow-x-auto [&_.markdown-body]:bg-transparent! [&_.markdown-body]:text-textcolor/90! [&_.markdown-body_:is(h1,h2,h3,h4,h5,h6)]:scroll-mt-3 [&_.markdown-body_pre]:max-w-full [&_.markdown-body_pre]:overflow-x-auto [&_.markdown-body_table]:block [&_.markdown-body_table]:max-w-full [&_.markdown-body_table]:overflow-x-auto',
+								enableMermaid && MARKDOWN_MERMAID_TAILWIND_CURSOR_ZOOM_IN_CLASS,
+							)}
+						>
+							{hasMermaidIslandLayout ? (
+								fenceParts.map((part, i) => {
+									if (part.type === 'markdown') {
+										const rawHtml = parser.render(part.text, {
+											enableMermaid: false,
+										});
+										return (
+											<div
+												key={`pv-${i}`}
+												dangerouslySetInnerHTML={{
+													__html: shiftMarkdownPreviewHeadingLineAttrs(
+														rawHtml,
+														part.lineBase0,
+													),
+												}}
+											/>
+										);
+									}
+									return renderMermaidPreviewPart(part, i);
+								})
+							) : (
+								<div dangerouslySetInnerHTML={{ __html: html }} />
+							)}
+						</div>
 					</div>
+				</ScrollArea>
+			) : (
+				<div className="flex items-center justify-center flex-col gap-5 h-full box-border min-w-0 max-w-full w-full p-3 rounded-md">
+					<Component className="w-16 h-16 text-textcolor/70 animate-bounce" />
+					<div className="text-sm text-textcolor/80">预览内容为空</div>
 				</div>
-			</ScrollArea>
+			)}
 			{showPreviewScrollCornerFab && previewScrollFabMode !== 'hidden' ? (
 				<Tooltip
 					content={
