@@ -38,3 +38,7 @@ Tauri WebView 内系统级复制/粘贴对 **Monaco** 与普通 **`<input>` / `<
 | `apps/frontend/src/utils/clipboard.ts` | `copyToClipboard`、`pasteFromClipboard`、Tauri 普通字段快捷键 |
 | `apps/frontend/src/components/design/Monaco/index.tsx` | Monaco C/X/V；无选区 X 整行见 `docs/monaco-cut-line-without-selection-cmd-x.md` |
 | `apps/frontend/src/components/ui/input.tsx` | 无逻辑变更；在 Tauri 下由上述快捷键处理 |
+
+## 补充：右键上下文菜单
+
+`MarkdownEditor` 在主编器外包一层 **`@/components/design/ContextMenu`** 的 **`QuickContextMenu`**，菜单项（复制 / 剪切 / 粘贴 / 全选 / 格式化）与上文 **Monaco `addCommand`（C/X/V）及 Shift+Alt+F 格式化** 共用同一套 ref 闭包，避免两套逻辑分叉。实现说明与代码摘录见 **`monaco/markdown-editor-context-menu.md`**。
