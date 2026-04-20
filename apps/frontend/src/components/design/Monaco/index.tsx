@@ -268,6 +268,10 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	const toggleMarkdownAssistant = useCallback(() => {
 		if (!chatNode) return;
 		const next = !markdownAssistantOpen;
+		// 仅通过机器人开关关闭助手时：回到「编辑源码」，避免仍停留在为助手而设的左编右预览分屏
+		if (!next) {
+			setViewMode('edit');
+		}
 		if (assistantPanelControlled && onMarkdownAssistantOpenChange) {
 			onMarkdownAssistantOpenChange(next);
 		} else {

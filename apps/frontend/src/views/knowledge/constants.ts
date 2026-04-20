@@ -1,3 +1,5 @@
+import { Sparkle, Sparkles } from 'lucide-react';
+
 /** Tauri 下知识 Markdown 目录（保存 / 删除本地文件与 invoke 一致） */
 export const TAURI_KNOWLEDGE_DIR = '/Users/dnhyxc/Documents/knowledge';
 // '/Users/dnhyxc/Documents/code/dnhyxc-ai/knowledge';
@@ -12,3 +14,16 @@ export function isKnowledgeLocalMarkdownId(
 }
 
 export const EDITOR_HEIGHT = 'calc(100vh - 172px)';
+
+export const KNOWLEDGE_ASSISTANT_PROMPTS = [
+	{
+		icon: Sparkle,
+		title: '润色文档内容',
+		description: '精修字句，提升质感',
+	},
+	{
+		icon: Sparkles,
+		title: '总结文档内容',
+		description: '提炼要点，掌握核心',
+	},
+];

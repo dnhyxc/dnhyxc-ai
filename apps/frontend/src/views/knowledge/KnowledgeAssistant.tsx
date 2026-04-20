@@ -5,6 +5,7 @@
 
 import Loading from '@design/Loading';
 import { Toast } from '@ui/index';
+import { Sparkles } from 'lucide-react';
 import { observer } from 'mobx-react';
 import {
 	type RefObject,
@@ -28,7 +29,10 @@ import { cn } from '@/lib/utils';
 import useStore from '@/store';
 import assistantStore from '@/store/assistant';
 import type { Message } from '@/types/chat';
-import { isKnowledgeLocalMarkdownId } from './constants';
+import {
+	isKnowledgeLocalMarkdownId,
+	KNOWLEDGE_ASSISTANT_PROMPTS,
+} from './constants';
 
 interface KnowledgeAssistantProps {
 	/** 与 MarkdownEditor `documentIdentity` 一致，用于绑定助手多轮会话 */
@@ -267,9 +271,41 @@ const KnowledgeAssistant = observer(
 					<div className="text-textcolor/70 flex flex-1 items-center justify-center px-4 text-center text-sm">
 						登录后可在此与 AI 助手对话，会话按当前知识文档分别保存。
 					</div>
-				) : assistantStore.isHistoryLoading && messages.length === 0 ? (
+				) : assistantStore.isHistoryLoading ? (
 					<div className="text-textcolor/70 flex flex-1 items-center justify-center text-sm">
 						<Loading text="正在加载对话…" />
+					</div>
+				) : !messages.length ? (
+					<div className="text-textcolor/70 flex flex-1 justify-center items-start text-sm pt-4 pl-4 pr-4.5">
+						{knowledgeStore.markdown ? (
+							<div className="w-full flex flex-col gap-2 justify-center items-center">
+								<div className="w-full flex gap-3">
+									{KNOWLEDGE_ASSISTANT_PROMPTS.map((item) => (
+										<div
+											key={item.title}
+											className="flex-1 flex items-start gap-2 border border-theme/10 bg-theme/10 text-textcolor hover:bg-theme/15 py-2 pl-2 pr-2.5 rounded-md cursor-pointer"
+										>
+											<item.icon className="text-teal-500 mt-0.5" />
+											<div className="flex flex-col gap-1">
+												<span className="text-base font-medium">
+													{item.title}
+												</span>
+												<span className="text-sm text-textcolor/80">
+													{item.description}
+												</span>
+											</div>
+										</div>
+									))}
+								</div>
+							</div>
+						) : (
+							<div className="w-full flex justify-between bg-theme/5 p-2 rounded-md border border-theme/10">
+								<Sparkles size={18} className="mr-2 text-teal-500 mt-0.5" />
+								<div className="flex-1">
+									Hi，我是您的专属知识库助手！从日常的资料查阅、流程指引，到棘手难题的排查与解答，我都会为您提供即时、精准的信息支持。您可以把我当作随时在线的业务智囊，帮您大幅节省检索时间，提升工作效能。
+								</div>
+							</div>
+						)}
 					</div>
 				) : (
 					<ScrollArea
@@ -302,11 +338,11 @@ const KnowledgeAssistant = observer(
 					</ScrollArea>
 				)}
 				{isLoggedIn ? (
-					<div className="mt-4 flex items-center justify-center">
+					<div className="w-full mt-4 flex items-center justify-center">
 						<ChatEntry
 							input={input}
 							setInput={setInput}
-							className="max-w-3xl pl-4 pr-4.5 pb-4.5 border-theme/10"
+							className="w-full pl-4 pr-4.5 pb-4.5 border-theme/10"
 							textareaClassName="min-h-9"
 							sendMessage={sendMessage}
 							placeholder={
