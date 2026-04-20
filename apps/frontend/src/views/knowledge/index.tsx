@@ -34,9 +34,9 @@ import {
 	TAURI_KNOWLEDGE_DIR,
 } from './constants';
 import KnowledgeAssistant from './KnowledgeAssistant';
+import KnowledgeEditorToolbar from './KnowledgeEditorToolbar';
 import KnowledgeList from './KnowledgeList';
 import KnowledgeTrashList from './KnowledgeTrashList';
-import KnowledgeEditorToolbar from './toolbar';
 import {
 	isKnowledgeLocalMarkdownId,
 	knowledgeAssistantArticleBinding,
