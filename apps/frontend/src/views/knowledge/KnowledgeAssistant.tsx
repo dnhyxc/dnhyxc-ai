@@ -2,6 +2,8 @@
  * 知识库右侧通用助手：维护 `knowledgeAssistantPersistenceAllowed` 与 `documentKey` 驱动的 `activateForDocument`。
  * 完整设计文档：`docs/knowledge/knowledge-assistant-complete.md`。
  */
+
+import Loading from '@design/Loading';
 import { Toast } from '@ui/index';
 import { observer } from 'mobx-react';
 import {
@@ -26,7 +28,6 @@ import { cn } from '@/lib/utils';
 import useStore from '@/store';
 import assistantStore from '@/store/assistant';
 import type { Message } from '@/types/chat';
-
 import { isKnowledgeLocalMarkdownId } from './constants';
 
 interface KnowledgeAssistantProps {
@@ -139,8 +140,10 @@ const KnowledgeAssistant = observer(
 			};
 		}, []);
 
+		// 左侧当前文档身份变化时，将助手 store 切到对应 documentKey 的会话（加载/恢复消息）。
+		// `draft-new*` 为新建草稿占位，尚无稳定条目 id，不调用 activate，避免与未保存文档错误绑定。
 		useEffect(() => {
-			if (!documentKey) return;
+			if (!documentKey || documentKey.startsWith('draft-new')) return;
 			void assistantStore.activateForDocument(documentKey);
 		}, [documentKey]);
 
@@ -266,7 +269,7 @@ const KnowledgeAssistant = observer(
 					</div>
 				) : assistantStore.isHistoryLoading && messages.length === 0 ? (
 					<div className="text-textcolor/70 flex flex-1 items-center justify-center text-sm">
-						正在加载对话…
+						<Loading text="正在加载对话…" />
 					</div>
 				) : (
 					<ScrollArea

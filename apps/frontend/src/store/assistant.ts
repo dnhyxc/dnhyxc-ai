@@ -63,7 +63,8 @@ function buildImportTranscriptLinesFromMessages(
 		if (m.role !== 'user' && m.role !== 'assistant') continue;
 		lines.push({ role: m.role, content: m.content ?? '' });
 	}
-	return lines.slice(0, 200);
+	// 与后端 `ImportAssistantTranscriptDto` 的 `@ArrayMaxSize(200)` 对齐；超出时只迁入「最近」200 条（时间顺序保留，即末尾窗口）
+	return lines.slice(-200);
 }
 
 /** 不落库多轮：已进入 UI 的轮次（排除末尾空占位助手） */

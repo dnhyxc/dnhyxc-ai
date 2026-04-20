@@ -567,6 +567,8 @@ export class AssistantService {
 
 	/**
 	 * 将草稿阶段对话迁入已绑定知识条目的会话（用于首次保存后落库）。
+	 *
+	 * `dto.lines` 须为时间升序；客户端仅提交「最近 200 条」时，会话标题取 **本批 lines 内** 首条非空 user 的前 60 字（未必等于整段草稿历史上第一条用户消息）。
 	 */
 	async importTranscript(
 		userId: number,

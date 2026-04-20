@@ -88,7 +88,7 @@
    - toKey   = {articleId}__trash-{nonce}
 3) 若当前仍为「未允许持久化」(knowledgeAssistantPersistenceAllowed === false)：
      await flushEphemeralTranscriptIfNeeded(articleId, fromKey, toKey)
-   - 前端把 assistantStore.messages 序列化为 lines（user/assistant 交替，最多 200 条）
+   - 前端把 assistantStore.messages 序列化为 lines（user/assistant 交替；超过 200 条时 **只提交最近 200 条** `slice(-200)`，时间序仍为升序）
    - POST assistant/session/import-transcript
        body: { knowledgeArticleId: articleId, lines }
 4) remapAssistantSessionDocumentKey(fromKey, toKey)   // 内存映射兜底
@@ -194,7 +194,7 @@ sequenceDiagram
 路径：`apps/backend/src/services/assistant/dto/import-assistant-transcript.dto.ts`。
 
 - `knowledgeArticleId`：保存后的云端知识条目 id。
-- `lines`：按时间顺序的 `user` / `assistant` 行；服务端按「user 一条 + 紧随其 optional assistant」解析并插入（与 `AssistantService.importTranscript` 实现一致）。
+- `lines`：按时间**从早到晚**的 `user` / `assistant` 行，**最多 200 条**；草稿轮次更多时由前端截成 **最近 200 条** 再提交。服务端按「user 一条 + 紧随其 optional assistant」解析并插入（与 `AssistantService.importTranscript` 实现一致）。
 
 ### 4.3 控制器路由顺序
 
@@ -230,7 +230,7 @@ sequenceDiagram
 | `activateForDocument(documentKey)` | 若不允许持久化：只更新 `activeDocumentKey` 并清空占位状态后 **return**，不请求历史 |
 | `ensureSessionForCurrentDocument()` | 不允许持久化时 **return null** |
 | `sendMessage` | 不允许持久化：`contextTurns` 来自 `buildEphemeralContextTurnsFromMessages(this.messages)`（**推送本轮 user 之前** 的快照语义在代码中体现为：先算 `contextTurns`，再 `push` 用户与助手占位）；SSE body 为 `{ ephemeral: true, content, contextTurns }`；完成后 **不** `fetchSessionMessages` |
-| `flushEphemeralTranscriptIfNeeded` | 将 `messages` 转为 `lines`（上限 200），`importAssistantTranscript`；成功后更新 `sessionByDocument`、`sessionId`，并在 `activeDocumentKey === fromKey` 时改为 `toKey` |
+| `flushEphemeralTranscriptIfNeeded` | 将 `messages` 转为 `lines`（超过 200 条时 **`slice(-200)`** 只迁最近 200 条），`importAssistantTranscript`；成功后更新 `sessionByDocument`、`sessionId`，并在 `activeDocumentKey === fromKey` 时改为 `toKey` |
 | `clearAssistantStateOnKnowledgeDraftReset` | 清空/新建草稿时：abort SSE、清空 `messages` / `sessionId`、删除当前 `activeDocumentKey` 的内存映射；若有 `sessionId` 则异步 `stopAssistantStream` |
 
 **说明**：`buildEphemeralContextTurnsFromMessages` 与 `buildImportTranscriptLinesFromMessages` 放在模块顶层（非 class `private`），避免 `apps/frontend/src/store/index.ts` 聚合导出实例类型时触发 TS4094（「exported anonymous class 不可含 private 成员」）。

@@ -1,6 +1,8 @@
 /**
  * 知识库「草稿阶段」助手对话迁入正式条目后的落库契约（对应 `POST assistant/session/import-transcript`）。
  * 设计说明见：`docs/knowledge/knowledge-assistant-complete.md`（总览）、`knowledge-assistant-ephemeral-persistence.md`（持久化专题）。
+ *
+ * `lines` 上限 200：客户端在草稿轮次超过上限时应发送 **按时间升序排列的最近 200 条**（`slice(-200)`），避免校验失败并保证落库为「当前可见」尾部对话。
  */
 import { Type } from 'class-transformer';
 import {
@@ -29,6 +31,7 @@ export class ImportAssistantTranscriptDto {
 	@MaxLength(1024)
 	knowledgeArticleId!: string;
 
+	/** 按时间从早到晚；条数 ≤200；超长草稿由客户端截断为最近 200 条再提交 */
 	@IsArray()
 	@ArrayMaxSize(200)
 	@ValidateNested({ each: true })

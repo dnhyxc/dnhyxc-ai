@@ -91,7 +91,7 @@ export const KNOWLEDGE_TRASH_DETAIL = '/knowledge/trash/detail';
 export const KNOWLEDGE_TRASH_DELETE = '/knowledge/trash/delete';
 export const KNOWLEDGE_TRASH_DELETE_BATCH = '/knowledge/trash/delete-batch';
 
-/** 通用助手（智谱 GLM，多轮 session） */
+/** 通用助手（智谱 GLM，多轮 session） 获取助手会话详情与消息（时间正序）*/
 export const ASSISTANT_SESSION = '/assistant/session';
 /** 草稿对话迁入已保存知识条目 */
 export const ASSISTANT_SESSION_IMPORT_TRANSCRIPT =

@@ -139,7 +139,7 @@ flowchart LR
 
 - **`ImportAssistantTranscriptDto`**（`import-assistant-transcript.dto.ts`）  
   - `knowledgeArticleId`：保存后的知识 id。  
-  - `lines`：最多 200 条，`user`/`assistant` 角色。
+  - `lines`：最多 200 条，`user`/`assistant` 角色；超长时客户端提交 **按时间升序的最近 200 条**（`slice(-200)`）。
 
 - **`AssistantStopDto`**：`sessionId`。
 
@@ -167,7 +167,7 @@ flowchart LR
 1. `findLatestSessionIdByKnowledgeArticle(userId, articleId)`。  
 2. 无则 **新建** `AssistantSession` 并设 `knowledgeArticleId = articleId`；有则 **删光**该 session 下消息再插入。  
 3. 按 `lines` 扫描：**必须以 `user` 行开启一轮**；每条 user 后可选一条 `assistant`；写入 `turnId` 成对。  
-4. 更新 session `title`（首条用户内容截断）与 `updatedAt`。  
+4. 更新 session `title`：取 **本批 `lines` 中** 首条有正文的 `user` 内容前 60 字（客户端超长时只提交最近 200 条，则标题对应该窗口内最早一轮用户句，而非整段草稿绝对首条）。  
 5. 返回 `{ sessionId, inserted }`。
 
 ### 4.5 `getSessionDetail` / `stopStream`（删除知识后的幂等）
@@ -387,7 +387,7 @@ useEffect(() => {
 
 ## 11. 工程细节与约束
 
-1. **DTO 数组上限**：后端 `contextTurns` 120、`import lines` 200；前端切片与之一致。  
+1. **DTO 数组上限**：后端 `contextTurns` 120、`import lines` 200；前端迁入用 **`lines.slice(-200)`**（最近 200 条，升序），与之一致。  
 2. **路由顺序**：`import-transcript`、`for-knowledge` 须在 `session/:id` 之前（§4.1）。  
 3. **MobX**：流式更新用 **替换数组元素** 而非原地 `push` delta 到不可观察结构。  
 4. **TS4094**：助手 store 的辅助函数放模块级（§6.2）。  
