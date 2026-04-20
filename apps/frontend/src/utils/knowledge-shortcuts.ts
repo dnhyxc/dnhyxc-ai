@@ -11,6 +11,23 @@ export const KNOWLEDGE_SHORTCUT_KEY_IDS = {
 	openTrash: 10,
 	/** 将编辑器选中的内容发送到助手输入框 */
 	pasteToAssistant: 11,
+	/**
+	 * Markdown 编辑器底部操作栏：按顺序的快速操作（⌘+1…⌘+0）
+	 *
+	 * 说明：
+	 * - 这些快捷键**仅在知识库页面内生效**（registerGlobally=false）
+	 * - 由 `MarkdownEditor` 内部根据当前可用按钮（是否有 Diff/助手/自动保存等）决定是否执行
+	 */
+	markdownBarAction1: 12,
+	markdownBarAction2: 13,
+	markdownBarAction3: 14,
+	markdownBarAction4: 15,
+	markdownBarAction5: 16,
+	markdownBarAction6: 17,
+	markdownBarAction7: 18,
+	markdownBarAction8: 19,
+	markdownBarAction9: 20,
+	markdownBarAction0: 21,
 } as const;
 
 /** 与 `views/setting/system/config.ts` 中默认值保持一致 */
@@ -26,6 +43,23 @@ export const KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS = {
 	openTrash: 'Meta + Shift + T',
 	/** Command（Meta）+ Shift + V：将编辑器选中的内容发送到助手输入框 */
 	pasteToAssistant: 'Meta + Shift + V',
+	/**
+	 * Markdown 底部操作栏：按顺序的快速操作（默认 ⌘ + 数字键）。
+	 *
+	 * 注意：
+	 * - 这里只提供默认 chord，实际是否执行由 `MarkdownEditor` 根据按钮可用性判定
+	 * - `0` 对应 Digit0
+	 */
+	markdownBarAction1: 'Meta + 1',
+	markdownBarAction2: 'Meta + 2',
+	markdownBarAction3: 'Meta + 3',
+	markdownBarAction4: 'Meta + 4',
+	markdownBarAction5: 'Meta + 5',
+	markdownBarAction6: 'Meta + 6',
+	markdownBarAction7: 'Meta + 7',
+	markdownBarAction8: 'Meta + 8',
+	markdownBarAction9: 'Meta + 9',
+	markdownBarAction0: 'Meta + 0',
 } as const;
 
 type ParsedChord = {
@@ -214,17 +248,60 @@ export async function loadKnowledgeShortcutChords(): Promise<{
 	toggleMarkdownBottomBar: string;
 	openTrash: string;
 	pasteToAssistant: string;
+	markdownBarAction1: string;
+	markdownBarAction2: string;
+	markdownBarAction3: string;
+	markdownBarAction4: string;
+	markdownBarAction5: string;
+	markdownBarAction6: string;
+	markdownBarAction7: string;
+	markdownBarAction8: string;
+	markdownBarAction9: string;
+	markdownBarAction0: string;
 }> {
-	const [s, c, o, b, t, v] = await Promise.all([
-		getValue<string>(`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.save}`),
-		getValue<string>(`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.clear}`),
-		getValue<string>(`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.openLibrary}`),
-		getValue<string>(
-			`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.toggleMarkdownBottomBar}`,
-		),
-		getValue<string>(`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.openTrash}`),
-		getValue<string>(`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.pasteToAssistant}`),
-	]);
+	const [s, c, o, b, t, v, a1, a2, a3, a4, a5, a6, a7, a8, a9, a0] =
+		await Promise.all([
+			getValue<string>(`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.save}`),
+			getValue<string>(`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.clear}`),
+			getValue<string>(`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.openLibrary}`),
+			getValue<string>(
+				`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.toggleMarkdownBottomBar}`,
+			),
+			getValue<string>(`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.openTrash}`),
+			getValue<string>(
+				`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.pasteToAssistant}`,
+			),
+			getValue<string>(
+				`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.markdownBarAction1}`,
+			),
+			getValue<string>(
+				`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.markdownBarAction2}`,
+			),
+			getValue<string>(
+				`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.markdownBarAction3}`,
+			),
+			getValue<string>(
+				`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.markdownBarAction4}`,
+			),
+			getValue<string>(
+				`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.markdownBarAction5}`,
+			),
+			getValue<string>(
+				`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.markdownBarAction6}`,
+			),
+			getValue<string>(
+				`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.markdownBarAction7}`,
+			),
+			getValue<string>(
+				`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.markdownBarAction8}`,
+			),
+			getValue<string>(
+				`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.markdownBarAction9}`,
+			),
+			getValue<string>(
+				`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.markdownBarAction0}`,
+			),
+		]);
 	const { value: clear, didMigrate: clearMigrated } =
 		normalizeLegacyClearChord(c);
 	if (clearMigrated) {
@@ -257,6 +334,26 @@ export async function loadKnowledgeShortcutChords(): Promise<{
 		openTrash: t?.trim() || KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.openTrash,
 		pasteToAssistant:
 			v?.trim() || KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.pasteToAssistant,
+		markdownBarAction1:
+			a1?.trim() || KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.markdownBarAction1,
+		markdownBarAction2:
+			a2?.trim() || KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.markdownBarAction2,
+		markdownBarAction3:
+			a3?.trim() || KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.markdownBarAction3,
+		markdownBarAction4:
+			a4?.trim() || KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.markdownBarAction4,
+		markdownBarAction5:
+			a5?.trim() || KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.markdownBarAction5,
+		markdownBarAction6:
+			a6?.trim() || KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.markdownBarAction6,
+		markdownBarAction7:
+			a7?.trim() || KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.markdownBarAction7,
+		markdownBarAction8:
+			a8?.trim() || KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.markdownBarAction8,
+		markdownBarAction9:
+			a9?.trim() || KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.markdownBarAction9,
+		markdownBarAction0:
+			a0?.trim() || KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.markdownBarAction0,
 	};
 }
 

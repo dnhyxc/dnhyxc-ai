@@ -39,6 +39,7 @@ import {
 	ResizablePanel,
 	ResizablePanelGroup,
 } from '@/components/ui/resizable';
+import { useMarkdownBottomBarShortcuts } from '@/hooks/useMarkdownBottomBarShortcuts';
 import { cn } from '@/lib/utils';
 import { copyToClipboard, pasteFromClipboard } from '@/utils/clipboard';
 import Loading from '../Loading';
@@ -233,7 +234,22 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	diffBaselineText,
 	onInsertSelectionToAssistant,
 }) => {
+	/** 底部 Markdown 操作条是否展开（受控或未传 props 时内部 state） */
+	const [internalMarkdownBottomBarOpen, setInternalMarkdownBottomBarOpen] =
+		useState(false);
+	const [viewMode, setViewMode] = useState<MarkdownViewMode>('edit');
+	const [splitScrollFollowMode, setSplitScrollFollowMode] =
+		useState<MarkdownSplitScrollFollowMode>('none');
+	/** Diff 左侧（original）对照文本：进入 splitDiff 时从当前编辑器快照 */
+	const [diffBaselineOriginal, setDiffBaselineOriginal] = useState('');
+	/** Diff 会话 id：每次进入 splitDiff +1，用于生成独立模型路径，避免 keepCurrent*Model 复用陈旧文本 */
+	const [diffSessionId, setDiffSessionId] = useState(0);
+	const [internalMarkdownAssistantOpen, setInternalMarkdownAssistantOpen] =
+		useState(false);
+
 	const editorRef = useRef<MonacoEditorInstance | null>(null);
+	/** MarkdownEditor 根容器：用于判定快捷键事件是否发生在本组件内（含底部操作栏） */
+	const rootRef = useRef<HTMLDivElement | null>(null);
 	/** onMount 注入：右键菜单与 Cmd/Ctrl+C/V/X 等同源 */
 	const editorContextActionsRef = useRef<MonacoEditorContextActions | null>(
 		null,
@@ -249,26 +265,91 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	const prevDocumentIdentityRef = useRef(documentIdentity);
 	/** 用于 value 同步：换篇（documentIdentity 变）时即使编辑器有焦点也允许 setValue */
 	const prevIdentityForValueSyncRef = useRef(documentIdentity);
-	const [viewMode, setViewMode] = useState<MarkdownViewMode>('edit');
-	const [splitScrollFollowMode, setSplitScrollFollowMode] =
-		useState<MarkdownSplitScrollFollowMode>('none');
 	/** ResizablePanelGroup 的命令式句柄：用于在 edit/split 间切换时恢复布局，避免右侧宽度卡死 */
 	const panelGroupRef = useRef<GroupImperativeHandle | null>(null);
 	const lastSplitLayoutRef = useRef<Layout>({ editor: 50, right: 50 });
-	/** Diff 左侧（original）对照文本：进入 splitDiff 时从当前编辑器快照 */
-	const [diffBaselineOriginal, setDiffBaselineOriginal] = useState('');
-	/** Diff 会话 id：每次进入 splitDiff +1，用于生成独立模型路径，避免 keepCurrent*Model 复用陈旧文本 */
-	const [diffSessionId, setDiffSessionId] = useState(0);
 	const activeDiffSessionRef = useRef(0);
-	/** 底部 Markdown 操作条是否展开（受控或未传 props 时内部 state） */
-	const [internalMarkdownBottomBarOpen, setInternalMarkdownBottomBarOpen] =
-		useState(false);
+	const viewModeRef = useRef(viewMode);
+	const previewViewportRef = useRef<HTMLDivElement | null>(null);
+	/** 包裹 DiffEditor 的宿主，用于显式 layout（与主编辑器一致） */
+	const diffEditorHostRef = useRef<HTMLDivElement | null>(null);
+	const applyDiffEditorLayoutRef = useRef<(() => void) | null>(null);
+	/** 分屏跟滚布局快照：正文/布局变化时重建；滚动时仅在折线上插值 */
+	const markdownScrollSyncSnapshotRef =
+		useRef<MarkdownScrollSyncSnapshot | null>(null);
+	/** 合并滚动同步到下一帧，避免 onDidScrollChange 高频读布局 */
+	const scrollSyncRafRef = useRef(0);
+	/** 预览滚动驱动编辑器的 rAF 合并 */
+	const previewToEditorRafRef = useRef(0);
+	/** 编辑器改预览 scrollTop 后，忽略下一波预览 scroll 回声，防双向打架 */
+	const suppressPreviewScrollEchoRef = useRef(false);
+	/** 预览改编辑器滚动后，忽略下一波 onDidScrollChange 回声 */
+	const suppressEditorScrollEchoRef = useRef(false);
+	/** ResizeObserver 回调合并到单帧，减轻分栏拖拽时连续测量 */
+	const previewResizeRafRef = useRef(0);
+	const splitScrollFollowModeRef = useRef(splitScrollFollowMode);
+	/** 仅换 path 时更新，避免 defaultValue 每键变化导致 memo(Editor) 重渲染与 IME 叠字 */
+	const lastPathForBootstrapRef = useRef<string | null>(null);
+	const editorBootstrapTextRef = useRef(value);
+	/**
+	 * Diff 退出后延迟 dispose 上一会话的模型：
+	 * - 由于 DiffEditor 传了 keepCurrent*Model，会保留原/改两个 TextModel，避免卸载竞态报错
+	 * - 但若不手动释放，会导致下一次进入 Diff 复用旧 model（内容残留）或长期累积内存
+	 *
+	 * 处理方式：
+	 * - 进入 splitDiff 时记录 activeDiffSessionRef
+	 * - 退出 splitDiff 时 capture 当次 session 的 modelPath，并在双 rAF 后 dispose
+	 */
+	const prevViewModeRef = useRef<MarkdownViewMode>(viewMode);
+
+	viewModeRef.current = viewMode;
+	// 与 useLayoutEffect / rAF 对齐：避免仅用 useEffect 写 ref 时滞后一帧
+	splitScrollFollowModeRef.current = splitScrollFollowMode;
+	const scrollFollowActive = splitScrollFollowMode !== 'none';
+	/** 预览侧是否监听 scroll 以驱动编辑器（单向左跟右 + 双边） */
+	const editorFollowsPreviewActive =
+		splitScrollFollowMode === 'editorFollowsPreview' ||
+		splitScrollFollowMode === 'bidirectional';
+
+	const markdownBottomBarId = useId();
+
 	const bottomBarControlled =
 		markdownBottomBarOpenProp !== undefined &&
 		onMarkdownBottomBarOpenChange !== undefined;
 	const markdownBottomBarOpen = bottomBarControlled
 		? markdownBottomBarOpenProp
 		: internalMarkdownBottomBarOpen;
+
+	const isMarkdown = language === 'markdown' && enableMarkdownPreview;
+	const assistantPanelControlled =
+		markdownAssistantOpenProp !== undefined &&
+		onMarkdownAssistantOpenChange !== undefined;
+	const markdownAssistantOpen = assistantPanelControlled
+		? Boolean(markdownAssistantOpenProp)
+		: internalMarkdownAssistantOpen;
+	/** 右侧栏是否为 AI 助手（非预览）：此时不按「左编右预览」处理分屏选中与跟滚 */
+	const assistantRightPaneActive = Boolean(chatNode && markdownAssistantOpen);
+	/** 分屏右侧为 Markdown 预览且启用跟滚时，才做左右滚动同步（Diff 模式下右侧无预览 DOM） */
+	const splitPreviewScrollSyncEligible =
+		viewMode === 'split' &&
+		scrollFollowActive &&
+		isMarkdown &&
+		!assistantRightPaneActive;
+
+	valueFromPropsRef.current = value;
+
+	const showOverwriteSaveToggle = Boolean(onOverwriteSaveEnabledChange);
+	const showAutoSaveControls = Boolean(
+		onAutoSaveEnabledChange && onAutoSaveIntervalSecChange,
+	);
+
+	/** 有正文时勿传占位文案，否则部分 Monaco 版本在失焦或未编辑时仍叠画「# 输入内容...」 */
+	const hasEditorBody = normalizeMonacoEol(value ?? '').trim().length > 0;
+	const effectivePlaceholder = hasEditorBody ? '' : placeholder;
+	const glassThemeId = GLASS_THEME_BY_UI[theme];
+
+	const monaco = useMonaco();
+
 	const toggleMarkdownBottomBar = useCallback(() => {
 		if (bottomBarControlled && onMarkdownBottomBarOpenChange) {
 			onMarkdownBottomBarOpenChange(!markdownBottomBarOpenProp);
@@ -281,14 +362,6 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 		onMarkdownBottomBarOpenChange,
 	]);
 
-	const [internalMarkdownAssistantOpen, setInternalMarkdownAssistantOpen] =
-		useState(false);
-	const assistantPanelControlled =
-		markdownAssistantOpenProp !== undefined &&
-		onMarkdownAssistantOpenChange !== undefined;
-	const markdownAssistantOpen = assistantPanelControlled
-		? Boolean(markdownAssistantOpenProp)
-		: internalMarkdownAssistantOpen;
 	const toggleMarkdownAssistant = useCallback(() => {
 		if (!chatNode) return;
 		const next = !markdownAssistantOpen;
@@ -317,11 +390,6 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 		}
 	}, [assistantPanelControlled, onMarkdownAssistantOpenChange]);
 
-	const showOverwriteSaveToggle = Boolean(onOverwriteSaveEnabledChange);
-	const showAutoSaveControls = Boolean(
-		onAutoSaveEnabledChange && onAutoSaveIntervalSecChange,
-	);
-
 	const autoSaveIntervalOptions = useMemo(() => {
 		const presets: number[] = [...KNOWLEDGE_AUTO_SAVE_INTERVAL_PRESETS];
 		if (!presets.includes(autoSaveIntervalSec)) {
@@ -329,34 +397,6 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 		}
 		return presets.sort((a, b) => a - b);
 	}, [autoSaveIntervalSec]);
-	const viewModeRef = useRef(viewMode);
-	viewModeRef.current = viewMode;
-	const splitScrollFollowModeRef = useRef(splitScrollFollowMode);
-	// 与 useLayoutEffect / rAF 对齐：避免仅用 useEffect 写 ref 时滞后一帧
-	splitScrollFollowModeRef.current = splitScrollFollowMode;
-	const scrollFollowActive = splitScrollFollowMode !== 'none';
-	/** 预览侧是否监听 scroll 以驱动编辑器（单向左跟右 + 双边） */
-	const editorFollowsPreviewActive =
-		splitScrollFollowMode === 'editorFollowsPreview' ||
-		splitScrollFollowMode === 'bidirectional';
-	const previewViewportRef = useRef<HTMLDivElement | null>(null);
-	/** 包裹 DiffEditor 的宿主，用于显式 layout（与主编辑器一致） */
-	const diffEditorHostRef = useRef<HTMLDivElement | null>(null);
-	const applyDiffEditorLayoutRef = useRef<(() => void) | null>(null);
-	/** 分屏跟滚布局快照：正文/布局变化时重建；滚动时仅在折线上插值 */
-	const markdownScrollSyncSnapshotRef =
-		useRef<MarkdownScrollSyncSnapshot | null>(null);
-	/** 合并滚动同步到下一帧，避免 onDidScrollChange 高频读布局 */
-	const scrollSyncRafRef = useRef(0);
-	/** 预览滚动驱动编辑器的 rAF 合并 */
-	const previewToEditorRafRef = useRef(0);
-	/** 编辑器改预览 scrollTop 后，忽略下一波预览 scroll 回声，防双向打架 */
-	const suppressPreviewScrollEchoRef = useRef(false);
-	/** 预览改编辑器滚动后，忽略下一波 onDidScrollChange 回声 */
-	const suppressEditorScrollEchoRef = useRef(false);
-	/** ResizeObserver 回调合并到单帧，减轻分栏拖拽时连续测量 */
-	const previewResizeRafRef = useRef(0);
-	const markdownBottomBarId = useId();
 
 	/** 主编辑器右键菜单（与快捷键逻辑一致，依赖 editorContextActionsRef） */
 	const editorContextMenuItems = useMemo(
@@ -370,18 +410,6 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 			}),
 		[readOnly, language, onInsertSelectionToAssistant],
 	);
-
-	const isMarkdown = language === 'markdown' && enableMarkdownPreview;
-	/** 右侧栏是否为 AI 助手（非预览）：此时不按「左编右预览」处理分屏选中与跟滚 */
-	const assistantRightPaneActive = Boolean(chatNode && markdownAssistantOpen);
-	/** 分屏右侧为 Markdown 预览且启用跟滚时，才做左右滚动同步（Diff 模式下右侧无预览 DOM） */
-	const splitPreviewScrollSyncEligible =
-		viewMode === 'split' &&
-		scrollFollowActive &&
-		isMarkdown &&
-		!assistantRightPaneActive;
-
-	valueFromPropsRef.current = value;
 
 	const markdownDiffEntryEligible = useMemo(
 		() =>
@@ -407,12 +435,6 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 		const id = String(documentIdentity).replace(/[^a-zA-Z0-9_-]/g, '_');
 		return `dnhyxc-md-diff-modified__${id}__s${diffSessionId}`;
 	}, [documentIdentity, diffSessionId]);
-
-	const monaco = useMonaco();
-
-	/** 有正文时勿传占位文案，否则部分 Monaco 版本在失焦或未编辑时仍叠画「# 输入内容...」 */
-	const hasEditorBody = normalizeMonacoEol(value ?? '').trim().length > 0;
-	const effectivePlaceholder = hasEditorBody ? '' : placeholder;
 
 	const mergedEditorOptions = useMemo(() => {
 		// 关闭 automaticLayout：WebView/Tauri 全屏→窗口化时内部 ResizeObserver 易滞后，改由宿主显式喂宽高
@@ -484,17 +506,12 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 		stickyScrollScrollWithEditor,
 	]);
 
-	const glassThemeId = GLASS_THEME_BY_UI[theme];
-
 	const handleMonacoBeforeMount: BeforeMount = useCallback((monaco) => {
 		registerMonacoGlassThemes(monaco);
 		registerPrettierFormatProviders(monaco);
 		registerMarkdownFenceEmbeddedHighlight(monaco);
 	}, []);
 
-	/** 仅换 path 时更新，避免 defaultValue 每键变化导致 memo(Editor) 重渲染与 IME 叠字 */
-	const lastPathForBootstrapRef = useRef<string | null>(null);
-	const editorBootstrapTextRef = useRef(value);
 	if (lastPathForBootstrapRef.current !== monacoModelPath) {
 		lastPathForBootstrapRef.current = monacoModelPath;
 		editorBootstrapTextRef.current = value;
@@ -527,16 +544,6 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 		}
 	}, [viewMode]);
 
-	/**
-	 * Diff 退出后延迟 dispose 上一会话的模型：
-	 * - 由于 DiffEditor 传了 keepCurrent*Model，会保留原/改两个 TextModel，避免卸载竞态报错
-	 * - 但若不手动释放，会导致下一次进入 Diff 复用旧 model（内容残留）或长期累积内存
-	 *
-	 * 处理方式：
-	 * - 进入 splitDiff 时记录 activeDiffSessionRef
-	 * - 退出 splitDiff 时 capture 当次 session 的 modelPath，并在双 rAF 后 dispose
-	 */
-	const prevViewModeRef = useRef<MarkdownViewMode>(viewMode);
 	useEffect(() => {
 		const prev = prevViewModeRef.current;
 		prevViewModeRef.current = viewMode;
@@ -1367,6 +1374,33 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 		closeMarkdownAssistant,
 	]);
 
+	/**
+	 * Markdown 底部操作栏快捷键（⌘+1…⌘+0）：
+	 * - 在「系统设置」中可配置，保存后写入 store（`shortcut_${keyId}`）
+	 * - 这里监听 `KNOWLEDGE_SHORTCUTS_CHANGED_EVENT` 实时重载，避免刷新页面才生效
+	 * - 仅当事件来源属于当前编辑器 DOM（Monaco 宿主）时处理，避免影响页面其它输入框
+	 */
+	useMarkdownBottomBarShortcuts({
+		enabled: isMarkdown,
+		rootRef,
+		viewModeRef,
+		assistantRightPaneActive,
+		markdownDiffBottomBarVisible,
+		chatNodeEnabled: Boolean(chatNode),
+		showOverwriteSaveToggle,
+		overwriteSaveEnabled,
+		showAutoSaveControls,
+		autoSaveEnabled,
+		focusEditor,
+		closeMarkdownAssistant,
+		toggleMarkdownSplitDiffCompare,
+		toggleMarkdownAssistant,
+		setViewMode,
+		setSplitScrollFollowMode,
+		onOverwriteSaveEnabledChange,
+		onAutoSaveEnabledChange,
+	});
+
 	/** 底部操作栏内图标按钮（与「跟随滚动」一致） */
 	const markdownBarIconBtnClass = (active: boolean) =>
 		cn(
@@ -1379,6 +1413,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	return (
 		<div
 			className={cn('relative min-w-0 max-w-full overflow-hidden', className)}
+			ref={rootRef}
 		>
 			<div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-md bg-theme/5">
 				<div
