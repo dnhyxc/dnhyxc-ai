@@ -29,11 +29,20 @@ interface Props {
 function TrashRow(props: {
 	item: KnowledgeTrashListItem;
 	checked: boolean;
+	/** 当前预览（回填到编辑器）的条目：选中态需与知识库列表一致 */
+	selected: boolean;
 	onToggleChecked: (id: string) => void;
 	onActivate: (item: KnowledgeTrashListItem) => void | Promise<void>;
 	onDeleteClick: (e: React.MouseEvent, item: KnowledgeTrashListItem) => void;
 }) {
-	const { item, checked, onToggleChecked, onActivate, onDeleteClick } = props;
+	const {
+		item,
+		checked,
+		selected,
+		onToggleChecked,
+		onActivate,
+		onDeleteClick,
+	} = props;
 	const onKeyDown = (e: React.KeyboardEvent) => {
 		if (e.key === 'Enter') {
 			e.preventDefault();
@@ -48,11 +57,17 @@ function TrashRow(props: {
 		<div
 			role="button"
 			tabIndex={0}
+			aria-current={selected ? 'true' : undefined}
 			onKeyDown={onKeyDown}
 			onClick={() => void onActivate(item)}
 			className={cn(
 				'w-full cursor-pointer overflow-hidden flex flex-col gap-1 p-2 rounded-md group transition-colors',
-				checked ? 'bg-theme/15' : 'hover:bg-theme/10',
+				// 与知识库列表一致：当前预览项使用相同的选中底色
+				selected
+					? 'bg-theme/15'
+					: checked
+						? 'bg-theme/10'
+						: 'hover:bg-theme/10',
 			)}
 		>
 			<div className="flex items-start justify-between gap-2 min-w-0 w-full">
@@ -368,6 +383,10 @@ const KnowledgeTrashList: React.FC<Props> = observer(
 										key={item.id}
 										item={item}
 										checked={Boolean(selection[item.id])}
+										selected={
+											knowledgeStore.knowledgeTrashPreviewId != null &&
+											knowledgeStore.knowledgeTrashPreviewId === item.id
+										}
 										onToggleChecked={toggleChecked}
 										onActivate={onActivateRow}
 										onDeleteClick={onDeleteClick}
