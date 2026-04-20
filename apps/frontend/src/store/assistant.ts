@@ -118,8 +118,12 @@ class AssistantStore {
 	/**
 	 * 知识编辑区执行「清空 / 新建草稿」时：中断流式、清空当前文档下的内存对话与 session 映射。
 	 * 用于未保存云端草稿等 `documentKey` 不变、不会再次触发 `activateForDocument` 的场景，避免助手气泡残留。
+	 *
+	 * @param syncActiveDocumentKey 清空后左侧 `documentKey` 已与 props 一致时传入，用于同步 `activeDocumentKey`（避免仅因 `editingId` 变 null 触发 `activateForDocument` 二次拉会话）；不传则不改写 `activeDocumentKey`。
 	 */
-	clearAssistantStateOnKnowledgeDraftReset(): void {
+	clearAssistantStateOnKnowledgeDraftReset(
+		syncActiveDocumentKey?: string | null,
+	): void {
 		const prevSid = this.sessionId;
 		this.abortStream?.();
 		this.abortStream = null;
@@ -131,6 +135,10 @@ class AssistantStore {
 			const key = this.activeDocumentKey;
 			if (key) {
 				delete this.sessionByDocument[key];
+			}
+			const next = syncActiveDocumentKey?.trim();
+			if (next) {
+				this.activeDocumentKey = next;
 			}
 		});
 		if (prevSid) {

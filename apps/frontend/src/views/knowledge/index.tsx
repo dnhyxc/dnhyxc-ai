@@ -117,9 +117,17 @@ const Knowledge = observer(() => {
 		// 从回收站打开时 id 可能恒为 null：仅靠 editingId 无法区分「清空前后」；需让编辑器 identity 变化以退出 splitDiff，由 clearDocumentNonce 承担
 		setClearDocumentNonce((n) => n + 1);
 		knowledgeStore.clearKnowledgeDraft();
+		// 与 KnowledgeAssistant 的 `documentKey` 公式一致，供助手 store 同步 activeDocumentKey，避免清空后 props 变 draft-new 又触发 activate
+		const binding =
+			knowledgeStore.knowledgeTrashPreviewId != null
+				? `__knowledge_trash__:${knowledgeStore.knowledgeTrashPreviewId}`
+				: (knowledgeStore.knowledgeEditingKnowledgeId ?? 'draft-new');
+		const nextAssistantDocumentKey = `${binding}__trash-${trashOpenNonce}`;
 		// 未保存草稿下 documentKey 常为 `draft-new__trash-*` 不变，须显式清空助手内存态（含不落库的 ephemeral 对话）
-		assistantStore.clearAssistantStateOnKnowledgeDraftReset();
-	}, [knowledgeStore]);
+		assistantStore.clearAssistantStateOnKnowledgeDraftReset(
+			nextAssistantDocumentKey,
+		);
+	}, [knowledgeStore, trashOpenNonce]);
 
 	// 快捷键监听
 	useEffect(() => {

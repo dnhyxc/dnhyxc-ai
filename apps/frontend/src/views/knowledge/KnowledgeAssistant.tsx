@@ -149,10 +149,14 @@ const KnowledgeAssistant = observer(
 
 		// 左侧当前文档身份变化时调用 activate：首段会写入 `activeDocumentKey`（ephemeral 发消息必填），再按是否允许落库拉历史 / 建 session。
 		// 未保存草稿的 key 形如 `draft-new__trash-*` 也必须走此处；若跳过则 `activeDocumentKey` 为空，发送时会提示「文档未就绪」。
+		// 清空草稿后 `clearAssistantStateOnKnowledgeDraftReset(nextKey)` 已同步 activeDocumentKey；此时无正文不应再 activate，否则会二次清空并可能拉 `draft-new` 会话。
 		useEffect(() => {
 			if (!documentKey) return;
+			if (assistantStore.activeDocumentKey === documentKey && !editorHasBody) {
+				return;
+			}
 			void assistantStore.activateForDocument(documentKey);
-		}, [documentKey]);
+		}, [documentKey, editorHasBody, assistantStore.activeDocumentKey]);
 
 		const assistantPersistenceAllowed = useMemo(() => {
 			if (knowledgeStore.knowledgeTrashPreviewId != null) return true;
@@ -318,7 +322,7 @@ const KnowledgeAssistant = observer(
 		}, []);
 
 		return (
-			<div className="relative flex h-full w-full flex-col overflow-hidden pr-4 pl-3.5">
+			<div className="relative flex h-full w-full flex-col overflow-hidden">
 				<ChatCodeFloatingToolbar />
 				{!isLoggedIn ? (
 					<div className="text-textcolor/70 flex flex-1 items-center justify-center px-4 text-center text-sm">
@@ -378,7 +382,7 @@ const KnowledgeAssistant = observer(
 						<div
 							className={cn(
 								// 仅加 min-w-0：勿再写 max-w-full，否则会覆盖 max-w-3xl 的栏宽上限
-								'pt-4 max-w-3xl mx-auto relative flex w-full min-w-0 flex-col select-none',
+								'pt-4 max-w-3xl mx-auto relative flex w-full min-w-0 flex-col select-none  pr-4 pl-3.5',
 							)}
 						>
 							{messages.map((message, index) => (
@@ -413,7 +417,7 @@ const KnowledgeAssistant = observer(
 					</ScrollArea>
 				)}
 				{isLoggedIn ? (
-					<div className="w-full flex items-center justify-center">
+					<div className="w-full flex items-center justify-center pr-4 pl-3.5">
 						<ChatEntry
 							input={input}
 							setInput={setInput}
