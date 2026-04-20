@@ -11,9 +11,13 @@ import {
 	GitCompare,
 	Timer,
 } from 'lucide-react';
-import { memo } from 'react';
-
+import { memo, type RefObject } from 'react';
+import {
+	formatChordForTip,
+	useMarkdownBottomBarShortcuts,
+} from '@/hooks/useMarkdownBottomBarShortcuts';
 import { cn } from '@/lib/utils';
+import { formatKnowledgeAutoSaveIntervalLabel } from './utils';
 
 type MarkdownViewMode = 'edit' | 'preview' | 'split' | 'splitDiff';
 type MarkdownSplitScrollFollowMode =
@@ -36,74 +40,92 @@ export type MarkdownBottomBarChords = {
 };
 
 export const MarkdownBottomBar = memo(function MarkdownBottomBar(props: {
-	markdownBottomBarId: string;
-	markdownBottomBarOpen: boolean;
-
-	viewMode: MarkdownViewMode;
-	setViewMode: (mode: MarkdownViewMode) => void;
-	viewModeAllowsSplit: boolean;
-
-	assistantRightPaneActive: boolean;
-	chatNodeEnabled: boolean;
-	markdownAssistantOpen: boolean;
-	toggleMarkdownAssistant: () => void;
-	closeMarkdownAssistant: () => void;
-
-	markdownDiffBottomBarVisible: boolean;
-	toggleMarkdownSplitDiffCompare: () => void;
-
-	splitScrollFollowMode: MarkdownSplitScrollFollowMode;
-	setSplitScrollFollowMode: (
-		updater: (
-			prev: MarkdownSplitScrollFollowMode,
-		) => MarkdownSplitScrollFollowMode,
-	) => void;
-
-	showOverwriteSaveToggle: boolean;
-	overwriteSaveEnabled: boolean;
-	onOverwriteSaveEnabledChange?: (next: boolean) => void;
-
-	showAutoSaveControls: boolean;
-	autoSaveEnabled: boolean;
-	onAutoSaveEnabledChange?: (next: boolean) => void;
-	autoSaveIntervalSec: number;
-	autoSaveIntervalOptions: readonly number[];
-	onAutoSaveIntervalSecChange?: (next: number) => void;
-	formatKnowledgeAutoSaveIntervalLabel: (sec: number) => string;
-
-	focusEditor: () => void;
-
-	chords: MarkdownBottomBarChords;
-	formatChordForTip: (raw: string | undefined | null) => string;
+	id: string;
+	open: boolean;
+	shortcuts: {
+		enabled: boolean;
+		rootRef: RefObject<HTMLElement | null>;
+		viewModeRef: RefObject<MarkdownViewMode>;
+	};
+	state: {
+		viewMode: MarkdownViewMode;
+		assistantRightPaneActive: boolean;
+		markdownAssistantOpen: boolean;
+		splitScrollFollowMode: MarkdownSplitScrollFollowMode;
+		showOverwriteSaveToggle: boolean;
+		overwriteSaveEnabled: boolean;
+		showAutoSaveControls: boolean;
+		autoSaveEnabled: boolean;
+		autoSaveIntervalSec: number;
+		autoSaveIntervalOptions: readonly number[];
+		markdownDiffBottomBarVisible: boolean;
+	};
+	options: {
+		bottomBarCustomNodeEnabled: boolean;
+	};
+	actions: {
+		setViewMode: (mode: MarkdownViewMode) => void;
+		setSplitScrollFollowMode: (
+			updater: (
+				prev: MarkdownSplitScrollFollowMode,
+			) => MarkdownSplitScrollFollowMode,
+		) => void;
+		toggleMarkdownAssistant: () => void;
+		closeMarkdownAssistant: () => void;
+		toggleMarkdownSplitDiffCompare: () => void;
+		focusEditor: () => void;
+		onOverwriteSaveEnabledChange?: (next: boolean) => void;
+		onAutoSaveEnabledChange?: (next: boolean) => void;
+		onAutoSaveIntervalSecChange?: (next: number) => void;
+	};
 }) {
+	const { id, open, shortcuts, state, options, actions } = props;
 	const {
-		markdownBottomBarId,
-		markdownBottomBarOpen,
 		viewMode,
-		setViewMode,
 		assistantRightPaneActive,
-		chatNodeEnabled,
 		markdownAssistantOpen,
-		toggleMarkdownAssistant,
-		closeMarkdownAssistant,
-		markdownDiffBottomBarVisible,
-		toggleMarkdownSplitDiffCompare,
 		splitScrollFollowMode,
-		setSplitScrollFollowMode,
 		showOverwriteSaveToggle,
 		overwriteSaveEnabled,
-		onOverwriteSaveEnabledChange,
 		showAutoSaveControls,
 		autoSaveEnabled,
-		onAutoSaveEnabledChange,
 		autoSaveIntervalSec,
 		autoSaveIntervalOptions,
-		onAutoSaveIntervalSecChange,
-		formatKnowledgeAutoSaveIntervalLabel,
+		markdownDiffBottomBarVisible,
+	} = state;
+	const { bottomBarCustomNodeEnabled } = options;
+	const {
+		setViewMode,
+		setSplitScrollFollowMode,
+		toggleMarkdownAssistant,
+		closeMarkdownAssistant,
+		toggleMarkdownSplitDiffCompare,
 		focusEditor,
-		chords,
-		formatChordForTip,
-	} = props;
+		onOverwriteSaveEnabledChange,
+		onAutoSaveEnabledChange,
+		onAutoSaveIntervalSecChange,
+	} = actions;
+
+	const { chords } = useMarkdownBottomBarShortcuts({
+		enabled: shortcuts.enabled,
+		rootRef: shortcuts.rootRef,
+		viewModeRef: shortcuts.viewModeRef,
+		assistantRightPaneActive,
+		markdownDiffBottomBarVisible,
+		bottomBarCustomNodeEnabled,
+		showOverwriteSaveToggle,
+		overwriteSaveEnabled,
+		showAutoSaveControls,
+		autoSaveEnabled,
+		focusEditor,
+		closeMarkdownAssistant,
+		toggleMarkdownSplitDiffCompare,
+		toggleMarkdownAssistant,
+		setViewMode,
+		setSplitScrollFollowMode,
+		onOverwriteSaveEnabledChange,
+		onAutoSaveEnabledChange,
+	});
 
 	/** 底部操作栏内图标按钮（与「跟随滚动」一致） */
 	const markdownBarIconBtnClass = (active: boolean) =>
@@ -116,12 +138,12 @@ export const MarkdownBottomBar = memo(function MarkdownBottomBar(props: {
 
 	return (
 		<div
-			id={markdownBottomBarId}
+			id={id}
 			role="toolbar"
 			aria-label="Markdown 底部操作"
 			className={cn(
 				'absolute bottom-0 left-1/2 z-30 flex max-w-2xl -translate-x-1/2 justify-center transition-transform duration-300 ease-out motion-reduce:transition-none motion-reduce:duration-0',
-				markdownBottomBarOpen
+				open
 					? '-translate-y-2 pointer-events-auto'
 					: 'translate-y-15 pointer-events-none',
 			)}
@@ -190,7 +212,7 @@ export const MarkdownBottomBar = memo(function MarkdownBottomBar(props: {
 						</button>
 					</Tooltip>
 
-					{chatNodeEnabled ? (
+					{bottomBarCustomNodeEnabled ? (
 						<Tooltip
 							content={`${markdownAssistantOpen ? '关闭 AI 助手' : '开启 AI 助手'}（${formatChordForTip(chords.markdownBarAction4)}）`}
 						>

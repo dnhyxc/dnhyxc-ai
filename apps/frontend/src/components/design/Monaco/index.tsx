@@ -26,10 +26,6 @@ import {
 	ResizablePanel,
 	ResizablePanelGroup,
 } from '@/components/ui/resizable';
-import {
-	formatChordForTip,
-	useMarkdownBottomBarShortcuts,
-} from '@/hooks/useMarkdownBottomBarShortcuts';
 import { cn } from '@/lib/utils';
 import { copyToClipboard, pasteFromClipboard } from '@/utils/clipboard';
 import Loading from '../Loading';
@@ -54,7 +50,6 @@ import {
 import ParserMarkdownPreviewPane from './preview';
 import {
 	buildMarkdownScrollSyncSnapshot,
-	formatKnowledgeAutoSaveIntervalLabel,
 	isMarkdownDiffEntryEligible,
 	type MarkdownDiffBaselineSource,
 	type MarkdownScrollSyncSnapshot,
@@ -1374,33 +1369,6 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 		closeMarkdownAssistant,
 	]);
 
-	/**
-	 * Markdown 底部操作栏快捷键（⌘+1…⌘+0）：
-	 * - 在「系统设置」中可配置，保存后写入 store（`shortcut_${keyId}`）
-	 * - 这里监听 `KNOWLEDGE_SHORTCUTS_CHANGED_EVENT` 实时重载，避免刷新页面才生效
-	 * - 仅当事件来源属于当前编辑器 DOM（Monaco 宿主）时处理，避免影响页面其它输入框
-	 */
-	const { chords: markdownBarChords } = useMarkdownBottomBarShortcuts({
-		enabled: isMarkdown,
-		rootRef,
-		viewModeRef,
-		assistantRightPaneActive,
-		markdownDiffBottomBarVisible,
-		chatNodeEnabled: Boolean(bottomBarCustomNode),
-		showOverwriteSaveToggle,
-		overwriteSaveEnabled,
-		showAutoSaveControls,
-		autoSaveEnabled,
-		focusEditor,
-		closeMarkdownAssistant,
-		toggleMarkdownSplitDiffCompare,
-		toggleMarkdownAssistant,
-		setViewMode,
-		setSplitScrollFollowMode,
-		onOverwriteSaveEnabledChange,
-		onAutoSaveEnabledChange,
-	});
-
 	return (
 		<div
 			className={cn('relative min-w-0 max-w-full overflow-hidden', className)}
@@ -1610,35 +1578,40 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 
 			{isMarkdown ? (
 				<MarkdownBottomBar
-					markdownBottomBarId={markdownBottomBarId}
-					markdownBottomBarOpen={markdownBottomBarOpen}
-					viewMode={viewMode}
-					setViewMode={setViewMode}
-					viewModeAllowsSplit
-					assistantRightPaneActive={assistantRightPaneActive}
-					chatNodeEnabled={Boolean(bottomBarCustomNode)}
-					markdownAssistantOpen={markdownAssistantOpen}
-					toggleMarkdownAssistant={toggleMarkdownAssistant}
-					closeMarkdownAssistant={closeMarkdownAssistant}
-					markdownDiffBottomBarVisible={markdownDiffBottomBarVisible}
-					toggleMarkdownSplitDiffCompare={toggleMarkdownSplitDiffCompare}
-					splitScrollFollowMode={splitScrollFollowMode}
-					setSplitScrollFollowMode={setSplitScrollFollowMode}
-					showOverwriteSaveToggle={showOverwriteSaveToggle}
-					overwriteSaveEnabled={overwriteSaveEnabled}
-					onOverwriteSaveEnabledChange={onOverwriteSaveEnabledChange}
-					showAutoSaveControls={showAutoSaveControls}
-					autoSaveEnabled={autoSaveEnabled}
-					onAutoSaveEnabledChange={onAutoSaveEnabledChange}
-					autoSaveIntervalSec={autoSaveIntervalSec}
-					autoSaveIntervalOptions={autoSaveIntervalOptions}
-					onAutoSaveIntervalSecChange={onAutoSaveIntervalSecChange}
-					formatKnowledgeAutoSaveIntervalLabel={
-						formatKnowledgeAutoSaveIntervalLabel
-					}
-					focusEditor={focusEditor}
-					chords={markdownBarChords}
-					formatChordForTip={formatChordForTip}
+					id={markdownBottomBarId}
+					open={markdownBottomBarOpen}
+					shortcuts={{
+						enabled: isMarkdown,
+						rootRef,
+						viewModeRef,
+					}}
+					options={{
+						bottomBarCustomNodeEnabled: Boolean(bottomBarCustomNode),
+					}}
+					state={{
+						viewMode,
+						assistantRightPaneActive,
+						markdownAssistantOpen,
+						splitScrollFollowMode,
+						showOverwriteSaveToggle,
+						overwriteSaveEnabled,
+						showAutoSaveControls,
+						autoSaveEnabled,
+						autoSaveIntervalSec,
+						autoSaveIntervalOptions,
+						markdownDiffBottomBarVisible,
+					}}
+					actions={{
+						setViewMode,
+						setSplitScrollFollowMode,
+						toggleMarkdownAssistant,
+						closeMarkdownAssistant,
+						toggleMarkdownSplitDiffCompare,
+						focusEditor,
+						onOverwriteSaveEnabledChange,
+						onAutoSaveEnabledChange,
+						onAutoSaveIntervalSecChange,
+					}}
 				/>
 			) : null}
 		</div>
