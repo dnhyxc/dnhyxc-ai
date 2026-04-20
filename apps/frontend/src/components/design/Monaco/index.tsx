@@ -7,20 +7,7 @@ import Editor, {
 	useMonaco,
 } from '@monaco-editor/react';
 import { Button } from '@ui/index';
-import {
-	BetweenHorizontalEnd,
-	BetweenHorizontalStart,
-	BetweenVerticalEnd,
-	Bot,
-	Columns2,
-	Eye,
-	FileInput,
-	FilePenLine,
-	GitCompare,
-	PanelTopClose,
-	PanelTopOpen,
-	Timer,
-} from 'lucide-react';
+import { PanelTopClose, PanelTopOpen } from 'lucide-react';
 import {
 	type RefObject,
 	useCallback,
@@ -57,6 +44,7 @@ import {
 	safeFormatMarkdownValue,
 } from './format';
 import { GLASS_THEME_BY_UI, registerMonacoGlassThemes } from './glassTheme';
+import { MarkdownBottomBar } from './MarkdownBottomBar';
 import { registerMarkdownFenceEmbeddedHighlight } from './markdownTokens';
 import {
 	KNOWLEDGE_AUTO_SAVE_INTERVAL_PRESETS,
@@ -111,12 +99,18 @@ interface MarkdownEditorProps {
 	language?: string;
 	toolbar: React.ReactNode;
 	title?: React.ReactNode;
-	chatNode?: React.ReactNode;
+	// 自定义底部操作栏的节点，如 AI 助手节点
+	bottomBarCustomNode?: React.ReactNode;
 	/**
 	 * Markdown 右侧 AI 助手面板是否展开；与 onMarkdownAssistantOpenChange 同时传入时为受控模式。
-	 * 开启后分屏右侧展示 `chatNode`（与预览 / Diff 互斥）；仅在传入 `chatNode` 时底部栏显示开关。
+	 * 开启后分屏右侧展示 `bottomBarCustomNode`（与预览 / Diff 互斥）；仅在传入 `bottomBarCustomNode` 时底部栏显示开关。
 	 */
 	markdownAssistantOpen?: boolean;
+	/**
+	 * 右侧 Markdown AI 助手面板的展开/收起变化时回调；
+	 * 受控模式下由父组件管理 markdownAssistantOpen 状态。
+	 * @param open - 控制助手面板显示（true）或隐藏（false）
+	 */
 	onMarkdownAssistantOpenChange?: (open: boolean) => void;
 	/** 为 markdown 时是否显示编辑/预览/分屏切换；默认 true */
 	enableMarkdownPreview?: boolean;
@@ -213,7 +207,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	language = 'markdown',
 	toolbar,
 	title,
-	chatNode,
+	bottomBarCustomNode,
 	markdownAssistantOpen: markdownAssistantOpenProp,
 	onMarkdownAssistantOpenChange,
 	enableMarkdownPreview = true,
@@ -247,6 +241,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	const [diffBaselineOriginal, setDiffBaselineOriginal] = useState('');
 	/** Diff 会话 id：每次进入 splitDiff +1，用于生成独立模型路径，避免 keepCurrent*Model 复用陈旧文本 */
 	const [diffSessionId, setDiffSessionId] = useState(0);
+	// 内部 state：Markdown 右侧 AI 助手是否开启（受控/不受控——无外部 props 时由内部管理）
 	const [internalMarkdownAssistantOpen, setInternalMarkdownAssistantOpen] =
 		useState(false);
 
@@ -331,7 +326,9 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 		? Boolean(markdownAssistantOpenProp)
 		: internalMarkdownAssistantOpen;
 	/** 右侧栏是否为 AI 助手（非预览）：此时不按「左编右预览」处理分屏选中与跟滚 */
-	const assistantRightPaneActive = Boolean(chatNode && markdownAssistantOpen);
+	const assistantRightPaneActive = Boolean(
+		bottomBarCustomNode && markdownAssistantOpen,
+	);
 	/** 分屏右侧为 Markdown 预览且启用跟滚时，才做左右滚动同步（Diff 模式下右侧无预览 DOM） */
 	const splitPreviewScrollSyncEligible =
 		viewMode === 'split' &&
@@ -366,7 +363,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	]);
 
 	const toggleMarkdownAssistant = useCallback(() => {
-		if (!chatNode) return;
+		if (!bottomBarCustomNode) return;
 		const next = !markdownAssistantOpen;
 		// 仅通过机器人开关关闭助手时：回到「编辑源码」，避免仍停留在为助手而设的左编右预览分屏
 		if (!next) {
@@ -378,7 +375,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 			setInternalMarkdownAssistantOpen(next);
 		}
 	}, [
-		chatNode,
+		bottomBarCustomNode,
 		markdownAssistantOpen,
 		assistantPanelControlled,
 		onMarkdownAssistantOpenChange,
@@ -594,15 +591,15 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 		setInternalMarkdownAssistantOpen(false);
 	}, [documentIdentity, assistantPanelControlled]);
 
-	// 外部不再传入 chatNode 时，内部开关复位
+	// 外部不再传入 bottomBarCustomNode 时，内部开关复位
 	useEffect(() => {
-		if (chatNode || assistantPanelControlled) return;
+		if (bottomBarCustomNode || assistantPanelControlled) return;
 		setInternalMarkdownAssistantOpen(false);
-	}, [chatNode, assistantPanelControlled]);
+	}, [bottomBarCustomNode, assistantPanelControlled]);
 
 	// 开启助手后需有右侧栏位：从纯编辑 / 纯预览 / 分屏 Diff 进入「左编 + 右侧助手」
 	useEffect(() => {
-		if (!markdownAssistantOpen || !chatNode) return;
+		if (!markdownAssistantOpen || !bottomBarCustomNode) return;
 		setViewMode((vm) =>
 			vm === 'split'
 				? vm
@@ -610,7 +607,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 					? 'split'
 					: vm,
 		);
-	}, [markdownAssistantOpen, chatNode]);
+	}, [markdownAssistantOpen, bottomBarCustomNode]);
 
 	// viewMode 在 edit ↔ split* 切换时同步 splitLayout，避免右侧面板保持 0 导致无法撑开
 	useEffect(() => {
@@ -1389,7 +1386,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 		viewModeRef,
 		assistantRightPaneActive,
 		markdownDiffBottomBarVisible,
-		chatNodeEnabled: Boolean(chatNode),
+		chatNodeEnabled: Boolean(bottomBarCustomNode),
 		showOverwriteSaveToggle,
 		overwriteSaveEnabled,
 		showAutoSaveControls,
@@ -1403,15 +1400,6 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 		onOverwriteSaveEnabledChange,
 		onAutoSaveEnabledChange,
 	});
-
-	/** 底部操作栏内图标按钮（与「跟随滚动」一致） */
-	const markdownBarIconBtnClass = (active: boolean) =>
-		cn(
-			'lucide-stroke-draw-hover flex size-7 cursor-pointer items-center justify-center rounded-md p-1 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-theme/40',
-			active
-				? 'bg-theme/25 text-textcolor'
-				: 'text-textcolor/80 hover:bg-theme/10 hover:text-textcolor',
-		);
 
 	return (
 		<div
@@ -1439,6 +1427,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 											: '展开 Markdown 底部操作栏'
 									}
 									aria-expanded={markdownBottomBarOpen}
+									// 指定受控元素的 ID，以便屏幕阅读器辅助导航关联此按钮和 Markdown 底部操作栏
 									aria-controls={markdownBottomBarId}
 									onClick={toggleMarkdownBottomBar}
 									className="lucide-stroke-draw-hover"
@@ -1569,10 +1558,10 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 								)}
 							>
 								<div className="h-full min-h-0 min-w-0 overflow-hidden contain-[inline-size]">
-									{markdownAssistantOpen && chatNode ? (
+									{markdownAssistantOpen && bottomBarCustomNode ? (
 										<div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
 											<div className="min-h-0 flex-1 overflow-auto">
-												{chatNode}
+												{bottomBarCustomNode}
 											</div>
 										</div>
 									) : viewMode === 'splitDiff' ? (
@@ -1620,268 +1609,37 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 			</div>
 
 			{isMarkdown ? (
-				<div
-					id={markdownBottomBarId}
-					role="toolbar"
-					aria-label="Markdown 底部操作"
-					className={cn(
-						'absolute bottom-0 left-1/2 z-30 flex max-w-2xl -translate-x-1/2 justify-center transition-transform duration-300 ease-out motion-reduce:transition-none motion-reduce:duration-0',
-						markdownBottomBarOpen
-							? '-translate-y-2 pointer-events-auto'
-							: 'translate-y-15 pointer-events-none',
-					)}
-				>
-					<div className="flex h-10 w-full min-w-0 px-1.5 items-center justify-between rounded-md border border-theme/5 bg-theme/5 shadow-[0_-6px_20px_-8px_color-mix(in_oklch,var(--theme-background)_60%,black)] backdrop-blur-[2px]">
-						<div
-							className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-							role="tablist"
-							aria-label="Markdown 视图"
-						>
-							<Tooltip
-								content={`编辑源码（${formatChordForTip(markdownBarChords.markdownBarAction1)}）`}
-							>
-								<button
-									type="button"
-									role="tab"
-									aria-selected={viewMode === 'edit'}
-									className={markdownBarIconBtnClass(viewMode === 'edit')}
-									aria-label="编辑源码"
-									onClick={() => {
-										closeMarkdownAssistant();
-										setViewMode('edit');
-										queueMicrotask(focusEditor);
-									}}
-								>
-									<FilePenLine size={18} strokeWidth={1.75} />
-								</button>
-							</Tooltip>
-							{markdownDiffBottomBarVisible ? (
-								<Tooltip
-									content={`${viewMode === 'splitDiff' ? '关闭分屏对照：回到单栏编辑' : '分屏对照修改：左编右只读 Diff'}（${formatChordForTip(markdownBarChords.markdownBarAction2)}）`}
-								>
-									<button
-										type="button"
-										className={markdownBarIconBtnClass(
-											viewMode === 'splitDiff' && !assistantRightPaneActive,
-										)}
-										aria-pressed={
-											viewMode === 'splitDiff' && !assistantRightPaneActive
-										}
-										aria-label="开关分屏 Markdown 修改对照（Diff）"
-										onClick={toggleMarkdownSplitDiffCompare}
-									>
-										<GitCompare size={18} strokeWidth={1.75} aria-hidden />
-									</button>
-								</Tooltip>
-							) : null}
-							<Tooltip
-								content={`预览渲染（${formatChordForTip(markdownBarChords.markdownBarAction3)}）`}
-							>
-								<button
-									type="button"
-									role="tab"
-									aria-selected={viewMode === 'preview'}
-									className={markdownBarIconBtnClass(viewMode === 'preview')}
-									aria-label="预览渲染"
-									onClick={() => {
-										closeMarkdownAssistant();
-										setViewMode('preview');
-									}}
-								>
-									<Eye size={18} strokeWidth={1.75} />
-								</button>
-							</Tooltip>
-							{chatNode ? (
-								<Tooltip
-									content={`${markdownAssistantOpen ? '关闭 AI 助手' : '开启 AI 助手'}（${formatChordForTip(markdownBarChords.markdownBarAction4)}）`}
-								>
-									<button
-										type="button"
-										className={markdownBarIconBtnClass(markdownAssistantOpen)}
-										aria-pressed={markdownAssistantOpen}
-										aria-label="开关 Markdown 右侧 AI 助手"
-										onClick={toggleMarkdownAssistant}
-									>
-										<Bot size={18} strokeWidth={1.75} aria-hidden />
-									</button>
-								</Tooltip>
-							) : null}
-							<Tooltip
-								content={`分屏：左编辑右预览（${formatChordForTip(markdownBarChords.markdownBarAction5)}）`}
-							>
-								<button
-									type="button"
-									role="tab"
-									aria-selected={
-										viewMode === 'split' && !assistantRightPaneActive
-									}
-									className={markdownBarIconBtnClass(
-										viewMode === 'split' && !assistantRightPaneActive,
-									)}
-									aria-label="分屏：左编辑右预览"
-									onClick={() => {
-										closeMarkdownAssistant();
-										setViewMode('split');
-										queueMicrotask(focusEditor);
-									}}
-								>
-									<Columns2 size={18} strokeWidth={1.75} />
-								</button>
-							</Tooltip>
-
-							{viewMode === 'split' && !assistantRightPaneActive && (
-								<>
-									<Tooltip
-										content={`双边跟随：编辑区与预览区双向同步滚动（${formatChordForTip(markdownBarChords.markdownBarAction6)}）`}
-									>
-										<button
-											type="button"
-											className={markdownBarIconBtnClass(
-												splitScrollFollowMode === 'bidirectional',
-											)}
-											aria-pressed={splitScrollFollowMode === 'bidirectional'}
-											aria-label="双边跟随：编辑与预览互相同步滚动"
-											onClick={() =>
-												setSplitScrollFollowMode((m) =>
-													m === 'bidirectional' ? 'none' : 'bidirectional',
-												)
-											}
-										>
-											<BetweenVerticalEnd
-												size={18}
-												strokeWidth={1.75}
-												aria-hidden
-											/>
-										</button>
-									</Tooltip>
-
-									<Tooltip
-										content={`右边跟随左边：滚动编辑区时预览区同步滚动（${formatChordForTip(markdownBarChords.markdownBarAction7)}）`}
-									>
-										<button
-											type="button"
-											className={markdownBarIconBtnClass(
-												splitScrollFollowMode === 'previewFollowsEditor',
-											)}
-											aria-pressed={
-												splitScrollFollowMode === 'previewFollowsEditor'
-											}
-											aria-label="右边跟随左边：预览跟随编辑滚动"
-											onClick={() =>
-												setSplitScrollFollowMode((m) =>
-													m === 'previewFollowsEditor'
-														? 'none'
-														: 'previewFollowsEditor',
-												)
-											}
-										>
-											<BetweenHorizontalEnd
-												size={18}
-												strokeWidth={1.75}
-												aria-hidden
-											/>
-										</button>
-									</Tooltip>
-									<Tooltip
-										content={`左边跟随右边：滚动预览区时编辑区同步滚动（${formatChordForTip(markdownBarChords.markdownBarAction8)}）`}
-									>
-										<button
-											type="button"
-											className={markdownBarIconBtnClass(
-												splitScrollFollowMode === 'editorFollowsPreview',
-											)}
-											aria-pressed={
-												splitScrollFollowMode === 'editorFollowsPreview'
-											}
-											aria-label="左边跟随右边：编辑区跟随预览滚动"
-											onClick={() =>
-												setSplitScrollFollowMode((m) =>
-													m === 'editorFollowsPreview'
-														? 'none'
-														: 'editorFollowsPreview',
-												)
-											}
-										>
-											<BetweenHorizontalStart
-												size={18}
-												strokeWidth={1.75}
-												aria-hidden
-											/>
-										</button>
-									</Tooltip>
-								</>
-							)}
-						</div>
-						{showOverwriteSaveToggle || showAutoSaveControls ? (
-							<div className="flex shrink-0 items-center gap-1.5 pl-2">
-								{showOverwriteSaveToggle ? (
-									<Tooltip
-										content={`${overwriteSaveEnabled ? '已开启覆盖保存：同名文件将直接覆盖写入' : '开启覆盖保存：同名文件不再弹窗确认，直接覆盖写入'}（${formatChordForTip(markdownBarChords.markdownBarAction9)}）`}
-									>
-										<button
-											type="button"
-											className={markdownBarIconBtnClass(overwriteSaveEnabled)}
-											aria-pressed={overwriteSaveEnabled}
-											aria-label={
-												overwriteSaveEnabled ? '关闭覆盖保存' : '开启覆盖保存'
-											}
-											onClick={() =>
-												onOverwriteSaveEnabledChange?.(!overwriteSaveEnabled)
-											}
-										>
-											<FileInput size={18} strokeWidth={1.75} aria-hidden />
-										</button>
-									</Tooltip>
-								) : null}
-								{showAutoSaveControls ? (
-									<>
-										<Tooltip
-											content={`${autoSaveEnabled ? '已开启自动保存：按所选间隔在有修改时保存' : '开启自动保存：按间隔自动保存（无标题/正文或同名冲突未开覆盖时会静默跳过）'}（${formatChordForTip(markdownBarChords.markdownBarAction0)}）`}
-										>
-											<button
-												type="button"
-												className={markdownBarIconBtnClass(autoSaveEnabled)}
-												aria-pressed={autoSaveEnabled}
-												aria-label={
-													autoSaveEnabled ? '关闭自动保存' : '开启自动保存'
-												}
-												onClick={() =>
-													onAutoSaveEnabledChange?.(!autoSaveEnabled)
-												}
-											>
-												<Timer size={18} strokeWidth={1.75} aria-hidden />
-											</button>
-										</Tooltip>
-										<label
-											className="sr-only"
-											htmlFor="markdown-auto-save-interval"
-										>
-											自动保存间隔
-										</label>
-										<select
-											id="markdown-auto-save-interval"
-											className={cn(
-												'h-7 max-w-26 shrink-0 rounded-md border border-theme/15 bg-transparent px-1 text-xs text-textcolor outline-none focus-visible:ring-2 focus-visible:ring-theme/40 disabled:cursor-not-allowed disabled:opacity-45',
-											)}
-											disabled={!autoSaveEnabled}
-											value={String(autoSaveIntervalSec)}
-											aria-label="自动保存间隔"
-											onChange={(e) =>
-												onAutoSaveIntervalSecChange?.(Number(e.target.value))
-											}
-										>
-											{autoSaveIntervalOptions.map((sec) => (
-												<option key={sec} value={String(sec)}>
-													{formatKnowledgeAutoSaveIntervalLabel(sec)}
-												</option>
-											))}
-										</select>
-									</>
-								) : null}
-							</div>
-						) : null}
-					</div>
-				</div>
+				<MarkdownBottomBar
+					markdownBottomBarId={markdownBottomBarId}
+					markdownBottomBarOpen={markdownBottomBarOpen}
+					viewMode={viewMode}
+					setViewMode={setViewMode}
+					viewModeAllowsSplit
+					assistantRightPaneActive={assistantRightPaneActive}
+					chatNodeEnabled={Boolean(bottomBarCustomNode)}
+					markdownAssistantOpen={markdownAssistantOpen}
+					toggleMarkdownAssistant={toggleMarkdownAssistant}
+					closeMarkdownAssistant={closeMarkdownAssistant}
+					markdownDiffBottomBarVisible={markdownDiffBottomBarVisible}
+					toggleMarkdownSplitDiffCompare={toggleMarkdownSplitDiffCompare}
+					splitScrollFollowMode={splitScrollFollowMode}
+					setSplitScrollFollowMode={setSplitScrollFollowMode}
+					showOverwriteSaveToggle={showOverwriteSaveToggle}
+					overwriteSaveEnabled={overwriteSaveEnabled}
+					onOverwriteSaveEnabledChange={onOverwriteSaveEnabledChange}
+					showAutoSaveControls={showAutoSaveControls}
+					autoSaveEnabled={autoSaveEnabled}
+					onAutoSaveEnabledChange={onAutoSaveEnabledChange}
+					autoSaveIntervalSec={autoSaveIntervalSec}
+					autoSaveIntervalOptions={autoSaveIntervalOptions}
+					onAutoSaveIntervalSecChange={onAutoSaveIntervalSecChange}
+					formatKnowledgeAutoSaveIntervalLabel={
+						formatKnowledgeAutoSaveIntervalLabel
+					}
+					focusEditor={focusEditor}
+					chords={markdownBarChords}
+					formatChordForTip={formatChordForTip}
+				/>
 			) : null}
 		</div>
 	);

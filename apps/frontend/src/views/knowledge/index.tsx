@@ -909,7 +909,7 @@ const Knowledge = observer(() => {
 							/>
 						</div>
 					}
-					chatNode={
+					bottomBarCustomNode={
 						<KnowledgeAssistant
 							documentKey={knowledgeAssistantDocumentKey(
 								assistantArticleBinding,
