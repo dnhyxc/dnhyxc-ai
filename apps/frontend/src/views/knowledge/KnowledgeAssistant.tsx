@@ -318,7 +318,7 @@ const KnowledgeAssistant = observer(
 		}, []);
 
 		return (
-			<div className="relative flex h-full w-full flex-col overflow-hidden">
+			<div className="relative flex h-full w-full flex-col overflow-hidden pr-4 pl-3.5">
 				<ChatCodeFloatingToolbar />
 				{!isLoggedIn ? (
 					<div className="text-textcolor/70 flex flex-1 items-center justify-center px-4 text-center text-sm">
@@ -378,7 +378,7 @@ const KnowledgeAssistant = observer(
 						<div
 							className={cn(
 								// 仅加 min-w-0：勿再写 max-w-full，否则会覆盖 max-w-3xl 的栏宽上限
-								'pt-4 max-w-3xl mx-auto relative flex w-full min-w-0 flex-col select-none pr-4 pl-3.5',
+								'pt-4 max-w-3xl mx-auto relative flex w-full min-w-0 flex-col select-none',
 							)}
 						>
 							{messages.map((message, index) => (
@@ -417,7 +417,7 @@ const KnowledgeAssistant = observer(
 						<ChatEntry
 							input={input}
 							setInput={setInput}
-							className="w-full pl-4 pr-4.5 pb-4.5 border-theme/10"
+							className="w-full pl-0.5 pr-0.5 pb-4.5 border-theme/10"
 							textareaClassName="min-h-9"
 							sendMessage={sendMessage}
 							placeholder={
