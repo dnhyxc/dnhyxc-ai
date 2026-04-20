@@ -46,6 +46,11 @@
 5. **生命周期**  
    在 **`editor.onDidDispose`** 与组件卸载 **`useEffect`** 中将 **`editorContextActionsRef.current = null`**，防止卸载后仍点菜单。
 
+6. **与知识库助手输入框联动（选区→输入框）**  
+   为了让知识库场景可以把“编辑器选中的片段”快速塞进右侧助手输入框，本实现增加一个**可选外部回调**：  
+   - Monaco 侧只负责：读取**非空选区**、调用回调、并在右键菜单中暴露入口。  
+   - 知识库侧负责：如何写入输入框（覆盖/追加/是否自动展开助手）与输入框的受控状态管理。  
+
 ---
 
 ## 4. 先决条件：`contextmenu: false`
@@ -65,6 +70,27 @@ export const options: any = {
 ---
 
 ## 5. Monaco 侧：ref + `useMemo` 菜单项
+
+### 5.0 对外接口：`onInsertSelectionToAssistant`
+
+为支持“编辑器选区 → 助手输入框”，`MarkdownEditor` 额外暴露一个可选回调：
+
+```typescript
+// apps/frontend/src/components/design/Monaco/index.tsx（节选）
+interface MarkdownEditorProps {
+	/**
+	 * 外部接入：将“编辑器当前选区文本”写入某个输入框（例如知识库助手输入框）。
+	 *
+	 * 约束：
+	 * - 仅处理**非空选区**（不会降级为“复制整行”），避免误把整行/整段塞进对话框。
+	 * - 具体写入方式（覆盖/追加、是否聚焦输入框）由外部决定。
+	 */
+	onInsertSelectionToAssistant?: (text: string) => void;
+}
+```
+
+该能力本身不依赖知识库模块，**任何宿主**都可传入回调实现“把选区送到任意输入框”。  
+知识库接入见本文 **§6**。
 
 ### 5.1 `editorContextActionsRef` 与 `editorContextMenuItems`
 
@@ -91,6 +117,9 @@ const editorContextMenuItems = useMemo(
 			readOnly,
 			language,
 			actionsRef: editorContextActionsRef,
+			// 外部传了回调才展示该菜单项，避免“点了无效果”
+			enableSendSelectionToAssistant:
+				typeof onInsertSelectionToAssistant === 'function',
 		}),
 	[readOnly, language],
 );
@@ -109,6 +138,8 @@ injectMonacoEditorContextActions({
 	imeComposingRef,
 	actionsRef: editorContextActionsRef,
 	getCopyTextFromSelections,
+	getSelectedTextOnlyFromSelections,
+	onInsertSelectionToAssistant,
 	rangeForCutWhenCursorOnly,
 	copyToClipboard,
 	pasteFromClipboard,
@@ -186,12 +217,73 @@ export interface QuickContextMenuProps {
 
 ---
 
+## 6. 知识库接入：选区写入 Knowledge Assistant 输入框
+
+### 6.1 受控输入框：`KnowledgeAssistant` 支持外部写入
+
+知识库页需要一个“外部入口”写入助手输入框（右键菜单只是其中一种），因此 `KnowledgeAssistant` 增加可选受控 props：
+
+```typescript
+// apps/frontend/src/views/knowledge/KnowledgeAssistant.tsx（节选）
+interface KnowledgeAssistantProps {
+	documentKey: string;
+	/**
+	 * 外部受控输入框（可选）：用于从编辑器右键菜单等外部入口写入草稿。
+	 * 若不传则组件内部维护 input state。
+	 */
+	input?: string;
+	setInput?: (value: string) => void;
+}
+```
+
+组件内部做“受控/非受控”双模式兼容：  
+若传入 `input/setInput` 就使用外部状态，否则回退到内部 `useState`，不影响其它用法。
+
+### 6.2 知识库页装配：上移 `assistantInput` + 传入 `onInsertSelectionToAssistant`
+
+知识库页面（`views/knowledge/index.tsx`）将助手输入框状态上移，保证编辑器回调可以写入同一份草稿，并自动展开助手面板：
+
+```tsx
+// apps/frontend/src/views/knowledge/index.tsx（节选）
+const [assistantInput, setAssistantInput] = useState('');
+
+<MarkdownEditor
+	// ...其它 props
+	onInsertSelectionToAssistant={(text) => {
+		// 右键菜单：将编辑器选区写入助手输入框，并自动展开助手面板
+		setMarkdownAssistantOpen(true);
+		setAssistantInput((prev) => {
+			const next = (text ?? '').trim();
+			if (!next) return prev;
+			const cur = (prev ?? '').trim();
+			return cur ? `${cur}\n\n${next}` : next;
+		});
+	}}
+	chatNode={
+		<KnowledgeAssistant
+			documentKey={/* ... */}
+			input={assistantInput}
+			setInput={setAssistantInput}
+		/>
+	}
+/>
+```
+
+### 6.3 为什么只处理“非空选区”
+
+- **复制（Copy）**：允许空选区复制整行（编辑器常见行为）。  
+- **送入助手输入框**：只处理非空选区，避免用户只是点了一下光标就把整行/整段写入对话草稿，造成误操作与噪声。
+
+---
+
 ## 7. 相关文件索引
 
 | 文件 | 说明 |
 |------|------|
 | `apps/frontend/src/components/design/Monaco/contextMenu.ts` | `buildMonacoEditorContextMenuItems`（菜单项生成）、`injectMonacoEditorContextActions`（动作注入）与 `MonacoEditorContextActions` 类型 |
 | `apps/frontend/src/components/design/Monaco/index.tsx` | 右键菜单装配：`editorContextActionsRef`、`editorContextMenuItems`、`QuickContextMenu`、`handleEditorMount` 中调用注入函数 |
+| `apps/frontend/src/views/knowledge/index.tsx` | 知识库接入：向 `MarkdownEditor` 传 `onInsertSelectionToAssistant`，并把 `KnowledgeAssistant` 输入框状态上移为受控 |
+| `apps/frontend/src/views/knowledge/KnowledgeAssistant.tsx` | 支持受控输入框（`input/setInput` 可选），供编辑器右键菜单等外部入口写入草稿 |
 | `apps/frontend/src/components/design/Monaco/options.ts` | `contextmenu: false` |
 | `apps/frontend/src/components/design/ContextMenu/QuickContextMenu.tsx` | 声明式右键菜单 |
 | `apps/frontend/src/components/design/ContextMenu/types.ts` | `QuickContextMenuEntry` 等类型 |

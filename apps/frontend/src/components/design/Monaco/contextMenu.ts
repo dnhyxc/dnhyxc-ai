@@ -7,6 +7,11 @@ export type MonacoEditorContextActions = {
 	paste: () => void;
 	selectAll: () => void;
 	formatDocument: () => void;
+	/**
+	 * 将「当前选区」写入外部输入框（如知识库助手输入框）。
+	 * 注意：只处理**非空选区**；空选区（仅光标）应视为无效，不做“复制整行”的降级。
+	 */
+	sendSelectionToAssistant?: () => void;
 };
 
 /**
@@ -20,8 +25,15 @@ export function buildMonacoEditorContextMenuItems(input: {
 	readOnly: boolean;
 	language: string;
 	actionsRef: React.MutableRefObject<MonacoEditorContextActions | null>;
+	/** 外部是否接入「发送选区到助手输入框」能力（由宿主传入回调决定） */
+	enableSendSelectionToAssistant?: boolean;
 }): QuickContextMenuEntry[] {
-	const { readOnly, language, actionsRef } = input;
+	const {
+		readOnly,
+		language,
+		actionsRef,
+		enableSendSelectionToAssistant = false,
+	} = input;
 	const items: QuickContextMenuEntry[] = [];
 
 	if (!readOnly) {
@@ -62,6 +74,17 @@ export function buildMonacoEditorContextMenuItems(input: {
 		onSelect: () => actionsRef.current?.selectAll(),
 	});
 
+	if (enableSendSelectionToAssistant) {
+		items.push({ type: 'separator' });
+		items.push({
+			type: 'item',
+			id: 'sendSelectionToAssistant',
+			label: '发送选中内容到助手输入框',
+			shortcut: '—',
+			onSelect: () => actionsRef.current?.sendSelectionToAssistant?.(),
+		});
+	}
+
 	if (!readOnly) {
 		items.push({ type: 'separator' });
 		items.push({
@@ -89,6 +112,10 @@ export function injectMonacoEditorContextActions(input: {
 	imeComposingRef: React.MutableRefObject<boolean>;
 	actionsRef: React.MutableRefObject<MonacoEditorContextActions | null>;
 	getCopyTextFromSelections: () => string;
+	/** 仅返回“真实选区文本”（无选区时返回空串），用于写入外部输入框 */
+	getSelectedTextOnlyFromSelections: () => string;
+	/** 外部接入：将选区写入助手输入框（实现由知识库页面决定） */
+	onInsertSelectionToAssistant?: (text: string) => void;
 	rangeForCutWhenCursorOnly: (
 		sel: NonNullable<
 			ReturnType<Parameters<OnMount>[0]['getSelections']>
@@ -106,6 +133,8 @@ export function injectMonacoEditorContextActions(input: {
 		imeComposingRef,
 		actionsRef,
 		getCopyTextFromSelections,
+		getSelectedTextOnlyFromSelections,
+		onInsertSelectionToAssistant,
 		rangeForCutWhenCursorOnly,
 		copyToClipboard,
 		pasteFromClipboard,
@@ -172,5 +201,12 @@ export function injectMonacoEditorContextActions(input: {
 			}
 			editor.trigger('keyboard', 'editor.action.formatDocument', null);
 		},
+		sendSelectionToAssistant: onInsertSelectionToAssistant
+			? () => {
+					const text = getSelectedTextOnlyFromSelections();
+					if (!text.trim()) return;
+					onInsertSelectionToAssistant(text);
+				}
+			: undefined,
 	};
 }

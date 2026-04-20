@@ -47,6 +47,7 @@ import {
 const Knowledge = observer(() => {
 	const { knowledgeStore, userStore } = useStore();
 	const { theme } = useTheme();
+	const [assistantInput, setAssistantInput] = useState('');
 
 	const [listOpen, setListOpen] = useState(false);
 	const [trashOpen, setTrashOpen] = useState(false);
@@ -790,6 +791,16 @@ const Knowledge = observer(() => {
 					onMarkdownAssistantOpenChange={setMarkdownAssistantOpen}
 					value={knowledgeStore.markdown}
 					onChange={handleMarkdownChange}
+					onInsertSelectionToAssistant={(text) => {
+						// 右键菜单：将编辑器选区写入助手输入框，并自动展开助手面板
+						setMarkdownAssistantOpen(true);
+						setAssistantInput((prev) => {
+							const next = (text ?? '').trim();
+							if (!next) return prev;
+							const cur = (prev ?? '').trim();
+							return cur ? `${cur}\n\n${next}` : next;
+						});
+					}}
 					getMarkdownFromEditorRef={getMarkdownFromEditorRef}
 					markdownBottomBarOpen={markdownBottomBarOpen}
 					onMarkdownBottomBarOpenChange={setMarkdownBottomBarOpen}
@@ -863,6 +874,8 @@ const Knowledge = observer(() => {
 								assistantArticleBinding,
 								trashOpenNonce,
 							)}
+							input={assistantInput}
+							setInput={setAssistantInput}
 						/>
 					}
 				/>

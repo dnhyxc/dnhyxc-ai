@@ -42,6 +42,12 @@ import {
 interface KnowledgeAssistantProps {
 	/** 与 MarkdownEditor `documentIdentity` 一致，用于绑定助手多轮会话 */
 	documentKey: string;
+	/**
+	 * 外部受控输入框（可选）：用于从编辑器右键菜单等外部入口写入草稿。
+	 * 若不传则组件内部维护 input state。
+	 */
+	input?: string;
+	setInput?: (value: string) => void;
 }
 
 interface KnowledgeAssistantMessageBubbleProps {
@@ -131,9 +137,15 @@ const KnowledgeAssistantMessageBubble = observer(
 );
 
 const KnowledgeAssistant = observer(
-	({ documentKey }: KnowledgeAssistantProps) => {
+	({
+		documentKey,
+		input: inputProp,
+		setInput: setInputProp,
+	}: KnowledgeAssistantProps) => {
 		const { knowledgeStore, userStore } = useStore();
-		const [input, setInput] = useState('');
+		const [internalInput, setInternalInput] = useState('');
+		const input = inputProp ?? internalInput;
+		const setInput = setInputProp ?? setInternalInput;
 		const [isCopyedId, setIsCopyedId] = useState('');
 
 		const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);

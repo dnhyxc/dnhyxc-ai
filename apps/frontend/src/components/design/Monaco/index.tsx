@@ -185,6 +185,14 @@ interface MarkdownEditorProps {
 	 * 该值用于生成 Diff 左侧（original）。
 	 */
 	diffBaselineText?: string;
+	/**
+	 * 外部接入：将“编辑器当前选区文本”写入某个输入框（例如知识库助手输入框）。
+	 *
+	 * 约束：
+	 * - 仅处理**非空选区**（不会降级为“复制整行”），避免误把整行/整段塞进对话框。
+	 * - 具体写入方式（覆盖/追加、是否聚焦输入框）由外部决定。
+	 */
+	onInsertSelectionToAssistant?: (text: string) => void;
 }
 
 const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
@@ -221,6 +229,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	stickyScrollScrollWithEditor = true,
 	diffBaselineSource = 'current',
 	diffBaselineText,
+	onInsertSelectionToAssistant,
 }) => {
 	const editorRef = useRef<MonacoEditorInstance | null>(null);
 	/** onMount 注入：右键菜单与 Cmd/Ctrl+C/V/X 等同源 */
@@ -351,8 +360,10 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 				readOnly,
 				language,
 				actionsRef: editorContextActionsRef,
+				enableSendSelectionToAssistant:
+					typeof onInsertSelectionToAssistant === 'function',
 			}),
-		[readOnly, language],
+		[readOnly, language, onInsertSelectionToAssistant],
 	);
 
 	const isMarkdown = language === 'markdown' && enableMarkdownPreview;
@@ -986,6 +997,31 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 			};
 
 			/**
+			 * 仅返回“真实选区文本”：
+			 * - 多选区：用模型 EOL 拼接（与复制一致）
+			 * - 空选区（仅光标）：返回空串（不降级为整行）
+			 *
+			 * 用于外部输入框（如知识库助手）接入，避免误把整行塞进对话草稿。
+			 */
+			const getSelectedTextOnlyFromSelections = (): string => {
+				const model = editor.getModel();
+				if (!model) return '';
+				const sels = editor.getSelections();
+				if (!sels?.length) return '';
+				const eol = model.getEOL();
+				return sels
+					.map((sel) => {
+						const isCursor =
+							sel.startLineNumber === sel.endLineNumber &&
+							sel.startColumn === sel.endColumn;
+						if (isCursor) return '';
+						return model.getValueInRange(sel);
+					})
+					.filter(Boolean)
+					.join(eol);
+			};
+
+			/**
 			 * 剪切时使用的范围：与 VS Code 一致，**空选区（仅光标）**表示「当前逻辑行」。
 			 * - 非最后一行：删除 (line,1)～(line+1,1)，去掉该行及行尾换行
 			 * - 最后一行且上文还有行：从上一行末尾到本行末尾，一并去掉行间换行
@@ -1064,6 +1100,8 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 				imeComposingRef,
 				actionsRef: editorContextActionsRef,
 				getCopyTextFromSelections,
+				getSelectedTextOnlyFromSelections,
+				onInsertSelectionToAssistant,
 				rangeForCutWhenCursorOnly,
 				copyToClipboard,
 				pasteFromClipboard,
