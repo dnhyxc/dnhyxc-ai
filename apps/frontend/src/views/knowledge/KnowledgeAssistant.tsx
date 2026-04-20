@@ -194,10 +194,21 @@ const KnowledgeAssistant = observer(
 
 		// 左侧编辑器被清空时，同步清空助手输入框，避免禁用输入后仍残留未发送草稿
 		useEffect(() => {
-			if (!(knowledgeStore.markdown ?? '').trim()) {
-				setInput('');
-			}
-		}, [knowledgeStore.markdown]);
+			/**
+			 * 注意：开启助手会导致 Monaco 视图切换与编辑器重挂载，期间父级 markdown 可能出现极短暂的空串。
+			 * 若此处立刻清空输入框，会造成“刚复制进输入框就被清掉”的体验。
+			 *
+			 * 策略：仅当 markdown 持续为空一段时间后再清空输入框，规避重挂载瞬态。
+			 */
+			const raw = knowledgeStore.markdown ?? '';
+			if (raw.trim()) return;
+			const id = window.setTimeout(() => {
+				if (!(knowledgeStore.markdown ?? '').trim()) {
+					setInput('');
+				}
+			}, 200);
+			return () => window.clearTimeout(id);
+		}, [knowledgeStore.markdown, setInput, knowledgeStore]);
 
 		const onSaveToKnowledge = useCallback(
 			(message: Message) => {

@@ -133,6 +133,11 @@ const Knowledge = observer(() => {
 		],
 	);
 
+	// 切换知识文档（binding 变化）时清空助手输入框，避免把上一篇草稿带到下一篇
+	useEffect(() => {
+		setAssistantInput('');
+	}, [assistantArticleBinding]);
+
 	/** 清空标题与正文（store 级草稿，与 markdown 一并清除） */
 	const resetEditorToNewDraft = useCallback(() => {
 		// 仅递增 clearDocumentNonce 驱动 Monaco 的 documentIdentity，勿动 trashOpenNonce（否则与助手 documentKey 联动，会清空会话并触发内部关助手）
@@ -819,14 +824,23 @@ const Knowledge = observer(() => {
 					value={knowledgeStore.markdown}
 					onChange={handleMarkdownChange}
 					onInsertSelectionToAssistant={(text) => {
-						// 右键菜单：将编辑器选区写入助手输入框，并自动展开助手面板
-						setMarkdownAssistantOpen(true);
+						/**
+						 * 将编辑器选区写入助手输入框，并在未打开时自动展开助手面板。
+						 *
+						 * 重要：开启助手会触发 Monaco 视图切换（edit→split）并导致 Editor 重挂载。
+						 * 若此时父级 markdown 尚未从 Editor 同步完成，会短暂表现为“编辑器内容被清空”，并触发助手输入框的清空逻辑。
+						 * 因此这里先强制从 Editor 同步最新正文，再写入输入框，最后再打开助手面板。
+						 */
+						getMarkdownFromEditorRef.current?.();
 						setAssistantInput((prev) => {
 							const next = (text ?? '').trim();
 							if (!next) return prev;
 							const cur = (prev ?? '').trim();
 							return cur ? `${cur}\n\n${next}` : next;
 						});
+						if (!markdownAssistantOpen) {
+							queueMicrotask(() => setMarkdownAssistantOpen(true));
+						}
 					}}
 					getMarkdownFromEditorRef={getMarkdownFromEditorRef}
 					markdownBottomBarOpen={markdownBottomBarOpen}

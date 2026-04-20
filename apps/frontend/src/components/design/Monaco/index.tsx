@@ -1390,6 +1390,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 									width="100%"
 									language={language}
 									path={monacoModelPath}
+									keepCurrentModel
 									defaultValue={editorBootstrapTextRef.current}
 									beforeMount={handleMonacoBeforeMount}
 									theme={glassThemeId}
@@ -1437,6 +1438,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 												width="100%"
 												language={language}
 												path={monacoModelPath}
+												keepCurrentModel
 												defaultValue={editorBootstrapTextRef.current}
 												beforeMount={handleMonacoBeforeMount}
 												theme={glassThemeId}
