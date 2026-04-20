@@ -39,7 +39,10 @@ import {
 	ResizablePanel,
 	ResizablePanelGroup,
 } from '@/components/ui/resizable';
-import { useMarkdownBottomBarShortcuts } from '@/hooks/useMarkdownBottomBarShortcuts';
+import {
+	formatChordForTip,
+	useMarkdownBottomBarShortcuts,
+} from '@/hooks/useMarkdownBottomBarShortcuts';
 import { cn } from '@/lib/utils';
 import { copyToClipboard, pasteFromClipboard } from '@/utils/clipboard';
 import Loading from '../Loading';
@@ -1380,7 +1383,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	 * - 这里监听 `KNOWLEDGE_SHORTCUTS_CHANGED_EVENT` 实时重载，避免刷新页面才生效
 	 * - 仅当事件来源属于当前编辑器 DOM（Monaco 宿主）时处理，避免影响页面其它输入框
 	 */
-	useMarkdownBottomBarShortcuts({
+	const { chords: markdownBarChords } = useMarkdownBottomBarShortcuts({
 		enabled: isMarkdown,
 		rootRef,
 		viewModeRef,
@@ -1634,7 +1637,9 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 							role="tablist"
 							aria-label="Markdown 视图"
 						>
-							<Tooltip content="编辑源码">
+							<Tooltip
+								content={`编辑源码（${formatChordForTip(markdownBarChords.markdownBarAction1)}）`}
+							>
 								<button
 									type="button"
 									role="tab"
@@ -1652,11 +1657,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 							</Tooltip>
 							{markdownDiffBottomBarVisible ? (
 								<Tooltip
-									content={
-										viewMode === 'splitDiff'
-											? '关闭分屏对照：回到单栏编辑'
-											: '分屏对照修改：左编右只读 Diff'
-									}
+									content={`${viewMode === 'splitDiff' ? '关闭分屏对照：回到单栏编辑' : '分屏对照修改：左编右只读 Diff'}（${formatChordForTip(markdownBarChords.markdownBarAction2)}）`}
 								>
 									<button
 										type="button"
@@ -1673,7 +1674,9 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 									</button>
 								</Tooltip>
 							) : null}
-							<Tooltip content="预览渲染">
+							<Tooltip
+								content={`预览渲染（${formatChordForTip(markdownBarChords.markdownBarAction3)}）`}
+							>
 								<button
 									type="button"
 									role="tab"
@@ -1690,9 +1693,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 							</Tooltip>
 							{chatNode ? (
 								<Tooltip
-									content={
-										markdownAssistantOpen ? '关闭 AI 助手' : '开启 AI 助手'
-									}
+									content={`${markdownAssistantOpen ? '关闭 AI 助手' : '开启 AI 助手'}（${formatChordForTip(markdownBarChords.markdownBarAction4)}）`}
 								>
 									<button
 										type="button"
@@ -1705,7 +1706,9 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 									</button>
 								</Tooltip>
 							) : null}
-							<Tooltip content="分屏：左编辑右预览">
+							<Tooltip
+								content={`分屏：左编辑右预览（${formatChordForTip(markdownBarChords.markdownBarAction5)}）`}
+							>
 								<button
 									type="button"
 									role="tab"
@@ -1728,7 +1731,9 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 
 							{viewMode === 'split' && !assistantRightPaneActive && (
 								<>
-									<Tooltip content="双边跟随：编辑区与预览区双向同步滚动">
+									<Tooltip
+										content={`双边跟随：编辑区与预览区双向同步滚动（${formatChordForTip(markdownBarChords.markdownBarAction6)}）`}
+									>
 										<button
 											type="button"
 											className={markdownBarIconBtnClass(
@@ -1750,7 +1755,9 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 										</button>
 									</Tooltip>
 
-									<Tooltip content="右边跟随左边：滚动编辑区时预览区同步滚动">
+									<Tooltip
+										content={`右边跟随左边：滚动编辑区时预览区同步滚动（${formatChordForTip(markdownBarChords.markdownBarAction7)}）`}
+									>
 										<button
 											type="button"
 											className={markdownBarIconBtnClass(
@@ -1775,7 +1782,9 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 											/>
 										</button>
 									</Tooltip>
-									<Tooltip content="左边跟随右边：滚动预览区时编辑区同步滚动">
+									<Tooltip
+										content={`左边跟随右边：滚动预览区时编辑区同步滚动（${formatChordForTip(markdownBarChords.markdownBarAction8)}）`}
+									>
 										<button
 											type="button"
 											className={markdownBarIconBtnClass(
@@ -1807,11 +1816,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 							<div className="flex shrink-0 items-center gap-1.5 pl-2">
 								{showOverwriteSaveToggle ? (
 									<Tooltip
-										content={
-											overwriteSaveEnabled
-												? '已开启覆盖保存：同名文件将直接覆盖写入'
-												: '开启覆盖保存：同名文件不再弹窗确认，直接覆盖写入'
-										}
+										content={`${overwriteSaveEnabled ? '已开启覆盖保存：同名文件将直接覆盖写入' : '开启覆盖保存：同名文件不再弹窗确认，直接覆盖写入'}（${formatChordForTip(markdownBarChords.markdownBarAction9)}）`}
 									>
 										<button
 											type="button"
@@ -1831,11 +1836,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 								{showAutoSaveControls ? (
 									<>
 										<Tooltip
-											content={
-												autoSaveEnabled
-													? '已开启自动保存：按所选间隔在有修改时保存'
-													: '开启自动保存：按间隔自动保存（无标题/正文或同名冲突未开覆盖时会静默跳过）'
-											}
+											content={`${autoSaveEnabled ? '已开启自动保存：按所选间隔在有修改时保存' : '开启自动保存：按间隔自动保存（无标题/正文或同名冲突未开覆盖时会静默跳过）'}（${formatChordForTip(markdownBarChords.markdownBarAction0)}）`}
 										>
 											<button
 												type="button"

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-
+import { isMacLike } from '@/utils';
 import {
 	chordMatchesStored,
 	KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS,
@@ -19,6 +19,36 @@ type MarkdownBottomBarChords = {
 	markdownBarAction9: string;
 	markdownBarAction0: string;
 };
+
+/**
+ * 将存储串（例如 `Meta + Shift + 1`）格式化为 Tooltip 更易读的显示文本。
+ *
+ * 说明：
+ * - Meta 在 macOS 上显示为 ⌘，非 macOS 显示为 Ctrl（更符合用户心智）
+ * - Shift/Alt 在 macOS 上显示为 ⇧/⌥
+ * - 仅用于展示，不参与匹配逻辑（匹配仍由 `chordMatchesStored` 处理）
+ */
+export function formatChordForTip(raw: string | undefined | null): string {
+	const s = String(raw ?? '').trim();
+	if (!s) return '';
+	const mac = isMacLike();
+	const parts = s
+		.split('+')
+		.map((p) => p.trim())
+		.filter(Boolean);
+	const mapped = parts.map((p) => {
+		const low = p.toLowerCase();
+		if (['meta', 'command', 'cmd', 'super'].includes(low))
+			return mac ? '⌘' : 'Ctrl';
+		if (['control', 'ctrl'].includes(low)) return 'Ctrl';
+		if (low === 'shift') return mac ? '⇧' : 'Shift';
+		if (low === 'alt') return mac ? '⌥' : 'Alt';
+		// 主键：数字/字母用大写；其它保持原样（例如 Enter）
+		if (p.length === 1) return p.toUpperCase();
+		return p;
+	});
+	return mapped.join(mac ? ' + ' : ' + ');
+}
 
 export function useMarkdownBottomBarShortcuts(input: {
 	enabled: boolean;
@@ -253,4 +283,6 @@ export function useMarkdownBottomBarShortcuts(input: {
 		onOverwriteSaveEnabledChange,
 		onAutoSaveEnabledChange,
 	]);
+
+	return { chords };
 }
