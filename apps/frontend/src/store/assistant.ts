@@ -345,9 +345,13 @@ class AssistantStore {
 		return created;
 	}
 
-	async sendMessage(raw?: string): Promise<void> {
+	async sendMessage(
+		raw?: string,
+		options?: { extraUserContentForModel?: string },
+	): Promise<void> {
 		const text = (raw ?? '').trim();
 		if (!text || this.isSending || this.isHistoryLoading) return;
+		const extraUserContentForModel = options?.extraUserContentForModel?.trim();
 
 		const ephemeral = !this.knowledgeAssistantPersistenceAllowed;
 		let sid: string | null = null;
@@ -422,11 +426,13 @@ class AssistantStore {
 					? {
 							ephemeral: true,
 							content: text,
+							...(extraUserContentForModel ? { extraUserContentForModel } : {}),
 							contextTurns,
 						}
 					: {
 							sessionId: sid,
 							content: text,
+							...(extraUserContentForModel ? { extraUserContentForModel } : {}),
 						},
 				callbacks: {
 					onDelta: (d) => applyAssistantPatch(d),

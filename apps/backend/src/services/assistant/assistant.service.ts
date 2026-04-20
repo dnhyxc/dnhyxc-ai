@@ -454,8 +454,32 @@ export class AssistantService {
 			if (r.role !== 'user' && r.role !== 'assistant') continue;
 			turns.push({ role: r.role, content: r.content ?? '' });
 		}
-		turns.push({ role: 'user', content: dto.content.trim() });
+		const extra = dto.extraUserContentForModel?.trim();
+		const tail = extra
+			? `${dto.content.trim()}\n\n${extra}`
+			: dto.content.trim();
+		turns.push({ role: 'user', content: tail });
 		return turns;
+	}
+
+	/** 将「仅给模型」的补充正文拼到上下文末尾最近一条 user 上（用于已按短 content 落库的场景） */
+	private mergeExtraUserContentForModelIntoTurns(
+		turns: AssistantChatTurn[],
+		extra?: string,
+	): AssistantChatTurn[] {
+		const t = extra?.trim();
+		if (!t) return turns;
+		const out = turns.map((x) => ({ ...x }));
+		for (let i = out.length - 1; i >= 0; i--) {
+			if (out[i].role === 'user') {
+				out[i] = {
+					...out[i],
+					content: `${out[i].content}\n\n${t}`,
+				};
+				break;
+			}
+		}
+		return out;
 	}
 
 	/** 不落库：仅智谱流式输出（知识库未保存草稿） */
@@ -765,15 +789,19 @@ export class AssistantService {
 					const allDb = await this.loadMessagesForSessionContext(sessionId!);
 
 					const allTurns = this.buildTurnsForContext(allDb);
+					const allTurnsForModel = this.mergeExtraUserContentForModelIntoTurns(
+						allTurns,
+						dto.extraUserContentForModel,
+					);
 
 					const budget = this.getHistoryTurnBudgetTokens(dto);
 					let contextTurns = takeRecentMessagesWithinTokenBudget(
-						allTurns,
+						allTurnsForModel,
 						budget,
 					);
 
-					if (contextTurns.length === 0 && allTurns.length > 0) {
-						const last = allTurns[allTurns.length - 1];
+					if (contextTurns.length === 0 && allTurnsForModel.length > 0) {
+						const last = allTurnsForModel[allTurnsForModel.length - 1];
 						contextTurns = [
 							{
 								role: last.role,

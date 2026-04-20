@@ -20,6 +20,7 @@
 10. [关键时序与竞态](#10-关键时序与竞态)
 11. [工程细节与约束](#11-工程细节与约束)
 12. [文件索引](#12-文件索引)
+13. [快捷卡片与 extraUserContentForModel](#13-快捷卡片与-extrausercontentformodel用户短句--模型长上下文)
 
 ---
 
@@ -44,7 +45,8 @@
 | **assistantArticleBinding** | `index.tsx` 中 `useMemo`：`knowledgeTrashPreviewId` 存在时为 `__knowledge_trash__:{行id}`，否则为 `knowledgeEditingKnowledgeId ?? 'draft-new'`。 |
 | **bindingId** | `knowledgeArticleBindingFromDocumentKey(documentKey)`：去掉 `__trash-*` 后缀后传给后端的「按文章查会话」标识（可为正式 UUID、`draft-new`、或回收站前缀串）。 |
 | **knowledgeAssistantPersistenceAllowed** | `assistantStore` 布尔：为 `false` 表示 **未保存云端草稿**，走 ephemeral，不落库。 |
-| **Ephemeral** | SSE body `ephemeral: true` + `contextTurns` + `content`；不传 `sessionId` / `knowledgeArticleId`。 |
+| **Ephemeral** | SSE body `ephemeral: true` + `contextTurns` + `content`；可选 `extraUserContentForModel`（仅拼进发给模型的 user 句，不落库）；不传 `sessionId` / `knowledgeArticleId`。 |
+| **extraUserContentForModel** | 可选字符串：与 `content` 换行拼接后仅用于 **本轮** 智谱请求；**不**写入 `assistant_messages`，气泡与落库 user 正文仍为短 `content`（见 §13）。 |
 | **Flush / import-transcript** | 首次保存成功后，把内存 `messages` 打成 `lines` 写入 `POST /assistant/session/import-transcript`。 |
 
 ---
@@ -355,6 +357,10 @@ useEffect(() => {
 - **`useStickToBottomScroll`**：`isStreaming` + `streamScrollTick` + `resetKey: documentKey`。  
 - **`useChatCodeFloatingToolbar`**：`layoutDeps` 含 `streamScrollTick`，避免仅依赖 `markdown` 导致助手区代码块工具条不重排。
 
+### 8.4 首页快捷卡片（润色 / 总结）
+
+当 `messages.length === 0` 且左侧编辑器已有正文时，展示 `KNOWLEDGE_ASSISTANT_PROMPTS` 卡片；点击后走 **`sendKnowledgePromptCard`**，经 `buildKnowledgeAssistantDocumentMessage` 拆成 **短 `userMessageShort` + `extraUserContentForModel`**，调用 `assistantStore.sendMessage`。**完整契约、后端拼接顺序与回归注意** 见 **§13**。
+
 ---
 
 ## 9. HTTP 封装与类型
@@ -403,7 +409,7 @@ useEffect(() => {
 | 前端 SSE | `apps/frontend/src/utils/assistantSse.ts` |
 | 前端助手 UI | `apps/frontend/src/views/knowledge/KnowledgeAssistant.tsx` |
 | 前端知识页 | `apps/frontend/src/views/knowledge/index.tsx` |
-| 前端常量 | `apps/frontend/src/views/knowledge/constants.ts`（`isKnowledgeLocalMarkdownId`） |
+| 前端常量 | `apps/frontend/src/views/knowledge/constants.ts`（`isKnowledgeLocalMarkdownId`、`KNOWLEDGE_ASSISTANT_PROMPTS`、`buildKnowledgeAssistantDocumentMessage`） |
 | 前端 API | `apps/frontend/src/service/index.ts`、`apps/frontend/src/service/api.ts` |
 | 后端控制器 | `apps/backend/src/services/assistant/assistant.controller.ts` |
 | 后端服务 | `apps/backend/src/services/assistant/assistant.service.ts` |
@@ -411,6 +417,243 @@ useEffect(() => {
 | 后端 DTO | `apps/backend/src/services/assistant/dto/*.ts` |
 | 知识删除联动 | `apps/backend/src/services/knowledge/knowledge.service.ts` |
 | 专题摘要（持久化/落点） | `docs/knowledge/knowledge-assistant-ephemeral-persistence.md` |
+
+---
+
+## 13. 快捷卡片与 extraUserContentForModel（用户短句 + 模型长上下文）
+
+本节描述知识库助手首页 **「润色文档内容」**、**「总结文档内容」** 两条快捷入口的完整设计：**用户气泡与数据库中的 user 正文仅为短标题**；**当前 Markdown 全文与任务说明**通过可选字段 **`extraUserContentForModel`** 在 **服务端** 拼入 **发给智谱的最后一条 user 消息** 中，**不单独落库、不增加 `assistant_messages` 列**。
+
+### 13.1 需求拆解（逐条）
+
+1. **展示与持久化一致**：用户看到的 user 气泡正文 = `Message.content` = 写入 `assistant_messages.content` 的字符串 = **`润色文档内容` 或 `总结文档内容`**（无整篇文档）。  
+2. **模型可见全文**：智谱 `chat/completions` 的 `messages` 数组中，对应轮次的 **user** `content` 必须为 **短标题 + 换行 + 指令与文档围栏**（由后端拼接），否则模型无法润色/总结。  
+3. **不传 extra 时行为不变**：普通键盘发送仅带 `content`；后端 **不** 做额外拼接（见 §13.4）。  
+4. **Ephemeral 与持久化两条路径都要支持**：未保存草稿走 `buildEphemeralTurns`；已保存条目走「先 `insertUserAndAssistantPlaceholder` 写短 user → 再 `buildTurnsForContext` + 合并 extra → `takeRecentMessagesWithinTokenBudget`」。  
+5. **持久化路径的 token 预算顺序**：必须 **先把 extra 合并进「完整多轮 turns」再截断预算**，否则会出现「先按短句算预算、再拼长文导致超出上下文」的误差（实现上先 `mergeExtraUserContentForModelIntoTurns` 再 `takeRecentMessagesWithinTokenBudget`）。  
+6. **Ephemeral 路径**：`buildEphemeralTurns` 已在 **单条最后 user** 上合并 `content` 与 `extra`，随后 `takeRecentMessagesWithinTokenBudget` 作用于已含长文的 `allTurns`，与持久化侧「先合并再截断」语义一致。  
+7. **前端不发两份 user**：`contextTurns` 仍由 **push 本轮之前** 的 `messages` 生成；本轮仅 **`content` + 可选 `extraUserContentForModel`** 进入 body（与后端「先历史再本轮 tail」一致）。  
+8. **`activeDocumentKey` 与草稿**：`documentKey` 为 `draft-new__trash-*` 时也必须 `activateForDocument`，否则 ephemeral 发送会因 `activeDocumentKey` 为空提示「文档未就绪」（见 `KnowledgeAssistant.tsx` 内注释）。  
+9. **多轮追问的局限**：历史里只存短 user 句，**不存**曾带给模型的文档；用户若后续只发「再总结一遍」而无新 extra，模型侧 **看不到** 旧文档全文——这是「不把文档写入 user 消息」的产品取舍。  
+10. **回归建议**：在 §附录 A 中增加：快捷卡片发轮后 DB 中 user 行仅为短标题；网络抓包/服务端日志中智谱请求体最后一条 user 含 `--- 文档 ---` 围栏。
+
+### 13.2 后端 DTO：`AssistantChatDto`
+
+文件：`apps/backend/src/services/assistant/dto/assistant-chat.dto.ts`。
+
+- **`content`**：必填，用户可见/可落库的短正文（快捷卡片时为「润色文档内容」或「总结文档内容」）。  
+- **`extraUserContentForModel`**：可选；**仅**用于服务端拼装智谱上下文，**长度上限单独放宽**（与 `content` 的 `100_000` 区分）。
+
+```typescript
+// 文件：apps/backend/src/services/assistant/dto/assistant-chat.dto.ts（节选 + 注释）
+@IsString()
+@IsNotEmpty()
+@MaxLength(100_000)
+content: string;
+
+/**
+ * 仅拼入本轮发给模型的最后一条 user 正文之后（换行衔接），不入库、不写入历史摘要。
+ * 用于知识库快捷操作：气泡与 `content` 仅短标题，长文档由该字段带给模型。
+ */
+@IsOptional()
+@IsString()
+@MaxLength(500_000)
+extraUserContentForModel?: string;
+```
+
+### 13.3 后端服务：`buildEphemeralTurns` 与 `mergeExtraUserContentForModelIntoTurns`
+
+文件：`apps/backend/src/services/assistant/assistant.service.ts`。
+
+**Ephemeral**：在 `contextTurns` 之后追加的 **最后一条 user** 上，若有 `extraUserContentForModel` 则 `content + "\n\n" + extra`，否则仅为 `content.trim()`。
+
+**持久化**：`insertUserAndAssistantPlaceholder(..., dto.content.trim())` 只写入短句；从库构建 `allTurns` 后调用 `mergeExtraUserContentForModelIntoTurns`：从 **末尾向前** 找到 **最近一条 `role: user`**，将 `"\n\n" + extra` 拼到其 `content` 后（仅本轮最后一条 user，通常为刚插入的那条）。
+
+```typescript
+// 文件：apps/backend/src/services/assistant/assistant.service.ts（节选 + 注释）
+
+// 不落库多轮：先还原 contextTurns，再追加「本轮 user」；本轮 user 的正文 = 短 content 可选拼 extra
+private buildEphemeralTurns(dto: AssistantChatDto): AssistantChatTurn[] {
+	const turns: AssistantChatTurn[] = [];
+	for (const r of dto.contextTurns ?? []) {
+		if (r.role !== 'user' && r.role !== 'assistant') continue;
+		turns.push({ role: r.role, content: r.content ?? '' });
+	}
+	const extra = dto.extraUserContentForModel?.trim();
+	const tail = extra
+		? `${dto.content.trim()}\n\n${extra}`
+		: dto.content.trim();
+	turns.push({ role: 'user', content: tail });
+	return turns;
+}
+
+/** 将「仅给模型」的补充正文拼到上下文末尾最近一条 user 上（用于已按短 content 落库的场景） */
+private mergeExtraUserContentForModelIntoTurns(
+	turns: AssistantChatTurn[],
+	extra?: string,
+): AssistantChatTurn[] {
+	const t = extra?.trim();
+	if (!t) return turns; // 无 extra：原样返回，等价于「普通发送不做拼接」
+	const out = turns.map((x) => ({ ...x }));
+	for (let i = out.length - 1; i >= 0; i--) {
+		if (out[i].role === 'user') {
+			out[i] = {
+				...out[i],
+				content: `${out[i].content}\n\n${t}`,
+			};
+			break;
+		}
+	}
+	return out;
+}
+```
+
+**持久化流中合并与截断的位置**（节选）：
+
+```typescript
+// 文件：apps/backend/src/services/assistant/assistant.service.ts（持久化分支节选）
+// 落库用户句仅为 dto.content（短标题）
+const { assistantMessageId: aid } = await this.insertUserAndAssistantPlaceholder(
+	session,
+	turnId,
+	dto.content.trim(),
+);
+
+const allDb = await this.loadMessagesForSessionContext(sessionId!);
+const allTurns = this.buildTurnsForContext(allDb);
+// 先合并 extra，再按 token 预算截取，避免预算按短句算准后再拼长文
+const allTurnsForModel = this.mergeExtraUserContentForModelIntoTurns(
+	allTurns,
+	dto.extraUserContentForModel,
+);
+const budget = this.getHistoryTurnBudgetTokens(dto);
+let contextTurns = takeRecentMessagesWithinTokenBudget(allTurnsForModel, budget);
+```
+
+### 13.4 「是否每次发送都拼接？」
+
+**否。** 仅当请求体携带 **`extraUserContentForModel`** 且 **`.trim()` 后非空** 时，后端才会把其拼到 **本轮** 发给模型的 user 正文之后；未传或为空字符串时，`tail` 仅为 `dto.content.trim()`，`mergeExtraUserContentForModelIntoTurns` 直接 `return turns`。
+
+### 13.5 前端常量：任务说明与文档围栏
+
+文件：`apps/frontend/src/views/knowledge/constants.ts`。
+
+- **`KNOWLEDGE_ASSISTANT_PROMPTS`**：`kind`（`'polish' | 'summarize'`）、图标、标题、副标题。  
+- **`buildKnowledgeAssistantDocumentMessage`**：返回 **`userMessageShort`**（与气泡一致）与 **`extraUserContentForModel`**（不含短标题重复；为指令 + `--- 文档 ---` … `--- 文档结束 ---` 包裹的当前全文）。
+
+```typescript
+// 文件：apps/frontend/src/views/knowledge/constants.ts（节选 + 注释）
+
+/**
+ * 快捷卡片：`userMessageShort` 为气泡与落库正文；`extraUserContentForModel` 仅由后端拼进发给模型的 user 上下文，不入库。
+ */
+export function buildKnowledgeAssistantDocumentMessage(
+	kind: KnowledgeAssistantPromptKind,
+	documentMarkdown: string,
+): { userMessageShort: string; extraUserContentForModel: string } {
+	const doc = documentMarkdown.replace(/\s+$/, '');
+	if (kind === 'polish') {
+		return {
+			userMessageShort: '润色文档内容',
+			extraUserContentForModel: `请根据以下「当前知识库文档」全文进行润色与优化：…
+
+--- 文档 ---
+${doc}
+--- 文档结束 ---`,
+		};
+	}
+	return {
+		userMessageShort: '总结文档内容',
+		extraUserContentForModel: `请根据以下「当前知识库文档」全文输出一份简洁的中文总结：…
+
+--- 文档 ---
+${doc}
+--- 文档结束 ---`,
+	};
+}
+```
+
+### 13.6 前端 Store：`sendMessage` 与 SSE body
+
+文件：`apps/frontend/src/store/assistant.ts`。
+
+- UI **push** 的用户消息：`content: text`（短），**不**把文档塞进 `Message.content`。  
+- **`streamAssistantSse` body**：持久化与 ephemeral 均在存在 `extraUserContentForModel` 时 **展开写入** JSON（与 DTO 字段名一致）。
+
+```typescript
+// 文件：apps/frontend/src/store/assistant.ts（节选 + 注释）
+
+async sendMessage(
+	raw?: string,
+	options?: { extraUserContentForModel?: string },
+): Promise<void> {
+	const text = (raw ?? '').trim();
+	// ...
+	const extraUserContentForModel = options?.extraUserContentForModel?.trim();
+
+	runInAction(() => {
+		this.messages.push({
+			chatId: userChatId,
+			role: 'user',
+			content: text, // 仅短标题入 UI / 入 import-transcript 行
+			timestamp: new Date(),
+		});
+		// ... assistant 占位
+	});
+
+	const abort = await streamAssistantSse({
+		body: ephemeral
+			? {
+					ephemeral: true,
+					content: text,
+					...(extraUserContentForModel ? { extraUserContentForModel } : {}),
+					contextTurns,
+				}
+			: {
+					sessionId: sid,
+					content: text,
+					...(extraUserContentForModel ? { extraUserContentForModel } : {}),
+				},
+		// ...
+	});
+}
+```
+
+### 13.7 前端 UI：`KnowledgeAssistant`
+
+文件：`apps/frontend/src/views/knowledge/KnowledgeAssistant.tsx`。
+
+- **`activateForDocument`**：`documentKey` 非空即调用（含 `draft-new*`），保证 **`activeDocumentKey`** 就绪。  
+- **`sendKnowledgePromptCard`**：校验登录、左侧有正文、非发送/加载/流式中；调用 `buildKnowledgeAssistantDocumentMessage`，再 `sendMessage(userMessageShort, { extraUserContentForModel })`。  
+- **首页卡片**：`button` + `onClick`；进行中时 `pointer-events-none opacity-50`。
+
+```tsx
+// 文件：apps/frontend/src/views/knowledge/KnowledgeAssistant.tsx（节选 + 注释）
+
+// 未保存草稿的 key 也必须 activate，否则 ephemeral 下 activeDocumentKey 为空 →「文档未就绪」
+useEffect(() => {
+	if (!documentKey) return;
+	void assistantStore.activateForDocument(documentKey);
+}, [documentKey]);
+
+/** 首页快捷卡片：用户气泡仅显示标题，请求体携带 extra（文档由后端拼进模型上下文） */
+const sendKnowledgePromptCard = useCallback(
+	async (kind: KnowledgeAssistantPromptKind) => {
+		// ... 登录、正文、isSending / isHistoryLoading / isStreaming 校验
+		const { userMessageShort, extraUserContentForModel } =
+			buildKnowledgeAssistantDocumentMessage(kind, knowledgeStore.markdown ?? '');
+		enableStreamStickToBottom();
+		await assistantStore.sendMessage(userMessageShort, {
+			extraUserContentForModel,
+		});
+	},
+	[isLoggedIn, knowledgeStore.markdown, enableStreamStickToBottom],
+);
+```
+
+### 13.8 与附录 B 的关系
+
+附录 **B.2**、**B.3** 中的部分片段为 **教学式最小示例**；**含 `extraUserContentForModel` 的完整契约与分支** 以 **本节 §13** 与仓库源码为准（下文 B.2 / B.3 已更新为与当前实现对齐的摘要）。
 
 ---
 
@@ -423,7 +666,8 @@ useEffect(() => {
 - [ ] 本地 `__local_md__`：持久化允许为 true。  
 - [ ] 清空草稿：助手气泡与映射清空。  
 - [ ] 删除当前知识：无「会话不存在」误报；助手状态可恢复。  
-- [ ] 另存为：与新建类似的 flush 顺序。
+- [ ] 另存为：与新建类似的 flush 顺序。  
+- [ ] 快捷卡片（润色/总结）：DB user 行仅为短标题；SSE 可选 `extraUserContentForModel` 时智谱侧 user 含文档围栏（§13）。
 
 ---
 
@@ -447,10 +691,14 @@ function knowledgeArticleBindingFromDocumentKey(documentKey: string): string {
 ### B.2 `sendMessage` 双轨（持久化 vs ephemeral）语义
 
 ```typescript
-// 文件：apps/frontend/src/store/assistant.ts — 逻辑重组说明
-async sendMessage(raw?: string): Promise<void> {
+// 文件：apps/frontend/src/store/assistant.ts — 逻辑重组说明（与当前实现一致；§13 补充 extra 字段）
+async sendMessage(
+	raw?: string,
+	options?: { extraUserContentForModel?: string },
+): Promise<void> {
 	const text = (raw ?? '').trim();
 	if (!text || this.isSending || this.isHistoryLoading) return;
+	const extraUserContentForModel = options?.extraUserContentForModel?.trim();
 
 	// 与 KnowledgeAssistant 同步的开关：false = 未保存云端草稿
 	const ephemeral = !this.knowledgeAssistantPersistenceAllowed;
@@ -461,18 +709,22 @@ async sendMessage(raw?: string): Promise<void> {
 		sid = await this.ensureSessionForCurrentDocument();
 		if (!sid) return;
 	} else {
-		// 临时：不创建 DB session；仅校验登录与 documentKey 已就绪
+		// 临时：不创建 DB session；须校验登录与 activeDocumentKey（草稿也需 activate，见 §13.7）
 		if (!readToken() || !this.activeDocumentKey) return;
 	}
 
 	// 关键：contextTurns 必须在「尚未 push 本轮 user/assistant」之前从 this.messages 生成，
-	// 这样发给后端的 history 不含本轮；本轮仅放在 body.content（与后端 buildEphemeralTurns 一致）。
+	// 这样发给后端的 history 不含本轮；本轮 user 正文在 UI 与 push 中仅为 text（短句）。
 	const contextTurns = ephemeral
 		? buildEphemeralContextTurnsFromMessages(this.messages)
 		: undefined;
 
-	// 再 push UI：用户气泡 + 空助手占位（isStreaming 触发滚动与 Markdown 懒加载等）
-	// ... streamAssistantSse({ body: ephemeral ? { ephemeral: true, content: text, contextTurns } : { sessionId: sid, content: text } })
+	// push：用户气泡 content = text（短）；SSE body 同 text，并可带 extraUserContentForModel（仅服务端拼进模型）
+	// ... streamAssistantSse({
+	//   body: ephemeral
+	//     ? { ephemeral: true, content: text, contextTurns, ...optionalExtra }
+	//     : { sessionId: sid, content: text, ...optionalExtra },
+	// })
 
 	// onComplete：仅持久化路径 fetchSessionMessages，用 DB 最终态覆盖（含服务端 message id 等）
 }
@@ -482,15 +734,20 @@ async sendMessage(raw?: string): Promise<void> {
 
 ```typescript
 // 文件：apps/backend/src/services/assistant/assistant.service.ts
-// 顺序：先追加 dto.contextTurns[]（user/assistant），再追加本轮 user（dto.content）。
-// 因此前端 contextTurns 不得包含本轮用户句。
+// 顺序：先追加 dto.contextTurns[]（user/assistant），再追加本轮 user。
+// 本轮 user 发给智谱的正文 = dto.content.trim() +（可选）"\n\n" + dto.extraUserContentForModel（§13）。
+// 因此前端 contextTurns 不得包含本轮用户句；文档长文应放 extra，避免与落库短 content 混写。
 private buildEphemeralTurns(dto: AssistantChatDto): AssistantChatTurn[] {
 	const turns: AssistantChatTurn[] = [];
 	for (const r of dto.contextTurns ?? []) {
 		if (r.role !== 'user' && r.role !== 'assistant') continue;
 		turns.push({ role: r.role, content: r.content ?? '' });
 	}
-	turns.push({ role: 'user', content: dto.content.trim() });
+	const extra = dto.extraUserContentForModel?.trim();
+	const tail = extra
+		? `${dto.content.trim()}\n\n${extra}`
+		: dto.content.trim();
+	turns.push({ role: 'user', content: tail });
 	return turns;
 }
 ```

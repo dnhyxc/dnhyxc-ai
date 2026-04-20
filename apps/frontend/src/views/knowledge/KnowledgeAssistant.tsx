@@ -30,8 +30,10 @@ import useStore from '@/store';
 import assistantStore from '@/store/assistant';
 import type { Message } from '@/types/chat';
 import {
+	buildKnowledgeAssistantDocumentMessage,
 	isKnowledgeLocalMarkdownId,
 	KNOWLEDGE_ASSISTANT_PROMPTS,
+	type KnowledgeAssistantPromptKind,
 } from './constants';
 
 interface KnowledgeAssistantProps {
@@ -144,10 +146,10 @@ const KnowledgeAssistant = observer(
 			};
 		}, []);
 
-		// 左侧当前文档身份变化时，将助手 store 切到对应 documentKey 的会话（加载/恢复消息）。
-		// `draft-new*` 为新建草稿占位，尚无稳定条目 id，不调用 activate，避免与未保存文档错误绑定。
+		// 左侧当前文档身份变化时调用 activate：首段会写入 `activeDocumentKey`（ephemeral 发消息必填），再按是否允许落库拉历史 / 建 session。
+		// 未保存草稿的 key 形如 `draft-new__trash-*` 也必须走此处；若跳过则 `activeDocumentKey` 为空，发送时会提示「文档未就绪」。
 		useEffect(() => {
-			if (!documentKey || documentKey.startsWith('draft-new')) return;
+			if (!documentKey) return;
 			void assistantStore.activateForDocument(documentKey);
 		}, [documentKey]);
 
@@ -260,6 +262,39 @@ const KnowledgeAssistant = observer(
 			[input, isLoggedIn, enableStreamStickToBottom],
 		);
 
+		/** 首页快捷卡片：用户气泡仅显示标题，请求体携带当前文档全文 */
+		const sendKnowledgePromptCard = useCallback(
+			async (kind: KnowledgeAssistantPromptKind) => {
+				if (!isLoggedIn) {
+					Toast({ type: 'warning', title: '请先登录后再使用助手' });
+					return;
+				}
+				const md = (knowledgeStore.markdown ?? '').trim();
+				if (!md) {
+					Toast({ type: 'warning', title: '请先在左侧编辑器输入正文' });
+					return;
+				}
+				if (
+					assistantStore.isSending ||
+					assistantStore.isHistoryLoading ||
+					assistantStore.isStreaming
+				) {
+					Toast({ type: 'warning', title: '请等待当前回复结束后再试' });
+					return;
+				}
+				const { userMessageShort, extraUserContentForModel } =
+					buildKnowledgeAssistantDocumentMessage(
+						kind,
+						knowledgeStore.markdown ?? '',
+					);
+				enableStreamStickToBottom();
+				await assistantStore.sendMessage(userMessageShort, {
+					extraUserContentForModel,
+				});
+			},
+			[isLoggedIn, knowledgeStore.markdown, enableStreamStickToBottom],
+		);
+
 		const stopGenerating = useCallback(() => {
 			void assistantStore.stopGenerating();
 		}, []);
@@ -281,12 +316,20 @@ const KnowledgeAssistant = observer(
 							<div className="w-full flex flex-col gap-2 justify-center items-center">
 								<div className="w-full flex gap-3">
 									{KNOWLEDGE_ASSISTANT_PROMPTS.map((item) => (
-										<div
-											key={item.title}
-											className="flex-1 flex items-start gap-2 border border-theme/10 bg-theme/10 text-textcolor hover:bg-theme/15 py-2 pl-2 pr-2.5 rounded-md cursor-pointer"
+										<button
+											key={item.kind}
+											type="button"
+											className={cn(
+												'flex-1 flex items-start gap-2 border border-theme/10 bg-theme/10 text-textcolor hover:bg-theme/15 py-2 pl-2 pr-2.5 rounded-md cursor-pointer text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-theme/40',
+												(assistantStore.isSending ||
+													assistantStore.isHistoryLoading ||
+													assistantStore.isStreaming) &&
+													'pointer-events-none opacity-50',
+											)}
+											onClick={() => void sendKnowledgePromptCard(item.kind)}
 										>
-											<item.icon className="text-teal-500 mt-0.5" />
-											<div className="flex flex-col gap-1">
+											<item.icon className="text-teal-500 mt-0.5 shrink-0" />
+											<div className="flex min-w-0 flex-1 flex-col gap-1">
 												<span className="text-base font-medium">
 													{item.title}
 												</span>
@@ -294,7 +337,7 @@ const KnowledgeAssistant = observer(
 													{item.description}
 												</span>
 											</div>
-										</div>
+										</button>
 									))}
 								</div>
 							</div>

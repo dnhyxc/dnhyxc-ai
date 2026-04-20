@@ -52,9 +52,9 @@
 
 1. 在 **push 本轮用户消息与助手占位之前**，用当前 `messages` 生成 **`contextTurns`**（历史轮次；末尾「空且仍在流式」的助手占位会排除，避免把无效占位发给模型）。
 2. 再 `push` 本轮 UI 消息。
-3. 调用 `POST` 知识助手 SSE 接口（如 `/assistant/sse`），请求体为 **`ephemeral: true`**、`content`（本轮用户输入）、**`contextTurns`**；**不传** `sessionId`、**不传** `knowledgeArticleId`。
+3. 调用 `POST` 知识助手 SSE 接口（如 `/assistant/sse`），请求体为 **`ephemeral: true`**、`content`（本轮用户输入）、**`contextTurns`**；**可选** `extraUserContentForModel`（仅服务端拼进发给智谱的最后一条 user，**不落库**；用于知识库「润色/总结」快捷卡片，见 `knowledge-assistant-complete.md` **§13**）；**不传** `sessionId`、**不传** `knowledgeArticleId`。
 
-后端 `AssistantService.chatStream` 在 `dto.ephemeral === true` 时进入 **`runEphemeralChatStream`**：只拼装智谱 `messages` 并消费流式结果，**不**走「占位插入 `assistant_messages`、事务、turnId」等落库路径。因此 **会话与对话不会进入 `assistant_sessions` / `assistant_messages`**。
+后端 `AssistantService.chatStream` 在 `dto.ephemeral === true` 时进入 **`runEphemeralChatStream`**：只拼装智谱 `messages` 并消费流式结果，**不**走「占位插入 `assistant_messages`、事务、turnId」等落库路径。因此 **会话与对话不会进入 `assistant_sessions` / `assistant_messages`**（UI 中的 `messages` 仍仅存短 `content`；长文档仅经 `extraUserContentForModel` 参与当次模型请求）。
 
 ### 1.1.4 与「已保存知识」的对比（帮助记忆）
 

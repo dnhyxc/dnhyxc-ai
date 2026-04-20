@@ -61,6 +61,15 @@ export class AssistantChatDto {
 	@MaxLength(100_000)
 	content: string;
 
+	/**
+	 * 仅拼入本轮发给模型的最后一条 user 正文之后（换行衔接），不入库、不写入历史摘要。
+	 * 用于知识库快捷操作：气泡与 `content` 仅短标题，长文档由该字段带给模型。
+	 */
+	@IsOptional()
+	@IsString()
+	@MaxLength(500_000)
+	extraUserContentForModel?: string;
+
 	@IsOptional()
 	@IsInt()
 	@Min(256)
