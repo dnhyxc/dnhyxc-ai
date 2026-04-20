@@ -508,7 +508,7 @@ const flushScrollToBottom = useCallback(() => {
 | 前端 SSE | `apps/frontend/src/utils/assistantSse.ts` |
 | 前端助手 UI | `apps/frontend/src/views/knowledge/KnowledgeAssistant.tsx` |
 | 前端知识页 | `apps/frontend/src/views/knowledge/index.tsx` |
-| 前端常量 | `apps/frontend/src/views/knowledge/constants.ts`（`isKnowledgeLocalMarkdownId`、`KNOWLEDGE_ASSISTANT_PROMPTS`、`buildKnowledgeAssistantDocumentMessage`） |
+| 前端常量 | `apps/frontend/src/views/knowledge/constants.ts`（`isKnowledgeLocalMarkdownId`、`knowledgeAssistantArticleBinding`、`knowledgeAssistantDocumentKey`、`KNOWLEDGE_ASSISTANT_PROMPTS`、`buildKnowledgeAssistantDocumentMessage`） |
 | 前端 API | `apps/frontend/src/service/index.ts`、`apps/frontend/src/service/api.ts` |
 | 后端控制器 | `apps/backend/src/services/assistant/assistant.controller.ts` |
 | 后端服务 | `apps/backend/src/services/assistant/assistant.service.ts` |

@@ -31,11 +31,13 @@ import useStore from '@/store';
 import assistantStore from '@/store/assistant';
 import type { Message } from '@/types/chat';
 import {
-	buildKnowledgeAssistantDocumentMessage,
-	isKnowledgeLocalMarkdownId,
 	KNOWLEDGE_ASSISTANT_PROMPTS,
 	type KnowledgeAssistantPromptKind,
 } from './constants';
+import {
+	buildKnowledgeAssistantDocumentMessage,
+	isKnowledgeLocalMarkdownId,
+} from './utils';
 
 interface KnowledgeAssistantProps {
 	/** 与 MarkdownEditor `documentIdentity` 一致，用于绑定助手多轮会话 */

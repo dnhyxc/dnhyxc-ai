@@ -30,7 +30,6 @@ import {
 } from '@/utils/knowledge-shortcuts';
 import {
 	EDITOR_HEIGHT,
-	isKnowledgeLocalMarkdownId,
 	KNOWLEDGE_LOCAL_MD_ID_PREFIX,
 	TAURI_KNOWLEDGE_DIR,
 } from './constants';
@@ -38,6 +37,11 @@ import KnowledgeAssistant from './KnowledgeAssistant';
 import KnowledgeList from './KnowledgeList';
 import KnowledgeTrashList from './KnowledgeTrashList';
 import KnowledgeEditorToolbar from './toolbar';
+import {
+	isKnowledgeLocalMarkdownId,
+	knowledgeAssistantArticleBinding,
+	knowledgeAssistantDocumentKey,
+} from './utils';
 
 /** 知识编辑页：正文与标题等草稿存于 knowledgeStore，聊天助手条「保存到知识库」会写入同一份草稿并跳转至此 */
 const Knowledge = observer(() => {
@@ -101,15 +105,17 @@ const Knowledge = observer(() => {
 	);
 
 	/** 助手 / Monaco 文档维度的条目标识：回收站预览用独立前缀，避免多条均落在 draft-new 下同一会话 */
-	const assistantArticleBinding = useMemo(() => {
-		if (knowledgeStore.knowledgeTrashPreviewId != null) {
-			return `__knowledge_trash__:${knowledgeStore.knowledgeTrashPreviewId}`;
-		}
-		return knowledgeStore.knowledgeEditingKnowledgeId ?? 'draft-new';
-	}, [
-		knowledgeStore.knowledgeTrashPreviewId,
-		knowledgeStore.knowledgeEditingKnowledgeId,
-	]);
+	const assistantArticleBinding = useMemo(
+		() =>
+			knowledgeAssistantArticleBinding({
+				knowledgeTrashPreviewId: knowledgeStore.knowledgeTrashPreviewId,
+				knowledgeEditingKnowledgeId: knowledgeStore.knowledgeEditingKnowledgeId,
+			}),
+		[
+			knowledgeStore.knowledgeTrashPreviewId,
+			knowledgeStore.knowledgeEditingKnowledgeId,
+		],
+	);
 
 	/** 清空标题与正文（store 级草稿，与 markdown 一并清除） */
 	const resetEditorToNewDraft = useCallback(() => {
@@ -117,12 +123,13 @@ const Knowledge = observer(() => {
 		// 从回收站打开时 id 可能恒为 null：仅靠 editingId 无法区分「清空前后」；需让编辑器 identity 变化以退出 splitDiff，由 clearDocumentNonce 承担
 		setClearDocumentNonce((n) => n + 1);
 		knowledgeStore.clearKnowledgeDraft();
-		// 与 KnowledgeAssistant 的 `documentKey` 公式一致，供助手 store 同步 activeDocumentKey，避免清空后 props 变 draft-new 又触发 activate
-		const binding =
-			knowledgeStore.knowledgeTrashPreviewId != null
-				? `__knowledge_trash__:${knowledgeStore.knowledgeTrashPreviewId}`
-				: (knowledgeStore.knowledgeEditingKnowledgeId ?? 'draft-new');
-		const nextAssistantDocumentKey = `${binding}__trash-${trashOpenNonce}`;
+		const nextAssistantDocumentKey = knowledgeAssistantDocumentKey(
+			knowledgeAssistantArticleBinding({
+				knowledgeTrashPreviewId: knowledgeStore.knowledgeTrashPreviewId,
+				knowledgeEditingKnowledgeId: knowledgeStore.knowledgeEditingKnowledgeId,
+			}),
+			trashOpenNonce,
+		);
 		// 未保存草稿下 documentKey 常为 `draft-new__trash-*` 不变，须显式清空助手内存态（含不落库的 ephemeral 对话）
 		assistantStore.clearAssistantStateOnKnowledgeDraftReset(
 			nextAssistantDocumentKey,
@@ -230,12 +237,18 @@ const Knowledge = observer(() => {
 			} as Omit<KnowledgeRecord, 'id'>);
 			// 新建成功后必须记下 id，否则删除本条时 id 仍为 null，无法清空编辑器
 			if (res.success && res.data?.id) {
-				const articleBase =
-					knowledgeStore.knowledgeTrashPreviewId != null
-						? `__knowledge_trash__:${knowledgeStore.knowledgeTrashPreviewId}`
-						: (editingId ?? 'draft-new');
-				const fromKey = `${articleBase}__trash-${trashOpenNonce}`;
-				const toKey = `${res.data.id}__trash-${trashOpenNonce}`;
+				const articleBase = knowledgeAssistantArticleBinding({
+					knowledgeTrashPreviewId: knowledgeStore.knowledgeTrashPreviewId,
+					knowledgeEditingKnowledgeId: editingId,
+				});
+				const fromKey = knowledgeAssistantDocumentKey(
+					articleBase,
+					trashOpenNonce,
+				);
+				const toKey = knowledgeAssistantDocumentKey(
+					res.data.id,
+					trashOpenNonce,
+				);
 				if (!assistantStore.knowledgeAssistantPersistenceAllowed) {
 					await assistantStore.flushEphemeralTranscriptIfNeeded(
 						res.data.id,
@@ -284,12 +297,15 @@ const Knowledge = observer(() => {
 				});
 				throw new Error('saveKnowledge save-as failed');
 			}
-			const articleBase =
-				knowledgeStore.knowledgeTrashPreviewId != null
-					? `__knowledge_trash__:${knowledgeStore.knowledgeTrashPreviewId}`
-					: (editingId ?? 'draft-new');
-			const fromKey = `${articleBase}__trash-${trashOpenNonce}`;
-			const toKey = `${res.data.id}__trash-${trashOpenNonce}`;
+			const articleBase = knowledgeAssistantArticleBinding({
+				knowledgeTrashPreviewId: knowledgeStore.knowledgeTrashPreviewId,
+				knowledgeEditingKnowledgeId: editingId,
+			});
+			const fromKey = knowledgeAssistantDocumentKey(
+				articleBase,
+				trashOpenNonce,
+			);
+			const toKey = knowledgeAssistantDocumentKey(res.data.id, trashOpenNonce);
 			if (!assistantStore.knowledgeAssistantPersistenceAllowed) {
 				await assistantStore.flushEphemeralTranscriptIfNeeded(
 					res.data.id,
@@ -598,12 +614,18 @@ const Knowledge = observer(() => {
 				tauriRes.filePath.length > 0
 			) {
 				const newEditingId = `${KNOWLEDGE_LOCAL_MD_ID_PREFIX}${encodeURIComponent(tauriRes.filePath)}`;
-				const articleBase =
-					prevTrashPreviewId != null
-						? `__knowledge_trash__:${prevTrashPreviewId}`
-						: (prevEditingId ?? 'draft-new');
-				const fromKey = `${articleBase}__trash-${trashOpenNonce}`;
-				const toKey = `${newEditingId}__trash-${trashOpenNonce}`;
+				const articleBase = knowledgeAssistantArticleBinding({
+					knowledgeTrashPreviewId: prevTrashPreviewId,
+					knowledgeEditingKnowledgeId: prevEditingId,
+				});
+				const fromKey = knowledgeAssistantDocumentKey(
+					articleBase,
+					trashOpenNonce,
+				);
+				const toKey = knowledgeAssistantDocumentKey(
+					newEditingId,
+					trashOpenNonce,
+				);
 				assistantStore.remapAssistantSessionDocumentKey(fromKey, toKey);
 				const sid = assistantStore.getSessionIdForDocumentKey(toKey);
 				if (sid) {
@@ -763,7 +785,7 @@ const Knowledge = observer(() => {
 					theme={monacoTheme}
 					language={monacoLanguage}
 					// trashOpenNonce：回收站 pick 等与助手会话对齐；clearDocumentNonce：仅清空草稿时 bump，驱动 Monaco 换篇且不重置助手
-					documentIdentity={`${assistantArticleBinding}__trash-${trashOpenNonce}__clear-${clearDocumentNonce}`}
+					documentIdentity={`${knowledgeAssistantDocumentKey(assistantArticleBinding, trashOpenNonce)}__clear-${clearDocumentNonce}`}
 					markdownAssistantOpen={markdownAssistantOpen}
 					onMarkdownAssistantOpenChange={setMarkdownAssistantOpen}
 					value={knowledgeStore.markdown}
@@ -837,7 +859,10 @@ const Knowledge = observer(() => {
 					}
 					chatNode={
 						<KnowledgeAssistant
-							documentKey={`${assistantArticleBinding}__trash-${trashOpenNonce}`}
+							documentKey={knowledgeAssistantDocumentKey(
+								assistantArticleBinding,
+								trashOpenNonce,
+							)}
 						/>
 					}
 				/>
