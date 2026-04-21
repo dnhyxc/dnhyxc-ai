@@ -42,11 +42,7 @@ import {
 import { GLASS_THEME_BY_UI, registerMonacoGlassThemes } from './glassTheme';
 import { MarkdownBottomBar } from './MarkdownBottomBar';
 import { registerMarkdownFenceEmbeddedHighlight } from './markdownTokens';
-import {
-	KNOWLEDGE_AUTO_SAVE_INTERVAL_PRESETS,
-	MARKDOWN_EDITOR_WORD_WRAP_COLUMN,
-	options,
-} from './options';
+import { MARKDOWN_EDITOR_WORD_WRAP_COLUMN, options } from './options';
 import ParserMarkdownPreviewPane from './preview';
 import {
 	buildMarkdownScrollSyncSnapshot,
@@ -333,10 +329,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 
 	valueFromPropsRef.current = value;
 
-	const showOverwriteSaveToggle = Boolean(onOverwriteSaveEnabledChange);
-	const showAutoSaveControls = Boolean(
-		onAutoSaveEnabledChange && onAutoSaveIntervalSecChange,
-	);
+	// 底部操作栏内部已根据回调是否存在计算显示与快捷键可用性，这里不再重复推导
 
 	/** 有正文时勿传占位文案，否则部分 Monaco 版本在失焦或未编辑时仍叠画「# 输入内容...」 */
 	const hasEditorBody = normalizeMonacoEol(value ?? '').trim().length > 0;
@@ -384,14 +377,6 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 			setInternalMarkdownAssistantOpen(false);
 		}
 	}, [assistantPanelControlled, onMarkdownAssistantOpenChange]);
-
-	const autoSaveIntervalOptions = useMemo(() => {
-		const presets: number[] = [...KNOWLEDGE_AUTO_SAVE_INTERVAL_PRESETS];
-		if (!presets.includes(autoSaveIntervalSec)) {
-			presets.push(autoSaveIntervalSec);
-		}
-		return presets.sort((a, b) => a - b);
-	}, [autoSaveIntervalSec]);
 
 	/** 主编辑器右键菜单（与快捷键逻辑一致，依赖 editorContextActionsRef） */
 	const editorContextMenuItems = useMemo(
@@ -1593,12 +1578,9 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 						assistantRightPaneActive,
 						markdownAssistantOpen,
 						splitScrollFollowMode,
-						showOverwriteSaveToggle,
 						overwriteSaveEnabled,
-						showAutoSaveControls,
 						autoSaveEnabled,
 						autoSaveIntervalSec,
-						autoSaveIntervalOptions,
 						markdownDiffBottomBarVisible,
 					}}
 					actions={{

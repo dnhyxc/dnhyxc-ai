@@ -11,12 +11,13 @@ import {
 	GitCompare,
 	Timer,
 } from 'lucide-react';
-import { memo, type RefObject } from 'react';
+import { memo, type RefObject, useMemo } from 'react';
 import {
 	formatChordForTip,
 	useMarkdownBottomBarShortcuts,
 } from '@/hooks/useMarkdownBottomBarShortcuts';
 import { cn } from '@/lib/utils';
+import { KNOWLEDGE_AUTO_SAVE_INTERVAL_PRESETS } from './options';
 import { formatKnowledgeAutoSaveIntervalLabel } from './utils';
 
 type MarkdownViewMode = 'edit' | 'preview' | 'split' | 'splitDiff';
@@ -52,12 +53,9 @@ export const MarkdownBottomBar = memo(function MarkdownBottomBar(props: {
 		assistantRightPaneActive: boolean;
 		markdownAssistantOpen: boolean;
 		splitScrollFollowMode: MarkdownSplitScrollFollowMode;
-		showOverwriteSaveToggle: boolean;
 		overwriteSaveEnabled: boolean;
-		showAutoSaveControls: boolean;
 		autoSaveEnabled: boolean;
 		autoSaveIntervalSec: number;
-		autoSaveIntervalOptions: readonly number[];
 		markdownDiffBottomBarVisible: boolean;
 	};
 	options: {
@@ -85,12 +83,9 @@ export const MarkdownBottomBar = memo(function MarkdownBottomBar(props: {
 		assistantRightPaneActive,
 		markdownAssistantOpen,
 		splitScrollFollowMode,
-		showOverwriteSaveToggle,
 		overwriteSaveEnabled,
-		showAutoSaveControls,
 		autoSaveEnabled,
 		autoSaveIntervalSec,
-		autoSaveIntervalOptions,
 		markdownDiffBottomBarVisible,
 	} = state;
 	const { bottomBarCustomNodeEnabled } = options;
@@ -105,6 +100,17 @@ export const MarkdownBottomBar = memo(function MarkdownBottomBar(props: {
 		onAutoSaveEnabledChange,
 		onAutoSaveIntervalSecChange,
 	} = actions;
+
+	const showOverwriteSaveToggle = Boolean(onOverwriteSaveEnabledChange);
+	const showAutoSaveControls = Boolean(
+		onAutoSaveEnabledChange && onAutoSaveIntervalSecChange,
+	);
+	const autoSaveIntervalOptions = useMemo(() => {
+		const presets: number[] = [...KNOWLEDGE_AUTO_SAVE_INTERVAL_PRESETS];
+		if (!presets.includes(autoSaveIntervalSec))
+			presets.push(autoSaveIntervalSec);
+		return presets.sort((a, b) => a - b);
+	}, [autoSaveIntervalSec]);
 
 	const { chords } = useMarkdownBottomBarShortcuts({
 		enabled: shortcuts.enabled,

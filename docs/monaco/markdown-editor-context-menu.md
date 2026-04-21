@@ -479,133 +479,12 @@ registerMonacoEditorCommands({
 
 ---
 
-## 7. 知识库：Markdown 底部操作栏快捷键（⌘+1…⌘+0）与 Tooltip 展示
+## 7. 知识库：Markdown 底部操作栏（快捷键 / Tooltip / 组件下沉）
 
-### 7.1 目标
+底部操作栏与「右键上下文菜单」是不同主线：前者依赖系统设置 store、`KNOWLEDGE_SHORTCUTS_CHANGED_EVENT` 热更新、`useMarkdownBottomBarShortcuts` 的 `window` 捕获，以及 `MarkdownBottomBar` 内部的 Tooltip 与 UI 推导。  
+详细实现说明与逐段示例代码已单独维护：
 
-为 `MarkdownEditor` 的底部操作栏（`role="toolbar"`）按**按钮从左到右**的顺序绑定快捷键：
-
-- ⌘+1、⌘+2 … ⌘+9、⌘+0
-
-并且把“当前生效的快捷键”（包含用户在系统设置里自定义后的 chord）展示到每个按钮的 Tooltip（tip）中，达到：
-
-- **可发现**：用户悬停即可看到对应快捷键
-- **可配置**：设置页修改后无需刷新即可同步到 tip
-- **不干扰输入**：在其它输入框里输入时不抢快捷键
-
-### 7.2 配置入口：系统设置写入 store（页面内快捷键）
-
-文件：`apps/frontend/src/views/setting/system/config.ts`
-
-要点：
-
-- 这 10 个快捷键项都设置为 `registerGlobally: false`
-- 只写入 store（键为 `shortcut_${keyId}`），由知识库页面/编辑器组件在窗口内监听
-
-```typescript
-// apps/frontend/src/views/setting/system/config.ts（节选）
-{
-  label: '知识库：操作栏：编辑源码（⌘+1）',
-  key: KNOWLEDGE_SHORTCUT_KEY_IDS.markdownBarAction1,
-  defaultShortcut: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.markdownBarAction1, // Meta + 1
-  action: 'knowledge_markdown_bar_action_1',
-  registerGlobally: false,
-},
-// ...依次到 markdownBarAction0（Meta + 0）
-```
-
-### 7.3 键值与默认 chord：`knowledge-shortcuts.ts`
-
-文件：`apps/frontend/src/utils/knowledge-shortcuts.ts`
-
-要点：
-
-- 为底部操作栏新增 10 个 key id（`markdownBarAction1` … `markdownBarAction0`）
-- 默认 chord 使用 `Meta + 数字`（在 macOS 上即 ⌘ + 数字）
-- `loadKnowledgeShortcutChords()` 扩展返回值，确保能从 store 读取用户自定义配置
-
-```typescript
-// apps/frontend/src/utils/knowledge-shortcuts.ts（节选）
-export const KNOWLEDGE_SHORTCUT_KEY_IDS = {
-  // ...
-  markdownBarAction1: 12,
-  // ...
-  markdownBarAction0: 21,
-} as const;
-
-export const KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS = {
-  // ...
-  markdownBarAction1: 'Meta + 1',
-  // ...
-  markdownBarAction0: 'Meta + 0',
-} as const;
-```
-
-### 7.4 运行时绑定：抽为公共 hook `useMarkdownBottomBarShortcuts`
-
-文件：`apps/frontend/src/hooks/useMarkdownBottomBarShortcuts.ts`
-
-为什么要抽 hook：
-
-- `MarkdownEditor` 本体已经非常长，底部操作栏快捷键涉及“加载配置 + 监听变更事件 + keydown 分发 + 行为边界”，抽离后更易维护
-- 同一套逻辑未来可复用到其它带“操作栏”的编辑器/视图
-
-hook 做两件事：
-
-1. **加载 chord 并监听配置变更**
-   - 从 store 读取 `loadKnowledgeShortcutChords()`
-   - 监听 `KNOWLEDGE_SHORTCUTS_CHANGED_EVENT`，设置页修改后立即生效
-2. **window keydown 捕获并分发**
-   - 使用 `chordMatchesStored` 做语义匹配（忽略 Meta/Command 写法差异、兼容 Digit0–9）
-   - 触发范围策略：允许“刚进入页面未点击编辑器”也能工作，但避开组件外 input/textarea/contenteditable
-
-```typescript
-// apps/frontend/src/hooks/useMarkdownBottomBarShortcuts.ts（节选）
-export function useMarkdownBottomBarShortcuts(...) {
-  const [chords, setChords] = useState(...);
-
-  // ① 加载 & 热更新
-  useEffect(() => {
-    const load = async () => setChords(await loadKnowledgeShortcutChords());
-    window.addEventListener(KNOWLEDGE_SHORTCUTS_CHANGED_EVENT, load);
-    return () => window.removeEventListener(KNOWLEDGE_SHORTCUTS_CHANGED_EVENT, load);
-  }, []);
-
-  // ② 捕获 keydown 并分发到具体动作（edit/preview/split/diff/助手/跟滚/保存开关等）
-  useEffect(() => {
-    window.addEventListener('keydown', onKeydown, true);
-    return () => window.removeEventListener('keydown', onKeydown, true);
-  }, [...]);
-
-  return { chords };
-}
-```
-
-### 7.5 Tooltip 展示：把“当前 chord”写到 tip 上
-
-文件：`apps/frontend/src/components/design/Monaco/index.tsx`
-
-策略：
-
-- hook 返回 `chords`，`MarkdownEditor` 拿到后用于 tooltip 展示
-- 通过 `formatChordForTip` 把存储串（如 `Meta + 1`）格式化为：
-  - macOS：`⌘1`、`⌘⇧V`（更符合用户习惯）
-  - 其它：`Ctrl + 1`、`Ctrl + Shift + V`
-
-```tsx
-// apps/frontend/src/components/design/Monaco/index.tsx（节选）
-const { chords: markdownBarChords } = useMarkdownBottomBarShortcuts({ /* ... */ });
-
-<Tooltip content={`编辑源码（${formatChordForTip(markdownBarChords.markdownBarAction1)}）`}>
-  <button /* ... */>...</button>
-</Tooltip>
-
-<Tooltip content={`预览渲染（${formatChordForTip(markdownBarChords.markdownBarAction3)}）`}>
-  <button /* ... */>...</button>
-</Tooltip>
-```
-
-> 注意：tip 只是“展示”，真正的快捷键匹配仍由 `chordMatchesStored` 负责；二者解耦避免 UI 展示逻辑影响功能正确性。
+- 详见：[markdown-bottom-bar.md](./markdown-bottom-bar.md)
 
 ## 9. Markdown 编辑器：避免 edit→split 的 Editor 重挂载
 
@@ -662,6 +541,7 @@ useEffect(() => {
 </ResizablePanelGroup>
 ```
 
+
 ---
 
 ## 7. 相关文件索引
@@ -680,11 +560,13 @@ useEffect(() => {
 | `apps/frontend/src/utils/clipboard.ts` | `copyToClipboard` / `pasteFromClipboard` |
 | `monaco/clipboard-global-handler-bypass.md` | Monaco 与 Tauri 剪贴板总览 |
 | `monaco/cut-line-without-selection-cmd-x.md` | 无选区剪切整行 |
+| `monaco/markdown-bottom-bar.md` | Markdown 底部操作栏：⌘+1…⌘+0、`useMarkdownBottomBarShortcuts`、`MarkdownBottomBar` |
 
 ---
 
 ## 8. 排查与优化提示
 
+- **底部操作栏快捷键 / Tooltip 不同步**：配置、热更新与 `MarkdownBottomBar` 装配说明见 **`monaco/markdown-bottom-bar.md`**。
 - **右键无菜单**：确认 `mergedEditorOptions` 是否仍包含 **`contextmenu: false`**；检查 Monaco 是否在某处改写了 `contextmenu`。
 - **菜单点了没反应**：多为 **`editorContextActionsRef` 尚未注入**（`onMount` 未完成）或已 **`onDidDispose` 清空**；挂载完成前菜单通常不会稳定出现。
 - **与快捷键行为不一致**：应把差异收敛到 **`editorContextActionsRef` 与 `addCommand` 共用的一段逻辑**，避免只在菜单里改一份。

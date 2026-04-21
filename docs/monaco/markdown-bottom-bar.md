@@ -1,0 +1,280 @@
+# Monaco Markdown 底部操作栏：快捷键（⌘+1…⌘+0）、Tooltip 展示与组件封装
+
+> 本文从 `docs/monaco/markdown-editor-context-menu.md` 拆分而来：  
+> 右键菜单文档聚焦“ContextMenu + Monaco 注入 + 知识库助手选区”；  
+> 底部操作栏（Bottom Bar）属于独立 UI/快捷键体系，单独维护更清晰。
+
+---
+
+## 1. 目标与约束（必须同时满足）
+
+- **目标 1：按顺序绑定快捷键**  
+  底部操作栏从左到右依次绑定：**⌘+1、⌘+2 … ⌘+9、⌘+0**。
+
+- **目标 2：支持系统设置自定义**  
+  用户在系统设置里改了 chord 后，知识库页面无需刷新即可生效。
+
+- **目标 3：不影响现有功能与布局**  
+  只增加快捷键/提示与组件拆分，不改变既有按钮行为、可用性条件与布局结构。
+
+- **目标 4：不干扰其它输入框**  
+  当用户在页面其它输入框（`input/textarea/contenteditable`）里输入时，不抢占快捷键。
+
+---
+
+## 2. 系统设置：按顺序新增 10 个快捷键项（仅页面内生效）
+
+文件：`apps/frontend/src/views/setting/system/config.ts`
+
+要点：
+
+- **`registerGlobally: false`**：只写入 store，由页面内监听，不占用系统全局快捷键。
+- **label 体现顺序与含义**：确保设置页展示清晰，并与底部操作栏顺序一致。
+
+```typescript
+// apps/frontend/src/views/setting/system/config.ts（节选）
+{
+  label: '知识库：操作栏：编辑源码（⌘+1）', // 设置页展示标题：强调“知识库/操作栏/顺序”
+  key: KNOWLEDGE_SHORTCUT_KEY_IDS.markdownBarAction1, // 存储 key id：决定写入 store 的键名 `shortcut_${key}`
+  defaultShortcut: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.markdownBarAction1, // 默认 chord：未设置时回落（示例：Meta + 1）
+  action: 'knowledge_markdown_bar_action_1', // 设置页分组/可读性字段：不直接参与运行时匹配
+  registerGlobally: false, // 关键：仅页面内生效（不走 Tauri 注册全局快捷键）
+}, // 一条设置项结束
+// ...依次添加 markdownBarAction2...markdownBarAction9（省略中间项，保持顺序与底部栏一致）
+{
+  label: '知识库：操作栏：开关自动保存（⌘+0）', // 0 对应 Digit0：仍保持“按顺序”的最后一项
+  key: KNOWLEDGE_SHORTCUT_KEY_IDS.markdownBarAction0, // 存储 key id：决定写入 store 的键名 `shortcut_${key}`
+  defaultShortcut: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.markdownBarAction0, // 默认 chord：未设置时回落（示例：Meta + 0）
+  action: 'knowledge_markdown_bar_action_0', // 设置页分组/可读性字段：不直接参与运行时匹配
+  registerGlobally: false, // 关键：仅页面内生效（不走 Tauri 注册全局快捷键）
+}, // 一条设置项结束
+```
+
+---
+
+## 3. 快捷键存储与读取：`knowledge-shortcuts.ts`
+
+文件：`apps/frontend/src/utils/knowledge-shortcuts.ts`
+
+要点：
+
+- 新增 10 个 key id：`markdownBarAction1`…`markdownBarAction0`
+- 新增默认 chord：`Meta + 1`…`Meta + 0`
+- 扩展 `loadKnowledgeShortcutChords()` 的返回值，能从 store 读取用户自定义值，未配置则回落默认
+
+```typescript
+// apps/frontend/src/utils/knowledge-shortcuts.ts（节选）
+export const KNOWLEDGE_SHORTCUT_KEY_IDS = {
+  // ...已有其它知识库快捷键（省略）                                         // 说明：与系统设置 `shortcut_${key}` 共用同一套存储方式
+  markdownBarAction1: 12, // ⌘+1：底部操作栏第 1 个按钮的快捷键 key id
+  markdownBarAction2: 13, // ⌘+2：底部操作栏第 2 个按钮的快捷键 key id
+  markdownBarAction3: 14, // ⌘+3：底部操作栏第 3 个按钮的快捷键 key id
+  markdownBarAction4: 15, // ⌘+4：底部操作栏第 4 个按钮的快捷键 key id
+  markdownBarAction5: 16, // ⌘+5：底部操作栏第 5 个按钮的快捷键 key id
+  markdownBarAction6: 17, // ⌘+6：底部操作栏第 6 个按钮的快捷键 key id
+  markdownBarAction7: 18, // ⌘+7：底部操作栏第 7 个按钮的快捷键 key id
+  markdownBarAction8: 19, // ⌘+8：底部操作栏第 8 个按钮的快捷键 key id
+  markdownBarAction9: 20, // ⌘+9：底部操作栏第 9 个按钮的快捷键 key id
+  markdownBarAction0: 21, // ⌘+0：底部操作栏第 10 个按钮的快捷键 key id
+} as const;
+
+export const KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS = {
+  // ...已有其它知识库默认 chord（省略）                                      // 说明：实际匹配由 chordMatchesStored 解析
+  markdownBarAction1: 'Meta + 1', // 默认 ⌘+1（macOS：Meta=⌘；其它平台：展示层可映射为 Ctrl）
+  markdownBarAction2: 'Meta + 2', // 默认 ⌘+2
+  markdownBarAction3: 'Meta + 3', // 默认 ⌘+3
+  markdownBarAction4: 'Meta + 4', // 默认 ⌘+4
+  markdownBarAction5: 'Meta + 5', // 默认 ⌘+5
+  markdownBarAction6: 'Meta + 6', // 默认 ⌘+6
+  markdownBarAction7: 'Meta + 7', // 默认 ⌘+7
+  markdownBarAction8: 'Meta + 8', // 默认 ⌘+8
+  markdownBarAction9: 'Meta + 9', // 默认 ⌘+9
+  markdownBarAction0: 'Meta + 0', // 默认 ⌘+0
+} as const;
+```
+
+---
+
+## 4. 运行时绑定：公共 hook `useMarkdownBottomBarShortcuts`
+
+文件：`apps/frontend/src/hooks/useMarkdownBottomBarShortcuts.ts`
+
+### 4.1 为什么要抽 hook
+
+底部操作栏快捷键包含 3 类逻辑，放在 `Monaco/index.tsx` 会让组件进一步膨胀：
+
+- **读取/热更新 chord**（监听设置页变更事件）
+- **window keydown 捕获**（保证“刚进入页面也可用”）
+- **动作分发与可用性约束**（Diff/助手/跟随滚动/保存开关等）
+
+抽成 hook 后，底部操作栏组件只需要提供“当前状态 + 回调”，即可完成快捷键绑定，降低耦合。
+
+### 4.2 chord 的热更新策略
+
+- hook 内部用 `loadKnowledgeShortcutChords()` 读取 store
+- 监听 `KNOWLEDGE_SHORTCUTS_CHANGED_EVENT`，设置页保存后立即 reload
+
+```typescript
+// apps/frontend/src/hooks/useMarkdownBottomBarShortcuts.ts（节选）
+const [chords, setChords] = useState(() => ({ // chords：用于“展示 + 匹配”的同一份来源（保持一致性）
+  markdownBarAction1: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.markdownBarAction1, // 初始化：未加载 store 前也有默认值（避免 Tooltip 空）
+  markdownBarAction2: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.markdownBarAction2, // 初始化：⌘+2 默认 chord
+  markdownBarAction3: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.markdownBarAction3, // 初始化：⌘+3 默认 chord
+  markdownBarAction4: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.markdownBarAction4, // 初始化：⌘+4 默认 chord
+  markdownBarAction5: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.markdownBarAction5, // 初始化：⌘+5 默认 chord
+  markdownBarAction6: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.markdownBarAction6, // 初始化：⌘+6 默认 chord
+  markdownBarAction7: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.markdownBarAction7, // 初始化：⌘+7 默认 chord
+  markdownBarAction8: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.markdownBarAction8, // 初始化：⌘+8 默认 chord
+  markdownBarAction9: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.markdownBarAction9, // 初始化：⌘+9 默认 chord
+  markdownBarAction0: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.markdownBarAction0, // 初始化：⌘+0 默认 chord
+})); // 初始化结束
+
+useEffect(() => {
+  const load = async () => { // load：读取 store 中用户自定义 chord（或回落默认）
+    const c = await loadKnowledgeShortcutChords(); // 从 store 批量读取（内部已做默认回落）
+    setChords({ // 写入本地 state：使 Tooltip 展示 & keydown 匹配同步更新
+      markdownBarAction1: c.markdownBarAction1, // ⌘+1：实际生效 chord
+      markdownBarAction2: c.markdownBarAction2, // ⌘+2：实际生效 chord
+      markdownBarAction3: c.markdownBarAction3, // ⌘+3：实际生效 chord
+      markdownBarAction4: c.markdownBarAction4, // ⌘+4：实际生效 chord
+      markdownBarAction5: c.markdownBarAction5, // ⌘+5：实际生效 chord
+      markdownBarAction6: c.markdownBarAction6, // ⌘+6：实际生效 chord
+      markdownBarAction7: c.markdownBarAction7, // ⌘+7：实际生效 chord
+      markdownBarAction8: c.markdownBarAction8, // ⌘+8：实际生效 chord
+      markdownBarAction9: c.markdownBarAction9, // ⌘+9：实际生效 chord
+      markdownBarAction0: c.markdownBarAction0, // ⌘+0：实际生效 chord
+    }); // setChords 结束
+  }; // load 定义结束
+  void load(); // 首次挂载立即读取：保证一进入页面就展示/生效用户设置
+  window.addEventListener(KNOWLEDGE_SHORTCUTS_CHANGED_EVENT, load); // 设置页保存后派发：这里监听以热更新
+  return () => window.removeEventListener(KNOWLEDGE_SHORTCUTS_CHANGED_EVENT, load); // 卸载清理：避免泄漏与重复监听
+}, []);
+```
+
+### 4.3 keydown 的触发范围策略（避免“开始不生效”）
+
+痛点：如果要求“必须在编辑器 DOM 内触发”，刚进入页面未点击编辑器时快捷键会失效。  
+因此采用“更宽松但有保护”的策略：
+
+- 不强制事件必须发生在组件内部
+- 但如果目标是**组件外的可编辑输入区域**（`input/textarea/contenteditable`），则直接 return，避免干扰用户输入
+
+```typescript
+// apps/frontend/src/hooks/useMarkdownBottomBarShortcuts.ts（节选）
+const target = e.target as HTMLElement | null; // 当前事件目标：用于判断是否来自输入框
+const dom = rootRef.current; // MarkdownEditor 根容器：用于判断“是否在本组件内”
+if (!dom) return; // 容器未挂载：不处理（避免空引用）
+
+const tag = (target?.tagName ?? '').toUpperCase(); // 目标标签名：用于识别 input/textarea
+const isEditable = // 是否为“可编辑输入区域”
+  tag === 'INPUT' || // 原生输入框：输入时必须让快捷键让路
+  tag === 'TEXTAREA' || // 多行输入框：输入时必须让快捷键让路
+  Boolean(target?.isContentEditable); // contenteditable：富文本/可编辑区域同样需要保护
+
+// 仅当“在组件外的输入框”输入时才跳过；其余场景允许快捷键生效
+// - 好处：刚进入页面未聚焦编辑器也能触发（解决“开始不生效”）
+// - 风险控制：不会影响页面其它输入框的输入体验
+if (isEditable && !dom.contains(target)) return; // 输入发生在组件外：不处理（避免抢键）
+```
+
+---
+
+## 5. Tooltip（tip）展示：显示“当前生效 chord”
+
+要点：
+
+- Tooltip 展示必须跟随用户配置变化（不是写死 `⌘+1`）
+- “展示”与“匹配”解耦：展示用 `formatChordForTip`，功能匹配仍用 `chordMatchesStored`
+
+```typescript
+// apps/frontend/src/hooks/useMarkdownBottomBarShortcuts.ts（节选）
+// 仅用于展示：mac 显示 ⌘/⇧/⌥，其它平台显示 Ctrl/Shift/Alt
+export function formatChordForTip(raw: string | undefined | null): string {
+  const s = String(raw ?? '').trim(); // 规范化输入：空/undefined 视为无快捷键
+  if (!s) return ''; // 无内容：Tooltip 不显示快捷键部分
+  // 下方省略：解析 `Meta + Shift + V` 为 token，并映射为平台友好的显示符号            // 设计原则见上文
+}
+```
+
+---
+
+## 6. 组件封装：`MarkdownBottomBar.tsx` 让底部栏更独立通用
+
+文件：`apps/frontend/src/components/design/Monaco/MarkdownBottomBar.tsx`
+
+封装目标：
+
+- `Monaco/index.tsx` 只负责编辑器本体与大布局；底部栏的 UI/快捷键/提示尽量下沉
+- 底部栏仅通过 `state/actions/options/shortcuts` 注入外部依赖，减少参数平铺
+
+### 6.1 快捷键注册迁入组件内部
+
+底部栏组件自己调用 hook 完成：
+
+- chord 加载与热更新
+- keydown 监听与动作分发
+- Tooltip 展示同一份 chord
+
+```tsx
+// apps/frontend/src/components/design/Monaco/MarkdownBottomBar.tsx（节选）
+const { chords } = useMarkdownBottomBarShortcuts({
+  enabled: shortcuts.enabled, // 是否启用：仅 markdown 且底部栏存在时才注册监听
+  rootRef: shortcuts.rootRef, // 根容器：用于“组件外输入框”保护策略
+  viewModeRef: shortcuts.viewModeRef, // 视图模式 ref：避免 keydown 闭包滞后
+  assistantRightPaneActive, // 右侧是否为助手：影响“跟随滚动”等按钮是否可用
+  markdownDiffBottomBarVisible, // Diff 是否可见：影响 ⌘+2 是否可执行
+  bottomBarCustomNodeEnabled, // 是否存在自定义节点（如助手）：决定 ⌘+4 是否有意义
+  showOverwriteSaveToggle, // 是否展示覆盖保存：决定 ⌘+9 是否可执行
+  overwriteSaveEnabled, // 当前覆盖保存开关状态：用于 toggle
+  showAutoSaveControls, // 是否展示自动保存控制：决定 ⌘+0 是否可执行
+  autoSaveEnabled, // 当前自动保存开关状态：用于 toggle
+  focusEditor, // 执行完某些动作后拉回焦点：对齐“点击按钮”的体验
+  closeMarkdownAssistant, // 切换视图前关闭助手：保持互斥关系与既有行为
+  toggleMarkdownSplitDiffCompare, // Diff 开关：与按钮同源
+  toggleMarkdownAssistant, // 助手开关：与按钮同源
+  setViewMode, // 切换 edit/preview/split：与按钮同源
+  setSplitScrollFollowMode, // 跟随滚动切换：与按钮同源
+  onOverwriteSaveEnabledChange, // 覆盖保存开关回调：由外部业务决定含义
+  onAutoSaveEnabledChange, // 自动保存开关回调：由外部业务决定含义
+});
+
+{/* Tooltip 展示与快捷键同源：用同一份 chords，保证用户看到的就是实际生效的按键 */}
+<Tooltip content={`编辑源码（${formatChordForTip(chords.markdownBarAction1)}）`}>
+  {/* ...按钮 */}
+</Tooltip>
+```
+
+### 6.2 能在组件内部推导的逻辑尽量内部化
+
+例如：
+
+- 是否展示覆盖保存按钮：`Boolean(onOverwriteSaveEnabledChange)`
+- 是否展示自动保存控制组：`Boolean(onAutoSaveEnabledChange && onAutoSaveIntervalSecChange)`
+- 自动保存间隔 options：由组件内部根据预设与当前 interval 合成（并使用 `useMemo` 避免每次 render 重建）
+
+```tsx
+// apps/frontend/src/components/design/Monaco/MarkdownBottomBar.tsx（节选）
+const showOverwriteSaveToggle = Boolean(onOverwriteSaveEnabledChange); // 有回调才展示覆盖保存按钮（否则无意义）
+const showAutoSaveControls = Boolean(onAutoSaveEnabledChange && onAutoSaveIntervalSecChange); // 两个回调齐全才展示自动保存控制组
+
+// 仅用于下拉框 option：保持预设 + 当前值（若用户选择了非预设值也能回显）
+const autoSaveIntervalOptions = useMemo(() => {
+  const presets: number[] = [...KNOWLEDGE_AUTO_SAVE_INTERVAL_PRESETS]; // 复制预设：避免直接 mutate 常量
+  if (!presets.includes(autoSaveIntervalSec)) presets.push(autoSaveIntervalSec); // 当前值非预设：追加以便下拉回显
+  return presets.sort((a, b) => a - b); // 排序：从小到大显示
+}, [autoSaveIntervalSec]); // 仅当 interval 改变时重算：减少无谓计算
+```
+
+这样 `Monaco/index.tsx` 就不需要维护这些底部栏细节，从而让底部栏组件更独立、更通用。
+
+---
+
+## 7. 相关文件索引
+
+| 文件 | 说明 |
+|------|------|
+| `apps/frontend/src/views/setting/system/config.ts` | 系统设置：新增底部操作栏 10 个快捷键项（页面内生效） |
+| `apps/frontend/src/utils/knowledge-shortcuts.ts` | key id、默认 chord、`loadKnowledgeShortcutChords` 扩展 |
+| `apps/frontend/src/hooks/useMarkdownBottomBarShortcuts.ts` | 读取/热更新 chord + window keydown 捕获 + 动作分发 + Tooltip 展示格式化 |
+| `apps/frontend/src/components/design/Monaco/MarkdownBottomBar.tsx` | 底部操作栏 UI + Tooltip + 内部逻辑下沉 |
+| `apps/frontend/src/components/design/Monaco/index.tsx` | 装配 `MarkdownBottomBar`（传入最小必要上下文） |
