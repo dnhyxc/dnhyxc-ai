@@ -105,6 +105,17 @@ function isPlainTextField(
 	return true;
 }
 
+/** 事件路径是否落在可编辑区域（input/textarea/contenteditable）内 */
+function editableInEventPath(event: KeyboardEvent): boolean {
+	for (const n of event.composedPath()) {
+		if (!(n instanceof Element)) continue;
+		const tag = n.tagName?.toUpperCase?.() ?? '';
+		if (tag === 'INPUT' || tag === 'TEXTAREA') return true;
+		if ((n as HTMLElement).isContentEditable) return true;
+	}
+	return false;
+}
+
 /**
  * 仅在 Tauri 下挂载：为普通 input/textarea 接管 Cmd/Ctrl+A/C/V/X（走插件剪贴板），不拦截 Z。
  * @returns 卸载函数
@@ -124,6 +135,21 @@ export function attachTauriPlainFieldClipboardShortcuts(): () => void {
 		if (key === 'z') return;
 
 		if (richEditorInEventPath(event)) return;
+
+		/**
+		 * 兜底：普通页面文本（非输入框/非富编辑器）选区复制
+		 * - 目的：修复 Tauri WebView 中“选中文本但无法复制”的问题
+		 * - 约束：不影响 input/textarea/contenteditable 的原生行为，也不影响 Monaco/CodeMirror
+		 */
+		if (key === 'c' && !editableInEventPath(event)) {
+			const selection = window.getSelection?.();
+			const text = selection?.toString?.() ?? '';
+			if (selection && !selection.isCollapsed && text.trim()) {
+				event.preventDefault();
+				void writeClipText(text);
+				return;
+			}
+		}
 
 		const el = document.activeElement;
 		if (!isPlainTextField(el)) return;

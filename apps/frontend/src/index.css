@@ -24,6 +24,9 @@ body {
 	width: 100%;
 	overscroll-behavior: none;
 	overflow: hidden;
+	/* 禁止页面选中文本（避免误选）；编辑器/输入框区域会单独放开 */
+	-webkit-user-select: none;
+	user-select: none;
 	/* find 样式关闭按钮样式 */
 	.monaco-editor .find-widget > .button.codicon-widget-close {
 		top: 8px;
@@ -70,6 +73,18 @@ body {
 	ul,
 	menu {
 		list-style: revert;
+	}
+
+	/* 放开可编辑区域与富编辑器的文本选中（不影响既有编辑/复制/粘贴功能） */
+	input,
+	textarea,
+	[contenteditable="true"],
+	[contenteditable=""],
+	.monaco-editor,
+	.monaco-diff-editor,
+	.cm-editor {
+		-webkit-user-select: text;
+		user-select: text;
 	}
 
 	/* find 样式 */
