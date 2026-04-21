@@ -846,7 +846,7 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 					className="flex-1 overflow-hidden w-full backdrop-blur-sm pb-5"
 					onScroll={handleScroll}
 				>
-					<div id="message-container" className="max-w-3xl m-auto min-w-0">
+					<div id="message-container" className="max-w-3xl mx-auto w-full">
 						<div id="message-content" className="space-y-6 min-w-0">
 							{!messages.length
 								? // emptyState 可选：嵌入方自定义欢迎页；默认保持原 ChatNewSession，避免行为变化。
