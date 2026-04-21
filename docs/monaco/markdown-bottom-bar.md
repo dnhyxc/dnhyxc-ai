@@ -276,7 +276,7 @@ const autoSaveIntervalOptions = useMemo(() => {
 | `apps/frontend/src/views/setting/system/config.ts` | 系统设置：新增底部操作栏 10 个快捷键项（页面内生效） |
 | `apps/frontend/src/utils/knowledge-shortcuts.ts` | key id、默认 chord、`loadKnowledgeShortcutChords` 扩展 |
 | `apps/frontend/src/hooks/useMarkdownBottomBarShortcuts.ts` | 读取/热更新 chord + window keydown 捕获 + 动作分发 + Tooltip 展示格式化 |
-| `apps/frontend/src/components/design/Monaco/MarkdownBottomBar.tsx` | 底部操作栏 UI + Tooltip + 拖动 / 淡显隐 + 边界夹紧等（见 §9） |
+| `apps/frontend/src/components/design/Monaco/MarkdownBottomBar.tsx` | 底部操作栏 UI + Tooltip + 拖动 / 淡显隐 / 边界夹紧 / 复位（见 §9、§9.9） |
 | `apps/frontend/src/components/design/Monaco/index.tsx` | 装配 `MarkdownBottomBar`（传入最小必要上下文） |
 
 ---
@@ -560,3 +560,68 @@ const onMove = (ev: PointerEvent) => {
 
 - 边界与快捷键的「页面内输入保护」仍依赖传入的 **`rootRef`**（编辑器最外层 `relative overflow-hidden` 容器）。
 - 不在 `index.tsx` 内维护 `dragOffset`：拖动状态完全局部在 `MarkdownBottomBar`，降低父组件复杂度。
+
+### 9.9 复位操作栏位置（LocateFixed）
+
+#### 9.9.1 需求与实现思路
+
+- **入口**：在底部栏 **最右侧**（覆盖保存、自动保存等控件之后）增加一个图标按钮，语义为「恢复到拖动前的默认位置」。
+- **默认位置含义**：`dragOffset === { x: 0, y: 0 }`，即拖动层 **不写** `transform: translate(...)`，仅保留外层 `absolute bottom-0 left-1/2 -translate-x-1/2 -translate-y-[10px]` 的基准布局（居中 + 距底 10px）。
+- **为何分两步**：先 `setDragOffset({0,0})` 让 React 提交布局；再在 **`requestAnimationFrame`** 里调用已有的 **`snapMarkdownBottomBarOffset`**。这样在 **极窄编辑器宽度** 下，复位后仍可与 **ResizeObserver** 使用同一套水平夹紧规则，避免栏体超出 `rootRef` 左右边界。
+- **不影响其它逻辑**：不修改 `viewMode`、快捷键、助手、自动保存等；仅读写本地 `dragOffset` 状态。
+- **右侧容器始终渲染**：原先「仅有覆盖保存或自动保存时才渲染右侧整块」改为 **始终渲染右侧 `flex` 容器**，内部对覆盖保存 / 自动保存仍条件渲染；**复位按钮始终存在**，避免知识库等场景无保存控件时找不到复位入口。
+- **禁用态**：当 `dragOffset.x === 0 && dragOffset.y === 0` 时 **`disabled`**，并加 `disabled:cursor-not-allowed`、`disabled:opacity-60`，避免无意义点击与误触反馈。
+- **图标**：使用 **`LocateFixed`**（lucide），表达「回到既定位置」；Tooltip 文案为「复位操作栏初始位置」。
+
+#### 9.9.2 核心代码（含注释）
+
+**复位回调（与 snap 复用）：**
+
+```typescript
+// apps/frontend/src/components/design/Monaco/MarkdownBottomBar.tsx（节选）
+
+/**
+ * 复位操作栏几何位置：
+ * 1) 将拖动层 translate 归零，与「从未拖动」时一致（外层仍是 bottom + 居中 + 距底 10px）。
+ * 2) 下一帧再跑水平 snap：与 ResizeObserver 共用 snapMarkdownBottomBarOffset，避免极窄 root 下整栏仍溢出左右。
+ */
+const resetBarPosition = useCallback(() => {
+	// 第一步：立即回到无内层 transform 的状态（见拖动层 style：x、y 均为 0 时不写 transform）
+	setDragOffset({ x: 0, y: 0 });
+	// 第二步：等浏览器完成上一帧布局后再量 rect，否则 getBoundingClientRect 可能仍对应旧 transform
+	requestAnimationFrame(() => {
+		const rootEl = rootRef.current; // 与拖动、Resize 夹紧一致：Monaco 外层 relative 容器
+		const barEl = dragLayerRef.current; // 带 translate 的测量层，与 snap 约定一致
+		if (!rootEl || !barEl) return;
+		// 仅修正水平 dx，垂直仍由外层与用户拖动语义负责（见 §9.3）
+		setDragOffset((prev) => snapMarkdownBottomBarOffset(rootEl, barEl, prev));
+	});
+}, []);
+```
+
+**最右侧按钮 JSX（节选）：**
+
+```tsx
+// apps/frontend/src/components/design/Monaco/MarkdownBottomBar.tsx（右侧栏末尾节选）
+
+<div className="flex shrink-0 items-center gap-1.5 pl-2">
+	{/* …覆盖保存、自动保存等条件块… */}
+
+	{/* 最右侧：与覆盖保存/自动保存并列；无业务回调时也会渲染，保证始终可复位 */}
+	<Tooltip content="复位操作栏初始位置">
+		<button
+			type="button"
+			className={cn(
+				markdownBarIconBtnClass(false),
+				// 已在默认位置时禁用，避免无意义点击；样式与其它 disabled 控件对齐
+				'disabled:cursor-not-allowed disabled:opacity-60',
+			)}
+			disabled={dragOffset.x === 0 && dragOffset.y === 0}
+			aria-label="复位操作栏位置"
+			onClick={resetBarPosition}
+		>
+			<LocateFixed size={18} strokeWidth={1.75} aria-hidden />
+		</button>
+	</Tooltip>
+</div>
+```

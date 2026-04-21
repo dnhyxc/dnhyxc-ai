@@ -11,6 +11,7 @@ import {
 	FilePen,
 	GitCompare,
 	GripVertical,
+	LocateFixed,
 } from 'lucide-react';
 import {
 	memo,
@@ -246,6 +247,21 @@ export const MarkdownBottomBar = memo(function MarkdownBottomBar(props: {
 		},
 		[open, rootRef],
 	);
+
+	/**
+	 * 复位操作栏几何位置：
+	 * 1) 将拖动层 translate 归零，与「从未拖动」时一致（外层仍是 bottom + 居中 + 距底 10px）。
+	 * 2) 下一帧再跑水平 snap：与 ResizeObserver 共用 snapMarkdownBottomBarOffset，避免极窄 root 下整栏仍溢出左右。
+	 */
+	const resetBarPosition = useCallback(() => {
+		setDragOffset({ x: 0, y: 0 });
+		requestAnimationFrame(() => {
+			const rootEl = rootRef.current;
+			const barEl = dragLayerRef.current;
+			if (!rootEl || !barEl) return;
+			setDragOffset((prev) => snapMarkdownBottomBarOffset(rootEl, barEl, prev));
+		});
+	}, []);
 
 	/** 底部操作栏内图标按钮（与「跟随滚动」一致） */
 	const markdownBarIconBtnClass = (active: boolean) =>
@@ -495,76 +511,89 @@ export const MarkdownBottomBar = memo(function MarkdownBottomBar(props: {
 						)}
 					</div>
 
-					{showOverwriteSaveToggle || showAutoSaveControls ? (
-						<div className="flex shrink-0 items-center gap-1.5 pl-2">
-							{showOverwriteSaveToggle ? (
+					<div className="flex shrink-0 items-center gap-1.5 pl-2">
+						{showOverwriteSaveToggle ? (
+							<Tooltip
+								content={`${overwriteSaveEnabled ? '已开启覆盖保存：同名文件将直接覆盖写入' : '开启覆盖保存：同名文件不再弹窗确认，直接覆盖写入'}（${formatChordForTip(chords.markdownBarAction9)}）`}
+							>
+								<button
+									type="button"
+									className={markdownBarIconBtnClass(overwriteSaveEnabled)}
+									aria-pressed={overwriteSaveEnabled}
+									aria-label={
+										overwriteSaveEnabled ? '关闭覆盖保存' : '开启覆盖保存'
+									}
+									onClick={() =>
+										onOverwriteSaveEnabledChange?.(!overwriteSaveEnabled)
+									}
+								>
+									<FileInput size={18} strokeWidth={1.75} aria-hidden />
+								</button>
+							</Tooltip>
+						) : null}
+
+						{showAutoSaveControls ? (
+							<>
 								<Tooltip
-									content={`${overwriteSaveEnabled ? '已开启覆盖保存：同名文件将直接覆盖写入' : '开启覆盖保存：同名文件不再弹窗确认，直接覆盖写入'}（${formatChordForTip(chords.markdownBarAction9)}）`}
+									content={`${autoSaveEnabled ? '已开启自动保存：按所选间隔在有修改时保存' : '开启自动保存：按间隔自动保存（无标题/正文或同名冲突未开覆盖时会静默跳过）'}（${formatChordForTip(chords.markdownBarAction0)}）`}
 								>
 									<button
 										type="button"
-										className={markdownBarIconBtnClass(overwriteSaveEnabled)}
-										aria-pressed={overwriteSaveEnabled}
+										className={markdownBarIconBtnClass(autoSaveEnabled)}
+										aria-pressed={autoSaveEnabled}
 										aria-label={
-											overwriteSaveEnabled ? '关闭覆盖保存' : '开启覆盖保存'
+											autoSaveEnabled ? '关闭自动保存' : '开启自动保存'
 										}
-										onClick={() =>
-											onOverwriteSaveEnabledChange?.(!overwriteSaveEnabled)
-										}
+										onClick={() => onAutoSaveEnabledChange?.(!autoSaveEnabled)}
 									>
-										<FileInput size={18} strokeWidth={1.75} aria-hidden />
+										<FileClock size={18} strokeWidth={1.75} aria-hidden />
 									</button>
 								</Tooltip>
-							) : null}
 
-							{showAutoSaveControls ? (
-								<>
-									<Tooltip
-										content={`${autoSaveEnabled ? '已开启自动保存：按所选间隔在有修改时保存' : '开启自动保存：按间隔自动保存（无标题/正文或同名冲突未开覆盖时会静默跳过）'}（${formatChordForTip(chords.markdownBarAction0)}）`}
-									>
-										<button
-											type="button"
-											className={markdownBarIconBtnClass(autoSaveEnabled)}
-											aria-pressed={autoSaveEnabled}
-											aria-label={
-												autoSaveEnabled ? '关闭自动保存' : '开启自动保存'
-											}
-											onClick={() =>
-												onAutoSaveEnabledChange?.(!autoSaveEnabled)
-											}
-										>
-											<FileClock size={18} strokeWidth={1.75} aria-hidden />
-										</button>
-									</Tooltip>
+								<label
+									className="sr-only"
+									htmlFor="markdown-auto-save-interval"
+								>
+									自动保存间隔
+								</label>
+								<select
+									id="markdown-auto-save-interval"
+									className={cn(
+										'h-7 max-w-26 shrink-0 rounded-md border border-theme/15 bg-transparent px-1 text-xs text-textcolor outline-none focus-visible:ring-2 focus-visible:ring-theme/40 disabled:cursor-not-allowed disabled:opacity-45',
+									)}
+									disabled={!autoSaveEnabled}
+									value={String(autoSaveIntervalSec)}
+									aria-label="自动保存间隔"
+									onChange={(e) =>
+										onAutoSaveIntervalSecChange?.(Number(e.target.value))
+									}
+								>
+									{autoSaveIntervalOptions.map((sec) => (
+										<option key={sec} value={String(sec)}>
+											{formatKnowledgeAutoSaveIntervalLabel(sec)}
+										</option>
+									))}
+								</select>
+							</>
+						) : null}
 
-									<label
-										className="sr-only"
-										htmlFor="markdown-auto-save-interval"
-									>
-										自动保存间隔
-									</label>
-									<select
-										id="markdown-auto-save-interval"
-										className={cn(
-											'h-7 max-w-26 shrink-0 rounded-md border border-theme/15 bg-transparent px-1 text-xs text-textcolor outline-none focus-visible:ring-2 focus-visible:ring-theme/40 disabled:cursor-not-allowed disabled:opacity-45',
-										)}
-										disabled={!autoSaveEnabled}
-										value={String(autoSaveIntervalSec)}
-										aria-label="自动保存间隔"
-										onChange={(e) =>
-											onAutoSaveIntervalSecChange?.(Number(e.target.value))
-										}
-									>
-										{autoSaveIntervalOptions.map((sec) => (
-											<option key={sec} value={String(sec)}>
-												{formatKnowledgeAutoSaveIntervalLabel(sec)}
-											</option>
-										))}
-									</select>
-								</>
-							) : null}
-						</div>
-					) : null}
+						{/* 最右侧：与覆盖保存/自动保存并列；无业务回调时也会渲染，保证始终可复位 */}
+						<Tooltip content="复位操作栏初始位置">
+							<button
+								type="button"
+								className={cn(
+									markdownBarIconBtnClass(false),
+									// 已在默认位置时禁用，避免无意义点击；样式与其它 disabled 控件对齐
+									'disabled:cursor-not-allowed disabled:opacity-60',
+								)}
+								disabled={dragOffset.x === 0 && dragOffset.y === 0}
+								aria-label="复位操作栏位置"
+								onClick={resetBarPosition}
+							>
+								<LocateFixed size={18} strokeWidth={1.75} aria-hidden />
+							</button>
+						</Tooltip>
+					</div>
 				</div>
 			</div>
 		</div>
