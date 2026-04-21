@@ -910,14 +910,16 @@ const Knowledge = observer(() => {
 						</div>
 					}
 					bottomBarCustomNode={
-						<KnowledgeAssistant
-							documentKey={knowledgeAssistantDocumentKey(
-								assistantArticleBinding,
-								trashOpenNonce,
-							)}
-							input={assistantInput}
-							setInput={setAssistantInput}
-						/>
+						isCloudLoggedIn ? (
+							<KnowledgeAssistant
+								documentKey={knowledgeAssistantDocumentKey(
+									assistantArticleBinding,
+									trashOpenNonce,
+								)}
+								input={assistantInput}
+								setInput={setAssistantInput}
+							/>
+						) : null
 					}
 				/>
 			</ScrollArea>
