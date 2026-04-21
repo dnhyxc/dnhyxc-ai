@@ -96,7 +96,7 @@ interface MarkdownEditorProps {
 	readOnly?: boolean;
 	theme?: 'vs' | 'vs-dark' | 'hc-black';
 	language?: string;
-	toolbar: React.ReactNode;
+	toolbar?: React.ReactNode;
 	title?: React.ReactNode;
 	/**
 	 * Markdown 右侧 AI 助手面板是否展开；与 onMarkdownAssistantOpenChange 同时传入时为受控模式。
@@ -178,7 +178,14 @@ interface MarkdownEditorProps {
 	 */
 	autoSaveEnabled?: boolean;
 	onAutoSaveEnabledChange?: (enabled: boolean) => void;
+	/**
+	 * 自动保存间隔秒数（单位：秒）。
+	 * - 由外部业务负责实际定时逻辑，仅用于显示和变更设置
+	 */
 	autoSaveIntervalSec?: number;
+	/**
+	 * 修改自动保存间隔回调。当用户变更自动保存间隔时触发，参数为新的间隔秒数。
+	 */
 	onAutoSaveIntervalSecChange?: (sec: number) => void;
 	/**
 	 * 保存前取编辑器当前全文并同步触发 onChange（消除 rAF 合并导致父状态滞后）。
@@ -1490,7 +1497,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 								</Button>
 							</Tooltip>
 						) : null}
-						{toolbar}
+						{toolbar ?? null}
 					</div>
 				</div>
 
