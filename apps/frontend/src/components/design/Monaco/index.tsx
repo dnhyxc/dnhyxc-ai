@@ -41,9 +41,9 @@ import {
 } from './format';
 import { GLASS_THEME_BY_UI, registerMonacoGlassThemes } from './glassTheme';
 import { MarkdownBottomBar } from './MarkdownBottomBar';
+import ParserMarkdownPreviewPane from './MarkdownPreview';
 import { registerMarkdownFenceEmbeddedHighlight } from './markdownTokens';
 import { MARKDOWN_EDITOR_WORD_WRAP_COLUMN, options } from './options';
-import ParserMarkdownPreviewPane from './preview';
 import {
 	buildMarkdownScrollSyncSnapshot,
 	isMarkdownDiffEntryEligible,
