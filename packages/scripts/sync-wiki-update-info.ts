@@ -13,8 +13,8 @@ dotenv.config();
 const TOKEN = process.env.GITHUB_TOKEN;
 const OWNER = process.env.WIKI_OWNER ?? process.env.OWNER ?? 'dnhyxc';
 const REPO = process.env.WIKI_REPO ?? process.env.APP_REPO ?? 'dnhyxc-ai';
-/** Wiki 页面 slug 为 Update-Info 时对应的文件名 */
-const WIKI_PAGE_FILE = process.env.WIKI_UPDATE_INFO_FILE ?? 'Update-Info.md';
+/** Wiki 页面 slug 为 【应用更新信息】 时对应的文件名 */
+const WIKI_PAGE_FILE = process.env.WIKI_UPDATE_INFO_FILE ?? '应用更新信息.md';
 const SOURCE_MD = path.resolve(_dirname, '../../docs/project-update-info.md');
 
 function runGit(
@@ -70,7 +70,7 @@ function main(): number {
 
 	try {
 		console.log('');
-		console.log('📚 同步 Wiki：Update-Info ← docs/project-update-info.md');
+		console.log('📚 同步 Wiki：应用更新信息 ← docs/project-update-info.md');
 		console.log(`   仓库: ${OWNER}/${REPO}.wiki`);
 		console.log('');
 
@@ -151,7 +151,7 @@ function main(): number {
 			return 1;
 		}
 
-		console.log('✅ Wiki 已更新: Update-Info');
+		console.log('✅ Wiki 已更新: 应用更新信息');
 		console.log('');
 		return 0;
 	} finally {
