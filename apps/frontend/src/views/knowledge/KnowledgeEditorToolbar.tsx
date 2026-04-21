@@ -1,6 +1,6 @@
 import Tooltip from '@design/Tooltip';
 import { Button } from '@ui/index';
-import { LayersPlus, LibraryBig, OctagonX, Trash2 } from 'lucide-react';
+import { LibraryBig, OctagonX, SaveIcon, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 /** 编辑器顶栏：知识库 / 草稿 / 保存 */
@@ -46,7 +46,7 @@ const KnowledgeEditorToolbar = (props: {
 					disabled={saveLoading}
 					aria-busy={saveLoading}
 				>
-					<LayersPlus className="mt-0.5" />
+					<SaveIcon className="mt-0.5" />
 					<span className="mt-0.5">保存</span>
 				</Button>
 			</Tooltip>
