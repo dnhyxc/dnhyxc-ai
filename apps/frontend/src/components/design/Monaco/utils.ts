@@ -590,3 +590,26 @@ export function isMarkdownDiffToolbarDisabled(
 		diffBaselineText,
 	);
 }
+
+/** 子像素取整容差：避免误判「溢出」导致初始 (0,0) 被推开，与改动前视觉位置不一致 */
+const SNAP_RECT_EPS_PX = 1;
+
+/**
+ * 单次将底部栏（已应用 drag transform）在水平方向约束在 root 内。
+ * 垂直位置由外层 `bottom:0` + `-translate-y-[10px]` 与用户拖动 `translateY` 负责，此处不改 y，避免 Resize 夹紧破坏距底 10px。
+ */
+export function snapMarkdownBottomBarOffset(
+	rootEl: HTMLElement,
+	barEl: HTMLElement,
+	prev: { x: number; y: number },
+): { x: number; y: number } {
+	const rootRect = rootEl.getBoundingClientRect();
+	const barRect = barEl.getBoundingClientRect();
+	let dx = 0;
+	if (barRect.left + SNAP_RECT_EPS_PX < rootRect.left)
+		dx = rootRect.left - barRect.left;
+	else if (barRect.right - SNAP_RECT_EPS_PX > rootRect.right)
+		dx = rootRect.right - barRect.right;
+	if (dx === 0) return prev;
+	return { x: prev.x + dx, y: prev.y };
+}

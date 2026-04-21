@@ -276,7 +276,7 @@ const autoSaveIntervalOptions = useMemo(() => {
 | `apps/frontend/src/views/setting/system/config.ts` | 系统设置：新增底部操作栏 10 个快捷键项（页面内生效） |
 | `apps/frontend/src/utils/knowledge-shortcuts.ts` | key id、默认 chord、`loadKnowledgeShortcutChords` 扩展 |
 | `apps/frontend/src/hooks/useMarkdownBottomBarShortcuts.ts` | 读取/热更新 chord + window keydown 捕获 + 动作分发 + Tooltip 展示格式化 |
-| `apps/frontend/src/components/design/Monaco/MarkdownBottomBar.tsx` | 底部操作栏 UI + Tooltip + 内部逻辑下沉 |
+| `apps/frontend/src/components/design/Monaco/MarkdownBottomBar.tsx` | 底部操作栏 UI + Tooltip + 拖动 / 淡显隐 + 边界夹紧等（见 §9） |
 | `apps/frontend/src/components/design/Monaco/index.tsx` | 装配 `MarkdownBottomBar`（传入最小必要上下文） |
 
 ---
@@ -377,3 +377,186 @@ if (hit(chords.markdownBarAction5)) {
 
 - **编辑源码（⌘+1）**、**Diff（⌘+2）**、**助手（⌘+4）**、**跟滚（⌘+6/7/8）** 等行为与本节改动无关。
 - **`splitDiff`** 与预览/分屏的互斥、进入退出逻辑仍在 `Monaco/index.tsx` 中维护；本节仅在「已是 preview / 已是纯 split」时增加「第二次触发 → edit」分支。
+
+---
+
+## 9. 拖动位置、边界夹紧、宽度与「当前位置淡显隐」
+
+本节记录 **Markdown 底部操作栏** 在拖动、布局约束与显隐方式上的实现思路；代码与注释以仓库当前实现为准。
+
+### 9.1 设计目标（约束）
+
+| 目标 | 说明 |
+|------|------|
+| 可拖动 | 用户可调整操作栏在编辑器容器内的水平/垂直偏移，且不越出 `Monaco/index.tsx` 中 `rootRef` 所指的 `relative overflow-hidden` 根容器。 |
+| 不影响既有交互 | 通过 **专用拖动手柄（Grip）** 发起拖动，避免与 Tab/按钮的 `click` 抢事件。 |
+| 宽度与改动前一致 | 外层保持 **`max-w-2xl`**，且 **不使用** 外层 `w-full` 拉满后再裁切，宽度语义与引入拖动前「内容 + 上限」一致。 |
+| 距底与水平锚定 | 使用 **`bottom: 0` + `left: 50%` + `-translate-x-1/2` + `-translate-y-[10px]`** 固定「距底约 10px + 水平居中」的基准（与产品约定对齐）。 |
+| 显隐 | **在当前位置** 用 **透明度** 淡入淡出，不再用「整栏下移到底部」类 `translate-y` 隐藏；拖动后的 **像素偏移在收起前后保持不变**。 |
+
+### 9.2 DOM 分层与 transform 职责拆分
+
+- **外层 `role="toolbar"`**：负责绝对定位、水平居中、距底 10px 的 **CSS translate**，以及 **`opacity` / `pointer-events` / `aria-hidden`** 控制显隐与无障碍。
+- **中间层 `dragLayerRef`**：仅承载用户拖动的 **`translate(xpx, ypx)`**；用 `getBoundingClientRect()` 与 `rootRef` 做夹紧时量的是这一层，与外层基准位移解耦。
+- **无偏移时不写 `transform`**：`dragOffset === (0,0)` 时省略内联 `transform`，减少与「仅外层 translate」等价的合成层差异。
+
+### 9.3 水平夹紧与 ResizeObserver（不在挂载瞬间强行 snap）
+
+- 函数 **`snapMarkdownBottomBarOffset`** 只做 **水平 dx** 修正，**不改 y**：垂直基准由外层 `-translate-y-[10px]` 与用户拖动 `y` 共同决定；若在 Resize 回调里再改 y，易与「距底 10px」冲突。
+- 使用 **`SNAP_RECT_EPS_PX`**（1px）容差，减轻子像素取整导致的假「溢出」。
+- **`ResizeObserver` 监听 `rootRef`**：仅在容器尺寸变化时调用 `runSnap`；**不在** `open` 后首帧同步 `runSnap()`，避免首帧把 `(0,0)` 推开。
+
+### 9.4 拖动手势与边界（指针事件）
+
+- **`pointerdown`** 仅在手柄上；记录 `barRect0`（拖动起点栏位矩形）、指针 `sx/sy`、当前偏移 `ox/oy`。
+- **`pointermove`**（`capture: true` 挂在 `window`）：用 **相对起点的屏幕位移** 与 **当前 root 的 `getBoundingClientRect()`** 计算 `minDx/maxDx`、`minDy/maxDy`，把位移夹紧后再 `setDragOffset`。
+- **`openRef`**：收起后若仍有迟到的 `pointermove`，直接 return，避免在 `open === false` 时写回状态。
+- **`dragPointerCleanupRef`**：`open` 变为 `false` 时在 `useLayoutEffect` 里调用保存的 `end`，移除监听并清空 gesture，与 **淡隐** 配合，避免隐藏过程中仍更新偏移。
+
+### 9.5 显隐：当前位置淡入淡出（替代底部滑出）
+
+- 展开：`opacity-100` + `pointer-events-auto`。
+- 收起：`opacity-0` + `pointer-events-none` + `aria-hidden={!open}`。
+- **`transition-opacity duration-300`**，并保留 **`motion-reduce`** 下关闭过渡。
+- **不再**在收起时把 `dragOffset` 清零（曾用于配合「下移隐藏」与子层 `translate` 的合成）；淡隐后栏仍在同一几何位置，仅不可见、不可点。
+
+### 9.6 其它控件（Diff / 自动保存等）
+
+- **分屏对照（GitCompare）**、自动保存等分支的 Tooltip、`disabled` 与条件渲染以当前 `MarkdownBottomBar.tsx` 为准；与 §9 拖动/淡显隐逻辑正交。
+
+### 9.7 关键实现代码（节选）
+
+**水平夹紧（仅 x）与 1px 容差：**
+
+```typescript
+// apps/frontend/src/components/design/Monaco/MarkdownBottomBar.tsx（节选）
+
+/** 子像素取整容差：避免误判「溢出」导致初始 (0,0) 被推开 */
+const SNAP_RECT_EPS_PX = 1;
+
+/**
+ * 单次将底部栏（已应用 drag transform）在水平方向约束在 root 内。
+ * 垂直位置由外层 bottom + translate-y 与用户拖动 translateY 负责，此处不改 y。
+ */
+function snapMarkdownBottomBarOffset(
+	rootEl: HTMLElement,
+	barEl: HTMLElement,
+	prev: { x: number; y: number },
+): { x: number; y: number } {
+	const rootRect = rootEl.getBoundingClientRect();
+	const barRect = barEl.getBoundingClientRect();
+	let dx = 0;
+	if (barRect.left + SNAP_RECT_EPS_PX < rootRect.left)
+		dx = rootRect.left - barRect.left;
+	else if (barRect.right - SNAP_RECT_EPS_PX > rootRect.right)
+		dx = rootRect.right - barRect.right;
+	if (dx === 0) return prev;
+	return { x: prev.x + dx, y: prev.y };
+}
+```
+
+**收起时打断拖动；仅 root 尺寸变化时水平夹紧：**
+
+```typescript
+// apps/frontend/src/components/design/Monaco/MarkdownBottomBar.tsx（节选）
+
+/** 淡隐时结束拖动：避免 open=false 后 onMove 仍更新偏移 */
+useLayoutEffect(() => {
+	if (!open) {
+		dragPointerCleanupRef.current?.();
+		dragPointerCleanupRef.current = null;
+		dragGestureRef.current = { active: false };
+	}
+}, [open]);
+
+useLayoutEffect(() => {
+	if (!open) return;
+	const rootEl = rootRef.current;
+	const barEl = dragLayerRef.current;
+	if (!rootEl || !barEl) return;
+	const runSnap = () => {
+		setDragOffset((prev) => snapMarkdownBottomBarOffset(rootEl, barEl, prev));
+	};
+	const ro = new ResizeObserver(() => {
+		runSnap();
+	});
+	ro.observe(rootEl);
+	return () => ro.disconnect();
+}, [open, rootRef]);
+```
+
+**指针拖动与夹紧（节选）：**
+
+```typescript
+// apps/frontend/src/components/design/Monaco/MarkdownBottomBar.tsx（onPointerDown / onMove 节选）
+
+const onMove = (ev: PointerEvent) => {
+	if (!openRef.current) return;
+	const g = dragGestureRef.current;
+	if (!g.active) return;
+	const rootRect = g.rootEl.getBoundingClientRect();
+	const ddx = ev.clientX - g.sx;
+	const ddy = ev.clientY - g.sy;
+	const minDx = rootRect.left - g.barRect0.left;
+	const maxDx = rootRect.right - g.barRect0.right;
+	const minDy = rootRect.top - g.barRect0.top;
+	const maxDy = rootRect.bottom - g.barRect0.bottom;
+	const cdx = Math.min(maxDx, Math.max(minDx, ddx));
+	const cdy = Math.min(maxDy, Math.max(minDy, ddy));
+	setDragOffset({ x: g.ox + cdx, y: g.oy + cdy });
+};
+```
+
+**外层定位 + 淡显隐 + 拖动层 transform：**
+
+```tsx
+// apps/frontend/src/components/design/Monaco/MarkdownBottomBar.tsx（return 外层节选）
+
+<div
+	id={id}
+	role="toolbar"
+	aria-label="Markdown 底部操作"
+	aria-hidden={!open}
+	className={cn(
+		// 距底 10px 与水平居中始终不变；显隐仅靠透明度，拖动后的位置保持不变
+		'absolute bottom-0 left-1/2 z-30 flex max-w-2xl -translate-x-1/2 -translate-y-[10px] justify-center transition-opacity duration-300 ease-out motion-reduce:transition-none motion-reduce:duration-0',
+		open ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none',
+	)}
+>
+	<div
+		ref={dragLayerRef}
+		className="flex min-w-0 w-full justify-center"
+		style={
+			dragOffset.x === 0 && dragOffset.y === 0
+				? undefined
+				: { transform: `translate(${dragOffset.x}px, ${dragOffset.y}px)` }
+		}
+	>
+		{/* 内层 pill：h-10、边框与 Tab 列表等 */}
+	</div>
+</div>
+```
+
+**拖动手柄（节选）：**
+
+```tsx
+// apps/frontend/src/components/design/Monaco/MarkdownBottomBar.tsx（手柄节选）
+
+<Tooltip content="拖动调整操作栏位置（不超出编辑器区域）">
+	<button
+		type="button"
+		className={cn(
+			'… cursor-grab touch-none … active:cursor-grabbing …',
+		)}
+		aria-label="拖动底部操作栏位置"
+		onPointerDown={onDragHandlePointerDown}
+	>
+		<GripVertical size={16} strokeWidth={1.75} aria-hidden />
+	</button>
+</Tooltip>
+```
+
+### 9.8 与 `Monaco/index.tsx` 的关系
+
+- 边界与快捷键的「页面内输入保护」仍依赖传入的 **`rootRef`**（编辑器最外层 `relative overflow-hidden` 容器）。
+- 不在 `index.tsx` 内维护 `dragOffset`：拖动状态完全局部在 `MarkdownBottomBar`，降低父组件复杂度。
