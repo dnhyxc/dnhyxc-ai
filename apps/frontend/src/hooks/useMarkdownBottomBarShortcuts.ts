@@ -18,6 +18,7 @@ type MarkdownBottomBarChords = {
 	markdownBarAction8: string;
 	markdownBarAction9: string;
 	markdownBarAction0: string;
+	markdownBarResetPosition: string;
 };
 
 /**
@@ -83,6 +84,8 @@ export function useMarkdownBottomBarShortcuts(input: {
 	) => void;
 	onOverwriteSaveEnabledChange?: (next: boolean) => void;
 	onAutoSaveEnabledChange?: (next: boolean) => void;
+	/** 与底部栏「复位操作栏初始位置」按钮一致 */
+	resetMarkdownBottomBarPosition: () => void;
 }) {
 	const {
 		enabled,
@@ -103,6 +106,7 @@ export function useMarkdownBottomBarShortcuts(input: {
 		setSplitScrollFollowMode,
 		onOverwriteSaveEnabledChange,
 		onAutoSaveEnabledChange,
+		resetMarkdownBottomBarPosition,
 	} = input;
 
 	const [chords, setChords] = useState<MarkdownBottomBarChords>(() => ({
@@ -116,6 +120,8 @@ export function useMarkdownBottomBarShortcuts(input: {
 		markdownBarAction8: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.markdownBarAction8,
 		markdownBarAction9: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.markdownBarAction9,
 		markdownBarAction0: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.markdownBarAction0,
+		markdownBarResetPosition:
+			KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.markdownBarResetPosition,
 	}));
 
 	useEffect(() => {
@@ -134,6 +140,7 @@ export function useMarkdownBottomBarShortcuts(input: {
 				markdownBarAction8: c.markdownBarAction8,
 				markdownBarAction9: c.markdownBarAction9,
 				markdownBarAction0: c.markdownBarAction0,
+				markdownBarResetPosition: c.markdownBarResetPosition,
 			});
 		};
 		void load();
@@ -271,6 +278,13 @@ export function useMarkdownBottomBarShortcuts(input: {
 				onAutoSaveEnabledChange?.(!autoSaveEnabled);
 				return;
 			}
+
+			if (hit(chords.markdownBarResetPosition)) {
+				e.preventDefault();
+				e.stopPropagation();
+				resetMarkdownBottomBarPosition();
+				return;
+			}
 		};
 
 		window.addEventListener('keydown', onKeydown, true);
@@ -295,6 +309,7 @@ export function useMarkdownBottomBarShortcuts(input: {
 		setSplitScrollFollowMode,
 		onOverwriteSaveEnabledChange,
 		onAutoSaveEnabledChange,
+		resetMarkdownBottomBarPosition,
 	]);
 
 	return { chords };

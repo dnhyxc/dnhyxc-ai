@@ -28,6 +28,8 @@ export const KNOWLEDGE_SHORTCUT_KEY_IDS = {
 	markdownBarAction8: 19,
 	markdownBarAction9: 20,
 	markdownBarAction0: 21,
+	/** Markdown 底部操作栏：复位拖动后的几何位置（与「复位操作栏初始位置」按钮一致） */
+	markdownBarResetPosition: 22,
 } as const;
 
 /** 与 `views/setting/system/config.ts` 中默认值保持一致 */
@@ -60,6 +62,8 @@ export const KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS = {
 	markdownBarAction8: 'Meta + 8',
 	markdownBarAction9: 'Meta + 9',
 	markdownBarAction0: 'Meta + 0',
+	/** Command（Meta）+ -：复位操作栏位置（避免与 ⌘+数字 冲突） */
+	markdownBarResetPosition: 'Meta + -',
 } as const;
 
 type ParsedChord = {
@@ -147,6 +151,9 @@ function eventKeyMatchesChord(e: KeyboardEvent, expectedKey: string): boolean {
 	if (digit && expectedKey === digit[1]) return true;
 	const numpad = /^Numpad([0-9])$/.exec(code);
 	if (numpad && expectedKey === numpad[1]) return true;
+	// 主键为减号：部分环境 e.key 与 e.code 不一致时用物理键兜底
+	if (expectedKey === '-' && (code === 'Minus' || code === 'NumpadSubtract'))
+		return true;
 
 	return false;
 }
@@ -258,8 +265,9 @@ export async function loadKnowledgeShortcutChords(): Promise<{
 	markdownBarAction8: string;
 	markdownBarAction9: string;
 	markdownBarAction0: string;
+	markdownBarResetPosition: string;
 }> {
-	const [s, c, o, b, t, v, a1, a2, a3, a4, a5, a6, a7, a8, a9, a0] =
+	const [s, c, o, b, t, v, a1, a2, a3, a4, a5, a6, a7, a8, a9, a0, aReset] =
 		await Promise.all([
 			getValue<string>(`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.save}`),
 			getValue<string>(`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.clear}`),
@@ -300,6 +308,9 @@ export async function loadKnowledgeShortcutChords(): Promise<{
 			),
 			getValue<string>(
 				`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.markdownBarAction0}`,
+			),
+			getValue<string>(
+				`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.markdownBarResetPosition}`,
 			),
 		]);
 	const { value: clear, didMigrate: clearMigrated } =
@@ -354,6 +365,9 @@ export async function loadKnowledgeShortcutChords(): Promise<{
 			a9?.trim() || KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.markdownBarAction9,
 		markdownBarAction0:
 			a0?.trim() || KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.markdownBarAction0,
+		markdownBarResetPosition:
+			aReset?.trim() ||
+			KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.markdownBarResetPosition,
 	};
 }
 

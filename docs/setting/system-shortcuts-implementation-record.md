@@ -674,7 +674,7 @@ const System = () => {
 
 ## 8. Rust 侧：为何知识库 `shortcut_6+` 不会注册为全局快捷键
 
-`load_shortcuts_from_store` 仅遍历 **`1..=MAX_SHORTCUT_KEY`**，且 **`MAX_SHORTCUT_KEY = 5`**。因此 **`shortcut_6`～`shortcut_21`** 虽被前端写入 store，但 **不会** 被 Rust 全局快捷键模块加载与注册。
+`load_shortcuts_from_store` 仅遍历 **`1..=MAX_SHORTCUT_KEY`**，且 **`MAX_SHORTCUT_KEY = 5`**。因此 **`shortcut_6`～`shortcut_22`**（含知识库页内快捷键与底部操作栏 ⌘+1…⌘+0、**复位 `shortcut_22`** 等）虽被前端写入 store，但 **不会** 被 Rust 全局快捷键模块加载与注册。
 
 ```rust
 // apps/frontend/src-tauri/src/system/shortcut.rs（节选 + 中文注释）

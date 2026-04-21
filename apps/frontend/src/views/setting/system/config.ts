@@ -229,4 +229,14 @@ export const DEFAULT_INFO: ShortcutSettingItem[] = [
 		action: 'knowledge_markdown_bar_action_0',
 		registerGlobally: false,
 	},
+	{
+		label: '知识库：操作栏：复位初始位置',
+		key: KNOWLEDGE_SHORTCUT_KEY_IDS.markdownBarResetPosition,
+		id: 'shortcut',
+		shortcut: '',
+		defaultShortcut: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.markdownBarResetPosition,
+		placeholder: '按键盘输入快捷键',
+		action: 'knowledge_markdown_bar_reset_position',
+		registerGlobally: false,
+	},
 ];

@@ -52,6 +52,7 @@ export type MarkdownBottomBarChords = {
 	markdownBarAction8: string;
 	markdownBarAction9: string;
 	markdownBarAction0: string;
+	markdownBarResetPosition: string;
 };
 
 export const MarkdownBottomBar = memo(function MarkdownBottomBar(props: {
@@ -125,27 +126,6 @@ export const MarkdownBottomBar = memo(function MarkdownBottomBar(props: {
 			presets.push(autoSaveIntervalSec);
 		return presets.sort((a, b) => a - b);
 	}, [autoSaveIntervalSec]);
-
-	const { chords } = useMarkdownBottomBarShortcuts({
-		enabled: shortcuts.enabled,
-		rootRef: shortcuts.rootRef,
-		viewModeRef: shortcuts.viewModeRef,
-		assistantRightPaneActive,
-		markdownDiffBottomBarVisible,
-		bottomBarCustomNodeEnabled,
-		showOverwriteSaveToggle,
-		overwriteSaveEnabled,
-		showAutoSaveControls,
-		autoSaveEnabled,
-		focusEditor,
-		closeMarkdownAssistant,
-		toggleMarkdownSplitDiffCompare,
-		toggleMarkdownAssistant,
-		setViewMode,
-		setSplitScrollFollowMode,
-		onOverwriteSaveEnabledChange,
-		onAutoSaveEnabledChange,
-	});
 
 	const { rootRef } = shortcuts;
 	const dragLayerRef = useRef<HTMLDivElement | null>(null);
@@ -262,6 +242,28 @@ export const MarkdownBottomBar = memo(function MarkdownBottomBar(props: {
 			setDragOffset((prev) => snapMarkdownBottomBarOffset(rootEl, barEl, prev));
 		});
 	}, []);
+
+	const { chords } = useMarkdownBottomBarShortcuts({
+		enabled: shortcuts.enabled,
+		rootRef: shortcuts.rootRef,
+		viewModeRef: shortcuts.viewModeRef,
+		assistantRightPaneActive,
+		markdownDiffBottomBarVisible,
+		bottomBarCustomNodeEnabled,
+		showOverwriteSaveToggle,
+		overwriteSaveEnabled,
+		showAutoSaveControls,
+		autoSaveEnabled,
+		focusEditor,
+		closeMarkdownAssistant,
+		toggleMarkdownSplitDiffCompare,
+		toggleMarkdownAssistant,
+		setViewMode,
+		setSplitScrollFollowMode,
+		onOverwriteSaveEnabledChange,
+		onAutoSaveEnabledChange,
+		resetMarkdownBottomBarPosition: resetBarPosition,
+	});
 
 	/** 底部操作栏内图标按钮（与「跟随滚动」一致） */
 	const markdownBarIconBtnClass = (active: boolean) =>
@@ -578,7 +580,9 @@ export const MarkdownBottomBar = memo(function MarkdownBottomBar(props: {
 						) : null}
 
 						{/* 最右侧：与覆盖保存/自动保存并列；无业务回调时也会渲染，保证始终可复位 */}
-						<Tooltip content="复位操作栏初始位置">
+						<Tooltip
+							content={`复位操作栏初始位置（${formatChordForTip(chords.markdownBarResetPosition)}）`}
+						>
 							<button
 								type="button"
 								className={cn(
