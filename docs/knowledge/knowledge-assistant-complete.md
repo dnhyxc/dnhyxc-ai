@@ -460,6 +460,220 @@ const flushScrollToBottom = useCallback(() => {
 }, []);
 ```
 
+### 8.6 右下角滚动角标按钮：置底 / 置顶（与 Monaco 预览一致）
+
+本节说明 `KnowledgeAssistant.tsx` 的**滚动角标按钮**（右下角、输入框上方、与输入框右边对齐）的完整实现思路与关键代码。该按钮的“何时显示、显示置顶还是置底、阈值判定”等逻辑**刻意与** `apps/frontend/src/components/design/Monaco/preview.tsx` 的预览角标保持一致，避免出现两套不一致的滚动体验。
+
+#### 8.6.1 设计目标与约束
+
+核心目标：
+
+- **体验一致**：判定逻辑、阈值、模式切换与 `preview.tsx` 一致（`hidden / toBottom / toTop` 三态）。
+- **不影响流式贴底**：`KnowledgeAssistant` 的消息列表在流式输出（streaming，流式输出）时由 `useStickToBottomScroll` 负责自动滚动到底部；角标按钮只能“提示/跳转”，不能破坏 hook 的跟底状态机。
+- **可中断可恢复**：用户手动向上滚动应当丝滑且能打断贴底；当用户回到底部（或点击“置底”）时，应当能恢复自动贴底；当流式进行中点击“置顶”时必须真的能留在顶部（不能被立刻拉回底部）。
+
+#### 8.6.2 为什么“置顶”要先 disableStickToBottom
+
+`useStickToBottomScroll` 在 `isStreaming === true` 且内部 `stickToBottomRef.current === true` 时，会在 `contentRevision` 变化（新 token 到来）后**强制把视口滚到底部**（详见 `useLayoutEffect([...contentRevision])`）。
+
+因此：
+
+- 若流式阶段用户点击“置顶”但不先 `disableStickToBottom()`，下一次 SSE chunk 到来就会把视口拉回底部，导致“流式时无法置顶”。
+- 解决方式是在 `toTop` 分支里**先** `disableStickToBottom()` 再 `scrollTo({ top: 0 })`。
+
+#### 8.6.3 与 Monaco 预览一致的判定逻辑（参考）
+
+`preview.tsx` 中角标按钮的核心判定如下（节选）：
+
+```tsx
+// 文件：apps/frontend/src/components/design/Monaco/preview.tsx（节选）
+// 语义：内容不可滚动 -> hidden；接近底部 -> toTop；否则 -> toBottom
+const refreshPreviewScrollFab = useCallback(() => {
+	if (!showPreviewScrollCornerFab) {
+		setPreviewScrollFabMode('hidden');
+		return;
+	}
+	const vp = localViewportRef.current;
+	if (!vp) return;
+	const { scrollTop, scrollHeight, clientHeight } = vp;
+	const maxScroll = scrollHeight - clientHeight;
+	if (maxScroll <= 4) {
+		setPreviewScrollFabMode('hidden');
+		return;
+	}
+	const threshold = 8;
+	setPreviewScrollFabMode(
+		scrollTop >= maxScroll - threshold ? 'toTop' : 'toBottom',
+	);
+}, [showPreviewScrollCornerFab]);
+```
+
+#### 8.6.4 `KnowledgeAssistant.tsx` 的完整实现思路（逐条）
+
+实现步骤（与源码一致）：
+
+1. **引入三态 mode**：`hidden | toBottom | toTop`，与 `preview.tsx` 对齐。
+2. **计算 mode 的 refresh 函数**：取 `ScrollArea` 的 viewport（`scrollViewportRef.current`），用 `maxScroll <= 4` 与 `threshold = 8` 计算 `nextMode`。
+3. **降低滚动抖动**：`onScroll` 高频触发时，如果每次都 `setState` 会导致重新渲染影响滚动手感；因此用 `scrollCornerFabModeRef` 记住上一次 mode，仅当 mode 变化时才 `setScrollCornerFabMode(nextMode)`。
+4. **刷新时机**：
+   - **滚动时**：在 `scrollViewportHandlers.onScroll` 之后追加 `refreshScrollCornerFab()`（保持与 hook 的滚动观测同一事件源）。
+   - **内容/尺寸变化时**：`streamScrollTick / documentKey / messages.length` 变化会改变高度；通过 `setTimeout(0) + requestAnimationFrame` 与 `ResizeObserver` 触发 refresh（与 `preview.tsx` 的“正文变化/视口变化刷新”策略一致）。
+5. **点击行为**：
+   - `toBottom`：先 `enableStickToBottom()` 再 smooth 滚到底部，确保“回到底部后能恢复流式贴底”。
+   - `toTop`：先 `disableStickToBottom()` 再 smooth 滚到顶部，确保“流式进行中也能置顶并停住”。
+6. **按钮位置**：渲染在输入框容器上方，使用 `absolute bottom-full mb-2 right-0`，使其位于右下角、输入框上方且与输入框右边对齐。
+
+#### 8.6.5 关键实现代码（带详细中文注释）
+
+下面代码块为 `KnowledgeAssistant.tsx` 相关片段的“带注释重排版”，字段名/行为与仓库实现保持一致（注释为解释性中文，便于维护时对照）。
+
+```tsx
+// 文件：apps/frontend/src/views/knowledge/KnowledgeAssistant.tsx // 代码来源（方便回到真实文件对照）
+// -------------------------------------------------------------------------------- // 分隔线：提高可读性
+// 角标按钮三态：与 Monaco 预览保持一致（hidden=不显示，toBottom=置底，toTop=置顶） // 类型语义说明
+type KnowledgeAssistantScrollCornerFabMode = 'hidden' | 'toBottom' | 'toTop'; // 与 preview.tsx 的 mode 命名保持一致
+// -------------------------------------------------------------------------------- // 分隔线
+// 从 useStickToBottomScroll 拿到：viewport ref、滚动事件处理、贴底控制、以及强制滚到底的方法 // hook 输出概览
+const { // 开始解构 hook 返回值
+	viewportRef: scrollViewportRef, // ScrollArea 的 viewport（可滚动容器）ref：角标判定与滚动跳转都依赖它
+	scrollViewportHandlers, // hook 提供的滚动/滚轮/指针事件处理器：负责“流式贴底状态机”
+	enableStickToBottom: enableStreamStickToBottom, // 允许自动贴底：回到底部后继续跟随流式输出
+	disableStickToBottom: disableStreamStickToBottom, // 禁止自动贴底：用于“置顶”时打断流式拉回
+	flushScrollToBottom, // 单次强制滚到底：不改变贴底状态（这里保留用于其它逻辑，如条带插入后贴底）
+} = useStickToBottomScroll({ // 调用贴底 hook 并传入配置
+	isStreaming: assistantStore.isStreaming, // streaming（流式输出）时：contentRevision 变化会触发 hook 的强制贴底逻辑
+	contentRevision: streamScrollTick, // 内容版本戳：内容增长/流式状态变化时更新，用于驱动 hook 以及角标刷新
+	resetKey: documentKey || undefined, // 换文档时重置 hook 内部滚动观测状态，避免沿用上一文档滚动位置
+}); // useStickToBottomScroll 调用结束
+// -------------------------------------------------------------------------------- // 分隔线
+// UI 层的角标按钮模式 state：用于决定是否渲染按钮、渲染哪个图标、aria-label 文案等 // state 作用说明
+const [scrollCornerFabMode, setScrollCornerFabMode] = // 声明 state：当前角标模式
+	useState<KnowledgeAssistantScrollCornerFabMode>('hidden'); // 初始为 hidden：避免首屏瞬间闪按钮
+// -------------------------------------------------------------------------------- // 分隔线
+// 高频 scroll 事件里如果每次都 setState，会触发大量渲染，导致滚动“发黏/不丝滑” // 性能问题说明
+// 因此用 ref 记录上一次 mode：只有 mode 真变了才 setState（减少渲染） // 解决策略说明
+const scrollCornerFabModeRef = // 声明 ref：缓存上一帧 mode
+	useRef<KnowledgeAssistantScrollCornerFabMode>('hidden'); // 初始与 state 对齐：避免第一次 refresh 误判为“变化”
+// -------------------------------------------------------------------------------- // 分隔线
+// refresh：根据 viewport 的 scrollTop / scrollHeight / clientHeight 计算按钮模式（与 Monaco 预览一致） // refresh 函数目的
+const refreshScrollCornerFab = useCallback(() => { // 用 useCallback 保证引用稳定（依赖最小化）
+	const vp = scrollViewportRef.current; // 读取 viewport DOM：ScrollArea 真正滚动的是 viewport
+	if (!vp) return; // viewport 未就绪：直接返回（避免空引用）
+	const { scrollTop, scrollHeight, clientHeight } = vp; // 取滚动位置与高度：用于计算“是否可滚/是否触底”
+	// -------------------------------------------------------------------------------- // 分隔线（局部）
+	const maxScroll = scrollHeight - clientHeight; // 最大可滚动距离：scrollTop 的理论上限
+	let nextMode: KnowledgeAssistantScrollCornerFabMode = 'hidden'; // 预置下一状态：默认隐藏
+	// -------------------------------------------------------------------------------- // 分隔线（局部）
+	if (maxScroll <= 4) { // 与 preview.tsx 一致：可滚动距离太小（≤4px）视为不可滚动
+		nextMode = 'hidden'; // 不可滚动：隐藏按钮
+	} else { // 可滚动：根据是否接近底部决定显示“置顶”或“置底”
+		const threshold = 8; // 与 preview.tsx 一致：触底阈值 8px（接近底部即认为在底部）
+		nextMode = scrollTop >= maxScroll - threshold ? 'toTop' : 'toBottom'; // 在底部带：显示置顶；否则显示置底
+	} // if/else 结束
+	// -------------------------------------------------------------------------------- // 分隔线（局部）
+	// 只有 mode 发生变化才 setState：避免 scroll 高频触发导致 UI 频繁 re-render 影响滚动手感 // 性能关键点
+	if (scrollCornerFabModeRef.current !== nextMode) { // 判断是否真的发生了模式切换
+		scrollCornerFabModeRef.current = nextMode; // 更新 ref：缓存最新模式，供下一次对比
+		setScrollCornerFabMode(nextMode); // 更新 state：触发 UI 更新（图标/可见性/aria 文案）
+	} // 条件块结束
+}, [scrollViewportRef]); // 依赖 viewport ref：ref 对象本身稳定，但按规范仍写入依赖
+// -------------------------------------------------------------------------------- // 分隔线
+// 将 hook 的 onScroll 包装一层：保留其贴底状态机逻辑，再追加 refresh 角标模式 // 包装原因说明
+const scrollAreaHandlers = useMemo(() => { // 用 useMemo 避免每次渲染都生成新 handlers
+	const { onScroll: onViewportScroll, ...rest } = scrollViewportHandlers; // 拆出 onScroll，其余 handler 原样透传
+	return { // 返回给 ScrollArea 展开使用的 handlers
+		...rest, // 透传 onWheelCapture / onPointerDownCapture：保证“流式时可中断贴底”的既有行为不变
+		onScroll: (e: UIEvent<HTMLDivElement>) => { // 重新实现 onScroll：在同一事件里串行执行
+			onViewportScroll(e); // 先让 hook 处理滚动：更新 stickToBottomRef（是否跟底）等内部状态机
+			// ...（此处省略：如代码块工具栏重排等其它滚动联动逻辑） // 与业务无关的其它逻辑提示
+			refreshScrollCornerFab(); // 最后刷新角标按钮模式：根据当前 scrollTop 判断 toTop/toBottom/hidden
+		}, // onScroll 结束
+	}; // 返回对象结束
+}, [scrollViewportHandlers, refreshScrollCornerFab]); // 依赖：handlers 与 refresh 引用变化时重算
+// -------------------------------------------------------------------------------- // 分隔线
+// 内容/尺寸变化时也要 refresh：流式输出、消息数量变化、切换文档会改变 scrollHeight，从而影响按钮模式 // effect 目的
+useEffect(() => { // 监听相关依赖变化
+	let ro: ResizeObserver | null = null; // ResizeObserver：观察 viewport 尺寸变化（如容器高度变化）
+	const tid = window.setTimeout(() => { // setTimeout(0)：让 DOM 更新先落地（与 preview.tsx 策略一致）
+		refreshScrollCornerFab(); // 先同步算一次：尽快更新按钮模式
+		requestAnimationFrame(() => refreshScrollCornerFab()); // 再下一帧算一次：处理 Radix/布局晚一帧稳定的情况
+		// -------------------------------------------------------------------------------- // 分隔线（局部）
+		const vp = scrollViewportRef.current; // 再取一次 viewport：此时更可能已就绪
+		if (vp) { // viewport 存在才观察
+			ro = new ResizeObserver(() => refreshScrollCornerFab()); // 尺寸变动时刷新：例如窗口 resize、输入框高度变化
+			ro.observe(vp); // 开始观察 viewport
+		} // if 结束
+	}, 0); // setTimeout 结束（delay=0）
+	// -------------------------------------------------------------------------------- // 分隔线（局部）
+	return () => { // effect 清理：避免泄漏
+		window.clearTimeout(tid); // 取消未执行的 setTimeout
+		ro?.disconnect(); // 停止 ResizeObserver
+	}; // cleanup 结束
+}, [ // 依赖数组开始：这些变化都可能改变 scrollHeight/布局
+	streamScrollTick, // 流式输出 tick：内容长度变化会触发
+	documentKey, // 文档切换：滚动容器内容完全变更
+	messages.length, // 消息数量变化：插入/加载历史等会改变高度
+	refreshScrollCornerFab, // refresh 函数引用变化：需要重新绑定
+	scrollViewportRef, // viewport ref：理论上稳定，但为了完整性放入依赖
+]); // useEffect 结束
+// -------------------------------------------------------------------------------- // 分隔线
+// 点击角标按钮：toBottom=置底并恢复贴底；toTop=置顶并打断贴底（否则流式会拉回） // 点击语义说明
+const onScrollCornerFabClick = useCallback(() => { // useCallback：避免每次渲染生成新函数
+	const vp = scrollViewportRef.current; // 取 viewport：后续 scrollTo 需要
+	if (!vp) return; // viewport 不存在：直接返回
+	// -------------------------------------------------------------------------------- // 分隔线（局部）
+	if (scrollCornerFabMode === 'toBottom') { // 当前按钮是“置底”
+		enableStreamStickToBottom(); // 先恢复自动贴底：确保后续流式 token 增量能继续跟底
+		vp.scrollTo({ // smooth 滚到底部：给用户明确的“跳到底”反馈
+			top: vp.scrollHeight - vp.clientHeight, // 计算物理底部 top：与 preview.tsx 一致
+			behavior: 'smooth', // 平滑滚动（丝滑体验）
+		}); // scrollTo 结束
+	} else if (scrollCornerFabMode === 'toTop') { // 当前按钮是“置顶”
+		disableStreamStickToBottom(); // 关键：先禁用贴底，否则 streaming 下一次 contentRevision 会把视口拉回底部
+		vp.scrollTo({ top: 0, behavior: 'smooth' }); // 平滑滚动到顶部（读历史更方便）
+	} // if/else 结束
+}, [ // 依赖数组：点击逻辑依赖这些引用/状态
+	scrollViewportRef, // 读取 viewport
+	scrollCornerFabMode, // 决定走 toBottom 还是 toTop
+	enableStreamStickToBottom, // toBottom 分支使用
+	disableStreamStickToBottom, // toTop 分支使用
+]); // useCallback 结束
+// -------------------------------------------------------------------------------- // 分隔线
+// JSX：按钮定位在输入框外层容器上方（右下角、输入框上方、右侧与输入框右侧对齐） // 布局说明
+return ( // 组件返回开始
+	<div className="relative w-full flex items-center justify-center pr-4 pl-3.5"> {/* 外层 relative：供按钮 absolute 定位；padding 与输入框一致 */} // 外层容器
+		{messages.length > 0 && scrollCornerFabMode !== 'hidden' ? ( // 有消息且 mode 非 hidden 才显示按钮（避免空会话出现）
+			<button // 角标按钮本体
+				type="button" // 明确 button 类型：避免在 form 场景误提交
+				className={cn( // 复用与 preview/ChatControls 类似的视觉样式
+					'absolute bottom-full mb-2 right-0 z-10 flex h-8.5 w-8.5 items-center justify-center rounded-full border border-theme/5 bg-theme/5 text-textcolor/90 backdrop-blur-[2px] hover:bg-theme/15', // 位置与玻璃态样式：bottom-full=输入框上方；right-0=右对齐
+					'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme/40', // 无障碍 focus ring：键盘可见
+				)} // className 结束
+				aria-label={ // 无障碍标签：屏幕阅读器读出操作含义
+					scrollCornerFabMode === 'toBottom' ? '滚动到底部' : '滚动到顶部' // 根据 mode 切换文案
+				} // aria-label 结束
+				onClick={onScrollCornerFabClick} // 点击触发置底/置顶逻辑
+			> {/* button children 开始 */} // children 容器说明
+				{scrollCornerFabMode === 'toBottom' ? ( // toBottom 显示向下箭头
+					<ArrowDown aria-hidden /> // 图标：对屏幕阅读器隐藏（由 aria-label 负责可读文案）
+				) : ( // 否则（toTop）显示向上箭头
+					<ArrowUp aria-hidden /> // 图标：同样 aria-hidden
+				)} {/* 条件渲染结束 */} // 条件渲染说明
+			</button> // button 结束
+		) : null} {/* 不满足条件则不渲染按钮 */} // 条件渲染说明
+		<ChatEntry /* 输入框本体：此处省略 props；按钮通过 right-0 与该区域右边对齐 */ /> // 输入框组件
+	</div> // 外层容器结束
+); // return 结束
+```
+
+#### 8.6.6 常见问题（FAQ）
+
+- **为什么角标阈值不用 hook 的 `resumeWithinBottomPx`（默认 48px）？**  
+  角标按钮的目标是与 `preview.tsx` 的体验一致（阈值 8px、模式切换明确）；而 `useStickToBottomScroll` 的 `resumeWithinBottomPx` 负责“贴底状态机”的稳定性与容错（更宽的底部带更符合用户拖拽/触控回到底部的判断）。两者职责不同，因此阈值不强行复用同一个值。
+
+- **为什么要用 `scrollCornerFabModeRef`？**  
+  `scroll` 事件频率很高；如果每次滚动都 `setState`，会导致 React 重新渲染频繁发生，从而影响滚动的丝滑程度。`ref` 让我们只在 mode 实际变化时更新 UI，减少不必要的渲染。
+
 ---
 
 ## 9. HTTP 封装与类型
