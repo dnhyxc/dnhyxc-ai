@@ -82,7 +82,7 @@ export function formatChordForTip(raw: string | undefined | null): string {
 		if (p.length === 1) return p.toUpperCase();
 		return p;
 	});
-	return mapped.join(mac ? ' + ' : ' + ');
+	return `（${mapped.join(mac ? ' + ' : ' + ')}）`;
 }
 
 export function useMarkdownBottomBarShortcuts(input: {

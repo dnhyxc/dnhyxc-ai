@@ -121,6 +121,15 @@ export const KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS = {
 
 抽成 hook 后，底部操作栏组件只需要提供“当前状态 + 回调”，即可完成快捷键绑定，降低耦合。
 
+### 4.1.1 组件可移植改造：hook 不再直接依赖项目快捷键实现
+
+随着组件通用化要求提升，`useMarkdownBottomBarShortcuts` 做了一个关键改造：**把 chord 的来源与匹配逻辑从 hook 内部移出**，改为由宿主通过 `shortcutSource` 注入（见 §4.2）。
+
+这样 `Monaco` 组件可以：
+
+- 在本项目继续使用知识库的快捷键 store（由知识库页注入）
+- 在其它项目替换为任意配置中心/本地存储/远端策略
+
 ### 4.2 chord 的热更新策略（组件可移植：由外部注入数据源）
 
 为保证 `Monaco` 组件可在其它项目直接复用，hook 不再直接依赖“知识库快捷键存储实现”，而是通过入参注入一个 `ShortcutSource`（数据源）：

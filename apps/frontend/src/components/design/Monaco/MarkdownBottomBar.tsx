@@ -356,7 +356,7 @@ export const MarkdownBottomBar = memo(function MarkdownBottomBar(
 						</Tooltip>
 
 						<Tooltip
-							content={`编辑源码（${formatChordForTip(chords.markdownBarAction1)}）`}
+							content={`编辑源码${formatChordForTip(chords.markdownBarAction1)}`}
 						>
 							<button
 								type="button"
@@ -376,7 +376,7 @@ export const MarkdownBottomBar = memo(function MarkdownBottomBar(
 
 						{markdownDiffBottomBarVisible ? (
 							<Tooltip
-								content={`${viewMode === 'splitDiff' ? '关闭分屏对照：回到单栏编辑' : '分屏对照修改：左编右只读 Diff'}（${formatChordForTip(chords.markdownBarAction2)}）`}
+								content={`${viewMode === 'splitDiff' ? '关闭分屏对照：回到单栏编辑' : '分屏对照修改：左编右只读 Diff'}${formatChordForTip(chords.markdownBarAction2)}`}
 							>
 								<button
 									type="button"
@@ -396,7 +396,7 @@ export const MarkdownBottomBar = memo(function MarkdownBottomBar(
 						) : null}
 
 						<Tooltip
-							content={`预览渲染（${formatChordForTip(chords.markdownBarAction3)}）`}
+							content={`预览渲染${formatChordForTip(chords.markdownBarAction3)}`}
 						>
 							<button
 								type="button"
@@ -420,7 +420,7 @@ export const MarkdownBottomBar = memo(function MarkdownBottomBar(
 
 						{bottomBarAssistantNodeEnabled ? (
 							<Tooltip
-								content={`${markdownAssistantOpen ? '关闭 AI 助手' : '开启 AI 助手'}（${formatChordForTip(chords.markdownBarAction4)}）`}
+								content={`${markdownAssistantOpen ? '关闭 AI 助手' : '开启 AI 助手'}${formatChordForTip(chords.markdownBarAction4)}`}
 							>
 								<button
 									type="button"
@@ -435,7 +435,7 @@ export const MarkdownBottomBar = memo(function MarkdownBottomBar(
 						) : null}
 
 						<Tooltip
-							content={`分屏：左编辑右预览（${formatChordForTip(chords.markdownBarAction5)}）`}
+							content={`分屏：左编辑右预览${formatChordForTip(chords.markdownBarAction5)}`}
 						>
 							<button
 								type="button"
@@ -468,7 +468,7 @@ export const MarkdownBottomBar = memo(function MarkdownBottomBar(
 						{viewMode === 'split' && !assistantRightPaneActive && (
 							<>
 								<Tooltip
-									content={`双边跟随：编辑区与预览区双向同步滚动（${formatChordForTip(chords.markdownBarAction6)}）`}
+									content={`双边跟随：编辑区与预览区双向同步滚动${formatChordForTip(chords.markdownBarAction6)}`}
 								>
 									<button
 										type="button"
@@ -492,7 +492,7 @@ export const MarkdownBottomBar = memo(function MarkdownBottomBar(
 								</Tooltip>
 
 								<Tooltip
-									content={`右边跟随左边：滚动编辑区时预览区同步滚动（${formatChordForTip(chords.markdownBarAction7)}）`}
+									content={`右边跟随左边：滚动编辑区时预览区同步滚动${formatChordForTip(chords.markdownBarAction7)}`}
 								>
 									<button
 										type="button"
@@ -520,7 +520,7 @@ export const MarkdownBottomBar = memo(function MarkdownBottomBar(
 								</Tooltip>
 
 								<Tooltip
-									content={`左边跟随右边：滚动预览区时编辑区同步滚动（${formatChordForTip(chords.markdownBarAction8)}）`}
+									content={`左边跟随右边：滚动预览区时编辑区同步滚动${formatChordForTip(chords.markdownBarAction8)}`}
 								>
 									<button
 										type="button"
@@ -553,7 +553,7 @@ export const MarkdownBottomBar = memo(function MarkdownBottomBar(
 					<div className="flex shrink-0 items-center gap-1.5 pl-2">
 						{showOverwriteSaveToggle ? (
 							<Tooltip
-								content={`${overwriteSaveEnabled ? '已开启覆盖保存：同名文件将直接覆盖写入' : '开启覆盖保存：同名文件不再弹窗确认，直接覆盖写入'}（${formatChordForTip(chords.markdownBarAction9)}）`}
+								content={`${overwriteSaveEnabled ? '已开启覆盖保存：同名文件将直接覆盖写入' : '开启覆盖保存：同名文件不再弹窗确认，直接覆盖写入'}${formatChordForTip(chords.markdownBarAction9)}`}
 							>
 								<button
 									type="button"
@@ -574,7 +574,7 @@ export const MarkdownBottomBar = memo(function MarkdownBottomBar(
 						{showAutoSaveControls ? (
 							<>
 								<Tooltip
-									content={`${autoSaveEnabled ? '已开启自动保存：按所选间隔在有修改时保存' : '开启自动保存：按间隔自动保存（无标题/正文或同名冲突未开覆盖时会静默跳过）'}（${formatChordForTip(chords.markdownBarAction0)}）`}
+									content={`${autoSaveEnabled ? '已开启自动保存：按所选间隔在有修改时保存' : '开启自动保存：按间隔自动保存（无标题/正文或同名冲突未开覆盖时会静默跳过）'}${formatChordForTip(chords.markdownBarAction0)}`}
 								>
 									<button
 										type="button"
@@ -618,7 +618,7 @@ export const MarkdownBottomBar = memo(function MarkdownBottomBar(
 
 						{/* 最右侧：与覆盖保存/自动保存并列；无业务回调时也会渲染，保证始终可复位 */}
 						<Tooltip
-							content={`复位操作栏初始位置（${formatChordForTip(chords.markdownBarResetPosition)}）`}
+							content={`复位操作栏初始位置${formatChordForTip(chords.markdownBarResetPosition)}`}
 						>
 							<button
 								type="button"
