@@ -420,11 +420,7 @@ const KnowledgeAssistant = observer(
 		return (
 			<div className="relative flex h-full w-full flex-col overflow-hidden">
 				<ChatCodeFloatingToolbar />
-				{!isLoggedIn ? (
-					<div className="text-textcolor/70 flex flex-1 items-center justify-center px-4 text-center text-sm">
-						登录后可在此与 AI 助手对话，会话按当前知识文档分别保存。
-					</div>
-				) : assistantStore.isHistoryLoading ? (
+				{assistantStore.isHistoryLoading ? (
 					<div className="text-textcolor/70 flex flex-1 items-center justify-center text-sm">
 						<Loading text="正在加载对话…" />
 					</div>
