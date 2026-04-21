@@ -278,3 +278,102 @@ const autoSaveIntervalOptions = useMemo(() => {
 | `apps/frontend/src/hooks/useMarkdownBottomBarShortcuts.ts` | 读取/热更新 chord + window keydown 捕获 + 动作分发 + Tooltip 展示格式化 |
 | `apps/frontend/src/components/design/Monaco/MarkdownBottomBar.tsx` | 底部操作栏 UI + Tooltip + 内部逻辑下沉 |
 | `apps/frontend/src/components/design/Monaco/index.tsx` | 装配 `MarkdownBottomBar`（传入最小必要上下文） |
+
+---
+
+## 8. 预览 / 分屏：选中态下再次点击（或快捷键）退出，并回到「编辑源码」
+
+### 8.1 需求与行为约定
+
+- **预览（preview）**：当 `viewMode === 'preview'` 时，用户再次点击「预览」按钮或触发 `markdownBarAction3`（默认 ⌘+3）→ 退出预览，**默认回到 `edit`（编辑源码）**，并 `focusEditor` 与「编辑源码」按钮一致。
+- **分屏（split，左编右预览）**：仅当底部栏上该 Tab **处于选中高亮** 时才算「已选中」。高亮条件与 UI 一致：`viewMode === 'split' && !assistantRightPaneActive`（右侧为 Markdown 预览而非 AI 助手）。此时再次点击「分屏」或触发 `markdownBarAction5`（默认 ⌘+5）→ **回到 `edit`**，并 `focusEditor`。
+- **分屏 + AI 助手**：`viewMode` 可能仍为 `split`，但 `assistantRightPaneActive === true` 时，分屏 Tab **不高亮**。此时点击「分屏」的语义仍是「关闭助手并进入左编右预览」，**不应**被误判为「退出纯分屏」；因此必须在 **`closeMarkdownAssistant()` 之前** 计算是否「纯分屏」，否则同一事件循环内助手状态尚未更新，会把「分屏+助手」误判成可退出态。
+
+### 8.2 实现位置
+
+| 位置 | 职责 |
+|------|------|
+| `MarkdownBottomBar.tsx` | 预览 / 分屏按钮 `onClick` |
+| `useMarkdownBottomBarShortcuts.ts` | `markdownBarAction3` / `markdownBarAction5` 与按钮行为对齐 |
+
+### 8.3 预览：按钮与快捷键（节选）
+
+预览分支始终先 `closeMarkdownAssistant()`，再按当前 `viewMode` / `viewModeRef` 分支：
+
+```tsx
+// apps/frontend/src/components/design/Monaco/MarkdownBottomBar.tsx（预览按钮 onClick 节选）
+onClick={() => {
+  closeMarkdownAssistant(); // 与其它视图切换一致：先关右侧助手，避免互斥状态残留
+  if (viewMode === 'preview') {
+    // 已在预览：再次点击视为「关闭预览」，回到单栏编辑并聚焦编辑器
+    setViewMode('edit');
+    queueMicrotask(focusEditor); // 与「编辑源码」按钮一致：微任务后聚焦，避免与本次点击焦点冲突
+  } else {
+    setViewMode('preview'); // 非预览：进入预览（行为与改动前一致）
+  }
+}}
+```
+
+```typescript
+// apps/frontend/src/hooks/useMarkdownBottomBarShortcuts.ts（markdownBarAction3 节选）
+if (hit(chords.markdownBarAction3)) {
+  e.preventDefault();
+  e.stopPropagation();
+  closeMarkdownAssistant();
+  // 使用 viewModeRef：避免 keydown 回调闭包读到过期的 viewMode
+  if (viewModeRef.current === 'preview') {
+    setViewMode('edit');
+    queueMicrotask(focusEditor);
+  } else {
+    setViewMode('preview');
+  }
+  return;
+}
+```
+
+### 8.4 分屏：按钮（必须在关助手前判断）
+
+```tsx
+// apps/frontend/src/components/design/Monaco/MarkdownBottomBar.tsx（分屏按钮 onClick 节选）
+onClick={() => {
+  // 需在关闭助手前判断：否则同一次点击内 assistant 仍为 true，会误判为「非纯分屏」
+  const exitPureSplit = viewMode === 'split' && !assistantRightPaneActive;
+  closeMarkdownAssistant();
+  if (exitPureSplit) {
+    setViewMode('edit');
+    queueMicrotask(focusEditor);
+  } else {
+    setViewMode('split');
+    queueMicrotask(focusEditor);
+  }
+}}
+```
+
+### 8.5 分屏：快捷键（与按钮同一判定顺序）
+
+快捷键处理函数里 `assistantRightPaneActive` 来自 hook 入参（最近一次 render），与「在 `closeMarkdownAssistant` 之前读取」组合使用，语义与点击一致：
+
+```typescript
+// apps/frontend/src/hooks/useMarkdownBottomBarShortcuts.ts（markdownBarAction5 节选）
+if (hit(chords.markdownBarAction5)) {
+  e.preventDefault();
+  e.stopPropagation();
+  // 与底部栏点击一致：在关闭助手前读取，避免闭包内 assistant 状态滞后
+  const exitPureSplit =
+    viewModeRef.current === 'split' && !assistantRightPaneActive;
+  closeMarkdownAssistant();
+  if (exitPureSplit) {
+    setViewMode('edit');
+    queueMicrotask(focusEditor);
+  } else {
+    setViewMode('split');
+    queueMicrotask(focusEditor);
+  }
+  return;
+}
+```
+
+### 8.6 未改动的相关语义（便于回归对照）
+
+- **编辑源码（⌘+1）**、**Diff（⌘+2）**、**助手（⌘+4）**、**跟滚（⌘+6/7/8）** 等行为与本节改动无关。
+- **`splitDiff`** 与预览/分屏的互斥、进入退出逻辑仍在 `Monaco/index.tsx` 中维护；本节仅在「已是 preview / 已是纯 split」时增加「第二次触发 → edit」分支。

@@ -190,7 +190,12 @@ export function useMarkdownBottomBarShortcuts(input: {
 				e.preventDefault();
 				e.stopPropagation();
 				closeMarkdownAssistant();
-				setViewMode('preview');
+				if (viewModeRef.current === 'preview') {
+					setViewMode('edit');
+					queueMicrotask(focusEditor);
+				} else {
+					setViewMode('preview');
+				}
 				return;
 			}
 
@@ -206,9 +211,17 @@ export function useMarkdownBottomBarShortcuts(input: {
 			if (hit(chords.markdownBarAction5)) {
 				e.preventDefault();
 				e.stopPropagation();
+				// 与底部栏点击一致：在关闭助手前读取，避免闭包内 assistant 状态滞后
+				const exitPureSplit =
+					viewModeRef.current === 'split' && !assistantRightPaneActive;
 				closeMarkdownAssistant();
-				setViewMode('split');
-				queueMicrotask(focusEditor);
+				if (exitPureSplit) {
+					setViewMode('edit');
+					queueMicrotask(focusEditor);
+				} else {
+					setViewMode('split');
+					queueMicrotask(focusEditor);
+				}
 				return;
 			}
 

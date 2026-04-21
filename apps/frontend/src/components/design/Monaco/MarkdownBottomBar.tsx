@@ -211,7 +211,12 @@ export const MarkdownBottomBar = memo(function MarkdownBottomBar(props: {
 							aria-label="预览渲染"
 							onClick={() => {
 								closeMarkdownAssistant();
-								setViewMode('preview');
+								if (viewMode === 'preview') {
+									setViewMode('edit');
+									queueMicrotask(focusEditor);
+								} else {
+									setViewMode('preview');
+								}
 							}}
 						>
 							<Eye size={18} strokeWidth={1.75} />
@@ -246,9 +251,17 @@ export const MarkdownBottomBar = memo(function MarkdownBottomBar(props: {
 							)}
 							aria-label="分屏：左编辑右预览"
 							onClick={() => {
+								// 需在关闭助手前判断：否则同一次点击内 assistant 仍为 true，会误判为「非纯分屏」
+								const exitPureSplit =
+									viewMode === 'split' && !assistantRightPaneActive;
 								closeMarkdownAssistant();
-								setViewMode('split');
-								queueMicrotask(focusEditor);
+								if (exitPureSplit) {
+									setViewMode('edit');
+									queueMicrotask(focusEditor);
+								} else {
+									setViewMode('split');
+									queueMicrotask(focusEditor);
+								}
 							}}
 						>
 							<Columns2 size={18} strokeWidth={1.75} />
