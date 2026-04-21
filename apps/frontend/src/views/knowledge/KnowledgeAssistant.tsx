@@ -5,7 +5,7 @@
 
 import Loading from '@design/Loading';
 import { Button, Toast } from '@ui/index';
-import { Sparkles } from 'lucide-react';
+import { ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
 import { observer } from 'mobx-react';
 import {
 	type RefObject,
@@ -60,6 +60,8 @@ interface KnowledgeAssistantMessageBubbleProps {
 	/** 与 ScrollArea Viewport ref 一致，供助手消息内代码块吸顶条与 MdPreview 懒挂载 */
 	scrollViewportRef: RefObject<HTMLElement | null>;
 }
+
+type KnowledgeAssistantScrollCornerFabMode = 'hidden' | 'toBottom' | 'toTop';
 
 /**
  * 单条气泡独立 observer：从 store 解析出当前 Message。
@@ -147,6 +149,10 @@ const KnowledgeAssistant = observer(
 		const input = inputProp ?? internalInput;
 		const setInput = setInputProp ?? setInternalInput;
 		const [isCopyedId, setIsCopyedId] = useState('');
+		const [scrollCornerFabMode, setScrollCornerFabMode] =
+			useState<KnowledgeAssistantScrollCornerFabMode>('hidden');
+		const scrollCornerFabModeRef =
+			useRef<KnowledgeAssistantScrollCornerFabMode>('hidden');
 
 		const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -245,12 +251,31 @@ const KnowledgeAssistant = observer(
 			viewportRef: scrollViewportRef,
 			scrollViewportHandlers,
 			enableStickToBottom: enableStreamStickToBottom,
+			disableStickToBottom: disableStreamStickToBottom,
 			flushScrollToBottom,
 		} = useStickToBottomScroll({
 			isStreaming: assistantStore.isStreaming,
 			contentRevision: streamScrollTick,
 			resetKey: documentKey || undefined,
 		});
+
+		const refreshScrollCornerFab = useCallback(() => {
+			const vp = scrollViewportRef.current;
+			if (!vp) return;
+			const { scrollTop, scrollHeight, clientHeight } = vp;
+			const maxScroll = scrollHeight - clientHeight;
+			let nextMode: KnowledgeAssistantScrollCornerFabMode = 'hidden';
+			if (maxScroll <= 4) {
+				nextMode = 'hidden';
+			} else {
+				const threshold = 8;
+				nextMode = scrollTop >= maxScroll - threshold ? 'toTop' : 'toBottom';
+			}
+			if (scrollCornerFabModeRef.current !== nextMode) {
+				scrollCornerFabModeRef.current = nextMode;
+				setScrollCornerFabMode(nextMode);
+			}
+		}, [scrollViewportRef]);
 
 		/** 流式/发送结束后展示「重新总结/润色」条带（跟在消息后，见下方 ScrollArea 内渲染） */
 		const showPostStreamActions =
@@ -290,9 +315,55 @@ const KnowledgeAssistant = observer(
 				onScroll: (e: UIEvent<HTMLDivElement>) => {
 					onViewportScroll(e);
 					relayoutCodeToolbar();
+					refreshScrollCornerFab();
 				},
 			};
-		}, [scrollViewportHandlers, relayoutCodeToolbar]);
+		}, [scrollViewportHandlers, relayoutCodeToolbar, refreshScrollCornerFab]);
+
+		// 正文变化 / 视口尺寸变化时更新「是否可滚、是否触底」
+		useEffect(() => {
+			let ro: ResizeObserver | null = null;
+			const tid = window.setTimeout(() => {
+				refreshScrollCornerFab();
+				requestAnimationFrame(() => refreshScrollCornerFab());
+				const vp = scrollViewportRef.current;
+				if (vp) {
+					ro = new ResizeObserver(() => refreshScrollCornerFab());
+					ro.observe(vp);
+				}
+			}, 0);
+			return () => {
+				window.clearTimeout(tid);
+				ro?.disconnect();
+			};
+		}, [
+			streamScrollTick,
+			documentKey,
+			messages.length,
+			refreshScrollCornerFab,
+			scrollViewportRef,
+		]);
+
+		const onScrollCornerFabClick = useCallback(() => {
+			const vp = scrollViewportRef.current;
+			if (!vp) return;
+			if (scrollCornerFabMode === 'toBottom') {
+				enableStreamStickToBottom();
+				vp.scrollTo({
+					top: vp.scrollHeight - vp.clientHeight,
+					behavior: 'smooth',
+				});
+			} else if (scrollCornerFabMode === 'toTop') {
+				// 流式阶段若不先解除贴底，会被 useStickToBottomScroll 立刻拉回底部
+				disableStreamStickToBottom();
+				vp.scrollTo({ top: 0, behavior: 'smooth' });
+			}
+		}, [
+			scrollViewportRef,
+			enableStreamStickToBottom,
+			disableStreamStickToBottom,
+			scrollCornerFabMode,
+		]);
 
 		const sendMessage = useCallback(
 			async (content?: string) => {
@@ -430,7 +501,7 @@ const KnowledgeAssistant = observer(
 										<Button
 											key={item.kind}
 											variant="dynamic"
-											className="w-fit rounded-md border border-theme/10 bg-theme/5 p-2 text-left text-sm text-textcolor/70 transition-colors hover:border-theme/20 hover:text-textcolor"
+											className="w-fit rounded-md border border-theme/10 bg-theme/5 p-2 text-left text-sm text-textcolor/80 transition-colors hover:border-theme/20 hover:text-textcolor"
 											onClick={() => void sendKnowledgePromptCard(item.kind)}
 										>
 											{item.title}
@@ -442,7 +513,28 @@ const KnowledgeAssistant = observer(
 					</ScrollArea>
 				)}
 				{isLoggedIn ? (
-					<div className="w-full flex items-center justify-center pr-4 pl-3.5">
+					<div className="relative w-full flex items-center justify-center pr-4 pl-3.5">
+						{messages.length > 0 && scrollCornerFabMode !== 'hidden' ? (
+							<button
+								type="button"
+								className={cn(
+									'absolute bottom-full mb-5 right-4.5 z-10 flex h-8.5 w-8.5 cursor-pointer items-center justify-center rounded-full border border-theme/5 bg-theme/5 text-textcolor/70 backdrop-blur-[2px] hover:bg-theme/15',
+									'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme/40',
+								)}
+								aria-label={
+									scrollCornerFabMode === 'toBottom'
+										? '滚动到底部'
+										: '滚动到顶部'
+								}
+								onClick={onScrollCornerFabClick}
+							>
+								{scrollCornerFabMode === 'toBottom' ? (
+									<ChevronDown aria-hidden />
+								) : (
+									<ChevronUp aria-hidden />
+								)}
+							</button>
+						) : null}
 						<ChatEntry
 							input={input}
 							setInput={setInput}

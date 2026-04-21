@@ -1,5 +1,5 @@
 import { Button } from '@ui/index';
-import { Activity, ArrowDown, ArrowUp, Sparkles } from 'lucide-react';
+import { Activity, ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface ChatScrollControlsProps {
@@ -76,10 +76,10 @@ const ChatControls = ({
 				{/* 滚动控制按钮 */}
 				{hasScrollbar && (
 					<div
-						className="w-8.5 h-8.5 bg-theme/5 hover:bg-theme/15 text-textcolor/90 flex justify-center items-center cursor-pointer border border-theme/5 backdrop-blur-[2px] rounded-full ml-2 z-99"
+						className="w-8.5 h-8.5 bg-theme/5 hover:bg-theme/15 text-textcolor/70 flex justify-center items-center cursor-pointer border border-theme/5 backdrop-blur-[2px] rounded-full ml-2 z-99"
 						onClick={() => onScrollTo(isAtBottom ? 'up' : 'down', 'auto')}
 					>
-						{isAtBottom ? <ArrowUp /> : <ArrowDown />}
+						{isAtBottom ? <ChevronUp /> : <ChevronDown />}
 					</div>
 				)}
 			</div>
