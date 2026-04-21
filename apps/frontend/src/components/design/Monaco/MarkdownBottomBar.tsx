@@ -6,10 +6,10 @@ import {
 	Bot,
 	Columns2,
 	Eye,
+	FileClock,
 	FileInput,
-	FilePenLine,
+	FilePen,
 	GitCompare,
-	Timer,
 } from 'lucide-react';
 import { memo, type RefObject, useMemo } from 'react';
 import {
@@ -175,7 +175,7 @@ export const MarkdownBottomBar = memo(function MarkdownBottomBar(props: {
 								queueMicrotask(focusEditor);
 							}}
 						>
-							<FilePenLine size={18} strokeWidth={1.75} />
+							<FilePen size={18} strokeWidth={1.75} />
 						</button>
 					</Tooltip>
 
@@ -389,7 +389,7 @@ export const MarkdownBottomBar = memo(function MarkdownBottomBar(props: {
 										}
 										onClick={() => onAutoSaveEnabledChange?.(!autoSaveEnabled)}
 									>
-										<Timer size={18} strokeWidth={1.75} aria-hidden />
+										<FileClock size={18} strokeWidth={1.75} aria-hidden />
 									</button>
 								</Tooltip>
 
