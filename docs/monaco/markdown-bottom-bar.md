@@ -121,54 +121,79 @@ export const KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS = {
 
 抽成 hook 后，底部操作栏组件只需要提供“当前状态 + 回调”，即可完成快捷键绑定，降低耦合。
 
-### 4.2 chord 的热更新策略
+### 4.2 chord 的热更新策略（组件可移植：由外部注入数据源）
 
-- hook 内部用 `loadKnowledgeShortcutChords()` 读取 store
-- 监听 `KNOWLEDGE_SHORTCUTS_CHANGED_EVENT`，设置页保存后立即 reload
+为保证 `Monaco` 组件可在其它项目直接复用，hook 不再直接依赖“知识库快捷键存储实现”，而是通过入参注入一个 `ShortcutSource`（数据源）：
+
+- **`shortcutSource.defaultChords`**：首次渲染的默认 chord（用于 Tooltip 展示兜底）
+- **`shortcutSource.loadChords()`**：异步加载用户自定义 chord（可返回部分字段覆盖默认）
+- **`shortcutSource.subscribeChordsChanged()`**：订阅热更新（例如“设置页保存后派发事件”）
+- **`shortcutSource.chordMatchesStored()`**：键位匹配逻辑（不同项目可能解析规则不同）
+
+若不传 `shortcutSource`，hook 内部会使用一个 **空数据源**（全部 chord 为空、永不命中），效果是：
+
+- UI 仍可用（按钮可点）
+- 但不会注册任何底部栏快捷键（避免组件在未知项目里“误绑定”）
 
 ```typescript
-// apps/frontend/src/hooks/useMarkdownBottomBarShortcuts.ts（节选）
-const [chords, setChords] = useState(() => ({
-	// chords：用于“展示 + 匹配”的同一份来源（保持一致性）
-	markdownBarAction1: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.markdownBarAction1, // 初始化：未加载 store 前也有默认值（避免 Tooltip 空）
-	markdownBarAction2: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.markdownBarAction2, // 初始化：⌘+2 默认 chord
-	markdownBarAction3: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.markdownBarAction3, // 初始化：⌘+3 默认 chord
-	markdownBarAction4: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.markdownBarAction4, // 初始化：⌘+4 默认 chord
-	markdownBarAction5: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.markdownBarAction5, // 初始化：⌘+5 默认 chord
-	markdownBarAction6: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.markdownBarAction6, // 初始化：⌘+6 默认 chord
-	markdownBarAction7: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.markdownBarAction7, // 初始化：⌘+7 默认 chord
-	markdownBarAction8: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.markdownBarAction8, // 初始化：⌘+8 默认 chord
-	markdownBarAction9: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.markdownBarAction9, // 初始化：⌘+9 默认 chord
-	markdownBarAction0: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.markdownBarAction0, // 初始化：⌘+0 默认 chord
-	markdownBarResetPosition:
-		KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.markdownBarResetPosition, // 初始化：复位默认 Meta + -
-})); // 初始化结束
+// apps/frontend/src/hooks/useMarkdownBottomBarShortcuts.ts（节选，逐行中文注释）
+
+export type ShortcutSource = {
+  defaultChords: MarkdownBottomBarChords; // 1) 默认 chords：首次渲染兜底
+  loadChords: () => Promise<Partial<MarkdownBottomBarChords> | null | undefined>; // 2) 加载 chords：可部分覆盖
+  subscribeChordsChanged: (onChange: () => void) => () => void; // 3) 热更新订阅：返回取消订阅
+  chordMatchesStored: (stored: string | undefined, e: KeyboardEvent) => boolean; // 4) 命中判定：交给外部实现
+};
+
+// 5) 内置空数据源：不注入时不注册快捷键（但 UI 仍可点）
+const EMPTY_MARKDOWN_BOTTOM_BAR_SHORTCUT_SOURCE: ShortcutSource = {
+  defaultChords: {
+    toggleMarkdownBottomBar: '',
+    markdownBarAction1: '',
+    markdownBarAction2: '',
+    markdownBarAction3: '',
+    markdownBarAction4: '',
+    markdownBarAction5: '',
+    markdownBarAction6: '',
+    markdownBarAction7: '',
+    markdownBarAction8: '',
+    markdownBarAction9: '',
+    markdownBarAction0: '',
+    markdownBarResetPosition: '',
+  },
+  loadChords: async () => null, // 6) 不加载
+  subscribeChordsChanged: () => () => {}, // 7) 不订阅
+  chordMatchesStored: () => false, // 8) 永不命中
+};
+
+// 9) 运行时选择：优先用外部注入；否则回落空数据源
+const shortcutSource = shortcutSourceProp ?? EMPTY_MARKDOWN_BOTTOM_BAR_SHORTCUT_SOURCE;
+
+// 10) chords state：用于 Tooltip 展示 + keydown 匹配的同一份来源（保持一致）
+const [chords, setChords] = useState(() => shortcutSource.defaultChords);
 
 useEffect(() => {
-	const load = async () => {
-		// load：读取 store 中用户自定义 chord（或回落默认）
-		const c = await loadKnowledgeShortcutChords(); // 从 store 批量读取（内部已做默认回落）
-		setChords({
-			// 写入本地 state：使 Tooltip 展示 & keydown 匹配同步更新
-			markdownBarAction1: c.markdownBarAction1, // ⌘+1：实际生效 chord
-			markdownBarAction2: c.markdownBarAction2, // ⌘+2：实际生效 chord
-			markdownBarAction3: c.markdownBarAction3, // ⌘+3：实际生效 chord
-			markdownBarAction4: c.markdownBarAction4, // ⌘+4：实际生效 chord
-			markdownBarAction5: c.markdownBarAction5, // ⌘+5：实际生效 chord
-			markdownBarAction6: c.markdownBarAction6, // ⌘+6：实际生效 chord
-			markdownBarAction7: c.markdownBarAction7, // ⌘+7：实际生效 chord
-			markdownBarAction8: c.markdownBarAction8, // ⌘+8：实际生效 chord
-			markdownBarAction9: c.markdownBarAction9, // ⌘+9：实际生效 chord
-			markdownBarAction0: c.markdownBarAction0, // ⌘+0：实际生效 chord
-			markdownBarResetPosition: c.markdownBarResetPosition, // 复位：实际生效 chord（默认 Meta + -）
-		}); // setChords 结束
-	}; // load 定义结束
-	void load(); // 首次挂载立即读取：保证一进入页面就展示/生效用户设置
-	window.addEventListener(KNOWLEDGE_SHORTCUTS_CHANGED_EVENT, load); // 设置页保存后派发：这里监听以热更新
-	return () =>
-		window.removeEventListener(KNOWLEDGE_SHORTCUTS_CHANGED_EVENT, load); // 卸载清理：避免泄漏与重复监听
-}, []);
+  let disposed = false;
+  const load = async () => {
+    const c = await shortcutSource.loadChords(); // 11) 外部加载：例如 localStorage / remote config
+    if (disposed) return;
+    if (!c) return;
+    setChords((prev) => ({ ...prev, ...c })); // 12) 只覆盖有值的字段：不破坏默认兜底
+  };
+  void load(); // 13) 首次加载：保证一进入页面就展示/生效用户设置
+
+  const unsubscribe = shortcutSource.subscribeChordsChanged(() => {
+    void load(); // 14) 热更新：外部通知变更后重新 load
+  });
+
+  return () => {
+    disposed = true;
+    unsubscribe?.(); // 15) 清理：避免重复订阅
+  };
+}, [shortcutSource]);
 ```
+
+**知识库页如何注入（示例）**：见 `apps/frontend/src/views/knowledge/index.tsx`，它用 `loadKnowledgeShortcutChords()` + `KNOWLEDGE_SHORTCUTS_CHANGED_EVENT` 构造 `shortcutSource` 并传给 `MarkdownEditor`。
 
 ### 4.3 keydown 的触发范围策略（避免“开始不生效”）
 
@@ -300,7 +325,7 @@ const autoSaveIntervalOptions = useMemo(() => {
 | ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `apps/frontend/src/views/setting/system/config.ts`                 | 系统设置：底部操作栏 ⌘+1…⌘+0（10 项）+ 复位初始位置（1 项，默认 `Meta + -`），均页面内生效                                                            |
 | `apps/frontend/src/utils/knowledge-shortcuts.ts`                   | key id（含 `markdownBarResetPosition` / `shortcut_22`）、默认 chord、`loadKnowledgeShortcutChords` 扩展；`eventKeyMatchesChord` 对 `-` / `Minus` 兜底 |
-| `apps/frontend/src/hooks/useMarkdownBottomBarShortcuts.ts`         | 读取/热更新 chord + window keydown 捕获 + 动作分发（含复位）+ Tooltip 展示格式化                                                                      |
+| `apps/frontend/src/hooks/useMarkdownBottomBarShortcuts.ts`         | 底部操作栏快捷键 hook：通过 `shortcutSource` 注入 chord 数据源/热更新/匹配逻辑；支持“不注入则不注册快捷键”（含复位）                                   |
 | `apps/frontend/src/components/design/Monaco/MarkdownBottomBar.tsx` | 底部操作栏 UI + Tooltip + 拖动 / 淡显隐 / 边界夹紧 / 复位按钮与快捷键装配（见 §9、§9.9、§9.9.3）                                                      |
 | `apps/frontend/src/components/design/Monaco/index.tsx`             | 装配 `MarkdownBottomBar`（传入最小必要上下文）                                                                                                        |
 

@@ -7,11 +7,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import MarkdownEditor from '@/components/design/Monaco';
 import { Input } from '@/components/ui';
 import { useTheme } from '@/hooks';
+import type { ShortcutSource } from '@/hooks/useMarkdownBottomBarShortcuts';
 import { saveKnowledge } from '@/service';
 import useStore from '@/store';
 import assistantStore from '@/store/assistant';
 import { KnowledgeRecord } from '@/types';
 import { isTauriRuntime } from '@/utils';
+import { copyToClipboard, pasteFromClipboard } from '@/utils/clipboard';
 import {
 	buildAuthorMeta,
 	dirnameFs,
@@ -77,6 +79,7 @@ const Knowledge = observer(() => {
 	const [markdownAssistantOpen, setMarkdownAssistantOpen] = useState(false);
 	/** 保存前从 Monaco 同步正文，避免 onChange 经 rAF 合并时 store 滞后导致脏检查误判 */
 	const getMarkdownFromEditorRef = useRef<(() => string) | null>(null);
+
 	const [knowledgeChords, setKnowledgeChords] = useState<{
 		save: string;
 		clear: string;
@@ -93,6 +96,90 @@ const Knowledge = observer(() => {
 		openTrash: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.openTrash,
 		pasteToAssistant: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.pasteToAssistant,
 	});
+
+	// 注入给 Monaco 的底部操作栏快捷键数据源（让 Monaco 组件不直接依赖知识库快捷键实现）
+	const shortcutSource = useMemo<ShortcutSource>(
+		() => ({
+			defaultChords: {
+				toggleMarkdownBottomBar:
+					KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.toggleMarkdownBottomBar,
+				markdownBarAction1:
+					KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.markdownBarAction1,
+				markdownBarAction2:
+					KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.markdownBarAction2,
+				markdownBarAction3:
+					KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.markdownBarAction3,
+				markdownBarAction4:
+					KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.markdownBarAction4,
+				markdownBarAction5:
+					KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.markdownBarAction5,
+				markdownBarAction6:
+					KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.markdownBarAction6,
+				markdownBarAction7:
+					KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.markdownBarAction7,
+				markdownBarAction8:
+					KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.markdownBarAction8,
+				markdownBarAction9:
+					KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.markdownBarAction9,
+				markdownBarAction0:
+					KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.markdownBarAction0,
+				markdownBarResetPosition:
+					KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.markdownBarResetPosition,
+			},
+			loadChords: async () => {
+				const c = await loadKnowledgeShortcutChords();
+				return {
+					toggleMarkdownBottomBar: c.toggleMarkdownBottomBar,
+					markdownBarAction1: c.markdownBarAction1,
+					markdownBarAction2: c.markdownBarAction2,
+					markdownBarAction3: c.markdownBarAction3,
+					markdownBarAction4: c.markdownBarAction4,
+					markdownBarAction5: c.markdownBarAction5,
+					markdownBarAction6: c.markdownBarAction6,
+					markdownBarAction7: c.markdownBarAction7,
+					markdownBarAction8: c.markdownBarAction8,
+					markdownBarAction9: c.markdownBarAction9,
+					markdownBarAction0: c.markdownBarAction0,
+					markdownBarResetPosition: c.markdownBarResetPosition,
+				};
+			},
+			subscribeChordsChanged: (onChange) => {
+				const handler = () => onChange();
+				window.addEventListener(KNOWLEDGE_SHORTCUTS_CHANGED_EVENT, handler);
+				return () =>
+					window.removeEventListener(
+						KNOWLEDGE_SHORTCUTS_CHANGED_EVENT,
+						handler,
+					);
+			},
+			chordMatchesStored: (stored, e) => chordMatchesStored(stored, e),
+		}),
+		[],
+	);
+
+	// 将编辑器选区写入助手输入框
+	const onInsertSelectionToAssistant = useCallback(
+		(text: string | undefined | null) => {
+			/**
+			 * 将编辑器选区写入助手输入框，并在未打开时自动展开助手面板。
+			 *
+			 * 重要：开启助手会触发 Monaco 视图切换（edit→split）并导致 Editor 重挂载。
+			 * 若此时父级 markdown 尚未从 Editor 同步完成，会短暂表现为“编辑器内容被清空”，并触发助手输入框的清空逻辑。
+			 * 因此这里先强制从 Editor 同步最新正文，再写入输入框，最后再打开助手面板。
+			 */
+			getMarkdownFromEditorRef.current?.();
+			setAssistantInput((prev) => {
+				const next = (text ?? '').trim();
+				if (!next) return prev;
+				const cur = (prev ?? '').trim();
+				return cur ? `${cur}\n\n${next}` : next;
+			});
+			if (!markdownAssistantOpen) {
+				queueMicrotask(() => setMarkdownAssistantOpen(true));
+			}
+		},
+		[markdownAssistantOpen],
+	);
 
 	const reloadKnowledgeChords = useCallback(async () => {
 		const c = await loadKnowledgeShortcutChords();
@@ -811,31 +898,18 @@ const Knowledge = observer(() => {
 					height={EDITOR_HEIGHT}
 					theme={monacoTheme}
 					language={monacoLanguage}
+					shortcutSource={shortcutSource}
+					clipboardAdapter={{
+						copyToClipboard,
+						pasteFromClipboard,
+					}}
 					// trashOpenNonce：回收站 pick 等与助手会话对齐；clearDocumentNonce：仅清空草稿时 bump，驱动 Monaco 换篇且不重置助手
 					documentIdentity={`${knowledgeAssistantDocumentKey(assistantArticleBinding, trashOpenNonce)}__clear-${clearDocumentNonce}`}
 					markdownAssistantOpen={markdownAssistantOpen}
 					onMarkdownAssistantOpenChange={setMarkdownAssistantOpen}
 					value={knowledgeStore.markdown}
 					onChange={handleMarkdownChange}
-					onInsertSelectionToAssistant={(text) => {
-						/**
-						 * 将编辑器选区写入助手输入框，并在未打开时自动展开助手面板。
-						 *
-						 * 重要：开启助手会触发 Monaco 视图切换（edit→split）并导致 Editor 重挂载。
-						 * 若此时父级 markdown 尚未从 Editor 同步完成，会短暂表现为“编辑器内容被清空”，并触发助手输入框的清空逻辑。
-						 * 因此这里先强制从 Editor 同步最新正文，再写入输入框，最后再打开助手面板。
-						 */
-						getMarkdownFromEditorRef.current?.();
-						setAssistantInput((prev) => {
-							const next = (text ?? '').trim();
-							if (!next) return prev;
-							const cur = (prev ?? '').trim();
-							return cur ? `${cur}\n\n${next}` : next;
-						});
-						if (!markdownAssistantOpen) {
-							queueMicrotask(() => setMarkdownAssistantOpen(true));
-						}
-					}}
+					onInsertSelectionToAssistant={onInsertSelectionToAssistant}
 					getMarkdownFromEditorRef={getMarkdownFromEditorRef}
 					markdownBottomBarShortcutHint={
 						knowledgeChords.toggleMarkdownBottomBar

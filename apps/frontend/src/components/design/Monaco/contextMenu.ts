@@ -1,6 +1,6 @@
+import type { QuickContextMenuEntry } from '@design/ContextMenu';
 import type { OnMount } from '@monaco-editor/react';
-import type { QuickContextMenuEntry } from '@/components/design/ContextMenu';
-import { isMacLike } from '@/utils';
+import { isMacLike } from './utils';
 
 function shortcutHintCtrlOrCmdShiftV(): string {
 	return isMacLike() ? '⌘+Shift+V' : 'Ctrl+Shift+V';

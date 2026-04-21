@@ -1,11 +1,8 @@
+import { isMacLike } from '@design/Monaco/utils';
 import { useEffect, useState } from 'react';
-import { isMacLike } from '@/utils';
-import {
-	chordMatchesStored,
-	KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS,
-	KNOWLEDGE_SHORTCUTS_CHANGED_EVENT,
-	loadKnowledgeShortcutChords,
-} from '@/utils/knowledge-shortcuts';
+
+// 注意：本 hook 不直接依赖任何“项目级快捷键存储实现”，
+// 具体数据源与匹配逻辑由调用方通过 shortcutSource 注入（见 ShortcutSource）。
 
 type MarkdownBottomBarChords = {
 	toggleMarkdownBottomBar: string;
@@ -20,6 +17,42 @@ type MarkdownBottomBarChords = {
 	markdownBarAction9: string;
 	markdownBarAction0: string;
 	markdownBarResetPosition: string;
+};
+
+export type ShortcutSource = {
+	/** 默认 chords（用于首次渲染兜底）。 */
+	defaultChords: MarkdownBottomBarChords;
+	/** 异步加载 chords（可返回部分字段覆盖默认值）。 */
+	loadChords: () => Promise<
+		Partial<MarkdownBottomBarChords> | null | undefined
+	>;
+	/** 订阅 chords 变更（例如设置保存后派发事件）；返回取消订阅函数。 */
+	subscribeChordsChanged: (onChange: () => void) => () => void;
+	/** chord 命中判定：由外部实现（不同项目可自定义解析/匹配规则）。 */
+	chordMatchesStored: (stored: string | undefined, e: KeyboardEvent) => boolean;
+};
+
+const EMPTY_MARKDOWN_BOTTOM_BAR_SHORTCUT_SOURCE: ShortcutSource = {
+	// 未注入时保持 hook “可用但不注册任何底部栏快捷键”：
+	// - 仍可点击 UI 按钮使用底部栏功能
+	// - 避免组件内部硬编码依赖某个项目的快捷键存储实现
+	defaultChords: {
+		toggleMarkdownBottomBar: '',
+		markdownBarAction1: '',
+		markdownBarAction2: '',
+		markdownBarAction3: '',
+		markdownBarAction4: '',
+		markdownBarAction5: '',
+		markdownBarAction6: '',
+		markdownBarAction7: '',
+		markdownBarAction8: '',
+		markdownBarAction9: '',
+		markdownBarAction0: '',
+		markdownBarResetPosition: '',
+	},
+	loadChords: async () => null,
+	subscribeChordsChanged: () => () => {},
+	chordMatchesStored: () => false,
 };
 
 /**
@@ -53,6 +86,7 @@ export function formatChordForTip(raw: string | undefined | null): string {
 }
 
 export function useMarkdownBottomBarShortcuts(input: {
+	shortcutSource?: ShortcutSource;
 	enabled: boolean;
 	rootRef: React.RefObject<HTMLElement | null>;
 	/** split/splitDiff 等模式需要即时值（避免 keydown 闭包滞后） */
@@ -93,6 +127,7 @@ export function useMarkdownBottomBarShortcuts(input: {
 	enableToggleMarkdownBottomBarShortcut: boolean;
 }) {
 	const {
+		shortcutSource: shortcutSourceProp,
 		enabled,
 		rootRef,
 		viewModeRef,
@@ -116,51 +151,30 @@ export function useMarkdownBottomBarShortcuts(input: {
 		enableToggleMarkdownBottomBarShortcut,
 	} = input;
 
-	const [chords, setChords] = useState<MarkdownBottomBarChords>(() => ({
-		toggleMarkdownBottomBar:
-			KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.toggleMarkdownBottomBar,
-		markdownBarAction1: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.markdownBarAction1,
-		markdownBarAction2: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.markdownBarAction2,
-		markdownBarAction3: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.markdownBarAction3,
-		markdownBarAction4: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.markdownBarAction4,
-		markdownBarAction5: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.markdownBarAction5,
-		markdownBarAction6: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.markdownBarAction6,
-		markdownBarAction7: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.markdownBarAction7,
-		markdownBarAction8: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.markdownBarAction8,
-		markdownBarAction9: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.markdownBarAction9,
-		markdownBarAction0: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.markdownBarAction0,
-		markdownBarResetPosition:
-			KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.markdownBarResetPosition,
-	}));
+	const shortcutSource =
+		shortcutSourceProp ?? EMPTY_MARKDOWN_BOTTOM_BAR_SHORTCUT_SOURCE;
+
+	const [chords, setChords] = useState<MarkdownBottomBarChords>(
+		() => shortcutSource.defaultChords,
+	);
 
 	useEffect(() => {
 		let disposed = false;
 		const load = async () => {
-			const c = await loadKnowledgeShortcutChords();
+			const c = await shortcutSource.loadChords();
 			if (disposed) return;
-			setChords({
-				toggleMarkdownBottomBar: c.toggleMarkdownBottomBar,
-				markdownBarAction1: c.markdownBarAction1,
-				markdownBarAction2: c.markdownBarAction2,
-				markdownBarAction3: c.markdownBarAction3,
-				markdownBarAction4: c.markdownBarAction4,
-				markdownBarAction5: c.markdownBarAction5,
-				markdownBarAction6: c.markdownBarAction6,
-				markdownBarAction7: c.markdownBarAction7,
-				markdownBarAction8: c.markdownBarAction8,
-				markdownBarAction9: c.markdownBarAction9,
-				markdownBarAction0: c.markdownBarAction0,
-				markdownBarResetPosition: c.markdownBarResetPosition,
-			});
+			if (!c) return;
+			setChords((prev) => ({ ...prev, ...c }));
 		};
 		void load();
-		const onChanged = () => void load();
-		window.addEventListener(KNOWLEDGE_SHORTCUTS_CHANGED_EVENT, onChanged);
+		const unsubscribe = shortcutSource.subscribeChordsChanged(() => {
+			void load();
+		});
 		return () => {
 			disposed = true;
-			window.removeEventListener(KNOWLEDGE_SHORTCUTS_CHANGED_EVENT, onChanged);
+			unsubscribe?.();
 		};
-	}, []);
+	}, [shortcutSource]);
 
 	useEffect(() => {
 		if (!enabled) return;
@@ -183,7 +197,8 @@ export function useMarkdownBottomBarShortcuts(input: {
 				Boolean(target?.isContentEditable);
 			if (isEditable && !dom.contains(target)) return;
 
-			const hit = (stored: string | undefined) => chordMatchesStored(stored, e);
+			const hit = (stored: string | undefined) =>
+				shortcutSource.chordMatchesStored(stored, e);
 
 			if (
 				enableToggleMarkdownBottomBarShortcut &&
@@ -310,6 +325,7 @@ export function useMarkdownBottomBarShortcuts(input: {
 		window.addEventListener('keydown', onKeydown, true);
 		return () => window.removeEventListener('keydown', onKeydown, true);
 	}, [
+		shortcutSource,
 		enabled,
 		rootRef,
 		chords,

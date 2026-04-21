@@ -28,10 +28,10 @@ import {
 } from '@/components/ui/resizable';
 import {
 	formatChordForTip,
+	type ShortcutSource,
 	useMarkdownBottomBarShortcuts,
 } from '@/hooks/useMarkdownBottomBarShortcuts';
 import { cn } from '@/lib/utils';
-import { copyToClipboard, pasteFromClipboard } from '@/utils/clipboard';
 // 底部操作栏快捷键统一收敛到 useMarkdownBottomBarShortcuts（见 MarkdownBottomBar.tsx）
 import Loading from '../Loading';
 import { registerMonacoEditorCommands } from './commands';
@@ -145,6 +145,23 @@ interface MarkdownEditorProps {
 	 */
 	enableMarkdownBottomBarToggleShortcut?: boolean;
 	/**
+	 * 底部操作栏快捷键数据源（由使用方注入，保证组件可移植）。
+	 * - 包含：默认 chords、加载 chords、订阅变更、匹配逻辑
+	 * - 组件内部不再直接依赖知识库快捷键存储实现
+	 */
+	shortcutSource?: ShortcutSource;
+	/**
+	 * 剪贴板适配器（adapter，适配层）：由使用方注入，保证组件可移植。
+	 *
+	 * 设计目标：
+	 * - 避免组件内部直接依赖某个项目的剪贴板实现（Web Clipboard / Tauri 插件等）
+	 * - 右键菜单与自定义命令（copy/cut/paste）统一走此实现，保证行为一致
+	 */
+	clipboardAdapter?: {
+		copyToClipboard: (text: string) => Promise<void> | void;
+		pasteFromClipboard: () => Promise<string>;
+	};
+	/**
 	 * Markdown 预览是否解析并渲染 ```mermaid 围栏（与 MarkdownParser `enableMermaid` 一致）。
 	 * @default true
 	 */
@@ -237,6 +254,8 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	enableMarkdownBottomBar = true,
 	markdownBottomBarShortcutHint,
 	enableMarkdownBottomBarToggleShortcut = true,
+	shortcutSource,
+	clipboardAdapter,
 	markdownEnableMermaid = true,
 	overwriteSaveEnabled = false,
 	onOverwriteSaveEnabledChange,
@@ -327,6 +346,13 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	const markdownBottomBarRef = useRef<MarkdownBottomBarImperativeHandle | null>(
 		null,
 	);
+	/**
+	 * 剪贴板默认适配器：
+	 * - 未注入时：不影响编辑器其它能力，但 copy/cut/paste 的自定义逻辑将不会工作（避免组件硬编码依赖项目实现）
+	 * - 使用方（例如知识库页）应注入适配器以确保 WebView/Tauri 场景可用
+	 */
+	const clipboardAdapterRef = useRef(clipboardAdapter);
+	clipboardAdapterRef.current = clipboardAdapter;
 
 	viewModeRef.current = viewMode;
 	// 与 useLayoutEffect / rAF 对齐：避免仅用 useEffect 写 ref 时滞后一帧
@@ -371,6 +397,13 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 
 	const toggleMarkdownBottomBar = useCallback(() => {
 		setInternalMarkdownBottomBarOpen((o) => !o);
+	}, []);
+
+	const copyToClipboard = useCallback(async (text: string) => {
+		await clipboardAdapterRef.current?.copyToClipboard(text);
+	}, []);
+	const pasteFromClipboard = useCallback(async () => {
+		return (await clipboardAdapterRef.current?.pasteFromClipboard()) ?? '';
 	}, []);
 
 	// 禁用底部操作栏时强制收起，避免内部状态残留造成“启用后默认展开”的错觉
@@ -1388,6 +1421,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	]);
 
 	const { chords: markdownBottomBarChords } = useMarkdownBottomBarShortcuts({
+		shortcutSource,
 		enabled: markdownBottomBarEnabled,
 		rootRef,
 		viewModeRef,

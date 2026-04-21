@@ -613,3 +613,22 @@ export function snapMarkdownBottomBarOffset(
 	if (dx === 0) return prev;
 	return { x: prev.x + dx, y: prev.y };
 }
+
+/**
+ * 是否为 macOS / iOS 等「Command（⌘）」平台。
+ *
+ * 用途：
+ * - 仅用于前端快捷键提示文案（⌘ vs Ctrl），不用于权限/能力判断。
+ * - iPadOS 可能以 MacIntel 上报，按 mac 处理更符合用户预期。
+ */
+export function isMacLike(): boolean {
+	if (typeof navigator === 'undefined') return false;
+	const platform = (navigator.platform || '').toLowerCase();
+	const ua = (navigator.userAgent || '').toLowerCase();
+	return (
+		platform.includes('mac') ||
+		ua.includes('mac os') ||
+		ua.includes('iphone') ||
+		ua.includes('ipad')
+	);
+}
