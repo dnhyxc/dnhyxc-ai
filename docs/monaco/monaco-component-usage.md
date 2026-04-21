@@ -38,6 +38,11 @@
 
 Markdown 专属/扩展能力的 props（你用到再看）在后续章节展开。
 
+补充：底部操作栏相关的两个“开关型”参数（默认都开启，保证组件开箱即用）：
+
+- **`enableMarkdownBottomBar?: boolean`**：是否启用 Markdown 底部操作栏（默认 `true`）。设为 `false` 时不渲染底部操作栏，也不会显示顶部「操作栏」按钮。
+- **`enableMarkdownBottomBarToggleShortcut?: boolean`**：是否由组件内部监听「切换操作栏」快捷键（默认 `true`）。设为 `false` 时，组件不再注册该快捷键监听（避免与页面级快捷键冲突）；此时若业务仍需快捷键切换，请在页面层自行实现“打开/关闭操作栏”的策略（注意：操作栏开合状态由组件内部维护，不提供外部受控 props）。
+
 ---
 
 ## 2. 场景 A：普通编辑器（非 Markdown）最小示例
@@ -204,12 +209,11 @@ export function ExampleKnowledgeLikeEditor() {
 
 ### 4.2 受控 vs 非受控：什么时候必须受控？
 
-该组件里有两类 UI 状态可受控：
+该组件里有一类 UI 状态可受控：
 
-- **底部操作栏**：`markdownBottomBarOpen` + `onMarkdownBottomBarOpenChange`
 - **右侧助手**：`markdownAssistantOpen` + `onMarkdownAssistantOpenChange`
 
-**建议**：在业务页面（知识库这类重页面）中一律受控，原因：
+**建议**：在业务页面（知识库这类重页面）中对「右侧助手」使用受控，原因：
 
 - 页面快捷键通常在页面层实现，需要准确控制开/关
 - 切换文档（`documentIdentity` 变）时，内部状态可能会被重置；受控可以避免“你以为开着，其实被关了”

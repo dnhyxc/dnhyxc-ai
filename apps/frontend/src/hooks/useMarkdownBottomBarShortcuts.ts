@@ -8,6 +8,7 @@ import {
 } from '@/utils/knowledge-shortcuts';
 
 type MarkdownBottomBarChords = {
+	toggleMarkdownBottomBar: string;
 	markdownBarAction1: string;
 	markdownBarAction2: string;
 	markdownBarAction3: string;
@@ -86,6 +87,10 @@ export function useMarkdownBottomBarShortcuts(input: {
 	onAutoSaveEnabledChange?: (next: boolean) => void;
 	/** 与底部栏「复位操作栏初始位置」按钮一致 */
 	resetMarkdownBottomBarPosition: () => void;
+	/** 切换底部操作栏开合（与顶部「操作栏」按钮一致） */
+	toggleMarkdownBottomBar: () => void;
+	/** 是否启用「切换操作栏」快捷键分支（默认由上层决定） */
+	enableToggleMarkdownBottomBarShortcut: boolean;
 }) {
 	const {
 		enabled,
@@ -107,9 +112,13 @@ export function useMarkdownBottomBarShortcuts(input: {
 		onOverwriteSaveEnabledChange,
 		onAutoSaveEnabledChange,
 		resetMarkdownBottomBarPosition,
+		toggleMarkdownBottomBar,
+		enableToggleMarkdownBottomBarShortcut,
 	} = input;
 
 	const [chords, setChords] = useState<MarkdownBottomBarChords>(() => ({
+		toggleMarkdownBottomBar:
+			KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.toggleMarkdownBottomBar,
 		markdownBarAction1: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.markdownBarAction1,
 		markdownBarAction2: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.markdownBarAction2,
 		markdownBarAction3: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.markdownBarAction3,
@@ -130,6 +139,7 @@ export function useMarkdownBottomBarShortcuts(input: {
 			const c = await loadKnowledgeShortcutChords();
 			if (disposed) return;
 			setChords({
+				toggleMarkdownBottomBar: c.toggleMarkdownBottomBar,
 				markdownBarAction1: c.markdownBarAction1,
 				markdownBarAction2: c.markdownBarAction2,
 				markdownBarAction3: c.markdownBarAction3,
@@ -174,6 +184,16 @@ export function useMarkdownBottomBarShortcuts(input: {
 			if (isEditable && !dom.contains(target)) return;
 
 			const hit = (stored: string | undefined) => chordMatchesStored(stored, e);
+
+			if (
+				enableToggleMarkdownBottomBarShortcut &&
+				hit(chords.toggleMarkdownBottomBar)
+			) {
+				e.preventDefault();
+				e.stopPropagation();
+				toggleMarkdownBottomBar();
+				return;
+			}
 
 			if (hit(chords.markdownBarAction1)) {
 				e.preventDefault();
@@ -293,6 +313,8 @@ export function useMarkdownBottomBarShortcuts(input: {
 		enabled,
 		rootRef,
 		chords,
+		enableToggleMarkdownBottomBarShortcut,
+		toggleMarkdownBottomBar,
 		viewModeRef,
 		assistantRightPaneActive,
 		markdownDiffBottomBarVisible,

@@ -23,10 +23,6 @@ import {
 	useRef,
 	useState,
 } from 'react';
-import {
-	formatChordForTip,
-	useMarkdownBottomBarShortcuts,
-} from '@/hooks/useMarkdownBottomBarShortcuts';
 import { cn } from '@/lib/utils';
 import { KNOWLEDGE_AUTO_SAVE_INTERVAL_PRESETS } from './options';
 import {
@@ -44,11 +40,11 @@ type MarkdownSplitScrollFollowMode =
 interface MarkdownBottomBarProps {
 	id: string;
 	open: boolean;
-	shortcuts: {
-		enabled: boolean;
-		rootRef: RefObject<HTMLElement | null>;
-		viewModeRef: RefObject<MarkdownViewMode>;
-	};
+	rootRef: RefObject<HTMLElement | null>;
+	chords: MarkdownBottomBarChords;
+	/** 仅用于 Tooltip 展示：由父组件传入，避免此处直接依赖 hook 文件 */
+	formatChordForTip: (raw: string | undefined | null) => string;
+	imperativeRef?: RefObject<MarkdownBottomBarImperativeHandle | null>;
 	state: {
 		viewMode: MarkdownViewMode;
 		assistantRightPaneActive: boolean;
@@ -76,6 +72,10 @@ interface MarkdownBottomBarProps {
 		onOverwriteSaveEnabledChange?: (next: boolean) => void;
 		onAutoSaveEnabledChange?: (next: boolean) => void;
 		onAutoSaveIntervalSecChange?: (next: number) => void;
+		/** 切换底部操作栏开合（与顶部「操作栏」按钮一致） */
+		toggleMarkdownBottomBar: () => void;
+		/** 是否启用「切换操作栏」快捷键分支（由上层决定） */
+		enableToggleMarkdownBottomBarShortcut: boolean;
 	};
 	customBottomBarNode?:
 		| React.ReactNode
@@ -84,6 +84,7 @@ interface MarkdownBottomBarProps {
 }
 
 export type MarkdownBottomBarChords = {
+	toggleMarkdownBottomBar: string;
 	markdownBarAction1: string;
 	markdownBarAction2: string;
 	markdownBarAction3: string;
@@ -95,6 +96,11 @@ export type MarkdownBottomBarChords = {
 	markdownBarAction9: string;
 	markdownBarAction0: string;
 	markdownBarResetPosition: string;
+};
+
+export type MarkdownBottomBarImperativeHandle = {
+	/** 与「复位操作栏初始位置」按钮一致 */
+	resetMarkdownBottomBarPosition: () => void;
 };
 
 export type MarkdownBottomBarCustomNodeContext = {
@@ -110,8 +116,18 @@ export type MarkdownBottomBarCustomNodeContext = {
 export const MarkdownBottomBar = memo(function MarkdownBottomBar(
 	props: MarkdownBottomBarProps,
 ) {
-	const { id, open, shortcuts, state, options, actions, customBottomBarNode } =
-		props;
+	const {
+		id,
+		open,
+		rootRef,
+		chords,
+		formatChordForTip,
+		imperativeRef,
+		state,
+		options,
+		actions,
+		customBottomBarNode,
+	} = props;
 	const {
 		viewMode,
 		assistantRightPaneActive,
@@ -146,7 +162,6 @@ export const MarkdownBottomBar = memo(function MarkdownBottomBar(
 		return presets.sort((a, b) => a - b);
 	}, [autoSaveIntervalSec]);
 
-	const { rootRef } = shortcuts;
 	const dragLayerRef = useRef<HTMLDivElement | null>(null);
 	const dragOffsetRef = useRef({ x: 0, y: 0 });
 	const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
@@ -262,27 +277,15 @@ export const MarkdownBottomBar = memo(function MarkdownBottomBar(
 		});
 	}, []);
 
-	const { chords } = useMarkdownBottomBarShortcuts({
-		enabled: shortcuts.enabled,
-		rootRef: shortcuts.rootRef,
-		viewModeRef: shortcuts.viewModeRef,
-		assistantRightPaneActive,
-		markdownDiffBottomBarVisible,
-		bottomBarAssistantNodeEnabled,
-		showOverwriteSaveToggle,
-		overwriteSaveEnabled,
-		showAutoSaveControls,
-		autoSaveEnabled,
-		focusEditor,
-		closeMarkdownAssistant,
-		toggleMarkdownSplitDiffCompare,
-		toggleMarkdownAssistant,
-		setViewMode,
-		setSplitScrollFollowMode,
-		onOverwriteSaveEnabledChange,
-		onAutoSaveEnabledChange,
-		resetMarkdownBottomBarPosition: resetBarPosition,
-	});
+	useEffect(() => {
+		if (!imperativeRef) return;
+		imperativeRef.current = {
+			resetMarkdownBottomBarPosition: resetBarPosition,
+		};
+		return () => {
+			if (imperativeRef.current) imperativeRef.current = null;
+		};
+	}, [imperativeRef, resetBarPosition]);
 
 	const customNodeCtx = useMemo<MarkdownBottomBarCustomNodeContext>(
 		() => ({

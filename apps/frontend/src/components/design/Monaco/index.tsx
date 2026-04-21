@@ -26,8 +26,13 @@ import {
 	ResizablePanel,
 	ResizablePanelGroup,
 } from '@/components/ui/resizable';
+import {
+	formatChordForTip,
+	useMarkdownBottomBarShortcuts,
+} from '@/hooks/useMarkdownBottomBarShortcuts';
 import { cn } from '@/lib/utils';
 import { copyToClipboard, pasteFromClipboard } from '@/utils/clipboard';
+// 底部操作栏快捷键统一收敛到 useMarkdownBottomBarShortcuts（见 MarkdownBottomBar.tsx）
 import Loading from '../Loading';
 import { registerMonacoEditorCommands } from './commands';
 import {
@@ -40,7 +45,10 @@ import {
 	safeFormatMarkdownValue,
 } from './format';
 import { GLASS_THEME_BY_UI, registerMonacoGlassThemes } from './glassTheme';
-import { MarkdownBottomBar } from './MarkdownBottomBar';
+import {
+	MarkdownBottomBar,
+	type MarkdownBottomBarImperativeHandle,
+} from './MarkdownBottomBar';
 import ParserMarkdownPreviewPane from './MarkdownPreview';
 import { registerMarkdownFenceEmbeddedHighlight } from './markdownTokens';
 import { MARKDOWN_EDITOR_WORD_WRAP_COLUMN, options } from './options';
@@ -116,12 +124,26 @@ interface MarkdownEditorProps {
 	/** 是否显示编辑/预览/分屏切换的 tab 栏；默认 true */
 	showTabBar?: boolean;
 	/**
-	 * Markdown 底部操作栏是否展开；与 onMarkdownBottomBarOpenChange 同时传入时为受控模式。
+	 * 是否启用 Markdown 底部操作栏（拖动、快捷操作、复位、自定义节点等）。
+	 *
+	 * 说明：
+	 * - 默认 true：组件默认支持底部操作栏（满足“开箱即用”）
+	 * - false：完全禁用底部操作栏（不渲染、不响应快捷键、不展示顶部「操作栏」按钮）
 	 */
-	markdownBottomBarOpen?: boolean;
-	onMarkdownBottomBarOpenChange?: (open: boolean) => void;
+	enableMarkdownBottomBar?: boolean;
+	/**
+	 * Markdown 底部操作栏是否展开：
+	 * - **组件内部维护**（不再提供外部受控 props），避免业务页重复维护状态。
+	 */
 	/** 「操作栏」按钮 Tooltip 中的快捷键说明 */
 	markdownBottomBarShortcutHint?: string;
+	/**
+	 * 是否在组件内部监听「切换操作栏」快捷键（读取 store 中的 chord 并热更新）。
+	 *
+	 * - 默认 true：组件内部自己监听并切换（外部无需维护状态/快捷键逻辑）
+	 * - 设为 false：外部可在页面层自行注册快捷键，并通过 imperativeRef 调用
+	 */
+	enableMarkdownBottomBarToggleShortcut?: boolean;
 	/**
 	 * Markdown 预览是否解析并渲染 ```mermaid 围栏（与 MarkdownParser `enableMermaid` 一致）。
 	 * @default true
@@ -212,9 +234,9 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	wordWrap = 'bounded',
 	wordWrapColumn = MARKDOWN_EDITOR_WORD_WRAP_COLUMN,
 	showTabBar = true,
-	markdownBottomBarOpen: markdownBottomBarOpenProp,
-	onMarkdownBottomBarOpenChange,
+	enableMarkdownBottomBar = true,
 	markdownBottomBarShortcutHint,
+	enableMarkdownBottomBarToggleShortcut = true,
 	markdownEnableMermaid = true,
 	overwriteSaveEnabled = false,
 	onOverwriteSaveEnabledChange,
@@ -298,6 +320,13 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	 * - 退出 splitDiff 时 capture 当次 session 的 modelPath，并在双 rAF 后 dispose
 	 */
 	const prevViewModeRef = useRef<MarkdownViewMode>(viewMode);
+	// 将底部操作栏快捷键的注册收敛到 useMarkdownBottomBarShortcuts：
+	// - chord 读取与热更新在 hook 内完成
+	// - window keydown(capture) 绑定在 hook 内完成
+	// - toggle 回调保持与顶部「操作栏」按钮一致
+	const markdownBottomBarRef = useRef<MarkdownBottomBarImperativeHandle | null>(
+		null,
+	);
 
 	viewModeRef.current = viewMode;
 	// 与 useLayoutEffect / rAF 对齐：避免仅用 useEffect 写 ref 时滞后一帧
@@ -310,14 +339,8 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 
 	const markdownBottomBarId = useId();
 
-	const bottomBarControlled =
-		markdownBottomBarOpenProp !== undefined &&
-		onMarkdownBottomBarOpenChange !== undefined;
-	const markdownBottomBarOpen = bottomBarControlled
-		? markdownBottomBarOpenProp
-		: internalMarkdownBottomBarOpen;
-
 	const isMarkdown = language === 'markdown' && enableMarkdownPreview;
+	const markdownBottomBarEnabled = isMarkdown && enableMarkdownBottomBar;
 	const assistantPanelControlled =
 		markdownAssistantOpenProp !== undefined &&
 		onMarkdownAssistantOpenChange !== undefined;
@@ -347,16 +370,18 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	const monaco = useMonaco();
 
 	const toggleMarkdownBottomBar = useCallback(() => {
-		if (bottomBarControlled && onMarkdownBottomBarOpenChange) {
-			onMarkdownBottomBarOpenChange(!markdownBottomBarOpenProp);
-		} else {
-			setInternalMarkdownBottomBarOpen((o) => !o);
-		}
-	}, [
-		bottomBarControlled,
-		markdownBottomBarOpenProp,
-		onMarkdownBottomBarOpenChange,
-	]);
+		setInternalMarkdownBottomBarOpen((o) => !o);
+	}, []);
+
+	// 禁用底部操作栏时强制收起，避免内部状态残留造成“启用后默认展开”的错觉
+	useEffect(() => {
+		if (markdownBottomBarEnabled) return;
+		setInternalMarkdownBottomBarOpen(false);
+	}, [markdownBottomBarEnabled]);
+
+	const resetBottomBarPosition = useCallback(() => {
+		markdownBottomBarRef.current?.resetMarkdownBottomBarPosition();
+	}, []);
 
 	const toggleMarkdownAssistant = useCallback(() => {
 		if (!bottomBarAssistantNode) return;
@@ -1362,6 +1387,33 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 		closeMarkdownAssistant,
 	]);
 
+	const { chords: markdownBottomBarChords } = useMarkdownBottomBarShortcuts({
+		enabled: markdownBottomBarEnabled,
+		rootRef,
+		viewModeRef,
+		assistantRightPaneActive,
+		markdownDiffBottomBarVisible,
+		bottomBarAssistantNodeEnabled: Boolean(bottomBarAssistantNode),
+		showOverwriteSaveToggle: Boolean(onOverwriteSaveEnabledChange),
+		overwriteSaveEnabled,
+		showAutoSaveControls: Boolean(
+			onAutoSaveEnabledChange && onAutoSaveIntervalSecChange,
+		),
+		autoSaveEnabled,
+		focusEditor,
+		closeMarkdownAssistant,
+		toggleMarkdownSplitDiffCompare,
+		toggleMarkdownAssistant,
+		toggleMarkdownBottomBar,
+		enableToggleMarkdownBottomBarShortcut:
+			enableMarkdownBottomBarToggleShortcut,
+		setViewMode,
+		setSplitScrollFollowMode,
+		onOverwriteSaveEnabledChange,
+		onAutoSaveEnabledChange,
+		resetMarkdownBottomBarPosition: resetBottomBarPosition,
+	});
+
 	return (
 		<div
 			className={cn('relative min-w-0 max-w-full overflow-hidden', className)}
@@ -1375,7 +1427,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 				>
 					<div className="min-w-0 flex-1">{title}</div>
 					<div className="flex min-w-0 shrink-0 items-center justify-end">
-						{showTabBar && isMarkdown ? (
+						{showTabBar && markdownBottomBarEnabled ? (
 							<Tooltip
 								side="bottom"
 								content={markdownBottomBarShortcutHint ?? 'Meta + Shift + B'}
@@ -1383,18 +1435,18 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 								<Button
 									variant="link"
 									aria-label={
-										markdownBottomBarOpen
+										internalMarkdownBottomBarOpen
 											? '收起 Markdown 底部操作栏'
 											: '展开 Markdown 底部操作栏'
 									}
-									aria-expanded={markdownBottomBarOpen}
+									aria-expanded={internalMarkdownBottomBarOpen}
 									// 指定受控元素的 ID，以便屏幕阅读器辅助导航关联此按钮和 Markdown 底部操作栏
 									aria-controls={markdownBottomBarId}
 									onClick={toggleMarkdownBottomBar}
 									className="lucide-stroke-draw-hover"
 								>
 									<div className="flex items-center gap-1">
-										{markdownBottomBarOpen ? (
+										{internalMarkdownBottomBarOpen ? (
 											<PanelTopOpen className="mt-0.5" />
 										) : (
 											<PanelTopClose className="mt-0.5" />
@@ -1569,15 +1621,14 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 				</div>
 			</div>
 
-			{isMarkdown ? (
+			{markdownBottomBarEnabled ? (
 				<MarkdownBottomBar
 					id={markdownBottomBarId}
-					open={markdownBottomBarOpen}
-					shortcuts={{
-						enabled: isMarkdown,
-						rootRef,
-						viewModeRef,
-					}}
+					open={internalMarkdownBottomBarOpen}
+					rootRef={rootRef}
+					chords={markdownBottomBarChords}
+					formatChordForTip={formatChordForTip}
+					imperativeRef={markdownBottomBarRef}
 					options={{
 						bottomBarAssistantNodeEnabled: Boolean(bottomBarAssistantNode),
 					}}
@@ -1601,6 +1652,9 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 						onOverwriteSaveEnabledChange,
 						onAutoSaveEnabledChange,
 						onAutoSaveIntervalSecChange,
+						toggleMarkdownBottomBar,
+						enableToggleMarkdownBottomBarShortcut:
+							enableMarkdownBottomBarToggleShortcut,
 					}}
 					customBottomBarNode={customBottomBarNode}
 				/>

@@ -65,7 +65,6 @@ const Knowledge = observer(() => {
 	const [listOpen, setListOpen] = useState(false);
 	const [trashOpen, setTrashOpen] = useState(false);
 	const [saveLoading, setSaveLoading] = useState(false);
-	const [markdownBottomBarOpen, setMarkdownBottomBarOpen] = useState(false);
 	/**
 	 * 回收站打开时强制让 Monaco 视为“新文档”：
 	 * - 解决：从回收站进入时 documentIdentity 可能恒为 'draft-new'，导致 MarkdownEditor 内部 viewMode 不重置（仍停留在 splitDiff）
@@ -533,11 +532,6 @@ const Knowledge = observer(() => {
 				setListOpen((open) => !open);
 				return;
 			}
-			if (chordMatchesStored(knowledgeChords.toggleMarkdownBottomBar, e)) {
-				e.preventDefault();
-				setMarkdownBottomBarOpen((open) => !open);
-				return;
-			}
 			if (chordMatchesStored(knowledgeChords.openTrash, e)) {
 				if (!isCloudLoggedIn) return;
 				e.preventDefault();
@@ -843,8 +837,6 @@ const Knowledge = observer(() => {
 						}
 					}}
 					getMarkdownFromEditorRef={getMarkdownFromEditorRef}
-					markdownBottomBarOpen={markdownBottomBarOpen}
-					onMarkdownBottomBarOpenChange={setMarkdownBottomBarOpen}
 					markdownBottomBarShortcutHint={
 						knowledgeChords.toggleMarkdownBottomBar
 					}
