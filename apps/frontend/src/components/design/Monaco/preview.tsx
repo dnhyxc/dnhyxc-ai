@@ -320,7 +320,7 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 	return (
 		<div
 			ref={markdownRef}
-			className="relative h-full min-h-0 min-w-0 max-w-full w-full overflow-hidden contain-[inline-size]"
+			className="relative h-full min-h-0 min-w-0 max-w-full w-full overflow-hidden contain-[inline-size] select-text"
 		>
 			<ChatCodeFloatingToolbar />
 			{markdown ? (
