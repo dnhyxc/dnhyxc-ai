@@ -680,3 +680,129 @@ if (hit(chords.markdownBarResetPosition)) {
 // 期望主键为 '-'（parseChordString 已将 token 规范为小写）时：除 e.key 外，用物理键码兜底
 if (expectedKey === '-' && (code === 'Minus' || code === 'NumpadSubtract')) return true;
 ```
+
+### 9.10 自定义 `customBottomBarNode`：让业务节点可调用编辑器所有可操作方法（render-prop）
+
+本节记录一次对 `customBottomBarNode` 的增强：在**不破坏现有 `ReactNode` 用法**的前提下，支持把它作为 **render-prop**（函数）传入，从而在业务自定义区域中**直接调用** `Monaco/MarkdownBottomBar` 体系里暴露的全部可操作方法（例如 `focusEditor`、`setViewMode`、`toggleMarkdownSplitDiffCompare`、`toggleMarkdownAssistant`、以及新增的 `resetMarkdownBottomBarPosition` 等），并读取当前状态与快捷键 chord 用于展示。
+
+#### 9.10.1 需求与约束
+
+- **向后兼容**：原先 `customBottomBarNode={<div/>}` 必须完全可用，且渲染行为不变。
+- **不影响现有功能**：不能改变底部操作栏原有按钮、快捷键、拖动、Diff、助手等的执行链路；只是额外提供“拿到上下文”的能力。
+- **上下文稳定**：传给自定义节点的 actions 必须是底部栏正在使用的那一套（避免出现“按钮能用，自定义节点拿到的是另一个闭包”的分叉）。
+
+#### 9.10.2 设计方案（为何用 render-prop）
+
+`customBottomBarNode` 原本是 `ReactNode`，业务节点只能“展示”，无法获取底部栏内部的 actions/state。
+
+解决方式：把类型升级为联合类型：
+
+- 仍可传 `ReactNode | null`
+- 也可传 `(ctx) => ReactNode`
+
+其中 `ctx`（上下文对象）包含：
+
+- `state`：底部栏的运行态（`viewMode`、`splitScrollFollowMode`、`markdownDiffBottomBarVisible`…）
+- `actions`：底部栏的可操作方法（`setViewMode`、`focusEditor`…）+ 补充 `resetMarkdownBottomBarPosition`
+- `options`：底部栏可用性（例如 `bottomBarAssistantNodeEnabled`）
+- `chords`：底部栏快捷键 chord 字符串（用于 Tooltip/展示）
+
+#### 9.10.3 关键实现代码（逐行注释版）
+
+##### A) 类型扩展：`MarkdownBottomBar` 新增上下文类型并支持函数式 `customBottomBarNode`
+
+```tsx
+// 文件：apps/frontend/src/components/design/Monaco/MarkdownBottomBar.tsx
+
+// 1) 组件 props：将 customBottomBarNode 从 “只能是 ReactNode” 扩展为 “ReactNode 或 (ctx)=>ReactNode”
+//    说明：保留 ReactNode 分支即可保证向后兼容，老代码不需要任何改动。
+customBottomBarNode?:
+	| React.ReactNode // 旧用法：直接传 JSX 节点
+	| null // 显式不渲染
+	| ((ctx: MarkdownBottomBarCustomNodeContext) => React.ReactNode); // 新用法：render-prop
+
+// 2) 新增上下文类型：把底部栏已经存在的 state/actions/options/chords 聚合成一份传给业务节点
+export type MarkdownBottomBarCustomNodeContext = {
+	// 当前底部栏状态：业务可根据 viewMode 等渲染不同按钮/禁用态
+	state: MarkdownBottomBarProps['state'];
+	// 底部栏 actions：与底部栏内部按钮/快捷键共用同一套回调
+	actions: MarkdownBottomBarProps['actions'] & {
+		// 补充：复位操作栏位置（与最右侧 LocateFixed 按钮一致）
+		resetMarkdownBottomBarPosition: () => void;
+	};
+	// options：业务可读 bottomBarAssistantNodeEnabled 等可用性
+	options: MarkdownBottomBarProps['options'];
+	// chords：业务可用于展示快捷键提示（formatChordForTip）
+	chords: MarkdownBottomBarChords;
+};
+
+// 3) 在组件内部构造 ctx，并将内部 resetBarPosition 注入给业务节点（与按钮/快捷键同路径）
+const customNodeCtx = useMemo<MarkdownBottomBarCustomNodeContext>(
+	() => ({
+		state, // 直接透传当前 state（来自 props）
+		actions: { ...actions, resetMarkdownBottomBarPosition: resetBarPosition }, // 注入 reset
+		options, // 透传 options
+		chords, // 透传 chords（与 Tooltip 同源）
+	}),
+	[state, actions, options, chords, resetBarPosition], // 依赖变化时更新 ctx
+);
+
+// 4) 解析 customBottomBarNode：函数则执行得到 ReactNode；否则按原样渲染
+const resolvedCustomBottomBarNode =
+	typeof customBottomBarNode === 'function'
+		? customBottomBarNode(customNodeCtx) // render-prop：业务拿到 ctx
+		: customBottomBarNode; // 旧用法：直接渲染 ReactNode
+
+// 5) 最终渲染：使用 resolvedCustomBottomBarNode，不改变布局结构（仍在右侧容器内）
+{resolvedCustomBottomBarNode ?? null}
+```
+
+##### B) 入口类型同步：`Monaco/index.tsx` 的 props 同样扩展为 render-prop（不破坏旧用法）
+
+```tsx
+// 文件：apps/frontend/src/components/design/Monaco/index.tsx
+
+// 让外部调用方能传函数：这里的类型与 MarkdownBottomBar 一致即可
+customBottomBarNode?:
+	| React.ReactNode // 旧用法：静态 JSX
+	| null // 显式不渲染
+	| ((
+			// ctx 类型从 MarkdownBottomBar 导出：保证上下文 shape 单一来源，避免拷贝漂移
+			ctx: import('./MarkdownBottomBar').MarkdownBottomBarCustomNodeContext,
+	  ) => React.ReactNode); // 新用法：render-prop
+```
+
+##### C) 业务侧示例：知识页通过 render-prop 调用编辑器 actions（不影响现有功能）
+
+```tsx
+// 文件：apps/frontend/src/views/knowledge/index.tsx（节选，示例）
+
+customBottomBarNode={
+	// 使用 render-prop：拿到 actions/state/chords/options
+	({ actions }) => (
+		<div className="flex items-center gap-2 ml-2">
+			<button
+				type="button"
+				aria-label="聚焦编辑器"
+				onClick={() => actions.focusEditor()} // 调用底部栏 actions：聚焦编辑器
+			>
+				{/* 这里仅做示例：实际可替换为任意业务图标 */}
+				<NotebookPen size={16} aria-hidden />
+			</button>
+			<button
+				type="button"
+				aria-label="复位操作栏位置"
+				onClick={() => actions.resetMarkdownBottomBarPosition()} // 调用与「复位」按钮一致的逻辑
+			>
+				<NotebookPen size={16} aria-hidden />
+			</button>
+		</div>
+	)
+}
+```
+
+#### 9.10.4 为什么这样不会影响现有功能
+
+- **旧用法保留**：`customBottomBarNode` 仍可传 `ReactNode`，渲染路径不变。
+- **不改既有分发**：底部栏按钮、快捷键仍调用 `actions` 与 `resetBarPosition`；render-prop 只是“把同一份 actions 暴露给业务节点”。
+- **不引入全局监听**：没有新增任何 `window` 事件监听或快捷键分支，只是类型与渲染增强。

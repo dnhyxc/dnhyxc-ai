@@ -90,11 +90,9 @@ interface MarkdownEditorProps {
 	language?: string;
 	toolbar: React.ReactNode;
 	title?: React.ReactNode;
-	// 自定义底部操作栏的节点，如 AI 助手节点
-	bottomBarCustomNode?: React.ReactNode;
 	/**
 	 * Markdown 右侧 AI 助手面板是否展开；与 onMarkdownAssistantOpenChange 同时传入时为受控模式。
-	 * 开启后分屏右侧展示 `bottomBarCustomNode`（与预览 / Diff 互斥）；仅在传入 `bottomBarCustomNode` 时底部栏显示开关。
+	 * 开启后分屏右侧展示 `bottomBarAssistantNode`（与预览 / Diff 互斥）；仅在传入 `bottomBarAssistantNode` 时底部栏显示开关。
 	 */
 	markdownAssistantOpen?: boolean;
 	/**
@@ -184,6 +182,15 @@ interface MarkdownEditorProps {
 	 * - 具体写入方式（覆盖/追加、是否聚焦输入框）由外部决定。
 	 */
 	onInsertSelectionToAssistant?: (text: string) => void;
+	// 自定义底部操作栏的节点，如 AI 助手节点
+	bottomBarAssistantNode?: React.ReactNode;
+	/** 自定义底部操作栏节点 */
+	customBottomBarNode?:
+		| React.ReactNode
+		| null
+		| ((
+				ctx: import('./MarkdownBottomBar').MarkdownBottomBarCustomNodeContext,
+		  ) => React.ReactNode);
 }
 
 const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
@@ -198,7 +205,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	language = 'markdown',
 	toolbar,
 	title,
-	bottomBarCustomNode,
+	bottomBarAssistantNode,
 	markdownAssistantOpen: markdownAssistantOpenProp,
 	onMarkdownAssistantOpenChange,
 	enableMarkdownPreview = true,
@@ -221,6 +228,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	diffBaselineSource = 'current',
 	diffBaselineText,
 	onInsertSelectionToAssistant,
+	customBottomBarNode = null,
 }) => {
 	/** 底部 Markdown 操作条是否展开（受控或未传 props 时内部 state） */
 	const [internalMarkdownBottomBarOpen, setInternalMarkdownBottomBarOpen] =
@@ -318,7 +326,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 		: internalMarkdownAssistantOpen;
 	/** 右侧栏是否为 AI 助手（非预览）：此时不按「左编右预览」处理分屏选中与跟滚 */
 	const assistantRightPaneActive = Boolean(
-		bottomBarCustomNode && markdownAssistantOpen,
+		bottomBarAssistantNode && markdownAssistantOpen,
 	);
 	/** 分屏右侧为 Markdown 预览且启用跟滚时，才做左右滚动同步（Diff 模式下右侧无预览 DOM） */
 	const splitPreviewScrollSyncEligible =
@@ -351,7 +359,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	]);
 
 	const toggleMarkdownAssistant = useCallback(() => {
-		if (!bottomBarCustomNode) return;
+		if (!bottomBarAssistantNode) return;
 		const next = !markdownAssistantOpen;
 		// 仅通过机器人开关关闭助手时：回到「编辑源码」，避免仍停留在为助手而设的左编右预览分屏
 		if (!next) {
@@ -363,7 +371,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 			setInternalMarkdownAssistantOpen(next);
 		}
 	}, [
-		bottomBarCustomNode,
+		bottomBarAssistantNode,
 		markdownAssistantOpen,
 		assistantPanelControlled,
 		onMarkdownAssistantOpenChange,
@@ -573,13 +581,13 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 
 	// 外部不再传入 bottomBarCustomNode 时，内部开关复位
 	useEffect(() => {
-		if (bottomBarCustomNode || assistantPanelControlled) return;
+		if (bottomBarAssistantNode || assistantPanelControlled) return;
 		setInternalMarkdownAssistantOpen(false);
-	}, [bottomBarCustomNode, assistantPanelControlled]);
+	}, [bottomBarAssistantNode, assistantPanelControlled]);
 
 	// 开启助手后需有右侧栏位：从纯编辑 / 纯预览 / 分屏 Diff 进入「左编 + 右侧助手」
 	useEffect(() => {
-		if (!markdownAssistantOpen || !bottomBarCustomNode) return;
+		if (!markdownAssistantOpen || !bottomBarAssistantNode) return;
 		setViewMode((vm) =>
 			vm === 'split'
 				? vm
@@ -587,7 +595,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 					? 'split'
 					: vm,
 		);
-	}, [markdownAssistantOpen, bottomBarCustomNode]);
+	}, [markdownAssistantOpen, bottomBarAssistantNode]);
 
 	// viewMode 在 edit ↔ split* 切换时同步 splitLayout，避免右侧面板保持 0 导致无法撑开
 	useEffect(() => {
@@ -1511,10 +1519,10 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 								)}
 							>
 								<div className="h-full min-h-0 min-w-0 overflow-hidden contain-[inline-size]">
-									{markdownAssistantOpen && bottomBarCustomNode ? (
+									{markdownAssistantOpen && bottomBarAssistantNode ? (
 										<div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
 											<div className="min-h-0 flex-1 overflow-auto">
-												{bottomBarCustomNode}
+												{bottomBarAssistantNode}
 											</div>
 										</div>
 									) : viewMode === 'splitDiff' ? (
@@ -1571,7 +1579,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 						viewModeRef,
 					}}
 					options={{
-						bottomBarCustomNodeEnabled: Boolean(bottomBarCustomNode),
+						bottomBarAssistantNodeEnabled: Boolean(bottomBarAssistantNode),
 					}}
 					state={{
 						viewMode,
@@ -1594,6 +1602,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 						onAutoSaveEnabledChange,
 						onAutoSaveIntervalSecChange,
 					}}
+					customBottomBarNode={customBottomBarNode}
 				/>
 			) : null}
 		</div>

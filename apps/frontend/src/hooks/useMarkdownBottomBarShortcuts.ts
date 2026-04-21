@@ -58,7 +58,7 @@ export function useMarkdownBottomBarShortcuts(input: {
 	viewModeRef: React.RefObject<'edit' | 'preview' | 'split' | 'splitDiff'>;
 	assistantRightPaneActive: boolean;
 	markdownDiffBottomBarVisible: boolean;
-	bottomBarCustomNodeEnabled: boolean;
+	bottomBarAssistantNodeEnabled: boolean;
 	showOverwriteSaveToggle: boolean;
 	overwriteSaveEnabled: boolean;
 	showAutoSaveControls: boolean;
@@ -93,7 +93,7 @@ export function useMarkdownBottomBarShortcuts(input: {
 		viewModeRef,
 		assistantRightPaneActive,
 		markdownDiffBottomBarVisible,
-		bottomBarCustomNodeEnabled,
+		bottomBarAssistantNodeEnabled,
 		showOverwriteSaveToggle,
 		overwriteSaveEnabled,
 		showAutoSaveControls,
@@ -209,7 +209,7 @@ export function useMarkdownBottomBarShortcuts(input: {
 			if (hit(chords.markdownBarAction4)) {
 				e.preventDefault();
 				e.stopPropagation();
-				if (bottomBarCustomNodeEnabled) {
+				if (bottomBarAssistantNodeEnabled) {
 					toggleMarkdownAssistant();
 				}
 				return;
@@ -296,7 +296,7 @@ export function useMarkdownBottomBarShortcuts(input: {
 		viewModeRef,
 		assistantRightPaneActive,
 		markdownDiffBottomBarVisible,
-		bottomBarCustomNodeEnabled,
+		bottomBarAssistantNodeEnabled,
 		showOverwriteSaveToggle,
 		overwriteSaveEnabled,
 		showAutoSaveControls,

@@ -41,21 +41,7 @@ type MarkdownSplitScrollFollowMode =
 	| 'previewFollowsEditor'
 	| 'editorFollowsPreview';
 
-export type MarkdownBottomBarChords = {
-	markdownBarAction1: string;
-	markdownBarAction2: string;
-	markdownBarAction3: string;
-	markdownBarAction4: string;
-	markdownBarAction5: string;
-	markdownBarAction6: string;
-	markdownBarAction7: string;
-	markdownBarAction8: string;
-	markdownBarAction9: string;
-	markdownBarAction0: string;
-	markdownBarResetPosition: string;
-};
-
-export const MarkdownBottomBar = memo(function MarkdownBottomBar(props: {
+interface MarkdownBottomBarProps {
 	id: string;
 	open: boolean;
 	shortcuts: {
@@ -74,7 +60,7 @@ export const MarkdownBottomBar = memo(function MarkdownBottomBar(props: {
 		markdownDiffBottomBarVisible: boolean;
 	};
 	options: {
-		bottomBarCustomNodeEnabled: boolean;
+		bottomBarAssistantNodeEnabled: boolean;
 	};
 	actions: {
 		setViewMode: (mode: MarkdownViewMode) => void;
@@ -91,8 +77,41 @@ export const MarkdownBottomBar = memo(function MarkdownBottomBar(props: {
 		onAutoSaveEnabledChange?: (next: boolean) => void;
 		onAutoSaveIntervalSecChange?: (next: number) => void;
 	};
-}) {
-	const { id, open, shortcuts, state, options, actions } = props;
+	customBottomBarNode?:
+		| React.ReactNode
+		| null
+		| ((ctx: MarkdownBottomBarCustomNodeContext) => React.ReactNode);
+}
+
+export type MarkdownBottomBarChords = {
+	markdownBarAction1: string;
+	markdownBarAction2: string;
+	markdownBarAction3: string;
+	markdownBarAction4: string;
+	markdownBarAction5: string;
+	markdownBarAction6: string;
+	markdownBarAction7: string;
+	markdownBarAction8: string;
+	markdownBarAction9: string;
+	markdownBarAction0: string;
+	markdownBarResetPosition: string;
+};
+
+export type MarkdownBottomBarCustomNodeContext = {
+	state: MarkdownBottomBarProps['state'];
+	actions: MarkdownBottomBarProps['actions'] & {
+		/** 与「复位操作栏初始位置」按钮一致 */
+		resetMarkdownBottomBarPosition: () => void;
+	};
+	options: MarkdownBottomBarProps['options'];
+	chords: MarkdownBottomBarChords;
+};
+
+export const MarkdownBottomBar = memo(function MarkdownBottomBar(
+	props: MarkdownBottomBarProps,
+) {
+	const { id, open, shortcuts, state, options, actions, customBottomBarNode } =
+		props;
 	const {
 		viewMode,
 		assistantRightPaneActive,
@@ -103,7 +122,7 @@ export const MarkdownBottomBar = memo(function MarkdownBottomBar(props: {
 		autoSaveIntervalSec,
 		markdownDiffBottomBarVisible,
 	} = state;
-	const { bottomBarCustomNodeEnabled } = options;
+	const { bottomBarAssistantNodeEnabled } = options;
 	const {
 		setViewMode,
 		setSplitScrollFollowMode,
@@ -249,7 +268,7 @@ export const MarkdownBottomBar = memo(function MarkdownBottomBar(props: {
 		viewModeRef: shortcuts.viewModeRef,
 		assistantRightPaneActive,
 		markdownDiffBottomBarVisible,
-		bottomBarCustomNodeEnabled,
+		bottomBarAssistantNodeEnabled,
 		showOverwriteSaveToggle,
 		overwriteSaveEnabled,
 		showAutoSaveControls,
@@ -264,6 +283,21 @@ export const MarkdownBottomBar = memo(function MarkdownBottomBar(props: {
 		onAutoSaveEnabledChange,
 		resetMarkdownBottomBarPosition: resetBarPosition,
 	});
+
+	const customNodeCtx = useMemo<MarkdownBottomBarCustomNodeContext>(
+		() => ({
+			state,
+			actions: { ...actions, resetMarkdownBottomBarPosition: resetBarPosition },
+			options,
+			chords,
+		}),
+		[state, actions, options, chords, resetBarPosition],
+	);
+
+	const resolvedCustomBottomBarNode =
+		typeof customBottomBarNode === 'function'
+			? customBottomBarNode(customNodeCtx)
+			: customBottomBarNode;
 
 	/** 底部操作栏内图标按钮（与「跟随滚动」一致） */
 	const markdownBarIconBtnClass = (active: boolean) =>
@@ -381,7 +415,7 @@ export const MarkdownBottomBar = memo(function MarkdownBottomBar(props: {
 							</button>
 						</Tooltip>
 
-						{bottomBarCustomNodeEnabled ? (
+						{bottomBarAssistantNodeEnabled ? (
 							<Tooltip
 								content={`${markdownAssistantOpen ? '关闭 AI 助手' : '开启 AI 助手'}（${formatChordForTip(chords.markdownBarAction4)}）`}
 							>
@@ -597,6 +631,7 @@ export const MarkdownBottomBar = memo(function MarkdownBottomBar(props: {
 								<LocateFixed size={18} strokeWidth={1.75} aria-hidden />
 							</button>
 						</Tooltip>
+						{resolvedCustomBottomBarNode ?? null}
 					</div>
 				</div>
 			</div>

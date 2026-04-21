@@ -909,7 +909,7 @@ const Knowledge = observer(() => {
 							/>
 						</div>
 					}
-					bottomBarCustomNode={
+					bottomBarAssistantNode={
 						isCloudLoggedIn ? (
 							<KnowledgeAssistant
 								documentKey={knowledgeAssistantDocumentKey(
