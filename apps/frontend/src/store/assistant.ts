@@ -16,6 +16,58 @@ import {
 import type { Message } from '@/types/chat';
 import { streamAssistantSse } from '@/utils/assistantSse';
 
+/**
+ * 对外暴露的 AssistantStore 公开 API。
+ *
+ * 目的：避免在 `useStore()` 返回类型推断时把 class 的 private 成员（如 activeState/canonicalKey 等）
+ * 带入导出类型，触发 TS4094（导出匿名类类型包含私有属性）。
+ */
+export interface AssistantStoreApi {
+	activeDocumentKey: string;
+	sessionByDocument: Record<string, string>;
+	knowledgeAssistantPersistenceAllowed: boolean;
+
+	readonly sessionId: string | null;
+	readonly messages: Message[];
+	readonly isHistoryLoading: boolean;
+	readonly isSending: boolean;
+	readonly loadError: string | null;
+	readonly abortStream: (() => void) | null;
+	readonly isStreaming: boolean;
+
+	setKnowledgeAssistantPersistenceAllowed(allowed: boolean): void;
+	clearAssistantStateOnKnowledgeDraftReset(
+		syncActiveDocumentKey?: string | null,
+	): void;
+
+	activateForDocument(documentKey: string): Promise<void>;
+	remapAssistantSessionDocumentKey(fromKey: string, toKey: string): void;
+	getSessionIdForDocumentKey(documentKey: string): string | null;
+	persistKnowledgeArticleBindingOnServer(
+		sessionId: string,
+		knowledgeArticleId: string,
+	): Promise<void>;
+	fetchSessionMessages(): Promise<void>;
+	flushEphemeralTranscriptIfNeeded(
+		cloudArticleId: string,
+		fromDocumentKey: string,
+		toDocumentKey: string,
+	): Promise<void>;
+	ensureSessionForCurrentDocument(): Promise<string | null>;
+	sendMessage(
+		raw?: string,
+		options?: { extraUserContentForModel?: string },
+	): Promise<void>;
+	stopGenerating(): Promise<void>;
+
+	isStreamingForDocumentKey(documentKey: string): boolean;
+	scheduleEphemeralFlushAfterStreaming(
+		cloudArticleId: string,
+		fromDocumentKey: string,
+		toDocumentKey: string,
+	): void;
+}
+
 function readToken(): string {
 	if (typeof window === 'undefined') {
 		return '';
@@ -85,7 +137,7 @@ function buildEphemeralContextTurnsFromMessages(
 /**
  * 知识库右侧「通用助手」：与后端 `AssistantController` 对齐，按文档维度缓存 sessionId。
  */
-class AssistantStore {
+export class AssistantStore {
 	/** 当前知识文档标识（与 MarkdownEditor documentIdentity 一致） */
 	activeDocumentKey = '';
 	/**
@@ -771,4 +823,6 @@ class AssistantStore {
 	}
 }
 
-export default new AssistantStore();
+const _assistantStore = new AssistantStore();
+export const assistantStore: AssistantStoreApi = _assistantStore;
+export default assistantStore;
