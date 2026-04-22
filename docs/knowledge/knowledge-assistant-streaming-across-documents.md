@@ -234,6 +234,92 @@ clearAssistantStateOnKnowledgeDraftReset(syncActiveDocumentKey?: string | null) 
 }
 ```
 
+#### 2.0.5 首次保存时避免“流式状态闪烁”：收尾阶段用“替换对象”而不是原地 mutate
+
+现象：在首次保存知识文档时，助手流式消息明明已经结束（`isStreaming === false`），但在“保存那一瞬间”UI 会短暂回闪为“正在输出”的状态。
+
+实现层面的常见触发原因：
+
+- 保存会触发 `fromKey → toKey` 的映射迁移、`activateForDocument` hydrate、以及一系列可观测状态更新。
+- 如果流式收尾（`onComplete/onError/stopGenerating`）是**原地 mutate**（例如 `msg.isStreaming = false`），在这些状态切换叠加时，UI 有机会在某一帧读到旧引用上的旧值，出现闪烁。
+
+解决策略：
+
+- 在所有“流式收尾”路径中，都用 **新对象替换** `messages[idx]`（或替换整个数组元素），确保 MobX/React 观察到的是一次明确的“引用级更新”，避免短暂的不一致读值。
+
+下面是与当前实现一致的关键代码（注释增强版）：
+
+```ts
+// 位置：apps/frontend/src/store/assistant.ts（sendMessage 的 SSE callbacks）
+onComplete: async (err) => {
+  runInAction(() => {
+    state.isSending = false;
+    const idx = state.messages.findIndex((m) => m.chatId === assistantChatId);
+    if (idx < 0) return;
+
+    const prev = state.messages[idx] as Message;
+
+    // 关键：不要 prev.isStreaming = false（原地 mutate）
+    // 而是构造 next 并替换元素引用，确保渲染在 key remap / hydrate 期间仍稳定
+    const next: Message = { ...prev, isStreaming: false };
+
+    // 错误场景：补齐内容并标记停止（同样在 next 上改）
+    if (err) {
+      next.content = next.content || `生成失败：${err}`;
+      next.isStopped = true;
+    }
+
+    state.messages[idx] = next;
+  });
+
+  state.abortStream = null;
+
+  // 省略：持久化路径下回填（注意按 canonicalKey 定位）
+};
+
+onError: (e) => {
+  runInAction(() => {
+    state.isSending = false;
+    const idx = state.messages.findIndex((m) => m.chatId === assistantChatId);
+    if (idx < 0) return;
+
+    const prev = state.messages[idx] as Message;
+
+    // 同样用“替换对象”完成收尾，避免切换/保存时的闪烁
+    state.messages[idx] = {
+      ...prev,
+      isStreaming: false,
+      content: prev.content || e.message,
+    };
+  });
+  state.abortStream = null;
+};
+
+// 位置：apps/frontend/src/store/assistant.ts（sendMessage 外层 catch）
+catch {
+  runInAction(() => {
+    state.isSending = false;
+    const idx = state.messages.findIndex((m) => m.chatId === assistantChatId);
+    if (idx < 0) return;
+    const prev = state.messages[idx] as Message;
+    state.messages[idx] = { ...prev, isStreaming: false };
+  });
+  state.abortStream = null;
+}
+
+// 位置：apps/frontend/src/store/assistant.ts（stopGenerating）
+runInAction(() => {
+  this.isSending = false;
+
+  // 关键：不要 for..of 原地改 m.isStreaming
+  // 用 map 返回新对象，确保停止态不会因其它状态迁移而“回闪”
+  this.messages = this.messages.map((m) => {
+    if (!m.isStreaming) return m;
+    return { ...m, isStreaming: false, isStopped: true };
+  });
+});
+```
+
 ### 2.1 按文档隔离运行态（stateByDocument）
 
 将以下运行态从“单例字段”改为“按文档 key 分桶”的结构（每个文档独立一份）：

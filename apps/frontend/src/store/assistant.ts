@@ -613,12 +613,17 @@ class AssistantStore {
 								(m) => m.chatId === assistantChatId,
 							);
 							if (idx >= 0) {
-								state.messages[idx].isStreaming = false;
+								const prev = state.messages[idx] as Message;
+								const next: Message = {
+									...prev,
+									isStreaming: false,
+								};
 								if (err) {
-									state.messages[idx].content =
-										state.messages[idx].content || `生成失败：${err}`;
-									state.messages[idx].isStopped = true;
+									next.content = next.content || `生成失败：${err}`;
+									next.isStopped = true;
 								}
+								// 用新对象替换，避免原地 mutate 在“key remap/视图切换”时出现短暂订阅/渲染不一致
+								state.messages[idx] = next;
 							}
 						});
 						state.abortStream = null;
@@ -637,9 +642,12 @@ class AssistantStore {
 								(m) => m.chatId === assistantChatId,
 							);
 							if (idx >= 0) {
-								state.messages[idx].isStreaming = false;
-								state.messages[idx].content =
-									state.messages[idx].content || e.message;
+								const prev = state.messages[idx] as Message;
+								state.messages[idx] = {
+									...prev,
+									isStreaming: false,
+									content: prev.content || e.message,
+								};
 							}
 						});
 						state.abortStream = null;
@@ -654,7 +662,11 @@ class AssistantStore {
 					(m) => m.chatId === assistantChatId,
 				);
 				if (idx >= 0) {
-					state.messages[idx].isStreaming = false;
+					const prev = state.messages[idx] as Message;
+					state.messages[idx] = {
+						...prev,
+						isStreaming: false,
+					};
 				}
 			});
 			state.abortStream = null;
@@ -667,12 +679,11 @@ class AssistantStore {
 		this.abortStream = null;
 		runInAction(() => {
 			this.isSending = false;
-			for (const m of this.messages) {
-				if (m.isStreaming) {
-					m.isStreaming = false;
-					m.isStopped = true;
-				}
-			}
+			// 用“替换对象”而不是原地 mutate：保证 UI 在文档切换/映射迁移时也能稳定刷新停止态
+			this.messages = this.messages.map((m) => {
+				if (!m.isStreaming) return m;
+				return { ...m, isStreaming: false, isStopped: true };
+			});
 		});
 		const sid = this.sessionId;
 		if (!sid) return;
