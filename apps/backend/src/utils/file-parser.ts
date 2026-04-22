@@ -3,7 +3,7 @@ import https from 'node:https';
 import { extname } from 'node:path';
 import { InternalServerErrorException } from '@nestjs/common';
 import mammoth from 'mammoth';
-import * as pdf from 'pdf-parse';
+import pdfParse from 'pdf-parse';
 import xlsx from 'xlsx';
 
 export const urlToBuffer = async (url: string) => {
@@ -27,20 +27,18 @@ export const urlToBuffer = async (url: string) => {
 	});
 };
 
+// pdf-parse 1.x 为函数式 API：pdfParse(buffer)；2.x 才有 PDFParse 类。
 const parsePdf = async (
-	_buffer: Buffer,
-	filePath?: string,
+	buffer: Buffer,
+	_filePath?: string,
 ): Promise<string> => {
 	try {
-		// 动态导入 pdf-parse 库
-		const parser = new (pdf as any).PDFParse({
-			url: filePath,
-		});
-		const result = await parser.getText();
-		return result.text;
+		const result = await pdfParse(buffer);
+		return result.text ?? '';
 	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
 		throw new InternalServerErrorException(
-			`PDF 解析失败: ${error.message}. 请确保已安装 pdf-parse 库: npm install pdf-parse`,
+			`PDF 解析失败: ${message}. 请确保已安装 pdf-parse 库: npm install pdf-parse`,
 		);
 	}
 };

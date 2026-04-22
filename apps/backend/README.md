@@ -432,10 +432,10 @@ export const CheckPolicies = (...handlers: PolicyHandlerCallback[]) =>
 export const Can = (
 	action: Action,
 	subject: InferSubjects<any>,
-	conditions?: any
+	conditions?: any,
 ) =>
 	SetMetadata(CHECK_POLICIES_KEY.CAN, (ability: AnyMongoAbility) =>
-		ability.can(action, subject, conditions)
+		ability.can(action, subject, conditions),
 	);
 
 /**
@@ -453,10 +453,10 @@ export const Can = (
 export const Cannot = (
 	action: Action,
 	subject: InferSubjects<any>,
-	conditions?: any
+	conditions?: any,
 ) =>
 	SetMetadata(CHECK_POLICIES_KEY.CANNOT, (ability: AnyMongoAbility) =>
-		ability.cannot(action, subject, conditions)
+		ability.cannot(action, subject, conditions),
 	);
 ```
 
@@ -483,7 +483,7 @@ import {
 export class CaslGuard implements CanActivate {
 	constructor(
 		private reflector: Reflector,
-		private caslAbilityService: CaslAbilityService
+		private caslAbilityService: CaslAbilityService,
 	) {}
 	async canActivate(context: ExecutionContext): Promise<boolean> {
 		const handlers = this.reflector.getAllAndMerge<PolicyHandlerCallback[]>(
@@ -491,14 +491,14 @@ export class CaslGuard implements CanActivate {
 			[
 				context.getHandler(), // 当前路由的处理函数（如 @Get() 修饰的方法）
 				context.getClass(), // 当前路由所属的控制器类
-			]
+			],
 		);
 		const canHandlers = this.reflector.getAllAndMerge<PolicyHandlerCallback[]>(
 			CHECK_POLICIES_KEY.CAN,
 			[
 				context.getHandler(), // 当前路由的处理函数（如 @Get() 修饰的方法）
 				context.getClass(), // 当前路由所属的控制器类
-			]
+			],
 		) as CaslHandlerType;
 		const cannotHandlers = this.reflector.getAllAndMerge<
 			PolicyHandlerCallback[]
@@ -517,7 +517,7 @@ export class CaslGuard implements CanActivate {
 		if (req?.user) {
 			// 获取当前用户权限
 			const ability = await this.caslAbilityService.forRoot(
-				req?.user?.username
+				req?.user?.username,
 			);
 
 			let flag = true;
@@ -812,7 +812,7 @@ export class AuthService {
 	constructor(
 		private readonly userService: UserService,
 		private jwt: JwtService,
-		@InjectRedis() private readonly redis: Redis
+		@InjectRedis() private readonly redis: Redis,
 	) {}
 
 	/**
@@ -848,7 +848,7 @@ export class AuthService {
 	 */
 	async verifyCaptcha(
 		captchaId: string,
-		captchaText: string
+		captchaText: string,
 	): Promise<boolean> {
 		if (!captchaId || !captchaText) {
 			return false;
@@ -877,7 +877,7 @@ export class AuthService {
 		username: string,
 		password: string,
 		captchaId: string,
-		captchaText: string
+		captchaText: string,
 	) {
 		// 1. 先验证验证码
 		const isCaptchaValid = await this.verifyCaptcha(captchaId, captchaText);
@@ -939,7 +939,7 @@ export class AuthService {
 		username: string,
 		password: string,
 		captchaId?: string,
-		captchaText?: string
+		captchaText?: string,
 	) {
 		// 如果需要验证码校验
 		if (captchaId && captchaText) {
@@ -1050,7 +1050,7 @@ export NVM_DIR="$HOME/.nvm"
 使用 `nvm` 安装 node：
 
 ```bash
-nvm install node@16.14.2
+nvm install v16.14.2
 
 node -v
 ```
@@ -1189,7 +1189,13 @@ services:
         condition: service_healthy
 ```
 
-之后在当前目录下执行 `docker-compose up -d` 创建数据库容器。
+之后在当前目录下执行 `sudo systemctl restart docker docker-compose up -d` 创建数据库容器。
+
+```bash
+sudo systemctl restart docker
+
+docker-compose up -d
+```
 
 创建成功后，可以通过 `docker ps` 命令查看容器状态。
 
@@ -1201,7 +1207,7 @@ services:
 
 ```bash
 # 从本地 /Users/dnhyxc/Desktop 目录下上传 redis-7.4.7.tar.gz 到服务器 /usr/local 目录下
-scp /Users/dnhyxc/Desktop/redis-7.4.7.tar.gz root@101.29.209.188:/usr/local
+scp /Users/dnhyxc/Desktop/redis-7.4.7.tar.gz root@47.96.84.136:/usr/local
 
 cd /usr/local
 
@@ -1435,7 +1441,7 @@ pnpm build
 
 压缩 dist 文件
 
-scp /Users/dnhyxc/Documents/code/dnhyxc-ai/dist.zip root@101.29.209.188:/usr/local/dnhyxc-ai/server
+scp /Users/dnhyxc/Documents/code/dnhyxc-ai/apps/backend/dist.zip root@47.96.84.136:/usr/local/dnhyxc-ai/server
 
 unzip dist.zip
 ```
@@ -1443,7 +1449,7 @@ unzip dist.zip
 之后将项目中的 `package.json` 文件也上传到服务器中的 `dnhyxc-ai/server` 文件目录下，方便安装响应的依赖：
 
 ```bash
-scp /Users/dnhyxc/Documents/code/dnhyxc-ai/package.json root@101.29.209.188:/usr/local/dnhyxc-ai/server
+scp /Users/dnhyxc/Documents/code/dnhyxc-ai/apps/backend/package.json root@47.96.84.136:/usr/local/dnhyxc-ai/server
 ```
 
 package.json 文件上传完成后，在服务器 `/user/local/dnhyxc-ai/server` 目录下执行以下命令安装项目所需的 `dependencies` 依赖：
