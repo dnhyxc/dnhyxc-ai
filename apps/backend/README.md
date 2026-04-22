@@ -1557,6 +1557,26 @@ pm2 save
 pm2 startup
 ```
 
+## 导出表结构
+
+使用如下命令导出本地数据库表结构 sql，之后在 Adminer 中导入。
+
+- 仅导出表结构（不含数据）：
+
+```bash
+docker exec dnhyxc_ai_db sh -lc \
+'mysqldump -uroot -pexample --databases dnhyxc_ai_db --no-data --routines --triggers --events --default-character-set=utf8mb4' \
+> dnhyxc_ai_db_schema.sql
+```
+
+- 导出结构 + 数据：
+
+```bash
+docker exec dnhyxc_ai_db sh -lc \
+'mysqldump -uroot -pexample --databases dnhyxc_ai_db --routines --triggers --events --single-transaction --set-gtid-purged=OFF --default-character-set=utf8mb4' \
+> dnhyxc_ai_db_full.sql
+```
+
 # 聊天服务 API 使用文档
 
 ## 概述

@@ -40,6 +40,9 @@ export const connectionOptions: TypeOrmModuleOptions = buildConnectionOptions();
 // 这里是为了对接 typeorm 的数据源，方便使用 typeorm 的 cli 命令
 export default new DataSource({
 	...connectionOptions,
-	migrations: ['src/migrations/**'],
+	// 同时兼容：
+	// - 源码执行（__dirname=apps/backend） -> apps/backend/src/migrations
+	// - 编译后执行（__dirname=apps/backend/dist） -> apps/backend/dist/src/migrations
+	migrations: [`${__dirname}/src/migrations/**/*.{ts,js}`],
 	subscribers: [],
 } as DataSourceOptions);

@@ -5,7 +5,6 @@ import { useParams } from 'react-router';
 import ChatAssistantMessage from '@/components/design/ChatAssistantMessage';
 import ChatFileList from '@/components/design/ChatFileList';
 import ChatMessageActions from '@/components/design/ChatMessageActions';
-import ChatUserMessage from '@/components/design/ChatUserMessage';
 import { useTheme } from '@/hooks';
 import {
 	ChatCodeFloatingToolbar,
@@ -185,7 +184,7 @@ const SessionShare = () => {
 			>
 				<div
 					className={cn(
-						'mt-2.5 max-w-208 mx-auto relative flex w-full flex-col select-none px-4',
+						'max-w-208 mx-auto w-full mt-2.5 relative flex flex-col select-none px-4',
 					)}
 				>
 					{chatData?.messages.map((message, index) => (
@@ -212,14 +211,17 @@ const SessionShare = () => {
 							<div
 								id="message-md-wrap"
 								className={cn(
-									'relative flex-1 rounded-md p-3 select-auto text-textcolor mb-5',
+									'relative rounded-md p-3 select-auto text-textcolor mb-5 min-w-0',
 									message.role === 'user'
-										? 'bg-blue-500/10 border border-blue-500/20 text-end pt-2 pb-2.5 px-3'
-										: 'bg-theme/5 border border-theme/20',
+										? `bg-teal-600/5 border border-teal-500/15 text-end pt-2 pb-2.5 px-3 ml-auto w-fit max-w-full`
+										: 'bg-theme/5 border border-theme/10 w-full',
 								)}
 							>
 								{message.role === 'user' ? (
-									<ChatUserMessage message={message} />
+									<ChatAssistantMessage
+										message={message}
+										className="text-left min-w-0 max-w-full [&_.markdown-body]:min-w-0 [&_.markdown-body]:max-w-full [&_.markdown-body]:overflow-x-auto"
+									/>
 								) : (
 									<ChatAssistantMessage message={message} />
 								)}

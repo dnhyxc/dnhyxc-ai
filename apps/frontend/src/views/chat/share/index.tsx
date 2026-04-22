@@ -49,7 +49,9 @@ const Share: React.FC<ShareProps> = ({
 				baseUrl?: string;
 			} = {
 				chatSessionId,
-				baseUrl: 'http://localhost:9002', // http://localhost:9226
+				baseUrl: import.meta.env.DEV
+					? import.meta.env.VITE_DEV_WEB_DOMAIN
+					: import.meta.env.VITE_PROD_WEB_DOMAIN, // http://localhost:9226
 			};
 			if (checkedMessages.size) {
 				data.messageIds = [...checkedMessages];
