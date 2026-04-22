@@ -357,11 +357,21 @@ const Knowledge = observer(() => {
 					trashOpenNonce,
 				);
 				if (!assistantStore.knowledgeAssistantPersistenceAllowed) {
-					await assistantStore.flushEphemeralTranscriptIfNeeded(
-						res.data.id,
-						fromKey,
-						toKey,
-					);
+					// 首次保存时若助手仍在流式：不要中断流式，也不要把不完整对话迁入/绑定到新知识条目
+					// 改为登记“流式结束后再迁入”，避免保存瞬间产生不完整的 assistant 会话关联
+					if (assistantStore.isStreamingForDocumentKey(fromKey)) {
+						assistantStore.scheduleEphemeralFlushAfterStreaming(
+							res.data.id,
+							fromKey,
+							toKey,
+						);
+					} else {
+						await assistantStore.flushEphemeralTranscriptIfNeeded(
+							res.data.id,
+							fromKey,
+							toKey,
+						);
+					}
 				}
 				assistantStore.remapAssistantSessionDocumentKey(fromKey, toKey);
 				knowledgeStore.setKnowledgeEditingKnowledgeId(res.data.id);
@@ -414,11 +424,19 @@ const Knowledge = observer(() => {
 			);
 			const toKey = knowledgeAssistantDocumentKey(res.data.id, trashOpenNonce);
 			if (!assistantStore.knowledgeAssistantPersistenceAllowed) {
-				await assistantStore.flushEphemeralTranscriptIfNeeded(
-					res.data.id,
-					fromKey,
-					toKey,
-				);
+				if (assistantStore.isStreamingForDocumentKey(fromKey)) {
+					assistantStore.scheduleEphemeralFlushAfterStreaming(
+						res.data.id,
+						fromKey,
+						toKey,
+					);
+				} else {
+					await assistantStore.flushEphemeralTranscriptIfNeeded(
+						res.data.id,
+						fromKey,
+						toKey,
+					);
+				}
 			}
 			assistantStore.remapAssistantSessionDocumentKey(fromKey, toKey);
 			knowledgeStore.setKnowledgeEditingKnowledgeId(res.data.id);

@@ -103,6 +103,15 @@ class AssistantStore {
 			abortStream: (() => void) | null;
 			/** 是否已尝试拉取过历史（避免频繁 activate 时重复请求） */
 			historyHydrated: boolean;
+			/**
+			 * 首次保存时若仍在流式输出：先不迁入（避免绑定不完整对话），等流式结束后再 flush。
+			 * 该字段挂在 state 上，确保在 `fromKey → toKey` remap 时会随 state 一起迁移。
+			 */
+			pendingEphemeralFlush: {
+				cloudArticleId: string;
+				fromDocumentKey: string;
+				toDocumentKey: string;
+			} | null;
 		}
 	> = {};
 	/** 文档 key → 已创建的助手 sessionId（内存级，换篇后仍保留映射） */
@@ -136,6 +145,11 @@ class AssistantStore {
 		loadError: string | null;
 		abortStream: (() => void) | null;
 		historyHydrated: boolean;
+		pendingEphemeralFlush: {
+			cloudArticleId: string;
+			fromDocumentKey: string;
+			toDocumentKey: string;
+		} | null;
 	} {
 		const key = this.canonicalKey(documentKey);
 		if (!key) {
@@ -148,6 +162,7 @@ class AssistantStore {
 				loadError: null,
 				abortStream: null,
 				historyHydrated: false,
+				pendingEphemeralFlush: null,
 			};
 		}
 		if (!this.stateByDocument[key]) {
@@ -159,9 +174,45 @@ class AssistantStore {
 				loadError: null,
 				abortStream: null,
 				historyHydrated: false,
+				pendingEphemeralFlush: null,
 			};
 		}
 		return this.stateByDocument[key];
+	}
+
+	/**
+	 * 查询某个文档（按 canonicalKey）当前是否仍有流式消息。
+	 * 用于首次保存时判断是否应当“延迟迁入”。
+	 */
+	isStreamingForDocumentKey(documentKey: string): boolean {
+		const key = this.canonicalKey(documentKey);
+		const state = key ? this.stateByDocument[key] : null;
+		return Boolean(state?.messages?.some((m) => m.isStreaming));
+	}
+
+	/**
+	 * 首次保存时若仍在流式：登记一个“待迁入”任务，等流式结束后自动 flush 到新知识条目。
+	 *
+	 * 注意：
+	 * - 这不会中断 SSE。
+	 * - 会将当前 state 标记为 historyHydrated，避免保存后 activate 拉取服务端空历史覆盖 UI。
+	 */
+	scheduleEphemeralFlushAfterStreaming(
+		cloudArticleId: string,
+		fromDocumentKey: string,
+		toDocumentKey: string,
+	): void {
+		const state = this.ensureState(fromDocumentKey);
+		runInAction(() => {
+			state.pendingEphemeralFlush = {
+				cloudArticleId,
+				fromDocumentKey,
+				toDocumentKey,
+			};
+			// 保存后会进入“允许持久化”模式，此时如果立刻 hydrate，服务端还没迁入会返回空，容易覆盖 UI
+			// 标记为已 hydrate，等流式结束后的 flush 完成后再由逻辑显式对齐（可选 fetch）
+			state.historyHydrated = true;
+		});
 	}
 
 	private get activeState() {
@@ -441,8 +492,13 @@ class AssistantStore {
 		toDocumentKey: string,
 	): Promise<void> {
 		if (!readToken()) return;
-		const fromState = this.ensureState(fromDocumentKey);
-		const lines = buildImportTranscriptLinesFromMessages(fromState.messages);
+		// 兼容：保存过程中可能已经 remap 了 state（fromCanonical 被迁走），因此优先复用已有 state
+		const from = this.canonicalKey(fromDocumentKey);
+		const to = this.canonicalKey(toDocumentKey);
+		const sourceState =
+			(this.stateByDocument[from] ?? this.stateByDocument[to]) ||
+			this.ensureState(fromDocumentKey);
+		const lines = buildImportTranscriptLinesFromMessages(sourceState.messages);
 		if (lines.length === 0) return;
 		try {
 			const res = await importAssistantTranscript({
@@ -452,13 +508,12 @@ class AssistantStore {
 			const sid = res.data?.sessionId;
 			if (!sid) return;
 			runInAction(() => {
-				const from = this.canonicalKey(fromDocumentKey);
-				const to = this.canonicalKey(toDocumentKey);
 				delete this.sessionByDocument[from];
 				this.sessionByDocument[to] = sid;
 				const toState = this.ensureState(to);
 				toState.sessionId = sid;
 				toState.historyHydrated = true;
+				toState.pendingEphemeralFlush = null;
 				if (this.activeDocumentKey === fromDocumentKey) {
 					this.activeDocumentKey = toDocumentKey;
 				}
@@ -627,6 +682,22 @@ class AssistantStore {
 							}
 						});
 						state.abortStream = null;
+						// 若首次保存时登记了“延迟迁入”：在流式结束后把完整对话迁入并绑定到新知识条目
+						// 注意：这里只处理“当前 state”上的 pending；它会在 fromKey→toKey remap 时随 state 迁移
+						const pending = state.pendingEphemeralFlush;
+						if (pending && !state.messages.some((m) => m.isStreaming)) {
+							try {
+								await this.flushEphemeralTranscriptIfNeeded(
+									pending.cloudArticleId,
+									pending.fromDocumentKey,
+									pending.toDocumentKey,
+								);
+							} finally {
+								runInAction(() => {
+									state.pendingEphemeralFlush = null;
+								});
+							}
+						}
 						if (!err && !ephemeral) {
 							try {
 								await this.fetchSessionMessagesForDocumentKey(canonical);
@@ -651,6 +722,11 @@ class AssistantStore {
 							}
 						});
 						state.abortStream = null;
+						// 发生错误时不自动迁入，避免把“错误/中断导致的不完整内容”强绑定到新知识条目
+						// 若产品需要“即使错误也迁入”，可把该逻辑移动到 UI 层由用户确认。
+						runInAction(() => {
+							state.pendingEphemeralFlush = null;
+						});
 					},
 				},
 			});

@@ -247,78 +247,210 @@ clearAssistantStateOnKnowledgeDraftReset(syncActiveDocumentKey?: string | null) 
 
 - 在所有“流式收尾”路径中，都用 **新对象替换** `messages[idx]`（或替换整个数组元素），确保 MobX/React 观察到的是一次明确的“引用级更新”，避免短暂的不一致读值。
 
-下面是与当前实现一致的关键代码（注释增强版）：
+下面是与当前实现一致的关键代码（**逐行注释版**）：
 
 ```ts
-// 位置：apps/frontend/src/store/assistant.ts（sendMessage 的 SSE callbacks）
-onComplete: async (err) => {
-  runInAction(() => {
-    state.isSending = false;
-    const idx = state.messages.findIndex((m) => m.chatId === assistantChatId);
-    if (idx < 0) return;
+// 位置：apps/frontend/src/store/assistant.ts（sendMessage 的 SSE callbacks） // 代码所在文件与入口位置
+onComplete: async (err) => { // SSE 正常结束/带 error 结束时的收尾回调
+  runInAction(() => { // MobX：在 action 中批量修改 observable，避免多次渲染与中间态暴露
+    state.isSending = false; // 该文档 state：发送生命周期结束（避免 UI 继续禁用输入/按钮）
+    const idx = state.messages.findIndex((m) => m.chatId === assistantChatId); // 在该文档消息列表中定位本轮 assistant 占位
+    if (idx < 0) return; // 防御：找不到占位则直接退出（避免越界）
 
-    const prev = state.messages[idx] as Message;
+    const prev = state.messages[idx] as Message; // 读取旧消息对象（用于复制其它字段）
 
-    // 关键：不要 prev.isStreaming = false（原地 mutate）
-    // 而是构造 next 并替换元素引用，确保渲染在 key remap / hydrate 期间仍稳定
-    const next: Message = { ...prev, isStreaming: false };
+    // 关键：不要做 prev.isStreaming = false 这种“原地 mutate” // 避免在 remap/hydrate 的竞态里 UI 读到旧引用的旧值
+    // 正确做法：构造 next 并替换数组元素引用，让观察者看到一次明确的“引用级更新” // 让停止态更稳定、避免回闪
+    const next: Message = { ...prev, isStreaming: false }; // 用新对象表示“本条消息已停止流式”
 
-    // 错误场景：补齐内容并标记停止（同样在 next 上改）
-    if (err) {
-      next.content = next.content || `生成失败：${err}`;
-      next.isStopped = true;
-    }
+    if (err) { // 若 SSE 是带错误结束（服务端 error 字段） // 需要把错误体现在气泡上
+      next.content = next.content || `生成失败：${err}`; // 若正文仍为空，用错误信息兜底填充（避免只剩空白）
+      next.isStopped = true; // 标记为停止（用于 UI 展示“继续生成”等交互）
+    } // if(err) 结束
 
-    state.messages[idx] = next;
-  });
+    state.messages[idx] = next; // 用新对象替换旧对象：触发稳定更新，避免保存瞬间 streaming 状态回闪
+  }); // runInAction 结束
 
-  state.abortStream = null;
+  state.abortStream = null; // 清理 abort 引用：该文档不再有进行中的 SSE
+}; // onComplete 结束
 
-  // 省略：持久化路径下回填（注意按 canonicalKey 定位）
-};
+onError: (e) => { // SSE 读取/解析/网络异常的收尾回调
+  runInAction(() => { // 同样在 action 中收尾，避免中间态
+    state.isSending = false; // 结束发送态：允许 UI 恢复交互
+    const idx = state.messages.findIndex((m) => m.chatId === assistantChatId); // 找到本轮 assistant 占位
+    if (idx < 0) return; // 防御：占位丢失则退出
 
-onError: (e) => {
-  runInAction(() => {
-    state.isSending = false;
-    const idx = state.messages.findIndex((m) => m.chatId === assistantChatId);
-    if (idx < 0) return;
+    const prev = state.messages[idx] as Message; // 取旧对象
 
-    const prev = state.messages[idx] as Message;
+    // 关键：同样用“替换对象”完成停止态收尾 // 避免在首次保存 remap/hydrate 时回闪到 streaming=true
+    state.messages[idx] = { // 用新对象替换旧对象
+      ...prev, // 保留 chatId/role/timestamp 等字段
+      isStreaming: false, // 明确停止流式
+      content: prev.content || e.message, // 若正文为空，用错误信息兜底（避免“思考中...”卡死）
+    }; // 替换结束
+  }); // runInAction 结束
+  state.abortStream = null; // 清理 abort：该文档 SSE 已结束/失败
+}; // onError 结束
 
-    // 同样用“替换对象”完成收尾，避免切换/保存时的闪烁
-    state.messages[idx] = {
-      ...prev,
-      isStreaming: false,
-      content: prev.content || e.message,
-    };
-  });
-  state.abortStream = null;
-};
+// 位置：apps/frontend/src/store/assistant.ts（sendMessage 外层 catch） // 捕获 streamAssistantSse 初始化阶段的异常
+catch { // 进入 catch 表示：连 SSE 连接都没建立成功或构造期抛错
+  runInAction(() => { // 用 action 包住收尾修改
+    state.isSending = false; // 恢复发送态：UI 可再次操作
+    const idx = state.messages.findIndex((m) => m.chatId === assistantChatId); // 找占位
+    if (idx < 0) return; // 防御：无占位则退出
+    const prev = state.messages[idx] as Message; // 读取旧对象
+    state.messages[idx] = { ...prev, isStreaming: false }; // 替换为“已停止”对象：避免 UI 悬挂在 streaming=true
+  }); // runInAction 结束
+  state.abortStream = null; // 清理 abort：保证状态一致
+} // catch 结束
 
-// 位置：apps/frontend/src/store/assistant.ts（sendMessage 外层 catch）
-catch {
-  runInAction(() => {
-    state.isSending = false;
-    const idx = state.messages.findIndex((m) => m.chatId === assistantChatId);
-    if (idx < 0) return;
-    const prev = state.messages[idx] as Message;
-    state.messages[idx] = { ...prev, isStreaming: false };
-  });
-  state.abortStream = null;
-}
+// 位置：apps/frontend/src/store/assistant.ts（stopGenerating） // 用户点击“停止生成”的路径
+runInAction(() => { // action：一次性更新所有相关字段
+  this.isSending = false; // 全局 getter（当前文档）：停止后不应处于 sending 状态
 
-// 位置：apps/frontend/src/store/assistant.ts（stopGenerating）
-runInAction(() => {
-  this.isSending = false;
-
-  // 关键：不要 for..of 原地改 m.isStreaming
-  // 用 map 返回新对象，确保停止态不会因其它状态迁移而“回闪”
-  this.messages = this.messages.map((m) => {
-    if (!m.isStreaming) return m;
-    return { ...m, isStreaming: false, isStopped: true };
-  });
-});
+  // 关键：不要 for..of 原地改 m.isStreaming（原地 mutate 容易在保存/切换时造成回闪） // 解释原因
+  // 改为 map：对每条 streaming 消息返回一个新对象，保证 UI 稳定收到“停止态”更新 // 解释策略
+  this.messages = this.messages.map((m) => { // 遍历当前文档的消息列表并生成新数组
+    if (!m.isStreaming) return m; // 非流式消息保持原引用（减少不必要的更新）
+    return { ...m, isStreaming: false, isStopped: true }; // 流式消息：替换为停止态对象
+  }); // map 结束
+}); // runInAction 结束
 ```
+
+#### 2.0.6 首次保存时“正在流式”不应被终止：延迟迁入（flush）直到流式自然结束
+
+##### 2.0.6.1 问题现象（产品视角）
+
+在 **首次保存知识库文档**（草稿 `draft-new` → 正式 `knowledgeArticleId`）的瞬间，如果 assistant 仍在 **streaming（流式输出）**：
+
+- 保存动作会让流式输出被终止（用户看到打字机突然停住）。
+- 同时会把当下“尚未完成”的 assistant 对话内容通过 `import-transcript` 迁入并绑定到新知识条目，导致新条目下的助手历史是不完整的。
+
+##### 2.0.6.2 设计目标（不影响现有功能）
+
+- **不终止流式**：保存知识本体不应影响正在进行的 SSE。
+- **不绑定不完整会话**：只有在流式自然结束后，才允许把完整对话迁入并绑定到新条目。
+- **不改变既有迁入语义**：当没有流式进行中时，仍按原逻辑立刻 `flushEphemeralTranscriptIfNeeded`，不影响现有功能与时序约束。
+
+##### 2.0.6.3 实现思路（具体到状态与时序）
+
+核心做法是在前端引入一个“延迟迁入任务”：
+
+- 当首次保存发生且该文档仍在流式时：
+  - **不调用** `flushEphemeralTranscriptIfNeeded`（避免迁入不完整内容）。
+  - 在“该文档的 state”上登记 `pendingEphemeralFlush = { cloudArticleId, fromKey, toKey }`。
+  - 同时将该 state 标记为 `historyHydrated = true`：
+    - 原因：保存后会进入“允许持久化”模式，若此时触发 `activateForDocument` 去服务端拉历史，服务端尚未迁入会返回空列表，可能覆盖 UI。
+    - 先标记 hydrate，可避免“保存瞬间 UI 被服务端空历史覆盖”的副作用。
+- 当流式自然结束（`onComplete` 收尾）时：
+  - 若 state 上存在 `pendingEphemeralFlush`，则在**停止态**触发一次 `flushEphemeralTranscriptIfNeeded(cloudArticleId, fromKey, toKey)`，把完整对话迁入并绑定到新条目。
+  - 迁入成功后清掉 `pendingEphemeralFlush`。
+- 错误策略（保持安全）：`onError` 时 **不自动迁入**，避免把“错误/中断导致的不完整内容”强绑定到新条目（如需迁入可改成用户确认型交互）。
+
+##### 2.0.6.4 关键实现代码（带详细注释）
+
+下面代码块为**对照当前源码的讲解式摘录**，字段名/调用关系与仓库一致，注释解释关键约束。
+
+**A）Store：登记延迟迁入任务（不终止流式，逐行注释版）**
+
+```ts
+// 文件：apps/frontend/src/store/assistant.ts（节选） // 标注来源文件，便于回到源码核对
+
+pendingEphemeralFlush: // 字段名：挂在“文档 state”上的延迟迁入任务（per-document）
+  | { // 任务对象：描述“迁入到哪篇文章、从哪个 key 迁到哪个 key”
+      cloudArticleId: string; // 新建保存返回的知识 UUID（正式 articleId）
+      fromDocumentKey: string; // 保存前的 documentKey（通常是 draft-new__trash-*）
+      toDocumentKey: string; // 保存后的 documentKey（通常是 {articleId}__trash-*）
+    } // 任务对象结束
+  | null; // 无任务时为 null（默认态）
+
+scheduleEphemeralFlushAfterStreaming( // 方法名：在“仍在流式时保存”场景登记延迟迁入任务
+  cloudArticleId: string, // 参数：新文章 id（用于 import-transcript 绑定 knowledgeArticleId）
+  fromDocumentKey: string, // 参数：保存前 documentKey（用于定位当前对话所在 state）
+  toDocumentKey: string, // 参数：保存后 documentKey（用于迁入后映射/绑定）
+): void { // 返回：同步方法（只登记任务，不发请求、不 await）
+  const state = this.ensureState(fromDocumentKey); // 找到“保存前文档”的 state（按 canonicalKey 分桶）
+  runInAction(() => { // action：保证下面两处状态写入是一个事务
+    state.pendingEphemeralFlush = { // 写入 pending：标记“稍后需要迁入”
+      cloudArticleId, // 记录新文章 id
+      fromDocumentKey, // 记录 fromKey（供之后 flush 用）
+      toDocumentKey, // 记录 toKey（供之后 flush 用）
+    }; // pending 对象写入结束
+    state.historyHydrated = true; // 关键：阻止保存后 activate 立刻去拉“服务端空历史”覆盖 UI
+  }); // runInAction 结束
+} // scheduleEphemeralFlushAfterStreaming 结束
+
+isStreamingForDocumentKey(documentKey: string): boolean { // 方法名：判断某文档当前是否仍在流式
+  const key = this.canonicalKey(documentKey); // 先把可能带 __trash-* 的 key 归一（避免分裂）
+  const state = key ? this.stateByDocument[key] : null; // 读取该 canonicalKey 对应的 state（可能不存在）
+  return Boolean(state?.messages?.some((m) => m.isStreaming)); // 只要该 state 内还有 streaming 消息，就认为仍在流式
+} // isStreamingForDocumentKey 结束
+```
+
+**B）Store：流式结束时自动执行迁入（flush）并绑定新条目（逐行注释版）**
+
+```ts
+// 文件：apps/frontend/src/store/assistant.ts（sendMessage 的 onComplete/onError 节选） // 标注来源
+
+onComplete: async (err) => { // SSE 收到 done 或 error 后触发的完成回调
+  // ... 省略：此处先把本轮 assistant 占位消息收尾为 isStreaming=false（见上一节“替换对象”） ... // 说明省略段落的语义
+
+  const pending = state.pendingEphemeralFlush; // 读取该文档 state 上的 pending 迁入任务（如果有）
+  if (pending && !state.messages.some((m) => m.isStreaming)) { // 只有在“当前 state 已完全停止流式”时才执行迁入（保证完整）
+    try { // try：保证无论 flush 成功或失败，都能清理 pending（避免重复执行）
+      await this.flushEphemeralTranscriptIfNeeded( // 调用迁入：把完整 messages 序列化为 lines 并 import-transcript
+        pending.cloudArticleId, // 新文章 id：作为 import-transcript 的 knowledgeArticleId（绑定到该知识条目）
+        pending.fromDocumentKey, // fromKey：用于定位迁入源 state（内部会做 canonicalKey 兼容）
+        pending.toDocumentKey, // toKey：用于写入 session 映射并让后续按文章打开能拉到历史
+      ); // flush 调用结束
+    } finally { // finally：确保 pending 一定清掉（避免下一次 onComplete 重复迁入）
+      runInAction(() => { // action：在 MobX 事务中清理
+        state.pendingEphemeralFlush = null; // 清空 pending：任务已消费
+      }); // runInAction 结束
+    } // finally 结束
+  } // if 结束
+}; // onComplete 结束
+
+onError: () => { // SSE/网络/解析等错误回调
+  // 错误策略：不自动迁入 // 避免把“错误/中断导致的不完整对话”静默绑定到新文章
+  // 若产品希望“错误也迁入”，建议做成用户确认型操作（避免 silent data quality） // 解释可选策略
+  runInAction(() => { // action：清理 pending 放在事务里
+    state.pendingEphemeralFlush = null; // 清掉 pending：避免后续误触发迁入
+  }); // runInAction 结束
+}; // onError 结束
+```
+
+**C）知识页保存流程：保存时分支决定“立即迁入”还是“延迟迁入”（逐行注释版）**
+
+```ts
+// 文件：apps/frontend/src/views/knowledge/index.tsx（首次保存分支节选，注释增强）
+
+if (!assistantStore.knowledgeAssistantPersistenceAllowed) { // 仅在“草稿阶段不落库(ephemeral)”时需要迁入；已允许持久化则不走 import-transcript
+  // 首次保存时若助手仍在流式：不要中断流式，也不要把不完整对话迁入/绑定到新知识条目 // 说明该分支的产品目标
+  // 改为登记“流式结束后再迁入”，避免保存瞬间产生不完整的 assistant 会话关联 // 说明策略：延迟迁入
+  if (assistantStore.isStreamingForDocumentKey(fromKey)) { // 判断“保存前文档(fromKey)”是否仍有 streaming 消息（必须按文档维度判断）
+    assistantStore.scheduleEphemeralFlushAfterStreaming( // 登记 pending 任务：不发请求、不 stopGenerating（不终止 SSE）
+      res.data.id, // cloudArticleId：新建保存返回的正式知识 UUID（用于最终 import-transcript 绑定）
+      fromKey, // fromKey：保存前 documentKey（通常 draft-new__trash-*，用于定位当前对话 state）
+      toKey, // toKey：保存后 documentKey（通常 {articleId}__trash-*，用于迁入后映射与后续按文章恢复历史）
+    ); // schedule 调用结束
+  } else { // 不在流式：可以立即迁入（保持旧语义，不影响现有功能）
+    await assistantStore.flushEphemeralTranscriptIfNeeded( // 立刻迁入：把当前 messages 序列化为 lines 并 import-transcript
+      res.data.id, // cloudArticleId：绑定到新知识条目
+      fromKey, // fromKey：源对话 key
+      toKey, // toKey：目标 key
+    ); // flush 结束
+  } // if/else 结束
+} // persistenceAllowed 分支结束
+```
+
+##### 2.0.6.5 回归建议（覆盖该问题）
+
+- 首次保存时 assistant 正在流式：
+  - 保存知识不应让流式停住（打字机继续）。
+  - 流式结束后，新知识条目下应能加载到完整对话历史（迁入发生在流式结束后）。
+- 首次保存时 assistant 不在流式：
+  - 行为与旧版本一致：保存后立刻迁入，历史不丢。
 
 ### 2.1 按文档隔离运行态（stateByDocument）
 

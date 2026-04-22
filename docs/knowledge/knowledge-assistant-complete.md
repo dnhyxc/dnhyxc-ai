@@ -7,6 +7,7 @@
 **问题修复记录**：
 
 - `knowledge-assistant-streaming-across-documents.md`：修复「流式输出时切换文档再切回」导致只剩“思考中...”与停止的问题（前端状态机按文档隔离 + 稳定 key + 回调绑定）。
+- `knowledge-assistant-streaming-across-documents.md`：修复「首次保存时若仍在流式：保存不应终止流式，且不应绑定不完整会话」的问题（延迟迁入 pendingEphemeralFlush，流式结束后再 flush）。
 
 ---
 
