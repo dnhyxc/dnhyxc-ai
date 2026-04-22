@@ -185,7 +185,7 @@ const Home = () => {
 											variant="dynamic"
 											onClick={() => {
 												void openExternalUrl(
-													'https://github.com/dnhyxc/dnhyxc-ai/wiki',
+													'https://github.com/dnhyxc/dnhyxc-ai-app/wiki/dnhyxc%E2%80%90ai-%E9%A1%B9%E7%9B%AE%E4%BB%8B%E7%BB%8D',
 												);
 											}}
 											className="h-10 w-30 rounded-md border border-theme/5 bg-theme-white/5 px-6 text-sm font-medium text-textcolor backdrop-blur-sm transition-colors hover:border-theme/10 hover:bg-theme-white/10"
