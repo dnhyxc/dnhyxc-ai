@@ -98,6 +98,23 @@ export class MessageService {
 			throw new NotFoundException('会话不存在');
 		}
 
+		// 分享场景：前端传入的 messageIds 顺序即「ChatBot 当前展示顺序」（包含分支/重生成筛选后的顺序）。
+		// 数据库 IN 查询 + createdAt 排序无法保证与展示顺序一致，因此这里按 messageIds 做稳定重排。
+		if (dto.messageIds?.length && Array.isArray(chatSession.messages)) {
+			const orderIndex = new Map(dto.messageIds.map((id, i) => [id, i]));
+			chatSession.messages.sort((a, b) => {
+				const ai = orderIndex.get(a.chatId);
+				const bi = orderIndex.get(b.chatId);
+				// 正常情况下都能命中；未命中时回退到 createdAt，保证排序稳定
+				if (ai == null && bi == null) {
+					return a.createdAt.getTime() - b.createdAt.getTime();
+				}
+				if (ai == null) return 1;
+				if (bi == null) return -1;
+				return ai - bi;
+			});
+		}
+
 		return chatSession;
 	}
 
