@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils';
 import ImagePreview from '../ImagePreview';
 
 export interface ImageProps extends React.ImgHTMLAttributes<HTMLImageElement> {
-	src: string;
+	src?: string;
 	size?: number;
 	alt?: string;
 	className?: string;
@@ -81,7 +81,10 @@ const Image = forwardRef<ImageHandle, ImageProps>(
 		}
 
 		// If there's an error but we have a fallback, use the fallback
-		const imageSrc = hasError && fallbackSrc ? fallbackSrc : src;
+		const imageSrc = hasError ? fallbackSrc || src : src || fallbackSrc;
+
+		// 没有任何可用地址时，不渲染
+		if (!imageSrc) return null;
 
 		// If there's an error, no fallback, and we should show on error, render the broken image
 		if (hasError && !fallbackSrc && showOnError) {
@@ -130,7 +133,7 @@ const Image = forwardRef<ImageHandle, ImageProps>(
 				<ImagePreview
 					visible={visible}
 					selectedImage={{
-						url: src,
+						url: src || fallbackSrc || '',
 						size,
 						id: '1',
 					}}
