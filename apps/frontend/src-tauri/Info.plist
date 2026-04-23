@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+  <dict>
+    <key>NSAppTransportSecurity</key>
+    <dict>
+      <!--
+        macOS ATS（App Transport Security，应用传输安全）默认禁止 http 明文资源。
+        生产包中若需要加载特定 http 域名资源，在此添加例外域名（仅放行必要域名，避免全局放开）。
+      -->
+      <key>NSExceptionDomains</key>
+      <dict>
+        <key>tdxerr4c5.hd-bkt.clouddn.com</key>
+        <dict>
+          <key>NSExceptionAllowsInsecureHTTPLoads</key>
+          <true/>
+          <key>NSIncludesSubdomains</key>
+          <true/>
+        </dict>
+      </dict>
+    </dict>
+  </dict>
+</plist>
+
