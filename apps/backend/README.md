@@ -1577,6 +1577,25 @@ docker exec dnhyxc_ai_db sh -lc \
 > dnhyxc_ai_db_full.sql
 ```
 
+## 服务器无法访问问题解决
+
+如果服务器放行了相关的端口，如：80，但是还是无法访问服务，需要查看是否服务器开启了防火墙：
+
+```bash
+sudo firewall-cmd --state
+sudo firewall-cmd --list-all
+```
+
+执行上述命令后，如果返回的是 `running`，那么就证明防火墙是在运行的，执行下述命令开启并重启防火墙：
+
+```bash
+sudo firewall-cmd --permanent --add-port=80/tcp
+sudo firewall-cmd --reload
+sudo firewall-cmd --list-ports
+```
+
+> 如果你通过 `sudo ufw status` 命令查看，可能会显示 `inactive` 为开启防火墙。但是使用 `firewall-cmd` 则会显示防火墙已开启。这种情况还是通过上述命令放行你需要的端口。
+
 # 聊天服务 API 使用文档
 
 ## 概述

@@ -191,7 +191,7 @@ const Upload: React.FC<IProps> = ({
 	};
 
 	const onDelete = (file: FileWithPreview) => {
-		if (file.preview) {
+		if (file?.preview) {
 			revokeObjectURL(file.preview);
 		}
 		setFiles((prev) => prev.filter((item) => item.id !== file.id));
