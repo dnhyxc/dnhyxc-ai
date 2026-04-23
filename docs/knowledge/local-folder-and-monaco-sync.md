@@ -24,7 +24,7 @@
 | `apps/frontend/src/store/knowledge.ts`                  | 列表分页 + 编辑器草稿（含 `knowledgeLocalDirPath`、清空草稿）                    |
 | `apps/frontend/src/views/knowledge/index.tsx`           | 保存走云端或仅磁盘、回填 `localDirPath`；覆盖/另存为冲突流程                     |
 | `apps/frontend/src/views/knowledge/KnowledgeList.tsx`   | 开关、选文件夹、本地列表与删除分支；本地模式下「在外部编辑器打开」按钮           |
-| `apps/frontend/src/components/design/Confirm/index.tsx` | 通用确认框；支持第三钮「另存为」（`secondaryActionText` / `onSecondaryAction`）  |
+| `apps/frontend/src/components/design/Confirm/index.tsx` | 通用确认框；支持 secondary/tertiary 两个可选操作按钮（用于「另存为」与「分流删除」） |
 | `apps/frontend/src/components/design/Monaco/index.tsx`  | 外部 `value` 与编辑器同步策略                                                    |
 
 ---
@@ -90,10 +90,208 @@
 2. **非 Tauri**：只打开「删除知识库记录」`deleteRecordOnlyOpen`（浏览器无法删本地默认目录文件）。
 3. **Tauri + 云端列表行**：`invokeResolveKnowledgeMarkdownTarget({ title, filePath: TAURI_KNOWLEDGE_DIR })`；若目标不存在 → 同「仅删库」；若存在 → `deleteLocalPath = target.path`，`localFileDeleteOnly = false`，打开 `deleteLocalOpen`，文案为库+盘双删。
 
-**`onConfirmDeleteLocal`**
+**确认删除（本次已拆分为多个 handler）**
 
-- 若 `localFileDeleteOnly && selectKnowledge?.localAbsolutePath`：只执行磁盘删除分支（见上），**不**调用 `handleDeleteApi`。
-- 否则：先 `handleDeleteApi`（`deleteKnowledge` + `removeFromLocalList`），再 `invokeDeleteKnowledgeMarkdown` 使用 `TAURI_KNOWLEDGE_DIR` 解析默认目录下标题对应文件。
+- 本地文件夹浏览列表（仅删磁盘）：`onConfirmDeleteLocalFolderFile`（见 §2.6.4）。
+- 合并删除主路径（旧行为，先删在线再删本地）：`onConfirmDeleteBoth`（见 §2.6.4）。
+
+---
+
+#### 2.6.1 新增需求：删除确认框提供「删除本地文件」「删除在线文件」
+
+本次增强的目标是在**不影响现有功能**的前提下，为「数据库模式 + 桌面端（Tauri）+ 已定位到同名本地文件」这一合并删除场景提供更细粒度的选择：
+
+- **删除本地文件**：只删磁盘 `.md`，不动云端数据库记录。
+- **删除在线文件**：只删云端数据库记录，保留本地 `.md` 文件。
+- **同时删除**：保持旧行为（先删在线，再删本地），确保历史逻辑与用户习惯不被破坏。
+
+> 术语说明：这里的“在线文件”指云端知识库**数据库记录**（API `deleteKnowledge` 删除），并非对象存储文件；为贴合产品文案沿用“在线文件”称呼。
+
+#### 2.6.2 关键设计点（保证“不影响当前功能”）
+
+1. **仅在合并删除弹窗出现额外按钮**  
+   `localFileDeleteOnly === true`（本地文件夹浏览列表）仍保持**只有一个「删除」按钮**，行为不变：只删磁盘并刷新本地列表。
+2. **保留原主按钮行为**  
+   合并删除弹窗的主按钮从文案上调整为「同时删除」，但其底层逻辑与原先单按钮「删除」一致：**先删库再删本地**。
+3. **复用原有删除能力**  
+   - 删在线复用 `handleDeleteApi`（内部包含登录态校验、Toast、`knowledgeStore.removeFromLocalList`、`onDeletedRecord` 回调）。
+   - 删本地复用 `invokeDeleteKnowledgeMarkdown`（Rust 侧已有严格的 `.md` 删除校验与路径解析）。
+
+#### 2.6.3 代码：`Confirm` 支持 tertiary 按钮（用于分流删除）
+
+`Confirm` 原先只有主确认 + 可选 `secondaryAction`。为了在不改动既有弹窗样式与调用方代码的前提下扩展能力，本次新增了可选 `tertiaryAction`（第三个操作按钮）。
+
+```tsx
+// apps/frontend/src/components/design/Confirm/index.tsx
+//
+// 说明：
+// - confirm = 主确认按钮（通常用于“覆盖保存/删除”等）
+// - secondary = 可选第二操作按钮（历史用途：另存为）
+// - tertiary = 可选第三操作按钮（本次用途：删除在线文件）
+// - 这三个按钮均可“缺省不传”，不影响旧调用点。
+
+interface ConfirmProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  title: string;
+  description: ReactNode;
+
+  confirmText?: string;
+  cancelText?: string;
+  confirmVariant?: 'default' | 'destructive';
+  closeOnConfirm?: boolean;
+  confirmOnEnter?: boolean;
+  onConfirm: () => void;
+
+  // secondary：位于“取消”和“主确认”之间，常用于“另存为/删除本地”等非主路径动作
+  secondaryActionText?: string;
+  onSecondaryAction?: () => void | Promise<void>;
+
+  // tertiary：位于 secondary 与主确认之间（更靠近主操作），可用于另一条重要分支
+  tertiaryActionText?: string;
+  onTertiaryAction?: () => void | Promise<void>;
+  tertiaryVariant?: 'outline' | 'destructive';
+}
+
+// 渲染顺序（从左到右）：
+// 取消 → secondary（可选）→ tertiary（可选）→ 主确认
+```
+
+#### 2.6.4 代码：`KnowledgeList` 的删除分流实现
+
+下面摘录的是“涉及本地文件的确认框”相关核心逻辑，并补充详细中文注释（便于未来维护者快速理解各分支为何存在）。
+
+```tsx
+// apps/frontend/src/views/knowledge/KnowledgeList.tsx
+
+// 统一收口：关闭弹窗 + 清理状态，避免不同按钮分支忘记 reset 造成下次误用旧选中项
+const closeDeleteLocalDialog = useCallback(() => {
+  setDeleteLocalOpen(false);
+  setDeleteLocalPath('');
+  setLocalFileDeleteOnly(false);
+  setSelectKnowledge(null);
+}, []);
+
+// ① 本地文件夹浏览列表：只删磁盘文件（与旧行为一致）
+// 触发条件：localFileDeleteOnly === true 且 selectKnowledge.localAbsolutePath 存在
+const onConfirmDeleteLocalFolderFile = useCallback(async () => {
+  if (!selectKnowledge?.localAbsolutePath) return;
+  try {
+    // 注意：这里传入完整 .md 绝对路径，Rust 会按“单文件路径”规则删除
+    const result = await invokeDeleteKnowledgeMarkdown({
+      title: selectKnowledge.title ?? '',
+      filePath: deleteLocalPath,
+    });
+    if (result.success === 'success') {
+      Toast({ type: 'success', title: '文件已删除' });
+      closeDeleteLocalDialog();
+      // 合成 id 由调用方（index.tsx）决定是否清空编辑器
+      onAfterLocalDelete?.(selectKnowledge.id);
+      // 刷新本地扫描列表，确保 UI 立即消失
+      await loadLocalMarkdownList();
+    } else {
+      Toast({ type: 'error', title: '删除失败', message: result.message });
+    }
+  } catch (e) {
+    Toast({ type: 'error', title: formatTauriInvokeError(e) });
+  }
+}, [closeDeleteLocalDialog, deleteLocalPath, loadLocalMarkdownList, onAfterLocalDelete, selectKnowledge]);
+
+// ② 合并删除弹窗：仅删本地（保留在线记录）
+// 触发方式：Confirm.secondaryActionText = "删除本地文件"
+const onSecondaryDeleteLocalOnly = useCallback(async () => {
+  if (!selectKnowledge) return;
+  try {
+    // 注意：这里传 TAURI_KNOWLEDGE_DIR（默认目录）+ title，
+    // Rust 会解析到“默认目录下同名文件”，与旧的“同时删除”本地部分一致。
+    const result = await invokeDeleteKnowledgeMarkdown({
+      title: selectKnowledge.title ?? '',
+      filePath: TAURI_KNOWLEDGE_DIR,
+    });
+    if (result.success === 'success') {
+      Toast({ type: 'success', title: '本地文件已删除' });
+      closeDeleteLocalDialog();
+      // 只删本地也可能需要清空编辑器（例如当前正在编辑的本地文件被删）
+      onAfterLocalDelete?.(selectKnowledge.id);
+    } else {
+      Toast({ type: 'error', title: '删除失败', message: result.message });
+    }
+  } catch (e) {
+    Toast({ type: 'error', title: formatTauriInvokeError(e) });
+  }
+}, [closeDeleteLocalDialog, onAfterLocalDelete, selectKnowledge]);
+
+// ③ 合并删除弹窗：仅删在线（保留本地文件）
+// 触发方式：Confirm.tertiaryActionText = "删除在线文件"
+const onTertiaryDeleteOnlineOnly = useCallback(async () => {
+  if (!selectKnowledge) return;
+  // handleDeleteApi 内含：登录态校验、调用 deleteKnowledge、从 store 本地列表移除、触发 onDeletedRecord
+  const ok = await handleDeleteApi(selectKnowledge);
+  if (ok) closeDeleteLocalDialog();
+}, [closeDeleteLocalDialog, handleDeleteApi, selectKnowledge]);
+
+// ④ 合并删除弹窗：同时删除（保持旧行为：先删在线、再删本地）
+// 触发方式：Confirm 主确认按钮（confirmText="同时删除"）
+const onConfirmDeleteBoth = useCallback(async () => {
+  if (!selectKnowledge) return;
+  try {
+    const dbOk = await handleDeleteApi(selectKnowledge);
+    if (!dbOk) return;
+    const result = await invokeDeleteKnowledgeMarkdown({
+      title: selectKnowledge.title ?? '',
+      filePath: TAURI_KNOWLEDGE_DIR,
+    });
+    if (result.success === 'success') {
+      Toast({ type: 'success', title: '已同时删除' });
+      closeDeleteLocalDialog();
+      onAfterLocalDelete?.(selectKnowledge.id);
+    } else {
+      // 这里刻意提示“本地文件删除失败”，因为在线记录已删成功，便于用户补救
+      Toast({ type: 'error', title: '本地文件删除失败', message: result.message });
+    }
+  } catch (e) {
+    Toast({ type: 'error', title: formatTauriInvokeError(e) });
+  }
+}, [closeDeleteLocalDialog, handleDeleteApi, onAfterLocalDelete, selectKnowledge]);
+```
+
+#### 2.6.5 UI：确认框按钮配置（仅合并删除场景出现三按钮）
+
+```tsx
+// apps/frontend/src/views/knowledge/KnowledgeList.tsx
+// deleteLocalOpen 弹窗：
+//
+// - localFileDeleteOnly=true（本地文件夹列表）：只有一个“删除”按钮
+// - localFileDeleteOnly=false（合并删除）：出现“删除本地文件”“删除在线文件”“同时删除”
+
+<Confirm
+  open={deleteLocalOpen}
+  onOpenChange={(v) => {
+    setDeleteLocalOpen(v);
+    if (!v) {
+      // 关闭时清状态，避免下次误用上一次的 path/选中项
+      setDeleteLocalPath('');
+      setLocalFileDeleteOnly(false);
+      setSelectKnowledge(null);
+    }
+  }}
+  title="删除文件？"
+  confirmText={localFileDeleteOnly ? '删除' : '同时删除'}
+  confirmVariant="destructive"
+  closeOnConfirm={false}
+  onConfirm={localFileDeleteOnly ? onConfirmDeleteLocalFolderFile : onConfirmDeleteBoth}
+  {...(localFileDeleteOnly
+    ? {}
+    : {
+        // 仅合并删除弹窗展示两个额外按钮
+        secondaryActionText: '删除本地文件',
+        onSecondaryAction: onSecondaryDeleteLocalOnly,
+        tertiaryActionText: '删除在线文件',
+        tertiaryVariant: 'destructive',
+        onTertiaryAction: onTertiaryDeleteOnlineOnly,
+      })}
+/>
+```
 
 **父页 `views/knowledge/index.tsx`**
 
@@ -755,48 +953,32 @@ const openDeleteFlow = useCallback(async (knowledge: KnowledgeListItem) => {
 }, []);
 ```
 
-#### 3.10.5 `onConfirmDeleteLocal`（确认删盘 / 库+盘）
+#### 3.10.5 删除确认：拆分为「仅删本地 / 仅删在线 / 同时删除」（逐行注释）
+
+> 说明：本节为 **2026-04** 的新版本实现；旧的 `onConfirmDeleteLocal` 已拆分为多个 handler。拆分的原因是需要在合并删除弹窗中提供「删除本地文件」与「删除在线文件」两条独立路径，同时保留“旧主行为”。
 
 ```ts
-const onConfirmDeleteLocal = useCallback(async () => {
+// 统一收口：关闭弹窗 + 清理状态，避免跨条目残留
+const closeDeleteLocalDialog = useCallback(() => {
+	setDeleteLocalOpen(false);
+	setDeleteLocalPath("");
+	setLocalFileDeleteOnly(false);
+	setSelectKnowledge(null);
+}, []);
+
+// A. 本地文件夹浏览列表：仅删磁盘文件（不涉及云端）
+const onConfirmDeleteLocalFolderFile = useCallback(async () => {
+	if (!selectKnowledge?.localAbsolutePath) return;
 	try {
-		if (localFileDeleteOnly && selectKnowledge?.localAbsolutePath) {
-			const result = await invokeDeleteKnowledgeMarkdown({
-				title: selectKnowledge.title ?? "",
-				filePath: deleteLocalPath, // 已是绝对 .md 路径
-			});
-			if (result.success === "success") {
-				Toast({
-					type: "success",
-					title: "文件已删除",
-					message: result.filePath,
-				});
-				setDeleteLocalOpen(false);
-				setDeleteLocalPath("");
-				setLocalFileDeleteOnly(false);
-				onAfterLocalDelete?.(selectKnowledge.id); // 合成 id，父页比对后清空编辑器
-				setSelectKnowledge(null);
-				await loadLocalMarkdownList(); // 本地列表与磁盘一致
-			} else {
-				Toast({ type: "error", title: "删除失败", message: result.message });
-			}
-			return; // 绝不调用 handleDeleteApi
-		}
-		if (selectKnowledge) {
-			const dbOk = await handleDeleteApi(selectKnowledge); // 先删库
-			if (!dbOk) return; // 库删失败则不再动磁盘
-		}
 		const result = await invokeDeleteKnowledgeMarkdown({
-			title: selectKnowledge?.title ?? "",
-			filePath: TAURI_KNOWLEDGE_DIR, // 按默认目录 + 标题解析
+			title: selectKnowledge.title ?? "",
+			filePath: deleteLocalPath, // 绝对 .md 路径：按“单文件路径”删除
 		});
 		if (result.success === "success") {
 			Toast({ type: "success", title: "文件已删除", message: result.filePath });
-			setDeleteLocalOpen(false);
-			setDeleteLocalPath("");
-			setLocalFileDeleteOnly(false);
-			onAfterLocalDelete?.(selectKnowledge?.id ?? ""); // 云端 id 或空
-			setSelectKnowledge(null);
+			closeDeleteLocalDialog();
+			onAfterLocalDelete?.(selectKnowledge.id); // 合成 id：父页可据此清空编辑器
+			await loadLocalMarkdownList(); // 确保列表与磁盘一致
 		} else {
 			Toast({ type: "error", title: "删除失败", message: result.message });
 		}
@@ -804,13 +986,62 @@ const onConfirmDeleteLocal = useCallback(async () => {
 		Toast({ type: "error", title: formatTauriInvokeError(e) });
 	}
 }, [
+	closeDeleteLocalDialog,
 	deleteLocalPath,
-	handleDeleteApi,
 	loadLocalMarkdownList,
-	localFileDeleteOnly,
 	onAfterLocalDelete,
 	selectKnowledge,
 ]);
+
+// B. 合并删除弹窗：仅删本地（保留在线记录）
+const onSecondaryDeleteLocalOnly = useCallback(async () => {
+	if (!selectKnowledge) return;
+	try {
+		const result = await invokeDeleteKnowledgeMarkdown({
+			title: selectKnowledge.title ?? "",
+			filePath: TAURI_KNOWLEDGE_DIR, // 默认目录 + 标题解析到本地同名文件
+		});
+		if (result.success === "success") {
+			Toast({ type: "success", title: "本地文件已删除", message: result.filePath });
+			closeDeleteLocalDialog();
+			onAfterLocalDelete?.(selectKnowledge.id);
+		} else {
+			Toast({ type: "error", title: "删除失败", message: result.message });
+		}
+	} catch (e) {
+		Toast({ type: "error", title: formatTauriInvokeError(e) });
+	}
+}, [closeDeleteLocalDialog, onAfterLocalDelete, selectKnowledge]);
+
+// C. 合并删除弹窗：仅删在线（保留本地文件）
+const onTertiaryDeleteOnlineOnly = useCallback(async () => {
+	if (!selectKnowledge) return;
+	const ok = await handleDeleteApi(selectKnowledge); // 内含登录态校验 + 删库 + store 更新 + onDeletedRecord
+	if (ok) closeDeleteLocalDialog();
+}, [closeDeleteLocalDialog, handleDeleteApi, selectKnowledge]);
+
+// D. 合并删除弹窗：同时删除（保留旧行为：先删在线，再删本地）
+const onConfirmDeleteBoth = useCallback(async () => {
+	if (!selectKnowledge) return;
+	try {
+		const dbOk = await handleDeleteApi(selectKnowledge);
+		if (!dbOk) return; // 只要在线删除失败，就不再动本地，避免“只删了一半”且难以解释
+		const result = await invokeDeleteKnowledgeMarkdown({
+			title: selectKnowledge.title ?? "",
+			filePath: TAURI_KNOWLEDGE_DIR,
+		});
+		if (result.success === "success") {
+			Toast({ type: "success", title: "已同时删除", message: result.filePath });
+			closeDeleteLocalDialog();
+			onAfterLocalDelete?.(selectKnowledge.id);
+		} else {
+			// 在线已删成功 → 这里明确提示“本地文件删除失败”，引导用户手动处理磁盘侧
+			Toast({ type: "error", title: "本地文件删除失败", message: result.message });
+		}
+	} catch (e) {
+		Toast({ type: "error", title: formatTauriInvokeError(e) });
+	}
+}, [closeDeleteLocalDialog, handleDeleteApi, onAfterLocalDelete, selectKnowledge]);
 ```
 
 #### 3.10.6 点击删除与弹窗绑定
@@ -836,20 +1067,39 @@ const deleteLocalFileName =
 					onOpenChange={(v) => {
 						setDeleteLocalOpen(v);
 						if (!v) {
-							setDeleteLocalPath(''); // 关闭时清路径
-							setLocalFileDeleteOnly(false); // 避免下次误用「仅删盘」标记
+							// 关闭弹窗时清理状态，防止下一次删除误用旧数据
+							setDeleteLocalPath("");
+							setLocalFileDeleteOnly(false);
+							setSelectKnowledge(null);
 						}
 					}}
 					title="删除文件？"
 					description={
 						<>
 							{localFileDeleteOnly
-								? '将仅从磁盘删除该文件，不涉及云端知识库数据。'
-								: '将同时移除数据库条目与本地同名文件。'}
+								? "将仅从磁盘删除该文件，不涉及云端知识库数据。"
+								: "已关联云端知识库条目与本地 Markdown，可选择仅删本地、仅删在线，或同时删除。"}
 							{/* ... 文件名与 deleteLocalPath 展示 ... */}
 						</>
 					}
-					onConfirm={onConfirmDeleteLocal}
+					// 本地文件夹列表：仍是单按钮“删除”
+					// 合并删除弹窗：主按钮文案为“同时删除”（保持旧行为）
+					confirmText={localFileDeleteOnly ? "删除" : "同时删除"}
+					confirmVariant="destructive"
+					closeOnConfirm={false}
+					onConfirm={
+						localFileDeleteOnly ? onConfirmDeleteLocalFolderFile : onConfirmDeleteBoth
+					}
+					// 仅合并删除弹窗提供额外按钮，避免影响本地文件夹列表的既有体验
+					{...(localFileDeleteOnly
+						? {}
+						: {
+								secondaryActionText: "删除本地文件",
+								onSecondaryAction: onSecondaryDeleteLocalOnly,
+								tertiaryActionText: "删除在线文件",
+								tertiaryVariant: "destructive",
+								onTertiaryAction: onTertiaryDeleteOnlineOnly,
+							})}
 				/>
 ```
 
