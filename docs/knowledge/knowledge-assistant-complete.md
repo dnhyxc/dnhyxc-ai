@@ -49,6 +49,7 @@
 | **documentKey**                          | 传给 `KnowledgeAssistant` 的字符串，格式为 `{assistantArticleBinding}__trash-{trashOpenNonce}`，用于区分「同一逻辑草稿在不同 UI nonce 下」的助手实例。                  |
 | **assistantArticleBinding**              | `index.tsx` 中 `useMemo`：`knowledgeTrashPreviewId` 存在时为 `__knowledge_trash__:{行id}`，否则为 `knowledgeEditingKnowledgeId ?? 'draft-new'`。                        |
 | **bindingId**                            | `knowledgeArticleBindingFromDocumentKey(documentKey)`：去掉 `__trash-*` 后缀后传给后端的「按文章查会话」标识（可为正式 UUID、`draft-new`、或回收站前缀串）。            |
+| **canonicalKey**                         | `assistantStore` 内部对 `documentKey` 规范化后的键：**`__trash-*` 前缀之前** 的条目标识；**`stateByDocument` / `sessionByDocument` 均按 canonicalKey 分桶**，切换 trash nonce 不丢对话。 |
 | **knowledgeAssistantPersistenceAllowed** | `assistantStore` 布尔：为 `false` 表示 **未保存云端草稿**，走 ephemeral，不落库。                                                                                       |
 | **Ephemeral**                            | SSE body `ephemeral: true` + `contextTurns` + `content`；可选 `extraUserContentForModel`（仅拼进发给模型的 user 句，不落库）；不传 `sessionId` / `knowledgeArticleId`。 |
 | **extraUserContentForModel**             | 可选字符串：与 `content` 换行拼接后仅用于 **本轮** 智谱请求；**不**写入 `assistant_messages`，气泡与落库 user 正文仍为短 `content`（见 §13）。                          |
@@ -228,66 +229,149 @@ const assistantArticleBinding = useMemo(() => {
 
 ### 5.3 清空草稿：`resetEditorToNewDraft`
 
-顺序：`clearDocumentNonce++` → `clearKnowledgeDraft()` → **`assistantStore.clearAssistantStateOnKnowledgeDraftReset()`**。
+顺序：`clearDocumentNonce++` → **`knowledgeStore.clearKnowledgeDraft()`** → 计算 **`nextAssistantDocumentKey = knowledgeAssistantDocumentKey(knowledgeAssistantArticleBinding(...), trashOpenNonce)`** → **`assistantStore.clearAssistantStateOnKnowledgeDraftReset(nextAssistantDocumentKey)`**。
 
-**原因**：未保存草稿清空后 `documentKey` 往往仍为 `draft-new__trash-*`，`useEffect([documentKey])` **不会**重跑，`activate` 不会清屏，必须 **显式** 清助手内存态。
+**原因**：未保存草稿清空后 `documentKey` 往往仍为 `draft-new__trash-*`，`KnowledgeAssistant` 内 **`useEffect([documentKey, ...])` 不会**重跑；必须 **显式** 清助手内存态（含 ephemeral）。**传入 `nextAssistantDocumentKey`**：在 **`activeDocumentKey` 已与 props 对齐** 且 **`editorHasBody === false`** 时，组件侧会 **短路 `activateForDocument`**（见 §8.0.1），避免二次清空或误拉 `draft-new` 会话。
 
 ---
 
 ## 6. 前端：assistantStore 状态机
 
-文件：`apps/frontend/src/store/assistant.ts`。
+文件：`apps/frontend/src/store/assistant.ts`。本节与当前类实现 **逐行对齐**：核心是 **按「规范化文档键 canonicalKey」隔离每篇文档的运行态**，**切换文档不中断其它文档的 SSE**；`activeDocumentKey` 仅表示 **当前 UI 指针**（可为带 `__trash-*` 后缀的完整 `documentKey`）。
 
-### 6.1 状态字段（注释语义）
+### 6.1 导出形态：`AssistantStoreApi` 与默认实例
 
-| 字段                                   | 说明                                                                         |
-| -------------------------------------- | ---------------------------------------------------------------------------- |
-| `activeDocumentKey`                    | 当前文档键；切换/迁入时更新。                                                |
-| `sessionId`                            | 当前持久化会话 id；ephemeral 下多为 `null`。                                 |
-| `messages`                             | UI 气泡列表；流式中用新对象替换元素以触发 MobX 细粒度更新。                  |
-| `sessionByDocument`                    | `documentKey → sessionId` 内存缓存；换篇后仍保留其它 key。                   |
-| `abortStream`                          | 取消当前 SSE 的函数（`streamAssistantSse` 返回的 `AbortController.abort`）。 |
-| `knowledgeAssistantPersistenceAllowed` | 由 `KnowledgeAssistant` 同步；默认 `true`，离开页面时复位 `true`。           |
+- **`AssistantStore`**：MobX `makeAutoObservable` 的具体类，含 `private` 成员（`canonicalKey`、`ensureState`、`activeState`、`fetchSessionMessagesForDocumentKey` 等）。
+- **`AssistantStoreApi`**：对外 **仅暴露公开 API 的 interface**，避免 `useStore()` 等处的导出类型把 **private 成员** 带进匿名类类型，触发 **TS4094**。
+- **`const _assistantStore = new AssistantStore()`**，再 **`export const assistantStore: AssistantStoreApi = _assistantStore`** 与 **`export default assistantStore`**：`KnowledgeAssistant` 使用默认导出即可。
 
-### 6.2 模块级纯函数（避免 TS4094）
+### 6.2 双键模型：`activeDocumentKey` vs `canonicalKey(documentKey)`
 
-`buildImportTranscriptLinesFromMessages`、`buildEphemeralContextTurnsFromMessages` 放在 **类外**：若作为 `private` 实例方法，经 `store/index.ts` 导出默认实例类型时会触发 **TS4094**（匿名类导出不可含 private）。
+- **`knowledgeArticleBindingFromDocumentKey(documentKey)`**（模块级）：若 `documentKey` 含子串 **`__trash-`**，则取 **该子串之前** 的前缀并 `trim()`；否则整串 `trim()`。用于 **后端按文章查会话**、**状态桶 key** 等「稳定条目标识」。
+- **`canonicalKey(raw)`**（类 `private`）：对入参 `trim()`；若为空返回 `''`；否则 **`knowledgeArticleBindingFromDocumentKey(raw) || raw`**。  
+  **`stateByDocument` / `sessionByDocument` 一律以 canonicalKey 为键**，这样 `draft-new__trash-A` 与 `draft-new__trash-B` 共享同一运行态，避免切换回收站视图 nonce 时对话丢失或重复 hydrate。
+- **`activeDocumentKey`**：`activateForDocument` 写入的是 **调用方传入的 `nextKey`（trim 后）**，**不**剥 `__trash-*`。因此「当前 props 的 `documentKey`」与 MobX 里 active 指针一致，便于 `ensureSessionForCurrentDocument` 里用 **`knowledgeArticleBindingFromDocumentKey(key)`** 得到绑定 id。
 
-- **迁入行**：每条 user/assistant 原样入列，**最多 200 条**（与后端 `ArrayMaxSize` 对齐）。
-- **Ephemeral 上下文**：跳过末尾 **「assistant 且 isStreaming 且正文空」** 的占位，避免把无效占位发给模型；**最多 120 条**（与 DTO `ArrayMaxSize(120)` 对齐）。
+### 6.3 每文档状态：`stateByDocument` 与 `sessionByDocument`
 
-### 6.3 `activateForDocument(documentKey)` 流程（注释级）
+**`private stateByDocument: Record<canonicalKey, { ... }>`** 每个桶包含：
 
-1. **中止**上一路 SSE，`abortStream = null`。
-2. `runInAction`：写入 `activeDocumentKey`，**清空** `messages` / `sessionId` / `loadError`（每次切换文档从空白开始）。
-3. **`!knowledgeAssistantPersistenceAllowed`**：直接 **return**（不请求后端历史；草稿对话仅存内存）。
-4. 无 token：return。
-5. 若 **`sessionByDocument[documentKey]`** 已有 sid：走 **缓存命中** 分支。
-6. 否则若有 **`bindingId`**：`getAssistantSessionByKnowledgeArticle`；若返回 `data?.session?.sessionId`，则 **hydratedFromArticleApi = true**，一次性写入 `sessionByDocument`、`sessionId`、`messages`，并 **return**（避免二次 `fetchSessionMessages`）。
-7. 若仍无 sid：**return**（空会话，等待用户首条消息创建会话）。
-8. 若有 sid 且非 hydrated：`fetchSessionMessages()`；失败则 **删除**该 key 的缓存并清空 UI（防止脏 sid）。
+| 字段 | 说明 |
+| --- | --- |
+| `sessionId` | 该文档持久化会话 id；ephemeral 阶段多为 `null`。 |
+| `messages` | 该文档下的 `Message[]`；与当前 UI 是否聚焦无关，**切走文档后仍保留**（含流式中）。 |
+| `isHistoryLoading` / `isSending` / `loadError` / `abortStream` | 该文档桶内的请求与流式句柄。 |
+| `historyHydrated` | **已为该文档尝试过**「拉服务端历史 / 判定无会话」；为 `true` 时 **`activateForDocument` 不再重复请求**（避免频繁 effect 打爆接口）。 |
+| `pendingEphemeralFlush` | 首次保存时若仍在流式：**延迟迁入** 任务 `{ cloudArticleId, fromDocumentKey, toDocumentKey }`；挂在 state 上以便 **`remapAssistantSessionDocumentKey` 时随 state 迁移**。 |
 
-### 6.4 `sendMessage` 流程
+**`sessionByDocument: Record<canonicalKey, string>`**：canonicalKey → sessionId 的内存缓存；换篇后其它 key 的映射仍保留。
 
-1. 防抖：`!text || isSending || isHistoryLoading` 则 return。
-2. **`ephemeral = !knowledgeAssistantPersistenceAllowed`**。
-3. 持久化：`ensureSessionForCurrentDocument`；ephemeral：校验 token + `activeDocumentKey`。
-4. **在 push 本轮消息之前** 计算 `contextTurns = buildEphemeralContextTurnsFromMessages(messages)`（仅 ephemeral）。
-5. 中止旧 SSE；`uuid` 生成 `userChatId` / `assistantChatId`；`push` user + 空 assistant（`isStreaming: true`）。
-6. **`applyAssistantPatch`**：累积 `content` / `thinkContent`，每次 **`runInAction` 替换整条 message 对象**（注释：让子 observer 稳定订阅）。
-7. **`streamAssistantSse`**：body 为 `{ ephemeral, content, contextTurns }` 或 `{ sessionId, content }`。
-8. `onComplete`：持久化成功后再 **`fetchSessionMessages`** 与 DB 对齐（ephemeral **跳过**，避免覆盖 UI）。
-9. `onError` / 外层 catch：收尾 `isStreaming`、`isSending`。
+**`private get activeState()`**：`ensureState(this.activeDocumentKey)`——注意参数是 **可能含 trash 后缀的 activeDocumentKey**；`ensureState` 内部会先 **`canonicalKey(documentKey)`** 再取桶。
 
-### 6.5 `stopGenerating`
+**只读 getter**（`sessionId`、`messages`、`isHistoryLoading`、`isSending`、`loadError`、`abortStream`）均代理 **`activeState`**，因此 UI 永远读写 **当前 active 文档桶**。
 
-1. **先** `abortStream()`（防止 await 网关期间仍收 delta）。
-2. `runInAction`：所有流式消息标记 `isStreaming=false`、`isStopped=true`。
-3. 若有 **`sessionId`**：`stopAssistantStream`（失败忽略）。
+**`get isStreaming()`**：`this.messages.some(m => m.isStreaming)`，仅看 **当前 active 文档**。
 
-### 6.6 `fetchSessionMessages` 与已删会话
+### 6.4 全局标志：`knowledgeAssistantPersistenceAllowed`
 
-若 `payload.session == null`：删除 **`sessionByDocument[activeDocumentKey]`**，清空 `sessionId` 与 `messages`（与 §4.5 后端约定对齐）。
+- 默认 **`true`**。
+- **`setKnowledgeAssistantPersistenceAllowed`**：`runInAction` 写入布尔。
+- **`sendMessage`** 内 **`ephemeral = !this.knowledgeAssistantPersistenceAllowed`**：为 `true` 时走持久化（`sessionId` + 落库）；为 `false` 时走 **`streamAssistantSse` 的 `ephemeral: true`** + `contextTurns`，**不传 `sessionId`**。
+
+### 6.5 模块级工具函数（避免 TS4094 + 与后端上限对齐）
+
+与 §6.1 同理，下列函数放在 **类外**（不作为 `private` 方法导出）：
+
+- **`readToken()`**：`localStorage.getItem('token')`（无 `window` 时返回 `''`）。
+- **`mapApiMessagesToUi(rows)`**：过滤 `role` 为 `user`/`assistant`；映射为 `Message`（`id`/`chatId` 用服务端 `id`，`isStreaming: false`）。
+- **`knowledgeArticleBindingFromDocumentKey`**：见 §6.2。
+- **`buildImportTranscriptLinesFromMessages(messages)`**：逐条收集 user/assistant 的 `content`；**`lines.slice(-200)`** 与 `ImportAssistantTranscriptDto` 的 `@ArrayMaxSize(200)` 对齐（**时间顺序保留，取末尾窗口**）。
+- **`buildEphemeralContextTurnsFromMessages(messages)`**：同上角色过滤；**跳过** `assistant && isStreaming && !(content).trim()` 的空占位；结果 **`slice(-120)`** 与 ephemeral `contextTurns` 上限对齐。
+
+### 6.6 `isStreamingForDocumentKey` / `scheduleEphemeralFlushAfterStreaming`
+
+- **`isStreamingForDocumentKey(documentKey)`**：对参数做 `canonicalKey`，若桶存在则 **`messages.some(m => m.isStreaming)`**。供知识保存逻辑判断「是否应延迟迁入」。
+- **`scheduleEphemeralFlushAfterStreaming(cloudArticleId, fromDocumentKey, toDocumentKey)`**：对 **`fromDocumentKey`** 取 `ensureState` 后 `runInAction`：设置 **`pendingEphemeralFlush`**，并 **`historyHydrated = true`**。含义：保存后即将允许持久化，若立刻按文章拉历史会得到 **空会话**，易覆盖 UI；先标 hydrated，等 **流式结束** 后在 `onComplete` 里 **`flushEphemeralTranscriptIfNeeded`**。
+
+### 6.7 `activateForDocument(documentKey)`（当前实现逐步）
+
+**不**在入口处 `abortStream`、**不**清空消息——换文档只 **切换指针并确保桶存在**，其它文档上的 SSE 继续跑。
+
+1. `nextKey = (documentKey ?? '').trim()`；空则 return。
+2. `docKey = this.canonicalKey(nextKey)`。
+3. **`runInAction`**：`this.activeDocumentKey = nextKey`；**`this.ensureState(docKey)`**（无 key 时 `ensureState` 返回临时空对象，不写入 `stateByDocument`）。
+4. `const state = this.ensureState(docKey)`。
+5. 若 **`!this.knowledgeAssistantPersistenceAllowed`**：return（不拉后端；草稿仅内存）。
+6. 若 **`!readToken()`**：return。
+7. 若 **`state.historyHydrated === true`**：return（**已 hydrate 过**，避免重复 `getAssistantSessionByKnowledgeArticle` / `getAssistantSessionDetail`）。
+8. **`sid`** 初值：`this.sessionByDocument[docKey] ?? state.sessionId ?? null`。
+9. 若 **尚无 `sid`** 且 **`bindingId = knowledgeArticleBindingFromDocumentKey(nextKey)`** 非空：
+   - `runInAction`：`state.isHistoryLoading = true`。
+   - **`await getAssistantSessionByKnowledgeArticle(bindingId)`**。
+   - 若 `data?.session?.sessionId`：`sid` 赋值；`runInAction` 写入 `sessionByDocument[docKey]`、`state.sessionId`、`state.messages = mapApiMessagesToUi(data.messages ?? [])`，**`hydratedFromArticleApi = true`**。
+   - `finally`：`state.isHistoryLoading = false`。
+10. 若 **仍无 `sid`**：`runInAction` **`state.historyHydrated = true`**；return（**空会话**，等用户首条 `sendMessage` 时 `createAssistantSession`）。
+11. 若 **`hydratedFromArticleApi`**：`runInAction` **`state.historyHydrated = true`**；return（**不再**调用 `fetchSessionMessages`，避免二次请求）。
+12. 否则（内存里已有 sid，且不是刚由 for-knowledge 一次性灌入）：`runInAction` 设置 `state.sessionId = sid`、`state.isHistoryLoading = true`；**`await this.fetchSessionMessages()`**（内部用当前 `activeDocumentKey` 解析 canonical 再拉详情）。
+13. `try/catch`：失败时 `runInAction` **`delete sessionByDocument[docKey]`**、**`state.sessionId = null`**、**`state.messages = []`**（脏 sid 丢弃）。
+14. `finally`：`state.isHistoryLoading = false`；**`state.historyHydrated = true`**。
+
+### 6.8 `remapAssistantSessionDocumentKey(fromKey, toKey)`
+
+`from`/`to` 为 **`canonicalKey(fromKey)`** / **`canonicalKey(toKey)`**。若缺失或 `from === to`：仅当 **`activeDocumentKey === fromKey`** 时把 **`activeDocumentKey` 改为 `toKey`**（无前缀迁移需求时）。否则 **`runInAction`**：迁移 **`sessionByDocument`** 与 **`stateByDocument`** 中 `from` → `to` 的条目并删除 `from`；若 **`activeDocumentKey === fromKey`** 则 **`activeDocumentKey = toKey`**。
+
+### 6.9 `clearAssistantStateOnKnowledgeDraftReset(syncActiveDocumentKey?)`
+
+用于 **`documentKey` 不变**（如仍为 `draft-new__trash-*`）但左侧已清空草稿的场景：`useEffect([documentKey])` **不会**再触发 `activate`，必须 **显式** 清助手。
+
+1. `rawKey = this.activeDocumentKey`，`key = canonicalKey(rawKey)`，`state = key ? ensureState(key) : null`，`prevSid = state?.sessionId ?? null`。
+2. **`state?.abortStream?.()`**，并 **`state.abortStream = null`**。
+3. **`runInAction`**：若 `key` 存在则 **`delete stateByDocument[key]`**、**`delete sessionByDocument[key]`**；若传入 **`syncActiveDocumentKey?.trim()`** 则 **`activeDocumentKey = next`** 并 **`ensureState(next)`**（避免后续 getter 空引用）。
+4. 若 **`prevSid`**：`void stopAssistantStream(prevSid).catch(() => {})`（尽力通知后端停流）。
+
+### 6.10 `fetchSessionMessages` / `fetchSessionMessagesForDocumentKey`
+
+- **`fetchSessionMessages()`**：取 **`this.activeDocumentKey`**，调用 **`fetchSessionMessagesForDocumentKey(key)`**。
+- **`fetchSessionMessagesForDocumentKey(documentKey)`**（`private`）：
+  - `key = canonicalKey(documentKey)`；`state = ensureState(key)`；无 **`state.sessionId`** 则 return。
+  - **`await getAssistantSessionDetail(state.sessionId)`**。
+  - 若 **`!payload?.session`**（会话已删，后端 200 返回空 session）：**`runInAction`** **`delete sessionByDocument[key]`**、**`delete stateByDocument[key]`**（整桶移除，与 §4.5 对齐）。
+  - 若有 **`payload.messages`**：**`runInAction`** `state.messages = mapApiMessagesToUi(...)`，`state.historyHydrated = true`。
+
+### 6.11 `flushEphemeralTranscriptIfNeeded` / `ensureSessionForCurrentDocument`
+
+- **`flushEphemeralTranscriptIfNeeded(cloudArticleId, fromDocumentKey, toDocumentKey)`**：无 token 则 return。`from`/`to` 为两参数的 canonical；**`sourceState = stateByDocument[from] ?? stateByDocument[to] ?? ensureState(fromDocumentKey)`**（兼容保存流程中已 remap）。**`lines = buildImportTranscriptLinesFromMessages(sourceState.messages)`**，空则 return。`await importAssistantTranscript({ knowledgeArticleId, lines })`；若返回 **`sessionId`**：`runInAction` 更新 **`sessionByDocument[to]`**、**`toState.sessionId`**、**`historyHydrated = true`**、**`pendingEphemeralFlush = null`**，并可能把 **`activeDocumentKey`** 从 `fromDocumentKey` 改为 `toDocumentKey`。
+- **`ensureSessionForCurrentDocument()`**：若不允许持久化 return `null`；无 token Toast「请先登录…」；无 **`activeDocumentKey`** Toast「文档未就绪」；若已有 **`state.sessionId` 或 `sessionByDocument[canonical]`** 则同步到 `state.sessionId` 并返回；否则 **`createAssistantSession`**（`knowledgeArticleBindingFromDocumentKey(key)` 有值则传入 **`knowledgeArticleId`**），成功后写入映射并 **`historyHydrated = true`**。
+
+### 6.12 `sendMessage(raw?, options?)`
+
+1. **`documentKey = activeDocumentKey.trim()`**；空则 Toast「文档未就绪」。
+2. **`canonical = canonicalKey(documentKey)`**，**`state = ensureState(canonical)`**。
+3. **`text = (raw ?? '').trim()`**；若 **`!text || state.isSending || state.isHistoryLoading`** 则 return（防抖）。
+4. **`extraUserContentForModel = options?.extraUserContentForModel?.trim()`**（可选）。
+5. **`ephemeral = !knowledgeAssistantPersistenceAllowed`**。非 ephemeral：**`sid = await ensureSessionForCurrentDocument()`**，失败 return。ephemeral：无 token Toast 后 return。
+6. **`contextTurns = ephemeral ? buildEphemeralContextTurnsFromMessages(state.messages) : undefined`**（在 push **之前** 快照历史）。
+7. **`state.abortStream?.()`** 并清空 **本桶** `abortStream`（只打断 **当前文档** 的上一次 SSE，不影响其它 canonical 桶）。
+8. **`userChatId` / `assistantChatId`**：`uuidv4()`。
+9. **`runInAction`**：`state.isSending = true`；`push` user（`content: text`）；`push` assistant 占位（`content: ''`，**`isStreaming: true`**，**`thinkContent: ''`**）。
+10. **`applyAssistantPatch(delta, thinkDelta?)`**：累加 `accumulated` / `thinkBuf`；**`runInAction`** 内按 **`assistantChatId`** 找到下标，**`state.messages[idx] = { ...prev, content, thinkContent }`**（**替换元素**触发细粒度更新）。
+11. **`await streamAssistantSse`**：
+    - ephemeral：**`{ ephemeral: true, content: text, contextTurns, ...可选 extraUserContentForModel }`**。
+    - 持久化：**`{ sessionId: sid, content: text, ...可选 extraUserContentForModel }`**。
+12. 返回的 **`abort`** 赋给 **`state.abortStream`**（注意：setter 写到 **activeState**，发送时 active 应已是该文档）。
+13. **`onComplete(err)`**（异步回调）：
+    - **`runInAction`**：`state.isSending = false`；找到 assistant 占位，**`isStreaming: false`**；若 `err` 则正文补 **`生成失败：${err}`** 且 **`isStopped: true`**；**整对象替换**。
+    - **`state.abortStream = null`**。
+    - 若存在 **`state.pendingEphemeralFlush`** 且 **当前桶内已无 `isStreaming`**：**`await flushEphemeralTranscriptIfNeeded(...)`**，**`finally`** 里 **`pendingEphemeralFlush = null`**。
+    - 若 **无 err 且非 ephemeral**：**`await fetchSessionMessagesForDocumentKey(canonical)`** 与 DB 对齐（失败忽略，UI 已展示累积正文）。
+14. **`onError`**：`isSending = false`、助手气泡收尾、**`abortStream = null`**、**`pendingEphemeralFlush = null`**（**错误时不自动迁入**，避免不完整对话绑定到新文章）。
+15. 外层 **`catch`**：同样收尾 **`isSending`** 与占位 **`isStreaming: false`**。
+
+### 6.13 `stopGenerating`
+
+1. **`this.abortStream?.()`** 然后 **`this.abortStream = null`**（注释：**先**断 SSE，避免 await **`stopAssistantStream`** 期间仍 apply delta 导致 `...prev` 仍 `isStreaming: true`）。
+2. **`runInAction`**：**`this.isSending = false`**（走 active getter）；**`this.messages = this.messages.map(m => m.isStreaming ? { ...m, isStreaming: false, isStopped: true } : m)`**（**替换数组**保证切换/映射时 UI 一致）。
+3. **`const sid = this.sessionId`**；有则 **`await stopAssistantStream(sid)`**（失败忽略）。
 
 ---
 
@@ -319,52 +403,151 @@ const assistantArticleBinding = useMemo(() => {
 
 ## 8. 前端：`KnowledgeAssistant` UI 层
 
-文件：`apps/frontend/src/views/knowledge/KnowledgeAssistant.tsx`。
+文件：`apps/frontend/src/views/knowledge/KnowledgeAssistant.tsx`。根组件 **`KnowledgeAssistant`** 与 **`KnowledgeAssistantMessageBubble`** 均为 **`observer`**，直接订阅 **`assistantStore`**（默认 import），与 **`useStore()`** 解构的 **`knowledgeStore` / `userStore`** 组合成页面逻辑。
 
-### 8.1 持久化开关同步
+### 8.0 Props、受控输入与派生状态
 
-摘录自 `apps/frontend/src/views/knowledge/KnowledgeAssistant.tsx`（`assistantPersistenceAllowed` 与同步 `useEffect`）：
+**`KnowledgeAssistantProps`**
+
+| Prop | 类型 | 说明 |
+| --- | --- | --- |
+| `documentKey` | `string` | **必填**。与 Markdown 编辑器 **`documentIdentity`** 一致；驱动 **`activateForDocument`** 与 **`useStickToBottomScroll` 的 `resetKey`**。 |
+| `input` | `string` | **可选**。传入则由父组件 **受控** 助手输入框（知识页把状态抬到 `index.tsx`，便于编辑器右键等外部入口写草稿）。 |
+| `setInput` | `(value: string) => void` | **可选**。与 `input` 成对使用；不传则组件内 **`useState('')`** 非受控。 |
+
+**派生**
+
+- **`isLoggedIn`**：`Boolean(userStore.userInfo?.id)`。
+- **`editorHasBody`**：`Boolean((knowledgeStore.markdown ?? '').trim())`——既影响 **占位与快捷卡片** 是否出现，也驱动 **`ChatEntry.disableTextInput`** 与 **发送前校验**（快捷卡片会 Toast「请先在左侧编辑器输入正文」）。
+- **`messages`**：`assistantStore.messages`（MobX，observer 自动追踪）。
+- **`streamScrollTick`**（与贴底 hook、代码块 toolbar、角标刷新共用）：  
+  - 有最后一条消息时：`` `${messages.length}:${lastMsg.chatId}:${lastMsg.content.length}:${lastMsg.thinkContent?.length ?? 0}:${lastMsg.isStreaming ? 1 : 0}` ``  
+  - 否则：`String(messages.length)`。  
+  语义：**消息列表版本戳**，流式阶段随 `content` / `thinkContent` / `isStreaming` 变化，驱动 **`useStickToBottomScroll` 的 `contentRevision`** 与布局类 effect。
+
+### 8.0.1 `activateForDocument` 的 `useEffect`（与 `editorHasBody` 的短路）
 
 ```tsx
-const assistantPersistenceAllowed = useMemo(() => {
-	if (knowledgeStore.knowledgeTrashPreviewId != null) return true;
-	const editingId = knowledgeStore.knowledgeEditingKnowledgeId;
-	if (isKnowledgeLocalMarkdownId(editingId)) return true;
-	if (editingId) return true;
-	return false;
-}, [
-	knowledgeStore.knowledgeTrashPreviewId,
-	knowledgeStore.knowledgeEditingKnowledgeId,
-]);
-
 useEffect(() => {
-	assistantStore.setKnowledgeAssistantPersistenceAllowed(
-		assistantPersistenceAllowed,
-	);
-	return () => {
-		assistantStore.setKnowledgeAssistantPersistenceAllowed(true);
-	};
-}, [assistantPersistenceAllowed]);
+	if (!documentKey) return;
+	if (assistantStore.activeDocumentKey === documentKey && !editorHasBody) {
+		return;
+	}
+	void assistantStore.activateForDocument(documentKey);
+}, [documentKey, editorHasBody, assistantStore.activeDocumentKey]);
 ```
 
-- **卸载复位为 `true`**：避免离开知识页后其它功能误用「禁止持久化」。
-- **登录态**：`userStore.userInfo?.id` 控制占位文案与是否渲染输入区。
-- **编辑器须有正文**：`editorHasBody` 才允许输入（`ChatEntry.disableTextInput`）；左侧清空 markdown 时 **同步清空**助手输入框 `useEffect`。
+- **首段**：`documentKey` 为空不激活。
+- **第二段（关键）**：当 **当前 store 的 `activeDocumentKey` 已与 props 一致** 且 **`editorHasBody === false`** 时 **不再调用 `activate`**。  
+  **原因**：清空草稿后 **`clearAssistantStateOnKnowledgeDraftReset(nextKey)`** 会把 `activeDocumentKey` 同步到下一 key；此时左侧无正文，若再 `activate` 会 **二次清空** 并可能错误去拉 **`draft-new`** 会话。未保存草稿的 key（`draft-new__trash-*`）在 **有正文** 时仍会走 `activate`，保证 **`activeDocumentKey` 写入**（否则 ephemeral 发送会 Toast「文档未就绪」——见组件文件头注释）。
+
+### 8.1 持久化开关同步、复制态清理、左侧清空输入防抖
+
+**`assistantPersistenceAllowed`（`useMemo`）** 与源码一致：
+
+- **`knowledgeTrashPreviewId != null`** → **`true`**（回收站预览允许持久化）。
+- 否则若 **`isKnowledgeLocalMarkdownId(editingId)`** → **`true`**（本地 Markdown 条目，与云端 UUID 区分）。
+- 否则若 **`knowledgeEditingKnowledgeId` 真值** → **`true`**（已绑定可落库 id）。
+- 否则 **`false`**（典型：**新建未保存云端草稿**，仅 `draft-new`）。
+
+**`useEffect` 同步到 store**：挂载时 **`assistantStore.setKnowledgeAssistantPersistenceAllowed(assistantPersistenceAllowed)`**；**卸载 cleanup** 调 **`setKnowledgeAssistantPersistenceAllowed(true)`**，避免离开知识页后全局误保持「禁止持久化」。
+
+**复制反馈**：`isCopyedId` state + **`copyTimerRef`**；**`onCopy`** 写剪贴板、`setIsCopyedId(chatId)`、**500ms** 后清空；组件 **卸载 `useEffect`** 里 **`clearTimeout(copyTimerRef)`**。
+
+**左侧 `markdown` 变空时清空助手输入**（避免禁用输入后仍残留草稿）：
+
+- 若 **`(knowledgeStore.markdown ?? '').trim()`** 非空：直接 return。
+- 否则 **`setTimeout(200ms)`** 后再检测一次仍为空才 **`setInput('')`**。  
+  **原因**（源码注释）：开启助手会导致 Monaco 视图切换与 **重挂载**，父级 `markdown` 可能出现 **极短暂空串**；若立即清空会造成「刚粘贴进输入框就被清掉」。
 
 ### 8.2 单条气泡 `KnowledgeAssistantMessageBubble`
 
-- **`observer`** 包裹单条，从 `assistantStore.messages` 按 `chatId` 查找。
-- **`data-msg-rev`**：合成「内容长度 + 思考长度 + 是否流式」字符串，**显式绑定** MobX 订阅字段，避免流式阶段子树不刷新（注释已说明非 hack）。
-- **`ChatMessageActions`**：`needShare={false}`；**「保存到知识」** 将助手正文 **append** 到 `knowledgeStore.markdown`。
+- **`observer`** 子组件；**`message = assistantStore.messages.find(m => m.chatId === chatId)`**，找不到 return `null`。
+- **`streamRev` / `data-msg-rev`**：  
+  - **assistant**：`` `${content.length}:${thinkContent?.length ?? 0}:${isStreaming ? 1 : 0}` ``  
+  - **user**：`` `${content.length}` ``  
+  绑定到 DOM **`data-msg-rev`**，使 MobX 在流式阶段 **稳定订阅** 正文长度、思考区长度与流式标记（注释：**消息内容版本戳**，语义化依赖，非 hack 预读）。
+- **布局**：根 `div` 使用 **`min-w-0 max-w-full flex-1`** 等，避免 flex 子项被代码块/长行 **撑破 ScrollArea**；用户气泡 **`items-end`**，气泡容器用户侧 **`w-fit self-end`** + 青色浅底边框，助手侧 **`flex-1`** + theme 浅底。
+- **`ChatAssistantMessage`**：用户消息传入额外 **`className`** 约束 markdown-body 的 **`min-w-0` / `max-w-full` / `overflow-x-auto`**；助手消息传入 **`scrollViewportRef`**，供 **代码块吸顶条** 与 **MdPreview 懒挂载**。
+- **`ChatMessageActions`**：绝对定位在气泡 **`message-md-wrap`** 下方（`-bottom-9`）；用户 **`right-0`**，助手 **`left-0`**；**`needShare={false}`**；**`onSaveToKnowledge`** 由父级传入（见下）。
 
-### 8.3 滚动与代码块工具栏
+**`onSaveToKnowledge`（父组件 `useCallback`）**：取 **`message.content`** trim，空则 Toast「没有可写入的正文」；否则 **`cur = knowledgeStore.markdown.trimEnd()`**，若 **`cur`** 非空则 **`next = cur + 两个换行 + body + 单个换行`**，否则 **`next = body + 单个换行`**，再 **`knowledgeStore.setMarkdown(next)`**，Toast「已追加到当前知识文档」。
 
-- **`useStickToBottomScroll`**（`apps/frontend/src/hooks/useStickToBottomScroll.ts`）：`isStreaming` + `streamScrollTick` + `resetKey: documentKey`；除 `enableStickToBottom` 外，暴露 **`flushScrollToBottom`**（单次 `scrollTop = scrollHeight`，不改变内部「是否跟底」状态），供 §8.5 在条带插入 DOM 后强制贴底。
-- **`useChatCodeFloatingToolbar`**：`layoutDeps` 含 `streamScrollTick`，避免仅依赖 `markdown` 导致助手区代码块工具条不重排。
+### 8.3 滚动、贴底、代码块浮动工具栏
 
-### 8.4 首页快捷卡片（润色 / 总结）
+**`useStickToBottomScroll`**（`apps/frontend/src/hooks/useStickToBottomScroll.ts`）入参：
 
-当 `messages.length === 0` 且左侧编辑器已有正文时，展示 `KNOWLEDGE_ASSISTANT_PROMPTS` 卡片；点击后走 **`sendKnowledgePromptCard`**，经 `buildKnowledgeAssistantDocumentMessage` 拆成 **短 `userMessageShort` + `extraUserContentForModel`**，调用 `assistantStore.sendMessage`。**完整契约、后端拼接顺序与回归注意** 见 **§13**。
+- **`isStreaming: assistantStore.isStreaming`**
+- **`contentRevision: streamScrollTick`**
+- **`resetKey: documentKey || undefined`**（换文档重置 hook 内部滚动状态）
+
+解构：**`viewportRef` → `scrollViewportRef`**、**`scrollViewportHandlers`**、**`enableStickToBottom` → `enableStreamStickToBottom`**、**`disableStickToBottom` → `disableStreamStickToBottom`**、**`flushScrollToBottom`**。
+
+- **`sendMessage` / `sendKnowledgePromptCard`** 在发消息前调用 **`enableStreamStickToBottom()`**，保证发完后流式跟底。
+- **角标「置顶」**前须 **`disableStreamStickToBottom()`**（见 §8.6），否则下一 token 会 **`useLayoutEffect`** 把视口拉回底部。
+
+**`useChatCodeFloatingToolbar`**（`scrollViewportRef as RefObject<HTMLElement | null>`）：
+
+- **`layoutDeps: [streamScrollTick, documentKey, messages.length]`**——助手正文/流式增量会变高，**勿仅用 `knowledgeStore.markdown`**，否则代码块工具条不重排。
+- **`passiveScrollLayout: true`**，**`passiveScrollDeps: [documentKey, messages.length, streamScrollTick, assistantStore.isStreaming]`**——滚动时由父级统一 **`relayout`**（见下）。
+
+**`scrollAreaHandlers`（`useMemo`）**：从 **`scrollViewportHandlers`** 拆出 **`onScroll`**，包装为：
+
+1. **`onViewportScroll(e)`**（贴底状态机）
+2. **`relayoutCodeToolbar()`**
+3. **`refreshScrollCornerFab()`**
+
+展开到 **`<ScrollArea {...scrollAreaHandlers} />`**，并设置 **`viewportClassName="pb-1 [overflow-anchor:none]"`**（关闭 overflow-anchor，减少浏览器自动滚动锚点干扰）、**`className="min-h-0 flex-1"`**、**`ref={scrollViewportRef}`**。
+
+**页面结构**：根 **`relative flex h-full w-full flex-col overflow-hidden`**；顶部 **`ChatCodeFloatingToolbar`**（与 hook 配套）；中间历史区或空态；底部 **`ChatEntry`** 包在 **`isLoggedIn`** 条件内（未登录整块输入区不渲染——与知识页 **`bottomBarAssistantNode`** gate 叠加时，以入口层为准）。
+
+### 8.4 空会话 UI、首屏快捷卡片与 `sendMessage` / `sendKnowledgePromptCard`
+
+**分支一：`assistantStore.isHistoryLoading`**
+
+- 中间区 **`flex-1` 居中**，渲染 **`<Loading text="正在加载对话…" />`**（`@design/Loading`），不展示消息列表与空态文案。
+
+**分支二：`!messages.length`（且无历史加载）**
+
+- **外层**：`text-textcolor/70`、`pt-4 pl-4 pr-4.5`、`items-start justify-center`。
+- **若 `knowledgeStore.markdown` 为真**（注意：此处用 **truthy**，与 `editorHasBody` 的 trim 略有不同——空字符串才走欢迎语）：
+  - 展示 **两列并排** **`KNOWLEDGE_ASSISTANT_PROMPTS.map`**：每项为 **`type="button"`**，**`flex-1`**，**`item.icon`**（`Sparkle` / `Sparkles`）+ 标题 + 描述。
+  - 当 **`isSending || isHistoryLoading || isStreaming`**：整卡 **`pointer-events-none opacity-50`**，禁止连点。
+  - **`onClick={() => void sendKnowledgePromptCard(item.kind)}`**。
+- **否则**（左侧无 markdown 字符串）：展示带 **`Sparkles`** 图标的欢迎说明文案（「Hi，我是您的专属知识库助手！…」），背景 **`bg-theme/5`**、边框 **`border-theme/10`**。
+
+**`sendMessage(content?: string)`（`useCallback`）**
+
+1. **`text = (content ?? input).trim()`**，空则 return。
+2. **`!isLoggedIn`**：Toast「请先登录后再使用助手」；return。
+3. **`setInput('')`**（发送前清空输入框）。
+4. **`enableStreamStickToBottom()`**。
+5. **`await assistantStore.sendMessage(text)`**（无第二参数——普通键盘发送不带 `extraUserContentForModel`）。
+
+依赖数组：`[input, isLoggedIn, enableStreamStickToBottom]`（**未**列入 `setInput`：父级受控时由父级 setter 稳定引用）。
+
+**`sendKnowledgePromptCard(kind)`（`useCallback`）**
+
+1. **`!isLoggedIn`**：同上 Toast。
+2. **`md = (knowledgeStore.markdown ?? '').trim()`**，空则 Toast「请先在左侧编辑器输入正文」。
+3. 若 **`isSending || isHistoryLoading || isStreaming`**：Toast「请等待当前回复结束后再试」。
+4. **`buildKnowledgeAssistantDocumentMessage(kind, knowledgeStore.markdown ?? '')`** 得到 **`userMessageShort`** 与 **`extraUserContentForModel`**（定义见 **`apps/frontend/src/views/knowledge/utils.ts`**，常量 **`KnowledgeAssistantPromptKind`** 见 **`constants.ts`**）。
+5. **`enableStreamStickToBottom()`**。
+6. **`await assistantStore.sendMessage(userMessageShort, { extraUserContentForModel })`**。
+
+依赖：`[isLoggedIn, knowledgeStore.markdown, enableStreamStickToBottom]`。
+
+**`stopGenerating`**：`void assistantStore.stopGenerating()`，作为 **`ChatEntry`** 的 **`stopGenerating`** 传入条件：**仅当 `assistantStore.isStreaming`** 时传入该回调，否则 **`undefined`**（不显示停止按钮）。
+
+**`ChatEntry`（已登录时）**
+
+- **`input` / `setInput`**：受控或非受控由 props 决定（见 §8.0）。
+- **`className="w-full pl-0.5 pr-0.5 pb-4.5 border-theme/10"`**，**`textareaClassName="min-h-9"`**。
+- **`placeholder`**：`editorHasBody` 为真时「请输入您的问题」，否则「请先在左侧编辑器输入正文后再向我提问」。
+- **`disableTextInput={!editorHasBody}`**。
+- **`loading={isSending || isHistoryLoading}`**（流式中 **`isSending`** 在 store 里与首轮请求绑定，停止后会清）。
+
+快捷卡片与 **`extraUserContentForModel`** 的后端契约见 **§13**。
 
 ### 8.5 流式结束后的快捷条（跟在消息流末尾 + 贴底滚动）
 
@@ -400,12 +583,13 @@ useEffect(() => {
 #### 8.5.4 代码摘录（含源码注释）
 
 ```tsx
-// 文件：apps/frontend/src/views/knowledge/KnowledgeAssistant.tsx（节选 + 与源码一致的注释）
+// 文件：apps/frontend/src/views/knowledge/KnowledgeAssistant.tsx（节选；与源码一致）
 
 const {
 	viewportRef: scrollViewportRef,
 	scrollViewportHandlers,
 	enableStickToBottom: enableStreamStickToBottom,
+	disableStickToBottom: disableStreamStickToBottom,
 	flushScrollToBottom,
 } = useStickToBottomScroll({
 	isStreaming: assistantStore.isStreaming,
@@ -444,7 +628,7 @@ useLayoutEffect(() => {
 				<Button
 					key={item.kind}
 					variant="dynamic"
-					className="w-fit rounded-md border border-theme/10 bg-theme/5 p-2 text-left text-sm text-textcolor/70 transition-colors hover:border-theme/20 hover:text-textcolor"
+					className="w-fit rounded-md border border-theme/10 bg-theme/5 p-2 text-left text-sm text-textcolor/80 transition-colors hover:border-theme/20 hover:text-textcolor"
 					onClick={() => void sendKnowledgePromptCard(item.kind)}
 				>
 					{item.title}
@@ -525,187 +709,24 @@ const refreshPreviewScrollFab = useCallback(() => {
 2. **计算 mode 的 refresh 函数**：取 `ScrollArea` 的 viewport（`scrollViewportRef.current`），用 `maxScroll <= 4` 与 `threshold = 8` 计算 `nextMode`。
 3. **降低滚动抖动**：`onScroll` 高频触发时，如果每次都 `setState` 会导致重新渲染影响滚动手感；因此用 `scrollCornerFabModeRef` 记住上一次 mode，仅当 mode 变化时才 `setScrollCornerFabMode(nextMode)`。
 4. **刷新时机**：
-   - **滚动时**：在 `scrollViewportHandlers.onScroll` 之后追加 `refreshScrollCornerFab()`（保持与 hook 的滚动观测同一事件源）。
-   - **内容/尺寸变化时**：`streamScrollTick / documentKey / messages.length` 变化会改变高度；通过 `setTimeout(0) + requestAnimationFrame` 与 `ResizeObserver` 触发 refresh（与 `preview.tsx` 的“正文变化/视口变化刷新”策略一致）。
+   - **滚动时**：在 **`scrollViewportHandlers.onScroll`** 之后依次 **`relayoutCodeToolbar()`**（`useChatCodeFloatingToolbar` 返回）与 **`refreshScrollCornerFab()`**（与 hook 同一滚动事件源，见 §8.3）。
+   - **内容/尺寸变化时**：`streamScrollTick / documentKey / messages.length` 变化会改变高度；通过 **`setTimeout(0) + requestAnimationFrame`** 与 **`ResizeObserver.observe(viewport)`** 触发 refresh（与 `preview.tsx` 的“正文变化/视口变化刷新”策略一致）。
 5. **点击行为**：
    - `toBottom`：先 `enableStickToBottom()` 再 smooth 滚到底部，确保“回到底部后能恢复流式贴底”。
    - `toTop`：先 `disableStickToBottom()` 再 smooth 滚到顶部，确保“流式进行中也能置顶并停住”。
-6. **按钮位置**：渲染在输入框容器上方，使用 `absolute bottom-full mb-2 right-0`，使其位于右下角、输入框上方且与输入框右边对齐。
+6. **按钮位置与图标（与当前源码一致）**：角标渲染在 **已登录** 时包裹 **`ChatEntry`** 的外层 **`div.relative.w-full.flex...pr-4.pl-3.5`** 内；条件为 **`messages.length > 0 && scrollCornerFabMode !== 'hidden'`**。按钮 **`type="button"`**，**`absolute bottom-full mb-5 right-4.5 z-10`**，**`h-8.5 w-8.5`**，**`cursor-pointer`**，**`text-textcolor/70`**，圆角描边与 **`backdrop-blur-[2px]`** 与源码一致。**`toBottom`** 分支使用 **`ChevronDown`**，**`toTop`** 使用 **`ChevronUp`**（来自 **`lucide-react`**，非 `ArrowDown`/`ArrowUp`）。**`aria-label`**：`toBottom` →「滚动到底部」，否则「滚动到顶部」。
 
-#### 8.6.5 关键实现代码（带详细中文注释）
+#### 8.6.5 与源码对齐的实现清单（避免文档内大段重复漂移）
 
-下面代码块为 `KnowledgeAssistant.tsx` 相关片段的“带注释重排版”，字段名/行为与仓库实现保持一致（注释为解释性中文，便于维护时对照）。
+下列行为以 **`KnowledgeAssistant.tsx`** 为准，维护时 **直接读源文件** 单文件即可：
 
-```tsx
-// 文件：apps/frontend/src/views/knowledge/KnowledgeAssistant.tsx // 代码来源（方便回到真实文件对照）
-// -------------------------------------------------------------------------------- // 分隔线：提高可读性
-// 角标按钮三态：与 Monaco 预览保持一致（hidden=不显示，toBottom=置底，toTop=置顶） // 类型语义说明
-type KnowledgeAssistantScrollCornerFabMode = "hidden" | "toBottom" | "toTop"; // 与 preview.tsx 的 mode 命名保持一致
-// -------------------------------------------------------------------------------- // 分隔线
-// 从 useStickToBottomScroll 拿到：viewport ref、滚动事件处理、贴底控制、以及强制滚到底的方法 // hook 输出概览
-const {
-	// 开始解构 hook 返回值
-	viewportRef: scrollViewportRef, // ScrollArea 的 viewport（可滚动容器）ref：角标判定与滚动跳转都依赖它
-	scrollViewportHandlers, // hook 提供的滚动/滚轮/指针事件处理器：负责“流式贴底状态机”
-	enableStickToBottom: enableStreamStickToBottom, // 允许自动贴底：回到底部后继续跟随流式输出
-	disableStickToBottom: disableStreamStickToBottom, // 禁止自动贴底：用于“置顶”时打断流式拉回
-	flushScrollToBottom, // 单次强制滚到底：不改变贴底状态（这里保留用于其它逻辑，如条带插入后贴底）
-} = useStickToBottomScroll({
-	// 调用贴底 hook 并传入配置
-	isStreaming: assistantStore.isStreaming, // streaming（流式输出）时：contentRevision 变化会触发 hook 的强制贴底逻辑
-	contentRevision: streamScrollTick, // 内容版本戳：内容增长/流式状态变化时更新，用于驱动 hook 以及角标刷新
-	resetKey: documentKey || undefined, // 换文档时重置 hook 内部滚动观测状态，避免沿用上一文档滚动位置
-}); // useStickToBottomScroll 调用结束
-// -------------------------------------------------------------------------------- // 分隔线
-// UI 层的角标按钮模式 state：用于决定是否渲染按钮、渲染哪个图标、aria-label 文案等 // state 作用说明
-const [scrollCornerFabMode, setScrollCornerFabMode] = // 声明 state：当前角标模式
-	useState<KnowledgeAssistantScrollCornerFabMode>("hidden"); // 初始为 hidden：避免首屏瞬间闪按钮
-// -------------------------------------------------------------------------------- // 分隔线
-// 高频 scroll 事件里如果每次都 setState，会触发大量渲染，导致滚动“发黏/不丝滑” // 性能问题说明
-// 因此用 ref 记录上一次 mode：只有 mode 真变了才 setState（减少渲染） // 解决策略说明
-const scrollCornerFabModeRef = // 声明 ref：缓存上一帧 mode
-	useRef<KnowledgeAssistantScrollCornerFabMode>("hidden"); // 初始与 state 对齐：避免第一次 refresh 误判为“变化”
-// -------------------------------------------------------------------------------- // 分隔线
-// refresh：根据 viewport 的 scrollTop / scrollHeight / clientHeight 计算按钮模式（与 Monaco 预览一致） // refresh 函数目的
-const refreshScrollCornerFab = useCallback(() => {
-	// 用 useCallback 保证引用稳定（依赖最小化）
-	const vp = scrollViewportRef.current; // 读取 viewport DOM：ScrollArea 真正滚动的是 viewport
-	if (!vp) return; // viewport 未就绪：直接返回（避免空引用）
-	const { scrollTop, scrollHeight, clientHeight } = vp; // 取滚动位置与高度：用于计算“是否可滚/是否触底”
-	// -------------------------------------------------------------------------------- // 分隔线（局部）
-	const maxScroll = scrollHeight - clientHeight; // 最大可滚动距离：scrollTop 的理论上限
-	let nextMode: KnowledgeAssistantScrollCornerFabMode = "hidden"; // 预置下一状态：默认隐藏
-	// -------------------------------------------------------------------------------- // 分隔线（局部）
-	if (maxScroll <= 4) {
-		// 与 preview.tsx 一致：可滚动距离太小（≤4px）视为不可滚动
-		nextMode = "hidden"; // 不可滚动：隐藏按钮
-	} else {
-		// 可滚动：根据是否接近底部决定显示“置顶”或“置底”
-		const threshold = 8; // 与 preview.tsx 一致：触底阈值 8px（接近底部即认为在底部）
-		nextMode = scrollTop >= maxScroll - threshold ? "toTop" : "toBottom"; // 在底部带：显示置顶；否则显示置底
-	} // if/else 结束
-	// -------------------------------------------------------------------------------- // 分隔线（局部）
-	// 只有 mode 发生变化才 setState：避免 scroll 高频触发导致 UI 频繁 re-render 影响滚动手感 // 性能关键点
-	if (scrollCornerFabModeRef.current !== nextMode) {
-		// 判断是否真的发生了模式切换
-		scrollCornerFabModeRef.current = nextMode; // 更新 ref：缓存最新模式，供下一次对比
-		setScrollCornerFabMode(nextMode); // 更新 state：触发 UI 更新（图标/可见性/aria 文案）
-	} // 条件块结束
-}, [scrollViewportRef]); // 依赖 viewport ref：ref 对象本身稳定，但按规范仍写入依赖
-// -------------------------------------------------------------------------------- // 分隔线
-// 将 hook 的 onScroll 包装一层：保留其贴底状态机逻辑，再追加 refresh 角标模式 // 包装原因说明
-const scrollAreaHandlers = useMemo(() => {
-	// 用 useMemo 避免每次渲染都生成新 handlers
-	const { onScroll: onViewportScroll, ...rest } = scrollViewportHandlers; // 拆出 onScroll，其余 handler 原样透传
-	return {
-		// 返回给 ScrollArea 展开使用的 handlers
-		...rest, // 透传 onWheelCapture / onPointerDownCapture：保证“流式时可中断贴底”的既有行为不变
-		onScroll: (e: UIEvent<HTMLDivElement>) => {
-			// 重新实现 onScroll：在同一事件里串行执行
-			onViewportScroll(e); // 先让 hook 处理滚动：更新 stickToBottomRef（是否跟底）等内部状态机
-			// ...（此处省略：如代码块工具栏重排等其它滚动联动逻辑） // 与业务无关的其它逻辑提示
-			refreshScrollCornerFab(); // 最后刷新角标按钮模式：根据当前 scrollTop 判断 toTop/toBottom/hidden
-		}, // onScroll 结束
-	}; // 返回对象结束
-}, [scrollViewportHandlers, refreshScrollCornerFab]); // 依赖：handlers 与 refresh 引用变化时重算
-// -------------------------------------------------------------------------------- // 分隔线
-// 内容/尺寸变化时也要 refresh：流式输出、消息数量变化、切换文档会改变 scrollHeight，从而影响按钮模式 // effect 目的
-useEffect(() => {
-	// 监听相关依赖变化
-	let ro: ResizeObserver | null = null; // ResizeObserver：观察 viewport 尺寸变化（如容器高度变化）
-	const tid = window.setTimeout(() => {
-		// setTimeout(0)：让 DOM 更新先落地（与 preview.tsx 策略一致）
-		refreshScrollCornerFab(); // 先同步算一次：尽快更新按钮模式
-		requestAnimationFrame(() => refreshScrollCornerFab()); // 再下一帧算一次：处理 Radix/布局晚一帧稳定的情况
-		// -------------------------------------------------------------------------------- // 分隔线（局部）
-		const vp = scrollViewportRef.current; // 再取一次 viewport：此时更可能已就绪
-		if (vp) {
-			// viewport 存在才观察
-			ro = new ResizeObserver(() => refreshScrollCornerFab()); // 尺寸变动时刷新：例如窗口 resize、输入框高度变化
-			ro.observe(vp); // 开始观察 viewport
-		} // if 结束
-	}, 0); // setTimeout 结束（delay=0）
-	// -------------------------------------------------------------------------------- // 分隔线（局部）
-	return () => {
-		// effect 清理：避免泄漏
-		window.clearTimeout(tid); // 取消未执行的 setTimeout
-		ro?.disconnect(); // 停止 ResizeObserver
-	}; // cleanup 结束
-}, [
-	// 依赖数组开始：这些变化都可能改变 scrollHeight/布局
-	streamScrollTick, // 流式输出 tick：内容长度变化会触发
-	documentKey, // 文档切换：滚动容器内容完全变更
-	messages.length, // 消息数量变化：插入/加载历史等会改变高度
-	refreshScrollCornerFab, // refresh 函数引用变化：需要重新绑定
-	scrollViewportRef, // viewport ref：理论上稳定，但为了完整性放入依赖
-]); // useEffect 结束
-// -------------------------------------------------------------------------------- // 分隔线
-// 点击角标按钮：toBottom=置底并恢复贴底；toTop=置顶并打断贴底（否则流式会拉回） // 点击语义说明
-const onScrollCornerFabClick = useCallback(() => {
-	// useCallback：避免每次渲染生成新函数
-	const vp = scrollViewportRef.current; // 取 viewport：后续 scrollTo 需要
-	if (!vp) return; // viewport 不存在：直接返回
-	// -------------------------------------------------------------------------------- // 分隔线（局部）
-	if (scrollCornerFabMode === "toBottom") {
-		// 当前按钮是“置底”
-		enableStreamStickToBottom(); // 先恢复自动贴底：确保后续流式 token 增量能继续跟底
-		vp.scrollTo({
-			// smooth 滚到底部：给用户明确的“跳到底”反馈
-			top: vp.scrollHeight - vp.clientHeight, // 计算物理底部 top：与 preview.tsx 一致
-			behavior: "smooth", // 平滑滚动（丝滑体验）
-		}); // scrollTo 结束
-	} else if (scrollCornerFabMode === "toTop") {
-		// 当前按钮是“置顶”
-		disableStreamStickToBottom(); // 关键：先禁用贴底，否则 streaming 下一次 contentRevision 会把视口拉回底部
-		vp.scrollTo({ top: 0, behavior: "smooth" }); // 平滑滚动到顶部（读历史更方便）
-	} // if/else 结束
-}, [
-	// 依赖数组：点击逻辑依赖这些引用/状态
-	scrollViewportRef, // 读取 viewport
-	scrollCornerFabMode, // 决定走 toBottom 还是 toTop
-	enableStreamStickToBottom, // toBottom 分支使用
-	disableStreamStickToBottom, // toTop 分支使用
-]); // useCallback 结束
-// -------------------------------------------------------------------------------- // 分隔线
-// JSX：按钮定位在输入框外层容器上方（右下角、输入框上方、右侧与输入框右侧对齐） // 布局说明
-return (
-	// 组件返回开始
-	<div className="relative w-full flex items-center justify-center pr-4 pl-3.5">
-		{" "}
-		{/* 外层 relative：供按钮 absolute 定位；padding 与输入框一致 */} //
-		外层容器
-		{messages.length > 0 && scrollCornerFabMode !== "hidden" ? ( // 有消息且 mode 非 hidden 才显示按钮（避免空会话出现）
-			<button // 角标按钮本体
-				type="button" // 明确 button 类型：避免在 form 场景误提交
-				className={cn(
-					// 复用与 preview/ChatControls 类似的视觉样式
-					"absolute bottom-full mb-2 right-0 z-10 flex h-8.5 w-8.5 items-center justify-center rounded-full border border-theme/5 bg-theme/5 text-textcolor/90 backdrop-blur-[2px] hover:bg-theme/15", // 位置与玻璃态样式：bottom-full=输入框上方；right-0=右对齐
-					"focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme/40", // 无障碍 focus ring：键盘可见
-				)} // className 结束
-				aria-label={
-					// 无障碍标签：屏幕阅读器读出操作含义
-					scrollCornerFabMode === "toBottom" ? "滚动到底部" : "滚动到顶部" // 根据 mode 切换文案
-				} // aria-label 结束
-				onClick={onScrollCornerFabClick} // 点击触发置底/置顶逻辑
-			>
-				{" "}
-				{/* button children 开始 */} // children 容器说明
-				{scrollCornerFabMode === "toBottom" ? ( // toBottom 显示向下箭头
-					<ArrowDown aria-hidden /> // 图标：对屏幕阅读器隐藏（由 aria-label 负责可读文案）
-				) : (
-					// 否则（toTop）显示向上箭头
-					<ArrowUp aria-hidden /> // 图标：同样 aria-hidden
-				)}{" "}
-				{/* 条件渲染结束 */} // 条件渲染说明
-			</button> // button 结束
-		) : null}{" "}
-		{/* 不满足条件则不渲染按钮 */} // 条件渲染说明
-		<ChatEntry /* 输入框本体：此处省略 props；按钮通过 right-0 与该区域右边对齐 */
-		/>{" "}
-		// 输入框组件
-	</div> // 外层容器结束
-); // return 结束
-```
+- **三态类型**：`KnowledgeAssistantScrollCornerFabMode = 'hidden' | 'toBottom' | 'toTop'`。
+- **`refreshScrollCornerFab`**：`maxScroll <= 4` → `hidden`；否则 **`threshold = 8`**，`scrollTop >= maxScroll - threshold` → `toTop`，否则 `toBottom`；**`scrollCornerFabModeRef` 与 state 同步**，仅 mode 变化时 `setState`。
+- **`scrollAreaHandlers`**：在 **`onViewportScroll`** 之后依次 **`relayoutCodeToolbar()`**、**`refreshScrollCornerFab()`**（文档 §8.3）。
+- **`useEffect`（ResizeObserver）**：依赖 **`[streamScrollTick, documentKey, messages.length, refreshScrollCornerFab, scrollViewportRef]`**，**`setTimeout(0)`** 内两次 **`refreshScrollCornerFab`** + **`rAF`**，并对 viewport **`ResizeObserver`**。
+- **`onScrollCornerFabClick`**：依赖含 **`disableStreamStickToBottom`**；**`toBottom`**：**`enableStreamStickToBottom()`** 后 **`vp.scrollTo({ top: scrollHeight - clientHeight, behavior: 'smooth' })`**；**`toTop`**：**`disableStreamStickToBottom()`** 后 **`vp.scrollTo({ top: 0, behavior: 'smooth' })`**。
+
+如需可复制的完整 TSX，请在仓库中打开 **`apps/frontend/src/views/knowledge/KnowledgeAssistant.tsx`**（约第 262–533 行：角标 + 输入区）。
 
 #### 8.6.6 常见问题（FAQ）
 
@@ -717,17 +738,15 @@ return (
 
 ### 8.7 未登录时不渲染底部助手面板（入口层 gate）
 
-知识页（`apps/frontend/src/views/knowledge/index.tsx`）通过 `isCloudLoggedIn = Boolean(userStore.userInfo.id)` 在**入口层**对 `bottomBarCustomNode` 做 gate：**未登录时直接不传入** `KnowledgeAssistant`（即 `bottomBarCustomNode={undefined}`），从而：
+知识页（`apps/frontend/src/views/knowledge/index.tsx`）通过 **`isCloudLoggedIn = Boolean(userStore.userInfo.id)`** 在 **入口层** 对 **`bottomBarAssistantNode`** 做 gate：**未登录时传入 `undefined`**，从而：
 
-- **UI 层面**：未登录用户不会看到助手面板、也不会看到「登录后可对话」的占位文案（避免把空间占住/误导用户以为可用）。
-- **组件层面**：避免 `KnowledgeAssistant` 在未登录态仍然 mount 并触发 `activateForDocument` 等副作用（即使其内部也会用 `isLoggedIn` 显示文案，但入口层不渲染更干净）。
-- **与 Monaco 底部栏逻辑对齐**：`Monaco` 仅在 `bottomBarCustomNode` 存在时才会开启相关面板开关与布局（见 `apps/frontend/src/components/design/Monaco/index.tsx` 对 `bottomBarCustomNode` 的判定）。
-
-对应实现片段如下（与当前仓库代码一致）：
+- **UI 层面**：未登录用户 **不 mount** `KnowledgeAssistant`，不占底部助手分屏。
+- **组件层面**：避免未登录仍执行 **`activateForDocument`**、持久化开关 **`useEffect`** 等副作用（组件内部仍有 **`isLoggedIn`** 分支，但入口不渲染更干净）。
+- **与 Monaco 对齐**：`apps/frontend/src/components/design/Monaco/index.tsx` 使用 **`bottomBarAssistantNode`**（注释中提及的旧名 **`bottomBarCustomNode`** 已过渡）；仅在传入该 prop 时启用 **`bottomBarAssistantNodeEnabled`** 等逻辑。
 
 ```tsx
 // 文件：apps/frontend/src/views/knowledge/index.tsx（节选）
-bottomBarCustomNode={
+bottomBarAssistantNode={
 	isCloudLoggedIn ? (
 		<KnowledgeAssistant
 			documentKey={knowledgeAssistantDocumentKey(
@@ -748,7 +767,7 @@ bottomBarCustomNode={
 文件：`apps/frontend/src/service/index.ts`、`apps/frontend/src/service/api.ts`。
 
 - 常量：`ASSISTANT_SESSION`、`ASSISTANT_SESSION_IMPORT_TRANSCRIPT`、`ASSISTANT_SSE`、`ASSISTANT_STOP`。
-- **`AssistantSessionDetailPayload.session`** 可为 **`null`**：表示会话已在服务端删除，前端应清缓存（见 §6.6）。
+- **`AssistantSessionDetailPayload.session`** 可为 **`null`**：表示会话已在服务端删除，前端应 **删除整桶 state**（见 §6.10）。
 - **`getAssistantSessionByKnowledgeArticle`**：返回类型 `... | null` 与控制器 `data: null` 对齐。
 
 ---
@@ -767,7 +786,7 @@ bottomBarCustomNode={
 
 ### 10.3 删除知识后的助手请求
 
-删除后主表会话已物理删除；前端可能仍 **`getAssistantSessionDetail`** 或 **`stopAssistantStream`**。后端 **不 404**（§4.5），前端 **`fetchSessionMessages` 见 `session: null` 清本地映射**（§6.6）。
+删除后主表会话已物理删除；前端可能仍 **`getAssistantSessionDetail`** 或 **`stopAssistantStream`**。后端 **不 404**（§4.5），前端在 **`fetchSessionMessagesForDocumentKey`** 中若见 **`payload.session == null`**，会 **`delete sessionByDocument[canonical]`** 且 **`delete stateByDocument[canonical]`**（整桶移除，见 §6.10）。
 
 ---
 
@@ -776,7 +795,7 @@ bottomBarCustomNode={
 1. **DTO 数组上限**：后端 `contextTurns` 120、`import lines` 200；前端迁入用 **`lines.slice(-200)`**（最近 200 条，升序），与之一致。
 2. **路由顺序**：`import-transcript`、`for-knowledge` 须在 `session/:id` 之前（§4.1）。
 3. **MobX**：流式更新用 **替换数组元素** 而非原地 `push` delta 到不可观察结构。
-4. **TS4094**：助手 store 的辅助函数放模块级（§6.2）。
+4. **TS4094**：助手 store 的 **模块级纯函数** 放类外（§6.5）；对外导出 **`AssistantStoreApi`** 接口 + **`assistantStore` 实例** 的显式标注（§6.1），避免 `useStore()` 推断类型带入 **private** 成员。
 5. **鉴权**：助手全路由 `JwtGuard`；SSE 未登录返回 `{ error: '未登录', done: true }`。
 
 ---
@@ -789,7 +808,8 @@ bottomBarCustomNode={
 | 前端 SSE                | `apps/frontend/src/utils/assistantSse.ts`                                                                                                                                                                                      |
 | 前端助手 UI             | `apps/frontend/src/views/knowledge/KnowledgeAssistant.tsx`                                                                                                                                                                     |
 | 前端知识页              | `apps/frontend/src/views/knowledge/index.tsx`                                                                                                                                                                                  |
-| 前端常量                | `apps/frontend/src/views/knowledge/constants.ts`（`isKnowledgeLocalMarkdownId`、`knowledgeAssistantArticleBinding`、`knowledgeAssistantDocumentKey`、`KNOWLEDGE_ASSISTANT_PROMPTS`、`buildKnowledgeAssistantDocumentMessage`） |
+| 前端常量                | `apps/frontend/src/views/knowledge/constants.ts`（`KNOWLEDGE_ASSISTANT_PROMPTS`、`KnowledgeAssistantPromptKind`、本地目录常量等）                                                                                                  |
+| 前端助手工具            | `apps/frontend/src/views/knowledge/utils.ts`（`isKnowledgeLocalMarkdownId`、`knowledgeAssistantArticleBinding`、`knowledgeAssistantDocumentKey`、`buildKnowledgeAssistantDocumentMessage`）                                        |
 | 前端 API                | `apps/frontend/src/service/index.ts`、`apps/frontend/src/service/api.ts`                                                                                                                                                       |
 | 后端控制器              | `apps/backend/src/services/assistant/assistant.controller.ts`                                                                                                                                                                  |
 | 后端服务                | `apps/backend/src/services/assistant/assistant.service.ts`                                                                                                                                                                     |
@@ -918,15 +938,13 @@ let contextTurns = takeRecentMessagesWithinTokenBudget(
 
 **否。** 仅当请求体携带 **`extraUserContentForModel`** 且 **`.trim()` 后非空** 时，后端才会把其拼到 **本轮** 发给模型的 user 正文之后；未传或为空字符串时，`tail` 仅为 `dto.content.trim()`，`mergeExtraUserContentForModelIntoTurns` 直接 `return turns`。
 
-### 13.5 前端常量：任务说明与文档围栏
+### 13.5 前端常量、工具函数：任务说明与文档围栏
 
-文件：`apps/frontend/src/views/knowledge/constants.ts`。
-
-- **`KNOWLEDGE_ASSISTANT_PROMPTS`**：`kind`（`'polish' | 'summarize'`）、图标、标题、副标题。
-- **`buildKnowledgeAssistantDocumentMessage`**：返回 **`userMessageShort`**（与气泡一致）与 **`extraUserContentForModel`**（不含短标题重复；为指令 + `--- 文档 ---` … `--- 文档结束 ---` 包裹的当前全文）。
+- **`apps/frontend/src/views/knowledge/constants.ts`**：**`KNOWLEDGE_ASSISTANT_PROMPTS`**（`kind`：`'polish' | 'summarize'`、**`LucideIcon`**、标题、副标题）、**`KnowledgeAssistantPromptKind`** 等。
+- **`apps/frontend/src/views/knowledge/utils.ts`**：**`buildKnowledgeAssistantDocumentMessage`**——返回 **`userMessageShort`**（与气泡一致）与 **`extraUserContentForModel`**（指令 + `--- 文档 ---` … `--- 文档结束 ---` 包裹的当前全文；**`documentMarkdown` 会先 `replace(/\s+$/, '')` 去尾空白**）。
 
 ```typescript
-// 文件：apps/frontend/src/views/knowledge/constants.ts（节选 + 注释）
+// 文件：apps/frontend/src/views/knowledge/utils.ts（节选 + 注释）
 
 /**
  * 快捷卡片：`userMessageShort` 为气泡与落库正文；`extraUserContentForModel` 仅由后端拼进发给模型的 user 上下文，不入库。
