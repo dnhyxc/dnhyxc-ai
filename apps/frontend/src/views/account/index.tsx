@@ -189,7 +189,7 @@ const Account = () => {
 			},
 		};
 		const res = await updateUser(
-			accountInfo.id,
+			storageInfo.id,
 			actions[key as keyof typeof actions],
 		);
 		if (res.success) {
