@@ -288,8 +288,8 @@ const KnowledgeTrashList: React.FC<Props> = observer(
 					}}
 					title={
 						pendingDeleteIds.length > 1
-							? '批量删除回收站条目？'
-							: '删除回收站条目？'
+							? '批量删除回收站文件？'
+							: '删除回收站文件？'
 					}
 					description={
 						<>

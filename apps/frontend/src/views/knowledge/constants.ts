@@ -1,7 +1,7 @@
 import type { LucideIcon } from 'lucide-react';
 import { Sparkle, Sparkles } from 'lucide-react';
 
-/** Tauri 下知识 Markdown 目录（保存 / 删除本地文件与 invoke 一致） */
+/** Tauri 下知识 Markdown 目录（保存 / 删除文件与 invoke 一致） */
 export const TAURI_KNOWLEDGE_DIR = '/Users/dnhyxc/Documents/knowledge';
 // '/Users/dnhyxc/Documents/code/dnhyxc-ai/knowledge';
 

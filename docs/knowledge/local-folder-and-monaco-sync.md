@@ -14,18 +14,18 @@
 
 ### 1.2 涉及文件
 
-| 路径                                                    | 作用                                                                            |
-| ------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| 路径                                                    | 作用                                                                             |
+| ------------------------------------------------------- | -------------------------------------------------------------------------------- |
 | `apps/frontend/src-tauri/src/command/knowledge.rs`      | 列出目录下 `.md`、读取单文件；`open_knowledge_markdown_in_editor`（Cursor/Trae） |
-| `apps/frontend/src-tauri/src/lib.rs`                    | 注册 Tauri `invoke` 命令                                                        |
-| `apps/frontend/src/utils/knowledge-save.ts`             | 前端封装 `invoke`                                                               |
-| `apps/frontend/src/types/index.ts`                      | `KnowledgeRecord` / `KnowledgeListItem` 扩展字段                                |
-| `apps/frontend/src/views/knowledge/constants.ts`        | 本地条目 id 前缀与判定函数                                                      |
-| `apps/frontend/src/store/knowledge.ts`                  | 列表分页 + 编辑器草稿（含 `knowledgeLocalDirPath`、清空草稿）                   |
-| `apps/frontend/src/views/knowledge/index.tsx`           | 保存走云端或仅磁盘、回填 `localDirPath`；覆盖/另存为冲突流程                    |
-| `apps/frontend/src/views/knowledge/KnowledgeList.tsx`   | 开关、选文件夹、本地列表与删除分支；本地模式下「在外部编辑器打开」按钮            |
-| `apps/frontend/src/components/design/Confirm/index.tsx` | 通用确认框；支持第三钮「另存为」（`secondaryActionText` / `onSecondaryAction`） |
-| `apps/frontend/src/components/design/Monaco/index.tsx`  | 外部 `value` 与编辑器同步策略                                                   |
+| `apps/frontend/src-tauri/src/lib.rs`                    | 注册 Tauri `invoke` 命令                                                         |
+| `apps/frontend/src/utils/knowledge-save.ts`             | 前端封装 `invoke`                                                                |
+| `apps/frontend/src/types/index.ts`                      | `KnowledgeRecord` / `KnowledgeListItem` 扩展字段                                 |
+| `apps/frontend/src/views/knowledge/constants.ts`        | 本地条目 id 前缀与判定函数                                                       |
+| `apps/frontend/src/store/knowledge.ts`                  | 列表分页 + 编辑器草稿（含 `knowledgeLocalDirPath`、清空草稿）                    |
+| `apps/frontend/src/views/knowledge/index.tsx`           | 保存走云端或仅磁盘、回填 `localDirPath`；覆盖/另存为冲突流程                     |
+| `apps/frontend/src/views/knowledge/KnowledgeList.tsx`   | 开关、选文件夹、本地列表与删除分支；本地模式下「在外部编辑器打开」按钮           |
+| `apps/frontend/src/components/design/Confirm/index.tsx` | 通用确认框；支持第三钮「另存为」（`secondaryActionText` / `onSecondaryAction`）  |
+| `apps/frontend/src/components/design/Monaco/index.tsx`  | 外部 `value` 与编辑器同步策略                                                    |
 
 ---
 
@@ -840,7 +840,7 @@ const deleteLocalFileName =
 							setLocalFileDeleteOnly(false); // 避免下次误用「仅删盘」标记
 						}
 					}}
-					title="删除本地文件？"
+					title="删除文件？"
 					description={
 						<>
 							{localFileDeleteOnly
@@ -1262,8 +1262,8 @@ use command::knowledge::{
 export async function invokeOpenKnowledgeMarkdownInEditor(
 	filePath: string, // 列表项上的 localAbsolutePath
 ): Promise<{ openedWith: string }> {
-	const { invoke } = await import('@tauri-apps/api/core'); // 动态 import，非 Tauri 构建不强制加载
-	return invoke<{ openedWith: string }>('open_knowledge_markdown_in_editor', {
+	const { invoke } = await import("@tauri-apps/api/core"); // 动态 import，非 Tauri 构建不强制加载
+	return invoke<{ openedWith: string }>("open_knowledge_markdown_in_editor", {
 		input: { filePath }, // 与 Rust `OpenKnowledgeMarkdownInEditorInput` 的 camelCase 对齐
 	});
 }
@@ -1274,13 +1274,13 @@ export async function invokeOpenKnowledgeMarkdownInEditor(
 #### 3.12.3 `KnowledgeList.tsx` — 行组件 props、按钮与回调
 
 ```tsx
-import { Code2, Trash2 } from 'lucide-react'; // Code2：外部编辑器；Trash2：删除
+import { Code2, Trash2 } from "lucide-react"; // Code2：外部编辑器；Trash2：删除
 // ...
 import {
 	// ...
 	invokeOpenKnowledgeMarkdownInEditor,
 	// ...
-} from '@/utils/knowledge-save';
+} from "@/utils/knowledge-save";
 ```
 
 ```tsx
@@ -1308,81 +1308,78 @@ function KnowledgeListRow(props: {
 ```
 
 ```tsx
-				<div className="flex shrink-0 items-start gap-0.5">
-					{showOpenInExternalEditor &&
-					item.localAbsolutePath &&
-					onOpenInExternalEditorClick ? (
-						<button
-							type="button" // 避免 submit
-							aria-label="在 Cursor 或 Trae 中打开" // 读屏
-							title="前台为 Cursor/Trae 则对应用之；否则若 Cursor 已在运行则优先 Cursor，再检测 Trae，都未开则尝试 Trae" // 悬停说明检测规则
-							className={cn(
-								'cursor-pointer shrink-0 p-1 rounded-md text-textcolor/80 transition-opacity duration-150',
-								'opacity-0 pointer-events-none', // 默认隐藏
-								'hover:text-teal-400 hover:bg-theme/10', // 与删除钮区分色
-								'group-hover:opacity-100 group-hover:pointer-events-auto', // 与删除钮同一套 hover 显隐
-							)}
-							onClick={(e) => {
-								e.stopPropagation(); // 不触发行 onClick 打开详情
-								onOpenInExternalEditorClick(e, item);
-							}}
-						>
-							<Code2 size={16} />
-						</button>
-					) : null}
-					<button
-						type="button"
-						aria-label={
-							item.localAbsolutePath ? '删除本地 Markdown 文件' : '从知识库删除'
-						}
-						// ... 删除钮 className 与 onTrashClick 同前
-					>
-						<Trash2 size={16} />
-					</button>
-				</div>
+<div className="flex shrink-0 items-start gap-0.5">
+	{showOpenInExternalEditor &&
+	item.localAbsolutePath &&
+	onOpenInExternalEditorClick ? (
+		<button
+			type="button" // 避免 submit
+			aria-label="在 Cursor 或 Trae 中打开" // 读屏
+			title="前台为 Cursor/Trae 则对应用之；否则若 Cursor 已在运行则优先 Cursor，再检测 Trae，都未开则尝试 Trae" // 悬停说明检测规则
+			className={cn(
+				"cursor-pointer shrink-0 p-1 rounded-md text-textcolor/80 transition-opacity duration-150",
+				"opacity-0 pointer-events-none", // 默认隐藏
+				"hover:text-teal-400 hover:bg-theme/10", // 与删除钮区分色
+				"group-hover:opacity-100 group-hover:pointer-events-auto", // 与删除钮同一套 hover 显隐
+			)}
+			onClick={(e) => {
+				e.stopPropagation(); // 不触发行 onClick 打开详情
+				onOpenInExternalEditorClick(e, item);
+			}}
+		>
+			<Code2 size={16} />
+		</button>
+	) : null}
+	<button
+		type="button"
+		aria-label={
+			item.localAbsolutePath ? "删除本地 Markdown 文件" : "从知识库删除"
+		}
+		// ... 删除钮 className 与 onTrashClick 同前
+	>
+		<Trash2 size={16} />
+	</button>
+</div>
 ```
 
 ```ts
-		/** 本地列表：在 Cursor / Trae 中打开（由 Rust 判定编辑器并执行打开） */
-		const onOpenInExternalEditorClick = useCallback(
-			async (_e: React.MouseEvent, knowledge: KnowledgeListItem) => {
-				const p = knowledge.localAbsolutePath; // 仅本地行有值
-				if (!p) return; // 防御
-				try {
-					const { openedWith } = await invokeOpenKnowledgeMarkdownInEditor(p); // Tauri 打开
-					Toast({
-						type: 'success',
-						title: '已在外部编辑器打开',
-						message: `使用 ${openedWith} 打开文件`, // 与 Rust 返回一致
-						duration: 2000,
-					});
-				} catch (err) {
-					Toast({
-						type: 'error',
-						title: '打开失败',
-						message: formatTauriInvokeError(err), // 统一解析 Tauri 错误
-					});
-				}
-			},
-			[],
-		);
+/** 本地列表：在 Cursor / Trae 中打开（由 Rust 判定编辑器并执行打开） */
+const onOpenInExternalEditorClick = useCallback(
+	async (_e: React.MouseEvent, knowledge: KnowledgeListItem) => {
+		const p = knowledge.localAbsolutePath; // 仅本地行有值
+		if (!p) return; // 防御
+		try {
+			const { openedWith } = await invokeOpenKnowledgeMarkdownInEditor(p); // Tauri 打开
+			Toast({
+				type: "success",
+				title: "已在外部编辑器打开",
+				message: `使用 ${openedWith} 打开文件`, // 与 Rust 返回一致
+				duration: 2000,
+			});
+		} catch (err) {
+			Toast({
+				type: "error",
+				title: "打开失败",
+				message: formatTauriInvokeError(err), // 统一解析 Tauri 错误
+			});
+		}
+	},
+	[],
+);
 ```
 
 ```tsx
-									<KnowledgeListRow
-										key={knowledge.id}
-										item={knowledge}
-										selected={
-											editingKnowledgeId != null &&
-											editingKnowledgeId === knowledge.id
-										}
-										onActivate={handleRowClick}
-										onTrashClick={onTrashClick}
-										showOpenInExternalEditor={
-											useLocalFolder && isTauriRuntime() // 仅本地数据源且桌面端
-										}
-										onOpenInExternalEditorClick={onOpenInExternalEditorClick}
-									/>
+<KnowledgeListRow
+	key={knowledge.id}
+	item={knowledge}
+	selected={editingKnowledgeId != null && editingKnowledgeId === knowledge.id}
+	onActivate={handleRowClick}
+	onTrashClick={onTrashClick}
+	showOpenInExternalEditor={
+		useLocalFolder && isTauriRuntime() // 仅本地数据源且桌面端
+	}
+	onOpenInExternalEditorClick={onOpenInExternalEditorClick}
+/>
 ```
 
 #### 3.12.4 `knowledge.rs` — 枚举、前台名、Cursor 检测与打开

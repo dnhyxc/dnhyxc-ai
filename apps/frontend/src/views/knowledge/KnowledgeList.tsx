@@ -504,7 +504,7 @@ const KnowledgeList: React.FC<IProps> = observer(
 							setLocalFileDeleteOnly(false);
 						}
 					}}
-					title="删除本地文件？"
+					title="删除文件？"
 					description={
 						<>
 							{localFileDeleteOnly
