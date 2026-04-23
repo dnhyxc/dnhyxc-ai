@@ -27,6 +27,10 @@ interface ConfirmProps {
 	/** 可选第三钮（如「另存为」），样式为 outline，位于取消与确认之间 */
 	secondaryActionText?: string;
 	onSecondaryAction?: () => void | Promise<void>;
+	/** 可选第四钮，位于 secondary 与主确认之间 */
+	tertiaryActionText?: string;
+	onTertiaryAction?: () => void | Promise<void>;
+	tertiaryVariant?: 'outline' | 'destructive';
 	onCancel?: () => void;
 	className?: string;
 }
@@ -45,6 +49,9 @@ const Confirm = ({
 	onConfirm,
 	secondaryActionText,
 	onSecondaryAction,
+	tertiaryActionText,
+	onTertiaryAction,
+	tertiaryVariant = 'outline',
 	onCancel,
 	className,
 }: ConfirmProps) => {
@@ -123,6 +130,15 @@ const Confirm = ({
 								onClick={() => void onSecondaryAction()}
 							>
 								{secondaryActionText}
+							</Button>
+						) : null}
+						{tertiaryActionText && onTertiaryAction ? (
+							<Button
+								type="button"
+								variant={tertiaryVariant}
+								onClick={() => void onTertiaryAction()}
+							>
+								{tertiaryActionText}
 							</Button>
 						) : null}
 						<AlertDialogPrimitive.Action

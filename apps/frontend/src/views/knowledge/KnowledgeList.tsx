@@ -342,42 +342,20 @@ const KnowledgeList: React.FC<IProps> = observer(
 			}
 		}, []);
 
-		/** 确认删除：先删数据库记录（若有选中项），再删本地 Markdown；或仅删本地浏览中的文件 */
-		const onConfirmDeleteLocal = useCallback(async () => {
+		const closeDeleteLocalDialog = useCallback(() => {
+			setDeleteLocalOpen(false);
+			setDeleteLocalPath('');
+			setLocalFileDeleteOnly(false);
+			setSelectKnowledge(null);
+		}, []);
+
+		/** 本地文件夹浏览：仅从磁盘删除当前文件 */
+		const onConfirmDeleteLocalFolderFile = useCallback(async () => {
+			if (!selectKnowledge?.localAbsolutePath) return;
 			try {
-				if (localFileDeleteOnly && selectKnowledge?.localAbsolutePath) {
-					const result = await invokeDeleteKnowledgeMarkdown({
-						title: selectKnowledge.title ?? '',
-						filePath: deleteLocalPath,
-					});
-					if (result.success === 'success') {
-						Toast({
-							type: 'success',
-							title: '文件已删除',
-							message: result.filePath ? `${result.filePath}` : undefined,
-						});
-						setDeleteLocalOpen(false);
-						setDeleteLocalPath('');
-						setLocalFileDeleteOnly(false);
-						onAfterLocalDelete?.(selectKnowledge.id);
-						setSelectKnowledge(null);
-						await loadLocalMarkdownList();
-					} else {
-						Toast({
-							type: 'error',
-							title: '删除失败',
-							message: result.message,
-						});
-					}
-					return;
-				}
-				if (selectKnowledge) {
-					const dbOk = await handleDeleteApi(selectKnowledge);
-					if (!dbOk) return;
-				}
 				const result = await invokeDeleteKnowledgeMarkdown({
-					title: selectKnowledge?.title ?? '',
-					filePath: TAURI_KNOWLEDGE_DIR,
+					title: selectKnowledge.title ?? '',
+					filePath: deleteLocalPath,
 				});
 				if (result.success === 'success') {
 					Toast({
@@ -385,11 +363,9 @@ const KnowledgeList: React.FC<IProps> = observer(
 						title: '文件已删除',
 						message: result.filePath ? `${result.filePath}` : undefined,
 					});
-					setDeleteLocalOpen(false);
-					setDeleteLocalPath('');
-					setLocalFileDeleteOnly(false);
-					onAfterLocalDelete?.(selectKnowledge?.id ?? '');
-					setSelectKnowledge(null);
+					closeDeleteLocalDialog();
+					onAfterLocalDelete?.(selectKnowledge.id);
+					await loadLocalMarkdownList();
 				} else {
 					Toast({
 						type: 'error',
@@ -404,10 +380,85 @@ const KnowledgeList: React.FC<IProps> = observer(
 				});
 			}
 		}, [
+			closeDeleteLocalDialog,
 			deleteLocalPath,
-			handleDeleteApi,
 			loadLocalMarkdownList,
-			localFileDeleteOnly,
+			onAfterLocalDelete,
+			selectKnowledge,
+		]);
+
+		/** 云端条目 + 已解析本地文件：仅删本地 Markdown，保留在线记录 */
+		const onSecondaryDeleteLocalOnly = useCallback(async () => {
+			if (!selectKnowledge) return;
+			try {
+				const result = await invokeDeleteKnowledgeMarkdown({
+					title: selectKnowledge.title ?? '',
+					filePath: TAURI_KNOWLEDGE_DIR,
+				});
+				if (result.success === 'success') {
+					Toast({
+						type: 'success',
+						title: '本地文件已删除',
+						message: result.filePath ? `${result.filePath}` : undefined,
+					});
+					closeDeleteLocalDialog();
+					onAfterLocalDelete?.(selectKnowledge.id);
+				} else {
+					Toast({
+						type: 'error',
+						title: '删除失败',
+						message: result.message,
+					});
+				}
+			} catch (e) {
+				Toast({
+					type: 'error',
+					title: formatTauriInvokeError(e),
+				});
+			}
+		}, [closeDeleteLocalDialog, onAfterLocalDelete, selectKnowledge]);
+
+		/** 云端条目 + 已解析本地文件：仅删在线（数据库）记录，保留本地文件 */
+		const onTertiaryDeleteOnlineOnly = useCallback(async () => {
+			if (!selectKnowledge) return;
+			const ok = await handleDeleteApi(selectKnowledge);
+			if (ok) closeDeleteLocalDialog();
+		}, [closeDeleteLocalDialog, handleDeleteApi, selectKnowledge]);
+
+		/** 先删在线记录再删本地文件（与原先单一「删除」一致） */
+		const onConfirmDeleteBoth = useCallback(async () => {
+			if (!selectKnowledge) return;
+			try {
+				const dbOk = await handleDeleteApi(selectKnowledge);
+				if (!dbOk) return;
+				const result = await invokeDeleteKnowledgeMarkdown({
+					title: selectKnowledge.title ?? '',
+					filePath: TAURI_KNOWLEDGE_DIR,
+				});
+				if (result.success === 'success') {
+					Toast({
+						type: 'success',
+						title: '已同时删除',
+						message: result.filePath ? `${result.filePath}` : undefined,
+					});
+					closeDeleteLocalDialog();
+					onAfterLocalDelete?.(selectKnowledge.id);
+				} else {
+					Toast({
+						type: 'error',
+						title: '本地文件删除失败',
+						message: result.message,
+					});
+				}
+			} catch (e) {
+				Toast({
+					type: 'error',
+					title: formatTauriInvokeError(e),
+				});
+			}
+		}, [
+			closeDeleteLocalDialog,
+			handleDeleteApi,
 			onAfterLocalDelete,
 			selectKnowledge,
 		]);
@@ -502,6 +553,7 @@ const KnowledgeList: React.FC<IProps> = observer(
 						if (!v) {
 							setDeleteLocalPath('');
 							setLocalFileDeleteOnly(false);
+							setSelectKnowledge(null);
 						}
 					}}
 					title="删除文件？"
@@ -509,7 +561,7 @@ const KnowledgeList: React.FC<IProps> = observer(
 						<>
 							{localFileDeleteOnly
 								? '将仅从磁盘删除该文件，不涉及云端知识库数据。'
-								: '将同时移除数据库条目与本地同名文件。'}
+								: '已关联云端知识库条目与本地 Markdown。可选择仅删本地、仅删在线，或使用「同时删除」移除两侧数据。'}
 							<div className="mt-2 font-medium text-base wrap-anywhere">
 								「{deleteLocalFileName}」
 							</div>
@@ -519,10 +571,23 @@ const KnowledgeList: React.FC<IProps> = observer(
 						</>
 					}
 					descriptionClassName="text-left"
-					confirmText="删除"
+					confirmText={localFileDeleteOnly ? '删除' : '同时删除'}
 					confirmVariant="destructive"
 					closeOnConfirm={false}
-					onConfirm={onConfirmDeleteLocal}
+					onConfirm={
+						localFileDeleteOnly
+							? onConfirmDeleteLocalFolderFile
+							: onConfirmDeleteBoth
+					}
+					{...(localFileDeleteOnly
+						? {}
+						: {
+								secondaryActionText: '本地删除',
+								onSecondaryAction: onSecondaryDeleteLocalOnly,
+								tertiaryActionText: '在线删除',
+								tertiaryVariant: 'destructive' as const,
+								onTertiaryAction: onTertiaryDeleteOnlineOnly,
+							})}
 				/>
 
 				<Drawer title="知识库" open={open} onOpenChange={onOpenChange}>
