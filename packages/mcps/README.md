@@ -2,12 +2,12 @@
 
 基于 `catalog/components.json` 的 **本地 stdio MCP（Model Context Protocol，模型上下文协议）**，为 AI 编程提供：
 
-| 工具名 | 作用 |
-| --- | --- |
-| `list_component_ids` | 返回组件 `ids` 列表，并附带 `items` 摘要（`id` / `title` / `description` / `group` / `category` / `source`）；支持 `group` / `category` / `tag` / `limit` 过滤，便于后续用 id 调 `get_component_details` / `resolve_component_import` |
-| `list_components` | 列出组件摘要，支持 `group` / `category` / `tag` / `limit` 过滤 |
-| `search_components` | 关键词检索（多词空格分隔，简单打分排序） |
-| `get_component_details` | 按 `id` 或 `slug`+`group` 取完整 props、examples、relatedSources，并返回 `usageExample`（可直接复制的 import + JSX 示例） |
+| 工具名                     | 作用                                                                                                                                                         |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `list_component_ids`       | 仅列出组件 id 列表（支持 `group` / `category` / `tag` / `limit` 过滤），便于后续用 id 调 `get_component_details` / `resolve_component_import`                |
+| `list_components`          | 列出组件摘要，支持 `group` / `category` / `tag` / `limit` 过滤                                                                                               |
+| `search_components`        | 关键词检索（多词空格分隔，简单打分排序）                                                                                                                     |
+| `get_component_details`    | 按 `id` 或 `slug`+`group` 取完整 props、examples、relatedSources，并返回 `usageExample`（可直接复制的 import + JSX 示例）                                    |
 | `resolve_component_import` | 生成推荐 `import` 与 `modulePath`；返回 `importKind`（default 或 named）、`binding`；对 design 下常见 default 入口做了 slug 映射（如 Monaco→MarkdownEditor） |
 
 ## 构建
@@ -20,8 +20,8 @@ pnpm --filter @dnhyxc-ai/mcps run build
 
 ## 环境变量
 
-| 变量 | 说明 |
-| --- | --- |
+| 变量                            | 说明                                        |
+| ------------------------------- | ------------------------------------------- |
 | `DNHYXC_COMPONENT_CATALOG_PATH` | 可选，指向自定义 `components.json` 绝对路径 |
 
 ## 在 Cursor 中使用
@@ -42,10 +42,10 @@ pnpm --filter @dnhyxc-ai/mcps run build
 
 Cursor 会读取 **`mcp.json`**（可与其它 MCP 合并）：
 
-| 范围 | 路径 |
-| --- | --- |
+| 范围           | 路径                                                       |
+| -------------- | ---------------------------------------------------------- |
 | **仅当前项目** | 仓库根目录下 `.cursor/mcp.json`（可提交到 Git 供团队共用） |
-| **本机全局** | `~/.cursor/mcp.json` |
+| **本机全局**   | `~/.cursor/mcp.json`                                       |
 
 按 [Cursor MCP 文档](https://cursor.com/docs/context/mcp)，stdio 类服务建议写 **`type": "stdio"`**（与 `command` / `args` 同级）。
 
@@ -53,13 +53,13 @@ Cursor 会读取 **`mcp.json`**（可与其它 MCP 合并）：
 
 ```json
 {
-  "mcpServers": {
-    "dnhyxc-component-catalog": {
-      "type": "stdio",
-      "command": "node",
-      "args": ["${workspaceFolder}/packages/mcps/dist/server.js"]
-    }
-  }
+	"mcpServers": {
+		"dnhyxc-component-catalog": {
+			"type": "stdio",
+			"command": "node",
+			"args": ["${workspaceFolder}/packages/mcps/dist/server.js"]
+		}
+	}
 }
 ```
 
@@ -69,16 +69,16 @@ Cursor 会读取 **`mcp.json`**（可与其它 MCP 合并）：
 
 ```json
 {
-  "mcpServers": {
-    "dnhyxc-component-catalog": {
-      "type": "stdio",
-      "command": "node",
-      "args": ["${workspaceFolder}/packages/mcps/dist/server.js"],
-      "env": {
-        "DNHYXC_COMPONENT_CATALOG_PATH": "${workspaceFolder}/packages/mcps/catalog/components.json"
-      }
-    }
-  }
+	"mcpServers": {
+		"dnhyxc-component-catalog": {
+			"type": "stdio",
+			"command": "node",
+			"args": ["${workspaceFolder}/packages/mcps/dist/server.js"],
+			"env": {
+				"DNHYXC_COMPONENT_CATALOG_PATH": "${workspaceFolder}/packages/mcps/catalog/components.json"
+			}
+		}
+	}
 }
 ```
 
@@ -94,16 +94,16 @@ Cursor 会读取 **`mcp.json`**（可与其它 MCP 合并）：
 
 ```json
 {
-  "mcpServers": {
-    "dnhyxc-component-catalog": {
-      "type": "stdio",
-      "command": "node",
-      "args": [
-        "${workspaceFolder}/node_modules/tsx/dist/cli.mjs",
-        "${workspaceFolder}/packages/mcps/src/server.ts"
-      ]
-    }
-  }
+	"mcpServers": {
+		"dnhyxc-component-catalog": {
+			"type": "stdio",
+			"command": "node",
+			"args": [
+				"${workspaceFolder}/node_modules/tsx/dist/cli.mjs",
+				"${workspaceFolder}/packages/mcps/src/server.ts"
+			]
+		}
+	}
 }
 ```
 

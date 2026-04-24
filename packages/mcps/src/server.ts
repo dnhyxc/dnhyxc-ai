@@ -30,40 +30,6 @@ function textResult(obj: unknown) {
 	};
 }
 
-/** 示例代码是否已包含 import（避免重复拼接 importStatement） */
-function exampleCodeHasImportStatement(code: string): boolean {
-	return /^\s*import\s/m.test(code);
-}
-
-/**
- * 生成可直接粘贴的 usage 代码：无示例时用占位；有示例但缺 import 时补上推荐 import。
- */
-function buildUsageExampleCode(
-	snippet: ReturnType<typeof buildImportSnippet>,
-	bestExampleCode: string,
-): string {
-	const trimmed = bestExampleCode.trim();
-	if (!trimmed) {
-		return [
-			snippet.importStatement,
-			'',
-			`// 在 JSX 中使用 <${snippet.binding} />（请结合 props 与源码 export 调整）`,
-		].join('\n');
-	}
-	if (exampleCodeHasImportStatement(trimmed)) {
-		return trimmed;
-	}
-	return `${snippet.importStatement}\n\n${trimmed}`;
-}
-
-function textResultFromError(err: unknown) {
-	const message = err instanceof Error ? err.message : String(err);
-	return textResult({
-		error: 'INTERNAL_ERROR',
-		message,
-	});
-}
-
 function main() {
 	const server = new McpServer(
 		{ name: 'dnhyxc-component-catalog', version: '0.0.1' },
@@ -75,7 +41,7 @@ function main() {
 		{
 			title: '列出组件 ID',
 			description:
-				'列出 catalog 中组件的 id 列表，并附带 items 摘要（id、title、description、group、category、source）；支持按 group、category、tag 过滤。适合在调用其它工具前快速拿到可用 id。',
+				'仅列出 catalog 中组件的 id 列表；支持按 group、category、tag 过滤。适合在调用其它工具前快速拿到可用 id。',
 			inputSchema: {
 				group: z.enum(['ui', 'design']).optional().describe('仅 ui 或 design'),
 				category: z
@@ -93,33 +59,20 @@ function main() {
 			},
 		},
 		async (args) => {
-			try {
-				const meta = loadCatalogSync();
-				const list = listComponents({
-					group: args.group,
-					category: args.category,
-					tag: args.tag,
-					limit: args.limit ?? 500,
-				});
-				const items = list.map((c) => ({
-					id: c.id,
-					title: c.title,
-					description: c.description,
-					group: c.group,
-					category: c.category,
-					source: c.source,
-				}));
-				return textResult({
-					catalogVersion: meta.version,
-					basePath: meta.basePath,
-					catalogPath: getCatalogPath(),
-					count: list.length,
-					ids: list.map((c) => c.id),
-					items,
-				});
-			} catch (err) {
-				return textResultFromError(err);
-			}
+			const meta = loadCatalogSync();
+			const list = listComponents({
+				group: args.group,
+				category: args.category,
+				tag: args.tag,
+				limit: args.limit ?? 500,
+			});
+			return textResult({
+				catalogVersion: meta.version,
+				basePath: meta.basePath,
+				catalogPath: getCatalogPath(),
+				count: list.length,
+				ids: list.map((c) => c.id),
+			});
 		},
 	);
 
@@ -146,35 +99,31 @@ function main() {
 			},
 		},
 		async (args) => {
-			try {
-				const meta = loadCatalogSync();
-				const list = listComponents({
-					group: args.group,
-					category: args.category,
-					tag: args.tag,
-					limit: args.limit,
-				});
-				const summaries = list.map((c) => ({
-					id: c.id,
-					title: c.title,
-					slug: c.slug,
-					name: c.name,
-					group: c.group,
-					category: c.category,
-					description: c.description,
-					source: c.source,
-					tags: c.tags,
-				}));
-				return textResult({
-					catalogVersion: meta.version,
-					basePath: meta.basePath,
-					catalogPath: getCatalogPath(),
-					count: summaries.length,
-					components: summaries,
-				});
-			} catch (err) {
-				return textResultFromError(err);
-			}
+			const meta = loadCatalogSync();
+			const list = listComponents({
+				group: args.group,
+				category: args.category,
+				tag: args.tag,
+				limit: args.limit,
+			});
+			const summaries = list.map((c) => ({
+				id: c.id,
+				title: c.title,
+				slug: c.slug,
+				name: c.name,
+				group: c.group,
+				category: c.category,
+				description: c.description,
+				source: c.source,
+				tags: c.tags,
+			}));
+			return textResult({
+				catalogVersion: meta.version,
+				basePath: meta.basePath,
+				catalogPath: getCatalogPath(),
+				count: summaries.length,
+				components: summaries,
+			});
 		},
 	);
 
@@ -191,28 +140,24 @@ function main() {
 			},
 		},
 		async (args) => {
-			try {
-				const hits = searchComponents(args.query, {
-					group: args.group,
-					limit: args.limit,
-				});
-				return textResult({
-					query: args.query,
-					count: hits.length,
-					results: hits.map(({ item, score }) => ({
-						score,
-						id: item.id,
-						title: item.title,
-						slug: item.slug,
-						group: item.group,
-						category: item.category,
-						source: item.source,
-						tags: item.tags,
-					})),
-				});
-			} catch (err) {
-				return textResultFromError(err);
-			}
+			const hits = searchComponents(args.query, {
+				group: args.group,
+				limit: args.limit,
+			});
+			return textResult({
+				query: args.query,
+				count: hits.length,
+				results: hits.map(({ item, score }) => ({
+					score,
+					id: item.id,
+					title: item.title,
+					slug: item.slug,
+					group: item.group,
+					category: item.category,
+					source: item.source,
+					tags: item.tags,
+				})),
+			});
 		},
 	);
 
@@ -229,48 +174,53 @@ function main() {
 			},
 		},
 		async (args) => {
-			try {
-				if (!args.id && !(args.slug && args.group)) {
-					return textResult({
-						error: 'INVALID_ARGUMENTS',
-						message: '必须提供 id，或同时提供 slug 与 group',
-					});
-				}
-				let comp = args.id ? getComponentById(args.id) : null;
-				if (!comp && args.slug && args.group) {
-					comp = getComponentBySlugAndGroup(args.slug, args.group);
-				}
-				if (!comp) {
-					return textResult({
-						error: 'NOT_FOUND',
-						message: '未找到组件，请检查 id 或 slug+group',
-						hint: '可先调用 search_components',
-					});
-				}
-				const meta = loadCatalogSync();
-				const snippet = buildImportSnippet(comp);
-				// examples 可能仅为 JSX：无 import 时拼接推荐 import，已有 import 则不重复
-				const bestExampleCode =
-					comp.examples?.map((e) => e.code?.trim()).find(Boolean) ?? '';
-				const usageExample = buildUsageExampleCode(snippet, bestExampleCode);
+			if (!args.id && !(args.slug && args.group)) {
 				return textResult({
-					meta: {
-						catalogVersion: meta.version,
-						basePath: meta.basePath,
-						catalogPath: getCatalogPath(),
-					},
-					usageExample: {
-						importKind: snippet.importKind,
-						binding: snippet.binding,
-						modulePath: snippet.modulePath,
-						importStatement: snippet.importStatement,
-						code: usageExample,
-					},
-					component: comp,
+					error: 'INVALID_ARGUMENTS',
+					message: '必须提供 id，或同时提供 slug 与 group',
 				});
-			} catch (err) {
-				return textResultFromError(err);
 			}
+			let comp = args.id ? getComponentById(args.id) : null;
+			if (!comp && args.slug && args.group) {
+				comp = getComponentBySlugAndGroup(args.slug, args.group);
+			}
+			if (!comp) {
+				return textResult({
+					error: 'NOT_FOUND',
+					message: '未找到组件，请检查 id 或 slug+group',
+					hint: '可先调用 search_components',
+				});
+			}
+			const meta = loadCatalogSync();
+			const snippet = buildImportSnippet(comp);
+			/**
+			 * components.json 的 examples 已尽量写成“可复制的实际用例”（含 import + JSX）。
+			 * 因此这里不再额外 prepend importStatement，避免出现重复导入。
+			 */
+			const bestExampleCode =
+				comp.examples?.map((e) => e.code?.trim()).find(Boolean) ?? '';
+			const usageExample = bestExampleCode
+				? bestExampleCode
+				: [
+						snippet.importStatement,
+						'',
+						`// 在 JSX 中使用 <${snippet.binding} />（请结合 props 与源码 export 调整）`,
+					].join('\n');
+			return textResult({
+				meta: {
+					catalogVersion: meta.version,
+					basePath: meta.basePath,
+					catalogPath: getCatalogPath(),
+				},
+				usageExample: {
+					importKind: snippet.importKind,
+					binding: snippet.binding,
+					modulePath: snippet.modulePath,
+					importStatement: snippet.importStatement,
+					code: usageExample,
+				},
+				component: comp,
+			});
 		},
 	);
 
@@ -287,51 +237,43 @@ function main() {
 			},
 		},
 		async (args) => {
-			try {
-				if (!args.id && !(args.slug && args.group)) {
-					return textResult({
-						error: 'INVALID_ARGUMENTS',
-						message: '必须提供 id，或同时提供 slug 与 group',
-					});
-				}
-				let comp = args.id ? getComponentById(args.id) : null;
-				if (!comp && args.slug && args.group) {
-					comp = getComponentBySlugAndGroup(args.slug, args.group);
-				}
-				if (!comp) {
-					return textResult({
-						error: 'NOT_FOUND',
-						message: '未找到组件',
-					});
-				}
-				const snippet = buildImportSnippet(comp);
-				const firstExample = comp.examples?.[0];
-				const firstExampleTitle =
-					firstExample?.title ??
-					firstExample?.name ??
-					firstExample?.description ??
-					'示例';
-				const exampleCode = firstExample?.code?.trim() ?? '';
-				const usageHintBody = exampleCode
-					? buildUsageExampleCode(snippet, exampleCode)
-					: `在 JSX 中使用 <${snippet.binding} />（请结合 props 与源码 export 调整）`;
+			if (!args.id && !(args.slug && args.group)) {
 				return textResult({
-					id: comp.id,
-					title: comp.title,
-					modulePath: snippet.modulePath,
-					importStatement: snippet.importStatement,
-					importKind: snippet.importKind,
-					binding: snippet.binding,
-					/** @deprecated 与 binding 相同，保留兼容旧消费方 */
-					namedExport: snippet.binding,
-					usageHint: firstExample
-						? `${firstExampleTitle}：\n${usageHintBody}`
-						: usageHintBody,
-					sourceFile: comp.source,
+					error: 'INVALID_ARGUMENTS',
+					message: '必须提供 id，或同时提供 slug 与 group',
 				});
-			} catch (err) {
-				return textResultFromError(err);
 			}
+			let comp = args.id ? getComponentById(args.id) : null;
+			if (!comp && args.slug && args.group) {
+				comp = getComponentBySlugAndGroup(args.slug, args.group);
+			}
+			if (!comp) {
+				return textResult({
+					error: 'NOT_FOUND',
+					message: '未找到组件',
+				});
+			}
+			const snippet = buildImportSnippet(comp);
+			const firstExample = comp.examples?.[0];
+			const firstExampleTitle =
+				firstExample?.title ??
+				firstExample?.name ??
+				firstExample?.description ??
+				'示例';
+			return textResult({
+				id: comp.id,
+				title: comp.title,
+				modulePath: snippet.modulePath,
+				importStatement: snippet.importStatement,
+				importKind: snippet.importKind,
+				binding: snippet.binding,
+				/** @deprecated 与 binding 相同，保留兼容旧消费方 */
+				namedExport: snippet.binding,
+				usageHint: firstExample
+					? `${firstExampleTitle}：\n${firstExample.code}`
+					: `在 JSX 中使用 <${snippet.binding} />（请结合 props 与源码 export 调整）`,
+				sourceFile: comp.source,
+			});
 		},
 	);
 
