@@ -6,7 +6,6 @@
 		"useIgnoreFile": true
 	},
 	"files": {
-		"includes": ["**/*", "!!.cursor/**/*"],
 		"ignoreUnknown": false
 	},
 	"formatter": {

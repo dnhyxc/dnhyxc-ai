@@ -6,6 +6,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Like, Repository } from 'typeorm';
 import { AssistantSession } from '../assistant/assistant-session.entity';
+import { KnowledgeEmbeddingService } from '../knowledge-embedding/knowledge-embedding.service';
 import { QueryKnowledgeDto } from './dto/query-knowledge.dto';
 import { QueryKnowledgeTrashDto } from './dto/query-knowledge-trash.dto';
 import { SaveKnowledgeDto } from './dto/save-knowledge.dto';
@@ -39,6 +40,7 @@ export class KnowledgeService {
 		private readonly knowledgeRepository: Repository<Knowledge>,
 		@InjectRepository(KnowledgeTrash)
 		private readonly knowledgeTrashRepository: Repository<KnowledgeTrash>,
+		private readonly embeddingService: KnowledgeEmbeddingService,
 	) {}
 
 	/** 新建一条知识库记录 */
@@ -50,6 +52,15 @@ export class KnowledgeService {
 			authorId: dto.authorId ?? null,
 		} satisfies Partial<Knowledge>);
 		const saved = await this.knowledgeRepository.save(row);
+		// 异步触发向量入库：不阻塞保存主流程
+		void this.embeddingService.safeIndexKnowledge({
+			knowledgeId: saved.id,
+			authorId: saved.authorId ?? null,
+			title: saved.title ?? null,
+			content: saved.content ?? '',
+			createdAt: saved.createdAt,
+			updatedAt: saved.updatedAt,
+		});
 		return { id: saved.id };
 	}
 
@@ -71,7 +82,17 @@ export class KnowledgeService {
 		if (content !== undefined) row.content = content;
 		if (author !== undefined) row.author = author;
 		if (authorId !== undefined) row.authorId = authorId;
-		return this.knowledgeRepository.save(row);
+		const saved = await this.knowledgeRepository.save(row);
+		// 异步触发向量入库：更新正文/标题后同步到 Qdrant
+		void this.embeddingService.safeIndexKnowledge({
+			knowledgeId: saved.id,
+			authorId: saved.authorId ?? null,
+			title: saved.title ?? null,
+			content: saved.content ?? '',
+			createdAt: saved.createdAt,
+			updatedAt: saved.updatedAt,
+		});
+		return saved;
 	}
 
 	/**
@@ -186,6 +207,14 @@ export class KnowledgeService {
 		await this.knowledgeTrashRepository.manager.transaction(async (manager) => {
 			const trashRepo = manager.getRepository(KnowledgeTrash);
 			const assistantSessionRepo = manager.getRepository(AssistantSession);
+			const trashRow = await trashRepo.findOne({ where: { id } });
+			if (!trashRow) {
+				throw new NotFoundException('回收站条目不存在');
+			}
+			// 物理删除回收站条目时，同步清理该知识条目在向量库中的残留
+			await this.embeddingService.deleteKnowledgeVectors({
+				knowledgeId: trashRow.originalId,
+			});
 			const articleId = assistantArticleIdForTrashRow(id);
 			await assistantSessionRepo.delete({ knowledgeArticleId: articleId });
 			const res = await trashRepo.delete({ id });
@@ -214,6 +243,15 @@ export class KnowledgeService {
 			async (manager) => {
 				const trashRepo = manager.getRepository(KnowledgeTrash);
 				const assistantSessionRepo = manager.getRepository(AssistantSession);
+				const rows = await trashRepo.find({
+					select: { id: true, originalId: true },
+					where: { id: In(uniq) },
+				});
+				const originalIds = rows.map((r) => r.originalId).filter(Boolean);
+				// 批量物理删除回收站条目时，批量清理向量库残留（按 originalId）
+				for (const knowledgeId of Array.from(new Set(originalIds))) {
+					await this.embeddingService.deleteKnowledgeVectors({ knowledgeId });
+				}
 				for (const tid of uniq) {
 					await assistantSessionRepo.delete({
 						knowledgeArticleId: assistantArticleIdForTrashRow(tid),

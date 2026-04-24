@@ -72,3 +72,22 @@ export enum ModelEnum {
 	SERPER_API_KEY = 'SERPER_API_KEY',
 	SERPER_SEARCH_URL = 'SERPER_SEARCH_URL',
 }
+
+export enum QdrantEnum {
+	/** 例如 http://127.0.0.1:6333 */
+	QDRANT_URL = 'QDRANT_URL',
+	/** 可选：Qdrant API Key（云端/托管常用） */
+	QDRANT_API_KEY = 'QDRANT_API_KEY',
+	/** collection 名，默认 knowledge_chunks_v1 */
+	QDRANT_KNOWLEDGE_COLLECTION = 'QDRANT_KNOWLEDGE_COLLECTION',
+}
+
+export enum KnowledgeQaEnum {
+	/** Embedding 模型名（OpenAI 兼容接口），默认 text-embedding-3-small */
+	KNOWLEDGE_EMBEDDING_MODEL = 'KNOWLEDGE_EMBEDDING_MODEL',
+	/** QA 用的聊天模型名（OpenAI 兼容接口），默认沿用 DEEPSEEK_MODEL_NAME */
+	KNOWLEDGE_QA_MODEL = 'KNOWLEDGE_QA_MODEL',
+	/** 检索 topK，默认 6 */
+	KNOWLEDGE_QA_TOPK = 'KNOWLEDGE_QA_TOPK',
+	DASHSCOPE_API_KEY = 'DASHSCOPE_API_KEY',
+}

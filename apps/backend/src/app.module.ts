@@ -15,12 +15,14 @@ import { AssistantModule } from './services/assistant/assistant.module';
 import { AuthModule } from './services/auth/auth.module';
 import { ChatModule } from './services/chat/chat.module';
 import { KnowledgeModule } from './services/knowledge/knowledge.module';
+import { KnowledgeQaModule } from './services/knowledge-qa/knowledge-qa.module';
 import { LogsModule } from './services/logs/logs.module';
 import { MailModule } from './services/mail/mail.module';
 import { MenusModule } from './services/menus/menus.module';
 import { OcrModule } from './services/ocr/ocr.module';
 import { PayModule } from './services/pay/pay.module';
 import { PromptModule } from './services/prompt/prompt.module';
+import { QdrantModule } from './services/qdrant/qdrant.module';
 import { RolesModule } from './services/roles/roles.module';
 import { ShareModule } from './services/share/share.module';
 import { UploadModule } from './services/upload/upload.module';
@@ -82,7 +84,9 @@ const connections = new Map();
 		PromptModule,
 		OcrModule,
 		ChatModule,
+		QdrantModule,
 		KnowledgeModule,
+		KnowledgeQaModule,
 		ShareModule,
 		PayModule,
 		AssistantModule,
