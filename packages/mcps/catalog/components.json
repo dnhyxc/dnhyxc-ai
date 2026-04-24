@@ -1,0 +1,1608 @@
+{
+	"version": "1.0.0",
+	"basePath": "@/components",
+	"description": "由 apps/frontend/src/components 扫描生成的组件目录：含 ui（shadcn/Radix 风格）与 design（业务）。",
+	"components": [
+		{
+			"id": "ui-alert-dialog",
+			"group": "ui",
+			"slug": "alert-dialog",
+			"name": "AlertDialog",
+			"title": "警告对话框",
+			"category": "overlay",
+			"description": "基于 @radix-ui/react-alert-dialog 的破坏性确认对话框，含标题、描述与操作按钮。",
+			"tags": ["radix", "modal", "confirm"],
+			"props": [
+				{
+					"name": "className",
+					"type": "string",
+					"description": "附加 Tailwind / cn 合并类名"
+				},
+				{
+					"name": "...props",
+					"type": "Record<string, unknown>",
+					"description": "继承底层 DOM 或 Radix 组件的其余属性"
+				}
+			],
+			"examples": [
+				{
+					"title": "危险确认",
+					"code": "<AlertDialog>\n  <AlertDialogTrigger asChild>\n    <Button variant=\"destructive\">删除</Button>\n  </AlertDialogTrigger>\n  <AlertDialogContent>\n    <AlertDialogHeader>\n      <AlertDialogTitle>确认删除？</AlertDialogTitle>\n      <AlertDialogDescription>此操作不可撤销。</AlertDialogDescription>\n    </AlertDialogHeader>\n    <AlertDialogFooter>\n      <AlertDialogCancel>取消</AlertDialogCancel>\n      <AlertDialogAction onClick={onConfirmDelete}>继续删除</AlertDialogAction>\n    </AlertDialogFooter>\n  </AlertDialogContent>\n</AlertDialog>"
+				}
+			],
+			"source": "@/components/ui/alert-dialog.tsx"
+		},
+		{
+			"id": "ui-button",
+			"group": "ui",
+			"slug": "button",
+			"name": "Button",
+			"title": "按钮",
+			"category": "actions",
+			"description": "基于 class-variance-authority（CVA）的按钮，支持 default / destructive / outline / secondary / ghost / link / dynamic 等变体与多种尺寸。",
+			"tags": ["actions", "cva", "radix-slot"],
+			"props": [
+				{
+					"name": "variant",
+					"type": "\"default\" | \"destructive\" | \"outline\" | \"secondary\" | \"ghost\" | \"link\" | \"dynamic\"",
+					"description": "视觉变体"
+				},
+				{
+					"name": "size",
+					"type": "\"default\" | \"sm\" | \"lg\" | \"icon\" | \"icon-sm\" | \"icon-lg\"",
+					"description": "尺寸"
+				},
+				{
+					"name": "asChild",
+					"type": "boolean",
+					"description": "为 true 时使用 Radix Slot 合并子元素"
+				},
+				{
+					"name": "className",
+					"type": "string",
+					"description": "附加 Tailwind / cn 合并类名"
+				},
+				{
+					"name": "...props",
+					"type": "React.ComponentProps<\"button\">",
+					"description": "原生 button 属性（disabled、onClick 等）"
+				}
+			],
+			"examples": [
+				{
+					"title": "主按钮",
+					"code": "<Button variant=\"default\" size=\"default\">主按钮</Button>"
+				},
+				{
+					"title": "次按钮",
+					"code": "<Button variant=\"secondary\" size=\"sm\">次按钮</Button>"
+				},
+				{
+					"title": "危险按钮",
+					"code": "<Button variant=\"destructive\" size=\"default\" disabled={isDeleting}>\n  {isDeleting ? '删除中…' : '删除'}\n</Button>"
+				},
+				{
+					"title": "描边按钮",
+					"code": "<Button variant=\"outline\" size=\"default\" onClick={() => console.log('outline')}>\n  虚线/描边\n</Button>"
+				},
+				{
+					"title": "链接按钮",
+					"code": "<Button variant=\"link\" size=\"default\" asChild>\n  <a href=\"#section\">跳转到锚点</a>\n</Button>"
+				},
+				{
+					"title": "动态按钮",
+					"code": "<Button variant=\"dynamic\" size=\"lg\" onClick={onPrimaryAction}>动态按钮</Button>"
+				}
+			],
+			"source": "@/components/ui/button.tsx"
+		},
+		{
+			"id": "ui-card",
+			"group": "ui",
+			"slug": "card",
+			"name": "Card",
+			"title": "卡片",
+			"category": "layout",
+			"description": "卡片容器与子区域：Card、CardHeader、CardTitle、CardDescription、CardAction、CardContent、CardFooter。",
+			"tags": ["layout", "container"],
+			"props": [
+				{
+					"name": "className",
+					"type": "string",
+					"description": "附加 Tailwind / cn 合并类名"
+				},
+				{
+					"name": "...props",
+					"type": "Record<string, unknown>",
+					"description": "继承底层 DOM 或 Radix 组件的其余属性"
+				}
+			],
+			"examples": [
+				{
+					"title": "卡片布局",
+					"code": "<Card>\n  <CardHeader>\n    <CardTitle>标题</CardTitle>\n    <CardDescription>描述信息</CardDescription>\n  </CardHeader>\n  <CardContent>\n    <p>内容区：可放表单、列表等</p>\n  </CardContent>\n  <CardFooter className=\"justify-end gap-2\">\n    <Button variant=\"secondary\">取消</Button>\n    <Button>确定</Button>\n  </CardFooter>\n</Card>"
+				}
+			],
+			"source": "@/components/ui/card.tsx"
+		},
+		{
+			"id": "ui-carousel",
+			"group": "ui",
+			"slug": "carousel",
+			"name": "Carousel",
+			"title": "轮播",
+			"category": "display",
+			"description": "基于 embla-carousel-react 的轮播组件，含 Carousel、CarouselContent、CarouselItem、CarouselPrevious、CarouselNext。",
+			"tags": ["carousel", "embla"],
+			"props": [
+				{
+					"name": "className",
+					"type": "string",
+					"description": "附加 Tailwind / cn 合并类名"
+				},
+				{
+					"name": "...props",
+					"type": "Record<string, unknown>",
+					"description": "继承底层 DOM 或 Radix 组件的其余属性"
+				}
+			],
+			"examples": [
+				{
+					"title": "轮播",
+					"code": "<Carousel className=\"w-full max-w-xl\">\n  <CarouselContent>\n    {slides.map((s) => (\n      <CarouselItem key={s.id} className=\"basis-full\">\n        <img src={s.url} alt={s.alt} className=\"w-full rounded-md\" />\n      </CarouselItem>\n    ))}\n  </CarouselContent>\n  <CarouselPrevious />\n  <CarouselNext />\n</Carousel>"
+				}
+			],
+			"source": "@/components/ui/carousel.tsx"
+		},
+		{
+			"id": "ui-checkbox",
+			"group": "ui",
+			"slug": "checkbox",
+			"name": "Checkbox",
+			"title": "复选框",
+			"category": "forms",
+			"description": "基于 @radix-ui/react-checkbox 的勾选控件。",
+			"tags": ["forms", "radix"],
+			"props": [
+				{
+					"name": "className",
+					"type": "string",
+					"description": "附加 Tailwind / cn 合并类名"
+				},
+				{
+					"name": "...props",
+					"type": "Record<string, unknown>",
+					"description": "继承底层 DOM 或 Radix 组件的其余属性"
+				}
+			],
+			"examples": [
+				{
+					"title": "复选框",
+					"code": "<div className=\"flex items-center gap-2\">\n  <Checkbox checked={agreed} onCheckedChange={(v) => setAgreed(Boolean(v))} />\n  <Label>我已阅读并同意</Label>\n</div>"
+				}
+			],
+			"source": "@/components/ui/checkbox.tsx"
+		},
+		{
+			"id": "ui-context-menu",
+			"group": "ui",
+			"slug": "context-menu",
+			"name": "ContextMenu",
+			"title": "上下文菜单",
+			"category": "navigation",
+			"description": "基于 @radix-ui/react-context-menu 的右键/上下文菜单。",
+			"tags": ["radix", "menu"],
+			"props": [
+				{
+					"name": "className",
+					"type": "string",
+					"description": "附加 Tailwind / cn 合并类名"
+				},
+				{
+					"name": "...props",
+					"type": "Record<string, unknown>",
+					"description": "继承底层 DOM 或 Radix 组件的其余属性"
+				}
+			],
+			"examples": [
+				{
+					"title": "右键菜单",
+					"code": "<ContextMenu>\n  <ContextMenuTrigger className=\"rounded-md border p-4\">\n    右键点击此区域\n  </ContextMenuTrigger>\n  <ContextMenuContent>\n    <ContextMenuItem onSelect={onCopy}>复制</ContextMenuItem>\n    <ContextMenuItem onSelect={onPaste}>粘贴</ContextMenuItem>\n  </ContextMenuContent>\n</ContextMenu>"
+				}
+			],
+			"source": "@/components/ui/context-menu.tsx"
+		},
+		{
+			"id": "ui-dialog",
+			"group": "ui",
+			"slug": "dialog",
+			"name": "Dialog",
+			"title": "对话框",
+			"category": "overlay",
+			"description": "基于 @radix-ui/react-dialog 的模态对话框，含 Overlay、Content、Header 等组合件。",
+			"tags": ["radix", "modal"],
+			"props": [
+				{
+					"name": "className",
+					"type": "string",
+					"description": "附加 Tailwind / cn 合并类名"
+				},
+				{
+					"name": "...props",
+					"type": "Record<string, unknown>",
+					"description": "继承底层 DOM 或 Radix 组件的其余属性"
+				}
+			],
+			"examples": [
+				{
+					"title": "对话框",
+					"code": "<Dialog open={open} onOpenChange={setOpen}>\n  <DialogTrigger asChild>\n    <Button variant=\"outline\">打开对话框</Button>\n  </DialogTrigger>\n  <DialogContent>\n    <DialogHeader>\n      <DialogTitle>编辑信息</DialogTitle>\n      <DialogDescription>修改后点击保存</DialogDescription>\n    </DialogHeader>\n    <div className=\"grid gap-3\">\n      <Label>名称</Label>\n      <Input value={name} onChange={(e) => setName(e.target.value)} />\n    </div>\n    <DialogFooter>\n      <Button onClick={onSave}>保存</Button>\n    </DialogFooter>\n  </DialogContent>\n</Dialog>"
+				}
+			],
+			"source": "@/components/ui/dialog.tsx"
+		},
+		{
+			"id": "ui-dropdown-menu",
+			"group": "ui",
+			"slug": "dropdown-menu",
+			"name": "DropdownMenu",
+			"title": "下拉菜单",
+			"category": "navigation",
+			"description": "基于 @radix-ui/react-dropdown-menu 的下拉菜单与菜单项组合。",
+			"tags": ["radix", "menu"],
+			"props": [
+				{
+					"name": "className",
+					"type": "string",
+					"description": "附加 Tailwind / cn 合并类名"
+				},
+				{
+					"name": "...props",
+					"type": "Record<string, unknown>",
+					"description": "继承底层 DOM 或 Radix 组件的其余属性"
+				}
+			],
+			"examples": [
+				{
+					"title": "下拉菜单",
+					"code": "<DropdownMenu>\n  <DropdownMenuTrigger asChild>\n    <Button variant=\"outline\">更多</Button>\n  </DropdownMenuTrigger>\n  <DropdownMenuContent align=\"end\">\n    <DropdownMenuItem onSelect={onRename}>重命名</DropdownMenuItem>\n    <DropdownMenuItem onSelect={onDuplicate}>复制</DropdownMenuItem>\n    <DropdownMenuSeparator />\n    <DropdownMenuItem className=\"text-destructive\" onSelect={onDelete}>删除</DropdownMenuItem>\n  </DropdownMenuContent>\n</DropdownMenu>"
+				}
+			],
+			"source": "@/components/ui/dropdown-menu.tsx"
+		},
+		{
+			"id": "ui-form",
+			"group": "ui",
+			"slug": "form",
+			"name": "Form",
+			"title": "表单",
+			"category": "forms",
+			"description": "与 react-hook-form 集成的 Form、FormField、FormItem、FormLabel、FormControl、FormMessage 等封装。",
+			"tags": ["forms", "react-hook-form"],
+			"props": [
+				{
+					"name": "className",
+					"type": "string",
+					"description": "附加 Tailwind / cn 合并类名"
+				},
+				{
+					"name": "...props",
+					"type": "Record<string, unknown>",
+					"description": "继承底层 DOM 或 Radix 组件的其余属性"
+				}
+			],
+			"examples": [
+				{
+					"title": "实际用例",
+					"code": "// 摘自 views/login/login-by-email-form.tsx\nimport { Form } from '@ui/index';\n\n<Form {...form}>\n\t\t\t<form onSubmit={form.handleSubmit(onSubmit)} className=\"space-y-5\">\n\t\t\t\t<FormField\n\t\t\t\t\tcontrol={form.control}\n\t\t\t\t\tname=\"email\"\n\t\t\t\t\trender={({ field }) => (\n\t\t\t\t\t\t<FormItem>\n\t\t\t\t\t\t\t<FormLabel className=\"text-md\">邮箱</FormLabel>\n\t\t\t\t\t\t\t<FormControl>\n\t\t\t\t\t\t\t\t<Input placeholder=\"请输入邮箱\" {...field} />\n\t\t\t\t\t\t\t</FormControl>\n\t\t\t\t\t\t\t<FormMessage />"
+				}
+			],
+			"source": "@/components/ui/form.tsx"
+		},
+		{
+			"id": "ui-input",
+			"group": "ui",
+			"slug": "input",
+			"name": "Input",
+			"title": "输入框",
+			"category": "forms",
+			"description": "单行文本输入，继承原生 input 属性，内置主题边框与 focus 环。",
+			"tags": ["forms", "input"],
+			"props": [
+				{
+					"name": "className",
+					"type": "string",
+					"description": "附加 Tailwind / cn 合并类名"
+				},
+				{
+					"name": "...props",
+					"type": "Record<string, unknown>",
+					"description": "继承底层 DOM 或 Radix 组件的其余属性"
+				}
+			],
+			"examples": [
+				{
+					"title": "受控输入",
+					"code": "<Input\n  value={title}\n  placeholder=\"请输入标题\"\n  onChange={(e) => setTitle(e.target.value)}\n/>"
+				}
+			],
+			"source": "@/components/ui/input.tsx"
+		},
+		{
+			"id": "ui-label",
+			"group": "ui",
+			"slug": "label",
+			"name": "Label",
+			"title": "标签",
+			"category": "forms",
+			"description": "基于 @radix-ui/react-label 的表单标签。",
+			"tags": ["forms", "radix"],
+			"props": [
+				{
+					"name": "className",
+					"type": "string",
+					"description": "附加 Tailwind / cn 合并类名"
+				},
+				{
+					"name": "...props",
+					"type": "Record<string, unknown>",
+					"description": "继承底层 DOM 或 Radix 组件的其余属性"
+				}
+			],
+			"examples": [
+				{
+					"title": "实际用例",
+					"code": "// 摘自 views/chat/index.tsx\nimport { Label } from '@ui/index';\n\n<Label htmlFor=\"terms\" className=\"cursor-pointer ml-2 text-md\">\n\t\t\t\t\t\t\t\t全选\n\t\t\t\t\t\t\t</Label>"
+				}
+			],
+			"source": "@/components/ui/label.tsx"
+		},
+		{
+			"id": "ui-navigation-menu",
+			"group": "ui",
+			"slug": "navigation-menu",
+			"name": "NavigationMenu",
+			"title": "导航菜单",
+			"category": "navigation",
+			"description": "基于 @radix-ui/react-navigation-menu 的顶层导航菜单。",
+			"tags": ["radix", "nav"],
+			"props": [
+				{
+					"name": "className",
+					"type": "string",
+					"description": "附加 Tailwind / cn 合并类名"
+				},
+				{
+					"name": "...props",
+					"type": "Record<string, unknown>",
+					"description": "继承底层 DOM 或 Radix 组件的其余属性"
+				}
+			],
+			"examples": [
+				{
+					"title": "导航菜单",
+					"code": "<NavigationMenu>\n  <NavigationMenuList>\n    <NavigationMenuItem>\n      <NavigationMenuTrigger>文档</NavigationMenuTrigger>\n      <NavigationMenuContent className=\"p-4\">\n        <NavigationMenuLink href=\"#intro\">介绍</NavigationMenuLink>\n      </NavigationMenuContent>\n    </NavigationMenuItem>\n  </NavigationMenuList>\n</NavigationMenu>"
+				}
+			],
+			"source": "@/components/ui/navigation-menu.tsx"
+		},
+		{
+			"id": "ui-progress",
+			"group": "ui",
+			"slug": "progress",
+			"name": "Progress",
+			"title": "进度条",
+			"category": "feedback",
+			"description": "基于 @radix-ui/react-progress 的进度指示。",
+			"tags": ["feedback", "radix"],
+			"props": [
+				{
+					"name": "className",
+					"type": "string",
+					"description": "附加 Tailwind / cn 合并类名"
+				},
+				{
+					"name": "...props",
+					"type": "Record<string, unknown>",
+					"description": "继承底层 DOM 或 Radix 组件的其余属性"
+				}
+			],
+			"examples": [
+				{
+					"title": "进度条",
+					"code": "<Progress value={progress} className=\"w-64\" />"
+				}
+			],
+			"source": "@/components/ui/progress.tsx"
+		},
+		{
+			"id": "ui-radio-group",
+			"group": "ui",
+			"slug": "radio-group",
+			"name": "RadioGroup",
+			"title": "单选组",
+			"category": "forms",
+			"description": "基于 @radix-ui/react-radio-group 的单选项组合。",
+			"tags": ["forms", "radix"],
+			"props": [
+				{
+					"name": "className",
+					"type": "string",
+					"description": "附加 Tailwind / cn 合并类名"
+				},
+				{
+					"name": "...props",
+					"type": "Record<string, unknown>",
+					"description": "继承底层 DOM 或 Radix 组件的其余属性"
+				}
+			],
+			"examples": [
+				{
+					"title": "单选组",
+					"code": "<RadioGroup value={theme} onValueChange={setTheme} className=\"gap-2\">\n  <div className=\"flex items-center gap-2\">\n    <RadioGroupItem value=\"light\" id=\"theme-light\" />\n    <Label htmlFor=\"theme-light\">亮色</Label>\n  </div>\n  <div className=\"flex items-center gap-2\">\n    <RadioGroupItem value=\"dark\" id=\"theme-dark\" />\n    <Label htmlFor=\"theme-dark\">暗色</Label>\n  </div>\n</RadioGroup>"
+				}
+			],
+			"source": "@/components/ui/radio-group.tsx"
+		},
+		{
+			"id": "ui-resizable",
+			"group": "ui",
+			"slug": "resizable",
+			"name": "Resizable",
+			"title": "resizable",
+			"category": "ui",
+			"description": "UI 组件：resizable",
+			"tags": ["ui"],
+			"props": [
+				{
+					"name": "className",
+					"type": "string",
+					"description": "附加 Tailwind / cn 合并类名"
+				},
+				{
+					"name": "...props",
+					"type": "Record<string, unknown>",
+					"description": "继承底层 DOM 或 Radix 组件的其余属性"
+				}
+			],
+			"examples": [
+				{
+					"title": "可拖拽分栏",
+					"code": "<ResizablePanelGroup direction=\"horizontal\" className=\"h-64 rounded-md border\">\n  <ResizablePanel defaultSize={60} minSize={30}>\n    <div className=\"p-4\">左侧</div>\n  </ResizablePanel>\n  <ResizableHandle withHandle />\n  <ResizablePanel defaultSize={40} minSize={20}>\n    <div className=\"p-4\">右侧</div>\n  </ResizablePanel>\n</ResizablePanelGroup>"
+				}
+			],
+			"source": "@/components/ui/resizable.tsx"
+		},
+		{
+			"id": "ui-scroll-area",
+			"group": "ui",
+			"slug": "scroll-area",
+			"name": "ScrollArea",
+			"title": "滚动区域",
+			"category": "layout",
+			"description": "基于 @radix-ui/react-scroll-area 的自定义滚动条区域。",
+			"tags": ["layout", "radix"],
+			"props": [
+				{
+					"name": "className",
+					"type": "string",
+					"description": "附加 Tailwind / cn 合并类名"
+				},
+				{
+					"name": "...props",
+					"type": "Record<string, unknown>",
+					"description": "继承底层 DOM 或 Radix 组件的其余属性"
+				}
+			],
+			"examples": [
+				{
+					"title": "滚动区域",
+					"code": "<ScrollArea className=\"h-48 w-full rounded-md border\">\n  <div className=\"p-4 space-y-2\">\n    {items.map((x) => (\n      <div key={x.id} className=\"text-sm\">{x.title}</div>\n    ))}\n  </div>\n  <ScrollBar orientation=\"vertical\" />\n</ScrollArea>"
+				}
+			],
+			"source": "@/components/ui/scroll-area.tsx"
+		},
+		{
+			"id": "ui-select",
+			"group": "ui",
+			"slug": "select",
+			"name": "Select",
+			"title": "选择器",
+			"category": "forms",
+			"description": "基于 Radix Select 的选择下拉，含 Trigger、Content、Item 等组合件。",
+			"tags": ["forms", "radix"],
+			"props": [
+				{
+					"name": "className",
+					"type": "string",
+					"description": "附加 Tailwind / cn 合并类名"
+				},
+				{
+					"name": "...props",
+					"type": "Record<string, unknown>",
+					"description": "继承底层 DOM 或 Radix 组件的其余属性"
+				}
+			],
+			"examples": [
+				{
+					"title": "选择器",
+					"code": "<Select value={status} onValueChange={setStatus}>\n  <SelectTrigger size=\"default\" className=\"w-40\">\n    <SelectValue placeholder=\"选择状态\" />\n  </SelectTrigger>\n  <SelectContent>\n    <SelectItem value=\"todo\">待办</SelectItem>\n    <SelectItem value=\"doing\">进行中</SelectItem>\n    <SelectItem value=\"done\">已完成</SelectItem>\n  </SelectContent>\n</Select>"
+				}
+			],
+			"source": "@/components/ui/select.tsx"
+		},
+		{
+			"id": "ui-sheet",
+			"group": "ui",
+			"slug": "sheet",
+			"name": "Sheet",
+			"title": "侧栏表单",
+			"category": "overlay",
+			"description": "基于 @radix-ui/react-dialog 的侧滑 Sheet（抽屉式面板）。",
+			"tags": ["overlay", "drawer", "radix"],
+			"props": [
+				{
+					"name": "className",
+					"type": "string",
+					"description": "附加 Tailwind / cn 合并类名"
+				},
+				{
+					"name": "...props",
+					"type": "Record<string, unknown>",
+					"description": "继承底层 DOM 或 Radix 组件的其余属性"
+				}
+			],
+			"examples": [
+				{
+					"title": "侧滑面板",
+					"code": "<Sheet open={open} onOpenChange={setOpen}>\n  <SheetTrigger asChild>\n    <Button variant=\"outline\">打开侧栏</Button>\n  </SheetTrigger>\n  <SheetContent side=\"right\" className=\"w-[420px]\">\n    <SheetHeader>\n      <SheetTitle>设置</SheetTitle>\n      <SheetDescription>在这里修改偏好</SheetDescription>\n    </SheetHeader>\n    <div className=\"mt-6 grid gap-4\">\n      <div className=\"flex items-center justify-between\">\n        <Label>启用功能</Label>\n        <Switch checked={enabled} onCheckedChange={setEnabled} />\n      </div>\n    </div>\n  </SheetContent>\n</Sheet>"
+				}
+			],
+			"source": "@/components/ui/sheet.tsx"
+		},
+		{
+			"id": "ui-sonner",
+			"group": "ui",
+			"slug": "sonner",
+			"name": "Sonner",
+			"title": "Sonner 通知",
+			"category": "feedback",
+			"description": "基于 sonner 的全局 Toast 入口（Toaster）。",
+			"tags": ["toast", "feedback"],
+			"props": [
+				{
+					"name": "className",
+					"type": "string",
+					"description": "附加 Tailwind / cn 合并类名"
+				},
+				{
+					"name": "...props",
+					"type": "Record<string, unknown>",
+					"description": "继承底层 DOM 或 Radix 组件的其余属性"
+				}
+			],
+			"examples": [
+				{
+					"title": "Toast 容器",
+					"code": "<Toaster richColors position=\"top-right\" />"
+				}
+			],
+			"source": "@/components/ui/sonner.tsx"
+		},
+		{
+			"id": "ui-spinner",
+			"group": "ui",
+			"slug": "spinner",
+			"name": "Spinner",
+			"title": "加载指示",
+			"category": "feedback",
+			"description": "旋转加载 SVG 图标组件。",
+			"tags": ["loading", "spinner"],
+			"props": [
+				{
+					"name": "className",
+					"type": "string",
+					"description": "附加 Tailwind / cn 合并类名"
+				},
+				{
+					"name": "...props",
+					"type": "Record<string, unknown>",
+					"description": "继承底层 DOM 或 Radix 组件的其余属性"
+				}
+			],
+			"examples": [
+				{
+					"title": "加载指示",
+					"code": "<Spinner className=\"size-5\" />"
+				}
+			],
+			"source": "@/components/ui/spinner.tsx"
+		},
+		{
+			"id": "ui-switch",
+			"group": "ui",
+			"slug": "switch",
+			"name": "Switch",
+			"title": "开关",
+			"category": "forms",
+			"description": "基于 @radix-ui/react-switch 的布尔开关。",
+			"tags": ["forms", "radix"],
+			"props": [
+				{
+					"name": "className",
+					"type": "string",
+					"description": "附加 Tailwind / cn 合并类名"
+				},
+				{
+					"name": "...props",
+					"type": "Record<string, unknown>",
+					"description": "继承底层 DOM 或 Radix 组件的其余属性"
+				}
+			],
+			"examples": [
+				{
+					"title": "开关",
+					"code": "<div className=\"flex items-center gap-2\">\n  <Switch checked={enabled} onCheckedChange={setEnabled} />\n  <Label>启用</Label>\n</div>"
+				}
+			],
+			"source": "@/components/ui/switch.tsx"
+		},
+		{
+			"id": "ui-textarea",
+			"group": "ui",
+			"slug": "textarea",
+			"name": "Textarea",
+			"title": "多行文本",
+			"category": "forms",
+			"description": "多行文本输入，继承原生 textarea 属性。",
+			"tags": ["forms", "textarea"],
+			"props": [
+				{
+					"name": "className",
+					"type": "string",
+					"description": "附加 Tailwind / cn 合并类名"
+				},
+				{
+					"name": "...props",
+					"type": "Record<string, unknown>",
+					"description": "继承底层 DOM 或 Radix 组件的其余属性"
+				}
+			],
+			"examples": [
+				{
+					"title": "多行输入",
+					"code": "<Textarea\n  value={content}\n  placeholder=\"请输入内容\"\n  rows={6}\n  onChange={(e) => setContent(e.target.value)}\n/>"
+				}
+			],
+			"source": "@/components/ui/textarea.tsx"
+		},
+		{
+			"id": "ui-tooltip",
+			"group": "ui",
+			"slug": "tooltip",
+			"name": "Tooltip",
+			"title": "工具提示",
+			"category": "overlay",
+			"description": "基于 @radix-ui/react-tooltip 的悬浮提示。",
+			"tags": ["overlay", "radix"],
+			"props": [
+				{
+					"name": "className",
+					"type": "string",
+					"description": "附加 Tailwind / cn 合并类名"
+				},
+				{
+					"name": "...props",
+					"type": "Record<string, unknown>",
+					"description": "继承底层 DOM 或 Radix 组件的其余属性"
+				}
+			],
+			"examples": [
+				{
+					"title": "提示",
+					"code": "<TooltipProvider>\n  <Tooltip>\n    <TooltipTrigger asChild>\n      <Button variant=\"outline\" size=\"icon\" aria-label=\"帮助\">?</Button>\n    </TooltipTrigger>\n    <TooltipContent side=\"top\">这是提示内容</TooltipContent>\n  </Tooltip>\n</TooltipProvider>"
+				}
+			],
+			"source": "@/components/ui/tooltip.tsx"
+		},
+		{
+			"id": "design-chat-anchor-nav",
+			"group": "design",
+			"slug": "ChatAnchorNav",
+			"name": "ChatAnchorNav",
+			"title": "聊天锚点导航",
+			"category": "chat",
+			"description": "会话或长文中的锚点/目录导航 UI。",
+			"tags": ["chat", "nav"],
+			"props": [
+				{
+					"name": "className",
+					"type": "string",
+					"description": "附加 Tailwind / cn 合并类名"
+				},
+				{
+					"name": "...props",
+					"type": "Record<string, unknown>",
+					"description": "继承底层 DOM 或 Radix 组件的其余属性"
+				}
+			],
+			"examples": [
+				{
+					"title": "实际用例（占位）",
+					"code": "// 该组件在项目中暂无可自动提取的 JSX 片段（可能未使用或为复杂组合导出）。\n// 建议先调用 get_component_details 查看 props，再到 source 对照真实 API。\n\nimport ChatAnchorNav from '@design/ChatAnchorNav';\n\n<ChatAnchorNav className=\"\" />"
+				}
+			],
+			"source": "@/components/design/ChatAnchorNav/index.tsx"
+		},
+		{
+			"id": "design-chat-assistant-message",
+			"group": "design",
+			"slug": "ChatAssistantMessage",
+			"name": "ChatAssistantMessage",
+			"title": "助手消息",
+			"category": "chat",
+			"description": "AI 助手气泡：Markdown 流式、思考区、搜索摘要等组合。",
+			"tags": ["chat", "markdown", "sse"],
+			"props": [
+				{
+					"name": "className",
+					"type": "string",
+					"description": "附加 Tailwind / cn 合并类名"
+				},
+				{
+					"name": "...props",
+					"type": "Record<string, unknown>",
+					"description": "继承底层 DOM 或 Radix 组件的其余属性"
+				}
+			],
+			"examples": [
+				{
+					"title": "实际用例",
+					"code": "// 摘自 views/share/index.tsx\nimport ChatAssistantMessage from '@/components/design/ChatAssistantMessage';\n\n<ChatAssistantMessage message={message} />"
+				}
+			],
+			"source": "@/components/design/ChatAssistantMessage/index.tsx",
+			"relatedSources": [
+				"@/components/design/ChatAssistantMessage/SearchOrganics.tsx",
+				"@/components/design/ChatAssistantMessage/StreamingMarkdownBody.tsx"
+			]
+		},
+		{
+			"id": "design-chat-bot",
+			"group": "design",
+			"slug": "ChatBot",
+			"name": "ChatBot",
+			"title": "聊天机器人视图",
+			"category": "chat",
+			"description": "主聊天区域视图壳层（含 ChatBotView / SimpleChatBotView 等编排）。",
+			"tags": ["chat", "glm"],
+			"props": [
+				{
+					"name": "className",
+					"type": "string",
+					"description": "附加 Tailwind / cn 合并类名"
+				},
+				{
+					"name": "...props",
+					"type": "Record<string, unknown>",
+					"description": "继承底层 DOM 或 Radix 组件的其余属性"
+				}
+			],
+			"examples": [
+				{
+					"title": "实际用例",
+					"code": "// 摘自 views/chat/session/index.tsx\nimport ChatBot from '@design/ChatBot';\n\n<ChatBot />"
+				}
+			],
+			"source": "@/components/design/ChatBot/index.tsx",
+			"relatedSources": [
+				"@/components/design/ChatBot/ChatBotView.tsx",
+				"@/components/design/ChatBot/SimpleChatBotView.tsx",
+				"@/components/design/ChatBot/utils.ts"
+			]
+		},
+		{
+			"id": "design-chat-code-tool-bar",
+			"group": "design",
+			"slug": "ChatCodeToolBar",
+			"name": "ChatCodeToolBar",
+			"title": "代码块工具栏",
+			"category": "chat",
+			"description": "Markdown 代码围栏上的复制/下载等操作条（与 @dnhyxc-ai/tools 契约配合）。",
+			"tags": ["chat", "markdown", "code"],
+			"props": [
+				{
+					"name": "className",
+					"type": "string",
+					"description": "附加 Tailwind / cn 合并类名"
+				},
+				{
+					"name": "...props",
+					"type": "Record<string, unknown>",
+					"description": "继承底层 DOM 或 Radix 组件的其余属性"
+				}
+			],
+			"examples": [
+				{
+					"title": "实际用例",
+					"code": "// 摘自 hooks/useChatCodeFloatingToolbar.tsx\nimport ChatCodeToolbarFloating from '@/components/design/ChatCodeToolBar';\n\nreturn <ChatCodeToolbarFloating />;"
+				}
+			],
+			"source": "@/components/design/ChatCodeToolBar/index.tsx"
+		},
+		{
+			"id": "design-chat-controls",
+			"group": "design",
+			"slug": "ChatControls",
+			"name": "ChatControls",
+			"title": "聊天控件",
+			"category": "chat",
+			"description": "发送、停止、模型切换等控制条。",
+			"tags": ["chat", "controls"],
+			"props": [
+				{
+					"name": "className",
+					"type": "string",
+					"description": "附加 Tailwind / cn 合并类名"
+				},
+				{
+					"name": "...props",
+					"type": "Record<string, unknown>",
+					"description": "继承底层 DOM 或 Radix 组件的其余属性"
+				}
+			],
+			"examples": [
+				{
+					"title": "实际用例",
+					"code": "// 摘自 components/design/ChatBot/ChatBotView.tsx\nimport ChatControls from '@design/ChatControls';\n\n<ChatControls {...chatControlsContext} />"
+				}
+			],
+			"source": "@/components/design/ChatControls/index.tsx"
+		},
+		{
+			"id": "design-chat-entry",
+			"group": "design",
+			"slug": "ChatEntry",
+			"name": "ChatEntry",
+			"title": "聊天入口",
+			"category": "chat",
+			"description": "发起对话或进入会话的入口组件。",
+			"tags": ["chat"],
+			"props": [
+				{
+					"name": "className",
+					"type": "string",
+					"description": "附加 Tailwind / cn 合并类名"
+				},
+				{
+					"name": "...props",
+					"type": "Record<string, unknown>",
+					"description": "继承底层 DOM 或 Radix 组件的其余属性"
+				}
+			],
+			"examples": [
+				{
+					"title": "实际用例（占位）",
+					"code": "// 该组件在项目中暂无可自动提取的 JSX 片段（可能未使用或为复杂组合导出）。\n// 建议先调用 get_component_details 查看 props，再到 source 对照真实 API。\n\nimport ChatEntry from '@design/ChatEntry';\n\n<ChatEntry className=\"\" />"
+				}
+			],
+			"source": "@/components/design/ChatEntry/index.tsx"
+		},
+		{
+			"id": "design-chat-file-list",
+			"group": "design",
+			"slug": "ChatFileList",
+			"name": "ChatFileList",
+			"title": "聊天文件列表",
+			"category": "chat",
+			"description": "会话关联文件列表展示与交互。",
+			"tags": ["chat", "files"],
+			"props": [
+				{
+					"name": "className",
+					"type": "string",
+					"description": "附加 Tailwind / cn 合并类名"
+				},
+				{
+					"name": "...props",
+					"type": "Record<string, unknown>",
+					"description": "继承底层 DOM 或 Radix 组件的其余属性"
+				}
+			],
+			"examples": [
+				{
+					"title": "实际用例（占位）",
+					"code": "// 该组件在项目中暂无可自动提取的 JSX 片段（可能未使用或为复杂组合导出）。\n// 建议先调用 get_component_details 查看 props，再到 source 对照真实 API。\n\nimport ChatFileList from '@design/ChatFileList';\n\n<ChatFileList className=\"\" />"
+				}
+			],
+			"source": "@/components/design/ChatFileList/index.tsx"
+		},
+		{
+			"id": "design-chat-message-actions",
+			"group": "design",
+			"slug": "ChatMessageActions",
+			"name": "ChatMessageActions",
+			"title": "消息操作",
+			"category": "chat",
+			"description": "单条消息上的操作按钮（复制、重新生成等）。",
+			"tags": ["chat"],
+			"props": [
+				{
+					"name": "className",
+					"type": "string",
+					"description": "附加 Tailwind / cn 合并类名"
+				},
+				{
+					"name": "...props",
+					"type": "Record<string, unknown>",
+					"description": "继承底层 DOM 或 Radix 组件的其余属性"
+				}
+			],
+			"examples": [
+				{
+					"title": "实际用例（占位）",
+					"code": "// 该组件在项目中暂无可自动提取的 JSX 片段（可能未使用或为复杂组合导出）。\n// 建议先调用 get_component_details 查看 props，再到 source 对照真实 API。\n\nimport ChatMessageActions from '@design/ChatMessageActions';\n\n<ChatMessageActions className=\"\" />"
+				}
+			],
+			"source": "@/components/design/ChatMessageActions/index.tsx"
+		},
+		{
+			"id": "design-chat-new-session",
+			"group": "design",
+			"slug": "ChatNewSession",
+			"name": "ChatNewSession",
+			"title": "新建会话",
+			"category": "chat",
+			"description": "新建对话会话的触发与表单区域。",
+			"tags": ["chat"],
+			"props": [
+				{
+					"name": "className",
+					"type": "string",
+					"description": "附加 Tailwind / cn 合并类名"
+				},
+				{
+					"name": "...props",
+					"type": "Record<string, unknown>",
+					"description": "继承底层 DOM 或 Radix 组件的其余属性"
+				}
+			],
+			"examples": [
+				{
+					"title": "实际用例",
+					"code": "// 摘自 views/chat/new/index.tsx\nimport ChatNewSession from '@design/ChatNewSession';\n\n<ChatNewSession />"
+				}
+			],
+			"source": "@/components/design/ChatNewSession/index.tsx"
+		},
+		{
+			"id": "design-chat-text-area",
+			"group": "design",
+			"slug": "ChatTextArea",
+			"name": "ChatTextArea",
+			"title": "聊天输入区",
+			"category": "chat",
+			"description": "多行输入与快捷键等聊天输入组件。",
+			"tags": ["chat", "input"],
+			"props": [
+				{
+					"name": "className",
+					"type": "string",
+					"description": "附加 Tailwind / cn 合并类名"
+				},
+				{
+					"name": "...props",
+					"type": "Record<string, unknown>",
+					"description": "继承底层 DOM 或 Radix 组件的其余属性"
+				}
+			],
+			"examples": [
+				{
+					"title": "实际用例（占位）",
+					"code": "// 该组件在项目中暂无可自动提取的 JSX 片段（可能未使用或为复杂组合导出）。\n// 建议先调用 get_component_details 查看 props，再到 source 对照真实 API。\n\nimport ChatTextArea from '@design/ChatTextArea';\n\n<ChatTextArea className=\"\" />"
+				}
+			],
+			"source": "@/components/design/ChatTextArea/index.tsx"
+		},
+		{
+			"id": "design-chat-user-message",
+			"group": "design",
+			"slug": "ChatUserMessage",
+			"name": "ChatUserMessage",
+			"title": "用户消息",
+			"category": "chat",
+			"description": "用户侧消息气泡与 Markdown 渲染。",
+			"tags": ["chat", "markdown"],
+			"props": [
+				{
+					"name": "className",
+					"type": "string",
+					"description": "附加 Tailwind / cn 合并类名"
+				},
+				{
+					"name": "...props",
+					"type": "Record<string, unknown>",
+					"description": "继承底层 DOM 或 Radix 组件的其余属性"
+				}
+			],
+			"examples": [
+				{
+					"title": "实际用例（占位）",
+					"code": "// 该组件在项目中暂无可自动提取的 JSX 片段（可能未使用或为复杂组合导出）。\n// 建议先调用 get_component_details 查看 props，再到 source 对照真实 API。\n\nimport ChatUserMessage from '@design/ChatUserMessage';\n\n<ChatUserMessage className=\"\" />"
+				}
+			],
+			"source": "@/components/design/ChatUserMessage/index.tsx"
+		},
+		{
+			"id": "design-confirm",
+			"group": "design",
+			"slug": "Confirm",
+			"name": "Confirm",
+			"title": "确认框",
+			"category": "feedback",
+			"description": "业务确认对话框封装。",
+			"tags": ["modal", "confirm"],
+			"props": [
+				{
+					"name": "className",
+					"type": "string",
+					"description": "附加 Tailwind / cn 合并类名"
+				},
+				{
+					"name": "...props",
+					"type": "Record<string, unknown>",
+					"description": "继承底层 DOM 或 Radix 组件的其余属性"
+				}
+			],
+			"examples": [
+				{
+					"title": "实际用例（占位）",
+					"code": "// 该组件在项目中暂无可自动提取的 JSX 片段（可能未使用或为复杂组合导出）。\n// 建议先调用 get_component_details 查看 props，再到 source 对照真实 API。\n\nimport Confirm from '@design/Confirm';\n\n<Confirm className=\"\" />"
+				}
+			],
+			"source": "@/components/design/Confirm/index.tsx"
+		},
+		{
+			"id": "design-context-menu",
+			"group": "design",
+			"slug": "ContextMenu",
+			"name": "ContextMenu",
+			"title": "业务上下文菜单",
+			"category": "navigation",
+			"description": "业务场景右键菜单（含 QuickContextMenu 等）。",
+			"tags": ["menu", "context"],
+			"props": [
+				{
+					"name": "className",
+					"type": "string",
+					"description": "附加 Tailwind / cn 合并类名"
+				},
+				{
+					"name": "...props",
+					"type": "Record<string, unknown>",
+					"description": "继承底层 DOM 或 Radix 组件的其余属性"
+				}
+			],
+			"examples": [
+				{
+					"title": "实际用例（占位）",
+					"code": "// 该组件在项目中暂无可自动提取的 JSX 片段（可能未使用或为复杂组合导出）。\n// 建议先调用 get_component_details 查看 props，再到 source 对照真实 API。\n\nimport ContextMenu from '@design/ContextMenu';\n\n<ContextMenu className=\"\" />"
+				}
+			],
+			"source": "@/components/design/ContextMenu/index.tsx",
+			"relatedSources": [
+				"@/components/design/ContextMenu/QuickContextMenu.tsx",
+				"@/components/design/ContextMenu/primitives.tsx",
+				"@/components/design/ContextMenu/types.ts"
+			]
+		},
+		{
+			"id": "design-drag-upload",
+			"group": "design",
+			"slug": "DragUpload",
+			"name": "DragUpload",
+			"title": "拖拽上传",
+			"category": "forms",
+			"description": "拖拽文件上传区域与配置。",
+			"tags": ["upload", "dnd"],
+			"props": [
+				{
+					"name": "className",
+					"type": "string",
+					"description": "附加 Tailwind / cn 合并类名"
+				},
+				{
+					"name": "...props",
+					"type": "Record<string, unknown>",
+					"description": "继承底层 DOM 或 Radix 组件的其余属性"
+				}
+			],
+			"examples": [
+				{
+					"title": "实际用例",
+					"code": "// 摘自 views/profile/index.tsx\nimport DragUpload from '@/components/design/DragUpload';\n\n<DragUpload uploadFile={uploadFile} />"
+				}
+			],
+			"source": "@/components/design/DragUpload/index.tsx",
+			"relatedSources": ["@/components/design/DragUpload/config.ts"]
+		},
+		{
+			"id": "design-drawer",
+			"group": "design",
+			"slug": "Drawer",
+			"name": "Drawer",
+			"title": "抽屉",
+			"category": "layout",
+			"description": "侧滑抽屉面板容器。",
+			"tags": ["layout", "drawer"],
+			"props": [
+				{
+					"name": "className",
+					"type": "string",
+					"description": "附加 Tailwind / cn 合并类名"
+				},
+				{
+					"name": "...props",
+					"type": "Record<string, unknown>",
+					"description": "继承底层 DOM 或 Radix 组件的其余属性"
+				}
+			],
+			"examples": [
+				{
+					"title": "实际用例",
+					"code": "// 摘自 views/chat/session-list/index.tsx\nimport { Drawer } from '@design/Drawer';\n\n<Drawer title=\"历史对话\" open={open} onOpenChange={onOpenChange}>\n\t\t\t<ScrollArea\n\t\t\t\tclassName=\"h-full overflow-y-auto pr-2 box-border\"\n\t\t\t\tonScroll={chatStore.onHistorySessionViewportScroll}\n\t\t\t>\n\t\t\t\t<div className=\"flex flex-col gap-0\">\n\t\t\t\t\t{showInitialPlaceholder ? (\n\t\t\t\t\t\t<div className=\"text-sm text-textcolor/60 py-6 text-center\">\n\t\t\t\t\t\t\t加载中…\n\t\t\t\t\t\t</div>\n\t\t\t\t\t) : null}\n\t\t\t\t\t{sessionList}\n\t\t\t\t\t{showLoadMoreHint ? (\n\t\t\t\t\t\t<div className=\"text-xs text-textcolor/50 py-2 text-center\">\n\t\t\t\t\t\t\t加载更多…\n\t\t\t\t\t\t</div>\n\t\t\t\t\t) : null}\n\t\t\t\t\t{showEmptyHint ? (\n\t\t\t\t\t\t<div className=\"text-sm text-textcolor/60 py-8 text-center\">\n\t\t\t\t\t\t\t暂无历史对话\n\t\t\t\t\t\t</div>\n\t\t\t\t\t) : null}\n\t\t\t\t</div>\n\t\t\t</ScrollArea>\n\t\t\t<Confirm\n\t\t\t\topen={confirmOpen}\n\t\t\t\tonOpenChange={setConfirmOpen}\n\t\t\t\ttitle=\"确认删除\"\n\t\t\t\tdescription=\"确定要删除这个会话吗？此操作无法撤销。\"\n\t\t\t\tclassName=\"w-100\"\n\t\t\t\tonConfirm={handleConfirmDelete}\n\t\t\t\tonCancel={handleCancelDelete}\n\t\t\t/>\n\t\t</Drawer>"
+				}
+			],
+			"source": "@/components/design/Drawer/index.tsx"
+		},
+		{
+			"id": "design-header",
+			"group": "design",
+			"slug": "Header",
+			"name": "Header",
+			"title": "顶栏",
+			"category": "layout",
+			"description": "应用顶部导航/标题栏区域。",
+			"tags": ["layout", "header"],
+			"props": [
+				{
+					"name": "className",
+					"type": "string",
+					"description": "附加 Tailwind / cn 合并类名"
+				},
+				{
+					"name": "...props",
+					"type": "Record<string, unknown>",
+					"description": "继承底层 DOM 或 Radix 组件的其余属性"
+				}
+			],
+			"examples": [
+				{
+					"title": "实际用例",
+					"code": "// 摘自 layout/index.tsx\nimport Header from '@design/Header';\n\n<Header />"
+				}
+			],
+			"source": "@/components/design/Header/index.tsx"
+		},
+		{
+			"id": "design-image",
+			"group": "design",
+			"slug": "Image",
+			"name": "Image",
+			"title": "图片",
+			"category": "media",
+			"description": "图片展示组件。",
+			"tags": ["media", "image"],
+			"props": [
+				{
+					"name": "className",
+					"type": "string",
+					"description": "附加 Tailwind / cn 合并类名"
+				},
+				{
+					"name": "...props",
+					"type": "Record<string, unknown>",
+					"description": "继承底层 DOM 或 Radix 组件的其余属性"
+				}
+			],
+			"examples": [
+				{
+					"title": "实际用例（占位）",
+					"code": "// 该组件在项目中暂无可自动提取的 JSX 片段（可能未使用或为复杂组合导出）。\n// 建议先调用 get_component_details 查看 props，再到 source 对照真实 API。\n\nimport Image from '@design/Image';\n\n<Image className=\"\" />"
+				}
+			],
+			"source": "@/components/design/Image/index.tsx"
+		},
+		{
+			"id": "design-image-preview",
+			"group": "design",
+			"slug": "ImagePreview",
+			"name": "ImagePreview",
+			"title": "图片预览",
+			"category": "media",
+			"description": "图片放大预览与灯箱类交互。",
+			"tags": ["media", "preview"],
+			"props": [
+				{
+					"name": "className",
+					"type": "string",
+					"description": "附加 Tailwind / cn 合并类名"
+				},
+				{
+					"name": "...props",
+					"type": "Record<string, unknown>",
+					"description": "继承底层 DOM 或 Radix 组件的其余属性"
+				}
+			],
+			"examples": [
+				{
+					"title": "实际用例（占位）",
+					"code": "// 该组件在项目中暂无可自动提取的 JSX 片段（可能未使用或为复杂组合导出）。\n// 建议先调用 get_component_details 查看 props，再到 source 对照真实 API。\n\nimport ImagePreview from '@design/ImagePreview';\n\n<ImagePreview className=\"\" />"
+				}
+			],
+			"source": "@/components/design/ImagePreview/index.tsx"
+		},
+		{
+			"id": "design-loading",
+			"group": "design",
+			"slug": "Loading",
+			"name": "Loading",
+			"title": "加载态",
+			"category": "feedback",
+			"description": "全页或局部加载占位。",
+			"tags": ["loading"],
+			"props": [
+				{
+					"name": "className",
+					"type": "string",
+					"description": "附加 Tailwind / cn 合并类名"
+				},
+				{
+					"name": "...props",
+					"type": "Record<string, unknown>",
+					"description": "继承底层 DOM 或 Radix 组件的其余属性"
+				}
+			],
+			"examples": [
+				{
+					"title": "实际用例",
+					"code": "// 摘自 views/chat/session/index.tsx\nimport Loading from '@/components/design/Loading';\n\n<Loading />"
+				}
+			],
+			"source": "@/components/design/Loading/index.tsx"
+		},
+		{
+			"id": "design-markdown",
+			"group": "design",
+			"slug": "Markdown",
+			"name": "Markdown",
+			"title": "Markdown",
+			"category": "content",
+			"description": "Markdown 内容展示相关封装。",
+			"tags": ["markdown"],
+			"props": [
+				{
+					"name": "className",
+					"type": "string",
+					"description": "附加 Tailwind / cn 合并类名"
+				},
+				{
+					"name": "...props",
+					"type": "Record<string, unknown>",
+					"description": "继承底层 DOM 或 Radix 组件的其余属性"
+				}
+			],
+			"examples": [
+				{
+					"title": "实际用例（占位）",
+					"code": "// 该组件在项目中暂无可自动提取的 JSX 片段（可能未使用或为复杂组合导出）。\n// 建议先调用 get_component_details 查看 props，再到 source 对照真实 API。\n\nimport Markdown from '@design/Markdown';\n\n<Markdown className=\"\" />"
+				}
+			],
+			"source": "@/components/design/Markdown/index.tsx"
+		},
+		{
+			"id": "design-menu",
+			"group": "design",
+			"slug": "Menu",
+			"name": "Menu",
+			"title": "菜单",
+			"category": "navigation",
+			"description": "通用菜单列表 UI。",
+			"tags": ["menu"],
+			"props": [
+				{
+					"name": "className",
+					"type": "string",
+					"description": "附加 Tailwind / cn 合并类名"
+				},
+				{
+					"name": "...props",
+					"type": "Record<string, unknown>",
+					"description": "继承底层 DOM 或 Radix 组件的其余属性"
+				}
+			],
+			"examples": [
+				{
+					"title": "实际用例（占位）",
+					"code": "// 该组件在项目中暂无可自动提取的 JSX 片段（可能未使用或为复杂组合导出）。\n// 建议先调用 get_component_details 查看 props，再到 source 对照真实 API。\n\nimport Menu from '@design/Menu';\n\n<Menu className=\"\" />"
+				}
+			],
+			"source": "@/components/design/Menu/index.tsx"
+		},
+		{
+			"id": "design-mermaid-fence-island",
+			"group": "design",
+			"slug": "MermaidFenceIsland",
+			"name": "MermaidFenceIsland",
+			"title": "Mermaid 岛",
+			"category": "content",
+			"description": "流式场景下独立 Mermaid 渲染岛，避免整段 innerHTML 冲掉 SVG。",
+			"tags": ["mermaid", "markdown"],
+			"props": [
+				{
+					"name": "className",
+					"type": "string",
+					"description": "附加 Tailwind / cn 合并类名"
+				},
+				{
+					"name": "...props",
+					"type": "Record<string, unknown>",
+					"description": "继承底层 DOM 或 Radix 组件的其余属性"
+				}
+			],
+			"examples": [
+				{
+					"title": "实际用例（占位）",
+					"code": "// 该组件在项目中暂无可自动提取的 JSX 片段（可能未使用或为复杂组合导出）。\n// 建议先调用 get_component_details 查看 props，再到 source 对照真实 API。\n\nimport MermaidFenceIsland from '@design/MermaidFenceIsland';\n\n<MermaidFenceIsland className=\"\" />"
+				}
+			],
+			"source": "@/components/design/MermaidFenceIsland/index.tsx"
+		},
+		{
+			"id": "design-mermaid-fence-toolbar",
+			"group": "design",
+			"slug": "MermaidFenceToolbar",
+			"name": "MermaidFenceToolbar",
+			"title": "Mermaid 工具栏",
+			"category": "content",
+			"description": "Mermaid 围栏上的工具栏与操作。",
+			"tags": ["mermaid", "toolbar"],
+			"props": [
+				{
+					"name": "className",
+					"type": "string",
+					"description": "附加 Tailwind / cn 合并类名"
+				},
+				{
+					"name": "...props",
+					"type": "Record<string, unknown>",
+					"description": "继承底层 DOM 或 Radix 组件的其余属性"
+				}
+			],
+			"examples": [
+				{
+					"title": "实际用例（占位）",
+					"code": "// 该组件在项目中暂无可自动提取的 JSX 片段（可能未使用或为复杂组合导出）。\n// 建议先调用 get_component_details 查看 props，再到 source 对照真实 API。\n\nimport MermaidFenceToolbar from '@design/MermaidFenceToolbar';\n\n<MermaidFenceToolbar className=\"\" />"
+				}
+			],
+			"source": "@/components/design/MermaidFenceToolbar/index.tsx"
+		},
+		{
+			"id": "design-model",
+			"group": "design",
+			"slug": "Model",
+			"name": "Model",
+			"title": "模型选择",
+			"category": "chat",
+			"description": "对话模型切换与展示相关 UI。",
+			"tags": ["chat", "model"],
+			"props": [
+				{
+					"name": "className",
+					"type": "string",
+					"description": "附加 Tailwind / cn 合并类名"
+				},
+				{
+					"name": "...props",
+					"type": "Record<string, unknown>",
+					"description": "继承底层 DOM 或 Radix 组件的其余属性"
+				}
+			],
+			"examples": [
+				{
+					"title": "实际用例（占位）",
+					"code": "// 该组件在项目中暂无可自动提取的 JSX 片段（可能未使用或为复杂组合导出）。\n// 建议先调用 get_component_details 查看 props，再到 source 对照真实 API。\n\nimport Model from '@design/Model';\n\n<Model className=\"\" />"
+				}
+			],
+			"source": "@/components/design/Model/index.tsx"
+		},
+		{
+			"id": "design-monaco",
+			"group": "design",
+			"slug": "Monaco",
+			"name": "Monaco",
+			"title": "Monaco 编辑器",
+			"category": "editor",
+			"description": "基于 Monaco Editor 的代码/Markdown 编辑与预览分屏、命令与主题等。",
+			"tags": ["monaco", "editor", "markdown"],
+			"props": [
+				{
+					"name": "className",
+					"type": "string",
+					"description": "附加 Tailwind / cn 合并类名"
+				},
+				{
+					"name": "...props",
+					"type": "Record<string, unknown>",
+					"description": "继承底层 DOM 或 Radix 组件的其余属性"
+				}
+			],
+			"examples": [
+				{
+					"title": "实际用例（占位）",
+					"code": "// 该组件在项目中暂无可自动提取的 JSX 片段（可能未使用或为复杂组合导出）。\n// 建议先调用 get_component_details 查看 props，再到 source 对照真实 API。\n\nimport Monaco from '@design/Monaco';\n\n<Monaco className=\"\" />"
+				}
+			],
+			"source": "@/components/design/Monaco/index.tsx",
+			"relatedSources": [
+				"@/components/design/Monaco/MarkdownBottomBar.tsx",
+				"@/components/design/Monaco/MarkdownPreview.tsx",
+				"@/components/design/Monaco/commands.ts",
+				"@/components/design/Monaco/contextMenu.ts",
+				"@/components/design/Monaco/format.ts",
+				"@/components/design/Monaco/glassTheme.ts",
+				"@/components/design/Monaco/markdownTokens.ts",
+				"@/components/design/Monaco/options.ts",
+				"@/components/design/Monaco/utils.ts"
+			]
+		},
+		{
+			"id": "design-sidebar",
+			"group": "design",
+			"slug": "Sidebar",
+			"name": "Sidebar",
+			"title": "侧栏",
+			"category": "layout",
+			"description": "应用侧栏布局与导航。",
+			"tags": ["layout", "sidebar"],
+			"props": [
+				{
+					"name": "className",
+					"type": "string",
+					"description": "附加 Tailwind / cn 合并类名"
+				},
+				{
+					"name": "...props",
+					"type": "Record<string, unknown>",
+					"description": "继承底层 DOM 或 Radix 组件的其余属性"
+				}
+			],
+			"examples": [
+				{
+					"title": "实际用例",
+					"code": "// 摘自 layout/index.tsx\nimport Sidebar from '@design/Sidebar';\n\n<Sidebar />"
+				}
+			],
+			"source": "@/components/design/Sidebar/index.tsx",
+			"relatedSources": ["@/components/design/Sidebar/enum.ts"]
+		},
+		{
+			"id": "design-tooltip",
+			"group": "design",
+			"slug": "Tooltip",
+			"name": "Tooltip",
+			"title": "业务 Tooltip",
+			"category": "overlay",
+			"description": "业务层 Tooltip 封装（与 ui/tooltip 区分用途）。",
+			"tags": ["tooltip", "overlay"],
+			"props": [
+				{
+					"name": "className",
+					"type": "string",
+					"description": "附加 Tailwind / cn 合并类名"
+				},
+				{
+					"name": "...props",
+					"type": "Record<string, unknown>",
+					"description": "继承底层 DOM 或 Radix 组件的其余属性"
+				}
+			],
+			"examples": [
+				{
+					"title": "实际用例",
+					"code": "// 摘自 views/knowledge/KnowledgeEditorToolbar.tsx\nimport Tooltip from '@design/Tooltip';\n\n<Tooltip side=\"bottom\" content={shortcutHintClear ?? 'Meta + Shift + D'}>\n\t\t\t\t<Button\n\t\t\t\t\tvariant=\"link\"\n\t\t\t\t\tclassName={cn(linkBtn, 'hover:text-orange-500')}\n\t\t\t\t\tonClick={onNewDraft}\n\t\t\t\t>\n\t\t\t\t\t<OctagonX className=\"mt-0.5\" />\n\t\t\t\t\t<span className=\"mt-0.5\">清空</span>\n\t\t\t\t</Button>\n\t\t\t</Tooltip>"
+				}
+			],
+			"source": "@/components/design/Tooltip/index.tsx"
+		},
+		{
+			"id": "design-upload",
+			"group": "design",
+			"slug": "Upload",
+			"name": "Upload",
+			"title": "上传",
+			"category": "forms",
+			"description": "文件上传控件与进度展示。",
+			"tags": ["upload", "forms"],
+			"props": [
+				{
+					"name": "className",
+					"type": "string",
+					"description": "附加 Tailwind / cn 合并类名"
+				},
+				{
+					"name": "...props",
+					"type": "Record<string, unknown>",
+					"description": "继承底层 DOM 或 Radix 组件的其余属性"
+				}
+			],
+			"examples": [
+				{
+					"title": "实际用例（占位）",
+					"code": "// 该组件在项目中暂无可自动提取的 JSX 片段（可能未使用或为复杂组合导出）。\n// 建议先调用 get_component_details 查看 props，再到 source 对照真实 API。\n\nimport Upload from '@design/Upload';\n\n<Upload className=\"\" />"
+				}
+			],
+			"source": "@/components/design/Upload/index.tsx"
+		},
+		{
+			"id": "design-monaco-markdown-bottom-bar",
+			"group": "design",
+			"parent": "Monaco",
+			"slug": "MarkdownBottomBar",
+			"name": "MarkdownBottomBar",
+			"title": "Monaco Markdown 底栏",
+			"category": "editor",
+			"description": "Markdown 预览底栏工具区。",
+			"tags": ["monaco", "markdown"],
+			"props": [
+				{
+					"name": "className",
+					"type": "string",
+					"description": "附加 Tailwind / cn 合并类名"
+				},
+				{
+					"name": "...props",
+					"type": "Record<string, unknown>",
+					"description": "继承底层 DOM 或 Radix 组件的其余属性"
+				}
+			],
+			"examples": [
+				{
+					"title": "实际用例（占位）",
+					"code": "// 该组件在项目中暂无可自动提取的 JSX 片段（可能未使用或为复杂组合导出）。\n// 建议先调用 get_component_details 查看 props，再到 source 对照真实 API。\n\nimport MarkdownBottomBar from '@design/MarkdownBottomBar';\n\n<MarkdownBottomBar className=\"\" />"
+				}
+			],
+			"source": "@/components/design/Monaco/MarkdownBottomBar.tsx"
+		},
+		{
+			"id": "design-monaco-markdown-preview",
+			"group": "design",
+			"parent": "Monaco",
+			"slug": "MarkdownPreview",
+			"name": "MarkdownPreview",
+			"title": "Monaco Markdown 预览",
+			"category": "editor",
+			"description": "Markdown 预览区组件。",
+			"tags": ["monaco", "markdown"],
+			"props": [
+				{
+					"name": "className",
+					"type": "string",
+					"description": "附加 Tailwind / cn 合并类名"
+				},
+				{
+					"name": "...props",
+					"type": "Record<string, unknown>",
+					"description": "继承底层 DOM 或 Radix 组件的其余属性"
+				}
+			],
+			"examples": [
+				{
+					"title": "实际用例（占位）",
+					"code": "// 该组件在项目中暂无可自动提取的 JSX 片段（可能未使用或为复杂组合导出）。\n// 建议先调用 get_component_details 查看 props，再到 source 对照真实 API。\n\nimport MarkdownPreview from '@design/MarkdownPreview';\n\n<MarkdownPreview className=\"\" />"
+				}
+			],
+			"source": "@/components/design/Monaco/MarkdownPreview.tsx"
+		}
+	]
+}

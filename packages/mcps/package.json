@@ -1,0 +1,29 @@
+{
+	"name": "@dnhyxc-ai/mcps",
+	"version": "0.0.1",
+	"private": true,
+	"type": "module",
+	"description": "本地 MCP：基于 catalog/components.json 的组件目录检索，辅助 AI 自动 import 与使用前端组件。",
+	"bin": {
+		"dnhyxc-component-catalog-mcp": "./dist/server.js"
+	},
+	"files": [
+		"dist",
+		"catalog"
+	],
+	"scripts": {
+		"build": "tsup",
+		"start": "node dist/server.js",
+		"dev": "tsx watch src/server.ts"
+	},
+	"dependencies": {
+		"@modelcontextprotocol/sdk": "^1.17.0",
+		"zod": "^3.24.0"
+	},
+	"devDependencies": {
+		"@types/node": "^22.10.7",
+		"tsup": "^8.5.1",
+		"tsx": "^4.21.0",
+		"typescript": "~5.8.3"
+	}
+}
