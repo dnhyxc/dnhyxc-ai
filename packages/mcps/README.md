@@ -4,7 +4,7 @@
 
 | 工具名 | 作用 |
 | --- | --- |
-| `list_component_ids` | 仅列出组件 id 列表（支持 `group` / `category` / `tag` / `limit` 过滤），便于后续用 id 调 `get_component_details` / `resolve_component_import` |
+| `list_component_ids` | 返回组件 `ids` 列表，并附带 `items` 摘要（`id` / `title` / `description` / `group` / `category` / `source`）；支持 `group` / `category` / `tag` / `limit` 过滤，便于后续用 id 调 `get_component_details` / `resolve_component_import` |
 | `list_components` | 列出组件摘要，支持 `group` / `category` / `tag` / `limit` 过滤 |
 | `search_components` | 关键词检索（多词空格分隔，简单打分排序） |
 | `get_component_details` | 按 `id` 或 `slug`+`group` 取完整 props、examples、relatedSources，并返回 `usageExample`（可直接复制的 import + JSX 示例） |

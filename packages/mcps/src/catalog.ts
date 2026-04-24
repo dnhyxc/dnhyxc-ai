@@ -101,8 +101,8 @@ export function searchComponents(
 		let score = 0;
 		for (const tok of tokens) {
 			if (!tok) continue;
+			// 子串命中即可；原先 else if split 分支在 includes 为假时与 includes 语义重叠，属于无效分支
 			if (hay.includes(tok)) score += 5;
-			else if (hay.split(tok).length > 1) score += 2;
 		}
 		return { item, score };
 	});
