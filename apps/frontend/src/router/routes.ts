@@ -22,6 +22,7 @@ import AboutApp from '@/views/setting/about';
 import AppSystem from '@/views/setting/system';
 import ThemeSetting from '@/views/setting/theme';
 import Share from '@/views/share';
+import VideoEditor from '@/views/video-editor';
 import ChildWindow from '@/views/win';
 
 export interface RouteMeta {
@@ -97,6 +98,13 @@ const routes: RouteConfig[] = [
 				Component: Knowledge,
 				meta: {
 					title: '知识库编辑',
+				},
+			},
+			{
+				path: '/video-editor',
+				Component: VideoEditor,
+				meta: {
+					title: '视频剪辑',
 				},
 			},
 			{

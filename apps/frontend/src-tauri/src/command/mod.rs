@@ -2,3 +2,4 @@
 pub mod common;
 pub mod download;
 pub mod knowledge;
+pub mod video;

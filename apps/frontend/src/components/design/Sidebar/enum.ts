@@ -9,6 +9,11 @@ export const MENUS = [
 		icon: 'BookOpenText',
 		path: '/knowledge',
 	},
+	{
+		name: '视频编辑',
+		icon: 'Video',
+		path: '/video-editor',
+	},
 	// {
 	// 	name: '智能对话',
 	// 	icon: 'Bot',

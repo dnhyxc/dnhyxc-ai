@@ -32,6 +32,7 @@ use command::knowledge::{
     delete_knowledge_markdown, list_knowledge_markdown_files, open_knowledge_markdown_in_editor,
     read_knowledge_markdown_file, resolve_knowledge_markdown_target, save_knowledge_markdown,
 };
+use command::video::{probe_media, select_media_files, stage_media_for_playback};
 
 /// 移动端入口属性宏：当编译目标为移动平台时，自动标记该函数为 Tauri 移动端入口
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -64,6 +65,9 @@ pub fn run() {
             greet_name,
             select_file,           // 选择文件
             select_directory,      // 选择目录
+            select_media_files,    // 选择媒体文件（多选）
+            probe_media,           // ffprobe：读取媒体元数据
+            stage_media_for_playback, // 将媒体文件 stage 到缓存以便播放
             save_file_with_picker, // 通用保存
             resolve_knowledge_markdown_target, // 知识保存：解析目标路径、是否已存在
             save_knowledge_markdown, // 知识页 Markdown 写入

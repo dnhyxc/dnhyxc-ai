@@ -14,6 +14,7 @@ import {
 	House,
 	LogOut,
 	Package,
+	Video,
 	WalletCards,
 } from 'lucide-react';
 import { useNavigate } from 'react-router';
@@ -41,6 +42,7 @@ const Sidebar = () => {
 		BookOpenText: <BookOpenText />,
 		WalletCards: <WalletCards />,
 		CreditCard: <CreditCard />,
+		Video: <Video />,
 	};
 
 	const processedMenus = MENUS.map((menu) => ({
