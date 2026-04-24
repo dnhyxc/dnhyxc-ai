@@ -6,7 +6,7 @@
 		"useIgnoreFile": true
 	},
 	"files": {
-		"includes": ["**/*", "!!**/packages/skills"],
+		"includes": ["**/*", "!!.cursor/**/*"],
 		"ignoreUnknown": false
 	},
 	"formatter": {
