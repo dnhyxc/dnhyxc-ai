@@ -5,7 +5,13 @@
 
 import Loading from '@design/Loading';
 import { Button, Toast } from '@ui/index';
-import { BookOpen, ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
+import {
+	BookOpen,
+	ChevronDown,
+	ChevronUp,
+	CirclePlus,
+	Sparkles,
+} from 'lucide-react';
 import { observer } from 'mobx-react';
 import {
 	type RefObject,
@@ -69,9 +75,20 @@ const KNOWLEDGE_ASSISTANT_MODE_KEY = 'knowledge-assistant-mode';
 type KnowledgeAssistantMode = 'ai' | 'rag';
 
 /**
- * RAG 模式单条气泡：从 `knowledgeRagQaStore` 取消息，与 AI 侧 `assistantStore` 完全隔离。
+ * 单条气泡独立 observer：从 store 解析出当前 Message。
+ * `data-msg-rev` 绑定「正文长度 + 思考区长度 + 是否在流式」的合成串，
+ * 使 MobX 在流式阶段能稳定订阅这些字段（语义：消息内容版本戳，非 hack 预读）。
  */
-const KnowledgeRagMessageBubble = observer(function KnowledgeRagMessageBubble({
+type SelectMessageByChatId = (chatId: string) => Message | undefined;
+
+const selectAssistantMessageByChatId: SelectMessageByChatId = (chatId) =>
+	assistantStore.messages.find((m) => m.chatId === chatId);
+
+const selectRagMessageByChatId: SelectMessageByChatId = (chatId) =>
+	knowledgeRagQaStore.messages.find((m) => m.chatId === chatId);
+
+const KnowledgeMessageBubble = observer(function KnowledgeMessageBubble({
+	selectMessageByChatId,
 	chatId,
 	index,
 	messagesLength,
@@ -79,8 +96,10 @@ const KnowledgeRagMessageBubble = observer(function KnowledgeRagMessageBubble({
 	onCopy,
 	onSaveToKnowledge,
 	scrollViewportRef,
-}: KnowledgeAssistantMessageBubbleProps) {
-	const message = knowledgeRagQaStore.messages.find((m) => m.chatId === chatId);
+}: KnowledgeAssistantMessageBubbleProps & {
+	selectMessageByChatId: SelectMessageByChatId;
+}) {
+	const message = selectMessageByChatId(chatId);
 	if (!message) return null;
 
 	const streamRev =
@@ -91,6 +110,7 @@ const KnowledgeRagMessageBubble = observer(function KnowledgeRagMessageBubble({
 	return (
 		<div
 			className={cn(
+				// min-w-0：flex 子项默认可缩到小于内容宽，避免代码块/长行把整列撑出 ScrollArea
 				'relative flex min-w-0 max-w-full flex-1 flex-col gap-1 pb-10 w-full group last:pb-8.5',
 				message.role === 'user' ? 'items-end' : '',
 			)}
@@ -137,81 +157,6 @@ const KnowledgeRagMessageBubble = observer(function KnowledgeRagMessageBubble({
 		</div>
 	);
 });
-
-/**
- * 单条气泡独立 observer：从 store 解析出当前 Message。
- * `data-msg-rev` 绑定「正文长度 + 思考区长度 + 是否在流式」的合成串，
- * 使 MobX 在流式阶段能稳定订阅这些字段（语义：消息内容版本戳，非 hack 预读）。
- */
-const KnowledgeAssistantMessageBubble = observer(
-	function KnowledgeAssistantMessageBubble({
-		chatId,
-		index,
-		messagesLength,
-		isCopyedId,
-		onCopy,
-		onSaveToKnowledge,
-		scrollViewportRef,
-	}: KnowledgeAssistantMessageBubbleProps) {
-		const message = assistantStore.messages.find((m) => m.chatId === chatId);
-		if (!message) return null;
-
-		const streamRev =
-			message.role === 'assistant'
-				? `${message.content.length}:${message.thinkContent?.length ?? 0}:${message.isStreaming ? 1 : 0}`
-				: `${message.content.length}`;
-
-		return (
-			<div
-				className={cn(
-					// min-w-0：flex 子项默认可缩到小于内容宽，避免代码块/长行把整列撑出 ScrollArea
-					'relative flex min-w-0 max-w-full flex-1 flex-col gap-1 pb-10 w-full group last:pb-8.5',
-					message.role === 'user' ? 'items-end' : '',
-				)}
-				data-msg-rev={streamRev}
-			>
-				<div
-					id="message-md-wrap"
-					className={cn(
-						'relative flex min-w-0 max-w-full rounded-md p-3 select-auto text-textcolor mb-5',
-						message.role === 'user'
-							? 'w-fit max-w-full self-end bg-teal-600/5 border border-teal-500/15 text-end pt-2 pb-2.5 px-3'
-							: 'flex-1 bg-theme/5 border border-theme/10',
-					)}
-				>
-					{message.role === 'user' ? (
-						<ChatAssistantMessage
-							message={message}
-							className="text-left min-w-0 max-w-full [&_.markdown-body]:min-w-0 [&_.markdown-body]:max-w-full [&_.markdown-body]:overflow-x-auto"
-						/>
-					) : (
-						<ChatAssistantMessage
-							message={message}
-							scrollViewportRef={scrollViewportRef}
-						/>
-					)}
-
-					<div
-						className={cn(
-							'absolute -bottom-9',
-							message.role === 'user' ? 'right-0' : 'left-0',
-						)}
-					>
-						<ChatMessageActions
-							message={message}
-							index={index}
-							isCopyedId={isCopyedId}
-							messagesLength={messagesLength}
-							onCopy={onCopy}
-							needShare={false}
-							onSaveToKnowledge={onSaveToKnowledge}
-						/>
-					</div>
-				</div>
-			</div>
-		);
-	},
-);
 
 const KnowledgeAssistant = observer(
 	({
@@ -647,39 +592,29 @@ const KnowledgeAssistant = observer(
 								'pt-4 max-w-3xl mx-auto relative flex w-full min-w-0 flex-col select-none  pr-4 pl-3.5',
 							)}
 						>
-							{messages.map((message, index) =>
-								isRagMode ? (
-									<KnowledgeRagMessageBubble
-										key={message.chatId}
-										chatId={message.chatId}
-										index={index}
-										messagesLength={messages.length}
-										isCopyedId={isCopyedId}
-										onCopy={onCopy}
-										onSaveToKnowledge={onSaveToKnowledge}
-										scrollViewportRef={
-											scrollViewportRef as RefObject<HTMLElement | null>
-										}
-									/>
-								) : (
-									<KnowledgeAssistantMessageBubble
-										key={message.chatId}
-										chatId={message.chatId}
-										index={index}
-										messagesLength={messages.length}
-										isCopyedId={isCopyedId}
-										onCopy={onCopy}
-										onSaveToKnowledge={onSaveToKnowledge}
-										scrollViewportRef={
-											scrollViewportRef as RefObject<HTMLElement | null>
-										}
-									/>
-								),
-							)}
+							{messages.map((message, index) => (
+								<KnowledgeMessageBubble
+									key={message.chatId}
+									selectMessageByChatId={
+										isRagMode
+											? selectRagMessageByChatId
+											: selectAssistantMessageByChatId
+									}
+									chatId={message.chatId}
+									index={index}
+									messagesLength={messages.length}
+									isCopyedId={isCopyedId}
+									onCopy={onCopy}
+									onSaveToKnowledge={onSaveToKnowledge}
+									scrollViewportRef={
+										scrollViewportRef as RefObject<HTMLElement | null>
+									}
+								/>
+							))}
 							{showRagNewConversation ? (
 								<div className="mb-3 flex w-full min-w-0 justify-start">
 									<Button
-										type="button"
+										size="sm"
 										variant="dynamic"
 										className="w-fit rounded-md border border-theme/10 bg-theme/5 px-3 py-1.5 text-sm text-textcolor/80 transition-colors hover:border-theme/20 hover:text-textcolor"
 										onClick={() => {
@@ -687,6 +622,7 @@ const KnowledgeAssistant = observer(
 											setRagInput('');
 										}}
 									>
+										<CirclePlus />
 										新对话
 									</Button>
 								</div>
@@ -696,10 +632,12 @@ const KnowledgeAssistant = observer(
 									{KNOWLEDGE_ASSISTANT_PROMPTS.map((item) => (
 										<Button
 											key={item.kind}
+											size="sm"
 											variant="dynamic"
 											className="w-fit rounded-md border border-theme/10 bg-theme/5 p-2 text-left text-sm text-textcolor/80 transition-colors hover:border-theme/20 hover:text-textcolor"
 											onClick={() => void sendKnowledgePromptCard(item.kind)}
 										>
+											<item.icon />
 											{item.title}
 										</Button>
 									))}
@@ -714,7 +652,7 @@ const KnowledgeAssistant = observer(
 							<button
 								type="button"
 								className={cn(
-									'absolute bottom-full mb-5 right-4.5 z-10 flex h-8.5 w-8.5 cursor-pointer items-center justify-center rounded-full border border-theme/5 bg-theme/5 text-textcolor/70 backdrop-blur-[2px] hover:bg-theme/15',
+									'absolute bottom-full mb-4.5 right-4.5 z-10 flex h-8.5 w-8.5 cursor-pointer items-center justify-center rounded-full border border-theme/5 bg-theme/5 text-textcolor/70 backdrop-blur-[2px] hover:bg-theme/15',
 									'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme/40',
 								)}
 								aria-label={
@@ -739,7 +677,7 @@ const KnowledgeAssistant = observer(
 							sendMessage={sendMessage}
 							placeholder={
 								isRagMode
-									? '向知识库提问（与当前文档无关）'
+									? '向知识库提问'
 									: editorHasBody
 										? '请输入您的问题'
 										: '请先在左侧编辑器输入正文后再向我提问'
@@ -761,32 +699,40 @@ const KnowledgeAssistant = observer(
 							}
 							entryChildren={
 								<div className="flex w-full items-center gap-1 pb-1">
-									<Button
-										variant="dynamic"
-										size="sm"
-										className={cn(
-											'px-2.5 border border-theme/15',
-											assistantMode === 'ai'
-												? 'bg-theme/15 text-textcolor'
-												: 'text-textcolor/70 hover:bg-theme/10',
-										)}
-										onClick={() => setAssistantMode('ai')}
-									>
-										AI 助手
-									</Button>
-									<Button
-										variant="dynamic"
-										size="sm"
-										className={cn(
-											'px-2.5 border border-theme/15',
-											assistantMode === 'rag'
-												? 'bg-theme/15 text-textcolor'
-												: 'text-textcolor/70 hover:bg-theme/10',
-										)}
-										onClick={() => setAssistantMode('rag')}
-									>
-										RAG 助手
-									</Button>
+									{(
+										[
+											{
+												id: 'ai',
+												label: 'AI 助手',
+												icon: <Sparkles />,
+											},
+											{
+												id: 'rag',
+												label: 'RAG 助手',
+												icon: <BookOpen />,
+											},
+										] satisfies Array<{
+											id: KnowledgeAssistantMode;
+											label: string;
+											icon: React.ReactNode;
+										}>
+									).map((item) => (
+										<Button
+											key={item.id}
+											variant="link"
+											size="sm"
+											className={cn(
+												'px-2.5 border border-theme/15',
+												assistantMode === item.id
+													? 'bg-theme/10 text-teal-500'
+													: 'text-textcolor/80 hover:bg-theme/10',
+											)}
+											onClick={() => setAssistantMode(item.id)}
+										>
+											{item.icon}
+											{item.label}
+										</Button>
+									))}
 								</div>
 							}
 						/>
