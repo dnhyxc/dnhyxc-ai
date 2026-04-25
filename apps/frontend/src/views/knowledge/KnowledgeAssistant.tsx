@@ -533,10 +533,9 @@ const KnowledgeAssistant = observer(
 				) : isRagMode && !ragMessages.length ? (
 					<div className="text-textcolor/70 flex flex-1 justify-center items-start text-sm pt-4 pl-4 pr-4.5">
 						<div className="w-full flex gap-2 border border-theme/10 bg-theme/5 p-3 rounded-md">
-							<BookOpen size={18} className="mt-0.5 shrink-0 text-teal-500" />
+							<BookOpen size={18} className="mt-[3px] shrink-0 text-teal-500" />
 							<div className="flex-1 text-sm leading-relaxed">
-								<b className="text-textcolor">RAG 知识库问答</b>
-								：基于您账号下已入库的知识向量检索并回答，与当前左侧打开的文档无关；左侧无正文时也可提问。对话在切换文章后仍会保留。
+								基于您账号下已入库的知识进行问答！系统将严格限定在您上传的私有数据范围内进行信息检索与推理，不会越界获取互联网公域信息。
 							</div>
 						</div>
 					</div>
