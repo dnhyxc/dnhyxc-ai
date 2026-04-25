@@ -1772,6 +1772,22 @@ curl -X DELETE http://localhost:3000/chat/session/session_123456
 
 使用 `DELETE /chat/session/:sessionId` 清除特定会话的历史记录。
 
+## 向量数据库 Qdrant
+
+通过 docker-compose 启动 Qdrant
+
+```ymal
+qdrant:
+  image: qdrant/qdrant:latest
+  container_name: dnhyxc_ai_qdrant
+  restart: always
+  ports:
+    - 6333:6333
+    - 6334:6334
+  volumes:
+    - ../qdrant/storage:/qdrant/storage
+```
+
 ## 错误处理
 
 ### 常见错误响应
