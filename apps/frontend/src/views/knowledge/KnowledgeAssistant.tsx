@@ -38,6 +38,7 @@ import assistantStore from '@/store/assistant';
 import knowledgeRagQaStore from '@/store/knowledgeRagQa';
 import type { Message } from '@/types/chat';
 import {
+	KNOWLEDGE_ASSISTANT_MODES,
 	KNOWLEDGE_ASSISTANT_PROMPTS,
 	type KnowledgeAssistantPromptKind,
 } from './constants';
@@ -699,24 +700,7 @@ const KnowledgeAssistant = observer(
 							}
 							entryChildren={
 								<div className="flex w-full items-center gap-1 pb-1">
-									{(
-										[
-											{
-												id: 'ai',
-												label: 'AI 助手',
-												icon: <Sparkles />,
-											},
-											{
-												id: 'rag',
-												label: 'RAG 助手',
-												icon: <BookOpen />,
-											},
-										] satisfies Array<{
-											id: KnowledgeAssistantMode;
-											label: string;
-											icon: React.ReactNode;
-										}>
-									).map((item) => (
+									{KNOWLEDGE_ASSISTANT_MODES.map((item) => (
 										<Button
 											key={item.id}
 											variant="link"
@@ -729,7 +713,7 @@ const KnowledgeAssistant = observer(
 											)}
 											onClick={() => setAssistantMode(item.id)}
 										>
-											{item.icon}
+											<item.icon />
 											{item.label}
 										</Button>
 									))}

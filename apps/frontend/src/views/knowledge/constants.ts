@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import { Sparkle, Sparkles } from 'lucide-react';
+import { BookOpen, Sparkle, Sparkles } from 'lucide-react';
 
 /** Tauri 下知识 Markdown 目录（保存 / 删除文件与 invoke 一致） */
 export const TAURI_KNOWLEDGE_DIR = '/Users/dnhyxc/Documents/knowledge';
@@ -20,6 +20,12 @@ export type KnowledgeAssistantPromptItem = {
 	description: string;
 };
 
+export type KnowledgeAssistantMode = {
+	id: 'ai' | 'rag';
+	label: string;
+	icon: LucideIcon;
+};
+
 export const KNOWLEDGE_ASSISTANT_PROMPTS: KnowledgeAssistantPromptItem[] = [
 	{
 		kind: 'polish',
@@ -32,5 +38,18 @@ export const KNOWLEDGE_ASSISTANT_PROMPTS: KnowledgeAssistantPromptItem[] = [
 		icon: Sparkles,
 		title: '总结文档内容',
 		description: '提炼要点，掌握核心',
+	},
+];
+
+export const KNOWLEDGE_ASSISTANT_MODES: KnowledgeAssistantMode[] = [
+	{
+		id: 'ai',
+		label: 'AI 助手',
+		icon: Sparkles,
+	},
+	{
+		id: 'rag',
+		label: 'RAG 助手',
+		icon: BookOpen,
 	},
 ];
