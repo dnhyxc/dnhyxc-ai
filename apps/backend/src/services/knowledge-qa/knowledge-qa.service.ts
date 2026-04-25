@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable, type LoggerService } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { Observable } from 'rxjs';
 import { KnowledgeQaEnum, ModelEnum } from '../../enum/config.enum';
 import { KnowledgeEmbeddingService } from '../knowledge-embedding/knowledge-embedding.service';
@@ -27,6 +28,10 @@ export class KnowledgeQaService {
 		private readonly config: ConfigService,
 		private readonly embedding: KnowledgeEmbeddingService,
 		private readonly qdrant: QdrantService,
+		// 注入 Winston logger
+		@Inject(WINSTON_MODULE_NEST_PROVIDER)
+		// logger 实例
+		private readonly logger: LoggerService,
 	) {}
 
 	private getGlmModelName(): string {
@@ -143,9 +148,10 @@ export class KnowledgeQaService {
 					const topK =
 						input.topK ??
 						Number(
-							this.config.get<string>(KnowledgeQaEnum.KNOWLEDGE_QA_TOPK) || 6,
+							this.config.get<string>(KnowledgeQaEnum.KNOWLEDGE_QA_TOPK) || 10,
 						);
 
+					// 生成单条 query 向量
 					const qvec = await this.embedding.embedQuery(input.question);
 
 					const hits = await this.qdrant.searchKnowledgeChunks({
@@ -154,13 +160,48 @@ export class KnowledgeQaService {
 						authorId: input.authorId,
 					});
 
-					const evidences: KnowledgeQaEvidence[] = hits.map((h) => ({
+					let evidences: KnowledgeQaEvidence[] = hits.map((h) => ({
 						knowledgeId: h.payload.knowledgeId,
 						title: h.payload.title,
 						chunkIndex: h.payload.chunkIndex,
 						score: h.score,
 						text: h.payload.text,
 					}));
+
+					// 对召回结果进行二次重排（rerank），提升最终相关性；若失败则回退原召回顺序
+					if (evidences.length > 1) {
+						try {
+							const docs = evidences.map(
+								(e) =>
+									`标题：${e.title}\n分片：#${e.chunkIndex}\n内容：\n${e.text}`,
+							);
+							const reranked = await this.embedding.rerank({
+								query: input.question,
+								documents: docs,
+								// 限制重排结果数量不超过 topK，可以将 topN 设置的比 topK 小，避免浪费资源，目前没有设置的比 topK 小，后续可以优化
+								topN: Math.min(evidences.length, topK),
+							});
+							if (reranked.length > 0) {
+								const used = new Set<number>();
+								const next: KnowledgeQaEvidence[] = [];
+								for (const r of reranked) {
+									const ev = evidences[r.index];
+									if (!ev) continue;
+									used.add(r.index);
+									next.push(ev);
+								}
+								// 将未被 rerank 返回的文档追加到末尾，避免丢证据（保持可解释性）
+								for (let i = 0; i < evidences.length; i++) {
+									if (!used.has(i)) next.push(evidences[i]!);
+								}
+								evidences = next;
+							}
+						} catch (e) {
+							this.logger.error(
+								`[askStream]: Failed to rerank evidences: ${JSON.stringify(e)}`,
+							);
+						}
+					}
 
 					if (input.includeEvidences !== false) {
 						subscriber.next({ type: 'qa.retrieval', evidences });

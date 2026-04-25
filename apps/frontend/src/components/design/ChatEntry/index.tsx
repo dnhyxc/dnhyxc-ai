@@ -39,6 +39,7 @@ interface ChatEntryProps {
 	stopGenerating?: () => void;
 	chatInputRef?: React.RefObject<HTMLTextAreaElement | null>; // 新增
 	children?: React.ReactNode;
+	entryChildren?: React.ReactNode;
 	className?: string;
 	uploadLoading?: boolean;
 	/** 是否启用 Serper 联网搜索（由后端注入检索上下文） */
@@ -66,6 +67,7 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 	stopGenerating,
 	chatInputRef,
 	children,
+	entryChildren,
 	className,
 	uploadLoading,
 	webSearchEnabled = false,
@@ -238,6 +240,7 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 
 						<div className="flex items-center justify-between h-10 p-2.5 mb-1 mt-2.5">
 							<div className="flex items-center gap-2">
+								{entryChildren ? entryChildren : null}
 								{clearChat && (
 									<Button
 										variant="ghost"

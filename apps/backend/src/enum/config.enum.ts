@@ -76,8 +76,6 @@ export enum ModelEnum {
 export enum QdrantEnum {
 	/** 例如 http://127.0.0.1:6333 */
 	QDRANT_URL = 'QDRANT_URL',
-	/** 可选：Qdrant API Key（云端/托管常用） */
-	QDRANT_API_KEY = 'QDRANT_API_KEY',
 	/** collection 名，默认 knowledge_chunks_v1 */
 	QDRANT_KNOWLEDGE_COLLECTION = 'QDRANT_KNOWLEDGE_COLLECTION',
 }
@@ -87,7 +85,10 @@ export enum KnowledgeQaEnum {
 	KNOWLEDGE_EMBEDDING_MODEL = 'KNOWLEDGE_EMBEDDING_MODEL',
 	/** QA 用的聊天模型名（OpenAI 兼容接口），默认沿用 DEEPSEEK_MODEL_NAME */
 	KNOWLEDGE_QA_MODEL = 'KNOWLEDGE_QA_MODEL',
-	/** 检索 topK，默认 6 */
+	/** 检索 topK，默认 10 */
 	KNOWLEDGE_QA_TOPK = 'KNOWLEDGE_QA_TOPK',
 	DASHSCOPE_API_KEY = 'DASHSCOPE_API_KEY',
+	DASHSCOPE_BASE_URL = 'DASHSCOPE_BASE_URL',
+	/** DashScope rerank 模型名，默认 qwen3-rerank */
+	DASHSCOPE_RERANK_MODEL_NAME = 'DASHSCOPE_RERANK_MODEL_NAME',
 }

@@ -43,7 +43,7 @@
 | **Chunk（块）** | 对原文连续片段的切分单元；块大小影响召回粒度与 embedding 成本。 |
 | **Embedding（嵌入向量）** | 将文本映射到稠密向量空间，用于相似度检索。 |
 | **Hybrid search（混合检索）** | 向量相似度 + 稀疏检索（如 BM25）融合，提高专有名词命中率。 |
-| **Rerank（重排）** | 对粗排 Top-N 用小模型或交叉编码器再排序，提高 Top-K 质量。 |
+| **Rerank（重排）** | 对粗排 Top-N 用小模型或交叉编码器再排序，提高 Top-K 质量（本仓库已对接 DashScope `qwen3-rerank`）。 |
 
 ---
 
@@ -217,6 +217,29 @@ apps/backend/src/rag/
 ---
 
 ## 8. 检索与生成编排（RAG Orchestration）
+
+### 8.0.1 本仓库已落地：DashScope `qwen3-rerank` 的请求体结构（避免 400 参数错误）
+
+在 DashScope 的 `text-rerank` 服务中，`query` 与 `documents` 必须放在 `input` 字段下，否则会出现类似：
+
+- `InternalError.Algo.InvalidParameter: Field required: input.query & Field required: input.documents`
+
+推荐请求体（与本仓库后端实现一致）：
+
+```json
+{
+  "model": "qwen3-rerank",
+  "input": {
+    "query": "什么是重排序模型",
+    "documents": [
+      "重排序模型广泛应用于搜索引擎和推荐系统，按相关性对候选文本进行排序",
+      "量子计算是计算科学的前沿领域",
+      "预训练语言模型的发展为重排序模型带来了新的进展"
+    ],
+    "top_n": 2
+  }
+}
+```
 
 ### 8.1 标准路径
 

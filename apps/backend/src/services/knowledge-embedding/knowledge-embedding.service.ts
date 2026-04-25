@@ -22,6 +22,14 @@ export type KnowledgeChunk = {
 	text: string;
 };
 
+// 重排（rerank）结果：文档在原 documents 数组中的下标与相关性分数
+export type KnowledgeRerankResult = {
+	// 原文档数组下标
+	index: number;
+	// 相关性分数（越大通常越相关）
+	score: number;
+};
+
 // 计算 sha256：用于内容幂等标识
 function sha256(text: string): string {
 	// 创建哈希器
@@ -63,7 +71,8 @@ export class KnowledgeEmbeddingService {
 			'';
 		// 读取 baseURL：用于推导 origin
 		const baseURL =
-			this.config.get<string>(ModelEnum.QWEN_BASE_URL) || undefined;
+			this.config.get<string>(KnowledgeQaEnum.DASHSCOPE_BASE_URL) ||
+			'https://dashscope.aliyuncs.com';
 		// 校验 API Key
 		if (!apiKey) {
 			throw new Error(
@@ -75,25 +84,8 @@ export class KnowledgeEmbeddingService {
 			this.config.get<string>(KnowledgeQaEnum.KNOWLEDGE_EMBEDDING_MODEL) ||
 			'qwen3-vl-embedding';
 
-		// 计算 origin
-		const origin = (() => {
-			if (!baseURL) return 'https://dashscope.aliyuncs.com';
-			try {
-				const u = new URL(baseURL);
-				if (
-					u.hostname.endsWith('dashscope.aliyuncs.com') ||
-					u.hostname.endsWith('dashscope-intl.aliyuncs.com')
-				) {
-					u.protocol = 'https:';
-				}
-				return u.origin;
-			} catch {
-				return baseURL;
-			}
-		})();
-
 		// 拼接 endpoint
-		const endpoint = `${origin}/api/v1/services/embeddings/multimodal-embedding/multimodal-embedding`;
+		const endpoint = `${baseURL}/api/v1/services/embeddings/multimodal-embedding/multimodal-embedding`;
 
 		// 单次请求：对一批 texts 做向量化
 		const callOnce = async (texts: string[]): Promise<number[][]> => {
@@ -236,6 +228,149 @@ export class KnowledgeEmbeddingService {
 	// 对外暴露：删除某篇知识库文档在向量库中的全部 points（供回收站物理删除等场景使用）
 	async deleteKnowledgeVectors(input: { knowledgeId: string }): Promise<void> {
 		await this.qdrant.deleteKnowledgePointsByKnowledgeId(input.knowledgeId);
+	}
+
+	/**
+	 * 对外暴露：对候选文档进行重排（rerank）
+	 *
+	 * - 适用场景：Qdrant（向量召回）拿到 topK 后，用 rerank 模型做二次排序，提升最终相关性。
+	 * - 输入：query（问题），documents（候选文本），topN（返回前 N 条）
+	 * - 输出：按相关性从高到低排序的结果（包含原下标 index）
+	 */
+	async rerank(input: {
+		query: string;
+		documents: string[];
+		topN?: number;
+	}): Promise<KnowledgeRerankResult[]> {
+		const apiKey =
+			this.config.get<string>(KnowledgeQaEnum.DASHSCOPE_API_KEY) ||
+			this.config.get<string>(ModelEnum.QWEN_API_KEY) ||
+			'';
+		if (!apiKey) {
+			throw new Error(
+				'缺少 DASHSCOPE_API_KEY（或 QWEN_API_KEY），无法进行 rerank',
+			);
+		}
+
+		const model =
+			this.config.get<string>(KnowledgeQaEnum.DASHSCOPE_RERANK_MODEL_NAME) ||
+			'qwen3-rerank';
+
+		const baseURL =
+			this.config.get<string>(KnowledgeQaEnum.DASHSCOPE_BASE_URL) ||
+			'https://dashscope.aliyuncs.com';
+
+		const endpoint = `${baseURL}/api/v1/services/rerank/text-rerank/text-rerank`;
+
+		const query = (input.query ?? '').trim();
+		const documents = (input.documents ?? []).map((d) => String(d ?? ''));
+		if (!query) return [];
+		if (documents.length === 0) return [];
+
+		const topN = Math.max(
+			1,
+			Math.min(
+				Number.isFinite(input.topN as number)
+					? Number(input.topN)
+					: documents.length,
+				documents.length,
+			),
+		);
+
+		const maxAttempts = 3;
+		for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+			const controller = new AbortController();
+			const timeout = setTimeout(() => controller.abort(), 60_000);
+			try {
+				let resp: Response;
+				try {
+					resp = await fetch(endpoint, {
+						method: 'POST',
+						headers: {
+							Authorization: `Bearer ${apiKey}`,
+							'Content-Type': 'application/json',
+						},
+						body: JSON.stringify({
+							model,
+							// DashScope rerank 期望 query/documents 位于 input 下（否则会报缺少 input.query / input.documents）
+							input: {
+								query,
+								documents,
+								top_n: topN,
+							},
+						}),
+						signal: controller.signal,
+					});
+				} catch (err: unknown) {
+					const e = err as any;
+					const causeMsg =
+						e?.cause instanceof Error
+							? e.cause.message
+							: e?.cause
+								? String(e.cause)
+								: '';
+					const msg = `DashScope rerank 请求网络错误：${e?.message || String(err)}${causeMsg ? `（cause: ${causeMsg}）` : ''}；endpoint=${endpoint}；attempt=${attempt}/${maxAttempts}`;
+					if (attempt === maxAttempts) throw new Error(msg);
+					await new Promise((r) => setTimeout(r, 300 * attempt));
+					continue;
+				}
+
+				const rawText = await resp.text().catch(() => '');
+				let json: any = null;
+				try {
+					json = rawText ? JSON.parse(rawText) : null;
+				} catch {
+					// ignore
+				}
+
+				if (!resp.ok) {
+					const msg =
+						json?.message ||
+						json?.error?.message ||
+						rawText ||
+						`HTTP ${resp.status}`;
+					throw new Error(
+						`DashScope rerank 请求失败：${msg}；status=${resp.status}；endpoint=${endpoint}`,
+					);
+				}
+
+				const results =
+					json?.output?.results ??
+					json?.output?.data ??
+					json?.data ??
+					json?.results;
+				if (!Array.isArray(results)) {
+					throw new Error(
+						`DashScope rerank 返回结构不包含 results：${JSON.stringify(
+							Object.keys(json || {}),
+						)}；endpoint=${endpoint}`,
+					);
+				}
+
+				const mapped = results
+					.map((r: any) => {
+						const index = Number(r?.index ?? r?.document_index ?? r?.doc_index);
+						const score = Number(
+							r?.relevance_score ??
+								r?.score ??
+								r?.relevance ??
+								r?.ranking_score,
+						);
+						if (!Number.isFinite(index) || !Number.isFinite(score)) return null;
+						return { index, score } satisfies KnowledgeRerankResult;
+					})
+					.filter(Boolean) as KnowledgeRerankResult[];
+
+				// 若服务端未保证排序，这里再按 score 兜底排序
+				mapped.sort((a, b) => b.score - a.score);
+
+				return mapped;
+			} finally {
+				clearTimeout(timeout);
+			}
+		}
+
+		throw new Error('DashScope rerank 请求失败：未知错误');
 	}
 
 	// Markdown 切分：标题优先、长度兜底、带 overlap

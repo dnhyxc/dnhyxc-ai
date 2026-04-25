@@ -187,12 +187,14 @@ async update(dto: UpdateKnowledgeDto): Promise<Knowledge> {
 
 - 用户刚保存完立刻提问，可能检索不到（向量仍未写入）；需要 UI/产品层可接受或做“入库完成提示”。
 
-#### 3.4 删除时的“现状注意点”（MySQL 删除 ≠ 向量删除）
+#### 3.4 删除主表条目：`remove` 的现状注意点（MySQL 删除 ≠ 向量删除）
 
-当前 `remove` 的事务逻辑包含回收站与会话清理，但**没有**调用 `QdrantService.deleteKnowledgePointsByKnowledgeId`。这意味着：
+当前 `remove(id)` 的事务逻辑包含“写回收站快照 + 删除 AssistantSession + 删除 Knowledge 主表”，但**不负责**删除向量库中的 points。也就是说：
 
-- MySQL 里条目被删了；
-- Qdrant 里该 `knowledgeId` 的向量仍可能存在（除非外部另有清理逻辑）。
+- MySQL 主表条目被删（条目从列表消失）；
+- 该条目对应的向量 points 仍可能存在于 Qdrant（直到后续被显式清理）。
+
+> 重要：本仓库的“向量清理”目前绑定在 **回收站物理删除**（见下一节），而不是绑定在 `remove`。
 
 文件：`apps/backend/src/services/knowledge/knowledge.service.ts`（L98-L127）
 
@@ -210,6 +212,88 @@ async remove(id: string): Promise<void> {
     // 事务函数结束：若无异常则提交
   });
   // remove 结束：返回 void
+}
+```
+
+#### 3.5 回收站物理删除：删除回收站记录时同步删除向量 points（已实现）
+
+当用户在回收站执行“物理删除”时，系统会：
+
+- 读取回收站行（拿到 `originalId`，即原 Knowledge.id）；
+- 调用 `KnowledgeEmbeddingService.deleteKnowledgeVectors({ knowledgeId: originalId })`；
+- 在 Qdrant 中按 `payload.knowledgeId == originalId` 删除该条目的全部 points；
+- 再删除回收站记录与回收站预览相关的 AssistantSession。
+
+文件：`apps/backend/src/services/knowledge/knowledge.service.ts`（回收站单条/批量物理删除）
+
+```ts
+// 回收站单条物理删除：删除回收站行 + 删除会话 + 同步删除向量库 points
+async removeTrash(id: string): Promise<void> {
+  // 事务：保证“查回收站行→删向量→删会话→删回收站行”整体一致
+  await this.knowledgeTrashRepository.manager.transaction(async (manager) => {
+    // 获取回收站 repository：用于读取 originalId 与执行 delete
+    const trashRepo = manager.getRepository(KnowledgeTrash);
+    // 获取会话 repository：用于清理回收站预览产生的 AssistantSession
+    const assistantSessionRepo = manager.getRepository(AssistantSession);
+    // 先读取回收站行：必须拿到 originalId 才能删向量 points
+    const trashRow = await trashRepo.findOne({ where: { id } });
+    // 行不存在：直接抛错（与原有语义一致）
+    if (!trashRow) {
+      throw new NotFoundException('回收站条目不存在');
+    }
+    // 物理删除回收站条目时，同步清理该知识条目在向量库中的残留
+    await this.embeddingService.deleteKnowledgeVectors({
+      knowledgeId: trashRow.originalId,
+    });
+    // 回收站预览会话 id：与前端预览前缀一致
+    const articleId = assistantArticleIdForTrashRow(id);
+    // 删除与回收站预览绑定的会话
+    await assistantSessionRepo.delete({ knowledgeArticleId: articleId });
+    // 删除回收站行
+    const res = await trashRepo.delete({ id });
+    // 兜底：delete 未影响任何行时仍认为不存在
+    if (!res.affected) {
+      throw new NotFoundException('回收站条目不存在');
+    }
+  });
+}
+
+// 回收站批量物理删除：对 ids 去重后批量删除向量与会话，再删回收站行
+async removeTrashBatch(ids: string[]): Promise<{ affected: number }> {
+  // 去重与过滤空值
+  const uniq = Array.from(new Set(ids)).filter(Boolean);
+  // 空数组直接报错：与单条语义对齐
+  if (uniq.length === 0) {
+    throw new BadRequestException('请至少提供一条要删除的回收站 id');
+  }
+  // 事务：保证批量删除过程的一致性
+  return await this.knowledgeTrashRepository.manager.transaction(async (manager) => {
+    // 回收站 repo
+    const trashRepo = manager.getRepository(KnowledgeTrash);
+    // 会话 repo
+    const assistantSessionRepo = manager.getRepository(AssistantSession);
+    // 查询回收站行，拿到 originalId 列表
+    const rows = await trashRepo.find({
+      select: { id: true, originalId: true },
+      where: { id: In(uniq) },
+    });
+    // 提取 originalId 并去重：避免重复删同一 knowledgeId 的 points
+    const originalIds = rows.map((r) => r.originalId).filter(Boolean);
+    // 批量物理删除回收站条目时，批量清理向量库残留（按 originalId）
+    for (const knowledgeId of Array.from(new Set(originalIds))) {
+      await this.embeddingService.deleteKnowledgeVectors({ knowledgeId });
+    }
+    // 删除每个回收站预览对应的会话
+    for (const tid of uniq) {
+      await assistantSessionRepo.delete({
+        knowledgeArticleId: assistantArticleIdForTrashRow(tid),
+      });
+    }
+    // 最后删除回收站行
+    const res = await trashRepo.delete({ id: In(uniq) });
+    // 返回影响行数：便于上层展示结果
+    return { affected: res.affected ?? 0 };
+  });
 }
 ```
 
@@ -237,6 +321,28 @@ async embedDocuments(texts: string[]): Promise<number[][]> {
   return this.createEmbeddingsClient().embedDocuments(texts);
   // 返回二维数组：每个元素是一个 chunk 的向量
 }
+```
+
+#### 4.1.1 对外暴露：删除某篇知识在向量库中的 points（供回收站物理删除使用）
+
+文件：`apps/backend/src/services/knowledge-embedding/knowledge-embedding.service.ts`（删除向量封装）
+
+```ts
+// 对外暴露：删除某篇知识库文档在向量库中的全部 points（供回收站物理删除等场景使用）
+async deleteKnowledgeVectors(input: { knowledgeId: string }): Promise<void> {
+  // 调用 Qdrant 删除：按 payload.knowledgeId 过滤批量删除
+  await this.qdrant.deleteKnowledgePointsByKnowledgeId(input.knowledgeId);
+  // 返回 void：上层仅关心“已触发删除/删除完成”，不需要返回点数量
+}
+```
+
+解释要点：
+
+```ts
+// 1) 为什么在 KnowledgeEmbeddingService 暴露 delete 而不是 KnowledgeService 直接调 Qdrant：
+//    - 统一向量相关能力入口，后续若要加日志/重试/指标只改一处
+// 2) 为什么按 knowledgeId filter 删除：
+//    - points.id 当前是随机 UUID，不维护稳定 id 映射；filter 删除最简单可靠
 ```
 
 #### 4.2 Markdown 切分：标题优先 + 长度兜底 + overlap
@@ -777,24 +883,77 @@ async askStream(input: { question: string; authorId: number; topK?: number; incl
 // 3) AbortController：
 //    - 当客户端断开/取消订阅时，触发 abort，能中断对 GLM 的 fetch 流读取
 // 4) topK：
-//    - dto.topK 优先，其次配置 KNOWLEDGE_QA_TOPK，最后默认 6
+//    - dto.topK 优先，其次配置 KNOWLEDGE_QA_TOPK，最后默认 10（与当前服务端配置枚举注释一致）
 // 5) embedding.embedQuery：
 //    - 与入库共享同一套 DashScope 调用与错误处理，保证向量空间一致（很重要）
 // 6) qdrant.searchKnowledgeChunks：
 //    - 必须传 authorId（隔离用户知识库），否则会搜到所有用户的 chunks（取决于写入 authorId 是否为空）
 // 7) evidences：
 //    - 把 payload 的关键字段拉平，避免 UI/上层依赖 payload 内部结构
-// 8) includeEvidences：
+// 8) rerank（重排）：
+//    - 在“向量召回（粗排）”之后，对候选片段做二次重排（精排），提升最终 Top-K 的相关性质量
+//    - rerank 失败时必须回退原召回顺序，保证可用性（不能因为重排挂了就让 QA 挂）
+// 9) includeEvidences：
 //    - 允许前端关闭“先发一包证据”，减少首包体积（更快看到模型输出）
-// 9) 空召回兜底：
+// 10) 空召回兜底：
 //    - 明确告诉用户“没搜到”，并结束流（done）
-// 10) context 拼接：
+// 11) context 拼接：
 //    - 限制最多 12 条（防止上下文爆炸、成本上升、模型输入过长）
 //    - 用分隔线 --- 提升可读性，也便于模型区分片段
-// 11) system 提示词：
+// 12) system 提示词：
 //    - 强约束“只基于片段回答”，降低幻觉（hallucination，幻觉）
-// 12) streamGlmChatCompletions：
+// 13) streamGlmChatCompletions：
 //    - 每解析出一段 delta 就发 qa.delta，让前端真正流式展示
+```
+
+#### 6.3.1 二次重排（Rerank，重排）：把“向量召回”结果再排序（已接入 QA）
+
+QA 在拿到 Qdrant 的 `hits → evidences` 后，会调用 `KnowledgeEmbeddingService.rerank` 做二次排序。重排过程的核心原则：
+
+- **只改变顺序，不丢证据**：rerank 返回的候选先排前面，未返回的追加到末尾（保证可解释性与完整性）。
+- **失败回退**：任何异常只写日志，不影响主链路。
+
+文件：`apps/backend/src/services/knowledge-qa/knowledge-qa.service.ts`（重排片段）
+
+```ts
+// 对召回结果进行二次重排（rerank），提升最终相关性；若失败则回退原召回顺序
+if (evidences.length > 1) {
+  try {
+    // 将候选证据序列化为 documents：标题 + chunkIndex + chunk 文本
+    const docs = evidences.map(
+      (e) => `标题：${e.title}\n分片：#${e.chunkIndex}\n内容：\n${e.text}`,
+    );
+    // 调用 rerank：query 为用户问题，documents 为候选文本集合
+    const reranked = await this.embedding.rerank({
+      query: input.question,
+      documents: docs,
+      topN: Math.min(evidences.length, topK),
+    });
+    // 若重排返回有效结果：按返回 index 重排 evidences
+    if (reranked.length > 0) {
+      // used：记录已被 rerank 选中的原下标，避免重复
+      const used = new Set<number>();
+      // next：新的证据顺序
+      const next: KnowledgeQaEvidence[] = [];
+      // 先按 rerank 返回顺序放入
+      for (const r of reranked) {
+        const ev = evidences[r.index];
+        if (!ev) continue;
+        used.add(r.index);
+        next.push(ev);
+      }
+      // 将未被 rerank 返回的证据追加到末尾，避免丢证据（保持可解释性）
+      for (let i = 0; i < evidences.length; i++) {
+        if (!used.has(i)) next.push(evidences[i]!);
+      }
+      // 覆盖 evidences 顺序：后续 context 拼接将使用重排后的顺序
+      evidences = next;
+    }
+  } catch (e) {
+    // 忽略重排失败：只记录日志并回退原召回顺序，确保 QA 可用
+    this.logger.error(`[askStream]: Failed to rerank evidences: ${JSON.stringify(e)}`);
+  }
+}
 ```
 
 #### 6.4 GLM（智谱）流式解析：从 `data:` 行提取 delta

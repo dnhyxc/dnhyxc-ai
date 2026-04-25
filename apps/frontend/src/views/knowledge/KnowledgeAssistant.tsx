@@ -5,7 +5,7 @@
 
 import Loading from '@design/Loading';
 import { Button, Toast } from '@ui/index';
-import { ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
+import { BookOpen, ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
 import { observer } from 'mobx-react';
 import {
 	type RefObject,
@@ -29,6 +29,7 @@ import {
 import { cn } from '@/lib/utils';
 import useStore from '@/store';
 import assistantStore from '@/store/assistant';
+import knowledgeRagQaStore from '@/store/knowledgeRagQa';
 import type { Message } from '@/types/chat';
 import {
 	KNOWLEDGE_ASSISTANT_PROMPTS,
@@ -62,6 +63,80 @@ interface KnowledgeAssistantMessageBubbleProps {
 }
 
 type KnowledgeAssistantScrollCornerFabMode = 'hidden' | 'toBottom' | 'toTop';
+
+/** 仅 UI：助手模式偏好，写入 localStorage */
+const KNOWLEDGE_ASSISTANT_MODE_KEY = 'knowledge-assistant-mode';
+type KnowledgeAssistantMode = 'ai' | 'rag';
+
+/**
+ * RAG 模式单条气泡：从 `knowledgeRagQaStore` 取消息，与 AI 侧 `assistantStore` 完全隔离。
+ */
+const KnowledgeRagMessageBubble = observer(function KnowledgeRagMessageBubble({
+	chatId,
+	index,
+	messagesLength,
+	isCopyedId,
+	onCopy,
+	onSaveToKnowledge,
+	scrollViewportRef,
+}: KnowledgeAssistantMessageBubbleProps) {
+	const message = knowledgeRagQaStore.messages.find((m) => m.chatId === chatId);
+	if (!message) return null;
+
+	const streamRev =
+		message.role === 'assistant'
+			? `${message.content.length}:${message.thinkContent?.length ?? 0}:${message.isStreaming ? 1 : 0}`
+			: `${message.content.length}`;
+
+	return (
+		<div
+			className={cn(
+				'relative flex min-w-0 max-w-full flex-1 flex-col gap-1 pb-10 w-full group last:pb-8.5',
+				message.role === 'user' ? 'items-end' : '',
+			)}
+			data-msg-rev={streamRev}
+		>
+			<div
+				id="message-md-wrap"
+				className={cn(
+					'relative flex min-w-0 max-w-full rounded-md p-3 select-auto text-textcolor mb-5',
+					message.role === 'user'
+						? 'w-fit max-w-full self-end bg-teal-600/5 border border-teal-500/15 text-end pt-2 pb-2.5 px-3'
+						: 'flex-1 bg-theme/5 border border-theme/10',
+				)}
+			>
+				{message.role === 'user' ? (
+					<ChatAssistantMessage
+						message={message}
+						className="text-left min-w-0 max-w-full [&_.markdown-body]:min-w-0 [&_.markdown-body]:max-w-full [&_.markdown-body]:overflow-x-auto"
+					/>
+				) : (
+					<ChatAssistantMessage
+						message={message}
+						scrollViewportRef={scrollViewportRef}
+					/>
+				)}
+
+				<div
+					className={cn(
+						'absolute -bottom-9',
+						message.role === 'user' ? 'right-0' : 'left-0',
+					)}
+				>
+					<ChatMessageActions
+						message={message}
+						index={index}
+						isCopyedId={isCopyedId}
+						messagesLength={messagesLength}
+						onCopy={onCopy}
+						needShare={false}
+						onSaveToKnowledge={onSaveToKnowledge}
+					/>
+				</div>
+			</div>
+		</div>
+	);
+});
 
 /**
  * 单条气泡独立 observer：从 store 解析出当前 Message。
@@ -148,11 +223,27 @@ const KnowledgeAssistant = observer(
 		const [internalInput, setInternalInput] = useState('');
 		const input = inputProp ?? internalInput;
 		const setInput = setInputProp ?? setInternalInput;
+		const [assistantMode, setAssistantModeState] =
+			useState<KnowledgeAssistantMode>(() => {
+				if (typeof window === 'undefined') return 'ai';
+				const v = localStorage.getItem(KNOWLEDGE_ASSISTANT_MODE_KEY);
+				return v === 'rag' ? 'rag' : 'ai';
+			});
+		const setAssistantMode = useCallback((m: KnowledgeAssistantMode) => {
+			setAssistantModeState(m);
+			if (typeof window !== 'undefined') {
+				localStorage.setItem(KNOWLEDGE_ASSISTANT_MODE_KEY, m);
+			}
+		}, []);
+		const [ragInput, setRagInput] = useState('');
+		const isRagMode = assistantMode === 'rag';
 		const [isCopyedId, setIsCopyedId] = useState('');
 		const [scrollCornerFabMode, setScrollCornerFabMode] =
 			useState<KnowledgeAssistantScrollCornerFabMode>('hidden');
 		const scrollCornerFabModeRef =
 			useRef<KnowledgeAssistantScrollCornerFabMode>('hidden');
+		/** 用于检测「刚切入 RAG 模式」：仅在 false→true 时贴底，避免影响 AI 模式与其它渲染 */
+		const wasRagModeRef = useRef(false);
 
 		const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -198,8 +289,9 @@ const KnowledgeAssistant = observer(
 			};
 		}, [assistantPersistenceAllowed]);
 
-		// 左侧编辑器被清空时，同步清空助手输入框，避免禁用输入后仍残留未发送草稿
+		// 左侧编辑器被清空时，同步清空「AI 助手」输入框（RAG 独立输入，且不因正文清空而清空）
 		useEffect(() => {
+			if (assistantMode !== 'ai') return;
 			/**
 			 * 注意：开启助手会导致 Monaco 视图切换与编辑器重挂载，期间父级 markdown 可能出现极短暂的空串。
 			 * 若此处立刻清空输入框，会造成“刚复制进输入框就被清掉”的体验。
@@ -214,7 +306,7 @@ const KnowledgeAssistant = observer(
 				}
 			}, 200);
 			return () => window.clearTimeout(id);
-		}, [knowledgeStore.markdown, setInput, knowledgeStore]);
+		}, [knowledgeStore.markdown, setInput, knowledgeStore, assistantMode]);
 
 		const onSaveToKnowledge = useCallback(
 			(message: Message) => {
@@ -239,7 +331,9 @@ const KnowledgeAssistant = observer(
 			}, 500);
 		}, []);
 
-		const messages = assistantStore.messages;
+		const aiMessages = assistantStore.messages;
+		const ragMessages = knowledgeRagQaStore.messages;
+		const messages = isRagMode ? ragMessages : aiMessages;
 
 		const lastMsg = messages[messages.length - 1];
 		const streamScrollTick =
@@ -254,10 +348,30 @@ const KnowledgeAssistant = observer(
 			disableStickToBottom: disableStreamStickToBottom,
 			flushScrollToBottom,
 		} = useStickToBottomScroll({
-			isStreaming: assistantStore.isStreaming,
+			isStreaming: isRagMode
+				? knowledgeRagQaStore.isStreaming
+				: assistantStore.isStreaming,
 			contentRevision: streamScrollTick,
-			resetKey: documentKey || undefined,
+			resetKey: isRagMode
+				? 'knowledge-rag-qa-global'
+				: documentKey || undefined,
 		});
+
+		// 切换到 RAG 助手时：将消息区滚到底部（仅在进入 RAG 的瞬间触发，不改变 AI 模式行为）
+		useLayoutEffect(() => {
+			if (!isRagMode) {
+				wasRagModeRef.current = false;
+				return;
+			}
+			const enteredRag = !wasRagModeRef.current;
+			wasRagModeRef.current = true;
+			if (!enteredRag) return;
+			enableStreamStickToBottom();
+			flushScrollToBottom();
+			requestAnimationFrame(() => {
+				flushScrollToBottom();
+			});
+		}, [isRagMode, enableStreamStickToBottom, flushScrollToBottom]);
 
 		const refreshScrollCornerFab = useCallback(() => {
 			const vp = scrollViewportRef.current;
@@ -279,12 +393,21 @@ const KnowledgeAssistant = observer(
 
 		/** 流式/发送结束后展示「重新总结/润色」条带（跟在消息后，见下方 ScrollArea 内渲染） */
 		const showPostStreamActions =
+			!isRagMode &&
 			isLoggedIn &&
-			messages.length > 0 &&
+			aiMessages.length > 0 &&
 			editorHasBody &&
 			!assistantStore.isHistoryLoading &&
 			!assistantStore.isSending &&
 			!assistantStore.isStreaming;
+
+		/** RAG：本轮流式结束后展示「新对话」，仅影响 RAG store，不涉及 AI */
+		const showRagNewConversation =
+			isRagMode &&
+			isLoggedIn &&
+			ragMessages.length > 0 &&
+			!knowledgeRagQaStore.isSending &&
+			!knowledgeRagQaStore.isStreaming;
 
 		// 条带插入后 scrollHeight 变化，须在布局后贴底，否则用户仍停在旧滚动位置
 		useLayoutEffect(() => {
@@ -293,17 +416,32 @@ const KnowledgeAssistant = observer(
 			requestAnimationFrame(() => flushScrollToBottom());
 		}, [showPostStreamActions, flushScrollToBottom]);
 
+		// RAG「新对话」条带出现后同样贴底，避免按钮把视口顶在旧位置
+		useLayoutEffect(() => {
+			if (!showRagNewConversation) return;
+			flushScrollToBottom();
+			requestAnimationFrame(() => flushScrollToBottom());
+		}, [showRagNewConversation, flushScrollToBottom]);
+
 		const { relayout: relayoutCodeToolbar } = useChatCodeFloatingToolbar(
 			scrollViewportRef as RefObject<HTMLElement | null>,
 			{
 				// 助手正文 / 流式增量会变高，须触发 `layoutChatCodeToolbars`（勿仅用 knowledgeStore.markdown）
-				layoutDeps: [streamScrollTick, documentKey, messages.length],
+				layoutDeps: [
+					streamScrollTick,
+					documentKey,
+					messages.length,
+					isRagMode,
+					knowledgeRagQaStore.isStreaming,
+				],
 				passiveScrollLayout: true,
 				passiveScrollDeps: [
 					documentKey,
 					messages.length,
 					streamScrollTick,
-					assistantStore.isStreaming,
+					isRagMode
+						? knowledgeRagQaStore.isStreaming
+						: assistantStore.isStreaming,
 				],
 			},
 		);
@@ -367,6 +505,18 @@ const KnowledgeAssistant = observer(
 
 		const sendMessage = useCallback(
 			async (content?: string) => {
+				if (isRagMode) {
+					const text = (content ?? ragInput).trim();
+					if (!text) return;
+					if (!isLoggedIn) {
+						Toast({ type: 'warning', title: '请先登录后再使用助手' });
+						return;
+					}
+					setRagInput('');
+					enableStreamStickToBottom();
+					await knowledgeRagQaStore.sendMessage(text);
+					return;
+				}
 				const text = (content ?? input).trim();
 				if (!text) return;
 				if (!isLoggedIn) {
@@ -377,12 +527,13 @@ const KnowledgeAssistant = observer(
 				enableStreamStickToBottom();
 				await assistantStore.sendMessage(text);
 			},
-			[input, isLoggedIn, enableStreamStickToBottom],
+			[input, ragInput, isLoggedIn, enableStreamStickToBottom, isRagMode],
 		);
 
 		/** 首页快捷卡片：用户气泡仅显示标题，请求体携带当前文档全文 */
 		const sendKnowledgePromptCard = useCallback(
 			async (kind: KnowledgeAssistantPromptKind) => {
+				if (isRagMode) return;
 				if (!isLoggedIn) {
 					Toast({ type: 'warning', title: '请先登录后再使用助手' });
 					return;
@@ -410,21 +561,40 @@ const KnowledgeAssistant = observer(
 					extraUserContentForModel,
 				});
 			},
-			[isLoggedIn, knowledgeStore.markdown, enableStreamStickToBottom],
+			[
+				isLoggedIn,
+				knowledgeStore.markdown,
+				enableStreamStickToBottom,
+				isRagMode,
+			],
 		);
 
 		const stopGenerating = useCallback(() => {
+			if (isRagMode) {
+				knowledgeRagQaStore.stopGenerating();
+				return;
+			}
 			void assistantStore.stopGenerating();
-		}, []);
+		}, [isRagMode]);
 
 		return (
 			<div className="relative flex h-full w-full flex-col overflow-hidden">
 				<ChatCodeFloatingToolbar />
-				{assistantStore.isHistoryLoading ? (
+				{!isRagMode && assistantStore.isHistoryLoading ? (
 					<div className="text-textcolor/70 flex flex-1 items-center justify-center text-sm">
 						<Loading text="正在加载对话…" />
 					</div>
-				) : !messages.length ? (
+				) : isRagMode && !ragMessages.length ? (
+					<div className="text-textcolor/70 flex flex-1 justify-center items-start text-sm pt-4 pl-4 pr-4.5">
+						<div className="w-full flex gap-2 border border-theme/10 bg-theme/5 p-3 rounded-md">
+							<BookOpen size={18} className="mt-0.5 shrink-0 text-teal-500" />
+							<div className="flex-1 text-sm leading-relaxed">
+								<b className="text-textcolor">RAG 知识库问答</b>
+								：基于您账号下已入库的知识向量检索并回答，与当前左侧打开的文档无关；左侧无正文时也可提问。对话在切换文章后仍会保留。
+							</div>
+						</div>
+					</div>
+				) : !isRagMode && !aiMessages.length ? (
 					<div className="text-textcolor/70 flex flex-1 justify-center items-start text-sm pt-4 pl-4 pr-4.5">
 						{knowledgeStore.markdown ? (
 							<div className="w-full flex flex-col gap-2 justify-center items-center">
@@ -477,20 +647,50 @@ const KnowledgeAssistant = observer(
 								'pt-4 max-w-3xl mx-auto relative flex w-full min-w-0 flex-col select-none  pr-4 pl-3.5',
 							)}
 						>
-							{messages.map((message, index) => (
-								<KnowledgeAssistantMessageBubble
-									key={message.chatId}
-									chatId={message.chatId}
-									index={index}
-									messagesLength={messages.length}
-									isCopyedId={isCopyedId}
-									onCopy={onCopy}
-									onSaveToKnowledge={onSaveToKnowledge}
-									scrollViewportRef={
-										scrollViewportRef as RefObject<HTMLElement | null>
-									}
-								/>
-							))}
+							{messages.map((message, index) =>
+								isRagMode ? (
+									<KnowledgeRagMessageBubble
+										key={message.chatId}
+										chatId={message.chatId}
+										index={index}
+										messagesLength={messages.length}
+										isCopyedId={isCopyedId}
+										onCopy={onCopy}
+										onSaveToKnowledge={onSaveToKnowledge}
+										scrollViewportRef={
+											scrollViewportRef as RefObject<HTMLElement | null>
+										}
+									/>
+								) : (
+									<KnowledgeAssistantMessageBubble
+										key={message.chatId}
+										chatId={message.chatId}
+										index={index}
+										messagesLength={messages.length}
+										isCopyedId={isCopyedId}
+										onCopy={onCopy}
+										onSaveToKnowledge={onSaveToKnowledge}
+										scrollViewportRef={
+											scrollViewportRef as RefObject<HTMLElement | null>
+										}
+									/>
+								),
+							)}
+							{showRagNewConversation ? (
+								<div className="mb-3 flex w-full min-w-0 justify-start">
+									<Button
+										type="button"
+										variant="dynamic"
+										className="w-fit rounded-md border border-theme/10 bg-theme/5 px-3 py-1.5 text-sm text-textcolor/80 transition-colors hover:border-theme/20 hover:text-textcolor"
+										onClick={() => {
+											knowledgeRagQaStore.resetConversation();
+											setRagInput('');
+										}}
+									>
+										新对话
+									</Button>
+								</div>
+							) : null}
 							{showPostStreamActions ? (
 								<div className="flex w-full min-w-0 flex-wrap gap-3.5 mb-3">
 									{KNOWLEDGE_ASSISTANT_PROMPTS.map((item) => (
@@ -532,22 +732,62 @@ const KnowledgeAssistant = observer(
 							</button>
 						) : null}
 						<ChatEntry
-							input={input}
-							setInput={setInput}
+							input={isRagMode ? ragInput : input}
+							setInput={isRagMode ? setRagInput : setInput}
 							className="w-full pl-0.5 pr-0.5 pb-4.5 border-theme/10"
 							textareaClassName="min-h-9"
 							sendMessage={sendMessage}
 							placeholder={
-								editorHasBody
-									? '请输入您的问题'
-									: '请先在左侧编辑器输入正文后再向我提问'
+								isRagMode
+									? '向知识库提问（与当前文档无关）'
+									: editorHasBody
+										? '请输入您的问题'
+										: '请先在左侧编辑器输入正文后再向我提问'
 							}
-							disableTextInput={!editorHasBody}
+							disableTextInput={isRagMode ? false : !editorHasBody}
 							loading={
-								assistantStore.isSending || assistantStore.isHistoryLoading
+								isRagMode
+									? knowledgeRagQaStore.isSending
+									: assistantStore.isSending || assistantStore.isHistoryLoading
 							}
 							stopGenerating={
-								assistantStore.isStreaming ? stopGenerating : undefined
+								isRagMode
+									? knowledgeRagQaStore.isStreaming
+										? stopGenerating
+										: undefined
+									: assistantStore.isStreaming
+										? stopGenerating
+										: undefined
+							}
+							entryChildren={
+								<div className="flex w-full items-center gap-1 pb-1">
+									<Button
+										variant="dynamic"
+										size="sm"
+										className={cn(
+											'px-2.5 border border-theme/15',
+											assistantMode === 'ai'
+												? 'bg-theme/15 text-textcolor'
+												: 'text-textcolor/70 hover:bg-theme/10',
+										)}
+										onClick={() => setAssistantMode('ai')}
+									>
+										AI 助手
+									</Button>
+									<Button
+										variant="dynamic"
+										size="sm"
+										className={cn(
+											'px-2.5 border border-theme/15',
+											assistantMode === 'rag'
+												? 'bg-theme/15 text-textcolor'
+												: 'text-textcolor/70 hover:bg-theme/10',
+										)}
+										onClick={() => setAssistantMode('rag')}
+									>
+										RAG 助手
+									</Button>
+								</div>
 							}
 						/>
 					</div>
