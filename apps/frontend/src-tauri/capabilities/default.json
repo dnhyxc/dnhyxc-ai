@@ -32,7 +32,13 @@
 			"identifier": "http:default",
 			"allow": [
 				{
-					"url": "http://47.96.84.136:9112/*"
+					"url": "http://101.43.50.15:9112/*"
+				},
+				{
+					"url": "http://dnhyxc.cn:9112/*"
+				},
+				{
+					"url": "https://dnhyxc.cn:9112/*"
 				},
 				{
 					"url": "http://localhost:9112/*"

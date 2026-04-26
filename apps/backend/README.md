@@ -1207,7 +1207,7 @@ docker-compose up -d
 
 ```bash
 # 从本地 /Users/dnhyxc/Desktop 目录下上传 redis-7.4.7.tar.gz 到服务器 /usr/local 目录下
-scp /Users/dnhyxc/Desktop/redis-7.4.7.tar.gz root@47.96.84.136:/usr/local
+scp /Users/dnhyxc/Desktop/redis-7.4.7.tar.gz root@101.43.50.15:/usr/local
 
 cd /usr/local
 
@@ -1441,7 +1441,7 @@ pnpm build
 
 压缩 dist 文件
 
-scp /Users/dnhyxc/Documents/code/dnhyxc-ai/apps/backend/dist.zip root@47.96.84.136:/usr/local/dnhyxc-ai/server
+scp /Users/dnhyxc/Documents/code/dnhyxc-ai/apps/backend/dist.zip root@101.43.50.15:/usr/local/dnhyxc-ai/server
 
 unzip dist.zip
 ```
@@ -1449,7 +1449,7 @@ unzip dist.zip
 之后将项目中的 `package.json` 文件也上传到服务器中的 `dnhyxc-ai/server` 文件目录下，方便安装响应的依赖：
 
 ```bash
-scp /Users/dnhyxc/Documents/code/dnhyxc-ai/apps/backend/package.json root@47.96.84.136:/usr/local/dnhyxc-ai/server
+scp /Users/dnhyxc/Documents/code/dnhyxc-ai/apps/backend/package.json root@101.43.50.15:/usr/local/dnhyxc-ai/server
 ```
 
 package.json 文件上传完成后，在服务器 `/user/local/dnhyxc-ai/server` 目录下执行以下命令安装项目所需的 `dependencies` 依赖：

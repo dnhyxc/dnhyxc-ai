@@ -188,7 +188,31 @@ services:
 
 ```bash
 sudo systemctl restart docker
+docker-compose up -d
+```
 
+如果 pull 太慢可以配置镜像加速：
+
+```bash
+mkdir -p /etc/docker
+cat > /etc/docker/daemon.json << 'EOF'
+{
+  "registry-mirrors": [
+    "https://docker.1ms.run",
+    "https://docker.xuanyuan.me",
+    "https://docker.m.daocloud.io"
+  ]
+}
+EOF
+```
+
+之后重启 docker：
+
+```bash
+systemctl daemon-reload
+systemctl restart docker
+
+# 重启之后重新执行
 docker-compose up -d
 ```
 
@@ -202,7 +226,7 @@ docker-compose up -d
 
 ```bash
 # 从本地 /Users/dnhyxc/Desktop 目录下上传 redis-7.4.7.tar.gz 到服务器 /usr/local 目录下
-scp /Users/dnhyxc/Desktop/redis-7.4.7.tar.gz root@47.96.84.136:/usr/local
+scp /Users/dnhyxc/Desktop/redis-7.4.7.tar.gz root@101.43.50.15:/usr/local
 
 cd /usr/local
 
@@ -319,6 +343,8 @@ source ~/.bash_profile
 但是在执行之前，需要修改 `./install_server.sh` 文件的第 77 行到 84行的代码注释掉，防止执行报错。
 
 ```bash
+cd /usr/local/redis-7.4.7/utils
+
 vi +77 install_server.sh
 ```
 
@@ -523,9 +549,7 @@ pm2 startup
 仅结构：
 
 ```bash
-docker exec dnhyxc_ai_db sh -lc \
-  'mysqldump -uroot -p<密码> --databases dnhyxc_ai_db --no-data --routines --triggers --events --default-character-set=utf8mb4' \
-  > dnhyxc_ai_db_schema.sql
+docker exec dnhyxc_ai_db sh -lc 'mysqldump -uroot -pexample --databases dnhyxc_ai_db --no-data --routines --triggers --events --default-character-set=utf8mb4' > dnhyxc_ai_db_schema.sql"
 ```
 
 结构 + 数据：
@@ -574,3 +598,5 @@ docker system prune -a --volumes
 ---
 
 更细的逐步截图级说明（如 Redis `install_server.sh` 注释段落）仍保留在 `apps/backend/README.md` 中，可按需对照；**以本文档为发布与防火墙策略的索引**即可。
+
+# 无法连接腾讯云 root@101.43... →点击查看智谱清言的回答https://chatglm.cn/share/xFOamL4i
