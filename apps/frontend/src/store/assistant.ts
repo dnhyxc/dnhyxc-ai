@@ -385,6 +385,13 @@ export class AssistantStore {
 			return;
 		}
 
+		// 并发去重：UI 层 effect 可能因 `activeDocumentKey` 被写入而二次触发 activate。
+		// 若同一 canonical 文档正在拉取历史/会话，则直接复用进行中的结果，避免重复请求
+		// `/assistant/session/for-knowledge?knowledgeArticleId=...`。
+		if (state.isHistoryLoading) {
+			return;
+		}
+
 		// 若该文档已经 hydrate 过历史/会话，且目前已有内容或正在流式，则不重复请求
 		if (state.historyHydrated) {
 			return;

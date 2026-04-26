@@ -303,31 +303,34 @@ const assistantArticleBinding = useMemo(() => {
 4. `const state = this.ensureState(docKey)`。
 5. 若 **`!this.knowledgeAssistantPersistenceAllowed`**：return（不拉后端；草稿仅内存）。
 6. 若 **`!readToken()`**：return。
-7. 若 **`state.historyHydrated === true`**：return（**已 hydrate 过**，避免重复 `getAssistantSessionByKnowledgeArticle` / `getAssistantSessionDetail`）。
-8. **`sid`** 初值：`this.sessionByDocument[docKey] ?? state.sessionId ?? null`。
-9. 若 **尚无 `sid`** 且 **`bindingId = knowledgeArticleBindingFromDocumentKey(nextKey)`** 非空：
+7. 若 **`state.isHistoryLoading === true`**：return（**并发去重**：UI effect 可能因 `activeDocumentKey` 被写入而二次触发 `activate`；同一桶正在拉历史时无需重复请求）。
+8. 若 **`state.historyHydrated === true`**：return（**已 hydrate 过**，避免重复 `getAssistantSessionByKnowledgeArticle` / `getAssistantSessionDetail`）。
+9. **`sid`** 初值：`this.sessionByDocument[docKey] ?? state.sessionId ?? null`。
+10. 若 **尚无 `sid`** 且 **`bindingId = knowledgeArticleBindingFromDocumentKey(nextKey)`** 非空：
    - `runInAction`：`state.isHistoryLoading = true`。
    - **`await getAssistantSessionByKnowledgeArticle(bindingId)`**。
    - 若 `data?.session?.sessionId`：`sid` 赋值；`runInAction` 写入 `sessionByDocument[docKey]`、`state.sessionId`、`state.messages = mapApiMessagesToUi(data.messages ?? [])`，**`hydratedFromArticleApi = true`**。
    - `finally`：`state.isHistoryLoading = false`。
-10. 若 **仍无 `sid`**：`runInAction` **`state.historyHydrated = true`**；return（**空会话**，等用户首条 `sendMessage` 时 `createAssistantSession`）。
-11. 若 **`hydratedFromArticleApi`**：`runInAction` **`state.historyHydrated = true`**；return（**不再**调用 `fetchSessionMessages`，避免二次请求）。
-12. 否则（内存里已有 sid，且不是刚由 for-knowledge 一次性灌入）：`runInAction` 设置 `state.sessionId = sid`、`state.isHistoryLoading = true`；**`await this.fetchSessionMessages()`**（内部用当前 `activeDocumentKey` 解析 canonical 再拉详情）。
-13. `try/catch`：失败时 `runInAction` **`delete sessionByDocument[docKey]`**、**`state.sessionId = null`**、**`state.messages = []`**（脏 sid 丢弃）。
-14. `finally`：`state.isHistoryLoading = false`；**`state.historyHydrated = true`**。
+11. 若 **仍无 `sid`**：`runInAction` **`state.historyHydrated = true`**；return（**空会话**，等用户首条 `sendMessage` 时 `createAssistantSession`）。
+12. 若 **`hydratedFromArticleApi`**：`runInAction` **`state.historyHydrated = true`**；return（**不再**调用 `fetchSessionMessages`，避免二次请求）。
+13. 否则（内存里已有 sid，且不是刚由 for-knowledge 一次性灌入）：`runInAction` 设置 `state.sessionId = sid`、`state.isHistoryLoading = true`；**`await this.fetchSessionMessages()`**（内部用当前 `activeDocumentKey` 解析 canonical 再拉详情）。
+14. `try/catch`：失败时 `runInAction` **`delete sessionByDocument[docKey]`**、**`state.sessionId = null`**、**`state.messages = []`**（脏 sid 丢弃）。
+15. `finally`：`state.isHistoryLoading = false`；**`state.historyHydrated = true`**。
 
 ### 6.8 `remapAssistantSessionDocumentKey(fromKey, toKey)`
 
 `from`/`to` 为 **`canonicalKey(fromKey)`** / **`canonicalKey(toKey)`**。若缺失或 `from === to`：仅当 **`activeDocumentKey === fromKey`** 时把 **`activeDocumentKey` 改为 `toKey`**（无前缀迁移需求时）。否则 **`runInAction`**：迁移 **`sessionByDocument`** 与 **`stateByDocument`** 中 `from` → `to` 的条目并删除 `from`；若 **`activeDocumentKey === fromKey`** 则 **`activeDocumentKey = toKey`**。
 
-### 6.9 `clearAssistantStateOnKnowledgeDraftReset(syncActiveDocumentKey?)`
+### 6.9 `clearAssistantStateOnKnowledgeDraftReset(syncActiveDocumentKey?, options?)`
 
 用于 **`documentKey` 不变**（如仍为 `draft-new__trash-*`）但左侧已清空草稿的场景：`useEffect([documentKey])` **不会**再触发 `activate`，必须 **显式** 清助手。
 
 1. `rawKey = this.activeDocumentKey`，`key = canonicalKey(rawKey)`，`state = key ? ensureState(key) : null`，`prevSid = state?.sessionId ?? null`。
 2. **`state?.abortStream?.()`**，并 **`state.abortStream = null`**。
 3. **`runInAction`**：若 `key` 存在则 **`delete stateByDocument[key]`**、**`delete sessionByDocument[key]`**；若传入 **`syncActiveDocumentKey?.trim()`** 则 **`activeDocumentKey = next`** 并 **`ensureState(next)`**（避免后续 getter 空引用）。
-4. 若 **`prevSid`**：`void stopAssistantStream(prevSid).catch(() => {})`（尽力通知后端停流）。
+4. 若 **`options?.stopBackend === true` 且 `prevSid` 存在**：`void stopAssistantStream(prevSid).catch(() => {})`（可选：显式要求时才通知后端停流）。
+
+> 说明：清空内容/新建草稿的默认语义是“本地重置编辑态”，只需要 **中止前端 SSE** 并清理内存状态；不应默认调用后端 `/assistant/stop`，否则会把“清空内容”误变成“停止生成”。
 
 ### 6.10 `fetchSessionMessages` / `fetchSessionMessagesForDocumentKey`
 
@@ -502,6 +505,107 @@ onComplete: async (err) => {
   - 仍会调用 `/api/assistant/stop`（原有功能不变）
 - 不点击停止、让流自然完成时：
   - 仍会在完成后 `fetchSessionMessagesForDocumentKey` 与服务端落库历史对齐（原有功能不变）
+
+### 6.15 修复：避免重复请求 `/assistant/session/for-knowledge`（同一 knowledgeArticleId 连续请求两次）
+
+#### 6.15.1 现象
+
+在知识库页面进入/切换条目时，浏览器网络面板可观察到同一个接口在极短时间内被请求两次：
+
+- `GET /api/assistant/session/for-knowledge?knowledgeArticleId=...`
+
+这会带来：
+
+- 无意义的重复网络开销
+- 在慢网/高延迟下可能造成加载态抖动（第二次请求覆写第一次返回）
+
+#### 6.15.2 根因（UI effect 自触发）
+
+`KnowledgeAssistant.tsx` 使用 `useEffect` 触发 `activateForDocument(documentKey)`，其依赖数组包含 `assistantStore.activeDocumentKey`：
+
+- `activateForDocument` 内部会写入 `activeDocumentKey`
+- 写入会导致 effect **再次触发**
+- 当 `editorHasBody === true` 时不会被短路，于是会对同一 `documentKey` 连续调用两次 `activateForDocument`
+- `activateForDocument` 在首次请求开始后，旧实现没有“并发去重”，因此会发起两次 `for-knowledge` 请求
+
+#### 6.15.3 修复策略（不改变 UI 依赖与现有时序）
+
+为了不改动 UI 的依赖关系（避免引入新的边界/时序问题），修复放在 store 层：
+
+- 当同一 canonical 文档桶已经进入 `isHistoryLoading === true`（说明正在拉历史/会话）时，后续重复的 `activateForDocument` 直接 `return`。
+- 这样：
+  - 第一次请求正常进行并写入 state
+  - 第二次触发被“并发去重”拦截，不会再打接口
+
+#### 6.15.4 关键实现代码（含详细中文注释）
+
+文件：`apps/frontend/src/store/assistant.ts`
+
+```ts
+// 并发去重：UI 层 effect 可能因 `activeDocumentKey` 被写入而二次触发 activate。
+// 若同一 canonical 文档正在拉取历史/会话，则直接复用进行中的结果，避免重复请求
+// `/assistant/session/for-knowledge?knowledgeArticleId=...`。
+if (state.isHistoryLoading) {
+	return;
+}
+```
+
+#### 6.15.5 行为验证（预期结果）
+
+- 同一 `knowledgeArticleId` 在一次激活流程中只会请求一次 `for-knowledge`
+- 历史 hydrate、session 绑定、UI 渲染逻辑保持不变
+
+### 6.16 调整：清空内容（按钮/⌘⇧D）不再调用 `/api/assistant/stop`
+
+#### 6.16.1 需求
+
+点击「清空内容」或使用快捷键 **⌘⇧D** 会触发清空草稿逻辑。目标是：
+
+- 清空内容时 **不要** 调用 `POST /api/assistant/stop`
+- 但「停止生成」按钮的语义保持不变（仍应调用 stop）
+
+#### 6.16.2 根因
+
+知识页清空草稿会调用 store 的 `clearAssistantStateOnKnowledgeDraftReset`。
+旧实现中该方法在清理本地状态后，会在末尾无条件（只要有 `prevSid`）调用：
+
+- `stopAssistantStream(prevSid)` → `/api/assistant/stop`
+
+因此“清空内容”的动作被绑定到了“停止生成”的后端语义上。
+
+#### 6.16.3 修复策略
+
+将 `clearAssistantStateOnKnowledgeDraftReset` 的“是否通知后端 stop”改为**显式可选**：
+
+- 默认：仅中止前端 SSE + 清理内存 state（不调 stop）
+- 需要时：调用方传 `{ stopBackend: true }`，才会调用 `/api/assistant/stop`
+
+这样既满足“清空不 stop”，也保留未来特殊入口的扩展能力。
+
+#### 6.16.4 关键实现代码（含详细中文注释）
+
+文件：`apps/frontend/src/store/assistant.ts`
+
+```ts
+clearAssistantStateOnKnowledgeDraftReset(
+	syncActiveDocumentKey?: string | null,
+	options?: { stopBackend?: boolean },
+): void {
+	// ...（省略：中止前端 SSE、清理 stateByDocument/sessionByDocument、同步 activeDocumentKey 等）
+
+	// 清空内容/新建草稿属于“本地重置编辑态”，只需要中断前端 SSE 并清理内存 state。
+	// 若此处调用后端 stop，会导致“清空内容”也中止服务端生成，影响用户对停止语义的预期。
+	// 如确有需要（例如某些入口希望清空时也停止服务端任务），可显式传入 `{ stopBackend: true }`。
+	if (options?.stopBackend && prevSid) {
+		void stopAssistantStream(prevSid).catch(() => {});
+	}
+}
+```
+
+#### 6.16.5 不受影响的功能点
+
+- 「停止生成」按钮仍走 `stopGenerating()`，依然会调用 `/api/assistant/stop`
+- 清空内容仍会立即中止前端 SSE，并清空本地消息/映射（避免气泡残留）
 
 ---
 
