@@ -66,6 +66,15 @@ export class AssistantService {
 		return `assistant:glm_stream_busy:${sessionId}`;
 	}
 
+	/** ephemeral（不落库）流式：按用户隔离的 epoch/busy key */
+	private ephemeralStreamEpochKey(userId: number, streamId: string): string {
+		return `assistant:ephemeral_stream_epoch:${userId}:${streamId}`;
+	}
+
+	private ephemeralStreamBusyKey(userId: number, streamId: string): string {
+		return `assistant:ephemeral_stream_busy:${userId}:${streamId}`;
+	}
+
 	private parseEpoch(v: unknown): number {
 		if (typeof v === 'number' && Number.isFinite(v)) return v;
 		const n = Number(v);
@@ -84,6 +93,27 @@ export class AssistantService {
 	private async getStreamEpoch(sessionId: string): Promise<number> {
 		return this.parseEpoch(
 			await this.cache.get(this.streamEpochKey(sessionId)),
+		);
+	}
+
+	/** 递增 ephemeral 流世代号（用于 stop）；返回递增后的值 */
+	private async incrementEphemeralStreamEpoch(
+		userId: number,
+		streamId: string,
+	): Promise<number> {
+		const key = this.ephemeralStreamEpochKey(userId, streamId);
+		const prev = this.parseEpoch(await this.cache.get(key));
+		const next = prev + 1;
+		await this.cache.set(key, next, ASSISTANT_STREAM_STATE_TTL_MS);
+		return next;
+	}
+
+	private async getEphemeralStreamEpoch(
+		userId: number,
+		streamId: string,
+	): Promise<number> {
+		return this.parseEpoch(
+			await this.cache.get(this.ephemeralStreamEpochKey(userId, streamId)),
 		);
 	}
 
@@ -486,7 +516,9 @@ export class AssistantService {
 	private async runEphemeralChatStream(
 		subscriber: Subscriber<ZhipuStreamData>,
 		dto: AssistantChatDto,
+		options: { streamId: string; userId: number },
 	): Promise<void> {
+		const { streamId, userId } = options;
 		const allTurns = this.buildEphemeralTurns(dto);
 		const budget = this.getHistoryTurnBudgetTokens(dto);
 		let contextTurns = takeRecentMessagesWithinTokenBudget(allTurns, budget);
@@ -519,6 +551,8 @@ export class AssistantService {
 		}
 		const modelName = this.getGlmModelName();
 		const abortController = new AbortController();
+		// 与持久化 stop 一致：用 Redis epoch 做跨实例停止信号；本实例在读循环中轮询 epoch 并 abort。
+		const startEpoch = await this.getEphemeralStreamEpoch(userId, streamId);
 		const url = `${baseURL.replace(/\/$/, '')}/chat/completions`;
 		const response = await fetch(url, {
 			method: 'POST',
@@ -554,6 +588,11 @@ export class AssistantService {
 		let buffer = '';
 		try {
 			while (true) {
+				// stop 触发时 epoch 会递增；发现变化即主动 abort（预期中断）
+				const curEpoch = await this.getEphemeralStreamEpoch(userId, streamId);
+				if (curEpoch !== startEpoch) {
+					abortController.abort();
+				}
 				const { done, value } = await reader.read();
 				if (done) break;
 				const chunk = decoder.decode(value, { stream: true });
@@ -744,7 +783,33 @@ export class AssistantService {
 								'ephemeral 模式下请勿传 knowledgeArticleId',
 							);
 						}
-						await this.runEphemeralChatStream(subscriber, dto);
+						// ephemeral 模式：生成一个可 stop 的 streamId，并在 SSE 开始时下发给前端
+						const streamId = randomUUID();
+						await this.cache.set(
+							this.ephemeralStreamBusyKey(userId, streamId),
+							1,
+							ASSISTANT_STREAM_STATE_TTL_MS,
+						);
+						await this.cache.set(
+							this.ephemeralStreamEpochKey(userId, streamId),
+							0,
+							ASSISTANT_STREAM_STATE_TTL_MS,
+						);
+						// meta：前端可拿到 streamId 用于 stop（不落库，不影响原 content/thinking 协议）
+						subscriber.next({
+							type: 'meta',
+							data: { streamId },
+						} as any);
+						try {
+							await this.runEphemeralChatStream(subscriber, dto, {
+								streamId,
+								userId,
+							});
+						} finally {
+							await this.cache.del(
+								this.ephemeralStreamBusyKey(userId, streamId),
+							);
+						}
 						return;
 					}
 					if (sessionId) {
@@ -961,6 +1026,24 @@ export class AssistantService {
 		}
 		// 任意实例调用：Redis 递增 epoch，持有 fetch 的实例在读循环中比对后本地 abort
 		await this.incrementStreamEpoch(sessionId);
+		return { success: true, message: '已停止生成' };
+	}
+
+	/**
+	 * 停止 ephemeral（不落库）流式输出。
+	 *
+	 * 说明：
+	 * - 通过 Redis 递增 epoch 向“持有 fetch/read 的实例”发信号；
+	 * - 读循环会轮询 epoch，发现变化后 abort，从而停止下游流式输出。
+	 */
+	async stopEphemeralStream(streamId: string, userId: number) {
+		const busy = await this.cache.get(
+			this.ephemeralStreamBusyKey(userId, streamId),
+		);
+		if (!busy) {
+			return { success: false, message: '当前无进行中的生成' };
+		}
+		await this.incrementEphemeralStreamEpoch(userId, streamId);
 		return { success: true, message: '已停止生成' };
 	}
 }

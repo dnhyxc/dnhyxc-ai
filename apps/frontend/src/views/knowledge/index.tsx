@@ -226,6 +226,22 @@ const Knowledge = observer(() => {
 
 	/** 清空标题与正文（store 级草稿，与 markdown 一并清除） */
 	const resetEditorToNewDraft = useCallback(() => {
+		// 清空内容会把“编辑态条目”切回 `draft-new`。
+		// 关键：这里不能仅用 `assistantArticleBinding === 'draft-new'` 判断“未保存草稿”，
+		// 因为“是否允许助手持久化”还取决于：
+		// - 回收站预览（trashPreview）应允许持久化
+		// - 本地 Markdown 条目（带前缀）也应允许持久化
+		//
+		// 规则与 `KnowledgeAssistant.tsx` 的 `assistantPersistenceAllowed` 对齐：
+		// - persistenceAllowed=false（典型：新建未保存云端草稿）时：清空需要清理 ephemeral 对话，并显式 stop 后端以避免资源浪费
+		// - persistenceAllowed=true（知识库/回收站/本地条目）时：清空仅重置编辑器，不应停止对应条目的流式输出
+		const editingId = knowledgeStore.knowledgeEditingKnowledgeId;
+		const assistantPersistenceAllowed =
+			knowledgeStore.knowledgeTrashPreviewId != null ||
+			isKnowledgeLocalMarkdownId(editingId) ||
+			Boolean(editingId);
+		const shouldClearAssistant = !assistantPersistenceAllowed;
+
 		// 仅递增 clearDocumentNonce 驱动 Monaco 的 documentIdentity，勿动 trashOpenNonce（否则与助手 documentKey 联动，会清空会话并触发内部关助手）
 		// 从回收站打开时 id 可能恒为 null：仅靠 editingId 无法区分「清空前后」；需让编辑器 identity 变化以退出 splitDiff，由 clearDocumentNonce 承担
 		setClearDocumentNonce((n) => n + 1);
@@ -238,9 +254,12 @@ const Knowledge = observer(() => {
 			trashOpenNonce,
 		);
 		// 未保存草稿下 documentKey 常为 `draft-new__trash-*` 不变，须显式清空助手内存态（含不落库的 ephemeral 对话）
-		assistantStore.clearAssistantStateOnKnowledgeDraftReset(
-			nextAssistantDocumentKey,
-		);
+		if (shouldClearAssistant) {
+			assistantStore.clearAssistantStateOnKnowledgeDraftReset(
+				nextAssistantDocumentKey,
+				{ stopBackend: true },
+			);
+		}
 	}, [knowledgeStore, trashOpenNonce]);
 
 	// 快捷键监听

@@ -325,10 +325,14 @@ const assistantArticleBinding = useMemo(() => {
 
 用于 **`documentKey` 不变**（如仍为 `draft-new__trash-*`）但左侧已清空草稿的场景：`useEffect([documentKey])` **不会**再触发 `activate`，必须 **显式** 清助手。
 
-1. `rawKey = this.activeDocumentKey`，`key = canonicalKey(rawKey)`，`state = key ? ensureState(key) : null`，`prevSid = state?.sessionId ?? null`。
+1. `rawKey = this.activeDocumentKey`，`key = canonicalKey(rawKey)`，`state = key ? ensureState(key) : null`：
+   - `prevSid = state?.sessionId ?? null`（持久化会话停止句柄）
+   - `prevStreamId = state.ephemeralStreamId ?? null`（ephemeral（不落库）流式停止句柄，见 §7.3）
 2. **`state?.abortStream?.()`**，并 **`state.abortStream = null`**。
 3. **`runInAction`**：若 `key` 存在则 **`delete stateByDocument[key]`**、**`delete sessionByDocument[key]`**；若传入 **`syncActiveDocumentKey?.trim()`** 则 **`activeDocumentKey = next`** 并 **`ensureState(next)`**（避免后续 getter 空引用）。
-4. 若 **`options?.stopBackend === true` 且 `prevSid` 存在**：`void stopAssistantStream(prevSid).catch(() => {})`（可选：显式要求时才通知后端停流）。
+4. 若 **`options?.stopBackend === true`**：按“可用句柄”停止后端流（可选：显式要求时才通知后端停流）：
+   - 若 `prevSid` 存在：`stopAssistantStream({ sessionId: prevSid })`
+   - 否则若 `prevStreamId` 存在：`stopAssistantStream({ streamId: prevStreamId })`
 
 > 说明：清空内容/新建草稿的默认语义是“本地重置编辑态”，只需要 **中止前端 SSE** 并清理内存状态；不应默认调用后端 `/assistant/stop`，否则会把“清空内容”误变成“停止生成”。
 
@@ -374,7 +378,9 @@ const assistantArticleBinding = useMemo(() => {
 
 1. **`this.abortStream?.()`** 然后 **`this.abortStream = null`**（注释：**先**断 SSE，避免 await **`stopAssistantStream`** 期间仍 apply delta 导致 `...prev` 仍 `isStreaming: true`）。
 2. **`runInAction`**：**`this.isSending = false`**（走 active getter）；**`this.messages = this.messages.map(m => m.isStreaming ? { ...m, isStreaming: false, isStopped: true } : m)`**（**替换数组**保证切换/映射时 UI 一致）。
-3. **`const sid = this.sessionId`**；有则 **`await stopAssistantStream(sid)`**（失败忽略）。
+3. **停止后端生成**：
+   - **持久化会话**：`const sid = this.sessionId`；有则 **`await stopAssistantStream({ sessionId: sid })`**（失败忽略）。
+   - **ephemeral（不落库）**：无 `sid` 时尝试读取 `activeState.ephemeralStreamId`，若存在则 **`await stopAssistantStream({ streamId })`**（失败忽略）。
 
 ### 6.14 修复：点击「停止」不再清空已接收流式正文（停止后只剩「思考中」问题）
 
@@ -629,10 +635,72 @@ clearAssistantStateOnKnowledgeDraftReset(
 | `error`（string）                           | `onComplete(error)` 并结束 readLoop。           |
 | `done === true`                             | `onComplete()` 正常结束。                       |
 | `type === 'thinking'`                       | 从 `raw` 或 `content` 取字符串 → `onThinking`。 |
+| `type === 'meta'`                           | 解析 `raw.streamId`（string）→ `onMeta({streamId})`（ephemeral stop 句柄）。 |
 | `type === 'usage'`                          | 忽略。                                          |
 | `type === 'content'` 且 `content` 为 string | `onDelta(content)`。                            |
 
 解析失败 Toast「助手流解析失败」并 **continue**（尽力容错）。
+
+### 7.3 `streamId`（ephemeral 可停止句柄）的下发与消费
+
+#### 7.3.1 需求与约束
+
+知识库“新建未保存云端草稿”会走 `ephemeral=true`（不落库、无 `sessionId`）。为了让**清空内容/停止生成**也能停止后端侧模型流式，需要后端提供一个 **ephemeral stop 句柄**。
+
+设计约束：
+
+- **不影响原有** `sessionId` 停止语义（持久化会话仍用 `sessionId` stop）。
+- `streamId` 仅用于**本次 ephemeral 流**，不落库；并按用户隔离（同一 `streamId` 仅能由所属用户 stop）。
+
+#### 7.3.2 后端下发方式（SSE `meta` 事件）
+
+后端在 `ephemeral=true` 的 SSE 开始阶段下发：
+
+```json
+{ "type": "meta", "raw": { "streamId": "uuid" } }
+```
+
+前端在 `streamAssistantSse` 里识别 `type === 'meta'`，并通过 `onMeta` 回调把 `streamId` 交给 store 保存。
+
+#### 7.3.3 前端落地：store 记录并用于 stop
+
+文件：`apps/frontend/src/store/assistant.ts`（简化示意，含中文注释）
+
+```ts
+// ephemeral：后端下发的可 stop 句柄（streamId）
+state.ephemeralStreamId = null;
+
+const abort = await streamAssistantSse({
+  body: { ephemeral: true, content: text, contextTurns },
+  callbacks: {
+    onMeta: (meta) => {
+      // 仅 ephemeral 才消费 streamId
+      if (meta?.streamId) {
+        state.ephemeralStreamId = meta.streamId;
+      }
+    },
+    onComplete: () => {
+      // 结束后清理句柄，避免误用旧 streamId
+      state.ephemeralStreamId = null;
+    },
+    onError: () => {
+      state.ephemeralStreamId = null;
+    },
+  },
+});
+```
+
+### 7.4 `/assistant/stop` 入参扩展（前端调用约定）
+
+前端 `stopAssistantStream` 统一改为发送 payload（二选一）：
+
+- 持久化：`{ sessionId: string }`
+- ephemeral：`{ streamId: string }`
+
+这样：
+
+- “停止生成”按钮在持久化与 ephemeral 下都能停止后端流
+- “清空内容（仅草稿重置）”在 ephemeral 下也能停止后端流（前提：已收到 `streamId`）
 
 ---
 

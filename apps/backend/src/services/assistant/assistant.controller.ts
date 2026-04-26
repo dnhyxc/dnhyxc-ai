@@ -140,6 +140,17 @@ export class AssistantController {
 		}
 		const source$ = this.assistantService.chatStream(userId, dto).pipe(
 			map((chunk) => {
+				// 兼容扩展类型（例如 ephemeral 下发 streamId 的 meta）
+				const t = (chunk as any)?.type as string | undefined;
+				if (t === 'meta') {
+					return {
+						data: {
+							type: 'meta',
+							raw: (chunk as any).data,
+							done: false,
+						},
+					};
+				}
 				return {
 					data: {
 						type: chunk.type,
@@ -170,6 +181,12 @@ export class AssistantController {
 		if (userId == null) {
 			return { success: false, message: '未登录' };
 		}
-		return this.assistantService.stopStream(body.sessionId, userId);
+		if (body.sessionId) {
+			return this.assistantService.stopStream(body.sessionId, userId);
+		}
+		if (body.streamId) {
+			return this.assistantService.stopEphemeralStream(body.streamId, userId);
+		}
+		return { success: false, message: '缺少停止参数' };
 	}
 }

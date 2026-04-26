@@ -307,10 +307,13 @@ export const importAssistantTranscript = async (body: {
 };
 
 /** 停止助手当前会话的流式生成 */
-export const stopAssistantStream = async (sessionId: string) => {
+export const stopAssistantStream = async (payload: {
+	sessionId?: string;
+	streamId?: string;
+}) => {
 	return await http.post<{ success: boolean; message: string }>(
 		ASSISTANT_STOP,
-		{ sessionId },
+		payload,
 	);
 };
 

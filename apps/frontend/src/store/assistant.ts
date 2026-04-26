@@ -41,6 +41,7 @@ export interface AssistantStoreApi {
 	setKnowledgeAssistantPersistenceAllowed(allowed: boolean): void;
 	clearAssistantStateOnKnowledgeDraftReset(
 		syncActiveDocumentKey?: string | null,
+		options?: { stopBackend?: boolean },
 	): void;
 
 	activateForDocument(documentKey: string): Promise<void>;
@@ -332,11 +333,22 @@ export class AssistantStore {
 	 */
 	clearAssistantStateOnKnowledgeDraftReset(
 		syncActiveDocumentKey?: string | null,
+		options?: { stopBackend?: boolean },
 	): void {
+		// 获取当前激活的文档 key（如 knowledge 编辑页的左右联动用于唯一标识 editor）
 		const rawKey = this.activeDocumentKey;
+		// 规范化 key，确保一致性（如 draft-new/已保存/本地 Markdown 等统一处理）
 		const key = rawKey ? this.canonicalKey(rawKey) : '';
+		// 拿到当前文档对应的助手状态对象，如不存在则为 null
 		const state = key ? this.ensureState(key) : null;
+		// 记录当前会话的 sessionId（持久化模式），用于必要时 stop
 		const prevSid = state?.sessionId ?? null;
+		// 记录当前 SSE 流的 ephemeral streamId（未保存草稿/本地临时态）。
+		// ephemeralStreamId 只存在于特定 state 下，需 Any 断言保证兼容
+		const prevStreamId =
+			(state as any)?.ephemeralStreamId != null
+				? String((state as any).ephemeralStreamId)
+				: null;
 
 		state?.abortStream?.();
 		if (state) {
@@ -356,7 +368,17 @@ export class AssistantStore {
 			}
 		});
 
-		if (prevSid) void stopAssistantStream(prevSid).catch(() => {});
+		// 清空内容/新建草稿属于“本地重置编辑态”，默认只需要中断前端 SSE 并清理内存 state。
+		// 若无条件调用后端 stop，会把“清空内容”误变成“停止生成”，并影响“已保存条目清空但流式继续”的体验。
+		// 仅在调用方显式要求时才通知后端停止。
+		if (options?.stopBackend) {
+			// 优先 stop 持久化 session；无 session 时尝试 stop ephemeral streamId
+			if (prevSid) {
+				void stopAssistantStream({ sessionId: prevSid }).catch(() => {});
+			} else if (prevStreamId) {
+				void stopAssistantStream({ streamId: prevStreamId }).catch(() => {});
+			}
+		}
 	}
 
 	get isStreaming(): boolean {
@@ -687,6 +709,10 @@ export class AssistantStore {
 
 		let accumulated = '';
 		let thinkBuf = '';
+		// ephemeral：后端下发的可 stop 句柄（streamId）
+		if (ephemeral) {
+			(state as any).ephemeralStreamId = null;
+		}
 
 		const applyAssistantPatch = (delta: string, thinkDelta?: string) => {
 			if (delta) accumulated += delta;
@@ -723,6 +749,12 @@ export class AssistantStore {
 				callbacks: {
 					onDelta: (d) => applyAssistantPatch(d),
 					onThinking: (t) => applyAssistantPatch('', t),
+					onMeta: (meta) => {
+						if (!ephemeral) return;
+						if (meta?.streamId) {
+							(state as any).ephemeralStreamId = meta.streamId;
+						}
+					},
 					onComplete: async (err) => {
 						const userAborted = err === ASSISTANT_SSE_USER_ABORT_MARKER;
 						runInAction(() => {
@@ -746,6 +778,9 @@ export class AssistantStore {
 							}
 						});
 						state.abortStream = null;
+						if (ephemeral) {
+							(state as any).ephemeralStreamId = null;
+						}
 						// 若首次保存时登记了“延迟迁入”：在流式结束后把完整对话迁入并绑定到新知识条目
 						// 注意：这里只处理“当前 state”上的 pending；它会在 fromKey→toKey remap 时随 state 迁移
 						const pending = state.pendingEphemeralFlush;
@@ -787,6 +822,9 @@ export class AssistantStore {
 							}
 						});
 						state.abortStream = null;
+						if (ephemeral) {
+							(state as any).ephemeralStreamId = null;
+						}
 						// 发生错误时不自动迁入，避免把“错误/中断导致的不完整内容”强绑定到新知识条目
 						// 若产品需要“即使错误也迁入”，可把该逻辑移动到 UI 层由用户确认。
 						runInAction(() => {
@@ -811,6 +849,9 @@ export class AssistantStore {
 				}
 			});
 			state.abortStream = null;
+			if (ephemeral) {
+				(state as any).ephemeralStreamId = null;
+			}
 		}
 	}
 
@@ -827,9 +868,23 @@ export class AssistantStore {
 			});
 		});
 		const sid = this.sessionId;
-		if (!sid) return;
+		if (!sid) {
+			// ephemeral：尝试用 streamId 停止后端流（若后端支持）
+			const streamId =
+				(this.activeState as any)?.ephemeralStreamId != null
+					? String((this.activeState as any).ephemeralStreamId)
+					: null;
+			if (streamId) {
+				try {
+					await stopAssistantStream({ streamId });
+				} catch {
+					// 无进行中时后端返回失败，忽略
+				}
+			}
+			return;
+		}
 		try {
-			await stopAssistantStream(sid);
+			await stopAssistantStream({ sessionId: sid });
 		} catch {
 			// 无进行中时后端返回失败，忽略
 		}

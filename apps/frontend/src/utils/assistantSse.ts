@@ -16,6 +16,8 @@ function readToken(): string {
 export interface AssistantSseCallbacks {
 	onDelta: (text: string) => void;
 	onThinking?: (text: string) => void;
+	/** ephemeral 模式下发的 stop 句柄（streamId） */
+	onMeta?: (meta: { streamId?: string }) => void;
 	onStart?: () => void;
 	onComplete?: (error?: string) => void;
 	onError?: (err: Error) => void;
@@ -38,7 +40,8 @@ export async function streamAssistantSse(options: {
 	callbacks: AssistantSseCallbacks;
 }): Promise<() => void> {
 	const { api = '/assistant/sse', body, callbacks } = options;
-	const { onDelta, onThinking, onStart, onComplete, onError } = callbacks;
+	const { onDelta, onThinking, onMeta, onStart, onComplete, onError } =
+		callbacks;
 
 	const controller = new AbortController();
 
@@ -124,6 +127,17 @@ export async function streamAssistantSse(options: {
 										? parsed.content
 										: '';
 							if (t) onThinking?.(t);
+							continue;
+						}
+						if (parsed.type === 'meta') {
+							// 约定：meta 里可包含 streamId（ephemeral stop 句柄）
+							const raw = parsed.raw;
+							if (raw && typeof raw === 'object') {
+								const o = raw as { streamId?: unknown };
+								const streamId =
+									typeof o.streamId === 'string' ? o.streamId : undefined;
+								onMeta?.({ streamId });
+							}
 							continue;
 						}
 						if (parsed.type === 'usage') {
