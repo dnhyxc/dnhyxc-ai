@@ -373,6 +373,136 @@ const assistantArticleBinding = useMemo(() => {
 2. **`runInAction`**：**`this.isSending = false`**（走 active getter）；**`this.messages = this.messages.map(m => m.isStreaming ? { ...m, isStreaming: false, isStopped: true } : m)`**（**替换数组**保证切换/映射时 UI 一致）。
 3. **`const sid = this.sessionId`**；有则 **`await stopAssistantStream(sid)`**（失败忽略）。
 
+### 6.14 修复：点击「停止」不再清空已接收流式正文（停止后只剩「思考中」问题）
+
+#### 6.14.1 现象与调用链
+
+在知识库助手里点击「停止」时，前端会依次发生：
+
+- 先 **中止 SSE（Server-Sent Events，服务器推送事件）**：`abortStream()` → `AbortController.abort()`
+- 再调用后端停止接口：`/api/assistant/stop`
+- 随后某些逻辑会继续调用会话详情：`/api/assistant/session/:sessionId`
+
+问题表现为：**前端界面上已经接收到的 assistant 正文被清空/回退**，只剩下思考区（`thinkContent`）或「思考中」占位，导致用户误以为没有输出。
+
+#### 6.14.2 根因（为什么会“停止后被覆盖”）
+
+核心原因是「用户主动停止」在旧实现里被当作「正常完成且无错误」处理，从而触发了“用服务端会话对齐覆盖本地消息”的逻辑：
+
+- `streamAssistantSse` 在捕获到 `AbortError`（用户停止导致）时会调用 `finish()`。
+- `finish()` 默认会 `onComplete()` **不带参数**，于是 `onComplete(err)` 里的 `err === undefined`。
+- `sendMessage` 的 `onComplete` 里有「`!err && !ephemeral` 时拉会话详情并覆盖本地 messages」的逻辑。
+- **停止瞬间后端往往还没把本轮 assistant 的流式片段落库**（或只落库了部分），会话详情返回的 messages 比本地已累积的短。
+- `fetchSessionMessagesForDocumentKey` 会用接口返回的 messages **整表替换** `state.messages`，于是本地刚刚显示的已接收正文被覆盖掉。
+
+一句话：**“用户停止”被误判为“成功完成” → 触发 fetchSessionMessages → 用未落库/不完整的服务端历史覆盖了本地已生成内容。**
+
+#### 6.14.3 修复策略（不影响现有功能的前提）
+
+我们需要在“用户主动停止”与“正常完成”之间做出可区分的信号，并保证：
+
+- **正常完成**（`done === true` 或流自然结束）仍然会 `fetchSessionMessagesForDocumentKey` 做服务端对齐，保持原有一致性。
+- **用户停止**（`AbortError`）不再触发对齐覆盖（因为对齐数据很可能不完整），从而保留本地已接收正文。
+
+实现上采用 **哨兵值（sentinel，哨兵字符串）**：
+
+- SSE 层在 `AbortError` 时 `onComplete(ASSISTANT_SSE_USER_ABORT_MARKER)`。
+- Store 层识别到该哨兵后：
+  - 不把它当成真实错误文案写到气泡里
+  - 不走 “无 err → fetchSessionMessages” 的覆盖对齐路径
+
+#### 6.14.4 关键实现代码（含详细中文注释）
+
+**① SSE 层：为用户停止提供“可识别的完成原因”**
+
+文件：`apps/frontend/src/utils/assistantSse.ts`
+
+```ts
+// 用户主动 `abort()` 时传给 `onComplete` 的哨兵值（非后端错误文案）。
+// 业务侧应跳过「成功后拉会话对齐」等逻辑，避免服务端尚未落库时覆盖本地已生成片段。
+export const ASSISTANT_SSE_USER_ABORT_MARKER =
+	'__FRONT_ASSISTANT_SSE_USER_ABORT__';
+
+// ...
+
+} catch (err: unknown) {
+	// 关键：AbortError 不是“正常完成”，它意味着用户点了停止。
+	// 如果这里调用 finish()（不带参数），上层会误以为 err 为空，从而去拉 session 对齐并覆盖 UI。
+	if (err instanceof DOMException && err.name === 'AbortError') {
+		// 传入哨兵值，让上层能区分“用户停止”与“自然完成”
+		finish(ASSISTANT_SSE_USER_ABORT_MARKER);
+		return;
+	}
+	// 非 AbortError 才走真正的 onError（例如网络错误、解析异常等）
+	const e =
+		err instanceof Error ? err : new Error(String(err ?? '请求中断'));
+	onError?.(e);
+}
+```
+
+**② Store 层：识别“用户停止”，避免用服务端会话覆盖本地已接收正文**
+
+文件：`apps/frontend/src/store/assistant.ts`
+
+```ts
+import {
+	ASSISTANT_SSE_USER_ABORT_MARKER,
+	streamAssistantSse,
+} from '@/utils/assistantSse';
+
+// ...
+
+onComplete: async (err) => {
+	// 是否为“用户主动停止”的哨兵值
+	const userAborted = err === ASSISTANT_SSE_USER_ABORT_MARKER;
+
+	runInAction(() => {
+		state.isSending = false;
+		const idx = state.messages.findIndex((m) => m.chatId === assistantChatId);
+		if (idx >= 0) {
+			const prev = state.messages[idx] as Message;
+			const next: Message = {
+				...prev,
+				isStreaming: false, // 无论自然完成/失败/停止，都要结束流式态
+			};
+
+			// 关键：用户停止时 err 是哨兵值，不应当显示“生成失败：xxx”
+			// 同时也不应当标记 isStopped（这里的 isStopped 语义是“失败/异常中止”）
+			if (err && !userAborted) {
+				next.content = next.content || `生成失败：${err}`;
+				next.isStopped = true;
+			}
+
+			// 替换对象以确保 MobX 订阅与 UI 渲染稳定
+			state.messages[idx] = next;
+		}
+	});
+
+	state.abortStream = null;
+
+	// ...（pendingEphemeralFlush 逻辑保持不变）
+
+	// 关键：只有“真正无 err 的自然完成”才去拉会话详情做服务端对齐。
+	// 用户主动停止时，服务端可能尚未落库本轮输出，拉取会导致用不完整历史覆盖 UI。
+	if (!err && !ephemeral) {
+		try {
+			await this.fetchSessionMessagesForDocumentKey(canonical);
+		} catch {
+			// 忽略：界面已展示累积正文
+		}
+	}
+},
+```
+
+#### 6.14.5 行为验证（预期结果）
+
+- 点击「停止」后：
+  - UI 中 **已经接收到的 assistant 正文仍保留**（不再被清空/回退）
+  - 不会出现把哨兵值当作错误文案显示
+  - 仍会调用 `/api/assistant/stop`（原有功能不变）
+- 不点击停止、让流自然完成时：
+  - 仍会在完成后 `fetchSessionMessagesForDocumentKey` 与服务端落库历史对齐（原有功能不变）
+
 ---
 
 ## 7. 前端：SSE 消费协议 `streamAssistantSse`
@@ -384,6 +514,7 @@ const assistantArticleBinding = useMemo(() => {
 - `POST BASE_URL + '/assistant/sse'`，`Authorization: Bearer` + `Content-Type: application/json`。
 - `getPlatformFetch`：兼容 Tauri / 浏览器 fetch。
 - `AbortController`：返回 `() => controller.abort()` 供停止。
+- `AbortError`：用户点「停止」触发；会 `onComplete(ASSISTANT_SSE_USER_ABORT_MARKER)`（**哨兵值**），用于区分“用户停止”与“自然完成”，避免停止后用服务端历史覆盖本地已接收片段。
 
 ### 7.2 行协议（与主 Chat 不同）
 

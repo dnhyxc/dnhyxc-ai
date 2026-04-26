@@ -14,7 +14,10 @@ import {
 	stopAssistantStream,
 } from '@/service';
 import type { Message } from '@/types/chat';
-import { streamAssistantSse } from '@/utils/assistantSse';
+import {
+	ASSISTANT_SSE_USER_ABORT_MARKER,
+	streamAssistantSse,
+} from '@/utils/assistantSse';
 
 /**
  * 对外暴露的 AssistantStore 公开 API。
@@ -714,6 +717,7 @@ export class AssistantStore {
 					onDelta: (d) => applyAssistantPatch(d),
 					onThinking: (t) => applyAssistantPatch('', t),
 					onComplete: async (err) => {
+						const userAborted = err === ASSISTANT_SSE_USER_ABORT_MARKER;
 						runInAction(() => {
 							state.isSending = false;
 							const idx = state.messages.findIndex(
@@ -725,7 +729,8 @@ export class AssistantStore {
 									...prev,
 									isStreaming: false,
 								};
-								if (err) {
+								// 用户点「停止」会先 abort SSE：此处勿把哨兵当真实错误，也勿用空会话覆盖已生成正文
+								if (err && !userAborted) {
 									next.content = next.content || `生成失败：${err}`;
 									next.isStopped = true;
 								}
@@ -750,6 +755,7 @@ export class AssistantStore {
 								});
 							}
 						}
+						// 主动停止时服务端往往尚未写入本轮 assistant 片段，拉会话会覆盖本地已累积内容
 						if (!err && !ephemeral) {
 							try {
 								await this.fetchSessionMessagesForDocumentKey(canonical);

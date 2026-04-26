@@ -22,6 +22,13 @@ export interface AssistantSseCallbacks {
 }
 
 /**
+ * 用户主动 `abort()` 时传给 `onComplete` 的哨兵值（非后端错误文案）。
+ * 业务侧应跳过「成功后拉会话对齐」等逻辑，避免服务端尚未落库时覆盖本地已生成片段。
+ */
+export const ASSISTANT_SSE_USER_ABORT_MARKER =
+	'__FRONT_ASSISTANT_SSE_USER_ABORT__';
+
+/**
  * 知识库右侧助手：消费后端 `/assistant/sse` 的 NestJS Sse 行协议（data: JSON）。
  * 与主聊天 `streamFetch` 的智谱包格式不同，故单独解析。
  */
@@ -132,7 +139,7 @@ export async function streamAssistantSse(options: {
 				}
 			} catch (err: unknown) {
 				if (err instanceof DOMException && err.name === 'AbortError') {
-					finish();
+					finish(ASSISTANT_SSE_USER_ABORT_MARKER);
 					return;
 				}
 				const e =
