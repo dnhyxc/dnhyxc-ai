@@ -157,6 +157,12 @@ export class AssistantStore {
 			isSending: boolean;
 			loadError: string | null;
 			abortStream: (() => void) | null;
+			/**
+			 * ephemeral（不落库）流式停止句柄：
+			 * - 后端在 `ephemeral=true` 的 SSE 开始阶段下发 `meta.streamId`
+			 * - 前端保存到该字段，供“停止生成/清空草稿”调用 `/assistant/stop` 使用
+			 */
+			ephemeralStreamId: string | null;
 			/** 是否已尝试拉取过历史（避免频繁 activate 时重复请求） */
 			historyHydrated: boolean;
 			/**
@@ -200,6 +206,7 @@ export class AssistantStore {
 		isSending: boolean;
 		loadError: string | null;
 		abortStream: (() => void) | null;
+		ephemeralStreamId: string | null;
 		historyHydrated: boolean;
 		pendingEphemeralFlush: {
 			cloudArticleId: string;
@@ -217,6 +224,7 @@ export class AssistantStore {
 				isSending: false,
 				loadError: null,
 				abortStream: null,
+				ephemeralStreamId: null,
 				historyHydrated: false,
 				pendingEphemeralFlush: null,
 			};
@@ -229,6 +237,7 @@ export class AssistantStore {
 				isSending: false,
 				loadError: null,
 				abortStream: null,
+				ephemeralStreamId: null,
 				historyHydrated: false,
 				pendingEphemeralFlush: null,
 			};
@@ -344,11 +353,7 @@ export class AssistantStore {
 		// 记录当前会话的 sessionId（持久化模式），用于必要时 stop
 		const prevSid = state?.sessionId ?? null;
 		// 记录当前 SSE 流的 ephemeral streamId（未保存草稿/本地临时态）。
-		// ephemeralStreamId 只存在于特定 state 下，需 Any 断言保证兼容
-		const prevStreamId =
-			(state as any)?.ephemeralStreamId != null
-				? String((state as any).ephemeralStreamId)
-				: null;
+		const prevStreamId = state?.ephemeralStreamId ?? null;
 
 		state?.abortStream?.();
 		if (state) {
@@ -711,7 +716,7 @@ export class AssistantStore {
 		let thinkBuf = '';
 		// ephemeral：后端下发的可 stop 句柄（streamId）
 		if (ephemeral) {
-			(state as any).ephemeralStreamId = null;
+			state.ephemeralStreamId = null;
 		}
 
 		const applyAssistantPatch = (delta: string, thinkDelta?: string) => {
@@ -752,7 +757,7 @@ export class AssistantStore {
 					onMeta: (meta) => {
 						if (!ephemeral) return;
 						if (meta?.streamId) {
-							(state as any).ephemeralStreamId = meta.streamId;
+							state.ephemeralStreamId = meta.streamId;
 						}
 					},
 					onComplete: async (err) => {
@@ -779,7 +784,7 @@ export class AssistantStore {
 						});
 						state.abortStream = null;
 						if (ephemeral) {
-							(state as any).ephemeralStreamId = null;
+							state.ephemeralStreamId = null;
 						}
 						// 若首次保存时登记了“延迟迁入”：在流式结束后把完整对话迁入并绑定到新知识条目
 						// 注意：这里只处理“当前 state”上的 pending；它会在 fromKey→toKey remap 时随 state 迁移
@@ -823,7 +828,7 @@ export class AssistantStore {
 						});
 						state.abortStream = null;
 						if (ephemeral) {
-							(state as any).ephemeralStreamId = null;
+							state.ephemeralStreamId = null;
 						}
 						// 发生错误时不自动迁入，避免把“错误/中断导致的不完整内容”强绑定到新知识条目
 						// 若产品需要“即使错误也迁入”，可把该逻辑移动到 UI 层由用户确认。
@@ -850,7 +855,7 @@ export class AssistantStore {
 			});
 			state.abortStream = null;
 			if (ephemeral) {
-				(state as any).ephemeralStreamId = null;
+				state.ephemeralStreamId = null;
 			}
 		}
 	}
@@ -870,10 +875,7 @@ export class AssistantStore {
 		const sid = this.sessionId;
 		if (!sid) {
 			// ephemeral：尝试用 streamId 停止后端流（若后端支持）
-			const streamId =
-				(this.activeState as any)?.ephemeralStreamId != null
-					? String((this.activeState as any).ephemeralStreamId)
-					: null;
+			const streamId = this.activeState.ephemeralStreamId;
 			if (streamId) {
 				try {
 					await stopAssistantStream({ streamId });
