@@ -690,6 +690,83 @@ const abort = await streamAssistantSse({
 });
 ```
 
+#### 7.3.4 类型安全：`ephemeralStreamId` 作为文档桶 state 的正式字段（避免 `any`）
+
+**实现思路**
+
+- `ephemeralStreamId` 属于“文档维度运行态”的一部分，应与 `sessionId / messages / abortStream` 一样挂在 **`stateByDocument[canonicalKey]`** 上。
+- 将其写入 **显式 TypeScript 字段**后：
+  - `clearAssistantStateOnKnowledgeDraftReset` 读取 `prevStreamId` 时不再需要 `(state as any)`
+  - `sendMessage` / `stopGenerating` 读写句柄时也不再需要 `(this.activeState as any)`
+- **行为不变**：字段默认 `null`；仅在 `ephemeral=true` 且收到 `meta.streamId` 后赋值；在 `onComplete/onError/发送前重置` 等路径清理为 `null`。
+
+**关键实现代码（含详细中文注释）**
+
+文件：`apps/frontend/src/store/assistant.ts`
+
+```ts
+// 文档桶：把 ephemeral 的 stop 句柄与 session 并列建模，避免隐式挂字段导致只能写 `(state as any)` 的类型逃逸
+private stateByDocument: Record<
+	string,
+	{
+		sessionId: string | null;
+		messages: Message[];
+		isHistoryLoading: boolean;
+		isSending: boolean;
+		loadError: string | null;
+		abortStream: (() => void) | null;
+		/**
+		 * ephemeral（不落库）流式停止句柄：
+		 * - 后端在 `ephemeral=true` 的 SSE 开始阶段下发 `meta.streamId`
+		 * - 前端保存到该字段，供“停止生成/清空草稿”调用 `/assistant/stop` 使用
+		 */
+		ephemeralStreamId: string | null;
+		/** 是否已尝试拉取过历史（避免频繁 activate 时重复请求） */
+		historyHydrated: boolean;
+		/**
+		 * 首次保存时若仍在流式输出：先不迁入（避免绑定不完整对话），等流式结束后再 flush。
+		 * 该字段挂在 state 上，确保在 `fromKey → toKey` remap 时会随 state 一起迁移。
+		 */
+		pendingEphemeralFlush: {
+			cloudArticleId: string;
+			fromDocumentKey: string;
+			toDocumentKey: string;
+		} | null;
+	}
+> = {};
+
+private ensureState(documentKey: string) {
+	// ...（省略：canonicalKey 计算）
+
+	// 新建桶时必须初始化 ephemeralStreamId，避免出现 undefined 与类型不一致
+	if (!this.stateByDocument[key]) {
+		this.stateByDocument[key] = {
+			sessionId: null,
+			messages: [],
+			isHistoryLoading: false,
+			isSending: false,
+			loadError: null,
+			abortStream: null,
+			ephemeralStreamId: null,
+			historyHydrated: false,
+			pendingEphemeralFlush: null,
+		};
+	}
+	return this.stateByDocument[key];
+}
+```
+
+**与 stop 的衔接（类型安全读取）**
+
+```ts
+// clear：优先 sessionId；否则用 ephemeralStreamId
+const prevSid = state?.sessionId ?? null;
+const prevStreamId = state?.ephemeralStreamId ?? null;
+
+// stopGenerating：无 sessionId 时读取 activeState.ephemeralStreamId
+const streamId = this.activeState.ephemeralStreamId;
+```
+
 ### 7.4 `/assistant/stop` 入参扩展（前端调用约定）
 
 前端 `stopAssistantStream` 统一改为发送 payload（二选一）：
