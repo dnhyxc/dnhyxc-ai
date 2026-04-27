@@ -41,7 +41,7 @@
 					"url": "https://dnhyxc.cn:9112/*"
 				},
 				{
-					"url": "http://localhost:9112/*"
+					"url": "http://localhost:9226/*"
 				},
 				{
 					"url": "http://127.0.0.1:9112/*"
