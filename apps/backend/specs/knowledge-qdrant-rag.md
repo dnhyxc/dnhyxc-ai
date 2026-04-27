@@ -20,7 +20,7 @@
 - **非目标**
   - 不包含“入库任务队列化（BullMQ）”的实现（仅在注释中提及）。
   - 不包含 embedding/检索结果的缓存、版本迁移、向量压缩等高级特性。
-  - 不包含 Rerank（重排）/Hybrid Search（混合检索）等策略。
+  - 不包含 Rerank（重排）/Hybrid Search（混合检索）等策略（本次补充的“多链路召回”先实现召回与融合，重排作为可选扩展条款）。
 
 ---
 
@@ -219,6 +219,32 @@
 - JSON 结构：
   - controller 将 service 的 `QaEvent` 包装为 `{ data: QaEvent }` 作为 SSE 输出。
 
+#### 6.2.1（新增）多链路召回参数扩展（向后兼容）
+
+> 目标：在不破坏现有默认行为（仅向量检索）的前提下，为 `POST /api/knowledge/qa/ask` 增加“多链路召回”能力开关与策略参数。
+
+- **新增 Request 字段（建议）**
+  - `retrievalMode?: 'vector_only' | 'multi_path'`（默认 `vector_only`）
+  - `retrievalPaths?: Array<'vector' | 'keyword' | 'title' | 'recent' | 'author_filter'>`
+    - 不传则由后端在 `multi_path` 下启用默认集合（建议：`['vector','keyword','title']`）
+  - `retrievalTopK?: number`（全局 topK；默认沿用现有 `KNOWLEDGE_QA_TOPK`）
+  - `retrievalBudgets?: Partial<Record<path, number>>`
+    - 例如：`{ vector: 10, keyword: 8, title: 5 }`（用于每条链路的配额）
+  - `retrievalMerge?: { dedupBy?: 'knowledgeId+chunkIndex' | 'textHash'; scoreFusion?: 'rrf' | 'weighted_sum' }`
+    - `rrf`：Reciprocal Rank Fusion（倒数排名融合）
+    - `weighted_sum`：分数归一化后加权求和
+  - `keywordQuery?: string`（可选：不传则默认用 `question`）
+  - `titleQuery?: string`（可选：不传则默认用 `question`）
+  - `recentWindowDays?: number`（可选：仅对 `recent` 链路）
+  - `includePathBreakdown?: boolean`（可选：是否在 `qa.retrieval` 中返回每条链路的命中明细，用于调试）
+
+- **新增 Response（SSE 事件）扩展（建议）**
+  - `qa.retrieval` 内新增字段：
+    - `retrievalMode`
+    - `pathsUsed`
+    - `evidences`（融合后的最终证据列表，保持现有结构）
+    - `pathBreakdown?`（当 `includePathBreakdown=true` 时返回：每条链路 raw hits）
+
 #### 6.3 向量入库协议（DashScope 原生 embedding）
 
 - Endpoint（拼接）：
@@ -250,6 +276,69 @@
 - 检索策略
   - `search(limit=topK, with_payload=true)`
   - 可选 filter：`authorId` 精确匹配
+
+---
+
+### 6.5（新增）多链路召回（Multi-path Retrieval，多通道检索）设计
+
+> 背景：单一向量召回在“专有名词/短 query/标题导向/最新内容优先”等场景容易漏召；多链路召回通过“不同信号源并行召回 + 融合去重”提升覆盖率与可控性。
+
+#### 6.5.1 召回链路（Paths）定义（建议最小集合）
+
+- **Path A：vector（向量召回）**
+  - 实现：现有 Qdrant `searchKnowledgeChunks({ vector, topK, authorId })`
+  - 适用：语义相近、同义改写
+
+- **Path B：keyword（关键词召回）**
+  - 实现选项（按落地成本从低到高）：
+    - 方案 1（快速可落地）：对 `Knowledge.title/content` 做 SQL LIKE/全文索引（取决于你当前 MySQL 配置），返回候选 `knowledgeId`，再到 Qdrant 过滤检索或直接用正文片段做证据
+    - 方案 2（更专业）：引入 BM25（例如 OpenSearch/Meilisearch/PG trigram/Elastic）
+  - 适用：专有名词、报错信息、代码符号、精确词匹配
+
+- **Path C：title（标题召回）**
+  - 实现：对 `Knowledge.title` 做精确/前缀/分词匹配，优先召回标题命中（再关联其 chunk）
+  - 适用：用户记得标题/章节名
+
+- **Path D：recent（最近更新优先）**
+  - 实现：先按 `updatedAt` 选近期 `knowledgeId`，再做向量检索过滤（或将其 evidence 提升权重）
+  - 适用：内容经常变更、用户更关注新版本
+
+- **Path E：author_filter（作者/租户过滤）**
+  - 实现：现有 `authorId` filter 已具备；多链路下需保证所有链路都遵守同一过滤条件
+
+#### 6.5.2 融合（Merge）与去重（Dedup）
+
+- **输入**：各链路 raw hits（每条 hit 至少包含：`knowledgeId/title/chunkIndex/text/score/path`）
+- **去重键（建议）**
+  - 默认：`knowledgeId + chunkIndex`
+  - 备选：`textHash`（对 `text` 做 hash，适合不同链路返回相同片段）
+- **融合策略（建议二选一）**
+  - **RRF（Reciprocal Rank Fusion，倒数排名融合）**
+    - 不要求不同链路 score 可比；按 rank 融合更稳健
+    - 适合“vector + keyword + title”混用
+  - **Weighted Sum（加权求和）**
+    - 需要对不同链路 score 做归一化（min-max 或 z-score），再按权重相加
+    - 适合你已经能稳定比较 score 的实现
+- **配额与阈值**
+  - 每条链路给预算 `budget[path]`
+  - 融合后截断为 `retrievalTopK`
+  - 对明显噪声片段可设置 `minScore`（仅对可比 score 的链路）
+
+#### 6.5.3 证据构造与提示词拼接
+
+- 融合后的 `evidences` 需要保持稳定顺序（按融合后的 final score/rank）
+- 建议在 evidence 中携带 `path` 与 `score`（用于调试；是否返回给前端由 `includeEvidences/includePathBreakdown` 控制）
+- 拼接上下文时：
+  - 限制总字数/总 token
+  - 同一 `knowledgeId` 连续 chunk 可适度合并（避免重复）
+
+#### 6.5.4 可选扩展：Rerank（重排）
+
+> 多链路召回解决“召回覆盖”，Rerank 解决“排序质量”。本 Spec 将其作为可选扩展，不要求首版实现。
+
+- Rerank 输入：`question + candidate evidences`
+- Rerank 输出：重排后的 topK evidences
+- 可用模型：DashScope rerank（你仓库已有 `DASHSCOPE_RERANK_MODEL_NAME` 配置字段可参考）
 
 ---
 
@@ -299,4 +388,11 @@
   - 能持续收到 `qa.delta`，最终 `qa.done`，最后 `qa.sse.done`。
   - 检索为空时输出固定提示文案并结束。
   - 中途断开连接后端能停止下游 GLM 请求（不继续产生输出）。
+
+- **多链路召回（新增）**
+  - `retrievalMode=vector_only` 时行为与现有实现一致（向后兼容）。
+  - `retrievalMode=multi_path` 且启用 `keyword/title` 时，针对“专有名词/标题命中”问题能命中正确 evidence（向量链路未命中时仍可召回）。
+  - `includePathBreakdown=true` 时，`qa.retrieval` 会返回每条链路的 raw hits（用于调试），且融合后的 `evidences` 去重正确。
+  - 设置 `retrievalBudgets` 后，各链路命中数量不超过预算，最终 `evidences` 截断到 `retrievalTopK`。
+  - 所有链路都遵守 `authorId`（或租户）过滤，不会跨用户召回证据。
 
