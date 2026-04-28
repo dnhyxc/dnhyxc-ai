@@ -2499,6 +2499,7 @@ const sendKnowledgePromptCard = useCallback(
 - [ ] 另存为：与新建类似的 flush 顺序。
 - [ ] 快捷卡片（润色/总结）：DB user 行仅为短标题；SSE 可选 `extraUserContentForModel` 时智谱侧 user 含文档围栏（§13）。
 - [ ] 有对话且流式结束后：消息列表底部出现与 `KNOWLEDGE_ASSISTANT_PROMPTS` 同源的快捷条，且视口自动贴底（§8.5）。
+- [ ] 历史对话抽屉：会话列表支持删除；正在流式输出的会话右上角显示旋转 loading，不展示删除入口；点击“删除”会二次确认并删除成功后列表与 activeSession 自动修正（§14）。
 
 ---
 
@@ -2600,3 +2601,377 @@ if (dto.ephemeral === true) {
 每一行形如：`data: {"type":"content","content":"..."}\n`  
 结束：`data: {"done":true}\n`（控制器在流末尾 concat 的 `done$`）。  
 错误：`data: {"error":"...","done":true}` 或由 `catchError` 注入的 `error` 字段。
+
+---
+
+## 14. 历史会话删除（UI/Store/Service/Backend 一致性方案）
+
+本节描述「知识助手」历史对话抽屉中，**每条历史会话 item 右上角的删除能力**，以及为什么要在 **前端禁用 + 后端兜底** 两层同时实现。
+
+### 14.1 目标与约束
+
+- **目标**：
+	- 历史会话列表 item 右上角提供删除入口；
+	- 点击后弹出 `Confirm（确认对话框）`，在确认框中点击“删除”才真正删除；
+	- 删除成功后，列表即时移除该条，并自动修正 `activeSessionId`（删除当前会话时自动切到列表第一条）；
+	- 若该会话正在流式输出，则：
+		- **不允许删除**（避免竞态/误删）；
+		- 在删除按钮同位置展示 `Spinner（旋转加载图标）`，作为「正在输出」的视觉反馈。
+
+- **约束**：
+	- 不改变当前业务实现逻辑（仅在既有结构上补齐删除能力与保护）；
+	- UI 层的限制不能替代后端兜底（安全边界必须在后端）。
+
+### 14.2 UI：抽屉列表 item 的删除图标 / 旋转图标 / 二次确认
+
+关键点：
+
+- `assistantStore.isSessionStreaming(sessionId)` 用于判断该 session 是否正在输出；
+- `isStreaming === true` 时，右上角固定位置渲染 `Spinner`，并且不渲染删除按钮；
+- `isStreaming === false` 时，删除按钮仍保持 **hover 才显示**（避免列表视觉噪声）；
+- 点击删除按钮只负责：
+	- `stopPropagation()`（避免触发“切换会话”的 item 点击行为）；
+	- 打开确认弹窗并记录目标 `sessionId`。
+
+```tsx
+// 文件：apps/frontend/src/views/knowledge/KnowledgeAssistantEntryToolbar.tsx
+// 片段：Drawer 内的 sessionList 渲染逻辑（教学式摘录，语义与当前实现一致）
+
+import Confirm from '@design/Confirm'; // Confirm（确认对话框）：用于二次确认删除
+import { Spinner } from '@/components/ui/spinner'; // Spinner（旋转加载图标）：流式输出时占位展示
+
+// ... 省略 props 与其它 UI ...
+
+// deleteConfirmOpen：控制确认弹窗是否打开
+const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+// deleteTargetSessionId：当前待删除的 sessionId
+const [deleteTargetSessionId, setDeleteTargetSessionId] = useState<string | null>(null);
+
+// deleteTargetTitle：用于确认弹窗中展示「将要删除的对话名称」
+const deleteTargetTitle = useMemo(() => {
+	// 若没有目标会话，直接返回空串
+	if (!deleteTargetSessionId) return '';
+	// 从当前列表中找目标会话（列表中存的是元信息：title/createdAt/updatedAt）
+	const row = sessionList.find((s) => s.sessionId === deleteTargetSessionId);
+	// title 为空时，用 sessionId 前 8 位兜底，避免 UI 出现空白
+	return row?.title?.trim()
+		? row.title.trim()
+		: `对话 ${deleteTargetSessionId.slice(0, 8)}`;
+}, [deleteTargetSessionId, sessionList]);
+
+// onConfirmDelete：点击确认弹窗中的“删除”按钮时触发
+const onConfirmDelete = useCallback(async () => {
+	// 没有目标会话就不做任何事
+	if (!deleteTargetSessionId) return;
+	// 真正删除逻辑交由 store，保证 UI 不直接操作缓存结构
+	await assistantStore.deleteSessionForCurrentDocument(deleteTargetSessionId);
+	// 删除后关闭弹窗
+	setDeleteConfirmOpen(false);
+	// 清空目标 sessionId，避免下次误用
+	setDeleteTargetSessionId(null);
+}, [deleteTargetSessionId]);
+
+return (
+	<>
+		{/* Confirm：二次确认删除（避免误触删除） */}
+		<Confirm
+			// open：受控打开状态
+			open={deleteConfirmOpen}
+			// onOpenChange：关闭时清理 deleteTargetSessionId，避免残留
+			onOpenChange={(v) => {
+				setDeleteConfirmOpen(v);
+				if (!v) setDeleteTargetSessionId(null);
+			}}
+			// title：确认弹窗标题
+			title="删除对话？"
+			// description：提示“不可撤销”，并展示将要删除的对话名称
+			description={
+				<div className="text-left">
+					确定要删除该历史对话吗？此操作无法撤销。
+					{deleteTargetTitle ? (
+						<div className="mt-2 font-medium text-base wrap-anywhere">
+							对话名称：「{deleteTargetTitle}」
+						</div>
+					) : null}
+				</div>
+			}
+			// confirmText：确认按钮文字
+			confirmText="删除"
+			// confirmVariant：危险操作样式
+			confirmVariant="destructive"
+			// closeOnConfirm：由 onConfirm 执行完再手动关闭（便于接入异步删除）
+			closeOnConfirm={false}
+			// onConfirm：真正删除
+			onConfirm={onConfirmDelete}
+			// onCancel：取消时关闭弹窗并清理目标
+			onCancel={() => {
+				setDeleteConfirmOpen(false);
+				setDeleteTargetSessionId(null);
+			}}
+		/>
+
+		{/* sessionList：历史会话列表 */}
+		{sessionList.map((s) => {
+			// active：当前激活会话高亮
+			const active = assistantStore.activeSessionId === s.sessionId;
+			// isStreaming：该会话是否正在流式输出（输出中禁删）
+			const isStreaming = assistantStore.isSessionStreaming(s.sessionId);
+			// title：展示标题（为空兜底）
+			const title = s.title?.trim() ? s.title.trim() : `对话 ${s.sessionId.slice(0, 8)}`;
+
+			return (
+				<button
+					// key：列表渲染 key
+					key={s.sessionId}
+					// type：避免默认 submit 行为
+					type="button"
+					// className：group 用于 hover 时显示删除按钮；relative 用于右上角绝对定位
+					className={cn(
+						'group relative cursor-pointer w-full text-left rounded-md px-2.5 py-2 hover:bg-theme/10 transition-colors',
+						active ? 'bg-theme/10' : '',
+					)}
+					// onClick：点击 item 切换会话（与删除按钮互斥，删除按钮会 stopPropagation）
+					onClick={() => {
+						void assistantStore.switchSessionForCurrentDocument(s.sessionId).then(() => {
+							setIsAiHistoryDrawerOpen(false);
+							enableStreamStickToBottom();
+							flushScrollToBottom();
+							requestAnimationFrame(() => flushScrollToBottom());
+						});
+					}}
+				>
+					{/* 右上角：流式输出时显示 Spinner，占位删除按钮位置 */}
+					{isStreaming ? (
+						<span className="absolute right-2 top-2 flex items-center justify-center h-7 w-7 rounded-md text-textcolor/60">
+							<Spinner className="size-4 text-textcolor/60" />
+						</span>
+					) : (
+						/* 非流式：hover 才显示删除按钮，减少视觉噪声 */
+						<button
+							type="button"
+							// hidden + group-hover:flex：仅 hover 时显示
+							className="cursor-pointer absolute right-2 top-2 hidden group-hover:flex items-center justify-center h-7 w-7 rounded-md text-textcolor/70 hover:text-red-500 hover:bg-red-500/10"
+							aria-label="删除对话"
+							onClick={(e) => {
+								// 阻止触发父 button 的“切换会话”
+								e.stopPropagation();
+								// 记录待删除目标会话
+								setDeleteTargetSessionId(s.sessionId);
+								// 打开确认弹窗
+								setDeleteConfirmOpen(true);
+							}}
+						>
+							<Trash2 className="h-4 w-4" />
+						</button>
+					)}
+
+					{/* 标题：一行截断 */}
+					<div className="text-sm text-textcolor line-clamp-1">{title}</div>
+					{/* 更新时间：时间戳展示 */}
+					<div className="text-xs text-textcolor/50 mt-1">
+						{s.updatedAt ? new Date(s.updatedAt).toLocaleString() : ''}
+					</div>
+				</button>
+			);
+		})}
+	</>
+);
+```
+
+### 14.3 Store：删除流程、列表缓存修正、activeSession 自动切换
+
+关键点：
+
+- **流式会话禁止删除**：在 `deleteSessionForCurrentDocument` 里二次兜底（避免绕过 UI）；
+- 删除成功后：
+	- 从 `sessionsByDocument[canonical]` 中移除该条；
+	- 同步更新分页 `total`（若存在）；
+	- 清理 `stateBySession[sessionId]`（避免残留占用内存与影响后续判断）；
+	- 如果删除的是当前激活会话，则自动切换到列表第一条；若列表为空则清空映射。
+
+```ts
+// 文件：apps/frontend/src/store/assistant.ts
+// 片段：isSessionStreaming + deleteSessionForCurrentDocument（教学式摘录，语义与当前实现一致）
+
+// isSessionStreaming：纯判断函数，供 UI/删除逻辑复用
+isSessionStreaming(sessionId: string): boolean {
+	// 规范化 sessionId，避免空格导致 stateBySession 命中失败
+	const sid = (sessionId ?? '').trim();
+	// 空 sid 直接 false
+	if (!sid) return false;
+	// 取会话运行态（可能不存在）
+	const sstate = this.stateBySession[sid];
+	// 只要 messages 中存在 isStreaming === true，就认为该会话正在流式输出
+	return Boolean(sstate?.messages?.some((m) => m.isStreaming));
+}
+
+// deleteSessionForCurrentDocument：历史会话抽屉的删除入口（业务逻辑集中在 store）
+async deleteSessionForCurrentDocument(sessionId: string): Promise<void> {
+	// 未允许持久化时（ephemeral）直接不处理
+	if (!this.knowledgeAssistantPersistenceAllowed) return;
+	// 未登录直接不处理
+	if (!readToken()) return;
+	// 规范化 sessionId
+	const sid = (sessionId ?? '').trim();
+	// 空 sid 直接返回
+	if (!sid) return;
+	// 取 canonicalKey（保证 documentKey 的 __trash-* 等后缀不影响缓存命中）
+	const canonical = this.canonicalKey(this.activeDocumentKey);
+	// 无 canonical 直接返回
+	if (!canonical) return;
+
+	// 正在流式输出的会话不允许删除（避免竞态/误删与状态错乱）
+	if (this.isSessionStreaming(sid)) {
+		// Toast（提示）：反馈给用户“输出中不可删除”
+		Toast({ type: 'info', title: '该对话正在输出中，暂不支持删除' });
+		return;
+	}
+
+	// deleteAssistantSession：前端 service 封装的 DELETE /assistant/session/:sessionId
+	const res = await deleteAssistantSession(sid);
+	// deletedId：后端回传的 sessionId（若没有则回退到 sid）
+	const deletedId = (res.data as any)?.sessionId ?? sid;
+
+	// runInAction：批量更新 mobx 状态，避免多次渲染抖动
+	runInAction(() => {
+		// 1) 从当前文档会话列表中移除已删除项
+		const prev = this.sessionsByDocument[canonical] ?? [];
+		this.sessionsByDocument[canonical] = prev.filter((s) => s.sessionId !== deletedId);
+
+		// 2) 同步更新分页 total（如果 page 信息存在）
+		const page = this.sessionsPageByDocument[canonical];
+		if (page) {
+			this.sessionsPageByDocument[canonical] = {
+				...page,
+				// total 最小为 0，避免负数
+				total: Math.max(0, (page.total ?? 0) - 1),
+			};
+		}
+
+		// 3) 清理会话运行态缓存（messages/isSending/isHistoryLoading 等）
+		delete this.stateBySession[deletedId];
+
+		// 4) 若删除的是当前激活会话：自动切到列表第一条；无则清空映射
+		const curActive = this.activeSessionByDocument[canonical] ?? null;
+		if (curActive === deletedId) {
+			const next = (this.sessionsByDocument[canonical] ?? [])[0]?.sessionId ?? null;
+			if (next) {
+				// 将 activeSession 与 sessionByDocument 同步切到 next
+				this.activeSessionByDocument[canonical] = next;
+				this.sessionByDocument[canonical] = next;
+			} else {
+				// 列表已空：清空映射
+				delete this.activeSessionByDocument[canonical];
+				delete this.sessionByDocument[canonical];
+			}
+		}
+	});
+
+	// 若删除导致 activeSession 切换到 next：沿用既有切换逻辑拉取消息（避免 UI 断层）
+	const nextActive = this.activeSessionByDocument[canonical] ?? null;
+	if (nextActive && nextActive !== sid) {
+		await this.switchSessionForCurrentDocument(nextActive);
+	}
+}
+```
+
+### 14.4 Service：前端 DELETE 封装
+
+关键点：使用 `http.delete` 对齐已有 `http.get/post/patch` 风格；路径复用 `ASSISTANT_SESSION` 常量，走 `params: [sessionId]` 与现有 `getAssistantSessionDetail` 一致。
+
+```ts
+// 文件：apps/frontend/src/service/index.ts
+// 片段：deleteAssistantSession（教学式摘录，语义与当前实现一致）
+
+// deleteAssistantSession：删除助手会话（会同时删除该会话下消息）
+export const deleteAssistantSession = async (sessionId: string) => {
+	// http.delete：请求 DELETE /assistant/session/:sessionId
+	return await http.delete<{ sessionId: string }>(ASSISTANT_SESSION, {
+		// params：与其它 assistant session 相关接口保持一致
+		params: [sessionId],
+	});
+};
+```
+
+### 14.5 Backend：删除接口与“流式写入兜底清理”为什么必须保留
+
+关键点：
+
+- **前端禁删不是安全边界**：用户可绕过 UI 直接调用接口；或旧版本前端不包含该限制；
+- **存在竞态（race condition）**：前端判断不流式 → 请求途中又开始流式；
+- **多实例一致性**：通过 Redis 里的 epoch/busy key 机制，让其它实例上的流式也能立刻失效。
+
+因此在后端删除会话时保留：
+
+- `incrementStreamEpoch(sid)`：递增流世代号（epoch），使正在运行的流式检测到 epoch 变化后停止继续写入；
+- `cache.del(streamBusyKey(sid))`：清理 busy 标记，避免删除后会话仍被视为“忙”。
+
+```ts
+// 文件：apps/backend/src/services/assistant/assistant.service.ts
+// 片段：deleteSession（教学式摘录，语义与当前实现一致）
+
+async deleteSession(userId: number, sessionId: string) {
+	// 规范化 sessionId
+	const sid = (sessionId ?? '').trim();
+	// 空 sid 直接报错（BadRequestException）
+	if (!sid) {
+		throw new BadRequestException('sessionId 不能为空');
+	}
+	// 校验归属：确保只能删除自己的会话
+	const session = await this.sessionRepo.findOne({
+		where: { id: sid, userId },
+		select: ['id'],
+	});
+	// 不存在直接 404
+	if (!session) {
+		throw new NotFoundException('会话不存在');
+	}
+
+	// 终止可能存在的流式写入（多实例下通过 epoch 生效）
+	await this.incrementStreamEpoch(sid);
+	// 清理 busy key，避免删除后仍被视为忙
+	await this.cache.del(this.streamBusyKey(sid));
+
+	// 事务：先删消息再删会话，避免外键约束导致失败
+	await this.dataSource.transaction(async (manager) => {
+		// 删除该会话下所有消息
+		await manager.delete(AssistantMessage, { session: { id: sid } as any });
+		// 删除会话本身
+		await manager.delete(AssistantSession, { id: sid, userId } as any);
+	});
+
+	// 返回删除的 sessionId，便于前端做缓存同步
+	return { sessionId: sid };
+}
+```
+
+对应 Controller：
+
+```ts
+// 文件：apps/backend/src/services/assistant/assistant.controller.ts
+// 片段：DELETE /assistant/session/:sessionId（教学式摘录，语义与当前实现一致）
+
+@Delete('session/:sessionId')
+async deleteSession(
+	@Req() req: AuthedRequest,
+	@Param('sessionId') sessionId: string,
+) {
+	// 从 JWT 中取用户 id
+	const userId = req.user?.userId;
+	// 未登录直接返回失败
+	if (userId == null) {
+		return { success: false, message: '未登录' };
+	}
+	// 调用 service 删除
+	const data = await this.assistantService.deleteSession(userId, sessionId);
+	// 统一封装 success 结构
+	return { success: true, data };
+}
+```
+
+### 14.6 交互回归点（建议自测）
+
+- **非流式会话**：hover 出现删除图标 → 点击 → 弹出确认框 → 确认删除后列表立刻移除；
+- **删除当前激活会话**：删除后自动切换到列表第一条，并且消息区能正常加载；
+- **流式会话**：右上角显示旋转 loading，hover 不出现删除图标，任何路径都不会删除；
+- **绕过 UI 调用接口（后端兜底）**：删除时仍会终止可能存在的流式写入（epoch/busy 清理生效）。

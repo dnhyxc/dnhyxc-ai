@@ -10,6 +10,7 @@ import {
 	// 新增：按知识条目标识拉取该文章下“全部”助手会话（用于历史记录抽屉）。
 	// 说明：原先只需要 getAssistantSessionByKnowledgeArticle（最近会话），多会话后必须有列表接口。
 	createAssistantSession,
+	deleteAssistantSession,
 	getAssistantSessionByKnowledgeArticle,
 	getAssistantSessionDetail,
 	// 新增：多会话列表接口封装（GET /assistant/sessions/for-knowledge）。
@@ -107,6 +108,10 @@ export interface AssistantStoreApi {
 	switchSessionForCurrentDocument(sessionId: string): Promise<void>;
 	// 新增：刷新当前文档的会话列表（用于抽屉打开时自动刷新）。
 	refreshSessionListForCurrentDocument(): Promise<void>;
+	/** 删除指定历史会话（仅持久化模式）；成功后会刷新/修正 activeSessionId 与列表 */
+	deleteSessionForCurrentDocument(sessionId: string): Promise<void>;
+	/** 指定会话是否正在流式输出（用于 UI 禁用删除等） */
+	isSessionStreaming(sessionId: string): boolean;
 	/** 抽屉列表滚动触底：从 store 触发加载更多（与 ChatBot SessionList 一致） */
 	onHistorySessionViewportScroll(e: UIEvent<HTMLElement>): void;
 	/** 历史会话列表首次加载中（抽屉打开时） */
@@ -1369,6 +1374,72 @@ export class AssistantStore {
 		if (remaining > 80) return;
 		void this.loadMoreSessionListForCurrentDocument();
 	};
+
+	isSessionStreaming(sessionId: string): boolean {
+		const sid = (sessionId ?? '').trim();
+		if (!sid) return false;
+		const sstate = this.stateBySession[sid];
+		return Boolean(sstate?.messages?.some((m) => m.isStreaming));
+	}
+
+	/** 删除指定会话（知识助手历史会话抽屉） */
+	async deleteSessionForCurrentDocument(sessionId: string): Promise<void> {
+		if (!this.knowledgeAssistantPersistenceAllowed) return;
+		if (!readToken()) return;
+		const sid = (sessionId ?? '').trim();
+		if (!sid) return;
+		const canonical = this.canonicalKey(this.activeDocumentKey);
+		if (!canonical) return;
+
+		// 正在流式输出的会话不允许删除（避免误删与状态错乱）
+		if (this.isSessionStreaming(sid)) {
+			Toast({ type: 'info', title: '该对话正在输出中，暂不支持删除' });
+			return;
+		}
+
+		const res = await deleteAssistantSession(sid);
+		const deletedId = (res.data as any)?.sessionId ?? sid;
+
+		runInAction(() => {
+			// 1) 移除列表项
+			const prev = this.sessionsByDocument[canonical] ?? [];
+			this.sessionsByDocument[canonical] = prev.filter(
+				(s) => s.sessionId !== deletedId,
+			);
+
+			// 2) 更新分页 total（若存在）
+			const page = this.sessionsPageByDocument[canonical];
+			if (page) {
+				this.sessionsPageByDocument[canonical] = {
+					...page,
+					total: Math.max(0, (page.total ?? 0) - 1),
+				};
+			}
+
+			// 3) 清理会话态缓存
+			delete this.stateBySession[deletedId];
+
+			// 4) 若删的是当前激活会话：切换到列表第一条或清空指针与消息
+			const curActive = this.activeSessionByDocument[canonical] ?? null;
+			if (curActive === deletedId) {
+				const next =
+					(this.sessionsByDocument[canonical] ?? [])[0]?.sessionId ?? null;
+				if (next) {
+					this.activeSessionByDocument[canonical] = next;
+					this.sessionByDocument[canonical] = next;
+				} else {
+					delete this.activeSessionByDocument[canonical];
+					delete this.sessionByDocument[canonical];
+				}
+			}
+		});
+
+		// 若当前激活会话被切走且 next 存在：按现有切会话逻辑拉取消息（不影响旧逻辑）
+		const nextActive = this.activeSessionByDocument[canonical] ?? null;
+		if (nextActive && nextActive !== sid) {
+			await this.switchSessionForCurrentDocument(nextActive);
+		}
+	}
 
 	// 发送一条消息到助手
 	async sendMessage(

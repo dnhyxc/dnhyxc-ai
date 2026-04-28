@@ -2,6 +2,7 @@ import {
 	Body,
 	ClassSerializerInterceptor,
 	Controller,
+	Delete,
 	Get,
 	Param,
 	Patch,
@@ -141,6 +142,20 @@ export class AssistantController {
 			sessionId,
 			body.knowledgeArticleId,
 		);
+		return { success: true, data };
+	}
+
+	/** 删除指定助手会话（会同时删除该会话下的消息） */
+	@Delete('session/:sessionId')
+	async deleteSession(
+		@Req() req: AuthedRequest,
+		@Param('sessionId') sessionId: string,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			return { success: false, message: '未登录' };
+		}
+		const data = await this.assistantService.deleteSession(userId, sessionId);
 		return { success: true, data };
 	}
 

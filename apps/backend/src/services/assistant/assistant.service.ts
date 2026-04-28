@@ -332,6 +332,40 @@ export class AssistantService {
 		return { sessionId, knowledgeArticleId: next };
 	}
 
+	/**
+	 * 删除指定助手会话（会同时删除该会话下全部消息）。
+	 *
+	 * 说明：
+	 * - 用于知识助手历史会话抽屉的“删除会话”操作；
+	 * - 删除前会递增 streamEpoch 并清理 busy key，确保进行中的流式不会继续写入已删除会话。
+	 */
+	async deleteSession(userId: number, sessionId: string) {
+		const sid = (sessionId ?? '').trim();
+		if (!sid) {
+			throw new BadRequestException('sessionId 不能为空');
+		}
+		// 校验归属（不存在则 404）
+		const session = await this.sessionRepo.findOne({
+			where: { id: sid, userId },
+			select: ['id'],
+		});
+		if (!session) {
+			throw new NotFoundException('会话不存在');
+		}
+
+		// 终止可能存在的流式写入（多实例下通过 epoch 生效）
+		await this.incrementStreamEpoch(sid);
+		await this.cache.del(this.streamBusyKey(sid));
+
+		// 事务：先删消息再删会话，避免外键约束导致失败
+		await this.dataSource.transaction(async (manager) => {
+			await manager.delete(AssistantMessage, { session: { id: sid } });
+			await manager.delete(AssistantSession, { id: sid, userId });
+		});
+
+		return { sessionId: sid };
+	}
+
 	async listSessions(userId: number, query: AssistantSessionListDto) {
 		const pageNo = query.pageNo ?? 1;
 		const pageSize = query.pageSize ?? 20;

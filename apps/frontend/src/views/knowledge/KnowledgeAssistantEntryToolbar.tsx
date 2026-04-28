@@ -3,13 +3,16 @@
  * 逻辑与样式从 `KnowledgeAssistant` 原样迁出，便于维护。
  */
 
+import Confirm from '@design/Confirm';
 import { Drawer } from '@design/Drawer';
 import { Button, Toast } from '@ui/index';
-import { CirclePlus, Clock } from 'lucide-react';
+import { CirclePlus, Clock, Trash2 } from 'lucide-react';
 import { observer } from 'mobx-react';
 import type { Dispatch, SetStateAction } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import Loading from '@/components/design/Loading';
 import { ScrollArea } from '@/components/ui';
+import { Spinner } from '@/components/ui/spinner';
 import { cn } from '@/lib/utils';
 import assistantStore from '@/store/assistant';
 import {
@@ -40,6 +43,10 @@ export const KnowledgeAssistantEntryToolbar = observer(
 		setAssistantMode,
 	}: KnowledgeAssistantEntryToolbarProps) {
 		const sessionList = assistantStore.sessionListForActiveDocument;
+		const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+		const [deleteTargetSessionId, setDeleteTargetSessionId] = useState<
+			string | null
+		>(null);
 		const showInitialPlaceholder =
 			assistantStore.historySessionLoading && sessionList.length === 0;
 		const showLoadMoreHint = assistantStore.historySessionLoadingMore;
@@ -48,8 +55,54 @@ export const KnowledgeAssistantEntryToolbar = observer(
 			sessionList.length === 0 &&
 			!assistantStore.historySessionLoadingMore;
 
+		const deleteTargetTitle = useMemo(() => {
+			if (!deleteTargetSessionId) return '';
+			const row = sessionList.find(
+				(s) => s.sessionId === deleteTargetSessionId,
+			);
+			return row?.title?.trim()
+				? row.title.trim()
+				: `对话 ${deleteTargetSessionId.slice(0, 8)}`;
+		}, [deleteTargetSessionId, sessionList]);
+
+		const onConfirmDelete = useCallback(async () => {
+			if (!deleteTargetSessionId) return;
+			await assistantStore.deleteSessionForCurrentDocument(
+				deleteTargetSessionId,
+			);
+			setDeleteConfirmOpen(false);
+			setDeleteTargetSessionId(null);
+		}, [deleteTargetSessionId]);
+
 		return (
 			<div className="inline-flex items-center pb-1 max-w-0">
+				<Confirm
+					open={deleteConfirmOpen}
+					onOpenChange={(v) => {
+						setDeleteConfirmOpen(v);
+						if (!v) setDeleteTargetSessionId(null);
+					}}
+					title="删除对话？"
+					description={
+						<div className="text-left">
+							确定要删除该历史对话吗？此操作无法撤销。
+							{deleteTargetTitle ? (
+								<div className="mt-2 font-medium text-base wrap-anywhere">
+									对话名称：「{deleteTargetTitle}」
+								</div>
+							) : null}
+						</div>
+					}
+					descriptionClassName="text-left"
+					confirmText="删除"
+					confirmVariant="destructive"
+					closeOnConfirm={false}
+					onConfirm={onConfirmDelete}
+					onCancel={() => {
+						setDeleteConfirmOpen(false);
+						setDeleteTargetSessionId(null);
+					}}
+				/>
 				{showAiSessionSwitcher ? (
 					<div className="inline-flex items-center gap-2">
 						<Button
@@ -138,6 +191,9 @@ export const KnowledgeAssistantEntryToolbar = observer(
 								) : null}
 								{sessionList.map((s) => {
 									const active = assistantStore.activeSessionId === s.sessionId;
+									const isStreaming = assistantStore.isSessionStreaming(
+										s.sessionId,
+									);
 									const title = s.title?.trim()
 										? s.title.trim()
 										: `对话 ${s.sessionId.slice(0, 8)}`;
@@ -146,7 +202,7 @@ export const KnowledgeAssistantEntryToolbar = observer(
 											key={s.sessionId}
 											type="button"
 											className={cn(
-												'cursor-pointer w-full text-left rounded-md px-2.5 py-2 hover:bg-theme/10 transition-colors',
+												'group relative cursor-pointer w-full text-left rounded-md px-2.5 py-2 hover:bg-theme/10 transition-colors',
 												active ? 'bg-theme/10' : '',
 											)}
 											onClick={() => {
@@ -160,6 +216,24 @@ export const KnowledgeAssistantEntryToolbar = observer(
 													});
 											}}
 										>
+											{isStreaming ? (
+												<span className="absolute right-2 top-2 flex items-center justify-center h-7 w-7 rounded-md text-textcolor/60">
+													<Spinner className="size-4 text-textcolor/60" />
+												</span>
+											) : (
+												<button
+													type="button"
+													className="cursor-pointer absolute right-2 top-2 hidden group-hover:flex items-center justify-center h-7 w-7 rounded-md text-textcolor/70 hover:text-red-500 hover:bg-red-500/10"
+													aria-label="删除对话"
+													onClick={(e) => {
+														e.stopPropagation();
+														setDeleteTargetSessionId(s.sessionId);
+														setDeleteConfirmOpen(true);
+													}}
+												>
+													<Trash2 className="h-4 w-4" />
+												</button>
+											)}
 											<div className="text-sm text-textcolor line-clamp-1">
 												{title}
 											</div>

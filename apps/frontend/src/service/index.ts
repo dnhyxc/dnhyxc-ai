@@ -321,6 +321,13 @@ export const patchAssistantSessionKnowledgeArticle = async (
 	}>(`${ASSISTANT_SESSION}/${sessionId}/knowledge-article`, body);
 };
 
+/** 删除助手会话（会同时删除该会话下消息） */
+export const deleteAssistantSession = async (sessionId: string) => {
+	return await http.delete<{ sessionId: string }>(ASSISTANT_SESSION, {
+		params: [sessionId],
+	});
+};
+
 /** 首次保存后将草稿阶段助手对话迁入数据库（与后端 import-transcript 对齐；`lines` 最多 200 条，超长由 store 截最近 200 条） */
 export const importAssistantTranscript = async (body: {
 	knowledgeArticleId: string;
