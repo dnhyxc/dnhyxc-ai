@@ -19,6 +19,7 @@ import { AssistantMessage } from '../assistant/assistant-message.entity';
 import { AssistantSession } from '../assistant/assistant-session.entity';
 import { ChatMessages } from '../chat/chat.entity';
 import { MessageService } from '../chat/message.service';
+import { Knowledge } from '../knowledge/knowledge.entity';
 import {
 	CreateShareDto,
 	CreateShareResponseDto,
@@ -26,8 +27,8 @@ import {
 	ShareCacheData,
 } from './dto/share.dto';
 
-// 默认过期时间：1天（毫秒）
-const DEFAULT_EXPIRES_IN = 1 * 24 * 60 * 60 * 1000;
+// 默认过期时间：7天（毫秒）
+const DEFAULT_EXPIRES_IN = 7 * 24 * 60 * 60 * 1000;
 
 @Injectable()
 export class ShareService {
@@ -42,6 +43,8 @@ export class ShareService {
 		private readonly assistantSessionRepo: Repository<AssistantSession>,
 		@InjectRepository(AssistantMessage)
 		private readonly assistantMessageRepo: Repository<AssistantMessage>,
+		@InjectRepository(Knowledge)
+		private readonly knowledgeRepo: Repository<Knowledge>,
 	) {}
 	/**
 	 * 按 sessionId 拉取分享消息：先查主聊天（chat_sessions），不存在则回退查助手（assistant_sessions）。
@@ -152,11 +155,13 @@ export class ShareService {
 		const shareId = randomUUID().replace(/-/g, '');
 		const now = Date.now();
 		const expiresAt = now + DEFAULT_EXPIRES_IN;
+		const shareType = dto.shareType ?? 'session';
 
 		// 存储到 Redis
 		const cacheData: ShareCacheData = {
 			shareId,
 			chatSessionId: dto.chatSessionId,
+			shareType,
 			sessionType: dto.sessionType,
 			messageIds: dto.messageIds,
 			createdAt: now,
@@ -176,8 +181,8 @@ export class ShareService {
 		return {
 			shareId,
 			shareUrl: dto.baseUrl
-				? `${dto.baseUrl}/share/${shareId}`
-				: `/share/${shareId}`,
+				? `${dto.baseUrl}/share/${shareId}${shareType === 'knowledge' ? '?type=knowledge' : ''}`
+				: `/share/${shareId}${shareType === 'knowledge' ? '?type=knowledge' : ''}`,
 			createdAt: now,
 			expiresAt,
 		};
@@ -201,6 +206,33 @@ export class ShareService {
 			throw new HttpException('分享已失效', HttpStatus.BAD_REQUEST);
 		}
 
+		// 1) 分享知识文章：chatSessionId 复用为 knowledgeId（保持接口兼容）
+		if ((cacheData.shareType ?? 'session') === 'knowledge') {
+			const id = (cacheData.chatSessionId ?? '').trim();
+			const row = await this.knowledgeRepo.findOne({
+				where: { id },
+				select: ['id', 'title', 'content', 'createdAt', 'updatedAt'],
+			});
+			if (!row) {
+				throw new NotFoundException('知识文章不存在');
+			}
+			return {
+				shareId: cacheData.shareId,
+				shareType: 'knowledge',
+				title: row.title?.trim() || '知识分享',
+				createdAt: cacheData.createdAt,
+				expiresAt: cacheData.expiresAt,
+				knowledge: {
+					id: row.id,
+					title: row.title,
+					content: row.content ?? '',
+					createdAt: row.createdAt?.getTime?.() ?? Date.now(),
+					updatedAt: row.updatedAt?.getTime?.() ?? Date.now(),
+				},
+			} as any;
+		}
+
+		// 2) 分享会话（chat / assistant）
 		const resolved = await this.resolveShareMessagesBySessionId({
 			sessionId: cacheData.chatSessionId,
 			sessionType: cacheData.sessionType ?? 'chat',
@@ -212,6 +244,7 @@ export class ShareService {
 			// assistant 回退分支没有 chat session 实体，这里直接透传 messages 即可
 			messages: resolved.messages,
 			shareId: cacheData.shareId,
+			shareType: 'session',
 			title: resolved.title,
 			createdAt: cacheData.createdAt,
 			expiresAt: cacheData.expiresAt,

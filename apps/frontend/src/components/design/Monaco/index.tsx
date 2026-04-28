@@ -1,3 +1,4 @@
+import ParserMarkdownPreviewPane from '@design/Markdown';
 import Tooltip from '@design/Tooltip';
 import Editor, {
 	type BeforeMount,
@@ -47,9 +48,9 @@ import {
 import { GLASS_THEME_BY_UI, registerMonacoGlassThemes } from './glassTheme';
 import {
 	MarkdownBottomBar,
+	type MarkdownBottomBarCustomNodeContext,
 	type MarkdownBottomBarImperativeHandle,
 } from './MarkdownBottomBar';
-import ParserMarkdownPreviewPane from './MarkdownPreview';
 import { registerMarkdownFenceEmbeddedHighlight } from './markdownTokens';
 import { MARKDOWN_EDITOR_WORD_WRAP_COLUMN, options } from './options';
 import {
@@ -143,7 +144,7 @@ interface MarkdownEditorProps {
 	 * - 默认 true：组件内部自己监听并切换（外部无需维护状态/快捷键逻辑）
 	 * - 设为 false：外部可在页面层自行注册快捷键，并通过 imperativeRef 调用
 	 */
-	enableMarkdownBottomBarToggleShortcut?: boolean;
+	enableToggleMarkdownBottomBarShortcut?: boolean;
 	/**
 	 * 底部操作栏快捷键数据源（由使用方注入，保证组件可移植）。
 	 * - 包含：默认 chords、加载 chords、订阅变更、匹配逻辑
@@ -234,9 +235,7 @@ interface MarkdownEditorProps {
 	customBottomBarNode?:
 		| React.ReactNode
 		| null
-		| ((
-				ctx: import('./MarkdownBottomBar').MarkdownBottomBarCustomNodeContext,
-		  ) => React.ReactNode);
+		| ((ctx: MarkdownBottomBarCustomNodeContext) => React.ReactNode);
 }
 
 const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
@@ -260,7 +259,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	showTabBar = true,
 	enableMarkdownBottomBar = true,
 	markdownBottomBarShortcutHint,
-	enableMarkdownBottomBarToggleShortcut = true,
+	enableToggleMarkdownBottomBarShortcut = true,
 	shortcutSource,
 	clipboardAdapter,
 	markdownEnableMermaid = true,
@@ -1446,8 +1445,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 		toggleMarkdownSplitDiffCompare,
 		toggleMarkdownAssistant,
 		toggleMarkdownBottomBar,
-		enableToggleMarkdownBottomBarShortcut:
-			enableMarkdownBottomBarToggleShortcut,
+		enableToggleMarkdownBottomBarShortcut,
 		setViewMode,
 		setSplitScrollFollowMode,
 		onOverwriteSaveEnabledChange,
@@ -1513,7 +1511,6 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 								className="box-border h-full min-h-0 min-w-0 max-w-full w-full overflow-hidden contain-[inline-size]"
 							>
 								<Editor
-									// key={monacoModelPath}
 									height={height}
 									width="100%"
 									language={language}
@@ -1575,7 +1572,6 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 											className="box-border h-full min-h-0 min-w-0 max-w-full w-full overflow-hidden contain-[inline-size]"
 										>
 											<Editor
-												// key={monacoModelPath}
 												height="100%"
 												width="100%"
 												language={language}
@@ -1694,8 +1690,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 						onAutoSaveEnabledChange,
 						onAutoSaveIntervalSecChange,
 						toggleMarkdownBottomBar,
-						enableToggleMarkdownBottomBarShortcut:
-							enableMarkdownBottomBarToggleShortcut,
+						enableToggleMarkdownBottomBarShortcut,
 					}}
 					customBottomBarNode={customBottomBarNode}
 				/>

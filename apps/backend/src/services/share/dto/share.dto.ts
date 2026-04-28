@@ -23,6 +23,16 @@ export class CreateShareDto {
 
 	@ApiPropertyOptional({
 		description:
+			'分享目标类型：session=分享会话（默认）；knowledge=分享知识文章（同一分享页通过 URL 参数区分渲染）',
+		example: 'session',
+		enum: ['session', 'knowledge'],
+	})
+	@IsIn(['session', 'knowledge'])
+	@IsOptional()
+	shareType?: 'session' | 'knowledge';
+
+	@ApiPropertyOptional({
+		description:
 			'会话类型：chat=主聊天会话，assistant=知识库助手会话（不填则默认 chat）',
 		example: 'chat',
 		enum: ['chat', 'assistant'],
@@ -129,12 +139,34 @@ export class GetShareResponseDto {
 
 	@ApiPropertyOptional({ description: '查看次数' })
 	viewCount?: number;
+
+	@ApiPropertyOptional({
+		description: '分享目标类型：session / knowledge',
+		enum: ['session', 'knowledge'],
+	})
+	@IsOptional()
+	shareType?: 'session' | 'knowledge';
+
+	@ApiPropertyOptional({
+		description:
+			'当 shareType=knowledge 时返回的文章数据（session 分享不返回该字段）',
+	})
+	@IsOptional()
+	knowledge?: {
+		id: string;
+		title: string | null;
+		content: string;
+		createdAt: number;
+		updatedAt: number;
+	};
 }
 
 // Redis 存储的数据结构
 export interface ShareCacheData {
 	shareId: string;
 	chatSessionId: string;
+	/** 分享目标类型：session / knowledge */
+	shareType?: 'session' | 'knowledge';
 	/** 可选：用于 getShare 时直接选择数据源，避免 try/catch 回退 */
 	sessionType?: 'chat' | 'assistant';
 	messageIds?: string[];

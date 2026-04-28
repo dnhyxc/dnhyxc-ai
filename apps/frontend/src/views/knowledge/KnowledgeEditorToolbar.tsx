@@ -1,6 +1,6 @@
 import Tooltip from '@design/Tooltip';
 import { Button } from '@ui/index';
-import { LibraryBig, OctagonX, SaveIcon, Trash2 } from 'lucide-react';
+import { LibraryBig, OctagonX, SaveIcon, Share2, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 /** 编辑器顶栏：知识库 / 草稿 / 保存 */
@@ -9,6 +9,7 @@ const KnowledgeEditorToolbar = (props: {
 	onOpenTrash: () => void;
 	onNewDraft: () => void;
 	onSave: () => void;
+	onShareKnowledge: () => void;
 	/** 保存请求进行中：禁用保存按钮 */
 	saveLoading?: boolean;
 	/** 未登录等场景隐藏回收站入口 */
@@ -18,18 +19,21 @@ const KnowledgeEditorToolbar = (props: {
 	shortcutHintClear?: string;
 	shortcutHintOpenLibrary?: string;
 	shortcutHintOpenTrash?: string;
+	shortcutHintShare?: string;
 }) => {
 	const {
 		onOpenLibrary,
 		onOpenTrash,
 		onNewDraft,
 		onSave,
+		onShareKnowledge,
 		saveLoading = false,
 		showTrash = true,
 		shortcutHintSave,
 		shortcutHintClear,
 		shortcutHintOpenLibrary,
 		shortcutHintOpenTrash,
+		shortcutHintShare,
 	} = props;
 	const linkBtn =
 		'lucide-stroke-draw-hover flex items-center gap-1 px-0 has-[>svg]:px-0 disabled:hover:text-textcolor' as const;
@@ -58,6 +62,12 @@ const KnowledgeEditorToolbar = (props: {
 				>
 					<OctagonX className="mt-0.5" />
 					<span className="mt-0.5">清空</span>
+				</Button>
+			</Tooltip>
+			<Tooltip side="bottom" content={shortcutHintShare ?? 'Meta + Shift + O'}>
+				<Button variant="link" className={linkBtn} onClick={onShareKnowledge}>
+					<Share2 className="mt-0.5" />
+					<span className="mt-0.5">分享</span>
 				</Button>
 			</Tooltip>
 			<Tooltip

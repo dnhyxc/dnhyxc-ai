@@ -414,12 +414,15 @@ export const createShare = async (params: {
 	messageIds?: string[] | undefined;
 	baseUrl?: string;
 	sessionType?: 'chat' | 'assistant';
+	/** session=会话分享（默认）；knowledge=知识文章分享 */
+	shareType?: 'session' | 'knowledge';
 }) => {
 	return await http.post<ShareInfo>(CREATE_SHARE, {
 		chatSessionId: params.chatSessionId,
 		sessionType: params.sessionType,
 		messageIds: params.messageIds,
 		baseUrl: params.baseUrl,
+		shareType: params.shareType,
 	});
 };
 

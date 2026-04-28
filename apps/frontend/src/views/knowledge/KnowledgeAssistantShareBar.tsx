@@ -1,10 +1,10 @@
+import ShareChat from '@design/Share';
 import { Button, Checkbox } from '@ui/index';
 import type { Dispatch, SetStateAction } from 'react';
 import { useCallback, useState } from 'react';
 import { useShareFlow } from '@/hooks';
 import assistantStore from '@/store/assistant';
 import type { Message } from '@/types/chat';
-import ShareChat from '@/views/chat/share';
 
 type ShareSelectionLike = {
 	checkedMessages: Set<string>;

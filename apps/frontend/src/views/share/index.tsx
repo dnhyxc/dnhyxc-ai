@@ -1,10 +1,11 @@
 import { Button, ScrollArea } from '@ui/index';
 import { ArrowDownToLine, ArrowUpToLine, CircleAlert } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useParams } from 'react-router';
+import { useLocation, useParams } from 'react-router';
 import ChatAssistantMessage from '@/components/design/ChatAssistantMessage';
 import ChatFileList from '@/components/design/ChatFileList';
 import ChatMessageActions from '@/components/design/ChatMessageActions';
+import MarkdownPreview from '@/components/design/Markdown';
 import { useTheme } from '@/hooks';
 import {
 	ChatCodeFloatingToolbar,
@@ -68,9 +69,17 @@ const SessionShare = () => {
 	});
 
 	const params = useParams();
+	const location = useLocation();
 	useTheme();
 
 	const [chatData, setChatData] = useState<Session>();
+	const [knowledgeData, setKnowledgeData] = useState<{
+		id: string;
+		title: string | null;
+		content: string;
+		createdAt: number;
+		updatedAt: number;
+	} | null>(null);
 
 	const { relayout: relayoutCodeToolbar } = useChatCodeFloatingToolbar(
 		scrollViewportRef,
@@ -122,9 +131,16 @@ const SessionShare = () => {
 	}, [syncScrollMetrics]);
 
 	const getShareData = async (id: string) => {
-		const res = await getShare<Session>(id);
+		const type = new URLSearchParams(location.search).get('type');
+		const res = await getShare<any>(id);
 		if (res.success) {
-			setChatData(res.data);
+			if (type === 'knowledge') {
+				setKnowledgeData(res.data?.knowledge ?? null);
+				setChatData(undefined);
+			} else {
+				setChatData(res.data);
+				setKnowledgeData(null);
+			}
 		}
 	};
 
@@ -170,81 +186,107 @@ const SessionShare = () => {
 		<div className="relative flex h-dvh w-full flex-col overflow-hidden bg-theme-background">
 			<ChatCodeFloatingToolbar />
 			<div className="flex items-center justify-between px-4 h-12.5 border border-b-theme/20">
-				<div className="text-base font-bold">分享对话内容</div>
+				<div className="text-base font-bold">
+					{knowledgeData ? '分享文章内容' : '分享对话内容'}
+				</div>
 				<div className="flex items-center gap-1 text-sm text-textcolor/80">
 					<CircleAlert size={17} className="text-textcolor/65" />
-					该对话来自分享，由 AI 生成，请仔细甄别
+					{knowledgeData
+						? '该文章来自分享，请仔细甄别'
+						: '该对话来自分享，由 AI 生成，请仔细甄别'}
 				</div>
 			</div>
+
 			<ScrollArea
 				ref={scrollViewportRef}
 				className="min-h-0 flex-1"
 				viewportClassName="pb-1"
 				onScroll={syncScrollMetrics}
 			>
-				<div
-					className={cn(
-						'max-w-208 mx-auto w-full mt-2.5 relative flex flex-col select-none px-4',
-					)}
-				>
-					{chatData?.messages.map((message, index) => (
-						<div
-							key={message.id}
-							className={cn(
-								'relative flex-1 flex flex-col gap-1 pb-10 w-full group',
-								message.role === 'user' ? 'items-end' : '',
-							)}
-						>
-							{!!message.attachments?.length && (
-								<div className="flex flex-wrap justify-end gap-1.5 mb-2">
-									{message.role === 'user'
-										? message.attachments.map((i) => (
-												<ChatFileList
-													key={i.id || i.uuid}
-													data={i}
-													showDownload
-												/>
-											))
-										: null}
-								</div>
-							)}
+				{knowledgeData ? (
+					<div
+						id="message-md-wrap"
+						className="max-w-208 mx-auto w-full mt-2.5 relative flex flex-col select-none px-4"
+					>
+						<div className="text-lg font-bold text-textcolor mb-2">
+							{knowledgeData.title?.trim() || '未命名'}
+						</div>
+						<div className="text-xs text-textcolor/50 mb-3">
+							更新 {new Date(knowledgeData.updatedAt).toLocaleString()}
+						</div>
+						<div className="bg-theme/5 border border-theme/10 rounded-md p-3 mb-4">
+							<MarkdownPreview
+								markdown={knowledgeData.content ?? ''}
+								documentIdentity={knowledgeData.id}
+								withScrollArea={false}
+							/>
+						</div>
+					</div>
+				) : (
+					<div
+						className={cn(
+							'max-w-208 mx-auto w-full mt-2.5 relative flex flex-col select-none px-4',
+						)}
+					>
+						{chatData?.messages.map((message, index) => (
 							<div
-								id="message-md-wrap"
+								key={message.id}
 								className={cn(
-									'relative rounded-md p-3 select-auto text-textcolor mb-5 min-w-0',
-									message.role === 'user'
-										? `bg-teal-600/5 border border-teal-500/15 text-end pt-2 pb-2.5 px-3 ml-auto w-fit max-w-full`
-										: 'bg-theme/5 border border-theme/10 w-full',
+									'relative flex-1 flex flex-col gap-1 pb-10 w-full group',
+									message.role === 'user' ? 'items-end' : '',
 								)}
 							>
-								{message.role === 'user' ? (
-									<ChatAssistantMessage
-										message={message}
-										className="text-left min-w-0 max-w-full [&_.markdown-body]:min-w-0 [&_.markdown-body]:max-w-full [&_.markdown-body]:overflow-x-auto"
-									/>
-								) : (
-									<ChatAssistantMessage message={message} />
+								{!!message.attachments?.length && (
+									<div className="flex flex-wrap justify-end gap-1.5 mb-2">
+										{message.role === 'user'
+											? message.attachments.map((i) => (
+													<ChatFileList
+														key={i.id || i.uuid}
+														data={i}
+														showDownload
+													/>
+												))
+											: null}
+									</div>
 								)}
-
 								<div
+									id="message-md-wrap"
 									className={cn(
-										'absolute -bottom-9',
-										message.role === 'user' ? 'right-0' : 'left-0',
+										'relative rounded-md p-3 select-auto text-textcolor mb-5 min-w-0',
+										message.role === 'user'
+											? `bg-teal-600/5 border border-teal-500/15 text-end pt-2 pb-2.5 px-3 ml-auto w-fit max-w-full`
+											: 'bg-theme/5 border border-theme/10 w-full',
 									)}
 								>
-									<ChatMessageActions
-										message={message}
-										index={index}
-										isCopyedId={isCopyedId}
-										messagesLength={chatData?.messages.length || 0}
-										onCopy={onCopy}
-										needShare={false}
-									/>
+									{message.role === 'user' ? (
+										<ChatAssistantMessage
+											message={message}
+											className="text-left min-w-0 max-w-full [&_.markdown-body]:min-w-0 [&_.markdown-body]:max-w-full [&_.markdown-body]:overflow-x-auto"
+										/>
+									) : (
+										<ChatAssistantMessage message={message} />
+									)}
+
+									<div
+										className={cn(
+											'absolute -bottom-9',
+											message.role === 'user' ? 'right-0' : 'left-0',
+										)}
+									>
+										<ChatMessageActions
+											message={message}
+											index={index}
+											isCopyedId={isCopyedId}
+											messagesLength={chatData?.messages.length || 0}
+											onCopy={onCopy}
+											needShare={false}
+										/>
+									</div>
 								</div>
 							</div>
-						</div>
-					))}
-				</div>
+						))}
+					</div>
+				)}
 			</ScrollArea>
 
 			{/* 单图标：未到底为下箭头（置底），到底后变为上箭头（回顶） */}

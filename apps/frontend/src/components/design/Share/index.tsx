@@ -21,6 +21,8 @@ interface ShareProps {
 	sessionId?: string;
 	/** 可选：不传则默认 chat；知识库助手分享建议传 assistant，避免后端走错误回退 */
 	sessionType?: 'chat' | 'assistant';
+	/** 可选：不传则默认 session；knowledge 表示分享知识文章 */
+	shareType?: 'session' | 'knowledge';
 }
 
 const Share: React.FC<ShareProps> = ({
@@ -29,6 +31,7 @@ const Share: React.FC<ShareProps> = ({
 	checkedMessages,
 	sessionId,
 	sessionType,
+	shareType,
 }) => {
 	const [shareInfo, setShareInfo] = useState<ShareInfo>();
 	const [copied, setCopied] = useState(false);
@@ -54,9 +57,11 @@ const Share: React.FC<ShareProps> = ({
 				sessionType?: 'chat' | 'assistant';
 				messageIds?: string[];
 				baseUrl?: string;
+				shareType?: 'session' | 'knowledge';
 			} = {
 				chatSessionId,
 				sessionType,
+				shareType,
 				baseUrl: import.meta.env.DEV
 					? import.meta.env.VITE_DEV_WEB_DOMAIN
 					: import.meta.env.VITE_PROD_WEB_DOMAIN, // http://localhost:9226
@@ -102,14 +107,14 @@ const Share: React.FC<ShareProps> = ({
 	return (
 		<Model
 			open={open}
-			title="创建分享链接"
+			title={shareType === 'knowledge' ? '创建文章分享链接' : '创建分享链接'}
 			width="450px"
 			footer={null}
 			onOpenChange={onOpenChange}
 		>
 			<div className="flex flex-col gap-5 overflow-hidden">
 				<div>
-					分享链接公开可见，任何人获取后均可查看。请在分享前仔细检查对话内容，确保不包含敏感信息或隐私数据。
+					分享链接公开可见，任何人获取后均可查看。请在分享前仔细检查内容，确保不包含敏感信息或隐私数据。
 				</div>
 				{shareInfo?.shareUrl ? (
 					<div className="relative border border-theme/20 rounded-md flex items-center">

@@ -616,6 +616,8 @@ export const MarkdownBottomBar = memo(function MarkdownBottomBar(
 							</>
 						) : null}
 
+						{resolvedCustomBottomBarNode ?? null}
+
 						{/* 最右侧：与覆盖保存/自动保存并列；无业务回调时也会渲染，保证始终可复位 */}
 						<Tooltip
 							content={`复位操作栏初始位置${formatChordForTip(chords.markdownBarResetPosition)}`}
@@ -634,7 +636,6 @@ export const MarkdownBottomBar = memo(function MarkdownBottomBar(
 								<LocateFixed size={18} strokeWidth={1.75} aria-hidden />
 							</button>
 						</Tooltip>
-						{resolvedCustomBottomBarNode ?? null}
 					</div>
 				</div>
 			</div>

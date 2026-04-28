@@ -1,4 +1,5 @@
 import ChatEntry from '@design/ChatEntry';
+import ShareChat from '@design/Share';
 import { Button, Checkbox, Label } from '@ui/index';
 import { History, Waypoints } from 'lucide-react';
 import { observer } from 'mobx-react';
@@ -11,7 +12,6 @@ import { uploadFiles } from '@/service';
 import useStore from '@/store';
 import { FileWithPreview, UploadedFile } from '@/types';
 import SessionList from './session-list';
-import ShareChat from './share';
 
 // Chat 主组件
 const Chat = observer(() => {

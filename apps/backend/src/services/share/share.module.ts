@@ -6,6 +6,7 @@ import { Attachments } from '../chat/attachments.entity';
 import { ChatMessages } from '../chat/chat.entity';
 import { ChatModule } from '../chat/chat.module';
 import { ChatSessions } from '../chat/session.entity';
+import { Knowledge } from '../knowledge/knowledge.entity';
 import { ShareController } from './share.controller';
 import { ShareService } from './share.service';
 
@@ -20,6 +21,7 @@ import { ShareService } from './share.service';
 			Attachments,
 			AssistantSession,
 			AssistantMessage,
+			Knowledge,
 		]),
 	],
 	controllers: [ShareController],

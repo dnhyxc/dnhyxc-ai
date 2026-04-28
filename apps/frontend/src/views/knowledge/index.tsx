@@ -5,6 +5,7 @@ import { NotebookPen } from 'lucide-react';
 import { observer } from 'mobx-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import MarkdownEditor from '@/components/design/Monaco';
+import Share from '@/components/design/Share';
 import { Input } from '@/components/ui';
 import { useTheme } from '@/hooks';
 import type { ShortcutSource } from '@/hooks/useMarkdownBottomBarShortcuts';
@@ -63,6 +64,9 @@ const Knowledge = observer(() => {
 	const { knowledgeStore, userStore } = useStore();
 	const { theme } = useTheme();
 	const [assistantInput, setAssistantInput] = useState('');
+
+	const [shareOpen, setShareOpen] = useState(false);
+	const shareCheckedMessages = useMemo(() => new Set<string>(), []);
 
 	const [listOpen, setListOpen] = useState(false);
 	const [trashOpen, setTrashOpen] = useState(false);
@@ -940,6 +944,19 @@ const Knowledge = observer(() => {
 		[knowledgeStore, isCloudLoggedIn, resetEditorToNewDraft],
 	);
 
+	/** 分享文档 */
+	const onShareKnowledge = useCallback(() => {
+		const id = (knowledgeStore.knowledgeEditingKnowledgeId ?? '').trim();
+		if (!id) {
+			Toast({
+				type: 'info',
+				title: '请先保存到知识库后再分享',
+			});
+			return;
+		}
+		setShareOpen(true);
+	}, [knowledgeStore.knowledgeEditingKnowledgeId]);
+
 	const overwriteTargetPath = knowledgeStore.knowledgeOverwriteTargetPath;
 	const overwriteFileName =
 		overwriteTargetPath.split(/[/\\]/).filter(Boolean).pop() ??
@@ -1033,6 +1050,7 @@ const Knowledge = observer(() => {
 							onOpenTrash={() => setTrashOpen(true)}
 							onNewDraft={resetEditorToNewDraft}
 							onSave={onSave}
+							onShareKnowledge={onShareKnowledge}
 							saveLoading={saveLoading}
 							showTrash={isCloudLoggedIn}
 							shortcutHintSave={knowledgeChords.save}
@@ -1099,6 +1117,13 @@ const Knowledge = observer(() => {
 					onPick={handlePickTrashRecord}
 				/>
 			) : null}
+			<Share
+				open={shareOpen}
+				onOpenChange={() => setShareOpen(false)}
+				checkedMessages={shareCheckedMessages}
+				sessionId={knowledgeStore.knowledgeEditingKnowledgeId ?? undefined}
+				shareType="knowledge"
+			/>
 		</div>
 	);
 });
