@@ -785,7 +785,7 @@ const streamId = this.activeState.ephemeralStreamId;
 
 ## 8. 前端：`KnowledgeAssistant` UI 层
 
-文件：`apps/frontend/src/views/knowledge/KnowledgeAssistant.tsx`。根组件 **`KnowledgeAssistant`** 与 **`KnowledgeAssistantMessageBubble`** 均为 **`observer`**，直接订阅 **`assistantStore`**（默认 import），与 **`useStore()`** 解构的 **`knowledgeStore` / `userStore`** 组合成页面逻辑。
+文件：`apps/frontend/src/views/knowledge/KnowledgeAssistant.tsx`。根组件 **`KnowledgeAssistant`** 与单条气泡 **`KnowledgeMessageBubble`** 均为 **`observer`**，直接订阅 **`assistantStore`**（默认 import），与 **`useStore()`** 解构的 **`knowledgeStore` / `userStore`** 组合成页面逻辑。
 
 ### 8.0 Props、受控输入与派生状态
 
@@ -852,16 +852,17 @@ useEffect(() => {
 - 否则 **`setTimeout(200ms)`** 后再检测一次仍为空才 **`setInput('')`**。  
   **原因**（源码注释）：开启助手会导致 Monaco 视图切换与 **重挂载**，父级 `markdown` 可能出现 **极短暂空串**；若立即清空会造成「刚粘贴进输入框就被清掉」。
 
-### 8.2 单条气泡 `KnowledgeAssistantMessageBubble`
+### 8.2 单条气泡 `KnowledgeMessageBubble`
 
-- **`observer`** 子组件；**`message = assistantStore.messages.find(m => m.chatId === chatId)`**，找不到 return `null`。
+- **独立文件**：`apps/frontend/src/views/knowledge/KnowledgeMessageBubble.tsx`。
+- **`observer`** 子组件；通过父级传入的 **`selectMessageByChatId(chatId)`** 取 `Message`，找不到 return `null`。
 - **`streamRev` / `data-msg-rev`**：  
   - **assistant**：`` `${content.length}:${thinkContent?.length ?? 0}:${isStreaming ? 1 : 0}` ``  
   - **user**：`` `${content.length}` ``  
   绑定到 DOM **`data-msg-rev`**，使 MobX 在流式阶段 **稳定订阅** 正文长度、思考区长度与流式标记（注释：**消息内容版本戳**，语义化依赖，非 hack 预读）。
 - **布局**：根 `div` 使用 **`min-w-0 max-w-full flex-1`** 等，避免 flex 子项被代码块/长行 **撑破 ScrollArea**；用户气泡 **`items-end`**，气泡容器用户侧 **`w-fit self-end`** + 青色浅底边框，助手侧 **`flex-1`** + theme 浅底。
 - **`ChatAssistantMessage`**：用户消息传入额外 **`className`** 约束 markdown-body 的 **`min-w-0` / `max-w-full` / `overflow-x-auto`**；助手消息传入 **`scrollViewportRef`**，供 **代码块吸顶条** 与 **MdPreview 懒挂载**。
-- **`ChatMessageActions`**：绝对定位在气泡 **`message-md-wrap`** 下方（`-bottom-9`）；用户 **`right-0`**，助手 **`left-0`**；**`needShare={false}`**；**`onSaveToKnowledge`** 由父级传入（见下）。**流式输出期间**与通用组件行为的差异见 **§8.2.1**。
+- **`ChatMessageActions`**：绝对定位在气泡 **`message-md-wrap`** 下方（`-bottom-9`）；用户 **`right-0`**，助手 **`left-0`**；分享相关 props（`needShare/isSharing/checkedMessages/setCheckedMessage`）在 **`KnowledgeMessageBubble` 内统一计算与兜底**（见 **§8.2.3**）；`onSaveToKnowledge` 由父级传入（见下）。**流式输出期间**与通用组件行为的差异见 **§8.2.1**。
 
 **`onSaveToKnowledge`（父组件 `useCallback`）**：取 **`message.content`** trim，空则 Toast「没有可写入的正文」；否则 **`cur = knowledgeStore.markdown.trimEnd()`**，若 **`cur`** 非空则 **`next = cur + 两个换行 + body + 单个换行`**，否则 **`next = body + 单个换行`**，再 **`knowledgeStore.setMarkdown(next)`**，Toast「已追加到当前知识文档」。
 
@@ -873,7 +874,7 @@ useEffect(() => {
 
 | 层级 | 文件 | 行为 |
 | --- | --- | --- |
-| **知识库气泡父级** | `apps/frontend/src/views/knowledge/KnowledgeAssistant.tsx` 内 **`KnowledgeAssistantMessageBubble`** | 当 **`message.isStreaming`** 为真时 **不渲染** 包裹 **`ChatMessageActions`** 的外层 **`div`**（`absolute -bottom-9` 整块不出现）。**仅**影响当前流式条；**`!message.isStreaming`** 的其它消息照常展示操作条。用户消息通常无 **`isStreaming`**，不受影响。 |
+| **知识库气泡组件** | `apps/frontend/src/views/knowledge/KnowledgeMessageBubble.tsx` | 当 **`message.isStreaming`** 为真时 **不渲染** 包裹 **`ChatMessageActions`** 的外层 **`div`**（`absolute -bottom-9` 整块不出现）。**仅**影响当前流式条；**`!message.isStreaming`** 的其它消息照常展示操作条。用户消息通常无 **`isStreaming`**，不受影响。 |
 | **通用消息操作组件** | `apps/frontend/src/components/design/ChatMessageActions/index.tsx` | 内部根据 **`blockCopySaveWhileStreaming = Boolean(message.isStreaming)`**：流式时对 **复制**、**保存到知识库** 使用 **`opacity-30`、`pointer-events-none`（及/或 `onClick` 早退）**、`title` 提示「输出完成后可…」。**ChatBot**、**分享页** 等仍挂载该组件、未在父级整段隐藏时，用户仍能看到操作区轮廓但无法点复制/保存，避免其它入口误用半成品。 |
 
 **设计说明**：
@@ -885,7 +886,7 @@ useEffect(() => {
 **代码锚点（与源码一致，维护时以源文件为准）**：
 
 ```tsx
-// KnowledgeAssistant.tsx — KnowledgeAssistantMessageBubble 内（节选）
+// KnowledgeMessageBubble.tsx — KnowledgeMessageBubble 内（节选）
 {!message.isStreaming ? (
 	<div className={cn('absolute -bottom-9', message.role === 'user' ? 'right-0' : 'left-0')}>
 		<ChatMessageActions /* needShare={false}, onSaveToKnowledge, ... */ />
@@ -1254,6 +1255,89 @@ private async resolveShareMessagesBySessionId(params: {
 
 	return { /* ... */ };
 }
+```
+
+#### 8.2.3 分享透传逻辑下沉到 `KnowledgeMessageBubble`（逐行注释）
+
+**目标**：保持 `useKnowledgeAssistantShare` 仍在页面级（`KnowledgeAssistant.tsx`）只创建一次的前提下，把**每条消息**所需的分享 props 计算/兜底迁入 `KnowledgeMessageBubble.tsx`，降低 `KnowledgeAssistant.tsx` 的“分享侵入”，同时确保现有行为完全一致。
+
+**关键约束：不能把 `useKnowledgeAssistantShare(...)` 迁入气泡组件**
+
+- **生命周期**：`KnowledgeMessageBubble` 在 `messages.map(...)` 中会被渲染多次；若在气泡内部调用 `useKnowledgeAssistantShare`，会为每条消息创建一套独立的 `shareSelection/shareModelVisible/shareChatNode`。
+- **行为变化**：会导致分享模式状态割裂、弹窗重复挂载、勾选集合不同步，属于不可接受的逻辑变化。
+- **正确边界**：`useKnowledgeAssistantShare` 是“会话级状态机”，必须只初始化一次并由页面层统一渲染 `shareChatNode`。
+
+因此，本次仅下沉“分享透传/兜底”，不下沉“状态机创建”。
+
+##### 8.2.3.1 父级接线：`KnowledgeAssistant.tsx` 仅传 `allowAiShare + shareSelection + onShare`
+
+```tsx
+// 文件：apps/frontend/src/views/knowledge/KnowledgeAssistant.tsx（节选 + 逐行注释）
+
+{messages.map((message, index) => (
+	<KnowledgeMessageBubble
+		key={message.chatId} // React key：按 chatId 稳定复用节点
+		selectMessageByChatId={
+			isRagMode ? selectRagMessageByChatId : selectAssistantMessageByChatId
+		} // 双模式下按当前 store 选择 message 源
+		chatId={message.chatId} // 仅传 id：气泡内部再取 message，减少父级订阅面
+		index={index} // 操作条依赖 index（例如上下条按钮可用性）
+		messagesLength={messages.length} // 操作条依赖总数（例如是否最后一条）
+		isCopyedId={isCopyedId} // 复制反馈态：用于显示“已复制”
+		onCopy={onCopy} // 点击复制回调
+		onSaveToKnowledge={onSaveToKnowledge} // 保存到知识库回调
+		allowAiShare={allowAiShare} // 是否允许 AI 分享（RAG/未登录/不可持久化时为 false）
+		shareSelection={shareSelection} // 页面级 shareSelection：全局唯一
+		onShare={onShare} // 进入分享模式回调（不再在父级算 needShare 等）
+		scrollViewportRef={scrollViewportRef as RefObject<HTMLElement | null>} // 供助手消息内部代码块工具条使用
+	/>
+))}
+```
+
+##### 8.2.3.2 气泡内兜底：`KnowledgeMessageBubble.tsx` 统一计算 `needShare/isSharing/checkedMessages/setCheckedMessage`
+
+```tsx
+// 文件：apps/frontend/src/views/knowledge/KnowledgeMessageBubble.tsx（节选 + 逐行注释）
+
+type ShareSelectionLike = {
+	isSharing: boolean; // 是否处于分享勾选模式
+	checkedMessages: Set<string>; // 已勾选的消息 id 集合
+	setCheckedMessage: (message: Message) => void; // 成对勾选入口（由 useShareSelection 提供）
+};
+
+export const KnowledgeMessageBubble = observer(function KnowledgeMessageBubble({
+	allowAiShare = false, // 默认不允许分享：保持旧行为（不展示分享入口）
+	shareSelection, // 可选：页面级传入；不存在则在本组件内兜底
+	onShare, // 可选：点击分享回调
+	// ... 其它与消息渲染相关 props ...
+}) {
+	// isSharing：仅当 allowAiShare 为真时才读取 shareSelection；否则固定 false
+	const isSharing = allowAiShare ? Boolean(shareSelection?.isSharing) : false;
+
+	// checkedMessages：allowAiShare 为真时取全局集合，否则用空 Set 兜底
+	const checkedMessages = allowAiShare
+		? (shareSelection?.checkedMessages ?? new Set<string>())
+		: new Set<string>();
+
+	// setCheckedMessage：allowAiShare 为真时透传；否则为 undefined（ChatMessageActions 内部会自行兜底）
+	const setCheckedMessage = allowAiShare
+		? shareSelection?.setCheckedMessage
+		: undefined;
+
+	// needShare：只在“允许分享 + 当前不在分享模式”时展示分享入口（与原父级逻辑一致）
+	const needShare = allowAiShare && !isSharing;
+
+	return (
+		<ChatMessageActions
+			needShare={needShare} // 控制是否展示分享按钮
+			onShare={needShare ? onShare : undefined} // 仅 needShare 时挂载 onShare，避免分享模式下重复触发
+			isSharing={isSharing} // 分享模式下展示 checkbox
+			checkedMessages={checkedMessages} // checkbox 勾选态来源
+			setCheckedMessage={setCheckedMessage} // 点击 checkbox/分享按钮时用于勾选当前 pair
+			// ... 其它 props 不变 ...
+		/>
+	);
+});
 ```
 
 ### 8.3 滚动、贴底、代码块浮动工具栏
@@ -1640,7 +1724,7 @@ useLayoutEffect(() => {
 // 同一文件：ScrollArea 内消息列表末尾（节选）
 {
 	messages.map((message, index) => (
-		<KnowledgeAssistantMessageBubble key={message.chatId} /* ... */ />
+		<KnowledgeMessageBubble key={message.chatId} /* ... */ />
 	));
 }
 {
@@ -1834,6 +1918,7 @@ bottomBarAssistantNode={
 | 前端助手输入区工具条    | `apps/frontend/src/views/knowledge/KnowledgeAssistantEntryToolbar.tsx`（`ChatEntry.entryChildren`：历史抽屉 / 新对话 / AI·RAG 切换）                                                                                            |
 | 前端贴底滚动 Hook       | `apps/frontend/src/hooks/useStickToBottomScroll.ts`（含可选 `idleFlushKey` 非流式贴底）                                                                                                                                          |
 | 前端消息操作条（通用） | `apps/frontend/src/components/design/ChatMessageActions/index.tsx`（流式时禁用复制/保存；详 **§8.2.1**）                                                                                                                      |
+| 前端消息气泡（知识助手） | `apps/frontend/src/views/knowledge/KnowledgeMessageBubble.tsx`（单条消息渲染 + 操作条显隐 + 分享透传兜底；详 **§8.2、§8.2.3**）                                                                                               |
 | 前端分享状态机（通用） | `apps/frontend/src/hooks/useShareSelection.ts`、`apps/frontend/src/hooks/useShareFlow.ts`（ChatBot 与助手共用；详 **§8.2.2.1**）                                                                                               |
 | 前端助手分享 UI        | `apps/frontend/src/views/knowledge/KnowledgeAssistantShareBar.tsx`（`useKnowledgeAssistantShare` + 分享底栏；详 **§8.2.2.2**）                                                                                                 |
 | 分享弹窗（复用）        | `apps/frontend/src/views/chat/share/index.tsx`（支持 `sessionId/sessionType`；详 **§8.2.2.3**）                                                                                                                                |
