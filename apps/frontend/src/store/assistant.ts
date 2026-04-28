@@ -90,7 +90,7 @@ export interface AssistantStoreApi {
 		toDocumentKey: string,
 	): Promise<void>;
 	ensureSessionForCurrentDocument(): Promise<string | null>;
-	// 新增：强制创建新会话（用于“新对话”按钮）。
+	// 新增：新对话（优先复用已有空会话，避免重复占位会话）。
 	createNewSessionForCurrentDocument(): Promise<string | null>;
 	// 新增：切换到指定会话（用于历史记录切换）。
 	switchSessionForCurrentDocument(sessionId: string): Promise<void>;
@@ -897,10 +897,62 @@ export class AssistantStore {
 	}
 
 	/**
-	 * 为当前激活的文档强制创建一个新的对话 session（用于用户点击“新对话”按钮）。
-	 * 若当前状态不允许持久化，则返回 null。
-	 * 若成功，切换激活 session，并清空新会话下的消息。
-	 * 最后刷新会话列表并返回新 sessionId。
+	 * 在会话列表中查找第一个「无历史消息、且非发送/流式/拉历史中」的可复用空会话。
+	 * 列表约定为 updatedAt 倒序，优先命中最近仍为空占位的新会话。
+	 */
+	private async findFirstReusableEmptySessionId(
+		canonical: string,
+		excludeSessionId: string | null,
+	): Promise<string | null> {
+		// 获取当前 canonical 文档下的所有会话列表（updatedAt 倒序，最新在前）
+		const list = this.sessionsByDocument[canonical] ?? [];
+		for (const item of list) {
+			// 读取会话 id，去除空白。若为空或被排除，则跳过本次循环
+			const sid = (item.sessionId ?? '').trim();
+			if (!sid || sid === excludeSessionId) continue;
+
+			// 优先检查本地缓存（stateBySession）中是否已有此会话的状态信息
+			const sstate = this.stateBySession[sid];
+			if (sstate) {
+				// 检查消息中是否存在流式（打字机效果未完成）消息
+				const streaming = sstate.messages.some((m) => m.isStreaming);
+				// 满足以下所有条件则视为本地可复用的“空会话”：
+				// - 无历史消息
+				// - 当前不在发送中
+				// - 当前没有流式输出
+				// - 当前未在加载历史消息
+				if (
+					sstate.messages.length === 0 &&
+					!sstate.isSending &&
+					!streaming &&
+					!sstate.isHistoryLoading
+				) {
+					// 命中第一个可用空会话（本地即可确认），直接返回
+					return sid;
+				}
+				// 如果本地状态有消息，则不会复用，查下一个
+				if (sstate.messages.length > 0) continue;
+			}
+
+			// 若本地无此会话/信息不全，则（已登录情况下）查一次接口以兜底获取服务器消息记录
+			if (!readToken()) continue; // 未登录无法调接口，跳过
+			const res = await getAssistantSessionDetail(sid);
+			const payload = res.data;
+			// 未查到会话详情，跳过
+			if (!payload?.session) continue;
+			const rows = payload.messages ?? [];
+			// 接口查到该会话“确实无历史消息”，将其视为可复用的空会话，直接返回
+			if (rows.length === 0) return sid;
+		}
+		// 遍历所有会话后未查到可复用的空会话，返回 null
+		return null;
+	}
+
+	/**
+	 * 为当前激活的文档创建或进入「新对话」会话（用于用户点击“新对话”按钮）。
+	 * - 当前激活会话已为空且无进行中流式/发送时：不重复创建，仅提示。
+	 * - 否则若列表中已有空会话：切换到该会话，不调用 forceNew 创建。
+	 * - 否则：沿用原逻辑 `createAssistantSession(..., forceNew: true)` 新建。
 	 */
 	async createNewSessionForCurrentDocument(): Promise<string | null> {
 		// 检查当前文档是否允许知识助手持久化（即是否允许多会话）
@@ -924,6 +976,42 @@ export class AssistantStore {
 		}
 		// 计算当前文档的 canonical key，用于跨草稿/知识统一定位
 		const canonical = this.canonicalKey(key);
+		// 先刷新列表，避免本地缓存缺少「已创建但未切换」的空会话
+		await this.refreshSessionListForCurrentDocument();
+
+		// 1. 获取当前文档激活的 sessionId（activeSessionByDocument 优先生效，其次 sessionByDocument，用于兼容老逻辑；都没有时为 null）
+		const active =
+			this.activeSessionByDocument[canonical] ?? // 当前文档对应的已激活会话（优先使用激活的）
+			this.sessionByDocument[canonical] ?? // 如果没有激活，则取已绑定的（可能为最近会话）
+			null; // 都没有时为 null
+
+		if (active) {
+			// 2. 确保该 sessionId 的状态已初始化（无则创建），获取其状态对象
+			const cur = this.ensureSessionState(active);
+			// 3. 检查该会话消息列表中是否有消息正在流式输出（用户切换 tab 时可能残留未完结流式）
+			const curStreaming = cur.messages.some((m) => m.isStreaming);
+			// 4. 满足“当前已激活会话为空会话（无历史消息）且不在发送/流式/加载历史”时，直接复用，无需新建
+			if (
+				cur.messages.length === 0 && // 会话消息列表为空
+				!cur.isSending && // 没有正在发送
+				!curStreaming && // 没有流式消息
+				!cur.isHistoryLoading // 没有正在加载历史消息
+			) {
+				return active; // 直接返回此空会话的 sessionId，供外部复用
+			}
+		}
+
+		// 5. 否则，查找本地缓存的已存在的其他空会话（避免后端重复新建）
+		const reusable = await this.findFirstReusableEmptySessionId(
+			canonical, // 当前文档 canonicalKey
+			active, // 已激活的 sessionId（避免重复）
+		);
+		if (reusable) {
+			// 6. 如有可复用的空会话，则切换到该会话
+			await this.switchSessionForCurrentDocument(reusable);
+			return reusable; // 返回可复用的新会话 sessionId
+		}
+
 		// 提取该文档对应的知识条目绑定 id
 		const binding = knowledgeArticleBindingFromDocumentKey(key);
 		// 调用后端接口创建新的助手会话（传 binding.id + forceNew:true 强制新建）

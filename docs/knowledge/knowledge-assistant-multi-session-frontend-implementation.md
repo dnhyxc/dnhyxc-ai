@@ -3,10 +3,12 @@
 > 本文从 `apps/frontend` 的**现有实现**反推实现思路，面向“每篇文章支持多个 session 对话 + 历史记录抽屉 + 并发流式互不影响”。
 >
 > 约束：
+>
 > - **不改变既有功能语义**：不传新字段时保持单会话/原接口行为不变（后端兼容由后端实现；本文只聚焦前端）。
 > - **允许并发流式**：A 会话流式时切到 B 会话继续提问，不会 stop/abort A；切回 A 仍能看到打字机（streaming）增量。
 >
 > 相关入口：
+>
 > - UI：`apps/frontend/src/views/knowledge/KnowledgeAssistant.tsx`
 > - Store：`apps/frontend/src/store/assistant.ts`
 > - API：`apps/frontend/src/service/api.ts`、`apps/frontend/src/service/index.ts`
@@ -92,12 +94,232 @@
   - 仅在 `knowledgeAssistantPersistenceAllowed=true` 时启用（草稿 ephemeral 不支持多会话）。
   - 需要登录 token。
 
-- **网络调用**
-  - `POST /assistant/session`，携带 `{ knowledgeArticleId, forceNew: true }`（无 `knowledgeArticleId` 时仅 `{ forceNew: true }`）。
+- **核心产品约束（本次变更）**
+  - **当“新会话（空会话）已存在时，不允许重复创建新会话**：避免出现多个“空壳 session”占位，导致历史列表困惑、且无必要消耗后端 session 记录。
+  - **从非新会话点击「新对话」时**：
+    - 若列表里已有一个可复用的空会话：**不新建**，而是**自动关联（切换）到该空会话**；
+    - 若当前激活会话本身就是空会话：**不新建**，直接提示用户可输入开始聊天；
+    - 仅当确实不存在可复用空会话时，才执行 `forceNew: true` 新建。
+
+- **网络调用（与实现一致，变更后为“尽量少调用”）**
+  - 先：`GET /assistant/sessions/for-knowledge?knowledgeArticleId=...`（刷新列表，确保拿到“已创建但未切换”的空会话）。
+  - 再按分支：
+    - **复用空会话**：必要时 `GET /assistant/session/:sessionId` 校验该会话是否确实无消息（仅当本地无该会话状态时才会打这个请求）。
+    - **确实无可复用空会话时**：`POST /assistant/session`，携带 `{ knowledgeArticleId, forceNew: true }`（无 `knowledgeArticleId` 时仅 `{ forceNew: true }`）。
 
 - **UI 表现**
   - 立刻切换到新会话（消息列表为空）。
   - **不在该方法末尾 `await` 拉会话列表**；抽屉内列表依赖 **`refreshSessionListForCurrentDocument`**（见 §4.3）、**`ensureSessionForCurrentDocument` 内异步刷新**、以及 **`sendMessage` 成功发起 SSE 后的异步刷新** 更新，故新建后若未打开抽屉，列表可能稍晚才含新会话。
+
+- **实现思路（详细）**
+  - **问题**：在“多会话 + 历史列表”上线后，用户可能连续点击「新对话」，或从旧会话切回再点「新对话」。如果每次都 `forceNew`，会产生多个**没有任何消息**的空会话，历史列表里出现多条“对话 xxxx”，用户难以理解哪个是可用入口。
+  - **目标**：保证同一文章下“同时最多只有一个可复用空会话”；用户再点「新对话」时要**进入**这个空会话，而不是**再创建**。
+  - **做法**：把“新对话”的语义从“必然新建”调整为“**创建或进入**新对话会话”，具体分三步：
+    1. **刷新列表**：`await refreshSessionListForCurrentDocument()`，确保 `sessionsByDocument[canonical]` 最新。
+    2. **检查当前激活会话**：若已是空会话（无消息、非发送、无流式、非拉历史），则直接返回该 `sessionId`（并提示用户可直接输入）。
+    3. **查找其它可复用空会话**：按 `sessionsByDocument[canonical]`（后端 `updatedAt DESC`）遍历：
+       - 若 `stateBySession[sid]` 已存在且满足“空会话 + 无发送/流式/拉历史”，直接命中；
+       - 否则（本地没缓存或不完整），用 `getAssistantSessionDetail(sid)` 兜底校验 `payload.messages.length === 0`；
+       - 找到即 `switchSessionForCurrentDocument(sid)` 切换；
+       - 都找不到才真正 `createAssistantSession({ ..., forceNew: true })`。
+
+- **关键实现代码（带中文注释，保持与源码一致）**
+
+```ts
+// apps/frontend/src/store/assistant.ts（节选，逐行注释版）
+// 目标：当已有“空的新会话”时，点击「新对话」不重复新建，而是复用并切换到该会话。
+// 约束：不影响既有行为（无可复用空会话时仍走 forceNew 新建；未登录/草稿等仍按原逻辑返回）。
+
+/**
+ * 在会话列表中查找第一个「可复用空会话」的 sessionId。
+ * “空会话”定义：服务端该 session 下 messages 为空，且本地该 session 不在发送/流式/拉历史中。
+ * 列表约定为 updatedAt 倒序，因此优先命中“最近被创建但仍为空”的新会话。
+ */
+// 私有方法：仅给 createNewSessionForCurrentDocument 用（把“找空会话”的逻辑封装起来）
+private async findFirstReusableEmptySessionId(
+  // 当前文档的 canonicalKey（去掉 __trash-* 后缀的稳定 key）
+  canonical: string,
+  // 排除当前激活会话，避免“复用自己”造成无意义切换
+  excludeSessionId: string | null,
+): Promise<string | null> {
+  // 读取当前文档的会话列表缓存；未拉取过则为空数组
+  const list = this.sessionsByDocument[canonical] ?? [];
+  // 按 updatedAt DESC 从新到旧遍历（更可能先命中最近空会话）
+  for (const item of list) {
+    // 规范化 sessionId，避免空白导致“幽灵 key”
+    const sid = (item.sessionId ?? '').trim();
+    // 无效 id 或被排除（当前 active）则跳过
+    if (!sid || sid === excludeSessionId) continue;
+
+    // 优先走本地缓存判定：避免不必要的网络请求（性能/体验更好）
+    const sstate = this.stateBySession[sid];
+    // 若本地已有该会话的运行态
+    if (sstate) {
+      // 流式判断：消息数组中是否存在仍在 streaming 的气泡
+      const streaming = sstate.messages.some((m) => m.isStreaming);
+      // 满足“可复用空会话”的所有条件才命中
+      if (
+        // 该会话目前无任何消息（本地视角为空）
+        sstate.messages.length === 0 &&
+        // 不在发送中（避免复用正在发送的会话造成体验混乱）
+        !sstate.isSending &&
+        // 不存在流式输出（避免复用仍在生成的会话）
+        !streaming &&
+        // 不在拉历史中（避免并发覆盖/切换后抖动）
+        !sstate.isHistoryLoading
+      ) {
+        // 直接复用该空会话（无需打接口验证）
+        return sid;
+      }
+      // 该会话已有历史消息：绝不复用，直接看下一个
+      if (sstate.messages.length > 0) continue;
+    }
+
+    // 本地不确定时，用接口兜底确认“服务端是否真的为空会话”
+    // 注意：只在“已登录”时才可能请求；未登录时不做任何额外请求，保持原行为。
+    // 无 token：不请求后端，直接跳过该 sid（避免 401 噪音）
+    if (!readToken()) continue;
+    // 捕获网络/解析异常，避免“新对话”按钮因单个会话异常而失败
+    try {
+      // 拉取该会话的详情与消息（服务端真相）
+      const res = await getAssistantSessionDetail(sid);
+      // 解包 payload（含 session 与 messages）
+      const payload = res.data;
+      // 会话不存在（可能被删）：跳过
+      if (!payload?.session) continue;
+      // 服务端确认 messages 为空：可复用，立即返回
+      if ((payload.messages ?? []).length === 0) return sid;
+    } catch {
+      // 忽略并继续遍历其它会话（不影响主流程）
+      continue;
+    }
+  }
+  // 未找到可复用空会话：返回 null，交由调用方决定是否 forceNew
+  return null;
+}
+
+/**
+ * 为当前激活的文档创建或进入「新对话」会话（用于用户点击“新对话”按钮）。
+ *
+ * 语义（与旧版“必然 forceNew”相比的新增约束）：
+ * - 当前激活会话本身就是空会话：不重复创建，只提示并复用当前会话；
+ * - 否则若文档下已有其它空会话：切换到该空会话（自动关联），不新建；
+ * - 只有当确实没有可复用空会话时，才 `forceNew: true` 新建一个会话。
+ */
+// 公共方法：给 UI「新对话」按钮调用
+async createNewSessionForCurrentDocument(): Promise<string | null> {
+  // 草稿/ephemeral：不支持多会话（保持旧逻辑）
+  if (!this.knowledgeAssistantPersistenceAllowed) {
+    // 给用户明确反馈
+    Toast({ type: 'warning', title: '未保存草稿不支持多会话' });
+    // 终止：不创建
+    return null;
+  }
+  // 未登录：不允许创建/切换会话（保持旧逻辑）
+  if (!readToken()) {
+    // 提示登录
+    Toast({ type: 'warning', title: '请先登录后再使用助手' });
+    // 终止：不创建
+    return null;
+  }
+  // 当前 UI 指针的 documentKey（可能含 __trash-* 后缀）
+  const key = this.activeDocumentKey;
+  // 文档未就绪（例如组件未传入/尚未 activate）
+  if (!key) {
+    // 提示用户稍后再试
+    Toast({ type: 'warning', title: '文档未就绪' });
+    // 终止：不创建
+    return null;
+  }
+  // 规范化：把同一文章的不同视图身份收敛为同一 key
+  const canonical = this.canonicalKey(key);
+
+  // 先刷新列表：避免本地 sessionsByDocument 缺少“已创建但未切换”的空会话，导致误新建
+  // 调用 GET /assistant/sessions/for-knowledge（轻量）
+  await this.refreshSessionListForCurrentDocument();
+
+  // 计算当前文档的“当前会话 id”
+  const active =
+    // 优先：当前 UI 选中的会话（多会话主指针）
+    this.activeSessionByDocument[canonical] ??
+    // 其次：兼容旧字段（文档 → sessionId）
+    this.sessionByDocument[canonical] ??
+    // 都没有则为 null（尚未有会话）
+    null;
+
+  // 若当前激活会话已是“空新对话”，不重复创建：直接复用
+  if (active) {
+    // 确保会话桶存在，拿到该会话运行态
+    const cur = this.ensureSessionState(active);
+    // 判断当前会话是否仍有流式输出
+    const curStreaming = cur.messages.some((m) => m.isStreaming);
+    // 命中“当前已是新对话”的判定
+    if (
+      // 无消息
+      cur.messages.length === 0 &&
+      // 未发送
+      !cur.isSending &&
+      // 无流式
+      !curStreaming &&
+      // 未拉历史
+      !cur.isHistoryLoading
+    ) {
+      // 仅提示，不做任何切换/新建
+      Toast({ type: 'info', title: '当前已是新对话，可直接输入开始聊天' });
+      // 返回当前会话 id（让调用方视为成功进入新对话）
+      return active;
+    }
+  }
+
+  // 查找并复用其它空会话：这一步实现“从旧会话点新对话时，自动关联到之前存在的新会话”
+  const reusable = await this.findFirstReusableEmptySessionId(
+    // 当前文档 canonical
+    canonical,
+    // 排除当前 active
+    active,
+  );
+  // 找到了可复用空会话
+  if (reusable) {
+    // 切换到该会话（UI messages getter 自动指向它）
+    await this.switchSessionForCurrentDocument(reusable);
+    // 返回复用的会话 id
+    return reusable;
+  }
+
+  // 确实没有可复用空会话：才真正调用后端 forceNew 新建（保持旧“新建”能力不变）
+  // 从 documentKey 提取 knowledgeArticleId（去掉 __trash-*）
+  const binding = knowledgeArticleBindingFromDocumentKey(key);
+  // 调用 POST /assistant/session
+  const res = await createAssistantSession(
+    // 有绑定 id 时传 knowledgeArticleId
+    binding
+      // forceNew:true 强制新建，避免复用最近会话
+      ? { knowledgeArticleId: binding, forceNew: true }
+      // 无 binding 时也可新建（回收站/特殊 key 等）
+      : { forceNew: true },
+  );
+  // 从响应中取新 sessionId
+  const created = (res.data as { sessionId?: string })?.sessionId;
+  // 防御：服务端异常未返回 id
+  if (!created) {
+    // 提示失败
+    Toast({ type: 'error', title: '创建新对话失败' });
+    // 终止
+    return null;
+  }
+  // MobX：批量更新 observable，避免多次渲染抖动
+  runInAction(() => {
+    // 设置当前文档激活会话为新建 id
+    this.activeSessionByDocument[canonical] = created;
+    // 同步兼容字段
+    this.sessionByDocument[canonical] = created;
+    // 初始化新会话消息为空（UI 立即显示空对话）
+    this.ensureSessionState(created).messages = [];
+  });
+  // 返回新建会话 id（调用方无需再额外处理）
+  return created;
+}
+```
 
 #### 4.3 点击“历史记录”圆形按钮：打开抽屉并切换会话
 
@@ -218,27 +440,29 @@ private get activeState() {
 
 ```ts
 // apps/frontend/src/service/api.ts
-export const ASSISTANT_SESSION = '/assistant/session'; // 助手会话：创建/详情
-export const ASSISTANT_SESSIONS_FOR_KNOWLEDGE =        // 新增：按知识文章查询会话列表
-  '/assistant/sessions/for-knowledge';
+export const ASSISTANT_SESSION = "/assistant/session"; // 助手会话：创建/详情
+export const ASSISTANT_SESSIONS_FOR_KNOWLEDGE = // 新增：按知识文章查询会话列表
+	"/assistant/sessions/for-knowledge";
 ```
 
 ```ts
 // apps/frontend/src/service/index.ts
 export const createAssistantSession = async (payload?: {
-  title?: string;                     // 可选：会话标题（后端也可能自动生成）
-  knowledgeArticleId?: string;         // 可选：绑定文章 id
-  forceNew?: boolean;                 // 可选：true 强制新建；false/不传复用最近会话（兼容旧）
+	title?: string; // 可选：会话标题（后端也可能自动生成）
+	knowledgeArticleId?: string; // 可选：绑定文章 id
+	forceNew?: boolean; // 可选：true 强制新建；false/不传复用最近会话（兼容旧）
 }) => {
-  // 向后端创建会话；返回 { sessionId, title }
-  return await http.post(ASSISTANT_SESSION, payload ?? {});
+	// 向后端创建会话；返回 { sessionId, title }
+	return await http.post(ASSISTANT_SESSION, payload ?? {});
 };
 
-export const getAssistantSessionsByKnowledgeArticle = async (knowledgeArticleId: string) => {
-  // 按文章拉取会话列表（后端按 updatedAt 倒序返回；前端仍会再做一次兜底排序）
-  return await http.get(ASSISTANT_SESSIONS_FOR_KNOWLEDGE, {
-    querys: { knowledgeArticleId },
-  });
+export const getAssistantSessionsByKnowledgeArticle = async (
+	knowledgeArticleId: string,
+) => {
+	// 按文章拉取会话列表（后端按 updatedAt 倒序返回；前端仍会再做一次兜底排序）
+	return await http.get(ASSISTANT_SESSIONS_FOR_KNOWLEDGE, {
+		querys: { knowledgeArticleId },
+	});
 };
 ```
 
@@ -292,18 +516,19 @@ async sendMessage(raw?: string) {
 ```ts
 // onComplete（关键片段，逐行注释）
 onComplete: async (err) => {
-  // ...先把当前会话的 streaming 置 false ...
+	// ...先把当前会话的 streaming 置 false ...
 
-  // 成功结束后，为了对齐服务端落库内容，可以拉一次会话详情
-  // 关键：必须用“本次请求对应的 sid”，不能用 activeSessionId（并发切换会串写）
-  if (!err && !ephemeral) {
-    const res = await getAssistantSessionDetail(sid);         // sid 是闭包里本次请求的会话 id
-    const payload = res.data;
-    if (payload?.session?.sessionId === sid) {                // 再次校验，避免误覆盖
-      state.messages = mapApiMessagesToUi(payload.messages ?? []);
-    }
-  }
-}
+	// 成功结束后，为了对齐服务端落库内容，可以拉一次会话详情
+	// 关键：必须用“本次请求对应的 sid”，不能用 activeSessionId（并发切换会串写）
+	if (!err && !ephemeral) {
+		const res = await getAssistantSessionDetail(sid); // sid 是闭包里本次请求的会话 id
+		const payload = res.data;
+		if (payload?.session?.sessionId === sid) {
+			// 再次校验，避免误覆盖
+			state.messages = mapApiMessagesToUi(payload.messages ?? []);
+		}
+	}
+};
 ```
 
 ---
@@ -365,4 +590,3 @@ useEffect(() => {
 - **回归点**
   - ephemeral（未保存草稿）仍按旧逻辑：不支持多会话、不会出现历史抽屉入口。
   - 切换文章（`documentKey` 变化）时 **`activateForDocument` 会恢复该文最近会话消息**；**会话全量列表**以打开历史抽屉或发消息后的刷新为准，不在进入文章时强依赖 `sessions/for-knowledge` 预拉。
-
