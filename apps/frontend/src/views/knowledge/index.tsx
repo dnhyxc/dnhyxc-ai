@@ -219,6 +219,13 @@ const Knowledge = observer(() => {
 		],
 	);
 
+	// 当前知识条目下助手 documentKey（用于停止未保存草稿的流式）
+	const assistantDocumentKey = useMemo(
+		() =>
+			knowledgeAssistantDocumentKey(assistantArticleBinding, trashOpenNonce),
+		[assistantArticleBinding, trashOpenNonce],
+	);
+
 	// 切换知识文档（binding 变化）时清空助手输入框，避免把上一篇草稿带到下一篇
 	useEffect(() => {
 		setAssistantInput('');
@@ -261,6 +268,34 @@ const Knowledge = observer(() => {
 			);
 		}
 	}, [knowledgeStore, trashOpenNonce]);
+
+	// 仅对“未保存云端草稿（ephemeral）”生效：离开当前条目/路由时停止流式，避免后台继续生成
+	const stopEphemeralAssistantStreamingIfNeeded = useCallback(
+		(nextAssistantDocumentKey?: string) => {
+			const editingId = knowledgeStore.knowledgeEditingKnowledgeId;
+			const assistantPersistenceAllowed =
+				knowledgeStore.knowledgeTrashPreviewId != null ||
+				isKnowledgeLocalMarkdownId(editingId) ||
+				Boolean(editingId);
+			if (assistantPersistenceAllowed) return;
+			// 仅未保存草稿且仍在流式时才停止
+			if (!assistantStore.isStreamingForDocumentKey(assistantDocumentKey))
+				return;
+			// 需求：切走时“像清空按钮一样”停止流式，并清空已接收的流式内容
+			// - 与 clear 按钮一致：abort SSE + stop 后端（可用）+ 删除草稿桶 state
+			// - 但允许传入 nextAssistantDocumentKey，用于同步 activeDocumentKey，避免后续 ephemeral 发送提示“文档未就绪”
+			assistantStore.clearAssistantStateOnKnowledgeDraftReset(
+				nextAssistantDocumentKey ?? null,
+				{ stopBackend: true },
+			);
+		},
+		[
+			knowledgeStore,
+			assistantDocumentKey,
+			knowledgeStore.knowledgeTrashPreviewId,
+			knowledgeStore.knowledgeEditingKnowledgeId,
+		],
+	);
 
 	// 快捷键监听
 	useEffect(() => {
@@ -813,8 +848,18 @@ const Knowledge = observer(() => {
 
 	const handlePickRecord = useCallback(
 		(record: KnowledgeRecord) => {
+			// 从未保存草稿切走时：像“清空”一样停止流式，并清空已接收内容
+			const nextAssistantKey = knowledgeAssistantDocumentKey(
+				knowledgeAssistantArticleBinding({
+					knowledgeTrashPreviewId: null,
+					knowledgeEditingKnowledgeId: record.id,
+				}),
+				trashOpenNonce,
+			);
+			stopEphemeralAssistantStreamingIfNeeded(nextAssistantKey);
 			knowledgeStore.setKnowledgeOverwriteOpen(false);
 			knowledgeStore.setKnowledgeEditingKnowledgeId(record.id);
+			knowledgeStore.setKnowledgeTrashPreviewId(null);
 			knowledgeStore.setKnowledgeLocalDirPath(record.localDirPath ?? null);
 			const t = (record.title ?? '').trim();
 			knowledgeStore.setKnowledgeLocalDiskTitle(t || null);
@@ -823,7 +868,7 @@ const Knowledge = observer(() => {
 			knowledgeStore.setKnowledgeTitle(record.title ?? '');
 			knowledgeStore.setMarkdown(content);
 		},
-		[knowledgeStore],
+		[knowledgeStore, stopEphemeralAssistantStreamingIfNeeded],
 	);
 
 	/**
@@ -839,6 +884,15 @@ const Knowledge = observer(() => {
 			content: string;
 			trashItemId: string;
 		}) => {
+			// 从未保存草稿切走时：像“清空”一样停止流式，并清空已接收内容
+			const nextAssistantKey = knowledgeAssistantDocumentKey(
+				knowledgeAssistantArticleBinding({
+					knowledgeTrashPreviewId: record.trashItemId,
+					knowledgeEditingKnowledgeId: null,
+				}),
+				trashOpenNonce,
+			);
+			stopEphemeralAssistantStreamingIfNeeded(nextAssistantKey);
 			setTrashOpenNonce((n) => n + 1);
 			knowledgeStore.setKnowledgeOverwriteOpen(false);
 			knowledgeStore.setKnowledgeEditingKnowledgeId(null);
@@ -855,8 +909,10 @@ const Knowledge = observer(() => {
 			knowledgeStore.setKnowledgeTitle(record.title ?? '');
 			knowledgeStore.setMarkdown(content);
 		},
-		[knowledgeStore],
+		[knowledgeStore, stopEphemeralAssistantStreamingIfNeeded],
 	);
+
+	// 注意：路由切换时不停止未保存草稿的流式输出（按产品要求与“切换到其它条目”区分）
 
 	const handleDeletedRecord = useCallback(
 		(id: string) => {

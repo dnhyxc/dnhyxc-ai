@@ -63,6 +63,8 @@ export interface AssistantStoreApi {
 		createdAt: string;
 		updatedAt: string;
 	}>;
+	/** 是否锁定「新对话/历史会话切换」交互（用于草稿迁入/未落库期间禁止切换） */
+	readonly isAssistantSessionSwitcherLocked: boolean;
 	readonly messages: Message[];
 	readonly isHistoryLoading: boolean;
 	readonly isSending: boolean;
@@ -73,6 +75,14 @@ export interface AssistantStoreApi {
 	setKnowledgeAssistantPersistenceAllowed(allowed: boolean): void;
 	clearAssistantStateOnKnowledgeDraftReset(
 		syncActiveDocumentKey?: string | null,
+		options?: { stopBackend?: boolean },
+	): void;
+	/**
+	 * 仅用于“未保存云端草稿（ephemeral）”场景：停止指定 documentKey 下的流式输出（不清空消息、不删映射）。
+	 * 切换到其它条目/路由时调用，避免后台继续生成占用资源。
+	 */
+	stopEphemeralStreamingForDocumentKey(
+		documentKey: string,
 		options?: { stopBackend?: boolean },
 	): void;
 
@@ -208,6 +218,12 @@ export class AssistantStore {
 			/** 是否已尝试拉取过历史（避免频繁 activate 时重复请求） */
 			historyHydrated: boolean;
 			/**
+			 * 草稿迁入（import-transcript）进行中：
+			 * - 迁入完成前，服务端尚未落库/绑定会话消息，禁止用户点击「新对话」或切换历史会话
+			 * - 迁入完成后置回 false
+			 */
+			isEphemeralFlushInProgress: boolean;
+			/**
 			 * 首次保存时若仍在流式输出：先不迁入（避免绑定不完整对话），等流式结束后再 flush。
 			 * 该字段挂在 state 上，确保在 `fromKey → toKey` remap 时会随 state 一起迁移。
 			 */
@@ -289,6 +305,7 @@ export class AssistantStore {
 		abortStream: (() => void) | null;
 		ephemeralStreamId: string | null;
 		historyHydrated: boolean;
+		isEphemeralFlushInProgress: boolean;
 		pendingEphemeralFlush: {
 			cloudArticleId: string;
 			fromDocumentKey: string;
@@ -308,6 +325,7 @@ export class AssistantStore {
 				abortStream: null,
 				ephemeralStreamId: null,
 				historyHydrated: false,
+				isEphemeralFlushInProgress: false,
 				pendingEphemeralFlush: null,
 			};
 		}
@@ -321,6 +339,7 @@ export class AssistantStore {
 				abortStream: null,
 				ephemeralStreamId: null,
 				historyHydrated: false,
+				isEphemeralFlushInProgress: false,
 				pendingEphemeralFlush: null,
 			};
 		}
@@ -425,6 +444,21 @@ export class AssistantStore {
 		return this.sessionsByDocument[docKey] ?? [];
 	}
 
+	get isAssistantSessionSwitcherLocked(): boolean {
+		// 仅对“允许持久化”的多会话入口加锁：草稿阶段本就不展示入口
+		if (!this.knowledgeAssistantPersistenceAllowed) return true;
+		// 未登录/无文档时不展示入口，此处返回 false 以避免多余 Toast；UI 侧已有 show 条件
+		if (!readToken()) return false;
+		const docKey = this.canonicalKey(this.activeDocumentKey);
+		if (!docKey) return false;
+		const state = this.ensureState(docKey);
+		// 1) pendingEphemeralFlush：保存发生在流式中，必须等流式结束后迁入落库
+		// 2) isEphemeralFlushInProgress：迁入进行中（可能是“立刻迁入”或“流式结束后迁入”）
+		return Boolean(
+			state.pendingEphemeralFlush || state.isEphemeralFlushInProgress,
+		);
+	}
+
 	get messages(): Message[] {
 		return this.activeState.messages;
 	}
@@ -506,6 +540,66 @@ export class AssistantStore {
 	}
 
 	/**
+	 * 复用的“停止流式”逻辑（与清空按钮同源）：
+	 * - 先 abort 前端 SSE，避免继续写入 delta
+	 * - 再按需收尾 UI（把 streaming 气泡置为 stopped）
+	 * - 最后可选调用后端 stop（优先 sessionId，其次 streamId）
+	 *
+	 * 注意：
+	 * - 该方法只处理“停止”本身，不做 state 删除；清空按钮在调用后会自行删除 state。
+	 */
+	private stopStreamingForDocumentState(
+		state: {
+			sessionId: string | null;
+			messages: Message[];
+			isHistoryLoading: boolean;
+			isSending: boolean;
+			loadError: string | null;
+			abortStream: (() => void) | null;
+			ephemeralStreamId: string | null;
+			historyHydrated: boolean;
+			isEphemeralFlushInProgress: boolean;
+			pendingEphemeralFlush: {
+				cloudArticleId: string;
+				fromDocumentKey: string;
+				toDocumentKey: string;
+			} | null;
+		},
+		options?: { stopBackend?: boolean; markStopped?: boolean },
+	): void {
+		const prevSid = state.sessionId ?? null;
+		const prevStreamId = state.ephemeralStreamId ?? null;
+
+		// 先断 SSE：避免 stopBackend await 期间仍有 delta 写入
+		state.abortStream?.();
+
+		runInAction(() => {
+			// 收尾发送态与句柄
+			state.isSending = false;
+			state.abortStream = null;
+			// ephemeral：清掉 streamId，避免误用旧句柄
+			state.ephemeralStreamId = null;
+
+			// 可选：把当前 streaming 气泡标记为 stopped（用于“切换/离开路由”但不清空消息的场景）
+			if (options?.markStopped) {
+				state.messages = state.messages.map((m) => {
+					if (!m.isStreaming) return m;
+					return { ...m, isStreaming: false, isStopped: true };
+				});
+			}
+		});
+
+		// 可选：通知后端停止（清空按钮/离开路由都希望避免资源浪费）
+		if (options?.stopBackend) {
+			if (prevSid) {
+				void stopAssistantStream({ sessionId: prevSid }).catch(() => {});
+			} else if (prevStreamId) {
+				void stopAssistantStream({ streamId: prevStreamId }).catch(() => {});
+			}
+		}
+	}
+
+	/**
 	 * 知识编辑区执行「清空 / 新建草稿」时：中断流式、清空当前文档下的内存对话与 session 映射。
 	 * 用于未保存云端草稿等 `documentKey` 不变、不会再次触发 `activateForDocument` 的场景，避免助手气泡残留。
 	 *
@@ -521,14 +615,13 @@ export class AssistantStore {
 		const key = rawKey ? this.canonicalKey(rawKey) : '';
 		// 拿到当前文档对应的助手状态对象，如不存在则为 null
 		const state = key ? this.ensureState(key) : null;
-		// 记录当前会话的 sessionId（持久化模式），用于必要时 stop
-		const prevSid = state?.sessionId ?? null;
-		// 记录当前 SSE 流的 ephemeral streamId（未保存草稿/本地临时态）。
-		const prevStreamId = state?.ephemeralStreamId ?? null;
-
-		state?.abortStream?.();
+		// 先停止流式（与其它“停止”入口共用），再做删除清理
 		if (state) {
-			state.abortStream = null;
+			this.stopStreamingForDocumentState(state, {
+				stopBackend: options?.stopBackend,
+				// 清空会删除 state，无需额外标记 stopped
+				markStopped: false,
+			});
 		}
 
 		runInAction(() => {
@@ -544,17 +637,34 @@ export class AssistantStore {
 			}
 		});
 
-		// 清空内容/新建草稿属于“本地重置编辑态”，默认只需要中断前端 SSE 并清理内存 state。
-		// 若无条件调用后端 stop，会把“清空内容”误变成“停止生成”，并影响“已保存条目清空但流式继续”的体验。
-		// 仅在调用方显式要求时才通知后端停止。
-		if (options?.stopBackend) {
-			// 优先 stop 持久化 session；无 session 时尝试 stop ephemeral streamId
-			if (prevSid) {
-				void stopAssistantStream({ sessionId: prevSid }).catch(() => {});
-			} else if (prevStreamId) {
-				void stopAssistantStream({ streamId: prevStreamId }).catch(() => {});
-			}
-		}
+		// stopBackend 已由 stopStreamingForDocumentState 统一处理
+	}
+
+	/**
+	 * 仅对 ephemeral（未保存、不落库）会话生效：停止某个 documentKey 下正在进行的流式输出。
+	 *
+	 * 设计意图：
+	 * - “切换到其它知识条目/回收站条目/离开路由”时，不应继续让未保存草稿的流式在后台跑；
+	 * - 但也不应像“清空草稿”那样删除 stateByDocument，否则用户返回时连已生成片段都看不到。
+	 */
+	stopEphemeralStreamingForDocumentKey(
+		documentKey: string,
+		options?: { stopBackend?: boolean },
+	): void {
+		// 仅未保存草稿（ephemeral）需要该行为；已保存条目允许后台继续生成（不影响既有功能）
+		if (this.knowledgeAssistantPersistenceAllowed) return;
+		const key = this.canonicalKey(documentKey);
+		if (!key) return;
+		const state = this.stateByDocument[key];
+		if (!state) return;
+		const hasStreaming = state.messages.some((m) => m.isStreaming);
+		if (!hasStreaming) return;
+
+		// 复用清空按钮同源的停止逻辑，但这里不删除 state，只收尾 UI
+		this.stopStreamingForDocumentState(state, {
+			stopBackend: options?.stopBackend,
+			markStopped: true,
+		});
 	}
 
 	get isStreaming(): boolean {
@@ -820,6 +930,9 @@ export class AssistantStore {
 			this.ensureState(fromDocumentKey);
 		const lines = buildImportTranscriptLinesFromMessages(sourceState.messages);
 		if (lines.length === 0) return;
+		runInAction(() => {
+			sourceState.isEphemeralFlushInProgress = true;
+		});
 		try {
 			// 多会话下，为避免覆盖已有历史，迁入时优先新建一个会话作为“草稿对话”承载。
 			// 不影响旧接口：后端仍支持不传 sessionId 的旧行为；这里只是更安全的默认策略。
@@ -848,6 +961,7 @@ export class AssistantStore {
 				const toState = this.ensureState(to);
 				toState.historyHydrated = true;
 				toState.pendingEphemeralFlush = null;
+				toState.isEphemeralFlushInProgress = false;
 				if (this.activeDocumentKey === fromDocumentKey) {
 					this.activeDocumentKey = toDocumentKey;
 				}
@@ -855,6 +969,10 @@ export class AssistantStore {
 			void this.refreshSessionListForCurrentDocument().catch(() => {});
 		} catch {
 			// Toast 由 http 层处理
+		} finally {
+			runInAction(() => {
+				sourceState.isEphemeralFlushInProgress = false;
+			});
 		}
 	}
 
@@ -955,6 +1073,10 @@ export class AssistantStore {
 	 * - 否则：沿用原逻辑 `createAssistantSession(..., forceNew: true)` 新建。
 	 */
 	async createNewSessionForCurrentDocument(): Promise<string | null> {
+		if (this.isAssistantSessionSwitcherLocked) {
+			Toast({ type: 'info', title: '正在保存对话，请稍后再新建对话' });
+			return this.activeSessionId;
+		}
 		// 检查当前文档是否允许知识助手持久化（即是否允许多会话）
 		if (!this.knowledgeAssistantPersistenceAllowed) {
 			// 若不允许，提示用户必须先保存草稿
@@ -1046,6 +1168,10 @@ export class AssistantStore {
 	 * @param sessionId 要切换到的 sessionId
 	 */
 	async switchSessionForCurrentDocument(sessionId: string): Promise<void> {
+		if (this.isAssistantSessionSwitcherLocked) {
+			Toast({ type: 'info', title: '正在保存对话，请稍后再切换历史对话' });
+			return;
+		}
 		// 规范化 sessionId，避免首尾空格影响
 		const sid = (sessionId ?? '').trim();
 		// 若 sessionId 为空，直接返回

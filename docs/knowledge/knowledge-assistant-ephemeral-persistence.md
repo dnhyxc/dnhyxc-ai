@@ -68,6 +68,216 @@
 
 ---
 
+## 1.1.5 未保存草稿的流式：切换条目时“清空式停止”，路由切换不停止
+
+本节描述一个**仅针对未保存云端草稿（ephemeral，不落库）**的交互优化，要求“区分切换条目 vs 切换路由”，且不影响已保存条目的既有语义。
+
+### 1.1.5.1 需求与约束（产品语义）
+
+- **切换到知识库列表/回收站列表中的其它条目**：
+  - 若当前未保存草稿的助手正在流式输出：需要像点击「清空」一样**停止流式**，并且**清空已接收的流式内容**（避免草稿内容残留、避免后台继续生成）。
+- **切换到其它路由**：
+  - **不停止**未保存草稿的流式输出；
+  - **不清空**已接收的流式内容；
+  - 该规则用于与“切换条目”明确区分。
+- **不影响现有功能**：
+  - 已保存条目/回收站预览/本地 Markdown：切换条目时仍保持原语义（不强行停止其流式）。
+
+### 1.1.5.2 Store：复用“清空按钮”的停止核心逻辑（同源抽取）
+
+实现位置：`apps/frontend/src/store/assistant.ts`。这里把“停止流式”的步骤抽成一个私有方法 `stopStreamingForDocumentState`，然后：
+
+- `clearAssistantStateOnKnowledgeDraftReset`（清空按钮）调用它并随后删除草稿桶 state（因此会清空已接收内容）
+- `stopEphemeralStreamingForDocumentKey`（草稿专用）也调用它，但不删除 state（用于“只停止但不清空”的场景）
+
+下面为关键实现代码（**逐行注释**，并且**注释都写在对应代码行上方**，与当前实现一致）：
+
+```ts
+// apps/frontend/src/store/assistant.ts（节选）
+
+// 私有方法：复用的“停止流式”核心逻辑（与清空按钮同源）
+private stopStreamingForDocumentState(
+  // state：文档桶状态（草稿 ephemeral 的消息、句柄均在这里）
+  state: {
+    // sessionId：兼容字段（草稿通常为 null）
+    sessionId: string | null;
+    // messages：草稿模式下的消息列表（含流式增量）
+    messages: Message[];
+    // isHistoryLoading：文档级历史加载标记
+    isHistoryLoading: boolean;
+    // isSending：文档级发送标记
+    isSending: boolean;
+    // loadError：文档级错误文案
+    loadError: string | null;
+    // abortStream：前端 SSE AbortController 的取消函数
+    abortStream: (() => void) | null;
+    // ephemeralStreamId：ephemeral 流式后端句柄（meta.streamId）
+    ephemeralStreamId: string | null;
+    // historyHydrated：是否已 hydrate（与停止逻辑无关，保留用于类型一致）
+    historyHydrated: boolean;
+    // isEphemeralFlushInProgress：草稿迁入进行中标记（与停止逻辑无关，保留用于类型一致）
+    isEphemeralFlushInProgress: boolean;
+    // pendingEphemeralFlush：保存发生在流式中时的延迟迁入任务（与停止逻辑无关，保留用于类型一致）
+    pendingEphemeralFlush: {
+      cloudArticleId: string;
+      fromDocumentKey: string;
+      toDocumentKey: string;
+    } | null;
+  },
+  // options：stopBackend 控制是否通知后端停止；markStopped 控制是否将 streaming 气泡置为 stopped
+  options?: { stopBackend?: boolean; markStopped?: boolean },
+): void {
+  // prevSid：后端 stop 优先用 sessionId（持久化路径兼容）
+  const prevSid = state.sessionId ?? null;
+  // prevStreamId：ephemeral 下后端 stop 依赖 streamId
+  const prevStreamId = state.ephemeralStreamId ?? null;
+
+  // 先断 SSE：避免 stopBackend 期间仍有 delta 写入
+  state.abortStream?.();
+
+  // runInAction：批量更新 MobX observable，避免多次渲染与状态抖动
+  runInAction(() => {
+    // 结束发送态
+    state.isSending = false;
+    // 清理 abort 句柄
+    state.abortStream = null;
+    // 清理 streamId，避免误用旧句柄
+    state.ephemeralStreamId = null;
+
+    // markStopped=true：表示“停止但保留已接收内容”，需要把 streaming 气泡置为 stopped
+    if (options?.markStopped) {
+      // 替换数组元素，确保 observer 能精确感知变更
+      state.messages = state.messages.map((m) => {
+        // 非流式气泡保持不变
+        if (!m.isStreaming) return m;
+        // 流式气泡：结束 streaming，并标记 stopped
+        return { ...m, isStreaming: false, isStopped: true };
+      });
+    }
+  });
+
+  // stopBackend=true：通知后端停止，避免后台继续生成占用资源
+  if (options?.stopBackend) {
+    // 若有 sessionId：优先按会话 stop
+    if (prevSid) {
+      // 忽略失败：无进行中/会话已删等均不应影响 UI
+      void stopAssistantStream({ sessionId: prevSid }).catch(() => {});
+    // 否则：ephemeral 用 streamId stop
+    } else if (prevStreamId) {
+      // 忽略失败：无进行中/streamId 不存在等均不应影响 UI
+      void stopAssistantStream({ streamId: prevStreamId }).catch(() => {});
+    }
+  }
+}
+
+// 清空按钮：停止后删除草稿桶（因此 markStopped=false，不需要额外标记 stopped）
+clearAssistantStateOnKnowledgeDraftReset(syncActiveDocumentKey?: string | null, options?: { stopBackend?: boolean }) {
+  // ... 省略：计算 key 与 state
+  // 先停止流式（同源复用）
+  this.stopStreamingForDocumentState(state, { stopBackend: options?.stopBackend, markStopped: false });
+  // 再删除 stateByDocument/sessionByDocument（清空已接收内容）
+  // ... 省略
+}
+
+// 仅草稿用：停止但不删除 state（用于“只停止、不清空已接收内容”的场景）
+stopEphemeralStreamingForDocumentKey(documentKey: string, options?: { stopBackend?: boolean }) {
+  // ... 省略：仅 ephemeral 生效、判定是否 hasStreaming
+  this.stopStreamingForDocumentState(state, { stopBackend: options?.stopBackend, markStopped: true });
+}
+```
+
+### 1.1.5.3 Knowledge 页编排：切换到其它条目时调用“清空式停止”（不用于路由切换）
+
+实现位置：`apps/frontend/src/views/knowledge/index.tsx`。关键点：
+
+- 仅在“**切换条目**”（知识库列表 pick / 回收站列表 pick）入口调用
+- 路由切换不调用（按产品要求）
+
+关键代码如下（逐行注释，注释都在代码行上方）：
+
+```ts
+// apps/frontend/src/views/knowledge/index.tsx（节选）
+
+// assistantDocumentKey：当前条目下助手 documentKey（与 KnowledgeAssistant props 一致）
+const assistantDocumentKey = useMemo(
+  // 用 binding + trashOpenNonce 构造 documentKey
+  () => knowledgeAssistantDocumentKey(assistantArticleBinding, trashOpenNonce),
+  // 依赖 binding 与 nonce
+  [assistantArticleBinding, trashOpenNonce],
+);
+
+// stopEphemeralAssistantStreamingIfNeeded：仅用于“切换到其它条目”的草稿停止与清空
+const stopEphemeralAssistantStreamingIfNeeded = useCallback(
+  // nextAssistantDocumentKey：将要进入的新条目的 assistant documentKey（用于同步 assistantStore.activeDocumentKey）
+  (nextAssistantDocumentKey?: string) => {
+    // editingId：当前编辑态 id（未保存草稿时通常为空）
+    const editingId = knowledgeStore.knowledgeEditingKnowledgeId;
+    // assistantPersistenceAllowed：与 KnowledgeAssistant.tsx 对齐的“是否允许持久化”判定
+    const assistantPersistenceAllowed =
+      knowledgeStore.knowledgeTrashPreviewId != null ||
+      isKnowledgeLocalMarkdownId(editingId) ||
+      Boolean(editingId);
+    // 若允许持久化：不停止（保持已保存条目的既有语义）
+    if (assistantPersistenceAllowed) return;
+
+    // 若当前草稿没有在流式：不处理
+    if (!assistantStore.isStreamingForDocumentKey(assistantDocumentKey)) return;
+
+    // 切换条目时像“清空”一样：停止流式并清空已接收内容
+    assistantStore.clearAssistantStateOnKnowledgeDraftReset(
+      // 同步 activeDocumentKey 到新条目，避免后续 ephemeral 发送提示“文档未就绪”
+      nextAssistantDocumentKey ?? null,
+      // 同时 stopBackend（若可用）避免后台继续生成
+      { stopBackend: true },
+    );
+  },
+  // 依赖：store 与当前 documentKey
+  [knowledgeStore, assistantDocumentKey, knowledgeStore.knowledgeTrashPreviewId, knowledgeStore.knowledgeEditingKnowledgeId],
+);
+
+// handlePickRecord：从知识库列表选中条目时，先停止草稿流式并清空，再切换 editingId
+const handlePickRecord = useCallback(
+  (record: KnowledgeRecord) => {
+    // nextAssistantKey：将要进入的知识条目的 assistant documentKey
+    const nextAssistantKey = knowledgeAssistantDocumentKey(
+      // 新条目：trashPreviewId 置空、editingKnowledgeId 为 record.id
+      knowledgeAssistantArticleBinding({
+        knowledgeTrashPreviewId: null,
+        knowledgeEditingKnowledgeId: record.id,
+      }),
+      // 使用当前 trashOpenNonce
+      trashOpenNonce,
+    );
+    // 草稿切走：停止并清空
+    stopEphemeralAssistantStreamingIfNeeded(nextAssistantKey);
+    // ... 省略：setKnowledgeEditingKnowledgeId(record.id) 等切换编辑态
+  },
+  [knowledgeStore, stopEphemeralAssistantStreamingIfNeeded],
+);
+
+// handlePickTrashRecord：从回收站列表选中条目时，同样先停止草稿流式并清空
+const handlePickTrashRecord = useCallback(
+  (record: { title: string | null; content: string; trashItemId: string }) => {
+    // nextAssistantKey：将要进入的回收站预览条目的 assistant documentKey
+    const nextAssistantKey = knowledgeAssistantDocumentKey(
+      // 回收站预览：trashPreviewId 为 record.trashItemId、editingKnowledgeId 置空
+      knowledgeAssistantArticleBinding({
+        knowledgeTrashPreviewId: record.trashItemId,
+        knowledgeEditingKnowledgeId: null,
+      }),
+      // 使用当前 trashOpenNonce
+      trashOpenNonce,
+    );
+    // 草稿切走：停止并清空
+    stopEphemeralAssistantStreamingIfNeeded(nextAssistantKey);
+    // ... 省略：setKnowledgeTrashPreviewId(record.trashItemId) 等切换预览态
+  },
+  [knowledgeStore, stopEphemeralAssistantStreamingIfNeeded],
+);
+
+// 注意：路由切换时不停止未保存草稿的流式输出（按产品要求与“切换到其它条目”区分）
+```
+
 ## 1.2 保存知识时：如何把助手会话与对话关联到对应知识？
 
 本节说明：**用户点击保存、接口返回正式 `knowledgeArticleId`（知识条目 id）之后**，助手侧如何从「纯前端内存」变成「数据库里可随文章恢复的历史」，以及 **关联字段** 落在哪些表、哪些 API。

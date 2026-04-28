@@ -532,6 +532,9 @@ const KnowledgeAssistant = observer(
 			// 草稿（ephemeral）阶段不支持多 session（仍保留原逻辑）
 			Boolean(assistantStore.sessionListForActiveDocument);
 
+		const isAiSessionSwitcherLocked =
+			showAiSessionSwitcher && assistantStore.isAssistantSessionSwitcherLocked;
+
 		const [isAiHistoryDrawerOpen, setIsAiHistoryDrawerOpen] = useState(false);
 
 		useEffect(() => {
@@ -723,7 +726,17 @@ const KnowledgeAssistant = observer(
 												variant="link"
 												className="mb-0.5 h-8.5 w-8.5 mt-0.5 rounded-full text-textcolor/80 hover:bg-theme/10 hover:text-teal-500 border border-theme/10 p-0 [&_svg]:overflow-visible"
 												aria-label="历史对话"
-												onClick={() => setIsAiHistoryDrawerOpen(true)}
+												disabled={isAiSessionSwitcherLocked}
+												onClick={() => {
+													if (isAiSessionSwitcherLocked) {
+														Toast({
+															type: 'info',
+															title: '正在保存对话，请稍后再查看历史对话',
+														});
+														return;
+													}
+													setIsAiHistoryDrawerOpen(true);
+												}}
 											>
 												<Clock className="h-4 w-4" />
 											</Button>
@@ -731,9 +744,17 @@ const KnowledgeAssistant = observer(
 												size="sm"
 												variant="link"
 												className="w-fit rounded-md border border-theme/10 px-3 py-1.5 text-sm text-textcolor/80 transition-colors hover:bg-theme/10 hover:text-teal-500"
-												onClick={() =>
-													void assistantStore.createNewSessionForCurrentDocument()
-												}
+												disabled={isAiSessionSwitcherLocked}
+												onClick={() => {
+													if (isAiSessionSwitcherLocked) {
+														Toast({
+															type: 'info',
+															title: '正在保存对话，请稍后再新建对话',
+														});
+														return;
+													}
+													void assistantStore.createNewSessionForCurrentDocument();
+												}}
 											>
 												<CirclePlus />
 												新对话
@@ -741,7 +762,17 @@ const KnowledgeAssistant = observer(
 											<Drawer
 												title="历史对话"
 												open={isAiHistoryDrawerOpen}
-												onOpenChange={setIsAiHistoryDrawerOpen}
+												onOpenChange={(next) => {
+													// 锁定期间禁止打开抽屉（避免在未落库时切换到其它会话）
+													if (next && isAiSessionSwitcherLocked) {
+														Toast({
+															type: 'info',
+															title: '正在保存对话，请稍后再查看历史对话',
+														});
+														return;
+													}
+													setIsAiHistoryDrawerOpen(next);
+												}}
 												width="sm:max-w-md"
 											>
 												<ScrollArea className="h-full overflow-y-auto pr-2 box-border">
