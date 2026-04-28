@@ -49,9 +49,9 @@ export const KnowledgeAssistantEntryToolbar = observer(
 			!assistantStore.historySessionLoadingMore;
 
 		return (
-			<div className="flex w-full items-center gap-2 pb-1">
+			<div className="inline-flex items-center pb-1 max-w-0">
 				{showAiSessionSwitcher ? (
-					<div className="flex w-full items-center gap-2">
+					<div className="inline-flex items-center gap-2">
 						<Button
 							variant="link"
 							className="mb-0.5 h-8.5 w-8.5 mt-0.5 rounded-full text-textcolor/80 hover:bg-theme/10 hover:text-teal-500 border border-theme/10 p-0 [&_svg]:overflow-visible"
@@ -89,27 +89,25 @@ export const KnowledgeAssistantEntryToolbar = observer(
 							<CirclePlus />
 							新对话
 						</Button>
+						{KNOWLEDGE_ASSISTANT_MODES.map((item) => (
+							<Button
+								key={item.id}
+								variant="link"
+								size="sm"
+								className={cn(
+									'px-2.5 border border-theme/15',
+									assistantMode === item.id
+										? 'bg-theme/10 text-teal-500'
+										: 'text-textcolor/80 hover:bg-theme/10',
+								)}
+								onClick={() => setAssistantMode(item.id)}
+							>
+								<item.icon />
+								{item.label}
+							</Button>
+						))}
 					</div>
 				) : null}
-				<div className="flex w-full items-center gap-2">
-					{KNOWLEDGE_ASSISTANT_MODES.map((item) => (
-						<Button
-							key={item.id}
-							variant="link"
-							size="sm"
-							className={cn(
-								'px-2.5 border border-theme/15',
-								assistantMode === item.id
-									? 'bg-theme/10 text-teal-500'
-									: 'text-textcolor/80 hover:bg-theme/10',
-							)}
-							onClick={() => setAssistantMode(item.id)}
-						>
-							<item.icon />
-							{item.label}
-						</Button>
-					))}
-				</div>
 				<Drawer
 					title="历史对话"
 					open={isAiHistoryDrawerOpen}
