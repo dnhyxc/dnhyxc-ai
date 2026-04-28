@@ -30,6 +30,7 @@ export const KNOWLEDGE_SHORTCUT_KEY_IDS = {
 	markdownBarAction0: 21,
 	/** Markdown 底部操作栏：复位拖动后的几何位置（与「复位操作栏初始位置」按钮一致） */
 	markdownBarResetPosition: 22,
+	share: 23,
 } as const;
 
 /** 与 `views/setting/system/config.ts` 中默认值保持一致 */
@@ -37,6 +38,8 @@ export const KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS = {
 	save: 'Meta + S',
 	/** 避免 Meta+Control+D：在 macOS 上常被系统拦截，应用收不到 keydown */
 	clear: 'Meta + Shift + D',
+	/** Command（Meta）+ Shift + O：分享知识文章 */
+	share: 'Meta + Shift + O',
 	/** Command（Meta）+ Shift + L */
 	openLibrary: 'Meta + Shift + L',
 	/** Command（Meta）+ Shift + B：切换底部操作栏 */
@@ -251,6 +254,7 @@ function normalizeLegacyMarkdownBottomBarChord(stored: string | undefined): {
 export async function loadKnowledgeShortcutChords(): Promise<{
 	save: string;
 	clear: string;
+	share: string;
 	openLibrary: string;
 	toggleMarkdownBottomBar: string;
 	openTrash: string;
@@ -267,10 +271,11 @@ export async function loadKnowledgeShortcutChords(): Promise<{
 	markdownBarAction0: string;
 	markdownBarResetPosition: string;
 }> {
-	const [s, c, o, b, t, v, a1, a2, a3, a4, a5, a6, a7, a8, a9, a0, aReset] =
+	const [s, c, sh, o, b, t, v, a1, a2, a3, a4, a5, a6, a7, a8, a9, a0, aReset] =
 		await Promise.all([
 			getValue<string>(`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.save}`),
 			getValue<string>(`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.clear}`),
+			getValue<string>(`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.share}`),
 			getValue<string>(`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.openLibrary}`),
 			getValue<string>(
 				`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.toggleMarkdownBottomBar}`,
@@ -340,6 +345,7 @@ export async function loadKnowledgeShortcutChords(): Promise<{
 	return {
 		save: s?.trim() || KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.save,
 		clear,
+		share: sh?.trim() || KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.share,
 		openLibrary,
 		toggleMarkdownBottomBar,
 		openTrash: t?.trim() || KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.openTrash,

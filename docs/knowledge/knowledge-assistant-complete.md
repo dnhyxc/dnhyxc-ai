@@ -3389,3 +3389,200 @@ export interface ParserMarkdownPreviewPaneProps {
 import ParserMarkdownPreviewPane from '@/components/design/Markdown';
 ```
 
+---
+
+## 17. 知识库编辑器快捷键：分享文章（Meta + Shift + O）
+
+本节目标：在 `@apps/frontend/src/views/setting/system` 中新增一条与「清空草稿（Meta + Shift + D）」**同一实现模式**的快捷键配置，用于触发知识编辑器顶栏的“分享”按钮（`KnowledgeEditorToolbar.tsx`）。
+
+要求：
+
+- **实现方式与清空一致**：快捷键在系统设置中可配置（存储到 `shortcut_${key}`），但 **registerGlobally=false**，即仅在知识库页面内监听 `keydown` 捕获阶段执行；
+- **不影响现有逻辑**：新增只扩展 chord 列表与捕获分支，不修改原有 save/clear/openLibrary 等行为；
+- **Tooltip 文案一致**：`KnowledgeEditorToolbar` 的分享按钮 tooltip 显示来自系统设置的 chord 字符串（无配置则回退默认值）。
+
+### 17.1 关键设计：为什么 `registerGlobally=false`
+
+- 知识库快捷键（保存/清空/分享/打开列表等）属于**页面内语义**，不应占用全局快捷键；
+- 在桌面端（Tauri）全局快捷键由 Rust 注册，可能与系统/其它应用冲突；
+- 因此知识库快捷键采用一致策略：**仅写入 store**，由知识库页面内的 `window.addEventListener('keydown', ..., true)` 捕获阶段执行。
+
+### 17.2 系统设置：增加“知识库：分享文章”条目（逐行注释）
+
+```ts
+// 文件：apps/frontend/src/views/setting/system/config.ts
+// 片段：DEFAULT_INFO 中新增一条（与 knowledge_clear 完全一致）
+
+{
+	// label：设置页展示名称
+	label: '知识库：分享文章',
+	// key：对应 storage key：shortcut_${key}，且与 knowledge-shortcuts.ts 中定义一致
+	key: KNOWLEDGE_SHORTCUT_KEY_IDS.share,
+	// id：输入框 id（沿用现有实现）
+	id: 'shortcut',
+	// shortcut：受控输入中间态（按键盘录入时写入）
+	shortcut: '',
+	// defaultShortcut：默认 chord（当 storage 中无值时使用）
+	defaultShortcut: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.share,
+	// placeholder：输入提示
+	placeholder: '按键盘输入快捷键',
+	// action：语义标识（仅用于描述，不参与执行；与其它 knowledge_* 一致）
+	action: 'knowledge_share',
+	// registerGlobally=false：仅在知识页内监听，不走 Tauri 全局注册
+	registerGlobally: false,
+},
+```
+
+### 17.3 快捷键常量：新增 `share` 的 key 与默认 chord（逐行注释）
+
+```ts
+// 文件：apps/frontend/src/utils/knowledge-shortcuts.ts
+// 片段：KNOWLEDGE_SHORTCUT_KEY_IDS + KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS
+
+export const KNOWLEDGE_SHORTCUT_KEY_IDS = {
+	// save/clear 等已有 key 保持不变
+	save: 6,
+	clear: 7,
+	// share：新增一个未占用的 key（对应系统设置存储 shortcut_23）
+	share: 23,
+	// ... 其它 key 省略 ...
+} as const;
+
+export const KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS = {
+	// save/clear 等已有默认值保持不变
+	save: 'Meta + S',
+	clear: 'Meta + Shift + D',
+	// share：默认 chord（与 KnowledgeEditorToolbar tooltip 回退文案一致）
+	share: 'Meta + Shift + O',
+	// ... 其它默认值省略 ...
+} as const;
+```
+
+### 17.4 从 store 读取 chords：`loadKnowledgeShortcutChords` 增加 share（逐行注释）
+
+```ts
+// 文件：apps/frontend/src/utils/knowledge-shortcuts.ts
+// 片段：loadKnowledgeShortcutChords 增加 share（与 save/clear 同模式）
+
+export async function loadKnowledgeShortcutChords(): Promise<{
+	save: string;
+	clear: string;
+	// share：新增字段
+	share: string;
+	openLibrary: string;
+	// ... 其余省略 ...
+}> {
+	// Promise.all：并行读取 storage，share 与其它字段同一批获取
+	const [s, c, sh, o /* ... */] = await Promise.all([
+		// save：读 shortcut_6
+		getValue<string>(`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.save}`),
+		// clear：读 shortcut_7（含历史迁移 normalize）
+		getValue<string>(`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.clear}`),
+		// share：读 shortcut_23
+		getValue<string>(`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.share}`),
+		// openLibrary：读 shortcut_8
+		getValue<string>(`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.openLibrary}`),
+		// ... 其余省略 ...
+	]);
+
+	// ... clear/openLibrary 的 legacy normalize 逻辑保持不变 ...
+
+	return {
+		// save：无值则回退默认
+		save: s?.trim() || KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.save,
+		// clear：normalize 后返回（保持原逻辑）
+		clear,
+		// share：无值则回退默认
+		share: sh?.trim() || KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.share,
+		// openLibrary：normalize 后返回（保持原逻辑）
+		openLibrary,
+		// ... 其余省略 ...
+	};
+}
+```
+
+### 17.5 知识页：捕获阶段监听 `keydown`，命中后触发 `onShareKnowledge()`（逐行注释）
+
+关键点：与清空草稿（`knowledgeChords.clear`）完全一致——在 `window` 捕获阶段判断 chord，`preventDefault()` 后执行对应动作。
+
+```ts
+// 文件：apps/frontend/src/views/knowledge/index.tsx
+// 片段：knowledgeChords 增加 share + keydown 捕获分支 + toolbar tooltip 透传
+
+// knowledgeChords：新增 share 字段，默认值来自 KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.share
+const [knowledgeChords, setKnowledgeChords] = useState({
+	save: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.save,
+	clear: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.clear,
+	share: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.share,
+	openLibrary: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.openLibrary,
+	openTrash: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.openTrash,
+	pasteToAssistant: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.pasteToAssistant,
+	// ... 其余省略 ...
+});
+
+useEffect(() => {
+	const onKeyDown = (e: KeyboardEvent) => {
+		// 与现有逻辑一致：保存中或覆盖确认弹窗打开时不响应快捷键
+		if (saveLoading || knowledgeStore.knowledgeOverwriteOpen) return;
+
+		// save：命中则保存
+		if (chordMatchesStored(knowledgeChords.save, e)) {
+			e.preventDefault();
+			void onSave();
+			return;
+		}
+
+		// clear：命中则清空草稿
+		if (chordMatchesStored(knowledgeChords.clear, e)) {
+			e.preventDefault();
+			resetEditorToNewDraft();
+			return;
+		}
+
+		// share：命中则触发分享（调用与按钮一致的 onShareKnowledge）
+		if (chordMatchesStored(knowledgeChords.share, e)) {
+			e.preventDefault();
+			onShareKnowledge();
+			return;
+		}
+
+		// openLibrary/openTrash/pasteToAssistant 等保持原逻辑
+	};
+	// 捕获阶段：优先于 Monaco 默认行为（与清空草稿一致）
+	window.addEventListener('keydown', onKeyDown, true);
+	return () => window.removeEventListener('keydown', onKeyDown, true);
+}, [
+	knowledgeChords,
+	onSave,
+	onShareKnowledge,
+	saveLoading,
+	knowledgeStore.knowledgeOverwriteOpen,
+	resetEditorToNewDraft,
+	isCloudLoggedIn,
+]);
+
+// toolbar：把 share chord 文案透传给 KnowledgeEditorToolbar，保证 tooltip 显示与系统设置一致
+<KnowledgeEditorToolbar
+	// ... 省略其它 props ...
+	shortcutHintSave={knowledgeChords.save}
+	shortcutHintClear={knowledgeChords.clear}
+	shortcutHintShare={knowledgeChords.share}
+	shortcutHintOpenLibrary={knowledgeChords.openLibrary}
+	shortcutHintOpenTrash={knowledgeChords.openTrash}
+/>;
+```
+
+### 17.6 `KnowledgeEditorToolbar`：tooltip 文案回退与按钮行为不变（逐行注释）
+
+```tsx
+// 文件：apps/frontend/src/views/knowledge/KnowledgeEditorToolbar.tsx
+// 片段：分享按钮 tooltip（实现模式与清空按钮一致：prop 文案优先，否则回退默认）
+
+<Tooltip side="bottom" content={shortcutHintShare ?? 'Meta + Shift + O'}>
+	<Button variant="link" className={linkBtn} onClick={onShareKnowledge}>
+		<Share2 className="mt-0.5" />
+		<span className="mt-0.5">分享</span>
+	</Button>
+</Tooltip>
+```
+

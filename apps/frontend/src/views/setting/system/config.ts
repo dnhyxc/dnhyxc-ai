@@ -90,6 +90,16 @@ export const DEFAULT_INFO: ShortcutSettingItem[] = [
 		registerGlobally: false,
 	},
 	{
+		label: '知识库：分享文章',
+		key: KNOWLEDGE_SHORTCUT_KEY_IDS.share,
+		id: 'shortcut',
+		shortcut: '',
+		defaultShortcut: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.share,
+		placeholder: '按键盘输入快捷键',
+		action: 'knowledge_share',
+		registerGlobally: false,
+	},
+	{
 		label: '知识库：打开列表',
 		key: KNOWLEDGE_SHORTCUT_KEY_IDS.openLibrary,
 		id: 'shortcut',

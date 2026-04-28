@@ -87,6 +87,7 @@ const Knowledge = observer(() => {
 	const [knowledgeChords, setKnowledgeChords] = useState<{
 		save: string;
 		clear: string;
+		share: string;
 		openLibrary: string;
 		toggleMarkdownBottomBar: string;
 		openTrash: string;
@@ -94,6 +95,7 @@ const Knowledge = observer(() => {
 	}>({
 		save: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.save,
 		clear: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.clear,
+		share: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.share,
 		openLibrary: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.openLibrary,
 		toggleMarkdownBottomBar:
 			KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.toggleMarkdownBottomBar,
@@ -690,6 +692,11 @@ const Knowledge = observer(() => {
 				resetEditorToNewDraft();
 				return;
 			}
+			if (chordMatchesStored(knowledgeChords.share, e)) {
+				e.preventDefault();
+				onShareKnowledge();
+				return;
+			}
 			if (chordMatchesStored(knowledgeChords.openLibrary, e)) {
 				e.preventDefault();
 				setListOpen((open) => !open);
@@ -1055,6 +1062,7 @@ const Knowledge = observer(() => {
 							showTrash={isCloudLoggedIn}
 							shortcutHintSave={knowledgeChords.save}
 							shortcutHintClear={knowledgeChords.clear}
+							shortcutHintShare={knowledgeChords.share}
 							shortcutHintOpenLibrary={knowledgeChords.openLibrary}
 							shortcutHintOpenTrash={knowledgeChords.openTrash}
 						/>
