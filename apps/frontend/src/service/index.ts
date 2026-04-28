@@ -280,12 +280,16 @@ export type AssistantSessionListItem = {
 /** 按知识条目标识拉取该文章下的会话列表（按 updatedAt 倒序） */
 export const getAssistantSessionsByKnowledgeArticle = async (
 	knowledgeArticleId: string,
+	params?: { pageNo?: number; pageSize?: number },
 ) => {
 	return await http.get<{
 		knowledgeArticleId: string;
 		list: AssistantSessionListItem[];
+		total?: number;
+		pageNo?: number;
+		pageSize?: number;
 	}>(ASSISTANT_SESSIONS_FOR_KNOWLEDGE, {
-		querys: { knowledgeArticleId },
+		querys: { knowledgeArticleId, ...(params ?? {}) },
 	});
 };
 

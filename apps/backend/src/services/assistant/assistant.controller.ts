@@ -86,6 +86,7 @@ export class AssistantController {
 		const data = await this.assistantService.listSessionsByKnowledgeArticle(
 			userId,
 			query.knowledgeArticleId,
+			{ pageNo: query.pageNo, pageSize: query.pageSize },
 		);
 		return { success: true, data };
 	}

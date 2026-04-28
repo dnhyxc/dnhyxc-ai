@@ -1589,6 +1589,314 @@ export const KnowledgeAssistantEntryToolbar = observer(
 
 > 上表为**缩略结构**（省略 `className`、`title`、`width` 等与行为无关的样式属性）；**完整可编译 TSX** 以仓库 **`KnowledgeAssistantEntryToolbar.tsx`** 为准，行为与迁出前 **`KnowledgeAssistant.tsx`** 内联实现一致。
 
+#### 8.3.5 历史会话抽屉：滚动加载更多（逻辑下沉 store + 后端分页配合，逐行注释）
+
+**目标**：让知识助手的「历史对话 Drawer」支持与 ChatBot 会话列表一致的“滚动触底加载更多”体验，并满足：
+
+- **逻辑位置一致**：滚动触底判断、loading 状态与 loadMore 触发都放在 **store** 中（与 `apps/frontend/src/views/chat/session-list/index.tsx` 的模式一致）。
+- **不影响现有交互**：点击会话仍然走 `switchSessionForCurrentDocument(...).then(() => close + enableStick + flush...)`；父级 `KnowledgeAssistant.tsx` 仍在抽屉打开时调用 `refreshSessionListForCurrentDocument()`（只会拉第一页）。
+- **后端可配合分页**：把 `GET /assistant/sessions/for-knowledge` 从“全量返回”改成支持 `pageNo/pageSize`。
+
+---
+
+##### 8.3.5.1 前端 store：分页态 + loading 标记 + onScroll 触底触发（逐行注释）
+
+文件：`apps/frontend/src/store/assistant.ts`。
+
+```ts
+// 文件：apps/frontend/src/store/assistant.ts（节选 + 逐行注释）
+import type { UIEvent } from 'react'; // ScrollArea onScroll 事件类型：与 ChatBot SessionList 对齐
+
+export interface AssistantStoreApi {
+	// ... 既有 API 省略 ...
+	refreshSessionListForCurrentDocument(): Promise<void>; // 打开 Drawer 时刷新第一页
+	onHistorySessionViewportScroll(e: UIEvent<HTMLElement>): void; // 触底加载更多：由 UI 直接绑定到 ScrollArea.onScroll
+	readonly historySessionLoading: boolean; // 首次加载中（第一页）
+	readonly historySessionLoadingMore: boolean; // 加载更多中（第 2 页起）
+}
+
+export class AssistantStore {
+	// sessionsByDocument：既有缓存，存“已拉取的会话元信息列表”
+	sessionsByDocument: Record<string, Array<{ sessionId: string; title: string | null; createdAt: string; updatedAt: string }>> = {};
+
+	// sessionsPageByDocument：新增分页信息（按 canonical 文档维度存）
+	private sessionsPageByDocument: Record<string, { pageNo: number; pageSize: number; total: number }> = {};
+
+	// historySessionLoadingByDocument：新增首屏 loading（按文档维度存，避免切换文档串状态）
+	private historySessionLoadingByDocument: Record<string, boolean> = {};
+
+	// historySessionLoadingMoreByDocument：新增加载更多 loading（同上）
+	private historySessionLoadingMoreByDocument: Record<string, boolean> = {};
+
+	// historySessionLoading：对外 getter，UI 不关心 docKey 的细节
+	get historySessionLoading(): boolean {
+		const docKey = this.canonicalKey(this.activeDocumentKey); // canonical：去掉 __trash-* 等后缀
+		if (!docKey) return false; // 无文档：不加载
+		return Boolean(this.historySessionLoadingByDocument[docKey]); // 未设置则 false
+	}
+
+	// historySessionLoadingMore：同上（加载更多）
+	get historySessionLoadingMore(): boolean {
+		const docKey = this.canonicalKey(this.activeDocumentKey);
+		if (!docKey) return false;
+		return Boolean(this.historySessionLoadingMoreByDocument[docKey]);
+	}
+
+	// hasMoreHistorySessionsForActiveDocument：是否还有更多页（用于 onScroll 早退）
+	private get hasMoreHistorySessionsForActiveDocument(): boolean {
+		const docKey = this.canonicalKey(this.activeDocumentKey);
+		if (!docKey) return false;
+		const page = this.sessionsPageByDocument[docKey]; // 没有分页信息说明还没拉过第一页
+		if (!page) return false;
+		const list = this.sessionsByDocument[docKey] ?? []; // 当前已加载条目数
+		return list.length < (page.total ?? 0); // total 由后端返回，兜底为 0
+	}
+
+	// refreshSessionListForCurrentDocument：拉第一页（用于 Drawer 打开时）
+	async refreshSessionListForCurrentDocument(): Promise<void> {
+		if (!this.knowledgeAssistantPersistenceAllowed) return; // 草稿/不可持久化：不拉
+		if (!readToken()) return; // 未登录：不拉
+		const key = this.activeDocumentKey; // 当前文档 key
+		const canonical = this.canonicalKey(key); // 用 canonical 做字典 key
+		const binding = knowledgeArticleBindingFromDocumentKey(key); // 用 binding 做后端查询参数
+		if (!canonical || !binding) return; // 任一无效都直接返回
+
+		try {
+			runInAction(() => {
+				this.historySessionLoadingByDocument[canonical] = true; // 首屏 loading = true
+			});
+
+			const pageNo = 1; // 第一页
+			const pageSize = 20; // 默认页大小（与后端默认一致）
+			const res = await getAssistantSessionsByKnowledgeArticle(binding, { pageNo, pageSize }); // 请求第一页
+			const data = res.data; // http 封装返回的数据
+			if (data?.list) {
+				runInAction(() => {
+					this.sessionsByDocument[canonical] = data.list ?? []; // 覆盖写入第一页列表
+					this.sessionsPageByDocument[canonical] = {
+						pageNo: data.pageNo ?? pageNo, // 记录当前页号（后端为准）
+						pageSize: data.pageSize ?? pageSize, // 记录页大小
+						total: data.total ?? (data.list?.length ?? 0), // 记录 total；兜底为当前 list 长度
+					};
+				});
+			}
+		} catch {
+			// 忽略异常：不影响主流程（与 store 既有 refresh 风格一致）
+		} finally {
+			runInAction(() => {
+				this.historySessionLoadingByDocument[canonical] = false; // 收尾：关闭首屏 loading
+			});
+		}
+	}
+
+	// loadMoreSessionListForCurrentDocument：拉第 2 页及以后（由 onScroll 触发）
+	private async loadMoreSessionListForCurrentDocument(): Promise<void> {
+		if (!this.knowledgeAssistantPersistenceAllowed) return; // 不允许持久化：不加载更多
+		if (!readToken()) return; // 未登录：不加载更多
+		const key = this.activeDocumentKey;
+		const canonical = this.canonicalKey(key);
+		const binding = knowledgeArticleBindingFromDocumentKey(key);
+		if (!canonical || !binding) return;
+		if (this.historySessionLoadingByDocument[canonical]) return; // 首屏加载中：不并发
+		if (this.historySessionLoadingMoreByDocument[canonical]) return; // 正在 loadMore：不并发
+		const page = this.sessionsPageByDocument[canonical]; // 必须先有第一页分页信息
+		if (!page) return;
+		if (!this.hasMoreHistorySessionsForActiveDocument) return; // 没有更多：直接返回
+
+		runInAction(() => {
+			this.historySessionLoadingMoreByDocument[canonical] = true; // 打开加载更多 loading
+		});
+
+		try {
+			const nextPageNo = (page.pageNo ?? 1) + 1; // 下一页页码
+			const pageSize = page.pageSize ?? 20; // 页大小沿用第一页
+			const res = await getAssistantSessionsByKnowledgeArticle(binding, { pageNo: nextPageNo, pageSize }); // 请求下一页
+			const data = res.data;
+			if (data?.list?.length) {
+				runInAction(() => {
+					const prev = this.sessionsByDocument[canonical] ?? []; // 已加载的列表
+					const seen = new Set(prev.map((s) => s.sessionId)); // 去重：避免并发或后端数据变化导致重复
+					const appended = data.list.filter((s) => !seen.has(s.sessionId)); // 只追加未出现过的 sessionId
+					this.sessionsByDocument[canonical] = [...prev, ...appended]; // 追加写回（保持原有顺序：updatedAt desc 的分页拼接）
+					this.sessionsPageByDocument[canonical] = {
+						pageNo: data.pageNo ?? nextPageNo, // 更新当前页号
+						pageSize: data.pageSize ?? pageSize, // 更新页大小
+						total: data.total ?? page.total, // total 以新返回为准，兜底为旧 total
+					};
+				});
+			}
+		} catch {
+			// ignore
+		} finally {
+			runInAction(() => {
+				this.historySessionLoadingMoreByDocument[canonical] = false; // 关闭加载更多 loading
+			});
+		}
+	}
+
+	// onHistorySessionViewportScroll：与 ChatBot SessionList 一致的“触底加载更多”入口
+	onHistorySessionViewportScroll = (e: UIEvent<HTMLElement>) => {
+		if (this.historySessionLoading) return; // 首屏加载中：不触发
+		if (this.historySessionLoadingMore) return; // loadMore 中：不触发
+		if (!this.hasMoreHistorySessionsForActiveDocument) return; // 无更多：不触发
+
+		const el = e.currentTarget; // 当前滚动容器
+		const remaining = el.scrollHeight - el.scrollTop - el.clientHeight; // 距离底部的剩余像素
+		if (remaining > 80) return; // 与 ChatBot 一致：未接近底部则返回（80px 阈值）
+		void this.loadMoreSessionListForCurrentDocument(); // 触发加载更多（异步，不阻塞滚动）
+	};
+}
+```
+
+---
+
+##### 8.3.5.2 前端 UI：抽屉只绑定 `store.onScroll` 并渲染 loading/empty/loadMore（逐行注释）
+
+文件：`apps/frontend/src/views/knowledge/KnowledgeAssistantEntryToolbar.tsx`。
+
+```tsx
+// 文件：apps/frontend/src/views/knowledge/KnowledgeAssistantEntryToolbar.tsx（节选 + 逐行注释）
+
+<Drawer title="历史对话" open={isAiHistoryDrawerOpen} onOpenChange={/* ... */}>
+	{assistantStore.historySessionLoading ? (
+		<Spinner className="w-4 h-4 mr-2 text-teal-500" /> // 首屏加载时展示 Spinner（位置与既有实现一致）
+	) : null}
+
+	<ScrollArea
+		className="h-full overflow-y-auto pr-2 box-border" // 滚动容器：同原样式
+		onScroll={assistantStore.onHistorySessionViewportScroll} // 触底判断下沉到 store（与 ChatBot 一致）
+	>
+		<div className="flex flex-col gap-1 pr-2">
+			{assistantStore.historySessionLoading &&
+			assistantStore.sessionListForActiveDocument.length === 0 ? (
+				<div className="text-sm text-textcolor/60 py-6 text-center">
+					加载中…
+				</div> // 首屏占位：仅在“加载中 + 当前列表为空”时出现
+			) : null}
+
+			{!assistantStore.historySessionLoading &&
+			assistantStore.sessionListForActiveDocument.length === 0 &&
+			!assistantStore.historySessionLoadingMore ? (
+				<div className="text-sm text-textcolor/60 py-6 text-center">
+					暂无历史对话
+				</div> // 空态：仅在“非加载中 + 列表为空 + 非加载更多”时出现
+			) : null}
+
+			{assistantStore.sessionListForActiveDocument.map((s) => (
+				<button
+					key={s.sessionId} // 列表 key
+					type="button"
+					onClick={() => {
+						// 切会话逻辑保持不变：成功后关闭抽屉 + 恢复跟底 + flush 两次
+						void assistantStore
+							.switchSessionForCurrentDocument(s.sessionId)
+							.then(() => {
+								setIsAiHistoryDrawerOpen(false);
+								enableStreamStickToBottom();
+								flushScrollToBottom();
+								requestAnimationFrame(() => flushScrollToBottom());
+							});
+					}}
+				>
+					{/* title + updatedAt 渲染略 */}
+				</button>
+			))}
+
+			{assistantStore.historySessionLoadingMore ? (
+				<div className="text-xs text-textcolor/50 py-2 text-center">
+					加载更多…
+				</div> // 加载更多提示：触底后 store 拉下一页时出现
+			) : null}
+		</div>
+	</ScrollArea>
+</Drawer>
+```
+
+---
+
+##### 8.3.5.3 前端 service：为 `sessions/for-knowledge` 追加分页参数（逐行注释）
+
+文件：`apps/frontend/src/service/index.ts`。
+
+```ts
+// 文件：apps/frontend/src/service/index.ts（节选 + 逐行注释）
+
+export const getAssistantSessionsByKnowledgeArticle = async (
+	knowledgeArticleId: string, // 必填：知识条目标识
+	params?: { pageNo?: number; pageSize?: number }, // 新增：分页参数（可选）
+) => {
+	return await http.get<{
+		knowledgeArticleId: string; // 回传：当前查询的知识条目
+		list: AssistantSessionListItem[]; // 当前页列表
+		total?: number; // 新增：总数（用于 hasMore 判断）
+		pageNo?: number; // 新增：当前页号
+		pageSize?: number; // 新增：页大小
+	}>(ASSISTANT_SESSIONS_FOR_KNOWLEDGE, {
+		querys: { knowledgeArticleId, ...(params ?? {}) }, // query 参数合并：兼容不传分页时默认第一页
+	});
+};
+```
+
+---
+
+##### 8.3.5.4 后端 DTO + Controller + Service：`sessions/for-knowledge` 支持分页（逐行注释）
+
+文件：`apps/backend/src/services/assistant/dto/assistant-sessions-for-knowledge.dto.ts`、`apps/backend/src/services/assistant/assistant.controller.ts`、`apps/backend/src/services/assistant/assistant.service.ts`。
+
+```ts
+// 文件：apps/backend/src/services/assistant/dto/assistant-sessions-for-knowledge.dto.ts（节选 + 逐行注释）
+
+export class AssistantSessionsForKnowledgeDto {
+	knowledgeArticleId!: string; // 既有：知识条目 id
+	pageNo?: number = 1; // 新增：页号（默认 1）
+	pageSize?: number = 20; // 新增：页大小（默认 20，与前端一致）
+}
+```
+
+```ts
+// 文件：apps/backend/src/services/assistant/assistant.controller.ts（节选 + 逐行注释）
+
+@Get('sessions/for-knowledge')
+async listSessionsForKnowledge(@Req() req: AuthedRequest, @Query() query: AssistantSessionsForKnowledgeDto) {
+	const userId = req.user?.userId; // 当前登录用户
+	if (userId == null) return { success: false, message: '未登录' }; // 未登录直接返回
+	const data = await this.assistantService.listSessionsByKnowledgeArticle(
+		userId,
+		query.knowledgeArticleId, // 文章绑定 id
+		{ pageNo: query.pageNo, pageSize: query.pageSize }, // 新增：分页参数透传
+	);
+	return { success: true, data }; // 响应中带 list/total/pageNo/pageSize
+}
+```
+
+```ts
+// 文件：apps/backend/src/services/assistant/assistant.service.ts（节选 + 逐行注释）
+
+async listSessionsByKnowledgeArticle(userId: number, knowledgeArticleId: string, page?: { pageNo?: number; pageSize?: number }) {
+	const articleId = knowledgeArticleId.trim(); // 入参清理
+	if (!articleId) throw new BadRequestException('knowledgeArticleId 不能为空'); // 空值保护
+
+	const pageNo = page?.pageNo ?? 1; // 默认页号
+	const pageSize = page?.pageSize ?? 20; // 默认页大小
+
+	const [list, total] = await this.sessionRepo.findAndCount({
+		where: { userId, knowledgeArticleId: articleId }, // 只查当前用户该知识条目
+		select: ['id', 'title', 'createdAt', 'updatedAt'], // 仅取列表需要字段（不拉 messages）
+		order: { updatedAt: 'DESC' }, // 最近活跃在前
+		skip: (pageNo - 1) * pageSize, // 分页偏移
+		take: pageSize, // 每页条数
+	});
+
+	return {
+		knowledgeArticleId: articleId, // 回传 articleId
+		list: list.map((s) => ({ sessionId: s.id, title: s.title, createdAt: s.createdAt, updatedAt: s.updatedAt })), // 字段映射
+		total, // 新增：总数
+		pageNo, // 新增：当前页号
+		pageSize, // 新增：页大小
+	};
+}
+```
+
 ### 8.4 空会话 UI、首屏快捷卡片与 `sendMessage` / `sendKnowledgePromptCard`
 
 **分支一：`assistantStore.isHistoryLoading`**

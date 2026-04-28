@@ -4,6 +4,7 @@
  */
 import { Toast } from '@ui/index';
 import { makeAutoObservable, runInAction } from 'mobx';
+import type { UIEvent } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import {
 	// 新增：按知识条目标识拉取该文章下“全部”助手会话（用于历史记录抽屉）。
@@ -106,6 +107,12 @@ export interface AssistantStoreApi {
 	switchSessionForCurrentDocument(sessionId: string): Promise<void>;
 	// 新增：刷新当前文档的会话列表（用于抽屉打开时自动刷新）。
 	refreshSessionListForCurrentDocument(): Promise<void>;
+	/** 抽屉列表滚动触底：从 store 触发加载更多（与 ChatBot SessionList 一致） */
+	onHistorySessionViewportScroll(e: UIEvent<HTMLElement>): void;
+	/** 历史会话列表首次加载中（抽屉打开时） */
+	readonly historySessionLoading: boolean;
+	/** 历史会话列表加载更多中（触底分页） */
+	readonly historySessionLoadingMore: boolean;
 	sendMessage(
 		raw?: string,
 		options?: { extraUserContentForModel?: string },
@@ -254,6 +261,18 @@ export class AssistantStore {
 			updatedAt: string;
 		}>
 	> = {};
+
+	/** 文档 key → 历史会话列表分页信息（用于滚动加载更多） */
+	private sessionsPageByDocument: Record<
+		string,
+		{ pageNo: number; pageSize: number; total: number }
+	> = {};
+
+	/** 文档 key → 历史会话列表首次加载中 */
+	private historySessionLoadingByDocument: Record<string, boolean> = {};
+
+	/** 文档 key → 历史会话列表加载更多中 */
+	private historySessionLoadingMoreByDocument: Record<string, boolean> = {};
 
 	// 新增：会话维度运行态（每个 sessionId 独立一份）。
 	// 关键收益：支持“多个会话同时流式”（并发 SSE），且不会发生 messages 串写/互相覆盖。
@@ -442,6 +461,27 @@ export class AssistantStore {
 		if (!docKey) return [];
 		// 返回缓存的历史会话列表；若尚未拉取则为空数组。
 		return this.sessionsByDocument[docKey] ?? [];
+	}
+
+	get historySessionLoading(): boolean {
+		const docKey = this.canonicalKey(this.activeDocumentKey);
+		if (!docKey) return false;
+		return Boolean(this.historySessionLoadingByDocument[docKey]);
+	}
+
+	get historySessionLoadingMore(): boolean {
+		const docKey = this.canonicalKey(this.activeDocumentKey);
+		if (!docKey) return false;
+		return Boolean(this.historySessionLoadingMoreByDocument[docKey]);
+	}
+
+	private get hasMoreHistorySessionsForActiveDocument(): boolean {
+		const docKey = this.canonicalKey(this.activeDocumentKey);
+		if (!docKey) return false;
+		const page = this.sessionsPageByDocument[docKey];
+		if (!page) return false;
+		const list = this.sessionsByDocument[docKey] ?? [];
+		return list.length < (page.total ?? 0);
 	}
 
 	get isAssistantSessionSwitcherLocked(): boolean {
@@ -1243,21 +1283,92 @@ export class AssistantStore {
 		// 如果 canonicalKey 无效 或 知识绑定 id 无效，则忽略本次刷新
 		if (!canonical || !binding) return;
 		try {
-			// 请求后端，获取该知识文章所有关联的会话列表
-			const res = await getAssistantSessionsByKnowledgeArticle(binding);
-			// 拿到响应数据
+			runInAction(() => {
+				this.historySessionLoadingByDocument[canonical] = true;
+			});
+			const pageNo = 1;
+			const pageSize = 20;
+			const res = await getAssistantSessionsByKnowledgeArticle(binding, {
+				pageNo,
+				pageSize,
+			});
 			const data = res.data;
-			// 如果返回的数据中有 list 字段，说明获取到了会话列表
 			if (data?.list) {
 				runInAction(() => {
-					// 将会话列表写入本地 store 的 sessionsByDocument，key 为 canonical 文档标识
 					this.sessionsByDocument[canonical] = data.list ?? [];
+					this.sessionsPageByDocument[canonical] = {
+						pageNo: data.pageNo ?? pageNo,
+						pageSize: data.pageSize ?? pageSize,
+						total: data.total ?? data.list?.length ?? 0,
+					};
 				});
 			}
 		} catch {
 			// 若拉取过程中出错，忽略异常（如网络错误/接口报错等不会影响 UI 主流程）
+		} finally {
+			runInAction(() => {
+				this.historySessionLoadingByDocument[canonical] = false;
+			});
 		}
 	}
+
+	private async loadMoreSessionListForCurrentDocument(): Promise<void> {
+		if (!this.knowledgeAssistantPersistenceAllowed) return;
+		if (!readToken()) return;
+		const key = this.activeDocumentKey;
+		const canonical = this.canonicalKey(key);
+		const binding = knowledgeArticleBindingFromDocumentKey(key);
+		if (!canonical || !binding) return;
+		if (this.historySessionLoadingByDocument[canonical]) return;
+		if (this.historySessionLoadingMoreByDocument[canonical]) return;
+		const page = this.sessionsPageByDocument[canonical];
+		if (!page) return;
+		if (!this.hasMoreHistorySessionsForActiveDocument) return;
+
+		runInAction(() => {
+			this.historySessionLoadingMoreByDocument[canonical] = true;
+		});
+		try {
+			const nextPageNo = (page.pageNo ?? 1) + 1;
+			const pageSize = page.pageSize ?? 20;
+			const res = await getAssistantSessionsByKnowledgeArticle(binding, {
+				pageNo: nextPageNo,
+				pageSize,
+			});
+			const data = res.data;
+			if (data?.list?.length) {
+				runInAction(() => {
+					const prev = this.sessionsByDocument[canonical] ?? [];
+					const seen = new Set(prev.map((s) => s.sessionId));
+					const appended = data.list.filter((s) => !seen.has(s.sessionId));
+					this.sessionsByDocument[canonical] = [...prev, ...appended];
+					this.sessionsPageByDocument[canonical] = {
+						pageNo: data.pageNo ?? nextPageNo,
+						pageSize: data.pageSize ?? pageSize,
+						total: data.total ?? page.total,
+					};
+				});
+			}
+		} catch {
+			// ignore
+		} finally {
+			runInAction(() => {
+				this.historySessionLoadingMoreByDocument[canonical] = false;
+			});
+		}
+	}
+
+	onHistorySessionViewportScroll = (e: UIEvent<HTMLElement>) => {
+		if (this.historySessionLoading) return;
+		if (this.historySessionLoadingMore) return;
+		if (!this.hasMoreHistorySessionsForActiveDocument) return;
+
+		const el = e.currentTarget;
+		const remaining = el.scrollHeight - el.scrollTop - el.clientHeight;
+		// 与 ChatBot 会话列表一致：接近底部时触发加载更多
+		if (remaining > 80) return;
+		void this.loadMoreSessionListForCurrentDocument();
+	};
 
 	// 发送一条消息到助手
 	async sendMessage(

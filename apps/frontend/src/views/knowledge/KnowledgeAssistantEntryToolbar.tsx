@@ -8,6 +8,7 @@ import { Button, Toast } from '@ui/index';
 import { CirclePlus, Clock } from 'lucide-react';
 import { observer } from 'mobx-react';
 import type { Dispatch, SetStateAction } from 'react';
+import Loading from '@/components/design/Loading';
 import { ScrollArea } from '@/components/ui';
 import { cn } from '@/lib/utils';
 import assistantStore from '@/store/assistant';
@@ -38,6 +39,15 @@ export const KnowledgeAssistantEntryToolbar = observer(
 		assistantMode,
 		setAssistantMode,
 	}: KnowledgeAssistantEntryToolbarProps) {
+		const sessionList = assistantStore.sessionListForActiveDocument;
+		const showInitialPlaceholder =
+			assistantStore.historySessionLoading && sessionList.length === 0;
+		const showLoadMoreHint = assistantStore.historySessionLoadingMore;
+		const showEmptyHint =
+			!assistantStore.historySessionLoading &&
+			sessionList.length === 0 &&
+			!assistantStore.historySessionLoadingMore;
+
 		return (
 			<div className="flex w-full items-center gap-2 pb-1">
 				{showAiSessionSwitcher ? (
@@ -95,52 +105,69 @@ export const KnowledgeAssistantEntryToolbar = observer(
 							}}
 							width="sm:max-w-md"
 						>
-							<ScrollArea className="h-full overflow-y-auto pr-2 box-border">
+							{assistantStore.historySessionLoading ? (
+								<div className="h-full flex flex-1 flex-col items-center justify-center py-6 text-center text-sm text-textcolor/60">
+									<Loading text="加载中…" />
+								</div>
+							) : null}
+							<ScrollArea
+								className="h-full overflow-y-auto pr-2 box-border"
+								onScroll={assistantStore.onHistorySessionViewportScroll}
+							>
 								<div className="flex flex-col gap-1 pr-2">
-									{assistantStore.sessionListForActiveDocument.length === 0 ? (
+									{showInitialPlaceholder ? (
+										<div className="text-sm text-textcolor/60 py-6 text-center">
+											加载中…
+										</div>
+									) : null}
+									{showEmptyHint ? (
 										<div className="text-sm text-textcolor/60 py-6 text-center">
 											暂无历史对话
 										</div>
-									) : (
-										assistantStore.sessionListForActiveDocument.map((s) => {
-											const active =
-												assistantStore.activeSessionId === s.sessionId;
-											const title = s.title?.trim()
-												? s.title.trim()
-												: `对话 ${s.sessionId.slice(0, 8)}`;
-											return (
-												<button
-													key={s.sessionId}
-													type="button"
-													className={cn(
-														'w-full text-left rounded-md px-2.5 py-2 border border-transparent hover:bg-theme/10 transition-colors',
-														active ? 'bg-theme/10 border-theme/10' : '',
-													)}
-													onClick={() => {
-														void assistantStore
-															.switchSessionForCurrentDocument(s.sessionId)
-															.then(() => {
-																setIsAiHistoryDrawerOpen(false);
-																enableStreamStickToBottom();
-																flushScrollToBottom();
-																requestAnimationFrame(() =>
-																	flushScrollToBottom(),
-																);
-															});
-													}}
-												>
-													<div className="text-sm text-textcolor line-clamp-1">
-														{title}
-													</div>
-													<div className="text-xs text-textcolor/50 mt-1">
-														{s.updatedAt
-															? new Date(s.updatedAt).toLocaleString()
-															: ''}
-													</div>
-												</button>
-											);
-										})
-									)}
+									) : null}
+									{sessionList.map((s) => {
+										const active =
+											assistantStore.activeSessionId === s.sessionId;
+										const title = s.title?.trim()
+											? s.title.trim()
+											: `对话 ${s.sessionId.slice(0, 8)}`;
+										return (
+											<button
+												key={s.sessionId}
+												type="button"
+												className={cn(
+													'cursor-pointer w-full text-left rounded-md px-2.5 py-2 hover:bg-theme/10 transition-colors',
+													active ? 'bg-theme/10' : '',
+												)}
+												onClick={() => {
+													void assistantStore
+														.switchSessionForCurrentDocument(s.sessionId)
+														.then(() => {
+															setIsAiHistoryDrawerOpen(false);
+															enableStreamStickToBottom();
+															flushScrollToBottom();
+															requestAnimationFrame(() =>
+																flushScrollToBottom(),
+															);
+														});
+												}}
+											>
+												<div className="text-sm text-textcolor line-clamp-1">
+													{title}
+												</div>
+												<div className="text-xs text-textcolor/50 mt-1">
+													{s.updatedAt
+														? new Date(s.updatedAt).toLocaleString()
+														: ''}
+												</div>
+											</button>
+										);
+									})}
+									{showLoadMoreHint ? (
+										<div className="text-xs text-textcolor/50 py-2 text-center">
+											加载更多…
+										</div>
+									) : null}
 								</div>
 							</ScrollArea>
 						</Drawer>

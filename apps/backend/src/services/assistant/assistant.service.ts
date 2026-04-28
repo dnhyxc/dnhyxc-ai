@@ -265,15 +265,20 @@ export class AssistantService {
 	async listSessionsByKnowledgeArticle(
 		userId: number,
 		knowledgeArticleId: string,
+		page?: { pageNo?: number; pageSize?: number },
 	) {
 		const articleId = knowledgeArticleId.trim();
 		if (!articleId) {
 			throw new BadRequestException('knowledgeArticleId 不能为空');
 		}
-		const list = await this.sessionRepo.find({
+		const pageNo = page?.pageNo ?? 1;
+		const pageSize = page?.pageSize ?? 20;
+		const [list, total] = await this.sessionRepo.findAndCount({
 			where: { userId, knowledgeArticleId: articleId },
 			select: ['id', 'title', 'createdAt', 'updatedAt'],
 			order: { updatedAt: 'DESC' },
+			skip: (pageNo - 1) * pageSize,
+			take: pageSize,
 		});
 		return {
 			knowledgeArticleId: articleId,
@@ -283,6 +288,9 @@ export class AssistantService {
 				createdAt: s.createdAt,
 				updatedAt: s.updatedAt,
 			})),
+			total,
+			pageNo,
+			pageSize,
 		};
 	}
 
