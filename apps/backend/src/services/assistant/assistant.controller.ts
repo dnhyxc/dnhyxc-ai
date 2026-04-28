@@ -19,6 +19,7 @@ import { AssistantService } from './assistant.service';
 import { AssistantChatDto } from './dto/assistant-chat.dto';
 import { AssistantSessionForKnowledgeDto } from './dto/assistant-session-for-knowledge.dto';
 import { AssistantSessionListDto } from './dto/assistant-session-list.dto';
+import { AssistantSessionsForKnowledgeDto } from './dto/assistant-sessions-for-knowledge.dto';
 import { AssistantStopDto } from './dto/assistant-stop.dto';
 import { CreateAssistantSessionDto } from './dto/create-assistant-session.dto';
 import { ImportAssistantTranscriptDto } from './dto/import-assistant-transcript.dto';
@@ -70,6 +71,23 @@ export class AssistantController {
 			return { success: false, message: '未登录' };
 		}
 		return this.assistantService.listSessions(userId, query);
+	}
+
+	/** 按知识条目标识拉取该文章下全部会话（用于历史记录/切换会话） */
+	@Get('sessions/for-knowledge')
+	async listSessionsForKnowledge(
+		@Req() req: AuthedRequest,
+		@Query() query: AssistantSessionsForKnowledgeDto,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			return { success: false, message: '未登录' };
+		}
+		const data = await this.assistantService.listSessionsByKnowledgeArticle(
+			userId,
+			query.knowledgeArticleId,
+		);
+		return { success: true, data };
 	}
 
 	/** 按知识条目标识拉取最近绑定的会话及消息（须在 `session/:id` 之前注册） */

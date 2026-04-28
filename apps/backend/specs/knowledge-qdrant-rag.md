@@ -1,5 +1,6 @@
-### 知识库 + 向量检索问答（Qdrant + DashScope Embedding + GLM）后端 SPEC（实现反推）
+### 知识库 + 向量检索问答（Qdrant + SiliconFlow Embedding/Rerank + GLM）后端 SPEC（实现反推）
 
+> **Embedding / Rerank 提供商以硅基流动为准**（请求形态、环境变量、维度与分片约束）：见 `apps/backend/specs/knowledge-siliconflow-embedding-rerank.md`。  
 > 说明：本文档从当前仓库实现反推，覆盖 `apps/backend/src/services/knowledge`、`knowledge-embedding`、`knowledge-qa`、`qdrant` 四个模块的**现状行为**与**可验收条款**。
 
 ---
@@ -15,12 +16,13 @@
   - 检索问答接口：`/api/knowledge/qa/ask`（SSE）
   - 向量入库：由 `KnowledgeService` 触发，异步执行（不阻塞主流程）
   - 向量库：Qdrant（REST，6333）
-  - Embedding（向量模型）：DashScope（百炼）多模态向量原生接口（文本模式）
+  - Embedding（向量模型）：硅基流动（SiliconFlow）OpenAI 兼容 `/v1/embeddings`
+  - Rerank（重排）：硅基流动 `/v1/rerank`（见 `knowledge-siliconflow-embedding-rerank.md`）
   - LLM（大模型）：GLM（智谱）`/chat/completions` 流式 SSE
 - **非目标**
   - 不包含“入库任务队列化（BullMQ）”的实现（仅在注释中提及）。
   - 不包含 embedding/检索结果的缓存、版本迁移、向量压缩等高级特性。
-  - 不包含 Rerank（重排）/Hybrid Search（混合检索）等策略（本次补充的“多链路召回”先实现召回与融合，重排作为可选扩展条款）。
+  - 不包含 Hybrid Search（混合检索）等策略；“多链路召回”文档段落中的部分 path 仍为规划/扩展项（与当前已落地的「向量召回 + SiliconFlow rerank」可并存阅读）。
 
 ---
 
@@ -44,7 +46,7 @@
   - **统一响应包装**：`ResponseInterceptor`（仅知识库 CRUD controller 使用）
   - **ORM**：TypeORM repositories（`Knowledge`、`KnowledgeTrash`）
   - **向量库 SDK**：`@qdrant/js-client-rest`
-  - **网络**：Node `fetch`（DashScope/GLM/Qdrant SDK 内部均使用 fetch/undici）
+  - **网络**：Node `fetch`（SiliconFlow/GLM/Qdrant SDK 内部均使用 fetch/undici）
 
 ---
 
@@ -57,7 +59,7 @@
 - **Chunk（分片）**
   - `KnowledgeEmbeddingService.chunkMarkdown()` 输出的片段（标题优先、长度兜底、带 overlap）。
 - **Embedding（向量）**
-  - 由 DashScope embedding 接口将文本映射为 `number[]`。
+  - 由 SiliconFlow `/v1/embeddings` 将文本映射为 `number[]`。
 - **Collection（集合）**
   - Qdrant 存储向量点的集合。默认名：`knowledge_chunks_v1`。
 - **Point（点）**
@@ -245,24 +247,17 @@
     - `evidences`（融合后的最终证据列表，保持现有结构）
     - `pathBreakdown?`（当 `includePathBreakdown=true` 时返回：每条链路 raw hits）
 
-#### 6.3 向量入库协议（DashScope 原生 embedding）
+#### 6.3 向量入库协议（SiliconFlow OpenAI 兼容 `/v1/embeddings`）
 
-- Endpoint（拼接）：
-  - `${origin}/api/v1/services/embeddings/multimodal-embedding/multimodal-embedding`
-  - `origin` 从 `QWEN_BASE_URL` 推导（若包含 `/compatible-mode/v1`，取其 origin）。
-- Headers：
-  - `Authorization: Bearer <apiKey>`
-  - `Content-Type: application/json`
-- Body：
-  - `model: <KNOWLEDGE_EMBEDDING_MODEL | 'qwen3-vl-embedding'>`
-  - `input.contents: Array<{ text: string }>`
-- 返回解析：
-  - 优先读取 `output.embeddings`，兼容 `output.data/data/embeddings` 变体；
-  - 每个元素内取 `embedding`（或兼容 `vector/output.embedding/...`）。
+> 细节与 env 键名见：`knowledge-siliconflow-embedding-rerank.md`。
+
+- Endpoint：`{SILICONFLOW_BASE_URL}/embeddings`（默认 `https://api.siliconflow.cn/v1/embeddings`）
+- Headers：`Authorization: Bearer <SILICONFLOW_API_KEY>`（兼容旧 key 见 SiliconFlow SPEC）
+- Body：`{ model, input: string | string[], encoding_format: "float" }`
+- 返回解析：`data[]` 按 `index` 排序后取每项 `embedding`
 - 限制策略：
-  - 分批：`batchSize=10`（避免服务端 batch 限制）
-  - 重试：`maxAttempts=3`（对网络层失败线性退避）
-  - 超时：60s
+  - 分批：`batchSize=32`（官方单请求 input 数组上限）
+  - 重试：`maxAttempts=3`；超时：60s
 
 #### 6.4 向量库协议（Qdrant）
 
@@ -338,7 +333,7 @@
 
 - Rerank 输入：`question + candidate evidences`
 - Rerank 输出：重排后的 topK evidences
-- 可用模型：DashScope rerank（你仓库已有 `DASHSCOPE_RERANK_MODEL_NAME` 配置字段可参考）
+- 可用模型：硅基流动 `/v1/rerank`（配置键 `KNOWLEDGE_RERANK_MODEL`，兼容 `DASHSCOPE_RERANK_MODEL_NAME`；详见 `knowledge-siliconflow-embedding-rerank.md`）
 
 ---
 

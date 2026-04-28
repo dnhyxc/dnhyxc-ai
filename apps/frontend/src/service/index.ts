@@ -7,6 +7,7 @@ import { http } from '@/utils/fetch';
 import {
 	ASSISTANT_SESSION,
 	ASSISTANT_SESSION_IMPORT_TRANSCRIPT,
+	ASSISTANT_SESSIONS_FOR_KNOWLEDGE,
 	ASSISTANT_STOP,
 	CREATE_CHECKOUT_SESSION,
 	CREATE_SESSION,
@@ -260,11 +261,32 @@ export type AssistantSessionDetailPayload = {
 export const createAssistantSession = async (payload?: {
 	title?: string;
 	knowledgeArticleId?: string;
+	/** true：强制新建（用于「新对话」）；false/不传：复用该文章最近会话（兼容旧行为） */
+	forceNew?: boolean;
 }) => {
 	return await http.post<{ sessionId: string; title: string | null }>(
 		ASSISTANT_SESSION,
 		payload ?? {},
 	);
+};
+
+export type AssistantSessionListItem = {
+	sessionId: string;
+	title: string | null;
+	createdAt: string;
+	updatedAt: string;
+};
+
+/** 按知识条目标识拉取该文章下的会话列表（按 updatedAt 倒序） */
+export const getAssistantSessionsByKnowledgeArticle = async (
+	knowledgeArticleId: string,
+) => {
+	return await http.get<{
+		knowledgeArticleId: string;
+		list: AssistantSessionListItem[];
+	}>(ASSISTANT_SESSIONS_FOR_KNOWLEDGE, {
+		querys: { knowledgeArticleId },
+	});
 };
 
 /** 拉取助手会话详情与消息（时间正序） */
@@ -298,6 +320,8 @@ export const patchAssistantSessionKnowledgeArticle = async (
 /** 首次保存后将草稿阶段助手对话迁入数据库（与后端 import-transcript 对齐；`lines` 最多 200 条，超长由 store 截最近 200 条） */
 export const importAssistantTranscript = async (body: {
 	knowledgeArticleId: string;
+	/** 可选：指定导入到哪个会话（用于多会话场景）；不传则兼容旧行为导入到最近会话 */
+	sessionId?: string;
 	lines: Array<{ role: 'user' | 'assistant'; content: string }>;
 }) => {
 	return await http.post<{ sessionId: string; inserted: number }>(

@@ -10,6 +10,7 @@ import {
 	IsArray,
 	IsIn,
 	IsNotEmpty,
+	IsOptional,
 	IsString,
 	MaxLength,
 	ValidateNested,
@@ -30,6 +31,16 @@ export class ImportAssistantTranscriptDto {
 	@IsNotEmpty()
 	@MaxLength(1024)
 	knowledgeArticleId!: string;
+
+	/**
+	 * 目标会话 id（可选）：
+	 * - 传入：迁入到该 session（会校验归属与 knowledgeArticleId 绑定）
+	 * - 不传：兼容旧行为，迁入到该文章最近会话（不存在则新建）
+	 */
+	@IsOptional()
+	@IsString()
+	@MaxLength(128)
+	sessionId?: string;
 
 	/** 按时间从早到晚；条数 ≤200；超长草稿由客户端截断为最近 200 条再提交 */
 	@IsArray()

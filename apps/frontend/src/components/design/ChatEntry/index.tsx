@@ -314,7 +314,7 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 									<Button
 										variant="ghost"
 										onClick={() => stopGenerating?.()}
-										className="lucide-stroke-draw-hover p-0 h-8 w-8 flex items-center justify-center rounded-full border border-red-500/30 bg-red-500/20 text-red-500 hover:bg-red-500/30 hover:text-red-500 shadow-none [&_svg]:overflow-visible"
+										className="lucide-stroke-draw-hover p-0 h-8.5 w-8.5 flex items-center justify-center rounded-full border border-red-500/30 bg-red-500/20 text-red-500 hover:bg-red-500/30 hover:text-red-500 shadow-none [&_svg]:overflow-visible"
 									>
 										<Target
 											className={cn(
@@ -332,7 +332,7 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 										chatInputRef?.current?.focus();
 									}}
 									disabled={!input.trim()}
-									className="lucide-stroke-draw-hover h-8 w-8 mb-1 flex items-center justify-center rounded-full bg-linear-to-r from-teal-500 to-cyan-600 [&_svg]:overflow-visible"
+									className="lucide-stroke-draw-hover h-8.5 w-8.5 mb-1 flex items-center justify-center rounded-full bg-linear-to-r from-teal-500 to-cyan-600 [&_svg]:overflow-visible"
 								>
 									<Rocket className="-rotate-45" />
 								</Button>

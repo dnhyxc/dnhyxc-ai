@@ -43,16 +43,17 @@ export class QdrantService {
 	getKnowledgeCollectionName(): string {
 		// return：优先使用配置，未配置则回落默认值
 		return (
+			//【重要维护说明】：当需要更换向量模型时，如果向量维度发生变化，需要将 QDRANT_KNOWLEDGE_COLLECTION 设置为新的集合名称，并删除旧的集合。
 			// QDRANT_KNOWLEDGE_COLLECTION：可按环境区分
 			this.config.get<string>(QdrantEnum.QDRANT_KNOWLEDGE_COLLECTION) ||
 			// 默认 collection：知识库 chunk 向量与 payload
-			'knowledge_chunks_v1'
+			'knowledge_chunks_v2'
 		);
 	}
 
 	// 确保 collection 存在：不存在则创建（幂等）
 	async ensureKnowledgeCollection(options: {
-		// 向量维度：必须与 embedding 输出维度一致
+		// 向量维度：必须与当前 embedding 模型输出维度一致（如 BAAI/bge-large-zh-v1.5 为 1024）
 		vectorSize: number;
 	}): Promise<void> {
 		// 获取 collection 名

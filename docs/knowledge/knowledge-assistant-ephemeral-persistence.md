@@ -134,7 +134,7 @@
 ### 1.2.6 保存后用户再打开该知识
 
 - 前端 `documentKey` 含真实 **`articleId`**，`knowledgeAssistantPersistenceAllowed === true`。
-- `activateForDocument` 会按 **`knowledgeArticleId`** 调 **`getAssistantSessionByKnowledgeArticle`**（或等价接口），后端用 **`assistant_sessions.knowledge_article_id = articleId`** 找到 **`sessionId`**，并带上消息列表返回，前端 **`mapApiMessagesToUi`** 还原为气泡。
+- `activateForDocument` 在无本地会话指针时，按 **`knowledgeArticleId`** 调 **`GET /assistant/session/for-knowledge`**（封装名 **`getAssistantSessionByKnowledgeArticle`**），取**最近**会话及消息写入 **`activeSessionByDocument` / `sessionByDocument`** 与 **`stateBySession[sid].messages`**；若内存已有 **`sid`** 则改走 **`getAssistantSessionDetail(sid)`**。**不在此阶段拉全量** `sessions/for-knowledge`（列表见多会话前端文档）。
 
 ---
 
@@ -231,8 +231,8 @@ sequenceDiagram
 | `knowledgeAssistantPersistenceAllowed` | 是否允许拉后端历史、建 session、落库流式 |
 | `activateForDocument(documentKey)` | 若不允许持久化：只更新 `activeDocumentKey` 并清空占位状态后 **return**，不请求历史 |
 | `ensureSessionForCurrentDocument()` | 不允许持久化时 **return null** |
-| `sendMessage` | 不允许持久化：`contextTurns` 来自 `buildEphemeralContextTurnsFromMessages(this.messages)`（**推送本轮 user 之前** 的快照语义在代码中体现为：先算 `contextTurns`，再 `push` 用户与助手占位）；SSE body 为 `{ ephemeral: true, content, contextTurns }`；完成后 **不** `fetchSessionMessages` |
-| `flushEphemeralTranscriptIfNeeded` | 将 `messages` 转为 `lines`（超过 200 条时 **`slice(-200)`** 只迁最近 200 条），`importAssistantTranscript`；成功后更新 `sessionByDocument`、`sessionId`，并在 `activeDocumentKey === fromKey` 时改为 `toKey` |
+| `sendMessage` | 不允许持久化：`contextTurns` 来自 `buildEphemeralContextTurnsFromMessages`（先快照再 `push` 占位）；SSE 为 `{ ephemeral: true, content, contextTurns }`；完成后 **不** 拉会话详情。允许持久化：按 **`ensureSessionState(sid)`** 写入流式与 **`onComplete` 内 `getAssistantSessionDetail(sid)`** 对齐；**`void refreshSessionListForCurrentDocument()`**；详见 `knowledge-assistant-complete.md` §6.12 |
+| `flushEphemeralTranscriptIfNeeded` | **`createAssistantSession({ knowledgeArticleId, forceNew: true })`** 后 **`importAssistantTranscript`**（可带 **`sessionId`**）；成功后更新 **`sessionByDocument` / `activeSessionByDocument`**、**`ensureSessionState(sid).messages`**，并在 `activeDocumentKey === fromKey` 时改为 `toKey`；**`void refreshSessionListForCurrentDocument()`** |
 | `clearAssistantStateOnKnowledgeDraftReset` | 清空/新建草稿时：abort SSE、清空 `messages` / `sessionId`、删除当前 `activeDocumentKey` 的内存映射；若有 `sessionId` 则异步 `stopAssistantStream` |
 
 **说明**：`buildEphemeralContextTurnsFromMessages` 与 `buildImportTranscriptLinesFromMessages` 放在模块顶层（非 class `private`），避免 `apps/frontend/src/store/index.ts` 聚合导出实例类型时触发 TS4094（「exported anonymous class 不可含 private 成员」）。
@@ -273,7 +273,7 @@ sequenceDiagram
 | --- | --- |
 | `AssistantService.getSessionDetail` | 会话行已不存在时 **不抛** `NotFoundException`，返回 **`{ session: null, messages: [] }`**（仍 200）。 |
 | `AssistantService.stopStream` | 会话行已不存在时 **不抛**，返回 **`{ success: true, message: '会话已不存在，无需停止' }`**，与「幂等停止」一致。 |
-| 前端 `assistantStore.fetchSessionMessages` | 若 `payload.session == null`，清空当前 **`sessionByDocument[activeDocumentKey]`**、**`sessionId`**、**`messages`**，与后端已删会话对齐。 |
+| 前端 `assistantStore.fetchSessionMessagesForDocumentKey`（遗留） | 若 `payload.session == null`，**`delete sessionByDocument[canonical]`** 与 **`delete stateByDocument[canonical]`**；多会话主路径以 **`activateForDocument` / `getAssistantSessionDetail`** 的清理为准（见 `knowledge-assistant-complete.md` §6.10、§10.3）。 |
 
 ---
 

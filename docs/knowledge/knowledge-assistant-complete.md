@@ -49,7 +49,8 @@
 | **documentKey**                          | 传给 `KnowledgeAssistant` 的字符串，格式为 `{assistantArticleBinding}__trash-{trashOpenNonce}`，用于区分「同一逻辑草稿在不同 UI nonce 下」的助手实例。                  |
 | **assistantArticleBinding**              | `index.tsx` 中 `useMemo`：`knowledgeTrashPreviewId` 存在时为 `__knowledge_trash__:{行id}`，否则为 `knowledgeEditingKnowledgeId ?? 'draft-new'`。                        |
 | **bindingId**                            | `knowledgeArticleBindingFromDocumentKey(documentKey)`：去掉 `__trash-*` 后缀后传给后端的「按文章查会话」标识（可为正式 UUID、`draft-new`、或回收站前缀串）。            |
-| **canonicalKey**                         | `assistantStore` 内部对 `documentKey` 规范化后的键：**`__trash-*` 前缀之前** 的条目标识；**`stateByDocument` / `sessionByDocument` 均按 canonicalKey 分桶**，切换 trash nonce 不丢对话。 |
+| **canonicalKey**                         | `assistantStore` 内部对 `documentKey` 规范化后的键：**`__trash-*` 前缀之前** 的条目标识；**`stateByDocument` / `sessionByDocument` / `activeSessionByDocument` / `sessionsByDocument` 均按 canonicalKey 分桶**，切换 trash nonce 不丢对话。 |
+| **activeSessionByDocument**              | 文档 canonical → **当前 UI 选中的 `sessionId`**；持久化下 **`messages` / `abortStream` / `isSending`** 等 getter 指向 **`stateBySession[activeSid]`**（见 §6.7、§6.12）。 |
 | **knowledgeAssistantPersistenceAllowed** | `assistantStore` 布尔：为 `false` 表示 **未保存云端草稿**，走 ephemeral，不落库。                                                                                       |
 | **Ephemeral**                            | SSE body `ephemeral: true` + `contextTurns` + `content`；可选 `extraUserContentForModel`（仅拼进发给模型的 user 句，不落库）；不传 `sessionId` / `knowledgeArticleId`。 |
 | **extraUserContentForModel**             | 可选字符串：与 `content` 换行拼接后仅用于 **本轮** 智谱请求；**不**写入 `assistant_messages`，气泡与落库 user 正文仍为短 `content`（见 §13）。                          |
@@ -241,7 +242,7 @@ const assistantArticleBinding = useMemo(() => {
 
 ### 6.1 导出形态：`AssistantStoreApi` 与默认实例
 
-- **`AssistantStore`**：MobX `makeAutoObservable` 的具体类，含 `private` 成员（`canonicalKey`、`ensureState`、`activeState`、`fetchSessionMessagesForDocumentKey` 等）。
+- **`AssistantStore`**：MobX `makeAutoObservable` 的具体类，含 `private` 成员（`canonicalKey`、`ensureState`、`ensureSessionState`、`activeState`、`stateBySession`、`fetchSessionMessagesForDocumentKey` 等）。
 - **`AssistantStoreApi`**：对外 **仅暴露公开 API 的 interface**，避免 `useStore()` 等处的导出类型把 **private 成员** 带进匿名类类型，触发 **TS4094**。
 - **`const _assistantStore = new AssistantStore()`**，再 **`export const assistantStore: AssistantStoreApi = _assistantStore`** 与 **`export default assistantStore`**：`KnowledgeAssistant` 使用默认导出即可。
 
@@ -293,29 +294,25 @@ const assistantArticleBinding = useMemo(() => {
 - **`isStreamingForDocumentKey(documentKey)`**：对参数做 `canonicalKey`，若桶存在则 **`messages.some(m => m.isStreaming)`**。供知识保存逻辑判断「是否应延迟迁入」。
 - **`scheduleEphemeralFlushAfterStreaming(cloudArticleId, fromDocumentKey, toDocumentKey)`**：对 **`fromDocumentKey`** 取 `ensureState` 后 `runInAction`：设置 **`pendingEphemeralFlush`**，并 **`historyHydrated = true`**。含义：保存后即将允许持久化，若立刻按文章拉历史会得到 **空会话**，易覆盖 UI；先标 hydrated，等 **流式结束** 后在 `onComplete` 里 **`flushEphemeralTranscriptIfNeeded`**。
 
-### 6.7 `activateForDocument(documentKey)`（当前实现逐步）
+### 6.7 `activateForDocument(documentKey)`（当前实现逐步，多会话版）
 
-**不**在入口处 `abortStream`、**不**清空消息——换文档只 **切换指针并确保桶存在**，其它文档上的 SSE 继续跑。
+**不**在入口处 `abortStream`、**不**清空消息——换文档只 **切换指针并确保桶存在**，其它文档上的 SSE 继续跑。持久化模式下 **消息与会话指针** 以 **`stateBySession[sessionId]`** + **`activeSessionByDocument` / `sessionByDocument`** 为主；`stateByDocument` 仍承载 **`historyHydrated` / `isHistoryLoading`（文档级）** 等。
 
 1. `nextKey = (documentKey ?? '').trim()`；空则 return。
 2. `docKey = this.canonicalKey(nextKey)`。
-3. **`runInAction`**：`this.activeDocumentKey = nextKey`；**`this.ensureState(docKey)`**（无 key 时 `ensureState` 返回临时空对象，不写入 `stateByDocument`）。
-4. `const state = this.ensureState(docKey)`。
-5. 若 **`!this.knowledgeAssistantPersistenceAllowed`**：return（不拉后端；草稿仅内存）。
+3. **`runInAction`**：`this.activeDocumentKey = nextKey`；**`this.ensureState(docKey)`**。
+4. `const state = this.ensureState(docKey)`（文档级：去重、hydrate 标记等）。
+5. 若 **`!this.knowledgeAssistantPersistenceAllowed`**：return（ephemeral，不请求后端）。
 6. 若 **`!readToken()`**：return。
-7. 若 **`state.isHistoryLoading === true`**：return（**并发去重**：UI effect 可能因 `activeDocumentKey` 被写入而二次触发 `activate`；同一桶正在拉历史时无需重复请求）。
-8. 若 **`state.historyHydrated === true`**：return（**已 hydrate 过**，避免重复 `getAssistantSessionByKnowledgeArticle` / `getAssistantSessionDetail`）。
-9. **`sid`** 初值：`this.sessionByDocument[docKey] ?? state.sessionId ?? null`。
-10. 若 **尚无 `sid`** 且 **`bindingId = knowledgeArticleBindingFromDocumentKey(nextKey)`** 非空：
-   - `runInAction`：`state.isHistoryLoading = true`。
-   - **`await getAssistantSessionByKnowledgeArticle(bindingId)`**。
-   - 若 `data?.session?.sessionId`：`sid` 赋值；`runInAction` 写入 `sessionByDocument[docKey]`、`state.sessionId`、`state.messages = mapApiMessagesToUi(data.messages ?? [])`，**`hydratedFromArticleApi = true`**。
-   - `finally`：`state.isHistoryLoading = false`。
-11. 若 **仍无 `sid`**：`runInAction` **`state.historyHydrated = true`**；return（**空会话**，等用户首条 `sendMessage` 时 `createAssistantSession`）。
-12. 若 **`hydratedFromArticleApi`**：`runInAction` **`state.historyHydrated = true`**；return（**不再**调用 `fetchSessionMessages`，避免二次请求）。
-13. 否则（内存里已有 sid，且不是刚由 for-knowledge 一次性灌入）：`runInAction` 设置 `state.sessionId = sid`、`state.isHistoryLoading = true`；**`await this.fetchSessionMessages()`**（内部用当前 `activeDocumentKey` 解析 canonical 再拉详情）。
-14. `try/catch`：失败时 `runInAction` **`delete sessionByDocument[docKey]`**、**`state.sessionId = null`**、**`state.messages = []`**（脏 sid 丢弃）。
-15. `finally`：`state.isHistoryLoading = false`；**`state.historyHydrated = true`**。
+7. 若 **`state.isHistoryLoading === true`**：return（并发去重，避免 effect 二次触发时重复打 `for-knowledge` / 详情）。
+8. 若 **`state.historyHydrated === true`**：return。
+9. `bindingId = knowledgeArticleBindingFromDocumentKey(nextKey)`。
+10. **`sid`** 初值：**`this.activeSessionByDocument[docKey] ?? this.sessionByDocument[docKey] ?? null`**（用户上次在该文选中的会话优先）。
+11. 若 **尚无 `sid`** 且 **`bindingId`** 非空：走 **`GET /assistant/session/for-knowledge`**（最近会话 + 消息）；成功则写入 **`sessionByDocument` / `activeSessionByDocument`**，并把消息灌入 **`ensureSessionState(sid).messages`**；`finally` 里 **`state.historyHydrated = true`**、**`state.isHistoryLoading = false`**；return。
+12. 若无 **`bindingId`**：`historyHydrated = true`；return。
+13. 若 **已有 `sid`**：`runInAction` 同步 **`sessionByDocument[docKey]`** 与 **`activeSessionByDocument[docKey]`**；取 **`ensureSessionState(sid)`**；若该会话 **已有消息 / 正在发送 / 正在拉历史** 则仅 **`historyHydrated = true`** 并 return；否则 **`getAssistantSessionDetail(sid)`** 拉全量消息写入 **`sstate.messages`**；异常时清理映射与消息；**`finally`** 置 **`sstate.isHistoryLoading = false`**、**`state.historyHydrated = true`**。
+
+> **不在此函数内** 调用 **`GET /assistant/sessions/for-knowledge`**。全量会话列表由 **`refreshSessionListForCurrentDocument`**（如历史抽屉 `useEffect`）、**`ensureSessionForCurrentDocument` 成功后的异步刷新**、**`sendMessage` 内发起 SSE 后的异步刷新** 维护，见 `knowledge-assistant-multi-session-frontend-implementation.md`。
 
 ### 6.8 `remapAssistantSessionDocumentKey(fromKey, toKey)`
 
@@ -339,40 +336,40 @@ const assistantArticleBinding = useMemo(() => {
 ### 6.10 `fetchSessionMessages` / `fetchSessionMessagesForDocumentKey`
 
 - **`fetchSessionMessages()`**：取 **`this.activeDocumentKey`**，调用 **`fetchSessionMessagesForDocumentKey(key)`**。
-- **`fetchSessionMessagesForDocumentKey(documentKey)`**（`private`）：
-  - `key = canonicalKey(documentKey)`；`state = ensureState(key)`；无 **`state.sessionId`** 则 return。
-  - **`await getAssistantSessionDetail(state.sessionId)`**。
-  - 若 **`!payload?.session`**（会话已删，后端 200 返回空 session）：**`runInAction`** **`delete sessionByDocument[key]`**、**`delete stateByDocument[key]`**（整桶移除，与 §4.5 对齐）。
-  - 若有 **`payload.messages`**：**`runInAction`** `state.messages = mapApiMessagesToUi(...)`，`state.historyHydrated = true`。
+- **`fetchSessionMessagesForDocumentKey(documentKey)`**（`private`，**偏单会话时代遗留**）：
+  - `key = canonicalKey(documentKey)`；`state = ensureState(key)`（**文档桶**）。
+  - 若 **`!state.sessionId`**：**直接 return**（多会话持久化路径下会话指针在 **`sessionByDocument` / `activeSessionByDocument`**，文档桶 **`state.sessionId`** 常保持 **null**，故该方法往往 **无操作**）。
+  - 否则 **`await getAssistantSessionDetail(state.sessionId)`**。
+  - 若 **`!payload?.session`**：**`runInAction`** **`delete sessionByDocument[key]`**、**`delete stateByDocument[key]`**（与 §4.5、§10.3 对齐）。
+  - 若有 **`payload.messages`**：**`runInAction`** 写入 **`state.messages`**（文档桶；**与当前 UI 主数据源 `stateBySession` 可能不一致**——持久化对齐应以 **`sendMessage` onComplete**、**`activateForDocument`**、**`switchSessionForCurrentDocument`** 内的 **`getAssistantSessionDetail(sid)`** 为准）。
+
+**多会话真相源（持久化、已登录）**：**`activeSessionByDocument[canonical]`** → **`ensureSessionState(sid).messages`**；全量元数据列表见 **`sessionsByDocument`** 与 **`refreshSessionListForCurrentDocument`**（详见 `knowledge-assistant-multi-session-frontend-implementation.md`）。
 
 ### 6.11 `flushEphemeralTranscriptIfNeeded` / `ensureSessionForCurrentDocument`
 
-- **`flushEphemeralTranscriptIfNeeded(cloudArticleId, fromDocumentKey, toDocumentKey)`**：无 token 则 return。`from`/`to` 为两参数的 canonical；**`sourceState = stateByDocument[from] ?? stateByDocument[to] ?? ensureState(fromDocumentKey)`**（兼容保存流程中已 remap）。**`lines = buildImportTranscriptLinesFromMessages(sourceState.messages)`**，空则 return。`await importAssistantTranscript({ knowledgeArticleId, lines })`；若返回 **`sessionId`**：`runInAction` 更新 **`sessionByDocument[to]`**、**`toState.sessionId`**、**`historyHydrated = true`**、**`pendingEphemeralFlush = null`**，并可能把 **`activeDocumentKey`** 从 `fromDocumentKey` 改为 `toDocumentKey`。
-- **`ensureSessionForCurrentDocument()`**：若不允许持久化 return `null`；无 token Toast「请先登录…」；无 **`activeDocumentKey`** Toast「文档未就绪」；若已有 **`state.sessionId` 或 `sessionByDocument[canonical]`** 则同步到 `state.sessionId` 并返回；否则 **`createAssistantSession`**（`knowledgeArticleBindingFromDocumentKey(key)` 有值则传入 **`knowledgeArticleId`**），成功后写入映射并 **`historyHydrated = true`**。
+- **`flushEphemeralTranscriptIfNeeded(cloudArticleId, fromDocumentKey, toDocumentKey)`**：无 token 则 return。`from`/`to` 为 canonical；**`sourceState`** 从 **`stateByDocument[from] ?? stateByDocument[to] ?? ensureState(fromDocumentKey)`** 取。**`createAssistantSession({ knowledgeArticleId, forceNew: true })`** + **`importAssistantTranscript`**（可带 **`sessionId`**）迁入；成功后 **`sessionByDocument[to]`**、**`activeSessionByDocument[to]`**、**`ensureSessionState(sid).messages`** 与 **`toState.historyHydrated`** 等；并 **`void refreshSessionListForCurrentDocument()`**。
+- **`ensureSessionForCurrentDocument()`**：若不允许持久化 return `null`；无 token / 无 **`activeDocumentKey`** 则 Toast 并 return；若 **`activeSessionByDocument[canonical]`** 已有则直接返回该 **`sessionId`**；否则 **`createAssistantSession`**（可带 **`knowledgeArticleId`**，**不传 `forceNew`** 以复用后端「最近会话」语义）；成功后写入 **`sessionByDocument` / `activeSessionByDocument`**、**`ensureSessionState(created)`**，并 **`void refreshSessionListForCurrentDocument()`**。
 
 ### 6.12 `sendMessage(raw?, options?)`
 
 1. **`documentKey = activeDocumentKey.trim()`**；空则 Toast「文档未就绪」。
-2. **`canonical = canonicalKey(documentKey)`**，**`state = ensureState(canonical)`**。
-3. **`text = (raw ?? '').trim()`**；若 **`!text || state.isSending || state.isHistoryLoading`** 则 return（防抖）。
+2. **`canonical = canonicalKey(documentKey)`**，**`docState = ensureState(canonical)`**；**`ephemeral = !knowledgeAssistantPersistenceAllowed`**。
+3. **`text = (raw ?? '').trim()`**；空则 return。
 4. **`extraUserContentForModel = options?.extraUserContentForModel?.trim()`**（可选）。
-5. **`ephemeral = !knowledgeAssistantPersistenceAllowed`**。非 ephemeral：**`sid = await ensureSessionForCurrentDocument()`**，失败 return。ephemeral：无 token Toast 后 return。
-6. **`contextTurns = ephemeral ? buildEphemeralContextTurnsFromMessages(state.messages) : undefined`**（在 push **之前** 快照历史）。
-7. **`state.abortStream?.()`** 并清空 **本桶** `abortStream`（只打断 **当前文档** 的上一次 SSE，不影响其它 canonical 桶）。
-8. **`userChatId` / `assistantChatId`**：`uuidv4()`。
-9. **`runInAction`**：`state.isSending = true`；`push` user（`content: text`）；`push` assistant 占位（`content: ''`，**`isStreaming: true`**，**`thinkContent: ''`**）。
-10. **`applyAssistantPatch(delta, thinkDelta?)`**：累加 `accumulated` / `thinkBuf`；**`runInAction`** 内按 **`assistantChatId`** 找到下标，**`state.messages[idx] = { ...prev, content, thinkContent }`**（**替换元素**触发细粒度更新）。
-11. **`await streamAssistantSse`**：
-    - ephemeral：**`{ ephemeral: true, content: text, contextTurns, ...可选 extraUserContentForModel }`**。
-    - 持久化：**`{ sessionId: sid, content: text, ...可选 extraUserContentForModel }`**。
-12. 返回的 **`abort`** 赋给 **`state.abortStream`**（注意：setter 写到 **activeState**，发送时 active 应已是该文档）。
-13. **`onComplete(err)`**（异步回调）：
-    - **`runInAction`**：`state.isSending = false`；找到 assistant 占位，**`isStreaming: false`**；若 `err` 则正文补 **`生成失败：${err}`** 且 **`isStopped: true`**；**整对象替换**。
-    - **`state.abortStream = null`**。
-    - 若存在 **`state.pendingEphemeralFlush`** 且 **当前桶内已无 `isStreaming`**：**`await flushEphemeralTranscriptIfNeeded(...)`**，**`finally`** 里 **`pendingEphemeralFlush = null`**。
-    - 若 **无 err 且非 ephemeral**：**`await fetchSessionMessagesForDocumentKey(canonical)`** 与 DB 对齐（失败忽略，UI 已展示累积正文）。
-14. **`onError`**：`isSending = false`、助手气泡收尾、**`abortStream = null`**、**`pendingEphemeralFlush = null`**（**错误时不自动迁入**，避免不完整对话绑定到新文章）。
-15. 外层 **`catch`**：同样收尾 **`isSending`** 与占位 **`isStreaming: false`**。
+5. 非 ephemeral：**`sid = await ensureSessionForCurrentDocument()`**，失败 return。ephemeral：无 token Toast 后 return。
+6. **关键**：**`state = ephemeral ? docState : this.ensureSessionState(sid!)`**；再判断 **`state.isSending || state.isHistoryLoading`** 则 return（互斥粒度为 **会话级**，支持多会话并发）。
+7. **`contextTurns = ephemeral ? buildEphemeralContextTurnsFromMessages(state.messages) : undefined`**（在 push **之前** 快照历史）。
+8. **`state.abortStream?.()`** 并 **`runInAction`** 清空 **`state.abortStream`**（仅打断 **当前 active 会话** 上一轮 SSE，其它 `sessionId` 的流式不受影响）。
+9. **`userChatId` / `assistantChatId`**：`uuidv4()`；**`runInAction`**：`state.isSending = true`；`push` user 与 assistant 占位（**`isStreaming: true`**）。
+10. **`applyAssistantPatch`**：按 **`assistantChatId`** 替换 **`state.messages[idx]`** 元素。
+11. **`await streamAssistantSse`**：ephemeral 带 **`ephemeral: true` + `contextTurns`**；持久化带 **`sessionId: sid`**。
+12. 返回的 **`abort`** 赋 **`state.abortStream`**；非 ephemeral 时 **`void refreshSessionListForCurrentDocument()`**（异步刷新会话列表）。
+13. **`onComplete(err)`**：
+    - **`userAborted`**：`err === ASSISTANT_SSE_USER_ABORT_MARKER` 时不把哨兵当业务错误。
+    - **`runInAction`**：收尾 **`isSending`**、助手 **`isStreaming: false`**。
+    - **`pendingEphemeralFlush`**：仍在 ephemeral 且当前 **`state`** 无流式时 **`flushEphemeralTranscriptIfNeeded`**。
+    - 若 **无 err 且非 ephemeral**：**`getAssistantSessionDetail(sid)`**，且 **`payload.session.sessionId === sid`** 时才覆盖 **`state.messages`**（**禁止**用 **`activeSessionId`** 拉别的会话，防并发串写）。
+14. **`onError`** / 外层 **`catch`**：收尾发送态与占位；**`pendingEphemeralFlush = null`**（错误不自动迁入）。
 
 ### 6.13 `stopGenerating`
 
@@ -402,23 +399,23 @@ const assistantArticleBinding = useMemo(() => {
 - `finish()` 默认会 `onComplete()` **不带参数**，于是 `onComplete(err)` 里的 `err === undefined`。
 - `sendMessage` 的 `onComplete` 里有「`!err && !ephemeral` 时拉会话详情并覆盖本地 messages」的逻辑。
 - **停止瞬间后端往往还没把本轮 assistant 的流式片段落库**（或只落库了部分），会话详情返回的 messages 比本地已累积的短。
-- `fetchSessionMessagesForDocumentKey` 会用接口返回的 messages **整表替换** `state.messages`，于是本地刚刚显示的已接收正文被覆盖掉。
+- 自然完成分支会用 **`getAssistantSessionDetail(sid)`** 返回的 messages **整表替换** **本会话** `state.messages`（`state` 为 **`ensureSessionState(sid)`**），若误判为“无 err 的成功完成”，会在服务端尚未落库本轮 assistant 时用**更短**的服务端列表覆盖本地已累积正文。
 
-一句话：**“用户停止”被误判为“成功完成” → 触发 fetchSessionMessages → 用未落库/不完整的服务端历史覆盖了本地已生成内容。**
+一句话：**“用户停止”被误判为“成功完成” → 触发详情拉取并对齐 messages → 用未落库/不完整的服务端历史覆盖了本地已生成内容。**
 
 #### 6.14.3 修复策略（不影响现有功能的前提）
 
 我们需要在“用户主动停止”与“正常完成”之间做出可区分的信号，并保证：
 
-- **正常完成**（`done === true` 或流自然结束）仍然会 `fetchSessionMessagesForDocumentKey` 做服务端对齐，保持原有一致性。
-- **用户停止**（`AbortError`）不再触发对齐覆盖（因为对齐数据很可能不完整），从而保留本地已接收正文。
+- **正常完成**（`done === true` 或流自然结束）仍会对 **闭包捕获的 `sid`** 调用 **`getAssistantSessionDetail`**，且在 **`payload.session.sessionId === sid`** 时才覆盖 **`state.messages`**，保持与服务端一致并避免多会话并发串写。
+- **用户停止**（`AbortError`）不再触发上述对齐覆盖（对齐数据很可能不完整），从而保留本地已接收正文。
 
 实现上采用 **哨兵值（sentinel，哨兵字符串）**：
 
 - SSE 层在 `AbortError` 时 `onComplete(ASSISTANT_SSE_USER_ABORT_MARKER)`。
 - Store 层识别到该哨兵后：
   - 不把它当成真实错误文案写到气泡里
-  - 不走 “无 err → fetchSessionMessages” 的覆盖对齐路径
+  - 不走 “无 err → `getAssistantSessionDetail` 覆盖 messages” 的对齐路径
 
 #### 6.14.4 关键实现代码（含详细中文注释）
 
@@ -491,11 +488,16 @@ onComplete: async (err) => {
 
 	// ...（pendingEphemeralFlush 逻辑保持不变）
 
-	// 关键：只有“真正无 err 的自然完成”才去拉会话详情做服务端对齐。
-	// 用户主动停止时，服务端可能尚未落库本轮输出，拉取会导致用不完整历史覆盖 UI。
-	if (!err && !ephemeral) {
+	// 关键：只有“真正无 err 的自然完成”才按本次 sid 拉详情对齐（禁止用 active 指针误绑其它会话）。
+	if (!err && !ephemeral && sid) {
 		try {
-			await this.fetchSessionMessagesForDocumentKey(canonical);
+			const res = await getAssistantSessionDetail(sid);
+			const payload = res.data;
+			if (payload?.session?.sessionId === sid) {
+				runInAction(() => {
+					state.messages = mapApiMessagesToUi(payload.messages ?? []);
+				});
+			}
 		} catch {
 			// 忽略：界面已展示累积正文
 		}
@@ -510,7 +512,7 @@ onComplete: async (err) => {
   - 不会出现把哨兵值当作错误文案显示
   - 仍会调用 `/api/assistant/stop`（原有功能不变）
 - 不点击停止、让流自然完成时：
-  - 仍会在完成后 `fetchSessionMessagesForDocumentKey` 与服务端落库历史对齐（原有功能不变）
+  - 仍会在完成后对 **本次请求的 `sessionId`** 调用 **`getAssistantSessionDetail`** 与服务端落库历史对齐（多会话下不可用 `fetchSessionMessagesForDocumentKey` 误绑当前 UI 会话）
 
 ### 6.15 修复：避免重复请求 `/assistant/session/for-knowledge`（同一 knowledgeArticleId 连续请求两次）
 
@@ -820,6 +822,16 @@ useEffect(() => {
 - **首段**：`documentKey` 为空不激活。
 - **第二段（关键）**：当 **当前 store 的 `activeDocumentKey` 已与 props 一致** 且 **`editorHasBody === false`** 时 **不再调用 `activate`**。  
   **原因**：清空草稿后 **`clearAssistantStateOnKnowledgeDraftReset(nextKey)`** 会把 `activeDocumentKey` 同步到下一 key；此时左侧无正文，若再 `activate` 会 **二次清空** 并可能错误去拉 **`draft-new`** 会话。未保存草稿的 key（`draft-new__trash-*`）在 **有正文** 时仍会走 `activate`，保证 **`activeDocumentKey` 写入**（否则 ephemeral 发送会 Toast「文档未就绪」——见组件文件头注释）。
+
+### 8.0.2 多会话入口（`ChatEntry.entryChildren`）
+
+当 **非 RAG**、**已登录**、**`knowledgeAssistantPersistenceAllowed`** 为真时，输入框上方 **`entryChildren`** 展示：
+
+1. **历史**：`Clock` 圆形按钮，`aria-label="历史对话"`，打开 **`Drawer`**（标题「历史对话」）。
+2. **新对话**：`CirclePlus` + 文案「新对话」，调用 **`createNewSessionForCurrentDocument()`**。
+3. **抽屉**：**`useEffect([isAiHistoryDrawerOpen])`** 在 **`open === true`** 时 **`refreshSessionListForCurrentDocument()`**；列表来自 **`sessionListForActiveDocument`**，点击项 **`switchSessionForCurrentDocument`** 后关抽屉。
+
+源码中 **`showAiSessionSwitcher`** 另含 **`Boolean(assistantStore.sessionListForActiveDocument)`**（getter 恒返回数组，故该条件在运行时常为真）；**ephemeral（未保存云端草稿）** 由 **`knowledgeAssistantPersistenceAllowed === false`** 排除，不展示多会话控件。更细的列表刷新时机见 **`knowledge-assistant-multi-session-frontend-implementation.md`**。
 
 ### 8.1 持久化开关同步、复制态清理、左侧清空输入防抖
 
@@ -1166,7 +1178,7 @@ bottomBarAssistantNode={
 
 ### 10.3 删除知识后的助手请求
 
-删除后主表会话已物理删除；前端可能仍 **`getAssistantSessionDetail`** 或 **`stopAssistantStream`**。后端 **不 404**（§4.5），前端在 **`fetchSessionMessagesForDocumentKey`** 中若见 **`payload.session == null`**，会 **`delete sessionByDocument[canonical]`** 且 **`delete stateByDocument[canonical]`**（整桶移除，见 §6.10）。
+删除后主表会话已物理删除；前端可能仍 **`getAssistantSessionDetail`** 或 **`stopAssistantStream`**。后端 **不 404**（§4.5）。**`activateForDocument`** 在详情 **`payload.session == null`** 时会 **`delete sessionByDocument` / `activeSessionByDocument`** 并清空该 **`stateBySession[sid]`** 的消息；**`switchSessionForCurrentDocument`** 遇空 session 时主要将 **`sstate.messages`** 置空（未必删映射）。遗留的 **`fetchSessionMessagesForDocumentKey`** 在 **`payload.session == null`** 时仍会 **`delete sessionByDocument[canonical]`** 与 **`delete stateByDocument[canonical]`**（见 §6.10）。
 
 ---
 
@@ -1447,7 +1459,7 @@ const sendKnowledgePromptCard = useCallback(
 
 - [ ] 未登录：助手区文案与禁用逻辑正确。
 - [ ] 新建云端草稿：可问答、刷新后对话消失；保存后对话进库且再开可加载。
-- [ ] 已保存条目：多轮、停止生成、`fetchSessionMessages` 对齐。
+- [ ] 已保存条目：多轮、停止生成、自然完成后 **`getAssistantSessionDetail(sid)`** 对齐。
 - [ ] 回收站预览：binding 前缀下会话隔离。
 - [ ] 本地 `__local_md__`：持久化允许为 true。
 - [ ] 清空草稿：助手气泡与映射清空。
@@ -1513,7 +1525,7 @@ async sendMessage(
 	//     : { sessionId: sid, content: text, ...optionalExtra },
 	// })
 
-	// onComplete：仅持久化路径 fetchSessionMessages，用 DB 最终态覆盖（含服务端 message id 等）
+	// onComplete：持久化路径对闭包 sid 调用 getAssistantSessionDetail，sessionId 校验通过后覆盖 messages
 }
 ```
 

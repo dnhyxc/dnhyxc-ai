@@ -81,14 +81,28 @@ export enum QdrantEnum {
 }
 
 export enum KnowledgeQaEnum {
-	/** Embedding 模型名（OpenAI 兼容接口），默认 text-embedding-3-small */
+	/**
+	 * 知识库向量模型名（硅基流动 OpenAI 兼容 `/v1/embeddings`），默认 BAAI/bge-large-zh-v1.5
+	 * @see https://docs.siliconflow.cn/cn/api-reference/embeddings/create-embeddings
+	 */
 	KNOWLEDGE_EMBEDDING_MODEL = 'KNOWLEDGE_EMBEDDING_MODEL',
 	/** QA 用的聊天模型名（OpenAI 兼容接口），默认沿用 DEEPSEEK_MODEL_NAME */
 	KNOWLEDGE_QA_MODEL = 'KNOWLEDGE_QA_MODEL',
 	/** 检索 topK，默认 10 */
 	KNOWLEDGE_QA_TOPK = 'KNOWLEDGE_QA_TOPK',
+	/** 硅基流动 API Key（Bearer），用于知识库 embedding + rerank */
+	SILICONFLOW_API_KEY = 'SILICONFLOW_API_KEY',
+	/** 硅基流动 API 根路径，默认 https://api.siliconflow.cn/v1 */
+	SILICONFLOW_BASE_URL = 'SILICONFLOW_BASE_URL',
+	/**
+	 * 知识库 rerank 模型名（硅基流动 `/v1/rerank`），默认 BAAI/bge-reranker-v2-m3
+	 * @see https://docs.siliconflow.cn/cn/api-reference/rerank/create-rerank
+	 */
+	KNOWLEDGE_RERANK_MODEL = 'KNOWLEDGE_RERANK_MODEL',
+	/** @deprecated 仅作兼容：未配置 SILICONFLOW_API_KEY 时可临时沿用旧键名 */
 	DASHSCOPE_API_KEY = 'DASHSCOPE_API_KEY',
+	/** @deprecated 硅基流动接入后不再使用 DashScope base URL */
 	DASHSCOPE_BASE_URL = 'DASHSCOPE_BASE_URL',
-	/** DashScope rerank 模型名，默认 qwen3-rerank */
+	/** @deprecated 请改用 KNOWLEDGE_RERANK_MODEL */
 	DASHSCOPE_RERANK_MODEL_NAME = 'DASHSCOPE_RERANK_MODEL_NAME',
 }

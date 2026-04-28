@@ -93,6 +93,9 @@ export const KNOWLEDGE_TRASH_DELETE_BATCH = '/knowledge/trash/delete-batch';
 
 /** 通用助手（智谱 GLM，多轮 session） 获取助手会话详情与消息（时间正序）*/
 export const ASSISTANT_SESSION = '/assistant/session';
+/** 按知识条目标识拉取该文章下全部会话（历史记录） */
+export const ASSISTANT_SESSIONS_FOR_KNOWLEDGE =
+	'/assistant/sessions/for-knowledge';
 /** 草稿对话迁入已保存知识条目 */
 export const ASSISTANT_SESSION_IMPORT_TRANSCRIPT =
 	'/assistant/session/import-transcript';

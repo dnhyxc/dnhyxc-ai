@@ -231,7 +231,8 @@ export class AssistantService {
 
 	async createSession(userId: number, dto?: CreateAssistantSessionDto) {
 		const articleId = dto?.knowledgeArticleId?.trim();
-		if (articleId) {
+		const forceNew = dto?.forceNew === true;
+		if (articleId && !forceNew) {
 			const existingId = await this.findLatestSessionIdByKnowledgeArticle(
 				userId,
 				articleId,
@@ -252,9 +253,37 @@ export class AssistantService {
 			userId,
 			title: dto?.title?.trim() || null,
 			knowledgeArticleId: articleId || null,
+			updatedAt: new Date(),
 		});
 		await this.sessionRepo.save(session);
 		return { sessionId: id, title: session.title };
+	}
+
+	/**
+	 * 按知识条目标识列出该文章下的全部会话（用于历史记录/切换会话）。
+	 */
+	async listSessionsByKnowledgeArticle(
+		userId: number,
+		knowledgeArticleId: string,
+	) {
+		const articleId = knowledgeArticleId.trim();
+		if (!articleId) {
+			throw new BadRequestException('knowledgeArticleId 不能为空');
+		}
+		const list = await this.sessionRepo.find({
+			where: { userId, knowledgeArticleId: articleId },
+			select: ['id', 'title', 'createdAt', 'updatedAt'],
+			order: { updatedAt: 'DESC' },
+		});
+		return {
+			knowledgeArticleId: articleId,
+			list: list.map((s) => ({
+				sessionId: s.id,
+				title: s.title,
+				createdAt: s.createdAt,
+				updatedAt: s.updatedAt,
+			})),
+		};
 	}
 
 	/**
@@ -638,10 +667,35 @@ export class AssistantService {
 		dto: ImportAssistantTranscriptDto,
 	): Promise<{ sessionId: string; inserted: number }> {
 		const articleId = dto.knowledgeArticleId.trim();
-		let sessionId = await this.findLatestSessionIdByKnowledgeArticle(
-			userId,
-			articleId,
-		);
+		const targetSid = dto.sessionId?.trim();
+		let sessionId: string | null = targetSid || null;
+
+		if (sessionId) {
+			const owned = await this.sessionRepo.findOne({
+				where: { id: sessionId, userId },
+				select: ['id', 'knowledgeArticleId'],
+			});
+			if (!owned) {
+				throw new NotFoundException('目标会话不存在');
+			}
+			// 防误写：必须属于同一 knowledgeArticleId（允许此前为 null 的会话在导入时绑定）
+			if (owned.knowledgeArticleId && owned.knowledgeArticleId !== articleId) {
+				throw new BadRequestException('目标会话不属于该知识条目');
+			}
+			if (!owned.knowledgeArticleId) {
+				await this.sessionRepo.update(
+					{ id: sessionId, userId },
+					{ knowledgeArticleId: articleId },
+				);
+			}
+		}
+
+		if (!sessionId) {
+			sessionId = await this.findLatestSessionIdByKnowledgeArticle(
+				userId,
+				articleId,
+			);
+		}
 		if (!sessionId) {
 			const id = randomUUID();
 			await this.sessionRepo.save(

@@ -42,6 +42,8 @@ function sha256(text: string): string {
 
 /**
  * 知识库 embedding 与 Qdrant 入库服务（一期：同步实现；后续可接 BullMQ 任务化）。
+ *
+ * 向量与重排：经硅基流动（SiliconFlow）OpenAI 兼容接口 `/v1/embeddings`、`/v1/rerank` 接入。
  */
 @Injectable()
 export class KnowledgeEmbeddingService {
@@ -57,37 +59,35 @@ export class KnowledgeEmbeddingService {
 		private readonly logger: LoggerService,
 	) {}
 
-	// 创建 embedding 客户端：封装 DashScope 调用、重试与解析
+	// 创建 embedding 客户端：封装硅基流动 `/v1/embeddings`（OpenAI 兼容）、重试与解析
 	private createEmbeddingsClient(): {
 		// 单条 query 向量
 		embedQuery: (text: string) => Promise<number[]>;
 		// 批量 document 向量
 		embedDocuments: (texts: string[]) => Promise<number[][]>;
 	} {
-		// 读取 API Key：优先 DASHSCOPE_API_KEY
+		// 读取 API Key：优先 SILICONFLOW_API_KEY，兼容旧环境 DASHSCOPE_API_KEY / QWEN_API_KEY
 		const apiKey =
+			this.config.get<string>(KnowledgeQaEnum.SILICONFLOW_API_KEY) ||
 			this.config.get<string>(KnowledgeQaEnum.DASHSCOPE_API_KEY) ||
 			this.config.get<string>(ModelEnum.QWEN_API_KEY) ||
 			'';
-		// 读取 baseURL：用于推导 origin
-		const baseURL =
-			this.config.get<string>(KnowledgeQaEnum.DASHSCOPE_BASE_URL) ||
-			'https://dashscope.aliyuncs.com';
-		// 校验 API Key
+		const baseURL = (
+			this.config.get<string>(KnowledgeQaEnum.SILICONFLOW_BASE_URL) ||
+			'https://api.siliconflow.cn/v1'
+		).replace(/\/$/, '');
 		if (!apiKey) {
 			throw new Error(
-				'缺少 DASHSCOPE_API_KEY（或 QWEN_API_KEY），无法进行知识库向量入库',
+				'缺少 SILICONFLOW_API_KEY（或兼容项 DASHSCOPE_API_KEY / QWEN_API_KEY），无法进行知识库向量入库',
 			);
 		}
-		// 读取模型名
 		const model =
 			this.config.get<string>(KnowledgeQaEnum.KNOWLEDGE_EMBEDDING_MODEL) ||
-			'qwen3-vl-embedding';
+			'BAAI/bge-large-zh-v1.5';
 
-		// 拼接 endpoint
-		const endpoint = `${baseURL}/api/v1/services/embeddings/multimodal-embedding/multimodal-embedding`;
+		const endpoint = `${baseURL}/embeddings`;
 
-		// 单次请求：对一批 texts 做向量化
+		// 单次请求：对一批 texts 做向量化（OpenAI 兼容：input 可为 string 或 string[]）
 		const callOnce = async (texts: string[]): Promise<number[][]> => {
 			const maxAttempts = 3;
 			for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -104,7 +104,8 @@ export class KnowledgeEmbeddingService {
 							},
 							body: JSON.stringify({
 								model,
-								input: { contents: texts.map((t) => ({ text: t })) },
+								input: texts.length === 1 ? texts[0] : texts,
+								encoding_format: 'float',
 							}),
 							signal: controller.signal,
 						});
@@ -116,7 +117,7 @@ export class KnowledgeEmbeddingService {
 								: e?.cause
 									? String(e.cause)
 									: '';
-						const msg = `DashScope 向量请求网络错误：${e?.message || String(err)}${causeMsg ? `（cause: ${causeMsg}）` : ''}；endpoint=${endpoint}；attempt=${attempt}/${maxAttempts}`;
+						const msg = `SiliconFlow 向量请求网络错误：${e?.message || String(err)}${causeMsg ? `（cause: ${causeMsg}）` : ''}；endpoint=${endpoint}；attempt=${attempt}/${maxAttempts}`;
 						if (attempt === maxAttempts) throw new Error(msg);
 						await new Promise((r) => setTimeout(r, 300 * attempt));
 						continue;
@@ -134,7 +135,7 @@ export class KnowledgeEmbeddingService {
 									? String(e.cause)
 									: '';
 						throw new Error(
-							`DashScope 读取响应失败：${e?.message || String(err)}${causeMsg ? `（cause: ${causeMsg}）` : ''}；endpoint=${endpoint}`,
+							`SiliconFlow 读取响应失败：${e?.message || String(err)}${causeMsg ? `（cause: ${causeMsg}）` : ''}；endpoint=${endpoint}`,
 						);
 					}
 
@@ -152,38 +153,30 @@ export class KnowledgeEmbeddingService {
 							rawText ||
 							`HTTP ${resp.status}`;
 						throw new Error(
-							`DashScope 向量请求失败：${msg}；status=${resp.status}；endpoint=${endpoint}`,
+							`SiliconFlow 向量请求失败：${msg}；status=${resp.status}；endpoint=${endpoint}`,
 						);
 					}
 
-					const embeddings =
-						json?.output?.embeddings ??
-						json?.output?.data ??
-						json?.data ??
-						json?.embeddings;
-					if (!Array.isArray(embeddings) || embeddings.length === 0) {
+					const data = json?.data;
+					if (!Array.isArray(data) || data.length === 0) {
 						throw new Error(
-							`DashScope 返回结构不包含 embeddings：${JSON.stringify(
+							`SiliconFlow 返回结构不包含 data[]：${JSON.stringify(
 								Object.keys(json || {}),
 							)}；endpoint=${endpoint}`,
 						);
 					}
 
-					const vectors = embeddings.map((e: any) => {
-						const v =
-							e?.embedding ??
-							e?.vector ??
-							e?.output?.embedding ??
-							e?.output?.vector ??
-							e?.embeddings ??
-							null;
-						if (Array.isArray(v)) return v;
-						if (Array.isArray(v?.dense)) return v.dense;
-						return null;
+					const sorted = [...data].sort(
+						(a: any, b: any) =>
+							(Number(a?.index) || 0) - (Number(b?.index) || 0),
+					);
+					const vectors = sorted.map((item: any) => {
+						const v = item?.embedding;
+						return Array.isArray(v) ? v : null;
 					});
 					if (vectors.some((v: any) => !Array.isArray(v))) {
 						throw new Error(
-							`DashScope 返回的 embedding 向量解析失败；endpoint=${endpoint}`,
+							`SiliconFlow 返回的 embedding 向量解析失败；endpoint=${endpoint}`,
 						);
 					}
 					return vectors as number[][];
@@ -191,13 +184,13 @@ export class KnowledgeEmbeddingService {
 					clearTimeout(timeout);
 				}
 			}
-			throw new Error('DashScope 向量请求失败：未知错误');
+			throw new Error('SiliconFlow 向量请求失败：未知错误');
 		};
 
-		// 分批调用：避免 batch size 限制
+		// 分批调用：硅基流动单请求 input 数组最多 32 条（见官方文档）
 		const callBatched = async (texts: string[]): Promise<number[][]> => {
 			const out: number[][] = [];
-			const batchSize = 10;
+			const batchSize = 32;
 			for (let i = 0; i < texts.length; i += batchSize) {
 				const batch = texts.slice(i, i + batchSize);
 				const vecs = await callOnce(batch);
@@ -243,24 +236,27 @@ export class KnowledgeEmbeddingService {
 		topN?: number;
 	}): Promise<KnowledgeRerankResult[]> {
 		const apiKey =
+			this.config.get<string>(KnowledgeQaEnum.SILICONFLOW_API_KEY) ||
 			this.config.get<string>(KnowledgeQaEnum.DASHSCOPE_API_KEY) ||
 			this.config.get<string>(ModelEnum.QWEN_API_KEY) ||
 			'';
 		if (!apiKey) {
 			throw new Error(
-				'缺少 DASHSCOPE_API_KEY（或 QWEN_API_KEY），无法进行 rerank',
+				'缺少 SILICONFLOW_API_KEY（或兼容项 DASHSCOPE_API_KEY / QWEN_API_KEY），无法进行 rerank',
 			);
 		}
 
 		const model =
+			this.config.get<string>(KnowledgeQaEnum.KNOWLEDGE_RERANK_MODEL) ||
 			this.config.get<string>(KnowledgeQaEnum.DASHSCOPE_RERANK_MODEL_NAME) ||
-			'qwen3-rerank';
+			'BAAI/bge-reranker-v2-m3';
 
-		const baseURL =
-			this.config.get<string>(KnowledgeQaEnum.DASHSCOPE_BASE_URL) ||
-			'https://dashscope.aliyuncs.com';
+		const baseURL = (
+			this.config.get<string>(KnowledgeQaEnum.SILICONFLOW_BASE_URL) ||
+			'https://api.siliconflow.cn/v1'
+		).replace(/\/$/, '');
 
-		const endpoint = `${baseURL}/api/v1/services/rerank/text-rerank/text-rerank`;
+		const endpoint = `${baseURL}/rerank`;
 
 		const query = (input.query ?? '').trim();
 		const documents = (input.documents ?? []).map((d) => String(d ?? ''));
@@ -292,12 +288,9 @@ export class KnowledgeEmbeddingService {
 						},
 						body: JSON.stringify({
 							model,
-							// DashScope rerank 期望 query/documents 位于 input 下（否则会报缺少 input.query / input.documents）
-							input: {
-								query,
-								documents,
-								top_n: topN,
-							},
+							query,
+							documents,
+							top_n: topN,
 						}),
 						signal: controller.signal,
 					});
@@ -309,7 +302,7 @@ export class KnowledgeEmbeddingService {
 							: e?.cause
 								? String(e.cause)
 								: '';
-					const msg = `DashScope rerank 请求网络错误：${e?.message || String(err)}${causeMsg ? `（cause: ${causeMsg}）` : ''}；endpoint=${endpoint}；attempt=${attempt}/${maxAttempts}`;
+					const msg = `SiliconFlow rerank 请求网络错误：${e?.message || String(err)}${causeMsg ? `（cause: ${causeMsg}）` : ''}；endpoint=${endpoint}；attempt=${attempt}/${maxAttempts}`;
 					if (attempt === maxAttempts) throw new Error(msg);
 					await new Promise((r) => setTimeout(r, 300 * attempt));
 					continue;
@@ -330,18 +323,18 @@ export class KnowledgeEmbeddingService {
 						rawText ||
 						`HTTP ${resp.status}`;
 					throw new Error(
-						`DashScope rerank 请求失败：${msg}；status=${resp.status}；endpoint=${endpoint}`,
+						`SiliconFlow rerank 请求失败：${msg}；status=${resp.status}；endpoint=${endpoint}`,
 					);
 				}
 
 				const results =
+					json?.results ??
 					json?.output?.results ??
 					json?.output?.data ??
-					json?.data ??
-					json?.results;
+					json?.data;
 				if (!Array.isArray(results)) {
 					throw new Error(
-						`DashScope rerank 返回结构不包含 results：${JSON.stringify(
+						`SiliconFlow rerank 返回结构不包含 results：${JSON.stringify(
 							Object.keys(json || {}),
 						)}；endpoint=${endpoint}`,
 					);
@@ -370,7 +363,7 @@ export class KnowledgeEmbeddingService {
 			}
 		}
 
-		throw new Error('DashScope rerank 请求失败：未知错误');
+		throw new Error('SiliconFlow rerank 请求失败：未知错误');
 	}
 
 	// Markdown 切分：标题优先、长度兜底、带 overlap
@@ -378,8 +371,9 @@ export class KnowledgeEmbeddingService {
 		const raw = `${input.title?.trim() || ''}\n\n${input.content ?? ''}`.trim();
 		if (!raw) return [];
 
-		const target = 1000;
-		const overlap = 160;
+		// 单条分片不宜过长：默认 embedding 模型 BAAI/bge-large-zh-v1.5 单条约 512 tokens 上限（硅基流动文档）
+		const target = 450;
+		const overlap = 72;
 		const lines = raw.split(/\r?\n/);
 
 		const blocks: string[] = [];
