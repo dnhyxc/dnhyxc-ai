@@ -1,3 +1,4 @@
+import { Label } from '@ui/index';
 import { observer } from 'mobx-react';
 import type { RefObject } from 'react';
 import ChatAssistantMessage from '@/components/design/ChatAssistantMessage';
@@ -73,8 +74,9 @@ export const KnowledgeMessageBubble = observer(function KnowledgeMessageBubble({
 			)}
 			data-msg-rev={streamRev}
 		>
-			<div
+			<Label
 				id="message-md-wrap"
+				htmlFor={message.chatId}
 				className={cn(
 					'relative flex min-w-0 max-w-full rounded-md p-3 select-auto text-textcolor mb-5',
 					message.role === 'user'
@@ -117,7 +119,7 @@ export const KnowledgeMessageBubble = observer(function KnowledgeMessageBubble({
 						/>
 					</div>
 				) : null}
-			</div>
+			</Label>
 		</div>
 	);
 });
