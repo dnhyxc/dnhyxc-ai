@@ -304,7 +304,7 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 									</Button>
 								) : null}
 							</div>
-							{loading ? (
+							{loading && stopGenerating ? (
 								<span
 									className={cn(
 										'inline-flex mb-1 h-8 w-8 items-center justify-center rounded-full',
@@ -331,7 +331,7 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 										sendMessage();
 										chatInputRef?.current?.focus();
 									}}
-									disabled={!input.trim()}
+									disabled={loading || !input.trim()}
 									className="lucide-stroke-draw-hover h-8.5 w-8.5 mb-1 flex items-center justify-center rounded-full bg-linear-to-r from-teal-500 to-cyan-600 [&_svg]:overflow-visible"
 								>
 									<Rocket className="-rotate-45" />
