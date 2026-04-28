@@ -2975,3 +2975,417 @@ async deleteSession(
 - **删除当前激活会话**：删除后自动切换到列表第一条，并且消息区能正常加载；
 - **流式会话**：右上角显示旋转 loading，hover 不出现删除图标，任何路径都不会删除；
 - **绕过 UI 调用接口（后端兜底）**：删除时仍会终止可能存在的流式写入（epoch/busy 清理生效）。
+
+---
+
+## 15. 文章分享复用会话分享链路（同接口 + 同页面 + URL 参数分流）
+
+本节目标：在不影响既有“会话分享（chat/assistant）”逻辑的前提下，新增“**知识文章分享**”能力，并要求：
+
+- **共用分享接口**：仍走 `POST /share/create` 与 `GET /share/get/:shareId`；
+- **共用分享页面**：仍访问 `/share/:shareId`，通过 URL 参数区分渲染；
+- **URL 参数控制分享目标**：例如 `?type=knowledge` 表示分享文章；
+- **兼容旧链接**：老的会话分享链接没有 `type` 参数，仍按会话分享渲染。
+
+### 15.1 设计取舍：为什么要引入 `shareType`
+
+- `sessionType` 只区分会话数据源（`chat` / `assistant`），不适合表达“文章 vs 会话”；
+- 文章分享不再是“消息列表”，而是“知识记录（title/content/updatedAt）”；
+- 因此新增 `shareType: 'session' | 'knowledge'`：
+	- `session`：沿用原逻辑；
+	- `knowledge`：在 `GET /share/get/:shareId` 中查询 `knowledge` 表并返回文章数据。
+
+### 15.2 后端：DTO 扩展（逐行注释）
+
+关键点：
+
+- `CreateShareDto` 增加 `shareType`（可选，默认 `session`）；
+- `ShareCacheData` 将 `shareType` 写入 Redis，供 `getShare` 决策；
+- `GetShareResponseDto` 增加可选的 `knowledge` 字段（仅文章分享返回）。
+
+```ts
+// 文件：apps/backend/src/services/share/dto/share.dto.ts
+// 片段：CreateShareDto / GetShareResponseDto / ShareCacheData（教学式摘录，语义与当前实现一致）
+
+export class CreateShareDto {
+	// chatSessionId：历史原因保留命名；当 shareType=knowledge 时复用为 knowledgeId（保持接口不变）
+	@IsString()
+	chatSessionId: string;
+
+	// shareType：分享目标类型；不传则默认 session（完全兼容旧前端）
+	@IsIn(['session', 'knowledge'])
+	@IsOptional()
+	shareType?: 'session' | 'knowledge';
+
+	// sessionType：仅在 shareType=session 时使用，用于选择 chat / assistant 会话数据源
+	@IsIn(['chat', 'assistant'])
+	@IsOptional()
+	sessionType?: 'chat' | 'assistant';
+
+	// messageIds：仅会话分享时可选；文章分享不使用该字段
+	@IsArray()
+	@IsString({ each: true })
+	@IsOptional()
+	messageIds?: string[];
+
+	// baseUrl：前端可传入用于拼接完整 shareUrl
+	@IsString()
+	@IsOptional()
+	baseUrl?: string;
+}
+
+export class GetShareResponseDto {
+	// shareId：URL 中的 shareId
+	shareId: string;
+	// title：分享标题（会话分享取对话标题；文章分享取知识标题）
+	title: string;
+	// createdAt / expiresAt：分享创建与过期时间戳
+	createdAt: number;
+	expiresAt?: number | null;
+
+	// shareType：返回给前端用于调试/扩展；核心渲染分流由 URL 参数 type 控制
+	@IsOptional()
+	shareType?: 'session' | 'knowledge';
+
+	// knowledge：仅当 shareType=knowledge 时返回文章数据（会话分享不返回该字段）
+	@IsOptional()
+	knowledge?: {
+		id: string;
+		title: string | null;
+		content: string;
+		createdAt: number;
+		updatedAt: number;
+	};
+}
+
+export interface ShareCacheData {
+	// shareId：Redis key 中也会包含该 id
+	shareId: string;
+	// chatSessionId：会话分享=chatSessionId；文章分享=knowledgeId（复用字段避免改接口）
+	chatSessionId: string;
+	// shareType：session / knowledge（决定 getShare 分支）
+	shareType?: 'session' | 'knowledge';
+	// sessionType：会话分享时用于选择 chat / assistant
+	sessionType?: 'chat' | 'assistant';
+	// messageIds：会话分享时可选
+	messageIds?: string[];
+	// createdAt / expiresAt：控制分享有效期
+	createdAt: number;
+	expiresAt: number | null;
+}
+```
+
+### 15.3 后端：ShareService 的分支与 URL 参数生成（逐行注释）
+
+关键点：
+
+- `createShare`：当 `shareType=knowledge` 时，返回的 `shareUrl` 自动拼上 `?type=knowledge`，使“通过 URL 参数控制渲染”天然成立；
+- `getShare`：先看 Redis 中的 `shareType`：
+	- `knowledge`：查 `knowledge` 表，返回 `{ knowledge: { ... } }`；
+	- `session`：完全沿用既有会话分享逻辑（chat/assistant）。
+
+```ts
+// 文件：apps/backend/src/services/share/share.service.ts
+// 片段：createShare / getShare（教学式摘录，语义与当前实现一致）
+
+async createShare(dto: CreateShareDto) {
+	// shareId：用于 URL 的随机 id（去掉 - 便于粘贴）
+	const shareId = randomUUID().replace(/-/g, '');
+	// now / expiresAt：控制分享有效期（默认 7 天）
+	const now = Date.now();
+	const expiresAt = now + DEFAULT_EXPIRES_IN;
+	// shareType：不传默认 session，确保旧前端不受影响
+	const shareType = dto.shareType ?? 'session';
+
+	// cacheData：写入 Redis 的最小参数集合（不查库，提升创建速度）
+	const cacheData: ShareCacheData = {
+		shareId,
+		chatSessionId: dto.chatSessionId,
+		shareType,
+		sessionType: dto.sessionType,
+		messageIds: dto.messageIds,
+		createdAt: now,
+		expiresAt,
+	};
+
+	// set：写入 Redis 并设置 TTL（到期自动清理）
+	await this.cache.set(this.getCacheKey(shareId), cacheData, DEFAULT_EXPIRES_IN);
+
+	// shareUrl：文章分享额外拼 `?type=knowledge`，会话分享保持原样
+	return {
+		shareId,
+		shareUrl: dto.baseUrl
+			? `${dto.baseUrl}/share/${shareId}${shareType === 'knowledge' ? '?type=knowledge' : ''}`
+			: `/share/${shareId}${shareType === 'knowledge' ? '?type=knowledge' : ''}`,
+		createdAt: now,
+		expiresAt,
+	};
+}
+
+async getShare(shareId: string) {
+	// 从 Redis 读取 cacheData：拿到 shareType / chatSessionId / sessionType / messageIds
+	const cacheData = await this.cache.get<ShareCacheData>(this.getCacheKey(shareId));
+	if (!cacheData) {
+		// 不存在或已过期：保持原接口的错误语义
+		throw new HttpException('分享不存在或已过期', HttpStatus.BAD_REQUEST);
+	}
+
+	// shareType=knowledge：chatSessionId 复用为 knowledgeId
+	if ((cacheData.shareType ?? 'session') === 'knowledge') {
+		const id = (cacheData.chatSessionId ?? '').trim();
+		// 查询 knowledge 表：只取必要字段
+		const row = await this.knowledgeRepo.findOne({
+			where: { id },
+			select: ['id', 'title', 'content', 'createdAt', 'updatedAt'],
+		});
+		if (!row) {
+			// 文章被删除等场景：返回 404
+			throw new NotFoundException('知识文章不存在');
+		}
+		// 返回文章数据：会话分享字段 messages 不出现
+		return {
+			shareId: cacheData.shareId,
+			shareType: 'knowledge',
+			title: row.title?.trim() || '知识分享',
+			createdAt: cacheData.createdAt,
+			expiresAt: cacheData.expiresAt,
+			knowledge: {
+				id: row.id,
+				title: row.title,
+				content: row.content ?? '',
+				createdAt: row.createdAt?.getTime?.() ?? Date.now(),
+				updatedAt: row.updatedAt?.getTime?.() ?? Date.now(),
+			},
+		};
+	}
+
+	// shareType=session：完全沿用既有会话分享逻辑（chat/assistant）
+	const resolved = await this.resolveShareMessagesBySessionId({
+		sessionId: cacheData.chatSessionId,
+		sessionType: cacheData.sessionType ?? 'chat',
+		messageIds: cacheData.messageIds,
+	});
+	return {
+		...(resolved.session ? resolved.session : {}),
+		messages: resolved.messages,
+		shareId: cacheData.shareId,
+		shareType: 'session',
+		title: resolved.title,
+		createdAt: cacheData.createdAt,
+		expiresAt: cacheData.expiresAt,
+	};
+}
+```
+
+### 15.4 前端：Share 弹窗复用（逐行注释）
+
+关键点：
+
+- `Share` 弹窗增加 `shareType` 参数；
+- 文章分享时传 `shareType="knowledge"`；
+- 仍复用 `createShare` 接口，不影响会话分享（默认不传 shareType 即为 session）。
+
+```tsx
+// 文件：apps/frontend/src/components/design/Share/index.tsx
+// 片段：ShareProps + onCreateShare（教学式摘录，语义与当前实现一致）
+
+interface ShareProps {
+	open: boolean;
+	onOpenChange: () => void;
+	checkedMessages: Set<string>;
+	sessionId?: string;
+	sessionType?: 'chat' | 'assistant';
+	// shareType：session / knowledge；不传默认 session
+	shareType?: 'session' | 'knowledge';
+}
+
+const onCreateShare = useCallback(async () => {
+	// loading：创建分享中禁用按钮
+	setLoading(true);
+	// chatSessionId：历史命名；文章分享时复用为 knowledgeId
+	const chatSessionId = sessionId ?? params?.id;
+	if (chatSessionId) {
+		// data：发给后端 createShare 的 payload
+		const data = {
+			chatSessionId,
+			sessionType, // 会话分享可能需要；文章分享可忽略
+			shareType,   // 关键：knowledge 时触发后端写入 shareType 并拼 `?type=knowledge`
+			baseUrl: import.meta.env.DEV
+				? import.meta.env.VITE_DEV_WEB_DOMAIN
+				: import.meta.env.VITE_PROD_WEB_DOMAIN,
+		};
+		// messageIds：仅当勾选集合非空时才传（会话分享用）
+		if (checkedMessages.size) {
+			(data as any).messageIds = [...checkedMessages];
+		}
+		const res = await createShare(data);
+		setLoading(false);
+		// ... 成功后复制 shareUrl（保持原行为） ...
+	}
+}, [params?.id, checkedMessages, sessionId, sessionType, shareType]);
+```
+
+知识页入口（文章分享按钮）：
+
+```tsx
+// 文件：apps/frontend/src/views/knowledge/index.tsx
+// 片段：onShareKnowledge + Share 挂载（教学式摘录，语义与当前实现一致）
+
+const [shareOpen, setShareOpen] = useState(false);
+const shareCheckedMessages = useMemo(() => new Set<string>(), []);
+
+// onShareKnowledge：只有保存到云端后（有 knowledgeEditingKnowledgeId）才允许分享
+const onShareKnowledge = useCallback(() => {
+	const id = (knowledgeStore.knowledgeEditingKnowledgeId ?? '').trim();
+	if (!id) {
+		Toast({ type: 'info', title: '请先保存到知识库后再分享' });
+		return;
+	}
+	setShareOpen(true);
+}, [knowledgeStore.knowledgeEditingKnowledgeId]);
+
+return (
+	<>
+		{/* ... 省略页面主体 ... */}
+		<Share
+			open={shareOpen}
+			onOpenChange={() => setShareOpen(false)}
+			checkedMessages={shareCheckedMessages} // 文章分享不需要 messageIds，传空集合即可
+			sessionId={knowledgeStore.knowledgeEditingKnowledgeId ?? undefined} // 复用为 knowledgeId
+			shareType="knowledge" // 关键：告诉后端这是文章分享
+		/>
+	</>
+);
+```
+
+### 15.5 分享页：同路由下按 URL 参数分流渲染（逐行注释）
+
+关键点：
+
+- 路由仍是 `/share/:shareId`；
+- 当 URL 含 `?type=knowledge` 时：渲染文章视图；
+- 否则保持原会话消息流渲染；
+- 文章视图复用现有的 `MdPreview`（`components/design/MdPreview`）渲染 markdown。
+
+```tsx
+// 文件：apps/frontend/src/views/share/index.tsx
+// 片段：读取 URL 参数并分流渲染（教学式摘录，语义与当前实现一致）
+
+const params = useParams();
+const location = useLocation();
+
+// knowledgeData：文章分享的数据容器；为 null 表示当前是会话分享
+const [knowledgeData, setKnowledgeData] = useState<{
+	id: string;
+	title: string | null;
+	content: string;
+	createdAt: number;
+	updatedAt: number;
+} | null>(null);
+
+const getShareData = async (id: string) => {
+	// type：从 URL 读取 `type=knowledge`，用于控制前端渲染分支
+	const type = new URLSearchParams(location.search).get('type');
+	// getShare：仍复用同一个接口
+	const res = await getShare<any>(id);
+	if (res.success) {
+		if (type === 'knowledge') {
+			// 文章分享：取 res.data.knowledge
+			setKnowledgeData(res.data?.knowledge ?? null);
+			// 清空 chatData，避免混渲染
+			setChatData(undefined);
+		} else {
+			// 会话分享：沿用旧逻辑
+			setChatData(res.data);
+			setKnowledgeData(null);
+		}
+	}
+};
+
+return (
+	<div>
+		{/* 文章分享不需要 ChatCodeFloatingToolbar（它服务于消息 code fence 吸顶） */}
+		{knowledgeData ? null : <ChatCodeFloatingToolbar />}
+
+		{/* header：根据 knowledgeData 切换标题文案 */}
+		<div className="text-base font-bold">
+			{knowledgeData ? '分享文章内容' : '分享对话内容'}
+		</div>
+
+		{/* body：knowledgeData 存在则渲染文章，否则渲染消息列表 */}
+		{knowledgeData ? (
+			<div>
+				<div className="text-lg font-bold">{knowledgeData.title?.trim() || '未命名'}</div>
+				<div className="text-xs">更新 {new Date(knowledgeData.updatedAt).toLocaleString()}</div>
+				<MdPreview value={knowledgeData.content ?? ''} />
+			</div>
+		) : (
+			<div>
+				{/* ... 旧的 chatData.messages 渲染逻辑保持不变 ... */}
+			</div>
+		)}
+	</div>
+);
+```
+
+---
+
+## 16. 将 Monaco 的 Markdown 预览组件抽为公共组件（迁入 `components/design/Markdown`）
+
+本节目标：把原本仅供 `Monaco` 使用的 `MarkdownPreview`（基于 `MarkdownParser`、支持 Mermaid 岛、支持 hash/目录滚动等）抽成公共组件，统一放到：
+
+- `apps/frontend/src/components/design/Markdown/index.tsx`
+
+要求：**不改变现有实现逻辑**，仅调整引用路径与导出位置，便于其它页面复用。
+
+### 16.1 迁移策略：保持实现文件不动，新增公共入口转导出
+
+为了最小化风险，本次采用“**入口转导出**”策略：
+
+- 仍保留实现文件 `components/design/Monaco/MarkdownPreview.tsx`（不改内部逻辑）；
+- 在 `components/design/Markdown/index.tsx` 中 **default re-export** 该组件；
+- 同时把 props 类型 `ParserMarkdownPreviewPaneProps` 导出，供外部使用；
+- `Monaco/index.tsx` 的 import 路径改为从公共入口引入。
+
+### 16.2 代码：公共入口 `components/design/Markdown/index.tsx`（逐行注释）
+
+```ts
+// 文件：apps/frontend/src/components/design/Markdown/index.tsx
+// 作用：作为公共入口，转导出 Monaco 的 ParserMarkdownPreviewPane，不改变任何实现逻辑
+
+// default export：直接把 Monaco/MarkdownPreview 的默认导出透传出去
+export { default } from '../Monaco/MarkdownPreview';
+
+// type export：把预览组件的 props 类型也一并对外暴露
+export type { ParserMarkdownPreviewPaneProps } from '../Monaco/MarkdownPreview';
+```
+
+### 16.3 代码：实现文件仅导出类型（逐行注释）
+
+为了让上面的 `export type { ... }` 可用，需要把原本文件内的 interface 变为导出接口（不改任何字段）：
+
+```ts
+// 文件：apps/frontend/src/components/design/Monaco/MarkdownPreview.tsx
+// 片段：把 interface 改为 export interface（仅影响类型可见性，不影响运行逻辑）
+
+export interface ParserMarkdownPreviewPaneProps {
+	markdown: string;
+	viewportRef?: RefObject<HTMLDivElement | null>;
+	documentIdentity?: string;
+	onViewportScrollFollow?: () => void;
+	showPreviewScrollCornerFab?: boolean;
+	enableMermaid?: boolean;
+}
+```
+
+### 16.4 代码：Monaco 改用公共入口（逐行注释）
+
+```ts
+// 文件：apps/frontend/src/components/design/Monaco/index.tsx
+// 片段：import 路径调整（逻辑不变）
+
+// 旧：import ParserMarkdownPreviewPane from './MarkdownPreview';
+// 新：从公共入口引入，便于其它页面复用与统一管理
+import ParserMarkdownPreviewPane from '@/components/design/Markdown';
+```
+
