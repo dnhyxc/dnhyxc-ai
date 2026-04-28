@@ -61,13 +61,10 @@ export function useKnowledgeAssistantShare(params: {
 	const { shareSelection } = shareFlow;
 
 	// 被点击分享的消息已由 ChatMessageActions 内部 setCheckedMessage 处理，这里只负责进入分享模式
-	const onShare = useCallback(
-		(_message?: Message) => {
-			if (!allowAiShare) return;
-			if (!shareSelection.isSharing) shareSelection.setIsSharing(true);
-		},
-		[allowAiShare, shareSelection],
-	);
+	const onShare = useCallback(() => {
+		if (!allowAiShare) return;
+		if (!shareSelection.isSharing) shareSelection.setIsSharing(true);
+	}, [allowAiShare, shareSelection]);
 
 	const onCloseShareModel = useCallback(() => {
 		setShareModelVisible(false);

@@ -26,7 +26,7 @@ interface Props {
 	}) => void | Promise<void>;
 }
 
-function TrashRow(props: {
+interface TrashRowProps {
 	item: KnowledgeTrashListItem;
 	checked: boolean;
 	/** 当前预览（回填到编辑器）的条目：选中态需与知识库列表一致 */
@@ -34,7 +34,9 @@ function TrashRow(props: {
 	onToggleChecked: (id: string) => void;
 	onActivate: (item: KnowledgeTrashListItem) => void | Promise<void>;
 	onDeleteClick: (e: React.MouseEvent, item: KnowledgeTrashListItem) => void;
-}) {
+}
+
+const TrashRow = (props: TrashRowProps) => {
 	const {
 		item,
 		checked,
@@ -46,6 +48,7 @@ function TrashRow(props: {
 	const onKeyDown = (e: React.KeyboardEvent) => {
 		if (e.key === 'Enter') {
 			e.preventDefault();
+			// 使用 void 操作符调用 onActivate(item)，忽略其返回值（包括 Promise），无需处理异步结果
 			void onActivate(item);
 		}
 		if (e.key === ' ') {
@@ -67,7 +70,7 @@ function TrashRow(props: {
 						: 'hover:bg-theme/10',
 			)}
 		>
-			<div className="flex items-start justify-between gap-2 min-w-0 w-full">
+			<div className="relative flex items-start justify-between gap-2 min-w-0 w-full">
 				<div className="flex min-w-0 flex-1 items-start gap-2">
 					<Checkbox
 						checked={checked}
@@ -86,8 +89,9 @@ function TrashRow(props: {
 					type="button"
 					aria-label="从回收站彻底删除"
 					className={cn(
-						'cursor-pointer shrink-0 p-1 rounded-md text-textcolor/80 transition-opacity duration-150',
-						'hidden group-hover:block',
+						'absolute right-0 top-0 cursor-pointer items-center justify-center h-7 w-7 rounded-md text-textcolor/80 transition-opacity duration-150',
+						'hidden group-hover:flex',
+						'items-center justify-center',
 						'hover:text-destructive hover:bg-destructive/10',
 					)}
 					onClick={(e) => onDeleteClick(e, item)}
@@ -100,7 +104,7 @@ function TrashRow(props: {
 			</div>
 		</div>
 	);
-}
+};
 
 const KnowledgeTrashList: React.FC<Props> = observer(
 	({ open, onOpenChange, onPick }) => {

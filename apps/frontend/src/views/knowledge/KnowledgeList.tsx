@@ -48,8 +48,7 @@ interface IProps {
 	allowCloudList?: boolean;
 }
 
-/** 单行：点击打开详情；删除图标与数据库列表一致，仅行 hover 时显示 */
-function KnowledgeListRow(props: {
+interface KnowledgeListRowProps {
 	item: KnowledgeListItem;
 	selected: boolean;
 	onActivate: (item: KnowledgeListItem) => void;
@@ -60,7 +59,9 @@ function KnowledgeListRow(props: {
 		e: React.MouseEvent,
 		item: KnowledgeListItem,
 	) => void;
-}) {
+}
+
+const KnowledgeListRow = (props: KnowledgeListRowProps) => {
 	const {
 		item,
 		selected,
@@ -90,7 +91,7 @@ function KnowledgeListRow(props: {
 				<div className="flow-root flex-1 min-w-0 max-w-full font-medium wrap-anywhere">
 					{item.title?.trim() || '未命名'}
 				</div>
-				<div className="flex shrink-0 items-start gap-1">
+				<div className="relative flex shrink-0 items-start gap-1">
 					{showOpenInExternalEditor &&
 					item.localAbsolutePath &&
 					onOpenInExternalEditorClick ? (
@@ -119,8 +120,9 @@ function KnowledgeListRow(props: {
 							item.localAbsolutePath ? '删除本地 Markdown 文件' : '从知识库删除'
 						}
 						className={cn(
-							'cursor-pointer shrink-0 p-1 rounded-md text-textcolor/80 transition-opacity duration-150',
-							'hidden group-hover:block',
+							'absolute right-0 top-0 cursor-pointer items-center justify-center h-7 w-7 rounded-md text-textcolor/80 transition-opacity duration-150',
+							'hidden group-hover:flex',
+							'items-center justify-center',
 							'hover:text-destructive hover:bg-destructive/10',
 						)}
 						onClick={(e) => onTrashClick(e, item)}
@@ -134,7 +136,7 @@ function KnowledgeListRow(props: {
 			</div>
 		</div>
 	);
-}
+};
 
 const KnowledgeList: React.FC<IProps> = observer(
 	({

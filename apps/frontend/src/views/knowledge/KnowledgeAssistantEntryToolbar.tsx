@@ -198,9 +198,8 @@ export const KnowledgeAssistantEntryToolbar = observer(
 										? s.title.trim()
 										: `对话 ${s.sessionId.slice(0, 8)}`;
 									return (
-										<button
+										<div
 											key={s.sessionId}
-											type="button"
 											className={cn(
 												'group relative cursor-pointer w-full text-left rounded-md px-2.5 py-2 hover:bg-theme/10 transition-colors',
 												active ? 'bg-theme/10' : '',
@@ -221,8 +220,8 @@ export const KnowledgeAssistantEntryToolbar = observer(
 													<Spinner className="size-4 text-textcolor/60" />
 												</span>
 											) : (
-												<button
-													type="button"
+												<Button
+													variant="link"
 													className="cursor-pointer absolute right-2 top-2 hidden group-hover:flex items-center justify-center h-7 w-7 rounded-md text-textcolor/70 hover:text-red-500 hover:bg-red-500/10"
 													aria-label="删除对话"
 													onClick={(e) => {
@@ -232,7 +231,7 @@ export const KnowledgeAssistantEntryToolbar = observer(
 													}}
 												>
 													<Trash2 className="h-4 w-4" />
-												</button>
+												</Button>
 											)}
 											<div className="text-sm text-textcolor line-clamp-1">
 												{title}
@@ -242,7 +241,7 @@ export const KnowledgeAssistantEntryToolbar = observer(
 													? new Date(s.updatedAt).toLocaleString()
 													: ''}
 											</div>
-										</button>
+										</div>
 									);
 								})}
 								{showLoadMoreHint ? (
