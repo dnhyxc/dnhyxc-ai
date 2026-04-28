@@ -504,6 +504,7 @@ sequenceDiagram
 | 后端服务 | `apps/backend/src/services/assistant/assistant.service.ts` |
 | 前端 Store | `apps/frontend/src/store/assistant.ts` |
 | 前端助手 UI | `apps/frontend/src/views/knowledge/KnowledgeAssistant.tsx` |
+| 流式时消息操作（复制/保存） | `KnowledgeAssistant` 对流式条目不挂载操作条；通用逻辑见 `apps/frontend/src/components/design/ChatMessageActions/index.tsx`；**详 `knowledge-assistant-complete.md` §8.2.1** |
 | 前端助手输入区工具条 | `apps/frontend/src/views/knowledge/KnowledgeAssistantEntryToolbar.tsx`（多会话入口与模式切换；详注见 `knowledge-assistant-complete.md` §8.3.4） |
 | 前端贴底 Hook | `apps/frontend/src/hooks/useStickToBottomScroll.ts`（可选 `idleFlushKey`；详注见 `knowledge-assistant-complete.md` §8.3.1–§8.3.2） |
 | 前端知识页编排 | `apps/frontend/src/views/knowledge/index.tsx` |

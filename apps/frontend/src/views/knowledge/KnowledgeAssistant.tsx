@@ -138,22 +138,25 @@ const KnowledgeMessageBubble = observer(function KnowledgeMessageBubble({
 					/>
 				)}
 
-				<div
-					className={cn(
-						'absolute -bottom-9',
-						message.role === 'user' ? 'right-0' : 'left-0',
-					)}
-				>
-					<ChatMessageActions
-						message={message}
-						index={index}
-						isCopyedId={isCopyedId}
-						messagesLength={messagesLength}
-						onCopy={onCopy}
-						needShare={false}
-						onSaveToKnowledge={onSaveToKnowledge}
-					/>
-				</div>
+				{/* 仅当前正在流式输出的那条助手消息隐藏操作条，其余消息照常展示 */}
+				{!message.isStreaming ? (
+					<div
+						className={cn(
+							'absolute -bottom-9',
+							message.role === 'user' ? 'right-0' : 'left-0',
+						)}
+					>
+						<ChatMessageActions
+							message={message}
+							index={index}
+							isCopyedId={isCopyedId}
+							messagesLength={messagesLength}
+							needShare={false}
+							onCopy={onCopy}
+							onSaveToKnowledge={onSaveToKnowledge}
+						/>
+					</div>
+				) : null}
 			</div>
 		</div>
 	);

@@ -556,6 +556,8 @@ export class KnowledgeRagQaStore {
 
 文件：`apps/frontend/src/views/knowledge/KnowledgeAssistant.tsx`
 
+**流式输出时的消息操作条**（复制、保存到知识库）：AI 与 RAG 共用同一套气泡与 **`ChatMessageActions`**；**正在流式输出的那条**（`message.isStreaming`）在知识库侧**不展示**操作条，通用组件内仍对复制/保存做禁用兜底。完整说明见 **`knowledge-assistant-complete.md` §8.2.1**。
+
 ### 5.1 模式切换：默认 AI，RAG 独立输入 `ragInput`
 
 ```ts

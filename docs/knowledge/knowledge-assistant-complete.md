@@ -861,9 +861,44 @@ useEffect(() => {
   绑定到 DOM **`data-msg-rev`**，使 MobX 在流式阶段 **稳定订阅** 正文长度、思考区长度与流式标记（注释：**消息内容版本戳**，语义化依赖，非 hack 预读）。
 - **布局**：根 `div` 使用 **`min-w-0 max-w-full flex-1`** 等，避免 flex 子项被代码块/长行 **撑破 ScrollArea**；用户气泡 **`items-end`**，气泡容器用户侧 **`w-fit self-end`** + 青色浅底边框，助手侧 **`flex-1`** + theme 浅底。
 - **`ChatAssistantMessage`**：用户消息传入额外 **`className`** 约束 markdown-body 的 **`min-w-0` / `max-w-full` / `overflow-x-auto`**；助手消息传入 **`scrollViewportRef`**，供 **代码块吸顶条** 与 **MdPreview 懒挂载**。
-- **`ChatMessageActions`**：绝对定位在气泡 **`message-md-wrap`** 下方（`-bottom-9`）；用户 **`right-0`**，助手 **`left-0`**；**`needShare={false}`**；**`onSaveToKnowledge`** 由父级传入（见下）。
+- **`ChatMessageActions`**：绝对定位在气泡 **`message-md-wrap`** 下方（`-bottom-9`）；用户 **`right-0`**，助手 **`left-0`**；**`needShare={false}`**；**`onSaveToKnowledge`** 由父级传入（见下）。**流式输出期间**与通用组件行为的差异见 **§8.2.1**。
 
 **`onSaveToKnowledge`（父组件 `useCallback`）**：取 **`message.content`** trim，空则 Toast「没有可写入的正文」；否则 **`cur = knowledgeStore.markdown.trimEnd()`**，若 **`cur`** 非空则 **`next = cur + 两个换行 + body + 单个换行`**，否则 **`next = body + 单个换行`**，再 **`knowledgeStore.setMarkdown(next)`**，Toast「已追加到当前知识文档」。
+
+#### 8.2.1 流式输出期间：复制、保存到知识库与操作条显隐
+
+**产品目标**：助手回复仍在 **SSE 流式（streaming）** 写入 **`Message.content` / 思考区** 时，**正文未稳定**，不应复制半成品，也不应「保存到知识库」写入编辑器。须 **只约束当前正在输出的那条消息**（`message.isStreaming === true`），历史气泡保持可复制、可保存。
+
+**实现分两层**（职责分离，避免仅靠子组件隐藏仍被 hover 误点）：
+
+| 层级 | 文件 | 行为 |
+| --- | --- | --- |
+| **知识库气泡父级** | `apps/frontend/src/views/knowledge/KnowledgeAssistant.tsx` 内 **`KnowledgeAssistantMessageBubble`** | 当 **`message.isStreaming`** 为真时 **不渲染** 包裹 **`ChatMessageActions`** 的外层 **`div`**（`absolute -bottom-9` 整块不出现）。**仅**影响当前流式条；**`!message.isStreaming`** 的其它消息照常展示操作条。用户消息通常无 **`isStreaming`**，不受影响。 |
+| **通用消息操作组件** | `apps/frontend/src/components/design/ChatMessageActions/index.tsx` | 内部根据 **`blockCopySaveWhileStreaming = Boolean(message.isStreaming)`**：流式时对 **复制**、**保存到知识库** 使用 **`opacity-30`、`pointer-events-none`（及/或 `onClick` 早退）**、`title` 提示「输出完成后可…」。**ChatBot**、**分享页** 等仍挂载该组件、未在父级整段隐藏时，用户仍能看到操作区轮廓但无法点复制/保存，避免其它入口误用半成品。 |
+
+**设计说明**：
+
+1. **为何知识库要整段不挂载**：知识库侧产品要求「流式时不展示操作」，避免空占位或 hover 区域干扰阅读；条件渲染比仅禁用图标更干净。
+2. **为何组件内仍保留 `blockCopySaveWhileStreaming`**：同一 **`ChatMessageActions`** 被 **`ChatBotView`** 等复用；若仅改 **`KnowledgeAssistant`**，其它页面在流式未完成时仍可误点复制；组件内兜底形成**统一安全边界**（知识库为「隐藏 + 双保险」，其它为「禁用」）。
+3. **判定依据**：以消息模型上的 **`isStreaming`** 为准（**`Message`** 类型见 **`apps/frontend/src/types/chat.ts`**），由 **`assistantStore`** / **`knowledgeRagQaStore`** 在流式开始、结束、停止时维护，与 **`assistantStore.isStreaming`** 等会话级聚合字段区分：本条 **`message.isStreaming`** 才对应「本条仍在输出」。
+
+**代码锚点（与源码一致，维护时以源文件为准）**：
+
+```tsx
+// KnowledgeAssistant.tsx — KnowledgeAssistantMessageBubble 内（节选）
+{!message.isStreaming ? (
+	<div className={cn('absolute -bottom-9', message.role === 'user' ? 'right-0' : 'left-0')}>
+		<ChatMessageActions /* needShare={false}, onSaveToKnowledge, ... */ />
+	</div>
+) : null}
+```
+
+```tsx
+// ChatMessageActions/index.tsx（节选；思路说明）
+const blockCopySaveWhileStreaming = Boolean(message.isStreaming);
+// 复制：<Copy /> 在 block 时为 opacity-30 + pointer-events-none，title「输出完成后可复制」
+// 保存：<LayersPlus /> 外层在 block 时为 cursor-not-allowed opacity-30 pointer-events-none，title「输出完成后可保存到知识库」
+```
 
 ### 8.3 滚动、贴底、代码块浮动工具栏
 
@@ -1442,6 +1477,7 @@ bottomBarAssistantNode={
 | 前端助手 UI             | `apps/frontend/src/views/knowledge/KnowledgeAssistant.tsx`                                                                                                                                                                     |
 | 前端助手输入区工具条    | `apps/frontend/src/views/knowledge/KnowledgeAssistantEntryToolbar.tsx`（`ChatEntry.entryChildren`：历史抽屉 / 新对话 / AI·RAG 切换）                                                                                            |
 | 前端贴底滚动 Hook       | `apps/frontend/src/hooks/useStickToBottomScroll.ts`（含可选 `idleFlushKey` 非流式贴底）                                                                                                                                          |
+| 前端消息操作条（通用） | `apps/frontend/src/components/design/ChatMessageActions/index.tsx`（流式时禁用复制/保存；详 **§8.2.1**）                                                                                                                      |
 | 前端知识页              | `apps/frontend/src/views/knowledge/index.tsx`                                                                                                                                                                                  |
 | 前端常量                | `apps/frontend/src/views/knowledge/constants.ts`（`KNOWLEDGE_ASSISTANT_PROMPTS`、`KnowledgeAssistantPromptKind`、本地目录常量等）                                                                                                  |
 | 前端助手工具            | `apps/frontend/src/views/knowledge/utils.ts`（`isKnowledgeLocalMarkdownId`、`knowledgeAssistantArticleBinding`、`knowledgeAssistantDocumentKey`、`buildKnowledgeAssistantDocumentMessage`）                                        |
