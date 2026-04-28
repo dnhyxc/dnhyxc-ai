@@ -793,7 +793,7 @@ const streamId = this.activeState.ephemeralStreamId;
 
 | Prop | 类型 | 说明 |
 | --- | --- | --- |
-| `documentKey` | `string` | **必填**。与 Markdown 编辑器 **`documentIdentity`** 一致；驱动 **`activateForDocument`** 与 **`useStickToBottomScroll` 的 `resetKey`**。 |
+| `documentKey` | `string` | **必填**。与 Markdown 编辑器 **`documentIdentity`** 一致；驱动 **`activateForDocument`**；与 **`useStickToBottomScroll`** 的 **`resetKey` / `idleFlushKey`** 组合见 **§8.3**。 |
 | `input` | `string` | **可选**。传入则由父组件 **受控** 助手输入框（知识页把状态抬到 `index.tsx`，便于编辑器右键等外部入口写草稿）。 |
 | `setInput` | `(value: string) => void` | **可选**。与 `input` 成对使用；不传则组件内 **`useState('')`** 非受控。 |
 
@@ -801,8 +801,8 @@ const streamId = this.activeState.ephemeralStreamId;
 
 - **`isLoggedIn`**：`Boolean(userStore.userInfo?.id)`。
 - **`editorHasBody`**：`Boolean((knowledgeStore.markdown ?? '').trim())`——既影响 **占位与快捷卡片** 是否出现，也驱动 **`ChatEntry.disableTextInput`** 与 **发送前校验**（快捷卡片会 Toast「请先在左侧编辑器输入正文」）。
-- **`messages`**：`assistantStore.messages`（MobX，observer 自动追踪）。
-- **`streamScrollTick`**（与贴底 hook、代码块 toolbar、角标刷新共用）：  
+- **`messages`**：**AI / RAG 双模式**下为 **`isRagMode ? knowledgeRagQaStore.messages : assistantStore.messages`**（MobX，`observer` 自动追踪）。
+- **`streamScrollTick`**（与贴底 hook、代码块 toolbar、角标刷新共用，基于当前 **`messages`**）：  
   - 有最后一条消息时：`` `${messages.length}:${lastMsg.chatId}:${lastMsg.content.length}:${lastMsg.thinkContent?.length ?? 0}:${lastMsg.isStreaming ? 1 : 0}` ``  
   - 否则：`String(messages.length)`。  
   语义：**消息列表版本戳**，流式阶段随 `content` / `thinkContent` / `isStreaming` 变化，驱动 **`useStickToBottomScroll` 的 `contentRevision`** 与布局类 effect。
@@ -867,11 +867,12 @@ useEffect(() => {
 
 ### 8.3 滚动、贴底、代码块浮动工具栏
 
-**`useStickToBottomScroll`**（`apps/frontend/src/hooks/useStickToBottomScroll.ts`）入参：
+**`useStickToBottomScroll`**（`apps/frontend/src/hooks/useStickToBottomScroll.ts`）入参（**AI / RAG 双模式**下由 `isRagMode` 分支；详见 **§8.3.1–§8.3.3**）：
 
-- **`isStreaming: assistantStore.isStreaming`**
-- **`contentRevision: streamScrollTick`**
-- **`resetKey: documentKey || undefined`**（换文档重置 hook 内部滚动状态）
+- **`isStreaming`**：RAG 时为 **`knowledgeRagQaStore.isStreaming`**，AI 时为 **`assistantStore.isStreaming`**。
+- **`contentRevision: streamScrollTick`**：由当前模式下的 **`messages`** 末条推导（条数、`chatId`、正文/思考区长度、`isStreaming`），流式阶段随 token 变化。
+- **`resetKey`**：RAG 时为固定 **`'knowledge-rag-qa-global'`**；AI 时为模板字符串 `` `${documentKey}:session:${activeSessionId ?? 'none'}` ``（**换文档或换会话**时重置 hook 内部跟底与 `scrollTop` 观测，避免沿用上一会话滚动状态）。
+- **`idleFlushKey`**（可选）：AI 模式传入 **`aiIdleFlushKey`**（见 §8.3.3）；RAG 时传 **`null`** 以清除 hook 内「非流式已贴底」记忆，避免切回 AI 时误判已滚过。
 
 解构：**`viewportRef` → `scrollViewportRef`**、**`scrollViewportHandlers`**、**`enableStickToBottom` → `enableStreamStickToBottom`**、**`disableStickToBottom` → `disableStreamStickToBottom`**、**`flushScrollToBottom`**。
 
@@ -880,8 +881,8 @@ useEffect(() => {
 
 **`useChatCodeFloatingToolbar`**（`scrollViewportRef as RefObject<HTMLElement | null>`）：
 
-- **`layoutDeps: [streamScrollTick, documentKey, messages.length]`**——助手正文/流式增量会变高，**勿仅用 `knowledgeStore.markdown`**，否则代码块工具条不重排。
-- **`passiveScrollLayout: true`**，**`passiveScrollDeps: [documentKey, messages.length, streamScrollTick, assistantStore.isStreaming]`**——滚动时由父级统一 **`relayout`**（见下）。
+- **`layoutDeps`**：含 **`streamScrollTick`**、**`documentKey`**、**`messages.length`**、**`isRagMode`**、**`knowledgeRagQaStore.isStreaming`**——双模式下正文/流式增量会变高，**勿仅用 `knowledgeStore.markdown`**。
+- **`passiveScrollLayout: true`**，**`passiveScrollDeps`**：含 **`documentKey`**、**`messages.length`**、**`streamScrollTick`**，以及 **`isRagMode ? knowledgeRagQaStore.isStreaming : assistantStore.isStreaming`**——滚动时由父级统一 **`relayout`**。
 
 **`scrollAreaHandlers`（`useMemo`）**：从 **`scrollViewportHandlers`** 拆出 **`onScroll`**，包装为：
 
@@ -891,7 +892,227 @@ useEffect(() => {
 
 展开到 **`<ScrollArea {...scrollAreaHandlers} />`**，并设置 **`viewportClassName="pb-1 [overflow-anchor:none]"`**（关闭 overflow-anchor，减少浏览器自动滚动锚点干扰）、**`className="min-h-0 flex-1"`**、**`ref={scrollViewportRef}`**。
 
-**页面结构**：根 **`relative flex h-full w-full flex-col overflow-hidden`**；顶部 **`ChatCodeFloatingToolbar`**（与 hook 配套）；中间历史区或空态；底部 **`ChatEntry`** 包在 **`isLoggedIn`** 条件内（未登录整块输入区不渲染——与知识页 **`bottomBarAssistantNode`** gate 叠加时，以入口层为准）。
+**页面结构**：根 **`relative flex h-full w-full flex-col overflow-hidden`**；顶部 **`ChatCodeFloatingToolbar`**（与 hook 配套）；中间历史区或空态；底部 **`ChatEntry`** 包在 **`isLoggedIn`** 条件内（未登录整块输入区不渲染——与知识页 **`bottomBarAssistantNode`** gate 叠加时，以入口层为准）。**`ChatEntry.entryChildren`** 由独立组件 **`KnowledgeAssistantEntryToolbar`** 渲染（见 **§8.3.4**）。
+
+#### 8.3.1 实现思路：非流式为何要 `idleFlushKey`
+
+Hook 内随 **`contentRevision`** 自动 **`flushScrollToBottom`** 的 **`useLayoutEffect`** 在 **`!isStreaming` 时直接 return**（见源码 `useStickToBottomScroll.ts`）。因此仅依赖 **`isStreaming` + `contentRevision`** 时，下列场景**不会**自动贴底：
+
+- 进入助手、**历史拉取结束**后首屏有消息但当前不在流式；
+- **切换会话**后消息列表替换且非流式；
+- **MdPreview / 图片**等异步撑高 **`scrollHeight`**，首帧 `flush` 仍可能停在旧位置。
+
+**做法**：在 hook 中增加可选 **`idleFlushKey`**。调用方用短字符串描述「当前应视为一次新的非流式列表形态」；**`null` / 空串**表示不就绪（加载中、无消息、RAG 模式），hook **清除**已应用 key，待就绪后再滚；**非空且与上次不同**时 **恢复跟底**并在一帧链路内多次 **`flush`**（含 **`setTimeout(0)`**），与流式贴底互补且不抢同一条消息内的 **`contentRevision`** 粒度（同一条仅正文变长仍由流式分支处理）。
+
+#### 8.3.2 实现代码：`useStickToBottomScroll` 中与 `idleFlushKey` 相关的接口与 `useLayoutEffect`（逐行注释）
+
+下列为 **`apps/frontend/src/hooks/useStickToBottomScroll.ts`** 中与 **`idleFlushKey`** 直接相关的片段在文档中的**逐行注释版**（逻辑与仓库源码一致；维护时以源文件为准）。
+
+```typescript
+// --- 选项类型：调用方可传可不传；不传则完全不跑 idle 贴底逻辑 ---
+idleFlushKey?: string | null;
+
+// --- 解构时重命名为 idleFlushKeyProp，避免与 effect 内局部变量混淆 ---
+idleFlushKey: idleFlushKeyProp,
+} = options;
+
+// --- 记录「上一次已对哪个 idleFlushKey 执行过贴底」，用于去重，避免每帧重复滚 ---
+const idleFlushAppliedKeyRef = useRef<string | null>(null);
+
+// --- 布局阶段执行：保证在浏览器绘制前尽量把 scrollTop 对齐到最新 scrollHeight ---
+useLayoutEffect(() => {
+	// --- 未传 idleFlushKey：旧组件完全不启用本能力，零行为变化 ---
+	if (idleFlushKeyProp === undefined) return;
+	// --- 传 null 或 ''：表示「当前不就绪」，清除记忆；例如历史加载中、消息数为 0、RAG 模式传 null 清 AI 残留 ---
+	if (idleFlushKeyProp === null || idleFlushKeyProp === '') {
+		idleFlushAppliedKeyRef.current = null;
+		return;
+	}
+	// --- 与上次已贴底的 key 相同：同一次列表形态，不再打断用户阅读 ---
+	if (idleFlushAppliedKeyRef.current === idleFlushKeyProp) return;
+	// --- 记下本次 key，后续相同 key 的重复渲染不再贴底 ---
+	idleFlushAppliedKeyRef.current = idleFlushKeyProp;
+
+	// --- 与 enableStickToBottom() 等价：恢复「跟底」内部开关 ---
+	stickToBottomRef.current = true;
+	// --- 立即滚一次：处理首帧布局 ---
+	flushScrollToBottom();
+	requestAnimationFrame(() => {
+		// --- 下一帧再滚：处理 Radix ScrollArea / flex 子树晚一帧的高度 ---
+		flushScrollToBottom();
+		requestAnimationFrame(() => {
+			// --- 再下一帧再滚：进一步对齐内层 table/flex 包裹导致的高度稳定时机 ---
+			flushScrollToBottom();
+			window.setTimeout(() => {
+				// --- 宏任务再滚：覆盖 MdPreview、图片 onload 等异步撑高 scrollHeight ---
+				flushScrollToBottom();
+			}, 0);
+		});
+	});
+}, [idleFlushKeyProp, flushScrollToBottom]); // --- 仅当 key 或 flush 回调引用变化时重跑 ---
+```
+
+#### 8.3.3 实现代码：`KnowledgeAssistant.tsx` 中 `aiIdleFlushKey` 与 `useStickToBottomScroll` 调用（逐行注释）
+
+下列为 **`apps/frontend/src/views/knowledge/KnowledgeAssistant.tsx`** 中与 **`aiIdleFlushKey`**、**hook 入参** 对应的**逐行注释版**（与仓库源码一致；若分隔符或字段与源文件有出入，以源文件为准）。
+
+```typescript
+// --- 仅在 AI 模式、历史已就绪、且至少有一条消息时返回非空串；否则返回 null 让 hook 清记忆 ---
+const aiIdleFlushKey = useMemo((): string | null => {
+	if (isRagMode) return null; // --- RAG：不跑 AI 的 idle 贴底；传 null 清 hook 内 idle 状态 ---
+	if (assistantStore.isHistoryLoading) return null; // --- 加载中：不就绪，避免在 Loading 与列表切换中间态误滚 ---
+	if (aiMessages.length === 0) return null; // --- 无消息：ScrollArea 可能未挂载消息列表，不生成 key ---
+	const first = aiMessages[0]; // --- 首条：参与签名，区分「仅首部变化」等少见形态（与实现保持一致）---
+	const last = aiMessages[aiMessages.length - 1]; // --- 末条：新用户消息会改 last.chatId，触发再贴底 ---
+	// --- 签名：documentKey + 会话 + 条数 + 首尾 chatId，用 '-' 连接；任一段变化即视为列表形态变化 ---
+	return `${documentKey}-${assistantStore.activeSessionId ?? ''}-${aiMessages.length}-${first?.chatId ?? ''}-${last?.chatId ?? ''}`;
+}, [
+	isRagMode,
+	documentKey,
+	assistantStore.activeSessionId,
+	assistantStore.isHistoryLoading,
+	aiMessages.length,
+	aiMessages[0]?.chatId,
+	aiMessages[aiMessages.length - 1]?.chatId,
+]);
+
+const {
+	viewportRef: scrollViewportRef,
+	scrollViewportHandlers,
+	enableStickToBottom: enableStreamStickToBottom,
+	disableStickToBottom: disableStreamStickToBottom,
+	flushScrollToBottom,
+} = useStickToBottomScroll({
+	isStreaming: isRagMode
+		? knowledgeRagQaStore.isStreaming
+		: assistantStore.isStreaming, // --- 双模式流式来源 ---
+	contentRevision: streamScrollTick, // --- 流式内容版本：同一条消息内增量靠它跟底 ---
+	resetKey: isRagMode
+		? 'knowledge-rag-qa-global'
+		: documentKey
+			? `${documentKey}:session:${assistantStore.activeSessionId ?? 'none'}` // --- AI：文档 + 会话切换时重置内部滚动观测 ---
+			: undefined,
+	idleFlushKey: aiIdleFlushKey, // --- AI：非流式就绪贴底；RAG 时 aiIdleFlushKey 为 null ---
+});
+```
+
+#### 8.3.4 实现思路与代码：`KnowledgeAssistantEntryToolbar`（输入区上工具条）
+
+**文件**：`apps/frontend/src/views/knowledge/KnowledgeAssistantEntryToolbar.tsx`。
+
+**思路**：将 **`ChatEntry.entryChildren`** 内「历史对话按钮 + 新对话 + Drawer 列表 + AI/RAG 模式切换」整段 UI 与交互**原样迁出**，父组件 **`KnowledgeAssistant.tsx`** 只传入布尔、状态 setter、贴底回调与模式，**不改变**锁定 Toast、**`switchSessionForCurrentDocument`** 成功后的 **`enableStreamStickToBottom` + `flushScrollToBottom` + `requestAnimationFrame`** 等行为。
+
+**为何包 `observer`**：子组件内直接读取 **`assistantStore.sessionListForActiveDocument`**、**`activeSessionId`** 并调用 store 方法；用 **`observer`** 包裹才能在列表/当前会话变化时**自动重渲染**，与原先写在父 `observer` 内时 MobX 订阅范围等价。
+
+**Props 一览**：
+
+| Prop | 含义 |
+| --- | --- |
+| `showAiSessionSwitcher` | 是否展示多会话入口（父级已按持久化、登录、列表非空等合成） |
+| `isAiSessionSwitcherLocked` | 草稿迁入等场景下禁止切会话 / 新对话 |
+| `isAiHistoryDrawerOpen` / `setIsAiHistoryDrawerOpen` | 历史 Drawer 受控开关 |
+| `enableStreamStickToBottom` / `flushScrollToBottom` | 来自 `useStickToBottomScroll`，会话切换后贴底 |
+| `assistantMode` / `setAssistantMode` | `'ai' \| 'rag'` 与 setter |
+
+**逐行注释摘录**（在仓库源码基础上为文档追加行尾/行上注释；**以 `KnowledgeAssistantEntryToolbar.tsx` 为准**）：
+
+> **说明**：仓库源码中组件参数为**解构写法**（`{ showAiSessionSwitcher, ... }`）；下块为便于逐项标注，统一写作 **`props.xxx`**，语义与解构等价。
+
+```tsx
+// 文件：apps/frontend/src/views/knowledge/KnowledgeAssistantEntryToolbar.tsx（节选 + 文档注释）
+
+export interface KnowledgeAssistantEntryToolbarProps {
+	showAiSessionSwitcher: boolean; // 父级已合成：持久化 + 登录 + 会话列表非空等
+	isAiSessionSwitcherLocked: boolean; // 草稿迁入等：禁止打开历史 / 新对话
+	isAiHistoryDrawerOpen: boolean; // Drawer 受控 open
+	setIsAiHistoryDrawerOpen: Dispatch<SetStateAction<boolean>>; // 父级 state setter
+	enableStreamStickToBottom: () => void; // 切会话后恢复跟底
+	flushScrollToBottom: () => void; // 切会话后视口贴底
+	assistantMode: KnowledgeAssistantMode['id']; // 'ai' | 'rag'
+	setAssistantMode: (m: KnowledgeAssistantMode['id']) => void; // 与父级 localStorage 偏好同步
+}
+
+export const KnowledgeAssistantEntryToolbar = observer(
+	function KnowledgeAssistantEntryToolbar(props: KnowledgeAssistantEntryToolbarProps) {
+		// observer：读取 assistantStore.sessionListForActiveDocument / activeSessionId 时自动订阅 MobX
+		return (
+			<div className="flex w-full items-center gap-2 pb-1">
+				{props.showAiSessionSwitcher ? (
+					<div className="flex w-full items-center gap-2">
+						<Button
+							disabled={props.isAiSessionSwitcherLocked} // 锁定时按钮灰显
+							onClick={() => {
+								if (props.isAiSessionSwitcherLocked) {
+									Toast({ type: 'info', title: '正在保存对话，请稍后再查看历史对话' });
+									return; // 不打开抽屉
+								}
+								props.setIsAiHistoryDrawerOpen(true); // 打开历史 Drawer
+							}}
+						>
+							<Clock className="h-4 w-4" />
+						</Button>
+						<Button
+							disabled={props.isAiSessionSwitcherLocked}
+							onClick={() => {
+								if (props.isAiSessionSwitcherLocked) {
+									Toast({ type: 'info', title: '正在保存对话，请稍后再新建对话' });
+									return;
+								}
+								void assistantStore.createNewSessionForCurrentDocument(); // 新建或复用空会话（store 内逻辑）
+							}}
+						>
+							<CirclePlus />
+							新对话
+						</Button>
+						<Drawer
+							open={props.isAiHistoryDrawerOpen}
+							onOpenChange={(next) => {
+								if (next && props.isAiSessionSwitcherLocked) {
+									Toast({ type: 'info', title: '正在保存对话，请稍后再查看历史对话' });
+									return; // 阻止在锁定态打开抽屉，避免未落库时切会话
+								}
+								props.setIsAiHistoryDrawerOpen(next);
+							}}
+						>
+							{assistantStore.sessionListForActiveDocument.length === 0 ? (
+								<div>暂无历史对话</div>
+							) : (
+								assistantStore.sessionListForActiveDocument.map((s) => (
+									<button
+										key={s.sessionId}
+										type="button"
+										onClick={() => {
+											void assistantStore
+												.switchSessionForCurrentDocument(s.sessionId)
+												.then(() => {
+													props.setIsAiHistoryDrawerOpen(false); // 关抽屉
+													props.enableStreamStickToBottom(); // 恢复跟底
+													props.flushScrollToBottom();
+													requestAnimationFrame(() => props.flushScrollToBottom()); // 再贴一帧，对齐 ScrollArea 高度
+												});
+										}}
+									>
+										{/* title / updatedAt 展示略；与源码一致 */}
+									</button>
+								))
+							)}
+						</Drawer>
+					</div>
+				) : null}
+				<div className="flex w-full items-center gap-2">
+					{KNOWLEDGE_ASSISTANT_MODES.map((item) => (
+						<Button key={item.id} onClick={() => props.setAssistantMode(item.id)}>
+							{/* icon + label 略 */}
+						</Button>
+					))}
+				</div>
+			</div>
+		);
+	},
+);
+```
+
+> 上表为**缩略结构**（省略 `className`、`title`、`width` 等与行为无关的样式属性）；**完整可编译 TSX** 以仓库 **`KnowledgeAssistantEntryToolbar.tsx`** 为准，行为与迁出前 **`KnowledgeAssistant.tsx`** 内联实现一致。
 
 ### 8.4 空会话 UI、首屏快捷卡片与 `sendMessage` / `sendKnowledgePromptCard`
 
@@ -936,8 +1157,8 @@ useEffect(() => {
 - **`input` / `setInput`**：受控或非受控由 props 决定（见 §8.0）。
 - **`className="w-full pl-0.5 pr-0.5 pb-4.5 border-theme/10"`**，**`textareaClassName="min-h-9"`**。
 - **`placeholder`**：`editorHasBody` 为真时「请输入您的问题」，否则「请先在左侧编辑器输入正文后再向我提问」。
-- **`disableTextInput={!editorHasBody}`**。
-- **`loading={isSending || isHistoryLoading}`**（流式中 **`isSending`** 在 store 里与首轮请求绑定，停止后会清）。
+- **`disableTextInput={isRagMode ? false : !editorHasBody}`**（RAG 不依赖左侧正文；AI 仍要求先有正文）。
+- **`loading`**：**RAG** 时为 **`knowledgeRagQaStore.isSending`**；**AI** 时为 **`assistantStore.isSending || assistantStore.isHistoryLoading`**（流式中 **`isSending`** 在 store 里与首轮请求绑定，停止后会清）。
 
 快捷卡片与 **`extraUserContentForModel`** 的后端契约见 **§13**。
 
@@ -955,8 +1176,9 @@ useEffect(() => {
 
 | 条件                  | 含义                                          |
 | --------------------- | --------------------------------------------- |
+| `!isRagMode`          | 仅 **AI 模式** 展示（RAG 另有 **`showRagNewConversation`** 与独立贴底 effect） |
 | `isLoggedIn`          | 已登录                                        |
-| `messages.length > 0` | 已进入对话列表                                |
+| `aiMessages.length > 0` | 已进入 **AI** 对话列表（源码用 `aiMessages`，非 RAG 的 `messages`） |
 | `editorHasBody`       | 左侧编辑器有正文，润色/总结才有文档可带给模型 |
 | `!isHistoryLoading`   | 不在拉取历史                                  |
 | `!isSending`          | 不在发送请求生命周期内（含等待首包）          |
@@ -967,12 +1189,14 @@ useEffect(() => {
 #### 8.5.3 实现要点（逐条）
 
 1. 从 **`useStickToBottomScroll`** 解构 **`flushScrollToBottom`**，与既有 `enableStreamStickToBottom` 并存。
-2. 定义布尔 **`showPostStreamActions`**（上表条件合成），供 JSX 与 `useLayoutEffect` 共用。
+2. 定义布尔 **`showPostStreamActions`**（上表条件合成，含 **`!isRagMode`** 与 **`aiMessages.length`**），供 JSX 与 `useLayoutEffect` 共用。
 3. **`useLayoutEffect`** 依赖 **`[showPostStreamActions, flushScrollToBottom]`**：当 `showPostStreamActions === true` 时调用 **`flushScrollToBottom()`**，并在 **`requestAnimationFrame`** 内再调用一次；`false` 时不做事。
 4. **渲染位置**：在 **`ScrollArea`** 内、`messages.map(...)` **之后**，与气泡同一 **`max-w-3xl mx-auto`** 列容器内；条带内 **`KNOWLEDGE_ASSISTANT_PROMPTS.map`** 渲染按钮（与首屏卡片同源 `kind` / 标题，避免文案分叉）。
 5. **与流式跟底的关系**：流式阶段仍由 `useStickToBottomScroll` 根据 `isStreaming` / `contentRevision` 跟底；条带仅在 idle 出现，**贴底由本节 `useLayoutEffect` 补偿**，二者职责不重复。
 
 #### 8.5.4 代码摘录（含源码注释）
+
+下列摘录与 **`KnowledgeAssistant.tsx`** 当前实现一致；**完整 hook 入参（含 `idleFlushKey`）**见 **§8.3.3**。
 
 ```tsx
 // 文件：apps/frontend/src/views/knowledge/KnowledgeAssistant.tsx（节选；与源码一致）
@@ -984,15 +1208,23 @@ const {
 	disableStickToBottom: disableStreamStickToBottom,
 	flushScrollToBottom,
 } = useStickToBottomScroll({
-	isStreaming: assistantStore.isStreaming,
+	isStreaming: isRagMode
+		? knowledgeRagQaStore.isStreaming
+		: assistantStore.isStreaming, // --- AI / RAG 分支 ---
 	contentRevision: streamScrollTick,
-	resetKey: documentKey || undefined,
+	resetKey: isRagMode
+		? 'knowledge-rag-qa-global'
+		: documentKey
+			? `${documentKey}:session:${assistantStore.activeSessionId ?? 'none'}`
+			: undefined,
+	idleFlushKey: aiIdleFlushKey, // --- 见 §8.3.3；进入助手 / 历史就绪 / 切会话等非流式贴底 ---
 });
 
 /** 流式/发送结束后展示「重新总结/润色」条带（跟在消息后，见下方 ScrollArea 内渲染） */
 const showPostStreamActions =
+	!isRagMode && // --- 非 RAG ---
 	isLoggedIn &&
-	messages.length > 0 &&
+	aiMessages.length > 0 && // --- 与上表一致：用 AI 消息列表 ---
 	editorHasBody &&
 	!assistantStore.isHistoryLoading &&
 	!assistantStore.isSending &&
@@ -1000,10 +1232,17 @@ const showPostStreamActions =
 
 // 条带插入后 scrollHeight 变化，须在布局后贴底，否则用户仍停在旧滚动位置
 useLayoutEffect(() => {
-	if (!showPostStreamActions) return;
+	if (!showPostStreamActions) return; // --- 未展示条带则不滚，避免无意义 flush ---
+	flushScrollToBottom(); // --- 布局后立刻贴底 ---
+	requestAnimationFrame(() => flushScrollToBottom()); // --- 下一帧再贴：高度晚一帧稳定 ---
+}, [showPostStreamActions, flushScrollToBottom]); // --- 条带显隐或 flush 引用变化时重跑 ---
+
+// RAG「新对话」条带出现后同样贴底（与 AI 条带分离，条件为 showRagNewConversation）
+useLayoutEffect(() => {
+	if (!showRagNewConversation) return;
 	flushScrollToBottom();
 	requestAnimationFrame(() => flushScrollToBottom());
-}, [showPostStreamActions, flushScrollToBottom]);
+}, [showRagNewConversation, flushScrollToBottom]);
 ```
 
 ```tsx
@@ -1039,11 +1278,13 @@ useLayoutEffect(() => {
 flushScrollToBottom: () => void;
 
 const flushScrollToBottom = useCallback(() => {
-	const vp = viewportRef.current;
-	if (!vp) return;
-	vp.scrollTop = vp.scrollHeight;
+	const vp = viewportRef.current; // --- Radix ScrollArea 将 ref 挂在 Viewport ---
+	if (!vp) return; // --- 列表未挂载（例如仍在 Loading）则 noop ---
+	vp.scrollTop = vp.scrollHeight; // --- 物理底部：依赖浏览器同步后的 scrollHeight ---
 }, []);
 ```
+
+**补充**：非流式、依赖 **`idleFlushKey`** 的多次 `flush`（含 `setTimeout(0)`）见 **§8.3.2**，与上段「单次 flush 函数本体」是**组合使用**关系。
 
 ### 8.6 右下角滚动角标按钮：置底 / 置顶（与 Monaco 预览一致）
 
@@ -1199,6 +1440,8 @@ bottomBarAssistantNode={
 | 前端 Store              | `apps/frontend/src/store/assistant.ts`                                                                                                                                                                                         |
 | 前端 SSE                | `apps/frontend/src/utils/assistantSse.ts`                                                                                                                                                                                      |
 | 前端助手 UI             | `apps/frontend/src/views/knowledge/KnowledgeAssistant.tsx`                                                                                                                                                                     |
+| 前端助手输入区工具条    | `apps/frontend/src/views/knowledge/KnowledgeAssistantEntryToolbar.tsx`（`ChatEntry.entryChildren`：历史抽屉 / 新对话 / AI·RAG 切换）                                                                                            |
+| 前端贴底滚动 Hook       | `apps/frontend/src/hooks/useStickToBottomScroll.ts`（含可选 `idleFlushKey` 非流式贴底）                                                                                                                                          |
 | 前端知识页              | `apps/frontend/src/views/knowledge/index.tsx`                                                                                                                                                                                  |
 | 前端常量                | `apps/frontend/src/views/knowledge/constants.ts`（`KNOWLEDGE_ASSISTANT_PROMPTS`、`KnowledgeAssistantPromptKind`、本地目录常量等）                                                                                                  |
 | 前端助手工具            | `apps/frontend/src/views/knowledge/utils.ts`（`isKnowledgeLocalMarkdownId`、`knowledgeAssistantArticleBinding`、`knowledgeAssistantDocumentKey`、`buildKnowledgeAssistantDocumentMessage`）                                        |

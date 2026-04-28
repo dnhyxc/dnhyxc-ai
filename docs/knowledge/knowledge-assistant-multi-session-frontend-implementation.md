@@ -10,6 +10,7 @@
 > 相关入口：
 >
 > - UI：`apps/frontend/src/views/knowledge/KnowledgeAssistant.tsx`
+> - 输入区工具条（历史抽屉 / 新对话 / 模式切换）：`apps/frontend/src/views/knowledge/KnowledgeAssistantEntryToolbar.tsx`
 > - Store：`apps/frontend/src/store/assistant.ts`
 > - API：`apps/frontend/src/service/api.ts`、`apps/frontend/src/service/index.ts`
 
@@ -36,6 +37,7 @@
 
 - **入口文件**
   - `apps/frontend/src/views/knowledge/KnowledgeAssistant.tsx`
+  - `apps/frontend/src/views/knowledge/KnowledgeAssistantEntryToolbar.tsx`（`ChatEntry.entryChildren`：与多会话相关的按钮与 Drawer，由父组件传入锁定态与贴底回调）
 
 - **关键依赖**
   - **Store（MobX）**：`apps/frontend/src/store/assistant.ts`
@@ -539,8 +541,10 @@ onComplete: async (err) => {
 
 实现原则：**抽屉只负责展示列表与触发切换**，切换逻辑仍然复用 store 方法，从而保持行为一致。
 
+**实现位置**：上述 UI 已从 **`KnowledgeAssistant.tsx`** 拆至 **`KnowledgeAssistantEntryToolbar.tsx`**，由 **`ChatEntry.entryChildren={ <KnowledgeAssistantEntryToolbar ... /> }`** 挂载；父组件仍持有 **`isAiHistoryDrawerOpen`** 状态及下列 **`useEffect`**（打开抽屉时刷新会话列表），与拆分前一致。
+
 ```tsx
-// KnowledgeAssistant.tsx — ChatEntry.entryChildren（与当前实现一致；样式为 link + 边框圆按钮等）
+// KnowledgeAssistant.tsx — 状态与刷新逻辑仍在父组件（与当前实现一致）
 const [isAiHistoryDrawerOpen, setIsAiHistoryDrawerOpen] = useState(false);
 
 useEffect(() => {
@@ -548,18 +552,12 @@ useEffect(() => {
   void assistantStore.refreshSessionListForCurrentDocument();
 }, [isAiHistoryDrawerOpen]);
 
+// entryChildren 内：KnowledgeAssistantEntryToolbar（observer + assistantStore 列表）
 // 同一行内：先「历史」圆形按钮，再「新对话」，再 Drawer；其后另起 flex 放 AI/RAG 模式切换
-<Button aria-label="历史对话" onClick={() => setIsAiHistoryDrawerOpen(true)}>
-  <Clock className="h-4 w-4" />
-</Button>
-<Button onClick={() => void assistantStore.createNewSessionForCurrentDocument()}>
-  <CirclePlus />
-  新对话
-</Button>
-<Drawer title="历史对话" open={isAiHistoryDrawerOpen} onOpenChange={setIsAiHistoryDrawerOpen}>
-  {/* 列表项：title 或「对话」+ sessionId 前 8 位；时间用 new Date(s.updatedAt).toLocaleString() */}
-</Drawer>
+// 锁定态、Toast、switchSession 成功后 enableStreamStickToBottom + flushScrollToBottom 等见该子文件
 ```
+
+**逐行注释版 UI 与交互**、**非流式贴底 `idleFlushKey`** 与 **`useStickToBottomScroll` 扩展**见主文档 **`docs/knowledge/knowledge-assistant-complete.md` §8.3、§8.3.1–§8.3.4、§8.5.4**。
 
 > 注意：历史抽屉中**不包含“新对话”按钮/条目**（已按产品要求移除）。
 
