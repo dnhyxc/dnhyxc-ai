@@ -289,6 +289,24 @@ const KnowledgeAssistant = observer(
 				? `${messages.length}:${lastMsg.chatId}:${lastMsg.content.length}:${lastMsg.thinkContent?.length ?? 0}:${lastMsg.isStreaming ? 1 : 0}`
 				: String(messages.length);
 
+		/** AI 模式非流式就绪贴底签名，交给 `useStickToBottomScroll.idleFlushKey`（RAG 传 null 以清除内部记忆） */
+		const aiIdleFlushKey = useMemo((): string | null => {
+			if (isRagMode) return null;
+			if (assistantStore.isHistoryLoading) return null;
+			if (aiMessages.length === 0) return null;
+			const first = aiMessages[0];
+			const last = aiMessages[aiMessages.length - 1];
+			return `${documentKey}-${assistantStore.activeSessionId ?? ''}-${aiMessages.length}-${first?.chatId ?? ''}-${last?.chatId ?? ''}`;
+		}, [
+			isRagMode,
+			documentKey,
+			assistantStore.activeSessionId,
+			assistantStore.isHistoryLoading,
+			aiMessages.length,
+			aiMessages[0]?.chatId,
+			aiMessages[aiMessages.length - 1]?.chatId,
+		]);
+
 		const {
 			viewportRef: scrollViewportRef,
 			scrollViewportHandlers,
@@ -302,7 +320,10 @@ const KnowledgeAssistant = observer(
 			contentRevision: streamScrollTick,
 			resetKey: isRagMode
 				? 'knowledge-rag-qa-global'
-				: documentKey || undefined,
+				: documentKey
+					? `${documentKey}:session:${assistantStore.activeSessionId ?? 'none'}`
+					: undefined,
+			idleFlushKey: aiIdleFlushKey,
 		});
 
 		// 切换到 RAG 助手时：将消息区滚到底部（仅在进入 RAG 的瞬间触发，不改变 AI 模式行为）

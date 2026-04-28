@@ -39,6 +39,13 @@ export interface UseStickToBottomScrollOptions {
 	interruptOnWheelUpWhileStreaming?: boolean;
 	/** 流式时指针在视口按下是否解除跟底，默认 true */
 	interruptOnPointerDownWhileStreaming?: boolean;
+	/**
+	 * 非流式（idle）就绪贴底：与 `isStreaming` + `contentRevision` 的贴底互补。
+	 * - 未传（`undefined`）：不启用该逻辑。
+	 * - `null` 或空串：清除「已贴底」记忆，不就绪时不滚（例如加载中、无列表）。
+	 * - 非空串且与上次不同：恢复跟底并在一帧内多次 `flush`（含 `setTimeout(0)`，覆盖 MdPreview/图片晚一拍撑高）。
+	 */
+	idleFlushKey?: string | null;
 }
 
 export interface StickToBottomScrollViewportHandlers {
@@ -63,6 +70,8 @@ export interface UseStickToBottomScrollResult {
 /**
  * 可滚动容器「内容增长时自动贴底 + 用户上滑/滚轮打断」的通用逻辑，
  * 适用于聊天、日志、SSE 文本区等；与 Radix `ScrollArea` 的 Viewport ref 配合使用。
+ *
+ * 流式贴底由 `isStreaming` + `contentRevision` 驱动；历史加载完成、切换会话等非流式场景可传 `idleFlushKey` 补滚。
  */
 export function useStickToBottomScroll(
 	options: UseStickToBottomScrollOptions,
@@ -75,12 +84,14 @@ export function useStickToBottomScroll(
 		releaseBeyondBottomPx = DEFAULT_STICK_RELEASE_BOTTOM_PX,
 		interruptOnWheelUpWhileStreaming = true,
 		interruptOnPointerDownWhileStreaming = true,
+		idleFlushKey: idleFlushKeyProp,
 	} = options;
 
 	const viewportRef = useRef<HTMLDivElement>(null);
 	const stickToBottomRef = useRef(true);
 	const suppressStickFromViewportScrollRef = useRef(false);
 	const lastViewportScrollTopRef = useRef<number | null>(null);
+	const idleFlushAppliedKeyRef = useRef<string | null>(null);
 
 	useEffect(() => {
 		if (resetKey === undefined || resetKey === null) return;
@@ -171,6 +182,28 @@ export function useStickToBottomScroll(
 			});
 		});
 	}, [contentRevision, isStreaming, flushScrollToBottom]);
+
+	useLayoutEffect(() => {
+		if (idleFlushKeyProp === undefined) return;
+		if (idleFlushKeyProp === null || idleFlushKeyProp === '') {
+			idleFlushAppliedKeyRef.current = null;
+			return;
+		}
+		if (idleFlushAppliedKeyRef.current === idleFlushKeyProp) return;
+		idleFlushAppliedKeyRef.current = idleFlushKeyProp;
+
+		stickToBottomRef.current = true;
+		flushScrollToBottom();
+		requestAnimationFrame(() => {
+			flushScrollToBottom();
+			requestAnimationFrame(() => {
+				flushScrollToBottom();
+				window.setTimeout(() => {
+					flushScrollToBottom();
+				}, 0);
+			});
+		});
+	}, [idleFlushKeyProp, flushScrollToBottom]);
 
 	const scrollViewportHandlers = useMemo<StickToBottomScrollViewportHandlers>(
 		() => ({
