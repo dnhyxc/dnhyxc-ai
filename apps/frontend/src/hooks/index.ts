@@ -5,6 +5,8 @@ import { isTauriRuntime } from '@/utils/runtime';
 export * from './theme';
 export * from './useMarkdownHashLinkViewportScroll';
 export * from './useMermaidImagePreview';
+export * from './useShareFlow';
+export * from './useShareSelection.ts';
 export * from './useStickToBottomScroll';
 
 export const useCountdown = (initialTime = 60, storageKey = 'countdown') => {

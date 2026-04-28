@@ -17,12 +17,18 @@ interface ShareProps {
 	open: boolean;
 	onOpenChange: () => void;
 	checkedMessages: Set<string>;
+	/** 可选：当不从路由 params 取 sessionId 时由外部注入（例如知识库助手分享） */
+	sessionId?: string;
+	/** 可选：不传则默认 chat；知识库助手分享建议传 assistant，避免后端走错误回退 */
+	sessionType?: 'chat' | 'assistant';
 }
 
 const Share: React.FC<ShareProps> = ({
 	open,
 	onOpenChange,
 	checkedMessages,
+	sessionId,
+	sessionType,
 }) => {
 	const [shareInfo, setShareInfo] = useState<ShareInfo>();
 	const [copied, setCopied] = useState(false);
@@ -41,14 +47,16 @@ const Share: React.FC<ShareProps> = ({
 
 	const onCreateShare = useCallback(async () => {
 		setLoading(true);
-		const chatSessionId = params?.id;
+		const chatSessionId = sessionId ?? params?.id;
 		if (chatSessionId) {
 			const data: {
 				chatSessionId: string;
+				sessionType?: 'chat' | 'assistant';
 				messageIds?: string[];
 				baseUrl?: string;
 			} = {
 				chatSessionId,
+				sessionType,
 				baseUrl: import.meta.env.DEV
 					? import.meta.env.VITE_DEV_WEB_DOMAIN
 					: import.meta.env.VITE_PROD_WEB_DOMAIN, // http://localhost:9226
@@ -74,7 +82,7 @@ const Share: React.FC<ShareProps> = ({
 				});
 			}
 		}
-	}, [params?.id, checkedMessages, theme]);
+	}, [params?.id, checkedMessages, theme, sessionId]);
 
 	const onCopy = async (shareUrl: string) => {
 		try {

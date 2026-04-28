@@ -900,6 +900,362 @@ const blockCopySaveWhileStreaming = Boolean(message.isStreaming);
 // 保存：<LayersPlus /> 外层在 block 时为 cursor-not-allowed opacity-30 pointer-events-none，title「输出完成后可保存到知识库」
 ```
 
+#### 8.2.2 AI 助手分享：与 ChatBot 通用的分享状态机 + 知识库侧接入
+
+**目标**：在不影响既有消息渲染、复制/保存、流式贴底等逻辑前提下，为 **AI 助手**接入“与 ChatBot 一致”的分享能力：
+
+- **分享勾选模式**（isSharing）：出现勾选框，支持全选/取消全选；
+- **成对勾选**：按「一问一答」成组勾选（user + assistant 两条）；
+- **创建分享链接**：复用现有分享弹窗 `ShareChat`；
+- **通用维护**：把“分享状态机”抽为公共 hooks（ChatBot 与 Assistant 共用同一份）。
+
+> 约束：RAG 助手当前不落库会话（无 `activeSessionId`），因此本节仅开放 **AI 模式且持久化允许**时的分享。
+
+##### 8.2.2.1 公共 hooks：`useShareSelection` 与 `useShareFlow`（逐行注释）
+
+文件：`apps/frontend/src/hooks/useShareSelection.ts`、`apps/frontend/src/hooks/useShareFlow.ts`。
+
+`useShareSelection` 负责“勾选集合与成对 toggle”；`useShareFlow` 负责“分享模式 + 弹窗开关 + 一键进入/退出分享模式”，从而让上层页面只做最少接线。
+
+```ts
+// 文件：apps/frontend/src/hooks/useShareSelection.ts（节选 + 逐行注释）
+
+export function useShareSelection<TMessage extends { chatId: string }>({
+	enabled, // 是否允许分享：false 时所有操作 noop，避免影响现有页面逻辑
+	pairResolver, // 成对勾选策略：输入 message + 可选 allMessages，输出 [id1,id2] 或 null
+	getAllMessages, // 可选：默认消息来源（用于全选/判断是否全选/成对定位）
+}: {
+	enabled: boolean;
+	pairResolver: (
+		msg: TMessage,
+		allMessages?: TMessage[],
+	) => [string, string] | null;
+	getAllMessages?: () => TMessage[];
+}) {
+	// isSharing：是否进入分享勾选模式（UI 层决定何时展示底栏/checkbox）
+	const [isSharing, setIsSharing] = useState(false);
+
+	// checkedMessages：已勾选的 chatId 集合；成对勾选时会同时写入两条 id
+	const [checkedMessages, setCheckedMessages] = useState<Set<string>>(
+		() => new Set(),
+	);
+
+	// clearAllCheckedMessages：清空集合（取消分享、取消全选、关闭弹窗时复用）
+	const clearAllCheckedMessages = useCallback(() => {
+		setCheckedMessages(new Set());
+	}, []);
+
+	// togglePair：对一对 id 执行“成对 toggle”（已选则删除，未选则添加）
+	const togglePair = useCallback(
+		(pair: [string, string]) => {
+			if (!enabled) return; // 未启用分享：不改状态
+			const [a, b] = pair;
+			setCheckedMessages((prev) => {
+				const next = new Set(prev); // Set 不可变更新：避免直接 mutate 导致状态不刷新
+				if (next.has(a) || next.has(b)) {
+					next.delete(a);
+					next.delete(b);
+				} else {
+					next.add(a);
+					next.add(b);
+				}
+				return next;
+			});
+		},
+		[enabled],
+	);
+
+	// setCheckedMessage：把一条消息映射成一组 pair 并执行 toggle
+	const setCheckedMessage = useCallback(
+		(message: TMessage, allMessages?: TMessage[]) => {
+			if (!enabled) return;
+			const pair = pairResolver(message, allMessages ?? getAllMessages?.());
+			if (!pair) return; // 无法配对（例如边界不完整）则忽略
+			togglePair(pair);
+		},
+		[enabled, getAllMessages, pairResolver, togglePair],
+	);
+
+	// setAllCheckedMessages：全选当前展示列表（调用方可传 messages；不传则用 getAllMessages）
+	const setAllCheckedMessages = useCallback(
+		(messages?: TMessage[]) => {
+			if (!enabled) return;
+			const list = messages ?? getAllMessages?.() ?? [];
+			setCheckedMessages(new Set(list.map((m) => m.chatId)));
+		},
+		[enabled, getAllMessages],
+	);
+
+	// isAllChecked：判断是否已全选（同上：可传 messages；否则用 getAllMessages）
+	const isAllChecked = useCallback(
+		(messages?: TMessage[]) => {
+			if (!enabled) return false;
+			const list = messages ?? getAllMessages?.() ?? [];
+			if (!list.length) return false;
+			return list.every((m) => checkedMessages.has(m.chatId));
+		},
+		[checkedMessages, enabled, getAllMessages],
+	);
+
+	// selectedPairCount：约定每组 = 2 条消息，因此 size/2 向下取整
+	const selectedPairCount = useMemo(() => {
+		if (!enabled) return 0;
+		return Math.floor(checkedMessages.size / 2);
+	}, [enabled, checkedMessages]);
+
+	return {
+		isSharing,
+		setIsSharing,
+		checkedMessages,
+		setCheckedMessage,
+		setAllCheckedMessages,
+		clearAllCheckedMessages,
+		isAllChecked,
+		selectedPairCount,
+	};
+}
+```
+
+```ts
+// 文件：apps/frontend/src/hooks/useShareFlow.ts（节选 + 逐行注释）
+
+export function useShareFlow<TMessage extends { chatId: string }>({
+	enabled, // 是否允许分享
+	pairResolver, // 成对勾选策略
+	getAllMessages, // 可选：默认消息来源
+}: {
+	enabled: boolean;
+	pairResolver: (
+		msg: TMessage,
+		allMessages?: TMessage[],
+	) => [string, string] | null;
+	getAllMessages?: () => TMessage[];
+}) {
+	// shareModelVisible：分享弹窗是否打开（UI 可用此状态渲染 ShareChat）
+	const [shareModelVisible, setShareModelVisible] = useState(false);
+
+	// shareSelection：复用下层的勾选状态机
+	const shareSelection = useShareSelection<TMessage>({
+		enabled,
+		pairResolver,
+		getAllMessages,
+	});
+
+	// onShowShareModel：打开弹窗（未启用分享时直接返回）
+	const onShowShareModel = useCallback(() => {
+		if (!enabled) return;
+		setShareModelVisible(true);
+	}, [enabled]);
+
+	// onCloseShareModel：关闭弹窗时同时退出分享模式并清空选中（避免下次进入残留）
+	const onCloseShareModel = useCallback(() => {
+		setShareModelVisible(false);
+		shareSelection.setIsSharing(false);
+		shareSelection.clearAllCheckedMessages();
+	}, [shareSelection]);
+
+	// onCancelShare：只退出分享模式并清空（不涉及弹窗）
+	const onCancelShare = useCallback(() => {
+		shareSelection.setIsSharing(false);
+		shareSelection.clearAllCheckedMessages();
+	}, [shareSelection]);
+
+	// onStartShare：进入分享模式；可选传 messagesToSelect 用于“进入即全选”的页面（ChatBot 用）
+	const onStartShare = useCallback(
+		(messagesToSelect?: TMessage[]) => {
+			if (!enabled) return;
+			shareSelection.setIsSharing(true);
+			shareSelection.setAllCheckedMessages(messagesToSelect);
+		},
+		[enabled, shareSelection],
+	);
+
+	return {
+		shareSelection,
+		shareModelVisible,
+		onShowShareModel,
+		onCloseShareModel,
+		onCancelShare,
+		onStartShare,
+	};
+}
+```
+
+##### 8.2.2.2 知识库侧接入：`useKnowledgeAssistantShare` + `KnowledgeAssistantShareBar`（逐行注释）
+
+文件：`apps/frontend/src/views/knowledge/KnowledgeAssistantShareBar.tsx`。
+
+知识库侧把“是否允许分享、成对勾选策略、ShareChat 弹窗节点”等集中到 `useKnowledgeAssistantShare`，`KnowledgeAssistant.tsx` 仅做接线，降低维护成本。
+
+```tsx
+// 文件：apps/frontend/src/views/knowledge/KnowledgeAssistantShareBar.tsx（节选 + 逐行注释）
+
+export function useKnowledgeAssistantShare(params: {
+	aiMessages: Message[]; // 当前 AI 模式消息列表（线性：user -> assistant）
+	isLoggedIn: boolean; // 登录态：未登录不允许分享
+	isRagMode: boolean; // RAG 模式不开放分享（无持久化 sessionId）
+}) {
+	const { aiMessages, isLoggedIn, isRagMode } = params;
+
+	// shareModelVisible：分享弹窗开关（复用 ShareChat）
+	const [shareModelVisible, setShareModelVisible] = useState(false);
+
+	// allowAiShare：仅在 AI 模式 + 已登录 + 允许持久化 + 有 activeSessionId 时开放分享
+	const allowAiShare =
+		!isRagMode &&
+		isLoggedIn &&
+		assistantStore.knowledgeAssistantPersistenceAllowed &&
+		Boolean(assistantStore.activeSessionId);
+
+	// shareFlow：复用公共 hook；pairResolver 采用“相邻成对”的策略
+	const shareFlow = useShareFlow<Message>({
+		enabled: allowAiShare,
+		getAllMessages: () => aiMessages,
+		pairResolver: (message, all) => {
+			const list = all ?? aiMessages;
+			const idx = list.findIndex((m) => m.chatId === message.chatId);
+			if (idx < 0) return null;
+
+			// 线性列表：assistant 点击时与上一条 user 成对；顺序固定为 user 在前 assistant 在后
+			if (message.role === 'assistant') {
+				const prev = list[idx - 1];
+				if (prev?.role !== 'user') return null;
+				return [prev.chatId, message.chatId];
+			}
+
+			// user 点击时与下一条 assistant 成对
+			const next = list[idx + 1];
+			if (next?.role !== 'assistant') return null;
+			return [message.chatId, next.chatId];
+		},
+	});
+
+	const { shareSelection } = shareFlow;
+
+	// onShare：注意 ChatMessageActions 内部会先 setCheckedMessage(message) 再触发 onShare(message)
+	// 因此这里仅负责“进入分享模式”，避免重复 toggle 导致最终未选中
+	const onShare = useCallback(
+		(_message?: Message) => {
+			if (!allowAiShare) return;
+			if (!shareSelection.isSharing) shareSelection.setIsSharing(true);
+		},
+		[allowAiShare, shareSelection],
+	);
+
+	// onCloseShareModel：关闭弹窗后退出分享并清空
+	const onCloseShareModel = useCallback(() => {
+		setShareModelVisible(false);
+		shareFlow.onCancelShare();
+	}, [shareFlow]);
+
+	// shareChatNode：封装 ShareChat 节点；外层只需渲染它
+	const shareChatNode = allowAiShare ? (
+		<ShareChat
+			open={shareModelVisible}
+			onOpenChange={onCloseShareModel}
+			checkedMessages={shareSelection.checkedMessages}
+			sessionId={assistantStore.activeSessionId ?? undefined} // 走 share/create 的 chatSessionId 字段
+			sessionType="assistant" // 告诉后端直接查 assistant，避免错误回退
+		/>
+	) : null;
+
+	return {
+		allowAiShare,
+		shareFlow,
+		shareSelection,
+		onShare,
+		setShareModelVisible,
+		shareChatNode,
+	};
+}
+```
+
+##### 8.2.2.3 Share 弹窗复用：`ShareChat` 增加 `sessionId/sessionType`（逐行注释）
+
+文件：`apps/frontend/src/views/chat/share/index.tsx`。
+
+该组件原本从路由 `params.id` 取 chat 会话；为复用到知识库助手，新增可选 `sessionId`（并透传可选 `sessionType`）：
+
+```ts
+// 文件：apps/frontend/src/views/chat/share/index.tsx（节选 + 逐行注释）
+
+interface ShareProps {
+	open: boolean; // 弹窗开关
+	onOpenChange: () => void; // 关闭弹窗回调（外部负责清空分享状态）
+	checkedMessages: Set<string>; // 已选择的 messageIds（成对勾选）
+	sessionId?: string; // 可选：外部注入会话 id（知识库助手用）
+	sessionType?: 'chat' | 'assistant'; // 可选：告诉后端查哪个数据源（避免回退）
+}
+
+const onCreateShare = useCallback(async () => {
+	setLoading(true);
+	const chatSessionId = sessionId ?? params?.id; // 优先使用外部注入 id，否则使用路由参数
+	if (chatSessionId) {
+		const data = {
+			chatSessionId, // 仍复用字段名：后端 createShare 只存该 id
+			sessionType, // 可选：知识库助手传 assistant；主聊天不传也可
+			messageIds: checkedMessages.size ? [...checkedMessages] : undefined,
+			baseUrl: import.meta.env.DEV ? import.meta.env.VITE_DEV_WEB_DOMAIN : import.meta.env.VITE_PROD_WEB_DOMAIN,
+		};
+		const res = await createShare(data); // 复用同一接口 /share/create
+		// ... 成功后拼主题 query 并复制链接（原逻辑不变） ...
+	}
+}, [params?.id, checkedMessages, theme, sessionId, sessionType]);
+```
+
+##### 8.2.2.4 后端统一封装：按 `sessionType` 选择数据源（逐行注释）
+
+文件：`apps/backend/src/services/share/share.service.ts`、DTO：`apps/backend/src/services/share/dto/share.dto.ts`。
+
+要求：**不做错误回退重试**，用参数明确选择数据源（chat/assistant），并在 assistant 分支保证消息顺序稳定（user 在上，assistant 在下）。
+
+```ts
+// 文件：apps/backend/src/services/share/dto/share.dto.ts（节选 + 逐行注释）
+
+export class CreateShareDto {
+	chatSessionId: string; // 复用字段名：承载 chat_sessions.id 或 assistant_sessions.id
+	sessionType?: 'chat' | 'assistant'; // 可选：不传默认 chat，assistant 侧应传 'assistant'
+	messageIds?: string[]; // 可选：只分享勾选的消息（按顺序传入）
+	baseUrl?: string; // 可选：拼完整 shareUrl
+}
+```
+
+```ts
+// 文件：apps/backend/src/services/share/share.service.ts（节选 + 逐行注释）
+
+private async resolveShareMessagesBySessionId(params: {
+	sessionId: string; // 会话 id（chat 或 assistant）
+	sessionType: 'chat' | 'assistant'; // 明确数据源：禁止用异常回退
+	messageIds?: string[]; // 可选：只取指定消息
+}) {
+	if (params.sessionType === 'chat') {
+		// chat：复用 MessageService.findMessages（含按 messageIds 重排的既有逻辑）
+		const session = await this.messageService.findMessages({
+			chatSessionId: params.sessionId,
+			messageIds: params.messageIds,
+		});
+		return { /* ... */ };
+	}
+
+	// assistant：直接查 assistant_sessions / assistant_messages
+	const qb = this.assistantMessageRepo
+		.createQueryBuilder('m')
+		.where('m.session_id = :sid', { sid: params.sessionId });
+
+	if (params.messageIds?.length) {
+		qb.andWhere('m.id IN (:...ids)', { ids: params.messageIds });
+	}
+
+	const rows = await qb
+		.orderBy('m.created_at', 'ASC') // 先按时间升序
+		.addOrderBy(\"CASE WHEN m.role = 'user' THEN 0 ELSE 1 END\", 'ASC') // 同秒时强制 user 在 assistant 前
+		.addOrderBy('m.id', 'ASC') // 再兜底按 uuid 保证稳定
+		.getMany();
+
+	return { /* ... */ };
+}
+```
+
 ### 8.3 滚动、贴底、代码块浮动工具栏
 
 **`useStickToBottomScroll`**（`apps/frontend/src/hooks/useStickToBottomScroll.ts`）入参（**AI / RAG 双模式**下由 `isRagMode` 分支；详见 **§8.3.1–§8.3.3**）：
@@ -1478,6 +1834,9 @@ bottomBarAssistantNode={
 | 前端助手输入区工具条    | `apps/frontend/src/views/knowledge/KnowledgeAssistantEntryToolbar.tsx`（`ChatEntry.entryChildren`：历史抽屉 / 新对话 / AI·RAG 切换）                                                                                            |
 | 前端贴底滚动 Hook       | `apps/frontend/src/hooks/useStickToBottomScroll.ts`（含可选 `idleFlushKey` 非流式贴底）                                                                                                                                          |
 | 前端消息操作条（通用） | `apps/frontend/src/components/design/ChatMessageActions/index.tsx`（流式时禁用复制/保存；详 **§8.2.1**）                                                                                                                      |
+| 前端分享状态机（通用） | `apps/frontend/src/hooks/useShareSelection.ts`、`apps/frontend/src/hooks/useShareFlow.ts`（ChatBot 与助手共用；详 **§8.2.2.1**）                                                                                               |
+| 前端助手分享 UI        | `apps/frontend/src/views/knowledge/KnowledgeAssistantShareBar.tsx`（`useKnowledgeAssistantShare` + 分享底栏；详 **§8.2.2.2**）                                                                                                 |
+| 分享弹窗（复用）        | `apps/frontend/src/views/chat/share/index.tsx`（支持 `sessionId/sessionType`；详 **§8.2.2.3**）                                                                                                                                |
 | 前端知识页              | `apps/frontend/src/views/knowledge/index.tsx`                                                                                                                                                                                  |
 | 前端常量                | `apps/frontend/src/views/knowledge/constants.ts`（`KNOWLEDGE_ASSISTANT_PROMPTS`、`KnowledgeAssistantPromptKind`、本地目录常量等）                                                                                                  |
 | 前端助手工具            | `apps/frontend/src/views/knowledge/utils.ts`（`isKnowledgeLocalMarkdownId`、`knowledgeAssistantArticleBinding`、`knowledgeAssistantDocumentKey`、`buildKnowledgeAssistantDocumentMessage`）                                        |
@@ -1486,6 +1845,7 @@ bottomBarAssistantNode={
 | 后端服务                | `apps/backend/src/services/assistant/assistant.service.ts`                                                                                                                                                                     |
 | 后端实体                | `apps/backend/src/services/assistant/assistant-session.entity.ts`、`assistant-message.entity.ts`                                                                                                                               |
 | 后端 DTO                | `apps/backend/src/services/assistant/dto/*.ts`                                                                                                                                                                                 |
+| 分享服务（后端）         | `apps/backend/src/services/share/share.service.ts`、`apps/backend/src/services/share/dto/share.dto.ts`（按 `sessionType` 选择数据源；详 **§8.2.2.4**）                                                                       |
 | 知识删除联动            | `apps/backend/src/services/knowledge/knowledge.service.ts`                                                                                                                                                                     |
 | 专题摘要（持久化/落点） | `docs/knowledge/knowledge-assistant-ephemeral-persistence.md`                                                                                                                                                                  |
 

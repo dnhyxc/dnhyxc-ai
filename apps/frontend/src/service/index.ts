@@ -402,9 +402,11 @@ export const createShare = async (params: {
 	chatSessionId: string;
 	messageIds?: string[] | undefined;
 	baseUrl?: string;
+	sessionType?: 'chat' | 'assistant';
 }) => {
 	return await http.post<ShareInfo>(CREATE_SHARE, {
 		chatSessionId: params.chatSessionId,
+		sessionType: params.sessionType,
 		messageIds: params.messageIds,
 		baseUrl: params.baseUrl,
 	});

@@ -3,7 +3,13 @@
  */
 
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { ArrayNotEmpty, IsArray, IsOptional, IsString } from 'class-validator';
+import {
+	ArrayNotEmpty,
+	IsArray,
+	IsIn,
+	IsOptional,
+	IsString,
+} from 'class-validator';
 import { ChatSessions } from 'src/services/chat/session.entity';
 
 // 创建分享请求 DTO
@@ -14,6 +20,16 @@ export class CreateShareDto {
 	})
 	@IsString()
 	chatSessionId: string;
+
+	@ApiPropertyOptional({
+		description:
+			'会话类型：chat=主聊天会话，assistant=知识库助手会话（不填则默认 chat）',
+		example: 'chat',
+		enum: ['chat', 'assistant'],
+	})
+	@IsIn(['chat', 'assistant'])
+	@IsOptional()
+	sessionType?: 'chat' | 'assistant';
 
 	@ApiProperty({
 		description: '消息ID列表，指定要分享的消息',
@@ -119,6 +135,8 @@ export class GetShareResponseDto {
 export interface ShareCacheData {
 	shareId: string;
 	chatSessionId: string;
+	/** 可选：用于 getShare 时直接选择数据源，避免 try/catch 回退 */
+	sessionType?: 'chat' | 'assistant';
 	messageIds?: string[];
 	createdAt: number;
 	expiresAt: number | null;

@@ -43,6 +43,10 @@ import {
 } from './constants';
 import { KnowledgeAssistantEntryToolbar } from './KnowledgeAssistantEntryToolbar';
 import {
+	KnowledgeAssistantShareBar,
+	useKnowledgeAssistantShare,
+} from './KnowledgeAssistantShareBar';
+import {
 	buildKnowledgeAssistantDocumentMessage,
 	isKnowledgeLocalMarkdownId,
 } from './utils';
@@ -65,6 +69,11 @@ interface KnowledgeAssistantMessageBubbleProps {
 	isCopyedId: string;
 	onCopy: (content: string, chatId: string) => void;
 	onSaveToKnowledge: (message: Message) => void;
+	needShare: boolean;
+	onShare: (message?: Message) => void;
+	isSharing: boolean;
+	checkedMessages: Set<string>;
+	setCheckedMessage: (message: Message) => void;
 	/** 与 ScrollArea Viewport ref 一致，供助手消息内代码块吸顶条与 MdPreview 懒挂载 */
 	scrollViewportRef: RefObject<HTMLElement | null>;
 }
@@ -96,6 +105,11 @@ const KnowledgeMessageBubble = observer(function KnowledgeMessageBubble({
 	isCopyedId,
 	onCopy,
 	onSaveToKnowledge,
+	needShare,
+	onShare,
+	isSharing,
+	checkedMessages,
+	setCheckedMessage,
 	scrollViewportRef,
 }: KnowledgeAssistantMessageBubbleProps & {
 	selectMessageByChatId: SelectMessageByChatId;
@@ -151,7 +165,11 @@ const KnowledgeMessageBubble = observer(function KnowledgeMessageBubble({
 							index={index}
 							isCopyedId={isCopyedId}
 							messagesLength={messagesLength}
-							needShare={false}
+							needShare={needShare}
+							onShare={needShare ? onShare : undefined}
+							isSharing={isSharing}
+							checkedMessages={checkedMessages}
+							setCheckedMessage={setCheckedMessage}
 							onCopy={onCopy}
 							onSaveToKnowledge={onSaveToKnowledge}
 						/>
@@ -565,6 +583,19 @@ const KnowledgeAssistant = observer(
 			void assistantStore.refreshSessionListForCurrentDocument();
 		}, [isAiHistoryDrawerOpen]);
 
+		const {
+			allowAiShare,
+			shareFlow,
+			shareSelection,
+			onShare,
+			setShareModelVisible,
+			shareChatNode,
+		} = useKnowledgeAssistantShare({
+			aiMessages,
+			isLoggedIn,
+			isRagMode,
+		});
+
 		return (
 			<div className="relative flex h-full w-full flex-col overflow-hidden">
 				<ChatCodeFloatingToolbar />
@@ -649,6 +680,13 @@ const KnowledgeAssistant = observer(
 									isCopyedId={isCopyedId}
 									onCopy={onCopy}
 									onSaveToKnowledge={onSaveToKnowledge}
+									needShare={allowAiShare && !shareSelection.isSharing}
+									onShare={onShare}
+									isSharing={allowAiShare ? shareSelection.isSharing : false}
+									checkedMessages={
+										allowAiShare ? shareSelection.checkedMessages : new Set()
+									}
+									setCheckedMessage={shareSelection.setCheckedMessage}
 									scrollViewportRef={
 										scrollViewportRef as RefObject<HTMLElement | null>
 									}
@@ -712,47 +750,59 @@ const KnowledgeAssistant = observer(
 								)}
 							</button>
 						) : null}
-						<ChatEntry
-							input={isRagMode ? ragInput : input}
-							setInput={isRagMode ? setRagInput : setInput}
-							className="w-full pl-0.5 pr-0.5 pb-4.5 border-theme/10"
-							textareaClassName="min-h-9"
-							sendMessage={sendMessage}
-							placeholder={
-								isRagMode
-									? '向知识库提问'
-									: editorHasBody
-										? '请输入您的问题'
-										: '请先在左侧编辑器输入正文后再向我提问'
-							}
-							disableTextInput={isRagMode ? false : !editorHasBody}
-							loading={
-								isRagMode
-									? knowledgeRagQaStore.isSending
-									: assistantStore.isSending || assistantStore.isHistoryLoading
-							}
-							stopGenerating={
-								isRagMode
-									? knowledgeRagQaStore.isStreaming
-										? stopGenerating
-										: undefined
-									: assistantStore.isStreaming
-										? stopGenerating
-										: undefined
-							}
-							entryChildren={
-								<KnowledgeAssistantEntryToolbar
-									showAiSessionSwitcher={showAiSessionSwitcher}
-									isAiSessionSwitcherLocked={isAiSessionSwitcherLocked}
-									isAiHistoryDrawerOpen={isAiHistoryDrawerOpen}
-									setIsAiHistoryDrawerOpen={setIsAiHistoryDrawerOpen}
-									enableStreamStickToBottom={enableStreamStickToBottom}
-									flushScrollToBottom={flushScrollToBottom}
-									assistantMode={assistantMode}
-									setAssistantMode={setAssistantMode}
-								/>
-							}
-						/>
+						{allowAiShare && shareSelection.isSharing ? (
+							<KnowledgeAssistantShareBar
+								aiMessages={aiMessages}
+								shareSelection={shareSelection}
+								shareFlow={shareFlow}
+								setShareModelVisible={setShareModelVisible}
+							/>
+						) : (
+							<ChatEntry
+								input={isRagMode ? ragInput : input}
+								setInput={isRagMode ? setRagInput : setInput}
+								className="w-full pl-0.5 pr-0.5 pb-4.5 border-theme/10"
+								textareaClassName="min-h-9"
+								sendMessage={sendMessage}
+								placeholder={
+									isRagMode
+										? '向知识库提问'
+										: editorHasBody
+											? '请输入您的问题'
+											: '请先在左侧编辑器输入正文后再向我提问'
+								}
+								disableTextInput={isRagMode ? false : !editorHasBody}
+								loading={
+									isRagMode
+										? knowledgeRagQaStore.isSending
+										: assistantStore.isSending ||
+											assistantStore.isHistoryLoading
+								}
+								stopGenerating={
+									isRagMode
+										? knowledgeRagQaStore.isStreaming
+											? stopGenerating
+											: undefined
+										: assistantStore.isStreaming
+											? stopGenerating
+											: undefined
+								}
+								entryChildren={
+									<KnowledgeAssistantEntryToolbar
+										showAiSessionSwitcher={showAiSessionSwitcher}
+										isAiSessionSwitcherLocked={isAiSessionSwitcherLocked}
+										isAiHistoryDrawerOpen={isAiHistoryDrawerOpen}
+										setIsAiHistoryDrawerOpen={setIsAiHistoryDrawerOpen}
+										enableStreamStickToBottom={enableStreamStickToBottom}
+										flushScrollToBottom={flushScrollToBottom}
+										assistantMode={assistantMode}
+										setAssistantMode={setAssistantMode}
+									/>
+								}
+							/>
+						)}
+
+						{shareChatNode}
 					</div>
 				) : null}
 			</div>

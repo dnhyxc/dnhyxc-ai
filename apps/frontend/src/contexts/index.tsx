@@ -7,6 +7,7 @@ import {
 	useRef,
 	useState,
 } from 'react';
+import { useShareFlow } from '@/hooks';
 import { UploadedFile } from '@/types';
 import { Message } from '@/types/chat';
 
@@ -80,67 +81,23 @@ export const ChatCoreProvider = ({ children }: { children: ReactNode }) => {
 	// 操作方法注册
 	const actionsRef = useRef<ChatBotActions | null>(null);
 
-	// 是否开启分享
-	const [isSharing, setIsSharing] = useState<boolean>(false);
-
 	// 联网搜索（与 useChatCore 共用，保证 ChatEntry 与 ChatBot 为同一状态）
 	const [webSearchEnabled, setWebSearchEnabled] = useState(false);
 
-	// 选中的消息
-	const [checkedMessages, setCheckedMessages] = useState<Set<string>>(
-		new Set(),
-	);
-
-	const onCheckedMessage = (id1: string, id2: string) => {
-		setCheckedMessages((prev) => {
-			// 创建新 Set（不可变更新）
-			const newSet = new Set(prev);
-			if (newSet.has(id1) || newSet.has(id2)) {
-				newSet.delete(id1);
-				newSet.delete(id2);
-			} else {
-				newSet.add(id1);
-				newSet.add(id2);
+	// 分享流程：抽成公共 hook，保持对外 context API 不变
+	const { shareSelection } = useShareFlow<Message>({
+		enabled: true,
+		pairResolver: (message) => {
+			const { chatId, parentId } = message;
+			if (message.role === 'assistant') {
+				if (!parentId) return null;
+				// 顺序与消息流一致：user(parent) 在前，assistant 在后
+				return [parentId, chatId];
 			}
-			return newSet;
-		});
-	};
-
-	const setCheckedMessage = (message: Message) => {
-		const { chatId, parentId } = message;
-		if (message.role === 'assistant') {
-			if (!parentId) return;
-			onCheckedMessage(chatId, parentId);
-		} else {
-			if (!message?.childrenIds?.length) return;
-			onCheckedMessage(
-				chatId,
-				message.childrenIds[message.childrenIds.length - 1],
-			);
-		}
-	};
-
-	// 批量设置选中消息（全选）
-	const setAllCheckedMessages = (messages: Message[]) => {
-		setCheckedMessages((prev) => {
-			const newSet = new Set(prev);
-			messages.forEach((message) => {
-				newSet.add(message.chatId);
-			});
-			return newSet;
-		});
-	};
-
-	// 清除所有选中消息（取消全选）
-	const clearAllCheckedMessages = () => {
-		setCheckedMessages(new Set());
-	};
-
-	// 检查是否已全选
-	const isAllChecked = (messages: Message[]): boolean => {
-		if (!messages.length) return false;
-		return messages.every((msg) => checkedMessages.has(msg.chatId));
-	};
+			if (!message?.childrenIds?.length) return null;
+			return [chatId, message.childrenIds[message.childrenIds.length - 1]];
+		},
+	});
 
 	const registerActions = (actions: ChatBotActions) => {
 		actionsRef.current = actions;
@@ -161,13 +118,14 @@ export const ChatCoreProvider = ({ children }: { children: ReactNode }) => {
 				actionsRef,
 				registerActions,
 				unregisterActions,
-				isSharing,
-				setIsSharing,
-				checkedMessages,
-				setCheckedMessage,
-				setAllCheckedMessages,
-				clearAllCheckedMessages,
-				isAllChecked,
+				isSharing: shareSelection.isSharing,
+				setIsSharing: shareSelection.setIsSharing,
+				checkedMessages: shareSelection.checkedMessages,
+				setCheckedMessage: (m) => shareSelection.setCheckedMessage(m),
+				setAllCheckedMessages: (messages) =>
+					shareSelection.setAllCheckedMessages(messages),
+				clearAllCheckedMessages: () => shareSelection.clearAllCheckedMessages(),
+				isAllChecked: (messages) => shareSelection.isAllChecked(messages),
 				webSearchEnabled,
 				setWebSearchEnabled,
 			}}
