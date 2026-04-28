@@ -55,16 +55,13 @@ function TrashRow(props: {
 	};
 	return (
 		<div
-			role="button"
-			tabIndex={0}
-			aria-current={selected ? 'true' : undefined}
 			onKeyDown={onKeyDown}
 			onClick={() => void onActivate(item)}
 			className={cn(
 				'w-full cursor-pointer overflow-hidden flex flex-col gap-1 p-2 rounded-md group transition-colors',
 				// 与知识库列表一致：当前预览项使用相同的选中底色
 				selected
-					? 'bg-theme/15'
+					? 'bg-theme/10'
 					: checked
 						? 'bg-theme/10'
 						: 'hover:bg-theme/10',
@@ -90,9 +87,8 @@ function TrashRow(props: {
 					aria-label="从回收站彻底删除"
 					className={cn(
 						'cursor-pointer shrink-0 p-1 rounded-md text-textcolor/80 transition-opacity duration-150',
-						'opacity-0 pointer-events-none',
+						'hidden group-hover:block',
 						'hover:text-destructive hover:bg-destructive/10',
-						'group-hover:opacity-100 group-hover:pointer-events-auto',
 					)}
 					onClick={(e) => onDeleteClick(e, item)}
 				>

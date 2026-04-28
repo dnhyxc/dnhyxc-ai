@@ -79,14 +79,11 @@ function KnowledgeListRow(props: {
 
 	return (
 		<div
-			role="button"
-			tabIndex={0}
-			aria-current={selected ? 'true' : undefined}
 			onClick={() => void onActivate(item)}
 			onKeyDown={onKeyDown}
 			className={cn(
 				'w-full cursor-pointer overflow-hidden flex flex-col gap-1 p-2 rounded-md group transition-colors',
-				selected ? 'bg-theme/15' : 'hover:bg-theme/10',
+				selected ? 'bg-theme/10' : 'hover:bg-theme/10',
 			)}
 		>
 			<div className="flex items-start justify-between gap-2 min-w-0 w-full">
@@ -123,10 +120,8 @@ function KnowledgeListRow(props: {
 						}
 						className={cn(
 							'cursor-pointer shrink-0 p-1 rounded-md text-textcolor/80 transition-opacity duration-150',
-							'opacity-0 pointer-events-none',
+							'hidden group-hover:block',
 							'hover:text-destructive hover:bg-destructive/10',
-							/* 仅 hover 显示：勿用 focus-within，否则抽屉打开时焦点落在首行会导致第一个删除钮常显 */
-							'group-hover:opacity-100 group-hover:pointer-events-auto',
 						)}
 						onClick={(e) => onTrashClick(e, item)}
 					>
