@@ -12,13 +12,13 @@
 		"restartPath": "/usr/local/dnhyxc-ai/server"
 	},
 	"restartScript": "pm2 restart server",
-	"dnhyxcAI": {
-		"name": "dnhyxc-ai",
+	"dnhyxcAIServer": {
+		"name": "dnhyxc-ai-server",
 		"localFilePath": {
-			"mac": "/Users/dnhyxc/Documents/code/dnhyxc-ai/apps/frontend",
-			"windows": "E:\\code\\dnhyxc-ai\\apps\\frontend"
+			"mac": "/Users/dnhyxc/Documents/code/dnhyxc-ai/apps/backend",
+			"windows": "E:\\code\\dnhyxc-ai\\apps\\backend"
 		},
-		"remoteFilePath": "/usr/local/nginx/dnhyxc-ai",
-		"isServer": false
+		"remoteFilePath": "/usr/local/dnhyxc-ai/server",
+		"isServer": true
 	}
 }
