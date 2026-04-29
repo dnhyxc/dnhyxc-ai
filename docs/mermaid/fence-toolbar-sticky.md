@@ -702,6 +702,14 @@ hasMermaidIslandLayout ? fenceParts.map : 整段 html
 mermaid 段 → renderMermaidPreviewPart → MermaidFenceToolbarActions（内含 MermaidFenceToolbar）→ children(mode) → Island | fallback
 ```
 
+### 12.6 分享页知识正文：`/share/:id?type=knowledge` 与「唯一 viewport」
+
+公开分享页 **`apps/frontend/src/views/share/index.tsx`** 在 **知识文章** 分支同样使用 **`ParserMarkdownPreviewPane`**（默认导出组件位于 **`apps/frontend/src/components/design/Markdown/index.tsx`**；历史上曾置于 `Monaco/preview.tsx`，维护时以仓库为准）。
+
+若在该页再套一层内层 **`ScrollArea`**，会出现 **两个** **`[data-slot="scroll-area-viewport"]`**： **`MermaidFenceToolbar`** 的 **`closest(...)`** 会命中**内层** viewport，而用户滚动的是**外层** viewport → 顶栏与 **`IntersectionObserver` 根**不一致，表现为顶栏「不出现」或吸顶异常；同时 **`layoutChatCodeToolbars`** 与 **`useChatCodeFloatingToolbar`** 的 viewport 若与真实滚动层错位，会导致代码吸顶条不稳定。
+
+**修复要点**：知识分支为 **`MarkdownPreview`** 传入与页面主 **`ScrollArea`** 相同的 **`viewportRef`**，并 **`withScrollArea={false}`**，使预览走 **「嵌入父级滚动」** 分支（去掉内层 **`ScrollArea`**），全页仅保留 **一个** Radix viewport；并修正分享页 **`layoutDeps`**、**`useChatCodeFloatingToolbar` 多实例卸载** 等。完整根因表、策略与带注释的代码摘录见 **`docs/chat/share.md` §三**。
+
 ---
 
 ## 13. 操作条「下载」：图表导出 SVG，代码导出 DSL

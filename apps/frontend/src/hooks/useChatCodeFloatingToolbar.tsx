@@ -10,6 +10,9 @@ import { layoutChatCodeToolbars } from '@/utils/chatCodeToolbar';
 
 const emptyDeps: DependencyList = [];
 
+/** 多实例共用同一 viewport 时避免任一子树卸载就把全局吸顶条清掉（见分享页外层 ScrollArea + Markdown 嵌入父滚动） */
+let chatCodeFloatingToolbarHookMountCount = 0;
+
 export type UseChatCodeFloatingToolbarOptions = {
 	/**
 	 * Markdown / 消息等变化后补算吸顶条（`requestAnimationFrame` + `useLayoutEffect`）。
@@ -46,10 +49,24 @@ export function useChatCodeFloatingToolbar(
 		layoutChatCodeToolbars(viewportRef.current);
 	}, [viewportRef]);
 
+	// 在全局范围追踪当前活跃的 useChatCodeFloatingToolbar 实例数量。
+	// 设计缘由：多实例共用同一 ScrollArea viewport 时，只有当**所有**相关组件都卸载后，才需要将悬浮工具栏全局同步置空（否则出现 Markdown 或 ScrollArea 父子嵌套时，中间某一子树卸载会导致吸顶条闪烁/消失）。
+	// 详见「多实例共用」场景，如分享页外层 ScrollArea + Markdown 嵌入父滚动。
 	useEffect(() => {
+		// 组件挂载时，活跃实例数 +1
+		chatCodeFloatingToolbarHookMountCount += 1;
 		return () => {
-			layoutChatCodeToolbars(null);
+			// 组件卸载时，活跃实例数 -1
+			chatCodeFloatingToolbarHookMountCount -= 1;
+			// 只有当所有相关组件都卸载后，才清除 chat code 工具栏浮层
+			if (chatCodeFloatingToolbarHookMountCount <= 0) {
+				// 兜底保证不小于 0，防守式写法
+				chatCodeFloatingToolbarHookMountCount = 0;
+				// 调用 layoutChatCodeToolbars(null) 显式清空全局浮层 DOM/状态
+				layoutChatCodeToolbars(null);
+			}
 		};
+		// 只在初次挂载、卸载时运行一次，无依赖
 	}, []);
 
 	useEffect(() => {

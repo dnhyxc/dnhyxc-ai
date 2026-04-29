@@ -1,9 +1,10 @@
-# 分享会话顺序一致性 & 用户代码块布局修复记录
+# 分享会话顺序一致性 & 用户代码块布局 & 知识正文预览工具栏
 
-本文记录两类在「分享」链路中暴露的问题与本次修复方式：
+本文记录在「分享」链路中暴露的问题与对应修复方式：
 
 - **分享会话消息顺序**：分享页的对话顺序偶发与 ChatBot 中的展示顺序不一致（尤其是分支/重生成场景）。
 - **用户消息代码块布局**：用户消息中包含代码块时，气泡宽度/对齐与 assistant 不一致，且长行会撑破最大宽度。
+- **知识文章分享（`?type=knowledge`）**：与 Monaco 预览共用 `ParserMarkdownPreviewPane`（`@/components/design/Markdown`）时，**代码块吸顶浮动条（`ChatCodeFloatingToolbar`）**不稳定、**Mermaid 围栏顶栏（`MermaidFenceToolbar`）**不出现的问题；详见 **§三**。
 
 ---
 
@@ -156,4 +157,214 @@ if (dto.messageIds?.length && Array.isArray(chatSession.messages)) {
   - 气泡宽度随内容变化，但不超过列宽
   - 代码块在气泡内出现横向滚动，不再撑破最大宽度
   - 代码块内容保持左对齐，整体观感与 assistant 一致
+
+---
+
+## 三、知识文章分享：与 Monaco 对齐的代码吸顶条与 Mermaid 顶栏
+
+### 1. 问题现象
+
+在 **`apps/frontend/src/views/share/index.tsx`** 中，当 URL 带 **`?type=knowledge`** 时，正文由 **`MarkdownPreview`**（即 **`ParserMarkdownPreviewPane`**，默认导出自 **`apps/frontend/src/components/design/Markdown/index.tsx`**）渲染。与 Monaco Markdown 预览相比曾出现：
+
+- **`ChatCodeFloatingToolbar`（代码块吸顶浮动条）**：刷新后**偶现**或位置/可见性不稳定。
+- **`MermaidFenceToolbar`（Mermaid 围栏顶栏）**：**始终不出现**或吸顶/哨兵逻辑异常。
+
+会话分享路径仍通过 **`ChatAssistantMessage`** 渲染 Markdown，与「整页嵌入 `ParserMarkdownPreviewPane`」不是同一 DOM 结构；本节主要针对 **知识正文** 分支。
+
+### 2. 根因分析
+
+| 根因 | 说明 |
+| --- | --- |
+| **双层 Radix `ScrollArea` viewport** | 分享页外层已有 **`ref={scrollViewportRef}`** 的 **`ScrollArea`**；预览组件在 `withScrollArea={false}` 时仍包裹**内层** **`ScrollArea`**，DOM 上出现**两个**带 **`data-slot="scroll-area-viewport"`** 的祖先。 |
+| **`MermaidFenceToolbar` 的 IO root 选错** | **`MermaidFenceToolbar`**（`apps/frontend/src/components/design/MermaidFenceToolbar/index.tsx`）用 **`sentinel.closest('[data-slot="scroll-area-viewport"]')`** 作为 **`IntersectionObserver` 的 `root`**。`closest` 命中**内层** viewport，而用户实际滚动的是**外层** viewport → 内层几乎不滚动，哨兵与 **`position: sticky`** 的参照系错误，顶栏表现为「没有」。详见 **`docs/mermaid/fence-toolbar-sticky.md`**。 |
+| **`layoutChatCodeToolbars` 与滚动层不一致** | **`useChatCodeFloatingToolbar`** 将 **`layoutChatCodeToolbars(viewport)`** 绑定到某一 viewport；若 viewport 与「代码块在文档流中随外层滚动」的几何关系不一致，吸顶条候选筛选（视口顶边与代码块相交）会抖动或长期为「无候选」。 |
+| **`layoutDeps` 未包含知识数据** | 分享页曾仅用 **`[chatData]`** 作为 **`useChatCodeFloatingToolbar`** 的 **`layoutDeps`**。知识分享时 **`chatData`** 为 **`undefined`**，正文异步写入后 **effect 不因正文变化重跑**，**`ResizeObserver`** 也未必因「仅 scrollHeight 变」触发 → 吸顶条**偶现**。 |
+| **同 viewport 多 hook 实例卸载误清全局** | 分享页与 **`Markdown`** 内各自调用 **`useChatCodeFloatingToolbar`** 且指向**同一** viewport 时，若任一实例在 **`useEffect` 卸载**时无条件执行 **`layoutChatCodeToolbars(null)`**，会导致另一实例仍挂载时全局状态被清空 → 闪烁/消失。 |
+
+### 3. 修复策略（概要）
+
+1. **嵌入父级滚动（embed）**：当 **`withScrollArea={false}`** 且宿主传入 **`viewportRef`（与外层 `ScrollArea` 的 ref 相同）** 时，预览**不再渲染内层** **`ScrollArea`**，正文直接落在外层滚动容器内，保证全页**唯一**滚动 viewport；**`MermaidFenceToolbar`** 的 **`closest`** 与 **`layoutChatCodeToolbars`** 使用同一层。
+2. **统一「有效滚动 ref」**：在 **`ParserMarkdownPreviewPane`** 内用 **`effectiveScrollViewportRef`**（嵌入时为 **`viewportRef`**，否则为内层 **`localViewportRef`**）驱动 **`useChatCodeFloatingToolbar`**、目录 hash 视口、**`documentIdentity`** 换篇时 **`scrollTop` 清零**、右下角预览 FAB 的 **`ResizeObserver`** 等。
+3. **嵌入时根容器 `overflow-visible`**：避免在滚动链之间夹 **`overflow-hidden`** 导致子树内 **`sticky`** 行为异常。
+4. **分享页 `layoutDeps`**：在 **`useChatCodeFloatingToolbar(scrollViewportRef, …)`** 中增加 **`knowledgeData?.id`**、**`knowledgeData?.content`**（及原有 **`chatData`**），保证知识正文到达后重新 **`attach` ResizeObserver** 与双帧 **`layoutChatCodeToolbars`**。
+5. **首屏与数据切换**：**`syncScrollMetrics`** 的 **`useEffect`** 依赖增加 **`knowledgeData`**，与 **`chatData`** 对称，避免仅会话路径会二次布局。
+6. **多实例引用计数**：在 **`useChatCodeFloatingToolbar.tsx`** 模块级维护 **`chatCodeFloatingToolbarHookMountCount`**，仅当计数归零时 **`layoutChatCodeToolbars(null)`**，避免子树卸载误伤全局 Portal 吸顶条。
+
+### 4. 关键实现代码（文档摘录 + 逐行意图说明）
+
+下列代码块与仓库实现**对齐**，注释为文档侧补充（便于维护时对照；若源码行内注释与本文不一致，以仓库为准）。
+
+#### 4.1 分享页：同一 viewport ref、`layoutDeps`、知识分支 `MarkdownPreview`
+
+文件：`apps/frontend/src/views/share/index.tsx`
+
+```tsx
+// scrollViewportRef：指向页面主内容区 ScrollArea 的 viewport（Radix 将 ref 落在可滚动的 viewport 节点上）。
+// 会话分享与知识分享共用这一滚动层，便于底部「置底/回顶」按钮读取 scrollHeight / scrollTop。
+const scrollViewportRef = useRef<HTMLDivElement>(null);
+
+// useChatCodeFloatingToolbar：在 viewport 上注册 resize / layoutDeps 变化时的 layoutChatCodeToolbars，
+// 并在 onScroll（见 syncScrollMetrics）中幂等 relayout。
+// layoutDeps 必须覆盖「知识正文从无到有」：
+// - 仅 [chatData] 时，知识模式下 chatData 恒为 undefined，正文到达后不会触发 hook 内与 layoutDeps 绑定的 effect → 吸顶条易「永远不算」或偶现。
+const { relayout: relayoutCodeToolbar } = useChatCodeFloatingToolbar(
+	scrollViewportRef,
+	{
+		layoutDeps: [chatData, knowledgeData?.id, knowledgeData?.content],
+	},
+);
+
+const syncScrollMetrics = useCallback(() => {
+	const el = scrollViewportRef.current;
+	if (!el) return;
+	setScrollMetrics({
+		top: el.scrollTop,
+		scrollHeight: el.scrollHeight,
+		clientHeight: el.clientHeight,
+	});
+	// 每次外层滚动都重算「当前应 pin 的代码块」与 Portal 几何。
+	relayoutCodeToolbar();
+}, [relayoutCodeToolbar]);
+
+// chatData / knowledgeData 任一侧数据变化后：立刻 + rAF 再跑一次，避免首帧 DOM 未稳定。
+useEffect(() => {
+	syncScrollMetrics();
+	const id = requestAnimationFrame(() => syncScrollMetrics());
+	return () => cancelAnimationFrame(id);
+}, [chatData, knowledgeData, syncScrollMetrics]);
+
+// 知识正文：withScrollArea={false} 表示不在预览内再挂一层 ChatCodeFloatingToolbar（页面根部已有 <ChatCodeFloatingToolbar />）。
+// viewportRef={scrollViewportRef} 触发 Markdown 内「嵌入父滚动」分支，去掉内层 ScrollArea，与外层共用唯一 viewport。
+<MarkdownPreview
+	markdown={knowledgeData.content ?? ''}
+	documentIdentity={knowledgeData.id}
+	withScrollArea={false}
+	viewportRef={scrollViewportRef}
+/>
+```
+
+#### 4.2 预览组件：嵌入判定、`effectiveScrollViewportRef`、props 文档
+
+文件：`apps/frontend/src/components/design/Markdown/index.tsx`
+
+```tsx
+interface ParserMarkdownPreviewPaneProps {
+	markdown: string;
+	/**
+	 * 分屏同步滚动：Monaco 分栏时指向右侧预览 ScrollArea 的 viewport。
+	 * 与 withScrollArea={false} 联用（如分享页）：不再套内层 ScrollArea，由宿主提供唯一滚动层，
+	 * 使 MermaidFenceToolbar 的 closest([data-slot="scroll-area-viewport"]) 与 layoutChatCodeToolbars 的 viewport 一致。
+	 */
+	viewportRef?: RefObject<HTMLDivElement | null>;
+	// ...
+	withScrollArea?: boolean;
+}
+
+const localViewportRef = useRef<HTMLDivElement | null>(null);
+
+// embedInParentScroll：宿主已包 ScrollArea，且希望预览不再嵌套第二个 viewport。
+const embedInParentScroll = !withScrollArea && Boolean(viewportRef);
+
+// 所有「需要读当前滚动容器」的逻辑统一走 effectiveScrollViewportRef，避免嵌入/非嵌入两套分支散落。
+const effectiveScrollViewportRef: RefObject<HTMLDivElement | null> =
+	embedInParentScroll && viewportRef ? viewportRef : localViewportRef;
+
+// 与外层滚动同一 viewport 时，根节点不要用 overflow-hidden 挡住 sticky 子树的滚动参照链。
+return (
+	<div
+		ref={markdownRef}
+		className={cn(
+			'relative h-full min-h-0 min-w-0 max-w-full w-full contain-[inline-size] select-text',
+			embedInParentScroll ? 'overflow-visible' : 'overflow-hidden',
+		)}
+	>
+		{withScrollArea ? <ChatCodeFloatingToolbar /> : null}
+		{markdown ? (
+			embedInParentScroll ? (
+				// 无内层 ScrollArea：正文 padding 与原先 ScrollArea 内层一致，避免版心突变。
+				<div className="box-border min-w-0 max-w-full w-full p-3">{previewHtmlRoot}</div>
+			) : (
+				<ScrollArea ref={assignViewportRef} onScroll={handleViewportScroll} /* ... */>
+					<div className="box-border min-w-0 max-w-full w-full p-3">{previewHtmlRoot}</div>
+				</ScrollArea>
+			)
+		) : (
+			/* 空状态 */
+			null
+		)}
+	</div>
+);
+```
+
+**与吸顶 / 哈希跳转相关的内部接线（摘录）：**
+
+```tsx
+// 目录与 # 标题锚点：读取的滚动容器与代码吸顶条一致。
+const getMarkdownHashScrollViewport = useCallback(
+	() => effectiveScrollViewportRef.current,
+	[effectiveScrollViewportRef],
+);
+
+// 换篇时滚动条归零：应对嵌入模式（否则仍误写 localViewportRef）。
+useLayoutEffect(() => {
+	const vp = effectiveScrollViewportRef.current;
+	if (vp) {
+		vp.scrollTop = 0;
+		vp.scrollLeft = 0;
+	}
+}, [documentIdentity, effectiveScrollViewportRef]);
+
+// 浮动代码条：layoutDeps 含 markdown，正文变化会重新 layout。
+const { relayout: relayoutCodeToolbar } = useChatCodeFloatingToolbar(
+	effectiveScrollViewportRef,
+	{ layoutDeps: [markdown] },
+);
+```
+
+#### 4.3 Hook：多实例引用计数（避免子树卸载清空全局）
+
+文件：`apps/frontend/src/hooks/useChatCodeFloatingToolbar.tsx`
+
+```tsx
+/** 多实例共用同一 viewport 时避免任一子树卸载就把全局吸顶条清掉（分享页外层 ScrollArea + Markdown 嵌入父滚动） */
+let chatCodeFloatingToolbarHookMountCount = 0;
+
+export function useChatCodeFloatingToolbar(
+	viewportRef: RefObject<HTMLElement | null>,
+	options?: UseChatCodeFloatingToolbarOptions,
+): { relayout: () => void } {
+	// ...
+
+	useEffect(() => {
+		chatCodeFloatingToolbarHookMountCount += 1;
+		return () => {
+			chatCodeFloatingToolbarHookMountCount -= 1;
+			if (chatCodeFloatingToolbarHookMountCount <= 0) {
+				chatCodeFloatingToolbarHookMountCount = 0;
+				layoutChatCodeToolbars(null);
+			}
+		};
+	}, []);
+
+	// 其余：window resize、viewport ResizeObserver、layoutDeps 双帧 relayout、可选 passive scroll …
+}
+```
+
+### 5. 相关源码路径速查
+
+| 主题 | 路径 |
+| --- | --- |
+| 分享页布局与数据分支 | `apps/frontend/src/views/share/index.tsx` |
+| Markdown 预览（`ParserMarkdownPreviewPane`） | `apps/frontend/src/components/design/Markdown/index.tsx` |
+| 浮动代码条 hook | `apps/frontend/src/hooks/useChatCodeFloatingToolbar.tsx` |
+| 几何计算与 Portal 状态 | `apps/frontend/src/utils/chatCodeToolbar.ts` |
+| Mermaid 顶栏 sticky + IO | `apps/frontend/src/components/design/MermaidFenceToolbar/index.tsx` |
+| Mermaid 与预览拆岛说明 | `docs/mermaid/fence-toolbar-sticky.md` §12、**§12.6**；`docs/mermaid/markdown-zoom-and-preview.md` |
+
+### 6. 验证方式
+
+- 打开 **`/share/:shareId?type=knowledge`**，正文中含 **普通 ` ``` ` 代码块** 与 **` ```mermaid `** 围栏。
+- **代码块**：滚动使某代码块顶部越过外层 viewport 上沿，应稳定出现与 Monaco 预览一致的吸顶浮动条；刷新多次应行为一致。
+- **Mermaid**：顶栏（图/代码、复制、预览、下载）应可见；滚动时哨兵触发的「粘顶/非粘顶」样式切换应与 Monaco 预览一致。
+- **会话分享**（无 `type=knowledge`）：行为应与改动前一致；仍依赖页面级 **`useChatCodeFloatingToolbar(scrollViewportRef)`** 与消息内 Markdown 结构。
 

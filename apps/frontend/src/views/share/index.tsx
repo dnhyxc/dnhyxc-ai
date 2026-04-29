@@ -83,7 +83,10 @@ const SessionShare = () => {
 
 	const { relayout: relayoutCodeToolbar } = useChatCodeFloatingToolbar(
 		scrollViewportRef,
-		{ layoutDeps: [chatData] },
+		{
+			// 知识分享时 chatData 为空，必须带上正文否则首屏后从不触发吸顶条布局
+			layoutDeps: [chatData, knowledgeData?.id, knowledgeData?.content],
+		},
 	);
 
 	const syncScrollMetrics = useCallback(() => {
@@ -114,11 +117,16 @@ const SessionShare = () => {
 		};
 	}, []);
 
+	// 保证每次 chatData 或 knowledgeData 变化时，能够同步刷新滚动指标（比如内容变多了，需要重新判断是否可滚动/是否在底部等）以及 code floating toolbar 的布局。
+	// 1. 首先在 effect 执行时（如组件挂载或依赖变化），立刻同步一次 scrollMetrics 和 code floating toolbar layout；
+	// 2. 然后利用 requestAnimationFrame 在下一帧再刷新一次，确保 React 完成实际渲染后再次刷新，
+	//    避免首次渲染后的 DOM 尚未更新导致布局计算不准确；
+	// 3. 卸载或依赖变动时取消该帧任务，避免重复调用或内存泄漏。
 	useEffect(() => {
-		syncScrollMetrics();
-		const id = requestAnimationFrame(() => syncScrollMetrics());
-		return () => cancelAnimationFrame(id);
-	}, [chatData, syncScrollMetrics]);
+		syncScrollMetrics(); // 立即同步一次
+		const id = requestAnimationFrame(() => syncScrollMetrics()); // 下一帧再同步一次，确保布局在 DOM 更新后准确
+		return () => cancelAnimationFrame(id); // 清理 requestAnimationFrame
+	}, [chatData, knowledgeData, syncScrollMetrics]);
 
 	useEffect(() => {
 		const el = scrollViewportRef.current;
@@ -219,6 +227,7 @@ const SessionShare = () => {
 								markdown={knowledgeData.content ?? ''}
 								documentIdentity={knowledgeData.id}
 								withScrollArea={false}
+								viewportRef={scrollViewportRef}
 							/>
 						</div>
 					</div>

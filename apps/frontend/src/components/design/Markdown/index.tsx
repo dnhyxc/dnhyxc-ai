@@ -60,7 +60,11 @@ type PreviewScrollCornerFabMode = 'hidden' | 'toBottom' | 'toTop';
 
 interface ParserMarkdownPreviewPaneProps {
 	markdown: string;
-	/** 分屏同步滚动：指向 ScrollArea 的 Viewport（Radix ref 落在 viewport 上） */
+	/**
+	 * 分屏同步滚动：指向 ScrollArea 的 Viewport（Radix ref 落在 viewport 上）。
+	 * 与 `withScrollArea={false}` 联用时：不再套内层 ScrollArea，由宿主提供唯一滚动层，
+	 * 使 `MermaidFenceToolbar` 的 `closest([data-slot="scroll-area-viewport"])` 与代码吸顶条与宿主 viewport 一致。
+	 */
 	viewportRef?: RefObject<HTMLDivElement | null>;
 	/** 逻辑文档切换时重置预览滚动，避免沿用上一篇的 scrollTop */
 	documentIdentity?: string;
@@ -91,6 +95,10 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 	/** 与 `dangerouslySetInnerHTML` 同层，保证 Mermaid 在内容写入后再扫描节点 */
 	const previewHtmlRootRef = useRef<HTMLDivElement>(null);
 	const localViewportRef = useRef<HTMLDivElement | null>(null);
+	/** 分享页等：父级 ScrollArea 为唯一滚动层，避免嵌套双 viewport 导致 Mermaid 顶栏/吸顶条失效 */
+	const embedInParentScroll = !withScrollArea && Boolean(viewportRef);
+	const effectiveScrollViewportRef: RefObject<HTMLDivElement | null> =
+		embedInParentScroll && viewportRef ? viewportRef : localViewportRef;
 	const [previewScrollFabMode, setPreviewScrollFabMode] =
 		useState<PreviewScrollCornerFabMode>('hidden');
 
@@ -101,7 +109,7 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 			setPreviewScrollFabMode('hidden');
 			return;
 		}
-		const vp = localViewportRef.current;
+		const vp = effectiveScrollViewportRef.current;
 		if (!vp) return;
 		const { scrollTop, scrollHeight, clientHeight } = vp;
 		const maxScroll = scrollHeight - clientHeight;
@@ -113,15 +121,15 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 		setPreviewScrollFabMode(
 			scrollTop >= maxScroll - threshold ? 'toTop' : 'toBottom',
 		);
-	}, [showPreviewScrollCornerFab]);
+	}, [showPreviewScrollCornerFab, effectiveScrollViewportRef]);
 
 	useLayoutEffect(() => {
-		const vp = localViewportRef.current;
+		const vp = effectiveScrollViewportRef.current;
 		if (vp) {
 			vp.scrollTop = 0;
 			vp.scrollLeft = 0;
 		}
-	}, [documentIdentity]);
+	}, [documentIdentity, effectiveScrollViewportRef]);
 
 	// 换篇或开启角标后更新「置底/置顶」状态（勿与上一段合并，避免 refresh 回调变动时误重置滚动）
 	useLayoutEffect(() => {
@@ -131,8 +139,8 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 
 	// 目录 / 页内 #：与聊天共用 `useMarkdownHashLinkViewportScroll`（实录见 docs/monaco/markdown-preview-toc-hash-navigation.md §9）
 	const getMarkdownHashScrollViewport = useCallback(
-		() => localViewportRef.current,
-		[],
+		() => effectiveScrollViewportRef.current,
+		[effectiveScrollViewportRef],
 	);
 	useMarkdownHashLinkViewportScroll(markdownRef, getMarkdownHashScrollViewport);
 
@@ -255,12 +263,12 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 	);
 
 	const { relayout: relayoutCodeToolbar } = useChatCodeFloatingToolbar(
-		localViewportRef,
+		effectiveScrollViewportRef,
 		{ layoutDeps: [markdown] },
 	);
 
 	const syncScrollMetrics = useCallback(() => {
-		const el = localViewportRef.current;
+		const el = effectiveScrollViewportRef.current;
 		if (!el) return;
 		relayoutCodeToolbar();
 	}, [relayoutCodeToolbar]);
@@ -295,7 +303,7 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 		const tid = window.setTimeout(() => {
 			refreshPreviewScrollFab();
 			requestAnimationFrame(() => refreshPreviewScrollFab());
-			const vp = localViewportRef.current;
+			const vp = effectiveScrollViewportRef.current;
 			if (vp) {
 				ro = new ResizeObserver(() => refreshPreviewScrollFab());
 				ro.observe(vp);
@@ -308,7 +316,7 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 	}, [markdown, html, showPreviewScrollCornerFab, refreshPreviewScrollFab]);
 
 	const onPreviewScrollCornerFabClick = useCallback(() => {
-		const vp = localViewportRef.current;
+		const vp = effectiveScrollViewportRef.current;
 		if (!vp) return;
 		if (previewScrollFabMode === 'toBottom') {
 			vp.scrollTo({
@@ -320,60 +328,96 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 		}
 	}, [previewScrollFabMode]);
 
+	/**
+	 * 渲染 Markdown 预览的根节点：
+	 * - ref={previewHtmlRootRef}：用于 Mermaid 等场景下内容生成后的 DOM 操作（如图表扫描/渲染），保证与 dangerouslySetInnerHTML 同层。
+	 * - className：结合 Tailwind 工具类，对 markdown-body 子节点做适配，确保内容换行、表格/代码块横向滚动等表现，且采用透明底色与主字体色。
+	 *   特别：
+	 *   - [&_.markdown-body] 前缀：仅限定 markdown-body 内部元素，不干扰其它样式。
+	 *   - enableMermaid && MARKDOWN_MERMAID_TAILWIND_CURSOR_ZOOM_IN_CLASS：支持 mermaid 图时鼠标变为缩放指针。
+	 *
+	 * 渲染内容逻辑：
+	 * - hasMermaidIslandLayout 为 true 时，说明存在 mermaid 岛屿布局（即 markdown 被 fenceParts 拆分，有代码/mermaid块需分别处理）：
+	 *   - 遍历 fenceParts（经过 splitForMermaidIslandsWithOpenTail 拆分的 markdown 段落），每个 part 可能是普通 markdown 或 mermaid 类型。
+	 *   - 对 type === 'markdown' 的片段单独渲染，注意此时禁用 enableMermaid，防止解析 mermaid 代码块为 html。
+	 *   - 渲染时调用 shiftMarkdownPreviewHeadingLineAttrs 给每个段落的 heading 标题行数加上正确的行号偏移（确保跳转或定位时与全文一致）。
+	 *   - 其它类型（如 mermaid 块）则用 renderMermaidPreviewPart 单独渲染（含占位、toolbar 等）。
+	 * - 否则（没有 mermaid 岛），直接整段渲染 markdown 生成的 html。
+	 */
+	const previewHtmlRoot = (
+		<div
+			ref={previewHtmlRootRef}
+			className={cn(
+				// markdown-body 相关的布局和样式优化，保证各种内容表现正常
+				'[&_.markdown-body]:min-w-0 [&_.markdown-body]:max-w-none [&_.markdown-body]:wrap-break-word [&_.markdown-body]:overflow-x-auto [&_.markdown-body]:bg-transparent! [&_.markdown-body]:text-textcolor/90! [&_.markdown-body_:is(h1,h2,h3,h4,h5,h6)]:scroll-mt-3 [&_.markdown-body_pre]:max-w-full [&_.markdown-body_pre]:overflow-x-auto [&_.markdown-body_table]:block [&_.markdown-body_table]:max-w-full [&_.markdown-body_table]:overflow-x-auto',
+				// 如果启用 Mermaid，则加相应的鼠标样式
+				enableMermaid && MARKDOWN_MERMAID_TAILWIND_CURSOR_ZOOM_IN_CLASS,
+			)}
+		>
+			{hasMermaidIslandLayout ? (
+				// 如果存在 Mermaid 岛布局，则遍历分离出来的各个块分别渲染
+				fenceParts.map((part, i) => {
+					if (part.type === 'markdown') {
+						// 处理普通 markdown 块，禁用 mermaid，避免二次渲染
+						const rawHtml = parser.render(part.text, {
+							enableMermaid: false,
+						});
+						return (
+							<div
+								key={`pv-${i}`}
+								dangerouslySetInnerHTML={{
+									// 对当前段落的 heading data-md-heading-line 属性进行校正（+part.lineBase0 偏移）
+									__html: shiftMarkdownPreviewHeadingLineAttrs(
+										rawHtml,
+										part.lineBase0,
+									),
+								}}
+							/>
+						);
+					}
+					// 其它类型（如 mermaid 岛）交由专用渲染
+					return renderMermaidPreviewPart(part, i);
+				})
+			) : (
+				// 若没有 mermaid 岛，直接整体渲染 markdown 解析出来的 html
+				<div dangerouslySetInnerHTML={{ __html: html }} />
+			)}
+		</div>
+	);
+
 	return (
 		<div
 			ref={markdownRef}
-			className="relative h-full min-h-0 min-w-0 max-w-full w-full overflow-hidden contain-[inline-size] select-text"
+			className={cn(
+				'relative h-full min-h-0 min-w-0 max-w-full w-full contain-[inline-size] select-text',
+				embedInParentScroll ? 'overflow-visible' : 'overflow-hidden',
+			)}
 		>
 			{withScrollArea ? <ChatCodeFloatingToolbar /> : null}
 			{markdown ? (
-				<ScrollArea
-					ref={assignViewportRef}
-					scrollbars="both"
-					onScroll={handleViewportScroll}
-					className={cn(
-						'h-full min-h-0 min-w-0 max-w-full w-full bg-transparent',
-					)}
-					// 覆盖 Radix 内层 display:table + minWidth:100%，否则 table 会按内容扩宽并顶破分栏
-					viewportClassName={cn(
-						'[&>div]:!box-border [&>div]:!block [&>div]:!w-full [&>div]:!min-w-0 [&>div]:!max-w-full',
-						withScrollArea && 'overscroll-y-contain',
-					)}
-				>
+				embedInParentScroll ? (
 					<div className="box-border min-w-0 max-w-full w-full p-3">
-						<div
-							ref={previewHtmlRootRef}
-							className={cn(
-								'[&_.markdown-body]:min-w-0 [&_.markdown-body]:max-w-none [&_.markdown-body]:wrap-break-word [&_.markdown-body]:overflow-x-auto [&_.markdown-body]:bg-transparent! [&_.markdown-body]:text-textcolor/90! [&_.markdown-body_:is(h1,h2,h3,h4,h5,h6)]:scroll-mt-3 [&_.markdown-body_pre]:max-w-full [&_.markdown-body_pre]:overflow-x-auto [&_.markdown-body_table]:block [&_.markdown-body_table]:max-w-full [&_.markdown-body_table]:overflow-x-auto',
-								enableMermaid && MARKDOWN_MERMAID_TAILWIND_CURSOR_ZOOM_IN_CLASS,
-							)}
-						>
-							{hasMermaidIslandLayout ? (
-								fenceParts.map((part, i) => {
-									if (part.type === 'markdown') {
-										const rawHtml = parser.render(part.text, {
-											enableMermaid: false,
-										});
-										return (
-											<div
-												key={`pv-${i}`}
-												dangerouslySetInnerHTML={{
-													__html: shiftMarkdownPreviewHeadingLineAttrs(
-														rawHtml,
-														part.lineBase0,
-													),
-												}}
-											/>
-										);
-									}
-									return renderMermaidPreviewPart(part, i);
-								})
-							) : (
-								<div dangerouslySetInnerHTML={{ __html: html }} />
-							)}
-						</div>
+						{previewHtmlRoot}
 					</div>
-				</ScrollArea>
+				) : (
+					<ScrollArea
+						ref={assignViewportRef}
+						scrollbars="both"
+						onScroll={handleViewportScroll}
+						className={cn(
+							'h-full min-h-0 min-w-0 max-w-full w-full bg-transparent',
+						)}
+						// 覆盖 Radix 内层 display:table + minWidth:100%，否则 table 会按内容扩宽并顶破分栏
+						viewportClassName={cn(
+							'[&>div]:!box-border [&>div]:!block [&>div]:!w-full [&>div]:!min-w-0 [&>div]:!max-w-full',
+							withScrollArea && 'overscroll-y-contain',
+						)}
+					>
+						<div className="box-border min-w-0 max-w-full w-full p-3">
+							{previewHtmlRoot}
+						</div>
+					</ScrollArea>
+				)
 			) : (
 				<div className="flex items-center justify-center flex-col gap-5 h-full box-border min-w-0 max-w-full w-full p-3 rounded-md">
 					<Component className="w-16 h-16 text-textcolor/70 animate-bounce" />
