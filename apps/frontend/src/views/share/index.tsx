@@ -1,59 +1,63 @@
 import { Button, ScrollArea } from '@ui/index';
 import { ArrowDownToLine, ArrowUpToLine, CircleAlert } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useParams } from 'react-router';
 import ChatAssistantMessage from '@/components/design/ChatAssistantMessage';
 import ChatFileList from '@/components/design/ChatFileList';
 import ChatMessageActions from '@/components/design/ChatMessageActions';
 import MarkdownPreview from '@/components/design/Markdown';
 import { useTheme } from '@/hooks';
+import { findLatestBranchSelection } from '@/hooks/useBranchManage';
 import {
 	ChatCodeFloatingToolbar,
 	useChatCodeFloatingToolbar,
 } from '@/hooks/useChatCodeFloatingToolbar';
+import { useMessageTools } from '@/hooks/useMessageTools';
 import { cn } from '@/lib/utils';
 import { getShare } from '@/service';
+import type { Message, Session } from '@/types/chat';
 
 /** 判定「已到底」允许的像素误差（避免子像素取整导致箭头来回跳） */
 const SCROLL_BOTTOM_THRESHOLD = 48;
 
-export interface Session {
-	id: string;
-	content: string;
-	role: string;
-	isActive: boolean;
-	createdAt: Date;
-	updatedAt: Date;
-	messages: Message[];
-	title: string;
+/** getShare 在 Session 上附带 Redis 中的 messageIds 顺序（与创建分享时 ChatBot 展示链一致） */
+type ShareSessionPayload = Session & { shareMessageIds?: string[] };
+
+/** 将接口 JSON 转为与 ChatBot 一致的 Date，供 buildMessageList / getFormatMessages */
+function normalizeMessagesForChatTools(raw: Message[]): Message[] {
+	return raw.map((m) => {
+		const ts =
+			m.timestamp instanceof Date
+				? m.timestamp
+				: new Date(
+						typeof m.timestamp === 'number'
+							? m.timestamp
+							: typeof m.timestamp === 'string'
+								? m.timestamp
+								: 0,
+					);
+		const created =
+			m.createdAt instanceof Date
+				? m.createdAt
+				: m.createdAt != null
+					? new Date(m.createdAt as string | number)
+					: ts;
+		return { ...m, createdAt: created, timestamp: ts };
+	});
 }
 
-export interface UploadedFile {
-	id: string;
-	uuid: string;
-	filename: string;
-	mimetype: string;
-	originalname: string;
-	path: string;
-	size: number;
-}
-
-export interface Message {
-	chatId: string;
-	content: string;
-	role: 'user' | 'assistant';
-	timestamp: Date;
-	id?: string;
-	createdAt?: Date;
-	attachments?: UploadedFile[] | null;
-	thinkContent?: string;
-	isStreaming?: boolean;
-	isStopped?: boolean;
-	parentId?: string;
-	childrenIds?: string[];
-	siblingIndex?: number;
-	siblingCount?: number;
-	currentChatId?: string;
+/**
+ * 按 shareMessageIds 顺序取出消息（与 ChatBotView 在分享瞬间的展示顺序一致）。
+ * 主聊天 findMessages 已按 messageIds 重排；此处再对齐一遍，并覆盖助手等路径。
+ */
+function pickMessagesInShareIdsOrder(
+	messages: Message[],
+	orderedIds: string[],
+): Message[] {
+	const byChatId = new Map(messages.map((m) => [m.chatId, m]));
+	return orderedIds
+		.map((id) => byChatId.get(id))
+		.filter((m): m is Message => m != null);
 }
 
 const SessionShare = () => {
@@ -72,7 +76,7 @@ const SessionShare = () => {
 	const location = useLocation();
 	useTheme();
 
-	const [chatData, setChatData] = useState<Session>();
+	const [chatData, setChatData] = useState<ShareSessionPayload>();
 	const [knowledgeData, setKnowledgeData] = useState<{
 		id: string;
 		title: string | null;
@@ -81,10 +85,11 @@ const SessionShare = () => {
 		updatedAt: number;
 	} | null>(null);
 
+	const { buildMessageList, getFormatMessages } = useMessageTools();
+
 	const { relayout: relayoutCodeToolbar } = useChatCodeFloatingToolbar(
 		scrollViewportRef,
 		{
-			// 知识分享时 chatData 为空，必须带上正文否则首屏后从不触发吸顶条布局
 			layoutDeps: [chatData, knowledgeData?.id, knowledgeData?.content],
 		},
 	);
@@ -117,15 +122,10 @@ const SessionShare = () => {
 		};
 	}, []);
 
-	// 保证每次 chatData 或 knowledgeData 变化时，能够同步刷新滚动指标（比如内容变多了，需要重新判断是否可滚动/是否在底部等）以及 code floating toolbar 的布局。
-	// 1. 首先在 effect 执行时（如组件挂载或依赖变化），立刻同步一次 scrollMetrics 和 code floating toolbar layout；
-	// 2. 然后利用 requestAnimationFrame 在下一帧再刷新一次，确保 React 完成实际渲染后再次刷新，
-	//    避免首次渲染后的 DOM 尚未更新导致布局计算不准确；
-	// 3. 卸载或依赖变动时取消该帧任务，避免重复调用或内存泄漏。
 	useEffect(() => {
-		syncScrollMetrics(); // 立即同步一次
-		const id = requestAnimationFrame(() => syncScrollMetrics()); // 下一帧再同步一次，确保布局在 DOM 更新后准确
-		return () => cancelAnimationFrame(id); // 清理 requestAnimationFrame
+		syncScrollMetrics();
+		const id = requestAnimationFrame(() => syncScrollMetrics());
+		return () => cancelAnimationFrame(id);
 	}, [chatData, knowledgeData, syncScrollMetrics]);
 
 	useEffect(() => {
@@ -140,17 +140,73 @@ const SessionShare = () => {
 
 	const getShareData = async (id: string) => {
 		const type = new URLSearchParams(location.search).get('type');
-		const res = await getShare<any>(id);
+		const res = await getShare<ShareSessionPayload & Record<string, unknown>>(
+			id,
+		);
 		if (res.success) {
 			if (type === 'knowledge') {
-				setKnowledgeData(res.data?.knowledge ?? null);
+				const k = res.data?.knowledge;
+				setKnowledgeData(
+					k &&
+						typeof k === 'object' &&
+						'id' in k &&
+						'content' in k &&
+						typeof (k as { id: unknown }).id === 'string'
+						? (k as {
+								id: string;
+								title: string | null;
+								content: string;
+								createdAt: number;
+								updatedAt: number;
+							})
+						: null,
+				);
 				setChatData(undefined);
 			} else {
-				setChatData(res.data);
+				const payload = res.data;
+				setChatData(
+					payload
+						? {
+								...payload,
+								messages: Array.isArray(payload.messages)
+									? payload.messages
+									: [],
+								shareMessageIds: payload.shareMessageIds,
+							}
+						: undefined,
+				);
 				setKnowledgeData(null);
 			}
 		}
 	};
+
+	/**
+	 * 与 ChatBotView 内 messages useMemo 对齐（无 displayMessages 分支）：
+	 * - 有 shareMessageIds：顺序 = 创建分享时写入的 messageIds（即当时 getDisplayMessages 顺序）；
+	 * - 否则：buildMessageList(flat, selectedChildMap) + getFormatMessages，
+	 *   无持久化分支选择时与 Chat 连接层一致，用 findLatestBranchSelection 推导 Map。
+	 */
+	const displayMessages = useMemo((): Message[] => {
+		const raw = chatData?.messages;
+		if (!raw?.length) return [];
+
+		const normalized = normalizeMessagesForChatTools(raw as Message[]);
+		const ids = chatData?.shareMessageIds;
+
+		if (ids?.length) {
+			const ordered = pickMessagesInShareIdsOrder(normalized, ids);
+			return getFormatMessages(ordered);
+		}
+
+		const branchMap = findLatestBranchSelection(normalized);
+		const chain = buildMessageList(normalized, branchMap);
+		return getFormatMessages(chain);
+	}, [
+		chatData?.messages,
+		chatData?.shareMessageIds,
+		buildMessageList,
+		getFormatMessages,
+	]);
 
 	const onCopy = (content: string, chatId: string) => {
 		navigator.clipboard.writeText(content);
@@ -237,9 +293,9 @@ const SessionShare = () => {
 							'max-w-208 mx-auto w-full mt-2.5 relative flex flex-col select-none px-4',
 						)}
 					>
-						{chatData?.messages.map((message, index) => (
+						{displayMessages.map((message, index) => (
 							<div
-								key={message.id}
+								key={message.chatId}
 								className={cn(
 									'relative flex-1 flex flex-col gap-1 pb-10 w-full group',
 									message.role === 'user' ? 'items-end' : '',
@@ -286,7 +342,7 @@ const SessionShare = () => {
 											message={message}
 											index={index}
 											isCopyedId={isCopyedId}
-											messagesLength={chatData?.messages.length || 0}
+											messagesLength={displayMessages.length}
 											onCopy={onCopy}
 											needShare={false}
 										/>
@@ -298,7 +354,6 @@ const SessionShare = () => {
 				)}
 			</ScrollArea>
 
-			{/* 单图标：未到底为下箭头（置底），到底后变为上箭头（回顶） */}
 			{canScroll ? (
 				<Button
 					title={atBottom ? '回到顶部' : '滚动到底部'}

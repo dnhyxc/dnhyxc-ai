@@ -17,6 +17,11 @@ interface ShareProps {
 	open: boolean;
 	onOpenChange: () => void;
 	checkedMessages: Set<string>;
+	/**
+	 * 可选：当前会话的展示顺序基准（与 ChatBotView 中 flat 列表 / getDisplayMessages 顺序一致），
+	 * 用于稳定 createShare 的 messageIds 顺序；不传则使用 Set 迭代顺序（不可靠）。
+	 */
+	orderedMessageIds?: string[];
 	/** 可选：当不从路由 params 取 sessionId 时由外部注入（例如知识库助手分享） */
 	sessionId?: string;
 	/** 可选：不传则默认 chat；知识库助手分享建议传 assistant，避免后端走错误回退 */
@@ -29,6 +34,7 @@ const Share: React.FC<ShareProps> = ({
 	open,
 	onOpenChange,
 	checkedMessages,
+	orderedMessageIds,
 	sessionId,
 	sessionType,
 	shareType,
@@ -42,6 +48,24 @@ const Share: React.FC<ShareProps> = ({
 
 	const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+	const onCopy = useCallback(
+		async (shareUrl: string) => {
+			try {
+				await navigator.clipboard.writeText(shareUrl);
+			} catch {
+				await copyToClipboard(shareUrl);
+			}
+			if (copied) return;
+			if (timer.current) {
+				clearTimeout(timer.current);
+				timer.current = null;
+			}
+			setCopied(true);
+			timer.current = setTimeout(() => setCopied(false), 5000);
+		},
+		[copied],
+	);
+
 	useEffect(() => {
 		return () => {
 			setShareInfo(undefined);
@@ -51,58 +75,63 @@ const Share: React.FC<ShareProps> = ({
 	const onCreateShare = useCallback(async () => {
 		setLoading(true);
 		const chatSessionId = sessionId ?? params?.id;
-		if (chatSessionId) {
-			const data: {
-				chatSessionId: string;
-				sessionType?: 'chat' | 'assistant';
-				messageIds?: string[];
-				baseUrl?: string;
-				shareType?: 'session' | 'knowledge';
-			} = {
-				chatSessionId,
-				sessionType,
-				shareType,
-				baseUrl: import.meta.env.DEV
-					? import.meta.env.VITE_DEV_WEB_DOMAIN
-					: import.meta.env.VITE_PROD_WEB_DOMAIN, // http://localhost:9226
-			};
-			if (checkedMessages.size) {
-				data.messageIds = [...checkedMessages];
-			}
-			const res = await createShare(data);
+		if (!chatSessionId) {
 			setLoading(false);
-			if (res.success) {
-				// 以 store 为准，避免 useTheme 异步未完成时主题仍是默认值
-				const stored = (await getValue('themeType')) as ThemeName;
-				const themeName = THEMES.some((t) => t.name === stored)
-					? stored
-					: theme;
-				const shareUrl = appendShareThemeQuery(res.data.shareUrl, themeName);
-				setShareInfo({ ...res.data, shareUrl });
-				onCopy(shareUrl);
+			return;
+		}
+		const data: {
+			chatSessionId: string;
+			sessionType?: 'chat' | 'assistant';
+			messageIds?: string[];
+			baseUrl?: string;
+			shareType?: 'session' | 'knowledge';
+		} = {
+			chatSessionId,
+			sessionType,
+			shareType,
+			baseUrl: import.meta.env.DEV
+				? import.meta.env.VITE_DEV_WEB_DOMAIN
+				: import.meta.env.VITE_PROD_WEB_DOMAIN, // http://localhost:9226
+		};
+		if (checkedMessages.size) {
+			const selected = [...checkedMessages];
+			if (orderedMessageIds?.length) {
+				const selectedSet = new Set(selected);
+				const orderedSelected = orderedMessageIds.filter((id) =>
+					selectedSet.has(id),
+				);
+				const orderedSet = new Set(orderedSelected);
+				const rest = selected.filter((id) => !orderedSet.has(id));
+				data.messageIds = [...orderedSelected, ...rest];
 			} else {
-				Toast({
-					type: 'error',
-					title: res.message,
-				});
+				data.messageIds = selected;
 			}
 		}
-	}, [params?.id, checkedMessages, theme, sessionId]);
-
-	const onCopy = async (shareUrl: string) => {
-		try {
-			await navigator.clipboard.writeText(shareUrl);
-		} catch {
-			await copyToClipboard(shareUrl);
+		const res = await createShare(data);
+		setLoading(false);
+		if (res.success) {
+			// 以 store 为准，避免 useTheme 异步未完成时主题仍是默认值
+			const stored = (await getValue('themeType')) as ThemeName;
+			const themeName = THEMES.some((t) => t.name === stored) ? stored : theme;
+			const shareUrl = appendShareThemeQuery(res.data.shareUrl, themeName);
+			setShareInfo({ ...res.data, shareUrl });
+			void onCopy(shareUrl);
+		} else {
+			Toast({
+				type: 'error',
+				title: res.message,
+			});
 		}
-		if (copied) return;
-		if (timer.current) {
-			clearTimeout(timer.current);
-			timer.current = null;
-		}
-		setCopied(true);
-		timer.current = setTimeout(() => setCopied(false), 5000);
-	};
+	}, [
+		params?.id,
+		checkedMessages,
+		orderedMessageIds,
+		theme,
+		sessionId,
+		sessionType,
+		shareType,
+		onCopy,
+	]);
 
 	return (
 		<Model

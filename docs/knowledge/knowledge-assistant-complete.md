@@ -1250,6 +1250,8 @@ export function useKnowledgeAssistantShare(params: {
 			open={shareModelVisible}
 			onOpenChange={onCloseShareModel}
 			checkedMessages={shareSelection.checkedMessages}
+			orderedMessageIds={aiMessages.map((m) => m.chatId)}
+			// 上一行：与 ChatBot 侧一致，按当前列表展示顺序写入 createShare.messageIds，避免 Set 无序；只读分享页与 ChatBotView 对齐见 docs/chat/share.md §四
 			sessionId={assistantStore.activeSessionId ?? undefined} // 走 share/create 的 chatSessionId 字段
 			sessionType="assistant" // 告诉后端直接查 assistant，避免错误回退
 		/>
@@ -1266,19 +1268,20 @@ export function useKnowledgeAssistantShare(params: {
 }
 ```
 
-##### 8.2.2.3 Share 弹窗复用：`ShareChat` 增加 `sessionId/sessionType`（逐行注释）
+##### 8.2.2.3 Share 弹窗复用：`ShareChat` 增加 `sessionId/sessionType/orderedMessageIds`（逐行注释）
 
-文件：`apps/frontend/src/views/chat/share/index.tsx`。
+文件：`apps/frontend/src/components/design/Share/index.tsx`（通过 `@design/Share` 引用；**不是** `views/chat/share`，后者为**只读分享页** `apps/frontend/src/views/share/index.tsx`）。
 
-该组件原本从路由 `params.id` 取 chat 会话；为复用到知识库助手，新增可选 `sessionId`（并透传可选 `sessionType`）：
+该组件原本从路由 `params.id` 取 chat 会话；为复用到知识库助手，新增可选 `sessionId`（并透传可选 `sessionType`）。为与 **ChatBotView** 展示顺序一致，新增可选 **`orderedMessageIds`**：创建分享时按该数组顺序在勾选集合上重建 **`messageIds`**（详见 **`docs/chat/share.md` §四**）。
 
 ```ts
-// 文件：apps/frontend/src/views/chat/share/index.tsx（节选 + 逐行注释）
+// 文件：apps/frontend/src/components/design/Share/index.tsx（节选 + 逐行注释）
 
 interface ShareProps {
 	open: boolean; // 弹窗开关
 	onOpenChange: () => void; // 关闭弹窗回调（外部负责清空分享状态）
-	checkedMessages: Set<string>; // 已选择的 messageIds（成对勾选）
+	checkedMessages: Set<string>; // 已选择的 chatId 集合（成对勾选）
+	orderedMessageIds?: string[]; // 可选：当前 UI 列表顺序（主聊天=getDisplayMessages；助手=aiMessages）
 	sessionId?: string; // 可选：外部注入会话 id（知识库助手用）
 	sessionType?: 'chat' | 'assistant'; // 可选：告诉后端查哪个数据源（避免回退）
 }
@@ -1286,17 +1289,26 @@ interface ShareProps {
 const onCreateShare = useCallback(async () => {
 	setLoading(true);
 	const chatSessionId = sessionId ?? params?.id; // 优先使用外部注入 id，否则使用路由参数
-	if (chatSessionId) {
-		const data = {
-			chatSessionId, // 仍复用字段名：后端 createShare 只存该 id
-			sessionType, // 可选：知识库助手传 assistant；主聊天不传也可
-			messageIds: checkedMessages.size ? [...checkedMessages] : undefined,
-			baseUrl: import.meta.env.DEV ? import.meta.env.VITE_DEV_WEB_DOMAIN : import.meta.env.VITE_PROD_WEB_DOMAIN,
-		};
-		const res = await createShare(data); // 复用同一接口 /share/create
-		// ... 成功后拼主题 query 并复制链接（原逻辑不变） ...
+	if (!chatSessionId) {
+		setLoading(false);
+		return;
 	}
-}, [params?.id, checkedMessages, theme, sessionId, sessionType]);
+	const data = { chatSessionId, sessionType, shareType, baseUrl: /* ... */ };
+	if (checkedMessages.size) {
+		const selected = [...checkedMessages];
+		if (orderedMessageIds?.length) {
+			const selectedSet = new Set(selected);
+			const orderedSelected = orderedMessageIds.filter((id) => selectedSet.has(id));
+			const orderedSet = new Set(orderedSelected);
+			const rest = selected.filter((id) => !orderedSet.has(id));
+			data.messageIds = [...orderedSelected, ...rest]; // 顺序 = 展示顺序 + 兜底未出现在 ordered 中的勾选
+		} else {
+			data.messageIds = selected; // 无 orderedMessageIds 时退化为 Set 展开顺序（弱保证）
+		}
+	}
+	const res = await createShare(data);
+	// ... 成功后拼主题 query 并复制链接 ...
+}, [params?.id, checkedMessages, orderedMessageIds, theme, sessionId, sessionType, shareType, onCopy]);
 ```
 
 ##### 8.2.2.4 后端统一封装：按 `sessionType` 选择数据源（逐行注释）
@@ -1348,9 +1360,15 @@ private async resolveShareMessagesBySessionId(params: {
 		.addOrderBy('m.id', 'ASC') // 再兜底按 uuid 保证稳定
 		.getMany();
 
+	// 当存在 messageIds：在内存中再按「创建分享时数组下标」稳定重排（与主聊天 findMessages 语义一致），
+	// 避免仅靠 DB 排序与前端 getDisplayMessages/orderedMessageIds 不一致；getShare 响应另带 shareMessageIds 供只读页使用（见 docs/chat/share.md §四）。
+	// …orderedRows / messages 映射略…
+
 	return { /* ... */ };
 }
 ```
+
+> **补充（与只读分享页对齐）**：`getShare` 会话类响应会携带 **`shareMessageIds: cacheData.messageIds`**；前端 **`apps/frontend/src/views/share/index.tsx`** 用 **`pickMessagesInShareIdsOrder` + `getFormatMessages`** 与 **ChatBotView** 的展示链对齐。完整说明见 **`docs/chat/share.md` 第四章**。
 
 #### 8.2.3 分享透传逻辑下沉到 `KnowledgeMessageBubble`（逐行注释）
 

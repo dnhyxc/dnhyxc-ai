@@ -113,6 +113,7 @@ export function useKnowledgeAssistantShare(params: {
 				open={shareModelVisible}
 				onOpenChange={onCloseShareModel}
 				checkedMessages={shareSelection.checkedMessages}
+				orderedMessageIds={aiMessages.map((m) => m.chatId)}
 				sessionId={assistantStore.activeSessionId ?? undefined}
 				sessionType="assistant"
 			/>

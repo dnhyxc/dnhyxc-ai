@@ -368,3 +368,301 @@ export function useChatCodeFloatingToolbar(
 - **Mermaid**：顶栏（图/代码、复制、预览、下载）应可见；滚动时哨兵触发的「粘顶/非粘顶」样式切换应与 Monaco 预览一致。
 - **会话分享**（无 `type=knowledge`）：行为应与改动前一致；仍依赖页面级 **`useChatCodeFloatingToolbar(scrollViewportRef)`** 与消息内 Markdown 结构。
 
+---
+
+## 四、分享页消息顺序与 ChatBotView 完全一致（实现思路 + 逐行注释摘录）
+
+本节记录 **2026 年** 前后端联动改造：分享页 **`displayMessages`** 的推导与 **`ChatBotView`** 内 **`messages`** 的 **`useMemo`** 语义对齐；创建分享时 **`messageIds`** 顺序与 **`getDisplayMessages()`** 一致；**`getShare`** 透出 **`shareMessageIds`** 供只读页复现顺序；**助手（assistant）** 分支在服务端按 **`messageIds`** 重排。
+
+### 4.1 实现思路（总览）
+
+| 环节 | 目标 | 做法 |
+| --- | --- | --- |
+| **创建分享** | `POST /share` 写入 Redis 的 `messageIds` 与用户在 Chat / 知识助手里看到的顺序一致 | 主聊天：`orderedMessageIds={getDisplayMessages().map(m => m.chatId)}`；助手：`orderedMessageIds={aiMessages.map(m => m.chatId)}`；**`Share`** 内按 `orderedMessageIds` 过滤勾选集合并组 **`messageIds`**，避免依赖 **`Set`** 迭代顺序 |
+| **读取分享** | 接口仍返回 `messages` 数组，但顺序可能因分支（chat/assistant）而不同 | **主聊天**：`MessageService.findMessages` 已按 **`messageIds`** 重排（见上文 **§一.4**）；**助手**：`ShareService.resolveShareMessagesBySessionId` 在 **`messageIds`** 存在时对查询结果再按索引排序 |
+| **分享页渲染** | 与 **`ChatBotView`** 相同管线：`getFormatMessages(buildMessageList(…))`；有 **`shareMessageIds`** 时顺序锁定为创建瞬间的展示链 | **`normalizeMessagesForChatTools`** 统一日期；有 **`shareMessageIds`** 则 **`pickMessagesInShareIdsOrder`** + **`getFormatMessages`**；否则 **`findLatestBranchSelection`** + **`buildMessageList`** + **`getFormatMessages`**（与 **`useChatCore.getDisplayMessages`** 在无持久化分支图时的默认策略一致，见 **`ChatBot/index.tsx`** 会话切换 effect） |
+| **接口契约** | 前端能拿到「创建时的 id 顺序」 | **`getShare`** 在会话类分享响应中增加 **`shareMessageIds: cacheData.messageIds`** |
+
+**与 `ChatBotView` 的等价关系（无 `displayMessages` 分支时）：**
+
+```text
+ChatBotView:  getFormatMessages(buildMessageList(flatMessages, selectedChildMap))
+分享页有 shareMessageIds:
+              getFormatMessages(pickMessagesInShareIdsOrder(flat, shareMessageIds))
+分享页无 shareMessageIds（旧数据）:
+              getFormatMessages(buildMessageList(flat, findLatestBranchSelection(flat)))
+```
+
+**已知局限**：若用户曾把 **`selectedChildMap`** 持久化为「非最新分支」且 **未** 把该 Map 写入分享 Redis，则旧链接在「无 **`shareMessageIds`**」时只能用 **`findLatestBranchSelection`** 近似；**新创建的分享** 因 **`shareMessageIds`** 与 **`orderedMessageIds`** 已足够与当时 **`getDisplayMessages()`** 对齐。
+
+---
+
+### 4.2 前端：`Share` 弹层 — `orderedMessageIds` 与 `messageIds` 组装（逐行注释）
+
+文件：`apps/frontend/src/components/design/Share/index.tsx`
+
+下列代码块在仓库真实逻辑基础上，为**每一行**补充中文注释（维护时以仓库为准；若行号漂移，以文件路径检索）。
+
+```tsx
+// --- ShareProps：弹层入参 ---
+interface ShareProps {
+	open: boolean; // 弹层是否打开
+	onOpenChange: () => void; // 关闭弹层回调
+	checkedMessages: Set<string>; // 当前勾选的要分享的消息 chatId 集合
+	/**
+	 * 可选：与 ChatBotView 当前展示列表顺序一致的 chatId 数组（主聊天 = getDisplayMessages()，助手 = aiMessages）。
+	 * 用于在勾选集合上重建「展示顺序」；不传则退化为 [...checkedMessages]，顺序依赖 Set 实现，不可靠。
+	 */
+	orderedMessageIds?: string[];
+	sessionId?: string; // 知识助手等场景下显式传入会话 id，避免仅用路由 params?.id
+	sessionType?: 'chat' | 'assistant'; // 后端分支：主聊天 / 助手会话
+	shareType?: 'session' | 'knowledge'; // session=会话分享；knowledge=知识文章分享
+}
+
+// --- onCreateShare 内：构造 createShare 请求体 data ---
+const onCreateShare = useCallback(async () => {
+	setLoading(true); // 点击「创建」后置加载态，防止重复提交
+	const chatSessionId = sessionId ?? params?.id; // 会话 id：props 优先，否则当前路由会话 id
+	if (!chatSessionId) {
+		setLoading(false); // 无会话 id 无法创建，结束 loading 避免按钮一直转圈
+		return; // 直接返回，不发起请求
+	}
+	const data = {
+		/* ... */ chatSessionId,
+		sessionType,
+		shareType,
+		baseUrl: import.meta.env.DEV
+			? import.meta.env.VITE_DEV_WEB_DOMAIN // 开发环境前端域名，用于拼完整分享 URL
+			: import.meta.env.VITE_PROD_WEB_DOMAIN, // 生产环境前端域名
+	};
+	if (checkedMessages.size) {
+		// 仅在用户至少勾选一条时携带 messageIds，否则后端按「整会话」语义处理（依后端约定）
+		const selected = [...checkedMessages]; // Set 转数组，得到勾选 id 列表（无序）
+		if (orderedMessageIds?.length) {
+			const selectedSet = new Set(selected); // 为 O(1) 判断「是否在勾选集中」
+			const orderedSelected = orderedMessageIds.filter((id) => selectedSet.has(id));
+			// 上一行：按「当前 UI 展示顺序」遍历，只保留仍被勾选的 id → 得到稳定顺序子序列
+			const orderedSet = new Set(orderedSelected); // 已排好序且出现在 ordered 中的 id
+			const rest = selected.filter((id) => !orderedSet.has(id));
+			// 上一行：勾选但不在 orderedMessageIds 中的 id（理论上少见），按 Set 展开顺序附在末尾，避免丢消息
+			data.messageIds = [...orderedSelected, ...rest]; // 最终写入 Redis 的顺序 = 展示顺序 + 兜底
+		} else {
+			data.messageIds = selected; // 无展示基准时只能使用 Set 展开顺序（弱保证）
+		}
+	}
+	const res = await createShare(data); // 调后端创建分享，Redis 存 messageIds 等
+	setLoading(false); // 请求结束（成功或失败）关闭 loading
+	if (res.success) {
+		/* ...主题、appendShareThemeQuery、setShareInfo、void onCopy(shareUrl) */
+	} else {
+		Toast({ type: 'error', title: res.message }); // 失败提示
+	}
+}, [params?.id, checkedMessages, orderedMessageIds, theme, sessionId, sessionType, shareType, onCopy]);
+// 依赖数组：任一变化时重建回调，避免闭包过期；orderedMessageIds 变化会改变 messageIds 组装结果
+```
+
+---
+
+### 4.3 前端：主聊天入口 — 传入 `orderedMessageIds`
+
+文件：`apps/frontend/src/views/chat/index.tsx`
+
+```tsx
+// ShareChat 与 ChatBot 同页：可直接调用 useChatCore 返回的 getDisplayMessages（与 ChatBotView 数据源一致）
+<ShareChat
+	open={shareModelVisible} // 分享弹层开关
+	onOpenChange={onCloseShareModel} // 关闭时清理分享态
+	checkedMessages={checkedMessages} // 勾选集（MobX/Context）
+	orderedMessageIds={getDisplayMessages().map((m) => m.chatId)}
+	// 上一行：把「当前分支下实际渲染顺序」的 chatId 列表传入 Share，用于稳定 messageIds 顺序
+/>
+```
+
+---
+
+### 4.4 前端：知识库助手 — 传入 `orderedMessageIds`
+
+文件：`apps/frontend/src/views/knowledge/KnowledgeAssistantShareBar.tsx`
+
+```tsx
+<ShareChat
+	open={shareModelVisible}
+	onOpenChange={onCloseShareModel}
+	checkedMessages={shareSelection.checkedMessages} // 助手分享勾选状态
+	orderedMessageIds={aiMessages.map((m) => m.chatId)}
+	// 上一行：助手侧列表顺序即 aiMessages 数组顺序，与气泡从上到下渲染顺序一致
+	sessionId={assistantStore.activeSessionId ?? undefined} // 助手会话 id
+	sessionType="assistant" // 强制走后端 assistant 分支，避免误走 chat_sessions
+/>
+```
+
+---
+
+### 4.5 前端：分享页 — `displayMessages` 与工具函数（逐行注释）
+
+文件：`apps/frontend/src/views/share/index.tsx`
+
+```tsx
+// --- 类型：在 Session 上扩展 shareMessageIds（来自 getShare，与 Redis 中 messageIds 一致）---
+type ShareSessionPayload = Session & { shareMessageIds?: string[] };
+
+// --- normalizeMessagesForChatTools：把 HTTP JSON 中的时间字段规范为 Date，避免 buildMessageList 内排序与 getFormatMessages 行为漂移 ---
+function normalizeMessagesForChatTools(raw: Message[]): Message[] {
+	return raw.map((m) => {
+		// 对每条消息 m：分别解析 timestamp、createdAt
+		const ts =
+			m.timestamp instanceof Date
+				? m.timestamp // 已是 Date 则直接使用
+				: new Date(
+						typeof m.timestamp === 'number'
+							? m.timestamp // JSON 数字毫秒
+							: typeof m.timestamp === 'string'
+								? m.timestamp // ISO 字符串
+								: 0, // 缺省回退 0，避免 Invalid Date 传播
+					);
+		const created =
+			m.createdAt instanceof Date
+				? m.createdAt
+				: m.createdAt != null
+					? new Date(m.createdAt as string | number) // 字符串或数字转 Date
+					: ts; // 无 createdAt 时用 timestamp 派生，保证 getMessageSortTime 有键可用
+		return { ...m, createdAt: created, timestamp: ts }; // 返回浅拷贝，写入规范化后的日期字段
+	});
+}
+
+// --- pickMessagesInShareIdsOrder：严格按 shareMessageIds 顺序从 flat 列表中取出消息对象 ---
+function pickMessagesInShareIdsOrder(messages: Message[], orderedIds: string[]): Message[] {
+	const byChatId = new Map(messages.map((m) => [m.chatId, m])); // chatId → 消息实体，便于 O(1) 查找
+	return orderedIds
+		.map((id) => byChatId.get(id)) // 按创建分享时的顺序映射为消息；可能得到 undefined（id 不在当前 payload）
+		.filter((m): m is Message => m != null); // 类型守卫：剔除 undefined，保证数组类型为 Message[]
+}
+
+// --- displayMessages：与 ChatBotView 内 messages 推导对齐的核心 useMemo ---
+const displayMessages = useMemo((): Message[] => {
+	const raw = chatData?.messages; // 原始接口 messages（可能缺字段、时间为 number/string）
+	if (!raw?.length) return []; // 无消息则空数组，避免下游 sort/map 异常
+
+	const normalized = normalizeMessagesForChatTools(raw as Message[]); // 先规范化日期与类型
+	const ids = chatData?.shareMessageIds; // 后端随 getShare 下发的顺序基准（与 Redis messageIds 一致）
+
+	if (ids?.length) {
+		const ordered = pickMessagesInShareIdsOrder(normalized, ids); // 按分享创建顺序重排子集
+		return getFormatMessages(ordered); // 与 ChatBotView 相同：统一展示字段（如 timestamp 为 Date）
+	}
+
+	const branchMap = findLatestBranchSelection(normalized); // 无 shareMessageIds 时：推导「最新分支」Map（与 ChatBot 连接层默认行为对齐）
+	const chain = buildMessageList(normalized, branchMap); // 在整棵 flat 树上走出当前展示链
+	return getFormatMessages(chain); // 同上，输出与 ChatBotView 一致的展示消息形态
+}, [chatData?.messages, chatData?.shareMessageIds, buildMessageList, getFormatMessages]);
+// 依赖：messages 或 shareMessageIds 或工具函数引用变化时重新计算（工具函数来自 useMessageTools 单例，引用稳定）
+
+// --- 渲染：使用 displayMessages 而非 chatData.messages，避免直接渲染接口默认顺序 ---
+{
+	displayMessages.map((message, index) => (
+		<div key={message.chatId}>
+			{' '}
+			{/* key 用 chatId：分享载荷中 id 与 chatId 可能并存，chatId 与勾选/分支逻辑一致 */}
+			<ChatMessageActions
+				message={message}
+				index={index}
+				messagesLength={displayMessages.length} // 与当前展示列表长度一致，避免操作区索引错位
+				/* ... */
+			/>
+		</div>
+	));
+}
+```
+
+**`getShareData` 中写入 `shareMessageIds` 的意图（逐行）：**
+
+```tsx
+const payload = res.data; // HTTP 返回体（含 messages、可能含 shareMessageIds）
+setChatData(
+	payload
+		? {
+				...payload, // 保留 title、id 等会话字段
+				messages: Array.isArray(payload.messages) ? payload.messages : [],
+				// 上一行：保证 messages 恒为数组，避免 map 崩溃
+				shareMessageIds: payload.shareMessageIds,
+				// 上一行：显式挂上顺序字段；老后端无该字段时为 undefined，走 findLatestBranchSelection 分支
+			}
+		: undefined,
+);
+```
+
+---
+
+### 4.6 后端：`ShareService` — 助手消息按 `messageIds` 重排 + `getShare` 返回 `shareMessageIds`（逐行注释）
+
+文件：`apps/backend/src/services/share/share.service.ts`（助手分支节选）
+
+```ts
+// 查询助手消息行（已按 created_at、role、id 做过数据库层稳定排序）
+const rows = await qb.orderBy('m.created_at', 'ASC').addOrderBy(/* user 优先于 assistant */).getMany();
+
+let orderedRows = rows; // 默认使用查询结果顺序
+if (params.messageIds?.length) {
+	// 仅当创建分享时传入了 messageIds：需要与前端展示顺序一致，不能仅靠 DB 排序
+	const orderIndex = new Map(params.messageIds.map((id, i) => [id, i]));
+	// 上一行：Redis 中 messageIds 数组下标 → 排序权重
+	orderedRows = [...rows].sort((a, b) => {
+		const ai = orderIndex.get(a.id); // 助手表主键 id 与前端 chatId 一致
+		const bi = orderIndex.get(b.id);
+		if (ai == null && bi == null) {
+			// 两者都不在 messageIds 中：回退按创建时间、id 稳定排序
+			const at = a.createdAt?.getTime?.() ?? 0;
+			const bt = b.createdAt?.getTime?.() ?? 0;
+			if (at !== bt) return at - bt;
+			return String(a.id).localeCompare(String(b.id));
+		}
+		if (ai == null) return 1; // 仅 a 未命中：排到后面，避免打乱已选顺序
+		if (bi == null) return -1; // 仅 b 未命中：a 靠前
+		return ai - bi; // 均在 messageIds 中：严格按前端传入顺序
+	});
+}
+
+const messages = orderedRows.map((m) => ({
+	/* id, chatId, role, content, timestamp */
+}));
+```
+
+**`getShare` 返回体节选：**
+
+```ts
+return {
+	...(resolved.session ? resolved.session : {}), // chat 分支可能展开 session 实体字段
+	messages: resolved.messages, // 已按上文规则排好序的消息列表
+	shareMessageIds: cacheData.messageIds, // 透传 Redis 中的 messageIds，供前端 pickMessagesInShareIdsOrder 使用
+	shareId: cacheData.shareId,
+	shareType: 'session',
+	title: resolved.title,
+	createdAt: cacheData.createdAt,
+	expiresAt: cacheData.expiresAt,
+} as any;
+```
+
+---
+
+### 4.7 与既有后端逻辑的关系（主聊天）
+
+主聊天路径仍使用 **`apps/backend/src/services/chat/message.service.ts`** 的 **`findMessages`**：在 **`dto.messageIds`** 存在时对 **`chatSession.messages`** 做 **Map 索引排序**（见本文 **§一.4**）。分享页在有 **`shareMessageIds`** 时仍执行 **`pickMessagesInShareIdsOrder`**，是为了：
+
+- **助手** 路径与 **主聊天** 路径在「前端只读页」侧使用**同一套**「按 id 列表重放顺序」的语义；
+- 防御性处理：即使未来某条 API 路径未重排，前端仍能按 **`shareMessageIds`** 纠正展示。
+
+---
+
+### 4.8 验证清单（回归）
+
+1. **主聊天**：切换分支 / 重生成 → 点分享 → 勾选若干条 → 创建链接 → 打开分享页：顺序与 **`getDisplayMessages()`** 一致。  
+2. **知识助手**：多轮对话后部分勾选 → 创建分享：顺序与 **`aiMessages`** 自上而下一致。  
+3. **网络面板**：**`GET /share/:id`** 响应体含 **`shareMessageIds`**（新后端）；旧 Redis 条目可能缺该字段，分享页应仍能 **`findLatestBranchSelection`** 渲染。  
+4. **纯展示**：分享页列表应渲染 **`displayMessages`**，且 **`ChatMessageActions`** 的 **`messagesLength`** 与 **`displayMessages.length`** 一致。
+
+---
+
+### 4.9 知识库专题文档交叉引用
+
+在 **`docs/knowledge/knowledge-assistant-complete.md`** 中若已有「助手分享」小节，可与本节对照阅读：**助手 `ShareChat` 必须传 `sessionType="assistant"` 与 `orderedMessageIds`**，否则顺序与后端分支可能双重偏离。本文以 **`docs/chat/share.md`** 为会话分享与顺序策略的**权威说明**之一。
+

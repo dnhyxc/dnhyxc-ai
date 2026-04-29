@@ -112,7 +112,35 @@ export class ShareService {
 			// 再兜底按 uuid，保证排序稳定
 			.addOrderBy('m.id', 'ASC')
 			.getMany();
-		const messages = rows.map((m) => ({
+
+		// 确保消息的顺序与前端传入的 messageIds 顺序一致
+		// 1. 默认情况下，orderedRows 直接引用 rows
+		let orderedRows = rows;
+		// 2. 如果前端有传入 messageIds，按照其顺序重新排序
+		if (params.messageIds?.length) {
+			// 创建一个 Map，将每个 messageId 映射到其在 messageIds 数组中的下标（顺序）
+			const orderIndex = new Map(params.messageIds.map((id, i) => [id, i]));
+			// 复制 rows 用于排序，不直接修改原数组
+			orderedRows = [...rows].sort((a, b) => {
+				const ai = orderIndex.get(a.id); // a.id 在 messageIds 中的下标
+				const bi = orderIndex.get(b.id); // b.id 在 messageIds 中的下标
+				// 如果 a/b 两者都未在 messageIds 里，回退用 createdAt 排序，再用 id 排序保证稳定性
+				if (ai == null && bi == null) {
+					const at = a.createdAt?.getTime?.() ?? 0;
+					const bt = b.createdAt?.getTime?.() ?? 0;
+					if (at !== bt) return at - bt; // createdAt 小的在前
+					return String(a.id).localeCompare(String(b.id)); // id 排序兜底，保证顺序唯一
+				}
+				// 如果 a 不在 messageIds、b 在，用 b 优先，a 往后
+				if (ai == null) return 1;
+				// 如果 b 不在 messageIds、a 在，用 a 优先，b 往后
+				if (bi == null) return -1;
+				// 都在 messageIds 里，则按它们在 messageIds 中的顺序排列
+				return ai - bi;
+			});
+		}
+
+		const messages = orderedRows.map((m) => ({
 			id: m.id,
 			chatId: m.id,
 			role: (m.role === 'assistant' ? 'assistant' : 'user') as
@@ -243,6 +271,8 @@ export class ShareService {
 			...(resolved.session ? resolved.session : {}),
 			// assistant 回退分支没有 chat session 实体，这里直接透传 messages 即可
 			messages: resolved.messages,
+			// 与创建分享时 ChatBot getDisplayMessages 顺序一致（前端按此对齐展示）
+			shareMessageIds: cacheData.messageIds,
 			shareId: cacheData.shareId,
 			shareType: 'session',
 			title: resolved.title,

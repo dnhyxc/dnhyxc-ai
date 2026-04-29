@@ -225,6 +225,7 @@ const Chat = observer(() => {
 				open={shareModelVisible}
 				onOpenChange={onCloseShareModel}
 				checkedMessages={checkedMessages}
+				orderedMessageIds={getDisplayMessages().map((m) => m.chatId)}
 			/>
 		</div>
 	);
