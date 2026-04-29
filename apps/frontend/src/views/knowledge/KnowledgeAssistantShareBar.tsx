@@ -128,7 +128,7 @@ export function KnowledgeAssistantShareBar({
 	setShareModelVisible,
 }: KnowledgeAssistantShareBarProps) {
 	return (
-		<div className="w-full flex justify-between items-center max-w-3xl mx-auto pb-4.5">
+		<div className="w-full flex justify-between items-center max-w-3xl mx-auto pb-4.5 pl-0.5 pr-0.5">
 			<div className="flex-1 flex items-center gap-3 text-textcolor/80">
 				<div className="flex items-center">
 					<Checkbox
