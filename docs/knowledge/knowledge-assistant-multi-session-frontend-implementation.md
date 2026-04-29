@@ -559,6 +559,115 @@ useEffect(() => {
 
 **逐行注释版 UI 与交互**、**非流式贴底 `idleFlushKey`** 与 **`useStickToBottomScroll` 扩展**见主文档 **`docs/knowledge/knowledge-assistant-complete.md` §8.3、§8.3.1–§8.3.4、§8.5.4**。
 
+#### 8.2 抽屉 UI 片段抽取为独立组件（不改变逻辑）
+
+目标：把 `KnowledgeAssistantEntryToolbar.tsx` 中较长的“历史对话 Drawer + 列表渲染”片段抽取到独立文件夹，提升可读性与可维护性，同时 **不影响当前实现逻辑与交互行为**。
+
+- **约束**
+  - **逻辑不变**：仍由 `assistantStore` 提供会话列表、滚动回调与切换/streaming 判断；仍复用原有的 `Toast` 提示与“锁定态禁止打开抽屉”的规则。
+  - **状态归属不变**：删除确认弹窗（`Confirm`）与其 state 仍留在 `KnowledgeAssistantEntryToolbar.tsx`；抽屉组件只接收 `setDeleteTargetSessionId/setDeleteConfirmOpen`，触发打开确认弹窗，不直接删除。
+  - **回调链路不变**：切换会话成功后仍按原逻辑执行 `setIsAiHistoryDrawerOpen(false)`、`enableStreamStickToBottom()`、`flushScrollToBottom()`，并在 `requestAnimationFrame` 再 flush 一次。
+
+- **目录结构**
+  - 新增：`apps/frontend/src/views/knowledge/components/KnowledgeAssistantHistoryDrawer/index.tsx`
+  - 调用处：`apps/frontend/src/views/knowledge/KnowledgeAssistantEntryToolbar.tsx`
+
+**抽取后的组件实现（关键片段，含中文注释，保持与现实现逻辑一致）**：
+
+```tsx
+// apps/frontend/src/views/knowledge/components/KnowledgeAssistantHistoryDrawer/index.tsx（节选）
+export function KnowledgeAssistantHistoryDrawer({
+	isAiSessionSwitcherLocked,
+	isAiHistoryDrawerOpen,
+	setIsAiHistoryDrawerOpen,
+	enableStreamStickToBottom,
+	flushScrollToBottom,
+	sessionList,
+	showInitialPlaceholder,
+	showLoadMoreHint,
+	showEmptyHint,
+	setDeleteTargetSessionId,
+	setDeleteConfirmOpen,
+}: KnowledgeAssistantHistoryDrawerProps) {
+	return (
+		<Drawer
+			title="历史对话"
+			open={isAiHistoryDrawerOpen}
+			onOpenChange={(next) => {
+				// 锁定期间禁止打开抽屉（避免在未落库时切换到其它会话）
+				if (next && isAiSessionSwitcherLocked) {
+					Toast({ type: 'info', title: '正在保存对话，请稍后再查看历史对话' });
+					return;
+				}
+				setIsAiHistoryDrawerOpen(next);
+			}}
+		>
+			<ScrollArea onScroll={assistantStore.onHistorySessionViewportScroll}>
+				{showInitialPlaceholder ? <Loading text="加载中…" /> : null}
+
+				{sessionList.map((s) => {
+					const active = assistantStore.activeSessionId === s.sessionId;
+					const isStreaming = assistantStore.isSessionStreaming(s.sessionId);
+					return (
+						<div
+							key={s.sessionId}
+							className={cn(active ? 'bg-theme/10' : '')}
+							onClick={() => {
+								void assistantStore
+									.switchSessionForCurrentDocument(s.sessionId)
+									.then(() => {
+										setIsAiHistoryDrawerOpen(false);
+										enableStreamStickToBottom();
+										flushScrollToBottom();
+										requestAnimationFrame(() => flushScrollToBottom());
+									});
+							}}
+						>
+							{isStreaming ? (
+								<Spinner />
+							) : (
+								<Button
+									aria-label="删除对话"
+									onClick={(e) => {
+										e.stopPropagation();
+										setDeleteTargetSessionId(s.sessionId);
+										setDeleteConfirmOpen(true);
+									}}
+								>
+									<Trash2 />
+								</Button>
+							)}
+						</div>
+					);
+				})}
+
+				{showLoadMoreHint ? <div>加载更多…</div> : null}
+				{showEmptyHint ? <div>暂无历史对话</div> : null}
+			</ScrollArea>
+		</Drawer>
+	);
+}
+```
+
+**在工具条中替换原片段（调用侧保持原有状态与数据来源不变）**：
+
+```tsx
+// apps/frontend/src/views/knowledge/KnowledgeAssistantEntryToolbar.tsx（节选）
+<KnowledgeAssistantHistoryDrawer
+	isAiSessionSwitcherLocked={isAiSessionSwitcherLocked}
+	isAiHistoryDrawerOpen={isAiHistoryDrawerOpen}
+	setIsAiHistoryDrawerOpen={setIsAiHistoryDrawerOpen}
+	enableStreamStickToBottom={enableStreamStickToBottom}
+	flushScrollToBottom={flushScrollToBottom}
+	sessionList={sessionList}
+	showInitialPlaceholder={showInitialPlaceholder}
+	showLoadMoreHint={showLoadMoreHint}
+	showEmptyHint={showEmptyHint}
+	setDeleteTargetSessionId={setDeleteTargetSessionId}
+	setDeleteConfirmOpen={setDeleteConfirmOpen}
+/>
+```
+
 > 注意：历史抽屉中**不包含“新对话”按钮/条目**（已按产品要求移除）。
 
 ---
