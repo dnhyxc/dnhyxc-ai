@@ -55,9 +55,9 @@ export const KnowledgeMessageBubble = observer(function KnowledgeMessageBubble({
 	const checkedMessages = allowAiShare
 		? (shareSelection?.checkedMessages ?? new Set<string>())
 		: new Set<string>();
-	const setCheckedMessage = allowAiShare
-		? shareSelection?.setCheckedMessage
-		: undefined;
+	// 非分享态点击“分享图标”由 onShare(message) 负责默认选中，避免首击走 toggle 被抵消
+	const setCheckedMessage =
+		allowAiShare && isSharing ? shareSelection?.setCheckedMessage : undefined;
 	const needShare = allowAiShare && !isSharing;
 
 	const streamRev =

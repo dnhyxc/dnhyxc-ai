@@ -1,14 +1,15 @@
 import ShareChat from '@design/Share';
 import { Button, Checkbox } from '@ui/index';
 import type { Dispatch, SetStateAction } from 'react';
-import { useCallback, useState } from 'react';
-import { useShareFlow } from '@/hooks';
+import { useCallback, useEffect, useState } from 'react';
+import { resolveSharePairFromList, useShareFlow } from '@/hooks';
 import assistantStore from '@/store/assistant';
 import type { Message } from '@/types/chat';
 
 type ShareSelectionLike = {
 	checkedMessages: Set<string>;
 	selectedPairCount: number;
+	replaceCheckedMessages: (ids: string[]) => void;
 	isAllChecked: (messages?: Message[]) => boolean;
 	setAllCheckedMessages: (messages?: Message[]) => void;
 	clearAllCheckedMessages: () => void;
@@ -32,6 +33,9 @@ export function useKnowledgeAssistantShare(params: {
 }) {
 	const { aiMessages, isLoggedIn, isRagMode } = params;
 	const [shareModelVisible, setShareModelVisible] = useState(false);
+	const [pendingShareChatId, setPendingShareChatId] = useState<string | null>(
+		null,
+	);
 
 	const allowAiShare =
 		!isRagMode &&
@@ -42,32 +46,57 @@ export function useKnowledgeAssistantShare(params: {
 	const shareFlow = useShareFlow<Message>({
 		enabled: allowAiShare,
 		getAllMessages: () => aiMessages,
-		pairResolver: (message, all) => {
-			const list = all ?? aiMessages;
-			const idx = list.findIndex((m) => m.chatId === message.chatId);
-			if (idx < 0) return null;
-			// 线性列表：user -> assistant；按相邻成对勾选（顺序与消息流一致：user 在前，assistant 在后）
-			if (message.role === 'assistant') {
-				const prev = list[idx - 1];
-				if (prev?.role !== 'user') return null;
-				return [prev.chatId, message.chatId];
-			}
-			const next = list[idx + 1];
-			if (next?.role !== 'assistant') return null;
-			return [message.chatId, next.chatId];
-		},
+		pairResolver: (message, all) =>
+			resolveSharePairFromList(message, all ?? aiMessages),
 	});
 
 	const { shareSelection } = shareFlow;
+	const resolveSharePair = useCallback(
+		(message: Message): [string, string] | null =>
+			resolveSharePairFromList(message, aiMessages),
+		[aiMessages],
+	);
 
-	// 被点击分享的消息已由 ChatMessageActions 内部 setCheckedMessage 处理，这里只负责进入分享模式
-	const onShare = useCallback(() => {
-		if (!allowAiShare) return;
-		if (!shareSelection.isSharing) shareSelection.setIsSharing(true);
-	}, [allowAiShare, shareSelection]);
+	const onShare = useCallback(
+		(message?: Message) => {
+			if (!allowAiShare) return;
+			if (!message) return;
+			setPendingShareChatId(message.chatId);
+			shareSelection.setIsSharing(true);
+			const pair = resolveSharePair(message);
+			if (!pair) return;
+			// 首次点击时同步写一次，再在下一帧重放一次，规避切换分享态过程中的状态覆盖
+			shareSelection.replaceCheckedMessages(pair);
+			queueMicrotask(() => {
+				shareSelection.replaceCheckedMessages(pair);
+			});
+			requestAnimationFrame(() => {
+				shareSelection.replaceCheckedMessages(pair);
+			});
+		},
+		[allowAiShare, resolveSharePair, shareSelection],
+	);
+
+	useEffect(() => {
+		if (!shareSelection.isSharing || !pendingShareChatId) return;
+		const target = aiMessages.find((m) => m.chatId === pendingShareChatId);
+		if (!target) return;
+		const pair = resolveSharePair(target);
+		if (pair) {
+			shareSelection.replaceCheckedMessages(pair);
+		}
+		setPendingShareChatId(null);
+	}, [
+		aiMessages,
+		pendingShareChatId,
+		resolveSharePair,
+		shareSelection,
+		shareSelection.isSharing,
+	]);
 
 	const onCloseShareModel = useCallback(() => {
 		setShareModelVisible(false);
+		setPendingShareChatId(null);
 		shareFlow.onCancelShare();
 	}, [shareFlow]);
 

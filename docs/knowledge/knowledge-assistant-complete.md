@@ -1022,6 +1022,56 @@ export function useShareSelection<TMessage extends { chatId: string }>({
 ```ts
 // 文件：apps/frontend/src/hooks/useShareFlow.ts（节选 + 逐行注释）
 
+// SharePairCandidate：分享配对所需最小字段，避免工具函数依赖完整 Message 类型
+export type SharePairCandidate = {
+	chatId: string;
+	role?: string;
+	parentId?: string;
+	childrenIds?: string[];
+};
+
+// resolveSharePairFromList：在线性消息列表中解析“一问一答”pair
+// 规则：优先 parent/children 关系，缺失时再做前后线性兜底
+export function resolveSharePairFromList<TMessage extends SharePairCandidate>(
+	message: TMessage,
+	messages: TMessage[],
+): [string, string] | null {
+	if (!messages.length) return null;
+	const byId = new Map(messages.map((m) => [m.chatId, m]));
+	const idx = messages.findIndex((m) => m.chatId === message.chatId);
+	if (idx < 0) return null;
+	if (message.role === 'assistant') {
+		const parentId = message.parentId;
+		if (parentId) {
+			const parent = byId.get(parentId);
+			if (parent?.role === 'user') return [parent.chatId, message.chatId];
+		}
+		for (let i = idx - 1; i >= 0; i -= 1) {
+			const prev = messages[i];
+			if (prev?.role === 'user') return [prev.chatId, message.chatId];
+		}
+		for (let i = idx + 1; i < messages.length; i += 1) {
+			const next = messages[i];
+			if (next?.role === 'user') return [next.chatId, message.chatId];
+		}
+		return null;
+	}
+	const lastChildId = message.childrenIds?.[message.childrenIds.length - 1];
+	if (lastChildId) {
+		const child = byId.get(lastChildId);
+		if (child?.role === 'assistant') return [message.chatId, child.chatId];
+	}
+	for (let i = idx + 1; i < messages.length; i += 1) {
+		const next = messages[i];
+		if (next?.role === 'assistant') return [message.chatId, next.chatId];
+	}
+	for (let i = idx - 1; i >= 0; i -= 1) {
+		const prev = messages[i];
+		if (prev?.role === 'assistant') return [message.chatId, prev.chatId];
+	}
+	return null;
+}
+
 export function useShareFlow<TMessage extends { chatId: string }>({
 	enabled, // 是否允许分享
 	pairResolver, // 成对勾选策略
@@ -1073,6 +1123,22 @@ export function useShareFlow<TMessage extends { chatId: string }>({
 		[enabled, shareSelection],
 	);
 
+	// onStartShareWithMessage：点击“分享图标”进入分享时，确定性选中当前这一组
+	// 注意：这里用 replaceCheckedMessages（覆盖）而非 toggle（翻转），避免首击被抵消
+	const onStartShareWithMessage = useCallback(
+		(message: TMessage, allMessages?: TMessage[]) => {
+			if (!enabled) return;
+			const pair = pairResolver(message, allMessages ?? getAllMessages?.());
+			shareSelection.setIsSharing(true);
+			if (pair) {
+				shareSelection.replaceCheckedMessages(pair);
+				return;
+			}
+			shareSelection.clearAllCheckedMessages();
+		},
+		[enabled, getAllMessages, pairResolver, shareSelection],
+	);
+
 	return {
 		shareSelection,
 		shareModelVisible,
@@ -1080,6 +1146,7 @@ export function useShareFlow<TMessage extends { chatId: string }>({
 		onCloseShareModel,
 		onCancelShare,
 		onStartShare,
+		onStartShareWithMessage,
 	};
 }
 ```
@@ -1093,6 +1160,9 @@ export function useShareFlow<TMessage extends { chatId: string }>({
 ```tsx
 // 文件：apps/frontend/src/views/knowledge/KnowledgeAssistantShareBar.tsx（节选 + 逐行注释）
 
+// resolveSharePairFromList 由 hooks 导出，Knowledge 侧不再重复实现配对规则
+import { resolveSharePairFromList, useShareFlow } from '@/hooks';
+
 export function useKnowledgeAssistantShare(params: {
 	aiMessages: Message[]; // 当前 AI 模式消息列表（线性：user -> assistant）
 	isLoggedIn: boolean; // 登录态：未登录不允许分享
@@ -1102,6 +1172,10 @@ export function useKnowledgeAssistantShare(params: {
 
 	// shareModelVisible：分享弹窗开关（复用 ShareChat）
 	const [shareModelVisible, setShareModelVisible] = useState(false);
+	// pendingShareChatId：记录“首击分享图标”的目标消息，供分享态稳定后兜底重放
+	const [pendingShareChatId, setPendingShareChatId] = useState<string | null>(
+		null,
+	);
 
 	// allowAiShare：仅在 AI 模式 + 已登录 + 允许持久化 + 有 activeSessionId 时开放分享
 	const allowAiShare =
@@ -1110,44 +1184,63 @@ export function useKnowledgeAssistantShare(params: {
 		assistantStore.knowledgeAssistantPersistenceAllowed &&
 		Boolean(assistantStore.activeSessionId);
 
-	// shareFlow：复用公共 hook；pairResolver 采用“相邻成对”的策略
+	// shareFlow：复用公共 hook；pairResolver 与本地解析函数共用同一工具函数
 	const shareFlow = useShareFlow<Message>({
 		enabled: allowAiShare,
 		getAllMessages: () => aiMessages,
-		pairResolver: (message, all) => {
-			const list = all ?? aiMessages;
-			const idx = list.findIndex((m) => m.chatId === message.chatId);
-			if (idx < 0) return null;
-
-			// 线性列表：assistant 点击时与上一条 user 成对；顺序固定为 user 在前 assistant 在后
-			if (message.role === 'assistant') {
-				const prev = list[idx - 1];
-				if (prev?.role !== 'user') return null;
-				return [prev.chatId, message.chatId];
-			}
-
-			// user 点击时与下一条 assistant 成对
-			const next = list[idx + 1];
-			if (next?.role !== 'assistant') return null;
-			return [message.chatId, next.chatId];
-		},
+		pairResolver: (message, all) =>
+			resolveSharePairFromList(message, all ?? aiMessages),
 	});
 
 	const { shareSelection } = shareFlow;
 
-	// onShare：注意 ChatMessageActions 内部会先 setCheckedMessage(message) 再触发 onShare(message)
-	// 因此这里仅负责“进入分享模式”，避免重复 toggle 导致最终未选中
-	const onShare = useCallback(
-		(_message?: Message) => {
-			if (!allowAiShare) return;
-			if (!shareSelection.isSharing) shareSelection.setIsSharing(true);
-		},
-		[allowAiShare, shareSelection],
+	// resolveSharePair：复用统一配对工具，避免页面内双份逻辑漂移
+	const resolveSharePair = useCallback(
+		(message: Message): [string, string] | null =>
+			resolveSharePairFromList(message, aiMessages),
+		[aiMessages],
 	);
+
+	// onShare：首击分享图标时，直接“进入分享 + 确定性选中当前组”
+	// 额外做 microtask + rAF 重放，降低切换分享态时被覆盖的概率
+	const onShare = useCallback((message?: Message) => {
+		if (!allowAiShare) return;
+		if (!message) return;
+		setPendingShareChatId(message.chatId);
+		shareSelection.setIsSharing(true);
+		const pair = resolveSharePair(message);
+		if (!pair) return;
+		shareSelection.replaceCheckedMessages(pair);
+		queueMicrotask(() => {
+			shareSelection.replaceCheckedMessages(pair);
+		});
+		requestAnimationFrame(() => {
+			shareSelection.replaceCheckedMessages(pair);
+		});
+	}, [allowAiShare, resolveSharePair, shareSelection]);
+
+	// 分享态已稳定后，再按 pendingShareChatId 做一次兜底覆盖
+	useEffect(() => {
+		if (!shareSelection.isSharing || !pendingShareChatId) return;
+		const target = aiMessages.find((m) => m.chatId === pendingShareChatId);
+		if (!target) return;
+		const pair = resolveSharePair(target);
+		if (pair) {
+			shareSelection.replaceCheckedMessages(pair);
+		}
+		setPendingShareChatId(null);
+	}, [
+		aiMessages,
+		pendingShareChatId,
+		resolveSharePair,
+		shareSelection,
+		shareSelection.isSharing,
+	]);
 
 	// onCloseShareModel：关闭弹窗后退出分享并清空
 	const onCloseShareModel = useCallback(() => {
 		setShareModelVisible(false);
+		setPendingShareChatId(null);
 		shareFlow.onCancelShare();
 	}, [shareFlow]);
 
