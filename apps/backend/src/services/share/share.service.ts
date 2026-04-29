@@ -203,7 +203,7 @@ export class ShareService {
 		);
 
 		this.logger.log(
-			`创建分享: ${shareId}, 会话: ${dto.chatSessionId}, 消息: ${dto?.messageIds?.length} 条`,
+			`创建分享: ${shareId}, 会话: ${dto.chatSessionId} ${dto?.messageIds?.length ? `, 消息: ${dto?.messageIds?.length} 条` : ''}`,
 		);
 
 		return {

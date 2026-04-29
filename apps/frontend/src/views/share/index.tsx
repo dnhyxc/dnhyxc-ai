@@ -360,7 +360,7 @@ const SessionShare = () => {
 					aria-label={atBottom ? '滚动到顶部' : '滚动到底部'}
 					onClick={onScrollFabClick}
 					className={cn(
-						'fixed bottom-6 right-5 z-50 flex size-10 items-center justify-center rounded-full',
+						'fixed bottom-5.5 right-5 z-50 flex size-10 items-center justify-center rounded-full',
 						'border border-theme/20 bg-theme-background/95 text-textcolor/85 shadow-md backdrop-blur-sm',
 						'transition-colors hover:border-theme/50 hover:bg-theme/10 hover:text-textcolor',
 						'focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none',
