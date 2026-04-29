@@ -13,6 +13,7 @@ import { useStorageInfo } from '@/hooks';
 import { getUploadToken, updateUser } from '@/service';
 import useStore from '@/store';
 import { type FileWithPreview } from '@/types';
+import { resolveQiniuUrlForWebDisplay } from '@/utils';
 import ResetEmailForm from './reset-email-form';
 
 const GenderEnum: Record<string, string> = {
@@ -273,6 +274,11 @@ const Account = () => {
 		});
 	};
 
+	const avatarFileUrl = useMemo(
+		() => resolveQiniuUrlForWebDisplay(accountInfo.avatar),
+		[accountInfo.avatar],
+	);
+
 	return (
 		<div className="w-full h-full flex flex-col justify-center items-center m-0">
 			<ScrollArea className="w-full h-full overflow-y-auto p-2.5 rounded-none">
@@ -282,7 +288,7 @@ const Account = () => {
 							<Upload
 								key={accountInfo.avatar}
 								onUpload={onUpload}
-								fileUrl={accountInfo.avatar}
+								fileUrl={avatarFileUrl}
 								onClearFileUrl={onClearFileUrl}
 							>
 								{accountInfo.avatar !== storageInfo?.profile?.avatar ? (

@@ -21,6 +21,42 @@ export * from './store';
 export * from './tauri';
 export * from './updater';
 
+/**
+ * 将七牛（Qiniu）头像 URL 在 Web 端（HTTPS 页面）做 mixed content 兼容改写：
+ * - Tauri：保持原始 URL 不变
+ * - 非生产环境：保持原始 URL 不变（避免影响本地调试）
+ * - Web：把 `VITE_QINIU_DOMAIN` 开头的 URL 改为走 `VITE_WEB_IMAGE_PROXY_PREFIX` 代理
+ *
+ * 注意：这个函数只用于“展示 URL”，不要用于提交/持久化用户数据。
+ */
+export const resolveQiniuUrlForWebDisplay = (url?: string): string => {
+	if (!url) return '';
+	// Tauri 保持原始地址，避免影响桌面端访问方式
+	if (isTauriRuntime()) return url;
+	// 只在生产环境处理 mixed content（生产环境走 HTTPS）
+	if (!import.meta.env.PROD) return url;
+
+	const qiniuDomainRaw = import.meta.env.VITE_QINIU_DOMAIN || '';
+	const webImageProxyPrefixRaw =
+		import.meta.env.VITE_WEB_IMAGE_PROXY_PREFIX || '/ext-img/';
+	if (!qiniuDomainRaw) return url;
+
+	const normalizedQiniuDomain = qiniuDomainRaw.endsWith('/')
+		? qiniuDomainRaw
+		: `${qiniuDomainRaw}/`;
+	if (!url.startsWith(normalizedQiniuDomain)) return url;
+
+	const normalizedProxyPrefix = webImageProxyPrefixRaw.startsWith('/')
+		? webImageProxyPrefixRaw
+		: `/${webImageProxyPrefixRaw}`;
+	const normalizedProxyPrefixWithSlash = normalizedProxyPrefix.endsWith('/')
+		? normalizedProxyPrefix
+		: `${normalizedProxyPrefix}/`;
+
+	const rawPath = url.slice(normalizedQiniuDomain.length);
+	return `${normalizedProxyPrefixWithSlash}${rawPath}`;
+};
+
 export const setStorage = (key: string, value: string) => {
 	localStorage.setItem(key, value);
 	window.dispatchEvent(new Event(`${key}Changed`));

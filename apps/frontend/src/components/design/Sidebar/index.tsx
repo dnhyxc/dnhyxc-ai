@@ -16,11 +16,12 @@ import {
 	Package,
 	WalletCards,
 } from 'lucide-react';
+import { useMemo } from 'react';
 import { useNavigate } from 'react-router';
 import ICON from '@/assets/icon.png';
 import { useStorageInfo } from '@/hooks';
 import useStore from '@/store';
-import { removeStorage } from '@/utils';
+import { removeStorage, resolveQiniuUrlForWebDisplay } from '@/utils';
 import Image from '../Image';
 import { MENUS } from './enum';
 
@@ -55,6 +56,12 @@ const Sidebar = () => {
 		navigate('/login');
 	};
 
+	const avatarUrl = useMemo(() => {
+		return storageInfo?.profile?.avatar
+			? resolveQiniuUrlForWebDisplay(storageInfo?.profile?.avatar)
+			: ICON;
+	}, [storageInfo?.profile?.avatar]);
+
 	return (
 		<div
 			data-tauri-drag-region
@@ -68,7 +75,7 @@ const Sidebar = () => {
 						onClick={() => onJump('/')}
 					>
 						<Image
-							src={storageInfo?.profile?.avatar}
+							src={avatarUrl}
 							fallbackSrc={ICON}
 							showOnError
 							className={`${storageInfo?.profile?.avatar ? 'rounded-md w-10.5 h-10.5 object-cover' : 'w-9.5 h-9.5 cursor-pointer'}`}
@@ -107,7 +114,7 @@ const Sidebar = () => {
 										className="flex justify-center items-center w-12 h-12 bg-theme-secondary cursor-pointer rounded-md hover:text-teal-500 transition-all duration-200 ease-in-out"
 									>
 										<img
-											src={storageInfo?.profile?.avatar || ICON}
+											src={avatarUrl || ICON}
 											alt=""
 											className={`${storageInfo?.profile?.avatar ? 'rounded-md w-11 h-11 object-cover' : 'w-10 h-10 cursor-pointer'}`}
 										/>
