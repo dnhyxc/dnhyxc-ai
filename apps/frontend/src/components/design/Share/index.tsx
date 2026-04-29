@@ -142,17 +142,17 @@ const Share: React.FC<ShareProps> = ({
 			onOpenChange={onOpenChange}
 		>
 			<div className="flex flex-col gap-5 overflow-hidden">
-				<div>
+				<div className="pt-2 pb-3">
 					分享链接公开可见，任何人获取后均可查看。请在分享前仔细检查内容，确保不包含敏感信息或隐私数据。
 				</div>
 				{shareInfo?.shareUrl ? (
-					<div className="relative border border-theme/20 rounded-md flex items-center">
+					<div className="relative border border-theme/20 rounded-md flex items-center h-9.5">
 						<div className="truncate pl-3 mr-2">{shareInfo.shareUrl}</div>
 						{/* 外部滤镜容器 */}
-						<div className=" h-full">
+						<div className="h-full">
 							<Button
 								variant="dynamic"
-								className="text-white rounded-none rounded-r-md border-none h-full w-25 bg-linear-to-r from-teal-500 to-cyan-600"
+								className="text-white rounded-none rounded-r-md border-none h-9.5 w-25 bg-linear-to-r from-teal-500 to-cyan-600"
 								disabled={copied}
 								onClick={() => onCopy(shareInfo.shareUrl)}
 							>
@@ -171,15 +171,17 @@ const Share: React.FC<ShareProps> = ({
 						</div>
 					</div>
 				) : (
-					<Button
-						variant="dynamic"
-						className="text-white border-textcolor/30 w-full bg-transparent hover:bg-transparent bg-linear-to-r from-teal-500/80 to-cyan-600/80 hover:from-teal-500 hover:to-cyan-600"
-						disabled={loading}
-						onClick={onCreateShare}
-					>
-						{loading ? <Spinner className="text-textcolor" /> : null}
-						创建并复制链接
-					</Button>
+					<div className="relative border border-theme/20 rounded-md flex items-center h-9.5">
+						<Button
+							variant="dynamic"
+							className="h-9.5 text-white border-textcolor/30 w-full bg-transparent hover:bg-transparent bg-linear-to-r from-teal-500/80 to-cyan-600/80 hover:from-teal-500 hover:to-cyan-600"
+							disabled={loading}
+							onClick={onCreateShare}
+						>
+							{loading ? <Spinner className="text-textcolor" /> : null}
+							创建并复制链接
+						</Button>
+					</div>
 				)}
 			</div>
 		</Model>
