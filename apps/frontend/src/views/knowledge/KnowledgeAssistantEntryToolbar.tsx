@@ -21,7 +21,8 @@ import {
 } from './constants';
 
 export interface KnowledgeAssistantEntryToolbarProps {
-	showAiSessionSwitcher: boolean;
+	showEntryToolbar: boolean;
+	showAiSessionActions: boolean;
 	isAiSessionSwitcherLocked: boolean;
 	isAiHistoryDrawerOpen: boolean;
 	setIsAiHistoryDrawerOpen: Dispatch<SetStateAction<boolean>>;
@@ -33,7 +34,8 @@ export interface KnowledgeAssistantEntryToolbarProps {
 
 export const KnowledgeAssistantEntryToolbar = observer(
 	function KnowledgeAssistantEntryToolbar({
-		showAiSessionSwitcher,
+		showEntryToolbar,
+		showAiSessionActions,
 		isAiSessionSwitcherLocked,
 		isAiHistoryDrawerOpen,
 		setIsAiHistoryDrawerOpen,
@@ -103,45 +105,49 @@ export const KnowledgeAssistantEntryToolbar = observer(
 						setDeleteTargetSessionId(null);
 					}}
 				/>
-				{showAiSessionSwitcher ? (
+				{showEntryToolbar ? (
 					<div className="inline-flex items-center gap-2">
-						<Button
-							variant="link"
-							className="mb-0.5 h-8.5 w-8.5 mt-0.5 rounded-full text-textcolor/80 hover:bg-theme/10 hover:text-teal-500 border border-theme/10 p-0 [&_svg]:overflow-visible"
-							aria-label="历史对话"
-							disabled={isAiSessionSwitcherLocked}
-							onClick={() => {
-								if (isAiSessionSwitcherLocked) {
-									Toast({
-										type: 'info',
-										title: '正在保存对话，请稍后再查看历史对话',
-									});
-									return;
-								}
-								setIsAiHistoryDrawerOpen(true);
-							}}
-						>
-							<Clock className="h-4 w-4" />
-						</Button>
-						<Button
-							size="sm"
-							variant="link"
-							className="w-fit rounded-md border border-theme/10 px-3 py-1.5 text-sm text-textcolor/80 transition-colors hover:bg-theme/10 hover:text-teal-500"
-							disabled={isAiSessionSwitcherLocked}
-							onClick={() => {
-								if (isAiSessionSwitcherLocked) {
-									Toast({
-										type: 'info',
-										title: '正在保存对话，请稍后再新建对话',
-									});
-									return;
-								}
-								void assistantStore.createNewSessionForCurrentDocument();
-							}}
-						>
-							<CirclePlus />
-							新对话
-						</Button>
+						{showAiSessionActions ? (
+							<>
+								<Button
+									variant="link"
+									className="mb-0.5 h-8.5 w-8.5 mt-0.5 rounded-full text-textcolor/80 hover:bg-theme/10 hover:text-teal-500 border border-theme/10 p-0 [&_svg]:overflow-visible"
+									aria-label="历史对话"
+									disabled={isAiSessionSwitcherLocked}
+									onClick={() => {
+										if (isAiSessionSwitcherLocked) {
+											Toast({
+												type: 'info',
+												title: '正在保存对话，请稍后再查看历史对话',
+											});
+											return;
+										}
+										setIsAiHistoryDrawerOpen(true);
+									}}
+								>
+									<Clock className="h-4 w-4" />
+								</Button>
+								<Button
+									size="sm"
+									variant="link"
+									className="w-fit rounded-md border border-theme/10 px-3 py-1.5 text-sm text-textcolor/80 transition-colors hover:bg-theme/10 hover:text-teal-500"
+									disabled={isAiSessionSwitcherLocked}
+									onClick={() => {
+										if (isAiSessionSwitcherLocked) {
+											Toast({
+												type: 'info',
+												title: '正在保存对话，请稍后再新建对话',
+											});
+											return;
+										}
+										void assistantStore.createNewSessionForCurrentDocument();
+									}}
+								>
+									<CirclePlus />
+									新对话
+								</Button>
+							</>
+						) : null}
 						{KNOWLEDGE_ASSISTANT_MODES.map((item) => (
 							<Button
 								key={item.id}

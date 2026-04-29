@@ -823,15 +823,17 @@ useEffect(() => {
 - **第二段（关键）**：当 **当前 store 的 `activeDocumentKey` 已与 props 一致** 且 **`editorHasBody === false`** 时 **不再调用 `activate`**。  
   **原因**：清空草稿后 **`clearAssistantStateOnKnowledgeDraftReset(nextKey)`** 会把 `activeDocumentKey` 同步到下一 key；此时左侧无正文，若再 `activate` 会 **二次清空** 并可能错误去拉 **`draft-new`** 会话。未保存草稿的 key（`draft-new__trash-*`）在 **有正文** 时仍会走 `activate`，保证 **`activeDocumentKey` 写入**（否则 ephemeral 发送会 Toast「文档未就绪」——见组件文件头注释）。
 
-### 8.0.2 多会话入口（`ChatEntry.entryChildren`）
+### 8.0.2 输入区工具条分层门控（`ChatEntry.entryChildren`）
 
-当 **非 RAG**、**已登录**、**`knowledgeAssistantPersistenceAllowed`** 为真时，输入框上方 **`entryChildren`** 展示：
+当前实现将输入区上方工具条拆为两层布尔（位于 `KnowledgeAssistant.tsx`）：
 
-1. **历史**：`Clock` 圆形按钮，`aria-label="历史对话"`，打开 **`Drawer`**（标题「历史对话」）。
-2. **新对话**：`CirclePlus` + 文案「新对话」，调用 **`createNewSessionForCurrentDocument()`**。
-3. **抽屉**：**`useEffect([isAiHistoryDrawerOpen])`** 在 **`open === true`** 时 **`refreshSessionListForCurrentDocument()`**；列表来自 **`sessionListForActiveDocument`**，点击项 **`switchSessionForCurrentDocument`** 后关抽屉。
+1. **`showEntryToolbar`**：控制工具条整体是否展示（当前为 `isLoggedIn`）。  
+   作用：即使处于 RAG，也保留 **AI/RAG 模式切换**，避免“切到 RAG 后无法切回 AI”。
+2. **`showAiSessionActions`**：控制 **AI 多会话操作**（历史 / 新对话）是否展示。  
+   条件为 `!isRagMode && isLoggedIn && knowledgeAssistantPersistenceAllowed && Boolean(sessionListForActiveDocument)`。
+3. **抽屉刷新**：`useEffect([isAiHistoryDrawerOpen])` 在 `open === true` 时调用 `refreshSessionListForCurrentDocument()`；列表来自 `sessionListForActiveDocument`，点击项后 `switchSessionForCurrentDocument` 并关闭抽屉。
 
-源码中 **`showAiSessionSwitcher`** 另含 **`Boolean(assistantStore.sessionListForActiveDocument)`**（getter 恒返回数组，故该条件在运行时常为真）；**ephemeral（未保存云端草稿）** 由 **`knowledgeAssistantPersistenceAllowed === false`** 排除，不展示多会话控件。更细的列表刷新时机见 **`knowledge-assistant-multi-session-frontend-implementation.md`**。
+结论：RAG 模式下工具条仍可见，但仅隐藏“历史/新对话”操作，模式切换按钮保留。更细的会话列表刷新与分页见 `knowledge-assistant-multi-session-frontend-implementation.md`。
 
 ### 8.1 持久化开关同步、复制态清理、左侧清空输入防抖
 
@@ -1475,7 +1477,12 @@ const {
 
 **文件**：`apps/frontend/src/views/knowledge/KnowledgeAssistantEntryToolbar.tsx`。
 
-**思路**：将 **`ChatEntry.entryChildren`** 内「历史对话按钮 + 新对话 + Drawer 列表 + AI/RAG 模式切换」整段 UI 与交互**原样迁出**，父组件 **`KnowledgeAssistant.tsx`** 只传入布尔、状态 setter、贴底回调与模式，**不改变**锁定 Toast、**`switchSessionForCurrentDocument`** 成功后的 **`enableStreamStickToBottom` + `flushScrollToBottom` + `requestAnimationFrame`** 等行为。
+**思路（本次更新）**：在既有迁出结构上，将“工具条是否显示”与“AI 多会话按钮是否显示”拆成两层门控，解决 RAG 模式下整条工具条被隐藏的问题：
+
+- `showEntryToolbar`：登录后始终展示（保证模式切换按钮可用）。
+- `showAiSessionActions`：仅 AI + 可持久化 + 有会话列表时展示历史/新对话。
+
+父组件仍只传入布尔、状态 setter、贴底回调与模式，不改变锁定 Toast、`switchSessionForCurrentDocument` 成功后的贴底链路。
 
 **为何包 `observer`**：子组件内直接读取 **`assistantStore.sessionListForActiveDocument`**、**`activeSessionId`** 并调用 store 方法；用 **`observer`** 包裹才能在列表/当前会话变化时**自动重渲染**，与原先写在父 `observer` 内时 MobX 订阅范围等价。
 
@@ -1483,7 +1490,8 @@ const {
 
 | Prop | 含义 |
 | --- | --- |
-| `showAiSessionSwitcher` | 是否展示多会话入口（父级已按持久化、登录、列表非空等合成） |
+| `showEntryToolbar` | 是否展示工具条整体（当前为登录后展示，含模式切换） |
+| `showAiSessionActions` | 是否展示 AI 多会话操作（历史/新对话） |
 | `isAiSessionSwitcherLocked` | 草稿迁入等场景下禁止切会话 / 新对话 |
 | `isAiHistoryDrawerOpen` / `setIsAiHistoryDrawerOpen` | 历史 Drawer 受控开关 |
 | `enableStreamStickToBottom` / `flushScrollToBottom` | 来自 `useStickToBottomScroll`，会话切换后贴底 |
@@ -1491,13 +1499,14 @@ const {
 
 **逐行注释摘录**（在仓库源码基础上为文档追加行尾/行上注释；**以 `KnowledgeAssistantEntryToolbar.tsx` 为准**）：
 
-> **说明**：仓库源码中组件参数为**解构写法**（`{ showAiSessionSwitcher, ... }`）；下块为便于逐项标注，统一写作 **`props.xxx`**，语义与解构等价。
+> **说明**：仓库源码中组件参数为解构写法（`{ showEntryToolbar, showAiSessionActions, ... }`）；下块仍写作 `props.xxx` 便于逐项注释。
 
 ```tsx
 // 文件：apps/frontend/src/views/knowledge/KnowledgeAssistantEntryToolbar.tsx（节选 + 文档注释）
 
 export interface KnowledgeAssistantEntryToolbarProps {
-	showAiSessionSwitcher: boolean; // 父级已合成：持久化 + 登录 + 会话列表非空等
+	showEntryToolbar: boolean; // 工具条整体开关（登录后展示，保证 RAG 下也能切回 AI）
+	showAiSessionActions: boolean; // AI 多会话操作开关（历史/新对话）
 	isAiSessionSwitcherLocked: boolean; // 草稿迁入等：禁止打开历史 / 新对话
 	isAiHistoryDrawerOpen: boolean; // Drawer 受控 open
 	setIsAiHistoryDrawerOpen: Dispatch<SetStateAction<boolean>>; // 父级 state setter
@@ -1512,33 +1521,37 @@ export const KnowledgeAssistantEntryToolbar = observer(
 		// observer：读取 assistantStore.sessionListForActiveDocument / activeSessionId 时自动订阅 MobX
 		return (
 			<div className="flex w-full items-center gap-2 pb-1">
-				{props.showAiSessionSwitcher ? (
+				{props.showEntryToolbar ? (
 					<div className="flex w-full items-center gap-2">
-						<Button
-							disabled={props.isAiSessionSwitcherLocked} // 锁定时按钮灰显
-							onClick={() => {
-								if (props.isAiSessionSwitcherLocked) {
-									Toast({ type: 'info', title: '正在保存对话，请稍后再查看历史对话' });
-									return; // 不打开抽屉
-								}
-								props.setIsAiHistoryDrawerOpen(true); // 打开历史 Drawer
-							}}
-						>
-							<Clock className="h-4 w-4" />
-						</Button>
-						<Button
-							disabled={props.isAiSessionSwitcherLocked}
-							onClick={() => {
-								if (props.isAiSessionSwitcherLocked) {
-									Toast({ type: 'info', title: '正在保存对话，请稍后再新建对话' });
-									return;
-								}
-								void assistantStore.createNewSessionForCurrentDocument(); // 新建或复用空会话（store 内逻辑）
-							}}
-						>
-							<CirclePlus />
-							新对话
-						</Button>
+						{props.showAiSessionActions ? (
+							<>
+								<Button
+									disabled={props.isAiSessionSwitcherLocked} // 锁定时按钮灰显
+									onClick={() => {
+										if (props.isAiSessionSwitcherLocked) {
+											Toast({ type: 'info', title: '正在保存对话，请稍后再查看历史对话' });
+											return; // 不打开抽屉
+										}
+										props.setIsAiHistoryDrawerOpen(true); // 打开历史 Drawer
+									}}
+								>
+									<Clock className="h-4 w-4" />
+								</Button>
+								<Button
+									disabled={props.isAiSessionSwitcherLocked}
+									onClick={() => {
+										if (props.isAiSessionSwitcherLocked) {
+											Toast({ type: 'info', title: '正在保存对话，请稍后再新建对话' });
+											return;
+										}
+										void assistantStore.createNewSessionForCurrentDocument(); // 新建或复用空会话（store 内逻辑）
+									}}
+								>
+									<CirclePlus />
+									新对话
+								</Button>
+							</>
+						) : null}
 						<Drawer
 							open={props.isAiHistoryDrawerOpen}
 							onOpenChange={(next) => {
@@ -1572,15 +1585,14 @@ export const KnowledgeAssistantEntryToolbar = observer(
 								))
 							)}
 						</Drawer>
+						{/* 模式切换按钮始终展示：RAG 模式下也能切回 AI */}
+						{KNOWLEDGE_ASSISTANT_MODES.map((item) => (
+							<Button key={item.id} onClick={() => props.setAssistantMode(item.id)}>
+								{/* icon + label 略 */}
+							</Button>
+						))}
 					</div>
 				) : null}
-				<div className="flex w-full items-center gap-2">
-					{KNOWLEDGE_ASSISTANT_MODES.map((item) => (
-						<Button key={item.id} onClick={() => props.setAssistantMode(item.id)}>
-							{/* icon + label 略 */}
-						</Button>
-					))}
-				</div>
 			</div>
 		);
 	},

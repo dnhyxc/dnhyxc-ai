@@ -461,15 +461,17 @@ const KnowledgeAssistant = observer(
 			void assistantStore.stopGenerating();
 		}, [isRagMode]);
 
-		const showAiSessionSwitcher =
+		/** 工具条整体展示：登录后始终可见（含 AI/RAG 模式切换） */
+		const showEntryToolbar = isLoggedIn;
+		/** AI 多会话操作仅在 AI 模式展示；RAG 模式下隐藏“历史/新对话” */
+		const showAiSessionActions =
 			!isRagMode &&
 			isLoggedIn &&
 			assistantStore.knowledgeAssistantPersistenceAllowed &&
-			// 草稿（ephemeral）阶段不支持多 session（仍保留原逻辑）
 			Boolean(assistantStore.sessionListForActiveDocument);
 
 		const isAiSessionSwitcherLocked =
-			showAiSessionSwitcher && assistantStore.isAssistantSessionSwitcherLocked;
+			showAiSessionActions && assistantStore.isAssistantSessionSwitcherLocked;
 
 		const [isAiHistoryDrawerOpen, setIsAiHistoryDrawerOpen] = useState(false);
 
@@ -681,7 +683,8 @@ const KnowledgeAssistant = observer(
 								}
 								entryChildren={
 									<KnowledgeAssistantEntryToolbar
-										showAiSessionSwitcher={showAiSessionSwitcher}
+										showEntryToolbar={showEntryToolbar}
+										showAiSessionActions={showAiSessionActions}
 										isAiSessionSwitcherLocked={isAiSessionSwitcherLocked}
 										isAiHistoryDrawerOpen={isAiHistoryDrawerOpen}
 										setIsAiHistoryDrawerOpen={setIsAiHistoryDrawerOpen}

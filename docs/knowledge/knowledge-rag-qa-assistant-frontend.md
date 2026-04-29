@@ -687,6 +687,50 @@ useLayoutEffect(() => {
 ) : null}
 ```
 
+### 5.5 输入区工具条在 RAG 下保持可见（本次修复）
+
+问题背景：如果把 `entryChildren` 整体绑定到「仅 AI 可见」条件，切到 RAG 后工具条会整体消失，用户无法直接切回 AI。  
+当前实现将工具条门控拆为两层：
+
+- **`showEntryToolbar`**：控制工具条整体（登录后展示，AI/RAG 都可见）。
+- **`showAiSessionActions`**：控制 AI 多会话按钮（历史/新对话），RAG 下隐藏。
+
+这样 RAG 下仍显示模式切换按钮，但不会误开放 AI 会话能力。
+
+```tsx
+// 文件：apps/frontend/src/views/knowledge/KnowledgeAssistant.tsx（节选 + 文档注释）
+
+/** 工具条整体展示：登录后始终可见（含 AI/RAG 模式切换） */
+const showEntryToolbar = isLoggedIn;
+
+/** AI 多会话操作仅在 AI 模式展示；RAG 模式下隐藏“历史/新对话” */
+const showAiSessionActions =
+  !isRagMode &&
+  isLoggedIn &&
+  assistantStore.knowledgeAssistantPersistenceAllowed &&
+  Boolean(assistantStore.sessionListForActiveDocument);
+
+const isAiSessionSwitcherLocked =
+  showAiSessionActions && assistantStore.isAssistantSessionSwitcherLocked;
+
+<ChatEntry
+  // ...其余 props 省略
+  entryChildren={
+    <KnowledgeAssistantEntryToolbar
+      showEntryToolbar={showEntryToolbar}          // 工具条整体开关
+      showAiSessionActions={showAiSessionActions}  // 仅 AI 显示历史/新对话
+      isAiSessionSwitcherLocked={isAiSessionSwitcherLocked}
+      isAiHistoryDrawerOpen={isAiHistoryDrawerOpen}
+      setIsAiHistoryDrawerOpen={setIsAiHistoryDrawerOpen}
+      enableStreamStickToBottom={enableStreamStickToBottom}
+      flushScrollToBottom={flushScrollToBottom}
+      assistantMode={assistantMode}
+      setAssistantMode={setAssistantMode}
+    />
+  }
+/>
+```
+
 ---
 
 ## 6. 回归清单（确保不影响现有逻辑）
