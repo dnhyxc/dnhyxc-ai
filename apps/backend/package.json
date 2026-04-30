@@ -26,7 +26,10 @@
 		"m:run:prod": "npm run typeorm:prod migration:run",
 		"m:revert": "npm run typeorm migration:revert",
 		"m:revert:prod": "npm run typeorm:prod migration:revert",
-		"schema:drop": "npm run typeorm schema:drop"
+		"schema:drop": "npm run typeorm schema:drop",
+		"pub": "dnhyxc-ci publish dnhyxcAIServer",
+		"deploy": "pnpm run build && pnpm pub",
+		"restart": "npx dnhyxc-ci restart server -rsc 'pm2 restart server'"
 	},
 	"dependencies": {
 		"@casl/ability": "^6.7.5",
