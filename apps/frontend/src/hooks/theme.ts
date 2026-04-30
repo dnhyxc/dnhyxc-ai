@@ -95,6 +95,12 @@ export const useTheme = () => {
 	);
 
 	useEffect(() => {
+		// 启动时先把当前主题应用到 body。
+		// 否则虽然 state 默认是 white，但未触发 changeTheme 时不会写入 body class / CSS 变量，
+		// 导致“设置页默认选中 white，但主题未生效，必须手动点一次”。
+		setThemeClass(theme);
+		persistThemeBootstrap(theme);
+
 		const initTheme = async () => {
 			// URL 优先：从 Tauri 复制出的分享链接带 ?theme=，浏览器无 store 也能对齐
 			if (typeof window !== 'undefined') {
