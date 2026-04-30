@@ -238,5 +238,5 @@ const Toaster = (props: ToasterProps) => {
 	);
 };
 
-export { Toaster, toast, Toast };
 export type { ToasterProps };
+export { Toast, Toaster, toast };

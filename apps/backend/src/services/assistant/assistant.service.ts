@@ -672,7 +672,7 @@ export class AssistantService {
 				buffer = lines.pop() || '';
 				for (const line of lines) {
 					const trimmed = line.trim();
-					if (!trimmed || !trimmed.startsWith('data:')) continue;
+					if (!trimmed?.startsWith('data:')) continue;
 					const dataStr = trimmed.slice(5).trim();
 					if (dataStr === '[DONE]') {
 						subscriber.complete();
@@ -1054,7 +1054,7 @@ export class AssistantService {
 
 							for (const line of lines) {
 								const trimmed = line.trim();
-								if (!trimmed || !trimmed.startsWith('data:')) continue;
+								if (!trimmed?.startsWith?.('data:')) continue;
 								const dataStr = trimmed.slice(5).trim();
 								if (dataStr === '[DONE]') {
 									await finalizeTurn();

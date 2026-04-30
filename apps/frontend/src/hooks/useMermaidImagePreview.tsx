@@ -91,7 +91,7 @@ export function useMermaidDiagramClickPreview(
 			const svg = wrap.querySelector(
 				`${MERMAID_ENTRY_SELECTOR} svg`,
 			) as SVGSVGElement | null;
-			if (!svg || !svg.contains(el)) return;
+			if (!svg?.contains(el)) return;
 
 			const url = mermaidSvgToPreviewDataUrl(svg);
 			if (url) openRef.current(url);
