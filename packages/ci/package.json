@@ -1,0 +1,32 @@
+{
+	"name": "@dnhyxc-ai/ci",
+	"version": "0.0.1",
+	"private": true,
+	"type": "module",
+	"description": "CI/部署工具：通过 SSH 上传 dist.zip、远端解压、可选安装依赖、pm2/nginx 重启。",
+	"bin": {
+		"dnhyxc-ci": "./dist/cli.js"
+	},
+	"files": [
+		"dist",
+		"README.md",
+		"examples"
+	],
+	"scripts": {
+		"build": "pnpm exec tsup",
+		"dev": "pnpm exec tsx src/cli.ts",
+		"start": "node dist/cli.js"
+	},
+	"dependencies": {
+		"commander": "^14.0.0",
+		"ssh2": "^1.17.0",
+		"zod": "^4.3.5"
+	},
+	"devDependencies": {
+		"@types/node": "^22.10.7",
+		"@types/ssh2": "^1.15.4",
+		"tsup": "^8.5.1",
+		"tsx": "^4.21.0",
+		"typescript": "~5.8.3"
+	}
+}

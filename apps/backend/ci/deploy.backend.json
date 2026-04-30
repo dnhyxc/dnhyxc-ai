@@ -1,0 +1,32 @@
+{
+	"servers": {
+		"prod-1": {
+			"kind": "ssh-cli",
+			"sshTarget": "root@101.43.50.15",
+			"port": 22,
+			"sshArgs": [],
+			"connectTimeoutMs": 15000
+		}
+	},
+	"targets": [
+		{
+			"name": "backend-api",
+			"server": "prod-1",
+			"localZip": "./dist.zip",
+			"remoteDir": "/usr/local/dnhyxc-ai/server",
+			"remoteTmpZip": "/tmp/dist.zip",
+			"cleanRemoteDir": false,
+			"installDeps": false,
+			"installCommand": "pnpm install --prod",
+			"pm2Name": "server",
+			"pm2RestartCommand": "pm2 restart",
+			"restartNginx": false,
+			"nginxRestartCommand": "sudo systemctl reload nginx",
+			"preCommands": [
+				"mkdir -p /usr/local/dnhyxc-ai/server",
+				"command -v unzip >/dev/null 2>&1 || (echo 'missing unzip' && exit 1)"
+			],
+			"postCommands": ["echo 'backend deployed'"]
+		}
+	]
+}

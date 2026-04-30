@@ -1,0 +1,38 @@
+{
+	"servers": {
+		"prod-1": {
+			"host": "1.2.3.4",
+			"port": 22,
+			"auth": {
+				"username": "root",
+				"privateKeyPath": "~/.ssh/id_rsa"
+			},
+			"connectTimeoutMs": 15000
+		}
+	},
+	"targets": [
+		{
+			"name": "frontend-web",
+			"server": "prod-1",
+			"localZip": "./dist/frontend/dist.zip",
+			"remoteDir": "/var/www/dnhyxc-ai",
+			"cleanRemoteDir": true,
+			"restartNginx": true,
+			"nginxRestartCommand": "sudo systemctl reload nginx",
+			"preCommands": ["mkdir -p /var/www/dnhyxc-ai"],
+			"postCommands": ["echo 'frontend deployed'"]
+		},
+		{
+			"name": "backend-api",
+			"server": "prod-1",
+			"localZip": "./dist/backend/dist.zip",
+			"remoteDir": "/srv/dnhyxc-ai/backend",
+			"cleanRemoteDir": false,
+			"installDeps": false,
+			"installCommand": "pnpm install --prod",
+			"pm2Name": "server",
+			"pm2RestartCommand": "pm2 restart",
+			"restartNginx": false
+		}
+	]
+}
