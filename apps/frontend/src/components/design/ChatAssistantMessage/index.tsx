@@ -146,10 +146,14 @@ function ChatAssistantMessageInner({
 		() =>
 			new MarkdownParser({
 				enableChatCodeFenceToolbar: true,
+				chatCodeFenceToolbarTexts: {
+					copy: t?.('common.copy') ?? '复制',
+					download: t?.('common.download') ?? '下载',
+				},
 				enableMermaid: false,
 				highlightTheme: getChatMarkdownHighlightTheme(appTheme),
 			}),
-		[appTheme],
+		[appTheme, t],
 	);
 
 	// 正文：流式阶段后端仍推送原始 [n]，有 searchOrganic 时在前端做与落库相同的引用转换

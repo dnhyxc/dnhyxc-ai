@@ -11,6 +11,8 @@ export const enUS = {
 	'common.delete': 'Delete',
 	'common.cancel': 'Cancel',
 	'common.confirm': 'Confirm',
+	'common.copy': 'Copy',
+	'common.download': 'Download',
 
 	'nav.home': 'Home',
 	'nav.knowledge': 'Knowledge',

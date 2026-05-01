@@ -11,6 +11,8 @@ export const zhCN = {
 	'common.delete': '删除',
 	'common.cancel': '取消',
 	'common.confirm': '确定',
+	'common.copy': '复制',
+	'common.download': '下载',
 
 	'nav.home': '首页',
 	'nav.knowledge': '知识库',

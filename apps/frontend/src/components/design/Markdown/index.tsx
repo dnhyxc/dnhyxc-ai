@@ -177,9 +177,13 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 			new MarkdownParser({
 				highlightTheme: getChatMarkdownHighlightTheme(theme),
 				enableChatCodeFenceToolbar: true,
+				chatCodeFenceToolbarTexts: {
+					copy: t?.('common.copy') ?? '复制',
+					download: t?.('common.download') ?? '下载',
+				},
 				enableHeadingSourceLineAttr: true,
 			}),
-		[theme],
+		[theme, t],
 	);
 
 	const { parts: fenceParts, openMermaidId } = useMemo(
@@ -261,7 +265,7 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 				</MermaidFenceToolbarActions>
 			);
 		},
-		[documentIdentity, openMermaidId, openMermaidPreview, theme],
+		[documentIdentity, openMermaidId, openMermaidPreview, theme, t],
 	);
 
 	useMermaidDiagramClickPreview(
@@ -402,7 +406,7 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 				embedInParentScroll ? 'overflow-visible' : 'overflow-hidden',
 			)}
 		>
-			{withScrollArea ? <ChatCodeFloatingToolbar /> : null}
+			{withScrollArea ? <ChatCodeFloatingToolbar t={t} /> : null}
 			{markdown ? (
 				embedInParentScroll ? (
 					<div className="box-border min-w-0 max-w-full w-full p-3">

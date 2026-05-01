@@ -233,6 +233,17 @@ export interface MarkdownParserOptions {
 	 */
 	enableChatCodeFenceToolbar?: boolean;
 	/**
+	 * 围栏代码块工具栏按钮文案（label，文案）。
+	 * - 仅在 `enableChatCodeFenceToolbar: true` 时生效
+	 * - 未提供时保持默认中文：`复制` / `下载`
+	 *
+	 * 注意：这里仅控制「按钮显示文案」，不影响 `data-chat-code-action="copy|download"` 等现有行为。
+	 */
+	chatCodeFenceToolbarTexts?: {
+		copy?: string;
+		download?: string;
+	};
+	/**
 	 * highlight.js 主题 id（与 highlightJsThemes / highlightJsThemeIds 一致，如 `github-dark`、`atom-one-dark`、`base16/dracula`）。
 	 * 设置后在浏览器内向 document.head 注入一条 `<link rel="stylesheet">`（jsDelivr CDN，需联网）。
 	 * 若同时设置 highlightThemeCss（非空字符串），则仅用内联样式，不请求 CDN。
@@ -273,6 +284,7 @@ class MarkdownParser {
 	private containerClass: string;
 	private onError?: (error: unknown) => void;
 	private codeBlockTabSize: number;
+	private chatCodeFenceToolbarTexts: { copy: string; download: string };
 
 	constructor(options: MarkdownParserOptions = {}) {
 		this.enableMermaid = options.enableMermaid !== false;
@@ -282,6 +294,10 @@ class MarkdownParser {
 			0,
 			Math.floor(options.codeBlockTabSize ?? 2),
 		);
+		this.chatCodeFenceToolbarTexts = {
+			copy: options.chatCodeFenceToolbarTexts?.copy || '复制',
+			download: options.chatCodeFenceToolbarTexts?.download || '下载',
+		};
 
 		const expandCodeTabs = (s: string): string => {
 			if (!s) return '';
@@ -428,6 +444,10 @@ class MarkdownParser {
 			const codeClass = langName
 				? `language-${md.utils.escapeHtml(langName)} hljs`
 				: 'hljs';
+			const copyText = md.utils.escapeHtml(this.chatCodeFenceToolbarTexts.copy);
+			const downloadText = md.utils.escapeHtml(
+				this.chatCodeFenceToolbarTexts.download,
+			);
 			return (
 				`<div class="${MARKDOWN_CODE_FENCE_BLOCK_WRAPPER_CLASS}" ${MARKDOWN_CODE_FENCE_BLOCK_ROOT_ATTR}>` +
 				`<div class="${MARKDOWN_CODE_FENCE_TOOLBAR_SLOT_CLASS}">` +
@@ -436,10 +456,14 @@ class MarkdownParser {
 				escapedLangLabel +
 				'</span>' +
 				`<div class="${MARKDOWN_CODE_FENCE_TOOLBAR_ACTIONS_CLASS}">` +
-				`<button type="button" class="${MARKDOWN_CODE_FENCE_TOOLBAR_BTN_CLASS}" ${MARKDOWN_CODE_FENCE_DATA_ACTION_ATTR}="copy">复制</button>` +
+				`<button type="button" class="${MARKDOWN_CODE_FENCE_TOOLBAR_BTN_CLASS}" ${MARKDOWN_CODE_FENCE_DATA_ACTION_ATTR}="copy">` +
+				copyText +
+				'</button>' +
 				`<button type="button" class="${MARKDOWN_CODE_FENCE_TOOLBAR_BTN_CLASS}" ${MARKDOWN_CODE_FENCE_DATA_ACTION_ATTR}="download" ${MARKDOWN_CODE_FENCE_DATA_BUTTON_LANG_ATTR}="` +
 				escapedLangLabel +
-				'">下载</button>' +
+				'">' +
+				downloadText +
+				'</button>' +
 				'</div></div></div>' +
 				'<pre><code class="' +
 				codeClass +

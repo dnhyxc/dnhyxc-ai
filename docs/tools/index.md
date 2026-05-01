@@ -122,9 +122,95 @@
 ### 2.4 聊天围栏代码块工具栏（可选）
 
 - **开关**：`enableChatCodeFenceToolbar: true`。
+- **文案可配置**：通过 `chatCodeFenceToolbarTexts` 传入 `copy/download` 按钮文案；不传则保持默认中文 **`复制` / `下载`**（兼容历史表现）。
 - **实现**：覆盖 `md.renderer.rules.fence`，输出固定结构：`chat-md-code-block`、`chat-md-code-toolbar-slot`、`data-chat-code-action="copy|download"`、`data-chat-code-lang` 等；高亮逻辑与默认 `highlight` 回调一致；**DOM 字面量**由 **`markdown/code-fence-dom.ts`** 常量驱动，与 **`markdown/code-fence-actions.ts`**、宿主 **`chatCodeToolbar.ts`** 共用同一套 **TypeScript 公共标识符**（`MARKDOWN_CODE_FENCE_*`）。
 - **样式与交互**：包内**不**包含工具栏视觉与点击逻辑；宿主（如本仓库 `ChatAssistantMessage` + `index.css` + `chatCodeToolbar`）负责布局与事件。
 - **行尾注释源码摘录**：见 **第 11.8.6.0 小节**。
+
+#### 2.4.1 本次实现思路：让“复制/下载”文案可由宿主自定义（且不破坏现有行为）
+
+**问题**：围栏工具栏按钮文案在解析器里写死为中文（`复制` / `下载`），当宿主切换 i18n（国际化）语言时，按钮文字无法随语言切换。
+
+**约束**（必须满足）：
+
+- **不影响现有功能**：不传新参数时，输出 HTML **必须与原来一致**（仍是 `复制/下载`）。
+- **不改变动作语义**：`data-chat-code-action="copy|download"` 等 DOM 契约不变；宿主既有的 `bindMarkdownCodeFenceActions`、`layoutChatCodeToolbars`、点击委托等逻辑不应被影响。
+- **安全**：按钮文案来自宿主输入，最终会拼到 HTML 字符串里，必须做 **escape（转义）**，避免注入风险。
+
+**方案**：
+
+1. 在 `MarkdownParserOptions` 中新增可选字段 `chatCodeFenceToolbarTexts?: { copy?: string; download?: string }`。
+2. `MarkdownParser` 构造时将其归一化为私有字段（带默认值），例如：
+   - `copy: options.chatCodeFenceToolbarTexts?.copy || '复制'`
+   - `download: options.chatCodeFenceToolbarTexts?.download || '下载'`
+3. 在 `patchChatCodeFenceRenderer()` 里渲染按钮时，不再写死文字，而是读取该字段，并用 `md.utils.escapeHtml(...)` 做转义后拼接。
+
+下面给出与仓库实现一致的关键代码摘录（含详细中文注释，便于未来维护时快速对照“为什么这么写”）。
+
+```ts
+// 源路径：packages/tools/src/markdown/parser.ts（节选）
+// 目标：让围栏工具栏的「复制 / 下载」文案可配置，且不传时保持历史默认中文
+
+export interface MarkdownParserOptions {
+	// ... 其它配置项省略 ...
+
+	enableChatCodeFenceToolbar?: boolean; // 仍然是总开关：只控制“是否输出工具栏 DOM”
+
+	/**
+	 * 围栏代码块工具栏按钮文案（label，文案）。
+	 * - 仅在 `enableChatCodeFenceToolbar: true` 时生效
+	 * - 未提供时保持默认中文：`复制` / `下载`（确保不破坏既有 UI）
+	 *
+	 * 注意：这里只控制“按钮显示文案”，不影响 data-chat-code-action="copy|download" 等行为契约。
+	 */
+	chatCodeFenceToolbarTexts?: {
+		copy?: string; // 复制按钮文案
+		download?: string; // 下载按钮文案
+	};
+}
+
+class MarkdownParser {
+	// ... 其它字段省略 ...
+
+	// 构造时归一化文案：把可选配置变成“始终有值”的内部字段，避免渲染时到处写 ?? 或 || 分支
+	private chatCodeFenceToolbarTexts: { copy: string; download: string };
+
+	constructor(options: MarkdownParserOptions = {}) {
+		// ... 其它初始化省略 ...
+
+		// 关键：默认值仍是“复制/下载”
+		// 这样即使所有现有调用点都不改，输出也不会有任何变化（兼容性保证）
+		this.chatCodeFenceToolbarTexts = {
+			copy: options.chatCodeFenceToolbarTexts?.copy || '复制',
+			download: options.chatCodeFenceToolbarTexts?.download || '下载',
+		};
+
+		// ... 其它初始化省略 ...
+	}
+
+	private patchChatCodeFenceRenderer(): void {
+		const md = this.md;
+		md.renderer.rules.fence = (tokens, idx, options, _env, _slf) => {
+			// ... token / langName / highlighted 等逻辑省略 ...
+
+			// 安全：按钮文案最终拼到 HTML 字符串里，必须 escapeHtml（避免宿主误传 `<img onerror=...>` 等）
+			const copyText = md.utils.escapeHtml(this.chatCodeFenceToolbarTexts.copy);
+			const downloadText = md.utils.escapeHtml(this.chatCodeFenceToolbarTexts.download);
+
+			return (
+				// ... 其它 DOM 结构省略 ...
+				`<button type="button" class="chat-md-code-btn" data-chat-code-action="copy">` +
+				copyText + // 复制按钮文案：可由宿主自定义（默认中文）
+				'</button>' +
+				`<button type="button" class="chat-md-code-btn" data-chat-code-action="download" data-chat-code-lang="...">` +
+				downloadText + // 下载按钮文案：可由宿主自定义（默认中文）
+				'</button>'
+				// ... 其它 DOM 结构省略 ...
+			);
+		};
+	}
+}
+```
 
 ### 2.5 Mermaid 图表（可选）
 
@@ -191,6 +277,7 @@
 - `highlightThemeCss?: string` — 内联注入；`''` 仅清除本包注入节点。
 - `injectHighlightTheme?: boolean` — 默认 `true`；`false` 则完全不注入。
 - `enableChatCodeFenceToolbar?: boolean`
+- `chatCodeFenceToolbarTexts?: { copy?: string; download?: string }` — 围栏工具栏按钮文案（默认中文 `复制/下载`，不影响既有行为）。
 - `enableMermaid?: boolean` — 默认 `true`；`false` 时 mermaid 围栏按普通代码块。配合 **`@dnhyxc-ai/tools/react`** 的 **`useMermaidInMarkdownRoot`**（见 §11）。
 - 其余：`html`、`linkify`、`typographer`、`breaks`、`containerClass`、`onError`
 

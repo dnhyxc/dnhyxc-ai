@@ -573,6 +573,11 @@ const parser = new MarkdownParser({
 ```ts
 const parser = new MarkdownParser({
 	enableChatCodeFenceToolbar: true,
+	// 可选：自定义工具栏文案（不传则保持默认中文“复制/下载”）
+	chatCodeFenceToolbarTexts: {
+		copy: 'Copy', // 复制按钮文案
+		download: 'Download', // 下载按钮文案
+	},
 });
 ```
 
@@ -627,6 +632,161 @@ export function MarkdownWithCodeToolbar({ markdown }: { markdown: string }) {
   - 按钮切换为 `已复制`，并在短暂延迟后恢复
 - 业务方通常只需要关心 `onDownload(payload)`，不再需要自己手动查找 `pre code`。
 - 也支持 `bindMarkdownCodeFenceActions(options)`（省略 root）：会默认绑定到 `document`。**仅建议在你明确只有一个宿主容器、且不会出现多个实例并存的页面使用**。
+
+#### 7.6.3（本次补充）在应用侧接入 i18n：让“复制/下载”随语言切换
+
+**推荐实践**：应用侧不要在 `MarkdownParser` 里写死中文/英文常量，而是把 i18n 的 `t()` 结果透传给 `chatCodeFenceToolbarTexts`。
+
+本仓库 `apps/frontend` 的 i18n（国际化）实现为 `useI18n()`，其 `t('common.copy') / t('common.download')` 已在 `zh-CN.ts` 与 `en-US.ts` 中定义。
+
+示例（节选，带中文注释，思路可直接复制到任意 React 预览容器）：
+
+```tsx
+import { MarkdownParser } from '@dnhyxc-ai/tools';
+import { useMemo } from 'react';
+import { useI18n } from '@/hooks/i18n';
+
+export function MarkdownPreview({ markdown }: { markdown: string }) {
+	const { t } = useI18n(); // t：随语言切换而变化（由 useSyncExternalStore 驱动）
+
+	const parser = useMemo(
+		() =>
+			new MarkdownParser({
+				enableChatCodeFenceToolbar: true, // 总开关：输出工具栏 DOM
+				chatCodeFenceToolbarTexts: {
+					// 关键：用 i18n 文案填充；并保留中文回退，确保 key 缺失时不破坏 UI
+					copy: t('common.copy') ?? '复制',
+					download: t('common.download') ?? '下载',
+				},
+			}),
+		[t], // 依赖 t：语言切换时重建 parser，确保新文案写入 HTML
+	);
+
+	return <div dangerouslySetInnerHTML={{ __html: parser.render(markdown) }} />;
+}
+```
+
+**为什么依赖是 `[t]`**：
+
+- `MarkdownParser` 在构造时把文案归一化进实例字段；若语言切换但 parser 不重建，按钮仍会保留旧文案。
+- 把 `t` 放进 `useMemo` 依赖，可以在语言切换时重建实例，保证输出 HTML 的按钮文案刷新。
+
+**兼容性说明**：
+
+- 你不传 `chatCodeFenceToolbarTexts` 时，仍会输出默认中文 `复制/下载`，与旧版行为一致（不影响现有功能）。
+
+#### 7.6.4（本次补充）本仓库 `apps/frontend/src` 的真实落地点（不改动代码，仅做说明）
+
+本节把“本次改动在前端是怎么落地的”集中记录下来，方便后续排查：
+
+- **目标**：让 Markdown 围栏 code toolbar 的“复制/下载”文案、以及 Mermaid 顶栏的文案，都能随 i18n（国际化）语言切换而变化。
+- **约束**：不改变任何既有行为契约（如 `data-chat-code-action="copy|download"`），不传文案时仍保持默认中文，避免破坏历史 UI。
+
+##### A. 知识库 / Monaco 预览：`ParserMarkdownPreviewPane` 内部创建 `MarkdownParser` 时透传文案
+
+文件：`apps/frontend/src/components/design/Markdown/index.tsx`
+
+关键点：
+
+- 该组件接收可选 `t`（翻译函数）；若不传则回退默认中文。
+- `MarkdownParser` 在构造时会把 `chatCodeFenceToolbarTexts` 归一化进实例字段，因此语言切换时需要让 `useMemo` 依赖里包含 `t`（或其等价的 locale 变化信号），确保 parser 重建。
+
+```tsx
+// 源路径：apps/frontend/src/components/design/Markdown/index.tsx（节选）
+// 作用：Monaco 预览 / 知识库预览等复用的 Markdown 预览壳
+
+const parser = useMemo(
+	() =>
+		new MarkdownParser({
+			highlightTheme: getChatMarkdownHighlightTheme(theme), // 代码高亮主题：随主题变化
+			enableChatCodeFenceToolbar: true, // 开启围栏工具栏 DOM（按钮结构由 tools 包输出）
+			chatCodeFenceToolbarTexts: {
+				// 关键：从 i18n t() 取文案；不传 t 时保持默认中文，确保兼容性
+				copy: t?.('common.copy') ?? '复制',
+				download: t?.('common.download') ?? '下载',
+			},
+			enableHeadingSourceLineAttr: true, // 标题行号：用于 Monaco 分屏同步滚动
+		}),
+	[theme, t], // 依赖：主题或语言变化时重建 parser，避免按钮文案停留在旧语言
+);
+```
+
+##### B. 聊天 / 知识库助手消息：`ChatAssistantMessage` 创建 `MarkdownParser` 时透传文案
+
+文件：`apps/frontend/src/components/design/ChatAssistantMessage/index.tsx`
+
+关键点：
+
+- 聊天消息使用 `StreamingMarkdownBody` 渲染 Mermaid（岛模式），因此这里设置 `enableMermaid: false`，避免 Mermaid 围栏重复解析。
+- code toolbar 文案同样由 i18n 的 `t()` 提供，并保留中文回退。
+
+```tsx
+// 源路径：apps/frontend/src/components/design/ChatAssistantMessage/index.tsx（节选）
+// 作用：聊天消息 Markdown 渲染（含围栏 code toolbar）
+
+const chatMdParser = useMemo(
+	() =>
+		new MarkdownParser({
+			enableChatCodeFenceToolbar: true, // 输出围栏工具栏 DOM：供行内按钮与吸顶浮动条复用
+			chatCodeFenceToolbarTexts: {
+				// 关键：按钮文案跟随 i18n；key 缺失时回退中文，避免出现空按钮
+				copy: t?.('common.copy') ?? '复制',
+				download: t?.('common.download') ?? '下载',
+			},
+			enableMermaid: false, // Mermaid 由 StreamingMarkdownBody 的独立岛渲染，避免重复解析
+			highlightTheme: getChatMarkdownHighlightTheme(appTheme), // 随主题变化
+		}),
+	[appTheme, t], // 依赖：主题/语言切换时重建 parser，保证文案刷新
+);
+```
+
+##### C. Mermaid 顶栏：`MermaidFenceToolbarActions` 通过 `t` 渲染文案
+
+文件：`apps/frontend/src/components/design/MermaidFenceToolbar/index.tsx`
+
+关键点：
+
+- 该组件已经支持可选 `t?: ChatI18nT`；当宿主（如 `StreamingMarkdownBody`、Monaco 预览）传入 `t` 时，文案会随语言切换。
+- 未传 `t` 时，仍有默认中文回退（`代码/图表/复制/已复制/预览/下载`），不破坏旧行为。
+
+```tsx
+// 源路径：apps/frontend/src/components/design/MermaidFenceToolbar/index.tsx（节选）
+// 作用：Mermaid 围栏的 sticky 顶栏（图/代码切换、复制、预览、下载）
+
+<span>
+	{mode === 'diagram'
+		? (t?.('mermaid.toolbar.code') ?? '代码') // i18n：代码
+		: (t?.('mermaid.toolbar.diagram') ?? '图表') // i18n：图表
+	}
+</span>
+
+<span className={cn(copied ? 'text-teal-500' : '', 'text-sm')}>
+	{copied
+		? (t?.('mermaid.toolbar.copied') ?? '已复制') // i18n：已复制
+		: (t?.('mermaid.toolbar.copy') ?? '复制') // i18n：复制
+	}
+</span>
+
+<span className="text-sm">
+	{t?.('mermaid.toolbar.preview') ?? '预览'} {/* i18n：预览 */}
+</span>
+
+<span className="text-sm">
+	{t?.('mermaid.toolbar.download') ?? '下载'} {/* i18n：下载 */}
+</span>
+```
+
+##### D. i18n 字典：需要包含的 key
+
+文件：
+
+- `apps/frontend/src/i18n/locales/zh-CN.ts`
+- `apps/frontend/src/i18n/locales/en-US.ts`
+
+本次涉及的 key（两种语言都应存在）：
+
+- `common.copy` / `common.download`
+- `mermaid.toolbar.code` / `mermaid.toolbar.diagram` / `mermaid.toolbar.copy` / `mermaid.toolbar.copied` / `mermaid.toolbar.preview` / `mermaid.toolbar.download`
 
 ### 7.6.0 Markdown 围栏代码块 DOM 契约（`MARKDOWN_CODE_FENCE_*`）
 

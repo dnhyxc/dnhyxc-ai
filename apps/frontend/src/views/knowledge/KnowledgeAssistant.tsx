@@ -84,6 +84,7 @@ const KnowledgeAssistant = observer(
 	}: KnowledgeAssistantProps) => {
 		const { knowledgeStore, userStore } = useStore();
 		const { t } = useI18n();
+
 		const [internalInput, setInternalInput] = useState('');
 		const input = inputProp ?? internalInput;
 		const setInput = setInputProp ?? setInternalInput;
@@ -518,7 +519,7 @@ const KnowledgeAssistant = observer(
 
 		return (
 			<div className="relative flex h-full w-full flex-col overflow-hidden">
-				<ChatCodeFloatingToolbar />
+				<ChatCodeFloatingToolbar t={t} />
 				{/* 多会话切换入口改到输入框区域（见 ChatEntry.entryChildren） */}
 				{!isRagMode && assistantStore.isHistoryLoading ? (
 					<div className="text-textcolor/70 flex flex-1 items-center justify-center text-sm">
@@ -592,6 +593,7 @@ const KnowledgeAssistant = observer(
 											? selectRagMessageByChatId
 											: selectAssistantMessageByChatId
 									}
+									t={t}
 									chatId={message.chatId}
 									index={index}
 									messagesLength={messages.length}

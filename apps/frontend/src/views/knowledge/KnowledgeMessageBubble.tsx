@@ -4,9 +4,10 @@ import type { RefObject } from 'react';
 import ChatAssistantMessage from '@/components/design/ChatAssistantMessage';
 import ChatMessageActions from '@/components/design/ChatMessageActions';
 import { cn } from '@/lib/utils';
-import type { Message } from '@/types/chat';
+import type { ChatI18nT, Message } from '@/types/chat';
 
 export interface KnowledgeAssistantMessageBubbleProps {
+	t?: ChatI18nT;
 	chatId: string;
 	index: number;
 	messagesLength: number;
@@ -42,6 +43,7 @@ export const KnowledgeMessageBubble = observer(function KnowledgeMessageBubble({
 	shareSelection,
 	onShare,
 	scrollViewportRef,
+	t,
 }: KnowledgeAssistantMessageBubbleProps & {
 	selectMessageByChatId: SelectMessageByChatId;
 	allowAiShare?: boolean;
@@ -87,12 +89,14 @@ export const KnowledgeMessageBubble = observer(function KnowledgeMessageBubble({
 				{message.role === 'user' ? (
 					<ChatAssistantMessage
 						message={message}
+						t={t}
 						className="text-left min-w-0 max-w-full [&_.markdown-body]:min-w-0 [&_.markdown-body]:max-w-full [&_.markdown-body]:overflow-x-auto"
 					/>
 				) : (
 					<ChatAssistantMessage
 						message={message}
 						scrollViewportRef={scrollViewportRef}
+						t={t}
 					/>
 				)}
 
@@ -116,6 +120,7 @@ export const KnowledgeMessageBubble = observer(function KnowledgeMessageBubble({
 							setCheckedMessage={setCheckedMessage}
 							onCopy={onCopy}
 							onSaveToKnowledge={onSaveToKnowledge}
+							t={t}
 						/>
 					</div>
 				) : null}
