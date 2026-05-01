@@ -6,6 +6,7 @@ import {
 	useLayoutEffect,
 } from 'react';
 import ChatCodeToolbarFloating from '@/components/design/ChatCodeToolBar';
+import { ChatI18nT } from '@/types/chat';
 import { layoutChatCodeToolbars } from '@/utils/chatCodeToolbar';
 
 const emptyDeps: DependencyList = [];
@@ -140,6 +141,6 @@ export function useChatCodeFloatingToolbar(
  * 与 `useChatCodeFloatingToolbar` 配套：挂在滚动容器**同级**（祖先含 `position: relative` 即可），
  * Portal 到 `document.body` 渲染吸顶代码栏。
  */
-export function ChatCodeFloatingToolbar() {
-	return <ChatCodeToolbarFloating />;
+export function ChatCodeFloatingToolbar(props: { t?: ChatI18nT }) {
+	return <ChatCodeToolbarFloating t={props.t} />;
 }

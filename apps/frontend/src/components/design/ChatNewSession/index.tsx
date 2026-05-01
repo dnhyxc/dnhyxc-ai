@@ -3,11 +3,13 @@ import { motion } from 'framer-motion';
 import { Bot } from 'lucide-react';
 import { observer } from 'mobx-react';
 import { useRef } from 'react';
+import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import { ChatBotProps } from '@/types/chat';
 
 const ChatNewSession = observer(function ChatBot(props) {
 	const { className } = props;
+	const { t } = useI18n();
 
 	const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -30,8 +32,8 @@ const ChatNewSession = observer(function ChatBot(props) {
 							className="flex flex-col items-center justify-center h-105 text-textcolor"
 						>
 							<Bot className="w-16 h-16 mb-4" />
-							<p className="text-2xl">欢迎来到 dnhyxc-ai 智能聊天</p>
-							<p className="text-lg mt-2">有什么我可以帮您的？</p>
+							<p className="text-2xl">{t('chat.newSession.welcomeTitle')}</p>
+							<p className="text-lg mt-2">{t('chat.newSession.welcomeHint')}</p>
 						</motion.div>
 					</div>
 				</div>

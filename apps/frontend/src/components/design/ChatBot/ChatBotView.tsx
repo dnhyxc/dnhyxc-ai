@@ -80,6 +80,7 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 			className,
 			showAvatar = false,
 			onBranchChange,
+			t,
 			flatMessages,
 			selectedChildMap,
 			onSelectedChildMapChange,
@@ -838,7 +839,7 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 					className,
 				)}
 			>
-				<ChatCodeFloatingToolbar />
+				<ChatCodeFloatingToolbar t={t} />
 				{/* ref 指向 ScrollArea Viewport；吸顶条由 useChatCodeFloatingToolbar + layoutChatCodeToolbars 同步 */}
 				<ScrollArea
 					ref={scrollContainerRef}
@@ -913,6 +914,7 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 															isLoading={isCurrentSessionLoading}
 															handleEditChange={handleEditChange}
 															sendMessage={sendMessage}
+															t={t}
 														/>
 													) : (
 														/* isStopped 由外部注入：主项目用 chatStore.isMessageStopped；独立项目可自实现映射 */
@@ -923,6 +925,7 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 															onContinue={onContinue}
 															onContinueAnswering={onContinueAnswering}
 															isStopped={isMessageStopped(message.chatId)}
+															t={t}
 															// 与上列 ScrollArea ref 相同：助手气泡内据此懒挂载 MdPreview
 															scrollViewportRef={scrollContainerRef}
 														/>
@@ -962,6 +965,7 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 															checkedMessages={checkedMessages}
 															setCheckedMessage={setCheckedMessage}
 															onSaveToKnowledge={onSaveToKnowledge}
+															t={t}
 														/>
 													)
 												) : null}
@@ -980,6 +984,7 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 							<ChatAnchorNav
 								messages={messages}
 								scrollContainerRef={scrollContainerRef}
+								t={t}
 							/>
 						)
 					) : null}
@@ -987,7 +992,7 @@ const ChatBotView = forwardRef<ChatBotRef, ChatBotViewProps>(
 						renderChatControls ? (
 							renderChatControls(chatControlsContext)
 						) : (
-							<ChatControls {...chatControlsContext} />
+							<ChatControls {...chatControlsContext} t={t} />
 						)
 					) : null}
 				</ScrollArea>

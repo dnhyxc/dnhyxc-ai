@@ -25,7 +25,7 @@ import {
 } from 'react';
 import ChatEntry from '@/components/design/ChatEntry';
 import { ScrollArea } from '@/components/ui';
-import { useStickToBottomScroll } from '@/hooks';
+import { useI18n, useStickToBottomScroll } from '@/hooks';
 import {
 	ChatCodeFloatingToolbar,
 	useChatCodeFloatingToolbar,
@@ -83,6 +83,7 @@ const KnowledgeAssistant = observer(
 		setInput: setInputProp,
 	}: KnowledgeAssistantProps) => {
 		const { knowledgeStore, userStore } = useStore();
+		const { t } = useI18n();
 		const [internalInput, setInternalInput] = useState('');
 		const input = inputProp ?? internalInput;
 		const setInput = setInputProp ?? setInternalInput;
@@ -175,15 +176,21 @@ const KnowledgeAssistant = observer(
 			(message: Message) => {
 				const body = (message.content ?? '').trim();
 				if (!body) {
-					Toast({ type: 'warning', title: '没有可写入的正文' });
+					Toast({
+						type: 'warning',
+						title: t('knowledge.assistant.noBodyToWrite'),
+					});
 					return;
 				}
 				const cur = knowledgeStore.markdown.trimEnd();
 				const next = cur ? `${cur}\n\n${body}\n` : `${body}\n`;
 				knowledgeStore.setMarkdown(next);
-				Toast({ type: 'success', title: '已追加到当前知识文档' });
+				Toast({
+					type: 'success',
+					title: t('knowledge.assistant.appendedToCurrentDoc'),
+				});
 			},
-			[knowledgeStore],
+			[knowledgeStore, t],
 		);
 
 		const onCopy = useCallback((content: string, chatId: string) => {
@@ -393,7 +400,10 @@ const KnowledgeAssistant = observer(
 					const text = (content ?? ragInput).trim();
 					if (!text) return;
 					if (!isLoggedIn) {
-						Toast({ type: 'warning', title: '请先登录后再使用助手' });
+						Toast({
+							type: 'warning',
+							title: t('knowledge.assistant.loginToUse'),
+						});
 						return;
 					}
 					setRagInput('');
@@ -404,7 +414,10 @@ const KnowledgeAssistant = observer(
 				const text = (content ?? input).trim();
 				if (!text) return;
 				if (!isLoggedIn) {
-					Toast({ type: 'warning', title: '请先登录后再使用助手' });
+					Toast({
+						type: 'warning',
+						title: t('knowledge.assistant.loginToUse'),
+					});
 					return;
 				}
 				setInput('');
@@ -419,12 +432,18 @@ const KnowledgeAssistant = observer(
 			async (kind: KnowledgeAssistantPromptKind) => {
 				if (isRagMode) return;
 				if (!isLoggedIn) {
-					Toast({ type: 'warning', title: '请先登录后再使用助手' });
+					Toast({
+						type: 'warning',
+						title: t('knowledge.assistant.loginToUse'),
+					});
 					return;
 				}
 				const md = (knowledgeStore.markdown ?? '').trim();
 				if (!md) {
-					Toast({ type: 'warning', title: '请先在左侧编辑器输入正文' });
+					Toast({
+						type: 'warning',
+						title: t('knowledge.assistant.enterBodyFirst'),
+					});
 					return;
 				}
 				if (
@@ -432,7 +451,10 @@ const KnowledgeAssistant = observer(
 					assistantStore.isHistoryLoading ||
 					assistantStore.isStreaming
 				) {
-					Toast({ type: 'warning', title: '请等待当前回复结束后再试' });
+					Toast({
+						type: 'warning',
+						title: t('knowledge.assistant.waitForCurrentReply'),
+					});
 					return;
 				}
 				const { userMessageShort, extraUserContentForModel } =
@@ -459,7 +481,7 @@ const KnowledgeAssistant = observer(
 				return;
 			}
 			void assistantStore.stopGenerating();
-		}, [isRagMode]);
+		}, [isRagMode, isLoggedIn, knowledgeStore.markdown, t]);
 
 		/** 工具条整体展示：登录后始终可见（含 AI/RAG 模式切换） */
 		const showEntryToolbar = isLoggedIn;
@@ -500,14 +522,14 @@ const KnowledgeAssistant = observer(
 				{/* 多会话切换入口改到输入框区域（见 ChatEntry.entryChildren） */}
 				{!isRagMode && assistantStore.isHistoryLoading ? (
 					<div className="text-textcolor/70 flex flex-1 items-center justify-center text-sm">
-						<Loading text="正在加载对话…" />
+						<Loading text={t('knowledge.assistant.loadingConversation')} />
 					</div>
 				) : isRagMode && !ragMessages.length ? (
 					<div className="text-textcolor/70 flex flex-1 justify-center items-start text-sm pt-4 pl-4 pr-4.5">
 						<div className="w-full flex gap-2 border border-theme/10 bg-theme/5 p-3 rounded-md">
 							<BookOpen size={18} className="mt-[3px] shrink-0 text-teal-500" />
 							<div className="flex-1 text-sm leading-relaxed">
-								基于您账号下已入库的知识进行问答！系统将严格限定在您上传的私有数据范围内进行信息检索与推理，不会越界获取互联网公域信息。
+								{t('knowledge.assistant.ragIntro')}
 							</div>
 						</div>
 					</div>
@@ -532,10 +554,10 @@ const KnowledgeAssistant = observer(
 											<item.icon className="text-teal-500 mt-0.5 shrink-0" />
 											<div className="flex min-w-0 flex-1 flex-col gap-1">
 												<span className="text-base font-medium">
-													{item.title}
+													{t(item.titleKey)}
 												</span>
 												<span className="text-sm text-textcolor/80">
-													{item.description}
+													{t(item.descriptionKey)}
 												</span>
 											</div>
 										</button>
@@ -545,9 +567,7 @@ const KnowledgeAssistant = observer(
 						) : (
 							<div className="w-full flex justify-between bg-theme/5 p-2 rounded-md border border-theme/10">
 								<Sparkles size={18} className="mr-2 text-teal-500 mt-0.5" />
-								<div className="flex-1">
-									Hi，我是您的专属知识库助手！从日常的资料查阅、流程指引，到棘手难题的排查与解答，我都会为您提供即时、精准的信息支持。您可以把我当作随时在线的业务智囊，帮您大幅节省检索时间，提升工作效能。
-								</div>
+								<div className="flex-1">{t('knowledge.assistant.aiIntro')}</div>
 							</div>
 						)}
 					</div>
@@ -598,7 +618,7 @@ const KnowledgeAssistant = observer(
 										}}
 									>
 										<CirclePlus />
-										新对话
+										{t('knowledge.assistant.newConversation')}
 									</Button>
 								</div>
 							) : null}
@@ -613,7 +633,7 @@ const KnowledgeAssistant = observer(
 											onClick={() => void sendKnowledgePromptCard(item.kind)}
 										>
 											<item.icon />
-											{item.title}
+											{t(item.titleKey)}
 										</Button>
 									))}
 								</div>
@@ -632,8 +652,8 @@ const KnowledgeAssistant = observer(
 								)}
 								aria-label={
 									scrollCornerFabMode === 'toBottom'
-										? '滚动到底部'
-										: '滚动到顶部'
+										? t('knowledge.assistant.scrollToBottom')
+										: t('knowledge.assistant.scrollToTop')
 								}
 								onClick={onScrollCornerFabClick}
 							>
@@ -660,10 +680,10 @@ const KnowledgeAssistant = observer(
 								sendMessage={sendMessage}
 								placeholder={
 									isRagMode
-										? '向知识库提问'
+										? t('knowledge.assistant.placeholder.rag')
 										: editorHasBody
-											? '请输入您的问题'
-											: '请先在左侧编辑器输入正文后再向我提问'
+											? t('knowledge.assistant.placeholder.ai')
+											: t('knowledge.assistant.placeholder.aiNeedsBody')
 								}
 								disableTextInput={isRagMode ? false : !editorHasBody}
 								loading={

@@ -21,6 +21,7 @@ import {
 	useState,
 } from 'react';
 import { cn } from '@/lib/utils';
+import { ChatI18nT } from '@/types/chat';
 import { downloadBlob } from '@/utils';
 import { copyToClipboard } from '@/utils/clipboard';
 import {
@@ -107,6 +108,8 @@ export type MermaidFenceToolbarActionsProps = {
 	/** 变化时重置模式与复制反馈（如 Monaco `documentIdentity`） */
 	resetKey?: string | number;
 	children: (mode: 'diagram' | 'code') => ReactNode;
+	/** i18n 翻译函数（可选）；不传则沿用组件内默认中文文案 */
+	t?: ChatI18nT;
 };
 
 /**
@@ -119,6 +122,7 @@ export function MermaidFenceToolbarActions({
 	defaultViewMode = 'diagram',
 	resetKey,
 	children,
+	t,
 }: MermaidFenceToolbarActionsProps) {
 	const [mode, setMode] = useState<'diagram' | 'code'>(defaultViewMode);
 	const [copied, setCopied] = useState(false);
@@ -215,7 +219,11 @@ export function MermaidFenceToolbarActions({
 					onClick={toggle}
 				>
 					<Code2 size={16} />
-					<span>{mode === 'diagram' ? '代码' : '图表'}</span>
+					<span>
+						{mode === 'diagram'
+							? (t?.('mermaid.toolbar.code') ?? '代码')
+							: (t?.('mermaid.toolbar.diagram') ?? '图表')}
+					</span>
 				</Button>
 				<div className="flex items-center justify-end">
 					<Button
@@ -226,7 +234,9 @@ export function MermaidFenceToolbarActions({
 					>
 						{copied ? <CheckCircle className="text-teal-500" /> : <Copy />}
 						<span className={cn(copied ? 'text-teal-500' : '', 'text-sm')}>
-							{copied ? '已复制' : '复制'}
+							{copied
+								? (t?.('mermaid.toolbar.copied') ?? '已复制')
+								: (t?.('mermaid.toolbar.copy') ?? '复制')}
 						</span>
 					</Button>
 					<Button
@@ -237,7 +247,9 @@ export function MermaidFenceToolbarActions({
 						disabled={mode !== 'diagram'}
 					>
 						<Eye size={16} />
-						<span className="text-sm">预览</span>
+						<span className="text-sm">
+							{t?.('mermaid.toolbar.preview') ?? '预览'}
+						</span>
 					</Button>
 					{/* void：忽略 async onDownload 返回的 Promise */}
 					<Button
@@ -248,7 +260,9 @@ export function MermaidFenceToolbarActions({
 						onClick={(e) => void onDownload(e)}
 					>
 						<Download size={16} />
-						<span className="text-sm">下载</span>
+						<span className="text-sm">
+							{t?.('mermaid.toolbar.download') ?? '下载'}
+						</span>
 					</Button>
 				</div>
 			</MermaidFenceToolbar>

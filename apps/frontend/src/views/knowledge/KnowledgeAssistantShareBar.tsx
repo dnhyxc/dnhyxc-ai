@@ -2,7 +2,7 @@ import ShareChat from '@design/Share';
 import { Button, Checkbox } from '@ui/index';
 import type { Dispatch, SetStateAction } from 'react';
 import { useCallback, useEffect, useState } from 'react';
-import { resolveSharePairFromList, useShareFlow } from '@/hooks';
+import { resolveSharePairFromList, useI18n, useShareFlow } from '@/hooks';
 import assistantStore from '@/store/assistant';
 import type { Message } from '@/types/chat';
 
@@ -127,6 +127,7 @@ export function KnowledgeAssistantShareBar({
 	shareFlow,
 	setShareModelVisible,
 }: KnowledgeAssistantShareBarProps) {
+	const { t } = useI18n();
 	return (
 		<div className="w-full flex justify-between items-center max-w-3xl mx-auto pt-4 pb-4.5 pl-0.5 pr-0.5">
 			<div className="flex-1 flex items-center gap-3 text-textcolor/80">
@@ -147,11 +148,15 @@ export function KnowledgeAssistantShareBar({
 						htmlFor="knowledge-assistant-share-all"
 						className="cursor-pointer ml-2 text-md"
 					>
-						全选
+						{t('knowledge.assistant.share.selectAll')}
 					</label>
 				</div>
 				<div className="border-l border-textcolor/50 h-3" />
-				<div>已选择 {shareSelection.selectedPairCount} 组对话</div>
+				<div>
+					{t('knowledge.assistant.share.selectedPairs', {
+						count: shareSelection.selectedPairCount,
+					})}
+				</div>
 			</div>
 			<div className="flex items-center gap-3">
 				<Button
@@ -162,7 +167,7 @@ export function KnowledgeAssistantShareBar({
 						shareFlow.onCancelShare();
 					}}
 				>
-					取消
+					{t('common.cancel')}
 				</Button>
 				<Button
 					variant="dynamic"
@@ -171,7 +176,7 @@ export function KnowledgeAssistantShareBar({
 					disabled={shareSelection.checkedMessages.size === 0}
 					onClick={() => setShareModelVisible(true)}
 				>
-					创建分享链接
+					{t('knowledge.assistant.share.createLink')}
 				</Button>
 			</div>
 		</div>

@@ -15,6 +15,7 @@ import {
 	FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { useI18n } from '@/hooks';
 import { createVerifyCode, login } from '@/service';
 import useStore from '@/store';
 import { encrypt, setStorage } from '@/utils';
@@ -35,6 +36,7 @@ const LoginForm: React.FC<IProps> = ({ onForgetPwd }) => {
 	});
 
 	const navigate = useNavigate();
+	const { t } = useI18n();
 
 	const { userStore } = useStore();
 
@@ -56,29 +58,35 @@ const LoginForm: React.FC<IProps> = ({ onForgetPwd }) => {
 			}
 		} catch (_error) {
 			Toast({
-				title: '获取验证码失败!',
+				title: t('auth.captcha.fetchFailed'),
 				type: 'error',
 			});
 		}
 	};
 
 	const formSchema = z.object({
-		username: z.string().trim().min(2, {
-			message: '用户名至少输入两个字符',
-		}),
+		username: z
+			.string()
+			.trim()
+			.min(2, {
+				message: t('auth.validation.usernameMin'),
+			}),
 		password: z
 			.string()
 			.trim()
-			.min(8, { message: '密码至少输入8个字符' })
+			.min(8, { message: t('auth.validation.passwordMin') })
 			.regex(
 				/^(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).+$/,
 				{
-					message: '密码必须包含英文、数字和特殊字符',
+					message: t('auth.validation.passwordComplex'),
 				},
 			),
-		captchaText: z.string().trim().min(4, {
-			message: '验证码至少输入4个字符',
-		}),
+		captchaText: z
+			.string()
+			.trim()
+			.min(4, {
+				message: t('auth.validation.captchaMin'),
+			}),
 	});
 
 	const form = useForm<z.infer<typeof formSchema>>({
@@ -117,9 +125,12 @@ const LoginForm: React.FC<IProps> = ({ onForgetPwd }) => {
 					name="username"
 					render={({ field }) => (
 						<FormItem className="w-90">
-							<FormLabel className="text-md">用户名</FormLabel>
+							<FormLabel className="text-md">{t('auth.username')}</FormLabel>
 							<FormControl>
-								<Input placeholder="请输入用户名" {...field} />
+								<Input
+									placeholder={t('auth.username.placeholder')}
+									{...field}
+								/>
 							</FormControl>
 							<FormMessage />
 						</FormItem>
@@ -130,9 +141,13 @@ const LoginForm: React.FC<IProps> = ({ onForgetPwd }) => {
 					name="password"
 					render={({ field }) => (
 						<FormItem>
-							<FormLabel className="text-md">密码</FormLabel>
+							<FormLabel className="text-md">{t('auth.password')}</FormLabel>
 							<FormControl>
-								<Input type="password" placeholder="请输入密码" {...field} />
+								<Input
+									type="password"
+									placeholder={t('auth.password.placeholder')}
+									{...field}
+								/>
 							</FormControl>
 							<FormMessage />
 						</FormItem>
@@ -143,10 +158,13 @@ const LoginForm: React.FC<IProps> = ({ onForgetPwd }) => {
 					name="captchaText"
 					render={({ field }) => (
 						<FormItem>
-							<FormLabel className="text-md">验证码</FormLabel>
+							<FormLabel className="text-md">{t('auth.captcha')}</FormLabel>
 							<FormControl>
 								<div className="flex items-center justify-between">
-									<Input placeholder="请输入验证码" {...field} />
+									<Input
+										placeholder={t('auth.captcha.placeholder')}
+										{...field}
+									/>
 									{captchaInfo.captcha && (
 										<div className="flex items-center justify-center relative ml-2 rounded-md hover:border-theme/30 hover:ring-theme/30 hover:ring-[3px] group">
 											<div
@@ -173,7 +191,7 @@ const LoginForm: React.FC<IProps> = ({ onForgetPwd }) => {
 					)}
 				/>
 				<Button type="submit" className="cursor-pointer w-full mt-5">
-					登录
+					{t('auth.login.submit')}
 				</Button>
 			</form>
 		</Form>

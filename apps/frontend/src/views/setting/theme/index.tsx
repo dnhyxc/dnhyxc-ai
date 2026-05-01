@@ -1,7 +1,7 @@
 import { Button } from '@ui/button';
 import { CircleCheckBig } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { THEMES, useTheme } from '@/hooks';
+import { THEMES, useI18n, useTheme } from '@/hooks';
 
 /** 展示用：中文说明 + 变量名 + 常用 Tailwind 类 */
 function StyleRow({
@@ -35,13 +35,16 @@ function StyleRow({
 
 const Theme = () => {
 	const { theme, changeTheme } = useTheme();
+	const { t } = useI18n();
 
 	const colorThemes = THEMES.filter((t) => t.type === 'color');
 
 	return (
 		<div className="box-border flex h-full min-h-0 w-full min-w-0 max-w-full flex-col overflow-x-hidden p-0.5">
 			<div className="mb-2 w-full min-w-0 max-w-full pb-5.5">
-				<div className="text-md mb-4.5 px-2 font-bold sm:px-4">彩色主题</div>
+				<div className="text-md mb-4.5 px-2 font-bold sm:px-4">
+					{t('setting.theme.colorTitle')}
+				</div>
 				<div className="flex flex-wrap justify-between gap-4 px-2 sm:px-4">
 					{colorThemes.map((t) => (
 						<Button
@@ -71,24 +74,26 @@ const Theme = () => {
 			</div>
 
 			<div className="mt-2 w-full min-w-0 max-w-full px-2 sm:px-4 pb-4.5">
-				<div className="text-md mb-4.5 font-bold">主题预览</div>
+				<div className="text-md mb-4.5 font-bold">
+					{t('setting.theme.previewTitle')}
+				</div>
 				<div className="box-border w-full min-w-0 max-w-full space-y-5 rounded-xl border border-theme-border bg-theme-card p-4 text-sm sm:p-6">
 					<StyleRow
-						title="当前卡片背景"
+						title={t('setting.theme.preview.cardBg.title')}
 						varName="--theme-card"
 						classHint="· bg-theme-card"
 					>
 						<p className="text-[11px] text-textcolor/55">
-							本预览区域容器使用 theme-card；切换上方主题即可看到变化。
+							{t('setting.theme.preview.cardBg.desc')}
 						</p>
 					</StyleRow>
 
 					<div className="wrap-break-word text-md font-bold text-textcolor">
-						选择彩色主题后，整个页面的背景色将跟随主题色变化
+						{t('setting.theme.preview.tip')}
 					</div>
 
 					<StyleRow
-						title="页面背景"
+						title={t('setting.theme.preview.pageBg.title')}
 						varName="--theme-background"
 						classHint="· bg-theme-background"
 					>
@@ -96,70 +101,69 @@ const Theme = () => {
 					</StyleRow>
 
 					<StyleRow
-						title="标题 / 前景字"
+						title={t('setting.theme.preview.foreground.title')}
 						varName="--theme-foreground"
 						classHint="· text-theme-foreground"
 					>
 						<p className="text-base font-semibold text-theme-foreground">
-							用于标题、强调段落的主要前景色
+							{t('setting.theme.preview.foreground.desc')}
 						</p>
 					</StyleRow>
 
 					<StyleRow
-						title="正文"
+						title={t('setting.theme.preview.text.title')}
 						varName="--theme-textcolor"
 						classHint="· text-textcolor"
 					>
 						<p className="leading-relaxed text-textcolor">
-							这是一段示例文本，展示在不同主题下的显示效果。页面的主要背景色、
-							卡片背景、文字颜色等都会随主题色变化。
+							{t('setting.theme.preview.text.desc')}
 						</p>
 					</StyleRow>
 
 					<StyleRow
-						title="次要说明字"
+						title={t('setting.theme.preview.mutedText.title')}
 						varName="—"
 						classHint="· text-textcolor/55（弱化层级）"
 					>
 						<p className="leading-relaxed text-textcolor/55">
-							辅助说明、时间戳、占位提示等次要信息。
+							{t('setting.theme.preview.mutedText.desc')}
 						</p>
 					</StyleRow>
 
 					<StyleRow
-						title="主题强调色"
+						title={t('setting.theme.preview.accent.title')}
 						varName="--theme-color"
 						classHint="· text-theme"
 					>
 						<p className="font-medium text-theme">
-							按钮、链接、焦点态等强调元素
+							{t('setting.theme.preview.accent.desc')}
 						</p>
 					</StyleRow>
 
 					<StyleRow
-						title="次要区域背景"
+						title={t('setting.theme.preview.mutedBg.title')}
 						varName="--theme-muted"
 						classHint="· bg-theme-muted"
 					>
 						<div className="rounded-lg bg-theme-muted p-4">
 							<p className="text-textcolor">
-								muted 背景上的正文仍使用 textcolor，层次靠底色区分。
+								{t('setting.theme.preview.mutedBg.desc')}
 							</p>
 						</div>
 					</StyleRow>
 
 					<StyleRow
-						title="次要填充"
+						title={t('setting.theme.preview.secondary.title')}
 						varName="--theme-secondary"
 						classHint="· bg-theme-secondary"
 					>
 						<div className="rounded-lg bg-theme-secondary px-4 py-2.5 text-textcolor">
-							侧栏条目、次级面板等使用的次要底色
+							{t('setting.theme.preview.secondary.desc')}
 						</div>
 					</StyleRow>
 
 					<StyleRow
-						title="文本选区"
+						title={t('setting.theme.preview.selection.title')}
 						varName="--theme-selection-bg / --theme-selection-fg"
 						classHint="· ::selection"
 					>
@@ -170,12 +174,12 @@ const Theme = () => {
 								color: 'var(--theme-selection-fg)',
 							}}
 						>
-							拖选文本时的背景与字色示意
+							{t('setting.theme.preview.selection.desc')}
 						</span>
 					</StyleRow>
 
 					<StyleRow
-						title="边框"
+						title={t('setting.theme.preview.border.title')}
 						varName="--theme-border"
 						classHint="· border-theme-border"
 					>
@@ -183,7 +187,7 @@ const Theme = () => {
 					</StyleRow>
 
 					<StyleRow
-						title="聚焦环"
+						title={t('setting.theme.preview.ring.title')}
 						varName="--theme-ring"
 						classHint="· ring / focus-visible"
 					>

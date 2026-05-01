@@ -16,13 +16,13 @@ export type KnowledgeAssistantPromptKind = 'polish' | 'summarize';
 export type KnowledgeAssistantPromptItem = {
 	kind: KnowledgeAssistantPromptKind;
 	icon: LucideIcon;
-	title: string;
-	description: string;
+	titleKey: string;
+	descriptionKey: string;
 };
 
 export type KnowledgeAssistantMode = {
 	id: 'ai' | 'rag';
-	label: string;
+	labelKey: string;
 	icon: LucideIcon;
 };
 
@@ -30,26 +30,26 @@ export const KNOWLEDGE_ASSISTANT_PROMPTS: KnowledgeAssistantPromptItem[] = [
 	{
 		kind: 'polish',
 		icon: Sparkle,
-		title: '润色文档内容',
-		description: '精修字句，提升质感',
+		titleKey: 'knowledge.assistant.prompts.polish.title',
+		descriptionKey: 'knowledge.assistant.prompts.polish.desc',
 	},
 	{
 		kind: 'summarize',
 		icon: Sparkles,
-		title: '总结文档内容',
-		description: '提炼要点，掌握核心',
+		titleKey: 'knowledge.assistant.prompts.summarize.title',
+		descriptionKey: 'knowledge.assistant.prompts.summarize.desc',
 	},
 ];
 
 export const KNOWLEDGE_ASSISTANT_MODES: KnowledgeAssistantMode[] = [
 	{
 		id: 'ai',
-		label: 'AI 助手',
+		labelKey: 'knowledge.assistant.modes.ai',
 		icon: Sparkles,
 	},
 	{
 		id: 'rag',
-		label: 'RAG 助手',
+		labelKey: 'knowledge.assistant.modes.rag',
 		icon: BookOpen,
 	},
 ];

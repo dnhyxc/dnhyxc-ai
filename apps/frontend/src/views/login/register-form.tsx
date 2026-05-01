@@ -12,7 +12,7 @@ import {
 	FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { useCountdown } from '@/hooks';
+import { useCountdown, useI18n } from '@/hooks';
 import { register, sendEmail } from '@/service';
 import { encrypt, formatTime, removeStorage } from '@/utils';
 
@@ -23,26 +23,32 @@ interface IProps {
 const RegisterForm: React.FC<IProps> = ({ onRegister }) => {
 	const [verifyCodeKey, setVerifyCodeKey] = useState('');
 	const { timeLeft, startTimer } = useCountdown();
+	const { t } = useI18n();
 
 	const formSchema = z.object({
 		username: z.string().min(2, {
-			message: '用户名至少输入两个字符',
+			message: t('auth.validation.usernameMin'),
 		}),
 		password: z
 			.string()
 			.trim()
-			.min(8, { message: '密码至少输入8个字符' })
+			.min(8, { message: t('auth.validation.passwordMin') })
 			.regex(
 				/^(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).+$/,
 				{
-					message: '密码必须包含英文、数字和特殊字符',
+					message: t('auth.validation.passwordComplex'),
 				},
 			),
 		email: z
 			.string()
 			.trim()
-			.regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, { message: '请输入合法的邮箱地址' }),
-		verifyCode: z.string().trim().min(6, { message: '验证码至少输入6个字符' }),
+			.regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, {
+				message: t('auth.validation.emailInvalid'),
+			}),
+		verifyCode: z
+			.string()
+			.trim()
+			.min(6, { message: t('auth.validation.verifyCodeMin') }),
 	});
 
 	const form = useForm<z.infer<typeof formSchema>>({
@@ -81,9 +87,13 @@ const RegisterForm: React.FC<IProps> = ({ onRegister }) => {
 					name="username"
 					render={({ field }) => (
 						<FormItem className="w-90">
-							<FormLabel className="text-md">用户名</FormLabel>
+							<FormLabel className="text-md">{t('auth.username')}</FormLabel>
 							<FormControl>
-								<Input placeholder="请输入用户名" {...field} className="" />
+								<Input
+									placeholder={t('auth.username.placeholder')}
+									{...field}
+									className=""
+								/>
 							</FormControl>
 							<FormMessage />
 						</FormItem>
@@ -94,9 +104,13 @@ const RegisterForm: React.FC<IProps> = ({ onRegister }) => {
 					name="password"
 					render={({ field }) => (
 						<FormItem>
-							<FormLabel className="text-md">密码</FormLabel>
+							<FormLabel className="text-md">{t('auth.password')}</FormLabel>
 							<FormControl>
-								<Input type="password" placeholder="请输入密码" {...field} />
+								<Input
+									type="password"
+									placeholder={t('auth.password.placeholder')}
+									{...field}
+								/>
 							</FormControl>
 							<FormMessage />
 						</FormItem>
@@ -107,9 +121,9 @@ const RegisterForm: React.FC<IProps> = ({ onRegister }) => {
 					name="email"
 					render={({ field }) => (
 						<FormItem>
-							<FormLabel className="text-md">邮箱</FormLabel>
+							<FormLabel className="text-md">{t('auth.email')}</FormLabel>
 							<FormControl>
-								<Input placeholder="请输入邮箱" {...field} />
+								<Input placeholder={t('auth.email.placeholder')} {...field} />
 							</FormControl>
 							<FormMessage />
 						</FormItem>
@@ -120,13 +134,13 @@ const RegisterForm: React.FC<IProps> = ({ onRegister }) => {
 					name="verifyCode"
 					render={({ field }) => (
 						<FormItem>
-							<FormLabel className="text-md">验证码</FormLabel>
+							<FormLabel className="text-md">{t('auth.verifyCode')}</FormLabel>
 							<FormControl>
 								<div className="flex items-center">
 									<Input
 										maxLength={6}
 										inputMode="numeric"
-										placeholder="请输入邮箱收到的验证码"
+										placeholder={t('auth.verifyCode.placeholder.email')}
 										{...field}
 										onChange={(e) => {
 											const value = e.target.value.replace(/\D/g, '');
@@ -143,7 +157,7 @@ const RegisterForm: React.FC<IProps> = ({ onRegister }) => {
 									>
 										{timeLeft > 0 && timeLeft < 60
 											? `${formatTime(timeLeft)}`
-											: '获取验证码'}
+											: t('auth.verifyCode.send')}
 									</Button>
 								</div>
 							</FormControl>
@@ -152,7 +166,7 @@ const RegisterForm: React.FC<IProps> = ({ onRegister }) => {
 					)}
 				/>
 				<Button type="submit" className="cursor-pointer w-full mt-5">
-					注册
+					{t('auth.register.submit')}
 				</Button>
 			</form>
 		</Form>

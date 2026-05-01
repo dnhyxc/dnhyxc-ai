@@ -10,7 +10,7 @@ import {
 	Share2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { Message } from '@/types/chat';
+import { ChatI18nT, Message } from '@/types/chat';
 
 /**
  * 消息操作组件的 Props 接口定义
@@ -43,6 +43,8 @@ interface MessageActionsProps {
 	deleteCheckedMessage?: (message: Message) => void;
 	/** 将助手回复写入知识库草稿（由 ChatBot 注入后跳转知识页） */
 	onSaveToKnowledge?: (message: Message) => void;
+	/** i18n 翻译函数（可选）；不传则沿用组件内默认中文文案 */
+	t?: ChatI18nT;
 }
 
 /**
@@ -74,6 +76,7 @@ export const MessageActions = ({
 	onSaveToKnowledge,
 	needShare = true,
 	needSave = true,
+	t,
 }: MessageActionsProps) => {
 	// 是否有多个兄弟节点（分支）
 	const hasSiblings = (message.siblingCount || 0) > 1;
@@ -218,7 +221,9 @@ export const MessageActions = ({
 						!isSharing && (
 							<div
 								className="cursor-pointer hover:text-textcolor"
-								title="保存到知识库"
+								title={
+									t?.('chat.messageActions.saveToKnowledge') ?? '保存到知识库'
+								}
 							>
 								<LayersPlus
 									size={16}
@@ -234,7 +239,7 @@ export const MessageActions = ({
 						onShare && (
 							<div
 								className="cursor-pointer hover:text-textcolor"
-								title="分享此回答"
+								title={t?.('chat.messageActions.shareAnswer') ?? '分享此回答'}
 							>
 								<Share2 size={16} onClick={() => onCheckShare(message)} />
 							</div>

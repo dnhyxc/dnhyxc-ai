@@ -3,6 +3,7 @@ import { Button, Spinner, Toast } from '@ui/index';
 import { CheckCircle, Copy } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router';
+import { useI18n } from '@/hooks';
 import {
 	appendShareThemeQuery,
 	THEMES,
@@ -12,6 +13,8 @@ import {
 import { createShare } from '@/service';
 import { ShareInfo } from '@/types';
 import { copyToClipboard, getValue } from '@/utils';
+
+export type ShareT = (key: string, params?: Record<string, unknown>) => string;
 
 interface ShareProps {
 	open: boolean;
@@ -28,6 +31,8 @@ interface ShareProps {
 	sessionType?: 'chat' | 'assistant';
 	/** 可选：不传则默认 session；knowledge 表示分享知识文章 */
 	shareType?: 'session' | 'knowledge';
+	/** i18n 翻译函数（可选）；不传则使用全局 i18n */
+	t?: ShareT;
 }
 
 const Share: React.FC<ShareProps> = ({
@@ -38,10 +43,14 @@ const Share: React.FC<ShareProps> = ({
 	sessionId,
 	sessionType,
 	shareType,
+	t,
 }) => {
 	const [shareInfo, setShareInfo] = useState<ShareInfo>();
 	const [copied, setCopied] = useState(false);
 	const [loading, setLoading] = useState(false);
+
+	const { t: i18nT } = useI18n();
+	const tt = t ?? i18nT;
 
 	const { theme } = useTheme();
 	const params = useParams();
@@ -136,14 +145,19 @@ const Share: React.FC<ShareProps> = ({
 	return (
 		<Model
 			open={open}
-			title={shareType === 'knowledge' ? '创建文章分享链接' : '创建分享链接'}
+			title={
+				shareType === 'knowledge'
+					? (tt('share.modal.title.knowledge') ?? '创建文章分享链接')
+					: (tt('share.modal.title.session') ?? '创建分享链接')
+			}
 			width="450px"
 			footer={null}
 			onOpenChange={onOpenChange}
 		>
 			<div className="flex flex-col gap-5 overflow-hidden">
 				<div className="pt-2 pb-3">
-					分享链接公开可见，任何人获取后均可查看。请在分享前仔细检查内容，确保不包含敏感信息或隐私数据。
+					{tt('share.modal.disclaimer') ??
+						'分享链接公开可见，任何人获取后均可查看。请在分享前仔细检查内容，确保不包含敏感信息或隐私数据。'}
 				</div>
 				{shareInfo?.shareUrl ? (
 					<div className="relative border border-theme/20 rounded-md flex items-center h-9.5">
@@ -159,12 +173,12 @@ const Share: React.FC<ShareProps> = ({
 								{copied ? (
 									<>
 										<CheckCircle className="w-4 h-4 mr-1" />
-										已复制
+										{tt('share.modal.copied') ?? '已复制'}
 									</>
 								) : (
 									<>
 										<Copy className="w-4 h-4 mr-1" />
-										复制
+										{tt('share.modal.copy') ?? '复制'}
 									</>
 								)}
 							</Button>
@@ -179,7 +193,7 @@ const Share: React.FC<ShareProps> = ({
 							onClick={onCreateShare}
 						>
 							{loading ? <Spinner className="text-textcolor" /> : null}
-							创建并复制链接
+							{tt('share.modal.createAndCopy') ?? '创建并复制链接'}
 						</Button>
 					</div>
 				)}

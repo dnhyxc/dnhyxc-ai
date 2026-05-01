@@ -12,6 +12,7 @@ import {
 } from '@ui/index';
 import { PackagePlus, RotateCw } from 'lucide-react';
 import type { RefObject } from 'react';
+import { useI18n } from '@/hooks';
 import { TEMPLATES } from './template';
 
 interface ToolbarProps {
@@ -33,6 +34,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
 	setTemplate,
 }) => {
 	const { dispatch, sandpack } = useSandpack();
+	const { t } = useI18n();
 
 	const handleRun = () => {
 		dispatch({ type: 'refresh' });
@@ -49,7 +51,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
 					<DropdownMenuTrigger asChild>
 						<Button variant="link" className="px-0 has-[>svg]:px-0">
 							<PackagePlus />
-							<span>选择模版</span>
+							<span>{t('coding.toolbar.selectTemplate')}</span>
 						</Button>
 					</DropdownMenuTrigger>
 					<DropdownMenuContent
@@ -79,7 +81,9 @@ const Toolbar: React.FC<ToolbarProps> = ({
 						onClick={onTogglePreview}
 						className="text-textcolor hover:bg-theme/10 hover:text-theme"
 					>
-						{isPreviewVisible ? '👁️ 隐藏预览' : '👁️‍🗨️ 显示预览'}
+						{isPreviewVisible
+							? t('coding.toolbar.preview.hide')
+							: t('coding.toolbar.preview.show')}
 					</Button>
 				)}
 
@@ -89,7 +93,9 @@ const Toolbar: React.FC<ToolbarProps> = ({
 						onClick={onToggleConsole}
 						className="text-textcolor hover:bg-theme/10 hover:text-theme"
 					>
-						{isConsoleVisible ? '👁️ 隐藏日志' : '👁️‍🗨️ 显示日志'}
+						{isConsoleVisible
+							? t('coding.toolbar.console.hide')
+							: t('coding.toolbar.console.show')}
 					</Button>
 				)}
 
@@ -100,11 +106,11 @@ const Toolbar: React.FC<ToolbarProps> = ({
 					className="ml-2 px-0 has-[>svg]:px-0 disabled:hover:text-textcolor/50"
 				>
 					<RotateCw />
-					<span>强制刷新</span>
+					<span>{t('coding.toolbar.forceRefresh')}</span>
 				</Button>
 			</div>
 			<div className="font-medium text-sm text-textcolor h-full flex items-center">
-				<span>当前语言：</span>
+				<span>{t('coding.toolbar.currentTemplate')}：</span>
 				<span className="text-lg text-theme">{template}</span>
 			</div>
 		</div>

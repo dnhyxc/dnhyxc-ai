@@ -1,7 +1,7 @@
-import { Settings, Shirt } from 'lucide-react';
+import { Languages, Settings, Shirt } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
-import { useStorageInfo } from '@/hooks';
+import { useI18n, useStorageInfo } from '@/hooks';
 import routes, { type RouteConfig } from '@/router/routes';
 import { checkVersion, getValue, removeStorage, setStorage } from '@/utils';
 
@@ -14,6 +14,7 @@ const Header: React.FC<Iprops> = ({ actions = true, ccustomActions }) => {
 	const [autoUpdate, setAutoUpdate] = useState(false);
 
 	const { storageInfo } = useStorageInfo('autoUpdate');
+	const { t, toggleLocale } = useI18n();
 
 	useEffect(() => {
 		checkUpdate();
@@ -49,7 +50,7 @@ const Header: React.FC<Iprops> = ({ actions = true, ccustomActions }) => {
 		): string | undefined => {
 			for (const route of routes) {
 				if (route.path === pathname) {
-					return route.meta?.title;
+					return route.meta?.titleKey || route.meta?.title;
 				}
 				if (route.children) {
 					const childTitle = findRouteTitle(route.children, pathname);
@@ -79,7 +80,7 @@ const Header: React.FC<Iprops> = ({ actions = true, ccustomActions }) => {
 					data-tauri-drag-region
 					className="text-xl font-bold font-['手札体-简'] cursor-default text-theme"
 				>
-					{title || '智能对话'}
+					{title ? t(title) : t('common.appTitle')}
 				</div>
 				{actions ? (
 					<div
@@ -88,6 +89,13 @@ const Header: React.FC<Iprops> = ({ actions = true, ccustomActions }) => {
 					>
 						{
 							<div className="flex items-center h-full">
+								<div
+									title={t('header.toggleLanguage')}
+									className="lucide-stroke-draw-hover h-full w-8 flex cursor-pointer items-center justify-center hover:text-teal-500 [&_svg]:overflow-visible"
+									onClick={() => void toggleLocale()}
+								>
+									<Languages className="w-5 h-4.5" />
+								</div>
 								<div
 									className="lucide-stroke-draw-hover h-full w-8 flex cursor-pointer items-center justify-center hover:text-teal-500 [&_svg]:overflow-visible"
 									onClick={() => navigate('/setting/theme')}

@@ -39,6 +39,11 @@ export interface SearchOrganic {
 	type: 'searchOrganic';
 }
 
+export type ChatI18nT = (
+	key: string,
+	params?: Record<string, unknown>,
+) => string;
+
 export interface Message {
 	chatId: string;
 	content: string;
@@ -169,6 +174,8 @@ export interface ChatBotViewProps {
 	className?: string;
 	showAvatar?: boolean;
 	onBranchChange?: (msgId: string, direction: 'prev' | 'next') => void;
+	/** i18n 翻译函数（可选）；不传则由子组件使用默认中文文案（或自身 useI18n） */
+	t?: ChatI18nT;
 
 	/**
 	 * 完整消息树（含多分支）；兄弟切换、buildMessageList 均依赖此数据。空会话传 `[]`。

@@ -15,6 +15,7 @@ import type {
 import { type RefObject, useMemo } from 'react';
 import { useMermaidImagePreview } from '@/hooks/useMermaidImagePreview';
 import { cn } from '@/lib/utils';
+import { ChatI18nT } from '@/types/chat';
 import {
 	hashText,
 	mermaidStreamingFallbackHtml,
@@ -30,6 +31,8 @@ export type StreamingMarkdownBodyProps = {
 	/** 每块 Mermaid 的默认展示模式（不传则默认图）；每块仍可独立切换 */
 	defaultMermaidViewMode?: 'diagram' | 'code';
 	containerRef?: RefObject<HTMLDivElement | null>;
+	/** i18n 翻译函数（可选）；不传则沿用 MermaidFenceToolbarActions 的默认中文文案 */
+	t?: ChatI18nT;
 };
 
 export function StreamingMarkdownBody({
@@ -40,6 +43,7 @@ export function StreamingMarkdownBody({
 	isStreaming,
 	defaultMermaidViewMode = 'diagram',
 	containerRef,
+	t,
 }: StreamingMarkdownBodyProps) {
 	const { parts, openMermaidId } = useMemo(
 		() =>
@@ -72,6 +76,7 @@ export function StreamingMarkdownBody({
 				mermaidCode={part.text}
 				openMermaidPreview={openMermaidPreview}
 				defaultViewMode={defaultMermaidViewMode}
+				t={t}
 			>
 				{(mode) =>
 					mode === 'code' ? (

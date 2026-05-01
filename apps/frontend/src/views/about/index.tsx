@@ -1,10 +1,11 @@
 import { Button } from '@ui/button';
 import { useEffect } from 'react';
-import { type ThemeName, useGetVersion, useTheme } from '@/hooks';
+import { type ThemeName, useGetVersion, useI18n, useTheme } from '@/hooks';
 import { onListen, openExternalUrl } from '@/utils';
 
 const About = () => {
 	const { version } = useGetVersion();
+	const { t } = useI18n();
 
 	const { changeTheme } = useTheme();
 
@@ -24,11 +25,11 @@ const About = () => {
 
 	return (
 		<div className="flex flex-col justify-center items-center w-full h-full">
-			<div className="mb-10">dnhyxc-ai 版本 {version}</div>
+			<div className="mb-10">{t('about.appVersion', { version })}</div>
 			<div className="flex flex-col justify-center items-center">
-				<div className="mb-2.5">dnhyxc 版权所有</div>
-				<div className="mb-2">Copyright © 2025 - 2026 Dnhyxc</div>
-				<div className="mb-2">All Rights Reserved</div>
+				<div className="mb-2.5">{t('about.copyright')}</div>
+				<div className="mb-2">{t('about.copyrightYears')}</div>
+				<div className="mb-2">{t('about.rightsReserved')}</div>
 				<div className="flex justify-center">
 					<Button
 						variant="link"
@@ -39,14 +40,14 @@ const About = () => {
 						}
 						className="mr-6 text-blue-500 hover:text-blue-400 text-md bg-transparent border-none cursor-pointer p-0"
 					>
-						服务政策
+						{t('about.links.policy')}
 					</Button>
 					<Button
 						variant="link"
 						onClick={() => handleOpenLink('https://dnhyxc.cn')}
 						className="text-blue-500 hover:text-blue-400 text-md bg-transparent border-none cursor-pointer p-0"
 					>
-						用户服务协议
+						{t('about.links.terms')}
 					</Button>
 				</div>
 			</div>

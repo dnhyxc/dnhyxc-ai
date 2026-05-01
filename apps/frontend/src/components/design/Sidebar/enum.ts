@@ -1,11 +1,11 @@
 export const MENUS = [
 	{
-		name: '首页',
+		nameKey: 'nav.home',
 		icon: 'House',
 		path: '/',
 	},
 	{
-		name: '知识库',
+		nameKey: 'nav.knowledge',
 		icon: 'BookOpenText',
 		path: '/knowledge',
 	},
@@ -30,7 +30,7 @@ export const MENUS = [
 	// 	path: '/profile',
 	// },
 	{
-		name: '会员充值',
+		nameKey: 'nav.pay',
 		icon: 'CreditCard',
 		path: '/pay',
 	},

@@ -6,6 +6,7 @@ import { Button, ScrollArea, Switch, Toast } from '@ui/index';
 import { Code2, Trash2 } from 'lucide-react';
 import { observer } from 'mobx-react';
 import { useCallback, useEffect, useState } from 'react';
+import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import { deleteKnowledge } from '@/service';
 import useStore from '@/store';
@@ -62,6 +63,7 @@ interface KnowledgeListRowProps {
 }
 
 const KnowledgeListRow = (props: KnowledgeListRowProps) => {
+	const { t } = useI18n();
 	const {
 		item,
 		selected,
@@ -89,16 +91,16 @@ const KnowledgeListRow = (props: KnowledgeListRowProps) => {
 		>
 			<div className="flex items-start justify-between gap-2 min-w-0 w-full">
 				<div className="flow-root flex-1 min-w-0 max-w-full font-medium wrap-anywhere">
-					{item.title?.trim() || '未命名'}
+					{item.title?.trim() || t('knowledge.common.untitled')}
 				</div>
 				<div className="relative flex shrink-0 items-start gap-1">
 					{showOpenInExternalEditor &&
 					item.localAbsolutePath &&
 					onOpenInExternalEditorClick ? (
-						<Tooltip side="left" content="在 Cursor 或 Trae 中打开">
+						<Tooltip side="left" content={t('knowledge.list.openInEditor')}>
 							<button
 								type="button"
-								aria-label="在 Cursor 或 Trae 中打开"
+								aria-label={t('knowledge.list.openInEditor')}
 								className={cn(
 									'cursor-pointer shrink-0 p-1 rounded-md text-textcolor/80 transition-opacity duration-150',
 									'opacity-0 pointer-events-none',
@@ -117,7 +119,9 @@ const KnowledgeListRow = (props: KnowledgeListRowProps) => {
 					<button
 						type="button"
 						aria-label={
-							item.localAbsolutePath ? '删除本地 Markdown 文件' : '从知识库删除'
+							item.localAbsolutePath
+								? t('knowledge.list.deleteLocalMdAria')
+								: t('knowledge.list.deleteFromLibraryAria')
 						}
 						className={cn(
 							'absolute right-0 top-0 cursor-pointer items-center justify-center h-7 w-7 rounded-md text-textcolor/80 transition-opacity duration-150',
@@ -132,7 +136,9 @@ const KnowledgeListRow = (props: KnowledgeListRowProps) => {
 				</div>
 			</div>
 			<div className="text-xs text-textcolor/50 space-y-0.5">
-				更新 {formatDate(item.updatedAt?.toString() ?? '')}
+				{t('knowledge.list.updatedAt', {
+					time: formatDate(item.updatedAt?.toString() ?? ''),
+				})}
 			</div>
 		</div>
 	);
@@ -150,6 +156,7 @@ const KnowledgeList: React.FC<IProps> = observer(
 		allowCloudList = true,
 	}) => {
 		const { knowledgeStore, userStore } = useStore();
+		const { t } = useI18n();
 
 		const [deleteLocalOpen, setDeleteLocalOpen] = useState(false);
 		const [deleteLocalPath, setDeleteLocalPath] = useState('');
@@ -186,14 +193,14 @@ const KnowledgeList: React.FC<IProps> = observer(
 			} catch (e) {
 				Toast({
 					type: 'error',
-					title: '加载本地列表失败',
+					title: t('knowledge.list.localLoadFailed'),
 					message: formatTauriInvokeError(e),
 				});
 				setLocalList([]);
 			} finally {
 				setLocalLoading(false);
 			}
-		}, [localFolderPath]);
+		}, [localFolderPath, t]);
 
 		// 未登录：固定使用本地文件夹模式，避免请求云端列表
 		useEffect(() => {
@@ -220,10 +227,10 @@ const KnowledgeList: React.FC<IProps> = observer(
 				setLocalFolderPath(dir);
 			} catch (e) {
 				const msg = formatTauriInvokeError(e);
-				if (msg === '未选择目录') return;
+				if (msg === t('knowledge.list.dirNotSelected')) return;
 				Toast({ type: 'error', title: msg });
 			}
-		}, []);
+		}, [t]);
 
 		const handleRowClick = useCallback(
 			async (item: KnowledgeListItem) => {
@@ -247,7 +254,7 @@ const KnowledgeList: React.FC<IProps> = observer(
 					} catch (e) {
 						Toast({
 							type: 'error',
-							title: '读取失败',
+							title: t('knowledge.list.readFailed'),
 							message: formatTauriInvokeError(e),
 						});
 					}
@@ -256,8 +263,8 @@ const KnowledgeList: React.FC<IProps> = observer(
 				if (!userStore.userInfo.id) {
 					Toast({
 						type: 'warning',
-						title: '请先登录',
-						message: '登录后可从云端知识库打开条目',
+						title: t('auth.loginRequired'),
+						message: t('knowledge.list.cloudOpenLoginTip'),
 					});
 					return;
 				}
@@ -265,15 +272,15 @@ const KnowledgeList: React.FC<IProps> = observer(
 				if (!detail) {
 					Toast({
 						type: 'error',
-						title: '加载失败',
-						message: '无法获取该条详情',
+						title: t('common.loadFailed'),
+						message: t('knowledge.list.detailMissing'),
 					});
 					return;
 				}
 				await onPick?.(detail);
 				onOpenChange(false);
 			},
-			[knowledgeStore, userStore.userInfo.id, onPick, onOpenChange],
+			[knowledgeStore, userStore.userInfo.id, onPick, onOpenChange, t],
 		);
 
 		const handleDeleteApi = useCallback(
@@ -281,8 +288,8 @@ const KnowledgeList: React.FC<IProps> = observer(
 				if (!userStore.userInfo.id) {
 					Toast({
 						type: 'warning',
-						title: '请先登录',
-						message: '未登录时无法删除云端知识库记录',
+						title: t('auth.loginRequired'),
+						message: t('knowledge.list.cloudDeleteLoginTip'),
 					});
 					return false;
 				}
@@ -290,8 +297,8 @@ const KnowledgeList: React.FC<IProps> = observer(
 				if (!res.success) {
 					Toast({
 						type: 'error',
-						title: '删除失败',
-						message: res.message || '请稍后重试',
+						title: t('common.deleteFailed'),
+						message: res.message || t('common.tryLater'),
 					});
 					return false;
 				}
@@ -299,7 +306,7 @@ const KnowledgeList: React.FC<IProps> = observer(
 				onDeletedRecord?.(item.id);
 				return true;
 			},
-			[knowledgeStore, userStore.userInfo.id, onDeletedRecord],
+			[knowledgeStore, userStore.userInfo.id, onDeletedRecord, t],
 		);
 
 		/**
@@ -357,7 +364,7 @@ const KnowledgeList: React.FC<IProps> = observer(
 				if (result.success === 'success') {
 					Toast({
 						type: 'success',
-						title: '文件已删除',
+						title: t('knowledge.list.fileDeleted'),
 						message: result.filePath ? `${result.filePath}` : undefined,
 					});
 					closeDeleteLocalDialog();
@@ -366,7 +373,7 @@ const KnowledgeList: React.FC<IProps> = observer(
 				} else {
 					Toast({
 						type: 'error',
-						title: '删除失败',
+						title: t('common.deleteFailed'),
 						message: result.message,
 					});
 				}
@@ -395,7 +402,7 @@ const KnowledgeList: React.FC<IProps> = observer(
 				if (result.success === 'success') {
 					Toast({
 						type: 'success',
-						title: '本地文件已删除',
+						title: t('knowledge.list.localFileDeleted'),
 						message: result.filePath ? `${result.filePath}` : undefined,
 					});
 					closeDeleteLocalDialog();
@@ -403,7 +410,7 @@ const KnowledgeList: React.FC<IProps> = observer(
 				} else {
 					Toast({
 						type: 'error',
-						title: '删除失败',
+						title: t('common.deleteFailed'),
 						message: result.message,
 					});
 				}
@@ -435,7 +442,7 @@ const KnowledgeList: React.FC<IProps> = observer(
 				if (result.success === 'success') {
 					Toast({
 						type: 'success',
-						title: '已同时删除',
+						title: t('knowledge.list.deletedBoth'),
 						message: result.filePath ? `${result.filePath}` : undefined,
 					});
 					closeDeleteLocalDialog();
@@ -443,7 +450,7 @@ const KnowledgeList: React.FC<IProps> = observer(
 				} else {
 					Toast({
 						type: 'error',
-						title: '本地文件删除失败',
+						title: t('knowledge.list.localFileDeleteFailed'),
 						message: result.message,
 					});
 				}
@@ -487,19 +494,21 @@ const KnowledgeList: React.FC<IProps> = observer(
 					const { openedWith } = await invokeOpenKnowledgeMarkdownInEditor(p);
 					Toast({
 						type: 'success',
-						title: '已在外部编辑器打开',
-						message: `使用 ${openedWith} 打开文件`,
+						title: t('knowledge.list.openedInExternalEditor'),
+						message: t('knowledge.list.openedWithEditor', {
+							editor: openedWith,
+						}),
 						duration: 2000,
 					});
 				} catch (err) {
 					Toast({
 						type: 'error',
-						title: '打开失败',
+						title: t('knowledge.list.openFailed'),
 						message: formatTauriInvokeError(err),
 					});
 				}
 			},
-			[],
+			[t],
 		);
 
 		const deleteLocalFileName =
@@ -515,7 +524,8 @@ const KnowledgeList: React.FC<IProps> = observer(
 			displayList.length === 0 &&
 			(!useLocalFolder ? !loadingMore : true);
 
-		const deleteRecordTitle = selectKnowledge?.title?.trim() || '未命名';
+		const deleteRecordTitle =
+			selectKnowledge?.title?.trim() || t('knowledge.common.untitled');
 
 		return (
 			<>
@@ -525,19 +535,22 @@ const KnowledgeList: React.FC<IProps> = observer(
 						setDeleteRecordOnlyOpen(v);
 						if (!v) setSelectKnowledge(null);
 					}}
-					title="删除知识库记录？"
+					title={t('knowledge.list.deleteRecordTitle')}
 					description={
 						<>
 							{isTauriRuntime()
-								? '本地目录未找到对应文件，是否仅从数据库删除该条目？'
-								: '是否从数据库删除该条目？'}
+								? t('knowledge.list.deleteRecordDesc.tauri')
+								: t('knowledge.list.deleteRecordDesc.web')}
 							<div className="mt-2 font-medium text-base wrap-anywhere">
-								文件名称：「{deleteRecordTitle}」
+								{t('knowledge.list.fileNameLabel', {
+									name: deleteRecordTitle,
+								})}
 							</div>
 						</>
 					}
+					cancelText={t('common.cancel')}
 					descriptionClassName="text-left"
-					confirmText="删除"
+					confirmText={t('common.delete')}
 					confirmVariant="destructive"
 					closeOnConfirm={false}
 					onConfirm={onConfirmDeleteRecordOnly}
@@ -553,12 +566,12 @@ const KnowledgeList: React.FC<IProps> = observer(
 							setSelectKnowledge(null);
 						}
 					}}
-					title="删除文件？"
+					title={t('knowledge.list.deleteFileTitle')}
 					description={
 						<>
 							{localFileDeleteOnly
-								? '将仅从磁盘删除该文件，不涉及云端知识库数据。'
-								: '已关联云端知识库条目与本地 Markdown。可选择仅删本地、仅删在线，或使用「同时删除」移除两侧数据。'}
+								? t('knowledge.list.deleteFileDesc.localOnly')
+								: t('knowledge.list.deleteFileDesc.linked')}
 							<div className="mt-2 font-medium text-base wrap-anywhere">
 								「{deleteLocalFileName}」
 							</div>
@@ -568,9 +581,14 @@ const KnowledgeList: React.FC<IProps> = observer(
 						</>
 					}
 					descriptionClassName="text-left"
-					confirmText={localFileDeleteOnly ? '删除' : '同时删除'}
+					confirmText={
+						localFileDeleteOnly
+							? t('common.delete')
+							: t('knowledge.list.deleteBoth')
+					}
 					confirmVariant="destructive"
 					closeOnConfirm={false}
+					cancelText={t('common.cancel')}
 					onConfirm={
 						localFileDeleteOnly
 							? onConfirmDeleteLocalFolderFile
@@ -579,19 +597,25 @@ const KnowledgeList: React.FC<IProps> = observer(
 					{...(localFileDeleteOnly
 						? {}
 						: {
-								secondaryActionText: '本地删除',
+								secondaryActionText: t('knowledge.list.deleteLocal'),
 								onSecondaryAction: onSecondaryDeleteLocalOnly,
-								tertiaryActionText: '在线删除',
+								tertiaryActionText: t('knowledge.list.deleteOnline'),
 								tertiaryVariant: 'destructive' as const,
 								onTertiaryAction: onTertiaryDeleteOnlineOnly,
 							})}
 				/>
 
-				<Drawer title="知识库" open={open} onOpenChange={onOpenChange}>
+				<Drawer
+					title={t('route.knowledge.title')}
+					open={open}
+					onOpenChange={onOpenChange}
+				>
 					<div className="flex h-full min-h-0 flex-col">
 						<div className="flex shrink-0 flex-col gap-0.5 pr-4 pl-2.5 pb-0.5">
 							<div className="flex flex-wrap items-center justify-between gap-2">
-								<span className="text-sm text-textcolor/80">数据来源</span>
+								<span className="text-sm text-textcolor/80">
+									{t('knowledge.list.dataSource')}
+								</span>
 								<div className="flex items-center gap-2">
 									<span
 										className={cn(
@@ -601,7 +625,7 @@ const KnowledgeList: React.FC<IProps> = observer(
 												'font-medium text-textcolor',
 										)}
 									>
-										数据库
+										{t('knowledge.list.source.db')}
 									</span>
 									<Switch
 										id="knowledge-drawer-local-source"
@@ -619,7 +643,7 @@ const KnowledgeList: React.FC<IProps> = observer(
 											useLocalFolder && 'font-medium text-textcolor',
 										)}
 									>
-										本地文件夹
+										{t('knowledge.list.source.local')}
 									</span>
 								</div>
 							</div>
@@ -632,7 +656,7 @@ const KnowledgeList: React.FC<IProps> = observer(
 											className="shrink-0 p-0 text-teal-400"
 											onClick={() => void pickLocalFolder()}
 										>
-											选择文件夹
+											{t('knowledge.list.pickFolder')}
 										</Button>
 										<Tooltip side="bottom" content={localFolderPath}>
 											<span className="min-w-0 flex-1 truncate text-xs text-textcolor/50">
@@ -644,7 +668,7 @@ const KnowledgeList: React.FC<IProps> = observer(
 							) : null}
 							{!isTauriRuntime() ? (
 								<div className="text-xs text-textcolor/50">
-									本地文件夹列表仅在桌面端（Tauri）可用。
+									{t('knowledge.list.localOnlyInDesktop')}
 								</div>
 							) : null}
 							<div
@@ -654,10 +678,10 @@ const KnowledgeList: React.FC<IProps> = observer(
 								)}
 							>
 								{!allowCloudList
-									? '未登录：仅可使用本地文件夹（不请求云端）'
+									? t('knowledge.list.cloudDisabledWhenLoggedOut')
 									: useLocalFolder
-										? '该列表的数据操作仅支持本地文件夹'
-										: '该列表的数据操作支持本地与数据库同步'}
+										? t('knowledge.list.localOpsOnly')
+										: t('knowledge.list.localAndDbSync')}
 							</div>
 						</div>
 						<ScrollArea
@@ -669,7 +693,7 @@ const KnowledgeList: React.FC<IProps> = observer(
 							<div className="flex min-h-0 w-full flex-1 flex-col gap-2">
 								{showInitialPlaceholder ? (
 									<div className="flex flex-1 flex-col items-center justify-center py-6 text-center text-sm text-textcolor/60">
-										<Loading text="加载中…" />
+										<Loading text={t('common.loading')} />
 									</div>
 								) : null}
 								{displayList.map((knowledge) => (
@@ -690,14 +714,14 @@ const KnowledgeList: React.FC<IProps> = observer(
 								))}
 								{showLoadMoreHint ? (
 									<div className="text-xs text-textcolor/50 py-2 text-center">
-										加载更多…
+										{t('common.loadingMore')}
 									</div>
 								) : null}
 								{showEmptyHint ? (
 									<div className="text-sm text-textcolor/60 py-8 text-center">
 										{useLocalFolder
-											? '该文件夹下暂无 .md 文件'
-											: '暂无知识库条目'}
+											? t('knowledge.list.empty.local')
+											: t('knowledge.list.empty.cloud')}
 									</div>
 								) : null}
 							</div>

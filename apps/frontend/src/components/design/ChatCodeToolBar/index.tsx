@@ -6,6 +6,7 @@ import { CheckCircle, Copy, Download } from 'lucide-react';
 import { useCallback, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui';
+import { ChatI18nT } from '@/types/chat';
 import {
 	downloadChatCodeBlock,
 	getChatCodeFloatingToolbarSnapshot,
@@ -16,7 +17,8 @@ import {
 /**
  * 将当前「吸顶」代码块工具栏渲染到 body，避免 ScrollArea 子树内 fixed 参照错误。
  */
-export default function ChatCodeToolbarFloating() {
+export default function ChatCodeToolbarFloating(props: { t?: ChatI18nT }) {
+	const { t } = props;
 	const state = useSyncExternalStore(
 		subscribeChatCodeFloatingToolbar,
 		getChatCodeFloatingToolbarSnapshot,
@@ -63,7 +65,7 @@ export default function ChatCodeToolbarFloating() {
 				fontFamily: 'var(--font-family)',
 			}}
 			role="toolbar"
-			aria-label="代码块工具栏"
+			aria-label={t?.('chat.codeToolbar.aria') ?? '代码块工具栏'}
 		>
 			<span className="text-sm text-textcolor/80">{state.lang}</span>
 			<div className="flex items-center h-8">
@@ -78,7 +80,9 @@ export default function ChatCodeToolbarFloating() {
 						<Copy size={16} />
 					)}
 					<span className={copied ? 'text-teal-500' : ''}>
-						{copied ? '已复制' : '复制'}
+						{copied
+							? (t?.('chat.codeToolbar.copied') ?? '已复制')
+							: (t?.('chat.codeToolbar.copy') ?? '复制')}
 					</span>
 				</Button>
 				<Button
@@ -87,7 +91,7 @@ export default function ChatCodeToolbarFloating() {
 					onClick={onDownload}
 				>
 					<Download size={16} />
-					<span>下载</span>
+					<span>{t?.('chat.codeToolbar.download') ?? '下载'}</span>
 				</Button>
 			</div>
 		</div>

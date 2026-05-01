@@ -6,7 +6,7 @@ import ChatAssistantMessage from '@/components/design/ChatAssistantMessage';
 import ChatFileList from '@/components/design/ChatFileList';
 import ChatMessageActions from '@/components/design/ChatMessageActions';
 import MarkdownPreview from '@/components/design/Markdown';
-import { useTheme } from '@/hooks';
+import { useI18n, useTheme } from '@/hooks';
 import { findLatestBranchSelection } from '@/hooks/useBranchManage';
 import {
 	ChatCodeFloatingToolbar,
@@ -62,6 +62,7 @@ function pickMessagesInShareIdsOrder(
 
 const SessionShare = () => {
 	const [isCopyedId, setIsCopyedId] = useState('');
+	const { t } = useI18n();
 
 	const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const scrollViewportRef = useRef<HTMLDivElement>(null);
@@ -251,13 +252,15 @@ const SessionShare = () => {
 			<ChatCodeFloatingToolbar />
 			<div className="flex items-center justify-between px-4 h-12.5 border border-b-theme/20">
 				<div className="text-base font-bold">
-					{knowledgeData ? '分享文章内容' : '分享对话内容'}
+					{knowledgeData
+						? t('share.header.knowledgeTitle')
+						: t('share.header.chatTitle')}
 				</div>
 				<div className="flex items-center gap-1 text-sm text-textcolor/80">
 					<CircleAlert size={17} className="text-textcolor/65" />
 					{knowledgeData
-						? '该文章来自分享，请仔细甄别'
-						: '该对话来自分享，由 AI 生成，请仔细甄别'}
+						? t('share.header.knowledgeDisclaimer')
+						: t('share.header.chatDisclaimer')}
 				</div>
 			</div>
 
@@ -273,10 +276,12 @@ const SessionShare = () => {
 						className="max-w-208 mx-auto w-full mt-2.5 relative flex flex-col select-none px-4"
 					>
 						<div className="text-lg font-bold text-textcolor mb-2">
-							{knowledgeData.title?.trim() || '未命名'}
+							{knowledgeData.title?.trim() || t('knowledge.common.untitled')}
 						</div>
 						<div className="text-xs text-textcolor/50 mb-3">
-							更新 {new Date(knowledgeData.updatedAt).toLocaleString()}
+							{t('share.knowledge.updatedAt', {
+								time: new Date(knowledgeData.updatedAt).toLocaleString(),
+							})}
 						</div>
 						<div className="bg-theme/5 border border-theme/10 rounded-md p-3 mb-4">
 							<MarkdownPreview
@@ -356,8 +361,14 @@ const SessionShare = () => {
 
 			{canScroll ? (
 				<Button
-					title={atBottom ? '回到顶部' : '滚动到底部'}
-					aria-label={atBottom ? '滚动到顶部' : '滚动到底部'}
+					title={
+						atBottom ? t('share.scroll.toTop') : t('share.scroll.toBottom')
+					}
+					aria-label={
+						atBottom
+							? t('share.scroll.ariaToTop')
+							: t('share.scroll.ariaToBottom')
+					}
 					onClick={onScrollFabClick}
 					className={cn(
 						'fixed bottom-5.5 right-5 z-50 flex size-10 items-center justify-center rounded-full',

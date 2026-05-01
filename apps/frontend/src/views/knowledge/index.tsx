@@ -7,7 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import MarkdownEditor from '@/components/design/Monaco';
 import Share from '@/components/design/Share';
 import { Input } from '@/components/ui';
-import { useTheme } from '@/hooks';
+import { useI18n, useTheme } from '@/hooks';
 import type { ShortcutSource } from '@/hooks/useMarkdownBottomBarShortcuts';
 import { saveKnowledge } from '@/service';
 import useStore from '@/store';
@@ -62,6 +62,7 @@ function isMonacoInEventPath(e: KeyboardEvent): boolean {
 /** 知识编辑页：正文与标题等草稿存于 knowledgeStore，聊天助手条「保存到知识库」会写入同一份草稿并跳转至此 */
 const Knowledge = observer(() => {
 	const { knowledgeStore, userStore } = useStore();
+	const { t } = useI18n();
 	const { theme } = useTheme();
 	const [assistantInput, setAssistantInput] = useState('');
 
@@ -352,18 +353,22 @@ const Knowledge = observer(() => {
 			if (result.success === 'success') {
 				Toast({
 					type: 'success',
-					title: '文件已保存',
+					title: t('knowledge.save.fileSaved'),
 					message: result.filePath
-						? `已保存到：${result.filePath}`
-						: '已保存到默认目录',
+						? t('knowledge.save.savedToPath', { path: result.filePath })
+						: t('knowledge.save.savedToDefaultDir'),
 					duration: 1000,
 				});
 			} else {
-				Toast({ type: 'error', title: '保存失败', message: result.message });
+				Toast({
+					type: 'error',
+					title: t('knowledge.save.failed'),
+					message: result.message,
+				});
 			}
 			return result;
 		},
-		[],
+		[t],
 	);
 
 	/**
@@ -392,8 +397,8 @@ const Knowledge = observer(() => {
 			if (!row) {
 				Toast({
 					type: 'error',
-					title: '保存失败',
-					message: '更新知识失败，请稍后重试',
+					title: t('knowledge.save.failed'),
+					message: t('knowledge.save.updateFailedTryLater'),
 				});
 				throw new Error('updateKnowledge failed');
 			}
@@ -469,8 +474,8 @@ const Knowledge = observer(() => {
 			if (!res.success || !res.data?.id) {
 				Toast({
 					type: 'error',
-					title: '保存失败',
-					message: res.message || '新建知识失败，请稍后重试',
+					title: t('knowledge.save.failed'),
+					message: res.message || t('knowledge.save.createFailedTryLater'),
 				});
 				throw new Error('saveKnowledge save-as failed');
 			}
@@ -528,13 +533,19 @@ const Knowledge = observer(() => {
 			const trimmedTitle = knowledgeStore.knowledgeTitle.trim();
 			if (!trimmedTitle) {
 				if (mode === 'normal') {
-					Toast({ type: 'warning', title: '请先输入文件名「标题」' });
+					Toast({
+						type: 'warning',
+						title: t('knowledge.validation.titleRequired'),
+					});
 				}
 				return;
 			}
 			if (!markdown) {
 				if (mode === 'normal') {
-					Toast({ type: 'warning', title: '请先输入内容' });
+					Toast({
+						type: 'warning',
+						title: t('knowledge.validation.contentRequired'),
+					});
 				}
 				return;
 			}
@@ -548,8 +559,8 @@ const Knowledge = observer(() => {
 				if (mode === 'normal') {
 					Toast({
 						type: 'warning',
-						title: '未登录',
-						message: '请登录后保存到云端知识库，或使用桌面端保存到本地文件夹。',
+						title: t('auth.loginRequired'),
+						message: t('knowledge.save.loginTip'),
 					});
 				}
 				return;
@@ -741,8 +752,8 @@ const Knowledge = observer(() => {
 		if (snap.title === trimmedTitle && snap.content === markdown) {
 			Toast({
 				type: 'info',
-				title: '暂无修改',
-				message: '标题与内容与上次保存一致，未执行保存',
+				title: t('knowledge.save.noChangesTitle'),
+				message: t('knowledge.save.noChangesMessage'),
 				duration: 2000,
 			});
 			knowledgeStore.setKnowledgeOverwriteOpen(false);
@@ -957,12 +968,12 @@ const Knowledge = observer(() => {
 		if (!id) {
 			Toast({
 				type: 'info',
-				title: '请先保存到知识库后再分享',
+				title: t('knowledge.share.saveBeforeShare'),
 			});
 			return;
 		}
 		setShareOpen(true);
-	}, [knowledgeStore.knowledgeEditingKnowledgeId]);
+	}, [knowledgeStore.knowledgeEditingKnowledgeId, t]);
 
 	const overwriteTargetPath = knowledgeStore.knowledgeOverwriteTargetPath;
 	const overwriteFileName =
@@ -980,26 +991,25 @@ const Knowledge = observer(() => {
 			<Confirm
 				open={knowledgeStore.knowledgeOverwriteOpen}
 				onOpenChange={handleOverwriteOpenChange}
-				title="覆盖已有文件？"
+				title={t('knowledge.overwrite.title')}
 				description={
 					<>
-						当前目录下已存在同名文件「{overwriteFileName}
-						」，确定要覆盖吗？此操作不可撤销。
+						{t('knowledge.overwrite.desc', { name: overwriteFileName })}
 						<div className="mt-2 block break-all text-xs opacity-80">
 							{overwriteTargetPath}
 						</div>
 						<p className="mt-3 text-sm text-textcolor/80">
-							也可选择「另存为」将文件保存为新文件
+							{t('knowledge.overwrite.saveAsTip')}
 						</p>
 					</>
 				}
 				descriptionClassName="text-left"
-				confirmText="覆盖保存"
+				confirmText={t('knowledge.overwrite.confirm')}
 				confirmVariant="destructive"
-				cancelText="取消保存"
+				cancelText={t('knowledge.overwrite.cancel')}
 				closeOnConfirm={false}
 				confirmOnEnter
-				secondaryActionText="另存为"
+				secondaryActionText={t('knowledge.overwrite.saveAs')}
 				onSecondaryAction={onSaveAsFromOverwrite}
 				onConfirm={onConfirmOverwrite}
 			/>
@@ -1024,6 +1034,7 @@ const Knowledge = observer(() => {
 					documentIdentity={`${knowledgeAssistantDocumentKey(assistantArticleBinding, trashOpenNonce)}__clear-${clearDocumentNonce}`}
 					markdownAssistantOpen={markdownAssistantOpen}
 					onMarkdownAssistantOpenChange={setMarkdownAssistantOpen}
+					t={t}
 					value={knowledgeStore.markdown}
 					onChange={handleMarkdownChange}
 					onInsertSelectionToAssistant={onInsertSelectionToAssistant}
@@ -1071,7 +1082,11 @@ const Knowledge = observer(() => {
 						<div className="flex flex-1 items-center pl-3 gap-1">
 							<span
 								role="img"
-								aria-label={hasUnsavedChanges ? '有未保存的修改' : '知识文档'}
+								aria-label={
+									hasUnsavedChanges
+										? t('knowledge.title.unsavedChanges')
+										: t('knowledge.title.document')
+								}
 								className="relative inline-flex shrink-0"
 							>
 								<NotebookPen size={16} className="text-textcolor" />
@@ -1088,8 +1103,8 @@ const Knowledge = observer(() => {
 								onChange={(e) =>
 									knowledgeStore.setKnowledgeTitle(e.target.value)
 								}
-								placeholder="请先输入文件名「标题」..."
-								aria-label="知识标题"
+								placeholder={t('knowledge.title.placeholder')}
+								aria-label={t('knowledge.title.aria')}
 								className="md:text-base h-full border-0 bg-transparent pr-2 text-textcolor shadow-none placeholder:text-sm placeholder:text-textcolor/60 focus-visible:border-0 focus-visible:ring-0"
 							/>
 						</div>

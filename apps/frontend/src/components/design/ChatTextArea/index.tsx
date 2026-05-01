@@ -4,7 +4,7 @@ import { Button, ScrollArea, Textarea } from '@ui/index';
 import React, { forwardRef, useRef } from 'react';
 import { useEntry } from '@/hooks/useEntry'; // 根据实际路径调整
 import { cn } from '@/lib/utils';
-import { Message } from '@/types/chat'; // 根据实际路径调整
+import { ChatI18nT, Message } from '@/types/chat'; // 根据实际路径调整
 
 interface ChatTextAreaProps {
 	// 状态
@@ -33,6 +33,8 @@ interface ChatTextAreaProps {
 	textareaClassName?: string;
 	/** 为 true 时禁用输入（仅 chat 模式；如知识库要求左侧编辑器先有正文） */
 	disableTextInput?: boolean;
+	/** i18n 翻译函数（可选）；不传则沿用组件内默认中文文案 */
+	t?: ChatI18nT;
 }
 
 const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
@@ -47,9 +49,10 @@ const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 			sendMessage,
 			mode,
 			className,
-			placeholder = '请输入您的问题',
+			placeholder: placeholderProp,
 			textareaClassName,
 			disableTextInput = false,
+			t,
 		},
 		ref,
 	) => {
@@ -78,6 +81,9 @@ const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 		const value = isEditMode ? editMessage?.content || '' : input;
 		const chatInputDisabled =
 			!isEditMode && (Boolean(loading) || Boolean(disableTextInput));
+
+		const placeholder =
+			placeholderProp ?? t?.('chat.textArea.placeholder') ?? '请输入您的问题';
 
 		const onScrollTo = () => {
 			scrollRef.current?.scrollTo({
@@ -118,7 +124,7 @@ const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 							variant="outline"
 							onClick={() => setEditMessage?.(null)}
 						>
-							取消
+							{t?.('common.cancel') ?? '取消'}
 						</Button>
 						<Button
 							size="sm"
@@ -133,7 +139,7 @@ const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 							}
 							disabled={loading}
 						>
-							发送
+							{t?.('chat.textArea.send') ?? '发送'}
 						</Button>
 					</div>
 				)}

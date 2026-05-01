@@ -10,6 +10,7 @@ import React, {
 } from 'react';
 import { useNavigate } from 'react-router';
 import { useChatCoreContext } from '@/contexts';
+import { useI18n } from '@/hooks';
 import { findLatestBranchSelection } from '@/hooks/useBranchManage';
 import { useChatCore } from '@/hooks/useChatCore';
 import useStore from '@/store';
@@ -56,6 +57,7 @@ const ChatBot = observer(
 
 		const navigate = useNavigate();
 		const { chatStore, knowledgeStore } = useStore();
+		const { t } = useI18n();
 		const {
 			onScrollToRef,
 			isSharing,
@@ -199,15 +201,15 @@ const ChatBot = observer(
 				if (!content) {
 					Toast({
 						type: 'warning',
-						title: '暂无内容',
-						message: '该条回复为空，无法保存到知识库',
+						title: t('chat.bot.toast.noContent.title'),
+						message: t('chat.bot.toast.noContent.desc'),
 					});
 					return;
 				}
 				knowledgeStore.applyKnowledgeDraftFromChatReply(content);
 				navigate('/knowledge');
 			},
-			[knowledgeStore, navigate],
+			[knowledgeStore, navigate, t],
 		);
 
 		const onSaveToKnowledge = onSaveToKnowledgeProp ?? defaultSaveToKnowledge;
@@ -216,6 +218,7 @@ const ChatBot = observer(
 			<ChatBotView
 				ref={ref}
 				className={className}
+				t={t}
 				showAvatar={showAvatar}
 				onBranchChange={onBranchChange}
 				flatMessages={allMessages}

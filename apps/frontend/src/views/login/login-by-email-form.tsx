@@ -13,7 +13,7 @@ import {
 	FormMessage,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
-import { useCountdown } from '@/hooks';
+import { useCountdown, useI18n } from '@/hooks';
 import { loginByEmail, sendEmail } from '@/service';
 import useStore from '@/store';
 import { formatTime, removeStorage, setStorage } from '@/utils';
@@ -26,6 +26,7 @@ interface IProps {
 const LoginByEmailForm: React.FC<IProps> = () => {
 	const [verifyCodeKey, setVerifyCodeKey] = useState('');
 	const { timeLeft, startTimer } = useCountdown();
+	const { t } = useI18n();
 
 	const navigate = useNavigate();
 
@@ -42,8 +43,13 @@ const LoginByEmailForm: React.FC<IProps> = () => {
 		email: z
 			.string()
 			.trim()
-			.regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, { message: '请输入合法的邮箱地址' }),
-		verifyCode: z.string().trim().min(6, { message: '验证码至少输入6个字符' }),
+			.regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, {
+				message: t('auth.validation.emailInvalid'),
+			}),
+		verifyCode: z
+			.string()
+			.trim()
+			.min(6, { message: t('auth.validation.verifyCodeMin') }),
 	});
 
 	const form = useForm<z.infer<typeof formSchema>>({
@@ -82,9 +88,9 @@ const LoginByEmailForm: React.FC<IProps> = () => {
 					name="email"
 					render={({ field }) => (
 						<FormItem>
-							<FormLabel className="text-md">邮箱</FormLabel>
+							<FormLabel className="text-md">{t('auth.email')}</FormLabel>
 							<FormControl>
-								<Input placeholder="请输入邮箱" {...field} />
+								<Input placeholder={t('auth.email.placeholder')} {...field} />
 							</FormControl>
 							<FormMessage />
 						</FormItem>
@@ -95,13 +101,13 @@ const LoginByEmailForm: React.FC<IProps> = () => {
 					name="verifyCode"
 					render={({ field }) => (
 						<FormItem>
-							<FormLabel className="text-md">验证码</FormLabel>
+							<FormLabel className="text-md">{t('auth.verifyCode')}</FormLabel>
 							<FormControl>
 								<div className="flex items-center">
 									<Input
 										maxLength={6}
 										inputMode="numeric"
-										placeholder="请输入邮箱收到的验证码"
+										placeholder={t('auth.verifyCode.placeholder.email')}
 										{...field}
 										onChange={(e) => {
 											const value = e.target.value.replace(/\D/g, '');
@@ -118,7 +124,7 @@ const LoginByEmailForm: React.FC<IProps> = () => {
 									>
 										{timeLeft > 0 && timeLeft < 60
 											? `${formatTime(timeLeft)}`
-											: '获取验证码'}
+											: t('auth.verifyCode.send')}
 									</Button>
 								</div>
 							</FormControl>
@@ -127,7 +133,7 @@ const LoginByEmailForm: React.FC<IProps> = () => {
 					)}
 				/>
 				<Button type="submit" className="cursor-pointer w-full mt-5">
-					登录
+					{t('auth.login.submit')}
 				</Button>
 			</form>
 		</Form>

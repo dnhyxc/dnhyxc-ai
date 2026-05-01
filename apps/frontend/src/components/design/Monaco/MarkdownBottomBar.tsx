@@ -37,10 +37,17 @@ type MarkdownSplitScrollFollowMode =
 	| 'previewFollowsEditor'
 	| 'editorFollowsPreview';
 
+type MarkdownEditorT = (
+	key: string,
+	params?: Record<string, unknown>,
+) => string;
+
 interface MarkdownBottomBarProps {
 	id: string;
 	open: boolean;
 	rootRef: RefObject<HTMLElement | null>;
+	/** i18n 翻译函数（可选）；不传则沿用组件内默认中文文案 */
+	t?: MarkdownEditorT;
 	chords: MarkdownBottomBarChords;
 	/** 仅用于 Tooltip 展示：由父组件传入，避免此处直接依赖 hook 文件 */
 	formatChordForTip: (raw: string | undefined | null) => string;
@@ -120,6 +127,7 @@ export const MarkdownBottomBar = memo(function MarkdownBottomBar(
 		id,
 		open,
 		rootRef,
+		t,
 		chords,
 		formatChordForTip,
 		imperativeRef,
@@ -315,7 +323,7 @@ export const MarkdownBottomBar = memo(function MarkdownBottomBar(
 		<div
 			id={id}
 			role="toolbar"
-			aria-label="Markdown 底部操作"
+			aria-label={t?.('monaco.bottomBar.aria.toolbar') ?? 'Markdown 底部操作'}
 			aria-hidden={!open}
 			className={cn(
 				// 距底 10px 与水平居中始终不变；显隐仅靠透明度，拖动后的位置保持不变
@@ -340,15 +348,22 @@ export const MarkdownBottomBar = memo(function MarkdownBottomBar(
 					<div
 						className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
 						role="tablist"
-						aria-label="Markdown 视图"
+						aria-label={t?.('monaco.bottomBar.aria.view') ?? 'Markdown 视图'}
 					>
-						<Tooltip content="拖动调整操作栏位置（不超出编辑器区域）">
+						<Tooltip
+							content={
+								t?.('monaco.bottomBar.tip.drag') ??
+								'拖动调整操作栏位置（不超出编辑器区域）'
+							}
+						>
 							<button
 								type="button"
 								className={cn(
 									'lucide-stroke-draw-hover flex size-7 shrink-0 cursor-grab touch-none items-center justify-center rounded-md p-1 text-textcolor/45 outline-none transition-colors active:cursor-grabbing hover:bg-theme/10 hover:text-textcolor focus-visible:ring-2 focus-visible:ring-theme/40',
 								)}
-								aria-label="拖动底部操作栏位置"
+								aria-label={
+									t?.('monaco.bottomBar.aria.drag') ?? '拖动底部操作栏位置'
+								}
 								onPointerDown={onDragHandlePointerDown}
 							>
 								<GripVertical size={16} strokeWidth={1.75} aria-hidden />
@@ -356,14 +371,14 @@ export const MarkdownBottomBar = memo(function MarkdownBottomBar(
 						</Tooltip>
 
 						<Tooltip
-							content={`编辑源码${formatChordForTip(chords.markdownBarAction1)}`}
+							content={`${t?.('monaco.bottomBar.tip.edit') ?? '编辑源码'}${formatChordForTip(chords.markdownBarAction1)}`}
 						>
 							<button
 								type="button"
 								role="tab"
 								aria-selected={viewMode === 'edit'}
 								className={markdownBarIconBtnClass(viewMode === 'edit')}
-								aria-label="编辑源码"
+								aria-label={t?.('monaco.bottomBar.aria.edit') ?? '编辑源码'}
 								onClick={() => {
 									closeMarkdownAssistant();
 									setViewMode('edit');
@@ -376,7 +391,7 @@ export const MarkdownBottomBar = memo(function MarkdownBottomBar(
 
 						{markdownDiffBottomBarVisible ? (
 							<Tooltip
-								content={`${viewMode === 'splitDiff' ? '关闭分屏对照：回到单栏编辑' : '分屏对照修改：左编右只读 Diff'}${formatChordForTip(chords.markdownBarAction2)}`}
+								content={`${viewMode === 'splitDiff' ? (t?.('monaco.bottomBar.tip.diff.close') ?? '关闭分屏对照：回到单栏编辑') : (t?.('monaco.bottomBar.tip.diff.open') ?? '分屏对照修改：左编右只读 Diff')}${formatChordForTip(chords.markdownBarAction2)}`}
 							>
 								<button
 									type="button"
@@ -387,7 +402,10 @@ export const MarkdownBottomBar = memo(function MarkdownBottomBar(
 									aria-pressed={
 										viewMode === 'splitDiff' && !assistantRightPaneActive
 									}
-									aria-label="开关分屏 Markdown 修改对照（Diff）"
+									aria-label={
+										t?.('monaco.bottomBar.aria.diff') ??
+										'开关分屏 Markdown 修改对照（Diff）'
+									}
 									onClick={toggleMarkdownSplitDiffCompare}
 								>
 									<GitCompare size={18} strokeWidth={1.75} aria-hidden />
@@ -396,14 +414,14 @@ export const MarkdownBottomBar = memo(function MarkdownBottomBar(
 						) : null}
 
 						<Tooltip
-							content={`预览渲染${formatChordForTip(chords.markdownBarAction3)}`}
+							content={`${t?.('monaco.bottomBar.tip.preview') ?? '预览渲染'}${formatChordForTip(chords.markdownBarAction3)}`}
 						>
 							<button
 								type="button"
 								role="tab"
 								aria-selected={viewMode === 'preview'}
 								className={markdownBarIconBtnClass(viewMode === 'preview')}
-								aria-label="预览渲染"
+								aria-label={t?.('monaco.bottomBar.aria.preview') ?? '预览渲染'}
 								onClick={() => {
 									closeMarkdownAssistant();
 									if (viewMode === 'preview') {
@@ -420,13 +438,16 @@ export const MarkdownBottomBar = memo(function MarkdownBottomBar(
 
 						{bottomBarAssistantNodeEnabled ? (
 							<Tooltip
-								content={`${markdownAssistantOpen ? '关闭 AI 助手' : '开启 AI 助手'}${formatChordForTip(chords.markdownBarAction4)}`}
+								content={`${markdownAssistantOpen ? (t?.('monaco.bottomBar.tip.assistant.close') ?? '关闭 AI 助手') : (t?.('monaco.bottomBar.tip.assistant.open') ?? '开启 AI 助手')}${formatChordForTip(chords.markdownBarAction4)}`}
 							>
 								<button
 									type="button"
 									className={markdownBarIconBtnClass(markdownAssistantOpen)}
 									aria-pressed={markdownAssistantOpen}
-									aria-label="开关 Markdown 右侧 AI 助手"
+									aria-label={
+										t?.('monaco.bottomBar.aria.assistant') ??
+										'开关 Markdown 右侧 AI 助手'
+									}
 									onClick={toggleMarkdownAssistant}
 								>
 									<Bot size={18} strokeWidth={1.75} aria-hidden />
@@ -435,7 +456,7 @@ export const MarkdownBottomBar = memo(function MarkdownBottomBar(
 						) : null}
 
 						<Tooltip
-							content={`分屏：左编辑右预览${formatChordForTip(chords.markdownBarAction5)}`}
+							content={`${t?.('monaco.bottomBar.tip.split') ?? '分屏：左编辑右预览'}${formatChordForTip(chords.markdownBarAction5)}`}
 						>
 							<button
 								type="button"
@@ -446,7 +467,9 @@ export const MarkdownBottomBar = memo(function MarkdownBottomBar(
 								className={markdownBarIconBtnClass(
 									viewMode === 'split' && !assistantRightPaneActive,
 								)}
-								aria-label="分屏：左编辑右预览"
+								aria-label={
+									t?.('monaco.bottomBar.aria.split') ?? '分屏：左编辑右预览'
+								}
 								onClick={() => {
 									// 需在关闭助手前判断：否则同一次点击内 assistant 仍为 true，会误判为「非纯分屏」
 									const exitPureSplit =
@@ -468,7 +491,7 @@ export const MarkdownBottomBar = memo(function MarkdownBottomBar(
 						{viewMode === 'split' && !assistantRightPaneActive && (
 							<>
 								<Tooltip
-									content={`双边跟随：编辑区与预览区双向同步滚动${formatChordForTip(chords.markdownBarAction6)}`}
+									content={`${t?.('monaco.bottomBar.tip.follow.bidirectional') ?? '双边跟随：编辑区与预览区双向同步滚动'}${formatChordForTip(chords.markdownBarAction6)}`}
 								>
 									<button
 										type="button"
@@ -476,7 +499,10 @@ export const MarkdownBottomBar = memo(function MarkdownBottomBar(
 											splitScrollFollowMode === 'bidirectional',
 										)}
 										aria-pressed={splitScrollFollowMode === 'bidirectional'}
-										aria-label="双边跟随：编辑与预览互相同步滚动"
+										aria-label={
+											t?.('monaco.bottomBar.aria.follow.bidirectional') ??
+											'双边跟随：编辑与预览互相同步滚动'
+										}
 										onClick={() =>
 											setSplitScrollFollowMode((m) =>
 												m === 'bidirectional' ? 'none' : 'bidirectional',
@@ -492,7 +518,7 @@ export const MarkdownBottomBar = memo(function MarkdownBottomBar(
 								</Tooltip>
 
 								<Tooltip
-									content={`右边跟随左边：滚动编辑区时预览区同步滚动${formatChordForTip(chords.markdownBarAction7)}`}
+									content={`${t?.('monaco.bottomBar.tip.follow.previewFollowsEditor') ?? '右边跟随左边：滚动编辑区时预览区同步滚动'}${formatChordForTip(chords.markdownBarAction7)}`}
 								>
 									<button
 										type="button"
@@ -502,7 +528,11 @@ export const MarkdownBottomBar = memo(function MarkdownBottomBar(
 										aria-pressed={
 											splitScrollFollowMode === 'previewFollowsEditor'
 										}
-										aria-label="右边跟随左边：预览跟随编辑滚动"
+										aria-label={
+											t?.(
+												'monaco.bottomBar.aria.follow.previewFollowsEditor',
+											) ?? '右边跟随左边：预览跟随编辑滚动'
+										}
 										onClick={() =>
 											setSplitScrollFollowMode((m) =>
 												m === 'previewFollowsEditor'
@@ -520,7 +550,7 @@ export const MarkdownBottomBar = memo(function MarkdownBottomBar(
 								</Tooltip>
 
 								<Tooltip
-									content={`左边跟随右边：滚动预览区时编辑区同步滚动${formatChordForTip(chords.markdownBarAction8)}`}
+									content={`${t?.('monaco.bottomBar.tip.follow.editorFollowsPreview') ?? '左边跟随右边：滚动预览区时编辑区同步滚动'}${formatChordForTip(chords.markdownBarAction8)}`}
 								>
 									<button
 										type="button"
@@ -530,7 +560,11 @@ export const MarkdownBottomBar = memo(function MarkdownBottomBar(
 										aria-pressed={
 											splitScrollFollowMode === 'editorFollowsPreview'
 										}
-										aria-label="左边跟随右边：编辑区跟随预览滚动"
+										aria-label={
+											t?.(
+												'monaco.bottomBar.aria.follow.editorFollowsPreview',
+											) ?? '左边跟随右边：编辑区跟随预览滚动'
+										}
 										onClick={() =>
 											setSplitScrollFollowMode((m) =>
 												m === 'editorFollowsPreview'
@@ -553,14 +587,18 @@ export const MarkdownBottomBar = memo(function MarkdownBottomBar(
 					<div className="flex shrink-0 items-center gap-1.5 pl-2">
 						{showOverwriteSaveToggle ? (
 							<Tooltip
-								content={`${overwriteSaveEnabled ? '已开启覆盖保存：同名文件将直接覆盖写入' : '开启覆盖保存：同名文件不再弹窗确认，直接覆盖写入'}${formatChordForTip(chords.markdownBarAction9)}`}
+								content={`${overwriteSaveEnabled ? (t?.('monaco.bottomBar.tip.overwrite.enabled') ?? '已开启覆盖保存：同名文件将直接覆盖写入') : (t?.('monaco.bottomBar.tip.overwrite.disabled') ?? '开启覆盖保存：同名文件不再弹窗确认，直接覆盖写入')}${formatChordForTip(chords.markdownBarAction9)}`}
 							>
 								<button
 									type="button"
 									className={markdownBarIconBtnClass(overwriteSaveEnabled)}
 									aria-pressed={overwriteSaveEnabled}
 									aria-label={
-										overwriteSaveEnabled ? '关闭覆盖保存' : '开启覆盖保存'
+										overwriteSaveEnabled
+											? (t?.('monaco.bottomBar.aria.overwrite.off') ??
+												'关闭覆盖保存')
+											: (t?.('monaco.bottomBar.aria.overwrite.on') ??
+												'开启覆盖保存')
 									}
 									onClick={() =>
 										onOverwriteSaveEnabledChange?.(!overwriteSaveEnabled)
@@ -574,14 +612,18 @@ export const MarkdownBottomBar = memo(function MarkdownBottomBar(
 						{showAutoSaveControls ? (
 							<>
 								<Tooltip
-									content={`${autoSaveEnabled ? '已开启自动保存：按所选间隔在有修改时保存' : '开启自动保存：按间隔自动保存（无标题/正文或同名冲突未开覆盖时会静默跳过）'}${formatChordForTip(chords.markdownBarAction0)}`}
+									content={`${autoSaveEnabled ? (t?.('monaco.bottomBar.tip.autosave.enabled') ?? '已开启自动保存：按所选间隔在有修改时保存') : (t?.('monaco.bottomBar.tip.autosave.disabled') ?? '开启自动保存：按间隔自动保存（无标题/正文或同名冲突未开覆盖时会静默跳过）')}${formatChordForTip(chords.markdownBarAction0)}`}
 								>
 									<button
 										type="button"
 										className={markdownBarIconBtnClass(autoSaveEnabled)}
 										aria-pressed={autoSaveEnabled}
 										aria-label={
-											autoSaveEnabled ? '关闭自动保存' : '开启自动保存'
+											autoSaveEnabled
+												? (t?.('monaco.bottomBar.aria.autosave.off') ??
+													'关闭自动保存')
+												: (t?.('monaco.bottomBar.aria.autosave.on') ??
+													'开启自动保存')
 										}
 										onClick={() => onAutoSaveEnabledChange?.(!autoSaveEnabled)}
 									>
@@ -593,7 +635,8 @@ export const MarkdownBottomBar = memo(function MarkdownBottomBar(
 									className="sr-only"
 									htmlFor="markdown-auto-save-interval"
 								>
-									自动保存间隔
+									{t?.('monaco.bottomBar.label.autosaveInterval') ??
+										'自动保存间隔'}
 								</label>
 								<select
 									id="markdown-auto-save-interval"
@@ -602,14 +645,17 @@ export const MarkdownBottomBar = memo(function MarkdownBottomBar(
 									)}
 									disabled={!autoSaveEnabled}
 									value={String(autoSaveIntervalSec)}
-									aria-label="自动保存间隔"
+									aria-label={
+										t?.('monaco.bottomBar.aria.autosaveInterval') ??
+										'自动保存间隔'
+									}
 									onChange={(e) =>
 										onAutoSaveIntervalSecChange?.(Number(e.target.value))
 									}
 								>
 									{autoSaveIntervalOptions.map((sec) => (
 										<option key={sec} value={String(sec)}>
-											{formatKnowledgeAutoSaveIntervalLabel(sec)}
+											{formatKnowledgeAutoSaveIntervalLabel(sec, t)}
 										</option>
 									))}
 								</select>
@@ -620,7 +666,7 @@ export const MarkdownBottomBar = memo(function MarkdownBottomBar(
 
 						{/* 最右侧：与覆盖保存/自动保存并列；无业务回调时也会渲染，保证始终可复位 */}
 						<Tooltip
-							content={`复位操作栏初始位置${formatChordForTip(chords.markdownBarResetPosition)}`}
+							content={`${t?.('monaco.bottomBar.tip.reset') ?? '复位操作栏初始位置'}${formatChordForTip(chords.markdownBarResetPosition)}`}
 						>
 							<button
 								type="button"
@@ -630,7 +676,9 @@ export const MarkdownBottomBar = memo(function MarkdownBottomBar(
 									'disabled:cursor-not-allowed disabled:opacity-60',
 								)}
 								disabled={dragOffset.x === 0 && dragOffset.y === 0}
-								aria-label="复位操作栏位置"
+								aria-label={
+									t?.('monaco.bottomBar.aria.reset') ?? '复位操作栏位置'
+								}
 								onClick={resetBarPosition}
 							>
 								<LocateFixed size={18} strokeWidth={1.75} aria-hidden />

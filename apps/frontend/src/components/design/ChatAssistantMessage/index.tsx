@@ -20,7 +20,7 @@ import { getChatMarkdownHighlightTheme } from '@/constant';
 import { useMarkdownHashLinkViewportScroll } from '@/hooks';
 import { useTheme } from '@/hooks/theme';
 import { cn } from '@/lib/utils';
-import { Message, SearchOrganicItem } from '@/types/chat';
+import { ChatI18nT, Message, SearchOrganicItem } from '@/types/chat';
 import { downloadChatCodeBlock } from '@/utils/chatCodeToolbar';
 import { openExternalUrl } from '@/utils/open-external';
 import {
@@ -105,6 +105,8 @@ interface AssistantMessageProps {
 	onContinue?: () => void;
 	onContinueAnswering?: (message?: Message) => void;
 	isStopped?: boolean;
+	/** i18n 翻译函数（可选）；不传则沿用组件内默认中文文案 */
+	t?: ChatI18nT;
 	/**
 	 * 与 ChatBot 里 ScrollArea 转发的 ref 一致（实际指向 Radix Viewport，即可滚动元素）。
 	 * 有值：启用「进视口才挂 MdPreview」；无值：保持旧行为，始终富文本（兼容其它调用方）。
@@ -120,6 +122,7 @@ function ChatAssistantMessageInner({
 	onContinue,
 	onContinueAnswering,
 	isStopped,
+	t,
 	scrollViewportRef,
 	className,
 }: AssistantMessageProps) {
@@ -151,13 +154,14 @@ function ChatAssistantMessageInner({
 
 	// 正文：流式阶段后端仍推送原始 [n]，有 searchOrganic 时在前端做与落库相同的引用转换
 	const bodyText = useMemo(() => {
-		const raw = message.content || (message?.thinkContent ? '' : '思考中...');
+		const thinkingText = t?.('chat.assistant.thinking') ?? '思考中...';
+		const raw = message.content || (message?.thinkContent ? '' : thinkingText);
 		const org = message.searchOrganic;
-		if (!org?.length || raw === '思考中...') {
+		if (!org?.length || raw === thinkingText) {
 			return raw;
 		}
 		return applyOrganicCitationAnchors(raw, org);
-	}, [message.content, message.thinkContent, message.searchOrganic]);
+	}, [message.content, message.thinkContent, message.searchOrganic, t]);
 
 	const isSearchOrganicEnabled = (message.searchOrganic?.length ?? 0) > 0;
 
@@ -338,7 +342,11 @@ function ChatAssistantMessageInner({
 					onClick={() => setOpen(true)}
 				>
 					<SearchIcon size={16} className="mr-1 mt-0.5" />
-					<div>已阅读 {message.searchOrganic?.length} 个网页</div>
+					<div>
+						{t?.('chat.assistant.readWebPages', {
+							n: message.searchOrganic?.length ?? 0,
+						}) ?? `已阅读 ${message.searchOrganic?.length} 个网页`}
+					</div>
 				</div>
 			)}
 			<div className="w-full">
@@ -347,7 +355,7 @@ function ChatAssistantMessageInner({
 						className="mb-2 flex items-center cursor-pointer select-none"
 						onClick={onToggleThinkContent}
 					>
-						思考过程
+						{t?.('chat.assistant.thinkProcess') ?? '思考过程'}
 						{isShowThinkContent ? (
 							<ChevronDown size={20} className="ml-2 mt-0.5" />
 						) : (
@@ -362,6 +370,7 @@ function ChatAssistantMessageInner({
 						parser={chatMdParser}
 						preferDark={appTheme === 'black'}
 						isStreaming={!!message.isStreaming}
+						t={t}
 						className={cn(`[&_.markdown-body]:text-textcolor/90!`, className)}
 					/>
 				) : null}
@@ -372,6 +381,7 @@ function ChatAssistantMessageInner({
 				parser={chatMdParser}
 				preferDark={appTheme === 'black'}
 				isStreaming={!!message.isStreaming}
+				t={t}
 				className={cn(
 					`[&_.markdown-body]:text-textcolor/90!`,
 					isSearchOrganicEnabled && '__md-search-enabled__',
@@ -381,14 +391,17 @@ function ChatAssistantMessageInner({
 			{message.isStreaming && (
 				<div className="mt-2.5 flex items-center">
 					<Spinner className="w-4 h-4 mr-2 text-textcolor/50" />
-					<span className="text-sm text-textcolor/50">正在生成中...</span>
+					<span className="text-sm text-textcolor/50">
+						{t?.('chat.assistant.generating') ?? '正在生成中...'}
+					</span>
 				</div>
 			)}
 			{message?.searchOrganic &&
 				message.searchOrganic?.length > 0 &&
 				!message.isStreaming && (
 					<div className="flex items-center justify-end text-[13px] text-textcolor/50 my-3 italic">
-						本回答由 AI 生成，内容仅供参考，请仔细甄别
+						{t?.('chat.assistant.aiDisclaimer') ??
+							'本回答由 AI 生成，内容仅供参考，请仔细甄别'}
 					</div>
 				)}
 			{((message?.searchOrganic &&
@@ -405,7 +418,9 @@ function ChatAssistantMessageInner({
 								onClick={() => setOpen(true)}
 							>
 								<Earth size={16} className="text-textcolor mb-0.5" />
-								{message.searchOrganic?.length} 个网页
+								{t?.('chat.assistant.webPagesCount', {
+									n: message.searchOrganic?.length ?? 0,
+								}) ?? `${message.searchOrganic?.length} 个网页`}
 							</Button>
 						)}
 					{isStopped && (
@@ -415,19 +430,20 @@ function ChatAssistantMessageInner({
 							onClick={onContinue}
 						>
 							<Rotate3d size={16} />
-							继续生成
+							{t?.('chat.assistant.continueGenerate') ?? '继续生成'}
 						</Button>
 					)}
 				</div>
 			)}
 			{message?.finishReason?.maxTokensReached && (
 				<div className="flex items-center justify-end">
-					超出最大输出长度，
+					{t?.('chat.assistant.maxTokensExceededPrefix') ??
+						'超出最大输出长度，'}
 					<div
 						className="cursor-pointer text-sm text-teal-400 hover:text-teal-300 select-none"
 						onClick={() => onContinueAnswering?.(message)}
 					>
-						点击接着回答
+						{t?.('chat.assistant.clickContinueAnswer') ?? '点击接着回答'}
 					</div>
 				</div>
 			)}
@@ -435,6 +451,7 @@ function ChatAssistantMessageInner({
 				open={open}
 				onOpenChange={() => setOpen(false)}
 				organics={message.searchOrganic || []}
+				t={t}
 			/>
 			{organicPreview &&
 				popoverPos &&

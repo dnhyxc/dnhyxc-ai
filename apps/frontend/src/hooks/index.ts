@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { getStorage as getLocalStorage, setStorage } from '@/utils';
 import { isTauriRuntime } from '@/utils/runtime';
 
+export * from './i18n';
 export * from './theme';
 export * from './useMarkdownHashLinkViewportScroll';
 export * from './useMermaidImagePreview';

@@ -5,6 +5,7 @@ import { Button, Checkbox, ScrollArea, Toast } from '@ui/index';
 import { Trash2 } from 'lucide-react';
 import { observer } from 'mobx-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import {
 	deleteKnowledgeTrash,
@@ -37,6 +38,7 @@ interface TrashRowProps {
 }
 
 const TrashRow = (props: TrashRowProps) => {
+	const { t } = useI18n();
 	const {
 		item,
 		checked,
@@ -74,7 +76,11 @@ const TrashRow = (props: TrashRowProps) => {
 				<div className="flex min-w-0 flex-1 items-start gap-2">
 					<Checkbox
 						checked={checked}
-						aria-label={checked ? '取消选择' : '选择'}
+						aria-label={
+							checked
+								? t('knowledge.trash.checkbox.unselect')
+								: t('knowledge.trash.checkbox.select')
+						}
 						className="mt-0.5 cursor-pointer"
 						onClick={(e) => {
 							e.stopPropagation();
@@ -82,12 +88,12 @@ const TrashRow = (props: TrashRowProps) => {
 						onCheckedChange={() => onToggleChecked(item.id)}
 					/>
 					<div className="flow-root -mt-0.5 flex-1 min-w-0 max-w-full font-medium wrap-anywhere">
-						{item.title?.trim() || '未命名'}
+						{item.title?.trim() || t('knowledge.common.untitled')}
 					</div>
 				</div>
 				<button
 					type="button"
-					aria-label="从回收站彻底删除"
+					aria-label={t('knowledge.trash.deleteForever')}
 					className={cn(
 						'absolute right-0 top-0 cursor-pointer items-center justify-center h-7 w-7 rounded-md text-textcolor/80 transition-opacity duration-150',
 						'hidden group-hover:flex',
@@ -100,7 +106,9 @@ const TrashRow = (props: TrashRowProps) => {
 				</button>
 			</div>
 			<div className="text-xs text-textcolor/50 space-y-0.5">
-				删除 {formatDate(item.deletedAt?.toString() ?? '')}
+				{t('knowledge.trash.deletedAt', {
+					time: formatDate(item.deletedAt?.toString() ?? ''),
+				})}
 			</div>
 		</div>
 	);
@@ -109,6 +117,7 @@ const TrashRow = (props: TrashRowProps) => {
 const KnowledgeTrashList: React.FC<Props> = observer(
 	({ open, onOpenChange, onPick }) => {
 		const { knowledgeStore } = useStore();
+		const { t } = useI18n();
 		const [selection, setSelection] = useState<Record<string, boolean>>({});
 		const [deleting, setDeleting] = useState(false);
 		const [loadingDetailId, setLoadingDetailId] = useState<string | null>(null);
@@ -153,8 +162,8 @@ const KnowledgeTrashList: React.FC<Props> = observer(
 					if (!res.success) {
 						Toast({
 							type: 'error',
-							title: '删除失败',
-							message: res.message || '请稍后重试',
+							title: t('common.deleteFailed'),
+							message: res.message || t('common.tryLater'),
 						});
 						return;
 					}
@@ -164,7 +173,7 @@ const KnowledgeTrashList: React.FC<Props> = observer(
 						delete next[item.id];
 						return next;
 					});
-					Toast({ type: 'success', title: '已从回收站删除' });
+					Toast({ type: 'success', title: t('knowledge.trash.deleted') });
 				} finally {
 					setDeleting(false);
 				}
@@ -176,10 +185,12 @@ const KnowledgeTrashList: React.FC<Props> = observer(
 			(e: React.MouseEvent, item: KnowledgeTrashListItem) => {
 				e.stopPropagation();
 				setPendingDeleteIds([item.id]);
-				setPendingDeleteLabel(item.title?.trim() || '未命名');
+				setPendingDeleteLabel(
+					item.title?.trim() || t('knowledge.common.untitled'),
+				);
 				setConfirmOpen(true);
 			},
-			[],
+			[t],
 		);
 
 		const onActivateRow = useCallback(
@@ -190,8 +201,8 @@ const KnowledgeTrashList: React.FC<Props> = observer(
 					if (!res.success || !res.data) {
 						Toast({
 							type: 'error',
-							title: '加载失败',
-							message: res.message || '无法获取该条回收站详情',
+							title: t('common.loadFailed'),
+							message: res.message || t('knowledge.trash.detailMissing'),
 						});
 						return;
 					}
@@ -205,15 +216,17 @@ const KnowledgeTrashList: React.FC<Props> = observer(
 					setLoadingDetailId(null);
 				}
 			},
-			[onOpenChange, onPick],
+			[onOpenChange, onPick, t],
 		);
 
 		const onBatchDeleteClick = useCallback(() => {
 			if (selectedIds.length === 0) return;
 			setPendingDeleteIds(selectedIds);
-			setPendingDeleteLabel(`已选 ${selectedIds.length} 条`);
+			setPendingDeleteLabel(
+				t('knowledge.trash.selectedCount', { count: selectedIds.length }),
+			);
 			setConfirmOpen(true);
-		}, [selectedIds]);
+		}, [selectedIds, t]);
 
 		const onConfirmDelete = useCallback(async () => {
 			const ids = pendingDeleteIds;
@@ -230,8 +243,8 @@ const KnowledgeTrashList: React.FC<Props> = observer(
 						if (!res.success) {
 							Toast({
 								type: 'error',
-								title: '删除失败',
-								message: res.message || '请稍后重试',
+								title: t('common.deleteFailed'),
+								message: res.message || t('common.tryLater'),
 							});
 							return;
 						}
@@ -241,15 +254,15 @@ const KnowledgeTrashList: React.FC<Props> = observer(
 							delete next[id];
 							return next;
 						});
-						Toast({ type: 'success', title: '已从回收站删除' });
+						Toast({ type: 'success', title: t('knowledge.trash.deleted') });
 					}
 				} else {
 					const res = await deleteKnowledgeTrashBatch(ids);
 					if (!res.success) {
 						Toast({
 							type: 'error',
-							title: '批量删除失败',
-							message: res.message || '请稍后重试',
+							title: t('knowledge.trash.batchDeleteFailed'),
+							message: res.message || t('common.tryLater'),
 						});
 						return;
 					}
@@ -257,8 +270,10 @@ const KnowledgeTrashList: React.FC<Props> = observer(
 					setSelection({});
 					Toast({
 						type: 'success',
-						title: '批量删除完成',
-						message: `已删除 ${res.data?.affected ?? 0} 条`,
+						title: t('knowledge.trash.batchDeleteDone'),
+						message: t('knowledge.trash.batchDeleteDoneMessage', {
+							count: res.data?.affected ?? 0,
+						}),
 					});
 				}
 				// 删除后直接重拉列表，保证分页/total 与服务端一致（避免本地减 total 造成边界问题）
@@ -269,7 +284,7 @@ const KnowledgeTrashList: React.FC<Props> = observer(
 			} finally {
 				setDeleting(false);
 			}
-		}, [doDeleteSingle, knowledgeStore, pendingDeleteIds, trashList]);
+		}, [doDeleteSingle, knowledgeStore, pendingDeleteIds, trashList, t]);
 
 		const showInitialPlaceholder = trashLoading && trashList.length === 0;
 		const showEmptyHint =
@@ -288,30 +303,35 @@ const KnowledgeTrashList: React.FC<Props> = observer(
 					}}
 					title={
 						pendingDeleteIds.length > 1
-							? '批量删除回收站文件？'
-							: '删除回收站文件？'
+							? t('knowledge.trash.confirm.batchTitle')
+							: t('knowledge.trash.confirm.singleTitle')
 					}
 					description={
 						<>
-							该操作将从回收站中彻底删除，无法恢复。
+							{t('knowledge.trash.confirm.desc')}
 							<div className="mt-2 font-medium text-base wrap-anywhere">
 								{pendingDeleteIds.length > 1
-									? `数量：${pendingDeleteIds.length}`
-									: `文件名称：「${pendingDeleteLabel || '未命名'}」`}
+									? t('knowledge.trash.confirm.count', {
+											count: pendingDeleteIds.length,
+										})
+									: t('knowledge.trash.confirm.fileName', {
+											name:
+												pendingDeleteLabel || t('knowledge.common.untitled'),
+										})}
 							</div>
 						</>
 					}
 					descriptionClassName="text-left"
-					confirmText="删除"
+					confirmText={t('common.delete')}
 					confirmVariant="destructive"
-					cancelText="取消"
+					cancelText={t('common.cancel')}
 					closeOnConfirm={false}
 					confirmOnEnter
 					onConfirm={() => void onConfirmDelete()}
 				/>
 
 				<Drawer
-					title="回收站"
+					title={t('knowledge.trash.title')}
 					bodyClassName="pt-2 pb-4"
 					open={open}
 					onOpenChange={onOpenChange}
@@ -335,7 +355,7 @@ const KnowledgeTrashList: React.FC<Props> = observer(
 										checked={
 											allChecked ? true : someChecked ? 'indeterminate' : false
 										}
-										aria-label="全选"
+										aria-label={t('knowledge.trash.selectAll')}
 										onClick={(e) => e.stopPropagation()}
 										onCheckedChange={() => toggleAll()}
 									/>
@@ -344,11 +364,14 @@ const KnowledgeTrashList: React.FC<Props> = observer(
 											allChecked ? 'text-textcolor' : 'text-textcolor/70'
 										}
 									>
-										全选
+										{t('knowledge.trash.selectAll')}
 									</span>
 								</div>
 								<span className="text-xs text-textcolor/50">
-									已选 {selectedIds.length} / {trashList.length}
+									{t('knowledge.trash.selectedRatio', {
+										selected: selectedIds.length,
+										total: trashList.length,
+									})}
 								</span>
 							</div>
 							<Button
@@ -364,7 +387,9 @@ const KnowledgeTrashList: React.FC<Props> = observer(
 								aria-busy={deleting}
 							>
 								<Trash2 className="mt-0.5" />
-								<span className="mt-0.5">批量删除</span>
+								<span className="mt-0.5">
+									{t('knowledge.trash.batchDelete')}
+								</span>
 							</Button>
 						</div>
 
@@ -375,7 +400,7 @@ const KnowledgeTrashList: React.FC<Props> = observer(
 							<div className="flex min-h-0 w-full flex-1 flex-col gap-2">
 								{showInitialPlaceholder ? (
 									<div className="flex flex-1 flex-col items-center justify-center py-6 text-center text-sm text-textcolor/60">
-										<Loading text="加载中…" />
+										<Loading text={t('common.loading')} />
 									</div>
 								) : null}
 								{trashList.map((item) => (
@@ -394,17 +419,17 @@ const KnowledgeTrashList: React.FC<Props> = observer(
 								))}
 								{loadingDetailId ? (
 									<div className="text-xs text-textcolor/50 py-1 text-center">
-										正在加载…
+										{t('knowledge.trash.loadingDetail')}
 									</div>
 								) : null}
 								{trashLoadingMore ? (
 									<div className="text-xs text-textcolor/50 py-2 text-center">
-										加载更多…
+										{t('common.loadingMore')}
 									</div>
 								) : null}
 								{showEmptyHint ? (
 									<div className="text-sm text-textcolor/60 py-8 text-center">
-										回收站暂无内容
+										{t('knowledge.trash.empty')}
 									</div>
 								) : null}
 							</div>

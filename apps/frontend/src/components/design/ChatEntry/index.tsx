@@ -17,6 +17,11 @@ import { cn } from '@/lib/utils';
 import { FileWithPreview, UploadedFile } from '@/types';
 import { Message } from '@/types/chat';
 
+export type ChatEntryT = (
+	key: string,
+	params?: Record<string, unknown>,
+) => string;
+
 interface ChatEntryProps {
 	input: string;
 	setInput: (val: string) => void;
@@ -50,6 +55,8 @@ interface ChatEntryProps {
 	/** 为 true 时禁用底部输入框（知识库：左侧编辑器无正文时禁止在助手框输入） */
 	disableTextInput?: boolean;
 	placeholder?: string;
+	/** i18n 翻译函数（可选）；不传则沿用组件内默认中文文案 */
+	t?: ChatEntryT;
 }
 
 const ChatEntry: React.FC<ChatEntryProps> = ({
@@ -74,7 +81,8 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 	onWebSearchEnabledChange,
 	textareaClassName,
 	disableTextInput = false,
-	placeholder = '请输入您的问题',
+	placeholder: placeholderProp,
+	t,
 }) => {
 	const scrollContainer = useRef<HTMLDivElement>(null);
 	const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -157,6 +165,9 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 		scrollState.width > scrollState.clientWidth &&
 		scrollState.left + scrollState.clientWidth >= scrollState.width - 1;
 
+	const placeholder =
+		placeholderProp ?? t?.('chat.entry.placeholder') ?? '请输入您的问题';
+
 	return (
 		<div className={cn('relative p-5.5 pt-0 backdrop-blur-sm', className)}>
 			<div className="max-w-3xl mx-auto flex">
@@ -166,7 +177,8 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 						{uploadedFiles && uploadedFiles?.length > 0 ? (
 							<div className="flex flex-1 flex-col rounded-md">
 								<div className="flex justify-between items-center mt-2.5 mb-0.5 px-3 text-sm text-textcolor/70">
-									只识别附件中的文字
+									{t?.('chat.entry.attachments.textOnlyHint') ??
+										'只识别附件中的文字'}
 									<div className="flex gap-3">
 										<Button
 											disabled={isAtStart}
@@ -236,6 +248,7 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 							sendMessage={sendMessage}
 							textareaClassName={textareaClassName}
 							disableTextInput={disableTextInput}
+							t={t}
 						/>
 
 						<div className="flex items-center justify-between h-10 p-2.5 mb-1 mt-2.5">
@@ -248,7 +261,7 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 										onClick={clearChat}
 									>
 										<CirclePlus className="w-4 h-4" />
-										新对话
+										{t?.('chat.entry.newChat') ?? '新对话'}
 									</Button>
 								)}
 								{onUploadFile && (
@@ -259,7 +272,10 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 										)}
 										maxSize={20 * 1024 * 1024}
 										multiple
-										countValidText="最多只能支持 5 个文件"
+										countValidText={
+											t?.('chat.entry.upload.maxFiles') ??
+											'最多只能支持 5 个文件'
+										}
 										uploadedCount={uploadedFiles?.length}
 										disabled={
 											(uploadedFiles && uploadedFiles?.length >= 5) ||
@@ -271,16 +287,20 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 										tooltipContent={
 											<div className="flex flex-col gap-1.5">
 												<div>
-													仅支持 PDF、DOCX、XLSX、PNG、JPG、JPEG、WEBP 格式！
+													{t?.('chat.entry.upload.tooltip.supportedTypes') ??
+														'仅支持 PDF、DOCX、XLSX、PNG、JPG、JPEG、WEBP 格式！'}
 												</div>
-												<div>最多同时支持 5 个文件，每个文件最大 20 MB！</div>
+												<div>
+													{t?.('chat.entry.upload.tooltip.maxFilesAndSize') ??
+														'最多同时支持 5 个文件，每个文件最大 20 MB！'}
+												</div>
 											</div>
 										}
 										onUpload={onUploadFile}
 									>
 										<div className="flex items-center">
 											<Link className="w-4 h-4 mr-2" />
-											上传附件
+											{t?.('chat.entry.upload.button') ?? '上传附件'}
 										</div>
 									</Upload>
 								)}
@@ -289,7 +309,7 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 										type="button"
 										variant="ghost"
 										aria-pressed={webSearchEnabled}
-										aria-label="联网搜索"
+										aria-label={t?.('chat.entry.webSearch') ?? '联网搜索'}
 										disabled={loading}
 										onClick={() => onWebSearchEnabledChange(!webSearchEnabled)}
 										className={cn(
@@ -300,7 +320,7 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 										)}
 									>
 										<Globe className="h-3.5 w-3.5 shrink-0" />
-										联网搜索
+										{t?.('chat.entry.webSearch') ?? '联网搜索'}
 									</Button>
 								) : null}
 							</div>

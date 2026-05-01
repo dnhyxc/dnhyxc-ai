@@ -14,46 +14,78 @@ import {
 } from 'lucide-react';
 import { useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router';
+import { useI18n } from '@/hooks';
 import { onListen, openExternalUrl } from '@/utils';
-
-const SHOWCASE = [
-	{
-		icon: Rocket,
-		title: '快速响应',
-		desc: '毫秒级响应速度',
-		color: 'from-orange-400 to-yellow-400',
-	},
-	{
-		icon: Shield,
-		title: '隐私保护',
-		desc: '本地化处理',
-		color: 'from-yellow-400 to-orange-400',
-	},
-	{
-		icon: Globe,
-		title: '多语言',
-		desc: '全球用户支持',
-		color: 'from-green-400 to-cyan-400',
-	},
-	{
-		icon: Zap,
-		title: '轻量高效',
-		desc: '低资源占用',
-		color: 'from-green-400 to-emerald-400',
-	},
-];
 
 const Home = () => {
 	const navigate = useNavigate();
+	const { t } = useI18n();
+
+	const SHOWCASE = useMemo(
+		() => [
+			{
+				icon: Rocket,
+				title: t('home.showcase.fast.title'),
+				desc: t('home.showcase.fast.desc'),
+				color: 'from-orange-400 to-yellow-400',
+			},
+			{
+				icon: Shield,
+				title: t('home.showcase.privacy.title'),
+				desc: t('home.showcase.privacy.desc'),
+				color: 'from-yellow-400 to-orange-400',
+			},
+			{
+				icon: Globe,
+				title: t('home.showcase.i18n.title'),
+				desc: t('home.showcase.i18n.desc'),
+				color: 'from-green-400 to-cyan-400',
+			},
+			{
+				icon: Zap,
+				title: t('home.showcase.lightweight.title'),
+				desc: t('home.showcase.lightweight.desc'),
+				color: 'from-green-400 to-emerald-400',
+			},
+		],
+		[t],
+	);
+
+	const STEPS = useMemo(
+		() => [
+			{
+				step: '1',
+				title: t('home.steps.install.title'),
+				desc: t('home.steps.install.desc'),
+				icon: Rocket,
+				color: 'from-teal-500 to-cyan-600',
+			},
+			{
+				step: '2',
+				title: t('home.steps.register.title'),
+				desc: t('home.steps.register.desc'),
+				icon: Shield,
+				color: 'from-cyan-500 to-blue-500',
+			},
+			{
+				step: '4',
+				title: t('home.steps.start.title'),
+				desc: t('home.steps.start.desc'),
+				icon: Zap,
+				color: 'from-orange-500 to-amber-500',
+			},
+		],
+		[t],
+	);
 
 	const FEATURES = useMemo(() => {
 		return [
 			{
 				index: '01',
 				icon: MessageSquare,
-				title: '智能对话',
-				subtitle: '自然语言处理',
-				desc: '与 AI 助手自然对话，获取实时解答、创作建议与学习辅导',
+				title: t('home.features.chat.title'),
+				subtitle: t('home.features.chat.subtitle'),
+				desc: t('home.features.chat.desc'),
 				color: 'from-emerald-400 to-teal-500',
 				glow: 'shadow-emerald-500/25',
 				hoverBg:
@@ -63,9 +95,9 @@ const Home = () => {
 			{
 				index: '02',
 				icon: Code2,
-				title: '代码助手',
-				subtitle: '编程支持',
-				desc: '智能生成、调试与优化代码，多语言开发全流程提效',
+				title: t('home.features.coding.title'),
+				subtitle: t('home.features.coding.subtitle'),
+				desc: t('home.features.coding.desc'),
 				color: 'from-amber-400 to-orange-500',
 				glow: 'shadow-amber-500/20',
 				hoverBg:
@@ -75,9 +107,9 @@ const Home = () => {
 			{
 				index: '03',
 				icon: FileText,
-				title: '文档处理',
-				subtitle: '智能分析',
-				desc: 'Image、PDF、Word、Excel 等格式的解析、总结与内容提取',
+				title: t('home.features.document.title'),
+				subtitle: t('home.features.document.subtitle'),
+				desc: t('home.features.document.desc'),
 				color: 'from-rose-400 to-amber-600',
 				glow: 'shadow-rose-500/20',
 				hoverBg:
@@ -85,7 +117,7 @@ const Home = () => {
 				onClick: () => navigate('/document'),
 			},
 		];
-	}, [navigate]);
+	}, [navigate, t]);
 
 	useEffect(() => {
 		const unlistenAboutPromise = onListen('about-send-message', (event) => {
@@ -149,9 +181,9 @@ const Home = () => {
 												fontFamily: '"Syne", "Noto Sans SC", sans-serif',
 											}}
 										>
-											欢迎使用
+											{t('home.hero.welcome')}
 											<span className="ml-3 bg-linear-to-r from-teal-300 via-cyan-400 to-amber-400 bg-clip-text text-transparent">
-												智能助手
+												{t('home.hero.product')}
 											</span>
 										</motion.h1>
 										<motion.div
@@ -160,8 +192,7 @@ const Home = () => {
 											transition={{ delay: 0.18, duration: 0.4 }}
 											className="mt-[21px] text-pretty text-xl leading-relaxed text-textcolor/50"
 										>
-											一处集成对话、代码与文档的桌面 AI
-											工作台。三种能力在此交融，随需切换，从念头闪现到成果落地，皆在这方寸之间完成。
+											{t('home.hero.subtitle')}
 										</motion.div>
 									</div>
 									<motion.div
@@ -178,7 +209,7 @@ const Home = () => {
 												fontFamily: '"Syne", "Noto Sans SC", sans-serif',
 											}}
 										>
-											快速开始
+											{t('home.hero.quickStart')}
 											<ArrowRight className="h-4 w-4 mb-1" />
 										</Button>
 										<Button
@@ -190,7 +221,7 @@ const Home = () => {
 											}}
 											className="h-10 w-30 rounded-md border border-theme/5 bg-theme-white/5 px-6 text-sm font-medium text-textcolor backdrop-blur-sm transition-colors hover:border-theme/10 hover:bg-theme-white/10"
 										>
-											了解更多
+											{t('home.hero.learnMore')}
 											<ArrowRight className="h-4 w-4" />
 										</Button>
 									</motion.div>
@@ -249,7 +280,7 @@ const Home = () => {
 										</p>
 
 										<div className="relative mt-4 flex items-center gap-2 border-t border-dashed border-theme/5 pt-4 text-sm font-semibold text-teal-400/85 transition-all duration-300 group-hover:translate-x-0.5 group-hover:text-teal-300">
-											<span>进入模块</span>
+											<span>{t('home.features.enter')}</span>
 											<ArrowRight className="h-4 w-4" />
 										</div>
 									</motion.div>
@@ -269,7 +300,7 @@ const Home = () => {
 								className="mb-6 bg-linear-to-r from-teal-400 via-cyan-400 to-amber-400 bg-clip-text text-2xl font-bold text-transparent"
 								style={{ fontFamily: '"Syne", "Noto Sans SC", sans-serif' }}
 							>
-								特色功能
+								{t('home.sections.showcase')}
 							</motion.h3>
 							<div className="grid grid-cols-2 gap-4 md:grid-cols-4 md:gap-5">
 								{SHOWCASE.map((feature, idx) => (
@@ -310,39 +341,10 @@ const Home = () => {
 								className="relative z-10 mb-6 text-xl font-semibold text-textcolor"
 								style={{ fontFamily: '"Syne", "Noto Sans SC", sans-serif' }}
 							>
-								快速开始
+								{t('home.sections.steps')}
 							</h3>
 							<div className="space-y-4">
-								{[
-									{
-										step: '1',
-										title: '安装应用',
-										desc: '下载并安装桌面版应用',
-										icon: Rocket,
-										color: 'from-teal-500 to-cyan-600',
-									},
-									{
-										step: '2',
-										title: '注册账号',
-										desc: '创建您的个人账户',
-										icon: Shield,
-										color: 'from-cyan-500 to-blue-500',
-									},
-									{
-										step: '3',
-										title: '选择功能',
-										desc: '根据需求选择AI工具',
-										icon: Globe,
-										color: 'from-amber-500 to-orange-500',
-									},
-									{
-										step: '4',
-										title: '开始使用',
-										desc: '享受智能助手服务',
-										icon: Zap,
-										color: 'from-orange-500 to-amber-500',
-									},
-								].map((item, idx) => (
+								{STEPS.map((item, idx) => (
 									<motion.div
 										key={item.step}
 										initial={{ opacity: 0, x: -12 }}

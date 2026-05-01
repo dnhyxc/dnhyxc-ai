@@ -16,17 +16,18 @@ import { CreditCard, Loader2, Lock, ShieldCheck, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { Link } from 'react-router';
+import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import { createCheckoutSession } from '@/service';
 import { getStorage } from '@/utils';
 
 const CURRENCIES = [
-	{ value: 'cny', label: 'CNY · 人民币', zeroDecimal: false },
-	{ value: 'usd', label: 'USD · 美元', zeroDecimal: false },
-	{ value: 'eur', label: 'EUR · 欧元', zeroDecimal: false },
-	{ value: 'hkd', label: 'HKD · 港币', zeroDecimal: false },
-	{ value: 'gbp', label: 'GBP · 英镑', zeroDecimal: false },
-	{ value: 'jpy', label: 'JPY · 日元', zeroDecimal: true },
+	{ value: 'cny', zeroDecimal: false },
+	{ value: 'usd', zeroDecimal: false },
+	{ value: 'eur', zeroDecimal: false },
+	{ value: 'hkd', zeroDecimal: false },
+	{ value: 'gbp', zeroDecimal: false },
+	{ value: 'jpy', zeroDecimal: true },
 ] as const;
 
 function toStripeMinorUnits(majorAmount: number, zeroDecimal: boolean): number {
@@ -36,10 +37,13 @@ function toStripeMinorUnits(majorAmount: number, zeroDecimal: boolean): number {
 }
 
 const Pay = () => {
+	const { t } = useI18n();
 	const [currency, setCurrency] =
 		useState<(typeof CURRENCIES)[number]['value']>('cny');
 	const [majorAmount, setMajorAmount] = useState<string>('9.99');
-	const [productName, setProductName] = useState('Pro 额度充值');
+	const defaultProductName = t('pay.productName.default');
+	const defaultProductNameRef = useRef(defaultProductName);
+	const [productName, setProductName] = useState(defaultProductName);
 	const [loading, setLoading] = useState(false);
 	const [embeddedOpen, setEmbeddedOpen] = useState(false);
 
@@ -56,6 +60,15 @@ const Pay = () => {
 		[currency],
 	);
 
+	// 若用户未手动改过商品说明，则随语言切换更新默认值
+	useEffect(() => {
+		const prevDefault = defaultProductNameRef.current;
+		defaultProductNameRef.current = defaultProductName;
+		setProductName((prev) =>
+			prev === prevDefault ? defaultProductName : prev,
+		);
+	}, [defaultProductName]);
+
 	const destroyEmbedded = useCallback(() => {
 		checkoutRef.current?.destroy();
 		checkoutRef.current = null;
@@ -70,16 +83,15 @@ const Pay = () => {
 
 	const onOpenEmbeddedCheckout = useCallback(async () => {
 		if (!token) {
-			Toast({ type: 'error', title: '请先登录后再发起支付' });
+			Toast({ type: 'error', title: t('pay.toast.loginRequired') });
 			return;
 		}
 		const pk = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY?.trim();
 		if (!pk) {
 			Toast({
 				type: 'error',
-				title: '缺少 VITE_STRIPE_PUBLISHABLE_KEY',
-				message:
-					'在前端 .env 中配置 Publishable key（pk_test_… / pk_live_…）。',
+				title: t('pay.toast.missingStripePk.title'),
+				message: t('pay.toast.missingStripePk.message'),
 			});
 			return;
 		}
@@ -87,12 +99,12 @@ const Pay = () => {
 			? Number.parseInt(majorAmount, 10)
 			: Number.parseFloat(majorAmount);
 		if (!Number.isFinite(parsed) || parsed <= 0) {
-			Toast({ type: 'error', title: '请输入有效金额' });
+			Toast({ type: 'error', title: t('pay.toast.invalidAmount') });
 			return;
 		}
 		const amount = toStripeMinorUnits(parsed, zeroDecimal);
 		if (amount < 1) {
-			Toast({ type: 'error', title: '金额过小' });
+			Toast({ type: 'error', title: t('pay.toast.amountTooSmall') });
 			return;
 		}
 		setLoading(true);
@@ -108,15 +120,15 @@ const Pay = () => {
 			if (!clientSecret) {
 				Toast({
 					type: 'error',
-					title: '未返回 client_secret',
-					message: '请确认后端已创建 ui_mode=embedded 的 Checkout Session。',
+					title: t('pay.toast.clientSecretMissing.title'),
+					message: t('pay.toast.clientSecretMissing.message'),
 				});
 				return;
 			}
 
 			const stripe = await loadStripe(pk);
 			if (!stripe) {
-				Toast({ type: 'error', title: 'Stripe.js 加载失败' });
+				Toast({ type: 'error', title: t('pay.toast.stripeLoadFailed') });
 				return;
 			}
 
@@ -126,8 +138,8 @@ const Pay = () => {
 					destroyEmbedded();
 					Toast({
 						type: 'success',
-						title: '支付已完成',
-						message: '感谢支持。',
+						title: t('pay.toast.paid.title'),
+						message: t('pay.toast.paid.message'),
 					});
 				},
 			});
@@ -141,7 +153,7 @@ const Pay = () => {
 				checkout.destroy();
 				checkoutRef.current = null;
 				setEmbeddedOpen(false);
-				Toast({ type: 'error', title: '挂载节点未就绪' });
+				Toast({ type: 'error', title: t('pay.toast.mountNodeNotReady') });
 				return;
 			}
 			checkout.mount(el);
@@ -156,7 +168,15 @@ const Pay = () => {
 		} finally {
 			setLoading(false);
 		}
-	}, [token, zeroDecimal, majorAmount, currency, productName, destroyEmbedded]);
+	}, [
+		token,
+		zeroDecimal,
+		majorAmount,
+		currency,
+		productName,
+		destroyEmbedded,
+		t,
+	]);
 
 	return (
 		<div className="relative min-h-full bg-theme-gradient">
@@ -176,10 +196,10 @@ const Pay = () => {
 				>
 					<div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/25 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-700 dark:text-emerald-300">
 						<ShieldCheck className="size-3.5" aria-hidden />
-						Stripe 嵌入式收银台
+						{t('pay.badge.stripeEmbedded')}
 					</div>
 					<h1 className="text-3xl font-semibold tracking-tight text-textcolor">
-						结账
+						{t('pay.title')}
 					</h1>
 				</motion.header>
 
@@ -192,17 +212,17 @@ const Pay = () => {
 					{!token ? (
 						<div className="space-y-4 text-center">
 							<p className="text-sm text-muted-foreground">
-								发起支付前需要登录账号。
+								{t('pay.loginRequiredHint')}
 							</p>
 							<Button asChild className="w-full">
-								<Link to="/login">去登录</Link>
+								<Link to="/login">{t('pay.goLogin')}</Link>
 							</Button>
 						</div>
 					) : (
 						<>
 							<div className="space-y-5">
 								<div className="space-y-2">
-									<Label htmlFor="pay-currency">货币</Label>
+									<Label htmlFor="pay-currency">{t('pay.form.currency')}</Label>
 									<Select
 										value={currency}
 										onValueChange={(v) =>
@@ -211,12 +231,15 @@ const Pay = () => {
 										disabled={embeddedOpen}
 									>
 										<SelectTrigger id="pay-currency" className="w-full">
-											<SelectValue placeholder="选择货币" />
+											<SelectValue
+												placeholder={t('pay.form.currency.placeholder')}
+											/>
 										</SelectTrigger>
 										<SelectContent position="popper">
 											{CURRENCIES.map((c) => (
 												<SelectItem key={c.value} value={c.value}>
-													{c.label}
+													{t(`pay.currency.${c.value}`) ??
+														c.value.toUpperCase()}
 												</SelectItem>
 											))}
 										</SelectContent>
@@ -224,7 +247,11 @@ const Pay = () => {
 								</div>
 								<div className="space-y-2">
 									<Label htmlFor="pay-amount">
-										金额（{zeroDecimal ? '整数，无小数' : '含两位小数'}）
+										{t('pay.form.amount', {
+											format: zeroDecimal
+												? t('pay.form.amount.format.integer')
+												: t('pay.form.amount.format.decimal2'),
+										})}
 									</Label>
 									<Input
 										id="pay-amount"
@@ -237,10 +264,10 @@ const Pay = () => {
 									/>
 								</div>
 								<div className="space-y-2">
-									<Label htmlFor="pay-product">商品说明（可选）</Label>
+									<Label htmlFor="pay-product">{t('pay.form.product')}</Label>
 									<Input
 										id="pay-product"
-										placeholder="例如：月度会员"
+										placeholder={t('pay.form.product.placeholder')}
 										value={productName}
 										disabled={embeddedOpen}
 										onChange={(e) => setProductName(e.target.value)}
@@ -278,12 +305,12 @@ const Pay = () => {
 												)}
 											/>
 										</span>
-										在页面内打开收银台
+										{t('pay.actions.openEmbedded')}
 									</Button>
 								</div>
 								<div className="flex items-center justify-center gap-1.5 text-xs text-muted-foreground">
 									<Lock className="size-3" aria-hidden />
-									支付表单由 Stripe 嵌入组件提供
+									{t('pay.footer.stripeProvided')}
 								</div>
 							</div>
 							<div
@@ -297,7 +324,7 @@ const Pay = () => {
 									size="icon"
 									className="absolute top-2 right-2 z-20 size-9 rounded-full border-theme/20 bg-theme-background/50 text-textcolor shadow-sm backdrop-blur-sm hover:bg-theme-background/80"
 									onClick={destroyEmbedded}
-									aria-label="关闭收银台"
+									aria-label={t('pay.actions.closeEmbedded')}
 								>
 									<X className="size-4 text-textcolor" aria-hidden />
 								</Button>

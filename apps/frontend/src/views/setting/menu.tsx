@@ -5,33 +5,41 @@ import {
 } from '@ui/navigation-menu';
 import { useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router';
+import { useI18n } from '@/hooks';
 
 const NavigationMenus = () => {
 	const { pathname } = useLocation();
 	const navigate = useNavigate();
+	const { t } = useI18n();
 
 	const menus = useMemo(
 		() => [
 			{
-				name: '系统设置',
+				name: t('setting.menu.system'),
 				key: 'system',
 				path: '/setting',
 				icon: 'icon-setting',
 			},
 			{
-				name: '主题设置',
+				name: t('setting.menu.theme'),
 				key: 'theme',
 				path: '/setting/theme',
 				icon: 'icon-theme',
 			},
 			{
-				name: '关于应用',
+				name: t('setting.menu.language'),
+				key: 'language',
+				path: '/setting/language',
+				icon: 'icon-language',
+			},
+			{
+				name: t('setting.menu.about'),
 				key: 'about',
 				path: '/setting/about',
 				icon: 'icon-about',
 			},
 		],
-		[],
+		[t],
 	);
 
 	return (

@@ -9,6 +9,7 @@ import { CirclePlus, Clock } from 'lucide-react';
 import { observer } from 'mobx-react';
 import type { Dispatch, SetStateAction } from 'react';
 import { useCallback, useMemo, useState } from 'react';
+import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import assistantStore from '@/store/assistant';
 import {
@@ -41,6 +42,7 @@ export const KnowledgeAssistantEntryToolbar = observer(
 		assistantMode,
 		setAssistantMode,
 	}: KnowledgeAssistantEntryToolbarProps) {
+		const { t } = useI18n();
 		const sessionList = assistantStore.sessionListForActiveDocument;
 		const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 		const [deleteTargetSessionId, setDeleteTargetSessionId] = useState<
@@ -61,8 +63,10 @@ export const KnowledgeAssistantEntryToolbar = observer(
 			);
 			return row?.title?.trim()
 				? row.title.trim()
-				: `对话 ${deleteTargetSessionId.slice(0, 8)}`;
-		}, [deleteTargetSessionId, sessionList]);
+				: t('knowledge.assistant.conversationFallback', {
+						id: deleteTargetSessionId.slice(0, 8),
+					});
+		}, [deleteTargetSessionId, sessionList, t]);
 
 		const onConfirmDelete = useCallback(async () => {
 			if (!deleteTargetSessionId) return;
@@ -81,19 +85,22 @@ export const KnowledgeAssistantEntryToolbar = observer(
 						setDeleteConfirmOpen(v);
 						if (!v) setDeleteTargetSessionId(null);
 					}}
-					title="删除对话？"
+					title={t('knowledge.assistant.deleteConversationTitle')}
 					description={
 						<div className="text-left">
-							确定要删除该历史对话吗？此操作无法撤销。
+							{t('knowledge.assistant.deleteConversationDesc')}
 							{deleteTargetTitle ? (
 								<div className="mt-2 font-medium text-base wrap-anywhere">
-									对话名称：「{deleteTargetTitle}」
+									{t('knowledge.assistant.conversationNameLabel', {
+										name: deleteTargetTitle,
+									})}
 								</div>
 							) : null}
 						</div>
 					}
 					descriptionClassName="text-left"
-					confirmText="删除"
+					confirmText={t('common.delete')}
+					cancelText={t('common.cancel')}
 					confirmVariant="destructive"
 					closeOnConfirm={false}
 					onConfirm={onConfirmDelete}
@@ -109,13 +116,15 @@ export const KnowledgeAssistantEntryToolbar = observer(
 								<Button
 									variant="link"
 									className="mb-0.5 h-8.5 w-8.5 mt-0.5 rounded-full text-textcolor/80 hover:bg-theme/10 hover:text-teal-500 border border-theme/10 p-0 [&_svg]:overflow-visible"
-									aria-label="历史对话"
+									aria-label={t('knowledge.assistant.history')}
 									disabled={isAiSessionSwitcherLocked}
 									onClick={() => {
 										if (isAiSessionSwitcherLocked) {
 											Toast({
 												type: 'info',
-												title: '正在保存对话，请稍后再查看历史对话',
+												title: t(
+													'knowledge.assistant.sessionSavingViewHistory',
+												),
 											});
 											return;
 										}
@@ -133,7 +142,7 @@ export const KnowledgeAssistantEntryToolbar = observer(
 										if (isAiSessionSwitcherLocked) {
 											Toast({
 												type: 'info',
-												title: '正在保存对话，请稍后再新建对话',
+												title: t('knowledge.assistant.sessionSaving'),
 											});
 											return;
 										}
@@ -141,7 +150,7 @@ export const KnowledgeAssistantEntryToolbar = observer(
 									}}
 								>
 									<CirclePlus />
-									新对话
+									{t('knowledge.assistant.newConversation')}
 								</Button>
 							</>
 						) : null}
@@ -159,7 +168,7 @@ export const KnowledgeAssistantEntryToolbar = observer(
 								onClick={() => setAssistantMode(item.id)}
 							>
 								<item.icon />
-								{item.label}
+								{t(item.labelKey)}
 							</Button>
 						))}
 					</div>

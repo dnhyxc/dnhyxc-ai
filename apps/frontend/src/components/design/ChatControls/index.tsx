@@ -1,6 +1,7 @@
 import { Button } from '@ui/index';
 import { Activity, ChevronDown, ChevronUp, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ChatI18nT } from '@/types/chat';
 
 interface ChatScrollControlsProps {
 	// 分支切换相关
@@ -14,6 +15,8 @@ interface ChatScrollControlsProps {
 	hasScrollbar: boolean;
 	isAtBottom: boolean;
 	onScrollTo: (position: 'up' | 'down', behavior?: 'smooth' | 'auto') => void;
+	/** i18n 翻译函数（可选）；不传则沿用组件内默认中文文案 */
+	t?: ChatI18nT;
 }
 
 /** 与工具栏一致的毛玻璃：主题底 + 轻模糊 + oklch 混色阴影 */
@@ -30,6 +33,7 @@ const ChatControls = ({
 	hasScrollbar,
 	isAtBottom,
 	onScrollTo,
+	t,
 }: ChatScrollControlsProps) => {
 	// 是否显示分支切换按钮
 	const showBranchButtons =
@@ -53,7 +57,10 @@ const ChatControls = ({
 								)}
 							>
 								<Sparkles />
-								<span className="text-md">回到正在生成的分支</span>
+								<span className="text-md">
+									{t?.('chat.controls.backToStreamingBranch') ??
+										'回到正在生成的分支'}
+								</span>
 							</Button>
 						)}
 						{/* 切换到最新分支的按钮 */}
@@ -67,7 +74,9 @@ const ChatControls = ({
 								)}
 							>
 								<Activity />
-								<span className="text-md">回到最新分支</span>
+								<span className="text-md">
+									{t?.('chat.controls.backToLatestBranch') ?? '回到最新分支'}
+								</span>
 							</Button>
 						)}
 					</div>
@@ -75,12 +84,23 @@ const ChatControls = ({
 
 				{/* 滚动控制按钮 */}
 				{hasScrollbar && (
-					<div
+					<button
+						type="button"
 						className="w-8.5 h-8.5 bg-theme/5 hover:bg-theme/15 text-textcolor/70 flex justify-center items-center cursor-pointer border border-theme/5 backdrop-blur-[2px] rounded-full ml-2 z-99"
 						onClick={() => onScrollTo(isAtBottom ? 'up' : 'down', 'auto')}
+						aria-label={
+							isAtBottom
+								? (t?.('chat.controls.scroll.toTop') ?? '滚动到顶部')
+								: (t?.('chat.controls.scroll.toBottom') ?? '滚动到底部')
+						}
+						title={
+							isAtBottom
+								? (t?.('chat.controls.scroll.toTop') ?? '滚动到顶部')
+								: (t?.('chat.controls.scroll.toBottom') ?? '滚动到底部')
+						}
 					>
 						{isAtBottom ? <ChevronUp /> : <ChevronDown />}
-					</div>
+					</button>
 				)}
 			</div>
 		</div>

@@ -19,6 +19,7 @@ import {
 import { useNavigate } from 'react-router';
 import { getChatMarkdownHighlightTheme } from '@/constant';
 import { useChatCoreContext } from '@/contexts';
+import { useI18n } from '@/hooks';
 import { useTheme } from '@/hooks/theme';
 import { useChatCore } from '@/hooks/useChatCore';
 import { deleteSession, updateSession } from '@/service';
@@ -58,6 +59,7 @@ const SessionItem = memo<SessionItemProps>(
 	}) => {
 		const [isComposing, setIsComposing] = useState(false);
 		const { chatStore } = useStore();
+		const { t } = useI18n();
 
 		const onChangeEditValue = (e: ChangeEvent<HTMLInputElement>) => {
 			e.stopPropagation();
@@ -82,7 +84,7 @@ const SessionItem = memo<SessionItemProps>(
 				if (res.success) {
 					Toast({
 						type: 'success',
-						title: '会话标题更新成功',
+						title: t('chat.sessionList.toast.titleUpdated'),
 					});
 				}
 				chatStore.updateSessionData(editItem.id, editItem.title);
@@ -159,7 +161,9 @@ const SessionItem = memo<SessionItemProps>(
 							className="line-clamp-1 max-w-85 flex-1 text-sm [&_.markdown-body]:text-textcolor!"
 							dangerouslySetInnerHTML={{
 								__html: parser.render(
-									item?.title || item.messages?.[0]?.content || '新对话',
+									item?.title ||
+										item.messages?.[0]?.content ||
+										t('chat.newSession'),
 								),
 							}}
 						/>
@@ -211,6 +215,7 @@ const SessionList = observer(({ open, onOpenChange }: IProps) => {
 	const { clearChat, stopGenerating } = useChatCore();
 	const { setIsSharing, clearAllCheckedMessages } = useChatCoreContext();
 	const { theme: appTheme } = useTheme();
+	const { t } = useI18n();
 
 	const navigate = useNavigate();
 
@@ -247,7 +252,10 @@ const SessionList = observer(({ open, onOpenChange }: IProps) => {
 				}
 				chatStore.updateSessionData(deleteItem.id);
 			} else {
-				Toast({ type: 'error', title: res.message || '删除失败' });
+				Toast({
+					type: 'error',
+					title: res.message || t('common.deleteFailed'),
+				});
 			}
 		}
 		setConfirmOpen(false);
@@ -338,7 +346,11 @@ const SessionList = observer(({ open, onOpenChange }: IProps) => {
 		!historySessionLoading && list.length === 0 && !historySessionLoadingMore;
 
 	return (
-		<Drawer title="历史对话" open={open} onOpenChange={onOpenChange}>
+		<Drawer
+			title={t('chat.sessionList.title')}
+			open={open}
+			onOpenChange={onOpenChange}
+		>
 			<ScrollArea
 				className="h-full overflow-y-auto pr-2 box-border"
 				onScroll={chatStore.onHistorySessionViewportScroll}
@@ -346,18 +358,18 @@ const SessionList = observer(({ open, onOpenChange }: IProps) => {
 				<div className="flex flex-col gap-0">
 					{showInitialPlaceholder ? (
 						<div className="text-sm text-textcolor/60 py-6 text-center">
-							加载中…
+							{t('common.loading')}
 						</div>
 					) : null}
 					{sessionList}
 					{showLoadMoreHint ? (
 						<div className="text-xs text-textcolor/50 py-2 text-center">
-							加载更多…
+							{t('common.loadingMore')}
 						</div>
 					) : null}
 					{showEmptyHint ? (
 						<div className="text-sm text-textcolor/60 py-8 text-center">
-							暂无历史对话
+							{t('chat.sessionList.empty')}
 						</div>
 					) : null}
 				</div>
@@ -365,9 +377,11 @@ const SessionList = observer(({ open, onOpenChange }: IProps) => {
 			<Confirm
 				open={confirmOpen}
 				onOpenChange={setConfirmOpen}
-				title="确认删除"
-				description="确定要删除这个会话吗？此操作无法撤销。"
+				title={t('chat.sessionList.confirmDelete.title')}
+				description={t('chat.sessionList.confirmDelete.desc')}
 				className="w-100"
+				cancelText={t('common.cancel')}
+				confirmText={t('common.confirm')}
 				onConfirm={handleConfirmDelete}
 				onCancel={handleCancelDelete}
 			/>

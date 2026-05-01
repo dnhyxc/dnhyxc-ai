@@ -9,21 +9,16 @@ import * as qiniu from 'qiniu-js';
 import { useEffect, useMemo, useState } from 'react';
 import Model from '@/components/design/Model';
 import Upload from '@/components/design/Upload';
-import { useStorageInfo } from '@/hooks';
+import { useI18n, useStorageInfo } from '@/hooks';
 import { getUploadToken, updateUser } from '@/service';
 import useStore from '@/store';
 import { type FileWithPreview } from '@/types';
 import { resolveQiniuUrlForWebDisplay } from '@/utils';
 import ResetEmailForm from './reset-email-form';
 
-const GenderEnum: Record<string, string> = {
-	1: '男',
-	2: '女',
-	3: '不便透露',
-};
-
 const Account = () => {
 	const { userStore } = useStore();
+	const { t, locale } = useI18n();
 	const [open, setOpen] = useState(false);
 	const [editKey, setEditKey] = useState('');
 	const [accountInfo, setAccountInfo] = useState({
@@ -68,12 +63,12 @@ const Account = () => {
 	const userInfos = useMemo(
 		() => [
 			{
-				label: '昵称',
+				label: t('account.fields.nickname'),
 				key: 'username',
 				value: accountInfo.username || '-',
 				component: (
 					<Input
-						placeholder="请输入昵称"
+						placeholder={t('account.placeholders.nickname')}
 						className="w-82"
 						value={accountInfo.username || ''}
 						onChange={(e) =>
@@ -83,9 +78,14 @@ const Account = () => {
 				),
 			},
 			{
-				label: '性别',
+				label: t('account.fields.gender'),
 				key: 'gender',
-				value: GenderEnum[accountInfo?.gender || '3'],
+				value:
+					accountInfo?.gender === '1'
+						? t('account.gender.male')
+						: accountInfo?.gender === '2'
+							? t('account.gender.female')
+							: t('account.gender.secret'),
 				component: (
 					<RadioGroup
 						value={accountInfo?.gender?.toString() || ''}
@@ -97,26 +97,26 @@ const Account = () => {
 						<div className="flex items-center gap-2 mr-5">
 							<RadioGroupItem value="1" id="c1" className="cursor-pointer" />
 							<Label htmlFor="c1" className="text-md cursor-pointer">
-								男
+								{t('account.gender.male')}
 							</Label>
 						</div>
 						<div className="flex items-center gap-2 mr-5">
 							<RadioGroupItem value="2" id="c2" className="cursor-pointer" />
 							<Label htmlFor="c2" className="text-md cursor-pointer">
-								女
+								{t('account.gender.female')}
 							</Label>
 						</div>
 						<div className="flex items-center gap-2">
 							<RadioGroupItem value="3" id="c3" className="cursor-pointer" />
 							<Label htmlFor="c3" className="text-md cursor-pointer">
-								不便透露
+								{t('account.gender.secret')}
 							</Label>
 						</div>
 					</RadioGroup>
 				),
 			},
 			{
-				label: '邮箱',
+				label: t('account.fields.email'),
 				key: 'email',
 				value: accountInfo.email || '-',
 				icon: (
@@ -128,7 +128,7 @@ const Account = () => {
 				),
 				component: (
 					<Input
-						placeholder="请输入邮箱"
+						placeholder={t('account.placeholders.email')}
 						className="w-82"
 						value={accountInfo.email || ''}
 						onChange={(e) =>
@@ -138,12 +138,12 @@ const Account = () => {
 				),
 			},
 			{
-				label: '地址',
+				label: t('account.fields.address'),
 				key: 'address',
 				value: accountInfo.address || '-',
 				component: (
 					<Input
-						placeholder="请输入地址"
+						placeholder={t('account.placeholders.address')}
 						className="w-82"
 						value={accountInfo.address || ''}
 						onChange={(e) =>
@@ -155,7 +155,7 @@ const Account = () => {
 				),
 			},
 		],
-		[accountInfo],
+		[accountInfo, t],
 	);
 
 	const onSubmit = async (key: string) => {
@@ -196,7 +196,7 @@ const Account = () => {
 		if (res.success) {
 			Toast({
 				type: 'success',
-				title: '修改成功',
+				title: t('account.toast.updateSuccess'),
 			});
 			const newUserInfo = { ...storageInfo, ...res.data };
 			setStorageInfo(newUserInfo);
@@ -205,7 +205,7 @@ const Account = () => {
 		} else {
 			Toast({
 				type: 'error',
-				title: '修改失败',
+				title: t('account.toast.updateFailed'),
 			});
 		}
 	};
@@ -298,14 +298,14 @@ const Account = () => {
 											className="p-0 mr-2 cursor-pointer hover:text-theme"
 											onClick={onChangeAvatar}
 										>
-											更换
+											{t('account.avatar.change')}
 										</Button>
 										<Button
 											variant="link"
 											className="p-0 cursor-pointer hover:text-theme"
 											onClick={onCancelAvatar}
 										>
-											取消
+											{t('common.cancel')}
 										</Button>
 									</div>
 								) : null}
@@ -321,7 +321,13 @@ const Account = () => {
 										>
 											{editKey !== i.key ? (
 												<div className="flex flex-1 w-full items-center gap-1 group">
-													<span className="min-w-10">{i.label}</span>
+													<span
+														className={
+															locale === 'zh-CN' ? 'min-w-6' : 'min-w-18'
+														}
+													>
+														{i.label}
+													</span>
 													<span className="ml-10">{i.value}</span>
 													{i.icon || (
 														<SquarePen
@@ -340,14 +346,14 @@ const Account = () => {
 														className="mx-2 cursor-pointer"
 														onClick={() => onSubmit(i.key)}
 													>
-														确定
+														{t('common.confirm')}
 													</Button>
 													<Button
 														variant="outline"
 														className="cursor-pointer"
 														onClick={onCancel}
 													>
-														取消
+														{t('common.cancel')}
 													</Button>
 												</div>
 											) : null}
@@ -361,7 +367,7 @@ const Account = () => {
 			</ScrollArea>
 			<Model
 				open={open}
-				title="修改邮箱"
+				title={t('account.modal.editEmail')}
 				width="350px"
 				footer={null}
 				onOpenChange={onOpenChange}

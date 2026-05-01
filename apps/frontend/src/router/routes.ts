@@ -19,6 +19,7 @@ import Pay from '@/views/pay';
 import Profile from '@/views/profile';
 import Setting from '@/views/setting';
 import AboutApp from '@/views/setting/about';
+import LanguageSetting from '@/views/setting/language';
 import AppSystem from '@/views/setting/system';
 import ThemeSetting from '@/views/setting/theme';
 import Share from '@/views/share';
@@ -26,6 +27,8 @@ import ChildWindow from '@/views/win';
 
 export interface RouteMeta {
 	title?: string;
+	/** 多语言标题 key；优先于 title 渲染 */
+	titleKey?: string;
 }
 
 export interface RouteConfig {
@@ -51,7 +54,7 @@ const routes: RouteConfig[] = [
 				path: '/chat',
 				Component: Chat,
 				meta: {
-					title: '智能对话',
+					titleKey: 'route.chat.title',
 				},
 				children: [
 					{
@@ -59,14 +62,14 @@ const routes: RouteConfig[] = [
 						// path: '/setting/system',
 						Component: NewChat,
 						meta: {
-							title: '智能对话',
+							titleKey: 'route.chat.title',
 						},
 					},
 					{
 						path: '/chat/c/:id?',
 						Component: Session,
 						meta: {
-							title: '智能对话',
+							titleKey: 'route.chat.title',
 						},
 					},
 				],
@@ -75,49 +78,49 @@ const routes: RouteConfig[] = [
 				path: '/document',
 				Component: Document,
 				meta: {
-					title: '智能文档处理',
+					titleKey: 'route.document.title',
 				},
 			},
 			{
 				path: '/coding',
 				Component: Coding,
 				meta: {
-					title: '智能代码处理',
+					titleKey: 'route.coding.title',
 				},
 			},
 			{
 				path: '/profile',
 				Component: Profile,
 				meta: {
-					title: '个人主页',
+					titleKey: 'route.profile.title',
 				},
 			},
 			{
 				path: '/knowledge',
 				Component: Knowledge,
 				meta: {
-					title: '知识库编辑',
+					titleKey: 'route.knowledge.title',
 				},
 			},
 			{
 				path: '/account',
 				Component: Account,
 				meta: {
-					title: '账号设置',
+					titleKey: 'route.account.title',
 				},
 			},
 			{
 				path: '/pay',
 				Component: Pay,
 				meta: {
-					title: '会员充值',
+					titleKey: 'route.pay.title',
 				},
 			},
 			{
 				path: '/setting',
 				Component: Setting,
 				meta: {
-					title: '系统设置',
+					titleKey: 'route.setting.title',
 				},
 				children: [
 					{
@@ -125,21 +128,28 @@ const routes: RouteConfig[] = [
 						// path: '/setting/system',
 						Component: AppSystem,
 						meta: {
-							title: '系统设置',
+							titleKey: 'route.setting.title',
 						},
 					},
 					{
 						path: '/setting/about',
 						Component: AboutApp,
 						meta: {
-							title: '关于应用',
+							titleKey: 'route.setting.about',
 						},
 					},
 					{
 						path: '/setting/theme',
 						Component: ThemeSetting,
 						meta: {
-							title: '主题设置',
+							titleKey: 'route.setting.theme',
+						},
+					},
+					{
+						path: '/setting/language',
+						Component: LanguageSetting,
+						meta: {
+							titleKey: 'route.setting.language',
 						},
 					},
 				],

@@ -14,7 +14,7 @@ import { Spinner } from '@ui/spinner';
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
-import { useCountdown } from '@/hooks';
+import { useCountdown, useI18n } from '@/hooks';
 import { sendEmail, updateEmail } from '@/service';
 import useStore from '@/store';
 import { formatTime, removeStorage } from '@/utils';
@@ -32,6 +32,7 @@ const ResetEmailForm: React.FC<IProps> = ({
 	onOpenChange,
 	handleAccountInfo,
 }) => {
+	const { t } = useI18n();
 	const [verifyCodeInfo, setVerifyCodeInfo] = useState({
 		oldVerifyCodeKey: '',
 		newVerifyCodeKey: '',
@@ -62,15 +63,17 @@ const ResetEmailForm: React.FC<IProps> = ({
 		email: z
 			.string()
 			.trim()
-			.regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, { message: '请输入合法的邮箱地址' }),
+			.regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, {
+				message: t('account.validation.emailInvalid'),
+			}),
 		oldVerifyCode: z
 			.string()
 			.trim()
-			.regex(/^\d{6}$/, { message: '验证码必须为6位数字' }),
+			.regex(/^\d{6}$/, { message: t('account.validation.verifyCode6Digits') }),
 		newVerifyCode: z
 			.string()
 			.trim()
-			.regex(/^\d{6}$/, { message: '验证码必须为6位数字' }),
+			.regex(/^\d{6}$/, { message: t('account.validation.verifyCode6Digits') }),
 	});
 
 	const form = useForm<z.infer<typeof formSchema>>({
@@ -119,7 +122,7 @@ const ResetEmailForm: React.FC<IProps> = ({
 				}
 			}
 			Toast({
-				title: '获取验证码成功',
+				title: t('account.toast.verifyCodeSent'),
 				type: 'success',
 			});
 		} catch (_error) {
@@ -139,7 +142,7 @@ const ResetEmailForm: React.FC<IProps> = ({
 			) {
 				return Toast({
 					type: 'info',
-					title: '验证码 Key 不能为空',
+					title: t('account.toast.verifyCodeKeyMissing'),
 				});
 			}
 			setLoading(true);
@@ -166,7 +169,7 @@ const ResetEmailForm: React.FC<IProps> = ({
 				});
 			}
 			Toast({
-				title: '邮箱修改成功',
+				title: t('account.toast.emailUpdated'),
 				type: 'success',
 			});
 		} catch (_error) {
@@ -178,7 +181,9 @@ const ResetEmailForm: React.FC<IProps> = ({
 		<Form {...form}>
 			<form onSubmit={form.handleSubmit(onSubmitEmail)} className="space-y-5">
 				<div className="flex flex-col">
-					<div className="my-2 font-medium">原邮箱</div>
+					<div className="my-2 font-medium">
+						{t('account.resetEmail.oldEmail')}
+					</div>
 					<Input value={userInfo?.email} disabled />
 				</div>
 				<FormField
@@ -186,13 +191,15 @@ const ResetEmailForm: React.FC<IProps> = ({
 					name="oldVerifyCode"
 					render={({ field }) => (
 						<FormItem>
-							<FormLabel className="text-md">原邮箱验证码</FormLabel>
+							<FormLabel className="text-md">
+								{t('account.resetEmail.oldVerifyCode')}
+							</FormLabel>
 							<FormControl>
 								<div className="flex items-center">
 									<Input
 										maxLength={6}
 										inputMode="numeric"
-										placeholder="请输入原邮箱验证码"
+										placeholder={t('account.placeholders.oldVerifyCode')}
 										{...field}
 										onChange={(e) => {
 											const value = e.target.value.replace(/\D/g, '');
@@ -213,7 +220,7 @@ const ResetEmailForm: React.FC<IProps> = ({
 										) : oldTimeLeft > 0 && oldTimeLeft < DEFAULT_TIME ? (
 											`${formatTime(oldTimeLeft)}`
 										) : (
-											'获取验证码'
+											t('account.actions.getVerifyCode')
 										)}
 									</Button>
 								</div>
@@ -228,9 +235,15 @@ const ResetEmailForm: React.FC<IProps> = ({
 						name="email"
 						render={({ field }) => (
 							<FormItem>
-								<FormLabel className="text-md">新邮箱</FormLabel>
+								<FormLabel className="text-md">
+									{t('account.resetEmail.newEmail')}
+								</FormLabel>
 								<FormControl>
-									<Input type="email" placeholder="请输入新邮箱" {...field} />
+									<Input
+										type="email"
+										placeholder={t('account.placeholders.newEmail')}
+										{...field}
+									/>
 								</FormControl>
 								<FormMessage />
 							</FormItem>
@@ -243,13 +256,15 @@ const ResetEmailForm: React.FC<IProps> = ({
 						name="newVerifyCode"
 						render={({ field }) => (
 							<FormItem>
-								<FormLabel className="text-md">新邮箱验证码</FormLabel>
+								<FormLabel className="text-md">
+									{t('account.resetEmail.newVerifyCode')}
+								</FormLabel>
 								<FormControl>
 									<div className="flex items-center">
 										<Input
 											maxLength={6}
 											inputMode="numeric"
-											placeholder="请输入新邮箱验证码"
+											placeholder={t('account.placeholders.newVerifyCode')}
 											{...field}
 											onChange={(e) => {
 												const value = e.target.value.replace(/\D/g, '');
@@ -271,7 +286,7 @@ const ResetEmailForm: React.FC<IProps> = ({
 											) : newTimeLeft > 0 && newTimeLeft < DEFAULT_TIME ? (
 												`${formatTime(newTimeLeft)}`
 											) : (
-												'获取验证码'
+												t('account.actions.getVerifyCode')
 											)}
 										</Button>
 									</div>
@@ -288,7 +303,7 @@ const ResetEmailForm: React.FC<IProps> = ({
 						className="cursor-pointer mr-2 w-20"
 					>
 						{loading ? <Spinner /> : null}
-						确定
+						{t('common.confirm')}
 					</Button>
 					<Button
 						variant="outline"
@@ -296,7 +311,7 @@ const ResetEmailForm: React.FC<IProps> = ({
 						className="cursor-pointer w-20"
 						onClick={onOpenChange}
 					>
-						取消
+						{t('common.cancel')}
 					</Button>
 				</div>
 			</form>

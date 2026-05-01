@@ -86,12 +86,19 @@ export type MarkdownEditorWordWrap =
 	| 'wordWrapColumn'
 	| 'bounded';
 
+export type MarkdownEditorT = (
+	key: string,
+	params?: Record<string, unknown>,
+) => string;
+
 interface MarkdownEditorProps {
 	value?: string;
 	onChange?: (value: string) => void;
 	/** 逻辑文档 id（如知识库条目），变化时换 model，避免串文 */
 	documentIdentity?: string;
 	placeholder?: string;
+	/** i18n 翻译函数（可选）；不传则沿用组件内默认中文文案 */
+	t?: MarkdownEditorT;
 	className?: string;
 	height?: string;
 	readOnly?: boolean;
@@ -242,7 +249,8 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	value = '',
 	onChange,
 	documentIdentity = 'default',
-	placeholder = '# 输入内容...',
+	placeholder: placeholderProp,
+	t,
 	className,
 	height = '300px',
 	readOnly = false,
@@ -391,6 +399,17 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 		!assistantRightPaneActive;
 
 	valueFromPropsRef.current = value;
+
+	// 国际化
+	const placeholder =
+		placeholderProp ?? t?.('monaco.placeholder') ?? '# 输入内容...';
+	const bottomBarLabel = t?.('monaco.topBar.bottomBar') ?? '操作栏';
+	const bottomBarAriaLabel = internalMarkdownBottomBarOpen
+		? (t?.('monaco.topBar.bottomBar.collapse') ?? '收起 Markdown 底部操作栏')
+		: (t?.('monaco.topBar.bottomBar.expand') ?? '展开 Markdown 底部操作栏');
+	const loadingEditorText = t?.('monaco.loading.editor') ?? '正在加载编辑器...';
+	const loadingDiffEditorText =
+		t?.('monaco.loading.diffEditor') ?? '正在加载对照编辑器...';
 
 	// 底部操作栏内部已根据回调是否存在计算显示与快捷键可用性，这里不再重复推导
 
@@ -1473,11 +1492,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 							>
 								<Button
 									variant="link"
-									aria-label={
-										internalMarkdownBottomBarOpen
-											? '收起 Markdown 底部操作栏'
-											: '展开 Markdown 底部操作栏'
-									}
+									aria-label={bottomBarAriaLabel}
 									aria-expanded={internalMarkdownBottomBarOpen}
 									// 指定受控元素的 ID，以便屏幕阅读器辅助导航关联此按钮和 Markdown 底部操作栏
 									aria-controls={markdownBottomBarId}
@@ -1490,7 +1505,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 										) : (
 											<PanelTopClose className="mt-0.5" />
 										)}
-										<span className="mt-0.5">操作栏</span>
+										<span className="mt-0.5">{bottomBarLabel}</span>
 									</div>
 								</Button>
 							</Tooltip>
@@ -1521,7 +1536,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 									theme={glassThemeId}
 									onMount={handleEditorMount}
 									options={mergedEditorOptions}
-									loading={<Loading text="正在加载编辑器..." />}
+									loading={<Loading text={loadingEditorText} />}
 								/>
 							</div>
 						</QuickContextMenu>
@@ -1533,6 +1548,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 							<ParserMarkdownPreviewPane
 								markdown={deferredPreviewMarkdown}
 								documentIdentity={documentIdentity}
+								t={t}
 								showPreviewScrollCornerFab
 								enableMermaid={markdownEnableMermaid}
 							/>
@@ -1582,7 +1598,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 												theme={glassThemeId}
 												onMount={handleEditorMount}
 												options={mergedEditorOptions}
-												loading={<Loading text="正在加载编辑器..." />}
+												loading={<Loading text={loadingEditorText} />}
 											/>
 										</div>
 									</QuickContextMenu>
@@ -1635,13 +1651,14 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 												theme={glassThemeId}
 												onMount={handleDiffEditorMount}
 												options={mergedDiffEditorOptions}
-												loading={<Loading text="正在加载对照编辑器..." />}
+												loading={<Loading text={loadingDiffEditorText} />}
 											/>
 										</div>
 									) : (
 										<ParserMarkdownPreviewPane
 											markdown={splitPaneMarkdown}
 											documentIdentity={documentIdentity}
+											t={t}
 											viewportRef={previewViewportRef}
 											onViewportScrollFollow={
 												editorFollowsPreviewActive
@@ -1662,6 +1679,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 				<MarkdownBottomBar
 					id={markdownBottomBarId}
 					open={internalMarkdownBottomBarOpen}
+					t={t}
 					rootRef={rootRef}
 					chords={markdownBottomBarChords}
 					formatChordForTip={formatChordForTip}

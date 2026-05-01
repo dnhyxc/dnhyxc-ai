@@ -3,16 +3,19 @@ import { Button, ScrollArea } from '@ui/index';
 import { ChevronDown, ChevronUp } from 'lucide-react'; // 引入图标
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
-import { Message } from '@/types/chat';
+import { ChatI18nT, Message } from '@/types/chat';
 
 interface ChatAnchorNavProps {
 	messages: Message[];
 	scrollContainerRef: React.RefObject<HTMLDivElement | null>;
+	/** i18n 翻译函数（可选）；不传则沿用组件内默认中文文案 */
+	t?: ChatI18nT;
 }
 
 const ChatAnchorNav = ({
 	messages,
 	scrollContainerRef,
+	t,
 }: ChatAnchorNavProps) => {
 	const [activeAnchor, setActiveAnchor] = useState<string>('');
 
@@ -235,6 +238,8 @@ const ChatAnchorNav = ({
 						className="w-6 h-6 rounded-full bg-theme/10 hover:bg-theme/20 text-textcolor/60 hover:text-textcolor"
 						onClick={handlePrev}
 						disabled={isPrevDisabled}
+						aria-label={t?.('chat.anchorNav.prev') ?? '上一条'}
+						title={t?.('chat.anchorNav.prev') ?? '上一条'}
 					>
 						<ChevronUp className="w-4 h-4" />
 					</Button>
@@ -252,7 +257,12 @@ const ChatAnchorNav = ({
 									<Tooltip
 										key={msg.chatId}
 										side="left"
-										content={`对话 ${index + 1}：${msg.content}`}
+										content={
+											t?.('chat.anchorNav.item', {
+												index: index + 1,
+												content: msg.content,
+											}) ?? `对话 ${index + 1}：${msg.content}`
+										}
 									>
 										<div
 											ref={(el) => {
@@ -283,6 +293,8 @@ const ChatAnchorNav = ({
 						className="w-6 h-6 rounded-full bg-theme/10 hover:bg-theme/20 text-textcolor/60 hover:text-textcolor"
 						onClick={handleNext}
 						disabled={isNextDisabled}
+						aria-label={t?.('chat.anchorNav.next') ?? '下一条'}
+						title={t?.('chat.anchorNav.next') ?? '下一条'}
 					>
 						<ChevronDown className="w-4 h-4" />
 					</Button>

@@ -58,8 +58,15 @@ function shiftMarkdownPreviewHeadingLineAttrs(
 /** 纯预览模式右下角：可滚动时显示置底，触底后切换为置顶 */
 type PreviewScrollCornerFabMode = 'hidden' | 'toBottom' | 'toTop';
 
+type MarkdownPreviewT = (
+	key: string,
+	params?: Record<string, unknown>,
+) => string;
+
 interface ParserMarkdownPreviewPaneProps {
 	markdown: string;
+	/** i18n 翻译函数（可选）；不传则沿用组件内默认中文文案 */
+	t?: MarkdownPreviewT;
 	/**
 	 * 分屏同步滚动：指向 ScrollArea 的 Viewport（Radix ref 落在 viewport 上）。
 	 * 与 `withScrollArea={false}` 联用时：不再套内层 ScrollArea，由宿主提供唯一滚动层，
@@ -84,6 +91,7 @@ interface ParserMarkdownPreviewPaneProps {
  */
 const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 	markdown,
+	t,
 	viewportRef,
 	documentIdentity,
 	onViewportScrollFollow,
@@ -231,6 +239,7 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 					openMermaidPreview={openMermaidPreview}
 					defaultViewMode="diagram"
 					resetKey={documentIdentity}
+					t={t}
 				>
 					{(mode) =>
 						mode === 'code' ? (
@@ -421,13 +430,17 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 			) : (
 				<div className="flex items-center justify-center flex-col gap-5 h-full box-border min-w-0 max-w-full w-full p-3 rounded-md">
 					<Component className="w-16 h-16 text-textcolor/70 animate-bounce" />
-					<div className="text-sm text-textcolor/80">预览内容为空</div>
+					<div className="text-sm text-textcolor/80">
+						{t?.('markdown.preview.empty') ?? '预览内容为空'}
+					</div>
 				</div>
 			)}
 			{showPreviewScrollCornerFab && previewScrollFabMode !== 'hidden' ? (
 				<Tooltip
 					content={
-						previewScrollFabMode === 'toBottom' ? '滚动到底部' : '滚动到顶部'
+						previewScrollFabMode === 'toBottom'
+							? (t?.('markdown.preview.scroll.toBottom') ?? '滚动到底部')
+							: (t?.('markdown.preview.scroll.toTop') ?? '滚动到顶部')
 					}
 				>
 					<button
@@ -438,7 +451,9 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 							'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme/40',
 						)}
 						aria-label={
-							previewScrollFabMode === 'toBottom' ? '滚动到底部' : '滚动到顶部'
+							previewScrollFabMode === 'toBottom'
+								? (t?.('markdown.preview.scroll.toBottom') ?? '滚动到底部')
+								: (t?.('markdown.preview.scroll.toTop') ?? '滚动到顶部')
 						}
 						onClick={onPreviewScrollCornerFabClick}
 					>

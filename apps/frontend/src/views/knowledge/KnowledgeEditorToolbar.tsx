@@ -1,6 +1,7 @@
 import Tooltip from '@design/Tooltip';
 import { Button } from '@ui/index';
 import { LibraryBig, OctagonX, SaveIcon, Share2, Trash2 } from 'lucide-react';
+import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 
 /** 编辑器顶栏：知识库 / 草稿 / 保存 */
@@ -21,6 +22,7 @@ const KnowledgeEditorToolbar = (props: {
 	shortcutHintOpenTrash?: string;
 	shortcutHintShare?: string;
 }) => {
+	const { t } = useI18n();
 	const {
 		onOpenLibrary,
 		onOpenTrash,
@@ -41,7 +43,7 @@ const KnowledgeEditorToolbar = (props: {
 		<div className="flex items-center pr-3 gap-4">
 			<Tooltip
 				side="bottom"
-				content={shortcutHintSave ?? 'Meta + S / Control + S'}
+				content={shortcutHintSave ?? t('knowledge.shortcuts.save')}
 			>
 				<Button
 					variant="link"
@@ -51,42 +53,50 @@ const KnowledgeEditorToolbar = (props: {
 					aria-busy={saveLoading}
 				>
 					<SaveIcon className="mt-0.5" />
-					<span className="mt-0.5">保存</span>
+					<span className="mt-0.5">{t('knowledge.toolbar.save')}</span>
 				</Button>
 			</Tooltip>
-			<Tooltip side="bottom" content={shortcutHintClear ?? 'Meta + Shift + D'}>
+			<Tooltip
+				side="bottom"
+				content={shortcutHintClear ?? t('knowledge.shortcuts.clear')}
+			>
 				<Button
 					variant="link"
 					className={cn(linkBtn, 'hover:text-orange-500')}
 					onClick={onNewDraft}
 				>
 					<OctagonX className="mt-0.5" />
-					<span className="mt-0.5">清空</span>
-				</Button>
-			</Tooltip>
-			<Tooltip side="bottom" content={shortcutHintShare ?? 'Meta + Shift + O'}>
-				<Button variant="link" className={linkBtn} onClick={onShareKnowledge}>
-					<Share2 className="mt-0.5" />
-					<span className="mt-0.5">分享</span>
+					<span className="mt-0.5">{t('knowledge.toolbar.clear')}</span>
 				</Button>
 			</Tooltip>
 			<Tooltip
 				side="bottom"
-				content={shortcutHintOpenLibrary ?? 'Meta + Shift + L'}
+				content={shortcutHintShare ?? t('knowledge.shortcuts.share')}
+			>
+				<Button variant="link" className={linkBtn} onClick={onShareKnowledge}>
+					<Share2 className="mt-0.5" />
+					<span className="mt-0.5">{t('knowledge.toolbar.share')}</span>
+				</Button>
+			</Tooltip>
+			<Tooltip
+				side="bottom"
+				content={
+					shortcutHintOpenLibrary ?? t('knowledge.shortcuts.openLibrary')
+				}
 			>
 				<Button variant="link" className={linkBtn} onClick={onOpenLibrary}>
 					<LibraryBig className="mt-0.5" />
-					<span className="mt-0.5">知识库</span>
+					<span className="mt-0.5">{t('knowledge.toolbar.library')}</span>
 				</Button>
 			</Tooltip>
 			{showTrash ? (
 				<Tooltip
 					side="bottom"
-					content={shortcutHintOpenTrash ?? 'Meta + Shift + T'}
+					content={shortcutHintOpenTrash ?? t('knowledge.shortcuts.openTrash')}
 				>
 					<Button variant="link" className={linkBtn} onClick={onOpenTrash}>
 						<Trash2 className="mt-0.5" />
-						<span className="mt-0.5">回收站</span>
+						<span className="mt-0.5">{t('knowledge.toolbar.trash')}</span>
 					</Button>
 				</Tooltip>
 			) : null}

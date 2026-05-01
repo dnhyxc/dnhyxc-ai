@@ -7,7 +7,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Outlet, useLocation, useNavigate, useParams } from 'react-router';
 import { v4 as uuidv4 } from 'uuid';
 import { useChatCoreContext } from '@/contexts';
+import { useI18n } from '@/hooks';
 import { useChatCore } from '@/hooks/useChatCore';
+import { cn } from '@/lib/utils';
 import { uploadFiles } from '@/service';
 import useStore from '@/store';
 import { FileWithPreview, UploadedFile } from '@/types';
@@ -16,6 +18,7 @@ import SessionList from './session-list';
 // Chat 主组件
 const Chat = observer(() => {
 	const { chatStore } = useStore();
+	const { t, locale } = useI18n();
 	const {
 		input,
 		setInput,
@@ -137,7 +140,12 @@ const Chat = observer(() => {
 
 	return (
 		<div className="flex flex-col w-full h-full overflow-hidden rounded-b-md">
-			<div className="absolute top-4 left-29 z-50 flex items-center gap-3 text-theme">
+			<div
+				className={cn(
+					'absolute top-4 left-29 z-50 flex items-center gap-3 text-theme',
+					locale === 'zh-CN' ? 'left-29.5' : 'left-34.5',
+				)}
+			>
 				<div className="lucide-stroke-draw-hover">
 					{open ? (
 						<History size={20} className="cursor-pointer text-teal-500 mt-px" />
@@ -173,11 +181,15 @@ const Chat = observer(() => {
 								className="cursor-pointer border-textcolor/60"
 							/>
 							<Label htmlFor="terms" className="cursor-pointer ml-2 text-md">
-								全选
+								{t('chat.share.selectAll')}
 							</Label>
 						</div>
 						<div className="border-l border-textcolor/50 h-3" />
-						<div>已选择 {checkedMessages.size / 2} 组对话</div>
+						<div>
+							{t('chat.share.selectedPairs', {
+								count: checkedMessages.size / 2,
+							})}
+						</div>
 					</div>
 					<div className="flex items-center gap-3">
 						<Button
@@ -186,7 +198,7 @@ const Chat = observer(() => {
 							className="border-theme"
 							onClick={onCancelShare}
 						>
-							取消
+							{t('common.cancel')}
 						</Button>
 						<Button
 							variant="dynamic"
@@ -194,12 +206,13 @@ const Chat = observer(() => {
 							className="text-white border-theme bg-transparent hover:bg-transparent bg-linear-to-r from-teal-500 to-cyan-600"
 							onClick={onShowShareModel}
 						>
-							创建分享链接
+							{t('chat.share.createLink')}
 						</Button>
 					</div>
 				</div>
 			) : (
 				<ChatEntry
+					t={t}
 					chatInputRef={chatInputRef}
 					input={input}
 					setInput={setInput}

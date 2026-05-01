@@ -5,6 +5,7 @@ import type { Dispatch, SetStateAction } from 'react';
 import Loading from '@/components/design/Loading';
 import { ScrollArea } from '@/components/ui';
 import { Spinner } from '@/components/ui/spinner';
+import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import assistantStore from '@/store/assistant';
 
@@ -43,16 +44,17 @@ const KnowledgeAssistantHistoryDrawer = ({
 	setDeleteTargetSessionId,
 	setDeleteConfirmOpen,
 }: KnowledgeAssistantHistoryDrawerProps) => {
+	const { t } = useI18n();
 	return (
 		<Drawer
-			title="历史对话"
+			title={t('knowledge.assistant.history')}
 			open={isAiHistoryDrawerOpen}
 			onOpenChange={(next) => {
 				// 锁定期间禁止打开抽屉（避免在未落库时切换到其它会话）
 				if (next && isAiSessionSwitcherLocked) {
 					Toast({
 						type: 'info',
-						title: '正在保存对话，请稍后再查看历史对话',
+						title: t('knowledge.assistant.sessionSavingViewHistory'),
 					});
 					return;
 				}
@@ -69,7 +71,7 @@ const KnowledgeAssistantHistoryDrawer = ({
 					<div className="flex min-h-0 w-full flex-1 flex-col gap-2">
 						{showInitialPlaceholder ? (
 							<div className="flex flex-1 flex-col items-center justify-center py-6 text-center text-sm text-textcolor/60">
-								<Loading text="加载中…" />
+								<Loading text={t('common.loading')} />
 							</div>
 						) : null}
 						{sessionList.map((s) => {
@@ -79,7 +81,9 @@ const KnowledgeAssistantHistoryDrawer = ({
 							);
 							const title = s.title?.trim()
 								? s.title.trim()
-								: `对话 ${s.sessionId.slice(0, 8)}`;
+								: t('knowledge.assistant.conversationFallback', {
+										id: s.sessionId.slice(0, 8),
+									});
 							return (
 								<div
 									key={s.sessionId}
@@ -106,7 +110,9 @@ const KnowledgeAssistantHistoryDrawer = ({
 										<Button
 											variant="link"
 											className="cursor-pointer absolute right-2 top-2 hidden group-hover:flex items-center justify-center h-7 w-7 rounded-md text-textcolor/70 hover:text-red-500 hover:bg-red-500/10"
-											aria-label="删除对话"
+											aria-label={t(
+												'knowledge.assistant.deleteConversationTitle',
+											)}
 											onClick={(e) => {
 												e.stopPropagation();
 												setDeleteTargetSessionId(s.sessionId);
@@ -127,12 +133,12 @@ const KnowledgeAssistantHistoryDrawer = ({
 						})}
 						{showLoadMoreHint ? (
 							<div className="text-xs text-textcolor/50 py-2 text-center">
-								加载更多…
+								{t('common.loadingMore')}
 							</div>
 						) : null}
 						{showEmptyHint ? (
 							<div className="text-sm text-textcolor/60 py-8 text-center">
-								暂无知识库条目
+								{t('knowledge.assistant.historyEmpty')}
 							</div>
 						) : null}
 					</div>

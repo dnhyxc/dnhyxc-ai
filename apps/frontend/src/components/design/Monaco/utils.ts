@@ -519,6 +519,12 @@ export function syncEditorScrollFromMarkdownPreview(
 	applyEditorScrollTop(editor, next);
 }
 
+/** 与 `MarkdownEditor` / `MarkdownBottomBar` 注入的 i18n 翻译函数签名对齐（可选） */
+export type KnowledgeAutoSaveIntervalT = (
+	key: string,
+	params?: Record<string, unknown>,
+) => string;
+
 /**
  * 将「自动保存间隔（秒）」格式化为 UI 可读文案。
  *
@@ -528,8 +534,21 @@ export function syncEditorScrollFromMarkdownPreview(
  * - 其它：仍显示「N 秒」（保持真实值，避免误导）
  *
  * @param sec 秒数（正整数；调用方应保证合理范围）
+ * @param t 可选 i18n 翻译函数；传入时优先使用字典 key（`monaco.autoSaveInterval.*`）
  */
-export function formatKnowledgeAutoSaveIntervalLabel(sec: number): string {
+export function formatKnowledgeAutoSaveIntervalLabel(
+	sec: number,
+	t?: KnowledgeAutoSaveIntervalT,
+): string {
+	if (t) {
+		if (sec < 60) {
+			return t('monaco.autoSaveInterval.seconds', { n: sec });
+		}
+		if (sec % 60 === 0) {
+			return t('monaco.autoSaveInterval.minutes', { m: sec / 60 });
+		}
+		return t('monaco.autoSaveInterval.seconds', { n: sec });
+	}
 	if (sec < 60) return `${sec} 秒`;
 	if (sec % 60 === 0) return `${sec / 60} 分钟`;
 	return `${sec} 秒`;

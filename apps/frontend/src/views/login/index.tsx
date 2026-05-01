@@ -2,7 +2,7 @@ import { Button } from '@ui/button';
 import { ScrollArea } from '@ui/scroll-area';
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
-import { useTheme } from '@/hooks';
+import { useI18n, useTheme } from '@/hooks';
 import ForgetPwdForm from './forget-pwd-form';
 import LoginByEmailForm from './login-by-email-form';
 import LoginForm from './login-form';
@@ -14,6 +14,7 @@ const Login = () => {
 	const [loginType, setLoginType] = useState('username');
 
 	const navigate = useNavigate();
+	const { t } = useI18n();
 
 	useTheme();
 
@@ -49,9 +50,9 @@ const Login = () => {
 				<div data-tauri-drag-region className="w-90 m-auto">
 					<div className="text-xl font-medium w-90 mb-10">
 						{isRegister ? (
-							'注册账号'
+							t('auth.register.title')
 						) : isForget ? (
-							'重置密码'
+							t('auth.resetPassword.title')
 						) : (
 							<div className="flex items-center">
 								<Button
@@ -59,14 +60,14 @@ const Login = () => {
 									className={`p-0 text-md cursor-pointer ${loginType !== 'username' ? 'text-theme/70' : 'text-theme'}`}
 									onClick={() => switchLoginType('username')}
 								>
-									账号密码登录
+									{t('auth.login.tab.username')}
 								</Button>
 								<Button
 									variant="link"
 									className={`p-0 ml-5 text-md cursor-pointer ${loginType !== 'email' ? 'text-theme/70' : 'text-theme'}`}
 									onClick={() => switchLoginType('email')}
 								>
-									邮箱登录
+									{t('auth.login.tab.email')}
 								</Button>
 							</div>
 						)}
@@ -90,21 +91,21 @@ const Login = () => {
 								className="cursor-pointer p-0 text-sm text-theme"
 								onClick={onRegister}
 							>
-								{isRegister ? '已有账号，前往登录' : '没有账号，点我注册'}
+								{isRegister ? t('auth.login.go') : t('auth.register.go')}
 							</Button>
 							<Button
 								variant="link"
 								className="cursor-pointer p-0 text-sm mx-4 text-theme"
 								onClick={() => onForgetPwd()}
 							>
-								忘记密码
+								{t('auth.forgotPassword')}
 							</Button>
 							<Button
 								variant="link"
 								className="cursor-pointer p-0 text-sm text-theme"
 								onClick={goHome}
 							>
-								返回首页
+								{t('nav.home')}
 							</Button>
 						</div>
 					)}

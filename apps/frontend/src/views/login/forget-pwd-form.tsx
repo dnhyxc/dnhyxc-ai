@@ -14,7 +14,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
-import { useCountdown } from '@/hooks';
+import { useCountdown, useI18n } from '@/hooks';
 import { resetPassword, sendResetPasswordEmail } from '@/service';
 import { encrypt, formatTime, removeStorage } from '@/utils';
 
@@ -27,47 +27,48 @@ const ForgetPwdForm: React.FC<IProps> = ({ onForgetPwd, switchLogin }) => {
 	const [verifyCodeKey, setVerifyCodeKey] = useState('');
 	const [sendLoading, setSendLoading] = useState(false);
 	const [resetLoading, setResetLoading] = useState(false);
+	const { t } = useI18n();
 
 	const { timeLeft, startTimer } = useCountdown(60, 'forget_countdown');
 
 	const formSchema = z
 		.object({
 			username: z.string().min(2, {
-				message: '用户名至少输入两个字符',
+				message: t('auth.validation.usernameMin'),
 			}),
 			password: z
 				.string()
 				.trim()
-				.min(8, { message: '密码至少输入8个字符' })
+				.min(8, { message: t('auth.validation.passwordMin') })
 				.regex(
 					/^(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).+$/,
 					{
-						message: '密码必须包含英文、数字和特殊字符',
+						message: t('auth.validation.passwordComplex'),
 					},
 				),
 			confirmPassword: z
 				.string()
 				.trim()
-				.min(8, { message: '密码至少输入8个字符' })
+				.min(8, { message: t('auth.validation.passwordMin') })
 				.regex(
 					/^(?=.*[A-Za-z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]).+$/,
 					{
-						message: '密码必须包含英文、数字和特殊字符',
+						message: t('auth.validation.passwordComplex'),
 					},
 				),
 			email: z
 				.string()
 				.trim()
 				.regex(/^[^\s@]+@[^\s@]+\.[^\s@]+$/, {
-					message: '请输入合法的邮箱地址',
+					message: t('auth.validation.emailInvalid'),
 				}),
 			verifyCode: z
 				.string()
 				.trim()
-				.min(6, { message: '验证码至少输入6个字符' }),
+				.min(6, { message: t('auth.validation.verifyCodeMin') }),
 		})
 		.refine((data) => data.password === data.confirmPassword, {
-			message: '两次输入的密码不一致',
+			message: t('auth.validation.passwordMismatch'),
 			path: ['confirmPassword'],
 		});
 
@@ -86,7 +87,7 @@ const ForgetPwdForm: React.FC<IProps> = ({ onForgetPwd, switchLogin }) => {
 		e.preventDefault();
 		if (!form.watch('username')) {
 			Toast({
-				title: '请先输入用户名',
+				title: t('auth.username.requiredFirst'),
 				type: 'warning',
 			});
 			return;
@@ -102,7 +103,7 @@ const ForgetPwdForm: React.FC<IProps> = ({ onForgetPwd, switchLogin }) => {
 			if (res.success) {
 				setVerifyCodeKey(res.data.key);
 				Toast({
-					title: '发送验证码成功',
+					title: t('auth.verifyCode.sentSuccess'),
 					type: 'success',
 				});
 			}
@@ -121,7 +122,7 @@ const ForgetPwdForm: React.FC<IProps> = ({ onForgetPwd, switchLogin }) => {
 			});
 			setResetLoading(false);
 			Toast({
-				title: '重置密码成功',
+				title: t('auth.resetPassword.success'),
 				type: 'success',
 			});
 			if (res.success) {
@@ -147,9 +148,13 @@ const ForgetPwdForm: React.FC<IProps> = ({ onForgetPwd, switchLogin }) => {
 					name="username"
 					render={({ field }) => (
 						<FormItem className="w-90">
-							<FormLabel className="text-md">用户名</FormLabel>
+							<FormLabel className="text-md">{t('auth.username')}</FormLabel>
 							<FormControl>
-								<Input placeholder="请输入用户名" {...field} className="" />
+								<Input
+									placeholder={t('auth.username.placeholder')}
+									{...field}
+									className=""
+								/>
 							</FormControl>
 							<FormMessage />
 						</FormItem>
@@ -160,9 +165,13 @@ const ForgetPwdForm: React.FC<IProps> = ({ onForgetPwd, switchLogin }) => {
 					name="password"
 					render={({ field }) => (
 						<FormItem>
-							<FormLabel className="text-md">密码</FormLabel>
+							<FormLabel className="text-md">{t('auth.password')}</FormLabel>
 							<FormControl>
-								<Input type="password" placeholder="请输入密码" {...field} />
+								<Input
+									type="password"
+									placeholder={t('auth.password.placeholder')}
+									{...field}
+								/>
 							</FormControl>
 							<FormMessage />
 						</FormItem>
@@ -173,11 +182,13 @@ const ForgetPwdForm: React.FC<IProps> = ({ onForgetPwd, switchLogin }) => {
 					name="confirmPassword"
 					render={({ field }) => (
 						<FormItem>
-							<FormLabel className="text-md">确认密码</FormLabel>
+							<FormLabel className="text-md">
+								{t('auth.confirmPassword')}
+							</FormLabel>
 							<FormControl>
 								<Input
 									type="password"
-									placeholder="请输入确认密码"
+									placeholder={t('auth.confirmPassword.placeholder')}
 									{...field}
 								/>
 							</FormControl>
@@ -190,9 +201,9 @@ const ForgetPwdForm: React.FC<IProps> = ({ onForgetPwd, switchLogin }) => {
 					name="email"
 					render={({ field }) => (
 						<FormItem>
-							<FormLabel className="text-md">邮箱</FormLabel>
+							<FormLabel className="text-md">{t('auth.email')}</FormLabel>
 							<FormControl>
-								<Input placeholder="请输入邮箱" {...field} />
+								<Input placeholder={t('auth.email.placeholder')} {...field} />
 							</FormControl>
 							<FormMessage />
 						</FormItem>
@@ -203,13 +214,13 @@ const ForgetPwdForm: React.FC<IProps> = ({ onForgetPwd, switchLogin }) => {
 					name="verifyCode"
 					render={({ field }) => (
 						<FormItem>
-							<FormLabel className="text-md">验证码</FormLabel>
+							<FormLabel className="text-md">{t('auth.verifyCode')}</FormLabel>
 							<FormControl className="flex items-center">
 								<div className="flex items-center">
 									<Input
 										maxLength={6}
 										inputMode="numeric"
-										placeholder="请输入邮箱收到的验证码"
+										placeholder={t('auth.verifyCode.placeholder.email')}
 										{...field}
 										onChange={(e) => {
 											const value = e.target.value.replace(/\D/g, '');
@@ -231,7 +242,7 @@ const ForgetPwdForm: React.FC<IProps> = ({ onForgetPwd, switchLogin }) => {
 										) : timeLeft > 0 && timeLeft < 60 ? (
 											`${formatTime(timeLeft)}`
 										) : (
-											'获取验证码'
+											t('auth.verifyCode.send')
 										)}
 									</Button>
 								</div>
@@ -247,14 +258,14 @@ const ForgetPwdForm: React.FC<IProps> = ({ onForgetPwd, switchLogin }) => {
 						onClick={form.handleSubmit(onSubmit)}
 					>
 						{resetLoading ? <Spinner /> : null}
-						确定重置
+						{t('auth.resetPassword.submit')}
 					</Button>
 					<Button
 						variant="outline"
 						className="cursor-pointer mt-5 flex-1 ml-4"
 						onClick={goToLogin}
 					>
-						返回登录
+						{t('auth.login.back')}
 					</Button>
 				</div>
 			</form>
