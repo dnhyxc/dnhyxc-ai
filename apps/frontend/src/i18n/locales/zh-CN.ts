@@ -176,6 +176,8 @@ export const zhCN = {
 	'setting.about.relaunchDialog.later': '稍后重启',
 	'setting.about.relaunchDialog.now': '立即重启',
 
+	'router.window.aboutTitle': '关于 dnhyxc-ai',
+
 	'setting.language.title': '语言设置',
 	'setting.language.zh': '中文（简体）',
 	'setting.language.en': 'English',

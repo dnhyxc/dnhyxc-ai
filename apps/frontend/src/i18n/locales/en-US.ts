@@ -188,6 +188,8 @@ export const enUS = {
 	'setting.about.relaunchDialog.later': 'Relaunch later',
 	'setting.about.relaunchDialog.now': 'Relaunch now',
 
+	'router.window.aboutTitle': 'About dnhyxc-ai',
+
 	// 语言设置文案
 	'setting.language.title': 'Language',
 	'setting.language.zh': '中文（简体）',

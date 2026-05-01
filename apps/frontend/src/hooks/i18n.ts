@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useSyncExternalStore } from 'react';
 import { DEFAULT_LOCALE, DICTS, type Locale, SUPPORTED_LOCALES } from '@/i18n';
-import { getValue, setValue } from '@/utils';
+import { getValue, onEmit, setValue } from '@/utils';
 
 /** 供首屏同步读取，降低刷新时语言晚于首帧 */
 export const LOCALE_BOOTSTRAP_STORAGE_KEY = 'dnhyxc_locale_bootstrap';
@@ -74,7 +74,10 @@ function getLocaleSnapshot(): Locale {
 	return currentLocale;
 }
 
-async function setLocaleGlobal(next: Locale, opts?: { syncUrl?: boolean }) {
+async function setLocaleGlobal(
+	next: Locale,
+	opts?: { syncUrl?: boolean; emitEvent?: boolean },
+) {
 	if (!SUPPORTED_LOCALES.includes(next)) return;
 	if (next === currentLocale) return;
 	currentLocale = next;
@@ -82,6 +85,10 @@ async function setLocaleGlobal(next: Locale, opts?: { syncUrl?: boolean }) {
 	persistLocaleBootstrap(next);
 	emitLocaleChanged();
 	await setValue('locale', next);
+	if (opts?.emitEvent !== false) {
+		// 跨窗口同步：主窗口切换语言后，子窗口自动跟随
+		await onEmit('locale', next);
+	}
 
 	// 推荐：同步覆盖 URL lang，保证复制/刷新一致
 	if (opts?.syncUrl !== false && typeof window !== 'undefined') {
@@ -137,7 +144,10 @@ export function useI18n() {
 		};
 	}, [dict, fallbackDict]);
 
-	const setLocale = async (next: Locale, opts?: { syncUrl?: boolean }) => {
+	const setLocale = async (
+		next: Locale,
+		opts?: { syncUrl?: boolean; emitEvent?: boolean },
+	) => {
 		await setLocaleGlobal(next, opts);
 	};
 

@@ -30,7 +30,7 @@ const App = () => {
 				onCreateWindow({
 					url: `/about?version=${eventOptions.version}`,
 					label: 'about',
-					title: '关于 dnhyxc-ai',
+					title: 'dnhyxc-ai',
 					width: 400,
 					height: 300,
 					titleBarStyle: 'visible',

@@ -1,11 +1,12 @@
 import { Button } from '@ui/button';
 import { useEffect } from 'react';
 import { type ThemeName, useGetVersion, useI18n, useTheme } from '@/hooks';
+import type { Locale } from '@/i18n';
 import { onListen, openExternalUrl } from '@/utils';
 
 const About = () => {
 	const { version } = useGetVersion();
-	const { t } = useI18n();
+	const { t, setLocale } = useI18n();
 
 	const { changeTheme } = useTheme();
 
@@ -14,10 +15,15 @@ const About = () => {
 			changeTheme(value as ThemeName, false);
 		});
 
+		const unlistenLocalePromise = onListen('locale', (value: Locale) => {
+			void setLocale(value, { syncUrl: false, emitEvent: false });
+		});
+
 		return () => {
 			unlistenThemePromise.then((unlisten) => unlisten());
+			unlistenLocalePromise.then((unlisten) => unlisten());
 		};
-	}, []);
+	}, [changeTheme, setLocale]);
 
 	const handleOpenLink = (url: string) => {
 		void openExternalUrl(url);
