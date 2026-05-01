@@ -27,12 +27,6 @@ const NavigationMenus = () => {
 				icon: 'icon-theme',
 			},
 			{
-				name: t('setting.menu.language'),
-				key: 'language',
-				path: '/setting/language',
-				icon: 'icon-language',
-			},
-			{
 				name: t('setting.menu.about'),
 				key: 'about',
 				path: '/setting/about',

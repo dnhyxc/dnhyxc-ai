@@ -11,6 +11,7 @@ import {
 	useRef,
 	useState,
 } from 'react';
+import { ChatI18nT } from '@/types/chat';
 import {
 	downloadMermaidPreviewSvg,
 	mermaidSvgToPreviewDataUrl,
@@ -21,13 +22,16 @@ export type UseMermaidImagePreviewResult = {
 	openMermaidPreview: (dataUrl: string) => void;
 	/** 挂到页面中的 ImagePreview 节点（通常放在组件树根附近） */
 	mermaidImagePreviewModal: ReactNode;
+	t?: ChatI18nT;
 };
 
 /**
  * Mermaid 图表：ImagePreview 弹层状态与下载逻辑。
  * 与 {@link useMermaidDiagramClickPreview} 配合，在任意 Markdown 根节点上委托点击。
  */
-export function useMermaidImagePreview(): UseMermaidImagePreviewResult {
+export function useMermaidImagePreview(
+	t?: ChatI18nT,
+): UseMermaidImagePreviewResult {
 	const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
 	const openMermaidPreview = useCallback((dataUrl: string) => {
@@ -50,9 +54,10 @@ export function useMermaidImagePreview(): UseMermaidImagePreviewResult {
 			visible={previewUrl !== null}
 			selectedImage={previewUrl ? { url: previewUrl } : { url: '' }}
 			onVisibleChange={onPreviewVisibleChange}
-			title="Mermaid 图表预览"
+			title={t?.('imagePreview.mermaidTitle') ?? 'Mermaid 图表预览'}
 			showDownload
 			download={onDownload}
+			t={t}
 		/>
 	);
 

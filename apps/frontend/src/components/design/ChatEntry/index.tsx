@@ -266,6 +266,7 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 								)}
 								{onUploadFile && (
 									<Upload
+										t={t}
 										uploadType="button"
 										className={cn(
 											'w-auto h-auto lucide-stroke-draw-hover [&_svg]:overflow-visible',

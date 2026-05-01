@@ -14,6 +14,31 @@ export const zhCN = {
 	'common.copy': '复制',
 	'common.download': '下载',
 
+	'image.loadFailed': '图片加载失败',
+
+	'imagePreview.title': '图片预览',
+	'imagePreview.mermaidTitle': 'Mermaid 图表预览',
+	'imagePreview.zoomIn': '放大',
+	'imagePreview.zoomOut': '缩小',
+	'imagePreview.rotate': '旋转',
+	'imagePreview.reset': '重置',
+	'imagePreview.prev': '上一张',
+	'imagePreview.next': '下一张',
+	'imagePreview.close': '关闭',
+
+	'upload.tooltip.default': '仅支持PDF、Word、Excel文件',
+	'upload.uploading': '上传中...',
+	'upload.button': '上传文件',
+	'upload.error.maxCount': '最多只能同时上传 {maxCount} 个文件',
+	'upload.error.invalidType': '不支持的文件类型: {type}',
+	'upload.error.maxSize': '文件大小不能超过 {maxSizeMb} MB',
+
+	'dragUpload.tip.prefix': '拖拽图片到此处或',
+	'dragUpload.tip.clickToSelect': '点击选择',
+	'dragUpload.tip.info': '支持 JPEG, PNG, GIF, SVG, WebP 格式，最大5MB',
+	'dragUpload.error.invalidType': '不支持的文件类型: {type}',
+	'dragUpload.error.maxSize': '文件大小不能超过 {maxSizeMb} MB',
+
 	'nav.home': '首页',
 	'nav.knowledge': '知识库',
 	'nav.pay': '会员充值',
@@ -24,6 +49,16 @@ export const zhCN = {
 	'setting.menu.language': '语言设置',
 	'setting.menu.about': '关于应用',
 	'setting.theme.colorTitle': '彩色主题',
+	'setting.theme.color.white': '白色',
+	'setting.theme.color.black': '黑色',
+	'setting.theme.color.green': '绿色',
+	'setting.theme.color.purple': '紫色',
+	'setting.theme.color.bluePurple': '蓝紫',
+	'setting.theme.color.blue': '蓝色',
+	'setting.theme.color.cyanBlue': '青蓝',
+	'setting.theme.color.orange': '橙色',
+	'setting.theme.color.red': '红色',
+	'setting.theme.color.beige': '米色',
 	'setting.theme.previewTitle': '主题预览',
 	'setting.theme.preview.cardBg.title': '当前卡片背景',
 	'setting.theme.preview.cardBg.desc':
@@ -50,6 +85,96 @@ export const zhCN = {
 	'setting.theme.preview.selection.desc': '拖选文本时的背景与字色示意',
 	'setting.theme.preview.border.title': '边框',
 	'setting.theme.preview.ring.title': '聚焦环',
+
+	'setting.system.storage.title': '文件存储',
+	'setting.system.storage.defaultPath': '默认存储路径',
+	'setting.system.storage.changeDir': '更改目录',
+	'setting.system.storage.selectDirOnlyDesktop':
+		'选择存储目录仅在桌面客户端可用',
+
+	'setting.system.startup.title': '启动设置',
+	'setting.system.startup.autoStart': '设置开机自启',
+	'setting.system.startup.autoStartOff': '开机不自动启动',
+	'setting.system.startup.autoStartOn': '开机自动启动',
+	'setting.system.startup.autoStartOnlyDesktop': '开机自启仅在桌面客户端可用',
+
+	'setting.system.close.title': '关闭设置',
+	'setting.system.close.closeApp': '关闭应用程序',
+	'setting.system.close.minimizeToTray': '最小化到托盘，不退出程序',
+	'setting.system.close.quit': '退出程序',
+
+	'setting.system.shortcuts.title': '快捷键设置',
+	'setting.system.shortcuts.desc':
+		'「应用显示/刷新」相关快捷键全局生效，其余项仅在对应的窗口内生效。',
+	'setting.system.shortcuts.group.other': '其他',
+	'setting.system.shortcuts.group.knowledge': '知识库',
+	'setting.system.shortcuts.group.appVisibility': '应用显示/刷新',
+	'setting.system.shortcuts.separator': '：',
+	'setting.system.shortcuts.pressKey': '按键盘输入快捷键',
+	'setting.system.shortcuts.conflictTitle': '快捷键冲突',
+	'setting.system.shortcuts.conflictMessage':
+		'该快捷键与「{label}」冲突，请更换其他组合',
+	'setting.system.shortcuts.globalOnlyDesktop': '全局快捷键仅在桌面客户端可用',
+	'setting.system.shortcuts.registerFailed': '全局快捷键注册失败',
+
+	'setting.system.shortcuts.item.hide': '隐藏程序',
+	'setting.system.shortcuts.item.hideOrShowApp': '显示隐藏应用',
+	'setting.system.shortcuts.item.reload': '刷新应用',
+	'setting.system.shortcuts.item.newWorkflow': '新建工作流',
+	'setting.system.shortcuts.item.openSubwindow': '打开子窗口',
+	'setting.system.shortcuts.item.knowledge.save': '知识库：保存',
+	'setting.system.shortcuts.item.knowledge.clearDraft': '知识库：清空草稿',
+	'setting.system.shortcuts.item.knowledge.share': '知识库：分享文章',
+	'setting.system.shortcuts.item.knowledge.openList': '知识库：打开列表',
+	'setting.system.shortcuts.item.knowledge.toggleActionBar':
+		'知识库：切换操作栏',
+	'setting.system.shortcuts.item.knowledge.openTrash': '知识库：打开回收站',
+	'setting.system.shortcuts.item.knowledge.sendSelectionToAssistant':
+		'知识库：发送选中内容到助手输入框',
+	'setting.system.shortcuts.item.knowledge.bar.editSource':
+		'知识库：操作栏：编辑源码',
+	'setting.system.shortcuts.item.knowledge.bar.diff':
+		'知识库：操作栏：分屏对照（Diff）',
+	'setting.system.shortcuts.item.knowledge.bar.previewRender':
+		'知识库：操作栏：预览渲染',
+	'setting.system.shortcuts.item.knowledge.bar.toggleAssistant':
+		'知识库：操作栏：开关 AI 助手',
+	'setting.system.shortcuts.item.knowledge.bar.splitPreview':
+		'知识库：操作栏：分屏预览',
+	'setting.system.shortcuts.item.knowledge.bar.followBidirectional':
+		'知识库：操作栏：双边跟随',
+	'setting.system.shortcuts.item.knowledge.bar.followPreviewFollowsEditor':
+		'知识库：操作栏：右边跟随左边',
+	'setting.system.shortcuts.item.knowledge.bar.followEditorFollowsPreview':
+		'知识库：操作栏：左边跟随右边',
+	'setting.system.shortcuts.item.knowledge.bar.toggleOverrideSave':
+		'知识库：操作栏：开关覆盖保存',
+	'setting.system.shortcuts.item.knowledge.bar.toggleAutoSave':
+		'知识库：操作栏：开关自动保存',
+	'setting.system.shortcuts.item.knowledge.bar.resetPosition':
+		'知识库：操作栏：复位初始位置',
+
+	'setting.about.toast.latestVersion': '已经是最新版本',
+	'setting.about.toast.fetchVersionFailed': '获取版本信息失败',
+	'setting.about.toast.relaunchFailed': '重启失败',
+	'setting.about.toast.cacheCleared': '缓存清理完成',
+	'setting.about.latestVersion': '最新版本',
+	'setting.about.releaseDate': '发布时间',
+	'setting.about.checkUpdate': '检查更新',
+	'setting.about.updateAndRelaunch': '更新并重启',
+	'setting.about.viewReleaseNotes': '查看更新内容',
+	'setting.about.download.downloading': '正在下载',
+	'setting.about.download.done': '下载完成',
+	'setting.about.update.title': '软件更新',
+	'setting.about.update.notifyMe': '新版本发布时提醒我',
+	'setting.about.cache.title': '应用缓存',
+	'setting.about.cache.size': '当前缓存大小 ',
+	'setting.about.cache.clear': '清空缓存',
+	'setting.about.relaunchDialog.title': '确定要现在重启应用吗?',
+	'setting.about.relaunchDialog.desc':
+		'即将自动重启完成更新，为确保数据安全，请在重启前保存所有未保存的工作。重启后未保存的数据将无法恢复。建议点击"立即重启"前再次确认重要数据已妥善保存。',
+	'setting.about.relaunchDialog.later': '稍后重启',
+	'setting.about.relaunchDialog.now': '立即重启',
 
 	'setting.language.title': '语言设置',
 	'setting.language.zh': '中文（简体）',

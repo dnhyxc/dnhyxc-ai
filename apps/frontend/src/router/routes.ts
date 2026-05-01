@@ -19,7 +19,6 @@ import Pay from '@/views/pay';
 import Profile from '@/views/profile';
 import Setting from '@/views/setting';
 import AboutApp from '@/views/setting/about';
-import LanguageSetting from '@/views/setting/language';
 import AppSystem from '@/views/setting/system';
 import ThemeSetting from '@/views/setting/theme';
 import Share from '@/views/share';
@@ -143,13 +142,6 @@ const routes: RouteConfig[] = [
 						Component: ThemeSetting,
 						meta: {
 							titleKey: 'route.setting.theme',
-						},
-					},
-					{
-						path: '/setting/language',
-						Component: LanguageSetting,
-						meta: {
-							titleKey: 'route.setting.language',
 						},
 					},
 				],

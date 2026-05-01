@@ -2,16 +2,76 @@ import { useEffect, useState } from 'react';
 import { getValue, onEmit, setValue } from '@/utils';
 
 export const THEMES = [
-	{ name: 'white', value: '#ffffff', label: '白色', type: 'color' },
-	{ name: 'black', value: '#1e1e1e', label: '黑色', type: 'color' },
-	{ name: 'green', value: '#469c77', label: '绿色', type: 'color' },
-	{ name: 'purple', value: '#8076c3', label: '紫色', type: 'color' },
-	{ name: 'blue-1', value: '#7987c4', label: '蓝紫', type: 'color' },
-	{ name: 'blue-2', value: '#607ce9', label: '蓝色', type: 'color' },
-	{ name: 'blue-3', value: '#459ac3', label: '青蓝', type: 'color' },
-	{ name: 'orange', value: '#f3ad56', label: '橙色', type: 'color' },
-	{ name: 'red', value: '#eb7177', label: '红色', type: 'color' },
-	{ name: 'beige', value: '#c1b7a6', label: '米色', type: 'color' },
+	{
+		name: 'white',
+		value: '#ffffff',
+		label: '白色',
+		labelKey: 'setting.theme.color.white',
+		type: 'color',
+	},
+	{
+		name: 'black',
+		value: '#1e1e1e',
+		label: '黑色',
+		labelKey: 'setting.theme.color.black',
+		type: 'color',
+	},
+	{
+		name: 'green',
+		value: '#469c77',
+		label: '绿色',
+		labelKey: 'setting.theme.color.green',
+		type: 'color',
+	},
+	{
+		name: 'purple',
+		value: '#8076c3',
+		label: '紫色',
+		labelKey: 'setting.theme.color.purple',
+		type: 'color',
+	},
+	{
+		name: 'blue-1',
+		value: '#7987c4',
+		label: '蓝紫',
+		labelKey: 'setting.theme.color.bluePurple',
+		type: 'color',
+	},
+	{
+		name: 'blue-2',
+		value: '#607ce9',
+		label: '蓝色',
+		labelKey: 'setting.theme.color.blue',
+		type: 'color',
+	},
+	{
+		name: 'blue-3',
+		value: '#459ac3',
+		label: '青蓝',
+		labelKey: 'setting.theme.color.cyanBlue',
+		type: 'color',
+	},
+	{
+		name: 'orange',
+		value: '#f3ad56',
+		label: '橙色',
+		labelKey: 'setting.theme.color.orange',
+		type: 'color',
+	},
+	{
+		name: 'red',
+		value: '#eb7177',
+		label: '红色',
+		labelKey: 'setting.theme.color.red',
+		type: 'color',
+	},
+	{
+		name: 'beige',
+		value: '#c1b7a6',
+		label: '米色',
+		labelKey: 'setting.theme.color.beige',
+		type: 'color',
+	},
 ] as const;
 
 export type ThemeName = (typeof THEMES)[number]['name'];

@@ -15,6 +15,8 @@ export interface ImageProps extends React.ImgHTMLAttributes<HTMLImageElement> {
 	imgClassName?: string;
 	fallbackSrc?: string;
 	showOnError?: boolean;
+	/** i18n 翻译函数（可选）；不传则沿用组件内默认中文文案 */
+	t?: (key: string, params?: Record<string, unknown>) => string;
 	loading?: 'lazy' | 'eager';
 	onLoad?: () => void;
 	onError?: () => void;
@@ -35,6 +37,7 @@ const Image = forwardRef<ImageHandle, ImageProps>(
 			className,
 			fallbackSrc,
 			showOnError = false,
+			t,
 			loading = 'lazy',
 			onLoad,
 			onError,
@@ -96,7 +99,9 @@ const Image = forwardRef<ImageHandle, ImageProps>(
 					)}
 					{...props}
 				>
-					<span className="text-textcolor/50 text-sm">图片加载失败</span>
+					<span className="text-textcolor/50 text-sm">
+						{t?.('image.loadFailed') ?? '图片加载失败'}
+					</span>
 					<div className="absolute inset-0 z-2 rounded-md w-full h-full bg-theme-background/50 items-center justify-center hidden group-hover:flex">
 						{children}
 					</div>
@@ -106,6 +111,7 @@ const Image = forwardRef<ImageHandle, ImageProps>(
 							url: imageSrc,
 							id: '1',
 						}}
+						t={t}
 						onVisibleChange={() => setVisible(false)}
 					/>
 				</div>
@@ -137,6 +143,7 @@ const Image = forwardRef<ImageHandle, ImageProps>(
 						size,
 						id: '1',
 					}}
+					t={t}
 					onVisibleChange={() => setVisible(false)}
 				/>
 			</div>

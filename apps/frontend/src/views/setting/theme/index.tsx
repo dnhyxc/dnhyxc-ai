@@ -37,31 +37,31 @@ const Theme = () => {
 	const { theme, changeTheme } = useTheme();
 	const { t } = useI18n();
 
-	const colorThemes = THEMES.filter((t) => t.type === 'color');
+	const colorThemes = THEMES.filter((themeItem) => themeItem.type === 'color');
 
 	return (
-		<div className="box-border flex h-full min-h-0 w-full min-w-0 max-w-full flex-col overflow-x-hidden p-0.5">
-			<div className="mb-2 w-full min-w-0 max-w-full pb-5.5">
-				<div className="text-md mb-4.5 px-2 font-bold sm:px-4">
+		<div className="box-border flex h-full min-h-0 w-full min-w-0 max-w-3xl mx-auto flex-col overflow-x-hidden">
+			<div className="mb-2 w-full pb-5.5">
+				<div className="text-md mb-4.5 font-bold">
 					{t('setting.theme.colorTitle')}
 				</div>
-				<div className="flex flex-wrap justify-between gap-4 px-2 sm:px-4">
-					{colorThemes.map((t) => (
+				<div className="flex flex-wrap justify-between gap-2">
+					{colorThemes.map((themeItem) => (
 						<Button
-							key={t.name}
-							onClick={() => changeTheme(t.name)}
+							key={themeItem.name}
+							onClick={() => changeTheme(themeItem.name)}
 							className={`group relative h-16 w-16 cursor-pointer rounded-xl transition-all duration-200 ${
-								theme === t.name ? 'ring-2' : 'hover:scale-102'
+								theme === themeItem.name ? 'ring-2' : 'hover:scale-102'
 							}`}
-							style={{ backgroundColor: t.value }}
+							style={{ backgroundColor: themeItem.value }}
 						>
 							<span
-								style={{ color: t.value }}
+								style={{ color: themeItem.value }}
 								className="absolute -bottom-5 left-1/2 -translate-x-1/2 whitespace-nowrap text-xs opacity-0 transition-opacity group-hover:opacity-100"
 							>
-								{t.label}
+								{t(themeItem.labelKey) ?? themeItem.label}
 							</span>
-							{theme === t.name && (
+							{theme === themeItem.name && (
 								<div className="absolute inset-0 flex items-center justify-center">
 									<div className="flex h-8 w-8 items-center justify-center rounded-full bg-theme/50">
 										<CircleCheckBig className="text-textcolor" />
@@ -73,11 +73,11 @@ const Theme = () => {
 				</div>
 			</div>
 
-			<div className="mt-2 w-full min-w-0 max-w-full px-2 sm:px-4 pb-4.5">
+			<div className="mt-2 w-full pb-4.5">
 				<div className="text-md mb-4.5 font-bold">
 					{t('setting.theme.previewTitle')}
 				</div>
-				<div className="box-border w-full min-w-0 max-w-full space-y-5 rounded-xl border border-theme-border bg-theme-card p-4 text-sm sm:p-6">
+				<div className="box-border w-full space-y-5 rounded-xl border border-theme-border bg-theme-card p-4 text-sm sm:p-6">
 					<StyleRow
 						title={t('setting.theme.preview.cardBg.title')}
 						varName="--theme-card"

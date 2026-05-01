@@ -21,6 +21,8 @@ interface IProps {
 	multiple?: boolean;
 	maxSize?: number;
 	infoText?: string;
+	/** i18n 翻译函数（可选）；不传则沿用组件内默认中文文案 */
+	t?: (key: string, params?: Record<string, unknown>) => string;
 	children?: ReactNode;
 }
 
@@ -37,6 +39,7 @@ const DragUpload = forwardRef<ForwardProps, IProps>(
 			validTypes,
 			maxSize,
 			infoText,
+			t,
 			multiple = false,
 			children,
 		},
@@ -105,7 +108,9 @@ const DragUpload = forwardRef<ForwardProps, IProps>(
 				if (!(validTypes || VALID_TYPES).includes(file.type)) {
 					Toast({
 						type: 'error',
-						title: `不支持的文件类型: ${file.type}`,
+						title:
+							t?.('dragUpload.error.invalidType', { type: file.type }) ??
+							`不支持的文件类型: ${file.type}`,
 					});
 					return false;
 				}
@@ -113,7 +118,10 @@ const DragUpload = forwardRef<ForwardProps, IProps>(
 				if (file.size > (maxSize ? maxSize * 1024 * 1024 : MAX_SIZE)) {
 					Toast({
 						type: 'error',
-						title: `文件大小不能超过 ${maxSize || MAX_SIZE / 1024 / 1024} MB`,
+						title:
+							t?.('dragUpload.error.maxSize', {
+								maxSizeMb: maxSize || MAX_SIZE / 1024 / 1024,
+							}) ?? `文件大小不能超过 ${maxSize || MAX_SIZE / 1024 / 1024} MB`,
 					});
 					return false;
 				}
@@ -201,13 +209,15 @@ const DragUpload = forwardRef<ForwardProps, IProps>(
 						<CloudUpload className="h-12 w-12 text-theme" />
 						<div>
 							<p className="text-md font-medium">
-								拖拽图片到此处或
+								{t?.('dragUpload.tip.prefix') ?? '拖拽图片到此处或'}
 								<span className="text-theme" onClick={onClickSelect}>
-									点击选择
+									{t?.('dragUpload.tip.clickToSelect') ?? '点击选择'}
 								</span>
 							</p>
 							<p className="text-textcolor/60 mt-1 text-sm">
-								{infoText || '支持 JPEG, PNG, GIF, SVG, WebP 格式，最大5MB'}
+								{infoText ||
+									t?.('dragUpload.tip.info') ||
+									'支持 JPEG, PNG, GIF, SVG, WebP 格式，最大5MB'}
 							</p>
 						</div>
 					</div>
@@ -225,6 +235,7 @@ const DragUpload = forwardRef<ForwardProps, IProps>(
 											src={i.preview ?? ''}
 											size={i.file.size}
 											alt={i.file.name}
+											t={t}
 											className="w-auto h-full max-w-27.5 rounded-md"
 										>
 											<div className="absolute inset-0 z-1 rounded-md w-full h-full bg-theme-background/50 items-center justify-center hidden group-hover:flex">

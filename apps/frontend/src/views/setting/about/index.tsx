@@ -17,7 +17,7 @@ import { Spinner } from '@ui/spinner';
 import { CircleArrowUp, Download, Info } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import Icon from '@/assets/icon.png';
-import { useGetVersion, useStorageInfo } from '@/hooks';
+import { useGetVersion, useI18n, useStorageInfo } from '@/hooks';
 import { cn } from '@/lib/utils';
 import {
 	checkForUpdates,
@@ -33,6 +33,7 @@ import {
 } from '@/utils';
 
 const SettingAbout = () => {
+	const { t } = useI18n();
 	const [updateInfo, setUpdateInfo] = useState<UpdateType | null>(null);
 	const [checkLoading, setCheckLoading] = useState(false);
 	const [downloading, setDownloading] = useState(false);
@@ -73,7 +74,7 @@ const SettingAbout = () => {
 			setCheckLoading(false);
 			if (!res) {
 				Toast({
-					title: '已经是最新版本',
+					title: t('setting.about.toast.latestVersion'),
 					type: 'success',
 				});
 			} else {
@@ -82,7 +83,7 @@ const SettingAbout = () => {
 		} catch (_error) {
 			setCheckLoading(false);
 			Toast({
-				title: '获取版本信息失败',
+				title: t('setting.about.toast.fetchVersionFailed'),
 				type: 'error',
 			});
 		}
@@ -103,7 +104,7 @@ const SettingAbout = () => {
 			setDownloading(false);
 		} catch (error) {
 			Toast({
-				title: '重启失败',
+				title: t('setting.about.toast.relaunchFailed'),
 				message: String(error),
 				type: 'error',
 			});
@@ -148,13 +149,13 @@ const SettingAbout = () => {
 		await insetCacheSize();
 		Toast({
 			type: 'success',
-			title: '缓存清理完成',
+			title: t('setting.about.toast.cacheCleared'),
 		});
 	};
 
 	return (
-		<div className="w-full h-full flex flex-col justify-center items-center m-3.5">
-			<div className="min-w-[610px]">
+		<div className="w-full h-full max-w-3xl mx-auto flex flex-col justify-center items-center m-3.5">
+			<div className="w-full">
 				<div className="flex items-center w-full h-28">
 					<img
 						src={Icon}
@@ -169,7 +170,7 @@ const SettingAbout = () => {
 							<div className="flex items-center">
 								{storageInfo?.version || updateInfo?.version ? (
 									<div className="text-textcolor/60 text-sm mt-1 mr-5">
-										最新版本
+										{t('setting.about.latestVersion')}
 										<span className="ml-2.5">
 											{storageInfo?.version || updateInfo?.version}
 										</span>
@@ -177,7 +178,7 @@ const SettingAbout = () => {
 								) : null}
 								{storageInfo?.date || updateInfo?.date ? (
 									<div className="text-textcolor/60 text-sm mt-1">
-										发布时间
+										{t('setting.about.releaseDate')}
 										<span className="ml-2.5">
 											{formatDate(storageInfo?.date || updateInfo?.date)}
 										</span>
@@ -203,7 +204,7 @@ const SettingAbout = () => {
 										<CircleArrowUp className="size-4" />
 									)}
 								</span>
-								检查更新
+								{t('setting.about.checkUpdate')}
 							</Button>
 							{storageInfo?.version || updateInfo ? (
 								<>
@@ -223,7 +224,7 @@ const SettingAbout = () => {
 												<Download className="size-4" />
 											)}
 										</span>
-										更新并重启
+										{t('setting.about.updateAndRelaunch')}
 									</Button>
 									<Button
 										size="sm"
@@ -236,7 +237,7 @@ const SettingAbout = () => {
 										}
 									>
 										<Info className="mt-0.5 mr-1" />
-										查看更新内容
+										{t('setting.about.viewReleaseNotes')}
 									</Button>
 								</>
 							) : null}
@@ -245,9 +246,13 @@ const SettingAbout = () => {
 				</div>
 			</div>
 			{downloaded && total ? (
-				<div className="mt-4 min-w-[610px]">
+				<div className="mt-4 w-full">
 					<div className="flex items-center justify-between pt-10 pb-2">
-						<span>{downloaded / total >= 1 ? '下载完成' : '正在下载'}</span>
+						<span>
+							{downloaded / total >= 1
+								? t('setting.about.download.done')
+								: t('setting.about.download.downloading')}
+						</span>
 						<div>
 							<span className="mr-3">
 								{downloaded > total ? total : downloaded} / {total}
@@ -266,8 +271,10 @@ const SettingAbout = () => {
 					/>
 				</div>
 			) : null}
-			<div className="min-w-[610px] mt-9 border-b pb-5 border-theme/20">
-				<div className="font-bold text-md">软件更新</div>
+			<div className="w-full mt-9 border-b pb-5 border-theme/20">
+				<div className="font-bold text-md">
+					{t('setting.about.update.title')}
+				</div>
 				<div className="flex items-center gap-3 mt-4.5 px-8.5">
 					<Checkbox
 						id="terms"
@@ -276,37 +283,42 @@ const SettingAbout = () => {
 						className="cursor-pointer"
 					/>
 					<Label htmlFor="terms" className="cursor-pointer">
-						新版本发布时提醒我
+						{t('setting.about.update.notifyMe')}
 					</Label>
 				</div>
 			</div>
-			<div className="min-w-[610px] mt-3.5">
-				<div className="font-bold text-md">应用缓存</div>
+			<div className="w-full mt-3.5">
+				<div className="font-bold text-md">
+					{t('setting.about.cache.title')}
+				</div>
 				<div className="flex items-center gap-3 mt-1.5 px-8.5 text-sm">
-					当前缓存大小 <span className="text-sm">{cacheSize}</span>
+					{t('setting.about.cache.size')}
+					<span className="text-sm">{cacheSize}</span>
 					<Button
 						variant="link"
 						className="cursor-pointer p-0 text-theme ml-5"
 						onClick={onClearCache}
 					>
-						清空缓存
+						{t('setting.about.cache.clear')}
 					</Button>
 				</div>
 			</div>
 			<AlertDialog open={open} onOpenChange={onReset}>
 				<AlertDialogContent className="w-112.5">
 					<AlertDialogHeader>
-						<AlertDialogTitle>确定要现在重启应用吗?</AlertDialogTitle>
+						<AlertDialogTitle>
+							{t('setting.about.relaunchDialog.title')}
+						</AlertDialogTitle>
 						<AlertDialogDescription>
-							即将自动重启完成更新，为确保数据安全，请在重启前保存所有未保存的工作。重启后未保存的数据将无法恢复。建议点击"立即重启"前再次确认重要数据已妥善保存。
+							{t('setting.about.relaunchDialog.desc')}
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>
 						<AlertDialogCancel className="cursor-pointer">
-							稍后重启
+							{t('setting.about.relaunchDialog.later')}
 						</AlertDialogCancel>
 						<AlertDialogAction className="cursor-pointer" onClick={onRestart}>
-							立即重启
+							{t('setting.about.relaunchDialog.now')}
 						</AlertDialogAction>
 					</AlertDialogFooter>
 				</AlertDialogContent>

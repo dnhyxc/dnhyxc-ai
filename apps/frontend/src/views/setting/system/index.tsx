@@ -3,6 +3,7 @@ import { Toast } from '@ui/index';
 import { Label } from '@ui/label';
 import { RadioGroup, RadioGroupItem } from '@ui/radio-group';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import { capitalizeWords, getValue, setValue } from '@/utils';
 import {
@@ -22,6 +23,7 @@ async function desktopInvoke<T>(
 }
 
 const System = () => {
+	const { t } = useI18n();
 	const [savePath, setSavePath] = useState('');
 	const [startType, setStartType] = useState('1');
 	const [closeType, setCloseType] = useState('1');
@@ -125,8 +127,10 @@ const System = () => {
 		if (conflict) {
 			Toast({
 				type: 'info',
-				title: '快捷键冲突',
-				message: `该快捷键与「${conflict.label}」冲突，请更换其他组合`,
+				title: t('setting.system.shortcuts.conflictTitle'),
+				message: t('setting.system.shortcuts.conflictMessage', {
+					label: t(conflict.labelKey) || conflict.label,
+				}),
 			});
 			setShortcutInfo((prev) =>
 				prev.map((item) =>
@@ -159,7 +163,10 @@ const System = () => {
 		}
 
 		if (!isTauriRuntime()) {
-			Toast({ type: 'info', title: '全局快捷键仅在桌面客户端可用' });
+			Toast({
+				type: 'info',
+				title: t('setting.system.shortcuts.globalOnlyDesktop'),
+			});
 			return;
 		}
 
@@ -183,7 +190,11 @@ const System = () => {
 				);
 			})
 			.catch((error: string) => {
-				Toast({ type: 'error', title: '全局快捷键注册失败', message: error });
+				Toast({
+					type: 'error',
+					title: t('setting.system.shortcuts.registerFailed'),
+					message: error,
+				});
 				console.error(error, 'error');
 				setShortcutInfo((prev) =>
 					prev.map((item) =>
@@ -214,7 +225,10 @@ const System = () => {
 
 	const changeDir = async () => {
 		if (!isTauriRuntime()) {
-			Toast({ type: 'info', title: '选择存储目录仅在桌面客户端可用' });
+			Toast({
+				type: 'info',
+				title: t('setting.system.storage.selectDirOnlyDesktop'),
+			});
 			return;
 		}
 		const path: string = await desktopInvoke<string>('select_directory');
@@ -224,7 +238,10 @@ const System = () => {
 
 	const onChangeAutoStart = async (value: string) => {
 		if (!isTauriRuntime()) {
-			Toast({ type: 'info', title: '开机自启仅在桌面客户端可用' });
+			Toast({
+				type: 'info',
+				title: t('setting.system.startup.autoStartOnlyDesktop'),
+			});
 			return;
 		}
 		if (value === '2' && startType === '1') {
@@ -260,163 +277,191 @@ const System = () => {
 	};
 
 	return (
-		<div className="w-full h-full flex flex-col justify-center items-center m-2">
-			<div className="border-b border-theme/20 pb-2 min-w-[610px]">
-				<div className="text-md font-bold">文件存储</div>
-				<div className="mt-2 px-8.5 text-sm">
-					<span className="mr-2">默认存储路径</span>
-					<span className="ml-2 text-theme/90 text-md">{savePath}</span>
-					<Button
-						variant="link"
-						className="cursor-pointer text-theme text-md"
-						onClick={changeDir}
-					>
-						更改目录
-					</Button>
+		<div className="w-full h-full max-w-3xl mx-auto flex flex-col justify-center items-center m-2">
+			<div className="w-full">
+				<div className="border-b border-theme/20 pb-2 w-full">
+					<div className="text-md font-bold">
+						{t('setting.system.storage.title')}
+					</div>
+					<div className="mt-2 px-8.5 text-sm">
+						<span className="mr-2">
+							{t('setting.system.storage.defaultPath')}
+						</span>
+						<span className="ml-2 text-theme/90 text-md">{savePath}</span>
+						<Button
+							variant="link"
+							className="cursor-pointer text-theme text-md"
+							onClick={changeDir}
+						>
+							{t('setting.system.storage.changeDir')}
+						</Button>
+					</div>
 				</div>
-			</div>
-			<div className="my-3.5 border-b border-theme/20 pb-4.5 min-w-[610px]">
-				<div className="text-md font-bold">启动设置</div>
-				<div className="flex items-center mt-3.5 px-8.5 text-sm">
-					<span className="mr-2">设置开机自启</span>
-					<RadioGroup
-						value={startType}
-						className="flex items-center ml-2"
-						onValueChange={onChangeAutoStart}
-					>
-						<div className="flex items-center gap-2 mr-5">
-							<RadioGroupItem value="1" id="r1" />
-							<Label htmlFor="r1" className="cursor-pointer">
-								开机不自动启动
-							</Label>
-						</div>
-						<div className="flex items-center gap-2">
-							<RadioGroupItem value="2" id="r2" />
-							<Label htmlFor="r2" className="text-sm cursor-pointer">
-								开机自动启动
-							</Label>
-						</div>
-					</RadioGroup>
+				<div className="my-3.5 border-b border-theme/20 pb-4.5 w-full">
+					<div className="text-md font-bold">
+						{t('setting.system.startup.title')}
+					</div>
+					<div className="flex items-center mt-3.5 px-8.5 text-sm">
+						<span className="mr-2">
+							{t('setting.system.startup.autoStart')}
+						</span>
+						<RadioGroup
+							value={startType}
+							className="flex items-center ml-2"
+							onValueChange={onChangeAutoStart}
+						>
+							<div className="flex items-center gap-2 mr-5">
+								<RadioGroupItem value="1" id="r1" />
+								<Label htmlFor="r1" className="cursor-pointer">
+									{t('setting.system.startup.autoStartOff')}
+								</Label>
+							</div>
+							<div className="flex items-center gap-2">
+								<RadioGroupItem value="2" id="r2" />
+								<Label htmlFor="r2" className="text-sm cursor-pointer">
+									{t('setting.system.startup.autoStartOn')}
+								</Label>
+							</div>
+						</RadioGroup>
+					</div>
 				</div>
-			</div>
-			<div className="border-b border-theme/20 pb-4.5 min-w-[610px]">
-				<div className="text-md font-bold">关闭设置</div>
-				<div className="flex items-center mt-3.5 px-8.5 text-sm">
-					<span className="mr-2">关闭应用程序</span>
-					<RadioGroup
-						value={closeType}
-						className="flex items-center ml-2"
-						onValueChange={onChangeCloseType}
-					>
-						<div className="flex items-center gap-2 mr-5">
-							<RadioGroupItem value="1" id="c1" />
-							<Label htmlFor="c1" className="text-md cursor-pointer">
-								最小化到托盘，不退出程序
-							</Label>
-						</div>
-						<div className="flex items-center gap-2">
-							<RadioGroupItem value="2" id="c2" />
-							<Label htmlFor="c2" className="text-md cursor-pointer">
-								退出程序
-							</Label>
-						</div>
-					</RadioGroup>
+				<div className="border-b border-theme/20 pb-4.5 w-full">
+					<div className="text-md font-bold">
+						{t('setting.system.close.title')}
+					</div>
+					<div className="flex items-center mt-3.5 px-8.5 text-sm">
+						<span className="mr-2">{t('setting.system.close.closeApp')}</span>
+						<RadioGroup
+							value={closeType}
+							className="flex items-center ml-2"
+							onValueChange={onChangeCloseType}
+						>
+							<div className="flex items-center gap-2 mr-5">
+								<RadioGroupItem value="1" id="c1" />
+								<Label htmlFor="c1" className="text-md cursor-pointer">
+									{t('setting.system.close.minimizeToTray')}
+								</Label>
+							</div>
+							<div className="flex items-center gap-2">
+								<RadioGroupItem value="2" id="c2" />
+								<Label htmlFor="c2" className="text-md cursor-pointer">
+									{t('setting.system.close.quit')}
+								</Label>
+							</div>
+						</RadioGroup>
+					</div>
 				</div>
-			</div>
-			<div className="mt-3.5 pb-4.5 min-w-[610px]">
-				<div className="text-md font-bold">快捷键设置</div>
-				<p className="mt-1 px-8.5 text-xs text-textcolor/55">
-					「知识库」相关快捷键仅在知识库页面内生效，不会注册为系统全局快捷键；其余项在桌面端为全局快捷键。
-				</p>
-				<div className="flex flex-col items-center mt-2 px-8.5 text-sm">
-					{(() => {
-						type Group = {
-							title: string;
-							items: Array<ShortcutSettingItem & { displayLabel: string }>;
-						};
+				<div className="mt-3.5 pb-4.5 w-full">
+					<div className="text-md font-bold">
+						{t('setting.system.shortcuts.title')}
+					</div>
+					<div className="my-3.5 px-8.5 text-xs text-textcolor/55">
+						{t('setting.system.shortcuts.desc')}
+					</div>
+					<div className="flex flex-col items-center mt-2 text-sm box-border">
+						{(() => {
+							type Group = {
+								title: string;
+								items: Array<ShortcutSettingItem & { displayLabel: string }>;
+							};
 
-						const groups = new Map<string, Group>();
-						for (const i of shortcutInfo) {
-							const parts = i.label.split('：').map((p) => p.trim());
-							const first = parts[0] || '其他';
+							const separator = t('setting.system.shortcuts.separator');
+							const knowledgePrefix = t(
+								'setting.system.shortcuts.group.knowledge',
+							);
 
-							// 手动归类：应用显示/刷新相关放在一起
-							const appVisibilityActions = new Set([
-								'hide',
-								'hideOrShowApp',
-								'reload',
-							]);
-							if (appVisibilityActions.has(i.action)) {
-								const groupTitle = '应用显示/刷新';
+							const groups = new Map<string, Group>();
+							for (const i of shortcutInfo) {
+								const localizedLabel = t(i.labelKey) || i.label;
+								const parts = localizedLabel
+									.split(/[:：]/)
+									.map((p) => p.trim());
+								const first =
+									parts[0] || t('setting.system.shortcuts.group.other');
+
+								// 手动归类：应用显示/刷新相关放在一起
+								const appVisibilityActions = new Set([
+									'hide',
+									'hideOrShowApp',
+									'reload',
+								]);
+								if (appVisibilityActions.has(i.action)) {
+									const groupTitle = t(
+										'setting.system.shortcuts.group.appVisibility',
+									);
+									const g = groups.get(groupTitle) ?? {
+										title: groupTitle,
+										items: [],
+									};
+									g.items.push({ ...i, displayLabel: localizedLabel });
+									groups.set(groupTitle, g);
+									continue;
+								}
+
+								// 约定：label 形如「知识库：保存」；若存在两级（如「知识库：产品：保存」），则按「知识库：产品」再细分
+								const groupTitle =
+									first === knowledgePrefix && parts.length >= 3
+										? `${knowledgePrefix}${separator || '：'}${parts[1]}`
+										: first;
+								const dropCount =
+									first === knowledgePrefix && parts.length >= 3
+										? 2
+										: parts.length >= 2
+											? 1
+											: 0;
+								const displayLabel =
+									dropCount > 0
+										? parts.slice(dropCount).join(separator || '：')
+										: localizedLabel;
+
 								const g = groups.get(groupTitle) ?? {
 									title: groupTitle,
 									items: [],
 								};
-								g.items.push({ ...i, displayLabel: i.label });
+								g.items.push({ ...i, displayLabel });
 								groups.set(groupTitle, g);
-								continue;
 							}
 
-							// 约定：label 形如「知识库：保存」；若存在两级（如「知识库：产品：保存」），则按「知识库：产品」再细分
-							const groupTitle =
-								first === '知识库' && parts.length >= 3
-									? `知识库：${parts[1]}`
-									: first;
-							const dropCount =
-								first === '知识库' && parts.length >= 3
-									? 2
-									: parts.length >= 2
-										? 1
-										: 0;
-							const displayLabel =
-								dropCount > 0 ? parts.slice(dropCount).join('：') : i.label;
-
-							const g = groups.get(groupTitle) ?? {
-								title: groupTitle,
-								items: [],
-							};
-							g.items.push({ ...i, displayLabel });
-							groups.set(groupTitle, g);
-						}
-
-						return Array.from(groups.values()).map((g) => (
-							<div
-								key={g.title}
-								className={cn(
-									'w-full',
-									'rounded-md border border-theme/15',
-									'px-3 py-2',
-									'not-first:mt-2',
-								)}
-							>
-								<div className="text-xs font-semibold text-textcolor/70 mb-1">
-									{g.title}
+							return Array.from(groups.values()).map((g) => (
+								<div
+									key={g.title}
+									className={cn(
+										'w-full',
+										'rounded-md border border-theme/15',
+										'px-3 pt-3 pb-0.5',
+										'not-first:mt-2',
+									)}
+								>
+									<div className="text-xs font-semibold text-textcolor/70 mb-1">
+										{g.title}
+									</div>
+									<div className="grid grid-cols-2 w-full gap-y-1">
+										{g.items.map((i) => (
+											<div key={i.key} className="flex items-center min-w-0">
+												<span className="shrink-0">{i.displayLabel}</span>
+												<Button
+													variant="link"
+													id={i.id}
+													className={cn(
+														'cursor-pointer text-md mt-1 min-w-0 truncate',
+														checkShortcut === i.key && !i.shortcut
+															? 'text-textcolor/70'
+															: 'text-textcolor',
+													)}
+													onClick={() => void onChangeShortCut(i.key)}
+												>
+													{checkShortcut === i.key
+														? i.shortcut ||
+															t('setting.system.shortcuts.pressKey')
+														: i.shortcut || i.defaultShortcut}
+												</Button>
+											</div>
+										))}
+									</div>
 								</div>
-								<div className="grid grid-cols-2 w-full gap-y-1">
-									{g.items.map((i) => (
-										<div key={i.key} className="flex items-center min-w-0">
-											<span className="shrink-0">{i.displayLabel}</span>
-											<Button
-												variant="link"
-												id={i.id}
-												className={cn(
-													'cursor-pointer text-md mt-1 min-w-0 truncate',
-													checkShortcut === i.key && !i.shortcut
-														? 'text-textcolor/70'
-														: 'text-textcolor',
-												)}
-												onClick={() => void onChangeShortCut(i.key)}
-											>
-												{checkShortcut === i.key
-													? i.shortcut || '按键盘输入快捷键'
-													: i.shortcut || i.defaultShortcut}
-											</Button>
-										</div>
-									))}
-								</div>
-							</div>
-						));
-					})()}
+							));
+						})()}
+					</div>
 				</div>
 			</div>
 		</div>

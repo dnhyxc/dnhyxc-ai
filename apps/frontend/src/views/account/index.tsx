@@ -287,6 +287,7 @@ const Account = () => {
 						<div className="absolute left-10 -bottom-10 p-2 rounded-md bg-theme-secondary box-border">
 							<Upload
 								key={accountInfo.avatar}
+								t={t}
 								onUpload={onUpload}
 								fileUrl={avatarFileUrl}
 								onClearFileUrl={onClearFileUrl}

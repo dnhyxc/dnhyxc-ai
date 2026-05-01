@@ -14,16 +14,54 @@ export const enUS = {
 	'common.copy': 'Copy',
 	'common.download': 'Download',
 
+	'image.loadFailed': 'Image failed to load',
+
+	// ImagePreview 组件文案
+	'imagePreview.title': 'Image preview',
+	'imagePreview.mermaidTitle': 'Mermaid preview',
+	'imagePreview.zoomIn': 'Zoom in',
+	'imagePreview.zoomOut': 'Zoom out',
+	'imagePreview.rotate': 'Rotate',
+	'imagePreview.reset': 'Reset',
+	'imagePreview.prev': 'Previous',
+	'imagePreview.next': 'Next',
+	'imagePreview.close': 'Close',
+
+	'upload.tooltip.default': 'Only PDF, Word, and Excel files are supported',
+	'upload.uploading': 'Uploading…',
+	'upload.button': 'Upload file',
+	'upload.error.maxCount': 'You can upload up to {maxCount} files at a time',
+	'upload.error.invalidType': 'Unsupported file type: {type}',
+	'upload.error.maxSize': 'File size cannot exceed {maxSizeMb} MB',
+
+	'dragUpload.tip.prefix': 'Drag an image here or',
+	'dragUpload.tip.clickToSelect': 'click to select',
+	'dragUpload.tip.info': 'Supports JPEG, PNG, GIF, SVG, WebP. Max 5MB.',
+	'dragUpload.error.invalidType': 'Unsupported file type: {type}',
+	'dragUpload.error.maxSize': 'File size cannot exceed {maxSizeMb} MB',
+
+	// 导航栏文案
 	'nav.home': 'Home',
 	'nav.knowledge': 'Knowledge',
 	'nav.pay': 'Membership',
 	'nav.profile': 'Profile',
 
+	// 设置菜单文案
 	'setting.menu.system': 'System',
 	'setting.menu.theme': 'Theme',
 	'setting.menu.language': 'Language',
 	'setting.menu.about': 'About',
 	'setting.theme.colorTitle': 'Color themes',
+	'setting.theme.color.white': 'White',
+	'setting.theme.color.black': 'Black',
+	'setting.theme.color.green': 'Green',
+	'setting.theme.color.purple': 'Purple',
+	'setting.theme.color.bluePurple': 'Blue-purple',
+	'setting.theme.color.blue': 'Blue',
+	'setting.theme.color.cyanBlue': 'Cyan-blue',
+	'setting.theme.color.orange': 'Orange',
+	'setting.theme.color.red': 'Red',
+	'setting.theme.color.beige': 'Beige',
 	'setting.theme.previewTitle': 'Theme preview',
 	'setting.theme.preview.cardBg.title': 'Card background',
 	'setting.theme.preview.cardBg.desc':
@@ -55,13 +93,111 @@ export const enUS = {
 	'setting.theme.preview.border.title': 'Border',
 	'setting.theme.preview.ring.title': 'Focus ring',
 
+	// System settings 文案
+	'setting.system.storage.title': 'File storage',
+	'setting.system.storage.defaultPath': 'Default storage path',
+	'setting.system.storage.changeDir': 'Change directory',
+	'setting.system.storage.selectDirOnlyDesktop':
+		'Selecting a storage directory is only available in the desktop app',
+
+	'setting.system.startup.title': 'Startup',
+	'setting.system.startup.autoStart': 'Launch at startup',
+	'setting.system.startup.autoStartOff': 'Do not launch at startup',
+	'setting.system.startup.autoStartOn': 'Launch at startup',
+	'setting.system.startup.autoStartOnlyDesktop':
+		'Launch at startup is only available in the desktop app',
+
+	'setting.system.close.title': 'Close behavior',
+	'setting.system.close.closeApp': 'When closing the app',
+	'setting.system.close.minimizeToTray': 'Minimize to tray and keep running',
+	'setting.system.close.quit': 'Quit the app',
+
+	'setting.system.shortcuts.title': 'Keyboard shortcuts',
+	'setting.system.shortcuts.desc':
+		'「App visibility/refresh」shortcuts are global, other shortcuts only work in their respective windows.',
+	'setting.system.shortcuts.group.other': 'Other',
+	'setting.system.shortcuts.group.knowledge': 'Knowledge',
+	'setting.system.shortcuts.group.appVisibility': 'App visibility / refresh',
+	'setting.system.shortcuts.separator': ': ',
+	'setting.system.shortcuts.pressKey': 'Press keys to set a shortcut',
+	'setting.system.shortcuts.conflictTitle': 'Shortcut conflict',
+	'setting.system.shortcuts.conflictMessage':
+		'This shortcut conflicts with “{label}”. Please use another combination.',
+	'setting.system.shortcuts.globalOnlyDesktop':
+		'Global shortcuts are only available in the desktop app',
+	'setting.system.shortcuts.registerFailed':
+		'Failed to register global shortcut',
+
+	'setting.system.shortcuts.item.hide': 'Hide app',
+	'setting.system.shortcuts.item.hideOrShowApp': 'Toggle app visibility',
+	'setting.system.shortcuts.item.reload': 'Reload app',
+	'setting.system.shortcuts.item.newWorkflow': 'Create workflow',
+	'setting.system.shortcuts.item.openSubwindow': 'Open subwindow',
+	'setting.system.shortcuts.item.knowledge.save': 'Knowledge: Save',
+	'setting.system.shortcuts.item.knowledge.clearDraft':
+		'Knowledge: Clear draft',
+	'setting.system.shortcuts.item.knowledge.share': 'Knowledge: Share article',
+	'setting.system.shortcuts.item.knowledge.openList': 'Knowledge: Open list',
+	'setting.system.shortcuts.item.knowledge.toggleActionBar':
+		'Knowledge: Toggle action bar',
+	'setting.system.shortcuts.item.knowledge.openTrash': 'Knowledge: Open trash',
+	'setting.system.shortcuts.item.knowledge.sendSelectionToAssistant':
+		'Knowledge: Send selection to assistant input',
+	'setting.system.shortcuts.item.knowledge.bar.editSource':
+		'Knowledge: Action bar: Edit source',
+	'setting.system.shortcuts.item.knowledge.bar.diff':
+		'Knowledge: Action bar: Split diff (Diff)',
+	'setting.system.shortcuts.item.knowledge.bar.previewRender':
+		'Knowledge: Action bar: Preview render',
+	'setting.system.shortcuts.item.knowledge.bar.toggleAssistant':
+		'Knowledge: Action bar: Toggle AI assistant',
+	'setting.system.shortcuts.item.knowledge.bar.splitPreview':
+		'Knowledge: Action bar: Split preview',
+	'setting.system.shortcuts.item.knowledge.bar.followBidirectional':
+		'Knowledge: Action bar: Bidirectional follow',
+	'setting.system.shortcuts.item.knowledge.bar.followPreviewFollowsEditor':
+		'Knowledge: Action bar: Preview follows editor',
+	'setting.system.shortcuts.item.knowledge.bar.followEditorFollowsPreview':
+		'Knowledge: Action bar: Editor follows preview',
+	'setting.system.shortcuts.item.knowledge.bar.toggleOverrideSave':
+		'Knowledge: Action bar: Toggle override save',
+	'setting.system.shortcuts.item.knowledge.bar.toggleAutoSave':
+		'Knowledge: Action bar: Toggle auto save',
+	'setting.system.shortcuts.item.knowledge.bar.resetPosition':
+		'Knowledge: Action bar: Reset position',
+
+	'setting.about.toast.latestVersion': "You're on the latest version",
+	'setting.about.toast.fetchVersionFailed': 'Failed to fetch version info',
+	'setting.about.toast.relaunchFailed': 'Relaunch failed',
+	'setting.about.toast.cacheCleared': 'Cache cleared',
+	'setting.about.latestVersion': 'Latest version',
+	'setting.about.releaseDate': 'Release date',
+	'setting.about.checkUpdate': 'Check for updates',
+	'setting.about.updateAndRelaunch': 'Update and relaunch',
+	'setting.about.viewReleaseNotes': 'View release notes',
+	'setting.about.download.downloading': 'Downloading',
+	'setting.about.download.done': 'Download complete',
+	'setting.about.update.title': 'Software update',
+	'setting.about.update.notifyMe': 'Notify me when a new version is available',
+	'setting.about.cache.title': 'App cache',
+	'setting.about.cache.size': 'Current cache size ',
+	'setting.about.cache.clear': 'Clear cache',
+	'setting.about.relaunchDialog.title': 'Relaunch the app now?',
+	'setting.about.relaunchDialog.desc':
+		'The app is about to relaunch to finish updating. To keep your data safe, please save any unsaved work before relaunching. Unsaved data cannot be recovered after relaunch. We recommend confirming that important data has been saved before clicking "Relaunch now".',
+	'setting.about.relaunchDialog.later': 'Relaunch later',
+	'setting.about.relaunchDialog.now': 'Relaunch now',
+
+	// 语言设置文案
 	'setting.language.title': 'Language',
 	'setting.language.zh': '中文（简体）',
 	'setting.language.en': 'English',
 	'setting.language.current': 'Current: {lang}',
 
+	// 头部切换语言文案
 	'header.toggleLanguage': 'Toggle language',
 
+	// Monaco 编辑器文案
 	'monaco.placeholder': '# Start writing…',
 	'monaco.topBar.bottomBar': 'Bottom bar',
 	'monaco.topBar.bottomBar.expand': 'Expand Markdown bottom bar',
@@ -118,10 +254,12 @@ export const enUS = {
 	'monaco.bottomBar.tip.reset': 'Reset bottom bar position',
 	'monaco.bottomBar.aria.reset': 'Reset bottom bar position',
 
+	// Markdown 预览文案
 	'markdown.preview.empty': 'Nothing to preview',
 	'markdown.preview.scroll.toBottom': 'Scroll to bottom',
 	'markdown.preview.scroll.toTop': 'Scroll to top',
 
+	// 关于文案
 	'about.appVersion': 'dnhyxc-ai version {version}',
 	'about.copyright': 'Copyright © dnhyxc',
 	'about.copyrightYears': 'Copyright © 2025 - 2026 Dnhyxc',
@@ -129,14 +267,17 @@ export const enUS = {
 	'about.links.policy': 'Policy',
 	'about.links.terms': 'Terms of service',
 
+	// 404 页面文案
 	'notFound.title': '404 Not Found',
 	'notFound.backHome': 'Back to home',
 
+	// 账号文案
 	'account.fields.nickname': 'Nickname',
 	'account.fields.gender': 'Gender',
 	'account.fields.email': 'Email',
 	'account.fields.address': 'Address',
 
+	// 账号输入框占位符文案
 	'account.placeholders.nickname': 'Enter nickname',
 	'account.placeholders.email': 'Enter email',
 	'account.placeholders.address': 'Enter address',
@@ -144,15 +285,21 @@ export const enUS = {
 	'account.placeholders.newEmail': 'Enter new email',
 	'account.placeholders.newVerifyCode': 'Enter code for new email',
 
+	// 账号性别文案
 	'account.gender.male': 'Male',
 	'account.gender.female': 'Female',
 	'account.gender.secret': 'Prefer not to say',
 
+	// 账号头像更换文案
 	'account.avatar.change': 'Change',
+
+	// 账号邮箱编辑模态框文案
 	'account.modal.editEmail': 'Edit email',
 
+	// 账号验证码获取文案
 	'account.actions.getVerifyCode': 'Get code',
 
+	// 账号更新成功提示文案
 	'account.toast.updateSuccess': 'Updated successfully.',
 	'account.toast.updateFailed': 'Update failed.',
 	'account.toast.verifyCodeSent': 'Verification code sent.',
@@ -160,14 +307,17 @@ export const enUS = {
 		'Verification code key cannot be empty.',
 	'account.toast.emailUpdated': 'Email updated successfully.',
 
+	// 账号邮箱重置文案
 	'account.resetEmail.oldEmail': 'Old email',
 	'account.resetEmail.oldVerifyCode': 'Old email code',
 	'account.resetEmail.newEmail': 'New email',
 	'account.resetEmail.newVerifyCode': 'New email code',
 
+	// 账号验证码验证文案
 	'account.validation.emailInvalid': 'Please enter a valid email address.',
 	'account.validation.verifyCode6Digits': 'Verification code must be 6 digits.',
 
+	// 聊天会话文案
 	'chat.newSession': 'New chat',
 	'chat.sessionList.title': 'History',
 	'chat.sessionList.empty': 'No conversations yet',
@@ -181,6 +331,7 @@ export const enUS = {
 	'chat.newSession.welcomeTitle': 'Welcome to dnhyxc-ai Chat',
 	'chat.newSession.welcomeHint': 'How can I help you?',
 
+	// 聊天输入框文案
 	'chat.entry.placeholder': 'Type your question',
 	'chat.entry.attachments.textOnlyHint':
 		'Only text in attachments will be recognized',
@@ -193,13 +344,16 @@ export const enUS = {
 		'Up to 5 files at once, max 20 MB per file.',
 	'chat.entry.webSearch': 'Web search',
 
+	// 聊天机器人文案
 	'chat.bot.toast.noContent.title': 'No content',
 	'chat.bot.toast.noContent.desc':
 		'This reply is empty and cannot be saved to the knowledge base.',
 
+	// 聊天消息操作文案
 	'chat.messageActions.saveToKnowledge': 'Save to knowledge',
 	'chat.messageActions.shareAnswer': 'Share this answer',
 
+	// 聊天助手文案
 	'chat.assistant.thinking': 'Thinking…',
 	'chat.assistant.readWebPages': 'Read {n} web pages',
 	'chat.assistant.thinkProcess': 'Thought process',
@@ -211,25 +365,31 @@ export const enUS = {
 	'chat.assistant.maxTokensExceededPrefix': 'Maximum output length exceeded, ',
 	'chat.assistant.clickContinueAnswer': 'click to continue',
 
+	// 聊天控制器文案
 	'chat.controls.backToStreamingBranch': 'Back to streaming branch',
 	'chat.controls.backToLatestBranch': 'Back to latest branch',
 	'chat.controls.scroll.toTop': 'Scroll to top',
 	'chat.controls.scroll.toBottom': 'Scroll to bottom',
 
+	// 聊天锚点导航文案
 	'chat.anchorNav.prev': 'Previous',
 	'chat.anchorNav.next': 'Next',
 	'chat.anchorNav.item': 'Chat {index}: {content}',
 
+	// 聊天代码工具栏文案
 	'chat.codeToolbar.aria': 'Code block toolbar',
 	'chat.codeToolbar.copy': 'Copy',
 	'chat.codeToolbar.copied': 'Copied',
 	'chat.codeToolbar.download': 'Download',
 
+	// 聊天文本区域文案
 	'chat.textArea.placeholder': 'Type your question',
 	'chat.textArea.send': 'Send',
 
+	// 聊天搜索有机文案
 	'chat.searchOrganics.title': 'Web search results',
 
+	// Mermaid 工具栏文案
 	'mermaid.toolbar.code': 'Code',
 	'mermaid.toolbar.diagram': 'Diagram',
 	'mermaid.toolbar.copy': 'Copy',
@@ -237,6 +397,7 @@ export const enUS = {
 	'mermaid.toolbar.preview': 'Preview',
 	'mermaid.toolbar.download': 'Download',
 
+	// 认证文案
 	'auth.logout': 'Log out',
 	'auth.loginRequired': 'Please sign in first.',
 	'auth.login.tab.username': 'Password login',
@@ -247,6 +408,7 @@ export const enUS = {
 	'auth.resetPassword.title': 'Reset password',
 	'auth.forgotPassword': 'Forgot password',
 
+	// 认证用户名文案
 	'auth.username': 'Username',
 	'auth.password': 'Password',
 	'auth.captcha': 'Captcha',
@@ -256,6 +418,7 @@ export const enUS = {
 	'auth.login.submit': 'Sign in',
 	'auth.captcha.fetchFailed': 'Failed to fetch captcha.',
 
+	// 认证用户名验证文案
 	'auth.validation.usernameMin': 'Username must be at least 2 characters.',
 	'auth.validation.passwordMin': 'Password must be at least 8 characters.',
 	'auth.validation.passwordComplex':
@@ -266,6 +429,7 @@ export const enUS = {
 		'Verification code must be at least 6 digits.',
 	'auth.validation.passwordMismatch': 'Passwords do not match.',
 
+	// 认证邮箱文案
 	'auth.email': 'Email',
 	'auth.verifyCode': 'Verification code',
 	'auth.confirmPassword': 'Confirm password',
@@ -273,15 +437,18 @@ export const enUS = {
 	'auth.verifyCode.placeholder.email': 'Enter the code sent to your email',
 	'auth.confirmPassword.placeholder': 'Enter password again',
 
+	// 认证验证码文案
 	'auth.verifyCode.send': 'Get code',
 	'auth.verifyCode.sentSuccess': 'Code sent.',
 	'auth.username.requiredFirst': 'Please enter username first.',
 
+	// 认证注册文案
 	'auth.register.submit': 'Sign up',
 	'auth.resetPassword.success': 'Password reset successfully.',
 	'auth.resetPassword.submit': 'Reset',
 	'auth.login.back': 'Back to sign in',
 
+	// 首页文案
 	'home.hero.welcome': 'Welcome',
 	'home.hero.product': 'Smart Assistant',
 	'home.hero.subtitle':
@@ -318,6 +485,7 @@ export const enUS = {
 	'home.steps.start.title': 'Start',
 	'home.steps.start.desc': 'Enjoy the smart assistant experience',
 
+	// 知识库文案
 	'knowledge.common.untitled': 'Untitled',
 	'knowledge.toolbar.save': 'Save',
 	'knowledge.toolbar.clear': 'Clear',
@@ -441,6 +609,7 @@ export const enUS = {
 	'knowledge.trash.loadingDetail': 'Loading…',
 	'knowledge.trash.empty': 'Trash is empty',
 
+	// 分享文案
 	'share.header.chatTitle': 'Shared conversation',
 	'share.header.knowledgeTitle': 'Shared article',
 	'share.header.chatDisclaimer':
@@ -461,6 +630,7 @@ export const enUS = {
 	'share.modal.copy': 'Copy',
 	'share.modal.createAndCopy': 'Create & copy link',
 
+	// 知识库保存文案
 	'knowledge.save.fileSaved': 'File saved',
 	'knowledge.save.savedToPath': 'Saved to: {path}',
 	'knowledge.save.savedToDefaultDir': 'Saved to default directory',
@@ -475,13 +645,16 @@ export const enUS = {
 	'knowledge.save.noChangesMessage':
 		'Title and content are unchanged. Save was skipped.',
 
+	// 知识库验证文案
 	'knowledge.validation.titleRequired':
 		'Please enter a file name (title) first.',
 	'knowledge.validation.contentRequired': 'Please enter content first.',
 
+	// 知识库分享文案
 	'knowledge.share.saveBeforeShare':
 		'Please save to knowledge base before sharing.',
 
+	// 知识库覆盖文案
 	'knowledge.overwrite.title': 'Overwrite existing file?',
 	'knowledge.overwrite.desc':
 		'A file with the same name “{name}” already exists in the current directory. Overwrite it? This action cannot be undone.',
@@ -496,6 +669,7 @@ export const enUS = {
 	'knowledge.title.placeholder': 'Enter file name (title)…',
 	'knowledge.title.aria': 'Knowledge title',
 
+	// 路由文案
 	'route.chat.title': 'Smart Chat',
 	'route.document.title': 'Document',
 	'route.coding.title': 'Coding',
@@ -508,6 +682,7 @@ export const enUS = {
 	'route.setting.theme': 'Theme',
 	'route.setting.language': 'Language',
 
+	// 编程文案
 	'coding.toolbar.selectTemplate': 'Select template',
 	'coding.toolbar.preview.show': '👁️‍🗨️ Show preview',
 	'coding.toolbar.preview.hide': '👁️ Hide preview',
@@ -516,6 +691,7 @@ export const enUS = {
 	'coding.toolbar.forceRefresh': 'Force refresh',
 	'coding.toolbar.currentTemplate': 'Current template',
 
+	// 支付文案
 	'pay.productName.default': 'Pro credit top-up',
 	'pay.toast.loginRequired': 'Please sign in before starting a payment.',
 	'pay.toast.missingStripePk.title': 'Missing VITE_STRIPE_PUBLISHABLE_KEY',

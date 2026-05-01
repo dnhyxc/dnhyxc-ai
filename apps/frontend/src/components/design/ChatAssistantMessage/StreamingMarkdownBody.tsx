@@ -57,7 +57,7 @@ export function StreamingMarkdownBody({
 	);
 
 	const { openMermaidPreview, mermaidImagePreviewModal } =
-		useMermaidImagePreview();
+		useMermaidImagePreview(t);
 
 	const renderMermaidPart = (
 		part: Extract<MarkdownMermaidSplitPart, { type: 'mermaid' }>,

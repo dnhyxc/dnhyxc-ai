@@ -224,7 +224,7 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 	});
 
 	const { openMermaidPreview, mermaidImagePreviewModal } =
-		useMermaidImagePreview();
+		useMermaidImagePreview(t);
 
 	const renderMermaidPreviewPart = useCallback(
 		(

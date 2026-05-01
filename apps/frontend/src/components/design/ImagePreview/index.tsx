@@ -34,6 +34,8 @@ export interface ImagePreviewOptions {
 	download?: (image: SelectedImage) => void;
 	getImgSizeFromUrl?: (url: string) => Promise<{ size: number }>;
 	changeImgUrlDomain?: (url: string) => string;
+	/** i18n 翻译函数（可选）；不传则沿用组件内默认中文文案 */
+	t?: (key: string, params?: Record<string, unknown>) => string;
 	showZoomIn?: boolean;
 	showZoomOut?: boolean;
 	showRotate?: boolean;
@@ -122,6 +124,7 @@ const ImagePreview = forwardRef<ImagePreviewHandle, ImagePreviewProps>(
 			download,
 			getImgSizeFromUrl,
 			changeImgUrlDomain,
+			t,
 			showZoomIn = true,
 			showZoomOut = true,
 			showRotate = true,
@@ -133,12 +136,14 @@ const ImagePreview = forwardRef<ImagePreviewHandle, ImagePreviewProps>(
 			showFooter,
 			imageTransformInfo: propImageTransformInfo,
 			onVisibleChange,
-			title = '图片预览',
+			title,
 			// 以下props在当前实现中未使用，但为了兼容性保留
 			closeOnClickModal: _closeOnClickModal,
 		},
 		ref,
 	) => {
+		const effectiveTitle = title ?? t?.('imagePreview.title') ?? '图片预览';
+
 		const [currentImage, setCurrentImage] = useState<SelectedImage>(
 			selectedImage || { url: '' },
 		);
@@ -566,140 +571,138 @@ const ImagePreview = forwardRef<ImagePreviewHandle, ImagePreviewProps>(
 		}, [prevImages, getCurrentImageIndex, onRefresh, onComputedImgSize]);
 
 		return (
-			<div>
-				<Model
-					title={title}
-					open={visible}
-					showCloseIcon={false}
-					onOpenChange={onVisibleChangeHandler}
-					header={
-						<div className="flex justify-between items-center pb-4.5 border-b border-theme-white/5 select-none">
-							<span className="text-xl font-medium text-textcolor">
-								{title}
-							</span>
-							<div className="relative flex items-center gap-1 -mr-2.5">
-								{showZoomIn && !isMaxed && (
-									<span
-										className="flex items-center justify-center w-9 h-9 rounded-md bg-transparent text-foreground cursor-pointer transition-all duration-200 hover:bg-theme/10"
-										onClick={() => onScaleMax(0.2)}
-										title="放大"
-									>
-										<ZoomIn className="text-textcolor" />
-									</span>
-								)}
-								{showZoomOut && !isMined && (
-									<span
-										className="flex items-center justify-center w-9 h-9 rounded-md bg-transparent text-foreground cursor-pointer transition-all duration-200 hover:bg-theme/10"
-										onClick={() => onScaleMin(0.2)}
-										title="缩小"
-									>
-										<ZoomOut className="text-textcolor" />
-									</span>
-								)}
-								{showRotate && (
-									<span
-										className="flex items-center justify-center w-9 h-9 rounded-md bg-transparent text-foreground cursor-pointer transition-all duration-200 hover:bg-theme/10"
-										onClick={onRotate}
-										title="旋转"
-									>
-										<RotateCw size={22} className="text-textcolor" />
-									</span>
-								)}
-								{showDownload && (
-									<span
-										className="flex items-center justify-center w-9 h-9 rounded-md bg-transparent text-foreground cursor-pointer transition-all duration-200 hover:bg-theme/10"
-										onClick={onDownload}
-										title="下载"
-									>
-										<Download size={22} className="text-textcolor" />
-									</span>
-								)}
-								{showReset && (
-									<span
-										className="flex items-center justify-center w-9 h-9 rounded-md bg-transparent text-foreground cursor-pointer transition-all duration-200 hover:bg-theme/10"
-										onClick={onRefresh}
-										title="重置"
-									>
-										<RefreshCw size={22} className="text-textcolor" />
-									</span>
-								)}
-								{showPrevAndNext && prevImages.length > 1 && (
-									<>
-										<span
-											className="flex items-center justify-center w-9 h-9 rounded-md bg-transparent text-foreground cursor-pointer transition-all duration-200 hover:bg-theme/10"
-											onClick={onPrev}
-											title="上一张"
-										>
-											<ChevronLeft className="text-textcolor" />
-										</span>
-										<span
-											className="flex items-center justify-center w-9 h-9 rounded-md bg-transparent text-foreground cursor-pointer transition-all duration-200 hover:bg-theme/10"
-											onClick={onNext}
-											title="下一张"
-										>
-											<ChevronRight className="text-textcolor" />
-										</span>
-									</>
-								)}
-								{fileSize !== null && fileSize !== 0 && (
-									<span className="text-textcolor font-medium text-sm">
-										{fileSize.toFixed(2)} KB
-									</span>
-								)}
-								{imageSize && (
-									<span className="text-textcolor font-medium text-sm">
-										{imageSize}
-									</span>
-								)}
-								{prevImages.length > 0 && currentImage && (
-									<div className="text-sm text-textcolor">
-										{prevImages.find((i) => i.url === currentImage.url)?.url}
-									</div>
-								)}
+			<Model
+				title={effectiveTitle}
+				open={visible}
+				showCloseIcon={false}
+				onOpenChange={onVisibleChangeHandler}
+				header={
+					<div className="flex justify-between items-center pb-4.5 border-b border-theme-white/5 select-none">
+						<span className="text-xl font-medium text-textcolor">
+							{effectiveTitle}
+						</span>
+						<div className="relative flex items-center gap-1 -mr-2.5">
+							{showZoomIn && !isMaxed && (
 								<span
-									className="position flex items-center justify-center w-9 h-9 rounded-md bg-transparent text-foreground cursor-pointer transition-all duration-200 hover:bg-theme/10"
-									onClick={() => onVisibleChange?.(false)}
-									title="关闭"
+									className="flex items-center justify-center w-9 h-9 rounded-md bg-transparent text-foreground cursor-pointer transition-all duration-200 hover:bg-theme/10"
+									onClick={() => onScaleMax(0.2)}
+									title={t?.('imagePreview.zoomIn') ?? '放大'}
 								>
-									<X size={25} className="text-textcolor" />
+									<ZoomIn size={20} className="text-textcolor" />
 								</span>
-							</div>
+							)}
+							{showZoomOut && !isMined && (
+								<span
+									className="flex items-center justify-center w-9 h-9 rounded-md bg-transparent text-foreground cursor-pointer transition-all duration-200 hover:bg-theme/10"
+									onClick={() => onScaleMin(0.2)}
+									title={t?.('imagePreview.zoomOut') ?? '缩小'}
+								>
+									<ZoomOut size={20} className="text-textcolor" />
+								</span>
+							)}
+							{showRotate && (
+								<span
+									className="flex items-center justify-center w-9 h-9 rounded-md bg-transparent text-foreground cursor-pointer transition-all duration-200 hover:bg-theme/10"
+									onClick={onRotate}
+									title={t?.('imagePreview.rotate') ?? '旋转'}
+								>
+									<RotateCw size={18} className="text-textcolor" />
+								</span>
+							)}
+							{showDownload && (
+								<span
+									className="flex items-center justify-center w-9 h-9 rounded-md bg-transparent text-foreground cursor-pointer transition-all duration-200 hover:bg-theme/10"
+									onClick={onDownload}
+									title={t?.('common.download') ?? '下载'}
+								>
+									<Download size={18} className="text-textcolor" />
+								</span>
+							)}
+							{showReset && (
+								<span
+									className="flex items-center justify-center w-9 h-9 rounded-md bg-transparent text-foreground cursor-pointer transition-all duration-200 hover:bg-theme/10"
+									onClick={onRefresh}
+									title={t?.('imagePreview.reset') ?? '重置'}
+								>
+									<RefreshCw size={18} className="text-textcolor" />
+								</span>
+							)}
+							{showPrevAndNext && prevImages.length > 1 && (
+								<>
+									<span
+										className="flex items-center justify-center w-9 h-9 rounded-md bg-transparent text-foreground cursor-pointer transition-all duration-200 hover:bg-theme/10"
+										onClick={onPrev}
+										title={t?.('imagePreview.prev') ?? '上一张'}
+									>
+										<ChevronLeft size={18} className="text-textcolor" />
+									</span>
+									<span
+										className="flex items-center justify-center w-9 h-9 rounded-md bg-transparent text-foreground cursor-pointer transition-all duration-200 hover:bg-theme/10"
+										onClick={onNext}
+										title={t?.('imagePreview.next') ?? '下一张'}
+									>
+										<ChevronRight size={18} className="text-textcolor" />
+									</span>
+								</>
+							)}
+							{fileSize !== null && fileSize !== 0 && (
+								<span className="text-textcolor font-medium text-sm">
+									{fileSize.toFixed(2)} KB
+								</span>
+							)}
+							{imageSize && (
+								<span className="text-textcolor font-medium text-sm">
+									{imageSize}
+								</span>
+							)}
+							{prevImages.length > 0 && currentImage && (
+								<div className="text-sm text-textcolor">
+									{prevImages.find((i) => i.url === currentImage.url)?.url}
+								</div>
+							)}
+							<span
+								className="position flex items-center justify-center w-9 h-9 rounded-md bg-transparent text-foreground cursor-pointer transition-all duration-200 hover:bg-theme/10"
+								onClick={() => onVisibleChange?.(false)}
+								title={t?.('imagePreview.close') ?? '关闭'}
+							>
+								<X size={22} className="text-textcolor" />
+							</span>
 						</div>
-					}
-					width="82vw"
-					height="85vh"
-					onSubmit={onClose}
-					showFooter={!!showFooter}
-					showClose={showClose}
-				>
-					<div
-						className="relative w-full h-full flex items-center justify-center overflow-hidden p-5"
-						ref={containerRef}
-					>
-						<img
-							ref={imgRef}
-							src={currentImage.url}
-							alt=""
-							className={
-								isDragging || isWheeling
-									? 'max-w-full max-h-full object-contain cursor-default select-none'
-									: 'max-w-full max-h-full object-contain transition-transform duration-300 cursor-default select-none'
-							}
-							style={{
-								touchAction: 'none',
-								transform: `translate(${position.x}px, ${position.y}px) rotate(${actualTransform.rotate}deg) scale(${actualTransform.scale})`,
-							}}
-							onWheel={onWheel}
-							onLoad={handleImgLoad}
-							onPointerDown={handlePointerDown}
-							onPointerMove={handlePointerMove}
-							onPointerUp={endPointerDrag}
-							onPointerCancel={endPointerDrag}
-							onLostPointerCapture={handleLostPointerCapture}
-						/>
 					</div>
-				</Model>
-			</div>
+				}
+				width="82vw"
+				height="85vh"
+				onSubmit={onClose}
+				showFooter={!!showFooter}
+				showClose={showClose}
+			>
+				<div
+					className="relative w-full h-full flex items-center justify-center overflow-hidden p-5"
+					ref={containerRef}
+				>
+					<img
+						ref={imgRef}
+						src={currentImage.url}
+						alt=""
+						className={
+							isDragging || isWheeling
+								? 'max-w-full max-h-full object-contain cursor-default select-none'
+								: 'max-w-full max-h-full object-contain transition-transform duration-300 cursor-default select-none'
+						}
+						style={{
+							touchAction: 'none',
+							transform: `translate(${position.x}px, ${position.y}px) rotate(${actualTransform.rotate}deg) scale(${actualTransform.scale})`,
+						}}
+						onWheel={onWheel}
+						onLoad={handleImgLoad}
+						onPointerDown={handlePointerDown}
+						onPointerMove={handlePointerMove}
+						onPointerUp={endPointerDrag}
+						onPointerCancel={endPointerDrag}
+						onLostPointerCapture={handleLostPointerCapture}
+					/>
+				</div>
+			</Model>
 		);
 	},
 );

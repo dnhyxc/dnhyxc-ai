@@ -4,6 +4,7 @@ import { Download, Eye, Trash2, Upload as UploadIcon } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { FileWithPreview } from '@/types';
+import { donwnloadWithUrl } from '@/utils';
 import Image from '../Image';
 import Tooltip from '../Tooltip';
 
@@ -24,6 +25,8 @@ interface IProps {
 	uploadType?: string;
 	showTooltip?: boolean;
 	tooltipContent?: React.ReactNode | string;
+	/** i18n 翻译函数（可选）；不传则沿用组件内默认中文文案 */
+	t?: (key: string, params?: Record<string, unknown>) => string;
 	disabled?: boolean;
 	loading?: boolean;
 }
@@ -50,7 +53,8 @@ const Upload: React.FC<IProps> = ({
 	countValidText = '',
 	uploadedCount = 0,
 	showTooltip = false,
-	tooltipContent = '仅支持PDF、Word、Excel文件',
+	tooltipContent,
+	t,
 	disabled = false,
 	loading,
 }) => {
@@ -100,7 +104,10 @@ const Upload: React.FC<IProps> = ({
 			) {
 				Toast({
 					type: 'error',
-					title: countValidText || `最多只能同时上传 ${maxCount} 个文件`,
+					title:
+						countValidText ||
+						t?.('upload.error.maxCount', { maxCount }) ||
+						`最多只能同时上传 ${maxCount} 个文件`,
 				});
 				return { valid: false, files: [] };
 			}
@@ -110,7 +117,9 @@ const Upload: React.FC<IProps> = ({
 				if (!validTypes.includes(file.type)) {
 					Toast({
 						type: 'error',
-						title: `不支持的文件类型: ${file.type}`,
+						title:
+							t?.('upload.error.invalidType', { type: file.type }) ||
+							`不支持的文件类型: ${file.type}`,
 					});
 					return false;
 				}
@@ -119,7 +128,10 @@ const Upload: React.FC<IProps> = ({
 				if (file.size > maxSize) {
 					Toast({
 						type: 'error',
-						title: `文件大小不能超过 ${maxSize / 1024 / 1024} MB`,
+						title:
+							t?.('upload.error.maxSize', {
+								maxSizeMb: maxSize / 1024 / 1024,
+							}) || `文件大小不能超过 ${maxSize / 1024 / 1024} MB`,
 					});
 					return false;
 				}
@@ -204,6 +216,16 @@ const Upload: React.FC<IProps> = ({
 		}
 	};
 
+	const onDownload = async () => {
+		if (fileUrl) {
+			const res = await donwnloadWithUrl({ url: fileUrl });
+			Toast({
+				type: res.success,
+				title: res.message,
+			});
+		}
+	};
+
 	return (
 		<div className={cn('w-32.5 h-32.5', className)}>
 			<Input
@@ -221,10 +243,14 @@ const Upload: React.FC<IProps> = ({
 							ref={imageRef}
 							src={fileUrl || files[0]?.preview || ''}
 							showOnError
+							t={t}
 							className="relative w-full h-full rounded-md"
 						>
 							<div className="absolute inset-0 z-1 rounded-md w-full h-full bg-theme-background/50 items-center justify-center hidden group-hover:flex">
-								<Download className="w-5 h-5 cursor-pointer hover:text-textcolor/80" />
+								<Download
+									className="w-5 h-5 cursor-pointer hover:text-textcolor/80"
+									onClick={onDownload}
+								/>
 								<Eye
 									className="w-5 h-5 cursor-pointer ml-2 hover:text-textcolor/80"
 									onClick={onPreview}
@@ -246,7 +272,15 @@ const Upload: React.FC<IProps> = ({
 					</div>
 				))}
 			{uploadType === 'button' && (
-				<Tooltip side="right" content={tooltipContent} disabled={!showTooltip}>
+				<Tooltip
+					side="right"
+					content={
+						tooltipContent ??
+						t?.('upload.tooltip.default') ??
+						'仅支持PDF、Word、Excel文件'
+					}
+					disabled={!showTooltip}
+				>
 					<Button
 						variant="ghost"
 						className="flex items-center text-sm bg-theme/5 mb-1 h-8 rounded-md"
@@ -255,14 +289,15 @@ const Upload: React.FC<IProps> = ({
 					>
 						{loading && (
 							<div className="flex items-center gap-2">
-								<Spinner className="text-textcolor" /> 上传中...
+								<Spinner className="text-textcolor" />
+								{t?.('upload.uploading') ?? '上传中...'}
 							</div>
 						)}
 						{!loading &&
 							(children || (
 								<div className="flex items-center">
 									<UploadIcon className="w-8 h-8 mx-auto text-textcolor mr-2" />
-									上传文件
+									{t?.('upload.button') ?? '上传文件'}
 								</div>
 							))}
 					</Button>
