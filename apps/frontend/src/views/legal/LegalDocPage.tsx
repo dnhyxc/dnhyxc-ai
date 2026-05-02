@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useI18n, useTheme } from '@/hooks';
+import { useI18n, useStandalonePageLocaleFromSearch, useTheme } from '@/hooks';
 import type { Locale } from '@/i18n';
 import type { LegalSection } from './legalDocuments';
 
@@ -12,13 +12,14 @@ type LegalDocPageProps = {
  * 独立全屏法律页（与分享页相同：不经 Layout，整页 h-dvh）。
  */
 export function LegalDocPage({ titleKey, getSections }: LegalDocPageProps) {
+	useStandalonePageLocaleFromSearch();
 	const { t, locale } = useI18n();
 	useTheme();
 	const sections = useMemo(() => getSections(locale), [getSections, locale]);
 
 	return (
 		<div className="relative flex h-dvh w-full flex-col overflow-hidden bg-theme-background text-textcolor">
-			<header className="flex h-12.5 shrink-0 items-center gap-3 border-b border-theme/20 px-4">
+			<header className="flex h-12.5 shrink-0 items-center gap-3 border-b border-theme/5 px-4">
 				<h1 className="min-w-0 truncate text-base font-semibold">
 					{t(titleKey)}
 				</h1>

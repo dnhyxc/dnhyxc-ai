@@ -13,7 +13,8 @@ function persistLocaleBootstrap(locale: Locale) {
 	}
 }
 
-function parseLocaleFromSearch(search: string): Locale | null {
+/** 从 URL 查询串解析语言（支持 `lang` 或 `locale`，与分享页等通过 search 传参一致）。 */
+export function parseLocaleFromSearch(search: string): Locale | null {
 	try {
 		const params = new URLSearchParams(
 			search.startsWith('?') ? search : `?${search}`,

@@ -248,6 +248,7 @@ export const zhCN = {
 	'about.rightsReserved': 'All Rights Reserved',
 	'about.links.policy': '用户服务政策',
 	'about.links.terms': '用户服务协议',
+	'about.links.updateInfo': '更新说明',
 
 	'legal.backHome': '返回首页',
 	'legal.servicePolicy.title': '用户服务政策',
@@ -623,6 +624,11 @@ export const zhCN = {
 	'route.setting.language': '语言设置',
 	'route.legal.servicePolicy': '用户服务政策',
 	'route.legal.userAgreement': '用户服务协议',
+	'route.updateInfo.title': '更新信息',
+
+	'updateInfoPage.header.subtitle':
+		'能力说明随版本更新；与仓库内《更新信息》文档请保持同步。',
+	'updateInfoPage.item.dateLabel': '更新：{date}',
 
 	'coding.toolbar.selectTemplate': '选择模版',
 	'coding.toolbar.preview.show': '👁️‍🗨️ 显示预览',

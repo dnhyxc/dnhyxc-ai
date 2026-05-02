@@ -7,7 +7,11 @@ export function isPublicPath(pathname: string): boolean {
 	if (pathname === '/login') return true;
 	if (pathname === '/win') return true;
 	if (pathname === '/about') return true;
-	if (pathname === '/service-policy' || pathname === '/user-agreement')
+	if (
+		pathname === '/service-policy' ||
+		pathname === '/user-agreement' ||
+		pathname === '/update-info'
+	)
 		return true;
 	if (pathname === '/knowledge') return true;
 	if (pathname === '/setting' || pathname.startsWith('/setting/')) return true;

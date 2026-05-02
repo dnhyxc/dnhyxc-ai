@@ -7,10 +7,11 @@ import {
 	getLegalPageAbsoluteUrl,
 	LEGAL_PAGE_PATHS,
 } from '@/views/legal/legalPageUrls';
+import { getUpdateInfoAbsoluteUrl } from '@/views/updateInfo/paths';
 
 const About = () => {
 	const { version } = useGetVersion();
-	const { t, setLocale } = useI18n();
+	const { t, setLocale, locale } = useI18n();
 
 	const { changeTheme } = useTheme();
 
@@ -36,28 +37,45 @@ const About = () => {
 				<div className="mb-2.5">{t('about.copyright')}</div>
 				<div className="mb-2">{t('about.copyrightYears')}</div>
 				<div className="mb-2">{t('about.rightsReserved')}</div>
-				<div className="flex justify-center">
+				<div className="flex flex-col items-center gap-2">
+					<div className="flex flex-wrap justify-center gap-x-6 gap-y-1">
+						<Button
+							variant="link"
+							onClick={() => {
+								void openExternalUrl(
+									getLegalPageAbsoluteUrl(
+										LEGAL_PAGE_PATHS.servicePolicy,
+										locale,
+									),
+								);
+							}}
+							className="text-blue-500 hover:text-blue-400 text-md bg-transparent border-none cursor-pointer p-0"
+						>
+							{t('about.links.policy')}
+						</Button>
+						<Button
+							variant="link"
+							onClick={() => {
+								void openExternalUrl(
+									getLegalPageAbsoluteUrl(
+										LEGAL_PAGE_PATHS.userAgreement,
+										locale,
+									),
+								);
+							}}
+							className="text-blue-500 hover:text-blue-400 text-md bg-transparent border-none cursor-pointer p-0"
+						>
+							{t('about.links.terms')}
+						</Button>
+					</div>
 					<Button
 						variant="link"
 						onClick={() => {
-							void openExternalUrl(
-								getLegalPageAbsoluteUrl(LEGAL_PAGE_PATHS.servicePolicy),
-							);
-						}}
-						className="mr-6 text-blue-500 hover:text-blue-400 text-md bg-transparent border-none cursor-pointer p-0"
-					>
-						{t('about.links.policy')}
-					</Button>
-					<Button
-						variant="link"
-						onClick={() => {
-							void openExternalUrl(
-								getLegalPageAbsoluteUrl(LEGAL_PAGE_PATHS.userAgreement),
-							);
+							void openExternalUrl(getUpdateInfoAbsoluteUrl(locale));
 						}}
 						className="text-blue-500 hover:text-blue-400 text-md bg-transparent border-none cursor-pointer p-0"
 					>
-						{t('about.links.terms')}
+						{t('about.links.updateInfo')}
 					</Button>
 				</div>
 			</div>

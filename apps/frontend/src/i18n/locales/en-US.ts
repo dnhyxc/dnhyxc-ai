@@ -268,6 +268,7 @@ export const enUS = {
 	'about.rightsReserved': 'All Rights Reserved',
 	'about.links.policy': 'User service policy',
 	'about.links.terms': 'Terms of service',
+	'about.links.updateInfo': 'Release notes',
 
 	'legal.backHome': 'Back to home',
 	'legal.servicePolicy.title': 'User service policy',
@@ -704,6 +705,11 @@ export const enUS = {
 	'route.setting.language': 'Language',
 	'route.legal.servicePolicy': 'User service policy',
 	'route.legal.userAgreement': 'User service agreement',
+	'route.updateInfo.title': 'Release notes',
+
+	'updateInfoPage.header.subtitle':
+		'Capabilities change with releases — keep in sync with the repo notes.',
+	'updateInfoPage.item.dateLabel': 'Updated: {date}',
 
 	// 编程文案
 	'coding.toolbar.selectTemplate': 'Select template',
