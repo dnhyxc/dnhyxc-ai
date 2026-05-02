@@ -24,7 +24,7 @@ export function LegalDocPage({ titleKey, getSections }: LegalDocPageProps) {
 					{t(titleKey)}
 				</h1>
 			</header>
-			<div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+			<div className="min-h-0 flex-1 overflow-y-auto px-4 py-6">
 				<div className="mx-auto max-w-2xl space-y-8 pb-10 text-sm leading-relaxed">
 					{sections.map((section) => (
 						<section key={section.title}>
