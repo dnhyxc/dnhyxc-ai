@@ -27,13 +27,7 @@ import {
 	Square,
 	Target,
 } from 'lucide-react';
-import {
-	startTransition,
-	useCallback,
-	useEffect,
-	useRef,
-	useState,
-} from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { CHAT_VALIDTYPES } from '@/constant';
 import { cn } from '@/lib/utils';
 import { transcribeSpeechAudio } from '@/service';
@@ -45,11 +39,17 @@ import {
 } from '@/utils/navigatorMediaDevices';
 import { isTauriRuntime } from '@/utils/runtime';
 
-/** Tauri 增量 ASR：在实时与准确率之间折中（更大门槛减轻不完整 WebM 误识别） */
-const TAURI_LIVE_POLL_MS = 1000;
-const TAURI_LIVE_FIRST_POLL_MS = 500;
-const TAURI_LIVE_MIN_BYTES = 9000;
-const TAURI_LIVE_MIN_GROWTH = 4500;
+/**
+ * Tauri 增量 ASR：首轮门槛低、轮询密 → 更快出字；后续轮次略提高门槛 → 更稳的 WebM 片段与识别。
+ */
+const TAURI_LIVE_POLL_MS = 650;
+const TAURI_LIVE_FIRST_POLL_MS = 320;
+/** 尚未成功送过一轮转写时（lastSent===0），用较小体积尽快触发首次识别 */
+const TAURI_LIVE_MIN_BYTES_FIRST = 4800;
+/** 已有转写基线后，用较大体积减轻不完整容器带来的错字 */
+const TAURI_LIVE_MIN_BYTES_STEADY = 7800;
+/** 相对上次上传体积的最小增量（仅第二轮起生效） */
+const TAURI_LIVE_MIN_GROWTH_STEADY = 2800;
 
 /**
  * 无法使用麦克风时的说明（多为「非安全上下文」：HTTP + 局域网 IP）
@@ -347,10 +347,13 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 		const blob = new Blob([...chunks], {
 			type: rec.mimeType || 'audio/webm',
 		});
-		// 过小的片段许多 ASR 无法解码；未完成 webm 也可能失败（静默忽略）
-		if (blob.size < TAURI_LIVE_MIN_BYTES) return;
 		const lastSent = tauriLiveLastSentBytesRef.current;
-		if (lastSent > 0 && blob.size - lastSent < TAURI_LIVE_MIN_GROWTH) return;
+		const minBytes =
+			lastSent === 0 ? TAURI_LIVE_MIN_BYTES_FIRST : TAURI_LIVE_MIN_BYTES_STEADY;
+		// 过小的片段许多 ASR 无法解码；未完成 webm 也可能失败（静默忽略）
+		if (blob.size < minBytes) return;
+		if (lastSent > 0 && blob.size - lastSent < TAURI_LIVE_MIN_GROWTH_STEADY)
+			return;
 
 		tauriLivePollBusyRef.current = true;
 		try {
@@ -374,9 +377,8 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 			tauriLiveLastTextRef.current = text;
 			bumpSent();
 			const base = voiceBaseRef.current;
-			startTransition(() => {
-				setInput(base ? `${base} ${text}`.trim() : text);
-			});
+			// 不用 startTransition：语音回填走高优先级更新，降低「出字慢一拍」体感
+			setInput(base ? `${base} ${text}`.trim() : text);
 		} catch {
 			tauriLiveLastSentBytesRef.current = blob.size;
 			/* 未完成容器或非完整编码时接口可能失败，不影响停录后整段转写 */
@@ -398,11 +400,21 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 		mediaStreamRef.current = null;
 	}, []);
 
+	/**
+	 * 启动语音录制与实时转写流程（仅 Tauri 环境下可用）。
+	 * 1. 校验环境及权限，弹窗反馈无法录音的原因
+	 * 2. 记录当前输入文本作为语音内容前缀
+	 * 3. 初始化 MediaRecorder，设置录音格式和码率，绑定数据事件
+	 * 4. 启动短周期采集定时器，实现音频分片的快速实时采集
+	 * 5. 开启轮询定时器，处理增量音频转写回填
+	 */
 	const startVoiceCapture = useCallback(async () => {
+		// 1. 仅在浏览器环境下，Tauri 壳内允许启动语音输入，否则直接返回
 		if (typeof navigator === 'undefined') return;
 		if (!isTauriRuntime()) return;
 		if (disableTextInput) return;
 
+		// 2. 检查麦克风使用可用性（安全上下文、接口存在性等），如不可用直接提示用户
 		const micBlocked = getMicrophoneUnavailableReason();
 		if (micBlocked) {
 			Toast({
@@ -412,9 +424,10 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 			return;
 		}
 
+		// 将当前输入内容作为语音识别前缀（前置文本），稍后回填时拼接使用
 		voiceBaseRef.current = input.trim();
 
-		// 桌面端：MediaRecorder + 定时增量 ASR，停录后再整段转写覆盖
+		// 3. 仅在支持 MediaRecorder 的环境下启动，防御 Safari/小众浏览器等兼容性问题
 		if (typeof MediaRecorder === 'undefined') {
 			Toast({
 				type: 'error',
@@ -426,51 +439,73 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 		}
 
 		try {
+			// 4. 异步获取麦克风音频流（带回声消除等约束）
 			const stream = await getAudioMediaStream();
 			mediaStreamRef.current = stream;
+			// 初始化音频分片列表
 			mediaChunksRef.current = [];
 
+			// 5. 根据支持的 mimeType 选出最佳音频格式，并设定较高录音码率（便于语音识别），优先用高码率，退而求其次
 			const mimeType = pickRecorderMimeType();
 			let recorder: MediaRecorder;
+			const withBitrate: MediaRecorderOptions = {
+				...(mimeType ? { mimeType } : {}),
+				audioBitsPerSecond: 128_000,
+			};
 			try {
-				recorder = new MediaRecorder(
-					stream,
-					mimeType ? { mimeType } : undefined,
-				);
-			} catch (err) {
-				stopMediaTracks();
-				Toast({
-					type: 'error',
-					title:
-						t?.('chat.entry.voice.noRecorder') ??
-						`无法创建录音器：${err instanceof Error ? err.message : String(err)}`,
-				});
-				return;
+				recorder = new MediaRecorder(stream, withBitrate);
+			} catch {
+				// 某些浏览器新参数不兼容时降级
+				try {
+					recorder = new MediaRecorder(
+						stream,
+						mimeType ? { mimeType } : undefined,
+					);
+				} catch (err) {
+					// 创建失败需及时释放流资源、防止设备被“锁住”，弹窗反馈
+					stopMediaTracks();
+					Toast({
+						type: 'error',
+						title:
+							t?.('chat.entry.voice.noRecorder') ??
+							`无法创建录音器：${err instanceof Error ? err.message : String(err)}`,
+					});
+					return;
+				}
 			}
 
+			// 6. 绑定全局 recorder 引用，采集音频分片，回调加入分片队列
 			mediaRecorderRef.current = recorder;
 			recorder.ondataavailable = (ev) => {
 				if (ev.data.size > 0) {
 					mediaChunksRef.current.push(ev.data);
 				}
 			};
-			// 较短 timeslice 更快攒够字节；Tauri 增量 ASR 依赖频繁 chunk
-			recorder.start(500);
+			// 7. 以较短的 timeslice（280ms）分片并触发 ondataavailable，提高首包出字速度
+			recorder.start(280);
 
+			// 8. 置录音激活标记（ref，为实时转写控制同步状态），更新界面录音状态
 			voiceRecordingRef.current = true;
 			setVoiceRecording(true);
+			// 9. 递增“录音会话代数”epoch，防止多轮竞态数据回填错乱
 			tauriLiveEpochRef.current += 1;
 			tauriLiveLastSentBytesRef.current = 0;
 			tauriLiveLastTextRef.current = '';
+			// 启动前清理前一轮定时器
 			clearTauriLiveTimers();
+
+			// 10. 首包回填定时器：极短延迟（320ms）后主动触发一次实时转写
 			tauriLiveKickTimerRef.current = window.setTimeout(() => {
 				tauriLiveKickTimerRef.current = null;
 				void runTauriLiveTranscribePoll();
 			}, TAURI_LIVE_FIRST_POLL_MS);
+
+			// 11. 后续增量实时回填定时器：固定周期定时拉音频片段转写
 			tauriLivePollTimerRef.current = window.setInterval(() => {
 				void runTauriLiveTranscribePoll();
 			}, TAURI_LIVE_POLL_MS);
 		} catch (err) {
+			// 捕获“用户拒绝”或“硬件/环境错误”，弹窗告知，同时增加定制麦克风说明
 			const base =
 				t?.('chat.entry.voice.micDenied') ?? formatGetUserMediaError(err);
 			Toast({

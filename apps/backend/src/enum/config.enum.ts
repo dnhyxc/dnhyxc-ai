@@ -101,6 +101,11 @@ export enum KnowledgeQaEnum {
 	 */
 	SILICONFLOW_TRANSCRIPTION_MODEL = 'SILICONFLOW_TRANSCRIPTION_MODEL',
 	/**
+	 * 语音转写语言提示（OpenAI 兼容 `language`，ISO 639-1，如 zh、en）；未配置时默认 zh。
+	 * 设为 off / none / disabled 时不发送该字段（上游若对 language 报错时可关闭）。
+	 */
+	SILICONFLOW_TRANSCRIPTION_LANGUAGE = 'SILICONFLOW_TRANSCRIPTION_LANGUAGE',
+	/**
 	 * 知识库 rerank 模型名（硅基流动 `/v1/rerank`），默认 BAAI/bge-reranker-v2-m3
 	 * @see https://docs.siliconflow.cn/cn/api-reference/rerank/create-rerank
 	 */

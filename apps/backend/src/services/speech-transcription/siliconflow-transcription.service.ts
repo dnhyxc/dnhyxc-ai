@@ -10,6 +10,8 @@ const KNOWN_TRANSCRIPTION_MODELS = new Set<string>([
 ]);
 /** 允许硅基后续新增 model id，限制为常见路径字符，避免误配置注入 multipart 字段 */
 const TRANSCRIPTION_MODEL_ID_RE = /^[A-Za-z0-9./_-]{3,96}$/;
+/** OpenAI 兼容转写可选字段 language，仅发送合法两字母代码 */
+const TRANSCRIPTION_LANGUAGE_RE = /^[a-z]{2}$/;
 
 /**
  * SenseVoice 等常返回 `<|zh|><|NEUTRAL|>` 类富标签，剥离后更利于直接回填输入框。
@@ -74,6 +76,27 @@ export class SiliconflowTranscriptionService {
 		});
 		formData.append('file', blob, file.originalname || 'audio.webm');
 		formData.append('model', this.resolveTranscriptionModel());
+
+		// 读取环境变量中配置的语音转写语言选项，并去除首尾空格
+		const rawLang = this.config
+			.get<string>(KnowledgeQaEnum.SILICONFLOW_TRANSCRIPTION_LANGUAGE)
+			?.trim();
+
+		// 判断是否显式要求不传递 language 参数（如：off、none、disabled，大小写不敏感）
+		const skipLang = rawLang && /^(off|none|disabled)$/i.test(rawLang);
+
+		// 如果未禁用 language 传参，则根据配置拼接 language 字段，未配置则默认 'zh'
+		if (!skipLang) {
+			// 若环境变量配置的语言合理，取其小写；否则降级为 'zh'
+			const lang =
+				rawLang && TRANSCRIPTION_LANGUAGE_RE.test(rawLang)
+					? rawLang.toLowerCase()
+					: 'zh';
+			// 仅当 lang 匹配有效正则（极端防御）时，传入 FormData
+			if (TRANSCRIPTION_LANGUAGE_RE.test(lang)) {
+				formData.append('language', lang);
+			}
+		}
 
 		const res = await fetch(url, {
 			method: 'POST',

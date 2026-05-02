@@ -1,6 +1,6 @@
 # 语音输入与语音识别（ASR）实现说明
 
-本文档基于当前仓库实现，梳理 **Tauri 桌面端** 聊天/助手输入区「语音输入」的完整思路，并收录相关源码摘录与**逐行说明**（行号与 `apps/frontend`、`apps/backend` 中文件一致）。**文档仅描述与摘录代码，不修改业务源码。**
+本文档基于当前仓库实现，梳理 **Tauri 桌面端** 聊天/助手输入区「语音输入」的完整思路，并收录相关源码摘录与**逐行说明**（行号与 `apps/frontend`、`apps/backend` 中文件一致）。**§10** 补充 **Live 出字速度与识别准确率** 相关迭代思路与代码摘录。**文档仅描述与摘录代码，不修改业务源码。**
 
 ---
 
@@ -9,8 +9,8 @@
 | 维度 | 说明 |
 |------|------|
 | 运行环境 | **仅 Tauri 壳内**（`isTauriRuntime() === true`）展示「文本 / 语音」模式切换、麦克风录音与 live 增量转写；纯 Web 仅保留文本发送按钮，强制 `inputMode === 'text'`。 |
-| 录音技术 | `navigator.mediaDevices.getUserMedia` + `MediaRecorder`，`timeslice` 500ms 产出 `Blob` 片段。 |
-| 实时听写 | 定时将**累积**音频打成 `Blob` 调后端转写，用 `epoch` 与 `voiceRecordingRef` 丢弃过期响应；有最小字节与最小增长门槛，减少不完整 WebM 与重复请求。 |
+| 录音技术 | `navigator.mediaDevices.getUserMedia` + `MediaRecorder`，`timeslice` **280ms** 产出 `Blob` 片段；优先 `audioBitsPerSecond: 128_000`，失败则降级创建。 |
+| 实时听写 | 定时将**累积**音频打成 `Blob` 调后端转写，用 `epoch` 与 `voiceRecordingRef` 丢弃过期响应；**首轮**用较低最小字节门槛尽快出字，**后续**用较高门槛与最小增量换更稳 WebM；live 回填直接 `setInput`（不走 `startTransition`）以降低出字延迟。 |
 | 停录 | 用户再次点击主按钮：`MediaRecorder.stop()` → 整段 `Blob` → 再调同一转写接口，**覆盖**本会话语音段文本（保留 `voiceBaseRef` 前缀）。 |
 | 后端 | NestJS `POST /speech-transcription/transcription`，`multipart` 字段 `file`；硅基流动 OpenAI 兼容 `POST /v1/audio/transcriptions`。 |
 | 业务约束 | 知识库 **AI 模式** 下左侧文档无正文时 `disableTextInput=true`：禁用文本输入、禁止悬停打开模式菜单、禁止开始语音/发送（录音中仍允许停录并识别，避免麦克风悬挂）。 |
@@ -31,7 +31,7 @@ sequenceDiagram
 	U->>CE: 悬停发送钮 / 选「语音输入」
 	U->>CE: 点击主按钮（麦）
 	CE->>CE: startVoiceCapture
-	CE->>MR: getUserMedia + start(500ms)
+	CE->>MR: getUserMedia + start(280ms timeslice)
 	loop 录音中
 		CE->>CE: setInterval runTauriLiveTranscribePoll
 		CE->>API: transcribeSpeechAudio(blob, live-*.webm)
@@ -341,7 +341,9 @@ export class SpeechTranscriptionController {
 
 ### 5.3 硅基流动转写服务（`apps/backend/src/services/speech-transcription/siliconflow-transcription.service.ts`）
 
-**摘录** `apps/backend/src/services/speech-transcription/siliconflow-transcription.service.ts` 第 1–107 行：
+下文摘录为服务主体（模型解析、`fetch`、响应解析）；**`language` 与 `TRANSCRIPTION_LANGUAGE_RE`、配置键 `SILICONFLOW_TRANSCRIPTION_LANGUAGE`** 等增量逻辑见 **§10.3**。
+
+**摘录** `apps/backend/src/services/speech-transcription/siliconflow-transcription.service.ts` 第 1–107 行（与仓库主干一致处；行号可能随文件增长略变）：
 
 ```typescript
 import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
@@ -501,16 +503,22 @@ export class SiliconflowTranscriptionService {
 
 以下按逻辑分段列出**与语音直接相关**的常量、辅助函数、状态、副作用与 UI；文件顶部 UI 导入（约 1–46 行）为通用聊天组件依赖，此处不逐行展开。
 
-### 6.1 常量与麦克风辅助（约 48–113 行）
+### 6.1 常量与麦克风辅助（约 42–113 行）
 
-**摘录** `apps/frontend/src/components/design/ChatEntry/index.tsx` 第 48–113 行：
+**摘录** `apps/frontend/src/components/design/ChatEntry/index.tsx` 第 42–113 行：
 
 ```tsx
-/** Tauri 增量 ASR：在实时与准确率之间折中（更大门槛减轻不完整 WebM 误识别） */
-const TAURI_LIVE_POLL_MS = 1000;
-const TAURI_LIVE_FIRST_POLL_MS = 500;
-const TAURI_LIVE_MIN_BYTES = 9000;
-const TAURI_LIVE_MIN_GROWTH = 4500;
+/**
+ * Tauri 增量 ASR：首轮门槛低、轮询密 → 更快出字；后续轮次略提高门槛 → 更稳的 WebM 片段与识别。
+ */
+const TAURI_LIVE_POLL_MS = 650;
+const TAURI_LIVE_FIRST_POLL_MS = 320;
+/** 尚未成功送过一轮转写时（lastSent===0），用较小体积尽快触发首次识别 */
+const TAURI_LIVE_MIN_BYTES_FIRST = 4800;
+/** 已有转写基线后，用较大体积减轻不完整容器带来的错字 */
+const TAURI_LIVE_MIN_BYTES_STEADY = 7800;
+/** 相对上次上传体积的最小增量（仅第二轮起生效） */
+const TAURI_LIVE_MIN_GROWTH_STEADY = 2800;
 
 /**
  * 无法使用麦克风时的说明（多为「非安全上下文」：HTTP + 局域网 IP）
@@ -576,10 +584,8 @@ function withTauriMicNote(message: string): string {
 
 | 行号 | 说明 |
 |------|------|
-| 48-49 | live 轮询间隔 1s。 |
-| 50 | 首次轮询延迟 500ms，给 MediaRecorder 攒数据时间。 |
-| 51 | 最小 Blob 字节：过小不解码，避免无效 ASR。 |
-| 52 | 相对上次上传体积的最小增量，防抖与省流量。 |
+| 42-44 | 常量区注释：首轮快出字 + 后续稳态策略。 |
+| 45-52 | `TAURI_LIVE_POLL_MS` / `FIRST`：轮询与首轮 kick 间隔；`MIN_BYTES_FIRST` / `STEADY` / `GROWTH_STEADY`：首轮与后续上传体积门槛及增量门槛（在 `runTauriLiveTranscribePoll` 内按 `lastSent` 分支选用）。 |
 | 54-57 | `getMicrophoneUnavailableReason`：说明壳内不测安全上下文。 |
 | 59 | 无 `window` 不检测，返回 `null`。 |
 | 61 | 先打补丁再检测。 |
@@ -648,8 +654,7 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 | 338-339 | 无 chunk 不请求。 |
 | 341-345 | `requestData` 尽量刷出新数据（忽略异常）。 |
 | 347-349 | 用当前全部 chunk 组 Blob（类型随 recorder）。 |
-| 350-351 | 小于 `MIN_BYTES` 直接返回。 |
-| 352-353 | 增量不足 `MIN_GROWTH` 返回，避免重复送同一段。 |
+| 350-356 | 读 `tauriLiveLastSentBytesRef`：`lastSent === 0` 时用 `TAURI_LIVE_MIN_BYTES_FIRST`，否则用 `TAURI_LIVE_MIN_BYTES_STEADY`；第二轮起再校验 `TAURI_LIVE_MIN_GROWTH_STEADY`。 |
 | 355 | 置 `busy`。 |
 | 357 | 调用 `transcribeSpeechAudio`（live 文件名带时间戳）。 |
 | 358-359 | `epoch` 或录音状态变化则丢弃结果。 |
@@ -658,30 +663,28 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 | 366-369 | 空文本只 bump 返回。 |
 | 370-372 | 与上次相同文本 bump 返回，避免 UI 抖动。 |
 | 374-375 | 记录上次文本并 bump。 |
-| 376-379 | 前缀 + 新文本 `setInput`，`startTransition` 降低卡顿感。 |
-| 380-382 | `catch`：失败也 bump 体积，依赖后续更多音频；注释说明停录后整段仍会转写。 |
-| 383-385 | `finally` 释放 `busy`。 |
-| 386 | `useCallback` 依赖仅 `setInput`。 |
+| 379-381 | 前缀 + 新文本直接 `setInput`（不走 `startTransition`），优先保证语音回填「跟手」。 |
+| 382-385 | `catch` / `finally`：失败时 bump 体积；`finally` 释放 `busy`。 |
+| 388 | `useCallback` 依赖仅 `setInput`。 |
 
-### 6.4 `pickRecorderMimeType`、`stopMediaTracks`、`startVoiceCapture`（约 388–489 行）
+### 6.4 `pickRecorderMimeType`、`stopMediaTracks`、`startVoiceCapture`（约 390–524 行）
 
 | 行号 | 说明 |
 |------|------|
-| 388-392 | 按优先级选浏览器支持的录音 MIME。 |
-| 394-399 | 停止所有音轨并清空流引用，释放麦克风。 |
-| 401-404 | `startVoiceCapture`：无 `navigator`、非 Tauri、或 `disableTextInput` 则直接返回。 |
-| 406-413 | 预检麦克风不可用原因，Toast 提示。 |
-| 415 | 记录开录前输入为前缀。 |
-| 417-426 | 无 `MediaRecorder` Toast 返回。 |
-| 428-431 | `getUserMedia` 成功则保存流、清空 chunk 数组。 |
-| 433-449 | 创建 `MediaRecorder`，失败则停轨并 Toast。 |
-| 451-456 | `ondataavailable` 追加非空 `BlobPart`。 |
-| 457-458 | `start(500)` 每 500ms 触发 data。 |
-| 460-461 | 标记正在录音（ref + state）。 |
-| 462-464 | 新会话：递增 `epoch`、清零 live 体积与上次文本。 |
-| 465-472 | 清旧定时器；首包延迟后启动轮询 + 周期 interval。 |
-| 473-480 | `getUserMedia`/录音异常：Toast 可读错误。 |
-| 481-489 | `useCallback` 依赖列表含 `disableTextInput`。 |
+| 390-394 | `pickRecorderMimeType`：按优先级选浏览器支持的录音 MIME。 |
+| 396-401 | `stopMediaTracks`：停止所有音轨并清空流引用。 |
+| 411-415 | `startVoiceCapture`：无 `navigator`、非 Tauri、或 `disableTextInput` 则直接返回。 |
+| 417-424 | 预检麦克风不可用原因，Toast 提示。 |
+| 427-428 | `voiceBaseRef` 记录开录前输入为前缀。 |
+| 430-438 | 无 `MediaRecorder` Toast 返回。 |
+| 441-446 | `getUserMedia` 成功则保存流、清空 chunk 数组。 |
+| 448-475 | 创建 `MediaRecorder`：优先 `audioBitsPerSecond: 128_000` + mime；失败则降级为仅 mime/默认选项；再失败 Toast 并 `stopMediaTracks`。 |
+| 478-483 | `ondataavailable` 追加非空 `BlobPart`。 |
+| 484-485 | `start(280)`：更短 timeslice，更快攒够首轮 live 门槛字节。 |
+| 487-493 | 置 `voiceRecordingRef` / `setVoiceRecording`；递增 `epoch`、清零 live 体积与上次文本。 |
+| 494-506 | `clearTauriLiveTimers`；首包 `setTimeout` 调 `runTauriLiveTranscribePoll`；`setInterval` 周期轮询。 |
+| 507-515 | `getUserMedia`/录音异常：Toast 可读错误。 |
+| 516-524 | `useCallback` 依赖列表（含 `disableTextInput` 等）。 |
 
 ### 6.5 `finalizeVoiceAndTranscribe`、`discardActiveVoiceCapture`、`sendMessageWithVoiceReset`（约 491–593 行）
 
@@ -1014,13 +1017,96 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 |----|------|
 | `SILICONFLOW_API_KEY` | 后端转写必填（或回退读 DashScope key，见服务实现）。 |
 | `SILICONFLOW_BASE_URL` | 可选，默认 `https://api.siliconflow.cn/v1`。 |
-| `SILICONFLOW_TRANSCRIPTION_MODEL` | 可选覆盖默认 `FunAudioLLM/SenseVoiceSmall`，需通过格式校验。 |
+| `SILICONFLOW_TRANSCRIPTION_MODEL` | 可选覆盖默认 `FunAudioLLM/SenseVoiceSmall`，需通过格式校验；中文场景可尝试 `TeleAI/TeleSpeechASR`（以硅基文档为准）。 |
+| `SILICONFLOW_TRANSCRIPTION_LANGUAGE` | 转写请求可选 `language`（ISO 639-1，如 `zh`、`en`）；未配置时默认 `zh`。设为 `off` / `none` / `disabled` 时不发送该字段（上游若对 `language` 报错时可关闭）。 |
 | Tauri macOS | 需在 `Info.plist` 声明 `NSMicrophoneUsageDescription`；用户系统设置中允许麦克风。 |
 | JWT | 转写接口带 `JwtGuard`，前端 `http` 需带登录态。 |
 
 ---
 
-## 10. 文档维护说明
+## 10. 性能与准确率优化（Live 调度与后端 language）
+
+本节对应近期迭代：**加快输入框内 live 出字速度**，并在不破坏 OpenAI 兼容的前提下 **提升中文等场景识别倾向**；与上文 §1、§2、§6.1、§6.3、§6.4、§9 一致。
+
+### 10.1 设计思路
+
+| 目标 | 做法 |
+|------|------|
+| 更快首字 | 缩短 `MediaRecorder.start` 的 **timeslice（280ms）**，更快产生 `ondataavailable` 分片；缩短 **首轮 kick**（`TAURI_LIVE_FIRST_POLL_MS`）与 **轮询间隔**（`TAURI_LIVE_POLL_MS`）。 |
+| 首轮 vs 稳态 | `tauriLiveLastSentBytesRef === 0` 时使用 **较小** `TAURI_LIVE_MIN_BYTES_FIRST`，尽快凑够首次上传；之后用 **较大** `TAURI_LIVE_MIN_BYTES_STEADY` 与 `TAURI_LIVE_MIN_GROWTH_STEADY`，减轻不完整 WebM 带来的错字与无效请求。 |
+| 回填跟手 | Live 路径对识别结果 **直接 `setInput`**，不再包一层 `startTransition`，减少低优先级更新造成的「慢一拍」。 |
+| 音质 / 码率 | 创建 `MediaRecorder` 时优先传入 **`audioBitsPerSecond: 128_000`**，不支持则降级为无码率选项的构造。 |
+| 后端语言提示 | 在硅基 `multipart` 中附加 OpenAI 兼容字段 **`language`**（默认 `zh`），见 §10.3；可通过环境变量关闭或改为 `en` 等。 |
+
+**权衡**：首轮门槛更低会略微增加「半成品音频」请求失败率（仍由 `catch` bump 体积、下一轮再试）；若线上错误率升高，可适当回调 `TAURI_LIVE_MIN_BYTES_FIRST` 或拉长 `TAURI_LIVE_POLL_MS`。
+
+### 10.2 `runTauriLiveTranscribePoll` 中双门槛逻辑（摘录）
+
+**摘录** `apps/frontend/src/components/design/ChatEntry/index.tsx`（`runTauriLiveTranscribePoll` 内组 Blob 之后至发起请求前）：
+
+```tsx
+		const blob = new Blob([...chunks], {
+			type: rec.mimeType || 'audio/webm',
+		});
+		const lastSent = tauriLiveLastSentBytesRef.current;
+		const minBytes =
+			lastSent === 0 ? TAURI_LIVE_MIN_BYTES_FIRST : TAURI_LIVE_MIN_BYTES_STEADY;
+		// 过小的片段许多 ASR 无法解码；未完成 webm 也可能失败（静默忽略）
+		if (blob.size < minBytes) return;
+		if (lastSent > 0 && blob.size - lastSent < TAURI_LIVE_MIN_GROWTH_STEADY)
+			return;
+```
+
+成功识别并需更新输入框时（省略 `bumpSent` 与空串/重复串分支）：
+
+```tsx
+			const base = voiceBaseRef.current;
+			// 不用 startTransition：语音回填走高优先级更新，降低「出字慢一拍」体感
+			setInput(base ? `${base} ${text}`.trim() : text);
+```
+
+### 10.3 后端转写请求附加 `language`（摘录）
+
+**摘录** `apps/backend/src/enum/config.enum.ts`（配置键说明）：
+
+```typescript
+	SILICONFLOW_TRANSCRIPTION_MODEL = 'SILICONFLOW_TRANSCRIPTION_MODEL',
+	/**
+	 * 语音转写语言提示（OpenAI 兼容 `language`，ISO 639-1，如 zh、en）；未配置时默认 zh。
+	 * 设为 off / none / disabled 时不发送该字段（上游若对 language 报错时可关闭）。
+	 */
+	SILICONFLOW_TRANSCRIPTION_LANGUAGE = 'SILICONFLOW_TRANSCRIPTION_LANGUAGE',
+```
+
+**摘录** `apps/backend/src/services/speech-transcription/siliconflow-transcription.service.ts`（构建 `FormData` 片段）：
+
+```typescript
+/** OpenAI 兼容转写可选字段 language，仅发送合法两字母代码 */
+const TRANSCRIPTION_LANGUAGE_RE = /^[a-z]{2}$/;
+// ... resolveTranscriptionModel、append file/model 略
+
+		const rawLang = this.config
+			.get<string>(KnowledgeQaEnum.SILICONFLOW_TRANSCRIPTION_LANGUAGE)
+			?.trim();
+
+		const skipLang = rawLang && /^(off|none|disabled)$/i.test(rawLang);
+
+		if (!skipLang) {
+			const lang =
+				rawLang && TRANSCRIPTION_LANGUAGE_RE.test(rawLang)
+					? rawLang.toLowerCase()
+					: 'zh';
+			if (TRANSCRIPTION_LANGUAGE_RE.test(lang)) {
+				formData.append('language', lang);
+			}
+		}
+```
+
+硅基官方 OpenAPI 文档中 `AudioRequest` 仅强制列出 `file` 与 `model`；`language` 按 **OpenAI 兼容惯例** 透传。若实际网关返回 4xx，请将 **`SILICONFLOW_TRANSCRIPTION_LANGUAGE`** 设为 **`off`**（或 `none` / `disabled`）以关闭该字段。
+
+---
+
+## 11. 文档维护说明
 
 - 源码行号随文件变更可能漂移；以仓库当前文件为准。
-- 若新增 Web 端语音或其它 ASR 供应商，请同步更新本文「适用范围」与序列图。
+- 若新增 Web 端语音或其它 ASR 供应商，请同步更新本文「适用范围」、序列图与 **§10**。
