@@ -95,6 +95,12 @@ export enum KnowledgeQaEnum {
 	/** 硅基流动 API 根路径，默认 https://api.siliconflow.cn/v1 */
 	SILICONFLOW_BASE_URL = 'SILICONFLOW_BASE_URL',
 	/**
+	 * 公共语音转写模型（`/v1/audio/transcriptions`，见 speech-transcription 模块），默认 FunAudioLLM/SenseVoiceSmall。
+	 * 可改为 TeleAI/TeleSpeechASR 对比中文场景效果（以硅基文档为准）。
+	 * @see https://docs.siliconflow.cn/cn/api-reference/audio/create-audio-transcriptions
+	 */
+	SILICONFLOW_TRANSCRIPTION_MODEL = 'SILICONFLOW_TRANSCRIPTION_MODEL',
+	/**
 	 * 知识库 rerank 模型名（硅基流动 `/v1/rerank`），默认 BAAI/bge-reranker-v2-m3
 	 * @see https://docs.siliconflow.cn/cn/api-reference/rerank/create-rerank
 	 */

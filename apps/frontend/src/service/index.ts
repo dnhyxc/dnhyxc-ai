@@ -39,6 +39,7 @@ import {
 	RESET_PASSWORD,
 	SEND_EMAIL,
 	SEND_RESET_PWD_EMAIL,
+	SPEECH_TRANSCRIPTION,
 	STOP_SSE,
 	UPDATE_EMAIL,
 	UPDATE_SESSION,
@@ -237,6 +238,21 @@ export const stopSse = async (sessionId: string) => {
 	return await http.post(STOP_SSE, {
 		sessionId,
 	});
+};
+
+/** 语音转写：上传录音，返回识别文本（后端 speech-transcription 模块） */
+export const transcribeSpeechAudio = async (blob: Blob, filename: string) => {
+	const file = new File([blob], filename, {
+		type: blob.type || 'audio/webm',
+	});
+	return await http.post<{ text: string }>(
+		SPEECH_TRANSCRIPTION,
+		{ file },
+		{
+			headers: { 'Content-Type': 'multipart/form-data' },
+			timeout: 120000,
+		},
+	);
 };
 
 /** 助手会话详情（与 getAssistantSessionDetail / 按知识条目查询 结构一致） */

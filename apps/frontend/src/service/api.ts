@@ -55,6 +55,9 @@ export const IMAGE_OCR = '/ocr/imageOcr';
 // 停止模型调用
 export const STOP_SSE = '/chat/stopSse';
 
+/** 语音转写：录音上传 → 硅基流动 ASR（与 chat 路由解耦） */
+export const SPEECH_TRANSCRIPTION = '/speech-transcription/transcription';
+
 // 创建会话
 export const CREATE_SESSION = '/chat/createSession';
 

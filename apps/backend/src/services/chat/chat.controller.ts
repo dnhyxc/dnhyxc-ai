@@ -21,7 +21,6 @@ import { HistoryDto, MessageDto } from './dto/message.dto';
 import { UpdateChatDto } from './dto/update-chat.dto';
 import { GlmChatService } from './glm.service';
 import { MessageService } from './message.service';
-
 @Controller('chat')
 @UseInterceptors(ClassSerializerInterceptor)
 @UseGuards(JwtGuard)

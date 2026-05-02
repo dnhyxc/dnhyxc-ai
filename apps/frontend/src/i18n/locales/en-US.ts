@@ -345,6 +345,21 @@ export const enUS = {
 	'chat.entry.upload.tooltip.maxFilesAndSize':
 		'Up to 5 files at once, max 20 MB per file.',
 	'chat.entry.webSearch': 'Web search',
+	'chat.entry.send': 'Send',
+	'chat.entry.sendDisabledHint':
+		'Please enter a message first. On desktop, hover the send button to open the menu and choose voice input.',
+	'chat.entry.sendDisabledHintWeb': 'Please enter a message first.',
+	'chat.entry.inputMode.label': 'Input mode',
+	'chat.entry.inputMode.text': 'Text input',
+	'chat.entry.inputMode.voice': 'Voice input',
+	'chat.entry.voice.noRecorder':
+		'Recording is not supported here or the recorder could not be created.',
+	'chat.entry.voice.micDenied': 'Microphone access was denied',
+	'chat.entry.voice.liveListening':
+		'Listening… transcribed text will appear here (about once per second).',
+	'chat.entry.voice.stop': 'Stop recording and transcribe',
+	'chat.entry.voice.transcribing': 'Transcribing…',
+	'chat.entry.voice.start': 'Start recording',
 
 	// 聊天机器人文案
 	'chat.bot.toast.noContent.title': 'No content',

@@ -310,6 +310,19 @@ export const zhCN = {
 	'chat.entry.upload.tooltip.maxFilesAndSize':
 		'最多同时支持 5 个文件，每个文件最大 20 MB！',
 	'chat.entry.webSearch': '联网搜索',
+	'chat.entry.send': '发送',
+	'chat.entry.sendDisabledHint':
+		'请先输入内容；桌面端可悬停发送按钮打开菜单并选择语音输入。',
+	'chat.entry.sendDisabledHintWeb': '请先输入内容',
+	'chat.entry.inputMode.label': '输入模式',
+	'chat.entry.inputMode.text': '文本输入',
+	'chat.entry.inputMode.voice': '语音输入',
+	'chat.entry.voice.noRecorder': '当前环境不支持录音或无法创建录音器',
+	'chat.entry.voice.micDenied': '无法使用麦克风',
+	'chat.entry.voice.liveListening': '聆听中，识别文字将填入此处（约每秒更新）…',
+	'chat.entry.voice.stop': '停止录音并识别',
+	'chat.entry.voice.transcribing': '识别中',
+	'chat.entry.voice.start': '开始录音',
 
 	'chat.bot.toast.noContent.title': '暂无内容',
 	'chat.bot.toast.noContent.desc': '该条回复为空，无法保存到知识库',
