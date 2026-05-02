@@ -266,8 +266,12 @@ export const enUS = {
 	'about.copyright': 'Copyright © dnhyxc',
 	'about.copyrightYears': 'Copyright © 2025 - 2026 Dnhyxc',
 	'about.rightsReserved': 'All Rights Reserved',
-	'about.links.policy': 'Policy',
+	'about.links.policy': 'User service policy',
 	'about.links.terms': 'Terms of service',
+
+	'legal.backHome': 'Back to home',
+	'legal.servicePolicy.title': 'User service policy',
+	'legal.userAgreement.title': 'User service agreement',
 
 	// 404 页面文案
 	'notFound.title': '404 Not Found',
@@ -698,6 +702,8 @@ export const enUS = {
 	'route.setting.about': 'About',
 	'route.setting.theme': 'Theme',
 	'route.setting.language': 'Language',
+	'route.legal.servicePolicy': 'User service policy',
+	'route.legal.userAgreement': 'User service agreement',
 
 	// 编程文案
 	'coding.toolbar.selectTemplate': 'Select template',

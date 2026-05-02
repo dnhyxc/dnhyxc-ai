@@ -246,8 +246,12 @@ export const zhCN = {
 	'about.copyright': 'dnhyxc 版权所有',
 	'about.copyrightYears': 'Copyright © 2025 - 2026 Dnhyxc',
 	'about.rightsReserved': 'All Rights Reserved',
-	'about.links.policy': '服务政策',
+	'about.links.policy': '用户服务政策',
 	'about.links.terms': '用户服务协议',
+
+	'legal.backHome': '返回首页',
+	'legal.servicePolicy.title': '用户服务政策',
+	'legal.userAgreement.title': '用户服务协议',
 
 	'notFound.title': '404 Not Found',
 	'notFound.backHome': '返回首页',
@@ -617,6 +621,8 @@ export const zhCN = {
 	'route.setting.about': '关于应用',
 	'route.setting.theme': '主题设置',
 	'route.setting.language': '语言设置',
+	'route.legal.servicePolicy': '用户服务政策',
+	'route.legal.userAgreement': '用户服务协议',
 
 	'coding.toolbar.selectTemplate': '选择模版',
 	'coding.toolbar.preview.show': '👁️‍🗨️ 显示预览',

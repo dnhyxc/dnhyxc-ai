@@ -1,6 +1,6 @@
 /**
  * 路由表。鉴权白名单（未登录可访问）见 `@/router/authPaths` 的 `isPublicPath`：
- * 首页 `/`、`/login`、`/win`、`/about`、`/share/:shareId`、`/setting` 及其子路径。
+ * 首页 `/`、`/login`、`/win`、`/about`、`/service-policy`、`/user-agreement`、`/share/:shareId`、`/setting` 及其子路径。
  */
 import React from 'react';
 import Layout from '@/layout';
@@ -14,6 +14,8 @@ import Coding from '@/views/coding';
 import Document from '@/views/document';
 import Home from '@/views/home';
 import Knowledge from '@/views/knowledge';
+import LegalServicePolicy from '@/views/legal/servicePolicy';
+import LegalUserAgreement from '@/views/legal/userAgreement';
 import Login from '@/views/login';
 import Pay from '@/views/pay';
 import Profile from '@/views/profile';
@@ -159,6 +161,20 @@ const routes: RouteConfig[] = [
 	{
 		path: '/about',
 		Component: About,
+	},
+	{
+		path: '/service-policy',
+		Component: LegalServicePolicy,
+		meta: {
+			titleKey: 'route.legal.servicePolicy',
+		},
+	},
+	{
+		path: '/user-agreement',
+		Component: LegalUserAgreement,
+		meta: {
+			titleKey: 'route.legal.userAgreement',
+		},
 	},
 	{
 		path: '/share/:shareId',
