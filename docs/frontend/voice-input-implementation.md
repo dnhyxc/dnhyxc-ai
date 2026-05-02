@@ -1,6 +1,6 @@
 # 语音输入与语音识别（ASR）实现说明
 
-本文档基于当前仓库实现，梳理 **Tauri 桌面端** 聊天/助手输入区「语音输入」的完整思路，并收录相关源码摘录与**逐行说明**（行号与 `apps/frontend`、`apps/backend` 中文件一致）。**§10** 补充 **Live 出字速度与识别准确率** 相关迭代思路与代码摘录；**§10.4** 专门说明 **由定时器改为 `ondataavailable` 驱动** 及 **`clearTauriLiveTimers` 移除** 的实现思路与文档内注释版代码；**§10.5** 专门说明 **停录时不再发起整段语音识别请求** 的实现思路、取舍与文档内注释版代码。**文档仅描述与摘录代码，不修改业务源码。**
+本文档基于当前仓库实现，梳理 **Tauri 桌面端** 聊天/助手输入区「语音输入」的完整思路，并收录相关源码摘录与**逐行说明**（行号与 `apps/frontend`、`apps/backend` 中文件一致）。**§10** 补充 **Live 出字速度与识别准确率** 相关迭代思路与代码摘录；**§10.4** 专门说明 **由定时器改为 `ondataavailable` 驱动** 及 **`clearTauriLiveTimers` 移除** 的实现思路与文档内注释版代码；**§10.5** 专门说明 **停录时不再发起整段语音识别请求** 的实现思路、取舍与文档内注释版代码；**§10.6** 专门说明 **`sendDisabled` / placeholder 可维护性** 与 **Tauri 主按钮 `DropdownMenuTrigger asChild` 直接合并到 `Button`** 的实现思路（与语音 ASR 正交）。**文档仅描述与摘录代码，不修改业务源码。**
 
 ---
 
@@ -712,7 +712,7 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 | 604-623 | `disableTextInput` 为真：关菜单；若语音模式且空闲则切回文本，避免无法通过悬停菜单切回。 |
 | 625-643 | Tauri 下输入从非空变空且仍有语音会话则 `discard`（与清空输入协同）。                    |
 
-### 6.7 主按钮逻辑与派生状态（约 645–714 行）
+### 6.7 主按钮逻辑与派生状态（约 645–740 行）
 
 | 行号    | 说明                                                                                          |
 | ------- | --------------------------------------------------------------------------------------------- |
@@ -720,15 +720,15 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 | 660-661 | `voiceTranscribing` 为真时忽略点击（保留与其它路径一致）。                                    |
 | 662-665 | 录音中点击走 `finalizeVoiceAndTranscribe`（**不**因 `disableTextInput` 拦截，便于停录收尾）。 |
 | 667-679 | 锁与空闲态：禁止开麦；有字发送否则 `startVoiceCapture`。                                      |
-| 680-690 | `useCallback` 依赖。                                                                          |
+| 680-690 | `handleSendOrVoicePrimary` 的 `useCallback` 依赖。                                            |
 | 692     | `voiceUiActive`：壳内且语音模式。                                                             |
-| 693-698 | 语音空闲且有字：主按钮显示为「发送」火箭图标。                                                |
-| 700-706 | `sendDisabled`：文本模式无字或 loading 或锁；录音中仍允许点击停录；等。                       |
-| 708-714 | placeholder：录音中显示 live 听写提示文案。                                                   |
+| 693-698 | `voicePrimaryShowsSend`：语音空闲、非转写、输入 `input.trim() !== ''`；用于主钮展示火箭「发送」（避免 `Boolean()`）。 |
+| 700-728 | `sendDisabled`：**`useMemo`**；内层用 `busy = loading ?? false`、`locked = disableTextInput ?? false`、`empty = !input.trim()` 归一化可选布尔，再按「非语音 / 录或转写中 / 语音有字发送 / 语音空闲开麦」四段 `if` 早返回，语义与原嵌套三元一致；依赖数组含上述布尔派生所需状态。 |
+| 730-740 | `defaultPlaceholder`、`liveListeningPlaceholder` 与 `chatTextAreaPlaceholder`：录音中占位与默认占位拆分变量，便于阅读与复用文案。 |
 
-### 6.8 `ChatTextArea` 与发送区 UI（约 783–797、895–1048 行）
+### 6.8 `ChatTextArea` 与发送区 UI（约 809–823、921–1039 行）
 
-**摘录** `apps/frontend/src/components/design/ChatEntry/index.tsx` 第 783–797 行：
+**摘录** `apps/frontend/src/components/design/ChatEntry/index.tsx` 第 809–823 行：
 
 ```tsx
 <ChatTextArea
@@ -750,167 +750,86 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 
 | 行号    | 说明                                                                            |
 | ------- | ------------------------------------------------------------------------------- |
-| 783-797 | 输入区：`sendMessage` 包装为带语音清理的版本；`disableTextInput` 透传禁用编辑。 |
+| 809-823 | 输入区：`sendMessage` 包装为带语音清理的版本；`disableTextInput` 透传禁用编辑。 |
 
-**摘录** `apps/frontend/src/components/design/ChatEntry/index.tsx` 第 895–1048 行：
+**摘录** `apps/frontend/src/components/design/ChatEntry/index.tsx` 第 921–1039 行（结构与关键 props；完整图标与菜单项见仓库）：
 
 ```tsx
-{
-	isTauriRuntime() ? (
-		<DropdownMenu
-			modal={false}
-			open={disableTextInput ? false : inputModeMenuOpen}
-			onOpenChange={handleInputModeMenuOpenChange}
-		>
-			<DropdownMenuTrigger asChild>
-				<div
-					className="inline-flex shrink-0 rounded-full"
-					onPointerEnter={disableTextInput ? undefined : openInputModeMenu}
-					onPointerLeave={
-						disableTextInput ? undefined : scheduleCloseInputModeMenu
-					}
-				>
-					<Button
-						variant="ghost"
-						type="button"
-						title={
-							sendDisabled &&
-							!voicePrimaryShowsSend &&
-							(!voiceUiActive || (!voiceRecording && !voiceTranscribing)) &&
-							(!input.trim() || disableTextInput)
-								? (t?.("chat.entry.sendDisabledHintWeb") ??
-									t?.("chat.entry.sendDisabledHint") ??
-									"请先输入内容")
-								: undefined
-						}
-						aria-label={
-							voicePrimaryShowsSend
-								? (t?.("chat.entry.send") ?? "发送")
-								: voiceUiActive
-									? voiceRecording
-										? (t?.("chat.entry.voice.stop") ?? "停止录音并识别")
-										: voiceTranscribing
-											? (t?.("chat.entry.voice.transcribing") ?? "识别中")
-											: (t?.("chat.entry.voice.start") ?? "开始录音")
-									: (t?.("chat.entry.send") ?? "发送")
-						}
-						aria-expanded={disableTextInput ? false : inputModeMenuOpen}
-						aria-haspopup={disableTextInput ? undefined : "menu"}
-						onClick={(e) => {
-							e.stopPropagation();
-							setInputModeMenuOpen(false);
-							void handleSendOrVoicePrimary();
-						}}
-						disabled={sendDisabled}
-						className={cn(
-							"lucide-stroke-draw-hover h-8.5 w-8.5 flex items-center justify-center rounded-full bg-linear-to-r from-teal-500 to-cyan-600 [&_svg]:overflow-visible",
-							voiceUiActive &&
-								voiceRecording &&
-								"animate-pulse ring-2 ring-teal-400/60",
-							inputMode === "voice" &&
-								!voiceRecording &&
-								!voiceTranscribing &&
-								!input.trim() &&
-								"ring-2 ring-teal-400/35",
-						)}
-					>
-						{voicePrimaryShowsSend ? (
-							<Rocket className="-rotate-45" />
-						) : voiceUiActive ? (
-							voiceTranscribing ? (
-								<Loader2 className="h-4 w-4 animate-spin" />
-							) : voiceRecording ? (
-								<Square className="h-3.5 w-3.5 fill-current" />
-							) : (
-								<Mic className="h-4 w-4" />
-							)
-						) : (
-							<Rocket className="-rotate-45" />
-						)}
-					</Button>
-				</div>
-			</DropdownMenuTrigger>
-			<DropdownMenuContent
-				side="top"
-				align="end"
-				sideOffset={6}
-				className="min-w-26"
-				onPointerEnter={clearCloseInputModeMenuTimer}
-				onPointerLeave={scheduleCloseInputModeMenu}
-				onCloseAutoFocus={(e) => e.preventDefault()}
+{isTauriRuntime() ? (
+	<DropdownMenu
+		modal={false}
+		open={disableTextInput ? false : inputModeMenuOpen}
+		onOpenChange={handleInputModeMenuOpenChange}
+	>
+		<DropdownMenuTrigger asChild>
+			<Button
+				variant="ghost"
+				type="button"
+				className={cn(
+					'inline-flex shrink-0 rounded-full lucide-stroke-draw-hover h-8.5 w-8.5 items-center justify-center bg-linear-to-r from-teal-500 to-cyan-600 [&_svg]:overflow-visible',
+					voiceUiActive && voiceRecording && 'animate-pulse ring-2 ring-teal-400/60',
+					inputMode === 'voice' &&
+						!voiceRecording &&
+						!voiceTranscribing &&
+						!input.trim() &&
+						'ring-2 ring-teal-400/35',
+				)}
+				onPointerEnter={disableTextInput ? undefined : openInputModeMenu}
+				onPointerLeave={
+					disableTextInput ? undefined : scheduleCloseInputModeMenu
+				}
+				onClick={(e) => {
+					e.stopPropagation();
+					setInputModeMenuOpen(false);
+					void handleSendOrVoicePrimary();
+				}}
+				disabled={sendDisabled}
 			>
-				<DropdownMenuLabel className="text-xs font-normal text-textcolor/60">
-					{t?.("chat.entry.inputMode.label") ?? "输入模式"}
-				</DropdownMenuLabel>
-				<DropdownMenuSeparator />
-				<DropdownMenuItem
-					className={cn(
-						"gap-2",
-						inputMode === "text" &&
-							"text-teal-500 focus:text-teal-500 data-highlighted:text-teal-500",
-					)}
-					onSelect={() => setInputMode("text")}
-				>
-					<Keyboard
-						className={cn(
-							"h-3.5 w-3.5 shrink-0",
-							inputMode === "text" && "text-teal-500",
-						)}
-					/>
-					{t?.("chat.entry.inputMode.text") ?? "文本输入"}
-				</DropdownMenuItem>
-				<DropdownMenuItem
-					className={cn(
-						"gap-2",
-						inputMode === "voice" &&
-							"text-teal-500 focus:text-teal-500 data-highlighted:text-teal-500",
-					)}
-					onSelect={() => setInputMode("voice")}
-				>
-					<Mic
-						className={cn(
-							"h-3.5 w-3.5 shrink-0",
-							inputMode === "voice" && "text-teal-500",
-						)}
-					/>
-					{t?.("chat.entry.inputMode.voice") ?? "语音输入"}
-				</DropdownMenuItem>
-			</DropdownMenuContent>
-		</DropdownMenu>
-	) : (
-		<Button
-			variant="ghost"
-			type="button"
-			title={
-				sendDisabled && !voiceUiActive && (!input.trim() || disableTextInput)
-					? (t?.("chat.entry.sendDisabledHintWeb") ??
-						t?.("chat.entry.sendDisabledHint") ??
-						"请先输入内容")
-					: undefined
-			}
-			aria-label={t?.("chat.entry.send") ?? "发送"}
-			onClick={() => void handleSendOrVoicePrimary()}
-			disabled={sendDisabled}
-			className="lucide-stroke-draw-hover h-8.5 w-8.5 flex items-center justify-center rounded-full bg-linear-to-r from-teal-500 to-cyan-600 [&_svg]:overflow-visible"
+				{/* 子节点：voicePrimaryShowsSend → Rocket；voiceUiActive 分支 → Loader2 / Square / Mic；否则 Rocket */}
+			</Button>
+		</DropdownMenuTrigger>
+		<DropdownMenuContent
+			side="top"
+			align="end"
+			sideOffset={6}
+			className="min-w-26"
+			onPointerEnter={clearCloseInputModeMenuTimer}
+			onPointerLeave={scheduleCloseInputModeMenu}
+			onCloseAutoFocus={(e) => e.preventDefault()}
 		>
-			<Rocket className="-rotate-45" />
-		</Button>
-	);
-}
+			{/* DropdownMenuLabel、DropdownMenuSeparator、两项 DropdownMenuItem（onSelect 设置 text/voice） */}
+		</DropdownMenuContent>
+	</DropdownMenu>
+) : (
+	<Button
+		variant="ghost"
+		type="button"
+		title={
+			sendDisabled && !voiceUiActive && (!input.trim() || disableTextInput)
+				? (t?.('chat.entry.sendDisabledHintWeb') ??
+					t?.('chat.entry.sendDisabledHint') ??
+					'请先输入内容')
+				: undefined
+		}
+		aria-label={t?.('chat.entry.send') ?? '发送'}
+		onClick={() => void handleSendOrVoicePrimary()}
+		disabled={sendDisabled}
+		className="lucide-stroke-draw-hover h-8.5 w-8.5 flex items-center justify-center rounded-full bg-linear-to-r from-teal-500 to-cyan-600 [&_svg]:overflow-visible"
+	>
+		<Rocket className="-rotate-45" />
+	</Button>
+)}
 ```
 
-**逐行说明（行号 = `ChatEntry/index.tsx` 当前文件内行号；与旧版逐行表相比，前文插入导致整体下移）**
+**结构说明（行号 = `ChatEntry/index.tsx` 当前文件）**
 
-| 行号段    | 说明                                                                                                                                                                                                                                                                                                                                |
-| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| 895–900   | Tauri 分支：`DropdownMenu`，`modal={false}`，受控 `open`（`disableTextInput` 时强制关），`onOpenChange`。                                                                                                                                                                                                                           |
-| 901–980   | `DropdownMenuTrigger asChild`：外层 `div` 承载 `onPointerEnter` / `onPointerLeave`（悬停展开与延迟关闭）；内层主按钮的 `title`、`aria-label`（发送 / 停录 / 转写中 / 开录等）、`aria-expanded` / `aria-haspopup`、`onClick`（关菜单 + `handleSendOrVoicePrimary`）、`disabled`、`className`（渐变圆钮、录音脉冲环、语音空闲弱环）。 |
-| 965–977   | 主按钮子内容：按「有字发送火箭 / 语音态 Loader·方片·麦 / 文本火箭」切换图标。                                                                                                                                                                                                                                                       |
-| 981–988   | `DropdownMenuContent`：`side` / `align` / `sideOffset`、`min-w-26`、悬停定时器、`onCloseAutoFocus` 防抢焦点。                                                                                                                                                                                                                       |
-| 989–993   | 菜单标题 `DropdownMenuLabel` 与 `DropdownMenuSeparator`。                                                                                                                                                                                                                                                                           |
-| 994–1025  | 两个 `DropdownMenuItem`：`onSelect` 分别 `setInputMode('text'                                                                                                                                                                                                                                                                       | 'voice')`；`className`与图标上按`inputMode`条件施加`text-teal-500`（与 `DropdownMenuItem`基类里对无`text-`的 SVG 施加`muted` 的规则配合）。 |
-| 1026–1027 | `DropdownMenuContent` 与 `DropdownMenu` 结束。                                                                                                                                                                                                                                                                                      |
-| 1028–1048 | Web 分支：单「发送」按钮，`title` / `aria-label` / `onClick` / `disabled` / 样式与火箭图标；三元分支结束。                                                                                                                                                                                                                          |
+| 行号段   | 说明 |
+| -------- | ---- |
+| 921–926  | Tauri：`DropdownMenu` 受控 `open`、`modal={false}`、`onOpenChange`。 |
+| 927–971  | **`DropdownMenuTrigger asChild` 直接包住单个 `Button`**（无外层 `div`）：`className` 合并原「圆形容器 + 渐变主钮 + 录音环」样式；`onPointerEnter` / `onPointerLeave` 仍在主钮上驱动悬停菜单；`onClick` 关菜单并 `handleSendOrVoicePrimary`；`disabled={sendDisabled}`。**`aria-expanded` / `aria-haspopup` 由 Radix 合并到与触发器同一 DOM（`button`）**；受控 `open` 在 `disableTextInput` 时为 `false`，与原先「锁定时不可展开」一致。 |
+| 957–969  | 主钮子节点：火箭 / Loader / 方片 / 麦 分支（与 §6.7 派生状态一致）。 |
+| 972–1018 | `DropdownMenuContent`（含悬停定时器）、`DropdownMenuLabel` / `Separator`、两项 **`DropdownMenuItem`**（`onSelect` 切换 `inputMode`，选中态与图标色见 **§10.6**、**§8**）。 |
+| 1019–1039 | Web：单发送按钮，`title` / `aria-label` / `onClick` / `disabled` / 样式与火箭图标；三元结束。 |
 
 ---
 
@@ -953,7 +872,7 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 | `chat.entry.voice.noRecorder`                              | 无 MediaRecorder                                   |
 | `chat.entry.voice.micDenied`                               | 麦克风拒绝                                         |
 | `chat.entry.voice.liveListening`                           | 录音中 placeholder                                 |
-| `chat.entry.voice.stop` / `transcribing` / `start`         | 主按钮无障碍标签                                   |
+| `chat.entry.voice.stop` / `transcribing` / `start`         | 文案键：可用于主按钮可读名称等（当前 Web 发送钮使用 `chat.entry.send`；Tauri 主钮以图标为主，见 **§10.6.3** 说明） |
 | `chat.entry.sendDisabledHint` / `sendDisabledHintWeb`      | 禁用发送提示                                       |
 
 定义见 `apps/frontend/src/i18n/locales/zh-CN.ts`、`en-US.ts`。
@@ -975,7 +894,7 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 
 ## 10. 性能与准确率优化（Live 调度与后端 language）
 
-本节对应近期迭代：**加快输入框内 live 出字速度**，并在不破坏 OpenAI 兼容的前提下 **提升中文等场景识别倾向**；与上文 §1、§2、§6.1、§6.3、§6.4、§9 一致。**§10.5** 另述停录路径**不再**二次调用转写接口（与 live 调度正交，可独立阅读）。
+本节对应近期迭代：**加快输入框内 live 出字速度**，并在不破坏 OpenAI 兼容的前提下 **提升中文等场景识别倾向**；与上文 §1、§2、§6.1、§6.3、§6.4、§9 一致。**§10.5** 另述停录路径**不再**二次调用转写接口（与 live 调度正交，可独立阅读）。**§10.6** 另述 **`sendDisabled` / 占位符拆分** 与 **Tauri 主按钮与 `DropdownMenuTrigger` 同节点合并**（与 ASR 请求无直接关系）。
 
 ### 10.1 设计思路
 
@@ -1224,9 +1143,64 @@ const finalizeVoiceAndTranscribe = useCallback(async () => {
 }, [chatInputRef, stopMediaTracks]);
 ```
 
+### 10.6 `ChatEntry`：`sendDisabled`、占位符与 Tauri 菜单触发器结构
+
+本节记录 **UI 状态派生与无障碍结构** 的迭代，便于与 §6.7、§6.8 对照；**不改变** live / 停录 / 后端转写协议。
+
+#### 10.6.1 `sendDisabled`：从嵌套三元到 `useMemo` + 显式分支
+
+| 动机 | 做法 |
+|------|------|
+| 深层嵌套三元难读、难改 | 使用 **`useMemo`**，内部按**固定顺序**四段 `if` 早返回，与历史嵌套三元**真值表一致**（勿调换分支顺序）。 |
+| `loading?: boolean`、`disableTextInput?: boolean` 与 `||` 组合易产生 **`boolean \| undefined`** | 在 `useMemo` 开头用 **`busy = loading ?? false`**、**`locked = disableTextInput ?? false`**、**`empty = !input.trim()`** 归一化，返回值恒为 **`boolean`**，避免使用 `Boolean()` 构造函数。 |
+
+**依赖数组**（与实现一致）：`disableTextInput`、`input`、`loading`、`voiceRecording`、`voicePrimaryShowsSend`、`voiceTranscribing`、`voiceUiActive`。
+
+#### 10.6.2 `voicePrimaryShowsSend` 与占位符
+
+- **`voicePrimaryShowsSend`**：`voiceUiActive && !voiceRecording && !voiceTranscribing && input.trim() !== ''`，用 **`!== ''`** 表达「有正文」，避免 `Boolean()`。
+- **`liveListeningPlaceholder`**：从 `t?.('chat.entry.voice.liveListening')` 与默认中文文案抽成常量，再赋给 **`chatTextAreaPlaceholder`**（`voiceUiActive && voiceRecording` 时选用），减少 JSX 内嵌套。
+
+#### 10.6.3 Tauri：`DropdownMenuTrigger asChild` 直接合并到主 `Button`
+
+| 原先结构 | 问题 |
+|----------|------|
+| `Trigger asChild` → **外层 `div`**（悬停）→ **内层 `Button`**（点击、图标） | Radix 将触发器 props（如 **`ref`、`aria-expanded`、`data-state`**）合并到 **`div`**，而键盘 **Tab 焦点**常在 **`button`** 上，读屏可能**看不到**与菜单一致的展开态，或出现「触发器与真实可点击元素分离」。 |
+
+| 当前结构 | 说明 |
+|----------|------|
+| **`DropdownMenuTrigger asChild` 的唯一子节点为 `Button`** | 悬停 **`onPointerEnter` / `onPointerLeave`**、渐变 **`className`**（含原 `div` 的 `inline-flex shrink-0 rounded-full`）、**`onClick`**、**`disabled`** 均在同一 **`button`** 上；**`aria-expanded` / `aria-haspopup`** 由 **Radix** 与受控 **`open={disableTextInput ? false : inputModeMenuOpen}`** 维护，与「锁定时菜单不可展开」一致。 |
+| **Web 分支** | 仍为单独 **`Button`**，保留 **`title`**（禁发提示）与 **`aria-label`**（纯火箭图标）。 |
+
+**说明**：Tauri 主钮当前实现以图标为主；若需与 Web 对齐的读屏名称，可在同一 `Button` 上按需补 **`aria-label` / `title`**，属产品文案层迭代，与触发器合并结构独立。
+
+#### 10.6.4 文档内摘录：`sendDisabled` 核心形态（教学注释）
+
+```typescript
+// 主发送钮禁用条件（分支顺序与原先嵌套三元一致，勿调换）
+const sendDisabled = useMemo(() => {
+	const busy = loading ?? false;
+	const locked = disableTextInput ?? false;
+	const empty = !input.trim();
+
+	if (!voiceUiActive) return busy || empty || locked;
+	if (voiceRecording || voiceTranscribing) return busy || voiceTranscribing;
+	if (voicePrimaryShowsSend) return busy || empty || locked;
+	return locked || busy;
+}, [
+	disableTextInput,
+	input,
+	loading,
+	voicePrimaryShowsSend,
+	voiceRecording,
+	voiceTranscribing,
+	voiceUiActive,
+]);
+```
+
 ---
 
 ## 11. 文档维护说明
 
 - 源码行号随文件变更可能漂移；以仓库当前文件为准。
-- 若新增 Web 端语音或其它 ASR 供应商，请同步更新本文「适用范围」、序列图、**§10**（含 **§10.4**、**§10.5**）。
+- 若新增 Web 端语音或其它 ASR 供应商，请同步更新本文「适用范围」、序列图、**§10**（含 **§10.4**、**§10.5**、**§10.6**）。

@@ -26,7 +26,7 @@ import {
 	Square,
 	Target,
 } from 'lucide-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CHAT_VALIDTYPES } from '@/constant';
 import { cn } from '@/lib/utils';
 import { transcribeSpeechAudio } from '@/service';
@@ -695,22 +695,48 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 		voiceUiActive &&
 		!voiceRecording &&
 		!voiceTranscribing &&
-		Boolean(input.trim());
+		input.trim() !== '';
 
-	const sendDisabled = !voiceUiActive
-		? loading || !input.trim() || disableTextInput
-		: voiceRecording || voiceTranscribing
-			? loading || voiceTranscribing
-			: voicePrimaryShowsSend
-				? loading || !input.trim() || disableTextInput
-				: disableTextInput || loading;
+	// 主发送钮禁用条件（分支顺序与原先嵌套三元一致，勿调换）
+	const sendDisabled = useMemo(() => {
+		const busy = loading ?? false;
+		const locked = disableTextInput ?? false;
+		const empty = !input.trim();
+
+		// 非语音 UI：等同纯文本发送区
+		if (!voiceUiActive) {
+			return busy || empty || locked;
+		}
+		// 录音或识别中：允许停录故不因无字禁用；识别中时防重复触发
+		if (voiceRecording || voiceTranscribing) {
+			return busy || voiceTranscribing;
+		}
+		// 语音模式空闲且输入框已有字：主钮为「发送」
+		if (voicePrimaryShowsSend) {
+			return busy || empty || locked;
+		}
+		// 语音模式空闲且无字：主钮为开麦，仅受锁与 loading 影响
+		return locked || busy;
+	}, [
+		disableTextInput,
+		input,
+		loading,
+		voiceRecording,
+		voicePrimaryShowsSend,
+		voiceTranscribing,
+		voiceUiActive,
+	]);
 
 	const defaultPlaceholder =
 		placeholderProp ?? t?.('chat.entry.placeholder') ?? '请输入您的问题';
+
+	const liveListeningPlaceholder =
+		t?.('chat.entry.voice.liveListening') ??
+		'聆听中，识别文字将填入此处（约每秒更新）…';
+
 	const chatTextAreaPlaceholder =
 		voiceUiActive && voiceRecording
-			? (t?.('chat.entry.voice.liveListening') ??
-				'聆听中，识别文字将填入此处（约每秒更新）…')
+			? liveListeningPlaceholder
 			: defaultPlaceholder;
 
 	return (
@@ -899,8 +925,20 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 											onOpenChange={handleInputModeMenuOpenChange}
 										>
 											<DropdownMenuTrigger asChild>
-												<div
-													className="inline-flex shrink-0 rounded-full"
+												<Button
+													variant="ghost"
+													type="button"
+													className={cn(
+														'inline-flex shrink-0 rounded-full lucide-stroke-draw-hover h-8.5 w-8.5 items-center justify-center bg-linear-to-r from-teal-500 to-cyan-600 [&_svg]:overflow-visible',
+														voiceUiActive &&
+															voiceRecording &&
+															'animate-pulse ring-2 ring-teal-400/60',
+														inputMode === 'voice' &&
+															!voiceRecording &&
+															!voiceTranscribing &&
+															!input.trim() &&
+															'ring-2 ring-teal-400/35',
+													)}
 													onPointerEnter={
 														disableTextInput ? undefined : openInputModeMenu
 													}
@@ -909,74 +947,27 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 															? undefined
 															: scheduleCloseInputModeMenu
 													}
+													onClick={(e) => {
+														e.stopPropagation();
+														setInputModeMenuOpen(false);
+														void handleSendOrVoicePrimary();
+													}}
+													disabled={sendDisabled}
 												>
-													<Button
-														variant="ghost"
-														type="button"
-														title={
-															sendDisabled &&
-															!voicePrimaryShowsSend &&
-															(!voiceUiActive ||
-																(!voiceRecording && !voiceTranscribing)) &&
-															(!input.trim() || disableTextInput)
-																? (t?.('chat.entry.sendDisabledHintWeb') ??
-																	t?.('chat.entry.sendDisabledHint') ??
-																	'请先输入内容')
-																: undefined
-														}
-														aria-label={
-															voicePrimaryShowsSend
-																? (t?.('chat.entry.send') ?? '发送')
-																: voiceUiActive
-																	? voiceRecording
-																		? (t?.('chat.entry.voice.stop') ??
-																			'停止录音并识别')
-																		: voiceTranscribing
-																			? (t?.('chat.entry.voice.transcribing') ??
-																				'识别中')
-																			: (t?.('chat.entry.voice.start') ??
-																				'开始录音')
-																	: (t?.('chat.entry.send') ?? '发送')
-														}
-														aria-expanded={
-															disableTextInput ? false : inputModeMenuOpen
-														}
-														aria-haspopup={
-															disableTextInput ? undefined : 'menu'
-														}
-														onClick={(e) => {
-															e.stopPropagation();
-															setInputModeMenuOpen(false);
-															void handleSendOrVoicePrimary();
-														}}
-														disabled={sendDisabled}
-														className={cn(
-															'lucide-stroke-draw-hover h-8.5 w-8.5 flex items-center justify-center rounded-full bg-linear-to-r from-teal-500 to-cyan-600 [&_svg]:overflow-visible',
-															voiceUiActive &&
-																voiceRecording &&
-																'animate-pulse ring-2 ring-teal-400/60',
-															inputMode === 'voice' &&
-																!voiceRecording &&
-																!voiceTranscribing &&
-																!input.trim() &&
-																'ring-2 ring-teal-400/35',
-														)}
-													>
-														{voicePrimaryShowsSend ? (
-															<Rocket className="-rotate-45" />
-														) : voiceUiActive ? (
-															voiceTranscribing ? (
-																<Loader2 className="h-4 w-4 animate-spin" />
-															) : voiceRecording ? (
-																<Square className="h-3.5 w-3.5 fill-current" />
-															) : (
-																<Mic className="h-4 w-4" />
-															)
+													{voicePrimaryShowsSend ? (
+														<Rocket className="-rotate-45" />
+													) : voiceUiActive ? (
+														voiceTranscribing ? (
+															<Loader2 className="h-4 w-4 animate-spin" />
+														) : voiceRecording ? (
+															<Square className="h-3.5 w-3.5 fill-current" />
 														) : (
-															<Rocket className="-rotate-45" />
-														)}
-													</Button>
-												</div>
+															<Mic className="h-4 w-4" />
+														)
+													) : (
+														<Rocket className="-rotate-45" />
+													)}
+												</Button>
 											</DropdownMenuTrigger>
 											<DropdownMenuContent
 												side="top"
