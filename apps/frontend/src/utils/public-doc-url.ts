@@ -26,6 +26,12 @@ export function withAppLangInSearch(
  */
 export function getSitePageAbsoluteUrl(path: string, locale?: Locale): string {
 	const base =
-		typeof window === 'undefined' ? path : `${window.location.origin}${path}`;
+		typeof window === 'undefined'
+			? path
+			: `${
+					import.meta.env.DEV
+						? import.meta.env.VITE_DEV_WEB_DOMAIN
+						: import.meta.env.VITE_PROD_WEB_DOMAIN
+				}${path}`;
 	return locale ? withAppLangInSearch(base, locale) : base;
 }

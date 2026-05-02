@@ -7,7 +7,6 @@ import {
 	getLegalPageAbsoluteUrl,
 	LEGAL_PAGE_PATHS,
 } from '@/views/legal/legalPageUrls';
-import { getUpdateInfoAbsoluteUrl } from '@/views/updateInfo/paths';
 
 const About = () => {
 	const { version } = useGetVersion();
@@ -68,15 +67,6 @@ const About = () => {
 							{t('about.links.terms')}
 						</Button>
 					</div>
-					<Button
-						variant="link"
-						onClick={() => {
-							void openExternalUrl(getUpdateInfoAbsoluteUrl(locale));
-						}}
-						className="text-blue-500 hover:text-blue-400 text-md bg-transparent border-none cursor-pointer p-0"
-					>
-						{t('about.links.updateInfo')}
-					</Button>
 				</div>
 			</div>
 		</div>

@@ -13,6 +13,7 @@ import {
 import { createShare } from '@/service';
 import { ShareInfo } from '@/types';
 import { copyToClipboard, getValue } from '@/utils';
+import { withAppLangInSearch } from '@/utils/public-doc-url';
 
 export type ShareT = (key: string, params?: Record<string, unknown>) => string;
 
@@ -49,7 +50,7 @@ const Share: React.FC<ShareProps> = ({
 	const [copied, setCopied] = useState(false);
 	const [loading, setLoading] = useState(false);
 
-	const { t: i18nT } = useI18n();
+	const { t: i18nT, locale } = useI18n();
 	const tt = t ?? i18nT;
 
 	const { theme } = useTheme();
@@ -122,7 +123,10 @@ const Share: React.FC<ShareProps> = ({
 			// 以 store 为准，避免 useTheme 异步未完成时主题仍是默认值
 			const stored = (await getValue('themeType')) as ThemeName;
 			const themeName = THEMES.some((t) => t.name === stored) ? stored : theme;
-			const shareUrl = appendShareThemeQuery(res.data.shareUrl, themeName);
+			const shareUrl = withAppLangInSearch(
+				appendShareThemeQuery(res.data.shareUrl, themeName),
+				locale,
+			);
 			setShareInfo({ ...res.data, shareUrl });
 			void onCopy(shareUrl);
 		} else {
@@ -136,6 +140,7 @@ const Share: React.FC<ShareProps> = ({
 		checkedMessages,
 		orderedMessageIds,
 		theme,
+		locale,
 		sessionId,
 		sessionType,
 		shareType,
