@@ -675,6 +675,7 @@ const KnowledgeAssistant = observer(
 							/>
 						) : (
 							<ChatEntry
+								t={t}
 								input={isRagMode ? ragInput : input}
 								setInput={isRagMode ? setRagInput : setInput}
 								className="w-full pl-0.5 pr-0.5 pb-4.5 border-theme/10"
