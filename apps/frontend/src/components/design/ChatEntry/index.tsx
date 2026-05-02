@@ -5,9 +5,8 @@ import {
 	Button,
 	DropdownMenu,
 	DropdownMenuContent,
+	DropdownMenuItem,
 	DropdownMenuLabel,
-	DropdownMenuRadioGroup,
-	DropdownMenuRadioItem,
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 	ScrollArea,
@@ -366,7 +365,7 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 			setInput(base ? `${base} ${text}`.trim() : text);
 		} catch {
 			tauriLiveLastSentBytesRef.current = blob.size;
-			/* 未完成容器或非完整编码时接口可能失败，不影响停录后整段转写 */
+			/* 未完成容器或非完整编码时接口可能失败，静默等待更多音频后再试 */
 		} finally {
 			tauriLivePollBusyRef.current = false;
 		}
@@ -495,89 +494,36 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 
 	/**
 	 * finalizeVoiceAndTranscribe
-	 * 收尾并转写本轮语音输入（用于“点击完成录音”操作）：
-	 * - 停止录音，生成音频 Blob；
-	 * - 调用语音转写 API，将音频识别为文本，回填输入框内容。
-	 * 主要流程及处理细节：
-	 * 1. 增加会话 epoch，终止当前轮的“直播”转写 polling，防止转写竞态。
-	 * 2. 标记 voiceRecordingRef 为 false，UI 层同步关闭“正在录音”状态。
-	 * 3. 获取 mediaRecorderRef（录音器引用），若已无录音则安全兜底退出（复位 UI 并释放硬件）。
-	 * 4. 若 recorder 存在且处于录音中：调用 stop，监听 stop 事件保证全部音频片段写入。
-	 * 5. 汇集 mediaChunksRef（录音分片）为 Blob，并根据 mimeType 设置音频格式（默认 webm），
-	 *    清空录音器及所有分片引用，确保后续录音可重新开始。
-	 * 6. 若 Blob 为空（如无有效音频片段），则仅聚焦输入框后直接返回。
-	 * 7. 推断文件扩展名（webm/m4a），setVoiceTranscribing 标记为“转写中”状态，
-	 *    调用 transcribeSpeechAudio API 进行语音识别。
-	 * 8. 转写成功后，若拿到有效文本，拼接 voiceBaseRef 历史片段，填充输入框。
-	 * 9. 无论结果如何，重置转写状态，恢复输入聚焦。
+	 * 停录收尾（用于「点击完成录音」）：停止 MediaRecorder、释放麦克风流与分片缓存。
+	 * 识别结果仅依赖 ondataavailable 驱动的 live 转写（transcribeSpeechAudio），此处不再整段请求。
+	 * 流程要点：递增 epoch 丢弃进行中的 live 异步回写；voiceRecordingRef/recorder 清理与 sendMessage 前 discard 一致。
 	 */
 	const finalizeVoiceAndTranscribe = useCallback(async () => {
-		// 1. 增加 epoch，主动中断可能存在的异步 polling 流程（防止竞态/回写）
 		tauriLiveEpochRef.current += 1;
-		// 2. 标记当前已退出录音态
 		voiceRecordingRef.current = false;
 
-		// 3. 获取当前 MediaRecorder
 		const recorder = mediaRecorderRef.current;
-		// 4. 若录音器不存在或已停止，直接清理并退出
 		if (!recorder || recorder.state === 'inactive') {
 			setVoiceRecording(false);
 			stopMediaTracks();
 			return;
 		}
 
-		// 5. 调用 stop，并等待 stop 事件全部数据刷入后继续
 		await new Promise<void>((resolve) => {
 			recorder.addEventListener('stop', () => resolve(), { once: true });
 			recorder.stop();
 		});
 
-		// 6. 生成音频 Blob
-		const mimeType = recorder.mimeType || 'audio/webm';
-		const blob = new Blob(mediaChunksRef.current, {
-			type: mimeType || 'audio/webm',
-		});
-		// 清空缓存，回收录音资源
 		mediaChunksRef.current = [];
 		mediaRecorderRef.current = null;
 		stopMediaTracks();
 		setVoiceRecording(false);
-
-		// 7. 若采集音频为空，则直接返回并聚焦输入框
-		if (!blob.size) {
-			chatInputRef?.current?.focus();
-			return;
-		}
-
-		// 8. 根据 mimeType 判定文件扩展名（兼容 m4a/webm）
-		const ext = mimeType.includes('mp4')
-			? 'm4a'
-			: mimeType.includes('webm')
-				? 'webm'
-				: 'webm';
-
-		// 9. 进入转写中状态，调用后端接口进行语音识别
-		setVoiceTranscribing(true);
-		try {
-			const res = await transcribeSpeechAudio(blob, `chat-input.${ext}`);
-			const payload = res?.data as { text?: string } | undefined;
-			const text = typeof payload?.text === 'string' ? payload.text.trim() : '';
-			// 10. 若转写获得有效文本，则拼接历史语音前缀后回填输入框
-			if (text) {
-				const base = voiceBaseRef.current;
-				setInput(base ? `${base} ${text}`.trim() : text);
-			}
-			// 操作完成后聚焦输入框，便于用户继续输入
-			chatInputRef?.current?.focus();
-		} finally {
-			// 11. 无论成功与否，退出“转写中”状态
-			setVoiceTranscribing(false);
-		}
-	}, [chatInputRef, setInput, stopMediaTracks]);
+		chatInputRef?.current?.focus();
+	}, [chatInputRef, stopMediaTracks]);
 
 	/**
 	 * 停止当前语音识别会话：关菜单、停录并丢弃未完成音频（不调用转写接口）；不改变输入模式（仍为语音时可继续点麦开录）。
-	 * 用于发送后 / 清空输入框等场景，与 finalizeVoiceAndTranscribe（停录并转写）分离。
+	 * 用于发送后 / 清空输入框等场景，与 finalizeVoiceAndTranscribe（停录收尾、不整段转写）分离。
 	 */
 	const discardActiveVoiceCapture = useCallback(async () => {
 		if (!isTauriRuntime()) return;
@@ -1036,7 +982,7 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 												side="top"
 												align="end"
 												sideOffset={6}
-												className="min-w-[168px]"
+												className="min-w-26"
 												onPointerEnter={clearCloseInputModeMenuTimer}
 												onPointerLeave={scheduleCloseInputModeMenu}
 												onCloseAutoFocus={(e) => e.preventDefault()}
@@ -1045,27 +991,38 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 													{t?.('chat.entry.inputMode.label') ?? '输入模式'}
 												</DropdownMenuLabel>
 												<DropdownMenuSeparator />
-												<DropdownMenuRadioGroup
-													value={inputMode}
-													onValueChange={(v) =>
-														setInputMode(v as 'text' | 'voice')
-													}
+												<DropdownMenuItem
+													className={cn(
+														'gap-2',
+														inputMode === 'text' &&
+															'text-teal-500 focus:text-teal-500 data-highlighted:text-teal-500',
+													)}
+													onSelect={() => setInputMode('text')}
 												>
-													<DropdownMenuRadioItem
-														value="text"
-														className="gap-2 data-[state=checked]:text-teal-500"
-													>
-														<Keyboard className="h-3.5 w-3.5 shrink-0" />
-														{t?.('chat.entry.inputMode.text') ?? '文本输入'}
-													</DropdownMenuRadioItem>
-													<DropdownMenuRadioItem
-														value="voice"
-														className="gap-2 data-[state=checked]:text-teal-500"
-													>
-														<Mic className="h-3.5 w-3.5 shrink-0" />
-														{t?.('chat.entry.inputMode.voice') ?? '语音输入'}
-													</DropdownMenuRadioItem>
-												</DropdownMenuRadioGroup>
+													<Keyboard
+														className={cn(
+															'h-3.5 w-3.5 shrink-0',
+															inputMode === 'text' && 'text-teal-500',
+														)}
+													/>
+													{t?.('chat.entry.inputMode.text') ?? '文本输入'}
+												</DropdownMenuItem>
+												<DropdownMenuItem
+													className={cn(
+														'gap-2',
+														inputMode === 'voice' &&
+															'text-teal-500 focus:text-teal-500 data-highlighted:text-teal-500',
+													)}
+													onSelect={() => setInputMode('voice')}
+												>
+													<Mic
+														className={cn(
+															'h-3.5 w-3.5 shrink-0',
+															inputMode === 'voice' && 'text-teal-500',
+														)}
+													/>
+													{t?.('chat.entry.inputMode.voice') ?? '语音输入'}
+												</DropdownMenuItem>
 											</DropdownMenuContent>
 										</DropdownMenu>
 									) : (
