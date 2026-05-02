@@ -493,53 +493,84 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 		disableTextInput,
 	]);
 
+	/**
+	 * finalizeVoiceAndTranscribe
+	 * 收尾并转写本轮语音输入（用于“点击完成录音”操作）：
+	 * - 停止录音，生成音频 Blob；
+	 * - 调用语音转写 API，将音频识别为文本，回填输入框内容。
+	 * 主要流程及处理细节：
+	 * 1. 增加会话 epoch，终止当前轮的“直播”转写 polling，防止转写竞态。
+	 * 2. 标记 voiceRecordingRef 为 false，UI 层同步关闭“正在录音”状态。
+	 * 3. 获取 mediaRecorderRef（录音器引用），若已无录音则安全兜底退出（复位 UI 并释放硬件）。
+	 * 4. 若 recorder 存在且处于录音中：调用 stop，监听 stop 事件保证全部音频片段写入。
+	 * 5. 汇集 mediaChunksRef（录音分片）为 Blob，并根据 mimeType 设置音频格式（默认 webm），
+	 *    清空录音器及所有分片引用，确保后续录音可重新开始。
+	 * 6. 若 Blob 为空（如无有效音频片段），则仅聚焦输入框后直接返回。
+	 * 7. 推断文件扩展名（webm/m4a），setVoiceTranscribing 标记为“转写中”状态，
+	 *    调用 transcribeSpeechAudio API 进行语音识别。
+	 * 8. 转写成功后，若拿到有效文本，拼接 voiceBaseRef 历史片段，填充输入框。
+	 * 9. 无论结果如何，重置转写状态，恢复输入聚焦。
+	 */
 	const finalizeVoiceAndTranscribe = useCallback(async () => {
+		// 1. 增加 epoch，主动中断可能存在的异步 polling 流程（防止竞态/回写）
 		tauriLiveEpochRef.current += 1;
+		// 2. 标记当前已退出录音态
 		voiceRecordingRef.current = false;
 
+		// 3. 获取当前 MediaRecorder
 		const recorder = mediaRecorderRef.current;
+		// 4. 若录音器不存在或已停止，直接清理并退出
 		if (!recorder || recorder.state === 'inactive') {
 			setVoiceRecording(false);
 			stopMediaTracks();
 			return;
 		}
 
+		// 5. 调用 stop，并等待 stop 事件全部数据刷入后继续
 		await new Promise<void>((resolve) => {
 			recorder.addEventListener('stop', () => resolve(), { once: true });
 			recorder.stop();
 		});
 
+		// 6. 生成音频 Blob
 		const mimeType = recorder.mimeType || 'audio/webm';
 		const blob = new Blob(mediaChunksRef.current, {
 			type: mimeType || 'audio/webm',
 		});
+		// 清空缓存，回收录音资源
 		mediaChunksRef.current = [];
 		mediaRecorderRef.current = null;
 		stopMediaTracks();
 		setVoiceRecording(false);
 
+		// 7. 若采集音频为空，则直接返回并聚焦输入框
 		if (!blob.size) {
 			chatInputRef?.current?.focus();
 			return;
 		}
 
+		// 8. 根据 mimeType 判定文件扩展名（兼容 m4a/webm）
 		const ext = mimeType.includes('mp4')
 			? 'm4a'
 			: mimeType.includes('webm')
 				? 'webm'
 				: 'webm';
+
+		// 9. 进入转写中状态，调用后端接口进行语音识别
 		setVoiceTranscribing(true);
 		try {
 			const res = await transcribeSpeechAudio(blob, `chat-input.${ext}`);
 			const payload = res?.data as { text?: string } | undefined;
 			const text = typeof payload?.text === 'string' ? payload.text.trim() : '';
-			// 用服务端识别覆盖本会话的语音段（前缀仍为 voiceBaseRef）
+			// 10. 若转写获得有效文本，则拼接历史语音前缀后回填输入框
 			if (text) {
 				const base = voiceBaseRef.current;
 				setInput(base ? `${base} ${text}`.trim() : text);
 			}
+			// 操作完成后聚焦输入框，便于用户继续输入
 			chatInputRef?.current?.focus();
 		} finally {
+			// 11. 无论成功与否，退出“转写中”状态
 			setVoiceTranscribing(false);
 		}
 	}, [chatInputRef, setInput, stopMediaTracks]);
@@ -581,6 +612,19 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 		voiceTranscribing,
 	]);
 
+	/**
+	 * 发送消息并重置语音状态：
+	 * 1. 主用于「语音输入模式」下，用户点击发送按钮时，
+	 *    保证在发送文本内容前，先彻底关闭/清理掉可能的录音会话和 ASR 状态
+	 *    —— 避免残留的 MediaRecorder 或 ASR 进程影响后续输入体验。
+	 * 2. 调用 discardActiveVoiceCapture()，其会：停掉录音、丢弃未转写内容、关闭菜单，复位所有语音相关数据。
+	 * 3. 然后实际触发 sendMessage（继续使用当前输入框内容及可选参数）。
+	 *
+	 * @param content    消息正文（可缺省，若无则用当前 input 状态）
+	 * @param index      编辑时指定修改哪一条消息（可选）
+	 * @param isEdit     是否为编辑操作（可选）
+	 * @param attachments 附件（如文件/图片，可选）
+	 */
 	const sendMessageWithVoiceReset = useCallback(
 		async (
 			content?: string,
@@ -588,7 +632,9 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 			isEdit?: boolean,
 			attachments?: any,
 		) => {
+			// 发送前先终止并清理录音/语音状态，保证不会有悬挂的录音会话
 			await discardActiveVoiceCapture();
+			// 调用主发送方法，完成文本/附件正式发送
 			sendMessage(content, index, isEdit, attachments);
 		},
 		[discardActiveVoiceCapture, sendMessage],
@@ -650,25 +696,40 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 		prevInputTrimRef.current = cur;
 	}, [input, discardActiveVoiceCapture, voiceRecording, voiceTranscribing]);
 
+	/**
+	 * 主发送按钮/语音按钮的操作逻辑，细致覆盖文本与语音模式下各种情形。
+	 */
 	const handleSendOrVoicePrimary = useCallback(async () => {
+		// 若非 Tauri 环境（如网页）、或当前为文本输入模式
 		if (!isTauriRuntime() || inputMode === 'text') {
+			// 如果文本输入被禁用则直接返回，不做任何操作
 			if (disableTextInput) return;
+			// 发送消息，并重置语音相关状态
 			await sendMessageWithVoiceReset();
+			// 重新聚焦到输入框
 			chatInputRef?.current?.focus();
 			return;
 		}
+		// Tauri + 语音输入模式
+		// 若当前正在语音转写（识别中），按钮不可点击，直接返回（防止重复触发）
 		if (voiceTranscribing) return;
+		// 若正在录音，按钮视为“停止录制并转写”
 		if (voiceRecording) {
 			await finalizeVoiceAndTranscribe();
 			return;
 		}
+		// 此处已是语音模式空闲状态
+		// 禁用文本输入时，此按钮应不可响应
 		if (disableTextInput) return;
-		// 语音模式已停录且框内有字：主按钮为发送
+		// 若输入框当前已有内容（由语音识别或手动输入），主按钮视为“发送”
 		if (input.trim()) {
+			// 如果输入框中已有内容（可能来源于语音识别或手动输入），点击主按钮则发送消息，并重置语音相关状态
 			await sendMessageWithVoiceReset();
+			// 发送后重新聚焦输入框，方便用户继续输入
 			chatInputRef?.current?.focus();
 			return;
 		}
+		// 以上条件都未命中，发起新的语音捕获
 		await startVoiceCapture();
 	}, [
 		chatInputRef,
