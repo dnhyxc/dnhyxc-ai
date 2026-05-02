@@ -40,10 +40,9 @@ import {
 import { isTauriRuntime } from '@/utils/runtime';
 
 /**
- * Tauri 增量 ASR：首轮门槛低、轮询密 → 更快出字；后续轮次略提高门槛 → 更稳的 WebM 片段与识别。
+ * Tauri 增量 ASR：由 MediaRecorder.ondataavailable 驱动尝试转写（有数据才跑），
+ * 首轮/后续用不同体积门槛折中出字速度与 WebM 稳定性。
  */
-const TAURI_LIVE_POLL_MS = 650;
-const TAURI_LIVE_FIRST_POLL_MS = 320;
 /** 尚未成功送过一轮转写时（lastSent===0），用较小体积尽快触发首次识别 */
 const TAURI_LIVE_MIN_BYTES_FIRST = 4800;
 /** 已有转写基线后，用较大体积减轻不完整容器带来的错字 */
@@ -270,9 +269,6 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 	/** 开始本条语音会话前输入框已有内容（前缀），实时识别结果追加在其后 */
 	const voiceBaseRef = useRef('');
 	const voiceRecordingRef = useRef(false);
-	/** Tauri：定时把已缓存音频送后端 ASR，实现「边说边出字」 */
-	const tauriLivePollTimerRef = useRef<number | null>(null);
-	const tauriLiveKickTimerRef = useRef<number | null>(null);
 	const tauriLivePollBusyRef = useRef(false);
 	/** 递增即可使进行中的 live 转写在返回后放弃写入（停录/卸载/新会话） */
 	const tauriLiveEpochRef = useRef(0);
@@ -315,17 +311,6 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 		},
 		[disableTextInput],
 	);
-
-	const clearTauriLiveTimers = useCallback(() => {
-		if (tauriLivePollTimerRef.current !== null) {
-			clearInterval(tauriLivePollTimerRef.current);
-			tauriLivePollTimerRef.current = null;
-		}
-		if (tauriLiveKickTimerRef.current !== null) {
-			clearTimeout(tauriLiveKickTimerRef.current);
-			tauriLiveKickTimerRef.current = null;
-		}
-	}, []);
 
 	const runTauriLiveTranscribePoll = useCallback(async () => {
 		if (!isTauriRuntime()) return;
@@ -405,8 +390,7 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 	 * 1. 校验环境及权限，弹窗反馈无法录音的原因
 	 * 2. 记录当前输入文本作为语音内容前缀
 	 * 3. 初始化 MediaRecorder，设置录音格式和码率，绑定数据事件
-	 * 4. 启动短周期采集定时器，实现音频分片的快速实时采集
-	 * 5. 开启轮询定时器，处理增量音频转写回填
+	 * 4. 短 timeslice 启动 MediaRecorder，在 ondataavailable 中累积分片并触发 live 转写尝试
 	 */
 	const startVoiceCapture = useCallback(async () => {
 		// 1. 仅在浏览器环境下，Tauri 壳内允许启动语音输入，否则直接返回
@@ -474,36 +458,23 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 				}
 			}
 
-			// 6. 绑定全局 recorder 引用，采集音频分片，回调加入分片队列
+			// 6. 先置会话标记，避免极少数环境下 start 同步触发 ondataavailable 时 poll 误判未在录
+			voiceRecordingRef.current = true;
+			setVoiceRecording(true);
+			tauriLiveEpochRef.current += 1;
+			tauriLiveLastSentBytesRef.current = 0;
+			tauriLiveLastTextRef.current = '';
+
+			// 7. 绑定 recorder：分片到达即尝试转写（无 setInterval 空转；门槛与 busy 在 poll 内处理）
 			mediaRecorderRef.current = recorder;
 			recorder.ondataavailable = (ev) => {
 				if (ev.data.size > 0) {
 					mediaChunksRef.current.push(ev.data);
 				}
+				void runTauriLiveTranscribePoll();
 			};
-			// 7. 以较短的 timeslice（280ms）分片并触发 ondataavailable，提高首包出字速度
+			// 8. 较短 timeslice → ondataavailable 更密，有增量即可能触发转写
 			recorder.start(280);
-
-			// 8. 置录音激活标记（ref，为实时转写控制同步状态），更新界面录音状态
-			voiceRecordingRef.current = true;
-			setVoiceRecording(true);
-			// 9. 递增“录音会话代数”epoch，防止多轮竞态数据回填错乱
-			tauriLiveEpochRef.current += 1;
-			tauriLiveLastSentBytesRef.current = 0;
-			tauriLiveLastTextRef.current = '';
-			// 启动前清理前一轮定时器
-			clearTauriLiveTimers();
-
-			// 10. 首包回填定时器：极短延迟（320ms）后主动触发一次实时转写
-			tauriLiveKickTimerRef.current = window.setTimeout(() => {
-				tauriLiveKickTimerRef.current = null;
-				void runTauriLiveTranscribePoll();
-			}, TAURI_LIVE_FIRST_POLL_MS);
-
-			// 11. 后续增量实时回填定时器：固定周期定时拉音频片段转写
-			tauriLivePollTimerRef.current = window.setInterval(() => {
-				void runTauriLiveTranscribePoll();
-			}, TAURI_LIVE_POLL_MS);
 		} catch (err) {
 			// 捕获“用户拒绝”或“硬件/环境错误”，弹窗告知，同时增加定制麦克风说明
 			const base =
@@ -515,7 +486,6 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 		}
 	}, [
 		input,
-		clearTauriLiveTimers,
 		pickRecorderMimeType,
 		runTauriLiveTranscribePoll,
 		stopMediaTracks,
@@ -525,7 +495,6 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 
 	const finalizeVoiceAndTranscribe = useCallback(async () => {
 		tauriLiveEpochRef.current += 1;
-		clearTauriLiveTimers();
 		voiceRecordingRef.current = false;
 
 		const recorder = mediaRecorderRef.current;
@@ -573,7 +542,7 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 		} finally {
 			setVoiceTranscribing(false);
 		}
-	}, [chatInputRef, setInput, clearTauriLiveTimers, stopMediaTracks]);
+	}, [chatInputRef, setInput, stopMediaTracks]);
 
 	/**
 	 * 停止当前语音识别会话：关菜单、停录并丢弃未完成音频（不调用转写接口）；不改变输入模式（仍为语音时可继续点麦开录）。
@@ -589,7 +558,6 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 		if (!needsTeardown) return;
 
 		tauriLiveEpochRef.current += 1;
-		clearTauriLiveTimers();
 		clearCloseInputModeMenuTimer();
 		setInputModeMenuOpen(false);
 		voiceRecordingRef.current = false;
@@ -608,7 +576,6 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 		setVoiceTranscribing(false);
 	}, [
 		clearCloseInputModeMenuTimer,
-		clearTauriLiveTimers,
 		stopMediaTracks,
 		voiceRecording,
 		voiceTranscribing,
@@ -630,14 +597,13 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 	useEffect(() => {
 		return () => {
 			tauriLiveEpochRef.current += 1;
-			clearTauriLiveTimers();
 			clearCloseInputModeMenuTimer();
 			stopMediaTracks();
 			if (mediaRecorderRef.current?.state === 'recording') {
 				mediaRecorderRef.current.stop();
 			}
 		};
-	}, [clearCloseInputModeMenuTimer, clearTauriLiveTimers, stopMediaTracks]);
+	}, [clearCloseInputModeMenuTimer, stopMediaTracks]);
 
 	useEffect(() => {
 		if (!isTauriRuntime()) setInputMode('text');

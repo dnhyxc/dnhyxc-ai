@@ -1,6 +1,6 @@
 # 语音输入与语音识别（ASR）实现说明
 
-本文档基于当前仓库实现，梳理 **Tauri 桌面端** 聊天/助手输入区「语音输入」的完整思路，并收录相关源码摘录与**逐行说明**（行号与 `apps/frontend`、`apps/backend` 中文件一致）。**§10** 补充 **Live 出字速度与识别准确率** 相关迭代思路与代码摘录。**文档仅描述与摘录代码，不修改业务源码。**
+本文档基于当前仓库实现，梳理 **Tauri 桌面端** 聊天/助手输入区「语音输入」的完整思路，并收录相关源码摘录与**逐行说明**（行号与 `apps/frontend`、`apps/backend` 中文件一致）。**§10** 补充 **Live 出字速度与识别准确率** 相关迭代思路与代码摘录；**§10.4** 专门说明 **由定时器改为 `ondataavailable` 驱动** 及 **`clearTauriLiveTimers` 移除** 的实现思路与文档内注释版代码。**文档仅描述与摘录代码，不修改业务源码。**
 
 ---
 
@@ -10,7 +10,7 @@
 |------|------|
 | 运行环境 | **仅 Tauri 壳内**（`isTauriRuntime() === true`）展示「文本 / 语音」模式切换、麦克风录音与 live 增量转写；纯 Web 仅保留文本发送按钮，强制 `inputMode === 'text'`。 |
 | 录音技术 | `navigator.mediaDevices.getUserMedia` + `MediaRecorder`，`timeslice` **280ms** 产出 `Blob` 片段；优先 `audioBitsPerSecond: 128_000`，失败则降级创建。 |
-| 实时听写 | 定时将**累积**音频打成 `Blob` 调后端转写，用 `epoch` 与 `voiceRecordingRef` 丢弃过期响应；**首轮**用较低最小字节门槛尽快出字，**后续**用较高门槛与最小增量换更稳 WebM；live 回填直接 `setInput`（不走 `startTransition`）以降低出字延迟。 |
+| 实时听写 | **`MediaRecorder.ondataavailable`** 驱动：有新分片即尝试将**累积**音频打成 `Blob` 调后端转写（无固定 `setInterval` 空转）；`epoch` 与 `voiceRecordingRef` 丢弃过期响应；**首轮/后续**用不同体积门槛与增量门槛；live 回填直接 `setInput`（不走 `startTransition`）。 |
 | 停录 | 用户再次点击主按钮：`MediaRecorder.stop()` → 整段 `Blob` → 再调同一转写接口，**覆盖**本会话语音段文本（保留 `voiceBaseRef` 前缀）。 |
 | 后端 | NestJS `POST /speech-transcription/transcription`，`multipart` 字段 `file`；硅基流动 OpenAI 兼容 `POST /v1/audio/transcriptions`。 |
 | 业务约束 | 知识库 **AI 模式** 下左侧文档无正文时 `disableTextInput=true`：禁用文本输入、禁止悬停打开模式菜单、禁止开始语音/发送（录音中仍允许停录并识别，避免麦克风悬挂）。 |
@@ -33,7 +33,7 @@ sequenceDiagram
 	CE->>CE: startVoiceCapture
 	CE->>MR: getUserMedia + start(280ms timeslice)
 	loop 录音中
-		CE->>CE: setInterval runTauriLiveTranscribePoll
+		CE->>CE: ondataavailable → runTauriLiveTranscribePoll
 		CE->>API: transcribeSpeechAudio(blob, live-*.webm)
 		API->>BE: multipart file
 		BE->>SF: FormData + Bearer
@@ -509,10 +509,8 @@ export class SiliconflowTranscriptionService {
 
 ```tsx
 /**
- * Tauri 增量 ASR：首轮门槛低、轮询密 → 更快出字；后续轮次略提高门槛 → 更稳的 WebM 片段与识别。
+ * Tauri 增量 ASR：由 ondataavailable 驱动尝试转写；首轮/后续用不同体积门槛折中速度与稳定性。
  */
-const TAURI_LIVE_POLL_MS = 650;
-const TAURI_LIVE_FIRST_POLL_MS = 320;
 /** 尚未成功送过一轮转写时（lastSent===0），用较小体积尽快触发首次识别 */
 const TAURI_LIVE_MIN_BYTES_FIRST = 4800;
 /** 已有转写基线后，用较大体积减轻不完整容器带来的错字 */
@@ -584,8 +582,8 @@ function withTauriMicNote(message: string): string {
 
 | 行号 | 说明 |
 |------|------|
-| 42-44 | 常量区注释：首轮快出字 + 后续稳态策略。 |
-| 45-52 | `TAURI_LIVE_POLL_MS` / `FIRST`：轮询与首轮 kick 间隔；`MIN_BYTES_FIRST` / `STEADY` / `GROWTH_STEADY`：首轮与后续上传体积门槛及增量门槛（在 `runTauriLiveTranscribePoll` 内按 `lastSent` 分支选用）。 |
+| 42-43 | 常量区注释：事件驱动 + 首轮/稳态门槛策略。 |
+| 45-50 | `TAURI_LIVE_MIN_BYTES_FIRST` / `STEADY` / `GROWTH_STEADY`：首轮与后续上传体积门槛及增量门槛（在 `runTauriLiveTranscribePoll` 内按 `lastSent` 分支选用）。 |
 | 54-57 | `getMicrophoneUnavailableReason`：说明壳内不测安全上下文。 |
 | 59 | 无 `window` 不检测，返回 `null`。 |
 | 61 | 先打补丁再检测。 |
@@ -648,7 +646,7 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 | 287-300 | `clear` / `schedule`：悬停离开 220ms 后关菜单。 |
 | 302-306 | `openInputModeMenu`：`disableTextInput` 时直接返回；否则清定时器并打开菜单。 |
 | 308-317 | `handleInputModeMenuOpenChange`：锁定时强制关并忽略 Radix 的 open 请求。 |
-| 319-328 | `clearTauriLiveTimers`：清 interval/timeout。 |
+| （已删） | 原 `clearTauriLiveTimers` 已去除；live 转写无 `setInterval`/`setTimeout`，停录与卸载路径直接递增 `epoch`、`stopMediaTracks` 等。 |
 | 330-336 | `runTauriLiveTranscribePoll`：非 Tauri、未在录、`busy`、无 recorder 或状态非 `recording` 则返回。 |
 | 334 | 记录本轮 `epoch`，用于丢弃过期异步结果。 |
 | 338-339 | 无 chunk 不请求。 |
@@ -682,7 +680,7 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 | 478-483 | `ondataavailable` 追加非空 `BlobPart`。 |
 | 484-485 | `start(280)`：更短 timeslice，更快攒够首轮 live 门槛字节。 |
 | 487-493 | 置 `voiceRecordingRef` / `setVoiceRecording`；递增 `epoch`、清零 live 体积与上次文本。 |
-| 494-506 | `clearTauriLiveTimers`；首包 `setTimeout` 调 `runTauriLiveTranscribePoll`；`setInterval` 周期轮询。 |
+| 482-495 | `ondataavailable`：写入分片后 `void runTauriLiveTranscribePoll()`；开录前已置 `epoch`/清空 live 基线，无单独 clear 定时器步骤。 |
 | 507-515 | `getUserMedia`/录音异常：Toast 可读错误。 |
 | 516-524 | `useCallback` 依赖列表（含 `disableTextInput` 等）。 |
 
@@ -690,19 +688,19 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 
 | 行号 | 说明 |
 |------|------|
-| 492-494 | 停 live：递增 `epoch`、清定时器、ref 标记非录音。 |
+| 492-494 | 停 live：递增 `epoch`、`voiceRecordingRef` 标记非录音（无独立 clear 定时器）。 |
 | 496-501 | 无活跃 recorder 则只更新 UI 与停轨。 |
 | 503-506 | 等 `stop` 事件再 resolve。 |
 | 508-515 | 组整段 Blob、清 chunk、释放 recorder 与轨、`setVoiceRecording(false)`。 |
 | 517-520 | 空 Blob 直接 focus 输入框返回。 |
 | 522-527 | 据 mime 选扩展名。 |
 | 527-539 | `voiceTranscribing` 包裹整段 `transcribeSpeechAudio`；有文本则与前缀拼接 `setInput`。 |
-| 541 | `finalize` 依赖：`chatInputRef`、`setInput`、清定时器、停轨。 |
+| 541 | `finalize` 依赖：`chatInputRef`、`setInput`、停轨。 |
 | 543-546 | `discardActiveVoiceCapture` 注释：不发转写、用于发送后清理。 |
 | 548 | 非 Tauri 直接返回。 |
 | 549-554 | 判断是否存在进行中的录音或转写。 |
 | 554 | 无则返回。 |
-| 556-560 | 递增 `epoch`、清定时器与菜单、ref 非录音。 |
+| 556-560 | 递增 `epoch`、`clearCloseInputModeMenuTimer`、关菜单、ref 非录音。 |
 | 562-568 | 若 recorder 活跃则 `stop` 并等待。 |
 | 569-573 | 清空缓存、停轨、状态复位。 |
 | 574-580 | 依赖数组。 |
@@ -712,7 +710,7 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 
 | 行号 | 说明 |
 |------|------|
-| 595-605 | 卸载时：递增 `epoch`、清定时器、停轨、若仍在录则 `stop`。 |
+| 595-605 | 卸载时：递增 `epoch`、`clearCloseInputModeMenuTimer`、停轨、若仍在录则 `stop`。 |
 | 607-609 | 非 Tauri 强制文本模式（Web 不展示语音 UI）。 |
 | 611-630 | `disableTextInput` 为真：关菜单；若语音模式且空闲则切回文本，避免无法通过悬停菜单切回。 |
 | 632-650 | Tauri 下输入从非空变空且仍有语音会话则 `discard`（与清空输入协同）。 |
@@ -1032,13 +1030,13 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 
 | 目标 | 做法 |
 |------|------|
-| 更快首字 | 缩短 `MediaRecorder.start` 的 **timeslice（280ms）**，更快产生 `ondataavailable` 分片；缩短 **首轮 kick**（`TAURI_LIVE_FIRST_POLL_MS`）与 **轮询间隔**（`TAURI_LIVE_POLL_MS`）。 |
+| 更快首字 | 缩短 `MediaRecorder.start` 的 **timeslice（280ms）**，更快产生 `ondataavailable`；**每次分片回调**内调用 `runTauriLiveTranscribePoll`（无固定 `setInterval` 空转）。 |
 | 首轮 vs 稳态 | `tauriLiveLastSentBytesRef === 0` 时使用 **较小** `TAURI_LIVE_MIN_BYTES_FIRST`，尽快凑够首次上传；之后用 **较大** `TAURI_LIVE_MIN_BYTES_STEADY` 与 `TAURI_LIVE_MIN_GROWTH_STEADY`，减轻不完整 WebM 带来的错字与无效请求。 |
 | 回填跟手 | Live 路径对识别结果 **直接 `setInput`**，不再包一层 `startTransition`，减少低优先级更新造成的「慢一拍」。 |
 | 音质 / 码率 | 创建 `MediaRecorder` 时优先传入 **`audioBitsPerSecond: 128_000`**，不支持则降级为无码率选项的构造。 |
 | 后端语言提示 | 在硅基 `multipart` 中附加 OpenAI 兼容字段 **`language`**（默认 `zh`），见 §10.3；可通过环境变量关闭或改为 `en` 等。 |
 
-**权衡**：首轮门槛更低会略微增加「半成品音频」请求失败率（仍由 `catch` bump 体积、下一轮再试）；若线上错误率升高，可适当回调 `TAURI_LIVE_MIN_BYTES_FIRST` 或拉长 `TAURI_LIVE_POLL_MS`。
+**权衡**：首轮门槛更低会略微增加「半成品音频」请求失败率（仍由 `catch` bump 体积、下一轮 `ondataavailable` 再试）；若线上错误率升高，可适当回调 `TAURI_LIVE_MIN_BYTES_FIRST` 或略增大 `recorder.start` 的 timeslice。
 
 ### 10.2 `runTauriLiveTranscribePoll` 中双门槛逻辑（摘录）
 
@@ -1104,9 +1102,106 @@ const TRANSCRIPTION_LANGUAGE_RE = /^[a-z]{2}$/;
 
 硅基官方 OpenAPI 文档中 `AudioRequest` 仅强制列出 `file` 与 `model`；`language` 按 **OpenAI 兼容惯例** 透传。若实际网关返回 4xx，请将 **`SILICONFLOW_TRANSCRIPTION_LANGUAGE`** 设为 **`off`**（或 `none` / `disabled`）以关闭该字段。
 
+### 10.4 Live 触发重构：`ondataavailable` 替代定时器与移除 `clearTauriLiveTimers`
+
+本节总结**另一次迭代**：去掉 **`setInterval` / `setTimeout` 驱动** 的 live 轮询与首轮 kick，改为 **`MediaRecorder.ondataavailable`** 在「有新音频分片」时再尝试转写；并**删除**已无实际逻辑的 **`clearTauriLiveTimers`** 空壳及其调用。以下代码块位于**文档内**，在源码行末或行上增加了**教学用注释**（仓库内源文件以保持简洁为主，未必逐字带这些长注释）。
+
+#### 10.4.1 背景与目标
+
+| 原先方式 | 问题 |
+|----------|------|
+| `setInterval` 固定周期调用 `runTauriLiveTranscribePoll` | 到点未必有新数据，仍反复进入 poll 做同步判断后 `return`，属于 **时钟驱动** 的轻微空转。 |
+| 首轮 `setTimeout` 再触发一次 poll | 与 `MediaRecorder.start(280)` 后首次 `ondataavailable` 时间接近，**冗余**。 |
+| 保留空的 `clearTauriLiveTimers` | 历史上用于清理 interval/timeout；定时器删光后函数 **无操作**，仅增加噪音与依赖项。 |
+
+| 目标 | 做法 |
+|------|------|
+| 数据驱动 | 在 `ondataavailable` 内 `push` 分片后 **`void runTauriLiveTranscribePoll()`**，有分片才推进尝试；字节门槛、`busy`、`epoch` 仍在 poll 内统一裁决。 |
+| 竞态安全 | **`recorder.start(280)` 之前** 先置 `voiceRecordingRef`、`epoch`、清空 live 基线，避免极少数环境 **同步触发** 首帧回调时 poll 误判「未在录」。 |
+| 依赖收敛 | 删除 `clearTauriLiveTimers` 及所有调用；`finalize` / `discard` / 卸载清理只保留 **`epoch` 递增**、**`stopMediaTracks`**、**`clearCloseInputModeMenuTimer`** 等仍有实际副作用的逻辑。 |
+
+#### 10.4.2 常量与 poll 门槛（与仓库一致；注释仅增强可读性）
+
+**对应文件**：`apps/frontend/src/components/design/ChatEntry/index.tsx`（模块顶部常量 + `runTauriLiveTranscribePoll` 核心）
+
+```tsx
+/**
+ * Tauri 增量 ASR：由 MediaRecorder.ondataavailable 驱动尝试转写（有数据才跑），
+ * 首轮/后续用不同体积门槛折中出字速度与 WebM 稳定性。
+ */
+/** 尚未成功送过一轮转写时（lastSent===0），用较小体积尽快触发首次识别 */
+const TAURI_LIVE_MIN_BYTES_FIRST = 4800;
+/** 已有转写基线后，用较大体积减轻不完整容器带来的错字 */
+const TAURI_LIVE_MIN_BYTES_STEADY = 7800;
+/** 相对上次上传体积的最小增量（仅第二轮起生效），避免同一体积反复打 ASR */
+const TAURI_LIVE_MIN_GROWTH_STEADY = 2800;
+
+// —— runTauriLiveTranscribePoll 内（节选）：组 Blob → 按「首轮/稳态」选门槛 → 未达标则直接 return ——
+const blob = new Blob([...chunks], {
+	type: rec.mimeType || 'audio/webm', // 与 MediaRecorder 协商的容器类型一致，便于后端解码
+});
+const lastSent = tauriLiveLastSentBytesRef.current; // 上次「已消费」的累积 Blob 体积；0 表示尚未成功送过一轮
+const minBytes =
+	lastSent === 0 ? TAURI_LIVE_MIN_BYTES_FIRST : TAURI_LIVE_MIN_BYTES_STEADY; // 首轮略松、后续略严
+if (blob.size < minBytes) return; // 体积不足：许多 ASR 对不完整 WebM 会失败，这里直接跳过
+if (lastSent > 0 && blob.size - lastSent < TAURI_LIVE_MIN_GROWTH_STEADY) return; // 第二轮起要求「足够新增音频」再请求
+
+// …其后置 busy、await transcribeSpeechAudio、bumpSent、setInput 等逻辑与 §10.2 一致…
+```
+
+#### 10.4.3 开录：`ondataavailable` 绑定与 `start(280)`（注释增强版）
+
+```tsx
+// 6. 先置会话标记：必须在 recorder.start 之前，防止个别实现同步派发首帧 ondataavailable 时 poll 读到「未在录」
+voiceRecordingRef.current = true; // 同步标志：runTauriLiveTranscribePoll 首行校验
+setVoiceRecording(true); // React 状态：驱动 UI（录音中按钮等）
+tauriLiveEpochRef.current += 1; // 新会话：使进行中的旧异步转写回调在返回后放弃写入
+tauriLiveLastSentBytesRef.current = 0; // 新会话：体积基线归零
+tauriLiveLastTextRef.current = ''; // 新会话：上次 live 文本清空，避免与上一条会话串台
+
+// 7. 绑定 recorder：分片到达即尝试转写（不再使用 setInterval / 首轮 setTimeout）
+mediaRecorderRef.current = recorder;
+recorder.ondataavailable = (ev) => {
+	if (ev.data.size > 0) {
+		mediaChunksRef.current.push(ev.data); // 累积 BlobPart，供 poll 内 new Blob([...chunks])
+	}
+	void runTauriLiveTranscribePoll(); // 每次分片回调都尝试；真正发 HTTP 仍由门槛与 busy 把关
+};
+// 8. timeslice=280ms：约每 280ms 触发一次 ondataavailable，在「出字速度」与「分片过碎」之间折中
+recorder.start(280);
+```
+
+#### 10.4.4 `runTauriLiveTranscribePoll` 入口守卫（注释增强版）
+
+```tsx
+const runTauriLiveTranscribePoll = useCallback(async () => {
+	if (!isTauriRuntime()) return; // 纯 Web 不跑 Tauri live 逻辑
+	if (!voiceRecordingRef.current) return; // 未处于录音会话（含已 finalize / discard 之后）
+	if (tauriLivePollBusyRef.current) return; // 上一轮转写尚未结束，避免并发重复请求
+	const epochAtStart = tauriLiveEpochRef.current; // 捕获会话代数，异步返回后比对是否仍有效
+	const rec = mediaRecorderRef.current;
+	if (!rec || rec.state !== 'recording') return; // recorder 已停或不可用
+	const chunks = mediaChunksRef.current;
+	if (chunks.length === 0) return; // 尚无分片
+	// …requestData、组 Blob、门槛、bumpSent、transcribeSpeechAudio、setInput…
+}, [setInput]);
+```
+
+#### 10.4.5 移除 `clearTauriLiveTimers` 后的清理职责
+
+以下路径**不再**调用任何「live 专用定时器清理」函数（因已无 `setInterval`/`setTimeout`）：
+
+| 路径 | 仍生效的清理 / 失效手段 |
+|------|-------------------------|
+| `finalizeVoiceAndTranscribe` | `tauriLiveEpochRef += 1`；`voiceRecordingRef = false`；`recorder.stop()`；`stopMediaTracks`；使进行中的 poll 在异步返回后因 `epoch` 或 `recording` 状态而丢弃写入。 |
+| `discardActiveVoiceCapture` | `tauriLiveEpochRef += 1`；`clearCloseInputModeMenuTimer`；关菜单；停录与 `stopMediaTracks`；同上使 live 回调失效。 |
+| 组件卸载 `useEffect` cleanup | `tauriLiveEpochRef += 1`；`clearCloseInputModeMenuTimer`；`stopMediaTracks`；若仍在录则 `recorder.stop()`。 |
+
+**影响说明**：删除空 `clearTauriLiveTimers` **不会**漏清任何仍存在的 live 定时器；若未来重新引入「防抖 `setTimeout`」等，应在**引入处**配对 `clearTimeout`，或再抽**有实际逻辑**的清理函数，无需恢复历史上的空实现。
+
 ---
 
 ## 11. 文档维护说明
 
 - 源码行号随文件变更可能漂移；以仓库当前文件为准。
-- 若新增 Web 端语音或其它 ASR 供应商，请同步更新本文「适用范围」、序列图与 **§10**。
+- 若新增 Web 端语音或其它 ASR 供应商，请同步更新本文「适用范围」、序列图、**§10**（含 **§10.4**）。
