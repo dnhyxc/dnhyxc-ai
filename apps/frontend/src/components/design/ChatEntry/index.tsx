@@ -992,7 +992,7 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 												>
 													<Keyboard
 														className={cn(
-															'h-3.5 w-3.5 shrink-0',
+															'h-3.5 w-3.5 shrink-0 text-textcolor/95',
 															inputMode === 'text' && 'text-teal-500',
 														)}
 													/>
@@ -1008,7 +1008,7 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 												>
 													<Mic
 														className={cn(
-															'h-3.5 w-3.5 shrink-0',
+															'h-3.5 w-3.5 shrink-0 text-textcolor/95',
 															inputMode === 'voice' && 'text-teal-500',
 														)}
 													/>
