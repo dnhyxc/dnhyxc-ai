@@ -255,7 +255,7 @@ const DocumentProcessor = () => {
 				<motion.div
 					initial={{ opacity: 0, y: 20 }}
 					animate={{ opacity: 1, y: 0 }}
-					className="max-w-6xl mx-auto space-y-6"
+					className="w-full space-y-6"
 				>
 					<motion.div
 						initial={{ opacity: 0, scale: 0.95 }}
