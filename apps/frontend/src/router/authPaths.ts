@@ -10,7 +10,8 @@ export function isPublicPath(pathname: string): boolean {
 	if (
 		pathname === '/service-policy' ||
 		pathname === '/user-agreement' ||
-		pathname === '/update-info'
+		pathname === '/update-info' ||
+		pathname === '/project-guide'
 	)
 		return true;
 	if (pathname === '/knowledge') return true;

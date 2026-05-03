@@ -625,6 +625,7 @@ export const zhCN = {
 	'route.legal.servicePolicy': '用户服务政策',
 	'route.legal.userAgreement': '用户服务协议',
 	'route.updateInfo.title': '更新信息',
+	'route.projectGuide.title': '产品指南',
 
 	'updateInfoPage.header.subtitle':
 		'能力说明随版本更新；与仓库内《更新信息》文档请保持同步。',

@@ -706,6 +706,7 @@ export const enUS = {
 	'route.legal.servicePolicy': 'User service policy',
 	'route.legal.userAgreement': 'User service agreement',
 	'route.updateInfo.title': 'Release notes',
+	'route.projectGuide.title': 'Product guide',
 
 	'updateInfoPage.header.subtitle':
 		'Capabilities change with releases — keep in sync with the repo notes.',

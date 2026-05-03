@@ -16,10 +16,11 @@ import { useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router';
 import { useI18n } from '@/hooks';
 import { onListen, openExternalUrl } from '@/utils';
+import { getProjectGuideAbsoluteUrl } from '@/views/projectGuide/paths';
 
 const Home = () => {
 	const navigate = useNavigate();
-	const { t } = useI18n();
+	const { t, locale } = useI18n();
 
 	const SHOWCASE = useMemo(
 		() => [
@@ -216,7 +217,7 @@ const Home = () => {
 											variant="dynamic"
 											onClick={() => {
 												void openExternalUrl(
-													'https://github.com/dnhyxc/dnhyxc-ai-app/wiki/dnhyxc%E2%80%90ai-%E9%A1%B9%E7%9B%AE%E4%BB%8B%E7%BB%8D',
+													getProjectGuideAbsoluteUrl(locale),
 												);
 											}}
 											className="h-10 w-30 rounded-md border border-theme/5 bg-theme-white/5 px-6 text-sm font-medium text-textcolor backdrop-blur-sm transition-colors hover:border-theme/10 hover:bg-theme-white/10"
