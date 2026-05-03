@@ -43,6 +43,7 @@ export const enUS = {
 	// 导航栏文案
 	'nav.home': 'Home',
 	'nav.knowledge': 'Knowledge',
+	'nav.chat': 'Smart Chat',
 	'nav.pay': 'Membership',
 	'nav.profile': 'Profile',
 

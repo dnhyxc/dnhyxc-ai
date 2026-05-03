@@ -20,6 +20,7 @@ import { useMemo } from 'react';
 import { useNavigate } from 'react-router';
 import ICON from '@/assets/icon.png';
 import { useI18n, useStorageInfo } from '@/hooks';
+import { hasValidAuthToken } from '@/router/authPaths';
 import useStore from '@/store';
 import { removeStorage, resolveQiniuUrlForWebDisplay } from '@/utils';
 import Image from '../Image';
@@ -45,7 +46,13 @@ const Sidebar = () => {
 		CreditCard: <CreditCard />,
 	};
 
-	const processedMenus = MENUS.map((menu) => ({
+	const visibleMenus = useMemo(() => {
+		const loggedIn = hasValidAuthToken();
+		return MENUS.filter((menu) => !menu.requiresAuth || loggedIn);
+		// storageInfo 变化（登录/登出）时与 token 展示状态对齐并重算菜单
+	}, [storageInfo]);
+
+	const processedMenus = visibleMenus.map((menu) => ({
 		...menu,
 		icon: iconMap[menu.icon as keyof typeof iconMap],
 		onClick: () => onJump(menu.path),

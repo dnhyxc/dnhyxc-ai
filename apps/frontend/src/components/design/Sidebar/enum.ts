@@ -1,4 +1,12 @@
-export const MENUS = [
+export type SidebarMenuConfig = {
+	nameKey: string;
+	icon: string;
+	path: string;
+	/** 为 true 时仅登录后展示 */
+	requiresAuth?: boolean;
+};
+
+export const MENUS: SidebarMenuConfig[] = [
 	{
 		nameKey: 'nav.home',
 		icon: 'House',
@@ -9,11 +17,12 @@ export const MENUS = [
 		icon: 'BookOpenText',
 		path: '/knowledge',
 	},
-	// {
-	// 	name: '智能对话',
-	// 	icon: 'Bot',
-	// 	path: '/chat',
-	// },
+	{
+		nameKey: 'nav.chat',
+		icon: 'Bot',
+		path: '/chat',
+		requiresAuth: true,
+	},
 	// {
 	// 	name: 'document',
 	// 	icon: 'Package',

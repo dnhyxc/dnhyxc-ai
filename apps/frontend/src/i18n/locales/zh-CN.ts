@@ -41,6 +41,7 @@ export const zhCN = {
 
 	'nav.home': '首页',
 	'nav.knowledge': '知识库',
+	'nav.chat': '智能会话',
 	'nav.pay': '会员充值',
 	'nav.profile': '我的主页',
 
