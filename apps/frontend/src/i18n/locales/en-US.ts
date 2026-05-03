@@ -709,6 +709,8 @@ export const enUS = {
 	'route.updateInfo.title': 'Release notes',
 	'route.projectGuide.title': 'Product guide',
 	'route.downloadDesktop.title': 'Download desktop app',
+	'route.guard.needLoginTitle':
+		'This page requires you to sign in before accessing.',
 
 	'downloadPage.hero.badge': 'Desktop · Stable',
 	'downloadPage.hero.title': 'Download dnhyxc-ai for desktop',

@@ -628,6 +628,7 @@ export const zhCN = {
 	'route.updateInfo.title': '更新信息',
 	'route.projectGuide.title': '产品指南',
 	'route.downloadDesktop.title': '下载桌面客户端',
+	'route.guard.needLoginTitle': '该页面需要登录后才能访问。',
 
 	'downloadPage.hero.badge': '桌面客户端 · 正式发行版',
 	'downloadPage.hero.title': '下载 dnhyxc-ai 桌面版',
