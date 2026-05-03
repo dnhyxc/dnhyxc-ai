@@ -211,18 +211,23 @@ export const PROJECT_GUIDE_ITEMS_EN: Record<
 			'Format supported fenced languages when available; nested fences may need backup or incremental paste.',
 	},
 	'pg-s13-1': {
-		title: 'Developer and ops docs',
+		title: 'Topic-specific maintainer notes',
 		description:
-			'This page targets everyday use. For self-hosting, reverse proxies, editor edge cases, or contributing, open the documentation folder in your local clone—indexed by topic alongside the source.',
+			'This page targets everyday use. For hosting, reverse proxies, editor edge cases, or contributing, search topic-specific maintainer material in your local clone—feature index, deployment examples, desktop voice, Monaco notes, etc.',
 	},
 	'pg-s14-1': {
 		title: 'Service policy and user agreement',
 		description:
-			'From About, links open in the system browser (desktop) or a new tab (web), not inside the small About window. Routes: /service-policy and /user-agreement—full-page scroll without the main app chrome. Available logged out; language follows Settings.',
+			'From About: Service Policy and User Agreement open in the system browser (desktop) or a new tab (web), not inside the small About window—same full-page scroll feel as share pages, without main chrome. Routes /service-policy and /user-agreement; available logged out.\nBesides changing UI language in Settings, those pages have a header toggle like the product guide: ?lang= switches zh/en and refreshes body copy immediately.\nLegal copy is product-level; maintainer-edited in code.',
 	},
 	'pg-s14-2': {
-		title: 'Release notes page',
+		title: 'Release notes (standalone structured page)',
 		description:
-			'About also links to structured release notes at /update-info—same standalone layout as share pages (header, scroll body). Content is maintained in frontend data modules synced from the repo changelog doc.',
+			'About also opens Release Notes in the browser. Route /update-info; no main chrome; header plus scroll body like share pages. Regular section layout (not a Markdown preview wall); wording stays aligned with the external release-notes write-up—update structured frontend data when that prose changes.',
+	},
+	'pg-s14-3': {
+		title: 'Product guide (standalone structured page)',
+		description:
+			'Home “Learn more” opens this guide in the default browser or a new tab. Route /project-guide; full-page scroll; logged-out OK. Header title plus language toggle (?lang=), same pattern as legal standalone pages. Structured sections like release notes; keep frontend guide modules (including English overlay) in sync when this prose changes.',
 	},
 };

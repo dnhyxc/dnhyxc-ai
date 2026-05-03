@@ -1,6 +1,6 @@
 /**
- * 与 docs/project-update-info.md 对齐的章节数据（产品级说明，供独立页渲染）。
- * 文档增删改时请同步维护本文件，保持与 Markdown 一致。
+ * 与对外《更新信息》说明正文对齐的章节数据（产品级说明，供独立页渲染）。
+ * 说明正文增删改时请同步维护本文件。
  * 英文正文映射见 updateInfoSectionsEnOverlay.ts。
  */
 
@@ -36,6 +36,13 @@ const UPDATE_INFO_SECTIONS_ZH: UpdateInfoSection[] = [
 				dateLabel: '2026-04-14',
 				description:
 					'完成打包发布后，更新信息页会自动刷新到最新内容，减少手动维护与遗漏；本地仅验证时可通过开关跳过同步步骤。（待提交）',
+			},
+			{
+				id: 's1-2',
+				title: 'GitHub Release 上传 dmg 脚本',
+				dateLabel: '2026-05-03',
+				description:
+					'工程内提供 upload-dmg-to-release 脚本（根目录 pnpm upload-dmg），将 Tauri 桌面端构建生成的 .dmg 安装包上传至与 upload-to-release 相同的 GitHub Release（如 latest 标签）；使用 GITHUB_TOKEN、OWNER、APP_REPO 等与既有上传脚本一致的环境变量。默认选取 dmg 构建输出目录中修改时间最新的 .dmg，也可通过命令行参数或环境变量 DMG_PATH 指定文件路径。',
 			},
 		],
 	},
@@ -618,13 +625,74 @@ const UPDATE_INFO_SECTIONS_ZH: UpdateInfoSection[] = [
 				description:
 					'上述路径纳入未登录可访问白名单；正文提供中英版本，随前端界面语言切换；实现代码集中在独立视图目录中，便于后续替换为正式法务文本。',
 			},
+			{
+				id: 's20-4',
+				title: '法律页顶栏语言切换',
+				dateLabel: '2026-05-03',
+				description:
+					'/service-policy 与 /user-agreement 顶栏右侧提供与 /project-guide 一致的语言切换：通过路由跳转并附带 ?lang= 查询参数切换中 / 英，与独立页 URL 语言同步逻辑联动，无需先改全局设置再手动刷新。',
+			},
+		],
+	},
+	{
+		id: 's21',
+		title: '21. 更新信息独立页（结构化 UI）',
+		items: [
+			{
+				id: 's21-1',
+				title: '/update-info 独立页',
+				dateLabel: '2026-05-02',
+				description:
+					'与分享页同型的全屏公开路由；顶栏含标题区等，主区为常规分区与条目分隔排版（非 Markdown 预览）。',
+			},
+			{
+				id: 's21-2',
+				title: '与本文档的关系',
+				dateLabel: '2026-05-02',
+				description:
+					'线上展示不直接渲染本说明的原始稿，而是由前端 updateInfoSections 等结构化数据驱动；增删改本说明时请同步改代码中的数据，以免用户看到的内容与说明脱节。',
+			},
+			{
+				id: 's21-3',
+				title: '关于入口',
+				dateLabel: '2026-05-02',
+				description:
+					'关于窗口中「更新说明」以绝对地址外开浏览器，打开即上述页面。',
+			},
+		],
+	},
+	{
+		id: 's22',
+		title: '22. 产品指南独立页与首页入口',
+		items: [
+			{
+				id: 's22-1',
+				title: '/project-guide 全屏公开路由',
+				dateLabel: '2026-05-03',
+				description:
+					'产品功能说明独立页，不经主导航 Layout；顶栏含标题与语言切换（?lang=）；内容与产品功能详解说明（与本更新说明姊妹维护的那份正文）对齐，由前端 projectGuideSections（及英文 projectGuideSectionsEnOverlay）驱动。',
+			},
+			{
+				id: 's22-2',
+				title: '首页「了解更多」外开浏览器',
+				dateLabel: '2026-05-03',
+				description:
+					'首页英雄区「了解更多」在桌面端通过系统默认浏览器、在网页端通过新标签打开产品指南页，并附带当前界面语言的 lang 查询参数。',
+			},
+			{
+				id: 's22-3',
+				title: '维护约定',
+				dateLabel: '2026-05-03',
+				description:
+					'修订产品功能详解说明正文后，须同步更新前端内产品指南视图配套的结构化数据及路由路径常量，再发布前端包。',
+			},
 		],
 	},
 ];
 
-/** 页首说明（与 docs 首段语义一致） */
+/** 页首说明（与对外更新信息说明首段一致） */
 const UPDATE_INFO_INTRO_ZH =
-	'这里汇总了本项目目前已具备的核心能力与近期更新点，方便你快速了解「新增/优化了什么」。以下内容为产品级说明，强调可感知的功能与体验提升。';
+	'这里汇总了本项目目前已具备的核心能力与近期更新点，方便你快速了解「新增/优化了什么」。以下内容为产品级说明，强调可感知的功能与体验提升；正文不列出工程内部的文件或目录路径，实现与专题细节请在本地克隆的仓库中按专题自行检索配套说明。';
 
 function mapUpdateInfoSectionsToLocale(
 	zh: UpdateInfoSection[],

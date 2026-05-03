@@ -4,7 +4,7 @@
  */
 
 export const UPDATE_INFO_INTRO_EN =
-	'This page summarizes core capabilities and recent improvements so you can quickly see what is new or better. The content is product-level and focuses on user-visible behavior.';
+	'This page summarizes core capabilities and recent improvements so you can quickly see what is new or better. The content is product-level and focuses on user-visible behavior. We do not list internal file or directory paths here—implementation details live alongside the source in topic-specific notes you can search after cloning the repo.';
 
 /** 章节标题（key = section.id） */
 export const UPDATE_INFO_SECTION_TITLES_EN: Record<string, string> = {
@@ -28,6 +28,8 @@ export const UPDATE_INFO_SECTION_TITLES_EN: Record<string, string> = {
 	s18: '18. @dnhyxc-ai/tools & fenced-block parsing',
 	s19: '19. Metadata & documentation conventions',
 	s20: '20. About dialog & standalone legal pages',
+	s21: '21. Release notes standalone page (structured UI)',
+	s22: '22. Product guide page & home entry',
 };
 
 /** 条目标题与描述（key = bullet.id） */
@@ -39,6 +41,11 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		title: 'Public update page refreshes after release',
 		description:
 			'After a production build is published, the update-info page refreshes to the latest content automatically, reducing manual upkeep and omissions. Local-only validation can skip the sync step via a flag. (Pending commit.)',
+	},
+	's1-2': {
+		title: 'GitHub Release DMG upload script',
+		description:
+			'upload-dmg-to-release (pnpm upload-dmg at repo root) uploads the Tauri-built .dmg to the same GitHub Release as upload-to-release (e.g. latest tag), using GITHUB_TOKEN, OWNER, APP_REPO, and related env vars. By default it picks the newest .dmg by mtime from the DMG build output folder; override via CLI arg or DMG_PATH.',
 	},
 	's2-1': {
 		title: 'Route-level login guard',
@@ -375,5 +382,40 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		title: 'Public access & copy',
 		description:
 			'Those paths are on the logged-out allowlist; body copy is zh/en and follows UI language; implementation lives under standalone legal views for easy swap to formal legal text later.',
+	},
+	's20-4': {
+		title: 'Legal pages: header language toggle',
+		description:
+			'/service-policy and /user-agreement headers include the same language toggle as /project-guide: navigate with ?lang= to switch zh/en immediately, wired to standalone-page locale-from-URL behavior—no need to change global settings first.',
+	},
+	's21-1': {
+		title: '/update-info standalone route',
+		description:
+			'Full-screen public route like share pages: header plus scrollable body with sectioned layout (not a Markdown preview renderer).',
+	},
+	's21-2': {
+		title: 'Relationship to this write-up',
+		description:
+			'The live page is driven by structured frontend data (updateInfoSections), not by rendering this prose directly—keep code and copy in sync when editing.',
+	},
+	's21-3': {
+		title: 'About entry point',
+		description:
+			'From About, “Release notes” opens the absolute URL in the browser as above.',
+	},
+	's22-1': {
+		title: '/project-guide full-screen route',
+		description:
+			'Standalone product guide without main chrome; header includes language toggle (?lang=). Content aligns with the companion product-guide prose and is driven by projectGuideSections (+ English overlay).',
+	},
+	's22-2': {
+		title: 'Home “Learn more” opens externally',
+		description:
+			'The hero “Learn more” button opens the guide in the system browser (desktop) or a new tab (web), passing the current UI lang as a query parameter.',
+	},
+	's22-3': {
+		title: 'Maintenance note',
+		description:
+			'When the external-facing guide copy changes, update the structured product-guide modules and route constants before shipping the frontend bundle.',
 	},
 };
