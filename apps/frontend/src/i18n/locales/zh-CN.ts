@@ -420,6 +420,7 @@ export const zhCN = {
 		'一处集成对话、代码与文档的桌面 AI 工作台。三种能力在此交融，随需切换，从念头闪现到成果落地，皆在这方寸之间完成。',
 	'home.hero.quickStart': '快速开始',
 	'home.hero.learnMore': '了解更多',
+	'home.hero.downloadDesktop': '下载桌面版',
 	'home.features.enter': '进入模块',
 	'home.sections.showcase': '特色功能',
 	'home.sections.steps': '快速开始',
@@ -626,6 +627,59 @@ export const zhCN = {
 	'route.legal.userAgreement': '用户服务协议',
 	'route.updateInfo.title': '更新信息',
 	'route.projectGuide.title': '产品指南',
+	'route.downloadDesktop.title': '下载桌面客户端',
+
+	'downloadPage.hero.badge': '桌面客户端 · 正式发行版',
+	'downloadPage.hero.title': '下载 dnhyxc-ai 桌面版',
+	'downloadPage.hero.subtitle':
+		'在 macOS 上获得完整系统能力：全局快捷键、本地文件夹、开机自启等。',
+	'downloadPage.hero.versionLabel': 'v{version}',
+	'downloadPage.hero.dateLabel': '发布：{date}',
+	'downloadPage.hero.primaryCtaMac': '下载 macOS 安装包（DMG）',
+	'downloadPage.hero.copyLink': '复制下载链接',
+	'downloadPage.hero.pickPlatform': '请选择下方平台卡片查看可用安装包。',
+	'downloadPage.links.releaseNotes': '更新说明',
+	'downloadPage.links.userGuide': '产品指南',
+	'downloadPage.links.backHome': '返回首页',
+	'downloadPage.platforms.sectionLabel': '选择系统',
+	'downloadPage.platforms.mac': 'macOS',
+	'downloadPage.platforms.windows': 'Windows',
+	'downloadPage.platforms.linux': 'Linux',
+	'downloadPage.mac.cardTitle': 'macOS（Apple 芯片）',
+	'downloadPage.mac.cardDesc':
+		'推荐大多数用户使用 DMG：下载后打开，将应用拖入「应用程序」。如需命令行或自动更新通道，可选用 .tar.gz。',
+	'downloadPage.mac.downloadDmg': '下载 .dmg',
+	'downloadPage.mac.downloadTarGz': '下载 .tar.gz（更新通道）',
+	'downloadPage.mac.stepInstall':
+		'打开 DMG，将 dnhyxc-ai 拖入「应用程序」后即可从启动台打开。',
+	'downloadPage.mac.stepGatekeeper':
+		'若提示「无法验证开发者」，可在「系统设置 → 隐私与安全性」中选择仍要打开，或右键应用图标打开。',
+	'downloadPage.mac.stepUpdater':
+		'应用内置更新检查（关于 → 检查更新）；也可留意本站更新说明获取发行要点。',
+	'downloadPage.mac.noteIntel':
+		'当前安装包面向 Apple 芯片（ARM64）。若使用 Intel Mac，请关注后续是否提供 x64 构建。',
+	'downloadPage.mac.noteSource':
+		'安装包由 GitHub Releases 托管下载；若下载较慢可更换网络或稍后重试。',
+	'downloadPage.mac.historyIntro':
+		'「全部版本」进入 Releases 列表，可逐个版本查看并下载附件（含 aarch64 等 dmg）。',
+	'downloadPage.mac.openLatestTag': '打开 latest 标签页',
+	'downloadPage.mac.openAllReleases': '浏览全部历史版本',
+	'downloadPage.windows.cardTitle': 'Windows',
+	'downloadPage.windows.cardDesc':
+		'Windows 安装包正在准备中。你现在仍可在浏览器中使用网页版核心能力。',
+	'downloadPage.windows.comingSoon': '敬请期待',
+	'downloadPage.linux.cardTitle': 'Linux',
+	'downloadPage.linux.cardDesc':
+		'Linux 桌面包正在评估中。欢迎先在浏览器端体验或通过源码自行构建。',
+	'downloadPage.linux.comingSoon': '敬请期待',
+	'downloadPage.requirements.title': '使用前提示',
+	'downloadPage.requirements.itemNet': '下载与首次配置需要可用的网络连接。',
+	'downloadPage.requirements.itemMac':
+		'macOS 建议使用较新系统版本，并为麦克风等权限按需授权。',
+	'downloadPage.requirements.itemAccount':
+		'部分功能需登录账号；未登录时知识库仍可本地使用。',
+	'downloadPage.toast.linkCopied': '下载链接已复制',
+	'downloadPage.toast.copyFailed': '复制失败，请手动选择链接',
 
 	'updateInfoPage.header.subtitle':
 		'能力说明随版本更新；与仓库内《更新信息》文档请保持同步。',

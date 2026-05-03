@@ -15,6 +15,7 @@ import { Outlet, useLocation, useNavigate } from 'react-router';
 import { ChatCoreProvider } from '@/contexts';
 import { useTheme } from '@/hooks';
 import { hasValidAuthToken, requiresAuthForPath } from '@/router/authPaths';
+import { isTauriRuntime } from '@/utils/runtime';
 
 /** 距容器中心归一化：中心 0、四角约 1，用于光圈随位置缩放 */
 // function pointerEdge01(xPct: number, yPct: number) {
@@ -71,7 +72,7 @@ const Layout = () => {
 
 	return (
 		<ChatCoreProvider>
-			<main className="w-full h-full flex rounded-md overflow-hidden bg-theme-background">
+			<main className="relative w-full h-full flex rounded-md overflow-hidden bg-theme-background">
 				<Sidebar />
 				<TooltipProvider>
 					<div
@@ -98,6 +99,17 @@ const Layout = () => {
 						</div>
 					</div>
 				</TooltipProvider>
+				{!isTauriRuntime() ? (
+					<footer className="absolute bottom-1 left-0 w-full text-right pr-6.5 text-xs text-textcolor/55">
+						<a
+							href="https://beian.miit.gov.cn/"
+							target="_blank"
+							rel="noopener noreferrer"
+						>
+							浙ICP备2024111222号-1
+						</a>
+					</footer>
+				) : null}
 			</main>
 		</ChatCoreProvider>
 	);

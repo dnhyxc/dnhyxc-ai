@@ -477,6 +477,7 @@ export const enUS = {
 		'A desktop AI workspace that unifies chat, coding, and documents. Switch seamlessly between capabilities—from idea to outcome, all in one place.',
 	'home.hero.quickStart': 'Get started',
 	'home.hero.learnMore': 'Learn more',
+	'home.hero.downloadDesktop': 'Download desktop app',
 	'home.features.enter': 'Enter',
 	'home.sections.showcase': 'Highlights',
 	'home.sections.steps': 'Quick start',
@@ -707,6 +708,61 @@ export const enUS = {
 	'route.legal.userAgreement': 'User service agreement',
 	'route.updateInfo.title': 'Release notes',
 	'route.projectGuide.title': 'Product guide',
+	'route.downloadDesktop.title': 'Download desktop app',
+
+	'downloadPage.hero.badge': 'Desktop · Stable',
+	'downloadPage.hero.title': 'Download dnhyxc-ai for desktop',
+	'downloadPage.hero.subtitle':
+		'Get the full macOS experience: global shortcuts, local folders, launch at login, and more. ',
+	'downloadPage.hero.versionLabel': 'v{version}',
+	'downloadPage.hero.dateLabel': 'Released: {date}',
+	'downloadPage.hero.primaryCtaMac': 'Download for macOS (DMG)',
+	'downloadPage.hero.copyLink': 'Copy link',
+	'downloadPage.hero.pickPlatform':
+		'Pick a platform below to see available installers.',
+	'downloadPage.links.releaseNotes': 'Release notes',
+	'downloadPage.links.userGuide': 'Product guide',
+	'downloadPage.links.backHome': 'Home',
+	'downloadPage.platforms.sectionLabel': 'Choose your platform',
+	'downloadPage.platforms.mac': 'macOS',
+	'downloadPage.platforms.windows': 'Windows',
+	'downloadPage.platforms.linux': 'Linux',
+	'downloadPage.mac.cardTitle': 'macOS (Apple silicon)',
+	'downloadPage.mac.cardDesc':
+		'Most users should grab the DMG. Prefer the .tar.gz if you need the updater channel layout.',
+	'downloadPage.mac.downloadDmg': 'Download .dmg',
+	'downloadPage.mac.downloadTarGz': 'Download .tar.gz (updater)',
+	'downloadPage.mac.stepInstall':
+		'Open the DMG and drag dnhyxc-ai into Applications, then launch from Launchpad.',
+	'downloadPage.mac.stepGatekeeper':
+		'If Gatekeeper blocks the app, allow it under System Settings → Privacy & Security, or right-click the app and choose Open.',
+	'downloadPage.mac.stepUpdater':
+		'The app can check for updates from About; see release notes on the site for highlights.',
+	'downloadPage.mac.noteIntel':
+		'This build targets Apple silicon (ARM64). Intel Mac support may arrive in a future release.',
+	'downloadPage.mac.noteSource':
+		'Binaries are served from GitHub Releases—if download is slow, try another network or retry later.',
+	'downloadPage.mac.historyIntro':
+		'“Browse all releases” to see every version and download attachments (including aarch64 DMGs).',
+	'downloadPage.mac.openLatestTag': 'Open latest tag',
+	'downloadPage.mac.openAllReleases': 'Browse all releases',
+	'downloadPage.windows.cardTitle': 'Windows',
+	'downloadPage.windows.cardDesc':
+		'A Windows installer is not available yet. You can keep using the web app for core workflows.',
+	'downloadPage.windows.comingSoon': 'Coming soon',
+	'downloadPage.linux.cardTitle': 'Linux',
+	'downloadPage.linux.cardDesc':
+		'Linux desktop packages are under consideration. Use the web app or build from source for now.',
+	'downloadPage.linux.comingSoon': 'Coming soon',
+	'downloadPage.requirements.title': 'Before you install',
+	'downloadPage.requirements.itemNet':
+		'You need a working network for download and first-run setup.',
+	'downloadPage.requirements.itemMac':
+		'Use a recent macOS version and grant permissions (e.g. microphone) when prompted.',
+	'downloadPage.requirements.itemAccount':
+		'Some features require sign-in; Knowledge still works locally when logged out.',
+	'downloadPage.toast.linkCopied': 'Download link copied',
+	'downloadPage.toast.copyFailed': 'Could not copy—select the link manually',
 
 	'updateInfoPage.header.subtitle':
 		'Capabilities change with releases — keep in sync with the repo notes.',

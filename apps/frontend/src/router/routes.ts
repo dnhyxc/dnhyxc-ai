@@ -1,6 +1,6 @@
 /**
  * 路由表。鉴权白名单（未登录可访问）见 `@/router/authPaths` 的 `isPublicPath`：
- * 首页 `/`、`/login`、`/win`、`/about`、`/service-policy`、`/user-agreement`、`/update-info`、`/project-guide`、`/share/:shareId`、`/setting` 及其子路径。
+ * 首页 `/`、`/login`、`/win`、`/about`、`/service-policy`、`/user-agreement`、`/update-info`、`/project-guide`、`/download-desktop`、`/share/:shareId`、`/setting` 及其子路径。
  */
 import React from 'react';
 import Layout from '@/layout';
@@ -11,6 +11,7 @@ import Chat from '@/views/chat';
 import NewChat from '@/views/chat/new';
 import Session from '@/views/chat/session';
 import Coding from '@/views/coding';
+import DesktopDownloadPage from '@/views/desktopDownload';
 import Document from '@/views/document';
 import Home from '@/views/home';
 import Knowledge from '@/views/knowledge';
@@ -190,6 +191,13 @@ const routes: RouteConfig[] = [
 		Component: ProjectGuidePage,
 		meta: {
 			titleKey: 'route.projectGuide.title',
+		},
+	},
+	{
+		path: '/download-desktop',
+		Component: DesktopDownloadPage,
+		meta: {
+			titleKey: 'route.downloadDesktop.title',
 		},
 	},
 	{

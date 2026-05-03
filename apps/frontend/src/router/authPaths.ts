@@ -11,7 +11,8 @@ export function isPublicPath(pathname: string): boolean {
 		pathname === '/service-policy' ||
 		pathname === '/user-agreement' ||
 		pathname === '/update-info' ||
-		pathname === '/project-guide'
+		pathname === '/project-guide' ||
+		pathname === '/download-desktop'
 	)
 		return true;
 	if (pathname === '/knowledge') return true;

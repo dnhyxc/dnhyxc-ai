@@ -11,8 +11,8 @@
 		"preview": "vite preview",
 		"tauri": "tauri",
 		"tauri:build": "tauri build --debug",
-		"pub": "dnhyxc-ci publish dnhyxcAI",
-		"deploy": "pnpm run build && pnpm pub",
+		"publish": "dnhyxc-ci publish dnhyxcAI",
+		"deploy": "pnpm run build && pnpm run publish",
 		"restart": "npx dnhyxc-ci restart server -rsc 'pm2 restart main'"
 	},
 	"dependencies": {

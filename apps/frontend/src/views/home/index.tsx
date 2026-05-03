@@ -16,6 +16,7 @@ import { useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router';
 import { useI18n } from '@/hooks';
 import { onListen, openExternalUrl } from '@/utils';
+import { getDesktopDownloadAbsoluteUrl } from '@/views/desktopDownload/paths';
 import { getProjectGuideAbsoluteUrl } from '@/views/projectGuide/paths';
 
 const Home = () => {
@@ -60,6 +61,8 @@ const Home = () => {
 				desc: t('home.steps.install.desc'),
 				icon: Rocket,
 				color: 'from-teal-500 to-cyan-600',
+				/** 在默认浏览器打开桌面端下载落地页 */
+				downloadDesktop: true,
 			},
 			{
 				step: '2',
@@ -76,7 +79,7 @@ const Home = () => {
 				color: 'from-orange-500 to-amber-500',
 			},
 		],
-		[t],
+		[t, locale],
 	);
 
 	const FEATURES = useMemo(() => {
@@ -354,6 +357,13 @@ const Home = () => {
 										transition={{ delay: idx * 0.06, duration: 0.35 }}
 										whileHover={{ scale: 1.01 }}
 										className="group relative flex cursor-pointer items-center rounded-md border border-transparent bg-theme-white/5 p-5 backdrop-blur-sm transition-all duration-300 hover:border-theme-white/12 hover:bg-theme-white/10 hover:shadow-lg hover:shadow-teal-500/10"
+										onClick={() => {
+											if (item.downloadDesktop) {
+												void openExternalUrl(
+													getDesktopDownloadAbsoluteUrl(locale),
+												);
+											}
+										}}
 									>
 										<div
 											className={`mr-4 flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-linear-to-br ${item.color} shadow-lg group-hover:shadow-xl md:mr-5`}

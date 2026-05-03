@@ -21,6 +21,8 @@
 		"latest": "pnpm --filter @dnhyxc-ai/scripts update-latest",
 		"upload": "pnpm --filter @dnhyxc-ai/scripts upload-to-release",
 		"upload-dmg": "pnpm --filter @dnhyxc-ai/scripts upload-dmg-to-release",
+		"publish": "pnpm -C apps/frontend run publish",
+		"deploy": "pnpm -C apps/frontend run build && pnpm run publish",
 		"update-wiki": "pnpm --filter @dnhyxc-ai/scripts sync-wiki-update-info",
 		"guide-wiki": "pnpm --filter @dnhyxc-ai/scripts sync-wiki-product-guide"
 	},
