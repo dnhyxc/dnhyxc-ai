@@ -10,7 +10,6 @@ import {
 	Bot,
 	CircleUserRound,
 	Codesandbox,
-	CreditCard,
 	House,
 	LogOut,
 	Package,
@@ -43,7 +42,6 @@ const Sidebar = () => {
 		Codesandbox: <Codesandbox />,
 		BookOpenText: <BookOpenText />,
 		WalletCards: <WalletCards />,
-		CreditCard: <CreditCard />,
 	};
 
 	const visibleMenus = useMemo(() => {

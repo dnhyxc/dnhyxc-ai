@@ -27,11 +27,16 @@ import {
 	Target,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { CHAT_VALIDTYPES } from '@/constant';
+import {
+	CHAT_VALIDTYPES,
+	PROFILE_VOICE_CONVERSION_CHANGED_EVENT,
+	PROFILE_VOICE_CONVERSION_ENABLED_KEY,
+} from '@/constant';
 import { cn } from '@/lib/utils';
 import { transcribeSpeechAudio } from '@/service';
 import { FileWithPreview, UploadedFile } from '@/types';
 import { Message } from '@/types/chat';
+import { getValue } from '@/utils';
 import {
 	formatGetUserMediaError,
 	patchNavigatorMediaDevices,
@@ -257,6 +262,9 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 	const isAtEnd =
 		scrollState.width > scrollState.clientWidth &&
 		scrollState.left + scrollState.clientWidth >= scrollState.width - 1;
+
+	/** 个人主页「语音转文字」总开关；关闭时桌面端行为与网页一致（仅文本发送） */
+	const [voiceConversionAllowed, setVoiceConversionAllowed] = useState(true);
 
 	/** 主发送区：文本（默认）或语音转写回填 */
 	const [inputMode, setInputMode] = useState<'text' | 'voice'>('text');
@@ -601,6 +609,42 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 		if (!isTauriRuntime()) setInputMode('text');
 	}, []);
 
+	useEffect(() => {
+		let cancelled = false;
+		void getValue<boolean>(PROFILE_VOICE_CONVERSION_ENABLED_KEY).then((v) => {
+			if (cancelled) return;
+			const allowed = v !== false;
+			setVoiceConversionAllowed(allowed);
+			if (!allowed && isTauriRuntime()) setInputMode('text');
+		});
+		return () => {
+			cancelled = true;
+		};
+	}, []);
+
+	useEffect(() => {
+		const onProfileVoice = (e: Event) => {
+			const allowed = (e as CustomEvent<boolean>).detail !== false;
+			setVoiceConversionAllowed(allowed);
+			if (!allowed && isTauriRuntime()) setInputMode('text');
+		};
+		window.addEventListener(
+			PROFILE_VOICE_CONVERSION_CHANGED_EVENT,
+			onProfileVoice,
+		);
+		return () =>
+			window.removeEventListener(
+				PROFILE_VOICE_CONVERSION_CHANGED_EVENT,
+				onProfileVoice,
+			);
+	}, []);
+
+	useEffect(() => {
+		if (!isTauriRuntime() || voiceConversionAllowed) return;
+		setInputMode('text');
+		void discardActiveVoiceCapture();
+	}, [voiceConversionAllowed, discardActiveVoiceCapture]);
+
 	/** 无正文（disableTextInput）时收起模式菜单；空闲语音态切回文本，避免麦钮被禁用后无法悬停打开菜单 */
 	useEffect(() => {
 		if (!disableTextInput) return;
@@ -689,7 +733,8 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 		voiceTranscribing,
 	]);
 
-	const voiceUiActive = isTauriRuntime() && inputMode === 'voice';
+	const voiceUiActive =
+		isTauriRuntime() && voiceConversionAllowed && inputMode === 'voice';
 	/** 语音模式空闲但输入框有内容时，主按钮展示为发送 */
 	const voicePrimaryShowsSend =
 		voiceUiActive &&
@@ -918,7 +963,7 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 								</span>
 							) : (
 								<div className="mb-1 flex items-center gap-1">
-									{isTauriRuntime() ? (
+									{isTauriRuntime() && voiceConversionAllowed ? (
 										<DropdownMenu
 											modal={false}
 											open={disableTextInput ? false : inputModeMenuOpen}

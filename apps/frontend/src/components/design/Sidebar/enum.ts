@@ -38,9 +38,9 @@ export const MENUS: SidebarMenuConfig[] = [
 	// 	icon: 'WalletCards',
 	// 	path: '/profile',
 	// },
-	{
-		nameKey: 'nav.pay',
-		icon: 'CreditCard',
-		path: '/pay',
-	},
+	// {
+	// 	nameKey: 'nav.pay',
+	// 	icon: 'CreditCard',
+	// 	path: '/pay',
+	// },
 ];

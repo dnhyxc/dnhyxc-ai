@@ -102,9 +102,11 @@ const Image = forwardRef<ImageHandle, ImageProps>(
 					<span className="text-textcolor/50 text-sm">
 						{t?.('image.loadFailed') ?? '图片加载失败'}
 					</span>
-					<div className="absolute inset-0 z-2 rounded-md w-full h-full bg-theme-background/50 items-center justify-center hidden group-hover:flex">
-						{children}
-					</div>
+					{children && (
+						<div className="absolute inset-0 z-2 rounded-md w-full h-full bg-theme-background/50 items-center justify-center hidden group-hover:flex">
+							{children}
+						</div>
+					)}
 					<ImagePreview
 						visible={visible}
 						selectedImage={{
@@ -133,9 +135,11 @@ const Image = forwardRef<ImageHandle, ImageProps>(
 					onError={handleError}
 					{...props}
 				/>
-				<div className="absolute inset-0 z-1 rounded-md w-full h-full bg-theme-background/50 items-center justify-center hidden group-hover:flex">
-					{children}
-				</div>
+				{children && (
+					<div className="absolute inset-0 z-1 rounded-md w-full h-full bg-theme-background/50 items-center justify-center hidden group-hover:flex">
+						{children}
+					</div>
+				)}
 				<ImagePreview
 					visible={visible}
 					selectedImage={{

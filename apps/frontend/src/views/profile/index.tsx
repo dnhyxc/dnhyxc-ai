@@ -1,423 +1,282 @@
+import Image from '@design/Image';
 import { Button } from '@ui/button';
-import { Input } from '@ui/input';
 import { ScrollArea } from '@ui/scroll-area';
-import { Toast } from '@ui/sonner';
-import * as qiniu from 'qiniu-js';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { ArrowRight, Check, CreditCard, Crown, Settings2 } from 'lucide-react';
+import { observer } from 'mobx-react';
+import { useMemo } from 'react';
 import { useNavigate } from 'react-router';
-import DragUpload from '@/components/design/DragUpload';
-import {
-	downloadFile as download,
-	downloadZip,
-	getUploadToken,
-	getUserProfile,
-} from '@/service';
-import type { DownloadProgress, DownloadResult } from '@/types';
-import {
-	createDownloadProgressListener,
-	createUnlistenFileInfoListener,
-	donwnloadWithUrl,
-	downloadBlob,
-	getValue,
-	onCreateWindow,
-	onEmit,
-	onListen,
-	saveFileWithPicker,
-} from '@/utils';
-import { isTauriRuntime } from '@/utils/runtime';
+import ICON from '@/assets/icon.png';
+import { useI18n } from '@/hooks';
+import { cn } from '@/lib/utils';
+import useStore from '@/store';
+import { resolveQiniuUrlForWebDisplay } from '@/utils';
 
-interface UploadInfo {
-	percent: number;
-	loaded: number;
-	size: number;
+const PROFILE_MEMBERSHIP_BENEFIT_KEYS = [
+	'profile.membership.benefit1',
+	'profile.membership.benefit2',
+	'profile.membership.benefit3',
+] as const;
+
+/** 从登录/用户信息中推断是否为付费会员（兼容多种后端字段命名） */
+function isPaidMemberFromUserInfo(u: object): boolean {
+	const r = u as Record<string, unknown>;
+	if (r.isMember === true || r.member === true || r.vip === true) return true;
+
+	const levelPositive = (v: unknown) =>
+		(typeof v === 'number' && v > 0) ||
+		(typeof v === 'string' &&
+			v.trim() !== '' &&
+			v !== '0' &&
+			!/^(free|none)$/i.test(v.trim()));
+
+	if (
+		levelPositive(r.membershipLevel) ||
+		levelPositive(r.memberLevel) ||
+		levelPositive(r.vipLevel)
+	)
+		return true;
+
+	const typeRaw = r.membershipType ?? r.memberType ?? r.userMemberType;
+	if (typeof typeRaw === 'string') {
+		const s = typeRaw.trim().toLowerCase();
+		if (['vip', 'pro', 'paid', 'premium', 'plus'].includes(s)) return true;
+	}
+	return false;
 }
 
-const Profile = () => {
-	const [greetMsg, setGreetMsg] = useState('');
-	const [downloadFileInfo, setDownloadFileInfo] = useState<DownloadResult[]>(
-		[],
-	);
-	const [downloadProgressInfo, setDownloadProgressInfo] = useState<
-		DownloadProgress[]
-	>([]);
-	const [url, setUrl] = useState(
-		'https://dnhyxc.cn:9216/files/__FILE__88872d9ec263023cc77d8df9595e69c2.pdf',
-	);
-	const [selectFile, setSelectFile] = useState<File | null>(null);
-	const [domainUrls, setDomainUrls] = useState<string[]>([]);
-	const [uploadInfos, setUploadInfos] = useState<UploadInfo[]>([]);
+function genderLabel(
+	gender: unknown,
+	t: (key: string, params?: Record<string, string | number>) => string,
+): string {
+	const g = gender === undefined || gender === null ? '' : String(gender);
+	if (g === '1' || g === 'male') return t('account.gender.male');
+	if (g === '2' || g === 'female') return t('account.gender.female');
+	return t('account.gender.secret');
+}
 
-	const fileInputRef = useRef<HTMLInputElement>(null);
-
+const Profile = observer(() => {
+	const { userStore } = useStore();
+	const { t, locale } = useI18n();
 	const navigate = useNavigate();
 
-	// 在组件中添加进度监听
-	useEffect(() => {
-		const unlistenProgress = createDownloadProgressListener(
-			setDownloadProgressInfo,
-		);
+	const u = userStore.userInfo;
+	const profile = u.profile;
+	const avatarSrc = profile?.avatar
+		? resolveQiniuUrlForWebDisplay(profile.avatar)
+		: ICON;
 
-		const unlistenDownloadInfo =
-			createUnlistenFileInfoListener(setDownloadFileInfo);
+	const rolesText = useMemo(() => {
+		if (!u.roles?.length) return '—';
+		return u.roles.map((r) => r.name).join(locale === 'zh-CN' ? '、' : ', ');
+	}, [u.roles, locale]);
 
-		const unlistenAboutPromise = onListen('about-send-message', (event) => {
-			console.log('about-send-message', event);
-		});
+	/** 与账号设置一致：优先 profile.address，兼容接口顶层 address */
+	const addressText = useMemo(() => {
+		const fromProfile = (profile as { address?: string }).address;
+		const fromUser = (u as { address?: string }).address;
+		const raw =
+			(typeof fromProfile === 'string' ? fromProfile : '') ||
+			(typeof fromUser === 'string' ? fromUser : '');
+		const trimmed = raw.trim();
+		return trimmed ? trimmed : '—';
+	}, [profile, u]);
 
-		const unlistenShortcut = onListen('shortcut-triggered', async (event) => {
-			if (event === 'new_workflow') {
-				Toast({
-					title: '快捷键触发',
-					type: 'success',
-					message: '新建工作流',
-				});
-			}
-			if (event === 'open_subwindow') {
-				const theme = (await getValue('theme')) as 'dark' | 'light';
-				onCreateWindow({
-					url: '/win',
-					width: 1000,
-					height: 690,
-					theme,
-				});
-			}
-		});
+	const isPaidMember = useMemo(() => isPaidMemberFromUserInfo(u), [u]);
 
-		return () => {
-			unlistenProgress.then((unlisten) => unlisten());
-			unlistenAboutPromise.then((unlisten) => unlisten());
-			unlistenDownloadInfo.then((unlisten) => unlisten());
-			unlistenShortcut.then((unlisten) => unlisten());
-		};
-	}, []);
-
-	const onOpenWindow = async () => {
-		const theme = (await getValue('theme')) as 'dark' | 'light';
-		onCreateWindow({
-			url: '/win',
-			width: 1000,
-			height: 690,
-			theme,
-		});
-	};
-
-	async function greet() {
-		if (!isTauriRuntime()) {
-			setGreetMsg('（浏览器预览：此演示需桌面客户端）');
-			return;
-		}
-		const { invoke } = await import('@tauri-apps/api/core');
-		const res: string = await invoke('greet_name', { name: url });
-		setGreetMsg(res);
-	}
-
-	function saveFile() {
-		saveFileWithPicker({
-			content: '这是一个测试文件',
-			file_name: 'document.txt',
-		});
-	}
-
-	// 下载文件
-	const downloadFile = async (url: string, filename?: string) => {
-		await donwnloadWithUrl({ url, file_name: filename }, setDownloadFileInfo);
-	};
-
-	const sendMessage = async () => {
-		await onEmit('message', {
-			message: 'hello world',
-		});
-	};
-
-	const getUserInfo = async () => {
-		const res = await getUserProfile(2);
-		Toast({
-			title: '获取用户信息成功!',
-			type: 'success',
-			message: res.data.username,
-		});
-	};
-
-	const onDownload = async () => {
-		const res = await download(
-			'0a6fad81-82d3-4598-8a55-f6dc326b1f61_128x128.png',
-		);
-		const downloadUrl = `${import.meta.env.VITE_DEV_DOMAIN}${res.data}`;
-		await donwnloadWithUrl({ url: downloadUrl });
-	};
-
-	const onDownloadZip = async () => {
-		const res = await downloadZip('ppp.pdf');
-		await downloadBlob(
+	const infoRows = useMemo(
+		() => [
 			{
-				file_name: 'test.zip',
-				overwrite: true,
-				id: Date.now().toString(),
+				label: t('account.fields.nickname'),
+				value: u.username?.trim() ? u.username : '—',
 			},
-			res.data,
+			{
+				label: t('account.fields.email'),
+				value: u.email?.trim() ? u.email : '—',
+			},
+			{
+				label: t('account.fields.gender'),
+				value: genderLabel(profile?.gender, t),
+			},
+			{
+				label: t('account.fields.address'),
+				value: addressText,
+			},
+			{
+				label: t('profile.fields.roles'),
+				value: rolesText,
+			},
+		],
+		[t, u.username, u.email, profile?.gender, rolesText, addressText],
+	);
+
+	const hasUser = u.id > 0;
+
+	if (!hasUser) {
+		return (
+			<div className="flex h-full w-full flex-col overflow-hidden m-0">
+				<ScrollArea className="h-full w-full overflow-y-auto p-2.5 rounded-none">
+					<div className="mx-auto flex max-w-lg flex-col items-center justify-center gap-4 rounded-md bg-theme-secondary px-8 py-16 text-center">
+						<p className="text-lg font-semibold text-default">
+							{t('profile.empty.title')}
+						</p>
+						<p className="text-sm text-textcolor/75">
+							{t('profile.empty.hint')}
+						</p>
+						<Button
+							className="mt-2 cursor-pointer"
+							onClick={() => navigate('/login')}
+						>
+							{t('profile.actions.goLogin')}
+						</Button>
+					</div>
+				</ScrollArea>
+			</div>
 		);
-	};
-
-	const onChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-		if (e.target.files?.[0]) {
-			setSelectFile(e.target.files?.[0]);
-		}
-	};
-
-	const observer = useMemo(() => {
-		return {
-			next(res: { total: UploadInfo }) {
-				setUploadInfos((prev) => [res.total, ...prev]);
-			},
-			error() {
-				// ...
-			},
-			complete(res: { key: string; hash: string }) {
-				const url = import.meta.env.VITE_QINIU_DOMAIN + res.key;
-				setDomainUrls((prev) => [url, ...prev]);
-			},
-		};
-	}, []);
-
-	const onSelectFile = () => {
-		fileInputRef?.current?.click();
-	};
-
-	const uploadFile = async (file: File) => {
-		const res = await getUploadToken();
-		const putExtra = {};
-		const config = {};
-		const observable = qiniu.upload(
-			file,
-			file.name,
-			res.data, // token
-			putExtra,
-			config,
-		);
-		observable.subscribe(observer); // 上传开始
-	};
-
-	const onUpload = async () => {
-		if (selectFile) {
-			uploadFile(selectFile);
-		}
-	};
+	}
 
 	return (
-		<div className="w-full h-full flex m-0 overflow-hidden">
-			<ScrollArea className="w-full overflow-y-auto p-2.5">
-				<h1 className="text-3xl font-bold mb-10 text-green-600">
-					Welcome to dnhyxc-ai
-					<Button
-						className="ml-5 cursor-pointer"
-						onClick={() => navigate('/account')}
+		<div className="flex h-full w-full flex-col overflow-hidden m-0">
+			<ScrollArea className="h-full w-full overflow-y-auto p-2.5 pt-0 rounded-none">
+				<div className="mx-auto flex w-full max-w-3xl flex-col gap-5 pb-10">
+					{/* 资料大卡：渐变顶栏 + 头像叠层 */}
+					<section
+						className={cn(
+							'overflow-hidden rounded-md border border-theme/15 bg-theme-secondary',
+						)}
 					>
-						修改个人信息
-					</Button>
-				</h1>
-				<div className="w-full h-full mb-10">
-					<DragUpload uploadFile={uploadFile} />
-					<Input
-						ref={fileInputRef}
-						type="file"
-						onChange={onChange}
-						placeholder="选择文件"
-						className="hidden"
-					/>
-					<div className="mt-5">
-						<Button className="mr-2 cursor-pointer" onClick={onSelectFile}>
-							选择文件
-						</Button>
-						<Button className="cursor-pointer" onClick={onUpload}>
-							上传
-						</Button>
-					</div>
-					{uploadInfos.length > 0
-						? uploadInfos.map((i, key) => {
-								return (
-									<div key={key}>
-										{i.size ? (
-											<div>文件大小：{Math.round(i.size / 1024)}KB</div>
-										) : null}
-										{i.percent ? (
-											<div>上传进度：{Math.round(i.percent)}%</div>
-										) : null}
+						<div className="relative px-5 py-5 sm:px-5">
+							{/* stretch：右侧栏与左侧头像区域同高；justify-between：上与头像顶对齐、下与头像底对齐 */}
+							<div className="flex flex-col items-center gap-5 sm:flex-row sm:items-stretch sm:gap-5">
+								<div className="flex shrink-0 flex-col items-center justify-start sm:items-start">
+									<div
+										className={cn(
+											'rounded-md border-4 border-theme-secondary bg-theme-secondary p-0.5',
+											'shadow-lg ring-1 ring-theme/10',
+										)}
+									>
+										<Image
+											src={avatarSrc}
+											fallbackSrc={ICON}
+											showOnError
+											className={cn(
+												'h-24 w-24 rounded-md object-cover sm:h-28 sm:w-28',
+												!profile?.avatar && 'object-contain p-4',
+											)}
+											alt=""
+										/>
 									</div>
-								);
-							})
-						: null}
-					{domainUrls.length > 0
-						? domainUrls.map((i, key) => {
-								return (
-									<div key={key}>
-										<img src={i} alt="图片" />
-									</div>
-								);
-							})
-						: null}
-				</div>
-				<div className="overflow-y-auto">
-					{downloadProgressInfo.map((i) => (
-						<div key={i.id}>
-							文件名称: {i.file_name}
-							下载进度: {i.percent}% 下载状态:{' '}
-							{i.success === 'success'
-								? '完成'
-								: i.success === 'start'
-									? '进行中'
-									: '失败'}
-						</div>
-					))}
-				</div>
-				{downloadProgressInfo.length > 0 && (
-					<div className="mb-8 w-full max-w-2xl">
-						<h3 className="text-lg font-bold mb-2">下载历史</h3>
-						<div className="space-y-2 max-h-60 overflow-y-auto">
-							{downloadProgressInfo.map((result, index) => (
-								<div
-									key={index}
-									className={`p-3 rounded border ${
-										result.success
-											? 'bg-green-50 border-green-200'
-											: 'bg-red-50 border-red-200'
-									}`}
-								>
-									<div className="flex justify-between items-center">
-										<span className="font-medium">
-											{result.success === 'success'
-												? '✅ 成功'
-												: result.success === 'start'
-													? '✨ 下载中'
-													: '❌ 失败'}
-										</span>
-										<span className="text-sm text-gray-500">
-											{result.file_size
-												? `${(result.file_size / 1024).toFixed(1)} KB`
-												: '未知大小'}
-										</span>
-									</div>
-									{result.file_name && (
-										<p className="text-sm truncate">
-											文件名: {result.file_name}
+								</div>
+								<div className="flex min-h-0 w-full flex-1 flex-col justify-between gap-3 text-center sm:w-auto sm:text-left">
+									<div className="min-w-0 space-y-1">
+										<div className="flex min-w-0 flex-wrap items-center justify-center gap-2 sm:justify-start">
+											<span className="truncate text-xl font-bold tracking-tight text-textcolor sm:text-3xl">
+												{u.username || t('nav.profile')}
+											</span>
+											{isPaidMember ? (
+												<span
+													className={cn(
+														'inline-flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-0.5',
+														'border-amber-500/40 bg-amber-500/12 text-xs font-semibold',
+														'text-amber-900 dark:text-amber-200',
+													)}
+												>
+													<Crown
+														className="size-3.5 shrink-0 opacity-90"
+														strokeWidth={2}
+														aria-hidden
+													/>
+													{t('profile.badge.member')}
+												</span>
+											) : (
+												<span
+													className={cn(
+														'inline-flex shrink-0 items-center rounded-md border px-2 py-0.5',
+														'border-theme/20 bg-theme/5 text-xs text-textcolor/60',
+													)}
+												>
+													{t('profile.badge.nonMember')}
+												</span>
+											)}
+										</div>
+										<p className="truncate text-base text-textcolor/70">
+											{u.email || '—'}
 										</p>
-									)}
-									<p className="text-sm">{result.message}</p>
+									</div>
+									<div className="flex flex-wrap items-center justify-center gap-3 sm:justify-start">
+										<Button
+											variant="default"
+											size="sm"
+											className="cursor-pointer gap-1.5 border-theme/25 shadow-sm"
+											onClick={() => navigate('/account')}
+										>
+											<Settings2 className="size-4 shrink-0" />
+											{t('profile.actions.editAccount')}
+										</Button>
+										<Button
+											variant="default"
+											size="sm"
+											className="cursor-pointer gap-1.5 font-semibold shadow-sm"
+											onClick={() => navigate('/pay')}
+										>
+											<CreditCard className="size-4 shrink-0" />
+											{t('profile.actions.buyMembership')}
+											<ArrowRight className="size-4 shrink-0 opacity-90" />
+										</Button>
+									</div>
+								</div>
+							</div>
+						</div>
+						<div className="border-t border-theme/10 px-5 py-4 sm:px-5">
+							<h3 className="mb-3 text-sm font-semibold text-textcolor">
+								{t('profile.membership.benefitsTitle')}
+							</h3>
+							<ul className="space-y-2.5 text-sm leading-relaxed text-textcolor/75">
+								{PROFILE_MEMBERSHIP_BENEFIT_KEYS.map((key) => (
+									<li key={key} className="flex gap-2.5">
+										<Check
+											className="mt-0.5 size-4 shrink-0 text-teal-500"
+											strokeWidth={2.5}
+											aria-hidden
+										/>
+										<span>{t(key)}</span>
+									</li>
+								))}
+							</ul>
+						</div>
+					</section>
+
+					{/* 基本信息独立卡片 */}
+					<section className="rounded-md border border-theme/15 bg-theme-secondary px-5 py-5">
+						<h2 className="mb-4 text-base font-semibold text-textcolor">
+							{t('profile.section.basic')}
+						</h2>
+						<dl className="grid gap-0 sm:grid-cols-1">
+							{infoRows.map((row) => (
+								<div
+									key={row.label}
+									className="flex flex-col gap-0.5 border-b border-theme/10 py-3 last:border-b-0 sm:flex-row sm:items-center sm:justify-between"
+								>
+									<dt
+										className={cn(
+											'text-sm text-textcolor/65',
+											locale === 'zh-CN'
+												? 'min-w-18 sm:min-w-24'
+												: 'sm:min-w-32',
+										)}
+									>
+										{row.label}
+									</dt>
+									<dd className="text-sm font-medium text-textcolor sm:text-right">
+										{row.value}
+									</dd>
 								</div>
 							))}
-						</div>
-					</div>
-				)}
-				{downloadFileInfo.length > 0 && (
-					<div className="mb-8 w-full max-w-2xl">
-						<h3 className="text-lg font-bold mb-2">下载历史-INFO</h3>
-						<div className="space-y-2 max-h-60 overflow-y-auto">
-							{downloadFileInfo.map((result, index) => (
-								<div
-									key={index}
-									className={`p-3 rounded border ${
-										result.success
-											? 'bg-green-50 border-green-200'
-											: 'bg-red-50 border-red-200'
-									}`}
-								>
-									<div className="flex justify-between items-center">
-										<span className="font-medium">
-											{result.success === 'success'
-												? '✅ 成功'
-												: result.success === 'error'
-													? '❌ 失败'
-													: '🚀 开始'}
-										</span>
-										<span className="text-sm text-gray-500">
-											{result.file_size
-												? `${(result.file_size / 1024).toFixed(1)} KB`
-												: '未知大小'}
-										</span>
-									</div>
-									{result.file_name && (
-										<p className="text-sm truncate">
-											文件名: {result.file_name}
-										</p>
-									)}
-									<p className="text-sm">{result.message}</p>
-								</div>
-							))}
-						</div>
-					</div>
-				)}
-				<form
-					className="flex justify-center"
-					onSubmit={(e) => {
-						e.preventDefault();
-						greet();
-					}}
-				>
-					<div className="flex gap-2 w-150">
-						<Input
-							id="greet-input"
-							value={url}
-							onChange={(e) => setUrl(e.currentTarget.value)}
-							placeholder="Enter a name..."
-						/>
-						<Button className="cursor-pointer">Greet</Button>
-					</div>
-				</form>
-				<p className="my-10 text-lg font-medium text-foreground">{greetMsg}</p>
-				<div className="flex justify-center items-center gap-4 mt-10">
-					<Button
-						variant="default"
-						className="cursor-pointer"
-						onClick={onOpenWindow}
-					>
-						Open Child Window
-					</Button>
-					<Button className="cursor-pointer" onClick={sendMessage}>
-						Send Message
-					</Button>
-					<Button className="cursor-pointer" onClick={getUserInfo}>
-						获取用户信息
-					</Button>
-				</div>
-				<div className="flex justify-center items-center gap-4 mt-10">
-					<Button
-						variant="default"
-						className="cursor-pointer"
-						onClick={saveFile}
-					>
-						Save File
-					</Button>
-					<Button
-						variant="default"
-						className="cursor-pointer"
-						onClick={() => downloadFile(url)}
-					>
-						download File
-					</Button>
-					<Button
-						variant="default"
-						className="cursor-pointer"
-						onClick={() => donwnloadWithUrl({ url })}
-					>
-						download pdf File with url
-					</Button>
-					<Button
-						variant="default"
-						className="cursor-pointer"
-						onClick={onDownload}
-					>
-						download file from network
-					</Button>
-					<Button
-						variant="default"
-						className="cursor-pointer"
-						onClick={onDownloadZip}
-					>
-						download zip file from network
-					</Button>
+						</dl>
+					</section>
 				</div>
 			</ScrollArea>
 		</div>
 	);
-};
+});
 
 export default Profile;

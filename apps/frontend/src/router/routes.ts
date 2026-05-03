@@ -13,6 +13,7 @@ import Session from '@/views/chat/session';
 import Coding from '@/views/coding';
 import DesktopDownloadPage from '@/views/desktopDownload';
 import Document from '@/views/document';
+import Download from '@/views/download';
 import Home from '@/views/home';
 import Knowledge from '@/views/knowledge';
 import LegalServicePolicy from '@/views/legal/servicePolicy';
@@ -90,6 +91,13 @@ const routes: RouteConfig[] = [
 				Component: Coding,
 				meta: {
 					titleKey: 'route.coding.title',
+				},
+			},
+			{
+				path: '/download',
+				Component: Download,
+				meta: {
+					titleKey: 'route.download.title',
 				},
 			},
 			{

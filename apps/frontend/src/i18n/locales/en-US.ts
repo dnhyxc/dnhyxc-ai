@@ -47,6 +47,31 @@ export const enUS = {
 	'nav.pay': 'Membership',
 	'nav.profile': 'Profile',
 
+	'profile.section.basic': 'Profile details',
+	'profile.section.voice': 'Voice input',
+	'profile.fields.roles': 'Roles',
+	'profile.badge.member': 'Member',
+	'profile.badge.nonMember': 'Free',
+	'profile.membership.title': 'Unlock membership benefits',
+	'profile.membership.desc':
+		'Purchase or renew your membership for more quota and perks. Checkout runs in a secure payment window.',
+	'profile.membership.benefitsTitle': 'Membership benefits',
+	'profile.membership.benefit1':
+		'Higher quota for chat, documents, and related features—fewer interruptions from limits.',
+	'profile.membership.benefit2':
+		'Pay through the embedded Stripe checkout—clear, traceable billing.',
+	'profile.membership.benefit3':
+		'Benefits evolve with the product; exact quota and terms are shown on the billing page.',
+	'profile.actions.buyMembership': 'Buy membership',
+	'profile.actions.editAccount': 'Edit account',
+	'profile.actions.goPay': 'Go to billing',
+	'profile.empty.title': 'No profile data yet',
+	'profile.empty.hint': 'Please sign in again.',
+	'profile.actions.goLogin': 'Sign in',
+	'profile.voice.desc':
+		'When enabled, desktop (Tauri) chat supports speech-to-text with live transcription into the input. When off, only text input and send are available.',
+	'profile.voice.enableLabel': 'Enable speech-to-text',
+
 	// 设置菜单文案
 	'setting.menu.system': 'System',
 	'setting.menu.theme': 'Theme',
