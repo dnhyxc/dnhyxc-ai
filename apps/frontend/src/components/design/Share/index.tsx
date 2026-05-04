@@ -1,5 +1,5 @@
 import Model from '@design/Model';
-import { Button, Spinner, Toast } from '@ui/index';
+import { Button, Spinner } from '@ui/index';
 import { CheckCircle, Copy } from 'lucide-react';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useParams } from 'react-router';
@@ -117,23 +117,24 @@ const Share: React.FC<ShareProps> = ({
 				data.messageIds = selected;
 			}
 		}
-		const res = await createShare(data);
-		setLoading(false);
-		if (res.success) {
-			// 以 store 为准，避免 useTheme 异步未完成时主题仍是默认值
-			const stored = (await getValue('themeType')) as ThemeName;
-			const themeName = THEMES.some((t) => t.name === stored) ? stored : theme;
-			const shareUrl = withAppLangInSearch(
-				appendShareThemeQuery(res.data.shareUrl, themeName),
-				locale,
-			);
-			setShareInfo({ ...res.data, shareUrl });
-			void onCopy(shareUrl);
-		} else {
-			Toast({
-				type: 'error',
-				title: res.message,
-			});
+		try {
+			const res = await createShare(data);
+			setLoading(false);
+			if (res.success) {
+				// 以 store 为准，避免 useTheme 异步未完成时主题仍是默认值
+				const stored = (await getValue('themeType')) as ThemeName;
+				const themeName = THEMES.some((t) => t.name === stored)
+					? stored
+					: theme;
+				const shareUrl = withAppLangInSearch(
+					appendShareThemeQuery(res.data.shareUrl, themeName),
+					locale,
+				);
+				setShareInfo({ ...res.data, shareUrl });
+				void onCopy(shareUrl);
+			}
+		} finally {
+			setLoading(false);
 		}
 	}, [
 		params?.id,

@@ -1127,7 +1127,7 @@ const Knowledge = observer(() => {
 							onSave={onSave}
 							onShareKnowledge={onShareKnowledge}
 							saveLoading={saveLoading}
-							showTrash={isCloudLoggedIn}
+							isCloudLoggedIn={isCloudLoggedIn}
 							shortcutHintSave={knowledgeChords.save}
 							shortcutHintClear={knowledgeChords.clear}
 							shortcutHintShare={knowledgeChords.share}

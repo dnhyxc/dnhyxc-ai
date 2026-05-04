@@ -4,6 +4,7 @@
 
 import {
 	Body,
+	ClassSerializerInterceptor,
 	Controller,
 	Delete,
 	Get,
@@ -11,8 +12,12 @@ import {
 	HttpStatus,
 	Param,
 	Post,
+	UseGuards,
+	UseInterceptors,
 } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { JwtGuard } from '../../guards/jwt.guard';
+import { ResponseInterceptor } from '../../interceptors/response.interceptor';
 import {
 	CreateShareDto,
 	CreateShareResponseDto,
@@ -22,6 +27,9 @@ import { ShareService } from './share.service';
 
 @ApiTags('分享')
 @Controller('/share')
+// ClassSerializerInterceptor 设置返回字段过滤，ResponseInterceptor 设置响应拦截器，统一响应的格式
+@UseInterceptors(ClassSerializerInterceptor, ResponseInterceptor)
+@UseGuards(JwtGuard)
 export class ShareController {
 	constructor(private readonly shareService: ShareService) {}
 

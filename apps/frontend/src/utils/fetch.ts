@@ -97,6 +97,20 @@ export interface RequestError {
 	success?: boolean;
 }
 
+/** 将后端/网络错误统一解析为 Toast 展示文案（与请求 catch 分支语义一致） */
+function resolveRequestErrorToastTitle(requestError: RequestError): string {
+	return (
+		normalizeErrorMessage(
+			requestError?.data?.data?.error?.message as UnknownErrorMessage,
+		) ||
+		normalizeErrorMessage(
+			requestError?.data?.data?.message as UnknownErrorMessage,
+		) ||
+		normalizeErrorMessage(requestError.message) ||
+		'请求接口异常'
+	);
+}
+
 // HTTP 请求类
 class HttpClient {
 	private baseURL: string;
@@ -475,22 +489,12 @@ class HttpClient {
 			if (isUnauthorized) {
 				this.setAuthToken('');
 				notifyUnauthorized();
-			} else {
-				console.log('requestError', requestError);
-				const title =
-					normalizeErrorMessage(
-						requestError?.data?.data?.error?.message as UnknownErrorMessage,
-					) ||
-					normalizeErrorMessage(
-						requestError?.data?.data?.message as UnknownErrorMessage,
-					) ||
-					normalizeErrorMessage(requestError.message) ||
-					'请求接口异常';
-				Toast({
-					type: 'error',
-					title,
-				});
 			}
+
+			Toast({
+				type: 'error',
+				title: resolveRequestErrorToastTitle(requestError),
+			});
 
 			// 抛出错误
 			throw requestError.data?.data || requestError;

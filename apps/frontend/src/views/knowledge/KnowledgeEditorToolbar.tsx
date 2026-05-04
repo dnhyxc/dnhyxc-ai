@@ -13,8 +13,8 @@ const KnowledgeEditorToolbar = (props: {
 	onShareKnowledge: () => void;
 	/** 保存请求进行中：禁用保存按钮 */
 	saveLoading?: boolean;
-	/** 未登录等场景隐藏回收站入口 */
-	showTrash?: boolean;
+	/** 是否登录云端 */
+	isCloudLoggedIn?: boolean;
 	/** 系统设置中配置的快捷键文案（用于 Tooltip） */
 	shortcutHintSave?: string;
 	shortcutHintClear?: string;
@@ -30,7 +30,7 @@ const KnowledgeEditorToolbar = (props: {
 		onSave,
 		onShareKnowledge,
 		saveLoading = false,
-		showTrash = true,
+		isCloudLoggedIn = false,
 		shortcutHintSave,
 		shortcutHintClear,
 		shortcutHintOpenLibrary,
@@ -69,15 +69,17 @@ const KnowledgeEditorToolbar = (props: {
 					<span className="mt-0.5">{t('knowledge.toolbar.clear')}</span>
 				</Button>
 			</Tooltip>
-			<Tooltip
-				side="bottom"
-				content={shortcutHintShare ?? t('knowledge.shortcuts.share')}
-			>
-				<Button variant="link" className={linkBtn} onClick={onShareKnowledge}>
-					<Share2 className="mt-0.5" />
-					<span className="mt-0.5">{t('knowledge.toolbar.share')}</span>
-				</Button>
-			</Tooltip>
+			{isCloudLoggedIn && (
+				<Tooltip
+					side="bottom"
+					content={shortcutHintShare ?? t('knowledge.shortcuts.share')}
+				>
+					<Button variant="link" className={linkBtn} onClick={onShareKnowledge}>
+						<Share2 className="mt-0.5" />
+						<span className="mt-0.5">{t('knowledge.toolbar.share')}</span>
+					</Button>
+				</Tooltip>
+			)}
 			<Tooltip
 				side="bottom"
 				content={
@@ -89,7 +91,7 @@ const KnowledgeEditorToolbar = (props: {
 					<span className="mt-0.5">{t('knowledge.toolbar.library')}</span>
 				</Button>
 			</Tooltip>
-			{showTrash ? (
+			{isCloudLoggedIn ? (
 				<Tooltip
 					side="bottom"
 					content={shortcutHintOpenTrash ?? t('knowledge.shortcuts.openTrash')}
