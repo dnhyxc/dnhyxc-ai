@@ -102,10 +102,10 @@ const KnowledgeListRow = (props: KnowledgeListRowProps) => {
 								type="button"
 								aria-label={t('knowledge.list.openInEditor')}
 								className={cn(
-									'cursor-pointer shrink-0 p-1 rounded-md text-textcolor/80 transition-opacity duration-150',
-									'opacity-0 pointer-events-none',
-									'hover:text-teal-400 hover:bg-theme/10',
-									'group-hover:opacity-100 group-hover:pointer-events-auto',
+									'absolute right-8 top-0 cursor-pointer shrink-0 h-7 w-7 rounded-md text-textcolor/80 transition-opacity duration-150',
+									'hidden group-hover:flex',
+									'items-center justify-center',
+									'hover:text-teal-500 hover:bg-teal-500/10',
 								)}
 								onClick={(e) => {
 									e.stopPropagation();
