@@ -1,0 +1,25 @@
+{
+	"root": ".",
+	"paths": {
+		"tauriConfig": "src-tauri/tauri.conf.json",
+		"latestJson": "latest.json",
+		"macosTarGz": "src-tauri/target/release/bundle/macos/dnhyxc-ai.app.tar.gz",
+		"macosSig": "src-tauri/target/release/bundle/macos/dnhyxc-ai.app.tar.gz.sig",
+		"dmgBundleDir": "src-tauri/target/release/bundle/dmg",
+		"wikiUpdateSourceMd": "../../docs/project-update-info.md",
+		"wikiGuideSourceMd": "../../docs/project-guide.md"
+	},
+	"latestJsonPlatformKey": "darwin-aarch64",
+	"wiki": {
+		"updateInfo": {
+			"owner": "dnhyxc",
+			"repo": "dnhyxc-ai",
+			"pageFile": "应用更新信息.md"
+		},
+		"guide": {
+			"owner": "dnhyxc",
+			"repo": "dnhyxc-ai-app",
+			"pageFile": "dnhyxc‐ai-项目介绍.md"
+		}
+	}
+}

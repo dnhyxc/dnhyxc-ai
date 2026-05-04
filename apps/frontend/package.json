@@ -13,7 +13,15 @@
 		"tauri:build": "tauri build --debug",
 		"publish": "dnhyxc-ci publish dnhyxcAI",
 		"deploy": "pnpm run build && pnpm run publish",
-		"restart": "npx dnhyxc-ci restart server -rsc 'pm2 restart main'"
+		"restart": "npx dnhyxc-ci restart server -rsc 'pm2 restart main'",
+		"release:bump": "release-kit bump-version patch",
+		"release:bump:minor": "release-kit bump-version minor",
+		"release:bump:major": "release-kit bump-version major",
+		"release:latest": "release-kit update-latest",
+		"release:upload": "release-kit upload-release",
+		"release:upload-dmg": "release-kit upload-dmg",
+		"release:wiki-update": "release-kit wiki-sync-update-info",
+		"release:wiki-guide": "release-kit wiki-sync-guide"
 	},
 	"dependencies": {
 		"@codemirror/state": "^6.5.2",
@@ -71,6 +79,7 @@
 		"zod": "^4.2.1"
 	},
 	"devDependencies": {
+		"@dnhyxc-ai/release-kit": "workspace:*",
 		"@tailwindcss/vite": "^4.1.18",
 		"@tauri-apps/cli": "^2",
 		"@types/crypto-js": "^4.2.2",

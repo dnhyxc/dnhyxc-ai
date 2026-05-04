@@ -1,0 +1,29 @@
+{
+	"_readme": "复制为 release-kit.config.json 并按项目修改；paths 内相对路径均相对于 root",
+	"root": ".",
+	"paths": {
+		"tauriConfig": "apps/frontend/src-tauri/tauri.conf.json",
+		"latestJson": "apps/frontend/latest.json",
+		"macosTarGz": "apps/frontend/src-tauri/target/release/bundle/macos/your-app.app.tar.gz",
+		"macosSig": "apps/frontend/src-tauri/target/release/bundle/macos/your-app.app.tar.gz.sig",
+		"dmgBundleDir": "apps/frontend/src-tauri/target/release/bundle/dmg",
+		"wikiUpdateSourceMd": "docs/project-update-info.md",
+		"wikiGuideSourceMd": "docs/project-guide.md"
+	},
+	"latestJsonPlatformKey": "darwin-aarch64",
+	"wiki": {
+		"updateInfo": {
+			"owner": "your-org",
+			"repo": "your-repo",
+			"pageFile": "Update-Info.md"
+		},
+		"guide": {
+			"owner": "your-org",
+			"repo": "your-product-repo",
+			"pageFile": "Product-Guide.md"
+		}
+	},
+	"upload": {
+		"extraFiles": []
+	}
+}
