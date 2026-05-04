@@ -3,24 +3,24 @@
 	"version": "0.0.1",
 	"type": "module",
 	"scripts": {
-		"bump-version": "tsx bump-version.ts",
-		"bump-version:patch": "tsx bump-version.ts patch",
-		"bump-version:minor": "tsx bump-version.ts minor",
-		"bump-version:major": "tsx bump-version.ts major",
-		"update-latest": "tsx update-latest.ts",
-		"upload-to-release": "tsx upload-to-release.ts",
-		"upload-dmg-to-release": "tsx upload-dmg-to-release.ts",
-		"sync-wiki-update-info": "tsx sync-wiki-update-info.ts",
-		"sync-wiki-product-guide": "tsx sync-wiki-product-guide.ts",
+		"bump-version": "tsx src/version/bump-version.ts",
+		"bump-version:patch": "tsx src/version/bump-version.ts patch",
+		"bump-version:minor": "tsx src/version/bump-version.ts minor",
+		"bump-version:major": "tsx src/version/bump-version.ts major",
+		"update-latest": "tsx src/release/update-latest.ts",
+		"upload-to-release": "tsx src/release/upload-to-release.ts",
+		"upload-dmg-to-release": "tsx src/release/upload-dmg-to-release.ts",
+		"sync-wiki-update-info": "tsx src/wiki/sync-wiki-update-info.ts",
+		"sync-wiki-product-guide": "tsx src/wiki/sync-wiki-product-guide.ts",
 		"export": "./export.sh --print"
 	},
 	"exports": {
-		"./bump-version": "./bump-version.ts",
-		"./update-latest": "./update-latest.ts",
-		"./upload-to-release": "./upload-to-release.ts",
-		"./upload-dmg-to-release": "./upload-dmg-to-release.ts",
-		"./sync-wiki-update-info": "./sync-wiki-update-info.ts",
-		"./sync-wiki-product-guide": "./sync-wiki-product-guide.ts"
+		"./bump-version": "./src/version/bump-version.ts",
+		"./update-latest": "./src/release/update-latest.ts",
+		"./upload-to-release": "./src/release/upload-to-release.ts",
+		"./upload-dmg-to-release": "./src/release/upload-dmg-to-release.ts",
+		"./sync-wiki-update-info": "./src/wiki/sync-wiki-update-info.ts",
+		"./sync-wiki-product-guide": "./src/wiki/sync-wiki-product-guide.ts"
 	},
 	"dependencies": {
 		"dotenv": "^17.2.3"

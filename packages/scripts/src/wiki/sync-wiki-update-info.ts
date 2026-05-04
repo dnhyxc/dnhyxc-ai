@@ -2,32 +2,18 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import dotenv from 'dotenv';
+import { DOC_PROJECT_UPDATE_INFO, SCRIPTS_ROOT } from '../lib/paths.ts';
 
-const _dirname = path.dirname(fileURLToPath(import.meta.url));
-
-dotenv.config({ path: path.join(_dirname, '.env') });
+dotenv.config({ path: path.join(SCRIPTS_ROOT, '.env') });
 dotenv.config();
 
 const TOKEN = process.env.GITHUB_TOKEN;
-
-/**
- * 目标：将 docs/project-guide.md 推送到 dnhyxc-ai-app 的 GitHub Wiki 页面。
- *
- * Wiki 页面 URL（slug）：
- *   dnhyxc‐ai-项目介绍
- *
- * GitHub Wiki 的文件名规则：
- * - 页面标题会映射为仓库根目录下的一个 .md 文件（通常与 slug 一致）
- * - 本脚本默认写入 `dnhyxc‐ai-项目介绍.md`
- * - 如你的 Wiki 实际文件名不同，可用环境变量覆盖
- */
-const OWNER = process.env.WIKI_APP_OWNER ?? 'dnhyxc';
-const REPO = process.env.WIKI_APP_REPO ?? 'dnhyxc-ai-app';
-const WIKI_PAGE_FILE =
-	process.env.WIKI_APP_INTRO_FILE ?? 'dnhyxc‐ai-项目介绍.md';
-const SOURCE_MD = path.resolve(_dirname, '../../docs/project-guide.md');
+const OWNER = process.env.WIKI_OWNER ?? process.env.OWNER ?? 'dnhyxc';
+const REPO = process.env.WIKI_REPO ?? process.env.APP_REPO ?? 'dnhyxc-ai';
+/** Wiki 页面 slug 为 【应用更新信息】 时对应的文件名 */
+const WIKI_PAGE_FILE = process.env.WIKI_UPDATE_INFO_FILE ?? '应用更新信息.md';
+const SOURCE_MD = DOC_PROJECT_UPDATE_INFO;
 
 function runGit(
 	cwd: string,
@@ -56,17 +42,17 @@ function wikiCloneUrl(): string {
 
 function main(): number {
 	if (
-		process.env.SKIP_WIKI_APP_SYNC === '1' ||
-		process.env.SKIP_WIKI_APP_SYNC === 'true'
+		process.env.SKIP_WIKI_SYNC === '1' ||
+		process.env.SKIP_WIKI_SYNC === 'true'
 	) {
-		console.log('⏭️  已设置 SKIP_WIKI_APP_SYNC，跳过 dnhyxc-ai-app Wiki 同步');
+		console.log('⏭️  已设置 SKIP_WIKI_SYNC，跳过 Wiki 同步');
 		return 0;
 	}
 
 	if (!TOKEN) {
 		console.error('❌ 未设置 GITHUB_TOKEN，无法推送 Wiki');
 		console.error(
-			'   需要具备目标仓库 Wiki 写权限的 PAT（Personal Access Token，个人访问令牌）',
+			'   与 upload-to-release 相同：需具备仓库写权限的 PAT（Personal Access Token，个人访问令牌）',
 		);
 		return 1;
 	}
@@ -82,9 +68,8 @@ function main(): number {
 
 	try {
 		console.log('');
-		console.log('📚 同步 Wiki：dnhyxc-ai-app 项目介绍');
+		console.log('📚 同步 Wiki：应用更新信息 ← docs/project-update-info.md');
 		console.log(`   仓库: ${OWNER}/${REPO}.wiki`);
-		console.log(`   页面文件: ${WIKI_PAGE_FILE}`);
 		console.log('');
 
 		const clone = runGit(tmpRoot, [
@@ -136,7 +121,7 @@ function main(): number {
 				`user.email=${authorEmail}`,
 				'commit',
 				'-m',
-				'docs: 同步产品功能与使用教程（PROJECT-GUIDE）',
+				'docs: 同步项目更新总览（project-update-info.md）',
 			],
 			{
 				GIT_AUTHOR_NAME: authorName,
@@ -164,14 +149,14 @@ function main(): number {
 			return 1;
 		}
 
-		console.log('✅ Wiki 已更新：dnhyxc-ai 项目介绍');
+		console.log('✅ Wiki 已更新: 应用更新信息');
 		console.log('');
 		return 0;
 	} finally {
 		try {
 			fs.rmSync(tmpRoot, { recursive: true, force: true });
 		} catch {
-			// 临时目录清理失败不影响已推送成功的结果
+			// 临时目录清理失败不影响已成功推送的结果
 		}
 	}
 }

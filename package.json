@@ -5,7 +5,7 @@
 	"type": "module",
 	"scripts": {
 		"dev": "pnpm -C apps/frontend tauri dev",
-		"build": "eval $(pnpm --filter @dnhyxc-ai/scripts --silent export) && pnpm --filter @dnhyxc-ai/scripts bump-version && pnpm -C apps/frontend tauri build && pnpm --filter @dnhyxc-ai/scripts update-latest && pnpm --filter @dnhyxc-ai/scripts upload-to-release && pnpm --filter @dnhyxc-ai/scripts upload-dmg-to-release",
+		"build": "pnpm run build:patch",
 		"build:patch": "eval $(pnpm --filter @dnhyxc-ai/scripts --silent export) && pnpm --filter @dnhyxc-ai/scripts bump-version:patch && pnpm -C apps/frontend tauri build && pnpm --filter @dnhyxc-ai/scripts update-latest && pnpm --filter @dnhyxc-ai/scripts upload-to-release && pnpm --filter @dnhyxc-ai/scripts upload-dmg-to-release",
 		"build:minor": "eval $(pnpm --filter @dnhyxc-ai/scripts --silent export) && pnpm --filter @dnhyxc-ai/scripts bump-version:minor && pnpm -C apps/frontend tauri build && pnpm --filter @dnhyxc-ai/scripts update-latest && pnpm --filter @dnhyxc-ai/scripts upload-to-release && pnpm --filter @dnhyxc-ai/scripts upload-dmg-to-release",
 		"build:major": "eval $(pnpm --filter @dnhyxc-ai/scripts --silent export) && pnpm --filter @dnhyxc-ai/scripts bump-version:major && pnpm -C apps/frontend tauri build && pnpm --filter @dnhyxc-ai/scripts update-latest && pnpm --filter @dnhyxc-ai/scripts upload-to-release && pnpm --filter @dnhyxc-ai/scripts upload-dmg-to-release",

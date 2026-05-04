@@ -1,21 +1,9 @@
 import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-const TAURI_CONFIG_PATH = path.resolve(
-	__dirname,
-	'../../apps/frontend/src-tauri/tauri.conf.json',
-);
-const LATEST_JSON_PATH = path.resolve(
-	__dirname,
-	'../../apps/frontend/latest.json',
-);
-const SIG_FILE_PATH = path.resolve(
-	__dirname,
-	'../../apps/frontend/src-tauri/target/release/bundle/macos/dnhyxc-ai.app.tar.gz.sig',
-);
+import {
+	LATEST_JSON_PATH,
+	MACOS_SIG_PATH,
+	TAURI_CONFIG_PATH,
+} from '../lib/paths.ts';
 
 function updateLatestJson() {
 	const tauriConfig = JSON.parse(fs.readFileSync(TAURI_CONFIG_PATH, 'utf-8'));
@@ -25,8 +13,8 @@ function updateLatestJson() {
 	latestJson.version = version;
 	latestJson.pub_date = new Date().toISOString();
 
-	if (fs.existsSync(SIG_FILE_PATH)) {
-		const signature = fs.readFileSync(SIG_FILE_PATH, 'utf-8').trim();
+	if (fs.existsSync(MACOS_SIG_PATH)) {
+		const signature = fs.readFileSync(MACOS_SIG_PATH, 'utf-8').trim();
 		if (!latestJson.platforms) {
 			latestJson.platforms = {};
 		}

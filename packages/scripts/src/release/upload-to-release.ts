@@ -1,13 +1,10 @@
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import dotenv from 'dotenv';
+import { LATEST_JSON_PATH, MACOS_TAR_GZ_PATH } from '../lib/paths.ts';
 import {
 	getReleaseId,
 	type ReleaseUploadConfig,
 	uploadToRelease,
 } from './github-release-upload.ts';
-
-const _dirname = path.dirname(fileURLToPath(import.meta.url));
 
 dotenv.config();
 
@@ -15,13 +12,7 @@ const TOKEN = process.env.GITHUB_TOKEN;
 const OWNER = process.env.OWNER;
 const REPO = process.env.APP_REPO;
 const TAG = process.env.APP_TAG || 'latest';
-const FILE_PATHS = [
-	path.resolve(
-		_dirname,
-		'../../apps/frontend/src-tauri/target/release/bundle/macos/dnhyxc-ai.app.tar.gz',
-	),
-	path.resolve(_dirname, '../../apps/frontend/latest.json'),
-];
+const FILE_PATHS = [MACOS_TAR_GZ_PATH, LATEST_JSON_PATH];
 
 async function main() {
 	if (!TOKEN) {

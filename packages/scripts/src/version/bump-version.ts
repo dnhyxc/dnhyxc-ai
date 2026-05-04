@@ -1,13 +1,5 @@
 import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
-const TAURI_CONFIG_PATH = path.resolve(
-	__dirname,
-	'../../apps/frontend/src-tauri/tauri.conf.json',
-);
+import { TAURI_CONFIG_PATH } from '../lib/paths.ts';
 
 type SemverBump = 'patch' | 'minor' | 'major';
 
@@ -54,8 +46,8 @@ function parseBumpArg(): SemverBump {
 	}
 	console.error(
 		`未知的递增类型: "${raw}"。请使用: patch | minor | major\n` +
-			'  示例: pnpm -C packages/scripts tsx bump-version.ts minor\n' +
-			'  或: RELEASE_TYPE=major pnpm -C packages/scripts tsx bump-version.ts',
+			'  示例: pnpm -C packages/scripts tsx src/version/bump-version.ts minor\n' +
+			'  或: RELEASE_TYPE=major pnpm -C packages/scripts tsx src/version/bump-version.ts',
 	);
 	process.exit(1);
 }
