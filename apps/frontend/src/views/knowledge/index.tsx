@@ -82,8 +82,20 @@ const Knowledge = observer(() => {
 	const [clearDocumentNonce, setClearDocumentNonce] = useState(0);
 	/** 受控：避免 `documentIdentity` 因清空而变时 Monaco 内部把助手关掉并切回「纯分屏预览」 */
 	const [markdownAssistantOpen, setMarkdownAssistantOpen] = useState(false);
+	const markdownAssistantOpenRef = useRef(markdownAssistantOpen);
+	markdownAssistantOpenRef.current = markdownAssistantOpen;
 	/** 保存前从 Monaco 同步正文，避免 onChange 经 rAF 合并时 store 滞后导致脏检查误判 */
 	const getMarkdownFromEditorRef = useRef<(() => string) | null>(null);
+	/**
+	 * 「复制选中内容到助手」重复写入防护：
+	 * - 右键菜单项在同一次点击链路里可能出现两次 onSelect（或与快捷键链路极短时间叠加）
+	 * - 先用 rAF 合并同帧多次调用，再对相同文本做短时去重，避免输入框出现两段完全相同内容
+	 */
+	const pendingAssistantInsertRef = useRef<string | null>(null);
+	const assistantInsertFlushRafRef = useRef(0);
+	const lastAssistantInsertRef = useRef<{ text: string; at: number } | null>(
+		null,
+	);
 
 	const [knowledgeChords, setKnowledgeChords] = useState<{
 		save: string;
@@ -164,6 +176,47 @@ const Knowledge = observer(() => {
 		[],
 	);
 
+	/**
+	 * 将待插入的助手输入内容刷新到助手输入框中。
+	 *
+	 * 逻辑说明：
+	 * 1. 清空当前 requestAnimationFrame id 引用。
+	 * 2. 取出 pendingAssistantInsertRef.current 所保存的文本，并立即清空它，避免重复插入。
+	 * 3. 若没有待插入内容则直接返回。
+	 * 4. 若上一条插入内容与当前相同，且两次操作间隔小于 160ms，则不做任何处理（防抖以避免短时间内重复插入）。
+	 * 5. 否则，记录本次插入内容和时间。
+	 * 6. 若助手输入框已有内容则用两行换行追加，否则直接写入内容。
+	 * 7. 如助手面板未打开，在本轮 microtask 末尾自动展开助手面板（不阻塞主流程）。
+	 */
+	const flushAssistantInsertFromEditor = useCallback(() => {
+		// 重置动画帧调用的 id，防止残留
+		assistantInsertFlushRafRef.current = 0;
+		const next = pendingAssistantInsertRef.current;
+		// 清空待插入内容，防止被多次消费
+		pendingAssistantInsertRef.current = null;
+		if (!next) return; // 没有新内容则返回
+
+		const now = performance.now();
+		const last = lastAssistantInsertRef.current;
+		// 防抖逻辑：短时间内重复内容不插入
+		if (last && last.text === next && now - last.at < 160) {
+			return;
+		}
+		// 记录本次插入内容和时间
+		lastAssistantInsertRef.current = { text: next, at: now };
+
+		// 设置助手输入框内容，已有内容则追加换行
+		setAssistantInput((prev) => {
+			const cur = (prev ?? '').trim();
+			return cur ? `${cur}\n\n${next}` : next;
+		});
+
+		// 如果助手面板当前是关闭状态，则在微任务末尾打开
+		if (!markdownAssistantOpenRef.current) {
+			queueMicrotask(() => setMarkdownAssistantOpen(true));
+		}
+	}, []);
+
 	// 将编辑器选区写入助手输入框
 	const onInsertSelectionToAssistant = useCallback(
 		(text: string | undefined | null) => {
@@ -175,18 +228,22 @@ const Knowledge = observer(() => {
 			 * 因此这里先强制从 Editor 同步最新正文，再写入输入框，最后再打开助手面板。
 			 */
 			getMarkdownFromEditorRef.current?.();
-			setAssistantInput((prev) => {
-				const next = (text ?? '').trim();
-				if (!next) return prev;
-				const cur = (prev ?? '').trim();
-				return cur ? `${cur}\n\n${next}` : next;
+			const next = (text ?? '').trim();
+			if (!next) return;
+			pendingAssistantInsertRef.current = next;
+			cancelAnimationFrame(assistantInsertFlushRafRef.current);
+			assistantInsertFlushRafRef.current = requestAnimationFrame(() => {
+				flushAssistantInsertFromEditor();
 			});
-			if (!markdownAssistantOpen) {
-				queueMicrotask(() => setMarkdownAssistantOpen(true));
-			}
 		},
-		[markdownAssistantOpen],
+		[flushAssistantInsertFromEditor],
 	);
+
+	useEffect(() => {
+		return () => {
+			cancelAnimationFrame(assistantInsertFlushRafRef.current);
+		};
+	}, []);
 
 	const reloadKnowledgeChords = useCallback(async () => {
 		const c = await loadKnowledgeShortcutChords();
