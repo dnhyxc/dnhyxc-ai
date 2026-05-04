@@ -36,7 +36,10 @@ import {
 	KNOWLEDGE_LOCAL_MD_ID_PREFIX,
 	TAURI_KNOWLEDGE_DIR,
 } from './constants';
-import KnowledgeAssistant from './KnowledgeAssistant';
+import KnowledgeAssistant, {
+	type KnowledgeAssistantMode,
+	readKnowledgeAssistantPanelMode,
+} from './KnowledgeAssistant';
 import KnowledgeEditorToolbar from './KnowledgeEditorToolbar';
 import KnowledgeList from './KnowledgeList';
 import KnowledgeTrashList from './KnowledgeTrashList';
@@ -65,6 +68,11 @@ const Knowledge = observer(() => {
 	const { t } = useI18n();
 	const { theme } = useTheme();
 	const [assistantInput, setAssistantInput] = useState('');
+	const [ragAssistantInput, setRagAssistantInput] = useState('');
+	/** 与 KnowledgeAssistant 内 AI/RAG 切换同步，供「复制选中内容到助手」写入对应输入框 */
+	const knowledgeAssistantModeRef = useRef<KnowledgeAssistantMode>(
+		readKnowledgeAssistantPanelMode(),
+	);
 
 	const [shareOpen, setShareOpen] = useState(false);
 	const shareCheckedMessages = useMemo(() => new Set<string>(), []);
@@ -185,7 +193,7 @@ const Knowledge = observer(() => {
 	 * 3. 若没有待插入内容则直接返回。
 	 * 4. 若上一条插入内容与当前相同，且两次操作间隔小于 160ms，则不做任何处理（防抖以避免短时间内重复插入）。
 	 * 5. 否则，记录本次插入内容和时间。
-	 * 6. 若助手输入框已有内容则用两行换行追加，否则直接写入内容。
+	 * 6. 按当前助手模式写入 AI 输入框或 RAG 输入框；若已有内容则用两行换行追加，否则直接写入。
 	 * 7. 如助手面板未打开，在本轮 microtask 末尾自动展开助手面板（不阻塞主流程）。
 	 */
 	const flushAssistantInsertFromEditor = useCallback(() => {
@@ -205,11 +213,16 @@ const Knowledge = observer(() => {
 		// 记录本次插入内容和时间
 		lastAssistantInsertRef.current = { text: next, at: now };
 
-		// 设置助手输入框内容，已有内容则追加换行
-		setAssistantInput((prev) => {
+		const appendBlock = (prev: string) => {
 			const cur = (prev ?? '').trim();
 			return cur ? `${cur}\n\n${next}` : next;
-		});
+		};
+
+		if (knowledgeAssistantModeRef.current === 'rag') {
+			setRagAssistantInput((prev) => appendBlock(prev));
+		} else {
+			setAssistantInput((prev) => appendBlock(prev));
+		}
 
 		// 如果助手面板当前是关闭状态，则在微任务末尾打开
 		if (!markdownAssistantOpenRef.current) {
@@ -293,6 +306,7 @@ const Knowledge = observer(() => {
 	// 切换知识文档（binding 变化）时清空助手输入框，避免把上一篇草稿带到下一篇
 	useEffect(() => {
 		setAssistantInput('');
+		setRagAssistantInput('');
 	}, [assistantArticleBinding]);
 
 	/** 清空标题与正文（store 级草稿，与 markdown 一并清除） */
@@ -1175,6 +1189,11 @@ const Knowledge = observer(() => {
 								)}
 								input={assistantInput}
 								setInput={setAssistantInput}
+								ragInput={ragAssistantInput}
+								setRagInput={setRagAssistantInput}
+								onAssistantModeChange={(mode) => {
+									knowledgeAssistantModeRef.current = mode;
+								}}
 							/>
 						) : null
 					}

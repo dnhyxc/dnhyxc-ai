@@ -14,7 +14,9 @@ import {
 } from 'lucide-react';
 import { observer } from 'mobx-react';
 import {
+	type Dispatch,
 	type RefObject,
+	type SetStateAction,
 	type UIEvent,
 	useCallback,
 	useEffect,
@@ -53,6 +55,8 @@ import {
 	isKnowledgeLocalMarkdownId,
 } from './utils';
 
+export type KnowledgeAssistantMode = 'ai' | 'rag';
+
 interface KnowledgeAssistantProps {
 	/** 与 MarkdownEditor `documentIdentity` 一致，用于绑定助手多轮会话 */
 	documentKey: string;
@@ -61,14 +65,28 @@ interface KnowledgeAssistantProps {
 	 * 若不传则组件内部维护 input state。
 	 */
 	input?: string;
-	setInput?: (value: string) => void;
+	setInput?: Dispatch<SetStateAction<string>>;
+	/**
+	 * 外部受控 RAG 输入框（可选）：与 input 一致，供「复制选中内容到助手」写入 RAG 模式草稿。
+	 */
+	ragInput?: string;
+	setRagInput?: Dispatch<SetStateAction<string>>;
+	/** 当前面板为 AI / RAG 时通知父级，便于外部写入对应输入框 */
+	onAssistantModeChange?: (mode: KnowledgeAssistantMode) => void;
 }
 
 type KnowledgeAssistantScrollCornerFabMode = 'hidden' | 'toBottom' | 'toTop';
 
-/** 仅 UI：助手模式偏好，写入 localStorage */
-const KNOWLEDGE_ASSISTANT_MODE_KEY = 'knowledge-assistant-mode';
-type KnowledgeAssistantMode = 'ai' | 'rag';
+/** 仅 UI：助手模式偏好，写入 localStorage（与知识页父组件读取保持一致） */
+export const KNOWLEDGE_ASSISTANT_MODE_STORAGE_KEY = 'knowledge-assistant-mode';
+
+/** 与初次挂载时组件内 state 初始化逻辑一致，供父组件初始化「当前模式」ref */
+export function readKnowledgeAssistantPanelMode(): KnowledgeAssistantMode {
+	if (typeof window === 'undefined') return 'ai';
+	return localStorage.getItem(KNOWLEDGE_ASSISTANT_MODE_STORAGE_KEY) === 'rag'
+		? 'rag'
+		: 'ai';
+}
 
 const selectAssistantMessageByChatId: SelectMessageByChatId = (chatId) =>
 	assistantStore.messages.find((m) => m.chatId === chatId);
@@ -81,6 +99,9 @@ const KnowledgeAssistant = observer(
 		documentKey,
 		input: inputProp,
 		setInput: setInputProp,
+		ragInput: ragInputProp,
+		setRagInput: setRagInputProp,
+		onAssistantModeChange,
 	}: KnowledgeAssistantProps) => {
 		const { knowledgeStore, userStore } = useStore();
 		const { t } = useI18n();
@@ -89,18 +110,16 @@ const KnowledgeAssistant = observer(
 		const input = inputProp ?? internalInput;
 		const setInput = setInputProp ?? setInternalInput;
 		const [assistantMode, setAssistantModeState] =
-			useState<KnowledgeAssistantMode>(() => {
-				if (typeof window === 'undefined') return 'ai';
-				const v = localStorage.getItem(KNOWLEDGE_ASSISTANT_MODE_KEY);
-				return v === 'rag' ? 'rag' : 'ai';
-			});
+			useState<KnowledgeAssistantMode>(readKnowledgeAssistantPanelMode);
 		const setAssistantMode = useCallback((m: KnowledgeAssistantMode) => {
 			setAssistantModeState(m);
 			if (typeof window !== 'undefined') {
-				localStorage.setItem(KNOWLEDGE_ASSISTANT_MODE_KEY, m);
+				localStorage.setItem(KNOWLEDGE_ASSISTANT_MODE_STORAGE_KEY, m);
 			}
 		}, []);
-		const [ragInput, setRagInput] = useState('');
+		const [internalRagInput, setInternalRagInput] = useState('');
+		const ragInput = ragInputProp ?? internalRagInput;
+		const setRagInput = setRagInputProp ?? setInternalRagInput;
 		const isRagMode = assistantMode === 'rag';
 		const [isCopyedId, setIsCopyedId] = useState('');
 		const [scrollCornerFabMode, setScrollCornerFabMode] =
@@ -114,6 +133,10 @@ const KnowledgeAssistant = observer(
 
 		const isLoggedIn = Boolean(userStore.userInfo?.id);
 		const editorHasBody = Boolean((knowledgeStore.markdown ?? '').trim());
+
+		useLayoutEffect(() => {
+			onAssistantModeChange?.(assistantMode);
+		}, [assistantMode, onAssistantModeChange]);
 
 		useEffect(() => {
 			return () => {
