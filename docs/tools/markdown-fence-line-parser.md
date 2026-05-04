@@ -61,7 +61,7 @@
 
 4. **Monaco 侧**  
    - `markdown` **不在** `LANGUAGES_WITH_FORMAT` 中，不注册文档格式化 Provider。  
-   - `Shift+Alt+F`：若 `languageId === 'markdown'`，调用 `safeFormatMarkdownValue` + `executeEdits`；否则仍触发 `formatDocument`（Prettier）。
+   - `⌘/Ctrl+Shift+F`：若 `languageId === 'markdown'`，调用 `safeFormatMarkdownValue` + `executeEdits`；否则仍触发 `formatDocument`（Prettier）。
 
 ---
 
@@ -249,7 +249,7 @@ return { prefix, body, openLine: i };
 | 行号（约） | 说明 |
 |------------|------|
 | 58–61 | 从 `./format` 引入 `registerPrettierFormatProviders`、`safeFormatMarkdownValue`。 |
-| 853–854 | 注册 `Shift+Alt+F`。 |
+| 853–854 | 注册 `⌘/Ctrl+Shift+F`（实现位于 `commands.ts`）。 |
 | 856–857 | 取 model，无则返回。 |
 | 858 | 仅 Markdown 模型走安全分支。 |
 | 859 | 只读不写。 |

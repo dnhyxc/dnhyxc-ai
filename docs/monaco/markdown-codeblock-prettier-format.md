@@ -30,8 +30,8 @@
 Monaco 里“格式化”可能来自两条入口：
 
 1. **自定义快捷键入口**（推荐、可控）
-   - `apps/frontend/src/components/design/Monaco/index.tsx`
-   - 绑定 `Shift + Alt + F`
+   - `apps/frontend/src/components/design/Monaco/commands.ts`（`editor.addCommand`）
+   - 绑定 **`⌘+Shift+F`（macOS）/ `Ctrl+Shift+F`（Windows/Linux）**
    - 当当前 model 的 `languageId === 'markdown'` 时，调用 `safeFormatMarkdownValue()`
 
 2. **Monaco Provider 入口**（右键/命令面板/默认行为）
@@ -143,7 +143,7 @@ const formatted = await format(value, {
 
 ## 6. 自定义快捷键入口：保证撤销栈与只读安全
 
-实现位置：`apps/frontend/src/components/design/Monaco/index.tsx`
+实现位置：`apps/frontend/src/components/design/Monaco/commands.ts`
 
 关键点：
 
@@ -154,7 +154,7 @@ const formatted = await format(value, {
 
 ```ts
 editor.addCommand(
-  monaco.KeyMod.Shift | monaco.KeyMod.Alt | monaco.KeyCode.KeyF,
+  monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyF,
   () => {
     const model = editor.getModel();
     if (!model) return;

@@ -304,6 +304,6 @@
 - split 跟滚四种模式工作正常；bidirectional 不抖动
 - Diff：空对空不可进；persisted 基线非空可展示全量删除；多次进入不复用旧内容
 - Ctrl/Cmd+Shift+V：无选区不触发；有选区写入助手且触发前会先同步父级内容
-- Shift+Alt+F：markdown 安全格式化不破坏围栏；其它语言格式化可用
+- ⌘/Ctrl+Shift+F：markdown 安全格式化不破坏围栏；其它语言格式化可用
 - 底部操作栏可拖拽且不超出编辑器；收起后不再响应拖动；复位可恢复默认位置
 

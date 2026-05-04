@@ -581,6 +581,18 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 		registerMonacoGlassThemes(monaco);
 		registerPrettierFormatProviders(monaco);
 		registerMarkdownFenceEmbeddedHighlight(monaco);
+		/**
+		 * 去掉 Monaco 默认的 Shift+Alt+F（macOS 即 Option+Shift+F）→「格式化文档」。
+		 * 产品统一使用 ⌘/Ctrl+Shift+F（见 `commands.ts`）；保留默认绑定会导致旧快捷键仍触发内置 formatDocument，
+		 * 与 Markdown 安全格式化路径不一致。
+		 */
+		monaco.editor.addKeybindingRules([
+			{
+				keybinding:
+					monaco.KeyMod.Shift | monaco.KeyMod.Alt | monaco.KeyCode.KeyF,
+				command: '-editor.action.formatDocument',
+			},
+		]);
 	}, []);
 
 	if (lastPathForBootstrapRef.current !== monacoModelPath) {
@@ -1216,7 +1228,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 				pasteFromClipboard,
 				/**
 				 * Markdown 安全格式化（safe format）：
-				 * - 用于 Shift+Alt+F：当语言是 markdown 时走“安全格式化”，避免围栏反引号/缩进等被错误破坏
+				 * - 用于 ⌘/Ctrl+Shift+F：当语言是 markdown 时走“安全格式化”，避免围栏反引号/缩进等被错误破坏
 				 * - 非 markdown 时回落到 Monaco 默认 `editor.action.formatDocument`
 				 */
 				safeFormatMarkdownValue,

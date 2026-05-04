@@ -111,12 +111,12 @@ export function registerMonacoEditorCommands(params: {
 	} = params;
 
 	/**
-	 * Shift+Alt+F：格式化文档
+	 * ⌘/Ctrl+Shift+F：格式化文档（与右键菜单「格式化」文案一致）
 	 * - Markdown：走安全格式化（避免围栏反引号数量等问题）
 	 * - 其它语言：走 Monaco 默认 formatDocument
 	 */
 	editor.addCommand(
-		monaco.KeyMod.Shift | monaco.KeyMod.Alt | monaco.KeyCode.KeyF,
+		monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyF,
 		() => {
 			const model = editor.getModel();
 			if (!model) return;

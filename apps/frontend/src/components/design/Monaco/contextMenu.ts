@@ -6,6 +6,11 @@ function shortcutHintCtrlOrCmdShiftV(): string {
 	return isMacLike() ? '⌘+Shift+V' : 'Ctrl+Shift+V';
 }
 
+/** 格式化文档：与 `commands.ts` 中 addCommand 绑定一致 */
+function shortcutHintCtrlOrCmdShiftF(): string {
+	return isMacLike() ? '⌘+Shift+F' : 'Ctrl+Shift+F';
+}
+
 function shortcutHintCtrlOrCmd(key: string): string {
 	return isMacLike() ? `⌘+${key}` : `Ctrl+${key}`;
 }
@@ -100,7 +105,7 @@ export function buildMonacoEditorContextMenuItems(input: {
 			type: 'item',
 			id: 'format',
 			label: language === 'markdown' ? '格式化文档' : '格式化',
-			shortcut: 'Shift+Alt+F',
+			shortcut: shortcutHintCtrlOrCmdShiftF(),
 			onSelect: () => actionsRef.current?.formatDocument(),
 		});
 	}

@@ -180,4 +180,4 @@ const onKeyDown = (event: KeyboardEvent) => {
 
 ## 补充：右键上下文菜单
 
-`MarkdownEditor` 在主编器外包一层 **`@/components/design/ContextMenu`** 的 **`QuickContextMenu`**，菜单项（复制 / 剪切 / 粘贴 / 全选 / 格式化）与上文 **Monaco `addCommand`（C/X/V）及 Shift+Alt+F 格式化** 共用同一套 ref 闭包，避免两套逻辑分叉。实现说明与代码摘录见 **`monaco/markdown-editor-context-menu.md`**。
+`MarkdownEditor` 在主编器外包一层 **`@/components/design/ContextMenu`** 的 **`QuickContextMenu`**，菜单项（复制 / 剪切 / 粘贴 / 全选 / 格式化）与上文 **Monaco `addCommand`（C/X/V）及 ⌘/Ctrl+Shift+F 格式化** 共用同一套 ref 闭包，避免两套逻辑分叉。实现说明与代码摘录见 **`monaco/markdown-editor-context-menu.md`**。

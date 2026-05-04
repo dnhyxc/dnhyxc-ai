@@ -236,7 +236,7 @@ registerMonacoEditorCommands({
 	copyToClipboard,
 	/** 统一剪贴板读取：用于粘贴 */
 	pasteFromClipboard,
-	/** Shift+Alt+F：markdown 走 safeFormat，其它走 Monaco formatDocument */
+	/** ⌘/Ctrl+Shift+F：markdown 走 safeFormat，其它走 Monaco formatDocument */
 	safeFormatMarkdownValue,
 	/** “真实选区”获取：用于 Ctrl/⌘+Shift+V（无选区不触发） */
 	getSelectedTextOnlyFromSelections,
@@ -267,7 +267,7 @@ editorContextActionsRef.current = null;
 
 `commands.ts` 内部集中注册的快捷键清单（与之前保持一致）：
 
-- `Shift + Alt + F`：格式化（markdown 走 `safeFormatMarkdownValue`，其它语言触发 Monaco `editor.action.formatDocument`）
+- `⌘+Shift+F` / `Ctrl+Shift+F`：格式化（markdown 走 `safeFormatMarkdownValue`，其它语言触发 Monaco `editor.action.formatDocument`）。Monaco 默认的 **Shift+Alt+F（Option+Shift+F）** 已在 `MarkdownEditor` 的 `beforeMount` 中通过 `monaco.editor.addKeybindingRules` 配合 `-editor.action.formatDocument` **注销**，避免旧组合仍走内置格式化。
 - `Ctrl/⌘ + B`：注释当前行（触发 Monaco `editor.action.commentLine`）
 - `Ctrl/⌘ + C`：复制（走统一剪贴板封装，支持“无选区复制整行”）
 - `Ctrl/⌘ + X`：剪切（先复制再删；无选区剪切整行，范围由 `rangeForCutWhenCursorOnly` 计算）
