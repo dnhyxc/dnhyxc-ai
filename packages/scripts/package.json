@@ -4,6 +4,9 @@
 	"type": "module",
 	"scripts": {
 		"bump-version": "tsx bump-version.ts",
+		"bump-version:patch": "tsx bump-version.ts patch",
+		"bump-version:minor": "tsx bump-version.ts minor",
+		"bump-version:major": "tsx bump-version.ts major",
 		"update-latest": "tsx update-latest.ts",
 		"upload-to-release": "tsx upload-to-release.ts",
 		"upload-dmg-to-release": "tsx upload-dmg-to-release.ts",
