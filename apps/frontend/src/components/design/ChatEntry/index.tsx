@@ -786,10 +786,14 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 
 	return (
 		<div className={cn('relative p-5.5 pt-0 backdrop-blur-sm', className)}>
-			<div className="max-w-3xl mx-auto flex">
-				<div className="flex-1 relative">
+			{/*
+				w-full：避免在 flex 父级或「外层已 max-w-3xl」嵌套时，内层再度 mx-auto 却不撑满导致卡片视觉上缩进。
+				与知识库消息列表容器「max-w-3xl + w-full」语义对齐。
+			*/}
+			<div className="mx-auto flex w-full max-w-3xl">
+				<div className="relative min-w-0 flex-1">
 					{children}
-					<div className="max-w-3xl flex flex-col overflow-y-auto rounded-md bg-theme/2 border border-theme/10">
+					<div className="flex w-full max-w-3xl flex-col overflow-y-auto rounded-md border border-theme/10 bg-theme/2">
 						{uploadedFiles && uploadedFiles?.length > 0 ? (
 							<div className="flex flex-1 flex-col rounded-md">
 								<div className="flex justify-between items-center mt-2.5 mb-0.5 px-3 text-sm text-textcolor/70">

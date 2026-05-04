@@ -540,6 +540,102 @@ const KnowledgeAssistant = observer(
 			isRagMode,
 		});
 
+		/** 当前为「会话列表 + 底部输入」视图（与加载中 / 空状态引导互斥） */
+		const conversationColumnActive = !(
+			(!isRagMode && assistantStore.isHistoryLoading) ||
+			(isRagMode && !ragMessages.length) ||
+			(!isRagMode && !aiMessages.length)
+		);
+
+		const renderAssistantFooter = (embeddedInConversationColumn: boolean) => (
+			<div
+				className={cn(
+					'min-w-0 w-full',
+					embeddedInConversationColumn && 'shrink-0',
+				)}
+			>
+				{/*
+					置顶/置底钮与消息列同宽：定位在 max-w-3xl 内容容器内，right-4 与 pr-4 对齐，避免相对全屏 footer 用 right-0 贴到面板最右侧。
+				*/}
+				<div className="relative mx-auto min-w-0 w-full max-w-3xl pl-3.5 pr-4">
+					{messages.length > 0 && scrollCornerFabMode !== 'hidden' ? (
+						<button
+							type="button"
+							className={cn(
+								'absolute bottom-full z-10 mb-4 right-4 flex h-8.5 w-8.5 cursor-pointer items-center justify-center rounded-full border border-theme/5 bg-theme/5 text-textcolor/70 backdrop-blur-[2px] hover:bg-theme/15',
+								'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme/40',
+							)}
+							aria-label={
+								scrollCornerFabMode === 'toBottom'
+									? t('knowledge.assistant.scrollToBottom')
+									: t('knowledge.assistant.scrollToTop')
+							}
+							onClick={onScrollCornerFabClick}
+						>
+							{scrollCornerFabMode === 'toBottom' ? (
+								<ChevronDown aria-hidden />
+							) : (
+								<ChevronUp aria-hidden />
+							)}
+						</button>
+					) : null}
+					{allowAiShare && shareSelection.isSharing ? (
+						<KnowledgeAssistantShareBar
+							aiMessages={aiMessages}
+							shareSelection={shareSelection}
+							shareFlow={shareFlow}
+							setShareModelVisible={setShareModelVisible}
+						/>
+					) : (
+						<ChatEntry
+							t={t}
+							input={isRagMode ? ragInput : input}
+							setInput={isRagMode ? setRagInput : setInput}
+							className="w-full px-0 pb-4.5 border-theme/10"
+							textareaClassName="min-h-9"
+							sendMessage={sendMessage}
+							placeholder={
+								isRagMode
+									? t('knowledge.assistant.placeholder.rag')
+									: editorHasBody
+										? t('knowledge.assistant.placeholder.ai')
+										: t('knowledge.assistant.placeholder.aiNeedsBody')
+							}
+							disableTextInput={isRagMode ? false : !editorHasBody}
+							loading={
+								isRagMode
+									? knowledgeRagQaStore.isSending
+									: assistantStore.isSending || assistantStore.isHistoryLoading
+							}
+							stopGenerating={
+								isRagMode
+									? knowledgeRagQaStore.isStreaming
+										? stopGenerating
+										: undefined
+									: assistantStore.isStreaming
+										? stopGenerating
+										: undefined
+							}
+							entryChildren={
+								<KnowledgeAssistantEntryToolbar
+									showEntryToolbar={showEntryToolbar}
+									showAiSessionActions={showAiSessionActions}
+									isAiSessionSwitcherLocked={isAiSessionSwitcherLocked}
+									isAiHistoryDrawerOpen={isAiHistoryDrawerOpen}
+									setIsAiHistoryDrawerOpen={setIsAiHistoryDrawerOpen}
+									enableStreamStickToBottom={enableStreamStickToBottom}
+									flushScrollToBottom={flushScrollToBottom}
+									assistantMode={assistantMode}
+									setAssistantMode={setAssistantMode}
+								/>
+							}
+						/>
+					)}
+					{shareChatNode}
+				</div>
+			</div>
+		);
+
 		return (
 			<div className="relative flex h-full w-full flex-col overflow-hidden">
 				<ChatCodeFloatingToolbar t={t} />
@@ -549,7 +645,7 @@ const KnowledgeAssistant = observer(
 						<Loading text={t('knowledge.assistant.loadingConversation')} />
 					</div>
 				) : isRagMode && !ragMessages.length ? (
-					<div className="text-textcolor/70 flex flex-1 justify-center items-start text-sm pt-4 pl-4 pr-4.5">
+					<div className="max-w-3xl text-textcolor/70 flex flex-1 justify-center items-start text-sm pt-4 pl-3.5 pr-4">
 						<div className="w-full flex gap-2 border border-theme/10 bg-theme/5 p-3 rounded-md">
 							<BookOpen size={18} className="mt-[3px] shrink-0 text-teal-500" />
 							<div className="flex-1 text-sm leading-relaxed">
@@ -558,7 +654,7 @@ const KnowledgeAssistant = observer(
 						</div>
 					</div>
 				) : !isRagMode && !aiMessages.length ? (
-					<div className="text-textcolor/70 flex flex-1 justify-center items-start text-sm pt-4 pl-4 pr-4.5">
+					<div className="text-textcolor/70 flex flex-1 justify-center items-start text-sm pt-4 pl-3.5 pr-4">
 						{knowledgeStore.markdown ? (
 							<div className="w-full flex flex-col gap-2 justify-center items-center">
 								<div className="w-full flex gap-3">
@@ -596,156 +692,81 @@ const KnowledgeAssistant = observer(
 						)}
 					</div>
 				) : (
-					<ScrollArea
-						ref={scrollViewportRef}
-						className="min-h-0 flex-1"
-						viewportClassName="pb-1 [overflow-anchor:none]"
-						{...scrollAreaHandlers}
-					>
-						<div
-							className={cn(
-								// 仅加 min-w-0：勿再写 max-w-full，否则会覆盖 max-w-3xl 的栏宽上限
-								'pt-4 max-w-3xl mx-auto relative flex w-full min-w-0 flex-col select-none  pr-4 pl-3.5',
-							)}
+					<div className="flex min-h-0 min-w-0 w-full flex-1 flex-col">
+						{/*
+							ScrollArea 必须占满助手面板宽度，滚动条才会贴在容器最右侧。
+							max-w-3xl 仅作用在滚动内容（及底部输入）上，避免整列变窄后滚动条跟着缩在中间留白旁。
+						*/}
+						<ScrollArea
+							ref={scrollViewportRef}
+							className="min-h-0 min-w-0 w-full flex-1 border-0"
+							viewportClassName="pb-1 [overflow-anchor:none]"
+							{...scrollAreaHandlers}
 						>
-							{messages.map((message, index) => (
-								<KnowledgeMessageBubble
-									key={message.chatId}
-									selectMessageByChatId={
-										isRagMode
-											? selectRagMessageByChatId
-											: selectAssistantMessageByChatId
-									}
-									t={t}
-									chatId={message.chatId}
-									index={index}
-									messagesLength={messages.length}
-									isCopyedId={isCopyedId}
-									onCopy={onCopy}
-									onSaveToKnowledge={onSaveToKnowledge}
-									allowAiShare={allowAiShare}
-									shareSelection={shareSelection}
-									onShare={onShare}
-									scrollViewportRef={
-										scrollViewportRef as RefObject<HTMLElement | null>
-									}
-								/>
-							))}
-							{showRagNewConversation ? (
-								<div className="mb-3 flex w-full min-w-0 justify-start">
-									<Button
-										size="sm"
-										variant="dynamic"
-										className="w-fit rounded-md border border-theme/10 bg-theme/5 px-3 py-1.5 text-sm text-textcolor/80 transition-colors hover:border-theme/20 hover:text-textcolor"
-										onClick={() => {
-											knowledgeRagQaStore.resetConversation();
-											setRagInput('');
-										}}
-									>
-										<CirclePlus />
-										{t('knowledge.assistant.newConversation')}
-									</Button>
-								</div>
-							) : null}
-							{showPostStreamActions ? (
-								<div className="flex w-full min-w-0 flex-wrap gap-3.5 mb-3">
-									{KNOWLEDGE_ASSISTANT_PROMPTS.map((item) => (
+							<div className="relative mx-auto flex min-h-0 w-full min-w-0 max-w-3xl flex-col pt-4 pl-3.5 pr-4 select-none">
+								{messages.map((message, index) => (
+									<KnowledgeMessageBubble
+										key={message.chatId}
+										selectMessageByChatId={
+											isRagMode
+												? selectRagMessageByChatId
+												: selectAssistantMessageByChatId
+										}
+										t={t}
+										chatId={message.chatId}
+										index={index}
+										messagesLength={messages.length}
+										isCopyedId={isCopyedId}
+										onCopy={onCopy}
+										onSaveToKnowledge={onSaveToKnowledge}
+										allowAiShare={allowAiShare}
+										shareSelection={shareSelection}
+										onShare={onShare}
+										scrollViewportRef={
+											scrollViewportRef as RefObject<HTMLElement | null>
+										}
+									/>
+								))}
+								{showRagNewConversation ? (
+									<div className="mb-3 flex w-full min-w-0 justify-start">
 										<Button
-											key={item.kind}
 											size="sm"
 											variant="dynamic"
-											className="w-fit rounded-md border border-theme/10 bg-theme/5 p-2 text-left text-sm text-textcolor/80 transition-colors hover:border-theme/20 hover:text-textcolor"
-											onClick={() => void sendKnowledgePromptCard(item.kind)}
+											className="w-fit rounded-md border border-theme/10 bg-theme/5 px-3 py-1.5 text-sm text-textcolor/80 transition-colors hover:border-theme/20 hover:text-textcolor"
+											onClick={() => {
+												knowledgeRagQaStore.resetConversation();
+												setRagInput('');
+											}}
 										>
-											<item.icon />
-											{t(item.titleKey)}
+											<CirclePlus />
+											{t('knowledge.assistant.newConversation')}
 										</Button>
-									))}
-								</div>
-							) : null}
-						</div>
-					</ScrollArea>
-				)}
-				{isLoggedIn ? (
-					<div className="relative w-full flex items-center justify-center pr-4 pl-3.5">
-						{messages.length > 0 && scrollCornerFabMode !== 'hidden' ? (
-							<button
-								type="button"
-								className={cn(
-									'absolute bottom-full mb-4.5 right-4.5 z-10 flex h-8.5 w-8.5 cursor-pointer items-center justify-center rounded-full border border-theme/5 bg-theme/5 text-textcolor/70 backdrop-blur-[2px] hover:bg-theme/15',
-									'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme/40',
-								)}
-								aria-label={
-									scrollCornerFabMode === 'toBottom'
-										? t('knowledge.assistant.scrollToBottom')
-										: t('knowledge.assistant.scrollToTop')
-								}
-								onClick={onScrollCornerFabClick}
-							>
-								{scrollCornerFabMode === 'toBottom' ? (
-									<ChevronDown aria-hidden />
-								) : (
-									<ChevronUp aria-hidden />
-								)}
-							</button>
-						) : null}
-						{allowAiShare && shareSelection.isSharing ? (
-							<KnowledgeAssistantShareBar
-								aiMessages={aiMessages}
-								shareSelection={shareSelection}
-								shareFlow={shareFlow}
-								setShareModelVisible={setShareModelVisible}
-							/>
-						) : (
-							<ChatEntry
-								t={t}
-								input={isRagMode ? ragInput : input}
-								setInput={isRagMode ? setRagInput : setInput}
-								className="w-full pl-0.5 pr-0.5 pb-4.5 border-theme/10"
-								textareaClassName="min-h-9"
-								sendMessage={sendMessage}
-								placeholder={
-									isRagMode
-										? t('knowledge.assistant.placeholder.rag')
-										: editorHasBody
-											? t('knowledge.assistant.placeholder.ai')
-											: t('knowledge.assistant.placeholder.aiNeedsBody')
-								}
-								disableTextInput={isRagMode ? false : !editorHasBody}
-								loading={
-									isRagMode
-										? knowledgeRagQaStore.isSending
-										: assistantStore.isSending ||
-											assistantStore.isHistoryLoading
-								}
-								stopGenerating={
-									isRagMode
-										? knowledgeRagQaStore.isStreaming
-											? stopGenerating
-											: undefined
-										: assistantStore.isStreaming
-											? stopGenerating
-											: undefined
-								}
-								entryChildren={
-									<KnowledgeAssistantEntryToolbar
-										showEntryToolbar={showEntryToolbar}
-										showAiSessionActions={showAiSessionActions}
-										isAiSessionSwitcherLocked={isAiSessionSwitcherLocked}
-										isAiHistoryDrawerOpen={isAiHistoryDrawerOpen}
-										setIsAiHistoryDrawerOpen={setIsAiHistoryDrawerOpen}
-										enableStreamStickToBottom={enableStreamStickToBottom}
-										flushScrollToBottom={flushScrollToBottom}
-										assistantMode={assistantMode}
-										setAssistantMode={setAssistantMode}
-									/>
-								}
-							/>
-						)}
-
-						{shareChatNode}
+									</div>
+								) : null}
+								{showPostStreamActions ? (
+									<div className="mb-3 flex w-full min-w-0 flex-wrap gap-3.5">
+										{KNOWLEDGE_ASSISTANT_PROMPTS.map((item) => (
+											<Button
+												key={item.kind}
+												size="sm"
+												variant="dynamic"
+												className="w-fit rounded-md border border-theme/10 bg-theme/5 p-2 text-left text-sm text-textcolor/80 transition-colors hover:border-theme/20 hover:text-textcolor"
+												onClick={() => void sendKnowledgePromptCard(item.kind)}
+											>
+												<item.icon />
+												{t(item.titleKey)}
+											</Button>
+										))}
+									</div>
+								) : null}
+							</div>
+						</ScrollArea>
+						{isLoggedIn ? renderAssistantFooter(true) : null}
 					</div>
-				) : null}
+				)}
+				{isLoggedIn && !conversationColumnActive
+					? renderAssistantFooter(false)
+					: null}
 			</div>
 		);
 	},

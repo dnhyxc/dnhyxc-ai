@@ -129,7 +129,7 @@ export function KnowledgeAssistantShareBar({
 }: KnowledgeAssistantShareBarProps) {
 	const { t } = useI18n();
 	return (
-		<div className="w-full flex justify-between items-center max-w-3xl mx-auto pt-4 pb-4.5 pl-0.5 pr-0.5">
+		<div className="flex w-full items-center justify-between pt-4 pb-4.5">
 			<div className="flex-1 flex items-center gap-3 text-textcolor/80">
 				<div className="flex items-center">
 					<Checkbox

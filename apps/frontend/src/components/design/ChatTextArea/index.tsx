@@ -95,7 +95,7 @@ const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 			<>
 				<ScrollArea
 					ref={scrollRef}
-					className={`flex flex-col w-full max-h-35 overflow-y-auto ${className || ''}`}
+					className={`flex max-h-35 w-full flex-col overflow-y-auto border-0 ${className || ''}`}
 				>
 					<Textarea
 						ref={ref}
