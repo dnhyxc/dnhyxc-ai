@@ -645,7 +645,7 @@ const KnowledgeAssistant = observer(
 						<Loading text={t('knowledge.assistant.loadingConversation')} />
 					</div>
 				) : isRagMode && !ragMessages.length ? (
-					<div className="max-w-3xl text-textcolor/70 flex flex-1 justify-center items-start text-sm pt-4 pl-3.5 pr-4">
+					<div className="max-w-3xl mx-auto text-textcolor/70 flex flex-1 justify-center items-start text-sm pt-4 pl-3.5 pr-4">
 						<div className="w-full flex gap-2 border border-theme/10 bg-theme/5 p-3 rounded-md">
 							<BookOpen size={18} className="mt-[3px] shrink-0 text-teal-500" />
 							<div className="flex-1 text-sm leading-relaxed">
@@ -654,9 +654,9 @@ const KnowledgeAssistant = observer(
 						</div>
 					</div>
 				) : !isRagMode && !aiMessages.length ? (
-					<div className="text-textcolor/70 flex flex-1 justify-center items-start text-sm pt-4 pl-3.5 pr-4">
+					<div className="text-textcolor/70 flex flex-1 justify-center items-start text-sm pt-4">
 						{knowledgeStore.markdown ? (
-							<div className="w-full flex flex-col gap-2 justify-center items-center">
+							<div className="max-w-3xl mx-auto w-full flex flex-col gap-2 justify-center items-center pl-3.5 pr-4">
 								<div className="w-full flex gap-3">
 									{KNOWLEDGE_ASSISTANT_PROMPTS.map((item) => (
 										<button
@@ -685,9 +685,13 @@ const KnowledgeAssistant = observer(
 								</div>
 							</div>
 						) : (
-							<div className="w-full flex justify-between bg-theme/5 p-2 rounded-md border border-theme/10">
-								<Sparkles size={18} className="mr-2 text-teal-500 mt-0.5" />
-								<div className="flex-1">{t('knowledge.assistant.aiIntro')}</div>
+							<div className="max-w-3xl w-full mx-auto pl-3.5 pr-4">
+								<div className="w-full flex justify-between bg-theme/5 p-2 rounded-md border border-theme/10">
+									<Sparkles size={18} className="mr-2 text-teal-500 mt-0.5" />
+									<div className="flex-1">
+										{t('knowledge.assistant.aiIntro')}
+									</div>
+								</div>
 							</div>
 						)}
 					</div>
