@@ -29,7 +29,6 @@ import { ShareService } from './share.service';
 @Controller('/share')
 // ClassSerializerInterceptor 设置返回字段过滤，ResponseInterceptor 设置响应拦截器，统一响应的格式
 @UseInterceptors(ClassSerializerInterceptor, ResponseInterceptor)
-@UseGuards(JwtGuard)
 export class ShareController {
 	constructor(private readonly shareService: ShareService) {}
 
@@ -38,6 +37,7 @@ export class ShareController {
 	 * POST /api/share/create
 	 */
 	@Post('/create')
+	@UseGuards(JwtGuard)
 	@ApiOperation({
 		summary: '创建分享',
 		description: '创建分享链接，只存储参数到Redis',
@@ -82,6 +82,7 @@ export class ShareController {
 	 * GET /api/share/check/:shareId/exists
 	 */
 	@Get('/check/:shareId/exists')
+	@UseGuards(JwtGuard)
 	@ApiOperation({ summary: '检查分享是否存在' })
 	@ApiParam({ name: 'shareId', description: '分享ID' })
 	@ApiResponse({ status: HttpStatus.OK, description: '返回是否存在' })
@@ -96,6 +97,7 @@ export class ShareController {
 	 * DELETE /api/share/delete/:shareId
 	 */
 	@Delete('/delete/:shareId')
+	@UseGuards(JwtGuard)
 	@HttpCode(HttpStatus.NO_CONTENT)
 	@ApiOperation({ summary: '删除分享' })
 	@ApiParam({ name: 'shareId', description: '分享ID' })

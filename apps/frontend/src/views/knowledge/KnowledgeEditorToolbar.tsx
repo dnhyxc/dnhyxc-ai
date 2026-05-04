@@ -20,6 +20,7 @@ const KnowledgeEditorToolbar = (props: {
 	shortcutHintClear?: string;
 	shortcutHintOpenLibrary?: string;
 	shortcutHintOpenTrash?: string;
+	/** 分享组合键提示；未登录时不展示分享按钮，父页 `knowledge/index` 亦不会响应分享快捷键 */
 	shortcutHintShare?: string;
 }) => {
 	const { t } = useI18n();

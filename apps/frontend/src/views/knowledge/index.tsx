@@ -775,6 +775,7 @@ const Knowledge = observer(() => {
 				return;
 			}
 			if (chordMatchesStored(knowledgeChords.share, e)) {
+				if (!isCloudLoggedIn) return;
 				e.preventDefault();
 				onShareKnowledge();
 				return;
