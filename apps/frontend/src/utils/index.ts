@@ -14,6 +14,7 @@ export * from './clipboard';
 export * from './crypto';
 export * from './event';
 export * from './event';
+export * from './format-bytes';
 export * from './knowledge-save';
 export { openExternalUrl } from './open-external';
 export { isTauriRuntime } from './runtime';

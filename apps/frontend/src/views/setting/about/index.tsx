@@ -23,6 +23,7 @@ import {
 	checkForUpdates,
 	checkVersion,
 	clearCache,
+	formatBytesAsMb,
 	formatDate,
 	getCacheSize,
 	getValue,
@@ -255,7 +256,8 @@ const SettingAbout = () => {
 						</span>
 						<div>
 							<span className="mr-3">
-								{downloaded > total ? total : downloaded} / {total}
+								{formatBytesAsMb(downloaded > total ? total : downloaded)} /{' '}
+								{formatBytesAsMb(total)}
 							</span>
 							<span>
 								{Math.floor(
