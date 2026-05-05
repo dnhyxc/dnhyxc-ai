@@ -1,5 +1,9 @@
 import { requirePath } from '../../config/resolve.js';
 import type { ResolvedReleaseKit } from '../../config/types.js';
+import {
+	exitIfMissingEnv,
+	logDotenvConfigurationHint,
+} from '../../lib/required-env.js';
 import { pushMarkdownToWiki } from '../../wiki/wiki-push.js';
 
 export function runWikiSyncUpdateInfo(ctx: ResolvedReleaseKit): number {
@@ -11,11 +15,12 @@ export function runWikiSyncUpdateInfo(ctx: ResolvedReleaseKit): number {
 		return 0;
 	}
 
-	const TOKEN = process.env.GITHUB_TOKEN;
-	if (!TOKEN) {
-		console.error('❌ 未设置 GITHUB_TOKEN，无法推送 Wiki');
-		return 1;
-	}
+	exitIfMissingEnv(
+		ctx,
+		['GITHUB_TOKEN'],
+		'未设置 GITHUB_TOKEN，无法推送 Wiki。',
+	);
+	const TOKEN = process.env.GITHUB_TOKEN!;
 
 	const source = requirePath(
 		'wikiUpdateSourceMd',
@@ -33,6 +38,7 @@ export function runWikiSyncUpdateInfo(ctx: ResolvedReleaseKit): number {
 		console.error(
 			'❌ 缺少 Wiki 目标仓库：请在配置 wiki.updateInfo.owner/repo 或设置 WIKI_OWNER、WIKI_REPO（或 OWNER、APP_REPO）',
 		);
+		logDotenvConfigurationHint(ctx);
 		return 1;
 	}
 

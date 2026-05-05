@@ -21,7 +21,8 @@
 		"release:upload": "release-kit upload-release",
 		"release:upload-dmg": "release-kit upload-dmg",
 		"release:wiki-update": "release-kit wiki-sync-update-info",
-		"release:wiki-guide": "release-kit wiki-sync-guide"
+		"release:wiki-guide": "release-kit wiki-sync-guide",
+		"release:print-signing-env": "release-kit print-tauri-signing-env"
 	},
 	"dependencies": {
 		"@codemirror/state": "^6.5.2",

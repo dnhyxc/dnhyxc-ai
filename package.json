@@ -6,9 +6,9 @@
 	"scripts": {
 		"dev": "pnpm -C apps/frontend tauri dev",
 		"build": "pnpm run build:patch",
-		"build:patch": "eval $(pnpm --filter @dnhyxc-ai/scripts --silent export) && pnpm -C apps/frontend exec release-kit bump-version patch && pnpm -C apps/frontend tauri build && pnpm -C apps/frontend exec release-kit update-latest && pnpm -C apps/frontend exec release-kit upload-release && pnpm -C apps/frontend exec release-kit upload-dmg",
-		"build:minor": "eval $(pnpm --filter @dnhyxc-ai/scripts --silent export) && pnpm -C apps/frontend exec release-kit bump-version minor && pnpm -C apps/frontend tauri build && pnpm -C apps/frontend exec release-kit update-latest && pnpm -C apps/frontend exec release-kit upload-release && pnpm -C apps/frontend exec release-kit upload-dmg",
-		"build:major": "eval $(pnpm --filter @dnhyxc-ai/scripts --silent export) && pnpm -C apps/frontend exec release-kit bump-version major && pnpm -C apps/frontend tauri build && pnpm -C apps/frontend exec release-kit update-latest && pnpm -C apps/frontend exec release-kit upload-release && pnpm -C apps/frontend exec release-kit upload-dmg",
+		"build:patch": "eval $(pnpm -C apps/frontend exec release-kit print-tauri-signing-env) && pnpm -C apps/frontend exec release-kit bump-version patch && pnpm -C apps/frontend tauri build && pnpm -C apps/frontend exec release-kit update-latest && pnpm -C apps/frontend exec release-kit upload-release && pnpm -C apps/frontend exec release-kit upload-dmg",
+		"build:minor": "eval $(pnpm -C apps/frontend exec release-kit print-tauri-signing-env) && pnpm -C apps/frontend exec release-kit bump-version minor && pnpm -C apps/frontend tauri build && pnpm -C apps/frontend exec release-kit update-latest && pnpm -C apps/frontend exec release-kit upload-release && pnpm -C apps/frontend exec release-kit upload-dmg",
+		"build:major": "eval $(pnpm -C apps/frontend exec release-kit print-tauri-signing-env) && pnpm -C apps/frontend exec release-kit bump-version major && pnpm -C apps/frontend tauri build && pnpm -C apps/frontend exec release-kit update-latest && pnpm -C apps/frontend exec release-kit upload-release && pnpm -C apps/frontend exec release-kit upload-dmg",
 		"server:dev": "pnpm -C apps/backend start:dev",
 		"server:start": "pnpm -C apps/backend start",
 		"server:debug": "pnpm -C apps/backend start:debug",

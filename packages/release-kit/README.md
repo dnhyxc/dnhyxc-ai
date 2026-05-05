@@ -45,6 +45,7 @@ npm install -D @dnhyxc-ai/release-kit
 
 ```bash
 release-kit bump-version [patch|minor|major]
+release-kit print-tauri-signing-env
 release-kit update-latest
 release-kit upload-release [--file <path>]...
 release-kit upload-dmg [dmg文件路径]
@@ -52,7 +53,29 @@ release-kit wiki-sync-update-info
 release-kit wiki-sync-guide
 ```
 
-上传相关环境变量：**`GITHUB_TOKEN`**、**`OWNER`**、**`APP_REPO`**、**`APP_TAG`**（默认 `latest`）。与既有脚本习惯一致。
+### `.env` 与缺省提示
+
+CLI 会在解析 `release-kit.config.json` 后加载 **`<root>/.env`**（或通过 **`--dotenv <path>`** 指定）。各子命令在缺少所需变量时会 **退出并列出变量名**，同时提示应配置的 **`.env` 绝对路径**（若文件不存在也会说明）。
+
+### Tauri 增量签名（替代原 `export.sh --print`）
+
+将以下变量写入 **发布工程根目录** 的 `.env`（本仓库为 `apps/frontend/.env`）：
+
+- **`TAURI_SIGNING_PRIVATE_KEY`**
+- **`TAURI_SIGNING_PRIVATE_KEY_PASSWORD`**
+
+在运行 **`tauri build`** 的同一 shell 中先注入环境变量，例如：
+
+```bash
+eval $(pnpm exec release-kit print-tauri-signing-env)
+pnpm exec tauri build
+```
+
+`print-tauri-signing-env` 仅向 **stdout** 输出两行 `export ...`（与原先 `export.sh --print` 行为一致），错误信息在 **stderr**，便于 `eval $(...)`。
+
+### 上传与 Wiki
+
+上传 GitHub Release 需要：**`GITHUB_TOKEN`**、**`OWNER`**、**`APP_REPO`**、**`APP_TAG`**（默认 `latest`）。Wiki 子命令需要 **`GITHUB_TOKEN`**，以及配置或环境变量中的仓库坐标（见配置文件中 `wiki` 段说明）。
 
 ## 发布到 npm
 

@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 const libDir = path.dirname(fileURLToPath(import.meta.url));
 
-/** packages/scripts 根目录（与 export.sh、.env 同级，不含 src） */
+/** packages/release-run 根目录（与 export.sh、.env 同级，不含 src） */
 export const SCRIPTS_ROOT = path.resolve(libDir, '../..');
 
 /** 仓库根目录（monorepo root） */

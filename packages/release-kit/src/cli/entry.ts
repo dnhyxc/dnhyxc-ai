@@ -1,12 +1,12 @@
 #!/usr/bin/env node
-import path from 'node:path';
-import dotenv from 'dotenv';
+import { runPrintTauriSigningEnv } from '../commands/env/print-tauri-signing-env.js';
 import { runUpdateLatest } from '../commands/release/update-latest.js';
 import { runUploadDmg } from '../commands/release/upload-dmg.js';
 import { runUploadRelease } from '../commands/release/upload-release.js';
 import { runBumpVersion } from '../commands/version/bump-version.js';
 import { runWikiSyncGuide } from '../commands/wiki/wiki-sync-guide.js';
 import { runWikiSyncUpdateInfo } from '../commands/wiki/wiki-sync-update-info.js';
+import { loadKitDotenv, resolveDotenvPath } from '../config/dotenv.js';
 import {
 	loadResolvedReleaseKit,
 	parseGlobalArgv,
@@ -34,14 +34,18 @@ release-kit — 通用 Tauri / GitHub Release 辅助 CLI
 
 子命令:
   bump-version [patch|minor|major]
+  print-tauri-signing-env   从 .env 读取 TAURI_SIGNING_*，向 stdout 输出可 eval 的 export 行（供 tauri build 前注入）
   update-latest
   upload-release [--file <path>]...
   upload-dmg [dmg路径]
   wiki-sync-update-info
   wiki-sync-guide
 
-环境变量（上传 GitHub Release）:
-  GITHUB_TOKEN, OWNER, APP_REPO, APP_TAG（默认 latest）
+环境变量（示例）:
+  Tauri 签名（写入 <root>/.env，与 print-tauri-signing-env / tauri build 共用）:
+    TAURI_SIGNING_PRIVATE_KEY, TAURI_SIGNING_PRIVATE_KEY_PASSWORD
+  上传 GitHub Release:
+    GITHUB_TOKEN, OWNER, APP_REPO, APP_TAG（默认 latest）
 
 详见 README 与 release-kit.config.example.json
 `);
@@ -87,15 +91,18 @@ async function main(): Promise<void> {
 		return;
 	}
 
-	const dotenvPath = flags.dotenvPath ?? path.join(ctx.root, '.env');
-	dotenv.config({ path: dotenvPath });
-	dotenv.config();
+	const dotenvPath = resolveDotenvPath(cwd, ctx.root, flags.dotenvPath);
+	ctx.dotenvPath = dotenvPath;
+	loadKitDotenv(dotenvPath);
 
 	let exitCode = 0;
 
 	switch (command) {
 		case 'bump-version':
 			runBumpVersion(ctx, commandArgs);
+			break;
+		case 'print-tauri-signing-env':
+			runPrintTauriSigningEnv(ctx);
 			break;
 		case 'update-latest':
 			runUpdateLatest(ctx);

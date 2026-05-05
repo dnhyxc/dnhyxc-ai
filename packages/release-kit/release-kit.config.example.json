@@ -1,5 +1,6 @@
 {
 	"_readme": "复制为 release-kit.config.json 并按项目修改；paths 内相对路径均相对于 root",
+	"_tauriSigning": "在 <root>/.env 中配置 TAURI_SIGNING_PRIVATE_KEY 与 TAURI_SIGNING_PRIVATE_KEY_PASSWORD；构建前执行 eval $(release-kit print-tauri-signing-env) 注入当前 shell（等价于原 export.sh --print）",
 	"root": ".",
 	"paths": {
 		"tauriConfig": "apps/frontend/src-tauri/tauri.conf.json",

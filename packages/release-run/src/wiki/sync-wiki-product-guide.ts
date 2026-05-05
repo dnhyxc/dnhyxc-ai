@@ -112,7 +112,7 @@ function main(): number {
 		const authorName =
 			process.env.WIKI_GIT_AUTHOR_NAME ??
 			process.env.GIT_AUTHOR_NAME ??
-			'dnhyxc-ai-scripts';
+			'dnhyxc-ai-release-run';
 		const authorEmail =
 			process.env.WIKI_GIT_AUTHOR_EMAIL ??
 			process.env.GIT_AUTHOR_EMAIL ??

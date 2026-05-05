@@ -1,5 +1,5 @@
 {
-	"name": "@dnhyxc-ai/scripts",
+	"name": "@dnhyxc-ai/release-run",
 	"version": "0.0.1",
 	"type": "module",
 	"scripts": {

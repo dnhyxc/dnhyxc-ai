@@ -11,6 +11,7 @@ const DEFAULT_CONFIG_NAMES = ['release-kit.config.json'] as const;
 /** 与 parseGlobalArgv 配合：先定位子命令，再解析其前的全局参数 */
 export const SUBCOMMANDS = new Set([
 	'bump-version',
+	'print-tauri-signing-env',
 	'update-latest',
 	'upload-release',
 	'upload-dmg',

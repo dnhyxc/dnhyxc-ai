@@ -46,8 +46,8 @@ function parseBumpArg(): SemverBump {
 	}
 	console.error(
 		`未知的递增类型: "${raw}"。请使用: patch | minor | major\n` +
-			'  示例: pnpm -C packages/scripts tsx src/version/bump-version.ts minor\n' +
-			'  或: RELEASE_TYPE=major pnpm -C packages/scripts tsx src/version/bump-version.ts',
+			'  示例: pnpm -C packages/release-run tsx src/version/bump-version.ts minor\n' +
+			'  或: RELEASE_TYPE=major pnpm -C packages/release-run tsx src/version/bump-version.ts',
 	);
 	process.exit(1);
 }

@@ -84,7 +84,7 @@ dnhyxc-ai/
 │       │   ├── services/  # API 服务
 │       │   └── ...       # 其他目录
 ├── packages/             # 共享包
-│   └── scripts/          # 脚本工具
+│   └── release-run/      # 发布辅助脚本（签名环境、Wiki 等）
 ├── docker-compose.yml    # Docker 配置
 └── package.json         # 项目配置
 ```

@@ -28,17 +28,19 @@
 
 ### 3.1 脚本文件
 
-- 脚本：`packages/scripts/src/wiki/sync-wiki-update-info.ts`
-- 仓库相对路径：`packages/scripts/src/lib/paths.ts`（导出 `DOC_PROJECT_UPDATE_INFO`、`SCRIPTS_ROOT` 等，供各脚本共用）
-- pnpm 脚本：`packages/scripts/package.json` 的 `sync-wiki-update-info`
+- 脚本：`packages/release-run/src/wiki/sync-wiki-update-info.ts`
+- 仓库相对路径：`packages/release-run/src/lib/paths.ts`（导出 `DOC_PROJECT_UPDATE_INFO`、`SCRIPTS_ROOT` 等，供各脚本共用）
+- pnpm 脚本：`packages/release-run/package.json` 的 `sync-wiki-update-info`
 
 ### 3.2 发布链路接入
 
 仓库根目录 `package.json` 中与 Wiki 同步相关的脚本（`scripts` 字段；行号随变更略有漂移）：
 
 ```json
-"update-wiki": "pnpm --filter @dnhyxc-ai/scripts sync-wiki-update-info"
+"update-wiki": "pnpm -C apps/frontend exec release-kit wiki-sync-update-info"
 ```
+
+（若需直接调用 `packages/release-run` 内脚本，可使用：`pnpm --filter @dnhyxc-ai/release-run sync-wiki-update-info`。）
 
 桌面完整发布链路见 `build` / `build:patch` 等；Wiki 同步可通过 **`pnpm update-wiki`** 单独执行（或在 CI 中接在 `upload-to-release` 之后）。
 
@@ -64,7 +66,7 @@
 
 ### 5.1 Wiki clone URL 的 token 写法
 
-文件：`packages/scripts/src/wiki/sync-wiki-update-info.ts`（约 L38–L41）
+文件：`packages/release-run/src/wiki/sync-wiki-update-info.ts`（约 L38–L41）
 
 ```ts
 function wikiCloneUrl(): string {
@@ -78,7 +80,7 @@ function wikiCloneUrl(): string {
 
 ### 5.2 `runGit`：统一封装 git 子进程（关键：禁止交互式输入）
 
-文件：`packages/scripts/src/wiki/sync-wiki-update-info.ts`（约 L18–L36）
+文件：`packages/release-run/src/wiki/sync-wiki-update-info.ts`（约 L18–L36）
 
 ```ts
 function runGit(
@@ -106,7 +108,7 @@ function runGit(
 
 ### 5.3 主流程：clone → 写入 → commit → push（含“无变化跳过”）
 
-文件：`packages/scripts/src/wiki/sync-wiki-update-info.ts`（约 L43 起至文件末尾的 `main`）
+文件：`packages/release-run/src/wiki/sync-wiki-update-info.ts`（约 L43 起至文件末尾的 `main`）
 
 ```ts
 function main(): number {
@@ -150,7 +152,7 @@ function main(): number {
 		fs.writeFileSync(targetPath, body, 'utf-8');
 
 		// 7) 提交作者信息：用 git -c 覆盖，避免依赖机器全局 git config
-		const authorName = process.env.WIKI_GIT_AUTHOR_NAME ?? 'dnhyxc-ai-scripts';
+		const authorName = process.env.WIKI_GIT_AUTHOR_NAME ?? 'dnhyxc-ai-release-run';
 		const authorEmail = process.env.WIKI_GIT_AUTHOR_EMAIL ?? 'dnhyxc-ai-sync@users.noreply.github.com';
 
 		// 8) add / commit / push
@@ -191,7 +193,7 @@ function main(): number {
 }
 ```
 
-> 说明：上面代码块是对源码的“结构化摘录 + 注释解释”，便于理解意图；最终执行逻辑仍以 `packages/scripts/src/wiki/sync-wiki-update-info.ts` 与 `packages/scripts/src/lib/paths.ts` 为准。
+> 说明：上面代码块是对源码的“结构化摘录 + 注释解释”，便于理解意图；最终执行逻辑仍以 `packages/release-run/src/wiki/sync-wiki-update-info.ts` 与 `packages/release-run/src/lib/paths.ts` 为准。
 
 ---
 

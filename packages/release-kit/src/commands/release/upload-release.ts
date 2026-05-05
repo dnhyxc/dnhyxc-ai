@@ -6,6 +6,7 @@ import {
 	type ReleaseUploadConfig,
 	uploadToRelease,
 } from '../../github/release-client.js';
+import { exitIfMissingEnv } from '../../lib/required-env.js';
 import { githubUserAgent } from '../../pkg/meta.js';
 
 function parseExtraFiles(cwd: string, args: string[]): string[] {
@@ -24,19 +25,12 @@ export async function runUploadRelease(
 	ctx: ResolvedReleaseKit,
 	args: string[],
 ): Promise<void> {
-	const TOKEN = process.env.GITHUB_TOKEN;
-	const OWNER = process.env.OWNER;
-	const REPO = process.env.APP_REPO;
-	const TAG = process.env.APP_TAG || 'latest';
+	exitIfMissingEnv(ctx, ['GITHUB_TOKEN', 'OWNER', 'APP_REPO']);
 
-	if (!TOKEN) {
-		console.error('❌ 请设置 GITHUB_TOKEN 环境变量');
-		process.exit(1);
-	}
-	if (!OWNER || !REPO) {
-		console.error('❌ 请设置 OWNER 与 APP_REPO 环境变量');
-		process.exit(1);
-	}
+	const TOKEN = process.env.GITHUB_TOKEN!;
+	const OWNER = process.env.OWNER!;
+	const REPO = process.env.APP_REPO!;
+	const TAG = process.env.APP_TAG || 'latest';
 
 	const tarGz = requirePath(
 		'macosTarGz',

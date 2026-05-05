@@ -7,5 +7,9 @@
 	"access": "public",
 	"baseBranch": "main",
 	"updateInternalDependencies": "patch",
-	"ignore": ["@dnhyxc-ai/backend", "@dnhyxc-ai/frontend"]
+	"ignore": [
+		"@dnhyxc-ai/backend",
+		"@dnhyxc-ai/frontend",
+		"@dnhyxc-ai/release-run"
+	]
 }

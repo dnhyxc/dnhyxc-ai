@@ -19,7 +19,7 @@ Monorepo 使用 [Changesets](https://github.com/changesets/changesets) 管理 **
 ## 配置位置
 
 - **`.changeset/config.json`**：`access`、`baseBranch`、`ignore` 等。
-- 默认 **`ignore`** 包含 **`@dnhyxc-ai/scripts`**（仓库内脚本包，不面向 npm）。  
+- 建议将 **`@dnhyxc-ai/release-run`**（仓库内发布辅助脚本包，不面向 npm）加入 **`ignore`**，避免被 Changesets 误纳入版本与发布。  
   已在 **`package.json`** 中标记 **`private: true`** 的包（如 `@dnhyxc-ai/mcps`、`@dnhyxc-ai/ci`）Changesets 也不会发布。
 
 若默认分支不是 `main`，请修改 `.changeset/config.json` 中的 **`baseBranch`**。

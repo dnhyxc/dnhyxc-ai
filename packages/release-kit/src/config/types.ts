@@ -44,6 +44,8 @@ export type CliGlobalFlags = {
 
 /** 绝对路径上下文（供各子命令使用） */
 export type ResolvedReleaseKit = {
+	/** CLI 入口解析并加载的 .env 绝对路径（用于缺省变量时的提示） */
+	dotenvPath?: string;
 	/** 工程根目录（解析相对路径的基准） */
 	root: string;
 	configPath: string | null;
