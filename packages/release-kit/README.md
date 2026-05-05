@@ -28,18 +28,18 @@ npm install -D @dnhyxc-ai/release-kit
 
 以下参数可在 **子命令前或后** 出现（二者等价），优先级高于配置文件：
 
-| 参数 | 说明 |
-|------|------|
-| `--config <path>` | 指定配置文件 |
-| `--root <path>` | 工程根目录 |
-| `--tauri-config <path>` | `tauri.conf.json` |
-| `--latest-json <path>` | `latest.json` |
-| `--macos-tar-gz <path>` | macOS 更新包 `.tar.gz` |
-| `--macos-sig <path>` | 签名文件 |
-| `--dmg-bundle-dir <dir>` | dmg 输出目录 |
-| `--wiki-update-md <path>` | Wiki 更新说明源 Markdown |
-| `--wiki-guide-md <path>` | Wiki 教程源 Markdown |
-| `--dotenv <path>` | `.env` 路径（默认 `<root>/.env`） |
+| 参数                      | 说明                              |
+| ------------------------- | --------------------------------- |
+| `--config <path>`         | 指定配置文件                      |
+| `--root <path>`           | 工程根目录                        |
+| `--tauri-config <path>`   | `tauri.conf.json`                 |
+| `--latest-json <path>`    | `latest.json`                     |
+| `--macos-tar-gz <path>`   | macOS 更新包 `.tar.gz`            |
+| `--macos-sig <path>`      | 签名文件                          |
+| `--dmg-bundle-dir <dir>`  | dmg 输出目录                      |
+| `--wiki-update-md <path>` | Wiki 更新说明源 Markdown          |
+| `--wiki-guide-md <path>`  | Wiki 教程源 Markdown              |
+| `--dotenv <path>`         | `.env` 路径（默认 `<root>/.env`） |
 
 ## 子命令
 
@@ -91,11 +91,11 @@ pnpm publish --access public
 
 ```json
 {
-  "scripts": {
-    "release:bump": "release-kit bump-version patch",
-    "release:latest": "release-kit update-latest",
-    "release:upload": "release-kit upload-release"
-  }
+	"scripts": {
+		"release:bump": "release-kit bump-version patch",
+		"release:latest": "release-kit update-latest",
+		"release:upload": "release-kit upload-release"
+	}
 }
 ```
 
@@ -103,10 +103,40 @@ pnpm publish --access public
 
 ```ts
 import {
-  loadResolvedReleaseKit,
-  parseGlobalArgv,
-  splitCommandArgv,
-} from '@dnhyxc-ai/release-kit';
+	loadResolvedReleaseKit,
+	parseGlobalArgv,
+	splitCommandArgv,
+} from "@dnhyxc-ai/release-kit";
+```
+
+## release-kit.config.json 配置示例
+
+```json
+{
+	"root": ".",
+	"paths": {
+		"tauriConfig": "apps/frontend/src-tauri/tauri.conf.json",
+		"latestJson": "apps/frontend/latest.json",
+		"macosTarGz": "apps/frontend/src-tauri/target/release/bundle/macos/your-app.app.tar.gz",
+		"macosSig": "apps/frontend/src-tauri/target/release/bundle/macos/your-app.app.tar.gz.sig",
+		"dmgBundleDir": "apps/frontend/src-tauri/target/release/bundle/dmg",
+		"wikiUpdateSourceMd": "docs/project-update-info.md",
+		"wikiGuideSourceMd": "docs/project-guide.md"
+	},
+	"latestJsonPlatformKey": "darwin-aarch64",
+	"wiki": {
+		"updateInfo": {
+			"owner": "your-org",
+			"repo": "your-repo",
+			"pageFile": "Update-Info.md"
+		},
+		"guide": {
+			"owner": "your-org",
+			"repo": "your-product-repo",
+			"pageFile": "Product-Guide.md"
+		}
+	}
+}
 ```
 
 ## 许可证
