@@ -10,6 +10,14 @@
 		"dist",
 		"README.md"
 	],
+	"keywords": [
+		"react",
+		"markdown",
+		"kit",
+		"markdown-kit"
+	],
+	"author": "dnhyxc <dnhyxc@163.com>",
+	"license": "MIT",
 	"scripts": {
 		"clean": "rm -rf dist src/highlight/styles.ts",
 		"build:css": "node scripts/build-mk-css.js",
