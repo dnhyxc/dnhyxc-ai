@@ -33,7 +33,8 @@
 		"guide-wiki": "pnpm -C apps/frontend exec release-kit wiki-sync-guide",
 		"changeset": "changeset",
 		"changeset:version": "changeset version",
-		"changeset:publish": "changeset publish"
+		"changeset:publish": "changeset publish",
+		"test": "pnpm --filter @dnhyxc-ai/markdown-kit test"
 	},
 	"keywords": [],
 	"author": "dnhyxc",

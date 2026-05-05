@@ -22,7 +22,10 @@
 		"clean": "rm -rf dist src/highlight/styles.ts",
 		"build:css": "node scripts/build-mk-css.js",
 		"build": "pnpm clean && pnpm build:css && tsup",
-		"prepack": "pnpm build"
+		"prepack": "pnpm build",
+		"pretest": "pnpm build:css",
+		"test": "vitest run",
+		"test:watch": "vitest"
 	},
 	"exports": {
 		".": {
@@ -60,11 +63,15 @@
 		"mermaid": "^11.14.0"
 	},
 	"devDependencies": {
+		"@testing-library/react": "^16.3.0",
 		"@types/highlight.js": "^10.1.0",
 		"@types/katex": "^0.16.8",
 		"@types/markdown-it": "^14.1.2",
 		"@types/react": "^19.1.8",
+		"happy-dom": "^20.0.10",
 		"react": "^19.1.0",
-		"tsup": "^8.5.1"
+		"react-dom": "^19.1.0",
+		"tsup": "^8.5.1",
+		"vitest": "^3.2.4"
 	}
 }
