@@ -30,7 +30,10 @@
 		"publish": "pnpm -C apps/frontend run publish",
 		"deploy": "pnpm -C apps/frontend run build && pnpm run publish",
 		"update-wiki": "pnpm -C apps/frontend exec release-kit wiki-sync-update-info",
-		"guide-wiki": "pnpm -C apps/frontend exec release-kit wiki-sync-guide"
+		"guide-wiki": "pnpm -C apps/frontend exec release-kit wiki-sync-guide",
+		"changeset": "changeset",
+		"changeset:version": "changeset version",
+		"changeset:publish": "changeset publish"
 	},
 	"keywords": [],
 	"author": "dnhyxc",
@@ -45,7 +48,8 @@
 		"husky": "8.0.3",
 		"ts-node": "^10.9.2",
 		"tsx": "^4.21.0",
-		"typescript": "~5.8.3"
+		"typescript": "~5.8.3",
+		"@changesets/cli": "^2.29.8"
 	},
 	"config": {
 		"commitizen": {
