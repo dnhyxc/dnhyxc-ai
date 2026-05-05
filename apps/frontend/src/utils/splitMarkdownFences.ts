@@ -9,7 +9,7 @@
 import type {
 	MarkdownMermaidSplitPart,
 	MarkdownParser,
-} from '@dnhyxc-ai/tools';
+} from '@dnhyxc-ai/markdown-kit';
 import {
 	fenceClosingIndentMatchesOpen,
 	isPlausibleMarkdownFenceIndent,

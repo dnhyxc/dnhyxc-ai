@@ -206,7 +206,7 @@ apps/backend/src/rag/
 ### 7.2 分块策略选择
 
 - **固定字符窗口 + overlap（重叠）**：实现简单；默认 baseline。
-- **Markdown 感知**：按 `##` 标题边界优先切，减少表格/代码块被拦腰截断（可结合本仓库 `@dnhyxc-ai/tools` 的 Markdown 解析能力做结构切分，属增强项）。
+- **Markdown 感知**：按 `##` 标题边界优先切，减少表格/代码块被拦腰截断（可结合本仓库 `@dnhyxc-ai/markdown-kit` 的 Markdown 解析能力做结构切分，属增强项）。
 - **代码仓库 RAG**：按文件/函数 AST 切分（本文不展开）。
 
 ### 7.3 版本与删除

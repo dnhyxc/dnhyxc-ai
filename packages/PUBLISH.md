@@ -6,7 +6,7 @@ Monorepo 使用 [Changesets](https://github.com/changesets/changesets) 管理 **
 
 - 已在仓库根目录安装 `@changesets/cli`（根目录 `package.json` 的 `devDependencies`）。
 - npm 已登录且对 `@dnhyxc-ai` scope 有发布权限：`npm login`。
-- 发布前各包需已构建（例如 `@dnhyxc-ai/release-kit` 的 `dist`、`@dnhyxc-ai/tools` 的 `dist`）；对应包内通常已有 `prepublishOnly` / `prepack`。
+- 发布前各包需已构建（例如 `@dnhyxc-ai/release-kit` 的 `dist`、`@dnhyxc-ai/markdown-kit` 的 `dist`）；对应包内通常已有 `prepublishOnly` / `prepack`。
 
 ## 常用命令（在仓库根目录执行）
 

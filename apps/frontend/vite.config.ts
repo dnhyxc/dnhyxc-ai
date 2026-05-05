@@ -18,7 +18,7 @@ export default defineConfig(() => {
 		},
 		optimizeDeps: {
 			include: [
-				'@dnhyxc-ai/tools/react',
+				'@dnhyxc-ai/markdown-kit/react',
 				'mermaid',
 				'monaco-editor',
 				'prettier/standalone',

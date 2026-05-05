@@ -1,4 +1,4 @@
-import type { HighlightJsThemeId } from '@dnhyxc-ai/tools';
+import type { HighlightJsThemeId } from '@dnhyxc-ai/markdown-kit';
 
 import type { ThemeName } from '@/hooks/theme';
 

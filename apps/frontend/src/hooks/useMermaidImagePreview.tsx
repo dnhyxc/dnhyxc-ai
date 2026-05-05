@@ -2,7 +2,7 @@ import ImagePreview from '@design/ImagePreview';
 import {
 	closestMermaidMarkdownWrap,
 	MERMAID_ENTRY_SELECTOR,
-} from '@dnhyxc-ai/tools';
+} from '@dnhyxc-ai/markdown-kit';
 import {
 	type ReactNode,
 	type RefObject,

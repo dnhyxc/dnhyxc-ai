@@ -1,6 +1,6 @@
-import { MarkdownParser } from '@dnhyxc-ai/tools';
-import { useMermaidInMarkdownRoot } from '@dnhyxc-ai/tools/react';
-import '@dnhyxc-ai/tools/styles.css';
+import { MarkdownParser } from '@dnhyxc-ai/markdown-kit';
+import { useMermaidInMarkdownRoot } from '@dnhyxc-ai/markdown-kit/react';
+import '@dnhyxc-ai/markdown-kit/styles.css';
 import DragUpload from '@design/DragUpload';
 import Image from '@design/Image';
 import {

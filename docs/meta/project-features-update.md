@@ -12,7 +12,7 @@
 | `apps/frontend`           | React + Vite 前端；知识库、聊天、设置、路由与 Tauri/Web 双端适配     |
 | `apps/backend`            | NestJS 后端；会话、流式对话、队列落库等（见 `chatbot.md`）           |
 | `apps/frontend/src-tauri` | Tauri 2 桌面壳；知识库本地目录、系统命令等                           |
-| `packages/tools`          | 发布为 `@dnhyxc-ai/tools`：Markdown 解析、样式、Mermaid React 辅助等 |
+| `packages/markdown-kit`          | 发布为 `@dnhyxc-ai/markdown-kit`：Markdown 解析、样式、Mermaid React 辅助等 |
 
 ---
 
@@ -48,7 +48,7 @@
 
 ---
 
-### 2.4 Markdown 工具包（`@dnhyxc-ai/tools`）
+### 2.4 Markdown 工具包（`@dnhyxc-ai/markdown-kit`）
 
 - **`MarkdownParser`**：`MarkdownIt` + KaTeX + GFM 待办补丁 + highlight.js；可选聊天围栏工具栏、Mermaid 占位、标题行号 `data-md-heading-line`、拆岛 **`splitForMermaidIslands`**（含 **`lineBase0`** 全文行号语义）等。
 - **样式产物**：`github-markdown`、KaTeX、全量 hljs 主题映射与类型安全 id。
@@ -110,15 +110,15 @@
 
 **文档**：[`mermaid/markdown-zoom-and-preview.md`](../mermaid/markdown-zoom-and-preview.md)
 
-- **Mermaid 占位 DOM 契约（选择器/HTML 片段）收口**：`packages/tools/src/mermaid/markdown-selectors.ts` 集中导出 **`MERMAID_MARKDOWN_*`**、`closestMermaidMarkdownWrap`、`MARKDOWN_MERMAID_PLACEHOLDER_HTML` 等，与 **`MarkdownParser.patchMermaidFence`**、**`runMermaidInMarkdownRoot`**、前端岛/工具栏/预览 **同源**，避免业务侧散落 `.markdown-mermaid-wrap` 字符串难维护。
+- **Mermaid 占位 DOM 契约（选择器/HTML 片段）收口**：`packages/markdown-kit/src/mermaid/markdown-selectors.ts` 集中导出 **`MERMAID_MARKDOWN_*`**、`closestMermaidMarkdownWrap`、`MARKDOWN_MERMAID_PLACEHOLDER_HTML` 等，与 **`MarkdownParser.patchMermaidFence`**、**`runMermaidInMarkdownRoot`**、前端岛/工具栏/预览 **同源**，避免业务侧散落 `.markdown-mermaid-wrap` 字符串难维护。
 
 **文档**：[`tools/index.md`](../tools/index.md) **§11.2.1**（动机与 API 表）、**§11.2.2**（**带行尾 `//` 中文注释** 的实现源码摘录：契约模块 / `runMermaidInMarkdownRoot` / `patchMermaidFence` 节选 / 岛与 Hook 与工具栏节选）；[`tools/usage-guide.md`](../tools/usage-guide.md) **§8.5**（使用者示例，同样行尾注释）
 
-- **Markdown 围栏代码块（复制/下载工具栏）DOM 契约**：`packages/tools/src/markdown/code-fence-dom.ts` 集中导出 **`MARKDOWN_CODE_FENCE_*`**、`queryMarkdownCodeFenceBlockRoots`；与 **`MarkdownParser.patchChatCodeFenceRenderer`**、**`markdown/code-fence-actions.ts`**、前端 **`layoutChatCodeToolbars`** **同源**，避免业务侧散落 `[data-chat-code-block]` 等字符串。
+- **Markdown 围栏代码块（复制/下载工具栏）DOM 契约**：`packages/markdown-kit/src/markdown/code-fence-dom.ts` 集中导出 **`MARKDOWN_CODE_FENCE_*`**、`queryMarkdownCodeFenceBlockRoots`；与 **`MarkdownParser.patchChatCodeFenceRenderer`**、**`markdown/code-fence-actions.ts`**、前端 **`layoutChatCodeToolbars`** **同源**，避免业务侧散落 `[data-chat-code-block]` 等字符串。
 
 **文档**：[`tools/index.md`](../tools/index.md) **第 11.8.6.0 小节**（动机、方案、维护约定、**带行尾 `//` 中文注释** 的源码摘录）；[`tools/usage-guide.md`](../tools/usage-guide.md) **第 7.6.0 小节**（从包内 import 的短示例）
 
-- **`packages/tools/src` 源码按功能分目录（重组，不改变对外 API）**：将 Markdown / Mermaid / highlight.js 相关源码分别归入 `markdown/`、`mermaid/`、`highlight/`；仅调整内部相对 import 与构建脚本生成路径，**使用方仍从 `@dnhyxc-ai/tools` / `@dnhyxc-ai/tools/react` 导入**，不需要变更业务侧 import。
+- **`packages/markdown-kit/src` 源码按功能分目录（重组，不改变对外导出的符号集合）**：将 Markdown / Mermaid / highlight.js 相关源码分别归入 `markdown/`、`mermaid/`、`highlight/`；仅调整内部相对 import 与构建脚本生成路径。**包名已由 `@dnhyxc-ai/tools` 更名为 `@dnhyxc-ai/markdown-kit`**，业务侧 import 需使用新 scope（子路径仍为 `/react`、样式路径等）。
 
 **文档**：[`tools/index.md`](../tools/index.md) **第 1.1 小节**（完整实现思路：约束、目录规划、迁移步骤、验证与常见误区）
 
@@ -144,8 +144,8 @@
 | [project-guide.md](../project-guide.md) | 面向普通用户的产品功能详解与使用教程 |
 | [meta/project-features-update.md](./project-features-update.md) | **本文**：项目功能与文档总览（索引入口） |
 | [meta/update.md](./update.md) | ChatBot 相关近期提交与代码级改动摘录（更新日志向；本文件位于 `docs/meta/`，因此链接目标仍是同目录 `./update.md`） |
-| [tools/index.md](../tools/index.md) | `@dnhyxc-ai/tools` 包能力、构建、样式与 `MarkdownParser` |
-| [tools/usage-guide.md](../tools/usage-guide.md) | `@dnhyxc-ai/tools` 使用者上手指南与完整示例 |
+| [tools/index.md](../tools/index.md) | `@dnhyxc-ai/markdown-kit` 包能力、构建、样式与 `MarkdownParser` |
+| [tools/usage-guide.md](../tools/usage-guide.md) | `@dnhyxc-ai/markdown-kit` 使用者上手指南与完整示例 |
 | [frontend/route-auth.md](../frontend/route-auth.md) | 前端路由守卫与 401 鉴权收口 |
 | [frontend/tauri-browser.md](../frontend/tauri-browser.md) | Tauri / 浏览器双端运行改造 |
 | [knowledge/auto-save.md](../knowledge/auto-save.md) | 知识库自动保存（防抖）与保存语义 |

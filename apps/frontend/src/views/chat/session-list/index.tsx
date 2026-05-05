@@ -1,6 +1,6 @@
 import Confirm from '@design/Confirm';
 import { Drawer } from '@design/Drawer';
-import { MarkdownParser } from '@dnhyxc-ai/tools';
+import { MarkdownParser } from '@dnhyxc-ai/markdown-kit';
 import { Input, ScrollArea, Spinner, Toast } from '@ui/index';
 import { Check, SquarePen, Trash2, X } from 'lucide-react';
 import { observer } from 'mobx-react';

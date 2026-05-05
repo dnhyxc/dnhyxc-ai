@@ -143,7 +143,7 @@ MobX/React 回显时，若 `value` 与编辑器当前内容一致但仍是「父
 - `apps/frontend/src/components/design/Monaco/utils.ts` — **`syncPreviewScrollFromMarkdownEditorByHeadings`**、**`syncEditorScrollFromPreviewByHeadings`**、**`buildHeadingScrollCache`**、**`HeadingScrollCache`**，及比例回退 **`editorVerticalScrollRatio` / `setPreviewVerticalScrollRatio`**（详见 **§5**、**§5.8**、**§5.9**）  
 - `apps/frontend/src/components/design/Monaco/glassTheme.ts` — 继承内置主题的透明 chrome 主题注册  
 - `apps/frontend/src/components/design/Monaco/options.ts` — 全局默认编辑器选项（Markdown 在 index 内再覆盖一部分）  
-- `packages/tools/src/markdown/parser.ts` — **`MarkdownParser`**；默认开启 **`enableHeadingAnchorIds`** 提供标题 `id`，**`enableHeadingSourceLineAttr`** 为预览标题注入 **`data-md-heading-line`**（详见 **§5**）
+- `packages/markdown-kit/src/markdown/parser.ts` — **`MarkdownParser`**；默认开启 **`enableHeadingAnchorIds`** 提供标题 `id`，**`enableHeadingSourceLineAttr`** 为预览标题注入 **`data-md-heading-line`**（详见 **§5**）
 - `apps/frontend/src/views/knowledge/index.tsx` — 传入 **`documentIdentity`**，保证换篇时 model 与引导文本一致  
 
 ### 3.1 数据流（概念）
@@ -262,7 +262,7 @@ Monaco 在插入 Tab 时，`CursorConfiguration` 使用 **`model.getOptions()`**
 
 当前实现改为：**以 Markdown 标题行为锚点**，在「文首 ↔ 各标题 ↔ 文末」之间用**源码行号**与预览 **`scrollTop`** 做**分段线性映射**。同步方向由 **`MarkdownSplitScrollFollowMode`** 控制（**§5.11**）：**仅预览跟编辑**、**仅编辑跟预览**，或 **双边**（两侧互相同步，仍用 **§5.9.3** 回声抑制防环路）。两套方向的 **utils 层 API** 不变，共用 **`HeadingScrollCache`** 与插值几何。
 
-核心正向 API：`utils.ts` 的 **`syncPreviewScrollFromMarkdownEditorByHeadings`**；反向 API：**`syncEditorScrollFromPreviewByHeadings`**；预览 DOM 行号由 `packages/tools` 的 **`MarkdownParser`** 注入（§5.1）。**与源码逐行对照的走读**见 **§5.10**；**模式门控、底部栏按钮、`memo` 与稳定回调**见 **§5.11**。
+核心正向 API：`utils.ts` 的 **`syncPreviewScrollFromMarkdownEditorByHeadings`**；反向 API：**`syncEditorScrollFromPreviewByHeadings`**；预览 DOM 行号由 `packages/markdown-kit` 的 **`MarkdownParser`** 注入（§5.1）。**与源码逐行对照的走读**见 **§5.10**；**模式门控、底部栏按钮、`memo` 与稳定回调**见 **§5.11**。
 
 ### 5.1 预览侧：标题绑定源码行号（`data-md-heading-line`）
 
@@ -271,7 +271,7 @@ Monaco 在插入 Tab 时，`CursorConfiguration` 使用 **`model.getOptions()`**
 - **ATX（`#`）与 Setext（下划线标题）** 只要解析为 `heading_open`，都会带该属性；**围栏代码块内**不会出现标题 token，因此不会误标。
 - 知识库 Monaco 内嵌的 **`ParserMarkdownPreviewPane`** 构造解析器时显式传入 **`enableHeadingSourceLineAttr: true`**（与 `enableChatCodeFenceToolbar` 等并列）；其它场景（如仅会话列表缩略预览）若未开启，则预览 HTML 无该属性，同步逻辑会走回退（见 5.5）。
 
-实现位置：`packages/tools/src/markdown/parser.ts` 中 **`patchHeadingPreviewAttrs`**（包装 `renderer.rules.heading_open`：在调用链前对 token 写入 **`data-md-heading-line`**；若同时开启 **`enableHeadingAnchorIds`** 则还写入 **`id`**，见目录锚点功能，与跟随滚动共用标题 DOM）。
+实现位置：`packages/markdown-kit/src/markdown/parser.ts` 中 **`patchHeadingPreviewAttrs`**（包装 `renderer.rules.heading_open`：在调用链前对 token 写入 **`data-md-heading-line`**；若同时开启 **`enableHeadingAnchorIds`** 则还写入 **`id`**，见目录锚点功能，与跟随滚动共用标题 DOM）。
 
 ### 5.2 编辑器侧：用「首可见行」代表当前阅读位置
 
@@ -467,7 +467,7 @@ Monaco 在插入 Tab 时，`CursorConfiguration` 使用 **`model.getOptions()`**
 - **`useLayoutEffect([documentIdentity])`**：换篇时 **`localViewportRef` 滚到顶**，与父级对 **`previewViewportRef`** 的换篇逻辑一致（分屏时实为同一节点）。  
 - **`ScrollArea`**（`@ui/scroll-area`）把 **`ref` 与 `onScroll` 挂在 Radix `Viewport`** 上，因此 **`scrollTop`**、**`scrollHeight`**、**`clientHeight`** 均针对该可滚层，与 **`buildHeadingScrollCache` 的 `querySelectorAll` 作用域**一致。
 
-#### 5.10.6 `packages/tools/src/markdown/parser.ts`（与锚点相关的渲染钩子）
+#### 5.10.6 `packages/markdown-kit/src/markdown/parser.ts`（与锚点相关的渲染钩子）
 
 - **`render(text)`** 内 **`const env: MarkdownRenderEnv = {}`**，**`this.md.render(processedText, env)`**，为标题 **`id`** 去重提供 **`env.headingSlugCounts`**（目录功能）；与 **`data-md-heading-line`** 独立但同在 **`patchHeadingPreviewAttrs`** 的 **`heading_open`** 包装里写入属性。  
 - **`patchHeadingPreviewAttrs`**：保存原 **`heading_open`** 规则；新规则里若 **`token.map` 存在**：当 **`enableHeadingSourceLineAttr === true`** 时写 **`taskListAttrSet(..., 'data-md-heading-line', String(map[0]+1))`**；当 **`enableHeadingAnchorIds !== false`** 时，从 **`tokens[idx+1]`** 内联 token 抽纯文本 → **`slugifyHeadingText` / `nextHeadingAnchorId`** → **`taskListAttrSet(..., 'id', id)`**；最后 **`prev(...)` 或 `self.renderToken`**。

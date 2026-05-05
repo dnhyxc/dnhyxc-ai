@@ -189,7 +189,7 @@ export function normalizeMermaidFenceBody(body: string): string {
 	return relaxMermaidBracketLabels(eol);
 }
 
-// 正文/公式样式仍建议 import '@dnhyxc-ai/tools/styles.css' 或 markdown-base.css。
+// 正文/公式样式仍建议 import '@dnhyxc-ai/markdown-kit/styles.css' 或 markdown-base.css。
 // 代码块主题可通过构造参数 highlightTheme（CDN）或 highlightThemeCss（内联）注入，亦可继续用手动 import。
 
 export interface MarkdownParserOptions {
@@ -271,7 +271,7 @@ export interface MarkdownParserOptions {
 	enableHeadingAnchorIds?: boolean;
 	/**
 	 * 是否将 ```mermaid 围栏解析为 Mermaid 占位 DOM。
-	 * 为 false 时按普通代码块展示；实例字段 `enableMermaid` 与之一致，配合 `@dnhyxc-ai/tools/react` 的 `useMermaidInMarkdownRoot`。
+	 * 为 false 时按普通代码块展示；实例字段 `enableMermaid` 与之一致，配合 `@dnhyxc-ai/markdown-kit/react` 的 `useMermaidInMarkdownRoot`。
 	 * @default true
 	 */
 	enableMermaid?: boolean;
@@ -475,7 +475,7 @@ class MarkdownParser {
 	}
 
 	/**
-	 * 包裹 fence：语言为 mermaid 时输出占位结构，插入 DOM 后由 `@dnhyxc-ai/tools/react` 的 `useMermaidInMarkdownRoot` 渲染。
+	 * 包裹 fence：语言为 mermaid 时输出占位结构，插入 DOM 后由 `@dnhyxc-ai/markdown-kit/react` 的 `useMermaidInMarkdownRoot` 渲染。
 	 */
 	private patchMermaidFence(): void {
 		const md = this.md;

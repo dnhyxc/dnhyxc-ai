@@ -808,7 +808,7 @@
 			"name": "ChatCodeToolBar",
 			"title": "代码块工具栏",
 			"category": "chat",
-			"description": "Markdown 代码围栏上的复制/下载等操作条（与 @dnhyxc-ai/tools 契约配合）。",
+			"description": "Markdown 代码围栏上的复制/下载等操作条（与 @dnhyxc-ai/markdown-kit 契约配合）。",
 			"tags": ["chat", "markdown", "code"],
 			"props": [
 				{

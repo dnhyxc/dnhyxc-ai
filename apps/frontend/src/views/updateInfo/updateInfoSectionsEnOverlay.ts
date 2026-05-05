@@ -25,7 +25,7 @@ export const UPDATE_INFO_SECTION_TITLES_EN: Record<string, string> = {
 	s15: '15. Monaco & Markdown advanced (summary)',
 	s16: '16. Desktop clipboard & layout',
 	s17: '17. Deployment, gateway & operations',
-	s18: '18. @dnhyxc-ai/tools & fenced-block parsing',
+	s18: '18. @dnhyxc-ai/markdown-kit & fenced-block parsing',
 	s19: '19. Metadata & documentation conventions',
 	s20: '20. About dialog & standalone legal pages',
 	s21: '21. Release notes standalone page (structured UI)',

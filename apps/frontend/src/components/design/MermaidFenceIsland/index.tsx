@@ -17,8 +17,8 @@ import {
 	MERMAID_ENTRY_SELECTOR,
 	normalizeMermaidFenceBody,
 	queryFirstMermaidMarkdownWrap,
-} from '@dnhyxc-ai/tools';
-import { runMermaidInMarkdownRoot } from '@dnhyxc-ai/tools/react';
+} from '@dnhyxc-ai/markdown-kit';
+import { runMermaidInMarkdownRoot } from '@dnhyxc-ai/markdown-kit/react';
 import { memo, useLayoutEffect, useRef } from 'react';
 import { useMermaidDiagramClickPreview } from '@/hooks/useMermaidImagePreview';
 import { cn } from '@/lib/utils';

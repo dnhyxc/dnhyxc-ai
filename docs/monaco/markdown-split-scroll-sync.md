@@ -1,6 +1,6 @@
 # Monaco Markdown 分屏跟随滚动：实现说明
 
-本文记录知识库 / Markdown 编辑器**分屏（split）**下「左侧 Monaco、右侧预览」**纵向滚动对齐**的完整实现思路、涉及模块与维护要点。实现分布在 `apps/frontend` 与 `packages/tools` 中。
+本文记录知识库 / Markdown 编辑器**分屏（split）**下「左侧 Monaco、右侧预览」**纵向滚动对齐**的完整实现思路、涉及模块与维护要点。实现分布在 `apps/frontend` 与 `packages/markdown-kit` 中。
 
 ---
 
@@ -117,7 +117,7 @@
 
 ### 4.1 标题属性：`data-md-heading-line`
 
-`packages/tools` 中 `MarkdownParser` 在 `enableHeadingSourceLineAttr: true` 时，于 `heading_open` 注入 **`data-md-heading-line`**，值为 **`token.map[0] + 1`**（与 Monaco **1-based 行号**一致）。分屏预览构造 parser 时已开启该选项。
+`packages/markdown-kit` 中 `MarkdownParser` 在 `enableHeadingSourceLineAttr: true` 时，于 `heading_open` 注入 **`data-md-heading-line`**，值为 **`token.map[0] + 1`**（与 Monaco **1-based 行号**一致）。分屏预览构造 parser 时已开启该选项。
 
 ### 4.2 Mermaid 岛布局带来的行号陷阱
 
@@ -125,7 +125,7 @@
 
 ### 4.3 修复：`lineBase0` + `shiftMarkdownPreviewHeadingLineAttrs`
 
-1. **`MarkdownParser.splitForMermaidIslands`**（`packages/tools/src/markdown/parser.ts`）  
+1. **`MarkdownParser.splitForMermaidIslands`**（`packages/markdown-kit/src/markdown/parser.ts`）  
    与 `render` 同源用 `md.parse` 切分；每个 `markdown` 段附带 **`lineBase0`**：整篇源在 **`\r\n`/`\r` 规范为 `\n` 后**，该段**首行**的 **0-based** 行下标。
 
 2. **`MarkdownMermaidSplitPart` 类型**（同文件导出）  
@@ -143,7 +143,7 @@
 补充说明（本轮优化点）：
 
 - 过去预览为了“同一处既要开 Mermaid、又要关 Mermaid”只能 `new MarkdownParser` 两次（一个 `enableMermaid: true`、一个 `false`）。
-- 现在 `@dnhyxc-ai/tools` 的 `MarkdownParser.render()` 支持 `render(text, { enableMermaid })`，因此 `preview.tsx` 可以只保留一个 parser，通过渲染参数按需禁用 Mermaid，占位 DOM 不会与 Mermaid 岛重复。
+- 现在 `@dnhyxc-ai/markdown-kit` 的 `MarkdownParser.render()` 支持 `render(text, { enableMermaid })`，因此 `preview.tsx` 可以只保留一个 parser，通过渲染参数按需禁用 Mermaid，占位 DOM 不会与 Mermaid 岛重复。
 
 ### 4.4 与 `splitForMermaidIslandsWithOpenTail` 的关系
 
@@ -270,7 +270,7 @@ __html: shiftMarkdownPreviewHeadingLineAttrs(rawHtml, part.lineBase0),
 ### 5.6 拆岛类型与 `lineBase0` 语义（`markdown/parser.ts`）
 
 ```typescript
-// packages/tools/src/markdown/parser.ts
+// packages/markdown-kit/src/markdown/parser.ts
 
 /**
  * markdown 段带 lineBase0：整篇源（\r\n 已规范为 \n）中该段首行的 0-based 行下标，
@@ -304,8 +304,8 @@ export type MarkdownMermaidSplitPart =
 | `apps/frontend/src/components/design/Monaco/preview.tsx` | 预览 DOM、拆岛渲染、行号平移；**TOC `#` 锚点**见 `markdown-preview-toc-hash-navigation.md` |
 | `apps/frontend/src/utils/external-link-click.ts` | 捕获阶段接管链接；**`#` + `skipHashAnchors` 须 `preventDefault`**，与预览内滚动配合 |
 | `apps/frontend/src/utils/splitMarkdownFences.ts` | `splitForMermaidIslandsWithOpenTail` 组合开放尾围栏 |
-| `packages/tools/src/markdown/parser.ts` | `splitForMermaidIslands`、`data-md-heading-line`、`MarkdownMermaidSplitPart` |
-| `packages/tools/src/index.ts` | 导出 `MarkdownMermaidSplitPart` 等 |
+| `packages/markdown-kit/src/markdown/parser.ts` | `splitForMermaidIslands`、`data-md-heading-line`、`MarkdownMermaidSplitPart` |
+| `packages/markdown-kit/src/index.ts` | 导出 `MarkdownMermaidSplitPart` 等 |
 
 ---
 

@@ -27,7 +27,7 @@ export type RunMermaidInMarkdownOptions = {
 
 /**
  * 在已挂载的 Markdown 容器内查找 `[data-mermaid="1"]` 占位块并渲染为 SVG。
- * 由 `@dnhyxc-ai/tools/react` 导出；`mermaid` 为 tsup external，随本包 dependencies 安装供打包器解析。
+ * 由 `@dnhyxc-ai/markdown-kit/react` 导出；`mermaid` 为 tsup external，随本包 dependencies 安装供打包器解析。
  */
 export async function runMermaidInMarkdownRoot(
 	root: HTMLElement | null | undefined,

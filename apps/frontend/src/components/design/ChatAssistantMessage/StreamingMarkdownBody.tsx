@@ -11,7 +11,7 @@ import { MermaidFenceToolbarActions } from '@design/MermaidFenceToolbar';
 import type {
 	MarkdownMermaidSplitPart,
 	MarkdownParser,
-} from '@dnhyxc-ai/tools';
+} from '@dnhyxc-ai/markdown-kit';
 import { type RefObject, useMemo } from 'react';
 import { useMermaidImagePreview } from '@/hooks/useMermaidImagePreview';
 import { cn } from '@/lib/utils';

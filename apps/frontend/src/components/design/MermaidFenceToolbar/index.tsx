@@ -8,7 +8,7 @@ import {
 	createMarkdownCodeFenceInfo,
 	downloadMarkdownCodeFenceWith,
 	MERMAID_MARKDOWN_SVG_SELECTOR,
-} from '@dnhyxc-ai/tools';
+} from '@dnhyxc-ai/markdown-kit';
 import { Button } from '@ui/index';
 import { CheckCircle, Code2, Copy, Download, Eye } from 'lucide-react';
 import {

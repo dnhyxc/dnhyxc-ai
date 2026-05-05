@@ -6,8 +6,8 @@ import {
 	MARKDOWN_MERMAID_TAILWIND_CURSOR_ZOOM_IN_CLASS,
 	type MarkdownMermaidSplitPart,
 	MarkdownParser,
-} from '@dnhyxc-ai/tools';
-import { useMermaidInMarkdownRoot } from '@dnhyxc-ai/tools/react';
+} from '@dnhyxc-ai/markdown-kit';
+import { useMermaidInMarkdownRoot } from '@dnhyxc-ai/markdown-kit/react';
 import { ScrollArea } from '@ui/index';
 import { ChevronDown, ChevronUp, Component } from 'lucide-react';
 import {
@@ -86,7 +86,7 @@ interface ParserMarkdownPreviewPaneProps {
 }
 
 /**
- * 使用 @dnhyxc-ai/tools 的 MarkdownParser 渲染预览（与文档处理等页一致）。
+ * 使用 @dnhyxc-ai/markdown-kit 的 MarkdownParser 渲染预览（与文档处理等页一致）。
  * 知识库等场景仍启用围栏代码块内联工具栏；Mermaid 岛与 `StreamingMarkdownBody` 一致带顶栏与 sticky 吸顶（`MermaidFenceToolbar`）。
  */
 const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({

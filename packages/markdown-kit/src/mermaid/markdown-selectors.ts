@@ -6,7 +6,7 @@
  * - `runMermaidInMarkdownRoot` / 前端岛组件 / 工具栏预览会依赖同一套选择器
  *
  * 若把选择器字符串散落在业务代码里，一旦解析器调整 DOM，会导致多处同步修改、易漏改。
- * 因此把“对外契约”集中在本文件，由 `@dnhyxc-ai/tools` 统一导出。
+ * 因此把“对外契约”集中在本文件，由 `@dnhyxc-ai/markdown-kit` 统一导出。
  */
 
 /** 外层包裹容器 class（与 `MarkdownParser.patchMermaidFence` 输出一致） */

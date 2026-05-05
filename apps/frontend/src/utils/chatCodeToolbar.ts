@@ -14,12 +14,12 @@ import {
 	MARKDOWN_CODE_FENCE_TOOLBAR_SELECTOR,
 	MARKDOWN_CODE_FENCE_TOOLBAR_SLOT_SELECTOR,
 	queryMarkdownCodeFenceBlockRoots,
-} from '@dnhyxc-ai/tools';
+} from '@dnhyxc-ai/markdown-kit';
 import { downloadBlob } from '.';
 
 /**
  * 宿主（聊天）消息气泡壳：用于浮动条水平对齐参照。
- * 说明：**非** `MarkdownParser` 输出；由前端消息布局约定，故保留在本文件而非 `@dnhyxc-ai/tools`。
+ * 说明：**非** `MarkdownParser` 输出；由前端消息布局约定，故保留在本文件而非 `@dnhyxc-ai/markdown-kit`。
  */
 const CHAT_ASSISTANT_SHELL_SELECTOR = '[data-chat-assistant-shell]';
 
@@ -80,7 +80,7 @@ export function getChatCodeFloatingToolbarSnapshot(): ChatCodeFloatingToolbarSta
  *
  * 清理内容包括：
  * - `PIN_ATTR`：标记“当前 pinned 的代码块”
- * - `MARKDOWN_CODE_FENCE_TOOLBAR_FLOAT_REPLACED_CLASS`：让原 toolbar 隐形/让位给浮动条的 class（与 `@dnhyxc-ai/tools` 导出一致）
+ * - `MARKDOWN_CODE_FENCE_TOOLBAR_FLOAT_REPLACED_CLASS`：让原 toolbar 隐形/让位给浮动条的 class（与 `@dnhyxc-ai/markdown-kit` 导出一致）
  * - 占位槽 `MARKDOWN_CODE_FENCE_TOOLBAR_SLOT_SELECTOR` 的 `minHeight`：用于占位，防止原 toolbar 被浮动条替换后导致布局跳动
  */
 function resetFloatingMarkersInViewport(viewport: HTMLElement): void {
@@ -127,7 +127,7 @@ function computePinnedBarBox(
 /**
  * 在滚动视口内选出「跨越视口顶边」的代码块中顶边最靠下者，将浮动工具栏固定到视口顶。
  *
- * 关键约定（DOM 契约由 `@dnhyxc-ai/tools` 的 `markdown/code-fence-dom` 与 `MarkdownParser` 同源维护）：
+ * 关键约定（DOM 契约由 `@dnhyxc-ai/markdown-kit` 的 `markdown/code-fence-dom` 与 `MarkdownParser` 同源维护）：
  * - 代码块根：`queryMarkdownCodeFenceBlockRoots` / `MARKDOWN_CODE_FENCE_BLOCK_ROOT_SELECTOR`
  * - 行内工具栏：`MARKDOWN_CODE_FENCE_TOOLBAR_SELECTOR`
  * - 占位槽：`MARKDOWN_CODE_FENCE_TOOLBAR_SLOT_SELECTOR`

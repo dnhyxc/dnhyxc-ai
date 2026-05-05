@@ -221,7 +221,7 @@ const katexSpacingRules = `
 */
 `;
 
-// 仅正文 + 公式 + 间距，不含 highlight.js（用户自行挑选 @dnhyxc-ai/tools/styles/hljs/* ）
+// 仅正文 + 公式 + 间距，不含 highlight.js（用户自行挑选 @dnhyxc-ai/markdown-kit/styles/hljs/* ）
 const markdownBaseParts = baseCssFiles.map((file) => {
 	try {
 		return fs.readFileSync(file.source, 'utf-8');

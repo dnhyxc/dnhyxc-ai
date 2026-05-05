@@ -6,7 +6,7 @@ import { highlightJsThemes } from './styles.js';
  * 转为可在源码中用于静态/动态 import 的包说明符（package specifier）。
  *
  * 示例：`resolveHighlightJsThemeSpecifier('atom-one-dark')`
- * → `@dnhyxc-ai/tools/styles/hljs/atom-one-dark.min.css`
+ * → `@dnhyxc-ai/markdown-kit/styles/hljs/atom-one-dark.min.css`
  */
 export function resolveHighlightJsThemeSpecifier(
 	themeId: HighlightJsThemeId,
@@ -17,5 +17,5 @@ export function resolveHighlightJsThemeSpecifier(
 			`未知的 highlight.js 主题 id: "${themeId}"，请对照包导出的 highlightJsThemeIds。`,
 		);
 	}
-	return `@dnhyxc-ai/tools/${rel.replace(/^\.\//, '')}`;
+	return `@dnhyxc-ai/markdown-kit/${rel.replace(/^\.\//, '')}`;
 }

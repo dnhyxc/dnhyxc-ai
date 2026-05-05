@@ -4,7 +4,10 @@
  * 避免分支切换时数百条编辑器同步初始化卡死主线程（非虚拟列表，DOM 仍保留）。
  */
 
-import { bindMarkdownCodeFenceActions, MarkdownParser } from '@dnhyxc-ai/tools';
+import {
+	bindMarkdownCodeFenceActions,
+	MarkdownParser,
+} from '@dnhyxc-ai/markdown-kit';
 import { Button, Spinner } from '@ui/index';
 import {
 	ChevronDown,

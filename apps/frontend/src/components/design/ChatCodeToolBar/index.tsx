@@ -1,7 +1,7 @@
 import {
 	copyMarkdownCodeFence,
 	getMarkdownCodeFenceInfo,
-} from '@dnhyxc-ai/tools';
+} from '@dnhyxc-ai/markdown-kit';
 import { CheckCircle, Copy, Download } from 'lucide-react';
 import { useCallback, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';

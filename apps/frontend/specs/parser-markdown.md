@@ -1,6 +1,6 @@
 ### 1. 目标与范围
 
-- **目标**：为 `@dnhyxc-ai/tools` 提供一套“Markdown → HTML”的解析与增强能力，覆盖常见文档预览、聊天消息渲染、Monaco 分屏预览等场景，并将关键 DOM/事件契约固化为可复用的工具函数与常量。
+- **目标**：为 `@dnhyxc-ai/markdown-kit` 提供一套“Markdown → HTML”的解析与增强能力，覆盖常见文档预览、聊天消息渲染、Monaco 分屏预览等场景，并将关键 DOM/事件契约固化为可复用的工具函数与常量。
 - **范围**：
   - Markdown 渲染：`MarkdownParser`（基于 `markdown-it`）
   - 数学公式：KaTeX（KaTeX，数学排版）
@@ -18,22 +18,22 @@
 
 ### 2. 目录结构与关键入口
 
-- **入口文件**：`packages/tools/src/index.ts`
+- **入口文件**：`packages/markdown-kit/src/index.ts`
 - **关键依赖**：
   - **markdown**：
-    - `packages/tools/src/markdown/parser.ts`：`MarkdownParser` 核心实现
-    - `packages/tools/src/markdown/code-fence-dom.ts`：围栏代码块（fence）带工具栏的 DOM 契约常量与选择器
-    - `packages/tools/src/markdown/code-fence-actions.ts`：围栏代码块复制/下载动作解析与默认行为
+    - `packages/markdown-kit/src/markdown/parser.ts`：`MarkdownParser` 核心实现
+    - `packages/markdown-kit/src/markdown/code-fence-dom.ts`：围栏代码块（fence）带工具栏的 DOM 契约常量与选择器
+    - `packages/markdown-kit/src/markdown/code-fence-actions.ts`：围栏代码块复制/下载动作解析与默认行为
   - **mermaid**：
-    - `packages/tools/src/mermaid/markdown-selectors.ts`：Mermaid 占位 DOM 契约与选择器
-    - `packages/tools/src/mermaid/in-markdown.ts`：`runMermaidInMarkdownRoot`（队列化 + initialize 去抖）
-    - `packages/tools/src/react/use-mermaid-in-markdown-root.ts`：`useMermaidInMarkdownRoot`（双 rAF + 节流）
+    - `packages/markdown-kit/src/mermaid/markdown-selectors.ts`：Mermaid 占位 DOM 契约与选择器
+    - `packages/markdown-kit/src/mermaid/in-markdown.ts`：`runMermaidInMarkdownRoot`（队列化 + initialize 去抖）
+    - `packages/markdown-kit/src/react/use-mermaid-in-markdown-root.ts`：`useMermaidInMarkdownRoot`（双 rAF + 节流）
   - **highlight**：
-    - `packages/tools/src/highlight/inject-theme.ts`：主题注入/清理（全局单例节点）
-    - `packages/tools/src/highlight/theme-import.ts`：主题 id → 可 import 的包说明符
-    - `packages/tools/src/highlight/styles.ts`：构建生成的主题映射与样式导出
+    - `packages/markdown-kit/src/highlight/inject-theme.ts`：主题注入/清理（全局单例节点）
+    - `packages/markdown-kit/src/highlight/theme-import.ts`：主题 id → 可 import 的包说明符
+    - `packages/markdown-kit/src/highlight/styles.ts`：构建生成的主题映射与样式导出
   - **generated**：
-    - `packages/tools/src/generated/highlight-js-theme-ids.ts`：`HighlightJsThemeId` 类型（与 `styles.ts` 对齐）
+    - `packages/markdown-kit/src/generated/highlight-js-theme-ids.ts`：`HighlightJsThemeId` 类型（与 `styles.ts` 对齐）
 
 ---
 

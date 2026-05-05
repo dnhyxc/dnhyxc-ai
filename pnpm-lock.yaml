@@ -282,9 +282,9 @@ importers:
       '@codesandbox/sandpack-react':
         specifier: ^2.20.0
         version: 2.20.0(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
-      '@dnhyxc-ai/tools':
+      '@dnhyxc-ai/markdown-kit':
         specifier: workspace:*
-        version: link:../../packages/tools
+        version: link:../../packages/markdown-kit
       '@hookform/resolvers':
         specifier: ^5.2.2
         version: 5.2.2(react-hook-form@7.71.1(react@19.2.3))
@@ -536,7 +536,7 @@ importers:
         specifier: ^17.2.3
         version: 17.2.3
 
-  packages/tools:
+  packages/markdown-kit:
     dependencies:
       github-markdown-css:
         specifier: ^5.8.1

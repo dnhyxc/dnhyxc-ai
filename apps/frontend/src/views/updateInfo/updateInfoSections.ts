@@ -563,7 +563,7 @@ const UPDATE_INFO_SECTIONS_ZH: UpdateInfoSection[] = [
 	},
 	{
 		id: 's18',
-		title: '18. @dnhyxc-ai/tools 与围栏解析',
+		title: '18. @dnhyxc-ai/markdown-kit 与围栏解析',
 		items: [
 			{
 				id: 's18-1',
