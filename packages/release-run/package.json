@@ -2,6 +2,7 @@
 	"name": "@dnhyxc-ai/release-run",
 	"version": "0.0.1",
 	"type": "module",
+	"private": true,
 	"scripts": {
 		"bump-version": "tsx src/version/bump-version.ts",
 		"bump-version:patch": "tsx src/version/bump-version.ts patch",

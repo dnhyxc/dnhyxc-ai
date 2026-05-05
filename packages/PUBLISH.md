@@ -31,3 +31,39 @@ Monorepo 使用 [Changesets](https://github.com/changesets/changesets) 管理 **
 3. `pnpm changeset:publish`（或 CI 中等价步骤）完成 npm 发布。
 
 **说明**：根目录脚本 **`pnpm version`** / **`pnpm version:patch`** 等仍用于 **Tauri 应用**（`release-kit` 写 `tauri.conf.json`），与 Changesets 的 **`pnpm changeset:version`** 不同，请勿混淆。
+
+## npm 发布说明
+
+目前发布 npm 包需要创建具有“绕过 2FA”权限的 Granular Access Token。
+
+使用这种令牌，你可以将其配置在 GitHub Actions 或本地环境变量中，实现无需手动输验证码就能自动发布。
+
+### 在 npm 网站生成专用令牌
+
+1. 登录 npmjs.com。
+
+2. 点击右上角你的头像 -> Access Tokens。
+
+3. 点击 Generate New Token -> 选择 Granular Access Token（细粒度访问令牌）。
+
+4. 配置令牌：
+
+- Token name: 随便起个名字，比如 github-actions-publish 或 local-publish。
+- Expiration: 选择一个合适的过期时间（推荐 90 天或 1 年，按需选择）。
+- Packages and scopes:
+  - 选择 Read and write。
+  - 在下面的 Select packages 中，选择 **Only select packages and scopes**，然后输入你的包名前缀 **@dnhyxc-ai**。
+- Organizations: 不用管。
+
+5. 点击 Generate token。⚠️ 立即复制并保存这个 token（以 npm\_ 开头），离开页面后将无法再看到！
+
+### 在本地配置该令牌
+
+你可以在项目根目录下创建一个 .npmrc 文件（如果已经有就不需要新建），将令牌配置到你的 scoped 包下：
+
+```bash
+# 在项目根目录执行，将下面的 YOUR_TOKEN 替换为你刚才复制的 token
+echo "//registry.npmjs.org/:_authToken=YOUR_TOKEN" >> .npmrc
+```
+
+**注意**：请务必将 `.npmrc` 加入你的 .gitignore 中，千万不要将带有 token 的文件提交到 Git 仓库！

@@ -3,6 +3,7 @@
 	"version": "0.1.0",
 	"description": "可配置的桌面端/Tauri 发布辅助 CLI：版本递增、latest.json、GitHub Release 上传、Wiki 文档推送",
 	"type": "module",
+	"private": true,
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
 	"bin": {
