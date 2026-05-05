@@ -28,7 +28,7 @@
 		"@codemirror/state": "^6.5.2",
 		"@codemirror/view": "^6.38.8",
 		"@codesandbox/sandpack-react": "^2.20.0",
-		"@dnhyxc-ai/markdown-kit": "workspace:*",
+		"@dnhyxc-ai/markdown-kit": "^1.0.1",
 		"@hookform/resolvers": "^5.2.2",
 		"@monaco-editor/react": "^4.7.0",
 		"@radix-ui/react-alert-dialog": "^1.1.15",
