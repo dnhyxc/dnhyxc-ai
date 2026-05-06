@@ -9,7 +9,7 @@
 		"prebuid": "rimraf dist",
 		"build": "cross-env NODE_ENV=production nest build",
 		"dist:zip": "rm -f dist.zip && cd dist && zip -qr ../dist.zip .",
-		"deploy:ssh": "pnpm build && pnpm dist:zip && node ../../packages/ci/dist/cli.js ssh:deploy -c ./ci/deploy.backend.json",
+		"deploy:ssh": "pnpm build && pnpm dist:zip && node ../../packages/ci/dist/cli.js ssh:deploy -c ./deploy.backend.json",
 		"start": "nest start",
 		"start:dev": "cross-env NODE_ENV=development nest start --watch",
 		"start:debug": "NODE_ENV=development nest start --debug --watch",

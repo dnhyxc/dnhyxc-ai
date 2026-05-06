@@ -562,7 +562,7 @@ const KnowledgeAssistant = observer(
 						<button
 							type="button"
 							className={cn(
-								'absolute bottom-full z-10 mb-4 right-4 flex h-8.5 w-8.5 cursor-pointer items-center justify-center rounded-full border border-theme/5 bg-theme/5 text-textcolor/70 backdrop-blur-[2px] hover:bg-theme/15',
+								'absolute bottom-full right-4 z-10 mb-4 flex h-8.5 w-8.5 cursor-pointer items-center justify-center rounded-full border border-theme/5 bg-theme/5 text-textcolor/70 backdrop-blur-[2px] hover:bg-theme/15',
 								'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme/40',
 							)}
 							aria-label={
@@ -703,7 +703,7 @@ const KnowledgeAssistant = observer(
 						*/}
 						<ScrollArea
 							ref={scrollViewportRef}
-							className="min-h-0 min-w-0 w-full flex-1 border-0"
+							className="min-h-0 min-w-0 w-full flex-1 border-0 mb-0.5"
 							viewportClassName="pb-1 [overflow-anchor:none]"
 							{...scrollAreaHandlers}
 						>
