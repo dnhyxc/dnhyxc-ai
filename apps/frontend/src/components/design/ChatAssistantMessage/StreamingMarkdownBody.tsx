@@ -12,7 +12,7 @@ import type {
 	MarkdownMermaidSplitPart,
 	MarkdownParser,
 } from '@dnhyxc-ai/markdown-kit';
-import { type RefObject, useMemo } from 'react';
+import { memo, type RefObject, useMemo } from 'react';
 import { useMermaidImagePreview } from '@/hooks/useMermaidImagePreview';
 import { cn } from '@/lib/utils';
 import { ChatI18nT } from '@/types/chat';
@@ -33,9 +33,14 @@ export type StreamingMarkdownBodyProps = {
 	containerRef?: RefObject<HTMLDivElement | null>;
 	/** i18n 翻译函数（可选）；不传则沿用 MermaidFenceToolbarActions 的默认中文文案 */
 	t?: ChatI18nT;
+	/**
+	 * 对 markdown-it 产出 HTML 的后处理（例如联网引用占位符 → <a>）。
+	 * 仅在 `type==='markdown'` 片段上调用，不会影响 ```mermaid``` 岛。
+	 */
+	renderedMarkdownHtmlPostProcess?: (html: string) => string;
 };
 
-export function StreamingMarkdownBody({
+function StreamingMarkdownBodyInner({
 	markdown,
 	parser,
 	className,
@@ -44,6 +49,7 @@ export function StreamingMarkdownBody({
 	defaultMermaidViewMode = 'diagram',
 	containerRef,
 	t,
+	renderedMarkdownHtmlPostProcess,
 }: StreamingMarkdownBodyProps) {
 	const { parts, openMermaidId } = useMemo(
 		() =>
@@ -102,11 +108,12 @@ export function StreamingMarkdownBody({
 		<div ref={containerRef} className={cn('streaming-md-body', className)}>
 			{parts.map((part: MarkdownMermaidSplitPart, i: number) => {
 				if (part.type === 'markdown') {
+					let html = parser.render(part.text);
+					if (renderedMarkdownHtmlPostProcess) {
+						html = renderedMarkdownHtmlPostProcess(html);
+					}
 					return (
-						<div
-							key={`md-${i}`}
-							dangerouslySetInnerHTML={{ __html: parser.render(part.text) }}
-						/>
+						<div key={`md-${i}`} dangerouslySetInnerHTML={{ __html: html }} />
 					);
 				}
 				return renderMermaidPart(part, i);
@@ -115,3 +122,28 @@ export function StreamingMarkdownBody({
 		</div>
 	);
 }
+
+function areStreamingMarkdownBodyPropsEqual(
+	prev: Readonly<StreamingMarkdownBodyProps>,
+	next: Readonly<StreamingMarkdownBodyProps>,
+): boolean {
+	return (
+		prev.markdown === next.markdown &&
+		prev.parser === next.parser &&
+		prev.preferDark === next.preferDark &&
+		prev.isStreaming === next.isStreaming &&
+		(prev.defaultMermaidViewMode ?? 'diagram') ===
+			(next.defaultMermaidViewMode ?? 'diagram') &&
+		prev.renderedMarkdownHtmlPostProcess ===
+			next.renderedMarkdownHtmlPostProcess &&
+		prev.containerRef === next.containerRef &&
+		prev.className === next.className &&
+		prev.t === next.t
+	);
+}
+
+/** 与父级（如角标悬浮 state）解耦，避免无关节点重绘时用 innerHTML 冲掉正文内已改写的合并胶囊 */
+export const StreamingMarkdownBody = memo(
+	StreamingMarkdownBodyInner,
+	areStreamingMarkdownBodyPropsEqual,
+);

@@ -1,7 +1,12 @@
 import { Drawer } from '@design/Drawer';
 import { ScrollArea } from '@ui/index';
+import { Globe } from 'lucide-react';
 import { ChatI18nT, SearchOrganicItem } from '@/types/chat';
 import { openExternalUrl } from '@/utils';
+import {
+	sanitizeOrganicSnippetForPreview,
+	shortHostnameFromUrl,
+} from '@/utils/organicCitation';
 
 interface IProps {
 	open: boolean;
@@ -27,34 +32,53 @@ const SearchOrganics: React.FC<IProps> = ({
 			open={open}
 			onOpenChange={onOpenChange}
 		>
-			<ScrollArea className="h-full overflow-y-auto pr-4 box-border">
-				<div className="flex flex-col gap-2">
-					{organics?.map((searchOrganic) => (
-						<div
-							key={searchOrganic.link}
-							onClick={() => onClickOrganic(searchOrganic.link)}
-							className="w-full cursor-pointer overflow-hidden flex flex-col gap-2 hover:bg-theme/10 p-2 rounded-md"
+			<ScrollArea className="box-border h-full overflow-y-auto pr-2">
+				<div className="flex flex-col gap-1 pb-2">
+					{organics?.map((item, idx) => (
+						<button
+							type="button"
+							key={`${item.link}-${idx}`}
+							onClick={() => onClickOrganic(item.link)}
+							className="w-full cursor-pointer bg-transparent text-left p-2 pr-1.5 rounded-md transition-colors hover:bg-theme/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme/30"
 						>
-							{/* float：首行标题在序号/日期右侧，换行后与 position 左缘齐平 */}
-							<div className="flow-root">
-								<div className="float-left flex items-center gap-2">
-									<span className="bg-theme/20 text-textcolor rounded-full text-[13px] w-5 h-5 p-2 flex items-center justify-center">
-										{searchOrganic.position}
+							<div className="flex flex-col gap-2">
+								<h3 className="text-[15px] font-semibold leading-snug text-textcolor wrap-break-word">
+									{item.title}
+								</h3>
+								{item.snippet ? (
+									<p className="line-clamp-3 wrap-break-word text-[13px] leading-relaxed text-textcolor/65">
+										{sanitizeOrganicSnippetForPreview(item.snippet)}
+									</p>
+								) : null}
+								<div className="flex flex-wrap items-center gap-x-2 gap-y-1 pt-0.5 text-[13px] text-textcolor/55">
+									<div className="relative flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden rounded-full bg-theme/20">
+										{item.icon ? (
+											<img
+												src={item.icon}
+												alt=""
+												referrerPolicy="no-referrer"
+												className="relative z-1 h-full w-full object-cover"
+												onError={(ev) => {
+													ev.currentTarget.style.visibility = 'hidden';
+												}}
+											/>
+										) : (
+											<Globe
+												size={12}
+												className="pointer-events-none absolute inset-0 m-auto text-textcolor/45"
+												aria-hidden
+											/>
+										)}
+									</div>
+									<span className="min-w-0 truncate">
+										{shortHostnameFromUrl(item.link)}
 									</span>
-									{searchOrganic.date && (
-										<span className="text-textcolor/50 text-base">
-											{searchOrganic.date}
-										</span>
-									)}
+									{item.date ? (
+										<span className="shrink-0 tabular-nums">{item.date}</span>
+									) : null}
 								</div>
-								<span className="wrap-break-word ml-3">
-									{searchOrganic.title}
-								</span>
 							</div>
-							<div className="text-sm text-textcolor/70">
-								{searchOrganic.snippet}
-							</div>
-						</div>
+						</button>
 					))}
 				</div>
 			</ScrollArea>

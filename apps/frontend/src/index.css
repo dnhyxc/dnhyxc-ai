@@ -116,22 +116,43 @@ body {
 			.markdown-body {
 				a[data-organic-cite],
 				a.__md-search-organic__ {
-					display: inline-block;
-					text-align: center;
+					display: inline-flex;
+					align-items: center;
+					gap: 4px;
 					cursor: pointer !important;
 					margin-left: 4px;
 					border-block-end: none !important;
-					border-radius: 100%;
+					border-radius: 9999px;
 					background-color: var(--theme-secondary);
-					width: 18px;
-					height: 18px;
-					font-size: 12px;
-					vertical-align: text-top;
+					padding: 4px 7px 6px 7px;
+					min-height: 18px;
+					max-width: min(14rem, 72vw);
+					width: auto;
+					height: auto;
+					font-size: 11px;
+					line-height: 1.25;
+					vertical-align: baseline;
 					color: var(--theme-textcolor);
+					white-space: nowrap;
 					overflow: hidden;
+					text-overflow: ellipsis;
+
+					.__md-search-organic-favicon__ {
+						flex-shrink: 0;
+						width: 12px;
+						height: 12px;
+						margin-top: 1px;
+						border-radius: 2px;
+						object-fit: cover;
+						pointer-events: none;
+					}
 
 					&:hover {
-						background-color: var(--theme-background);
+						background: linear-gradient(
+							90deg,
+							color-mix(in oklch, var(--theme-background) 90%, transparent),
+							color-mix(in oklch, var(--theme-background) 50%, transparent)
+						);
 					}
 
 					&::after {

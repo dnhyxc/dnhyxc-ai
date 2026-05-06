@@ -319,6 +319,10 @@ class ChatStore {
 						? streamingMsg.thinkContent ||
 							mergedMessages[existingIndex].thinkContent
 						: mergedMessages[existingIndex].thinkContent,
+					// 联网检索快照仅在流式阶段由 SSE 写入，合并时必须带回，否则 icon 等字段会丢
+					searchOrganic:
+						streamingMsg.searchOrganic ??
+						mergedMessages[existingIndex].searchOrganic,
 				};
 			} else {
 				if (streamingMsg.isStreaming) {

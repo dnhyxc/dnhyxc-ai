@@ -23,6 +23,19 @@ export class SerperOrganicItemDto {
 	@IsOptional()
 	@IsString()
 	snippet?: string;
+
+	@IsOptional()
+	@IsString()
+	icon?: string;
+
+	@IsOptional()
+	@IsString()
+	date?: string;
+
+	@IsOptional()
+	@Type(() => Number)
+	@IsInt()
+	position?: number;
 }
 
 export class MessageDto {

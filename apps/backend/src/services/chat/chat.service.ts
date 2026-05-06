@@ -4,6 +4,7 @@ import {
 	HumanMessage,
 	SystemMessage,
 } from '@langchain/core/messages';
+import type { DynamicTool } from '@langchain/core/tools';
 import { ChatOpenAI } from '@langchain/openai';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Cache } from '@nestjs/cache-manager';
@@ -22,6 +23,8 @@ import { catchError, Observable, Subject } from 'rxjs';
 import { ModelEnum } from 'src/enum/config.enum';
 import { parseFile } from '../../utils/file-parser';
 import { OcrService } from '../ocr/ocr.service';
+import { WebSearchService } from '../web-search/web-search.service';
+import type { WebSearchOrganicItem } from '../web-search/web-search.types';
 import { MessageRole } from './chat.entity';
 import { ChatContinueDto } from './dto/chat-continue.dto';
 import { ChatMessageDto } from './dto/chat-message.dto';
@@ -30,7 +33,6 @@ import { MessageService } from './message.service';
 import {
 	applyOrganicCitationAnchors,
 	type SerperOrganicItem,
-	SerperService,
 } from './serper.service';
 
 // Scope.REQUEST: 声明作用域，否则 queue-events.listener 中的队列监听器会被忽略，不生效
@@ -53,12 +55,19 @@ export class ChatService {
 		@InjectQueue('chat-message-queue')
 		private readonly messageQueue: Queue,
 		private readonly ocrService: OcrService,
-		private readonly serperService: SerperService,
+		private readonly webSearchService: WebSearchService,
 		@Inject(WINSTON_MODULE_NEST_PROVIDER)
 		private readonly logger: LoggerService,
 	) {}
 
-	/** 从本次请求中解析用于 Serper 的检索词（优先 userMessage，否则取最后一条用户消息） */
+	/** 为 SSE / 落库的 organic 写入 1-based position，便于前端抽屉与悬浮预览，目前没有使用 position 字段 */
+	private withOrganicPositions(
+		items: WebSearchOrganicItem[],
+	): SerperOrganicItem[] {
+		return items.map((item, i) => ({ ...item, position: i + 1 }));
+	}
+
+	/** 从本次请求中解析用于联网检索的检索词（优先 userMessage，否则取最后一条用户消息） */
 	private resolveWebSearchQuery(dto: ChatRequestDto): string {
 		const fromMeta = dto.userMessage?.content?.trim();
 		if (fromMeta) {
@@ -70,7 +79,7 @@ export class ChatService {
 	}
 
 	/**
-	 * 续写轮次不重新跑 Serper，需从已落库的助手消息取 searchOrganic，才能把【n】转成 <a>。
+	 * 续写轮次不重新跑联网检索，需从已落库的助手消息取 searchOrganic，才能把【n】转成 <a>。
 	 */
 	private async getSearchOrganicForAnchors(
 		fromSerper: SerperOrganicItem[] | null,
@@ -325,23 +334,37 @@ Stick strictly to what is visually present.`,
 							: systemContent.trim(),
 					};
 
-					// Serper 联网搜索：将检索摘要并入系统提示（续写轮次不重复检索）
+					// 联网搜索：将检索摘要并入系统提示（续写轮次不重复检索）
+					// 检查是否启用了联网搜索，且不是续写模式。续写场景下不重复执行检索
 					if (dto.webSearch && !dto.isContinuation) {
-						const searchQuery = this.resolveWebSearchQuery(dto);
+						const searchQuery = this.resolveWebSearchQuery(dto); // 解析实际用作检索的查询字符串
 						if (searchQuery) {
-							if (!this.serperService.isConfigured()) {
-								systemPrompt.content +=
-									'\n（用户开启了联网搜索，但服务端联网搜索接口出错，请说明无法实时检索并尽量用已有知识回答。）\n';
+							// 获取选定的检索服务提供商（provider）
+							const provider = this.webSearchService.resolveProvider(
+								dto.webSearchProvider,
+							);
+							// 检查服务端是否配置了此 provider 所需的 API KEY
+							if (!this.webSearchService.isProviderConfigured(provider)) {
+								// 如果未配置 KEY，告知用户无法实时联网检索
+								const keyName =
+									provider === 'tavily' ? 'TAVILY_API_KEY' : 'SERPER_API_KEY';
+								systemPrompt.content += `\n（用户开启了联网搜索，但服务端未配置 ${keyName}，请说明无法实时检索并尽量用已有知识回答。）\n`;
 							} else {
-								const serperResult =
-									await this.serperService.formatSearchContextForPrompt(
+								// 调用联网检索 API，获取摘要文本及 organic 结构数据
+								const searchResult =
+									await this.webSearchService.formatSearchContextForPrompt(
 										searchQuery,
+										{ provider, num: 10 },
 									);
-								if (serperResult.promptText) {
-									systemPrompt.content += serperResult.promptText;
+								// 如果 summary 文本存在，则将其拼接到 system prompt
+								if (searchResult.promptText) {
+									systemPrompt.content += searchResult.promptText;
 								}
-								if (serperResult.organic?.length) {
-									serperOrganicForAssistant = serperResult.organic;
+								// organic 包含结构化搜索结果，用于后续“可引用”与落库
+								if (searchResult.organic?.length) {
+									serperOrganicForAssistant = this.withOrganicPositions(
+										searchResult.organic,
+									);
 								}
 							}
 						}
@@ -719,23 +742,32 @@ Stick strictly to what is visually present.`,
 		if (dto.webSearch && !dto.isContinuation) {
 			const searchQuery = this.resolveWebSearchQuery(dto);
 			if (searchQuery) {
-				let serperBlock = '';
-				if (!this.serperService.isConfigured()) {
-					serperBlock =
-						'\n（用户开启了联网搜索，但服务端未配置 SERPER_API_KEY，请说明无法实时检索并尽量用已有知识回答。）\n';
+				const provider = this.webSearchService.resolveProvider(
+					dto.webSearchProvider,
+				);
+				let searchBlock = '';
+				if (!this.webSearchService.isProviderConfigured(provider)) {
+					const keyName =
+						provider === 'tavily' ? 'TAVILY_API_KEY' : 'SERPER_API_KEY';
+					searchBlock = `\n（用户开启了联网搜索，但服务端未配置 ${keyName}，请说明无法实时检索并尽量用已有知识回答。）\n`;
 				} else {
-					const serperResult =
-						await this.serperService.formatSearchContextForPrompt(searchQuery);
-					if (serperResult.promptText) {
-						serperBlock = serperResult.promptText;
+					const searchResult =
+						await this.webSearchService.formatSearchContextForPrompt(
+							searchQuery,
+							{ provider, num: 10 },
+						);
+					if (searchResult.promptText) {
+						searchBlock = searchResult.promptText;
 					}
-					if (serperResult.organic?.length) {
-						serperOrganicForAssistant = serperResult.organic;
+					if (searchResult.organic?.length) {
+						serperOrganicForAssistant = this.withOrganicPositions(
+							searchResult.organic,
+						);
 					}
 				}
-				if (serperBlock) {
+				if (searchBlock) {
 					enhancedMessages = [
-						{ role: 'system', content: serperBlock },
+						{ role: 'system', content: searchBlock },
 						...enhancedMessages,
 					];
 				}
@@ -854,5 +886,17 @@ Stick strictly to what is visually present.`,
 			sessionId,
 			finishReason: 'stop',
 		};
+	}
+
+	/**
+	 * LangChain DynamicTool：联网检索，可与 llm.bindTools / Agent 组合使用。
+	 * 与 webSearch 注入逻辑共用同一套 Tavily / Serper 实现。
+	 */
+	getWebSearchLangChainTools(
+		dto?: Pick<ChatRequestDto, 'webSearchProvider'>,
+	): DynamicTool[] {
+		return this.webSearchService.createLangChainWebSearchTools({
+			provider: dto?.webSearchProvider,
+		});
 	}
 }

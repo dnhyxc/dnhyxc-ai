@@ -2,21 +2,17 @@ import { Inject, Injectable, type LoggerService } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { ModelEnum } from 'src/enum/config.enum';
+import { buildWebSearchReferencePromptAppendix } from '../web-search/search-context-format';
+import type {
+	WebSearchContextResult,
+	WebSearchOrganicItem,
+} from '../web-search/web-search.types';
 
-/** Serper 单条网页结果（与 API 返回字段对齐） */
-export interface SerperOrganicItem {
-	title: string;
-	link: string;
-	snippet?: string;
-}
+/** Serper 单条网页结果（与 API 返回字段对齐，与 WebSearchOrganicItem 同构） */
+export type SerperOrganicItem = WebSearchOrganicItem;
 
 /** 联网检索结果：供写入提示词、落库与 SSE 推送 */
-export interface SerperSearchContextResult {
-	/** 拼入系统提示的文本；null 表示本轮不追加检索块（未配置或未检索） */
-	promptText: string | null;
-	/** Serper organic 热点列表；仅在有有效网页结果时非空 */
-	organic: SerperOrganicItem[] | null;
-}
+export type SerperSearchContextResult = WebSearchContextResult;
 
 /**
  * 官方 Google 网页搜索端点（POST + JSON body + X-API-KEY）。
@@ -27,18 +23,6 @@ const SERPER_GOOGLE_SEARCH_URL = 'https://google.serper.dev/search';
 /** 转义 href 属性中的引号与 &，避免破坏 HTML */
 function escapeHrefForDoubleQuotedAttr(url: string): string {
 	return url.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
-}
-
-/** Markdown 链接 destination：含空白、尖括号或圆括号时用尖括号包裹并转义 <>，避免破坏解析 */
-function wrapMarkdownLinkDestination(url: string): string {
-	const t = url.trim();
-	if (!t) {
-		return t;
-	}
-	if (/[\s<>()]/.test(t)) {
-		return `<${t.replace(/</g, '%3C').replace(/>/g, '%3E')}>`;
-	}
-	return t;
 }
 
 /** 与 organic 条目的 URL 比对（trim + 尽力 decodeURIComponent 归一化） */
@@ -177,7 +161,7 @@ export class SerperService {
 				};
 			}
 
-			const data = (await res.json()) as { organic?: SerperOrganicItem[] };
+			const data = (await res.json()) as { organic?: WebSearchOrganicItem[] };
 			const organic = data.organic;
 			if (!organic?.length) {
 				return {
@@ -187,23 +171,10 @@ export class SerperService {
 				};
 			}
 
-			const blocks = organic.map((item, i) => {
-				const snippet = item.snippet ?? '';
-				const n = i + 1;
-				const mdDest = wrapMarkdownLinkDestination(item.link);
-				// 每条给出可复制 Markdown 引用示例；落库前由 applyOrganicCitationAnchors 转为带 class 等属性的 <a>
-				return `${n}. **${item.title}**\n   URL: ${item.link}\n   摘要: ${snippet}\n   引用示例（正文须使用此 Markdown 链接形式）: [${n}](${mdDest})`;
-			});
-
-			const promptText =
-				'\n\n---\n**以下为通过 Serper（Google 搜索结果 SERP，即搜索引擎结果页）获取的参考资料**。回答时请结合这些内容；与问题无关的可忽略。\n\n' +
-				'**引用格式（须严格遵守）**：\n' +
-				'1. 引用第 n 条资料时，**必须**使用 **Markdown 链接** `[n](URL)`，其中 URL 与对应条目的「URL:」行**逐字符一致**（含特殊字符时与「引用示例」相同，可能为尖括号包裹 `<...>`）。\n' +
-				'2. **禁止**只写半角方括号序号如 `[n]`（后接句号、空格或句末等），也禁止写脚注式上标；那不是有效 Markdown 链接，引用会失效。\n' +
-				'3. 或使用全角序号 **【n】**。\n' +
-				'系统会将合规引用转为带 `target="_blank"`、`rel="noopener noreferrer"`、`data-organic-cite`、`style="cursor: pointer;"`、`class="__md-search-organic__"` 的可点击样式。\n\n' +
-				blocks.join('\n\n') +
-				'\n---\n';
+			const promptText = buildWebSearchReferencePromptAppendix(
+				'Serper（Google 搜索结果 SERP，即搜索引擎结果页）',
+				organic,
+			);
 
 			return { promptText, organic };
 		} catch (err) {

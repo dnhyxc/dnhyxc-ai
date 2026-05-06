@@ -134,7 +134,21 @@ export const streamFetch = async ({
 												.organic,
 										)
 									) {
-										onGetSearchOrganic?.(parsed.content);
+										const raw = parsed.content as SearchOrganic;
+										const organic = raw.organic?.map((row) => {
+											const ext = row as SearchOrganicItem & {
+												favicon?: string;
+											};
+											return {
+												...row,
+												icon:
+													row.icon?.trim() || ext.favicon?.trim() || undefined,
+											};
+										});
+										onGetSearchOrganic?.({
+											...raw,
+											organic: organic ?? [],
+										});
 									}
 								} catch (e) {
 									Toast({

@@ -11,13 +11,23 @@ import {
 import { Button, Spinner } from '@ui/index';
 import {
 	ChevronDown,
+	ChevronLeft,
 	ChevronRight,
 	Earth,
+	Globe,
 	Rotate3d,
 	SearchIcon,
 } from 'lucide-react';
 // memo：父级重渲染时若 props 判定相等则跳过本组件，减少与 PlainTextFallback / MdPreview 的协调成本
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+	memo,
+	useCallback,
+	useEffect,
+	useLayoutEffect,
+	useMemo,
+	useRef,
+	useState,
+} from 'react';
 import { createPortal } from 'react-dom';
 import { getChatMarkdownHighlightTheme } from '@/constant';
 import { useMarkdownHashLinkViewportScroll } from '@/hooks';
@@ -28,9 +38,15 @@ import { downloadChatCodeBlock } from '@/utils/chatCodeToolbar';
 import { openExternalUrl } from '@/utils/open-external';
 import {
 	applyOrganicCitationAnchors,
+	areOrganicPreviewItemsSame,
 	findClosestOrganicCitationAnchor,
 	findOrganicCitationAnchorAtPoint,
-	resolveSearchOrganicFromCitationAnchor,
+	injectOrganicCitationAnchorsIntoMarkdownHtml,
+	normalizePersistedOrganicAnchorsInMarkdown,
+	resolveOrganicCitationPreviewItems,
+	sanitizeOrganicSnippetForPreview,
+	shortHostnameFromUrl,
+	syncOrganicMergedAnchorDom,
 } from '@/utils/organicCitation';
 import SearchOrganics from './SearchOrganics';
 import { StreamingMarkdownBody } from './StreamingMarkdownBody';
@@ -101,6 +117,20 @@ function layoutOrganicPopoverForAnchor(anchorRect: OrganicAnchorRect): {
 	return { left, top: 'auto', bottom, maxHeight };
 }
 
+/** 合并胶囊分页：按已保存页码恢复，并夹紧在条数范围内 */
+function clampMergedOrganicPreviewIndex(
+	saved: number | undefined,
+	itemCount: number,
+): number {
+	if (itemCount < 2) {
+		return 0;
+	}
+	if (saved === undefined) {
+		return 0;
+	}
+	return Math.min(Math.max(0, saved), itemCount - 1);
+}
+
 interface AssistantMessageProps {
 	message: Message;
 	isShowThinkContent?: boolean;
@@ -136,11 +166,23 @@ function ChatAssistantMessageInner({
 	const previewBubbleRef = useRef<HTMLDivElement>(null);
 	/** 与当前预览绑定的角标节点；同 position 多出处时需区分，否则会沿用旧 rect 导致气泡跑偏 */
 	const organicPreviewAnchorRef = useRef<HTMLAnchorElement | null>(null);
+	/** 合并胶囊 DOM 定位；关闭预览时不再把正文打回第一条 */
+	const lastMergedAnchorVisualRef = useRef<{
+		el: HTMLAnchorElement;
+		items: SearchOrganicItem[];
+	} | null>(null);
+	/** `data-organic-cite-group` → 用户选的页码（0-based），悬浮框关闭后仍保留 */
+	const mergedOrganicPageByGroupRef = useRef<Map<string, number>>(new Map());
+	const mergedAnchorDomSyncRef = useRef<{ el: Element | null; index: number }>({
+		el: null,
+		index: -1,
+	});
 	const previewLeaveTimerRef = useRef(0);
 	const [open, setOpen] = useState(false);
 	/** 按角标矩形定位；同一条引用在 pointermove 内不重复 setState，避免气泡跟手抖 */
 	const [organicPreview, setOrganicPreview] = useState<{
-		item: SearchOrganicItem;
+		items: SearchOrganicItem[];
+		index: number;
 		anchorRect: OrganicAnchorRect;
 	} | null>(null);
 
@@ -159,18 +201,31 @@ function ChatAssistantMessageInner({
 		[appTheme, t],
 	);
 
-	// 正文：流式阶段后端仍推送原始 [n]，有 searchOrganic 时在前端做与落库相同的引用转换
+	// 正文：先规范化落库里的 <a data-organic-cite>，再将 【n】/[n] 转为占位符；真实 <a> 在 Markdown 渲染后注入（避免 md html:false 转义）
 	const bodyText = useMemo(() => {
 		const thinkingText = t?.('chat.assistant.thinking') ?? '思考中...';
-		const raw = message.content || (message?.thinkContent ? '' : thinkingText);
+		let raw = message.content || (message?.thinkContent ? '' : thinkingText);
 		const org = message.searchOrganic;
-		if (!org?.length || raw === thinkingText) {
+		if (raw === thinkingText) {
+			return raw;
+		}
+		raw = normalizePersistedOrganicAnchorsInMarkdown(raw, org);
+		if (!org?.length) {
 			return raw;
 		}
 		return applyOrganicCitationAnchors(raw, org);
 	}, [message.content, message.thinkContent, message.searchOrganic, t]);
 
 	const isSearchOrganicEnabled = (message.searchOrganic?.length ?? 0) > 0;
+
+	const injectSearchOrganicAnchorsHtml = useCallback(
+		(html: string) =>
+			injectOrganicCitationAnchorsIntoMarkdownHtml(
+				html,
+				message.searchOrganic ?? [],
+			),
+		[message.searchOrganic],
+	);
 
 	// 目录 / 页内 #：与 Monaco 预览共用 Hook（实录见 docs/monaco/markdown-preview-toc-hash-navigation.md §9）
 	const getMarkdownHashScrollViewport = useCallback(() => {
@@ -203,24 +258,35 @@ function ChatAssistantMessageInner({
 		}
 	}, []);
 
+	const clearOrganicMergedPreviewRefs = useCallback(() => {
+		lastMergedAnchorVisualRef.current = null;
+		mergedAnchorDomSyncRef.current = { el: null, index: -1 };
+	}, []);
+
 	const closeOrganicPreviewNow = useCallback(() => {
 		clearOrganicPreviewLeaveTimer();
+		clearOrganicMergedPreviewRefs();
 		organicPreviewAnchorRef.current = null;
 		setOrganicPreview(null);
-	}, [clearOrganicPreviewLeaveTimer]);
+	}, [clearOrganicPreviewLeaveTimer, clearOrganicMergedPreviewRefs]);
 
 	const scheduleHideOrganicPreview = () => {
 		clearOrganicPreviewLeaveTimer();
 		previewLeaveTimerRef.current = window.setTimeout(() => {
+			clearOrganicMergedPreviewRefs();
 			organicPreviewAnchorRef.current = null;
 			setOrganicPreview(null);
 		}, 180);
 	};
 
-	// 点击预览气泡，在新标签页中打开链接
+	// 点击预览气泡，在新标签页中打开当前索引对应链接
 	const onClickOrganicPreview = useCallback(() => {
-		if (!organicPreview) return;
-		void openExternalUrl(organicPreview.item.link);
+		if (!organicPreview?.items.length) return;
+		const cur =
+			organicPreview.items[
+				Math.min(organicPreview.index, organicPreview.items.length - 1)
+			];
+		if (cur?.link) void openExternalUrl(cur.link);
 	}, [organicPreview]);
 
 	// 正文内 Serper 引用：悬停/在链接上移动时跟随指针展示摘要（不量锚点）
@@ -242,19 +308,33 @@ function ChatAssistantMessageInner({
 				);
 			}
 			if (!a) return;
-			const item = resolveSearchOrganicFromCitationAnchor(a, organics);
-			if (!item) return;
+			const items = resolveOrganicCitationPreviewItems(a, organics);
+			if (!items.length) return;
 			clearOrganicPreviewLeaveTimer();
+			if (items.length > 1) {
+				lastMergedAnchorVisualRef.current = { el: a, items };
+			} else {
+				lastMergedAnchorVisualRef.current = null;
+			}
 			setOrganicPreview((prev) => {
+				const rect = snapshotOrganicAnchorRect(a);
 				if (
 					prev &&
-					prev.item.position === item.position &&
-					organicPreviewAnchorRef.current === a
+					organicPreviewAnchorRef.current === a &&
+					areOrganicPreviewItemsSame(prev.items, items)
 				) {
-					return prev;
+					return { ...prev, anchorRect: rect };
 				}
 				organicPreviewAnchorRef.current = a;
-				return { item, anchorRect: snapshotOrganicAnchorRect(a) };
+				const group = a.getAttribute('data-organic-cite-group')?.trim();
+				const initialIndex =
+					group && items.length > 1
+						? clampMergedOrganicPreviewIndex(
+								mergedOrganicPageByGroupRef.current.get(group),
+								items.length,
+							)
+						: 0;
+				return { items, index: initialIndex, anchorRect: rect };
 			});
 		};
 
@@ -276,31 +356,90 @@ function ChatAssistantMessageInner({
 		root.addEventListener('pointerout', onPointerOut);
 		return () => {
 			clearOrganicPreviewLeaveTimer();
+			clearOrganicMergedPreviewRefs();
 			organicPreviewAnchorRef.current = null;
 			root.removeEventListener('pointerover', applyIfCitation);
 			root.removeEventListener('pointermove', applyIfCitation);
 			root.removeEventListener('pointerout', onPointerOut);
 		};
-	}, [message.searchOrganic, bodyText, clearOrganicPreviewLeaveTimer]);
+	}, [
+		message.searchOrganic,
+		bodyText,
+		clearOrganicPreviewLeaveTimer,
+		clearOrganicMergedPreviewRefs,
+	]);
 
 	const prevBodyTextRef = useRef(bodyText);
 
 	useEffect(() => {
 		if (prevBodyTextRef.current === bodyText) return;
 		prevBodyTextRef.current = bodyText;
+		mergedOrganicPageByGroupRef.current.clear();
 		closeOrganicPreviewNow();
 	}, [bodyText, closeOrganicPreviewNow]);
 
 	useEffect(() => {
 		if (!message.searchOrganic?.length) {
+			mergedOrganicPageByGroupRef.current.clear();
 			closeOrganicPreviewNow();
 		}
 	}, [message.searchOrganic, closeOrganicPreviewNow]);
+
+	/** 合并胶囊：预览分页切换时更新正文内域名 / favicon（layout 阶段执行，避免 paint 后仍被 innerHTML 覆盖） */
+	useLayoutEffect(() => {
+		if (!organicPreview || organicPreview.items.length < 2) {
+			mergedAnchorDomSyncRef.current = { el: null, index: -1 };
+			return;
+		}
+		const el =
+			lastMergedAnchorVisualRef.current?.el ?? organicPreviewAnchorRef.current;
+		const group = el?.getAttribute('data-organic-cite-group')?.trim();
+		if (!el || !group) {
+			return;
+		}
+		const idx = organicPreview.index;
+		const prevSync = mergedAnchorDomSyncRef.current;
+		if (prevSync.el === el && prevSync.index === idx) {
+			return;
+		}
+		mergedAnchorDomSyncRef.current = { el, index: idx };
+		syncOrganicMergedAnchorDom(el, organicPreview.items, idx);
+		mergedOrganicPageByGroupRef.current.set(group, idx);
+	}, [organicPreview]);
 
 	const popoverPos = useMemo(() => {
 		if (!organicPreview) return null;
 		return layoutOrganicPopoverForAnchor(organicPreview.anchorRect);
 	}, [organicPreview]);
+
+	const previewOrganicBase: SearchOrganicItem | null = organicPreview?.items
+		?.length
+		? (organicPreview.items[
+				Math.min(organicPreview.index, organicPreview.items.length - 1)
+			] ?? null)
+		: null;
+
+	/** 与当前 message.searchOrganic 按 link 对齐，避免悬停时缓存了无 icon 的旧引用而抽屉已是新数据 */
+	const previewOrganicCurrent = useMemo((): SearchOrganicItem | null => {
+		if (!previewOrganicBase) {
+			return null;
+		}
+		const list = message.searchOrganic;
+		if (!list?.length) {
+			return previewOrganicBase;
+		}
+		const hit = list.find(
+			(o) => o.link.trim() === previewOrganicBase.link.trim(),
+		);
+		if (!hit) {
+			return previewOrganicBase;
+		}
+		return {
+			...previewOrganicBase,
+			...hit,
+			icon: hit.icon?.trim() || previewOrganicBase.icon?.trim(),
+		};
+	}, [previewOrganicBase, message.searchOrganic]);
 
 	useEffect(() => {
 		if (!organicPreview) return;
@@ -389,6 +528,11 @@ function ChatAssistantMessageInner({
 				preferDark={appTheme === 'black'}
 				isStreaming={!!message.isStreaming}
 				t={t}
+				renderedMarkdownHtmlPostProcess={
+					isSearchOrganicEnabled && message.searchOrganic?.length
+						? injectSearchOrganicAnchorsHtml
+						: undefined
+				}
 				className={cn(
 					`[&_.markdown-body]:text-textcolor/90!`,
 					isSearchOrganicEnabled && '__md-search-enabled__',
@@ -462,11 +606,12 @@ function ChatAssistantMessageInner({
 			/>
 			{organicPreview &&
 				popoverPos &&
+				previewOrganicCurrent &&
 				createPortal(
 					<div
 						ref={previewBubbleRef}
 						role="tooltip"
-						className="pointer-events-auto cursor-pointer fixed z-10050 w-[min(22rem,calc(100vw-1.5rem))] overflow-y-auto rounded-lg border border-theme-white/10 bg-theme-background/95 p-3 text-left shadow-lg backdrop-blur-md"
+						className="pointer-events-auto cursor-pointer fixed z-10050 w-[min(22rem,calc(100vw-1.5rem))] overflow-hidden rounded-xl border border-theme-white/12 bg-theme-background/97 text-left shadow-xl backdrop-blur-md"
 						style={{
 							left: popoverPos.left,
 							top: popoverPos.top,
@@ -478,26 +623,100 @@ function ChatAssistantMessageInner({
 						onPointerLeave={scheduleHideOrganicPreview}
 						onClick={onClickOrganicPreview}
 					>
-						{/* 与 SearchOrganics 列表项排版、字号一致 */}
-						<div className="flex flex-col gap-2">
-							<div className="flow-root">
-								<div className="float-left flex items-center gap-2">
-									<span className="bg-theme/20 text-textcolor rounded-full text-sm w-5.5 h-5.5 p-2 flex items-center justify-center">
-										{organicPreview.item.position}
-									</span>
-									{organicPreview.item.date ? (
-										<span className="text-textcolor/50 text-base">
-											{organicPreview.item.date}
-										</span>
-									) : null}
+						<div className="flex max-h-[min(280px,70vh)] flex-col overflow-y-auto">
+							<div className="mt-auto flex shrink-0 items-center gap-2 border-b border-theme-white/10 px-3 py-2.5">
+								<div className="relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-theme/20">
+									{previewOrganicCurrent.icon ? (
+										<img
+											key={`${previewOrganicCurrent.link}-${organicPreview.index}-icon`}
+											src={previewOrganicCurrent.icon}
+											alt=""
+											referrerPolicy="no-referrer"
+											className="relative z-1 h-full w-full object-cover"
+											onError={(ev) => {
+												ev.currentTarget.style.visibility = 'hidden';
+											}}
+										/>
+									) : (
+										<Globe
+											size={14}
+											className="pointer-events-none absolute inset-0 m-auto text-textcolor/45"
+											aria-hidden
+										/>
+									)}
 								</div>
-								<span className="wrap-break-word ml-3">
-									{organicPreview.item.title}
-								</span>
+								<div className="min-w-0 flex-1">
+									<div className="truncate text-[13px] text-textcolor/80">
+										{previewOrganicCurrent.title}
+									</div>
+									<div className="truncate text-xs text-textcolor/45">
+										{shortHostnameFromUrl(previewOrganicCurrent.link)}
+									</div>
+								</div>
+								{previewOrganicCurrent.date ? (
+									<span className="shrink-0 text-xs tabular-nums text-textcolor/45">
+										{previewOrganicCurrent.date}
+									</span>
+								) : null}
 							</div>
-							{organicPreview.item.snippet ? (
-								<div className="text-sm text-textcolor/70">
-									{organicPreview.item.snippet}
+
+							<div className="flex flex-col gap-2 px-3 py-3">
+								<h3 className="text-[15px] font-semibold leading-snug text-textcolor wrap-break-word">
+									{previewOrganicCurrent.title}
+								</h3>
+								{previewOrganicCurrent.snippet ? (
+									<p className="line-clamp-3 wrap-break-word text-[13px] leading-relaxed text-textcolor/65">
+										{sanitizeOrganicSnippetForPreview(
+											previewOrganicCurrent.snippet,
+										)}
+									</p>
+								) : null}
+							</div>
+							{organicPreview.items.length > 1 ? (
+								<div className="flex shrink-0 items-center justify-between border-t border-theme-white/10 px-3 py-2">
+									<span className="text-xs text-textcolor/55 tabular-nums">
+										{organicPreview.index + 1}/{organicPreview.items.length}
+									</span>
+									<div className="flex items-center gap-0.5">
+										<button
+											type="button"
+											className="rounded-md p-1 text-textcolor/70 hover:bg-theme/15 hover:text-textcolor"
+											aria-label="上一条来源"
+											onClick={(e) => {
+												e.preventDefault();
+												e.stopPropagation();
+												setOrganicPreview((prev) => {
+													if (!prev || prev.items.length < 2) return prev;
+													const n = prev.items.length;
+													return {
+														...prev,
+														index: (prev.index - 1 + n) % n,
+													};
+												});
+											}}
+										>
+											<ChevronLeft size={16} />
+										</button>
+										<button
+											type="button"
+											className="rounded-md p-1 text-textcolor/70 hover:bg-theme/15 hover:text-textcolor"
+											aria-label="下一条来源"
+											onClick={(e) => {
+												e.preventDefault();
+												e.stopPropagation();
+												setOrganicPreview((prev) => {
+													if (!prev || prev.items.length < 2) return prev;
+													const n = prev.items.length;
+													return {
+														...prev,
+														index: (prev.index + 1) % n,
+													};
+												});
+											}}
+										>
+											<ChevronRight size={16} />
+										</button>
+									</div>
 								</div>
 							) : null}
 						</div>

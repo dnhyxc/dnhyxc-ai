@@ -71,6 +71,13 @@ export enum ModelEnum {
 	/** Serper.dev 联网搜索（用于 Chat 注入检索上下文） */
 	SERPER_API_KEY = 'SERPER_API_KEY',
 	SERPER_SEARCH_URL = 'SERPER_SEARCH_URL',
+	/** Tavily 联网搜索 API Key（用于 Chat 默认检索源） */
+	TAVILY_API_KEY = 'TAVILY_API_KEY',
+	/**
+	 * 默认联网检索后端：`tavily` | `serper`（不区分大小写）。未配置时默认 tavily。
+	 * 单次请求可用 ChatRequestDto.webSearchProvider 覆盖。
+	 */
+	WEB_SEARCH_DEFAULT_PROVIDER = 'WEB_SEARCH_DEFAULT_PROVIDER',
 }
 
 export enum QdrantEnum {

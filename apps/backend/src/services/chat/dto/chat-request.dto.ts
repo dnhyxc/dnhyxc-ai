@@ -3,6 +3,7 @@ import {
 	ArrayMinSize,
 	IsArray,
 	IsBoolean,
+	IsIn,
 	IsNumber,
 	IsObject,
 	IsOptional,
@@ -138,8 +139,16 @@ export class ChatRequestDto {
 	@IsOptional()
 	role?: 'user' | 'assistant' | 'system';
 
-	/** 为 true 时服务端通过 Serper 检索后把摘要注入系统提示（需配置 SERPER_API_KEY） */
+	/** 为 true 时服务端联网检索后把摘要注入系统提示（需配置对应 API Key） */
 	@IsBoolean()
 	@IsOptional()
 	webSearch?: boolean;
+
+	/**
+	 * 联网检索后端：`tavily`（默认）或 `serper`。
+	 * 未传时由环境变量 WEB_SEARCH_DEFAULT_PROVIDER 决定，仍缺省则为 tavily。
+	 */
+	@IsOptional()
+	@IsIn(['tavily', 'serper'])
+	webSearchProvider?: 'tavily' | 'serper';
 }

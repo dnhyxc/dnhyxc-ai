@@ -23,11 +23,12 @@ export interface SessionData {
 	total: number;
 }
 
-/** Serper 联网检索单条 organic（与后端 searchOrganic 字段一致） */
+/** Serper / Tavily 联网检索单条 organic（与后端 searchOrganic 字段一致） */
 export interface SearchOrganicItem {
 	title: string;
 	link: string;
-	position: number;
+	/** 1-based；旧数据可能缺失，前端用下标回退 */
+	position?: number;
 	snippet?: string;
 	date?: string;
 	icon?: string;
