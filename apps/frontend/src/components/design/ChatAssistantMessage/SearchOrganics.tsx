@@ -32,7 +32,7 @@ const SearchOrganics: React.FC<IProps> = ({
 			open={open}
 			onOpenChange={onOpenChange}
 		>
-			<ScrollArea className="box-border h-full overflow-y-auto pr-2">
+			<ScrollArea className="box-border h-full overflow-y-auto pl-0.5 pr-2">
 				<div className="flex flex-col gap-1 pb-2">
 					{organics?.map((item, idx) => (
 						<button
