@@ -3,9 +3,9 @@ import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { Inject, type LoggerService } from '@nestjs/common';
 import type { Job } from 'bullmq';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
+import type { SerperOrganicItem } from '../web-search/web-search.types';
 import { MessageRole } from './chat.entity';
 import { MessageService } from './message.service';
-import type { SerperOrganicItem } from './serper.service';
 
 interface SaveMessageJobData {
 	sessionId: string;

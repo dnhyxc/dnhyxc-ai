@@ -7,8 +7,8 @@ import {
 	OneToMany,
 	PrimaryGeneratedColumn,
 } from 'typeorm';
+import type { SerperOrganicItem } from '../web-search/web-search.types';
 import { Attachments } from './attachments.entity';
-import type { SerperOrganicItem } from './serper.service';
 import { ChatSessions } from './session.entity';
 
 export enum MessageRole {

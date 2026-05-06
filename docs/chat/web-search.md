@@ -16,12 +16,13 @@
 | 类别           | 路径                                                                 | 说明                                                  |
 | -------------- | -------------------------------------------------------------------- | ----------------------------------------------------- |
 | 后端枚举       | `apps/backend/src/enum/config.enum.ts`                               | Tavily Key、默认 provider 枚举项                      |
-| 后端模块       | `apps/backend/src/services/chat/chat.module.ts`                      | 注册 Tavily + WebSearch 门面                          |
-| 后端 Chat      | `apps/backend/src/services/chat/chat.service.ts`                     | 检索调用、position、SSE organic、落库、LangChain 工具 |
+| 后端模块       | `apps/backend/src/services/chat/chat.module.ts`                      | 注册 **`SerperSearchService`**、Tavily、`WebSearch` 门面 |
+| 后端 Chat      | `apps/backend/src/services/chat/chat.service.ts`                     | 检索调用、`organic-citation` 角标、SSE organic、落库、LangChain 工具 |
 | 后端 DTO       | `apps/backend/src/services/chat/dto/chat-request.dto.ts`             | `webSearchProvider`                                   |
 | 后端 DTO       | `apps/backend/src/services/chat/dto/message.dto.ts`                  | organic 条目 `icon`/`date`/`position`                 |
-| 后端 Serper    | `apps/backend/src/services/chat/serper.service.ts`                   | 共用类型与附录拼装函数                                |
-| 后端（新目录） | `apps/backend/src/services/web-search/*`                             | 类型、Tavily、门面、附录、barrel                      |
+| 后端 Serper    | `apps/backend/src/services/web-search/serper-search.service.ts`      | Serper Google Search API 适配（原 `chat/serper.service` 内类逻辑） |
+| 后端角标       | `apps/backend/src/services/web-search/organic-citation.ts`           | `applyOrganicCitationAnchors`（落库前 HTML `<a>`）    |
+| 后端（目录）   | `apps/backend/src/services/web-search/*`                             | 类型别名、Tavily、Serper、门面、附录、barrel          |
 | 前端类型       | `apps/frontend/src/types/chat.ts`                                    | `SearchOrganicItem` 扩展                              |
 | 前端 SSE       | `apps/frontend/src/utils/sse.ts`                                     | `favicon` → `icon`                                    |
 | 前端 Store     | `apps/frontend/src/store/chat.ts`                                    | 合并消息时保留 `searchOrganic`                        |
@@ -31,6 +32,21 @@
 | 前端组件       | `.../SearchOrganics.tsx`                                             | 抽屉列表 UI                                           |
 | 前端样式       | `apps/frontend/src/index.css`                                        | 联网胶囊样式                                          |
 | 构建缓存       | `apps/frontend/tsconfig.tsbuildinfo`                                 | TypeScript 增量信息，**无业务语义**                   |
+
+### 2.1 本轮：Serper 检索与 `applyOrganicCitationAnchors` 迁入 `web-search`（实现思路）
+
+- **要解决什么问题**：原先 Serper HTTP 与落库角标函数混在 `chat/serper.service.ts`，与已在 `web-search/` 的 Tavily、门面、`search-context-format` 割裂；目录职责不清，`WebSearchService` 需反向依赖 `chat` 包。
+- **做法（不改变对外行为）**：
+  1. **`SerperSearchService`**（`serper-search.service.ts`）：承接原 `SerperService` 的 `isConfigured` / `formatSearchContextForPrompt`，仍读 `SERPER_API_KEY`、`SERPER_SEARCH_URL`，仍 POST `google.serper.dev`，仍调用 `buildWebSearchReferencePromptAppendix`。
+  2. **`organic-citation.ts`**：承接原文件中的 `applyOrganicCitationAnchors`；内部 `escapeHrefForDoubleQuotedAttr`、`urlsMatchForOrganic` 保持模块私有；函数签名改为 `Pick<WebSearchOrganicItem, 'link'>[]`，与原先 `Pick<SerperOrganicItem, 'link'>[]` 等价（`SerperOrganicItem` 为类型别名）。
+  3. **`web-search.types.ts`**：集中声明 **`SerperOrganicItem`**、**`SerperSearchContextResult`** 别名，供 `chat.entity`、`chat-message.processor`、`chat.service` 继续沿用历史类型名。
+  4. **`WebSearchService`**：注入 **`SerperSearchService`**（字段名 `serperSearchService`），不再 `import` `chat/serper.service`。
+  5. **`ChatModule.providers`**：注册 **`SerperSearchService`**，删除原 **`SerperService`**；**删除** `apps/backend/src/services/chat/serper.service.ts`。
+  6. **`chat.service`**：`applyOrganicCitationAnchors` 从 **`../web-search/organic-citation`** 引入；`SerperOrganicItem` 从 **`../web-search/web-search.types`** 引入。
+  7. **`chat.entity` / `chat-message.processor`**：`SerperOrganicItem` 类型改为自 **`web-search.types`** 引入。
+  8. **前端**：`organicCitation.ts` 文件头注释指向后端 **`organic-citation.ts`**，语义对齐说明不变。
+- **兼容性与破坏面**：对外 HTTP、提示词附录、SSE / 落库 JSON、角标 HTML **应与重构前一致**；Nest **注入类名**由 `SerperService` 变为 **`SerperSearchService`**（仅模块内与测试若硬编码类 token需同步）。
+- **建议回归**：Serper 路径联网一轮；流式/非流式落库后正文角标；续写 + `getSearchOrganicForAnchors`；`pnpm run build`（`nest build`）通过。
 
 ---
 
@@ -56,20 +72,21 @@ WEB_SEARCH_DEFAULT_PROVIDER = 'WEB_SEARCH_DEFAULT_PROVIDER',
 
 ### 3.2 `chat.module.ts`：依赖注入注册
 
-- **新增 import**：`TavilySearchService`、`WebSearchService` 自 `../web-search/`。
-- **`providers` 数组**：在原有 `SerperService` 基础上追加 **`TavilySearchService`**、**`WebSearchService`**，使 `ChatService` 可注入门面（Serper 仍保留，供门面内部调用）。
+- **import**：`SerperSearchService`、`TavilySearchService`、`WebSearchService` 均自 `../web-search/`。
+- **`providers` 数组**：注册 **`SerperSearchService`**、`TavilySearchService`、`WebSearchService`（`WebSearchService` 构造注入前两者的 Nest **解析顺序**由框架处理；三者均需列入 `providers`）。
 
-**来源**：`apps/backend/src/services/chat/chat.module.ts`（约 L14–L40）
+**来源**：`apps/backend/src/services/chat/chat.module.ts`（约 L7–L40）
 
 ```typescript
-// 说明：NestJS Module — providers 内多注册两个可注入服务
+// 说明：Serper 检索实现已迁至 web-search，与 Tavily 并列注册供门面注入
+import { SerperSearchService } from '../web-search/serper-search.service';
 import { TavilySearchService } from '../web-search/tavily-search.service';
 import { WebSearchService } from '../web-search/web-search.service';
 // ...
 providers: [
   ChatService,
   GlmChatService,
-  SerperService,
+  SerperSearchService,
   TavilySearchService,
   WebSearchService,
   // ...
@@ -79,13 +96,15 @@ providers: [
 ### 3.3 `web-search.types.ts`：统一 organic 形状
 
 - **`WebSearchOrganicItem`**：`title`、`link` 必填语义；可选 **`snippet`**、**`icon`**（注释说明 favicon URL）、**`date`**、**`position`**（1-based，供前端）。
+- **`SerperOrganicItem`**：类型别名，**等价于** `WebSearchOrganicItem`，供 Entity / Processor / `chat.service` 沿用历史命名。
 - **`WebSearchContextResult`**：`promptText` 可为 `null`；`organic` 可为 `null`。
+- **`SerperSearchContextResult`**：类型别名，**等价于** `WebSearchContextResult`。
 - **`WebSearchProvider`**：字面量联合 **`'tavily' | 'serper'`**。
 
-**来源**：`apps/backend/src/services/web-search/web-search.types.ts`（约 L1–L23，全文）
+**来源**：`apps/backend/src/services/web-search/web-search.types.ts`（约 L1–L29，全文）
 
 ```typescript
-// 说明：与 Serper/Tavily 返回字段对齐，供附录、SSE、落库 JSON 共用形状
+// 说明：与 Serper/Tavily 返回字段对齐；别名减少 chat 层改名范围
 /** 单条网页结果（与 Serper organic / Tavily results 对齐，供提示词与落库） */
 export interface WebSearchOrganicItem {
 	title: string;
@@ -99,6 +118,9 @@ export interface WebSearchOrganicItem {
 	position?: number;
 }
 
+/** 历史命名：与 Serper organic / 落库 searchOrganic 一致，形状同 WebSearchOrganicItem */
+export type SerperOrganicItem = WebSearchOrganicItem;
+
 /** 联网检索结果：供写入提示词、落库与 SSE 推送 */
 export interface WebSearchContextResult {
 	/** 拼入系统提示的文本；null 表示本轮不追加检索块（未配置或未检索） */
@@ -106,6 +128,9 @@ export interface WebSearchContextResult {
 	/** 热点列表；仅在有有效网页结果时非空 */
 	organic: WebSearchOrganicItem[] | null;
 }
+
+/** 历史命名：同 WebSearchContextResult */
+export type SerperSearchContextResult = WebSearchContextResult;
 
 /** 联网检索后端实现（默认 Tavily） */
 export type WebSearchProvider = 'tavily' | 'serper';
@@ -287,22 +312,22 @@ async formatSearchContextForPrompt(
 ### 3.6 `web-search.service.ts`：门面与 LangChain 工具
 
 - **`resolveProvider(override?)`**：`override` 为 `tavily`/`serper` 时直接返回；否则读 `WEB_SEARCH_DEFAULT_PROVIDER` trim+toLowerCase，仅当值为 **`serper`** 时选 Serper，否则 **tavily**。
-- **`isProviderConfigured(provider)`**：tavily 走 `tavilySearchService.isConfigured()`，否则 Serper。
+- **`isProviderConfigured(provider)`**：tavily 走 `tavilySearchService.isConfigured()`，否则走 **`serperSearchService.isConfigured()`**。
 - **`formatSearchContextForPrompt(query, options?)`**：先 `resolveProvider`；tavily 分支传 **`maxResults: options?.num ?? 10`**；serper 分支传 **`num: options?.num`**。
 - **`createLangChainWebSearchTools(opts?)`**：
   - 工具名 **`internet_search`**。
   - **description**：中文说明 + 动态拼接当前 provider 名。
   - **`func`**：输入转字符串后调 `formatSearchContextForPrompt`，返回 **`promptText ?? '（无检索结果）'`**（字符串给 LLM）。
 
-**来源**：`apps/backend/src/services/web-search/web-search.service.ts`（约 L12–L84）
+**来源**：`apps/backend/src/services/web-search/web-search.service.ts`（约 L12–L85）
 
 ```typescript
-// 说明：override 显式 tavily/serper 优先；否则读 WEB_SEARCH_DEFAULT_PROVIDER，仅 serper 选 Serper，其余默认 Tavily
+// 说明：Serper 侧注入 SerperSearchService；文件顶部另有 import DynamicTool、SerperSearchService 等
 @Injectable()
 export class WebSearchService {
 	constructor(
 		private readonly configService: ConfigService,
-		private readonly serperService: SerperService,
+		private readonly serperSearchService: SerperSearchService,
 		private readonly tavilySearchService: TavilySearchService,
 	) {}
 
@@ -324,7 +349,7 @@ export class WebSearchService {
 		if (provider === 'tavily') {
 			return this.tavilySearchService.isConfigured();
 		}
-		return this.serperService.isConfigured();
+		return this.serperSearchService.isConfigured();
 	}
 
 	async formatSearchContextForPrompt(
@@ -337,7 +362,7 @@ export class WebSearchService {
 				maxResults: options?.num ?? 10,
 			});
 		}
-		return this.serperService.formatSearchContextForPrompt(query, {
+		return this.serperSearchService.formatSearchContextForPrompt(query, {
 			num: options?.num,
 		});
 	}
@@ -367,42 +392,65 @@ export class WebSearchService {
 
 ### 3.7 `web-search/index.ts`：Barrel 导出
 
-- 再导出 **`buildWebSearchReferencePromptAppendix`**、**`wrapMarkdownLinkDestination`**、服务类与类型，便于其它模块按需 import。
+- 再导出 **`applyOrganicCitationAnchors`**、**`SerperSearchService`**、附录函数、Tavily / 门面服务及类型，便于其它模块按需 import。
 
-**来源**：`apps/backend/src/services/web-search/index.ts`（约 L1–L11）
+**来源**：`apps/backend/src/services/web-search/index.ts`（约 L1–L15）
 
 ```typescript
-// 说明：Barrel（桶文件）集中导出，Chat / Serper 可按需 import 类型或函数
+// 说明：Barrel（桶文件）集中导出；chat 层可直接引 organic-citation 或由此 barrel 统一引入
 export {
 	buildWebSearchReferencePromptAppendix,
 	wrapMarkdownLinkDestination,
 } from './search-context-format';
+export { applyOrganicCitationAnchors } from './organic-citation';
+export { SerperSearchService } from './serper-search.service';
 export { TavilySearchService } from './tavily-search.service';
 export { WebSearchService } from './web-search.service';
 export type {
+	SerperOrganicItem,
+	SerperSearchContextResult,
 	WebSearchContextResult,
 	WebSearchOrganicItem,
 	WebSearchProvider,
 } from './web-search.types';
 ```
 
-### 3.8 `serper.service.ts`：与共用类型及附录对齐
+### 3.8 `organic-citation.ts` 与 `serper-search.service.ts`（原 `chat/serper.service.ts` 已移除）
 
-- **类型别名**：`SerperOrganicItem = WebSearchOrganicItem`；`SerperSearchContextResult = WebSearchContextResult`，减少重复定义。
-- **import**：`buildWebSearchReferencePromptAppendix` 来自 `../web-search/search-context-format`。
-- **保留**：`SERPER_GOOGLE_SEARCH_URL` 注释说明勿用会 404 的路径；**`escapeHrefForDoubleQuotedAttr`**；**`urlsMatchForOrganic`**；**`applyOrganicCitationAnchors`**（三档替换：`[n](url)` 校验 URL、`【n】`、负向前瞻排除 `[n](` 的裸 `[n]`）。
-- **`formatSearchContextForPrompt`**：读 `SERPER_API_KEY`、`SERPER_SEARCH_URL`（可配置覆盖默认 Google 端点）；未配置 Key 打 warn；空 query；POST body 含 **`hl: 'zh-cn'`**、**`tbs: 'qdr:d'`**（时间范围）、**`num`**；错误与空 organic 的提示文案；成功时用 **`buildWebSearchReferencePromptAppendix('Serper（...）', organic)`** 生成 `promptText`。
+#### 3.8.1 `organic-citation.ts`：落库前角标 HTML
 
-**来源**：`apps/backend/src/services/chat/serper.service.ts`（约 L11–L101 类型与 `applyOrganicCitationAnchors`；约 L119–L179 `formatSearchContextForPrompt` 主体）
+- **职责**：纯函数 **`applyOrganicCitationAnchors`**；**`escapeHrefForDoubleQuotedAttr`**、**`urlsMatchForOrganic`** 保持模块内私有（不导出）。
+- **三档替换**（与前端 `organicCitation.ts` 中占位符管线同源语义）：校验通过的 **`[n](url)`**、**`【n】`**、负向前瞻 **`[n](` 以外的裸 `[n]`**。
+- **签名**：`organic: Pick<WebSearchOrganicItem, 'link'>[]`，与历史上 `Pick<SerperOrganicItem, 'link'>[]` 等价。
+
+**来源**：`apps/backend/src/services/web-search/organic-citation.ts`（约 L1–L81）
 
 ```typescript
-// 说明：与 web-search.types 同构别名，减少重复；落库前把 [n](url)/【n】/[n] 转为带 data-organic-cite 的 <a>
-export type SerperOrganicItem = WebSearchOrganicItem;
-export type SerperSearchContextResult = WebSearchContextResult;
+// 说明：输出带 data-organic-cite、__md-search-organic__ 的 <a>，供落库与前端 persisted 分支解析
+import type { WebSearchOrganicItem } from './web-search.types';
+
+/** 转义 href 属性中的引号与 &，避免破坏 HTML */
+function escapeHrefForDoubleQuotedAttr(url: string): string {
+	return url.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+}
+
+/** 与 organic 条目的 URL 比对（trim + 尽力 decodeURIComponent 归一化） */
+function urlsMatchForOrganic(dest: string, organicLink: string): boolean {
+	const norm = (u: string) => {
+		let s = u.trim();
+		try {
+			s = decodeURIComponent(s);
+		} catch {
+			// 非法百分号序列时保持原样
+		}
+		return s;
+	};
+	return norm(dest) === norm(organicLink);
+}
 
 export function applyOrganicCitationAnchors(
 	text: string,
-	organic: Pick<SerperOrganicItem, 'link'>[],
+	organic: Pick<WebSearchOrganicItem, 'link'>[],
 ): string {
 	if (!text || !organic?.length) {
 		return text;
@@ -419,6 +467,7 @@ export function applyOrganicCitationAnchors(
 		return `<a href="${escapeHrefForDoubleQuotedAttr(link)}" data-organic-cite="${idx}" target="_blank" rel="noopener noreferrer" style="cursor: pointer;" class="__md-search-organic__">${idx}</a>`;
 	};
 
+	// 模型按提示输出 Markdown [n](url) 时，href 以 organic 为准（防篡改）
 	let out = text.replace(
 		/\[(\d+)\]\(\s*(?:<([^>\n]+)>|([^)\n]+))\s*\)/g,
 		(full, raw: string, angled?: string, plain?: string) => {
@@ -445,6 +494,7 @@ export function applyOrganicCitationAnchors(
 		}
 		return toAnchor(i) ?? full;
 	});
+	// 排除 Markdown 链接 [text](url) 中的 [数字]
 	out = out.replace(/\[(\d+)\](?!\()/g, (full, raw: string) => {
 		const i = Number.parseInt(raw, 10);
 		if (Number.isNaN(i)) {
@@ -456,77 +506,86 @@ export function applyOrganicCitationAnchors(
 }
 ```
 
-**来源**：`apps/backend/src/services/chat/serper.service.ts`（`formatSearchContextForPrompt` 请求与附录，约 L119–L179）
+#### 3.8.2 `serper-search.service.ts`：Serper HTTP 与附录
+
+- **`SERPER_GOOGLE_SEARCH_URL`**：默认 `https://google.serper.dev/search`；注释说明勿 POST `api.serper.dev/search`（易 404）。
+- **`isConfigured`**：`SERPER_API_KEY` trim 非空。
+- **`formatSearchContextForPrompt`**：`SERPER_SEARCH_URL` 可覆盖默认端点；请求体 **`hl: 'zh-cn'`**、**`tbs: 'qdr:d'`**、**`num`**；错误 / 空 organic 文案与重构前一致；成功则 **`buildWebSearchReferencePromptAppendix('Serper（Google ...）', organic)`**。
+
+**来源**：`apps/backend/src/services/web-search/serper-search.service.ts`（约 L17–L101，`SerperSearchService` 类）
 
 ```typescript
-// 说明：searchUrl 支持 SERPER_SEARCH_URL 覆盖默认 google.serper.dev；organic 走共用 buildWebSearchReferencePromptAppendix
-async formatSearchContextForPrompt(
-	query: string,
-	options?: { num?: number },
-): Promise<SerperSearchContextResult> {
-	const apiKey = this.configService.get<string>(ModelEnum.SERPER_API_KEY);
-	const configuredUrl = this.configService.get<string>(
-		ModelEnum.SERPER_SEARCH_URL,
-	);
-	const searchUrl = configuredUrl || SERPER_GOOGLE_SEARCH_URL;
-	if (!apiKey?.trim()) {
-		this.logger.warn?.('[Serper] SERPER_API_KEY 未配置，跳过联网搜索');
-		return { promptText: null, organic: null };
-	}
-
-	const q = query?.trim();
-	if (!q) {
-		return { promptText: null, organic: null };
-	}
-
-	try {
-		const res = await fetch(searchUrl, {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json',
-				'X-API-KEY': apiKey.trim(),
-			},
-			body: JSON.stringify({
-				q,
-				hl: 'zh-cn',
-				tbs: 'qdr:d',
-				num: options?.num ?? 10,
-			}),
-		});
-
-		if (!res.ok) {
-			const text = await res.text();
-			this.logger.error?.(
-				`[Serper] 请求失败 ${res.status}: ${text?.slice(0, 500)}`,
-			);
-			return {
-				promptText: '\n（联网检索请求失败，请仅凭既有知识回答。）\n',
-				organic: null,
-			};
-		}
-
-		const data = (await res.json()) as { organic?: WebSearchOrganicItem[] };
-		const organic = data.organic;
-		if (!organic?.length) {
-			return {
-				promptText:
-					'\n（联网检索未返回有效网页结果，请仅凭既有知识回答。）\n',
-				organic: null,
-			};
-		}
-
-		const promptText = buildWebSearchReferencePromptAppendix(
-			'Serper（Google 搜索结果 SERP，即搜索引擎结果页）',
-			organic,
+// 说明：类名 SerperSearchService，与 TavilySearchService 对称，供 WebSearchService 注入
+@Injectable()
+export class SerperSearchService {
+	async formatSearchContextForPrompt(
+		query: string,
+		options?: { num?: number },
+	): Promise<SerperSearchContextResult> {
+		const apiKey = this.configService.get<string>(ModelEnum.SERPER_API_KEY);
+		const configuredUrl = this.configService.get<string>(
+			ModelEnum.SERPER_SEARCH_URL,
 		);
+		const searchUrl = configuredUrl || SERPER_GOOGLE_SEARCH_URL;
+		if (!apiKey?.trim()) {
+			this.logger.warn?.('[Serper] SERPER_API_KEY 未配置，跳过联网搜索');
+			return { promptText: null, organic: null };
+		}
 
-		return { promptText, organic };
-	} catch (err) {
-		this.logger.error?.(`[Serper] 调用异常: ${String(err)}`);
-		return {
-			promptText: '\n（联网检索过程异常，请仅凭既有知识回答。）\n',
-			organic: null,
-		};
+		const q = query?.trim();
+		if (!q) {
+			return { promptText: null, organic: null };
+		}
+
+		try {
+			const res = await fetch(searchUrl, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					'X-API-KEY': apiKey.trim(),
+				},
+				body: JSON.stringify({
+					q,
+					hl: 'zh-cn',
+					tbs: 'qdr:d',
+					num: options?.num ?? 10,
+				}),
+			});
+
+			if (!res.ok) {
+				const text = await res.text();
+				this.logger.error?.(
+					`[Serper] 请求失败 ${res.status}: ${text?.slice(0, 500)}`,
+				);
+				return {
+					promptText: '\n（联网检索请求失败，请仅凭既有知识回答。）\n',
+					organic: null,
+				};
+			}
+
+			const data = (await res.json()) as { organic?: WebSearchOrganicItem[] };
+			const organic = data.organic;
+			if (!organic?.length) {
+				return {
+					promptText:
+						'\n（联网检索未返回有效网页结果，请仅凭既有知识回答。）\n',
+					organic: null,
+				};
+			}
+
+			const promptText = buildWebSearchReferencePromptAppendix(
+				'Serper（Google 搜索结果 SERP，即搜索引擎结果页）',
+				organic,
+			);
+
+			return { promptText, organic };
+		} catch (err) {
+			this.logger.error?.(`[Serper] 调用异常: ${String(err)}`);
+			return {
+				promptText: '\n（联网检索过程异常，请仅凭既有知识回答。）\n',
+				organic: null,
+			};
+		}
 	}
 }
 ```
@@ -550,12 +609,12 @@ private withOrganicPositions(
 
 #### 3.9.2 构造函数依赖
 
-- **`SerperService` 从构造注入列表移除**（相对旧版），改为注入 **`WebSearchService`**（Serper 仍作为 `WebSearchService` 的子依赖存在）。
+- **`ChatService` 只注入 `WebSearchService`**（不直接注入 Serper）；**`SerperSearchService`** 与 **`TavilySearchService`** 由 **`WebSearchService`** 构造注入，并在同一 **`ChatModule.providers`** 中注册（Nest 解析依赖链）。
 
 **来源**：`apps/backend/src/services/chat/chat.service.ts`（约 L49–L61，构造函数）
 
 ```typescript
-// 说明：联网统一走 WebSearchService；Serper 仅在其内部被调用（摘录，省略构造内注释）
+// 说明：联网统一走 WebSearchService；Serper/Tavily 具体 HTTP 在 web-search 子服务内（摘录，省略构造内注释）
 constructor(
 	private configService: ConfigService,
 	private cache: Cache,
@@ -567,6 +626,16 @@ constructor(
 	@Inject(WINSTON_MODULE_NEST_PROVIDER)
 	private readonly logger: LoggerService,
 ) {}
+```
+
+**来源**：`apps/backend/src/services/chat/chat.service.ts`（约 L26–L34，联网与角标相关 import）
+
+```typescript
+// 说明：落库前角标函数来自 web-search；类型 SerperOrganicItem 为历史别名，定义在 web-search.types
+import { WebSearchService } from '../web-search/web-search.service';
+import type { WebSearchOrganicItem } from '../web-search/web-search.types';
+import { applyOrganicCitationAnchors } from '../web-search/organic-citation';
+import type { SerperOrganicItem } from '../web-search/web-search.types';
 ```
 
 #### 3.9.3 `resolveWebSearchQuery(dto)`
@@ -957,7 +1026,7 @@ mergedMessages[existingIndex] = {
 
 | 符号 / 区域                                        | 作用（细项）                                                                                                                                                    |
 | -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 文件头注释                                         | 与后端 `applyOrganicCitationAnchors` 语义对齐说明                                                                                                               |
+| 文件头注释                                         | 与后端 `apps/.../web-search/organic-citation.ts` 中 `applyOrganicCitationAnchors` 语义对齐说明                                                                  |
 | `PERSISTED_ORGANIC_ANCHOR_RE`                      | 匹配落库 HTML `<a data-organic-cite="n">...</a>`                                                                                                                |
 | `escapeHtmlText` / `escapeHrefForDoubleQuotedAttr` | 注入 HTML 安全转义                                                                                                                                              |
 | `organicCitationMarker`                            | 返回 `〔cite:n〕` 内部占位符                                                                                                                                    |
@@ -989,7 +1058,7 @@ const label = count === 1 ? hosts[0] : `${hosts[0]} +${count - 1}`;
 **来源**：`apps/frontend/src/utils/organicCitation.ts`（约 L165–L232，`urlsMatchForOrganic` 与 `applyOrganicCitationAnchors`）
 
 ```typescript
-// 说明：与后端 serper.service 三档替换同源；前端输出占位符〔cite:n〕，供 markdown-it 渲染后再 inject 成 <a>
+// 说明：与后端 web-search/organic-citation.ts 三档替换同源；前端输出占位符〔cite:n〕，供 markdown-it 渲染后再 inject 成 <a>
 function urlsMatchForOrganic(dest: string, organicLink: string): boolean {
 	const norm = (u: string) => {
 		let s = u.trim();
@@ -1365,6 +1434,7 @@ const SearchOrganics: React.FC<IProps> = ({
 
 ## 6. 测试与回归建议（清单）
 
+- [ ] **`ChatModule`** 已注册 **`SerperSearchService`**，`WebSearchService` 可正常解析 Serper 分支（无循环依赖、无缺失 provider）。
 - [ ] 仅配 Tavily / 仅配 Serper / 两者都配：未配置 Key 的提示是否指向正确变量名。
 - [ ] `webSearchProvider` 传 `serper` / `tavily` / 不传。
 - [ ] 续写：`isContinuation` 为 true 时不重复检索，角标仍能 **`getSearchOrganicForAnchors`**。
@@ -1377,9 +1447,11 @@ const SearchOrganics: React.FC<IProps> = ({
 
 ## 7. 相关源码索引
 
-| 说明           | 路径                                                                 |
-| -------------- | -------------------------------------------------------------------- |
-| 本文档         | `docs/chat/apps-web-search-organics.md`                              |
-| 联网模块（新） | `apps/backend/src/services/web-search/`                              |
-| 助手气泡       | `apps/frontend/src/components/design/ChatAssistantMessage/index.tsx` |
-| 引用工具       | `apps/frontend/src/utils/organicCitation.ts`                         |
+| 说明              | 路径                                                                 |
+| ----------------- | -------------------------------------------------------------------- |
+| 本文档            | `docs/chat/web-search.md`                                            |
+| 联网模块          | `apps/backend/src/services/web-search/`                              |
+| Serper HTTP       | `apps/backend/src/services/web-search/serper-search.service.ts`      |
+| 落库角标（HTML）  | `apps/backend/src/services/web-search/organic-citation.ts`           |
+| 助手气泡          | `apps/frontend/src/components/design/ChatAssistantMessage/index.tsx` |
+| 前端引用工具      | `apps/frontend/src/utils/organicCitation.ts`                         |

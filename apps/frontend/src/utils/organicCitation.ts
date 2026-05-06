@@ -1,5 +1,5 @@
 /**
- * 与后端 serper.service.ts 中 applyOrganicCitationAnchors 语义对齐：
+ * 与后端 apps/backend/src/services/web-search/organic-citation.ts 中 applyOrganicCitationAnchors 语义对齐：
  * 流式阶段把 【n】、[n](url)、裸 [n] 转为 Markdown 安全占位符（避免 markdown-it html:false 把 <a> 当纯文本转义）。
  * 占位符在 Markdown 渲染后再替换为真实 <a>（见 injectOrganicCitationAnchorsIntoMarkdownHtml）。
  */

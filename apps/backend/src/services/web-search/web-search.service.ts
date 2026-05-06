@@ -2,7 +2,7 @@ import { DynamicTool } from '@langchain/core/tools';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ModelEnum } from 'src/enum/config.enum';
-import { SerperService } from '../chat/serper.service';
+import { SerperSearchService } from './serper-search.service';
 import { TavilySearchService } from './tavily-search.service';
 import type {
 	WebSearchContextResult,
@@ -13,7 +13,7 @@ import type {
 export class WebSearchService {
 	constructor(
 		private readonly configService: ConfigService,
-		private readonly serperService: SerperService,
+		private readonly serperSearchService: SerperSearchService,
 		private readonly tavilySearchService: TavilySearchService,
 	) {}
 
@@ -38,7 +38,7 @@ export class WebSearchService {
 		if (provider === 'tavily') {
 			return this.tavilySearchService.isConfigured();
 		}
-		return this.serperService.isConfigured();
+		return this.serperSearchService.isConfigured();
 	}
 
 	/**
@@ -54,7 +54,7 @@ export class WebSearchService {
 				maxResults: options?.num ?? 10,
 			});
 		}
-		return this.serperService.formatSearchContextForPrompt(query, {
+		return this.serperSearchService.formatSearchContextForPrompt(query, {
 			num: options?.num,
 		});
 	}

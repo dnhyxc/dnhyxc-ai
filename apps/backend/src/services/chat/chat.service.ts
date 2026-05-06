@@ -23,17 +23,17 @@ import { catchError, Observable, Subject } from 'rxjs';
 import { ModelEnum } from 'src/enum/config.enum';
 import { parseFile } from '../../utils/file-parser';
 import { OcrService } from '../ocr/ocr.service';
+import { applyOrganicCitationAnchors } from '../web-search/organic-citation';
 import { WebSearchService } from '../web-search/web-search.service';
-import type { WebSearchOrganicItem } from '../web-search/web-search.types';
+import type {
+	SerperOrganicItem,
+	WebSearchOrganicItem,
+} from '../web-search/web-search.types';
 import { MessageRole } from './chat.entity';
 import { ChatContinueDto } from './dto/chat-continue.dto';
 import { ChatMessageDto } from './dto/chat-message.dto';
 import { ChatRequestDto } from './dto/chat-request.dto';
 import { MessageService } from './message.service';
-import {
-	applyOrganicCitationAnchors,
-	type SerperOrganicItem,
-} from './serper.service';
 
 // Scope.REQUEST: 声明作用域，否则 queue-events.listener 中的队列监听器会被忽略，不生效
 @Injectable({ scope: Scope.REQUEST })
