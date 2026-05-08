@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { DynamicTool } from '@langchain/core/tools';
 import { Inject, Injectable, type LoggerService } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
@@ -132,6 +133,71 @@ export class KnowledgeQaService {
 		}
 	}
 
+	/**
+	 * 向量召回 + rerank（askStream 与 Agent RAG 工具共用，避免重复实现）
+	 */
+	private async retrieveEvidencesWithRerank(params: {
+		question: string;
+		authorId: number;
+		/** 与 askStream 一致：未传时使用 KNOWLEDGE_QA_TOPK，缺省为 10 */
+		topK?: number;
+		/** rerank 失败日志前缀，便于区分调用方 */
+		rerankErrorLogTag: string;
+	}): Promise<KnowledgeQaEvidence[]> {
+		const topK =
+			params.topK ??
+			Number(this.config.get<string>(KnowledgeQaEnum.KNOWLEDGE_QA_TOPK) || 10);
+
+		const qvec = await this.embedding.embedQuery(params.question);
+
+		const hits = await this.qdrant.searchKnowledgeChunks({
+			vector: qvec,
+			topK,
+			authorId: params.authorId,
+		});
+
+		let evidences: KnowledgeQaEvidence[] = hits.map((h) => ({
+			knowledgeId: h.payload.knowledgeId,
+			title: h.payload.title,
+			chunkIndex: h.payload.chunkIndex,
+			score: h.score,
+			text: h.payload.text,
+		}));
+
+		if (evidences.length > 1) {
+			try {
+				const docs = evidences.map(
+					(e) => `标题：${e.title}\n分片：#${e.chunkIndex}\n内容：\n${e.text}`,
+				);
+				const reranked = await this.embedding.rerank({
+					query: params.question,
+					documents: docs,
+					topN: Math.min(evidences.length, topK),
+				});
+				if (reranked.length > 0) {
+					const used = new Set<number>();
+					const next: KnowledgeQaEvidence[] = [];
+					for (const r of reranked) {
+						const ev = evidences[r.index];
+						if (!ev) continue;
+						used.add(r.index);
+						next.push(ev);
+					}
+					for (let i = 0; i < evidences.length; i++) {
+						if (!used.has(i)) next.push(evidences[i]!);
+					}
+					evidences = next;
+				}
+			} catch (e) {
+				this.logger.error(
+					`[${params.rerankErrorLogTag}]: Failed to rerank evidences: ${JSON.stringify(e)}`,
+				);
+			}
+		}
+
+		return evidences;
+	}
+
 	async askStream(input: {
 		question: string;
 		authorId: number;
@@ -145,63 +211,13 @@ export class KnowledgeQaService {
 			(async () => {
 				try {
 					subscriber.next({ type: 'qa.start', runId });
-					const topK =
-						input.topK ??
-						Number(
-							this.config.get<string>(KnowledgeQaEnum.KNOWLEDGE_QA_TOPK) || 10,
-						);
 
-					// 生成单条 query 向量
-					const qvec = await this.embedding.embedQuery(input.question);
-
-					const hits = await this.qdrant.searchKnowledgeChunks({
-						vector: qvec,
-						topK,
+					const evidences = await this.retrieveEvidencesWithRerank({
+						question: input.question,
 						authorId: input.authorId,
+						topK: input.topK,
+						rerankErrorLogTag: 'askStream',
 					});
-
-					let evidences: KnowledgeQaEvidence[] = hits.map((h) => ({
-						knowledgeId: h.payload.knowledgeId,
-						title: h.payload.title,
-						chunkIndex: h.payload.chunkIndex,
-						score: h.score,
-						text: h.payload.text,
-					}));
-
-					// 对召回结果进行二次重排（rerank），提升最终相关性；若失败则回退原召回顺序
-					if (evidences.length > 1) {
-						try {
-							const docs = evidences.map(
-								(e) =>
-									`标题：${e.title}\n分片：#${e.chunkIndex}\n内容：\n${e.text}`,
-							);
-							const reranked = await this.embedding.rerank({
-								query: input.question,
-								documents: docs,
-								// 限制重排结果数量不超过 topK，可以将 topN 设置的比 topK 小，避免浪费资源，目前没有设置的比 topK 小，后续可以优化
-								topN: Math.min(evidences.length, topK),
-							});
-							if (reranked.length > 0) {
-								const used = new Set<number>();
-								const next: KnowledgeQaEvidence[] = [];
-								for (const r of reranked) {
-									const ev = evidences[r.index];
-									if (!ev) continue;
-									used.add(r.index);
-									next.push(ev);
-								}
-								// 将未被 rerank 返回的文档追加到末尾，避免丢证据（保持可解释性）
-								for (let i = 0; i < evidences.length; i++) {
-									if (!used.has(i)) next.push(evidences[i]!);
-								}
-								evidences = next;
-							}
-						} catch (e) {
-							this.logger.error(
-								`[askStream]: Failed to rerank evidences: ${JSON.stringify(e)}`,
-							);
-						}
-					}
 
 					if (input.includeEvidences !== false) {
 						subscriber.next({ type: 'qa.retrieval', evidences });
@@ -262,6 +278,47 @@ export class KnowledgeQaService {
 			return () => {
 				abortController.abort();
 			};
+		});
+	}
+
+	/**
+	 * 封装供 LangChain Agent 使用的知识库 RAG DynamicTool（固定绑定 authorId，与当前登录用户一致）。
+	 */
+	createAgentKnowledgeRagTool(authorId: number): DynamicTool {
+		return new DynamicTool({
+			name: 'knowledge_base_retrieval',
+			description:
+				'从当前用户已入库的知识库中做语义检索（向量 + 重排），返回相关文档分片。' +
+				'适用于问题与用户自有笔记、文档、站内知识相关时；输入为一句简洁检索查询。' +
+				'公网时效信息请改用互联网搜索工具。',
+			func: async (input: string) => {
+				const q =
+					typeof input === 'string' ? input.trim() : String(input ?? '').trim();
+				if (!q) {
+					return '（查询为空：请传入检索句或关键词。）';
+				}
+				try {
+					const evidences = await this.retrieveEvidencesWithRerank({
+						question: q,
+						authorId,
+						rerankErrorLogTag: 'createAgentKnowledgeRagTool',
+					});
+					if (evidences.length === 0) {
+						return '未在知识库中检索到相关分片。可尝试换关键词，或使用互联网搜索工具。';
+					}
+					return evidences
+						.slice(0, 12)
+						.map(
+							(e, i) =>
+								`[#${i + 1}] 标题：${e.title}\n知识条目ID：${e.knowledgeId}\n分片序号：${e.chunkIndex} | 相关度=${e.score.toFixed(4)}\n${e.text}`,
+						)
+						.join('\n\n---\n\n');
+				} catch (err: unknown) {
+					const msg =
+						err instanceof Error ? err.message : String(err ?? '未知错误');
+					return `知识库检索失败：${msg}`;
+				}
+			},
 		});
 	}
 }

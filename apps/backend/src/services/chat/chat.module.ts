@@ -4,9 +4,6 @@ import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { QueueEventsListener } from '../../utils/queue-events-listener';
 import { OcrService } from '../ocr/ocr.service';
-import { SerperSearchService } from '../web-search/serper-search.service';
-import { TavilySearchService } from '../web-search/tavily-search.service';
-import { WebSearchService } from '../web-search/web-search.service';
 import { Attachments } from './attachments.entity';
 import { ChatController } from './chat.controller';
 import { ChatMessages } from './chat.entity';
@@ -30,9 +27,6 @@ import { ChatSessions } from './session.entity';
 	providers: [
 		ChatService,
 		GlmChatService,
-		SerperSearchService,
-		TavilySearchService,
-		WebSearchService,
 		MessageService,
 		ChatMessageProcessor,
 		OcrService,

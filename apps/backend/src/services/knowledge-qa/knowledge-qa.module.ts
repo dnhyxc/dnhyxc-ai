@@ -7,5 +7,6 @@ import { KnowledgeQaService } from './knowledge-qa.service';
 	imports: [KnowledgeEmbeddingModule],
 	controllers: [KnowledgeQaController],
 	providers: [KnowledgeQaService],
+	exports: [KnowledgeQaService],
 })
 export class KnowledgeQaModule {}

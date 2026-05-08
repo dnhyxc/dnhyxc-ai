@@ -10,6 +10,7 @@ import { TypeOrmDestroyService } from './database/typeorm-destroy.service';
 import { appConfig } from './factorys/app-config.factory';
 import { createBullRedisConnectionOptions } from './factorys/bull-redis-connection.factory';
 import { RedisConfigFactory } from './factorys/redis-config.factory';
+import { AgentModule } from './services/agent/agent.module';
 import { AssistantModule } from './services/assistant/assistant.module';
 // 业务模块
 import { AuthModule } from './services/auth/auth.module';
@@ -28,6 +29,7 @@ import { ShareModule } from './services/share/share.module';
 import { SpeechTranscriptionModule } from './services/speech-transcription/speech-transcription.module';
 import { UploadModule } from './services/upload/upload.module';
 import { UserModule } from './services/user/user.module';
+import { WebSearchModule } from './services/web-search/web-search.module';
 
 // 数据库连接池
 const connections = new Map();
@@ -85,6 +87,7 @@ const connections = new Map();
 		PromptModule,
 		OcrModule,
 		SpeechTranscriptionModule,
+		WebSearchModule,
 		ChatModule,
 		QdrantModule,
 		KnowledgeModule,
@@ -92,6 +95,7 @@ const connections = new Map();
 		ShareModule,
 		PayModule,
 		AssistantModule,
+		AgentModule,
 	],
 	controllers: [],
 	providers: [
