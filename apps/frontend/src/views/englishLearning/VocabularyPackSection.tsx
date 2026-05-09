@@ -2,12 +2,19 @@
  * 按主题拉取结构化单词资料（IPA / 释义 / 例句），逐词朗读。
  */
 import { Button, Toast } from '@ui/index';
-import { BookText, Loader2, Square, Volume2 } from 'lucide-react';
+import { BookText, History, Loader2, Square, Volume2 } from 'lucide-react';
 import { observer } from 'mobx-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
-import type { EnglishVocabularyItem } from '@/service';
+import type {
+	EnglishVocabularyHistoryEntry,
+	EnglishVocabularyItem,
+} from '@/service';
+import {
+	getEnglishVocabularyHistoryDetail,
+	listEnglishVocabularyHistory,
+} from '@/service';
 import englishAgentStore from '@/store/englishAgent';
 import {
 	playEnglishPreferred,
@@ -22,6 +29,14 @@ const COUNT_PRESETS = [10, 100, 500, 1000, 3000] as const;
 
 function sanitizeCountDigits(raw: string): string {
 	return raw.replace(/\D/g, '').slice(0, 4);
+}
+
+function formatHistoryLineDate(iso: string): string {
+	try {
+		return new Date(iso).toLocaleString();
+	} catch {
+		return iso;
+	}
 }
 
 export type VocabProgressState = {
@@ -46,6 +61,14 @@ function VocabularyPackSectionInner({
 	const [progress, setProgress] = useState<VocabProgressState | null>(null);
 	const [items, setItems] = useState<EnglishVocabularyItem[]>([]);
 	const [playingKey, setPlayingKey] = useState<string | null>(null);
+	const [historyEntries, setHistoryEntries] = useState<
+		EnglishVocabularyHistoryEntry[]
+	>([]);
+	const [historyLoading, setHistoryLoading] = useState(false);
+	const [loadingHistoryDetailId, setLoadingHistoryDetailId] = useState<
+		string | null
+	>(null);
+	const [loadedStreamId, setLoadedStreamId] = useState<string | null>(null);
 
 	const abortRef = useRef<((fromUser?: boolean) => void) | null>(null);
 	const genIdRef = useRef(0);
@@ -56,6 +79,52 @@ function VocabularyPackSectionInner({
 			abortRef.current = null;
 		};
 	}, []);
+
+	const loadHistory = useCallback(async () => {
+		setHistoryLoading(true);
+		try {
+			const res = await listEnglishVocabularyHistory({
+				limit: 30,
+				offset: 0,
+			});
+			const list = res.data;
+			setHistoryEntries(Array.isArray(list) ? list : []);
+		} catch {
+			setHistoryEntries([]);
+		} finally {
+			setHistoryLoading(false);
+		}
+	}, []);
+
+	useEffect(() => {
+		void loadHistory();
+	}, [loadHistory]);
+
+	const openHistoryDetail = useCallback(
+		async (streamId: string) => {
+			setLoadingHistoryDetailId(streamId);
+			try {
+				const res = await getEnglishVocabularyHistoryDetail(streamId);
+				const d = res.data;
+				if (d?.items?.length) {
+					setItems(d.items);
+					setLoadedStreamId(streamId);
+					Toast({
+						type: 'success',
+						title: t('englishLearning.vocab.historyLoaded'),
+					});
+				} else {
+					Toast({
+						type: 'info',
+						title: t('englishLearning.vocab.empty'),
+					});
+				}
+			} finally {
+				setLoadingHistoryDetailId(null);
+			}
+		},
+		[t],
+	);
 
 	const cancelGenerate = useCallback(() => {
 		abortRef.current?.(true);
@@ -94,6 +163,7 @@ function VocabularyPackSectionInner({
 
 		setLoading(true);
 		setProgress({ collected: 0, target: count, round: 0 });
+		setItems([]);
 
 		const abort = await streamEnglishVocabularyPack({
 			body: { topic: req, count, level: levelTier },
@@ -102,12 +172,19 @@ function VocabularyPackSectionInner({
 					if (genIdRef.current !== myGen) return;
 					setProgress(p);
 				},
+				onChunk: ({ items: delta }) => {
+					if (genIdRef.current !== myGen) return;
+					if (!delta.length) return;
+					setItems((prev) => [...prev, ...delta]);
+				},
 				onDone: ({ items: list, requested }) => {
 					if (genIdRef.current !== myGen) return;
 					abortRef.current = null;
 					setLoading(false);
 					setProgress(null);
 					setItems(list);
+					setLoadedStreamId(null);
+					void loadHistory();
 					if (list.length === 0) {
 						Toast({
 							type: 'info',
@@ -153,7 +230,7 @@ function VocabularyPackSectionInner({
 			},
 		});
 		abortRef.current = abort;
-	}, [topic, countInput, levelTier, t]);
+	}, [topic, countInput, levelTier, t, loadHistory]);
 
 	const toggleWordAudio = useCallback(
 		async (word: string, key: string) => {
@@ -226,6 +303,76 @@ function VocabularyPackSectionInner({
 				</div>
 			</div>
 		) : null;
+
+	const historySection = (
+		<div className="border-theme/10 space-y-2 rounded-xl border bg-theme-secondary/30 px-3 py-2.5">
+			<div className="text-textcolor/70 flex items-center justify-between gap-2 text-[11px] font-medium">
+				<span className="flex min-w-0 items-center gap-1.5">
+					<History className="size-3.5 shrink-0 opacity-80" aria-hidden />
+					{t('englishLearning.vocab.historyTitle')}
+				</span>
+				<button
+					type="button"
+					disabled={historyLoading}
+					onClick={() => void loadHistory()}
+					className="text-teal-600/90 hover:text-teal-500 dark:text-teal-400/95 shrink-0 text-[10px] font-medium underline-offset-2 hover:underline disabled:opacity-40"
+				>
+					{t('englishLearning.vocab.historyRefresh')}
+				</button>
+			</div>
+			{historyLoading ? (
+				<p className="text-textcolor/45 text-[11px]">
+					{t('englishLearning.vocab.historyLoading')}
+				</p>
+			) : historyEntries.length === 0 ? (
+				<p className="text-textcolor/45 text-[11px] leading-snug">
+					{t('englishLearning.vocab.historyEmpty')}
+				</p>
+			) : (
+				<ul className="max-h-44 space-y-1.5 overflow-y-auto overscroll-y-contain pr-0.5">
+					{historyEntries.map((h) => {
+						const active = loadedStreamId === h.streamId;
+						const busy = loadingHistoryDetailId === h.streamId;
+						return (
+							<li key={h.streamId}>
+								<button
+									type="button"
+									disabled={busy}
+									onClick={() => void openHistoryDetail(h.streamId)}
+									className={cn(
+										'border-theme/10 flex w-full flex-col items-start gap-0.5 rounded-lg border px-2.5 py-2 text-left transition-colors',
+										active
+											? 'border-teal-500/35 bg-teal-500/10'
+											: 'bg-theme-secondary/40 hover:bg-theme-secondary/60',
+									)}
+								>
+									<span className="text-textcolor line-clamp-2 w-full text-[12px] font-medium leading-snug">
+										{h.topic || '—'}
+									</span>
+									<span className="text-textcolor/45 flex w-full flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px]">
+										<span>
+											{t('englishLearning.vocab.historyWords', {
+												count: h.wordCount,
+											})}
+										</span>
+										<span className="tabular-nums">
+											{formatHistoryLineDate(h.updatedAt)}
+										</span>
+										{busy ? (
+											<Loader2
+												className="size-3 shrink-0 animate-spin"
+												aria-hidden
+											/>
+										) : null}
+									</span>
+								</button>
+							</li>
+						);
+					})}
+				</ul>
+			)}
+		</div>
+	);
 
 	const countBlock = (
 		<div className="w-full min-w-0">
@@ -339,6 +486,7 @@ function VocabularyPackSectionInner({
 						) : null}
 					</div>
 					{progressBlock}
+					{historySection}
 				</div>
 				<p className="text-textcolor/40 mb-4 text-[10px]">
 					{t('englishLearning.vocab.useLevel', {
@@ -454,6 +602,7 @@ function VocabularyPackSectionInner({
 					) : null}
 				</div>
 				{progressBlock}
+				{historySection}
 			</div>
 			<p className="text-textcolor/45 -mt-1 text-xs">
 				{t('englishLearning.vocab.useLevel', {

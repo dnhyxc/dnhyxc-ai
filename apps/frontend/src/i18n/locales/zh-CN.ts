@@ -705,6 +705,15 @@ export const zhCN = {
 	'englishLearning.vocab.empty': '未返回词条，请换主题重试',
 	'englishLearning.vocab.useLevel': '将使用当前难度：{level}',
 	'englishLearning.vocab.playWord': '朗读该词',
+	'englishLearning.vocab.listHeading': '词条列表',
+	'englishLearning.vocab.historyTitle': '历史拉取记录',
+	'englishLearning.vocab.historyEmpty':
+		'暂无记录；拉取单词成功后会自动保存在此处',
+	'englishLearning.vocab.historyWords': '{count} 词',
+	'englishLearning.vocab.historyLoad': '载入',
+	'englishLearning.vocab.historyLoaded': '已载入该次单词列表',
+	'englishLearning.vocab.historyLoading': '加载历史…',
+	'englishLearning.vocab.historyRefresh': '刷新',
 
 	'englishLearning.tts.play': '朗读',
 	'englishLearning.tts.stop': '停止',

@@ -50,12 +50,24 @@ export type EnglishVocabStreamProgress = {
 	round: number;
 };
 
+export type EnglishVocabStreamChunk = {
+	/** 与后端 SSE 一致，用于关联 DB 批次 */
+	streamId?: string;
+	round: number;
+	collected: number;
+	target: number;
+	items: EnglishVocabularyItem[];
+};
+
 export type EnglishVocabStreamCallbacks = {
 	onProgress?: (p: EnglishVocabStreamProgress) => void;
+	/** 每轮 LLM 合并后的新词条（与后端入库批次一致），用于实时追加 UI */
+	onChunk?: (chunk: EnglishVocabStreamChunk) => void;
 	/** 正常结束：携带词条与请求条数（用于部分成功提示） */
 	onDone?: (payload: {
 		items: EnglishVocabularyItem[];
 		requested: number;
+		streamId?: string;
 	}) => void;
 	onError?: (message: string) => void;
 	/** 用户点击取消触发的中断（非静默替换上一轮请求） */
@@ -81,7 +93,8 @@ export async function streamEnglishVocabularyPack(options: {
 		body,
 		callbacks,
 	} = options;
-	const { onProgress, onDone, onError, onUserAbort, onIncomplete } = callbacks;
+	const { onProgress, onChunk, onDone, onError, onUserAbort, onIncomplete } =
+		callbacks;
 
 	const controller = new AbortController();
 	let userAbortRequested = false;
@@ -147,13 +160,40 @@ export async function streamEnglishVocabularyPack(options: {
 				return false;
 			}
 
+			if (type === 'vocab.chunk') {
+				const collected = Number(parsed.collected);
+				const target = Number(parsed.target);
+				const round = Number(parsed.round);
+				const items = parseItems(parsed.items);
+				const streamId =
+					typeof parsed.streamId === 'string' ? parsed.streamId : undefined;
+				if (
+					items.length > 0 &&
+					Number.isFinite(collected) &&
+					Number.isFinite(target) &&
+					Number.isFinite(round)
+				) {
+					onChunk?.({
+						streamId,
+						round,
+						collected,
+						target,
+						items,
+					});
+				}
+				return false;
+			}
+
 			if (type === 'vocab.complete') {
 				receivedComplete = true;
 				const items = parseItems(parsed.items);
 				const requested = Number(parsed.requested);
+				const streamId =
+					typeof parsed.streamId === 'string' ? parsed.streamId : undefined;
 				onDone?.({
 					items,
 					requested: Number.isFinite(requested) ? requested : items.length,
+					streamId,
 				});
 				return true;
 			}

@@ -1,17 +1,26 @@
+import { randomUUID } from 'node:crypto';
 import {
 	Body,
 	ClassSerializerInterceptor,
 	Controller,
+	Get,
 	HttpException,
+	Param,
 	Post,
+	Query,
+	Req,
 	Sse,
+	UnauthorizedException,
 	UseGuards,
 	UseInterceptors,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import { Observable } from 'rxjs';
 import { JwtGuard } from 'src/guards/jwt.guard';
 import { GenerateVocabularyDto } from './dto/generate-vocabulary.dto';
 import { EnglishLearningService } from './english-learning.service';
+
+type AuthedRequest = Request & { user?: { userId: number } };
 
 function vocabularyHttpMessage(e: HttpException): string {
 	const res = e.getResponse();
@@ -38,6 +47,50 @@ export class EnglishLearningController {
 	/**
 	 * 按主题与档位拉取单词学习资料（含 IPA、中文释义、例句）；读音由前端调用 TTS 播放 word。
 	 */
+	/**
+	 * 分页获取当前用户历史拉取的单词包会话列表（按最近活动时间倒序）。
+	 */
+	@Get('vocabulary-history')
+	async listVocabularyHistory(
+		@Req() req: AuthedRequest,
+		@Query('limit') limitStr?: string,
+		@Query('offset') offsetStr?: string,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const limit = Math.min(
+			100,
+			Math.max(1, Number.parseInt(limitStr ?? '20', 10) || 20),
+		);
+		const offset = Math.max(0, Number.parseInt(offsetStr ?? '0', 10) || 0);
+		const list = await this.englishLearningService.listVocabularyHistory(
+			userId,
+			{ limit, offset },
+		);
+		return { success: true, data: list };
+	}
+
+	/**
+	 * 获取某次拉取会话的完整单词列表（验权：仅本人 streamId）。
+	 */
+	@Get('vocabulary-history/:streamId')
+	async getVocabularyHistoryDetail(
+		@Req() req: AuthedRequest,
+		@Param('streamId') streamId: string,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const detail = await this.englishLearningService.getVocabularyHistoryDetail(
+			userId,
+			streamId,
+		);
+		return { success: true, data: detail };
+	}
+
 	@Post('vocabulary-pack')
 	async vocabularyPack(@Body() dto: GenerateVocabularyDto) {
 		const itemsPayload =
@@ -46,20 +99,27 @@ export class EnglishLearningController {
 	}
 
 	/**
-	 * 同上，但以 SSE 推送进度并最终下发完整 items，避免大批量时 HTTP 短超时导致一直转圈无结果。
-	 * 事件：`vocab.progress` → `vocab.complete` | `vocab.error`
+	 * 同上，但以 SSE 推送进度、每轮新词条（`vocab.chunk`）并最终下发完整 items。
+	 * 事件：`vocab.progress`（可选）→ `vocab.chunk`（每轮有新词时）→ `vocab.complete` | `vocab.error`
 	 */
 	@Post('vocabulary-pack/stream')
 	@Sse()
 	vocabularyPackStream(
+		@Req() req: AuthedRequest,
 		@Body() dto: GenerateVocabularyDto,
 	): Observable<{ data: Record<string, unknown> }> {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
 		const target = Math.min(3000, Math.max(3, dto.count ?? 10));
-		console.log('dto', dto);
+		const streamId = randomUUID();
+		const level = dto.level ?? null;
 		return new Observable((subscriber) => {
 			subscriber.next({
 				data: {
 					type: 'vocab.progress',
+					streamId,
 					collected: 0,
 					target,
 					round: 0,
@@ -70,21 +130,44 @@ export class EnglishLearningController {
 					const items =
 						await this.englishLearningService.runVocabularyGeneration(
 							dto,
-							(p) => {
+							async (p) => {
 								subscriber.next({
 									data: {
 										type: 'vocab.progress',
+										streamId,
 										collected: p.collected,
 										target: p.target,
 										round: p.round,
 									},
 								});
+								if (p.newItems?.length) {
+									await this.englishLearningService.saveVocabularyPackBatch({
+										userId,
+										streamId,
+										round: p.round,
+										topic: dto.topic,
+										level,
+										targetCount: target,
+										items: p.newItems,
+									});
+									subscriber.next({
+										data: {
+											type: 'vocab.chunk',
+											streamId,
+											round: p.round,
+											collected: p.collected,
+											target: p.target,
+											items: p.newItems,
+										},
+									});
+								}
 							},
 						);
 					subscriber.next({
 						data: {
 							type: 'vocab.complete',
 							success: true,
+							streamId,
 							items,
 							requested: target,
 						},

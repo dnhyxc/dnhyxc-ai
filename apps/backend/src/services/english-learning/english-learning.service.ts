@@ -1,9 +1,21 @@
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { ChatOpenAI } from '@langchain/openai';
-import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
+import {
+	HttpException,
+	HttpStatus,
+	Injectable,
+	Logger,
+	NotFoundException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { InjectRepository } from '@nestjs/typeorm';
 import { ModelEnum } from 'src/enum/config.enum';
+import { In, Repository } from 'typeorm';
 import { GenerateVocabularyDto } from './dto/generate-vocabulary.dto';
+import {
+	EnglishVocabularyPackBatch,
+	type EnglishVocabularyPackItemJson,
+} from './english-vocabulary.entity';
 
 export type VocabularyItemDto = {
 	word: string;
@@ -17,6 +29,19 @@ export type VocabularyGenerationProgress = {
 	collected: number;
 	target: number;
 	round: number;
+	/** 本轮 LLM 解析后新并入总列表的词条（去重后）；无新增时不传 */
+	newItems?: VocabularyItemDto[];
+};
+
+/** 历史列表单项：按 streamId 聚合一次「拉取单词包」会话 */
+export type VocabularyHistoryListItem = {
+	streamId: string;
+	topic: string;
+	level: string | null;
+	targetCount: number;
+	wordCount: number;
+	createdAt: string;
+	updatedAt: string;
 };
 
 const LEVEL_HINT: Record<
@@ -37,7 +62,11 @@ const LEVEL_HINT: Record<
 export class EnglishLearningService {
 	private readonly logger = new Logger(EnglishLearningService.name);
 
-	constructor(private readonly configService: ConfigService) {}
+	constructor(
+		private readonly configService: ConfigService,
+		@InjectRepository(EnglishVocabularyPackBatch)
+		private readonly vocabBatchRepo: Repository<EnglishVocabularyPackBatch>,
+	) {}
 
 	private buildVocabLlm(): ChatOpenAI {
 		const apiKey = this.configService.get<string>(ModelEnum.DEEPSEEK_API_KEY);
@@ -181,6 +210,135 @@ export class EnglishLearningService {
 		return out;
 	}
 
+	/**
+	 * 将本轮流式生成的新词条写入数据库（每轮 LLM 一批一行）。
+	 */
+	async saveVocabularyPackBatch(params: {
+		userId: number;
+		streamId: string;
+		round: number;
+		topic: string;
+		level: string | null;
+		targetCount: number;
+		items: VocabularyItemDto[];
+	}): Promise<void> {
+		if (!params.items.length) return;
+		const row = this.vocabBatchRepo.create({
+			userId: params.userId,
+			streamId: params.streamId,
+			round: params.round,
+			topic: params.topic.trim().slice(0, 500),
+			level: params.level,
+			targetCount: params.targetCount,
+			items: params.items as EnglishVocabularyPackItemJson[],
+		});
+		await this.vocabBatchRepo.save(row);
+	}
+
+	/**
+	 * 分页列出当前用户曾拉取过的单词包会话（按最近活动时间倒序）。
+	 */
+	async listVocabularyHistory(
+		userId: number,
+		options?: { limit?: number; offset?: number },
+	): Promise<VocabularyHistoryListItem[]> {
+		const limit = Math.min(100, Math.max(1, options?.limit ?? 20));
+		const offset = Math.max(0, options?.offset ?? 0);
+
+		const grouped = await this.vocabBatchRepo
+			.createQueryBuilder('b')
+			.select('b.streamId', 'streamId')
+			.addSelect('MIN(b.createdAt)', 'createdAt')
+			.addSelect('MAX(b.createdAt)', 'updatedAt')
+			.where('b.userId = :userId', { userId })
+			.groupBy('b.streamId')
+			.orderBy('MAX(b.createdAt)', 'DESC')
+			.offset(offset)
+			.limit(limit)
+			.getRawMany<{
+				streamId: string;
+				createdAt: Date;
+				updatedAt: Date;
+			}>();
+
+		if (!grouped.length) return [];
+
+		const streamIds = grouped.map((g) => g.streamId);
+		const batches = await this.vocabBatchRepo.find({
+			where: { userId, streamId: In(streamIds) },
+			order: { streamId: 'ASC', round: 'ASC' },
+		});
+
+		const byStream = new Map<string, typeof batches>();
+		for (const row of batches) {
+			const arr = byStream.get(row.streamId) ?? [];
+			arr.push(row);
+			byStream.set(row.streamId, arr);
+		}
+
+		return grouped.map((g) => {
+			const rows = byStream.get(g.streamId) ?? [];
+			const first = rows[0];
+			let wordCount = 0;
+			for (const r of rows) {
+				wordCount += Array.isArray(r.items) ? r.items.length : 0;
+			}
+			return {
+				streamId: g.streamId,
+				topic: first?.topic ?? '',
+				level: first?.level ?? null,
+				targetCount: first?.targetCount ?? 0,
+				wordCount,
+				createdAt: new Date(g.createdAt).toISOString(),
+				updatedAt: new Date(g.updatedAt).toISOString(),
+			};
+		});
+	}
+
+	/**
+	 * 按 streamId 还原该次拉取的完整单词列表（按轮次顺序拼接各批 items）。
+	 */
+	async getVocabularyHistoryDetail(
+		userId: number,
+		streamId: string,
+	): Promise<{
+		streamId: string;
+		topic: string;
+		level: string | null;
+		targetCount: number;
+		items: VocabularyItemDto[];
+		createdAt: string;
+	}> {
+		const batches = await this.vocabBatchRepo.find({
+			where: { userId, streamId },
+			order: { round: 'ASC' },
+		});
+		if (!batches.length) {
+			throw new NotFoundException('未找到该单词记录');
+		}
+		const items: VocabularyItemDto[] = [];
+		for (const b of batches) {
+			if (!Array.isArray(b.items)) continue;
+			for (const it of b.items) {
+				items.push({
+					word: it.word,
+					ipa: it.ipa,
+					translationZh: it.translationZh || '—',
+					example: it.example || '—',
+				});
+			}
+		}
+		const first = batches[0];
+		return {
+			streamId,
+			topic: first.topic,
+			level: first.level,
+			targetCount: first.targetCount,
+			items,
+			createdAt: first.createdAt.toISOString(),
+		};
+	}
+
 	private async invokeVocabularyLlm(
 		llm: ChatOpenAI,
 		system: string,
@@ -208,18 +366,19 @@ export class EnglishLearningService {
 
 	/**
 	 * 根据主题与档位生成单词列表（每条含 IPA、中文释义、英文例句）。
-	 * 数量较大时分批请求模型并去重合并，单次最多约 80 条 JSON，避免截断。
+	 * 数量较大时分批请求模型并去重合并；每轮固定请求 20 条，便于前端更快收到 vocab.chunk。
 	 * @param onProgress 每轮合并后触发（含首轮前 round=0 可由调用方自行先发起点）
 	 */
 	async runVocabularyGeneration(
 		dto: GenerateVocabularyDto,
-		onProgress?: (p: VocabularyGenerationProgress) => void,
+		onProgress?: (p: VocabularyGenerationProgress) => void | Promise<void>,
 	): Promise<VocabularyItemDto[]> {
 		const count = Math.min(3000, Math.max(3, dto.count ?? 10));
 		const level = dto.level ?? 'intermediate';
 		const levelText = LEVEL_HINT[level];
-		const MAX_PER_CALL = 80;
-		const maxRounds = Math.min(200, Math.ceil(count / 15) + 60);
+		/** 每轮向模型请求的 items 条数（较小则单次响应更快，前端可更频繁展示） */
+		const ITEMS_PER_ROUND = 20;
+		const maxRounds = Math.min(400, Math.ceil(count / ITEMS_PER_ROUND) + 120);
 
 		const llm = this.buildVocabLlm();
 
@@ -246,7 +405,7 @@ export class EnglishLearningService {
 			while (accumulated.length < count && rounds < maxRounds) {
 				rounds++;
 				const need = count - accumulated.length;
-				const batch = Math.min(MAX_PER_CALL, need);
+				const batch = Math.min(ITEMS_PER_ROUND, need);
 				const excludeSnippet =
 					accumulated.length === 0
 						? ''
@@ -280,21 +439,28 @@ export class EnglishLearningService {
 					);
 				}
 
+				const newItemsThisRound: VocabularyItemDto[] = [];
 				let added = 0;
 				for (const item of batchItems) {
 					const key = item.word.toLowerCase();
 					if (seen.has(key)) continue;
 					seen.add(key);
 					accumulated.push(item);
+					newItemsThisRound.push(item);
 					added++;
 					if (accumulated.length >= count) break;
 				}
 
-				onProgress?.({
-					collected: accumulated.length,
-					target: count,
-					round: rounds,
-				});
+				await Promise.resolve(
+					onProgress?.({
+						collected: accumulated.length,
+						target: count,
+						round: rounds,
+						...(newItemsThisRound.length > 0
+							? { newItems: newItemsThisRound }
+							: {}),
+					}),
+				);
 
 				if (added === 0) {
 					stall++;

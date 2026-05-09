@@ -787,6 +787,15 @@ export const enUS = {
 	'englishLearning.vocab.empty': 'No items returned; try another topic',
 	'englishLearning.vocab.useLevel': 'Uses current level: {level}',
 	'englishLearning.vocab.playWord': 'Play word',
+	'englishLearning.vocab.listHeading': 'Words',
+	'englishLearning.vocab.historyTitle': 'Past word lists',
+	'englishLearning.vocab.historyEmpty':
+		'No saved lists yet. They appear here after a successful fetch.',
+	'englishLearning.vocab.historyWords': '{count} words',
+	'englishLearning.vocab.historyLoad': 'Load',
+	'englishLearning.vocab.historyLoaded': 'Loaded this word list',
+	'englishLearning.vocab.historyLoading': 'Loading history…',
+	'englishLearning.vocab.historyRefresh': 'Refresh',
 
 	'englishLearning.tts.play': 'Read aloud',
 	'englishLearning.tts.stop': 'Stop',

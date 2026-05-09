@@ -118,3 +118,6 @@ export const ENGLISH_LEARNING_VOCABULARY_PACK =
 /** 同上，SSE 进度 + 最终 items（大批量避免短超时） */
 export const ENGLISH_LEARNING_VOCABULARY_PACK_STREAM =
 	'/english-learning/vocabulary-pack/stream';
+/** 当前用户历史拉取的单词包会话列表（分页） */
+export const ENGLISH_LEARNING_VOCABULARY_HISTORY =
+	'/english-learning/vocabulary-history';

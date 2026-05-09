@@ -20,6 +20,7 @@ import {
 	DELETE_SESSION,
 	DOWNLOAD_FILE,
 	DOWNLOAD_ZIP_FILE,
+	ENGLISH_LEARNING_VOCABULARY_HISTORY,
 	ENGLISH_LEARNING_VOCABULARY_PACK,
 	GET_SESSION,
 	GET_SESSION_LIST,
@@ -439,6 +440,47 @@ export const generateEnglishVocabularyPack = async (params: {
 		ENGLISH_LEARNING_VOCABULARY_PACK,
 		params,
 	);
+};
+
+/** 单次「拉取单词包」会话摘要（与后端 VocabularyHistoryListItem 一致） */
+export type EnglishVocabularyHistoryEntry = {
+	streamId: string;
+	topic: string;
+	level: string | null;
+	targetCount: number;
+	wordCount: number;
+	createdAt: string;
+	updatedAt: string;
+};
+
+/** 分页列出当前用户历史拉取的单词包会话 */
+export const listEnglishVocabularyHistory = async (options?: {
+	limit?: number;
+	offset?: number;
+}) => {
+	return await http.get<EnglishVocabularyHistoryEntry[]>(
+		ENGLISH_LEARNING_VOCABULARY_HISTORY,
+		{
+			querys: {
+				limit: options?.limit ?? 20,
+				offset: options?.offset ?? 0,
+			},
+		},
+	);
+};
+
+/** 获取某次会话的完整单词列表（含 IPA / 释义 / 例句） */
+export const getEnglishVocabularyHistoryDetail = async (streamId: string) => {
+	return await http.get<{
+		streamId: string;
+		topic: string;
+		level: string | null;
+		targetCount: number;
+		items: EnglishVocabularyItem[];
+		createdAt: string;
+	}>(ENGLISH_LEARNING_VOCABULARY_HISTORY, {
+		params: [streamId],
+	});
 };
 
 export const getSession = async (sessionId: string) => {
