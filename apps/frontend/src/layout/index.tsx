@@ -56,7 +56,7 @@ const Layout = () => {
 						data-tauri-drag-region
 						className="box-border flex h-full w-full min-w-0 max-w-full flex-1 flex-col rounded-md py-7 pr-7"
 					>
-						<div className="relative h-full w-full min-w-0 max-w-full rounded-md bg-theme-secondary">
+						<div className="relative h-full w-full min-w-0 max-w-full rounded-md bg-theme-secondary overflow-hidden">
 							<Header />
 							<div className="box-border h-[calc(100%-3.25rem)] min-h-0 min-w-0 w-full max-w-full overflow-x-hidden overflow-y-auto">
 								{needAuth && !authed ? null : <Outlet />}

@@ -44,6 +44,7 @@ export const enUS = {
 	'nav.home': 'Home',
 	'nav.knowledge': 'Knowledge',
 	'nav.chat': 'Smart Chat',
+	'nav.englishLearning': 'English',
 	'nav.pay': 'Membership',
 	'nav.profile': 'Profile',
 
@@ -720,6 +721,79 @@ export const enUS = {
 
 	// 路由文案
 	'route.chat.title': 'Smart Chat',
+	'route.englishLearning.title': 'English learning',
+
+	'englishLearning.toolbarSubtitle':
+		'Level: {level} · Tools & vocabulary on the left, chat on the right',
+	'englishLearning.toolbarSubtitleShort':
+		'Level: {level} · Practice in the chat on the right',
+	'englishLearning.quickIntents': 'Quick intents',
+	'englishLearning.disclaimerShort':
+		'AI output is for practice only—verify for important use.',
+	'englishLearning.conversationTitle': 'Practice chat',
+
+	'englishLearning.intro':
+		'Use the left panel for level, intents, and vocabulary packs; type in the chat on the right. Your knowledge base can be retrieved first when relevant.',
+	'englishLearning.disclaimer':
+		'Translations and explanations are for learning only—please proofread important texts. Literature guidance respects copyright; prefer summaries and discussion prompts.',
+	'englishLearning.newChat': 'New chat',
+	'englishLearning.loading': 'Loading…',
+	'englishLearning.placeholder':
+		'Type English or Chinese: a word, a paragraph to translate, or a topic to read…',
+	'englishLearning.levelLabel': 'Level',
+	'englishLearning.level.basic': 'Basic',
+	'englishLearning.level.intermediate': 'Intermediate',
+	'englishLearning.level.advanced': 'Advanced',
+	'englishLearning.chip.vocabulary': 'Vocabulary',
+	'englishLearning.chip.translate': 'Translation',
+	'englishLearning.chip.reading': 'Reading',
+	'englishLearning.chip.literature': 'Literature',
+	'englishLearning.chip.grammar': 'Grammar',
+	'englishLearning.intent.vocabulary':
+		'[Intent] Focus on vocabulary: meaning, collocations, and example sentences; confirm my level if needed.',
+	'englishLearning.intent.translate':
+		'[Intent] Provide bilingual translation with line/sentence alignment; note proper names where needed.',
+	'englishLearning.intent.reading':
+		'[Intent] Generate a leveled short text for intensive reading and explain hard parts.',
+	'englishLearning.intent.literature':
+		'[Intent] Literature guide: context, summary, and discussion—avoid long copyrighted quotations.',
+	'englishLearning.intent.grammar':
+		'[Intent] Explain the grammar with good and common-mistake examples.',
+	'englishLearning.pendingIntent': 'Intent (appended on next send)',
+	'englishLearning.pendingIntentShort': 'Appended on next send',
+
+	'englishLearning.vocab.title': 'Vocabulary pack',
+	'englishLearning.vocab.desc':
+		'Generate a themed word list (IPA, Chinese gloss, example). Use the speaker to hear each English word (cloud TTS when configured).',
+	'englishLearning.vocab.descShort':
+		'Themed list with IPA, gloss, and examples; tap to hear each word.',
+	'englishLearning.vocab.topicFieldLabel': 'Topic / goal',
+	'englishLearning.vocab.topicPlaceholder':
+		'e.g. travel phrases, business verbs, IELTS collocations, easily confused pairs…',
+	'englishLearning.vocab.topicRequired': 'Enter a topic or learning goal first',
+	'englishLearning.vocab.count': 'Count',
+	'englishLearning.vocab.countHint':
+		'Enter any whole number from 3 to 3000, or use a preset',
+	'englishLearning.vocab.countInvalid': 'Enter a whole number from 3 to 3000',
+	'englishLearning.vocab.progress':
+		'{collected} / {target} words · batch {round}',
+	'englishLearning.vocab.partialResult':
+		'Requested {want}; received {got} (stopped early due to duplicates or limits)',
+	'englishLearning.vocab.aborted': 'Fetch cancelled',
+	'englishLearning.vocab.streamDisconnected':
+		'Stream ended unexpectedly—check your network and try again',
+	'englishLearning.vocab.cancel': 'Cancel',
+	'englishLearning.vocab.generate': 'Fetch word list',
+	'englishLearning.vocab.empty': 'No items returned; try another topic',
+	'englishLearning.vocab.useLevel': 'Uses current level: {level}',
+	'englishLearning.vocab.playWord': 'Play word',
+
+	'englishLearning.tts.play': 'Read aloud',
+	'englishLearning.tts.stop': 'Stop',
+	'englishLearning.tts.unsupported':
+		'Playback unavailable. Check login and cloud TTS, or use a browser with local speech.',
+	'englishLearning.tts.hint':
+		'Cloud TTS is tried first; browser speech is the fallback. Vocabulary cards play each word.',
 	'route.document.title': 'Document',
 	'route.coding.title': 'Coding',
 	'route.profile.title': 'Profile',

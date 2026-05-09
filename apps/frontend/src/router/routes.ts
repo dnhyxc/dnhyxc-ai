@@ -14,6 +14,7 @@ import Coding from '@/views/coding';
 import DesktopDownloadPage from '@/views/desktopDownload';
 import Document from '@/views/document';
 import Download from '@/views/download';
+import EnglishLearning from '@/views/englishLearning';
 import Home from '@/views/home';
 import Knowledge from '@/views/knowledge';
 import LegalServicePolicy from '@/views/legal/servicePolicy';
@@ -112,6 +113,13 @@ const routes: RouteConfig[] = [
 				Component: Knowledge,
 				meta: {
 					titleKey: 'route.knowledge.title',
+				},
+			},
+			{
+				path: '/english-learning',
+				Component: EnglishLearning,
+				meta: {
+					titleKey: 'route.englishLearning.title',
 				},
 			},
 			{

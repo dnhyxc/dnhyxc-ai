@@ -7,6 +7,7 @@ import {
 	ManyToOne,
 	PrimaryGeneratedColumn,
 } from 'typeorm';
+import type { SerperOrganicItem } from '../web-search/web-search.types';
 import { AgentSession } from './agent-session.entity';
 
 export enum AgentMessageRole {
@@ -42,6 +43,10 @@ export class AgentMessage {
 
 	@Column({ type: 'longtext' })
 	content: string;
+
+	/** 联网检索快照（与 Chat 助手消息 searchOrganic 一致），供正文【n】角标渲染为胶囊 */
+	@Column({ name: 'search_organic', type: 'json', nullable: true })
+	searchOrganic: SerperOrganicItem[] | null;
 
 	@CreateDateColumn({ name: 'created_at', type: 'timestamp' })
 	createdAt: Date;

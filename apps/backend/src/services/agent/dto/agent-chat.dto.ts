@@ -1,4 +1,5 @@
 import {
+	IsIn,
 	IsInt,
 	IsNotEmpty,
 	IsNumber,
@@ -37,4 +38,11 @@ export class AgentChatDto {
 	@Min(0)
 	@Max(1)
 	temperature?: number;
+
+	/**
+	 * 专项模式：英语学习时传 `english_learning`，服务端附加对应系统提示。
+	 */
+	@IsOptional()
+	@IsIn(['english_learning'])
+	assistMode?: 'english_learning';
 }

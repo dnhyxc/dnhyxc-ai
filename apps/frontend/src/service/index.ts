@@ -3,8 +3,11 @@ import {
 	type KnowledgeRecord,
 	ShareInfo,
 } from '@/types';
+import type { SearchOrganicItem } from '@/types/chat';
 import { http } from '@/utils/fetch';
 import {
+	AGENT_SESSION,
+	AGENT_STOP,
 	ASSISTANT_SESSION,
 	ASSISTANT_SESSION_IMPORT_TRANSCRIPT,
 	ASSISTANT_SESSIONS_FOR_KNOWLEDGE,
@@ -17,6 +20,7 @@ import {
 	DELETE_SESSION,
 	DOWNLOAD_FILE,
 	DOWNLOAD_ZIP_FILE,
+	ENGLISH_LEARNING_VOCABULARY_PACK,
 	GET_SESSION,
 	GET_SESSION_LIST,
 	GET_SHARE,
@@ -365,6 +369,75 @@ export const stopAssistantStream = async (payload: {
 	return await http.post<{ success: boolean; message: string }>(
 		ASSISTANT_STOP,
 		payload,
+	);
+};
+
+/** ---------- LangChain Agent（英语学习等专项模式共用）---------- */
+
+export type AgentSessionDetailPayload = {
+	session: {
+		sessionId: string;
+		title: string | null;
+		createdAt: string;
+		updatedAt: string;
+	} | null;
+	messages: Array<{
+		id: string;
+		turnId: string | null;
+		role: string;
+		content: string;
+		searchOrganic?: SearchOrganicItem[] | null;
+		createdAt: string;
+	}>;
+};
+
+/** 创建空 Agent 会话 */
+export const createAgentSession = async (body?: { title?: string }) => {
+	return await http.post<{ sessionId: string; title: string | null }>(
+		AGENT_SESSION,
+		body ?? {},
+	);
+};
+
+/** 拉取 Agent 会话与消息（时间正序） */
+export const getAgentSessionDetail = async (sessionId: string) => {
+	return await http.get<AgentSessionDetailPayload>(AGENT_SESSION, {
+		params: [sessionId],
+	});
+};
+
+/** 删除 Agent 会话 */
+export const deleteAgentSession = async (sessionId: string) => {
+	return await http.delete<{ sessionId: string }>(AGENT_SESSION, {
+		params: [sessionId],
+	});
+};
+
+/** 停止 Agent 当前轮次流式输出 */
+export const stopAgentStream = async (body: { sessionId: string }) => {
+	return await http.post<{ success: boolean; message: string }>(
+		AGENT_STOP,
+		body,
+	);
+};
+
+/** ---------- 英语学习：结构化单词包（IPA + 释义 + 例句）---------- */
+
+export type EnglishVocabularyItem = {
+	word: string;
+	ipa: string;
+	translationZh: string;
+	example: string;
+};
+
+export const generateEnglishVocabularyPack = async (params: {
+	topic: string;
+	count?: number;
+	level?: 'basic' | 'intermediate' | 'advanced';
+}) => {
+	return await http.post<{ items: EnglishVocabularyItem[] }>(
+		ENGLISH_LEARNING_VOCABULARY_PACK,
+		params,
 	);
 };
 

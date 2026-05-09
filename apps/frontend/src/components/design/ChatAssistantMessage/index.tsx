@@ -40,7 +40,6 @@ import {
 	applyOrganicCitationAnchors,
 	areOrganicPreviewItemsSame,
 	findClosestOrganicCitationAnchor,
-	findOrganicCitationAnchorAtPoint,
 	injectOrganicCitationAnchorsIntoMarkdownHtml,
 	normalizePersistedOrganicAnchorsInMarkdown,
 	resolveOrganicCitationPreviewItems,
@@ -48,6 +47,7 @@ import {
 	shortHostnameFromUrl,
 	syncOrganicMergedAnchorDom,
 } from '@/utils/organicCitation';
+// import { patchIncompleteNonMermaidFence } from '@/utils/splitMarkdownFences';
 import SearchOrganics from './SearchOrganics';
 import { StreamingMarkdownBody } from './StreamingMarkdownBody';
 
@@ -209,6 +209,8 @@ function ChatAssistantMessageInner({
 		if (raw === thinkingText) {
 			return raw;
 		}
+		// 未闭合的 ```json / ``` 等会把后续正文吞进 code 块，联网场景常见；先修补再渲染
+		// raw = patchIncompleteNonMermaidFence(raw);
 		raw = normalizePersistedOrganicAnchorsInMarkdown(raw, org);
 		if (!org?.length) {
 			return raw;
@@ -298,15 +300,8 @@ function ChatAssistantMessageInner({
 		}
 
 		const applyIfCitation = (e: PointerEvent) => {
-			let a = findClosestOrganicCitationAnchor(e.target, root, organics);
-			if (!a) {
-				a = findOrganicCitationAnchorAtPoint(
-					root,
-					organics,
-					e.clientX,
-					e.clientY,
-				);
-			}
+			// 仅当指针落在引用胶囊 <a>（或其子节点）上时展示预览，避免邻近正文因「扩展命中区」误触（与 Chat 预期一致）
+			const a = findClosestOrganicCitationAnchor(e.target, root, organics);
 			if (!a) return;
 			const items = resolveOrganicCitationPreviewItems(a, organics);
 			if (!items.length) return;

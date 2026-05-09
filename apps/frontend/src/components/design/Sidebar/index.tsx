@@ -11,6 +11,7 @@ import {
 	CircleUserRound,
 	Codesandbox,
 	House,
+	Languages,
 	LogOut,
 	Package,
 	WalletCards,
@@ -42,6 +43,7 @@ const Sidebar = () => {
 		Codesandbox: <Codesandbox />,
 		BookOpenText: <BookOpenText />,
 		WalletCards: <WalletCards />,
+		Languages: <Languages />,
 	};
 
 	const visibleMenus = useMemo(() => {

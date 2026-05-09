@@ -23,6 +23,11 @@ export const MENUS: SidebarMenuConfig[] = [
 		icon: 'Bot',
 		path: '/chat',
 	},
+	{
+		nameKey: 'nav.englishLearning',
+		icon: 'Languages',
+		path: '/english-learning',
+	},
 	// {
 	// 	name: 'document',
 	// 	icon: 'Package',

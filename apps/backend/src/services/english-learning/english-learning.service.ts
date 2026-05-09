@@ -1,0 +1,336 @@
+import { HumanMessage, SystemMessage } from '@langchain/core/messages';
+import { ChatOpenAI } from '@langchain/openai';
+import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { ModelEnum } from 'src/enum/config.enum';
+import { GenerateVocabularyDto } from './dto/generate-vocabulary.dto';
+
+export type VocabularyItemDto = {
+	word: string;
+	ipa: string;
+	translationZh: string;
+	example: string;
+};
+
+/** 单词包生成进度（供 SSE 与回调） */
+export type VocabularyGenerationProgress = {
+	collected: number;
+	target: number;
+	round: number;
+};
+
+const LEVEL_HINT: Record<
+	NonNullable<GenerateVocabularyDto['level']>,
+	string
+> = {
+	basic:
+		'基础：高频词、短句搭配，释义偏简明，例句简短（初中生～日常 survival）',
+	intermediate:
+		'进阶：高中～四级难度，可适当短语动词与一词多义，例句贴近真实场景',
+	advanced: '提高：六级及以上或雅思托福常见学术/报刊用词，例句可稍长，释义精准',
+};
+
+/**
+ * 英语学习辅助：调用 DeepSeek（OpenAI 兼容接口）生成结构化单词表（含 IPA、释义、例句）。
+ */
+@Injectable()
+export class EnglishLearningService {
+	private readonly logger = new Logger(EnglishLearningService.name);
+
+	constructor(private readonly configService: ConfigService) {}
+
+	private buildVocabLlm(): ChatOpenAI {
+		const apiKey = this.configService.get<string>(ModelEnum.DEEPSEEK_API_KEY);
+		const baseURL =
+			this.configService.get<string>(ModelEnum.DEEPSEEK_BASE_URL) ||
+			'https://api.deepseek.com';
+		const modelName =
+			this.configService.get<string>(ModelEnum.DEEPSEEK_MODEL_NAME) ||
+			'deepseek-chat';
+		if (!apiKey?.trim()) {
+			throw new HttpException(
+				'DeepSeek 未配置（DEEPSEEK_API_KEY），无法生成单词资料',
+				HttpStatus.SERVICE_UNAVAILABLE,
+			);
+		}
+		return new ChatOpenAI({
+			apiKey,
+			modelName,
+			streaming: false,
+			temperature: 0.35,
+			// 大批量词条 JSON 较长；DeepSeek 文档建议为 JSON 模式预留足够 max_tokens
+			maxTokens: 8192,
+			configuration: { baseURL },
+			// DeepSeek OpenAI 兼容接口：约束输出为合法 JSON，减少前后缀与 markdown
+			modelKwargs: {
+				response_format: { type: 'json_object' },
+			},
+		});
+	}
+
+	/**
+	 * 从 start 处的 `{` 起截取配平的 JSON 对象（字符串内的括号不计入深度）。
+	 * 避免原先贪婪正则 `\\{[\\s\\S]*\\}` 吞到文末解释文字或截断边界错误。
+	 */
+	private sliceBalancedJsonObject(text: string, start: number): string | null {
+		if (start < 0 || start >= text.length || text[start] !== '{') {
+			return null;
+		}
+		let depth = 0;
+		let inString = false;
+		let escaped = false;
+		for (let i = start; i < text.length; i++) {
+			const ch = text[i];
+			if (escaped) {
+				escaped = false;
+				continue;
+			}
+			if (inString) {
+				if (ch === '\\') {
+					escaped = true;
+					continue;
+				}
+				if (ch === '"') {
+					inString = false;
+					continue;
+				}
+				continue;
+			}
+			if (ch === '"') {
+				inString = true;
+				continue;
+			}
+			if (ch === '{') depth++;
+			else if (ch === '}') {
+				depth--;
+				if (depth === 0) return text.slice(start, i + 1);
+			}
+		}
+		return null;
+	}
+
+	private extractJsonObject(raw: string): unknown {
+		const s = raw.trim().replace(/^\uFEFF/, '');
+		const fence = s.match(/```(?:json)?\s*([\s\S]*?)```/i);
+		const candidate = fence?.[1]?.trim() ?? s;
+
+		const tryParse = (jsonStr: string): unknown => JSON.parse(jsonStr);
+
+		let searchFrom = 0;
+		const maxBraceAttempts = 16;
+		for (let n = 0; n < maxBraceAttempts; n++) {
+			const idx = candidate.indexOf('{', searchFrom);
+			if (idx === -1) break;
+			const slice = this.sliceBalancedJsonObject(candidate, idx);
+			searchFrom = idx + 1;
+			if (!slice) continue;
+			try {
+				return tryParse(slice);
+			} catch {
+				// 模型偶发在数组/对象末尾多一个逗号
+				try {
+					const relaxed = slice.replace(/,\s*([\]}])/g, '$1');
+					return tryParse(relaxed);
+				} catch {}
+			}
+		}
+
+		this.logger.warn(
+			`[EnglishLearning] JSON 解析失败，原文前缀（截断）：${candidate.slice(0, 500)}`,
+		);
+		throw new HttpException(
+			candidate.includes('{')
+				? '单词资料 JSON 解析失败'
+				: '模型返回无法解析为 JSON',
+			HttpStatus.BAD_GATEWAY,
+		);
+	}
+
+	/** 从解析后的 JSON 对象提取词条；结构不对或无效时返回空数组 */
+	private extractVocabularyItemsLoose(data: unknown): VocabularyItemDto[] {
+		if (!data || typeof data !== 'object' || !('items' in data)) {
+			return [];
+		}
+		const items = (data as { items?: unknown }).items;
+		if (!Array.isArray(items) || items.length === 0) {
+			return [];
+		}
+		const out: VocabularyItemDto[] = [];
+		for (const row of items) {
+			if (!row || typeof row !== 'object') continue;
+			const r = row as Record<string, unknown>;
+			const word = typeof r.word === 'string' ? r.word.trim() : '';
+			const ipa = typeof r.ipa === 'string' ? r.ipa.trim() : '';
+			const translationZh =
+				typeof r.translationZh === 'string'
+					? r.translationZh.trim()
+					: typeof r.translation_zh === 'string'
+						? r.translation_zh.trim()
+						: typeof r.translation === 'string'
+							? r.translation.trim()
+							: '';
+			const example = typeof r.example === 'string' ? r.example.trim() : '';
+			if (!word || !ipa) continue;
+			out.push({
+				word,
+				ipa,
+				translationZh: translationZh || '—',
+				example: example || '—',
+			});
+		}
+		return out;
+	}
+
+	private async invokeVocabularyLlm(
+		llm: ChatOpenAI,
+		system: string,
+		user: string,
+	): Promise<string> {
+		const res = await llm.invoke([
+			new SystemMessage(system),
+			new HumanMessage(user),
+		]);
+		return typeof res.content === 'string'
+			? res.content
+			: Array.isArray(res.content)
+				? res.content
+						.map((p: unknown) =>
+							p &&
+							typeof p === 'object' &&
+							'text' in p &&
+							typeof (p as { text?: string }).text === 'string'
+								? (p as { text: string }).text
+								: '',
+						)
+						.join('')
+				: '';
+	}
+
+	/**
+	 * 根据主题与档位生成单词列表（每条含 IPA、中文释义、英文例句）。
+	 * 数量较大时分批请求模型并去重合并，单次最多约 80 条 JSON，避免截断。
+	 * @param onProgress 每轮合并后触发（含首轮前 round=0 可由调用方自行先发起点）
+	 */
+	async runVocabularyGeneration(
+		dto: GenerateVocabularyDto,
+		onProgress?: (p: VocabularyGenerationProgress) => void,
+	): Promise<VocabularyItemDto[]> {
+		const count = Math.min(3000, Math.max(3, dto.count ?? 10));
+		const level = dto.level ?? 'intermediate';
+		const levelText = LEVEL_HINT[level];
+		const MAX_PER_CALL = 80;
+		const maxRounds = Math.min(200, Math.ceil(count / 15) + 60);
+
+		const llm = this.buildVocabLlm();
+
+		const system = `你是英语教学助手。用户会给出「主题/学习需求」与难度。
+用户可能分多轮请求；每一轮都会给出该轮必须生成的确切条数，请严格遵守该轮条数（items 数组长度必须等于该数字）。
+你必须生成英文单词或实用短语（phrase）的学习条目。
+每一条必须包含：
+- word：英文单词或短语（不要用序号前缀）
+- ipa：该条目的英式或美式 IPA 音标，使用 Unicode 音标符号（如 ˈæpl），放在字符串中
+- translationZh：简明中文释义（可与主题相关）
+- example：一句地道英文例句，展示该词用法
+
+只输出一个 JSON 对象，不要 markdown，不要代码围栏，不要解释文字。
+格式严格为：{"items":[{"word":"","ipa":"","translationZh":"","example":""}]}`;
+
+		const topic = dto.topic.trim();
+
+		try {
+			const accumulated: VocabularyItemDto[] = [];
+			const seen = new Set<string>();
+			let stall = 0;
+			let rounds = 0;
+
+			while (accumulated.length < count && rounds < maxRounds) {
+				rounds++;
+				const need = count - accumulated.length;
+				const batch = Math.min(MAX_PER_CALL, need);
+				const excludeSnippet =
+					accumulated.length === 0
+						? ''
+						: [...seen]
+								.slice(-120)
+								.map((w) => w.replace(/`/g, "'"))
+								.join(', ');
+
+				const user =
+					accumulated.length === 0
+						? `主题/需求：${topic}
+难度说明：${levelText}
+请恰好生成 ${batch} 条 items（数组长度必须等于 ${batch}）。`
+						: `主题/需求：${topic}（与前几轮相同，请继续围绕该主题扩展）
+难度说明：${levelText}
+请再生成恰好 ${batch} 条新的 items（数组长度必须等于 ${batch}）。
+以下英文词条已出现过，请勿重复（不区分大小写）：${excludeSnippet}
+请输出与上述完全不同的词或短语。`;
+
+				const text = await this.invokeVocabularyLlm(llm, system, user);
+				const parsed = this.extractJsonObject(text);
+				let batchItems = this.extractVocabularyItemsLoose(parsed);
+				if (batchItems.length > batch) {
+					batchItems = batchItems.slice(0, batch);
+				}
+
+				if (batchItems.length === 0 && accumulated.length === 0) {
+					throw new HttpException(
+						'单词资料为空或无法解析为有效词条',
+						HttpStatus.BAD_GATEWAY,
+					);
+				}
+
+				let added = 0;
+				for (const item of batchItems) {
+					const key = item.word.toLowerCase();
+					if (seen.has(key)) continue;
+					seen.add(key);
+					accumulated.push(item);
+					added++;
+					if (accumulated.length >= count) break;
+				}
+
+				onProgress?.({
+					collected: accumulated.length,
+					target: count,
+					round: rounds,
+				});
+
+				if (added === 0) {
+					stall++;
+					if (stall >= 6) {
+						this.logger.warn(
+							`[EnglishLearning] vocabulary pack stalled at ${accumulated.length}/${count}`,
+						);
+						break;
+					}
+				} else {
+					stall = 0;
+				}
+			}
+
+			if (accumulated.length === 0) {
+				throw new HttpException(
+					'未得到有效词条（需含 word 与 ipa）',
+					HttpStatus.BAD_GATEWAY,
+				);
+			}
+
+			return accumulated.slice(0, count);
+		} catch (e: unknown) {
+			if (e instanceof HttpException) throw e;
+			this.logger.warn('[EnglishLearning] generateVocabularyPack failed', e);
+			throw new HttpException(
+				'生成单词资料失败，请稍后重试',
+				HttpStatus.BAD_GATEWAY,
+			);
+		}
+	}
+
+	async generateVocabularyPack(
+		dto: GenerateVocabularyDto,
+	): Promise<{ items: VocabularyItemDto[] }> {
+		const items = await this.runVocabularyGeneration(dto);
+		return { items };
+	}
+}

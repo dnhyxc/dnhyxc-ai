@@ -15,6 +15,7 @@ import { AssistantModule } from './services/assistant/assistant.module';
 // 业务模块
 import { AuthModule } from './services/auth/auth.module';
 import { ChatModule } from './services/chat/chat.module';
+import { EnglishLearningModule } from './services/english-learning/english-learning.module';
 import { KnowledgeModule } from './services/knowledge/knowledge.module';
 import { KnowledgeQaModule } from './services/knowledge-qa/knowledge-qa.module';
 import { LogsModule } from './services/logs/logs.module';
@@ -87,6 +88,7 @@ const connections = new Map();
 		PromptModule,
 		OcrModule,
 		SpeechTranscriptionModule,
+		EnglishLearningModule,
 		WebSearchModule,
 		ChatModule,
 		QdrantModule,

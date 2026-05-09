@@ -19,6 +19,10 @@ import { ModelEnum } from 'src/enum/config.enum';
 import { Repository } from 'typeorm';
 import { KnowledgeQaService } from '../knowledge-qa/knowledge-qa.service';
 import { WebSearchService } from '../web-search/web-search.service';
+import type {
+	SerperOrganicItem,
+	WebSearchOrganicItem,
+} from '../web-search/web-search.types';
 import { AgentMemoryService } from './agent-memory.service';
 import { buildAgentLangchainMiddleware } from './agent-middleware';
 import { AgentSession } from './agent-session.entity';
@@ -28,7 +32,52 @@ import { CreateAgentSessionDto } from './dto/create-agent-session.dto';
 
 // 默认Agent系统提示语（中文，指令型，包含工具使用指引）
 const DEFAULT_AGENT_SYSTEM_PROMPT = `你是一个具备工具调用能力的智能助手（ReAct Agent）。请准确、有条理地回答；不确定时请说明；不要编造事实。
-涉及用户自有文档、笔记、已入库知识时优先使用「知识库检索」工具；需要时效信息或公开网页时使用互联网搜索工具。`;
+涉及用户自有文档、笔记、已入库知识时优先使用「知识库检索」工具；需要时效信息或公开网页时使用互联网搜索工具。
+引用互联网检索摘录时，在句末使用【1】【2】等与摘录序号一致的角标（全角方括号），便于展示来源胶囊。`;
+
+/** 英语学习场景下追加的系统提示（assistMode=english_learning） */
+const ENGLISH_LEARNING_SYSTEM_APPEND = `【英语学习专项约束】
+你面向希望提升英语（English）的普通话使用者，内容可覆盖单词、短语、短文、口语表达与即时翻译需求。
+1）词汇与短语：给出释义、常见搭配、1～2 个地道例句；凡列出单词或短语须标注 IPA 音标（国际音标）；表格或列表逐条给出读音标注；说明仅供参考，以权威词典为准。
+2）短文：可按用户水平（如 A1～C1 或初中/高中/四级等自述）生成或改写精读材料，配关键句讲解；长文分段输出便于跟读。
+3）口语：提供场景对话范例、可替换说法、常用应答；说明无法替代真人纠音与外教课。
+4）实时翻译：用户粘贴中英文段落时给出对应译文；可逐句对照或先原文后译文；专有名词、歧义词简要注明取舍理由；不声称等同专业同声传译或法律医学认证译文。
+5）名著与文献：以导读、节选、摘要、讨论为主；公版作品可短节选并注释；仍在版权期的现代作品避免大段复制原文，以摘要与仿写练习为主。
+6）工具：用户生词本与笔记已入库时优先「知识库检索」；需核查用法或新闻英语时可适度「互联网搜索」摘要并标注信息性质。
+7）边界：拒绝违规内容；敏感话题以中性语言学习角度处理或礼貌拒绝。`;
+
+function resolveAgentSystemPrompt(dto: AgentChatDto): string {
+	if (dto.assistMode === 'english_learning') {
+		return `${DEFAULT_AGENT_SYSTEM_PROMPT}\n\n${ENGLISH_LEARNING_SYSTEM_APPEND}`;
+	}
+	return DEFAULT_AGENT_SYSTEM_PROMPT;
+}
+
+/** 合并多轮 internet_search 的 organic，按 link 去重 */
+function mergeAgentSearchOrganic(
+	prev: WebSearchOrganicItem[],
+	batch: WebSearchOrganicItem[] | null | undefined,
+): WebSearchOrganicItem[] {
+	if (!batch?.length) return prev;
+	const seen = new Set(
+		prev.map((x) => (x.link ?? '').trim()).filter((k) => k.length > 0),
+	);
+	const out = [...prev];
+	for (const item of batch) {
+		const k = (item.link ?? '').trim();
+		if (!k || seen.has(k)) continue;
+		seen.add(k);
+		out.push({ ...item });
+	}
+	return out;
+}
+
+/** 与 Chat 一致：写入 1-based position，供正文【n】与胶囊对齐 */
+function withAgentOrganicPositions(
+	items: WebSearchOrganicItem[],
+): SerperOrganicItem[] {
+	return items.map((item, i) => ({ ...item, position: i + 1 }));
+}
 
 // Agent会话流式相关状态缓存的存活时间（12小时）
 const AGENT_STREAM_STATE_TTL_MS = 12 * 60 * 60 * 1000;
@@ -72,7 +121,8 @@ export type AgentSseChunk =
 				input?: unknown;
 				output?: unknown;
 			};
-	  };
+	  }
+	| { type: 'searchOrganic'; data: { organic: SerperOrganicItem[] } };
 
 @Injectable()
 export class AgentService {
@@ -201,6 +251,7 @@ export class AgentService {
 				turnId: m.turnId,
 				role: m.role,
 				content: m.content,
+				searchOrganic: m.searchOrganic ?? null,
 				createdAt: m.createdAt,
 			})),
 		};
@@ -311,6 +362,8 @@ export class AgentService {
 		let sessionId = dto.sessionId; // 可能是新会话
 		let session!: AgentSession;
 		let accumulated = ''; // 用户本轮assistant回复内容临时拼接
+		/** 本轮合并后的联网检索列表（去重），落库与 SSE 推送前补 position */
+		let turnSearchOrganic: WebSearchOrganicItem[] = [];
 		let assistantMessageId: string | undefined;
 		let activeTurnId: string | undefined;
 		let streamSessionId: string | undefined;
@@ -332,11 +385,16 @@ export class AgentService {
 				await this.memory.deleteTurnPair(streamSessionId, activeTurnId);
 				return;
 			}
-			// 正常则补全assistant message内容
+			// 正常则补全 assistant 正文与联网胶囊数据源
+			const organicToSave =
+				turnSearchOrganic.length > 0
+					? withAgentOrganicPositions(turnSearchOrganic)
+					: null;
 			await this.memory.updateAssistantContent(
 				streamSessionId,
 				assistantMessageId,
 				accumulated,
+				organicToSave,
 			);
 		};
 
@@ -350,10 +408,15 @@ export class AgentService {
 			}
 			try {
 				if (accumulated.trim()) {
+					const organicToSave =
+						turnSearchOrganic.length > 0
+							? withAgentOrganicPositions(turnSearchOrganic)
+							: null;
 					await this.memory.updateAssistantContent(
 						streamSessionId,
 						assistantMessageId,
 						accumulated,
+						organicToSave,
 					);
 				} else {
 					await this.memory.deleteTurnPair(streamSessionId, activeTurnId);
@@ -414,18 +477,36 @@ export class AgentService {
 			});
 
 			// （7）拼装工具集（见 agent-langchain-tools.ts）
-			const tools = buildAgentLangChainTools({
-				webSearchService: this.webSearchService,
-				knowledgeQaService: this.knowledgeQaService,
-				userId,
-			});
+			const tools = buildAgentLangChainTools(
+				{
+					webSearchService: this.webSearchService,
+					knowledgeQaService: this.knowledgeQaService,
+					userId,
+				},
+				{
+					onInternetSearchComplete: (r) => {
+						const batch = r.organic;
+						if (!batch?.length) return;
+						turnSearchOrganic = mergeAgentSearchOrganic(
+							turnSearchOrganic,
+							batch,
+						);
+						subscriber.next({
+							type: 'searchOrganic',
+							data: {
+								organic: withAgentOrganicPositions(turnSearchOrganic),
+							},
+						});
+					},
+				},
+			);
 
 			// （8）创建Agent
 			const agent = createAgent({
 				// 构建Agent所需核心参数，包括主模型、工具集、系统提示与中间件
 				model: mainLlm, // 主聊天大模型，流式推理
 				tools, // 工具列表（如Web检索、rag、获取时间等）
-				systemPrompt: DEFAULT_AGENT_SYSTEM_PROMPT, // 系统级指令型提示语，统一Agent行为
+				systemPrompt: resolveAgentSystemPrompt(dto),
 				middleware: buildAgentLangchainMiddleware({
 					summaryLlm: summaryLlm,
 					estimatePromptTokens: (msgs) =>

@@ -57,6 +57,8 @@ export const STOP_SSE = '/chat/stopSse';
 
 /** 语音转写：录音上传 → 硅基流动 ASR（与 chat 路由解耦） */
 export const SPEECH_TRANSCRIPTION = '/speech-transcription/transcription';
+/** 云端文本转语音（硅基流动，需 SILICONFLOW_API_KEY） */
+export const SPEECH_TTS = '/speech-transcription/speech';
 
 // 创建会话
 export const CREATE_SESSION = '/chat/createSession';
@@ -104,3 +106,15 @@ export const ASSISTANT_SESSION_IMPORT_TRANSCRIPT =
 	'/assistant/session/import-transcript';
 export const ASSISTANT_SSE = '/assistant/sse';
 export const ASSISTANT_STOP = '/assistant/stop';
+
+/** LangChain Agent（工具调用 + SSE） */
+export const AGENT_SESSION = '/agent/session';
+export const AGENT_SSE = '/agent/sse';
+export const AGENT_STOP = '/agent/stop';
+
+/** 英语学习：按主题生成结构化单词包（IPA + 释义 + 例句） */
+export const ENGLISH_LEARNING_VOCABULARY_PACK =
+	'/english-learning/vocabulary-pack';
+/** 同上，SSE 进度 + 最终 items（大批量避免短超时） */
+export const ENGLISH_LEARNING_VOCABULARY_PACK_STREAM =
+	'/english-learning/vocabulary-pack/stream';

@@ -93,8 +93,9 @@ body {
 		display: none;
 	}
 
-	/* 消息 Markdown */
-	#message-md-wrap {
+	/* 消息 Markdown（#message-md-wrap：ChatBot；.message-md-wrap：英语学习等多条气泡，避免重复 id） */
+	#message-md-wrap,
+	.message-md-wrap {
 		/* 与 flex 子项 min-w-0 配合：Markdown 根层不成为「不可收缩」的宽度源 */
 		.streaming-md-body {
 			min-width: 0;

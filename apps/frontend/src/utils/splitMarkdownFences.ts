@@ -227,3 +227,23 @@ export function hashText(s: string): string {
 	}
 	return (h >>> 0).toString(36);
 }
+
+/**
+ * 若全文末尾存在「未闭合的非 mermaid 代码围栏」，临时补上闭合行。
+ * 否则 markdown-it 会把围栏后的所有内容吞进 code，表现为正文下方大块空白；
+ * 联网检索后模型常输出 ```json 等未闭合围栏。
+ */
+export function patchIncompleteNonMermaidFence(markdown: string): string {
+	if (!markdown?.trim()) return markdown;
+	const normalized = markdown.replace(/\r\n/g, '\n');
+	const segs = splitMarkdownFencedBlocks(normalized);
+	const last = segs[segs.length - 1];
+	if (!last?.fenced || last.complete) return markdown;
+	const firstLine = last.text.split('\n')[0] ?? '';
+	const openMatch = /^(\s*)(`{3,})([^`]*)$/.exec(firstLine.trimEnd());
+	if (!openMatch) return markdown;
+	const lang = (openMatch[3] ?? '').trim().split(/\s+/)[0]?.toLowerCase();
+	if (lang === 'mermaid') return markdown;
+	const tickLen = openMatch[2].length;
+	return `${normalized}\n${'`'.repeat(tickLen)}`;
+}

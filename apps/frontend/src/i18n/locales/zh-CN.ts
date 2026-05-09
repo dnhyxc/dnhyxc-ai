@@ -42,6 +42,7 @@ export const zhCN = {
 	'nav.home': '首页',
 	'nav.knowledge': '知识库',
 	'nav.chat': '智能会话',
+	'nav.englishLearning': '英语学习',
 	'nav.pay': '会员充值',
 	'nav.profile': '我的主页',
 
@@ -639,6 +640,78 @@ export const zhCN = {
 	'knowledge.title.aria': '知识标题',
 
 	'route.chat.title': '智能对话',
+	'route.englishLearning.title': '英语学习',
+
+	'englishLearning.toolbarSubtitle':
+		'当前难度：{level} · 左侧选主题与单词，右侧对话练习',
+	'englishLearning.toolbarSubtitleShort':
+		'当前难度：{level} · 右侧输入框对话练习',
+	'englishLearning.quickIntents': '快捷意图',
+	'englishLearning.disclaimerShort':
+		'翻译与生成内容仅供参考；重要场合请人工核对。',
+	'englishLearning.conversationTitle': '对话练习',
+
+	'englishLearning.intro':
+		'左侧选择难度与快捷主题，在右侧输入框用自然语提问；支持单词、翻译、短文、名著导读等。已入库的知识库可由 Agent 优先引用。',
+	'englishLearning.disclaimer':
+		'翻译与讲解仅供学习参考，重要文件请人工校对；名著导读遵守版权，长文以摘要与讨论为主。',
+	'englishLearning.newChat': '新对话',
+	'englishLearning.loading': '加载中…',
+	'englishLearning.placeholder':
+		'输入英语或中文，例如要查的词、要翻译的段落、想读的主题…',
+	'englishLearning.levelLabel': '难度',
+	'englishLearning.level.basic': '基础',
+	'englishLearning.level.intermediate': '进阶',
+	'englishLearning.level.advanced': '提高',
+	'englishLearning.chip.vocabulary': '背单词',
+	'englishLearning.chip.translate': '翻译对照',
+	'englishLearning.chip.reading': '短文精读',
+	'englishLearning.chip.literature': '名著导读',
+	'englishLearning.chip.grammar': '语法讲解',
+	'englishLearning.intent.vocabulary':
+		'【意图】请侧重词汇：释义、搭配与例句；如需请先澄清我的水平。',
+	'englishLearning.intent.translate':
+		'【意图】请提供中英对照翻译，可分句；标注专有名词取舍。',
+	'englishLearning.intent.reading':
+		'【意图】请按当前档位生成一篇精读短文并注释难点。',
+	'englishLearning.intent.literature':
+		'【意图】请做名著/英语文献导读：摘要、背景与讨论题，避免大段复制原文。',
+	'englishLearning.intent.grammar':
+		'【意图】请讲解下列语法点并给出正例与常见错误。',
+	'englishLearning.pendingIntent': '已选意图（下次发送时附带）',
+	'englishLearning.pendingIntentShort': '下次发送附带',
+
+	'englishLearning.vocab.title': '单词学习资料',
+	'englishLearning.vocab.desc':
+		'按你的主题与上方「难度」生成一批单词：含国际音标（IPA）、中文释义与例句。点击小喇叭可朗读该英文单词（云端 TTS 优先）。',
+	'englishLearning.vocab.descShort':
+		'按主题与左侧难度生成 IPA、释义与例句，可逐词朗读。',
+	'englishLearning.vocab.topicFieldLabel': '学习主题',
+	'englishLearning.vocab.topicPlaceholder':
+		'例如：商务会议常用动词、旅游问路、易混形近词、本月四级高频词…',
+	'englishLearning.vocab.topicRequired': '请先填写学习主题或需求',
+	'englishLearning.vocab.count': '词数',
+	'englishLearning.vocab.countHint': '可输入任意 3～3000 的整数，或点快捷数量',
+	'englishLearning.vocab.countInvalid': '请输入 3～3000 之间的整数',
+	'englishLearning.vocab.progress':
+		'已生成 {collected} / {target} 条 · 第 {round} 批模型请求',
+	'englishLearning.vocab.partialResult':
+		'目标 {want} 条，本次返回 {got} 条（可能因重复过多或达到重试上限提前结束）',
+	'englishLearning.vocab.aborted': '已取消拉取',
+	'englishLearning.vocab.streamDisconnected':
+		'流式连接异常结束，请检查网络后重试',
+	'englishLearning.vocab.cancel': '取消',
+	'englishLearning.vocab.generate': '拉取单词表',
+	'englishLearning.vocab.empty': '未返回词条，请换主题重试',
+	'englishLearning.vocab.useLevel': '将使用当前难度：{level}',
+	'englishLearning.vocab.playWord': '朗读该词',
+
+	'englishLearning.tts.play': '朗读',
+	'englishLearning.tts.stop': '停止',
+	'englishLearning.tts.unsupported':
+		'朗读不可用，请检查登录与云端语音配置，或换用支持本机语音的浏览器。',
+	'englishLearning.tts.hint':
+		'消息区朗读优先云端 TTS，失败时使用浏览器语音；单词表可逐词播放。',
 	'route.document.title': '智能文档处理',
 	'route.coding.title': '智能代码处理',
 	'route.profile.title': '个人主页',

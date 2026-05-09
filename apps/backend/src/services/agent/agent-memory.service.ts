@@ -11,6 +11,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { ModelEnum } from 'src/enum/config.enum';
 import { Repository } from 'typeorm';
 import { estimateTokenCount } from '../assistant/assistant-context.util';
+import type { SerperOrganicItem } from '../web-search/web-search.types';
 import { AgentMessage, AgentMessageRole } from './agent-message.entity';
 import { AgentSession } from './agent-session.entity';
 import { AgentSessionSummary } from './agent-session-summary.entity';
@@ -223,10 +224,19 @@ export class AgentMemoryService {
 		sessionId: string,
 		assistantMessageId: string,
 		content: string,
+		/** undefined：不修改 search_organic；null：清空；数组：落库 */
+		searchOrganic?: SerperOrganicItem[] | null,
 	): Promise<void> {
 		const now = new Date();
+		const patch: {
+			content: string;
+			searchOrganic?: SerperOrganicItem[] | null;
+		} = { content };
+		if (searchOrganic !== undefined) {
+			patch.searchOrganic = searchOrganic;
+		}
 		await Promise.all([
-			this.messageRepo.update({ id: assistantMessageId }, { content }),
+			this.messageRepo.update({ id: assistantMessageId }, patch),
 			this.sessionRepo.update({ id: sessionId }, { updatedAt: now }),
 		]);
 	}
@@ -244,12 +254,15 @@ export class AgentMemoryService {
 	async listMessagesAsc(
 		sessionId: string,
 	): Promise<
-		Pick<AgentMessage, 'id' | 'turnId' | 'role' | 'content' | 'createdAt'>[]
+		Pick<
+			AgentMessage,
+			'id' | 'turnId' | 'role' | 'content' | 'searchOrganic' | 'createdAt'
+		>[]
 	> {
 		return this.messageRepo.find({
 			where: { session: { id: sessionId } },
 			order: { createdAt: 'ASC' },
-			select: ['id', 'turnId', 'role', 'content', 'createdAt'],
+			select: ['id', 'turnId', 'role', 'content', 'searchOrganic', 'createdAt'],
 		});
 	}
 

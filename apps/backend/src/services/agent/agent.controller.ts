@@ -83,14 +83,25 @@ export class AgentController {
 			});
 		}
 		const source$ = this.agentService.chatStream(userId, dto).pipe(
-			map((chunk) => ({
-				data: {
-					type: chunk.type,
-					content: chunk.type === 'content' ? chunk.data : undefined,
-					raw: chunk.type === 'tool' ? chunk.data : undefined,
-					done: false,
-				},
-			})),
+			map((chunk) => {
+				if (chunk.type === 'searchOrganic') {
+					return {
+						data: {
+							type: 'searchOrganic',
+							organic: chunk.data.organic,
+							done: false,
+						},
+					};
+				}
+				return {
+					data: {
+						type: chunk.type,
+						content: chunk.type === 'content' ? chunk.data : undefined,
+						raw: chunk.type === 'tool' ? chunk.data : undefined,
+						done: false,
+					},
+				};
+			}),
 		);
 		const done$ = of({
 			data: { done: true },

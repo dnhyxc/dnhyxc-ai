@@ -64,6 +64,8 @@ export class WebSearchService {
 	 */
 	createLangChainWebSearchTools(opts?: {
 		provider?: WebSearchProvider;
+		/** 每次检索完成后回调（含 organic），供 Agent SSE 推送胶囊数据源 */
+		onSearchComplete?: (result: WebSearchContextResult) => void;
 	}): DynamicTool[] {
 		const provider = this.resolveProvider(opts?.provider);
 		return [
@@ -77,6 +79,7 @@ export class WebSearchService {
 						typeof input === 'string' ? input : String(input ?? ''),
 						{ provider },
 					);
+					opts?.onSearchComplete?.(r);
 					return r.promptText ?? '（无检索结果）';
 				},
 			}),
