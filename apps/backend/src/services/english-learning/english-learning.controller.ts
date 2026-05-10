@@ -38,6 +38,17 @@ function vocabularyHttpMessage(e: HttpException): string {
 	return e.message || '生成单词资料失败，请稍后重试';
 }
 
+/** 工具入参摘要，供前端展示检索关键词（控制长度避免 SSE 过大） */
+function englishPackToolInputPreview(input: unknown): string | undefined {
+	if (input == null) return undefined;
+	if (typeof input === 'string') return input.trim().slice(0, 240);
+	try {
+		return JSON.stringify(input).slice(0, 240);
+	} catch {
+		return undefined;
+	}
+}
+
 function classicQuoteHttpMessage(e: HttpException): string {
 	const res = e.getResponse();
 	if (typeof res === 'string' && res.trim()) return res;
@@ -108,9 +119,16 @@ export class EnglishLearningController {
 	}
 
 	@Post('vocabulary-pack')
-	async vocabularyPack(@Body() dto: GenerateVocabularyDto) {
+	async vocabularyPack(
+		@Req() req: AuthedRequest,
+		@Body() dto: GenerateVocabularyDto,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
 		const itemsPayload =
-			await this.englishLearningService.generateVocabularyPack(dto);
+			await this.englishLearningService.generateVocabularyPack(dto, { userId });
 		return { success: true, data: itemsPayload };
 	}
 
@@ -180,6 +198,20 @@ export class EnglishLearningController {
 										},
 									});
 								}
+							},
+							{
+								userId,
+								onAgentTool: async (ev) => {
+									subscriber.next({
+										data: {
+											type: 'vocab.agent_tool',
+											streamId,
+											phase: ev.phase,
+											name: typeof ev.name === 'string' ? ev.name : '',
+											query: englishPackToolInputPreview(ev.input),
+										},
+									});
+								},
 							},
 						);
 					subscriber.next({
@@ -253,9 +285,20 @@ export class EnglishLearningController {
 	}
 
 	@Post('classic-quotes')
-	async classicQuotesPack(@Body() dto: GenerateClassicQuotesDto) {
-		const payload =
-			await this.englishLearningService.generateClassicQuotesPack(dto);
+	async classicQuotesPack(
+		@Req() req: AuthedRequest,
+		@Body() dto: GenerateClassicQuotesDto,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const payload = await this.englishLearningService.generateClassicQuotesPack(
+			dto,
+			{
+				userId,
+			},
+		);
 		return { success: true, data: payload };
 	}
 
@@ -324,6 +367,20 @@ export class EnglishLearningController {
 										},
 									});
 								}
+							},
+							{
+								userId,
+								onAgentTool: async (ev) => {
+									subscriber.next({
+										data: {
+											type: 'classic.agent_tool',
+											streamId,
+											phase: ev.phase,
+											name: typeof ev.name === 'string' ? ev.name : '',
+											query: englishPackToolInputPreview(ev.input),
+										},
+									});
+								},
 							},
 						);
 					subscriber.next({

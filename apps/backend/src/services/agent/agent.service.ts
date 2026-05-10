@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { AIMessageChunk } from '@langchain/core/messages';
+import { HumanMessage } from '@langchain/core/messages';
 import { ChatOpenAI } from '@langchain/openai';
 import { Cache } from '@nestjs/cache-manager';
 import {
@@ -109,6 +110,17 @@ function extractChunkText(chunk: AIMessageChunk | undefined): string {
 		})
 		.join('');
 }
+
+/**
+ * 英语学习「单词包 / 经典句」批量生成前的 Agent 检索阶段专用系统提示（与聊天 Agent 分流，不落库）。
+ */
+const ENGLISH_PACK_RESEARCH_SYSTEM_PROMPT = `你是一个只做资料搜集与整理的助手（不向终端用户闲聊）。可使用工具：互联网搜索、知识库检索、当前时间。
+任务：根据用户给出的「英语学习主题」与难度说明，检索并汇总与主题强相关的可扩展素材（中文要点），供后续程序生成结构化 JSON 英文词条或经典英文句使用。
+要求：
+1）优先使用「知识库检索」工具读取用户已入库笔记；必要时使用互联网搜索补充公开事实、领域专有名词、代表性作品与人物（若任务侧重经典语句，尤重可引用的出处线索）。
+2）输出用分条列表：与主题相关的领域词与搭配方向、可扩展子话题、重要专名/书名/时代（如能确定）；不要输出 JSON；不要编造检索未验证的细节（无法验证处请写「待查证」）。
+3）总字数控制在 1800 汉字以内；不要寒暄与道歉。
+4）若工具均无有效结果：给出 5～8 条基于常识的扩展方向，并标注「常识推测」。`;
 
 // SSE消息类型定义，支持普通文本和tool相关事件
 export type AgentSseChunk =
@@ -586,6 +598,110 @@ export class AgentService {
 	 * @param sessionId 会话ID
 	 * @param userId 用户ID
 	 */
+	/**
+	 * 英语学习批量生成：用 Agent（GLM + 工具）为主题做一轮检索与要点整理，不落库、不占用户 Agent 会话。
+	 * 智谱未配置或执行失败时返回空串，调用方继续走原有 DeepSeek JSON 多轮逻辑。
+	 */
+	async gatherContextForEnglishPackResearch(params: {
+		userId: number;
+		topic: string;
+		levelHint: string;
+		kind: 'vocabulary' | 'classic_quotes';
+		/** 工具调用开始/结束，供英语学习 SSE 透传前端展示 */
+		onToolEvent?: (e: {
+			phase: 'start' | 'end';
+			name?: string;
+			input?: unknown;
+			output?: unknown;
+		}) => void | Promise<void>;
+	}): Promise<string> {
+		const { userId, topic, levelHint, kind, onToolEvent } = params;
+		// 主题有长度限制，超过 500 可能导致模型 prompt/token 压力过大，截断保证健壮性
+		const trimmedTopic = topic.trim().slice(0, 500);
+		if (!trimmedTopic) return '';
+
+		const abortController = new AbortController();
+		const timeoutMs = 90_000;
+		const timer = setTimeout(() => abortController.abort(), timeoutMs);
+		let accumulated = '';
+		try {
+			const { main: mainLlm, summary: summaryLlm } = this.buildModels({
+				maxTokens: 6144,
+				temperature: 0.25,
+				signal: abortController.signal,
+			});
+			const tools = buildAgentLangChainTools({
+				webSearchService: this.webSearchService,
+				knowledgeQaService: this.knowledgeQaService,
+				userId,
+			});
+			const agent = createAgent({
+				model: mainLlm,
+				tools,
+				systemPrompt: ENGLISH_PACK_RESEARCH_SYSTEM_PROMPT,
+				middleware: buildAgentLangchainMiddleware({
+					summaryLlm: summaryLlm,
+					estimatePromptTokens: (msgs) =>
+						this.memory.estimatePromptTokens(msgs),
+				}),
+			});
+			const taskLabel =
+				kind === 'vocabulary'
+					? '批量英文单词/短语学习包'
+					: '批量英文经典语句、名言金句与地道表达';
+			const human = new HumanMessage(
+				`主题/需求：${trimmedTopic}\n难度说明：${levelHint}\n任务类型：${taskLabel}\n请按要求调用工具并输出整理后的中文要点列表（不要 JSON）。`,
+			);
+			const eventStream = agent.streamEvents(
+				{ messages: [human] },
+				{ version: 'v2', signal: abortController.signal },
+			);
+			for await (const ev of eventStream) {
+				if (ev.event === 'on_chat_model_stream') {
+					const chunk = ev.data?.chunk as AIMessageChunk | undefined;
+					const text = extractChunkText(chunk);
+					if (text) {
+						accumulated += text;
+						if (accumulated.length > 8000) {
+							abortController.abort();
+							break;
+						}
+					}
+				} else if (ev.event === 'on_tool_start' && onToolEvent) {
+					await Promise.resolve(
+						onToolEvent({
+							phase: 'start',
+							name: typeof ev.name === 'string' ? ev.name : undefined,
+							input: ev.data?.input,
+						}),
+					);
+				} else if (ev.event === 'on_tool_end' && onToolEvent) {
+					await Promise.resolve(
+						onToolEvent({
+							phase: 'end',
+							name: typeof ev.name === 'string' ? ev.name : undefined,
+							input: ev.data?.input,
+							output: ev.data?.output,
+						}),
+					);
+				}
+			}
+			const t = accumulated.trim();
+			if (!t) return '';
+			return t.length > 3600 ? `${t.slice(0, 3600)}\n…（已截断）` : t;
+		} catch (e: unknown) {
+			if (!this.isUserAbortError(e)) {
+				this.logger.warn?.(
+					'[AgentService] gatherContextForEnglishPackResearch failed',
+					e,
+				);
+			}
+			return '';
+		} finally {
+			clearTimeout(timer);
+		}
+	}
+
 	async stopStream(sessionId: string, userId: number) {
 		// 权限校验，避免越权stop
 		const owned = await this.sessionRepo.findOne({

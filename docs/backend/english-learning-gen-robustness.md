@@ -13,7 +13,7 @@
 
 | 路径 | 说明 |
 |------|------|
-| `apps/backend/src/services/english-learning/english-learning.service.ts` | `buildVocabLlm` 入参化 `maxTokens`；新增 `resolveVocabOutputMaxTokens` / `resolveClassicOutputMaxTokens` / `resolveStallBreakLimit` / `resolveMaxRounds`；`runVocabularyGeneration` 与 `runClassicQuotesGeneration` 内：动态 token、解析重试、`batchCap`、扩大 exclude、`diversityHint`、stall 阈值与提示词去重条款 |
+| `apps/backend/src/services/english-learning/english-learning.service.ts` | `buildVocabLlm` 入参化 `maxTokens`；`resolveVocabOutputMaxTokens` / `resolveClassicOutputMaxTokens`；`resolveStallBreakBase` + **`resolveStallBreakWithGap`**（按剩余条数放宽熔断）；`resolveMaxRounds`；单词/经典循环内：动态 token、解析重试、**全重复时同轮加急多 pass**、`batchCap`、exclude、`diversityHint`、提示词去重等 |
 
 ---
 
@@ -77,16 +77,19 @@ private resolveClassicOutputMaxTokens(batch: number): number {
 	return Math.min(32768, Math.max(12288, 1200 + batch * 1500)); // 说明：经典默认下限 12288，避免短输出顶满后截断
 }
 
-/**
- * 连续「净增 0 条」轮数熔断阈值：目标越大越宽容，避免 500 条仅 6 轮重复就放弃。
- */
-private resolveStallBreakLimit(count: number): number {
-	return Math.max(10, Math.min(48, 6 + Math.ceil(count / 22))); // 说明：count 越大，允许更多「零净增」轮再放弃
+private resolveStallBreakBase(count: number): number {
+	return Math.max(14, Math.min(100, 8 + Math.ceil(count / 12)));
+}
+
+private resolveStallBreakWithGap(count: number, accumulated: number): number {
+	const gap = Math.max(0, count - accumulated);
+	const bonus = Math.min(120, Math.ceil(gap / 12));
+	return Math.min(200, this.resolveStallBreakBase(count) + bonus);
 }
 
 private resolveMaxRounds(count: number, itemsPerRound: number): number {
-	const base = Math.ceil(count / Math.max(1, itemsPerRound)) + 280; // 说明：在「按 batch 估算的轮数」上再加缓冲轮
-	return Math.min(1400, base); // 说明：总帽 1400，避免无限循环又留足大任务空间
+	const base = Math.ceil(count / Math.max(1, itemsPerRound)) + 420;
+	return Math.min(2200, base);
 }
 ```
 
@@ -97,7 +100,7 @@ private resolveMaxRounds(count: number, itemsPerRound: number): number {
 | `capped` | 防止传入过小/过大 `maxTokens` 触发接口错误或浪费。 |
 | `resolveVocabOutputMaxTokens` | 单词字段短于经典，斜率 420/条，底 8192。 |
 | `resolveClassicOutputMaxTokens` | 句子长，斜率 1500/条，底 12288。 |
-| `resolveStallBreakLimit` | 用 `count` 动态放大容忍度，替代魔法数 `6`。 |
+| `resolveStallBreakWithGap` | 在 `count` 基础上按 **缺口** `count - accumulated` 再加 bonus，上限 200。 |
 | `resolveMaxRounds` | 与 `ITEMS_PER_ROUND` 解耦，大 count 时仍有多余轮次消化重复/解析失败。 |
 
 ---
@@ -110,7 +113,7 @@ private resolveMaxRounds(count: number, itemsPerRound: number): number {
 // 摘录：常量、stall 阈值与 system 中去重段落（字符串内容与仓库一致，此处用注释标意图）
 const ITEMS_PER_ROUND = 20;
 const maxRounds = this.resolveMaxRounds(count, ITEMS_PER_ROUND); // 说明：总轮次上限
-const stallBreak = this.resolveStallBreakLimit(count); // 说明：连续零净增熔断阈值
+const stallLimit = this.resolveStallBreakWithGap(count, accumulated.length); // 说明：每轮可变的熔断阈值
 
 // system 模板中含【去重硬性规定】三条：单轮 word 互异、与 user 列表及历史不重复、禁止同词多条凑数 —— 与下方 seen 去重逻辑对齐，减少无效轮次
 
@@ -176,7 +179,7 @@ while (accumulated.length < count && rounds < maxRounds) {
 
 **来源**：`apps/backend/src/services/english-learning/english-learning.service.ts`（`runClassicQuotesGeneration` 内约 L769–L897）
 
-- 使用同一套 **`resolveMaxRounds` / `resolveStallBreakLimit` / 内层 3 次解析重试`**；`maxTok` 使用 **`resolveClassicOutputMaxTokens(batch) + att * 3072`**。
+- 使用同一套 **`resolveMaxRounds` / `resolveStallBreakWithGap` / 内层解析重试与全重复加急 pass`**；`maxTok` 使用 **`resolveClassicOutputMaxTokens(batch) + att * 3072`**。
 - **`batchCap`**：全重复时 `Math.max(4, batchCap - 2)`，成功一轮 `batchCap + 1` 封顶 `ITEMS_PER_ROUND`（10）。
 - **system** 含 **【去重硬性规定】**（`english` 单轮互异、与列表不雷同、禁止同句多条）。
 - **user** 强调本批 `english` 各不相同；后续轮附带 **120** 条节选 exclude + **`diversityHint`**（换作品/时代等）。

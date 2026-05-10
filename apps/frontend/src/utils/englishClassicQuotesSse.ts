@@ -60,8 +60,15 @@ export type EnglishClassicStreamChunk = {
 	items: EnglishClassicQuoteItem[];
 };
 
+export type EnglishClassicAgentToolEvent = {
+	phase: 'start' | 'end';
+	name: string;
+	query?: string;
+};
+
 export type EnglishClassicStreamCallbacks = {
 	onProgress?: (p: EnglishClassicStreamProgress) => void;
+	onAgentTool?: (e: EnglishClassicAgentToolEvent) => void;
 	onChunk?: (chunk: EnglishClassicStreamChunk) => void;
 	onDone?: (payload: {
 		items: EnglishClassicQuoteItem[];
@@ -87,8 +94,15 @@ export async function streamEnglishClassicQuotes(options: {
 		body,
 		callbacks,
 	} = options;
-	const { onProgress, onChunk, onDone, onError, onUserAbort, onIncomplete } =
-		callbacks;
+	const {
+		onProgress,
+		onAgentTool,
+		onChunk,
+		onDone,
+		onError,
+		onUserAbort,
+		onIncomplete,
+	} = callbacks;
 
 	const controller = new AbortController();
 	let userAbortRequested = false;
@@ -151,6 +165,15 @@ export async function streamEnglishClassicQuotes(options: {
 				) {
 					onProgress?.({ collected, target, round });
 				}
+				return false;
+			}
+
+			if (type === 'classic.agent_tool') {
+				const phase = parsed.phase === 'end' ? 'end' : 'start';
+				const name = typeof parsed.name === 'string' ? parsed.name : '';
+				const query =
+					typeof parsed.query === 'string' ? parsed.query : undefined;
+				onAgentTool?.({ phase, name, query });
 				return false;
 			}
 

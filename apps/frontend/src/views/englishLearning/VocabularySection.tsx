@@ -11,6 +11,13 @@ import {
 	useRef,
 	useState,
 } from 'react';
+import {
+	COUNT_PRESETS,
+	SCROLL_LOAD_THRESHOLD_PX,
+	VOCAB_COUNT_MAX,
+	VOCAB_COUNT_MIN,
+	VOCAB_HISTORY_PAGE_SIZE,
+} from '@/constant';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import type {
@@ -22,27 +29,14 @@ import {
 	listEnglishVocabularyHistory,
 } from '@/service';
 import englishAgentStore from '@/store/englishAgent';
+import { displayIpaWrapped, sanitizeCountDigits } from '@/utils';
 import {
 	playEnglishPreferred,
 	stopAllEnglishPlayback,
 } from '@/utils/englishTts';
 import { streamEnglishVocabularyPack } from '@/utils/englishVocabularySse';
+import { formatEnglishLearningAgentToolLine } from './agentToolStatusText';
 import { VocabularyHistoryDrawer } from './VocabularyHistoryDrawer';
-
-/** 与后端 GenerateVocabularyDto 一致 */
-const VOCAB_COUNT_MIN = 1;
-/** 与后端 `ENGLISH_VOCAB_GENERATION_MAX` 一致 */
-const VOCAB_COUNT_MAX = 12000;
-const COUNT_PRESETS = [10, 100, 500, 1000, 3000, 12000] as const;
-
-/** 历史列表分页大小（与知识库列表分页量级一致） */
-const VOCAB_HISTORY_PAGE_SIZE = 20;
-/** 距视口底部小于该像素时加载下一页（与 knowledgeStore.onListViewportScroll 一致） */
-const SCROLL_LOAD_THRESHOLD_PX = 72;
-
-function sanitizeCountDigits(raw: string): string {
-	return raw.replace(/\D/g, '').slice(0, 5);
-}
 
 export type VocabProgressState = {
 	collected: number;
@@ -57,6 +51,8 @@ function VocabularyPackSectionInner() {
 	const [topic, setTopic] = useState('');
 	const [countInput, setCountInput] = useState('10');
 	const [loading, setLoading] = useState(false);
+	/** Agent 检索阶段工具状态（DeepSeek 开始出词后清空） */
+	const [agentToolLine, setAgentToolLine] = useState<string | null>(null);
 	const [progress, setProgress] = useState<VocabProgressState | null>(null);
 	const [items, setItems] = useState<EnglishVocabularyItem[]>([]);
 	const [playingKey, setPlayingKey] = useState<string | null>(null);
@@ -194,6 +190,7 @@ function VocabularyPackSectionInner() {
 		abortRef.current?.(true);
 		abortRef.current = null;
 		setLoading(false);
+		setAgentToolLine(null);
 		setProgress(null);
 	}, []);
 
@@ -226,6 +223,7 @@ function VocabularyPackSectionInner() {
 		abortRef.current = null;
 
 		setLoading(true);
+		setAgentToolLine(null);
 		setProgress({ collected: 0, target: count, round: 0 });
 		setItems([]);
 
@@ -236,15 +234,21 @@ function VocabularyPackSectionInner() {
 					if (genIdRef.current !== myGen) return;
 					setProgress(p);
 				},
+				onAgentTool: (ev) => {
+					if (genIdRef.current !== myGen) return;
+					setAgentToolLine(formatEnglishLearningAgentToolLine(t, ev));
+				},
 				onChunk: ({ items: delta }) => {
 					if (genIdRef.current !== myGen) return;
 					if (!delta.length) return;
+					setAgentToolLine(null);
 					setItems((prev) => [...prev, ...delta]);
 				},
 				onDone: ({ items: list, requested }) => {
 					if (genIdRef.current !== myGen) return;
 					abortRef.current = null;
 					setLoading(false);
+					setAgentToolLine(null);
 					setProgress(null);
 					setItems(list);
 					setLoadedStreamId(null);
@@ -270,6 +274,7 @@ function VocabularyPackSectionInner() {
 					if (genIdRef.current !== myGen) return;
 					abortRef.current = null;
 					setLoading(false);
+					setAgentToolLine(null);
 					setProgress(null);
 					Toast({ type: 'error', title: msg });
 				},
@@ -277,6 +282,7 @@ function VocabularyPackSectionInner() {
 					if (genIdRef.current !== myGen) return;
 					abortRef.current = null;
 					setLoading(false);
+					setAgentToolLine(null);
 					setProgress(null);
 					Toast({
 						type: 'info',
@@ -287,6 +293,7 @@ function VocabularyPackSectionInner() {
 					if (genIdRef.current !== myGen) return;
 					abortRef.current = null;
 					setLoading(false);
+					setAgentToolLine(null);
 					setProgress(null);
 					Toast({
 						type: 'warning',
@@ -334,6 +341,8 @@ function VocabularyPackSectionInner() {
 		const clamped = Math.min(VOCAB_COUNT_MAX, Math.max(VOCAB_COUNT_MIN, n));
 		setCountInput(String(clamped));
 	}, [countInput]);
+
+	console.log(agentToolLine, 'agentToolLineagentToolLine');
 
 	return (
 		<div className="rounded-none p-4 pb-0 @container min-w-0">
@@ -456,6 +465,11 @@ function VocabularyPackSectionInner() {
 				</div>
 				{loading && progress ? (
 					<div className="space-y-2 rounded-md bg-theme-secondary/40 px-3 py-2.5">
+						{agentToolLine ? (
+							<div className="text-teal-600/90 dark:text-teal-400/90 text-xs leading-snug">
+								{agentToolLine}
+							</div>
+						) : null}
 						<div className="text-textcolor/70 text-xs leading-snug">
 							{t('englishLearning.vocab.progress', {
 								collected: progress.collected,
@@ -497,7 +511,7 @@ function VocabularyPackSectionInner() {
 												{item.word}
 											</div>
 											<div className="font-mono text-xs leading-snug text-teal-600/90 @min-[26rem]:text-xs dark:text-teal-400/90">
-												/{item.ipa}/
+												{displayIpaWrapped(item.ipa)}
 											</div>
 										</div>
 										<Button
@@ -523,10 +537,10 @@ function VocabularyPackSectionInner() {
 											)}
 										</Button>
 									</div>
-									<div className="text-textcolor/85 text-sm leading-snug @min-[26rem]:text-sm">
+									<div className="text-textcolor/95 text-sm leading-snug @min-[26rem]:text-sm">
 										{item.translationZh}
 									</div>
-									<div className="text-textcolor/55 text-xs leading-relaxed italic @min-[26rem]:text-xs">
+									<div className="text-textcolor/80 text-sm leading-relaxed italic @min-[26rem]:text-xs">
 										{item.example}
 									</div>
 								</div>

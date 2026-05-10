@@ -11,6 +11,13 @@ import {
 	useRef,
 	useState,
 } from 'react';
+import {
+	COUNT_PRESETS,
+	HISTORY_PAGE_SIZE,
+	QUOTE_COUNT_MAX,
+	QUOTE_COUNT_MIN,
+	SCROLL_LOAD_THRESHOLD_PX,
+} from '@/constant';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import type {
@@ -22,23 +29,14 @@ import {
 	listEnglishClassicQuotesHistory,
 } from '@/service';
 import englishAgentStore from '@/store/englishAgent';
+import { sanitizeCountDigits } from '@/utils';
 import { streamEnglishClassicQuotes } from '@/utils/englishClassicQuotesSse';
 import {
 	playEnglishPreferred,
 	stopAllEnglishPlayback,
 } from '@/utils/englishTts';
+import { formatEnglishLearningAgentToolLine } from './agentToolStatusText';
 import { ClassicQuotesHistoryDrawer } from './ClassicQuotesHistoryDrawer';
-
-const QUOTE_COUNT_MIN = 1;
-/** 与后端 `ENGLISH_CLASSIC_QUOTES_GENERATION_MAX` 一致 */
-const QUOTE_COUNT_MAX = 6000;
-const COUNT_PRESETS = [10, 100, 500, 1000, 3000, 6000] as const;
-const HISTORY_PAGE_SIZE = 20;
-const SCROLL_LOAD_THRESHOLD_PX = 72;
-
-function sanitizeCountDigits(raw: string): string {
-	return raw.replace(/\D/g, '').slice(0, 5);
-}
 
 export type ClassicQuoteProgressState = {
 	collected: number;
@@ -53,6 +51,7 @@ function ClassicQuotesSectionInner() {
 	const [topic, setTopic] = useState('');
 	const [countInput, setCountInput] = useState('10');
 	const [loading, setLoading] = useState(false);
+	const [agentToolLine, setAgentToolLine] = useState<string | null>(null);
 	const [progress, setProgress] = useState<ClassicQuoteProgressState | null>(
 		null,
 	);
@@ -191,6 +190,7 @@ function ClassicQuotesSectionInner() {
 		abortRef.current?.(true);
 		abortRef.current = null;
 		setLoading(false);
+		setAgentToolLine(null);
 		setProgress(null);
 	}, []);
 
@@ -222,6 +222,7 @@ function ClassicQuotesSectionInner() {
 		abortRef.current = null;
 
 		setLoading(true);
+		setAgentToolLine(null);
 		setProgress({ collected: 0, target: count, round: 0 });
 		setItems([]);
 
@@ -232,15 +233,21 @@ function ClassicQuotesSectionInner() {
 					if (genIdRef.current !== myGen) return;
 					setProgress(p);
 				},
+				onAgentTool: (ev) => {
+					if (genIdRef.current !== myGen) return;
+					setAgentToolLine(formatEnglishLearningAgentToolLine(t, ev));
+				},
 				onChunk: ({ items: delta }) => {
 					if (genIdRef.current !== myGen) return;
 					if (!delta.length) return;
+					setAgentToolLine(null);
 					setItems((prev) => [...prev, ...delta]);
 				},
 				onDone: ({ items: list, requested }) => {
 					if (genIdRef.current !== myGen) return;
 					abortRef.current = null;
 					setLoading(false);
+					setAgentToolLine(null);
 					setProgress(null);
 					setItems(list);
 					setLoadedStreamId(null);
@@ -266,6 +273,7 @@ function ClassicQuotesSectionInner() {
 					if (genIdRef.current !== myGen) return;
 					abortRef.current = null;
 					setLoading(false);
+					setAgentToolLine(null);
 					setProgress(null);
 					Toast({ type: 'error', title: msg });
 				},
@@ -273,6 +281,7 @@ function ClassicQuotesSectionInner() {
 					if (genIdRef.current !== myGen) return;
 					abortRef.current = null;
 					setLoading(false);
+					setAgentToolLine(null);
 					setProgress(null);
 					Toast({
 						type: 'info',
@@ -283,6 +292,7 @@ function ClassicQuotesSectionInner() {
 					if (genIdRef.current !== myGen) return;
 					abortRef.current = null;
 					setLoading(false);
+					setAgentToolLine(null);
 					setProgress(null);
 					Toast({
 						type: 'warning',
@@ -448,6 +458,11 @@ function ClassicQuotesSectionInner() {
 				</div>
 				{loading && progress ? (
 					<div className="space-y-2 rounded-md bg-theme-secondary/40 px-3 py-2.5">
+						{agentToolLine ? (
+							<div className="text-indigo-600/90 dark:text-indigo-400/90 text-xs leading-snug">
+								{agentToolLine}
+							</div>
+						) : null}
 						<div className="text-textcolor/70 text-xs leading-snug">
 							{t('englishLearning.classic.progress', {
 								collected: progress.collected,
@@ -511,14 +526,14 @@ function ClassicQuotesSectionInner() {
 											)}
 										</Button>
 									</div>
-									<div className="text-textcolor/85 text-sm leading-snug">
+									<div className="text-textcolor/90 text-sm leading-snug">
 										{item.translationZh}
 									</div>
-									<div className="text-textcolor/50 text-xs">
+									<div className="text-textcolor/70 text-xs">
 										{t('englishLearning.classic.sourceLabel')}
 										{item.source || '—'}
 									</div>
-									<div className="text-textcolor/55 text-xs leading-relaxed italic">
+									<div className="text-textcolor/70 text-xs leading-relaxed italic">
 										{item.noteZh}
 									</div>
 								</div>

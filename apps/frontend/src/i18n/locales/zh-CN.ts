@@ -677,6 +677,14 @@ export const zhCN = {
 	'englishLearning.pendingIntent': '已选意图（下次发送时附带）',
 	'englishLearning.pendingIntentShort': '下次发送附带',
 
+	'englishLearning.agentTool.internet': '联网搜索',
+	'englishLearning.agentTool.knowledge': '知识库检索',
+	'englishLearning.agentTool.datetime': '获取时间',
+	'englishLearning.agentTool.other': '{name}',
+	'englishLearning.agentTool.querySuffix': '：{q}',
+	'englishLearning.agentTool.statusDoing': '资料助手 · {action} 进行中{detail}',
+	'englishLearning.agentTool.statusDone': '资料助手 · {action} 已完成',
+
 	'englishLearning.vocab.title': '单词学习资料',
 	'englishLearning.vocab.desc':
 		'按你的主题与上方「难度」生成一批单词：含国际音标（IPA）、中文释义与例句。点击小喇叭可朗读该英文单词（云端 TTS 优先）。',

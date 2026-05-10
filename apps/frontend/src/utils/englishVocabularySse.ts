@@ -59,8 +59,18 @@ export type EnglishVocabStreamChunk = {
 	items: EnglishVocabularyItem[];
 };
 
+/** Agent 检索阶段工具事件（与后端 `vocab.agent_tool` 对齐） */
+export type EnglishVocabAgentToolEvent = {
+	phase: 'start' | 'end';
+	name: string;
+	/** 工具入参摘要（如检索关键词） */
+	query?: string;
+};
+
 export type EnglishVocabStreamCallbacks = {
 	onProgress?: (p: EnglishVocabStreamProgress) => void;
+	/** Agent 调用联网 / 知识库等工具时回调，用于前端展示 */
+	onAgentTool?: (e: EnglishVocabAgentToolEvent) => void;
 	/** 每轮 LLM 合并后的新词条（与后端入库批次一致），用于实时追加 UI */
 	onChunk?: (chunk: EnglishVocabStreamChunk) => void;
 	/** 正常结束：携带词条与请求条数（用于部分成功提示） */
@@ -93,8 +103,15 @@ export async function streamEnglishVocabularyPack(options: {
 		body,
 		callbacks,
 	} = options;
-	const { onProgress, onChunk, onDone, onError, onUserAbort, onIncomplete } =
-		callbacks;
+	const {
+		onProgress,
+		onAgentTool,
+		onChunk,
+		onDone,
+		onError,
+		onUserAbort,
+		onIncomplete,
+	} = callbacks;
 
 	const controller = new AbortController();
 	let userAbortRequested = false;
@@ -146,6 +163,8 @@ export async function streamEnglishVocabularyPack(options: {
 			const parsed = unwrapVocabPayload(raw);
 			const type = parsed.type;
 
+			console.log(type, 'type');
+
 			if (type === 'vocab.progress') {
 				const collected = Number(parsed.collected);
 				const target = Number(parsed.target);
@@ -157,6 +176,15 @@ export async function streamEnglishVocabularyPack(options: {
 				) {
 					onProgress?.({ collected, target, round });
 				}
+				return false;
+			}
+
+			if (type === 'vocab.agent_tool') {
+				const phase = parsed.phase === 'end' ? 'end' : 'start';
+				const name = typeof parsed.name === 'string' ? parsed.name : '';
+				const query =
+					typeof parsed.query === 'string' ? parsed.query : undefined;
+				onAgentTool?.({ phase, name, query });
 				return false;
 			}
 

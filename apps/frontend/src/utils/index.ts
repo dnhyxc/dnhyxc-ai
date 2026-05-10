@@ -443,3 +443,24 @@ export const isValidImageUrl = (url: string): boolean => {
 		return false;
 	}
 };
+
+/**
+ * 仅保留输入中的数字（去除所有非数字），并限制长度为5位以内
+ * 例如：'123abc456' => '12345'
+ * 用于单词数量输入的清洗，防止非数字和超长输入
+ * @param raw 原始输入字符串
+ * @returns 只包含最多5位数字的字符串
+ */
+export function sanitizeCountDigits(raw: string): string {
+	return raw.replace(/\D/g, '').slice(0, 5);
+}
+
+/** IPA 展示：已含首尾 / 则不再包一层，否则补上斜杠 */
+export function displayIpaWrapped(ipa: string): string {
+	const s = ipa.trim();
+	if (!s) return '';
+	if (s.length >= 2 && s.startsWith('/') && s.endsWith('/')) {
+		return s;
+	}
+	return `/${s}/`;
+}

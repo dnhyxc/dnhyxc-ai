@@ -757,6 +757,15 @@ export const enUS = {
 	'englishLearning.pendingIntent': 'Intent (appended on next send)',
 	'englishLearning.pendingIntentShort': 'Appended on next send',
 
+	'englishLearning.agentTool.internet': 'Web search',
+	'englishLearning.agentTool.knowledge': 'Knowledge base',
+	'englishLearning.agentTool.datetime': 'Date/time',
+	'englishLearning.agentTool.other': '{name}',
+	'englishLearning.agentTool.querySuffix': ': {q}',
+	'englishLearning.agentTool.statusDoing':
+		'Research · {action} in progress{detail}',
+	'englishLearning.agentTool.statusDone': 'Research · {action} done',
+
 	'englishLearning.vocab.title': 'Vocabulary pack',
 	'englishLearning.vocab.desc':
 		'Generate a themed word list (IPA, Chinese gloss, example). Use the speaker to hear each English word (cloud TTS when configured).',

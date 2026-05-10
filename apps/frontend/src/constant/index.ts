@@ -40,3 +40,34 @@ export function getChatMarkdownHighlightTheme(
 ): HighlightJsThemeId {
 	return themeName === 'black' ? 'atom-one-dark' : 'atom-one-light';
 }
+
+/** 与后端 GenerateVocabularyDto 一致 */
+export const VOCAB_COUNT_MIN = 1;
+/** 与后端 `ENGLISH_VOCAB_GENERATION_MAX` 一致 */
+export const VOCAB_COUNT_MAX = 12000;
+/**
+ * 单词数量、经典语句等数量的常用预设选项。
+ * 用于快捷按钮，方便用户一键选择。
+ */
+export const VOCAB_COUNT_PRESETS = [10, 100, 500, 1000, 3000, 12000] as const;
+/** 历史列表分页大小（与知识库列表分页量级一致） */
+export const VOCAB_HISTORY_PAGE_SIZE = 20;
+
+/** 英文经典语句生成的最小数量（前端和后端校验均需保持一致） */
+export const QUOTE_COUNT_MIN = 1;
+/** 英文经典语句生成的最大数量，需与后端 `ENGLISH_CLASSIC_QUOTES_GENERATION_MAX` 保持一致 */
+export const QUOTE_COUNT_MAX = 6000;
+/**
+ * 英文经典语句、单词等数量的常用预设选项。
+ * 用于快捷按钮，方便用户一键选择。
+ */
+export const COUNT_PRESETS = [10, 100, 500, 1000, 3000, 6000] as const;
+/**
+ * 经典语句/单词历史列表每页拉取的条数，用于分页加载。
+ */
+export const HISTORY_PAGE_SIZE = 20;
+/**
+ * 历史列表懒加载的滚动距离阈值（像素）。
+ * 当滚动距离不足此值时会尝试加载更多内容。
+ */
+export const SCROLL_LOAD_THRESHOLD_PX = 72;

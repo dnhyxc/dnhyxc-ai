@@ -10,6 +10,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ModelEnum } from 'src/enum/config.enum';
+import { AgentService } from 'src/services/agent/agent.service';
 import { In, Repository } from 'typeorm';
 import {
 	ENGLISH_CLASSIC_QUOTES_GENERATION_MAX,
@@ -66,6 +67,14 @@ export type VocabularyGenerationProgress = {
 	newItems?: VocabularyItemDto[];
 };
 
+/** 英语学习拉取：Agent 检索阶段工具事件（经 SSE 透传前端） */
+export type EnglishLearningPackAgentToolEvent = {
+	phase: 'start' | 'end';
+	name?: string;
+	input?: unknown;
+	output?: unknown;
+};
+
 /** 历史列表单项：按 streamId 聚合一次「拉取单词包」会话 */
 export type VocabularyHistoryListItem = {
 	streamId: string;
@@ -97,6 +106,7 @@ export class EnglishLearningService {
 
 	constructor(
 		private readonly configService: ConfigService,
+		private readonly agentService: AgentService,
 		@InjectRepository(EnglishVocabularyPackBatch)
 		private readonly vocabBatchRepo: Repository<EnglishVocabularyPackBatch>,
 		@InjectRepository(EnglishClassicQuotePackBatch)
@@ -145,15 +155,21 @@ export class EnglishLearningService {
 	}
 
 	/**
-	 * 连续「净增 0 条」轮数熔断阈值：目标越大越宽容，避免 500 条仅 6 轮重复就放弃。
+	 * 连续「净增 0 条」轮数熔断：基础随目标增大；剩余缺口越大额外越宽容，减少「差很远就停」。
 	 */
-	private resolveStallBreakLimit(count: number): number {
-		return Math.max(10, Math.min(48, 6 + Math.ceil(count / 22)));
+	private resolveStallBreakBase(count: number): number {
+		return Math.max(14, Math.min(100, 8 + Math.ceil(count / 12)));
+	}
+
+	private resolveStallBreakWithGap(count: number, accumulated: number): number {
+		const gap = Math.max(0, count - accumulated);
+		const bonus = Math.min(120, Math.ceil(gap / 12));
+		return Math.min(200, this.resolveStallBreakBase(count) + bonus);
 	}
 
 	private resolveMaxRounds(count: number, itemsPerRound: number): number {
-		const base = Math.ceil(count / Math.max(1, itemsPerRound)) + 280;
-		return Math.min(1400, base);
+		const base = Math.ceil(count / Math.max(1, itemsPerRound)) + 420;
+		return Math.min(2200, base);
 	}
 
 	/**
@@ -588,6 +604,12 @@ export class EnglishLearningService {
 	async runVocabularyGeneration(
 		dto: GenerateVocabularyDto,
 		onProgress?: (p: VocabularyGenerationProgress) => void | Promise<void>,
+		context?: {
+			userId?: number;
+			onAgentTool?: (
+				e: EnglishLearningPackAgentToolEvent,
+			) => void | Promise<void>;
+		},
 	): Promise<VocabularyItemDto[]> {
 		const count = Math.min(
 			ENGLISH_VOCAB_GENERATION_MAX,
@@ -598,7 +620,6 @@ export class EnglishLearningService {
 		/** 每轮向模型请求的 items 条数上限（重复过多时会自适应下调） */
 		const ITEMS_PER_ROUND = 20;
 		const maxRounds = this.resolveMaxRounds(count, ITEMS_PER_ROUND);
-		const stallBreak = this.resolveStallBreakLimit(count);
 
 		const system = `你是英语教学助手。用户会给出「主题/学习需求」与难度。
 用户可能分多轮请求；每一轮都会给出该轮必须生成的确切条数，请严格遵守该轮条数（items 数组长度必须等于该数字）。
@@ -618,6 +639,27 @@ export class EnglishLearningService {
 格式严格为：{"items":[{"word":"","ipa":"","translationZh":"","example":""}]}`;
 
 		const topic = dto.topic.trim();
+
+		/** Agent（工具 + GLM）检索要点，拼入 user 提示；失败则空串，逻辑与无 Agent 时一致 */
+		let agentResearchAppendix = '';
+		if (context?.userId != null) {
+			try {
+				const raw = await this.agentService.gatherContextForEnglishPackResearch(
+					{
+						userId: context.userId,
+						topic,
+						levelHint: levelText,
+						kind: 'vocabulary',
+						onToolEvent: context.onAgentTool,
+					},
+				);
+				if (raw.trim()) {
+					agentResearchAppendix = `\n【检索与知识库要点（供扩展词汇方向，勿逐字照抄为 word）】\n${raw.trim()}`;
+				}
+			} catch (e: unknown) {
+				this.logger.warn('[EnglishLearning] Agent 检索增强跳过（单词）', e);
+			}
+		}
 
 		try {
 			const accumulated: VocabularyItemDto[] = [];
@@ -644,60 +686,76 @@ export class EnglishLearningService {
 						? `\n【多样性】请换子角度：同主题下的不同词性、常见搭配、近义辨析词、学科细分小类、短语动词变体等，严禁与已列词条同形或仅大小写差异。`
 						: '';
 
-				const user =
+				const userBase =
 					accumulated.length === 0
 						? `主题/需求：${topic}
 难度说明：${levelText}
 请恰好生成 ${batch} 条 items（数组长度必须等于 ${batch}）。
-要求：本批 items 内每条 word 必须各不相同（小写比较无重复）；禁止输出已在常见教材附录中机械重复的同一词不同写法凑条数。`
+要求：本批 items 内每条 word 必须各不相同（小写比较无重复）；禁止输出已在常见教材附录中机械重复的同一词不同写法凑条数。${agentResearchAppendix}`
 						: `主题/需求：${topic}（与前几轮相同，请继续围绕该主题扩展）
 难度说明：${levelText}
 请再生成恰好 ${batch} 条新的 items（数组长度必须等于 ${batch}）。
 以下英文词条已出现过，禁止再次输出（不区分大小写；归一化后须与下列全部不同）：${excludeSnippet}
-本批 items 内部也不得出现彼此重复的 word。请输出与上述列表完全不同的词或短语。${diversityHint}`;
-
-				let batchItems: VocabularyItemDto[] = [];
-				const parseRetries = 3;
-				for (let att = 0; att < parseRetries; att++) {
-					const maxTok = this.resolveVocabOutputMaxTokens(batch) + att * 2048;
-					const llm = this.buildVocabLlm(maxTok);
-					try {
-						const text = await this.invokeVocabularyLlm(llm, system, user);
-						const parsed = this.extractJsonObject(text);
-						batchItems = this.extractVocabularyItemsLoose(parsed);
-						break;
-					} catch (e: unknown) {
-						if (accumulated.length === 0 && att === parseRetries - 1) {
-							throw e;
-						}
-						this.logger.warn(
-							`[EnglishLearning] vocabulary JSON 解析重试 ${att + 1}/${parseRetries}`,
-							e,
-						);
-					}
-				}
-
-				if (batchItems.length > batch) {
-					batchItems = batchItems.slice(0, batch);
-				}
-
-				if (batchItems.length === 0 && accumulated.length === 0) {
-					throw new HttpException(
-						'单词资料为空或无法解析为有效词条',
-						HttpStatus.BAD_GATEWAY,
-					);
-				}
+本批 items 内部也不得出现彼此重复的 word。请输出与上述列表完全不同的词或短语。${diversityHint}${agentResearchAppendix}`;
 
 				const newItemsThisRound: VocabularyItemDto[] = [];
 				let added = 0;
-				for (const item of batchItems) {
-					const key = item.word.toLowerCase();
-					if (seen.has(key)) continue;
-					seen.add(key);
-					accumulated.push(item);
-					newItemsThisRound.push(item);
-					added++;
-					if (accumulated.length >= count) break;
+				let batchItems: VocabularyItemDto[] = [];
+				/** 已有累积时允许多次「全重复则加急换一批」再进入 stall，提高凑满概率 */
+				const maxDupPasses = accumulated.length === 0 ? 1 : 5;
+
+				for (let dupPass = 0; dupPass < maxDupPasses; dupPass++) {
+					const urgency =
+						dupPass === 0
+							? ''
+							: `\n【紧急】上一轮返回的词条全部与已收集列表重复。请换完全不同的词根、子话题、词族、搭配域与词性，仍必须恰好 ${batch} 条 items，且数组内互不重复。`;
+					const user = `${userBase}${urgency}`;
+
+					batchItems = [];
+					const parseRetries = 3;
+					for (let att = 0; att < parseRetries; att++) {
+						const maxTok = this.resolveVocabOutputMaxTokens(batch) + att * 2048;
+						const llm = this.buildVocabLlm(maxTok);
+						try {
+							const text = await this.invokeVocabularyLlm(llm, system, user);
+							const parsed = this.extractJsonObject(text);
+							batchItems = this.extractVocabularyItemsLoose(parsed);
+							break;
+						} catch (e: unknown) {
+							if (accumulated.length === 0 && att === parseRetries - 1) {
+								throw e;
+							}
+							this.logger.warn(
+								`[EnglishLearning] vocabulary JSON 解析重试 ${att + 1}/${parseRetries}`,
+								e,
+							);
+						}
+					}
+
+					if (batchItems.length > batch) {
+						batchItems = batchItems.slice(0, batch);
+					}
+
+					if (batchItems.length === 0 && accumulated.length === 0) {
+						throw new HttpException(
+							'单词资料为空或无法解析为有效词条',
+							HttpStatus.BAD_GATEWAY,
+						);
+					}
+
+					newItemsThisRound.length = 0;
+					added = 0;
+					for (const item of batchItems) {
+						const key = item.word.toLowerCase();
+						if (seen.has(key)) continue;
+						seen.add(key);
+						accumulated.push(item);
+						newItemsThisRound.push(item);
+						added++;
+						if (accumulated.length >= count) break;
+					}
+					if (added > 0) break;
+					if (batchItems.length === 0) break;
 				}
 
 				await Promise.resolve(
@@ -711,14 +769,18 @@ export class EnglishLearningService {
 					}),
 				);
 
+				const stallLimit = this.resolveStallBreakWithGap(
+					count,
+					accumulated.length,
+				);
 				if (added === 0) {
 					stall++;
 					if (batchItems.length > 0) {
 						batchCap = Math.max(5, batchCap - 3);
 					}
-					if (stall >= stallBreak) {
+					if (stall >= stallLimit) {
 						this.logger.warn(
-							`[EnglishLearning] vocabulary pack stalled at ${accumulated.length}/${count} (stallBreak=${stallBreak})`,
+							`[EnglishLearning] vocabulary pack stalled at ${accumulated.length}/${count} (stallLimit=${stallLimit})`,
 						);
 						break;
 					}
@@ -748,8 +810,9 @@ export class EnglishLearningService {
 
 	async generateVocabularyPack(
 		dto: GenerateVocabularyDto,
+		opts?: { userId?: number },
 	): Promise<{ items: VocabularyItemDto[] }> {
-		const items = await this.runVocabularyGeneration(dto);
+		const items = await this.runVocabularyGeneration(dto, undefined, opts);
 		return { items };
 	}
 
@@ -759,6 +822,12 @@ export class EnglishLearningService {
 	async runClassicQuotesGeneration(
 		dto: GenerateClassicQuotesDto,
 		onProgress?: (p: ClassicQuoteGenerationProgress) => void | Promise<void>,
+		context?: {
+			userId?: number;
+			onAgentTool?: (
+				e: EnglishLearningPackAgentToolEvent,
+			) => void | Promise<void>;
+		},
 	): Promise<ClassicQuoteItemDto[]> {
 		const count = Math.min(
 			ENGLISH_CLASSIC_QUOTES_GENERATION_MAX,
@@ -768,7 +837,6 @@ export class EnglishLearningService {
 		const levelText = LEVEL_HINT[level];
 		const ITEMS_PER_ROUND = 10;
 		const maxRounds = this.resolveMaxRounds(count, ITEMS_PER_ROUND);
-		const stallBreak = this.resolveStallBreakLimit(count);
 
 		const system = `你是英语教学助手。用户会给出「主题/学习需求」与难度。
 用户可能分多轮请求；每一轮都会给出该轮必须生成的确切条数，请严格遵守该轮条数（items 数组长度必须等于该数字）。
@@ -789,6 +857,26 @@ export class EnglishLearningService {
 
 		const topic = dto.topic.trim();
 
+		let agentResearchAppendix = '';
+		if (context?.userId != null) {
+			try {
+				const raw = await this.agentService.gatherContextForEnglishPackResearch(
+					{
+						userId: context.userId,
+						topic,
+						levelHint: levelText,
+						kind: 'classic_quotes',
+						onToolEvent: context.onAgentTool,
+					},
+				);
+				if (raw.trim()) {
+					agentResearchAppendix = `\n【检索与知识库要点（供扩展名言/原句线索，勿逐字照抄为 english）】\n${raw.trim()}`;
+				}
+			} catch (e: unknown) {
+				this.logger.warn('[EnglishLearning] Agent 检索增强跳过（经典句）', e);
+			}
+		}
+
 		try {
 			const accumulated: ClassicQuoteItemDto[] = [];
 			const seen = new Set<string>();
@@ -804,7 +892,7 @@ export class EnglishLearningService {
 					accumulated.length === 0
 						? ''
 						: [...seen]
-								.slice(-120)
+								.slice(-160)
 								.map((s) => s.replace(/`/g, "'").slice(0, 120))
 								.join(' | ');
 
@@ -813,60 +901,76 @@ export class EnglishLearningService {
 						? `\n【多样性】请换不同作品/时代/体裁/演讲场合；避免仅改写标点或个别词的同一句式变体。`
 						: '';
 
-				const user =
+				const userBase =
 					accumulated.length === 0
 						? `主题/需求：${topic}
 难度说明：${levelText}
 请恰好生成 ${batch} 条 items（数组长度必须等于 ${batch}）。
-要求：本批每条 english 必须各不相同；禁止同一句改标点或微调几个词当作多条。`
+要求：本批每条 english 必须各不相同；禁止同一句改标点或微调几个词当作多条。${agentResearchAppendix}`
 						: `主题/需求：${topic}（与前几轮相同，请继续围绕该主题扩展）
 难度说明：${levelText}
 请再生成恰好 ${batch} 条新的 items（数组长度必须等于 ${batch}）。
 以下英文句子（节选）已出现过，禁止再次输出相同或实质雷同的句子（含轻微改写）：${excludeSnippet}
-本批 items 内部的 english 也不得彼此重复或雷同。${diversityHint}`;
-
-				let batchItems: ClassicQuoteItemDto[] = [];
-				const parseRetries = 3;
-				for (let att = 0; att < parseRetries; att++) {
-					const maxTok = this.resolveClassicOutputMaxTokens(batch) + att * 3072;
-					const llm = this.buildVocabLlm(maxTok);
-					try {
-						const text = await this.invokeVocabularyLlm(llm, system, user);
-						const parsed = this.extractJsonObject(text);
-						batchItems = this.extractClassicQuoteItemsLoose(parsed);
-						break;
-					} catch (e: unknown) {
-						if (accumulated.length === 0 && att === parseRetries - 1) {
-							throw e;
-						}
-						this.logger.warn(
-							`[EnglishLearning] classic quotes JSON 解析重试 ${att + 1}/${parseRetries}`,
-							e,
-						);
-					}
-				}
-
-				if (batchItems.length > batch) {
-					batchItems = batchItems.slice(0, batch);
-				}
-
-				if (batchItems.length === 0 && accumulated.length === 0) {
-					throw new HttpException(
-						'经典语句为空或无法解析为有效条目',
-						HttpStatus.BAD_GATEWAY,
-					);
-				}
+本批 items 内部的 english 也不得彼此重复或雷同。${diversityHint}${agentResearchAppendix}`;
 
 				const newItemsThisRound: ClassicQuoteItemDto[] = [];
 				let added = 0;
-				for (const item of batchItems) {
-					const key = item.english.toLowerCase().trim().slice(0, 400);
-					if (!key || seen.has(key)) continue;
-					seen.add(key);
-					accumulated.push(item);
-					newItemsThisRound.push(item);
-					added++;
-					if (accumulated.length >= count) break;
+				let batchItems: ClassicQuoteItemDto[] = [];
+				const maxDupPasses = accumulated.length === 0 ? 1 : 5;
+
+				for (let dupPass = 0; dupPass < maxDupPasses; dupPass++) {
+					const urgency =
+						dupPass === 0
+							? ''
+							: `\n【紧急】上一轮返回的句子全部与已收集列表重复或实质雷同。请换不同作品、时代、人物、体裁与句式，仍必须恰好 ${batch} 条 items，且数组内互不重复。`;
+					const user = `${userBase}${urgency}`;
+
+					batchItems = [];
+					const parseRetries = 3;
+					for (let att = 0; att < parseRetries; att++) {
+						const maxTok =
+							this.resolveClassicOutputMaxTokens(batch) + att * 3072;
+						const llm = this.buildVocabLlm(maxTok);
+						try {
+							const text = await this.invokeVocabularyLlm(llm, system, user);
+							const parsed = this.extractJsonObject(text);
+							batchItems = this.extractClassicQuoteItemsLoose(parsed);
+							break;
+						} catch (e: unknown) {
+							if (accumulated.length === 0 && att === parseRetries - 1) {
+								throw e;
+							}
+							this.logger.warn(
+								`[EnglishLearning] classic quotes JSON 解析重试 ${att + 1}/${parseRetries}`,
+								e,
+							);
+						}
+					}
+
+					if (batchItems.length > batch) {
+						batchItems = batchItems.slice(0, batch);
+					}
+
+					if (batchItems.length === 0 && accumulated.length === 0) {
+						throw new HttpException(
+							'经典语句为空或无法解析为有效条目',
+							HttpStatus.BAD_GATEWAY,
+						);
+					}
+
+					newItemsThisRound.length = 0;
+					added = 0;
+					for (const item of batchItems) {
+						const key = item.english.toLowerCase().trim().slice(0, 400);
+						if (!key || seen.has(key)) continue;
+						seen.add(key);
+						accumulated.push(item);
+						newItemsThisRound.push(item);
+						added++;
+						if (accumulated.length >= count) break;
+					}
+					if (added > 0) break;
+					if (batchItems.length === 0) break;
 				}
 
 				await Promise.resolve(
@@ -880,14 +984,18 @@ export class EnglishLearningService {
 					}),
 				);
 
+				const stallLimit = this.resolveStallBreakWithGap(
+					count,
+					accumulated.length,
+				);
 				if (added === 0) {
 					stall++;
 					if (batchItems.length > 0) {
 						batchCap = Math.max(4, batchCap - 2);
 					}
-					if (stall >= stallBreak) {
+					if (stall >= stallLimit) {
 						this.logger.warn(
-							`[EnglishLearning] classic quotes stalled at ${accumulated.length}/${count} (stallBreak=${stallBreak})`,
+							`[EnglishLearning] classic quotes stalled at ${accumulated.length}/${count} (stallLimit=${stallLimit})`,
 						);
 						break;
 					}
@@ -917,8 +1025,9 @@ export class EnglishLearningService {
 
 	async generateClassicQuotesPack(
 		dto: GenerateClassicQuotesDto,
+		opts?: { userId?: number },
 	): Promise<{ items: ClassicQuoteItemDto[] }> {
-		const items = await this.runClassicQuotesGeneration(dto);
+		const items = await this.runClassicQuotesGeneration(dto, undefined, opts);
 		return { items };
 	}
 }
