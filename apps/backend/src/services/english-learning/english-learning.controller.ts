@@ -17,7 +17,12 @@ import {
 import type { Request } from 'express';
 import { Observable } from 'rxjs';
 import { JwtGuard } from 'src/guards/jwt.guard';
-import { GenerateVocabularyDto } from './dto/generate-vocabulary.dto';
+import {
+	ENGLISH_CLASSIC_QUOTES_GENERATION_MAX,
+	ENGLISH_VOCAB_GENERATION_MAX,
+	GenerateClassicQuotesDto,
+	GenerateVocabularyDto,
+} from './dto/generate-vocabulary.dto';
 import { EnglishLearningService } from './english-learning.service';
 
 type AuthedRequest = Request & { user?: { userId: number } };
@@ -31,6 +36,17 @@ function vocabularyHttpMessage(e: HttpException): string {
 		if (Array.isArray(m)) return m.map(String).join('；');
 	}
 	return e.message || '生成单词资料失败，请稍后重试';
+}
+
+function classicQuoteHttpMessage(e: HttpException): string {
+	const res = e.getResponse();
+	if (typeof res === 'string' && res.trim()) return res;
+	if (res && typeof res === 'object' && 'message' in res) {
+		const m = (res as { message?: unknown }).message;
+		if (typeof m === 'string' && m.trim()) return m;
+		if (Array.isArray(m)) return m.map(String).join('；');
+	}
+	return e.message || '生成经典语句失败，请稍后重试';
 }
 
 /**
@@ -112,7 +128,10 @@ export class EnglishLearningController {
 		if (userId == null) {
 			throw new UnauthorizedException('未授权');
 		}
-		const target = Math.min(3000, Math.max(3, dto.count ?? 10));
+		const target = Math.min(
+			ENGLISH_VOCAB_GENERATION_MAX,
+			Math.max(1, dto.count ?? 10),
+		);
 		const streamId = randomUUID();
 		const level = dto.level ?? null;
 		return new Observable((subscriber) => {
@@ -180,6 +199,150 @@ export class EnglishLearningController {
 					subscriber.next({
 						data: {
 							type: 'vocab.error',
+							success: false,
+							message,
+						},
+					});
+				} finally {
+					subscriber.complete();
+				}
+			})();
+		});
+	}
+
+	/**
+	 * 分页列出当前用户历史拉取的经典语句会话。
+	 */
+	@Get('classic-quotes-history')
+	async listClassicQuotesHistory(
+		@Req() req: AuthedRequest,
+		@Query('limit') limitStr?: string,
+		@Query('offset') offsetStr?: string,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const limit = Math.min(
+			100,
+			Math.max(1, Number.parseInt(limitStr ?? '20', 10) || 20),
+		);
+		const offset = Math.max(0, Number.parseInt(offsetStr ?? '0', 10) || 0);
+		const list = await this.englishLearningService.listClassicQuotesHistory(
+			userId,
+			{ limit, offset },
+		);
+		return { success: true, data: list };
+	}
+
+	@Get('classic-quotes-history/:streamId')
+	async getClassicQuotesHistoryDetail(
+		@Req() req: AuthedRequest,
+		@Param('streamId') streamId: string,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const detail =
+			await this.englishLearningService.getClassicQuotesHistoryDetail(
+				userId,
+				streamId,
+			);
+		return { success: true, data: detail };
+	}
+
+	@Post('classic-quotes')
+	async classicQuotesPack(@Body() dto: GenerateClassicQuotesDto) {
+		const payload =
+			await this.englishLearningService.generateClassicQuotesPack(dto);
+		return { success: true, data: payload };
+	}
+
+	/**
+	 * 经典语句 SSE：`classic.progress` → `classic.chunk` → `classic.complete` | `classic.error`
+	 */
+	@Post('classic-quotes/stream')
+	@Sse()
+	classicQuotesStream(
+		@Req() req: AuthedRequest,
+		@Body() dto: GenerateClassicQuotesDto,
+	): Observable<{ data: Record<string, unknown> }> {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const target = Math.min(
+			ENGLISH_CLASSIC_QUOTES_GENERATION_MAX,
+			Math.max(1, dto.count ?? 10),
+		);
+		const streamId = randomUUID();
+		const level = dto.level ?? null;
+		return new Observable((subscriber) => {
+			subscriber.next({
+				data: {
+					type: 'classic.progress',
+					streamId,
+					collected: 0,
+					target,
+					round: 0,
+				},
+			});
+			void (async () => {
+				try {
+					const items =
+						await this.englishLearningService.runClassicQuotesGeneration(
+							dto,
+							async (p) => {
+								subscriber.next({
+									data: {
+										type: 'classic.progress',
+										streamId,
+										collected: p.collected,
+										target: p.target,
+										round: p.round,
+									},
+								});
+								if (p.newItems?.length) {
+									await this.englishLearningService.saveClassicQuotesPackBatch({
+										userId,
+										streamId,
+										round: p.round,
+										topic: dto.topic,
+										level,
+										targetCount: target,
+										items: p.newItems,
+									});
+									subscriber.next({
+										data: {
+											type: 'classic.chunk',
+											streamId,
+											round: p.round,
+											collected: p.collected,
+											target: p.target,
+											items: p.newItems,
+										},
+									});
+								}
+							},
+						);
+					subscriber.next({
+						data: {
+							type: 'classic.complete',
+							success: true,
+							streamId,
+							items,
+							requested: target,
+						},
+					});
+				} catch (e: unknown) {
+					const message =
+						e instanceof HttpException
+							? classicQuoteHttpMessage(e)
+							: '生成经典语句失败，请稍后重试';
+					subscriber.next({
+						data: {
+							type: 'classic.error',
 							success: false,
 							message,
 						},

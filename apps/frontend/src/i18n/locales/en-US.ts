@@ -722,16 +722,11 @@ export const enUS = {
 	// 路由文案
 	'route.chat.title': 'Smart Chat',
 	'route.englishLearning.title': 'English learning',
-
+	'route.englishLearning.subtitle': 'Learning configuration',
 	'englishLearning.toolbarSubtitle':
 		'Level: {level} · Tools & vocabulary on the left, chat on the right',
-	'englishLearning.toolbarSubtitleShort':
-		'Level: {level} · Practice in the chat on the right',
+	'englishLearning.toolbarSubtitleShort': 'Level: {level}',
 	'englishLearning.quickIntents': 'Quick intents',
-	'englishLearning.disclaimerShort':
-		'AI output is for practice only—verify for important use.',
-	'englishLearning.conversationTitle': 'Practice chat',
-
 	'englishLearning.intro':
 		'Use the left panel for level, intents, and vocabulary packs; type in the chat on the right. Your knowledge base can be retrieved first when relevant.',
 	'englishLearning.disclaimer':
@@ -740,7 +735,7 @@ export const enUS = {
 	'englishLearning.loading': 'Loading…',
 	'englishLearning.placeholder':
 		'Type English or Chinese: a word, a paragraph to translate, or a topic to read…',
-	'englishLearning.levelLabel': 'Level',
+	'englishLearning.levelLabel': 'Learning level',
 	'englishLearning.level.basic': 'Basic',
 	'englishLearning.level.intermediate': 'Intermediate',
 	'englishLearning.level.advanced': 'Advanced',
@@ -765,16 +760,15 @@ export const enUS = {
 	'englishLearning.vocab.title': 'Vocabulary pack',
 	'englishLearning.vocab.desc':
 		'Generate a themed word list (IPA, Chinese gloss, example). Use the speaker to hear each English word (cloud TTS when configured).',
-	'englishLearning.vocab.descShort':
-		'Themed list with IPA, gloss, and examples; tap to hear each word.',
+	'englishLearning.vocab.descShort': 'Generate a word list by theme and level',
 	'englishLearning.vocab.topicFieldLabel': 'Topic / goal',
 	'englishLearning.vocab.topicPlaceholder':
 		'e.g. travel phrases, business verbs, IELTS collocations, easily confused pairs…',
 	'englishLearning.vocab.topicRequired': 'Enter a topic or learning goal first',
 	'englishLearning.vocab.count': 'Count',
 	'englishLearning.vocab.countHint':
-		'Enter any whole number from 3 to 3000, or use a preset',
-	'englishLearning.vocab.countInvalid': 'Enter a whole number from 3 to 3000',
+		'Enter any whole number from 1 to 12000, or use a preset',
+	'englishLearning.vocab.countInvalid': 'Enter a whole number from 1 to 12000',
 	'englishLearning.vocab.progress':
 		'{collected} / {target} words · batch {round}',
 	'englishLearning.vocab.partialResult':
@@ -782,20 +776,52 @@ export const enUS = {
 	'englishLearning.vocab.aborted': 'Fetch cancelled',
 	'englishLearning.vocab.streamDisconnected':
 		'Stream ended unexpectedly—check your network and try again',
-	'englishLearning.vocab.cancel': 'Cancel',
+	'englishLearning.vocab.stop': 'Stop fetching',
 	'englishLearning.vocab.generate': 'Fetch word list',
 	'englishLearning.vocab.empty': 'No items returned; try another topic',
 	'englishLearning.vocab.useLevel': 'Uses current level: {level}',
 	'englishLearning.vocab.playWord': 'Play word',
 	'englishLearning.vocab.listHeading': 'Words',
 	'englishLearning.vocab.historyTitle': 'Past word lists',
+	'englishLearning.vocab.historyOpenDrawer': 'History',
 	'englishLearning.vocab.historyEmpty':
 		'No saved lists yet. They appear here after a successful fetch.',
 	'englishLearning.vocab.historyWords': '{count} words',
 	'englishLearning.vocab.historyLoad': 'Load',
 	'englishLearning.vocab.historyLoaded': 'Loaded this word list',
 	'englishLearning.vocab.historyLoading': 'Loading history…',
-	'englishLearning.vocab.historyRefresh': 'Refresh',
+
+	'englishLearning.classic.title': 'Classic quotes',
+	'englishLearning.classic.descShort':
+		'Fetch famous quotes, phrases, etc. by theme and level',
+	'englishLearning.classic.topicFieldLabel': 'Topic / angle',
+	'englishLearning.classic.topicPlaceholder':
+		'e.g. courage quotes, Pride & Prejudice lines, speech highlights, Shakespeare…',
+	'englishLearning.classic.topicRequired': 'Enter a topic or angle first',
+	'englishLearning.classic.count': 'Count',
+	'englishLearning.classic.countHint':
+		'Enter any whole number from 1 to 6000, or use a preset',
+	'englishLearning.classic.countInvalid': 'Enter a whole number from 1 to 6000',
+	'englishLearning.classic.progress':
+		'{collected} / {target} lines · batch {round}',
+	'englishLearning.classic.partialResult':
+		'Requested {want}; received {got} (stopped early due to duplicates or limits)',
+	'englishLearning.classic.aborted': 'Fetch cancelled',
+	'englishLearning.classic.streamDisconnected':
+		'Stream ended unexpectedly—check your network and try again',
+	'englishLearning.classic.stop': 'Stop fetching',
+	'englishLearning.classic.generate': 'Fetch quotes',
+	'englishLearning.classic.empty': 'No lines returned; try another topic',
+	'englishLearning.classic.useLevel': 'Uses current level: {level}',
+	'englishLearning.classic.playQuote': 'Play line',
+	'englishLearning.classic.listHeading': 'Lines',
+	'englishLearning.classic.sourceLabel': 'Source: ',
+	'englishLearning.classic.historyTitle': 'Past quote lists',
+	'englishLearning.classic.historyOpenDrawer': 'History',
+	'englishLearning.classic.historyEmpty': 'No records yet',
+	'englishLearning.classic.historyQuotes': '{count} lines',
+	'englishLearning.classic.historyLoaded': 'Loaded this list',
+	'englishLearning.classic.historyLoading': 'Loading history…',
 
 	'englishLearning.tts.play': 'Read aloud',
 	'englishLearning.tts.stop': 'Stop',

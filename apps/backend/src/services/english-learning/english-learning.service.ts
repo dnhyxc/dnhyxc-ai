@@ -11,11 +11,44 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ModelEnum } from 'src/enum/config.enum';
 import { In, Repository } from 'typeorm';
-import { GenerateVocabularyDto } from './dto/generate-vocabulary.dto';
+import {
+	ENGLISH_CLASSIC_QUOTES_GENERATION_MAX,
+	ENGLISH_VOCAB_GENERATION_MAX,
+	GenerateClassicQuotesDto,
+	GenerateVocabularyDto,
+} from './dto/generate-vocabulary.dto';
+import {
+	type EnglishClassicQuoteItemJson,
+	EnglishClassicQuotePackBatch,
+} from './english-classic-quote.entity';
 import {
 	EnglishVocabularyPackBatch,
 	type EnglishVocabularyPackItemJson,
 } from './english-vocabulary.entity';
+
+export type ClassicQuoteItemDto = {
+	english: string;
+	translationZh: string;
+	source: string;
+	noteZh: string;
+};
+
+export type ClassicQuoteGenerationProgress = {
+	collected: number;
+	target: number;
+	round: number;
+	newItems?: ClassicQuoteItemDto[];
+};
+
+export type ClassicQuoteHistoryListItem = {
+	streamId: string;
+	topic: string;
+	level: string | null;
+	targetCount: number;
+	quoteCount: number;
+	createdAt: string;
+	updatedAt: string;
+};
 
 export type VocabularyItemDto = {
 	word: string;
@@ -66,6 +99,8 @@ export class EnglishLearningService {
 		private readonly configService: ConfigService,
 		@InjectRepository(EnglishVocabularyPackBatch)
 		private readonly vocabBatchRepo: Repository<EnglishVocabularyPackBatch>,
+		@InjectRepository(EnglishClassicQuotePackBatch)
+		private readonly classicBatchRepo: Repository<EnglishClassicQuotePackBatch>,
 	) {}
 
 	private buildVocabLlm(): ChatOpenAI {
@@ -210,6 +245,43 @@ export class EnglishLearningService {
 		return out;
 	}
 
+	private extractClassicQuoteItemsLoose(data: unknown): ClassicQuoteItemDto[] {
+		if (!data || typeof data !== 'object' || !('items' in data)) {
+			return [];
+		}
+		const items = (data as { items?: unknown }).items;
+		if (!Array.isArray(items) || items.length === 0) {
+			return [];
+		}
+		const out: ClassicQuoteItemDto[] = [];
+		for (const row of items) {
+			if (!row || typeof row !== 'object') continue;
+			const r = row as Record<string, unknown>;
+			const english = typeof r.english === 'string' ? r.english.trim() : '';
+			const translationZh =
+				typeof r.translationZh === 'string'
+					? r.translationZh.trim()
+					: typeof r.translation_zh === 'string'
+						? r.translation_zh.trim()
+						: '';
+			const source = typeof r.source === 'string' ? r.source.trim() : '';
+			const noteZh =
+				typeof r.noteZh === 'string'
+					? r.noteZh.trim()
+					: typeof r.note_zh === 'string'
+						? r.note_zh.trim()
+						: '';
+			if (!english || !translationZh) continue;
+			out.push({
+				english,
+				translationZh,
+				source: source || '—',
+				noteZh: noteZh || '—',
+			});
+		}
+		return out;
+	}
+
 	/**
 	 * 将本轮流式生成的新词条写入数据库（每轮 LLM 一批一行）。
 	 */
@@ -233,6 +305,28 @@ export class EnglishLearningService {
 			items: params.items as EnglishVocabularyPackItemJson[],
 		});
 		await this.vocabBatchRepo.save(row);
+	}
+
+	async saveClassicQuotesPackBatch(params: {
+		userId: number;
+		streamId: string;
+		round: number;
+		topic: string;
+		level: string | null;
+		targetCount: number;
+		items: ClassicQuoteItemDto[];
+	}): Promise<void> {
+		if (!params.items.length) return;
+		const row = this.classicBatchRepo.create({
+			userId: params.userId,
+			streamId: params.streamId,
+			round: params.round,
+			topic: params.topic.trim().slice(0, 500),
+			level: params.level,
+			targetCount: params.targetCount,
+			items: params.items as EnglishClassicQuoteItemJson[],
+		});
+		await this.classicBatchRepo.save(row);
 	}
 
 	/**
@@ -339,6 +433,104 @@ export class EnglishLearningService {
 		};
 	}
 
+	async listClassicQuotesHistory(
+		userId: number,
+		options?: { limit?: number; offset?: number },
+	): Promise<ClassicQuoteHistoryListItem[]> {
+		const limit = Math.min(100, Math.max(1, options?.limit ?? 20));
+		const offset = Math.max(0, options?.offset ?? 0);
+
+		const grouped = await this.classicBatchRepo
+			.createQueryBuilder('b')
+			.select('b.streamId', 'streamId')
+			.addSelect('MIN(b.createdAt)', 'createdAt')
+			.addSelect('MAX(b.createdAt)', 'updatedAt')
+			.where('b.userId = :userId', { userId })
+			.groupBy('b.streamId')
+			.orderBy('MAX(b.createdAt)', 'DESC')
+			.offset(offset)
+			.limit(limit)
+			.getRawMany<{
+				streamId: string;
+				createdAt: Date;
+				updatedAt: Date;
+			}>();
+
+		if (!grouped.length) return [];
+
+		const streamIds = grouped.map((g) => g.streamId);
+		const batches = await this.classicBatchRepo.find({
+			where: { userId, streamId: In(streamIds) },
+			order: { streamId: 'ASC', round: 'ASC' },
+		});
+
+		const byStream = new Map<string, typeof batches>();
+		for (const row of batches) {
+			const arr = byStream.get(row.streamId) ?? [];
+			arr.push(row);
+			byStream.set(row.streamId, arr);
+		}
+
+		return grouped.map((g) => {
+			const rows = byStream.get(g.streamId) ?? [];
+			const first = rows[0];
+			let quoteCount = 0;
+			for (const r of rows) {
+				quoteCount += Array.isArray(r.items) ? r.items.length : 0;
+			}
+			return {
+				streamId: g.streamId,
+				topic: first?.topic ?? '',
+				level: first?.level ?? null,
+				targetCount: first?.targetCount ?? 0,
+				quoteCount,
+				createdAt: new Date(g.createdAt).toISOString(),
+				updatedAt: new Date(g.updatedAt).toISOString(),
+			};
+		});
+	}
+
+	async getClassicQuotesHistoryDetail(
+		userId: number,
+		streamId: string,
+	): Promise<{
+		streamId: string;
+		topic: string;
+		level: string | null;
+		targetCount: number;
+		items: ClassicQuoteItemDto[];
+		createdAt: string;
+	}> {
+		const batches = await this.classicBatchRepo.find({
+			where: { userId, streamId },
+			order: { round: 'ASC' },
+		});
+		if (!batches.length) {
+			throw new NotFoundException('未找到该经典语句记录');
+		}
+		const items: ClassicQuoteItemDto[] = [];
+		for (const b of batches) {
+			if (!Array.isArray(b.items)) continue;
+			for (const it of b.items) {
+				items.push({
+					english: it.english,
+					translationZh: it.translationZh || '—',
+					source: it.source || '—',
+					noteZh: it.noteZh || '—',
+				});
+			}
+		}
+		const first = batches[0];
+		return {
+			streamId,
+			topic: first.topic,
+			level: first.level,
+			targetCount: first.targetCount,
+			items,
+			createdAt: first.createdAt.toISOString(),
+		};
+	}
+
 	private async invokeVocabularyLlm(
 		llm: ChatOpenAI,
 		system: string,
@@ -373,12 +565,16 @@ export class EnglishLearningService {
 		dto: GenerateVocabularyDto,
 		onProgress?: (p: VocabularyGenerationProgress) => void | Promise<void>,
 	): Promise<VocabularyItemDto[]> {
-		const count = Math.min(3000, Math.max(3, dto.count ?? 10));
+		const count = Math.min(
+			ENGLISH_VOCAB_GENERATION_MAX,
+			Math.max(1, dto.count ?? 10),
+		);
 		const level = dto.level ?? 'intermediate';
 		const levelText = LEVEL_HINT[level];
 		/** 每轮向模型请求的 items 条数（较小则单次响应更快，前端可更频繁展示） */
 		const ITEMS_PER_ROUND = 20;
-		const maxRounds = Math.min(400, Math.ceil(count / ITEMS_PER_ROUND) + 120);
+		/** 轮次上限随目标条数放宽；旧版固定 max 400 轮不足以凑满 12000 条 */
+		const maxRounds = Math.min(1200, Math.ceil(count / ITEMS_PER_ROUND) + 200);
 
 		const llm = this.buildVocabLlm();
 
@@ -497,6 +693,141 @@ export class EnglishLearningService {
 		dto: GenerateVocabularyDto,
 	): Promise<{ items: VocabularyItemDto[] }> {
 		const items = await this.runVocabularyGeneration(dto);
+		return { items };
+	}
+
+	/**
+	 * 经典语句：名言、台词、地道隽语等；分批生成 JSON，结构与单词包类似。
+	 */
+	async runClassicQuotesGeneration(
+		dto: GenerateClassicQuotesDto,
+		onProgress?: (p: ClassicQuoteGenerationProgress) => void | Promise<void>,
+	): Promise<ClassicQuoteItemDto[]> {
+		const count = Math.min(
+			ENGLISH_CLASSIC_QUOTES_GENERATION_MAX,
+			Math.max(1, dto.count ?? 10),
+		);
+		const level = dto.level ?? 'intermediate';
+		const levelText = LEVEL_HINT[level];
+		const ITEMS_PER_ROUND = 10;
+		const maxRounds = Math.min(1200, Math.ceil(count / ITEMS_PER_ROUND) + 200);
+
+		const llm = this.buildVocabLlm();
+
+		const system = `你是英语教学助手。用户会给出「主题/学习需求」与难度。
+用户可能分多轮请求；每一轮都会给出该轮必须生成的确切条数，请严格遵守该轮条数（items 数组长度必须等于该数字）。
+你必须生成英文经典语句（名言、名著节选、影视台词、演讲金句、谚语等地道表达），用于英语学习与赏析。
+每一条必须包含：
+- english：英文原句（不要用序号前缀；保持原汁原味标点）
+- translationZh：准确、自然的中文翻译
+- source：出处（作者、作品、年份或语境；不确定可填 "—"）
+- noteZh：一句中文赏析、修辞或学习要点（可简短）
+
+只输出一个 JSON 对象，不要 markdown，不要代码围栏，不要解释文字。
+格式严格为：{"items":[{"english":"","translationZh":"","source":"","noteZh":""}]}`;
+
+		const topic = dto.topic.trim();
+
+		try {
+			const accumulated: ClassicQuoteItemDto[] = [];
+			const seen = new Set<string>();
+			let stall = 0;
+			let rounds = 0;
+
+			while (accumulated.length < count && rounds < maxRounds) {
+				rounds++;
+				const need = count - accumulated.length;
+				const batch = Math.min(ITEMS_PER_ROUND, need);
+				const excludeSnippet =
+					accumulated.length === 0
+						? ''
+						: [...seen]
+								.slice(-80)
+								.map((s) => s.replace(/`/g, "'").slice(0, 120))
+								.join(' | ');
+
+				const user =
+					accumulated.length === 0
+						? `主题/需求：${topic}
+难度说明：${levelText}
+请恰好生成 ${batch} 条 items（数组长度必须等于 ${batch}）。`
+						: `主题/需求：${topic}（与前几轮相同，请继续围绕该主题扩展）
+难度说明：${levelText}
+请再生成恰好 ${batch} 条新的 items（数组长度必须等于 ${batch}）。
+以下英文句子（节选）已出现过，请勿重复相同或实质雷同的句子：${excludeSnippet}`;
+
+				const text = await this.invokeVocabularyLlm(llm, system, user);
+				const parsed = this.extractJsonObject(text);
+				let batchItems = this.extractClassicQuoteItemsLoose(parsed);
+				if (batchItems.length > batch) {
+					batchItems = batchItems.slice(0, batch);
+				}
+
+				if (batchItems.length === 0 && accumulated.length === 0) {
+					throw new HttpException(
+						'经典语句为空或无法解析为有效条目',
+						HttpStatus.BAD_GATEWAY,
+					);
+				}
+
+				const newItemsThisRound: ClassicQuoteItemDto[] = [];
+				let added = 0;
+				for (const item of batchItems) {
+					const key = item.english.toLowerCase().trim().slice(0, 400);
+					if (!key || seen.has(key)) continue;
+					seen.add(key);
+					accumulated.push(item);
+					newItemsThisRound.push(item);
+					added++;
+					if (accumulated.length >= count) break;
+				}
+
+				await Promise.resolve(
+					onProgress?.({
+						collected: accumulated.length,
+						target: count,
+						round: rounds,
+						...(newItemsThisRound.length > 0
+							? { newItems: newItemsThisRound }
+							: {}),
+					}),
+				);
+
+				if (added === 0) {
+					stall++;
+					if (stall >= 6) {
+						this.logger.warn(
+							`[EnglishLearning] classic quotes stalled at ${accumulated.length}/${count}`,
+						);
+						break;
+					}
+				} else {
+					stall = 0;
+				}
+			}
+
+			if (accumulated.length === 0) {
+				throw new HttpException(
+					'未得到有效经典语句（需含 english 与 translationZh）',
+					HttpStatus.BAD_GATEWAY,
+				);
+			}
+
+			return accumulated.slice(0, count);
+		} catch (e: unknown) {
+			if (e instanceof HttpException) throw e;
+			this.logger.warn('[EnglishLearning] classic quotes generation failed', e);
+			throw new HttpException(
+				'生成经典语句失败，请稍后重试',
+				HttpStatus.BAD_GATEWAY,
+			);
+		}
+	}
+
+	async generateClassicQuotesPack(
+		dto: GenerateClassicQuotesDto,
+	): Promise<{ items: ClassicQuoteItemDto[] }> {
+		const items = await this.runClassicQuotesGeneration(dto);
 		return { items };
 	}
 }

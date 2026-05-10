@@ -121,3 +121,13 @@ export const ENGLISH_LEARNING_VOCABULARY_PACK_STREAM =
 /** 当前用户历史拉取的单词包会话列表（分页） */
 export const ENGLISH_LEARNING_VOCABULARY_HISTORY =
 	'/english-learning/vocabulary-history';
+
+/** 英语学习：按主题生成经典语句（译文 + 出处 + 赏析） */
+export const ENGLISH_LEARNING_CLASSIC_QUOTES =
+	'/english-learning/classic-quotes';
+/** 同上，SSE 进度 + items */
+export const ENGLISH_LEARNING_CLASSIC_QUOTES_STREAM =
+	'/english-learning/classic-quotes/stream';
+/** 经典语句历史会话列表（分页） */
+export const ENGLISH_LEARNING_CLASSIC_QUOTES_HISTORY =
+	'/english-learning/classic-quotes-history';

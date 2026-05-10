@@ -20,6 +20,7 @@ import {
 	DELETE_SESSION,
 	DOWNLOAD_FILE,
 	DOWNLOAD_ZIP_FILE,
+	ENGLISH_LEARNING_CLASSIC_QUOTES_HISTORY,
 	ENGLISH_LEARNING_VOCABULARY_HISTORY,
 	ENGLISH_LEARNING_VOCABULARY_PACK,
 	GET_SESSION,
@@ -479,6 +480,55 @@ export const getEnglishVocabularyHistoryDetail = async (streamId: string) => {
 		items: EnglishVocabularyItem[];
 		createdAt: string;
 	}>(ENGLISH_LEARNING_VOCABULARY_HISTORY, {
+		params: [streamId],
+	});
+};
+
+/** ---------- 英语学习：经典语句包 ---------- */
+
+export type EnglishClassicQuoteItem = {
+	english: string;
+	translationZh: string;
+	source: string;
+	noteZh: string;
+};
+
+export type EnglishClassicQuoteHistoryEntry = {
+	streamId: string;
+	topic: string;
+	level: string | null;
+	targetCount: number;
+	quoteCount: number;
+	createdAt: string;
+	updatedAt: string;
+};
+
+export const listEnglishClassicQuotesHistory = async (options?: {
+	limit?: number;
+	offset?: number;
+}) => {
+	return await http.get<EnglishClassicQuoteHistoryEntry[]>(
+		ENGLISH_LEARNING_CLASSIC_QUOTES_HISTORY,
+		{
+			querys: {
+				limit: options?.limit ?? 20,
+				offset: options?.offset ?? 0,
+			},
+		},
+	);
+};
+
+export const getEnglishClassicQuotesHistoryDetail = async (
+	streamId: string,
+) => {
+	return await http.get<{
+		streamId: string;
+		topic: string;
+		level: string | null;
+		targetCount: number;
+		items: EnglishClassicQuoteItem[];
+		createdAt: string;
+	}>(ENGLISH_LEARNING_CLASSIC_QUOTES_HISTORY, {
 		params: [streamId],
 	});
 };

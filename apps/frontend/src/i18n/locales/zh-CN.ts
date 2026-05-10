@@ -641,16 +641,12 @@ export const zhCN = {
 
 	'route.chat.title': '智能对话',
 	'route.englishLearning.title': '英语学习',
+	'route.englishLearning.subtitle': '学习配置',
 
 	'englishLearning.toolbarSubtitle':
 		'当前难度：{level} · 左侧选主题与单词，右侧对话练习',
-	'englishLearning.toolbarSubtitleShort':
-		'当前难度：{level} · 右侧输入框对话练习',
+	'englishLearning.toolbarSubtitleShort': '当前难度：{level}',
 	'englishLearning.quickIntents': '快捷意图',
-	'englishLearning.disclaimerShort':
-		'翻译与生成内容仅供参考；重要场合请人工核对。',
-	'englishLearning.conversationTitle': '对话练习',
-
 	'englishLearning.intro':
 		'左侧选择难度与快捷主题，在右侧输入框用自然语提问；支持单词、翻译、短文、名著导读等。已入库的知识库可由 Agent 优先引用。',
 	'englishLearning.disclaimer':
@@ -659,7 +655,7 @@ export const zhCN = {
 	'englishLearning.loading': '加载中…',
 	'englishLearning.placeholder':
 		'输入英语或中文，例如要查的词、要翻译的段落、想读的主题…',
-	'englishLearning.levelLabel': '难度',
+	'englishLearning.levelLabel': '学习难度',
 	'englishLearning.level.basic': '基础',
 	'englishLearning.level.intermediate': '进阶',
 	'englishLearning.level.advanced': '提高',
@@ -684,15 +680,14 @@ export const zhCN = {
 	'englishLearning.vocab.title': '单词学习资料',
 	'englishLearning.vocab.desc':
 		'按你的主题与上方「难度」生成一批单词：含国际音标（IPA）、中文释义与例句。点击小喇叭可朗读该英文单词（云端 TTS 优先）。',
-	'englishLearning.vocab.descShort':
-		'按主题与左侧难度生成 IPA、释义与例句，可逐词朗读。',
+	'englishLearning.vocab.descShort': '按主题与难度生成单词表',
 	'englishLearning.vocab.topicFieldLabel': '学习主题',
 	'englishLearning.vocab.topicPlaceholder':
 		'例如：商务会议常用动词、旅游问路、易混形近词、本月四级高频词…',
 	'englishLearning.vocab.topicRequired': '请先填写学习主题或需求',
 	'englishLearning.vocab.count': '词数',
-	'englishLearning.vocab.countHint': '可输入任意 3～3000 的整数，或点快捷数量',
-	'englishLearning.vocab.countInvalid': '请输入 3～3000 之间的整数',
+	'englishLearning.vocab.countHint': '可输入任意 1～12000 的整数，或点快捷数量',
+	'englishLearning.vocab.countInvalid': '请输入 1～12000 之间的整数',
 	'englishLearning.vocab.progress':
 		'已生成 {collected} / {target} 条 · 第 {round} 批模型请求',
 	'englishLearning.vocab.partialResult':
@@ -700,20 +695,51 @@ export const zhCN = {
 	'englishLearning.vocab.aborted': '已取消拉取',
 	'englishLearning.vocab.streamDisconnected':
 		'流式连接异常结束，请检查网络后重试',
-	'englishLearning.vocab.cancel': '取消',
+	'englishLearning.vocab.stop': '停止拉取',
 	'englishLearning.vocab.generate': '拉取单词表',
 	'englishLearning.vocab.empty': '未返回词条，请换主题重试',
 	'englishLearning.vocab.useLevel': '将使用当前难度：{level}',
 	'englishLearning.vocab.playWord': '朗读该词',
-	'englishLearning.vocab.listHeading': '词条列表',
+	'englishLearning.vocab.listHeading': '单词列表',
 	'englishLearning.vocab.historyTitle': '历史拉取记录',
+	'englishLearning.vocab.historyOpenDrawer': '历史记录',
 	'englishLearning.vocab.historyEmpty':
 		'暂无记录；拉取单词成功后会自动保存在此处',
 	'englishLearning.vocab.historyWords': '{count} 词',
 	'englishLearning.vocab.historyLoad': '载入',
 	'englishLearning.vocab.historyLoaded': '已载入该次单词列表',
 	'englishLearning.vocab.historyLoading': '加载历史…',
-	'englishLearning.vocab.historyRefresh': '刷新',
+
+	'englishLearning.classic.title': '经典语句',
+	'englishLearning.classic.descShort': '按主题与难度拉取名句、短语等',
+	'englishLearning.classic.topicFieldLabel': '主题 / 方向',
+	'englishLearning.classic.topicPlaceholder':
+		'例如：关于勇气的名言、《傲慢与偏见》节选、励志演讲金句、莎士比亚十四行…',
+	'englishLearning.classic.topicRequired': '请先填写主题或想要的方向',
+	'englishLearning.classic.count': '条数',
+	'englishLearning.classic.countHint':
+		'可输入任意 1～6000 的整数，或点快捷数量',
+	'englishLearning.classic.countInvalid': '请输入 1～6000 之间的整数',
+	'englishLearning.classic.progress':
+		'已生成 {collected} / {target} 条 · 第 {round} 批',
+	'englishLearning.classic.partialResult':
+		'目标 {want} 条，本次返回 {got} 条（可能因重复或上限提前结束）',
+	'englishLearning.classic.aborted': '已取消拉取',
+	'englishLearning.classic.streamDisconnected':
+		'流式连接异常结束，请检查网络后重试',
+	'englishLearning.classic.stop': '停止拉取',
+	'englishLearning.classic.generate': '拉取经典语句',
+	'englishLearning.classic.empty': '未返回条目，请换主题重试',
+	'englishLearning.classic.useLevel': '将使用当前难度：{level}',
+	'englishLearning.classic.playQuote': '朗读该句',
+	'englishLearning.classic.listHeading': '语句列表',
+	'englishLearning.classic.sourceLabel': '出处：',
+	'englishLearning.classic.historyTitle': '经典语句历史',
+	'englishLearning.classic.historyOpenDrawer': '历史记录',
+	'englishLearning.classic.historyEmpty': '暂无记录',
+	'englishLearning.classic.historyQuotes': '{count} 条',
+	'englishLearning.classic.historyLoaded': '已载入该次语句列表',
+	'englishLearning.classic.historyLoading': '加载历史…',
 
 	'englishLearning.tts.play': '朗读',
 	'englishLearning.tts.stop': '停止',
