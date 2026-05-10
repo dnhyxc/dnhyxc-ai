@@ -103,7 +103,10 @@ export class EnglishLearningService {
 		private readonly classicBatchRepo: Repository<EnglishClassicQuotePackBatch>,
 	) {}
 
-	private buildVocabLlm(): ChatOpenAI {
+	/**
+	 * DeepSeek JSON 模式；maxTokens 按单轮条数由调用方传入，降低长 JSON 被截断导致缺条。
+	 */
+	private buildVocabLlm(maxTokens: number): ChatOpenAI {
 		const apiKey = this.configService.get<string>(ModelEnum.DEEPSEEK_API_KEY);
 		const baseURL =
 			this.configService.get<string>(ModelEnum.DEEPSEEK_BASE_URL) ||
@@ -117,19 +120,40 @@ export class EnglishLearningService {
 				HttpStatus.SERVICE_UNAVAILABLE,
 			);
 		}
+		const capped = Math.min(32768, Math.max(4096, Math.floor(maxTokens)));
 		return new ChatOpenAI({
 			apiKey,
 			modelName,
 			streaming: false,
 			temperature: 0.35,
-			// 大批量词条 JSON 较长；DeepSeek 文档建议为 JSON 模式预留足够 max_tokens
-			maxTokens: 8192,
+			maxTokens: capped,
 			configuration: { baseURL },
-			// DeepSeek OpenAI 兼容接口：约束输出为合法 JSON，减少前后缀与 markdown
 			modelKwargs: {
 				response_format: { type: 'json_object' },
 			},
 		});
+	}
+
+	/** 单词：每轮 batch 越大，预留输出 token 越多（IPA+例句 JSON 偏长） */
+	private resolveVocabOutputMaxTokens(batch: number): number {
+		return Math.min(32768, Math.max(8192, 900 + batch * 420));
+	}
+
+	/** 经典句：单条更长，同样 batch 下需要比单词更高的 maxTokens */
+	private resolveClassicOutputMaxTokens(batch: number): number {
+		return Math.min(32768, Math.max(12288, 1200 + batch * 1500));
+	}
+
+	/**
+	 * 连续「净增 0 条」轮数熔断阈值：目标越大越宽容，避免 500 条仅 6 轮重复就放弃。
+	 */
+	private resolveStallBreakLimit(count: number): number {
+		return Math.max(10, Math.min(48, 6 + Math.ceil(count / 22)));
+	}
+
+	private resolveMaxRounds(count: number, itemsPerRound: number): number {
+		const base = Math.ceil(count / Math.max(1, itemsPerRound)) + 280;
+		return Math.min(1400, base);
 	}
 
 	/**
@@ -558,7 +582,7 @@ export class EnglishLearningService {
 
 	/**
 	 * 根据主题与档位生成单词列表（每条含 IPA、中文释义、英文例句）。
-	 * 数量较大时分批请求模型并去重合并；每轮固定请求 20 条，便于前端更快收到 vocab.chunk。
+	 * 数量较大时分批 JSON 请求并去重合并；默认每轮最多 20 条，重复过多时会自适应减小单轮条数。
 	 * @param onProgress 每轮合并后触发（含首轮前 round=0 可由调用方自行先发起点）
 	 */
 	async runVocabularyGeneration(
@@ -571,12 +595,10 @@ export class EnglishLearningService {
 		);
 		const level = dto.level ?? 'intermediate';
 		const levelText = LEVEL_HINT[level];
-		/** 每轮向模型请求的 items 条数（较小则单次响应更快，前端可更频繁展示） */
+		/** 每轮向模型请求的 items 条数上限（重复过多时会自适应下调） */
 		const ITEMS_PER_ROUND = 20;
-		/** 轮次上限随目标条数放宽；旧版固定 max 400 轮不足以凑满 12000 条 */
-		const maxRounds = Math.min(1200, Math.ceil(count / ITEMS_PER_ROUND) + 200);
-
-		const llm = this.buildVocabLlm();
+		const maxRounds = this.resolveMaxRounds(count, ITEMS_PER_ROUND);
+		const stallBreak = this.resolveStallBreakLimit(count);
 
 		const system = `你是英语教学助手。用户会给出「主题/学习需求」与难度。
 用户可能分多轮请求；每一轮都会给出该轮必须生成的确切条数，请严格遵守该轮条数（items 数组长度必须等于该数字）。
@@ -586,6 +608,11 @@ export class EnglishLearningService {
 - ipa：该条目的英式或美式 IPA 音标，使用 Unicode 音标符号（如 ˈæpl），放在字符串中
 - translationZh：简明中文释义（可与主题相关）
 - example：一句地道英文例句，展示该词用法
+
+【去重硬性规定】
+1）同一轮输出的 items 数组内：任意两条的 word 在去首尾空格、英文小写归一化后必须互不相同；禁止仅大小写、标点或多余空格不同的「假不同」。
+2）若用户消息中列出「已出现过的英文词条」：本轮输出的每一条 word 均不得与该列表中任一项相同（同样按小写归一化比较）；亦不得与前几轮已生成内容相同。
+3）禁止用同一 word 重复填多条 items 凑数。
 
 只输出一个 JSON 对象，不要 markdown，不要代码围栏，不要解释文字。
 格式严格为：{"items":[{"word":"","ipa":"","translationZh":"","example":""}]}`;
@@ -597,33 +624,59 @@ export class EnglishLearningService {
 			const seen = new Set<string>();
 			let stall = 0;
 			let rounds = 0;
+			/** 重复过多时下调每轮请求条数，减轻模型「全重复」与 JSON 压力 */
+			let batchCap = ITEMS_PER_ROUND;
 
 			while (accumulated.length < count && rounds < maxRounds) {
 				rounds++;
 				const need = count - accumulated.length;
-				const batch = Math.min(ITEMS_PER_ROUND, need);
+				const batch = Math.min(batchCap, need);
 				const excludeSnippet =
 					accumulated.length === 0
 						? ''
 						: [...seen]
-								.slice(-120)
+								.slice(-220)
 								.map((w) => w.replace(/`/g, "'"))
 								.join(', ');
+
+				const diversityHint =
+					stall >= 2 && accumulated.length > 0
+						? `\n【多样性】请换子角度：同主题下的不同词性、常见搭配、近义辨析词、学科细分小类、短语动词变体等，严禁与已列词条同形或仅大小写差异。`
+						: '';
 
 				const user =
 					accumulated.length === 0
 						? `主题/需求：${topic}
 难度说明：${levelText}
-请恰好生成 ${batch} 条 items（数组长度必须等于 ${batch}）。`
+请恰好生成 ${batch} 条 items（数组长度必须等于 ${batch}）。
+要求：本批 items 内每条 word 必须各不相同（小写比较无重复）；禁止输出已在常见教材附录中机械重复的同一词不同写法凑条数。`
 						: `主题/需求：${topic}（与前几轮相同，请继续围绕该主题扩展）
 难度说明：${levelText}
 请再生成恰好 ${batch} 条新的 items（数组长度必须等于 ${batch}）。
-以下英文词条已出现过，请勿重复（不区分大小写）：${excludeSnippet}
-请输出与上述完全不同的词或短语。`;
+以下英文词条已出现过，禁止再次输出（不区分大小写；归一化后须与下列全部不同）：${excludeSnippet}
+本批 items 内部也不得出现彼此重复的 word。请输出与上述列表完全不同的词或短语。${diversityHint}`;
 
-				const text = await this.invokeVocabularyLlm(llm, system, user);
-				const parsed = this.extractJsonObject(text);
-				let batchItems = this.extractVocabularyItemsLoose(parsed);
+				let batchItems: VocabularyItemDto[] = [];
+				const parseRetries = 3;
+				for (let att = 0; att < parseRetries; att++) {
+					const maxTok = this.resolveVocabOutputMaxTokens(batch) + att * 2048;
+					const llm = this.buildVocabLlm(maxTok);
+					try {
+						const text = await this.invokeVocabularyLlm(llm, system, user);
+						const parsed = this.extractJsonObject(text);
+						batchItems = this.extractVocabularyItemsLoose(parsed);
+						break;
+					} catch (e: unknown) {
+						if (accumulated.length === 0 && att === parseRetries - 1) {
+							throw e;
+						}
+						this.logger.warn(
+							`[EnglishLearning] vocabulary JSON 解析重试 ${att + 1}/${parseRetries}`,
+							e,
+						);
+					}
+				}
+
 				if (batchItems.length > batch) {
 					batchItems = batchItems.slice(0, batch);
 				}
@@ -660,14 +713,18 @@ export class EnglishLearningService {
 
 				if (added === 0) {
 					stall++;
-					if (stall >= 6) {
+					if (batchItems.length > 0) {
+						batchCap = Math.max(5, batchCap - 3);
+					}
+					if (stall >= stallBreak) {
 						this.logger.warn(
-							`[EnglishLearning] vocabulary pack stalled at ${accumulated.length}/${count}`,
+							`[EnglishLearning] vocabulary pack stalled at ${accumulated.length}/${count} (stallBreak=${stallBreak})`,
 						);
 						break;
 					}
 				} else {
 					stall = 0;
+					batchCap = Math.min(ITEMS_PER_ROUND, batchCap + 1);
 				}
 			}
 
@@ -710,9 +767,8 @@ export class EnglishLearningService {
 		const level = dto.level ?? 'intermediate';
 		const levelText = LEVEL_HINT[level];
 		const ITEMS_PER_ROUND = 10;
-		const maxRounds = Math.min(1200, Math.ceil(count / ITEMS_PER_ROUND) + 200);
-
-		const llm = this.buildVocabLlm();
+		const maxRounds = this.resolveMaxRounds(count, ITEMS_PER_ROUND);
+		const stallBreak = this.resolveStallBreakLimit(count);
 
 		const system = `你是英语教学助手。用户会给出「主题/学习需求」与难度。
 用户可能分多轮请求；每一轮都会给出该轮必须生成的确切条数，请严格遵守该轮条数（items 数组长度必须等于该数字）。
@@ -722,6 +778,11 @@ export class EnglishLearningService {
 - translationZh：准确、自然的中文翻译
 - source：出处（作者、作品、年份或语境；不确定可填 "—"）
 - noteZh：一句中文赏析、修辞或学习要点（可简短）
+
+【去重硬性规定】
+1）同一轮 items 内：任意两条的 english 在去首尾空格、小写归一化后不得相同；不得仅通过增删冠词、逗号或个别虚词制造「假不同」。
+2）若用户消息列出已出现过的英文句子（节选）：本轮每条 english 均不得与该列表任一条相同或实质雷同（同句换少量词仍视为雷同）。
+3）禁止用同一句 english 重复填多条 items 凑数。
 
 只输出一个 JSON 对象，不要 markdown，不要代码围栏，不要解释文字。
 格式严格为：{"items":[{"english":"","translationZh":"","source":"","noteZh":""}]}`;
@@ -733,32 +794,58 @@ export class EnglishLearningService {
 			const seen = new Set<string>();
 			let stall = 0;
 			let rounds = 0;
+			let batchCap = ITEMS_PER_ROUND;
 
 			while (accumulated.length < count && rounds < maxRounds) {
 				rounds++;
 				const need = count - accumulated.length;
-				const batch = Math.min(ITEMS_PER_ROUND, need);
+				const batch = Math.min(batchCap, need);
 				const excludeSnippet =
 					accumulated.length === 0
 						? ''
 						: [...seen]
-								.slice(-80)
+								.slice(-120)
 								.map((s) => s.replace(/`/g, "'").slice(0, 120))
 								.join(' | ');
+
+				const diversityHint =
+					stall >= 2 && accumulated.length > 0
+						? `\n【多样性】请换不同作品/时代/体裁/演讲场合；避免仅改写标点或个别词的同一句式变体。`
+						: '';
 
 				const user =
 					accumulated.length === 0
 						? `主题/需求：${topic}
 难度说明：${levelText}
-请恰好生成 ${batch} 条 items（数组长度必须等于 ${batch}）。`
+请恰好生成 ${batch} 条 items（数组长度必须等于 ${batch}）。
+要求：本批每条 english 必须各不相同；禁止同一句改标点或微调几个词当作多条。`
 						: `主题/需求：${topic}（与前几轮相同，请继续围绕该主题扩展）
 难度说明：${levelText}
 请再生成恰好 ${batch} 条新的 items（数组长度必须等于 ${batch}）。
-以下英文句子（节选）已出现过，请勿重复相同或实质雷同的句子：${excludeSnippet}`;
+以下英文句子（节选）已出现过，禁止再次输出相同或实质雷同的句子（含轻微改写）：${excludeSnippet}
+本批 items 内部的 english 也不得彼此重复或雷同。${diversityHint}`;
 
-				const text = await this.invokeVocabularyLlm(llm, system, user);
-				const parsed = this.extractJsonObject(text);
-				let batchItems = this.extractClassicQuoteItemsLoose(parsed);
+				let batchItems: ClassicQuoteItemDto[] = [];
+				const parseRetries = 3;
+				for (let att = 0; att < parseRetries; att++) {
+					const maxTok = this.resolveClassicOutputMaxTokens(batch) + att * 3072;
+					const llm = this.buildVocabLlm(maxTok);
+					try {
+						const text = await this.invokeVocabularyLlm(llm, system, user);
+						const parsed = this.extractJsonObject(text);
+						batchItems = this.extractClassicQuoteItemsLoose(parsed);
+						break;
+					} catch (e: unknown) {
+						if (accumulated.length === 0 && att === parseRetries - 1) {
+							throw e;
+						}
+						this.logger.warn(
+							`[EnglishLearning] classic quotes JSON 解析重试 ${att + 1}/${parseRetries}`,
+							e,
+						);
+					}
+				}
+
 				if (batchItems.length > batch) {
 					batchItems = batchItems.slice(0, batch);
 				}
@@ -795,14 +882,18 @@ export class EnglishLearningService {
 
 				if (added === 0) {
 					stall++;
-					if (stall >= 6) {
+					if (batchItems.length > 0) {
+						batchCap = Math.max(4, batchCap - 2);
+					}
+					if (stall >= stallBreak) {
 						this.logger.warn(
-							`[EnglishLearning] classic quotes stalled at ${accumulated.length}/${count}`,
+							`[EnglishLearning] classic quotes stalled at ${accumulated.length}/${count} (stallBreak=${stallBreak})`,
 						);
 						break;
 					}
 				} else {
 					stall = 0;
+					batchCap = Math.min(ITEMS_PER_ROUND, batchCap + 1);
 				}
 			}
 
