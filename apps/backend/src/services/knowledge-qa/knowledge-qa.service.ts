@@ -136,7 +136,7 @@ export class KnowledgeQaService {
 	/**
 	 * 向量召回 + rerank（askStream 与 Agent RAG 工具共用，避免重复实现）
 	 */
-	private async retrieveEvidencesWithRerank(params: {
+	async retrieveEvidencesWithRerank(params: {
 		question: string;
 		authorId: number;
 		/** 与 askStream 一致：未传时使用 KNOWLEDGE_QA_TOPK，缺省为 10 */

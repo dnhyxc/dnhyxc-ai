@@ -6,6 +6,8 @@ import {
 	Injectable,
 	Logger,
 	NotFoundException,
+	Inject,
+	Optional,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -26,6 +28,7 @@ import {
 	EnglishVocabularyPackBatch,
 	type EnglishVocabularyPackItemJson,
 } from './english-vocabulary.entity';
+import { EnglishLearningAgentOrchestrator } from './english-learning-agent-orchestrator';
 
 export type ClassicQuoteItemDto = {
 	english: string;
@@ -111,6 +114,9 @@ export class EnglishLearningService {
 		private readonly vocabBatchRepo: Repository<EnglishVocabularyPackBatch>,
 		@InjectRepository(EnglishClassicQuotePackBatch)
 		private readonly classicBatchRepo: Repository<EnglishClassicQuotePackBatch>,
+		@Inject(EnglishLearningAgentOrchestrator)
+		@Optional()
+		private readonly agentOrchestrator?: EnglishLearningAgentOrchestrator,
 	) {}
 
 	/**
@@ -1029,5 +1035,98 @@ export class EnglishLearningService {
 	): Promise<{ items: ClassicQuoteItemDto[] }> {
 		const items = await this.runClassicQuotesGeneration(dto, undefined, opts);
 		return { items };
+	}
+
+	/**
+	 * 使用 LangChain Agent 编排模式生成单词包
+	 * 通过 Agent 自动协调搜索、上下文收集和词汇生成
+	 */
+	async runVocabularyGenerationWithAgent(
+		dto: GenerateVocabularyDto,
+		onProgress?: (p: VocabularyGenerationProgress) => void | Promise<void>,
+		context?: {
+			userId?: number;
+			onAgentTool?: (e: EnglishLearningPackAgentToolEvent) => void | Promise<void>;
+		},
+	): Promise<VocabularyItemDto[]> {
+		if (!this.agentOrchestrator || !context?.userId) {
+			this.logger.warn('[EnglishLearning] Agent orchestrator 不可用，回退到传统模式');
+			return this.runVocabularyGeneration(dto, onProgress, context);
+		}
+
+		try {
+			const items = await this.agentOrchestrator.runVocabularyAgent({
+				topic: dto.topic,
+				level: dto.level ?? 'intermediate',
+				targetCount: Math.min(
+					ENGLISH_VOCAB_GENERATION_MAX,
+					Math.max(1, dto.count ?? 10),
+				),
+				userId: context.userId,
+				onProgress: (p) => {
+					if (onProgress && p.newItems) {
+						void Promise.resolve(
+							onProgress({
+								collected: p.collected,
+								target: p.target,
+								round: p.round,
+								newItems: p.newItems as VocabularyItemDto[],
+							}),
+						);
+					}
+				},
+				onToolEvent: context.onAgentTool,
+			});
+			return items;
+		} catch (e: unknown) {
+			this.logger.warn('[EnglishLearning] Agent 模式生成失败，回退到传统模式', e);
+			return this.runVocabularyGeneration(dto, onProgress, context);
+		}
+	}
+
+	/**
+	 * 使用 LangChain Agent 编排模式生成经典语句包
+	 */
+	async runClassicQuotesGenerationWithAgent(
+		dto: GenerateClassicQuotesDto,
+		onProgress?: (p: ClassicQuoteGenerationProgress) => void | Promise<void>,
+		context?: {
+			userId?: number;
+			onAgentTool?: (e: EnglishLearningPackAgentToolEvent) => void | Promise<void>;
+		},
+	): Promise<ClassicQuoteItemDto[]> {
+		if (!this.agentOrchestrator || !context?.userId) {
+			this.logger.warn('[EnglishLearning] Agent orchestrator 不可用，回退到传统模式');
+			return this.runClassicQuotesGeneration(dto, onProgress, context);
+		}
+
+		try {
+			const items = await this.agentOrchestrator.runClassicQuotesAgent({
+				topic: dto.topic,
+				level: dto.level ?? 'intermediate',
+				targetCount: Math.min(
+					ENGLISH_CLASSIC_QUOTES_GENERATION_MAX,
+					Math.max(1, dto.count ?? 10),
+				),
+				userId: context.userId,
+				onProgress: (p) => {
+					if (onProgress && p.newItems) {
+						void Promise.resolve(
+							onProgress({
+								collected: p.collected,
+								target: p.target,
+								round: p.round,
+								newItems: p.newItems as ClassicQuoteItemDto[],
+							}),
+						);
+					}
+				},
+				onToolEvent: context.onAgentTool,
+			});
+			return items;
+		} catch (e: unknown) {
+			this.logger.warn('[EnglishLearning] Agent 模式生成失败，回退到传统模式', e);
+			return this.runClassicQuotesGeneration(dto, onProgress, context);
+		}
 	}
 }
