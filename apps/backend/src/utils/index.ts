@@ -4,6 +4,7 @@ import * as dotenv from 'dotenv';
 export * from './bcrypt';
 export * from './common';
 export * from './db.helper';
+export * from './english-pack';
 
 export const getEnv = (env: string): Record<string, unknown> => {
 	if (fs.existsSync(env)) {
