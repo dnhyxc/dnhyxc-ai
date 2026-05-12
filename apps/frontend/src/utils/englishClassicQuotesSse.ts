@@ -85,7 +85,6 @@ export async function streamEnglishClassicQuotes(options: {
 	body: {
 		topic: string;
 		count: number;
-		level?: 'basic' | 'intermediate' | 'advanced';
 	};
 	callbacks: EnglishClassicStreamCallbacks;
 }): Promise<(fromUser?: boolean) => void> {

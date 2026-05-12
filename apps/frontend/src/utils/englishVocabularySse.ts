@@ -94,7 +94,6 @@ export async function streamEnglishVocabularyPack(options: {
 	body: {
 		topic: string;
 		count: number;
-		level?: 'basic' | 'intermediate' | 'advanced';
 	};
 	callbacks: EnglishVocabStreamCallbacks;
 }): Promise<(fromUser?: boolean) => void> {

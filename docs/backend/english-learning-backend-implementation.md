@@ -4,12 +4,14 @@
 
 **专题（子模型多轮 prompt、线程、`english-pack` 工具函数、`.type` 等）**：见同目录 [`english-learning-submodel-prompt-thread.md`](./english-learning-submodel-prompt-thread.md)。
 
+**专题（移除用户可选「学习难度」档位、统一语境与 API 面）**：见同目录 [`english-learning-no-level.md`](./english-learning-no-level.md)。
+
 ---
 
 ## 1. 背景与目标
 
-- **单词包**：按主题与难度生成结构化词条（`word` / `ipa` / `translationZh` / `example`），支持大批量、多轮请求与去重合并。
-- **经典句包**：按主题与难度生成名言/台词类条目（`english` / `translationZh` / `source` / `noteZh`），逻辑与单词包共享批大小、stall、多轮线程等模式。
+- **单词包**：按主题生成结构化词条（`word` / `ipa` / `translationZh` / `example`），支持大批量、多轮请求与去重合并。
+- **经典句包**：按主题生成名言/台词类条目（`english` / `translationZh` / `source` / `noteZh`），逻辑与单词包共享批大小、stall、多轮线程等模式。
 - **已登录增强**：开场跑一次**主 Agent**（硅基流动 + LangChain `createAgent` + 联网 / 知识库 / 日期工具），产出中文检索要点；**子模型**仅用 **JSON 模式**（`response_format: json_object`）批量产出结构化 JSON，不绑定工具。
 - **可观测性**：SSE 可推送主 Agent 工具阶段事件；子模型每次请求的 **`[system]` + `[user]`** 可追加写入本地日志文件便于排障。
 
@@ -17,16 +19,16 @@
 
 ## 2. 改动范围（文件清单）
 
-| 角色 | 路径 |
-|------|------|
-| 服务实现 | `apps/backend/src/services/english-learning/english-learning.service.ts` |
+| 角色                                                | 路径                                                                         |
+| --------------------------------------------------- | ---------------------------------------------------------------------------- |
+| 服务实现                                            | `apps/backend/src/services/english-learning/english-learning.service.ts`     |
 | 英语学习工具函数（流式文本 / 中止 / JSON 引号修复） | `apps/backend/src/utils/english-pack.ts`（经 `src/utils/index.ts` 聚合导出） |
-| HTTP / SSE | `apps/backend/src/services/english-learning/english-learning.controller.ts` |
-| Nest 模块 | `apps/backend/src/services/english-learning/english-learning.module.ts` |
-| 入参 DTO | `apps/backend/src/services/english-learning/dto/generate-vocabulary.dto.ts` |
-| 单词包批次实体 | `apps/backend/src/services/english-learning/english-vocabulary.entity.ts` |
-| 经典句批次实体 | `apps/backend/src/services/english-learning/english-classic-quote.entity.ts` |
-| 工具与主 Agent 数据路径（延伸阅读） | `docs/backend/english-learning-master-agent-web-search-to-llm.md` |
+| HTTP / SSE                                          | `apps/backend/src/services/english-learning/english-learning.controller.ts`  |
+| Nest 模块                                           | `apps/backend/src/services/english-learning/english-learning.module.ts`      |
+| 入参 DTO                                            | `apps/backend/src/services/english-learning/dto/generate-vocabulary.dto.ts`  |
+| 单词包批次实体                                      | `apps/backend/src/services/english-learning/english-vocabulary.entity.ts`    |
+| 经典句批次实体                                      | `apps/backend/src/services/english-learning/english-classic-quote.entity.ts` |
+| 工具与主 Agent 数据路径（延伸阅读）                 | `docs/backend/english-learning-master-agent-web-search-to-llm.md`            |
 
 ---
 
@@ -117,8 +119,8 @@ export class GenerateVocabularyDto {
 	count?: number;
 
 	@IsOptional()
-	@IsIn(['basic', 'intermediate', 'advanced'])
-	level?: 'basic' | 'intermediate' | 'advanced';
+	@IsIn(["basic", "intermediate", "advanced"])
+	level?: "basic" | "intermediate" | "advanced";
 }
 
 // 说明：经典句 DTO 字段与单词包一致，仅 count 上限不同
@@ -133,26 +135,26 @@ export class GenerateClassicQuotesDto {
 
 ```typescript
 // 说明：流式场景下「每一轮合并后的新词条」写一行；按 userId + streamId + round 建联合索引便于列表与详情查询
-@Entity('english_vocabulary')
-@Index('idx_ev_pack_batch_user_stream_round', ['userId', 'streamId', 'round'])
+@Entity("english_vocabulary")
+@Index("idx_ev_pack_batch_user_stream_round", ["userId", "streamId", "round"])
 export class EnglishVocabularyPackBatch {
-	@PrimaryGeneratedColumn('uuid')
+	@PrimaryGeneratedColumn("uuid")
 	id!: string;
-	@Column({ name: 'user_id', type: 'int' })
+	@Column({ name: "user_id", type: "int" })
 	userId!: number;
-	@Column({ name: 'stream_id', type: 'varchar', length: 36 })
+	@Column({ name: "stream_id", type: "varchar", length: 36 })
 	streamId!: string;
-	@Column({ type: 'int' })
+	@Column({ type: "int" })
 	round!: number;
-	@Column({ type: 'varchar', length: 500 })
+	@Column({ type: "varchar", length: 500 })
 	topic!: string;
-	@Column({ name: 'target_count', type: 'int' })
+	@Column({ name: "target_count", type: "int" })
 	targetCount!: number;
-	@Column({ type: 'varchar', length: 32, nullable: true })
+	@Column({ type: "varchar", length: 32, nullable: true })
 	level!: string | null;
-	@Column({ type: 'json' })
+	@Column({ type: "json" })
 	items!: EnglishVocabularyPackItemJson[]; // 说明：仅本轮新增片段，详情接口按 round 顺序拼接
-	@CreateDateColumn({ name: 'created_at', type: 'timestamp' })
+	@CreateDateColumn({ name: "created_at", type: "timestamp" })
 	createdAt!: Date;
 }
 ```
@@ -167,20 +169,20 @@ export class EnglishVocabularyPackBatch {
 
 ```typescript
 // 说明：全局 JwtGuard，从 req.user.userId 取当前用户；未登录直接 401
-@Controller('english-learning')
+@Controller("english-learning")
 @UseInterceptors(ClassSerializerInterceptor)
 @UseGuards(JwtGuard)
 export class EnglishLearningController {
 	// ...
 
-	@Post('vocabulary-pack/stream')
+	@Post("vocabulary-pack/stream")
 	@Sse()
 	vocabularyPackStream(
 		@Req() req: AuthedRequest,
 		@Body() dto: GenerateVocabularyDto,
 	): Observable<{ data: Record<string, unknown> }> {
 		const userId = req.user?.userId;
-		if (userId == null) throw new UnauthorizedException('未授权');
+		if (userId == null) throw new UnauthorizedException("未授权");
 
 		const target = Math.min(
 			ENGLISH_VOCAB_GENERATION_MAX,
@@ -193,7 +195,7 @@ export class EnglishLearningController {
 			// 说明：先发 round=0 进度，便于前端立刻展示进度条
 			subscriber.next({
 				data: {
-					type: 'vocab.progress',
+					type: "vocab.progress",
 					streamId,
 					collected: 0,
 					target,
@@ -203,60 +205,61 @@ export class EnglishLearningController {
 
 			void (async () => {
 				try {
-					const items = await this.englishLearningService.runVocabularyGeneration(
-						dto,
-						async (p) => {
-							subscriber.next({
-								data: {
-									type: 'vocab.progress',
-									streamId,
-									collected: p.collected,
-									target: p.target,
-									round: p.round,
-								},
-							});
-							if (p.newItems?.length) {
-								// 说明：边生成边落库，避免进程崩溃丢失已生成部分
-								await this.englishLearningService.saveVocabularyPackBatch({
-									userId,
-									streamId,
-									round: p.round,
-									topic: dto.topic,
-									level,
-									targetCount: target,
-									items: p.newItems,
-								});
+					const items =
+						await this.englishLearningService.runVocabularyGeneration(
+							dto,
+							async (p) => {
 								subscriber.next({
 									data: {
-										type: 'vocab.chunk',
+										type: "vocab.progress",
 										streamId,
-										round: p.round,
 										collected: p.collected,
 										target: p.target,
-										items: p.newItems,
+										round: p.round,
 									},
 								});
-							}
-						},
-						{
-							userId,
-							// 说明：把主 Agent 工具起止映射为 SSE，供前端展示检索过程
-							onAgentTool: async (ev) => {
-								subscriber.next({
-									data: {
-										type: 'vocab.agent_tool',
+								if (p.newItems?.length) {
+									// 说明：边生成边落库，避免进程崩溃丢失已生成部分
+									await this.englishLearningService.saveVocabularyPackBatch({
+										userId,
 										streamId,
-										phase: ev.phase,
-										name: typeof ev.name === 'string' ? ev.name : '',
-										query: englishPackToolInputPreview(ev.input),
-									},
-								});
+										round: p.round,
+										topic: dto.topic,
+										level,
+										targetCount: target,
+										items: p.newItems,
+									});
+									subscriber.next({
+										data: {
+											type: "vocab.chunk",
+											streamId,
+											round: p.round,
+											collected: p.collected,
+											target: p.target,
+											items: p.newItems,
+										},
+									});
+								}
 							},
-						},
-					);
+							{
+								userId,
+								// 说明：把主 Agent 工具起止映射为 SSE，供前端展示检索过程
+								onAgentTool: async (ev) => {
+									subscriber.next({
+										data: {
+											type: "vocab.agent_tool",
+											streamId,
+											phase: ev.phase,
+											name: typeof ev.name === "string" ? ev.name : "",
+											query: englishPackToolInputPreview(ev.input),
+										},
+									});
+								},
+							},
+						);
 					subscriber.next({
 						data: {
-							type: 'vocab.complete',
+							type: "vocab.complete",
 							success: true,
 							streamId,
 							items,
@@ -428,7 +431,7 @@ private async invokeEnglishPackSubModelJson(/* ... */): Promise<string> {
 
 ```typescript
 // 说明：system 仅为固定 JSON 指令，不合并附录；附录由 buildSubModelUserWithOptionalResearchAppendix 按需拼入 user
-let agentResearchAppendix = '';
+let agentResearchAppendix = "";
 // ... runEnglishPackMasterResearchPhase 填充 ...
 
 while (accumulated.length < count && rounds < maxRounds) {
@@ -461,7 +464,7 @@ while (accumulated.length < count && rounds < maxRounds) {
 
 **来源**：`apps/backend/src/services/english-learning/english-learning.service.ts`（约 L534–L651，`sliceBalancedJsonObject` + `extractJsonObject` 核心循环）
 
-```typescript
+````typescript
 // 说明：从首个 { 开始做括号深度扫描，字符串内括号不计入深度，避免贪婪正则截断错误
 private sliceBalancedJsonObject(text: string, start: number): string | null {
 	// ... depth / inString / escaped 状态机
@@ -484,7 +487,7 @@ private extractJsonObject(raw: string): unknown {
 	}
 	throw new HttpException(/* ... */, HttpStatus.BAD_GATEWAY);
 }
-```
+````
 
 词条 / 经典句条目抽取见 `extractVocabularyItemsLoose`、`extractClassicQuoteItemsLoose`（宽松字段名、缺省填 `—`）。
 
@@ -541,21 +544,21 @@ async saveVocabularyPackBatch(params: {
 
 ## 14. 建议回归用例
 
-| 场景 | 建议 |
-|------|------|
-| 未配置硅基 Key | 应返回 `SERVICE_UNAVAILABLE` 或统一错误文案 |
-| 小 count 单次成功 | `vocabulary-pack` 与 `stream` 结果一致 |
-| 大 count 多轮 | `stall` 触发、`batchCap` 下调、最终条数 ≤ 请求 |
-| 已登录 SSE | 依次收到 `progress` / `chunk` / `complete`，DB 可按 `streamId` 还原 |
-| 主 Agent 失败 | 仍应能仅靠子模型生成（附录为空） |
+| 场景              | 建议                                                                |
+| ----------------- | ------------------------------------------------------------------- |
+| 未配置硅基 Key    | 应返回 `SERVICE_UNAVAILABLE` 或统一错误文案                         |
+| 小 count 单次成功 | `vocabulary-pack` 与 `stream` 结果一致                              |
+| 大 count 多轮     | `stall` 触发、`batchCap` 下调、最终条数 ≤ 请求                      |
+| 已登录 SSE        | 依次收到 `progress` / `chunk` / `complete`，DB 可按 `streamId` 还原 |
+| 主 Agent 失败     | 仍应能仅靠子模型生成（附录为空）                                    |
 
 ---
 
 ## 15. 相关源码路径速查
 
-| 说明 | 路径 |
-|------|------|
-| 核心服务 | `apps/backend/src/services/english-learning/english-learning.service.ts` |
-| 接口层 | `apps/backend/src/services/english-learning/english-learning.controller.ts` |
-| 模块 | `apps/backend/src/services/english-learning/english-learning.module.ts` |
-| 主 Agent 与 Web Search 注入链说明 | `docs/backend/english-learning-master-agent-web-search-to-llm.md` |
+| 说明                              | 路径                                                                        |
+| --------------------------------- | --------------------------------------------------------------------------- |
+| 核心服务                          | `apps/backend/src/services/english-learning/english-learning.service.ts`    |
+| 接口层                            | `apps/backend/src/services/english-learning/english-learning.controller.ts` |
+| 模块                              | `apps/backend/src/services/english-learning/english-learning.module.ts`     |
+| 主 Agent 与 Web Search 注入链说明 | `docs/backend/english-learning-master-agent-web-search-to-llm.md`           |

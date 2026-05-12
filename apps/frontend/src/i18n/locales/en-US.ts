@@ -724,21 +724,18 @@ export const enUS = {
 	'route.englishLearning.title': 'English learning',
 	'route.englishLearning.subtitle': 'Learning configuration',
 	'englishLearning.toolbarSubtitle':
-		'Level: {level} · Tools & vocabulary on the left, chat on the right',
-	'englishLearning.toolbarSubtitleShort': 'Level: {level}',
+		'Tools & vocabulary on the left, chat on the right',
+	'englishLearning.toolbarSubtitleShort':
+		'Use quick intents or chat on the right',
 	'englishLearning.quickIntents': 'Quick intents',
 	'englishLearning.intro':
-		'Use the left panel for level, intents, and vocabulary packs; type in the chat on the right. Your knowledge base can be retrieved first when relevant.',
+		'Use the left panel for intents and vocabulary packs; type in the chat on the right. Your knowledge base can be retrieved first when relevant.',
 	'englishLearning.disclaimer':
 		'Translations and explanations are for learning only—please proofread important texts. Literature guidance respects copyright; prefer summaries and discussion prompts.',
 	'englishLearning.newChat': 'New chat',
 	'englishLearning.loading': 'Loading…',
 	'englishLearning.placeholder':
 		'Type English or Chinese: a word, a paragraph to translate, or a topic to read…',
-	'englishLearning.levelLabel': 'Learning level',
-	'englishLearning.level.basic': 'Basic',
-	'englishLearning.level.intermediate': 'Intermediate',
-	'englishLearning.level.advanced': 'Advanced',
 	'englishLearning.chip.vocabulary': 'Vocabulary',
 	'englishLearning.chip.translate': 'Translation',
 	'englishLearning.chip.reading': 'Reading',
@@ -749,7 +746,7 @@ export const enUS = {
 	'englishLearning.intent.translate':
 		'[Intent] Provide bilingual translation with line/sentence alignment; note proper names where needed.',
 	'englishLearning.intent.reading':
-		'[Intent] Generate a leveled short text for intensive reading and explain hard parts.',
+		'[Intent] Generate a short text for intensive reading and explain hard parts.',
 	'englishLearning.intent.literature':
 		'[Intent] Literature guide: context, summary, and discussion—avoid long copyrighted quotations.',
 	'englishLearning.intent.grammar':
@@ -769,7 +766,7 @@ export const enUS = {
 	'englishLearning.vocab.title': 'Vocabulary pack',
 	'englishLearning.vocab.desc':
 		'Generate a themed word list (IPA, Chinese gloss, example). Use the speaker to hear each English word (cloud TTS when configured).',
-	'englishLearning.vocab.descShort': 'Generate a word list by theme and level',
+	'englishLearning.vocab.descShort': 'Generate a word list by theme',
 	'englishLearning.vocab.topicFieldLabel': 'Topic / goal',
 	'englishLearning.vocab.topicPlaceholder':
 		'e.g. travel phrases, business verbs, IELTS collocations, easily confused pairs…',
@@ -788,7 +785,6 @@ export const enUS = {
 	'englishLearning.vocab.stop': 'Stop fetching',
 	'englishLearning.vocab.generate': 'Fetch word list',
 	'englishLearning.vocab.empty': 'No items returned; try another topic',
-	'englishLearning.vocab.useLevel': 'Uses current level: {level}',
 	'englishLearning.vocab.playWord': 'Play word',
 	'englishLearning.vocab.listHeading': 'Words',
 	'englishLearning.vocab.historyTitle': 'Past word lists',
@@ -802,7 +798,7 @@ export const enUS = {
 
 	'englishLearning.classic.title': 'Classic quotes',
 	'englishLearning.classic.descShort':
-		'Fetch famous quotes, phrases, etc. by theme and level',
+		'Fetch famous quotes, phrases, etc. by theme',
 	'englishLearning.classic.topicFieldLabel': 'Topic / angle',
 	'englishLearning.classic.topicPlaceholder':
 		'e.g. courage quotes, Pride & Prejudice lines, speech highlights, Shakespeare…',
@@ -821,7 +817,6 @@ export const enUS = {
 	'englishLearning.classic.stop': 'Stop fetching',
 	'englishLearning.classic.generate': 'Fetch quotes',
 	'englishLearning.classic.empty': 'No lines returned; try another topic',
-	'englishLearning.classic.useLevel': 'Uses current level: {level}',
 	'englishLearning.classic.playQuote': 'Play line',
 	'englishLearning.classic.listHeading': 'Lines',
 	'englishLearning.classic.sourceLabel': 'Source: ',

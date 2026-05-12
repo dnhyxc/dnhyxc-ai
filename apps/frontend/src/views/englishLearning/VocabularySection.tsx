@@ -3,7 +3,6 @@
  */
 import { Button, Input, Spinner, Toast } from '@ui/index';
 import { BookText, Square, Volume2 } from 'lucide-react';
-import { observer } from 'mobx-react';
 import {
 	type UIEventHandler,
 	useCallback,
@@ -28,7 +27,6 @@ import {
 	getEnglishVocabularyHistoryDetail,
 	listEnglishVocabularyHistory,
 } from '@/service';
-import englishAgentStore from '@/store/englishAgent';
 import { displayIpaWrapped, sanitizeCountDigits } from '@/utils';
 import {
 	playEnglishPreferred,
@@ -46,7 +44,6 @@ export type VocabProgressState = {
 
 function VocabularyPackSectionInner() {
 	const { t } = useI18n();
-	const levelTier = englishAgentStore.levelTier;
 
 	const [topic, setTopic] = useState('');
 	const [countInput, setCountInput] = useState('10');
@@ -228,7 +225,7 @@ function VocabularyPackSectionInner() {
 		setItems([]);
 
 		const abort = await streamEnglishVocabularyPack({
-			body: { topic: req, count, level: levelTier },
+			body: { topic: req, count },
 			callbacks: {
 				onProgress: (p) => {
 					if (genIdRef.current !== myGen) return;
@@ -303,7 +300,7 @@ function VocabularyPackSectionInner() {
 			},
 		});
 		abortRef.current = abort;
-	}, [topic, countInput, levelTier, t, fetchHistoryFirstPage]);
+	}, [topic, countInput, t, fetchHistoryFirstPage]);
 
 	const toggleWordAudio = useCallback(
 		async (word: string, key: string) => {
@@ -342,8 +339,6 @@ function VocabularyPackSectionInner() {
 		setCountInput(String(clamped));
 	}, [countInput]);
 
-	console.log(agentToolLine, 'agentToolLineagentToolLine');
-
 	return (
 		<div className="rounded-none p-4 pb-0 @container min-w-0">
 			<div className="mb-4 flex items-start gap-3">
@@ -358,10 +353,7 @@ function VocabularyPackSectionInner() {
 						{t('englishLearning.vocab.title')}
 					</div>
 					<div className="text-textcolor/50 mt-1 text-xs leading-snug">
-						<span className="text-teal-600 dark:text-teal-400">
-							{t(`englishLearning.level.${englishAgentStore.levelTier}`)}
-						</span>
-						：{t('englishLearning.vocab.descShort')}
+						{t('englishLearning.vocab.descShort')}
 					</div>
 				</div>
 			</div>
@@ -564,4 +556,4 @@ function VocabularyPackSectionInner() {
 	);
 }
 
-export const VocabularyPackSection = observer(VocabularyPackSectionInner);
+export const VocabularyPackSection = VocabularyPackSectionInner;

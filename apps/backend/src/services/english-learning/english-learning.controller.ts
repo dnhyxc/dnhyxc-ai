@@ -72,7 +72,7 @@ export class EnglishLearningController {
 	) {}
 
 	/**
-	 * 按主题与档位拉取单词学习资料（含 IPA、中文释义、例句）；读音由前端调用 TTS 播放 word。
+	 * 按主题拉取单词学习资料（含 IPA、中文释义、例句）；读音由前端调用 TTS 播放 word。
 	 */
 	/**
 	 * 分页获取当前用户历史拉取的单词包会话列表（按最近活动时间倒序）。
@@ -151,7 +151,6 @@ export class EnglishLearningController {
 			Math.max(1, dto.count ?? 10),
 		);
 		const streamId = randomUUID();
-		const level = dto.level ?? null;
 		return new Observable((subscriber) => {
 			subscriber.next({
 				data: {
@@ -183,7 +182,6 @@ export class EnglishLearningController {
 										streamId,
 										round: p.round,
 										topic: dto.topic,
-										level,
 										targetCount: target,
 										items: p.newItems,
 									});
@@ -320,7 +318,6 @@ export class EnglishLearningController {
 			Math.max(1, dto.count ?? 10),
 		);
 		const streamId = randomUUID();
-		const level = dto.level ?? null;
 		return new Observable((subscriber) => {
 			subscriber.next({
 				data: {
@@ -352,7 +349,6 @@ export class EnglishLearningController {
 										streamId,
 										round: p.round,
 										topic: dto.topic,
-										level,
 										targetCount: target,
 										items: p.newItems,
 									});

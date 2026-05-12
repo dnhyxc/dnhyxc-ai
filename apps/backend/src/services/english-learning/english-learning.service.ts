@@ -59,7 +59,6 @@ export type ClassicQuoteGenerationProgress = {
 export type ClassicQuoteHistoryListItem = {
 	streamId: string;
 	topic: string;
-	level: string | null;
 	targetCount: number;
 	quoteCount: number;
 	createdAt: string;
@@ -94,23 +93,17 @@ export type EnglishLearningPackAgentToolEvent = {
 export type VocabularyHistoryListItem = {
 	streamId: string;
 	topic: string;
-	level: string | null;
 	targetCount: number;
 	wordCount: number;
 	createdAt: string;
 	updatedAt: string;
 };
 
-const LEVEL_HINT: Record<
-	NonNullable<GenerateVocabularyDto['level']>,
-	string
-> = {
-	basic:
-		'基础：高频词、短句搭配，释义偏简明，例句简短（初中生～日常 survival）',
-	intermediate:
-		'进阶：高中～四级难度，可适当短语动词与一词多义，例句贴近真实场景',
-	advanced: '提高：六级及以上或雅思托福常见学术/报刊用词，例句可稍长，释义精准',
-};
+/**
+ * 单词包 / 经典句主检索 Human 与子模型「学习任务」共用：不再由用户选档位时的固定学习语境（中文，供 prompt 使用）。
+ */
+const ENGLISH_PACK_LEARNER_CONTEXT_HINT =
+	'面向一般英语学习者：词汇与例句篇幅适中、用地道常见表达，贴近生活与应用场景；经典句兼顾可读性与出处可查证性。';
 
 /** 单词包与经典句共用：每轮 JSON 条数上限、已出现列表尾部条数、stall 时 batch 下调（与单词包逻辑一致） */
 const TOPIC_PACK_ITEMS_PER_ROUND = 20;
@@ -147,7 +140,7 @@ const ENGLISH_PACK_MASTER_APPENDIX_CHAR_CAP = 24_000;
  * TODO: 目前单词/语句拉取不需要进行 RAG 检索，先去除第一点中的知识库检索
  */
 const ENGLISH_PACK_RESEARCH_SYSTEM_PROMPT = `你是一个只做资料搜集与整理的助手（不向终端用户闲聊）。可使用工具：互联网搜索、知识库检索、当前日期。
-任务：根据用户给出的「英语学习主题」与难度说明，检索并汇总与主题强相关的可扩展素材（中文要点），供后续程序生成结构化 JSON 英文词条或经典英文句使用。
+任务：根据用户给出的「英语学习主题」与学习语境说明，检索并汇总与主题强相关的可扩展素材（中文要点），供后续程序生成结构化 JSON 英文词条或经典英文句使用。
 要求：
 1）必要时使用互联网搜索补充公开事实、领域专有名词、代表性作品与人物（若任务侧重经典语句，尤重可引用的出处线索）。
 2）输出用分条列表：与主题相关的领域词与搭配方向、可扩展子话题、重要专名/书名/时代（如能确定）；不要输出 JSON；不要编造检索未验证的细节（无法验证处请写「待查证」）。
@@ -394,20 +387,18 @@ export class EnglishLearningService {
 	 * 参数说明:
 	 * - userId: 当前用户的唯一标识
 	 * - topic: 用户指定的主题，例如某类单词、名言等
-	 * - levelHint: 反映所需难度或语境的信息
 	 * - kind: 区分调用场景（单词包/经典句）
 	 * - onToolEvent: 可选，外部在工具调用时的回调，用于追踪工具过程和输入输出
 	 */
 	private async runEnglishPackMasterResearchPhase(params: {
 		userId: number;
 		topic: string;
-		levelHint: string;
 		kind: 'vocabulary' | 'classic_quotes';
 		onToolEvent?: (
 			e: EnglishLearningPackAgentToolEvent,
 		) => void | Promise<void>;
 	}): Promise<string> {
-		const { userId, topic, levelHint, kind, onToolEvent } = params;
+		const { userId, topic, kind, onToolEvent } = params;
 
 		// 设置流式环节的超时保护（120秒），避免大模型/链路异常时永不返回
 		const abortController = new AbortController();
@@ -450,10 +441,10 @@ export class EnglishLearningService {
 			const kindLabel =
 				kind === 'vocabulary' ? '单词/短语主题包' : '英文名言/金句主题包';
 
-			// 组织发送给 LLM 的 Human prompt，指明具体任务、主题、难度等
+			// 组织发送给 LLM 的 Human prompt，指明具体任务、主题与学习语境等
 			const userHumanText = `任务类型：${kindLabel}
 主题/需求：${topic.trim()}
-难度/语境说明：${levelHint.trim()}
+学习语境：${ENGLISH_PACK_LEARNER_CONTEXT_HINT}
 
 请按系统提示调用工具完成检索与核对，然后输出一段简明要点（中文为主，可夹关键英文术语），供下游子模型扩展词条或句子方向使用；不要输出 JSON，不要输出 markdown 代码块。`;
 
@@ -797,7 +788,6 @@ export class EnglishLearningService {
 		streamId: string;
 		round: number;
 		topic: string;
-		level: string | null;
 		targetCount: number;
 		items: VocabularyItemDto[];
 	}): Promise<void> {
@@ -807,7 +797,7 @@ export class EnglishLearningService {
 			streamId: params.streamId,
 			round: params.round,
 			topic: params.topic.trim().slice(0, 500),
-			level: params.level,
+			level: null,
 			targetCount: params.targetCount,
 			items: params.items as EnglishVocabularyPackItemJson[],
 		});
@@ -824,7 +814,6 @@ export class EnglishLearningService {
 	 *   - streamId: string             当前词包/句包会话的唯一标识
 	 *   - round: number                当前批次在会话中的轮次编号（从 0/1 开始递增）
 	 *   - topic: string                用户选择或系统分配的主题（需做去空格和长度限制）
-	 *   - level: string | null         难度档位，可为空
 	 *   - targetCount: number          本轮目标输出的条目数（用于后续校验）
 	 *   - items: ClassicQuoteItemDto[] 本轮大模型输出的经典句子数组（已校验、去重）
 	 */
@@ -833,7 +822,6 @@ export class EnglishLearningService {
 		streamId: string;
 		round: number;
 		topic: string;
-		level: string | null;
 		targetCount: number;
 		items: ClassicQuoteItemDto[];
 	}): Promise<void> {
@@ -845,7 +833,7 @@ export class EnglishLearningService {
 			streamId: params.streamId,
 			round: params.round,
 			topic: params.topic.trim().slice(0, 500), // 主题防止过长，最大 500 字符
-			level: params.level,
+			level: null,
 			targetCount: params.targetCount,
 			items: params.items as EnglishClassicQuoteItemJson[],
 		});
@@ -902,7 +890,7 @@ export class EnglishLearningService {
 	}
 
 	/**
-	 * 根据主题与档位生成单词列表（每条含 IPA、中文释义、英文例句）。
+	 * 根据主题生成单词列表（每条含 IPA、中文释义、英文例句）。
 	 * 数量较大时分批 JSON 请求并去重合并；默认每轮最多 20 条，重复过多时会自适应减小单轮条数。
 	 * @param onProgress 每轮合并后触发（含首轮前 round=0 可由调用方自行先发起点）
 	 */
@@ -921,11 +909,9 @@ export class EnglishLearningService {
 			ENGLISH_VOCAB_GENERATION_MAX,
 			Math.max(1, dto.count ?? 10),
 		);
-		const level = dto.level ?? 'intermediate';
-		const levelText = LEVEL_HINT[level];
 		const maxRounds = this.resolveMaxRounds(count, TOPIC_PACK_ITEMS_PER_ROUND);
 
-		const vocabularySystemStatic = `你是英语教学助手。主题与难度见文末「【当前学习任务】」（整场不变）；可能分多轮请求。每一轮的条数、已出现词条节选、多样性说明均以当次 system 末尾「【本轮生成要求】」为准；请严格遵守 items 数组长度，并遵守去重规定。
+		const vocabularySystemStatic = `你是英语教学助手。主题与学习语境见文末「【当前学习任务】」（整场不变）；可能分多轮请求。每一轮的条数、已出现词条节选、多样性说明均以当次 system 末尾「【本轮生成要求】」为准；请严格遵守 items 数组长度，并遵守去重规定。
 你必须生成英文单词或实用短语（phrase）的学习条目。
 每一条必须包含：
 - word：英文单词或短语（不要用序号前缀）
@@ -949,7 +935,7 @@ export class EnglishLearningService {
 
 【当前学习任务】
 主题/需求：${topic}
-难度说明：${levelText}`;
+学习语境：${ENGLISH_PACK_LEARNER_CONTEXT_HINT}`;
 
 		/** 主 Agent 检索要点（整场一次）；非空时仅在「线程中尚未含附录」的首条 Human 前置附录。每轮子模型 system 会动态追加「本轮生成要求」。 */
 		let agentResearchAppendix = '';
@@ -958,7 +944,6 @@ export class EnglishLearningService {
 				const raw = await this.runEnglishPackMasterResearchPhase({
 					userId: context.userId,
 					topic,
-					levelHint: levelText,
 					kind: 'vocabulary',
 					onToolEvent: context?.onAgentTool,
 				});
@@ -1169,7 +1154,7 @@ export class EnglishLearningService {
 	 * 生成一批经典英文语句（如名言、台词、谚语等），并保证内容多样、去重且 JSON 结构规范。
 	 * 支持多轮生成及对话上下文，兼容 Agent 预检索辅助。
 	 *
-	 * @param dto 生成参数，包含主题(topic)、难度(level)、目标条数(count)等
+	 * @param dto 生成参数，包含主题(topic)、目标条数(count)等
 	 * @param onProgress (可选) 生成进展回调
 	 * @param context (可选) 上下文（含 userId、工具事件回调等）
 	 * @returns ClassicQuoteItemDto[] 生成的经典句条目数组
@@ -1189,11 +1174,9 @@ export class EnglishLearningService {
 			ENGLISH_CLASSIC_QUOTES_GENERATION_MAX,
 			Math.max(1, dto.count ?? 10),
 		);
-		const level = dto.level ?? 'intermediate';
-		const levelText = LEVEL_HINT[level];
 		const maxRounds = this.resolveMaxRounds(count, TOPIC_PACK_ITEMS_PER_ROUND);
 
-		const classicQuotesSystemStatic = `你是英语教学助手。主题与难度见文末「【当前学习任务】」（整场不变）；可能分多轮请求。每一轮的条数、已出现句子节选、多样性说明均以当次 system 末尾「【本轮生成要求】」为准；请严格遵守 items 数组长度，并遵守去重规定。
+		const classicQuotesSystemStatic = `你是英语教学助手。主题与学习语境见文末「【当前学习任务】」（整场不变）；可能分多轮请求。每一轮的条数、已出现句子节选、多样性说明均以当次 system 末尾「【本轮生成要求】」为准；请严格遵守 items 数组长度，并遵守去重规定。
 你必须生成英文经典语句（名言、名著节选、影视台词、演讲金句、谚语等地道表达），用于英语学习与赏析。
 每一条必须包含：
 - english：英文原句（不要用序号前缀；保持原汁原味标点）
@@ -1217,7 +1200,7 @@ export class EnglishLearningService {
 
 【当前学习任务】
 主题/需求：${topic}
-难度说明：${levelText}`;
+学习语境：${ENGLISH_PACK_LEARNER_CONTEXT_HINT}`;
 
 		/**
 		 * 主 Agent 检索要点（整场一次）；非空时仅在「线程中尚未含附录」的首条 Human 前置附录。每轮子模型 system 会动态追加「本轮生成要求」。
@@ -1228,7 +1211,6 @@ export class EnglishLearningService {
 				const raw = await this.runEnglishPackMasterResearchPhase({
 					userId: context.userId,
 					topic,
-					levelHint: levelText,
 					kind: 'classic_quotes',
 					onToolEvent: context?.onAgentTool,
 				});
@@ -1455,12 +1437,12 @@ export class EnglishLearningService {
 	/**
 	 * 生成一组经典英语句型（“经典句包”）。
 	 *
-	 * - 调用 runClassicQuotesGeneration 方法，根据传入的 dto（主题、档位、目标个数等）生成句子集合。
+	 * - 调用 runClassicQuotesGeneration 方法，根据传入的 dto（主题、目标个数等）生成句子集合。
 	 * - 可指定 opts.userId，便于在个性化上下文/多轮会话时长期追踪。
 	 * - 返回格式为 { items }，其中 items 为 ClassicQuoteItemDto[]，即经典句条目的数组。
 	 * - 典型用例包含 AI 大模型题材能力评测、素材采集、写作学习等。
 	 *
-	 * @param dto 配置生成参数，例如 topic, level, targetCount 等
+	 * @param dto 配置生成参数，例如 topic、targetCount（条数）等
 	 * @param opts 可选项，包括 userId
 	 * @returns items: ClassicQuoteItemDto[] 经典句结果数组
 	 */
@@ -1525,7 +1507,6 @@ export class EnglishLearningService {
 			return {
 				streamId: g.streamId,
 				topic: first?.topic ?? '',
-				level: first?.level ?? null,
 				targetCount: first?.targetCount ?? 0,
 				wordCount,
 				createdAt: new Date(g.createdAt).toISOString(),
@@ -1543,7 +1524,6 @@ export class EnglishLearningService {
 	): Promise<{
 		streamId: string;
 		topic: string;
-		level: string | null;
 		targetCount: number;
 		items: VocabularyItemDto[];
 		createdAt: string;
@@ -1571,7 +1551,6 @@ export class EnglishLearningService {
 		return {
 			streamId,
 			topic: first.topic,
-			level: first.level,
 			targetCount: first.targetCount,
 			items,
 			createdAt: first.createdAt.toISOString(),
@@ -1626,7 +1605,6 @@ export class EnglishLearningService {
 			return {
 				streamId: g.streamId,
 				topic: first?.topic ?? '',
-				level: first?.level ?? null,
 				targetCount: first?.targetCount ?? 0,
 				quoteCount,
 				createdAt: new Date(g.createdAt).toISOString(),
@@ -1641,7 +1619,6 @@ export class EnglishLearningService {
 	): Promise<{
 		streamId: string;
 		topic: string;
-		level: string | null;
 		targetCount: number;
 		items: ClassicQuoteItemDto[];
 		createdAt: string;
@@ -1669,7 +1646,6 @@ export class EnglishLearningService {
 		return {
 			streamId,
 			topic: first.topic,
-			level: first.level,
 			targetCount: first.targetCount,
 			items,
 			createdAt: first.createdAt.toISOString(),

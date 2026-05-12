@@ -1,15 +1,13 @@
 /**
- * 英语学习左栏：学习设置（卡片化 + 分段难度 + 规整快捷意图）
+ * 英语学习左栏：学习设置（卡片化 + 快捷意图）
  */
 import { Languages } from 'lucide-react';
 import { observer } from 'mobx-react';
-import { type ReactNode, useMemo } from 'react';
+import { type ReactNode } from 'react';
 import { Button } from '@/components/ui';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
-import englishAgentStore, { type EnglishLevelTier } from '@/store/englishAgent';
-
-const LEVEL_KEYS: EnglishLevelTier[] = ['basic', 'intermediate', 'advanced'];
+import englishAgentStore from '@/store/englishAgent';
 
 const chipDefs = [
 	{
@@ -56,11 +54,6 @@ export const EnglishLearningToolbar = observer(
 	function EnglishLearningToolbar() {
 		const { t } = useI18n();
 
-		const levelLabel = useMemo(
-			() => t(`englishLearning.level.${englishAgentStore.levelTier}`),
-			[t, englishAgentStore.levelTier],
-		);
-
 		return (
 			<SidebarPanel className="min-w-0">
 				{/* 标题区 */}
@@ -73,42 +66,8 @@ export const EnglishLearningToolbar = observer(
 							{t('route.englishLearning.subtitle')}
 						</div>
 						<div className="text-textcolor/50 mt-1 text-xs leading-snug">
-							{t('englishLearning.toolbarSubtitleShort', { level: levelLabel })}
+							{t('englishLearning.toolbarSubtitleShort')}
 						</div>
-					</div>
-				</div>
-
-				{/* 难度：分段控件 */}
-				<div className="mb-4">
-					<div className="text-textcolor/45 mb-2 text-sm font-medium tracking-wide">
-						{t('englishLearning.levelLabel')}
-					</div>
-					<div
-						className="grid grid-cols-3 gap-2.5 rounded-md"
-						role="tablist"
-						aria-label={t('englishLearning.levelLabel')}
-					>
-						{LEVEL_KEYS.map((tier) => {
-							const active = englishAgentStore.levelTier === tier;
-							return (
-								<Button
-									key={tier}
-									variant="link"
-									role="tab"
-									size="sm"
-									aria-selected={active}
-									onClick={() => englishAgentStore.setLevelTier(tier)}
-									className={cn(
-										'border border-theme/10 bg-theme/5 hover:bg-theme/10',
-										active
-											? 'text-teal-500 border-teal-500/20'
-											: 'text-textcolor/60 hover:text-textcolor/90',
-									)}
-								>
-									{t(`englishLearning.level.${tier}`)}
-								</Button>
-							);
-						})}
 					</div>
 				</div>
 

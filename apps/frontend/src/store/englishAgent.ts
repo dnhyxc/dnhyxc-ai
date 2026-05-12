@@ -12,18 +12,10 @@ import {
 import type { Message, SearchOrganicItem } from '@/types/chat';
 import { AGENT_SSE_USER_ABORT_MARKER, streamAgentSse } from '@/utils/agentSse';
 
-export type EnglishLevelTier = 'basic' | 'intermediate' | 'advanced';
-
 function readToken(): string {
 	if (typeof window === 'undefined') return '';
 	return localStorage.getItem('token') || '';
 }
-
-const LEVEL_LABEL: Record<EnglishLevelTier, string> = {
-	basic: '基础',
-	intermediate: '进阶',
-	advanced: '提高',
-};
 
 export class EnglishAgentStore {
 	sessionId: string | null = null;
@@ -31,8 +23,6 @@ export class EnglishAgentStore {
 	messages: Message[] = [];
 	isSending = false;
 	abortStream: (() => void) | null = null;
-	/** 档位：影响发给模型的前缀提示 */
-	levelTier: EnglishLevelTier = 'intermediate';
 	/** 快捷意图：下次发送时拼入正文前缀，发送后清空 */
 	pendingIntentPrefix = '';
 	/** 工具调用轻量状态（展示「检索中」等） */
@@ -50,11 +40,10 @@ export class EnglishAgentStore {
 
 	private buildOutgoingContent(userText: string): string {
 		const trimmed = userText.trim();
-		const tierLine = `[档位：${LEVEL_LABEL[this.levelTier]}]`;
 		const intentBlock = this.pendingIntentPrefix
 			? `${this.pendingIntentPrefix}\n\n`
 			: '';
-		return `${tierLine}\n${intentBlock}${trimmed}`;
+		return `${intentBlock}${trimmed}`;
 	}
 
 	/** 确保已有会话，首次发送时创建 */
@@ -159,10 +148,6 @@ export class EnglishAgentStore {
 				return { ...m, isStreaming: false, isStopped: true };
 			});
 		});
-	}
-
-	setLevelTier(tier: EnglishLevelTier): void {
-		this.levelTier = tier;
 	}
 
 	setIntentPrefix(prefix: string): void {

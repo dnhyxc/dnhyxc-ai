@@ -435,7 +435,6 @@ export type EnglishVocabularyItem = {
 export const generateEnglishVocabularyPack = async (params: {
 	topic: string;
 	count?: number;
-	level?: 'basic' | 'intermediate' | 'advanced';
 }) => {
 	return await http.post<{ items: EnglishVocabularyItem[] }>(
 		ENGLISH_LEARNING_VOCABULARY_PACK,
@@ -447,7 +446,6 @@ export const generateEnglishVocabularyPack = async (params: {
 export type EnglishVocabularyHistoryEntry = {
 	streamId: string;
 	topic: string;
-	level: string | null;
 	targetCount: number;
 	wordCount: number;
 	createdAt: string;
@@ -475,7 +473,6 @@ export const getEnglishVocabularyHistoryDetail = async (streamId: string) => {
 	return await http.get<{
 		streamId: string;
 		topic: string;
-		level: string | null;
 		targetCount: number;
 		items: EnglishVocabularyItem[];
 		createdAt: string;
@@ -496,7 +493,6 @@ export type EnglishClassicQuoteItem = {
 export type EnglishClassicQuoteHistoryEntry = {
 	streamId: string;
 	topic: string;
-	level: string | null;
 	targetCount: number;
 	quoteCount: number;
 	createdAt: string;
@@ -524,7 +520,6 @@ export const getEnglishClassicQuotesHistoryDetail = async (
 	return await http.get<{
 		streamId: string;
 		topic: string;
-		level: string | null;
 		targetCount: number;
 		items: EnglishClassicQuoteItem[];
 		createdAt: string;

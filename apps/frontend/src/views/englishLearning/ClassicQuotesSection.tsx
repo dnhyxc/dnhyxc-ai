@@ -3,7 +3,6 @@
  */
 import { Button, Input, Spinner, Toast } from '@ui/index';
 import { BookMarked, Square, Volume2 } from 'lucide-react';
-import { observer } from 'mobx-react';
 import {
 	type UIEventHandler,
 	useCallback,
@@ -28,7 +27,6 @@ import {
 	getEnglishClassicQuotesHistoryDetail,
 	listEnglishClassicQuotesHistory,
 } from '@/service';
-import englishAgentStore from '@/store/englishAgent';
 import { sanitizeCountDigits } from '@/utils';
 import { streamEnglishClassicQuotes } from '@/utils/englishClassicQuotesSse';
 import {
@@ -46,7 +44,6 @@ export type ClassicQuoteProgressState = {
 
 function ClassicQuotesSectionInner() {
 	const { t } = useI18n();
-	const levelTier = englishAgentStore.levelTier;
 
 	const [topic, setTopic] = useState('');
 	const [countInput, setCountInput] = useState('10');
@@ -227,7 +224,7 @@ function ClassicQuotesSectionInner() {
 		setItems([]);
 
 		const abort = await streamEnglishClassicQuotes({
-			body: { topic: req, count, level: levelTier },
+			body: { topic: req, count },
 			callbacks: {
 				onProgress: (p) => {
 					if (genIdRef.current !== myGen) return;
@@ -302,7 +299,7 @@ function ClassicQuotesSectionInner() {
 			},
 		});
 		abortRef.current = abort;
-	}, [topic, countInput, levelTier, t, fetchHistoryFirstPage]);
+	}, [topic, countInput, t, fetchHistoryFirstPage]);
 
 	const toggleQuoteAudio = useCallback(
 		async (text: string, key: string) => {
@@ -352,9 +349,6 @@ function ClassicQuotesSectionInner() {
 						{t('englishLearning.classic.title')}
 					</div>
 					<div className="text-textcolor/50 @min-[26rem]:text-xs @min-[26rem]:mt-1.5 mt-1 text-xs leading-relaxed">
-						<span className="text-teal-600 dark:text-teal-400">
-							{t(`englishLearning.level.${englishAgentStore.levelTier}`)}：
-						</span>
 						{t('englishLearning.classic.descShort')}
 					</div>
 				</div>
@@ -558,4 +552,4 @@ function ClassicQuotesSectionInner() {
 	);
 }
 
-export const ClassicQuotesSection = observer(ClassicQuotesSectionInner);
+export const ClassicQuotesSection = ClassicQuotesSectionInner;

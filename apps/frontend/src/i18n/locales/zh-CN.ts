@@ -643,33 +643,27 @@ export const zhCN = {
 	'route.englishLearning.title': '英语学习',
 	'route.englishLearning.subtitle': '学习配置',
 
-	'englishLearning.toolbarSubtitle':
-		'当前难度：{level} · 左侧选主题与单词，右侧对话练习',
-	'englishLearning.toolbarSubtitleShort': '当前难度：{level}',
+	'englishLearning.toolbarSubtitle': '左侧选主题与单词，右侧对话练习',
+	'englishLearning.toolbarSubtitleShort': '可选快捷意图，或直接在右侧对话',
 	'englishLearning.quickIntents': '快捷意图',
 	'englishLearning.intro':
-		'左侧选择难度与快捷主题，在右侧输入框用自然语提问；支持单词、翻译、短文、名著导读等。已入库的知识库可由 Agent 优先引用。',
+		'左侧选择快捷主题，在右侧输入框用自然语提问；支持单词、翻译、短文、名著导读等。已入库的知识库可由 Agent 优先引用。',
 	'englishLearning.disclaimer':
 		'翻译与讲解仅供学习参考，重要文件请人工校对；名著导读遵守版权，长文以摘要与讨论为主。',
 	'englishLearning.newChat': '新对话',
 	'englishLearning.loading': '加载中…',
 	'englishLearning.placeholder':
 		'输入英语或中文，例如要查的词、要翻译的段落、想读的主题…',
-	'englishLearning.levelLabel': '学习难度',
-	'englishLearning.level.basic': '基础',
-	'englishLearning.level.intermediate': '进阶',
-	'englishLearning.level.advanced': '提高',
 	'englishLearning.chip.vocabulary': '背单词',
 	'englishLearning.chip.translate': '翻译对照',
 	'englishLearning.chip.reading': '短文精读',
 	'englishLearning.chip.literature': '名著导读',
 	'englishLearning.chip.grammar': '语法讲解',
 	'englishLearning.intent.vocabulary':
-		'【意图】请侧重词汇：释义、搭配与例句；如需请先澄清我的水平。',
+		'【意图】请侧重词汇：释义、搭配与例句；如需可先了解我的大致基础。',
 	'englishLearning.intent.translate':
 		'【意图】请提供中英对照翻译，可分句；标注专有名词取舍。',
-	'englishLearning.intent.reading':
-		'【意图】请按当前档位生成一篇精读短文并注释难点。',
+	'englishLearning.intent.reading': '【意图】请生成一篇精读短文并注释难点。',
 	'englishLearning.intent.literature':
 		'【意图】请做名著/英语文献导读：摘要、背景与讨论题，避免大段复制原文。',
 	'englishLearning.intent.grammar':
@@ -687,8 +681,8 @@ export const zhCN = {
 
 	'englishLearning.vocab.title': '单词学习资料',
 	'englishLearning.vocab.desc':
-		'按你的主题与上方「难度」生成一批单词：含国际音标（IPA）、中文释义与例句。点击小喇叭可朗读该英文单词（云端 TTS 优先）。',
-	'englishLearning.vocab.descShort': '按主题与难度生成单词表',
+		'按你的主题生成一批单词：含国际音标（IPA）、中文释义与例句。点击小喇叭可朗读该英文单词（云端 TTS 优先）。',
+	'englishLearning.vocab.descShort': '按主题生成单词表',
 	'englishLearning.vocab.topicFieldLabel': '学习主题',
 	'englishLearning.vocab.topicPlaceholder':
 		'例如：商务会议常用动词、旅游问路、易混形近词、本月四级高频词…',
@@ -706,7 +700,6 @@ export const zhCN = {
 	'englishLearning.vocab.stop': '停止拉取',
 	'englishLearning.vocab.generate': '拉取单词表',
 	'englishLearning.vocab.empty': '未返回词条，请换主题重试',
-	'englishLearning.vocab.useLevel': '将使用当前难度：{level}',
 	'englishLearning.vocab.playWord': '朗读该词',
 	'englishLearning.vocab.listHeading': '单词列表',
 	'englishLearning.vocab.historyTitle': '历史拉取记录',
@@ -719,7 +712,7 @@ export const zhCN = {
 	'englishLearning.vocab.historyLoading': '加载历史…',
 
 	'englishLearning.classic.title': '经典语句',
-	'englishLearning.classic.descShort': '按主题与难度拉取名句、短语等',
+	'englishLearning.classic.descShort': '按主题拉取名句、短语等',
 	'englishLearning.classic.topicFieldLabel': '主题 / 方向',
 	'englishLearning.classic.topicPlaceholder':
 		'例如：关于勇气的名言、《傲慢与偏见》节选、励志演讲金句、莎士比亚十四行…',
@@ -738,7 +731,6 @@ export const zhCN = {
 	'englishLearning.classic.stop': '停止拉取',
 	'englishLearning.classic.generate': '拉取经典语句',
 	'englishLearning.classic.empty': '未返回条目，请换主题重试',
-	'englishLearning.classic.useLevel': '将使用当前难度：{level}',
 	'englishLearning.classic.playQuote': '朗读该句',
 	'englishLearning.classic.listHeading': '语句列表',
 	'englishLearning.classic.sourceLabel': '出处：',
