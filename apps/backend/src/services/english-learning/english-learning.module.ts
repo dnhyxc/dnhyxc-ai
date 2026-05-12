@@ -4,6 +4,7 @@ import { KnowledgeQaModule } from '../knowledge-qa/knowledge-qa.module';
 import { EnglishClassicQuotePackBatch } from './english-classic-quote.entity';
 import { EnglishLearningController } from './english-learning.controller';
 import { EnglishLearningService } from './english-learning.service';
+import { EnglishLearningStreamAbortRegistry } from './english-learning-stream-abort.registry';
 import { EnglishVocabularyPackBatch } from './english-vocabulary.entity';
 
 @Module({
@@ -15,7 +16,7 @@ import { EnglishVocabularyPackBatch } from './english-vocabulary.entity';
 		]),
 	],
 	controllers: [EnglishLearningController],
-	providers: [EnglishLearningService],
+	providers: [EnglishLearningService, EnglishLearningStreamAbortRegistry],
 	exports: [EnglishLearningService],
 })
 export class EnglishLearningModule {}

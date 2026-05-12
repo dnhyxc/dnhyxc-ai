@@ -21,6 +21,7 @@ import {
 	DOWNLOAD_FILE,
 	DOWNLOAD_ZIP_FILE,
 	ENGLISH_LEARNING_CLASSIC_QUOTES_HISTORY,
+	ENGLISH_LEARNING_STREAM_CANCEL,
 	ENGLISH_LEARNING_VOCABULARY_HISTORY,
 	ENGLISH_LEARNING_VOCABULARY_PACK,
 	GET_SESSION,
@@ -441,6 +442,24 @@ export const generateEnglishVocabularyPack = async (params: {
 		params,
 	);
 };
+
+/**
+ * 显式中止正在进行的单词包/经典句 SSE 生成（与 progress 中的 streamId 一致）。
+ * 使用 `http.post` + `silent`，失败时不弹 Toast（任务已结束等属预期情况）。
+ */
+export async function postEnglishLearningStreamCancel(
+	streamId: string,
+): Promise<void> {
+	try {
+		await http.post<{ success: boolean; cancelled: boolean }>(
+			ENGLISH_LEARNING_STREAM_CANCEL,
+			{ streamId },
+			{ silent: true },
+		);
+	} catch {
+		// 流已结束或网络失败时不阻塞本地 abort
+	}
+}
 
 /** 单次「拉取单词包」会话摘要（与后端 VocabularyHistoryListItem 一致） */
 export type EnglishVocabularyHistoryEntry = {

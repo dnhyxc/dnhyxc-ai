@@ -166,6 +166,17 @@ export class EnglishLearningService {
 		private readonly classicBatchRepo: Repository<EnglishClassicQuotePackBatch>,
 	) {}
 
+	/** 中止类异常：用户断开 SSE / 显式 cancel / LangChain 链取消 */
+	private isAbortLike(e: unknown): boolean {
+		if (e == null) return false;
+		if (typeof e === 'object') {
+			const o = e as { name?: string; code?: string };
+			if (o.name === 'AbortError') return true;
+			if (o.code === 'ABORT_ERR') return true;
+		}
+		return false;
+	}
+
 	/** 主 Agent 最终要点：trim + 仅在超过后备上限时截断并告警（正常应由模型自行压缩） */
 	private finalizeMasterResearchAppendix(raw: string): string {
 		const t = raw.trim();
@@ -394,16 +405,21 @@ export class EnglishLearningService {
 		userId: number;
 		topic: string;
 		kind: 'vocabulary' | 'classic_quotes';
+		/** 与 SSE / 显式 cancel 共用，与 120s 超时合并为任一触发即中止 */
+		clientSignal?: AbortSignal;
 		onToolEvent?: (
 			e: EnglishLearningPackAgentToolEvent,
 		) => void | Promise<void>;
 	}): Promise<string> {
-		const { userId, topic, kind, onToolEvent } = params;
+		const { userId, topic, kind, onToolEvent, clientSignal } = params;
 
-		// 设置流式环节的超时保护（120秒），避免大模型/链路异常时永不返回
-		const abortController = new AbortController();
+		const timeoutAc = new AbortController();
 		const timeoutMs = 120_000;
-		const timer = setTimeout(() => abortController.abort(), timeoutMs);
+		const timer = setTimeout(() => timeoutAc.abort(), timeoutMs);
+		const combinedSignal =
+			clientSignal != null
+				? AbortSignal.any([timeoutAc.signal, clientSignal])
+				: timeoutAc.signal;
 
 		let accumulated = ''; // 累加大模型流式返回的片段
 
@@ -412,7 +428,7 @@ export class EnglishLearningService {
 			const { main: mainLlm } = this.buildSiliconFlowPackAgentModels({
 				maxTokens: 8192,
 				temperature: 0.35,
-				signal: abortController.signal, // 传递信号可被外部提前终止
+				signal: combinedSignal,
 			});
 
 			// 动态构建支持的工具，包括 Web 检索及知识 QA 工具
@@ -453,7 +469,7 @@ export class EnglishLearningService {
 				{ messages: [new HumanMessage(userHumanText)] },
 				{
 					version: 'v2',
-					signal: abortController.signal,
+					signal: combinedSignal,
 					recursionLimit: 80, // 限制工具递归调用层数防止死循环
 				},
 			);
@@ -468,7 +484,7 @@ export class EnglishLearningService {
 						accumulated += text;
 						// 超出最大融合字符数自动熔断，防止输出过长
 						if (accumulated.length > ENGLISH_PACK_MASTER_STREAM_CHAR_FUSE) {
-							abortController.abort();
+							timeoutAc.abort();
 							break;
 						}
 					}
@@ -510,7 +526,10 @@ export class EnglishLearningService {
 	/**
 	 * 硅基流动 JSON 模式（无登录或 Agent 不可用时的回退）；maxTokens 由调用方传入。
 	 */
-	private buildSiliconFlowJsonLlm(maxTokens: number): ChatOpenAI {
+	private buildSiliconFlowJsonLlm(
+		maxTokens: number,
+		signal?: AbortSignal,
+	): ChatOpenAI {
 		const { apiKey, baseURL, modelName } =
 			this.resolveEnglishPackSiliconFlowConfig();
 		const capped = Math.min(32768, Math.max(4096, Math.floor(maxTokens)));
@@ -524,6 +543,9 @@ export class EnglishLearningService {
 			modelKwargs: {
 				response_format: { type: 'json_object' },
 			},
+			...(signal && {
+				callOptions: { signal },
+			}),
 		});
 	}
 
@@ -851,8 +873,15 @@ export class EnglishLearningService {
 		user: string;
 		maxTokens: number;
 		priorThread?: BaseMessage[];
+		/** 与 SSE / 显式 cancel 联动，中止子模型 HTTP 请求 */
+		signal?: AbortSignal;
 	}): Promise<string> {
-		const llm = this.buildSiliconFlowJsonLlm(params.maxTokens);
+		if (params.signal?.aborted) {
+			const err = new Error('Aborted');
+			err.name = 'AbortError';
+			throw err;
+		}
+		const llm = this.buildSiliconFlowJsonLlm(params.maxTokens, params.signal);
 		const msgs: BaseMessage[] = [new SystemMessage(params.system)];
 		if (params.priorThread?.length) {
 			msgs.push(
@@ -872,7 +901,12 @@ export class EnglishLearningService {
 		} else {
 			msgs.push(new HumanMessage(' '));
 		}
-		const res = await llm.invoke(msgs);
+		if (params.signal?.aborted) {
+			const err = new Error('Aborted');
+			err.name = 'AbortError';
+			throw err;
+		}
+		const res = await llm.invoke(msgs, { signal: params.signal });
 		return typeof res.content === 'string'
 			? res.content
 			: Array.isArray(res.content)
@@ -899,6 +933,8 @@ export class EnglishLearningService {
 		onProgress?: (p: VocabularyGenerationProgress) => void | Promise<void>,
 		context?: {
 			userId?: number;
+			/** 与 SSE、显式 cancel、连接断开联动 */
+			signal?: AbortSignal;
 			onAgentTool?: (
 				e: EnglishLearningPackAgentToolEvent,
 			) => void | Promise<void>;
@@ -942,6 +978,7 @@ export class EnglishLearningService {
 					userId: context.userId,
 					topic,
 					kind: 'vocabulary',
+					clientSignal: context?.signal,
 					onToolEvent: context?.onAgentTool,
 				});
 				if (raw.trim()) {
@@ -955,8 +992,9 @@ export class EnglishLearningService {
 			}
 		}
 
+		let accumulated: VocabularyItemDto[] = [];
 		try {
-			const accumulated: VocabularyItemDto[] = [];
+			accumulated = [];
 			const seen = new Set<string>();
 			/** 已登录时多轮 JSON 子模型的 LangChain 消息线程 */
 			const packAgentThread: BaseMessage[] = [];
@@ -966,6 +1004,9 @@ export class EnglishLearningService {
 			let batchCap = TOPIC_PACK_ITEMS_PER_ROUND;
 
 			while (accumulated.length < count && rounds < maxRounds) {
+				if (context?.signal?.aborted) {
+					break;
+				}
 				rounds++;
 				const need = count - accumulated.length;
 				const batch = Math.min(batchCap, need);
@@ -1012,6 +1053,11 @@ export class EnglishLearningService {
 					batchItems = [];
 					const parseRetries = 3;
 					for (let att = 0; att < parseRetries; att++) {
+						if (context?.signal?.aborted) {
+							const err = new Error('Aborted');
+							err.name = 'AbortError';
+							throw err;
+						}
 						const maxTok = this.resolveVocabOutputMaxTokens(batch) + att * 2048;
 						try {
 							const text = await this.invokeEnglishPackSubModelJson({
@@ -1020,6 +1066,7 @@ export class EnglishLearningService {
 								maxTokens: maxTok,
 								priorThread:
 									context?.userId != null ? packAgentThread : undefined,
+								signal: context?.signal,
 							});
 							const parsed = this.extractJsonObject(text);
 							batchItems = this.extractVocabularyItemsLoose(parsed);
@@ -1050,6 +1097,9 @@ export class EnglishLearningService {
 							}
 							break;
 						} catch (e: unknown) {
+							if (context?.signal?.aborted || this.isAbortLike(e)) {
+								throw e;
+							}
 							if (accumulated.length === 0 && att === parseRetries - 1) {
 								throw e;
 							}
@@ -1131,6 +1181,18 @@ export class EnglishLearningService {
 			return accumulated.slice(0, count);
 		} catch (e: unknown) {
 			if (e instanceof HttpException) throw e;
+			if (this.isAbortLike(e) || context?.signal?.aborted) {
+				if (accumulated.length === 0) {
+					throw new HttpException(
+						'生成已中止，尚未得到有效词条',
+						HttpStatus.BAD_GATEWAY,
+					);
+				}
+				this.logger.warn(
+					`[EnglishLearning] 单词包生成已中止，返回已收集 ${accumulated.length} 条`,
+				);
+				return accumulated.slice(0, count);
+			}
 			this.logger.warn('[EnglishLearning] generateVocabularyPack failed', e);
 			throw new HttpException(
 				'生成单词资料失败，请稍后重试',
@@ -1161,6 +1223,8 @@ export class EnglishLearningService {
 		onProgress?: (p: ClassicQuoteGenerationProgress) => void | Promise<void>,
 		context?: {
 			userId?: number;
+			/** 与 SSE、显式 cancel、连接断开联动 */
+			signal?: AbortSignal;
 			onAgentTool?: (
 				e: EnglishLearningPackAgentToolEvent,
 			) => void | Promise<void>;
@@ -1206,6 +1270,7 @@ export class EnglishLearningService {
 					userId: context.userId,
 					topic,
 					kind: 'classic_quotes',
+					clientSignal: context?.signal,
 					onToolEvent: context?.onAgentTool,
 				});
 				if (raw.trim()) {
@@ -1221,9 +1286,9 @@ export class EnglishLearningService {
 			}
 		}
 
+		let accumulated: ClassicQuoteItemDto[] = [];
 		try {
-			// 最终已收集的经典句数组
-			const accumulated: ClassicQuoteItemDto[] = [];
+			accumulated = [];
 			// 已收集过的句子（归一化为小写去空格的形式）
 			const seen = new Set<string>();
 			/**
@@ -1237,6 +1302,9 @@ export class EnglishLearningService {
 
 			// 主生成循环，每轮尝试若干条，并处理去重、stall判定及退出条件
 			while (accumulated.length < count && rounds < maxRounds) {
+				if (context?.signal?.aborted) {
+					break;
+				}
 				rounds++;
 				const need = count - accumulated.length; // 剩余待采集条数
 				const batch = Math.min(batchCap, need); // 本轮请求条数（不超 batchCap）
@@ -1285,6 +1353,11 @@ export class EnglishLearningService {
 					batchItems = [];
 					const parseRetries = 3;
 					for (let att = 0; att < parseRetries; att++) {
+						if (context?.signal?.aborted) {
+							const err = new Error('Aborted');
+							err.name = 'AbortError';
+							throw err;
+						}
 						const maxTok =
 							this.resolveClassicOutputMaxTokens(batch) + att * 3072;
 						try {
@@ -1294,6 +1367,7 @@ export class EnglishLearningService {
 								maxTokens: maxTok,
 								priorThread:
 									context?.userId != null ? packAgentThread : undefined,
+								signal: context?.signal,
 							});
 							const parsed = this.extractJsonObject(text);
 							batchItems = this.extractClassicQuoteItemsLoose(parsed);
@@ -1324,6 +1398,9 @@ export class EnglishLearningService {
 							}
 							break;
 						} catch (e: unknown) {
+							if (context?.signal?.aborted || this.isAbortLike(e)) {
+								throw e;
+							}
 							// 首轮最后一次解析失败，直接抛异常
 							if (accumulated.length === 0 && att === parseRetries - 1) {
 								throw e;
@@ -1420,6 +1497,18 @@ export class EnglishLearningService {
 		} catch (e: unknown) {
 			// 主逻辑异常捕获，若已是 HttpException 直接上抛，否则包裹成统一 HttpException
 			if (e instanceof HttpException) throw e;
+			if (this.isAbortLike(e) || context?.signal?.aborted) {
+				if (accumulated.length === 0) {
+					throw new HttpException(
+						'生成已中止，尚未得到有效经典语句',
+						HttpStatus.BAD_GATEWAY,
+					);
+				}
+				this.logger.warn(
+					`[EnglishLearning] 经典句生成已中止，返回已收集 ${accumulated.length} 条`,
+				);
+				return accumulated.slice(0, count);
+			}
 			this.logger.warn('[EnglishLearning] classic quotes generation failed', e);
 			throw new HttpException(
 				'生成经典语句失败，请稍后重试',

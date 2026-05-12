@@ -4,6 +4,7 @@ import {
 	ClassSerializerInterceptor,
 	Controller,
 	Get,
+	Header,
 	HttpException,
 	Param,
 	Post,
@@ -14,9 +15,10 @@ import {
 	UseGuards,
 	UseInterceptors,
 } from '@nestjs/common';
-import type { Request } from 'express';
+import type { Request, Response } from 'express';
 import { Observable } from 'rxjs';
 import { JwtGuard } from 'src/guards/jwt.guard';
+import { CancelEnglishLearningStreamDto } from './dto/cancel-english-learning-stream.dto';
 import {
 	GenerateClassicQuotesDto,
 	GenerateVocabularyDto,
@@ -24,8 +26,43 @@ import {
 	resolveVocabularyPackTargetCount,
 } from './dto/generate-vocabulary.dto';
 import { EnglishLearningService } from './english-learning.service';
+import { EnglishLearningStreamAbortRegistry } from './english-learning-stream-abort.registry';
 
 type AuthedRequest = Request & { user?: { userId: number } };
+
+/**
+ * SSE 客户端断开或显式 cancel 时中止生成：多路监听，避免仅 `req.close` 不触发。
+ */
+function wireEnglishLearningSseAbort(
+	req: Request,
+	streamAbort: AbortController,
+): () => void {
+	const onDisconnect = () => {
+		streamAbort.abort();
+	};
+	if (req.aborted) {
+		queueMicrotask(onDisconnect);
+	}
+	req.once('close', onDisconnect);
+	req.once('aborted', onDisconnect);
+	req.once('error', onDisconnect);
+	const socket = req.socket;
+	if (socket) {
+		socket.once('close', onDisconnect);
+	}
+	const res = (req as Request & { res?: Response }).res;
+	if (res) {
+		res.once('close', onDisconnect);
+	}
+	return () => {
+		req.removeListener('close', onDisconnect);
+		req.removeListener('aborted', onDisconnect);
+		req.removeListener('error', onDisconnect);
+		socket?.removeListener('close', onDisconnect);
+		res?.removeListener('close', onDisconnect);
+		streamAbort.abort();
+	};
+}
 
 function vocabularyHttpMessage(e: HttpException): string {
 	const res = e.getResponse();
@@ -69,7 +106,28 @@ function classicQuoteHttpMessage(e: HttpException): string {
 export class EnglishLearningController {
 	constructor(
 		private readonly englishLearningService: EnglishLearningService,
+		private readonly streamAbortRegistry: EnglishLearningStreamAbortRegistry,
 	) {}
+
+	/**
+	 * 显式取消正在进行的单词包 / 经典句流式生成（不依赖 TCP 断开是否及时上报）。
+	 * 与 SSE 首帧 `*.progress` 中的 `streamId` 一致；若任务已结束则 `cancelled` 为 false。
+	 */
+	@Post('stream/cancel')
+	async cancelActiveStream(
+		@Req() req: AuthedRequest,
+		@Body() dto: CancelEnglishLearningStreamDto,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const cancelled = this.streamAbortRegistry.cancelByStreamId(
+			userId,
+			dto.streamId,
+		);
+		return { success: true, cancelled };
+	}
 
 	/**
 	 * 按主题拉取单词学习资料（含 IPA、中文释义、例句）；读音由前端调用 TTS 播放 word。
@@ -138,6 +196,8 @@ export class EnglishLearningController {
 	 */
 	@Post('vocabulary-pack/stream')
 	@Sse()
+	@Header('X-Accel-Buffering', 'no')
+	@Header('Cache-Control', 'no-cache, no-transform')
 	vocabularyPackStream(
 		@Req() req: AuthedRequest,
 		@Body() dto: GenerateVocabularyDto,
@@ -149,14 +209,22 @@ export class EnglishLearningController {
 		const target = resolveVocabularyPackTargetCount(dto.count);
 		const streamId = randomUUID();
 		return new Observable((subscriber) => {
-			subscriber.next({
-				data: {
-					type: 'vocab.progress',
-					streamId,
-					collected: 0,
-					target,
-					round: 0,
-				},
+			const streamAbort = new AbortController();
+			this.streamAbortRegistry.register(userId, streamId, streamAbort);
+			const detachSseAbort = wireEnglishLearningSseAbort(req, streamAbort);
+			const emit = (data: Record<string, unknown>) => {
+				try {
+					subscriber.next({ data });
+				} catch {
+					streamAbort.abort();
+				}
+			};
+			emit({
+				type: 'vocab.progress',
+				streamId,
+				collected: 0,
+				target,
+				round: 0,
 			});
 			void (async () => {
 				try {
@@ -164,14 +232,12 @@ export class EnglishLearningController {
 						await this.englishLearningService.runVocabularyGeneration(
 							dto,
 							async (p) => {
-								subscriber.next({
-									data: {
-										type: 'vocab.progress',
-										streamId,
-										collected: p.collected,
-										target: p.target,
-										round: p.round,
-									},
+								emit({
+									type: 'vocab.progress',
+									streamId,
+									collected: p.collected,
+									target: p.target,
+									round: p.round,
 								});
 								if (p.newItems?.length) {
 									await this.englishLearningService.saveVocabularyPackBatch({
@@ -182,58 +248,57 @@ export class EnglishLearningController {
 										targetCount: target,
 										items: p.newItems,
 									});
-									subscriber.next({
-										data: {
-											type: 'vocab.chunk',
-											streamId,
-											round: p.round,
-											collected: p.collected,
-											target: p.target,
-											items: p.newItems,
-										},
+									emit({
+										type: 'vocab.chunk',
+										streamId,
+										round: p.round,
+										collected: p.collected,
+										target: p.target,
+										items: p.newItems,
 									});
 								}
 							},
 							{
 								userId,
+								signal: streamAbort.signal,
 								onAgentTool: async (ev) => {
-									subscriber.next({
-										data: {
-											type: 'vocab.agent_tool',
-											streamId,
-											phase: ev.phase,
-											name: typeof ev.name === 'string' ? ev.name : '',
-											query: englishPackToolInputPreview(ev.input),
-										},
+									emit({
+										type: 'vocab.agent_tool',
+										streamId,
+										phase: ev.phase,
+										name: typeof ev.name === 'string' ? ev.name : '',
+										query: englishPackToolInputPreview(ev.input),
 									});
 								},
 							},
 						);
-					subscriber.next({
-						data: {
-							type: 'vocab.complete',
-							success: true,
-							streamId,
-							items,
-							requested: target,
-						},
+					emit({
+						type: 'vocab.complete',
+						success: true,
+						streamId,
+						items,
+						requested: target,
 					});
 				} catch (e: unknown) {
 					const message =
 						e instanceof HttpException
 							? vocabularyHttpMessage(e)
 							: '生成单词资料失败，请稍后重试';
-					subscriber.next({
-						data: {
-							type: 'vocab.error',
-							success: false,
-							message,
-						},
+					emit({
+						type: 'vocab.error',
+						success: false,
+						message,
 					});
 				} finally {
+					this.streamAbortRegistry.unregister(streamId);
+					detachSseAbort();
 					subscriber.complete();
 				}
 			})();
+			return () => {
+				detachSseAbort();
+				this.streamAbortRegistry.unregister(streamId);
+			};
 		});
 	}
 
@@ -302,6 +367,8 @@ export class EnglishLearningController {
 	 */
 	@Post('classic-quotes/stream')
 	@Sse()
+	@Header('X-Accel-Buffering', 'no')
+	@Header('Cache-Control', 'no-cache, no-transform')
 	classicQuotesStream(
 		@Req() req: AuthedRequest,
 		@Body() dto: GenerateClassicQuotesDto,
@@ -313,14 +380,22 @@ export class EnglishLearningController {
 		const target = resolveClassicQuotesPackTargetCount(dto.count);
 		const streamId = randomUUID();
 		return new Observable((subscriber) => {
-			subscriber.next({
-				data: {
-					type: 'classic.progress',
-					streamId,
-					collected: 0,
-					target,
-					round: 0,
-				},
+			const streamAbort = new AbortController();
+			this.streamAbortRegistry.register(userId, streamId, streamAbort);
+			const detachSseAbort = wireEnglishLearningSseAbort(req, streamAbort);
+			const emit = (data: Record<string, unknown>) => {
+				try {
+					subscriber.next({ data });
+				} catch {
+					streamAbort.abort();
+				}
+			};
+			emit({
+				type: 'classic.progress',
+				streamId,
+				collected: 0,
+				target,
+				round: 0,
 			});
 			void (async () => {
 				try {
@@ -328,14 +403,12 @@ export class EnglishLearningController {
 						await this.englishLearningService.runClassicQuotesGeneration(
 							dto,
 							async (p) => {
-								subscriber.next({
-									data: {
-										type: 'classic.progress',
-										streamId,
-										collected: p.collected,
-										target: p.target,
-										round: p.round,
-									},
+								emit({
+									type: 'classic.progress',
+									streamId,
+									collected: p.collected,
+									target: p.target,
+									round: p.round,
 								});
 								if (p.newItems?.length) {
 									await this.englishLearningService.saveClassicQuotesPackBatch({
@@ -346,58 +419,57 @@ export class EnglishLearningController {
 										targetCount: target,
 										items: p.newItems,
 									});
-									subscriber.next({
-										data: {
-											type: 'classic.chunk',
-											streamId,
-											round: p.round,
-											collected: p.collected,
-											target: p.target,
-											items: p.newItems,
-										},
+									emit({
+										type: 'classic.chunk',
+										streamId,
+										round: p.round,
+										collected: p.collected,
+										target: p.target,
+										items: p.newItems,
 									});
 								}
 							},
 							{
 								userId,
+								signal: streamAbort.signal,
 								onAgentTool: async (ev) => {
-									subscriber.next({
-										data: {
-											type: 'classic.agent_tool',
-											streamId,
-											phase: ev.phase,
-											name: typeof ev.name === 'string' ? ev.name : '',
-											query: englishPackToolInputPreview(ev.input),
-										},
+									emit({
+										type: 'classic.agent_tool',
+										streamId,
+										phase: ev.phase,
+										name: typeof ev.name === 'string' ? ev.name : '',
+										query: englishPackToolInputPreview(ev.input),
 									});
 								},
 							},
 						);
-					subscriber.next({
-						data: {
-							type: 'classic.complete',
-							success: true,
-							streamId,
-							items,
-							requested: target,
-						},
+					emit({
+						type: 'classic.complete',
+						success: true,
+						streamId,
+						items,
+						requested: target,
 					});
 				} catch (e: unknown) {
 					const message =
 						e instanceof HttpException
 							? classicQuoteHttpMessage(e)
 							: '生成经典语句失败，请稍后重试';
-					subscriber.next({
-						data: {
-							type: 'classic.error',
-							success: false,
-							message,
-						},
+					emit({
+						type: 'classic.error',
+						success: false,
+						message,
 					});
 				} finally {
+					this.streamAbortRegistry.unregister(streamId);
+					detachSseAbort();
 					subscriber.complete();
 				}
 			})();
+			return () => {
+				detachSseAbort();
+				this.streamAbortRegistry.unregister(streamId);
+			};
 		});
 	}
 }

@@ -4,7 +4,10 @@
 import { Toast } from '@ui/index';
 import { BASE_URL } from '@/constant';
 import { notifyUnauthorized } from '@/router/authSession';
-import type { EnglishClassicQuoteItem } from '@/service';
+import {
+	type EnglishClassicQuoteItem,
+	postEnglishLearningStreamCancel,
+} from '@/service';
 import { ENGLISH_LEARNING_CLASSIC_QUOTES_STREAM } from '@/service/api';
 import { getPlatformFetch } from '@/utils/fetch';
 
@@ -47,6 +50,7 @@ function parseItems(raw: unknown): EnglishClassicQuoteItem[] {
 }
 
 export type EnglishClassicStreamProgress = {
+	streamId?: string;
 	collected: number;
 	target: number;
 	round: number;
@@ -108,6 +112,8 @@ export async function streamEnglishClassicQuotes(options: {
 	let userAbortRequested = false;
 	let receivedComplete = false;
 	let endedWithError = false;
+	let serverStreamId: string | undefined;
+	let streamReader: ReadableStreamDefaultReader<Uint8Array> | undefined;
 
 	try {
 		const platformFetch = await getPlatformFetch();
@@ -133,8 +139,8 @@ export async function streamEnglishClassicQuotes(options: {
 			throw new Error(`HTTP ${response.status}`);
 		}
 
-		const reader = response.body?.getReader();
-		if (!reader) {
+		streamReader = response.body?.getReader();
+		if (!streamReader) {
 			throw new Error('无法读取流式响应');
 		}
 
@@ -162,12 +168,20 @@ export async function streamEnglishClassicQuotes(options: {
 				const collected = Number(parsed.collected);
 				const target = Number(parsed.target);
 				const round = Number(parsed.round);
+				const sid =
+					typeof parsed.streamId === 'string' ? parsed.streamId : undefined;
+				if (sid) serverStreamId = sid;
 				if (
 					Number.isFinite(collected) &&
 					Number.isFinite(target) &&
 					Number.isFinite(round)
 				) {
-					onProgress?.({ collected, target, round });
+					onProgress?.({
+						streamId: sid,
+						collected,
+						target,
+						round,
+					});
 				}
 				return false;
 			}
@@ -234,7 +248,7 @@ export async function streamEnglishClassicQuotes(options: {
 		void (async () => {
 			try {
 				readLoop: while (true) {
-					const { done, value } = await reader.read();
+					const { done, value } = await streamReader.read();
 					if (value) {
 						const chunk = decoder.decode(value, { stream: true });
 						buffer += chunk;
@@ -283,6 +297,10 @@ export async function streamEnglishClassicQuotes(options: {
 		if (fromUser === true) {
 			userAbortRequested = true;
 		}
+		if (serverStreamId) {
+			void postEnglishLearningStreamCancel(serverStreamId);
+		}
+		void streamReader?.cancel().catch(() => {});
 		controller.abort();
 	};
 }

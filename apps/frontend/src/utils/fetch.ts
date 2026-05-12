@@ -78,6 +78,8 @@ export interface RequestConfig
 	timeout?: number;
 	headers?: Record<string, string>;
 	onUploadProgress?: (progress: number) => void; // 上传进度回调
+	/** 为 true 时不弹出错误 Toast（如用户主动取消、预期可能失败的请求） */
+	silent?: boolean;
 }
 
 // 响应数据接口
@@ -491,10 +493,12 @@ class HttpClient {
 				notifyUnauthorized();
 			}
 
-			Toast({
-				type: 'error',
-				title: resolveRequestErrorToastTitle(requestError),
-			});
+			if (!finalConfig.silent) {
+				Toast({
+					type: 'error',
+					title: resolveRequestErrorToastTitle(requestError),
+				});
+			}
 
 			// 抛出错误
 			throw requestError.data?.data || requestError;
