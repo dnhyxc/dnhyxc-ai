@@ -771,10 +771,12 @@ export const enUS = {
 	'englishLearning.vocab.topicPlaceholder':
 		'e.g. travel phrases, business verbs, IELTS collocations, easily confused pairs…',
 	'englishLearning.vocab.topicRequired': 'Enter a topic or learning goal first',
-	'englishLearning.vocab.count': 'Count',
+	'englishLearning.vocab.count': 'Count (optional)',
+	'englishLearning.vocab.countPlaceholder': 'Empty = fetch up to 12000',
 	'englishLearning.vocab.countHint':
-		'Enter any whole number from 1 to 12000, or use a preset',
-	'englishLearning.vocab.countInvalid': 'Enter a whole number from 1 to 12000',
+		'Leave empty to use the per-request maximum on the server; if set, use a whole number from 1 to 12000, or a preset',
+	'englishLearning.vocab.countInvalid':
+		'When set, count must be a whole number from 1 to 12000; leave the field empty for maximum',
 	'englishLearning.vocab.progress':
 		'{collected} / {target} words · batch {round}',
 	'englishLearning.vocab.partialResult':
@@ -803,10 +805,12 @@ export const enUS = {
 	'englishLearning.classic.topicPlaceholder':
 		'e.g. courage quotes, Pride & Prejudice lines, speech highlights, Shakespeare…',
 	'englishLearning.classic.topicRequired': 'Enter a topic or angle first',
-	'englishLearning.classic.count': 'Count',
+	'englishLearning.classic.count': 'Count (optional)',
+	'englishLearning.classic.countPlaceholder': 'Empty = fetch up to 6000',
 	'englishLearning.classic.countHint':
-		'Enter any whole number from 1 to 6000, or use a preset',
-	'englishLearning.classic.countInvalid': 'Enter a whole number from 1 to 6000',
+		'Leave empty to use the per-request maximum on the server; if set, use a whole number from 1 to 6000, or a preset',
+	'englishLearning.classic.countInvalid':
+		'When set, count must be a whole number from 1 to 6000; leave the field empty for maximum',
 	'englishLearning.classic.progress':
 		'{collected} / {target} lines · batch {round}',
 	'englishLearning.classic.partialResult':

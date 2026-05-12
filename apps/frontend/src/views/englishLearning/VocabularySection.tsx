@@ -46,7 +46,7 @@ function VocabularyPackSectionInner() {
 	const { t } = useI18n();
 
 	const [topic, setTopic] = useState('');
-	const [countInput, setCountInput] = useState('10');
+	const [countInput, setCountInput] = useState('');
 	const [loading, setLoading] = useState(false);
 	/** Agent 检索阶段工具状态（DeepSeek 开始出词后清空） */
 	const [agentToolLine, setAgentToolLine] = useState<string | null>(null);
@@ -201,31 +201,32 @@ function VocabularyPackSectionInner() {
 			});
 			return;
 		}
-		const parsed =
-			countInput.trim() === '' ? Number.NaN : Number.parseInt(countInput, 10);
-		if (
-			!Number.isFinite(parsed) ||
-			parsed < VOCAB_COUNT_MIN ||
-			parsed > VOCAB_COUNT_MAX
-		) {
-			Toast({
-				type: 'warning',
-				title: t('englishLearning.vocab.countInvalid'),
-			});
-			return;
+		let effectiveTarget = VOCAB_COUNT_MAX;
+		const body: { topic: string; count?: number } = { topic: req };
+		if (countInput.trim() !== '') {
+			const n = Number.parseInt(countInput, 10);
+			if (!Number.isFinite(n) || n < VOCAB_COUNT_MIN || n > VOCAB_COUNT_MAX) {
+				Toast({
+					type: 'warning',
+					title: t('englishLearning.vocab.countInvalid'),
+				});
+				return;
+			}
+			effectiveTarget = Math.min(VOCAB_COUNT_MAX, Math.max(VOCAB_COUNT_MIN, n));
+			body.count = effectiveTarget;
 		}
-		const count = parsed;
+
 		const myGen = ++genIdRef.current;
 		abortRef.current?.();
 		abortRef.current = null;
 
 		setLoading(true);
 		setAgentToolLine(null);
-		setProgress({ collected: 0, target: count, round: 0 });
+		setProgress({ collected: 0, target: effectiveTarget, round: 0 });
 		setItems([]);
 
 		const abort = await streamEnglishVocabularyPack({
-			body: { topic: req, count },
+			body,
 			callbacks: {
 				onProgress: (p) => {
 					if (genIdRef.current !== myGen) return;
@@ -327,12 +328,11 @@ function VocabularyPackSectionInner() {
 
 	const normalizeCountOnBlur = useCallback(() => {
 		if (countInput.trim() === '') {
-			setCountInput('10');
 			return;
 		}
 		const n = Number.parseInt(countInput, 10);
 		if (!Number.isFinite(n)) {
-			setCountInput('10');
+			setCountInput('');
 			return;
 		}
 		const clamped = Math.min(VOCAB_COUNT_MAX, Math.max(VOCAB_COUNT_MIN, n));
@@ -385,6 +385,7 @@ function VocabularyPackSectionInner() {
 						id="english-vocab-count"
 						autoComplete="off"
 						aria-describedby="english-vocab-count-hint"
+						placeholder={t('englishLearning.vocab.countPlaceholder')}
 						value={countInput}
 						onChange={(e) => setCountInput(sanitizeCountDigits(e.target.value))}
 						onBlur={normalizeCountOnBlur}

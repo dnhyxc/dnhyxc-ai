@@ -28,10 +28,10 @@ import {
 } from 'src/utils/english-pack';
 import { In, Repository } from 'typeorm';
 import {
-	ENGLISH_CLASSIC_QUOTES_GENERATION_MAX,
-	ENGLISH_VOCAB_GENERATION_MAX,
 	GenerateClassicQuotesDto,
 	GenerateVocabularyDto,
+	resolveClassicQuotesPackTargetCount,
+	resolveVocabularyPackTargetCount,
 } from './dto/generate-vocabulary.dto';
 import {
 	type EnglishClassicQuoteItemJson,
@@ -905,10 +905,7 @@ export class EnglishLearningService {
 		},
 	): Promise<VocabularyItemDto[]> {
 		const topic = dto.topic.trim();
-		const count = Math.min(
-			ENGLISH_VOCAB_GENERATION_MAX,
-			Math.max(1, dto.count ?? 10),
-		);
+		const count = resolveVocabularyPackTargetCount(dto.count);
 		const maxRounds = this.resolveMaxRounds(count, TOPIC_PACK_ITEMS_PER_ROUND);
 
 		const vocabularySystemStatic = `你是英语教学助手。主题与学习语境见文末「【当前学习任务】」（整场不变）；可能分多轮请求。每一轮的条数、已出现词条节选、多样性说明均以当次 system 末尾「【本轮生成要求】」为准；请严格遵守 items 数组长度，并遵守去重规定。
@@ -1170,10 +1167,7 @@ export class EnglishLearningService {
 		},
 	): Promise<ClassicQuoteItemDto[]> {
 		const topic = dto.topic.trim();
-		const count = Math.min(
-			ENGLISH_CLASSIC_QUOTES_GENERATION_MAX,
-			Math.max(1, dto.count ?? 10),
-		);
+		const count = resolveClassicQuotesPackTargetCount(dto.count);
 		const maxRounds = this.resolveMaxRounds(count, TOPIC_PACK_ITEMS_PER_ROUND);
 
 		const classicQuotesSystemStatic = `你是英语教学助手。主题与学习语境见文末「【当前学习任务】」（整场不变）；可能分多轮请求。每一轮的条数、已出现句子节选、多样性说明均以当次 system 末尾「【本轮生成要求】」为准；请严格遵守 items 数组长度，并遵守去重规定。

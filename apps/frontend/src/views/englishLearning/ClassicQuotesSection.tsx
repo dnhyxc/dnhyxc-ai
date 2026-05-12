@@ -46,7 +46,7 @@ function ClassicQuotesSectionInner() {
 	const { t } = useI18n();
 
 	const [topic, setTopic] = useState('');
-	const [countInput, setCountInput] = useState('10');
+	const [countInput, setCountInput] = useState('');
 	const [loading, setLoading] = useState(false);
 	const [agentToolLine, setAgentToolLine] = useState<string | null>(null);
 	const [progress, setProgress] = useState<ClassicQuoteProgressState | null>(
@@ -200,31 +200,32 @@ function ClassicQuotesSectionInner() {
 			});
 			return;
 		}
-		const parsed =
-			countInput.trim() === '' ? Number.NaN : Number.parseInt(countInput, 10);
-		if (
-			!Number.isFinite(parsed) ||
-			parsed < QUOTE_COUNT_MIN ||
-			parsed > QUOTE_COUNT_MAX
-		) {
-			Toast({
-				type: 'warning',
-				title: t('englishLearning.classic.countInvalid'),
-			});
-			return;
+		let effectiveTarget = QUOTE_COUNT_MAX;
+		const body: { topic: string; count?: number } = { topic: req };
+		if (countInput.trim() !== '') {
+			const n = Number.parseInt(countInput, 10);
+			if (!Number.isFinite(n) || n < QUOTE_COUNT_MIN || n > QUOTE_COUNT_MAX) {
+				Toast({
+					type: 'warning',
+					title: t('englishLearning.classic.countInvalid'),
+				});
+				return;
+			}
+			effectiveTarget = Math.min(QUOTE_COUNT_MAX, Math.max(QUOTE_COUNT_MIN, n));
+			body.count = effectiveTarget;
 		}
-		const count = parsed;
+
 		const myGen = ++genIdRef.current;
 		abortRef.current?.();
 		abortRef.current = null;
 
 		setLoading(true);
 		setAgentToolLine(null);
-		setProgress({ collected: 0, target: count, round: 0 });
+		setProgress({ collected: 0, target: effectiveTarget, round: 0 });
 		setItems([]);
 
 		const abort = await streamEnglishClassicQuotes({
-			body: { topic: req, count },
+			body,
 			callbacks: {
 				onProgress: (p) => {
 					if (genIdRef.current !== myGen) return;
@@ -326,12 +327,11 @@ function ClassicQuotesSectionInner() {
 
 	const normalizeCountOnBlur = useCallback(() => {
 		if (countInput.trim() === '') {
-			setCountInput('10');
 			return;
 		}
 		const n = Number.parseInt(countInput, 10);
 		if (!Number.isFinite(n)) {
-			setCountInput('10');
+			setCountInput('');
 			return;
 		}
 		const clamped = Math.min(QUOTE_COUNT_MAX, Math.max(QUOTE_COUNT_MIN, n));
@@ -381,6 +381,7 @@ function ClassicQuotesSectionInner() {
 						id="english-classic-count"
 						autoComplete="off"
 						aria-describedby="english-classic-count-hint"
+						placeholder={t('englishLearning.classic.countPlaceholder')}
 						value={countInput}
 						onChange={(e) => setCountInput(sanitizeCountDigits(e.target.value))}
 						onBlur={normalizeCountOnBlur}

@@ -38,7 +38,8 @@
 3. **主检索方法签名瘦身**：`runEnglishPackMasterResearchPhase` 只接收 `userId`、`topic`、`kind`、`onToolEvent`；语境字符串在方法内直接引用常量，避免再传一层「hint 参数」与难度概念耦合。
 4. **持久化**：`saveVocabularyPackBatch` / `saveClassicQuotesPackBatch` 的入参去掉 `level`；`create` 时写 `level: null`，与 TypeORM 实体上可空列对齐，历史行里旧有非空 `level` 仍可读，但新写入统一为空。
 5. **历史 API**：列表项类型 `VocabularyHistoryListItem`、`ClassicQuoteHistoryListItem` 与详情返回类型去掉 `level` 字段，与前端 `EnglishVocabularyHistoryEntry` 等类型一致，减少「已废弃字段」泄漏。
-6. **前端**：左栏去掉难度分段控件；SSE `body` 仅 `{ topic, count }`；对话 `buildOutgoingContent` 去掉 `[档位：…]` 前缀；i18n 去掉 `englishLearning.level*` 等键并改写工具栏/模块描述。
+6. **前端**：左栏去掉难度分段控件；单词/经典句 SSE 请求体为 `{ topic }` 或 `{ topic, count }`（`count` 可省略）；对话 `buildOutgoingContent` 去掉 `[档位：…]` 前缀；i18n 去掉 `englishLearning.level*` 等键并改写工具栏/模块描述。
+7. **词数/条数选填**：`count` 省略时前后端按单次上限（单词 12000、经典句 6000）拉取；填写时限制在 `[1, 上限]`；前端留空不传 `count` 字段，由 `resolveVocabularyPackTargetCount` / `resolveClassicQuotesPackTargetCount` 与 Controller 的 `target` 对齐。
 
 ---
 

@@ -84,7 +84,8 @@ export async function streamEnglishClassicQuotes(options: {
 	api?: string;
 	body: {
 		topic: string;
-		count: number;
+		/** 省略时由后端按单次上限拉取 */
+		count?: number;
 	};
 	callbacks: EnglishClassicStreamCallbacks;
 }): Promise<(fromUser?: boolean) => void> {
@@ -110,13 +111,17 @@ export async function streamEnglishClassicQuotes(options: {
 
 	try {
 		const platformFetch = await getPlatformFetch();
+		const requestBody =
+			body.count == null
+				? { topic: body.topic }
+				: { topic: body.topic, count: body.count };
 		const response = await platformFetch(BASE_URL + api, {
 			method: 'POST',
 			headers: {
 				Authorization: `Bearer ${readToken()}`,
 				'Content-Type': 'application/json',
 			},
-			body: JSON.stringify(body),
+			body: JSON.stringify(requestBody),
 			signal: controller.signal,
 		});
 

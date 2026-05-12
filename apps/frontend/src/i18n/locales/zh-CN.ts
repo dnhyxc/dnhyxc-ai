@@ -687,9 +687,12 @@ export const zhCN = {
 	'englishLearning.vocab.topicPlaceholder':
 		'例如：商务会议常用动词、旅游问路、易混形近词、本月四级高频词…',
 	'englishLearning.vocab.topicRequired': '请先填写学习主题或需求',
-	'englishLearning.vocab.count': '词数',
-	'englishLearning.vocab.countHint': '可输入任意 1～12000 的整数，或点快捷数量',
-	'englishLearning.vocab.countInvalid': '请输入 1～12000 之间的整数',
+	'englishLearning.vocab.count': '词数（选填）',
+	'englishLearning.vocab.countPlaceholder': '留空则按单次上限 12000 拉取',
+	'englishLearning.vocab.countHint':
+		'留空不指定条数，由服务端按单次上限生成；填写时须为 1～12000 的整数，也可点快捷数量',
+	'englishLearning.vocab.countInvalid':
+		'填写时须为 1～12000 的整数；留空则按上限拉取',
 	'englishLearning.vocab.progress':
 		'已生成 {collected} / {target} 条 · 第 {round} 批模型请求',
 	'englishLearning.vocab.partialResult':
@@ -717,10 +720,12 @@ export const zhCN = {
 	'englishLearning.classic.topicPlaceholder':
 		'例如：关于勇气的名言、《傲慢与偏见》节选、励志演讲金句、莎士比亚十四行…',
 	'englishLearning.classic.topicRequired': '请先填写主题或想要的方向',
-	'englishLearning.classic.count': '条数',
+	'englishLearning.classic.count': '条数（选填）',
+	'englishLearning.classic.countPlaceholder': '留空则按单次上限 6000 拉取',
 	'englishLearning.classic.countHint':
-		'可输入任意 1～6000 的整数，或点快捷数量',
-	'englishLearning.classic.countInvalid': '请输入 1～6000 之间的整数',
+		'留空不指定条数，由服务端按单次上限生成；填写时须为 1～6000 的整数，也可点快捷数量',
+	'englishLearning.classic.countInvalid':
+		'填写时须为 1～6000 的整数；留空则按上限拉取',
 	'englishLearning.classic.progress':
 		'已生成 {collected} / {target} 条 · 第 {round} 批',
 	'englishLearning.classic.partialResult':

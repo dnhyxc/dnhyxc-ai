@@ -93,7 +93,8 @@ export async function streamEnglishVocabularyPack(options: {
 	api?: string;
 	body: {
 		topic: string;
-		count: number;
+		/** 省略时由后端按单次上限拉取 */
+		count?: number;
 	};
 	callbacks: EnglishVocabStreamCallbacks;
 }): Promise<(fromUser?: boolean) => void> {
@@ -119,13 +120,17 @@ export async function streamEnglishVocabularyPack(options: {
 
 	try {
 		const platformFetch = await getPlatformFetch();
+		const requestBody =
+			body.count == null
+				? { topic: body.topic }
+				: { topic: body.topic, count: body.count };
 		const response = await platformFetch(BASE_URL + api, {
 			method: 'POST',
 			headers: {
 				Authorization: `Bearer ${readToken()}`,
 				'Content-Type': 'application/json',
 			},
-			body: JSON.stringify(body),
+			body: JSON.stringify(requestBody),
 			signal: controller.signal,
 		});
 
@@ -161,8 +166,6 @@ export async function streamEnglishVocabularyPack(options: {
 
 			const parsed = unwrapVocabPayload(raw);
 			const type = parsed.type;
-
-			console.log(type, 'type');
 
 			if (type === 'vocab.progress') {
 				const collected = Number(parsed.collected);

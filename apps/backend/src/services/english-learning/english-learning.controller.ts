@@ -18,10 +18,10 @@ import type { Request } from 'express';
 import { Observable } from 'rxjs';
 import { JwtGuard } from 'src/guards/jwt.guard';
 import {
-	ENGLISH_CLASSIC_QUOTES_GENERATION_MAX,
-	ENGLISH_VOCAB_GENERATION_MAX,
 	GenerateClassicQuotesDto,
 	GenerateVocabularyDto,
+	resolveClassicQuotesPackTargetCount,
+	resolveVocabularyPackTargetCount,
 } from './dto/generate-vocabulary.dto';
 import { EnglishLearningService } from './english-learning.service';
 
@@ -146,10 +146,7 @@ export class EnglishLearningController {
 		if (userId == null) {
 			throw new UnauthorizedException('未授权');
 		}
-		const target = Math.min(
-			ENGLISH_VOCAB_GENERATION_MAX,
-			Math.max(1, dto.count ?? 10),
-		);
+		const target = resolveVocabularyPackTargetCount(dto.count);
 		const streamId = randomUUID();
 		return new Observable((subscriber) => {
 			subscriber.next({
@@ -313,10 +310,7 @@ export class EnglishLearningController {
 		if (userId == null) {
 			throw new UnauthorizedException('未授权');
 		}
-		const target = Math.min(
-			ENGLISH_CLASSIC_QUOTES_GENERATION_MAX,
-			Math.max(1, dto.count ?? 10),
-		);
+		const target = resolveClassicQuotesPackTargetCount(dto.count);
 		const streamId = randomUUID();
 		return new Observable((subscriber) => {
 			subscriber.next({

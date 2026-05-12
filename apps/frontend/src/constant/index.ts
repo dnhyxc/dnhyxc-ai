@@ -41,7 +41,7 @@ export function getChatMarkdownHighlightTheme(
 	return themeName === 'black' ? 'atom-one-dark' : 'atom-one-light';
 }
 
-/** 与后端 GenerateVocabularyDto 一致 */
+/** 与后端 GenerateVocabularyDto 一致：`count` 选填，填写时最小为 1 */
 export const VOCAB_COUNT_MIN = 1;
 /** 与后端 `ENGLISH_VOCAB_GENERATION_MAX` 一致 */
 export const VOCAB_COUNT_MAX = 12000;
