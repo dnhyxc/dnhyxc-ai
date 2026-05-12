@@ -2,7 +2,13 @@
  * 按主题拉取结构化单词资料（IPA / 释义 / 例句），逐词朗读。
  */
 import { Button, Input, Spinner, Toast } from '@ui/index';
-import { BookText, Square, Volume2 } from 'lucide-react';
+import {
+	BookText,
+	CircleChevronDown,
+	CircleChevronRight,
+	Square,
+	Volume2,
+} from 'lucide-react';
 import {
 	type UIEventHandler,
 	useCallback,
@@ -28,11 +34,11 @@ import {
 	listEnglishVocabularyHistory,
 } from '@/service';
 import { displayIpaWrapped, sanitizeCountDigits } from '@/utils';
+import { streamEnglishVocabularyPack } from '@/utils/englishLearningPackSse';
 import {
 	playEnglishPreferred,
 	stopAllEnglishPlayback,
 } from '@/utils/englishTts';
-import { streamEnglishVocabularyPack } from '@/utils/englishVocabularySse';
 import { formatEnglishLearningAgentToolLine } from './agentToolStatusText';
 import { VocabularyHistoryDrawer } from './VocabularyHistoryDrawer';
 
@@ -63,6 +69,8 @@ function VocabularyPackSectionInner() {
 		string | null
 	>(null);
 	const [loadedStreamId, setLoadedStreamId] = useState<string | null>(null);
+	/** 单词列表是否展开（默认展开） */
+	const [listExpanded, setListExpanded] = useState(true);
 
 	const historyOffsetRef = useRef(0);
 	const historyHasMoreRef = useRef(true);
@@ -164,6 +172,7 @@ function VocabularyPackSectionInner() {
 				const d = res.data;
 				if (d?.items?.length) {
 					setItems(d.items);
+					setListExpanded(true);
 					setLoadedStreamId(streamId);
 					setHistoryDrawerOpen(false);
 					Toast({
@@ -224,6 +233,7 @@ function VocabularyPackSectionInner() {
 		setAgentToolLine(null);
 		setProgress({ collected: 0, target: effectiveTarget, round: 0 });
 		setItems([]);
+		setListExpanded(true);
 
 		const abort = await streamEnglishVocabularyPack({
 			body,
@@ -344,7 +354,7 @@ function VocabularyPackSectionInner() {
 			<div className="mb-4 flex items-start gap-3">
 				<div className="bg-linear-to-r from-teal-500 to-cyan-600 @min-[26rem]:size-10 flex size-10 shrink-0 items-center justify-center rounded-md">
 					<BookText
-						className="text-textcolor @min-[26rem]:size-6 size-6"
+						className="text-white @min-[26rem]:size-6 size-6"
 						aria-hidden
 					/>
 				</div>
@@ -425,7 +435,8 @@ function VocabularyPackSectionInner() {
 						variant={loading ? 'outline' : 'default'}
 						onClick={() => (loading ? cancelGenerate() : void onGenerate())}
 						className={cn(
-							'h-9 min-w-0 flex-1 gap-2 rounded-md px-3 text-textcolor',
+							'h-9 min-w-0 flex-1 gap-2 rounded-md px-3 text-white',
+							'hover:bg-linear-to-r hover:from-teal-400 hover:to-cyan-600',
 							loading
 								? 'border-red-500/20 bg-red-500/20 text-textcolor/80 hover:bg-red-500/25'
 								: 'bg-linear-to-r from-teal-500 to-cyan-600',
@@ -448,7 +459,7 @@ function VocabularyPackSectionInner() {
 						type="button"
 						size="sm"
 						onClick={() => setHistoryDrawerOpen(true)}
-						className="bg-linear-to-r from-teal-500 to-cyan-600 text-textcolor hover:bg-theme/8 h-9 shrink-0 gap-1.5 whitespace-nowrap rounded-md px-2.5 sm:px-3"
+						className="text-white hover:bg-linear-to-r hover:from-teal-400 hover:to-cyan-600 bg-linear-to-r from-teal-500 to-cyan-600 h-9 shrink-0 gap-1.5 whitespace-nowrap rounded-md px-2.5 sm:px-3"
 						title={t('englishLearning.vocab.historyTitle')}
 					>
 						<span className="max-[340px]:sr-only">
@@ -457,7 +468,7 @@ function VocabularyPackSectionInner() {
 					</Button>
 				</div>
 				{loading && progress ? (
-					<div className="space-y-2 rounded-md bg-theme-secondary/40 px-3 py-2.5">
+					<div className="border border-theme/10 space-y-2 rounded-md bg-theme-secondary/40 px-3 py-2.5">
 						{agentToolLine ? (
 							<div className="text-teal-600/90 dark:text-teal-400/90 text-xs leading-snug">
 								{agentToolLine}
@@ -486,60 +497,94 @@ function VocabularyPackSectionInner() {
 			</div>
 			{items.length > 0 ? (
 				<div>
-					<div className="text-textcolor/45 mb-1.5 mt-5 text-sm font-medium">
-						{t('englishLearning.vocab.listHeading')}
+					<div className="mt-5 flex min-h-8 items-center justify-between gap-2">
+						<div className="text-textcolor/45 text-sm font-medium">
+							{t('englishLearning.vocab.listHeading')}
+						</div>
+						<Button
+							type="button"
+							variant="link"
+							size="sm"
+							className="text-textcolor/55 hover:text-textcolor h-8 w-8 shrink-0 p-0! mt-0.5 -mr-2"
+							onClick={() => setListExpanded((v) => !v)}
+							aria-expanded={listExpanded}
+							aria-label={
+								listExpanded
+									? t('englishLearning.vocab.collapseList')
+									: t('englishLearning.vocab.expandList')
+							}
+							title={
+								listExpanded
+									? t('englishLearning.vocab.collapseList')
+									: t('englishLearning.vocab.expandList')
+							}
+						>
+							{listExpanded ? (
+								<CircleChevronDown
+									className="w-full h-full transition-transform duration-200"
+									aria-hidden
+								/>
+							) : (
+								<CircleChevronRight
+									className="w-full h-full transition-transform duration-200"
+									aria-hidden
+								/>
+							)}
+						</Button>
 					</div>
-					<div className="grid grid-cols-1 gap-4 @min-[26rem]:grid-cols-2">
-						{items.map((item, i) => {
-							const key = `${i}-${item.word}`;
-							const playing = playingKey === key;
-							return (
-								<div
-									key={key}
-									className="bg-theme/5 border border-theme/10 flex flex-col gap-1.5 rounded-md px-3 py-2.5 @min-[26rem]:p-3"
-								>
-									<div className="flex items-start justify-between gap-2">
-										<div className="min-w-0 flex-1">
-											<div className="truncate text-lg font-semibold text-textcolor @min-[26rem]:text-base">
-												{item.word}
+					{listExpanded ? (
+						<div className="mt-1.5 grid grid-cols-1 gap-4 @min-[26rem]:grid-cols-2">
+							{items.map((item, i) => {
+								const key = `${i}-${item.word}`;
+								const playing = playingKey === key;
+								return (
+									<div
+										key={key}
+										className="bg-theme/5 border border-theme/10 flex flex-col gap-1.5 rounded-md px-3 py-2.5 @min-[26rem]:p-3"
+									>
+										<div className="flex items-start justify-between gap-2">
+											<div className="min-w-0 flex-1">
+												<div className="truncate text-lg font-semibold text-textcolor @min-[26rem]:text-base">
+													{item.word}
+												</div>
+												<div className="font-mono text-xs leading-snug text-teal-600/90 @min-[26rem]:text-xs dark:text-teal-400/90">
+													{displayIpaWrapped(item.ipa)}
+												</div>
 											</div>
-											<div className="font-mono text-xs leading-snug text-teal-600/90 @min-[26rem]:text-xs dark:text-teal-400/90">
-												{displayIpaWrapped(item.ipa)}
-											</div>
+											<Button
+												variant="ghost"
+												size="sm"
+												onClick={() => void toggleWordAudio(item.word, key)}
+												className={cn(
+													'w-7 h-7 shrink-0 rounded-md border p-2 transition-colors @min-[26rem]:border-theme/15 @min-[26rem]:p-1.5',
+													playing
+														? 'border-teal-500/40 bg-teal-500/15 text-teal-600 dark:text-teal-400'
+														: 'border-theme/10 text-textcolor/60 hover:border-theme/20 hover:bg-theme/10 hover:text-teal-600 dark:hover:text-teal-400',
+												)}
+												aria-label={
+													playing
+														? t('englishLearning.tts.stop')
+														: t('englishLearning.vocab.playWord')
+												}
+											>
+												{playing ? (
+													<Square className="size-3.5 fill-current" />
+												) : (
+													<Volume2 className="size-3.5" />
+												)}
+											</Button>
 										</div>
-										<Button
-											variant="ghost"
-											size="sm"
-											onClick={() => void toggleWordAudio(item.word, key)}
-											className={cn(
-												'w-7 h-7 shrink-0 rounded-md border p-2 transition-colors @min-[26rem]:border-theme/15 @min-[26rem]:p-1.5',
-												playing
-													? 'border-teal-500/40 bg-teal-500/15 text-teal-600 dark:text-teal-400'
-													: 'border-theme/10 text-textcolor/60 hover:border-theme/20 hover:bg-theme/10 hover:text-teal-600 dark:hover:text-teal-400',
-											)}
-											aria-label={
-												playing
-													? t('englishLearning.tts.stop')
-													: t('englishLearning.vocab.playWord')
-											}
-										>
-											{playing ? (
-												<Square className="size-3.5 fill-current" />
-											) : (
-												<Volume2 className="size-3.5" />
-											)}
-										</Button>
+										<div className="text-textcolor/95 text-sm leading-snug @min-[26rem]:text-sm">
+											{item.translationZh}
+										</div>
+										<div className="text-textcolor/80 text-sm leading-relaxed italic @min-[26rem]:text-xs">
+											{item.example}
+										</div>
 									</div>
-									<div className="text-textcolor/95 text-sm leading-snug @min-[26rem]:text-sm">
-										{item.translationZh}
-									</div>
-									<div className="text-textcolor/80 text-sm leading-relaxed italic @min-[26rem]:text-xs">
-										{item.example}
-									</div>
-								</div>
-							);
-						})}
-					</div>
+								);
+							})}
+						</div>
+					) : null}
 				</div>
 			) : null}
 			<VocabularyHistoryDrawer

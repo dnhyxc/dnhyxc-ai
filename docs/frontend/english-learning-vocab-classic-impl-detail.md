@@ -24,7 +24,7 @@
 | 后端实体 | `apps/backend/src/services/english-learning/english-classic-quote.entity.ts` |
 | 前端 API 常量 | `apps/frontend/src/service/api.ts` |
 | 前端 HTTP 封装 | `apps/frontend/src/service/index.ts` |
-| 前端 SSE | `apps/frontend/src/utils/englishClassicQuotesSse.ts`（及既有 `englishVocabularySse.ts`） |
+| 前端 SSE | `apps/frontend/src/utils/englishLearningPackSse.ts`（原 `englishVocabularySse` / `englishClassicQuotesSse` 已合并，详见 [english-learning-pack-sse.md](./english-learning-pack-sse.md)） |
 | 页面 | `apps/frontend/src/views/englishLearning/index.tsx` |
 | 单词区块 | `apps/frontend/src/views/englishLearning/VocabularySection.tsx`、`VocabularyHistoryDrawer.tsx` |
 | 经典语句区块 | `apps/frontend/src/views/englishLearning/ClassicQuotesSection.tsx`、`ClassicQuotesHistoryDrawer.tsx` |
@@ -341,7 +341,9 @@ export const ENGLISH_LEARNING_CLASSIC_QUOTES_HISTORY =
 
 ### 变更点 H：`streamEnglishClassicQuotes`（SSE 客户端）
 
-**来源**：`apps/frontend/src/utils/englishClassicQuotesSse.ts`（约 L1–L47 及 `processLine` 内分支）
+**来源**：`apps/frontend/src/utils/englishLearningPackSse.ts`（`parseClassicItems`、`unwrapPackPayload` 与 `runEnglishLearningPackSseStream` 在 `typePrefix: 'classic.'` 下的分支；合并前等价逻辑在已移除的 `englishClassicQuotesSse.ts`）
+
+> 下列代码块为**合并前** `unwrapClassicPayload` / `parseItems` 的语义摘录，便于对照；当前仓库以 `unwrapPackPayload(raw, 'classic.')` 与 `parseClassicItems` 为准，详见 [english-learning-pack-sse.md](./english-learning-pack-sse.md)。
 
 ```typescript
 function unwrapClassicPayload(
@@ -384,7 +386,7 @@ function parseItems(raw: unknown): EnglishClassicQuoteItem[] {
 | `parseItems` 开头 `!Array.isArray` | 服务端若传非数组，直接返回空数组，避免 UI 崩溃。 |
 | `english` / `translationZh` 必填 trim | 两者缺一则跳过该元素，与后端 `extractClassicQuoteItemsLoose` 一致。 |
 | `source` / `noteZh` 默认 `'—'` | 模型可省略；前端展示占位。 |
-| `processLine` 中 `classic.progress` / `chunk` / `complete` / `error` | 与 `englishVocabularySse.ts` 中 `vocab.*` 分支对称；`complete` 时调 `onDone` 并置 `receivedComplete`。 |
+| `processLine` 中 `classic.progress` / `chunk` / `complete` / `error` | 与同一文件内 `vocab.*`（`typePrefix: 'vocab.'`）分支对称；`complete` 时调 `onDone` 并置 `receivedComplete`。 |
 
 ---
 
@@ -549,8 +551,7 @@ const COUNT_PRESETS = [10, 100, 500, 1000, 3000, 6000] as const;
 | 经典实体 | `apps/backend/src/services/english-learning/english-classic-quote.entity.ts` |
 | HTTP + SSE 控制器 | `apps/backend/src/services/english-learning/english-learning.controller.ts` |
 | 业务逻辑 | `apps/backend/src/services/english-learning/english-learning.service.ts` |
-| 经典 SSE 客户端 | `apps/frontend/src/utils/englishClassicQuotesSse.ts` |
-| 单词 SSE 客户端 | `apps/frontend/src/utils/englishVocabularySse.ts` |
+| 单词 / 经典 SSE 客户端（合并） | `apps/frontend/src/utils/englishLearningPackSse.ts`（[专题说明](./english-learning-pack-sse.md)） |
 | 英语学习页 | `apps/frontend/src/views/englishLearning/index.tsx` |
 
 若与仓库最新源码不一致，以源码为准。

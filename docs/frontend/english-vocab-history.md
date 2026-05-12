@@ -20,8 +20,8 @@
 | 控制器 | `apps/backend/src/services/english-learning/english-learning.controller.ts` |
 | 迁移（若启用 TypeORM 迁移） | `apps/backend/src/migrations/` 下新增迁移文件 |
 | API 常量 / 封装 | `apps/frontend/src/service/api.ts`、`apps/frontend/src/service/index.ts` |
-| SSE 客户端 | `apps/frontend/src/utils/englishVocabularySse.ts` |
-| 页面 | `apps/frontend/src/views/englishLearning/VocabularyPackSection.tsx` |
+| SSE 客户端 | `apps/frontend/src/utils/englishLearningPackSse.ts`（[合并说明](./english-learning-pack-sse.md)） |
+| 页面 | `apps/frontend/src/views/englishLearning/VocabularySection.tsx` |
 | 文案 | `apps/frontend/src/i18n/locales/zh-CN.ts`、`en-US.ts` |
 
 > 构建产物类文件（如 `tsconfig.tsbuildinfo`）的变更不计入业务说明。
@@ -179,23 +179,22 @@ export const getEnglishVocabularyHistoryDetail = async (streamId: string) => {
 };
 ```
 
-**来源**：`apps/frontend/src/utils/englishVocabularySse.ts`（约 L53–L184，`EnglishVocabStreamChunk` 与 `type === 'vocab.chunk'` 分支）
+**来源**：`apps/frontend/src/utils/englishLearningPackSse.ts`（`EnglishPackStreamChunk`、`EnglishVocabStreamChunk` 与 `processLine` 内 `` type === `${tp}chunk` `` 且 `tp === 'vocab.'` 的分支，约 L89–L282）
+
+> 说明：`EnglishVocabStreamChunk` 为 `EnglishPackStreamChunk<EnglishVocabularyItem>` 的类型别名。
 
 ```typescript
-// 说明：解析 data 帧 JSON，识别 vocab.chunk 后回调 onChunk，供页面增量追加 items。
-if (type === 'vocab.chunk') {
-  const items = parseItems(parsed.items);
-  const streamId = typeof parsed.streamId === 'string' ? parsed.streamId : undefined;
-  if (items.length > 0 && /* collected/target/round 为有限数 */) {
-    onChunk?.({ streamId, round, collected, target, items });
-  }
+// 说明：`tp` 为 `vocab.` 时即原 `vocab.chunk` 分支
+if (type === `${tp}chunk`) {
+  const items = def.parseItems(parsed.items);
+  // ... 说明：校验 collected/target/round 后 onChunk?.({ streamId, round, collected, target, items })
   return false;
 }
 ```
 
 ### 4.5 页面：加载历史、载入详情、生成结束刷新
 
-**来源**：`apps/frontend/src/views/englishLearning/VocabularyPackSection.tsx`（约 L86–L236、`historySection` 约 L310 起）
+**来源**：`apps/frontend/src/views/englishLearning/VocabularySection.tsx`（历史抽屉与 `onGenerate` / `openHistoryDetail` 等，行号以仓库为准）
 
 ```typescript
 // 说明：挂载 loadHistory；列表数据取 res.data；点击条目 getEnglishVocabularyHistoryDetail 后 setItems + 高亮 loadedStreamId。
@@ -242,7 +241,7 @@ callbacks: {
 | 列表 / 详情 / 持久化逻辑 | `apps/backend/src/services/english-learning/english-learning.service.ts` |
 | HTTP + SSE | `apps/backend/src/services/english-learning/english-learning.controller.ts` |
 | 前端封装 | `apps/frontend/src/service/index.ts`、`api.ts` |
-| SSE 解析 | `apps/frontend/src/utils/englishVocabularySse.ts` |
-| UI | `apps/frontend/src/views/englishLearning/VocabularyPackSection.tsx` |
+| SSE 解析 | `apps/frontend/src/utils/englishLearningPackSse.ts` |
+| UI | `apps/frontend/src/views/englishLearning/VocabularySection.tsx` |
 
 若与仓库最新源码不一致，以源码为准。

@@ -2,7 +2,13 @@
  * 按主题拉取英文经典语句（译文、出处、赏析），可朗读原句。
  */
 import { Button, Input, Spinner, Toast } from '@ui/index';
-import { BookMarked, Square, Volume2 } from 'lucide-react';
+import {
+	BookMarked,
+	CircleChevronDown,
+	CircleChevronRight,
+	Square,
+	Volume2,
+} from 'lucide-react';
 import {
 	type UIEventHandler,
 	useCallback,
@@ -28,7 +34,7 @@ import {
 	listEnglishClassicQuotesHistory,
 } from '@/service';
 import { sanitizeCountDigits } from '@/utils';
-import { streamEnglishClassicQuotes } from '@/utils/englishClassicQuotesSse';
+import { streamEnglishClassicQuotes } from '@/utils/englishLearningPackSse';
 import {
 	playEnglishPreferred,
 	stopAllEnglishPlayback,
@@ -64,6 +70,8 @@ function ClassicQuotesSectionInner() {
 		string | null
 	>(null);
 	const [loadedStreamId, setLoadedStreamId] = useState<string | null>(null);
+	/** 语句列表是否展开（默认展开） */
+	const [listExpanded, setListExpanded] = useState(true);
 
 	const historyOffsetRef = useRef(0);
 	const historyHasMoreRef = useRef(true);
@@ -164,6 +172,7 @@ function ClassicQuotesSectionInner() {
 				const d = res.data;
 				if (d?.items?.length) {
 					setItems(d.items);
+					setListExpanded(true);
 					setLoadedStreamId(streamId);
 					setHistoryDrawerOpen(false);
 					Toast({
@@ -223,6 +232,7 @@ function ClassicQuotesSectionInner() {
 		setAgentToolLine(null);
 		setProgress({ collected: 0, target: effectiveTarget, round: 0 });
 		setItems([]);
+		setListExpanded(true);
 
 		const abort = await streamEnglishClassicQuotes({
 			body,
@@ -342,7 +352,7 @@ function ClassicQuotesSectionInner() {
 		<div className="rounded-none @container min-w-0 px-4 pb-0 pt-7.5">
 			<div className="mb-4 flex items-start gap-3">
 				<div className="bg-linear-to-r from-violet-500 to-indigo-600 @min-[26rem]:size-11 flex size-10 shrink-0 items-center justify-center rounded-md">
-					<BookMarked className="text-textcolor size-6" aria-hidden />
+					<BookMarked className="text-white size-6" aria-hidden />
 				</div>
 				<div className="min-w-0">
 					<div className="text-textcolor leading-tight font-semibold tracking-tight">
@@ -421,7 +431,8 @@ function ClassicQuotesSectionInner() {
 						variant={loading ? 'outline' : 'default'}
 						onClick={() => (loading ? cancelGenerate() : void onGenerate())}
 						className={cn(
-							'h-9 min-w-0 flex-1 gap-2 rounded-md px-3 text-textcolor',
+							'h-9 min-w-0 flex-1 gap-2 rounded-md px-3 text-white',
+							'hover:bg-linear-to-r hover:from-violet-400 hover:to-indigo-600',
 							loading
 								? 'border-red-500/20 bg-red-500/20 text-textcolor/80 hover:bg-red-500/25'
 								: 'bg-linear-to-r from-violet-600 to-indigo-600',
@@ -443,7 +454,7 @@ function ClassicQuotesSectionInner() {
 					<Button
 						size="sm"
 						onClick={() => setHistoryDrawerOpen(true)}
-						className="text-textcolor bg-linear-to-r from-indigo-500 to-indigo-600 h-9 shrink-0 gap-1.5 whitespace-nowrap rounded-md px-2.5 sm:px-3"
+						className="text-white hover:bg-linear-to-r hover:from-indigo-400 hover:to-indigo-600 bg-linear-to-r from-indigo-500 to-indigo-600 h-9 shrink-0 gap-1.5 whitespace-nowrap rounded-md px-2.5 sm:px-3"
 						title={t('englishLearning.classic.historyTitle')}
 					>
 						<span className="max-[340px]:sr-only">
@@ -452,7 +463,7 @@ function ClassicQuotesSectionInner() {
 					</Button>
 				</div>
 				{loading && progress ? (
-					<div className="space-y-2 rounded-md bg-theme-secondary/40 px-3 py-2.5">
+					<div className="border border-theme/10 space-y-2 rounded-md bg-theme-secondary/40 px-3 py-2.5">
 						{agentToolLine ? (
 							<div className="text-indigo-600/90 dark:text-indigo-400/90 text-xs leading-snug">
 								{agentToolLine}
@@ -482,59 +493,93 @@ function ClassicQuotesSectionInner() {
 
 			{items.length > 0 ? (
 				<div>
-					<div className="text-textcolor/45 mb-1.5 mt-5 text-sm font-medium">
-						{t('englishLearning.classic.listHeading')}
+					<div className="mt-5 flex min-h-8 items-center justify-between gap-2">
+						<div className="text-textcolor/45 text-sm font-medium">
+							{t('englishLearning.classic.listHeading')}
+						</div>
+						<Button
+							type="button"
+							variant="link"
+							size="sm"
+							className="text-textcolor/55 hover:text-textcolor h-8 w-8 shrink-0 p-0 mt-0.5 -mr-2"
+							onClick={() => setListExpanded((v) => !v)}
+							aria-expanded={listExpanded}
+							aria-label={
+								listExpanded
+									? t('englishLearning.classic.collapseList')
+									: t('englishLearning.classic.expandList')
+							}
+							title={
+								listExpanded
+									? t('englishLearning.classic.collapseList')
+									: t('englishLearning.classic.expandList')
+							}
+						>
+							{listExpanded ? (
+								<CircleChevronDown
+									className="w-full h-full transition-transform duration-200"
+									aria-hidden
+								/>
+							) : (
+								<CircleChevronRight
+									className="w-full h-full transition-transform duration-200"
+									aria-hidden
+								/>
+							)}
+						</Button>
 					</div>
-					<div className="grid grid-cols-1 gap-4 @min-[26rem]:grid-cols-2">
-						{items.map((item, i) => {
-							const key = `${i}-${item.english.slice(0, 48)}`;
-							const playing = playingKey === key;
-							return (
-								<div
-									key={key}
-									className="bg-theme/5 border border-theme/10 flex flex-col gap-1.5 rounded-md px-3 py-2.5 @min-[26rem]:p-3"
-								>
-									<div className="flex items-start justify-between gap-2">
-										<div className="text-textcolor min-w-0 flex-1 text-base font-medium leading-snug @min-[26rem]:text-lg">
-											{item.english}
+					{listExpanded ? (
+						<div className="mt-1.5 grid grid-cols-1 gap-4 @min-[26rem]:grid-cols-2">
+							{items.map((item, i) => {
+								const key = `${i}-${item.english.slice(0, 48)}`;
+								const playing = playingKey === key;
+								return (
+									<div
+										key={key}
+										className="bg-theme/5 border border-theme/10 flex flex-col gap-1.5 rounded-md px-3 py-2.5 @min-[26rem]:p-3"
+									>
+										<div className="flex items-start justify-between gap-2">
+											<div className="text-textcolor min-w-0 flex-1 text-base font-medium leading-snug @min-[26rem]:text-lg">
+												{item.english}
+											</div>
+											<Button
+												variant="ghost"
+												size="sm"
+												onClick={() => void toggleQuoteAudio(item.english, key)}
+												className={cn(
+													'w-7 h-7 shrink-0 rounded-md border p-2 transition-colors @min-[26rem]:border-theme/15 @min-[26rem]:p-1.5',
+													playing
+														? 'border-violet-500/40 bg-violet-500/15 text-violet-600 dark:text-violet-400'
+														: 'border-theme/12 text-textcolor/60 hover:border-theme/20 hover:bg-theme/10 hover:text-violet-600 dark:hover:text-violet-400',
+												)}
+												aria-label={
+													playing
+														? t('englishLearning.tts.stop')
+														: t('englishLearning.classic.playQuote')
+												}
+											>
+												{playing ? (
+													<Square className="size-3.5 fill-current" />
+												) : (
+													<Volume2 className="size-3.5" />
+												)}
+											</Button>
 										</div>
-										<Button
-											variant="ghost"
-											size="sm"
-											onClick={() => void toggleQuoteAudio(item.english, key)}
-											className={cn(
-												'w-7 h-7 shrink-0 rounded-md border p-2 transition-colors @min-[26rem]:border-theme/15 @min-[26rem]:p-1.5',
-												playing
-													? 'border-violet-500/40 bg-violet-500/15 text-violet-600 dark:text-violet-400'
-													: 'border-theme/12 text-textcolor/60 hover:border-theme/20 hover:bg-theme/10 hover:text-violet-600 dark:hover:text-violet-400',
-											)}
-											aria-label={
-												playing
-													? t('englishLearning.tts.stop')
-													: t('englishLearning.classic.playQuote')
-											}
-										>
-											{playing ? (
-												<Square className="size-3.5 fill-current" />
-											) : (
-												<Volume2 className="size-3.5" />
-											)}
-										</Button>
+										<div className="text-textcolor/90 text-sm leading-snug">
+											{item.translationZh}
+										</div>
+										<div className="text-textcolor/70 text-xs">
+											{t('englishLearning.classic.sourceLabel')}
+											{item.source || '—'}
+										</div>
+										<div className="text-textcolor/70 text-xs leading-relaxed italic">
+											{item.noteZh}
+										</div>
 									</div>
-									<div className="text-textcolor/90 text-sm leading-snug">
-										{item.translationZh}
-									</div>
-									<div className="text-textcolor/70 text-xs">
-										{t('englishLearning.classic.sourceLabel')}
-										{item.source || '—'}
-									</div>
-									<div className="text-textcolor/70 text-xs leading-relaxed italic">
-										{item.noteZh}
-									</div>
-								</div>
-							);
-						})}
-					</div>
+								);
+							})}
+						</div>
+					) : null}
 				</div>
 			) : null}
 

@@ -20,7 +20,7 @@
 | HTTP 请求配置扩展 | `apps/frontend/src/utils/fetch.ts` |
 | 取消流 API 封装 | `apps/frontend/src/service/index.ts` |
 | 路由常量（无逻辑变更，文档引用） | `apps/frontend/src/service/api.ts` |
-| SSE 工具在停止时调用取消 | `apps/frontend/src/utils/englishVocabularySse.ts`、`apps/frontend/src/utils/englishClassicQuotesSse.ts` |
+| SSE 工具在停止时调用取消 | `apps/frontend/src/utils/englishLearningPackSse.ts`（单词包与经典句共用） |
 | Nest 模块注册取消注册表 | `apps/backend/src/services/english-learning/english-learning.module.ts` |
 | 取消路由 + 两条 SSE 流入口 | `apps/backend/src/services/english-learning/english-learning.controller.ts` |
 | 按 `streamId` 内存登记 `AbortController` | `apps/backend/src/services/english-learning/english-learning-stream-abort.registry.ts` |
@@ -180,7 +180,7 @@ export const ENGLISH_LEARNING_STREAM_CANCEL = '/english-learning/stream/cancel';
 
 ### 4.6 SSE 停止时触发后端取消（摘录）
 
-**来源**：`apps/frontend/src/utils/englishVocabularySse.ts`（约 L305–L314，返回的 `abort` 函数）
+**来源**：`apps/frontend/src/utils/englishLearningPackSse.ts`（`runEnglishLearningPackSseStream` 返回的 `abort` 闭包末尾，与合并前 `englishVocabularySse` 行为一致）
 
 ```typescript
 return (fromUser?: boolean) => {
@@ -196,7 +196,7 @@ return (fromUser?: boolean) => {
 };
 ```
 
-> `englishClassicQuotesSse.ts` 中停止逻辑与上类似，同样在存在 `serverStreamId` 时调用 `postEnglishLearningStreamCancel`。
+> 经典句 `streamEnglishClassicQuotes` 与单词包共用同一套 `runEnglishLearningPackSseStream` 返回的 abort 逻辑。
 
 ### 4.7 后端模块：将注册表注入 Nest 容器
 
@@ -487,12 +487,21 @@ private async invokeEnglishPackSubModelJson(params: {
 | `silent` 与 `HttpClient` | `apps/frontend/src/utils/fetch.ts` |
 | 取消流封装 | `apps/frontend/src/service/index.ts` |
 | 路径常量 | `apps/frontend/src/service/api.ts` |
-| 单词包 SSE | `apps/frontend/src/utils/englishVocabularySse.ts` |
-| 经典句 SSE | `apps/frontend/src/utils/englishClassicQuotesSse.ts` |
+| 单词包 / 经典句 SSE（共用模块） | `apps/frontend/src/utils/englishLearningPackSse.ts` |
 | Nest 模块 | `apps/backend/src/services/english-learning/english-learning.module.ts` |
 | 控制器：取消 + SSE + `wireEnglishLearningSseAbort` | `apps/backend/src/services/english-learning/english-learning.controller.ts` |
 | `streamId` → `AbortController` 注册表 | `apps/backend/src/services/english-learning/english-learning-stream-abort.registry.ts` |
 | 取消 Body DTO | `apps/backend/src/services/english-learning/dto/cancel-english-learning-stream.dto.ts` |
 | 生成与 `AbortSignal` / LLM | `apps/backend/src/services/english-learning/english-learning.service.ts` |
+
+---
+
+## 8. 附录：SSE 客户端合并为 `englishLearningPackSse.ts`
+
+原先拆分为 `englishVocabularySse.ts` 与 `englishClassicQuotesSse.ts` 的两套 **读流、`processLine`、`abort` + `postEnglishLearningStreamCancel`** 逻辑，已合并为单一模块 **`apps/frontend/src/utils/englishLearningPackSse.ts`**：通过 `PackSseDefinition<TItem>` 与 `runEnglishLearningPackSseStream` 参数化 `vocab.*` / `classic.*` 与 `parseItems`，对外仍导出 `streamEnglishVocabularyPack`、`streamEnglishClassicQuotes`。与本文 **`http.post` + `silent`** 正交：取消请求在 `service/index.ts`，本附录仅说明「谁在什么时机调用取消」。
+
+**专题文档（实现思路 + 带注释代码摘录）**：[english-learning-pack-sse.md](./english-learning-pack-sse.md)
+
+---
 
 若与仓库最新源码不一致，以源码为准。

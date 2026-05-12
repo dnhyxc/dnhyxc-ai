@@ -705,6 +705,8 @@ export const zhCN = {
 	'englishLearning.vocab.empty': '未返回词条，请换主题重试',
 	'englishLearning.vocab.playWord': '朗读该词',
 	'englishLearning.vocab.listHeading': '单词列表',
+	'englishLearning.vocab.collapseList': '收起单词列表',
+	'englishLearning.vocab.expandList': '展开单词列表',
 	'englishLearning.vocab.historyTitle': '历史拉取记录',
 	'englishLearning.vocab.historyOpenDrawer': '历史记录',
 	'englishLearning.vocab.historyEmpty':
@@ -738,6 +740,8 @@ export const zhCN = {
 	'englishLearning.classic.empty': '未返回条目，请换主题重试',
 	'englishLearning.classic.playQuote': '朗读该句',
 	'englishLearning.classic.listHeading': '语句列表',
+	'englishLearning.classic.collapseList': '收起语句列表',
+	'englishLearning.classic.expandList': '展开语句列表',
 	'englishLearning.classic.sourceLabel': '出处：',
 	'englishLearning.classic.historyTitle': '经典语句历史',
 	'englishLearning.classic.historyOpenDrawer': '历史记录',

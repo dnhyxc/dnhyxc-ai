@@ -24,7 +24,7 @@
 | Service（prompt、保存、历史 API 类型） | `apps/backend/src/services/english-learning/english-learning.service.ts` |
 | 前端 Store | `apps/frontend/src/store/englishAgent.ts` |
 | 前端页面 | `apps/frontend/src/views/englishLearning/LearningToolbar.tsx`、`VocabularySection.tsx`、`ClassicQuotesSection.tsx` |
-| 前端 SSE 工具 | `apps/frontend/src/utils/englishVocabularySse.ts`、`englishClassicQuotesSse.ts` |
+| 前端 SSE 工具 | `apps/frontend/src/utils/englishLearningPackSse.ts` |
 | 前端 API 类型 | `apps/frontend/src/service/index.ts` |
 | 文案 | `apps/frontend/src/i18n/locales/zh-CN.ts`、`en-US.ts` |
 | 总览补充 | `docs/backend/english-learning-backend-implementation.md`（交叉引用 + 概述措辞） |

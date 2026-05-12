@@ -26,7 +26,7 @@
 | 后端文档（既有文更新） | `docs/backend/english-learning-gen-robustness.md`                                                                     |
 | 前端常量               | `apps/frontend/src/constant/index.ts`                                                                                 |
 | 前端工具聚合           | `apps/frontend/src/utils/index.ts`                                                                                    |
-| SSE                    | `apps/frontend/src/utils/englishVocabularySse.ts`、`englishClassicQuotesSse.ts`                                       |
+| SSE                    | `apps/frontend/src/utils/englishLearningPackSse.ts`                                       |
 | 视图                   | `apps/frontend/src/views/englishLearning/VocabularySection.tsx`、`ClassicQuotesSection.tsx`、`agentToolStatusText.ts` |
 | i18n                   | `apps/frontend/src/i18n/locales/zh-CN.ts`、`en-US.ts`                                                                 |
 
@@ -260,7 +260,7 @@ subscriber.next({
 
 | 字段                       | 逐行释义                                                                    |
 | -------------------------- | --------------------------------------------------------------------------- |
-| `type: 'vocab.agent_tool'` | 与前端 `englishVocabularySse` 分支约定一致；经典句为 `classic.agent_tool`。 |
+| `type: 'vocab.agent_tool'` | 与前端 `englishLearningPackSse`（`vocab.*` 分支）约定一致；经典句为 `classic.agent_tool`。 |
 | `streamId`                 | 与本次流式会话一致，便于前端关联（若需）。                                  |
 | `phase`                    | `start` / `end`，驱动「进行中 / 已完成」文案。                              |
 | `name`                     | LangChain 工具名，如 `internet_search`、`knowledge_base_retrieval`。        |
@@ -411,16 +411,16 @@ export function displayIpaWrapped(ipa: string): string {
 
 ### 4.6 前端 SSE：`vocab.agent_tool` / `classic.agent_tool`
 
-**来源**：`apps/frontend/src/utils/englishVocabularySse.ts`（类型与 `processLine` 分支，约 L62–L187）
+**来源**：`apps/frontend/src/utils/englishLearningPackSse.ts`（`EnglishPackAgentToolEvent`、`EnglishPackStreamCallbacks` 与 `processLine` 内 `` `${tp}agent_tool` `` 分支，约 L102–L259）
 
 | 片段                          | 逐行释义                                        |
 | ----------------------------- | ----------------------------------------------- |
-| `EnglishVocabAgentToolEvent`  | `phase`、`name`、`query` 与后端 payload 对齐。  |
+| `EnglishPackAgentToolEvent`   | `phase`、`name`、`query` 与后端 payload 对齐（单词与经典句共用类型）。 |
 | `onAgentTool?:`               | 可选回调，不设则忽略工具事件。                  |
-| `type === 'vocab.agent_tool'` | 解析 `phase`（默认 `start`）、`name`、`query`。 |
+| `` type === `${tp}agent_tool` `` | `tp` 为 `vocab.` 或 `classic.`；解析 `phase`（默认 `start`）、`name`、`query`。 |
 | `return false`                | 不结束 SSE 读取循环（与 progress/chunk 相同）。 |
 
-`englishClassicQuotesSse.ts` 中 **`classic.agent_tool`** 结构对称。
+> 说明：合并前分别在 `englishVocabularySse.ts` / `englishClassicQuotesSse.ts` 中维护；现由 `PackSseDefinition.typePrefix` 驱动，行为等价。
 
 ---
 
@@ -494,7 +494,7 @@ export function displayIpaWrapped(ipa: string): string {
 | Agent 检索     | `apps/backend/src/services/agent/agent.service.ts`                              |
 | SSE 与 REST    | `apps/backend/src/services/english-learning/english-learning.controller.ts`     |
 | 生成主逻辑     | `apps/backend/src/services/english-learning/english-learning.service.ts`        |
-| 前端 SSE       | `apps/frontend/src/utils/englishVocabularySse.ts`、`englishClassicQuotesSse.ts` |
+| 前端 SSE       | `apps/frontend/src/utils/englishLearningPackSse.ts` |
 | IPA / 数字清洗 | `apps/frontend/src/utils/index.ts`                                              |
 | 常量           | `apps/frontend/src/constant/index.ts`                                           |
 

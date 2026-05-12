@@ -59,7 +59,7 @@ export const EnglishLearningToolbar = observer(
 				{/* 标题区 */}
 				<div className="mb-4 flex items-start gap-3">
 					<div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-linear-to-r from-cyan-500 to-blue-600">
-						<Languages className="size-6 text-textcolor" aria-hidden />
+						<Languages className="size-6 text-white" aria-hidden />
 					</div>
 					<div className="min-w-0">
 						<div className="text-textcolor leading-tight font-semibold tracking-tight">

@@ -22,7 +22,7 @@
 | DTO + 纯函数 | [`apps/backend/src/services/english-learning/dto/generate-vocabulary.dto.ts`](../../apps/backend/src/services/english-learning/dto/generate-vocabulary.dto.ts) |
 | Controller（SSE `target`） | [`apps/backend/src/services/english-learning/english-learning.controller.ts`](../../apps/backend/src/services/english-learning/english-learning.controller.ts) |
 | Service（生成循环目标条数） | [`apps/backend/src/services/english-learning/english-learning.service.ts`](../../apps/backend/src/services/english-learning/english-learning.service.ts) |
-| 前端 SSE | [`apps/frontend/src/utils/englishVocabularySse.ts`](../../apps/frontend/src/utils/englishVocabularySse.ts)、[`englishClassicQuotesSse.ts`](../../apps/frontend/src/utils/englishClassicQuotesSse.ts) |
+| 前端 SSE | [`apps/frontend/src/utils/englishLearningPackSse.ts`](../../apps/frontend/src/utils/englishLearningPackSse.ts) |
 | 前端页面 | [`apps/frontend/src/views/englishLearning/VocabularySection.tsx`](../../apps/frontend/src/views/englishLearning/VocabularySection.tsx)、[`ClassicQuotesSection.tsx`](../../apps/frontend/src/views/englishLearning/ClassicQuotesSection.tsx) |
 | 文案 | [`apps/frontend/src/i18n/locales/zh-CN.ts`](../../apps/frontend/src/i18n/locales/zh-CN.ts)、[`en-US.ts`](../../apps/frontend/src/i18n/locales/en-US.ts) |
 | 常量注释 | [`apps/frontend/src/constant/index.ts`](../../apps/frontend/src/constant/index.ts) |
@@ -120,7 +120,7 @@ const maxRounds = this.resolveMaxRounds(count, TOPIC_PACK_ITEMS_PER_ROUND);
 
 ### 4.4 前端 SSE：省略 `count` 键
 
-**来源**：[`apps/frontend/src/utils/englishVocabularySse.ts`](../../apps/frontend/src/utils/englishVocabularySse.ts)（约 L92–L133）
+**来源**：[`apps/frontend/src/utils/englishLearningPackSse.ts`](../../apps/frontend/src/utils/englishLearningPackSse.ts)（`runEnglishLearningPackSseStream` 内请求体构造，约 L180–L186）
 
 ```typescript
 body: {

@@ -789,6 +789,8 @@ export const enUS = {
 	'englishLearning.vocab.empty': 'No items returned; try another topic',
 	'englishLearning.vocab.playWord': 'Play word',
 	'englishLearning.vocab.listHeading': 'Words',
+	'englishLearning.vocab.collapseList': 'Collapse word list',
+	'englishLearning.vocab.expandList': 'Expand word list',
 	'englishLearning.vocab.historyTitle': 'Past word lists',
 	'englishLearning.vocab.historyOpenDrawer': 'History',
 	'englishLearning.vocab.historyEmpty':
@@ -823,6 +825,8 @@ export const enUS = {
 	'englishLearning.classic.empty': 'No lines returned; try another topic',
 	'englishLearning.classic.playQuote': 'Play line',
 	'englishLearning.classic.listHeading': 'Lines',
+	'englishLearning.classic.collapseList': 'Collapse quote list',
+	'englishLearning.classic.expandList': 'Expand quote list',
 	'englishLearning.classic.sourceLabel': 'Source: ',
 	'englishLearning.classic.historyTitle': 'Past quote lists',
 	'englishLearning.classic.historyOpenDrawer': 'History',
