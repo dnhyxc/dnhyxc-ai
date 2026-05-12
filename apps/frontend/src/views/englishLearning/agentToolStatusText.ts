@@ -10,8 +10,8 @@ export function formatEnglishLearningAgentToolLine(
 			? t('englishLearning.agentTool.internet')
 			: e.name === 'knowledge_base_retrieval'
 				? t('englishLearning.agentTool.knowledge')
-				: e.name === 'get_current_datetime'
-					? t('englishLearning.agentTool.datetime')
+				: e.name === 'get_current_date' || e.name === 'get_current_datetime'
+					? t('englishLearning.agentTool.date')
 					: t('englishLearning.agentTool.other', {
 							name: e.name || 'tool',
 						});

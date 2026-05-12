@@ -53,6 +53,12 @@ export enum ModelEnum {
 	DEEPSEEK_API_KEY = 'DEEPSEEK_API_KEY',
 	DEEPSEEK_MODEL_NAME = 'DEEPSEEK_MODEL_NAME',
 	DEEPSEEK_BASE_URL = 'DEEPSEEK_BASE_URL',
+	/**
+	 * 英语学习词句拉取：硅基流动 Chat 模型名（`/v1/chat/completions`），默认 Pro/zai-org/GLM-4.7。
+	 * API Key 与 Base URL 沿用 KnowledgeQaEnum.SILICONFLOW_*（与知识库 embedding 同源）。
+	 * @see https://docs.siliconflow.cn/cn/api-reference/chat-completions/chat-completions
+	 */
+	ENGLISH_LEARNING_SILICONFLOW_MODEL_NAME = 'ENGLISH_LEARNING_SILICONFLOW_MODEL_NAME',
 	ZHIPU_API_KEY = 'ZHIPU_API_KEY',
 	ZHIPU_MODEL_NAME = 'ZHIPU_MODEL_NAME',
 	ZHIPU_BASE_URL = 'ZHIPU_BASE_URL',

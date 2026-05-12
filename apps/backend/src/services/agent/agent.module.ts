@@ -15,6 +15,6 @@ import { AgentSessionSummary } from './agent-session-summary.entity';
 	],
 	controllers: [AgentController],
 	providers: [AgentService, AgentMemoryService],
-	exports: [AgentService],
+	exports: [AgentService, AgentMemoryService],
 })
 export class AgentModule {}

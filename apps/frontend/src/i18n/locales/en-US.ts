@@ -759,7 +759,7 @@ export const enUS = {
 
 	'englishLearning.agentTool.internet': 'Web search',
 	'englishLearning.agentTool.knowledge': 'Knowledge base',
-	'englishLearning.agentTool.datetime': 'Date/time',
+	'englishLearning.agentTool.date': 'Current date',
 	'englishLearning.agentTool.other': '{name}',
 	'englishLearning.agentTool.querySuffix': ': {q}',
 	'englishLearning.agentTool.statusDoing':

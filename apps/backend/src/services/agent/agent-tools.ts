@@ -4,14 +4,14 @@ import type { WebSearchService } from '../web-search/web-search.service';
 import type { WebSearchContextResult } from '../web-search/web-search.types';
 
 /**
- * 当前服务器 UTC 时间（LangChain DynamicTool）
+ * 当前服务器 UTC 日期（LangChain DynamicTool，格式 YYYY-MM-DD）
  */
-export function createAgentDatetimeTool(): DynamicTool {
+export function createAgentDateTool(): DynamicTool {
 	return new DynamicTool({
-		name: 'get_current_datetime',
+		name: 'get_current_date',
 		description:
-			'返回当前服务器时间的 ISO8601 字符串（UTC），用于回答与时间相关的问题。',
-		func: async () => new Date().toISOString(),
+			'返回当前服务器日期，格式为 YYYY-MM-DD（按 UTC），用于回答与「今天」「当前日期」等涉及时间相关的问题。',
+		func: async () => new Date().toISOString().slice(0, 10),
 	});
 }
 
@@ -28,17 +28,17 @@ export type BuildAgentLangChainToolsOpts = {
 };
 
 /**
- * 组装 Agent 使用的 LangChain 工具列表（顺序：联网检索 → 知识库 RAG → 时间）
+ * 组装 Agent 使用的 LangChain 工具列表（顺序：联网检索 → 知识库 RAG → 当前日期）
  */
 export function buildAgentLangChainTools(
 	deps: BuildAgentLangChainToolsDeps,
 	opts?: BuildAgentLangChainToolsOpts,
 ): DynamicTool[] {
 	return [
+		createAgentDateTool(),
 		...deps.webSearchService.createLangChainWebSearchTools({
 			onSearchComplete: opts?.onInternetSearchComplete,
 		}),
 		deps.knowledgeQaService.createAgentKnowledgeRagTool(deps.userId),
-		createAgentDatetimeTool(),
 	];
 }

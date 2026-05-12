@@ -679,7 +679,7 @@ export const zhCN = {
 
 	'englishLearning.agentTool.internet': '联网搜索',
 	'englishLearning.agentTool.knowledge': '知识库检索',
-	'englishLearning.agentTool.datetime': '获取时间',
+	'englishLearning.agentTool.date': '获取日期',
 	'englishLearning.agentTool.other': '{name}',
 	'englishLearning.agentTool.querySuffix': '：{q}',
 	'englishLearning.agentTool.statusDoing': '资料助手 · {action} 进行中{detail}',
