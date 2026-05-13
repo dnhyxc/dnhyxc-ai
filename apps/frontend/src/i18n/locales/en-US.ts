@@ -763,7 +763,7 @@ export const enUS = {
 	'englishLearning.intent.reading':
 		'[Intent] Generate a short text for intensive reading and explain hard parts.',
 	'englishLearning.intent.literature':
-		'[Intent] Literature guide: context, summary, and discussion—avoid long copyrighted quotations.',
+		'[Intent] Literature guide: context, summary, and discussion; also pick at least 5 high-quality passages from the original (each excerpt reasonably short), each followed by a Chinese translation; avoid unrelated long verbatim copying.',
 	'englishLearning.intent.grammar':
 		'[Intent] Explain the grammar with good and common-mistake examples.',
 	'englishLearning.pendingIntent': 'Intent (appended on next send)',

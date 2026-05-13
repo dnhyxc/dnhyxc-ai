@@ -62,6 +62,11 @@ const chipDefs = [
 	},
 ] as const;
 
+/** 快捷意图与输入框联动：选中填入意图名，取消选中时由父级移除自动填入片段 */
+export type QuickIntentInputSyncPayload =
+	| { mode: 'select'; label: string }
+	| { mode: 'clear' };
+
 /** 左栏内统一卡片容器 */
 function SidebarPanel({
 	children,
@@ -75,78 +80,91 @@ function SidebarPanel({
 	);
 }
 
-export const EnglishLearningToolbar = observer(
-	function EnglishLearningToolbar() {
-		const { t } = useI18n();
+type EnglishLearningToolbarProps = {
+	onQuickIntentInputSync?: (payload: QuickIntentInputSyncPayload) => void;
+};
 
-		return (
-			<SidebarPanel className="min-w-0">
-				{/* 标题区 */}
-				<div className="mb-4 flex items-start gap-3">
-					<div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-linear-to-r from-cyan-500 to-blue-600">
-						<Languages className="size-6 text-white" aria-hidden />
-					</div>
-					<div className="min-w-0">
-						<div className="text-textcolor leading-tight font-semibold tracking-tight">
-							{t('route.englishLearning.subtitle')}
-						</div>
-						<div className="text-textcolor/50 mt-1 text-xs leading-snug">
-							{t('englishLearning.toolbarSubtitleShort')}
-						</div>
-					</div>
+export const EnglishLearningToolbar = observer(function EnglishLearningToolbar({
+	onQuickIntentInputSync,
+}: EnglishLearningToolbarProps) {
+	const { t } = useI18n();
+
+	return (
+		<SidebarPanel className="min-w-0">
+			{/* 标题区 */}
+			<div className="mb-4 flex items-start gap-3">
+				<div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-linear-to-r from-cyan-500 to-blue-600">
+					<Languages className="size-6 text-white" aria-hidden />
 				</div>
-
-				{/*
-				 * 快捷意图：按本卡片（容器查询）宽度弹性列数——极窄单列，随宽度增加自动多列。
-				 * auto-fill + minmax：列最小约 7.25rem，放不下则自动降为 1 列。
-				 */}
 				<div className="min-w-0">
-					<div className="text-textcolor/45 mb-2 flex items-center gap-1.5 text-sm font-medium tracking-wide">
-						{t('englishLearning.quickIntents')}
+					<div className="text-textcolor leading-tight font-semibold tracking-tight">
+						{t('route.englishLearning.subtitle')}
 					</div>
-					<div
-						className={cn(
-							'grid min-w-0 gap-2.5',
-							'grid-cols-[repeat(auto-fill,minmax(min(100%,7.25rem),1fr))]',
-						)}
-					>
-						{chipDefs.map((c) => {
-							const prefix = t(c.prefixKey);
-							const selected = englishAgentStore.pendingIntentPrefix === prefix;
-							return (
-								<Button
-									key={c.key}
-									variant="link"
-									size="sm"
-									aria-pressed={selected}
-									className={cn(
-										'border border-theme/10 bg-theme/5',
-										selected
-											? 'text-teal-500 border-teal-500/20'
-											: 'text-textcolor/60 hover:text-textcolor/90',
-									)}
-									onClick={() =>
-										englishAgentStore.setIntentPrefix(selected ? '' : prefix)
-									}
-								>
-									{t(c.labelKey)}
-								</Button>
-							);
-						})}
+					<div className="text-textcolor/50 mt-1 text-xs leading-snug">
+						{t('englishLearning.toolbarSubtitleShort')}
 					</div>
 				</div>
+			</div>
 
-				{englishAgentStore.pendingIntentPrefix ? (
-					<div className="mt-2.5 bg-teal-500/10 rounded-md px-3 py-2.5 border border-theme/10">
-						<div className="text-teal-700/85 dark:text-teal-400/90 mb-1 text-sm font-semibold uppercase tracking-wider">
-							{t('englishLearning.pendingIntentShort')}
-						</div>
-						<div className="text-textcolor/80 line-clamp-5 text-sm leading-relaxed">
-							{englishAgentStore.pendingIntentPrefix}
-						</div>
+			{/*
+			 * 快捷意图：按本卡片（容器查询）宽度弹性列数——极窄单列，随宽度增加自动多列。
+			 * auto-fill + minmax：列最小约 7.25rem，放不下则自动降为 1 列。
+			 */}
+			<div className="min-w-0">
+				<div className="text-textcolor/45 mb-2 flex items-center gap-1.5 text-sm font-medium tracking-wide">
+					{t('englishLearning.quickIntents')}
+				</div>
+				<div
+					className={cn(
+						'grid min-w-0 gap-2.5',
+						'grid-cols-[repeat(auto-fill,minmax(min(100%,7.25rem),1fr))]',
+					)}
+				>
+					{chipDefs.map((c) => {
+						const prefix = t(c.prefixKey);
+						const selected = englishAgentStore.pendingIntentPrefix === prefix;
+						return (
+							<Button
+								key={c.key}
+								variant="link"
+								size="sm"
+								aria-pressed={selected}
+								className={cn(
+									'border border-theme/10 bg-theme/5',
+									selected
+										? 'text-teal-500 border-teal-500/20'
+										: 'text-textcolor/60 hover:text-textcolor/90',
+								)}
+								onClick={() => {
+									if (selected) {
+										englishAgentStore.setIntentPrefix('');
+										onQuickIntentInputSync?.({ mode: 'clear' });
+									} else {
+										englishAgentStore.setIntentPrefix(prefix);
+										onQuickIntentInputSync?.({
+											mode: 'select',
+											label: t(c.labelKey),
+										});
+									}
+								}}
+							>
+								{t(c.labelKey)}
+							</Button>
+						);
+					})}
+				</div>
+			</div>
+
+			{englishAgentStore.pendingIntentPrefix ? (
+				<div className="mt-2.5 bg-teal-500/10 rounded-md px-3 py-2.5 border border-theme/10">
+					<div className="text-teal-700/85 dark:text-teal-400/90 mb-1 text-sm font-semibold uppercase tracking-wider">
+						{t('englishLearning.pendingIntentShort')}
 					</div>
-				) : null}
-			</SidebarPanel>
-		);
-	},
-);
+					<div className="text-textcolor/80 line-clamp-5 text-sm leading-relaxed">
+						{englishAgentStore.pendingIntentPrefix}
+					</div>
+				</div>
+			) : null}
+		</SidebarPanel>
+	);
+});

@@ -680,7 +680,7 @@ export const zhCN = {
 		'【意图】请提供中英对照翻译，可分句；标注专有名词取舍。',
 	'englishLearning.intent.reading': '【意图】请生成一篇精读短文并注释难点。',
 	'englishLearning.intent.literature':
-		'【意图】请做名著/英语文献导读：摘要、背景与讨论题，避免大段复制原文。',
+		'【意图】请做名著/英语文献导读：摘要、背景与讨论题；并请从原文中摘取不少于 5 段优质段落（每段适度篇幅），逐段附带中文翻译；避免无关的冗长照抄。',
 	'englishLearning.intent.grammar':
 		'【意图】请讲解下列语法点并给出正例与常见错误。',
 	'englishLearning.pendingIntent': '已选意图（下次发送时附带）',

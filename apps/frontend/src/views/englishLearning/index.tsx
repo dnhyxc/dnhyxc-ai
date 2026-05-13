@@ -26,8 +26,24 @@ import englishAgentStore from '@/store/englishAgent';
 import type { ChatI18nT, Message } from '@/types/chat';
 import { stopAllEnglishPlayback } from '@/utils/englishTts';
 import { ClassicQuotesSection } from './ClassicQuotesSection';
-import { EnglishLearningToolbar } from './LearningToolbar';
+import {
+	EnglishLearningToolbar,
+	type QuickIntentInputSyncPayload,
+} from './LearningToolbar';
 import { VocabularyPackSection } from './VocabularySection';
+
+/** 取消选中意图时：去掉输入框开头的自动填充意图名，保留用户后续手动输入 */
+function stripAutoFilledIntentName(input: string, snapshot: string): string {
+	const s = snapshot.trim();
+	if (!s) return input;
+	if (input.trim() === s) return '';
+	const raw = input;
+	const lead = raw.match(/^\s*/)?.[0] ?? '';
+	const rest = raw.slice(lead.length);
+	if (!rest.startsWith(s)) return raw;
+	const after = rest.slice(s.length).replace(/^\s+/, '');
+	return lead + after;
+}
 
 function selectMessageByChatId(chatId: string): Message | undefined {
 	return englishAgentStore.messages.find((m) => m.chatId === chatId);
@@ -89,6 +105,10 @@ const EnglishLearning = observer(function EnglishLearning() {
 	const [searchParams, setSearchParams] = useSearchParams();
 	const [input, setInput] = useState('');
 	const scrollViewportRef = useRef<HTMLDivElement>(null);
+	/** Agent 输入框（ChatTextArea），快捷意图填入后用于自动聚焦 */
+	const chatInputRef = useRef<HTMLTextAreaElement | null>(null);
+	/** 当前由快捷意图自动填入输入框的展示名（与 chip 文案一致），用于取消选中时精确移除 */
+	const intentInputAutoFillRef = useRef<string | null>(null);
 
 	const sessionQ = searchParams.get('session');
 
@@ -100,15 +120,36 @@ const EnglishLearning = observer(function EnglishLearning() {
 
 	const onNewChat = useCallback(() => {
 		stopAllEnglishPlayback();
+		intentInputAutoFillRef.current = null;
 		englishAgentStore.resetConversation();
 		setSearchParams({}, { replace: true });
 	}, [setSearchParams]);
+
+	const onQuickIntentInputSync = useCallback(
+		(payload: QuickIntentInputSyncPayload) => {
+			if (payload.mode === 'select') {
+				intentInputAutoFillRef.current = payload.label;
+				setInput(payload.label);
+				// 等布局提交后再聚焦，避免 ref 未更新或光标未落到文本域
+				requestAnimationFrame(() => {
+					chatInputRef.current?.focus();
+				});
+				return;
+			}
+			const snap = intentInputAutoFillRef.current;
+			intentInputAutoFillRef.current = null;
+			if (!snap) return;
+			setInput((prev) => stripAutoFilledIntentName(prev, snap));
+		},
+		[],
+	);
 
 	const titleFallback = t('route.englishLearning.title');
 
 	const sendMessage = useCallback(async () => {
 		const text = input.trim();
 		if (!text) return;
+		intentInputAutoFillRef.current = null;
 		setInput('');
 		await englishAgentStore.sendMessage(text, { titleFallback });
 		if (englishAgentStore.sessionId) {
@@ -159,7 +200,9 @@ const EnglishLearning = observer(function EnglishLearning() {
 								)}
 							>
 								<div className="my-4 flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-y-contain">
-									<EnglishLearningToolbar />
+									<EnglishLearningToolbar
+										onQuickIntentInputSync={onQuickIntentInputSync}
+									/>
 									<VocabularyPackSection />
 									<ClassicQuotesSection />
 								</div>
@@ -231,6 +274,7 @@ const EnglishLearning = observer(function EnglishLearning() {
 										<div className="mx-auto w-full max-w-3xl">
 											<ChatEntry
 												t={t}
+												chatInputRef={chatInputRef}
 												input={input}
 												setInput={setInput}
 												className="w-full border-0 px-0 pb-3 pt-1"
