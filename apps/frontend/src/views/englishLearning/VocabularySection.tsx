@@ -9,6 +9,7 @@ import {
 	Square,
 	Volume2,
 } from 'lucide-react';
+import { observer } from 'mobx-react';
 import {
 	type UIEventHandler,
 	useCallback,
@@ -25,15 +26,14 @@ import {
 } from '@/constant';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
-import type {
-	EnglishVocabularyHistoryEntry,
-	EnglishVocabularyItem,
-} from '@/service';
+import type { EnglishVocabularyHistoryEntry } from '@/service';
 import {
 	getEnglishVocabularyHistoryDetail,
 	listEnglishVocabularyHistory,
 } from '@/service';
-import type { SearchOrganicItem } from '@/types/chat';
+import EnglishPackStore, {
+	type EnglishPackUiProgress,
+} from '@/store/englishPack';
 import { displayIpaWrapped, sanitizeCountDigits } from '@/utils';
 import { streamEnglishVocabularyPack } from '@/utils/englishLearningPackSse';
 import { mergeEnglishPackWebSearchOrganics } from '@/utils/englishPackWebSearchMerge';
@@ -45,26 +45,19 @@ import { formatEnglishLearningAgentToolLine } from './agentToolStatusText';
 import { VocabularyHistoryDrawer } from './VocabularyHistoryDrawer';
 import { MasterWebSearchResultsBar } from './WebSearchResultsBar';
 
-export type VocabProgressState = {
-	collected: number;
-	target: number;
-	round: number;
-};
+export type VocabProgressState = EnglishPackUiProgress;
 
 function VocabularyPackSectionInner() {
 	const { t } = useI18n();
 
+	const loading = EnglishPackStore.vocabLoading;
+	const agentToolLine = EnglishPackStore.vocabAgentToolLine;
+	const masterSearchOrganic = EnglishPackStore.vocabMasterSearchOrganic;
+	const progress = EnglishPackStore.vocabProgress;
+	const items = EnglishPackStore.vocabItems;
+
 	const [topic, setTopic] = useState('');
 	const [countInput, setCountInput] = useState('');
-	const [loading, setLoading] = useState(false);
-	/** Agent 检索阶段工具状态（DeepSeek 开始出词后清空） */
-	const [agentToolLine, setAgentToolLine] = useState<string | null>(null);
-	/** 主检索 `internet_search` 返回的网页列表（SSE `phase: organic`） */
-	const [masterSearchOrganic, setMasterSearchOrganic] = useState<
-		SearchOrganicItem[]
-	>([]);
-	const [progress, setProgress] = useState<VocabProgressState | null>(null);
-	const [items, setItems] = useState<EnglishVocabularyItem[]>([]);
 	const [playingKey, setPlayingKey] = useState<string | null>(null);
 	const [historyDrawerOpen, setHistoryDrawerOpen] = useState(false);
 	const [historyEntries, setHistoryEntries] = useState<
@@ -83,16 +76,6 @@ function VocabularyPackSectionInner() {
 	const historyHasMoreRef = useRef(true);
 	const historyFetchingMoreRef = useRef(false);
 	const historyDrawerOpenRef = useRef(false);
-
-	const abortRef = useRef<((fromUser?: boolean) => void) | null>(null);
-	const genIdRef = useRef(0);
-
-	useEffect(() => {
-		return () => {
-			abortRef.current?.();
-			abortRef.current = null;
-		};
-	}, []);
 
 	useEffect(() => {
 		historyDrawerOpenRef.current = historyDrawerOpen;
@@ -178,8 +161,8 @@ function VocabularyPackSectionInner() {
 				const res = await getEnglishVocabularyHistoryDetail(streamId);
 				const d = res.data;
 				if (d?.items?.length) {
-					setItems(d.items);
-					setMasterSearchOrganic(
+					EnglishPackStore.vocabLoadHistoryDetail(
+						d.items,
 						mergeEnglishPackWebSearchOrganics(d.webSearchRounds),
 					);
 					setListExpanded(true);
@@ -203,12 +186,7 @@ function VocabularyPackSectionInner() {
 	);
 
 	const cancelGenerate = useCallback(() => {
-		abortRef.current?.(true);
-		abortRef.current = null;
-		setLoading(false);
-		setAgentToolLine(null);
-		setMasterSearchOrganic([]);
-		setProgress(null);
+		EnglishPackStore.vocabCancelByUser();
 	}, []);
 
 	// 拉取单词表
@@ -236,45 +214,33 @@ function VocabularyPackSectionInner() {
 			body.count = effectiveTarget;
 		}
 
-		const myGen = ++genIdRef.current;
-		abortRef.current?.();
-		abortRef.current = null;
+		const myGen = EnglishPackStore.startVocabStream(effectiveTarget);
 
-		setLoading(true);
-		setAgentToolLine(null);
-		setMasterSearchOrganic([]);
-		setProgress({ collected: 0, target: effectiveTarget, round: 0 });
-		setItems([]);
 		setListExpanded(true);
 
 		const abort = await streamEnglishVocabularyPack({
 			body,
 			callbacks: {
 				onProgress: (p) => {
-					if (genIdRef.current !== myGen) return;
-					setProgress(p);
+					EnglishPackStore.vocabOnProgress(myGen, p);
 				},
 				onAgentTool: (ev) => {
-					if (genIdRef.current !== myGen) return;
 					if (ev.phase === 'organic' && ev.organic?.length) {
-						setMasterSearchOrganic(ev.organic);
+						EnglishPackStore.vocabOnAgentTool(myGen, null, ev.organic);
 						return;
 					}
-					setAgentToolLine(formatEnglishLearningAgentToolLine(t, ev));
+					EnglishPackStore.vocabOnAgentTool(
+						myGen,
+						formatEnglishLearningAgentToolLine(t, ev),
+						[],
+					);
 				},
 				onChunk: ({ items: delta }) => {
-					if (genIdRef.current !== myGen) return;
-					if (!delta.length) return;
-					setAgentToolLine(null);
-					setItems((prev) => [...prev, ...delta]);
+					EnglishPackStore.vocabOnChunk(myGen, delta);
 				},
 				onDone: ({ items: list, requested }) => {
-					if (genIdRef.current !== myGen) return;
-					abortRef.current = null;
-					setLoading(false);
-					setAgentToolLine(null);
-					setProgress(null);
-					setItems(list);
+					if (myGen !== EnglishPackStore.vocabStreamGenId) return;
+					EnglishPackStore.vocabOnDone(myGen, list);
 					setLoadedStreamId(null);
 					if (historyDrawerOpenRef.current) {
 						void fetchHistoryFirstPage();
@@ -295,30 +261,21 @@ function VocabularyPackSectionInner() {
 					}
 				},
 				onError: (msg) => {
-					if (genIdRef.current !== myGen) return;
-					abortRef.current = null;
-					setLoading(false);
-					setAgentToolLine(null);
-					setProgress(null);
+					if (myGen !== EnglishPackStore.vocabStreamGenId) return;
+					EnglishPackStore.vocabOnError(myGen);
 					Toast({ type: 'error', title: msg });
 				},
 				onUserAbort: () => {
-					if (genIdRef.current !== myGen) return;
-					abortRef.current = null;
-					setLoading(false);
-					setAgentToolLine(null);
-					setProgress(null);
+					if (myGen !== EnglishPackStore.vocabStreamGenId) return;
+					EnglishPackStore.vocabOnUserAbort(myGen);
 					Toast({
 						type: 'info',
 						title: t('englishLearning.vocab.aborted'),
 					});
 				},
 				onIncomplete: () => {
-					if (genIdRef.current !== myGen) return;
-					abortRef.current = null;
-					setLoading(false);
-					setAgentToolLine(null);
-					setProgress(null);
+					if (myGen !== EnglishPackStore.vocabStreamGenId) return;
+					EnglishPackStore.vocabOnIncomplete(myGen);
 					Toast({
 						type: 'warning',
 						title: t('englishLearning.vocab.streamDisconnected'),
@@ -326,7 +283,9 @@ function VocabularyPackSectionInner() {
 				},
 			},
 		});
-		abortRef.current = abort;
+		if (myGen === EnglishPackStore.vocabStreamGenId) {
+			EnglishPackStore.setVocabAbort(abort);
+		}
 	}, [topic, countInput, t, fetchHistoryFirstPage]);
 
 	const toggleWordAudio = useCallback(
@@ -366,7 +325,7 @@ function VocabularyPackSectionInner() {
 	}, [countInput]);
 
 	return (
-		<div className="rounded-none p-4 pb-0 @container min-w-0">
+		<div className="rounded-none p-4 pb-0 @container min-w-0 mb-7.5">
 			<div className="mb-4 flex items-start gap-3">
 				<div className="bg-linear-to-r from-teal-500 to-cyan-600 @min-[26rem]:size-10 flex size-10 shrink-0 items-center justify-center rounded-md">
 					<BookText
@@ -399,7 +358,7 @@ function VocabularyPackSectionInner() {
 				disabled={loading}
 			/>
 
-			<div className="mb-1 space-y-3">
+			<div className="mb-2.5 space-y-3">
 				<div className="w-full min-w-0">
 					<label
 						htmlFor="english-vocab-count"
@@ -444,12 +403,7 @@ function VocabularyPackSectionInner() {
 						))}
 					</div>
 				</div>
-				<div
-					className={cn(
-						'flex min-w-0 items-stretch gap-2 mb-7.5',
-						items.length ? 'mb-4.5' : listExpanded ? 'mb-7.5' : 'mb-0',
-					)}
-				>
+				<div className="flex min-w-0 items-stretch gap-2">
 					<Button
 						type="button"
 						size="sm"
@@ -517,12 +471,7 @@ function VocabularyPackSectionInner() {
 			</div>
 			{items.length > 0 ? (
 				<>
-					<div
-						className={cn(
-							'sticky -top-2.5 z-20 -mx-4 pb-2 flex min-h-6 items-center justify-between gap-2 bg-theme-background/95 px-4 backdrop-blur-sm',
-							listExpanded ? 'mb-0' : 'mb-3 mt-4.5',
-						)}
-					>
+					<div className="sticky -top-2.5 z-20 -mx-4 px-4 pb-2 flex min-h-6 items-center justify-between gap-2 bg-theme-background/95 backdrop-blur-sm">
 						<div className="flex items-center gap-2 text-textcolor/45 text-sm font-medium">
 							{t('englishLearning.vocab.listHeading')}
 							{masterSearchOrganic.length > 0 ? (
@@ -561,7 +510,7 @@ function VocabularyPackSectionInner() {
 						</Button>
 					</div>
 					{listExpanded ? (
-						<div className="grid grid-cols-1 gap-4 @min-[26rem]:grid-cols-2 mb-7.5">
+						<div className="grid grid-cols-1 gap-4 @min-[26rem]:grid-cols-2">
 							{items.map((item, i) => {
 								const key = `${i}-${item.word}`;
 								const playing = playingKey === key;
@@ -630,4 +579,4 @@ function VocabularyPackSectionInner() {
 	);
 }
 
-export const VocabularyPackSection = VocabularyPackSectionInner;
+export const VocabularyPackSection = observer(VocabularyPackSectionInner);

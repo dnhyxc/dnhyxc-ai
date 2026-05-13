@@ -9,6 +9,7 @@ import {
 	Square,
 	Volume2,
 } from 'lucide-react';
+import { observer } from 'mobx-react';
 import {
 	type UIEventHandler,
 	useCallback,
@@ -25,15 +26,14 @@ import {
 } from '@/constant';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
-import type {
-	EnglishClassicQuoteHistoryEntry,
-	EnglishClassicQuoteItem,
-} from '@/service';
+import type { EnglishClassicQuoteHistoryEntry } from '@/service';
 import {
 	getEnglishClassicQuotesHistoryDetail,
 	listEnglishClassicQuotesHistory,
 } from '@/service';
-import type { SearchOrganicItem } from '@/types/chat';
+import EnglishPackStore, {
+	type EnglishPackUiProgress,
+} from '@/store/englishPack';
 import { sanitizeCountDigits } from '@/utils';
 import { streamEnglishClassicQuotes } from '@/utils/englishLearningPackSse';
 import { mergeEnglishPackWebSearchOrganics } from '@/utils/englishPackWebSearchMerge';
@@ -45,26 +45,19 @@ import { formatEnglishLearningAgentToolLine } from './agentToolStatusText';
 import { ClassicQuotesHistoryDrawer } from './ClassicQuotesHistoryDrawer';
 import { MasterWebSearchResultsBar } from './WebSearchResultsBar';
 
-export type ClassicQuoteProgressState = {
-	collected: number;
-	target: number;
-	round: number;
-};
+export type ClassicQuoteProgressState = EnglishPackUiProgress;
 
 function ClassicQuotesSectionInner() {
 	const { t } = useI18n();
 
+	const loading = EnglishPackStore.classicLoading;
+	const agentToolLine = EnglishPackStore.classicAgentToolLine;
+	const masterSearchOrganic = EnglishPackStore.classicMasterSearchOrganic;
+	const progress = EnglishPackStore.classicProgress;
+	const items = EnglishPackStore.classicItems;
+
 	const [topic, setTopic] = useState('');
 	const [countInput, setCountInput] = useState('');
-	const [loading, setLoading] = useState(false);
-	const [agentToolLine, setAgentToolLine] = useState<string | null>(null);
-	const [masterSearchOrganic, setMasterSearchOrganic] = useState<
-		SearchOrganicItem[]
-	>([]);
-	const [progress, setProgress] = useState<ClassicQuoteProgressState | null>(
-		null,
-	);
-	const [items, setItems] = useState<EnglishClassicQuoteItem[]>([]);
 	const [playingKey, setPlayingKey] = useState<string | null>(null);
 	const [historyDrawerOpen, setHistoryDrawerOpen] = useState(false);
 	const [historyEntries, setHistoryEntries] = useState<
@@ -83,16 +76,6 @@ function ClassicQuotesSectionInner() {
 	const historyHasMoreRef = useRef(true);
 	const historyFetchingMoreRef = useRef(false);
 	const historyDrawerOpenRef = useRef(false);
-
-	const abortRef = useRef<((fromUser?: boolean) => void) | null>(null);
-	const genIdRef = useRef(0);
-
-	useEffect(() => {
-		return () => {
-			abortRef.current?.();
-			abortRef.current = null;
-		};
-	}, []);
 
 	useEffect(() => {
 		historyDrawerOpenRef.current = historyDrawerOpen;
@@ -177,8 +160,8 @@ function ClassicQuotesSectionInner() {
 				const res = await getEnglishClassicQuotesHistoryDetail(streamId);
 				const d = res.data;
 				if (d?.items?.length) {
-					setItems(d.items);
-					setMasterSearchOrganic(
+					EnglishPackStore.classicLoadHistoryDetail(
+						d.items,
 						mergeEnglishPackWebSearchOrganics(d.webSearchRounds),
 					);
 					setListExpanded(true);
@@ -202,12 +185,7 @@ function ClassicQuotesSectionInner() {
 	);
 
 	const cancelGenerate = useCallback(() => {
-		abortRef.current?.(true);
-		abortRef.current = null;
-		setLoading(false);
-		setAgentToolLine(null);
-		setMasterSearchOrganic([]);
-		setProgress(null);
+		EnglishPackStore.classicCancelByUser();
 	}, []);
 
 	const onGenerate = useCallback(async () => {
@@ -234,45 +212,33 @@ function ClassicQuotesSectionInner() {
 			body.count = effectiveTarget;
 		}
 
-		const myGen = ++genIdRef.current;
-		abortRef.current?.();
-		abortRef.current = null;
+		const myGen = EnglishPackStore.startClassicStream(effectiveTarget);
 
-		setLoading(true);
-		setAgentToolLine(null);
-		setMasterSearchOrganic([]);
-		setProgress({ collected: 0, target: effectiveTarget, round: 0 });
-		setItems([]);
 		setListExpanded(true);
 
 		const abort = await streamEnglishClassicQuotes({
 			body,
 			callbacks: {
 				onProgress: (p) => {
-					if (genIdRef.current !== myGen) return;
-					setProgress(p);
+					EnglishPackStore.classicOnProgress(myGen, p);
 				},
 				onAgentTool: (ev) => {
-					if (genIdRef.current !== myGen) return;
 					if (ev.phase === 'organic' && ev.organic?.length) {
-						setMasterSearchOrganic(ev.organic);
+						EnglishPackStore.classicOnAgentTool(myGen, null, ev.organic);
 						return;
 					}
-					setAgentToolLine(formatEnglishLearningAgentToolLine(t, ev));
+					EnglishPackStore.classicOnAgentTool(
+						myGen,
+						formatEnglishLearningAgentToolLine(t, ev),
+						[],
+					);
 				},
 				onChunk: ({ items: delta }) => {
-					if (genIdRef.current !== myGen) return;
-					if (!delta.length) return;
-					setAgentToolLine(null);
-					setItems((prev) => [...prev, ...delta]);
+					EnglishPackStore.classicOnChunk(myGen, delta);
 				},
 				onDone: ({ items: list, requested }) => {
-					if (genIdRef.current !== myGen) return;
-					abortRef.current = null;
-					setLoading(false);
-					setAgentToolLine(null);
-					setProgress(null);
-					setItems(list);
+					if (myGen !== EnglishPackStore.classicStreamGenId) return;
+					EnglishPackStore.classicOnDone(myGen, list);
 					setLoadedStreamId(null);
 					if (historyDrawerOpenRef.current) {
 						void fetchHistoryFirstPage();
@@ -293,30 +259,21 @@ function ClassicQuotesSectionInner() {
 					}
 				},
 				onError: (msg) => {
-					if (genIdRef.current !== myGen) return;
-					abortRef.current = null;
-					setLoading(false);
-					setAgentToolLine(null);
-					setProgress(null);
+					if (myGen !== EnglishPackStore.classicStreamGenId) return;
+					EnglishPackStore.classicOnError(myGen);
 					Toast({ type: 'error', title: msg });
 				},
 				onUserAbort: () => {
-					if (genIdRef.current !== myGen) return;
-					abortRef.current = null;
-					setLoading(false);
-					setAgentToolLine(null);
-					setProgress(null);
+					if (myGen !== EnglishPackStore.classicStreamGenId) return;
+					EnglishPackStore.classicOnUserAbort(myGen);
 					Toast({
 						type: 'info',
 						title: t('englishLearning.classic.aborted'),
 					});
 				},
 				onIncomplete: () => {
-					if (genIdRef.current !== myGen) return;
-					abortRef.current = null;
-					setLoading(false);
-					setAgentToolLine(null);
-					setProgress(null);
+					if (myGen !== EnglishPackStore.classicStreamGenId) return;
+					EnglishPackStore.classicOnIncomplete(myGen);
 					Toast({
 						type: 'warning',
 						title: t('englishLearning.classic.streamDisconnected'),
@@ -324,7 +281,9 @@ function ClassicQuotesSectionInner() {
 				},
 			},
 		});
-		abortRef.current = abort;
+		if (myGen === EnglishPackStore.classicStreamGenId) {
+			EnglishPackStore.setClassicAbort(abort);
+		}
 	}, [topic, countInput, t, fetchHistoryFirstPage]);
 
 	const toggleQuoteAudio = useCallback(
@@ -394,7 +353,7 @@ function ClassicQuotesSectionInner() {
 				disabled={loading}
 			/>
 
-			<div className="space-y-3">
+			<div className="mb-2.5 space-y-3">
 				<div className="w-full min-w-0">
 					<label
 						htmlFor="english-classic-count"
@@ -439,12 +398,7 @@ function ClassicQuotesSectionInner() {
 						))}
 					</div>
 				</div>
-				<div
-					className={cn(
-						'flex min-w-0 items-stretch gap-2 mb-7.5',
-						items.length ? 'mb-4.5' : 'mb-0',
-					)}
-				>
+				<div className="flex min-w-0 items-stretch gap-2">
 					<Button
 						type="button"
 						size="sm"
@@ -512,12 +466,7 @@ function ClassicQuotesSectionInner() {
 
 			{items.length > 0 ? (
 				<>
-					<div
-						className={cn(
-							'sticky -top-2.5 z-20 -mx-4 pb-2 flex min-h-6 items-center justify-between gap-2 bg-theme-background/95 px-4 backdrop-blur-sm',
-							listExpanded ? 'mb-0' : 'mt-4.5 pb-0',
-						)}
-					>
+					<div className="sticky -top-2.5 z-20 -mx-4 pb-2 flex min-h-6 items-center justify-between gap-2 bg-theme-background/95 px-4 backdrop-blur-sm">
 						<div className="flex items-center gap-2 text-textcolor/45 text-sm font-medium">
 							{t('englishLearning.classic.listHeading')}
 							{masterSearchOrganic.length > 0 ? (
@@ -625,4 +574,4 @@ function ClassicQuotesSectionInner() {
 	);
 }
 
-export const ClassicQuotesSection = ClassicQuotesSectionInner;
+export const ClassicQuotesSection = observer(ClassicQuotesSectionInner);
