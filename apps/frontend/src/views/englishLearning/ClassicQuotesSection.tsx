@@ -433,7 +433,6 @@ function ClassicQuotesSectionInner() {
 						size="sm"
 						onClick={() => setHistoryDrawerOpen(true)}
 						className="text-white hover:bg-linear-to-r hover:from-indigo-400 hover:to-indigo-600 bg-linear-to-r from-indigo-500 to-indigo-600 h-9 shrink-0 gap-1.5 whitespace-nowrap rounded-md px-2.5 sm:px-3"
-						title={t('englishLearning.classic.historyTitle')}
 					>
 						<span className="max-[340px]:sr-only">
 							{t('englishLearning.classic.historyOpenDrawer')}
@@ -471,7 +470,7 @@ function ClassicQuotesSectionInner() {
 
 			{items.length > 0 ? (
 				<>
-					<div className="sticky -top-2.5 z-20 -mx-4 mt-2.5 pb-2 flex min-h-6 items-center justify-between gap-2 bg-theme-background/95 px-4 backdrop-blur-sm">
+					<div className="sticky -top-0.5 -mx-4 px-4 mt-2.5 pb-0.5 flex min-h-6 items-center justify-between gap-2 bg-theme-background/95 backdrop-blur-sm">
 						<div className="flex items-center gap-2 text-textcolor/45 text-sm font-medium">
 							{t('englishLearning.classic.listHeading')}
 							{masterSearchOrganic.length > 0 ? (
@@ -486,11 +485,6 @@ function ClassicQuotesSectionInner() {
 							onClick={() => setListExpanded((v) => !v)}
 							aria-expanded={listExpanded}
 							aria-label={
-								listExpanded
-									? t('englishLearning.classic.collapseList')
-									: t('englishLearning.classic.expandList')
-							}
-							title={
 								listExpanded
 									? t('englishLearning.classic.collapseList')
 									: t('englishLearning.classic.expandList')

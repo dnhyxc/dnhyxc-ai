@@ -464,3 +464,19 @@ export function displayIpaWrapped(ipa: string): string {
 	}
 	return `/${s}/`;
 }
+
+/** 取消选中意图时：去掉输入框开头的自动填充意图名，保留用户后续手动输入 */
+export function stripAutoFilledIntentName(
+	input: string,
+	snapshot: string,
+): string {
+	const s = snapshot.trim();
+	if (!s) return input;
+	if (input.trim() === s) return '';
+	const raw = input;
+	const lead = raw.match(/^\s*/)?.[0] ?? '';
+	const rest = raw.slice(lead.length);
+	if (!rest.startsWith(s)) return raw;
+	const after = rest.slice(s.length).replace(/^\s+/, '');
+	return lead + after;
+}

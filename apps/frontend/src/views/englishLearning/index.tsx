@@ -4,7 +4,7 @@
  */
 import ChatAssistantMessage from '@design/ChatAssistantMessage';
 import ChatEntry from '@design/ChatEntry';
-import { Button, ScrollArea } from '@ui/index';
+import { ScrollArea } from '@ui/index';
 import { BookOpen } from 'lucide-react';
 import { observer } from 'mobx-react';
 import {
@@ -24,7 +24,8 @@ import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import englishAgentStore from '@/store/englishAgent';
 import EnglishPackStore from '@/store/englishPack';
-import type { ChatI18nT, Message } from '@/types/chat';
+import type { ChatI18nT } from '@/types/chat';
+import { stripAutoFilledIntentName } from '@/utils';
 import { stopAllEnglishPlayback } from '@/utils/englishTts';
 import { ClassicQuotesSection } from './ClassicQuotesSection';
 import {
@@ -32,23 +33,6 @@ import {
 	type QuickIntentInputSyncPayload,
 } from './LearningToolbar';
 import { VocabularyPackSection } from './VocabularySection';
-
-/** 取消选中意图时：去掉输入框开头的自动填充意图名，保留用户后续手动输入 */
-function stripAutoFilledIntentName(input: string, snapshot: string): string {
-	const s = snapshot.trim();
-	if (!s) return input;
-	if (input.trim() === s) return '';
-	const raw = input;
-	const lead = raw.match(/^\s*/)?.[0] ?? '';
-	const rest = raw.slice(lead.length);
-	if (!rest.startsWith(s)) return raw;
-	const after = rest.slice(s.length).replace(/^\s+/, '');
-	return lead + after;
-}
-
-function selectMessageByChatId(chatId: string): Message | undefined {
-	return englishAgentStore.messages.find((m) => m.chatId === chatId);
-}
 
 const EnglishLearningMessageRow = observer(function EnglishLearningMessageRow({
 	chatId,
@@ -59,7 +43,7 @@ const EnglishLearningMessageRow = observer(function EnglishLearningMessageRow({
 	scrollViewportRef: RefObject<HTMLElement | null>;
 	t: ChatI18nT;
 }) {
-	const message = selectMessageByChatId(chatId);
+	const message = englishAgentStore.messages.find((m) => m.chatId === chatId);
 	if (!message) return null;
 	const streamRev =
 		message.role === 'assistant'
@@ -171,23 +155,6 @@ const EnglishLearning = observer(function EnglishLearning() {
 		}
 	}, [input, setSearchParams, titleFallback]);
 
-	if (englishAgentStore.loadError) {
-		return (
-			<div className="flex min-h-0 h-full w-full flex-col">
-				<div className="box-border flex h-full min-h-0 w-full flex-col p-5 pt-0">
-					<div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 rounded-md bg-theme/5 p-8 text-center">
-						<p className="text-textcolor/75 max-w-sm text-sm leading-relaxed">
-							{englishAgentStore.loadError}
-						</p>
-						<Button type="button" variant="dynamic" onClick={() => onNewChat()}>
-							{t('englishLearning.newChat')}
-						</Button>
-					</div>
-				</div>
-			</div>
-		);
-	}
-
 	return (
 		<div className="flex min-h-0 h-full w-full flex-col">
 			<div className="box-border flex h-full min-h-0 w-full min-w-0 flex-col p-5 pt-0">
@@ -210,13 +177,15 @@ const EnglishLearning = observer(function EnglishLearning() {
 									'flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-theme-background',
 								)}
 							>
-								<div className="my-4 flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-y-contain">
-									<EnglishLearningToolbar
-										onQuickIntentInputSync={onQuickIntentInputSync}
-									/>
-									<VocabularyPackSection />
-									<ClassicQuotesSection />
-								</div>
+								<ScrollArea>
+									<div className="my-4 flex min-h-0 flex-1 flex-col">
+										<EnglishLearningToolbar
+											onQuickIntentInputSync={onQuickIntentInputSync}
+										/>
+										<VocabularyPackSection />
+										<ClassicQuotesSection />
+									</div>
+								</ScrollArea>
 							</aside>
 						</ResizablePanel>
 						<ResizableHandle withHandle className="w-0" />
