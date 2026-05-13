@@ -33,14 +33,17 @@ import {
 	getEnglishClassicQuotesHistoryDetail,
 	listEnglishClassicQuotesHistory,
 } from '@/service';
+import type { SearchOrganicItem } from '@/types/chat';
 import { sanitizeCountDigits } from '@/utils';
 import { streamEnglishClassicQuotes } from '@/utils/englishLearningPackSse';
+import { mergeEnglishPackWebSearchOrganics } from '@/utils/englishPackWebSearchMerge';
 import {
 	playEnglishPreferred,
 	stopAllEnglishPlayback,
 } from '@/utils/englishTts';
 import { formatEnglishLearningAgentToolLine } from './agentToolStatusText';
 import { ClassicQuotesHistoryDrawer } from './ClassicQuotesHistoryDrawer';
+import { MasterWebSearchResultsBar } from './MasterWebSearchResultsBar';
 
 export type ClassicQuoteProgressState = {
 	collected: number;
@@ -55,6 +58,9 @@ function ClassicQuotesSectionInner() {
 	const [countInput, setCountInput] = useState('');
 	const [loading, setLoading] = useState(false);
 	const [agentToolLine, setAgentToolLine] = useState<string | null>(null);
+	const [masterSearchOrganic, setMasterSearchOrganic] = useState<
+		SearchOrganicItem[]
+	>([]);
 	const [progress, setProgress] = useState<ClassicQuoteProgressState | null>(
 		null,
 	);
@@ -172,6 +178,9 @@ function ClassicQuotesSectionInner() {
 				const d = res.data;
 				if (d?.items?.length) {
 					setItems(d.items);
+					setMasterSearchOrganic(
+						mergeEnglishPackWebSearchOrganics(d.webSearchRounds),
+					);
 					setListExpanded(true);
 					setLoadedStreamId(streamId);
 					setHistoryDrawerOpen(false);
@@ -197,6 +206,7 @@ function ClassicQuotesSectionInner() {
 		abortRef.current = null;
 		setLoading(false);
 		setAgentToolLine(null);
+		setMasterSearchOrganic([]);
 		setProgress(null);
 	}, []);
 
@@ -230,6 +240,7 @@ function ClassicQuotesSectionInner() {
 
 		setLoading(true);
 		setAgentToolLine(null);
+		setMasterSearchOrganic([]);
 		setProgress({ collected: 0, target: effectiveTarget, round: 0 });
 		setItems([]);
 		setListExpanded(true);
@@ -243,6 +254,10 @@ function ClassicQuotesSectionInner() {
 				},
 				onAgentTool: (ev) => {
 					if (genIdRef.current !== myGen) return;
+					if (ev.phase === 'organic' && ev.organic?.length) {
+						setMasterSearchOrganic(ev.organic);
+						return;
+					}
 					setAgentToolLine(formatEnglishLearningAgentToolLine(t, ev));
 				},
 				onChunk: ({ items: delta }) => {
@@ -493,8 +508,11 @@ function ClassicQuotesSectionInner() {
 			{items.length > 0 ? (
 				<div>
 					<div className="mt-5 flex min-h-8 items-center justify-between gap-2">
-						<div className="text-textcolor/45 text-sm font-medium">
+						<div className="flex items-center gap-2 text-textcolor/45 text-sm font-medium">
 							{t('englishLearning.classic.listHeading')}
+							{masterSearchOrganic.length > 0 ? (
+								<MasterWebSearchResultsBar items={masterSearchOrganic} t={t} />
+							) : null}
 						</div>
 						<Button
 							type="button"

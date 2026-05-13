@@ -14,6 +14,7 @@ import {
 	ENGLISH_LEARNING_CLASSIC_QUOTES_STREAM,
 	ENGLISH_LEARNING_VOCABULARY_PACK_STREAM,
 } from '@/service/api';
+import type { SearchOrganicItem } from '@/types/chat';
 import { getPlatformFetch } from '@/utils/fetch';
 
 function readToken(): string {
@@ -74,6 +75,28 @@ function parseClassicItems(raw: unknown): EnglishClassicQuoteItem[] {
 	return out;
 }
 
+/** 解析 SSE 中 `organic` 数组（与 Chat searchOrganic 形状对齐） */
+function parsePackSearchOrganic(raw: unknown): SearchOrganicItem[] {
+	if (!Array.isArray(raw)) return [];
+	const out: SearchOrganicItem[] = [];
+	for (const x of raw) {
+		if (!x || typeof x !== 'object') continue;
+		const o = x as Record<string, unknown>;
+		const title = typeof o.title === 'string' ? o.title.trim() : '';
+		const link = typeof o.link === 'string' ? o.link.trim() : '';
+		if (!title || !link) continue;
+		const item: SearchOrganicItem = { title, link };
+		if (typeof o.snippet === 'string') item.snippet = o.snippet;
+		if (typeof o.date === 'string') item.date = o.date;
+		if (typeof o.icon === 'string') item.icon = o.icon;
+		if (typeof o.position === 'number' && Number.isFinite(o.position)) {
+			item.position = o.position;
+		}
+		out.push(item);
+	}
+	return out;
+}
+
 /** 进度事件公共形状（与后端 `*.progress` 一致） */
 export type EnglishPackStreamProgress = {
 	/** 与后端 SSE 首帧一致，用于显式 cancel */
@@ -99,11 +122,12 @@ export type EnglishVocabStreamChunk =
 export type EnglishClassicStreamChunk =
 	EnglishPackStreamChunk<EnglishClassicQuoteItem>;
 
-/** Agent 工具事件（与后端 `*.agent_tool` 对齐） */
+/** Agent 工具事件（与后端 `*.agent_tool` 对齐）；`organic` 为主检索联网结果 */
 export type EnglishPackAgentToolEvent = {
-	phase: 'start' | 'end';
+	phase: 'start' | 'end' | 'organic';
 	name: string;
 	query?: string;
+	organic?: SearchOrganicItem[];
 };
 
 export type EnglishVocabAgentToolEvent = EnglishPackAgentToolEvent;
@@ -250,11 +274,26 @@ async function runEnglishLearningPackSseStream<TItem>(
 			}
 
 			if (type === `${tp}agent_tool`) {
-				const phase = parsed.phase === 'end' ? 'end' : 'start';
+				const phaseRaw = parsed.phase;
+				const phase: EnglishPackAgentToolEvent['phase'] =
+					phaseRaw === 'organic'
+						? 'organic'
+						: phaseRaw === 'end'
+							? 'end'
+							: 'start';
 				const name = typeof parsed.name === 'string' ? parsed.name : '';
 				const query =
 					typeof parsed.query === 'string' ? parsed.query : undefined;
-				onAgentTool?.({ phase, name, query });
+				const organic =
+					phase === 'organic'
+						? parsePackSearchOrganic(parsed.organic)
+						: undefined;
+				onAgentTool?.({
+					phase,
+					name,
+					query,
+					...(organic?.length ? { organic } : {}),
+				});
 				return false;
 			}
 

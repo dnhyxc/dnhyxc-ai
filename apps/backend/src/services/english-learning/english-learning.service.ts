@@ -21,7 +21,10 @@ import { KnowledgeQaEnum, ModelEnum } from '../../enum/config.enum';
 import { buildAgentLangChainTools } from '../../services/agent/agent-tools';
 import { KnowledgeQaService } from '../../services/knowledge-qa/knowledge-qa.service';
 import { WebSearchService } from '../../services/web-search/web-search.service';
-import type { WebSearchRecencyPreset } from '../../services/web-search/web-search.types';
+import type {
+	WebSearchOrganicItem,
+	WebSearchRecencyPreset,
+} from '../../services/web-search/web-search.types';
 import {
 	englishPackAgentIsUserAbort,
 	extractEnglishPackAgentChunkText,
@@ -54,6 +57,10 @@ import {
 	EnglishClassicQuotePackBatch,
 } from './english-classic-quote.entity';
 import {
+	EnglishPackWebSearchRecord,
+	type EnglishPackWebSearchRoundJson,
+} from './english-pack-web-search.entity';
+import {
 	EnglishVocabularyPackBatch,
 	type EnglishVocabularyPackItemJson,
 } from './english-vocabulary.entity';
@@ -85,6 +92,8 @@ export type ClassicQuoteHistoryListItem = {
 	quoteCount: number;
 	createdAt: string;
 	updatedAt: string;
+	/** 本会话已落库的联网检索轮数（0 表示无主检索网页记录） */
+	webSearchRoundCount: number;
 };
 
 export type VocabularyItemDto = {
@@ -105,10 +114,14 @@ export type VocabularyGenerationProgress = {
 
 /** 英语学习拉取：Agent 检索阶段工具事件（经 SSE 透传前端） */
 export type EnglishLearningPackAgentToolEvent = {
-	phase: 'start' | 'end';
+	/** `organic`：主检索 `internet_search` 完成后的网页列表，供前端胶囊/抽屉展示 */
+	phase: 'start' | 'end' | 'organic';
 	name?: string;
 	input?: unknown;
 	output?: unknown;
+	searchOrganic?: WebSearchOrganicItem[] | null;
+	/** `organic` 阶段：模型传入的检索关键词原文（用于落库与 SSE 摘要） */
+	searchQuery?: string | null;
 };
 
 /** 历史列表单项：按 streamId 聚合一次「拉取单词包」会话 */
@@ -119,6 +132,8 @@ export type VocabularyHistoryListItem = {
 	wordCount: number;
 	createdAt: string;
 	updatedAt: string;
+	/** 本会话已落库的联网检索轮数（0 表示无主检索网页记录） */
+	webSearchRoundCount: number;
 };
 
 /**
@@ -270,6 +285,8 @@ export class EnglishLearningService {
 		private readonly vocabBatchRepo: Repository<EnglishVocabularyPackBatch>,
 		@InjectRepository(EnglishClassicQuotePackBatch)
 		private readonly classicBatchRepo: Repository<EnglishClassicQuotePackBatch>,
+		@InjectRepository(EnglishPackWebSearchRecord)
+		private readonly packWebSearchRepo: Repository<EnglishPackWebSearchRecord>,
 	) {}
 
 	/** 中止类异常：用户断开 SSE / 显式 cancel / LangChain 链取消 */
@@ -721,16 +738,35 @@ export class EnglishLearningService {
 			// 根据主题推断联网检索时间策略（显式公历 → Tavily 区间；Serper 用粗粒度 tbs）
 			const webSearchTime = this.resolveWebSearchTime(topic);
 			// 动态构建支持的工具，包括 Web 检索及知识 QA 工具
-			const tools = buildAgentLangChainTools({
-				webSearchService: this.webSearchService,
-				knowledgeQaService: this.knowledgeQaService,
-				userId,
-				webSearchRecency: webSearchTime.recency,
-				webSearchTavilyStartDate: webSearchTime.tavilyStartDate,
-				webSearchTavilyEndDate: webSearchTime.tavilyEndDate,
-				// includeCurrentDateTool:
-				// 	this.inferEnglishPackUserNeedsCurrentDateTool(topic),
-			});
+			const tools = buildAgentLangChainTools(
+				{
+					webSearchService: this.webSearchService,
+					knowledgeQaService: this.knowledgeQaService,
+					userId,
+					webSearchRecency: webSearchTime.recency,
+					webSearchTavilyStartDate: webSearchTime.tavilyStartDate,
+					webSearchTavilyEndDate: webSearchTime.tavilyEndDate,
+					// includeCurrentDateTool:
+					// 	this.inferEnglishPackUserNeedsCurrentDateTool(topic),
+				},
+				{
+					onInternetSearchComplete: async (r, meta) => {
+						const list = r.organic;
+						if (!onToolEvent || !Array.isArray(list) || list.length === 0) {
+							return;
+						}
+						const q = meta?.searchQuery?.trim();
+						await Promise.resolve(
+							onToolEvent({
+								phase: 'organic',
+								name: 'internet_search',
+								searchOrganic: list,
+								searchQuery: q || undefined,
+							}),
+						);
+					},
+				},
+			);
 
 			// 构建 LangChain Agent，传入主模型、工具、系统 Prompt 及中间件
 			const agent = createAgent({
@@ -1118,6 +1154,50 @@ export class EnglishLearningService {
 			items: params.items as EnglishVocabularyPackItemJson[],
 		});
 		await this.vocabBatchRepo.save(row);
+	}
+
+	/**
+	 * 追加一轮主检索联网结果（同 stream 多次调用则合并到 `search_rounds` 数组）。
+	 */
+	async appendPackWebSearchRound(params: {
+		userId: number;
+		streamId: string;
+		packKind: 'vocabulary' | 'classic_quotes';
+		query?: string | null;
+		organic: WebSearchOrganicItem[];
+	}): Promise<void> {
+		if (!params.organic.length) return;
+		try {
+			const existing = await this.packWebSearchRepo.findOne({
+				where: {
+					userId: params.userId,
+					streamId: params.streamId,
+					packKind: params.packKind,
+				},
+			});
+			const round: EnglishPackWebSearchRoundJson = {
+				query: params.query?.trim() ? params.query.trim().slice(0, 500) : null,
+				organic: params.organic,
+			};
+			if (!existing) {
+				await this.packWebSearchRepo.save(
+					this.packWebSearchRepo.create({
+						userId: params.userId,
+						streamId: params.streamId,
+						packKind: params.packKind,
+						searchRounds: [round],
+					}),
+				);
+				return;
+			}
+			const prev = Array.isArray(existing.searchRounds)
+				? existing.searchRounds
+				: [];
+			existing.searchRounds = [...prev, round];
+			await this.packWebSearchRepo.save(existing);
+		} catch (e) {
+			this.logger.warn('[EnglishLearning] 联网检索结果落库失败', e);
+		}
 	}
 
 	/**
@@ -1816,6 +1896,17 @@ export class EnglishLearningService {
 		if (!grouped.length) return [];
 
 		const streamIds = grouped.map((g) => g.streamId);
+		const wsRows = await this.packWebSearchRepo.find({
+			where: { userId, streamId: In(streamIds), packKind: 'vocabulary' },
+		});
+		const wsCountByStream = new Map<string, number>();
+		for (const w of wsRows) {
+			wsCountByStream.set(
+				w.streamId,
+				Array.isArray(w.searchRounds) ? w.searchRounds.length : 0,
+			);
+		}
+
 		const batches = await this.vocabBatchRepo.find({
 			where: { userId, streamId: In(streamIds) },
 			order: { streamId: 'ASC', round: 'ASC' },
@@ -1842,6 +1933,7 @@ export class EnglishLearningService {
 				wordCount,
 				createdAt: new Date(g.createdAt).toISOString(),
 				updatedAt: new Date(g.updatedAt).toISOString(),
+				webSearchRoundCount: wsCountByStream.get(g.streamId) ?? 0,
 			};
 		});
 	}
@@ -1858,6 +1950,8 @@ export class EnglishLearningService {
 		targetCount: number;
 		items: VocabularyItemDto[];
 		createdAt: string;
+		/** 与本次拉取关联的主检索联网记录（按轮次顺序） */
+		webSearchRounds: EnglishPackWebSearchRoundJson[];
 	}> {
 		const batches = await this.vocabBatchRepo.find({
 			where: { userId, streamId },
@@ -1879,12 +1973,16 @@ export class EnglishLearningService {
 			}
 		}
 		const first = batches[0];
+		const ws = await this.packWebSearchRepo.findOne({
+			where: { userId, streamId, packKind: 'vocabulary' },
+		});
 		return {
 			streamId,
 			topic: first.topic,
 			targetCount: first.targetCount,
 			items,
 			createdAt: first.createdAt.toISOString(),
+			webSearchRounds: Array.isArray(ws?.searchRounds) ? ws.searchRounds : [],
 		};
 	}
 
@@ -1914,6 +2012,17 @@ export class EnglishLearningService {
 		if (!grouped.length) return [];
 
 		const streamIds = grouped.map((g) => g.streamId);
+		const wsRows = await this.packWebSearchRepo.find({
+			where: { userId, streamId: In(streamIds), packKind: 'classic_quotes' },
+		});
+		const wsCountByStream = new Map<string, number>();
+		for (const w of wsRows) {
+			wsCountByStream.set(
+				w.streamId,
+				Array.isArray(w.searchRounds) ? w.searchRounds.length : 0,
+			);
+		}
+
 		const batches = await this.classicBatchRepo.find({
 			where: { userId, streamId: In(streamIds) },
 			order: { streamId: 'ASC', round: 'ASC' },
@@ -1940,6 +2049,7 @@ export class EnglishLearningService {
 				quoteCount,
 				createdAt: new Date(g.createdAt).toISOString(),
 				updatedAt: new Date(g.updatedAt).toISOString(),
+				webSearchRoundCount: wsCountByStream.get(g.streamId) ?? 0,
 			};
 		});
 	}
@@ -1953,6 +2063,7 @@ export class EnglishLearningService {
 		targetCount: number;
 		items: ClassicQuoteItemDto[];
 		createdAt: string;
+		webSearchRounds: EnglishPackWebSearchRoundJson[];
 	}> {
 		const batches = await this.classicBatchRepo.find({
 			where: { userId, streamId },
@@ -1974,12 +2085,16 @@ export class EnglishLearningService {
 			}
 		}
 		const first = batches[0];
+		const ws = await this.packWebSearchRepo.findOne({
+			where: { userId, streamId, packKind: 'classic_quotes' },
+		});
 		return {
 			streamId,
 			topic: first.topic,
 			targetCount: first.targetCount,
 			items,
 			createdAt: first.createdAt.toISOString(),
+			webSearchRounds: Array.isArray(ws?.searchRounds) ? ws.searchRounds : [],
 		};
 	}
 }

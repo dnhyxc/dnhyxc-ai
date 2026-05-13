@@ -3,8 +3,11 @@
  */
 export function formatEnglishLearningAgentToolLine(
 	t: (key: string, vars?: Record<string, string | number>) => string,
-	e: { phase: 'start' | 'end'; name: string; query?: string },
+	e: { phase: 'start' | 'end' | 'organic'; name: string; query?: string },
 ): string {
+	if (e.phase === 'organic') {
+		return '';
+	}
 	const action =
 		e.name === 'internet_search'
 			? t('englishLearning.agentTool.internet')

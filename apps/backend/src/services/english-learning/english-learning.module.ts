@@ -5,6 +5,7 @@ import { EnglishClassicQuotePackBatch } from './english-classic-quote.entity';
 import { EnglishLearningController } from './english-learning.controller';
 import { EnglishLearningService } from './english-learning.service';
 import { EnglishLearningStreamAbortRegistry } from './english-learning-stream-abort.registry';
+import { EnglishPackWebSearchRecord } from './english-pack-web-search.entity';
 import { EnglishVocabularyPackBatch } from './english-vocabulary.entity';
 
 @Module({
@@ -13,6 +14,7 @@ import { EnglishVocabularyPackBatch } from './english-vocabulary.entity';
 		TypeOrmModule.forFeature([
 			EnglishVocabularyPackBatch,
 			EnglishClassicQuotePackBatch,
+			EnglishPackWebSearchRecord,
 		]),
 	],
 	controllers: [EnglishLearningController],

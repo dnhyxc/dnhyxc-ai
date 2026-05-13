@@ -88,6 +88,13 @@ export function ClassicQuotesHistoryDrawer({
 													count: h.quoteCount,
 												})}
 											</span>
+											{(h.webSearchRoundCount ?? 0) > 0 ? (
+												<span className="text-violet-600/85 dark:text-violet-400/85">
+													{t('englishLearning.packHistory.webSearchRounds', {
+														n: h.webSearchRoundCount ?? 0,
+													})}
+												</span>
+											) : null}
 											<span className="tabular-nums">
 												{formatHistoryLineDate(h.updatedAt)}
 											</span>

@@ -25,7 +25,10 @@ import {
 	resolveClassicQuotesPackTargetCount,
 	resolveVocabularyPackTargetCount,
 } from './dto/generate-vocabulary.dto';
-import { EnglishLearningService } from './english-learning.service';
+import {
+	type EnglishLearningPackAgentToolEvent,
+	EnglishLearningService,
+} from './english-learning.service';
 import { EnglishLearningStreamAbortRegistry } from './english-learning-stream-abort.registry';
 
 type AuthedRequest = Request & { user?: { userId: number } };
@@ -73,6 +76,33 @@ function vocabularyHttpMessage(e: HttpException): string {
 		if (Array.isArray(m)) return m.map(String).join('；');
 	}
 	return e.message || '生成单词资料失败，请稍后重试';
+}
+
+/** 组装 `*.agent_tool` SSE 载荷；`organic` 仅在主检索联网完成后附带 */
+function packAgentToolSsePayload(
+	prefix: 'vocab' | 'classic',
+	streamId: string,
+	ev: EnglishLearningPackAgentToolEvent,
+): Record<string, unknown> {
+	const qFromSearch =
+		typeof ev.searchQuery === 'string' && ev.searchQuery.trim()
+			? ev.searchQuery.trim().slice(0, 240)
+			: undefined;
+	const data: Record<string, unknown> = {
+		type: `${prefix}.agent_tool`,
+		streamId,
+		phase: ev.phase,
+		name: typeof ev.name === 'string' ? ev.name : '',
+		query: qFromSearch ?? englishPackToolInputPreview(ev.input),
+	};
+	if (
+		ev.phase === 'organic' &&
+		Array.isArray(ev.searchOrganic) &&
+		ev.searchOrganic.length > 0
+	) {
+		data.organic = ev.searchOrganic;
+	}
+	return data;
 }
 
 /** 工具入参摘要，供前端展示检索关键词（控制长度避免 SSE 过大） */
@@ -262,13 +292,23 @@ export class EnglishLearningController {
 								userId,
 								signal: streamAbort.signal,
 								onAgentTool: async (ev) => {
-									emit({
-										type: 'vocab.agent_tool',
-										streamId,
-										phase: ev.phase,
-										name: typeof ev.name === 'string' ? ev.name : '',
-										query: englishPackToolInputPreview(ev.input),
-									});
+									emit(packAgentToolSsePayload('vocab', streamId, ev));
+									if (
+										ev.phase === 'organic' &&
+										Array.isArray(ev.searchOrganic) &&
+										ev.searchOrganic.length > 0
+									) {
+										await this.englishLearningService.appendPackWebSearchRound({
+											userId,
+											streamId,
+											packKind: 'vocabulary',
+											query:
+												typeof ev.searchQuery === 'string'
+													? ev.searchQuery
+													: undefined,
+											organic: ev.searchOrganic,
+										});
+									}
 								},
 							},
 						);
@@ -433,13 +473,23 @@ export class EnglishLearningController {
 								userId,
 								signal: streamAbort.signal,
 								onAgentTool: async (ev) => {
-									emit({
-										type: 'classic.agent_tool',
-										streamId,
-										phase: ev.phase,
-										name: typeof ev.name === 'string' ? ev.name : '',
-										query: englishPackToolInputPreview(ev.input),
-									});
+									emit(packAgentToolSsePayload('classic', streamId, ev));
+									if (
+										ev.phase === 'organic' &&
+										Array.isArray(ev.searchOrganic) &&
+										ev.searchOrganic.length > 0
+									) {
+										await this.englishLearningService.appendPackWebSearchRound({
+											userId,
+											streamId,
+											packKind: 'classic_quotes',
+											query:
+												typeof ev.searchQuery === 'string'
+													? ev.searchQuery
+													: undefined,
+											organic: ev.searchOrganic,
+										});
+									}
 								},
 							},
 						);

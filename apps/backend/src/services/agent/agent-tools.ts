@@ -42,7 +42,10 @@ export type BuildAgentLangChainToolsDeps = {
 
 export type BuildAgentLangChainToolsOpts = {
 	/** internet_search 完成后回调，用于 SSE 推送 searchOrganic */
-	onInternetSearchComplete?: (result: WebSearchContextResult) => void;
+	onInternetSearchComplete?: (
+		result: WebSearchContextResult,
+		meta: { searchQuery: string },
+	) => void;
 };
 
 /**

@@ -77,8 +77,11 @@ export class WebSearchService {
 	 */
 	createLangChainWebSearchTools(opts?: {
 		provider?: WebSearchProvider;
-		/** 每次检索完成后回调（含 organic），供 Agent SSE 推送胶囊数据源 */
-		onSearchComplete?: (result: WebSearchContextResult) => void;
+		/** 每次检索完成后回调（含 organic）；`meta.searchQuery` 为模型传入的检索串 */
+		onSearchComplete?: (
+			result: WebSearchContextResult,
+			meta: { searchQuery: string },
+		) => void;
 		/** 时间收窄策略；未传时与站内其它调用一致，Serper 默认 `qdr:d` */
 		recency?: WebSearchRecencyPreset;
 		/** Tavily 专用：显式日历区间（YYYY-MM-DD）；与 recency 并存时由 Tavily 层优先使用区间 */
@@ -96,11 +99,15 @@ export class WebSearchService {
 					'联网搜索公开网页。输入简洁的检索关键词或问题，返回可引用的网页标题、链接与摘要。' +
 					'【调用约束】仅在确有公开网页信息缺口时调用（事实核验、时效、冷门专名/作品、出处线索等）；禁止为「先搜再说」或走流程而例行调用；若常识与知识库已足够则不要调用。',
 				func: async (input: string) => {
-					const r = await this.formatSearchContextForPrompt(
-						typeof input === 'string' ? input : String(input ?? ''),
-						{ provider, recency, tavilyStartDate, tavilyEndDate },
-					);
-					opts?.onSearchComplete?.(r);
+					const searchQuery =
+						typeof input === 'string' ? input : String(input ?? '');
+					const r = await this.formatSearchContextForPrompt(searchQuery, {
+						provider,
+						recency,
+						tavilyStartDate,
+						tavilyEndDate,
+					});
+					opts?.onSearchComplete?.(r, { searchQuery });
 					return r.promptText ?? '（无检索结果）';
 				},
 			}),

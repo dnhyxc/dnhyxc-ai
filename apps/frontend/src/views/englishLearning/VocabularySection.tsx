@@ -33,13 +33,16 @@ import {
 	getEnglishVocabularyHistoryDetail,
 	listEnglishVocabularyHistory,
 } from '@/service';
+import type { SearchOrganicItem } from '@/types/chat';
 import { displayIpaWrapped, sanitizeCountDigits } from '@/utils';
 import { streamEnglishVocabularyPack } from '@/utils/englishLearningPackSse';
+import { mergeEnglishPackWebSearchOrganics } from '@/utils/englishPackWebSearchMerge';
 import {
 	playEnglishPreferred,
 	stopAllEnglishPlayback,
 } from '@/utils/englishTts';
 import { formatEnglishLearningAgentToolLine } from './agentToolStatusText';
+import { MasterWebSearchResultsBar } from './MasterWebSearchResultsBar';
 import { VocabularyHistoryDrawer } from './VocabularyHistoryDrawer';
 
 export type VocabProgressState = {
@@ -56,6 +59,10 @@ function VocabularyPackSectionInner() {
 	const [loading, setLoading] = useState(false);
 	/** Agent 检索阶段工具状态（DeepSeek 开始出词后清空） */
 	const [agentToolLine, setAgentToolLine] = useState<string | null>(null);
+	/** 主检索 `internet_search` 返回的网页列表（SSE `phase: organic`） */
+	const [masterSearchOrganic, setMasterSearchOrganic] = useState<
+		SearchOrganicItem[]
+	>([]);
 	const [progress, setProgress] = useState<VocabProgressState | null>(null);
 	const [items, setItems] = useState<EnglishVocabularyItem[]>([]);
 	const [playingKey, setPlayingKey] = useState<string | null>(null);
@@ -172,6 +179,9 @@ function VocabularyPackSectionInner() {
 				const d = res.data;
 				if (d?.items?.length) {
 					setItems(d.items);
+					setMasterSearchOrganic(
+						mergeEnglishPackWebSearchOrganics(d.webSearchRounds),
+					);
 					setListExpanded(true);
 					setLoadedStreamId(streamId);
 					setHistoryDrawerOpen(false);
@@ -197,6 +207,7 @@ function VocabularyPackSectionInner() {
 		abortRef.current = null;
 		setLoading(false);
 		setAgentToolLine(null);
+		setMasterSearchOrganic([]);
 		setProgress(null);
 	}, []);
 
@@ -231,6 +242,7 @@ function VocabularyPackSectionInner() {
 
 		setLoading(true);
 		setAgentToolLine(null);
+		setMasterSearchOrganic([]);
 		setProgress({ collected: 0, target: effectiveTarget, round: 0 });
 		setItems([]);
 		setListExpanded(true);
@@ -244,6 +256,10 @@ function VocabularyPackSectionInner() {
 				},
 				onAgentTool: (ev) => {
 					if (genIdRef.current !== myGen) return;
+					if (ev.phase === 'organic' && ev.organic?.length) {
+						setMasterSearchOrganic(ev.organic);
+						return;
+					}
 					setAgentToolLine(formatEnglishLearningAgentToolLine(t, ev));
 				},
 				onChunk: ({ items: delta }) => {
@@ -497,8 +513,11 @@ function VocabularyPackSectionInner() {
 			{items.length > 0 ? (
 				<div>
 					<div className="mt-5 flex min-h-8 items-center justify-between gap-2">
-						<div className="text-textcolor/45 text-sm font-medium">
+						<div className="flex items-center gap-2 text-textcolor/45 text-sm font-medium">
 							{t('englishLearning.vocab.listHeading')}
+							{masterSearchOrganic.length > 0 ? (
+								<MasterWebSearchResultsBar items={masterSearchOrganic} t={t} />
+							) : null}
 						</div>
 						<Button
 							type="button"

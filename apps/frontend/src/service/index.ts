@@ -4,6 +4,7 @@ import {
 	ShareInfo,
 } from '@/types';
 import type { SearchOrganicItem } from '@/types/chat';
+import type { EnglishPackWebSearchRoundDto } from '@/utils/englishPackWebSearchMerge';
 import { http } from '@/utils/fetch';
 import {
 	AGENT_SESSION,
@@ -469,6 +470,8 @@ export type EnglishVocabularyHistoryEntry = {
 	wordCount: number;
 	createdAt: string;
 	updatedAt: string;
+	/** 本会话已落库的联网检索轮数 */
+	webSearchRoundCount: number;
 };
 
 /** 分页列出当前用户历史拉取的单词包会话 */
@@ -495,6 +498,7 @@ export const getEnglishVocabularyHistoryDetail = async (streamId: string) => {
 		targetCount: number;
 		items: EnglishVocabularyItem[];
 		createdAt: string;
+		webSearchRounds: EnglishPackWebSearchRoundDto[];
 	}>(ENGLISH_LEARNING_VOCABULARY_HISTORY, {
 		params: [streamId],
 	});
@@ -516,6 +520,7 @@ export type EnglishClassicQuoteHistoryEntry = {
 	quoteCount: number;
 	createdAt: string;
 	updatedAt: string;
+	webSearchRoundCount: number;
 };
 
 export const listEnglishClassicQuotesHistory = async (options?: {
@@ -542,6 +547,7 @@ export const getEnglishClassicQuotesHistoryDetail = async (
 		targetCount: number;
 		items: EnglishClassicQuoteItem[];
 		createdAt: string;
+		webSearchRounds: EnglishPackWebSearchRoundDto[];
 	}>(ENGLISH_LEARNING_CLASSIC_QUOTES_HISTORY, {
 		params: [streamId],
 	});

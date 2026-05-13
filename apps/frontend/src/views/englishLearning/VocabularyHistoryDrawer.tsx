@@ -88,6 +88,13 @@ export function VocabularyHistoryDrawer({
 													count: h.wordCount,
 												})}
 											</span>
+											{(h.webSearchRoundCount ?? 0) > 0 ? (
+												<span className="text-teal-600/85 dark:text-teal-400/85">
+													{t('englishLearning.packHistory.webSearchRounds', {
+														n: h.webSearchRoundCount ?? 0,
+													})}
+												</span>
+											) : null}
 											<span className="tabular-nums">
 												{formatHistoryLineDate(h.updatedAt)}
 											</span>
