@@ -781,7 +781,7 @@ export const enUS = {
 	'englishLearning.webSearch.viewPagesTitle': 'This web search results ({n})',
 	'englishLearning.packHistory.webSearchRounds': 'Web search ×{n}',
 
-	'englishLearning.vocab.title': 'Vocabulary pack',
+	'englishLearning.vocab.title': 'Vocabulary',
 	'englishLearning.vocab.desc':
 		'Generate a themed word list (IPA, Chinese gloss, example). Use the speaker to hear each English word (cloud TTS when configured).',
 	'englishLearning.vocab.descShort': 'Generate a word list by theme',

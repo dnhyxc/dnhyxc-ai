@@ -9,6 +9,7 @@ import {
 	getAgentSessionDetail,
 	stopAgentStream,
 } from '@/service';
+import EnglishPackStore from '@/store/englishPack';
 import type { Message, SearchOrganicItem } from '@/types/chat';
 import { AGENT_SSE_USER_ABORT_MARKER, streamAgentSse } from '@/utils/agentSse';
 
@@ -125,6 +126,7 @@ export class EnglishAgentStore {
 			this.pendingIntentPrefix = '';
 			this.loadError = null;
 		});
+		EnglishPackStore.setSidebarIntentPrefix('');
 	}
 
 	stopGenerating(): void {
@@ -152,6 +154,7 @@ export class EnglishAgentStore {
 
 	setIntentPrefix(prefix: string): void {
 		this.pendingIntentPrefix = prefix;
+		EnglishPackStore.setSidebarIntentPrefix(prefix);
 	}
 
 	async sendMessage(
@@ -186,6 +189,7 @@ export class EnglishAgentStore {
 		runInAction(() => {
 			this.pendingIntentPrefix = '';
 		});
+		EnglishPackStore.setSidebarIntentPrefix('');
 
 		const userChatId = uuidv4();
 		const assistantChatId = uuidv4();

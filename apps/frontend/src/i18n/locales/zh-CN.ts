@@ -697,7 +697,7 @@ export const zhCN = {
 	'englishLearning.webSearch.viewPagesTitle': '本次联网搜索结果（{n}）',
 	'englishLearning.packHistory.webSearchRounds': '联网 {n} 次',
 
-	'englishLearning.vocab.title': '单词学习资料',
+	'englishLearning.vocab.title': '单词资料',
 	'englishLearning.vocab.desc':
 		'按你的主题生成一批单词：含国际音标（IPA）、中文释义与例句。点击小喇叭可朗读该英文单词（云端 TTS 优先）。',
 	'englishLearning.vocab.descShort': '按主题生成单词表',
@@ -777,7 +777,7 @@ export const zhCN = {
 	'route.document.title': '智能文档处理',
 	'route.coding.title': '智能代码处理',
 	'route.profile.title': '个人主页',
-	'route.knowledge.title': '知识库编辑',
+	'route.knowledge.title': '知识库',
 	'route.account.title': '账号设置',
 	'route.pay.title': '会员充值',
 	'route.setting.title': '系统设置',

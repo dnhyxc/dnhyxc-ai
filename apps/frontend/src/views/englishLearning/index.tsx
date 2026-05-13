@@ -23,6 +23,7 @@ import {
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import englishAgentStore from '@/store/englishAgent';
+import EnglishPackStore from '@/store/englishPack';
 import type { ChatI18nT, Message } from '@/types/chat';
 import { stopAllEnglishPlayback } from '@/utils/englishTts';
 import { ClassicQuotesSection } from './ClassicQuotesSection';
@@ -117,6 +118,16 @@ const EnglishLearning = observer(function EnglishLearning() {
 		if (englishAgentStore.sessionId === sessionQ) return;
 		void englishAgentStore.hydrateSession(sessionQ);
 	}, [sessionQ]);
+
+	/** 从 EnglishPack 恢复快捷意图（例如 HMR 或 Agent 被清空但 Pack 仍保留镜像时） */
+	useEffect(() => {
+		if (
+			EnglishPackStore.sidebarIntentPrefix &&
+			!englishAgentStore.pendingIntentPrefix
+		) {
+			englishAgentStore.setIntentPrefix(EnglishPackStore.sidebarIntentPrefix);
+		}
+	}, []);
 
 	const onNewChat = useCallback(() => {
 		stopAllEnglishPlayback();

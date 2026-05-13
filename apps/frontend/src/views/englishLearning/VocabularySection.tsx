@@ -56,8 +56,9 @@ function VocabularyPackSectionInner() {
 	const progress = EnglishPackStore.vocabProgress;
 	const items = EnglishPackStore.vocabItems;
 
-	const [topic, setTopic] = useState('');
-	const [countInput, setCountInput] = useState('');
+	const topic = EnglishPackStore.vocabTopic;
+	const countInput = EnglishPackStore.vocabCountInput;
+
 	const [playingKey, setPlayingKey] = useState<string | null>(null);
 	const [historyDrawerOpen, setHistoryDrawerOpen] = useState(false);
 	const [historyEntries, setHistoryEntries] = useState<
@@ -317,11 +318,11 @@ function VocabularyPackSectionInner() {
 		}
 		const n = Number.parseInt(countInput, 10);
 		if (!Number.isFinite(n)) {
-			setCountInput('');
+			EnglishPackStore.setVocabCountInput('');
 			return;
 		}
 		const clamped = Math.min(VOCAB_COUNT_MAX, Math.max(VOCAB_COUNT_MIN, n));
-		setCountInput(String(clamped));
+		EnglishPackStore.setVocabCountInput(String(clamped));
 	}, [countInput]);
 
 	return (
@@ -352,13 +353,13 @@ function VocabularyPackSectionInner() {
 			<Input
 				id="english-vocab-topic"
 				value={topic}
-				onChange={(e) => setTopic(e.target.value)}
+				onChange={(e) => EnglishPackStore.setVocabTopic(e.target.value)}
 				placeholder={t('englishLearning.vocab.topicPlaceholder')}
 				className="h-9 w-full border-theme/10 bg-theme/5 focus-visible:border-theme/10 focus-visible:ring-0 mt-0.5 mb-4"
 				disabled={loading}
 			/>
 
-			<div className="mb-2.5 space-y-3">
+			<div className="space-y-3">
 				<div className="w-full min-w-0">
 					<label
 						htmlFor="english-vocab-count"
@@ -372,7 +373,11 @@ function VocabularyPackSectionInner() {
 						aria-describedby="english-vocab-count-hint"
 						placeholder={t('englishLearning.vocab.countPlaceholder')}
 						value={countInput}
-						onChange={(e) => setCountInput(sanitizeCountDigits(e.target.value))}
+						onChange={(e) =>
+							EnglishPackStore.setVocabCountInput(
+								sanitizeCountDigits(e.target.value),
+							)
+						}
 						onBlur={normalizeCountOnBlur}
 						disabled={loading}
 						className="mt-0.5 h-9 w-full border-theme/10 bg-theme/5 focus-visible:border-theme/10 focus-visible:ring-0"
@@ -390,7 +395,7 @@ function VocabularyPackSectionInner() {
 								size="sm"
 								variant="outline"
 								disabled={loading}
-								onClick={() => setCountInput(String(n))}
+								onClick={() => EnglishPackStore.setVocabCountInput(String(n))}
 								className={cn(
 									'flex-1 rounded-md border bg-theme/5 px-2 py-1 text-xs font-medium transition-colors',
 									countInput === String(n)
@@ -471,7 +476,7 @@ function VocabularyPackSectionInner() {
 			</div>
 			{items.length > 0 ? (
 				<>
-					<div className="sticky -top-2.5 z-20 -mx-4 px-4 pb-2 flex min-h-6 items-center justify-between gap-2 bg-theme-background/95 backdrop-blur-sm">
+					<div className="sticky -top-2.5 z-20 -mx-4 px-4 mt-2.5 pb-2 flex min-h-6 items-center justify-between gap-2 bg-theme-background/95 backdrop-blur-sm">
 						<div className="flex items-center gap-2 text-textcolor/45 text-sm font-medium">
 							{t('englishLearning.vocab.listHeading')}
 							{masterSearchOrganic.length > 0 ? (

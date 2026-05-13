@@ -56,8 +56,9 @@ function ClassicQuotesSectionInner() {
 	const progress = EnglishPackStore.classicProgress;
 	const items = EnglishPackStore.classicItems;
 
-	const [topic, setTopic] = useState('');
-	const [countInput, setCountInput] = useState('');
+	const topic = EnglishPackStore.classicTopic;
+	const countInput = EnglishPackStore.classicCountInput;
+
 	const [playingKey, setPlayingKey] = useState<string | null>(null);
 	const [historyDrawerOpen, setHistoryDrawerOpen] = useState(false);
 	const [historyEntries, setHistoryEntries] = useState<
@@ -315,11 +316,11 @@ function ClassicQuotesSectionInner() {
 		}
 		const n = Number.parseInt(countInput, 10);
 		if (!Number.isFinite(n)) {
-			setCountInput('');
+			EnglishPackStore.setClassicCountInput('');
 			return;
 		}
 		const clamped = Math.min(QUOTE_COUNT_MAX, Math.max(QUOTE_COUNT_MIN, n));
-		setCountInput(String(clamped));
+		EnglishPackStore.setClassicCountInput(String(clamped));
 	}, [countInput]);
 
 	return (
@@ -347,13 +348,13 @@ function ClassicQuotesSectionInner() {
 			<Input
 				id="english-classic-topic"
 				value={topic}
-				onChange={(e) => setTopic(e.target.value)}
+				onChange={(e) => EnglishPackStore.setClassicTopic(e.target.value)}
 				placeholder={t('englishLearning.classic.topicPlaceholder')}
 				className="h-9 w-full border-theme/10 bg-theme/5 focus-visible:border-theme/10 focus-visible:ring-0 mt-0.5 mb-4"
 				disabled={loading}
 			/>
 
-			<div className="mb-2.5 space-y-3">
+			<div className="space-y-3">
 				<div className="w-full min-w-0">
 					<label
 						htmlFor="english-classic-count"
@@ -367,7 +368,11 @@ function ClassicQuotesSectionInner() {
 						aria-describedby="english-classic-count-hint"
 						placeholder={t('englishLearning.classic.countPlaceholder')}
 						value={countInput}
-						onChange={(e) => setCountInput(sanitizeCountDigits(e.target.value))}
+						onChange={(e) =>
+							EnglishPackStore.setClassicCountInput(
+								sanitizeCountDigits(e.target.value),
+							)
+						}
 						onBlur={normalizeCountOnBlur}
 						disabled={loading}
 						className="mt-0.5 h-9 w-full border-theme/10 bg-theme/5 focus-visible:border-theme/10 focus-visible:ring-0"
@@ -385,7 +390,7 @@ function ClassicQuotesSectionInner() {
 								size="sm"
 								variant="outline"
 								disabled={loading}
-								onClick={() => setCountInput(String(n))}
+								onClick={() => EnglishPackStore.setClassicCountInput(String(n))}
 								className={cn(
 									'flex-1 rounded-md border bg-theme/5 px-2 py-1 text-xs font-medium transition-colors',
 									countInput === String(n)
@@ -466,7 +471,7 @@ function ClassicQuotesSectionInner() {
 
 			{items.length > 0 ? (
 				<>
-					<div className="sticky -top-2.5 z-20 -mx-4 pb-2 flex min-h-6 items-center justify-between gap-2 bg-theme-background/95 px-4 backdrop-blur-sm">
+					<div className="sticky -top-2.5 z-20 -mx-4 mt-2.5 pb-2 flex min-h-6 items-center justify-between gap-2 bg-theme-background/95 px-4 backdrop-blur-sm">
 						<div className="flex items-center gap-2 text-textcolor/45 text-sm font-medium">
 							{t('englishLearning.classic.listHeading')}
 							{masterSearchOrganic.length > 0 ? (

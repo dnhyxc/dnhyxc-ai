@@ -2,6 +2,7 @@
  * 英语学习包（单词包/经典句）流式拉取的 UI 状态 Store（跨路由持久）。
  * - 进入英语包页面会用到此 Store，页面即使离开且 SSE 流未断开时，也能持续接收流式内容，保证 UI 状态完整。
  * - 再次进入英语学习页时，可以无缝展示当前进度与历史。
+ * - 左栏「快捷意图」镜像、单词包/经典句的主题与词数字段亦存于此，换路由后表单可恢复。
  */
 import { makeAutoObservable, runInAction } from 'mobx';
 import type { EnglishClassicQuoteItem, EnglishVocabularyItem } from '@/service';
@@ -23,6 +24,11 @@ export type EnglishPackUiProgress = {
  * 跨路由持久化数据管理 - 维护单词包、经典句两类流式任务的 UI 状态。
  */
 class EnglishPack {
+	constructor() {
+		// 使所有状态自动响应式，并绑定 this
+		makeAutoObservable(this);
+	}
+
 	// —— 单词包相关 observables ——
 	vocabStreamGenId = 0; // 流式拉取会话版本，每次新请求递增，用于判定回调归属
 	vocabLoading = false; // 当前是否正在加载（流处理中）
@@ -41,9 +47,45 @@ class EnglishPack {
 	classicMasterSearchOrganic: SearchOrganicItem[] = []; // 搜索引擎结果
 	classicAbort: ((fromUser?: boolean) => void) | null = null; // 当前经典句流终止回调
 
-	constructor() {
-		// 使所有状态自动响应式，并绑定 this
-		makeAutoObservable(this);
+	// ——— 左栏学习表单持久化（跨路由；与 Agent 意图镜像见 englishAgent 同步）———
+
+	/** 快捷意图长文案，与 `englishAgentStore.pendingIntentPrefix` 镜像 */
+	sidebarIntentPrefix = '';
+	/** 单词包：主题、数量输入（字符串与 Input 受控一致） */
+	vocabTopic = '';
+	vocabCountInput = '';
+	/** 经典句：主题、数量输入 */
+	classicTopic = '';
+	classicCountInput = '';
+
+	setSidebarIntentPrefix(v: string) {
+		runInAction(() => {
+			this.sidebarIntentPrefix = v;
+		});
+	}
+
+	setVocabTopic(v: string) {
+		runInAction(() => {
+			this.vocabTopic = v;
+		});
+	}
+
+	setVocabCountInput(v: string) {
+		runInAction(() => {
+			this.vocabCountInput = v;
+		});
+	}
+
+	setClassicTopic(v: string) {
+		runInAction(() => {
+			this.classicTopic = v;
+		});
+	}
+
+	setClassicCountInput(v: string) {
+		runInAction(() => {
+			this.classicCountInput = v;
+		});
 	}
 
 	// ——— 单词包逻辑方法 ———
