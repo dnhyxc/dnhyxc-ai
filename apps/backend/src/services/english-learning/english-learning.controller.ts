@@ -216,6 +216,29 @@ export class EnglishLearningController {
 		return { success: true, data: detail };
 	}
 
+	/** 分页列出当前用户收藏的单词（按收藏时间倒序） */
+	@Get('vocabulary-favorites')
+	async listVocabularyFavoritesPaginated(
+		@Req() req: AuthedRequest,
+		@Query('limit') limitStr?: string,
+		@Query('offset') offsetStr?: string,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const limit = Math.min(
+			100,
+			Math.max(1, Number.parseInt(limitStr ?? '20', 10) || 20),
+		);
+		const offset = Math.max(0, Number.parseInt(offsetStr ?? '0', 10) || 0);
+		const data = await this.englishLearningService.listVocabularyFavoritesPage(
+			userId,
+			{ limit, offset },
+		);
+		return { success: true, data };
+	}
+
 	/** 收藏当前单词（同一词形不重复落库） */
 	@Post('vocabulary-favorites')
 	async addVocabularyFavorite(
@@ -444,6 +467,30 @@ export class EnglishLearningController {
 				streamId,
 			);
 		return { success: true, data: detail };
+	}
+
+	/** 分页列出当前用户收藏的经典句（按收藏时间倒序） */
+	@Get('classic-quotes-favorites')
+	async listClassicQuoteFavoritesPaginated(
+		@Req() req: AuthedRequest,
+		@Query('limit') limitStr?: string,
+		@Query('offset') offsetStr?: string,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const limit = Math.min(
+			100,
+			Math.max(1, Number.parseInt(limitStr ?? '20', 10) || 20),
+		);
+		const offset = Math.max(0, Number.parseInt(offsetStr ?? '0', 10) || 0);
+		const data =
+			await this.englishLearningService.listClassicQuoteFavoritesPage(userId, {
+				limit,
+				offset,
+			});
+		return { success: true, data };
 	}
 
 	/** 收藏经典句（同一内容键不重复落库） */

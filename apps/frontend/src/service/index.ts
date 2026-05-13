@@ -537,6 +537,31 @@ export const fetchEnglishVocabularyFavoriteStatus = async (words: string[]) => {
 	);
 };
 
+/** 单词收藏分页列表项（GET 收藏记录） */
+export type EnglishVocabularyFavoriteListEntry = {
+	id: string;
+	word: string;
+	ipa: string;
+	translationZh: string;
+	example: string;
+	createdAt: string;
+};
+
+export const listEnglishVocabularyFavorites = async (options?: {
+	limit?: number;
+	offset?: number;
+}) => {
+	return await http.get<EnglishVocabularyFavoriteListEntry[]>(
+		ENGLISH_LEARNING_VOCABULARY_FAVORITES,
+		{
+			querys: {
+				limit: options?.limit ?? 20,
+				offset: options?.offset ?? 0,
+			},
+		},
+	);
+};
+
 /** ---------- 英语学习：经典语句包 ---------- */
 
 export type EnglishClassicQuoteItem = {
@@ -615,6 +640,31 @@ export const fetchEnglishClassicQuoteFavoriteStatus = async (
 	return await http.post<{ favoritedContentKeys: string[] }>(
 		`${ENGLISH_LEARNING_CLASSIC_QUOTES_FAVORITES}/status`,
 		{ englishes },
+	);
+};
+
+/** 经典句收藏分页列表项（GET 收藏记录） */
+export type EnglishClassicQuoteFavoriteListEntry = {
+	id: string;
+	english: string;
+	translationZh: string;
+	source: string;
+	noteZh: string;
+	createdAt: string;
+};
+
+export const listEnglishClassicQuoteFavorites = async (options?: {
+	limit?: number;
+	offset?: number;
+}) => {
+	return await http.get<EnglishClassicQuoteFavoriteListEntry[]>(
+		ENGLISH_LEARNING_CLASSIC_QUOTES_FAVORITES,
+		{
+			querys: {
+				limit: options?.limit ?? 20,
+				offset: options?.offset ?? 0,
+			},
+		},
 	);
 };
 

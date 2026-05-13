@@ -2112,4 +2112,64 @@ export class EnglishLearningService {
 		});
 		return rows.map((r) => r.contentKey);
 	}
+
+	/** 分页列出当前用户收藏的单词（按收藏时间倒序） */
+	async listVocabularyFavoritesPage(
+		userId: number,
+		opts: { limit: number; offset: number },
+	): Promise<
+		Array<{
+			id: string;
+			word: string;
+			ipa: string;
+			translationZh: string;
+			example: string;
+			createdAt: string;
+		}>
+	> {
+		const rows = await this.vocabFavoriteRepo.find({
+			where: { userId },
+			order: { createdAt: 'DESC' },
+			take: opts.limit,
+			skip: opts.offset,
+		});
+		return rows.map((r) => ({
+			id: r.id,
+			word: r.word,
+			ipa: r.ipa ?? '',
+			translationZh: r.translationZh ?? '',
+			example: r.example ?? '',
+			createdAt: r.createdAt.toISOString(),
+		}));
+	}
+
+	/** 分页列出当前用户收藏的经典句（按收藏时间倒序） */
+	async listClassicQuoteFavoritesPage(
+		userId: number,
+		opts: { limit: number; offset: number },
+	): Promise<
+		Array<{
+			id: string;
+			english: string;
+			translationZh: string;
+			source: string;
+			noteZh: string;
+			createdAt: string;
+		}>
+	> {
+		const rows = await this.classicQuoteFavoriteRepo.find({
+			where: { userId },
+			order: { createdAt: 'DESC' },
+			take: opts.limit,
+			skip: opts.offset,
+		});
+		return rows.map((r) => ({
+			id: r.id,
+			english: r.english,
+			translationZh: r.translationZh ?? '',
+			source: r.source ?? '',
+			noteZh: r.noteZh ?? '',
+			createdAt: r.createdAt.toISOString(),
+		}));
+	}
 }

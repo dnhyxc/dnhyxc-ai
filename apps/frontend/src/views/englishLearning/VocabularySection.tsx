@@ -3,6 +3,7 @@
  */
 import { Button, Input, Spinner, Toast } from '@ui/index';
 import {
+	Bookmark,
 	BookText,
 	CircleChevronDown,
 	CircleChevronRight,
@@ -29,6 +30,7 @@ import {
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import type {
+	EnglishVocabularyFavoriteListEntry,
 	EnglishVocabularyHistoryEntry,
 	EnglishVocabularyItem,
 } from '@/service';
@@ -36,6 +38,7 @@ import {
 	addEnglishVocabularyFavorite,
 	fetchEnglishVocabularyFavoriteStatus,
 	getEnglishVocabularyHistoryDetail,
+	listEnglishVocabularyFavorites,
 	listEnglishVocabularyHistory,
 	normalizeEnglishVocabWordKey,
 	removeEnglishVocabularyFavorite,
@@ -51,6 +54,7 @@ import {
 	stopAllEnglishPlayback,
 } from '@/utils/englishTts';
 import { formatEnglishLearningAgentToolLine } from './agentToolStatusText';
+import { VocabularyFavoritesDrawer } from './VocabularyFavoritesDrawer';
 import { VocabularyHistoryDrawer } from './VocabularyHistoryDrawer';
 import { MasterWebSearchResultsBar } from './WebSearchResultsBar';
 
@@ -70,11 +74,17 @@ function VocabularyPackSectionInner() {
 
 	const [playingKey, setPlayingKey] = useState<string | null>(null);
 	const [historyDrawerOpen, setHistoryDrawerOpen] = useState(false);
+	const [favoritesDrawerOpen, setFavoritesDrawerOpen] = useState(false);
 	const [historyEntries, setHistoryEntries] = useState<
 		EnglishVocabularyHistoryEntry[]
 	>([]);
+	const [favoriteEntries, setFavoriteEntries] = useState<
+		EnglishVocabularyFavoriteListEntry[]
+	>([]);
 	const [historyLoading, setHistoryLoading] = useState(false);
 	const [historyLoadingMore, setHistoryLoadingMore] = useState(false);
+	const [favoriteLoading, setFavoriteLoading] = useState(false);
+	const [favoriteLoadingMore, setFavoriteLoadingMore] = useState(false);
 	const [loadingHistoryDetailId, setLoadingHistoryDetailId] = useState<
 		string | null
 	>(null);
@@ -125,6 +135,10 @@ function VocabularyPackSectionInner() {
 	const historyHasMoreRef = useRef(true);
 	const historyFetchingMoreRef = useRef(false);
 	const historyDrawerOpenRef = useRef(false);
+
+	const favoriteOffsetRef = useRef(0);
+	const favoriteHasMoreRef = useRef(true);
+	const favoriteFetchingMoreRef = useRef(false);
 
 	useEffect(() => {
 		historyDrawerOpenRef.current = historyDrawerOpen;
@@ -232,6 +246,78 @@ function VocabularyPackSectionInner() {
 			}
 		},
 		[t],
+	);
+
+	const fetchFavoritesFirstPage = useCallback(async () => {
+		favoriteFetchingMoreRef.current = false;
+		setFavoriteLoading(true);
+		setFavoriteLoadingMore(false);
+		favoriteOffsetRef.current = 0;
+		favoriteHasMoreRef.current = true;
+		setFavoriteEntries([]);
+		try {
+			const res = await listEnglishVocabularyFavorites({
+				limit: VOCAB_HISTORY_PAGE_SIZE,
+				offset: 0,
+			});
+			const list = Array.isArray(res.data) ? res.data : [];
+			setFavoriteEntries(list);
+			favoriteOffsetRef.current = list.length;
+			favoriteHasMoreRef.current = list.length >= VOCAB_HISTORY_PAGE_SIZE;
+		} catch {
+			setFavoriteEntries([]);
+			favoriteHasMoreRef.current = false;
+		} finally {
+			setFavoriteLoading(false);
+		}
+	}, []);
+
+	const fetchFavoritesMore = useCallback(async () => {
+		if (
+			!favoriteHasMoreRef.current ||
+			favoriteFetchingMoreRef.current ||
+			favoriteLoading
+		) {
+			return;
+		}
+		favoriteFetchingMoreRef.current = true;
+		setFavoriteLoadingMore(true);
+		const offset = favoriteOffsetRef.current;
+		try {
+			const res = await listEnglishVocabularyFavorites({
+				limit: VOCAB_HISTORY_PAGE_SIZE,
+				offset,
+			});
+			const chunk = Array.isArray(res.data) ? res.data : [];
+			if (chunk.length === 0) {
+				favoriteHasMoreRef.current = false;
+				return;
+			}
+			setFavoriteEntries((prev) => [...prev, ...chunk]);
+			favoriteOffsetRef.current += chunk.length;
+			favoriteHasMoreRef.current = chunk.length >= VOCAB_HISTORY_PAGE_SIZE;
+		} catch {
+			favoriteHasMoreRef.current = false;
+		} finally {
+			favoriteFetchingMoreRef.current = false;
+			setFavoriteLoadingMore(false);
+		}
+	}, [favoriteLoading]);
+
+	useEffect(() => {
+		if (!favoritesDrawerOpen) return;
+		void fetchFavoritesFirstPage();
+	}, [favoritesDrawerOpen, fetchFavoritesFirstPage]);
+
+	const onFavoritesViewportScroll = useCallback<UIEventHandler<HTMLDivElement>>(
+		(e) => {
+			const el = e.currentTarget;
+			const rest = el.scrollHeight - el.scrollTop - el.clientHeight;
+			if (rest < SCROLL_LOAD_THRESHOLD_PX) {
+				void fetchFavoritesMore();
+			}
+		},
+		[fetchFavoritesMore],
 	);
 
 	const cancelGenerate = useCallback(() => {
@@ -486,7 +572,7 @@ function VocabularyPackSectionInner() {
 						))}
 					</div>
 				</div>
-				<div className="flex min-w-0 items-stretch gap-2">
+				<div className="flex min-w-0 items-stretch gap-1.5 sm:gap-2">
 					<Button
 						type="button"
 						size="sm"
@@ -516,10 +602,24 @@ function VocabularyPackSectionInner() {
 						type="button"
 						size="sm"
 						onClick={() => setHistoryDrawerOpen(true)}
-						className="text-white hover:bg-linear-to-r hover:from-teal-400 hover:to-cyan-600 bg-linear-to-r from-teal-500 to-cyan-600 h-9 shrink-0 gap-1.5 whitespace-nowrap rounded-md px-2.5 sm:px-3"
+						className="text-white hover:bg-linear-to-r hover:from-teal-400 hover:to-cyan-600 bg-linear-to-r from-teal-500 to-cyan-600 h-9 shrink-0 gap-1.5 whitespace-nowrap rounded-md px-2 sm:px-2.5"
+						title={t('englishLearning.vocab.historyOpenDrawer')}
 					>
-						<span className="max-[340px]:sr-only">
+						<span className="max-[380px]:sr-only">
 							{t('englishLearning.vocab.historyOpenDrawer')}
+						</span>
+					</Button>
+					<Button
+						type="button"
+						size="sm"
+						onClick={() => setFavoritesDrawerOpen(true)}
+						className="text-white hover:bg-linear-to-r hover:from-teal-400 hover:to-cyan-600 bg-linear-to-r from-teal-500 to-cyan-600 h-9 w-9 shrink-0 gap-0 rounded-md px-0 sm:w-auto sm:gap-1.5 sm:px-2.5"
+						title={t('englishLearning.vocab.favoritesOpenDrawer')}
+						aria-label={t('englishLearning.vocab.favoritesOpenDrawer')}
+					>
+						<Bookmark className="size-4 shrink-0 sm:hidden" aria-hidden />
+						<span className="hidden sm:inline max-[420px]:sr-only">
+							{t('englishLearning.vocab.favoritesOpenDrawer')}
 						</span>
 					</Button>
 				</div>
@@ -691,6 +791,16 @@ function VocabularyPackSectionInner() {
 				loadingDetailId={loadingHistoryDetailId}
 				onViewportScroll={onHistoryViewportScroll}
 				onSelectEntry={openHistoryDetail}
+			/>
+			<VocabularyFavoritesDrawer
+				open={favoritesDrawerOpen}
+				onOpenChange={setFavoritesDrawerOpen}
+				entries={favoriteEntries}
+				loading={favoriteLoading}
+				loadingMore={favoriteLoadingMore}
+				onViewportScroll={onFavoritesViewportScroll}
+				playingKey={playingKey}
+				onTogglePlayWord={toggleWordAudio}
 			/>
 		</div>
 	);
