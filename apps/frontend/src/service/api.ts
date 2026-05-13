@@ -123,6 +123,9 @@ export const ENGLISH_LEARNING_STREAM_CANCEL = '/english-learning/stream/cancel';
 /** 当前用户历史拉取的单词包会话列表（分页） */
 export const ENGLISH_LEARNING_VOCABULARY_HISTORY =
 	'/english-learning/vocabulary-history';
+/** 单词收藏：新增、取消、批量查询已收藏词形 */
+export const ENGLISH_LEARNING_VOCABULARY_FAVORITES =
+	'/english-learning/vocabulary-favorites';
 
 /** 英语学习：按主题生成经典语句（译文 + 出处 + 赏析） */
 export const ENGLISH_LEARNING_CLASSIC_QUOTES =
@@ -133,3 +136,6 @@ export const ENGLISH_LEARNING_CLASSIC_QUOTES_STREAM =
 /** 经典语句历史会话列表（分页） */
 export const ENGLISH_LEARNING_CLASSIC_QUOTES_HISTORY =
 	'/english-learning/classic-quotes-history';
+/** 经典句收藏：新增、取消、批量查询已收藏内容键（SHA256 hex） */
+export const ENGLISH_LEARNING_CLASSIC_QUOTES_FAVORITES =
+	'/english-learning/classic-quotes-favorites';

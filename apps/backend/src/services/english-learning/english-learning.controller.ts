@@ -20,11 +20,21 @@ import { Observable } from 'rxjs';
 import { JwtGuard } from 'src/guards/jwt.guard';
 import { CancelEnglishLearningStreamDto } from './dto/cancel-english-learning-stream.dto';
 import {
+	ClassicQuoteFavoriteBodyDto,
+	ClassicQuoteFavoriteRemoveDto,
+	ClassicQuoteFavoriteStatusDto,
+} from './dto/classic-quote-favorite.dto';
+import {
 	GenerateClassicQuotesDto,
 	GenerateVocabularyDto,
 	resolveClassicQuotesPackTargetCount,
 	resolveVocabularyPackTargetCount,
 } from './dto/generate-vocabulary.dto';
+import {
+	VocabularyFavoriteBodyDto,
+	VocabularyFavoriteRemoveDto,
+	VocabularyFavoriteStatusDto,
+} from './dto/vocabulary-favorite.dto';
 import {
 	type EnglishLearningPackAgentToolEvent,
 	EnglishLearningService,
@@ -206,6 +216,58 @@ export class EnglishLearningController {
 		return { success: true, data: detail };
 	}
 
+	/** 收藏当前单词（同一词形不重复落库） */
+	@Post('vocabulary-favorites')
+	async addVocabularyFavorite(
+		@Req() req: AuthedRequest,
+		@Body() dto: VocabularyFavoriteBodyDto,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const data = await this.englishLearningService.addVocabularyFavorite(
+			userId,
+			dto,
+		);
+		return { success: true, data };
+	}
+
+	/** 取消收藏 */
+	@Post('vocabulary-favorites/remove')
+	async removeVocabularyFavorite(
+		@Req() req: AuthedRequest,
+		@Body() dto: VocabularyFavoriteRemoveDto,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const data = await this.englishLearningService.removeVocabularyFavorite(
+			userId,
+			dto.word,
+		);
+		return { success: true, data };
+	}
+
+	/** 批量查询列表中已收藏的规范化词形 */
+	@Post('vocabulary-favorites/status')
+	async vocabularyFavoritesStatus(
+		@Req() req: AuthedRequest,
+		@Body() dto: VocabularyFavoriteStatusDto,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const favoritedWordKeys =
+			await this.englishLearningService.listVocabularyFavoriteKeysForWords(
+				userId,
+				dto.words,
+			);
+		return { success: true, data: { favoritedWordKeys } };
+	}
+
 	@Post('vocabulary-pack')
 	async vocabularyPack(
 		@Req() req: AuthedRequest,
@@ -382,6 +444,56 @@ export class EnglishLearningController {
 				streamId,
 			);
 		return { success: true, data: detail };
+	}
+
+	/** 收藏经典句（同一内容键不重复落库） */
+	@Post('classic-quotes-favorites')
+	async addClassicQuoteFavorite(
+		@Req() req: AuthedRequest,
+		@Body() dto: ClassicQuoteFavoriteBodyDto,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const data = await this.englishLearningService.addClassicQuoteFavorite(
+			userId,
+			dto,
+		);
+		return { success: true, data };
+	}
+
+	@Post('classic-quotes-favorites/remove')
+	async removeClassicQuoteFavorite(
+		@Req() req: AuthedRequest,
+		@Body() dto: ClassicQuoteFavoriteRemoveDto,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const data = await this.englishLearningService.removeClassicQuoteFavorite(
+			userId,
+			dto.english,
+		);
+		return { success: true, data };
+	}
+
+	@Post('classic-quotes-favorites/status')
+	async classicQuoteFavoritesStatus(
+		@Req() req: AuthedRequest,
+		@Body() dto: ClassicQuoteFavoriteStatusDto,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const favoritedContentKeys =
+			await this.englishLearningService.listClassicQuoteFavoriteContentKeys(
+				userId,
+				dto.englishes,
+			);
+		return { success: true, data: { favoritedContentKeys } };
 	}
 
 	@Post('classic-quotes')

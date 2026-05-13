@@ -7,6 +7,7 @@ import {
 	CircleChevronDown,
 	CircleChevronRight,
 	Square,
+	Star,
 	Volume2,
 } from 'lucide-react';
 import { observer } from 'mobx-react';
@@ -14,6 +15,7 @@ import {
 	type UIEventHandler,
 	useCallback,
 	useEffect,
+	useMemo,
 	useRef,
 	useState,
 } from 'react';
@@ -26,10 +28,17 @@ import {
 } from '@/constant';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
-import type { EnglishVocabularyHistoryEntry } from '@/service';
+import type {
+	EnglishVocabularyHistoryEntry,
+	EnglishVocabularyItem,
+} from '@/service';
 import {
+	addEnglishVocabularyFavorite,
+	fetchEnglishVocabularyFavoriteStatus,
 	getEnglishVocabularyHistoryDetail,
 	listEnglishVocabularyHistory,
+	normalizeEnglishVocabWordKey,
+	removeEnglishVocabularyFavorite,
 } from '@/service';
 import EnglishPackStore, {
 	type EnglishPackUiProgress,
@@ -72,6 +81,45 @@ function VocabularyPackSectionInner() {
 	const [loadedStreamId, setLoadedStreamId] = useState<string | null>(null);
 	/** 单词列表是否展开（默认展开） */
 	const [listExpanded, setListExpanded] = useState(true);
+
+	/** 已收藏的规范化词形（与后端 word_key 一致） */
+	const [favoritedWordKeys, setFavoritedWordKeys] = useState<Set<string>>(
+		() => new Set(),
+	);
+	/** 正在请求收藏/取消的规范化词形，用于禁用该词按钮 */
+	const [favoriteActionKey, setFavoriteActionKey] = useState<string | null>(
+		null,
+	);
+
+	const itemsWordSig = useMemo(
+		() => items.map((it) => it.word).join('\u0001'),
+		[items],
+	);
+
+	useEffect(() => {
+		if (items.length === 0) {
+			setFavoritedWordKeys(new Set());
+			return;
+		}
+		let cancelled = false;
+		void (async () => {
+			try {
+				const res = await fetchEnglishVocabularyFavoriteStatus(
+					items.map((i) => i.word),
+				);
+				if (cancelled) return;
+				const keys = res.data?.favoritedWordKeys;
+				setFavoritedWordKeys(new Set(Array.isArray(keys) ? keys : []));
+			} catch {
+				if (!cancelled) {
+					setFavoritedWordKeys(new Set());
+				}
+			}
+		})();
+		return () => {
+			cancelled = true;
+		};
+	}, [itemsWordSig]);
 
 	const historyOffsetRef = useRef(0);
 	const historyHasMoreRef = useRef(true);
@@ -312,6 +360,36 @@ function VocabularyPackSectionInner() {
 		[playingKey, t],
 	);
 
+	const toggleVocabularyFavorite = useCallback(
+		async (item: EnglishVocabularyItem, currentlyFavorited: boolean) => {
+			const wk = normalizeEnglishVocabWordKey(item.word);
+			if (!wk) return;
+			setFavoriteActionKey(wk);
+			try {
+				if (currentlyFavorited) {
+					await removeEnglishVocabularyFavorite(item.word);
+					setFavoritedWordKeys((prev) => {
+						const next = new Set(prev);
+						next.delete(wk);
+						return next;
+					});
+				} else {
+					await addEnglishVocabularyFavorite(item);
+					setFavoritedWordKeys((prev) => {
+						const next = new Set(prev);
+						next.add(wk);
+						return next;
+					});
+				}
+			} catch {
+				// 错误提示由 http 客户端统一处理
+			} finally {
+				setFavoriteActionKey(null);
+			}
+		},
+		[],
+	);
+
 	const normalizeCountOnBlur = useCallback(() => {
 		if (countInput.trim() === '') {
 			return;
@@ -513,6 +591,9 @@ function VocabularyPackSectionInner() {
 							{items.map((item, i) => {
 								const key = `${i}-${item.word}`;
 								const playing = playingKey === key;
+								const wordKey = normalizeEnglishVocabWordKey(item.word);
+								const isFavorited = favoritedWordKeys.has(wordKey);
+								const favBusy = favoriteActionKey === wordKey;
 								return (
 									<div
 										key={key}
@@ -527,28 +608,65 @@ function VocabularyPackSectionInner() {
 													{displayIpaWrapped(item.ipa)}
 												</div>
 											</div>
-											<Button
-												variant="ghost"
-												size="sm"
-												onClick={() => void toggleWordAudio(item.word, key)}
-												className={cn(
-													'w-7 h-7 shrink-0 rounded-md border p-2 transition-colors @min-[26rem]:border-theme/15 @min-[26rem]:p-1.5',
-													playing
-														? 'border-teal-500/40 bg-teal-500/15 text-teal-600 dark:text-teal-400'
-														: 'border-theme/10 text-textcolor/60 hover:border-theme/20 hover:bg-theme/10 hover:text-teal-600 dark:hover:text-teal-400',
-												)}
-												aria-label={
-													playing
-														? t('englishLearning.tts.stop')
-														: t('englishLearning.vocab.playWord')
-												}
-											>
-												{playing ? (
-													<Square className="size-3.5 fill-current" />
-												) : (
-													<Volume2 className="size-3.5" />
-												)}
-											</Button>
+											<div className="flex shrink-0 items-center gap-1">
+												<Button
+													type="button"
+													variant="ghost"
+													size="sm"
+													onClick={() => void toggleWordAudio(item.word, key)}
+													className={cn(
+														'h-7 w-7 shrink-0 rounded-md border p-2 transition-colors @min-[26rem]:border-theme/15 @min-[26rem]:p-1.5',
+														playing
+															? 'border-teal-500/40 bg-teal-500/15 text-teal-600 dark:text-teal-400'
+															: 'border-theme/10 text-textcolor/60 hover:border-theme/20 hover:bg-theme/10 hover:text-teal-600 dark:hover:text-teal-400',
+													)}
+													aria-label={
+														playing
+															? t('englishLearning.tts.stop')
+															: t('englishLearning.vocab.playWord')
+													}
+												>
+													{playing ? (
+														<Square className="size-3.5 fill-current" />
+													) : (
+														<Volume2 className="size-3.5" />
+													)}
+												</Button>
+												<Button
+													type="button"
+													variant="ghost"
+													size="sm"
+													disabled={favBusy}
+													onClick={() =>
+														void toggleVocabularyFavorite(item, isFavorited)
+													}
+													className={cn(
+														'h-7 w-7 shrink-0 rounded-md border p-0 transition-colors @min-[26rem]:h-8 @min-[26rem]:w-8 @min-[26rem]:border-theme/15',
+														isFavorited
+															? 'border-amber-400/45 bg-amber-400/12 text-amber-600'
+															: 'border-theme/10 text-textcolor/55 hover:border-theme/20 hover:bg-theme/10 hover:text-amber-600',
+													)}
+													aria-pressed={isFavorited}
+													aria-label={
+														isFavorited
+															? t('englishLearning.vocab.unfavoriteWord')
+															: t('englishLearning.vocab.favoriteWord')
+													}
+													title={
+														isFavorited
+															? t('englishLearning.vocab.unfavoriteWord')
+															: t('englishLearning.vocab.favoriteWord')
+													}
+												>
+													<Star
+														className={cn(
+															'size-3.5 @min-[26rem]:size-3.5',
+															isFavorited && 'fill-current',
+														)}
+														aria-hidden
+													/>
+												</Button>
+											</div>
 										</div>
 										<div className="text-textcolor/95 text-sm leading-snug @min-[26rem]:text-sm">
 											{item.translationZh}

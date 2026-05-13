@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import {
 	AIMessage,
 	type AIMessageChunk,
@@ -7,6 +8,7 @@ import {
 } from '@langchain/core/messages';
 import { ChatOpenAI } from '@langchain/openai';
 import {
+	BadRequestException,
 	HttpException,
 	HttpStatus,
 	Injectable,
@@ -56,6 +58,7 @@ import {
 	type EnglishClassicQuoteItemJson,
 	EnglishClassicQuotePackBatch,
 } from './english-classic-quote.entity';
+import { EnglishClassicQuoteFavorite } from './english-classic-quote-favorite.entity';
 import {
 	EnglishPackWebSearchRecord,
 	type EnglishPackWebSearchRoundJson,
@@ -64,6 +67,7 @@ import {
 	EnglishVocabularyPackBatch,
 	type EnglishVocabularyPackItemJson,
 } from './english-vocabulary.entity';
+import { EnglishVocabularyFavorite } from './english-vocabulary-favorite.entity';
 import {
 	AGENT_SYSTEM_PROMPT,
 	CLASSIC_QUOTES_SUBMODEL_SYSTEM_STATIC,
@@ -153,6 +157,10 @@ export class EnglishLearningService {
 		private readonly classicBatchRepo: Repository<EnglishClassicQuotePackBatch>,
 		@InjectRepository(EnglishPackWebSearchRecord)
 		private readonly packWebSearchRepo: Repository<EnglishPackWebSearchRecord>,
+		@InjectRepository(EnglishVocabularyFavorite)
+		private readonly vocabFavoriteRepo: Repository<EnglishVocabularyFavorite>,
+		@InjectRepository(EnglishClassicQuoteFavorite)
+		private readonly classicQuoteFavoriteRepo: Repository<EnglishClassicQuoteFavorite>,
 	) {}
 
 	/** 中止类异常：用户断开 SSE / 显式 cancel / LangChain 链取消 */
@@ -1962,5 +1970,146 @@ export class EnglishLearningService {
 			createdAt: first.createdAt.toISOString(),
 			webSearchRounds: Array.isArray(ws?.searchRounds) ? ws.searchRounds : [],
 		};
+	}
+
+	/** 与前端 `normalizeEnglishVocabWordKey` 对齐：trim + 小写 */
+	normalizeVocabularyFavoriteWordKey(word: string): string {
+		return word.trim().toLowerCase();
+	}
+
+	/**
+	 * 收藏单词：同一用户同一规范化词形仅保留一行；已存在则返回 created=false，不报错。
+	 */
+	async addVocabularyFavorite(
+		userId: number,
+		item: VocabularyItemDto,
+	): Promise<{ created: boolean; id: string | null }> {
+		const wordKey = this.normalizeVocabularyFavoriteWordKey(item.word);
+		if (!wordKey) {
+			throw new BadRequestException('单词不能为空');
+		}
+		const existed = await this.vocabFavoriteRepo.findOne({
+			where: { userId, wordKey },
+		});
+		if (existed) {
+			return { created: false, id: existed.id };
+		}
+		const row = this.vocabFavoriteRepo.create({
+			userId,
+			wordKey,
+			word: item.word.trim(),
+			ipa: typeof item.ipa === 'string' ? item.ipa : '',
+			translationZh: item.translationZh ?? '',
+			example: item.example ?? '',
+		});
+		const saved = await this.vocabFavoriteRepo.save(row);
+		return { created: true, id: saved.id };
+	}
+
+	async removeVocabularyFavorite(
+		userId: number,
+		word: string,
+	): Promise<{ removed: boolean }> {
+		const wordKey = this.normalizeVocabularyFavoriteWordKey(word);
+		if (!wordKey) {
+			throw new BadRequestException('单词不能为空');
+		}
+		const r = await this.vocabFavoriteRepo.delete({ userId, wordKey });
+		return { removed: (r.affected ?? 0) > 0 };
+	}
+
+	/** 返回当前用户已收藏的规范化词形列表（仅包含入参中出现过的） */
+	async listVocabularyFavoriteKeysForWords(
+		userId: number,
+		words: string[],
+	): Promise<string[]> {
+		const keys = [
+			...new Set(
+				words
+					.map((w) => this.normalizeVocabularyFavoriteWordKey(w))
+					.filter((k) => k.length > 0),
+			),
+		];
+		if (keys.length === 0) {
+			return [];
+		}
+		const rows = await this.vocabFavoriteRepo.find({
+			where: { userId, wordKey: In(keys) },
+			select: ['wordKey'],
+		});
+		return rows.map((r) => r.wordKey);
+	}
+
+	/**
+	 * 经典句收藏去重键：trim + 小写后 SHA256(hex)，与前端 `classicQuoteFavoriteContentKey` 一致。
+	 */
+	classicQuoteFavoriteContentKey(english: string): string {
+		const n = english.trim().toLowerCase();
+		if (!n) {
+			return '';
+		}
+		return createHash('sha256').update(n, 'utf8').digest('hex');
+	}
+
+	async addClassicQuoteFavorite(
+		userId: number,
+		item: ClassicQuoteItemDto,
+	): Promise<{ created: boolean; id: string | null }> {
+		const contentKey = this.classicQuoteFavoriteContentKey(item.english);
+		if (!contentKey) {
+			throw new BadRequestException('英文原句不能为空');
+		}
+		const existed = await this.classicQuoteFavoriteRepo.findOne({
+			where: { userId, contentKey },
+		});
+		if (existed) {
+			return { created: false, id: existed.id };
+		}
+		const row = this.classicQuoteFavoriteRepo.create({
+			userId,
+			contentKey,
+			english: item.english.trim(),
+			translationZh: item.translationZh ?? '',
+			source: typeof item.source === 'string' ? item.source : '',
+			noteZh: item.noteZh ?? '',
+		});
+		const saved = await this.classicQuoteFavoriteRepo.save(row);
+		return { created: true, id: saved.id };
+	}
+
+	async removeClassicQuoteFavorite(
+		userId: number,
+		english: string,
+	): Promise<{ removed: boolean }> {
+		const contentKey = this.classicQuoteFavoriteContentKey(english);
+		if (!contentKey) {
+			throw new BadRequestException('英文原句不能为空');
+		}
+		const r = await this.classicQuoteFavoriteRepo.delete({
+			userId,
+			contentKey,
+		});
+		return { removed: (r.affected ?? 0) > 0 };
+	}
+
+	async listClassicQuoteFavoriteContentKeys(
+		userId: number,
+		englishes: string[],
+	): Promise<string[]> {
+		const keys = [
+			...new Set(
+				englishes
+					.map((e) => this.classicQuoteFavoriteContentKey(e))
+					.filter((k) => k.length > 0),
+			),
+		];
+		if (keys.length === 0) {
+			return [];
+		}
+		const rows = await this.classicQuoteFavoriteRepo.find({
+			where: { userId, contentKey: In(keys) },
+			select: ['contentKey'],
+		});
+		return rows.map((r) => r.contentKey);
 	}
 }

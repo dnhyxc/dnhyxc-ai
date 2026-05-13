@@ -1,3 +1,4 @@
+import CryptoJS from 'crypto-js';
 import {
 	type KnowledgeListItem,
 	type KnowledgeRecord,
@@ -21,8 +22,10 @@ import {
 	DELETE_SESSION,
 	DOWNLOAD_FILE,
 	DOWNLOAD_ZIP_FILE,
+	ENGLISH_LEARNING_CLASSIC_QUOTES_FAVORITES,
 	ENGLISH_LEARNING_CLASSIC_QUOTES_HISTORY,
 	ENGLISH_LEARNING_STREAM_CANCEL,
+	ENGLISH_LEARNING_VOCABULARY_FAVORITES,
 	ENGLISH_LEARNING_VOCABULARY_HISTORY,
 	ENGLISH_LEARNING_VOCABULARY_PACK,
 	GET_SESSION,
@@ -504,6 +507,36 @@ export const getEnglishVocabularyHistoryDetail = async (streamId: string) => {
 	});
 };
 
+/** 与后端收藏去重规则一致：trim + 小写（规范化词形） */
+export function normalizeEnglishVocabWordKey(word: string): string {
+	return word.trim().toLowerCase();
+}
+
+/** 收藏单词：服务端对同一规范化词形不重复插入 */
+export const addEnglishVocabularyFavorite = async (
+	item: EnglishVocabularyItem,
+) => {
+	return await http.post<{ created: boolean; id: string | null }>(
+		ENGLISH_LEARNING_VOCABULARY_FAVORITES,
+		item,
+	);
+};
+
+export const removeEnglishVocabularyFavorite = async (word: string) => {
+	return await http.post<{ removed: boolean }>(
+		`${ENGLISH_LEARNING_VOCABULARY_FAVORITES}/remove`,
+		{ word },
+	);
+};
+
+/** 查询当前列表中哪些词已收藏（返回规范化词形） */
+export const fetchEnglishVocabularyFavoriteStatus = async (words: string[]) => {
+	return await http.post<{ favoritedWordKeys: string[] }>(
+		`${ENGLISH_LEARNING_VOCABULARY_FAVORITES}/status`,
+		{ words },
+	);
+};
+
 /** ---------- 英语学习：经典语句包 ---------- */
 
 export type EnglishClassicQuoteItem = {
@@ -551,6 +584,38 @@ export const getEnglishClassicQuotesHistoryDetail = async (
 	}>(ENGLISH_LEARNING_CLASSIC_QUOTES_HISTORY, {
 		params: [streamId],
 	});
+};
+
+/** 与后端 `classicQuoteFavoriteContentKey` 一致：trim + 小写 + SHA256(hex) */
+export function classicQuoteFavoriteContentKey(english: string): string {
+	const n = english.trim().toLowerCase();
+	if (!n) return '';
+	return CryptoJS.SHA256(n).toString(CryptoJS.enc.Hex);
+}
+
+export const addEnglishClassicQuoteFavorite = async (
+	item: EnglishClassicQuoteItem,
+) => {
+	return await http.post<{ created: boolean; id: string | null }>(
+		ENGLISH_LEARNING_CLASSIC_QUOTES_FAVORITES,
+		item,
+	);
+};
+
+export const removeEnglishClassicQuoteFavorite = async (english: string) => {
+	return await http.post<{ removed: boolean }>(
+		`${ENGLISH_LEARNING_CLASSIC_QUOTES_FAVORITES}/remove`,
+		{ english },
+	);
+};
+
+export const fetchEnglishClassicQuoteFavoriteStatus = async (
+	englishes: string[],
+) => {
+	return await http.post<{ favoritedContentKeys: string[] }>(
+		`${ENGLISH_LEARNING_CLASSIC_QUOTES_FAVORITES}/status`,
+		{ englishes },
+	);
 };
 
 export const getSession = async (sessionId: string) => {
