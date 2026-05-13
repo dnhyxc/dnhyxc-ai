@@ -436,10 +436,9 @@ function VocabularyPackSectionInner() {
 						onClick={() => (loading ? cancelGenerate() : void onGenerate())}
 						className={cn(
 							'h-9 min-w-0 flex-1 gap-2 rounded-md px-3 text-white',
-							'hover:bg-linear-to-r hover:from-teal-400 hover:to-cyan-600',
 							loading
 								? 'border-red-500/20 bg-red-500/20 text-textcolor/80 hover:bg-red-500/25'
-								: 'bg-linear-to-r from-teal-500 to-cyan-600',
+								: 'bg-linear-to-r from-teal-500 to-cyan-600 hover:bg-linear-to-r hover:from-teal-400 hover:to-cyan-600',
 						)}
 					>
 						{loading ? (

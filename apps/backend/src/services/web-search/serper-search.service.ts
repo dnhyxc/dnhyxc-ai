@@ -6,6 +6,7 @@ import { buildWebSearchReferencePromptAppendix } from './search-context-format';
 import type {
 	SerperSearchContextResult,
 	WebSearchOrganicItem,
+	WebSearchRecencyPreset,
 } from './web-search.types';
 
 /**
@@ -13,6 +14,28 @@ import type {
  * 勿使用 https://api.serper.dev/search，该路径会 404（Cannot POST /search）。
  */
 const SERPER_GOOGLE_SEARCH_URL = 'https://google.serper.dev/search';
+
+/** Serper Google `tbs` 时间过滤参数；`null` 表示请求体中不传该字段 */
+function serperTbsFromRecency(
+	recency?: WebSearchRecencyPreset,
+): string | null | undefined {
+	if (recency == null || recency === 'default') {
+		return 'qdr:d';
+	}
+	if (recency === 'none') {
+		return null;
+	}
+	const map: Record<
+		Exclude<WebSearchRecencyPreset, 'default' | 'none'>,
+		string
+	> = {
+		day: 'qdr:d',
+		week: 'qdr:w',
+		month: 'qdr:m',
+		year: 'qdr:y',
+	};
+	return map[recency];
+}
 
 @Injectable()
 export class SerperSearchService {
@@ -32,7 +55,7 @@ export class SerperSearchService {
 	 */
 	async formatSearchContextForPrompt(
 		query: string,
-		options?: { num?: number },
+		options?: { num?: number; recency?: WebSearchRecencyPreset },
 	): Promise<SerperSearchContextResult> {
 		const apiKey = this.configService.get<string>(ModelEnum.SERPER_API_KEY);
 		const configuredUrl = this.configService.get<string>(
@@ -50,18 +73,23 @@ export class SerperSearchService {
 		}
 
 		try {
+			const tbs = serperTbsFromRecency(options?.recency);
+			const body: Record<string, unknown> = {
+				q,
+				hl: 'zh-cn',
+				num: options?.num ?? 10,
+			};
+			if (tbs != null) {
+				body.tbs = tbs;
+			}
+
 			const res = await fetch(searchUrl, {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json',
 					'X-API-KEY': apiKey.trim(),
 				},
-				body: JSON.stringify({
-					q,
-					hl: 'zh-cn',
-					tbs: 'qdr:d',
-					num: options?.num ?? 10,
-				}),
+				body: JSON.stringify(body),
 			});
 
 			if (!res.ok) {

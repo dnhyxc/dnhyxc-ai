@@ -6,9 +6,77 @@ import { buildWebSearchReferencePromptAppendix } from './search-context-format';
 import type {
 	WebSearchContextResult,
 	WebSearchOrganicItem,
+	WebSearchRecencyPreset,
 } from './web-search.types';
 
 const TAVILY_SEARCH_URL = 'https://api.tavily.com/search';
+
+/** Tavily REST 要求 YYYY-MM-DD；与 @tavily/core 的 startDate/endDate 字符串格式一致 */
+const TAVILY_ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+function isTavilyIsoDateString(s: string): boolean {
+	return TAVILY_ISO_DATE.test(s.trim());
+}
+
+/**
+ * 将预设映射为 Tavily `time_range`。
+ * 说明：`day` 必须用 `time_range: 'day'`——API 要求 `start_date` 与 `end_date` 不能为同一天（否则会 400）。
+ * @see https://docs.tavily.com/documentation/api-reference/endpoint/search
+ */
+function tavilyTimeRangeFromRecency(
+	recency?: WebSearchRecencyPreset,
+): 'day' | 'week' | 'month' | 'year' | undefined {
+	if (recency == null || recency === 'default' || recency === 'none') {
+		return undefined;
+	}
+	const map: Record<
+		Exclude<WebSearchRecencyPreset, 'default' | 'none'>,
+		'day' | 'week' | 'month' | 'year'
+	> = {
+		day: 'day',
+		week: 'week',
+		month: 'month',
+		year: 'year',
+	};
+	return map[recency];
+}
+
+/**
+ * 写入 Tavily 请求体的时间条件：
+ * - 显式 `start_date`/`end_date`：仅当起止不同且为合法 YYYY-MM-DD；若相同则退化为 `time_range: 'day'`（避免 400）。
+ * - 否则按 `recency` 写 `time_range`（含 `day`）。
+ * REST 为 snake_case；SDK 为 camelCase。
+ */
+function applyTavilyTimeFiltersToBody(
+	body: Record<string, unknown>,
+	opts: {
+		recency?: WebSearchRecencyPreset;
+		startDate?: string;
+		endDate?: string;
+	},
+): void {
+	const start = opts.startDate?.trim();
+	const end = opts.endDate?.trim();
+	if (
+		start &&
+		end &&
+		isTavilyIsoDateString(start) &&
+		isTavilyIsoDateString(end)
+	) {
+		// 说明：Tavily 返回 400「start_date and end_date cannot be the same」
+		if (start === end) {
+			body.time_range = 'day';
+			return;
+		}
+		body.start_date = start;
+		body.end_date = end;
+		return;
+	}
+	const timeRange = tavilyTimeRangeFromRecency(opts.recency);
+	if (timeRange != null) {
+		body.time_range = timeRange;
+	}
+}
 
 /** Tavily API 单条 result（仅解析用到的字段） */
 interface TavilyResultItem {
@@ -45,6 +113,14 @@ export class TavilySearchService {
 			maxResults?: number;
 			searchDepth?: 'basic' | 'advanced';
 			includeAnswer?: boolean | 'basic' | 'advanced';
+			recency?: WebSearchRecencyPreset;
+			/**
+			 * 与 `@tavily/core` 的 `startDate`/`endDate` 对应（REST：`start_date`/`end_date`）。
+			 * 须为 `YYYY-MM-DD`；**起止不能为同一天**（否则 Tavily 400）；若相同则本实现改为使用 `time_range: 'day'`。
+			 * 若与 `recency` 同时存在，本字段优先。
+			 */
+			startDate?: string;
+			endDate?: string;
 		},
 	): Promise<WebSearchContextResult> {
 		const apiKey = this.configService.get<string>(ModelEnum.TAVILY_API_KEY);
@@ -63,18 +139,25 @@ export class TavilySearchService {
 		const includeAnswer = options?.includeAnswer ?? 'advanced';
 
 		try {
+			const body: Record<string, unknown> = {
+				api_key: apiKey.trim(),
+				query: q,
+				include_answer: includeAnswer,
+				search_depth: searchDepth,
+				max_results: maxResults,
+				include_favicon: true,
+				include_usage: true,
+			};
+			applyTavilyTimeFiltersToBody(body, {
+				recency: options?.recency,
+				startDate: options?.startDate,
+				endDate: options?.endDate,
+			});
+
 			const res = await fetch(TAVILY_SEARCH_URL, {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					api_key: apiKey.trim(),
-					query: q,
-					include_answer: includeAnswer,
-					search_depth: searchDepth,
-					max_results: maxResults,
-					include_favicon: true,
-					include_usage: true,
-				}),
+				body: JSON.stringify(body),
 			});
 
 			if (!res.ok) {

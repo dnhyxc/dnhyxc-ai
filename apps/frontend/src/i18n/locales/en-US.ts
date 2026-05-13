@@ -737,12 +737,27 @@ export const enUS = {
 	'englishLearning.placeholder':
 		'Type English or Chinese: a word, a paragraph to translate, or a topic to read…',
 	'englishLearning.chip.vocabulary': 'Vocabulary',
+	'englishLearning.chip.morphology': 'Roots & affixes',
+	'englishLearning.chip.collocations': 'Collocations',
+	'englishLearning.chip.confusables': 'Near-synonyms',
+	'englishLearning.chip.pronunciation': 'Pronunciation',
+	'englishLearning.chip.speaking': 'Spoken practice',
 	'englishLearning.chip.translate': 'Translation',
 	'englishLearning.chip.reading': 'Reading',
 	'englishLearning.chip.literature': 'Literature',
 	'englishLearning.chip.grammar': 'Grammar',
 	'englishLearning.intent.vocabulary':
 		'[Intent] Focus on vocabulary: meaning, collocations, and example sentences; confirm my level if needed.',
+	'englishLearning.intent.morphology':
+		'[Intent] Starting from roots, prefixes, suffixes, and word-formation rules, explain the common morphological patterns and provide representative words for each.',
+	'englishLearning.intent.collocations':
+		'[Intent] Focus on idiomatic collocations/chunks: list common pairs, briefly contrast near equivalents, and add short examples.',
+	'englishLearning.intent.confusables':
+		'[Intent] Contrast easily confused words or near-synonyms: differences, typical misuse, and correct examples (table or bullets).',
+	'englishLearning.intent.pronunciation':
+		'[Intent] Focus on pronunciation and rhythm: stress, weak forms, linking or assimilation; include IPA and short practice tips.',
+	'englishLearning.intent.speaking':
+		'[Intent] Focus on spoken interaction and fluency: situational dialogues, natural replies, turn-taking and fillers; include short dialogue samples and register notes.',
 	'englishLearning.intent.translate':
 		'[Intent] Provide bilingual translation with line/sentence alignment; note proper names where needed.',
 	'englishLearning.intent.reading':

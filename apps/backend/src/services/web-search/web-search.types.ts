@@ -27,3 +27,17 @@ export type SerperSearchContextResult = WebSearchContextResult;
 
 /** 联网检索后端实现（默认 Tavily） */
 export type WebSearchProvider = 'tavily' | 'serper';
+
+/**
+ * Serper `tbs`（时间范围）与 Tavily `time_range` 的统一预设。
+ * - `default`：未显式指定时的兼容行为（Serper 仍带 `qdr:d`，与历史实现一致）。
+ * - `none`：不按时间收窄（Serper 不传 `tbs`；Tavily 不传 `time_range`），适合典籍、考试词表等。
+ * - 其余：Serper 映射到 Google `qdr:*`；Tavily 统一用 `time_range`（含 `day`）。显式日历区间用 `start_date`/`end_date` 时二者须不同，否则服务端 400。
+ */
+export type WebSearchRecencyPreset =
+	| 'default'
+	| 'none'
+	| 'day'
+	| 'week'
+	| 'month'
+	| 'year';

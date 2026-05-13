@@ -7,6 +7,7 @@ import { TavilySearchService } from './tavily-search.service';
 import type {
 	WebSearchContextResult,
 	WebSearchProvider,
+	WebSearchRecencyPreset,
 } from './web-search.types';
 
 @Injectable()
@@ -46,16 +47,28 @@ export class WebSearchService {
 	 */
 	async formatSearchContextForPrompt(
 		query: string,
-		options?: { provider?: WebSearchProvider; num?: number },
+		options?: {
+			provider?: WebSearchProvider;
+			num?: number;
+			recency?: WebSearchRecencyPreset;
+			/** Tavily：区间起点 YYYY-MM-DD（须与 tavilyEndDate 不同；相同则内部改用 time_range: day） */
+			tavilyStartDate?: string;
+			/** Tavily：区间终点 YYYY-MM-DD */
+			tavilyEndDate?: string;
+		},
 	): Promise<WebSearchContextResult> {
 		const provider = this.resolveProvider(options?.provider);
 		if (provider === 'tavily') {
 			return this.tavilySearchService.formatSearchContextForPrompt(query, {
 				maxResults: options?.num ?? 10,
+				recency: options?.recency,
+				startDate: options?.tavilyStartDate,
+				endDate: options?.tavilyEndDate,
 			});
 		}
 		return this.serperSearchService.formatSearchContextForPrompt(query, {
 			num: options?.num,
+			recency: options?.recency,
 		});
 	}
 
@@ -66,18 +79,26 @@ export class WebSearchService {
 		provider?: WebSearchProvider;
 		/** 每次检索完成后回调（含 organic），供 Agent SSE 推送胶囊数据源 */
 		onSearchComplete?: (result: WebSearchContextResult) => void;
+		/** 时间收窄策略；未传时与站内其它调用一致，Serper 默认 `qdr:d` */
+		recency?: WebSearchRecencyPreset;
+		/** Tavily 专用：显式日历区间（YYYY-MM-DD）；与 recency 并存时由 Tavily 层优先使用区间 */
+		tavilyStartDate?: string;
+		tavilyEndDate?: string;
 	}): DynamicTool[] {
 		const provider = this.resolveProvider(opts?.provider);
+		const recency = opts?.recency;
+		const tavilyStartDate = opts?.tavilyStartDate;
+		const tavilyEndDate = opts?.tavilyEndDate;
 		return [
 			new DynamicTool({
 				name: 'internet_search',
 				description:
 					'联网搜索公开网页。输入简洁的检索关键词或问题，返回可引用的网页标题、链接与摘要。' +
-					` 当前检索后端为：${provider}。`,
+					'【调用约束】仅在确有公开网页信息缺口时调用（事实核验、时效、冷门专名/作品、出处线索等）；禁止为「先搜再说」或走流程而例行调用；若常识与知识库已足够则不要调用。',
 				func: async (input: string) => {
 					const r = await this.formatSearchContextForPrompt(
 						typeof input === 'string' ? input : String(input ?? ''),
-						{ provider },
+						{ provider, recency, tavilyStartDate, tavilyEndDate },
 					);
 					opts?.onSearchComplete?.(r);
 					return r.promptText ?? '（无检索结果）';

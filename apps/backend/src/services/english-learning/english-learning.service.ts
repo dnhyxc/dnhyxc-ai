@@ -16,17 +16,33 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { createAgent, toolCallLimitMiddleware } from 'langchain';
-import { KnowledgeQaEnum, ModelEnum } from 'src/enum/config.enum';
-import { buildAgentLangChainTools } from 'src/services/agent/agent-tools';
-import { KnowledgeQaService } from 'src/services/knowledge-qa/knowledge-qa.service';
-import { WebSearchService } from 'src/services/web-search/web-search.service';
+import { In, Repository } from 'typeorm';
+import { KnowledgeQaEnum, ModelEnum } from '../../enum/config.enum';
+import { buildAgentLangChainTools } from '../../services/agent/agent-tools';
+import { KnowledgeQaService } from '../../services/knowledge-qa/knowledge-qa.service';
+import { WebSearchService } from '../../services/web-search/web-search.service';
+import type { WebSearchRecencyPreset } from '../../services/web-search/web-search.types';
 import {
 	englishPackAgentIsUserAbort,
 	extractEnglishPackAgentChunkText,
 	isJsonStringClosingQuoteAt,
 	repairJsonUnescapedInteriorQuotes,
-} from 'src/utils/english-pack';
-import { In, Repository } from 'typeorm';
+} from '../../utils/english-pack';
+import {
+	ENGLISH_PACK_MASTER_APPENDIX_CHAR_CAP,
+	ENGLISH_PACK_MASTER_STREAM_CHAR_FUSE,
+	ENGLISH_PACK_WEB_SEARCH_RECENCY_HEURISTIC_RULES,
+	ENGLISH_PACK_WEB_SEARCH_RECENCY_NEWS_EN_RE,
+	ENGLISH_PACK_WEB_SEARCH_RECENCY_NEWS_FLAVOR_RE,
+	PACK_AGENT_THREAD_MAX_MESSAGES,
+	TOPIC_PACK_EXCLUDE_CLASSIC_ITEM_MAX_CHARS,
+	TOPIC_PACK_EXCLUDE_CLASSIC_TAIL_ITEMS,
+	TOPIC_PACK_EXCLUDE_PROMPT_MAX_CHARS,
+	TOPIC_PACK_EXCLUDE_TAIL,
+	TOPIC_PACK_ITEMS_PER_ROUND,
+	TOPIC_PACK_STALL_BATCH_FLOOR,
+	TOPIC_PACK_STALL_BATCH_STEP,
+} from './constant';
 import {
 	GenerateClassicQuotesDto,
 	GenerateVocabularyDto,
@@ -41,6 +57,12 @@ import {
 	EnglishVocabularyPackBatch,
 	type EnglishVocabularyPackItemJson,
 } from './english-vocabulary.entity';
+import {
+	AGENT_SYSTEM_PROMPT,
+	CLASSIC_QUOTES_SUBMODEL_SYSTEM_STATIC,
+	ENGLISH_PACK_LEARNER_CONTEXT_HINT,
+	VOCABULARY_PACK_SUBMODEL_SYSTEM_STATIC,
+} from './prompt';
 
 export type ClassicQuoteItemDto = {
 	english: string;
@@ -100,54 +122,138 @@ export type VocabularyHistoryListItem = {
 };
 
 /**
+ * 单词包子模型 system 固定段（不含用户主题与学习语境常量）。
+ * 每轮另在末尾追加「【本轮生成要求】」；主题与语境在首次拼接时写入「【当前学习任务】」块。
+ */
+// const VOCABULARY_PACK_SUBMODEL_SYSTEM_STATIC = `你是英语教学助手。主题与学习语境见文末「【当前学习任务】」（整场不变）；可能分多轮请求。每一轮的条数、已出现词条节选、多样性说明均以当次 system 末尾「【本轮生成要求】」为准；请严格遵守 items 数组长度，并遵守去重规定。
+// 你必须生成英文单词或实用短语（phrase）的学习条目。
+// 每一条必须包含：
+// - word：英文单词或短语（不要用序号前缀）
+// - ipa：该条目的英式或美式 IPA 音标，使用 Unicode 音标符号（如 ˈæpl），放在字符串中
+// - translationZh：简明中文释义（可与主题相关）
+// - example：一句地道英文例句，展示该词用法
+
+// 【多轮与线程】
+// 每轮任务与条数在 system「本轮生成要求」中；user 可无正文（无检索附录时），有检索要点时 Human 仅携带附录。历史约束还来自对话中各条 AI「【上轮已产出】」快照里的 words。去重须同时遵守本 system 末尾「本轮生成要求」、上述快照，以及「节选未列出但已收录的词条同样禁止」。对话须保持 human/ai 交替；不得忽略任一快照中的 words。
+
+// 【去重硬性规定】
+// 1）同一轮输出的 items 数组内：任意两条的 word 在去首尾空格、英文小写归一化后必须互不相同；禁止仅大小写、标点或多余空格不同的「假不同」；禁止输出已在常见教材附录中机械重复的同一词不同写法凑条数。
+// 2）若「本轮生成要求」中列出「已出现过的英文词条」节选：每条 word 均不得与该列表任一项相同（小写归一化比较），亦不得与前几轮已生成内容相同。
+// 3）禁止用同一 word 重复填多条 items 凑数。
+// 4）各轮之间：不得输出与此前任一条 AI「【上轮已产出】」快照中的 words 实质相同的一批词（含仅调换顺序、删改少数词或个别同义替换后的「假新」）。
+
+// 【JSON 语法】所有字符串字段内禁止出现未转义的英文半角双引号 "；术语或引号请用中文直角引号「」或半角单引号 '；违者会导致解析失败。
+
+// 只输出一个 JSON 对象，不要 markdown，不要代码围栏，不要解释文字。
+// 格式严格为：{"items":[{"word":"","ipa":"","translationZh":"","example":""}]}
+
+// 【当前学习任务】
+// 主题/需求：`;
+
+/**
+ * 经典句子模型 system 固定段（不含用户主题与学习语境常量）。
+ * 每轮另在末尾追加「【本轮生成要求】」；主题与语境在首次拼接时写入「【当前学习任务】」块。
+ */
+// const CLASSIC_QUOTES_SUBMODEL_SYSTEM_STATIC = `你是英语教学助手。主题与学习语境见文末「【当前学习任务】」（整场不变）；可能分多轮请求。每一轮的条数、已出现句子节选、多样性说明均以当次 system 末尾「【本轮生成要求】」为准；请严格遵守 items 数组长度，并遵守去重规定。
+// 你必须生成英文经典语句（名言、名著节选、影视台词、演讲金句、谚语等地道表达），用于英语学习与赏析。
+// 每一条必须包含：
+// - english：英文原句（不要用序号前缀；保持原汁原味标点）
+// - translationZh：准确、自然的中文翻译
+// - source：出处（作者、作品、年份或语境；不确定可填 "—"）
+// - noteZh：一句中文赏析、修辞或学习要点（可简短）
+
+// 【多轮与线程】
+// 每轮任务与条数在 system「本轮生成要求」中；user 可无正文（无检索附录时），有检索要点时 Human 仅携带附录。历史约束还来自对话中各条 AI「【上轮已产出】」快照里的 english_prefixes（节选）。去重须同时遵守本 system 末尾「本轮生成要求」、上述快照，以及「节选未列出但已收录的句子同样禁止实质雷同」。对话须保持 human/ai 交替。
+
+// 【去重硬性规定】
+// 1）同一轮 items 内：任意两条的 english 在去首尾空格、小写归一化后不得相同；不得仅通过增删冠词、逗号或个别虚词制造「假不同」；禁止同一句改标点或微调几个词当作多条；禁止同一出处下机械堆叠、句式实质雷同的多条。
+// 2）若「本轮生成要求」中列出已出现句子的节选：每条 english 均不得与该列表任一条相同或实质雷同（同句换少量词仍视为雷同），亦不得与前几轮已生成内容相同。
+// 3）禁止用同一句 english 重复填多条 items 凑数。
+// 4）各轮之间：不得与此前任一条 AI 快照中的 english_prefixes 所指代的原句实质雷同地再输出一批（含仅轻微改写、删改片段或换标点而主干仍一致）。
+
+// 【JSON 语法】所有字符串字段（尤其 noteZh、translationZh）内禁止出现未转义的英文半角双引号 "；强调术语请用「」或单引号 '，不要用 " 包裹中文词；违者会导致解析失败。
+
+// 只输出一个 JSON 对象，不要 markdown，不要代码围栏，不要解释文字。
+// 格式严格为：{"items":[{"english":"","translationZh":"","source":"","noteZh":""}]}
+
+// 【当前学习任务】
+// 主题/需求：`;
+
+/**
  * 单词包 / 经典句主检索 Human 与子模型「学习任务」共用：不再由用户选档位时的固定学习语境（中文，供 prompt 使用）。
  */
-const ENGLISH_PACK_LEARNER_CONTEXT_HINT =
-	'面向一般英语学习者：词汇与例句篇幅适中、用地道常见表达，贴近生活与应用场景；经典句兼顾可读性与出处可查证性。';
+// const ENGLISH_PACK_LEARNER_CONTEXT_HINT =
+// 	'面向一般英语学习者：词汇与例句篇幅适中、用地道常见表达，贴近生活与应用场景；经典句兼顾可读性与出处可查证性。';
 
 /** 单词包与经典句共用：每轮 JSON 条数上限、已出现列表尾部条数、stall 时 batch 下调（与单词包逻辑一致） */
-const TOPIC_PACK_ITEMS_PER_ROUND = 20;
-const TOPIC_PACK_EXCLUDE_TAIL = 220;
-const TOPIC_PACK_STALL_BATCH_FLOOR = 5;
-const TOPIC_PACK_STALL_BATCH_STEP = 3;
+// const TOPIC_PACK_ITEMS_PER_ROUND = 20;
+// const TOPIC_PACK_EXCLUDE_TAIL = 220;
+// const TOPIC_PACK_STALL_BATCH_FLOOR = 5;
+// const TOPIC_PACK_STALL_BATCH_STEP = 3;
 
 /** 多轮 JSON 生成时保留在 LangChain 消息线程内的最大条数（Human/AI 交替） */
-const PACK_AGENT_THREAD_MAX_MESSAGES = 32;
+// const PACK_AGENT_THREAD_MAX_MESSAGES = 32;
 
 /**
  * 子模型 user 内「禁止重复」列表的总字符上限：从已收录键集合尾部择优保留；服务端 `seen` 仍为全集，去重语义不变。
  */
-const TOPIC_PACK_EXCLUDE_PROMPT_MAX_CHARS = 12_000;
+// const TOPIC_PACK_EXCLUDE_PROMPT_MAX_CHARS = 12_000;
 
 /** 经典句：每条 english 写入禁止列表的最大节选长度（避免 220×240 级 prompt） */
-const TOPIC_PACK_EXCLUDE_CLASSIC_ITEM_MAX_CHARS = 96;
+// const TOPIC_PACK_EXCLUDE_CLASSIC_ITEM_MAX_CHARS = 96;
 
 /** 经典句：禁止列表最多取已收录集合尾部条数（单词仍用 TOPIC_PACK_EXCLUDE_TAIL） */
-const TOPIC_PACK_EXCLUDE_CLASSIC_TAIL_ITEMS = 80;
+// const TOPIC_PACK_EXCLUDE_CLASSIC_TAIL_ITEMS = 80;
 
 /** 主 Agent 流式拼接正文的绝对熔断（防止异常超长输出占满内存） */
-const ENGLISH_PACK_MASTER_STREAM_CHAR_FUSE = 200_000;
+// const ENGLISH_PACK_MASTER_STREAM_CHAR_FUSE = 200_000;
 
 /**
  * 主 Agent 产出写入下游「检索附录」的后备上限（字符数）。
  * 系统提示要求模型先归纳工具结果并控制在约 1800 汉字内；附录经 `finalizeMasterResearchAppendix` 截断后再进入子模型 user（按需前置），本值为对主 Agent 流式正文的硬上限保护。
  */
-const ENGLISH_PACK_MASTER_APPENDIX_CHAR_CAP = 24_000;
+// const ENGLISH_PACK_MASTER_APPENDIX_CHAR_CAP = 24_000;
 
-/**
- * 英语学习「单词包 / 经典句」主 Agent（大脑）检索阶段专用系统提示：只搜集整理，输出中文要点，不输出 JSON。
- * 由 english-learning 主 Agent（硅基流动 + 工具）使用；与聊天 Agent 分流。
- * TODO: 目前单词/语句拉取不需要进行 RAG 检索，先去除第一点中的知识库检索
- */
-const ENGLISH_PACK_RESEARCH_SYSTEM_PROMPT = `你是一个只做资料搜集与整理的助手（不向终端用户闲聊）。可使用工具：互联网搜索、知识库检索、当前日期。
-任务：根据用户给出的「英语学习主题」与学习语境说明，检索并汇总与主题强相关的可扩展素材（中文要点），供后续程序生成结构化 JSON 英文词条或经典英文句使用。
-要求：
-1）必要时使用互联网搜索补充公开事实、领域专有名词、代表性作品与人物（若任务侧重经典语句，尤重可引用的出处线索）。
-2）输出用分条列表：与主题相关的领域词与搭配方向、可扩展子话题、重要专名/书名/时代（如能确定）；不要输出 JSON；不要编造检索未验证的细节（无法验证处请写「待查证」）。
-3）总字数控制在 1800 汉字以内；不要寒暄与道歉。
-4）若工具均无有效结果：给出 5～8 条基于常识的扩展方向，并标注「常识推测」。
-5）工具返回（搜索摘要、知识库片段等）可能很长：必须在心中消化后只写入归纳后的要点，禁止把原始搜索结果全文、未裁剪的 RAG 长文或大段复制粘贴进最终答复；若单次检索信息量过大，先分层摘录关键词、搭配方向与可核对出处，再组织成简短条目。
-6）最终答复本身必须符合第 3 条字数上限；归纳优先于罗列原材料。`;
+/** 主 Agent 主题 → 联网 recency 启发规则（顺序敏感：先匹配先返回） */
+// const ENGLISH_PACK_WEB_SEARCH_RECENCY_HEURISTIC_RULES: ReadonlyArray<{
+// 	preset: WebSearchRecencyPreset;
+// 	re: RegExp;
+// }> = [
+// 		{
+// 			preset: 'day',
+// 			re: /今日|今天|本日|昨夜|昨晚|今早|刚才|刚刚|实时|突发|小时前|分钟前|即时|快讯|头条|\btoday\b|\btonight\b|\blast night\b|\bthis morning\b|\bbreaking news\b|\bbreaking\b/i,
+// 		},
+// 		{
+// 			preset: 'week',
+// 			re: /本周|这周|近一周|过去一周|\bpast week\b|\bthis week\b/i,
+// 		},
+// 		{
+// 			preset: 'month',
+// 			re: /本月|这个月|近一月|近一个月|\bthis month\b/i,
+// 		},
+// 		{
+// 			preset: 'year',
+// 			re: /今年|本年|年初至今|year to date|\bthis year\b|20[12][0-9]\s*年|20[12][0-9][年\.\-\/]/i,
+// 		},
+// 		{
+// 			preset: 'year',
+// 			re: /近几年|近些年|近若干年|最近一年|过去一年|近一年|过去数年|\brecent years\b|\bin the past year\b|\bover the past year\b/i,
+// 		},
+// 		{
+// 			preset: 'month',
+// 			re: /近期|近段时间|近段时期|近来一段|最近几个月|过去几个月|近几个月|近两三个月|近半年|近三十天|近30天|\bover the past (few|several) months\b|\bin recent months\b/i,
+// 		},
+// 		{
+// 			preset: 'week',
+// 			re: /最近|近来|近况|近些天|近些日子|近几日|近几天|这些天|这几天|前些天|前两天|这两天|上一阵|一阵子|前不久|\brecently\b|\brecent\b|\blately\b|\bin recent days\b|\bover the past few\b|\bthe last few (days|weeks)\b/i,
+// 		},
+// 	];
+
+// const ENGLISH_PACK_WEB_SEARCH_RECENCY_NEWS_FLAVOR_RE =
+// 	/最新|热点|新闻|资讯|动态|舆情|股价|汇率|财报|融资|发布会|上新|单曲打榜|票房|赛程|赛果|转会/i;
+
+// const ENGLISH_PACK_WEB_SEARCH_RECENCY_NEWS_EN_RE =
+// 	/\b(latest|headlines?|news)\b/i;
 
 /**
  * 英语学习辅助：主从结构 — 主 Agent（硅基流动 + 工具）负责检索；子模型仅 JSON 模式输出词条/句子，不绑工具。
@@ -266,6 +372,187 @@ export class EnglishLearningService {
 		if (!agentResearchAppendix.trim()) return user;
 		if (this.packAgentThreadHasResearchAppendix(thread)) return user;
 		return `${agentResearchAppendix}\n\n${user}`;
+	}
+
+	/** 公历年月日 → UTC 的 `YYYY-MM-DD`；非法日历返回 null */
+	private toUtcIsoDate(y: number, m: number, d: number): string | null {
+		if (y < 1000 || y > 9999 || m < 1 || m > 12 || d < 1) return null;
+		const maxD = new Date(Date.UTC(y, m, 0)).getUTCDate();
+		if (d > maxD) return null;
+		const mm = m < 10 ? `0${m}` : String(m);
+		const dd = d < 10 ? `0${d}` : String(d);
+		return `${y}-${mm}-${dd}`;
+	}
+
+	/**
+	 * Serper `qdr`：按含首尾的自然日数映射到最接近的 recency。
+	 * Tavily 若另有 start/end 以 Tavily 为准，此处仍给 Serper 一个合理 tbs。
+	 */
+	private recencyFromUtcSpan(
+		start: string,
+		end: string,
+	): WebSearchRecencyPreset {
+		let s = start.trim();
+		let e = end.trim();
+		if (s > e) {
+			const x = s;
+			s = e;
+			e = x;
+		}
+		const t0 = Date.parse(`${s}T00:00:00.000Z`);
+		const t1 = Date.parse(`${e}T00:00:00.000Z`);
+		if (Number.isNaN(t0) || Number.isNaN(t1)) return 'none';
+		const days = Math.floor((t1 - t0) / 86_400_000) + 1;
+		if (days <= 1) return 'day';
+		if (days <= 7) return 'week';
+		if (days <= 31) return 'month';
+		if (days <= 366) return 'year';
+		return 'none';
+	}
+
+	/**
+	 * 从主题解析显式公历（中文 / ISO），供 Tavily `start_date`/`end_date`。
+	 * 支持：区间、单日、整月（YYYY年M月）、缺省年的 M月D日（补当前 UTC 年）。
+	 */
+	private tryParseTopicUtcRange(
+		topic: string,
+	): { start: string; end: string } | null {
+		const t = topic.trim();
+		if (!t) return null;
+
+		const refY = new Date().getUTCFullYear();
+
+		const norm = (y: number, m: number, d: number) =>
+			this.toUtcIsoDate(y, m, d);
+
+		// 1) 中文：YYYY年M月D日 ～ YYYY年M月D日（起止可跨任意长度）
+		let m = t.match(
+			/(\d{4})年(\d{1,2})月(\d{1,2})日?\s*(?:到|至|-|~|～)\s*(\d{4})年(\d{1,2})月(\d{1,2})日?/,
+		);
+		if (m) {
+			const a = norm(+m[1], +m[2], +m[3]);
+			const b = norm(+m[4], +m[5], +m[6]);
+			if (a && b) return { start: a, end: b };
+		}
+
+		// 2) ISO / 斜杠：YYYY-M-D ～ YYYY-M-D
+		m = t.match(
+			/\b(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})\b\s*(?:到|至|-|~|～)\s*\b(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})\b/,
+		);
+		if (m) {
+			const a = norm(+m[1], +m[2], +m[3]);
+			const b = norm(+m[4], +m[5], +m[6]);
+			if (a && b) return { start: a, end: b };
+		}
+
+		// 3) 同年缩写：YYYY年M月D日 ～ M月D日
+		m = t.match(
+			/(\d{4})年(\d{1,2})月(\d{1,2})日?\s*(?:到|至|-|~|～)\s*(\d{1,2})月(\d{1,2})日?/,
+		);
+		if (m) {
+			const y0 = +m[1];
+			const a = norm(y0, +m[2], +m[3]);
+			const b = norm(y0, +m[4], +m[5]);
+			if (a && b) return { start: a, end: b };
+		}
+
+		// 4) 单日：YYYY年M月D日
+		m = t.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
+		if (m) {
+			const one = norm(+m[1], +m[2], +m[3]);
+			if (one) return { start: one, end: one };
+		}
+
+		// 5) 单日：YYYY-MM-DD（或 / .）
+		m = t.match(/\b(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})\b/);
+		if (m) {
+			const one = norm(+m[1], +m[2], +m[3]);
+			if (one) return { start: one, end: one };
+		}
+
+		// 6) 整月：YYYY年M月（后面不是「若干日」的完整某日，避免与单日冲突）
+		const monthRe = /(\d{4})年(\d{1,2})月/g;
+		let mm = monthRe.exec(t);
+		while (mm !== null) {
+			const y = +mm[1];
+			const mo = +mm[2];
+			const tail = t.slice(mm.index + mm[0].length);
+			if (/^\s*\d{1,2}\s*日/.test(tail)) {
+				mm = monthRe.exec(t);
+				continue;
+			}
+			const start = norm(y, mo, 1);
+			const last = new Date(Date.UTC(y, mo, 0)).getUTCDate();
+			const end = norm(y, mo, last);
+			if (start && end) return { start, end };
+			mm = monthRe.exec(t);
+		}
+
+		// 7) 缺省年：M月D日（取当前 UTC 年；若 2/29 非法则退回 null）
+		m = t.match(/(?:^|[^\d])(\d{1,2})月(\d{1,2})日(?:[^\d]|$)/);
+		if (m) {
+			const one = norm(refY, +m[1], +m[2]);
+			if (one) return { start: one, end: one };
+		}
+
+		return null;
+	}
+
+	/** 典籍 / 考试 / 辞典向：不做联网时间收窄 */
+	private isLexiconExamTopic(topic: string): boolean {
+		return /莎士比亚|莎翁|Sonnets?|十四行|傲慢与偏见|圣经|荷马|古希腊|罗马|唐诗|宋词|文言|古文|名言|格言|谚语|俚语|GRE|托福|雅思|IELTS|TOEFL|四六级|CET-|专四|专八|考研英语|PETS|托业|BEC|教材|课文|词根|词缀|WordNet|牛津|朗文|柯林斯|韦氏/i.test(
+			topic.trim(),
+		);
+	}
+
+	/**
+	 * 主检索联网时间策略：显式日期优先，否则关键词启发。
+	 * Tavily 合法起止走 `start_date`/`end_date`（见 `applyTavilyTimeFiltersToBody`）。
+	 */
+	private resolveWebSearchTime(topic: string): {
+		recency: WebSearchRecencyPreset;
+		tavilyStartDate?: string;
+		tavilyEndDate?: string;
+	} {
+		const t = topic.trim();
+		if (!t) {
+			return { recency: 'none' };
+		}
+		if (this.isLexiconExamTopic(t)) {
+			return { recency: 'none' };
+		}
+
+		const explicit = this.tryParseTopicUtcRange(t);
+		if (explicit) {
+			return {
+				recency: this.recencyFromUtcSpan(explicit.start, explicit.end),
+				tavilyStartDate: explicit.start,
+				tavilyEndDate: explicit.end,
+			};
+		}
+
+		return { recency: this.heuristicRecencyFromTopic(t) };
+	}
+
+	/**
+	 * 关键词启发 recency（不含空主题、典籍排除、显式日期——后者由 `resolveWebSearchTime` 先行处理）。
+	 * 顺序与 `ENGLISH_PACK_WEB_SEARCH_RECENCY_HEURISTIC_RULES` 及末尾「新闻/动态」分支一致，勿随意重排。
+	 */
+	private heuristicRecencyFromTopic(topic: string): WebSearchRecencyPreset {
+		const t = topic.trim();
+		for (const {
+			preset,
+			re,
+		} of ENGLISH_PACK_WEB_SEARCH_RECENCY_HEURISTIC_RULES) {
+			if (re.test(t)) return preset;
+		}
+		if (
+			ENGLISH_PACK_WEB_SEARCH_RECENCY_NEWS_FLAVOR_RE.test(t) ||
+			ENGLISH_PACK_WEB_SEARCH_RECENCY_NEWS_EN_RE.test(t)
+		) {
+			return 'week';
+		}
+		return 'none';
 	}
 
 	/**
@@ -431,18 +718,25 @@ export class EnglishLearningService {
 				signal: combinedSignal,
 			});
 
+			// 根据主题推断联网检索时间策略（显式公历 → Tavily 区间；Serper 用粗粒度 tbs）
+			const webSearchTime = this.resolveWebSearchTime(topic);
 			// 动态构建支持的工具，包括 Web 检索及知识 QA 工具
 			const tools = buildAgentLangChainTools({
 				webSearchService: this.webSearchService,
 				knowledgeQaService: this.knowledgeQaService,
 				userId,
+				webSearchRecency: webSearchTime.recency,
+				webSearchTavilyStartDate: webSearchTime.tavilyStartDate,
+				webSearchTavilyEndDate: webSearchTime.tavilyEndDate,
+				// includeCurrentDateTool:
+				// 	this.inferEnglishPackUserNeedsCurrentDateTool(topic),
 			});
 
 			// 构建 LangChain Agent，传入主模型、工具、系统 Prompt 及中间件
 			const agent = createAgent({
 				model: mainLlm,
 				tools,
-				systemPrompt: ENGLISH_PACK_RESEARCH_SYSTEM_PROMPT,
+				systemPrompt: AGENT_SYSTEM_PROMPT,
 				// 仅保留工具次数上限（与 chat Agent 中间件一致），无会话摘要折叠
 				middleware: [
 					toolCallLimitMiddleware({
@@ -457,12 +751,12 @@ export class EnglishLearningService {
 			const kindLabel =
 				kind === 'vocabulary' ? '单词/短语主题包' : '英文名言/金句主题包';
 
-			// 组织发送给 LLM 的 Human prompt，指明具体任务、主题与学习语境等
+			// 组织发送给 LLM 的 Human prompt：与系统提示一致，强调「按需用工具」，避免模型为走流程而必调联网
 			const userHumanText = `任务类型：${kindLabel}
 主题/需求：${topic.trim()}
 学习语境：${ENGLISH_PACK_LEARNER_CONTEXT_HINT}
 
-请按系统提示调用工具完成检索与核对，然后输出一段简明要点（中文为主，可夹关键英文术语），供下游子模型扩展词条或句子方向使用；不要输出 JSON，不要输出 markdown 代码块。`;
+请先判断是否真的需要调用工具（互联网搜索 / 知识库检索 / 当前日期）。若主题以课内词汇、搭配扩展、词根词缀等为主、且无必须核验的公开事实或出处缺口，可直接整理要点，**不必**为完成任务而例行联网。确有必要时再按需调用工具并消化结果，然后输出一段简明要点（中文为主，可夹关键英文术语），供下游子模型扩展词条或句子方向使用；不要输出 JSON，不要输出 markdown 代码块。`;
 
 			// 启动流式 Agent，会不断地以事件流方式返回推理阶段的各类事件（模型输出增量、工具调用等）
 			const eventStream = agent.streamEvents(
@@ -944,30 +1238,7 @@ export class EnglishLearningService {
 		const count = resolveVocabularyPackTargetCount(dto.count);
 		const maxRounds = this.resolveMaxRounds(count, TOPIC_PACK_ITEMS_PER_ROUND);
 
-		const vocabularySystemStatic = `你是英语教学助手。主题与学习语境见文末「【当前学习任务】」（整场不变）；可能分多轮请求。每一轮的条数、已出现词条节选、多样性说明均以当次 system 末尾「【本轮生成要求】」为准；请严格遵守 items 数组长度，并遵守去重规定。
-你必须生成英文单词或实用短语（phrase）的学习条目。
-每一条必须包含：
-- word：英文单词或短语（不要用序号前缀）
-- ipa：该条目的英式或美式 IPA 音标，使用 Unicode 音标符号（如 ˈæpl），放在字符串中
-- translationZh：简明中文释义（可与主题相关）
-- example：一句地道英文例句，展示该词用法
-
-【多轮与线程】
-每轮任务与条数在 system「本轮生成要求」中；user 可无正文（无检索附录时），有检索要点时 Human 仅携带附录。历史约束还来自对话中各条 AI「【上轮已产出】」快照里的 words。去重须同时遵守本 system 末尾「本轮生成要求」、上述快照，以及「节选未列出但已收录的词条同样禁止」。对话须保持 human/ai 交替；不得忽略任一快照中的 words。
-
-【去重硬性规定】
-1）同一轮输出的 items 数组内：任意两条的 word 在去首尾空格、英文小写归一化后必须互不相同；禁止仅大小写、标点或多余空格不同的「假不同」；禁止输出已在常见教材附录中机械重复的同一词不同写法凑条数。
-2）若「本轮生成要求」中列出「已出现过的英文词条」节选：每条 word 均不得与该列表任一项相同（小写归一化比较），亦不得与前几轮已生成内容相同。
-3）禁止用同一 word 重复填多条 items 凑数。
-4）各轮之间：不得输出与此前任一条 AI「【上轮已产出】」快照中的 words 实质相同的一批词（含仅调换顺序、删改少数词或个别同义替换后的「假新」）。
-
-【JSON 语法】所有字符串字段内禁止出现未转义的英文半角双引号 "；术语或引号请用中文直角引号「」或半角单引号 '；违者会导致解析失败。
-
-只输出一个 JSON 对象，不要 markdown，不要代码围栏，不要解释文字。
-格式严格为：{"items":[{"word":"","ipa":"","translationZh":"","example":""}]}
-
-【当前学习任务】
-主题/需求：${topic}
+		const vocabularySystemStatic = `${VOCABULARY_PACK_SUBMODEL_SYSTEM_STATIC}${topic}
 学习语境：${ENGLISH_PACK_LEARNER_CONTEXT_HINT}`;
 
 		/** 主 Agent 检索要点（整场一次）；非空时仅在「线程中尚未含附录」的首条 Human 前置附录。每轮子模型 system 会动态追加「本轮生成要求」。 */
@@ -1234,30 +1505,7 @@ export class EnglishLearningService {
 		const count = resolveClassicQuotesPackTargetCount(dto.count);
 		const maxRounds = this.resolveMaxRounds(count, TOPIC_PACK_ITEMS_PER_ROUND);
 
-		const classicQuotesSystemStatic = `你是英语教学助手。主题与学习语境见文末「【当前学习任务】」（整场不变）；可能分多轮请求。每一轮的条数、已出现句子节选、多样性说明均以当次 system 末尾「【本轮生成要求】」为准；请严格遵守 items 数组长度，并遵守去重规定。
-你必须生成英文经典语句（名言、名著节选、影视台词、演讲金句、谚语等地道表达），用于英语学习与赏析。
-每一条必须包含：
-- english：英文原句（不要用序号前缀；保持原汁原味标点）
-- translationZh：准确、自然的中文翻译
-- source：出处（作者、作品、年份或语境；不确定可填 "—"）
-- noteZh：一句中文赏析、修辞或学习要点（可简短）
-
-【多轮与线程】
-每轮任务与条数在 system「本轮生成要求」中；user 可无正文（无检索附录时），有检索要点时 Human 仅携带附录。历史约束还来自对话中各条 AI「【上轮已产出】」快照里的 english_prefixes（节选）。去重须同时遵守本 system 末尾「本轮生成要求」、上述快照，以及「节选未列出但已收录的句子同样禁止实质雷同」。对话须保持 human/ai 交替。
-
-【去重硬性规定】
-1）同一轮 items 内：任意两条的 english 在去首尾空格、小写归一化后不得相同；不得仅通过增删冠词、逗号或个别虚词制造「假不同」；禁止同一句改标点或微调几个词当作多条；禁止同一出处下机械堆叠、句式实质雷同的多条。
-2）若「本轮生成要求」中列出已出现句子的节选：每条 english 均不得与该列表任一条相同或实质雷同（同句换少量词仍视为雷同），亦不得与前几轮已生成内容相同。
-3）禁止用同一句 english 重复填多条 items 凑数。
-4）各轮之间：不得与此前任一条 AI 快照中的 english_prefixes 所指代的原句实质雷同地再输出一批（含仅轻微改写、删改片段或换标点而主干仍一致）。
-
-【JSON 语法】所有字符串字段（尤其 noteZh、translationZh）内禁止出现未转义的英文半角双引号 "；强调术语请用「」或单引号 '，不要用 " 包裹中文词；违者会导致解析失败。
-
-只输出一个 JSON 对象，不要 markdown，不要代码围栏，不要解释文字。
-格式严格为：{"items":[{"english":"","translationZh":"","source":"","noteZh":""}]}
-
-【当前学习任务】
-主题/需求：${topic}
+		const classicQuotesSystemStatic = `${CLASSIC_QUOTES_SUBMODEL_SYSTEM_STATIC}${topic}
 学习语境：${ENGLISH_PACK_LEARNER_CONTEXT_HINT}`;
 
 		/**

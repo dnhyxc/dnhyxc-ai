@@ -655,12 +655,27 @@ export const zhCN = {
 	'englishLearning.placeholder':
 		'输入英语或中文，例如要查的词、要翻译的段落、想读的主题…',
 	'englishLearning.chip.vocabulary': '背单词',
+	'englishLearning.chip.morphology': '词根词缀',
+	'englishLearning.chip.collocations': '固定搭配',
+	'englishLearning.chip.confusables': '易混辨析',
+	'englishLearning.chip.pronunciation': '发音规律',
+	'englishLearning.chip.speaking': '口语演练',
 	'englishLearning.chip.translate': '翻译对照',
 	'englishLearning.chip.reading': '短文精读',
 	'englishLearning.chip.literature': '名著导读',
 	'englishLearning.chip.grammar': '语法讲解',
 	'englishLearning.intent.vocabulary':
 		'【意图】请侧重词汇：释义、搭配与例句；如需可先了解我的大致基础。',
+	'englishLearning.intent.morphology':
+		'【意图】请从词根、前缀、后缀与构词法入手，说明常见变形规律并各举一些代表词。',
+	'englishLearning.intent.collocations':
+		'【意图】请侧重地道搭配与语块：给出常用搭配、简要辨析近义搭配，并各配短例句。',
+	'englishLearning.intent.confusables':
+		'【意图】请对比易混词或近义表达：差异、典型误用与正例，可用表格或分条呈现。',
+	'englishLearning.intent.pronunciation':
+		'【意图】请侧重发音与节律：重音、弱读、连读或同化等规律，可给 IPA 与跟读提示。',
+	'englishLearning.intent.speaking':
+		'【意图】请侧重口语交际与流利度：情景对话、地道应答、常用话轮与填充语；给短对话范例并说明语境正式度。',
 	'englishLearning.intent.translate':
 		'【意图】请提供中英对照翻译，可分句；标注专有名词取舍。',
 	'englishLearning.intent.reading': '【意图】请生成一篇精读短文并注释难点。',

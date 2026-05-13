@@ -16,6 +16,31 @@ const chipDefs = [
 		prefixKey: 'englishLearning.intent.vocabulary' as const,
 	},
 	{
+		key: 'morphology',
+		labelKey: 'englishLearning.chip.morphology' as const,
+		prefixKey: 'englishLearning.intent.morphology' as const,
+	},
+	{
+		key: 'collocations',
+		labelKey: 'englishLearning.chip.collocations' as const,
+		prefixKey: 'englishLearning.intent.collocations' as const,
+	},
+	{
+		key: 'confusables',
+		labelKey: 'englishLearning.chip.confusables' as const,
+		prefixKey: 'englishLearning.intent.confusables' as const,
+	},
+	{
+		key: 'pronunciation',
+		labelKey: 'englishLearning.chip.pronunciation' as const,
+		prefixKey: 'englishLearning.intent.pronunciation' as const,
+	},
+	{
+		key: 'speaking',
+		labelKey: 'englishLearning.chip.speaking' as const,
+		prefixKey: 'englishLearning.intent.speaking' as const,
+	},
+	{
 		key: 'translate',
 		labelKey: 'englishLearning.chip.translate' as const,
 		prefixKey: 'englishLearning.intent.translate' as const,
@@ -75,7 +100,7 @@ export const EnglishLearningToolbar = observer(
 				 * 快捷意图：按本卡片（容器查询）宽度弹性列数——极窄单列，随宽度增加自动多列。
 				 * auto-fill + minmax：列最小约 7.25rem，放不下则自动降为 1 列。
 				 */}
-				<div className="mb-4 min-w-0">
+				<div className="min-w-0">
 					<div className="text-textcolor/45 mb-2 flex items-center gap-1.5 text-sm font-medium tracking-wide">
 						{t('englishLearning.quickIntents')}
 					</div>
@@ -86,19 +111,22 @@ export const EnglishLearningToolbar = observer(
 						)}
 					>
 						{chipDefs.map((c) => {
+							const prefix = t(c.prefixKey);
+							const selected = englishAgentStore.pendingIntentPrefix === prefix;
 							return (
 								<Button
 									key={c.key}
 									variant="link"
 									size="sm"
+									aria-pressed={selected}
 									className={cn(
 										'border border-theme/10 bg-theme/5',
-										englishAgentStore.pendingIntentPrefix === t(c.prefixKey)
+										selected
 											? 'text-teal-500 border-teal-500/20'
 											: 'text-textcolor/60 hover:text-textcolor/90',
 									)}
 									onClick={() =>
-										englishAgentStore.setIntentPrefix(t(c.prefixKey))
+										englishAgentStore.setIntentPrefix(selected ? '' : prefix)
 									}
 								>
 									{t(c.labelKey)}
@@ -109,7 +137,7 @@ export const EnglishLearningToolbar = observer(
 				</div>
 
 				{englishAgentStore.pendingIntentPrefix ? (
-					<div className="bg-teal-500/10 rounded-md px-3 py-2.5 border border-theme/10">
+					<div className="mt-2.5 bg-teal-500/10 rounded-md px-3 py-2.5 border border-theme/10">
 						<div className="text-teal-700/85 dark:text-teal-400/90 mb-1 text-sm font-semibold uppercase tracking-wider">
 							{t('englishLearning.pendingIntentShort')}
 						</div>
