@@ -364,7 +364,7 @@ function ClassicQuotesSectionInner() {
 	}, [countInput]);
 
 	return (
-		<div className="rounded-none @container min-w-0 px-4 pb-0 pt-7.5">
+		<div className="rounded-none @container min-w-0 px-4 pb-0">
 			<div className="mb-4 flex items-start gap-3">
 				<div className="bg-linear-to-r from-violet-500 to-indigo-600 @min-[26rem]:size-11 flex size-10 shrink-0 items-center justify-center rounded-md">
 					<BookMarked className="text-white size-6" aria-hidden />
@@ -439,7 +439,12 @@ function ClassicQuotesSectionInner() {
 						))}
 					</div>
 				</div>
-				<div className="flex min-w-0 items-stretch gap-2">
+				<div
+					className={cn(
+						'flex min-w-0 items-stretch gap-2 mb-7.5',
+						items.length ? 'mb-4.5' : 'mb-0',
+					)}
+				>
 					<Button
 						type="button"
 						size="sm"
@@ -506,8 +511,13 @@ function ClassicQuotesSectionInner() {
 			</div>
 
 			{items.length > 0 ? (
-				<div>
-					<div className="mt-5 flex min-h-8 items-center justify-between gap-2">
+				<>
+					<div
+						className={cn(
+							'sticky -top-2.5 z-20 -mx-4 pb-2 flex min-h-6 items-center justify-between gap-2 bg-theme-background/95 px-4 backdrop-blur-sm',
+							listExpanded ? 'mb-0' : 'mt-4.5 pb-0',
+						)}
+					>
 						<div className="flex items-center gap-2 text-textcolor/45 text-sm font-medium">
 							{t('englishLearning.classic.listHeading')}
 							{masterSearchOrganic.length > 0 ? (
@@ -546,7 +556,7 @@ function ClassicQuotesSectionInner() {
 						</Button>
 					</div>
 					{listExpanded ? (
-						<div className="mt-1.5 grid grid-cols-1 gap-4 @min-[26rem]:grid-cols-2">
+						<div className="grid grid-cols-1 gap-4 @min-[26rem]:grid-cols-2">
 							{items.map((item, i) => {
 								const key = `${i}-${item.english.slice(0, 48)}`;
 								const playing = playingKey === key;
@@ -597,7 +607,7 @@ function ClassicQuotesSectionInner() {
 							})}
 						</div>
 					) : null}
-				</div>
+				</>
 			) : null}
 
 			<ClassicQuotesHistoryDrawer
