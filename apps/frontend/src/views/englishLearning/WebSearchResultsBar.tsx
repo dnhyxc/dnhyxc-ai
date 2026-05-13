@@ -16,7 +16,7 @@ export function MasterWebSearchResultsBar({
 	const [drawerOpen, setDrawerOpen] = useState(false);
 	if (!items.length) return null;
 	return (
-		<div className="">
+		<>
 			<Button
 				type="button"
 				variant="link"
@@ -24,14 +24,17 @@ export function MasterWebSearchResultsBar({
 				className="text-teal-600/90 dark:text-teal-400/90 h-auto min-h-0 px-0 py-0 text-xs font-normal"
 				onClick={() => setDrawerOpen(true)}
 			>
-				{t('englishLearning.masterSearch.viewPages', { n: items.length })}
+				{t('englishLearning.webSearch.viewPages', { n: items.length })}
 			</Button>
 			<SearchOrganics
 				open={drawerOpen}
 				onOpenChange={setDrawerOpen}
 				organics={items}
+				title={t('englishLearning.webSearch.viewPagesTitle', {
+					n: items.length,
+				})}
 				t={t}
 			/>
-		</div>
+		</>
 	);
 }

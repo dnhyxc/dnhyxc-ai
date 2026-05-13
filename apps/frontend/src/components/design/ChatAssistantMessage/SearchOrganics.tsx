@@ -14,6 +14,7 @@ interface IProps {
 	organics: SearchOrganicItem[];
 	/** i18n 翻译函数（可选）；不传则沿用组件内默认中文文案 */
 	t?: ChatI18nT;
+	title?: string;
 }
 
 const SearchOrganics: React.FC<IProps> = ({
@@ -21,6 +22,7 @@ const SearchOrganics: React.FC<IProps> = ({
 	onOpenChange,
 	organics,
 	t,
+	title,
 }) => {
 	const onClickOrganic = (link: string) => {
 		void openExternalUrl(link);
@@ -28,7 +30,7 @@ const SearchOrganics: React.FC<IProps> = ({
 
 	return (
 		<Drawer
-			title={t?.('chat.searchOrganics.title') ?? '联网搜索结果'}
+			title={title ?? t?.('chat.searchOrganics.title') ?? '联网搜索结果'}
 			open={open}
 			onOpenChange={onOpenChange}
 		>

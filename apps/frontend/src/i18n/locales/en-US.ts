@@ -777,8 +777,8 @@ export const enUS = {
 	'englishLearning.agentTool.statusDoing':
 		'Research · {action} in progress{detail}',
 	'englishLearning.agentTool.statusDone': 'Research · {action} done',
-	'englishLearning.masterSearch.viewPages':
-		'View web results from this run ({n})',
+	'englishLearning.webSearch.viewPages': 'View web results from this run ({n})',
+	'englishLearning.webSearch.viewPagesTitle': 'This web search results ({n})',
 	'englishLearning.packHistory.webSearchRounds': 'Web search ×{n}',
 
 	'englishLearning.vocab.title': 'Vocabulary pack',

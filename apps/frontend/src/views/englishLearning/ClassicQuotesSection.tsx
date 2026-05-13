@@ -43,7 +43,7 @@ import {
 } from '@/utils/englishTts';
 import { formatEnglishLearningAgentToolLine } from './agentToolStatusText';
 import { ClassicQuotesHistoryDrawer } from './ClassicQuotesHistoryDrawer';
-import { MasterWebSearchResultsBar } from './MasterWebSearchResultsBar';
+import { MasterWebSearchResultsBar } from './WebSearchResultsBar';
 
 export type ClassicQuoteProgressState = {
 	collected: number;

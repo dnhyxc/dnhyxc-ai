@@ -693,7 +693,8 @@ export const zhCN = {
 	'englishLearning.agentTool.querySuffix': '：{q}',
 	'englishLearning.agentTool.statusDoing': '资料助手 · {action} 进行中{detail}',
 	'englishLearning.agentTool.statusDone': '资料助手 · {action} 已完成',
-	'englishLearning.masterSearch.viewPages': '查看本次联网检索网页（{n}）',
+	'englishLearning.webSearch.viewPages': '查看本次联网检索网页（{n}）',
+	'englishLearning.webSearch.viewPagesTitle': '本次联网搜索结果（{n}）',
 	'englishLearning.packHistory.webSearchRounds': '联网 {n} 次',
 
 	'englishLearning.vocab.title': '单词学习资料',

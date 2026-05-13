@@ -42,8 +42,8 @@ import {
 	stopAllEnglishPlayback,
 } from '@/utils/englishTts';
 import { formatEnglishLearningAgentToolLine } from './agentToolStatusText';
-import { MasterWebSearchResultsBar } from './MasterWebSearchResultsBar';
 import { VocabularyHistoryDrawer } from './VocabularyHistoryDrawer';
+import { MasterWebSearchResultsBar } from './WebSearchResultsBar';
 
 export type VocabProgressState = {
 	collected: number;
