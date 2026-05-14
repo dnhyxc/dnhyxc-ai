@@ -1,3 +1,4 @@
+import './polyfills/node-crypto-global';
 import { HttpAdapterHost, NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import 'winston-daily-rotate-file';
