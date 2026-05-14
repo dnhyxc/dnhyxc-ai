@@ -685,7 +685,7 @@ function ClassicQuotesSectionInner() {
 						</Button>
 					</div>
 					{listExpanded ? (
-						<div className="grid grid-cols-1 gap-4 @min-[26rem]:grid-cols-2">
+						<div className="select-text grid grid-cols-1 gap-4 @min-[26rem]:grid-cols-2">
 							{items.map((item, i) => {
 								const contentKey = classicQuoteFavoriteContentKey(item.english);
 								const key = `${i}-${contentKey || item.english.slice(0, 48)}`;
