@@ -5,6 +5,7 @@
 import { Drawer } from '@design/Drawer';
 import Loading from '@design/Loading';
 import { Button, ScrollArea, Toast } from '@ui/index';
+import { Spinner } from '@ui/spinner';
 import { Square, Volume2 } from 'lucide-react';
 import type { UIEventHandler } from 'react';
 import { useState } from 'react';
@@ -89,14 +90,19 @@ export function VocabularyFavoritesDrawer({
 				<footer className="flex justify-end">
 					<Button
 						type="button"
-						variant="outline"
 						size="sm"
 						disabled={exportDisabled}
+						className="flex items-center w-25"
 						onClick={() => void handleExportDocx()}
 					>
-						{exportingDocx
-							? t('common.loading')
-							: t('englishLearning.vocab.exportDocx')}
+						{exportingDocx ? (
+							<>
+								<Spinner className="w-4 h-4" />
+								{t('common.downloading')}
+							</>
+						) : (
+							t('englishLearning.vocab.exportDocx')
+						)}
 					</Button>
 				</footer>
 			}

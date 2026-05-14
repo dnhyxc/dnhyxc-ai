@@ -3,8 +3,8 @@ export const zhCN = {
 	'common.theme': '主题',
 	'common.settings': '设置',
 	'common.appTitle': '智能对话',
-	'common.loading': '加载中…',
-	'common.loadingMore': '加载更多…',
+	'common.loading': '加载中...',
+	'common.loadingMore': '加载更多...',
 	'common.loadFailed': '加载失败',
 	'common.deleteFailed': '删除失败',
 	'common.tryLater': '请稍后重试',
@@ -13,6 +13,7 @@ export const zhCN = {
 	'common.confirm': '确定',
 	'common.copy': '复制',
 	'common.download': '下载',
+	'common.downloading': '下载中...',
 
 	'image.loadFailed': '图片加载失败',
 

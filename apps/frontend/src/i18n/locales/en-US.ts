@@ -3,8 +3,8 @@ export const enUS = {
 	'common.theme': 'Theme',
 	'common.settings': 'Settings',
 	'common.appTitle': 'Smart Chat',
-	'common.loading': 'Loading…',
-	'common.loadingMore': 'Loading more…',
+	'common.loading': 'Loading...',
+	'common.loadingMore': 'Loading more...',
 	'common.loadFailed': 'Load failed',
 	'common.deleteFailed': 'Delete failed',
 	'common.tryLater': 'Please try again later.',
@@ -13,6 +13,7 @@ export const enUS = {
 	'common.confirm': 'Confirm',
 	'common.copy': 'Copy',
 	'common.download': 'Download',
+	'common.downloading': 'Downloading...',
 
 	'image.loadFailed': 'Image failed to load',
 
@@ -28,7 +29,7 @@ export const enUS = {
 	'imagePreview.close': 'Close',
 
 	'upload.tooltip.default': 'Only PDF, Word, and Excel files are supported',
-	'upload.uploading': 'Uploading…',
+	'upload.uploading': 'Uploading...',
 	'upload.button': 'Upload file',
 	'upload.error.maxCount': 'You can upload up to {maxCount} files at a time',
 	'upload.error.invalidType': 'Unsupported file type: {type}',
