@@ -650,7 +650,7 @@ export const zhCN = {
 	'englishLearning.quickIntentsCollapse': '收起快捷意图',
 	'englishLearning.quickIntentsExpand': '展开快捷意图',
 	'englishLearning.intro':
-		'左侧选择快捷主题，在右侧输入框用自然语提问；支持单词、翻译、短文、名著导读等。已入库的知识库可由 Agent 优先引用。',
+		'左侧点选「快捷意图」可限定对话方向或附带学习素材，右侧在输入框用自然语言提问即可，适合查词、翻译、短文赏析与名著导读等。已在知识库入库的内容，Agent 会在相关时优先检索并引用。',
 	'englishLearning.disclaimer':
 		'翻译与讲解仅供学习参考，重要文件请人工校对；名著导读遵守版权，长文以摘要与讨论为主。',
 	'englishLearning.newChat': '新对话',

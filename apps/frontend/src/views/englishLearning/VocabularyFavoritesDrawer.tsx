@@ -284,7 +284,7 @@ export function VocabularyFavoritesDrawer({
 				onConfirm={() => void executeSingleRemoveConfirm()}
 			/>
 			<Drawer
-				title={`${t('englishLearning.vocab.favoritesTitle')} (${entries.length})`}
+				title={`${t('englishLearning.vocab.favoritesTitle')}（${entries.length}）`}
 				open={open}
 				onOpenChange={onOpenChange}
 				bodyClassName="pt-1.5 pb-2"
@@ -367,7 +367,6 @@ export function VocabularyFavoritesDrawer({
 							{entries.map((row) => {
 								const playKey = `fav-vocab-${row.id}`;
 								const playing = playingKey === playKey;
-								const rowChecked = selectedIds.has(row.id);
 								return (
 									<div
 										key={row.id}
@@ -377,7 +376,7 @@ export function VocabularyFavoritesDrawer({
 											<Checkbox
 												id={`vocab-fav-${row.id}`}
 												className="cursor-pointer"
-												checked={rowChecked}
+												checked={selectedIds.has(row.id)}
 												disabled={selectionDisabled}
 												onCheckedChange={(v) =>
 													toggleRowSelected(row.id, v === true)
@@ -385,13 +384,16 @@ export function VocabularyFavoritesDrawer({
 												aria-label={`${t('englishLearning.favoritesDrawer.toggleRow')}: ${row.word}`}
 											/>
 										</div>
-										<div className="min-w-0 flex-1">
+										<div className="select-text min-w-0 flex-1 flex flex-col">
 											<div className="flex items-start justify-between gap-2">
 												<div className="min-w-0 flex-1">
-													<div className="truncate text-base font-semibold text-textcolor">
+													<Label
+														htmlFor={`vocab-fav-${row.id}`}
+														className="select-text cursor-pointer truncate text-base font-semibold text-textcolor"
+													>
 														{row.word}
-													</div>
-													<div className="font-mono text-xs leading-snug text-teal-600/90 @min-[26rem]:text-xs dark:text-teal-400/90">
+													</Label>
+													<div className="mt-1 font-mono text-xs leading-snug text-teal-600/90 dark:text-teal-400/90">
 														{displayIpaWrapped(row.ipa)}
 													</div>
 												</div>

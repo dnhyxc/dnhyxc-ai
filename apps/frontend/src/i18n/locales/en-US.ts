@@ -732,7 +732,7 @@ export const enUS = {
 	'englishLearning.quickIntentsCollapse': 'Collapse quick intents',
 	'englishLearning.quickIntentsExpand': 'Expand quick intents',
 	'englishLearning.intro':
-		'Use the left panel for intents and vocabulary packs; type in the chat on the right. Your knowledge base can be retrieved first when relevant.',
+		'On the left, pick quick intents to steer the topic or attach study material; on the right, ask in natural language in the input—for lookups, translation, short passages, or literature guidance. Content already in your knowledge base is retrieved and cited first when it applies.',
 	'englishLearning.disclaimer':
 		'Translations and explanations are for learning only—please proofread important texts. Literature guidance respects copyright; prefer summaries and discussion prompts.',
 	'englishLearning.newChat': 'New chat',

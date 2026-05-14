@@ -49,7 +49,7 @@ export function ClassicQuotesHistoryDrawer({
 
 	return (
 		<Drawer
-			title={t('englishLearning.classic.historyTitle')}
+			title={`${t('englishLearning.classic.historyTitle')}（${entries.length}）`}
 			open={open}
 			onOpenChange={onOpenChange}
 			bodyClassName="pt-1.5 pb-2"

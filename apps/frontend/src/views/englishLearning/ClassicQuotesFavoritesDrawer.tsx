@@ -293,7 +293,7 @@ export function ClassicQuotesFavoritesDrawer({
 				onConfirm={() => void executeSingleRemoveConfirm()}
 			/>
 			<Drawer
-				title={`${t('englishLearning.classic.favoritesTitle')} (${entries.length})`}
+				title={`${t('englishLearning.classic.favoritesTitle')}（${entries.length}）`}
 				open={open}
 				onOpenChange={onOpenChange}
 				bodyClassName="pt-1.5 pb-2"
@@ -395,10 +395,15 @@ export function ClassicQuotesFavoritesDrawer({
 												aria-label={`${t('englishLearning.favoritesDrawer.toggleRow')}: ${row.english.slice(0, 120)}`}
 											/>
 										</div>
-										<div className="min-w-0 flex-1">
+										<div className="select-text min-w-0 flex-1 flex flex-col">
 											<div className="flex items-start justify-between gap-2">
 												<div className="text-textcolor min-w-0 flex-1 text-base font-semibold leading-snug">
-													{row.english}
+													<Label
+														htmlFor={`classic-fav-${row.id}`}
+														className="select-text cursor-pointer text-base font-semibold text-textcolor"
+													>
+														{row.english}
+													</Label>
 												</div>
 												<div className="flex shrink-0 items-center gap-1 transition-opacity duration-200">
 													<Button

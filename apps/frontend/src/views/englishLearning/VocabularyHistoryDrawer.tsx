@@ -49,7 +49,7 @@ export function VocabularyHistoryDrawer({
 
 	return (
 		<Drawer
-			title={t('englishLearning.vocab.historyTitle')}
+			title={`${t('englishLearning.vocab.historyTitle')}（${entries.length}）`}
 			open={open}
 			onOpenChange={onOpenChange}
 			bodyClassName="pt-1.5 pb-2"

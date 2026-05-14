@@ -7,7 +7,7 @@ import ChatEntry from '@design/ChatEntry';
 import ChatMessageActions from '@design/ChatMessageActions';
 import Loading from '@design/Loading';
 import { Label, ScrollArea, Toast } from '@ui/index';
-import { BookOpen, ChevronDown, ChevronUp } from 'lucide-react';
+import { Atom, ChevronDown, ChevronUp, Vegan } from 'lucide-react';
 import { observer } from 'mobx-react';
 import {
 	type Dispatch,
@@ -447,15 +447,21 @@ export const AgentPanel = observer(function AgentPanel({
 					<Loading text={t('englishLearning.loading')} />
 				</div>
 			) : messages.length === 0 ? (
-				<div className="text-textcolor/70 mx-auto flex max-w-3xl w-full flex-1 items-start justify-center self-stretch pt-4.5 px-4.5 text-sm">
+				<div className="text-textcolor/70 mx-auto flex max-w-3xl w-full flex-1 flex-col justify-between self-stretch pt-4.5 px-4.5 text-sm">
 					<div className="border-theme/10 bg-theme/5 flex w-full gap-2 rounded-md border p-3">
-						<BookOpen
+						<Atom
 							size={18}
-							className="mt-[3px] shrink-0 text-teal-500"
+							className="mt-[3px] shrink-0 text-teal-500 opacity-80"
 							aria-hidden
 						/>
 						<div className="flex-1 text-sm leading-relaxed">
 							{t('englishLearning.intro')}
+						</div>
+					</div>
+					<div className="flex-1 flex flex-col items-center justify-center">
+						<Vegan className="size-50 text-teal-500 opacity-10" />
+						<div className="text-3xl font-bold text-teal-500 opacity-15">
+							ENGLISH AGENT
 						</div>
 					</div>
 				</div>
