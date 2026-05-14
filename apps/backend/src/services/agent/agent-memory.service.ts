@@ -194,7 +194,7 @@ export class AgentMemoryService {
 		session: AgentSession,
 		turnId: string,
 		userContent: string,
-	): Promise<{ assistantMessageId: string }> {
+	): Promise<{ userMessageId: string; assistantMessageId: string }> {
 		const user = this.messageRepo.create({
 			session,
 			role: AgentMessageRole.USER,
@@ -217,7 +217,7 @@ export class AgentMemoryService {
 			session.title = t;
 		}
 
-		return { assistantMessageId: assistant.id };
+		return { userMessageId: user.id, assistantMessageId: assistant.id };
 	}
 
 	async updateAssistantContent(

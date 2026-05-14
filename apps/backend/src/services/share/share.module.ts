@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { AgentMessage } from '../agent/agent-message.entity';
+import { AgentSession } from '../agent/agent-session.entity';
 import { AssistantMessage } from '../assistant/assistant-message.entity';
 import { AssistantSession } from '../assistant/assistant-session.entity';
 import { Attachments } from '../chat/attachments.entity';
@@ -21,6 +23,8 @@ import { ShareService } from './share.service';
 			Attachments,
 			AssistantSession,
 			AssistantMessage,
+			AgentSession,
+			AgentMessage,
 			Knowledge,
 		]),
 	],

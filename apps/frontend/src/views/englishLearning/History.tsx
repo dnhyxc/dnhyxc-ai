@@ -1,28 +1,34 @@
+/**
+ * 英语学习 Agent 历史抽屉：交互对齐 `KnowledgeAssistantHistory`（滚动加载、切换不关 SSE）。
+ */
+
 import { Drawer } from '@design/Drawer';
 import { Button, Toast } from '@ui/index';
 import { Trash2 } from 'lucide-react';
+import { observer } from 'mobx-react';
 import type { Dispatch, SetStateAction } from 'react';
+import { useSearchParams } from 'react-router';
 import Loading from '@/components/design/Loading';
 import { ScrollArea } from '@/components/ui';
 import { Spinner } from '@/components/ui/spinner';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
-import assistantStore from '@/store/assistant';
+import englishAgentStore from '@/store/englishAgent';
 
-export interface KnowledgeAssistantHistoryDrawerSessionRow {
+export type EnglishLearningAgentHistorySessionRow = {
 	sessionId: string;
 	title?: string | null;
 	updatedAt?: string | number | Date | null;
-}
+};
 
-export interface KnowledgeAssistantHistoryDrawerProps {
-	isAiSessionSwitcherLocked: boolean;
-	isAiHistoryDrawerOpen: boolean;
-	setIsAiHistoryDrawerOpen: Dispatch<SetStateAction<boolean>>;
+export interface EnglishLearningAgentHistoryProps {
+	isSessionSwitcherLocked: boolean;
+	isHistoryDrawerOpen: boolean;
+	setIsHistoryDrawerOpen: Dispatch<SetStateAction<boolean>>;
 	enableStreamStickToBottom: () => void;
 	flushScrollToBottom: () => void;
 
-	sessionList: KnowledgeAssistantHistoryDrawerSessionRow[];
+	sessionList: EnglishLearningAgentHistorySessionRow[];
 	showInitialPlaceholder: boolean;
 	showLoadMoreHint: boolean;
 	showEmptyHint: boolean;
@@ -31,52 +37,54 @@ export interface KnowledgeAssistantHistoryDrawerProps {
 	setDeleteConfirmOpen: Dispatch<SetStateAction<boolean>>;
 }
 
-const KnowledgeAssistantHistoryDrawer = ({
-	isAiSessionSwitcherLocked,
-	isAiHistoryDrawerOpen,
-	setIsAiHistoryDrawerOpen,
-	enableStreamStickToBottom,
-	flushScrollToBottom,
-	sessionList,
-	showInitialPlaceholder,
-	showLoadMoreHint,
-	showEmptyHint,
-	setDeleteTargetSessionId,
-	setDeleteConfirmOpen,
-}: KnowledgeAssistantHistoryDrawerProps) => {
+const History = observer(function EnglishLearningAgentHistory(
+	props: EnglishLearningAgentHistoryProps,
+) {
+	const {
+		isSessionSwitcherLocked,
+		isHistoryDrawerOpen,
+		setIsHistoryDrawerOpen,
+		enableStreamStickToBottom,
+		flushScrollToBottom,
+		sessionList,
+		showInitialPlaceholder,
+		showLoadMoreHint,
+		showEmptyHint,
+		setDeleteTargetSessionId,
+		setDeleteConfirmOpen,
+	} = props;
 	const { t } = useI18n();
+	const [, setSearchParams] = useSearchParams();
 	return (
 		<Drawer
 			title={t('knowledge.assistant.history')}
-			open={isAiHistoryDrawerOpen}
+			open={isHistoryDrawerOpen}
 			onOpenChange={(next) => {
-				// 锁定期间禁止打开抽屉（避免在未落库时切换到其它会话）
-				if (next && isAiSessionSwitcherLocked) {
+				if (next && isSessionSwitcherLocked) {
 					Toast({
 						type: 'info',
 						title: t('knowledge.assistant.sessionSavingViewHistory'),
 					});
 					return;
 				}
-				setIsAiHistoryDrawerOpen(next);
+				setIsHistoryDrawerOpen(next);
 			}}
 		>
 			<div className="flex h-full min-h-0 flex-col">
-				{/* 与 KnowledgeList Drawer 对齐：预留同样的左右 padding 区块 */}
 				<div className="flex shrink-0 flex-col gap-0.5 pr-4 pl-2.5 pb-0.5" />
 				<ScrollArea
-					className="flex min-h-0 flex-1 flex-col pr-1.5 box-border"
-					onScroll={assistantStore.onHistorySessionViewportScroll}
+					className="box-border flex min-h-0 flex-1 flex-col pr-1.5"
+					onScroll={englishAgentStore.onHistorySessionViewportScroll}
 				>
 					<div className="flex min-h-0 w-full flex-1 flex-col gap-2">
 						{showInitialPlaceholder ? (
-							<div className="flex flex-1 flex-col items-center justify-center py-6 text-center text-sm text-textcolor/60">
+							<div className="text-textcolor/60 flex flex-1 flex-col items-center justify-center py-6 text-center text-sm">
 								<Loading text={t('common.loading')} />
 							</div>
 						) : null}
 						{sessionList.map((s) => {
-							const active = assistantStore.activeSessionId === s.sessionId;
-							const isStreaming = assistantStore.isSessionStreaming(
+							const active = englishAgentStore.activeSessionId === s.sessionId;
+							const isStreaming = englishAgentStore.isSessionStreaming(
 								s.sessionId,
 							);
 							const title = s.title?.trim()
@@ -88,28 +96,33 @@ const KnowledgeAssistantHistoryDrawer = ({
 								<div
 									key={s.sessionId}
 									className={cn(
-										'group relative cursor-pointer w-full text-left rounded-md px-2.5 py-2 hover:bg-theme/10 transition-colors',
+										'group relative w-full cursor-pointer rounded-md px-2.5 py-2 text-left transition-colors hover:bg-theme/10',
 										active ? 'bg-theme/10' : '',
 									)}
 									onClick={() => {
-										void assistantStore
-											.switchSessionForCurrentDocument(s.sessionId)
+										// 先关抽屉再切会话与同步 URL，避免 Sheet 仍打开时路由/MobX 大重绘与 Radix 关闭动画抢帧导致抖动
+										setIsHistoryDrawerOpen(false);
+										void englishAgentStore
+											.switchSession(s.sessionId)
 											.then(() => {
+												setSearchParams(
+													{ session: s.sessionId },
+													{ replace: true },
+												);
 												enableStreamStickToBottom();
 												flushScrollToBottom();
 												requestAnimationFrame(() => flushScrollToBottom());
 											});
-										setIsAiHistoryDrawerOpen(false);
 									}}
 								>
 									{isStreaming ? (
-										<span className="absolute right-2 top-2 flex items-center justify-center h-7 w-7 rounded-md text-textcolor/60">
-											<Spinner className="size-4 text-textcolor/60" />
+										<span className="text-textcolor/60 absolute top-2 right-2 flex h-7 w-7 items-center justify-center rounded-md">
+											<Spinner className="text-textcolor/60 size-4" />
 										</span>
 									) : (
 										<Button
 											variant="link"
-											className="cursor-pointer absolute right-2 top-2 hidden group-hover:flex items-center justify-center h-7 w-7 rounded-md text-textcolor/70 hover:text-red-500 hover:bg-red-500/10"
+											className="text-textcolor/70 hover:text-red-500 hover:bg-red-500/10 absolute top-2 right-2 hidden h-7 w-7 cursor-pointer items-center justify-center rounded-md group-hover:flex"
 											aria-label={t(
 												'knowledge.assistant.deleteConversationTitle',
 											)}
@@ -122,22 +135,22 @@ const KnowledgeAssistantHistoryDrawer = ({
 											<Trash2 className="h-4 w-4" />
 										</Button>
 									)}
-									<div className="text-sm text-textcolor line-clamp-1">
+									<div className="text-textcolor line-clamp-1 text-sm">
 										{title}
 									</div>
-									<div className="text-xs text-textcolor/50 mt-1">
+									<div className="text-textcolor/50 mt-1 text-xs">
 										{s.updatedAt ? new Date(s.updatedAt).toLocaleString() : ''}
 									</div>
 								</div>
 							);
 						})}
 						{showLoadMoreHint ? (
-							<div className="text-xs text-textcolor/50 py-2 text-center">
+							<div className="text-textcolor/50 py-2 text-center text-xs">
 								{t('common.loadingMore')}
 							</div>
 						) : null}
 						{showEmptyHint ? (
-							<div className="text-sm text-textcolor/60 py-8 text-center">
+							<div className="text-textcolor/60 py-8 text-center text-sm">
 								{t('knowledge.assistant.historyEmpty')}
 							</div>
 						) : null}
@@ -146,6 +159,6 @@ const KnowledgeAssistantHistoryDrawer = ({
 			</div>
 		</Drawer>
 	);
-};
+});
 
-export default KnowledgeAssistantHistoryDrawer;
+export default History;

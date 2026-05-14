@@ -6,6 +6,7 @@ import {
 	Get,
 	Param,
 	Post,
+	Query,
 	Req,
 	Sse,
 	UseGuards,
@@ -41,6 +42,33 @@ export class AgentController {
 		}
 		const data = await this.agentService.createSession(userId, dto);
 		return { success: true, data };
+	}
+
+	/** 分页列出当前用户的 Agent 会话（须放在 `session/:id` 之前避免被误匹配） */
+	@Get('sessions')
+	async listSessions(
+		@Req() req: AuthedRequest,
+		@Query('pageNo') pageNo?: string,
+		@Query('pageSize') pageSize?: string,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			return { success: false, message: '未登录' };
+		}
+		const pn = Math.max(1, parseInt(pageNo ?? '1', 10) || 1);
+		const ps = Math.min(50, Math.max(1, parseInt(pageSize ?? '20', 10) || 20));
+		const data = await this.agentService.listSessions(userId, pn, ps);
+		return {
+			success: true,
+			data: {
+				...data,
+				list: data.list.map((row) => ({
+					...row,
+					createdAt: row.createdAt.toISOString(),
+					updatedAt: row.updatedAt.toISOString(),
+				})),
+			},
+		};
 	}
 
 	@Get('session/:sessionId')
@@ -89,6 +117,16 @@ export class AgentController {
 						data: {
 							type: 'searchOrganic',
 							organic: chunk.data.organic,
+							done: false,
+						},
+					};
+				}
+				if (chunk.type === 'messageIds') {
+					return {
+						data: {
+							type: 'messageIds',
+							userMessageId: chunk.data.userMessageId,
+							assistantMessageId: chunk.data.assistantMessageId,
 							done: false,
 						},
 					};

@@ -29,7 +29,8 @@ function unwrapAgentPayload(
 			'content' in o ||
 			'error' in o ||
 			'raw' in o ||
-			'organic' in o
+			'organic' in o ||
+			('userMessageId' in o && 'assistantMessageId' in o)
 		) {
 			return o;
 		}
@@ -46,6 +47,11 @@ export interface AgentSseCallbacks {
 	onError?: (err: Error) => void;
 	/** 联网检索 organic（与 Chat SSE searchOrganic 对齐，用于正文胶囊） */
 	onSearchOrganic?: (organic: SearchOrganicItem[]) => void;
+	/** 占位落库后服务端下发的真实消息 ID，用于分享等与库内 id 对齐 */
+	onMessageIds?: (ids: {
+		userMessageId: string;
+		assistantMessageId: string;
+	}) => void;
 }
 
 /**
@@ -57,8 +63,15 @@ export async function streamAgentSse(options: {
 	callbacks: AgentSseCallbacks;
 }): Promise<() => void> {
 	const { api = AGENT_SSE, body, callbacks } = options;
-	const { onDelta, onTool, onStart, onComplete, onError, onSearchOrganic } =
-		callbacks;
+	const {
+		onDelta,
+		onTool,
+		onStart,
+		onComplete,
+		onError,
+		onSearchOrganic,
+		onMessageIds,
+	} = callbacks;
 
 	const controller = new AbortController();
 
@@ -148,6 +161,17 @@ export async function streamAgentSse(options: {
 							Array.isArray(parsed.organic)
 						) {
 							onSearchOrganic?.(parsed.organic as SearchOrganicItem[]);
+							continue;
+						}
+						if (
+							parsed.type === 'messageIds' &&
+							typeof parsed.userMessageId === 'string' &&
+							typeof parsed.assistantMessageId === 'string'
+						) {
+							onMessageIds?.({
+								userMessageId: parsed.userMessageId,
+								assistantMessageId: parsed.assistantMessageId,
+							});
 							continue;
 						}
 						if (parsed.type === 'tool') {

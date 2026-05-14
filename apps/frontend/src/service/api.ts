@@ -109,6 +109,7 @@ export const ASSISTANT_STOP = '/assistant/stop';
 
 /** LangChain Agent（工具调用 + SSE） */
 export const AGENT_SESSION = '/agent/session';
+export const AGENT_SESSIONS = '/agent/sessions';
 export const AGENT_SSE = '/agent/sse';
 export const AGENT_STOP = '/agent/stop';
 

@@ -873,8 +873,8 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 
 						<div className="flex items-center justify-between h-10 p-2.5 mb-1 mt-2.5">
 							<div className="flex items-center gap-2">
-								{entryChildren ? entryChildren : null}
-								{clearChat && (
+								{entryChildren && !clearChat ? entryChildren : null}
+								{clearChat ? (
 									<Button
 										variant="ghost"
 										className="lucide-stroke-draw-hover flex items-center text-sm bg-theme/5 mb-1 h-8 rounded-md [&_svg]:overflow-visible"
@@ -883,7 +883,8 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 										<CirclePlus className="w-4 h-4" />
 										{t?.('chat.entry.newChat') ?? '新对话'}
 									</Button>
-								)}
+								) : null}
+								{entryChildren && clearChat ? entryChildren : null}
 								{onUploadFile && (
 									<Upload
 										t={t}

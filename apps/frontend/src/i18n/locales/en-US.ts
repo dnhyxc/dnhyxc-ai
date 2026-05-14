@@ -734,6 +734,8 @@ export const enUS = {
 		'Translations and explanations are for learning only—please proofread important texts. Literature guidance respects copyright; prefer summaries and discussion prompts.',
 	'englishLearning.newChat': 'New chat',
 	'englishLearning.loading': 'Loading…',
+	'englishLearning.assistant.scrollToBottom': 'Scroll to bottom',
+	'englishLearning.assistant.scrollToTop': 'Scroll to top',
 	'englishLearning.placeholder':
 		'Type English or Chinese: a word, a paragraph to translate, or a topic to read…',
 	'englishLearning.chip.vocabulary': 'Vocabulary',

@@ -9,6 +9,7 @@ import type { EnglishPackWebSearchRoundDto } from '@/utils/englishPackWebSearchM
 import { http } from '@/utils/fetch';
 import {
 	AGENT_SESSION,
+	AGENT_SESSIONS,
 	AGENT_STOP,
 	ASSISTANT_SESSION,
 	ASSISTANT_SESSION_IMPORT_TRANSCRIPT,
@@ -413,6 +414,31 @@ export const getAgentSessionDetail = async (sessionId: string) => {
 	});
 };
 
+export type AgentSessionListRow = {
+	sessionId: string;
+	title: string | null;
+	createdAt: string;
+	updatedAt: string;
+};
+
+/** 分页列出当前用户的 Agent 会话（按更新时间倒序） */
+export const listAgentSessions = async (params: {
+	pageNo?: number;
+	pageSize?: number;
+}) => {
+	return await http.get<{
+		list: AgentSessionListRow[];
+		pageNo: number;
+		pageSize: number;
+		total: number;
+	}>(AGENT_SESSIONS, {
+		querys: {
+			pageNo: params.pageNo ?? 1,
+			pageSize: params.pageSize ?? 20,
+		},
+	});
+};
+
 /** 删除 Agent 会话 */
 export const deleteAgentSession = async (sessionId: string) => {
 	return await http.delete<{ sessionId: string }>(AGENT_SESSION, {
@@ -729,7 +755,7 @@ export const createShare = async (params: {
 	chatSessionId: string;
 	messageIds?: string[] | undefined;
 	baseUrl?: string;
-	sessionType?: 'chat' | 'assistant';
+	sessionType?: 'chat' | 'assistant' | 'agent';
 	/** session=会话分享（默认）；knowledge=知识文章分享 */
 	shareType?: 'session' | 'knowledge';
 }) => {

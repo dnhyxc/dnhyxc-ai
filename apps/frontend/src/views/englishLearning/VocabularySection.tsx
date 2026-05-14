@@ -653,7 +653,7 @@ function VocabularyPackSectionInner() {
 			</div>
 			{items.length > 0 ? (
 				<>
-					<div className="sticky -top-0.5 -mx-4 px-4 mt-2.5 pb-0.5 flex min-h-6 items-center justify-between gap-2 bg-theme-background/95 backdrop-blur-sm">
+					<div className="sticky -top-2.5 -mx-4 px-4 mt-2.5 pb-0.5 flex min-h-6 items-center justify-between gap-2 bg-theme-background/95 backdrop-blur-sm">
 						<div className="flex items-center gap-2 text-textcolor/45 text-sm font-medium">
 							{t('englishLearning.vocab.listHeading')}
 							{masterSearchOrganic.length > 0 ? (

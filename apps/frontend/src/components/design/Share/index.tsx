@@ -28,8 +28,8 @@ interface ShareProps {
 	orderedMessageIds?: string[];
 	/** 可选：当不从路由 params 取 sessionId 时由外部注入（例如知识库助手分享） */
 	sessionId?: string;
-	/** 可选：不传则默认 chat；知识库助手分享建议传 assistant，避免后端走错误回退 */
-	sessionType?: 'chat' | 'assistant';
+	/** 可选：不传则默认 chat；知识库助手建议传 assistant；英语学习 Agent 传 agent */
+	sessionType?: 'chat' | 'assistant' | 'agent';
 	/** 可选：不传则默认 session；knowledge 表示分享知识文章 */
 	shareType?: 'session' | 'knowledge';
 	/** i18n 翻译函数（可选）；不传则使用全局 i18n */
@@ -91,7 +91,7 @@ const Share: React.FC<ShareProps> = ({
 		}
 		const data: {
 			chatSessionId: string;
-			sessionType?: 'chat' | 'assistant';
+			sessionType?: 'chat' | 'assistant' | 'agent';
 			messageIds?: string[];
 			baseUrl?: string;
 			shareType?: 'session' | 'knowledge';

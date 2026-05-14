@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { AIMessageChunk } from '@langchain/core/messages';
+import { type AIMessageChunk, HumanMessage } from '@langchain/core/messages';
 import { ChatOpenAI } from '@langchain/openai';
 import { Cache } from '@nestjs/cache-manager';
 import {
@@ -122,7 +122,11 @@ export type AgentSseChunk =
 				output?: unknown;
 			};
 	  }
-	| { type: 'searchOrganic'; data: { organic: SerperOrganicItem[] } };
+	| { type: 'searchOrganic'; data: { organic: SerperOrganicItem[] } }
+	| {
+			type: 'messageIds';
+			data: { userMessageId: string; assistantMessageId: string };
+	  };
 
 @Injectable()
 export class AgentService {
@@ -223,6 +227,46 @@ export class AgentService {
 		});
 		await this.sessionRepo.save(session);
 		return { sessionId: id, title: session.title };
+	}
+
+	/**
+	 * 分页列出当前用户的 Agent 会话（按更新时间倒序，供英语学习历史抽屉）
+	 */
+	async listSessions(
+		userId: number,
+		pageNo = 1,
+		pageSize = 20,
+	): Promise<{
+		list: Array<{
+			sessionId: string;
+			title: string | null;
+			createdAt: Date;
+			updatedAt: Date;
+		}>;
+		pageNo: number;
+		pageSize: number;
+		total: number;
+	}> {
+		const pn = Math.max(1, Math.floor(pageNo));
+		const ps = Math.min(50, Math.max(1, Math.floor(pageSize)));
+		const qb = this.sessionRepo
+			.createQueryBuilder('s')
+			.where('s.user_id = :uid', { uid: userId })
+			.orderBy('s.updated_at', 'DESC')
+			.skip((pn - 1) * ps)
+			.take(ps);
+		const [rows, total] = await qb.getManyAndCount();
+		return {
+			list: rows.map((r) => ({
+				sessionId: r.id,
+				title: r.title,
+				createdAt: r.createdAt,
+				updatedAt: r.updatedAt,
+			})),
+			pageNo: pn,
+			pageSize: ps,
+			total,
+		};
 	}
 
 	/**
@@ -448,17 +492,42 @@ export class AgentService {
 			// （3）新一轮对话turn占位
 			const turnId = randomUUID();
 			activeTurnId = turnId;
-			const { assistantMessageId: aid } =
+			const { userMessageId: uid, assistantMessageId: aid } =
 				await this.memory.insertUserAndAssistantPlaceholder(
 					session,
 					turnId,
 					dto.content.trim(),
 				);
 			assistantMessageId = aid;
+			subscriber.next({
+				type: 'messageIds',
+				data: { userMessageId: uid, assistantMessageId: aid },
+			});
 
-			// （4）构建 langchain message 历史
+			// （4）构建 langchain message 历史（user 行入库为纯 `content`；intentPrefix 仅注入本轮模型输入）
 			const lcMessages =
 				await this.memory.buildLangChainMessagesFromDb(sessionId);
+			const intent =
+				dto.assistMode === 'english_learning'
+					? dto.intentPrefix?.trim()
+					: undefined;
+			if (intent) {
+				for (let i = lcMessages.length - 1; i >= 0; i -= 1) {
+					const msg = lcMessages[i];
+					if (!(msg instanceof HumanMessage)) continue;
+					const c = msg.content;
+					const plain =
+						typeof c === 'string'
+							? c
+							: Array.isArray(c)
+								? (c as { text?: string }[])
+										.map((p) => (typeof p?.text === 'string' ? p.text : ''))
+										.join('')
+								: String(c ?? '');
+					lcMessages[i] = new HumanMessage(`${intent}\n\n${plain}`);
+					break;
+				}
+			}
 
 			// （5）流式并发控制（epoch机制），每次流式启动+1，高并发终止旧流
 			const abortController = new AbortController();

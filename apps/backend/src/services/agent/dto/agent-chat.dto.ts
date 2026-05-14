@@ -22,6 +22,15 @@ export class AgentChatDto {
 	@MaxLength(100_000)
 	content!: string;
 
+	/**
+	 * 快捷意图等「仅影响本轮模型输入」的前缀，不入库：落库的 user 行仅保存 `content`。
+	 * 英语学习等场景由前端传入，服务端拼入 LangChain HumanMessage（见 AgentService）。
+	 */
+	@IsOptional()
+	@IsString()
+	@MaxLength(20_000)
+	intentPrefix?: string;
+
 	@IsOptional()
 	@IsString()
 	@MaxLength(255)

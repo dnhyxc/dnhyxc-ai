@@ -15,6 +15,8 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { AgentMessage } from '../agent/agent-message.entity';
+import { AgentSession } from '../agent/agent-session.entity';
 import { AssistantMessage } from '../assistant/assistant-message.entity';
 import { AssistantSession } from '../assistant/assistant-session.entity';
 import { ChatMessages } from '../chat/chat.entity';
@@ -43,6 +45,10 @@ export class ShareService {
 		private readonly assistantSessionRepo: Repository<AssistantSession>,
 		@InjectRepository(AssistantMessage)
 		private readonly assistantMessageRepo: Repository<AssistantMessage>,
+		@InjectRepository(AgentSession)
+		private readonly agentSessionRepo: Repository<AgentSession>,
+		@InjectRepository(AgentMessage)
+		private readonly agentMessageRepo: Repository<AgentMessage>,
 		@InjectRepository(Knowledge)
 		private readonly knowledgeRepo: Repository<Knowledge>,
 	) {}
@@ -52,7 +58,7 @@ export class ShareService {
 	 */
 	private async resolveShareMessagesBySessionId(params: {
 		sessionId: string;
-		sessionType: 'chat' | 'assistant';
+		sessionType: 'chat' | 'assistant' | 'agent';
 		messageIds?: string[];
 	}): Promise<{
 		title: string;
@@ -88,73 +94,126 @@ export class ShareService {
 		}
 
 		// 2) 知识库助手：按 assistant_sessions 查询
-		const session = await this.assistantSessionRepo.findOne({
-			where: { id: params.sessionId },
-			select: ['id', 'title', 'createdAt', 'updatedAt'],
-		});
-		if (!session) {
-			throw new NotFoundException('会话不存在');
-		}
-
-		const qb = this.assistantMessageRepo
-			.createQueryBuilder('m')
-			.select(['m.id', 'm.role', 'm.content', 'm.createdAt'])
-			.where('m.session_id = :sid', { sid: params.sessionId });
-
-		if (params.messageIds?.length) {
-			qb.andWhere('m.id IN (:...ids)', { ids: params.messageIds });
-		}
-
-		const rows = await qb
-			.orderBy('m.created_at', 'ASC')
-			// created_at 精度不足时（同秒），强制 user 在 assistant 之前，避免 UI 上下颠倒
-			.addOrderBy("CASE WHEN m.role = 'user' THEN 0 ELSE 1 END", 'ASC')
-			// 再兜底按 uuid，保证排序稳定
-			.addOrderBy('m.id', 'ASC')
-			.getMany();
-
-		// 确保消息的顺序与前端传入的 messageIds 顺序一致
-		// 1. 默认情况下，orderedRows 直接引用 rows
-		let orderedRows = rows;
-		// 2. 如果前端有传入 messageIds，按照其顺序重新排序
-		if (params.messageIds?.length) {
-			// 创建一个 Map，将每个 messageId 映射到其在 messageIds 数组中的下标（顺序）
-			const orderIndex = new Map(params.messageIds.map((id, i) => [id, i]));
-			// 复制 rows 用于排序，不直接修改原数组
-			orderedRows = [...rows].sort((a, b) => {
-				const ai = orderIndex.get(a.id); // a.id 在 messageIds 中的下标
-				const bi = orderIndex.get(b.id); // b.id 在 messageIds 中的下标
-				// 如果 a/b 两者都未在 messageIds 里，回退用 createdAt 排序，再用 id 排序保证稳定性
-				if (ai == null && bi == null) {
-					const at = a.createdAt?.getTime?.() ?? 0;
-					const bt = b.createdAt?.getTime?.() ?? 0;
-					if (at !== bt) return at - bt; // createdAt 小的在前
-					return String(a.id).localeCompare(String(b.id)); // id 排序兜底，保证顺序唯一
-				}
-				// 如果 a 不在 messageIds、b 在，用 b 优先，a 往后
-				if (ai == null) return 1;
-				// 如果 b 不在 messageIds、a 在，用 a 优先，b 往后
-				if (bi == null) return -1;
-				// 都在 messageIds 里，则按它们在 messageIds 中的顺序排列
-				return ai - bi;
+		if (params.sessionType === 'assistant') {
+			const session = await this.assistantSessionRepo.findOne({
+				where: { id: params.sessionId },
+				select: ['id', 'title', 'createdAt', 'updatedAt'],
 			});
+			if (!session) {
+				throw new NotFoundException('会话不存在');
+			}
+
+			const qb = this.assistantMessageRepo
+				.createQueryBuilder('m')
+				.select(['m.id', 'm.role', 'm.content', 'm.createdAt'])
+				.where('m.session_id = :sid', { sid: params.sessionId });
+
+			if (params.messageIds?.length) {
+				qb.andWhere('m.id IN (:...ids)', { ids: params.messageIds });
+			}
+
+			const rows = await qb
+				.orderBy('m.created_at', 'ASC')
+				.addOrderBy("CASE WHEN m.role = 'user' THEN 0 ELSE 1 END", 'ASC')
+				.addOrderBy('m.id', 'ASC')
+				.getMany();
+
+			let orderedRows = rows;
+			if (params.messageIds?.length) {
+				const orderIndex = new Map(params.messageIds.map((id, i) => [id, i]));
+				orderedRows = [...rows].sort((a, b) => {
+					const ai = orderIndex.get(a.id);
+					const bi = orderIndex.get(b.id);
+					if (ai == null && bi == null) {
+						const at = a.createdAt?.getTime?.() ?? 0;
+						const bt = b.createdAt?.getTime?.() ?? 0;
+						if (at !== bt) return at - bt;
+						return String(a.id).localeCompare(String(b.id));
+					}
+					if (ai == null) return 1;
+					if (bi == null) return -1;
+					return ai - bi;
+				});
+			}
+
+			const messages = orderedRows.map((m) => ({
+				id: m.id,
+				chatId: m.id,
+				role: (m.role === 'assistant' ? 'assistant' : 'user') as
+					| 'user'
+					| 'assistant',
+				content: m.content ?? '',
+				timestamp: m.createdAt?.getTime?.() ?? Date.now(),
+			}));
+			return {
+				title:
+					session.title ||
+					this.generateTitle(messages as unknown as ChatMessages[]),
+				messages,
+			};
 		}
 
-		const messages = orderedRows.map((m) => ({
-			id: m.id,
-			chatId: m.id,
-			role: (m.role === 'assistant' ? 'assistant' : 'user') as
-				| 'user'
-				| 'assistant',
-			content: m.content ?? '',
-			timestamp: m.createdAt?.getTime?.() ?? Date.now(),
-		}));
-		return {
-			title:
-				session.title ||
-				this.generateTitle(messages as unknown as ChatMessages[]),
-			messages,
-		};
+		// 3) LangChain Agent 专项会话（英语学习等）：agent_sessions / agent_messages
+		if (params.sessionType === 'agent') {
+			const session = await this.agentSessionRepo.findOne({
+				where: { id: params.sessionId },
+				select: ['id', 'title', 'createdAt', 'updatedAt'],
+			});
+			if (!session) {
+				throw new NotFoundException('会话不存在');
+			}
+
+			const qb = this.agentMessageRepo
+				.createQueryBuilder('m')
+				.select(['m.id', 'm.role', 'm.content', 'm.createdAt'])
+				.where('m.session_id = :sid', { sid: params.sessionId });
+
+			if (params.messageIds?.length) {
+				qb.andWhere('m.id IN (:...ids)', { ids: params.messageIds });
+			}
+
+			const rows = await qb
+				.orderBy('m.created_at', 'ASC')
+				.addOrderBy("CASE WHEN m.role = 'user' THEN 0 ELSE 1 END", 'ASC')
+				.addOrderBy('m.id', 'ASC')
+				.getMany();
+
+			let orderedRows = rows;
+			if (params.messageIds?.length) {
+				const orderIndex = new Map(params.messageIds.map((id, i) => [id, i]));
+				orderedRows = [...rows].sort((a, b) => {
+					const ai = orderIndex.get(a.id);
+					const bi = orderIndex.get(b.id);
+					if (ai == null && bi == null) {
+						const at = a.createdAt?.getTime?.() ?? 0;
+						const bt = b.createdAt?.getTime?.() ?? 0;
+						if (at !== bt) return at - bt;
+						return String(a.id).localeCompare(String(b.id));
+					}
+					if (ai == null) return 1;
+					if (bi == null) return -1;
+					return ai - bi;
+				});
+			}
+
+			const messages = orderedRows.map((m) => ({
+				id: m.id,
+				chatId: m.id,
+				role: (m.role === 'assistant' ? 'assistant' : 'user') as
+					| 'user'
+					| 'assistant',
+				content: m.content ?? '',
+				timestamp: m.createdAt?.getTime?.() ?? Date.now(),
+			}));
+			return {
+				title:
+					session.title ||
+					this.generateTitle(messages as unknown as ChatMessages[]),
+				messages,
+			};
+		}
+
+		throw new NotFoundException('会话不存在');
 	}
 
 	/**
