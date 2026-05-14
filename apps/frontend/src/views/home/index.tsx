@@ -70,6 +70,8 @@ const Home = () => {
 				desc: t('home.steps.register.desc'),
 				icon: Shield,
 				color: 'from-cyan-500 to-blue-500',
+				/** 点击后进入登录页「账号注册」视图 */
+				navigateRegister: true,
 			},
 			{
 				step: '4',
@@ -77,6 +79,8 @@ const Home = () => {
 				desc: t('home.steps.start.desc'),
 				icon: Zap,
 				color: 'from-orange-500 to-amber-500',
+				/** 点击后进入智能对话 */
+				navigateChat: true,
 			},
 		],
 		[t, locale],
@@ -139,7 +143,7 @@ const Home = () => {
 	}, []);
 
 	// 使用原生 button + CSS 过渡，避免 motion.button 的 whileTap 与路由卸载叠在同一帧造成卡顿
-	const onClickStart = () => {
+	const onClickQuickStart = () => {
 		navigate('/chat');
 	};
 
@@ -207,7 +211,7 @@ const Home = () => {
 									>
 										<Button
 											variant="dynamic"
-											onClick={onClickStart}
+											onClick={onClickQuickStart}
 											className="relative h-10 w-30 cursor-pointer overflow-hidden rounded-md bg-linear-to-r from-teal-500 to-cyan-600 px-6 pt-3 text-sm font-semibold text-textcolor shadow-lg transition-[transform,box-shadow] duration-200 ease-out hover:scale-[1.03] hover:shadow-teal-500/30 active:scale-[0.98]"
 											style={{
 												fontFamily: '"Syne", "Noto Sans SC", sans-serif',
@@ -362,6 +366,10 @@ const Home = () => {
 												void openExternalUrl(
 													getDesktopDownloadAbsoluteUrl(locale),
 												);
+											} else if (item.navigateRegister) {
+												navigate('/login?mode=register');
+											} else if (item.navigateChat) {
+												navigate('/chat');
 											}
 										}}
 									>

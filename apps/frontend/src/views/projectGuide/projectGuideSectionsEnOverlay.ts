@@ -14,8 +14,9 @@ export const PROJECT_GUIDE_SECTION_TITLES_EN: Record<string, string> = {
 	'pg-s10': '10. Glossary',
 	'pg-s11': '11. Sharing, RAG mode, and UI language',
 	'pg-s12': '12. More in the Knowledge editor',
-	'pg-s13': '13. Going deeper',
-	'pg-s14': '14. About window and legal pages',
+	'pg-s13': '13. English learning (word packs, quotes, favorites)',
+	'pg-s14': '14. Going deeper',
+	'pg-s15': '15. About window and legal pages',
 };
 
 export const PROJECT_GUIDE_ITEMS_EN: Record<
@@ -31,6 +32,11 @@ export const PROJECT_GUIDE_ITEMS_EN: Record<
 		title: 'Knowledge base',
 		description:
 			'Capture notes in Markdown (cloud or local), then reuse them while writing and searching.',
+	},
+	'pg-s1-english': {
+		title: 'English learning',
+		description:
+			'Generate themed word packs and classic sentences, with favorites, a drawer, and one-click Word (DOCX) export. Main flows require signing in.',
 	},
 	'pg-s1-3': {
 		title: 'Rich Markdown',
@@ -50,7 +56,7 @@ export const PROJECT_GUIDE_ITEMS_EN: Record<
 	'pg-s2-2': {
 		title: '2.2 Browser',
 		description:
-			'Good for quick access. Features are limited to what the web platform allows; some actions show “desktop only.”',
+			'Good for quick access. Features are limited to what the web platform allows; some actions show “desktop only.” When logged out you can still browse the home page, open Knowledge (local mode by default), and read some public pages (product guide, release notes, policies, etc.). Flows that need an account (e.g. Chat) will prompt you to sign in after you enter.',
 	},
 	'pg-s3-1': {
 		title: '3.1 First-time suggestions',
@@ -62,6 +68,11 @@ export const PROJECT_GUIDE_ITEMS_EN: Record<
 		description:
 			'Chat then capture: outline in chat, then persist conclusions in Knowledge.\nOrganize sources: turn links and summaries into searchable Markdown.\nSpec writing: Background → Goals → Options → Trade-offs → Conclusion, plus Mermaid flow or sequence diagrams.',
 	},
+	'pg-s3-3': {
+		title: '3.3 Home “Quick start”: steps vs top bar',
+		description:
+			'The step list and the top “quick start” button differ: the top button still opens /chat. The “Create account” step opens Login with the registration form (URL carries mode=register so refresh or copy keeps you on register). “Get started” steps match the top bar and open Chat. Toggling login/register syncs the address bar; history usually uses replace to avoid stacking duplicate /login entries. Opening /login?mode=register from a bookmark also lands on register.',
+	},
 	'pg-s4-1': {
 		title: '4.1 Basic prompts',
 		description:
@@ -70,7 +81,7 @@ export const PROJECT_GUIDE_ITEMS_EN: Record<
 	'pg-s4-2': {
 		title: '4.2 Streaming, stop, and continue',
 		description:
-			'Replies stream as they generate. Stop early if you have enough; use continue to extend the current answer.',
+			'Replies stream as they generate. Stop early if you have enough; use continue to extend the current answer. Branches and regeneration live in a message tree; shared read-only pages try to keep order and layout consistent even in complex branch cases.',
 	},
 	'pg-s4-3': {
 		title: '4.3 Web search and citations',
@@ -115,7 +126,7 @@ export const PROJECT_GUIDE_ITEMS_EN: Record<
 	'pg-s5-6': {
 		title: '5.6 In-document AI assistant (logged in)',
 		description:
-			'When logged in, use the Knowledge doc assistant at the bottom of the editor for multi-turn help grounded in the current Markdown. Hidden when logged out. Long threads: use scroll-to-bottom / scroll-to-top near the input; during streaming you can jump back to the latest output. On desktop when logged in, the assistant supports text/voice like Chat and follows UI language.',
+			'When logged in, use the Knowledge doc assistant at the bottom of the editor for multi-turn help grounded in the current Markdown. Hidden when logged out. Long threads: use scroll-to-bottom / scroll-to-top near the input; during streaming you can jump back to the latest output. Send selected editor text to the assistant for AI or RAG follow-ups; overlapping selections may be deduped for context (behavior per release). On desktop when logged in, the assistant supports text/voice like Chat and follows UI language.',
 	},
 	'pg-s6-1': {
 		title: '6.1 Task lists',
@@ -211,22 +222,42 @@ export const PROJECT_GUIDE_ITEMS_EN: Record<
 			'Format supported fenced languages when available; nested fences may need backup or incremental paste.',
 	},
 	'pg-s13-1': {
-		title: 'Topic-specific maintainer notes',
+		title: '13.1 Word packs and classic lines (streaming)',
 		description:
-			'This page targets everyday use. For hosting, reverse proxies, editor edge cases, or contributing, search topic-specific maintainer material in your local clone—feature index, deployment examples, desktop voice, Monaco notes, etc.',
+			'Fill theme and counts, then generate with streaming UI; cancel per product controls; errors show readable messages. Main pass summarizes points; web search triggers when the model judges it needed (e.g. time-sensitive topics). Combine with Knowledge RAG so answers carry verifiable citations, consistent with the Knowledge assistant domain.',
+	},
+	'pg-s13-2': {
+		title: '13.2 Quick intents (toolbar chips)',
+		description:
+			'Toolbar chips attach prefixes or intent hints; tap again to deselect. Labels follow the UI language from Settings.',
+	},
+	'pg-s13-3': {
+		title: '13.3 Left form and returning to the page',
+		description:
+			'Theme, counts, and other left-panel fields are generally restored after you navigate away and back (works with streaming singleton state; exact behavior per release).',
+	},
+	'pg-s13-4': {
+		title: '13.4 Favorites, drawer, and DOCX export',
+		description:
+			'Favorite words or lines; browse and manage in a paginated drawer. Export word favorites or quote favorites to Word (DOCX); the server aggregates up to about 3000 items per account by favorite time (newest first), independent of the drawer page. Browser and desktop both use binary download and local save; desktop dedupe prompts if implemented.',
 	},
 	'pg-s14-1': {
-		title: 'Service policy and user agreement',
+		title: 'Topic notes and release overview',
+		description:
+			'This page targets everyday use. For hosting, reverse proxies, editor edge cases, or contributing, search topic-specific maintainer material in your local clone—feature index, deployment examples, desktop voice, Monaco notes, etc. The in-app Release Notes page (/update-info) is the user-facing “what changed” overview—read it alongside this guide; keep it in sync with maintainer source material before each release.',
+	},
+	'pg-s15-1': {
+		title: '15.1 Service policy and user agreement',
 		description:
 			'From About: Service Policy and User Agreement open in the system browser (desktop) or a new tab (web), not inside the small About window—same full-page scroll feel as share pages, without main chrome. Routes /service-policy and /user-agreement; available logged out.\nBesides changing UI language in Settings, those pages have a header toggle like the product guide: ?lang= switches zh/en and refreshes body copy immediately.\nLegal copy is product-level; maintainer-edited in code.',
 	},
-	'pg-s14-2': {
-		title: 'Release notes (standalone structured page)',
+	'pg-s15-2': {
+		title: '15.2 Release notes (standalone structured page)',
 		description:
 			'About also opens Release Notes in the browser. Route /update-info; no main chrome; header plus scroll body like share pages. Regular section layout (not a Markdown preview wall); wording stays aligned with the external release-notes write-up—update structured frontend data when that prose changes.',
 	},
-	'pg-s14-3': {
-		title: 'Product guide (standalone structured page)',
+	'pg-s15-3': {
+		title: '15.3 Product guide (standalone structured page)',
 		description:
 			'Home “Learn more” opens this guide in the default browser or a new tab. Route /project-guide; full-page scroll; logged-out OK. Header title plus language toggle (?lang=), same pattern as legal standalone pages. Structured sections like release notes; keep frontend guide modules (including English overlay) in sync when this prose changes.',
 	},

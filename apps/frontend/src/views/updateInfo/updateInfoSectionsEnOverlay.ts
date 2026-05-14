@@ -30,6 +30,8 @@ export const UPDATE_INFO_SECTION_TITLES_EN: Record<string, string> = {
 	s20: '20. About dialog & standalone legal pages',
 	s21: '21. Release notes standalone page (structured UI)',
 	s22: '22. Product guide page & home entry',
+	s23: '23. Home “Quick start” & sign-up entry',
+	s24: '24. English learning (vocabulary packs, quotes & favorites)',
 };
 
 /** 条目标题与描述（key = bullet.id） */
@@ -56,6 +58,11 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		title: 'Auth expiry handling',
 		description:
 			'When the API returns 401 Unauthorized, the session is cleared consistently and re-login is triggered, avoiding “looks logged in but is actually expired” drift.',
+	},
+	's2-3': {
+		title: 'Public route policy',
+		description:
+			'When logged out you can still open home, login, about, share links, the knowledge base (local-only by default—see Section 6), settings and its subpaths, the desktop download landing page, the product guide, legal policies, agreements, and this structured update page. Chat and other signed-in flows stay behind the guard; standalone public routes match Sections 21–22.',
 	},
 	's3-1': {
 		title: 'One frontend for desktop and browser',
@@ -93,26 +100,31 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 			'Create sessions, list and query history, update, and delete sessions.',
 	},
 	's4-3': {
+		title: 'Branches & regenerate',
+		description:
+			'Conversations support tree-shaped branches and regenerate flows; share read-only views keep message order and layout aligned with online reading even in complex branch cases (complements Section 14 and the message-order fix).',
+	},
+	's4-4': {
 		title: 'Shared conversation message order fix',
 		description:
 			'Fixes incorrect message order on share pages for more consistent reading.',
 	},
-	's4-4': {
+	's4-5': {
 		title: 'Web search & citations',
 		description:
 			'Supports web retrieval with citation metadata for traceability.',
 	},
-	's4-5': {
+	's4-6': {
 		title: 'Attachments & OCR',
 		description:
 			'Attachment handling and OCR improve multimodal input usability.',
 	},
-	's4-6': {
+	's4-7': {
 		title: 'Async persistence & reliability',
 		description:
 			'Queues (e.g. BullMQ) improve message persistence reliability and scalability.',
 	},
-	's4-7': {
+	's4-8': {
 		title: 'Desktop chat input: voice & stop-recording policy',
 		description:
 			'On the Tauri client, the bottom input supports text/voice modes, live dictation, and stop-recording cleanup; after stop, no second full-audio transcription pass is sent—see Section 11 for details.',
@@ -199,6 +211,11 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		title: 'Local directory & editor sync',
 		description:
 			'Folder scan, disk writes, editor buffer, and list state stay aligned; logged-out local-only policy matches earlier Section 6 items.',
+	},
+	's6-12': {
+		title: 'Send selection to the document assistant',
+		description:
+			'In the knowledge-base Markdown editor you can send the current selection to the bottom document assistant for AI or RAG prompts; overlapping or duplicate sends are deduped to reduce noisy context.',
 	},
 	's7-1': {
 		title: 'IME (input method editor) compatibility',
@@ -417,5 +434,45 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		title: 'Maintenance note',
 		description:
 			'When the external-facing guide copy changes, update the structured product-guide modules and route constants before shipping the frontend bundle.',
+	},
+	's23-1': {
+		title: 'Quick-start steps vs top-bar CTA',
+		description:
+			'On the home “Quick start” list, specific steps (e.g. register) are fully clickable for that flow; the main top-bar quick-start still opens chat (/chat) so one button does not mix two product intents. A “get started” style step matches the top bar and opens the main chat view.',
+	},
+	's23-2': {
+		title: 'Login URL stays in sync with register mode',
+		description:
+			'The login page can open directly in register mode via the mode=register query string; switching between login and register updates the address bar with replace history to avoid stacking duplicate /login entries—refresh and shared links land on the right view.',
+	},
+	's24-1': {
+		title: 'Topic-driven packs & streaming',
+		description:
+			'Signed-in users generate vocabulary packs and classic quotes from a topic in the English-learning area; generation streams over SSE with cancel, multi-turn agent chat, and clear error feedback.',
+	},
+	's24-2': {
+		title: 'Quick-intent chips',
+		description:
+			'Toolbar chips attach a prefix to outgoing content; click again to clear selection; copy follows Section 12 UI language.',
+	},
+	's24-3': {
+		title: 'Left rail form persists across routes',
+		description:
+			'Leaving the English-learning route and returning restores topic/count inputs and intent mirror text so you do not retype; works with the singleton pack/stream store.',
+	},
+	's24-4': {
+		title: 'Favorites & drawers',
+		description:
+			'Vocabulary and quotes can be favorited, browsed paged inside drawers; list and sidebar UX includes refinements such as collapse memory where implemented.',
+	},
+	's24-5': {
+		title: 'Export favorites to Word (DOCX)',
+		description:
+			'One-click DOCX export for vocabulary or quote favorites; the server aggregates up to about 3000 rows per user (newest favorites first, decoupled from UI pagination) with binary download on both browser and Tauri.',
+	},
+	's24-6': {
+		title: 'Master retrieval: on-demand web search & RAG',
+		description:
+			'The master agent summarizes pack content; web search fires only when the model decides it is needed, with unified parsing of dates/recency in topics to cut routine noise; can combine with knowledge-base RAG tools so citations feel like the main chat product.',
 	},
 };

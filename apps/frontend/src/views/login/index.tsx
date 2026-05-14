@@ -1,7 +1,7 @@
 import { Button } from '@ui/button';
 import { ScrollArea } from '@ui/scroll-area';
 import { useState } from 'react';
-import { useNavigate } from 'react-router';
+import { useNavigate, useSearchParams } from 'react-router';
 import { useI18n, useTheme } from '@/hooks';
 import ForgetPwdForm from './forget-pwd-form';
 import LoginByEmailForm from './login-by-email-form';
@@ -9,7 +9,10 @@ import LoginForm from './login-form';
 import RegisterForm from './register-form';
 
 const Login = () => {
-	const [isRegister, setIsRegister] = useState(false);
+	const [searchParams, setSearchParams] = useSearchParams();
+	const [isRegister, setIsRegister] = useState(
+		() => searchParams.get('mode') === 'register',
+	);
 	const [isForget, setIsForget] = useState(false);
 	const [loginType, setLoginType] = useState('username');
 
@@ -18,14 +21,21 @@ const Login = () => {
 
 	useTheme();
 
-	const onRegister = () => {
-		setIsRegister(!isRegister);
+	const onRegister = (status?: boolean) => {
+		const next = status !== undefined ? status : !isRegister;
+		setIsRegister(next);
 		setIsForget(false);
+		if (next) {
+			setSearchParams({ mode: 'register' }, { replace: true });
+		} else {
+			setSearchParams({}, { replace: true });
+		}
 	};
 
 	const switchLogin = () => {
 		setIsRegister(false);
 		setIsForget(false);
+		setSearchParams({}, { replace: true });
 	};
 
 	const switchLoginType = (type: string) => {
@@ -89,7 +99,7 @@ const Login = () => {
 							<Button
 								variant="link"
 								className="cursor-pointer p-0 text-sm text-theme"
-								onClick={onRegister}
+								onClick={() => onRegister()}
 							>
 								{isRegister ? t('auth.login.go') : t('auth.register.go')}
 							</Button>
