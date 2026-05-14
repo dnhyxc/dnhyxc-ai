@@ -15,6 +15,7 @@
 		"start:debug": "NODE_ENV=development nest start --debug --watch",
 		"start:prod": "cross-env NODE_ENV=production node dist/src/main",
 		"sql": "docker exec dnhyxc_ai_db sh -lc 'mysqldump -uroot -pexample --databases dnhyxc_ai_db --no-data --routines --triggers --events --default-character-set=utf8mb4' > dnhyxc_ai_db_schema.sql",
+		"sql:safe": "docker exec dnhyxc_ai_db sh -lc 'mysqldump -uroot -pexample --databases dnhyxc_ai_db --no-data --skip-add-drop-table --routines --triggers --events --default-character-set=utf8mb4' | sed 's/^CREATE TABLE /CREATE TABLE IF NOT EXISTS /' > dnhyxc_ai_db_schema_safe.sql",
 		"test": "jest",
 		"test:watch": "jest --watch",
 		"test:cov": "jest --coverage",

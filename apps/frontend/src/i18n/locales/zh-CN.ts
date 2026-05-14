@@ -647,6 +647,8 @@ export const zhCN = {
 	'englishLearning.toolbarSubtitle': '左侧选主题与单词，右侧对话练习',
 	'englishLearning.toolbarSubtitleShort': '可选快捷意图，或直接在右侧对话',
 	'englishLearning.quickIntents': '快捷意图',
+	'englishLearning.quickIntentsCollapse': '收起快捷意图',
+	'englishLearning.quickIntentsExpand': '展开快捷意图',
 	'englishLearning.intro':
 		'左侧选择快捷主题，在右侧输入框用自然语提问；支持单词、翻译、短文、名著导读等。已入库的知识库可由 Agent 优先引用。',
 	'englishLearning.disclaimer':
@@ -657,7 +659,7 @@ export const zhCN = {
 	'englishLearning.assistant.scrollToTop': '滚动到顶部',
 	'englishLearning.placeholder':
 		'输入英语或中文，例如要查的词、要翻译的段落、想读的主题…',
-	'englishLearning.chip.vocabulary': '背单词',
+	'englishLearning.chip.vocabulary': '单词背诵',
 	'englishLearning.chip.morphology': '词根词缀',
 	'englishLearning.chip.collocations': '固定搭配',
 	'englishLearning.chip.confusables': '易混辨析',
@@ -699,6 +701,27 @@ export const zhCN = {
 	'englishLearning.webSearch.viewPages': '查看本次联网检索网页（{n}）',
 	'englishLearning.webSearch.viewPagesTitle': '本次联网搜索结果（{n}）',
 	'englishLearning.packHistory.webSearchRounds': '联网 {n} 次',
+
+	'englishLearning.favoritesDrawer.selectAllLoaded': '全选',
+	'englishLearning.favoritesDrawer.selectedCount': '已选 {count} 项',
+	'englishLearning.favoritesDrawer.removeSelected': '移除所选',
+	'englishLearning.favoritesDrawer.removing': '移除中...',
+	'englishLearning.favoritesDrawer.removeSuccess': '已移除所选收藏',
+	'englishLearning.favoritesDrawer.removeFail': '移除失败，请稍后重试',
+	'englishLearning.favoritesDrawer.removeConfirmTitle': '确认移除所选收藏？',
+	'englishLearning.favoritesDrawer.removeConfirmDesc':
+		'将移除已选中的 {count} 条收藏，移除后可在列表中重新收藏。',
+	'englishLearning.favoritesDrawer.removeConfirmAction': '确认移除',
+	'englishLearning.favoritesDrawer.removeNoneHint': '请先勾选要移除的条目',
+	'englishLearning.favoritesDrawer.removeOneAction': '删除该条收藏',
+	'englishLearning.favoritesDrawer.removeOneConfirmTitle': '确认删除这条收藏？',
+	'englishLearning.favoritesDrawer.removeOneConfirmDescVocab':
+		'将取消收藏词条「{word}」，移除后可在列表中重新收藏。',
+	'englishLearning.favoritesDrawer.removeOneConfirmDescClassicIntro':
+		'将取消收藏以下英文原句，移除后可在列表中重新收藏。',
+	'englishLearning.favoritesDrawer.removeOneSuccess': '已删除该收藏',
+
+	'englishLearning.favoritesDrawer.toggleRow': '选择该行',
 
 	'englishLearning.vocab.title': '单词资料',
 	'englishLearning.vocab.desc':

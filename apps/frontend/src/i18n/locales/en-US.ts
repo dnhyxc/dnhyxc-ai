@@ -729,6 +729,8 @@ export const enUS = {
 	'englishLearning.toolbarSubtitleShort':
 		'Use quick intents or chat on the right',
 	'englishLearning.quickIntents': 'Quick intents',
+	'englishLearning.quickIntentsCollapse': 'Collapse quick intents',
+	'englishLearning.quickIntentsExpand': 'Expand quick intents',
 	'englishLearning.intro':
 		'Use the left panel for intents and vocabulary packs; type in the chat on the right. Your knowledge base can be retrieved first when relevant.',
 	'englishLearning.disclaimer':
@@ -783,6 +785,31 @@ export const enUS = {
 	'englishLearning.webSearch.viewPages': 'View web results from this run ({n})',
 	'englishLearning.webSearch.viewPagesTitle': 'This web search results ({n})',
 	'englishLearning.packHistory.webSearchRounds': 'Web search ×{n}',
+
+	'englishLearning.favoritesDrawer.selectAllLoaded': 'Select all',
+	'englishLearning.favoritesDrawer.selectedCount': '{count} selected',
+	'englishLearning.favoritesDrawer.removeSelected': 'Remove selected',
+	'englishLearning.favoritesDrawer.removing': 'Removing...',
+	'englishLearning.favoritesDrawer.removeSuccess': 'Removed selected favorites',
+	'englishLearning.favoritesDrawer.removeFail':
+		'Remove failed. Try again later.',
+	'englishLearning.favoritesDrawer.removeConfirmTitle':
+		'Remove selected favorites?',
+	'englishLearning.favoritesDrawer.removeConfirmDesc':
+		'This will remove {count} selected favorite(s). You can favorite them again from the list.',
+	'englishLearning.favoritesDrawer.removeConfirmAction': 'Remove',
+	'englishLearning.favoritesDrawer.removeNoneHint':
+		'Select items to remove first.',
+	'englishLearning.favoritesDrawer.removeOneAction': 'Remove this favorite',
+	'englishLearning.favoritesDrawer.removeOneConfirmTitle':
+		'Remove this favorite?',
+	'englishLearning.favoritesDrawer.removeOneConfirmDescVocab':
+		'This will unfavorite the word “{word}”. You can favorite it again from the list.',
+	'englishLearning.favoritesDrawer.removeOneConfirmDescClassicIntro':
+		'This will unfavorite the English line below. You can favorite it again from the list.',
+	'englishLearning.favoritesDrawer.removeOneSuccess': 'Favorite removed',
+
+	'englishLearning.favoritesDrawer.toggleRow': 'Select row',
 
 	'englishLearning.vocab.title': 'Vocabulary',
 	'englishLearning.vocab.desc':

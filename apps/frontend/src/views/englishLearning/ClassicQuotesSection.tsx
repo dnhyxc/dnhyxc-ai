@@ -321,6 +321,25 @@ function ClassicQuotesSectionInner() {
 		[fetchFavoriteDrawerMore],
 	);
 
+	const onBatchRemoveClassicFavorites = useCallback(
+		async (selected: EnglishClassicQuoteFavoriteListEntry[]) => {
+			if (selected.length === 0) return;
+			await Promise.all(
+				selected.map((it) => removeEnglishClassicQuoteFavorite(it.english)),
+			);
+			setFavoritedContentKeys((prev) => {
+				const next = new Set(prev);
+				for (const it of selected) {
+					const ck = classicQuoteFavoriteContentKey(it.english);
+					if (ck) next.delete(ck);
+				}
+				return next;
+			});
+			await fetchFavoriteDrawerFirstPage();
+		},
+		[fetchFavoriteDrawerFirstPage],
+	);
+
 	const cancelGenerate = useCallback(() => {
 		EnglishPackStore.classicCancelByUser();
 	}, []);
@@ -516,7 +535,7 @@ function ClassicQuotesSectionInner() {
 				value={topic}
 				onChange={(e) => EnglishPackStore.setClassicTopic(e.target.value)}
 				placeholder={t('englishLearning.classic.topicPlaceholder')}
-				className="h-9 w-full border-theme/10 bg-theme/5 focus-visible:border-theme/10 focus-visible:ring-0 mt-0.5 mb-4"
+				className="h-9 w-full border-theme/10 bg-theme/5 focus-visible:border-theme/10 focus-visible:ring-0 mt-0.5 mb-3.5"
 				disabled={loading}
 			/>
 
@@ -549,7 +568,7 @@ function ClassicQuotesSectionInner() {
 					>
 						{t('englishLearning.classic.countHint')}
 					</div>
-					<div className="mt-2 mb-5.5 flex flex-wrap gap-2 justify-between">
+					<div className="mt-2 mb-5 flex flex-wrap gap-2 justify-between">
 						{COUNT_PRESETS.map((n: (typeof COUNT_PRESETS)[number]) => (
 							<Button
 								key={n}
@@ -802,6 +821,7 @@ function ClassicQuotesSectionInner() {
 				onViewportScroll={onFavoriteDrawerViewportScroll}
 				playingKey={playingKey}
 				onTogglePlayQuote={toggleQuoteAudio}
+				onBatchRemoveFavorites={onBatchRemoveClassicFavorites}
 			/>
 		</div>
 	);

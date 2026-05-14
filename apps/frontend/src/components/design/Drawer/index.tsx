@@ -113,7 +113,7 @@ export function Drawer({
 				</div>
 
 				{footer && (
-					<SheetFooter className="pt-3.5 py-2.5 border-t shrink-0 bg-background">
+					<SheetFooter className="pt-3.5 py-2.5 border-t border-theme/10 shrink-0 bg-background">
 						{footer}
 					</SheetFooter>
 				)}

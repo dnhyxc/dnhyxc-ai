@@ -1,14 +1,17 @@
 /**
  * 英语学习：经典句收藏记录抽屉（滚动分页列表）
- * 列表项布局与主区语句卡片一致（含朗读），无收藏按钮。
+ * 列表项布局与主区语句卡片一致（含朗读），无收藏按钮；支持多选批量移除收藏。
  */
+import Confirm from '@design/Confirm';
 import { Drawer } from '@design/Drawer';
 import Loading from '@design/Loading';
+import { Checkbox } from '@ui/checkbox';
 import { Button, ScrollArea, Toast } from '@ui/index';
+import { Label } from '@ui/label';
 import { Spinner } from '@ui/spinner';
-import { Square, Volume2 } from 'lucide-react';
+import { Square, Trash2, Volume2 } from 'lucide-react';
 import type { UIEventHandler } from 'react';
-import { useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import {
@@ -27,6 +30,10 @@ export type ClassicQuotesFavoritesDrawerProps = {
 	/** 与主区语句列表共用，保证互斥朗读与停止后 UI 一致 */
 	playingKey: string | null;
 	onTogglePlayQuote: (english: string, key: string) => void | Promise<void>;
+	/** 批量取消收藏（由父组件调用接口并刷新列表） */
+	onBatchRemoveFavorites: (
+		selected: EnglishClassicQuoteFavoriteListEntry[],
+	) => Promise<void>;
 };
 
 export function ClassicQuotesFavoritesDrawer({
@@ -38,9 +45,16 @@ export function ClassicQuotesFavoritesDrawer({
 	onViewportScroll,
 	playingKey,
 	onTogglePlayQuote,
+	onBatchRemoveFavorites,
 }: ClassicQuotesFavoritesDrawerProps) {
 	const { t } = useI18n();
 	const [exportingDocx, setExportingDocx] = useState(false);
+	const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+	const [batchRemoving, setBatchRemoving] = useState(false);
+	const [removeConfirmOpen, setRemoveConfirmOpen] = useState(false);
+	const [singleRemoveConfirmOpen, setSingleRemoveConfirmOpen] = useState(false);
+	const [singleRemoveTarget, setSingleRemoveTarget] =
+		useState<EnglishClassicQuoteFavoriteListEntry | null>(null);
 
 	const showInitialLoading = loading && entries.length === 0;
 	const showLoadMoreHint = loadingMore;
@@ -48,6 +62,154 @@ export function ClassicQuotesFavoritesDrawer({
 
 	const exportDisabled =
 		exportingDocx || loading || (!loading && entries.length === 0);
+
+	const entryIdSet = useMemo(
+		() => new Set(entries.map((e) => e.id)),
+		[entries],
+	);
+
+	const allLoadedSelected =
+		entries.length > 0 && entries.every((e) => selectedIds.has(e.id));
+	const someLoadedSelected = entries.some((e) => selectedIds.has(e.id));
+
+	const selectAllCheckboxState: boolean | 'indeterminate' = allLoadedSelected
+		? true
+		: someLoadedSelected
+			? 'indeterminate'
+			: false;
+
+	useEffect(() => {
+		if (!open) {
+			setSelectedIds(new Set());
+			setRemoveConfirmOpen(false);
+			setSingleRemoveConfirmOpen(false);
+			setSingleRemoveTarget(null);
+		}
+	}, [open]);
+
+	useEffect(() => {
+		setSelectedIds((prev) => {
+			if (prev.size === 0) return prev;
+			const next = new Set<string>();
+			for (const id of prev) {
+				if (entryIdSet.has(id)) next.add(id);
+			}
+			if (next.size === prev.size) return prev;
+			return next;
+		});
+	}, [entryIdSet]);
+
+	const toggleSelectAllLoaded = useCallback(
+		(checked: boolean | 'indeterminate') => {
+			if (checked === true) {
+				setSelectedIds(new Set(entries.map((e) => e.id)));
+			} else {
+				setSelectedIds(new Set());
+			}
+		},
+		[entries],
+	);
+
+	const toggleRowSelected = useCallback((id: string, checked: boolean) => {
+		setSelectedIds((prev) => {
+			const next = new Set(prev);
+			if (checked) next.add(id);
+			else next.delete(id);
+			return next;
+		});
+	}, []);
+
+	const selectedEntries = useMemo(
+		() => entries.filter((e) => selectedIds.has(e.id)),
+		[entries, selectedIds],
+	);
+
+	const requestRemoveConfirm = useCallback(() => {
+		if (selectedIds.size === 0) {
+			Toast({
+				type: 'info',
+				title: t('englishLearning.favoritesDrawer.removeNoneHint'),
+			});
+			return;
+		}
+		setSingleRemoveConfirmOpen(false);
+		setSingleRemoveTarget(null);
+		setRemoveConfirmOpen(true);
+	}, [selectedIds, t]);
+
+	const requestSingleRemove = useCallback(
+		(entry: EnglishClassicQuoteFavoriteListEntry) => {
+			setRemoveConfirmOpen(false);
+			setSingleRemoveTarget(entry);
+			setSingleRemoveConfirmOpen(true);
+		},
+		[],
+	);
+
+	const executeRemoveConfirm = useCallback(async () => {
+		const toRemove = entries.filter((e) => selectedIds.has(e.id));
+		if (toRemove.length === 0) {
+			setRemoveConfirmOpen(false);
+			return;
+		}
+		setBatchRemoving(true);
+		try {
+			await onBatchRemoveFavorites(toRemove);
+			setSelectedIds(new Set());
+			setRemoveConfirmOpen(false);
+			setSingleRemoveConfirmOpen(false);
+			setSingleRemoveTarget(null);
+			Toast({
+				type: 'success',
+				title: t('englishLearning.favoritesDrawer.removeSuccess'),
+			});
+		} catch (e) {
+			Toast({
+				type: 'error',
+				title:
+					e instanceof Error
+						? e.message
+						: t('englishLearning.favoritesDrawer.removeFail'),
+			});
+			setRemoveConfirmOpen(false);
+		} finally {
+			setBatchRemoving(false);
+		}
+	}, [entries, onBatchRemoveFavorites, selectedIds, t]);
+
+	const executeSingleRemoveConfirm = useCallback(async () => {
+		const target = singleRemoveTarget;
+		if (!target) {
+			setSingleRemoveConfirmOpen(false);
+			return;
+		}
+		setBatchRemoving(true);
+		try {
+			await onBatchRemoveFavorites([target]);
+			setSelectedIds((prev) => {
+				const next = new Set(prev);
+				next.delete(target.id);
+				return next;
+			});
+			setSingleRemoveTarget(null);
+			setSingleRemoveConfirmOpen(false);
+			Toast({
+				type: 'success',
+				title: t('englishLearning.favoritesDrawer.removeOneSuccess'),
+			});
+		} catch (e) {
+			Toast({
+				type: 'error',
+				title:
+					e instanceof Error
+						? e.message
+						: t('englishLearning.favoritesDrawer.removeFail'),
+			});
+			setSingleRemoveConfirmOpen(false);
+		} finally {
+			setBatchRemoving(false);
+		}
+	}, [onBatchRemoveFavorites, singleRemoveTarget, t]);
 
 	const handleExportDocx = async () => {
 		if (entries.length === 0 && !loading) {
@@ -80,110 +242,236 @@ export function ClassicQuotesFavoritesDrawer({
 		}
 	};
 
+	const selectionDisabled = loading || batchRemoving;
+	const removeDisabled =
+		batchRemoving || selectedIds.size === 0 || entries.length === 0;
+
 	return (
-		<Drawer
-			title={t('englishLearning.classic.favoritesTitle')}
-			open={open}
-			onOpenChange={onOpenChange}
-			bodyClassName="pt-1.5 pb-2"
-			footer={
-				<footer className="flex justify-end">
-					<Button
-						type="button"
-						size="sm"
-						disabled={exportDisabled}
-						className="flex items-center w-25"
-						onClick={() => void handleExportDocx()}
-					>
-						{exportingDocx ? (
-							<>
-								<Spinner className="w-4 h-4" />
-								{t('common.downloading')}
-							</>
-						) : (
-							t('englishLearning.classic.exportDocx')
-						)}
-					</Button>
-				</footer>
-			}
-		>
-			<div className="flex h-full min-h-0 flex-col">
-				<ScrollArea
-					className="box-border flex min-h-0 flex-1 flex-col pr-1.5"
-					onScroll={onViewportScroll}
-				>
-					<div className="flex min-h-0 w-full flex-1 flex-col">
-						{showInitialLoading ? (
-							<div className="text-textcolor/60 flex flex-1 flex-col items-center justify-center py-6 text-center text-sm">
-								<Loading text={t('englishLearning.classic.favoritesLoading')} />
-							</div>
-						) : null}
-						{entries.map((row) => {
-							const playKey = `fav-classic-${row.id}`;
-							const playing = playingKey === playKey;
-							return (
-								<div
-									key={row.id}
-									className="hover:bg-theme/10 flex flex-col gap-1.5 rounded-md px-3 py-2.5 @min-[26rem]:p-3"
-								>
-									<div className="flex items-start justify-between gap-2">
-										<div className="text-textcolor min-w-0 flex-1 text-base font-medium leading-snug @min-[26rem]:text-lg">
-											{row.english}
-										</div>
-										<div className="flex shrink-0 items-center gap-1 transition-opacity duration-200">
-											<Button
-												type="button"
-												variant="ghost"
-												size="sm"
-												onClick={() =>
-													void onTogglePlayQuote(row.english, playKey)
-												}
-												className={cn(
-													'h-7 w-7 shrink-0 rounded-md border p-2 transition-colors @min-[26rem]:border-theme/15 @min-[26rem]:p-1.5',
-													playing
-														? 'border-violet-500/40 bg-violet-500/15 text-violet-600 dark:text-violet-400'
-														: 'border-theme/12 text-textcolor/60 hover:border-theme/20 hover:bg-theme/10 hover:text-violet-600 dark:hover:text-violet-400',
-												)}
-												aria-label={
-													playing
-														? t('englishLearning.tts.stop')
-														: t('englishLearning.classic.playQuote')
-												}
-											>
-												{playing ? (
-													<Square className="size-3.5 fill-current" />
-												) : (
-													<Volume2 className="size-3.5" />
-												)}
-											</Button>
-										</div>
+		<>
+			<Confirm
+				open={removeConfirmOpen}
+				onOpenChange={setRemoveConfirmOpen}
+				title={t('englishLearning.favoritesDrawer.removeConfirmTitle')}
+				description={t('englishLearning.favoritesDrawer.removeConfirmDesc', {
+					count: selectedEntries.length,
+				})}
+				descriptionClassName="text-left"
+				confirmText={t('englishLearning.favoritesDrawer.removeConfirmAction')}
+				cancelText={t('common.cancel')}
+				confirmVariant="destructive"
+				closeOnConfirm={false}
+				onConfirm={() => void executeRemoveConfirm()}
+			/>
+			<Confirm
+				open={singleRemoveConfirmOpen}
+				onOpenChange={(v) => {
+					setSingleRemoveConfirmOpen(v);
+					if (!v) setSingleRemoveTarget(null);
+				}}
+				title={t('englishLearning.favoritesDrawer.removeOneConfirmTitle')}
+				description={
+					singleRemoveTarget ? (
+						<div className="space-y-2">
+							<p>
+								{t(
+									'englishLearning.favoritesDrawer.removeOneConfirmDescClassicIntro',
+								)}
+							</p>
+							<p className="wrap-anywhere text-textcolor py-1.5 text-sm font-medium leading-snug">
+								{singleRemoveTarget.english}
+							</p>
+						</div>
+					) : (
+						'\u00a0'
+					)
+				}
+				descriptionClassName="text-left"
+				confirmText={t('englishLearning.favoritesDrawer.removeConfirmAction')}
+				cancelText={t('common.cancel')}
+				confirmVariant="destructive"
+				closeOnConfirm={false}
+				onConfirm={() => void executeSingleRemoveConfirm()}
+			/>
+			<Drawer
+				title={`${t('englishLearning.classic.favoritesTitle')} (${entries.length})`}
+				open={open}
+				onOpenChange={onOpenChange}
+				bodyClassName="pt-1.5 pb-2"
+				footer={
+					<footer className="flex justify-between gap-2">
+						<div className="flex items-center gap-2">
+							{!showInitialLoading && entries.length > 0 ? (
+								<div className="flex shrink-0 flex-wrap items-center gap-3 py-2">
+									<div className="flex items-center gap-2">
+										<Checkbox
+											id="classic-fav-select-all"
+											checked={selectAllCheckboxState}
+											disabled={selectionDisabled}
+											onCheckedChange={(v) => toggleSelectAllLoaded(v)}
+										/>
+										<Label
+											htmlFor="classic-fav-select-all"
+											className="cursor-pointer text-sm text-textcolor/85"
+										>
+											{t('englishLearning.favoritesDrawer.selectAllLoaded')}
+										</Label>
 									</div>
-									<div className="text-textcolor/90 text-sm leading-snug">
-										{row.translationZh}
-									</div>
-									<div className="text-textcolor/70 text-xs">
-										{t('englishLearning.classic.sourceLabel')}
-										{row.source || '—'}
-									</div>
-									<div className="text-textcolor/70 text-xs leading-relaxed italic">
-										{row.noteZh}
-									</div>
+									<span className="text-textcolor/60 text-xs">
+										{t('englishLearning.favoritesDrawer.selectedCount', {
+											count: selectedIds.size,
+										})}
+									</span>
 								</div>
-							);
-						})}
-						{showLoadMoreHint ? (
-							<div className="text-textcolor/50 py-2 text-center text-xs">
-								{t('common.loadingMore')}
-							</div>
-						) : null}
-						{showEmpty ? (
-							<div className="text-textcolor/60 py-8 text-center text-sm">
-								{t('englishLearning.classic.favoritesEmpty')}
-							</div>
-						) : null}
-					</div>
-				</ScrollArea>
-			</div>
-		</Drawer>
+							) : null}
+						</div>
+						<div className="flex items-center gap-2">
+							<Button
+								type="button"
+								variant="destructive"
+								size="sm"
+								disabled={removeDisabled}
+								className="shrink-0 w-24"
+								onClick={() => requestRemoveConfirm()}
+							>
+								{batchRemoving ? (
+									<>
+										<Spinner className="h-4 w-4" />
+										{t('englishLearning.favoritesDrawer.removing')}
+									</>
+								) : (
+									t('englishLearning.favoritesDrawer.removeSelected')
+								)}
+							</Button>
+							<Button
+								type="button"
+								size="sm"
+								disabled={exportDisabled}
+								className="flex w-24 shrink-0 items-center"
+								onClick={() => void handleExportDocx()}
+							>
+								{exportingDocx ? (
+									<>
+										<Spinner className="h-4 w-4" />
+										{t('common.downloading')}
+									</>
+								) : (
+									t('englishLearning.classic.exportDocx')
+								)}
+							</Button>
+						</div>
+					</footer>
+				}
+			>
+				<div className="flex h-full min-h-0 flex-col">
+					<ScrollArea
+						className="box-border flex min-h-0 flex-1 flex-col pr-1.5"
+						onScroll={onViewportScroll}
+					>
+						<div className="flex min-h-0 w-full flex-1 flex-col">
+							{showInitialLoading ? (
+								<div className="text-textcolor/60 flex flex-1 flex-col items-center justify-center py-6 text-center text-sm">
+									<Loading
+										text={t('englishLearning.classic.favoritesLoading')}
+									/>
+								</div>
+							) : null}
+							{entries.map((row) => {
+								const playKey = `fav-classic-${row.id}`;
+								const playing = playingKey === playKey;
+								return (
+									<div
+										key={row.id}
+										className="hover:bg-theme/10 flex gap-2 rounded-md px-2 py-2.5 @min-[26rem]:px-3 @min-[26rem]:py-2.5"
+									>
+										<div className="flex shrink-0 items-start pt-1">
+											<Checkbox
+												id={`classic-fav-${row.id}`}
+												className="cursor-pointer"
+												checked={selectedIds.has(row.id)}
+												disabled={selectionDisabled}
+												onCheckedChange={(v) =>
+													toggleRowSelected(row.id, v === true)
+												}
+												aria-label={`${t('englishLearning.favoritesDrawer.toggleRow')}: ${row.english.slice(0, 120)}`}
+											/>
+										</div>
+										<div className="min-w-0 flex-1">
+											<div className="flex items-start justify-between gap-2">
+												<div className="text-textcolor min-w-0 flex-1 text-base font-semibold leading-snug">
+													{row.english}
+												</div>
+												<div className="flex shrink-0 items-center gap-1 transition-opacity duration-200">
+													<Button
+														type="button"
+														variant="ghost"
+														size="sm"
+														onClick={() =>
+															void onTogglePlayQuote(row.english, playKey)
+														}
+														className={cn(
+															'h-7 w-7 shrink-0 rounded-md border p-2 transition-colors @min-[26rem]:border-theme/15 @min-[26rem]:p-1.5',
+															playing
+																? 'border-violet-500/40 bg-violet-500/15 text-violet-600 dark:text-violet-400'
+																: 'border-theme/12 text-textcolor/60 hover:border-theme/20 hover:bg-theme/10 hover:text-violet-600 dark:hover:text-violet-400',
+														)}
+														aria-label={
+															playing
+																? t('englishLearning.tts.stop')
+																: t('englishLearning.classic.playQuote')
+														}
+													>
+														{playing ? (
+															<Square className="size-3.5 fill-current" />
+														) : (
+															<Volume2 className="size-3.5" />
+														)}
+													</Button>
+													<Button
+														type="button"
+														variant="ghost"
+														size="sm"
+														disabled={selectionDisabled}
+														onClick={() => requestSingleRemove(row)}
+														className={cn(
+															'h-7 w-7 shrink-0 rounded-md border p-2 transition-colors @min-[26rem]:border-theme/15 @min-[26rem]:p-1.5',
+															'border-theme/12 text-textcolor/60 hover:border-destructive/35 hover:bg-destructive/10 hover:text-destructive',
+														)}
+														aria-label={t(
+															'englishLearning.favoritesDrawer.removeOneAction',
+														)}
+													>
+														<Trash2 className="size-3.5" />
+													</Button>
+												</div>
+											</div>
+											<div className="text-textcolor/90 text-sm leading-snug mt-1">
+												{row.translationZh}
+											</div>
+											<div className="text-textcolor/70 text-xs my-1">
+												{t('englishLearning.classic.sourceLabel')}
+												{row.source || '—'}
+											</div>
+											<div className="text-textcolor/70 text-xs leading-relaxed italic">
+												{row.noteZh}
+											</div>
+										</div>
+									</div>
+								);
+							})}
+							{showLoadMoreHint ? (
+								<div className="text-textcolor/50 py-2 text-center text-xs">
+									{t('common.loadingMore')}
+								</div>
+							) : null}
+							{showEmpty ? (
+								<div className="text-textcolor/60 py-8 text-center text-sm">
+									{t('englishLearning.classic.favoritesEmpty')}
+								</div>
+							) : null}
+						</div>
+					</ScrollArea>
+				</div>
+			</Drawer>
+		</>
 	);
 }

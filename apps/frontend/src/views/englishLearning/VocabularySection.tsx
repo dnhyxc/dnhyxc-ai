@@ -320,6 +320,24 @@ function VocabularyPackSectionInner() {
 		[fetchFavoritesMore],
 	);
 
+	const onBatchRemoveVocabularyFavorites = useCallback(
+		async (selected: EnglishVocabularyFavoriteListEntry[]) => {
+			if (selected.length === 0) return;
+			await Promise.all(
+				selected.map((it) => removeEnglishVocabularyFavorite(it.word)),
+			);
+			setFavoritedWordKeys((prev) => {
+				const next = new Set(prev);
+				for (const it of selected) {
+					next.delete(normalizeEnglishVocabWordKey(it.word));
+				}
+				return next;
+			});
+			await fetchFavoritesFirstPage();
+		},
+		[fetchFavoritesFirstPage],
+	);
+
 	const cancelGenerate = useCallback(() => {
 		EnglishPackStore.vocabCancelByUser();
 	}, []);
@@ -519,7 +537,7 @@ function VocabularyPackSectionInner() {
 				value={topic}
 				onChange={(e) => EnglishPackStore.setVocabTopic(e.target.value)}
 				placeholder={t('englishLearning.vocab.topicPlaceholder')}
-				className="h-9 w-full border-theme/10 bg-theme/5 focus-visible:border-theme/10 focus-visible:ring-0 mt-0.5 mb-4"
+				className="h-9 w-full border-theme/10 bg-theme/5 focus-visible:border-theme/10 focus-visible:ring-0 mt-0.5 mb-3.5"
 				disabled={loading}
 			/>
 
@@ -552,7 +570,7 @@ function VocabularyPackSectionInner() {
 					>
 						{t('englishLearning.vocab.countHint')}
 					</div>
-					<div className="mt-2 mb-5.5 flex flex-wrap gap-2 justify-between">
+					<div className="mt-2 mb-5 flex flex-wrap gap-2 justify-between">
 						{COUNT_PRESETS.map((n) => (
 							<Button
 								key={n}
@@ -801,6 +819,7 @@ function VocabularyPackSectionInner() {
 				onViewportScroll={onFavoritesViewportScroll}
 				playingKey={playingKey}
 				onTogglePlayWord={toggleWordAudio}
+				onBatchRemoveFavorites={onBatchRemoveVocabularyFavorites}
 			/>
 		</div>
 	);
