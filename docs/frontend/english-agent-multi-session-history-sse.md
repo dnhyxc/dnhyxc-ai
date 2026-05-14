@@ -519,12 +519,78 @@ sessionType?: 'chat' | 'assistant' | 'agent';
 
 ---
 
+### 3.11 补充：新建会话 `updatedAt`、工具状态文案与工具条布局
+
+本轮小改动聚焦 **历史列表排序可靠性** 与 **工具调用轻提示（tool status）** 的展示一致性。
+
+#### 3.11.1 后端：`createSession` 显式写入 `updatedAt`
+
+**问题**：会话列表按 `updated_at DESC` 排序。若 ORM/默认值未在插入瞬间写入 `updatedAt`，新建会话可能排在列表尾部或顺序异常。
+
+**做法**：在 `sessionRepo.create` 时传入 `updatedAt: new Date()`，与 `createdAt` 行为一致，保证新会话立刻参与「最近更新」排序。
+
+**来源**：`apps/backend/src/services/agent/agent.service.ts`（约 L221–L230，`createSession`）
+
+```typescript
+async createSession(userId: number, dto?: CreateAgentSessionDto) {
+	const id = randomUUID();
+	const session = this.sessionRepo.create({
+		id,
+		userId,
+		title: dto?.title?.trim() || null,
+		// 说明：与列表接口 orderBy('s.updated_at','DESC') 对齐，避免新行 updated_at 为空导致排序异常
+		updatedAt: new Date(),
+	});
+	await this.sessionRepo.save(session);
+	return { sessionId: id, title: session.title };
+}
+```
+
+#### 3.11.2 前端 Store：`onTool` 状态文案去掉省略号
+
+**做法**：`toolStatus` 在工具 `start` 阶段展示为 `调用工具：${name}` 或 `检索中`（不再后缀 `…`），避免与 UI 加载动画重复表达「进行中」。
+
+**来源**：`apps/frontend/src/store/englishAgent.ts`（约 L598–L606，`sendMessage` → `streamAgentSse` → `onTool`）
+
+```typescript
+onTool: (ev) => {
+	runInAction(() => {
+		st.toolStatus =
+			ev.phase === 'start'
+				? ev.name
+					? `调用工具：${ev.name}`
+					: '检索中'
+				: null;
+	});
+},
+```
+
+#### 3.11.3 前端：`AgentPanel` 工具状态条与主聊天气泡宽度对齐
+
+**做法**：在会话列激活时，工具状态条外包一层 `max-w-3xl` + 水平内边距，内层 `rounded-md` + `border`，与上方消息区常见最大宽度视觉对齐（非全宽顶栏）。
+
+**来源**：`apps/frontend/src/views/englishLearning/AgentPanel.tsx`（约 L495–L501，主会话列内 `toolStatus` 渲染）
+
+```tsx
+{englishAgentStore.toolStatus ? (
+	<div className="max-w-3xl px-4.5 py-3">
+		<div className="w-full border border-theme/10 rounded-md bg-theme/5 text-textcolor/60 shrink-0 px-4 py-2 text-center text-sm">
+			{englishAgentStore.toolStatus}
+		</div>
+	</div>
+) : null}
+```
+
+---
+
 ## 4. 兼容性与行为变化
 
 - **破坏性**：若外部代码仍写 `englishAgentStore.messages = ...` 等直接改数组（旧单会话模型），需改为通过 `stateBySession` 或 Store 已有方法修改；当前设计以 getter 暴露 `messages`。
 - **URL**：无 `session` 参数时可为「草稿」态；发送成功后由调用方写回 `?session=`。
 - **新对话**：不再在点击时调用 `createNewSession`（方法仍保留于 Store 供其它场景复用）。
 - **新建会话标题**：首条发送时 `titleFallback` 由「当前 `sessionTitle` → 首条正文摘要（36 字）→ 路由默认名」决定，不再写死单一字符串。
+- **新建会话排序**：后端创建行时显式设置 `updatedAt`，与历史列表「按更新时间倒序」一致。
+- **工具状态条**：主列内改为卡片式容器并与 `max-w-3xl` 对齐；文案不再自带省略号（与 Spinner 等动效分工）。
 
 ---
 
@@ -536,6 +602,8 @@ sessionType?: 'chat' | 'assistant' | 'agent';
 | 会话 A 流式中，打开历史切到会话 B | A 的 SSE 不被前端无谓 abort（除非用户停止） |
 | 新对话 → 历史列表 | 无行高亮；首条发送后创建会话并写 URL |
 | 新对话首条发送 | 历史列表中新会话标题接近首条消息摘要（≤36 字 +「…」），而非固定路由标题 |
+| 新会话刚创建后刷新历史 | 新会话应出现在列表靠前位置（`updated_at` 有效） |
+| 工具调用进行中 | 主区底部状态为圆角卡片且宽度与聊天气泡区域协调；文案无多余「…」 |
 | 带快捷意图发送 | DB 中 user 正文无 intent 前缀；模型侧能收到拼接后的 Human |
 | 发送一轮完成后 | 列表标题/时间可通过 `refreshSessionList` 更新（以当前实现为准） |
 
@@ -550,4 +618,7 @@ sessionType?: 'chat' | 'assistant' | 'agent';
 | MobX 多会话 Store | `apps/frontend/src/store/englishAgent.ts` |
 | Agent 列表/详情 HTTP | `apps/frontend/src/service/index.ts`、`service/api.ts` |
 | SSE 解析 | `apps/frontend/src/utils/agentSse.ts` |
+| 英语学习 Agent 主面板（含工具状态条） | `apps/frontend/src/views/englishLearning/AgentPanel.tsx` |
 | 会话列表与 SSE 映射 | `apps/backend/src/services/agent/agent.controller.ts`、`agent.service.ts` |
+
+若与仓库最新源码不一致，以源码为准。

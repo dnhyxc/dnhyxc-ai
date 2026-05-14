@@ -224,6 +224,7 @@ export class AgentService {
 			id,
 			userId,
 			title: dto?.title?.trim() || null,
+			updatedAt: new Date(),
 		});
 		await this.sessionRepo.save(session);
 		return { sessionId: id, title: session.title };

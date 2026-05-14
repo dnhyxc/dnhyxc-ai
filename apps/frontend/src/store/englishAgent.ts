@@ -600,8 +600,8 @@ export class EnglishAgentStore {
 							st.toolStatus =
 								ev.phase === 'start'
 									? ev.name
-										? `调用工具：${ev.name}…`
-										: '检索中…'
+										? `调用工具：${ev.name}`
+										: '检索中'
 									: null;
 						});
 					},

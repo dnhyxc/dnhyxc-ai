@@ -493,8 +493,10 @@ export const AgentPanel = observer(function AgentPanel({
 						</div>
 					</ScrollArea>
 					{englishAgentStore.toolStatus ? (
-						<div className="border-theme/10 bg-theme/5 text-textcolor/60 shrink-0 border-t px-4 py-2 text-center text-sm">
-							{englishAgentStore.toolStatus}
+						<div className="max-w-3xl px-4.5 py-3">
+							<div className="w-full border border-theme/10 rounded-md bg-theme/5 text-textcolor/60 shrink-0 px-4 py-2 text-center text-sm">
+								{englishAgentStore.toolStatus}
+							</div>
 						</div>
 					) : null}
 					{renderAssistantFooter(true)}
