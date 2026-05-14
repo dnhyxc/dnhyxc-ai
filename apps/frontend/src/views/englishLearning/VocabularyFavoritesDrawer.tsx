@@ -4,13 +4,17 @@
  */
 import { Drawer } from '@design/Drawer';
 import Loading from '@design/Loading';
-import { Button, ScrollArea } from '@ui/index';
+import { Button, ScrollArea, Toast } from '@ui/index';
 import { Square, Volume2 } from 'lucide-react';
 import type { UIEventHandler } from 'react';
+import { useState } from 'react';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
-import type { EnglishVocabularyFavoriteListEntry } from '@/service';
-import { displayIpaWrapped } from '@/utils';
+import {
+	downloadEnglishVocabularyFavoritesDocx,
+	type EnglishVocabularyFavoriteListEntry,
+} from '@/service';
+import { displayIpaWrapped, isTauriRuntime } from '@/utils';
 
 export type VocabularyFavoritesDrawerProps = {
 	open: boolean;
@@ -35,10 +39,45 @@ export function VocabularyFavoritesDrawer({
 	onTogglePlayWord,
 }: VocabularyFavoritesDrawerProps) {
 	const { t } = useI18n();
+	const [exportingDocx, setExportingDocx] = useState(false);
 
 	const showInitialLoading = loading && entries.length === 0;
 	const showLoadMoreHint = loadingMore;
 	const showEmpty = !loading && entries.length === 0 && !loadingMore;
+
+	const exportDisabled =
+		exportingDocx || loading || (!loading && entries.length === 0);
+
+	const handleExportDocx = async () => {
+		if (entries.length === 0 && !loading) {
+			Toast({
+				type: 'info',
+				title: t('englishLearning.vocab.exportDocxEmpty'),
+			});
+			return;
+		}
+		setExportingDocx(true);
+		try {
+			await downloadEnglishVocabularyFavoritesDocx();
+			// Web：无内置 Toast；Tauri：`downloadBlob` 已提示（与 Mermaid 工具栏等一致）
+			if (!isTauriRuntime()) {
+				Toast({
+					type: 'success',
+					title: t('englishLearning.vocab.exportDocxSuccess'),
+				});
+			}
+		} catch (e) {
+			Toast({
+				type: 'error',
+				title:
+					e instanceof Error
+						? e.message
+						: t('englishLearning.vocab.exportDocxFail'),
+			});
+		} finally {
+			setExportingDocx(false);
+		}
+	};
 
 	return (
 		<Drawer
@@ -46,6 +85,21 @@ export function VocabularyFavoritesDrawer({
 			open={open}
 			onOpenChange={onOpenChange}
 			bodyClassName="pt-1.5 pb-2"
+			footer={
+				<footer className="flex justify-end">
+					<Button
+						type="button"
+						variant="outline"
+						size="sm"
+						disabled={exportDisabled}
+						onClick={() => void handleExportDocx()}
+					>
+						{exportingDocx
+							? t('common.loading')
+							: t('englishLearning.vocab.exportDocx')}
+					</Button>
+				</footer>
+			}
 		>
 			<div className="flex h-full min-h-0 flex-col">
 				<ScrollArea

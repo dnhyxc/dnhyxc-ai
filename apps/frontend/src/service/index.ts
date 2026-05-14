@@ -5,8 +5,10 @@ import {
 	ShareInfo,
 } from '@/types';
 import type { SearchOrganicItem } from '@/types/chat';
+import { downloadBlob } from '@/utils';
 import type { EnglishPackWebSearchRoundDto } from '@/utils/englishPackWebSearchMerge';
 import { http } from '@/utils/fetch';
+import { isTauriRuntime } from '@/utils/runtime';
 import {
 	AGENT_SESSION,
 	AGENT_SESSIONS,
@@ -24,9 +26,11 @@ import {
 	DOWNLOAD_FILE,
 	DOWNLOAD_ZIP_FILE,
 	ENGLISH_LEARNING_CLASSIC_QUOTES_FAVORITES,
+	ENGLISH_LEARNING_CLASSIC_QUOTES_FAVORITES_EXPORT_DOCX,
 	ENGLISH_LEARNING_CLASSIC_QUOTES_HISTORY,
 	ENGLISH_LEARNING_STREAM_CANCEL,
 	ENGLISH_LEARNING_VOCABULARY_FAVORITES,
+	ENGLISH_LEARNING_VOCABULARY_FAVORITES_EXPORT_DOCX,
 	ENGLISH_LEARNING_VOCABULARY_HISTORY,
 	ENGLISH_LEARNING_VOCABULARY_PACK,
 	GET_SESSION,
@@ -693,6 +697,53 @@ export const listEnglishClassicQuoteFavorites = async (options?: {
 		},
 	);
 };
+
+/**
+ * 带鉴权拉取收藏导出 DOCX：`http.get` 取 `ArrayBuffer` 后统一走 {@link downloadBlob}（Web 为 `<a download>`，Tauri 为 `download_blob`）。
+ */
+async function downloadEnglishFavoritesAuthorizedDocx(
+	path: string,
+	filename: string,
+): Promise<void> {
+	const { data } = await http.get<ArrayBuffer>(path, { silent: true });
+	if (!(data instanceof ArrayBuffer)) {
+		throw new Error('导出文件无效');
+	}
+	const blob = new Blob([data], {
+		type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+	});
+	const result = await downloadBlob(
+		{
+			file_name: filename,
+			id: `english-favorites-${Date.now()}`,
+			overwrite: true,
+		},
+		blob,
+	);
+	if (result.success !== 'success') {
+		// Tauri：`downloadBlob` 内已 Toast；Web：无内置 Toast，抛错由抽屉提示
+		if (isTauriRuntime()) {
+			return;
+		}
+		throw new Error(result.message || '下载失败');
+	}
+}
+
+/** 下载当前用户单词收藏 Word（服务端至多导出 3000 条） */
+export async function downloadEnglishVocabularyFavoritesDocx(): Promise<void> {
+	await downloadEnglishFavoritesAuthorizedDocx(
+		ENGLISH_LEARNING_VOCABULARY_FAVORITES_EXPORT_DOCX,
+		`vocabulary-${Date.now()}.docx`,
+	);
+}
+
+/** 下载当前用户经典句收藏 Word（服务端至多导出 3000 条） */
+export async function downloadEnglishClassicQuoteFavoritesDocx(): Promise<void> {
+	await downloadEnglishFavoritesAuthorizedDocx(
+		ENGLISH_LEARNING_CLASSIC_QUOTES_FAVORITES_EXPORT_DOCX,
+		`classic-quote-${Date.now()}.docx`,
+	);
+}
 
 export const getSession = async (sessionId: string) => {
 	return await http.get(GET_SESSION, {

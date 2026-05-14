@@ -1,7 +1,7 @@
 /**
  * 英语学习左栏：学习设置（卡片化 + 快捷意图）
  */
-import { Languages } from 'lucide-react';
+import { Cog } from 'lucide-react';
 import { observer } from 'mobx-react';
 import { type ReactNode } from 'react';
 import { Button } from '@/components/ui';
@@ -94,7 +94,7 @@ export const EnglishLearningToolbar = observer(function EnglishLearningToolbar({
 			{/* 标题区 */}
 			<div className="mb-4 flex items-start gap-3">
 				<div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-linear-to-r from-cyan-500 to-blue-600">
-					<Languages className="size-6 text-white" aria-hidden />
+					<Cog className="size-6 text-white" aria-hidden />
 				</div>
 				<div className="min-w-0">
 					<div className="text-textcolor leading-tight font-semibold tracking-tight">
@@ -126,14 +126,14 @@ export const EnglishLearningToolbar = observer(function EnglishLearningToolbar({
 						return (
 							<Button
 								key={c.key}
-								variant="link"
+								variant="outline"
 								size="sm"
 								aria-pressed={selected}
 								className={cn(
-									'border border-theme/10 bg-theme/5',
+									'border border-theme/10 bg-theme/5 hover:text-teal-500 hover:border-teal-500/20',
 									selected
 										? 'text-teal-500 border-teal-500/20'
-										: 'text-textcolor/60 hover:text-textcolor/90',
+										: 'text-textcolor/60',
 								)}
 								onClick={() => {
 									if (selected) {

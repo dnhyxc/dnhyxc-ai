@@ -25,7 +25,7 @@ export const MENUS: SidebarMenuConfig[] = [
 	},
 	{
 		nameKey: 'nav.englishLearning',
-		icon: 'Languages',
+		icon: 'Vegan',
 		path: '/english-learning',
 	},
 	// {

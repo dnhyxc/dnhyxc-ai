@@ -26,6 +26,7 @@ dist-ssr
 .env*
 .env.*
 .npmrc
+.pnpm-store
 
 # Tauri
 client/src-tauri/target

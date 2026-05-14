@@ -10,6 +10,7 @@ import {
 	Post,
 	Query,
 	Req,
+	Res,
 	Sse,
 	UnauthorizedException,
 	UseGuards,
@@ -237,6 +238,32 @@ export class EnglishLearningController {
 			{ limit, offset },
 		);
 		return { success: true, data };
+	}
+
+	/** 导出当前用户单词收藏为 DOCX（服务端拉全量至多 3000 条，与列表分页无关） */
+	@Get('vocabulary-favorites/export-docx')
+	async exportVocabularyFavoritesDocx(
+		@Req() req: AuthedRequest,
+		@Res() res: Response,
+	): Promise<void> {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const buf =
+			await this.englishLearningService.exportVocabularyFavoritesDocxBuffer(
+				userId,
+			);
+		res.setHeader(
+			'Content-Type',
+			'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+		);
+		res.setHeader(
+			'Content-Disposition',
+			'attachment; filename="english-vocabulary-favorites.docx"',
+		);
+		res.setHeader('Content-Length', String(buf.length));
+		res.end(buf);
 	}
 
 	/** 收藏当前单词（同一词形不重复落库） */
@@ -491,6 +518,32 @@ export class EnglishLearningController {
 				offset,
 			});
 		return { success: true, data };
+	}
+
+	/** 导出当前用户经典句收藏为 DOCX（服务端拉全量至多 3000 条） */
+	@Get('classic-quotes-favorites/export-docx')
+	async exportClassicQuoteFavoritesDocx(
+		@Req() req: AuthedRequest,
+		@Res() res: Response,
+	): Promise<void> {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const buf =
+			await this.englishLearningService.exportClassicQuoteFavoritesDocxBuffer(
+				userId,
+			);
+		res.setHeader(
+			'Content-Type',
+			'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+		);
+		res.setHeader(
+			'Content-Disposition',
+			'attachment; filename="english-classic-quote-favorites.docx"',
+		);
+		res.setHeader('Content-Length', String(buf.length));
+		res.end(buf);
 	}
 
 	/** 收藏经典句（同一内容键不重复落库） */

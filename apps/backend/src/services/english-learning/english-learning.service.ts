@@ -60,6 +60,10 @@ import {
 } from './english-classic-quote.entity';
 import { EnglishClassicQuoteFavorite } from './english-classic-quote-favorite.entity';
 import {
+	buildClassicQuoteFavoritesDocxBuffer,
+	buildVocabularyFavoritesDocxBuffer,
+} from './english-favorites-docx.builder';
+import {
 	EnglishPackWebSearchRecord,
 	type EnglishPackWebSearchRoundJson,
 } from './english-pack-web-search.entity';
@@ -2171,5 +2175,40 @@ export class EnglishLearningService {
 			noteZh: r.noteZh ?? '',
 			createdAt: r.createdAt.toISOString(),
 		}));
+	}
+
+	/** 导出收藏为 DOCX 时单次最多行数，避免超大文档占用内存 */
+	private static readonly FAVORITES_DOCX_EXPORT_MAX = 3000;
+
+	/** 当前用户单词收藏导出为 Word（最多 FAVORITES_DOCX_EXPORT_MAX 条，按收藏时间倒序） */
+	async exportVocabularyFavoritesDocxBuffer(userId: number): Promise<Buffer> {
+		const rows = await this.vocabFavoriteRepo.find({
+			where: { userId },
+			order: { createdAt: 'DESC' },
+			take: EnglishLearningService.FAVORITES_DOCX_EXPORT_MAX,
+		});
+		const list = rows.map((r) => ({
+			word: r.word,
+			ipa: r.ipa ?? '',
+			translationZh: r.translationZh ?? '',
+			example: r.example ?? '',
+		}));
+		return buildVocabularyFavoritesDocxBuffer(list);
+	}
+
+	/** 当前用户经典句收藏导出为 Word（最多 FAVORITES_DOCX_EXPORT_MAX 条，按收藏时间倒序） */
+	async exportClassicQuoteFavoritesDocxBuffer(userId: number): Promise<Buffer> {
+		const rows = await this.classicQuoteFavoriteRepo.find({
+			where: { userId },
+			order: { createdAt: 'DESC' },
+			take: EnglishLearningService.FAVORITES_DOCX_EXPORT_MAX,
+		});
+		const list = rows.map((r) => ({
+			english: r.english,
+			translationZh: r.translationZh ?? '',
+			source: r.source ?? '',
+			noteZh: r.noteZh ?? '',
+		}));
+		return buildClassicQuoteFavoritesDocxBuffer(list);
 	}
 }

@@ -11,9 +11,9 @@ import {
 	CircleUserRound,
 	Codesandbox,
 	House,
-	Languages,
 	LogOut,
 	Package,
+	Vegan,
 	WalletCards,
 } from 'lucide-react';
 import { useMemo } from 'react';
@@ -43,7 +43,7 @@ const Sidebar = () => {
 		Codesandbox: <Codesandbox />,
 		BookOpenText: <BookOpenText />,
 		WalletCards: <WalletCards />,
-		Languages: <Languages />,
+		Vegan: <Vegan />,
 	};
 
 	const visibleMenus = useMemo(() => {

@@ -563,8 +563,8 @@ function VocabularyPackSectionInner() {
 								className={cn(
 									'flex-1 rounded-md border bg-theme/5 px-2 py-1 text-xs font-medium transition-colors',
 									countInput === String(n)
-										? 'border-teal-500/35 bg-teal-500/10 text-textcolor'
-										: 'border-theme/10 text-textcolor/65 hover:border-theme/20 hover:bg-theme-secondary/60',
+										? 'border-teal-500/35 text-teal-500'
+										: 'border-theme/10 text-textcolor/65 hover:border-teal-500/20 hover:text-teal-500',
 								)}
 							>
 								{n}
