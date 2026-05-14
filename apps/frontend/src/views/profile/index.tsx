@@ -60,20 +60,35 @@ const Profile = observer(() => {
 	const navigate = useNavigate();
 
 	const u = userStore.userInfo;
-	const profile = u.profile;
+	const rawProfile = u?.profile;
+	// 接口或历史缓存可能缺少 profile / 为 null，避免对 null 做属性访问（Safari 等会报「null is not an object」）
+	const profile =
+		rawProfile != null && typeof rawProfile === 'object' ? rawProfile : null;
 	const avatarSrc = profile?.avatar
 		? resolveQiniuUrlForWebDisplay(profile.avatar)
 		: ICON;
 
 	const rolesText = useMemo(() => {
-		if (!u.roles?.length) return '—';
-		return u.roles.map((r) => r.name).join(locale === 'zh-CN' ? '、' : ', ');
-	}, [u.roles, locale]);
+		const roles = Array.isArray(u?.roles) ? u.roles : [];
+		if (!roles.length) return '—';
+		return roles
+			.map((r) =>
+				r && typeof r === 'object' ? (r as { name?: string }).name : '',
+			)
+			.filter(Boolean)
+			.join(locale === 'zh-CN' ? '、' : ', ');
+	}, [u?.roles, locale]);
 
 	/** 与账号设置一致：优先 profile.address，兼容接口顶层 address */
 	const addressText = useMemo(() => {
-		const fromProfile = (profile as { address?: string }).address;
-		const fromUser = (u as { address?: string }).address;
+		const fromProfile =
+			profile && typeof profile === 'object'
+				? (profile as { address?: string }).address
+				: undefined;
+		const fromUser =
+			u && typeof u === 'object'
+				? (u as { address?: string }).address
+				: undefined;
 		const raw =
 			(typeof fromProfile === 'string' ? fromProfile : '') ||
 			(typeof fromUser === 'string' ? fromUser : '');
@@ -81,17 +96,20 @@ const Profile = observer(() => {
 		return trimmed ? trimmed : '—';
 	}, [profile, u]);
 
-	const isPaidMember = useMemo(() => isPaidMemberFromUserInfo(u), [u]);
+	const isPaidMember = useMemo(
+		() => (u && typeof u === 'object' ? isPaidMemberFromUserInfo(u) : false),
+		[u],
+	);
 
 	const infoRows = useMemo(
 		() => [
 			{
 				label: t('account.fields.nickname'),
-				value: u.username?.trim() ? u.username : '—',
+				value: u?.username?.trim() ? u.username : '—',
 			},
 			{
 				label: t('account.fields.email'),
-				value: u.email?.trim() ? u.email : '—',
+				value: u?.email?.trim() ? u.email : '—',
 			},
 			{
 				label: t('account.fields.gender'),
@@ -106,10 +124,10 @@ const Profile = observer(() => {
 				value: rolesText,
 			},
 		],
-		[t, u.username, u.email, profile?.gender, rolesText, addressText],
+		[t, u?.username, u?.email, profile?.gender, rolesText, addressText],
 	);
 
-	const hasUser = u.id > 0;
+	const hasUser = Number(u?.id) > 0;
 
 	if (!hasUser) {
 		return (
@@ -170,7 +188,7 @@ const Profile = observer(() => {
 									<div className="min-w-0 space-y-1">
 										<div className="flex min-w-0 flex-wrap items-center justify-center gap-2 sm:justify-start">
 											<span className="truncate text-xl font-bold tracking-tight text-textcolor sm:text-3xl">
-												{u.username || t('nav.profile')}
+												{u?.username || t('nav.profile')}
 											</span>
 											{isPaidMember ? (
 												<span
@@ -199,7 +217,7 @@ const Profile = observer(() => {
 											)}
 										</div>
 										<p className="truncate text-base text-textcolor/70">
-											{u.email || '—'}
+											{u?.email || '—'}
 										</p>
 									</div>
 									<div className="flex flex-wrap items-center justify-center gap-3 sm:justify-start">
