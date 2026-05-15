@@ -11,6 +11,27 @@ function clip(s: string, max: number = FIELD_MAX): string {
 	return t.length <= max ? t : `${t.slice(0, max)}…`;
 }
 
+/**
+ * 导出 DOCX 时音标用斜线包裹（如 /ˈæpl/）。
+ * 若原文已带前导或尾随 `/`，只补缺失的一侧，避免重复。
+ */
+function formatIpaForDocxExport(ipa: string): string {
+	const t = ipa.trim();
+	if (!t) return '';
+	const hasLeading = t.startsWith('/');
+	const hasTrailing = t.endsWith('/');
+	if (hasLeading && hasTrailing) {
+		return t;
+	}
+	if (hasLeading) {
+		return `${t}/`;
+	}
+	if (hasTrailing) {
+		return `/${t}`;
+	}
+	return `/${t}/`;
+}
+
 /** 单词收藏：标题 + 逐条（词、音标、释义、例句） */
 export async function buildVocabularyFavoritesDocxBuffer(
 	rows: ReadonlyArray<{
@@ -49,7 +70,9 @@ export async function buildVocabularyFavoritesDocxBuffer(
 				new Paragraph({
 					children: [
 						new TextRun({ text: '音标：', bold: true }),
-						new TextRun({ text: clip(r.ipa, 500) }),
+						new TextRun({
+							text: clip(formatIpaForDocxExport(r.ipa), 500),
+						}),
 					],
 				}),
 			);
