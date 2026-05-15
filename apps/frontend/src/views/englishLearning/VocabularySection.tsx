@@ -507,21 +507,36 @@ function VocabularyPackSectionInner() {
 		EnglishPackStore.setVocabCountInput(String(clamped));
 	}, [countInput]);
 
+	// 导入单词
+	const onImportVocabulary = () => {
+		console.log('onImportVocabulary');
+	};
+
 	return (
 		<div className="rounded-none p-4 pb-0 @container min-w-0 mb-7.5">
-			<div className="mb-4 flex items-start gap-3">
+			<div className="mb-3.5 flex items-start gap-3">
 				<div className="bg-linear-to-r from-teal-500 to-cyan-600 @min-[26rem]:size-10 flex size-10 shrink-0 items-center justify-center rounded-md">
 					<BookText
 						className="text-white @min-[26rem]:size-6 size-6"
 						aria-hidden
 					/>
 				</div>
-				<div className="min-w-0 flex-1">
+				<div className="min-w-0 flex-1 flex flex-col justify-between">
 					<div className="text-textcolor font-semibold leading-tight">
 						{t('englishLearning.vocab.title')}
 					</div>
-					<div className="text-textcolor/50 mt-1 text-xs leading-snug">
+					<div className="h-5 flex items-center justify-between gap-2 text-textcolor/50 mt-1 text-xs leading-snug">
 						{t('englishLearning.vocab.descShort')}
+						<div className="flex items-center gap-2">
+							<Button
+								variant="link"
+								size="sm"
+								className="p-0! h-4 text-xs text-teal-500 hover:text-teal-400"
+								onClick={onImportVocabulary}
+							>
+								导入单词
+							</Button>
+						</div>
 					</div>
 				</div>
 			</div>
@@ -566,7 +581,7 @@ function VocabularyPackSectionInner() {
 					/>
 					<div
 						id="english-vocab-count-hint"
-						className="text-textcolor/40 mt-1.5 text-xs leading-snug"
+						className="text-textcolor/40 mt-2 mb-0.5 text-xs leading-snug"
 					>
 						{t('englishLearning.vocab.countHint')}
 					</div>

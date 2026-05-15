@@ -79,7 +79,7 @@ function SidebarPanel({
 	className?: string;
 }) {
 	return (
-		<div className={cn('rounded-none px-4 pb-4', className)}>{children}</div>
+		<div className={cn('rounded-none px-4 pb-3', className)}>{children}</div>
 	);
 }
 

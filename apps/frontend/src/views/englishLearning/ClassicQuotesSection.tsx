@@ -508,18 +508,33 @@ function ClassicQuotesSectionInner() {
 		EnglishPackStore.setClassicCountInput(String(clamped));
 	}, [countInput]);
 
+	// 导入语句
+	const onImportClassicQuotes = () => {
+		console.log('onImportClassicQuotes');
+	};
+
 	return (
 		<div className="rounded-none @container min-w-0 px-4 pb-0">
-			<div className="mb-4 flex items-start gap-3">
+			<div className="mb-3.5 flex items-start gap-3">
 				<div className="bg-linear-to-r from-violet-500 to-indigo-600 @min-[26rem]:size-11 flex size-10 shrink-0 items-center justify-center rounded-md">
 					<BookMarked className="text-white size-6" aria-hidden />
 				</div>
-				<div className="min-w-0">
+				<div className="min-w-0 flex-1 flex flex-col justify-between">
 					<div className="text-textcolor leading-tight font-semibold tracking-tight">
 						{t('englishLearning.classic.title')}
 					</div>
-					<div className="text-textcolor/50 @min-[26rem]:text-xs @min-[26rem]:mt-1.5 mt-1 text-xs leading-relaxed">
+					<div className="h-5 flex items-center justify-between gap-2  text-textcolor/50 mt-1 text-xs leading-relaxed">
 						{t('englishLearning.classic.descShort')}
+						<div className="flex items-center gap-2">
+							<Button
+								variant="link"
+								size="sm"
+								className="p-0! h-4 text-xs text-teal-500 hover:text-teal-400"
+								onClick={onImportClassicQuotes}
+							>
+								导入语句
+							</Button>
+						</div>
 					</div>
 				</div>
 			</div>
@@ -564,7 +579,7 @@ function ClassicQuotesSectionInner() {
 					/>
 					<div
 						id="english-classic-count-hint"
-						className="text-textcolor/40 mt-1.5 text-xs leading-snug"
+						className="text-textcolor/40 mt-2 mb-0.5 text-xs leading-snug"
 					>
 						{t('englishLearning.classic.countHint')}
 					</div>
