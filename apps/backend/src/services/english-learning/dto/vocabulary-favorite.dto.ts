@@ -2,6 +2,7 @@ import {
 	ArrayMaxSize,
 	IsArray,
 	IsNotEmpty,
+	IsOptional,
 	IsString,
 	MaxLength,
 } from 'class-validator';
@@ -16,6 +17,12 @@ export class VocabularyFavoriteBodyDto {
 	@IsString()
 	@MaxLength(2000)
 	ipa!: string;
+
+	/** 词性英文缩写（可选，与生成条目 pos 一致） */
+	@IsOptional()
+	@IsString()
+	@MaxLength(32)
+	pos?: string;
 
 	@IsString()
 	@MaxLength(8000)

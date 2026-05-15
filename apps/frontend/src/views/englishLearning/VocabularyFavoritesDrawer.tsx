@@ -389,9 +389,19 @@ export function VocabularyFavoritesDrawer({
 												<div className="min-w-0 flex-1">
 													<Label
 														htmlFor={`vocab-fav-${row.id}`}
-														className="select-text cursor-pointer truncate text-base font-semibold text-textcolor"
+														className="select-text flex min-w-0 cursor-pointer flex-wrap items-baseline gap-x-2 gap-y-0.5"
 													>
-														{row.word}
+														<span className="truncate text-base font-semibold text-textcolor">
+															{row.word}
+														</span>
+														{row.pos?.trim() ? (
+															<span
+																className="text-textcolor/50 shrink-0 text-xs font-medium tracking-wide"
+																title={t('englishLearning.vocab.pos')}
+															>
+																{row.pos}
+															</span>
+														) : null}
 													</Label>
 													<div className="mt-1 font-mono text-xs leading-snug text-teal-600/90 dark:text-teal-400/90">
 														{displayIpaWrapped(row.ipa)}

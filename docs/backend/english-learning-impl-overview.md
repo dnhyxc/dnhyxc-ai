@@ -33,6 +33,8 @@
 | `apps/frontend/src/i18n/locales/zh-CN.ts`、`en-US.ts` | chip 与 intent 前缀文案。 |
 | `apps/frontend/src/views/englishLearning/VocabularySection.tsx`、`ClassicQuotesSection.tsx` | 与生成流程相关的少量同步（若有）。 |
 
+> **专题补充（单词包词性 pos）**：`docs/backend/english-vocabulary-pos.md` — 拉取词条增加英文词性缩写、全链路解析/收藏/UI/DOCX。
+
 ---
 
 ## 3. 架构与数据流

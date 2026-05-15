@@ -29,6 +29,10 @@ export class EnglishVocabularyFavorite {
 	@Column({ type: 'varchar', length: 500, default: '' })
 	ipa!: string;
 
+	/** 词性英文缩写（如 n、v、adj），与单词包条目一致 */
+	@Column({ type: 'varchar', length: 32, default: '' })
+	pos!: string;
+
 	@Column({ name: 'translation_zh', type: 'text' })
 	translationZh!: string;
 

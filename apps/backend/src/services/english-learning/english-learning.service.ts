@@ -54,6 +54,7 @@ import {
 	resolveClassicQuotesPackTargetCount,
 	resolveVocabularyPackTargetCount,
 } from './dto/generate-vocabulary.dto';
+import type { VocabularyFavoriteBodyDto } from './dto/vocabulary-favorite.dto';
 import {
 	type EnglishClassicQuoteItemJson,
 	EnglishClassicQuotePackBatch,
@@ -107,6 +108,8 @@ export type ClassicQuoteHistoryListItem = {
 export type VocabularyItemDto = {
 	word: string;
 	ipa: string;
+	/** 词性英文缩写，如 n、v、adj（旧数据或解析失败时可为空串） */
+	pos: string;
 	translationZh: string;
 	example: string;
 };
@@ -488,6 +491,19 @@ export class EnglishLearningService {
 			return `【已收录节选】下列为近期已收录条目的节选（因长度已裁剪）；禁止与此前任意已收录条目重复（含未列出项）。\n${joined}`;
 		}
 		return joined;
+	}
+
+	/** 从 LLM JSON 行对象解析词性缩写（兼容多种键名） */
+	private parseVocabularyPosFromJsonRow(r: Record<string, unknown>): string {
+		const raw =
+			(typeof r.pos === 'string' && r.pos) ||
+			(typeof r.posAbbr === 'string' && r.posAbbr) ||
+			(typeof r.pos_abbr === 'string' && r.pos_abbr) ||
+			(typeof r.partOfSpeech === 'string' && r.partOfSpeech) ||
+			(typeof r.part_of_speech === 'string' && r.part_of_speech) ||
+			(typeof r.speech === 'string' && r.speech) ||
+			'';
+		return raw.trim().slice(0, 32);
 	}
 
 	/**
@@ -929,9 +945,11 @@ export class EnglishLearningService {
 							: '';
 			const example = typeof r.example === 'string' ? r.example.trim() : '';
 			if (!word || !ipa) continue;
+			const pos = this.parseVocabularyPosFromJsonRow(r);
 			out.push({
 				word,
 				ipa,
+				pos,
 				translationZh: translationZh || '—',
 				example: example || '—',
 			});
@@ -1845,6 +1863,7 @@ export class EnglishLearningService {
 				items.push({
 					word: it.word,
 					ipa: it.ipa,
+					pos: typeof it.pos === 'string' ? it.pos.trim().slice(0, 32) : '',
 					translationZh: it.translationZh || '—',
 					example: it.example || '—',
 				});
@@ -1986,7 +2005,7 @@ export class EnglishLearningService {
 	 */
 	async addVocabularyFavorite(
 		userId: number,
-		item: VocabularyItemDto,
+		item: VocabularyFavoriteBodyDto,
 	): Promise<{ created: boolean; id: string | null }> {
 		const wordKey = this.normalizeVocabularyFavoriteWordKey(item.word);
 		if (!wordKey) {
@@ -2003,6 +2022,7 @@ export class EnglishLearningService {
 			wordKey,
 			word: item.word.trim(),
 			ipa: typeof item.ipa === 'string' ? item.ipa : '',
+			pos: typeof item.pos === 'string' ? item.pos.trim().slice(0, 32) : '',
 			translationZh: item.translationZh ?? '',
 			example: item.example ?? '',
 		});
@@ -2126,6 +2146,7 @@ export class EnglishLearningService {
 			id: string;
 			word: string;
 			ipa: string;
+			pos: string;
 			translationZh: string;
 			example: string;
 			createdAt: string;
@@ -2141,6 +2162,7 @@ export class EnglishLearningService {
 			id: r.id,
 			word: r.word,
 			ipa: r.ipa ?? '',
+			pos: r.pos ?? '',
 			translationZh: r.translationZh ?? '',
 			example: r.example ?? '',
 			createdAt: r.createdAt.toISOString(),
@@ -2190,6 +2212,7 @@ export class EnglishLearningService {
 		const list = rows.map((r) => ({
 			word: r.word,
 			ipa: r.ipa ?? '',
+			pos: r.pos ?? '',
 			translationZh: r.translationZh ?? '',
 			example: r.example ?? '',
 		}));

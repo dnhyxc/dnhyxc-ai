@@ -463,6 +463,8 @@ export const stopAgentStream = async (body: { sessionId: string }) => {
 export type EnglishVocabularyItem = {
 	word: string;
 	ipa: string;
+	/** 词性英文缩写，如 n、v、adj（旧接口可能缺省，按空串处理） */
+	pos: string;
 	translationZh: string;
 	example: string;
 };
@@ -572,6 +574,7 @@ export type EnglishVocabularyFavoriteListEntry = {
 	id: string;
 	word: string;
 	ipa: string;
+	pos: string;
 	translationZh: string;
 	example: string;
 	createdAt: string;

@@ -698,7 +698,7 @@ export const zhCN = {
 	'englishLearning.agentTool.querySuffix': '：{q}',
 	'englishLearning.agentTool.statusDoing': '资料助手 · {action} 进行中{detail}',
 	'englishLearning.agentTool.statusDone': '资料助手 · {action} 已完成',
-	'englishLearning.webSearch.viewPages': '查看本次联网检索网页（{n}）',
+	'englishLearning.webSearch.viewPages': '联网检索网页（{n}）',
 	'englishLearning.webSearch.viewPagesTitle': '本次联网搜索结果（{n}）',
 	'englishLearning.packHistory.webSearchRounds': '联网 {n} 次',
 
@@ -748,6 +748,7 @@ export const zhCN = {
 	'englishLearning.vocab.generate': '拉取单词表',
 	'englishLearning.vocab.empty': '未返回词条，请换主题重试',
 	'englishLearning.vocab.playWord': '朗读该词',
+	'englishLearning.vocab.pos': '词性（英文缩写，如 n、v、adj）',
 	'englishLearning.vocab.favoriteWord': '收藏该词',
 	'englishLearning.vocab.unfavoriteWord': '取消收藏',
 	'englishLearning.vocab.listHeading': '单词列表',

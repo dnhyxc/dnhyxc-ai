@@ -10,6 +10,8 @@ import {
 export type EnglishVocabularyPackItemJson = {
 	word: string;
 	ipa: string;
+	/** 词性英文缩写，如 n / v / adj（旧数据可能缺省） */
+	pos?: string;
 	translationZh: string;
 	example: string;
 };

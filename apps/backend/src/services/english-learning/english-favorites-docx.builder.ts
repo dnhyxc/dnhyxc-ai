@@ -16,6 +16,7 @@ export async function buildVocabularyFavoritesDocxBuffer(
 	rows: ReadonlyArray<{
 		word: string;
 		ipa: string;
+		pos: string;
 		translationZh: string;
 		example: string;
 	}>,
@@ -49,6 +50,16 @@ export async function buildVocabularyFavoritesDocxBuffer(
 					children: [
 						new TextRun({ text: '音标：', bold: true }),
 						new TextRun({ text: clip(r.ipa, 500) }),
+					],
+				}),
+			);
+		}
+		if (r.pos?.trim()) {
+			children.push(
+				new Paragraph({
+					children: [
+						new TextRun({ text: '词性：', bold: true }),
+						new TextRun({ text: clip(r.pos, 64) }),
 					],
 				}),
 			);

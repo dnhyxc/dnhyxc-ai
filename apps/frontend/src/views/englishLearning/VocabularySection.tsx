@@ -722,8 +722,18 @@ function VocabularyPackSectionInner() {
 									>
 										<div className="flex items-start justify-between gap-2">
 											<div className="min-w-0 flex-1">
-												<div className="truncate text-lg font-semibold text-textcolor @min-[26rem]:text-base">
-													{item.word}
+												<div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
+													<div className="truncate text-lg font-semibold text-textcolor @min-[26rem]:text-base">
+														{item.word}
+													</div>
+													{item.pos?.trim() ? (
+														<span
+															className="text-textcolor/55 shrink-0 text-xs font-medium tracking-wide"
+															title={t('englishLearning.vocab.pos')}
+														>
+															{item.pos}
+														</span>
+													) : null}
 												</div>
 												<div className="font-mono text-xs leading-snug text-teal-600/90 @min-[26rem]:text-xs dark:text-teal-400/90">
 													{displayIpaWrapped(item.ipa)}

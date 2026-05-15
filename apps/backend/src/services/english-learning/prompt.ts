@@ -97,11 +97,12 @@ export const VOCABULARY_PACK_SUBMODEL_SYSTEM_STATIC = `
 # Output Format
 严格输出单个 JSON 对象，不要 Markdown，不要代码围栏，不要任何解释文字。
 格式规范：
-{"items":[{"word":"","ipa":"","translationZh":"","example":""}]}
+{"items":[{"word":"","ipa":"","pos":"","translationZh":"","example":""}]}
 
 字段要求：
 - word：英文单词或短语（无序号前缀，严格去重）
 - ipa：英式或美式 IPA 音标，使用 Unicode 符号（如 ˈæpl），直接写入字符串，不要加斜杠 // 或方括号 []
+- pos：**词性缩写**（英文标记，小写优先，1～12 字符）。须与 word 在该义项下的主要词性一致；短语可用 phr.、phr.v.、phr.n. 等。常用：n（名词）、v（动词）、adj（形容词）、adv（副词）、prep（介词）、conj（连词）、pron（代词）、det（限定词）、num（数词）、int（感叹词）、abbr（缩写专有）、phr.（短语/固定搭配）等。
 - translationZh：简明中文释义（优先贴合当前主题语境）
 - example：地道英文例句，展示该词用法
 

@@ -47,6 +47,7 @@ function parseVocabItems(raw: unknown): EnglishVocabularyItem[] {
 		out.push({
 			word: o.word,
 			ipa: o.ipa,
+			pos: typeof o.pos === 'string' ? o.pos.trim().slice(0, 32) : '',
 			translationZh:
 				typeof o.translationZh === 'string' ? o.translationZh : '—',
 			example: typeof o.example === 'string' ? o.example : '—',

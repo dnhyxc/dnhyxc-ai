@@ -7,7 +7,7 @@
 	"license": "UNLICENSED",
 	"scripts": {
 		"prebuid": "rimraf dist",
-		"build": "cross-env NODE_ENV=production nest build",
+		"build": "cross-env NODE_ENV=production nest build && node -e \"require('node:fs').mkdirSync('dist/scripts',{recursive:true});require('node:fs').copyFileSync('scripts/typeorm-prod.cjs','dist/scripts/typeorm-prod.cjs')\"",
 		"dist:zip": "rm -f dist.zip && cd dist && zip -qr ../dist.zip .",
 		"deploy:ssh": "pnpm build && pnpm dist:zip && node ../../packages/ci/dist/cli.js ssh:deploy -c ./deploy.backend.json",
 		"start": "nest start",
@@ -22,13 +22,16 @@
 		"test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
 		"test:e2e": "jest --config ./test/jest-e2e.json",
 		"typeorm": "typeorm-ts-node-commonjs -d ormconfig.ts",
-		"typeorm:prod": "typeorm -d dist/ormconfig.js",
+		"m:c": "f() { npm run typeorm migration:create -p \"./src/migrations/$@\"; }; f",
 		"m:g": "f() { npm run typeorm migration:generate -p \"./src/migrations/$@\"; }; f",
-		"m:c": "typeorm-ts-node-commonjs migration:create",
 		"m:run": "npm run typeorm migration:run",
-		"m:run:prod": "npm run typeorm:prod migration:run",
 		"m:revert": "npm run typeorm migration:revert",
 		"m:revert:prod": "npm run typeorm:prod migration:revert",
+		"typeorm:prod": "cross-env NODE_ENV=production node dist/scripts/typeorm-prod.cjs",
+		"m:g:prod": "f() { npm run typeorm:prod migration:generate \"$@\"; }; f",
+		"m:c:prod": "f() { npm run typeorm:prod migration:create \"$@\"; }; f",
+		"m:run:prod": "npm run typeorm:prod migration:run",
+		"m:show:prod": "npm run typeorm:prod migration:show",
 		"schema:drop": "npm run typeorm schema:drop"
 	},
 	"dependencies": {

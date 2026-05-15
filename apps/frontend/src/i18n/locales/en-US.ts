@@ -782,7 +782,7 @@ export const enUS = {
 	'englishLearning.agentTool.statusDoing':
 		'Research · {action} in progress{detail}',
 	'englishLearning.agentTool.statusDone': 'Research · {action} done',
-	'englishLearning.webSearch.viewPages': 'View web results from this run ({n})',
+	'englishLearning.webSearch.viewPages': 'Web search ({n})',
 	'englishLearning.webSearch.viewPagesTitle': 'This web search results ({n})',
 	'englishLearning.packHistory.webSearchRounds': 'Web search ×{n}',
 
@@ -836,6 +836,7 @@ export const enUS = {
 	'englishLearning.vocab.generate': 'Fetch word list',
 	'englishLearning.vocab.empty': 'No items returned; try another topic',
 	'englishLearning.vocab.playWord': 'Play word',
+	'englishLearning.vocab.pos': 'Part of speech (e.g. n, v, adj)',
 	'englishLearning.vocab.favoriteWord': 'Save word',
 	'englishLearning.vocab.unfavoriteWord': 'Remove from saved',
 	'englishLearning.vocab.listHeading': 'Words',
