@@ -226,6 +226,7 @@ export const enUS = {
 
 	// 头部切换语言文案
 	'header.toggleLanguage': 'Toggle language',
+	'header.breadcrumbNav': 'Breadcrumb',
 
 	// Monaco 编辑器文案
 	'monaco.placeholder': '# Start writing…',

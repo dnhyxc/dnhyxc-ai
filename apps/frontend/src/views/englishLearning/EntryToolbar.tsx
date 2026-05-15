@@ -118,7 +118,7 @@ export const EntryToolbar = observer(function EntryToolbar({
 					</Button>
 					<Button
 						variant="link"
-						className="lucide-stroke-draw-hover flex items-center text-sm hover:bg-theme/10 border border-theme/10 h-8 rounded-md [&_svg]:overflow-visible hover:text-teal-500"
+						className="lucide-stroke-draw-hover text-textcolor/80 flex items-center text-sm hover:bg-theme/10 border border-theme/10 h-8 rounded-md [&_svg]:overflow-visible hover:text-teal-500"
 						aria-label={t('englishLearning.vocab.historyOpenDrawer')}
 						disabled={isSessionSwitcherLocked}
 						onClick={() => {

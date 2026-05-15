@@ -397,7 +397,7 @@ export default function EnglishLearningImportPage() {
 								if (rejected.length > 0) onDropZoneReject();
 							}}
 						>
-							<div className="pointer-events-none flex h-full min-h-0 flex-col items-center justify-center gap-2 px-4 text-center text-sm">
+							<div className="mb-10 pointer-events-none flex h-full min-h-0 flex-col items-center justify-center gap-2 px-4 text-center text-sm">
 								<CloudUpload
 									className="size-18 text-theme opacity-50 group-hover:opacity-70"
 									aria-hidden

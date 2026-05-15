@@ -1,4 +1,4 @@
-import { Languages, Settings, Shirt } from 'lucide-react';
+import { ChevronRight, Languages, Settings, Shirt } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { useI18n, useStorageInfo } from '@/hooks';
@@ -9,6 +9,9 @@ interface Iprops {
 	actions?: boolean;
 	ccustomActions?: React.ReactNode;
 }
+
+/** 顶栏面包屑单项：titleKey 走 i18n，path 为可导航的绝对 pathname */
+type HeaderBreadcrumbCrumb = { titleKey: string; path: string };
 
 const Header: React.FC<Iprops> = ({ actions = true, ccustomActions }) => {
 	const [autoUpdate, setAutoUpdate] = useState(false);
@@ -43,7 +46,7 @@ const Header: React.FC<Iprops> = ({ actions = true, ccustomActions }) => {
 	const navigate = useNavigate();
 	const location = useLocation();
 
-	const title = useMemo(() => {
+	const { breadcrumbTrail, headerTitleKey } = useMemo(() => {
 		const metaOf = (r: RouteConfig) => r.meta?.titleKey || r.meta?.title;
 
 		/** 将当前 route 与父级前缀拼成绝对 pathname（与 React Router 嵌套路由一致） */
@@ -87,10 +90,85 @@ const Header: React.FC<Iprops> = ({ actions = true, ccustomActions }) => {
 			return undefined;
 		};
 
-		return (
+		/** 相邻两级 meta 标题相同（如 layout 与 index 同 titleKey）时只保留一项 */
+		const dedupeAdjacentTitleKeys = (items: HeaderBreadcrumbCrumb[]) => {
+			const out: HeaderBreadcrumbCrumb[] = [];
+			for (const it of items) {
+				if (out.length > 0 && out[out.length - 1].titleKey === it.titleKey) {
+					continue;
+				}
+				out.push(it);
+			}
+			return out;
+		};
+
+		/**
+		 * 在嵌套路由树中收集从根到当前 pathname 的 meta 链，用于面包屑。
+		 * 策略：先递归子路由再判断当前节点是否精确匹配 pathname，避免父 path 与 index 子 path 相同时误跳过子节点。
+		 */
+		const findBreadcrumbTrail = (
+			routeList: RouteConfig[],
+			pathname: string,
+			parentBase: string,
+			prefix: HeaderBreadcrumbCrumb[],
+		): HeaderBreadcrumbCrumb[] | null => {
+			for (const route of routeList) {
+				const absolute = resolveAbsolute(route, parentBase);
+				const titleK = metaOf(route);
+				const parentCrumb =
+					titleK && absolute
+						? ({
+								titleKey: titleK,
+								path: absolute,
+							} satisfies HeaderBreadcrumbCrumb)
+						: null;
+
+				if (route.children?.length) {
+					const nextBase = absolute ?? parentBase;
+					const extendedPrefix = parentCrumb
+						? [...prefix, parentCrumb]
+						: prefix;
+					const hit = findBreadcrumbTrail(
+						route.children,
+						pathname,
+						nextBase,
+						extendedPrefix,
+					);
+					if (hit) return hit;
+				}
+
+				if (absolute === pathname && titleK && absolute) {
+					return [
+						...prefix,
+						{
+							titleKey: titleK,
+							path: absolute,
+						} satisfies HeaderBreadcrumbCrumb,
+					];
+				}
+			}
+			return null;
+		};
+
+		const rawTrail =
+			findBreadcrumbTrail(routes, location.pathname, '', []) ?? [];
+		const trail = dedupeAdjacentTitleKeys(rawTrail);
+
+		if (trail.length >= 2) {
+			return { breadcrumbTrail: trail, headerTitleKey: undefined };
+		}
+		if (trail.length === 1) {
+			return {
+				breadcrumbTrail: null,
+				headerTitleKey: trail[0].titleKey,
+			};
+		}
+
+		const single =
 			findRouteTitle(routes, location.pathname, '') ??
-			routes.find((i) => i.path === '/chat/:id?')?.meta?.title
-		);
+			routes.find((i) => i.path === '/chat/:id?')?.meta?.title;
+
+		return { breadcrumbTrail: null, headerTitleKey: single };
 	}, [location.pathname]);
 
 	const toSetting = () => {
@@ -109,9 +187,45 @@ const Header: React.FC<Iprops> = ({ actions = true, ccustomActions }) => {
 			>
 				<div
 					data-tauri-drag-region
-					className="text-xl font-bold font-['手札体-简'] cursor-default text-theme"
+					className="min-w-0 flex-1 text-xl font-bold font-['手札体-简'] text-theme"
 				>
-					{title ? t(title) : t('common.appTitle')}
+					{breadcrumbTrail ? (
+						<nav
+							aria-label={t('header.breadcrumbNav')}
+							className="flex min-w-0 items-center gap-0.5"
+						>
+							{breadcrumbTrail.map((c, i) => (
+								<span
+									key={`${c.path}:${c.titleKey}:${i}`}
+									className="flex min-w-0 items-center gap-0.5"
+								>
+									{i > 0 ? (
+										<ChevronRight
+											className="size-4 shrink-0 opacity-50"
+											aria-hidden
+										/>
+									) : null}
+									{i < breadcrumbTrail.length - 1 ? (
+										<button
+											type="button"
+											className="cursor-pointer truncate border-0 bg-transparent p-0 font-['手札体-简'] text-xl font-bold text-theme/80 transition-colors hover:text-theme"
+											onClick={() => void navigate(c.path)}
+										>
+											{t(c.titleKey)}
+										</button>
+									) : (
+										<span className="cursor-default truncate text-theme">
+											{t(c.titleKey)}
+										</span>
+									)}
+								</span>
+							))}
+						</nav>
+					) : (
+						<div className="cursor-default truncate">
+							{headerTitleKey ? t(headerTitleKey) : t('common.appTitle')}
+						</div>
+					)}
 				</div>
 				{actions ? (
 					<div

@@ -212,6 +212,7 @@ export const zhCN = {
 	'setting.language.current': '当前语言：{lang}',
 
 	'header.toggleLanguage': '切换语言',
+	'header.breadcrumbNav': '面包屑导航',
 
 	'monaco.placeholder': '# 输入内容...',
 	'monaco.topBar.bottomBar': '操作栏',
