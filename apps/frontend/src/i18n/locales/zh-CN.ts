@@ -643,6 +643,35 @@ export const zhCN = {
 	'route.chat.title': '智能对话',
 	'route.englishLearning.title': '英语学习',
 	'route.englishLearning.subtitle': '学习配置',
+	'route.englishLearning.import.title': '导入学习资料',
+
+	'englishLearning.import.titleVocab': '导入单词（JSON）',
+	'englishLearning.import.titleClassic': '导入经典语句（JSON）',
+	'englishLearning.import.back': '返回英语学习',
+	'englishLearning.import.selectFile': '选择 JSON 文件',
+	'englishLearning.import.hintVocab':
+		'支持顶层为数组，或含 items 数组的对象。每项至少需要 word 与 ipa，可选 pos、translationZh、example。数据示例如下：',
+	'englishLearning.import.hintClassic':
+		'支持顶层为数组，或含 items 数组的对象。每项至少需要 english 与 translationZh，可选 source、noteZh。数据示例如下：',
+	'englishLearning.import.preview': 'JSON 预览',
+	'englishLearning.import.parseError': '无法解析为合法 JSON',
+	'englishLearning.import.readError': '读取文件失败',
+	'englishLearning.import.validateError': '结构校验未通过：',
+	'englishLearning.import.err.expect-array': '需要为数组或 { "items": [...] }',
+	'englishLearning.import.err.no-vocab':
+		'未解析到有效单词（每项需含非空 word 与 ipa）',
+	'englishLearning.import.err.no-classic':
+		'未解析到有效语句（每项需含非空 english 与 translationZh）',
+	'englishLearning.import.parsedCount': '已解析 {count} 条',
+	'englishLearning.import.apply': '导入到左侧列表',
+	'englishLearning.import.applySuccess': '已写入左侧列表',
+	'englishLearning.import.dropReject': '请拖拽或选择 .json 文件',
+	'englishLearning.import.titlePlaceholder': '请先输入标题...',
+	'englishLearning.import.saveToVocab': '保存到单词库',
+	'englishLearning.import.saveToClassic': '保存到经典语句库',
+	'englishLearning.import.titleRequired': '请先输入标题',
+	'englishLearning.import.needParsed': '请先上传并成功解析 JSON 后再保存',
+	'englishLearning.import.reupload': '重新上传',
 
 	'englishLearning.toolbarSubtitle': '左侧选主题与单词，右侧对话练习',
 	'englishLearning.toolbarSubtitleShort': '可选快捷意图，或直接在右侧对话',
@@ -727,6 +756,7 @@ export const zhCN = {
 	'englishLearning.vocab.desc':
 		'按你的主题生成一批单词：含国际音标（IPA）、中文释义与例句。点击小喇叭可朗读该英文单词（云端 TTS 优先）。',
 	'englishLearning.vocab.descShort': '按主题生成单词表',
+	'englishLearning.vocab.import': '导入单词',
 	'englishLearning.vocab.topicFieldLabel': '学习主题',
 	'englishLearning.vocab.topicPlaceholder':
 		'例如：商务会议常用动词、旅游问路、易混形近词、本月四级高频词…',
@@ -770,10 +800,11 @@ export const zhCN = {
 	'englishLearning.vocab.historyWords': '{count} 词',
 	'englishLearning.vocab.historyLoad': '载入',
 	'englishLearning.vocab.historyLoaded': '已载入该次单词列表',
-	'englishLearning.vocab.historyLoading': '加载历史…',
+	'englishLearning.vocab.historyLoading': '加载历史...',
 
 	'englishLearning.classic.title': '经典语句',
 	'englishLearning.classic.descShort': '按主题拉取名句、短语等',
+	'englishLearning.classic.import': '导入语句',
 	'englishLearning.classic.topicFieldLabel': '主题 / 方向',
 	'englishLearning.classic.topicPlaceholder':
 		'例如：关于勇气的名言、《傲慢与偏见》节选、励志演讲金句、莎士比亚十四行…',
@@ -815,7 +846,7 @@ export const zhCN = {
 	'englishLearning.classic.historyEmpty': '暂无记录',
 	'englishLearning.classic.historyQuotes': '{count} 条',
 	'englishLearning.classic.historyLoaded': '已载入该次语句列表',
-	'englishLearning.classic.historyLoading': '加载历史…',
+	'englishLearning.classic.historyLoading': '加载历史...',
 
 	'englishLearning.tts.play': '朗读',
 	'englishLearning.tts.stop': '停止',

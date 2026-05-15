@@ -243,6 +243,11 @@ interface MarkdownEditorProps {
 		| React.ReactNode
 		| null
 		| ((ctx: MarkdownBottomBarCustomNodeContext) => React.ReactNode);
+	/**
+	 * 紧凑模式：隐藏顶栏（标题/工具区），编辑区域在父级 flex 布局下占满剩余高度。
+	 * 请与外层 `h-full min-h-0 flex-1` 及 `height="100%"` 配合使用。
+	 */
+	compactChrome?: boolean;
 }
 
 const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
@@ -284,6 +289,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	diffBaselineText,
 	onInsertSelectionToAssistant,
 	customBottomBarNode = null,
+	compactChrome = false,
 }) => {
 	/** 底部 Markdown 操作条是否展开（受控或未传 props 时内部 state） */
 	const [internalMarkdownBottomBarOpen, setInternalMarkdownBottomBarOpen] =
@@ -735,7 +741,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 			requestAnimationFrame(() => applyEditorLayoutRef.current?.());
 		};
 		queueMicrotask(run);
-	}, [height, viewMode, isMarkdown]);
+	}, [height, viewMode, isMarkdown, compactChrome]);
 
 	/**
 	 * 不向 Editor 传受控 value；外部正文与模型不一致时 setValue。
@@ -1484,51 +1490,67 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 		resetMarkdownBottomBarPosition: resetBottomBarPosition,
 	});
 
+	const editorPixelHeight = compactChrome ? '100%' : height;
+
 	return (
 		<div
-			className={cn('relative min-w-0 max-w-full overflow-hidden', className)}
+			className={cn(
+				'relative min-w-0 max-w-full overflow-hidden',
+				compactChrome && 'flex h-full min-h-0 flex-col',
+				className,
+			)}
 			ref={rootRef}
 		>
-			<div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-md bg-theme/5">
-				<div
-					className={cn(
-						'flex h-10 min-w-0 shrink-0 items-center gap-2 border-b border-theme/5',
-					)}
-				>
-					<div className="min-w-0 flex-1">{title}</div>
-					<div className="flex min-w-0 shrink-0 items-center justify-end">
-						{showTabBar && markdownBottomBarEnabled ? (
-							<Tooltip
-								side="bottom"
-								content={markdownBottomBarShortcutHint ?? 'Meta + Shift + B'}
-							>
-								<Button
-									variant="link"
-									aria-label={bottomBarAriaLabel}
-									aria-expanded={internalMarkdownBottomBarOpen}
-									// 指定受控元素的 ID，以便屏幕阅读器辅助导航关联此按钮和 Markdown 底部操作栏
-									aria-controls={markdownBottomBarId}
-									onClick={toggleMarkdownBottomBar}
-									className="lucide-stroke-draw-hover"
+			<div
+				className={cn(
+					'flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-md bg-theme/5',
+					compactChrome && 'min-h-0 flex-1',
+				)}
+			>
+				{!compactChrome ? (
+					<div
+						className={cn(
+							'flex h-10 min-w-0 shrink-0 items-center gap-2 border-b border-theme/5',
+						)}
+					>
+						<div className="min-w-0 flex-1">{title}</div>
+						<div className="flex min-w-0 shrink-0 items-center justify-end">
+							{showTabBar && markdownBottomBarEnabled ? (
+								<Tooltip
+									side="bottom"
+									content={markdownBottomBarShortcutHint ?? 'Meta + Shift + B'}
 								>
-									<div className="flex items-center gap-1">
-										{internalMarkdownBottomBarOpen ? (
-											<PanelTopOpen className="mt-0.5" />
-										) : (
-											<PanelTopClose className="mt-0.5" />
-										)}
-										<span className="mt-0.5">{bottomBarLabel}</span>
-									</div>
-								</Button>
-							</Tooltip>
-						) : null}
-						{toolbar ?? null}
+									<Button
+										variant="link"
+										aria-label={bottomBarAriaLabel}
+										aria-expanded={internalMarkdownBottomBarOpen}
+										// 指定受控元素的 ID，以便屏幕阅读器辅助导航关联此按钮和 Markdown 底部操作栏
+										aria-controls={markdownBottomBarId}
+										onClick={toggleMarkdownBottomBar}
+										className="lucide-stroke-draw-hover"
+									>
+										<div className="flex items-center gap-1">
+											{internalMarkdownBottomBarOpen ? (
+												<PanelTopOpen className="mt-0.5" />
+											) : (
+												<PanelTopClose className="mt-0.5" />
+											)}
+											<span className="mt-0.5">{bottomBarLabel}</span>
+										</div>
+									</Button>
+								</Tooltip>
+							) : null}
+							{toolbar ?? null}
+						</div>
 					</div>
-				</div>
+				) : null}
 
 				<div
-					className="box-border min-h-0 min-w-0 max-w-full overflow-hidden"
-					style={{ height }}
+					className={cn(
+						'box-border min-h-0 min-w-0 max-w-full overflow-hidden',
+						compactChrome && 'flex min-h-0 flex-1 flex-col',
+					)}
+					style={compactChrome ? undefined : { height }}
 				>
 					{/* 非 Markdown：保持单栏编辑器渲染 */}
 					{!isMarkdown ? (
@@ -1538,7 +1560,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 								className="box-border h-full min-h-0 min-w-0 max-w-full w-full overflow-hidden contain-[inline-size]"
 							>
 								<Editor
-									height={height}
+									height={editorPixelHeight}
 									width="100%"
 									language={language}
 									path={monacoModelPath}

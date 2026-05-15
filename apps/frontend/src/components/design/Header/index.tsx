@@ -44,22 +44,53 @@ const Header: React.FC<Iprops> = ({ actions = true, ccustomActions }) => {
 	const location = useLocation();
 
 	const title = useMemo(() => {
+		const metaOf = (r: RouteConfig) => r.meta?.titleKey || r.meta?.title;
+
+		/** 将当前 route 与父级前缀拼成绝对 pathname（与 React Router 嵌套路由一致） */
+		const resolveAbsolute = (
+			route: RouteConfig,
+			parentBase: string,
+		): string | null => {
+			if (route.index) {
+				return parentBase || null;
+			}
+			if (!route.path) return null;
+			if (route.path.startsWith('/')) {
+				return route.path;
+			}
+			if (!parentBase) {
+				return `/${route.path}`.replace(/\/+/g, '/');
+			}
+			return `${parentBase.replace(/\/$/, '')}/${route.path}`.replace(
+				/\/+/g,
+				'/',
+			);
+		};
+
 		const findRouteTitle = (
-			routes: RouteConfig[],
+			routeList: RouteConfig[],
 			pathname: string,
+			parentBase: string,
 		): string | undefined => {
-			for (const route of routes) {
-				if (route.path === pathname) {
-					return route.meta?.titleKey || route.meta?.title;
+			for (const route of routeList) {
+				const absolute = resolveAbsolute(route, parentBase);
+				if (absolute === pathname) {
+					const m = metaOf(route);
+					if (m) return m;
 				}
-				if (route.children) {
-					const childTitle = findRouteTitle(route.children, pathname);
-					if (childTitle) return childTitle;
+				if (route.children?.length) {
+					const nextBase = absolute ?? parentBase;
+					const nested = findRouteTitle(route.children, pathname, nextBase);
+					if (nested) return nested;
 				}
 			}
-			return routes.find((i) => i.path === '/chat/:id?')?.meta?.title;
+			return undefined;
 		};
-		return findRouteTitle(routes, location.pathname);
+
+		return (
+			findRouteTitle(routes, location.pathname, '') ??
+			routes.find((i) => i.path === '/chat/:id?')?.meta?.title
+		);
 	}, [location.pathname]);
 
 	const toSetting = () => {

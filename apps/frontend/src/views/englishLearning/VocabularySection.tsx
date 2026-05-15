@@ -20,6 +20,7 @@ import {
 	useRef,
 	useState,
 } from 'react';
+import { useNavigate } from 'react-router';
 import {
 	COUNT_PRESETS,
 	SCROLL_LOAD_THRESHOLD_PX,
@@ -62,6 +63,7 @@ export type VocabProgressState = EnglishPackUiProgress;
 
 function VocabularyPackSectionInner() {
 	const { t } = useI18n();
+	const navigate = useNavigate();
 
 	const loading = EnglishPackStore.vocabLoading;
 	const agentToolLine = EnglishPackStore.vocabAgentToolLine;
@@ -507,10 +509,10 @@ function VocabularyPackSectionInner() {
 		EnglishPackStore.setVocabCountInput(String(clamped));
 	}, [countInput]);
 
-	// 导入单词
-	const onImportVocabulary = () => {
-		console.log('onImportVocabulary');
-	};
+	// 导入单词：跳转独立导入页
+	const onImportVocabulary = useCallback(() => {
+		navigate('/english-learning/import?kind=vocab');
+	}, [navigate]);
 
 	return (
 		<div className="rounded-none p-4 pb-0 @container min-w-0 mb-7.5">
@@ -534,7 +536,7 @@ function VocabularyPackSectionInner() {
 								className="p-0! h-4 text-xs text-teal-500 hover:text-teal-400"
 								onClick={onImportVocabulary}
 							>
-								导入单词
+								{t('englishLearning.vocab.import')}
 							</Button>
 						</div>
 					</div>

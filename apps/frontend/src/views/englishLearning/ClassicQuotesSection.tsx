@@ -20,6 +20,7 @@ import {
 	useRef,
 	useState,
 } from 'react';
+import { useNavigate } from 'react-router';
 import {
 	COUNT_PRESETS,
 	HISTORY_PAGE_SIZE,
@@ -62,6 +63,7 @@ export type ClassicQuoteProgressState = EnglishPackUiProgress;
 
 function ClassicQuotesSectionInner() {
 	const { t } = useI18n();
+	const navigate = useNavigate();
 
 	const loading = EnglishPackStore.classicLoading;
 	const agentToolLine = EnglishPackStore.classicAgentToolLine;
@@ -508,10 +510,10 @@ function ClassicQuotesSectionInner() {
 		EnglishPackStore.setClassicCountInput(String(clamped));
 	}, [countInput]);
 
-	// 导入语句
-	const onImportClassicQuotes = () => {
-		console.log('onImportClassicQuotes');
-	};
+	// 导入语句：跳转独立导入页
+	const onImportClassicQuotes = useCallback(() => {
+		navigate('/english-learning/import?kind=classic');
+	}, [navigate]);
 
 	return (
 		<div className="rounded-none @container min-w-0 px-4 pb-0">
@@ -532,7 +534,7 @@ function ClassicQuotesSectionInner() {
 								className="p-0! h-4 text-xs text-teal-500 hover:text-teal-400"
 								onClick={onImportClassicQuotes}
 							>
-								导入语句
+								{t('englishLearning.classic.import')}
 							</Button>
 						</div>
 					</div>

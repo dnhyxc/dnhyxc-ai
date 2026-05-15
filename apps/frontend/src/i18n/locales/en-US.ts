@@ -724,6 +724,38 @@ export const enUS = {
 	'route.chat.title': 'Smart Chat',
 	'route.englishLearning.title': 'English learning',
 	'route.englishLearning.subtitle': 'Learning configuration',
+	'route.englishLearning.import.title': 'Import study data',
+
+	'englishLearning.import.titleVocab': 'Import vocabulary (JSON)',
+	'englishLearning.import.titleClassic': 'Import classic quotes (JSON)',
+	'englishLearning.import.back': 'Back to English learning',
+	'englishLearning.import.selectFile': 'Choose JSON file',
+	'englishLearning.import.hintVocab':
+		'Supports a top-level array, or an object containing an items array. Each entry must have word and ipa; pos, translationZh, and example are optional. Example data:',
+	'englishLearning.import.hintClassic':
+		'Supports a top-level array, or an object containing an items array. Each entry must include english and translationZh; source and noteZh are optional. Example data:',
+	'englishLearning.import.preview': 'JSON preview',
+	'englishLearning.import.parseError': 'Invalid JSON',
+	'englishLearning.import.readError': 'Failed to read file',
+	'englishLearning.import.validateError': 'Validation failed:',
+	'englishLearning.import.err.expect-array':
+		'Expected an array or { "items": [...] }',
+	'englishLearning.import.err.no-vocab':
+		'No valid words (each item needs non-empty word and ipa)',
+	'englishLearning.import.err.no-classic':
+		'No valid quotes (each item needs non-empty english and translationZh)',
+	'englishLearning.import.parsedCount': '{count} item(s) parsed',
+	'englishLearning.import.apply': 'Import into left list',
+	'englishLearning.import.applySuccess': 'Loaded into the left list',
+	'englishLearning.import.dropReject': 'Please drop or pick a .json file',
+	'englishLearning.import.titlePlaceholder': 'Enter title',
+	'englishLearning.import.saveToVocab': 'Save to vocabulary',
+	'englishLearning.import.saveToClassic': 'Save to classic quotes',
+	'englishLearning.import.titleRequired': 'Please enter a title',
+	'englishLearning.import.needParsed':
+		'Upload and parse a valid JSON file before saving',
+	'englishLearning.import.reupload': 'Re-upload',
+
 	'englishLearning.toolbarSubtitle':
 		'Tools & vocabulary on the left, chat on the right',
 	'englishLearning.toolbarSubtitleShort':
@@ -815,6 +847,7 @@ export const enUS = {
 	'englishLearning.vocab.desc':
 		'Generate a themed word list (IPA, Chinese gloss, example). Use the speaker to hear each English word (cloud TTS when configured).',
 	'englishLearning.vocab.descShort': 'Generate a word list by theme',
+	'englishLearning.vocab.import': 'Import vocabulary',
 	'englishLearning.vocab.topicFieldLabel': 'Topic / goal',
 	'englishLearning.vocab.topicPlaceholder':
 		'e.g. travel phrases, business verbs, IELTS collocations, easily confused pairs…',
@@ -863,6 +896,7 @@ export const enUS = {
 	'englishLearning.classic.title': 'Classic quotes',
 	'englishLearning.classic.descShort':
 		'Fetch famous quotes, phrases, etc. by theme',
+	'englishLearning.classic.import': 'Import quotes',
 	'englishLearning.classic.topicFieldLabel': 'Topic / angle',
 	'englishLearning.classic.topicPlaceholder':
 		'e.g. courage quotes, Pride & Prejudice lines, speech highlights, Shakespeare…',

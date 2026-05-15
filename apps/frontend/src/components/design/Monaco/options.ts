@@ -65,6 +65,12 @@ export const options: any = {
 	 * 关闭后走浏览器默认粘贴，以 text/plain 为主，格式与常见编辑器一致。
 	 */
 	pasteAs: { enabled: false },
+	// 中文 JSON / Markdown 等含大量非 ASCII 时，Monaco 会弹出「ambiguous unicode characters」顶栏警告
+	unicodeHighlight: {
+		ambiguousCharacters: false,
+		nonBasicASCII: false,
+		invisibleCharacters: false,
+	},
 	// stickyScroll 由组件外部参数控制（见 Monaco/index.tsx 的 stickyScrollEnabled 等 props）
 	stickyScroll: { enabled: true, scrollWithEditor: true },
 };

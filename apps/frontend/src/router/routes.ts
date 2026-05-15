@@ -15,6 +15,8 @@ import DesktopDownloadPage from '@/views/desktopDownload';
 import Document from '@/views/document';
 import Download from '@/views/download';
 import EnglishLearning from '@/views/englishLearning';
+import EnglishLearningImportPage from '@/views/englishLearning/EnglishLearningImportPage';
+import EnglishLearningLayout from '@/views/englishLearning/EnglishLearningLayout';
 import Home from '@/views/home';
 import Knowledge from '@/views/knowledge';
 import LegalServicePolicy from '@/views/legal/servicePolicy';
@@ -117,10 +119,26 @@ const routes: RouteConfig[] = [
 			},
 			{
 				path: '/english-learning',
-				Component: EnglishLearning,
+				Component: EnglishLearningLayout,
 				meta: {
 					titleKey: 'route.englishLearning.title',
 				},
+				children: [
+					{
+						index: true,
+						Component: EnglishLearning,
+						meta: {
+							titleKey: 'route.englishLearning.title',
+						},
+					},
+					{
+						path: 'import',
+						Component: EnglishLearningImportPage,
+						meta: {
+							titleKey: 'route.englishLearning.import.title',
+						},
+					},
+				],
 			},
 			{
 				path: '/account',
