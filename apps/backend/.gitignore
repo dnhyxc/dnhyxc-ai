@@ -3,9 +3,6 @@
 /node_modules
 /build
 
-# 生产迁移 CLI 在本地试跑时生成（正式目录在服务器 server/migrations/）
-/migrations
-.typeorm.prod-datasource.cjs
 
 # Logs
 /backend/logs

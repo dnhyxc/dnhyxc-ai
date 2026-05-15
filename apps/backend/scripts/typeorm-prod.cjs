@@ -10,7 +10,9 @@ const { spawnSync } = require('node:child_process');
 const cwd = process.cwd();
 const distOrmconfig = resolve(cwd, 'dist/ormconfig.js');
 const migrationsDir = resolve(cwd, 'migrations');
-const prodDataSourceFile = resolve(cwd, '.typeorm.prod-datasource.cjs');
+// 固定写在项目根下的 scripts/（本地即 apps/backend/scripts/；生产即 server/scripts/），与源码中 typeorm-prod.cjs 所在目录一致，且不在 dist 内以免被覆盖
+const scriptsDir = resolve(cwd, 'scripts');
+const prodDataSourceFile = join(scriptsDir, '.typeorm.prod-datasource.cjs');
 
 if (!existsSync(distOrmconfig)) {
 	console.error(
@@ -21,8 +23,9 @@ if (!existsSync(distOrmconfig)) {
 
 mkdirSync(migrationsDir, { recursive: true });
 
-/** 基于 dist/ormconfig，将 migrations 指向 server 根目录 ./migrations */
+/** 基于 dist/ormconfig，将 migrations 指向项目根 ./migrations */
 function ensureProdDataSourceFile() {
+	mkdirSync(scriptsDir, { recursive: true });
 	const content = `'use strict';
 const path = require('node:path');
 const { DataSource } = require('typeorm');
