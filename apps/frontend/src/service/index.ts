@@ -32,6 +32,9 @@ import {
 	ENGLISH_LEARNING_VOCABULARY_FAVORITES,
 	ENGLISH_LEARNING_VOCABULARY_FAVORITES_EXPORT_DOCX,
 	ENGLISH_LEARNING_VOCABULARY_HISTORY,
+	ENGLISH_LEARNING_VOCABULARY_LIBRARIES,
+	ENGLISH_LEARNING_VOCABULARY_LIBRARY,
+	ENGLISH_LEARNING_VOCABULARY_LIBRARY_UPLOAD,
 	ENGLISH_LEARNING_VOCABULARY_PACK,
 	GET_SESSION,
 	GET_SESSION_LIST,
@@ -536,6 +539,85 @@ export const getEnglishVocabularyHistoryDetail = async (streamId: string) => {
 		webSearchRounds: EnglishPackWebSearchRoundDto[];
 	}>(ENGLISH_LEARNING_VOCABULARY_HISTORY, {
 		params: [streamId],
+	});
+};
+
+/** 保存导入的单词包到服务端「单词库」表（JSON body，仅适合较小包体） */
+export const saveEnglishVocabularyLibrary = async (params: {
+	title: string;
+	items: EnglishVocabularyItem[];
+}) => {
+	return await http.post<{ id: string; wordCount: number }>(
+		ENGLISH_LEARNING_VOCABULARY_LIBRARY,
+		params,
+	);
+};
+
+/**
+ * 以 multipart 上传当前 JSON 文本（字段 `file` + `title`），服务端解析后落库。
+ * 使用 FormData 绕过 JSON body 默认大小限制；字段名需与后端 `FileInterceptor('file')` 一致。
+ */
+export const uploadEnglishVocabularyLibraryJson = async (params: {
+	title: string;
+	jsonUtf8: string;
+	filename?: string;
+}) => {
+	const fd = new FormData();
+	fd.append('title', params.title);
+	fd.append(
+		'file',
+		new Blob([params.jsonUtf8], { type: 'application/json' }),
+		params.filename ?? 'vocabulary-import.json',
+	);
+	return await http.post<{ id: string; wordCount: number }>(
+		ENGLISH_LEARNING_VOCABULARY_LIBRARY_UPLOAD,
+		fd,
+		{ timeout: 120_000 },
+	);
+};
+
+export type EnglishVocabularyLibraryListItem = {
+	id: string;
+	title: string;
+	wordCount: number;
+	createdAt: string;
+};
+
+export type EnglishVocabularyLibraryItemRow = EnglishVocabularyItem & {
+	id: string;
+	sortOrder: number;
+};
+
+/** 分页列出当前用户的单词库 */
+export const listEnglishVocabularyLibraries = async (options?: {
+	limit?: number;
+	offset?: number;
+}) => {
+	return await http.get<EnglishVocabularyLibraryListItem[]>(
+		ENGLISH_LEARNING_VOCABULARY_LIBRARIES,
+		{
+			querys: {
+				limit: options?.limit ?? 20,
+				offset: options?.offset ?? 0,
+			},
+		},
+	);
+};
+
+/** 分页列出某单词库内的词条 */
+export const listEnglishVocabularyLibraryItems = async (
+	libraryId: string,
+	options?: { limit?: number; offset?: number },
+) => {
+	return await http.get<{
+		library: EnglishVocabularyLibraryListItem;
+		items: EnglishVocabularyLibraryItemRow[];
+	}>(ENGLISH_LEARNING_VOCABULARY_LIBRARIES, {
+		params: [libraryId, 'items'],
+		querys: {
+			limit: options?.limit ?? 50,
+			offset: options?.offset ?? 0,
+		},
 	});
 };
 

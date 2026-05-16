@@ -18,7 +18,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { createAgent, toolCallLimitMiddleware } from 'langchain';
-import { In, Repository } from 'typeorm';
+import { DataSource, In, Repository } from 'typeorm';
 import { KnowledgeQaEnum, ModelEnum } from '../../enum/config.enum';
 import { buildAgentLangChainTools } from '../../services/agent/agent-tools';
 import { KnowledgeQaService } from '../../services/knowledge-qa/knowledge-qa.service';
@@ -49,11 +49,13 @@ import {
 	TOPIC_PACK_STALL_BATCH_STEP,
 } from './constant';
 import {
+	ENGLISH_VOCAB_GENERATION_MAX,
 	GenerateClassicQuotesDto,
 	GenerateVocabularyDto,
 	resolveClassicQuotesPackTargetCount,
 	resolveVocabularyPackTargetCount,
 } from './dto/generate-vocabulary.dto';
+import { SaveVocabularyLibraryDto } from './dto/save-vocabulary-library.dto';
 import type { VocabularyFavoriteBodyDto } from './dto/vocabulary-favorite.dto';
 import {
 	type EnglishClassicQuoteItemJson,
@@ -73,6 +75,8 @@ import {
 	type EnglishVocabularyPackItemJson,
 } from './english-vocabulary.entity';
 import { EnglishVocabularyFavorite } from './english-vocabulary-favorite.entity';
+import { EnglishVocabularyLibrary } from './english-vocabulary-library.entity';
+import { EnglishVocabularyLibraryItem } from './english-vocabulary-library-item.entity';
 import {
 	AGENT_SYSTEM_PROMPT,
 	CLASSIC_QUOTES_SUBMODEL_SYSTEM_STATIC,
@@ -112,6 +116,20 @@ export type VocabularyItemDto = {
 	pos: string;
 	translationZh: string;
 	example: string;
+};
+
+/** 单词库（包）列表项 */
+export type VocabularyLibraryListItem = {
+	id: string;
+	title: string;
+	wordCount: number;
+	createdAt: string;
+};
+
+/** 单词库内单条词条（分页列表） */
+export type VocabularyLibraryItemDto = VocabularyItemDto & {
+	id: string;
+	sortOrder: number;
 };
 
 /** 单词包生成进度（供 SSE 与回调） */
@@ -155,6 +173,7 @@ export class EnglishLearningService {
 	private readonly logger = new Logger(EnglishLearningService.name);
 
 	constructor(
+		private readonly dataSource: DataSource,
 		private readonly configService: ConfigService,
 		private readonly webSearchService: WebSearchService,
 		private readonly knowledgeQaService: KnowledgeQaService,
@@ -168,6 +187,10 @@ export class EnglishLearningService {
 		private readonly vocabFavoriteRepo: Repository<EnglishVocabularyFavorite>,
 		@InjectRepository(EnglishClassicQuoteFavorite)
 		private readonly classicQuoteFavoriteRepo: Repository<EnglishClassicQuoteFavorite>,
+		@InjectRepository(EnglishVocabularyLibrary)
+		private readonly vocabLibraryRepo: Repository<EnglishVocabularyLibrary>,
+		@InjectRepository(EnglishVocabularyLibraryItem)
+		private readonly vocabLibraryItemRepo: Repository<EnglishVocabularyLibraryItem>,
 	) {}
 
 	/** 中止类异常：用户断开 SSE / 显式 cancel / LangChain 链取消 */
@@ -1050,6 +1073,246 @@ export class EnglishLearningService {
 			items: params.items as EnglishVocabularyPackItemJson[],
 		});
 		await this.vocabBatchRepo.save(row);
+	}
+
+	/** 从 JSON 根节点提取数组或 `{ items: [] }`（与导入页约定一致） */
+	private extractVocabularyImportItemArray(data: unknown): unknown[] | null {
+		if (Array.isArray(data)) return data;
+		if (
+			data &&
+			typeof data === 'object' &&
+			Array.isArray((data as { items?: unknown }).items)
+		) {
+			return (data as { items: unknown[] }).items;
+		}
+		return null;
+	}
+
+	/**
+	 * 将导入 JSON 解析为单词库条目（与前端 parseVocabularyImport 规则对齐）。
+	 */
+	private parseVocabularyPackRootToLibraryItems(
+		root: unknown,
+	): EnglishVocabularyPackItemJson[] {
+		const arr = this.extractVocabularyImportItemArray(root);
+		if (!arr) {
+			throw new BadRequestException('JSON 需为数组或包含 items 数组的对象');
+		}
+		const itemsJson: EnglishVocabularyPackItemJson[] = [];
+		for (const row of arr) {
+			if (!row || typeof row !== 'object') continue;
+			const o = row as Record<string, unknown>;
+			const word = typeof o.word === 'string' ? o.word.trim() : '';
+			const ipa = typeof o.ipa === 'string' ? o.ipa.trim() : '';
+			if (!word || !ipa) continue;
+			const pos = typeof o.pos === 'string' ? o.pos.trim().slice(0, 64) : '';
+			const translationZh =
+				typeof o.translationZh === 'string'
+					? o.translationZh
+					: typeof o.translation_zh === 'string'
+						? o.translation_zh
+						: '—';
+			const example = typeof o.example === 'string' ? o.example : '—';
+			itemsJson.push({
+				word: word.slice(0, 500),
+				ipa: ipa.slice(0, 2000),
+				pos: pos || undefined,
+				translationZh: String(translationZh).trim().slice(0, 8000),
+				example: String(example).trim().slice(0, 8000),
+			});
+		}
+		if (!itemsJson.length) {
+			throw new BadRequestException(
+				'未解析到有效单词（每项需含非空 word 与 ipa）',
+			);
+		}
+		if (itemsJson.length > ENGLISH_VOCAB_GENERATION_MAX) {
+			throw new BadRequestException(
+				`单次最多保存 ${ENGLISH_VOCAB_GENERATION_MAX} 条单词`,
+			);
+		}
+		return itemsJson;
+	}
+
+	private mapLibraryItemRow(
+		row: EnglishVocabularyLibraryItem,
+	): VocabularyLibraryItemDto {
+		return {
+			id: row.id,
+			sortOrder: row.sortOrder,
+			word: row.word,
+			ipa: row.ipa,
+			pos: row.pos ?? '',
+			translationZh: row.translationZh,
+			example: row.example,
+		};
+	}
+
+	private async assertVocabularyLibraryOwned(
+		userId: number,
+		libraryId: string,
+	): Promise<EnglishVocabularyLibrary> {
+		const lib = await this.vocabLibraryRepo.findOne({
+			where: { id: libraryId, userId },
+		});
+		if (!lib) {
+			throw new NotFoundException('单词库不存在或无权访问');
+		}
+		return lib;
+	}
+
+	/**
+	 * 事务写入：先落库元数据，再批量插入词条行（支持后续分页查询）。
+	 */
+	private async persistVocabularyLibrary(
+		userId: number,
+		title: string,
+		itemsJson: EnglishVocabularyPackItemJson[],
+	): Promise<{ id: string; wordCount: number }> {
+		const t = title.trim().slice(0, 200);
+		if (!t) {
+			throw new BadRequestException('标题不能为空');
+		}
+		const wordCount = itemsJson.length;
+
+		return this.dataSource.transaction(async (manager) => {
+			const libRepo = manager.getRepository(EnglishVocabularyLibrary);
+			const itemRepo = manager.getRepository(EnglishVocabularyLibraryItem);
+
+			const lib = await libRepo.save(
+				libRepo.create({
+					userId,
+					title: t,
+					wordCount,
+				}),
+			);
+
+			const itemRows = itemsJson.map((item, index) =>
+				itemRepo.create({
+					libraryId: lib.id,
+					userId,
+					sortOrder: index,
+					word: item.word,
+					ipa: item.ipa,
+					pos: item.pos ?? '',
+					translationZh: item.translationZh,
+					example: item.example,
+				}),
+			);
+
+			// 大批量时分块插入，避免单条 SQL 过长
+			const chunkSize = 500;
+			for (let i = 0; i < itemRows.length; i += chunkSize) {
+				await itemRepo.save(itemRows.slice(i, i + chunkSize));
+			}
+
+			return { id: lib.id, wordCount: lib.wordCount };
+		});
+	}
+
+	/** 分页列出当前用户的单词库（包） */
+	async listVocabularyLibraries(
+		userId: number,
+		options?: { limit?: number; offset?: number },
+	): Promise<VocabularyLibraryListItem[]> {
+		const limit = Math.min(100, Math.max(1, options?.limit ?? 20));
+		const offset = Math.max(0, options?.offset ?? 0);
+		const rows = await this.vocabLibraryRepo.find({
+			where: { userId },
+			order: { createdAt: 'DESC' },
+			take: limit,
+			skip: offset,
+		});
+		return rows.map((r) => ({
+			id: r.id,
+			title: r.title,
+			wordCount: r.wordCount,
+			createdAt: r.createdAt.toISOString(),
+		}));
+	}
+
+	/** 分页列出某单词库内的词条（按 sort_order 升序） */
+	async listVocabularyLibraryItems(
+		userId: number,
+		libraryId: string,
+		options?: { limit?: number; offset?: number },
+	): Promise<{
+		library: VocabularyLibraryListItem;
+		items: VocabularyLibraryItemDto[];
+	}> {
+		const lib = await this.assertVocabularyLibraryOwned(userId, libraryId);
+		const limit = Math.min(200, Math.max(1, options?.limit ?? 50));
+		const offset = Math.max(0, options?.offset ?? 0);
+
+		const rows = await this.vocabLibraryItemRepo.find({
+			where: { libraryId, userId },
+			order: { sortOrder: 'ASC' },
+			take: limit,
+			skip: offset,
+		});
+
+		return {
+			library: {
+				id: lib.id,
+				title: lib.title,
+				wordCount: lib.wordCount,
+				createdAt: lib.createdAt.toISOString(),
+			},
+			items: rows.map((r) => this.mapLibraryItemRow(r)),
+		};
+	}
+
+	/**
+	 * 将导入页校验后的单词包写入「单词库」表（每包一行，与 SSE 流式批次表分离）。
+	 */
+	async saveImportedVocabularyLibrary(
+		userId: number,
+		dto: SaveVocabularyLibraryDto,
+	): Promise<{ id: string; wordCount: number }> {
+		const itemsJson: EnglishVocabularyPackItemJson[] = [];
+		for (const row of dto.items) {
+			const word = row.word.trim();
+			const ipa = row.ipa.trim();
+			if (!word || !ipa) continue;
+			const pos =
+				typeof row.pos === 'string' ? row.pos.trim().slice(0, 64) : '';
+			const translationZh = String(row.translationZh ?? '—')
+				.trim()
+				.slice(0, 8000);
+			const example = String(row.example ?? '—')
+				.trim()
+				.slice(0, 8000);
+			itemsJson.push({
+				word: word.slice(0, 500),
+				ipa: ipa.slice(0, 2000),
+				pos: pos || undefined,
+				translationZh,
+				example,
+			});
+		}
+		if (!itemsJson.length) {
+			throw new BadRequestException(
+				'没有有效的单词条目（word 与 ipa 不能为空）',
+			);
+		}
+		if (itemsJson.length > ENGLISH_VOCAB_GENERATION_MAX) {
+			throw new BadRequestException(
+				`单次最多保存 ${ENGLISH_VOCAB_GENERATION_MAX} 条单词`,
+			);
+		}
+		return this.persistVocabularyLibrary(userId, dto.title, itemsJson);
+	}
+
+	/**
+	 * 将已解析的 JSON 根对象写入单词库（供 multipart 上传文件后服务端解析调用）。
+	 */
+	async saveImportedVocabularyLibraryFromPackJson(
+		userId: number,
+		title: string,
+		root: unknown,
+	): Promise<{ id: string; wordCount: number }> {
+		const itemsJson = this.parseVocabularyPackRootToLibraryItems(root);
+		return this.persistVocabularyLibrary(userId, title, itemsJson);
 	}
 
 	/**

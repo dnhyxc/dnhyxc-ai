@@ -756,6 +756,16 @@ export const enUS = {
 	'englishLearning.import.needParsed':
 		'Upload and parse a valid JSON file before saving',
 	'englishLearning.import.reupload': 'Re-upload',
+	'englishLearning.import.saveVocabSuccess':
+		'Saved {count} word(s) to your vocabulary library',
+	'englishLearning.import.saveVocabLoading': 'Saving…',
+
+	'englishLearning.library.vocab.title': 'Vocabulary library',
+	'englishLearning.library.vocab.descShort': 'Import word packs',
+	'englishLearning.library.vocab.bank': 'Word bank',
+	'englishLearning.library.classic.title': 'Quotes library',
+	'englishLearning.library.classic.descShort': 'Import quote packs',
+	'englishLearning.library.classic.bank': 'Corpus',
 
 	'englishLearning.toolbarSubtitle':
 		'Tools & vocabulary on the left, chat on the right',

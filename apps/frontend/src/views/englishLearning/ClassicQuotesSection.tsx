@@ -20,7 +20,6 @@ import {
 	useRef,
 	useState,
 } from 'react';
-import { useNavigate } from 'react-router';
 import {
 	COUNT_PRESETS,
 	HISTORY_PAGE_SIZE,
@@ -63,7 +62,6 @@ export type ClassicQuoteProgressState = EnglishPackUiProgress;
 
 function ClassicQuotesSectionInner() {
 	const { t } = useI18n();
-	const navigate = useNavigate();
 
 	const loading = EnglishPackStore.classicLoading;
 	const agentToolLine = EnglishPackStore.classicAgentToolLine;
@@ -510,11 +508,6 @@ function ClassicQuotesSectionInner() {
 		EnglishPackStore.setClassicCountInput(String(clamped));
 	}, [countInput]);
 
-	// 导入语句：跳转独立导入页
-	const onImportClassicQuotes = useCallback(() => {
-		navigate('/english-learning/import?kind=classic');
-	}, [navigate]);
-
 	return (
 		<div className="rounded-none @container min-w-0 px-4 pb-0">
 			<div className="mb-3.5 flex items-start gap-3">
@@ -525,18 +518,8 @@ function ClassicQuotesSectionInner() {
 					<div className="text-textcolor leading-tight font-semibold tracking-tight">
 						{t('englishLearning.classic.title')}
 					</div>
-					<div className="h-5 flex items-center justify-between gap-2  text-textcolor/50 mt-1 text-xs leading-relaxed">
+					<div className="h-5 text-textcolor/50 mt-1 text-xs leading-relaxed">
 						{t('englishLearning.classic.descShort')}
-						<div className="flex items-center gap-2">
-							<Button
-								variant="link"
-								size="sm"
-								className="p-0! h-4 text-xs text-teal-500 hover:text-teal-400"
-								onClick={onImportClassicQuotes}
-							>
-								{t('englishLearning.classic.import')}
-							</Button>
-						</div>
 					</div>
 				</div>
 			</div>

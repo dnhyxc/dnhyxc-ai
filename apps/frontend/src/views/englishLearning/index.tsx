@@ -19,6 +19,7 @@ import { stripAutoFilledIntentName } from '@/utils';
 import { stopAllEnglishPlayback } from '@/utils/englishTts';
 import { AgentPanel } from './AgentPanel';
 import { ClassicQuotesSection } from './ClassicQuotesSection';
+import EnglishSource from './EnglishSource';
 import {
 	EnglishLearningToolbar,
 	type QuickIntentInputSyncPayload,
@@ -126,6 +127,18 @@ const EnglishLearning = observer(function EnglishLearning() {
 										/>
 										<VocabularyPackSection />
 										<ClassicQuotesSection />
+										<EnglishSource
+											title={t('englishLearning.library.vocab.title')}
+											description={t('englishLearning.library.vocab.descShort')}
+											type="vocab"
+										/>
+										<EnglishSource
+											title={t('englishLearning.library.classic.title')}
+											description={t(
+												'englishLearning.library.classic.descShort',
+											)}
+											type="classic"
+										/>
 									</div>
 								</ScrollArea>
 							</aside>

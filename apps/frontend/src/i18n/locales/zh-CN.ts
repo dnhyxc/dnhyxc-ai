@@ -673,6 +673,15 @@ export const zhCN = {
 	'englishLearning.import.titleRequired': '请先输入标题',
 	'englishLearning.import.needParsed': '请先上传并成功解析 JSON 后再保存',
 	'englishLearning.import.reupload': '重新上传',
+	'englishLearning.import.saveVocabSuccess': '已将 {count} 个单词保存至单词库',
+	'englishLearning.import.saveVocabLoading': '保存中…',
+
+	'englishLearning.library.vocab.title': '单词库',
+	'englishLearning.library.vocab.descShort': '导入单词包',
+	'englishLearning.library.vocab.bank': '词库',
+	'englishLearning.library.classic.title': '语句库',
+	'englishLearning.library.classic.descShort': '导入语句包',
+	'englishLearning.library.classic.bank': '语料库',
 
 	'englishLearning.toolbarSubtitle': '左侧选主题与单词，右侧对话练习',
 	'englishLearning.toolbarSubtitleShort': '可选快捷意图，或直接在右侧对话',

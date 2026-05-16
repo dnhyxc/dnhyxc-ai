@@ -17,7 +17,11 @@ import type { DragDropAcceptResult } from '@/components/design/DragDropFileUploa
 import DragDropFileUpload from '@/components/design/DragDropFileUpload';
 import MarkdownEditor from '@/components/design/Monaco';
 import { useI18n, useTheme } from '@/hooks';
-import type { EnglishClassicQuoteItem, EnglishVocabularyItem } from '@/service';
+import {
+	type EnglishClassicQuoteItem,
+	type EnglishVocabularyItem,
+	uploadEnglishVocabularyLibraryJson,
+} from '@/service';
 import { copyToClipboard, pasteFromClipboard } from '@/utils/clipboard';
 
 type ImportKind = 'vocab' | 'classic';
@@ -135,6 +139,7 @@ export default function EnglishLearningImportPage() {
 		EnglishClassicQuoteItem[] | null
 	>(null);
 	const [importTitle, setImportTitle] = useState('');
+	const [vocabSaveLoading, setVocabSaveLoading] = useState(false);
 	const reuploadInputRef = useRef<HTMLInputElement>(null);
 
 	const resetParsed = useCallback(() => {
@@ -243,7 +248,7 @@ export default function EnglishLearningImportPage() {
 	);
 
 	// 保存到单词库
-	const onSaveToVocab = useCallback(() => {
+	const onSaveToVocab = useCallback(async () => {
 		if (jsonErrorKind !== null || structFailReason !== null) {
 			Toast({
 				type: 'error',
@@ -258,15 +263,33 @@ export default function EnglishLearningImportPage() {
 			});
 			return;
 		}
-		if (!importTitle) {
+		if (!importTitle.trim()) {
 			Toast({
 				type: 'error',
 				title: t('englishLearning.import.titleRequired'),
 			});
 			return;
 		}
-		console.log('onSaveToVocab', importTitle, parsedVocab.length);
-	}, [importTitle, jsonErrorKind, parsedVocab, structFailReason, t]);
+		try {
+			setVocabSaveLoading(true);
+			const res = await uploadEnglishVocabularyLibraryJson({
+				title: importTitle.trim(),
+				jsonUtf8: previewText,
+			});
+			if (res.success && res.data) {
+				Toast({
+					type: 'success',
+					title: t('englishLearning.import.saveVocabSuccess', {
+						count: String(res.data.wordCount),
+					}),
+				});
+			}
+		} catch {
+			// 错误文案由 http 层 Toast 统一展示
+		} finally {
+			setVocabSaveLoading(false);
+		}
+	}, [importTitle, jsonErrorKind, previewText, structFailReason, t]);
 
 	// 保存到经典语句库
 	const onSaveToClassic = useCallback(() => {
@@ -373,13 +396,24 @@ export default function EnglishLearningImportPage() {
 										<Button
 											variant="link"
 											className="px-0 text-theme"
+											disabled={
+												kind === 'vocab'
+													? vocabSaveLoading ||
+														jsonErrorKind !== null ||
+														structFailReason !== null ||
+														!parsedVocab?.length ||
+														!importTitle.trim()
+													: false
+											}
 											onClick={
 												kind === 'vocab' ? onSaveToVocab : onSaveToClassic
 											}
 										>
-											{kind === 'vocab'
-												? t('englishLearning.import.saveToVocab')
-												: t('englishLearning.import.saveToClassic')}
+											{kind === 'vocab' && vocabSaveLoading
+												? t('englishLearning.import.saveVocabLoading')
+												: kind === 'vocab'
+													? t('englishLearning.import.saveToVocab')
+													: t('englishLearning.import.saveToClassic')}
 										</Button>
 									</div>
 								</div>

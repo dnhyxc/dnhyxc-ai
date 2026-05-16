@@ -1,5 +1,7 @@
 # 英语学习 JSON 独立导入页与嵌套路由
 
+> **更新**：单词库子表持久化、multipart 大包上传、左栏 `EnglishSource` 等完整说明见 [english-learning-library-import.md](./english-learning-library-import.md)。
+
 ## 1. 背景与目标
 
 - **用户问题**：单词包、经典语句区块的「导入」原先仅占位（`console.log`），无法在应用内完成 JSON 校验与预览。

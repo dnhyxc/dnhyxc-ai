@@ -22,7 +22,7 @@
 		"test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
 		"test:e2e": "jest --config ./test/jest-e2e.json",
 		"typeorm": "typeorm-ts-node-commonjs -d ormconfig.ts",
-		"m:c": "f() { npm run typeorm migration:create -p \"./src/migrations/$@\"; }; f",
+		"m:c": "typeorm-ts-node-commonjs migration:create",
 		"m:g": "f() { npm run typeorm migration:generate -p \"./src/migrations/$@\"; }; f",
 		"m:run": "npm run typeorm migration:run",
 		"m:revert": "npm run typeorm migration:revert",

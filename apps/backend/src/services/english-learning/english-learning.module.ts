@@ -9,6 +9,8 @@ import { EnglishLearningStreamAbortRegistry } from './english-learning-stream-ab
 import { EnglishPackWebSearchRecord } from './english-pack-web-search.entity';
 import { EnglishVocabularyPackBatch } from './english-vocabulary.entity';
 import { EnglishVocabularyFavorite } from './english-vocabulary-favorite.entity';
+import { EnglishVocabularyLibrary } from './english-vocabulary-library.entity';
+import { EnglishVocabularyLibraryItem } from './english-vocabulary-library-item.entity';
 
 @Module({
 	imports: [
@@ -19,6 +21,8 @@ import { EnglishVocabularyFavorite } from './english-vocabulary-favorite.entity'
 			EnglishPackWebSearchRecord,
 			EnglishVocabularyFavorite,
 			EnglishClassicQuoteFavorite,
+			EnglishVocabularyLibrary,
+			EnglishVocabularyLibraryItem,
 		]),
 	],
 	controllers: [EnglishLearningController],

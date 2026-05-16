@@ -124,6 +124,15 @@ export const ENGLISH_LEARNING_STREAM_CANCEL = '/english-learning/stream/cancel';
 /** 当前用户历史拉取的单词包会话列表（分页） */
 export const ENGLISH_LEARNING_VOCABULARY_HISTORY =
 	'/english-learning/vocabulary-history';
+/** 将导入页解析后的单词包保存到「单词库」表（JSON body，大包易触默认 body 限制） */
+export const ENGLISH_LEARNING_VOCABULARY_LIBRARY =
+	'/english-learning/vocabulary-library';
+/** 以 multipart 上传 JSON 文件，服务端解析后写入单词库（适合大包） */
+export const ENGLISH_LEARNING_VOCABULARY_LIBRARY_UPLOAD =
+	'/english-learning/vocabulary-library/upload';
+/** 单词库（包）列表与库内词条分页 */
+export const ENGLISH_LEARNING_VOCABULARY_LIBRARIES =
+	'/english-learning/vocabulary-libraries';
 /** 单词收藏：新增、取消、批量查询已收藏词形 */
 export const ENGLISH_LEARNING_VOCABULARY_FAVORITES =
 	'/english-learning/vocabulary-favorites';

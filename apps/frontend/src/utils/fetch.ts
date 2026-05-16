@@ -398,11 +398,14 @@ class HttpClient {
 		let body: any;
 		const contentType = finalConfig.headers?.['Content-Type'] || '';
 
-		// 判断是否为 FormData 上传
-		const isFormData =
-			contentType.includes('multipart/form-data') && finalConfig.data;
-
-		if (isFormData) {
+		// 原生 FormData：直接作为 body，并去掉 JSON Content-Type，由运行时自动带 multipart boundary
+		if (finalConfig.data instanceof FormData) {
+			body = finalConfig.data;
+			delete finalConfig.headers?.['Content-Type'];
+		} else if (
+			contentType.includes('multipart/form-data') &&
+			finalConfig.data
+		) {
 			// 异步构建 FormData，避免阻塞主线程
 			body = await this.buildFormDataAsync(
 				finalConfig.data,

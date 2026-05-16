@@ -20,7 +20,6 @@ import {
 	useRef,
 	useState,
 } from 'react';
-import { useNavigate } from 'react-router';
 import {
 	COUNT_PRESETS,
 	SCROLL_LOAD_THRESHOLD_PX,
@@ -63,8 +62,6 @@ export type VocabProgressState = EnglishPackUiProgress;
 
 function VocabularyPackSectionInner() {
 	const { t } = useI18n();
-	const navigate = useNavigate();
-
 	const loading = EnglishPackStore.vocabLoading;
 	const agentToolLine = EnglishPackStore.vocabAgentToolLine;
 	const masterSearchOrganic = EnglishPackStore.vocabMasterSearchOrganic;
@@ -509,11 +506,6 @@ function VocabularyPackSectionInner() {
 		EnglishPackStore.setVocabCountInput(String(clamped));
 	}, [countInput]);
 
-	// 导入单词：跳转独立导入页
-	const onImportVocabulary = useCallback(() => {
-		navigate('/english-learning/import?kind=vocab');
-	}, [navigate]);
-
 	return (
 		<div className="rounded-none p-4 pb-0 @container min-w-0 mb-7.5">
 			<div className="mb-3.5 flex items-start gap-3">
@@ -527,18 +519,8 @@ function VocabularyPackSectionInner() {
 					<div className="text-textcolor font-semibold leading-tight">
 						{t('englishLearning.vocab.title')}
 					</div>
-					<div className="h-5 flex items-center justify-between gap-2 text-textcolor/50 mt-1 text-xs leading-snug">
+					<div className="h-5 text-textcolor/50 mt-1 text-xs leading-relaxed">
 						{t('englishLearning.vocab.descShort')}
-						<div className="flex items-center gap-2">
-							<Button
-								variant="link"
-								size="sm"
-								className="p-0! h-4 text-xs text-teal-500 hover:text-teal-400"
-								onClick={onImportVocabulary}
-							>
-								{t('englishLearning.vocab.import')}
-							</Button>
-						</div>
 					</div>
 				</div>
 			</div>
