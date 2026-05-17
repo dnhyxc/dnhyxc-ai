@@ -912,6 +912,10 @@ export const enUS = {
 		'When set, count must be a whole number from 1 to 12000; leave the field empty for maximum',
 	'englishLearning.vocab.progress':
 		'{collected} / {target} words · batch {round}',
+	'englishLearning.vocab.fromDatabase':
+		'Loaded {count} word(s) from your library (matching topic)',
+	'englishLearning.classic.fromDatabase':
+		'Loaded {count} quote(s) from your library (matching topic)',
 	'englishLearning.vocab.partialResult':
 		'Requested {want}; received {got} (stopped early due to duplicates or limits)',
 	'englishLearning.vocab.aborted': 'Fetch cancelled',

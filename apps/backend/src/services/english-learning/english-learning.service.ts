@@ -21,6 +21,7 @@ import { createAgent, toolCallLimitMiddleware } from 'langchain';
 import { DataSource, In, Repository } from 'typeorm';
 import { KnowledgeQaEnum, ModelEnum } from '../../enum/config.enum';
 import { buildAgentLangChainTools } from '../../services/agent/agent-tools';
+import { KnowledgeEmbeddingService } from '../../services/knowledge-embedding/knowledge-embedding.service';
 import { KnowledgeQaService } from '../../services/knowledge-qa/knowledge-qa.service';
 import { WebSearchService } from '../../services/web-search/web-search.service';
 import type {
@@ -40,6 +41,16 @@ import {
 	ENGLISH_PACK_WEB_SEARCH_RECENCY_NEWS_EN_RE,
 	ENGLISH_PACK_WEB_SEARCH_RECENCY_NEWS_FLAVOR_RE,
 	PACK_AGENT_THREAD_MAX_MESSAGES,
+	PACK_GENERATION_DB_EXCLUDE_MAX_KEYS,
+	PACK_GENERATION_FAVORITE_EXCLUDE_LIMIT,
+	PACK_GENERATION_MASTER_EXISTING_HINT_MAX_CHARS,
+	PACK_GENERATION_MASTER_HINT_SAMPLE_ITEMS,
+	PACK_GENERATION_TOPIC_HISTORY_BATCH_ROWS,
+	PACK_GENERATION_TOPIC_MATCH_LIBRARIES,
+	PACK_SSE_DATABASE_EMIT_CHUNK_SIZE,
+	PACK_TOPIC_LIBRARY_ITEMS_PAGE_SIZE,
+	PACK_TOPIC_VECTOR_MATCH_MAX_LABELS,
+	PACK_TOPIC_VECTOR_SIMILARITY_MIN,
 	TOPIC_PACK_EXCLUDE_CLASSIC_ITEM_MAX_CHARS,
 	TOPIC_PACK_EXCLUDE_CLASSIC_TAIL_ITEMS,
 	TOPIC_PACK_EXCLUDE_PROMPT_MAX_CHARS,
@@ -87,6 +98,10 @@ import {
 	ENGLISH_PACK_LEARNER_CONTEXT_HINT,
 	VOCABULARY_PACK_SUBMODEL_SYSTEM_STATIC,
 } from './prompt';
+/** 同主题匹配索引：一次生成内复用，避免重复调 embedding */
+export type PackTopicMatchIndex = {
+	isRelated: (sourceLabel: string) => boolean;
+};
 
 export type ClassicQuoteItemDto = {
 	english: string;
@@ -100,6 +115,8 @@ export type ClassicQuoteGenerationProgress = {
 	target: number;
 	round: number;
 	newItems?: ClassicQuoteItemDto[];
+	/** 命中库内同主题资料，未调用大模型 */
+	fromDatabase?: boolean;
 };
 
 export type ClassicQuoteHistoryListItem = {
@@ -157,6 +174,8 @@ export type VocabularyGenerationProgress = {
 	round: number;
 	/** 本轮 LLM 解析后新并入总列表的词条（去重后）；无新增时不传 */
 	newItems?: VocabularyItemDto[];
+	/** 命中库内同主题资料，未调用大模型 */
+	fromDatabase?: boolean;
 };
 
 /** 英语学习拉取：Agent 检索阶段工具事件（经 SSE 透传前端） */
@@ -195,6 +214,7 @@ export class EnglishLearningService {
 		private readonly configService: ConfigService,
 		private readonly webSearchService: WebSearchService,
 		private readonly knowledgeQaService: KnowledgeQaService,
+		private readonly knowledgeEmbedding: KnowledgeEmbeddingService,
 		@InjectRepository(EnglishVocabularyPackBatch)
 		private readonly vocabBatchRepo: Repository<EnglishVocabularyPackBatch>,
 		@InjectRepository(EnglishClassicQuotePackBatch)
@@ -478,6 +498,14 @@ export class EnglishLearningService {
 	}
 
 	/**
+	 * 主题是否具时效性（今日/近期/新闻/显式日期等）。
+	 * 与主 Agent 联网 recency 判断一致：此类不走库内直出/预填，统一走 Agent + 子模型。
+	 */
+	private isPackTopicTimeSensitive(topic: string): boolean {
+		return this.resolveWebSearchTime(topic).recency !== 'none';
+	}
+
+	/**
 	 * 关键词启发 recency（不含空主题、典籍排除、显式日期——后者由 `resolveWebSearchTime` 先行处理）。
 	 * 顺序与 `ENGLISH_PACK_WEB_SEARCH_RECENCY_HEURISTIC_RULES` 及末尾「新闻/动态」分支一致，勿随意重排。
 	 */
@@ -635,6 +663,656 @@ export class EnglishLearningService {
 		return { main, summary };
 	}
 
+	/** 与 runVocabularyGeneration 内 seen 一致 */
+	private normalizePackVocabKey(word: string): string {
+		return word.trim().toLowerCase();
+	}
+
+	/** 与 runClassicQuotesGeneration 内 seen 一致 */
+	private normalizePackClassicEnglishKey(english: string): string {
+		return english.toLowerCase().trim().slice(0, 400);
+	}
+
+	/** 为候选标签建立主题相关索引：完全相等快速命中，其余走 KnowledgeEmbedding 向量比对 */
+	private async buildPackTopicMatchIndex(
+		topic: string,
+		labels: Iterable<string>,
+	): Promise<PackTopicMatchIndex> {
+		const topicTrim = topic.trim();
+		const topicKey = topicTrim.toLowerCase();
+		const relatedKeys = new Set<string>();
+		const candidates: { key: string; text: string }[] = [];
+		const seenKeys = new Set<string>();
+
+		for (const raw of labels) {
+			const text = typeof raw === 'string' ? raw.trim() : '';
+			if (!text) continue;
+			const key = text.toLowerCase();
+			if (seenKeys.has(key)) continue;
+			seenKeys.add(key);
+			if (topicKey && key === topicKey) {
+				relatedKeys.add(key);
+				continue;
+			}
+			candidates.push({ key, text });
+		}
+
+		if (topicTrim && candidates.length > 0) {
+			const capped = candidates.slice(0, PACK_TOPIC_VECTOR_MATCH_MAX_LABELS);
+			try {
+				const matched =
+					await this.knowledgeEmbedding.findCandidateIndicesSimilarToQuery({
+						query: topicTrim,
+						candidates: capped.map((x) => x.text),
+						minCosineSimilarity: PACK_TOPIC_VECTOR_SIMILARITY_MIN,
+					});
+				for (const idx of matched) {
+					const item = capped[idx];
+					if (item) relatedKeys.add(item.key);
+				}
+			} catch (e: unknown) {
+				this.logger.warn(
+					'[EnglishLearning] 主题向量匹配失败，同主题库/历史批次将不参与匹配',
+					e,
+				);
+			}
+		}
+
+		return {
+			isRelated: (sourceLabel: string) => {
+				const k = sourceLabel.trim().toLowerCase();
+				return k.length > 0 && relatedKeys.has(k);
+			},
+		};
+	}
+
+	/** 合并历史批次 topic 与库标题，按 trim 后小写去重（保留首次出现的原文） */
+	/** 大批量库内数据分多帧 progress/chunk 推送，避免单次 SSE 过大 */
+	private async emitPackNewItemsInChunks<T>(params: {
+		onProgress?: (p: {
+			collected: number;
+			target: number;
+			round: number;
+			newItems?: T[];
+			fromDatabase?: boolean;
+		}) => void | Promise<void>;
+		items: T[];
+		target: number;
+		fromDatabase?: boolean;
+		startRound?: number;
+		chunkSize?: number;
+	}): Promise<void> {
+		const { onProgress, items, target, fromDatabase, startRound = 1 } = params;
+		if (!onProgress || items.length === 0) return;
+		const chunkSize = params.chunkSize ?? PACK_SSE_DATABASE_EMIT_CHUNK_SIZE;
+		if (items.length <= chunkSize) {
+			await Promise.resolve(
+				onProgress({
+					collected: items.length,
+					target,
+					round: startRound,
+					newItems: items,
+					fromDatabase,
+				}),
+			);
+			return;
+		}
+		let collected = 0;
+		let round = startRound;
+		for (let i = 0; i < items.length; i += chunkSize) {
+			const slice = items.slice(i, i + chunkSize);
+			collected += slice.length;
+			await Promise.resolve(
+				onProgress({
+					collected,
+					target,
+					round,
+					newItems: slice,
+					fromDatabase,
+				}),
+			);
+			round += 1;
+		}
+	}
+
+	/**
+	 * 收集去重后的 topic/title 标签（如单词批次主题、库标题等）。
+	 *
+	 * 说明：
+	 * - 支持任意数量的标签集合传入（每个集合为 Iterable），参数 groups 数组展开。
+	 * - 每个集合可以是字符串、null 或 undefined 的混合类型。
+	 * - 对所有集合中出现的标签，统一进行 trim 去首尾空白、toLowerCase 小写，使用小写字符串做唯一性标记（防止大小写或空白差异重复）。
+	 * - 仅保留首次出现的原文（即首个未遇到其小写等价物的 text），顺序与原始输入顺序一致。
+	 * - 返回去重后的标签数组，适合作为主题索引、显示等用途。
+	 *
+	 * @param groups 各种可迭代的标签集合（如批次主题、库标题）
+	 * @returns 去重后的原始标签数组（保持首出现顺序）
+	 */
+	private collectUniquePackTopicLabels(
+		...groups: Iterable<string | null | undefined>[]
+	): string[] {
+		const seen = new Set<string>(); // 存放所有已遇到的小写标签，用于判重
+		const out: string[] = []; // 存放已收集的唯一原始标签，顺序与输入一致
+		for (const group of groups) {
+			for (const raw of group) {
+				// 若 raw 是字符串则去除前后空白，否则视为空
+				const text = typeof raw === 'string' ? raw.trim() : '';
+				if (!text) continue; // 跳过空字符串和 null/undefined
+				const key = text.toLowerCase(); // 小写化用于判重
+				if (seen.has(key)) continue; // 已收集过则跳过
+				seen.add(key);
+				out.push(text); // 保留原始内容（含大小写/空白）
+			}
+		}
+		return out;
+	}
+
+	/**
+	 * 为指定用户根据其历史批次和资料库中的主题/标题收集标签，生成 topic 匹配索引
+	 * @param userId 用户ID
+	 * @param topic 当前请求主题
+	 * @param kind 类型（'vocabulary' 单词包|'classic_quotes' 经典句）
+	 * @returns 主题匹配索引
+	 */
+	private async createPackTopicMatchIndexForUser(
+		userId: number, // 当前用户ID
+		topic: string, // 目标主题
+		kind: 'vocabulary' | 'classic_quotes', // 资料包类型
+	): Promise<PackTopicMatchIndex> {
+		let labels: string[]; // 存放去重后的主题/标题标签
+		if (kind === 'vocabulary') {
+			// 如果类型为单词包
+			const [batches, libraries] = await Promise.all([
+				// 查找该用户的单词包历史批次，按创建时间倒序取若干条
+				this.vocabBatchRepo.find({
+					where: { userId },
+					order: { createdAt: 'DESC' },
+					take: PACK_GENERATION_TOPIC_HISTORY_BATCH_ROWS,
+				}),
+				// 查找该用户的单词库，按创建时间倒序取40条
+				this.vocabLibraryRepo.find({
+					where: { userId },
+					order: { createdAt: 'DESC' },
+					take: 40,
+				}),
+			]);
+			labels = this.collectUniquePackTopicLabels(
+				batches.map((b) => b.topic), // 批次主题列表
+				libraries.map((lib) => lib.title), // 单词库标题列表
+			);
+		} else {
+			// 类型为经典句包
+			const [batches, libraries] = await Promise.all([
+				// 查找该用户的经典句生成批次，按创建时间倒序取若干条
+				this.classicBatchRepo.find({
+					where: { userId },
+					order: { createdAt: 'DESC' },
+					take: PACK_GENERATION_TOPIC_HISTORY_BATCH_ROWS,
+				}),
+				// 查找该用户的经典句资料库，按创建时间倒序取40条
+				this.classicQuotesLibraryRepo.find({
+					where: { userId },
+					order: { createdAt: 'DESC' },
+					take: 40,
+				}),
+			]);
+			labels = this.collectUniquePackTopicLabels(
+				batches.map((b) => b.topic), // 批次主题
+				libraries.map((lib) => lib.title), // 资料库标题
+			);
+		}
+		// 调用工具函数生成主题匹配索引，便于后续匹配/去重
+		return this.buildPackTopicMatchIndex(topic, labels);
+	}
+
+	/**
+	 * 向 keys 集合中添加新的去重 key（如单词或句子），用于后续生成时排除重复项。
+	 *
+	 * @param keys 当前已收集的 key 集合（Set），会原地添加新 key
+	 * @param rawKeys 原始 key 的可迭代对象（如字符串数组或 Set），每个元素会被去首尾空格
+	 * @param maxKeys 限制 keys 总数量，超出后停止添加
+	 */
+	private addPackExcludeKeys(
+		keys: Set<string>,
+		rawKeys: Iterable<string>,
+		maxKeys: number,
+	): void {
+		if (keys.size >= maxKeys) return; // 已达上限则不处理
+		for (const raw of rawKeys) {
+			const k = raw.trim(); // 去除首尾空白
+			if (!k) continue; // 忽略空字符串
+			keys.add(k); // 添加去重 key
+			if (keys.size >= maxKeys) break; // 达到最大数后立即终止
+		}
+	}
+
+	/**
+	 * 生成前从 DB 加载去重键（同主题历史 + 标题相关导入库 + 收藏），并入子模型 seen。
+	 * 全集进内存 Set；写入 prompt 时仍由 buildSeenKeysExcludePromptForModel 按字符上限节选。
+	 */
+	/**
+	 * 加载当前主题与用户相关、用作去重的 key 集合（如单词或经典句），
+	 * 包含：同主题历史生成批次、相关资料库、收藏等，合并最大 maxKeys 项。
+	 * @param params.userId 用户ID
+	 * @param params.topic 主题内容
+	 * @param params.kind 包类型（"vocabulary" | "classic_quotes"）
+	 * @param params.topicMatch 主题索引，若不传则自动创建
+	 * @returns Set<string> 全部去重 key 的集合
+	 */
+	private async loadExistingPackKeysForGeneration(params: {
+		userId: number; // 用户 ID
+		topic: string; // 目标主题
+		kind: 'vocabulary' | 'classic_quotes'; // 包类型：单词 or 经典句
+		topicMatch?: PackTopicMatchIndex; // （可选）主题匹配索引
+	}): Promise<Set<string>> {
+		const { userId, topic, kind, topicMatch: topicMatchIn } = params; // 解构参数
+		const keys = new Set<string>(); // 存放最终所有去重 key 的集合
+		const maxKeys = PACK_GENERATION_DB_EXCLUDE_MAX_KEYS; // 最大去重 key 数
+		const topicMatch =
+			topicMatchIn ?? // 使用外部传入的主题匹配对象（如果有）
+			(await this.createPackTopicMatchIndexForUser(userId, topic, kind)); // 否则基于用户和主题新生成一个匹配索引
+
+		// 词包类型
+		if (kind === 'vocabulary') {
+			// 1. 查找历史生成批次
+			const batches = await this.vocabBatchRepo.find({
+				where: { userId }, // 当前用户
+				order: { createdAt: 'DESC' }, // 创建时间倒序
+				take: PACK_GENERATION_TOPIC_HISTORY_BATCH_ROWS, // 限定数量
+			});
+			// 遍历每个批次
+			for (const b of batches) {
+				if (!topicMatch.isRelated(b.topic)) continue; // 跳过无关主题
+				if (!Array.isArray(b.items)) continue; // 跳过无 items 的批次
+				// 遍历所有单词
+				for (const item of b.items as EnglishVocabularyPackItemJson[]) {
+					if (keys.size >= maxKeys) break; // 已到最大限制则跳出
+					const w = typeof item.word === 'string' ? item.word : ''; // 提取 word 字符串
+					const k = this.normalizePackVocabKey(w); // 标准化成去重 key
+					if (k) keys.add(k); // 非空则加入集合
+				}
+			}
+
+			// 2. 查找资料库并筛选主题相关的库
+			const libraries = await this.vocabLibraryRepo.find({
+				where: { userId },
+				order: { createdAt: 'DESC' },
+				take: 40, // 限制最多查 40 个库
+			});
+			// 过滤与主题相关的库，限制每次处理的库数量
+			const libIds = libraries
+				.filter((lib) => topicMatch.isRelated(lib.title)) // 仅主题相关
+				.slice(0, PACK_GENERATION_TOPIC_MATCH_LIBRARIES) // 最多 N 个库
+				.map((lib) => lib.id); // 取出各库的ID
+			// 读取相关库中的单词项
+			if (libIds.length > 0 && keys.size < maxKeys) {
+				const rows = await this.vocabLibraryItemRepo.find({
+					where: { userId, libraryId: In(libIds) }, // 属于目标库
+					select: ['word'], // 仅取 word 字段
+					take: maxKeys - keys.size, // 剩余可加 key 数
+				});
+				this.addPackExcludeKeys(
+					keys,
+					rows.map((r) => this.normalizePackVocabKey(r.word)), // 标准化 key
+					maxKeys,
+				);
+			}
+
+			// 3. 加入用户收藏夹中的单词（如还未超限）
+			if (keys.size < maxKeys) {
+				const favs = await this.vocabFavoriteRepo.find({
+					where: { userId }, // 当前用户
+					select: ['wordKey'], // 只要 key
+					order: { createdAt: 'DESC' }, // 新到旧
+					take: PACK_GENERATION_FAVORITE_EXCLUDE_LIMIT, // 限数量
+				});
+				this.addPackExcludeKeys(
+					keys,
+					favs.map((f) => f.wordKey), // 收藏本身已标准化，无需再 normalize
+					maxKeys,
+				);
+			}
+		} else {
+			// 经典句类型
+			// 1. 查找历史生成批次
+			const batches = await this.classicBatchRepo.find({
+				where: { userId }, // 当前用户
+				order: { createdAt: 'DESC' },
+				take: PACK_GENERATION_TOPIC_HISTORY_BATCH_ROWS,
+			});
+			for (const b of batches) {
+				if (!topicMatch.isRelated(b.topic)) continue; // 跳过主题无关
+				if (!Array.isArray(b.items)) continue; // 跳过无 items
+				for (const item of b.items as EnglishClassicQuoteItemJson[]) {
+					if (keys.size >= maxKeys) break; // 已达上限
+					const en = typeof item.english === 'string' ? item.english : ''; // 取英文文本
+					const k = this.normalizePackClassicEnglishKey(en); // 标准化 key
+					if (k) keys.add(k); // 非空则加入
+				}
+			}
+
+			// 2. 资料库相关（经典句库）
+			const libraries = await this.classicQuotesLibraryRepo.find({
+				where: { userId },
+				order: { createdAt: 'DESC' },
+				take: 40, // 最多查40个库
+			});
+			const libIds = libraries
+				.filter((lib) => topicMatch.isRelated(lib.title)) // 主题相关
+				.slice(0, PACK_GENERATION_TOPIC_MATCH_LIBRARIES) // 限最大数
+				.map((lib) => lib.id); // 取出ID
+			if (libIds.length > 0 && keys.size < maxKeys) {
+				const rows = await this.classicQuotesLibraryItemRepo.find({
+					where: { userId, libraryId: In(libIds) }, // 目标库
+					select: ['english'], // 仅查英文字段
+					take: maxKeys - keys.size,
+				});
+				this.addPackExcludeKeys(
+					keys,
+					rows.map((r) => this.normalizePackClassicEnglishKey(r.english)), // 标准化 key
+					maxKeys,
+				);
+			}
+
+			// 3. 用户收藏夹中的经典句
+			if (keys.size < maxKeys) {
+				const favs = await this.classicQuoteFavoriteRepo.find({
+					where: { userId }, // 用户
+					select: ['english'], // 只要英文内容
+					order: { createdAt: 'DESC' }, // 新到旧
+					take: PACK_GENERATION_FAVORITE_EXCLUDE_LIMIT, // 限数量
+				});
+				this.addPackExcludeKeys(
+					keys,
+					favs.map((f) => this.normalizePackClassicEnglishKey(f.english)), // 标准化
+					maxKeys,
+				);
+			}
+		}
+
+		return keys; // 返回所有去重 key
+	}
+
+	/**
+	 * 将 JSON 格式的单词包条目映射为 VocabularyItemDto。
+	 * 若缺少必要字段（word, ipa）则返回 null。
+	 * @param row JSON 字典，通常为大模型产出或库内原始数据
+	 * @returns VocabularyItemDto | null
+	 */
+	private mapPackJsonToVocabDto(
+		row: EnglishVocabularyPackItemJson,
+	): VocabularyItemDto | null {
+		const word = typeof row.word === 'string' ? row.word.trim() : '';
+		const ipa = typeof row.ipa === 'string' ? row.ipa.trim() : '';
+		// 必须包含单词和音标，否则丢弃该条目
+		if (!word || !ipa) return null;
+		return {
+			word, // 单词
+			ipa, // 音标
+			pos: typeof row.pos === 'string' ? row.pos.trim().slice(0, 64) : '', // 词性（截断至最多64字）
+			translationZh:
+				typeof row.translationZh === 'string' ? row.translationZh : '—', // 中文释义，缺省时为 "—"
+			example: typeof row.example === 'string' ? row.example : '—', // 例句，缺省时为 "—"
+		};
+	}
+
+	private tryPushVocabItemDeduped(
+		out: VocabularyItemDto[],
+		seen: Set<string>,
+		item: VocabularyItemDto,
+		limit: number,
+	): void {
+		if (out.length >= limit) return;
+		const key = this.normalizePackVocabKey(item.word);
+		if (!key || seen.has(key)) return;
+		seen.add(key);
+		out.push(item);
+	}
+
+	/**
+	 * 分页读取指定用户的单词库条目，并进行去重、筛选，直至 items 满足 limit 或库内无更多条目。
+	 * 该方法用于合成单词包时优先利用用户自己的词库资源，减少大模型资源消耗。
+	 *
+	 * @param userId 用户 ID
+	 * @param libraryId 单词库 ID
+	 * @param items 累积结果的输出数组（外部传入，自动累加）
+	 * @param seen 已收录的单词 key（用于去重）
+	 * @param limit 需要补足的目标数量
+	 */
+	private async loadVocabItemsFromLibraryPaginated(
+		userId: number,
+		libraryId: string,
+		items: VocabularyItemDto[],
+		seen: Set<string>,
+		limit: number,
+	): Promise<void> {
+		let skip = 0; // 用于分页查询的偏移量
+		while (items.length < limit) {
+			// 分页查询单词库条目，按 sortOrder 升序排序
+			const rows = await this.vocabLibraryItemRepo.find({
+				where: { userId, libraryId },
+				order: { sortOrder: 'ASC' },
+				take: PACK_TOPIC_LIBRARY_ITEMS_PAGE_SIZE, // 每页条数
+				skip, // 跳过已处理条目
+			});
+			if (rows.length === 0) break; // 库内已无更多条目，提前退出
+
+			// 遍历当前页查询出的单词库条目，将符合去重条件的单词加入结果集
+			for (const row of rows) {
+				this.tryPushVocabItemDeduped(
+					items, // 累加输出的目标数组
+					seen, // 去重依据的已见单词集合
+					{
+						word: row.word, // 单词本身
+						ipa: row.ipa ?? '', // 音标，缺省时为空字符串
+						pos: row.pos ?? '', // 词性，缺省时为空字符串
+						translationZh: row.translationZh, // 中文释义
+						example: row.example ?? '—', // 例句，缺省时为 '—'
+					},
+					limit, // 目标数量
+				);
+				if (items.length >= limit) return; // 达到上限立即返回
+			}
+			skip += rows.length; // 增加偏移量，准备下一页
+			if (rows.length < PACK_TOPIC_LIBRARY_ITEMS_PAGE_SIZE) break; // 本页不足一页剩余，说明已读完
+		}
+	}
+
+	/** 同主题：导入库 + 历史批次中的完整词条（用于命中则直接返回，不走大模型） */
+	private async loadTopicRelatedVocabularyItemsFromDb(
+		userId: number,
+		topic: string,
+		limit: number,
+		topicMatch?: PackTopicMatchIndex,
+	): Promise<VocabularyItemDto[]> {
+		const items: VocabularyItemDto[] = [];
+		const seen = new Set<string>();
+		const match =
+			topicMatch ??
+			(await this.createPackTopicMatchIndexForUser(
+				userId,
+				topic,
+				'vocabulary',
+			));
+
+		const libraries = await this.vocabLibraryRepo.find({
+			where: { userId },
+			order: { createdAt: 'DESC' },
+			take: 40,
+		});
+		const libIds = libraries
+			.filter((lib) => match.isRelated(lib.title))
+			.slice(0, PACK_GENERATION_TOPIC_MATCH_LIBRARIES)
+			.map((lib) => lib.id);
+
+		for (const libraryId of libIds) {
+			if (items.length >= limit) break;
+			await this.loadVocabItemsFromLibraryPaginated(
+				userId,
+				libraryId,
+				items,
+				seen,
+				limit,
+			);
+		}
+
+		const batches = await this.vocabBatchRepo.find({
+			where: { userId },
+			order: { createdAt: 'DESC' },
+			take: PACK_GENERATION_TOPIC_HISTORY_BATCH_ROWS,
+		});
+		for (const b of batches) {
+			if (items.length >= limit) break;
+			if (!match.isRelated(b.topic)) continue;
+			if (!Array.isArray(b.items)) continue;
+			for (const raw of b.items as EnglishVocabularyPackItemJson[]) {
+				const dto = this.mapPackJsonToVocabDto(raw);
+				if (dto) this.tryPushVocabItemDeduped(items, seen, dto, limit);
+			}
+		}
+
+		return items;
+	}
+
+	private mapPackJsonToClassicDto(
+		row: EnglishClassicQuoteItemJson,
+	): ClassicQuoteItemDto | null {
+		const english = typeof row.english === 'string' ? row.english.trim() : '';
+		const translationZh =
+			typeof row.translationZh === 'string' ? row.translationZh.trim() : '';
+		if (!english || !translationZh) return null;
+		return {
+			english,
+			translationZh,
+			source:
+				typeof row.source === 'string' ? row.source.trim().slice(0, 2000) : '—',
+			noteZh: typeof row.noteZh === 'string' ? row.noteZh.trim() : '—',
+		};
+	}
+
+	private tryPushClassicItemDeduped(
+		out: ClassicQuoteItemDto[],
+		seen: Set<string>,
+		item: ClassicQuoteItemDto,
+		limit: number,
+	): void {
+		if (out.length >= limit) return;
+		const key = this.normalizePackClassicEnglishKey(item.english);
+		if (!key || seen.has(key)) return;
+		seen.add(key);
+		out.push(item);
+	}
+
+	/** 从单个经典语句库分页读取，直至凑满 limit 或库内无更多行 */
+	private async loadClassicItemsFromLibraryPaginated(
+		userId: number,
+		libraryId: string,
+		items: ClassicQuoteItemDto[],
+		seen: Set<string>,
+		limit: number,
+	): Promise<void> {
+		let skip = 0;
+		while (items.length < limit) {
+			const rows = await this.classicQuotesLibraryItemRepo.find({
+				where: { userId, libraryId },
+				order: { sortOrder: 'ASC' },
+				take: PACK_TOPIC_LIBRARY_ITEMS_PAGE_SIZE,
+				skip,
+			});
+			if (rows.length === 0) break;
+			for (const row of rows) {
+				this.tryPushClassicItemDeduped(
+					items,
+					seen,
+					{
+						english: row.english,
+						translationZh: row.translationZh,
+						source: row.source ?? '—',
+						noteZh: row.noteZh ?? '—',
+					},
+					limit,
+				);
+				if (items.length >= limit) return;
+			}
+			skip += rows.length;
+			if (rows.length < PACK_TOPIC_LIBRARY_ITEMS_PAGE_SIZE) break;
+		}
+	}
+
+	private async loadTopicRelatedClassicQuotesFromDb(
+		userId: number,
+		topic: string,
+		limit: number,
+		topicMatch?: PackTopicMatchIndex,
+	): Promise<ClassicQuoteItemDto[]> {
+		const items: ClassicQuoteItemDto[] = [];
+		const seen = new Set<string>();
+		const match =
+			topicMatch ??
+			(await this.createPackTopicMatchIndexForUser(
+				userId,
+				topic,
+				'classic_quotes',
+			));
+
+		const libraries = await this.classicQuotesLibraryRepo.find({
+			where: { userId },
+			order: { createdAt: 'DESC' },
+			take: 40,
+		});
+		const libIds = libraries
+			.filter((lib) => match.isRelated(lib.title))
+			.slice(0, PACK_GENERATION_TOPIC_MATCH_LIBRARIES)
+			.map((lib) => lib.id);
+
+		for (const libraryId of libIds) {
+			if (items.length >= limit) break;
+			await this.loadClassicItemsFromLibraryPaginated(
+				userId,
+				libraryId,
+				items,
+				seen,
+				limit,
+			);
+		}
+
+		const batches = await this.classicBatchRepo.find({
+			where: { userId },
+			order: { createdAt: 'DESC' },
+			take: PACK_GENERATION_TOPIC_HISTORY_BATCH_ROWS,
+		});
+		for (const b of batches) {
+			if (items.length >= limit) break;
+			if (!match.isRelated(b.topic)) continue;
+			if (!Array.isArray(b.items)) continue;
+			for (const raw of b.items as EnglishClassicQuoteItemJson[]) {
+				const dto = this.mapPackJsonToClassicDto(raw);
+				if (dto) this.tryPushClassicItemDeduped(items, seen, dto, limit);
+			}
+		}
+
+		return items;
+	}
+
+	/** 主 Agent 用短摘要（不重复查库）；无键时返回空串 */
+	private buildExistingPackHintForMaster(
+		kind: 'vocabulary' | 'classic_quotes',
+		keys: Set<string>,
+	): string {
+		if (keys.size === 0) return '';
+		const sample = [...keys].slice(-PACK_GENERATION_MASTER_HINT_SAMPLE_ITEMS);
+		const joined = sample.join('；');
+		const head =
+			kind === 'vocabulary'
+				? `【用户已有词条（同主题相关资料）】约 ${keys.size} 个词形已收录，下游禁止重复同形（不区分大小写）。节选：`
+				: `【用户已有句子（同主题相关资料）】约 ${keys.size} 句已收录，下游禁止重复相同或实质雷同英文。节选：`;
+		let text = `${head}${joined}`;
+		if (text.length > PACK_GENERATION_MASTER_EXISTING_HINT_MAX_CHARS) {
+			text = `${text.slice(0, PACK_GENERATION_MASTER_EXISTING_HINT_MAX_CHARS)}…`;
+		}
+		return text;
+	}
+
 	/**
 	 * 主 Agent（大脑）：仅检索与要点整理，可调工具；不负责输出 JSON。整场单词/经典句开始时调用一次。
 	 * 此方法负责协调主 Agent 的大模型调用与工具流程，产出“简明要点”作为后续知识生成的核心输入。
@@ -648,13 +1326,16 @@ export class EnglishLearningService {
 		userId: number;
 		topic: string;
 		kind: 'vocabulary' | 'classic_quotes';
+		/** 用户已有同主题资料短摘要（由 loadExistingPackKeysForGeneration 生成，勿过长） */
+		existingPackHint?: string;
 		/** 与 SSE / 显式 cancel 共用，与 120s 超时合并为任一触发即中止 */
 		clientSignal?: AbortSignal;
 		onToolEvent?: (
 			e: EnglishLearningPackAgentToolEvent,
 		) => void | Promise<void>;
 	}): Promise<string> {
-		const { userId, topic, kind, onToolEvent, clientSignal } = params;
+		const { userId, topic, kind, existingPackHint, onToolEvent, clientSignal } =
+			params;
 
 		const timeoutAc = new AbortController();
 		const timeoutMs = 120_000;
@@ -727,10 +1408,14 @@ export class EnglishLearningService {
 				kind === 'vocabulary' ? '单词/短语主题包' : '英文名言/金句主题包';
 
 			// 组织发送给 LLM 的 Human prompt：与系统提示一致，强调「按需用工具」，避免模型为走流程而必调联网
+			const existingHintBlock = existingPackHint?.trim()
+				? `\n${existingPackHint.trim()}\n`
+				: '';
+
 			const userHumanText = `任务类型：${kindLabel}
 主题/需求：${topic.trim()}
 学习语境：${ENGLISH_PACK_LEARNER_CONTEXT_HINT}
-
+${existingHintBlock}
 请先判断是否真的需要调用工具（互联网搜索 / 知识库检索 / 当前日期）。若主题以课内词汇、搭配扩展、词根词缀等为主、且无必须核验的公开事实或出处缺口，可直接整理要点，**不必**为完成任务而例行联网。确有必要时再按需调用工具并消化结果，然后输出一段简明要点（中文为主，可夹关键英文术语），供下游子模型扩展词条或句子方向使用；不要输出 JSON，不要输出 markdown 代码块。`;
 
 			// 启动流式 Agent，会不断地以事件流方式返回推理阶段的各类事件（模型输出增量、工具调用等）
@@ -1074,7 +1759,7 @@ export class EnglishLearningService {
 	}
 
 	/**
-	 * 将本轮流式生成的新词条写入数据库（每轮 LLM 一批一行）。
+	 * 将本轮新词条写入当前 stream 的 batch 表（LLM 每轮一批；库内预填/直出按 chunk 分批，便于历史列表与详情还原）。
 	 */
 	async saveVocabularyPackBatch(params: {
 		userId: number;
@@ -1610,9 +2295,8 @@ export class EnglishLearningService {
 	}
 
 	/**
-	 * 将本轮流式生成的新“经典句”条目批量写入数据库。
-	 * - 每轮大模型生成后执行一次，将该轮批量内容作为一条 batch 记录保存
-	 * - 主要用于流式词包/句包会话持久化，方便后续查询和历史回溯
+	 * 将本轮新经典句写入当前 stream 的 batch 表（LLM 每轮一批；库内预填/直出按 chunk 分批）。
+	 * - 用于流式会话持久化，历史列表 wordCount/quoteCount 与各批 items 之和一致
 	 *
 	 * @param params 包含以下字段：
 	 *   - userId: number               当前用户的 ID（生成者）
@@ -1730,6 +2414,100 @@ export class EnglishLearningService {
 		const vocabularySystemStatic = `${VOCABULARY_PACK_SUBMODEL_SYSTEM_STATIC}${topic}
 学习语境：${ENGLISH_PACK_LEARNER_CONTEXT_HINT}`;
 
+		let accumulated: VocabularyItemDto[] = [];
+		const seen = new Set<string>();
+
+		const timeSensitive =
+			context?.userId != null && this.isPackTopicTimeSensitive(topic);
+
+		if (context?.userId != null && !timeSensitive) {
+			let topicMatch: PackTopicMatchIndex | undefined;
+			try {
+				topicMatch = await this.createPackTopicMatchIndexForUser(
+					context.userId,
+					topic,
+					'vocabulary',
+				);
+			} catch (e: unknown) {
+				this.logger.warn(
+					'[EnglishLearning] 构建单词包主题匹配索引失败，将按条回退',
+					e,
+				);
+			}
+			try {
+				const dbItems = await this.loadTopicRelatedVocabularyItemsFromDb(
+					context.userId,
+					topic,
+					count,
+					topicMatch,
+				);
+				if (dbItems.length >= count) {
+					const result = dbItems.slice(0, count);
+					await this.emitPackNewItemsInChunks({
+						onProgress,
+						items: result,
+						target: count,
+						fromDatabase: true,
+						startRound: 1,
+					});
+					this.logger.log(
+						`[EnglishLearning] 单词包库内同主题资料已满 ${result.length}/${count} 条，跳过大模型（topic=${topic.slice(0, 48)}）`,
+					);
+					return result;
+				}
+				if (dbItems.length > 0) {
+					accumulated = dbItems;
+					for (const item of accumulated) {
+						const k = this.normalizePackVocabKey(item.word);
+						if (k) seen.add(k);
+					}
+					await this.emitPackNewItemsInChunks({
+						onProgress,
+						items: accumulated,
+						target: count,
+						fromDatabase: true,
+						startRound: 0,
+					});
+					this.logger.log(
+						`[EnglishLearning] 单词包库内预填 ${accumulated.length}/${count} 条，大模型补足剩余（topic=${topic.slice(0, 48)}）`,
+					);
+				}
+			} catch (e: unknown) {
+				this.logger.warn(
+					'[EnglishLearning] 查询库内同主题单词失败，改走大模型生成',
+					e,
+				);
+			}
+			try {
+				const dbKeys = await this.loadExistingPackKeysForGeneration({
+					userId: context.userId,
+					topic,
+					kind: 'vocabulary',
+					topicMatch,
+				});
+				for (const k of dbKeys) seen.add(k);
+				if (dbKeys.size > 0) {
+					this.logger.log(
+						`[EnglishLearning] 单词生成并入 DB 去重键 ${dbKeys.size} 个（topic=${topic.slice(0, 48)}）`,
+					);
+				}
+			} catch (e: unknown) {
+				this.logger.warn(
+					'[EnglishLearning] 加载已有单词去重键失败，继续生成',
+					e,
+				);
+			}
+		} else if (timeSensitive) {
+			this.logger.log(
+				`[EnglishLearning] 单词包主题为时效性，跳过全部库内查询，直走主 Agent（topic=${topic.slice(0, 48)}）`,
+			);
+		}
+
+		const existingPackHint =
+			context?.userId != null && !timeSensitive
+				? this.buildExistingPackHintForMaster('vocabulary', seen)
+				: '';
+
 		/** 主 Agent 检索要点（整场一次）；非空时仅在「线程中尚未含附录」的首条 Human 前置附录。每轮子模型 system 会动态追加「本轮生成要求」。 */
 		let agentResearchAppendix = '';
 		if (context?.userId != null) {
@@ -1738,6 +2516,7 @@ export class EnglishLearningService {
 					userId: context.userId,
 					topic,
 					kind: 'vocabulary',
+					existingPackHint,
 					clientSignal: context?.signal,
 					onToolEvent: context?.onAgentTool,
 				});
@@ -1752,10 +2531,7 @@ export class EnglishLearningService {
 			}
 		}
 
-		let accumulated: VocabularyItemDto[] = [];
 		try {
-			accumulated = [];
-			const seen = new Set<string>();
 			/** 已登录时多轮 JSON 子模型的 LangChain 消息线程 */
 			const packAgentThread: BaseMessage[] = [];
 			let stall = 0;
@@ -1772,7 +2548,7 @@ export class EnglishLearningService {
 				const batch = Math.min(batchCap, need);
 				const seenKeys = [...seen];
 				const excludeSnippet =
-					accumulated.length === 0
+					seen.size === 0
 						? ''
 						: this.buildSeenKeysExcludePromptForModel(seenKeys, {
 								maxTailItems: TOPIC_PACK_EXCLUDE_TAIL,
@@ -1784,18 +2560,25 @@ export class EnglishLearningService {
 						? `\n【多样性】请换子角度：同主题下的不同词性、常见搭配、近义辨析词、学科细分小类、短语动词变体等，严禁与已列词条同形或仅大小写差异。`
 						: '';
 
+				const excludeBlock = excludeSnippet
+					? `\n以下英文词条已出现过，禁止再次输出（不区分大小写；归一化后须与下列全部不同）：${excludeSnippet}\n本批 items 内部也不得出现彼此重复的 word。`
+					: '';
+
+				const prefillNote =
+					accumulated.length > 0 && rounds === 1
+						? `\n【说明】用户资源库中已有 ${accumulated.length} 条同主题词条，请勿重复；本批仅需补足至总数 ${count} 条。`
+						: '';
+
 				/** 每轮拼入 system，避免写入 packAgentThread 的 Human 重复携带长节选 */
 				const roundRequirement =
 					accumulated.length === 0
-						? `请恰好生成 ${batch} 条 items（数组长度必须等于 ${batch}）。`
-						: `请再生成恰好 ${batch} 条新的 items（数组长度必须等于 ${batch}）。
-以下英文词条已出现过，禁止再次输出（不区分大小写；归一化后须与下列全部不同）：${excludeSnippet}
-本批 items 内部也不得出现彼此重复的 word。请输出与上述列表完全不同的词或短语。${diversityHint}`;
+						? `请恰好生成 ${batch} 条 items（数组长度必须等于 ${batch}）。${excludeBlock}请输出与已有资料完全不同的词或短语。${diversityHint}`
+						: `请再生成恰好 ${batch} 条新的 items（数组长度必须等于 ${batch}）。${excludeBlock}${prefillNote}请输出与上述列表完全不同的词或短语。${diversityHint}`;
 
 				const newItemsThisRound: VocabularyItemDto[] = [];
 				let added = 0;
 				let batchItems: VocabularyItemDto[] = [];
-				const maxDupPasses = accumulated.length === 0 ? 1 : 5;
+				const maxDupPasses = seen.size === 0 ? 1 : 5;
 
 				const userForModel = this.buildSubModelUserWithOptionalResearchAppendix(
 					agentResearchAppendix,
@@ -1884,8 +2667,8 @@ export class EnglishLearningService {
 					newItemsThisRound.length = 0;
 					added = 0;
 					for (const item of batchItems) {
-						const key = item.word.toLowerCase();
-						if (seen.has(key)) continue;
+						const key = this.normalizePackVocabKey(item.word);
+						if (!key || seen.has(key)) continue;
 						seen.add(key);
 						accumulated.push(item);
 						newItemsThisRound.push(item);
@@ -1997,6 +2780,100 @@ export class EnglishLearningService {
 		const classicQuotesSystemStatic = `${CLASSIC_QUOTES_SUBMODEL_SYSTEM_STATIC}${topic}
 学习语境：${ENGLISH_PACK_LEARNER_CONTEXT_HINT}`;
 
+		let accumulated: ClassicQuoteItemDto[] = [];
+		const seen = new Set<string>();
+
+		const timeSensitive =
+			context?.userId != null && this.isPackTopicTimeSensitive(topic);
+
+		if (context?.userId != null && !timeSensitive) {
+			let topicMatch: PackTopicMatchIndex | undefined;
+			try {
+				topicMatch = await this.createPackTopicMatchIndexForUser(
+					context.userId,
+					topic,
+					'classic_quotes',
+				);
+			} catch (e: unknown) {
+				this.logger.warn(
+					'[EnglishLearning] 构建经典句主题匹配索引失败，将按条回退',
+					e,
+				);
+			}
+			try {
+				const dbItems = await this.loadTopicRelatedClassicQuotesFromDb(
+					context.userId,
+					topic,
+					count,
+					topicMatch,
+				);
+				if (dbItems.length >= count) {
+					const result = dbItems.slice(0, count);
+					await this.emitPackNewItemsInChunks({
+						onProgress,
+						items: result,
+						target: count,
+						fromDatabase: true,
+						startRound: 1,
+					});
+					this.logger.log(
+						`[EnglishLearning] 经典句库内同主题资料已满 ${result.length}/${count} 条，跳过大模型（topic=${topic.slice(0, 48)}）`,
+					);
+					return result;
+				}
+				if (dbItems.length > 0) {
+					accumulated = dbItems;
+					for (const item of accumulated) {
+						const k = this.normalizePackClassicEnglishKey(item.english);
+						if (k) seen.add(k);
+					}
+					await this.emitPackNewItemsInChunks({
+						onProgress,
+						items: accumulated,
+						target: count,
+						fromDatabase: true,
+						startRound: 0,
+					});
+					this.logger.log(
+						`[EnglishLearning] 经典句库内预填 ${accumulated.length}/${count} 条，大模型补足剩余（topic=${topic.slice(0, 48)}）`,
+					);
+				}
+			} catch (e: unknown) {
+				this.logger.warn(
+					'[EnglishLearning] 查询库内同主题语句失败，改走大模型生成',
+					e,
+				);
+			}
+			try {
+				const dbKeys = await this.loadExistingPackKeysForGeneration({
+					userId: context.userId,
+					topic,
+					kind: 'classic_quotes',
+					topicMatch,
+				});
+				for (const k of dbKeys) seen.add(k);
+				if (dbKeys.size > 0) {
+					this.logger.log(
+						`[EnglishLearning] 经典句生成并入 DB 去重键 ${dbKeys.size} 个（topic=${topic.slice(0, 48)}）`,
+					);
+				}
+			} catch (e: unknown) {
+				this.logger.warn(
+					'[EnglishLearning] 加载已有经典句去重键失败，继续生成',
+					e,
+				);
+			}
+		} else if (timeSensitive) {
+			this.logger.log(
+				`[EnglishLearning] 经典句主题为时效性，跳过全部库内查询，直走主 Agent（topic=${topic.slice(0, 48)}）`,
+			);
+		}
+
+		const existingPackHint =
+			context?.userId != null && !timeSensitive
+				? this.buildExistingPackHintForMaster('classic_quotes', seen)
+				: '';
+
 		/**
 		 * 主 Agent 检索要点（整场一次）；非空时仅在「线程中尚未含附录」的首条 Human 前置附录。每轮子模型 system 会动态追加「本轮生成要求」。
 		 */
@@ -2007,6 +2884,7 @@ export class EnglishLearningService {
 					userId: context.userId,
 					topic,
 					kind: 'classic_quotes',
+					existingPackHint,
 					clientSignal: context?.signal,
 					onToolEvent: context?.onAgentTool,
 				});
@@ -2023,11 +2901,7 @@ export class EnglishLearningService {
 			}
 		}
 
-		let accumulated: ClassicQuoteItemDto[] = [];
 		try {
-			accumulated = [];
-			// 已收集过的句子（归一化为小写去空格的形式）
-			const seen = new Set<string>();
 			/**
 			 * 多轮消息线程，仅在有 userId 时累计，便于子模型对话流上下文记忆。
 			 * packAgentThread 每轮添加一次 user/ai 交换，并裁剪长度。
@@ -2048,7 +2922,7 @@ export class EnglishLearningService {
 				// 生成“排除片段”列表，传递给LLM避免重复（仅取近N条）
 				const seenKeys = [...seen];
 				const excludeSnippet =
-					accumulated.length === 0
+					seen.size === 0
 						? ''
 						: this.buildSeenKeysExcludePromptForModel(seenKeys, {
 								maxTailItems: TOPIC_PACK_EXCLUDE_CLASSIC_TAIL_ITEMS,
@@ -2061,18 +2935,25 @@ export class EnglishLearningService {
 						? `\n【多样性】请换不同作品/时代/体裁/演讲场合；避免仅改写标点或个别词的同一句式变体。`
 						: '';
 
+				const excludeBlock = excludeSnippet
+					? `\n以下英文句子（节选）已出现过，禁止再次输出相同或实质雷同的句子（含轻微改写；不区分大小写；归一化后须与下列全部不同）：${excludeSnippet}\n本批 items 内部的 english 也不得彼此重复或雷同。`
+					: '';
+
+				const prefillNote =
+					accumulated.length > 0 && rounds === 1
+						? `\n【说明】用户资源库中已有 ${accumulated.length} 条同主题语句，请勿重复；本批仅需补足至总数 ${count} 条。`
+						: '';
+
 				/** 每轮拼入 system，避免写入 packAgentThread 的 Human 重复携带长节选（与单词生成一致） */
 				const roundRequirement =
 					accumulated.length === 0
-						? `请恰好生成 ${batch} 条 items（数组长度必须等于 ${batch}）。`
-						: `请再生成恰好 ${batch} 条新的 items（数组长度必须等于 ${batch}）。
-以下英文句子（节选）已出现过，禁止再次输出相同或实质雷同的句子（含轻微改写；不区分大小写；归一化后须与下列全部不同）：${excludeSnippet}
-本批 items 内部的 english 也不得彼此重复或雷同。请输出与上述列表完全不同的句子。${diversityHint}`;
+						? `请恰好生成 ${batch} 条 items（数组长度必须等于 ${batch}）。${excludeBlock}请输出与已有资料完全不同的句子。${diversityHint}`
+						: `请再生成恰好 ${batch} 条新的 items（数组长度必须等于 ${batch}）。${excludeBlock}${prefillNote}请输出与上述列表完全不同的句子。${diversityHint}`;
 
 				const newItemsThisRound: ClassicQuoteItemDto[] = [];
 				let added = 0;
 				let batchItems: ClassicQuoteItemDto[] = [];
-				const maxDupPasses = accumulated.length === 0 ? 1 : 5;
+				const maxDupPasses = seen.size === 0 ? 1 : 5;
 
 				const userForModel = this.buildSubModelUserWithOptionalResearchAppendix(
 					agentResearchAppendix,
@@ -2168,7 +3049,7 @@ export class EnglishLearningService {
 					added = 0;
 					// 对本批次条目做归一化去重、判空
 					for (const item of batchItems) {
-						const key = item.english.toLowerCase().trim().slice(0, 400); // 归一化key
+						const key = this.normalizePackClassicEnglishKey(item.english);
 						if (!key || seen.has(key)) continue; // 忽略空串或前面已出现过的句子
 						seen.add(key); // 记入去重集合
 						accumulated.push(item); // 加入总集

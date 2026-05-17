@@ -145,6 +145,11 @@ export type EnglishPackStreamCallbacks<TItem> = {
 		items: TItem[];
 		requested: number;
 		streamId?: string;
+		/** 来自库内同主题资料，未走大模型 */
+		fromDatabase?: boolean;
+		/** 条目已由 chunk 送达，complete 未重复携带 items */
+		itemsOmitted?: boolean;
+		itemCount?: number;
 	}) => void;
 	onError?: (message: string) => void;
 	/** 用户点击取消触发的中断（非静默替换上一轮请求） */
@@ -253,6 +258,10 @@ async function runEnglishLearningPackSseStream<TItem>(
 			const type = parsed.type;
 
 			if (type === `${tp}progress`) {
+				// 服务端保活帧，仅用于维持连接，不得覆盖库内预填后的进度
+				if (parsed.heartbeat === true) {
+					return false;
+				}
 				const collected = Number(parsed.collected);
 				const target = Number(parsed.target);
 				const round = Number(parsed.round);
@@ -326,12 +335,18 @@ async function runEnglishLearningPackSseStream<TItem>(
 				receivedComplete = true;
 				const items = def.parseItems(parsed.items);
 				const requested = Number(parsed.requested);
+				const itemCount = Number(parsed.itemCount);
 				const streamId =
 					typeof parsed.streamId === 'string' ? parsed.streamId : undefined;
+				const fromDatabase = parsed.fromDatabase === true;
+				const itemsOmitted = parsed.itemsOmitted === true;
 				onDone?.({
 					items,
 					requested: Number.isFinite(requested) ? requested : items.length,
 					streamId,
+					...(fromDatabase ? { fromDatabase: true } : {}),
+					...(itemsOmitted ? { itemsOmitted: true } : {}),
+					...(Number.isFinite(itemCount) ? { itemCount } : {}),
 				});
 				return true;
 			}

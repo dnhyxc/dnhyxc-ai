@@ -816,6 +816,10 @@ export const zhCN = {
 		'填写时须为 1～12000 的整数；留空则按上限拉取',
 	'englishLearning.vocab.progress':
 		'已生成 {collected} / {target} 条 · 第 {round} 批模型请求',
+	'englishLearning.vocab.fromDatabase':
+		'已从资源库加载 {count} 个单词（同主题）',
+	'englishLearning.classic.fromDatabase':
+		'已从资源库加载 {count} 条语句（同主题）',
 	'englishLearning.vocab.partialResult':
 		'目标 {want} 条，本次返回 {got} 条（可能因重复过多或达到重试上限提前结束）',
 	'englishLearning.vocab.aborted': '已取消生成',

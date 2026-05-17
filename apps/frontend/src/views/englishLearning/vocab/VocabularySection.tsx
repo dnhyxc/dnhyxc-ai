@@ -252,23 +252,45 @@ function VocabularyPackSectionInner() {
 				onChunk: ({ items: delta }) => {
 					EnglishPackStore.vocabOnChunk(myGen, delta);
 				},
-				onDone: ({ items: list, requested }) => {
+				onDone: ({
+					items: list,
+					requested,
+					fromDatabase,
+					itemsOmitted,
+					itemCount,
+				}) => {
 					if (myGen !== EnglishPackStore.vocabStreamGenId) return;
-					EnglishPackStore.vocabOnDone(myGen, list);
+					const finalList =
+						itemsOmitted &&
+						list.length === 0 &&
+						EnglishPackStore.vocabItems.length > 0
+							? EnglishPackStore.vocabItems.slice(
+									0,
+									Number.isFinite(itemCount) ? itemCount : requested,
+								)
+							: list;
+					EnglishPackStore.vocabOnDone(myGen, finalList);
 					setLoadedStreamId(null);
 					if (historyDrawerOpenRef.current) {
 						void fetchHistoryFirstPage();
 					}
-					if (list.length === 0) {
+					if (finalList.length === 0) {
 						Toast({
 							type: 'info',
 							title: t('englishLearning.vocab.empty'),
 						});
-					} else if (list.length < requested) {
+					} else if (fromDatabase) {
+						Toast({
+							type: 'success',
+							title: t('englishLearning.vocab.fromDatabase', {
+								count: String(finalList.length),
+							}),
+						});
+					} else if (finalList.length < requested) {
 						Toast({
 							type: 'info',
 							title: t('englishLearning.vocab.partialResult', {
-								got: list.length,
+								got: finalList.length,
 								want: requested,
 							}),
 						});

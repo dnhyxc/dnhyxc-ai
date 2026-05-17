@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { KnowledgeEmbeddingModule } from '../knowledge-embedding/knowledge-embedding.module';
 import { KnowledgeQaModule } from '../knowledge-qa/knowledge-qa.module';
 import { EnglishClassicQuotePackBatch } from './english-classic-quote.entity';
 import { EnglishClassicQuoteFavorite } from './english-classic-quote-favorite.entity';
@@ -17,6 +18,7 @@ import { EnglishVocabularyLibraryItem } from './english-vocabulary-library-item.
 @Module({
 	imports: [
 		KnowledgeQaModule,
+		KnowledgeEmbeddingModule,
 		TypeOrmModule.forFeature([
 			EnglishVocabularyPackBatch,
 			EnglishClassicQuotePackBatch,

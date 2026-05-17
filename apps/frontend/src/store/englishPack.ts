@@ -131,6 +131,15 @@ class EnglishPack {
 	vocabOnProgress(gen: number, p: EnglishPackUiProgress) {
 		if (gen !== this.vocabStreamGenId) return;
 		runInAction(() => {
+			const prev = this.vocabProgress;
+			if (prev && p.collected < prev.collected) {
+				this.vocabProgress = {
+					...p,
+					collected: prev.collected,
+					round: Math.max(prev.round, p.round),
+				};
+				return;
+			}
 			this.vocabProgress = p;
 		});
 	}
@@ -164,6 +173,12 @@ class EnglishPack {
 		runInAction(() => {
 			this.vocabAgentToolLine = null;
 			this.vocabItems = [...this.vocabItems, ...delta];
+			if (this.vocabProgress) {
+				const collected = this.vocabItems.length;
+				if (collected > this.vocabProgress.collected) {
+					this.vocabProgress = { ...this.vocabProgress, collected };
+				}
+			}
 		});
 	}
 
@@ -295,6 +310,15 @@ class EnglishPack {
 	classicOnProgress(gen: number, p: EnglishPackUiProgress) {
 		if (gen !== this.classicStreamGenId) return;
 		runInAction(() => {
+			const prev = this.classicProgress;
+			if (prev && p.collected < prev.collected) {
+				this.classicProgress = {
+					...p,
+					collected: prev.collected,
+					round: Math.max(prev.round, p.round),
+				};
+				return;
+			}
 			this.classicProgress = p;
 		});
 	}
@@ -325,6 +349,12 @@ class EnglishPack {
 		runInAction(() => {
 			this.classicAgentToolLine = null;
 			this.classicItems = [...this.classicItems, ...delta];
+			if (this.classicProgress) {
+				const collected = this.classicItems.length;
+				if (collected > this.classicProgress.collected) {
+					this.classicProgress = { ...this.classicProgress, collected };
+				}
+			}
 		});
 	}
 

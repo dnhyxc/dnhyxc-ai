@@ -28,6 +28,10 @@ import type { Request, Response } from 'express';
 import { diskStorage } from 'multer';
 import { Observable } from 'rxjs';
 import { JwtGuard } from 'src/guards/jwt.guard';
+import {
+	PACK_SSE_COMPLETE_OMIT_ITEMS_THRESHOLD,
+	PACK_SSE_KEEPALIVE_INTERVAL_MS,
+} from './constant';
 import { CancelEnglishLearningStreamDto } from './dto/cancel-english-learning-stream.dto';
 import {
 	ClassicQuoteFavoriteBodyDto,
@@ -52,6 +56,50 @@ import {
 	EnglishLearningService,
 } from './english-learning.service';
 import { EnglishLearningStreamAbortRegistry } from './english-learning-stream-abort.registry';
+
+/** 长任务 SSE 心跳，避免库内加载/向量匹配期间被代理或客户端判为断流 */
+function startEnglishPackSseKeepalive(
+	emit: (data: Record<string, unknown>) => void,
+	params: {
+		eventPrefix: 'vocab' | 'classic';
+		streamId: string;
+		target: number;
+	},
+): () => void {
+	const timer = setInterval(() => {
+		emit({
+			type: `${params.eventPrefix}.progress`,
+			streamId: params.streamId,
+			collected: 0,
+			target: params.target,
+			round: 0,
+			heartbeat: true,
+		});
+	}, PACK_SSE_KEEPALIVE_INTERVAL_MS);
+	return () => clearInterval(timer);
+}
+
+function buildEnglishPackCompleteSsePayload(params: {
+	eventPrefix: 'vocab' | 'classic';
+	streamId: string;
+	items: unknown[];
+	requested: number;
+	servedFromDatabase: boolean;
+}): Record<string, unknown> {
+	const omitItems =
+		params.servedFromDatabase ||
+		params.items.length >= PACK_SSE_COMPLETE_OMIT_ITEMS_THRESHOLD;
+	return {
+		type: `${params.eventPrefix}.complete`,
+		success: true,
+		streamId: params.streamId,
+		items: omitItems ? [] : params.items,
+		itemCount: params.items.length,
+		requested: params.requested,
+		...(omitItems ? { itemsOmitted: true } : {}),
+		...(params.servedFromDatabase ? { fromDatabase: true } : {}),
+	};
+}
 
 type AuthedRequest = Request & { user?: { userId: number } };
 
@@ -689,12 +737,19 @@ export class EnglishLearningController {
 				target,
 				round: 0,
 			});
+			const stopKeepalive = startEnglishPackSseKeepalive(emit, {
+				eventPrefix: 'vocab',
+				streamId,
+				target,
+			});
 			void (async () => {
+				let servedFromDatabase = false;
 				try {
 					const items =
 						await this.englishLearningService.runVocabularyGeneration(
 							dto,
 							async (p) => {
+								if (p.fromDatabase) servedFromDatabase = true;
 								emit({
 									type: 'vocab.progress',
 									streamId,
@@ -718,6 +773,7 @@ export class EnglishLearningController {
 										collected: p.collected,
 										target: p.target,
 										items: p.newItems,
+										...(p.fromDatabase ? { fromDatabase: true } : {}),
 									});
 								}
 							},
@@ -745,13 +801,15 @@ export class EnglishLearningController {
 								},
 							},
 						);
-					emit({
-						type: 'vocab.complete',
-						success: true,
-						streamId,
-						items,
-						requested: target,
-					});
+					emit(
+						buildEnglishPackCompleteSsePayload({
+							eventPrefix: 'vocab',
+							streamId,
+							items,
+							requested: target,
+							servedFromDatabase,
+						}),
+					);
 				} catch (e: unknown) {
 					const message =
 						e instanceof HttpException
@@ -763,12 +821,14 @@ export class EnglishLearningController {
 						message,
 					});
 				} finally {
+					stopKeepalive();
 					this.streamAbortRegistry.unregister(streamId);
 					detachSseAbort();
 					subscriber.complete();
 				}
 			})();
 			return () => {
+				stopKeepalive();
 				detachSseAbort();
 				this.streamAbortRegistry.unregister(streamId);
 			};
@@ -970,12 +1030,19 @@ export class EnglishLearningController {
 				target,
 				round: 0,
 			});
+			const stopKeepalive = startEnglishPackSseKeepalive(emit, {
+				eventPrefix: 'classic',
+				streamId,
+				target,
+			});
 			void (async () => {
+				let servedFromDatabase = false;
 				try {
 					const items =
 						await this.englishLearningService.runClassicQuotesGeneration(
 							dto,
 							async (p) => {
+								if (p.fromDatabase) servedFromDatabase = true;
 								emit({
 									type: 'classic.progress',
 									streamId,
@@ -999,6 +1066,7 @@ export class EnglishLearningController {
 										collected: p.collected,
 										target: p.target,
 										items: p.newItems,
+										...(p.fromDatabase ? { fromDatabase: true } : {}),
 									});
 								}
 							},
@@ -1026,13 +1094,15 @@ export class EnglishLearningController {
 								},
 							},
 						);
-					emit({
-						type: 'classic.complete',
-						success: true,
-						streamId,
-						items,
-						requested: target,
-					});
+					emit(
+						buildEnglishPackCompleteSsePayload({
+							eventPrefix: 'classic',
+							streamId,
+							items,
+							requested: target,
+							servedFromDatabase,
+						}),
+					);
 				} catch (e: unknown) {
 					const message =
 						e instanceof HttpException
@@ -1044,12 +1114,14 @@ export class EnglishLearningController {
 						message,
 					});
 				} finally {
+					stopKeepalive();
 					this.streamAbortRegistry.unregister(streamId);
 					detachSseAbort();
 					subscriber.complete();
 				}
 			})();
 			return () => {
+				stopKeepalive();
 				detachSseAbort();
 				this.streamAbortRegistry.unregister(streamId);
 			};

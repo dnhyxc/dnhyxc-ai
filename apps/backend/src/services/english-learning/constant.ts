@@ -20,6 +20,44 @@ export const TOPIC_PACK_EXCLUDE_CLASSIC_ITEM_MAX_CHARS = 96;
 /** 经典句：禁止列表最多取已收录集合尾部条数（单词仍用 TOPIC_PACK_EXCLUDE_TAIL） */
 export const TOPIC_PACK_EXCLUDE_CLASSIC_TAIL_ITEMS = 80;
 
+/** 生成前去重：从 DB 并入 seen 的键上限（内存 Set；prompt 仍由 buildSeenKeysExcludePromptForModel 节选） */
+export const PACK_GENERATION_DB_EXCLUDE_MAX_KEYS = 8000;
+
+/** 主 Agent 人类消息内「用户已有资料」节选最大字符（仅小摘要，避免滥用 token） */
+export const PACK_GENERATION_MASTER_EXISTING_HINT_MAX_CHARS = 1200;
+
+/** 主 Agent 摘要中展示的样例条数 */
+export const PACK_GENERATION_MASTER_HINT_SAMPLE_ITEMS = 12;
+
+/** 同主题历史批次：最多扫描的近期 batch 行数 */
+export const PACK_GENERATION_TOPIC_HISTORY_BATCH_ROWS = 24;
+
+/** 同主题导入库：最多匹配的库数量 */
+export const PACK_GENERATION_TOPIC_MATCH_LIBRARIES = 8;
+
+/**
+ * 主题 embedding 向量比对：余弦相似度下限（与知识库同款 KNOWLEDGE_EMBEDDING_MODEL）。
+ */
+export const PACK_TOPIC_VECTOR_SIMILARITY_MIN = 0.72;
+
+/** 单次 embedding 请求中参与向量比对的候选标签上限 */
+export const PACK_TOPIC_VECTOR_MATCH_MAX_LABELS = 64;
+
+/** 同主题从单个导入库分页拉取词条/语句时的每页行数 */
+export const PACK_TOPIC_LIBRARY_ITEMS_PAGE_SIZE = 1000;
+
+/** 库内直出/预填时，单次 SSE chunk 最多推送条数（避免单帧 JSON 过大导致断流） */
+export const PACK_SSE_DATABASE_EMIT_CHUNK_SIZE = 400;
+
+/** complete 事件省略 items 数组的条数阈值（已由 chunk 送达时不再重复塞入 complete） */
+export const PACK_SSE_COMPLETE_OMIT_ITEMS_THRESHOLD = 200;
+
+/** 生成任务进行中 SSE 心跳间隔（库内加载/向量匹配耗时较长时保活） */
+export const PACK_SSE_KEEPALIVE_INTERVAL_MS = 12_000;
+
+/** 收藏并入去重键的上限（体量通常较小） */
+export const PACK_GENERATION_FAVORITE_EXCLUDE_LIMIT = 800;
+
 /** 主 Agent 流式拼接正文的绝对熔断（防止异常超长输出占满内存） */
 export const ENGLISH_PACK_MASTER_STREAM_CHAR_FUSE = 200_000;
 

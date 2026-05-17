@@ -144,18 +144,33 @@ export function speakEnglishText(
 		stopAllEnglishPlayback();
 
 		const runSpeak = () => {
+			// 创建一个用于英文语音合成的 SpeechSynthesisUtterance 实例，文本为 plain
 			const utter = new SpeechSynthesisUtterance(plain);
+			// 默认语言设置为美式英语
 			utter.lang = 'en-US';
+
+			// 尝试选择合适的英文语音
 			const voice = pickEnglishVoice();
 			if (voice) {
+				// 如果找到语音，则指定使用该 voice，并使用其语言设定
 				utter.voice = voice;
-				utter.lang = voice.lang || 'en-US';
+				utter.lang = voice.lang || 'en-US'; // 优先用 voice 提供的语言
 			}
-			utter.rate = options?.rate ?? 0.92;
+
+			// 设置语音合成的速率，默认为 0.92（比正常稍慢，适合学习）
+			utter.rate = options?.rate ?? 0.82;
+			// 设置语音的音调，高度，默认为 1
 			utter.pitch = options?.pitch ?? 1;
+			// 设置音量，默认为最大 1
 			utter.volume = options?.volume ?? 1;
+
+			// 合成播放结束回调，无论成功失败都 resolve，保证流程继续
 			utter.onend = () => resolve();
+
+			// 播放出错时同样 resolve，不 reject（保证调用方流程简化）
 			utter.onerror = () => resolve();
+
+			// 使用 speechSynthesis API 播放此语音
 			window.speechSynthesis.speak(utter);
 		};
 

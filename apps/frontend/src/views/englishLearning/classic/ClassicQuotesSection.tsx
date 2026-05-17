@@ -284,23 +284,45 @@ function ClassicQuotesSectionInner() {
 				onChunk: ({ items: delta }) => {
 					EnglishPackStore.classicOnChunk(myGen, delta);
 				},
-				onDone: ({ items: list, requested }) => {
+				onDone: ({
+					items: list,
+					requested,
+					fromDatabase,
+					itemsOmitted,
+					itemCount,
+				}) => {
 					if (myGen !== EnglishPackStore.classicStreamGenId) return;
-					EnglishPackStore.classicOnDone(myGen, list);
+					const finalList =
+						itemsOmitted &&
+						list.length === 0 &&
+						EnglishPackStore.classicItems.length > 0
+							? EnglishPackStore.classicItems.slice(
+									0,
+									Number.isFinite(itemCount) ? itemCount : requested,
+								)
+							: list;
+					EnglishPackStore.classicOnDone(myGen, finalList);
 					setLoadedStreamId(null);
 					if (historyDrawerOpenRef.current) {
 						void fetchHistoryFirstPage();
 					}
-					if (list.length === 0) {
+					if (finalList.length === 0) {
 						Toast({
 							type: 'info',
 							title: t('englishLearning.classic.empty'),
 						});
-					} else if (list.length < requested) {
+					} else if (fromDatabase) {
+						Toast({
+							type: 'success',
+							title: t('englishLearning.classic.fromDatabase', {
+								count: String(finalList.length),
+							}),
+						});
+					} else if (finalList.length < requested) {
 						Toast({
 							type: 'info',
 							title: t('englishLearning.classic.partialResult', {
-								got: list.length,
+								got: finalList.length,
 								want: requested,
 							}),
 						});

@@ -30,6 +30,23 @@ export type KnowledgeRerankResult = {
 	score: number;
 };
 
+/** 两 embedding 向量的余弦相似度（模块内用于向量比对） */
+function cosineSimilarity(a: number[], b: number[]): number {
+	if (a.length === 0 || b.length === 0 || a.length !== b.length) return 0;
+	let dot = 0;
+	let na = 0;
+	let nb = 0;
+	for (let i = 0; i < a.length; i++) {
+		const x = a[i] ?? 0;
+		const y = b[i] ?? 0;
+		dot += x * y;
+		na += x * x;
+		nb += y * y;
+	}
+	const denom = Math.sqrt(na) * Math.sqrt(nb);
+	return denom === 0 ? 0 : dot / denom;
+}
+
 // 计算 sha256：用于内容幂等标识
 function sha256(text: string): string {
 	// 创建哈希器
@@ -216,6 +233,50 @@ export class KnowledgeEmbeddingService {
 	// 对外暴露：批量生成 document 向量（供入库等流程复用）
 	async embedDocuments(texts: string[]): Promise<number[][]> {
 		return this.createEmbeddingsClient().embedDocuments(texts);
+	}
+
+	/**
+	 * 用项目配置的 embedding 模型向量化 query 与候选短文本，按余弦相似度筛选相关项。
+	 * @returns 达到阈值的候选在 `candidates` 中的下标（空串候选跳过）
+	 */
+	async findCandidateIndicesSimilarToQuery(input: {
+		query: string;
+		candidates: string[];
+		minCosineSimilarity?: number;
+	}): Promise<number[]> {
+		const query = (input.query ?? '').trim();
+		const minSim =
+			typeof input.minCosineSimilarity === 'number' &&
+			Number.isFinite(input.minCosineSimilarity)
+				? input.minCosineSimilarity
+				: 0.72;
+		const candidates = (input.candidates ?? []).map((c) =>
+			String(c ?? '').trim(),
+		);
+		if (!query || candidates.length === 0) return [];
+
+		const indexed: { index: number; text: string }[] = [];
+		for (let i = 0; i < candidates.length; i++) {
+			const text = candidates[i]!;
+			if (text) indexed.push({ index: i, text });
+		}
+		if (indexed.length === 0) return [];
+
+		const vectors = await this.embedDocuments([
+			query,
+			...indexed.map((x) => x.text),
+		]);
+		const queryVec = vectors[0];
+		if (!queryVec?.length) return [];
+
+		const matched: number[] = [];
+		for (let j = 0; j < indexed.length; j++) {
+			const vec = vectors[j + 1];
+			if (vec?.length && cosineSimilarity(queryVec, vec) >= minSim) {
+				matched.push(indexed[j]!.index);
+			}
+		}
+		return matched;
 	}
 
 	// 对外暴露：删除某篇知识库文档在向量库中的全部 points（供回收站物理删除等场景使用）
