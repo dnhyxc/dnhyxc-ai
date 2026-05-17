@@ -286,14 +286,14 @@ export function VocabularyLibraryListPanel({
 						<Loading text={t('englishLearning.library.listLoading')} />
 					</div>
 				) : (
-					<div className="flex flex-col gap-4 px-4">
+					<div className="@container grid grid-cols-[repeat(auto-fill,minmax(min(100%,11rem),1fr))] gap-4 px-4">
 						{entries.map((lib) => {
 							const active = selectedId === lib.id;
 							return (
 								<div
 									key={lib.id}
 									className={cn(
-										'group bg-theme/5 border border-theme/10 flex w-full items-stretch gap-1 overflow-hidden rounded-md transition-colors',
+										'group relative bg-theme/5 border border-theme/10 flex min-w-0 items-stretch gap-1 overflow-hidden rounded-md transition-colors',
 										active
 											? 'border-theme/15 bg-theme/15'
 											: 'hover:border-theme/12 hover:bg-theme/12',
@@ -304,7 +304,7 @@ export function VocabularyLibraryListPanel({
 										onClick={() => onSelect(lib)}
 										className="flex min-w-0 flex-1 cursor-pointer flex-col gap-1.5 px-3 py-2 text-left"
 									>
-										<div className="text-textcolor line-clamp-2 text-sm font-medium leading-snug">
+										<div className="text-textcolor line-clamp-2 text-sm font-medium leading-snug mr-6">
 											{lib.title || '—'}
 										</div>
 										<div className="text-textcolor/50 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm">
@@ -329,8 +329,8 @@ export function VocabularyLibraryListPanel({
 										disabled={deleting}
 										onClick={() => requestDeleteLibrary(lib)}
 										className={cn(
-											'group-hover:flex hidden mt-1 mr-1 h-7 w-7 shrink-0 rounded-md p-0 transition-colors',
-											'text-textcolor/55 hover:border hover:border-destructive/10 hover:bg-destructive/10 hover:text-destructive',
+											'absolute top-0 right-0 group-hover:flex hidden mt-1 mr-1 h-7 w-7 shrink-0 rounded-md p-0 transition-colors',
+											'text-textcolor/65 hover:border hover:border-destructive/10 hover:bg-destructive/10 hover:text-destructive',
 										)}
 										aria-label={
 											kind === 'vocab'
@@ -344,13 +344,13 @@ export function VocabularyLibraryListPanel({
 							);
 						})}
 						{loadingMore ? (
-							<div className="text-textcolor/50 flex items-center justify-center gap-1.5 py-2 text-xs">
+							<div className="text-textcolor/50 col-span-full flex items-center justify-center gap-1.5 py-2 text-xs">
 								<Loader2 className="size-3.5 animate-spin" aria-hidden />
 								{t('common.loadingMore')}
 							</div>
 						) : null}
 						{showEmpty ? (
-							<div className="text-textcolor/60 flex flex-col items-center gap-3 py-8 text-center text-sm">
+							<div className="text-textcolor/60 col-span-full flex flex-col items-center gap-3 py-8 text-center text-sm">
 								<p>
 									{kind === 'vocab'
 										? t('englishLearning.library.listEmpty')
