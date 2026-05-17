@@ -2,6 +2,7 @@
  * 生产环境 TypeORM CLI（在 /usr/local/dnhyxc-ai/server 或 apps/backend 根目录执行）：
  * - 数据库连接：dist/ormconfig.js（实体仍从 dist 加载）
  * - 迁移文件：./migrations/（与 dist 同级，重新部署 dist 不会覆盖）
+ * - migration:create / migration:generate 均自动加 --outputJs，产出 .js；migration:run 仅加载 *.js
  */
 const { existsSync, mkdirSync, writeFileSync } = require('node:fs');
 const { resolve, join } = require('node:path');
@@ -33,7 +34,8 @@ const root = ${JSON.stringify(cwd)};
 const base = require(${JSON.stringify(distOrmconfig)}).default;
 module.exports = new DataSource({
 	...base.options,
-	migrations: [path.join(root, 'migrations', '**', '*.{js,ts}')],
+	// 说明：生产 migration:run 用 node require，仅加载 .js；勿把 .ts 放进 ./migrations
+	migrations: [path.join(root, 'migrations', '**', '*.js')],
 });
 `;
 	writeFileSync(prodDataSourceFile, content, 'utf8');
@@ -96,7 +98,12 @@ function buildMigrationGenerateArgs(rest) {
 	const { pathArg, extraFlags } = resolveMigrationPathArg(rest, {
 		requireName: true,
 	});
-	return ['migration:generate', pathArg, ...extraFlags];
+	const out = ['migration:generate', pathArg, ...extraFlags];
+	// 与 migration:create 一致：生产 ./migrations 须为 CommonJS .js，否则 migration:run 无法 require .ts
+	if (!out.includes('--outputJs') && !out.includes('-o')) {
+		out.push('--outputJs');
+	}
+	return out;
 }
 
 let typeormArgv;
