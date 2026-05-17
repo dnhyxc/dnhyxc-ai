@@ -107,7 +107,7 @@ export const EnglishLearningToolbar = observer(function EnglishLearningToolbar({
 		<SidebarPanel className="min-w-0">
 			{/* 标题区 */}
 			<div className="mb-2.5 flex items-start gap-3">
-				<div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-linear-to-r from-cyan-500 to-blue-600">
+				<div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-linear-to-r from-lime-500 to-green-600">
 					<Cog className="size-6 text-white" aria-hidden />
 				</div>
 				<div className="min-w-0">
@@ -172,10 +172,9 @@ export const EnglishLearningToolbar = observer(function EnglishLearningToolbar({
 								variant="outline"
 								aria-pressed={selected}
 								className={cn(
-									'h-9 border border-theme/10 bg-theme/5 hover:text-teal-500 hover:border-teal-500/20',
-									selected
-										? 'text-teal-500 border-teal-500/20'
-										: 'text-textcolor/60',
+									'h-9 border-none text-white bg-linear-to-r from-lime-500 to-green-600',
+									'hover:bg-linear-to-r hover:from-lime-600 hover:to-green-700',
+									selected && 'bg-linear-to-r from-lime-600 to-green-700',
 								)}
 								onClick={() => {
 									if (selected) {

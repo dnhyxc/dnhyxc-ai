@@ -4,7 +4,6 @@
 import { Button, Input, Spinner, Toast } from '@ui/index';
 import {
 	BookMarked,
-	Bookmark,
 	CircleChevronDown,
 	CircleChevronRight,
 	Square,
@@ -30,7 +29,6 @@ import {
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import type {
-	EnglishClassicQuoteFavoriteListEntry,
 	EnglishClassicQuoteHistoryEntry,
 	EnglishClassicQuoteItem,
 } from '@/service';
@@ -39,7 +37,6 @@ import {
 	classicQuoteFavoriteContentKey,
 	fetchEnglishClassicQuoteFavoriteStatus,
 	getEnglishClassicQuotesHistoryDetail,
-	listEnglishClassicQuoteFavorites,
 	listEnglishClassicQuotesHistory,
 	removeEnglishClassicQuoteFavorite,
 } from '@/service';
@@ -53,10 +50,9 @@ import {
 	playEnglishPreferred,
 	stopAllEnglishPlayback,
 } from '@/utils/englishTts';
-import { formatEnglishLearningAgentToolLine } from './agentToolStatusText';
-import { ClassicQuotesFavoritesDrawer } from './ClassicQuotesFavoritesDrawer';
+import { formatEnglishLearningAgentToolLine } from '../agent/agentToolStatusText';
+import { MasterWebSearchResultsBar } from '../shared/WebSearchResultsBar';
 import { ClassicQuotesHistoryDrawer } from './ClassicQuotesHistoryDrawer';
-import { MasterWebSearchResultsBar } from './WebSearchResultsBar';
 
 export type ClassicQuoteProgressState = EnglishPackUiProgress;
 
@@ -74,18 +70,11 @@ function ClassicQuotesSectionInner() {
 
 	const [playingKey, setPlayingKey] = useState<string | null>(null);
 	const [historyDrawerOpen, setHistoryDrawerOpen] = useState(false);
-	const [favoritesDrawerOpen, setFavoritesDrawerOpen] = useState(false);
 	const [historyEntries, setHistoryEntries] = useState<
 		EnglishClassicQuoteHistoryEntry[]
 	>([]);
-	const [favoriteDrawerEntries, setFavoriteDrawerEntries] = useState<
-		EnglishClassicQuoteFavoriteListEntry[]
-	>([]);
 	const [historyLoading, setHistoryLoading] = useState(false);
 	const [historyLoadingMore, setHistoryLoadingMore] = useState(false);
-	const [favoriteDrawerLoading, setFavoriteDrawerLoading] = useState(false);
-	const [favoriteDrawerLoadingMore, setFavoriteDrawerLoadingMore] =
-		useState(false);
 	const [loadingHistoryDetailId, setLoadingHistoryDetailId] = useState<
 		string | null
 	>(null);
@@ -135,10 +124,6 @@ function ClassicQuotesSectionInner() {
 	const historyHasMoreRef = useRef(true);
 	const historyFetchingMoreRef = useRef(false);
 	const historyDrawerOpenRef = useRef(false);
-
-	const favoriteDrawerOffsetRef = useRef(0);
-	const favoriteDrawerHasMoreRef = useRef(true);
-	const favoriteDrawerFetchingMoreRef = useRef(false);
 
 	useEffect(() => {
 		historyDrawerOpenRef.current = historyDrawerOpen;
@@ -245,99 +230,6 @@ function ClassicQuotesSectionInner() {
 			}
 		},
 		[t],
-	);
-
-	const fetchFavoriteDrawerFirstPage = useCallback(async () => {
-		favoriteDrawerFetchingMoreRef.current = false;
-		setFavoriteDrawerLoading(true);
-		setFavoriteDrawerLoadingMore(false);
-		favoriteDrawerOffsetRef.current = 0;
-		favoriteDrawerHasMoreRef.current = true;
-		setFavoriteDrawerEntries([]);
-		try {
-			const res = await listEnglishClassicQuoteFavorites({
-				limit: HISTORY_PAGE_SIZE,
-				offset: 0,
-			});
-			const list = Array.isArray(res.data) ? res.data : [];
-			setFavoriteDrawerEntries(list);
-			favoriteDrawerOffsetRef.current = list.length;
-			favoriteDrawerHasMoreRef.current = list.length >= HISTORY_PAGE_SIZE;
-		} catch {
-			setFavoriteDrawerEntries([]);
-			favoriteDrawerHasMoreRef.current = false;
-		} finally {
-			setFavoriteDrawerLoading(false);
-		}
-	}, []);
-
-	const fetchFavoriteDrawerMore = useCallback(async () => {
-		if (
-			!favoriteDrawerHasMoreRef.current ||
-			favoriteDrawerFetchingMoreRef.current ||
-			favoriteDrawerLoading
-		) {
-			return;
-		}
-		favoriteDrawerFetchingMoreRef.current = true;
-		setFavoriteDrawerLoadingMore(true);
-		const offset = favoriteDrawerOffsetRef.current;
-		try {
-			const res = await listEnglishClassicQuoteFavorites({
-				limit: HISTORY_PAGE_SIZE,
-				offset,
-			});
-			const chunk = Array.isArray(res.data) ? res.data : [];
-			if (chunk.length === 0) {
-				favoriteDrawerHasMoreRef.current = false;
-				return;
-			}
-			setFavoriteDrawerEntries((prev) => [...prev, ...chunk]);
-			favoriteDrawerOffsetRef.current += chunk.length;
-			favoriteDrawerHasMoreRef.current = chunk.length >= HISTORY_PAGE_SIZE;
-		} catch {
-			favoriteDrawerHasMoreRef.current = false;
-		} finally {
-			favoriteDrawerFetchingMoreRef.current = false;
-			setFavoriteDrawerLoadingMore(false);
-		}
-	}, [favoriteDrawerLoading]);
-
-	useEffect(() => {
-		if (!favoritesDrawerOpen) return;
-		void fetchFavoriteDrawerFirstPage();
-	}, [favoritesDrawerOpen, fetchFavoriteDrawerFirstPage]);
-
-	const onFavoriteDrawerViewportScroll = useCallback<
-		UIEventHandler<HTMLDivElement>
-	>(
-		(e) => {
-			const el = e.currentTarget;
-			const rest = el.scrollHeight - el.scrollTop - el.clientHeight;
-			if (rest < SCROLL_LOAD_THRESHOLD_PX) {
-				void fetchFavoriteDrawerMore();
-			}
-		},
-		[fetchFavoriteDrawerMore],
-	);
-
-	const onBatchRemoveClassicFavorites = useCallback(
-		async (selected: EnglishClassicQuoteFavoriteListEntry[]) => {
-			if (selected.length === 0) return;
-			await Promise.all(
-				selected.map((it) => removeEnglishClassicQuoteFavorite(it.english)),
-			);
-			setFavoritedContentKeys((prev) => {
-				const next = new Set(prev);
-				for (const it of selected) {
-					const ck = classicQuoteFavoriteContentKey(it.english);
-					if (ck) next.delete(ck);
-				}
-				return next;
-			});
-			await fetchFavoriteDrawerFirstPage();
-		},
-		[fetchFavoriteDrawerFirstPage],
 	);
 
 	const cancelGenerate = useCallback(() => {
@@ -577,7 +469,7 @@ function ClassicQuotesSectionInner() {
 								disabled={loading}
 								onClick={() => EnglishPackStore.setClassicCountInput(String(n))}
 								className={cn(
-									'flex-1 rounded-md border bg-theme/5 px-2 py-1 text-xs font-medium transition-colors',
+									'flex-1 rounded-md border bg-theme/5 px-0 py-1 text-xs font-medium transition-colors',
 									countInput === String(n)
 										? 'border-teal-500/35 text-teal-500'
 										: 'border-theme/10 text-textcolor/65 hover:border-teal-500/20 hover:text-teal-500',
@@ -588,14 +480,13 @@ function ClassicQuotesSectionInner() {
 						))}
 					</div>
 				</div>
-				<div className="flex min-w-0 items-stretch gap-2">
+				<div className="flex min-w-0 items-stretch gap-3.5">
 					<Button
-						type="button"
 						size="sm"
 						variant={loading ? 'outline' : 'default'}
 						onClick={() => (loading ? cancelGenerate() : void onGenerate())}
 						className={cn(
-							'h-9 min-w-0 flex-1 gap-2 rounded-md px-3 text-white',
+							'h-9 min-w-0 flex-1 rounded-md text-white',
 							loading
 								? 'border-red-500/20 bg-red-500/20 text-textcolor/80 hover:bg-red-500/25'
 								: 'bg-linear-to-r from-violet-600 to-indigo-600 hover:bg-linear-to-r hover:from-violet-400 hover:to-indigo-600',
@@ -615,27 +506,13 @@ function ClassicQuotesSectionInner() {
 						)}
 					</Button>
 					<Button
-						type="button"
 						size="sm"
 						onClick={() => setHistoryDrawerOpen(true)}
-						className="text-white hover:bg-linear-to-r hover:from-indigo-400 hover:to-indigo-600 bg-linear-to-r from-indigo-500 to-indigo-600 h-9 shrink-0 gap-1.5 whitespace-nowrap rounded-md px-2 sm:px-2.5"
+						className="flex-1 text-white hover:bg-linear-to-r hover:from-indigo-400 hover:to-indigo-600 bg-linear-to-r from-indigo-500 to-indigo-600 h-9 shrink-0 whitespace-nowrap rounded-md"
 						title={t('englishLearning.classic.historyOpenDrawer')}
 					>
 						<span className="max-[380px]:sr-only">
 							{t('englishLearning.classic.historyOpenDrawer')}
-						</span>
-					</Button>
-					<Button
-						type="button"
-						size="sm"
-						onClick={() => setFavoritesDrawerOpen(true)}
-						className="text-white hover:bg-linear-to-r hover:from-indigo-400 hover:to-indigo-600 bg-linear-to-r from-indigo-500 to-indigo-600 h-9 w-9 shrink-0 gap-0 rounded-md px-0 sm:w-auto sm:gap-1.5 sm:px-2.5"
-						title={t('englishLearning.classic.favoritesOpenDrawer')}
-						aria-label={t('englishLearning.classic.favoritesOpenDrawer')}
-					>
-						<Bookmark className="size-4 shrink-0 sm:hidden" aria-hidden />
-						<span className="hidden sm:inline max-[420px]:sr-only">
-							{t('englishLearning.classic.favoritesOpenDrawer')}
 						</span>
 					</Button>
 				</div>
@@ -814,17 +691,6 @@ function ClassicQuotesSectionInner() {
 				loadingDetailId={loadingHistoryDetailId}
 				onViewportScroll={onHistoryViewportScroll}
 				onSelectEntry={openHistoryDetail}
-			/>
-			<ClassicQuotesFavoritesDrawer
-				open={favoritesDrawerOpen}
-				onOpenChange={setFavoritesDrawerOpen}
-				entries={favoriteDrawerEntries}
-				loading={favoriteDrawerLoading}
-				loadingMore={favoriteDrawerLoadingMore}
-				onViewportScroll={onFavoriteDrawerViewportScroll}
-				playingKey={playingKey}
-				onTogglePlayQuote={toggleQuoteAudio}
-				onBatchRemoveFavorites={onBatchRemoveClassicFavorites}
 			/>
 		</div>
 	);

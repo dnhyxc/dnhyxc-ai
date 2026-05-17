@@ -1,4 +1,5 @@
 import CryptoJS from 'crypto-js';
+import { VOCAB_FAVORITE_STATUS_BATCH_SIZE } from '@/constant';
 import {
 	type KnowledgeListItem,
 	type KnowledgeRecord,
@@ -604,6 +605,16 @@ export const listEnglishVocabularyLibraries = async (options?: {
 	);
 };
 
+/** 删除单词库（含库内全部词条） */
+export const deleteEnglishVocabularyLibrary = async (libraryId: string) => {
+	return await http.delete<{ deleted: boolean }>(
+		ENGLISH_LEARNING_VOCABULARY_LIBRARIES,
+		{
+			params: [libraryId],
+		},
+	);
+};
+
 /** 分页列出某单词库内的词条 */
 export const listEnglishVocabularyLibraryItems = async (
 	libraryId: string,
@@ -643,12 +654,33 @@ export const removeEnglishVocabularyFavorite = async (word: string) => {
 	);
 };
 
-/** 查询当前列表中哪些词已收藏（返回规范化词形） */
+/** 查询当前列表中哪些词已收藏（返回规范化词形）；超过单次上限时自动分批请求并合并 */
 export const fetchEnglishVocabularyFavoriteStatus = async (words: string[]) => {
-	return await http.post<{ favoritedWordKeys: string[] }>(
-		`${ENGLISH_LEARNING_VOCABULARY_FAVORITES}/status`,
-		{ words },
-	);
+	if (words.length <= VOCAB_FAVORITE_STATUS_BATCH_SIZE) {
+		return await http.post<{ favoritedWordKeys: string[] }>(
+			`${ENGLISH_LEARNING_VOCABULARY_FAVORITES}/status`,
+			{ words },
+		);
+	}
+	const favoritedWordKeys: string[] = [];
+	let lastRes: Awaited<
+		ReturnType<typeof http.post<{ favoritedWordKeys: string[] }>>
+	>;
+	for (let i = 0; i < words.length; i += VOCAB_FAVORITE_STATUS_BATCH_SIZE) {
+		const batch = words.slice(i, i + VOCAB_FAVORITE_STATUS_BATCH_SIZE);
+		lastRes = await http.post<{ favoritedWordKeys: string[] }>(
+			`${ENGLISH_LEARNING_VOCABULARY_FAVORITES}/status`,
+			{ words: batch },
+		);
+		const keys = lastRes.data?.favoritedWordKeys;
+		if (Array.isArray(keys)) {
+			favoritedWordKeys.push(...keys);
+		}
+	}
+	return {
+		...lastRes!,
+		data: { favoritedWordKeys },
+	};
 };
 
 /** 单词收藏分页列表项（GET 收藏记录） */

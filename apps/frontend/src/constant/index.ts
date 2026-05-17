@@ -52,6 +52,12 @@ export const VOCAB_COUNT_MAX = 12000;
 export const VOCAB_COUNT_PRESETS = [10, 100, 500, 1000, 3000, 12000] as const;
 /** 历史列表分页大小（与知识库列表分页量级一致） */
 export const VOCAB_HISTORY_PAGE_SIZE = 20;
+/** 单词库列表每页条数 */
+export const VOCAB_LIBRARY_LIST_PAGE_SIZE = 20;
+/** 单词库内词条每页条数 */
+export const VOCAB_LIBRARY_ITEMS_PAGE_SIZE = 50;
+/** 收藏状态批量查询单次最多词数，与后端 `VocabularyFavoriteStatusDto` 的 `@ArrayMaxSize(500)` 一致 */
+export const VOCAB_FAVORITE_STATUS_BATCH_SIZE = 500;
 
 /** 英文经典语句生成的最小数量（前端和后端校验均需保持一致） */
 export const QUOTE_COUNT_MIN = 1;

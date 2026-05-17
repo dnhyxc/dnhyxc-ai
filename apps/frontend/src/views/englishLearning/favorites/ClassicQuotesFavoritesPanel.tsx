@@ -1,9 +1,8 @@
 /**
- * 英语学习：经典句收藏记录抽屉（滚动分页列表）
+ * 英语学习：经典句收藏记录页（滚动分页列表）
  * 列表项布局与主区语句卡片一致（含朗读），无收藏按钮；支持多选批量移除收藏。
  */
 import Confirm from '@design/Confirm';
-import { Drawer } from '@design/Drawer';
 import Loading from '@design/Loading';
 import { Checkbox } from '@ui/checkbox';
 import { Button, ScrollArea, Toast } from '@ui/index';
@@ -20,9 +19,7 @@ import {
 } from '@/service';
 import { isTauriRuntime } from '@/utils';
 
-export type ClassicQuotesFavoritesDrawerProps = {
-	open: boolean;
-	onOpenChange: (open: boolean) => void;
+export type ClassicQuotesFavoritesPanelProps = {
 	entries: EnglishClassicQuoteFavoriteListEntry[];
 	loading: boolean;
 	loadingMore: boolean;
@@ -36,9 +33,7 @@ export type ClassicQuotesFavoritesDrawerProps = {
 	) => Promise<void>;
 };
 
-export function ClassicQuotesFavoritesDrawer({
-	open,
-	onOpenChange,
+export function ClassicQuotesFavoritesPanel({
 	entries,
 	loading,
 	loadingMore,
@@ -46,7 +41,7 @@ export function ClassicQuotesFavoritesDrawer({
 	playingKey,
 	onTogglePlayQuote,
 	onBatchRemoveFavorites,
-}: ClassicQuotesFavoritesDrawerProps) {
+}: ClassicQuotesFavoritesPanelProps) {
 	const { t } = useI18n();
 	const [exportingDocx, setExportingDocx] = useState(false);
 	const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
@@ -77,15 +72,6 @@ export function ClassicQuotesFavoritesDrawer({
 		: someLoadedSelected
 			? 'indeterminate'
 			: false;
-
-	useEffect(() => {
-		if (!open) {
-			setSelectedIds(new Set());
-			setRemoveConfirmOpen(false);
-			setSingleRemoveConfirmOpen(false);
-			setSingleRemoveTarget(null);
-		}
-	}, [open]);
 
 	useEffect(() => {
 		setSelectedIds((prev) => {
@@ -292,191 +278,183 @@ export function ClassicQuotesFavoritesDrawer({
 				closeOnConfirm={false}
 				onConfirm={() => void executeSingleRemoveConfirm()}
 			/>
-			<Drawer
-				title={`${t('englishLearning.classic.favoritesTitle')}（${entries.length}）`}
-				open={open}
-				onOpenChange={onOpenChange}
-				bodyClassName="pt-1.5 pb-2"
-				footer={
-					<footer className="flex justify-between gap-2">
-						<div className="flex items-center gap-2">
-							{!showInitialLoading && entries.length > 0 ? (
-								<div className="flex shrink-0 flex-wrap items-center gap-3 py-2">
-									<div className="flex items-center gap-2">
-										<Checkbox
-											id="classic-fav-select-all"
-											checked={selectAllCheckboxState}
-											disabled={selectionDisabled}
-											onCheckedChange={(v) => toggleSelectAllLoaded(v)}
-										/>
-										<Label
-											htmlFor="classic-fav-select-all"
-											className="cursor-pointer text-sm text-textcolor/85"
-										>
-											{t('englishLearning.favoritesDrawer.selectAllLoaded')}
-										</Label>
-									</div>
-									<span className="text-textcolor/60 text-xs">
-										{t('englishLearning.favoritesDrawer.selectedCount', {
-											count: selectedIds.size,
-										})}
-									</span>
-								</div>
-							) : null}
+			<div className="flex h-full min-h-0 flex-col">
+				<ScrollArea
+					className="@container min-h-0 flex-1 px-4 py-4"
+					onScroll={onViewportScroll}
+				>
+					{showInitialLoading ? (
+						<div className="text-textcolor/60 flex min-h-full flex-1 items-center justify-center text-center text-sm">
+							<Loading text={t('englishLearning.classic.favoritesLoading')} />
 						</div>
-						<div className="flex items-center gap-2">
-							<Button
-								type="button"
-								variant="destructive"
-								size="sm"
-								disabled={removeDisabled}
-								className="shrink-0 w-24"
-								onClick={() => requestRemoveConfirm()}
-							>
-								{batchRemoving ? (
-									<>
-										<Spinner className="h-4 w-4" />
-										{t('englishLearning.favoritesDrawer.removing')}
-									</>
-								) : (
-									t('englishLearning.favoritesDrawer.removeSelected')
-								)}
-							</Button>
-							<Button
-								type="button"
-								size="sm"
-								disabled={exportDisabled}
-								className="flex w-24 shrink-0 items-center"
-								onClick={() => void handleExportDocx()}
-							>
-								{exportingDocx ? (
-									<>
-										<Spinner className="h-4 w-4" />
-										{t('common.downloading')}
-									</>
-								) : (
-									t('englishLearning.classic.exportDocx')
-								)}
-							</Button>
-						</div>
-					</footer>
-				}
-			>
-				<div className="flex h-full min-h-0 flex-col">
-					<ScrollArea
-						className="box-border flex min-h-0 flex-1 flex-col pr-1.5"
-						onScroll={onViewportScroll}
-					>
-						<div className="flex min-h-0 w-full flex-1 flex-col">
-							{showInitialLoading ? (
-								<div className="text-textcolor/60 flex flex-1 flex-col items-center justify-center py-6 text-center text-sm">
-									<Loading
-										text={t('englishLearning.classic.favoritesLoading')}
-									/>
-								</div>
-							) : null}
+					) : (
+						<div className="grid grid-cols-2 gap-4">
 							{entries.map((row) => {
 								const playKey = `fav-classic-${row.id}`;
 								const playing = playingKey === playKey;
 								return (
 									<div
 										key={row.id}
-										className="hover:bg-theme/10 flex gap-2 rounded-md px-2 py-2.5 @min-[26rem]:px-3 @min-[26rem]:py-2.5"
+										className="select-text bg-theme/5 border border-theme/10 flex min-w-0 flex-col gap-1.5 rounded-md px-3 py-2.5"
 									>
-										<div className="flex shrink-0 items-start pt-1">
-											<Checkbox
-												id={`classic-fav-${row.id}`}
-												className="cursor-pointer"
-												checked={selectedIds.has(row.id)}
-												disabled={selectionDisabled}
-												onCheckedChange={(v) =>
-													toggleRowSelected(row.id, v === true)
-												}
-												aria-label={`${t('englishLearning.favoritesDrawer.toggleRow')}: ${row.english.slice(0, 120)}`}
-											/>
-										</div>
-										<div className="select-text min-w-0 flex-1 flex flex-col">
-											<div className="flex items-start justify-between gap-2">
-												<div className="text-textcolor min-w-0 flex-1 text-base font-semibold leading-snug">
-													<Label
-														htmlFor={`classic-fav-${row.id}`}
-														className="select-text cursor-pointer text-base font-semibold text-textcolor"
-													>
-														{row.english}
-													</Label>
+										<div className="flex gap-2">
+											<div className="flex shrink-0 items-start pt-1">
+												<Checkbox
+													id={`classic-fav-${row.id}`}
+													className="cursor-pointer"
+													checked={selectedIds.has(row.id)}
+													disabled={selectionDisabled}
+													onCheckedChange={(v) =>
+														toggleRowSelected(row.id, v === true)
+													}
+													aria-label={`${t('englishLearning.favoritesDrawer.toggleRow')}: ${row.english.slice(0, 120)}`}
+												/>
+											</div>
+											<div className="min-w-0 flex-1 flex flex-col">
+												<div className="flex items-start justify-between gap-2">
+													<div className="text-textcolor min-w-0 flex-1 text-base font-semibold leading-snug">
+														<Label
+															htmlFor={`classic-fav-${row.id}`}
+															className="select-text cursor-pointer text-base font-semibold text-textcolor"
+														>
+															{row.english}
+														</Label>
+													</div>
+													<div className="flex shrink-0 items-center gap-1 transition-opacity duration-200">
+														<Button
+															type="button"
+															variant="ghost"
+															size="sm"
+															onClick={() =>
+																void onTogglePlayQuote(row.english, playKey)
+															}
+															className={cn(
+																'h-7 w-7 shrink-0 rounded-md border p-2 transition-colors @min-[26rem]:border-theme/15 @min-[26rem]:p-1.5',
+																playing
+																	? 'border-violet-500/40 bg-violet-500/15 text-violet-600 dark:text-violet-400'
+																	: 'border-theme/12 text-textcolor/60 hover:border-theme/20 hover:bg-theme/10 hover:text-violet-600 dark:hover:text-violet-400',
+															)}
+															aria-label={
+																playing
+																	? t('englishLearning.tts.stop')
+																	: t('englishLearning.classic.playQuote')
+															}
+														>
+															{playing ? (
+																<Square className="size-3.5 fill-current" />
+															) : (
+																<Volume2 className="size-3.5" />
+															)}
+														</Button>
+														<Button
+															type="button"
+															variant="ghost"
+															size="sm"
+															disabled={selectionDisabled}
+															onClick={() => requestSingleRemove(row)}
+															className={cn(
+																'h-7 w-7 shrink-0 rounded-md border p-2 transition-colors @min-[26rem]:border-theme/15 @min-[26rem]:p-1.5',
+																'border-theme/12 text-textcolor/60 hover:border-destructive/35 hover:bg-destructive/10 hover:text-destructive',
+															)}
+															aria-label={t(
+																'englishLearning.favoritesDrawer.removeOneAction',
+															)}
+														>
+															<Trash2 className="size-3.5" />
+														</Button>
+													</div>
 												</div>
-												<div className="flex shrink-0 items-center gap-1 transition-opacity duration-200">
-													<Button
-														type="button"
-														variant="ghost"
-														size="sm"
-														onClick={() =>
-															void onTogglePlayQuote(row.english, playKey)
-														}
-														className={cn(
-															'h-7 w-7 shrink-0 rounded-md border p-2 transition-colors @min-[26rem]:border-theme/15 @min-[26rem]:p-1.5',
-															playing
-																? 'border-violet-500/40 bg-violet-500/15 text-violet-600 dark:text-violet-400'
-																: 'border-theme/12 text-textcolor/60 hover:border-theme/20 hover:bg-theme/10 hover:text-violet-600 dark:hover:text-violet-400',
-														)}
-														aria-label={
-															playing
-																? t('englishLearning.tts.stop')
-																: t('englishLearning.classic.playQuote')
-														}
-													>
-														{playing ? (
-															<Square className="size-3.5 fill-current" />
-														) : (
-															<Volume2 className="size-3.5" />
-														)}
-													</Button>
-													<Button
-														type="button"
-														variant="ghost"
-														size="sm"
-														disabled={selectionDisabled}
-														onClick={() => requestSingleRemove(row)}
-														className={cn(
-															'h-7 w-7 shrink-0 rounded-md border p-2 transition-colors @min-[26rem]:border-theme/15 @min-[26rem]:p-1.5',
-															'border-theme/12 text-textcolor/60 hover:border-destructive/35 hover:bg-destructive/10 hover:text-destructive',
-														)}
-														aria-label={t(
-															'englishLearning.favoritesDrawer.removeOneAction',
-														)}
-													>
-														<Trash2 className="size-3.5" />
-													</Button>
+												<div className="text-textcolor/90 text-sm leading-snug mt-1">
+													{row.translationZh}
 												</div>
-											</div>
-											<div className="text-textcolor/90 text-sm leading-snug mt-1">
-												{row.translationZh}
-											</div>
-											<div className="text-textcolor/70 text-xs my-1">
-												{t('englishLearning.classic.sourceLabel')}
-												{row.source || '—'}
-											</div>
-											<div className="text-textcolor/70 text-xs leading-relaxed italic">
-												{row.noteZh}
+												<div className="text-textcolor/70 text-xs my-1">
+													{t('englishLearning.classic.sourceLabel')}
+													{row.source || '—'}
+												</div>
+												<div className="text-textcolor/70 text-xs leading-relaxed italic">
+													{row.noteZh}
+												</div>
 											</div>
 										</div>
 									</div>
 								);
 							})}
 							{showLoadMoreHint ? (
-								<div className="text-textcolor/50 py-2 text-center text-xs">
+								<div className="text-textcolor/50 col-span-2 py-2 text-center text-xs">
 									{t('common.loadingMore')}
 								</div>
 							) : null}
 							{showEmpty ? (
-								<div className="text-textcolor/60 py-8 text-center text-sm">
+								<div className="text-textcolor/60 col-span-2 py-12 text-center text-sm">
 									{t('englishLearning.classic.favoritesEmpty')}
 								</div>
 							) : null}
 						</div>
-					</ScrollArea>
-				</div>
-			</Drawer>
+					)}
+				</ScrollArea>
+				<footer className="shrink-0 flex flex-wrap items-center justify-between gap-3 border-t border-theme/10 px-5 py-3">
+					<div className="flex items-center gap-2">
+						{!showInitialLoading && entries.length > 0 ? (
+							<div className="flex shrink-0 flex-wrap items-center gap-3">
+								<div className="flex items-center gap-2">
+									<Checkbox
+										id="classic-fav-select-all"
+										checked={selectAllCheckboxState}
+										disabled={selectionDisabled}
+										onCheckedChange={(v) => toggleSelectAllLoaded(v)}
+									/>
+									<Label
+										htmlFor="classic-fav-select-all"
+										className="cursor-pointer text-sm text-textcolor/85"
+									>
+										{t('englishLearning.favoritesDrawer.selectAllLoaded')}
+									</Label>
+								</div>
+								<span className="text-textcolor/60 text-xs">
+									{t('englishLearning.favoritesDrawer.selectedCount', {
+										count: selectedIds.size,
+									})}
+								</span>
+							</div>
+						) : null}
+					</div>
+					<div className="flex items-center gap-2">
+						<Button
+							type="button"
+							variant="destructive"
+							size="sm"
+							disabled={removeDisabled}
+							className="shrink-0 w-24"
+							onClick={() => requestRemoveConfirm()}
+						>
+							{batchRemoving ? (
+								<>
+									<Spinner className="h-4 w-4" />
+									{t('englishLearning.favoritesDrawer.removing')}
+								</>
+							) : (
+								t('englishLearning.favoritesDrawer.removeSelected')
+							)}
+						</Button>
+						<Button
+							type="button"
+							size="sm"
+							disabled={exportDisabled}
+							className="flex w-24 shrink-0 items-center"
+							onClick={() => void handleExportDocx()}
+						>
+							{exportingDocx ? (
+								<>
+									<Spinner className="h-4 w-4" />
+									{t('common.downloading')}
+								</>
+							) : (
+								t('englishLearning.classic.exportDocx')
+							)}
+						</Button>
+					</div>
+				</footer>
+			</div>
 		</>
 	);
 }

@@ -1,9 +1,7 @@
 /**
- * 英语学习：单词收藏记录抽屉（滚动分页列表）
- * 列表项布局与主区单词卡片一致（含朗读），无收藏按钮；支持多选批量移除收藏。
+ * 英语学习：单词收藏记录页（滚动分页列表）
  */
 import Confirm from '@design/Confirm';
-import { Drawer } from '@design/Drawer';
 import Loading from '@design/Loading';
 import { Checkbox } from '@ui/checkbox';
 import { Button, ScrollArea, Toast } from '@ui/index';
@@ -20,25 +18,19 @@ import {
 } from '@/service';
 import { displayIpaWrapped, isTauriRuntime } from '@/utils';
 
-export type VocabularyFavoritesDrawerProps = {
-	open: boolean;
-	onOpenChange: (open: boolean) => void;
+export type VocabularyFavoritesPanelProps = {
 	entries: EnglishVocabularyFavoriteListEntry[];
 	loading: boolean;
 	loadingMore: boolean;
 	onViewportScroll: UIEventHandler<HTMLDivElement>;
-	/** 与主区单词列表共用，保证互斥朗读与停止后 UI 一致 */
 	playingKey: string | null;
 	onTogglePlayWord: (word: string, key: string) => void | Promise<void>;
-	/** 批量取消收藏（由父组件调用接口并刷新列表） */
 	onBatchRemoveFavorites: (
 		selected: EnglishVocabularyFavoriteListEntry[],
 	) => Promise<void>;
 };
 
-export function VocabularyFavoritesDrawer({
-	open,
-	onOpenChange,
+export function VocabularyFavoritesPanel({
 	entries,
 	loading,
 	loadingMore,
@@ -46,7 +38,7 @@ export function VocabularyFavoritesDrawer({
 	playingKey,
 	onTogglePlayWord,
 	onBatchRemoveFavorites,
-}: VocabularyFavoritesDrawerProps) {
+}: VocabularyFavoritesPanelProps) {
 	const { t } = useI18n();
 	const [exportingDocx, setExportingDocx] = useState(false);
 	const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
@@ -59,7 +51,6 @@ export function VocabularyFavoritesDrawer({
 	const showInitialLoading = loading && entries.length === 0;
 	const showLoadMoreHint = loadingMore;
 	const showEmpty = !loading && entries.length === 0 && !loadingMore;
-
 	const exportDisabled =
 		exportingDocx || loading || (!loading && entries.length === 0);
 
@@ -67,25 +58,14 @@ export function VocabularyFavoritesDrawer({
 		() => new Set(entries.map((e) => e.id)),
 		[entries],
 	);
-
 	const allLoadedSelected =
 		entries.length > 0 && entries.every((e) => selectedIds.has(e.id));
 	const someLoadedSelected = entries.some((e) => selectedIds.has(e.id));
-
 	const selectAllCheckboxState: boolean | 'indeterminate' = allLoadedSelected
 		? true
 		: someLoadedSelected
 			? 'indeterminate'
 			: false;
-
-	useEffect(() => {
-		if (!open) {
-			setSelectedIds(new Set());
-			setRemoveConfirmOpen(false);
-			setSingleRemoveConfirmOpen(false);
-			setSingleRemoveTarget(null);
-		}
-	}, [open]);
 
 	useEffect(() => {
 		setSelectedIds((prev) => {
@@ -222,7 +202,6 @@ export function VocabularyFavoritesDrawer({
 		setExportingDocx(true);
 		try {
 			await downloadEnglishVocabularyFavoritesDocx();
-			// Web：无内置 Toast；Tauri：`downloadBlob` 已提示（与 Mermaid 工具栏等一致）
 			if (!isTauriRuntime()) {
 				Toast({
 					type: 'success',
@@ -283,198 +262,192 @@ export function VocabularyFavoritesDrawer({
 				closeOnConfirm={false}
 				onConfirm={() => void executeSingleRemoveConfirm()}
 			/>
-			<Drawer
-				title={`${t('englishLearning.vocab.favoritesTitle')}（${entries.length}）`}
-				open={open}
-				onOpenChange={onOpenChange}
-				bodyClassName="pt-1.5 pb-2"
-				footer={
-					<footer className="flex justify-between gap-2">
-						<div className="flex items-center gap-2">
-							{!showInitialLoading && entries.length > 0 ? (
-								<div className="flex shrink-0 flex-wrap items-center gap-3 py-2">
-									<div className="flex items-center gap-2">
-										<Checkbox
-											id="vocab-fav-select-all"
-											checked={selectAllCheckboxState}
-											disabled={selectionDisabled}
-											onCheckedChange={(v) => toggleSelectAllLoaded(v)}
-										/>
-										<Label
-											htmlFor="vocab-fav-select-all"
-											className="cursor-pointer text-sm text-textcolor/85"
-										>
-											{t('englishLearning.favoritesDrawer.selectAllLoaded')}
-										</Label>
-									</div>
-									<span className="text-textcolor/60 text-xs">
-										{t('englishLearning.favoritesDrawer.selectedCount', {
-											count: selectedIds.size,
-										})}
-									</span>
-								</div>
-							) : null}
+			<div className="flex h-full min-h-0 flex-col">
+				<ScrollArea
+					className="@container min-h-0 flex-1 px-4 py-4"
+					onScroll={onViewportScroll}
+				>
+					{showInitialLoading ? (
+						<div className="text-textcolor/60 flex min-h-full flex-1 items-center justify-center text-center text-sm">
+							<Loading text={t('englishLearning.vocab.favoritesLoading')} />
 						</div>
-						<div className="flex items-center gap-2">
-							<Button
-								type="button"
-								variant="destructive"
-								size="sm"
-								disabled={removeDisabled}
-								className="shrink-0 w-24"
-								onClick={() => requestRemoveConfirm()}
-							>
-								{batchRemoving ? (
-									<>
-										<Spinner className="h-4 w-4" />
-										{t('englishLearning.favoritesDrawer.removing')}
-									</>
-								) : (
-									t('englishLearning.favoritesDrawer.removeSelected')
-								)}
-							</Button>
-							<Button
-								type="button"
-								size="sm"
-								disabled={exportDisabled}
-								className="flex w-24 shrink-0 items-center"
-								onClick={() => void handleExportDocx()}
-							>
-								{exportingDocx ? (
-									<>
-										<Spinner className="h-4 w-4" />
-										{t('common.downloading')}
-									</>
-								) : (
-									t('englishLearning.vocab.exportDocx')
-								)}
-							</Button>
-						</div>
-					</footer>
-				}
-			>
-				<div className="flex h-full min-h-0 flex-col">
-					<ScrollArea
-						className="box-border flex min-h-0 flex-1 flex-col pr-1.5"
-						onScroll={onViewportScroll}
-					>
-						<div className="flex min-h-0 w-full flex-1 flex-col">
-							{showInitialLoading ? (
-								<div className="text-textcolor/60 flex flex-1 flex-col items-center justify-center py-6 text-center text-sm">
-									<Loading text={t('englishLearning.vocab.favoritesLoading')} />
-								</div>
-							) : null}
+					) : (
+						<div className="grid grid-cols-2 gap-4">
 							{entries.map((row) => {
 								const playKey = `fav-vocab-${row.id}`;
 								const playing = playingKey === playKey;
 								return (
 									<div
 										key={row.id}
-										className="hover:bg-theme/10 flex gap-2 rounded-md px-2 py-2.5 @min-[26rem]:px-3 @min-[26rem]:py-2.5"
+										className="select-text bg-theme/5 border border-theme/10 flex min-w-0 flex-col gap-1.5 rounded-md px-3 py-2.5"
 									>
-										<div className="flex shrink-0 items-start pt-1">
-											<Checkbox
-												id={`vocab-fav-${row.id}`}
-												className="cursor-pointer"
-												checked={selectedIds.has(row.id)}
-												disabled={selectionDisabled}
-												onCheckedChange={(v) =>
-													toggleRowSelected(row.id, v === true)
-												}
-												aria-label={`${t('englishLearning.favoritesDrawer.toggleRow')}: ${row.word}`}
-											/>
-										</div>
-										<div className="select-text min-w-0 flex-1 flex flex-col">
-											<div className="flex items-start justify-between gap-2">
-												<div className="min-w-0 flex-1">
-													<Label
-														htmlFor={`vocab-fav-${row.id}`}
-														className="select-text flex min-w-0 cursor-pointer flex-wrap items-baseline gap-x-2 gap-y-0.5"
-													>
-														<span className="truncate text-base font-semibold text-textcolor">
-															{row.word}
-														</span>
-														{row.pos?.trim() ? (
-															<span
-																className="text-textcolor/50 shrink-0 text-xs font-medium tracking-wide"
-																title={t('englishLearning.vocab.pos')}
-															>
-																{row.pos}
+										<div className="flex gap-2">
+											<div className="flex shrink-0 items-start pt-1">
+												<Checkbox
+													id={`vocab-fav-${row.id}`}
+													className="cursor-pointer"
+													checked={selectedIds.has(row.id)}
+													disabled={selectionDisabled}
+													onCheckedChange={(v) =>
+														toggleRowSelected(row.id, v === true)
+													}
+													aria-label={`${t('englishLearning.favoritesDrawer.toggleRow')}: ${row.word}`}
+												/>
+											</div>
+											<div className="min-w-0 flex-1 flex flex-col">
+												<div className="flex items-start justify-between gap-2">
+													<div className="min-w-0 flex-1">
+														<Label
+															htmlFor={`vocab-fav-${row.id}`}
+															className="select-text flex min-w-0 cursor-pointer flex-wrap items-baseline gap-x-2 gap-y-0.5"
+														>
+															<span className="truncate text-base font-semibold text-textcolor">
+																{row.word}
 															</span>
-														) : null}
-													</Label>
-													<div className="mt-1 font-mono text-xs leading-snug text-teal-600/90 dark:text-teal-400/90">
-														{displayIpaWrapped(row.ipa)}
+															{row.pos?.trim() ? (
+																<span
+																	className="text-textcolor/50 shrink-0 text-xs font-medium tracking-wide"
+																	title={t('englishLearning.vocab.pos')}
+																>
+																	{row.pos}
+																</span>
+															) : null}
+														</Label>
+														<div className="mt-1 font-mono text-xs leading-snug text-teal-600/90 dark:text-teal-400/90">
+															{displayIpaWrapped(row.ipa)}
+														</div>
+													</div>
+													<div className="flex shrink-0 items-center gap-1">
+														<Button
+															type="button"
+															variant="ghost"
+															size="sm"
+															onClick={() =>
+																void onTogglePlayWord(row.word, playKey)
+															}
+															className={cn(
+																'h-7 w-7 shrink-0 rounded-md border p-2 transition-colors',
+																playing
+																	? 'border-teal-500/40 bg-teal-500/15 text-teal-600 dark:text-teal-400'
+																	: 'border-theme/10 text-textcolor/60 hover:border-theme/20 hover:bg-theme/10 hover:text-teal-600 dark:hover:text-teal-400',
+															)}
+															aria-label={
+																playing
+																	? t('englishLearning.tts.stop')
+																	: t('englishLearning.vocab.playWord')
+															}
+														>
+															{playing ? (
+																<Square className="size-3.5 fill-current" />
+															) : (
+																<Volume2 className="size-3.5" />
+															)}
+														</Button>
+														<Button
+															type="button"
+															variant="ghost"
+															size="sm"
+															disabled={selectionDisabled}
+															onClick={() => requestSingleRemove(row)}
+															className={cn(
+																'h-7 w-7 shrink-0 rounded-md border p-2 transition-colors',
+																'border-theme/10 text-textcolor/60 hover:border-destructive/35 hover:bg-destructive/10 hover:text-destructive',
+															)}
+															aria-label={t(
+																'englishLearning.favoritesDrawer.removeOneAction',
+															)}
+														>
+															<Trash2 className="size-3.5" />
+														</Button>
 													</div>
 												</div>
-												<div className="flex shrink-0 items-center gap-1">
-													<Button
-														type="button"
-														variant="ghost"
-														size="sm"
-														onClick={() =>
-															void onTogglePlayWord(row.word, playKey)
-														}
-														className={cn(
-															'h-7 w-7 shrink-0 rounded-md border p-2 transition-colors @min-[26rem]:border-theme/15 @min-[26rem]:p-1.5',
-															playing
-																? 'border-teal-500/40 bg-teal-500/15 text-teal-600 dark:text-teal-400'
-																: 'border-theme/10 text-textcolor/60 hover:border-theme/20 hover:bg-theme/10 hover:text-teal-600 dark:hover:text-teal-400',
-														)}
-														aria-label={
-															playing
-																? t('englishLearning.tts.stop')
-																: t('englishLearning.vocab.playWord')
-														}
-													>
-														{playing ? (
-															<Square className="size-3.5 fill-current" />
-														) : (
-															<Volume2 className="size-3.5" />
-														)}
-													</Button>
-													<Button
-														type="button"
-														variant="ghost"
-														size="sm"
-														disabled={selectionDisabled}
-														onClick={() => requestSingleRemove(row)}
-														className={cn(
-															'h-7 w-7 shrink-0 rounded-md border p-2 transition-colors @min-[26rem]:border-theme/15 @min-[26rem]:p-1.5',
-															'border-theme/10 text-textcolor/60 hover:border-destructive/35 hover:bg-destructive/10 hover:text-destructive',
-														)}
-														aria-label={t(
-															'englishLearning.favoritesDrawer.removeOneAction',
-														)}
-													>
-														<Trash2 className="size-3.5" />
-													</Button>
+												<div className="text-textcolor/95 mt-1 text-sm leading-snug">
+													{row.translationZh}
 												</div>
-											</div>
-											<div className="text-textcolor/95 text-sm leading-snug mt-1">
-												{row.translationZh}
-											</div>
-											<div className="text-textcolor/80 text-sm leading-relaxed italic mt-0.5">
-												{row.example}
+												<div className="text-textcolor/80 mt-0.5 text-sm leading-relaxed italic">
+													{row.example}
+												</div>
 											</div>
 										</div>
 									</div>
 								);
 							})}
 							{showLoadMoreHint ? (
-								<div className="text-textcolor/50 py-2 text-center text-xs">
+								<div className="text-textcolor/50 col-span-2 py-2 text-center text-xs">
 									{t('common.loadingMore')}
 								</div>
 							) : null}
 							{showEmpty ? (
-								<div className="text-textcolor/60 py-8 text-center text-sm">
+								<div className="text-textcolor/60 col-span-2 py-12 text-center text-sm">
 									{t('englishLearning.vocab.favoritesEmpty')}
 								</div>
 							) : null}
 						</div>
-					</ScrollArea>
-				</div>
-			</Drawer>
+					)}
+				</ScrollArea>
+				<footer className="shrink-0 flex flex-wrap items-center justify-between gap-3 border-t border-theme/10 px-5 py-3">
+					<div className="flex items-center gap-2">
+						{!showInitialLoading && entries.length > 0 ? (
+							<div className="flex shrink-0 flex-wrap items-center gap-3">
+								<div className="flex items-center gap-2">
+									<Checkbox
+										id="vocab-fav-select-all"
+										checked={selectAllCheckboxState}
+										disabled={selectionDisabled}
+										onCheckedChange={(v) => toggleSelectAllLoaded(v)}
+									/>
+									<Label
+										htmlFor="vocab-fav-select-all"
+										className="cursor-pointer text-sm text-textcolor/85"
+									>
+										{t('englishLearning.favoritesDrawer.selectAllLoaded')}
+									</Label>
+								</div>
+								<span className="text-textcolor/60 text-xs">
+									{t('englishLearning.favoritesDrawer.selectedCount', {
+										count: selectedIds.size,
+									})}
+								</span>
+							</div>
+						) : null}
+					</div>
+					<div className="flex items-center gap-2">
+						<Button
+							type="button"
+							variant="destructive"
+							size="sm"
+							disabled={removeDisabled}
+							className="shrink-0 w-24"
+							onClick={() => requestRemoveConfirm()}
+						>
+							{batchRemoving ? (
+								<>
+									<Spinner className="h-4 w-4" />
+									{t('englishLearning.favoritesDrawer.removing')}
+								</>
+							) : (
+								t('englishLearning.favoritesDrawer.removeSelected')
+							)}
+						</Button>
+						<Button
+							type="button"
+							size="sm"
+							disabled={exportDisabled}
+							className="flex w-24 shrink-0 items-center"
+							onClick={() => void handleExportDocx()}
+						>
+							{exportingDocx ? (
+								<>
+									<Spinner className="h-4 w-4" />
+									{t('common.downloading')}
+								</>
+							) : (
+								t('englishLearning.vocab.exportDocx')
+							)}
+						</Button>
+					</div>
+				</footer>
+			</div>
 		</>
 	);
 }

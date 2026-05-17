@@ -15,8 +15,10 @@ import DesktopDownloadPage from '@/views/desktopDownload';
 import Document from '@/views/document';
 import Download from '@/views/download';
 import EnglishLearning from '@/views/englishLearning';
-import EnglishLearningImportPage from '@/views/englishLearning/EnglishLearningImportPage';
-import EnglishLearningLayout from '@/views/englishLearning/EnglishLearningLayout';
+import EnglishLearningFavoritesPage from '@/views/englishLearning/favorites/EnglishLearningFavoritesPage';
+import EnglishLearningImportPage from '@/views/englishLearning/import/EnglishLearningImportPage';
+import EnglishLearningLayout from '@/views/englishLearning/Layout';
+import EnglishLearningLibraryPage from '@/views/englishLearning/library/EnglishLearningLibraryPage';
 import Home from '@/views/home';
 import Knowledge from '@/views/knowledge';
 import LegalServicePolicy from '@/views/legal/servicePolicy';
@@ -136,6 +138,20 @@ const routes: RouteConfig[] = [
 						Component: EnglishLearningImportPage,
 						meta: {
 							titleKey: 'route.englishLearning.import.title',
+						},
+					},
+					{
+						path: 'library',
+						Component: EnglishLearningLibraryPage,
+						meta: {
+							titleKey: 'route.englishLearning.library.title',
+						},
+					},
+					{
+						path: 'favorites',
+						Component: EnglishLearningFavoritesPage,
+						meta: {
+							titleKey: 'route.englishLearning.favorites.title',
 						},
 					},
 				],

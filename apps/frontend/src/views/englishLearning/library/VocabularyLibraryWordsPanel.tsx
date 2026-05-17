@@ -1,0 +1,367 @@
+/**
+ * 资源库页：右侧单词列表（滚动分页加载）
+ */
+import Loading from '@design/Loading';
+import { Button, ScrollArea, Toast } from '@ui/index';
+import { Loader2, Square, Star, Volume2 } from 'lucide-react';
+import {
+	type UIEventHandler,
+	useCallback,
+	useEffect,
+	useRef,
+	useState,
+} from 'react';
+import { useNavigate } from 'react-router';
+import {
+	SCROLL_LOAD_THRESHOLD_PX,
+	VOCAB_LIBRARY_ITEMS_PAGE_SIZE,
+} from '@/constant';
+import { useI18n, useIncrementalVocabFavoriteStatus } from '@/hooks';
+import { cn } from '@/lib/utils';
+import type { EnglishVocabularyItem } from '@/service';
+import {
+	addEnglishVocabularyFavorite,
+	type EnglishVocabularyLibraryItemRow,
+	type EnglishVocabularyLibraryListItem,
+	listEnglishVocabularyLibraryItems,
+	normalizeEnglishVocabWordKey,
+	removeEnglishVocabularyFavorite,
+} from '@/service';
+import { displayIpaWrapped } from '@/utils';
+import {
+	playEnglishPreferred,
+	stopAllEnglishPlayback,
+} from '@/utils/englishTts';
+
+export type VocabularyLibraryWordsPanelProps = {
+	kind: 'vocab' | 'classic';
+	libraryId: string | null;
+	libraryMeta: EnglishVocabularyLibraryListItem | null;
+};
+
+export function VocabularyLibraryWordsPanel({
+	kind,
+	libraryId,
+	libraryMeta,
+}: VocabularyLibraryWordsPanelProps) {
+	const { t } = useI18n();
+	const navigate = useNavigate();
+	const [items, setItems] = useState<EnglishVocabularyLibraryItemRow[]>([]);
+	const [resolvedLibrary, setResolvedLibrary] =
+		useState<EnglishVocabularyLibraryListItem | null>(null);
+	const [loading, setLoading] = useState(false);
+	const [loadingMore, setLoadingMore] = useState(false);
+	const [playingKey, setPlayingKey] = useState<string | null>(null);
+	const { favoritedWordKeys, setFavoritedWordKeys } =
+		useIncrementalVocabFavoriteStatus(items);
+	const [favoriteActionKey, setFavoriteActionKey] = useState<string | null>(
+		null,
+	);
+	const offsetRef = useRef(0);
+	const hasMoreRef = useRef(true);
+	const fetchingMoreRef = useRef(false);
+	const libraryIdRef = useRef<string | null>(null);
+
+	const fetchFirstPage = useCallback(async (id: string) => {
+		fetchingMoreRef.current = false;
+		setLoading(true);
+		setLoadingMore(false);
+		offsetRef.current = 0;
+		hasMoreRef.current = true;
+		setItems([]);
+		setResolvedLibrary(null);
+		try {
+			const res = await listEnglishVocabularyLibraryItems(id, {
+				limit: VOCAB_LIBRARY_ITEMS_PAGE_SIZE,
+				offset: 0,
+			});
+			if (res.data?.library) {
+				setResolvedLibrary(res.data.library);
+			}
+			const list = Array.isArray(res.data?.items) ? res.data.items : [];
+			setItems(list);
+			offsetRef.current = list.length;
+			hasMoreRef.current = list.length >= VOCAB_LIBRARY_ITEMS_PAGE_SIZE;
+		} catch {
+			setItems([]);
+			hasMoreRef.current = false;
+		} finally {
+			setLoading(false);
+		}
+	}, []);
+
+	const fetchMore = useCallback(async () => {
+		const id = libraryIdRef.current;
+		if (!id || !hasMoreRef.current || fetchingMoreRef.current || loading) {
+			return;
+		}
+		fetchingMoreRef.current = true;
+		setLoadingMore(true);
+		const offset = offsetRef.current;
+		try {
+			const res = await listEnglishVocabularyLibraryItems(id, {
+				limit: VOCAB_LIBRARY_ITEMS_PAGE_SIZE,
+				offset,
+			});
+			const chunk = Array.isArray(res.data?.items) ? res.data.items : [];
+			if (chunk.length === 0) {
+				hasMoreRef.current = false;
+				return;
+			}
+			setItems((prev) => [...prev, ...chunk]);
+			offsetRef.current += chunk.length;
+			hasMoreRef.current = chunk.length >= VOCAB_LIBRARY_ITEMS_PAGE_SIZE;
+		} catch {
+			hasMoreRef.current = false;
+		} finally {
+			fetchingMoreRef.current = false;
+			setLoadingMore(false);
+		}
+	}, [loading]);
+
+	useEffect(() => {
+		stopAllEnglishPlayback();
+		setPlayingKey(null);
+		libraryIdRef.current = libraryId;
+		if (kind !== 'vocab' || !libraryId) {
+			setItems([]);
+			return;
+		}
+		void fetchFirstPage(libraryId);
+	}, [kind, libraryId, fetchFirstPage]);
+
+	const onViewportScroll = useCallback<UIEventHandler<HTMLDivElement>>(
+		(e) => {
+			const el = e.currentTarget;
+			const rest = el.scrollHeight - el.scrollTop - el.clientHeight;
+			if (rest < SCROLL_LOAD_THRESHOLD_PX) {
+				void fetchMore();
+			}
+		},
+		[fetchMore],
+	);
+
+	const toggleWordAudio = useCallback(
+		async (word: string, key: string) => {
+			if (playingKey === key) {
+				stopAllEnglishPlayback();
+				setPlayingKey(null);
+				return;
+			}
+			stopAllEnglishPlayback();
+			setPlayingKey(key);
+			try {
+				await playEnglishPreferred(word);
+			} catch {
+				Toast({
+					type: 'warning',
+					title: t('englishLearning.tts.unsupported'),
+				});
+			} finally {
+				setPlayingKey((k) => (k === key ? null : k));
+			}
+		},
+		[playingKey, t],
+	);
+
+	const toggleVocabularyFavorite = useCallback(
+		async (item: EnglishVocabularyItem, currentlyFavorited: boolean) => {
+			const wk = normalizeEnglishVocabWordKey(item.word);
+			if (!wk) return;
+			setFavoriteActionKey(wk);
+			try {
+				if (currentlyFavorited) {
+					await removeEnglishVocabularyFavorite(item.word);
+					setFavoritedWordKeys((prev) => {
+						const next = new Set(prev);
+						next.delete(wk);
+						return next;
+					});
+				} else {
+					await addEnglishVocabularyFavorite(item);
+					setFavoritedWordKeys((prev) => {
+						const next = new Set(prev);
+						next.add(wk);
+						return next;
+					});
+				}
+			} catch {
+				// 错误提示由 http 客户端统一处理
+			} finally {
+				setFavoriteActionKey(null);
+			}
+		},
+		[],
+	);
+
+	if (kind === 'classic') {
+		return (
+			<div className="text-textcolor/60 flex h-full min-h-0 flex-col items-center justify-center px-6 text-center text-sm">
+				{t('englishLearning.library.classic.wordsPlaceholder')}
+			</div>
+		);
+	}
+
+	if (!libraryId) {
+		return (
+			<div className="text-textcolor/60 flex h-full min-h-0 flex-col items-center justify-center px-6 text-center text-sm">
+				{t('englishLearning.library.selectLibrary')}
+			</div>
+		);
+	}
+
+	const meta = libraryMeta ?? resolvedLibrary;
+	const title = meta?.title?.trim() || '—';
+	const total = meta?.wordCount ?? items.length;
+	const showInitialLoading = loading && items.length === 0;
+	const showEmpty = !loading && items.length === 0;
+
+	return (
+		<div className="flex h-full min-h-0 flex-col @container">
+			<div className="flex items-center justify-between px-4.5 pt-3.5">
+				<div>
+					<h2 className="text-textcolor line-clamp-2 text-base font-semibold">
+						{title}
+					</h2>
+					<p className="text-textcolor/50 mt-0.5 text-xs">
+						{t('englishLearning.library.wordsHeading', { count: total })}
+					</p>
+				</div>
+				<div className="flex items-center gap-1.5 mt-1">
+					<Button
+						variant="link"
+						className="border border-theme/15 bg-theme/10 hover:border-theme/15 hover:bg-theme/15"
+						onClick={() => {
+							navigate('/english-learning/favorites');
+						}}
+					>
+						{t('route.englishLearning.favorites.title')}
+					</Button>
+				</div>
+			</div>
+			<ScrollArea className="min-h-0 flex-1 p-4" onScroll={onViewportScroll}>
+				{showInitialLoading ? (
+					<div className="text-textcolor/60 flex min-h-full flex-1 items-center justify-center text-center text-sm">
+						<Loading text={t('englishLearning.library.wordsLoading')} />
+					</div>
+				) : (
+					<>
+						{showEmpty ? (
+							<div className="text-textcolor/60 py-12 text-center text-sm">
+								{t('englishLearning.vocab.empty')}
+							</div>
+						) : null}
+						{items.length > 0 ? (
+							<div className="grid grid-cols-1 gap-4 @min-[28rem]:grid-cols-2">
+								{items.map((item) => {
+									const key = `${item.id}-${item.word}`;
+									const playing = playingKey === key;
+									const wordKey = normalizeEnglishVocabWordKey(item.word);
+									const isFavorited = favoritedWordKeys.has(wordKey);
+									const favBusy = favoriteActionKey === wordKey;
+									return (
+										<div
+											key={key}
+											className="select-text bg-theme/5 border border-theme/10 flex flex-col gap-1.5 rounded-md px-3 py-2.5"
+										>
+											<div className="flex items-start justify-between gap-2">
+												<div className="min-w-0 flex-1">
+													<div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
+														<div className="truncate text-lg font-semibold text-textcolor">
+															{item.word}
+														</div>
+														{item.pos?.trim() ? (
+															<span className="text-textcolor/55 shrink-0 text-xs font-medium">
+																{item.pos}
+															</span>
+														) : null}
+													</div>
+													<div className="font-mono text-xs leading-snug text-teal-600/90 dark:text-teal-400/90">
+														{displayIpaWrapped(item.ipa)}
+													</div>
+												</div>
+												<div className="flex shrink-0 items-center gap-1">
+													<Button
+														type="button"
+														variant="ghost"
+														size="sm"
+														onClick={() => void toggleWordAudio(item.word, key)}
+														className={cn(
+															'h-7 w-7 shrink-0 rounded-md border p-2 transition-colors',
+															playing
+																? 'border-teal-500/40 bg-teal-500/15 text-teal-600 dark:text-teal-400'
+																: 'border-theme/10 text-textcolor/60 hover:border-theme/20 hover:bg-theme/10 hover:text-teal-600 dark:hover:text-teal-400',
+														)}
+														aria-label={
+															playing
+																? t('englishLearning.tts.stop')
+																: t('englishLearning.vocab.playWord')
+														}
+													>
+														{playing ? (
+															<Square className="size-3.5 fill-current" />
+														) : (
+															<Volume2 className="size-3.5" />
+														)}
+													</Button>
+													<Button
+														type="button"
+														variant="ghost"
+														size="sm"
+														disabled={favBusy}
+														onClick={() =>
+															void toggleVocabularyFavorite(item, isFavorited)
+														}
+														className={cn(
+															'h-7 w-7 shrink-0 rounded-md border p-0 transition-colors',
+															isFavorited
+																? 'border-amber-400/45 bg-amber-400/12 text-amber-600'
+																: 'border-theme/10 text-textcolor/55 hover:border-theme/20 hover:bg-theme/10 hover:text-amber-600',
+														)}
+														aria-pressed={isFavorited}
+														aria-label={
+															isFavorited
+																? t('englishLearning.vocab.unfavoriteWord')
+																: t('englishLearning.vocab.favoriteWord')
+														}
+														title={
+															isFavorited
+																? t('englishLearning.vocab.unfavoriteWord')
+																: t('englishLearning.vocab.favoriteWord')
+														}
+													>
+														<Star
+															className={cn(
+																'size-3.5',
+																isFavorited && 'fill-current',
+															)}
+															aria-hidden
+														/>
+													</Button>
+												</div>
+											</div>
+											<div className="text-textcolor/95 text-sm leading-snug">
+												{item.translationZh}
+											</div>
+											{item.example?.trim() ? (
+												<div className="text-textcolor/80 text-sm leading-relaxed italic">
+													{item.example}
+												</div>
+											) : null}
+										</div>
+									);
+								})}
+							</div>
+						) : null}
+						{loadingMore ? (
+							<div className="text-textcolor/50 flex items-center justify-center gap-1.5 py-4 text-xs">
+								<Loader2 className="size-3.5 animate-spin" aria-hidden />
+								{t('common.loadingMore')}
+							</div>
+						) : null}
+					</>
+				)}
+			</ScrollArea>
+		</div>
+	);
+}

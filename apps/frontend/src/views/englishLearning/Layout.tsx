@@ -3,7 +3,7 @@
  */
 import { Outlet } from 'react-router';
 
-export default function EnglishLearningLayout() {
+export default function Layout() {
 	return (
 		<div className="h-full min-h-0 w-full min-w-0">
 			<Outlet />

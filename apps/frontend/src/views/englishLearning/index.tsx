@@ -17,14 +17,15 @@ import englishAgentStore from '@/store/englishAgent';
 import EnglishPackStore from '@/store/englishPack';
 import { stripAutoFilledIntentName } from '@/utils';
 import { stopAllEnglishPlayback } from '@/utils/englishTts';
-import { AgentPanel } from './AgentPanel';
-import { ClassicQuotesSection } from './ClassicQuotesSection';
-import EnglishSource from './EnglishSource';
+import { AgentPanel } from './agent/AgentPanel';
+import { ClassicQuotesSection } from './classic/ClassicQuotesSection';
+import FavoriteSession from './favorites/FavoriteSession';
+import EnglishSource from './shared/EnglishSource';
 import {
 	EnglishLearningToolbar,
 	type QuickIntentInputSyncPayload,
-} from './LearningToolbar';
-import { VocabularyPackSection } from './VocabularySection';
+} from './shared/LearningToolbar';
+import { VocabularyPackSection } from './vocab/VocabularySection';
 
 const EnglishLearning = observer(function EnglishLearning() {
 	const { t } = useI18n();
@@ -125,8 +126,6 @@ const EnglishLearning = observer(function EnglishLearning() {
 										<EnglishLearningToolbar
 											onQuickIntentInputSync={onQuickIntentInputSync}
 										/>
-										<VocabularyPackSection />
-										<ClassicQuotesSection />
 										<EnglishSource
 											title={t('englishLearning.library.vocab.title')}
 											description={t('englishLearning.library.vocab.descShort')}
@@ -139,6 +138,9 @@ const EnglishLearning = observer(function EnglishLearning() {
 											)}
 											type="classic"
 										/>
+										<FavoriteSession />
+										<VocabularyPackSection />
+										<ClassicQuotesSection />
 									</div>
 								</ScrollArea>
 							</aside>

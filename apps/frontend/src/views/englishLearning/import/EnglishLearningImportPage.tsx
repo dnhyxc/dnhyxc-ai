@@ -12,7 +12,7 @@ import {
 	useRef,
 	useState,
 } from 'react';
-import { useSearchParams } from 'react-router';
+import { useNavigate, useSearchParams } from 'react-router';
 import type { DragDropAcceptResult } from '@/components/design/DragDropFileUpload';
 import DragDropFileUpload from '@/components/design/DragDropFileUpload';
 import MarkdownEditor from '@/components/design/Monaco';
@@ -103,6 +103,7 @@ function parseClassicImport(
 export default function EnglishLearningImportPage() {
 	const { t } = useI18n();
 	const { theme } = useTheme();
+	const navigate = useNavigate();
 	const [searchParams] = useSearchParams();
 	const kind: ImportKind = useMemo(() => {
 		return searchParams.get('kind') === 'classic' ? 'classic' : 'vocab';
@@ -283,13 +284,17 @@ export default function EnglishLearningImportPage() {
 						count: String(res.data.wordCount),
 					}),
 				});
+				navigate(
+					`/english-learning/library?kind=vocab&library=${encodeURIComponent(res.data.id)}`,
+					{ replace: true },
+				);
 			}
 		} catch {
 			// 错误文案由 http 层 Toast 统一展示
 		} finally {
 			setVocabSaveLoading(false);
 		}
-	}, [importTitle, jsonErrorKind, previewText, structFailReason, t]);
+	}, [importTitle, jsonErrorKind, navigate, previewText, structFailReason, t]);
 
 	// 保存到经典语句库
 	const onSaveToClassic = useCallback(() => {
@@ -314,7 +319,6 @@ export default function EnglishLearningImportPage() {
 			});
 			return;
 		}
-		console.log('onSaveToClassic', importTitle, parsedClassic.length);
 	}, [importTitle, jsonErrorKind, parsedClassic, structFailReason, t]);
 
 	const hint =
@@ -334,8 +338,21 @@ export default function EnglishLearningImportPage() {
 				onChange={onReuploadHiddenFileChange}
 			/>
 			<div className="text-textcolor/80 mb-3 shrink-0 leading-relaxed text-sm">
-				<div>{hint}</div>
-				{`[{"word": "hello", "ipa": "/həˈləʊ/", "pos": "n.", "translationZh": "你好", "example": "Hello, how are you?"}]`}
+				<div className="flex items-center justify-between gap-1">
+					{hint}
+					<Button
+						variant="link"
+						className="px-0 text-theme"
+						onClick={() => navigate(`/english-learning/library?kind=${kind}`)}
+					>
+						{t('route.englishLearning.library.title')}
+					</Button>
+				</div>
+				<div className="max-w-3xl">
+					{kind === 'vocab'
+						? `[{"word": "hello", "ipa": "/həˈləʊ/", "pos": "n.", "translationZh": "你好", "example": "Hello, how are you?"}]`
+						: `[{"english": "Education is not the filling of a pail, but the lighting of a fire.", "translationZh": "教育不是注满一桶水，而是点燃一把火。", "source": "William Butler Yeats", "noteZh": "经典比喻，阐明教育的本质是激发热情。"}]`}
+				</div>
 			</div>
 
 			{jsonErrorKind === 'parse' ? (

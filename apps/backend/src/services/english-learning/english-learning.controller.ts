@@ -8,6 +8,7 @@ import {
 	Body,
 	ClassSerializerInterceptor,
 	Controller,
+	Delete,
 	Get,
 	Header,
 	HttpException,
@@ -287,6 +288,23 @@ export class EnglishLearningController {
 		const data = await this.englishLearningService.listVocabularyLibraries(
 			userId,
 			{ limit, offset },
+		);
+		return { success: true, data };
+	}
+
+	/** 删除单词库（含库内全部词条，数据库级联删除） */
+	@Delete('vocabulary-libraries/:libraryId')
+	async deleteVocabularyLibrary(
+		@Req() req: AuthedRequest,
+		@Param('libraryId') libraryId: string,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const data = await this.englishLearningService.deleteVocabularyLibrary(
+			userId,
+			libraryId,
 		);
 		return { success: true, data };
 	}

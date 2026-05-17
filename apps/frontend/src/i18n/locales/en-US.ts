@@ -726,6 +726,8 @@ export const enUS = {
 	'route.englishLearning.title': 'English learning',
 	'route.englishLearning.subtitle': 'Learning configuration',
 	'route.englishLearning.import.title': 'Import study data',
+	'route.englishLearning.library.title': 'Library',
+	'route.englishLearning.favorites.title': 'My favorites',
 
 	'englishLearning.import.titleVocab': 'Import vocabulary (JSON)',
 	'englishLearning.import.titleClassic': 'Import classic quotes (JSON)',
@@ -758,14 +760,44 @@ export const enUS = {
 	'englishLearning.import.reupload': 'Re-upload',
 	'englishLearning.import.saveVocabSuccess':
 		'Saved {count} word(s) to your vocabulary library',
-	'englishLearning.import.saveVocabLoading': 'Saving…',
+	'englishLearning.import.saveVocabLoading': 'Saving...',
+	'englishLearning.import.dataExample': 'Import word json example',
+	'englishLearning.import.dataExampleClassic':
+		'Import classic quotes json example',
 
 	'englishLearning.library.vocab.title': 'Vocabulary library',
-	'englishLearning.library.vocab.descShort': 'Import word packs',
+	'englishLearning.library.vocab.descShort': 'Import words, view word library',
 	'englishLearning.library.vocab.bank': 'Word bank',
 	'englishLearning.library.classic.title': 'Quotes library',
-	'englishLearning.library.classic.descShort': 'Import quote packs',
+	'englishLearning.library.classic.descShort': 'Import quotes, view corpus',
 	'englishLearning.library.classic.bank': 'Corpus',
+	'englishLearning.library.listHint': 'Select a pack on the left to view words',
+	'englishLearning.library.listLoading': 'Loading libraries…',
+	'englishLearning.library.listEmpty': 'No vocabulary libraries yet',
+	'englishLearning.library.deleteAction': 'Delete library',
+	'englishLearning.library.deleteConfirmTitle': 'Delete this library?',
+	'englishLearning.library.deleteConfirmDesc':
+		'This will permanently delete "{title}" and all {count} word(s) in it.',
+	'englishLearning.library.deleteConfirmAction': 'Delete',
+	'englishLearning.library.deleting': 'Deleting…',
+	'englishLearning.library.deleteSuccess': 'Library deleted',
+	'englishLearning.library.goImport': 'Go to import',
+	'englishLearning.library.selectLibrary':
+		'Select a vocabulary library on the left',
+	'englishLearning.library.wordsHeading': '{count} words',
+	'englishLearning.library.wordsLoading': 'Loading words…',
+	'englishLearning.library.classic.comingSoon':
+		'Classic quote library is coming soon. You can import JSON packs now.',
+	'englishLearning.library.classic.goImport': 'Import quotes',
+	'englishLearning.library.classic.wordsPlaceholder':
+		'Quote corpus will appear here when the library is available',
+	'englishLearning.favorites.bank': 'Favorites',
+	'englishLearning.favorites.sidebarTitle': 'Categories',
+	'englishLearning.favorites.listHint': 'Pick a category to view saved items',
+	'englishLearning.favorites.vocab.nav': 'Vocabulary',
+	'englishLearning.favorites.classic.nav': 'Quotes',
+	'englishLearning.favorites.desc': 'View your saved word and quote packs',
+	'englishLearning.favorites.toFavorites': 'Go to my favorites',
 
 	'englishLearning.toolbarSubtitle':
 		'Tools & vocabulary on the left, chat on the right',

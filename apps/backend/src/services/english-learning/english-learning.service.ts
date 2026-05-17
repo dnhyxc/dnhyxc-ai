@@ -1210,6 +1210,18 @@ export class EnglishLearningService {
 		});
 	}
 
+	/**
+	 * 删除单词库及其全部词条（库表删除后子表由 FK ON DELETE CASCADE 级联清理）。
+	 */
+	async deleteVocabularyLibrary(
+		userId: number,
+		libraryId: string,
+	): Promise<{ deleted: boolean }> {
+		const lib = await this.assertVocabularyLibraryOwned(userId, libraryId);
+		await this.vocabLibraryRepo.remove(lib);
+		return { deleted: true };
+	}
+
 	/** 分页列出当前用户的单词库（包） */
 	async listVocabularyLibraries(
 		userId: number,

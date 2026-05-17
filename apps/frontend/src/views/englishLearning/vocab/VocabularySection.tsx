@@ -3,7 +3,6 @@
  */
 import { Button, Input, Spinner, Toast } from '@ui/index';
 import {
-	Bookmark,
 	BookText,
 	CircleChevronDown,
 	CircleChevronRight,
@@ -16,7 +15,6 @@ import {
 	type UIEventHandler,
 	useCallback,
 	useEffect,
-	useMemo,
 	useRef,
 	useState,
 } from 'react';
@@ -27,18 +25,15 @@ import {
 	VOCAB_COUNT_MIN,
 	VOCAB_HISTORY_PAGE_SIZE,
 } from '@/constant';
-import { useI18n } from '@/hooks';
+import { useI18n, useIncrementalVocabFavoriteStatus } from '@/hooks';
 import { cn } from '@/lib/utils';
 import type {
-	EnglishVocabularyFavoriteListEntry,
 	EnglishVocabularyHistoryEntry,
 	EnglishVocabularyItem,
 } from '@/service';
 import {
 	addEnglishVocabularyFavorite,
-	fetchEnglishVocabularyFavoriteStatus,
 	getEnglishVocabularyHistoryDetail,
-	listEnglishVocabularyFavorites,
 	listEnglishVocabularyHistory,
 	normalizeEnglishVocabWordKey,
 	removeEnglishVocabularyFavorite,
@@ -53,10 +48,9 @@ import {
 	playEnglishPreferred,
 	stopAllEnglishPlayback,
 } from '@/utils/englishTts';
-import { formatEnglishLearningAgentToolLine } from './agentToolStatusText';
-import { VocabularyFavoritesDrawer } from './VocabularyFavoritesDrawer';
+import { formatEnglishLearningAgentToolLine } from '../agent/agentToolStatusText';
+import { MasterWebSearchResultsBar } from '../shared/WebSearchResultsBar';
 import { VocabularyHistoryDrawer } from './VocabularyHistoryDrawer';
-import { MasterWebSearchResultsBar } from './WebSearchResultsBar';
 
 export type VocabProgressState = EnglishPackUiProgress;
 
@@ -73,17 +67,11 @@ function VocabularyPackSectionInner() {
 
 	const [playingKey, setPlayingKey] = useState<string | null>(null);
 	const [historyDrawerOpen, setHistoryDrawerOpen] = useState(false);
-	const [favoritesDrawerOpen, setFavoritesDrawerOpen] = useState(false);
 	const [historyEntries, setHistoryEntries] = useState<
 		EnglishVocabularyHistoryEntry[]
 	>([]);
-	const [favoriteEntries, setFavoriteEntries] = useState<
-		EnglishVocabularyFavoriteListEntry[]
-	>([]);
 	const [historyLoading, setHistoryLoading] = useState(false);
 	const [historyLoadingMore, setHistoryLoadingMore] = useState(false);
-	const [favoriteLoading, setFavoriteLoading] = useState(false);
-	const [favoriteLoadingMore, setFavoriteLoadingMore] = useState(false);
 	const [loadingHistoryDetailId, setLoadingHistoryDetailId] = useState<
 		string | null
 	>(null);
@@ -91,53 +79,17 @@ function VocabularyPackSectionInner() {
 	/** 单词列表是否展开（默认展开） */
 	const [listExpanded, setListExpanded] = useState(true);
 
-	/** 已收藏的规范化词形（与后端 word_key 一致） */
-	const [favoritedWordKeys, setFavoritedWordKeys] = useState<Set<string>>(
-		() => new Set(),
-	);
+	const { favoritedWordKeys, setFavoritedWordKeys } =
+		useIncrementalVocabFavoriteStatus(items);
 	/** 正在请求收藏/取消的规范化词形，用于禁用该词按钮 */
 	const [favoriteActionKey, setFavoriteActionKey] = useState<string | null>(
 		null,
 	);
 
-	const itemsWordSig = useMemo(
-		() => items.map((it) => it.word).join('\u0001'),
-		[items],
-	);
-
-	useEffect(() => {
-		if (items.length === 0) {
-			setFavoritedWordKeys(new Set());
-			return;
-		}
-		let cancelled = false;
-		void (async () => {
-			try {
-				const res = await fetchEnglishVocabularyFavoriteStatus(
-					items.map((i) => i.word),
-				);
-				if (cancelled) return;
-				const keys = res.data?.favoritedWordKeys;
-				setFavoritedWordKeys(new Set(Array.isArray(keys) ? keys : []));
-			} catch {
-				if (!cancelled) {
-					setFavoritedWordKeys(new Set());
-				}
-			}
-		})();
-		return () => {
-			cancelled = true;
-		};
-	}, [itemsWordSig]);
-
 	const historyOffsetRef = useRef(0);
 	const historyHasMoreRef = useRef(true);
 	const historyFetchingMoreRef = useRef(false);
 	const historyDrawerOpenRef = useRef(false);
-
-	const favoriteOffsetRef = useRef(0);
-	const favoriteHasMoreRef = useRef(true);
-	const favoriteFetchingMoreRef = useRef(false);
 
 	useEffect(() => {
 		historyDrawerOpenRef.current = historyDrawerOpen;
@@ -245,96 +197,6 @@ function VocabularyPackSectionInner() {
 			}
 		},
 		[t],
-	);
-
-	const fetchFavoritesFirstPage = useCallback(async () => {
-		favoriteFetchingMoreRef.current = false;
-		setFavoriteLoading(true);
-		setFavoriteLoadingMore(false);
-		favoriteOffsetRef.current = 0;
-		favoriteHasMoreRef.current = true;
-		setFavoriteEntries([]);
-		try {
-			const res = await listEnglishVocabularyFavorites({
-				limit: VOCAB_HISTORY_PAGE_SIZE,
-				offset: 0,
-			});
-			const list = Array.isArray(res.data) ? res.data : [];
-			setFavoriteEntries(list);
-			favoriteOffsetRef.current = list.length;
-			favoriteHasMoreRef.current = list.length >= VOCAB_HISTORY_PAGE_SIZE;
-		} catch {
-			setFavoriteEntries([]);
-			favoriteHasMoreRef.current = false;
-		} finally {
-			setFavoriteLoading(false);
-		}
-	}, []);
-
-	const fetchFavoritesMore = useCallback(async () => {
-		if (
-			!favoriteHasMoreRef.current ||
-			favoriteFetchingMoreRef.current ||
-			favoriteLoading
-		) {
-			return;
-		}
-		favoriteFetchingMoreRef.current = true;
-		setFavoriteLoadingMore(true);
-		const offset = favoriteOffsetRef.current;
-		try {
-			const res = await listEnglishVocabularyFavorites({
-				limit: VOCAB_HISTORY_PAGE_SIZE,
-				offset,
-			});
-			const chunk = Array.isArray(res.data) ? res.data : [];
-			if (chunk.length === 0) {
-				favoriteHasMoreRef.current = false;
-				return;
-			}
-			setFavoriteEntries((prev) => [...prev, ...chunk]);
-			favoriteOffsetRef.current += chunk.length;
-			favoriteHasMoreRef.current = chunk.length >= VOCAB_HISTORY_PAGE_SIZE;
-		} catch {
-			favoriteHasMoreRef.current = false;
-		} finally {
-			favoriteFetchingMoreRef.current = false;
-			setFavoriteLoadingMore(false);
-		}
-	}, [favoriteLoading]);
-
-	useEffect(() => {
-		if (!favoritesDrawerOpen) return;
-		void fetchFavoritesFirstPage();
-	}, [favoritesDrawerOpen, fetchFavoritesFirstPage]);
-
-	const onFavoritesViewportScroll = useCallback<UIEventHandler<HTMLDivElement>>(
-		(e) => {
-			const el = e.currentTarget;
-			const rest = el.scrollHeight - el.scrollTop - el.clientHeight;
-			if (rest < SCROLL_LOAD_THRESHOLD_PX) {
-				void fetchFavoritesMore();
-			}
-		},
-		[fetchFavoritesMore],
-	);
-
-	const onBatchRemoveVocabularyFavorites = useCallback(
-		async (selected: EnglishVocabularyFavoriteListEntry[]) => {
-			if (selected.length === 0) return;
-			await Promise.all(
-				selected.map((it) => removeEnglishVocabularyFavorite(it.word)),
-			);
-			setFavoritedWordKeys((prev) => {
-				const next = new Set(prev);
-				for (const it of selected) {
-					next.delete(normalizeEnglishVocabWordKey(it.word));
-				}
-				return next;
-			});
-			await fetchFavoritesFirstPage();
-		},
-		[fetchFavoritesFirstPage],
 	);
 
 	const cancelGenerate = useCallback(() => {
@@ -578,7 +440,7 @@ function VocabularyPackSectionInner() {
 								disabled={loading}
 								onClick={() => EnglishPackStore.setVocabCountInput(String(n))}
 								className={cn(
-									'flex-1 rounded-md border bg-theme/5 px-2 py-1 text-xs font-medium transition-colors',
+									'flex-1 rounded-md border bg-theme/5 px-0 py-1 text-xs font-medium transition-colors',
 									countInput === String(n)
 										? 'border-teal-500/35 text-teal-500'
 										: 'border-theme/10 text-textcolor/65 hover:border-teal-500/20 hover:text-teal-500',
@@ -589,14 +451,14 @@ function VocabularyPackSectionInner() {
 						))}
 					</div>
 				</div>
-				<div className="flex min-w-0 items-stretch gap-2">
+				<div className="flex min-w-0 items-stretch gap-3.5">
 					<Button
 						type="button"
 						size="sm"
 						variant={loading ? 'outline' : 'default'}
 						onClick={() => (loading ? cancelGenerate() : void onGenerate())}
 						className={cn(
-							'h-9 min-w-0 flex-1 gap-2 rounded-md px-3 text-white',
+							'h-9 min-w-0 flex-1 rounded-md text-white',
 							loading
 								? 'border-red-500/20 bg-red-500/20 text-textcolor/80 hover:bg-red-500/25'
 								: 'bg-linear-to-r from-teal-500 to-cyan-600 hover:bg-linear-to-r hover:from-teal-400 hover:to-cyan-600',
@@ -619,24 +481,11 @@ function VocabularyPackSectionInner() {
 						type="button"
 						size="sm"
 						onClick={() => setHistoryDrawerOpen(true)}
-						className="text-white hover:bg-linear-to-r hover:from-teal-400 hover:to-cyan-600 bg-linear-to-r from-teal-500 to-cyan-600 h-9 shrink-0 gap-1.5 whitespace-nowrap rounded-md px-2 sm:px-2.5"
+						className="flex-1 text-white hover:bg-linear-to-r hover:from-teal-400 hover:to-cyan-600 bg-linear-to-r from-teal-500 to-cyan-600 h-9 shrink-0 whitespace-nowrap rounded-md"
 						title={t('englishLearning.vocab.historyOpenDrawer')}
 					>
 						<span className="max-[380px]:sr-only">
 							{t('englishLearning.vocab.historyOpenDrawer')}
-						</span>
-					</Button>
-					<Button
-						type="button"
-						size="sm"
-						onClick={() => setFavoritesDrawerOpen(true)}
-						className="text-white hover:bg-linear-to-r hover:from-teal-400 hover:to-cyan-600 bg-linear-to-r from-teal-500 to-cyan-600 h-9 w-9 shrink-0 gap-0 rounded-md px-0 sm:w-auto sm:gap-1.5 sm:px-2.5"
-						title={t('englishLearning.vocab.favoritesOpenDrawer')}
-						aria-label={t('englishLearning.vocab.favoritesOpenDrawer')}
-					>
-						<Bookmark className="size-4 shrink-0 sm:hidden" aria-hidden />
-						<span className="hidden sm:inline max-[420px]:sr-only">
-							{t('englishLearning.vocab.favoritesOpenDrawer')}
 						</span>
 					</Button>
 				</div>
@@ -730,7 +579,9 @@ function VocabularyPackSectionInner() {
 															className="text-textcolor/55 shrink-0 text-xs font-medium tracking-wide"
 															title={t('englishLearning.vocab.pos')}
 														>
-															{item.pos}
+															{item.pos.endsWith('.')
+																? item.pos
+																: `${item.pos}.`}
 														</span>
 													) : null}
 												</div>
@@ -821,17 +672,6 @@ function VocabularyPackSectionInner() {
 				loadingDetailId={loadingHistoryDetailId}
 				onViewportScroll={onHistoryViewportScroll}
 				onSelectEntry={openHistoryDetail}
-			/>
-			<VocabularyFavoritesDrawer
-				open={favoritesDrawerOpen}
-				onOpenChange={setFavoritesDrawerOpen}
-				entries={favoriteEntries}
-				loading={favoriteLoading}
-				loadingMore={favoriteLoadingMore}
-				onViewportScroll={onFavoritesViewportScroll}
-				playingKey={playingKey}
-				onTogglePlayWord={toggleWordAudio}
-				onBatchRemoveFavorites={onBatchRemoveVocabularyFavorites}
 			/>
 		</div>
 	);
