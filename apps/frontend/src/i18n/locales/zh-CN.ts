@@ -647,6 +647,24 @@ export const zhCN = {
 	'route.englishLearning.import.title': '导入学习资料',
 	'route.englishLearning.library.title': '资源库',
 	'route.englishLearning.favorites.title': '我的收藏',
+	'route.englishLearning.stream.title': '拉取结果',
+
+	'englishLearning.stream.back': '返回英语学习',
+	'englishLearning.stream.kindTabsAria': '拉取结果类型',
+	'englishLearning.stream.vocab.nav': '单词',
+	'englishLearning.stream.classic.nav': '语句',
+	'englishLearning.stream.vocab.pageTitle': '单词拉取结果',
+	'englishLearning.stream.classic.pageTitle': '语句拉取结果',
+	'englishLearning.stream.topicLabel': '主题',
+	'englishLearning.stream.openLivePage': '查看实时列表',
+	'englishLearning.stream.liveSummaryCount':
+		'已拉取 {count} 条，可在独立页实时查看',
+	'englishLearning.stream.liveSummaryProgress':
+		'拉取中 {collected} / {target} 条，可在独立页实时查看',
+	'englishLearning.stream.vocab.empty':
+		'暂无单词。请在英语学习页填写主题并点击「生成单词」，或从历史记录载入。',
+	'englishLearning.stream.classic.empty':
+		'暂无语句。请在英语学习页填写主题并点击「生成语句」，或从历史记录载入。',
 
 	'englishLearning.import.titleVocab': '导入单词（JSON）',
 	'englishLearning.import.titleClassic': '导入经典语句（JSON）',
@@ -775,6 +793,7 @@ export const zhCN = {
 	'englishLearning.agentTool.statusDoing': '资料助手 · {action} 进行中{detail}',
 	'englishLearning.agentTool.statusDone': '资料助手 · {action} 已完成',
 	'englishLearning.webSearch.viewPages': '联网检索网页（{n}）',
+	'englishLearning.webSearch.viewWebPages': '检索网页',
 	'englishLearning.webSearch.viewPagesTitle': '本次联网搜索结果（{n}）',
 	'englishLearning.packHistory.webSearchRounds': '联网 {n} 次',
 

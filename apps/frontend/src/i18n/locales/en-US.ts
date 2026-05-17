@@ -728,6 +728,24 @@ export const enUS = {
 	'route.englishLearning.import.title': 'Import study data',
 	'route.englishLearning.library.title': 'Library',
 	'route.englishLearning.favorites.title': 'My favorites',
+	'route.englishLearning.stream.title': 'Fetch results',
+
+	'englishLearning.stream.back': 'Back to English learning',
+	'englishLearning.stream.kindTabsAria': 'Fetch result type',
+	'englishLearning.stream.vocab.nav': 'Words',
+	'englishLearning.stream.classic.nav': 'Quotes',
+	'englishLearning.stream.vocab.pageTitle': 'Word fetch results',
+	'englishLearning.stream.classic.pageTitle': 'Quote fetch results',
+	'englishLearning.stream.topicLabel': 'Topic',
+	'englishLearning.stream.openLivePage': 'Open live list',
+	'englishLearning.stream.liveSummaryCount':
+		'{count} item(s) fetched—view live on the results page',
+	'englishLearning.stream.liveSummaryProgress':
+		'Fetching {collected} / {target}—view live on the results page',
+	'englishLearning.stream.vocab.empty':
+		'No words yet. Start a fetch on the English learning page, or load from history.',
+	'englishLearning.stream.classic.empty':
+		'No quotes yet. Start a fetch on the English learning page, or load from history.',
 
 	'englishLearning.import.titleVocab': 'Import vocabulary (JSON)',
 	'englishLearning.import.titleClassic': 'Import classic quotes (JSON)',
@@ -867,6 +885,7 @@ export const enUS = {
 		'Research · {action} in progress{detail}',
 	'englishLearning.agentTool.statusDone': 'Research · {action} done',
 	'englishLearning.webSearch.viewPages': 'Web search ({n})',
+	'englishLearning.webSearch.viewWebPages': 'View search',
 	'englishLearning.webSearch.viewPagesTitle': 'This web search results ({n})',
 	'englishLearning.packHistory.webSearchRounds': 'Web search ×{n}',
 

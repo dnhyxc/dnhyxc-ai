@@ -2,23 +2,16 @@
  * 按主题拉取英文经典语句（译文、出处、赏析），可朗读原句。
  */
 import { Button, Input, Spinner, Toast } from '@ui/index';
-import {
-	BookMarked,
-	CircleChevronDown,
-	CircleChevronRight,
-	Square,
-	Star,
-	Volume2,
-} from 'lucide-react';
+import { BookMarked } from 'lucide-react';
 import { observer } from 'mobx-react';
 import {
 	type UIEventHandler,
 	useCallback,
 	useEffect,
-	useMemo,
 	useRef,
 	useState,
 } from 'react';
+import { useNavigate } from 'react-router';
 import {
 	COUNT_PRESETS,
 	HISTORY_PAGE_SIZE,
@@ -28,17 +21,10 @@ import {
 } from '@/constant';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
-import type {
-	EnglishClassicQuoteHistoryEntry,
-	EnglishClassicQuoteItem,
-} from '@/service';
+import type { EnglishClassicQuoteHistoryEntry } from '@/service';
 import {
-	addEnglishClassicQuoteFavorite,
-	classicQuoteFavoriteContentKey,
-	fetchEnglishClassicQuoteFavoriteStatus,
 	getEnglishClassicQuotesHistoryDetail,
 	listEnglishClassicQuotesHistory,
-	removeEnglishClassicQuoteFavorite,
 } from '@/service';
 import EnglishPackStore, {
 	type EnglishPackUiProgress,
@@ -46,29 +32,20 @@ import EnglishPackStore, {
 import { sanitizeCountDigits } from '@/utils';
 import { streamEnglishClassicQuotes } from '@/utils/englishLearningPackSse';
 import { mergeEnglishPackWebSearchOrganics } from '@/utils/englishPackWebSearchMerge';
-import {
-	playEnglishPreferred,
-	stopAllEnglishPlayback,
-} from '@/utils/englishTts';
 import { formatEnglishLearningAgentToolLine } from '../agent/agentToolStatusText';
-import { MasterWebSearchResultsBar } from '../shared/WebSearchResultsBar';
+import { PackStreamLiveLink } from '../pack/PackStreamLiveLink';
 import { ClassicQuotesHistoryDrawer } from './ClassicQuotesHistoryDrawer';
 
 export type ClassicQuoteProgressState = EnglishPackUiProgress;
 
 function ClassicQuotesSectionInner() {
 	const { t } = useI18n();
+	const navigate = useNavigate();
 
 	const loading = EnglishPackStore.classicLoading;
-	const agentToolLine = EnglishPackStore.classicAgentToolLine;
-	const masterSearchOrganic = EnglishPackStore.classicMasterSearchOrganic;
-	const progress = EnglishPackStore.classicProgress;
-	const items = EnglishPackStore.classicItems;
-
 	const topic = EnglishPackStore.classicTopic;
 	const countInput = EnglishPackStore.classicCountInput;
 
-	const [playingKey, setPlayingKey] = useState<string | null>(null);
 	const [historyDrawerOpen, setHistoryDrawerOpen] = useState(false);
 	const [historyEntries, setHistoryEntries] = useState<
 		EnglishClassicQuoteHistoryEntry[]
@@ -79,46 +56,6 @@ function ClassicQuotesSectionInner() {
 		string | null
 	>(null);
 	const [loadedStreamId, setLoadedStreamId] = useState<string | null>(null);
-	/** 语句列表是否展开（默认展开） */
-	const [listExpanded, setListExpanded] = useState(true);
-
-	/** 已收藏句子的内容键（SHA256 hex，与后端 content_key 一致） */
-	const [favoritedContentKeys, setFavoritedContentKeys] = useState<Set<string>>(
-		() => new Set(),
-	);
-	const [favoriteActionKey, setFavoriteActionKey] = useState<string | null>(
-		null,
-	);
-
-	const itemsEnglishSig = useMemo(
-		() => items.map((it) => it.english).join('\u0001'),
-		[items],
-	);
-
-	useEffect(() => {
-		if (items.length === 0) {
-			setFavoritedContentKeys(new Set());
-			return;
-		}
-		let cancelled = false;
-		void (async () => {
-			try {
-				const res = await fetchEnglishClassicQuoteFavoriteStatus(
-					items.map((i) => i.english),
-				);
-				if (cancelled) return;
-				const keys = res.data?.favoritedContentKeys;
-				setFavoritedContentKeys(new Set(Array.isArray(keys) ? keys : []));
-			} catch {
-				if (!cancelled) {
-					setFavoritedContentKeys(new Set());
-				}
-			}
-		})();
-		return () => {
-			cancelled = true;
-		};
-	}, [itemsEnglishSig]);
 
 	const historyOffsetRef = useRef(0);
 	const historyHasMoreRef = useRef(true);
@@ -212,9 +149,9 @@ function ClassicQuotesSectionInner() {
 						d.items,
 						mergeEnglishPackWebSearchOrganics(d.webSearchRounds),
 					);
-					setListExpanded(true);
 					setLoadedStreamId(streamId);
 					setHistoryDrawerOpen(false);
+					navigate('/english-learning/stream?kind=classic');
 					Toast({
 						type: 'success',
 						title: t('englishLearning.classic.historyLoaded'),
@@ -229,7 +166,7 @@ function ClassicQuotesSectionInner() {
 				setLoadingHistoryDetailId(null);
 			}
 		},
-		[t],
+		[t, navigate],
 	);
 
 	const cancelGenerate = useCallback(() => {
@@ -261,8 +198,6 @@ function ClassicQuotesSectionInner() {
 		}
 
 		const myGen = EnglishPackStore.startClassicStream(effectiveTarget);
-
-		setListExpanded(true);
 
 		const abort = await streamEnglishClassicQuotes({
 			body,
@@ -355,59 +290,6 @@ function ClassicQuotesSectionInner() {
 			EnglishPackStore.setClassicAbort(abort);
 		}
 	}, [topic, countInput, t, fetchHistoryFirstPage]);
-
-	const toggleQuoteAudio = useCallback(
-		async (text: string, key: string) => {
-			if (playingKey === key) {
-				stopAllEnglishPlayback();
-				setPlayingKey(null);
-				return;
-			}
-			stopAllEnglishPlayback();
-			setPlayingKey(key);
-			try {
-				await playEnglishPreferred(text);
-			} catch {
-				Toast({
-					type: 'warning',
-					title: t('englishLearning.tts.unsupported'),
-				});
-			} finally {
-				setPlayingKey((k) => (k === key ? null : k));
-			}
-		},
-		[playingKey, t],
-	);
-
-	const toggleClassicQuoteFavorite = useCallback(
-		async (item: EnglishClassicQuoteItem, currentlyFavorited: boolean) => {
-			const ck = classicQuoteFavoriteContentKey(item.english);
-			if (!ck) return;
-			setFavoriteActionKey(ck);
-			try {
-				if (currentlyFavorited) {
-					await removeEnglishClassicQuoteFavorite(item.english);
-					setFavoritedContentKeys((prev) => {
-						const next = new Set(prev);
-						next.delete(ck);
-						return next;
-					});
-				} else {
-					await addEnglishClassicQuoteFavorite(item);
-					setFavoritedContentKeys((prev) => {
-						const next = new Set(prev);
-						next.add(ck);
-						return next;
-					});
-				}
-			} catch {
-				// 错误提示由 http 客户端统一处理
-			} finally {
-				setFavoriteActionKey(null);
-			}
-		},
-		[],
-	);
 
 	const normalizeCountOnBlur = useCallback(() => {
 		if (countInput.trim() === '') {
@@ -538,170 +420,8 @@ function ClassicQuotesSectionInner() {
 						</span>
 					</Button>
 				</div>
-				{loading && progress ? (
-					<div className="border border-theme/10 space-y-2 rounded-md bg-theme-secondary/40 px-3 py-2.5">
-						{agentToolLine ? (
-							<div className="text-indigo-600/90 dark:text-indigo-400/90 text-xs leading-snug">
-								{agentToolLine}
-							</div>
-						) : null}
-						<div className="text-textcolor/70 text-xs leading-snug">
-							{t('englishLearning.classic.progress', {
-								collected: progress.collected,
-								target: progress.target,
-								round: progress.round,
-							})}
-						</div>
-						<div className="bg-theme/10 h-1.5 w-full overflow-hidden rounded-md">
-							<div
-								className="bg-violet-500/85 h-full rounded-md transition-[width] duration-300 ease-out"
-								style={{
-									width: `${Math.min(
-										100,
-										(progress.collected / Math.max(1, progress.target)) * 100,
-									)}%`,
-								}}
-							/>
-						</div>
-					</div>
-				) : null}
+				<PackStreamLiveLink kind="classic" />
 			</div>
-
-			{items.length > 0 ? (
-				<>
-					<div className="sticky -top-2.5 -mx-4 px-4 mt-2.5 pb-0.5 flex min-h-6 items-center justify-between gap-2 bg-theme-background/95 backdrop-blur-sm">
-						<div className="flex items-center gap-2 text-textcolor/45 text-sm font-medium">
-							<div className="flex items-center">
-								{t('englishLearning.classic.listHeading')}
-								<span className="mt-0.5">（{items.length}）</span>
-							</div>
-							{masterSearchOrganic.length > 0 ? (
-								<MasterWebSearchResultsBar items={masterSearchOrganic} t={t} />
-							) : null}
-						</div>
-						<Button
-							type="button"
-							variant="link"
-							size="sm"
-							className="text-textcolor/55 hover:text-textcolor h-8 w-8 shrink-0 p-0 mt-0.5 -mr-2"
-							onClick={() => setListExpanded((v) => !v)}
-							aria-expanded={listExpanded}
-							aria-label={
-								listExpanded
-									? t('englishLearning.classic.collapseList')
-									: t('englishLearning.classic.expandList')
-							}
-						>
-							{listExpanded ? (
-								<CircleChevronDown
-									className="w-full h-full transition-transform duration-200"
-									aria-hidden
-								/>
-							) : (
-								<CircleChevronRight
-									className="w-full h-full transition-transform duration-200"
-									aria-hidden
-								/>
-							)}
-						</Button>
-					</div>
-					{listExpanded ? (
-						<div className="select-text grid grid-cols-1 gap-4 @min-[26rem]:grid-cols-2">
-							{items.map((item, i) => {
-								const contentKey = classicQuoteFavoriteContentKey(item.english);
-								const key = `${i}-${contentKey || item.english.slice(0, 48)}`;
-								const playing = playingKey === key;
-								const isFavorited =
-									contentKey.length > 0 && favoritedContentKeys.has(contentKey);
-								const favBusy = favoriteActionKey === contentKey;
-								return (
-									<div
-										key={key}
-										className="bg-theme/5 border border-theme/10 flex flex-col gap-1.5 rounded-md px-3 py-2.5 @min-[26rem]:p-3"
-									>
-										<div className="flex items-start justify-between gap-2">
-											<div className="text-textcolor min-w-0 flex-1 text-base font-medium leading-snug @min-[26rem]:text-lg">
-												{item.english}
-											</div>
-											<div className="flex transition-opacity duration-200 shrink-0 items-center gap-1">
-												<Button
-													type="button"
-													variant="ghost"
-													size="sm"
-													onClick={() =>
-														void toggleQuoteAudio(item.english, key)
-													}
-													className={cn(
-														'h-7 w-7 shrink-0 rounded-md border p-2 transition-colors @min-[26rem]:border-theme/15 @min-[26rem]:p-1.5',
-														playing
-															? 'border-violet-500/40 bg-violet-500/15 text-violet-600 dark:text-violet-400'
-															: 'border-theme/12 text-textcolor/60 hover:border-theme/20 hover:bg-theme/10 hover:text-violet-600 dark:hover:text-violet-400',
-													)}
-													aria-label={
-														playing
-															? t('englishLearning.tts.stop')
-															: t('englishLearning.classic.playQuote')
-													}
-												>
-													{playing ? (
-														<Square className="size-3.5 fill-current" />
-													) : (
-														<Volume2 className="size-3.5" />
-													)}
-												</Button>
-												<Button
-													type="button"
-													variant="ghost"
-													size="sm"
-													disabled={favBusy || !contentKey}
-													onClick={() =>
-														void toggleClassicQuoteFavorite(item, isFavorited)
-													}
-													className={cn(
-														'h-7 w-7 shrink-0 rounded-md border p-0 transition-colors @min-[26rem]:h-8 @min-[26rem]:w-8 @min-[26rem]:border-theme/15',
-														isFavorited
-															? 'border-amber-400/45 bg-amber-400/12 text-amber-600 dark:text-amber-400'
-															: 'border-theme/12 text-textcolor/55 hover:border-theme/20 hover:bg-theme/10 hover:text-amber-600',
-													)}
-													aria-pressed={isFavorited}
-													aria-label={
-														isFavorited
-															? t('englishLearning.classic.unfavoriteQuote')
-															: t('englishLearning.classic.favoriteQuote')
-													}
-													title={
-														isFavorited
-															? t('englishLearning.classic.unfavoriteQuote')
-															: t('englishLearning.classic.favoriteQuote')
-													}
-												>
-													<Star
-														className={cn(
-															'size-3.5',
-															isFavorited && 'fill-current',
-														)}
-														aria-hidden
-													/>
-												</Button>
-											</div>
-										</div>
-										<div className="text-textcolor/90 text-sm leading-snug">
-											{item.translationZh}
-										</div>
-										<div className="text-textcolor/70 text-xs">
-											{t('englishLearning.classic.sourceLabel')}
-											{item.source || '—'}
-										</div>
-										<div className="text-textcolor/70 text-xs leading-relaxed italic">
-											{item.noteZh}
-										</div>
-									</div>
-								);
-							})}
-						</div>
-					) : null}
-				</>
-			) : null}
 
 			<ClassicQuotesHistoryDrawer
 				open={historyDrawerOpen}

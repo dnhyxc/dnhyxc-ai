@@ -19,6 +19,7 @@ import EnglishLearningFavoritesPage from '@/views/englishLearning/favorites/Engl
 import EnglishLearningImportPage from '@/views/englishLearning/import/EnglishLearningImportPage';
 import EnglishLearningLayout from '@/views/englishLearning/Layout';
 import EnglishLearningLibraryPage from '@/views/englishLearning/library/EnglishLearningLibraryPage';
+import EnglishLearningPackStreamPage from '@/views/englishLearning/pack/EnglishLearningPackStreamPage';
 import Home from '@/views/home';
 import Knowledge from '@/views/knowledge';
 import LegalServicePolicy from '@/views/legal/servicePolicy';
@@ -152,6 +153,13 @@ const routes: RouteConfig[] = [
 						Component: EnglishLearningFavoritesPage,
 						meta: {
 							titleKey: 'route.englishLearning.favorites.title',
+						},
+					},
+					{
+						path: 'stream',
+						Component: EnglishLearningPackStreamPage,
+						meta: {
+							titleKey: 'route.englishLearning.stream.title',
 						},
 					},
 				],

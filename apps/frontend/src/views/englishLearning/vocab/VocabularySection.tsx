@@ -2,14 +2,7 @@
  * 按主题拉取结构化单词资料（IPA / 释义 / 例句），逐词朗读。
  */
 import { Button, Input, Spinner, Toast } from '@ui/index';
-import {
-	BookText,
-	CircleChevronDown,
-	CircleChevronRight,
-	Square,
-	Star,
-	Volume2,
-} from 'lucide-react';
+import { BookText } from 'lucide-react';
 import { observer } from 'mobx-react';
 import {
 	type UIEventHandler,
@@ -18,6 +11,7 @@ import {
 	useRef,
 	useState,
 } from 'react';
+import { useNavigate } from 'react-router';
 import {
 	COUNT_PRESETS,
 	SCROLL_LOAD_THRESHOLD_PX,
@@ -25,47 +19,33 @@ import {
 	VOCAB_COUNT_MIN,
 	VOCAB_HISTORY_PAGE_SIZE,
 } from '@/constant';
-import { useI18n, useIncrementalVocabFavoriteStatus } from '@/hooks';
+import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
-import type {
-	EnglishVocabularyHistoryEntry,
-	EnglishVocabularyItem,
-} from '@/service';
+import type { EnglishVocabularyHistoryEntry } from '@/service';
 import {
-	addEnglishVocabularyFavorite,
 	getEnglishVocabularyHistoryDetail,
 	listEnglishVocabularyHistory,
-	normalizeEnglishVocabWordKey,
-	removeEnglishVocabularyFavorite,
 } from '@/service';
 import EnglishPackStore, {
 	type EnglishPackUiProgress,
 } from '@/store/englishPack';
-import { displayIpaWrapped, sanitizeCountDigits } from '@/utils';
+import { sanitizeCountDigits } from '@/utils';
 import { streamEnglishVocabularyPack } from '@/utils/englishLearningPackSse';
 import { mergeEnglishPackWebSearchOrganics } from '@/utils/englishPackWebSearchMerge';
-import {
-	playEnglishPreferred,
-	stopAllEnglishPlayback,
-} from '@/utils/englishTts';
 import { formatEnglishLearningAgentToolLine } from '../agent/agentToolStatusText';
-import { MasterWebSearchResultsBar } from '../shared/WebSearchResultsBar';
+import { PackStreamLiveLink } from '../pack/PackStreamLiveLink';
 import { VocabularyHistoryDrawer } from './VocabularyHistoryDrawer';
 
 export type VocabProgressState = EnglishPackUiProgress;
 
 function VocabularyPackSectionInner() {
 	const { t } = useI18n();
+	const navigate = useNavigate();
 	const loading = EnglishPackStore.vocabLoading;
-	const agentToolLine = EnglishPackStore.vocabAgentToolLine;
-	const masterSearchOrganic = EnglishPackStore.vocabMasterSearchOrganic;
-	const progress = EnglishPackStore.vocabProgress;
-	const items = EnglishPackStore.vocabItems;
 
 	const topic = EnglishPackStore.vocabTopic;
 	const countInput = EnglishPackStore.vocabCountInput;
 
-	const [playingKey, setPlayingKey] = useState<string | null>(null);
 	const [historyDrawerOpen, setHistoryDrawerOpen] = useState(false);
 	const [historyEntries, setHistoryEntries] = useState<
 		EnglishVocabularyHistoryEntry[]
@@ -76,15 +56,6 @@ function VocabularyPackSectionInner() {
 		string | null
 	>(null);
 	const [loadedStreamId, setLoadedStreamId] = useState<string | null>(null);
-	/** 单词列表是否展开（默认展开） */
-	const [listExpanded, setListExpanded] = useState(true);
-
-	const { favoritedWordKeys, setFavoritedWordKeys } =
-		useIncrementalVocabFavoriteStatus(items);
-	/** 正在请求收藏/取消的规范化词形，用于禁用该词按钮 */
-	const [favoriteActionKey, setFavoriteActionKey] = useState<string | null>(
-		null,
-	);
 
 	const historyOffsetRef = useRef(0);
 	const historyHasMoreRef = useRef(true);
@@ -179,9 +150,9 @@ function VocabularyPackSectionInner() {
 						d.items,
 						mergeEnglishPackWebSearchOrganics(d.webSearchRounds),
 					);
-					setListExpanded(true);
 					setLoadedStreamId(streamId);
 					setHistoryDrawerOpen(false);
+					navigate('/english-learning/stream?kind=vocab');
 					Toast({
 						type: 'success',
 						title: t('englishLearning.vocab.historyLoaded'),
@@ -196,7 +167,7 @@ function VocabularyPackSectionInner() {
 				setLoadingHistoryDetailId(null);
 			}
 		},
-		[t],
+		[t, navigate],
 	);
 
 	const cancelGenerate = useCallback(() => {
@@ -229,8 +200,6 @@ function VocabularyPackSectionInner() {
 		}
 
 		const myGen = EnglishPackStore.startVocabStream(effectiveTarget);
-
-		setListExpanded(true);
 
 		const abort = await streamEnglishVocabularyPack({
 			body,
@@ -323,59 +292,6 @@ function VocabularyPackSectionInner() {
 			EnglishPackStore.setVocabAbort(abort);
 		}
 	}, [topic, countInput, t, fetchHistoryFirstPage]);
-
-	const toggleWordAudio = useCallback(
-		async (word: string, key: string) => {
-			if (playingKey === key) {
-				stopAllEnglishPlayback();
-				setPlayingKey(null);
-				return;
-			}
-			stopAllEnglishPlayback();
-			setPlayingKey(key);
-			try {
-				await playEnglishPreferred(word);
-			} catch {
-				Toast({
-					type: 'warning',
-					title: t('englishLearning.tts.unsupported'),
-				});
-			} finally {
-				setPlayingKey((k) => (k === key ? null : k));
-			}
-		},
-		[playingKey, t],
-	);
-
-	const toggleVocabularyFavorite = useCallback(
-		async (item: EnglishVocabularyItem, currentlyFavorited: boolean) => {
-			const wk = normalizeEnglishVocabWordKey(item.word);
-			if (!wk) return;
-			setFavoriteActionKey(wk);
-			try {
-				if (currentlyFavorited) {
-					await removeEnglishVocabularyFavorite(item.word);
-					setFavoritedWordKeys((prev) => {
-						const next = new Set(prev);
-						next.delete(wk);
-						return next;
-					});
-				} else {
-					await addEnglishVocabularyFavorite(item);
-					setFavoritedWordKeys((prev) => {
-						const next = new Set(prev);
-						next.add(wk);
-						return next;
-					});
-				}
-			} catch {
-				// 错误提示由 http 客户端统一处理
-			} finally {
-				setFavoriteActionKey(null);
-			}
-		},
-		[],
-	);
 
 	const normalizeCountOnBlur = useCallback(() => {
 		if (countInput.trim() === '') {
@@ -511,179 +427,8 @@ function VocabularyPackSectionInner() {
 						</span>
 					</Button>
 				</div>
-				{loading && progress ? (
-					<div className="border border-theme/10 space-y-2 rounded-md bg-theme-secondary/40 px-3 py-2.5">
-						{agentToolLine ? (
-							<div className="text-teal-600/90 dark:text-teal-400/90 text-xs leading-snug">
-								{agentToolLine}
-							</div>
-						) : null}
-						<div className="text-textcolor/70 text-xs leading-snug">
-							{t('englishLearning.vocab.progress', {
-								collected: progress.collected,
-								target: progress.target,
-								round: progress.round,
-							})}
-						</div>
-						<div className="bg-theme/10 h-1.5 w-full overflow-hidden rounded-md">
-							<div
-								className="bg-teal-500/85 h-full rounded-md transition-[width] duration-300 ease-out"
-								style={{
-									width: `${Math.min(
-										100,
-										(progress.collected / Math.max(1, progress.target)) * 100,
-									)}%`,
-								}}
-							/>
-						</div>
-					</div>
-				) : null}
+				<PackStreamLiveLink kind="vocab" />
 			</div>
-			{items.length > 0 ? (
-				<>
-					<div className="sticky -top-2.5 -mx-4 px-4 mt-2.5 pb-0.5 flex min-h-6 items-center justify-between gap-2 bg-theme-background/95 backdrop-blur-sm">
-						<div className="flex items-center gap-2 text-textcolor/45 text-sm font-medium">
-							<div className="flex items-center">
-								{t('englishLearning.vocab.listHeading')}
-								<span className="mt-0.5">（{items.length}）</span>
-							</div>
-							{masterSearchOrganic.length > 0 ? (
-								<MasterWebSearchResultsBar items={masterSearchOrganic} t={t} />
-							) : null}
-						</div>
-						<Button
-							type="button"
-							variant="link"
-							size="sm"
-							className="text-textcolor/55 hover:text-textcolor h-8 w-8 shrink-0 p-0! mt-0.5 -mr-2"
-							onClick={() => setListExpanded((v) => !v)}
-							aria-expanded={listExpanded}
-							aria-label={
-								listExpanded
-									? t('englishLearning.vocab.collapseList')
-									: t('englishLearning.vocab.expandList')
-							}
-						>
-							{listExpanded ? (
-								<CircleChevronDown
-									className="w-full h-full transition-transform duration-200"
-									aria-hidden
-								/>
-							) : (
-								<CircleChevronRight
-									className="w-full h-full transition-transform duration-200"
-									aria-hidden
-								/>
-							)}
-						</Button>
-					</div>
-					{listExpanded ? (
-						<div className="grid grid-cols-1 gap-4 @min-[26rem]:grid-cols-2">
-							{items.map((item, i) => {
-								const key = `${i}-${item.word}`;
-								const playing = playingKey === key;
-								const wordKey = normalizeEnglishVocabWordKey(item.word);
-								const isFavorited = favoritedWordKeys.has(wordKey);
-								const favBusy = favoriteActionKey === wordKey;
-								return (
-									<div
-										key={key}
-										className="select-text bg-theme/5 border border-theme/10 flex flex-col gap-1.5 rounded-md px-3 py-2.5 @min-[26rem]:p-3"
-									>
-										<div className="flex items-start justify-between gap-2">
-											<div className="min-w-0 flex-1">
-												<div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
-													<div className="truncate text-lg font-semibold text-textcolor @min-[26rem]:text-base">
-														{item.word}
-													</div>
-													{item.pos?.trim() ? (
-														<span
-															className="text-textcolor/55 shrink-0 text-xs font-medium tracking-wide"
-															title={t('englishLearning.vocab.pos')}
-														>
-															{item.pos.endsWith('.')
-																? item.pos
-																: `${item.pos}.`}
-														</span>
-													) : null}
-												</div>
-												<div className="font-mono text-xs leading-snug text-teal-600/90 @min-[26rem]:text-xs dark:text-teal-400/90">
-													{displayIpaWrapped(item.ipa)}
-												</div>
-											</div>
-											<div className="flex shrink-0 items-center gap-1">
-												<Button
-													type="button"
-													variant="ghost"
-													size="sm"
-													onClick={() => void toggleWordAudio(item.word, key)}
-													className={cn(
-														'h-7 w-7 shrink-0 rounded-md border p-2 transition-colors @min-[26rem]:border-theme/15 @min-[26rem]:p-1.5',
-														playing
-															? 'border-teal-500/40 bg-teal-500/15 text-teal-600 dark:text-teal-400'
-															: 'border-theme/10 text-textcolor/60 hover:border-theme/20 hover:bg-theme/10 hover:text-teal-600 dark:hover:text-teal-400',
-													)}
-													aria-label={
-														playing
-															? t('englishLearning.tts.stop')
-															: t('englishLearning.vocab.playWord')
-													}
-												>
-													{playing ? (
-														<Square className="size-3.5 fill-current" />
-													) : (
-														<Volume2 className="size-3.5" />
-													)}
-												</Button>
-												<Button
-													type="button"
-													variant="ghost"
-													size="sm"
-													disabled={favBusy}
-													onClick={() =>
-														void toggleVocabularyFavorite(item, isFavorited)
-													}
-													className={cn(
-														'h-7 w-7 shrink-0 rounded-md border p-0 transition-colors @min-[26rem]:h-8 @min-[26rem]:w-8 @min-[26rem]:border-theme/15',
-														isFavorited
-															? 'border-amber-400/45 bg-amber-400/12 text-amber-600'
-															: 'border-theme/10 text-textcolor/55 hover:border-theme/20 hover:bg-theme/10 hover:text-amber-600',
-													)}
-													aria-pressed={isFavorited}
-													aria-label={
-														isFavorited
-															? t('englishLearning.vocab.unfavoriteWord')
-															: t('englishLearning.vocab.favoriteWord')
-													}
-													title={
-														isFavorited
-															? t('englishLearning.vocab.unfavoriteWord')
-															: t('englishLearning.vocab.favoriteWord')
-													}
-												>
-													<Star
-														className={cn(
-															'size-3.5 @min-[26rem]:size-3.5',
-															isFavorited && 'fill-current',
-														)}
-														aria-hidden
-													/>
-												</Button>
-											</div>
-										</div>
-										<div className="text-textcolor/95 text-sm leading-snug @min-[26rem]:text-sm">
-											{item.translationZh}
-										</div>
-										<div className="text-textcolor/80 text-sm leading-relaxed italic @min-[26rem]:text-xs">
-											{item.example}
-										</div>
-									</div>
-								);
-							})}
-						</div>
-					) : null}
-				</>
-			) : null}
 			<VocabularyHistoryDrawer
 				open={historyDrawerOpen}
 				onOpenChange={setHistoryDrawerOpen}
