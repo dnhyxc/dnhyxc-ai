@@ -3,6 +3,8 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { KnowledgeQaModule } from '../knowledge-qa/knowledge-qa.module';
 import { EnglishClassicQuotePackBatch } from './english-classic-quote.entity';
 import { EnglishClassicQuoteFavorite } from './english-classic-quote-favorite.entity';
+import { EnglishClassicQuotesLibrary } from './english-classic-quotes-library.entity';
+import { EnglishClassicQuotesLibraryItem } from './english-classic-quotes-library-item.entity';
 import { EnglishLearningController } from './english-learning.controller';
 import { EnglishLearningService } from './english-learning.service';
 import { EnglishLearningStreamAbortRegistry } from './english-learning-stream-abort.registry';
@@ -23,6 +25,8 @@ import { EnglishVocabularyLibraryItem } from './english-vocabulary-library-item.
 			EnglishClassicQuoteFavorite,
 			EnglishVocabularyLibrary,
 			EnglishVocabularyLibraryItem,
+			EnglishClassicQuotesLibrary,
+			EnglishClassicQuotesLibraryItem,
 		]),
 	],
 	controllers: [EnglishLearningController],

@@ -29,6 +29,8 @@ import {
 	ENGLISH_LEARNING_CLASSIC_QUOTES_FAVORITES,
 	ENGLISH_LEARNING_CLASSIC_QUOTES_FAVORITES_EXPORT_DOCX,
 	ENGLISH_LEARNING_CLASSIC_QUOTES_HISTORY,
+	ENGLISH_LEARNING_CLASSIC_QUOTES_LIBRARIES,
+	ENGLISH_LEARNING_CLASSIC_QUOTES_LIBRARY_UPLOAD,
 	ENGLISH_LEARNING_STREAM_CANCEL,
 	ENGLISH_LEARNING_VOCABULARY_FAVORITES,
 	ENGLISH_LEARNING_VOCABULARY_FAVORITES_EXPORT_DOCX,
@@ -624,6 +626,85 @@ export const listEnglishVocabularyLibraryItems = async (
 		library: EnglishVocabularyLibraryListItem;
 		items: EnglishVocabularyLibraryItemRow[];
 	}>(ENGLISH_LEARNING_VOCABULARY_LIBRARIES, {
+		params: [libraryId, 'items'],
+		querys: {
+			limit: options?.limit ?? 50,
+			offset: options?.offset ?? 0,
+		},
+	});
+};
+
+/** 以 multipart 上传当前 JSON 文本，服务端解析后写入经典语句库 */
+export const uploadEnglishClassicQuotesLibraryJson = async (params: {
+	title: string;
+	jsonUtf8: string;
+	filename?: string;
+}) => {
+	const fd = new FormData();
+	fd.append('title', params.title);
+	fd.append(
+		'file',
+		new Blob([params.jsonUtf8], { type: 'application/json' }),
+		params.filename ?? 'classic-quotes-import.json',
+	);
+	return await http.post<{ id: string; quoteCount: number }>(
+		ENGLISH_LEARNING_CLASSIC_QUOTES_LIBRARY_UPLOAD,
+		fd,
+		{ timeout: 120_000 },
+	);
+};
+
+export type EnglishClassicQuotesLibraryListItem = {
+	id: string;
+	title: string;
+	quoteCount: number;
+	createdAt: string;
+};
+
+export type EnglishClassicQuotesLibraryItemRow = {
+	id: string;
+	sortOrder: number;
+	english: string;
+	translationZh: string;
+	source: string;
+	noteZh: string;
+};
+
+/** 分页列出当前用户的经典语句库 */
+export const listEnglishClassicQuotesLibraries = async (options?: {
+	limit?: number;
+	offset?: number;
+}) => {
+	return await http.get<EnglishClassicQuotesLibraryListItem[]>(
+		ENGLISH_LEARNING_CLASSIC_QUOTES_LIBRARIES,
+		{
+			querys: {
+				limit: options?.limit ?? 20,
+				offset: options?.offset ?? 0,
+			},
+		},
+	);
+};
+
+/** 删除经典语句库（含库内全部语句） */
+export const deleteEnglishClassicQuotesLibrary = async (libraryId: string) => {
+	return await http.delete<{ deleted: boolean }>(
+		ENGLISH_LEARNING_CLASSIC_QUOTES_LIBRARIES,
+		{
+			params: [libraryId],
+		},
+	);
+};
+
+/** 分页列出某经典语句库内的语句 */
+export const listEnglishClassicQuotesLibraryItems = async (
+	libraryId: string,
+	options?: { limit?: number; offset?: number },
+) => {
+	return await http.get<{
+		library: EnglishClassicQuotesLibraryListItem;
+		items: EnglishClassicQuotesLibraryItemRow[];
+	}>(ENGLISH_LEARNING_CLASSIC_QUOTES_LIBRARIES, {
 		params: [libraryId, 'items'],
 		querys: {
 			limit: options?.limit ?? 50,

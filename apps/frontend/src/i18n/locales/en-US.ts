@@ -761,6 +761,9 @@ export const enUS = {
 	'englishLearning.import.saveVocabSuccess':
 		'Saved {count} word(s) to your vocabulary library',
 	'englishLearning.import.saveVocabLoading': 'Saving...',
+	'englishLearning.import.saveClassicSuccess':
+		'Saved {count} quote(s) to your quotes library',
+	'englishLearning.import.saveClassicLoading': 'Saving...',
 	'englishLearning.import.dataExample': 'Import word json example',
 	'englishLearning.import.dataExampleClassic':
 		'Import classic quotes json example',
@@ -774,23 +777,29 @@ export const enUS = {
 	'englishLearning.library.listHint': 'Select a pack on the left to view words',
 	'englishLearning.library.listLoading': 'Loading libraries…',
 	'englishLearning.library.listEmpty': 'No vocabulary libraries yet',
+	'englishLearning.library.listEmptyClassic': 'No quotes libraries yet',
 	'englishLearning.library.deleteAction': 'Delete library',
+	'englishLearning.library.deleteActionClassic': 'Delete quotes library',
 	'englishLearning.library.deleteConfirmTitle': 'Delete this library?',
+	'englishLearning.library.deleteConfirmTitleClassic':
+		'Delete this quotes library?',
 	'englishLearning.library.deleteConfirmDesc':
 		'This will permanently delete "{title}" and all {count} word(s) in it.',
+	'englishLearning.library.deleteConfirmDescClassic':
+		'This will permanently delete "{title}" and all {count} quote(s) in it.',
 	'englishLearning.library.deleteConfirmAction': 'Delete',
 	'englishLearning.library.deleting': 'Deleting…',
 	'englishLearning.library.deleteSuccess': 'Library deleted',
+	'englishLearning.library.deleteSuccessClassic': 'Quotes library deleted',
 	'englishLearning.library.goImport': 'Go to import',
 	'englishLearning.library.selectLibrary':
 		'Select a vocabulary library on the left',
+	'englishLearning.library.selectLibraryClassic':
+		'Select a quotes library on the left',
 	'englishLearning.library.wordsHeading': '{count} words',
+	'englishLearning.library.quotesHeading': '{count} quotes',
 	'englishLearning.library.wordsLoading': 'Loading words…',
-	'englishLearning.library.classic.comingSoon':
-		'Classic quote library is coming soon. You can import JSON packs now.',
-	'englishLearning.library.classic.goImport': 'Import quotes',
-	'englishLearning.library.classic.wordsPlaceholder':
-		'Quote corpus will appear here when the library is available',
+	'englishLearning.library.quotesLoading': 'Loading quotes…',
 	'englishLearning.favorites.bank': 'Favorites',
 	'englishLearning.favorites.sidebarTitle': 'Categories',
 	'englishLearning.favorites.listHint': 'Pick a category to view saved items',

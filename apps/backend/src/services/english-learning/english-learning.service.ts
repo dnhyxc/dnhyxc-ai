@@ -49,12 +49,14 @@ import {
 	TOPIC_PACK_STALL_BATCH_STEP,
 } from './constant';
 import {
+	ENGLISH_CLASSIC_QUOTES_GENERATION_MAX,
 	ENGLISH_VOCAB_GENERATION_MAX,
 	GenerateClassicQuotesDto,
 	GenerateVocabularyDto,
 	resolveClassicQuotesPackTargetCount,
 	resolveVocabularyPackTargetCount,
 } from './dto/generate-vocabulary.dto';
+import { SaveClassicQuotesLibraryDto } from './dto/save-classic-quotes-library.dto';
 import { SaveVocabularyLibraryDto } from './dto/save-vocabulary-library.dto';
 import type { VocabularyFavoriteBodyDto } from './dto/vocabulary-favorite.dto';
 import {
@@ -62,6 +64,8 @@ import {
 	EnglishClassicQuotePackBatch,
 } from './english-classic-quote.entity';
 import { EnglishClassicQuoteFavorite } from './english-classic-quote-favorite.entity';
+import { EnglishClassicQuotesLibrary } from './english-classic-quotes-library.entity';
+import { EnglishClassicQuotesLibraryItem } from './english-classic-quotes-library-item.entity';
 import {
 	buildClassicQuoteFavoritesDocxBuffer,
 	buildVocabularyFavoritesDocxBuffer,
@@ -132,6 +136,20 @@ export type VocabularyLibraryItemDto = VocabularyItemDto & {
 	sortOrder: number;
 };
 
+/** 经典语句库（包）列表项 */
+export type ClassicQuotesLibraryListItem = {
+	id: string;
+	title: string;
+	quoteCount: number;
+	createdAt: string;
+};
+
+/** 经典语句库内单条（分页列表） */
+export type ClassicQuotesLibraryItemDto = ClassicQuoteItemDto & {
+	id: string;
+	sortOrder: number;
+};
+
 /** 单词包生成进度（供 SSE 与回调） */
 export type VocabularyGenerationProgress = {
 	collected: number;
@@ -191,6 +209,10 @@ export class EnglishLearningService {
 		private readonly vocabLibraryRepo: Repository<EnglishVocabularyLibrary>,
 		@InjectRepository(EnglishVocabularyLibraryItem)
 		private readonly vocabLibraryItemRepo: Repository<EnglishVocabularyLibraryItem>,
+		@InjectRepository(EnglishClassicQuotesLibrary)
+		private readonly classicQuotesLibraryRepo: Repository<EnglishClassicQuotesLibrary>,
+		@InjectRepository(EnglishClassicQuotesLibraryItem)
+		private readonly classicQuotesLibraryItemRepo: Repository<EnglishClassicQuotesLibraryItem>,
 	) {}
 
 	/** 中止类异常：用户断开 SSE / 显式 cancel / LangChain 链取消 */
@@ -1325,6 +1347,222 @@ export class EnglishLearningService {
 	): Promise<{ id: string; wordCount: number }> {
 		const itemsJson = this.parseVocabularyPackRootToLibraryItems(root);
 		return this.persistVocabularyLibrary(userId, title, itemsJson);
+	}
+
+	/**
+	 * 将导入 JSON 解析为经典语句库条目（与前端 parseClassicImport 规则对齐）。
+	 */
+	private parseClassicPackRootToLibraryItems(
+		root: unknown,
+	): EnglishClassicQuoteItemJson[] {
+		const arr = this.extractVocabularyImportItemArray(root);
+		if (!arr) {
+			throw new BadRequestException('JSON 需为数组或包含 items 数组的对象');
+		}
+		const itemsJson: EnglishClassicQuoteItemJson[] = [];
+		for (const row of arr) {
+			if (!row || typeof row !== 'object') continue;
+			const o = row as Record<string, unknown>;
+			const english = typeof o.english === 'string' ? o.english.trim() : '';
+			const translationZh =
+				typeof o.translationZh === 'string'
+					? o.translationZh.trim()
+					: typeof o.translation_zh === 'string'
+						? o.translation_zh.trim()
+						: '';
+			if (!english || !translationZh) continue;
+			const source =
+				typeof o.source === 'string' ? o.source.trim().slice(0, 2000) : '—';
+			const noteZh =
+				typeof o.noteZh === 'string'
+					? o.noteZh.trim().slice(0, 8000)
+					: typeof o.note_zh === 'string'
+						? o.note_zh.trim().slice(0, 8000)
+						: '—';
+			itemsJson.push({ english, translationZh, source, noteZh });
+		}
+		if (!itemsJson.length) {
+			throw new BadRequestException(
+				'未解析到有效经典语句（每项需含非空 english 与 translationZh）',
+			);
+		}
+		if (itemsJson.length > ENGLISH_CLASSIC_QUOTES_GENERATION_MAX) {
+			throw new BadRequestException(
+				`单次最多保存 ${ENGLISH_CLASSIC_QUOTES_GENERATION_MAX} 条经典语句`,
+			);
+		}
+		return itemsJson;
+	}
+
+	private mapClassicLibraryItemRow(
+		row: EnglishClassicQuotesLibraryItem,
+	): ClassicQuotesLibraryItemDto {
+		return {
+			id: row.id,
+			sortOrder: row.sortOrder,
+			english: row.english,
+			translationZh: row.translationZh,
+			source: row.source ?? '',
+			noteZh: row.noteZh,
+		};
+	}
+
+	private async assertClassicQuotesLibraryOwned(
+		userId: number,
+		libraryId: string,
+	): Promise<EnglishClassicQuotesLibrary> {
+		const lib = await this.classicQuotesLibraryRepo.findOne({
+			where: { id: libraryId, userId },
+		});
+		if (!lib) {
+			throw new NotFoundException('经典语句库不存在或无权访问');
+		}
+		return lib;
+	}
+
+	private async persistClassicQuotesLibrary(
+		userId: number,
+		title: string,
+		itemsJson: EnglishClassicQuoteItemJson[],
+	): Promise<{ id: string; quoteCount: number }> {
+		const t = title.trim().slice(0, 200);
+		if (!t) {
+			throw new BadRequestException('标题不能为空');
+		}
+		const quoteCount = itemsJson.length;
+
+		return this.dataSource.transaction(async (manager) => {
+			const libRepo = manager.getRepository(EnglishClassicQuotesLibrary);
+			const itemRepo = manager.getRepository(EnglishClassicQuotesLibraryItem);
+
+			const lib = await libRepo.save(
+				libRepo.create({
+					userId,
+					title: t,
+					quoteCount,
+				}),
+			);
+
+			const itemRows = itemsJson.map((item, index) =>
+				itemRepo.create({
+					libraryId: lib.id,
+					userId,
+					sortOrder: index,
+					english: item.english,
+					translationZh: item.translationZh,
+					source: item.source ?? '',
+					noteZh: item.noteZh,
+				}),
+			);
+
+			const chunkSize = 500;
+			for (let i = 0; i < itemRows.length; i += chunkSize) {
+				await itemRepo.save(itemRows.slice(i, i + chunkSize));
+			}
+
+			return { id: lib.id, quoteCount: lib.quoteCount };
+		});
+	}
+
+	async deleteClassicQuotesLibrary(
+		userId: number,
+		libraryId: string,
+	): Promise<{ deleted: boolean }> {
+		const lib = await this.assertClassicQuotesLibraryOwned(userId, libraryId);
+		await this.classicQuotesLibraryRepo.remove(lib);
+		return { deleted: true };
+	}
+
+	async listClassicQuotesLibraries(
+		userId: number,
+		options?: { limit?: number; offset?: number },
+	): Promise<ClassicQuotesLibraryListItem[]> {
+		const limit = Math.min(100, Math.max(1, options?.limit ?? 20));
+		const offset = Math.max(0, options?.offset ?? 0);
+		const rows = await this.classicQuotesLibraryRepo.find({
+			where: { userId },
+			order: { createdAt: 'DESC' },
+			take: limit,
+			skip: offset,
+		});
+		return rows.map((r) => ({
+			id: r.id,
+			title: r.title,
+			quoteCount: r.quoteCount,
+			createdAt: r.createdAt.toISOString(),
+		}));
+	}
+
+	async listClassicQuotesLibraryItems(
+		userId: number,
+		libraryId: string,
+		options?: { limit?: number; offset?: number },
+	): Promise<{
+		library: ClassicQuotesLibraryListItem;
+		items: ClassicQuotesLibraryItemDto[];
+	}> {
+		const lib = await this.assertClassicQuotesLibraryOwned(userId, libraryId);
+		const limit = Math.min(200, Math.max(1, options?.limit ?? 50));
+		const offset = Math.max(0, options?.offset ?? 0);
+
+		const rows = await this.classicQuotesLibraryItemRepo.find({
+			where: { libraryId, userId },
+			order: { sortOrder: 'ASC' },
+			take: limit,
+			skip: offset,
+		});
+
+		return {
+			library: {
+				id: lib.id,
+				title: lib.title,
+				quoteCount: lib.quoteCount,
+				createdAt: lib.createdAt.toISOString(),
+			},
+			items: rows.map((r) => this.mapClassicLibraryItemRow(r)),
+		};
+	}
+
+	async saveImportedClassicQuotesLibrary(
+		userId: number,
+		dto: SaveClassicQuotesLibraryDto,
+	): Promise<{ id: string; quoteCount: number }> {
+		const itemsJson: EnglishClassicQuoteItemJson[] = [];
+		for (const row of dto.items) {
+			const english = row.english.trim();
+			const translationZh = String(row.translationZh ?? '').trim();
+			if (!english || !translationZh) continue;
+			itemsJson.push({
+				english: english.slice(0, 8000),
+				translationZh: translationZh.slice(0, 8000),
+				source: String(row.source ?? '—')
+					.trim()
+					.slice(0, 2000),
+				noteZh: String(row.noteZh ?? '—')
+					.trim()
+					.slice(0, 8000),
+			});
+		}
+		if (!itemsJson.length) {
+			throw new BadRequestException(
+				'没有有效的经典语句（english 与 translationZh 不能为空）',
+			);
+		}
+		if (itemsJson.length > ENGLISH_CLASSIC_QUOTES_GENERATION_MAX) {
+			throw new BadRequestException(
+				`单次最多保存 ${ENGLISH_CLASSIC_QUOTES_GENERATION_MAX} 条经典语句`,
+			);
+		}
+		return this.persistClassicQuotesLibrary(userId, dto.title, itemsJson);
+	}
+
+	async saveImportedClassicQuotesLibraryFromPackJson(
+		userId: number,
+		title: string,
+		root: unknown,
+	): Promise<{ id: string; quoteCount: number }> {
+		const itemsJson = this.parseClassicPackRootToLibraryItems(root);
+		return this.persistClassicQuotesLibrary(userId, title, itemsJson);
 	}
 
 	/**

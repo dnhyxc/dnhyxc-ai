@@ -677,6 +677,9 @@ export const zhCN = {
 	'englishLearning.import.reupload': '重新上传',
 	'englishLearning.import.saveVocabSuccess': '已将 {count} 个单词保存至单词库',
 	'englishLearning.import.saveVocabLoading': '保存中...',
+	'englishLearning.import.saveClassicSuccess':
+		'已将 {count} 条经典语句保存至语句库',
+	'englishLearning.import.saveClassicLoading': '保存中...',
 	'englishLearning.import.dataExample': '导入单词 json 示例',
 	'englishLearning.import.dataExampleClassic': '导入语句 json 示例',
 
@@ -689,22 +692,26 @@ export const zhCN = {
 	'englishLearning.library.listHint': '选择左侧资源包查看词条',
 	'englishLearning.library.listLoading': '加载资源列表…',
 	'englishLearning.library.listEmpty': '暂无已导入的单词库',
+	'englishLearning.library.listEmptyClassic': '暂无已导入的语句库',
 	'englishLearning.library.deleteAction': '删除单词库',
+	'englishLearning.library.deleteActionClassic': '删除语句库',
 	'englishLearning.library.deleteConfirmTitle': '确认删除单词库？',
+	'englishLearning.library.deleteConfirmTitleClassic': '确认删除语句库？',
 	'englishLearning.library.deleteConfirmDesc':
 		'将删除「{title}」及其中的 {count} 个单词，此操作不可恢复。',
+	'englishLearning.library.deleteConfirmDescClassic':
+		'将删除「{title}」及其中的 {count} 条语句，此操作不可恢复。',
 	'englishLearning.library.deleteConfirmAction': '删除',
 	'englishLearning.library.deleting': '删除中…',
 	'englishLearning.library.deleteSuccess': '单词库已删除',
+	'englishLearning.library.deleteSuccessClassic': '语句库已删除',
 	'englishLearning.library.goImport': '前往导入',
 	'englishLearning.library.selectLibrary': '请从左侧选择一个单词库',
+	'englishLearning.library.selectLibraryClassic': '请从左侧选择一个语句库',
 	'englishLearning.library.wordsHeading': '共 {count} 个单词',
+	'englishLearning.library.quotesHeading': '共 {count} 条语句',
 	'englishLearning.library.wordsLoading': '加载单词…',
-	'englishLearning.library.classic.comingSoon':
-		'经典语句库即将上线，可先导入 JSON 包',
-	'englishLearning.library.classic.goImport': '导入语句包',
-	'englishLearning.library.classic.wordsPlaceholder':
-		'语句库上线后可在此浏览语料',
+	'englishLearning.library.quotesLoading': '加载语句…',
 	'englishLearning.favorites.bank': '收藏',
 	'englishLearning.favorites.sidebarTitle': '收藏分类',
 	'englishLearning.favorites.listHint': '选择分类查看收藏记录',

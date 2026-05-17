@@ -9,8 +9,15 @@ import {
 	ResizablePanelGroup,
 } from '@/components/ui/resizable';
 import { cn } from '@/lib/utils';
-import type { EnglishVocabularyLibraryListItem } from '@/service';
-import { VocabularyLibraryListPanel } from './VocabularyLibraryListPanel';
+import type {
+	EnglishClassicQuotesLibraryListItem,
+	EnglishVocabularyLibraryListItem,
+} from '@/service';
+import { ClassicQuotesLibraryWordsPanel } from './ClassicQuotesLibraryWordsPanel';
+import {
+	type EnglishLibraryListItem,
+	VocabularyLibraryListPanel,
+} from './VocabularyLibraryListPanel';
 import { VocabularyLibraryWordsPanel } from './VocabularyLibraryWordsPanel';
 
 type LibraryKind = 'vocab' | 'classic';
@@ -27,7 +34,7 @@ export default function EnglishLearningLibraryPage() {
 	);
 
 	const [selectedLibrary, setSelectedLibrary] =
-		useState<EnglishVocabularyLibraryListItem | null>(null);
+		useState<EnglishLibraryListItem | null>(null);
 	/** 仅 kind 切换时用于左侧列表首次选中，避免点击项改 URL 触发列表重载 */
 	const [listBootLibraryId, setListBootLibraryId] = useState<string | null>(
 		() => searchParams.get('library'),
@@ -39,7 +46,7 @@ export default function EnglishLearningLibraryPage() {
 	}, [kind]);
 
 	const onSelectLibrary = useCallback(
-		(library: EnglishVocabularyLibraryListItem) => {
+		(library: EnglishLibraryListItem) => {
 			setSelectedLibrary(library);
 			setSearchParams(
 				(prev) => {
@@ -71,6 +78,15 @@ export default function EnglishLearningLibraryPage() {
 
 	const libraryIdFromUrl = searchParams.get('library');
 	const activeLibraryId = selectedLibrary?.id ?? libraryIdFromUrl;
+
+	const vocabLibraryMeta =
+		kind === 'vocab' && selectedLibrary
+			? (selectedLibrary as EnglishVocabularyLibraryListItem)
+			: null;
+	const classicLibraryMeta =
+		kind === 'classic' && selectedLibrary
+			? (selectedLibrary as EnglishClassicQuotesLibraryListItem)
+			: null;
 
 	return (
 		<div className="flex min-h-0 h-full w-full flex-col">
@@ -107,11 +123,17 @@ export default function EnglishLearningLibraryPage() {
 							className="min-h-0 min-w-0"
 						>
 							<section className="border-l border-theme/10 flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-theme-background">
-								<VocabularyLibraryWordsPanel
-									kind={kind}
-									libraryId={kind === 'vocab' ? activeLibraryId : null}
-									libraryMeta={selectedLibrary}
-								/>
+								{kind === 'vocab' ? (
+									<VocabularyLibraryWordsPanel
+										libraryId={activeLibraryId}
+										libraryMeta={vocabLibraryMeta}
+									/>
+								) : (
+									<ClassicQuotesLibraryWordsPanel
+										libraryId={activeLibraryId}
+										libraryMeta={classicLibraryMeta}
+									/>
+								)}
 							</section>
 						</ResizablePanel>
 					</ResizablePanelGroup>

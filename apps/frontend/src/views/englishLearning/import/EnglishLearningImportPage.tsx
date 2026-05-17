@@ -20,6 +20,7 @@ import { useI18n, useTheme } from '@/hooks';
 import {
 	type EnglishClassicQuoteItem,
 	type EnglishVocabularyItem,
+	uploadEnglishClassicQuotesLibraryJson,
 	uploadEnglishVocabularyLibraryJson,
 } from '@/service';
 import { copyToClipboard, pasteFromClipboard } from '@/utils/clipboard';
@@ -141,6 +142,7 @@ export default function EnglishLearningImportPage() {
 	>(null);
 	const [importTitle, setImportTitle] = useState('');
 	const [vocabSaveLoading, setVocabSaveLoading] = useState(false);
+	const [classicSaveLoading, setClassicSaveLoading] = useState(false);
 	const reuploadInputRef = useRef<HTMLInputElement>(null);
 
 	const resetParsed = useCallback(() => {
@@ -297,7 +299,7 @@ export default function EnglishLearningImportPage() {
 	}, [importTitle, jsonErrorKind, navigate, previewText, structFailReason, t]);
 
 	// 保存到经典语句库
-	const onSaveToClassic = useCallback(() => {
+	const onSaveToClassic = useCallback(async () => {
 		if (jsonErrorKind !== null || structFailReason !== null) {
 			Toast({
 				type: 'error',
@@ -312,14 +314,45 @@ export default function EnglishLearningImportPage() {
 			});
 			return;
 		}
-		if (!importTitle) {
+		if (!importTitle.trim()) {
 			Toast({
 				type: 'error',
 				title: t('englishLearning.import.titleRequired'),
 			});
 			return;
 		}
-	}, [importTitle, jsonErrorKind, parsedClassic, structFailReason, t]);
+		try {
+			setClassicSaveLoading(true);
+			const res = await uploadEnglishClassicQuotesLibraryJson({
+				title: importTitle.trim(),
+				jsonUtf8: previewText,
+			});
+			if (res.success && res.data) {
+				Toast({
+					type: 'success',
+					title: t('englishLearning.import.saveClassicSuccess', {
+						count: String(res.data.quoteCount),
+					}),
+				});
+				navigate(
+					`/english-learning/library?kind=classic&library=${encodeURIComponent(res.data.id)}`,
+					{ replace: true },
+				);
+			}
+		} catch {
+			// 错误文案由 http 层 Toast 统一展示
+		} finally {
+			setClassicSaveLoading(false);
+		}
+	}, [
+		importTitle,
+		jsonErrorKind,
+		navigate,
+		previewText,
+		parsedClassic,
+		structFailReason,
+		t,
+	]);
 
 	const hint =
 		kind === 'vocab'
@@ -420,7 +453,11 @@ export default function EnglishLearningImportPage() {
 														structFailReason !== null ||
 														!parsedVocab?.length ||
 														!importTitle.trim()
-													: false
+													: classicSaveLoading ||
+														jsonErrorKind !== null ||
+														structFailReason !== null ||
+														!parsedClassic?.length ||
+														!importTitle.trim()
 											}
 											onClick={
 												kind === 'vocab' ? onSaveToVocab : onSaveToClassic
@@ -428,9 +465,11 @@ export default function EnglishLearningImportPage() {
 										>
 											{kind === 'vocab' && vocabSaveLoading
 												? t('englishLearning.import.saveVocabLoading')
-												: kind === 'vocab'
-													? t('englishLearning.import.saveToVocab')
-													: t('englishLearning.import.saveToClassic')}
+												: kind === 'classic' && classicSaveLoading
+													? t('englishLearning.import.saveClassicLoading')
+													: kind === 'vocab'
+														? t('englishLearning.import.saveToVocab')
+														: t('englishLearning.import.saveToClassic')}
 										</Button>
 									</div>
 								</div>

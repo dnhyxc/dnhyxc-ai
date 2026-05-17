@@ -20,16 +20,32 @@ import {
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import {
+	deleteEnglishClassicQuotesLibrary,
 	deleteEnglishVocabularyLibrary,
+	type EnglishClassicQuotesLibraryListItem,
 	type EnglishVocabularyLibraryListItem,
+	listEnglishClassicQuotesLibraries,
 	listEnglishVocabularyLibraries,
 } from '@/service';
+
+export type EnglishLibraryListItem =
+	| EnglishVocabularyLibraryListItem
+	| EnglishClassicQuotesLibraryListItem;
+
+function getLibraryItemCount(
+	lib: EnglishLibraryListItem,
+	kind: 'vocab' | 'classic',
+): number {
+	return kind === 'vocab'
+		? (lib as EnglishVocabularyLibraryListItem).wordCount
+		: (lib as EnglishClassicQuotesLibraryListItem).quoteCount;
+}
 
 export type VocabularyLibraryListPanelProps = {
 	kind: 'vocab' | 'classic';
 	selectedId: string | null;
 	initialLibraryId?: string | null;
-	onSelect: (library: EnglishVocabularyLibraryListItem) => void;
+	onSelect: (library: EnglishLibraryListItem) => void;
 	/** 当前选中的库被删除且列表已空时，由父级清空 URL 与右侧栏 */
 	onLibraryDeleted?: (deletedId: string) => void;
 };
@@ -52,14 +68,12 @@ export function VocabularyLibraryListPanel({
 	const { t } = useI18n();
 	const navigate = useNavigate();
 
-	const [entries, setEntries] = useState<EnglishVocabularyLibraryListItem[]>(
-		[],
-	);
+	const [entries, setEntries] = useState<EnglishLibraryListItem[]>([]);
 	const [loading, setLoading] = useState(false);
 	const [loadingMore, setLoadingMore] = useState(false);
 	const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
 	const [deleteTarget, setDeleteTarget] =
-		useState<EnglishVocabularyLibraryListItem | null>(null);
+		useState<EnglishLibraryListItem | null>(null);
 	const [deleting, setDeleting] = useState(false);
 	const offsetRef = useRef(0);
 	const hasMoreRef = useRef(true);
@@ -75,7 +89,6 @@ export function VocabularyLibraryListPanel({
 	}, [kind, initialLibraryId]);
 
 	const fetchFirstPage = useCallback(async () => {
-		if (kind !== 'vocab') return;
 		fetchingMoreRef.current = false;
 		setLoading(true);
 		setLoadingMore(false);
@@ -83,10 +96,16 @@ export function VocabularyLibraryListPanel({
 		hasMoreRef.current = true;
 		setEntries([]);
 		try {
-			const res = await listEnglishVocabularyLibraries({
-				limit: VOCAB_LIBRARY_LIST_PAGE_SIZE,
-				offset: 0,
-			});
+			const res =
+				kind === 'vocab'
+					? await listEnglishVocabularyLibraries({
+							limit: VOCAB_LIBRARY_LIST_PAGE_SIZE,
+							offset: 0,
+						})
+					: await listEnglishClassicQuotesLibraries({
+							limit: VOCAB_LIBRARY_LIST_PAGE_SIZE,
+							offset: 0,
+						});
 			const list = Array.isArray(res.data) ? res.data : [];
 			setEntries(list);
 			offsetRef.current = list.length;
@@ -107,22 +126,23 @@ export function VocabularyLibraryListPanel({
 	}, [kind]);
 
 	const fetchMore = useCallback(async () => {
-		if (
-			kind !== 'vocab' ||
-			!hasMoreRef.current ||
-			fetchingMoreRef.current ||
-			loading
-		) {
+		if (!hasMoreRef.current || fetchingMoreRef.current || loading) {
 			return;
 		}
 		fetchingMoreRef.current = true;
 		setLoadingMore(true);
 		const offset = offsetRef.current;
 		try {
-			const res = await listEnglishVocabularyLibraries({
-				limit: VOCAB_LIBRARY_LIST_PAGE_SIZE,
-				offset,
-			});
+			const res =
+				kind === 'vocab'
+					? await listEnglishVocabularyLibraries({
+							limit: VOCAB_LIBRARY_LIST_PAGE_SIZE,
+							offset,
+						})
+					: await listEnglishClassicQuotesLibraries({
+							limit: VOCAB_LIBRARY_LIST_PAGE_SIZE,
+							offset,
+						});
 			const chunk = Array.isArray(res.data) ? res.data : [];
 			if (chunk.length === 0) {
 				hasMoreRef.current = false;
@@ -154,13 +174,10 @@ export function VocabularyLibraryListPanel({
 		[fetchMore],
 	);
 
-	const requestDeleteLibrary = useCallback(
-		(lib: EnglishVocabularyLibraryListItem) => {
-			setDeleteTarget(lib);
-			setDeleteConfirmOpen(true);
-		},
-		[],
-	);
+	const requestDeleteLibrary = useCallback((lib: EnglishLibraryListItem) => {
+		setDeleteTarget(lib);
+		setDeleteConfirmOpen(true);
+	}, []);
 
 	const executeDeleteLibrary = useCallback(async () => {
 		const target = deleteTarget;
@@ -170,7 +187,11 @@ export function VocabularyLibraryListPanel({
 		}
 		setDeleting(true);
 		try {
-			await deleteEnglishVocabularyLibrary(target.id);
+			if (kind === 'vocab') {
+				await deleteEnglishVocabularyLibrary(target.id);
+			} else {
+				await deleteEnglishClassicQuotesLibrary(target.id);
+			}
 			const wasSelected = selectedId === target.id;
 			setEntries((prev) => {
 				const next = prev.filter((e) => e.id !== target.id);
@@ -187,7 +208,10 @@ export function VocabularyLibraryListPanel({
 			setDeleteTarget(null);
 			Toast({
 				type: 'success',
-				title: t('englishLearning.library.deleteSuccess'),
+				title:
+					kind === 'vocab'
+						? t('englishLearning.library.deleteSuccess')
+						: t('englishLearning.library.deleteSuccessClassic'),
 			});
 		} catch {
 			// 错误由 http 层 Toast
@@ -195,28 +219,7 @@ export function VocabularyLibraryListPanel({
 		} finally {
 			setDeleting(false);
 		}
-	}, [deleteTarget, onLibraryDeleted, selectedId, t]);
-
-	if (kind === 'classic') {
-		return (
-			<div className="flex h-full min-h-0 flex-col gap-3 p-4">
-				<h2 className="text-textcolor text-base font-semibold">
-					{t('englishLearning.library.classic.title')}
-				</h2>
-				<div className="text-textcolor/60 flex flex-1 flex-col items-center justify-center gap-3 text-center text-sm">
-					<p>{t('englishLearning.library.classic.comingSoon')}</p>
-					<Button
-						type="button"
-						size="sm"
-						variant="outline"
-						onClick={() => navigate('/english-learning/import?kind=classic')}
-					>
-						{t('englishLearning.library.classic.goImport')}
-					</Button>
-				</div>
-			</div>
-		);
-	}
+	}, [deleteTarget, kind, onLibraryDeleted, selectedId, t]);
 
 	const showInitialLoading = loading && entries.length === 0;
 	const showEmpty = !loading && entries.length === 0 && !loadingMore;
@@ -229,13 +232,22 @@ export function VocabularyLibraryListPanel({
 					setDeleteConfirmOpen(open);
 					if (!open) setDeleteTarget(null);
 				}}
-				title={t('englishLearning.library.deleteConfirmTitle')}
+				title={
+					kind === 'vocab'
+						? t('englishLearning.library.deleteConfirmTitle')
+						: t('englishLearning.library.deleteConfirmTitleClassic')
+				}
 				description={
 					deleteTarget
-						? t('englishLearning.library.deleteConfirmDesc', {
-								title: deleteTarget.title || '—',
-								count: deleteTarget.wordCount,
-							})
+						? kind === 'vocab'
+							? t('englishLearning.library.deleteConfirmDesc', {
+									title: deleteTarget.title || '—',
+									count: getLibraryItemCount(deleteTarget, kind),
+								})
+							: t('englishLearning.library.deleteConfirmDescClassic', {
+									title: deleteTarget.title || '—',
+									count: getLibraryItemCount(deleteTarget, kind),
+								})
 						: '\u00a0'
 				}
 				descriptionClassName="text-left"
@@ -248,7 +260,9 @@ export function VocabularyLibraryListPanel({
 			<div className="flex items-center justify-between px-4.5 pt-3.5">
 				<div className="flex flex-col">
 					<h2 className="text-textcolor text-base font-semibold">
-						{t('englishLearning.library.vocab.title')}
+						{kind === 'vocab'
+							? t('englishLearning.library.vocab.title')
+							: t('englishLearning.library.classic.title')}
 					</h2>
 					<p className="text-textcolor/50 mt-0.5 text-xs">
 						{t('englishLearning.library.listHint')}
@@ -295,9 +309,13 @@ export function VocabularyLibraryListPanel({
 										</div>
 										<div className="text-textcolor/50 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm">
 											<span>
-												{t('englishLearning.vocab.historyWords', {
-													count: lib.wordCount,
-												})}
+												{kind === 'vocab'
+													? t('englishLearning.vocab.historyWords', {
+															count: getLibraryItemCount(lib, kind),
+														})
+													: t('englishLearning.classic.historyQuotes', {
+															count: getLibraryItemCount(lib, kind),
+														})}
 											</span>
 											<span className="tabular-nums">
 												{formatLibraryDate(lib.createdAt)}
@@ -314,7 +332,11 @@ export function VocabularyLibraryListPanel({
 											'group-hover:flex hidden mt-1 mr-1 h-7 w-7 shrink-0 rounded-md p-0 transition-colors',
 											'text-textcolor/55 hover:border hover:border-destructive/10 hover:bg-destructive/10 hover:text-destructive',
 										)}
-										aria-label={t('englishLearning.library.deleteAction')}
+										aria-label={
+											kind === 'vocab'
+												? t('englishLearning.library.deleteAction')
+												: t('englishLearning.library.deleteActionClassic')
+										}
 									>
 										<Trash2 className="size-3.5" />
 									</Button>
@@ -329,13 +351,17 @@ export function VocabularyLibraryListPanel({
 						) : null}
 						{showEmpty ? (
 							<div className="text-textcolor/60 flex flex-col items-center gap-3 py-8 text-center text-sm">
-								<p>{t('englishLearning.library.listEmpty')}</p>
+								<p>
+									{kind === 'vocab'
+										? t('englishLearning.library.listEmpty')
+										: t('englishLearning.library.listEmptyClassic')}
+								</p>
 								<Button
 									type="button"
 									size="sm"
 									variant="outline"
 									onClick={() =>
-										navigate('/english-learning/import?kind=vocab')
+										navigate(`/english-learning/import?kind=${kind}`)
 									}
 								>
 									{t('englishLearning.library.goImport')}

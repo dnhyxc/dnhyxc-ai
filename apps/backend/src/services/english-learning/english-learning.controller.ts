@@ -40,6 +40,7 @@ import {
 	resolveClassicQuotesPackTargetCount,
 	resolveVocabularyPackTargetCount,
 } from './dto/generate-vocabulary.dto';
+import { SaveClassicQuotesLibraryDto } from './dto/save-classic-quotes-library.dto';
 import { SaveVocabularyLibraryDto } from './dto/save-vocabulary-library.dto';
 import {
 	VocabularyFavoriteBodyDto,
@@ -397,6 +398,140 @@ export class EnglishLearningController {
 		}
 		const data =
 			await this.englishLearningService.saveImportedVocabularyLibrary(
+				userId,
+				dto,
+			);
+		return { success: true, data };
+	}
+
+	/** 分页列出当前用户的经典语句库（包） */
+	@Get('classic-quotes-libraries')
+	async listClassicQuotesLibraries(
+		@Req() req: AuthedRequest,
+		@Query('limit') limitStr?: string,
+		@Query('offset') offsetStr?: string,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const limit = Math.min(
+			100,
+			Math.max(1, Number.parseInt(limitStr ?? '20', 10) || 20),
+		);
+		const offset = Math.max(0, Number.parseInt(offsetStr ?? '0', 10) || 0);
+		const data = await this.englishLearningService.listClassicQuotesLibraries(
+			userId,
+			{ limit, offset },
+		);
+		return { success: true, data };
+	}
+
+	/** 删除经典语句库（含库内全部语句，数据库级联删除） */
+	@Delete('classic-quotes-libraries/:libraryId')
+	async deleteClassicQuotesLibrary(
+		@Req() req: AuthedRequest,
+		@Param('libraryId') libraryId: string,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const data = await this.englishLearningService.deleteClassicQuotesLibrary(
+			userId,
+			libraryId,
+		);
+		return { success: true, data };
+	}
+
+	/** 分页列出某经典语句库内的语句（按导入顺序 sort_order 升序） */
+	@Get('classic-quotes-libraries/:libraryId/items')
+	async listClassicQuotesLibraryItems(
+		@Req() req: AuthedRequest,
+		@Param('libraryId') libraryId: string,
+		@Query('limit') limitStr?: string,
+		@Query('offset') offsetStr?: string,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const limit = Math.min(
+			200,
+			Math.max(1, Number.parseInt(limitStr ?? '50', 10) || 50),
+		);
+		const offset = Math.max(0, Number.parseInt(offsetStr ?? '0', 10) || 0);
+		const data =
+			await this.englishLearningService.listClassicQuotesLibraryItems(
+				userId,
+				libraryId,
+				{ limit, offset },
+			);
+		return { success: true, data };
+	}
+
+	/**
+	 * multipart 上传 JSON 文件（字段 `file` + `title`），服务端读取、解析、落库后删除临时文件。
+	 */
+	@Post('classic-quotes-library/upload')
+	@UseInterceptors(
+		FileInterceptor('file', vocabularyLibraryJsonUploadMulterOptions()),
+	)
+	async saveClassicQuotesLibraryUpload(
+		@Req() req: AuthedRequest,
+		@UploadedFile() file: Express.Multer.File,
+		@Body('title') titleRaw?: string,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const diskPath = file?.path;
+		try {
+			if (!diskPath) {
+				throw new BadRequestException('请上传 JSON 文件');
+			}
+			const title = typeof titleRaw === 'string' ? titleRaw.trim() : '';
+			if (!title) {
+				throw new BadRequestException('标题不能为空');
+			}
+			const text = readFileSync(diskPath, 'utf8');
+			let root: unknown;
+			try {
+				root = text ? JSON.parse(text) : null;
+			} catch {
+				throw new BadRequestException('无法解析为合法 JSON');
+			}
+			const data =
+				await this.englishLearningService.saveImportedClassicQuotesLibraryFromPackJson(
+					userId,
+					title,
+					root,
+				);
+			return { success: true, data };
+		} finally {
+			if (diskPath) {
+				try {
+					await unlink(diskPath);
+				} catch {
+					// 临时文件删除失败不阻塞成功响应
+				}
+			}
+		}
+	}
+
+	/** 将导入页 JSON 解析后的经典语句包保存到「语句库」表（小包体可用 JSON body） */
+	@Post('classic-quotes-library')
+	async saveClassicQuotesLibrary(
+		@Req() req: AuthedRequest,
+		@Body() dto: SaveClassicQuotesLibraryDto,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const data =
+			await this.englishLearningService.saveImportedClassicQuotesLibrary(
 				userId,
 				dto,
 			);

@@ -133,6 +133,15 @@ export const ENGLISH_LEARNING_VOCABULARY_LIBRARY_UPLOAD =
 /** 单词库（包）列表与库内词条分页 */
 export const ENGLISH_LEARNING_VOCABULARY_LIBRARIES =
 	'/english-learning/vocabulary-libraries';
+/** 将导入页解析后的经典语句包保存到「语句库」表 */
+export const ENGLISH_LEARNING_CLASSIC_QUOTES_LIBRARY =
+	'/english-learning/classic-quotes-library';
+/** 以 multipart 上传 JSON 文件，服务端解析后写入经典语句库 */
+export const ENGLISH_LEARNING_CLASSIC_QUOTES_LIBRARY_UPLOAD =
+	'/english-learning/classic-quotes-library/upload';
+/** 经典语句库（包）列表与库内语句分页 */
+export const ENGLISH_LEARNING_CLASSIC_QUOTES_LIBRARIES =
+	'/english-learning/classic-quotes-libraries';
 /** 单词收藏：新增、取消、批量查询已收藏词形 */
 export const ENGLISH_LEARNING_VOCABULARY_FAVORITES =
 	'/english-learning/vocabulary-favorites';
