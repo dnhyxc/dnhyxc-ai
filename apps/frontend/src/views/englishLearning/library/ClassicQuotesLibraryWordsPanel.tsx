@@ -238,28 +238,27 @@ export function ClassicQuotesLibraryWordsPanel({
 
 	return (
 		<div className="flex h-full min-h-0 flex-col @container">
-			<div className="flex items-center justify-between px-4.5 pt-3.5">
-				<div>
-					<h2 className="text-textcolor line-clamp-2 text-base font-semibold">
-						{title}
-					</h2>
-					<p className="text-textcolor/50 mt-0.5 text-xs">
+			<div className="h-12 flex px-4.5 py-1 items-center justify-between gap-1 text-textcolor line-clamp-2 text-base">
+				<div className="flex items-center gap-2">
+					{title}
+					<div className="text-textcolor/50 mt-0.5 text-sm">
 						{t('englishLearning.library.quotesHeading', { count: total })}
-					</p>
+					</div>
 				</div>
-				<div className="flex items-center gap-1.5 mt-1">
-					<Button
-						variant="link"
-						className="border border-theme/15 bg-theme/10 hover:border-theme/15 hover:bg-theme/15"
-						onClick={() => {
-							navigate('/english-learning/favorites?kind=classic');
-						}}
-					>
-						{t('route.englishLearning.favorites.title')}
-					</Button>
+				<div
+					className="flex items-center gap-1 text-teal-500 hover:text-teal-400 cursor-pointer text-sm"
+					onClick={() => {
+						navigate('/english-learning/favorites?kind=classic');
+					}}
+				>
+					<Star className="size-4.5" />
+					{t('route.englishLearning.favorites.title')}
 				</div>
 			</div>
-			<ScrollArea className="min-h-0 flex-1 p-4" onScroll={onViewportScroll}>
+			<ScrollArea
+				className="min-h-0 flex-1 px-4 pb-4"
+				onScroll={onViewportScroll}
+			>
 				{showInitialLoading ? (
 					<div className="text-textcolor/60 flex min-h-full flex-1 items-center justify-center text-center text-sm">
 						<Loading text={t('englishLearning.library.quotesLoading')} />

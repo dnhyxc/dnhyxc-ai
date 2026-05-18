@@ -82,7 +82,7 @@ const EnglishSource = ({ title, description, type }: EnglishSourceProps) => {
 				<ScrollArea
 					scrollbars="both"
 					className={cn(
-						'bg-theme/5 border mb-5 max-h-50 w-full min-w-0 rounded-md',
+						'px-2 py-[9px] bg-theme/5 border mb-5 max-h-50 w-full min-w-0 rounded-md',
 						type === 'vocab'
 							? 'bg-linear-to-r from-cyan-500/8 to-blue-600/8'
 							: 'bg-linear-to-r from-indigo-500/8 to-blue-600/8',
@@ -91,9 +91,7 @@ const EnglishSource = ({ title, description, type }: EnglishSourceProps) => {
 					viewportClassName="[&>div]:!block [&>div]:w-max"
 				>
 					<pre
-						className={cn(
-							'm-0 w-max px-2 py-2.5 text-xs leading-relaxed whitespace-pre',
-						)}
+						className={cn('m-0 w-max text-xs leading-relaxed whitespace-pre')}
 					>
 						{JSON.stringify(vocabExample, null, 2)}
 					</pre>

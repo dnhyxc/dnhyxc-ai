@@ -4,7 +4,14 @@
 import Loading from '@design/Loading';
 import { ScrollArea } from '@ui/index';
 import { observer } from 'mobx-react';
-import { type UIEventHandler, useEffect, useMemo, useState } from 'react';
+import {
+	type UIEventHandler,
+	useCallback,
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+} from 'react';
 import { useSearchParams } from 'react-router';
 import { useI18n } from '@/hooks';
 import {
@@ -16,6 +23,7 @@ import type { SearchOrganicItem } from '@/types/chat';
 import { mergeEnglishPackWebSearchOrganics } from '@/utils/englishPackWebSearchMerge';
 import { MasterWebSearchResultsBar } from '../shared/WebSearchResultsBar';
 import { ClassicQuotesPackList } from './ClassicQuotesPackList';
+import { PackStreamHistoryDrawerTrigger } from './PackStreamHistoryDrawerTrigger';
 import type { PackStreamKind } from './PackStreamKindTabs';
 import { PackStreamProgress } from './PackStreamProgress';
 import { useClassicQuotesPackHistoryList } from './useClassicQuotesPackHistoryList';
@@ -43,6 +51,27 @@ function EnglishLearningPackStreamPageInner() {
 		organic: SearchOrganicItem[];
 	} | null>(null);
 
+	const fetchHistoryMeta = useCallback(
+		async (sid: string) => {
+			const res =
+				kind === 'vocab'
+					? await getEnglishVocabularyHistoryDetail(sid)
+					: await getEnglishClassicQuotesHistoryDetail(sid);
+			const d = res.data;
+			if (!d) {
+				setHistoryItemCount(0);
+				setHistoryHeader({ topic: '', organic: [] });
+				return;
+			}
+			setHistoryHeader({
+				topic: d.topic?.trim() ?? '',
+				organic: mergeEnglishPackWebSearchOrganics(d.webSearchRounds),
+			});
+			setHistoryItemCount(d.itemCount ?? 0);
+		},
+		[kind],
+	);
+
 	useEffect(() => {
 		const sid = historyStreamId;
 		if (!sid) {
@@ -58,22 +87,7 @@ function EnglishLearningPackStreamPageInner() {
 		}
 		void (async () => {
 			try {
-				const res =
-					kind === 'vocab'
-						? await getEnglishVocabularyHistoryDetail(sid)
-						: await getEnglishClassicQuotesHistoryDetail(sid);
-				if (cancelled) return;
-				const d = res.data;
-				if (!d) {
-					setHistoryItemCount(0);
-					setHistoryHeader({ topic: '', organic: [] });
-					return;
-				}
-				setHistoryHeader({
-					topic: d.topic?.trim() ?? '',
-					organic: mergeEnglishPackWebSearchOrganics(d.webSearchRounds),
-				});
-				setHistoryItemCount(d.itemCount ?? 0);
+				await fetchHistoryMeta(sid);
 			} catch {
 				if (!cancelled) {
 					setHistoryItemCount(0);
@@ -84,12 +98,36 @@ function EnglishLearningPackStreamPageInner() {
 		return () => {
 			cancelled = true;
 		};
-	}, [historyStreamId, kind]);
+	}, [historyStreamId, fetchHistoryMeta, kind]);
 
 	const loading =
 		kind === 'vocab'
 			? EnglishPackStore.vocabLoading
 			: EnglishPackStore.classicLoading;
+	const prevLoadingRef = useRef(loading);
+
+	// 拉取从 true→false 时刷新 meta（web_search 已落库），避免页头仍用空的 historyHeader
+	useEffect(() => {
+		const wasLoading = prevLoadingRef.current;
+		prevLoadingRef.current = loading;
+		const sid = historyStreamId;
+		if (!sid || !wasLoading || loading) return;
+		let cancelled = false;
+		void (async () => {
+			try {
+				await fetchHistoryMeta(sid);
+			} catch {
+				if (!cancelled) {
+					setHistoryItemCount(0);
+					setHistoryHeader({ topic: '', organic: [] });
+				}
+			}
+		})();
+		return () => {
+			cancelled = true;
+		};
+	}, [historyStreamId, fetchHistoryMeta, loading]);
+
 	const liveItemCount =
 		kind === 'vocab'
 			? EnglishPackStore.vocabItems.length
@@ -99,7 +137,9 @@ function EnglishLearningPackStreamPageInner() {
 		kind === 'vocab'
 			? EnglishPackStore.isVocabLiveStreamView(historyStreamId)
 			: EnglishPackStore.isClassicLiveStreamView(historyStreamId);
-	const useHistoryPagination = isHistoryView && !isLiveStreamView;
+	// 停止后 Store 无词条但服务端已落库时，仍走历史分页（避免仅因 organic 占住「直播」却不拉列表）
+	const useHistoryPagination =
+		isHistoryView && (!isLiveStreamView || (liveItemCount === 0 && !loading));
 	const vocabHistory = useVocabularyPackHistoryList(
 		useHistoryPagination && kind === 'vocab' ? historyStreamId : null,
 	);
@@ -112,23 +152,17 @@ function EnglishLearningPackStreamPageInner() {
 				? vocabHistory.onViewportScroll
 				: classicHistory.onViewportScroll
 			: undefined;
-	const itemCount =
-		isLiveStreamView || !isHistoryView
-			? liveItemCount
-			: (historyItemCount ?? liveItemCount);
+	const activeHistory = kind === 'vocab' ? vocabHistory : classicHistory;
+	const itemCount = useHistoryPagination
+		? (historyItemCount ?? activeHistory.itemCount ?? 0)
+		: liveItemCount;
 	const historyMetaPending = useHistoryPagination && historyItemCount === null;
-
-	const title =
-		kind === 'vocab'
-			? t('englishLearning.stream.vocab.pageTitle')
-			: t('englishLearning.stream.classic.pageTitle');
 
 	const emptyHint =
 		kind === 'vocab'
 			? t('englishLearning.stream.vocab.empty')
 			: t('englishLearning.stream.classic.empty');
 
-	const activeHistory = kind === 'vocab' ? vocabHistory : classicHistory;
 	const historyListLoading =
 		useHistoryPagination &&
 		activeHistory.loading &&
@@ -147,49 +181,54 @@ function EnglishLearningPackStreamPageInner() {
 		itemCount === 0 &&
 		(!useHistoryPagination || historyItemCount === 0);
 
-	const topic =
-		isLiveStreamView || !isHistoryView
-			? kind === 'vocab'
-				? EnglishPackStore.vocabTopic.trim()
-				: EnglishPackStore.classicTopic.trim()
-			: (historyHeader?.topic ?? '');
-	const masterSearchOrganic =
-		isLiveStreamView || !isHistoryView
-			? kind === 'vocab'
-				? EnglishPackStore.vocabMasterSearchOrganic
-				: EnglishPackStore.classicMasterSearchOrganic
-			: (historyHeader?.organic ?? []);
+	const liveTopic =
+		kind === 'vocab'
+			? EnglishPackStore.vocabTopic.trim()
+			: EnglishPackStore.classicTopic.trim();
+	const liveOrganic =
+		kind === 'vocab'
+			? EnglishPackStore.vocabMasterSearchOrganic
+			: EnglishPackStore.classicMasterSearchOrganic;
+	const historyTopic = historyHeader?.topic ?? '';
+	const historyOrganic = historyHeader?.organic ?? [];
+	const sameActiveSession = Boolean(
+		historyStreamId &&
+			(kind === 'vocab'
+				? EnglishPackStore.vocabActiveStreamId === historyStreamId
+				: EnglishPackStore.classicActiveStreamId === historyStreamId),
+	);
+	// 停止拉取后 Store 仍可能保留本轮 organic；与 isLiveStreamView 一起决定页头数据源
+	const preferStoreHeader =
+		isLiveStreamView ||
+		!isHistoryView ||
+		(sameActiveSession && (liveOrganic.length > 0 || liveTopic.length > 0));
+	const topic = preferStoreHeader ? liveTopic : historyTopic;
+	const masterSearchOrganic = preferStoreHeader ? liveOrganic : historyOrganic;
 
 	return (
 		<div className="flex min-h-0 h-full w-full flex-col">
 			<div className="box-border flex h-full min-h-0 w-full min-w-0 flex-col p-5.5 pt-0">
 				<div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-md bg-theme-background">
-					<header className="h-13.5 flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-theme/10 px-4.5 py-3.5">
-						<div className="flex min-w-0 items-center gap-2">
-							<h1 className="text-textcolor min-w-0 truncate text-base font-semibold">
-								{title}
-								{itemCount > 0 ? (
-									<span className="text-textcolor/50 ml-1.5 text-sm font-medium">
-										（{itemCount}）
+					<header className="h-12 flex shrink-0 items-center justify-between gap-3 border-b border-theme/10 px-4.5 py-3.5">
+						<div className="flex min-w-0 flex-1 flex-wrap items-center gap-4 text-textcolor/45 font-medium">
+							{topic ? (
+								<p className="text-textcolor/80 max-w-md truncate leading-snug flex items-center gap-2">
+									{t('englishLearning.stream.topicLabel')}: {topic}
+									<span className="text-textcolor/50 text-sm">
+										{t('englishLearning.library.listCount', {
+											count: itemCount,
+										})}
 									</span>
-								) : null}
-							</h1>
+								</p>
+							) : null}
+							{masterSearchOrganic.length > 0 ? (
+								<MasterWebSearchResultsBar items={masterSearchOrganic} t={t} />
+							) : null}
 						</div>
-						{topic || masterSearchOrganic.length > 0 ? (
-							<div className="flex min-w-0 flex-wrap items-center justify-end gap-2 text-textcolor/45 text-sm font-medium">
-								{masterSearchOrganic.length > 0 ? (
-									<MasterWebSearchResultsBar
-										items={masterSearchOrganic}
-										t={t}
-									/>
-								) : null}
-								{topic ? (
-									<p className="text-textcolor/80 max-w-md truncate leading-snug">
-										{t('englishLearning.stream.topicLabel')}: {topic}
-									</p>
-								) : null}
-							</div>
-						) : null}
+						<PackStreamHistoryDrawerTrigger
+							kind={kind}
+							loadedStreamId={historyStreamId}
+						/>
 					</header>
 
 					{showPageLoading ? (

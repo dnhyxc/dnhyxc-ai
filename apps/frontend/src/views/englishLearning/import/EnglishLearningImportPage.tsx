@@ -380,17 +380,18 @@ export default function EnglishLearningImportPage() {
 				onChange={onReuploadHiddenFileChange}
 			/>
 			<div className="text-textcolor/80 mb-3 shrink-0 leading-relaxed text-sm">
-				<div className="flex items-center justify-between gap-1">
-					{hint}
+				<div className="flex items-start justify-between">
+					<div className="-mt-0.5">{hint}</div>
 					<Button
 						variant="link"
-						className="px-0 text-theme"
+						size="sm"
+						className="text-teal-500 hover:text-teal-400 hover:bg-teal-500/5 border border-teal-600/20"
 						onClick={() => navigate(`/english-learning/library?kind=${kind}`)}
 					>
 						{t('route.englishLearning.library.title')}
 					</Button>
 				</div>
-				<div className="max-w-3xl">
+				<div className="max-w-3xl -mt-1">
 					{kind === 'vocab'
 						? `[{"word": "hello", "ipa": "/həˈləʊ/", "pos": "n.", "translationZh": "你好", "example": "Hello, how are you?"}]`
 						: `[{"english": "Education is not the filling of a pail, but the lighting of a fire.", "translationZh": "教育不是注满一桶水，而是点燃一把火。", "source": "William Butler Yeats", "noteZh": "经典比喻，阐明教育的本质是激发热情。"}]`}

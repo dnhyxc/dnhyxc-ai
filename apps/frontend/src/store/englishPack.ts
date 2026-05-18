@@ -281,7 +281,7 @@ class EnglishPack {
 			this.vocabAbort = null;
 			this.vocabLoading = false;
 			this.vocabAgentToolLine = null;
-			this.vocabMasterSearchOrganic = [];
+			// 保留 vocabMasterSearchOrganic，停止后结果页页头仍可展示联网摘要
 			this.vocabProgress = null;
 		});
 	}
@@ -292,6 +292,8 @@ class EnglishPack {
 	 */
 	vocabEnterHistoryView(viewingStreamId: string) {
 		if (this.vocabLoading) return;
+		// 同一会话不因「仅联网摘要」误判而清空已拉取的词条
+		if (this.vocabActiveStreamId === viewingStreamId) return;
 		if (this.isVocabLiveStreamView(viewingStreamId)) return;
 		runInAction(() => {
 			this.vocabItems = [];
@@ -308,6 +310,7 @@ class EnglishPack {
 			this.vocabItems = [];
 			this.vocabLoading = false;
 			this.vocabAgentToolLine = null;
+			this.vocabMasterSearchOrganic = [];
 			this.vocabProgress = null;
 			this.vocabAbort = null;
 		});
@@ -480,7 +483,7 @@ class EnglishPack {
 			this.classicAbort = null;
 			this.classicLoading = false;
 			this.classicAgentToolLine = null;
-			this.classicMasterSearchOrganic = [];
+			// 保留 classicMasterSearchOrganic，停止后结果页页头仍可展示联网摘要
 			this.classicProgress = null;
 		});
 	}
@@ -488,6 +491,7 @@ class EnglishPack {
 	/** 进入历史结果页：拉取进行中时不改动 Store */
 	classicEnterHistoryView(viewingStreamId: string) {
 		if (this.classicLoading) return;
+		if (this.classicActiveStreamId === viewingStreamId) return;
 		if (this.isClassicLiveStreamView(viewingStreamId)) return;
 		runInAction(() => {
 			this.classicItems = [];
@@ -503,6 +507,7 @@ class EnglishPack {
 			this.classicItems = [];
 			this.classicLoading = false;
 			this.classicAgentToolLine = null;
+			this.classicMasterSearchOrganic = [];
 			this.classicProgress = null;
 			this.classicAbort = null;
 		});

@@ -4,7 +4,7 @@
 import Confirm from '@design/Confirm';
 import Loading from '@design/Loading';
 import { Button, ScrollArea, Toast } from '@ui/index';
-import { Loader2, Trash2 } from 'lucide-react';
+import { Loader2, SquareArrowRight, Trash2 } from 'lucide-react';
 import {
 	type UIEventHandler,
 	useCallback,
@@ -257,30 +257,26 @@ export function VocabularyLibraryListPanel({
 				closeOnConfirm={false}
 				onConfirm={() => void executeDeleteLibrary()}
 			/>
-			<div className="flex items-center justify-between px-4.5 pt-3.5">
-				<div className="flex flex-col">
-					<h2 className="text-textcolor text-base font-semibold">
-						{kind === 'vocab'
-							? t('englishLearning.library.vocab.title')
-							: t('englishLearning.library.classic.title')}
-					</h2>
-					<p className="text-textcolor/50 mt-0.5 text-xs">
-						{t('englishLearning.library.listHint')}
-					</p>
+			<div className="h-12 flex items-center justify-between px-4.5 py-1">
+				<div className="flex items-center gap-2">
+					{kind === 'vocab'
+						? t('englishLearning.library.vocab.title')
+						: t('englishLearning.library.classic.title')}
+					<div className="text-textcolor/50 mt-0.5 text-sm">
+						{t('englishLearning.library.listCount', { count: entries.length })}
+					</div>
 				</div>
-				<div className="flex items-center gap-1.5 mt-1">
-					<Button
-						variant="link"
-						className="border border-theme/15 bg-theme/10 hover:border-theme/15 hover:bg-theme/15"
-						onClick={() => {
-							navigate(`/english-learning/import?kind=${kind}`);
-						}}
-					>
-						{t('englishLearning.library.goImport')}
-					</Button>
+				<div
+					className="flex items-center gap-1 text-teal-500 hover:text-teal-400 cursor-pointer text-sm"
+					onClick={() => {
+						navigate(`/english-learning/import?kind=${kind}`);
+					}}
+				>
+					<SquareArrowRight className="size-4.5" />
+					{t('englishLearning.library.goImport')}
 				</div>
 			</div>
-			<ScrollArea className="min-h-0 flex-1 py-4" onScroll={onViewportScroll}>
+			<ScrollArea className="min-h-0 flex-1 pb-4" onScroll={onViewportScroll}>
 				{showInitialLoading ? (
 					<div className="text-textcolor/60 flex min-h-full flex-1 items-center justify-center text-center text-sm">
 						<Loading text={t('englishLearning.library.listLoading')} />

@@ -264,7 +264,7 @@ export function VocabularyFavoritesPanel({
 			/>
 			<div className="flex h-full min-h-0 flex-col">
 				<ScrollArea
-					className="@container min-h-0 flex-1 px-4 py-4"
+					className="@container min-h-0 flex-1 px-4"
 					onScroll={onViewportScroll}
 				>
 					{showInitialLoading ? (
@@ -385,10 +385,10 @@ export function VocabularyFavoritesPanel({
 						</div>
 					)}
 				</ScrollArea>
-				<footer className="h-13.5 shrink-0 flex flex-wrap items-center justify-between gap-3 border-t border-theme/10 px-5 py-3">
+				<footer className="h-12 shrink-0 flex flex-wrap items-center justify-between gap-3 px-5 py-3">
 					<div className="flex items-center gap-2">
 						{!showInitialLoading && entries.length > 0 ? (
-							<div className="flex shrink-0 flex-wrap items-center gap-3">
+							<div className="flex shrink-0 flex-wrap items-center gap-3 mb-1">
 								<div className="flex items-center gap-2">
 									<Checkbox
 										id="vocab-fav-select-all"
@@ -403,7 +403,7 @@ export function VocabularyFavoritesPanel({
 										{t('englishLearning.favoritesDrawer.selectAllLoaded')}
 									</Label>
 								</div>
-								<span className="text-textcolor/60 text-xs">
+								<span className="text-textcolor/60 text-sm">
 									{t('englishLearning.favoritesDrawer.selectedCount', {
 										count: selectedIds.size,
 									})}
@@ -411,7 +411,7 @@ export function VocabularyFavoritesPanel({
 							</div>
 						) : null}
 					</div>
-					<div className="flex items-center gap-2">
+					<div className="flex items-center gap-2 -mt-0.5">
 						<Button
 							type="button"
 							variant="destructive"

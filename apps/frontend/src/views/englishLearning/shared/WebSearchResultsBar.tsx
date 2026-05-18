@@ -21,7 +21,7 @@ export function MasterWebSearchResultsBar({
 				type="button"
 				variant="link"
 				size="sm"
-				className="text-teal-600/90 dark:text-teal-400/90 h-auto min-h-0 px-0 py-0 text-xs font-normal"
+				className="text-teal-500 hover:text-teal-400 h-auto min-h-0 px-0 py-0 text-sm font-normal"
 				onClick={() => setDrawerOpen(true)}
 			>
 				{t('englishLearning.webSearch.viewPages', { n: items.length })}
