@@ -369,7 +369,7 @@ export default function EnglishLearningImportPage() {
 			: t('englishLearning.import.hintClassic');
 
 	return (
-		<div className="flex h-full max-h-full min-h-0 w-full flex-col overflow-hidden p-5 pt-0">
+		<div className="flex h-full max-h-full min-h-0 w-full flex-col overflow-hidden p-5.5 pt-0">
 			<input
 				ref={reuploadInputRef}
 				type="file"

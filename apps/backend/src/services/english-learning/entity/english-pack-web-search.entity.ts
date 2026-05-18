@@ -7,7 +7,7 @@ import {
 	Unique,
 	UpdateDateColumn,
 } from 'typeorm';
-import type { WebSearchOrganicItem } from '../web-search/web-search.types';
+import type { WebSearchOrganicItem } from '../../web-search/web-search.types';
 
 /** 单次拉取会话内一轮 internet_search 的落库结构（可多轮追加到同一 stream） */
 export type EnglishPackWebSearchRoundJson = {

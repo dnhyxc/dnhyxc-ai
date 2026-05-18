@@ -103,7 +103,7 @@ const EnglishLearning = observer(function EnglishLearning() {
 
 	return (
 		<div className="flex min-h-0 h-full w-full flex-col">
-			<div className="box-border flex h-full min-h-0 w-full min-w-0 flex-col p-5 pt-0">
+			<div className="box-border flex h-full min-h-0 w-full min-w-0 flex-col p-5.5 pt-0">
 				{/* 与知识库页 ScrollArea 一致：外层 p-5 pt-0；内壳与 Monaco 根容器一致 rounded-md bg-theme/5 */}
 				<div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-md">
 					<ResizablePanelGroup
