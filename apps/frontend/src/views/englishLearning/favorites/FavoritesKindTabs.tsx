@@ -24,7 +24,7 @@ export function FavoritesKindTabs({
 
 	return (
 		<div
-			className="flex shrink-0 items-center gap-1 rounded-md border border-theme/10 bg-theme/5 p-0.5"
+			className="flex shrink-0 items-center gap-1 rounded-md border box-border border-theme/10 bg-theme/5 p-0.5"
 			role="tablist"
 			aria-label={t('englishLearning.favorites.sidebarTitle')}
 		>

@@ -788,7 +788,7 @@ export const enUS = {
 
 	'englishLearning.library.vocab.title': 'Vocabulary library',
 	'englishLearning.library.vocab.descShort': 'Import words, view word library',
-	'englishLearning.library.vocab.bank': 'Word bank',
+	'englishLearning.library.vocab.bank': 'Vocabulary library',
 	'englishLearning.library.classic.title': 'Quotes library',
 	'englishLearning.library.classic.descShort': 'Import quotes, view corpus',
 	'englishLearning.library.classic.bank': 'Corpus',
@@ -854,25 +854,25 @@ export const enUS = {
 	'englishLearning.chip.literature': 'Literature',
 	'englishLearning.chip.grammar': 'Grammar',
 	'englishLearning.intent.vocabulary':
-		'[Intent] Focus on vocabulary: meaning, collocations, and example sentences; confirm my level if needed.',
+		'### Intent: Focus on vocabulary: meaning, collocations, and example sentences; confirm my level if needed.',
 	'englishLearning.intent.morphology':
-		'[Intent] Starting from roots, prefixes, suffixes, and word-formation rules, explain the common morphological patterns and provide representative words for each.',
+		'### Intent: Starting from roots, prefixes, suffixes, and word-formation rules, explain the common morphological patterns and provide representative words for each.',
 	'englishLearning.intent.collocations':
-		'[Intent] Focus on idiomatic collocations/chunks: list common pairs, briefly contrast near equivalents, and add short examples.',
+		'### Intent: Focus on idiomatic collocations/chunks: list common pairs, briefly contrast near equivalents, and add short examples.',
 	'englishLearning.intent.confusables':
-		'[Intent] Contrast easily confused words or near-synonyms: differences, typical misuse, and correct examples (table or bullets).',
+		'### Intent: Contrast easily confused words or near-synonyms: differences, typical misuse, and correct examples (table or bullets).',
 	'englishLearning.intent.pronunciation':
-		'[Intent] Focus on pronunciation and rhythm: stress, weak forms, linking or assimilation; include IPA and short practice tips.',
+		'### Intent: Focus on pronunciation and rhythm: stress, weak forms, linking or assimilation; include IPA and short practice tips.',
 	'englishLearning.intent.speaking':
-		'[Intent] Focus on spoken interaction and fluency: situational dialogues, natural replies, turn-taking and fillers; include short dialogue samples and register notes.',
+		'### Intent: Focus on spoken interaction and fluency: situational dialogues, natural replies, turn-taking and fillers; include short dialogue samples and register notes.',
 	'englishLearning.intent.translate':
-		'[Intent] Provide bilingual translation with line/sentence alignment; note proper names where needed.',
+		'### Intent: Provide bilingual translation with line/sentence alignment; note proper names where needed.',
 	'englishLearning.intent.reading':
-		'[Intent] Generate a short text for intensive reading and explain hard parts.',
+		'### Intent: Generate a short text for intensive reading and explain hard parts.',
 	'englishLearning.intent.literature':
-		'[Intent] Literature guide: context, summary, and discussion; also pick at least 5 high-quality passages from the original (each excerpt reasonably short), each followed by a Chinese translation; avoid unrelated long verbatim copying.',
+		'### Intent: Literature guide: context, summary, and discussion; also pick at least 5 high-quality passages from the original (each excerpt reasonably short), each followed by a Chinese translation; avoid unrelated long verbatim copying.',
 	'englishLearning.intent.grammar':
-		'[Intent] Explain the grammar with good and common-mistake examples.',
+		'### Intent: Explain the grammar with good and common-mistake examples.',
 	'englishLearning.pendingIntent': 'Intent (appended on next send)',
 	'englishLearning.pendingIntentShort': 'Appended on next send',
 
@@ -888,6 +888,14 @@ export const enUS = {
 	'englishLearning.webSearch.viewWebPages': 'View search',
 	'englishLearning.webSearch.viewPagesTitle': 'This web search results ({n})',
 	'englishLearning.packHistory.webSearchRounds': 'Web search ×{n}',
+	'englishLearning.packHistory.deleteAction': 'Delete record',
+	'englishLearning.packHistory.deleteConfirmTitle': 'Delete this run?',
+	'englishLearning.packHistory.deleteConfirmDesc':
+		'This will permanently delete "{topic}" and {count} word(s) from this run.',
+	'englishLearning.packHistory.deleteConfirmDescClassic':
+		'This will permanently delete "{topic}" and {count} quote(s) from this run.',
+	'englishLearning.packHistory.deleteConfirmAction': 'Delete',
+	'englishLearning.packHistory.deleteSuccess': 'Run deleted',
 
 	'englishLearning.favoritesDrawer.selectAllLoaded': 'Select all',
 	'englishLearning.favoritesDrawer.selectedCount': '{count} selected',
@@ -967,6 +975,7 @@ export const enUS = {
 	'englishLearning.vocab.historyLoad': 'Load',
 	'englishLearning.vocab.historyLoaded': 'Loaded this word list',
 	'englishLearning.vocab.historyLoading': 'Loading history…',
+	'englishLearning.vocab.historyStreaming': 'Generating',
 
 	'englishLearning.classic.title': 'Classic quotes',
 	'englishLearning.classic.descShort':
@@ -995,7 +1004,6 @@ export const enUS = {
 	'englishLearning.classic.playQuote': 'Play line',
 	'englishLearning.classic.favoriteQuote': 'Save quote',
 	'englishLearning.classic.unfavoriteQuote': 'Remove from saved',
-	'englishLearning.classic.listHeading': 'Lines',
 	'englishLearning.classic.collapseList': 'Collapse quote list',
 	'englishLearning.classic.expandList': 'Expand quote list',
 	'englishLearning.classic.sourceLabel': 'Source: ',
@@ -1014,6 +1022,7 @@ export const enUS = {
 	'englishLearning.classic.historyQuotes': '{count} lines',
 	'englishLearning.classic.historyLoaded': 'Loaded this list',
 	'englishLearning.classic.historyLoading': 'Loading history…',
+	'englishLearning.classic.historyStreaming': 'Generating',
 
 	'englishLearning.tts.play': 'Read aloud',
 	'englishLearning.tts.stop': 'Stop',

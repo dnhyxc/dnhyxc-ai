@@ -1,6 +1,7 @@
 /**
  * 按主题拉取结构化单词资料（IPA / 释义 / 例句），逐词朗读。
  */
+import Confirm from '@design/Confirm';
 import { Button, Input, Spinner, Toast } from '@ui/index';
 import { BookText } from 'lucide-react';
 import { observer } from 'mobx-react';
@@ -11,7 +12,7 @@ import {
 	useRef,
 	useState,
 } from 'react';
-import { useNavigate } from 'react-router';
+import { useLocation, useNavigate } from 'react-router';
 import {
 	COUNT_PRESETS,
 	SCROLL_LOAD_THRESHOLD_PX,
@@ -23,7 +24,7 @@ import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import type { EnglishVocabularyHistoryEntry } from '@/service';
 import {
-	getEnglishVocabularyHistoryDetail,
+	deleteEnglishVocabularyPackHistory,
 	listEnglishVocabularyHistory,
 } from '@/service';
 import EnglishPackStore, {
@@ -31,7 +32,6 @@ import EnglishPackStore, {
 } from '@/store/englishPack';
 import { sanitizeCountDigits } from '@/utils';
 import { streamEnglishVocabularyPack } from '@/utils/englishLearningPackSse';
-import { mergeEnglishPackWebSearchOrganics } from '@/utils/englishPackWebSearchMerge';
 import { formatEnglishLearningAgentToolLine } from '../agent/agentToolStatusText';
 import { PackStreamLiveLink } from '../pack/PackStreamLiveLink';
 import { VocabularyHistoryDrawer } from './VocabularyHistoryDrawer';
@@ -41,6 +41,7 @@ export type VocabProgressState = EnglishPackUiProgress;
 function VocabularyPackSectionInner() {
 	const { t } = useI18n();
 	const navigate = useNavigate();
+	const location = useLocation();
 	const loading = EnglishPackStore.vocabLoading;
 
 	const topic = EnglishPackStore.vocabTopic;
@@ -52,10 +53,14 @@ function VocabularyPackSectionInner() {
 	>([]);
 	const [historyLoading, setHistoryLoading] = useState(false);
 	const [historyLoadingMore, setHistoryLoadingMore] = useState(false);
-	const [loadingHistoryDetailId, setLoadingHistoryDetailId] = useState<
+	const [loadedStreamId, setLoadedStreamId] = useState<string | null>(null);
+	const [historyDeleteTarget, setHistoryDeleteTarget] =
+		useState<EnglishVocabularyHistoryEntry | null>(null);
+	const [historyDeleteConfirmOpen, setHistoryDeleteConfirmOpen] =
+		useState(false);
+	const [deletingHistoryStreamId, setDeletingHistoryStreamId] = useState<
 		string | null
 	>(null);
-	const [loadedStreamId, setLoadedStreamId] = useState<string | null>(null);
 
 	const historyOffsetRef = useRef(0);
 	const historyHasMoreRef = useRef(true);
@@ -140,33 +145,71 @@ function VocabularyPackSectionInner() {
 	);
 
 	const openHistoryDetail = useCallback(
-		async (streamId: string) => {
-			setLoadingHistoryDetailId(streamId);
-			try {
-				const res = await getEnglishVocabularyHistoryDetail(streamId);
-				const d = res.data;
-				if (!d) return;
-				EnglishPackStore.vocabPrepareHistoryView(
-					d.topic,
-					mergeEnglishPackWebSearchOrganics(d.webSearchRounds),
-				);
-				setLoadedStreamId(streamId);
-				setHistoryDrawerOpen(false);
-				navigate(
-					`/english-learning/stream?kind=vocab&streamId=${encodeURIComponent(streamId)}`,
-				);
-				if ((d.itemCount ?? 0) > 0) {
-					Toast({
-						type: 'success',
-						title: t('englishLearning.vocab.historyLoaded'),
-					});
-				}
-			} finally {
-				setLoadingHistoryDetailId(null);
-			}
+		(streamId: string) => {
+			setLoadedStreamId(streamId);
+			setHistoryDrawerOpen(false);
+			navigate(
+				`/english-learning/stream?kind=vocab&streamId=${encodeURIComponent(streamId)}`,
+			);
 		},
-		[t, navigate],
+		[navigate],
 	);
+
+	const requestDeleteHistory = useCallback(
+		(entry: EnglishVocabularyHistoryEntry) => {
+			setHistoryDeleteTarget(entry);
+			setHistoryDeleteConfirmOpen(true);
+		},
+		[],
+	);
+
+	const executeDeleteHistory = useCallback(async () => {
+		const target = historyDeleteTarget;
+		if (!target) {
+			setHistoryDeleteConfirmOpen(false);
+			return;
+		}
+		setDeletingHistoryStreamId(target.streamId);
+		try {
+			if (
+				EnglishPackStore.vocabActiveStreamId === target.streamId &&
+				EnglishPackStore.vocabLoading
+			) {
+				EnglishPackStore.vocabCancelByUser();
+			}
+			await deleteEnglishVocabularyPackHistory(target.streamId);
+			EnglishPackStore.vocabClearSessionIfDeleted(target.streamId);
+			setHistoryEntries((prev) =>
+				prev.filter((e) => e.streamId !== target.streamId),
+			);
+			if (loadedStreamId === target.streamId) {
+				setLoadedStreamId(null);
+			}
+			if (
+				location.pathname.includes('/english-learning/stream') &&
+				new URLSearchParams(location.search).get('streamId') === target.streamId
+			) {
+				navigate('/english-learning', { replace: true });
+			}
+			Toast({
+				type: 'success',
+				title: t('englishLearning.packHistory.deleteSuccess'),
+			});
+		} catch {
+			// 错误由 http 层 Toast
+		} finally {
+			setDeletingHistoryStreamId(null);
+			setHistoryDeleteConfirmOpen(false);
+			setHistoryDeleteTarget(null);
+		}
+	}, [
+		historyDeleteTarget,
+		loadedStreamId,
+		location.pathname,
+		location.search,
+		navigate,
+		t,
+	]);
 
 	const cancelGenerate = useCallback(() => {
 		EnglishPackStore.vocabCancelByUser();
@@ -203,6 +246,7 @@ function VocabularyPackSectionInner() {
 			body,
 			callbacks: {
 				onProgress: (p) => {
+					EnglishPackStore.vocabNoteStreamId(p.streamId);
 					EnglishPackStore.vocabOnProgress(myGen, p);
 				},
 				onAgentTool: (ev) => {
@@ -216,7 +260,8 @@ function VocabularyPackSectionInner() {
 						[],
 					);
 				},
-				onChunk: ({ items: delta }) => {
+				onChunk: ({ items: delta, streamId }) => {
+					EnglishPackStore.vocabNoteStreamId(streamId);
 					EnglishPackStore.vocabOnChunk(myGen, delta);
 				},
 				onDone: ({
@@ -225,7 +270,9 @@ function VocabularyPackSectionInner() {
 					fromDatabase,
 					itemsOmitted,
 					itemCount,
+					streamId,
 				}) => {
+					EnglishPackStore.vocabNoteStreamId(streamId);
 					if (myGen !== EnglishPackStore.vocabStreamGenId) return;
 					const finalList =
 						itemsOmitted &&
@@ -306,6 +353,28 @@ function VocabularyPackSectionInner() {
 
 	return (
 		<div className="rounded-none p-4 pb-0 @container min-w-0 mb-7.5">
+			<Confirm
+				open={historyDeleteConfirmOpen}
+				onOpenChange={(open) => {
+					setHistoryDeleteConfirmOpen(open);
+					if (!open) setHistoryDeleteTarget(null);
+				}}
+				title={t('englishLearning.packHistory.deleteConfirmTitle')}
+				description={
+					historyDeleteTarget
+						? t('englishLearning.packHistory.deleteConfirmDesc', {
+								topic: historyDeleteTarget.topic || '—',
+								count: historyDeleteTarget.wordCount,
+							})
+						: '\u00a0'
+				}
+				descriptionClassName="text-left"
+				confirmText={t('englishLearning.packHistory.deleteConfirmAction')}
+				cancelText={t('common.cancel')}
+				confirmVariant="destructive"
+				closeOnConfirm={false}
+				onConfirm={() => void executeDeleteHistory()}
+			/>
 			<div className="mb-3.5 flex items-start gap-3">
 				<div className="bg-linear-to-r from-teal-500 to-cyan-600 @min-[26rem]:size-10 flex size-10 shrink-0 items-center justify-center rounded-md">
 					<BookText
@@ -434,9 +503,11 @@ function VocabularyPackSectionInner() {
 				loading={historyLoading}
 				loadingMore={historyLoadingMore}
 				loadedStreamId={loadedStreamId}
-				loadingDetailId={loadingHistoryDetailId}
+				loadingDetailId={null}
+				deletingStreamId={deletingHistoryStreamId}
 				onViewportScroll={onHistoryViewportScroll}
 				onSelectEntry={openHistoryDetail}
+				onDeleteEntry={requestDeleteHistory}
 			/>
 		</div>
 	);

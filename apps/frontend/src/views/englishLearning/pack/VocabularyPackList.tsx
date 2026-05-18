@@ -19,7 +19,6 @@ import {
 	playEnglishPreferred,
 	stopAllEnglishPlayback,
 } from '@/utils/englishTts';
-import { MasterWebSearchResultsBar } from '../shared/WebSearchResultsBar';
 import type { useVocabularyPackHistoryList } from './useVocabularyPackHistoryList';
 
 export type VocabularyPackListProps = {
@@ -31,12 +30,8 @@ function VocabularyPackListInner({ history }: VocabularyPackListProps) {
 	const { t } = useI18n();
 	const isHistoryMode = Boolean(history?.active);
 	const liveItems = EnglishPackStore.vocabItems;
-	const masterSearchOrganic = EnglishPackStore.vocabMasterSearchOrganic;
-	const topic = EnglishPackStore.vocabTopic.trim();
 
 	const items = isHistoryMode && history ? history.items : liveItems;
-	const displayTotal =
-		isHistoryMode && history ? history.itemCount : items.length;
 
 	const [playingKey, setPlayingKey] = useState<string | null>(null);
 	const { favoritedWordKeys, setFavoritedWordKeys } =
@@ -104,20 +99,6 @@ function VocabularyPackListInner({ history }: VocabularyPackListProps) {
 
 	return (
 		<div className="min-w-0 space-y-4">
-			<div className="flex flex-wrap items-center gap-2 text-textcolor/45 text-sm font-medium">
-				<span>
-					{t('englishLearning.vocab.listHeading')}
-					<span className="mt-0.5">（{displayTotal}）</span>
-				</span>
-				{masterSearchOrganic.length > 0 ? (
-					<MasterWebSearchResultsBar items={masterSearchOrganic} t={t} />
-				) : null}
-			</div>
-			{topic ? (
-				<p className="text-textcolor/50 text-xs leading-snug">
-					{t('englishLearning.stream.topicLabel')}: {topic}
-				</p>
-			) : null}
 			<div className="min-w-0">
 				<div className="mb-0 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
 					{items.map((item, i) => {

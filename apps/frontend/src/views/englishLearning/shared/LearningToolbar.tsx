@@ -107,7 +107,7 @@ export const EnglishLearningToolbar = observer(function EnglishLearningToolbar({
 		<SidebarPanel className="min-w-0">
 			{/* 标题区 */}
 			<div className="mb-2.5 flex items-start gap-3">
-				<div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-linear-to-r from-lime-500 to-green-600">
+				<div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-linear-to-r from-lime-600 to-green-700">
 					<Cog className="size-6 text-white" aria-hidden />
 				</div>
 				<div className="min-w-0">
@@ -172,9 +172,10 @@ export const EnglishLearningToolbar = observer(function EnglishLearningToolbar({
 								variant="outline"
 								aria-pressed={selected}
 								className={cn(
-									'h-9 border-none text-white bg-linear-to-r from-lime-500 to-green-600',
-									'hover:bg-linear-to-r hover:from-lime-600 hover:to-green-700',
-									selected && 'bg-linear-to-r from-lime-600 to-green-700',
+									'h-9 border-none bg-linear-to-r from-lime-600 to-green-700 text-lime-50',
+									'hover:bg-linear-to-r hover:from-lime-300 hover:to-green-500 hover:text-lime-800',
+									selected &&
+										'bg-linear-to-r from-lime-300 to-green-500 text-lime-800',
 								)}
 								onClick={() => {
 									if (selected) {
@@ -197,8 +198,8 @@ export const EnglishLearningToolbar = observer(function EnglishLearningToolbar({
 			</div>
 
 			{englishAgentStore.pendingIntentPrefix ? (
-				<div className="mt-2.5 bg-teal-500/10 rounded-md px-3 py-2.5 border border-theme/10">
-					<div className="text-teal-700/85 dark:text-teal-400/90 mb-1 text-sm font-semibold uppercase tracking-wider">
+				<div className="mt-2.5 bg-linear-to-r from-lime-400/8 to-green-500/8 rounded-md px-3 py-2.5 border border-theme/10">
+					<div className="text-teal-700/85 mb-1 text-sm font-semibold uppercase tracking-wider">
 						{t('englishLearning.pendingIntentShort')}
 					</div>
 					<div className="text-textcolor/80 line-clamp-5 text-sm leading-relaxed">

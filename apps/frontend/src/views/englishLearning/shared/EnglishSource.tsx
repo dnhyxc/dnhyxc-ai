@@ -24,8 +24,8 @@ const EnglishSource = ({ title, description, type }: EnglishSourceProps) => {
 						word: 'hello',
 						ipa: '/həˈləʊ/',
 						pos: 'n.',
-						translationZh: '你好',
-						example: 'Hello, how are you?',
+						translationZh: '你好，世界',
+						example: 'Hello, world',
 					},
 				]
 			: [
@@ -70,7 +70,7 @@ const EnglishSource = ({ title, description, type }: EnglishSourceProps) => {
 					</div>
 				</div>
 			</div>
-			<div className="">
+			<div>
 				<label
 					htmlFor="english-vocab-topic"
 					className="text-textcolor/45 mb-2 block text-sm font-medium"
@@ -81,10 +81,20 @@ const EnglishSource = ({ title, description, type }: EnglishSourceProps) => {
 				</label>
 				<ScrollArea
 					scrollbars="both"
-					className="bg-theme/5 border border-theme/10 mb-5 max-h-50 w-full min-w-0 rounded-md"
+					className={cn(
+						'bg-theme/5 border mb-5 max-h-50 w-full min-w-0 rounded-md',
+						type === 'vocab'
+							? 'bg-linear-to-r from-cyan-500/8 to-blue-600/8'
+							: 'bg-linear-to-r from-indigo-500/8 to-blue-600/8',
+						type === 'vocab' ? 'border-blue-500/10' : 'border-indigo-500/10',
+					)}
 					viewportClassName="[&>div]:!block [&>div]:w-max"
 				>
-					<pre className="m-0 w-max px-2 py-2.5 text-xs leading-relaxed whitespace-pre">
+					<pre
+						className={cn(
+							'm-0 w-max px-2 py-2.5 text-xs leading-relaxed whitespace-pre',
+						)}
+					>
 						{JSON.stringify(vocabExample, null, 2)}
 					</pre>
 				</ScrollArea>

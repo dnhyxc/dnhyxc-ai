@@ -38,7 +38,7 @@ const FavoriteSession = () => {
 						'bg-linear-to-r from-orange-500 to-yellow-500 hover:bg-linear-to-r hover:from-orange-400 hover:to-yellow-600',
 					)}
 					onClick={() => {
-						navigate('/english-learning/library?kind=vocab');
+						navigate('/english-learning/favorites?kind=vocab');
 					}}
 				>
 					{t('englishLearning.favorites.vocab.nav')}
@@ -51,7 +51,7 @@ const FavoriteSession = () => {
 						'bg-linear-to-r from-orange-500 to-yellow-500 hover:bg-linear-to-r hover:from-orange-400 hover:to-yellow-600',
 					)}
 					onClick={() => {
-						navigate('/english-learning/library?kind=classic');
+						navigate('/english-learning/favorites?kind=classic');
 					}}
 				>
 					{t('englishLearning.favorites.classic.nav')}

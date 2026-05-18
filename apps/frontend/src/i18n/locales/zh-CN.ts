@@ -702,8 +702,8 @@ export const zhCN = {
 	'englishLearning.import.dataExampleClassic': '导入语句 json 示例',
 
 	'englishLearning.library.vocab.title': '单词库',
-	'englishLearning.library.vocab.descShort': '可导入单词，查看词库',
-	'englishLearning.library.vocab.bank': '词库',
+	'englishLearning.library.vocab.descShort': '可导入单词，查看词汇库',
+	'englishLearning.library.vocab.bank': '词汇库',
 	'englishLearning.library.classic.title': '语句库',
 	'englishLearning.library.classic.descShort': '可导入语句，查看语料库',
 	'englishLearning.library.classic.bank': '语料库',
@@ -764,24 +764,24 @@ export const zhCN = {
 	'englishLearning.chip.literature': '名著导读',
 	'englishLearning.chip.grammar': '语法讲解',
 	'englishLearning.intent.vocabulary':
-		'【意图】请侧重词汇：释义、搭配与例句；如需可先了解我的大致基础。',
+		'### 意图：请侧重词汇：释义、搭配与例句；如需可先了解我的大致基础。',
 	'englishLearning.intent.morphology':
-		'【意图】请从词根、前缀、后缀与构词法入手，说明常见变形规律并各举一些代表词。',
+		'### 意图：请从词根、前缀、后缀与构词法入手，说明常见变形规律并各举一些代表词。',
 	'englishLearning.intent.collocations':
-		'【意图】请侧重地道搭配与语块：给出常用搭配、简要辨析近义搭配，并各配短例句。',
+		'### 意图：请侧重地道搭配与语块：给出常用搭配、简要辨析近义搭配，并各配短例句。',
 	'englishLearning.intent.confusables':
-		'【意图】请对比易混词或近义表达：差异、典型误用与正例，可用表格或分条呈现。',
+		'### 意图：请对比易混词或近义表达：差异、典型误用与正例，可用表格或分条呈现。',
 	'englishLearning.intent.pronunciation':
-		'【意图】请侧重发音与节律：重音、弱读、连读或同化等规律，可给 IPA 与跟读提示。',
+		'### 意图：请侧重发音与节律：重音、弱读、连读或同化等规律，可给 IPA 与跟读提示。',
 	'englishLearning.intent.speaking':
-		'【意图】请侧重口语交际与流利度：情景对话、地道应答、常用话轮与填充语；给短对话范例并说明语境正式度。',
+		'### 意图：请侧重口语交际与流利度：情景对话、地道应答、常用话轮与填充语；给短对话范例并说明语境正式度。',
 	'englishLearning.intent.translate':
-		'【意图】请提供中英对照翻译，可分句；标注专有名词取舍。',
-	'englishLearning.intent.reading': '【意图】请生成一篇精读短文并注释难点。',
+		'### 意图：请提供中英对照翻译，可分句；标注专有名词取舍。',
+	'englishLearning.intent.reading': '### 意图：请生成一篇精读短文并注释难点。',
 	'englishLearning.intent.literature':
-		'【意图】请做名著/英语文献导读：摘要、背景与讨论题；并请从原文中摘取不少于 5 段优质段落（每段适度篇幅），逐段附带中文翻译；避免无关的冗长照抄。',
+		'### 意图：请做名著/英语文献导读：摘要、背景与讨论题；并请从原文中摘取不少于 5 段优质段落（每段适度篇幅），逐段附带中文翻译；避免无关的冗长照抄。',
 	'englishLearning.intent.grammar':
-		'【意图】请讲解下列语法点并给出正例与常见错误。',
+		'### 意图：请讲解下列语法点并给出正例与常见错误。',
 	'englishLearning.pendingIntent': '已选意图（下次发送时附带）',
 	'englishLearning.pendingIntentShort': '下次发送附带',
 
@@ -796,6 +796,14 @@ export const zhCN = {
 	'englishLearning.webSearch.viewWebPages': '检索网页',
 	'englishLearning.webSearch.viewPagesTitle': '本次联网搜索结果（{n}）',
 	'englishLearning.packHistory.webSearchRounds': '联网 {n} 次',
+	'englishLearning.packHistory.deleteAction': '删除记录',
+	'englishLearning.packHistory.deleteConfirmTitle': '删除生成记录？',
+	'englishLearning.packHistory.deleteConfirmDesc':
+		'将删除「{topic}」及其已拉取的 {count} 个单词，不可恢复。',
+	'englishLearning.packHistory.deleteConfirmDescClassic':
+		'将删除「{topic}」及其已拉取的 {count} 条语句，不可恢复。',
+	'englishLearning.packHistory.deleteConfirmAction': '确认删除',
+	'englishLearning.packHistory.deleteSuccess': '已删除生成记录',
 
 	'englishLearning.favoritesDrawer.selectAllLoaded': '全选',
 	'englishLearning.favoritesDrawer.selectedCount': '已选 {count} 项',
@@ -871,6 +879,7 @@ export const zhCN = {
 	'englishLearning.vocab.historyLoad': '载入',
 	'englishLearning.vocab.historyLoaded': '已载入该次单词列表',
 	'englishLearning.vocab.historyLoading': '加载历史...',
+	'englishLearning.vocab.historyStreaming': '正在拉取',
 
 	'englishLearning.classic.title': '经典语句',
 	'englishLearning.classic.descShort': '按主题拉取名句、短语等',
@@ -898,7 +907,6 @@ export const zhCN = {
 	'englishLearning.classic.playQuote': '朗读该句',
 	'englishLearning.classic.favoriteQuote': '收藏该句',
 	'englishLearning.classic.unfavoriteQuote': '取消收藏',
-	'englishLearning.classic.listHeading': '语句列表',
 	'englishLearning.classic.collapseList': '收起语句列表',
 	'englishLearning.classic.expandList': '展开语句列表',
 	'englishLearning.classic.sourceLabel': '出处：',
@@ -917,6 +925,7 @@ export const zhCN = {
 	'englishLearning.classic.historyQuotes': '{count} 条',
 	'englishLearning.classic.historyLoaded': '已载入该次语句列表',
 	'englishLearning.classic.historyLoading': '加载历史...',
+	'englishLearning.classic.historyStreaming': '正在拉取',
 
 	'englishLearning.tts.play': '朗读',
 	'englishLearning.tts.stop': '停止',

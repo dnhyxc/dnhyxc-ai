@@ -546,6 +546,14 @@ export const getEnglishVocabularyHistoryDetail = async (streamId: string) => {
 	});
 };
 
+/** 删除单词包拉取历史（含已拉取词条明细） */
+export const deleteEnglishVocabularyPackHistory = async (streamId: string) => {
+	return await http.delete<{ deleted: boolean }>(
+		ENGLISH_LEARNING_VOCABULARY_HISTORY,
+		{ params: [streamId] },
+	);
+};
+
 /** 按 streamId + sortOrder 分页读取单词明细 */
 export const listEnglishVocabularyPackItems = async (
 	streamId: string,
@@ -858,6 +866,16 @@ export const getEnglishClassicQuotesHistoryDetail = async (
 		params: [streamId],
 		silent: true,
 	});
+};
+
+/** 删除经典句拉取历史（含已拉取语句明细） */
+export const deleteEnglishClassicQuotesPackHistory = async (
+	streamId: string,
+) => {
+	return await http.delete<{ deleted: boolean }>(
+		ENGLISH_LEARNING_CLASSIC_QUOTES_HISTORY,
+		{ params: [streamId] },
+	);
 };
 
 export const listEnglishClassicQuotesPackItems = async (

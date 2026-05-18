@@ -338,6 +338,23 @@ export class EnglishLearningController {
 		return { success: true, data: detail };
 	}
 
+	/** 删除单词包拉取历史（含 pack_item 明细） */
+	@Delete('vocabulary-history/:streamId')
+	async deleteVocabularyPackHistory(
+		@Req() req: AuthedRequest,
+		@Param('streamId') streamId: string,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const data = await this.englishLearningService.deleteVocabularyPackHistory(
+			userId,
+			streamId,
+		);
+		return { success: true, data };
+	}
+
 	/** 分页列出当前用户的单词库（包） */
 	@Get('vocabulary-libraries')
 	async listVocabularyLibraries(
@@ -916,6 +933,24 @@ export class EnglishLearningController {
 				streamId,
 			);
 		return { success: true, data: detail };
+	}
+
+	/** 删除经典句拉取历史（含 pack_item 明细） */
+	@Delete('classic-quotes-history/:streamId')
+	async deleteClassicQuotesPackHistory(
+		@Req() req: AuthedRequest,
+		@Param('streamId') streamId: string,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const data =
+			await this.englishLearningService.deleteClassicQuotesPackHistory(
+				userId,
+				streamId,
+			);
+		return { success: true, data };
 	}
 
 	/** 分页列出当前用户收藏的经典句（按收藏时间倒序） */

@@ -1,6 +1,7 @@
 /**
  * 按主题拉取英文经典语句（译文、出处、赏析），可朗读原句。
  */
+import Confirm from '@design/Confirm';
 import { Button, Input, Spinner, Toast } from '@ui/index';
 import { BookMarked } from 'lucide-react';
 import { observer } from 'mobx-react';
@@ -11,7 +12,7 @@ import {
 	useRef,
 	useState,
 } from 'react';
-import { useNavigate } from 'react-router';
+import { useLocation, useNavigate } from 'react-router';
 import {
 	COUNT_PRESETS,
 	HISTORY_PAGE_SIZE,
@@ -23,7 +24,7 @@ import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import type { EnglishClassicQuoteHistoryEntry } from '@/service';
 import {
-	getEnglishClassicQuotesHistoryDetail,
+	deleteEnglishClassicQuotesPackHistory,
 	listEnglishClassicQuotesHistory,
 } from '@/service';
 import EnglishPackStore, {
@@ -31,7 +32,6 @@ import EnglishPackStore, {
 } from '@/store/englishPack';
 import { sanitizeCountDigits } from '@/utils';
 import { streamEnglishClassicQuotes } from '@/utils/englishLearningPackSse';
-import { mergeEnglishPackWebSearchOrganics } from '@/utils/englishPackWebSearchMerge';
 import { formatEnglishLearningAgentToolLine } from '../agent/agentToolStatusText';
 import { PackStreamLiveLink } from '../pack/PackStreamLiveLink';
 import { ClassicQuotesHistoryDrawer } from './ClassicQuotesHistoryDrawer';
@@ -41,6 +41,7 @@ export type ClassicQuoteProgressState = EnglishPackUiProgress;
 function ClassicQuotesSectionInner() {
 	const { t } = useI18n();
 	const navigate = useNavigate();
+	const location = useLocation();
 
 	const loading = EnglishPackStore.classicLoading;
 	const topic = EnglishPackStore.classicTopic;
@@ -52,10 +53,14 @@ function ClassicQuotesSectionInner() {
 	>([]);
 	const [historyLoading, setHistoryLoading] = useState(false);
 	const [historyLoadingMore, setHistoryLoadingMore] = useState(false);
-	const [loadingHistoryDetailId, setLoadingHistoryDetailId] = useState<
+	const [loadedStreamId, setLoadedStreamId] = useState<string | null>(null);
+	const [historyDeleteTarget, setHistoryDeleteTarget] =
+		useState<EnglishClassicQuoteHistoryEntry | null>(null);
+	const [historyDeleteConfirmOpen, setHistoryDeleteConfirmOpen] =
+		useState(false);
+	const [deletingHistoryStreamId, setDeletingHistoryStreamId] = useState<
 		string | null
 	>(null);
-	const [loadedStreamId, setLoadedStreamId] = useState<string | null>(null);
 
 	const historyOffsetRef = useRef(0);
 	const historyHasMoreRef = useRef(true);
@@ -139,33 +144,71 @@ function ClassicQuotesSectionInner() {
 	);
 
 	const openHistoryDetail = useCallback(
-		async (streamId: string) => {
-			setLoadingHistoryDetailId(streamId);
-			try {
-				const res = await getEnglishClassicQuotesHistoryDetail(streamId);
-				const d = res.data;
-				if (!d) return;
-				EnglishPackStore.classicPrepareHistoryView(
-					d.topic,
-					mergeEnglishPackWebSearchOrganics(d.webSearchRounds),
-				);
-				setLoadedStreamId(streamId);
-				setHistoryDrawerOpen(false);
-				navigate(
-					`/english-learning/stream?kind=classic&streamId=${encodeURIComponent(streamId)}`,
-				);
-				if ((d.itemCount ?? 0) > 0) {
-					Toast({
-						type: 'success',
-						title: t('englishLearning.classic.historyLoaded'),
-					});
-				}
-			} finally {
-				setLoadingHistoryDetailId(null);
-			}
+		(streamId: string) => {
+			setLoadedStreamId(streamId);
+			setHistoryDrawerOpen(false);
+			navigate(
+				`/english-learning/stream?kind=classic&streamId=${encodeURIComponent(streamId)}`,
+			);
 		},
-		[t, navigate],
+		[navigate],
 	);
+
+	const requestDeleteHistory = useCallback(
+		(entry: EnglishClassicQuoteHistoryEntry) => {
+			setHistoryDeleteTarget(entry);
+			setHistoryDeleteConfirmOpen(true);
+		},
+		[],
+	);
+
+	const executeDeleteHistory = useCallback(async () => {
+		const target = historyDeleteTarget;
+		if (!target) {
+			setHistoryDeleteConfirmOpen(false);
+			return;
+		}
+		setDeletingHistoryStreamId(target.streamId);
+		try {
+			if (
+				EnglishPackStore.classicActiveStreamId === target.streamId &&
+				EnglishPackStore.classicLoading
+			) {
+				EnglishPackStore.classicCancelByUser();
+			}
+			await deleteEnglishClassicQuotesPackHistory(target.streamId);
+			EnglishPackStore.classicClearSessionIfDeleted(target.streamId);
+			setHistoryEntries((prev) =>
+				prev.filter((e) => e.streamId !== target.streamId),
+			);
+			if (loadedStreamId === target.streamId) {
+				setLoadedStreamId(null);
+			}
+			if (
+				location.pathname.includes('/english-learning/stream') &&
+				new URLSearchParams(location.search).get('streamId') === target.streamId
+			) {
+				navigate('/english-learning', { replace: true });
+			}
+			Toast({
+				type: 'success',
+				title: t('englishLearning.packHistory.deleteSuccess'),
+			});
+		} catch {
+			// 错误由 http 层 Toast
+		} finally {
+			setDeletingHistoryStreamId(null);
+			setHistoryDeleteConfirmOpen(false);
+			setHistoryDeleteTarget(null);
+		}
+	}, [
+		historyDeleteTarget,
+		loadedStreamId,
+		location.pathname,
+		location.search,
+		navigate,
+		t,
+	]);
 
 	const cancelGenerate = useCallback(() => {
 		EnglishPackStore.classicCancelByUser();
@@ -201,6 +244,7 @@ function ClassicQuotesSectionInner() {
 			body,
 			callbacks: {
 				onProgress: (p) => {
+					EnglishPackStore.classicNoteStreamId(p.streamId);
 					EnglishPackStore.classicOnProgress(myGen, p);
 				},
 				onAgentTool: (ev) => {
@@ -214,7 +258,8 @@ function ClassicQuotesSectionInner() {
 						[],
 					);
 				},
-				onChunk: ({ items: delta }) => {
+				onChunk: ({ items: delta, streamId }) => {
+					EnglishPackStore.classicNoteStreamId(streamId);
 					EnglishPackStore.classicOnChunk(myGen, delta);
 				},
 				onDone: ({
@@ -223,7 +268,9 @@ function ClassicQuotesSectionInner() {
 					fromDatabase,
 					itemsOmitted,
 					itemCount,
+					streamId,
 				}) => {
+					EnglishPackStore.classicNoteStreamId(streamId);
 					if (myGen !== EnglishPackStore.classicStreamGenId) return;
 					const finalList =
 						itemsOmitted &&
@@ -304,6 +351,28 @@ function ClassicQuotesSectionInner() {
 
 	return (
 		<div className="rounded-none @container min-w-0 px-4 pb-0">
+			<Confirm
+				open={historyDeleteConfirmOpen}
+				onOpenChange={(open) => {
+					setHistoryDeleteConfirmOpen(open);
+					if (!open) setHistoryDeleteTarget(null);
+				}}
+				title={t('englishLearning.packHistory.deleteConfirmTitle')}
+				description={
+					historyDeleteTarget
+						? t('englishLearning.packHistory.deleteConfirmDescClassic', {
+								topic: historyDeleteTarget.topic || '—',
+								count: historyDeleteTarget.quoteCount,
+							})
+						: '\u00a0'
+				}
+				descriptionClassName="text-left"
+				confirmText={t('englishLearning.packHistory.deleteConfirmAction')}
+				cancelText={t('common.cancel')}
+				confirmVariant="destructive"
+				closeOnConfirm={false}
+				onConfirm={() => void executeDeleteHistory()}
+			/>
 			<div className="mb-3.5 flex items-start gap-3">
 				<div className="bg-linear-to-r from-violet-500 to-indigo-600 @min-[26rem]:size-11 flex size-10 shrink-0 items-center justify-center rounded-md">
 					<BookMarked className="text-white size-6" aria-hidden />
@@ -428,9 +497,11 @@ function ClassicQuotesSectionInner() {
 				loading={historyLoading}
 				loadingMore={historyLoadingMore}
 				loadedStreamId={loadedStreamId}
-				loadingDetailId={loadingHistoryDetailId}
+				loadingDetailId={null}
+				deletingStreamId={deletingHistoryStreamId}
 				onViewportScroll={onHistoryViewportScroll}
 				onSelectEntry={openHistoryDetail}
+				onDeleteEntry={requestDeleteHistory}
 			/>
 		</div>
 	);

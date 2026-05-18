@@ -18,6 +18,8 @@ export type EnglishPackUiProgress = {
 	collected: number;
 	target: number;
 	round: number;
+	/** SSE 进度帧携带，用于历史与进行中的会话对齐 */
+	streamId?: string;
 };
 
 /**
@@ -37,6 +39,8 @@ class EnglishPack {
 	vocabAgentToolLine: string | null = null; // 工具响应行文案
 	vocabMasterSearchOrganic: SearchOrganicItem[] = []; // 搜索引擎结果
 	vocabAbort: ((fromUser?: boolean) => void) | null = null; // 存储当前流的 abort 回调（用于手动/自动终止 SSE）
+	/** 当前进行中的单词包 streamId（SSE 首帧后写入） */
+	vocabActiveStreamId: string | null = null;
 
 	// —— 经典句相关 observables ——
 	classicStreamGenId = 0; // 同理：经典句流式拉取会话版本
@@ -46,6 +50,8 @@ class EnglishPack {
 	classicAgentToolLine: string | null = null; // 工具响应行
 	classicMasterSearchOrganic: SearchOrganicItem[] = []; // 搜索引擎结果
 	classicAbort: ((fromUser?: boolean) => void) | null = null; // 当前经典句流终止回调
+	/** 当前进行中的经典句 streamId */
+	classicActiveStreamId: string | null = null;
 
 	// ——— 左栏学习表单持久化（跨路由；与 Agent 意图镜像见 englishAgent 同步）———
 
@@ -112,8 +118,29 @@ class EnglishPack {
 				round: 0,
 			}; // 初始化进度
 			this.vocabItems = []; // 清已收集词条
+			this.vocabActiveStreamId = null;
 		});
 		return this.vocabStreamGenId;
+	}
+
+	/** 记录 SSE 下发的 streamId（进度 / chunk / complete） */
+	vocabNoteStreamId(streamId: string | undefined) {
+		if (!streamId?.trim()) return;
+		runInAction(() => {
+			this.vocabActiveStreamId = streamId.trim();
+		});
+	}
+
+	/**
+	 * 结果页是否应走「进行中拉取」展示（Store 实时状态），而非历史分页。
+	 * @param streamId URL 上的 streamId；无则表示直播结果页（无历史 id）
+	 */
+	isVocabLiveStreamView(streamId: string | null): boolean {
+		if (!streamId) {
+			return this.vocabLoading || this.vocabItems.length > 0;
+		}
+		if (this.vocabActiveStreamId !== streamId) return false;
+		return this.vocabLoading || this.vocabItems.length > 0;
 	}
 
 	/**
@@ -131,6 +158,9 @@ class EnglishPack {
 	vocabOnProgress(gen: number, p: EnglishPackUiProgress) {
 		if (gen !== this.vocabStreamGenId) return;
 		runInAction(() => {
+			if (p.streamId?.trim()) {
+				this.vocabActiveStreamId = p.streamId.trim();
+			}
 			const prev = this.vocabProgress;
 			if (prev && p.collected < prev.collected) {
 				this.vocabProgress = {
@@ -256,15 +286,30 @@ class EnglishPack {
 		});
 	}
 
-	/** 打开历史会话：仅恢复联网检索与主题，词条由结果页分页 API 加载 */
-	vocabPrepareHistoryView(topic: string, organic: SearchOrganicItem[]) {
+	/**
+	 * 进入历史结果页：仅在不干扰进行中拉取时清空 Store 词条/进度。
+	 * 拉取进行中或切回当前 streamId 时不改动，便于历史抽屉来回切换。
+	 */
+	vocabEnterHistoryView(viewingStreamId: string) {
+		if (this.vocabLoading) return;
+		if (this.isVocabLiveStreamView(viewingStreamId)) return;
 		runInAction(() => {
 			this.vocabItems = [];
-			this.vocabTopic = topic;
-			this.vocabMasterSearchOrganic = organic;
+			this.vocabAgentToolLine = null;
+			this.vocabProgress = null;
+		});
+	}
+
+	/** 删除服务端会话后，若与当前 Store 会话一致则清空本地拉取状态 */
+	vocabClearSessionIfDeleted(streamId: string) {
+		if (this.vocabActiveStreamId !== streamId) return;
+		runInAction(() => {
+			this.vocabActiveStreamId = null;
+			this.vocabItems = [];
 			this.vocabLoading = false;
 			this.vocabAgentToolLine = null;
 			this.vocabProgress = null;
+			this.vocabAbort = null;
 		});
 	}
 
@@ -288,8 +333,24 @@ class EnglishPack {
 				round: 0,
 			};
 			this.classicItems = [];
+			this.classicActiveStreamId = null;
 		});
 		return this.classicStreamGenId;
+	}
+
+	classicNoteStreamId(streamId: string | undefined) {
+		if (!streamId?.trim()) return;
+		runInAction(() => {
+			this.classicActiveStreamId = streamId.trim();
+		});
+	}
+
+	isClassicLiveStreamView(streamId: string | null): boolean {
+		if (!streamId) {
+			return this.classicLoading || this.classicItems.length > 0;
+		}
+		if (this.classicActiveStreamId !== streamId) return false;
+		return this.classicLoading || this.classicItems.length > 0;
 	}
 
 	/**
@@ -305,6 +366,9 @@ class EnglishPack {
 	classicOnProgress(gen: number, p: EnglishPackUiProgress) {
 		if (gen !== this.classicStreamGenId) return;
 		runInAction(() => {
+			if (p.streamId?.trim()) {
+				this.classicActiveStreamId = p.streamId.trim();
+			}
 			const prev = this.classicProgress;
 			if (prev && p.collected < prev.collected) {
 				this.classicProgress = {
@@ -421,15 +485,26 @@ class EnglishPack {
 		});
 	}
 
-	/** 打开历史会话：仅恢复联网检索与主题，语句由结果页分页 API 加载 */
-	classicPrepareHistoryView(topic: string, organic: SearchOrganicItem[]) {
+	/** 进入历史结果页：拉取进行中时不改动 Store */
+	classicEnterHistoryView(viewingStreamId: string) {
+		if (this.classicLoading) return;
+		if (this.isClassicLiveStreamView(viewingStreamId)) return;
 		runInAction(() => {
 			this.classicItems = [];
-			this.classicTopic = topic;
-			this.classicMasterSearchOrganic = organic;
+			this.classicAgentToolLine = null;
+			this.classicProgress = null;
+		});
+	}
+
+	classicClearSessionIfDeleted(streamId: string) {
+		if (this.classicActiveStreamId !== streamId) return;
+		runInAction(() => {
+			this.classicActiveStreamId = null;
+			this.classicItems = [];
 			this.classicLoading = false;
 			this.classicAgentToolLine = null;
 			this.classicProgress = null;
+			this.classicAbort = null;
 		});
 	}
 }

@@ -220,12 +220,10 @@ export class EnglishLearningService {
 		private readonly webSearchService: WebSearchService,
 		private readonly knowledgeQaService: KnowledgeQaService,
 		private readonly knowledgeEmbedding: KnowledgeEmbeddingService,
-		@InjectRepository(EnglishVocabularyPackBatch)
 		@InjectRepository(EnglishVocabularyPackSession)
 		private readonly vocabPackSessionRepo: Repository<EnglishVocabularyPackSession>,
 		@InjectRepository(EnglishVocabularyPackItem)
 		private readonly vocabPackItemRepo: Repository<EnglishVocabularyPackItem>,
-		@InjectRepository(EnglishClassicQuotePackBatch)
 		@InjectRepository(EnglishClassicQuotesPackSession)
 		private readonly classicPackSessionRepo: Repository<EnglishClassicQuotesPackSession>,
 		@InjectRepository(EnglishClassicQuotesPackItem)
@@ -3455,6 +3453,32 @@ ${existingHintBlock}
 		};
 	}
 
+	/**
+	 * 删除单词包拉取会话：明细、轮次审计、联网记录与会话元数据一并删除。
+	 */
+	async deleteVocabularyPackHistory(
+		userId: number,
+		streamId: string,
+	): Promise<{ deleted: boolean }> {
+		const session = await this.vocabPackSessionRepo.findOne({
+			where: { userId, streamId },
+		});
+		if (!session) {
+			throw new NotFoundException('拉取记录不存在或无权访问');
+		}
+		await this.dataSource.transaction(async (manager) => {
+			await manager.delete(EnglishVocabularyPackItem, { userId, streamId });
+			await manager.delete(EnglishVocabularyPackBatch, { userId, streamId });
+			await manager.delete(EnglishPackWebSearchRecord, {
+				userId,
+				streamId,
+				packKind: 'vocabulary',
+			});
+			await manager.delete(EnglishVocabularyPackSession, { streamId, userId });
+		});
+		return { deleted: true };
+	}
+
 	async listClassicQuotesHistory(
 		userId: number,
 		options?: { limit?: number; offset?: number },
@@ -3561,6 +3585,33 @@ ${existingHintBlock}
 			itemCount: session.itemCount,
 			items: rows.map((r) => this.mapClassicPackItemRow(r)),
 		};
+	}
+
+	/** 删除经典句拉取会话及全部明细 */
+	async deleteClassicQuotesPackHistory(
+		userId: number,
+		streamId: string,
+	): Promise<{ deleted: boolean }> {
+		const session = await this.classicPackSessionRepo.findOne({
+			where: { userId, streamId },
+		});
+		if (!session) {
+			throw new NotFoundException('拉取记录不存在或无权访问');
+		}
+		await this.dataSource.transaction(async (manager) => {
+			await manager.delete(EnglishClassicQuotesPackItem, { userId, streamId });
+			await manager.delete(EnglishClassicQuotePackBatch, { userId, streamId });
+			await manager.delete(EnglishPackWebSearchRecord, {
+				userId,
+				streamId,
+				packKind: 'classic_quotes',
+			});
+			await manager.delete(EnglishClassicQuotesPackSession, {
+				streamId,
+				userId,
+			});
+		});
+		return { deleted: true };
 	}
 
 	/** 与前端 `normalizeEnglishVocabWordKey` 对齐：trim + 小写 */

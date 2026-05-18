@@ -3,12 +3,14 @@
  */
 import { Drawer } from '@design/Drawer';
 import Loading from '@design/Loading';
-import { ScrollArea } from '@ui/index';
-import { Loader2 } from 'lucide-react';
+import { Button, ScrollArea, Spinner } from '@ui/index';
+import { Loader2, Trash2 } from 'lucide-react';
+import { observer } from 'mobx-react';
 import { type UIEventHandler } from 'react';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import type { EnglishClassicQuoteHistoryEntry } from '@/service';
+import EnglishPackStore from '@/store/englishPack';
 
 export type ClassicQuotesHistoryDrawerProps = {
 	open: boolean;
@@ -18,8 +20,10 @@ export type ClassicQuotesHistoryDrawerProps = {
 	loadingMore: boolean;
 	loadedStreamId: string | null;
 	loadingDetailId: string | null;
+	deletingStreamId: string | null;
 	onViewportScroll: UIEventHandler<HTMLDivElement>;
 	onSelectEntry: (streamId: string) => void | Promise<void>;
+	onDeleteEntry: (entry: EnglishClassicQuoteHistoryEntry) => void;
 };
 
 function formatHistoryLineDate(iso: string): string {
@@ -30,7 +34,7 @@ function formatHistoryLineDate(iso: string): string {
 	}
 }
 
-export function ClassicQuotesHistoryDrawer({
+function ClassicQuotesHistoryDrawerInner({
 	open,
 	onOpenChange,
 	entries,
@@ -38,8 +42,10 @@ export function ClassicQuotesHistoryDrawer({
 	loadingMore,
 	loadedStreamId,
 	loadingDetailId,
+	deletingStreamId,
 	onViewportScroll,
 	onSelectEntry,
+	onDeleteEntry,
 }: ClassicQuotesHistoryDrawerProps) {
 	const { t } = useI18n();
 
@@ -68,18 +74,25 @@ export function ClassicQuotesHistoryDrawer({
 						{entries.map((h) => {
 							const active = loadedStreamId === h.streamId;
 							const busy = loadingDetailId === h.streamId;
+							const deleting = deletingStreamId === h.streamId;
+							const isStreaming =
+								EnglishPackStore.classicLoading &&
+								EnglishPackStore.classicActiveStreamId === h.streamId;
 							return (
-								<div key={h.streamId}>
+								<div
+									key={h.streamId}
+									className={cn(
+										'group flex items-stretch gap-0.5 overflow-hidden rounded-md',
+										active ? 'bg-theme/10' : 'hover:bg-theme/10',
+									)}
+								>
 									<button
 										type="button"
-										disabled={busy}
+										disabled={busy || deleting}
 										onClick={() => void onSelectEntry(h.streamId)}
-										className={cn(
-											'flex w-full cursor-pointer flex-col gap-0.5 overflow-hidden rounded-md p-2 text-left transition-colors',
-											active ? 'bg-theme/10' : 'hover:bg-theme/10',
-										)}
+										className="flex min-w-0 flex-1 cursor-pointer flex-col gap-0.5 p-2 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-60"
 									>
-										<div className="text-textcolor line-clamp-2 w-full min-w-0 max-w-full text-sm font-medium wrap-anywhere leading-snug">
+										<div className="text-textcolor line-clamp-2 w-full min-w-0 max-w-full text-sm font-medium wrap-anywhere leading-snug mb-1">
 											{h.topic || '—'}
 										</div>
 										<div className="text-textcolor/50 flex w-full flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
@@ -98,7 +111,7 @@ export function ClassicQuotesHistoryDrawer({
 											<span className="tabular-nums">
 												{formatHistoryLineDate(h.updatedAt)}
 											</span>
-											{busy ? (
+											{busy || deleting ? (
 												<Loader2
 													className="size-3 shrink-0 animate-spin"
 													aria-hidden
@@ -106,6 +119,30 @@ export function ClassicQuotesHistoryDrawer({
 											) : null}
 										</div>
 									</button>
+									{isStreaming ? (
+										<div
+											role="status"
+											className="my-1 mr-1 flex h-7 w-7 shrink-0 items-center justify-center"
+											aria-label={t('englishLearning.classic.historyStreaming')}
+										>
+											<Spinner className="size-4 shrink-0 text-violet-600 dark:text-violet-400" />
+										</div>
+									) : (
+										<Button
+											type="button"
+											variant="ghost"
+											size="sm"
+											disabled={busy || deleting}
+											className="group-hover:flex hidden items-center justify-center text-textcolor/65 hover:text-destructive hover:bg-destructive/10 border border-transparent hover:border-destructive/35 my-1 mr-1 h-7 w-7 shrink-0 p-0"
+											aria-label={t('englishLearning.packHistory.deleteAction')}
+											onClick={(e) => {
+												e.stopPropagation();
+												onDeleteEntry(h);
+											}}
+										>
+											<Trash2 className="size-4" aria-hidden />
+										</Button>
+									)}
 								</div>
 							);
 						})}
@@ -125,3 +162,7 @@ export function ClassicQuotesHistoryDrawer({
 		</Drawer>
 	);
 }
+
+export const ClassicQuotesHistoryDrawer = observer(
+	ClassicQuotesHistoryDrawerInner,
+);

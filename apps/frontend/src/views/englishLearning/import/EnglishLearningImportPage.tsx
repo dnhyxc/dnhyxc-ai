@@ -41,6 +41,14 @@ function extractItemArray(data: unknown): unknown[] | null {
 	return null;
 }
 
+/** 取文件名（不含路径）并去掉最后一个扩展名，用于导入标题默认值 */
+function fileNameWithoutExtension(name: string): string {
+	const base = name.replace(/\\/g, '/').split('/').pop() ?? name;
+	const lastDot = base.lastIndexOf('.');
+	if (lastDot <= 0) return base;
+	return base.slice(0, lastDot);
+}
+
 function parseVocabularyImport(
 	data: unknown,
 ):
@@ -160,6 +168,7 @@ export default function EnglishLearningImportPage() {
 	const processJsonFile = useCallback(
 		(file: File) => {
 			resetParsed();
+			setImportTitle(fileNameWithoutExtension(file.name).slice(0, 100));
 			const reader = new FileReader();
 			reader.onload = () => {
 				const text = typeof reader.result === 'string' ? reader.result : '';

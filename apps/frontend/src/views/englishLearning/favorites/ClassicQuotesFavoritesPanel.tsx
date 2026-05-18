@@ -392,8 +392,8 @@ export function ClassicQuotesFavoritesPanel({
 						</div>
 					)}
 				</ScrollArea>
-				<footer className="shrink-0 flex flex-wrap items-center justify-between gap-3 border-t border-theme/10 px-5 py-3">
-					<div className="flex items-center gap-2">
+				<footer className="h-13.5 shrink-0 flex flex-wrap items-center justify-between gap-3 border-t border-theme/10 px-5 py-3">
+					<div className="flex items-center gap-2 -mt-0.5">
 						{!showInitialLoading && entries.length > 0 ? (
 							<div className="flex shrink-0 flex-wrap items-center gap-3">
 								<div className="flex items-center gap-2">
@@ -418,7 +418,7 @@ export function ClassicQuotesFavoritesPanel({
 							</div>
 						) : null}
 					</div>
-					<div className="flex items-center gap-2">
+					<div className="flex items-center gap-2 -mt-0.5">
 						<Button
 							type="button"
 							variant="destructive"

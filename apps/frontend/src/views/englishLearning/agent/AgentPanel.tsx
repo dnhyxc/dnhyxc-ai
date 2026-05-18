@@ -20,6 +20,7 @@ import {
 	useRef,
 	useState,
 } from 'react';
+import { useNavigate } from 'react-router';
 import { useI18n, useStickToBottomScroll } from '@/hooks';
 import {
 	ChatCodeFloatingToolbar,
@@ -159,6 +160,7 @@ export const AgentPanel = observer(function AgentPanel({
 	onNewChat,
 }: AgentPanelProps) {
 	const { t } = useI18n();
+	const navigate = useNavigate();
 	const { knowledgeStore, userStore } = useStore();
 	const isLoggedIn = Boolean(userStore.userInfo?.id);
 	const [scrollCornerFabMode, setScrollCornerFabMode] =
@@ -208,12 +210,9 @@ export const AgentPanel = observer(function AgentPanel({
 			const cur = knowledgeStore.markdown.trimEnd();
 			const next = cur ? `${cur}\n\n${body}\n` : `${body}\n`;
 			knowledgeStore.setMarkdown(next);
-			Toast({
-				type: 'success',
-				title: t('knowledge.assistant.appendedToCurrentDoc'),
-			});
+			navigate('/knowledge');
 		},
-		[knowledgeStore, t],
+		[knowledgeStore, navigate, t],
 	);
 
 	const lastMsg = messages[messages.length - 1];

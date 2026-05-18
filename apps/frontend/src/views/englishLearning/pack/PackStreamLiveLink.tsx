@@ -59,8 +59,11 @@ function PackStreamLiveLinkInner({ kind, className }: PackStreamLiveLinkProps) {
 		? 'text-teal-600/90 dark:text-teal-400/90'
 		: 'text-indigo-600/90 dark:text-indigo-400/90';
 	const accentBorder = isVocab
-		? 'border-teal-500/25 bg-teal-500/8 hover:border-teal-500/35'
-		: 'border-violet-500/25 bg-violet-500/8 hover:border-violet-500/35';
+		? 'border-teal-500/10 bg-linear-to-r from-teal-500/8 to-cyan-600/8'
+		: 'border-violet-500/10 bg-linear-to-r from-violet-500/8 to-indigo-600/8';
+	const bgColor = isVocab
+		? 'bg-linear-to-r from-teal-500/30 to-cyan-600/30'
+		: 'bg-linear-to-r from-violet-500/30 to-indigo-600/30';
 
 	return (
 		<div
@@ -109,8 +112,21 @@ function PackStreamLiveLinkInner({ kind, className }: PackStreamLiveLinkProps) {
 					type="button"
 					size="sm"
 					variant="outline"
-					className="h-8 min-w-0 pb-0.5 items-center flex-1 justify-center gap-1.5 border-theme/15 bg-theme-background/80 px-2 text-xs"
-					onClick={() => navigate(`/english-learning/stream?kind=${kind}`)}
+					className={cn(
+						'h-8 min-w-0 pb-0.5 items-center border-none flex-1 justify-center gap-1.5 px-2 text-xs',
+						bgColor,
+					)}
+					onClick={() => {
+						const activeStreamId =
+							kind === 'vocab'
+								? EnglishPackStore.vocabActiveStreamId
+								: EnglishPackStore.classicActiveStreamId;
+						const q = new URLSearchParams({ kind });
+						if (activeStreamId) {
+							q.set('streamId', activeStreamId);
+						}
+						navigate(`/english-learning/stream?${q.toString()}`);
+					}}
 				>
 					<ExternalLink className="size-3.5 shrink-0 opacity-70" aria-hidden />
 					<span className="truncate">
@@ -122,7 +138,10 @@ function PackStreamLiveLinkInner({ kind, className }: PackStreamLiveLinkProps) {
 						type="button"
 						size="sm"
 						variant="outline"
-						className="h-8 min-w-0 pb-0.5 flex-1 items-center justify-center gap-1.5 border-theme/15 bg-theme-background/80 px-2 text-xs"
+						className={cn(
+							'h-8 min-w-0 pb-0.5 flex-1 items-center justify-center gap-1.5 border-none px-2 text-xs',
+							bgColor,
+						)}
 						onClick={() => setWebSearchDrawerOpen(true)}
 					>
 						<Globe className="size-3.5 mt-px shrink-0 opacity-70" aria-hidden />
