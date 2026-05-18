@@ -1,5 +1,5 @@
 /**
- * 经典句拉取结果列表（订阅 EnglishPackStore，跨路由实时更新）
+ * 经典句拉取结果列表：直播订阅 EnglishPackStore；历史模式按 streamId 分页 API
  */
 import { Button, Toast } from '@ui/index';
 import { Square, Star, Volume2 } from 'lucide-react';
@@ -20,12 +20,22 @@ import {
 	stopAllEnglishPlayback,
 } from '@/utils/englishTts';
 import { MasterWebSearchResultsBar } from '../shared/WebSearchResultsBar';
+import type { useClassicQuotesPackHistoryList } from './useClassicQuotesPackHistoryList';
 
-function ClassicQuotesPackListInner() {
+export type ClassicQuotesPackListProps = {
+	history?: ReturnType<typeof useClassicQuotesPackHistoryList> | null;
+};
+
+function ClassicQuotesPackListInner({ history }: ClassicQuotesPackListProps) {
 	const { t } = useI18n();
-	const items = EnglishPackStore.classicItems;
+	const isHistoryMode = Boolean(history?.active);
+	const liveItems = EnglishPackStore.classicItems;
 	const masterSearchOrganic = EnglishPackStore.classicMasterSearchOrganic;
 	const topic = EnglishPackStore.classicTopic.trim();
+
+	const items = isHistoryMode && history ? history.items : liveItems;
+	const displayTotal =
+		isHistoryMode && history ? history.itemCount : items.length;
 
 	const [playingKey, setPlayingKey] = useState<string | null>(null);
 	const [favoritedContentKeys, setFavoritedContentKeys] = useState<Set<string>>(
@@ -127,7 +137,7 @@ function ClassicQuotesPackListInner() {
 			<div className="flex flex-wrap items-center gap-2 text-textcolor/45 text-sm font-medium">
 				<span>
 					{t('englishLearning.classic.listHeading')}
-					<span className="mt-0.5">（{items.length}）</span>
+					<span className="mt-0.5">（{displayTotal}）</span>
 				</span>
 				{masterSearchOrganic.length > 0 ? (
 					<MasterWebSearchResultsBar items={masterSearchOrganic} t={t} />
@@ -141,7 +151,9 @@ function ClassicQuotesPackListInner() {
 			<div className="select-text grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
 				{items.map((item, i) => {
 					const contentKey = classicQuoteFavoriteContentKey(item.english);
-					const key = `${i}-${contentKey || item.english.slice(0, 48)}`;
+					const key = isHistoryMode
+						? `history-${i}-${contentKey || item.english.slice(0, 48)}`
+						: `${i}-${contentKey || item.english.slice(0, 48)}`;
 					const playing = playingKey === key;
 					const isFavorited =
 						contentKey.length > 0 && favoritedContentKeys.has(contentKey);
@@ -221,6 +233,11 @@ function ClassicQuotesPackListInner() {
 					);
 				})}
 			</div>
+			{isHistoryMode && history?.loadingMore ? (
+				<p className="text-textcolor/45 py-3 text-center text-sm">
+					{t('common.loadingMore')}
+				</p>
+			) : null}
 		</div>
 	);
 }

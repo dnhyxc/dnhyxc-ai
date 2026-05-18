@@ -56,6 +56,8 @@ export const VOCAB_HISTORY_PAGE_SIZE = 20;
 export const VOCAB_LIBRARY_LIST_PAGE_SIZE = 20;
 /** 单词库内词条每页条数 */
 export const VOCAB_LIBRARY_ITEMS_PAGE_SIZE = 50;
+/** 拉取结果历史会话内词条每页条数（与后端 PACK_HISTORY_ITEMS_PAGE_MAX 上限对齐） */
+export const PACK_ITEMS_PAGE_SIZE = 100;
 /** 收藏状态批量查询单次最多词数，与后端 `VocabularyFavoriteStatusDto` 的 `@ArrayMaxSize(500)` 一致 */
 export const VOCAB_FAVORITE_STATUS_BATCH_SIZE = 500;
 

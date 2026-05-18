@@ -256,16 +256,11 @@ class EnglishPack {
 		});
 	}
 
-	/**
-	 * 从历史详情页载入词包及相关网页搜索内容，复现之前的展示。
-	 * - 主用于“历史记录”详情页面复用此 Store
-	 */
-	vocabLoadHistoryDetail(
-		items: EnglishVocabularyItem[],
-		organic: SearchOrganicItem[],
-	) {
+	/** 打开历史会话：仅恢复联网检索与主题，词条由结果页分页 API 加载 */
+	vocabPrepareHistoryView(topic: string, organic: SearchOrganicItem[]) {
 		runInAction(() => {
-			this.vocabItems = items;
+			this.vocabItems = [];
+			this.vocabTopic = topic;
 			this.vocabMasterSearchOrganic = organic;
 			this.vocabLoading = false;
 			this.vocabAgentToolLine = null;
@@ -426,15 +421,11 @@ class EnglishPack {
 		});
 	}
 
-	/**
-	 * 经典句历史详情加载
-	 */
-	classicLoadHistoryDetail(
-		items: EnglishClassicQuoteItem[],
-		organic: SearchOrganicItem[],
-	) {
+	/** 打开历史会话：仅恢复联网检索与主题，语句由结果页分页 API 加载 */
+	classicPrepareHistoryView(topic: string, organic: SearchOrganicItem[]) {
 		runInAction(() => {
-			this.classicItems = items;
+			this.classicItems = [];
+			this.classicTopic = topic;
 			this.classicMasterSearchOrganic = organic;
 			this.classicLoading = false;
 			this.classicAgentToolLine = null;

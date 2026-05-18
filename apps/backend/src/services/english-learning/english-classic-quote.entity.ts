@@ -41,8 +41,9 @@ export class EnglishClassicQuotePackBatch {
 	@Column({ type: 'varchar', length: 32, nullable: true })
 	level!: string | null;
 
-	@Column({ type: 'json' })
-	items!: EnglishClassicQuoteItemJson[];
+	/** 本轮写入明细表的条数（审计用，明细见 english_classic_quotes_pack_item） */
+	@Column({ name: 'item_count', type: 'int', default: 0 })
+	itemCount!: number;
 
 	@CreateDateColumn({ name: 'created_at', type: 'timestamp' })
 	createdAt!: Date;

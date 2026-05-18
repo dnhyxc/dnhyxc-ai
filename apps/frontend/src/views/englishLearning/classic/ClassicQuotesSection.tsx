@@ -144,22 +144,20 @@ function ClassicQuotesSectionInner() {
 			try {
 				const res = await getEnglishClassicQuotesHistoryDetail(streamId);
 				const d = res.data;
-				if (d?.items?.length) {
-					EnglishPackStore.classicLoadHistoryDetail(
-						d.items,
-						mergeEnglishPackWebSearchOrganics(d.webSearchRounds),
-					);
-					setLoadedStreamId(streamId);
-					setHistoryDrawerOpen(false);
-					navigate('/english-learning/stream?kind=classic');
+				if (!d) return;
+				EnglishPackStore.classicPrepareHistoryView(
+					d.topic,
+					mergeEnglishPackWebSearchOrganics(d.webSearchRounds),
+				);
+				setLoadedStreamId(streamId);
+				setHistoryDrawerOpen(false);
+				navigate(
+					`/english-learning/stream?kind=classic&streamId=${encodeURIComponent(streamId)}`,
+				);
+				if ((d.itemCount ?? 0) > 0) {
 					Toast({
 						type: 'success',
 						title: t('englishLearning.classic.historyLoaded'),
-					});
-				} else {
-					Toast({
-						type: 'info',
-						title: t('englishLearning.classic.empty'),
 					});
 				}
 			} finally {

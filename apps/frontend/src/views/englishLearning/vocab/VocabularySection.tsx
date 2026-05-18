@@ -145,22 +145,20 @@ function VocabularyPackSectionInner() {
 			try {
 				const res = await getEnglishVocabularyHistoryDetail(streamId);
 				const d = res.data;
-				if (d?.items?.length) {
-					EnglishPackStore.vocabLoadHistoryDetail(
-						d.items,
-						mergeEnglishPackWebSearchOrganics(d.webSearchRounds),
-					);
-					setLoadedStreamId(streamId);
-					setHistoryDrawerOpen(false);
-					navigate('/english-learning/stream?kind=vocab');
+				if (!d) return;
+				EnglishPackStore.vocabPrepareHistoryView(
+					d.topic,
+					mergeEnglishPackWebSearchOrganics(d.webSearchRounds),
+				);
+				setLoadedStreamId(streamId);
+				setHistoryDrawerOpen(false);
+				navigate(
+					`/english-learning/stream?kind=vocab&streamId=${encodeURIComponent(streamId)}`,
+				);
+				if ((d.itemCount ?? 0) > 0) {
 					Toast({
 						type: 'success',
 						title: t('englishLearning.vocab.historyLoaded'),
-					});
-				} else {
-					Toast({
-						type: 'info',
-						title: t('englishLearning.vocab.empty'),
 					});
 				}
 			} finally {

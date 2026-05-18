@@ -58,6 +58,9 @@ export const PACK_SSE_KEEPALIVE_INTERVAL_MS = 12_000;
 /** 收藏并入去重键的上限（体量通常较小） */
 export const PACK_GENERATION_FAVORITE_EXCLUDE_LIMIT = 800;
 
+/** 历史/结果页按 streamId 分页拉取单词或语句时每页上限 */
+export const PACK_HISTORY_ITEMS_PAGE_MAX = 200;
+
 /** 主 Agent 流式拼接正文的绝对熔断（防止异常超长输出占满内存） */
 export const ENGLISH_PACK_MASTER_STREAM_CHAR_FUSE = 200_000;
 

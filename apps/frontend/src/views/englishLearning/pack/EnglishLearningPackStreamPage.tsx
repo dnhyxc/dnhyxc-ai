@@ -1,15 +1,29 @@
 /**
- * 英语学习：单词 / 经典句拉取结果（独立路由，MobX 实时同步）
+ * 英语学习：单词 / 经典句拉取结果（独立路由，MobX 实时同步；历史带 streamId 分页）
  */
+import Loading from '@design/Loading';
 import { ScrollArea } from '@ui/index';
 import { observer } from 'mobx-react';
-import { useCallback, useMemo } from 'react';
+import {
+	type UIEventHandler,
+	useCallback,
+	useEffect,
+	useMemo,
+	useState,
+} from 'react';
 import { useSearchParams } from 'react-router';
 import { useI18n } from '@/hooks';
+import {
+	getEnglishClassicQuotesHistoryDetail,
+	getEnglishVocabularyHistoryDetail,
+} from '@/service';
 import EnglishPackStore from '@/store/englishPack';
+import { mergeEnglishPackWebSearchOrganics } from '@/utils/englishPackWebSearchMerge';
 import { ClassicQuotesPackList } from './ClassicQuotesPackList';
 import { type PackStreamKind, PackStreamKindTabs } from './PackStreamKindTabs';
 import { PackStreamProgress } from './PackStreamProgress';
+import { useClassicQuotesPackHistoryList } from './useClassicQuotesPackHistoryList';
+import { useVocabularyPackHistoryList } from './useVocabularyPackHistoryList';
 import { VocabularyPackList } from './VocabularyPackList';
 
 function parseKind(raw: string | null): PackStreamKind {
@@ -23,6 +37,11 @@ function EnglishLearningPackStreamPageInner() {
 		() => parseKind(searchParams.get('kind')),
 		[searchParams],
 	);
+	const historyStreamId = useMemo(
+		() => searchParams.get('streamId')?.trim() || null,
+		[searchParams],
+	);
+	const [historyItemCount, setHistoryItemCount] = useState<number | null>(null);
 
 	const onSelectKind = useCallback(
 		(next: PackStreamKind) => {
@@ -38,14 +57,66 @@ function EnglishLearningPackStreamPageInner() {
 		[setSearchParams],
 	);
 
+	useEffect(() => {
+		const sid = historyStreamId;
+		if (!sid) {
+			setHistoryItemCount(null);
+			return;
+		}
+		let cancelled = false;
+		void (async () => {
+			try {
+				const res =
+					kind === 'vocab'
+						? await getEnglishVocabularyHistoryDetail(sid)
+						: await getEnglishClassicQuotesHistoryDetail(sid);
+				if (cancelled) return;
+				const d = res.data;
+				if (!d) {
+					setHistoryItemCount(0);
+					return;
+				}
+				const organic = mergeEnglishPackWebSearchOrganics(d.webSearchRounds);
+				if (kind === 'vocab') {
+					EnglishPackStore.vocabPrepareHistoryView(d.topic, organic);
+				} else {
+					EnglishPackStore.classicPrepareHistoryView(d.topic, organic);
+				}
+				setHistoryItemCount(d.itemCount ?? 0);
+			} catch {
+				if (!cancelled) setHistoryItemCount(0);
+			}
+		})();
+		return () => {
+			cancelled = true;
+		};
+	}, [historyStreamId, kind]);
+
 	const loading =
 		kind === 'vocab'
 			? EnglishPackStore.vocabLoading
 			: EnglishPackStore.classicLoading;
-	const itemCount =
+	const liveItemCount =
 		kind === 'vocab'
 			? EnglishPackStore.vocabItems.length
 			: EnglishPackStore.classicItems.length;
+	const isHistoryView = Boolean(historyStreamId);
+	const vocabHistory = useVocabularyPackHistoryList(
+		isHistoryView && kind === 'vocab' ? historyStreamId : null,
+	);
+	const classicHistory = useClassicQuotesPackHistoryList(
+		isHistoryView && kind === 'classic' ? historyStreamId : null,
+	);
+	const onHistoryViewportScroll: UIEventHandler<HTMLDivElement> | undefined =
+		isHistoryView
+			? kind === 'vocab'
+				? vocabHistory.onViewportScroll
+				: classicHistory.onViewportScroll
+			: undefined;
+	const itemCount = isHistoryView
+		? (historyItemCount ?? liveItemCount)
+		: liveItemCount;
+	const historyMetaPending = isHistoryView && historyItemCount === null;
 
 	const title =
 		kind === 'vocab'
@@ -56,6 +127,23 @@ function EnglishLearningPackStreamPageInner() {
 		kind === 'vocab'
 			? t('englishLearning.stream.vocab.empty')
 			: t('englishLearning.stream.classic.empty');
+
+	const activeHistory = kind === 'vocab' ? vocabHistory : classicHistory;
+	const historyListLoading =
+		isHistoryView && activeHistory.loading && activeHistory.items.length === 0;
+	const showPageLoading =
+		isHistoryView && (historyMetaPending || historyListLoading);
+	const historyLoadingText =
+		kind === 'vocab'
+			? t('englishLearning.vocab.historyLoading')
+			: t('englishLearning.classic.historyLoading');
+
+	const showEmpty =
+		!showPageLoading &&
+		!loading &&
+		!activeHistory.loading &&
+		itemCount === 0 &&
+		(!isHistoryView || historyItemCount === 0);
 
 	return (
 		<div className="flex min-h-0 h-full w-full flex-col">
@@ -75,23 +163,36 @@ function EnglishLearningPackStreamPageInner() {
 						<PackStreamKindTabs kind={kind} onSelectKind={onSelectKind} />
 					</header>
 
-					<ScrollArea className="min-h-0 flex-1 pb-4">
-						<div className="space-y-5 px-4 pt-2.5">
-							<PackStreamProgress kind={kind} />
-
-							{kind === 'vocab' ? (
-								<VocabularyPackList />
-							) : (
-								<ClassicQuotesPackList />
-							)}
-
-							{!loading && itemCount === 0 ? (
-								<div className="text-textcolor/45 rounded-md border border-dashed border-theme/15 bg-theme/5 px-4 py-10 text-center text-sm leading-relaxed">
-									{emptyHint}
-								</div>
-							) : null}
+					{showPageLoading ? (
+						<div className="text-textcolor/60 flex min-h-0 flex-1 items-center justify-center px-4 text-center text-sm">
+							<Loading text={historyLoadingText} />
 						</div>
-					</ScrollArea>
+					) : (
+						<ScrollArea
+							className="min-h-0 flex-1 pb-4"
+							onScroll={onHistoryViewportScroll}
+						>
+							<div className="space-y-5 px-4 pt-2.5">
+								{!isHistoryView ? <PackStreamProgress kind={kind} /> : null}
+
+								{kind === 'vocab' ? (
+									<VocabularyPackList
+										history={isHistoryView ? vocabHistory : null}
+									/>
+								) : (
+									<ClassicQuotesPackList
+										history={isHistoryView ? classicHistory : null}
+									/>
+								)}
+
+								{showEmpty ? (
+									<div className="text-textcolor/45 rounded-md border border-dashed border-theme/15 bg-theme/5 px-4 py-10 text-center text-sm leading-relaxed">
+										{emptyHint}
+									</div>
+								) : null}
+							</div>
+						</ScrollArea>
+					)}
 				</div>
 			</div>
 		</div>

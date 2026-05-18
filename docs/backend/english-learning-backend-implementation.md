@@ -8,6 +8,8 @@
 
 **专题（词数 / 条数选填、未传则按单次上限解析）**：见同目录 [`english-learning-count-optional.md`](./english-learning-count-optional.md)。
 
+**专题（拉取包 Session + 明细分行存储、历史分页 API、迁移与读写改造）**：见同目录 [`english-learning-pack-session-storage.md`](./english-learning-pack-session-storage.md)。
+
 ---
 
 ## 1. 背景与目标
@@ -29,7 +31,10 @@
 | Nest 模块                                           | `apps/backend/src/services/english-learning/english-learning.module.ts`      |
 | 入参 DTO                                            | `apps/backend/src/services/english-learning/dto/generate-vocabulary.dto.ts`  |
 | 单词包批次实体                                      | `apps/backend/src/services/english-learning/english-vocabulary.entity.ts`    |
+| 单词包会话 / 明细实体                               | `english-vocabulary-pack-session.entity.ts`、`english-vocabulary-pack-item.entity.ts` |
 | 经典句批次实体                                      | `apps/backend/src/services/english-learning/english-classic-quote.entity.ts` |
+| 经典句会话 / 明细实体                               | `english-classic-quotes-pack-session.entity.ts`、`english-classic-quotes-pack-item.entity.ts` |
+| 存储改造迁移                                        | `apps/backend/src/migrations/1779200000000-english-pack-item-rows.ts`        |
 | 工具与主 Agent 数据路径（延伸阅读）                 | `docs/backend/english-learning-master-agent-web-search-to-llm.md`            |
 
 ---

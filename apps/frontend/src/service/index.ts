@@ -531,17 +531,37 @@ export const listEnglishVocabularyHistory = async (options?: {
 	);
 };
 
-/** 获取某次会话的完整单词列表（含 IPA / 释义 / 例句） */
+/** 获取某次拉取会话元数据（不含词条明细） */
 export const getEnglishVocabularyHistoryDetail = async (streamId: string) => {
 	return await http.get<{
 		streamId: string;
 		topic: string;
 		targetCount: number;
-		items: EnglishVocabularyItem[];
+		itemCount: number;
 		createdAt: string;
 		webSearchRounds: EnglishPackWebSearchRoundDto[];
 	}>(ENGLISH_LEARNING_VOCABULARY_HISTORY, {
 		params: [streamId],
+		silent: true,
+	});
+};
+
+/** 按 streamId + sortOrder 分页读取单词明细 */
+export const listEnglishVocabularyPackItems = async (
+	streamId: string,
+	options?: { limit?: number; offset?: number },
+) => {
+	return await http.get<{
+		streamId: string;
+		itemCount: number;
+		items: EnglishVocabularyItem[];
+	}>(ENGLISH_LEARNING_VOCABULARY_HISTORY, {
+		params: [streamId, 'items'],
+		querys: {
+			limit: options?.limit ?? 100,
+			offset: options?.offset ?? 0,
+		},
+		silent: true,
 	});
 };
 
@@ -831,11 +851,30 @@ export const getEnglishClassicQuotesHistoryDetail = async (
 		streamId: string;
 		topic: string;
 		targetCount: number;
-		items: EnglishClassicQuoteItem[];
+		itemCount: number;
 		createdAt: string;
 		webSearchRounds: EnglishPackWebSearchRoundDto[];
 	}>(ENGLISH_LEARNING_CLASSIC_QUOTES_HISTORY, {
 		params: [streamId],
+		silent: true,
+	});
+};
+
+export const listEnglishClassicQuotesPackItems = async (
+	streamId: string,
+	options?: { limit?: number; offset?: number },
+) => {
+	return await http.get<{
+		streamId: string;
+		itemCount: number;
+		items: EnglishClassicQuoteItem[];
+	}>(ENGLISH_LEARNING_CLASSIC_QUOTES_HISTORY, {
+		params: [streamId, 'items'],
+		querys: {
+			limit: options?.limit ?? 100,
+			offset: options?.offset ?? 0,
+		},
+		silent: true,
 	});
 };
 

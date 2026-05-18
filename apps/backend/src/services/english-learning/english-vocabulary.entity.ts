@@ -44,9 +44,9 @@ export class EnglishVocabularyPackBatch {
 	@Column({ type: 'varchar', length: 32, nullable: true })
 	level!: string | null;
 
-	/** 本轮新增的词条（JSON 数组） */
-	@Column({ type: 'json' })
-	items!: EnglishVocabularyPackItemJson[];
+	/** 本轮写入明细表的条数（审计用，明细见 english_vocabulary_pack_item） */
+	@Column({ name: 'item_count', type: 'int', default: 0 })
+	itemCount!: number;
 
 	@CreateDateColumn({ name: 'created_at', type: 'timestamp' })
 	createdAt!: Date;

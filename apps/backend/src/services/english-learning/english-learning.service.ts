@@ -47,6 +47,7 @@ import {
 	PACK_GENERATION_MASTER_HINT_SAMPLE_ITEMS,
 	PACK_GENERATION_TOPIC_HISTORY_BATCH_ROWS,
 	PACK_GENERATION_TOPIC_MATCH_LIBRARIES,
+	PACK_HISTORY_ITEMS_PAGE_MAX,
 	PACK_SSE_DATABASE_EMIT_CHUNK_SIZE,
 	PACK_TOPIC_LIBRARY_ITEMS_PAGE_SIZE,
 	PACK_TOPIC_VECTOR_MATCH_MAX_LABELS,
@@ -77,6 +78,8 @@ import {
 import { EnglishClassicQuoteFavorite } from './english-classic-quote-favorite.entity';
 import { EnglishClassicQuotesLibrary } from './english-classic-quotes-library.entity';
 import { EnglishClassicQuotesLibraryItem } from './english-classic-quotes-library-item.entity';
+import { EnglishClassicQuotesPackItem } from './english-classic-quotes-pack-item.entity';
+import { EnglishClassicQuotesPackSession } from './english-classic-quotes-pack-session.entity';
 import {
 	buildClassicQuoteFavoritesDocxBuffer,
 	buildVocabularyFavoritesDocxBuffer,
@@ -92,6 +95,8 @@ import {
 import { EnglishVocabularyFavorite } from './english-vocabulary-favorite.entity';
 import { EnglishVocabularyLibrary } from './english-vocabulary-library.entity';
 import { EnglishVocabularyLibraryItem } from './english-vocabulary-library-item.entity';
+import { EnglishVocabularyPackItem } from './english-vocabulary-pack-item.entity';
+import { EnglishVocabularyPackSession } from './english-vocabulary-pack-session.entity';
 import {
 	AGENT_SYSTEM_PROMPT,
 	CLASSIC_QUOTES_SUBMODEL_SYSTEM_STATIC,
@@ -216,9 +221,15 @@ export class EnglishLearningService {
 		private readonly knowledgeQaService: KnowledgeQaService,
 		private readonly knowledgeEmbedding: KnowledgeEmbeddingService,
 		@InjectRepository(EnglishVocabularyPackBatch)
-		private readonly vocabBatchRepo: Repository<EnglishVocabularyPackBatch>,
+		@InjectRepository(EnglishVocabularyPackSession)
+		private readonly vocabPackSessionRepo: Repository<EnglishVocabularyPackSession>,
+		@InjectRepository(EnglishVocabularyPackItem)
+		private readonly vocabPackItemRepo: Repository<EnglishVocabularyPackItem>,
 		@InjectRepository(EnglishClassicQuotePackBatch)
-		private readonly classicBatchRepo: Repository<EnglishClassicQuotePackBatch>,
+		@InjectRepository(EnglishClassicQuotesPackSession)
+		private readonly classicPackSessionRepo: Repository<EnglishClassicQuotesPackSession>,
+		@InjectRepository(EnglishClassicQuotesPackItem)
+		private readonly classicPackItemRepo: Repository<EnglishClassicQuotesPackItem>,
 		@InjectRepository(EnglishPackWebSearchRecord)
 		private readonly packWebSearchRepo: Repository<EnglishPackWebSearchRecord>,
 		@InjectRepository(EnglishVocabularyFavorite)
@@ -821,15 +832,12 @@ export class EnglishLearningService {
 	): Promise<PackTopicMatchIndex> {
 		let labels: string[]; // 存放去重后的主题/标题标签
 		if (kind === 'vocabulary') {
-			// 如果类型为单词包
-			const [batches, libraries] = await Promise.all([
-				// 查找该用户的单词包历史批次，按创建时间倒序取若干条
-				this.vocabBatchRepo.find({
+			const [sessions, libraries] = await Promise.all([
+				this.vocabPackSessionRepo.find({
 					where: { userId },
-					order: { createdAt: 'DESC' },
+					order: { updatedAt: 'DESC' },
 					take: PACK_GENERATION_TOPIC_HISTORY_BATCH_ROWS,
 				}),
-				// 查找该用户的单词库，按创建时间倒序取40条
 				this.vocabLibraryRepo.find({
 					where: { userId },
 					order: { createdAt: 'DESC' },
@@ -837,19 +845,16 @@ export class EnglishLearningService {
 				}),
 			]);
 			labels = this.collectUniquePackTopicLabels(
-				batches.map((b) => b.topic), // 批次主题列表
-				libraries.map((lib) => lib.title), // 单词库标题列表
+				sessions.map((s) => s.topic),
+				libraries.map((lib) => lib.title),
 			);
 		} else {
-			// 类型为经典句包
-			const [batches, libraries] = await Promise.all([
-				// 查找该用户的经典句生成批次，按创建时间倒序取若干条
-				this.classicBatchRepo.find({
+			const [sessions, libraries] = await Promise.all([
+				this.classicPackSessionRepo.find({
 					where: { userId },
-					order: { createdAt: 'DESC' },
+					order: { updatedAt: 'DESC' },
 					take: PACK_GENERATION_TOPIC_HISTORY_BATCH_ROWS,
 				}),
-				// 查找该用户的经典句资料库，按创建时间倒序取40条
 				this.classicQuotesLibraryRepo.find({
 					where: { userId },
 					order: { createdAt: 'DESC' },
@@ -857,8 +862,8 @@ export class EnglishLearningService {
 				}),
 			]);
 			labels = this.collectUniquePackTopicLabels(
-				batches.map((b) => b.topic), // 批次主题
-				libraries.map((lib) => lib.title), // 资料库标题
+				sessions.map((s) => s.topic),
+				libraries.map((lib) => lib.title),
 			);
 		}
 		// 调用工具函数生成主题匹配索引，便于后续匹配/去重
@@ -914,23 +919,25 @@ export class EnglishLearningService {
 
 		// 词包类型
 		if (kind === 'vocabulary') {
-			// 1. 查找历史生成批次
-			const batches = await this.vocabBatchRepo.find({
-				where: { userId }, // 当前用户
-				order: { createdAt: 'DESC' }, // 创建时间倒序
-				take: PACK_GENERATION_TOPIC_HISTORY_BATCH_ROWS, // 限定数量
+			const sessions = await this.vocabPackSessionRepo.find({
+				where: { userId },
+				order: { updatedAt: 'DESC' },
+				take: PACK_GENERATION_TOPIC_HISTORY_BATCH_ROWS,
 			});
-			// 遍历每个批次
-			for (const b of batches) {
-				if (!topicMatch.isRelated(b.topic)) continue; // 跳过无关主题
-				if (!Array.isArray(b.items)) continue; // 跳过无 items 的批次
-				// 遍历所有单词
-				for (const item of b.items as EnglishVocabularyPackItemJson[]) {
-					if (keys.size >= maxKeys) break; // 已到最大限制则跳出
-					const w = typeof item.word === 'string' ? item.word : ''; // 提取 word 字符串
-					const k = this.normalizePackVocabKey(w); // 标准化成去重 key
-					if (k) keys.add(k); // 非空则加入集合
-				}
+			for (const s of sessions) {
+				if (!topicMatch.isRelated(s.topic)) continue;
+				if (keys.size >= maxKeys) break;
+				const rows = await this.vocabPackItemRepo.find({
+					where: { userId, streamId: s.streamId },
+					select: ['word'],
+					order: { sortOrder: 'DESC' },
+					take: maxKeys - keys.size,
+				});
+				this.addPackExcludeKeys(
+					keys,
+					rows.map((r) => this.normalizePackVocabKey(r.word)),
+					maxKeys,
+				);
 			}
 
 			// 2. 查找资料库并筛选主题相关的库
@@ -973,22 +980,25 @@ export class EnglishLearningService {
 				);
 			}
 		} else {
-			// 经典句类型
-			// 1. 查找历史生成批次
-			const batches = await this.classicBatchRepo.find({
-				where: { userId }, // 当前用户
-				order: { createdAt: 'DESC' },
+			const sessions = await this.classicPackSessionRepo.find({
+				where: { userId },
+				order: { updatedAt: 'DESC' },
 				take: PACK_GENERATION_TOPIC_HISTORY_BATCH_ROWS,
 			});
-			for (const b of batches) {
-				if (!topicMatch.isRelated(b.topic)) continue; // 跳过主题无关
-				if (!Array.isArray(b.items)) continue; // 跳过无 items
-				for (const item of b.items as EnglishClassicQuoteItemJson[]) {
-					if (keys.size >= maxKeys) break; // 已达上限
-					const en = typeof item.english === 'string' ? item.english : ''; // 取英文文本
-					const k = this.normalizePackClassicEnglishKey(en); // 标准化 key
-					if (k) keys.add(k); // 非空则加入
-				}
+			for (const s of sessions) {
+				if (!topicMatch.isRelated(s.topic)) continue;
+				if (keys.size >= maxKeys) break;
+				const rows = await this.classicPackItemRepo.find({
+					where: { userId, streamId: s.streamId },
+					select: ['english'],
+					order: { sortOrder: 'DESC' },
+					take: maxKeys - keys.size,
+				});
+				this.addPackExcludeKeys(
+					keys,
+					rows.map((r) => this.normalizePackClassicEnglishKey(r.english)),
+					maxKeys,
+				);
 			}
 
 			// 2. 资料库相关（经典句库）
@@ -1031,29 +1041,6 @@ export class EnglishLearningService {
 		}
 
 		return keys; // 返回所有去重 key
-	}
-
-	/**
-	 * 将 JSON 格式的单词包条目映射为 VocabularyItemDto。
-	 * 若缺少必要字段（word, ipa）则返回 null。
-	 * @param row JSON 字典，通常为大模型产出或库内原始数据
-	 * @returns VocabularyItemDto | null
-	 */
-	private mapPackJsonToVocabDto(
-		row: EnglishVocabularyPackItemJson,
-	): VocabularyItemDto | null {
-		const word = typeof row.word === 'string' ? row.word.trim() : '';
-		const ipa = typeof row.ipa === 'string' ? row.ipa.trim() : '';
-		// 必须包含单词和音标，否则丢弃该条目
-		if (!word || !ipa) return null;
-		return {
-			word, // 单词
-			ipa, // 音标
-			pos: typeof row.pos === 'string' ? row.pos.trim().slice(0, 64) : '', // 词性（截断至最多64字）
-			translationZh:
-				typeof row.translationZh === 'string' ? row.translationZh : '—', // 中文释义，缺省时为 "—"
-			example: typeof row.example === 'string' ? row.example : '—', // 例句，缺省时为 "—"
-		};
 	}
 
 	private tryPushVocabItemDeduped(
@@ -1156,37 +1143,66 @@ export class EnglishLearningService {
 			);
 		}
 
-		const batches = await this.vocabBatchRepo.find({
+		const sessions = await this.vocabPackSessionRepo.find({
 			where: { userId },
-			order: { createdAt: 'DESC' },
+			order: { updatedAt: 'DESC' },
 			take: PACK_GENERATION_TOPIC_HISTORY_BATCH_ROWS,
 		});
-		for (const b of batches) {
+		for (const s of sessions) {
 			if (items.length >= limit) break;
-			if (!match.isRelated(b.topic)) continue;
-			if (!Array.isArray(b.items)) continue;
-			for (const raw of b.items as EnglishVocabularyPackItemJson[]) {
-				const dto = this.mapPackJsonToVocabDto(raw);
-				if (dto) this.tryPushVocabItemDeduped(items, seen, dto, limit);
-			}
+			if (!match.isRelated(s.topic)) continue;
+			await this.loadVocabItemsFromPackSessionPaginated(
+				userId,
+				s.streamId,
+				items,
+				seen,
+				limit,
+			);
 		}
 
 		return items;
 	}
 
-	private mapPackJsonToClassicDto(
-		row: EnglishClassicQuoteItemJson,
-	): ClassicQuoteItemDto | null {
-		const english = typeof row.english === 'string' ? row.english.trim() : '';
-		const translationZh =
-			typeof row.translationZh === 'string' ? row.translationZh.trim() : '';
-		if (!english || !translationZh) return null;
+	/** 从单次拉取会话分页读取词条，直至凑满 limit */
+	private async loadVocabItemsFromPackSessionPaginated(
+		userId: number,
+		streamId: string,
+		items: VocabularyItemDto[],
+		seen: Set<string>,
+		limit: number,
+	): Promise<void> {
+		let skip = 0;
+		while (items.length < limit) {
+			const rows = await this.vocabPackItemRepo.find({
+				where: { userId, streamId },
+				order: { sortOrder: 'ASC' },
+				take: PACK_TOPIC_LIBRARY_ITEMS_PAGE_SIZE,
+				skip,
+			});
+			if (rows.length === 0) break;
+			for (const row of rows) {
+				this.tryPushVocabItemDeduped(
+					items,
+					seen,
+					this.mapVocabPackItemRow(row),
+					limit,
+				);
+				if (items.length >= limit) return;
+			}
+			skip += rows.length;
+			if (rows.length < PACK_TOPIC_LIBRARY_ITEMS_PAGE_SIZE) break;
+		}
+	}
+
+	private mapVocabPackItemRow(
+		row: EnglishVocabularyPackItem,
+	): VocabularyItemDto {
 		return {
-			english,
-			translationZh,
-			source:
-				typeof row.source === 'string' ? row.source.trim().slice(0, 2000) : '—',
-			noteZh: typeof row.noteZh === 'string' ? row.noteZh.trim() : '—',
+			word: row.word,
+			ipa: row.ipa,
+			pos: typeof row.pos === 'string' ? row.pos.trim() : '',
+			translationZh: row.translationZh,
+			example: row.example,
 		};
 	}
 
@@ -1276,22 +1292,65 @@ export class EnglishLearningService {
 			);
 		}
 
-		const batches = await this.classicBatchRepo.find({
+		const sessions = await this.classicPackSessionRepo.find({
 			where: { userId },
-			order: { createdAt: 'DESC' },
+			order: { updatedAt: 'DESC' },
 			take: PACK_GENERATION_TOPIC_HISTORY_BATCH_ROWS,
 		});
-		for (const b of batches) {
+		for (const s of sessions) {
 			if (items.length >= limit) break;
-			if (!match.isRelated(b.topic)) continue;
-			if (!Array.isArray(b.items)) continue;
-			for (const raw of b.items as EnglishClassicQuoteItemJson[]) {
-				const dto = this.mapPackJsonToClassicDto(raw);
-				if (dto) this.tryPushClassicItemDeduped(items, seen, dto, limit);
-			}
+			if (!match.isRelated(s.topic)) continue;
+			await this.loadClassicItemsFromPackSessionPaginated(
+				userId,
+				s.streamId,
+				items,
+				seen,
+				limit,
+			);
 		}
 
 		return items;
+	}
+
+	private async loadClassicItemsFromPackSessionPaginated(
+		userId: number,
+		streamId: string,
+		items: ClassicQuoteItemDto[],
+		seen: Set<string>,
+		limit: number,
+	): Promise<void> {
+		let skip = 0;
+		while (items.length < limit) {
+			const rows = await this.classicPackItemRepo.find({
+				where: { userId, streamId },
+				order: { sortOrder: 'ASC' },
+				take: PACK_TOPIC_LIBRARY_ITEMS_PAGE_SIZE,
+				skip,
+			});
+			if (rows.length === 0) break;
+			for (const row of rows) {
+				this.tryPushClassicItemDeduped(
+					items,
+					seen,
+					this.mapClassicPackItemRow(row),
+					limit,
+				);
+				if (items.length >= limit) return;
+			}
+			skip += rows.length;
+			if (rows.length < PACK_TOPIC_LIBRARY_ITEMS_PAGE_SIZE) break;
+		}
+	}
+
+	private mapClassicPackItemRow(
+		row: EnglishClassicQuotesPackItem,
+	): ClassicQuoteItemDto {
+		return {
+			english: row.english,
+			translationZh: row.translationZh,
+			source: row.source || '—',
+			noteZh: row.noteZh || '—',
+		};
 	}
 
 	/** 主 Agent 用短摘要（不重复查库）；无键时返回空串 */
@@ -1770,16 +1829,79 @@ ${existingHintBlock}
 		items: VocabularyItemDto[];
 	}): Promise<void> {
 		if (!params.items.length) return;
-		const row = this.vocabBatchRepo.create({
-			userId: params.userId,
-			streamId: params.streamId,
-			round: params.round,
-			topic: params.topic.trim().slice(0, 500),
-			level: null,
-			targetCount: params.targetCount,
-			items: params.items as EnglishVocabularyPackItemJson[],
+		const topic = params.topic.trim().slice(0, 500);
+		await this.dataSource.transaction(async (manager) => {
+			const sessionRepo = manager.getRepository(EnglishVocabularyPackSession);
+			const itemRepo = manager.getRepository(EnglishVocabularyPackItem);
+			const batchRepo = manager.getRepository(EnglishVocabularyPackBatch);
+
+			let session = await sessionRepo.findOne({
+				where: { streamId: params.streamId, userId: params.userId },
+			});
+			if (!session) {
+				session = sessionRepo.create({
+					streamId: params.streamId,
+					userId: params.userId,
+					topic,
+					targetCount: params.targetCount,
+					itemCount: 0,
+				});
+			} else {
+				session.topic = topic;
+				session.targetCount = params.targetCount;
+			}
+
+			const maxRaw = await itemRepo
+				.createQueryBuilder('i')
+				.select('MAX(i.sortOrder)', 'maxSort')
+				.where('i.streamId = :streamId', { streamId: params.streamId })
+				.andWhere('i.userId = :userId', { userId: params.userId })
+				.getRawOne<{ maxSort: string | number | null }>();
+			let sortOrder = maxRaw?.maxSort != null ? Number(maxRaw.maxSort) + 1 : 0;
+			if (!Number.isFinite(sortOrder)) sortOrder = 0;
+
+			const batchRow = batchRepo.create({
+				userId: params.userId,
+				streamId: params.streamId,
+				round: params.round,
+				topic,
+				level: null,
+				targetCount: params.targetCount,
+				itemCount: params.items.length,
+			});
+			const savedBatch = await batchRepo.save(batchRow);
+
+			const itemRows: EnglishVocabularyPackItem[] = [];
+			for (const it of params.items) {
+				const word = it.word.trim().slice(0, 500);
+				const ipa = it.ipa.trim().slice(0, 2000);
+				if (!word || !ipa) continue;
+				itemRows.push(
+					itemRepo.create({
+						userId: params.userId,
+						streamId: params.streamId,
+						round: params.round,
+						sortOrder,
+						batchId: savedBatch.id,
+						word,
+						ipa,
+						pos: typeof it.pos === 'string' ? it.pos.trim().slice(0, 64) : '',
+						translationZh: String(it.translationZh ?? '—')
+							.trim()
+							.slice(0, 8000),
+						example: String(it.example ?? '—')
+							.trim()
+							.slice(0, 8000),
+					}),
+				);
+				sortOrder += 1;
+			}
+			if (itemRows.length) {
+				await itemRepo.save(itemRows);
+				session.itemCount += itemRows.length;
+			}
+			await sessionRepo.save(session);
 		});
-		await this.vocabBatchRepo.save(row);
 	}
 
 	/** 从 JSON 根节点提取数组或 `{ items: [] }`（与导入页约定一致） */
@@ -2314,20 +2436,81 @@ ${existingHintBlock}
 		targetCount: number;
 		items: ClassicQuoteItemDto[];
 	}): Promise<void> {
-		// 若本轮无有效句目，则无需写入
 		if (!params.items.length) return;
-		// 构建数据库批量记录（items 需强转为数据库定义的 JSON 类型）
-		const row = this.classicBatchRepo.create({
-			userId: params.userId,
-			streamId: params.streamId,
-			round: params.round,
-			topic: params.topic.trim().slice(0, 500), // 主题防止过长，最大 500 字符
-			level: null,
-			targetCount: params.targetCount,
-			items: params.items as EnglishClassicQuoteItemJson[],
+		const topic = params.topic.trim().slice(0, 500);
+		await this.dataSource.transaction(async (manager) => {
+			const sessionRepo = manager.getRepository(
+				EnglishClassicQuotesPackSession,
+			);
+			const itemRepo = manager.getRepository(EnglishClassicQuotesPackItem);
+			const batchRepo = manager.getRepository(EnglishClassicQuotePackBatch);
+
+			let session = await sessionRepo.findOne({
+				where: { streamId: params.streamId, userId: params.userId },
+			});
+			if (!session) {
+				session = sessionRepo.create({
+					streamId: params.streamId,
+					userId: params.userId,
+					topic,
+					targetCount: params.targetCount,
+					itemCount: 0,
+				});
+			} else {
+				session.topic = topic;
+				session.targetCount = params.targetCount;
+			}
+
+			const maxRaw = await itemRepo
+				.createQueryBuilder('i')
+				.select('MAX(i.sortOrder)', 'maxSort')
+				.where('i.streamId = :streamId', { streamId: params.streamId })
+				.andWhere('i.userId = :userId', { userId: params.userId })
+				.getRawOne<{ maxSort: string | number | null }>();
+			let sortOrder = maxRaw?.maxSort != null ? Number(maxRaw.maxSort) + 1 : 0;
+			if (!Number.isFinite(sortOrder)) sortOrder = 0;
+
+			const batchRow = batchRepo.create({
+				userId: params.userId,
+				streamId: params.streamId,
+				round: params.round,
+				topic,
+				level: null,
+				targetCount: params.targetCount,
+				itemCount: params.items.length,
+			});
+			const savedBatch = await batchRepo.save(batchRow);
+
+			const itemRows: EnglishClassicQuotesPackItem[] = [];
+			for (const it of params.items) {
+				const english = it.english.trim();
+				const translationZh = it.translationZh.trim();
+				if (!english || !translationZh) continue;
+				itemRows.push(
+					itemRepo.create({
+						userId: params.userId,
+						streamId: params.streamId,
+						round: params.round,
+						sortOrder,
+						batchId: savedBatch.id,
+						english: english.slice(0, 8000),
+						translationZh: translationZh.slice(0, 8000),
+						source: String(it.source ?? '—')
+							.trim()
+							.slice(0, 2000),
+						noteZh: String(it.noteZh ?? '—')
+							.trim()
+							.slice(0, 8000),
+					}),
+				);
+				sortOrder += 1;
+			}
+			if (itemRows.length) {
+				await itemRepo.save(itemRows);
+				session.itemCount += itemRows.length;
+			}
+			await sessionRepo.save(session);
 		});
-		// 批量保存到 classicBatchRepo 表进行持久化
-		await this.classicBatchRepo.save(row);
 	}
 
 	/**
@@ -3167,25 +3350,15 @@ ${existingHintBlock}
 		const limit = Math.min(100, Math.max(1, options?.limit ?? 20));
 		const offset = Math.max(0, options?.offset ?? 0);
 
-		const grouped = await this.vocabBatchRepo
-			.createQueryBuilder('b')
-			.select('b.streamId', 'streamId')
-			.addSelect('MIN(b.createdAt)', 'createdAt')
-			.addSelect('MAX(b.createdAt)', 'updatedAt')
-			.where('b.userId = :userId', { userId })
-			.groupBy('b.streamId')
-			.orderBy('MAX(b.createdAt)', 'DESC')
-			.offset(offset)
-			.limit(limit)
-			.getRawMany<{
-				streamId: string;
-				createdAt: Date;
-				updatedAt: Date;
-			}>();
+		const sessions = await this.vocabPackSessionRepo.find({
+			where: { userId },
+			order: { updatedAt: 'DESC' },
+			take: limit,
+			skip: offset,
+		});
+		if (!sessions.length) return [];
 
-		if (!grouped.length) return [];
-
-		const streamIds = grouped.map((g) => g.streamId);
+		const streamIds = sessions.map((s) => s.streamId);
 		const wsRows = await this.packWebSearchRepo.find({
 			where: { userId, streamId: In(streamIds), packKind: 'vocabulary' },
 		});
@@ -3197,39 +3370,19 @@ ${existingHintBlock}
 			);
 		}
 
-		const batches = await this.vocabBatchRepo.find({
-			where: { userId, streamId: In(streamIds) },
-			order: { streamId: 'ASC', round: 'ASC' },
-		});
-
-		const byStream = new Map<string, typeof batches>();
-		for (const row of batches) {
-			const arr = byStream.get(row.streamId) ?? [];
-			arr.push(row);
-			byStream.set(row.streamId, arr);
-		}
-
-		return grouped.map((g) => {
-			const rows = byStream.get(g.streamId) ?? [];
-			const first = rows[0];
-			let wordCount = 0;
-			for (const r of rows) {
-				wordCount += Array.isArray(r.items) ? r.items.length : 0;
-			}
-			return {
-				streamId: g.streamId,
-				topic: first?.topic ?? '',
-				targetCount: first?.targetCount ?? 0,
-				wordCount,
-				createdAt: new Date(g.createdAt).toISOString(),
-				updatedAt: new Date(g.updatedAt).toISOString(),
-				webSearchRoundCount: wsCountByStream.get(g.streamId) ?? 0,
-			};
-		});
+		return sessions.map((s) => ({
+			streamId: s.streamId,
+			topic: s.topic,
+			targetCount: s.targetCount,
+			wordCount: s.itemCount,
+			createdAt: s.createdAt.toISOString(),
+			updatedAt: s.updatedAt.toISOString(),
+			webSearchRoundCount: wsCountByStream.get(s.streamId) ?? 0,
+		}));
 	}
 
 	/**
-	 * 按 streamId 还原该次拉取的完整单词列表（按轮次顺序拼接各批 items）。
+	 * 拉取会话元数据（不含词条明细；明细请调 listVocabularyPackItems 分页接口）。
 	 */
 	async getVocabularyHistoryDetail(
 		userId: number,
@@ -3238,42 +3391,67 @@ ${existingHintBlock}
 		streamId: string;
 		topic: string;
 		targetCount: number;
-		items: VocabularyItemDto[];
+		itemCount: number;
 		createdAt: string;
-		/** 与本次拉取关联的主检索联网记录（按轮次顺序） */
 		webSearchRounds: EnglishPackWebSearchRoundJson[];
 	}> {
-		const batches = await this.vocabBatchRepo.find({
+		const session = await this.vocabPackSessionRepo.findOne({
 			where: { userId, streamId },
-			order: { round: 'ASC' },
 		});
-		if (!batches.length) {
-			throw new NotFoundException('未找到该单词记录');
+		if (!session) {
+			return {
+				streamId,
+				topic: '',
+				targetCount: 0,
+				itemCount: 0,
+				createdAt: new Date(0).toISOString(),
+				webSearchRounds: [],
+			};
 		}
-		const items: VocabularyItemDto[] = [];
-		for (const b of batches) {
-			if (!Array.isArray(b.items)) continue;
-			for (const it of b.items) {
-				items.push({
-					word: it.word,
-					ipa: it.ipa,
-					pos: typeof it.pos === 'string' ? it.pos.trim().slice(0, 32) : '',
-					translationZh: it.translationZh || '—',
-					example: it.example || '—',
-				});
-			}
-		}
-		const first = batches[0];
 		const ws = await this.packWebSearchRepo.findOne({
 			where: { userId, streamId, packKind: 'vocabulary' },
 		});
 		return {
 			streamId,
-			topic: first.topic,
-			targetCount: first.targetCount,
-			items,
-			createdAt: first.createdAt.toISOString(),
+			topic: session.topic,
+			targetCount: session.targetCount,
+			itemCount: session.itemCount,
+			createdAt: session.createdAt.toISOString(),
 			webSearchRounds: Array.isArray(ws?.searchRounds) ? ws.searchRounds : [],
+		};
+	}
+
+	/** 按 streamId + sortOrder 分页读取单词明细 */
+	async listVocabularyPackItems(
+		userId: number,
+		streamId: string,
+		options?: { limit?: number; offset?: number },
+	): Promise<{
+		streamId: string;
+		itemCount: number;
+		items: VocabularyItemDto[];
+	}> {
+		const session = await this.vocabPackSessionRepo.findOne({
+			where: { userId, streamId },
+		});
+		if (!session) {
+			return { streamId, itemCount: 0, items: [] };
+		}
+		const limit = Math.min(
+			PACK_HISTORY_ITEMS_PAGE_MAX,
+			Math.max(1, options?.limit ?? 100),
+		);
+		const offset = Math.max(0, options?.offset ?? 0);
+		const rows = await this.vocabPackItemRepo.find({
+			where: { userId, streamId },
+			order: { sortOrder: 'ASC' },
+			take: limit,
+			skip: offset,
+		});
+		return {
+			streamId,
+			itemCount: session.itemCount,
+			items: rows.map((r) => this.mapVocabPackItemRow(r)),
 		};
 	}
 
@@ -3284,25 +3462,15 @@ ${existingHintBlock}
 		const limit = Math.min(100, Math.max(1, options?.limit ?? 20));
 		const offset = Math.max(0, options?.offset ?? 0);
 
-		const grouped = await this.classicBatchRepo
-			.createQueryBuilder('b')
-			.select('b.streamId', 'streamId')
-			.addSelect('MIN(b.createdAt)', 'createdAt')
-			.addSelect('MAX(b.createdAt)', 'updatedAt')
-			.where('b.userId = :userId', { userId })
-			.groupBy('b.streamId')
-			.orderBy('MAX(b.createdAt)', 'DESC')
-			.offset(offset)
-			.limit(limit)
-			.getRawMany<{
-				streamId: string;
-				createdAt: Date;
-				updatedAt: Date;
-			}>();
+		const sessions = await this.classicPackSessionRepo.find({
+			where: { userId },
+			order: { updatedAt: 'DESC' },
+			take: limit,
+			skip: offset,
+		});
+		if (!sessions.length) return [];
 
-		if (!grouped.length) return [];
-
-		const streamIds = grouped.map((g) => g.streamId);
+		const streamIds = sessions.map((s) => s.streamId);
 		const wsRows = await this.packWebSearchRepo.find({
 			where: { userId, streamId: In(streamIds), packKind: 'classic_quotes' },
 		});
@@ -3314,35 +3482,15 @@ ${existingHintBlock}
 			);
 		}
 
-		const batches = await this.classicBatchRepo.find({
-			where: { userId, streamId: In(streamIds) },
-			order: { streamId: 'ASC', round: 'ASC' },
-		});
-
-		const byStream = new Map<string, typeof batches>();
-		for (const row of batches) {
-			const arr = byStream.get(row.streamId) ?? [];
-			arr.push(row);
-			byStream.set(row.streamId, arr);
-		}
-
-		return grouped.map((g) => {
-			const rows = byStream.get(g.streamId) ?? [];
-			const first = rows[0];
-			let quoteCount = 0;
-			for (const r of rows) {
-				quoteCount += Array.isArray(r.items) ? r.items.length : 0;
-			}
-			return {
-				streamId: g.streamId,
-				topic: first?.topic ?? '',
-				targetCount: first?.targetCount ?? 0,
-				quoteCount,
-				createdAt: new Date(g.createdAt).toISOString(),
-				updatedAt: new Date(g.updatedAt).toISOString(),
-				webSearchRoundCount: wsCountByStream.get(g.streamId) ?? 0,
-			};
-		});
+		return sessions.map((s) => ({
+			streamId: s.streamId,
+			topic: s.topic,
+			targetCount: s.targetCount,
+			quoteCount: s.itemCount,
+			createdAt: s.createdAt.toISOString(),
+			updatedAt: s.updatedAt.toISOString(),
+			webSearchRoundCount: wsCountByStream.get(s.streamId) ?? 0,
+		}));
 	}
 
 	async getClassicQuotesHistoryDetail(
@@ -3352,40 +3500,66 @@ ${existingHintBlock}
 		streamId: string;
 		topic: string;
 		targetCount: number;
-		items: ClassicQuoteItemDto[];
+		itemCount: number;
 		createdAt: string;
 		webSearchRounds: EnglishPackWebSearchRoundJson[];
 	}> {
-		const batches = await this.classicBatchRepo.find({
+		const session = await this.classicPackSessionRepo.findOne({
 			where: { userId, streamId },
-			order: { round: 'ASC' },
 		});
-		if (!batches.length) {
-			throw new NotFoundException('未找到该经典语句记录');
+		if (!session) {
+			return {
+				streamId,
+				topic: '',
+				targetCount: 0,
+				itemCount: 0,
+				createdAt: new Date(0).toISOString(),
+				webSearchRounds: [],
+			};
 		}
-		const items: ClassicQuoteItemDto[] = [];
-		for (const b of batches) {
-			if (!Array.isArray(b.items)) continue;
-			for (const it of b.items) {
-				items.push({
-					english: it.english,
-					translationZh: it.translationZh || '—',
-					source: it.source || '—',
-					noteZh: it.noteZh || '—',
-				});
-			}
-		}
-		const first = batches[0];
 		const ws = await this.packWebSearchRepo.findOne({
 			where: { userId, streamId, packKind: 'classic_quotes' },
 		});
 		return {
 			streamId,
-			topic: first.topic,
-			targetCount: first.targetCount,
-			items,
-			createdAt: first.createdAt.toISOString(),
+			topic: session.topic,
+			targetCount: session.targetCount,
+			itemCount: session.itemCount,
+			createdAt: session.createdAt.toISOString(),
 			webSearchRounds: Array.isArray(ws?.searchRounds) ? ws.searchRounds : [],
+		};
+	}
+
+	async listClassicQuotesPackItems(
+		userId: number,
+		streamId: string,
+		options?: { limit?: number; offset?: number },
+	): Promise<{
+		streamId: string;
+		itemCount: number;
+		items: ClassicQuoteItemDto[];
+	}> {
+		const session = await this.classicPackSessionRepo.findOne({
+			where: { userId, streamId },
+		});
+		if (!session) {
+			return { streamId, itemCount: 0, items: [] };
+		}
+		const limit = Math.min(
+			PACK_HISTORY_ITEMS_PAGE_MAX,
+			Math.max(1, options?.limit ?? 100),
+		);
+		const offset = Math.max(0, options?.offset ?? 0);
+		const rows = await this.classicPackItemRepo.find({
+			where: { userId, streamId },
+			order: { sortOrder: 'ASC' },
+			take: limit,
+			skip: offset,
+		});
+		return {
+			streamId,
+			itemCount: session.itemCount,
+			items: rows.map((r) => this.mapClassicPackItemRow(r)),
 		};
 	}
 

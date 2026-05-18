@@ -299,9 +299,29 @@ export class EnglishLearningController {
 		return { success: true, data: list };
 	}
 
-	/**
-	 * 获取某次拉取会话的完整单词列表（验权：仅本人 streamId）。
-	 */
+	/** 按 streamId + sortOrder 分页读取单词明细 */
+	@Get('vocabulary-history/:streamId/items')
+	async listVocabularyPackItems(
+		@Req() req: AuthedRequest,
+		@Param('streamId') streamId: string,
+		@Query('limit') limitStr?: string,
+		@Query('offset') offsetStr?: string,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const limit = Math.max(1, Number.parseInt(limitStr ?? '100', 10) || 100);
+		const offset = Math.max(0, Number.parseInt(offsetStr ?? '0', 10) || 0);
+		const data = await this.englishLearningService.listVocabularyPackItems(
+			userId,
+			streamId,
+			{ limit, offset },
+		);
+		return { success: true, data };
+	}
+
+	/** 拉取会话元数据（不含词条明细） */
 	@Get('vocabulary-history/:streamId')
 	async getVocabularyHistoryDetail(
 		@Req() req: AuthedRequest,
@@ -858,6 +878,27 @@ export class EnglishLearningController {
 			{ limit, offset },
 		);
 		return { success: true, data: list };
+	}
+
+	@Get('classic-quotes-history/:streamId/items')
+	async listClassicQuotesPackItems(
+		@Req() req: AuthedRequest,
+		@Param('streamId') streamId: string,
+		@Query('limit') limitStr?: string,
+		@Query('offset') offsetStr?: string,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const limit = Math.max(1, Number.parseInt(limitStr ?? '100', 10) || 100);
+		const offset = Math.max(0, Number.parseInt(offsetStr ?? '0', 10) || 0);
+		const data = await this.englishLearningService.listClassicQuotesPackItems(
+			userId,
+			streamId,
+			{ limit, offset },
+		);
+		return { success: true, data };
 	}
 
 	@Get('classic-quotes-history/:streamId')

@@ -22,6 +22,10 @@
 - **SSE 协议与后端生成逻辑**不变（参见 [english-learning-pack-sse.md](./english-learning-pack-sse.md)、[english-learning-topic-match-db-sse.md](./english-learning-topic-match-db-sse.md)）；
 - **拉取仍由侧栏 Section 发起**：`streamEnglishVocabularyPack` / `streamEnglishClassicQuotes` 未迁移到结果页。
 
+### 1.4 延伸阅读（存储与历史分页）
+
+历史会话 **Session + 明细分行**、分页 API、结果页 Loading/空态与「空数据不报错」见：[english-learning-pack-session-items.md](./english-learning-pack-session-items.md)。
+
 ---
 
 ## 2. 改动范围
