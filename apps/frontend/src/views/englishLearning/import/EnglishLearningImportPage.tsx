@@ -421,7 +421,7 @@ export default function EnglishLearningImportPage() {
 						<MarkdownEditor
 							className="h-full min-h-0"
 							value={previewText}
-							readOnly={false}
+							readOnly={vocabSaveLoading || classicSaveLoading}
 							onChange={onPreviewEditorChange}
 							language="json"
 							theme={monacoTheme}
