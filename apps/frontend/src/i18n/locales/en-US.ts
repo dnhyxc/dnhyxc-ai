@@ -8,6 +8,9 @@ export const enUS = {
 	'common.loadFailed': 'Load failed',
 	'common.deleteFailed': 'Delete failed',
 	'common.tryLater': 'Please try again later.',
+	'common.networkErrorTryAgain':
+		'Network error. Please check your connection and try again.',
+	'common.requestFailed': 'Request failed. Please try again later.',
 	'common.delete': 'Delete',
 	'common.cancel': 'Cancel',
 	'common.confirm': 'Confirm',

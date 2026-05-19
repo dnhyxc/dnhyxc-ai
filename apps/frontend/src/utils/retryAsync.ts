@@ -18,6 +18,17 @@ export function isTransientNetworkError(error: unknown): boolean {
 	);
 }
 
+/** 是否应将错误文案替换为用户可读提示（避免 Toast 展示 Tauri 原始报错） */
+export function shouldMaskAsUserFacingNetworkError(
+	message: string | null | undefined,
+): boolean {
+	if (!message) return false;
+	const trimmed = message.trim();
+	if (!trimmed) return false;
+	if (isTransientNetworkError(trimmed)) return true;
+	return /error sending request for url\s*\(/i.test(trimmed);
+}
+
 export type RetryAsyncOptions = {
 	/** 额外重试次数（总尝试 = retries + 1） */
 	retries?: number;

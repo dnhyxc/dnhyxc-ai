@@ -1,7 +1,11 @@
 import { Toast } from '@ui/sonner';
 import { BASE_URL } from '@/constant';
+import { translateSync } from '@/i18n';
 import { notifyUnauthorized } from '@/router/authSession';
-import { isTransientNetworkError } from './retryAsync';
+import {
+	isTransientNetworkError,
+	shouldMaskAsUserFacingNetworkError,
+} from './retryAsync';
 import { isTauriRuntime } from './runtime';
 
 type UnknownErrorMessage =
@@ -107,16 +111,29 @@ export interface RequestError {
 
 /** 将后端/网络错误统一解析为 Toast 展示文案（与请求 catch 分支语义一致） */
 function resolveRequestErrorToastTitle(requestError: RequestError): string {
-	return (
+	const candidates = [
 		normalizeErrorMessage(
 			requestError?.data?.data?.error?.message as UnknownErrorMessage,
-		) ||
+		),
 		normalizeErrorMessage(
 			requestError?.data?.data?.message as UnknownErrorMessage,
-		) ||
-		normalizeErrorMessage(requestError.message) ||
-		'请求接口异常'
-	);
+		),
+		normalizeErrorMessage(requestError.message),
+	];
+
+	for (const msg of candidates) {
+		if (shouldMaskAsUserFacingNetworkError(msg)) {
+			return translateSync('common.networkErrorTryAgain');
+		}
+	}
+
+	const display =
+		candidates.find((msg) => msg && msg.trim().length > 0) ?? null;
+	if (shouldMaskAsUserFacingNetworkError(display)) {
+		return translateSync('common.networkErrorTryAgain');
+	}
+
+	return display ?? translateSync('common.requestFailed');
 }
 
 // HTTP 请求类
@@ -362,21 +379,37 @@ class HttpClient {
 
 	// 处理网络错误等其他错误
 	private handleNetworkError(error: any): RequestError {
+		const rawMessage =
+			error && typeof error === 'object' && 'message' in error
+				? String((error as { message?: unknown }).message ?? '')
+				: String(error ?? '');
+		const friendlyMessage = shouldMaskAsUserFacingNetworkError(rawMessage)
+			? translateSync('common.networkErrorTryAgain')
+			: null;
+
 		if (error && typeof error === 'object') {
 			if ('code' in error && 'message' in error) {
-				return error as RequestError;
+				const existing = error as RequestError;
+				if (friendlyMessage) {
+					return { ...existing, message: friendlyMessage };
+				}
+				return existing;
 			}
 
 			return {
 				code: error.status || 500,
-				message: error.message || '请求失败',
+				message:
+					friendlyMessage ||
+					error.message ||
+					translateSync('common.requestFailed'),
 				data: error.data || error,
 			};
 		}
 
 		return {
 			code: 500,
-			message: String(error) || '未知错误',
+			message:
+				friendlyMessage || rawMessage || translateSync('common.requestFailed'),
 		};
 	}
 

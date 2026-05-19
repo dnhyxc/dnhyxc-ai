@@ -34,11 +34,13 @@
 | P1 | Tauri 桌面端列表首屏或「加载更多」偶发空白，控制台 `error sending request`，需手动刷新 | 远程 HTTPS 在原生请求栈上瞬时失败；改前 GET **不重试** | **HttpClient**：Tauri 下 GET/HEAD 默认 `retries: 2`；**`useLibraryWordsList`** 再包一层 `retryAsync` |
 | P2 | 资源库快速切换左侧库时，右侧短暂显示**上一库**词条 | 慢请求返回未校验「当前库 id」 | **`loadGenRef` + `libraryIdRef`**：返回前比对世代号与 id，过期响应直接丢弃 |
 | P3 | 「加载更多」失败一次后，滚到底再也无法加载 | `catch` 里把 `hasMoreRef` 置为 `false` | **`fetchMore` 失败不关闭 `hasMoreRef`**，用户可再次滚到底触发 |
-| P4 | 滚动加载后收藏星标不亮，或整表反复查 `/status` | 全量查状态 + 无防抖 + 失败后 key 仍标记「已查」 | **增量 Hook**（只查新 key）+ **150ms 防抖** + **失败回滚 `queriedKeysRef`** |
+| P4 | 滚动加载后收藏星标不亮，或整表反复查 `/status` | 全量查状态 + 无防抖 + 失败后 key 仍标记「已查」 | **增量 Hook**（只查新 key）+ **150ms 防抖** + **失败回滚 `queriedKeysRef`**（详见 [`favorite-star-incremental-ui.md`](./favorite-star-incremental-ui.md)） |
+| P4b | 星标「慢半拍」：条目已显示，已收藏星标要等全部 HTTP 批结束才一起亮 | 串行小批 + Hook 仅在全量返回后 `setState` 一次 | **`onPartialKeys` 渐进 merge** + **`runTasksWithConcurrency(3)`**（同上专文） |
 | P5 | 经典句包列表条目多时，一次 POST 几百条 `englishes`，易超时 / 发送失败 | 单次 body 过大 | **HTTP 50 小批** + 批间 50ms + **`retryAsync` 每批** |
 | P6 | 经典句包曾用内联 `useEffect` 全量 `fetchEnglishClassicQuoteFavoriteStatus` | 与资源库逻辑重复、难维护 | 抽出 **`useIncrementalClassicQuoteFavoriteStatus`**，与单词 Hook 对称 |
 | P7 | 列表失败时 Toast 重复（HttpClient 默认 + 面板自定义） | 未传 `silent` | 列表类 API 透传 **`silent: true`**，由 Hook / 面板统一 i18n Toast |
 | P8 | 收藏 Tab 切走后，进行中的列表请求仍 `setState` | 无取消世代 | **`active === false` 时 `loadGenRef++`**，丢弃过期响应 |
+| P9 | 重试失败后 Toast 展示 `error sending request for url (...)` 或硬编码「请求接口异常」 | HttpClient 未脱敏 Tauri 原文、Toast 未走 i18n | **`shouldMaskAsUserFacingNetworkError` + `translateSync`**（详见 [`http-network-error-toast.md`](./http-network-error-toast.md)） |
 
 **刻意不重试的场景**：`add/remove` 收藏等 **非幂等 POST** 仍只请求 1 次（避免重复副作用）；仅 **`/status` 查询** 在 service 层用 `retryAsync` 包裹。
 
@@ -682,6 +684,8 @@ useEffect(() => {
 
 ## 11. 相关文档
 
+- [`http-network-error-toast.md`](./http-network-error-toast.md) — 网络错误 Toast 友好化与 `translateSync`
+- [`favorite-star-incremental-ui.md`](./favorite-star-incremental-ui.md) — 星标慢半拍、`onPartialKeys`、有限并发与乐观点击
 - [`vocab-favorite-status-query.md`](./vocab-favorite-status-query.md) — 单词收藏状态增量查询与 500 上限（本轮在其上扩展 HTTP 50 小批与重试）
 - [`english-learning-library-ux-and-delete.md`](./english-learning-library-ux-and-delete.md) — 资源库 UX 与删除
 - [`tauri-macos-ats-http.md`](./tauri-macos-ats-http.md) — Tauri / HTTP 相关背景（若存在网络策略问题可交叉查阅）

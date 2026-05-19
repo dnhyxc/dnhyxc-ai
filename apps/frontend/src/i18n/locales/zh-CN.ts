@@ -8,6 +8,8 @@ export const zhCN = {
 	'common.loadFailed': '加载失败',
 	'common.deleteFailed': '删除失败',
 	'common.tryLater': '请稍后重试',
+	'common.networkErrorTryAgain': '网络异常，请检查网络后重试',
+	'common.requestFailed': '请求失败，请稍后重试',
 	'common.delete': '删除',
 	'common.cancel': '取消',
 	'common.confirm': '确定',
