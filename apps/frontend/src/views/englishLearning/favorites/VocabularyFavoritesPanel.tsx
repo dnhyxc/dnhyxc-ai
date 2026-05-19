@@ -379,7 +379,7 @@ export function VocabularyFavoritesPanel({
 								</div>
 							) : null}
 							{showEmpty ? (
-								<div className="text-textcolor/60 col-span-2 py-12 text-center text-sm">
+								<div className="text-textcolor/60 col-span-full py-12 text-center text-sm">
 									{t('englishLearning.vocab.favoritesEmpty')}
 								</div>
 							) : null}

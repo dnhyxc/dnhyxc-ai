@@ -386,7 +386,7 @@ export function ClassicQuotesFavoritesPanel({
 								</div>
 							) : null}
 							{showEmpty ? (
-								<div className="text-textcolor/60 col-span-2 py-12 text-center text-sm">
+								<div className="col-span-full text-textcolor/60 py-12 text-center text-sm">
 									{t('englishLearning.classic.favoritesEmpty')}
 								</div>
 							) : null}
