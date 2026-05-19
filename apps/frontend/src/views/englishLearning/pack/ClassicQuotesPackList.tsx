@@ -97,7 +97,7 @@ function ClassicQuotesPackListInner({ history }: ClassicQuotesPackListProps) {
 
 	return (
 		<div className="min-w-0 space-y-4">
-			<div className="select-text grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+			<div className="select-text grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3">
 				{items.map((item, i) => {
 					const contentKey = classicQuoteFavoriteContentKey(item.english);
 					const key = isHistoryMode
