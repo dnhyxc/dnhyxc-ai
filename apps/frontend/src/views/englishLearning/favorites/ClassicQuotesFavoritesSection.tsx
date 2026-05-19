@@ -11,22 +11,33 @@ import {
 import { ClassicQuotesFavoritesPanel } from './ClassicQuotesFavoritesPanel';
 import { useClassicQuoteFavoritesList } from './useClassicQuoteFavoritesList';
 
+import type { FavoritesListCounts } from './VocabularyFavoritesSection';
+
 export type ClassicQuotesFavoritesSectionProps = {
 	active: boolean;
-	onEntriesCountChange?: (count: number) => void;
+	onCountsChange?: (counts: FavoritesListCounts) => void;
 };
 
 export function ClassicQuotesFavoritesSection({
 	active,
-	onEntriesCountChange,
+	onCountsChange,
 }: ClassicQuotesFavoritesSectionProps) {
 	const { t } = useI18n();
-	const { entries, loading, loadingMore, onViewportScroll, onBatchRemove } =
-		useClassicQuoteFavoritesList(active);
+	const {
+		entries,
+		totalCount,
+		loading,
+		loadingMore,
+		onViewportScroll,
+		onBatchRemove,
+	} = useClassicQuoteFavoritesList(active);
 
 	useEffect(() => {
-		onEntriesCountChange?.(entries.length);
-	}, [entries.length, onEntriesCountChange]);
+		onCountsChange?.({
+			loaded: entries.length,
+			total: totalCount,
+		});
+	}, [entries.length, totalCount, onCountsChange]);
 	const [playingKey, setPlayingKey] = useState<string | null>(null);
 
 	const onTogglePlayQuote = useCallback(

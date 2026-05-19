@@ -17,6 +17,10 @@ export const enUS = {
 	'common.copy': 'Copy',
 	'common.download': 'Download',
 	'common.downloading': 'Downloading...',
+	'common.loaded': 'loaded {count} {type}',
+	'common.type-1': 'of them',
+	'common.type-2': 'items',
+	'common.type-3': 'items',
 
 	'image.loadFailed': 'Image failed to load',
 
@@ -819,7 +823,7 @@ export const enUS = {
 		'Select a quotes library on the left',
 	'englishLearning.library.wordsHeading': '{count} words',
 	'englishLearning.library.quotesHeading': '{count} quotes',
-	'englishLearning.library.listCount': '{count} items',
+	'englishLearning.library.listCount': '{count} {type}',
 	'englishLearning.library.wordsLoading': 'Loading words…',
 	'englishLearning.library.wordsLoadFailed':
 		'Failed to load items. Please try again later.',

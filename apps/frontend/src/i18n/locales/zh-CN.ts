@@ -16,6 +16,10 @@ export const zhCN = {
 	'common.copy': '复制',
 	'common.download': '下载',
 	'common.downloading': '下载中...',
+	'common.loaded': '已加载 {count} {type}',
+	'common.type-1': '个',
+	'common.type-2': '条',
+	'common.type-3': '项',
 
 	'image.loadFailed': '图片加载失败',
 
@@ -730,7 +734,7 @@ export const zhCN = {
 	'englishLearning.library.selectLibraryClassic': '请从左侧选择一个语句库',
 	'englishLearning.library.wordsHeading': '共 {count} 个单词',
 	'englishLearning.library.quotesHeading': '共 {count} 条语句',
-	'englishLearning.library.listCount': '共 {count} 条',
+	'englishLearning.library.listCount': '共 {count} {type}',
 	'englishLearning.library.wordsLoading': '加载单词…',
 	'englishLearning.library.wordsLoadFailed': '加载词条失败，请稍后重试',
 	'englishLearning.library.wordsLoadMoreFailed':

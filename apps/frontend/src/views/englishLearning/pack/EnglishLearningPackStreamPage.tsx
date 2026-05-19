@@ -156,6 +156,11 @@ function EnglishLearningPackStreamPageInner() {
 	const itemCount = useHistoryPagination
 		? (historyItemCount ?? activeHistory.itemCount ?? 0)
 		: liveItemCount;
+	const loadedCount = useHistoryPagination
+		? activeHistory.items.length
+		: liveItemCount;
+	const loadedCountType =
+		kind === 'vocab' ? t('common.type-1') : t('common.type-2');
 	const historyMetaPending = useHistoryPagination && historyItemCount === null;
 
 	const emptyHint =
@@ -217,6 +222,15 @@ function EnglishLearningPackStreamPageInner() {
 									<span className="text-textcolor/50 text-sm">
 										{t('englishLearning.library.listCount', {
 											count: itemCount,
+											type:
+												kind === 'vocab'
+													? t('common.type-1')
+													: t('common.type-2'),
+										})}{' '}
+										/{' '}
+										{t('common.loaded', {
+											count: loadedCount,
+											type: loadedCountType,
 										})}
 									</span>
 								</p>

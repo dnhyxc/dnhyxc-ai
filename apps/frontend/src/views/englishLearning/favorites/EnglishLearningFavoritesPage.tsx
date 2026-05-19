@@ -19,8 +19,14 @@ export default function EnglishLearningFavoritesPage() {
 		() => parseKind(searchParams.get('kind')),
 		[searchParams],
 	);
-	const [vocabCount, setVocabCount] = useState(0);
-	const [classicCount, setClassicCount] = useState(0);
+	const [vocabCounts, setVocabCounts] = useState<{
+		loaded: number;
+		total: number;
+	}>({ loaded: 0, total: 0 });
+	const [classicCounts, setClassicCounts] = useState<{
+		loaded: number;
+		total: number;
+	}>({ loaded: 0, total: 0 });
 
 	const onSelectKind = useCallback(
 		(next: FavoritesKind) => {
@@ -40,7 +46,8 @@ export default function EnglishLearningFavoritesPage() {
 		kind === 'vocab'
 			? t('englishLearning.vocab.favoritesTitle')
 			: t('englishLearning.classic.favoritesTitle');
-	const count = kind === 'vocab' ? vocabCount : classicCount;
+	const counts = kind === 'vocab' ? vocabCounts : classicCounts;
+	const countType = kind === 'vocab' ? t('common.type-1') : t('common.type-2');
 
 	return (
 		<div className="flex min-h-0 h-full w-full flex-col">
@@ -50,7 +57,15 @@ export default function EnglishLearningFavoritesPage() {
 						<h2 className="text-textcolor min-w-0 text-base font-semibold flex items-center gap-2">
 							{title}
 							<span className="text-textcolor/50 ml-1 text-sm font-normal">
-								{t('englishLearning.library.listCount', { count: count })}
+								{t('englishLearning.library.listCount', {
+									count: counts.total,
+									type: countType,
+								})}{' '}
+								/{' '}
+								{t('common.loaded', {
+									count: counts.loaded,
+									type: countType,
+								})}
 							</span>
 						</h2>
 						<FavoritesKindTabs kind={kind} onSelectKind={onSelectKind} />
@@ -59,12 +74,12 @@ export default function EnglishLearningFavoritesPage() {
 						{kind === 'vocab' ? (
 							<VocabularyFavoritesSection
 								active
-								onEntriesCountChange={setVocabCount}
+								onCountsChange={setVocabCounts}
 							/>
 						) : (
 							<ClassicQuotesFavoritesSection
 								active
-								onEntriesCountChange={setClassicCount}
+								onCountsChange={setClassicCounts}
 							/>
 						)}
 					</section>

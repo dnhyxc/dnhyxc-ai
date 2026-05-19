@@ -51,9 +51,9 @@ export const VOCAB_COUNT_MAX = 12000;
  */
 export const VOCAB_COUNT_PRESETS = [10, 100, 500, 1000, 3000, 12000] as const;
 /** 历史列表分页大小（与知识库列表分页量级一致） */
-export const VOCAB_HISTORY_PAGE_SIZE = 20;
+export const VOCAB_HISTORY_PAGE_SIZE = 50;
 /** 单词库列表每页条数 */
-export const VOCAB_LIBRARY_LIST_PAGE_SIZE = 20;
+export const VOCAB_LIBRARY_LIST_PAGE_SIZE = 50;
 /** 单词库内词条每页条数 */
 export const VOCAB_LIBRARY_ITEMS_PAGE_SIZE = 50;
 /** 拉取结果历史会话内词条每页条数（与后端 PACK_HISTORY_ITEMS_PAGE_MAX 上限对齐） */
@@ -77,7 +77,7 @@ export const COUNT_PRESETS = [10, 100, 500, 1000, 3000, 6000] as const;
 /**
  * 经典语句/单词历史列表每页拉取的条数，用于分页加载。
  */
-export const HISTORY_PAGE_SIZE = 20;
+export const HISTORY_PAGE_SIZE = 50;
 /**
  * 历史列表懒加载的滚动距离阈值（像素）。
  * 当滚动距离不足此值时会尝试加载更多内容。

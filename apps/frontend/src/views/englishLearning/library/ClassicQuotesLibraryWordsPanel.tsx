@@ -147,7 +147,11 @@ export function ClassicQuotesLibraryWordsPanel({
 				<div className="flex items-center gap-2">
 					{title}
 					<div className="text-textcolor/50 mt-0.5 text-sm">
-						{t('englishLearning.library.quotesHeading', { count: total })}
+						{t('englishLearning.library.quotesHeading', { count: total })} /{' '}
+						{t('common.loaded', {
+							count: items.length,
+							type: t('common.type-2'),
+						})}
 					</div>
 				</div>
 				<div

@@ -877,12 +877,17 @@ export type EnglishVocabularyFavoriteListEntry = {
 	createdAt: string;
 };
 
+export type EnglishVocabularyFavoritesPage = {
+	items: EnglishVocabularyFavoriteListEntry[];
+	totalCount: number;
+};
+
 export const listEnglishVocabularyFavorites = async (options?: {
 	limit?: number;
 	offset?: number;
 	silent?: boolean;
 }) => {
-	return await http.get<EnglishVocabularyFavoriteListEntry[]>(
+	return await http.get<EnglishVocabularyFavoritesPage>(
 		ENGLISH_LEARNING_VOCABULARY_FAVORITES,
 		{
 			querys: {
@@ -1023,12 +1028,17 @@ export type EnglishClassicQuoteFavoriteListEntry = {
 	createdAt: string;
 };
 
+export type EnglishClassicQuoteFavoritesPage = {
+	items: EnglishClassicQuoteFavoriteListEntry[];
+	totalCount: number;
+};
+
 export const listEnglishClassicQuoteFavorites = async (options?: {
 	limit?: number;
 	offset?: number;
 	silent?: boolean;
 }) => {
-	return await http.get<EnglishClassicQuoteFavoriteListEntry[]>(
+	return await http.get<EnglishClassicQuoteFavoritesPage>(
 		ENGLISH_LEARNING_CLASSIC_QUOTES_FAVORITES,
 		{
 			querys: {

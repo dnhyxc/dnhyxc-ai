@@ -263,7 +263,10 @@ export function VocabularyLibraryListPanel({
 						? t('englishLearning.library.vocab.title')
 						: t('englishLearning.library.classic.title')}
 					<div className="text-textcolor/50 mt-0.5 text-sm">
-						{t('englishLearning.library.listCount', { count: entries.length })}
+						{t('englishLearning.library.listCount', {
+							count: entries.length,
+							type: kind === 'vocab' ? t('common.type-1') : t('common.type-2'),
+						})}
 					</div>
 				</div>
 				<div

@@ -22,12 +22,19 @@ export function useVocabularyFavoritesList(active: boolean) {
 	const [entries, setEntries] = useState<EnglishVocabularyFavoriteListEntry[]>(
 		[],
 	);
+	const [totalCount, setTotalCount] = useState(0);
 	const [loading, setLoading] = useState(false);
 	const [loadingMore, setLoadingMore] = useState(false);
 	const offsetRef = useRef(0);
 	const hasMoreRef = useRef(true);
+	const [hasMore, setHasMore] = useState(true);
 	const fetchingMoreRef = useRef(false);
 	const loadGenRef = useRef(0);
+
+	const syncHasMore = useCallback((value: boolean) => {
+		hasMoreRef.current = value;
+		setHasMore(value);
+	}, []);
 
 	const fetchFirstPage = useCallback(
 		async (gen: number) => {
@@ -35,8 +42,9 @@ export function useVocabularyFavoritesList(active: boolean) {
 			setLoading(true);
 			setLoadingMore(false);
 			offsetRef.current = 0;
-			hasMoreRef.current = true;
+			syncHasMore(true);
 			setEntries([]);
+			setTotalCount(0);
 			try {
 				const res = await listEnglishVocabularyFavorites({
 					limit: VOCAB_HISTORY_PAGE_SIZE,
@@ -44,14 +52,19 @@ export function useVocabularyFavoritesList(active: boolean) {
 					silent: true,
 				});
 				if (gen !== loadGenRef.current) return;
-				const list = Array.isArray(res.data) ? res.data : [];
+				const page = res.data;
+				const list = Array.isArray(page?.items) ? page.items : [];
 				setEntries(list);
+				setTotalCount(
+					typeof page?.totalCount === 'number' ? page.totalCount : list.length,
+				);
 				offsetRef.current = list.length;
-				hasMoreRef.current = list.length >= VOCAB_HISTORY_PAGE_SIZE;
+				syncHasMore(list.length >= VOCAB_HISTORY_PAGE_SIZE);
 			} catch {
 				if (gen !== loadGenRef.current) return;
 				setEntries([]);
-				hasMoreRef.current = false;
+				setTotalCount(0);
+				syncHasMore(false);
 				Toast({
 					type: 'error',
 					title: t('englishLearning.favorites.listLoadFailed'),
@@ -62,7 +75,7 @@ export function useVocabularyFavoritesList(active: boolean) {
 				}
 			}
 		},
-		[t],
+		[syncHasMore, t],
 	);
 
 	const fetchMore = useCallback(async () => {
@@ -80,14 +93,18 @@ export function useVocabularyFavoritesList(active: boolean) {
 				silent: true,
 			});
 			if (gen !== loadGenRef.current) return;
-			const chunk = Array.isArray(res.data) ? res.data : [];
+			const page = res.data;
+			const chunk = Array.isArray(page?.items) ? page.items : [];
+			if (typeof page?.totalCount === 'number') {
+				setTotalCount(page.totalCount);
+			}
 			if (chunk.length === 0) {
-				hasMoreRef.current = false;
+				syncHasMore(false);
 				return;
 			}
 			setEntries((prev) => [...prev, ...chunk]);
 			offsetRef.current += chunk.length;
-			hasMoreRef.current = chunk.length >= VOCAB_HISTORY_PAGE_SIZE;
+			syncHasMore(chunk.length >= VOCAB_HISTORY_PAGE_SIZE);
 		} catch {
 			if (gen !== loadGenRef.current) return;
 			Toast({
@@ -100,7 +117,7 @@ export function useVocabularyFavoritesList(active: boolean) {
 				setLoadingMore(false);
 			}
 		}
-	}, [loading, t]);
+	}, [loading, syncHasMore, t]);
 
 	useEffect(() => {
 		if (!active) {
@@ -136,6 +153,8 @@ export function useVocabularyFavoritesList(active: boolean) {
 
 	return {
 		entries,
+		totalCount,
+		hasMore,
 		loading,
 		loadingMore,
 		onViewportScroll,

@@ -11,22 +11,37 @@ import {
 import { useVocabularyFavoritesList } from './useVocabularyFavoritesList';
 import { VocabularyFavoritesPanel } from './VocabularyFavoritesPanel';
 
+export type FavoritesListCounts = {
+	loaded: number;
+	/** 服务端返回的收藏总数（首屏请求即可得） */
+	total: number;
+};
+
 export type VocabularyFavoritesSectionProps = {
 	active: boolean;
-	onEntriesCountChange?: (count: number) => void;
+	onCountsChange?: (counts: FavoritesListCounts) => void;
 };
 
 export function VocabularyFavoritesSection({
 	active,
-	onEntriesCountChange,
+	onCountsChange,
 }: VocabularyFavoritesSectionProps) {
 	const { t } = useI18n();
-	const { entries, loading, loadingMore, onViewportScroll, onBatchRemove } =
-		useVocabularyFavoritesList(active);
+	const {
+		entries,
+		totalCount,
+		loading,
+		loadingMore,
+		onViewportScroll,
+		onBatchRemove,
+	} = useVocabularyFavoritesList(active);
 
 	useEffect(() => {
-		onEntriesCountChange?.(entries.length);
-	}, [entries.length, onEntriesCountChange]);
+		onCountsChange?.({
+			loaded: entries.length,
+			total: totalCount,
+		});
+	}, [entries.length, totalCount, onCountsChange]);
 	const [playingKey, setPlayingKey] = useState<string | null>(null);
 
 	const onTogglePlayWord = useCallback(
