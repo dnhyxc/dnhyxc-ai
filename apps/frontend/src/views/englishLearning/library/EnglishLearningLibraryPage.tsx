@@ -14,6 +14,7 @@ import type {
 	EnglishVocabularyLibraryListItem,
 } from '@/service';
 import { ClassicQuotesLibraryWordsPanel } from './ClassicQuotesLibraryWordsPanel';
+import { invalidateLibraryWordsListCache } from './libraryWordsListCache';
 import {
 	type EnglishLibraryListItem,
 	VocabularyLibraryListPanel,
@@ -61,19 +62,26 @@ export default function EnglishLearningLibraryPage() {
 		[kind, setSearchParams],
 	);
 
+	/**
+	 * 当前库被删除时的回调：
+	 * 1. 使该库在词条列表的会话内缓存（滚动、分页等）失效，避免下次切回时误用旧缓存。
+	 * 2. 清除当前已选中的库。
+	 * 3. 从 URL searchParams 中移除 library 字段，防止直接跳回已删除库。
+	 */
 	const onLibraryDeleted = useCallback(
-		(_deletedId: string) => {
-			setSelectedLibrary(null);
+		(deletedId: string) => {
+			invalidateLibraryWordsListCache(kind, deletedId); // 使会话缓存失效
+			setSelectedLibrary(null); // 清除当前选中库
 			setSearchParams(
 				(prev) => {
 					const next = new URLSearchParams(prev);
-					next.delete('library');
+					next.delete('library'); // 从 URL 参数中移除已删除库
 					return next;
 				},
 				{ replace: true },
 			);
 		},
-		[setSearchParams],
+		[kind, setSearchParams],
 	);
 
 	const libraryIdFromUrl = searchParams.get('library');

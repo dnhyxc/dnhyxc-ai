@@ -11,7 +11,7 @@
 | ③ | JSON 导入保存成功后仍停留在导入页 | 跳转到资源库并选中新建单词库 |
 | ④ | 单词库列表无法删除；删除需连同库内词条 | 二次确认 + `DELETE` API + DB 级联删除词条 |
 
-**说明**：收藏状态查询的专题说明另见 [`vocab-favorite-status-query.md`](./vocab-favorite-status-query.md)。若与仓库最新源码不一致，**以源码为准**。
+**说明**：收藏状态查询的专题说明另见 [`vocab-favorite-status-query.md`](./vocab-favorite-status-query.md)；词条列表会话内缓存与滚动恢复见 [`library-words-list-cache.md`](./library-words-list-cache.md)。若与仓库最新源码不一致，**以源码为准**。
 
 ---
 

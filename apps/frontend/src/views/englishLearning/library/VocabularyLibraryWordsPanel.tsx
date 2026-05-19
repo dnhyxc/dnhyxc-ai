@@ -4,7 +4,13 @@
 import Loading from '@design/Loading';
 import { Button, ScrollArea, Spinner, Toast } from '@ui/index';
 import { Square, Star, Volume2 } from 'lucide-react';
-import { useCallback, useEffect, useState } from 'react';
+import {
+	useCallback,
+	useEffect,
+	useLayoutEffect,
+	useRef,
+	useState,
+} from 'react';
 import { useNavigate } from 'react-router';
 import { useI18n, useIncrementalVocabFavoriteStatus } from '@/hooks';
 import { cn } from '@/lib/utils';
@@ -58,14 +64,29 @@ export function VocabularyLibraryWordsPanel({
 		[],
 	);
 
-	const { items, resolvedLibrary, loading, loadingMore, onViewportScroll } =
-		useLibraryWordsList<
-			EnglishVocabularyLibraryItemRow,
-			EnglishVocabularyLibraryListItem
-		>({
-			libraryId,
-			fetchPage: fetchVocabPage,
-		});
+	const scrollViewportRef = useRef<HTMLDivElement>(null);
+
+	const {
+		items,
+		resolvedLibrary,
+		loading,
+		loadingMore,
+		initialScrollTop,
+		onViewportScroll,
+	} = useLibraryWordsList<
+		EnglishVocabularyLibraryItemRow,
+		EnglishVocabularyLibraryListItem
+	>({
+		libraryId,
+		cacheNamespace: 'vocab',
+		fetchPage: fetchVocabPage,
+	});
+
+	useLayoutEffect(() => {
+		const el = scrollViewportRef.current;
+		if (!el || initialScrollTop <= 0) return;
+		el.scrollTop = initialScrollTop;
+	}, [libraryId, initialScrollTop]);
 
 	const { favoritedWordKeys, setFavoritedWordKeys } =
 		useIncrementalVocabFavoriteStatus(items);
@@ -166,6 +187,7 @@ export function VocabularyLibraryWordsPanel({
 				</div>
 			</div>
 			<ScrollArea
+				ref={scrollViewportRef}
 				className="min-h-0 flex-1 px-4 pb-4"
 				onScroll={onViewportScroll}
 			>
