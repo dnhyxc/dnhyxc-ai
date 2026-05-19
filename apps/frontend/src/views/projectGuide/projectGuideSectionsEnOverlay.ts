@@ -36,7 +36,7 @@ export const PROJECT_GUIDE_ITEMS_EN: Record<
 	'pg-s1-english': {
 		title: 'English learning',
 		description:
-			'Generate themed word packs and classic sentences, with favorites, a drawer, and one-click Word (DOCX) export. Main flows require signing in.',
+			'Stream themed word packs and classic sentences; import JSON into libraries with paginated browsing, pull history, multi-session Agent chat, favorites, and one-click Word (DOCX) export. Main flows require signing in.',
 	},
 	'pg-s1-3': {
 		title: 'Rich Markdown',
@@ -239,7 +239,37 @@ export const PROJECT_GUIDE_ITEMS_EN: Record<
 	'pg-s13-4': {
 		title: '13.4 Favorites, drawer, and DOCX export',
 		description:
-			'Favorite words or lines; browse and manage in a paginated drawer. Export word favorites or quote favorites to Word (DOCX); the server aggregates up to about 3000 items per account by favorite time (newest first), independent of the drawer page. Browser and desktop both use binary download and local save; desktop dedupe prompts if implemented.',
+			'Favorite words or lines; browse and manage in a paginated drawer, with multi-select and confirmed batch unfavorite. Export word favorites or quote favorites to Word (DOCX); the server aggregates up to about 3000 items per account by favorite time (newest first), independent of the drawer page; word export may include part-of-speech (pos) fields. Browser and desktop both use binary download and local save; desktop dedupe prompts if implemented.',
+	},
+	'pg-s13-5': {
+		title: '13.5 Libraries and JSON import',
+		description:
+			'Use the left-rail library area to import. Standalone page /english-learning/import with kind=vocab or kind=classic. Drag a .json file, preview/validate, set a title, and save; large packs use an upload path suited to big files. After save you land in the library with the new pack selected; the title can be prefilled from the filename without extension.',
+	},
+	'pg-s13-6': {
+		title: '13.6 Browse and manage libraries',
+		description:
+			'Pick a library on the left; the right pane loads entries with pagination and load-more. Within the same session, switching libraries and returning restores loaded pages and scroll when possible. Delete a word library after confirmation (entries cascade). Favorite stars load incrementally as lists grow.',
+	},
+	'pg-s13-7': {
+		title: '13.7 Pull history, results page, and stop',
+		description:
+			'History drawer lists past pack runs; in-progress rows are marked and usually not deletable. Opening history goes to the results page without overwriting the left-rail form for a new pull. Finished history can be deleted. Header shows topic and web-search summary; live vs history paging differs. Stopping a stream keeps generated content and typically avoids a harsh error toast.',
+	},
+	'pg-s13-8': {
+		title: '13.8 English-learning Agent (multi-session)',
+		description:
+			'Agent chat supports multiple sessions with a paginated history drawer; “New chat” clears the view and creates the server session on first send. Quick intents affect only the current turn, not stored transcript. Saving to the knowledge base may navigate you there to continue editing.',
+	},
+	'pg-s13-9': {
+		title: '13.9 List and left-rail UX details',
+		description:
+			'Pulled word or quote grids can collapse/expand; a new pull expands automatically. Quick intents show a few chips by default with expand for all. Word packs can show abbreviated part-of-speech labels (e.g. n, v, adj).',
+	},
+	'pg-s13-10': {
+		title: '13.10 When the network is flaky (especially desktop)',
+		description:
+			'On desktop, transient list or favorite-status failures may auto-retry read-only calls and show readable toasts instead of raw transport errors. Write actions such as favorite/unfavorite are generally not retried to avoid duplicate side effects.',
 	},
 	'pg-s14-1': {
 		title: 'Topic notes and release overview',

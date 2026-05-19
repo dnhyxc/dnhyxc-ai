@@ -475,4 +475,49 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'The master agent summarizes pack content; web search fires only when the model decides it is needed, with unified parsing of dates/recency in topics to cut routine noise; can combine with knowledge-base RAG tools so citations feel like the main chat product.',
 	},
+	's24-7': {
+		title: 'JSON import & persisted libraries',
+		description:
+			'Standalone /english-learning/import (kind=vocab|classic): drag JSON, preview/validate, title, save; libraries use main+item tables with pagination; large packs via multipart upload; left rail groups import/library entry; after save navigate to the library with the new pack selected.',
+	},
+	's24-8': {
+		title: 'Library paging, delete & session cache',
+		description:
+			'Right-pane entry lists paginate; delete a word library with confirm and cascade; switching libraries and returning restores loaded pages and scroll in-session (cleared on full refresh).',
+	},
+	's24-9': {
+		title: 'Pull history delete & results UX',
+		description:
+			'History drawer deletes finished runs with cascade cleanup; opening history only navigates to results without refilling the left form; in-progress rows marked and usually not deletable; topic/web summary moved to page header; Agent save may jump to Knowledge.',
+	},
+	's24-10': {
+		title: 'English-learning Agent multi-session',
+		description:
+			'Per-session messages and SSE; paginated history drawer and URL alignment; new chat without pre-creating empty sessions; intentPrefix not stored; placeholder IDs replaced via SSE with real DB ids.',
+	},
+	's24-11': {
+		title: 'Batch unfavorite & collapsed quick intents',
+		description:
+			'Favorites drawer: multi-select, batch/single unfavorite with confirm; left rail shows two quick-intent chips by default, expandable to all.',
+	},
+	's24-12': {
+		title: 'Vocabulary part-of-speech (pos)',
+		description:
+			'Streaming pull, lists, favorites, and DOCX export carry abbreviated English pos; legacy rows without pos treated as empty.',
+	},
+	's24-13': {
+		title: 'List retries & friendlier errors',
+		description:
+			'Tauri GET retries by default; library/favorites/pack lists batch favorite-status with retries; list failure toasts use i18n copy; debounced status queries and progressive star highlights.',
+	},
+	's24-14': {
+		title: 'Stream stop & silent cancel',
+		description:
+			'Stopping pack SSE aborts locally and may notify the server; cancel calls are silent so user-initiated stop does not show an error toast.',
+	},
+	's24-15': {
+		title: 'Collapsible word/quote grids',
+		description:
+			'Pulled entry grids collapse/expand; new pulls auto-expand; a11y labels follow UI language.',
+	},
 };
