@@ -396,7 +396,7 @@ export function ClassicQuotesFavoritesPanel({
 				<footer className="h-12 shrink-0 flex flex-wrap items-center justify-between gap-3 px-5 py-3">
 					<div className="flex items-center gap-2">
 						{!showInitialLoading && entries.length > 0 ? (
-							<div className="flex shrink-0 flex-wrap items-center gap-3 mb-1">
+							<div className="flex shrink-0 flex-wrap items-center gap-3 mb-2">
 								<div className="flex items-center gap-2">
 									<Checkbox
 										id="classic-fav-select-all"
@@ -419,7 +419,7 @@ export function ClassicQuotesFavoritesPanel({
 							</div>
 						) : null}
 					</div>
-					<div className="flex items-center gap-2 -mt-0.5">
+					<div className="flex items-center gap-2 -mt-1.5">
 						<Button
 							type="button"
 							variant="destructive"

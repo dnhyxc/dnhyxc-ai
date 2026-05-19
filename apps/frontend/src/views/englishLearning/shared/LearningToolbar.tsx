@@ -173,9 +173,9 @@ export const EnglishLearningToolbar = observer(function EnglishLearningToolbar({
 								aria-pressed={selected}
 								className={cn(
 									'h-9 border-none bg-linear-to-r from-lime-600 to-green-700 text-lime-50',
-									'hover:bg-linear-to-r hover:from-lime-300 hover:to-green-500 hover:text-lime-800',
+									'hover:bg-linear-to-r hover:from-lime-400 hover:to-green-500 hover:text-lime-800',
 									selected &&
-										'bg-linear-to-r from-lime-300 to-green-500 text-lime-800',
+										'bg-linear-to-r from-lime-400 to-green-500 text-lime-800',
 								)}
 								onClick={() => {
 									if (selected) {

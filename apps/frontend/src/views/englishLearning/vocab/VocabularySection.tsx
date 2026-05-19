@@ -403,7 +403,7 @@ function VocabularyPackSectionInner() {
 				value={topic}
 				onChange={(e) => EnglishPackStore.setVocabTopic(e.target.value)}
 				placeholder={t('englishLearning.vocab.topicPlaceholder')}
-				className="h-9 w-full border-theme/10 bg-theme/5 focus-visible:border-theme/10 focus-visible:ring-0 mt-0.5 mb-3.5"
+				className="h-9 w-full border-theme/5 bg-theme/5 focus-visible:border-theme/10 focus-visible:ring-0 mt-0.5 mb-3.5"
 				disabled={loading}
 			/>
 
@@ -428,7 +428,7 @@ function VocabularyPackSectionInner() {
 						}
 						onBlur={normalizeCountOnBlur}
 						disabled={loading}
-						className="mt-0.5 h-9 w-full border-theme/10 bg-theme/5 focus-visible:border-theme/10 focus-visible:ring-0"
+						className="mt-0.5 h-9 w-full border-theme/5 bg-theme/5 focus-visible:border-theme/10 focus-visible:ring-0"
 					/>
 					<div
 						id="english-vocab-count-hint"
@@ -443,12 +443,16 @@ function VocabularyPackSectionInner() {
 								size="sm"
 								variant="outline"
 								disabled={loading}
-								onClick={() => EnglishPackStore.setVocabCountInput(String(n))}
+								onClick={() =>
+									EnglishPackStore.setVocabCountInput(
+										countInput === String(n) ? '' : String(n),
+									)
+								}
 								className={cn(
-									'flex-1 rounded-md border bg-theme/5 px-0 py-1 text-xs font-medium transition-colors',
+									'flex-1 rounded-md border bg-teal-500/15 hover:bg-teal-500/20 px-0 py-1 text-xs font-medium transition-colors',
 									countInput === String(n)
-										? 'border-teal-500/35 text-teal-500'
-										: 'border-theme/10 text-textcolor/65 hover:border-teal-500/20 hover:text-teal-500',
+										? 'border-teal-500/35 text-teal-500 bg-teal-500/20'
+										: 'border-teal-500/10 text-textcolor hover:border-teal-500/20 hover:text-teal-500 hover:bg-teal-500/20',
 								)}
 							>
 								{n}
@@ -487,7 +491,6 @@ function VocabularyPackSectionInner() {
 						size="sm"
 						onClick={() => setHistoryDrawerOpen(true)}
 						className="flex-1 text-white hover:bg-linear-to-r hover:from-teal-400 hover:to-cyan-600 bg-linear-to-r from-teal-500 to-cyan-600 h-9 shrink-0 whitespace-nowrap rounded-md"
-						title={t('englishLearning.vocab.historyOpenDrawer')}
 					>
 						<span className="max-[380px]:sr-only">
 							{t('englishLearning.vocab.historyOpenDrawer')}

@@ -235,10 +235,10 @@ function EnglishLearningPackStreamPageInner() {
 									</span>
 								</p>
 							) : null}
-							{masterSearchOrganic.length > 0 ? (
-								<MasterWebSearchResultsBar items={masterSearchOrganic} t={t} />
-							) : null}
 						</div>
+						{masterSearchOrganic.length > 0 ? (
+							<MasterWebSearchResultsBar items={masterSearchOrganic} t={t} />
+						) : null}
 						<PackStreamHistoryDrawerTrigger
 							kind={kind}
 							loadedStreamId={historyStreamId}

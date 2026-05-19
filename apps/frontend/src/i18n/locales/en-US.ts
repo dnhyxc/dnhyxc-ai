@@ -968,7 +968,6 @@ export const enUS = {
 	'englishLearning.vocab.generate': 'Fetch word list',
 	'englishLearning.vocab.empty': 'No items returned; try another topic',
 	'englishLearning.vocab.playWord': 'Play word',
-	'englishLearning.vocab.pos': 'Part of speech (e.g. n, v, adj)',
 	'englishLearning.vocab.favoriteWord': 'Save word',
 	'englishLearning.vocab.unfavoriteWord': 'Remove from saved',
 	'englishLearning.vocab.listHeading': 'Words',

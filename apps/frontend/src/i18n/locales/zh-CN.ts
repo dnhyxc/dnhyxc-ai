@@ -869,7 +869,6 @@ export const zhCN = {
 	'englishLearning.vocab.generate': '生成单词',
 	'englishLearning.vocab.empty': '未返回词条，请换主题重试',
 	'englishLearning.vocab.playWord': '朗读该词',
-	'englishLearning.vocab.pos': '词性（英文缩写，如 n、v、adj）',
 	'englishLearning.vocab.favoriteWord': '收藏该词',
 	'englishLearning.vocab.unfavoriteWord': '取消收藏',
 	'englishLearning.vocab.listHeading': '单词列表',

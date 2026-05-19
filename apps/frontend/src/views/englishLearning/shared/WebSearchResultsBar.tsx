@@ -1,9 +1,10 @@
 /**
  * 单词包 / 经典句主检索阶段：展示本次拉取中 `internet_search` 返回的网页列表（抽屉）。
  */
+
+import { Globe } from 'lucide-react';
 import { useState } from 'react';
 import SearchOrganics from '@/components/design/ChatAssistantMessage/SearchOrganics';
-import { Button } from '@/components/ui';
 import type { ChatI18nT, SearchOrganicItem } from '@/types/chat';
 
 export function MasterWebSearchResultsBar({
@@ -17,15 +18,15 @@ export function MasterWebSearchResultsBar({
 	if (!items.length) return null;
 	return (
 		<>
-			<Button
-				type="button"
-				variant="link"
-				size="sm"
-				className="text-teal-500 hover:text-teal-400 h-auto min-h-0 px-0 py-0 text-sm font-normal"
+			<div
+				className="cursor-pointer text-teal-500 hover:text-teal-400 flex items-center shrink-0 gap-1.5 whitespace-nowrap text-sm font-medium"
 				onClick={() => setDrawerOpen(true)}
 			>
-				{t('englishLearning.webSearch.viewPages', { n: items.length })}
-			</Button>
+				<Globe className="size-4 shrink-0 opacity-90" aria-hidden />
+				<span>
+					{t('englishLearning.webSearch.viewPages', { n: items.length })}
+				</span>
+			</div>
 			<SearchOrganics
 				open={drawerOpen}
 				onOpenChange={setDrawerOpen}

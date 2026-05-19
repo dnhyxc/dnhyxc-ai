@@ -105,8 +105,8 @@ const EnglishLearningMessageRow = observer(function EnglishLearningMessageRow({
 				className={cn(
 					'message-md-wrap relative mb-5 flex min-w-0 max-w-full select-auto rounded-md p-4 text-textcolor',
 					message.role === 'user'
-						? 'w-fit max-w-[min(100%,36rem)] border border-teal-500/20 bg-teal-500/8 px-4 pt-2 pb-2.5'
-						: 'w-full border border-theme/12 bg-theme-secondary/60 py-3',
+						? 'w-fit max-w-[min(100%,36rem)] border border-teal-500/5 bg-teal-500/8 px-4 pt-2 pb-2.5'
+						: 'w-full border border-theme/5 bg-theme-secondary/60 py-3',
 				)}
 			>
 				{message.role === 'user' ? (
@@ -403,8 +403,9 @@ export const AgentPanel = observer(function AgentPanel({
 						chatInputRef={chatInputRef}
 						input={input}
 						setInput={setInput}
-						className="w-full px-0 pb-4.5 border-theme/10"
+						className="w-full px-0 pb-4.5"
 						textareaClassName="min-h-12 rounded-md"
+						inputWrapClassName="border-theme/5"
 						sendMessage={handleSendMessage}
 						placeholder={t('englishLearning.placeholder')}
 						disableTextInput={false}
@@ -447,7 +448,7 @@ export const AgentPanel = observer(function AgentPanel({
 				</div>
 			) : messages.length === 0 ? (
 				<div className="text-textcolor/70 mx-auto flex max-w-3xl w-full flex-1 flex-col justify-between self-stretch pt-4.5 px-4.5 text-sm">
-					<div className="border-theme/10 bg-theme/5 flex w-full gap-2 rounded-md border p-3">
+					<div className="border-theme/5 bg-theme/2 flex w-full gap-2 rounded-md border p-3">
 						<Atom
 							size={18}
 							className="mt-[3px] shrink-0 text-teal-500 opacity-80"

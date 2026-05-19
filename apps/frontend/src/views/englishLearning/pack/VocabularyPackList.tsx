@@ -121,10 +121,7 @@ function VocabularyPackListInner({ history }: VocabularyPackListProps) {
 												{item.word}
 											</div>
 											{item.pos?.trim() ? (
-												<span
-													className="text-textcolor/55 shrink-0 text-xs font-medium tracking-wide"
-													title={t('englishLearning.vocab.pos')}
-												>
+												<span className="text-textcolor/55 shrink-0 text-xs font-medium tracking-wide">
 													{item.pos.endsWith('.') ? item.pos : `${item.pos}.`}
 												</span>
 											) : null}

@@ -398,7 +398,7 @@ function ClassicQuotesSectionInner() {
 				value={topic}
 				onChange={(e) => EnglishPackStore.setClassicTopic(e.target.value)}
 				placeholder={t('englishLearning.classic.topicPlaceholder')}
-				className="h-9 w-full border-theme/10 bg-theme/5 focus-visible:border-theme/10 focus-visible:ring-0 mt-0.5 mb-3.5"
+				className="h-9 w-full border-theme/5 bg-theme/5 focus-visible:border-theme/10 focus-visible:ring-0 mt-0.5 mb-3.5"
 				disabled={loading}
 			/>
 
@@ -423,7 +423,7 @@ function ClassicQuotesSectionInner() {
 						}
 						onBlur={normalizeCountOnBlur}
 						disabled={loading}
-						className="mt-0.5 h-9 w-full border-theme/10 bg-theme/5 focus-visible:border-theme/10 focus-visible:ring-0"
+						className="mt-0.5 h-9 w-full border-theme/5 bg-theme/5 focus-visible:border-theme/10 focus-visible:ring-0"
 					/>
 					<div
 						id="english-classic-count-hint"
@@ -438,12 +438,16 @@ function ClassicQuotesSectionInner() {
 								size="sm"
 								variant="outline"
 								disabled={loading}
-								onClick={() => EnglishPackStore.setClassicCountInput(String(n))}
+								onClick={() =>
+									EnglishPackStore.setClassicCountInput(
+										countInput === String(n) ? '' : String(n),
+									)
+								}
 								className={cn(
-									'flex-1 rounded-md border bg-theme/5 px-0 py-1 text-xs font-medium transition-colors',
+									'flex-1 rounded-md border bg-violet-500/15 hover:bg-violet-500/20 px-0 py-1 text-xs font-medium transition-colors',
 									countInput === String(n)
-										? 'border-teal-500/35 text-teal-500'
-										: 'border-theme/10 text-textcolor/65 hover:border-teal-500/20 hover:text-teal-500',
+										? 'border-violet-500/35 text-violet-500 bg-violet-500/20'
+										: 'border-violet-500/10 text-textcolor hover:border-violet-500/20 hover:text-violet-500 hover:bg-violet-500/20',
 								)}
 							>
 								{n}
@@ -480,7 +484,6 @@ function ClassicQuotesSectionInner() {
 						size="sm"
 						onClick={() => setHistoryDrawerOpen(true)}
 						className="flex-1 text-white hover:bg-linear-to-r hover:from-indigo-400 hover:to-indigo-600 bg-linear-to-r from-indigo-500 to-indigo-600 h-9 shrink-0 whitespace-nowrap rounded-md"
-						title={t('englishLearning.classic.historyOpenDrawer')}
 					>
 						<span className="max-[380px]:sr-only">
 							{t('englishLearning.classic.historyOpenDrawer')}

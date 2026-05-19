@@ -310,7 +310,7 @@ function PackStreamHistoryDrawerTriggerInner({
 				)}
 				onClick={() => setHistoryDrawerOpen(true)}
 			>
-				<History className="size-4 shrink-0 opacity-80" aria-hidden />
+				<History className="size-4 shrink-0 opacity-90" aria-hidden />
 				<span>{openDrawerLabel}</span>
 			</div>
 			{isVocab ? (

@@ -59,10 +59,10 @@ function PackStreamLiveLinkInner({ kind, className }: PackStreamLiveLinkProps) {
 		? 'text-teal-600/90 dark:text-teal-400/90'
 		: 'text-indigo-600/90 dark:text-indigo-400/90';
 	const accentBorder = isVocab
-		? 'border-teal-500/10 bg-linear-to-r from-teal-500/8 to-cyan-600/8'
-		: 'border-violet-500/10 bg-linear-to-r from-violet-500/8 to-indigo-600/8';
+		? 'border-teal-500/6 bg-linear-to-r from-teal-500/18 to-cyan-600/18'
+		: 'border-violet-500/6 bg-linear-to-r from-violet-500/18 to-indigo-600/18';
 	const bgColor = isVocab
-		? 'bg-linear-to-r from-teal-500/30 to-cyan-600/30'
+		? 'bg-linear-to-r from-teal-500/35 to-cyan-600/30'
 		: 'bg-linear-to-r from-violet-500/30 to-indigo-600/30';
 
 	return (

@@ -305,10 +305,7 @@ export function VocabularyFavoritesPanel({
 																{row.word}
 															</span>
 															{row.pos?.trim() ? (
-																<span
-																	className="text-textcolor/50 shrink-0 text-xs font-medium tracking-wide"
-																	title={t('englishLearning.vocab.pos')}
-																>
+																<span className="text-textcolor/50 shrink-0 text-xs font-medium tracking-wide">
 																	{row.pos}
 																</span>
 															) : null}

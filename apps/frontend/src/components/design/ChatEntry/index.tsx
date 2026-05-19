@@ -155,6 +155,8 @@ interface ChatEntryProps {
 	placeholder?: string;
 	/** i18n 翻译函数（可选）；不传则沿用组件内默认中文文案 */
 	t?: ChatEntryT;
+	/** 输入框包裹样式 */
+	inputWrapClassName?: string;
 }
 
 const ChatEntry: React.FC<ChatEntryProps> = ({
@@ -181,6 +183,7 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 	disableTextInput = false,
 	placeholder: placeholderProp,
 	t,
+	inputWrapClassName,
 }) => {
 	const scrollContainer = useRef<HTMLDivElement>(null);
 	const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -793,7 +796,12 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 			<div className="mx-auto flex w-full max-w-3xl">
 				<div className="relative min-w-0 flex-1">
 					{children}
-					<div className="flex w-full max-w-3xl flex-col overflow-y-auto rounded-md border border-theme/10 bg-theme/2">
+					<div
+						className={cn(
+							'flex w-full max-w-3xl flex-col overflow-y-auto rounded-md border border-theme/10 bg-theme/2',
+							inputWrapClassName,
+						)}
+					>
 						{uploadedFiles && uploadedFiles?.length > 0 ? (
 							<div className="flex flex-1 flex-col rounded-md">
 								<div className="flex justify-between items-center mt-2.5 mb-0.5 px-3 text-sm text-textcolor/70">

@@ -35,7 +35,7 @@ const FavoriteSession = () => {
 					size="sm"
 					className={cn(
 						'h-9 min-w-0 flex-1 gap-2 rounded-md px-3 text-white',
-						'bg-linear-to-r from-orange-500 to-yellow-500 hover:bg-linear-to-r hover:from-orange-400 hover:to-yellow-600',
+						'bg-linear-to-r from-orange-500 to-yellow-500 hover:bg-linear-to-r hover:from-orange-400 hover:to-yellow-500',
 					)}
 					onClick={() => {
 						navigate('/english-learning/favorites?kind=vocab');
@@ -48,7 +48,7 @@ const FavoriteSession = () => {
 					size="sm"
 					className={cn(
 						'h-9 min-w-0 flex-1 gap-2 rounded-md px-3 text-white',
-						'bg-linear-to-r from-orange-500 to-yellow-500 hover:bg-linear-to-r hover:from-orange-400 hover:to-yellow-600',
+						'bg-linear-to-r from-orange-500 to-yellow-500 hover:bg-linear-to-r hover:from-orange-400 hover:to-yellow-500',
 					)}
 					onClick={() => {
 						navigate('/english-learning/favorites?kind=classic');
