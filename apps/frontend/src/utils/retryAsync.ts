@@ -53,3 +53,27 @@ export async function retryAsync<T>(
 	}
 	throw lastError;
 }
+
+/**
+ * 以有限并发执行任务工厂，返回结果顺序与 tasks 一致
+ */
+export async function runTasksWithConcurrency<T>(
+	tasks: Array<() => Promise<T>>,
+	concurrency: number,
+): Promise<T[]> {
+	if (tasks.length === 0) return [];
+	const results: T[] = new Array(tasks.length);
+	let nextIndex = 0;
+	const workerCount = Math.max(1, Math.min(concurrency, tasks.length));
+
+	async function worker() {
+		while (true) {
+			const index = nextIndex++;
+			if (index >= tasks.length) break;
+			results[index] = await tasks[index]();
+		}
+	}
+
+	await Promise.all(Array.from({ length: workerCount }, () => worker()));
+	return results;
+}

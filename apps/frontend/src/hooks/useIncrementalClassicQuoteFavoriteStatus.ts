@@ -55,18 +55,21 @@ export function useIncrementalClassicQuoteFavoriteStatus(
 			}
 			if (englishesToQuery.length === 0) return;
 
+			const mergeFavoritedKeys = (keys: string[]) => {
+				if (cancelled || keys.length === 0) return;
+				setFavoritedContentKeys((prev) => {
+					const next = new Set(prev);
+					for (const k of keys) next.add(k);
+					return next;
+				});
+			};
+
 			void (async () => {
 				try {
-					const res =
-						await fetchEnglishClassicQuoteFavoriteStatus(englishesToQuery);
-					if (cancelled) return;
-					const keys = res.data?.favoritedContentKeys;
-					if (!Array.isArray(keys) || keys.length === 0) return;
-					setFavoritedContentKeys((prev) => {
-						const next = new Set(prev);
-						for (const k of keys) next.add(k);
-						return next;
+					await fetchEnglishClassicQuoteFavoriteStatus(englishesToQuery, {
+						onPartialKeys: mergeFavoritedKeys,
 					});
+					if (cancelled) return;
 				} catch {
 					if (!cancelled) {
 						for (const english of englishesToQuery) {

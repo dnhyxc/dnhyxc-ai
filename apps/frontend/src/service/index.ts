@@ -1,5 +1,6 @@
 import CryptoJS from 'crypto-js';
 import {
+	FAVORITE_STATUS_HTTP_BATCH_CONCURRENCY,
 	FAVORITE_STATUS_HTTP_BATCH_SIZE,
 	VOCAB_FAVORITE_STATUS_BATCH_SIZE,
 } from '@/constant';
@@ -12,7 +13,7 @@ import type { SearchOrganicItem } from '@/types/chat';
 import { downloadBlob } from '@/utils';
 import type { EnglishPackWebSearchRoundDto } from '@/utils/englishPackWebSearchMerge';
 import { http } from '@/utils/fetch';
-import { retryAsync } from '@/utils/retryAsync';
+import { retryAsync, runTasksWithConcurrency } from '@/utils/retryAsync';
 import { isTauriRuntime } from '@/utils/runtime';
 import {
 	AGENT_SESSION,
@@ -769,11 +770,42 @@ export const removeEnglishVocabularyFavorite = async (word: string) => {
 	);
 };
 
-/** 收藏状态分批 POST：小批次 + 重试 + 批次间短间隔，降低滚动加载时的瞬时失败 */
+type FavoriteStatusBatchOptions = {
+	/** 每完成一小批 HTTP 即回调，便于 UI 渐进更新星标 */
+	onPartialKeys?: (keys: string[]) => void;
+};
+
+async function fetchFavoriteStatusHttpBatch(
+	url: string,
+	batch: string[],
+	bodyKey: 'words' | 'englishes',
+): Promise<string[]> {
+	return retryAsync(
+		async () => {
+			const res = await http.post<{
+				favoritedWordKeys?: string[];
+				favoritedContentKeys?: string[];
+			}>(url, { [bodyKey]: batch }, { silent: true });
+			const data = res.data;
+			if (bodyKey === 'words') {
+				return Array.isArray(data?.favoritedWordKeys)
+					? data.favoritedWordKeys
+					: [];
+			}
+			return Array.isArray(data?.favoritedContentKeys)
+				? data.favoritedContentKeys
+				: [];
+		},
+		{ retries: 2, delayMs: 350 },
+	);
+}
+
+/** 收藏状态分批 POST：小批次 + 有限并发 + 重试；chunk 间短间隔防请求风暴 */
 async function fetchFavoriteStatusInHttpBatches(
 	url: string,
 	words: string[],
 	bodyKey: 'words' | 'englishes',
+	options?: FavoriteStatusBatchOptions,
 ): Promise<string[]> {
 	const merged: string[] = [];
 	for (
@@ -785,31 +817,27 @@ async function fetchFavoriteStatusInHttpBatches(
 			chunkStart,
 			chunkStart + VOCAB_FAVORITE_STATUS_BATCH_SIZE,
 		);
+		const batches: string[][] = [];
 		for (let i = 0; i < chunk.length; i += FAVORITE_STATUS_HTTP_BATCH_SIZE) {
-			const batch = chunk.slice(i, i + FAVORITE_STATUS_HTTP_BATCH_SIZE);
-			const keys = await retryAsync(
-				async () => {
-					const res = await http.post<{
-						favoritedWordKeys?: string[];
-						favoritedContentKeys?: string[];
-					}>(url, { [bodyKey]: batch }, { silent: true });
-					const data = res.data;
-					if (bodyKey === 'words') {
-						return Array.isArray(data?.favoritedWordKeys)
-							? data.favoritedWordKeys
-							: [];
-					}
-					return Array.isArray(data?.favoritedContentKeys)
-						? data.favoritedContentKeys
-						: [];
-				},
-				{ retries: 2, delayMs: 350 },
-			);
-			merged.push(...keys);
-			if (i + FAVORITE_STATUS_HTTP_BATCH_SIZE < chunk.length) {
-				await new Promise((resolve) => setTimeout(resolve, 50));
-			}
+			batches.push(chunk.slice(i, i + FAVORITE_STATUS_HTTP_BATCH_SIZE));
 		}
+
+		const chunkKeyLists = await runTasksWithConcurrency(
+			batches.map(
+				(batch) => () =>
+					fetchFavoriteStatusHttpBatch(url, batch, bodyKey).then((keys) => {
+						if (keys.length > 0) {
+							options?.onPartialKeys?.(keys);
+						}
+						return keys;
+					}),
+			),
+			FAVORITE_STATUS_HTTP_BATCH_CONCURRENCY,
+		);
+		for (const keys of chunkKeyLists) {
+			merged.push(...keys);
+		}
+
 		if (chunkStart + VOCAB_FAVORITE_STATUS_BATCH_SIZE < words.length) {
 			await new Promise((resolve) => setTimeout(resolve, 50));
 		}
@@ -817,12 +845,18 @@ async function fetchFavoriteStatusInHttpBatches(
 	return merged;
 }
 
+export type FetchEnglishFavoriteStatusOptions = FavoriteStatusBatchOptions;
+
 /** 查询当前列表中哪些词已收藏（返回规范化词形）；自动小批请求并合并 */
-export const fetchEnglishVocabularyFavoriteStatus = async (words: string[]) => {
+export const fetchEnglishVocabularyFavoriteStatus = async (
+	words: string[],
+	options?: FetchEnglishFavoriteStatusOptions,
+) => {
 	const favoritedWordKeys = await fetchFavoriteStatusInHttpBatches(
 		`${ENGLISH_LEARNING_VOCABULARY_FAVORITES}/status`,
 		words,
 		'words',
+		options,
 	);
 	return {
 		code: 200,
@@ -963,11 +997,13 @@ export const removeEnglishClassicQuoteFavorite = async (english: string) => {
 
 export const fetchEnglishClassicQuoteFavoriteStatus = async (
 	englishes: string[],
+	options?: FetchEnglishFavoriteStatusOptions,
 ) => {
 	const favoritedContentKeys = await fetchFavoriteStatusInHttpBatches(
 		`${ENGLISH_LEARNING_CLASSIC_QUOTES_FAVORITES}/status`,
 		englishes,
 		'englishes',
+		options,
 	);
 	return {
 		code: 200,

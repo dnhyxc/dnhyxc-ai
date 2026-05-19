@@ -62,6 +62,8 @@ export const PACK_ITEMS_PAGE_SIZE = 100;
 export const VOCAB_FAVORITE_STATUS_BATCH_SIZE = 500;
 /** 收藏状态 HTTP 分批大小（降低单次 payload，减轻 Tauri 瞬时网络失败） */
 export const FAVORITE_STATUS_HTTP_BATCH_SIZE = 50;
+/** 同一逻辑 chunk 内并行查询 /status 的 HTTP 批次数上限（加快星标展示，仍控总 QPS） */
+export const FAVORITE_STATUS_HTTP_BATCH_CONCURRENCY = 3;
 
 /** 英文经典语句生成的最小数量（前端和后端校验均需保持一致） */
 export const QUOTE_COUNT_MIN = 1;
