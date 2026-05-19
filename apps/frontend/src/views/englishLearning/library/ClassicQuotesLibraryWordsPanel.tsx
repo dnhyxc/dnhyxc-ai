@@ -2,22 +2,11 @@
  * 资源库页：右侧经典语句列表（滚动分页加载）
  */
 import Loading from '@design/Loading';
-import { Button, ScrollArea, Toast } from '@ui/index';
-import { Loader2, Square, Star, Volume2 } from 'lucide-react';
-import {
-	type UIEventHandler,
-	useCallback,
-	useEffect,
-	useMemo,
-	useRef,
-	useState,
-} from 'react';
+import { Button, ScrollArea, Spinner, Toast } from '@ui/index';
+import { Square, Star, Volume2 } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
-import {
-	SCROLL_LOAD_THRESHOLD_PX,
-	VOCAB_LIBRARY_ITEMS_PAGE_SIZE,
-} from '@/constant';
-import { useI18n } from '@/hooks';
+import { useI18n, useIncrementalClassicQuoteFavoriteStatus } from '@/hooks';
 import { cn } from '@/lib/utils';
 import type { EnglishClassicQuoteItem } from '@/service';
 import {
@@ -25,7 +14,6 @@ import {
 	classicQuoteFavoriteContentKey,
 	type EnglishClassicQuotesLibraryItemRow,
 	type EnglishClassicQuotesLibraryListItem,
-	fetchEnglishClassicQuoteFavoriteStatus,
 	listEnglishClassicQuotesLibraryItems,
 	removeEnglishClassicQuoteFavorite,
 } from '@/service';
@@ -33,6 +21,7 @@ import {
 	playEnglishPreferred,
 	stopAllEnglishPlayback,
 } from '@/utils/englishTts';
+import { useLibraryWordsList } from './useLibraryWordsList';
 
 export type ClassicQuotesLibraryWordsPanelProps = {
 	libraryId: string | null;
@@ -45,129 +34,45 @@ export function ClassicQuotesLibraryWordsPanel({
 }: ClassicQuotesLibraryWordsPanelProps) {
 	const { t } = useI18n();
 	const navigate = useNavigate();
-	const [items, setItems] = useState<EnglishClassicQuotesLibraryItemRow[]>([]);
-	const [resolvedLibrary, setResolvedLibrary] =
-		useState<EnglishClassicQuotesLibraryListItem | null>(null);
-	const [loading, setLoading] = useState(false);
-	const [loadingMore, setLoadingMore] = useState(false);
 	const [playingKey, setPlayingKey] = useState<string | null>(null);
-	const [favoritedContentKeys, setFavoritedContentKeys] = useState<Set<string>>(
-		() => new Set(),
-	);
 	const [favoriteActionKey, setFavoriteActionKey] = useState<string | null>(
 		null,
 	);
-	const offsetRef = useRef(0);
-	const hasMoreRef = useRef(true);
-	const fetchingMoreRef = useRef(false);
-	const libraryIdRef = useRef<string | null>(null);
 
-	const itemsEnglishSig = useMemo(
-		() => items.map((it) => it.english).join('\u0001'),
-		[items],
+	const fetchClassicPage = useCallback(
+		async (id: string, limit: number, offset: number) => {
+			const res = await listEnglishClassicQuotesLibraryItems(id, {
+				limit,
+				offset,
+				silent: true,
+			});
+			if (!res.data) {
+				throw new Error('empty library items response');
+			}
+			return {
+				library: res.data.library,
+				items: Array.isArray(res.data.items) ? res.data.items : [],
+			};
+		},
+		[],
 	);
 
-	useEffect(() => {
-		if (items.length === 0) {
-			setFavoritedContentKeys(new Set());
-			return;
-		}
-		let cancelled = false;
-		void (async () => {
-			try {
-				const res = await fetchEnglishClassicQuoteFavoriteStatus(
-					items.map((i) => i.english),
-				);
-				if (cancelled) return;
-				const keys = res.data?.favoritedContentKeys;
-				setFavoritedContentKeys(new Set(Array.isArray(keys) ? keys : []));
-			} catch {
-				if (!cancelled) setFavoritedContentKeys(new Set());
-			}
-		})();
-		return () => {
-			cancelled = true;
-		};
-	}, [itemsEnglishSig]);
+	const { items, resolvedLibrary, loading, loadingMore, onViewportScroll } =
+		useLibraryWordsList<
+			EnglishClassicQuotesLibraryItemRow,
+			EnglishClassicQuotesLibraryListItem
+		>({
+			libraryId,
+			fetchPage: fetchClassicPage,
+		});
 
-	const fetchFirstPage = useCallback(async (id: string) => {
-		fetchingMoreRef.current = false;
-		setLoading(true);
-		setLoadingMore(false);
-		offsetRef.current = 0;
-		hasMoreRef.current = true;
-		setItems([]);
-		setResolvedLibrary(null);
-		try {
-			const res = await listEnglishClassicQuotesLibraryItems(id, {
-				limit: VOCAB_LIBRARY_ITEMS_PAGE_SIZE,
-				offset: 0,
-			});
-			if (res.data?.library) {
-				setResolvedLibrary(res.data.library);
-			}
-			const list = Array.isArray(res.data?.items) ? res.data.items : [];
-			setItems(list);
-			offsetRef.current = list.length;
-			hasMoreRef.current = list.length >= VOCAB_LIBRARY_ITEMS_PAGE_SIZE;
-		} catch {
-			setItems([]);
-			hasMoreRef.current = false;
-		} finally {
-			setLoading(false);
-		}
-	}, []);
-
-	const fetchMore = useCallback(async () => {
-		const id = libraryIdRef.current;
-		if (!id || !hasMoreRef.current || fetchingMoreRef.current || loading) {
-			return;
-		}
-		fetchingMoreRef.current = true;
-		setLoadingMore(true);
-		const offset = offsetRef.current;
-		try {
-			const res = await listEnglishClassicQuotesLibraryItems(id, {
-				limit: VOCAB_LIBRARY_ITEMS_PAGE_SIZE,
-				offset,
-			});
-			const chunk = Array.isArray(res.data?.items) ? res.data.items : [];
-			if (chunk.length === 0) {
-				hasMoreRef.current = false;
-				return;
-			}
-			setItems((prev) => [...prev, ...chunk]);
-			offsetRef.current += chunk.length;
-			hasMoreRef.current = chunk.length >= VOCAB_LIBRARY_ITEMS_PAGE_SIZE;
-		} catch {
-			hasMoreRef.current = false;
-		} finally {
-			fetchingMoreRef.current = false;
-			setLoadingMore(false);
-		}
-	}, [loading]);
+	const { favoritedContentKeys, setFavoritedContentKeys } =
+		useIncrementalClassicQuoteFavoriteStatus(items);
 
 	useEffect(() => {
 		stopAllEnglishPlayback();
 		setPlayingKey(null);
-		libraryIdRef.current = libraryId;
-		if (!libraryId) {
-			setItems([]);
-			return;
-		}
-		void fetchFirstPage(libraryId);
-	}, [libraryId, fetchFirstPage]);
-
-	const onViewportScroll = useCallback<UIEventHandler<HTMLDivElement>>(
-		(e) => {
-			const el = e.currentTarget;
-			const rest = el.scrollHeight - el.scrollTop - el.clientHeight;
-			if (rest < SCROLL_LOAD_THRESHOLD_PX) {
-				void fetchMore();
-			}
-		},
-		[fetchMore],
-	);
+	}, [libraryId]);
 
 	const toggleQuoteAudio = useCallback(
 		async (text: string, key: string) => {
@@ -366,8 +271,8 @@ export function ClassicQuotesLibraryWordsPanel({
 							</div>
 						) : null}
 						{loadingMore ? (
-							<div className="text-textcolor/50 flex items-center justify-center gap-1.5 py-4 text-xs">
-								<Loader2 className="size-3.5 animate-spin" aria-hidden />
+							<div className="col-span-full text-textcolor/50 flex items-center justify-center gap-1.5 py-4 text-xs">
+								<Spinner className="size-3.5 text-textcolor/50" aria-hidden />
 								{t('common.loadingMore')}
 							</div>
 						) : null}

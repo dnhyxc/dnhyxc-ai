@@ -2,20 +2,10 @@
  * 资源库页：右侧单词列表（滚动分页加载）
  */
 import Loading from '@design/Loading';
-import { Button, ScrollArea, Toast } from '@ui/index';
-import { Loader2, Square, Star, Volume2 } from 'lucide-react';
-import {
-	type UIEventHandler,
-	useCallback,
-	useEffect,
-	useRef,
-	useState,
-} from 'react';
+import { Button, ScrollArea, Spinner, Toast } from '@ui/index';
+import { Square, Star, Volume2 } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
-import {
-	SCROLL_LOAD_THRESHOLD_PX,
-	VOCAB_LIBRARY_ITEMS_PAGE_SIZE,
-} from '@/constant';
 import { useI18n, useIncrementalVocabFavoriteStatus } from '@/hooks';
 import { cn } from '@/lib/utils';
 import type { EnglishVocabularyItem } from '@/service';
@@ -32,6 +22,7 @@ import {
 	playEnglishPreferred,
 	stopAllEnglishPlayback,
 } from '@/utils/englishTts';
+import { useLibraryWordsList } from './useLibraryWordsList';
 
 export type VocabularyLibraryWordsPanelProps = {
 	libraryId: string | null;
@@ -44,100 +35,45 @@ export function VocabularyLibraryWordsPanel({
 }: VocabularyLibraryWordsPanelProps) {
 	const { t } = useI18n();
 	const navigate = useNavigate();
-	const [items, setItems] = useState<EnglishVocabularyLibraryItemRow[]>([]);
-	const [resolvedLibrary, setResolvedLibrary] =
-		useState<EnglishVocabularyLibraryListItem | null>(null);
-	const [loading, setLoading] = useState(false);
-	const [loadingMore, setLoadingMore] = useState(false);
 	const [playingKey, setPlayingKey] = useState<string | null>(null);
-	const { favoritedWordKeys, setFavoritedWordKeys } =
-		useIncrementalVocabFavoriteStatus(items);
 	const [favoriteActionKey, setFavoriteActionKey] = useState<string | null>(
 		null,
 	);
-	const offsetRef = useRef(0);
-	const hasMoreRef = useRef(true);
-	const fetchingMoreRef = useRef(false);
-	const libraryIdRef = useRef<string | null>(null);
 
-	const fetchFirstPage = useCallback(async (id: string) => {
-		fetchingMoreRef.current = false;
-		setLoading(true);
-		setLoadingMore(false);
-		offsetRef.current = 0;
-		hasMoreRef.current = true;
-		setItems([]);
-		setResolvedLibrary(null);
-		try {
+	const fetchVocabPage = useCallback(
+		async (id: string, limit: number, offset: number) => {
 			const res = await listEnglishVocabularyLibraryItems(id, {
-				limit: VOCAB_LIBRARY_ITEMS_PAGE_SIZE,
-				offset: 0,
-			});
-			if (res.data?.library) {
-				setResolvedLibrary(res.data.library);
-			}
-			const list = Array.isArray(res.data?.items) ? res.data.items : [];
-			setItems(list);
-			offsetRef.current = list.length;
-			hasMoreRef.current = list.length >= VOCAB_LIBRARY_ITEMS_PAGE_SIZE;
-		} catch {
-			setItems([]);
-			hasMoreRef.current = false;
-		} finally {
-			setLoading(false);
-		}
-	}, []);
-
-	const fetchMore = useCallback(async () => {
-		const id = libraryIdRef.current;
-		if (!id || !hasMoreRef.current || fetchingMoreRef.current || loading) {
-			return;
-		}
-		fetchingMoreRef.current = true;
-		setLoadingMore(true);
-		const offset = offsetRef.current;
-		try {
-			const res = await listEnglishVocabularyLibraryItems(id, {
-				limit: VOCAB_LIBRARY_ITEMS_PAGE_SIZE,
+				limit,
 				offset,
+				silent: true,
 			});
-			const chunk = Array.isArray(res.data?.items) ? res.data.items : [];
-			if (chunk.length === 0) {
-				hasMoreRef.current = false;
-				return;
+			if (!res.data) {
+				throw new Error('empty library items response');
 			}
-			setItems((prev) => [...prev, ...chunk]);
-			offsetRef.current += chunk.length;
-			hasMoreRef.current = chunk.length >= VOCAB_LIBRARY_ITEMS_PAGE_SIZE;
-		} catch {
-			hasMoreRef.current = false;
-		} finally {
-			fetchingMoreRef.current = false;
-			setLoadingMore(false);
-		}
-	}, [loading]);
+			return {
+				library: res.data.library,
+				items: Array.isArray(res.data.items) ? res.data.items : [],
+			};
+		},
+		[],
+	);
+
+	const { items, resolvedLibrary, loading, loadingMore, onViewportScroll } =
+		useLibraryWordsList<
+			EnglishVocabularyLibraryItemRow,
+			EnglishVocabularyLibraryListItem
+		>({
+			libraryId,
+			fetchPage: fetchVocabPage,
+		});
+
+	const { favoritedWordKeys, setFavoritedWordKeys } =
+		useIncrementalVocabFavoriteStatus(items);
 
 	useEffect(() => {
 		stopAllEnglishPlayback();
 		setPlayingKey(null);
-		libraryIdRef.current = libraryId;
-		if (!libraryId) {
-			setItems([]);
-			return;
-		}
-		void fetchFirstPage(libraryId);
-	}, [libraryId, fetchFirstPage]);
-
-	const onViewportScroll = useCallback<UIEventHandler<HTMLDivElement>>(
-		(e) => {
-			const el = e.currentTarget;
-			const rest = el.scrollHeight - el.scrollTop - el.clientHeight;
-			if (rest < SCROLL_LOAD_THRESHOLD_PX) {
-				void fetchMore();
-			}
-		},
-		[fetchMore],
-	);
+	}, [libraryId]);
 
 	const toggleWordAudio = useCallback(
 		async (word: string, key: string) => {
@@ -343,8 +279,8 @@ export function VocabularyLibraryWordsPanel({
 							</div>
 						) : null}
 						{loadingMore ? (
-							<div className="text-textcolor/50 flex items-center justify-center gap-1.5 py-4 text-xs">
-								<Loader2 className="size-3.5 animate-spin" aria-hidden />
+							<div className="col-span-full text-textcolor/50 flex items-center justify-center gap-1.5 py-4 text-xs">
+								<Spinner className="size-3.5 text-textcolor/50" aria-hidden />
 								{t('common.loadingMore')}
 							</div>
 						) : null}

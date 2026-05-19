@@ -1,5 +1,8 @@
 import CryptoJS from 'crypto-js';
-import { VOCAB_FAVORITE_STATUS_BATCH_SIZE } from '@/constant';
+import {
+	FAVORITE_STATUS_HTTP_BATCH_SIZE,
+	VOCAB_FAVORITE_STATUS_BATCH_SIZE,
+} from '@/constant';
 import {
 	type KnowledgeListItem,
 	type KnowledgeRecord,
@@ -9,6 +12,7 @@ import type { SearchOrganicItem } from '@/types/chat';
 import { downloadBlob } from '@/utils';
 import type { EnglishPackWebSearchRoundDto } from '@/utils/englishPackWebSearchMerge';
 import { http } from '@/utils/fetch';
+import { retryAsync } from '@/utils/retryAsync';
 import { isTauriRuntime } from '@/utils/runtime';
 import {
 	AGENT_SESSION,
@@ -648,7 +652,7 @@ export const deleteEnglishVocabularyLibrary = async (libraryId: string) => {
 /** 分页列出某单词库内的词条 */
 export const listEnglishVocabularyLibraryItems = async (
 	libraryId: string,
-	options?: { limit?: number; offset?: number },
+	options?: { limit?: number; offset?: number; silent?: boolean },
 ) => {
 	return await http.get<{
 		library: EnglishVocabularyLibraryListItem;
@@ -659,6 +663,7 @@ export const listEnglishVocabularyLibraryItems = async (
 			limit: options?.limit ?? 50,
 			offset: options?.offset ?? 0,
 		},
+		silent: options?.silent,
 	});
 };
 
@@ -727,7 +732,7 @@ export const deleteEnglishClassicQuotesLibrary = async (libraryId: string) => {
 /** 分页列出某经典语句库内的语句 */
 export const listEnglishClassicQuotesLibraryItems = async (
 	libraryId: string,
-	options?: { limit?: number; offset?: number },
+	options?: { limit?: number; offset?: number; silent?: boolean },
 ) => {
 	return await http.get<{
 		library: EnglishClassicQuotesLibraryListItem;
@@ -738,6 +743,7 @@ export const listEnglishClassicQuotesLibraryItems = async (
 			limit: options?.limit ?? 50,
 			offset: options?.offset ?? 0,
 		},
+		silent: options?.silent,
 	});
 };
 
@@ -763,31 +769,65 @@ export const removeEnglishVocabularyFavorite = async (word: string) => {
 	);
 };
 
-/** 查询当前列表中哪些词已收藏（返回规范化词形）；超过单次上限时自动分批请求并合并 */
-export const fetchEnglishVocabularyFavoriteStatus = async (words: string[]) => {
-	if (words.length <= VOCAB_FAVORITE_STATUS_BATCH_SIZE) {
-		return await http.post<{ favoritedWordKeys: string[] }>(
-			`${ENGLISH_LEARNING_VOCABULARY_FAVORITES}/status`,
-			{ words },
+/** 收藏状态分批 POST：小批次 + 重试 + 批次间短间隔，降低滚动加载时的瞬时失败 */
+async function fetchFavoriteStatusInHttpBatches(
+	url: string,
+	words: string[],
+	bodyKey: 'words' | 'englishes',
+): Promise<string[]> {
+	const merged: string[] = [];
+	for (
+		let chunkStart = 0;
+		chunkStart < words.length;
+		chunkStart += VOCAB_FAVORITE_STATUS_BATCH_SIZE
+	) {
+		const chunk = words.slice(
+			chunkStart,
+			chunkStart + VOCAB_FAVORITE_STATUS_BATCH_SIZE,
 		);
-	}
-	const favoritedWordKeys: string[] = [];
-	let lastRes: Awaited<
-		ReturnType<typeof http.post<{ favoritedWordKeys: string[] }>>
-	>;
-	for (let i = 0; i < words.length; i += VOCAB_FAVORITE_STATUS_BATCH_SIZE) {
-		const batch = words.slice(i, i + VOCAB_FAVORITE_STATUS_BATCH_SIZE);
-		lastRes = await http.post<{ favoritedWordKeys: string[] }>(
-			`${ENGLISH_LEARNING_VOCABULARY_FAVORITES}/status`,
-			{ words: batch },
-		);
-		const keys = lastRes.data?.favoritedWordKeys;
-		if (Array.isArray(keys)) {
-			favoritedWordKeys.push(...keys);
+		for (let i = 0; i < chunk.length; i += FAVORITE_STATUS_HTTP_BATCH_SIZE) {
+			const batch = chunk.slice(i, i + FAVORITE_STATUS_HTTP_BATCH_SIZE);
+			const keys = await retryAsync(
+				async () => {
+					const res = await http.post<{
+						favoritedWordKeys?: string[];
+						favoritedContentKeys?: string[];
+					}>(url, { [bodyKey]: batch }, { silent: true });
+					const data = res.data;
+					if (bodyKey === 'words') {
+						return Array.isArray(data?.favoritedWordKeys)
+							? data.favoritedWordKeys
+							: [];
+					}
+					return Array.isArray(data?.favoritedContentKeys)
+						? data.favoritedContentKeys
+						: [];
+				},
+				{ retries: 2, delayMs: 350 },
+			);
+			merged.push(...keys);
+			if (i + FAVORITE_STATUS_HTTP_BATCH_SIZE < chunk.length) {
+				await new Promise((resolve) => setTimeout(resolve, 50));
+			}
+		}
+		if (chunkStart + VOCAB_FAVORITE_STATUS_BATCH_SIZE < words.length) {
+			await new Promise((resolve) => setTimeout(resolve, 50));
 		}
 	}
+	return merged;
+}
+
+/** 查询当前列表中哪些词已收藏（返回规范化词形）；自动小批请求并合并 */
+export const fetchEnglishVocabularyFavoriteStatus = async (words: string[]) => {
+	const favoritedWordKeys = await fetchFavoriteStatusInHttpBatches(
+		`${ENGLISH_LEARNING_VOCABULARY_FAVORITES}/status`,
+		words,
+		'words',
+	);
 	return {
-		...lastRes!,
+		code: 200,
+		success: true,
+		message: '',
 		data: { favoritedWordKeys },
 	};
 };
@@ -806,6 +846,7 @@ export type EnglishVocabularyFavoriteListEntry = {
 export const listEnglishVocabularyFavorites = async (options?: {
 	limit?: number;
 	offset?: number;
+	silent?: boolean;
 }) => {
 	return await http.get<EnglishVocabularyFavoriteListEntry[]>(
 		ENGLISH_LEARNING_VOCABULARY_FAVORITES,
@@ -814,6 +855,7 @@ export const listEnglishVocabularyFavorites = async (options?: {
 				limit: options?.limit ?? 20,
 				offset: options?.offset ?? 0,
 			},
+			silent: options?.silent,
 		},
 	);
 };
@@ -922,10 +964,17 @@ export const removeEnglishClassicQuoteFavorite = async (english: string) => {
 export const fetchEnglishClassicQuoteFavoriteStatus = async (
 	englishes: string[],
 ) => {
-	return await http.post<{ favoritedContentKeys: string[] }>(
+	const favoritedContentKeys = await fetchFavoriteStatusInHttpBatches(
 		`${ENGLISH_LEARNING_CLASSIC_QUOTES_FAVORITES}/status`,
-		{ englishes },
+		englishes,
+		'englishes',
 	);
+	return {
+		code: 200,
+		success: true,
+		message: '',
+		data: { favoritedContentKeys },
+	};
 };
 
 /** 经典句收藏分页列表项（GET 收藏记录） */
@@ -941,6 +990,7 @@ export type EnglishClassicQuoteFavoriteListEntry = {
 export const listEnglishClassicQuoteFavorites = async (options?: {
 	limit?: number;
 	offset?: number;
+	silent?: boolean;
 }) => {
 	return await http.get<EnglishClassicQuoteFavoriteListEntry[]>(
 		ENGLISH_LEARNING_CLASSIC_QUOTES_FAVORITES,
@@ -949,6 +999,7 @@ export const listEnglishClassicQuoteFavorites = async (options?: {
 				limit: options?.limit ?? 20,
 				offset: options?.offset ?? 0,
 			},
+			silent: options?.silent,
 		},
 	);
 };

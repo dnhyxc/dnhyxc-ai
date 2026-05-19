@@ -818,6 +818,10 @@ export const enUS = {
 	'englishLearning.library.quotesHeading': '{count} quotes',
 	'englishLearning.library.listCount': '{count} items',
 	'englishLearning.library.wordsLoading': 'Loading words…',
+	'englishLearning.library.wordsLoadFailed':
+		'Failed to load items. Please try again later.',
+	'englishLearning.library.wordsLoadMoreFailed':
+		'Failed to load more. Scroll again or try later.',
 	'englishLearning.library.quotesLoading': 'Loading quotes…',
 	'englishLearning.favorites.bank': 'Favorites',
 	'englishLearning.favorites.sidebarTitle': 'Categories',
@@ -826,6 +830,10 @@ export const enUS = {
 	'englishLearning.favorites.classic.nav': 'Quotes',
 	'englishLearning.favorites.desc': 'View your saved word and quote packs',
 	'englishLearning.favorites.toFavorites': 'Go to my favorites',
+	'englishLearning.favorites.listLoadFailed':
+		'Failed to load favorites. Please try again.',
+	'englishLearning.favorites.listLoadMoreFailed':
+		'Failed to load more. Scroll down to retry.',
 
 	'englishLearning.toolbarSubtitle':
 		'Tools & vocabulary on the left, chat on the right',

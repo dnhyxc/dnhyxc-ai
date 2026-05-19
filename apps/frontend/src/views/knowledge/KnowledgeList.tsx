@@ -2,7 +2,7 @@ import Confirm from '@design/Confirm';
 import { Drawer } from '@design/Drawer';
 import Loading from '@design/Loading';
 import Tooltip from '@design/Tooltip';
-import { Button, ScrollArea, Switch, Toast } from '@ui/index';
+import { Button, ScrollArea, Spinner, Switch, Toast } from '@ui/index';
 import { Code2, Trash2 } from 'lucide-react';
 import { observer } from 'mobx-react';
 import { useCallback, useEffect, useState } from 'react';
@@ -713,7 +713,11 @@ const KnowledgeList: React.FC<IProps> = observer(
 									/>
 								))}
 								{showLoadMoreHint ? (
-									<div className="text-xs text-textcolor/50 py-2 text-center">
+									<div className="col-span-full text-textcolor/50 flex items-center justify-center gap-1.5 py-2 text-xs">
+										<Spinner
+											className="size-3.5 text-textcolor/50"
+											aria-hidden
+										/>
 										{t('common.loadingMore')}
 									</div>
 								) : null}

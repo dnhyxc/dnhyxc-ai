@@ -1,17 +1,16 @@
 /**
  * 经典句拉取结果列表：直播订阅 EnglishPackStore；历史模式按 streamId 分页 API
  */
-import { Button, Toast } from '@ui/index';
+import { Button, Spinner, Toast } from '@ui/index';
 import { Square, Star, Volume2 } from 'lucide-react';
 import { observer } from 'mobx-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useI18n } from '@/hooks';
+import { useCallback, useState } from 'react';
+import { useI18n, useIncrementalClassicQuoteFavoriteStatus } from '@/hooks';
 import { cn } from '@/lib/utils';
 import type { EnglishClassicQuoteItem } from '@/service';
 import {
 	addEnglishClassicQuoteFavorite,
 	classicQuoteFavoriteContentKey,
-	fetchEnglishClassicQuoteFavoriteStatus,
 	removeEnglishClassicQuoteFavorite,
 } from '@/service';
 import EnglishPackStore from '@/store/englishPack';
@@ -33,42 +32,11 @@ function ClassicQuotesPackListInner({ history }: ClassicQuotesPackListProps) {
 	const items = isHistoryMode && history ? history.items : liveItems;
 
 	const [playingKey, setPlayingKey] = useState<string | null>(null);
-	const [favoritedContentKeys, setFavoritedContentKeys] = useState<Set<string>>(
-		() => new Set(),
-	);
+	const { favoritedContentKeys, setFavoritedContentKeys } =
+		useIncrementalClassicQuoteFavoriteStatus(items);
 	const [favoriteActionKey, setFavoriteActionKey] = useState<string | null>(
 		null,
 	);
-
-	const itemsEnglishSig = useMemo(
-		() => items.map((it) => it.english).join('\u0001'),
-		[items],
-	);
-
-	useEffect(() => {
-		if (items.length === 0) {
-			setFavoritedContentKeys(new Set());
-			return;
-		}
-		let cancelled = false;
-		void (async () => {
-			try {
-				const res = await fetchEnglishClassicQuoteFavoriteStatus(
-					items.map((i) => i.english),
-				);
-				if (cancelled) return;
-				const keys = res.data?.favoritedContentKeys;
-				setFavoritedContentKeys(new Set(Array.isArray(keys) ? keys : []));
-			} catch {
-				if (!cancelled) {
-					setFavoritedContentKeys(new Set());
-				}
-			}
-		})();
-		return () => {
-			cancelled = true;
-		};
-	}, [itemsEnglishSig, items.length]);
 
 	const toggleQuoteAudio = useCallback(
 		async (text: string, key: string) => {
@@ -215,9 +183,10 @@ function ClassicQuotesPackListInner({ history }: ClassicQuotesPackListProps) {
 				})}
 			</div>
 			{isHistoryMode && history?.loadingMore ? (
-				<p className="text-textcolor/45 py-3 text-center text-sm">
+				<div className="col-span-full text-textcolor/50 flex items-center justify-center gap-1.5 py-2 text-xs">
+					<Spinner className="size-3.5 text-textcolor/50" aria-hidden />
 					{t('common.loadingMore')}
-				</p>
+				</div>
 			) : null}
 		</div>
 	);

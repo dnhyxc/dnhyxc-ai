@@ -363,7 +363,8 @@ const SessionList = observer(({ open, onOpenChange }: IProps) => {
 					) : null}
 					{sessionList}
 					{showLoadMoreHint ? (
-						<div className="text-xs text-textcolor/50 py-2 text-center">
+						<div className="col-span-full text-textcolor/50 flex items-center justify-center gap-1.5 py-2 text-xs">
+							<Spinner className="size-3.5 text-textcolor/50" aria-hidden />
 							{t('common.loadingMore')}
 						</div>
 					) : null}

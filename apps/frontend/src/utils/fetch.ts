@@ -1,6 +1,7 @@
 import { Toast } from '@ui/sonner';
 import { BASE_URL } from '@/constant';
 import { notifyUnauthorized } from '@/router/authSession';
+import { isTransientNetworkError } from './retryAsync';
 import { isTauriRuntime } from './runtime';
 
 type UnknownErrorMessage =
@@ -80,6 +81,11 @@ export interface RequestConfig
 	onUploadProgress?: (progress: number) => void; // 上传进度回调
 	/** 为 true 时不弹出错误 Toast（如用户主动取消、预期可能失败的请求） */
 	silent?: boolean;
+	/**
+	 * 瞬时网络失败时的额外重试次数（总尝试 = retries + 1）。
+	 * 默认：Tauri 下 GET/HEAD 为 2，其余为 0（线上远程 HTTPS 偶发 `error sending request`）。
+	 */
+	retries?: number;
 }
 
 // 响应数据接口
@@ -432,80 +438,97 @@ class HttpClient {
 			body: method === 'GET' || method === 'HEAD' ? undefined : body,
 		};
 
-		let response: Response | null = null;
+		const isIdempotentRead = method === 'GET' || method === 'HEAD';
+		const defaultRetries = isTauriRuntime() && isIdempotentRead ? 2 : 0;
+		const retryCount = finalConfig.retries ?? defaultRetries;
+		const maxAttempts = retryCount + 1;
 
-		try {
-			// 让出主线程，确保 UI 有机会更新
-			await new Promise((resolve) => setTimeout(resolve, 0));
+		for (let attempt = 0; attempt < maxAttempts; attempt++) {
+			let response: Response | null = null;
 
-			// 发送请求
-			const platformFetch = await getPlatformFetch();
-			response = await platformFetch(finalUrl, requestOptions);
+			try {
+				// 让出主线程，确保 UI 有机会更新
+				await new Promise((resolve) => setTimeout(resolve, 0));
 
-			// 解析响应数据
-			const responseData = await this.parseResponseBody(response);
+				const platformFetch = await getPlatformFetch();
+				response = await platformFetch(finalUrl, requestOptions);
 
-			// 检查响应状态
-			if (!response.ok) {
-				const errorInfo = await this.handleErrorResponse(
-					response,
-					responseData,
-				);
-				throw errorInfo;
-			}
+				const responseData = await this.parseResponseBody(response);
 
-			// 返回标准化响应
-			if (responseData && typeof responseData === 'object') {
+				if (!response.ok) {
+					const errorInfo = await this.handleErrorResponse(
+						response,
+						responseData,
+					);
+					throw errorInfo;
+				}
+
+				if (responseData && typeof responseData === 'object') {
+					return {
+						code: responseData.code || response.status,
+						data: (responseData.data || responseData) as T,
+						success:
+							responseData.success !== undefined ? responseData.success : true,
+						message: responseData.message || '请求成功',
+					};
+				}
+
 				return {
-					code: responseData.code || response.status,
-					data: (responseData.data || responseData) as T,
-					success:
-						responseData.success !== undefined ? responseData.success : true,
-					message: responseData.message || '请求成功',
+					code: response.status,
+					data: responseData as T,
+					success: true,
+					message: '请求成功',
 				};
+			} catch (error) {
+				let requestError: RequestError;
+
+				if (response) {
+					requestError = await this.handleErrorResponse(response, error);
+				} else if (
+					error &&
+					typeof error === 'object' &&
+					'code' in error &&
+					'message' in error
+				) {
+					requestError = error as RequestError;
+				} else {
+					requestError = this.handleNetworkError(error);
+				}
+
+				const isUnauthorized =
+					response?.status === 401 || requestError.code === 401;
+
+				if (isUnauthorized) {
+					this.setAuthToken('');
+					notifyUnauthorized();
+				}
+
+				const canRetry =
+					attempt < maxAttempts - 1 &&
+					!response &&
+					!isUnauthorized &&
+					(isTransientNetworkError(error) ||
+						isTransientNetworkError(requestError.message));
+
+				if (canRetry) {
+					await new Promise((resolve) =>
+						setTimeout(resolve, 400 * (attempt + 1)),
+					);
+					continue;
+				}
+
+				if (!finalConfig.silent) {
+					Toast({
+						type: 'error',
+						title: resolveRequestErrorToastTitle(requestError),
+					});
+				}
+
+				throw requestError.data?.data || requestError;
 			}
-
-			return {
-				code: response.status,
-				data: responseData as T,
-				success: true,
-				message: '请求成功',
-			};
-		} catch (error) {
-			// 错误处理
-			let requestError: RequestError;
-
-			if (response) {
-				requestError = await this.handleErrorResponse(response, error);
-			} else if (
-				error &&
-				typeof error === 'object' &&
-				'code' in error &&
-				'message' in error
-			) {
-				requestError = error as RequestError;
-			} else {
-				requestError = this.handleNetworkError(error);
-			}
-
-			const isUnauthorized =
-				response?.status === 401 || requestError.code === 401;
-
-			if (isUnauthorized) {
-				this.setAuthToken('');
-				notifyUnauthorized();
-			}
-
-			if (!finalConfig.silent) {
-				Toast({
-					type: 'error',
-					title: resolveRequestErrorToastTitle(requestError),
-				});
-			}
-
-			// 抛出错误
-			throw requestError.data?.data || requestError;
 		}
+
+		throw new Error('请求失败');
 	}
 
 	// GET 请求

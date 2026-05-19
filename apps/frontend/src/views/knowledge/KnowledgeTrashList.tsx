@@ -1,7 +1,7 @@
 import Confirm from '@design/Confirm';
 import { Drawer } from '@design/Drawer';
 import Loading from '@design/Loading';
-import { Button, Checkbox, ScrollArea, Toast } from '@ui/index';
+import { Button, Checkbox, ScrollArea, Spinner, Toast } from '@ui/index';
 import { Trash2 } from 'lucide-react';
 import { observer } from 'mobx-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -423,7 +423,11 @@ const KnowledgeTrashList: React.FC<Props> = observer(
 									</div>
 								) : null}
 								{trashLoadingMore ? (
-									<div className="text-xs text-textcolor/50 py-2 text-center">
+									<div className="col-span-full text-textcolor/50 flex items-center justify-center gap-1.5 py-2 text-xs">
+										<Spinner
+											className="size-3.5 text-textcolor/50"
+											aria-hidden
+										/>
 										{t('common.loadingMore')}
 									</div>
 								) : null}

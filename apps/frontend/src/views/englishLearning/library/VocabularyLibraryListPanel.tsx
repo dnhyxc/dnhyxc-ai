@@ -3,8 +3,8 @@
  */
 import Confirm from '@design/Confirm';
 import Loading from '@design/Loading';
-import { Button, ScrollArea, Toast } from '@ui/index';
-import { Loader2, SquareArrowRight, Trash2 } from 'lucide-react';
+import { Button, ScrollArea, Spinner, Toast } from '@ui/index';
+import { SquareArrowRight, Trash2 } from 'lucide-react';
 import {
 	type UIEventHandler,
 	useCallback,
@@ -340,8 +340,8 @@ export function VocabularyLibraryListPanel({
 							);
 						})}
 						{loadingMore ? (
-							<div className="text-textcolor/50 col-span-full flex items-center justify-center gap-1.5 py-2 text-xs">
-								<Loader2 className="size-3.5 animate-spin" aria-hidden />
+							<div className="col-span-full text-textcolor/50 flex items-center justify-center gap-1.5 py-2 text-xs">
+								<Spinner className="size-3.5 text-textcolor/50" aria-hidden />
 								{t('common.loadingMore')}
 							</div>
 						) : null}

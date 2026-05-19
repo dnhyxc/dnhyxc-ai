@@ -1,5 +1,6 @@
 # 单词收藏状态查询：分批请求与增量同步
 
+> **延伸阅读（网络重试 / HTTP 50 小批 / 资源库分页 Hook）**：[`english-learning-list-network-retry.md`](./english-learning-list-network-retry.md)。  
 > 同一会话中的 Loading 居中、导入跳转、单词库删除等改动见 [`english-learning-library-ux-and-delete.md`](./english-learning-library-ux-and-delete.md)。
 
 ## 1. 背景与目标

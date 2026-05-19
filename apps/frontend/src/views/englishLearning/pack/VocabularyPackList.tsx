@@ -1,7 +1,7 @@
 /**
  * 单词包拉取结果列表：直播订阅 EnglishPackStore；历史模式走分页 hook
  */
-import { Button, Toast } from '@ui/index';
+import { Button, Spinner, Toast } from '@ui/index';
 import { Square, Star, Volume2 } from 'lucide-react';
 import { observer } from 'mobx-react';
 import { useCallback, useState } from 'react';
@@ -199,9 +199,10 @@ function VocabularyPackListInner({ history }: VocabularyPackListProps) {
 					})}
 				</div>
 				{isHistoryMode && history?.loadingMore ? (
-					<p className="text-textcolor/45 py-3 text-center text-sm">
+					<div className="col-span-full text-textcolor/50 flex items-center justify-center gap-1.5 py-2 text-xs">
+						<Spinner className="size-3.5 text-textcolor/50" aria-hidden />
 						{t('common.loadingMore')}
-					</p>
+					</div>
 				) : null}
 			</div>
 		</div>

@@ -730,6 +730,9 @@ export const zhCN = {
 	'englishLearning.library.quotesHeading': '共 {count} 条语句',
 	'englishLearning.library.listCount': '共 {count} 条',
 	'englishLearning.library.wordsLoading': '加载单词…',
+	'englishLearning.library.wordsLoadFailed': '加载词条失败，请稍后重试',
+	'englishLearning.library.wordsLoadMoreFailed':
+		'加载更多失败，请继续下滑或稍后重试',
 	'englishLearning.library.quotesLoading': '加载语句…',
 	'englishLearning.favorites.bank': '收藏',
 	'englishLearning.favorites.sidebarTitle': '收藏分类',
@@ -738,6 +741,9 @@ export const zhCN = {
 	'englishLearning.favorites.classic.nav': '语句收藏',
 	'englishLearning.favorites.desc': '查看收藏的单词或语句包',
 	'englishLearning.favorites.toFavorites': '前往我的收藏',
+	'englishLearning.favorites.listLoadFailed': '加载收藏失败，请稍后重试',
+	'englishLearning.favorites.listLoadMoreFailed':
+		'加载更多失败，请继续下滑重试',
 
 	'englishLearning.toolbarSubtitle': '左侧选主题与单词，右侧对话练习',
 	'englishLearning.toolbarSubtitleShort': '可选快捷意图，或直接在右侧对话',
