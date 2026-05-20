@@ -112,7 +112,7 @@ export const EnglishLearningToolbar = observer(function EnglishLearningToolbar({
 				</div>
 				<div className="min-w-0">
 					<div className="text-textcolor leading-tight font-semibold tracking-tight">
-						{t('route.englishLearning.subtitle')}
+						{t('englishLearning.quickIntents')}
 					</div>
 					<div className="text-textcolor/50 mt-1 text-xs leading-snug">
 						{t('englishLearning.toolbarSubtitleShort')}
@@ -127,7 +127,7 @@ export const EnglishLearningToolbar = observer(function EnglishLearningToolbar({
 			<div className="min-w-0">
 				<div className="mb-0.5 flex min-h-6 items-center justify-between gap-2">
 					<div className="text-textcolor/45 flex items-center gap-1.5 text-sm font-medium tracking-wide">
-						{t('englishLearning.quickIntents')}
+						{t('englishLearning.intentSection')}
 					</div>
 					{showIntentExpandToggle ? (
 						<Button

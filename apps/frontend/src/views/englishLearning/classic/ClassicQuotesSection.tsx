@@ -483,7 +483,7 @@ function ClassicQuotesSectionInner() {
 					<Button
 						size="sm"
 						onClick={() => setHistoryDrawerOpen(true)}
-						className="flex-1 text-white hover:bg-linear-to-r hover:from-indigo-400 hover:to-indigo-600 bg-linear-to-r from-indigo-500 to-indigo-600 h-9 shrink-0 whitespace-nowrap rounded-md"
+						className="flex-1 text-white hover:bg-linear-to-r hover:from-indigo-400 hover:to-indigo-600 bg-linear-to-r from-violet-600 to-indigo-600 h-9 shrink-0 whitespace-nowrap rounded-md"
 					>
 						<span className="max-[380px]:sr-only">
 							{t('englishLearning.classic.historyOpenDrawer')}

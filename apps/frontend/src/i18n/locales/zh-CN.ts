@@ -649,7 +649,6 @@ export const zhCN = {
 
 	'route.chat.title': '智能对话',
 	'route.englishLearning.title': '英语学习',
-	'route.englishLearning.subtitle': '学习配置',
 	'route.englishLearning.import.title': '导入学习资料',
 	'route.englishLearning.library.title': '资源库',
 	'route.englishLearning.favorites.title': '我的收藏',
@@ -707,6 +706,7 @@ export const zhCN = {
 	'englishLearning.import.dataExample': '导入单词 json 示例',
 	'englishLearning.import.dataExampleClassic': '导入语句 json 示例',
 
+	'englishLearning.intentSection': '选择意图',
 	'englishLearning.library.vocab.title': '单词库',
 	'englishLearning.library.vocab.descShort': '可导入单词，查看词汇库',
 	'englishLearning.library.vocab.bank': '词汇库',

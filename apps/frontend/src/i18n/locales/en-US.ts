@@ -731,7 +731,6 @@ export const enUS = {
 	// 路由文案
 	'route.chat.title': 'Smart Chat',
 	'route.englishLearning.title': 'English learning',
-	'route.englishLearning.subtitle': 'Learning configuration',
 	'route.englishLearning.import.title': 'Import study data',
 	'route.englishLearning.library.title': 'Library',
 	'route.englishLearning.favorites.title': 'My favorites',
@@ -754,6 +753,7 @@ export const enUS = {
 	'englishLearning.stream.classic.empty':
 		'No quotes yet. Start a fetch on the English learning page, or load from history.',
 
+	'englishLearning.intentSection': 'Select intent',
 	'englishLearning.import.titleVocab': 'Import vocabulary (JSON)',
 	'englishLearning.import.titleClassic': 'Import classic quotes (JSON)',
 	'englishLearning.import.back': 'Back to English learning',
