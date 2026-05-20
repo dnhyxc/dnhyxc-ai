@@ -67,6 +67,25 @@ const EnglishSource = ({ title, description, type }: EnglishSourceProps) => {
 					</div>
 					<div className="h-5 flex items-center justify-between gap-2 text-textcolor/50 mt-1 text-xs leading-snug">
 						{description}
+						{type === 'vocab' ? (
+							<button
+								type="button"
+								className="shrink-0 cursor-pointer bg-linear-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 bg-clip-text text-transparent"
+								onClick={() =>
+									navigate('/english-learning/reference/morphology')
+								}
+							>
+								{t('englishLearning.source.morphologyLink')}
+							</button>
+						) : (
+							<button
+								type="button"
+								className="shrink-0 cursor-pointer bg-linear-to-r from-indigo-500 to-blue-600 hover:from-indigo-400 hover:to-blue-500 bg-clip-text text-transparent"
+								onClick={() => navigate('/english-learning/reference/grammar')}
+							>
+								{t('englishLearning.source.grammarLink')}
+							</button>
+						)}
 					</div>
 				</div>
 			</div>

@@ -20,6 +20,8 @@ import EnglishLearningImportPage from '@/views/englishLearning/import/EnglishLea
 import EnglishLearningLayout from '@/views/englishLearning/Layout';
 import EnglishLearningLibraryPage from '@/views/englishLearning/library/EnglishLearningLibraryPage';
 import EnglishLearningPackStreamPage from '@/views/englishLearning/pack/EnglishLearningPackStreamPage';
+import EnglishGrammarReferencePage from '@/views/englishLearning/reference/EnglishGrammarReferencePage';
+import EnglishMorphologyReferencePage from '@/views/englishLearning/reference/EnglishMorphologyReferencePage';
 import Home from '@/views/home';
 import Knowledge from '@/views/knowledge';
 import LegalServicePolicy from '@/views/legal/servicePolicy';
@@ -160,6 +162,20 @@ const routes: RouteConfig[] = [
 						Component: EnglishLearningPackStreamPage,
 						meta: {
 							titleKey: 'route.englishLearning.stream.title',
+						},
+					},
+					{
+						path: 'reference/morphology',
+						Component: EnglishMorphologyReferencePage,
+						meta: {
+							titleKey: 'route.englishLearning.morphology.title',
+						},
+					},
+					{
+						path: 'reference/grammar',
+						Component: EnglishGrammarReferencePage,
+						meta: {
+							titleKey: 'route.englishLearning.grammar.title',
 						},
 					},
 				],

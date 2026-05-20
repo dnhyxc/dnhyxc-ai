@@ -653,6 +653,16 @@ export const zhCN = {
 	'route.englishLearning.library.title': '资源库',
 	'route.englishLearning.favorites.title': '我的收藏',
 	'route.englishLearning.stream.title': '拉取结果',
+	'route.englishLearning.morphology.title': '词根词缀大全',
+	'route.englishLearning.grammar.title': '英语语法大全',
+
+	'englishLearning.source.morphologyLink': '词根词缀',
+	'englishLearning.source.grammarLink': '语法大全',
+	'englishLearning.reference.morphology.pageTitle': '词根词缀大全',
+	'englishLearning.reference.morphology.tabPrefixes': '前缀',
+	'englishLearning.reference.morphology.tabSuffixes': '后缀',
+	'englishLearning.reference.morphology.tabRoots': '词根',
+	'englishLearning.reference.grammar.empty': '暂无语法条目',
 
 	'englishLearning.stream.back': '返回英语学习',
 	'englishLearning.stream.kindTabsAria': '拉取结果类型',

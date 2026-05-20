@@ -735,6 +735,16 @@ export const enUS = {
 	'route.englishLearning.library.title': 'Library',
 	'route.englishLearning.favorites.title': 'My favorites',
 	'route.englishLearning.stream.title': 'Fetch results',
+	'route.englishLearning.morphology.title': 'Roots & affixes',
+	'route.englishLearning.grammar.title': 'English grammar',
+
+	'englishLearning.source.morphologyLink': 'Roots & affixes',
+	'englishLearning.source.grammarLink': 'Grammar guide',
+	'englishLearning.reference.morphology.pageTitle': 'Roots & affixes reference',
+	'englishLearning.reference.morphology.tabPrefixes': 'Prefixes',
+	'englishLearning.reference.morphology.tabSuffixes': 'Suffixes',
+	'englishLearning.reference.morphology.tabRoots': 'Roots',
+	'englishLearning.reference.grammar.empty': 'No grammar section selected',
 
 	'englishLearning.stream.back': 'Back to English learning',
 	'englishLearning.stream.kindTabsAria': 'Fetch result type',
