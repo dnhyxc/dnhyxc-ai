@@ -20,6 +20,7 @@ import { useMemo } from 'react';
 import { useNavigate } from 'react-router';
 import ICON from '@/assets/icon.png';
 import { useI18n, useStorageInfo } from '@/hooks';
+import { cn } from '@/lib/utils';
 import { hasValidAuthToken } from '@/router/authPaths';
 import useStore from '@/store';
 import { removeStorage, resolveQiniuUrlForWebDisplay } from '@/utils';
@@ -94,11 +95,15 @@ const Sidebar = () => {
 							key={item.path}
 							role="button"
 							tabIndex={0}
-							title={t((item as any).nameKey ?? '') || undefined}
 							className="lucide-stroke-draw-hover group text-theme mb-4 flex h-11 w-11 cursor-pointer items-center justify-center rounded-md bg-theme-secondary transition-[color,background-color] duration-200 ease-linear hover:bg-theme/12 hover:text-teal-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/50"
 							onClick={item.onClick}
 						>
-							<span className="flex size-full items-center justify-center [&>svg]:size-[22px] [&>svg]:shrink-0 [&>svg]:overflow-visible">
+							<span
+								className={cn(
+									'flex size-full items-center justify-center [&>svg]:size-[22px] [&>svg]:shrink-0 [&>svg]:overflow-visible',
+									item.nameKey === 'nav.chat' && '[&>svg]:size-[24px]',
+								)}
+							>
 								{item.icon}
 							</span>
 						</div>
