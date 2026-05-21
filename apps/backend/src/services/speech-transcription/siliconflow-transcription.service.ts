@@ -7,6 +7,8 @@ const DEFAULT_TTS_MODEL = 'FunAudioLLM/CosyVoice2-0.5B';
 /** 硅基预置女声：claire（温柔女声） */
 const DEFAULT_TTS_VOICE = 'FunAudioLLM/CosyVoice2-0.5B:claire';
 const TTS_INPUT_MAX_CHARS = 4096;
+/** 同文朗读缓存上限（CosyVoice2 无 seed，缓存保证重复播放读音一致） */
+const TTS_SPEECH_CACHE_MAX = 256;
 /** 硅基文档列出的转写模型（用于无自定义配置时的说明与校验参考） */
 const KNOWN_TRANSCRIPTION_MODELS = new Set<string>([
 	DEFAULT_TRANSCRIPTION_MODEL,
@@ -37,8 +39,40 @@ function normalizeAsrPlainText(raw: string): string {
 @Injectable()
 export class SiliconflowTranscriptionService {
 	private readonly logger = new Logger(SiliconflowTranscriptionService.name);
+	/** 文本 + 模型/音色参数 → MP3，避免 CosyVoice 每次合成发音漂移 */
+	private readonly ttsSpeechCache = new Map<string, Buffer>();
 
 	constructor(private readonly config: ConfigService) {}
+
+	private buildTtsSpeechCacheKey(plain: string): string {
+		return [
+			this.resolveTtsModel(),
+			this.resolveTtsVoice(),
+			'1',
+			'0',
+			plain,
+		].join('\u0001');
+	}
+
+	private getTtsSpeechFromCache(key: string): Buffer | null {
+		const hit = this.ttsSpeechCache.get(key);
+		if (!hit) return null;
+		this.ttsSpeechCache.delete(key);
+		this.ttsSpeechCache.set(key, hit);
+		return hit;
+	}
+
+	private setTtsSpeechCache(key: string, buffer: Buffer): void {
+		if (this.ttsSpeechCache.has(key)) {
+			this.ttsSpeechCache.delete(key);
+		}
+		this.ttsSpeechCache.set(key, buffer);
+		while (this.ttsSpeechCache.size > TTS_SPEECH_CACHE_MAX) {
+			const oldest = this.ttsSpeechCache.keys().next().value;
+			if (oldest === undefined) break;
+			this.ttsSpeechCache.delete(oldest);
+		}
+	}
 
 	private resolveTranscriptionModel(): string {
 		const configured = this.config
@@ -88,6 +122,12 @@ export class SiliconflowTranscriptionService {
 			throw new HttpException('朗读文本为空', HttpStatus.BAD_REQUEST);
 		}
 
+		const cacheKey = this.buildTtsSpeechCacheKey(plain);
+		const cached = this.getTtsSpeechFromCache(cacheKey);
+		if (cached) {
+			return Buffer.from(cached);
+		}
+
 		const apiKey =
 			this.config.get<string>(KnowledgeQaEnum.SILICONFLOW_API_KEY) ||
 			this.config.get<string>(KnowledgeQaEnum.DASHSCOPE_API_KEY);
@@ -130,7 +170,9 @@ export class SiliconflowTranscriptionService {
 			);
 		}
 
-		return Buffer.from(await res.arrayBuffer());
+		const buffer = Buffer.from(await res.arrayBuffer());
+		this.setTtsSpeechCache(cacheKey, buffer);
+		return buffer;
 	}
 
 	async transcribe(file: Express.Multer.File): Promise<{ text: string }> {

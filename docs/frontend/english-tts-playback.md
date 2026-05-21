@@ -1,7 +1,8 @@
 # 英语学习朗读：播放世代与单词本机优先
 
 > 网络列表重试、收藏分页见 [`english-learning-list-network-retry.md`](./english-learning-list-network-retry.md)。  
-> 收藏抽屉与主列表共用朗读见 [`english-learning-favorites-drawer.md`](./english-learning-favorites-drawer.md)。
+> 收藏抽屉与主列表共用朗读见 [`english-learning-favorites-drawer.md`](./english-learning-favorites-drawer.md)。  
+> **云端同句读音一致（MP3 LRU 缓存）**见 [`english-tts-cache-consistency.md`](./english-tts-cache-consistency.md)。
 
 ## 1. 背景与目标
 
@@ -75,6 +76,10 @@ sequenceDiagram
 ### 3.3 与列表网络问题的关系
 
 本方案**不解决** `error sending request` 类 HTTP 列表错误；该问题见 [`english-learning-list-network-retry.md`](./english-learning-list-network-retry.md)。TTS 云端路径仍可能失败，句子场景会回退本机。
+
+### 3.4 云端同句读音漂移与 MP3 缓存
+
+硅基 CosyVoice2 **无 seed**，同一 `text` 多次合成听感可能不同。已在前后端对规范化文本做 **MP3 LRU 缓存**（前端 64 条、后端 256 条）：**第一次**合成结果作为该句标准读音，**之后**重复播放复用缓存。详见 [`english-tts-cache-consistency.md`](./english-tts-cache-consistency.md)。
 
 ---
 
@@ -230,6 +235,7 @@ await playEnglishPreferred(word, { preferLocal: true });
 
 | 说明 | 路径 |
 |------|------|
+| 同句云端读音缓存 | [`english-tts-cache-consistency.md`](./english-tts-cache-consistency.md) |
 | 列表 / 收藏 HTTP 韧性 | [`english-learning-list-network-retry.md`](./english-learning-list-network-retry.md) |
 | 收藏抽屉朗读 | [`english-learning-favorites-drawer.md`](./english-learning-favorites-drawer.md) |
 | 包内收藏与 TTS | [`english-learning-pack-favorites.md`](./english-learning-pack-favorites.md) |

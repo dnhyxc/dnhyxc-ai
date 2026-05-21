@@ -49,6 +49,21 @@ const KnowledgeEditorToolbar = (props: {
 				<Button
 					variant="link"
 					className={linkBtn}
+					// onClick={onImport}
+					// disabled={importLoading}
+					// aria-busy={importLoading}
+				>
+					<SaveIcon className="mt-0.5" />
+					<span className="mt-0.5">{t('knowledge.toolbar.import')}</span>
+				</Button>
+			</Tooltip>
+			<Tooltip
+				side="bottom"
+				content={shortcutHintSave ?? t('knowledge.shortcuts.save')}
+			>
+				<Button
+					variant="link"
+					className={linkBtn}
 					onClick={onSave}
 					disabled={saveLoading}
 					aria-busy={saveLoading}

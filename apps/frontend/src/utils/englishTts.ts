@@ -1,6 +1,7 @@
 /**
  * 英语学习朗读：默认优先云端 TTS，失败则本机 Web Speech；
  * `preferLocal: true` 时优先本机（适合单词），不支持则抛错。
+ * 云端 CosyVoice2 无 seed，同一句会随机漂移；对规范化文本做 MP3 缓存以保证重复播放读音一致。
  */
 import { BASE_URL } from '@/constant';
 import { SPEECH_TTS } from '@/service/api';
@@ -82,6 +83,30 @@ let cloudObjectUrl: string | null = null;
 /** 每次新播放或 stopAll 时递增，用于丢弃过期的异步 TTS 请求/本机朗读 */
 let playbackGeneration = 0;
 
+const CLOUD_TTS_CACHE_MAX = 64;
+/** 规范化文本 → MP3 ArrayBuffer（LRU：重复 get 时移到末尾） */
+const cloudTtsAudioCache = new Map<string, ArrayBuffer>();
+
+function touchCloudTtsCache(key: string, audio: ArrayBuffer): void {
+	if (cloudTtsAudioCache.has(key)) {
+		cloudTtsAudioCache.delete(key);
+	}
+	cloudTtsAudioCache.set(key, audio);
+	while (cloudTtsAudioCache.size > CLOUD_TTS_CACHE_MAX) {
+		const oldest = cloudTtsAudioCache.keys().next().value;
+		if (oldest === undefined) break;
+		cloudTtsAudioCache.delete(oldest);
+	}
+}
+
+function getCloudTtsFromCache(plain: string): Blob | null {
+	const hit = cloudTtsAudioCache.get(plain);
+	if (!hit) return null;
+	cloudTtsAudioCache.delete(plain);
+	cloudTtsAudioCache.set(plain, hit);
+	return new Blob([hit], { type: 'audio/mpeg' });
+}
+
 function readToken(): string {
 	if (typeof window === 'undefined') return '';
 	return localStorage.getItem('token')?.trim() || '';
@@ -138,7 +163,12 @@ export function stopAllEnglishPlayback(): void {
 	stopPlaybackMediaOnly();
 }
 
-async function fetchCloudTtsBlob(text: string): Promise<Blob> {
+async function fetchCloudTtsBlob(plain: string): Promise<Blob> {
+	const cached = getCloudTtsFromCache(plain);
+	if (cached) {
+		return cached;
+	}
+
 	const token = readToken();
 	if (!token) {
 		throw new Error('NO_TOKEN');
@@ -150,12 +180,15 @@ async function fetchCloudTtsBlob(text: string): Promise<Blob> {
 			Authorization: `Bearer ${token}`,
 			'Content-Type': 'application/json',
 		},
-		body: JSON.stringify({ text }),
+		body: JSON.stringify({ text: plain }),
 	});
 	if (!res.ok) {
 		throw new Error(`TTS_HTTP_${res.status}`);
 	}
-	return res.blob();
+	const blob = await res.blob();
+	const buf = await blob.arrayBuffer();
+	touchCloudTtsCache(plain, buf);
+	return new Blob([buf], { type: 'audio/mpeg' });
 }
 
 function playCloudMp3Blob(blob: Blob, generation: number): Promise<void> {
