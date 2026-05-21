@@ -30,6 +30,7 @@
 2. `useEffect` 依赖 `favoritesDrawerOpen` 为真 → 调用 `fetch*FirstPage`：offset=0，清空列表，请求第一页。
 3. 用户在 `ScrollArea` 内滚动 → `onViewportScroll` 计算距底部剩余像素；若小于 `SCROLL_LOAD_THRESHOLD_PX`（与历史抽屉一致）→ `fetch*More` 追加下一页。
 4. 朗读：抽屉内每条使用**独立 playKey**（`fav-vocab-${id}` / `fav-classic-${id}`），调用父组件传入的 `toggle*Audio(文本, playKey)`；内部会先 `stopAllEnglishPlayback()`，与主列表索引键不冲突。
+5. **单词本机朗读**：主区单词收藏（`VocabularyFavoritesSection`）使用 `playEnglishPreferred(word, { preferLocal: true })`；快速连点由播放世代丢弃过期音频，见 [`english-tts-playback.md`](./english-tts-playback.md)。
 
 ## 4. 后端实现
 
@@ -631,4 +632,6 @@ const showEmpty = !loading && entries.length === 0 && !loadingMore;
 | 单词包父组件 | `apps/frontend/src/views/englishLearning/VocabularySection.tsx` |
 | 经典句父组件 | `apps/frontend/src/views/englishLearning/ClassicQuotesSection.tsx` |
 | TTS 工具 | `apps/frontend/src/utils/englishTts.ts` |
+| TTS 播放世代 / preferLocal | [`english-tts-playback.md`](./english-tts-playback.md) |
+| 收藏列表 HTTP 重试 | [`english-learning-list-network-retry.md`](./english-learning-list-network-retry.md) |
 | 收藏列表 API 类型 | `apps/frontend/src/service/index.ts` |

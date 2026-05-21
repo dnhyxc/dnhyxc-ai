@@ -1,5 +1,6 @@
 /**
- * 英语学习朗读：优先硅基云端 TTS（POST /speech-transcription/speech），失败则 Web Speech（分句停顿）。
+ * 英语学习朗读：默认优先云端 TTS，失败则本机 Web Speech；
+ * `preferLocal: true` 时优先本机（适合单词），不支持则抛错。
  */
 import { BASE_URL } from '@/constant';
 import { SPEECH_TTS } from '@/service/api';
@@ -68,12 +69,50 @@ export type SpeakEnglishOptions = {
 	volume?: number;
 };
 
+export type PlayEnglishPreferredOptions = {
+	/** 为 true 时优先本机 Web Speech（单词）；默认 false 为优先云端 TTS（句子） */
+	preferLocal?: boolean;
+	/** 本机朗读时透传给 Web Speech */
+	speak?: SpeakEnglishOptions;
+};
+
 let cloudAudio: HTMLAudioElement | null = null;
 let cloudObjectUrl: string | null = null;
+
+/** 每次新播放或 stopAll 时递增，用于丢弃过期的异步 TTS 请求/本机朗读 */
+let playbackGeneration = 0;
 
 function readToken(): string {
 	if (typeof window === 'undefined') return '';
 	return localStorage.getItem('token')?.trim() || '';
+}
+
+function isPlaybackGenerationActive(generation: number): boolean {
+	return generation === playbackGeneration;
+}
+
+/** 仅停止当前音频与本机 speech，不递增世代（供会话内切换介质使用） */
+function stopPlaybackMediaOnly(): void {
+	if (isEnglishTtsSupported()) {
+		window.speechSynthesis.cancel();
+	}
+	if (cloudAudio) {
+		cloudAudio.pause();
+		cloudAudio.src = '';
+		cloudAudio.load();
+		cloudAudio = null;
+	}
+	if (cloudObjectUrl) {
+		URL.revokeObjectURL(cloudObjectUrl);
+		cloudObjectUrl = null;
+	}
+}
+
+/** 开始新的播放会话：作废上一轮并清空介质 */
+function beginPlaybackSession(): number {
+	playbackGeneration += 1;
+	stopPlaybackMediaOnly();
+	return playbackGeneration;
 }
 
 export function stopEnglishTts(): void {
@@ -95,8 +134,8 @@ export function stopCloudEnglishTts(): void {
 }
 
 export function stopAllEnglishPlayback(): void {
-	stopEnglishTts();
-	stopCloudEnglishTts();
+	playbackGeneration += 1;
+	stopPlaybackMediaOnly();
 }
 
 async function fetchCloudTtsBlob(text: string): Promise<Blob> {
@@ -119,14 +158,27 @@ async function fetchCloudTtsBlob(text: string): Promise<Blob> {
 	return res.blob();
 }
 
-function playCloudMp3Blob(blob: Blob): Promise<void> {
-	stopAllEnglishPlayback();
+function playCloudMp3Blob(blob: Blob, generation: number): Promise<void> {
+	stopPlaybackMediaOnly();
+	if (!isPlaybackGenerationActive(generation)) {
+		return Promise.resolve();
+	}
+
 	const url = URL.createObjectURL(blob);
 	cloudObjectUrl = url;
 	const audio = new Audio(url);
 	cloudAudio = audio;
 	return new Promise((resolve, reject) => {
 		audio.onended = () => {
+			if (!isPlaybackGenerationActive(generation)) {
+				if (cloudObjectUrl === url) {
+					URL.revokeObjectURL(url);
+					cloudObjectUrl = null;
+					cloudAudio = null;
+				}
+				resolve();
+				return;
+			}
 			if (cloudObjectUrl === url) {
 				URL.revokeObjectURL(url);
 				cloudObjectUrl = null;
@@ -140,18 +192,33 @@ function playCloudMp3Blob(blob: Blob): Promise<void> {
 				cloudObjectUrl = null;
 				cloudAudio = null;
 			}
+			if (!isPlaybackGenerationActive(generation)) {
+				resolve();
+				return;
+			}
 			reject(new Error('AUDIO_PLAY'));
 		};
-		void audio.play().catch(reject);
+		void audio.play().catch((err) => {
+			if (!isPlaybackGenerationActive(generation)) {
+				resolve();
+				return;
+			}
+			reject(err);
+		});
 	});
 }
 
 function speakOneUtterance(
 	plain: string,
+	generation: number,
 	options?: SpeakEnglishOptions,
 ): Promise<void> {
 	return new Promise((resolve) => {
-		if (!isEnglishTtsSupported() || !plain) {
+		if (
+			!isPlaybackGenerationActive(generation) ||
+			!isEnglishTtsSupported() ||
+			!plain
+		) {
 			resolve();
 			return;
 		}
@@ -193,44 +260,73 @@ function waitForVoicesReady(): Promise<void> {
 	});
 }
 
-export async function speakEnglishText(
+async function speakEnglishTextWithGeneration(
 	text: string,
+	generation: number,
 	options?: SpeakEnglishOptions,
 ): Promise<void> {
 	if (!isEnglishTtsSupported()) return;
 
 	const plain = stripMarkdownForTts(text);
 	if (!plain) return;
+	if (!isPlaybackGenerationActive(generation)) return;
 
-	stopAllEnglishPlayback();
 	await waitForVoicesReady();
+	if (!isPlaybackGenerationActive(generation)) return;
 
 	const chunks = splitTextForTtsPauses(plain);
 	const chunkRate = chunks.length > 1 ? 0.88 : 0.92;
 	for (let i = 0; i < chunks.length; i += 1) {
+		if (!isPlaybackGenerationActive(generation)) return;
 		if (i > 0) {
 			await pauseMs(320);
+			if (!isPlaybackGenerationActive(generation)) return;
 		}
-		await speakOneUtterance(chunks[i], {
+		await speakOneUtterance(chunks[i], generation, {
 			...options,
 			rate: options?.rate ?? chunkRate,
 		});
 	}
 }
 
-export async function playEnglishPreferred(rawText: string): Promise<void> {
+export async function speakEnglishText(
+	text: string,
+	options?: SpeakEnglishOptions,
+): Promise<void> {
+	const generation = beginPlaybackSession();
+	await speakEnglishTextWithGeneration(text, generation, options);
+}
+
+export async function playEnglishPreferred(
+	rawText: string,
+	options?: PlayEnglishPreferredOptions,
+): Promise<void> {
 	const plain = stripMarkdownForTts(rawText);
 	if (!plain) return;
 
-	try {
-		const blob = await fetchCloudTtsBlob(plain);
-		await playCloudMp3Blob(blob);
-		return;
-	} catch {
+	const generation = beginPlaybackSession();
+	const speakOpts = options?.speak;
+
+	if (options?.preferLocal) {
+		if (!isPlaybackGenerationActive(generation)) return;
 		if (!isEnglishTtsSupported()) {
 			throw new Error('NO_TTS');
 		}
-		await speakEnglishText(rawText);
+		await speakEnglishTextWithGeneration(rawText, generation, speakOpts);
+		return;
+	}
+
+	try {
+		const blob = await fetchCloudTtsBlob(plain);
+		if (!isPlaybackGenerationActive(generation)) return;
+		await playCloudMp3Blob(blob, generation);
+		return;
+	} catch {
+		if (!isPlaybackGenerationActive(generation)) return;
+		if (!isEnglishTtsSupported()) {
+			throw new Error('NO_TTS');
+		}
+		await speakEnglishTextWithGeneration(rawText, generation, speakOpts);
 	}
 }
 

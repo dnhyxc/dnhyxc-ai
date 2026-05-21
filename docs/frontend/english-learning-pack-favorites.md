@@ -54,6 +54,7 @@
 ### 3.5 前端 UI 说明
 
 - 每条卡片右侧为 **flex 横排**：当前源码中依次为 **朗读（TTS）**、**收藏（星标）**；已收藏时星标为实心 + 琥珀色系高亮，`aria-pressed` 便于无障碍。
+- **单词朗读**：`VocabularyPackList` 等对单词调用 `playEnglishPreferred(word, { preferLocal: true })`（本机 Web Speech 优先）；经典句仍默认云端 TTS。播放竞态与世代号见 [`english-tts-playback.md`](./english-tts-playback.md)。
 - 若需调整为先收藏后朗读，仅需调换同一 `flex` 容器内两个 `Button` 的 JSX 顺序。
 
 ## 4. 关键代码与注释（讲解版）

@@ -4,7 +4,8 @@
 > - 星标「慢半拍」、`onPartialKeys` 渐进点亮、有限并发：[`favorite-star-incremental-ui.md`](./favorite-star-incremental-ui.md)  
 > - 网络错误 Toast 友好化：[`http-network-error-toast.md`](./http-network-error-toast.md)  
 > - 资源库列表会话缓存与滚动恢复：[`library-words-list-cache.md`](./library-words-list-cache.md)  
-> - 网络重试 / HTTP 50 小批 / 资源库分页 Hook：[`english-learning-list-network-retry.md`](./english-learning-list-network-retry.md)  
+> - 网络重试 / HTTP 50 小批 / 资源库分页 Hook：[`english-learning-list-network-retry.md`](./english-learning-list-network-retry.md)（含 §1.4 线上 vs 本地）
+> - 单词朗读 `preferLocal` / 播放世代：[`english-tts-playback.md`](./english-tts-playback.md)  
 > 同一会话中的 Loading 居中、导入跳转、单词库删除等改动见 [`english-learning-library-ux-and-delete.md`](./english-learning-library-ux-and-delete.md)。
 
 ## 1. 背景与目标

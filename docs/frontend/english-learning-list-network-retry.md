@@ -27,6 +27,17 @@
 
 若与仓库最新源码不一致，**以源码为准**。
 
+### 1.4 为何「线上偶发、本地难复现」
+
+| 环境 | 典型 `BASE_URL` | 现象 |
+|------|-----------------|------|
+| 本地开发 | `http://127.0.0.1` / 局域网后端 | RTT 低、连接稳定，很少触发 Tauri `error sending request` |
+| 线上桌面端 | `https://dnhyxc.cn:9112` 等远程 HTTPS | 延迟与 TLS、连接复用、瞬时断连更易暴露；滚动分页 + `/status` 小批 POST 并发时更明显 |
+
+**说明**：报错文案来自 **Tauri HTTP 插件**在「请求未得到 HTTP 响应」时的原生层，不一定是后端 5xx。浏览器 H5 直连同源 API 时默认 **不重试**（见 §4.4）；桌面端对 **GET/HEAD** 默认多 2 次重试，收藏列表、资源库分页、收藏 `/status` 分批等见下文各节。
+
+**用户可见改进**：失败时优先 `silent: true` + 业务层 i18n Toast，避免直接展示 `error sending request for url (...)`；详见 [`http-network-error-toast.md`](./http-network-error-toast.md)。
+
 ### 1.3 要解决的具体问题（改前 → 改后）
 
 | # | 现象（用户 / 开发视角） | 根因 | 本轮如何解决 |
@@ -684,6 +695,7 @@ useEffect(() => {
 
 ## 11. 相关文档
 
+- [`english-tts-playback.md`](./english-tts-playback.md) — 朗读播放世代、`preferLocal` 单词本机优先（与 HTTP 列表错误正交）
 - [`http-network-error-toast.md`](./http-network-error-toast.md) — 网络错误 Toast 友好化与 `translateSync`
 - [`favorite-star-incremental-ui.md`](./favorite-star-incremental-ui.md) — 星标慢半拍、`onPartialKeys`、有限并发与乐观点击
 - [`vocab-favorite-status-query.md`](./vocab-favorite-status-query.md) — 单词收藏状态增量查询与 500 上限（本轮在其上扩展 HTTP 50 小批与重试）

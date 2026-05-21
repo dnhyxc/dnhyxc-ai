@@ -106,7 +106,7 @@ export function VocabularyLibraryWordsPanel({
 			stopAllEnglishPlayback();
 			setPlayingKey(key);
 			try {
-				await playEnglishPreferred(word);
+				await playEnglishPreferred(word, { preferLocal: true });
 			} catch {
 				Toast({
 					type: 'warning',
