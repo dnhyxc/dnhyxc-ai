@@ -44,6 +44,10 @@ import KnowledgeEditorToolbar from './KnowledgeEditorToolbar';
 import KnowledgeList from './KnowledgeList';
 import KnowledgeTrashList from './KnowledgeTrashList';
 import {
+	importFileNameToTitle,
+	pickKnowledgeImportFile,
+} from './knowledge-import';
+import {
 	isKnowledgeLocalMarkdownId,
 	knowledgeAssistantArticleBinding,
 	knowledgeAssistantDocumentKey,
@@ -80,6 +84,7 @@ const Knowledge = observer(() => {
 	const [listOpen, setListOpen] = useState(false);
 	const [trashOpen, setTrashOpen] = useState(false);
 	const [saveLoading, setSaveLoading] = useState(false);
+	const [importLoading, setImportLoading] = useState(false);
 	/**
 	 * 回收站打开时强制让 Monaco 视为“新文档”：
 	 * - 解决：从回收站进入时 documentIdentity 可能恒为 'draft-new'，导致 MarkdownEditor 内部 viewMode 不重置（仍停留在 splitDiff）
@@ -107,6 +112,7 @@ const Knowledge = observer(() => {
 
 	const [knowledgeChords, setKnowledgeChords] = useState<{
 		save: string;
+		import: string;
 		clear: string;
 		share: string;
 		openLibrary: string;
@@ -115,6 +121,7 @@ const Knowledge = observer(() => {
 		pasteToAssistant: string;
 	}>({
 		save: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.save,
+		import: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.import,
 		clear: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.clear,
 		share: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.share,
 		openLibrary: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.openLibrary,
@@ -705,6 +712,52 @@ const Knowledge = observer(() => {
 		void performSave('normal');
 	}, [performSave]);
 
+	const onImport = useCallback(() => {
+		if (importLoading) return;
+		setImportLoading(true);
+		void (async () => {
+			try {
+				const picked = await pickKnowledgeImportFile();
+				if (!picked) return;
+				const content = picked.content;
+				if (!content.trim()) {
+					Toast({
+						type: 'warning',
+						title: t('knowledge.import.empty'),
+					});
+					return;
+				}
+				knowledgeStore.setMarkdown(content);
+				const titleFromFile = importFileNameToTitle(picked.fileName);
+				if (titleFromFile) {
+					knowledgeStore.setKnowledgeTitle(titleFromFile);
+				}
+			} catch (err) {
+				const code = err instanceof Error ? err.message : String(err ?? '');
+				if (code === 'not_md') {
+					Toast({
+						type: 'warning',
+						title: t('knowledge.import.notMd'),
+					});
+					return;
+				}
+				if (code === 'file_too_large') {
+					Toast({
+						type: 'warning',
+						title: t('knowledge.import.tooLarge'),
+					});
+					return;
+				}
+				Toast({
+					type: 'error',
+					title: t('knowledge.import.failed'),
+				});
+			} finally {
+				setImportLoading(false);
+			}
+		})();
+	}, [importLoading, knowledgeStore, t]);
+
 	const saveLoadingRef = useRef(saveLoading);
 	saveLoadingRef.current = saveLoading;
 	const knowledgeStoreRef = useRef(knowledgeStore);
@@ -763,10 +816,21 @@ const Knowledge = observer(() => {
 	 */
 	useEffect(() => {
 		const onKeyDown = (e: KeyboardEvent) => {
-			if (saveLoading || knowledgeStore.knowledgeOverwriteOpen) return;
+			if (
+				saveLoading ||
+				importLoading ||
+				knowledgeStore.knowledgeOverwriteOpen
+			) {
+				return;
+			}
 			if (chordMatchesStored(knowledgeChords.save, e)) {
 				e.preventDefault();
 				void onSave();
+				return;
+			}
+			if (chordMatchesStored(knowledgeChords.import, e)) {
+				e.preventDefault();
+				onImport();
 				return;
 			}
 			if (chordMatchesStored(knowledgeChords.clear, e)) {
@@ -809,7 +873,9 @@ const Knowledge = observer(() => {
 	}, [
 		knowledgeChords,
 		onSave,
+		onImport,
 		saveLoading,
+		importLoading,
 		knowledgeStore.knowledgeOverwriteOpen,
 		resetEditorToNewDraft,
 		isCloudLoggedIn,
@@ -1140,10 +1206,13 @@ const Knowledge = observer(() => {
 							onOpenTrash={() => setTrashOpen(true)}
 							onNewDraft={resetEditorToNewDraft}
 							onSave={onSave}
+							onImport={onImport}
 							onShareKnowledge={onShareKnowledge}
 							saveLoading={saveLoading}
+							importLoading={importLoading}
 							isCloudLoggedIn={isCloudLoggedIn}
 							shortcutHintSave={knowledgeChords.save}
+							shortcutHintImport={knowledgeChords.import}
 							shortcutHintClear={knowledgeChords.clear}
 							shortcutHintShare={knowledgeChords.share}
 							shortcutHintOpenLibrary={knowledgeChords.openLibrary}

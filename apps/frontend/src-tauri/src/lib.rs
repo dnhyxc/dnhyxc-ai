@@ -23,14 +23,16 @@ use utils::common::set_screen_center;
 use command::common::{
     clear_all_shortcuts, clear_updater_cache, disable_auto_start, enable_auto_start,
     get_cache_size, greet_name, is_auto_start_enabled, register_shortcut, reload_all_shortcuts,
-    select_directory, select_file,
+    read_english_learning_import_json_file, select_directory, select_file,
+    select_english_learning_import_json_file,
 };
 use command::download::{
     download_blob, download_file, download_files, get_file_info, save_file_with_picker,
 };
 use command::knowledge::{
     delete_knowledge_markdown, list_knowledge_markdown_files, open_knowledge_markdown_in_editor,
-    read_knowledge_markdown_file, resolve_knowledge_markdown_target, save_knowledge_markdown,
+    read_knowledge_markdown_file, resolve_knowledge_markdown_target,
+    select_knowledge_import_md_file, save_knowledge_markdown,
 };
 
 /// 移动端入口属性宏：当编译目标为移动平台时，自动标记该函数为 Tauri 移动端入口
@@ -63,6 +65,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             greet_name,
             select_file,           // 选择文件
+            select_english_learning_import_json_file, // 英语学习导入：仅 .json
+            read_english_learning_import_json_file, // 读取导入用 .json
             select_directory,      // 选择目录
             save_file_with_picker, // 通用保存
             resolve_knowledge_markdown_target, // 知识保存：解析目标路径、是否已存在
@@ -70,6 +74,7 @@ pub fn run() {
             delete_knowledge_markdown, // 知识页 Markdown 删除
             list_knowledge_markdown_files, // 列出目录下所有 Markdown
             read_knowledge_markdown_file, // 读取单个 Markdown 文件
+            select_knowledge_import_md_file, // 知识库导入：仅 .md 文件选择
             open_knowledge_markdown_in_editor, // 本地 .md 在 Cursor / Trae 中打开
             download_file,         // 通用下载
             download_files,        // 批量下载

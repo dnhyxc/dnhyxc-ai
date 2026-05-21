@@ -12,6 +12,7 @@ import {
 } from '@/utils/knowledge-shortcuts';
 import { isTauriRuntime } from '@/utils/runtime';
 import { DEFAULT_INFO, type ShortcutSettingItem } from './config';
+import { TtsVoiceSetting } from './TtsVoiceSetting';
 
 /** 仅在桌面壳内调用 Rust 命令 */
 async function desktopInvoke<T>(
@@ -351,6 +352,7 @@ const System = () => {
 						</RadioGroup>
 					</div>
 				</div>
+				<TtsVoiceSetting />
 				<div className="mt-3.5 pb-4.5 w-full">
 					<div className="text-md font-bold">
 						{t('setting.system.shortcuts.title')}

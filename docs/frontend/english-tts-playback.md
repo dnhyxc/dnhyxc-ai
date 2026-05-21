@@ -2,7 +2,8 @@
 
 > 网络列表重试、收藏分页见 [`english-learning-list-network-retry.md`](./english-learning-list-network-retry.md)。  
 > 收藏抽屉与主列表共用朗读见 [`english-learning-favorites-drawer.md`](./english-learning-favorites-drawer.md)。  
-> **云端同句读音一致（MP3 LRU 缓存）**见 [`english-tts-cache-consistency.md`](./english-tts-cache-consistency.md)。
+> **云端同句读音一致（MP3 LRU 缓存）**见 [`english-tts-cache-consistency.md`](./english-tts-cache-consistency.md)。  
+> **系统设置本机音色（默认 Karen、Dropdown 选择）**见 [`english-tts-local-voice.md`](./english-tts-local-voice.md)。
 
 ## 1. 背景与目标
 

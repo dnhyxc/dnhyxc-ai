@@ -137,6 +137,21 @@ export const zhCN = {
 	'setting.system.close.minimizeToTray': '最小化到托盘，不退出程序',
 	'setting.system.close.quit': '退出程序',
 
+	'setting.system.localTts.title': '英语学习本机语音',
+	'setting.system.localTts.desc':
+		'朗读使用浏览器本机语音；下拉按女声、男声分组，可选具体音色并试听。自动模式仍默认优先女声。句子朗读仍优先云端合成。',
+	'setting.system.localTts.voiceLabel': '朗读音色',
+	'setting.system.localTts.autoOption': '默认（Karen）',
+	'setting.system.localTts.groupFemale': '女声',
+	'setting.system.localTts.groupMale': '男声',
+	'setting.system.localTts.genderTag.female': '女声',
+	'setting.system.localTts.genderTag.male': '男声',
+	'setting.system.localTts.preview': '试听',
+	'setting.system.localTts.previewText': 'Hello, this is a voice preview.',
+	'setting.system.localTts.unsupported': '当前环境不支持本机语音合成。',
+	'setting.system.localTts.noVoices':
+		'未检测到英语语音，请在系统「辅助功能 → 朗读内容」中下载语音后重试。',
+
 	'setting.system.shortcuts.title': '快捷键设置',
 	'setting.system.shortcuts.desc':
 		'「应用显示/刷新」相关快捷键全局生效，其余项仅在对应的窗口内生效。',
@@ -157,6 +172,7 @@ export const zhCN = {
 	'setting.system.shortcuts.item.newWorkflow': '新建工作流',
 	'setting.system.shortcuts.item.openSubwindow': '打开子窗口',
 	'setting.system.shortcuts.item.knowledge.save': '知识库：保存',
+	'setting.system.shortcuts.item.knowledge.import': '知识库：导入文件',
 	'setting.system.shortcuts.item.knowledge.clearDraft': '知识库：清空草稿',
 	'setting.system.shortcuts.item.knowledge.share': '知识库：分享文章',
 	'setting.system.shortcuts.item.knowledge.openList': '知识库：打开列表',
@@ -487,11 +503,18 @@ export const zhCN = {
 
 	'knowledge.common.untitled': '未命名',
 	'knowledge.toolbar.save': '保存',
+	'knowledge.toolbar.import': '导入',
+	'knowledge.import.success': '已导入到编辑器',
+	'knowledge.import.empty': '文件内容为空',
+	'knowledge.import.failed': '导入失败',
+	'knowledge.import.tooLarge': '文件过大（上限 5MB）',
+	'knowledge.import.notMd': '仅支持导入 .md 文件',
 	'knowledge.toolbar.clear': '清空',
 	'knowledge.toolbar.share': '分享',
 	'knowledge.toolbar.library': '知识库',
 	'knowledge.toolbar.trash': '回收站',
 	'knowledge.shortcuts.save': 'Meta + S / Control + S',
+	'knowledge.shortcuts.import': 'Meta + I',
 	'knowledge.shortcuts.clear': 'Meta + Shift + D',
 	'knowledge.shortcuts.share': 'Meta + Shift + O',
 	'knowledge.shortcuts.openLibrary': 'Meta + Shift + L',

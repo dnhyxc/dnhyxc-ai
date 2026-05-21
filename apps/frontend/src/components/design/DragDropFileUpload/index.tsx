@@ -49,8 +49,18 @@ export type DragDropFileValidator = (file: File) => DragDropRejectReason | null;
 
 export interface UseDragDropFileUploadOptions {
 	disabled?: boolean;
-	/** 原生 accept，如 `.json,application/json` */
+	/** 原生 accept，如 `.json`（系统对话框可能仍可切到「所有文件」，需配合 extensionOnly / pickFiles） */
 	accept?: string;
+	/**
+	 * 为 true 时仅按扩展名规则校验（忽略 MIME），避免误选非目标类型仍通过。
+	 * accept 中应包含 `.ext` 规则，如 `.json`。
+	 */
+	acceptExtensionOnly?: boolean;
+	/**
+	 * 自定义打开文件选择（如 Tauri 原生仅 .json 对话框）；返回 null 表示取消。
+	 * 设置后点击区域/编程式 open 不再触发隐藏 input。
+	 */
+	pickFiles?: () => Promise<File[] | null>;
 	multiple?: boolean;
 	/** 表单字段名 */
 	name?: string;
@@ -109,6 +119,31 @@ export function matchAcceptRule(
 	return false;
 }
 
+/** 仅按 accept 中的扩展名规则校验（用于 JSON / MD 等严格导入） */
+export function matchAcceptExtensionOnly(
+	file: File,
+	accept: string | undefined,
+): boolean {
+	if (!accept?.trim()) return true;
+	const exts = accept
+		.split(',')
+		.map((s) => s.trim())
+		.filter((s) => s.startsWith('.'));
+	if (exts.length === 0) return matchAcceptRule(file, accept);
+	const lower = file.name.toLowerCase();
+	return exts.some((ext) => lower.endsWith(ext.toLowerCase()));
+}
+
+function matchAcceptForOptions(
+	file: File,
+	accept: string | undefined,
+	extensionOnly?: boolean,
+): boolean {
+	return extensionOnly
+		? matchAcceptExtensionOnly(file, accept)
+		: matchAcceptRule(file, accept);
+}
+
 function getFileAt(list: FileList | readonly File[], i: number): File | null {
 	if (typeof FileList !== 'undefined' && list instanceof FileList) {
 		return list.item(i);
@@ -120,6 +155,7 @@ function parseFileList(
 	list: FileList | readonly File[],
 	options: {
 		accept?: string;
+		acceptExtensionOnly?: boolean;
 		maxCount?: number;
 		maxFileBytes?: number;
 		validateFile?: DragDropFileValidator;
@@ -145,7 +181,9 @@ function parseFileList(
 			});
 			continue;
 		}
-		if (!matchAcceptRule(file, options.accept)) {
+		if (
+			!matchAcceptForOptions(file, options.accept, options.acceptExtensionOnly)
+		) {
 			rejected.push({
 				file,
 				reason: { code: 'accept', message: `类型不符合 accept：${file.name}` },
@@ -225,6 +263,7 @@ export function useDragDropFileUpload(
 			if (optsRef.current.disabled) return;
 			const { accepted, rejected } = parseFileList(list, {
 				accept: optsRef.current.accept,
+				acceptExtensionOnly: optsRef.current.acceptExtensionOnly,
 				maxCount: optsRef.current.maxCount,
 				maxFileBytes: optsRef.current.maxFileBytes,
 				validateFile: optsRef.current.validateFile,
@@ -290,8 +329,15 @@ export function useDragDropFileUpload(
 
 	const openFilePicker = useCallback(() => {
 		if (optsRef.current.disabled) return;
+		const pick = optsRef.current.pickFiles;
+		if (pick) {
+			void pick().then((files) => {
+				if (files?.length) emit(files, 'input');
+			});
+			return;
+		}
 		inputRef.current?.click();
-	}, []);
+	}, [emit]);
 
 	const resetInput = useCallback(() => {
 		if (inputRef.current) inputRef.current.value = '';

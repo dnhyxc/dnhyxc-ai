@@ -1,6 +1,13 @@
 import Tooltip from '@design/Tooltip';
 import { Button } from '@ui/index';
-import { LibraryBig, OctagonX, SaveIcon, Share2, Trash2 } from 'lucide-react';
+import {
+	LibraryBig,
+	OctagonX,
+	SaveIcon,
+	Share2,
+	SquareArrowRight,
+	Trash2,
+} from 'lucide-react';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 
@@ -10,13 +17,17 @@ const KnowledgeEditorToolbar = (props: {
 	onOpenTrash: () => void;
 	onNewDraft: () => void;
 	onSave: () => void;
+	onImport: () => void;
 	onShareKnowledge: () => void;
 	/** 保存请求进行中：禁用保存按钮 */
 	saveLoading?: boolean;
+	/** 导入请求进行中：禁用导入按钮 */
+	importLoading?: boolean;
 	/** 是否登录云端 */
 	isCloudLoggedIn?: boolean;
 	/** 系统设置中配置的快捷键文案（用于 Tooltip） */
 	shortcutHintSave?: string;
+	shortcutHintImport?: string;
 	shortcutHintClear?: string;
 	shortcutHintOpenLibrary?: string;
 	shortcutHintOpenTrash?: string;
@@ -29,10 +40,13 @@ const KnowledgeEditorToolbar = (props: {
 		onOpenTrash,
 		onNewDraft,
 		onSave,
+		onImport,
 		onShareKnowledge,
 		saveLoading = false,
+		importLoading = false,
 		isCloudLoggedIn = false,
 		shortcutHintSave,
+		shortcutHintImport,
 		shortcutHintClear,
 		shortcutHintOpenLibrary,
 		shortcutHintOpenTrash,
@@ -44,16 +58,16 @@ const KnowledgeEditorToolbar = (props: {
 		<div className="flex items-center pr-3 gap-4">
 			<Tooltip
 				side="bottom"
-				content={shortcutHintSave ?? t('knowledge.shortcuts.save')}
+				content={shortcutHintImport ?? t('knowledge.shortcuts.import')}
 			>
 				<Button
 					variant="link"
 					className={linkBtn}
-					// onClick={onImport}
-					// disabled={importLoading}
-					// aria-busy={importLoading}
+					onClick={onImport}
+					disabled={importLoading}
+					aria-busy={importLoading}
 				>
-					<SaveIcon className="mt-0.5" />
+					<SquareArrowRight className="mt-0.5" />
 					<span className="mt-0.5">{t('knowledge.toolbar.import')}</span>
 				</Button>
 			</Tooltip>

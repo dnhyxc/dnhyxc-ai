@@ -31,11 +31,14 @@ export const KNOWLEDGE_SHORTCUT_KEY_IDS = {
 	/** Markdown 底部操作栏：复位拖动后的几何位置（与「复位操作栏初始位置」按钮一致） */
 	markdownBarResetPosition: 22,
 	share: 23,
+	/** 从本地文件导入到编辑器 */
+	import: 24,
 } as const;
 
 /** 与 `views/setting/system/config.ts` 中默认值保持一致 */
 export const KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS = {
 	save: 'Meta + S',
+	import: 'Meta + I',
 	/** 避免 Meta+Control+D：在 macOS 上常被系统拦截，应用收不到 keydown */
 	clear: 'Meta + Shift + D',
 	/** Command（Meta）+ Shift + O：分享知识文章 */
@@ -253,6 +256,7 @@ function normalizeLegacyMarkdownBottomBarChord(stored: string | undefined): {
 /** 从 store 读取知识库页面快捷键（无记录则用默认） */
 export async function loadKnowledgeShortcutChords(): Promise<{
 	save: string;
+	import: string;
 	clear: string;
 	share: string;
 	openLibrary: string;
@@ -271,53 +275,71 @@ export async function loadKnowledgeShortcutChords(): Promise<{
 	markdownBarAction0: string;
 	markdownBarResetPosition: string;
 }> {
-	const [s, c, sh, o, b, t, v, a1, a2, a3, a4, a5, a6, a7, a8, a9, a0, aReset] =
-		await Promise.all([
-			getValue<string>(`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.save}`),
-			getValue<string>(`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.clear}`),
-			getValue<string>(`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.share}`),
-			getValue<string>(`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.openLibrary}`),
-			getValue<string>(
-				`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.toggleMarkdownBottomBar}`,
-			),
-			getValue<string>(`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.openTrash}`),
-			getValue<string>(
-				`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.pasteToAssistant}`,
-			),
-			getValue<string>(
-				`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.markdownBarAction1}`,
-			),
-			getValue<string>(
-				`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.markdownBarAction2}`,
-			),
-			getValue<string>(
-				`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.markdownBarAction3}`,
-			),
-			getValue<string>(
-				`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.markdownBarAction4}`,
-			),
-			getValue<string>(
-				`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.markdownBarAction5}`,
-			),
-			getValue<string>(
-				`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.markdownBarAction6}`,
-			),
-			getValue<string>(
-				`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.markdownBarAction7}`,
-			),
-			getValue<string>(
-				`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.markdownBarAction8}`,
-			),
-			getValue<string>(
-				`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.markdownBarAction9}`,
-			),
-			getValue<string>(
-				`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.markdownBarAction0}`,
-			),
-			getValue<string>(
-				`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.markdownBarResetPosition}`,
-			),
-		]);
+	const [
+		s,
+		imp,
+		c,
+		sh,
+		o,
+		b,
+		t,
+		v,
+		a1,
+		a2,
+		a3,
+		a4,
+		a5,
+		a6,
+		a7,
+		a8,
+		a9,
+		a0,
+		aReset,
+	] = await Promise.all([
+		getValue<string>(`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.save}`),
+		getValue<string>(`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.import}`),
+		getValue<string>(`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.clear}`),
+		getValue<string>(`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.share}`),
+		getValue<string>(`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.openLibrary}`),
+		getValue<string>(
+			`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.toggleMarkdownBottomBar}`,
+		),
+		getValue<string>(`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.openTrash}`),
+		getValue<string>(`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.pasteToAssistant}`),
+		getValue<string>(
+			`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.markdownBarAction1}`,
+		),
+		getValue<string>(
+			`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.markdownBarAction2}`,
+		),
+		getValue<string>(
+			`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.markdownBarAction3}`,
+		),
+		getValue<string>(
+			`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.markdownBarAction4}`,
+		),
+		getValue<string>(
+			`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.markdownBarAction5}`,
+		),
+		getValue<string>(
+			`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.markdownBarAction6}`,
+		),
+		getValue<string>(
+			`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.markdownBarAction7}`,
+		),
+		getValue<string>(
+			`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.markdownBarAction8}`,
+		),
+		getValue<string>(
+			`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.markdownBarAction9}`,
+		),
+		getValue<string>(
+			`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.markdownBarAction0}`,
+		),
+		getValue<string>(
+			`shortcut_${KNOWLEDGE_SHORTCUT_KEY_IDS.markdownBarResetPosition}`,
+		),
+	]);
 	const { value: clear, didMigrate: clearMigrated } =
 		normalizeLegacyClearChord(c);
 	if (clearMigrated) {
@@ -344,6 +366,7 @@ export async function loadKnowledgeShortcutChords(): Promise<{
 	}
 	return {
 		save: s?.trim() || KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.save,
+		import: imp?.trim() || KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.import,
 		clear,
 		share: sh?.trim() || KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.share,
 		openLibrary,

@@ -139,6 +139,20 @@ export async function invokeListKnowledgeMarkdownFiles(
 	});
 }
 
+/** 知识库导入：打开仅含 `.md` 的系统文件选择对话框；取消返回 null */
+export async function invokeSelectKnowledgeImportMdFile(): Promise<
+	string | null
+> {
+	const { invoke } = await import('@tauri-apps/api/core');
+	try {
+		return await invoke<string>('select_knowledge_import_md_file');
+	} catch (e) {
+		const msg = e instanceof Error ? e.message : String(e ?? '');
+		if (msg.includes('canceled')) return null;
+		throw e;
+	}
+}
+
 /** 读取单个 Markdown 文件正文 */
 export async function invokeReadKnowledgeMarkdownFile(
 	filePath: string,

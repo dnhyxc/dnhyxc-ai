@@ -47,10 +47,10 @@
 ### 步骤 4：导入页数据流
 
 1. **`useSearchParams`** 读取 `kind`，默认 **`vocab`**。
-2. **`DragDropFileUpload`**：接受 JSON、`maxCount={1}`，回调 **`onDropZoneFiles`** → **`processJsonFile`**。
+2. **`DragDropFileUpload`**：接受 **仅 `.json`**（`acceptExtensionOnly` + `pickFiles`）、`maxCount={1}`，回调 **`onDropZoneFiles`** → **`processJsonFile`**。详见 **§7**。
 3. **`FileReader`** 读 UTF-8 → **`JSON.parse`**；失败则 **`jsonErrorKind: 'parse'`** 并保留原始文本便于手改。
 4. 成功则 **`JSON.stringify(..., null, 2)`** 写入 **`previewText`**，驱动 **`MarkdownEditor`**（`language="json"`）；同时 **`parseVocabularyImport` / `parseClassicImport`** 填充 **`parsedVocab` / `parsedClassic`** 或 **`structFailReason`**。
-5. **「重新上传」**：页面根级常驻隐藏 **`input[type=file]`**，点击后 **`resetParsed` + 清空 `previewText` + `input.click()`**（因预览模式下拖拽区未挂载，不能依赖 `DragDropFileUpload` 的 ref）；选文件后仍走 **`processJsonFile`**，并在 **`onChange` 末尾清空 `input.value`** 以便重复选择同一文件。
+5. **「重新上传」**：与空态上传区共用 **`pickEnglishLearningJsonFile()`**（Tauri 为仅 JSON 系统对话框）；不再使用根级隐藏 `input`。
 6. **保存**：校验无 JSON/结构错误、已解析条数、标题非空；通过后当前为 **`console.log`** 占位。
 
 ### 步骤 5：Monaco 与编辑器默认项
@@ -395,15 +395,82 @@ const openFilePicker = useCallback(() => {
 
 ---
 
-## 7. 相关源码路径速查
+## 7. 严格 `.json` 文件选择（增补）
+
+### 7.1 问题
+
+仅设置 `accept=".json,application/json"` 时：
+
+- 系统文件对话框仍常出现「所有文件」或可按 MIME 误匹配；
+- 用户反馈「设置了 accept 仍能选其它类型」。
+
+### 7.2 方案（与知识库 `.md` 导入同构）
+
+| 层级 | 做法 |
+|------|------|
+| **Tauri** | `select_english_learning_import_json_file` + `read_english_learning_import_json_file`（`common.rs`） |
+| **Web** | `accept=".json"` + 选中后扩展名校验（`not_json`） |
+| **拖拽** | `DragDropFileUpload` 的 **`acceptExtensionOnly`**（忽略 MIME，只认 `.json`） |
+| **点击上传** | **`pickFiles`** 注入 `pickEnglishLearningJsonFile`，桌面端不走隐藏 input |
+
+新建 **`englishLearningImportFile.ts`** 统一 Web/Tauri 分支；导入页通过 **`pickImportJsonFiles`** 传给 `DragDropFileUpload` 与「重新上传」。
+
+### 7.3 `DragDropFileUpload` 新增能力
+
+**来源**：`apps/frontend/src/components/design/DragDropFileUpload/index.tsx`（选项与 `openFilePicker`，约 L50–L63、L320 附近）
+
+```typescript
+// acceptExtensionOnly：parseFileList 内用 matchAcceptExtensionOnly，避免 application/json MIME 误放行
+acceptExtensionOnly?: boolean;
+
+// pickFiles：若提供，点击区域/编程式 open 调用自定义选择器（Tauri 原生对话框）
+pickFiles?: () => Promise<File[] | null>;
+```
+
+### 7.4 Tauri 命令
+
+**来源**：`apps/frontend/src-tauri/src/command/common.rs`（约 L31–L56）
+
+```rust
+// 对话框过滤器仅 ["json"]
+pub fn select_english_learning_import_json_file() -> Result<String, String> { ... }
+
+// 读取前再次校验路径以 .json 结尾
+pub fn read_english_learning_import_json_file(file_path: String) -> Result<String, String> { ... }
+```
+
+前端将读到的字符串包装为 `new File([content], fileName, { type: 'application/json' })`，后续仍走既有 **`processJsonFile`**。
+
+### 7.5 导入页接线
+
+**来源**：`apps/frontend/src/views/englishLearning/import/EnglishLearningImportPage.tsx`（`DragDropFileUpload` 与 `pickImportJsonFiles`，约 L227–L260、L500 附近）
+
+```tsx
+<DragDropFileUpload
+  accept={JSON_IMPORT_ACCEPT}       // '.json'
+  acceptExtensionOnly
+  pickFiles={pickImportJsonFiles}   // Tauri: 系统对话框；Web: 隐藏 input
+  onReject={...}                    // 拖拽非 .json → Toast
+/>
+```
+
+**来源**：`apps/frontend/src/views/englishLearning/import/englishLearningImportFile.ts`（全文）
+
+知识库 Markdown 导入的平行实现见 [`../knowledge/knowledge-md-import.md`](../knowledge/knowledge-md-import.md)。
+
+---
+
+## 8. 相关源码路径速查
 
 | 说明 | 路径 |
 |------|------|
 | 路由表 | `apps/frontend/src/router/routes.ts` |
 | 导入页 | `apps/frontend/src/views/englishLearning/EnglishLearningImportPage.tsx` |
+| JSON 选择工具 | `apps/frontend/src/views/englishLearning/import/englishLearningImportFile.ts` |
 | 布局壳 | `apps/frontend/src/views/englishLearning/EnglishLearningLayout.tsx` |
 | 顶栏 | `apps/frontend/src/components/design/Header/index.tsx` |
 | Monaco | `apps/frontend/src/components/design/Monaco/index.tsx`、`options.ts` |
 | 拖拽上传 | `apps/frontend/src/components/design/DragDropFileUpload/index.tsx` |
+| Tauri JSON 命令 | `apps/frontend/src-tauri/src/command/common.rs` |
 
 若与仓库最新源码不一致，**以源码为准**。

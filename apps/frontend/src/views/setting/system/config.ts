@@ -66,6 +66,17 @@ export const DEFAULT_INFO: ShortcutSettingItem[] = [
 		registerGlobally: false,
 	},
 	{
+		labelKey: 'setting.system.shortcuts.item.knowledge.import',
+		label: '知识库：导入文件',
+		key: KNOWLEDGE_SHORTCUT_KEY_IDS.import,
+		id: 'shortcut',
+		shortcut: '',
+		defaultShortcut: KNOWLEDGE_SHORTCUT_DEFAULT_CHORDS.import,
+		placeholder: '按键盘输入快捷键',
+		action: 'knowledge_import',
+		registerGlobally: false,
+	},
+	{
 		labelKey: 'setting.system.shortcuts.item.knowledge.clearDraft',
 		label: '知识库：清空草稿',
 		key: KNOWLEDGE_SHORTCUT_KEY_IDS.clear,

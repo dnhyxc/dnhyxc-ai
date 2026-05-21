@@ -28,6 +28,33 @@ pub async fn select_file() -> Result<String, String> {
     }
 }
 
+/// 英语学习导入：系统文件对话框仅展示 `.json`
+#[tauri::command]
+pub fn select_english_learning_import_json_file() -> Result<String, String> {
+    match FileDialog::new().add_filter("JSON", &["json"]).pick_file() {
+        Some(path) => Ok(path.to_string_lossy().to_string()),
+        None => Err("canceled".to_string()),
+    }
+}
+
+/// 读取用户选中的 `.json` 导入文件（UTF-8）
+#[tauri::command]
+pub fn read_english_learning_import_json_file(file_path: String) -> Result<String, String> {
+    let trimmed = file_path.trim();
+    if trimmed.is_empty() {
+        return Err("filePath 不能为空".to_string());
+    }
+    let lower = trimmed.to_lowercase();
+    if !lower.ends_with(".json") {
+        return Err("仅允许读取 .json 文件".to_string());
+    }
+    let p = std::path::Path::new(trimmed);
+    if !p.exists() || !p.is_file() {
+        return Err("文件不存在或不是普通文件".to_string());
+    }
+    fs::read_to_string(p).map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 pub async fn select_directory() -> Result<String, String> {
     match FileDialog::new().pick_folder() {

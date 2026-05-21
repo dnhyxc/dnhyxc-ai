@@ -147,6 +147,22 @@ export const enUS = {
 	'setting.system.close.minimizeToTray': 'Minimize to tray and keep running',
 	'setting.system.close.quit': 'Quit the app',
 
+	'setting.system.localTts.title': 'English learning (local voice)',
+	'setting.system.localTts.desc':
+		'read-aloud uses local speech. Voices are grouped as female and male; Auto still prefers a female voice. Full sentences prefer cloud TTS when available.',
+	'setting.system.localTts.voiceLabel': 'Voice',
+	'setting.system.localTts.autoOption': 'Default (Karen)',
+	'setting.system.localTts.groupFemale': 'Female',
+	'setting.system.localTts.groupMale': 'Male',
+	'setting.system.localTts.genderTag.female': 'Female',
+	'setting.system.localTts.genderTag.male': 'Male',
+	'setting.system.localTts.preview': 'Preview',
+	'setting.system.localTts.previewText': 'Hello, this is a voice preview.',
+	'setting.system.localTts.unsupported':
+		'Local speech synthesis is not available in this environment.',
+	'setting.system.localTts.noVoices':
+		'No English voices found. Install voices in system accessibility / speech settings, then retry.',
+
 	'setting.system.shortcuts.title': 'Keyboard shortcuts',
 	'setting.system.shortcuts.desc':
 		'「App visibility/refresh」shortcuts are global, other shortcuts only work in their respective windows.',
@@ -169,6 +185,7 @@ export const enUS = {
 	'setting.system.shortcuts.item.newWorkflow': 'Create workflow',
 	'setting.system.shortcuts.item.openSubwindow': 'Open subwindow',
 	'setting.system.shortcuts.item.knowledge.save': 'Knowledge: Save',
+	'setting.system.shortcuts.item.knowledge.import': 'Knowledge: Import file',
 	'setting.system.shortcuts.item.knowledge.clearDraft':
 		'Knowledge: Clear draft',
 	'setting.system.shortcuts.item.knowledge.share': 'Knowledge: Share article',
@@ -547,11 +564,18 @@ export const enUS = {
 	// 知识库文案
 	'knowledge.common.untitled': 'Untitled',
 	'knowledge.toolbar.save': 'Save',
+	'knowledge.toolbar.import': 'Import',
+	'knowledge.import.success': 'Imported into editor',
+	'knowledge.import.empty': 'File is empty',
+	'knowledge.import.failed': 'Import failed',
+	'knowledge.import.tooLarge': 'File is too large (max 5MB)',
+	'knowledge.import.notMd': 'Only .md files can be imported',
 	'knowledge.toolbar.clear': 'Clear',
 	'knowledge.toolbar.share': 'Share',
 	'knowledge.toolbar.library': 'Library',
 	'knowledge.toolbar.trash': 'Trash',
 	'knowledge.shortcuts.save': 'Meta + S / Control + S',
+	'knowledge.shortcuts.import': 'Meta + I',
 	'knowledge.shortcuts.clear': 'Meta + Shift + D',
 	'knowledge.shortcuts.share': 'Meta + Shift + O',
 	'knowledge.shortcuts.openLibrary': 'Meta + Shift + L',

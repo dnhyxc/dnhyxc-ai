@@ -15,6 +15,8 @@
 
 知识库操作强依赖当前页面上下文（Monaco 焦点、抽屉、底部栏），若注册为系统全局快捷键，容易在其它页面误触或与系统/其它应用冲突。因此：**只存字符串到 store，不调用 `register_shortcut`**，由知识页读取 chord 后自行匹配 `KeyboardEvent`。
 
+**导入本地 `.md`**：`shortcut_24`，默认 **Meta + I**，行为与顶栏「导入」一致，见 [`knowledge-md-import.md`](./knowledge-md-import.md)。
+
 ### 1.2 数据流（主窗口单实例前提）
 
 ```mermaid

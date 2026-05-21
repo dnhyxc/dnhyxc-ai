@@ -4,14 +4,7 @@
 
 import { Button, Input, Toast } from '@ui/index';
 import { CloudUpload, NotebookPen } from 'lucide-react';
-import {
-	type ChangeEvent,
-	useCallback,
-	useEffect,
-	useMemo,
-	useRef,
-	useState,
-} from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import type { DragDropAcceptResult } from '@/components/design/DragDropFileUpload';
 import DragDropFileUpload from '@/components/design/DragDropFileUpload';
@@ -24,6 +17,11 @@ import {
 	uploadEnglishVocabularyLibraryJson,
 } from '@/service';
 import { copyToClipboard, pasteFromClipboard } from '@/utils/clipboard';
+import {
+	isJsonImportFileName,
+	JSON_IMPORT_ACCEPT,
+	pickEnglishLearningJsonFile,
+} from './englishLearningImportFile';
 
 type ImportKind = 'vocab' | 'classic';
 
@@ -151,7 +149,6 @@ export default function EnglishLearningImportPage() {
 	const [importTitle, setImportTitle] = useState('');
 	const [vocabSaveLoading, setVocabSaveLoading] = useState(false);
 	const [classicSaveLoading, setClassicSaveLoading] = useState(false);
-	const reuploadInputRef = useRef<HTMLInputElement>(null);
 
 	const resetParsed = useCallback(() => {
 		setParsedVocab(null);
@@ -167,6 +164,13 @@ export default function EnglishLearningImportPage() {
 
 	const processJsonFile = useCallback(
 		(file: File) => {
+			if (!isJsonImportFileName(file.name)) {
+				Toast({
+					type: 'warning',
+					title: t('englishLearning.import.dropReject'),
+				});
+				return;
+			}
 			resetParsed();
 			setImportTitle(fileNameWithoutExtension(file.name).slice(0, 100));
 			const reader = new FileReader();
@@ -212,8 +216,24 @@ export default function EnglishLearningImportPage() {
 			};
 			reader.readAsText(file, 'UTF-8');
 		},
-		[kind, resetParsed],
+		[kind, resetParsed, t],
 	);
+
+	const pickImportJsonFiles = useCallback(async (): Promise<File[] | null> => {
+		try {
+			const file = await pickEnglishLearningJsonFile();
+			return file ? [file] : null;
+		} catch (e) {
+			if (e instanceof Error && e.message === 'not_json') {
+				Toast({
+					type: 'warning',
+					title: t('englishLearning.import.dropReject'),
+				});
+				return null;
+			}
+			throw e;
+		}
+	}, [t]);
 
 	const onDropZoneFiles = useCallback(
 		(result: DragDropAcceptResult) => {
@@ -230,21 +250,15 @@ export default function EnglishLearningImportPage() {
 		});
 	}, [t]);
 
-	/** 标题栏「重新上传」：清空当前内容并打开文件选择（与拖拽区 accept 一致） */
-	const onReuploadHiddenFileChange = useCallback(
-		(e: ChangeEvent<HTMLInputElement>) => {
-			const file = e.target.files?.[0];
-			e.target.value = '';
-			if (file) processJsonFile(file);
-		},
-		[processJsonFile],
-	);
-
+	/** 标题栏「重新上传」：与拖拽区共用 pickImportJsonFiles（Tauri 为仅 .json 系统对话框） */
 	const onReupload = useCallback(() => {
 		resetParsed();
 		setPreviewText('');
-		reuploadInputRef.current?.click();
-	}, [resetParsed]);
+		void pickImportJsonFiles().then((files) => {
+			const file = files?.[0];
+			if (file) processJsonFile(file);
+		});
+	}, [resetParsed, pickImportJsonFiles, processJsonFile]);
 
 	/** 编辑器删空后回到拖拽上传区，并清空解析结果 */
 	const onPreviewEditorChange = useCallback(
@@ -370,15 +384,6 @@ export default function EnglishLearningImportPage() {
 
 	return (
 		<div className="flex h-full max-h-full min-h-0 w-full flex-col overflow-hidden p-5.5 pt-0">
-			<input
-				ref={reuploadInputRef}
-				type="file"
-				accept=".json,application/json"
-				className="hidden"
-				aria-hidden
-				tabIndex={-1}
-				onChange={onReuploadHiddenFileChange}
-			/>
 			<div className="text-textcolor/80 mb-3 shrink-0 leading-relaxed text-sm">
 				<div className="flex items-start justify-between">
 					<div className="-mt-0.5">{hint}</div>
@@ -397,7 +402,6 @@ export default function EnglishLearningImportPage() {
 						: `[{"english": "Education is not the filling of a pail, but the lighting of a fire.", "translationZh": "教育不是注满一桶水，而是点燃一把火。", "source": "William Butler Yeats", "noteZh": "经典比喻，阐明教育的本质是激发热情。"}]`}
 				</div>
 			</div>
-
 			{jsonErrorKind === 'parse' ? (
 				<p className="text-destructive mb-2 shrink-0 text-sm">
 					{t('englishLearning.import.parseError')}
@@ -414,7 +418,6 @@ export default function EnglishLearningImportPage() {
 					{t(`englishLearning.import.err.${structFailReason}`)}
 				</p>
 			) : null}
-
 			<div className="flex min-h-0 min-w-0 flex-1 basis-0 flex-col">
 				<div className="border-theme-border min-h-0 min-w-0 flex-1 basis-0 overflow-hidden rounded-md border bg-theme/5">
 					{previewText ? (
@@ -489,9 +492,11 @@ export default function EnglishLearningImportPage() {
 						<DragDropFileUpload
 							className="group flex h-full min-h-0 flex-1 flex-col"
 							zoneClassName="flex h-full min-h-0 flex-1 flex-col rounded-md border border-dashed border-theme/50 hover:border-theme"
-							accept=".json,application/json"
+							accept={JSON_IMPORT_ACCEPT}
+							acceptExtensionOnly
+							pickFiles={pickImportJsonFiles}
 							maxCount={1}
-							ariaLabel={t('englishLearning.import.dropReject')}
+							ariaLabel={t('englishLearning.import.selectFile')}
 							onFiles={(result) => onDropZoneFiles(result)}
 							onReject={(rejected) => {
 								if (rejected.length > 0) onDropZoneReject();
