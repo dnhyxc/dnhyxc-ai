@@ -3169,7 +3169,7 @@ export const dataSource = {
 									word: 'nonsense',
 									ipa: '/ˈnɒnsəns/',
 									pos: 'n.',
-									translationZh: 'nonsense',
+									translationZh: '胡说；废话；瞎扯',
 								},
 								{
 									word: 'nonviolent',
