@@ -1,10 +1,11 @@
 /**
- * 按列表增量查询经典句收藏状态：仅对尚未查询过的句子请求 /status，结果合并进 Set。
+ * 按列表增量查询经典句收藏状态：仅对尚未查询过的句子请求 /status，结果合并进 Map（contentKey → 收藏 id）。
  * 列表被整体替换（非末尾追加）时清空本地状态并重新查询。
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
 	classicQuoteFavoriteContentKey,
+	type EnglishClassicQuoteFavoriteRef,
 	fetchEnglishClassicQuoteFavoriteStatus,
 } from '@/service';
 
@@ -14,11 +15,16 @@ const STATUS_QUERY_DEBOUNCE_MS = 150;
 export function useIncrementalClassicQuoteFavoriteStatus(
 	items: ReadonlyArray<{ english: string }>,
 ) {
-	const [favoritedContentKeys, setFavoritedContentKeys] = useState<Set<string>>(
-		() => new Set(),
-	);
+	const [favoriteIdByContentKey, setFavoriteIdByContentKey] = useState<
+		Map<string, string>
+	>(() => new Map());
 	const queriedKeysRef = useRef<Set<string>>(new Set());
 	const prevItemsEnglishSigRef = useRef('');
+
+	const favoritedContentKeys = useMemo(
+		() => new Set(favoriteIdByContentKey.keys()),
+		[favoriteIdByContentKey],
+	);
 
 	const itemsEnglishSig = useMemo(
 		() => items.map((it) => it.english).join(ENGLISH_SIG_SEP),
@@ -27,7 +33,7 @@ export function useIncrementalClassicQuoteFavoriteStatus(
 
 	useEffect(() => {
 		if (items.length === 0) {
-			setFavoritedContentKeys(new Set());
+			setFavoriteIdByContentKey(new Map());
 			queriedKeysRef.current = new Set();
 			prevItemsEnglishSigRef.current = '';
 			return;
@@ -39,7 +45,7 @@ export function useIncrementalClassicQuoteFavoriteStatus(
 			(itemsEnglishSig === prevSig ||
 				itemsEnglishSig.startsWith(`${prevSig}${ENGLISH_SIG_SEP}`));
 		if (!appended) {
-			setFavoritedContentKeys(new Set());
+			setFavoriteIdByContentKey(new Map());
 			queriedKeysRef.current = new Set();
 		}
 		prevItemsEnglishSigRef.current = itemsEnglishSig;
@@ -55,11 +61,11 @@ export function useIncrementalClassicQuoteFavoriteStatus(
 			}
 			if (englishesToQuery.length === 0) return;
 
-			const mergeFavoritedKeys = (keys: string[]) => {
-				if (cancelled || keys.length === 0) return;
-				setFavoritedContentKeys((prev) => {
-					const next = new Set(prev);
-					for (const k of keys) next.add(k);
+			const mergeFavoritedRefs = (refs: EnglishClassicQuoteFavoriteRef[]) => {
+				if (cancelled || refs.length === 0) return;
+				setFavoriteIdByContentKey((prev) => {
+					const next = new Map(prev);
+					for (const r of refs) next.set(r.contentKey, r.id);
 					return next;
 				});
 			};
@@ -67,7 +73,7 @@ export function useIncrementalClassicQuoteFavoriteStatus(
 			void (async () => {
 				try {
 					await fetchEnglishClassicQuoteFavoriteStatus(englishesToQuery, {
-						onPartialKeys: mergeFavoritedKeys,
+						onPartial: mergeFavoritedRefs,
 					});
 					if (cancelled) return;
 				} catch {
@@ -87,5 +93,30 @@ export function useIncrementalClassicQuoteFavoriteStatus(
 		};
 	}, [itemsEnglishSig, items]);
 
-	return { favoritedContentKeys, setFavoritedContentKeys };
+	const getClassicQuoteFavoriteId = (contentKey: string) =>
+		favoriteIdByContentKey.get(contentKey);
+
+	const setClassicQuoteFavoriteId = (contentKey: string, id: string) => {
+		setFavoriteIdByContentKey((prev) => {
+			const next = new Map(prev);
+			next.set(contentKey, id);
+			return next;
+		});
+	};
+
+	const clearClassicQuoteFavorite = (contentKey: string) => {
+		setFavoriteIdByContentKey((prev) => {
+			if (!prev.has(contentKey)) return prev;
+			const next = new Map(prev);
+			next.delete(contentKey);
+			return next;
+		});
+	};
+
+	return {
+		favoritedContentKeys,
+		getClassicQuoteFavoriteId,
+		setClassicQuoteFavoriteId,
+		clearClassicQuoteFavorite,
+	};
 }

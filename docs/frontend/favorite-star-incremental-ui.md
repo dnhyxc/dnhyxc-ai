@@ -1,5 +1,6 @@
 # 收藏星标「慢半拍」：增量查询与渐进点亮
 
+> **按 id 取消收藏、Hook 内 `Map<key,id>`、`onPartial(refs)`**：见 [`english-learning-favorites-by-id.md`](./english-learning-favorites-by-id.md)。  
 > 本文聚焦 **星标高亮滞后**（列表已渲染，已收藏词条的星仍空心，需等数秒才批量亮起）。  
 > 网络重试、资源库分页等见 [`english-learning-list-network-retry.md`](./english-learning-list-network-retry.md)（含线上偶发 `error sending request` 说明）；  
 > 重试失败后 Toast 脱敏与 i18n 见 [`http-network-error-toast.md`](./http-network-error-toast.md)；单词 500 上限与增量 Hook 初版见 [`vocab-favorite-status-query.md`](./vocab-favorite-status-query.md)。
@@ -26,11 +27,11 @@
 
 | 层级 | 目标 |
 |------|------|
-| Service | 每完成一小批 HTTP 即通过回调上报已收藏 key，不必等所有批结束 |
+| Service | 每完成一小批 HTTP 即通过 `onPartial(refs)` 上报已收藏 **key + id**，不必等所有批结束 |
 | Service | 同一 500 逻辑 chunk 内 **有限并发**（默认 3）拉批，缩短总等待 |
 | Hook | 只查 **未查过的** 词/句；滚动 **追加** 时保留已有 Set，不整表清空 |
 | Hook | **150ms 防抖**，避免连续 `setItems` 触发多次 `/status` |
-| 面板 | 用户点击收藏时 **乐观更新** `Set`，与 `/status` 解耦 |
+| 面板 | 用户点击收藏时更新 **Map/派生 Set**（含 `id`），取消时用 `get*FavoriteId`；与 `/status` 解耦 |
 
 若与仓库最新源码不一致，**以源码为准**。
 

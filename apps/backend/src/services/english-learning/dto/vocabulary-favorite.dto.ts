@@ -4,6 +4,7 @@ import {
 	IsNotEmpty,
 	IsOptional,
 	IsString,
+	IsUUID,
 	MaxLength,
 } from 'class-validator';
 
@@ -33,12 +34,18 @@ export class VocabularyFavoriteBodyDto {
 	example!: string;
 }
 
-/** 取消收藏：仅需词面（服务端按与新增相同的规则规范化） */
+/** 取消收藏：按收藏记录 id */
 export class VocabularyFavoriteRemoveDto {
-	@IsString()
-	@IsNotEmpty()
-	@MaxLength(500)
-	word!: string;
+	@IsUUID('4')
+	id!: string;
+}
+
+/** 批量取消收藏（单次请求） */
+export class VocabularyFavoriteRemoveBatchDto {
+	@IsArray()
+	@ArrayMaxSize(3000)
+	@IsUUID('4', { each: true })
+	ids!: string[];
 }
 
 /** 批量查询当前列表中哪些词已收藏 */

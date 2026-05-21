@@ -3651,21 +3651,33 @@ ${existingHintBlock}
 
 	async removeVocabularyFavorite(
 		userId: number,
-		word: string,
+		id: string,
 	): Promise<{ removed: boolean }> {
-		const wordKey = this.normalizeVocabularyFavoriteWordKey(word);
-		if (!wordKey) {
-			throw new BadRequestException('单词不能为空');
-		}
-		const r = await this.vocabFavoriteRepo.delete({ userId, wordKey });
+		const r = await this.vocabFavoriteRepo.delete({ userId, id });
 		return { removed: (r.affected ?? 0) > 0 };
 	}
 
-	/** 返回当前用户已收藏的规范化词形列表（仅包含入参中出现过的） */
-	async listVocabularyFavoriteKeysForWords(
+	/** 批量取消单词收藏（按收藏记录 id，一条 SQL） */
+	async removeVocabularyFavoritesBatch(
+		userId: number,
+		ids: string[],
+	): Promise<{ removedCount: number }> {
+		const unique = [...new Set(ids.map((id) => id.trim()).filter(Boolean))];
+		if (unique.length === 0) {
+			return { removedCount: 0 };
+		}
+		const r = await this.vocabFavoriteRepo.delete({
+			userId,
+			id: In(unique),
+		});
+		return { removedCount: r.affected ?? 0 };
+	}
+
+	/** 批量查询：入参词面中已收藏项的 wordKey + id */
+	async listVocabularyFavoriteRefsForWords(
 		userId: number,
 		words: string[],
-	): Promise<string[]> {
+	): Promise<Array<{ wordKey: string; id: string }>> {
 		const keys = [
 			...new Set(
 				words
@@ -3678,9 +3690,9 @@ ${existingHintBlock}
 		}
 		const rows = await this.vocabFavoriteRepo.find({
 			where: { userId, wordKey: In(keys) },
-			select: ['wordKey'],
+			select: ['id', 'wordKey'],
 		});
-		return rows.map((r) => r.wordKey);
+		return rows.map((r) => ({ wordKey: r.wordKey, id: r.id }));
 	}
 
 	/**
@@ -3722,23 +3734,33 @@ ${existingHintBlock}
 
 	async removeClassicQuoteFavorite(
 		userId: number,
-		english: string,
+		id: string,
 	): Promise<{ removed: boolean }> {
-		const contentKey = this.classicQuoteFavoriteContentKey(english);
-		if (!contentKey) {
-			throw new BadRequestException('英文原句不能为空');
-		}
-		const r = await this.classicQuoteFavoriteRepo.delete({
-			userId,
-			contentKey,
-		});
+		const r = await this.classicQuoteFavoriteRepo.delete({ userId, id });
 		return { removed: (r.affected ?? 0) > 0 };
 	}
 
-	async listClassicQuoteFavoriteContentKeys(
+	/** 批量取消经典句收藏（按收藏记录 id） */
+	async removeClassicQuoteFavoritesBatch(
+		userId: number,
+		ids: string[],
+	): Promise<{ removedCount: number }> {
+		const unique = [...new Set(ids.map((id) => id.trim()).filter(Boolean))];
+		if (unique.length === 0) {
+			return { removedCount: 0 };
+		}
+		const r = await this.classicQuoteFavoriteRepo.delete({
+			userId,
+			id: In(unique),
+		});
+		return { removedCount: r.affected ?? 0 };
+	}
+
+	/** 批量查询：入参原句中已收藏项的 contentKey + id */
+	async listClassicQuoteFavoriteRefsForEnglishes(
 		userId: number,
 		englishes: string[],
-	): Promise<string[]> {
+	): Promise<Array<{ contentKey: string; id: string }>> {
 		const keys = [
 			...new Set(
 				englishes
@@ -3751,9 +3773,9 @@ ${existingHintBlock}
 		}
 		const rows = await this.classicQuoteFavoriteRepo.find({
 			where: { userId, contentKey: In(keys) },
-			select: ['contentKey'],
+			select: ['id', 'contentKey'],
 		});
-		return rows.map((r) => r.contentKey);
+		return rows.map((r) => ({ contentKey: r.contentKey, id: r.id }));
 	}
 
 	/** 分页列出当前用户收藏的单词（按收藏时间倒序，含总数） */

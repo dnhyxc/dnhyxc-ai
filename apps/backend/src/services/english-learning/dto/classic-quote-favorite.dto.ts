@@ -3,6 +3,7 @@ import {
 	IsArray,
 	IsNotEmpty,
 	IsString,
+	IsUUID,
 	MaxLength,
 } from 'class-validator';
 
@@ -26,15 +27,21 @@ export class ClassicQuoteFavoriteBodyDto {
 	noteZh!: string;
 }
 
-/** 取消收藏：传入英文原句（与服务端计算 content_key 的规则一致） */
+/** 取消收藏：按收藏记录 id */
 export class ClassicQuoteFavoriteRemoveDto {
-	@IsString()
-	@IsNotEmpty()
-	@MaxLength(12000)
-	english!: string;
+	@IsUUID('4')
+	id!: string;
 }
 
-/** 批量查询当前列表中哪些句已收藏（返回 content_key） */
+/** 批量取消收藏（单次请求） */
+export class ClassicQuoteFavoriteRemoveBatchDto {
+	@IsArray()
+	@ArrayMaxSize(3000)
+	@IsUUID('4', { each: true })
+	ids!: string[];
+}
+
+/** 批量查询当前列表中哪些句已收藏 */
 export class ClassicQuoteFavoriteStatusDto {
 	@IsArray()
 	@ArrayMaxSize(500)

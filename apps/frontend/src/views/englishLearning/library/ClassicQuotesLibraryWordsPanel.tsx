@@ -87,8 +87,12 @@ export function ClassicQuotesLibraryWordsPanel({
 		el.scrollTop = initialScrollTop;
 	}, [libraryId, initialScrollTop]);
 
-	const { favoritedContentKeys, setFavoritedContentKeys } =
-		useIncrementalClassicQuoteFavoriteStatus(items);
+	const {
+		favoritedContentKeys,
+		getClassicQuoteFavoriteId,
+		setClassicQuoteFavoriteId,
+		clearClassicQuoteFavorite,
+	} = useIncrementalClassicQuoteFavoriteStatus(items);
 
 	useEffect(() => {
 		stopAllEnglishPlayback();
@@ -125,19 +129,14 @@ export function ClassicQuotesLibraryWordsPanel({
 			setFavoriteActionKey(ck);
 			try {
 				if (currentlyFavorited) {
-					await removeEnglishClassicQuoteFavorite(item.english);
-					setFavoritedContentKeys((prev) => {
-						const next = new Set(prev);
-						next.delete(ck);
-						return next;
-					});
+					const favoriteId = getClassicQuoteFavoriteId(ck);
+					if (!favoriteId) return;
+					await removeEnglishClassicQuoteFavorite(favoriteId);
+					clearClassicQuoteFavorite(ck);
 				} else {
-					await addEnglishClassicQuoteFavorite(item);
-					setFavoritedContentKeys((prev) => {
-						const next = new Set(prev);
-						next.add(ck);
-						return next;
-					});
+					const res = await addEnglishClassicQuoteFavorite(item);
+					const favoriteId = res.data?.id;
+					if (favoriteId) setClassicQuoteFavoriteId(ck, favoriteId);
 				}
 			} catch {
 				// 错误提示由 http 客户端统一处理
@@ -145,7 +144,11 @@ export function ClassicQuotesLibraryWordsPanel({
 				setFavoriteActionKey(null);
 			}
 		},
-		[],
+		[
+			getClassicQuoteFavoriteId,
+			setClassicQuoteFavoriteId,
+			clearClassicQuoteFavorite,
+		],
 	);
 
 	if (!libraryId) {

@@ -14,7 +14,7 @@ import { useI18n } from '@/hooks';
 import {
 	type EnglishVocabularyFavoriteListEntry,
 	listEnglishVocabularyFavorites,
-	removeEnglishVocabularyFavorite,
+	removeEnglishVocabularyFavoritesBatch,
 } from '@/service';
 
 export function useVocabularyFavoritesList(active: boolean) {
@@ -142,9 +142,7 @@ export function useVocabularyFavoritesList(active: boolean) {
 	const onBatchRemove = useCallback(
 		async (selected: EnglishVocabularyFavoriteListEntry[]) => {
 			if (selected.length === 0) return;
-			await Promise.all(
-				selected.map((it) => removeEnglishVocabularyFavorite(it.word)),
-			);
+			await removeEnglishVocabularyFavoritesBatch(selected.map((it) => it.id));
 			const gen = ++loadGenRef.current;
 			await fetchFirstPage(gen);
 		},

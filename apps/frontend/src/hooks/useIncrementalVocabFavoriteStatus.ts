@@ -1,9 +1,10 @@
 /**
- * 按列表增量查询单词收藏状态：仅对尚未查询过的词请求 /status，结果合并进 Set。
+ * 按列表增量查询单词收藏状态：仅对尚未查询过的词请求 /status，结果合并进 Map（wordKey → 收藏 id）。
  * 列表被整体替换（非末尾追加）时清空本地状态并重新查询。
  */
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+	type EnglishVocabFavoriteRef,
 	fetchEnglishVocabularyFavoriteStatus,
 	normalizeEnglishVocabWordKey,
 } from '@/service';
@@ -14,11 +15,16 @@ const STATUS_QUERY_DEBOUNCE_MS = 150;
 export function useIncrementalVocabFavoriteStatus(
 	items: ReadonlyArray<{ word: string }>,
 ) {
-	const [favoritedWordKeys, setFavoritedWordKeys] = useState<Set<string>>(
-		() => new Set(),
-	);
+	const [favoriteIdByWordKey, setFavoriteIdByWordKey] = useState<
+		Map<string, string>
+	>(() => new Map());
 	const queriedKeysRef = useRef<Set<string>>(new Set());
 	const prevItemsWordSigRef = useRef('');
+
+	const favoritedWordKeys = useMemo(
+		() => new Set(favoriteIdByWordKey.keys()),
+		[favoriteIdByWordKey],
+	);
 
 	const itemsWordSig = useMemo(
 		() => items.map((it) => it.word).join(WORD_SIG_SEP),
@@ -27,7 +33,7 @@ export function useIncrementalVocabFavoriteStatus(
 
 	useEffect(() => {
 		if (items.length === 0) {
-			setFavoritedWordKeys(new Set());
+			setFavoriteIdByWordKey(new Map());
 			queriedKeysRef.current = new Set();
 			prevItemsWordSigRef.current = '';
 			return;
@@ -39,7 +45,7 @@ export function useIncrementalVocabFavoriteStatus(
 			(itemsWordSig === prevSig ||
 				itemsWordSig.startsWith(`${prevSig}${WORD_SIG_SEP}`));
 		if (!appended) {
-			setFavoritedWordKeys(new Set());
+			setFavoriteIdByWordKey(new Map());
 			queriedKeysRef.current = new Set();
 		}
 		prevItemsWordSigRef.current = itemsWordSig;
@@ -55,11 +61,11 @@ export function useIncrementalVocabFavoriteStatus(
 			}
 			if (wordsToQuery.length === 0) return;
 
-			const mergeFavoritedKeys = (keys: string[]) => {
-				if (cancelled || keys.length === 0) return;
-				setFavoritedWordKeys((prev) => {
-					const next = new Set(prev);
-					for (const k of keys) next.add(k);
+			const mergeFavoritedRefs = (refs: EnglishVocabFavoriteRef[]) => {
+				if (cancelled || refs.length === 0) return;
+				setFavoriteIdByWordKey((prev) => {
+					const next = new Map(prev);
+					for (const r of refs) next.set(r.wordKey, r.id);
 					return next;
 				});
 			};
@@ -67,7 +73,7 @@ export function useIncrementalVocabFavoriteStatus(
 			void (async () => {
 				try {
 					await fetchEnglishVocabularyFavoriteStatus(wordsToQuery, {
-						onPartialKeys: mergeFavoritedKeys,
+						onPartial: mergeFavoritedRefs,
 					});
 					if (cancelled) return;
 				} catch {
@@ -87,5 +93,30 @@ export function useIncrementalVocabFavoriteStatus(
 		};
 	}, [itemsWordSig, items]);
 
-	return { favoritedWordKeys, setFavoritedWordKeys };
+	const getVocabularyFavoriteId = (wordKey: string) =>
+		favoriteIdByWordKey.get(wordKey);
+
+	const setVocabularyFavoriteId = (wordKey: string, id: string) => {
+		setFavoriteIdByWordKey((prev) => {
+			const next = new Map(prev);
+			next.set(wordKey, id);
+			return next;
+		});
+	};
+
+	const clearVocabularyFavorite = (wordKey: string) => {
+		setFavoriteIdByWordKey((prev) => {
+			if (!prev.has(wordKey)) return prev;
+			const next = new Map(prev);
+			next.delete(wordKey);
+			return next;
+		});
+	};
+
+	return {
+		favoritedWordKeys,
+		getVocabularyFavoriteId,
+		setVocabularyFavoriteId,
+		clearVocabularyFavorite,
+	};
 }

@@ -198,7 +198,10 @@ export function TtsVoiceSetting() {
 								value={selected}
 								onValueChange={onVoiceChange}
 							>
-								<DropdownMenuRadioItem value={LOCAL_ENGLISH_TTS_VOICE_AUTO}>
+								<DropdownMenuRadioItem
+									value={LOCAL_ENGLISH_TTS_VOICE_AUTO}
+									className="px-2 pl-2 [&>span:first-child]:hidden"
+								>
 									{t('setting.system.localTts.autoOption')}
 								</DropdownMenuRadioItem>
 								{hasFemaleGroup || hasMaleGroup ? (

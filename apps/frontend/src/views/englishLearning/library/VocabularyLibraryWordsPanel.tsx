@@ -88,8 +88,12 @@ export function VocabularyLibraryWordsPanel({
 		el.scrollTop = initialScrollTop;
 	}, [libraryId, initialScrollTop]);
 
-	const { favoritedWordKeys, setFavoritedWordKeys } =
-		useIncrementalVocabFavoriteStatus(items);
+	const {
+		favoritedWordKeys,
+		getVocabularyFavoriteId,
+		setVocabularyFavoriteId,
+		clearVocabularyFavorite,
+	} = useIncrementalVocabFavoriteStatus(items);
 
 	useEffect(() => {
 		stopAllEnglishPlayback();
@@ -126,19 +130,14 @@ export function VocabularyLibraryWordsPanel({
 			setFavoriteActionKey(wk);
 			try {
 				if (currentlyFavorited) {
-					await removeEnglishVocabularyFavorite(item.word);
-					setFavoritedWordKeys((prev) => {
-						const next = new Set(prev);
-						next.delete(wk);
-						return next;
-					});
+					const favoriteId = getVocabularyFavoriteId(wk);
+					if (!favoriteId) return;
+					await removeEnglishVocabularyFavorite(favoriteId);
+					clearVocabularyFavorite(wk);
 				} else {
-					await addEnglishVocabularyFavorite(item);
-					setFavoritedWordKeys((prev) => {
-						const next = new Set(prev);
-						next.add(wk);
-						return next;
-					});
+					const res = await addEnglishVocabularyFavorite(item);
+					const favoriteId = res.data?.id;
+					if (favoriteId) setVocabularyFavoriteId(wk, favoriteId);
 				}
 			} catch {
 				// 错误提示由 http 客户端统一处理
@@ -146,7 +145,7 @@ export function VocabularyLibraryWordsPanel({
 				setFavoriteActionKey(null);
 			}
 		},
-		[],
+		[getVocabularyFavoriteId, setVocabularyFavoriteId, clearVocabularyFavorite],
 	);
 
 	if (!libraryId) {
@@ -271,11 +270,6 @@ export function VocabularyLibraryWordsPanel({
 														)}
 														aria-pressed={isFavorited}
 														aria-label={
-															isFavorited
-																? t('englishLearning.vocab.unfavoriteWord')
-																: t('englishLearning.vocab.favoriteWord')
-														}
-														title={
 															isFavorited
 																? t('englishLearning.vocab.unfavoriteWord')
 																: t('englishLearning.vocab.favoriteWord')

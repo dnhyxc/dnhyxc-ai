@@ -34,8 +34,12 @@ function VocabularyPackListInner({ history }: VocabularyPackListProps) {
 	const items = isHistoryMode && history ? history.items : liveItems;
 
 	const [playingKey, setPlayingKey] = useState<string | null>(null);
-	const { favoritedWordKeys, setFavoritedWordKeys } =
-		useIncrementalVocabFavoriteStatus(items);
+	const {
+		favoritedWordKeys,
+		getVocabularyFavoriteId,
+		setVocabularyFavoriteId,
+		clearVocabularyFavorite,
+	} = useIncrementalVocabFavoriteStatus(items);
 	const [favoriteActionKey, setFavoriteActionKey] = useState<string | null>(
 		null,
 	);
@@ -70,19 +74,14 @@ function VocabularyPackListInner({ history }: VocabularyPackListProps) {
 			setFavoriteActionKey(wk);
 			try {
 				if (currentlyFavorited) {
-					await removeEnglishVocabularyFavorite(item.word);
-					setFavoritedWordKeys((prev) => {
-						const next = new Set(prev);
-						next.delete(wk);
-						return next;
-					});
+					const favoriteId = getVocabularyFavoriteId(wk);
+					if (!favoriteId) return;
+					await removeEnglishVocabularyFavorite(favoriteId);
+					clearVocabularyFavorite(wk);
 				} else {
-					await addEnglishVocabularyFavorite(item);
-					setFavoritedWordKeys((prev) => {
-						const next = new Set(prev);
-						next.add(wk);
-						return next;
-					});
+					const res = await addEnglishVocabularyFavorite(item);
+					const favoriteId = res.data?.id;
+					if (favoriteId) setVocabularyFavoriteId(wk, favoriteId);
 				}
 			} catch {
 				// 错误提示由 http 客户端统一处理
@@ -90,7 +89,7 @@ function VocabularyPackListInner({ history }: VocabularyPackListProps) {
 				setFavoriteActionKey(null);
 			}
 		},
-		[setFavoritedWordKeys],
+		[getVocabularyFavoriteId, setVocabularyFavoriteId, clearVocabularyFavorite],
 	);
 
 	if (items.length === 0) {

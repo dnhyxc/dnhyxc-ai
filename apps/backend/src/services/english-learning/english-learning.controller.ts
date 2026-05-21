@@ -35,6 +35,7 @@ import {
 import { CancelEnglishLearningStreamDto } from './dto/cancel-english-learning-stream.dto';
 import {
 	ClassicQuoteFavoriteBodyDto,
+	ClassicQuoteFavoriteRemoveBatchDto,
 	ClassicQuoteFavoriteRemoveDto,
 	ClassicQuoteFavoriteStatusDto,
 } from './dto/classic-quote-favorite.dto';
@@ -48,6 +49,7 @@ import { SaveClassicQuotesLibraryDto } from './dto/save-classic-quotes-library.d
 import { SaveVocabularyLibraryDto } from './dto/save-vocabulary-library.dto';
 import {
 	VocabularyFavoriteBodyDto,
+	VocabularyFavoriteRemoveBatchDto,
 	VocabularyFavoriteRemoveDto,
 	VocabularyFavoriteStatusDto,
 } from './dto/vocabulary-favorite.dto';
@@ -701,8 +703,26 @@ export class EnglishLearningController {
 		}
 		const data = await this.englishLearningService.removeVocabularyFavorite(
 			userId,
-			dto.word,
+			dto.id,
 		);
+		return { success: true, data };
+	}
+
+	/** 批量取消收藏（移除所选） */
+	@Post('vocabulary-favorites/remove-batch')
+	async removeVocabularyFavoritesBatch(
+		@Req() req: AuthedRequest,
+		@Body() dto: VocabularyFavoriteRemoveBatchDto,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const data =
+			await this.englishLearningService.removeVocabularyFavoritesBatch(
+				userId,
+				dto.ids,
+			);
 		return { success: true, data };
 	}
 
@@ -716,12 +736,12 @@ export class EnglishLearningController {
 		if (userId == null) {
 			throw new UnauthorizedException('未授权');
 		}
-		const favoritedWordKeys =
-			await this.englishLearningService.listVocabularyFavoriteKeysForWords(
+		const favorited =
+			await this.englishLearningService.listVocabularyFavoriteRefsForWords(
 				userId,
 				dto.words,
 			);
-		return { success: true, data: { favoritedWordKeys } };
+		return { success: true, data: { favorited } };
 	}
 
 	@Post('vocabulary-pack')
@@ -1031,8 +1051,25 @@ export class EnglishLearningController {
 		}
 		const data = await this.englishLearningService.removeClassicQuoteFavorite(
 			userId,
-			dto.english,
+			dto.id,
 		);
+		return { success: true, data };
+	}
+
+	@Post('classic-quotes-favorites/remove-batch')
+	async removeClassicQuoteFavoritesBatch(
+		@Req() req: AuthedRequest,
+		@Body() dto: ClassicQuoteFavoriteRemoveBatchDto,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const data =
+			await this.englishLearningService.removeClassicQuoteFavoritesBatch(
+				userId,
+				dto.ids,
+			);
 		return { success: true, data };
 	}
 
@@ -1045,12 +1082,12 @@ export class EnglishLearningController {
 		if (userId == null) {
 			throw new UnauthorizedException('未授权');
 		}
-		const favoritedContentKeys =
-			await this.englishLearningService.listClassicQuoteFavoriteContentKeys(
+		const favorited =
+			await this.englishLearningService.listClassicQuoteFavoriteRefsForEnglishes(
 				userId,
 				dto.englishes,
 			);
-		return { success: true, data: { favoritedContentKeys } };
+		return { success: true, data: { favorited } };
 	}
 
 	@Post('classic-quotes')

@@ -14,7 +14,7 @@ import { useI18n } from '@/hooks';
 import {
 	type EnglishClassicQuoteFavoriteListEntry,
 	listEnglishClassicQuoteFavorites,
-	removeEnglishClassicQuoteFavorite,
+	removeEnglishClassicQuoteFavoritesBatch,
 } from '@/service';
 
 export function useClassicQuoteFavoritesList(active: boolean) {
@@ -142,8 +142,8 @@ export function useClassicQuoteFavoritesList(active: boolean) {
 	const onBatchRemove = useCallback(
 		async (selected: EnglishClassicQuoteFavoriteListEntry[]) => {
 			if (selected.length === 0) return;
-			await Promise.all(
-				selected.map((it) => removeEnglishClassicQuoteFavorite(it.english)),
+			await removeEnglishClassicQuoteFavoritesBatch(
+				selected.map((it) => it.id),
 			);
 			const gen = ++loadGenRef.current;
 			await fetchFirstPage(gen);

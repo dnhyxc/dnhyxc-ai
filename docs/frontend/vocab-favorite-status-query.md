@@ -1,7 +1,8 @@
 # 单词收藏状态查询：分批请求与增量同步
 
 > **延伸阅读**  
-> - 星标「慢半拍」、`onPartialKeys` 渐进点亮、有限并发：[`favorite-star-incremental-ui.md`](./favorite-star-incremental-ui.md)  
+> - **按收藏 id 取消 / 批量 remove-batch / status 返回 `{ favorited: [{ wordKey, id }] }`**：[`english-learning-favorites-by-id.md`](./english-learning-favorites-by-id.md)（**以该文为准**更新 remove 与 status 响应）  
+> - 星标「慢半拍」、`onPartial` 渐进点亮、有限并发：[`favorite-star-incremental-ui.md`](./favorite-star-incremental-ui.md)  
 > - 网络错误 Toast 友好化：[`http-network-error-toast.md`](./http-network-error-toast.md)  
 > - 资源库列表会话缓存与滚动恢复：[`library-words-list-cache.md`](./library-words-list-cache.md)  
 > - 网络重试 / HTTP 50 小批 / 资源库分页 Hook：[`english-learning-list-network-retry.md`](./english-learning-list-network-retry.md)（含 §1.4 线上 vs 本地）
@@ -32,7 +33,7 @@
 | Hook | 仅对**尚未查询过**的词发起 `/status`，结果 **merge** 进 `favoritedWordKeys` |
 | 页面 | 资源库 `VocabularyLibraryWordsPanel`、拉词 `VocabularySection` 共用 Hook，去掉各自重复的全量 `useEffect` |
 
-**说明**：收藏/取消仍走既有 `addEnglishVocabularyFavorite` / `removeEnglishVocabularyFavorite`，本方案只优化**批量查状态**路径。
+**说明**：收藏/取消已改为按收藏记录 **id** 删除，status 返回 **wordKey + id**；详见 [`english-learning-favorites-by-id.md`](./english-learning-favorites-by-id.md)。本文主要描述**批量查状态**的分批与增量 Hook。
 
 若与仓库最新源码不一致，**以源码为准**。
 

@@ -763,51 +763,70 @@ export const addEnglishVocabularyFavorite = async (
 	);
 };
 
-export const removeEnglishVocabularyFavorite = async (word: string) => {
+export const removeEnglishVocabularyFavorite = async (id: string) => {
 	return await http.post<{ removed: boolean }>(
 		`${ENGLISH_LEARNING_VOCABULARY_FAVORITES}/remove`,
-		{ word },
+		{ id },
 	);
 };
 
-type FavoriteStatusBatchOptions = {
-	/** 每完成一小批 HTTP 即回调，便于 UI 渐进更新星标 */
-	onPartialKeys?: (keys: string[]) => void;
+/** 批量取消单词收藏（按收藏记录 id） */
+export const removeEnglishVocabularyFavoritesBatch = async (ids: string[]) => {
+	return await http.post<{ removedCount: number }>(
+		`${ENGLISH_LEARNING_VOCABULARY_FAVORITES}/remove-batch`,
+		{ ids },
+	);
 };
 
-async function fetchFavoriteStatusHttpBatch(
-	url: string,
+export type EnglishVocabFavoriteRef = { wordKey: string; id: string };
+
+export type EnglishClassicQuoteFavoriteRef = { contentKey: string; id: string };
+
+type FavoriteStatusBatchOptions<T extends { id: string }> = {
+	/** 每完成一小批 HTTP 即回调，便于 UI 渐进更新星标 */
+	onPartial?: (refs: T[]) => void;
+};
+
+async function fetchVocabFavoriteStatusHttpBatch(
 	batch: string[],
-	bodyKey: 'words' | 'englishes',
-): Promise<string[]> {
+): Promise<EnglishVocabFavoriteRef[]> {
 	return retryAsync(
 		async () => {
-			const res = await http.post<{
-				favoritedWordKeys?: string[];
-				favoritedContentKeys?: string[];
-			}>(url, { [bodyKey]: batch }, { silent: true });
-			const data = res.data;
-			if (bodyKey === 'words') {
-				return Array.isArray(data?.favoritedWordKeys)
-					? data.favoritedWordKeys
-					: [];
-			}
-			return Array.isArray(data?.favoritedContentKeys)
-				? data.favoritedContentKeys
-				: [];
+			const res = await http.post<{ favorited?: EnglishVocabFavoriteRef[] }>(
+				`${ENGLISH_LEARNING_VOCABULARY_FAVORITES}/status`,
+				{ words: batch },
+				{ silent: true },
+			);
+			return Array.isArray(res.data?.favorited) ? res.data.favorited : [];
 		},
 		{ retries: 2, delayMs: 350 },
 	);
 }
 
-/** 收藏状态分批 POST：小批次 + 有限并发 + 重试；chunk 间短间隔防请求风暴 */
-async function fetchFavoriteStatusInHttpBatches(
-	url: string,
+async function fetchClassicQuoteFavoriteStatusHttpBatch(
+	batch: string[],
+): Promise<EnglishClassicQuoteFavoriteRef[]> {
+	return retryAsync(
+		async () => {
+			const res = await http.post<{
+				favorited?: EnglishClassicQuoteFavoriteRef[];
+			}>(
+				`${ENGLISH_LEARNING_CLASSIC_QUOTES_FAVORITES}/status`,
+				{ englishes: batch },
+				{ silent: true },
+			);
+			return Array.isArray(res.data?.favorited) ? res.data.favorited : [];
+		},
+		{ retries: 2, delayMs: 350 },
+	);
+}
+
+/** 单词收藏状态分批查询 */
+async function fetchVocabFavoriteStatusInHttpBatches(
 	words: string[],
-	bodyKey: 'words' | 'englishes',
-	options?: FavoriteStatusBatchOptions,
-): Promise<string[]> {
-	const merged: string[] = [];
+	options?: FavoriteStatusBatchOptions<EnglishVocabFavoriteRef>,
+): Promise<EnglishVocabFavoriteRef[]> {
+	const merged: EnglishVocabFavoriteRef[] = [];
 	for (
 		let chunkStart = 0;
 		chunkStart < words.length;
@@ -822,20 +841,20 @@ async function fetchFavoriteStatusInHttpBatches(
 			batches.push(chunk.slice(i, i + FAVORITE_STATUS_HTTP_BATCH_SIZE));
 		}
 
-		const chunkKeyLists = await runTasksWithConcurrency(
+		const chunkRefs = await runTasksWithConcurrency(
 			batches.map(
 				(batch) => () =>
-					fetchFavoriteStatusHttpBatch(url, batch, bodyKey).then((keys) => {
-						if (keys.length > 0) {
-							options?.onPartialKeys?.(keys);
+					fetchVocabFavoriteStatusHttpBatch(batch).then((refs) => {
+						if (refs.length > 0) {
+							options?.onPartial?.(refs);
 						}
-						return keys;
+						return refs;
 					}),
 			),
 			FAVORITE_STATUS_HTTP_BATCH_CONCURRENCY,
 		);
-		for (const keys of chunkKeyLists) {
-			merged.push(...keys);
+		for (const refs of chunkRefs) {
+			merged.push(...refs);
 		}
 
 		if (chunkStart + VOCAB_FAVORITE_STATUS_BATCH_SIZE < words.length) {
@@ -845,24 +864,68 @@ async function fetchFavoriteStatusInHttpBatches(
 	return merged;
 }
 
-export type FetchEnglishFavoriteStatusOptions = FavoriteStatusBatchOptions;
+async function fetchClassicQuoteFavoriteStatusInHttpBatches(
+	englishes: string[],
+	options?: FavoriteStatusBatchOptions<EnglishClassicQuoteFavoriteRef>,
+): Promise<EnglishClassicQuoteFavoriteRef[]> {
+	const merged: EnglishClassicQuoteFavoriteRef[] = [];
+	for (
+		let chunkStart = 0;
+		chunkStart < englishes.length;
+		chunkStart += VOCAB_FAVORITE_STATUS_BATCH_SIZE
+	) {
+		const chunk = englishes.slice(
+			chunkStart,
+			chunkStart + VOCAB_FAVORITE_STATUS_BATCH_SIZE,
+		);
+		const batches: string[][] = [];
+		for (let i = 0; i < chunk.length; i += FAVORITE_STATUS_HTTP_BATCH_SIZE) {
+			batches.push(chunk.slice(i, i + FAVORITE_STATUS_HTTP_BATCH_SIZE));
+		}
 
-/** 查询当前列表中哪些词已收藏（返回规范化词形）；自动小批请求并合并 */
+		const chunkRefs = await runTasksWithConcurrency(
+			batches.map(
+				(batch) => () =>
+					fetchClassicQuoteFavoriteStatusHttpBatch(batch).then((refs) => {
+						if (refs.length > 0) {
+							options?.onPartial?.(refs);
+						}
+						return refs;
+					}),
+			),
+			FAVORITE_STATUS_HTTP_BATCH_CONCURRENCY,
+		);
+		for (const refs of chunkRefs) {
+			merged.push(...refs);
+		}
+
+		if (chunkStart + VOCAB_FAVORITE_STATUS_BATCH_SIZE < englishes.length) {
+			await new Promise((resolve) => setTimeout(resolve, 50));
+		}
+	}
+	return merged;
+}
+
+export type FetchEnglishFavoriteStatusOptions =
+	FavoriteStatusBatchOptions<EnglishVocabFavoriteRef>;
+
+export type FetchEnglishClassicQuoteFavoriteStatusOptions =
+	FavoriteStatusBatchOptions<EnglishClassicQuoteFavoriteRef>;
+
+/** 查询当前列表中哪些词已收藏（返回 wordKey + 收藏 id） */
 export const fetchEnglishVocabularyFavoriteStatus = async (
 	words: string[],
 	options?: FetchEnglishFavoriteStatusOptions,
 ) => {
-	const favoritedWordKeys = await fetchFavoriteStatusInHttpBatches(
-		`${ENGLISH_LEARNING_VOCABULARY_FAVORITES}/status`,
-		words,
-		'words',
-		options,
-	);
+	const favorited = await fetchVocabFavoriteStatusInHttpBatches(words, options);
 	return {
 		code: 200,
 		success: true,
 		message: '',
-		data: { favoritedWordKeys },
+		data: {
+			favorited,
+			favoritedWordKeys: favorited.map((r) => r.wordKey),
+		},
 	};
 };
 
@@ -993,28 +1056,39 @@ export const addEnglishClassicQuoteFavorite = async (
 	);
 };
 
-export const removeEnglishClassicQuoteFavorite = async (english: string) => {
+export const removeEnglishClassicQuoteFavorite = async (id: string) => {
 	return await http.post<{ removed: boolean }>(
 		`${ENGLISH_LEARNING_CLASSIC_QUOTES_FAVORITES}/remove`,
-		{ english },
+		{ id },
+	);
+};
+
+/** 批量取消经典句收藏（按收藏记录 id） */
+export const removeEnglishClassicQuoteFavoritesBatch = async (
+	ids: string[],
+) => {
+	return await http.post<{ removedCount: number }>(
+		`${ENGLISH_LEARNING_CLASSIC_QUOTES_FAVORITES}/remove-batch`,
+		{ ids },
 	);
 };
 
 export const fetchEnglishClassicQuoteFavoriteStatus = async (
 	englishes: string[],
-	options?: FetchEnglishFavoriteStatusOptions,
+	options?: FetchEnglishClassicQuoteFavoriteStatusOptions,
 ) => {
-	const favoritedContentKeys = await fetchFavoriteStatusInHttpBatches(
-		`${ENGLISH_LEARNING_CLASSIC_QUOTES_FAVORITES}/status`,
+	const favorited = await fetchClassicQuoteFavoriteStatusInHttpBatches(
 		englishes,
-		'englishes',
 		options,
 	);
 	return {
 		code: 200,
 		success: true,
 		message: '',
-		data: { favoritedContentKeys },
+		data: {
+			favorited,
+			favoritedContentKeys: favorited.map((r) => r.contentKey),
+		},
 	};
 };
 
