@@ -1,8 +1,10 @@
 import {
 	BadRequestException,
+	Body,
 	ClassSerializerInterceptor,
 	Controller,
 	Post,
+	StreamableFile,
 	UploadedFile,
 	UseGuards,
 	UseInterceptors,
@@ -38,5 +40,17 @@ export class SpeechTranscriptionController {
 			throw new BadRequestException('请上传有效的音频文件');
 		}
 		return this.siliconflowTranscriptionService.transcribe(file);
+	}
+
+	/** 文本转语音（硅基 CosyVoice2 等），返回 MP3 流 */
+	@Post('speech')
+	async speech(@Body() body: { text?: string }) {
+		const text = typeof body?.text === 'string' ? body.text.trim() : '';
+		if (!text) {
+			throw new BadRequestException('请提供有效的 text');
+		}
+		const buffer =
+			await this.siliconflowTranscriptionService.synthesizeSpeech(text);
+		return new StreamableFile(buffer, { type: 'audio/mpeg' });
 	}
 }

@@ -3,6 +3,10 @@ import { ConfigService } from '@nestjs/config';
 import { KnowledgeQaEnum } from '../../enum/config.enum';
 
 const DEFAULT_TRANSCRIPTION_MODEL = 'FunAudioLLM/SenseVoiceSmall';
+const DEFAULT_TTS_MODEL = 'FunAudioLLM/CosyVoice2-0.5B';
+/** 硅基预置女声：claire（温柔女声） */
+const DEFAULT_TTS_VOICE = 'FunAudioLLM/CosyVoice2-0.5B:claire';
+const TTS_INPUT_MAX_CHARS = 4096;
 /** 硅基文档列出的转写模型（用于无自定义配置时的说明与校验参考） */
 const KNOWN_TRANSCRIPTION_MODELS = new Set<string>([
 	DEFAULT_TRANSCRIPTION_MODEL,
@@ -51,6 +55,82 @@ export class SiliconflowTranscriptionService {
 			this.logger.log(`语音转写使用自定义模型: ${configured}`);
 		}
 		return configured;
+	}
+
+	private resolveTtsModel(): string {
+		const configured = this.config
+			.get<string>(KnowledgeQaEnum.SILICONFLOW_TTS_MODEL)
+			?.trim();
+		if (!configured) return DEFAULT_TTS_MODEL;
+		if (!TRANSCRIPTION_MODEL_ID_RE.test(configured)) {
+			this.logger.warn(
+				`SILICONFLOW_TTS_MODEL 格式无效，已回退为 ${DEFAULT_TTS_MODEL}`,
+			);
+			return DEFAULT_TTS_MODEL;
+		}
+		return configured;
+	}
+
+	private resolveTtsVoice(): string {
+		const configured = this.config
+			.get<string>(KnowledgeQaEnum.SILICONFLOW_TTS_VOICE)
+			?.trim();
+		if (!configured) return DEFAULT_TTS_VOICE;
+		return configured;
+	}
+
+	/**
+	 * 硅基流动 OpenAI 兼容 TTS：POST /v1/audio/speech，返回 MP3 二进制。
+	 */
+	async synthesizeSpeech(text: string): Promise<Buffer> {
+		const plain = text.trim().slice(0, TTS_INPUT_MAX_CHARS);
+		if (!plain) {
+			throw new HttpException('朗读文本为空', HttpStatus.BAD_REQUEST);
+		}
+
+		const apiKey =
+			this.config.get<string>(KnowledgeQaEnum.SILICONFLOW_API_KEY) ||
+			this.config.get<string>(KnowledgeQaEnum.DASHSCOPE_API_KEY);
+		if (!apiKey?.trim()) {
+			throw new HttpException(
+				'未配置 SILICONFLOW_API_KEY，无法进行语音合成',
+				HttpStatus.SERVICE_UNAVAILABLE,
+			);
+		}
+
+		const baseUrl = (
+			this.config.get<string>(KnowledgeQaEnum.SILICONFLOW_BASE_URL) ||
+			'https://api.siliconflow.cn/v1'
+		).replace(/\/$/, '');
+		const url = `${baseUrl}/audio/speech`;
+
+		const res = await fetch(url, {
+			method: 'POST',
+			headers: {
+				Authorization: `Bearer ${apiKey.trim()}`,
+				'Content-Type': 'application/json',
+			},
+			body: JSON.stringify({
+				model: this.resolveTtsModel(),
+				input: plain,
+				voice: this.resolveTtsVoice(),
+				response_format: 'mp3',
+				speed: 1,
+				gain: 0,
+			}),
+		});
+
+		if (!res.ok) {
+			const raw = await res.text();
+			throw new HttpException(
+				`语音合成失败（${res.status}）：${raw.slice(0, 500)}`,
+				res.status >= 400 && res.status < 600
+					? res.status
+					: HttpStatus.BAD_GATEWAY,
+			);
+		}
+
+		return Buffer.from(await res.arrayBuffer());
 	}
 
 	async transcribe(file: Express.Multer.File): Promise<{ text: string }> {

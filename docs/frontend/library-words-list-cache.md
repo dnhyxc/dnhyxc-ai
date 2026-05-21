@@ -1,6 +1,7 @@
 # 资源库词条列表：会话内缓存与滚动位置恢复
 
 > 解决用户在 **单词库 / 经典语句库** 右侧词条列表中切换库、离开页面再返回时，已加载分页与 **滚动位置丢失** 的问题。  
+> 对应提交：`504a5f93`（feat: 资料库增加缓存效果）。  
 > 列表网络重试、世代号丢弃过期响应见 [`english-learning-list-network-retry.md`](./english-learning-list-network-retry.md)；资源库删除与 UX 见 [`english-learning-library-ux-and-delete.md`](./english-learning-library-ux-and-delete.md)。
 
 若与仓库最新源码不一致，**以源码为准**。
@@ -151,8 +152,16 @@ function touchLru(key: string, slot: CacheSlot<unknown, unknown>) {
 
 function evictIfNeeded() {
 	while (store.size > MAX_CACHE_ENTRIES) {
-		// 扫描最久未访问的 key 并删除
-		// ...
+		let oldestKey: string | null = null;
+		let oldest = Infinity;
+		for (const [key, slot] of store) {
+			if (slot.lastAccess < oldest) {
+				oldest = slot.lastAccess;
+				oldestKey = key;
+			}
+		}
+		if (!oldestKey) break;
+		store.delete(oldestKey); // 淘汰最久未访问的库
 	}
 }
 
@@ -254,7 +263,35 @@ const onViewportScroll = useCallback<UIEventHandler<HTMLDivElement>>(
 
 说明：`onViewportScroll` 依赖 `items` / `resolvedLibrary`，滚动时会用当前列表快照更新缓存；条目很多时写缓存频率与滚动事件一致，但仅内存赋值，开销可接受。
 
-### 4.4 面板：`useLayoutEffect` 恢复滚动
+### 4.4 首屏与加载更多成功后写入缓存
+
+**来源**：`apps/frontend/src/views/englishLearning/library/useLibraryWordsList.ts`（`fetchFirstPage` 约 L90–L128；`fetchMore` 约 L133–L178）
+
+```typescript
+// 首屏：无缓存命中时才执行；成功后写入缓存供下次 restoreFromCache
+const fetchFirstPage = useCallback(async (id: string, gen: number) => {
+	setInitialScrollTop(0); // 新拉首屏，滚动从顶开始
+	scrollTopRef.current = 0;
+	// ...
+	const list = Array.isArray(data.items) ? data.items : [];
+	setItems(list);
+	offsetRef.current = list.length;
+	hasMoreRef.current = list.length >= pageSize;
+	persistCache(id, { items: list, resolvedLibrary: resolved });
+}, [/* ... */]);
+
+// 加载更多：在 setItems 回调内合并 chunk 并 persist，保证 items 与 offset 一致
+setItems((prev) => {
+	const next = [...prev, ...chunk];
+	offsetRef.current = next.length;
+	hasMoreRef.current = chunk.length >= pageSize;
+	persistCache(id, { items: next, resolvedLibrary });
+	return next;
+});
+// 若 chunk 为空：仅更新 hasMore，仍 persist 当前 prev，避免切回后误判可继续加载
+```
+
+### 4.5 面板：`useLayoutEffect` 恢复滚动
 
 **来源**：`apps/frontend/src/views/englishLearning/library/VocabularyLibraryWordsPanel.tsx`（约 L61–L83、L181 附近）
 
@@ -290,20 +327,20 @@ useLayoutEffect(() => {
 
 经典句库 `ClassicQuotesLibraryWordsPanel.tsx` 结构相同，仅 `cacheNamespace: 'classic'`。
 
-### 4.5 删除库时使缓存失效
+### 4.6 删除库时使缓存失效
 
-**来源**：`apps/frontend/src/views/englishLearning/library/EnglishLearningLibraryPage.tsx`（约 L65–L78）
+**来源**：`apps/frontend/src/views/englishLearning/library/EnglishLearningLibraryPage.tsx`（`onLibraryDeleted` 约 L65–L85）
 
 ```typescript
 const onLibraryDeleted = useCallback(
 	(deletedId: string) => {
-		// kind 为 'vocab' | 'classic'，与面板 cacheNamespace 一致
+		// kind 与面板 cacheNamespace（'vocab' | 'classic'）一致
 		invalidateLibraryWordsListCache(kind, deletedId);
 		setSelectedLibrary(null);
 		setSearchParams(
 			(prev) => {
 				const next = new URLSearchParams(prev);
-				next.delete('library');
+				next.delete('library'); // 避免 URL 仍指向已删库
 				return next;
 			},
 			{ replace: true },

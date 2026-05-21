@@ -687,5 +687,6 @@ useEffect(() => {
 - [`http-network-error-toast.md`](./http-network-error-toast.md) — 网络错误 Toast 友好化与 `translateSync`
 - [`favorite-star-incremental-ui.md`](./favorite-star-incremental-ui.md) — 星标慢半拍、`onPartialKeys`、有限并发与乐观点击
 - [`vocab-favorite-status-query.md`](./vocab-favorite-status-query.md) — 单词收藏状态增量查询与 500 上限（本轮在其上扩展 HTTP 50 小批与重试）
+- [`library-words-list-cache.md`](./library-words-list-cache.md) — 资源库词条列表会话内缓存与滚动恢复
 - [`english-learning-library-ux-and-delete.md`](./english-learning-library-ux-and-delete.md) — 资源库 UX 与删除
 - [`tauri-macos-ats-http.md`](./tauri-macos-ats-http.md) — Tauri / HTTP 相关背景（若存在网络策略问题可交叉查阅）

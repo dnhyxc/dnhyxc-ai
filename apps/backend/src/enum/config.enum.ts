@@ -119,6 +119,13 @@ export enum KnowledgeQaEnum {
 	 */
 	SILICONFLOW_TRANSCRIPTION_LANGUAGE = 'SILICONFLOW_TRANSCRIPTION_LANGUAGE',
 	/**
+	 * 文本转语音模型（`/v1/audio/speech`），默认 FunAudioLLM/CosyVoice2-0.5B。
+	 * @see https://docs.siliconflow.cn/cn/api-reference/audio/create-speech
+	 */
+	SILICONFLOW_TTS_MODEL = 'SILICONFLOW_TTS_MODEL',
+	/** 预置音色，如 FunAudioLLM/CosyVoice2-0.5B:claire（女声） */
+	SILICONFLOW_TTS_VOICE = 'SILICONFLOW_TTS_VOICE',
+	/**
 	 * 知识库 rerank 模型名（硅基流动 `/v1/rerank`），默认 BAAI/bge-reranker-v2-m3
 	 * @see https://docs.siliconflow.cn/cn/api-reference/rerank/create-rerank
 	 */
