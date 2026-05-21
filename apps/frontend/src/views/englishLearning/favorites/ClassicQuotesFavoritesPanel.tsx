@@ -18,6 +18,7 @@ import {
 	type EnglishClassicQuoteFavoriteListEntry,
 } from '@/service';
 import { isTauriRuntime } from '@/utils';
+import { FavoritesPanelFooter } from './FavoritesPanelFooter';
 
 export type ClassicQuotesFavoritesPanelProps = {
 	entries: EnglishClassicQuoteFavoriteListEntry[];
@@ -393,68 +394,21 @@ export function ClassicQuotesFavoritesPanel({
 						</div>
 					)}
 				</ScrollArea>
-				<footer className="h-12 shrink-0 flex flex-wrap items-center justify-between gap-3 px-5 py-3">
-					<div className="flex items-center gap-2">
-						{!showInitialLoading && entries.length > 0 ? (
-							<div className="flex shrink-0 flex-wrap items-center gap-3 mb-2">
-								<div className="flex items-center gap-2">
-									<Checkbox
-										id="classic-fav-select-all"
-										checked={selectAllCheckboxState}
-										disabled={selectionDisabled}
-										onCheckedChange={(v) => toggleSelectAllLoaded(v)}
-									/>
-									<Label
-										htmlFor="classic-fav-select-all"
-										className="cursor-pointer text-sm text-textcolor/85"
-									>
-										{t('englishLearning.favoritesDrawer.selectAllLoaded')}
-									</Label>
-								</div>
-								<span className="text-textcolor/60 text-sm">
-									{t('englishLearning.favoritesDrawer.selectedCount', {
-										count: selectedIds.size,
-									})}
-								</span>
-							</div>
-						) : null}
-					</div>
-					<div className="flex items-center gap-2 -mt-1.5">
-						<Button
-							type="button"
-							variant="destructive"
-							size="sm"
-							disabled={removeDisabled}
-							className="shrink-0 w-24"
-							onClick={() => requestRemoveConfirm()}
-						>
-							{batchRemoving ? (
-								<>
-									<Spinner className="h-4 w-4" />
-									{t('englishLearning.favoritesDrawer.removing')}
-								</>
-							) : (
-								t('englishLearning.favoritesDrawer.removeSelected')
-							)}
-						</Button>
-						<Button
-							type="button"
-							size="sm"
-							disabled={exportDisabled}
-							className="flex w-24 shrink-0 items-center"
-							onClick={() => void handleExportDocx()}
-						>
-							{exportingDocx ? (
-								<>
-									<Spinner className="h-4 w-4" />
-									{t('common.downloading')}
-								</>
-							) : (
-								t('englishLearning.classic.exportDocx')
-							)}
-						</Button>
-					</div>
-				</footer>
+				<FavoritesPanelFooter
+					selectAllId="classic-fav-select-all"
+					showSelection={!showInitialLoading && entries.length > 0}
+					selectAllCheckboxState={selectAllCheckboxState}
+					selectionDisabled={selectionDisabled}
+					onToggleSelectAll={toggleSelectAllLoaded}
+					selectedCount={selectedIds.size}
+					removeDisabled={removeDisabled}
+					batchRemoving={batchRemoving}
+					onRequestRemove={requestRemoveConfirm}
+					exportDisabled={exportDisabled}
+					exportingDocx={exportingDocx}
+					onExportDocx={handleExportDocx}
+					exportLabel={t('englishLearning.classic.exportDocx')}
+				/>
 			</div>
 		</>
 	);
