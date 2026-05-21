@@ -70,42 +70,74 @@ export async function getReleaseId(
 	});
 }
 
-export async function getExistingAssetId(
+/** GitHub List release assets 单页上限（接口最大 100） */
+const RELEASE_ASSETS_PER_PAGE = 100;
+
+type ReleaseAssetSummary = { id?: number; name?: string };
+
+async function listReleaseAssetsPage(
 	cfg: ReleaseUploadConfig,
 	releaseId: number,
-	fileName: string,
-): Promise<number | null> {
+	page: number,
+): Promise<ReleaseAssetSummary[]> {
 	return new Promise((resolve, reject) => {
 		const req = https.request(
 			{
 				hostname: 'api.github.com',
-				path: `/repos/${cfg.owner}/${cfg.repo}/releases/${releaseId}/assets`,
+				path: `/repos/${cfg.owner}/${cfg.repo}/releases/${releaseId}/assets?per_page=${RELEASE_ASSETS_PER_PAGE}&page=${page}`,
 				method: 'GET',
 				headers: {
 					Authorization: `token ${cfg.token}`,
 					'User-Agent': cfg.userAgent,
+					Accept: 'application/vnd.github.v3+json',
 				},
 			},
 			async (res) => {
 				try {
 					const assets = await parseJsonResponse<unknown>(res);
-					if (!Array.isArray(assets)) {
-						resolve(null);
-						return;
-					}
-					const existing = assets.find(
-						(a: { id?: number; name?: string }) =>
-							a && typeof a.name === 'string' && a.name === fileName,
-					) as { id: number; name: string } | undefined;
-					resolve(existing?.id ?? null);
-				} catch (_e) {
-					resolve(null);
+					resolve(Array.isArray(assets) ? assets : []);
+				} catch (e) {
+					reject(e);
 				}
 			},
 		);
 		req.on('error', (e) => reject(e));
 		req.end();
 	});
+}
+
+/** 按文件名查找已有附件 id（遍历全部分页，避免默认 30 条漏查导致 422 already_exists） */
+export async function getExistingAssetId(
+	cfg: ReleaseUploadConfig,
+	releaseId: number,
+	fileName: string,
+): Promise<number | null> {
+	let page = 1;
+
+	while (true) {
+		let assets: ReleaseAssetSummary[];
+		try {
+			assets = await listReleaseAssetsPage(cfg, releaseId, page);
+		} catch {
+			return null;
+		}
+
+		const existing = assets.find(
+			(a) =>
+				a &&
+				typeof a.name === 'string' &&
+				a.name === fileName &&
+				typeof a.id === 'number',
+		);
+		if (existing?.id != null) {
+			return existing.id;
+		}
+
+		if (assets.length < RELEASE_ASSETS_PER_PAGE) {
+			return null;
+		}
+		page += 1;
+	}
 }
 
 export async function deleteAsset(cfg: ReleaseUploadConfig, assetId: number) {
