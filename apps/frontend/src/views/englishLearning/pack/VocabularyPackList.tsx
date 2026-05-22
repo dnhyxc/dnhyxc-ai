@@ -19,7 +19,7 @@ import {
 	playEnglishPreferred,
 	stopAllEnglishPlayback,
 } from '@/utils/englishTts';
-import { VocabularySegmentationLine } from '../components/VocabularySegmentationLine';
+import { VocabularySegmentationLine } from '../shared/VocabularySegmentationLine';
 import type { useVocabularyPackHistoryList } from './useVocabularyPackHistoryList';
 
 export type VocabularyPackListProps = {

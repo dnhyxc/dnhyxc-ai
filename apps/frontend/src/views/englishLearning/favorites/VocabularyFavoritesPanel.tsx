@@ -17,7 +17,7 @@ import {
 	type EnglishVocabularyFavoriteListEntry,
 } from '@/service';
 import { displayIpaWrapped, isTauriRuntime } from '@/utils';
-import { VocabularySegmentationLine } from '../components/VocabularySegmentationLine';
+import { VocabularySegmentationLine } from '../shared/VocabularySegmentationLine';
 import { FavoritesPanelFooter } from './FavoritesPanelFooter';
 
 export type VocabularyFavoritesPanelProps = {
