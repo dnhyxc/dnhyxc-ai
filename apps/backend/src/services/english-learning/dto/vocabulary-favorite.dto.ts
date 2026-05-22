@@ -25,6 +25,11 @@ export class VocabularyFavoriteBodyDto {
 	@MaxLength(32)
 	pos?: string;
 
+	@IsOptional()
+	@IsString()
+	@MaxLength(500)
+	segmentation?: string;
+
 	@IsString()
 	@MaxLength(8000)
 	translationZh!: string;

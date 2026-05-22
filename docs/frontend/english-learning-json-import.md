@@ -1,6 +1,7 @@
 # 英语学习 JSON 独立导入页与嵌套路由
 
-> **更新**：单词库子表持久化、multipart 大包上传、左栏 `EnglishSource` 等完整说明见 [english-learning-library-import.md](./english-learning-library-import.md)。经典语句库对称实现见 [classic-quotes-library-import.md](./classic-quotes-library-import.md)。
+> **更新**：单词库子表持久化、multipart 大包上传、左栏 `EnglishSource` 等完整说明见 [english-learning-library-import.md](./english-learning-library-import.md)。经典语句库对称实现见 [classic-quotes-library-import.md](./classic-quotes-library-import.md)。  
+> **音节划分 `segmentation`、导入页编辑后实时校验**：见 [vocab-segmentation-import.md](./vocab-segmentation-import.md)。
 
 ## 1. 背景与目标
 

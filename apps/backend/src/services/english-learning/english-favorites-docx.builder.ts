@@ -38,6 +38,7 @@ export async function buildVocabularyFavoritesDocxBuffer(
 		word: string;
 		ipa: string;
 		pos: string;
+		segmentation: string;
 		translationZh: string;
 		example: string;
 	}>,
@@ -83,6 +84,16 @@ export async function buildVocabularyFavoritesDocxBuffer(
 					children: [
 						new TextRun({ text: '词性：', bold: true }),
 						new TextRun({ text: clip(r.pos, 64) }),
+					],
+				}),
+			);
+		}
+		if (r.segmentation?.trim()) {
+			children.push(
+				new Paragraph({
+					children: [
+						new TextRun({ text: '音节划分：', bold: true }),
+						new TextRun({ text: clip(r.segmentation, 500) }),
 					],
 				}),
 			);

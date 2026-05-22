@@ -476,6 +476,8 @@ export type EnglishVocabularyItem = {
 	ipa: string;
 	/** 词性英文缩写，如 n、v、adj（旧接口可能缺省，按空串处理） */
 	pos: string;
+	/** 音节划分，如 ap·ple（旧接口可能缺省，按空串处理） */
+	segmentation: string;
 	translationZh: string;
 	example: string;
 };
@@ -935,6 +937,7 @@ export type EnglishVocabularyFavoriteListEntry = {
 	word: string;
 	ipa: string;
 	pos: string;
+	segmentation: string;
 	translationZh: string;
 	example: string;
 	createdAt: string;

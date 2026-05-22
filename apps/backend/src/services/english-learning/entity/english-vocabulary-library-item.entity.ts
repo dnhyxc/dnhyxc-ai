@@ -47,6 +47,10 @@ export class EnglishVocabularyLibraryItem {
 	@Column({ type: 'varchar', length: 64, default: '' })
 	pos!: string;
 
+	/** 音节划分展示，如 ap·ple */
+	@Column({ type: 'varchar', length: 500, default: '' })
+	segmentation!: string;
+
 	@Column({ name: 'translation_zh', type: 'text' })
 	translationZh!: string;
 

@@ -468,7 +468,7 @@ export const zhCN = {
 	'home.hero.welcome': '欢迎使用',
 	'home.hero.product': '智能助手',
 	'home.hero.subtitle':
-		'一处集成对话、代码与文档的桌面 AI 工作台。三种能力在此交融，随需切换，从念头闪现到成果落地，皆在这方寸之间完成。',
+		'一处集成智能对话、知识库与英语学习的桌面 AI 工作台。流式问答、Markdown 沉淀、单词与经典句练习及收藏导出，从讨论到笔记再到语言学习，皆在同一应用内完成。',
 	'home.hero.quickStart': '快速开始',
 	'home.hero.learnMore': '了解更多',
 	'home.hero.downloadDesktop': '下载桌面版',
@@ -709,7 +709,7 @@ export const zhCN = {
 	'englishLearning.import.back': '返回英语学习',
 	'englishLearning.import.selectFile': '选择 JSON 文件',
 	'englishLearning.import.hintVocab':
-		'支持顶层为数组，或含 items 数组的对象。每项至少需要 word 与 ipa，可选 pos、translationZh、example。数据示例如下：',
+		'支持顶层为数组，或含 items 数组的对象。每项至少需要 word 与 ipa，可选 pos、segmentation（音节划分）、translationZh、example。数据示例如下：',
 	'englishLearning.import.hintClassic':
 		'支持顶层为数组，或含 items 数组的对象。每项至少需要 english 与 translationZh，可选 source、noteZh。数据示例如下：',
 	'englishLearning.import.preview': 'JSON 预览',

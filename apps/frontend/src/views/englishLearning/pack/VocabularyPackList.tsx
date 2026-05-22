@@ -19,6 +19,7 @@ import {
 	playEnglishPreferred,
 	stopAllEnglishPlayback,
 } from '@/utils/englishTts';
+import { VocabularySegmentationLine } from '../components/VocabularySegmentationLine';
 import type { useVocabularyPackHistoryList } from './useVocabularyPackHistoryList';
 
 export type VocabularyPackListProps = {
@@ -128,6 +129,9 @@ function VocabularyPackListInner({ history }: VocabularyPackListProps) {
 										<div className="font-mono text-xs leading-snug text-teal-600/90 dark:text-teal-400/90">
 											{displayIpaWrapped(item.ipa)}
 										</div>
+										<VocabularySegmentationLine
+											segmentation={item.segmentation}
+										/>
 									</div>
 									<div className="flex shrink-0 items-center gap-1">
 										<Button

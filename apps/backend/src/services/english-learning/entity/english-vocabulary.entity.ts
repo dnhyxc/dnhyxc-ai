@@ -12,6 +12,8 @@ export type EnglishVocabularyPackItemJson = {
 	ipa: string;
 	/** 词性英文缩写，如 n / v / adj（旧数据可能缺省） */
 	pos?: string;
+	/** 音节划分，如 ap·ple（旧数据可能缺省） */
+	segmentation?: string;
 	translationZh: string;
 	example: string;
 };

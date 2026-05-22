@@ -1,6 +1,8 @@
 # 英语学习：单词库持久化、JSON 导入与左栏入口整合
 
-> **经典语句库**：与本文对称的语句包导入、资源库浏览实现见 [classic-quotes-library-import.md](./classic-quotes-library-import.md)。
+> **经典语句库**：与本文对称的语句包导入、资源库浏览实现见 [classic-quotes-library-import.md](./classic-quotes-library-import.md)。  
+> **音节划分 `segmentation` + 导入页编辑后实时校验**：见 [vocab-segmentation-import.md](./vocab-segmentation-import.md)。
+
 
 ## 1. 背景与目标
 

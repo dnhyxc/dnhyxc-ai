@@ -527,7 +527,7 @@ export const enUS = {
 	'home.hero.welcome': 'Welcome',
 	'home.hero.product': 'Smart Assistant',
 	'home.hero.subtitle':
-		'A desktop AI workspace that unifies chat, coding, and documents. Switch seamlessly between capabilities—from idea to outcome, all in one place.',
+		'A desktop AI workspace that unifies chat, a Markdown knowledge library, and English learning. Stream conversations, organize notes, practice vocabulary and classic quotes—from dialogue to lasting notes, all in one app.',
 	'home.hero.quickStart': 'Get started',
 	'home.hero.learnMore': 'Learn more',
 	'home.hero.downloadDesktop': 'Download desktop app',
@@ -793,7 +793,7 @@ export const enUS = {
 	'englishLearning.import.back': 'Back to English learning',
 	'englishLearning.import.selectFile': 'Choose JSON file',
 	'englishLearning.import.hintVocab':
-		'Supports a top-level array, or an object containing an items array. Each entry must have word and ipa; pos, translationZh, and example are optional. Example data:',
+		'Supports a top-level array, or an object containing an items array. Each entry must have word and ipa; pos, segmentation (syllables), translationZh, and example are optional. Example data:',
 	'englishLearning.import.hintClassic':
 		'Supports a top-level array, or an object containing an items array. Each entry must include english and translationZh; source and noteZh are optional. Example data:',
 	'englishLearning.import.preview': 'JSON preview',

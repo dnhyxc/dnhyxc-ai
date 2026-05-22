@@ -62,6 +62,10 @@ function parseVocabularyImport(
 		const ipa = typeof o.ipa === 'string' ? o.ipa.trim() : '';
 		if (!word || !ipa) continue;
 		const pos = typeof o.pos === 'string' ? o.pos.trim().slice(0, 64) : '';
+		const segmentation =
+			typeof o.segmentation === 'string'
+				? o.segmentation.trim().slice(0, 500)
+				: '';
 		const translationZh =
 			typeof o.translationZh === 'string'
 				? o.translationZh
@@ -69,7 +73,7 @@ function parseVocabularyImport(
 					? o.translation_zh
 					: '—';
 		const example = typeof o.example === 'string' ? o.example : '—';
-		items.push({ word, ipa, pos, translationZh, example });
+		items.push({ word, ipa, pos, segmentation, translationZh, example });
 	}
 	if (!items.length) return { ok: false, reason: 'no-vocab' };
 	return { ok: true, items };
@@ -107,6 +111,72 @@ function parseClassicImport(
 	return { ok: true, items };
 }
 
+type ImportValidation = {
+	jsonParseError: boolean;
+	structFailReason: ParseFailReason | null;
+	parsedVocab: EnglishVocabularyItem[] | null;
+	parsedClassic: EnglishClassicQuoteItem[] | null;
+};
+
+/** 根据当前编辑器 JSON 文本重新校验（导入后与编辑中均适用） */
+function validateImportPreview(
+	text: string,
+	kind: ImportKind,
+): ImportValidation {
+	const trimmed = text.trim();
+	if (!trimmed) {
+		return {
+			jsonParseError: false,
+			structFailReason: null,
+			parsedVocab: null,
+			parsedClassic: null,
+		};
+	}
+	let parsed: unknown;
+	try {
+		parsed = JSON.parse(text);
+	} catch {
+		return {
+			jsonParseError: true,
+			structFailReason: null,
+			parsedVocab: null,
+			parsedClassic: null,
+		};
+	}
+	if (kind === 'vocab') {
+		const res = parseVocabularyImport(parsed);
+		if (res.ok) {
+			return {
+				jsonParseError: false,
+				structFailReason: null,
+				parsedVocab: res.items,
+				parsedClassic: null,
+			};
+		}
+		return {
+			jsonParseError: false,
+			structFailReason: res.reason,
+			parsedVocab: null,
+			parsedClassic: null,
+		};
+	}
+	const res = parseClassicImport(parsed);
+	if (res.ok) {
+		return {
+			jsonParseError: false,
+			structFailReason: null,
+			parsedVocab: null,
+			parsedClassic: res.items,
+		};
+	}
+	return {
+		jsonParseError: false,
+		structFailReason: res.reason,
+		parsedVocab: null,
+		parsedClassic: null,
+	};
+}
+
 export default function EnglishLearningImportPage() {
 	const { t } = useI18n();
 	const { theme } = useTheme();
@@ -135,32 +205,24 @@ export default function EnglishLearningImportPage() {
 	);
 
 	const [previewText, setPreviewText] = useState('');
-	const [jsonErrorKind, setJsonErrorKind] = useState<'parse' | 'read' | null>(
-		null,
-	);
-	const [structFailReason, setStructFailReason] =
-		useState<ParseFailReason | null>(null);
-	const [parsedVocab, setParsedVocab] = useState<
-		EnglishVocabularyItem[] | null
-	>(null);
-	const [parsedClassic, setParsedClassic] = useState<
-		EnglishClassicQuoteItem[] | null
-	>(null);
+	/** 仅文件读取失败时使用；JSON 语法与结构校验随 previewText 派生 */
+	const [fileReadError, setFileReadError] = useState(false);
 	const [importTitle, setImportTitle] = useState('');
 	const [vocabSaveLoading, setVocabSaveLoading] = useState(false);
 	const [classicSaveLoading, setClassicSaveLoading] = useState(false);
 
-	const resetParsed = useCallback(() => {
-		setParsedVocab(null);
-		setParsedClassic(null);
-		setStructFailReason(null);
-		setJsonErrorKind(null);
-	}, []);
+	const importValidation = useMemo(
+		() => validateImportPreview(previewText, kind),
+		[previewText, kind],
+	);
+
+	const { jsonParseError, structFailReason, parsedVocab, parsedClassic } =
+		importValidation;
 
 	useEffect(() => {
-		resetParsed();
 		setPreviewText('');
-	}, [kind, resetParsed]);
+		setFileReadError(false);
+	}, [kind]);
 
 	const processJsonFile = useCallback(
 		(file: File) => {
@@ -171,52 +233,30 @@ export default function EnglishLearningImportPage() {
 				});
 				return;
 			}
-			resetParsed();
+			setFileReadError(false);
 			setImportTitle(fileNameWithoutExtension(file.name).slice(0, 100));
 			const reader = new FileReader();
 			reader.onload = () => {
 				const text = typeof reader.result === 'string' ? reader.result : '';
-				let parsed: unknown;
-				try {
-					parsed = text ? JSON.parse(text) : null;
-					setJsonErrorKind(null);
-				} catch {
-					setJsonErrorKind('parse');
-					setStructFailReason(null);
-					// 非法 JSON 时仍展示完整原始文本，便于对照修正
-					setPreviewText(text);
+				if (!text.trim()) {
+					setPreviewText('');
 					return;
 				}
-				const pretty = JSON.stringify(parsed, null, 2);
-				setPreviewText(pretty);
-
-				if (kind === 'vocab') {
-					const res = parseVocabularyImport(parsed);
-					if (res.ok) {
-						setParsedVocab(res.items);
-						setParsedClassic(null);
-						setStructFailReason(null);
-					} else {
-						setStructFailReason(res.reason);
-					}
-				} else {
-					const res = parseClassicImport(parsed);
-					if (res.ok) {
-						setParsedClassic(res.items);
-						setParsedVocab(null);
-						setStructFailReason(null);
-					} else {
-						setStructFailReason(res.reason);
-					}
+				try {
+					const parsed = JSON.parse(text);
+					setPreviewText(JSON.stringify(parsed, null, 2));
+				} catch {
+					// 非法 JSON 时仍展示完整原始文本，便于对照修正；校验由 importValidation 派生
+					setPreviewText(text);
 				}
 			};
 			reader.onerror = () => {
-				setJsonErrorKind('read');
+				setFileReadError(true);
 				setPreviewText('');
 			};
 			reader.readAsText(file, 'UTF-8');
 		},
-		[kind, resetParsed, t],
+		[t],
 	);
 
 	const pickImportJsonFiles = useCallback(async (): Promise<File[] | null> => {
@@ -252,30 +292,26 @@ export default function EnglishLearningImportPage() {
 
 	/** 标题栏「重新上传」：与拖拽区共用 pickImportJsonFiles（Tauri 为仅 .json 系统对话框） */
 	const onReupload = useCallback(() => {
-		resetParsed();
+		setFileReadError(false);
 		setPreviewText('');
 		void pickImportJsonFiles().then((files) => {
 			const file = files?.[0];
 			if (file) processJsonFile(file);
 		});
-	}, [resetParsed, pickImportJsonFiles, processJsonFile]);
+	}, [pickImportJsonFiles, processJsonFile]);
 
-	/** 编辑器删空后回到拖拽上传区，并清空解析结果 */
-	const onPreviewEditorChange = useCallback(
-		(next: string) => {
-			if (!next.trim()) {
-				setPreviewText('');
-				resetParsed();
-				return;
-			}
-			setPreviewText(next);
-		},
-		[resetParsed],
-	);
+	/** 编辑器内容变更时同步 previewText，校验结果由 importValidation 自动更新 */
+	const onPreviewEditorChange = useCallback((next: string) => {
+		if (!next.trim()) {
+			setPreviewText('');
+			return;
+		}
+		setPreviewText(next);
+	}, []);
 
 	// 保存到单词库
 	const onSaveToVocab = useCallback(async () => {
-		if (jsonErrorKind !== null || structFailReason !== null) {
+		if (jsonParseError || structFailReason !== null) {
 			Toast({
 				type: 'error',
 				title: t('englishLearning.import.parseError'),
@@ -319,11 +355,19 @@ export default function EnglishLearningImportPage() {
 		} finally {
 			setVocabSaveLoading(false);
 		}
-	}, [importTitle, jsonErrorKind, navigate, previewText, structFailReason, t]);
+	}, [
+		importTitle,
+		jsonParseError,
+		navigate,
+		previewText,
+		parsedVocab,
+		structFailReason,
+		t,
+	]);
 
 	// 保存到经典语句库
 	const onSaveToClassic = useCallback(async () => {
-		if (jsonErrorKind !== null || structFailReason !== null) {
+		if (jsonParseError || structFailReason !== null) {
 			Toast({
 				type: 'error',
 				title: t('englishLearning.import.parseError'),
@@ -369,7 +413,7 @@ export default function EnglishLearningImportPage() {
 		}
 	}, [
 		importTitle,
-		jsonErrorKind,
+		jsonParseError,
 		navigate,
 		previewText,
 		parsedClassic,
@@ -398,16 +442,16 @@ export default function EnglishLearningImportPage() {
 				</div>
 				<div className="max-w-3xl -mt-1">
 					{kind === 'vocab'
-						? `[{"word": "hello", "ipa": "/həˈləʊ/", "pos": "n.", "translationZh": "你好", "example": "Hello, how are you?"}]`
+						? `[{"word": "hello", "ipa": "/həˈləʊ/", "pos": "n.", "segmentation": "hel·lo", "translationZh": "你好", "example": "Hello, how are you?"}]`
 						: `[{"english": "Education is not the filling of a pail, but the lighting of a fire.", "translationZh": "教育不是注满一桶水，而是点燃一把火。", "source": "William Butler Yeats", "noteZh": "经典比喻，阐明教育的本质是激发热情。"}]`}
 				</div>
 			</div>
-			{jsonErrorKind === 'parse' ? (
+			{jsonParseError ? (
 				<p className="text-destructive mb-2 shrink-0 text-sm">
 					{t('englishLearning.import.parseError')}
 				</p>
 			) : null}
-			{jsonErrorKind === 'read' ? (
+			{fileReadError ? (
 				<p className="text-destructive mb-2 shrink-0 text-sm">
 					{t('englishLearning.import.readError')}
 				</p>
@@ -462,12 +506,12 @@ export default function EnglishLearningImportPage() {
 											disabled={
 												kind === 'vocab'
 													? vocabSaveLoading ||
-														jsonErrorKind !== null ||
+														jsonParseError ||
 														structFailReason !== null ||
 														!parsedVocab?.length ||
 														!importTitle.trim()
 													: classicSaveLoading ||
-														jsonErrorKind !== null ||
+														jsonParseError ||
 														structFailReason !== null ||
 														!parsedClassic?.length ||
 														!importTitle.trim()

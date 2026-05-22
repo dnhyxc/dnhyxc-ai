@@ -33,6 +33,9 @@ export class EnglishVocabularyFavorite {
 	@Column({ type: 'varchar', length: 32, default: '' })
 	pos!: string;
 
+	@Column({ type: 'varchar', length: 500, default: '' })
+	segmentation!: string;
+
 	@Column({ name: 'translation_zh', type: 'text' })
 	translationZh!: string;
 

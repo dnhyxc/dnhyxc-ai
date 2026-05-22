@@ -28,6 +28,12 @@ export class SaveVocabularyLibraryItemDto {
 	@MaxLength(64)
 	pos?: string;
 
+	/** 音节划分（可选），如 ap·ple */
+	@IsOptional()
+	@IsString()
+	@MaxLength(500)
+	segmentation?: string;
+
 	@IsString()
 	@MaxLength(8000)
 	translationZh!: string;

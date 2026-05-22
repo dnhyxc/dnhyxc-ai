@@ -140,6 +140,8 @@ export type VocabularyItemDto = {
 	ipa: string;
 	/** 词性英文缩写，如 n、v、adj（旧数据或解析失败时可为空串） */
 	pos: string;
+	/** 音节划分，如 ap·ple（旧数据或解析失败时可为空串） */
+	segmentation: string;
 	translationZh: string;
 	example: string;
 };
@@ -586,6 +588,18 @@ export class EnglishLearningService {
 			(typeof r.speech === 'string' && r.speech) ||
 			'';
 		return raw.trim().slice(0, 32);
+	}
+
+	/** 从 JSON 行对象解析音节划分（兼容 segmentation / syllables 等键名） */
+	private parseVocabularySegmentationFromJsonRow(
+		r: Record<string, unknown>,
+	): string {
+		const raw =
+			(typeof r.segmentation === 'string' && r.segmentation) ||
+			(typeof r.syllables === 'string' && r.syllables) ||
+			(typeof r.syllable === 'string' && r.syllable) ||
+			'';
+		return raw.trim().slice(0, 500);
 	}
 
 	/**
@@ -1088,11 +1102,12 @@ export class EnglishLearningService {
 					items, // 累加输出的目标数组
 					seen, // 去重依据的已见单词集合
 					{
-						word: row.word, // 单词本身
-						ipa: row.ipa ?? '', // 音标，缺省时为空字符串
-						pos: row.pos ?? '', // 词性，缺省时为空字符串
-						translationZh: row.translationZh, // 中文释义
-						example: row.example ?? '—', // 例句，缺省时为 '—'
+						word: row.word,
+						ipa: row.ipa ?? '',
+						pos: row.pos ?? '',
+						segmentation: row.segmentation ?? '',
+						translationZh: row.translationZh,
+						example: row.example ?? '—',
 					},
 					limit, // 目标数量
 				);
@@ -1199,6 +1214,8 @@ export class EnglishLearningService {
 			word: row.word,
 			ipa: row.ipa,
 			pos: typeof row.pos === 'string' ? row.pos.trim() : '',
+			segmentation:
+				typeof row.segmentation === 'string' ? row.segmentation.trim() : '',
 			translationZh: row.translationZh,
 			example: row.example,
 		};
@@ -1733,10 +1750,12 @@ ${existingHintBlock}
 			const example = typeof r.example === 'string' ? r.example.trim() : '';
 			if (!word || !ipa) continue;
 			const pos = this.parseVocabularyPosFromJsonRow(r);
+			const segmentation = this.parseVocabularySegmentationFromJsonRow(r);
 			out.push({
 				word,
 				ipa,
 				pos,
+				segmentation,
 				translationZh: translationZh || '—',
 				example: example || '—',
 			});
@@ -1884,6 +1903,10 @@ ${existingHintBlock}
 						word,
 						ipa,
 						pos: typeof it.pos === 'string' ? it.pos.trim().slice(0, 64) : '',
+						segmentation:
+							typeof it.segmentation === 'string'
+								? it.segmentation.trim().slice(0, 500)
+								: '',
 						translationZh: String(it.translationZh ?? '—')
 							.trim()
 							.slice(0, 8000),
@@ -1933,6 +1956,7 @@ ${existingHintBlock}
 			const ipa = typeof o.ipa === 'string' ? o.ipa.trim() : '';
 			if (!word || !ipa) continue;
 			const pos = typeof o.pos === 'string' ? o.pos.trim().slice(0, 64) : '';
+			const segmentation = this.parseVocabularySegmentationFromJsonRow(o);
 			const translationZh =
 				typeof o.translationZh === 'string'
 					? o.translationZh
@@ -1944,6 +1968,7 @@ ${existingHintBlock}
 				word: word.slice(0, 500),
 				ipa: ipa.slice(0, 2000),
 				pos: pos || undefined,
+				segmentation: segmentation || undefined,
 				translationZh: String(translationZh).trim().slice(0, 8000),
 				example: String(example).trim().slice(0, 8000),
 			});
@@ -1970,6 +1995,7 @@ ${existingHintBlock}
 			word: row.word,
 			ipa: row.ipa,
 			pos: row.pos ?? '',
+			segmentation: row.segmentation ?? '',
 			translationZh: row.translationZh,
 			example: row.example,
 		};
@@ -2022,6 +2048,7 @@ ${existingHintBlock}
 					word: item.word,
 					ipa: item.ipa,
 					pos: item.pos ?? '',
+					segmentation: item.segmentation ?? '',
 					translationZh: item.translationZh,
 					example: item.example,
 				}),
@@ -2115,6 +2142,10 @@ ${existingHintBlock}
 			if (!word || !ipa) continue;
 			const pos =
 				typeof row.pos === 'string' ? row.pos.trim().slice(0, 64) : '';
+			const segmentation =
+				typeof row.segmentation === 'string'
+					? row.segmentation.trim().slice(0, 500)
+					: '';
 			const translationZh = String(row.translationZh ?? '—')
 				.trim()
 				.slice(0, 8000);
@@ -2125,6 +2156,7 @@ ${existingHintBlock}
 				word: word.slice(0, 500),
 				ipa: ipa.slice(0, 2000),
 				pos: pos || undefined,
+				segmentation: segmentation || undefined,
 				translationZh,
 				example,
 			});
@@ -3642,6 +3674,10 @@ ${existingHintBlock}
 			word: item.word.trim(),
 			ipa: typeof item.ipa === 'string' ? item.ipa : '',
 			pos: typeof item.pos === 'string' ? item.pos.trim().slice(0, 32) : '',
+			segmentation:
+				typeof item.segmentation === 'string'
+					? item.segmentation.trim().slice(0, 500)
+					: '',
 			translationZh: item.translationZh ?? '',
 			example: item.example ?? '',
 		});
@@ -3788,6 +3824,7 @@ ${existingHintBlock}
 			word: string;
 			ipa: string;
 			pos: string;
+			segmentation: string;
 			translationZh: string;
 			example: string;
 			createdAt: string;
@@ -3810,6 +3847,7 @@ ${existingHintBlock}
 				word: r.word,
 				ipa: r.ipa ?? '',
 				pos: r.pos ?? '',
+				segmentation: r.segmentation ?? '',
 				translationZh: r.translationZh ?? '',
 				example: r.example ?? '',
 				createdAt: r.createdAt.toISOString(),
@@ -3868,6 +3906,7 @@ ${existingHintBlock}
 			word: r.word,
 			ipa: r.ipa ?? '',
 			pos: r.pos ?? '',
+			segmentation: r.segmentation ?? '',
 			translationZh: r.translationZh ?? '',
 			example: r.example ?? '',
 		}));
