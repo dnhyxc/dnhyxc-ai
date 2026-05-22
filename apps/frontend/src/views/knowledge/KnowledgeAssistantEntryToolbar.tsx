@@ -115,7 +115,7 @@ export const KnowledgeAssistantEntryToolbar = observer(
 							<>
 								<Button
 									variant="link"
-									className="mb-0.5 h-8.5 w-8.5 mt-0.5 rounded-full text-textcolor/80 hover:bg-theme/10 hover:text-teal-500 border border-theme/10 p-0 [&_svg]:overflow-visible"
+									className="mb-0.5 h-8.5 w-8.5 mt-0.5 rounded-full text-textcolor/80 hover:bg-theme/5 hover:text-teal-500 border border-theme/5 p-0 [&_svg]:overflow-visible"
 									aria-label={t('knowledge.assistant.history')}
 									disabled={isAiSessionSwitcherLocked}
 									onClick={() => {
@@ -136,7 +136,7 @@ export const KnowledgeAssistantEntryToolbar = observer(
 								<Button
 									size="sm"
 									variant="link"
-									className="w-fit rounded-md border border-theme/10 px-3 py-1.5 text-sm text-textcolor/80 transition-colors hover:bg-theme/10 hover:text-teal-500"
+									className="w-fit rounded-md border border-theme/5 px-3 py-1.5 text-sm text-textcolor/80 transition-colors hover:bg-theme/5 hover:text-teal-500"
 									disabled={isAiSessionSwitcherLocked}
 									onClick={() => {
 										if (isAiSessionSwitcherLocked) {
@@ -160,10 +160,10 @@ export const KnowledgeAssistantEntryToolbar = observer(
 								variant="link"
 								size="sm"
 								className={cn(
-									'px-2.5 border border-theme/15',
+									'px-2.5 border border-theme/5',
 									assistantMode === item.id
-										? 'bg-theme/10 text-teal-500'
-										: 'text-textcolor/80 hover:bg-theme/10',
+										? 'text-teal-500 bg-theme/5'
+										: 'text-textcolor/80 hover:bg-theme/5',
 								)}
 								onClick={() => setAssistantMode(item.id)}
 							>

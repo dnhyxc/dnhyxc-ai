@@ -2030,7 +2030,7 @@ async listSessionsByKnowledgeArticle(userId: number, knowledgeArticleId: string,
 
 - **外层**：`text-textcolor/70`、`pt-4 pl-4 pr-4.5`、`items-start justify-center`。
 - **若 `knowledgeStore.markdown` 为真**（注意：此处用 **truthy**，与 `editorHasBody` 的 trim 略有不同——空字符串才走欢迎语）：
-  - 展示 **两列并排** **`KNOWLEDGE_ASSISTANT_PROMPTS.map`**：每项为 **`type="button"`**，**`flex-1`**，**`item.icon`**（`Sparkle` / `Sparkles`）+ 标题 + 描述。
+  - 展示 **`grid grid-cols-2`** 四宫格 **`KNOWLEDGE_ASSISTANT_PROMPTS.map`**（润色 / 总结 / 生成目录 / 扩写；详见 [knowledge-assistant-prompt-cards.md](./knowledge-assistant-prompt-cards.md)）：每项为 **`type="button"`**，**`item.icon`** + 四字标题 + 描述。
   - 当 **`isSending || isHistoryLoading || isStreaming`**：整卡 **`pointer-events-none opacity-50`**，禁止连点。
   - **`onClick={() => void sendKnowledgePromptCard(item.kind)}`**。
 - **否则**（左侧无 markdown 字符串）：展示带 **`Sparkles`** 图标的欢迎说明文案（「Hi，我是您的专属知识库助手！…」），背景 **`bg-theme/5`**、边框 **`border-theme/10`**。
@@ -2369,11 +2369,13 @@ bottomBarAssistantNode={
 
 ## 13. 快捷卡片与 extraUserContentForModel（用户短句 + 模型长上下文）
 
-本节描述知识库助手首页 **「润色文档内容」**、**「总结文档内容」** 两条快捷入口的完整设计：**用户气泡与数据库中的 user 正文仅为短标题**；**当前 Markdown 全文与任务说明**通过可选字段 **`extraUserContentForModel`** 在 **服务端** 拼入 **发给智谱的最后一条 user 消息** 中，**不单独落库、不增加 `assistant_messages` 列**。
+> **四入口实现专题**（润色 / 总结 / 生成目录 / 扩写、2×2 首屏、四字标题）：[knowledge-assistant-prompt-cards.md](./knowledge-assistant-prompt-cards.md)。
+
+本节描述知识库助手文档快捷入口的完整设计（历史上为润色、总结两条；现扩展为四条，气泡短句为四字中文如「润色文档」「生成目录」）：**用户气泡与数据库中的 user 正文仅为短标题**；**当前 Markdown 全文与任务说明**通过可选字段 **`extraUserContentForModel`** 在 **服务端** 拼入 **发给智谱的最后一条 user 消息** 中，**不单独落库、不增加 `assistant_messages` 列**。
 
 ### 13.1 需求拆解（逐条）
 
-1. **展示与持久化一致**：用户看到的 user 气泡正文 = `Message.content` = 写入 `assistant_messages.content` 的字符串 = **`润色文档内容` 或 `总结文档内容`**（无整篇文档）。
+1. **展示与持久化一致**：用户看到的 user 气泡正文 = `Message.content` = 写入 `assistant_messages.content` 的字符串 = **四字短标题**（如「润色文档」「总结文档」「生成目录」「扩写文档」；无整篇文档）。
 2. **模型可见全文**：智谱 `chat/completions` 的 `messages` 数组中，对应轮次的 **user** `content` 必须为 **短标题 + 换行 + 指令与文档围栏**（由后端拼接），否则模型无法润色/总结。
 3. **不传 extra 时行为不变**：普通键盘发送仅带 `content`；后端 **不** 做额外拼接（见 §13.4）。
 4. **Ephemeral 与持久化两条路径都要支持**：未保存草稿走 `buildEphemeralTurns`；已保存条目走「先 `insertUserAndAssistantPlaceholder` 写短 user → 再 `buildTurnsForContext` + 合并 extra → `takeRecentMessagesWithinTokenBudget`」。
@@ -2388,7 +2390,7 @@ bottomBarAssistantNode={
 
 文件：`apps/backend/src/services/assistant/dto/assistant-chat.dto.ts`。
 
-- **`content`**：必填，用户可见/可落库的短正文（快捷卡片时为「润色文档内容」或「总结文档内容」）。
+- **`content`**：必填，用户可见/可落库的短正文（快捷卡片时为四字标题，见 `buildKnowledgeAssistantDocumentMessage`）。
 - **`extraUserContentForModel`**：可选；**仅**用于服务端拼装智谱上下文，**长度上限单独放宽**（与 `content` 的 `100_000` 区分）。
 
 ```typescript
@@ -2490,37 +2492,7 @@ let contextTurns = takeRecentMessagesWithinTokenBudget(
 - **`apps/frontend/src/views/knowledge/constants.ts`**：**`KNOWLEDGE_ASSISTANT_PROMPTS`**（`kind`：`'polish' | 'summarize'`、**`LucideIcon`**、标题、副标题）、**`KnowledgeAssistantPromptKind`** 等。
 - **`apps/frontend/src/views/knowledge/utils.ts`**：**`buildKnowledgeAssistantDocumentMessage`**——返回 **`userMessageShort`**（与气泡一致）与 **`extraUserContentForModel`**（指令 + `--- 文档 ---` … `--- 文档结束 ---` 包裹的当前全文；**`documentMarkdown` 会先 `replace(/\s+$/, '')` 去尾空白**）。
 
-```typescript
-// 文件：apps/frontend/src/views/knowledge/utils.ts（节选 + 注释）
-
-/**
- * 快捷卡片：`userMessageShort` 为气泡与落库正文；`extraUserContentForModel` 仅由后端拼进发给模型的 user 上下文，不入库。
- */
-export function buildKnowledgeAssistantDocumentMessage(
-	kind: KnowledgeAssistantPromptKind,
-	documentMarkdown: string,
-): { userMessageShort: string; extraUserContentForModel: string } {
-	const doc = documentMarkdown.replace(/\s+$/, "");
-	if (kind === "polish") {
-		return {
-			userMessageShort: "润色文档内容",
-			extraUserContentForModel: `请根据以下「当前知识库文档」全文进行润色与优化：…
-
---- 文档 ---
-${doc}
---- 文档结束 ---`,
-		};
-	}
-	return {
-		userMessageShort: "总结文档内容",
-		extraUserContentForModel: `请根据以下「当前知识库文档」全文输出一份简洁的中文总结：…
-
---- 文档 ---
-${doc}
---- 文档结束 ---`,
-	};
-}
-```
+四类 `kind` 与 `switch` 实现见专题文档 [knowledge-assistant-prompt-cards.md](./knowledge-assistant-prompt-cards.md) §4.2；源文件 `apps/frontend/src/views/knowledge/utils.ts`。
 
 ### 13.6 前端 Store：`sendMessage` 与 SSE body
 

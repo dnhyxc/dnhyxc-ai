@@ -632,6 +632,11 @@ export const enUS = {
 	'knowledge.assistant.prompts.polish.desc': 'Refine wording and improve tone',
 	'knowledge.assistant.prompts.summarize.title': 'Summarize document',
 	'knowledge.assistant.prompts.summarize.desc': 'Extract key points quickly',
+	'knowledge.assistant.prompts.outline.title': 'Generate table of contents',
+	'knowledge.assistant.prompts.outline.desc':
+		'Build a navigable TOC from headings',
+	'knowledge.assistant.prompts.expand.title': 'Expand document',
+	'knowledge.assistant.prompts.expand.desc': 'Add detail and depth',
 	'knowledge.assistant.modes.ai': 'AI Chat',
 	'knowledge.assistant.modes.rag': 'RAG Chat',
 	'knowledge.assistant.loadingConversation': 'Loading conversation…',

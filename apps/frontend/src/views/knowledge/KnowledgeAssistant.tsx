@@ -557,12 +557,12 @@ const KnowledgeAssistant = observer(
 				{/*
 					置顶/置底钮与消息列同宽：定位在 max-w-3xl 内容容器内，right-4 与 pr-4 对齐，避免相对全屏 footer 用 right-0 贴到面板最右侧。
 				*/}
-				<div className="relative mx-auto min-w-0 w-full max-w-3xl pl-3.5 pr-4">
+				<div className="relative mx-auto min-w-0 w-full max-w-3xl pl-4 pr-4">
 					{messages.length > 0 && scrollCornerFabMode !== 'hidden' ? (
 						<button
 							type="button"
 							className={cn(
-								'absolute bottom-full right-4 z-10 mb-4 flex h-8.5 w-8.5 cursor-pointer items-center justify-center rounded-full border border-theme/5 bg-theme/5 text-textcolor/70 backdrop-blur-[2px] hover:bg-theme/15',
+								'absolute bottom-full right-4 z-10 mb-[17px] flex h-8.5 w-8.5 cursor-pointer items-center justify-center rounded-full border border-theme/5 bg-theme/5 text-textcolor/70 backdrop-blur-[2px] hover:bg-theme/15',
 								'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme/40',
 							)}
 							aria-label={
@@ -591,8 +591,9 @@ const KnowledgeAssistant = observer(
 							t={t}
 							input={isRagMode ? ragInput : input}
 							setInput={isRagMode ? setRagInput : setInput}
-							className="w-full px-0 pb-4.5 border-theme/10"
+							className="w-full px-0 pb-4.5"
 							textareaClassName="min-h-9"
+							inputWrapClassName="border-theme/5"
 							sendMessage={sendMessage}
 							placeholder={
 								isRagMode
@@ -645,8 +646,8 @@ const KnowledgeAssistant = observer(
 						<Loading text={t('knowledge.assistant.loadingConversation')} />
 					</div>
 				) : isRagMode && !ragMessages.length ? (
-					<div className="max-w-3xl mx-auto text-textcolor/70 flex flex-1 justify-center items-start text-sm pt-4 pl-3.5 pr-4">
-						<div className="w-full flex gap-2 border border-theme/10 bg-theme/5 p-3 rounded-md">
+					<div className="max-w-3xl mx-auto text-textcolor/70 flex flex-1 justify-center items-start text-sm pt-4 pl-4 pr-4">
+						<div className="w-full flex gap-2 border border-theme/5 bg-theme/5 p-3 rounded-md">
 							<BookOpen size={18} className="mt-[3px] shrink-0 text-teal-500" />
 							<div className="flex-1 text-sm leading-relaxed">
 								{t('knowledge.assistant.ragIntro')}
@@ -656,14 +657,14 @@ const KnowledgeAssistant = observer(
 				) : !isRagMode && !aiMessages.length ? (
 					<div className="text-textcolor/70 flex flex-1 justify-center items-start text-sm pt-4">
 						{knowledgeStore.markdown ? (
-							<div className="max-w-3xl mx-auto w-full flex flex-col gap-2 justify-center items-center pl-3.5 pr-4">
-								<div className="w-full flex gap-3">
+							<div className="max-w-3xl mx-auto w-full flex flex-col gap-2 justify-center items-center pl-4 pr-4">
+								<div className="grid w-full grid-cols-2 gap-3">
 									{KNOWLEDGE_ASSISTANT_PROMPTS.map((item) => (
 										<button
 											key={item.kind}
 											type="button"
 											className={cn(
-												'flex-1 flex items-start gap-2 border border-theme/10 bg-theme/5 text-textcolor hover:bg-theme/15 py-2 pl-2 pr-2.5 rounded-md cursor-pointer text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-theme/40',
+												'flex-1 flex items-start gap-2 border border-theme/5 bg-theme/5 text-textcolor hover:bg-theme/15 pt-2 pb-3 pl-2 pr-2.5 rounded-md cursor-pointer text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-theme/40',
 												(assistantStore.isSending ||
 													assistantStore.isHistoryLoading ||
 													assistantStore.isStreaming) &&
@@ -671,12 +672,12 @@ const KnowledgeAssistant = observer(
 											)}
 											onClick={() => void sendKnowledgePromptCard(item.kind)}
 										>
-											<item.icon className="text-teal-500 mt-0.5 shrink-0" />
+											<item.icon className="text-teal-500 mt-0.5 shrink-0 size-5" />
 											<div className="flex min-w-0 flex-1 flex-col gap-1">
-												<span className="text-base font-medium">
+												<span className="text-sm font-medium">
 													{t(item.titleKey)}
 												</span>
-												<span className="text-sm text-textcolor/80">
+												<span className="text-xs text-textcolor/80">
 													{t(item.descriptionKey)}
 												</span>
 											</div>
@@ -685,8 +686,8 @@ const KnowledgeAssistant = observer(
 								</div>
 							</div>
 						) : (
-							<div className="max-w-3xl w-full mx-auto pl-3.5 pr-4">
-								<div className="w-full flex justify-between bg-theme/5 p-2 rounded-md border border-theme/10">
+							<div className="max-w-3xl w-full mx-auto pl-4 pr-4">
+								<div className="w-full flex justify-between bg-theme/5 p-2 rounded-md border border-theme/5">
 									<Sparkles size={18} className="mr-2 text-teal-500 mt-0.5" />
 									<div className="flex-1">
 										{t('knowledge.assistant.aiIntro')}
@@ -707,7 +708,7 @@ const KnowledgeAssistant = observer(
 							viewportClassName="pb-1 [overflow-anchor:none]"
 							{...scrollAreaHandlers}
 						>
-							<div className="relative mx-auto flex min-h-0 w-full min-w-0 max-w-3xl flex-col pt-4 pl-3.5 pr-4 select-none">
+							<div className="relative mx-auto flex min-h-0 w-full min-w-0 max-w-3xl flex-col pt-4 pl-4 pr-4 select-none">
 								{messages.map((message, index) => (
 									<KnowledgeMessageBubble
 										key={message.chatId}
@@ -736,7 +737,7 @@ const KnowledgeAssistant = observer(
 										<Button
 											size="sm"
 											variant="dynamic"
-											className="w-fit rounded-md border border-theme/10 bg-theme/5 px-3 py-1.5 text-sm text-textcolor/80 transition-colors hover:border-theme/20 hover:text-textcolor"
+											className="w-fit rounded-md border border-theme/5 bg-theme/5 px-3 py-1.5 text-sm text-textcolor/80 transition-colors hover:border-theme/20 hover:text-textcolor"
 											onClick={() => {
 												knowledgeRagQaStore.resetConversation();
 												setRagInput('');
@@ -748,13 +749,13 @@ const KnowledgeAssistant = observer(
 									</div>
 								) : null}
 								{showPostStreamActions ? (
-									<div className="mb-3 flex w-full min-w-0 flex-wrap gap-3.5">
+									<div className="mb-3 flex justify-between min-w-0 gap-1.5 mr-10">
 										{KNOWLEDGE_ASSISTANT_PROMPTS.map((item) => (
 											<Button
 												key={item.kind}
 												size="sm"
-												variant="dynamic"
-												className="w-fit rounded-md border border-theme/10 bg-theme/5 p-2 text-left text-sm text-textcolor/80 transition-colors hover:border-theme/20 hover:text-textcolor"
+												variant="link"
+												className="flex-1 px-1! rounded-md border border-theme/5 bg-theme/5 text-xs text-textcolor/80 transition-colors hover:text-textcolor hover:bg-theme/10"
 												onClick={() => void sendKnowledgePromptCard(item.kind)}
 											>
 												<item.icon />

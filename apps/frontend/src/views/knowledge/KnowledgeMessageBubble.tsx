@@ -82,8 +82,8 @@ export const KnowledgeMessageBubble = observer(function KnowledgeMessageBubble({
 				className={cn(
 					'relative flex min-w-0 max-w-full rounded-md p-3 select-auto text-textcolor mb-5',
 					message.role === 'user'
-						? 'w-fit max-w-full self-end bg-teal-600/5 border border-teal-500/15 text-end pt-2 pb-2.5 px-3'
-						: 'flex-1 bg-theme/5 border border-theme/10',
+						? 'w-fit max-w-full self-end bg-teal-600/5 border border-teal-500/5 text-end pt-2 pb-2.5 px-3'
+						: 'flex-1 bg-theme/5 border border-theme/5',
 				)}
 			>
 				{message.role === 'user' ? (

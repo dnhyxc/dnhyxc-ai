@@ -1610,7 +1610,6 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 								<div
 									className={cn(
 										'flex h-full min-h-0 min-w-0 flex-col overflow-hidden',
-										viewMode === 'edit' ? '' : 'border-r border-theme/10',
 									)}
 								>
 									<QuickContextMenu
@@ -1641,6 +1640,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 							<ResizableHandle
 								withHandle
 								className={cn(
+									'w-0',
 									viewMode === 'edit'
 										? 'pointer-events-none opacity-0'
 										: 'pointer-events-auto opacity-100',
@@ -1657,7 +1657,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 										: 'pointer-events-auto opacity-100',
 								)}
 							>
-								<div className="h-full min-h-0 min-w-0 overflow-hidden contain-[inline-size]">
+								<div className="border-l border-theme/10 h-full min-h-0 min-w-0 overflow-hidden contain-[inline-size]">
 									{markdownAssistantOpen && bottomBarAssistantNode ? (
 										<div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
 											<div className="min-h-0 flex-1 overflow-auto">
