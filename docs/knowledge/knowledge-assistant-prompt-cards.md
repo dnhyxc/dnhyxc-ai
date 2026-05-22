@@ -2,7 +2,8 @@
 
 > **延伸阅读**  
 > - 快捷卡片与 `extraUserContentForModel` 后端契约总览：[knowledge-assistant-complete.md](./knowledge-assistant-complete.md) §13  
-> - 持久化 / Ephemeral 发送路径：[knowledge-assistant-ephemeral-persistence.md](./knowledge-assistant-ephemeral-persistence.md)
+> - 持久化 / Ephemeral 发送路径：[knowledge-assistant-ephemeral-persistence.md](./knowledge-assistant-ephemeral-persistence.md)  
+> - **「生成目录」完成后自动写入编辑器文首**：[knowledge-assistant-outline-toc-prepend.md](./knowledge-assistant-outline-toc-prepend.md)
 
 ## 1. 背景与目标
 
@@ -67,7 +68,7 @@
 |------|------------|----------|----------------|
 | `polish` | 润色文档 | 润色文档 | 润色优化全文，保留原意与代码块 |
 | `summarize` | 总结文档 | 总结文档 | 中文总结，不必贴全文 |
-| `outline` | 生成目录 | 生成目录 | 文首 Markdown 目录，锚点链接 |
+| `outline` | 生成目录 | 生成目录 | 文首 Markdown 目录，锚点链接；**流式成功后自动 prepend 至编辑器**（见 [knowledge-assistant-outline-toc-prepend.md](./knowledge-assistant-outline-toc-prepend.md)） |
 | `expand` | 扩写文档 | 扩写文档 | 扩写全文或先列要点再全文 |
 
 ---

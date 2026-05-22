@@ -52,7 +52,11 @@ import {
 } from './KnowledgeMessageBubble';
 import {
 	buildKnowledgeAssistantDocumentMessage,
+	documentHasLeadingToc,
+	extractTocBlockFromAssistantReply,
+	findCompletedOutlineAssistantReply,
 	isKnowledgeLocalMarkdownId,
+	prependTocToDocument,
 } from './utils';
 
 export type KnowledgeAssistantMode = 'ai' | 'rag';
@@ -130,6 +134,9 @@ const KnowledgeAssistant = observer(
 		const wasRagModeRef = useRef(false);
 
 		const copyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+		/** 「生成目录」快捷卡发送后，流式结束且成功时尝试写入编辑器文首 */
+		const pendingOutlineTocApplyRef = useRef(false);
+		const wasAssistantStreamingRef = useRef(false);
 
 		const isLoggedIn = Boolean(userStore.userInfo?.id);
 		const editorHasBody = Boolean((knowledgeStore.markdown ?? '').trim());
@@ -486,10 +493,20 @@ const KnowledgeAssistant = observer(
 						kind,
 						knowledgeStore.markdown ?? '',
 					);
+				const messagesLenBefore = assistantStore.messages.length;
+				if (kind === 'outline') {
+					pendingOutlineTocApplyRef.current = true;
+				}
 				enableStreamStickToBottom();
 				await assistantStore.sendMessage(userMessageShort, {
 					extraUserContentForModel,
 				});
+				if (
+					kind === 'outline' &&
+					assistantStore.messages.length === messagesLenBefore
+				) {
+					pendingOutlineTocApplyRef.current = false;
+				}
 			},
 			[
 				isLoggedIn,
@@ -498,6 +515,50 @@ const KnowledgeAssistant = observer(
 				isRagMode,
 			],
 		);
+
+		/** 生成目录完成后：文首无目录则将助手输出的目录块插入编辑器顶部 */
+		useEffect(() => {
+			if (isRagMode) return;
+			const streaming = assistantStore.isStreaming;
+			const wasStreaming = wasAssistantStreamingRef.current;
+			wasAssistantStreamingRef.current = streaming;
+
+			if (!wasStreaming || streaming || !pendingOutlineTocApplyRef.current) {
+				return;
+			}
+			pendingOutlineTocApplyRef.current = false;
+
+			const assistant = findCompletedOutlineAssistantReply(
+				assistantStore.messages,
+			);
+			if (!assistant) return;
+
+			const currentMd = knowledgeStore.markdown ?? '';
+			if (documentHasLeadingToc(currentMd)) {
+				Toast({
+					type: 'info',
+					title: t('knowledge.assistant.tocAlreadyAtTop'),
+				});
+				return;
+			}
+
+			const tocBlock = extractTocBlockFromAssistantReply(
+				assistant.content ?? '',
+			);
+			if (!tocBlock) return;
+
+			knowledgeStore.setMarkdown(prependTocToDocument(currentMd, tocBlock));
+			Toast({
+				type: 'success',
+				title: t('knowledge.assistant.tocPrependedToDoc'),
+			});
+		}, [
+			isRagMode,
+			assistantStore.isStreaming,
+			assistantStore.messages,
+			knowledgeStore,
+			t,
+		]);
 
 		const stopGenerating = useCallback(() => {
 			if (isRagMode) {

@@ -285,9 +285,6 @@ importers:
       '@codesandbox/sandpack-react':
         specifier: ^2.20.0
         version: 2.20.0(react-dom@19.2.3(react@19.2.3))(react@19.2.3)
-      '@dnhyxc-ai/markdown-kit':
-        specifier: ^1.0.1
-        version: 1.0.1(react@19.2.3)
       '@hookform/resolvers':
         specifier: ^5.2.2
         version: 5.2.2(react-hook-form@7.71.1(react@19.2.3))
@@ -1154,11 +1151,6 @@ packages:
 
   '@dabh/diagnostics@2.0.8':
     resolution: {integrity: sha512-R4MSXTVnuMzGD7bzHdW2ZhhdPC/igELENcq5IjEverBvq5hn1SXCWcsi6eSsdWP0/Ur+SItRRjAktmdoX/8R/Q==}
-
-  '@dnhyxc-ai/markdown-kit@1.0.1':
-    resolution: {integrity: sha512-0+xzewNDeooZy5BNHW9NaWo465F0GUgqXUiwgtYj/Zy2dPc7/py2DOQD1J1OBYJz95AfcVunV8ZxT/fS2BLZIQ==}
-    peerDependencies:
-      react: '>=18.0.0'
 
   '@eggjs/yauzl@2.11.0':
     resolution: {integrity: sha512-Jq+k2fCZJ3i3HShb0nxLUiAgq5pwo8JTT1TrH22JoehZQ0Nm2dvByGIja1NYfNyuE4Tx5/Dns5nVsBN/mlC8yg==}
@@ -10016,17 +10008,6 @@ snapshots:
       enabled: 2.0.0
       kuler: 2.0.0
 
-  '@dnhyxc-ai/markdown-kit@1.0.1(react@19.2.3)':
-    dependencies:
-      github-markdown-css: 5.8.1
-      highlight.js: 11.11.1
-      katex: 0.16.28
-      markdown-it: 14.1.0
-      markdown-it-katex: 2.0.3
-      markdown-it-task-lists: 2.1.1
-      mermaid: 11.14.0
-      react: 19.2.3
-
   '@eggjs/yauzl@2.11.0':
     dependencies:
       buffer-crc32: 0.2.13
@@ -12973,7 +12954,7 @@ snapshots:
 
   axios@1.13.2:
     dependencies:
-      follow-redirects: 1.15.11(debug@4.4.3)
+      follow-redirects: 1.15.11
       form-data: 4.0.5
       proxy-from-env: 1.1.0
     transitivePeerDependencies:
@@ -14565,6 +14546,8 @@ snapshots:
   flushwritable@1.0.0: {}
 
   fn.name@1.1.0: {}
+
+  follow-redirects@1.15.11: {}
 
   follow-redirects@1.15.11(debug@4.4.3):
     optionalDependencies:

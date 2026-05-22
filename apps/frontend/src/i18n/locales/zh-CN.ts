@@ -593,6 +593,8 @@ export const zhCN = {
 	'knowledge.assistant.historyEmpty': '暂无历史对话',
 	'knowledge.assistant.noBodyToWrite': '没有可写入的正文',
 	'knowledge.assistant.appendedToCurrentDoc': '已追加到当前知识文档',
+	'knowledge.assistant.tocAlreadyAtTop': '文档开头已有目录，未重复插入',
+	'knowledge.assistant.tocPrependedToDoc': '已将生成的目录插入文档顶部',
 	'knowledge.assistant.loginToUse': '请先登录后再使用助手',
 	'knowledge.assistant.enterBodyFirst': '请先在左侧编辑器输入正文',
 	'knowledge.assistant.waitForCurrentReply': '请等待当前回复结束后再试',

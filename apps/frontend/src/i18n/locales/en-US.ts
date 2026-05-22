@@ -660,6 +660,10 @@ export const enUS = {
 	'knowledge.assistant.historyEmpty': 'No conversations yet',
 	'knowledge.assistant.noBodyToWrite': 'No body content to write.',
 	'knowledge.assistant.appendedToCurrentDoc': 'Appended to current document.',
+	'knowledge.assistant.tocAlreadyAtTop':
+		'A table of contents is already at the top; nothing was inserted.',
+	'knowledge.assistant.tocPrependedToDoc':
+		'Generated table of contents inserted at the top of the document.',
 	'knowledge.assistant.loginToUse': 'Please sign in to use the assistant.',
 	'knowledge.assistant.enterBodyFirst':
 		'Please enter document content in the editor first.',
