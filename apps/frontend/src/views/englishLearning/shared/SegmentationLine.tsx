@@ -1,7 +1,7 @@
 /** 单词音节划分展示行（有内容时渲染） */
-export function VocabularySegmentationLine({
+export function SegmentationLine({
 	segmentation,
-	className = 'text-textcolor/85 text-sm leading-snug my-1',
+	className = 'text-textcolor/85 leading-snug',
 }: {
 	segmentation?: string | null;
 	className?: string;

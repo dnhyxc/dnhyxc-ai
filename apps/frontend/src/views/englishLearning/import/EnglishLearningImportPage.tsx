@@ -442,7 +442,7 @@ export default function EnglishLearningImportPage() {
 				</div>
 				<div className="max-w-3xl -mt-1">
 					{kind === 'vocab'
-						? `[{"word": "hello", "ipa": "/həˈləʊ/", "pos": "n.", "segmentation": "hel·lo", "translationZh": "你好", "example": "Hello, how are you?"}]`
+						? `[{"word": "hello", "ipa": "/həˈləʊ/", "pos": "n.", "segmentation": "hel-lo", "translationZh": "你好", "example": "Hello, how are you?"}]`
 						: `[{"english": "Education is not the filling of a pail, but the lighting of a fire.", "translationZh": "教育不是注满一桶水，而是点燃一把火。", "source": "William Butler Yeats", "noteZh": "经典比喻，阐明教育的本质是激发热情。"}]`}
 				</div>
 			</div>

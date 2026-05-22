@@ -84,6 +84,39 @@ export const CLASSIC_QUOTES_SUBMODEL_SYSTEM_STATIC = `
 主题 / 需求：`;
 
 /**
+ * 单词音节划分（segmentation）规则摘要，供单词包子模型生成。
+ * 完整说明见同目录 `元音单词切分规则.md`。
+ */
+export const VOCABULARY_SEGMENTATION_RULES_BLOCK = `
+# Syllable Segmentation (segmentation) — 元音切分规则（必遵）
+
+每条 item 必须填写 **segmentation**：按**元音为锚点**将 word 拆成音节，音节之间用半角连字符 **-** 连接（如 hel-lo、ap-ple、beau-ti-ful）。禁止用空格、中点 · 或斜杠 / 作为音节分隔符。
+
+优先级（高→低）：**词缀独立** > **辅音连缀不拆** > **辅音数量规则** > **元音组合一体**。
+
+## 辅音数量（相邻元音单元之间）
+1. **1 个辅音（VCV）**：辅音归后一音节 → o-pen、pa-per、ho-tel。
+2. **2 个辅音（VCCV）**：中间切开 → kit-ten、sum-mer、let-ter。
+3. **3 个及以上**：优先保持常见连缀完整再切 → chil-dren（dr）、mon-ster（st）、ex-am-ple（pl）。
+
+## 辅音连缀
+首连缀（bl, cl, br, dr, st, sp, str…）、尾连缀（nd, nt, mp, st, ld…）、三连缀（spl, spr, str）**不得在连缀内部切开**。
+
+## 元音组合与特殊拼写
+- 双元音字母（ai, ea, oa, ie…）、r 控制元音（ar, er, ir, or, ur）、magic e（make, like）→ 视为**一个元音单元**，不拆开。
+- y 作元音时按 V 处理（如 hap-py）；x 常归前一音节（ex-am）。
+
+## 词缀与结尾
+- 常见前缀/后缀可独立成节：re-write、un-hap-py、ac-tion、quick-ly、run-ning。
+- **-le** 词尾拼写：前一辅音 + le 同节 → ta-ble、sim-ple（此处 - 仅为音节切分符，非英文拼写连字符）。
+- **-ck**、双写辅音：ck 不拆；双写从中间分 → rap-per、bet-ter。
+
+## 短语
+word 为短语时，对其中**每个英文实词**分别按上规则给出音节划分，同一 segmentation 字符串内用 - 连接各词内部音节（词与词之间可用空格分隔，如 look-ing for-ward）。
+
+口诀：**一辅归后，两辅中分，连缀不拆，词缀独立，元音组合为一体。**`;
+
+/**
  * 单词包子模型 system 固定段（不含用户主题与学习语境常量）。
  * 每轮另在末尾追加「【本轮生成要求】」；主题与语境在首次拼接时写入「【当前学习任务】」块。
  */
@@ -97,14 +130,17 @@ export const VOCABULARY_PACK_SUBMODEL_SYSTEM_STATIC = `
 # Output Format
 严格输出单个 JSON 对象，不要 Markdown，不要代码围栏，不要任何解释文字。
 格式规范：
-{"items":[{"word":"","ipa":"","pos":"","translationZh":"","example":""}]}
+{"items":[{"word":"","ipa":"","pos":"","segmentation":"","translationZh":"","example":""}]}
 
 字段要求：
 - word：英文单词或短语（无序号前缀，严格去重）
 - ipa：英式或美式 IPA 音标，使用 Unicode 符号（如 ˈæpl），直接写入字符串，不要加斜杠 // 或方括号 []
 - pos：**词性缩写**（英文标记，小写优先，1～12 字符）。须与 word 在该义项下的主要词性一致；短语可用 phr.、phr.v.、phr.n. 等。常用：n（名词）、v（动词）、adj（形容词）、adv（副词）、prep（介词）、conj（连词）、pron（代词）、det（限定词）、num（数词）、int（感叹词）、abbr（缩写专有）、phr.（短语/固定搭配）等。
+- segmentation：**必填**。音节划分字符串，音节间用半角 **-** 连接；须符合文末「元音切分规则」及口诀，与 word 拼写一致（仅插入 - 作切分，不改正文拼写）。
 - translationZh：简明中文释义（优先贴合当前主题语境）
 - example：地道英文例句，展示该词用法
+
+${VOCABULARY_SEGMENTATION_RULES_BLOCK}
 
 # JSON Syntax Constraints (Critical)
 1. 所有字符串字段内（尤其 example 中）**严禁**出现未转义的英文半角双引号 "。

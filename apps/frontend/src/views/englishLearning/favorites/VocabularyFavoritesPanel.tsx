@@ -17,7 +17,7 @@ import {
 	type EnglishVocabularyFavoriteListEntry,
 } from '@/service';
 import { displayIpaWrapped, isTauriRuntime } from '@/utils';
-import { VocabularySegmentationLine } from '../shared/VocabularySegmentationLine';
+import { SegmentationLine } from '../shared/SegmentationLine';
 import { FavoritesPanelFooter } from './FavoritesPanelFooter';
 
 export type VocabularyFavoritesPanelProps = {
@@ -315,7 +315,7 @@ export function VocabularyFavoritesPanel({
 														<div className="mt-1 font-mono text-xs leading-snug text-teal-600/90 dark:text-teal-400/90">
 															{displayIpaWrapped(row.ipa)}
 														</div>
-														<VocabularySegmentationLine
+														<SegmentationLine
 															segmentation={row.segmentation}
 															className="text-textcolor/55 mt-0.5 text-xs leading-snug"
 														/>
