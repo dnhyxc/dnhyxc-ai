@@ -47,7 +47,7 @@ import {
 	shortHostnameFromUrl,
 	syncOrganicMergedAnchorDom,
 } from '@/utils/organicCitation';
-// import { patchIncompleteNonMermaidFence } from '@/utils/splitMarkdownFences';
+import { patchIncompleteNonMermaidFence } from '@/utils/splitMarkdownFences';
 import SearchOrganics from './SearchOrganics';
 import { StreamingMarkdownBody } from './StreamingMarkdownBody';
 
@@ -210,7 +210,7 @@ function ChatAssistantMessageInner({
 			return raw;
 		}
 		// 未闭合的 ```json / ``` 等会把后续正文吞进 code 块，联网场景常见；先修补再渲染
-		// raw = patchIncompleteNonMermaidFence(raw);
+		raw = patchIncompleteNonMermaidFence(raw);
 		raw = normalizePersistedOrganicAnchorsInMarkdown(raw, org);
 		if (!org?.length) {
 			return raw;

@@ -8,6 +8,7 @@ import markdownItKatex from 'markdown-it-katex';
 import markdownItTaskLists from 'markdown-it-task-lists';
 import type { HighlightJsThemeId } from '../generated/highlight-js-theme-ids.js';
 import { applyHighlightJsTheme } from '../highlight/inject-theme.js';
+import { isMermaidFenceLang } from '../mermaid/detect-mermaid-source.js';
 import {
 	MARKDOWN_MERMAID_WRAP_CLASS,
 	MARKDOWN_MERMAID_WRAP_DATA_ATTR,
@@ -142,8 +143,18 @@ function escapeMermaidDoubleQuotedLabelInner(raw: string): string {
 	return raw.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
 }
 
+/** 未加引号的方括号标签是否应补双引号（括号/冒号等易触发 flowchart 解析歧义） */
+function mermaidBracketLabelNeedsQuoting(raw: string): boolean {
+	const t = raw.trim();
+	if (t.startsWith('"') || mermaidBracketLabelLooksTrapezoid(raw)) {
+		return false;
+	}
+	// / + 历史兼容；() : 常见于中文架构图（如 LRU 淘汰策略 (Max 12)、key: namespace）
+	return /[/+():]/.test(t);
+}
+
 /**
- * 为未加引号且含 / 或 + 的方括号文案补双引号，减轻 Mermaid 解析失败（预览区只剩 DSL 文本）。
+ * 为未加引号且易歧义的方括号文案补双引号，减轻 Mermaid 解析失败（预览区只剩 DSL 文本）。
  * 不改变已带引号的片段；跳过梯形 [/.../]。
  */
 function relaxMermaidBracketLabels(body: string): string {
@@ -152,14 +163,8 @@ function relaxMermaidBracketLabels(body: string): string {
 		/(^|\n)([\t ]*subgraph\s+\S+\s+)\[([^\]\r\n]+)\]/g,
 		(full, lead, pre, title) => {
 			const raw = title as string;
-			const t = raw.trim();
-			if (t.startsWith('"') || mermaidBracketLabelLooksTrapezoid(raw)) {
-				return full;
-			}
-			if (t.includes('/') || t.includes('+')) {
-				return `${lead}${pre}["${escapeMermaidDoubleQuotedLabelInner(raw)}"]`;
-			}
-			return full;
+			if (!mermaidBracketLabelNeedsQuoting(raw)) return full;
+			return `${lead}${pre}["${escapeMermaidDoubleQuotedLabelInner(raw)}"]`;
 		},
 	);
 	text = text.replace(
@@ -167,21 +172,15 @@ function relaxMermaidBracketLabels(body: string): string {
 		(full, id, label) => {
 			if (MERMAID_FLOWCHART_ID_SKIP.has(id)) return full;
 			const raw = label as string;
-			const t = raw.trim();
-			if (t.startsWith('"') || mermaidBracketLabelLooksTrapezoid(raw)) {
-				return full;
-			}
-			if (t.includes('/') || t.includes('+')) {
-				return `${id}["${escapeMermaidDoubleQuotedLabelInner(raw)}"]`;
-			}
-			return full;
+			if (!mermaidBracketLabelNeedsQuoting(raw)) return full;
+			return `${id}["${escapeMermaidDoubleQuotedLabelInner(raw)}"]`;
 		},
 	);
 	return text;
 }
 
 /**
- * Mermaid 围栏源码预处理：统一换行，并对含 /、+ 的未加引号方括号文案补引号。
+ * Mermaid 围栏源码预处理：统一换行，并对易歧义的未加引号方括号文案补双引号。
  * 供 MarkdownParser 与流式 Mermaid 岛等共用。
  */
 export function normalizeMermaidFenceBody(body: string): string {
@@ -597,7 +596,7 @@ class MarkdownParser {
 				lastLine = end;
 				continue;
 			}
-			if (lang === 'mermaid') {
+			if (isMermaidFenceLang(lang, body)) {
 				raw.push({ type: 'mermaid', text: body, complete: true });
 			} else if (rawFence !== '') {
 				raw.push({ type: 'markdown', text: rawFence, lineBase0: start });

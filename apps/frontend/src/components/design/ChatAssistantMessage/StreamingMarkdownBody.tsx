@@ -51,16 +51,25 @@ function StreamingMarkdownBodyInner({
 	t,
 	renderedMarkdownHtmlPostProcess,
 }: StreamingMarkdownBodyProps) {
-	const { parts, openMermaidId } = useMemo(
-		() =>
-			splitForMermaidIslandsWithOpenTail({
-				markdown,
-				parser,
-				enableOpenTail: isStreaming,
-				openMermaidIdPrefix: 'mmd-open-line-',
-			}),
-		[markdown, parser, isStreaming],
-	);
+	const { parts, openMermaidId } = useMemo(() => {
+		const split = splitForMermaidIslandsWithOpenTail({
+			markdown,
+			parser,
+			// 与 Monaco 预览一致：始终探测尾部开放 mermaid；闭合围栏仍走 parser 完整块
+			enableOpenTail: true,
+			openMermaidIdPrefix: 'mmd-open-line-',
+		});
+		if (!isStreaming) {
+			return {
+				...split,
+				parts: split.parts.map((p) =>
+					p.type === 'mermaid' ? { ...p, complete: true } : p,
+				),
+				openMermaidId: null,
+			};
+		}
+		return split;
+	}, [markdown, parser, isStreaming]);
 
 	const { openMermaidPreview, mermaidImagePreviewModal } =
 		useMermaidImagePreview(t);
@@ -95,7 +104,7 @@ function StreamingMarkdownBodyInner({
 						<MermaidFenceIsland
 							code={part.text}
 							preferDark={preferDark}
-							isStreaming={isStreaming || !part.complete}
+							isStreaming={!part.complete}
 							openMermaidPreview={openMermaidPreview}
 						/>
 					)

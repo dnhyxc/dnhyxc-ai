@@ -64,6 +64,10 @@ export {
 	normalizeMermaidFenceBody,
 } from './markdown/parser.js';
 export {
+	isMermaidFenceLang,
+	looksLikeMermaidDiagramSource,
+} from './mermaid/detect-mermaid-source.js';
+export {
 	closestMermaidMarkdownWrap,
 	MARKDOWN_MERMAID_PLACEHOLDER_HTML,
 	MARKDOWN_MERMAID_TAILWIND_CURSOR_ZOOM_IN_CLASS,

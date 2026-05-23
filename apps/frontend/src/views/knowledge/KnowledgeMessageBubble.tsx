@@ -94,9 +94,11 @@ export const KnowledgeMessageBubble = observer(function KnowledgeMessageBubble({
 					/>
 				) : (
 					<ChatAssistantMessage
+						key={`${message.chatId}-${streamRev}`}
 						message={message}
 						scrollViewportRef={scrollViewportRef}
 						t={t}
+						className="min-w-0 w-full max-w-full [&_.streaming-md-body]:min-w-0 [&_.markdown-mermaid-wrap]:max-w-full"
 					/>
 				)}
 

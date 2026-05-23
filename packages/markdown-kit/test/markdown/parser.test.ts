@@ -21,6 +21,15 @@ describe('normalizeMermaidFenceBody', () => {
 	it('跳过梯形 [/.../] 形态', () => {
 		expect(normalizeMermaidFenceBody('A[/x/y/]')).toBe('A[/x/y/]');
 	});
+
+	it('为含括号或冒号的未加引号节点标签补双引号', () => {
+		expect(normalizeMermaidFenceBody('LRU[LRU 淘汰策略 (Max 12)]')).toBe(
+			'LRU["LRU 淘汰策略 (Max 12)"]',
+		);
+		expect(
+			normalizeMermaidFenceBody('MAP[Map 存储结构 key: namespace:libraryId]'),
+		).toBe('MAP["Map 存储结构 key: namespace:libraryId"]');
+	});
 });
 
 describe('MarkdownParser', () => {

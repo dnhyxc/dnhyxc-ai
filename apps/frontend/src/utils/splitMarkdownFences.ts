@@ -10,6 +10,7 @@ import type {
 	MarkdownMermaidSplitPart,
 	MarkdownParser,
 } from '@dnhyxc-ai/markdown-kit';
+import { isMermaidFenceLang } from '@dnhyxc-ai/markdown-kit';
 import {
 	fenceClosingIndentMatchesOpen,
 	isPlausibleMarkdownFenceIndent,
@@ -58,7 +59,7 @@ export function splitMarkdownByCodeFences(source: string): MarkdownFencePart[] {
 			seg.complete && lines.length >= 2
 				? lines.slice(1, -1).join('\n')
 				: lines.slice(1).join('\n');
-		if (lang === 'mermaid') {
+		if (isMermaidFenceLang(lang, body)) {
 			out.push({ type: 'mermaid', text: body, complete: seg.complete });
 		} else {
 			out.push({ type: 'markdown', text: seg.text });
@@ -117,11 +118,13 @@ export function splitOpenMermaidTail(
 		if (!openMatch) continue;
 		const openIndent = openMatch[1] ?? '';
 		const tickLen = openMatch[2]?.length ?? 3;
-		const lang = (openMatch[3] ?? '').trim().split(/\s+/)[0]?.toLowerCase();
+		const lang =
+			(openMatch[3] ?? '').trim().split(/\s+/)[0]?.toLowerCase() ?? '';
 		if (!isPlausibleMarkdownFenceIndent(openIndent)) continue;
-		if (lang !== 'mermaid') continue;
+		const bodyAfterOpen = lines.slice(i + 1).join('\n');
+		if (!isMermaidFenceLang(lang, bodyAfterOpen)) continue;
 
-		// 找到 ```mermaid 后，向下查找是否有对应的围栏结束（闭合）
+		// 找到 mermaid 围栏后，向下查找是否有对应的围栏结束（闭合）
 		let j = i + 1;
 		let closed = false;
 		while (j < lines.length) {
@@ -181,6 +184,11 @@ export function splitForMermaidIslandsWithOpenTail(args: {
 	 * - Monaco 预览：仅 enableMermaid 时启用
 	 */
 	enableOpenTail: boolean;
+	/**
+	 * 流式已结束但仍存在未闭合 mermaid 围栏时，将尾部块并入岛并标记 complete。
+	 * 避免 `enableOpenTail: false` 时 markdown-it 无法产出 fence token 导致整段丢失。
+	 */
+	finalizeOpenTail?: boolean;
 	/** 未闭合 Mermaid 围栏对应的稳定 key 前缀（拼接 openLine） */
 	openMermaidIdPrefix: string;
 }): {
@@ -188,9 +196,37 @@ export function splitForMermaidIslandsWithOpenTail(args: {
 	openTail: { prefix: string; body: string; openLine: number } | null;
 	openMermaidId: string | null;
 } {
-	const { markdown, parser, enableOpenTail, openMermaidIdPrefix } = args;
+	const {
+		markdown,
+		parser,
+		enableOpenTail,
+		finalizeOpenTail = false,
+		openMermaidIdPrefix,
+	} = args;
+
+	const mergeOpenTail = (
+		openTail: { prefix: string; body: string; openLine: number },
+		complete: boolean,
+	) => {
+		const headParts = parser.splitForMermaidIslands(openTail.prefix);
+		const parts: MarkdownMermaidSplitPart[] = [
+			...headParts,
+			{ type: 'mermaid', text: openTail.body, complete },
+		];
+		return {
+			parts,
+			openTail,
+			openMermaidId: complete
+				? null
+				: `${openMermaidIdPrefix}${openTail.openLine}`,
+		};
+	};
 
 	if (!enableOpenTail) {
+		const openTail = finalizeOpenTail ? splitOpenMermaidTail(markdown) : null;
+		if (openTail) {
+			return mergeOpenTail(openTail, true);
+		}
 		return {
 			parts: parser.splitForMermaidIslands(markdown),
 			openTail: null,
@@ -207,16 +243,7 @@ export function splitForMermaidIslandsWithOpenTail(args: {
 		};
 	}
 
-	const headParts = parser.splitForMermaidIslands(openTail.prefix);
-	const parts: MarkdownMermaidSplitPart[] = [
-		...headParts,
-		{ type: 'mermaid', text: openTail.body, complete: false },
-	];
-	return {
-		parts,
-		openTail,
-		openMermaidId: `${openMermaidIdPrefix}${openTail.openLine}`,
-	};
+	return mergeOpenTail(openTail, false);
 }
 
 export function hashText(s: string): string {
@@ -242,8 +269,9 @@ export function patchIncompleteNonMermaidFence(markdown: string): string {
 	const firstLine = last.text.split('\n')[0] ?? '';
 	const openMatch = /^(\s*)(`{3,})([^`]*)$/.exec(firstLine.trimEnd());
 	if (!openMatch) return markdown;
-	const lang = (openMatch[3] ?? '').trim().split(/\s+/)[0]?.toLowerCase();
-	if (lang === 'mermaid') return markdown;
+	const lang = (openMatch[3] ?? '').trim().split(/\s+/)[0]?.toLowerCase() ?? '';
+	const body = last.text.split('\n').slice(1).join('\n');
+	if (isMermaidFenceLang(lang, body)) return markdown;
 	const tickLen = openMatch[2].length;
 	return `${normalized}\n${'`'.repeat(tickLen)}`;
 }

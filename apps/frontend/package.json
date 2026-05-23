@@ -25,6 +25,7 @@
 		"release:print-signing-env": "release-kit print-tauri-signing-env"
 	},
 	"dependencies": {
+		"@dnhyxc-ai/markdown-kit": "workspace:*",
 		"@codemirror/state": "^6.5.2",
 		"@codemirror/view": "^6.38.8",
 		"@codesandbox/sandpack-react": "^2.20.0",

@@ -22,6 +22,7 @@ import { runMermaidInMarkdownRoot } from '@dnhyxc-ai/markdown-kit/react';
 import { memo, useLayoutEffect, useRef } from 'react';
 import { useMermaidDiagramClickPreview } from '@/hooks/useMermaidImagePreview';
 import { cn } from '@/lib/utils';
+import { mermaidStreamingFallbackHtml } from '@/utils/splitMarkdownFences';
 
 export type MermaidFenceIslandProps = {
 	code: string;
@@ -149,7 +150,17 @@ export const MermaidFenceIsland = memo(function MermaidFenceIsland({
 			const svg = stageInner.querySelector('svg');
 			if (!svg || looksLikeErrorSvg(svg)) {
 				// DSL 不完整或语法错误：不提交错误 SVG，保留上一帧避免闪
-				if (!hasEverRenderedRef.current) inner.textContent = dsl;
+				if (!hasEverRenderedRef.current) {
+					// 勿仅写 textContent 到 .mermaid（易被全局样式隐藏）；非流式时在占位内展示源码
+					if (!isStreamingRef.current) {
+						const fallback = mermaidStreamingFallbackHtml(code);
+						const doc = new DOMParser().parseFromString(fallback, 'text/html');
+						const pre = doc.querySelector('pre');
+						inner.innerHTML = pre?.outerHTML ?? fallback;
+					} else {
+						inner.textContent = dsl;
+					}
+				}
 				return;
 			}
 
