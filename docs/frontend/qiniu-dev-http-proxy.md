@@ -1,9 +1,11 @@
-# 七牛 HTTP 本地开发与 Tauri ATS：上传成功但图片不显示
+# 七牛 HTTP 展示代理（开发 / Web 生产 / Tauri）
 
+> **文档角色**：本专题为七牛 HTTP 展示链的**主文档**（含代码摘录与回归清单）。  
 > **延伸阅读**  
-> - macOS ATS 总览：[tauri-macos-ats-http.md](./tauri-macos-ats-http.md)  
-> - Web 生产 `/ext-img/` 与 mixed content：[route-auth.md](./route-auth.md) §12  
-> - Nginx 生产代理：`docs/backend/nginx.md` 中 `location /ext-img/`
+> - macOS ATS 概念：[tauri-macos-ats-http.md](./tauri-macos-ats-http.md)（指向本文，避免重复）  
+> - 路由鉴权中的 mixed content 摘要：[route-auth.md](./route-auth.md) §12  
+> - Nginx 生产代理：[../backend/nginx.md](../backend/nginx.md) `location /ext-img/`  
+> - 文档总索引：[../README.md](../README.md)
 
 ## 1. 背景与目标
 

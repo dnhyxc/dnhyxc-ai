@@ -40,4 +40,10 @@
 ## 7. 相关文档与代码索引
 
 | 说明 | 路径 |
-```
+
+---
+
+## 8. 落盘后（Agent 自检，不必写入专题正文）
+
+- 已按 `docs-maintenance.md` 更新 `docs/README.md` 与领域 README。
+- 若用户可感知：已更新 `project-update-info.md` / `project-guide.md`（无路径，见 `product-user-docs.md`）。

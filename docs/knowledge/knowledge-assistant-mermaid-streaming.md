@@ -1,9 +1,10 @@
 # 知识库助手流式 Mermaid 无法出图：问题分析与修复
 
 > **延伸阅读**  
+> - 知识库文档索引：[README.md](./README.md)  
 > - 助手总览与消息渲染链：[knowledge-assistant-complete.md](./knowledge-assistant-complete.md) §8  
 > - Monaco 预览 Mermaid 岛（对照行为）：同文 §11 / `apps/frontend/src/components/design/Markdown/index.tsx`  
-> - 工具包 Mermaid 契约：`docs/tools/index.md` §11（`@dnhyxc-ai/markdown-kit`）
+> - 工具包 Mermaid 契约：[../tools/index.md](../tools/index.md) §11（`@dnhyxc-ai/markdown-kit`）
 
 ## 1. 背景与目标
 

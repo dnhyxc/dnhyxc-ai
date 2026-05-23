@@ -2,7 +2,7 @@
 
 本文是知识编辑页 **右侧通用助手**（智谱 GLM、独立于主站 Chat）的 **完整** 实现说明：产品语义、前后端数据流、接口与表结构、MobX 状态机、SSE 协议、未保存草稿（ephemeral）、保存迁入（import-transcript）、清空/删除边界，以及 UI 与可观测性细节。实现代码以仓库当前版本为准；阅读时可对照下列路径跳转。
 
-**相关文档**：持久化与数据落点的专题摘要仍保留在 `knowledge-assistant-ephemeral-persistence.md`（可与本文对照）；**以本文为权威总览**。编辑器「复制选中内容到助手」写入当前 **AI / RAG** 输入框的实现见 `knowledge-assistant-insert-selection-ai-rag.md`，重复点击防护见 `knowledge-editor-send-selection-to-assistant-dedupe.md`。
+**相关文档**：目录索引见 [README.md](./README.md)；持久化与数据落点的专题摘要仍保留在 `knowledge-assistant-ephemeral-persistence.md`（可与本文对照）；**以本文为权威总览**。编辑器「复制选中内容到助手」写入当前 **AI / RAG** 输入框的实现见 `knowledge-assistant-insert-selection-ai-rag.md`，重复点击防护见 `knowledge-editor-send-selection-to-assistant-dedupe.md`。
 
 **问题修复记录**：
 

@@ -1,138 +1,77 @@
-# Tauri macOS 生产包访问 HTTP 域名（ATS）处理记录
+# Tauri macOS：ATS（应用传输安全）与 HTTP 资源
 
-本文档记录 `apps/frontend` 在 **Tauri v2** 打包为 **macOS 生产包**后，访问 `http://` 资源被系统策略拦截（ATS）的原因、解决思路与具体代码落点。
+本文说明 **macOS 生产包**中 WKWebView 加载 `http://` 外链被 **ATS（App Transport Security，应用传输安全）** 拦截的原因与策略。**七牛 CDN 展示链、开发态 `/ext-img/` 代理、代码摘录与回归清单**以专题文为准，避免两处重复维护：
+
+→ **[qiniu-dev-http-proxy.md](./qiniu-dev-http-proxy.md)**（主文档）
 
 ---
 
 ## 1. 现象与报错
 
-生产包中加载 `http://` 域名资源（例如图片）时，WebView 控制台常见报错类似：
+生产包或 Tauri dev 加载 `http://` 资源（如七牛 `*.clouddn.com` 图片）时，控制台常见：
 
+- `App Transport Security policy requires the use of a secure connection`
 - `Failed to load resource: The network connection was lost.`
-- `Failed to load resource: The resource could not be loaded because the App Transport Security policy requires the use of a secure connection.`
 
-示例资源：
+示例（host 以 `.env` 中 `VITE_QINIU_DOMAIN` 为准，当前桶域多为 `tfhx5uh5p.hd-bkt.clouddn.com`）：
 
-- `http://tdxerr4c5.hd-bkt.clouddn.com/128x128@2x.png`
+- `http://tfhx5uh5p.hd-bkt.clouddn.com/128x128@2x.png`
 
 ---
 
 ## 2. 根因
 
-macOS 的 **ATS（App Transport Security，应用传输安全）** 默认要求网络请求使用 **HTTPS（TLS，加密传输）**。  
-在 Tauri 的 macOS 生产包中，前端运行在 `WKWebView` 内，加载外部 `http://` 资源会被 ATS 直接阻断，从而出现“资源无法加载 / 连接丢失”等错误。
+macOS ATS 默认要求 **HTTPS（TLS）**。Tauri macOS 前端运行在 **WKWebView** 内，对外部 `http://` 资源的请求受系统策略约束，与前端 `fetch` 写法无关。
 
-> 注意：这不是前端代码的 fetch/axios 逻辑问题，而是系统层的网络安全策略。
+| 场景 | 典型处理 |
+|------|----------|
+| **开发**（`pnpm dev` / Tauri dev） | 展示 URL 改写为同源 `/ext-img/`，由 Vite 代理回源 HTTP（见七牛主文档） |
+| **Tauri 生产** | 无 Vite：展示用原始 HTTP URL + `Info.plist` 对 CDN 域名做 **NSExceptionDomains** |
+| **Web 生产 HTTPS** | `/ext-img/` + Nginx 回源（见 [route-auth.md](./route-auth.md) §12） |
 
 ---
 
 ## 3. 解决思路（推荐顺序）
 
-### 3.1 最佳方案：切到 HTTPS
+### 3.1 长期：资源域名 HTTPS
 
-把资源域名升级为 HTTPS 是最推荐的做法，安全性与兼容性最好，无需在客户端放行明文 HTTP。
+七牛控制台绑定 HTTPS 域名后，可逐步取消 HTTP 例外，安全性最好。
 
-### 3.2 折中方案：仅对特定域名放行 HTTP（本次采用）
+### 3.2 当前：按环境分层（本项目）
 
-在 macOS 应用的 `Info.plist` 中配置 ATS 的 **NSExceptionDomains**，只对必须的域名放行明文 HTTP。
+1. **开发 / Tauri dev**：`resolveQiniuUrlForWebDisplay` + Vite `server.proxy['/ext-img']`（不改持久化 URL）。
+2. **Tauri 生产**：`apps/frontend/src-tauri/Info.plist` 中对 **当前 CDN host** 配置 `NSExceptionAllowsInsecureHTTPLoads`；并配置 `NSAllowsLocalNetworking` 以便 `http://localhost` API。
+3. **Web 生产**：Nginx `location /ext-img/`（[backend/nginx.md](../backend/nginx.md)）。
 
-Tauri v2 支持将 `src-tauri` 目录下的 `Info.plist` 自动合并进最终打包产物，因此我们选择在仓库中新增该文件。
+完整配置片段、capabilities 白名单、换桶 checklist → [qiniu-dev-http-proxy.md](./qiniu-dev-http-proxy.md) §5–§8。
 
-### 3.3 不推荐：全局放开 HTTP
+### 3.3 不推荐
 
-设置 `NSAllowsArbitraryLoads = true` 会放开所有 HTTP，风险更高（尤其是加载第三方资源时），一般不建议在生产包里这样做。
-
----
-
-## 4. 具体代码改动
-
-### 4.1 新增/修改文件
-
-- **macOS ATS 放行配置**：`apps/frontend/src-tauri/Info.plist`
-
-关键配置（仅放行 `tdxerr4c5.hd-bkt.clouddn.com`）：
-
-```xml
-<key>NSAppTransportSecurity</key>
-<dict>
-  <key>NSExceptionDomains</key>
-  <dict>
-    <key>tdxerr4c5.hd-bkt.clouddn.com</key>
-    <dict>
-      <key>NSExceptionAllowsInsecureHTTPLoads</key>
-      <true/>
-      <key>NSIncludesSubdomains</key>
-      <true/>
-    </dict>
-  </dict>
-</dict>
-```
-
-如果需要同时放行多个域名，可以在 `NSExceptionDomains` 下追加多个域名节点，例如：
-
-```xml
-<key>NSAppTransportSecurity</key>
-<dict>
-  <key>NSExceptionDomains</key>
-  <dict>
-    <key>tdxerr4c5.hd-bkt.clouddn.com</key>
-    <dict>
-      <key>NSExceptionAllowsInsecureHTTPLoads</key>
-      <true/>
-      <key>NSIncludesSubdomains</key>
-      <true/>
-    </dict>
-
-    <key>example-http-assets.com</key>
-    <dict>
-      <key>NSExceptionAllowsInsecureHTTPLoads</key>
-      <true/>
-      <key>NSIncludesSubdomains</key>
-      <true/>
-    </dict>
-  </dict>
-</dict>
-```
-
-### 4.2 为什么放在 `src-tauri/Info.plist`
-
-根据 Tauri v2 配置说明，Tauri 会自动寻找并合并与配置文件同目录的 `Info.plist`，也可以通过配置项显式指定 “用于合并的 Info.plist 路径”。  
-本项目采用“同目录自动合并”的最小改动方式，便于维护与审计。
+`NSAllowsArbitraryLoads = true` 会放开全部 HTTP，生产环境一般避免。
 
 ---
 
-## 5. 验证方式
+## 4. Info.plist 落点
 
-重新打包 macOS 生产包后，打开应用，确认：
-
-- 控制台不再出现 ATS 相关报错
-- `http://tdxerr4c5.hd-bkt.clouddn.com/128x128@2x.png` 能正常加载
-
-如果你在 CI 环境或本机环境中遇到 `--ci` 参数解析异常，可以临时通过取消环境变量 `CI` 的方式运行构建：
-
-```bash
-cd apps/frontend
-env -u CI pnpm run tauri build --debug
-```
+- 文件：`apps/frontend/src-tauri/Info.plist`
+- Tauri v2 会合并同目录 `Info.plist` 进 macOS 包。
+- **域名键只写 host**（无 `http://`、无端口）；换桶时与 `VITE_QINIU_DOMAIN`、`capabilities/default.json` 的 `http.allowlist` **同步修改**。
 
 ---
 
-## 6. 七牛 HTTP 本地展示（开发代理）
+## 5. 验证
 
-上传可走 HTTPS 上传域而成功，但 **Tauri dev** 用 `http://*.clouddn.com/` 做 `<img src>` 仍会被 ATS 拦截。若需 **本地坚持 HTTP、不改 HTTPS**，开发态应走 Vite `/ext-img/` 同源代理，详见专题文：[qiniu-dev-http-proxy.md](./qiniu-dev-http-proxy.md)。
-
-要点：
-
-- `resolveQiniuUrlForWebDisplay` 在 `import.meta.env.DEV` 下改写为 `/ext-img/{key}`；
-- `vite.config.ts` 将 `/ext-img` 代理到 `VITE_QINIU_DOMAIN`；
-- 持久化 URL 仍为七牛 HTTP 原始地址。
+1. 修改 `Info.plist` 或 `vite.config.ts` 后：**Tauri 需重新 build / 重启 dev**（代理不热更新）。
+2. macOS 生产包：控制台无 ATS 报错，CDN 图片可加载。
+3. CI 若遇 `--ci` 解析问题，可 `env -u CI pnpm run tauri build --debug`（见历史记录）。
 
 ---
 
-## 7. 常见坑与注意事项
+## 6. 相关文档
 
-- **域名必须不带协议与端口**：ATS 的域名例外按 `host` 配置，不能写 `http://`、不能带 `:80`。
-- **尽量只放行必要域名**：避免使用 `NSAllowsArbitraryLoads`。
-- **多域名场景**：继续在 `NSExceptionDomains` 下追加多个域名即可（每个域名一个 dict）。
-- **改 `vite.config.ts` 后须重启 dev**：代理规则不会热更新到已启动的 dev server。
-
+| 文档 | 内容 |
+|------|------|
+| [qiniu-dev-http-proxy.md](./qiniu-dev-http-proxy.md) | 实现、代码、环境变量、回归 |
+| [route-auth.md](./route-auth.md) §12 | mixed content 与调用方 |
+| [../backend/nginx.md](../backend/nginx.md) | 生产 `/ext-img/` |
+| [../README.md](../README.md) | 文档总索引 |

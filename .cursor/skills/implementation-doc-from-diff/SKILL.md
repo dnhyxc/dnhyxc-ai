@@ -1,6 +1,6 @@
 ---
 name: implementation-doc-from-diff
-description: 基于当前改动（git diff、@ 文件或会话内已达成共识的变更）在 docs/ 下生成「实现思路」专题 Markdown：包含方案说明、关键代码摘录及代码块内详细中文注释；每个代码块上方须标注来源文件（仓库相对路径）与大致位置；新建文档文件名须简短且贴题；严禁修改业务源码，仅允许新建或编辑文档。适用于用户说「把本次改动写成文档/实现思路文档/只写 docs 不改代码/改动说明落盘到 docs/基于 diff 写文档」等。
+description: 基于当前改动（git diff、@ 文件或会话内已达成共识的变更）在 docs/ 下生成「实现思路」专题 Markdown：包含方案说明、关键代码摘录及代码块内详细中文注释；每个代码块上方须标注来源文件（仓库相对路径）与大致位置；新建文档后自动整理 docs/ 索引；若为用户可感知的新功能则按 project-guide.md / project-update-info.md 格式同步姊妹产品文档（正文中不得出现文件路径）；新建文档文件名须简短且贴题；严禁修改业务源码，仅允许新建或编辑文档。适用于用户说「把本次改动写成文档/实现思路文档/只写 docs 不改代码/改动说明落盘到 docs/基于 diff 写文档」等。
 ---
 
 # 基于改动的实现说明文档（implementation-doc-from-diff）
@@ -11,6 +11,8 @@ description: 基于当前改动（git diff、@ 文件或会话内已达成共识
 
 - **实现思路**：为何这样做、关键决策、数据流与边界。
 - **具体代码**：用 Markdown **围栏代码块**呈现与改动相关的片段；块内附**详细中文注释**（可比仓库源码注释更细，便于单独阅读）。
+- **docs 体系**：新增专题后**自动整理**整个 `docs/` 索引（见 `references/docs-maintenance.md`）。
+- **产品姊妹稿**：若改动包含**用户可感知**的新功能/体验变化，同步更新 `docs/project-guide.md` 与 `docs/project-update-info.md`（格式见 `references/product-user-docs.md`；**这两份正文不得出现文件 路径**）。
 - **只写文档**：**不得**修改业务代码、配置与构建脚本；**仅**在 `docs/`（或用户明确指定的文档目录，且须为文档用途）中新建或更新 `*.md`。
 
 ## 硬约束（必须遵守）
@@ -19,7 +21,7 @@ description: 基于当前改动（git diff、@ 文件或会话内已达成共识
    - 不得编辑：`apps/**`、`packages/**`、`libs/**`、根配置、`scripts/**` 等实现与工程配置（除非用户 Explicitly 授权 —— 本 Skill 默认**不授权**）。
    - 允许编辑：`docs/**/*.md`，以及用户点名「仅文档」的同级路径（例如某些 `README.md` 若用户写明）。
 
-2. **代码块与源码关系**
+2. **代码块与源码关系**（仅适用于**专题实现文**，不适用于 `project-guide.md` / `project-update-info.md`）
    - 代码块内容应与仓库**一致**；若因篇幅做省略，用 `// ...` 标明，并在段首说明「摘录」。
    - 代码块内注释统一使用**中文**；保留英文技术术语，**首次出现可加括号中文释义**。
    - **每个**围栏代码块**正上方**（紧挨 ``` 之前）须有一段**来源标注**，写清：
@@ -30,10 +32,12 @@ description: 基于当前改动（git diff、@ 文件或会话内已达成共识
 
 3. **语言与链接**
    - 正文：**简体中文**。
-   - 文档内引用仓库路径：使用 **相对 `docs/` 或仓库根** 的完整相对路径，便于点击跳转。
+   - **专题实现文**内引用仓库路径：使用 **相对仓库根** 的完整相对路径，便于点击跳转。
+   - **`project-guide.md` / `project-update-info.md`**：遵守 `references/product-user-docs.md` §1，**禁止**出现 `apps/`、`docs/`、`packages/`、`.ts` 路径及「见 xxx.md」类开发索引。
 
-4. **与总索引的关系（可选）**
-   - 若新增独立专题文，可在 `docs/documentation-master-index.md` 对应章节**追加一行索引**（属于文档改动，允许）。
+4. **与 docs 总索引的关系（新增专题时必做）**
+   - 更新 [`docs/README.md`](../../../../docs/README.md) 与对应 `docs/<领域>/README.md`（规则见 `references/docs-maintenance.md`）。
+   - 相关旧专题文：文首补「延伸阅读」或收窄为摘要 + 链到主文档，避免双份维护。
 
 5. **新建文档文件名**
    - 须**简短**且**准确概括本轮改动**（具体规则见下文 **§4 落盘路径与文件名**）；与「只写文档」约束并列，作为落盘时的硬性自检项。
@@ -65,10 +69,11 @@ description: 基于当前改动（git diff、@ 文件或会话内已达成共识
 至少回答：
 
 - **要解决什么问题**（用户视角一句）。
-- **改了哪些地方**（路径清单）。
+- **改了哪些地方**（路径清单，用于专题文 §2；**不要**原样粘贴进 `project-guide` / `project-update-info`）。
 - **核心思路**（3～8 条要点，含权衡：为何不用备选方案）。
 - **行为变化**：兼容 / 破坏性 / 开关（若有）。
 - **风险与回归**：建议测哪些路径。
+- **是否用户可感知**：若是，标记需在步骤 6 写入产品姊妹稿。
 
 可参考 `references/doc-outline.md` 的章节骨架。
 
@@ -101,14 +106,51 @@ description: 基于当前改动（git diff、@ 文件或会话内已达成共识
 | `web-search-organic-citations-implementation-notes.md` | `web-search-organics.md` |
 | `monaco-preview-fix-implementation.md` | `monaco-preview-hash-scroll.md` |
 
-### 5) 自检清单（写入前在心里过一遍）
+### 5) 整理整个 `docs/` 目录（新增或显著更新专题时必做）
+
+按 [`references/docs-maintenance.md`](references/docs-maintenance.md) 执行：
+
+1. 在 `docs/<领域>/README.md` 登记新专题（无则创建该 README 并在 `docs/README.md` 补入口）。
+2. 视需要更新 `docs/README.md` 的「按功能域」或「常见排查」表。
+3. 检查与既有文档是否重复；确立**主文档** + 它处摘要链接。
+4. 在新旧专题文文首维护「延伸阅读 / 文档角色」。
+
+### 6) 同步产品向姊妹文档（用户可感知改动时必做）
+
+当本轮包含**新功能、体验优化或用户可见修复**时，在专题文与索引整理完成后，更新：
+
+| 文件 | 作用 |
+|------|------|
+| [`docs/project-update-info.md`](../../../../docs/project-update-info.md) | 「新增/优化了什么」— bullet + `（更新：YYYY-MM-DD）` |
+| [`docs/project-guide.md`](../../../../docs/project-guide.md) | 「怎么用」— 教程章节/小节 |
+
+格式、章节归属、**禁止出现路径**等细则见 [`references/product-user-docs.md`](references/product-user-docs.md)。
+
+**注意**：
+
+- 应用内 `/update-info`、`/project-guide` 由前端 `updateInfoSections` / `projectGuideSections` 驱动；本 Skill **默认只改上述两份 Markdown**。完成后在回复中**提醒用户**：若需线上页一致，须另开任务同步结构化数据（属 `apps/frontend`，非本 Skill 默认范围）。
+- `project-guide.md` §14 对开发文档仅保留「查阅仓库内开发文档总索引」级表述，**不写** `docs/` 下具体文件名。
+
+### 7) 自检清单（写入前在心里过一遍）
+
+**专题实现文**
 
 - [ ] 是否**没有任何非 docs** 文件被修改？
 - [ ] 代码块是否与 diff / 源码对齐？
 - [ ] 是否说明「未涵盖的边角」或「后续可做」？
-- [ ] 是否需要更新 `documentation-master-index.md` 一行索引？
-- [ ] 新建文档的**文件名**是否**简短**且**准确描述本轮改动**（见 §4 落盘路径与文件名）？
-- [ ] **每个**代码块上方是否都有**来源路径 + 大致位置**（见硬约束第 2 条、§3）？
+- [ ] 新建文档的**文件名**是否**简短**且**准确描述本轮改动**？
+- [ ] **每个**代码块上方是否都有**来源路径 + 大致位置**？
+
+**docs 整理**
+
+- [ ] `docs/README.md` 与领域 `README.md` 是否已更新？
+- [ ] 是否已去重并补交叉链接？
+
+**产品姊妹稿**（若适用）
+
+- [ ] `project-update-info.md` 是否已增条目且**无路径/无文件名**？
+- [ ] `project-guide.md` 是否已补充使用说明（若需要操作步骤）？
+- [ ] 是否误将专题文中的路径或代码块粘贴进产品向文档？
 
 ## 输出格式建议
 
@@ -143,7 +185,15 @@ description: 基于当前改动（git diff、@ 文件或会话内已达成共识
 |------|------|
 ```
 
+## 参考文件
+
+| 文件 | 用途 |
+|------|------|
+| [references/doc-outline.md](references/doc-outline.md) | 专题实现文章节骨架 |
+| [references/docs-maintenance.md](references/docs-maintenance.md) | `docs/` 索引整理与去重 |
+| [references/product-user-docs.md](references/product-user-docs.md) | `project-guide` / `project-update-info` 格式与禁路径 |
+
 ## 与相近 Skill 的边界
 
 - **`spec-from-implementation`**：从**现有完整实现**反推可验收 SPEC，偏重规范条款与 checklist。
-- **本 Skill**：从**一轮 diff / 明确改动集合**写**实现说明**，偏重「这轮做了什么 + 注释代码块」，默认**不写 spec 全套章节**除非用户要求合并。
+- **本 Skill**：从**一轮 diff / 明确改动集合**写**实现说明**，偏重「这轮做了什么 + 注释代码块」，并**整理 docs 索引**、必要时**更新产品姊妹稿**；默认**不写 spec 全套章节**除非用户要求合并。

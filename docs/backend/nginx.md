@@ -197,18 +197,19 @@ server {
   }
 
   # Web 端 HTTPS 页面加载外部 HTTP 图片（mixed content）兼容
-  # 用法：把图片地址从 `http://tdxerr4c5.hd-bkt.clouddn.com/...`
-  # 改成 `https://dnhyxc.cn/ext-img/...`
+  # 用法：前端展示为 https://dnhyxc.cn/ext-img/{key}，此处回源七牛 HTTP
+  # Host / proxy_pass 须与 apps/frontend/.env 的 VITE_QINIU_DOMAIN 一致（换桶时同步修改）
+  # 说明：docs/frontend/qiniu-dev-http-proxy.md
   location /ext-img/ {
     # 透传 Host，兼容部分对象存储/CDN 回源校验
-    proxy_set_header Host tdxerr4c5.hd-bkt.clouddn.com;
+    proxy_set_header Host tfhx5uh5p.hd-bkt.clouddn.com;
     proxy_set_header X-Real-IP $remote_addr;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $scheme;
 
     # 去掉 /ext-img/ 前缀，回源到外部 HTTP 地址
     rewrite ^/ext-img/(.*)$ /$1 break;
-    proxy_pass http://tdxerr4c5.hd-bkt.clouddn.com;
+    proxy_pass http://tfhx5uh5p.hd-bkt.clouddn.com;
 
     # 可选：简单缓存（按需调整）
     add_header Cache-Control "public, max-age=604800";

@@ -293,76 +293,29 @@ if (!response.ok) {
 
 ### 12.2 Nginx `/ext-img/` 代理配置（摘要）
 
-完整配置见：`docs/backend/nginx.md` 中 `listen 9112 ssl; server_name dnhyxc.cn;` 的 `server` 块，这里只列出图片代理片段：
+完整配置见：`docs/backend/nginx.md` 中 `listen 9112 ssl; server_name dnhyxc.cn;` 的 `server` 块。
 
-```conf
-# Web 端 HTTPS 页面加载外部 HTTP 图片（mixed content）兼容
-# 用法：把图片地址从 `http://tdxerr4c5.hd-bkt.clouddn.com/...`
-# 改成 `https://dnhyxc.cn/ext-img/...`
-location /ext-img/ {
-  # 透传 Host，兼容部分对象存储/CDN 回源校验
-  proxy_set_header Host tdxerr4c5.hd-bkt.clouddn.com;
-  proxy_set_header X-Real-IP $remote_addr;
-  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-  proxy_set_header X-Forwarded-Proto $scheme;
+- `proxy_set_header Host` 与 `proxy_pass` 的 host **必须与** `VITE_QINIU_DOMAIN` 一致（换桶时同步改 Nginx，勿沿用旧桶域名）。
+- 前端把 `http://{CDN}/{key}` 展示为 `https://dnhyxc.cn/ext-img/{key}`。
 
-  # 去掉 /ext-img/ 前缀，回源到外部 HTTP 地址
-  rewrite ^/ext-img/(.*)$ /$1 break;
-  proxy_pass http://tdxerr4c5.hd-bkt.clouddn.com;
-
-  # 可选：简单缓存（按需调整）
-  add_header Cache-Control "public, max-age=604800";
-}
-```
+实现细节、Vite 开发代理与 Tauri ATS → [qiniu-dev-http-proxy.md](./qiniu-dev-http-proxy.md)。
 
 ### 12.3 前端工具函数：`resolveQiniuUrlForWebDisplay`
 
-工具函数位置：`apps/frontend/src/utils/index.ts`。职责是在 **开发态与 Web 生产环境** 把七牛 HTTP 地址映射到 `/ext-img/` 代理（开发走 Vite 代理，生产走 Nginx）；Tauri 生产包保持原始 HTTP。避免 mixed content 与 macOS ATS 问题。
+位置：`apps/frontend/src/utils/index.ts`（**展示用，不落库**）。
 
-```typescript
-// apps/frontend/src/utils/index.ts
+| 环境 | 行为 |
+|------|------|
+| `import.meta.env.DEV`（含 Tauri dev） | 改写为 `/ext-img/{key}`，由 Vite 代理回源七牛 HTTP |
+| Tauri **生产** | 原始 HTTP URL（`Info.plist` ATS 例外） |
+| Web **生产**（HTTPS） | 改写为 `/ext-img/{key}`，由 Nginx 回源 |
 
-/**
- * 将七牛（Qiniu）头像 URL 在 Web 端（HTTPS 页面）做 mixed content 兼容改写：
- * - Tauri：保持原始 URL 不变
- * - 非生产环境：保持原始 URL 不变（避免影响本地调试）
- * - Web：把 `VITE_QINIU_DOMAIN` 开头的 URL 改为走 `VITE_WEB_IMAGE_PROXY_PREFIX` 代理
- *
- * 注意：这个函数只用于“展示 URL”，不要用于提交/持久化用户数据。
- */
-export const resolveQiniuUrlForWebDisplay = (url?: string): string => {
-	if (!url) return "";
-	// Tauri 保持原始地址，避免影响桌面端访问方式
-	if (isTauriRuntime()) return url;
-	// 只在生产环境处理 mixed content（生产环境走 HTTPS）
-	if (!import.meta.env.PROD) return url;
+源码与注释见 [qiniu-dev-http-proxy.md](./qiniu-dev-http-proxy.md) §5.1。
 
-	const qiniuDomainRaw = import.meta.env.VITE_QINIU_DOMAIN || "";
-	const webImageProxyPrefixRaw =
-		import.meta.env.VITE_WEB_IMAGE_PROXY_PREFIX || "/ext-img/";
-	if (!qiniuDomainRaw) return url;
+**环境变量：**
 
-	const normalizedQiniuDomain = qiniuDomainRaw.endsWith("/")
-		? qiniuDomainRaw
-		: `${qiniuDomainRaw}/`;
-	if (!url.startsWith(normalizedQiniuDomain)) return url;
-
-	const normalizedProxyPrefix = webImageProxyPrefixRaw.startsWith("/")
-		? webImageProxyPrefixRaw
-		: `/${webImageProxyPrefixRaw}`;
-	const normalizedProxyPrefixWithSlash = normalizedProxyPrefix.endsWith("/")
-		? normalizedProxyPrefix
-		: `${normalizedProxyPrefix}/`;
-
-	const rawPath = url.slice(normalizedQiniuDomain.length);
-	return `${normalizedProxyPrefixWithSlash}${rawPath}`;
-};
-```
-
-**环境变量约定：**
-
-- `VITE_QINIU_DOMAIN`：七牛域名，例如 `http://tdxerr4c5.hd-bkt.clouddn.com/`（尾斜杠可选）。
-- `VITE_WEB_IMAGE_PROXY_PREFIX`：Web 侧代理前缀，例如 `/ext-img/`（首尾斜杠可选，函数内部会标准化）。
+- `VITE_QINIU_DOMAIN`：七牛 HTTP 源，如 `http://tfhx5uh5p.hd-bkt.clouddn.com/`
+- `VITE_WEB_IMAGE_PROXY_PREFIX`：默认 `/ext-img/`
 
 ### 12.4 在账号设置页中使用（`account/index.tsx`）
 
@@ -468,6 +421,7 @@ const observer = useMemo(() => {
 
 ### 12.6 设计总结
 
-- **安全性**：浏览器再也不会因为 HTTPS 页面加载 HTTP 图片而自动升级协议或拦截请求，统一由 Nginx 代理处理。
-- **兼容性**：Tauri 与本地开发环境完全不受影响，沿用原始七牛地址；只在 Web 生产环境改写 URL。
-- **可维护性**：域名与前缀全部通过环境变量与单一工具函数集中管理；所有头像展示处统一调用 `resolveQiniuUrlForWebDisplay`，后续如需切换 CDN 或路径时只需修改一处。
+- **安全性**：Web 生产 HTTPS 页面经 Nginx 同源代理加载图片，避免 mixed content。
+- **开发体验**：DEV / Tauri dev 同样走 `/ext-img/`，避免 WKWebView ATS 拦截七牛 HTTP。
+- **持久化**：`avatar` 等字段仍为七牛原始 HTTP URL；仅展示层改写。
+- **可维护性**：域名与环境变量集中在 `resolveQiniuUrlForWebDisplay`；换桶见 [qiniu-dev-http-proxy.md](./qiniu-dev-http-proxy.md) §8。
