@@ -144,7 +144,7 @@ const Home = () => {
 
 	// 使用原生 button + CSS 过渡，避免 motion.button 的 whileTap 与路由卸载叠在同一帧造成卡顿
 	const onClickQuickStart = () => {
-		navigate('/chat');
+		navigate('/knowledge');
 	};
 
 	return (
