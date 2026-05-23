@@ -60,7 +60,7 @@ export default function ChatCodeToolbarFloating(props: { t?: ChatI18nT }) {
 				top: state.top,
 				left: state.left,
 				width: state.width,
-				zIndex: 1,
+				zIndex: 9,
 				boxSizing: 'border-box',
 				fontFamily: 'var(--font-family)',
 			}}

@@ -252,7 +252,7 @@ const SessionShare = () => {
 		<TooltipProvider>
 			<div className="relative flex h-dvh w-full flex-col overflow-hidden bg-theme-background">
 				<ChatCodeFloatingToolbar />
-				<div className="flex items-center justify-between px-2.5 h-12.5 border border-b-theme/20">
+				<div className="flex items-center justify-between px-2.5 h-12.5 border border-b-theme/15">
 					<div className="text-base font-bold">
 						{knowledgeData
 							? t('share.header.knowledgeTitle')

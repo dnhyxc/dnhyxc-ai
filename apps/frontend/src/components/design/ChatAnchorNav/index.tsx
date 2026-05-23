@@ -190,7 +190,7 @@ const ChatAnchorNav = ({
 
 			main.scrollTo({
 				top: offset,
-				behavior: 'smooth',
+				behavior: 'auto',
 			});
 
 			setActiveAnchor(chatId);

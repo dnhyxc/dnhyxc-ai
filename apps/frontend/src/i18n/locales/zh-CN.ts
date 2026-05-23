@@ -631,7 +631,7 @@ export const zhCN = {
 
 	'share.header.chatTitle': '分享对话内容',
 	'share.header.knowledgeTitle': '分享文章内容',
-	'share.header.chatDisclaimer': '该对话来自分享，由 AI 生成，请仔细甄别',
+	'share.header.chatDisclaimer': '该分享内容由 AI 生成，请仔细甄别',
 	'share.header.knowledgeDisclaimer': '该文章来自分享，请仔细甄别',
 	'share.knowledge.updatedAt': '更新 {time}',
 	'share.scroll.toTop': '回到顶部',
