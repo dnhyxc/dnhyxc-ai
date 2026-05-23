@@ -13,6 +13,7 @@ import {
 	House,
 	LogOut,
 	Package,
+	SquareArrowRight,
 	Vegan,
 	WalletCards,
 } from 'lucide-react';
@@ -155,7 +156,7 @@ const Sidebar = () => {
 						className="lucide-stroke-draw-hover group text-theme flex h-11 w-11 cursor-pointer items-center justify-center rounded-md bg-theme-secondary transition-[color,background-color] duration-200 ease-linear hover:bg-theme/12 hover:text-teal-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-400/50"
 						onClick={() => onJump('/login')}
 					>
-						<CircleUserRound className="size-[22px] shrink-0 overflow-visible" />
+						<SquareArrowRight className="size-[22px] shrink-0 overflow-visible" />
 					</div>
 				)}
 			</div>

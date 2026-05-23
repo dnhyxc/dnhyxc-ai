@@ -117,9 +117,22 @@ env -u CI pnpm run tauri build --debug
 
 ---
 
-## 6. 常见坑与注意事项
+## 6. 七牛 HTTP 本地展示（开发代理）
+
+上传可走 HTTPS 上传域而成功，但 **Tauri dev** 用 `http://*.clouddn.com/` 做 `<img src>` 仍会被 ATS 拦截。若需 **本地坚持 HTTP、不改 HTTPS**，开发态应走 Vite `/ext-img/` 同源代理，详见专题文：[qiniu-dev-http-proxy.md](./qiniu-dev-http-proxy.md)。
+
+要点：
+
+- `resolveQiniuUrlForWebDisplay` 在 `import.meta.env.DEV` 下改写为 `/ext-img/{key}`；
+- `vite.config.ts` 将 `/ext-img` 代理到 `VITE_QINIU_DOMAIN`；
+- 持久化 URL 仍为七牛 HTTP 原始地址。
+
+---
+
+## 7. 常见坑与注意事项
 
 - **域名必须不带协议与端口**：ATS 的域名例外按 `host` 配置，不能写 `http://`、不能带 `:80`。
 - **尽量只放行必要域名**：避免使用 `NSAllowsArbitraryLoads`。
 - **多域名场景**：继续在 `NSExceptionDomains` 下追加多个域名即可（每个域名一个 dict）。
+- **改 `vite.config.ts` 后须重启 dev**：代理规则不会热更新到已启动的 dev server。
 

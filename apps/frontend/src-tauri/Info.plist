@@ -12,13 +12,17 @@
     <string>需要使用语音识别，以便将语音实时转为文字（与麦克风配合使用）。</string>
     <key>NSAppTransportSecurity</key>
     <dict>
+      <!-- Tauri 开发态：getUploadToken 等访问 http://localhost API -->
+      <key>NSAllowsLocalNetworking</key>
+      <true/>
       <!--
         macOS ATS（App Transport Security，应用传输安全）默认禁止 http 明文资源。
         生产包中若需要加载特定 http 域名资源，在此添加例外域名（仅放行必要域名，避免全局放开）。
+        本地开发展示图优先走 Vite /ext-img/ 代理，可不依赖此处；生产 Tauri 包仍需要。
       -->
       <key>NSExceptionDomains</key>
       <dict>
-        <key>tdxerr4c5.hd-bkt.clouddn.com</key>
+        <key>tfhx5uh5p.hd-bkt.clouddn.com</key>
         <dict>
           <key>NSExceptionAllowsInsecureHTTPLoads</key>
           <true/>
@@ -29,4 +33,3 @@
     </dict>
   </dict>
 </plist>
-

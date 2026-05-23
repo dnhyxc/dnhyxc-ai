@@ -279,7 +279,7 @@ if (!response.ok) {
 为兼容两端，前端与 Nginx 共同实现：
 
 1. **Nginx 侧**：提供 `https://dnhyxc.cn/ext-img/...` 这样的 HTTPS 代理入口，由 Nginx 去回源七牛的 HTTP 域名。
-2. **前端侧**：仅在 Web 生产环境，把以 `VITE_QINIU_DOMAIN` 开头的 URL 改写为 `/ext-img/...`，Tauri 与开发环境仍使用原始 URL。
+2. **前端侧**：Web 生产环境与 **本地开发**（`import.meta.env.DEV`，含 Tauri dev）把以 `VITE_QINIU_DOMAIN` 开头的 URL 改写为 `/ext-img/...`；**Tauri 生产包**仍使用原始 HTTP URL（依赖 Info.plist）。详见 [qiniu-dev-http-proxy.md](./qiniu-dev-http-proxy.md)。
 3. **数据层**：用户信息中保存的 `avatar` 字段仍是 **原始七牛地址**，改写仅发生在「展示层」，避免影响后端与其他逻辑。
 
 相关配置/代码：
@@ -317,7 +317,7 @@ location /ext-img/ {
 
 ### 12.3 前端工具函数：`resolveQiniuUrlForWebDisplay`
 
-工具函数位置：`apps/frontend/src/utils/index.ts`。职责是**只在 Web 生产环境**把七牛 HTTP 地址映射到 `/ext-img/` 代理，避免混合内容问题。
+工具函数位置：`apps/frontend/src/utils/index.ts`。职责是在 **开发态与 Web 生产环境** 把七牛 HTTP 地址映射到 `/ext-img/` 代理（开发走 Vite 代理，生产走 Nginx）；Tauri 生产包保持原始 HTTP。避免 mixed content 与 macOS ATS 问题。
 
 ```typescript
 // apps/frontend/src/utils/index.ts

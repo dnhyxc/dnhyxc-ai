@@ -22,6 +22,7 @@ import {
 	onCreateWindow,
 	onEmit,
 	onListen,
+	resolveQiniuUrlForWebDisplay,
 	saveFileWithPicker,
 } from '@/utils';
 import { isTauriRuntime } from '@/utils/runtime';
@@ -250,7 +251,7 @@ const Download = () => {
 						? domainUrls.map((i, key) => {
 								return (
 									<div key={key}>
-										<img src={i} alt="图片" />
+										<img src={resolveQiniuUrlForWebDisplay(i)} alt="图片" />
 									</div>
 								);
 							})
