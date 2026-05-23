@@ -5,6 +5,10 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { ChatI18nT, Message } from '@/types/chat';
 
+/** 锚点悬停提示：限制宽度并换行，避免长消息挤成单行 */
+const ANCHOR_TOOLTIP_CONTENT_CLASS =
+	'max-w-72 min-w-0 whitespace-normal break-words text-left [text-wrap:wrap] px-3 py-2';
+
 interface ChatAnchorNavProps {
 	messages: Message[];
 	scrollContainerRef: React.RefObject<HTMLDivElement | null>;
@@ -257,11 +261,11 @@ const ChatAnchorNav = ({
 									<Tooltip
 										key={msg.chatId}
 										side="left"
+										className={ANCHOR_TOOLTIP_CONTENT_CLASS}
 										content={
-											t?.('chat.anchorNav.item', {
-												index: index + 1,
-												content: msg.content,
-											}) ?? `对话 ${index + 1}：${msg.content}`
+											<span className="block max-h-48 overflow-y-auto whitespace-pre-wrap wrap-break-word leading-relaxed text-left">
+												{index + 1}. {msg.content.trim() || '—'}
+											</span>
 										}
 									>
 										<div
