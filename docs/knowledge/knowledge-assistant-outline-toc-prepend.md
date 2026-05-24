@@ -17,7 +17,8 @@
 | 流式结束后自动写入 | 监听 `assistantStore.isStreaming` 由 true→false，且本轮为 outline 快捷卡 |
 | 文首去重 | `documentHasLeadingToc` 检测已有 `## 目录` 或锚点列表 |
 | 解析助手回复 | `extractTocBlockFromAssistantReply` 抽取目录块（可剥掉外层 markdown 围栏） |
-| 合并正文 | `prependTocToDocument`：目录 + 空行 + 原正文 |
+| 目录标题规范化 | `ensureTocSectionHeading`：写入前保证块首为 `## 目录` |
+| 合并正文 | `prependTocToDocument`：经规范化后的目录 + 空行 + 原正文 |
 | 用户反馈 | Toast：已插入 / 已有目录跳过 |
 
 若与仓库最新源码不一致，**以源码为准**。
@@ -28,7 +29,7 @@
 
 | 路径 | 说明 |
 |------|------|
-| `apps/frontend/src/views/knowledge/utils.ts` | 目录检测、提取、prepend、匹配 outline 轮次 |
+| `apps/frontend/src/views/knowledge/utils.ts` | `KNOWLEDGE_TOC_SECTION_HEADING`、目录检测、提取、`ensureTocSectionHeading`、`prependTocToDocument`、匹配 outline 轮次 |
 | `apps/frontend/src/views/knowledge/KnowledgeAssistant.tsx` | `pendingOutlineTocApplyRef` + `useEffect` 写入逻辑 |
 | `apps/frontend/src/i18n/locales/zh-CN.ts` | `tocAlreadyAtTop` / `tocPrependedToDoc` |
 | `apps/frontend/src/i18n/locales/en-US.ts` | 英文 Toast |
@@ -58,7 +59,19 @@
 - 第一个非空块的首行匹配 `^#{1,6}\s*(目录|Table of Contents|TOC|Contents)`（不区分大小写），或  
 - 首块内至少 2 行且均为 `- [text](#anchor)` 形式（无标题的纯锚点目录列表）。
 
-### 3.4 与「保存到知识库」操作条的区别
+### 3.4 写入前统一 `## 目录` 标题
+
+模型在 outline 提示词下常只返回锚点列表，或使用 `# 目录` / `### Table of Contents` 等非标准标题。若直接 prepend，左侧编辑器文首缺少与 `documentHasLeadingToc` 一致的二级标题，预览 TOC 与人工维护习惯也不对齐。
+
+因此在 `prependTocToDocument` 内先调用 **`ensureTocSectionHeading`**：
+
+- 首行已是「目录类」标题（`TOC_HEADING_LINE_RE`）→ 规范为常量 **`## 目录`**（`KNOWLEDGE_TOC_SECTION_HEADING`）；
+- 首行仅为列表项 → 在块前插入 `## 目录` 与空行；
+- 空块 → 仅返回 `## 目录`（边界情况，正常流式路径不会走到）。
+
+**不在** `extractTocBlockFromAssistantReply` 内改标题：助手气泡仍展示模型原文，仅**写入编辑器**时规范化。
+
+### 3.5 与「保存到知识库」操作条的区别
 
 | 能力 | 行为 |
 |------|------|
@@ -76,6 +89,9 @@
 ```typescript
 /** 与快捷卡 userMessageShort、i18n 标题「生成目录」一致 */
 export const KNOWLEDGE_ASSISTANT_OUTLINE_USER_SHORT = '生成目录';
+
+/** 写入编辑器文首时固定的目录小节标题（二级标题） */
+export const KNOWLEDGE_TOC_SECTION_HEADING = '## 目录';
 
 const TOC_HEADING_LINE_RE =
   /^#{1,6}\s*(目录|Table\s+of\s+Contents|TOC|Contents)\s*$/i;
@@ -112,9 +128,56 @@ export function extractTocBlockFromAssistantReply(content: string): string | nul
 }
 ```
 
-### 4.4 匹配最近一轮「生成目录」助手消息
+### 4.4 目录标题规范化与 prepend
 
-**来源**：`apps/frontend/src/views/knowledge/utils.ts`（`findCompletedOutlineAssistantReply` 约 L187–L209）
+**来源**：`apps/frontend/src/views/knowledge/utils.ts`（`ensureTocSectionHeading`、`prependTocToDocument` 约 L179–L206）
+
+```typescript
+/** 保证目录块首行为 `## 目录`（助手若仅输出列表或用了其它级别标题则规范化） */
+export function ensureTocSectionHeading(tocBlock: string): string {
+  const trimmed = tocBlock.trim();
+  if (!trimmed) return KNOWLEDGE_TOC_SECTION_HEADING;
+
+  const lines = trimmed.split(/\r?\n/);
+  const firstContentIdx = lines.findIndex((l) => l.trim().length > 0);
+  if (firstContentIdx < 0) return KNOWLEDGE_TOC_SECTION_HEADING;
+
+  // 说明：首行已是「目录 / TOC」类标题 → 替换为统一的 ## 目录
+  if (TOC_HEADING_LINE_RE.test(lines[firstContentIdx].trim())) {
+    const normalized = [...lines];
+    normalized[firstContentIdx] = KNOWLEDGE_TOC_SECTION_HEADING;
+    return normalized.join('\n').trim();
+  }
+
+  // 说明：首行是锚点列表 → 在列表前插入 ## 目录 与空行
+  return `${KNOWLEDGE_TOC_SECTION_HEADING}\n\n${trimmed}`;
+}
+
+export function prependTocToDocument(markdown: string, tocBlock: string): string {
+  const toc = ensureTocSectionHeading(tocBlock); // 说明：写入前必过一遍标题规范化
+  const body = markdown.trimStart();
+  if (!body) return `${toc}\n\n`;
+  return `${toc}\n\n${body}`;
+}
+```
+
+**写入后文首示例**（摘录）：
+
+```markdown
+## 目录
+
+- [引言](#引言)
+- [实现](#实现)
+
+（空行）
+
+# 正文一级标题
+…
+```
+
+### 4.5 匹配最近一轮「生成目录」助手消息
+
+**来源**：`apps/frontend/src/views/knowledge/utils.ts`（`findCompletedOutlineAssistantReply` 约 L208–L230）
 
 ```typescript
 export function findCompletedOutlineAssistantReply(messages: Message[]): Message | null {
@@ -131,7 +194,7 @@ export function findCompletedOutlineAssistantReply(messages: Message[]): Message
 }
 ```
 
-### 4.5 发送 outline 时打标 + 流式结束写入
+### 4.6 发送 outline 时打标 + 流式结束写入
 
 **来源**：`apps/frontend/src/views/knowledge/KnowledgeAssistant.tsx`（`sendKnowledgePromptCard` 摘录约 L493–L509）
 
@@ -189,8 +252,8 @@ sequenceDiagram
   KA->>AS: sendMessage(生成目录, extra含全文)
   AS-->>KA: SSE 流式 assistant.content
   Note over AS: isStreaming true → false
-  KA->>KA: extractToc + prependTocToDocument
-  KA->>KS: setMarkdown(目录+正文)
+  KA->>KA: extractToc + ensureTocSectionHeading + prepend
+  KA->>KS: setMarkdown(## 目录 + 列表 + 正文)
   KA->>U: Toast 已插入文档顶部
 ```
 
@@ -210,11 +273,12 @@ sequenceDiagram
 
 ## 7. 建议回归
 
-1. 左侧有正文 → 点「生成目录」→ 流式结束 → 编辑器文首出现目录块，助手区 Toast「已将生成的目录插入文档顶部」。
-2. 文首已有 `## 目录` → 再点「生成目录」→ Toast「文档开头已有目录，未重复插入」，正文不变。
-3. 流式中点停止 → 不应写入（`isStopped` 或找不到有效 assistant）。
-4. 未登录 / 无正文 → 仍被 `sendKnowledgePromptCard` 前置校验拦截，不置 pending 标记。
-5. 模型回复无目录结构（仅文字说明）→ 静默不写入，不 Toast 成功。
+1. 左侧有正文 → 点「生成目录」→ 流式结束 → 编辑器文首为 **`## 目录`** + 锚点列表 + 空行 + 原正文；助手区 Toast「已将生成的目录插入文档顶部」。若模型回复仅有列表无标题，写入后仍应出现 `## 目录`。
+2. 模型返回 `# 目录` 或 `### Contents` → 写入后首行应为 `## 目录`，级别被规范化。
+3. 文首已有 `## 目录` → 再点「生成目录」→ Toast「文档开头已有目录，未重复插入」，正文不变。
+4. 流式中点停止 → 不应写入（`isStopped` 或找不到有效 assistant）。
+5. 未登录 / 无正文 → 仍被 `sendKnowledgePromptCard` 前置校验拦截，不置 pending 标记。
+6. 模型回复无目录结构（仅文字说明）→ 静默不写入，不 Toast 成功。
 
 ---
 

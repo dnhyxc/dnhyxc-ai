@@ -7,6 +7,9 @@ import {
 /** 与「生成目录」快捷卡 `userMessageShort` 一致，用于匹配待写入编辑器的助手轮次 */
 export const KNOWLEDGE_ASSISTANT_OUTLINE_USER_SHORT = '生成目录';
 
+/** 写入编辑器文首时固定的目录小节标题 */
+export const KNOWLEDGE_TOC_SECTION_HEADING = '## 目录';
+
 /** 文首目录标题行（中英常见写法） */
 const TOC_HEADING_LINE_RE =
 	/^#{1,6}\s*(目录|Table\s+of\s+Contents|TOC|Contents)\s*$/i;
@@ -173,12 +176,30 @@ export function extractTocBlockFromAssistantReply(
 	return block.length > 0 ? block : null;
 }
 
+/** 保证目录块首行为 `## 目录`（助手若仅输出列表或用了其它级别标题则规范化） */
+export function ensureTocSectionHeading(tocBlock: string): string {
+	const trimmed = tocBlock.trim();
+	if (!trimmed) return KNOWLEDGE_TOC_SECTION_HEADING;
+
+	const lines = trimmed.split(/\r?\n/);
+	const firstContentIdx = lines.findIndex((l) => l.trim().length > 0);
+	if (firstContentIdx < 0) return KNOWLEDGE_TOC_SECTION_HEADING;
+
+	if (TOC_HEADING_LINE_RE.test(lines[firstContentIdx].trim())) {
+		const normalized = [...lines];
+		normalized[firstContentIdx] = KNOWLEDGE_TOC_SECTION_HEADING;
+		return normalized.join('\n').trim();
+	}
+
+	return `${KNOWLEDGE_TOC_SECTION_HEADING}\n\n${trimmed}`;
+}
+
 /** 将目录块插入文档顶部（与正文之间空一行） */
 export function prependTocToDocument(
 	markdown: string,
 	tocBlock: string,
 ): string {
-	const toc = tocBlock.trim();
+	const toc = ensureTocSectionHeading(tocBlock);
 	const body = markdown.trimStart();
 	if (!body) return `${toc}\n\n`;
 	return `${toc}\n\n${body}`;

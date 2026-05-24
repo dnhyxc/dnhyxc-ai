@@ -222,6 +222,11 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'In the knowledge-base Markdown editor you can send the current selection to the bottom document assistant for AI or RAG prompts; overlapping or duplicate sends are deduped to reduce noisy context.',
 	},
+	's6-13': {
+		title: 'Outline TOC prepended with a level-2 heading',
+		description:
+			'After the “Generate outline” quick card finishes streaming in Knowledge AI mode, the inserted TOC block starts with “## 目录” (Table of Contents) followed by anchor links; list-only or other heading levels from the model are normalized on insert, consistent with duplicate detection at the top of the doc.',
+	},
 	's7-1': {
 		title: 'IME (input method editor) compatibility',
 		description:
