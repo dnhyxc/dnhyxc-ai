@@ -458,18 +458,17 @@ function ClassicQuotesSectionInner() {
 				<div className="flex min-w-0 items-stretch gap-3.5">
 					<Button
 						size="sm"
-						variant={loading ? 'outline' : 'default'}
 						onClick={() => (loading ? cancelGenerate() : void onGenerate())}
 						className={cn(
 							'h-9 min-w-0 flex-1 rounded-md text-white',
 							loading
-								? 'border-red-500/20 bg-red-500/20 text-textcolor/80 hover:bg-red-500/25'
+								? 'bg-linear-to-r from-red-600/80 to-red-600/80 hover:bg-linear-to-r hover:from-red-500/80 hover:to-red-600/80'
 								: 'bg-linear-to-r from-violet-600 to-indigo-600 hover:bg-linear-to-r hover:from-violet-400 hover:to-indigo-600',
 						)}
 					>
 						{loading ? (
 							<>
-								<Spinner className="size-4 shrink-0 text-textcolor" />
+								<Spinner className="size-4 shrink-0 text-white" />
 								<span className="truncate">
 									{t('englishLearning.classic.stop')}
 								</span>
