@@ -225,7 +225,12 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 	's6-13': {
 		title: 'Outline TOC prepended with a level-2 heading',
 		description:
-			'After the “Generate outline” quick card finishes streaming in Knowledge AI mode, the inserted TOC block starts with “## 目录” (Table of Contents) followed by anchor links; list-only or other heading levels from the model are normalized on insert, consistent with duplicate detection at the top of the doc.',
+			'After “Generate outline” in Knowledge AI mode, the TOC is inserted with a “## 目录” heading; if the doc already has anchor links or a non-standard TOC title at the top, only the heading is added or normalized; if “## 目录” is already present, you are notified and nothing is duplicated.',
+	},
+	's6-14': {
+		title: 'Knowledge assistant streaming UX',
+		description:
+			'AI-mode assistant streaming no longer shows a collapsible “thinking process” block; the loading spinner beside “Generating…” animates correctly, aligned with main Chat behavior.',
 	},
 	's7-1': {
 		title: 'IME (input method editor) compatibility',

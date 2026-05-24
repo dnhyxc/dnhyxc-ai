@@ -93,6 +93,21 @@ ${docFence}`,
 	}
 }
 
+function firstMeaningfulLine(markdown: string): string | undefined {
+	const trimmed = markdown.trimStart();
+	if (!trimmed) return undefined;
+	for (const line of trimmed.split(/\r?\n/)) {
+		const t = line.trim();
+		if (t) return t;
+	}
+	return undefined;
+}
+
+/** 文首首条非空行是否已是规范的 `## 目录` */
+export function documentHasCanonicalTocHeading(markdown: string): boolean {
+	return firstMeaningfulLine(markdown) === KNOWLEDGE_TOC_SECTION_HEADING;
+}
+
 /** 判断文档开头是否已有目录块（标题或连续锚点列表） */
 export function documentHasLeadingToc(markdown: string): boolean {
 	const trimmed = markdown.trimStart();
@@ -111,6 +126,38 @@ export function documentHasLeadingToc(markdown: string): boolean {
 		return true;
 	}
 	return false;
+}
+
+/**
+ * 文首已有目录块但缺少 `## 目录` 时补上或规范化标题行（不重复插入锚点列表）。
+ * 若文首已是 `## 目录` 则原样返回。
+ */
+export function ensureTocHeadingAtDocumentTop(markdown: string): string {
+	const body = markdown.trimStart();
+	if (!body) return markdown;
+
+	const leadingWs = markdown.slice(0, markdown.length - body.length);
+	const first = firstMeaningfulLine(markdown);
+	if (first === KNOWLEDGE_TOC_SECTION_HEADING) {
+		return markdown;
+	}
+
+	const lines = body.split(/\r?\n/);
+	const firstContentIdx = lines.findIndex((l) => l.trim().length > 0);
+	if (firstContentIdx < 0) return markdown;
+
+	const firstTrimmed = lines[firstContentIdx].trim();
+	if (TOC_HEADING_LINE_RE.test(firstTrimmed)) {
+		const next = [...lines];
+		next[firstContentIdx] = KNOWLEDGE_TOC_SECTION_HEADING;
+		return leadingWs + next.join('\n');
+	}
+
+	if (documentHasLeadingToc(markdown)) {
+		return `${leadingWs}${KNOWLEDGE_TOC_SECTION_HEADING}\n\n${body}`;
+	}
+
+	return markdown;
 }
 
 /** 从助手回复中提取可粘贴的目录 Markdown 块 */

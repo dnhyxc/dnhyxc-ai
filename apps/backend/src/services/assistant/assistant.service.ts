@@ -161,19 +161,11 @@ export class AssistantService {
 		});
 	}
 
-	/** 将 LangChain 流式 chunk 映射为前端既有的 ZhipuStreamData 协议 */
+	/** 将 LangChain 流式 chunk 映射为前端既有的 ZhipuStreamData 协议（仅正文，不下发思考链） */
 	private mapStreamChunkToZhipuEvents(
 		chunk: AIMessageChunk,
 	): ZhipuStreamData[] {
 		const out: ZhipuStreamData[] = [];
-		const ak = chunk.additional_kwargs ?? {};
-		const reasoningRaw =
-			(typeof ak.reasoning_content === 'string' && ak.reasoning_content) ||
-			(typeof (ak as { reasoning?: unknown }).reasoning === 'string' &&
-				(ak as { reasoning: string }).reasoning);
-		if (reasoningRaw) {
-			out.push({ type: 'thinking', data: reasoningRaw });
-		}
 
 		const content = chunk.content;
 		if (typeof content === 'string' && content) {
@@ -229,6 +221,8 @@ export class AssistantService {
 			maxTokensPolicy: 'default',
 			defaultMaxTokens: 4096,
 			abortSignal: abortController.signal,
+			// GLM 等模型默认会流式返回 reasoning_content；知识库助手不向用户展示思考链
+			modelKwargs: { thinking: { type: 'disabled' as const } },
 		});
 
 		const stream = await llm.stream(

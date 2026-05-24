@@ -24,7 +24,8 @@
 | [knowledge-assistant-streaming-across-documents.md](./knowledge-assistant-streaming-across-documents.md) | 切文档后流式状态丢失 |
 | [knowledge-assistant-ephemeral-persistence.md](./knowledge-assistant-ephemeral-persistence.md) | 未保存草稿 ephemeral |
 | [knowledge-assistant-prompt-cards.md](./knowledge-assistant-prompt-cards.md) | 快捷卡片 |
-| [knowledge-assistant-outline-toc-prepend.md](./knowledge-assistant-outline-toc-prepend.md) | 「生成目录」完成后文首 prepend，含 `## 目录` 标题规范化 |
+| [knowledge-assistant-outline-toc-prepend.md](./knowledge-assistant-outline-toc-prepend.md) | 「生成目录」文首写入 / 补 `## 目录`（三分支） |
+| [knowledge-assistant-stream-ux.md](./knowledge-assistant-stream-ux.md) | 流式：隐藏思考链、Spinner 动画 |
 | [knowledge-assistant-layout-scrollbar-alignment.md](./knowledge-assistant-layout-scrollbar-alignment.md) | 滚动条对齐 |
 | [knowledge-editor-send-selection-to-assistant-dedupe.md](./knowledge-editor-send-selection-to-assistant-dedupe.md) | 选中发送到助手去重 |
 | [knowledge-assistant-insert-selection-ai-rag.md](./knowledge-assistant-insert-selection-ai-rag.md) | 选中写入 AI/RAG 输入框 |

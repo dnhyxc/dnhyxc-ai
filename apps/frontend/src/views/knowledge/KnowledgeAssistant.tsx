@@ -52,7 +52,9 @@ import {
 } from './KnowledgeMessageBubble';
 import {
 	buildKnowledgeAssistantDocumentMessage,
+	documentHasCanonicalTocHeading,
 	documentHasLeadingToc,
+	ensureTocHeadingAtDocumentTop,
 	extractTocBlockFromAssistantReply,
 	findCompletedOutlineAssistantReply,
 	isKnowledgeLocalMarkdownId,
@@ -534,10 +536,19 @@ const KnowledgeAssistant = observer(
 			if (!assistant) return;
 
 			const currentMd = knowledgeStore.markdown ?? '';
-			if (documentHasLeadingToc(currentMd)) {
+			if (documentHasCanonicalTocHeading(currentMd)) {
 				Toast({
 					type: 'info',
 					title: t('knowledge.assistant.tocAlreadyAtTop'),
+				});
+				return;
+			}
+
+			if (documentHasLeadingToc(currentMd)) {
+				knowledgeStore.setMarkdown(ensureTocHeadingAtDocumentTop(currentMd));
+				Toast({
+					type: 'success',
+					title: t('knowledge.assistant.tocPrependedToDoc'),
 				});
 				return;
 			}

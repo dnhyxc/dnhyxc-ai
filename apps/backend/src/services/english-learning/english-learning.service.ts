@@ -2483,6 +2483,7 @@ ${existingHintBlock}
 			maxTokens: capped,
 			maxTokensPolicy: 'default',
 			abortSignal: params.signal,
+			// 设定 LLM 输出格式为 JSON（json_object）：避免自然语言混杂/生成结构可信度更高
 			modelKwargs: {
 				response_format: { type: 'json_object' },
 			},

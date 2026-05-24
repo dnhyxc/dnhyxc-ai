@@ -327,6 +327,7 @@ export class AgentService {
 	private getGlmModelName(): string {
 		return (
 			this.configService.get<string>(ModelEnum.SILICONFLOW_MODEL_NAME) ||
+			this.configService.get<string>(ModelEnum.DEEPSEEK_MODEL_NAME) ||
 			this.configService.get<string>(ModelEnum.ZHIPU_MODEL_NAME) ||
 			'glm-4.7'
 		);
@@ -341,19 +342,19 @@ export class AgentService {
 		temperature?: number;
 		signal?: AbortSignal;
 	}): { main: ChatOpenAI; summary: ChatOpenAI } {
-		const apiKey = this.configService.get<string>(ModelEnum.ZHIPU_API_KEY);
+		const apiKey = this.configService.get<string>(
+			ModelEnum.SILICONFLOW_API_KEY,
+		);
 		const baseURL =
-			this.configService.get<string>(ModelEnum.ZHIPU_BASE_URL) ||
+			this.configService.get<string>(ModelEnum.SILICONFLOW_BASE_URL) ||
 			'https://open.bigmodel.cn/api/paas/v4';
 		const modelName = this.getGlmModelName();
 		if (!apiKey) {
 			throw new HttpException(
-				'智谱 GLM 未正确配置（ZHIPU_API_KEY）',
+				'硅基流动 未正确配置（SILICONFLOW_API_KEY）',
 				HttpStatus.SERVICE_UNAVAILABLE,
 			);
 		}
-		// 与 assistant.service 中智谱请求一致：关闭 thinking（思考链），避免干扰工具调用与流式正文
-		const modelKwargs = { thinking: { type: 'disabled' as const } };
 		// 主模型：用于主会话推理，流式
 		const main = new ChatOpenAI({
 			apiKey,
@@ -362,23 +363,22 @@ export class AgentService {
 			temperature: options.temperature ?? 0.3,
 			maxTokens: options.maxTokens ?? 4096,
 			configuration: { baseURL },
-			modelKwargs,
+			// 与 assistant.service 中智谱请求一致：关闭 thinking（思考链），避免干扰工具调用与流式正文
+			modelKwargs: { thinking: { type: 'disabled' as const } },
 			...(options.signal && {
 				callOptions: { signal: options.signal },
 			}),
 		});
 		// 摘要模型：非流式、温度低，用于 summarizationMiddleware / 折叠摘要
-		const summaryModelName =
-			this.configService.get<string>('AGENT_SUMMARY_MODEL_NAME')?.trim() ||
-			modelName;
 		const summary = new ChatOpenAI({
 			apiKey,
-			modelName: summaryModelName,
+			modelName,
 			streaming: false,
 			temperature: 0.2,
 			maxTokens: 2048,
 			configuration: { baseURL },
-			modelKwargs,
+			// 与 assistant.service 中智谱请求一致：关闭 thinking（思考链），避免干扰工具调用与流式正文
+			modelKwargs: { thinking: { type: 'disabled' as const } },
 		});
 		return { main, summary };
 	}
