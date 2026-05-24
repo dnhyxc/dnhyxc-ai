@@ -1,0 +1,212 @@
+# 后端 `createLlm` 统一工厂
+
+> **文档角色**：硅基流动 + LangChain `ChatOpenAI` 的**唯一创建入口**说明。  
+> **延伸阅读**：[siliconflow-chat-unification.md](./siliconflow-chat-unification.md)（业务为何统一硅基、Assistant SSE 等）、[english-learning-gen-robustness.md](./english-learning-gen-robustness.md)（单词包凑条与 JSON 重试）。
+
+## 1. 背景与目标
+
+### 1.1 问题
+
+主站 Chat、知识库助手、RAG 问答、英语学习等模块曾各自维护 `resolveXxxSiliconFlowConfig` + `new ChatOpenAI(...)`，凭证回退链与 `maxTokens` 策略分散，易出现：
+
+- 同一硅基 Key 下误用 **DeepSeek 模型名**（如 `deepseek-chat`）→ 上游 **`400 status code (no body)`**；
+- 环境变量键名迁移后（`CHAT_SILICONFLOW_MODEL_NAME` → `SILICONFLOW_MODEL_NAME`）未配置新键，回退到 deprecated 模型名。
+
+### 1.2 目标
+
+- 提供**单一函数** `createLlm(config, options)`，各业务只传 `preset` 与构造参数。
+- **不改变**各模块既有 `temperature` / `maxTokens` / `streaming` / `modelKwargs`（含 JSON `response_format`）行为。
+- 凭证与模型名解析按 **preset** 隔离，便于对照 `.env` 排查。
+
+若与仓库最新源码不一致，**以源码为准**。
+
+---
+
+## 2. 改动范围
+
+| 路径 | 说明 |
+|------|------|
+| `apps/backend/src/utils/create-llm.ts` | **新增**：`createLlm`、`CreateLlmOptions`、`SiliconFlowLlmPreset`、预设表 |
+| `apps/backend/src/utils/index.ts` | 导出 `create-llm` |
+| `apps/backend/src/services/chat/chat.service.ts` | 删除 `initModel` / 私有 resolve；直接 `createLlm(..., { preset: 'chat' })` |
+| `apps/backend/src/services/assistant/assistant.service.ts` | 删除私有 `buildAssistantStreamLlm`；`preset: 'assistant'` |
+| `apps/backend/src/services/knowledge-qa/knowledge-qa.service.ts` | 删除私有 resolve/build；`preset: 'knowledgeQa'` |
+| `apps/backend/src/services/english-learning/english-learning.service.ts` | 主 Agent 与子模型 JSON 均 `preset: 'englishLearning'` |
+| `apps/backend/src/enum/config.enum.ts` | 统一 `SILICONFLOW_MODEL_NAME` / `SILICONFLOW_API_KEY` 等（`DEEPSEEK_*` 标 deprecated） |
+
+---
+
+## 3. 实现思路
+
+### 3.1 调用方式
+
+各 Service **不再**封装本地 `initModel` / `buildXxxLlm`，在需要处直接：
+
+```typescript
+const llm = createLlm(this.configService, {
+  preset: 'chat', // | 'assistant' | 'knowledgeQa' | 'englishLearning'
+  temperature: 0.3,
+  maxTokens: 8192,
+  maxTokensPolicy: 'optional', // 主站 Chat：未传 maxTokens 则不写入 ChatOpenAI
+  abortSignal: controller.signal,
+  modelKwargs: { response_format: { type: 'json_object' } }, // 英语学习 JSON 子模型
+});
+```
+
+### 3.2 `preset` 与凭证 / 模型名
+
+| preset | 典型调用方 | API Key 回退（顺序） | Base URL 回退 | 模型名回退（顺序） | 缺 Key 时 |
+|--------|------------|----------------------|---------------|-------------------|-----------|
+| `chat` | `ChatService` | `SILICONFLOW_API_KEY` → `DEEPSEEK_API_KEY` | `SILICONFLOW_BASE_URL` → `DEEPSEEK_BASE_URL` | `SILICONFLOW_MODEL_NAME` → `DEEPSEEK_MODEL_NAME` → 默认 GLM-4.7 | `HttpException` 503 |
+| `assistant` | `AssistantService` | 硅基 → DeepSeek → DashScope → Qwen | 硅基 → DeepSeek | `getAssistantSiliconFlowModelName`（硅基模型名 → DeepSeek 模型名） | 503 |
+| `knowledgeQa` | `KnowledgeQaService` | 硅基 → DashScope → Qwen | 仅硅基 | `SILICONFLOW_MODEL_NAME` → `DEEPSEEK_MODEL_NAME` → `KNOWLEDGE_QA_MODEL` | 普通 `Error` |
+| `englishLearning` | 单词包 Agent / JSON 子模型 | 硅基 → DeepSeek → DashScope | 硅基 → DeepSeek | `SILICONFLOW_MODEL_NAME` → `DEEPSEEK_MODEL_NAME` → 默认 GLM-4.7 | 503 |
+
+**重要**：当实际请求发往 **硅基流动** `baseURL` 时，`modelName` 必须是硅基支持的 ID（如 `Pro/zai-org/GLM-4.7`）。若仅配置了 `DEEPSEEK_MODEL_NAME=deepseek-chat` 而未配置 `SILICONFLOW_MODEL_NAME`，会触发 **400**（见 §5 排查）。
+
+### 3.3 `maxTokensPolicy`
+
+| 值 | 行为 | 使用方 |
+|----|------|--------|
+| `optional` | 仅当调用方显式传入 `maxTokens` 时才写入 `ChatOpenAI` | 主站 Chat |
+| `default`（默认） | 未传 `maxTokens` 时使用 `defaultMaxTokens`（默认 4096） | 助手、RAG、英语学习 |
+
+### 3.4 与旧文档的关系
+
+[siliconflow-chat-unification.md](./siliconflow-chat-unification.md) 描述「为何统一硅基 + Assistant 流式协议」；**具体如何 new 模型**以本文与 `create-llm.ts` 为准。
+
+---
+
+## 4. 关键代码与注释
+
+### 4.1 `createLlm` 入口
+
+**来源**：`apps/backend/src/utils/create-llm.ts`（约 L215–L258）
+
+```typescript
+export function createLlm(
+  config: ConfigService,
+  options: CreateLlmOptions,
+): ChatOpenAI {
+  const {
+    preset,
+    modelName: modelNameOverride,
+    streaming = true,
+    temperature,
+    defaultTemperature = 0.3,
+    maxTokens,
+    maxTokensPolicy = 'default',
+    defaultMaxTokens = 4096,
+    abortSignal,
+    modelKwargs,
+  } = options;
+
+  // 说明：按 preset 解析 apiKey / baseURL / modelName（各业务回退链不同）
+  const credentials = resolveSiliconFlowCredentials(
+    config,
+    siliconFlowResolvePresets[preset](config),
+  );
+  if (modelNameOverride) {
+    credentials.modelName = modelNameOverride; // 例如英语学习 summary 专用模型
+  }
+
+  const maxTokensField =
+    maxTokensPolicy === 'optional'
+      ? maxTokens !== undefined
+        ? { maxTokens }
+        : {}
+      : { maxTokens: maxTokens ?? defaultMaxTokens };
+
+  return new ChatOpenAI({
+    apiKey: credentials.apiKey,
+    modelName: credentials.modelName,
+    streaming,
+    temperature: temperature ?? defaultTemperature,
+    ...maxTokensField,
+    configuration: { baseURL: credentials.baseURL },
+    ...(modelKwargs && { modelKwargs }),
+    ...(abortSignal && { callOptions: { signal: abortSignal } }),
+  });
+}
+```
+
+### 4.2 英语学习 JSON 子模型
+
+**来源**：`apps/backend/src/services/english-learning/english-learning.service.ts`（`invokeEnglishPackSubModelJson` 约 L2478–L2488）
+
+```typescript
+const llm = createLlm(this.configService, {
+  preset: 'englishLearning',
+  streaming: false,
+  temperature: 0.35,
+  maxTokens: capped, // 说明：按 batch 动态估算，上限 32768
+  maxTokensPolicy: 'default',
+  abortSignal: params.signal,
+  modelKwargs: {
+    response_format: { type: 'json_object' },
+  },
+});
+```
+
+### 4.3 主站 Chat 流式
+
+**来源**：`apps/backend/src/services/chat/chat.service.ts`（约 L225–L232）
+
+```typescript
+const llm = createLlm(this.configService, {
+  preset: 'chat',
+  temperature: dto.temperature,
+  maxTokens: dto.maxTokens || 8192,
+  maxTokensPolicy: 'optional',
+  defaultTemperature: 0.3,
+  abortSignal: abortController.signal,
+});
+```
+
+---
+
+## 5. 兼容性与排查
+
+### 5.1 环境变量迁移
+
+| 旧键（建议迁移） | 新键 |
+|------------------|------|
+| `CHAT_SILICONFLOW_MODEL_NAME` | `SILICONFLOW_MODEL_NAME` |
+| `KnowledgeQaEnum.SILICONFLOW_*`（部分模块） | `ModelEnum.SILICONFLOW_API_KEY` / `SILICONFLOW_BASE_URL` |
+
+部署时请在 `.env` 中显式设置：
+
+```bash
+SILICONFLOW_API_KEY=sk-...
+SILICONFLOW_BASE_URL=https://api.siliconflow.cn/v1
+SILICONFLOW_MODEL_NAME=Pro/zai-org/GLM-4.7
+```
+
+可选：`KNOWLEDGE_QA_MODEL` 覆盖 RAG 问答模型名。
+
+### 5.2 现象：单词包拉取 `400 status code (no body)`
+
+| 可能原因 | 处理 |
+|----------|------|
+| 硅基 URL + `deepseek-chat` 模型名 | 配置 `SILICONFLOW_MODEL_NAME`，勿仅依赖 `DEEPSEEK_MODEL_NAME` |
+| 仍使用旧 env 键 `CHAT_SILICONFLOW_MODEL_NAME` 而代码读 `SILICONFLOW_MODEL_NAME` | 改名或双写直至迁移完成 |
+| JSON 模式 + 极大 `maxTokens` 与超长 system | 见 [english-learning-gen-robustness.md](./english-learning-gen-robustness.md) |
+
+日志特征：主 Agent 检索与子模型 JSON **几乎同时** 400，且重试无效。
+
+### 5.3 回归建议
+
+1. 主站 Chat 流式 / 停止 / 续写。
+2. 知识库助手多轮 + 停止；RAG `qa.delta`。
+3. 英语学习：主题单词包流式、JSON 子模型、主 Agent 联网（可选）。
+4. 修改 `.env` 后重启 `pnpm server:dev`。
+
+---
+
+## 6. 相关源码索引
+
+| 说明 | 路径 |
+|------|------|
+| 工厂实现 | `apps/backend/src/utils/create-llm.ts` |
+| 配置枚举 | `apps/backend/src/enum/config.enum.ts` |
+| 硅基接入总览 | [siliconflow-chat-unification.md](./siliconflow-chat-unification.md) |

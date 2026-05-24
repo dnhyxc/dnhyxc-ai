@@ -3,6 +3,7 @@ import * as dotenv from 'dotenv';
 
 export * from './bcrypt';
 export * from './common';
+export * from './create-llm';
 export * from './db.helper';
 export * from './english-pack';
 

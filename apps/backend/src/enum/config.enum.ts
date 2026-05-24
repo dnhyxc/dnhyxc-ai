@@ -60,21 +60,15 @@ export enum ModelEnum {
 	 * 主站 Chat 流式对话：硅基流动 Chat 模型名，默认 Pro/zai-org/GLM-4.7。
 	 * API Key / Base URL 沿用 KnowledgeQaEnum.SILICONFLOW_*。
 	 */
-	CHAT_SILICONFLOW_MODEL_NAME = 'CHAT_SILICONFLOW_MODEL_NAME',
+	SILICONFLOW_MODEL_NAME = 'SILICONFLOW_MODEL_NAME',
 	/**
 	 * 英语学习词句拉取：硅基流动 Chat 模型名（`/v1/chat/completions`），默认 Pro/zai-org/GLM-4.7。
 	 * API Key 与 Base URL 沿用 KnowledgeQaEnum.SILICONFLOW_*（与知识库 embedding 同源）。
 	 * @see https://docs.siliconflow.cn/cn/api-reference/chat-completions/chat-completions
 	 */
-	ENGLISH_LEARNING_SILICONFLOW_MODEL_NAME = 'ENGLISH_LEARNING_SILICONFLOW_MODEL_NAME',
 	ZHIPU_API_KEY = 'ZHIPU_API_KEY',
 	ZHIPU_MODEL_NAME = 'ZHIPU_MODEL_NAME',
 	ZHIPU_BASE_URL = 'ZHIPU_BASE_URL',
-	/**
-	 * 知识库助手 Chat 模型名（硅基流动），默认 Pro/zai-org/GLM-4.7。
-	 * 未配置时回退 CHAT_SILICONFLOW_MODEL_NAME。
-	 */
-	ASSISTANT_GLM_MODEL_NAME = 'ASSISTANT_GLM_MODEL_NAME',
 	/**
 	 * 当前助手所用大模型的「单请求最大输入上下文」token 上限（与智谱文档一致时可不填）。
 	 * 未配置时按 ASSISTANT_GLM_MODEL_NAME 推断（如 glm-4.7 默认 200000）。
@@ -95,6 +89,10 @@ export enum ModelEnum {
 	 * 单次请求可用 ChatRequestDto.webSearchProvider 覆盖。
 	 */
 	WEB_SEARCH_DEFAULT_PROVIDER = 'WEB_SEARCH_DEFAULT_PROVIDER',
+	/** 硅基流动 API Key（Bearer），用于知识库 embedding + rerank */
+	SILICONFLOW_API_KEY = 'SILICONFLOW_API_KEY',
+	/** 硅基流动 API 根路径，默认 https://api.siliconflow.cn/v1 */
+	SILICONFLOW_BASE_URL = 'SILICONFLOW_BASE_URL',
 }
 
 export enum QdrantEnum {
@@ -118,9 +116,9 @@ export enum KnowledgeQaEnum {
 	/** 检索 topK，默认 10 */
 	KNOWLEDGE_QA_TOPK = 'KNOWLEDGE_QA_TOPK',
 	/** 硅基流动 API Key（Bearer），用于知识库 embedding + rerank */
-	SILICONFLOW_API_KEY = 'SILICONFLOW_API_KEY',
+	// SILICONFLOW_API_KEY = 'SILICONFLOW_API_KEY',
 	/** 硅基流动 API 根路径，默认 https://api.siliconflow.cn/v1 */
-	SILICONFLOW_BASE_URL = 'SILICONFLOW_BASE_URL',
+	// SILICONFLOW_BASE_URL = 'SILICONFLOW_BASE_URL',
 	/**
 	 * 公共语音转写模型（`/v1/audio/transcriptions`，见 speech-transcription 模块），默认 FunAudioLLM/SenseVoiceSmall。
 	 * 可改为 TeleAI/TeleSpeechASR 对比中文场景效果（以硅基文档为准）。

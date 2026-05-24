@@ -6,7 +6,6 @@ import {
 	HumanMessage,
 	SystemMessage,
 } from '@langchain/core/messages';
-import { ChatOpenAI } from '@langchain/openai';
 import {
 	BadRequestException,
 	HttpException,
@@ -19,7 +18,6 @@ import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { createAgent, toolCallLimitMiddleware } from 'langchain';
 import { DataSource, In, Repository } from 'typeorm';
-import { KnowledgeQaEnum, ModelEnum } from '../../enum/config.enum';
 import { buildAgentLangChainTools } from '../../services/agent/agent-tools';
 import { KnowledgeEmbeddingService } from '../../services/knowledge-embedding/knowledge-embedding.service';
 import { KnowledgeQaService } from '../../services/knowledge-qa/knowledge-qa.service';
@@ -28,6 +26,7 @@ import type {
 	WebSearchOrganicItem,
 	WebSearchRecencyPreset,
 } from '../../services/web-search/web-search.types';
+import { createLlm } from '../../utils/create-llm';
 import {
 	englishPackAgentIsUserAbort,
 	extractEnglishPackAgentChunkText,
@@ -617,76 +616,6 @@ export class EnglishLearningService {
 			x.english.trim().replace(/\s+/g, ' ').slice(0, 120),
 		);
 		return `【上轮已产出 english 节选（勿重复；下一条回复仍须仅为 JSON 对象）】\n${JSON.stringify({ english_prefixes: prefixes })}`;
-	}
-
-	/**
-	 * 硅基流动凭证（与知识库 embedding 一致：优先 SILICONFLOW_API_KEY，兼容旧键名）。
-	 */
-	private resolveEnglishPackSiliconFlowConfig(): {
-		apiKey: string;
-		baseURL: string;
-		modelName: string;
-	} {
-		const apiKey = (
-			this.configService.get<string>(KnowledgeQaEnum.SILICONFLOW_API_KEY) ||
-			this.configService.get<string>(KnowledgeQaEnum.DASHSCOPE_API_KEY) ||
-			this.configService.get<string>(ModelEnum.DEEPSEEK_API_KEY) ||
-			''
-		).trim();
-		const baseURL = (
-			this.configService.get<string>(KnowledgeQaEnum.SILICONFLOW_BASE_URL) ||
-			this.configService.get<string>(ModelEnum.DEEPSEEK_BASE_URL) ||
-			'https://api.siliconflow.cn/v1'
-		).replace(/\/$/, '');
-		const modelName =
-			this.configService
-				.get<string>(ModelEnum.ENGLISH_LEARNING_SILICONFLOW_MODEL_NAME)
-				?.trim() ||
-			this.configService.get<string>(ModelEnum.DEEPSEEK_MODEL_NAME)?.trim() ||
-			'Pro/zai-org/GLM-4.7';
-		if (!apiKey) {
-			throw new HttpException(
-				'硅基流动未配置（SILICONFLOW_API_KEY，或兼容 DEEPSEEK_API_KEY），无法生成学习内容',
-				HttpStatus.SERVICE_UNAVAILABLE,
-			);
-		}
-		return { apiKey, baseURL, modelName };
-	}
-
-	/**
-	 * 词句包主 Agent：硅基流动 OpenAI 兼容端点；流式主模型不设 response_format，便于工具调用；summary 供摘要中间件使用。
-	 */
-	private buildSiliconFlowPackAgentModels(options: {
-		maxTokens?: number;
-		temperature?: number;
-		signal?: AbortSignal;
-	}): { main: ChatOpenAI; summary: ChatOpenAI } {
-		const { apiKey, baseURL, modelName } =
-			this.resolveEnglishPackSiliconFlowConfig();
-		const main = new ChatOpenAI({
-			apiKey,
-			modelName,
-			streaming: true,
-			temperature: options.temperature ?? 0.35,
-			maxTokens: options.maxTokens ?? 8192,
-			configuration: { baseURL },
-			...(options.signal && {
-				callOptions: { signal: options.signal },
-			}),
-		});
-		const summaryModelName =
-			this.configService
-				.get<string>('ENGLISH_PACK_AGENT_SUMMARY_MODEL_NAME')
-				?.trim() || modelName;
-		const summary = new ChatOpenAI({
-			apiKey,
-			modelName: summaryModelName,
-			streaming: false,
-			temperature: 0.2,
-			maxTokens: 2048,
-			configuration: { baseURL },
-		});
-		return { main, summary };
 	}
 
 	/** 与 runVocabularyGeneration 内 seen 一致 */
@@ -1426,10 +1355,14 @@ export class EnglishLearningService {
 
 		try {
 			// 主检索为单次会话，消息量通常达不到摘要中间件触发阈值；不设 summarization，避免误用 AgentMemory 的 token 估算与副模型调用
-			const { main: mainLlm } = this.buildSiliconFlowPackAgentModels({
+			const mainLlm = createLlm(this.configService, {
+				preset: 'englishLearning',
 				maxTokens: 8192,
 				temperature: 0.35,
-				signal: combinedSignal,
+				defaultTemperature: 0.35,
+				maxTokensPolicy: 'default',
+				defaultMaxTokens: 8192,
+				abortSignal: combinedSignal,
 			});
 
 			// 根据主题推断联网检索时间策略（显式公历 → Tavily 区间；Serper 用粗粒度 tbs）
@@ -1552,32 +1485,6 @@ ${existingHintBlock}
 		} finally {
 			clearTimeout(timer); // 无论异常与否，均需清理定时器
 		}
-	}
-
-	/**
-	 * 硅基流动 JSON 模式（无登录或 Agent 不可用时的回退）；maxTokens 由调用方传入。
-	 */
-	private buildSiliconFlowJsonLlm(
-		maxTokens: number,
-		signal?: AbortSignal,
-	): ChatOpenAI {
-		const { apiKey, baseURL, modelName } =
-			this.resolveEnglishPackSiliconFlowConfig();
-		const capped = Math.min(32768, Math.max(4096, Math.floor(maxTokens)));
-		return new ChatOpenAI({
-			apiKey,
-			modelName,
-			streaming: false,
-			temperature: 0.35,
-			maxTokens: capped,
-			configuration: { baseURL },
-			modelKwargs: {
-				response_format: { type: 'json_object' },
-			},
-			...(signal && {
-				callOptions: { signal },
-			}),
-		});
 	}
 
 	/** 单词：每轮 batch 越大，预留输出 token 越多（IPA+例句 JSON 偏长） */
@@ -2564,7 +2471,22 @@ ${existingHintBlock}
 			err.name = 'AbortError';
 			throw err;
 		}
-		const llm = this.buildSiliconFlowJsonLlm(params.maxTokens, params.signal);
+		const capped = Math.min(
+			32768,
+			Math.max(4096, Math.floor(params.maxTokens)),
+		);
+		const llm = createLlm(this.configService, {
+			preset: 'englishLearning',
+			streaming: false,
+			temperature: 0.35,
+			defaultTemperature: 0.35,
+			maxTokens: capped,
+			maxTokensPolicy: 'default',
+			abortSignal: params.signal,
+			modelKwargs: {
+				response_format: { type: 'json_object' },
+			},
+		});
 		const msgs: BaseMessage[] = [new SystemMessage(params.system)];
 		if (params.priorThread?.length) {
 			msgs.push(

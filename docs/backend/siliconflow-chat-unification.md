@@ -1,7 +1,8 @@
 # 后端对话模型统一接入硅基流动（ChatOpenAI）
 
-> **文档角色**：本轮后端 LLM 接入方式重构的**主文档**。  
-> **延伸阅读**：[knowledge-assistant-complete.md](../knowledge/knowledge-assistant-complete.md)（助手产品语义与 SSE，文中部分「智谱 fetch」描述需与本文学实现对齐）、[knowledge-qdrant-rag.md](./knowledge-qdrant-rag.md)、[knowledge-siliconflow-embedding-rerank.md](../backend/knowledge-siliconflow-embedding-rerank.md)。
+> **文档角色**：后端对话类能力**为何/如何**统一硅基流动 + `ChatOpenAI` 的产品与技术总览。  
+> **实现细节（创建 LLM 的唯一入口）**：见 **[create-llm.md](./create-llm.md)**（`createLlm` + `preset`）。  
+> **延伸阅读**：[knowledge-assistant-complete.md](../knowledge/knowledge-assistant-complete.md)、[knowledge-qdrant-rag.md](./knowledge-qdrant-rag.md)、[knowledge-siliconflow-embedding-rerank.md](./knowledge-siliconflow-embedding-rerank.md)。
 
 ## 1. 背景与目标
 
@@ -23,11 +24,12 @@
 
 | 路径 | 说明 |
 |------|------|
-| `apps/backend/src/enum/config.enum.ts` | 新增 `CHAT_SILICONFLOW_MODEL_NAME`；`DEEPSEEK_*` 标 deprecated；补充 `ASSISTANT_GLM_MODEL_NAME` / `KNOWLEDGE_QA_MODEL` 注释 |
-| `apps/backend/src/services/chat/chat.service.ts` | `initModel` → `resolveChatSiliconFlowConfig` + 硅基 `ChatOpenAI` |
-| `apps/backend/src/services/assistant/assistant.service.ts` | 去掉智谱 `fetch` 读流；`pumpAssistantOpenAiStream` + chunk 映射为 `ZhipuStreamData` |
-| `apps/backend/src/services/knowledge-qa/knowledge-qa.service.ts` | `streamGlmChatCompletions` → `streamChatCompletions`（`ChatOpenAI`） |
-| `apps/backend/src/services/english-learning/english-learning.service.ts` | 硅基凭证回退链微调（与 Chat 对齐时可读 `DEEPSEEK_API_KEY`） |
+| `apps/backend/src/utils/create-llm.ts` | **统一工厂** `createLlm`（详见 [create-llm.md](./create-llm.md)） |
+| `apps/backend/src/enum/config.enum.ts` | `SILICONFLOW_MODEL_NAME` / `SILICONFLOW_API_KEY`；`DEEPSEEK_*` 标 deprecated |
+| `apps/backend/src/services/chat/chat.service.ts` | 硅基 `ChatOpenAI` 流式 |
+| `apps/backend/src/services/assistant/assistant.service.ts` | 去掉智谱 `fetch`；`pumpAssistantOpenAiStream` + `ZhipuStreamData` 映射 |
+| `apps/backend/src/services/knowledge-qa/knowledge-qa.service.ts` | `ChatOpenAI` 流式 RAG |
+| `apps/backend/src/services/english-learning/english-learning.service.ts` | 主 Agent + JSON 子模型均经 `createLlm` |
 
 **未改动**：向量 embedding / rerank、语音 TTS/ASR、OCR、联网检索（Serper/Tavily）等仍走各自模块。
 
@@ -48,14 +50,15 @@ flowchart LR
   subgraph llm [硅基 OpenAI 兼容]
     SF["/v1/chat/completions"]
   end
-  Chat --> COA[ChatOpenAI.stream]
-  Asst --> COA
-  QA --> COA
-  EL --> COA
+  Chat --> CL[createLlm]
+  Asst --> CL
+  QA --> CL
+  EL --> CL
+  CL --> COA[ChatOpenAI]
   COA --> SF
 ```
 
-各模块保留自己的 **system prompt、历史裁剪、落库、停止** 逻辑，仅替换「如何发 HTTP 流式请求」。
+各模块保留自己的 **system prompt、历史裁剪、落库、停止** 逻辑；**创建 LLM** 统一走 `createLlm`（见 [create-llm.md](./create-llm.md)）。
 
 ### 3.2 凭证与模型名（环境变量）
 

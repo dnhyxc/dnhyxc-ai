@@ -1,5 +1,7 @@
 # 英语学习批量生成：凑满条数与去重提示（后端实现说明）
 
+> **延伸阅读**：LLM 创建统一走 [create-llm.md](./create-llm.md)（`preset: 'englishLearning'`）；硅基接入总览见 [siliconflow-chat-unification.md](./siliconflow-chat-unification.md)。
+
 ## 1. 背景与目标
 
 - **现象**：用户指定较大条数（如 500）时，单词包或经典语句流式生成常在远未达标时结束，实际条数明显偏少。

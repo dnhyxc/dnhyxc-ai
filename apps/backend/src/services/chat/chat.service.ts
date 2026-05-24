@@ -5,7 +5,6 @@ import {
 	SystemMessage,
 } from '@langchain/core/messages';
 import type { DynamicTool } from '@langchain/core/tools';
-import { ChatOpenAI } from '@langchain/openai';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Cache } from '@nestjs/cache-manager';
 import {
@@ -20,7 +19,7 @@ import { ConfigService } from '@nestjs/config';
 import { type Queue } from 'bullmq';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { catchError, Observable, Subject } from 'rxjs';
-import { KnowledgeQaEnum, ModelEnum } from 'src/enum/config.enum';
+import { createLlm } from '../../utils/create-llm';
 import { parseFile } from '../../utils/file-parser';
 import { OcrService } from '../ocr/ocr.service';
 import { applyOrganicCitationAnchors } from '../web-search/organic-citation';
@@ -110,63 +109,6 @@ export class ChatService {
 			}),
 		);
 		return fileContents.join('\n');
-	}
-
-	/**
-	 * 主站 Chat：硅基流动 OpenAI 兼容端点（默认 Pro/zai-org/GLM-4.7）。
-	 */
-	private resolveChatSiliconFlowConfig(): {
-		apiKey: string;
-		baseURL: string;
-		modelName: string;
-	} {
-		const apiKey = (
-			this.configService.get<string>(KnowledgeQaEnum.SILICONFLOW_API_KEY) ||
-			this.configService.get<string>(ModelEnum.DEEPSEEK_API_KEY) ||
-			''
-		).trim();
-		const baseURL = (
-			this.configService.get<string>(KnowledgeQaEnum.SILICONFLOW_BASE_URL) ||
-			this.configService.get<string>(ModelEnum.DEEPSEEK_BASE_URL) ||
-			'https://api.siliconflow.cn/v1'
-		).replace(/\/$/, '');
-		const modelName =
-			this.configService
-				.get<string>(ModelEnum.CHAT_SILICONFLOW_MODEL_NAME)
-				?.trim() ||
-			this.configService.get<string>(ModelEnum.DEEPSEEK_MODEL_NAME)?.trim() ||
-			'Pro/zai-org/GLM-4.7';
-		if (!apiKey) {
-			throw new HttpException(
-				'硅基流动未配置（SILICONFLOW_API_KEY，或兼容 DEEPSEEK_API_KEY），无法发起对话',
-				HttpStatus.SERVICE_UNAVAILABLE,
-			);
-		}
-		return { apiKey, baseURL, modelName };
-	}
-
-	private initModel(options?: {
-		temperature?: number;
-		maxTokens?: number;
-		abortSignal?: AbortSignal;
-	}): ChatOpenAI {
-		const { apiKey, baseURL, modelName } = this.resolveChatSiliconFlowConfig();
-		const llm = new ChatOpenAI({
-			apiKey,
-			modelName,
-			streaming: true,
-			configuration: {
-				baseURL,
-			},
-			temperature: options?.temperature ?? 0.3,
-			// 没有传递 maxTokens 时不限制
-			...(options?.maxTokens !== undefined && { maxTokens: options.maxTokens }),
-			...(options?.abortSignal && {
-				callOptions: { signal: options.abortSignal },
-			}),
-		});
-
-		return llm;
 	}
 
 	private convertToLangChainMessages(
@@ -280,9 +222,12 @@ Stick strictly to what is visually present.`,
 		// 缓存取消控制器，12 小时后自动过期并清除
 		await this.cache.set(sessionId, cancel$, 12 * 60 * 60 * 1000);
 
-		const llm = this.initModel({
+		const llm = createLlm(this.configService, {
+			preset: 'chat',
 			temperature: dto.temperature,
 			maxTokens: dto.maxTokens || 8192, // 65536
+			maxTokensPolicy: 'optional',
+			defaultTemperature: 0.3,
 			abortSignal: abortController.signal,
 		});
 
@@ -759,9 +704,12 @@ Stick strictly to what is visually present.`,
 
 	// deepseek 非流失对话
 	async chat(dto: ChatRequestDto): Promise<any> {
-		const llm = this.initModel({
+		const llm = createLlm(this.configService, {
+			preset: 'chat',
 			temperature: dto.temperature,
 			maxTokens: dto.maxTokens || 4096,
+			maxTokensPolicy: 'optional',
+			defaultTemperature: 0.3,
 		});
 		const sessionId = dto.sessionId || randomUUID();
 

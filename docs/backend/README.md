@@ -8,7 +8,8 @@
 
 | 文档 | 说明 |
 |------|------|
-| **[siliconflow-chat-unification.md](./siliconflow-chat-unification.md)** | Chat / Assistant / RAG QA 统一硅基流动 + ChatOpenAI（主文档） |
+| **[create-llm.md](./create-llm.md)** | `createLlm` 统一工厂（preset / maxTokens / 排查 400） |
+| **[siliconflow-chat-unification.md](./siliconflow-chat-unification.md)** | 硅基接入总览 + Assistant SSE |
 | [english-learning-backend-implementation.md](./english-learning-backend-implementation.md) | 英语学习后端总览 |
 | [english-learning-master-agent-web-search-to-llm.md](./english-learning-master-agent-web-search-to-llm.md) | 英语学习 Agent 与联网 |
 

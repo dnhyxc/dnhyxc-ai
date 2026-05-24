@@ -33,6 +33,8 @@
 | 知识库助手流式 Mermaid 不出图 | [knowledge/knowledge-assistant-mermaid-streaming.md](./knowledge/knowledge-assistant-mermaid-streaming.md) |
 | 知识库助手总览 | [knowledge/knowledge-assistant-complete.md](./knowledge/knowledge-assistant-complete.md) |
 | 对话模型统一硅基接入 | [backend/siliconflow-chat-unification.md](./backend/siliconflow-chat-unification.md) |
+| 单词包拉取 400 / 模型名与硅基端点不匹配 | [backend/create-llm.md](./backend/create-llm.md) §5.2 |
+| `createLlm` 工厂与 preset | [backend/create-llm.md](./backend/create-llm.md) |
 
 ---
 

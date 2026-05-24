@@ -5,12 +5,9 @@ import {
 	HumanMessage,
 	SystemMessage,
 } from '@langchain/core/messages';
-import { ChatOpenAI } from '@langchain/openai';
 import { Cache } from '@nestjs/cache-manager';
 import {
 	BadRequestException,
-	HttpException,
-	HttpStatus,
 	Inject,
 	Injectable,
 	type LoggerService,
@@ -20,7 +17,11 @@ import { ConfigService } from '@nestjs/config';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { Observable, type Subscriber } from 'rxjs';
-import { KnowledgeQaEnum, ModelEnum } from 'src/enum/config.enum';
+import { ModelEnum } from 'src/enum/config.enum';
+import {
+	createLlm,
+	getAssistantSiliconFlowModelName,
+} from 'src/utils/create-llm';
 import { DataSource, Repository } from 'typeorm';
 import { ZhipuStreamData } from '../chat/dto/zhipu-stream-data.dto';
 import {
@@ -138,65 +139,9 @@ export class AssistantService {
 		return false;
 	}
 
-	/** 助手流式模型名（硅基流动；用于 token 预算推断与 ChatOpenAI） */
+	/** 助手流式模型名（硅基流动；用于 token 预算推断） */
 	private getGlmModelName(): string {
-		return (
-			this.configService
-				.get<string>(ModelEnum.ASSISTANT_GLM_MODEL_NAME)
-				?.trim() ||
-			this.configService
-				.get<string>(ModelEnum.CHAT_SILICONFLOW_MODEL_NAME)
-				?.trim() ||
-			'Pro/zai-org/GLM-4.7'
-		);
-	}
-
-	/** 知识库助手：硅基流动凭证（对齐 chat.service / knowledge-qa） */
-	private resolveAssistantSiliconFlowConfig(): {
-		apiKey: string;
-		baseURL: string;
-		modelName: string;
-	} {
-		const apiKey = (
-			this.configService.get<string>(KnowledgeQaEnum.SILICONFLOW_API_KEY) ||
-			this.configService.get<string>(KnowledgeQaEnum.DASHSCOPE_API_KEY) ||
-			this.configService.get<string>(ModelEnum.QWEN_API_KEY) ||
-			this.configService.get<string>(ModelEnum.DEEPSEEK_API_KEY) ||
-			''
-		).trim();
-		const baseURL = (
-			this.configService.get<string>(KnowledgeQaEnum.SILICONFLOW_BASE_URL) ||
-			this.configService.get<string>(ModelEnum.DEEPSEEK_BASE_URL) ||
-			'https://api.siliconflow.cn/v1'
-		).replace(/\/$/, '');
-		const modelName = this.getGlmModelName();
-		if (!apiKey) {
-			throw new HttpException(
-				'硅基流动未配置（SILICONFLOW_API_KEY，或兼容 DASHSCOPE_API_KEY / QWEN_API_KEY / DEEPSEEK_API_KEY），无法使用知识库助手',
-				HttpStatus.SERVICE_UNAVAILABLE,
-			);
-		}
-		return { apiKey, baseURL, modelName };
-	}
-
-	private buildAssistantStreamLlm(options: {
-		temperature?: number;
-		maxTokens?: number;
-		abortSignal?: AbortSignal;
-	}): ChatOpenAI {
-		const { apiKey, baseURL, modelName } =
-			this.resolveAssistantSiliconFlowConfig();
-		return new ChatOpenAI({
-			apiKey,
-			modelName,
-			streaming: true,
-			temperature: options.temperature ?? 0.3,
-			maxTokens: options.maxTokens ?? 4096,
-			configuration: { baseURL },
-			...(options.abortSignal && {
-				callOptions: { signal: options.abortSignal },
-			}),
-		});
+		return getAssistantSiliconFlowModelName(this.configService);
 	}
 
 	private toAssistantLangChainMessages(
@@ -276,9 +221,13 @@ export class AssistantService {
 			onContentDelta,
 		} = params;
 
-		const llm = this.buildAssistantStreamLlm({
+		const llm = createLlm(this.configService, {
+			preset: 'assistant',
 			temperature: dto.temperature ?? 0.3,
 			maxTokens: dto.maxTokens ?? 4096,
+			defaultTemperature: 0.3,
+			maxTokensPolicy: 'default',
+			defaultMaxTokens: 4096,
 			abortSignal: abortController.signal,
 		});
 

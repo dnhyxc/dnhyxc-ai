@@ -5,12 +5,12 @@ import {
 	SystemMessage,
 } from '@langchain/core/messages';
 import { DynamicTool } from '@langchain/core/tools';
-import { ChatOpenAI } from '@langchain/openai';
 import { Inject, Injectable, type LoggerService } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { Observable } from 'rxjs';
-import { KnowledgeQaEnum, ModelEnum } from '../../enum/config.enum';
+import { KnowledgeQaEnum } from '../../enum/config.enum';
+import { createLlm } from '../../utils/create-llm';
 import { KnowledgeEmbeddingService } from '../knowledge-embedding/knowledge-embedding.service';
 import { QdrantService } from '../qdrant/qdrant.service';
 
@@ -41,57 +41,6 @@ export class KnowledgeQaService {
 		private readonly logger: LoggerService,
 	) {}
 
-	/**
-	 * 知识库 QA：硅基流动凭证（与 embedding / 主 Chat 一致）。
-	 */
-	private resolveKnowledgeQaSiliconFlowConfig(): {
-		apiKey: string;
-		baseURL: string;
-		modelName: string;
-	} {
-		const apiKey = (
-			this.config.get<string>(KnowledgeQaEnum.SILICONFLOW_API_KEY) ||
-			this.config.get<string>(KnowledgeQaEnum.DASHSCOPE_API_KEY) ||
-			this.config.get<string>(ModelEnum.QWEN_API_KEY) ||
-			''
-		).trim();
-		const baseURL = (
-			this.config.get<string>(KnowledgeQaEnum.SILICONFLOW_BASE_URL) ||
-			'https://api.siliconflow.cn/v1'
-		).replace(/\/$/, '');
-		const modelName =
-			this.config.get<string>(KnowledgeQaEnum.KNOWLEDGE_QA_MODEL)?.trim() ||
-			this.config.get<string>(ModelEnum.CHAT_SILICONFLOW_MODEL_NAME)?.trim() ||
-			'Pro/zai-org/GLM-4.7';
-		if (!apiKey) {
-			throw new Error(
-				'硅基流动未配置（SILICONFLOW_API_KEY，或兼容 DASHSCOPE_API_KEY / QWEN_API_KEY），无法进行知识库问答',
-			);
-		}
-		return { apiKey, baseURL, modelName };
-	}
-
-	/** 流式问答用 ChatOpenAI（对齐 english-learning / chat 的硅基接入方式） */
-	private buildKnowledgeQaStreamLlm(options: {
-		temperature?: number;
-		maxTokens?: number;
-		signal?: AbortSignal;
-	}): ChatOpenAI {
-		const { apiKey, baseURL, modelName } =
-			this.resolveKnowledgeQaSiliconFlowConfig();
-		return new ChatOpenAI({
-			apiKey,
-			modelName,
-			streaming: true,
-			temperature: options.temperature ?? 0.2,
-			maxTokens: options.maxTokens ?? 4096,
-			configuration: { baseURL },
-			...(options.signal && {
-				callOptions: { signal: options.signal },
-			}),
-		});
-	}
-
 	private toLangChainMessages(
 		messages: Array<{
 			role: 'system' | 'user' | 'assistant';
@@ -120,10 +69,14 @@ export class KnowledgeQaService {
 		},
 		signal?: AbortSignal,
 	): AsyncGenerator<string> {
-		const llm = this.buildKnowledgeQaStreamLlm({
+		const llm = createLlm(this.config, {
+			preset: 'knowledgeQa',
 			temperature: input.temperature,
 			maxTokens: input.maxTokens,
-			signal,
+			defaultTemperature: 0.2,
+			maxTokensPolicy: 'default',
+			defaultMaxTokens: 4096,
+			abortSignal: signal,
 		});
 		const stream = await llm.stream(this.toLangChainMessages(input.messages));
 

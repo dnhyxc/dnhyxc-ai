@@ -1,6 +1,6 @@
 import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { KnowledgeQaEnum } from '../../enum/config.enum';
+import { KnowledgeQaEnum, ModelEnum } from '../../enum/config.enum';
 
 const DEFAULT_TRANSCRIPTION_MODEL = 'FunAudioLLM/SenseVoiceSmall';
 const DEFAULT_TTS_MODEL = 'FunAudioLLM/CosyVoice2-0.5B';
@@ -129,7 +129,7 @@ export class SiliconflowTranscriptionService {
 		}
 
 		const apiKey =
-			this.config.get<string>(KnowledgeQaEnum.SILICONFLOW_API_KEY) ||
+			this.config.get<string>(ModelEnum.SILICONFLOW_API_KEY) ||
 			this.config.get<string>(KnowledgeQaEnum.DASHSCOPE_API_KEY);
 		if (!apiKey?.trim()) {
 			throw new HttpException(
@@ -139,7 +139,7 @@ export class SiliconflowTranscriptionService {
 		}
 
 		const baseUrl = (
-			this.config.get<string>(KnowledgeQaEnum.SILICONFLOW_BASE_URL) ||
+			this.config.get<string>(ModelEnum.SILICONFLOW_BASE_URL) ||
 			'https://api.siliconflow.cn/v1'
 		).replace(/\/$/, '');
 		const url = `${baseUrl}/audio/speech`;
@@ -177,7 +177,7 @@ export class SiliconflowTranscriptionService {
 
 	async transcribe(file: Express.Multer.File): Promise<{ text: string }> {
 		const apiKey =
-			this.config.get<string>(KnowledgeQaEnum.SILICONFLOW_API_KEY) ||
+			this.config.get<string>(ModelEnum.SILICONFLOW_API_KEY) ||
 			this.config.get<string>(KnowledgeQaEnum.DASHSCOPE_API_KEY);
 		if (!apiKey?.trim()) {
 			throw new HttpException(
@@ -187,7 +187,7 @@ export class SiliconflowTranscriptionService {
 		}
 
 		const baseUrl = (
-			this.config.get<string>(KnowledgeQaEnum.SILICONFLOW_BASE_URL) ||
+			this.config.get<string>(ModelEnum.SILICONFLOW_BASE_URL) ||
 			'https://api.siliconflow.cn/v1'
 		).replace(/\/$/, '');
 		const url = `${baseUrl}/audio/transcriptions`;

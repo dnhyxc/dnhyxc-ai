@@ -85,12 +85,12 @@ export class KnowledgeEmbeddingService {
 	} {
 		// 读取 API Key：优先 SILICONFLOW_API_KEY，兼容旧环境 DASHSCOPE_API_KEY / QWEN_API_KEY
 		const apiKey =
-			this.config.get<string>(KnowledgeQaEnum.SILICONFLOW_API_KEY) ||
+			this.config.get<string>(ModelEnum.SILICONFLOW_API_KEY) ||
 			this.config.get<string>(KnowledgeQaEnum.DASHSCOPE_API_KEY) ||
 			this.config.get<string>(ModelEnum.QWEN_API_KEY) ||
 			'';
 		const baseURL = (
-			this.config.get<string>(KnowledgeQaEnum.SILICONFLOW_BASE_URL) ||
+			this.config.get<string>(ModelEnum.SILICONFLOW_BASE_URL) ||
 			'https://api.siliconflow.cn/v1'
 		).replace(/\/$/, '');
 		if (!apiKey) {
@@ -297,7 +297,7 @@ export class KnowledgeEmbeddingService {
 		topN?: number;
 	}): Promise<KnowledgeRerankResult[]> {
 		const apiKey =
-			this.config.get<string>(KnowledgeQaEnum.SILICONFLOW_API_KEY) ||
+			this.config.get<string>(ModelEnum.SILICONFLOW_API_KEY) ||
 			this.config.get<string>(KnowledgeQaEnum.DASHSCOPE_API_KEY) ||
 			this.config.get<string>(ModelEnum.QWEN_API_KEY) ||
 			'';
@@ -313,7 +313,7 @@ export class KnowledgeEmbeddingService {
 			'BAAI/bge-reranker-v2-m3';
 
 		const baseURL = (
-			this.config.get<string>(KnowledgeQaEnum.SILICONFLOW_BASE_URL) ||
+			this.config.get<string>(ModelEnum.SILICONFLOW_BASE_URL) ||
 			'https://api.siliconflow.cn/v1'
 		).replace(/\/$/, '');
 

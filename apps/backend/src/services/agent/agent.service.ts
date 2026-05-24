@@ -326,7 +326,7 @@ export class AgentService {
 	 */
 	private getGlmModelName(): string {
 		return (
-			this.configService.get<string>(ModelEnum.ASSISTANT_GLM_MODEL_NAME) ||
+			this.configService.get<string>(ModelEnum.SILICONFLOW_MODEL_NAME) ||
 			this.configService.get<string>(ModelEnum.ZHIPU_MODEL_NAME) ||
 			'glm-4.7'
 		);

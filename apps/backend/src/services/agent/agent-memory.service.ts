@@ -40,7 +40,7 @@ export class AgentMemoryService {
 	/** 与 Assistant 一致：智谱 GLM 模型名 */
 	private getGlmModelName(): string {
 		return (
-			this.configService.get<string>(ModelEnum.ASSISTANT_GLM_MODEL_NAME) ||
+			this.configService.get<string>(ModelEnum.SILICONFLOW_MODEL_NAME) ||
 			this.configService.get<string>(ModelEnum.ZHIPU_MODEL_NAME) ||
 			'glm-4.7'
 		);
