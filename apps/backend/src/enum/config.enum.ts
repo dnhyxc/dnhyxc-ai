@@ -50,9 +50,17 @@ export enum ModelEnum {
 	QWEN_API_KEY = 'QWEN_API_KEY',
 	QWEN_MODEL_NAME = 'QWEN_MODEL_NAME',
 	QWEN_BASE_URL = 'QWEN_BASE_URL',
+	/** @deprecated 主聊天已改用硅基流动，见 CHAT_SILICONFLOW_MODEL_NAME */
 	DEEPSEEK_API_KEY = 'DEEPSEEK_API_KEY',
+	/** @deprecated */
 	DEEPSEEK_MODEL_NAME = 'DEEPSEEK_MODEL_NAME',
+	/** @deprecated */
 	DEEPSEEK_BASE_URL = 'DEEPSEEK_BASE_URL',
+	/**
+	 * 主站 Chat 流式对话：硅基流动 Chat 模型名，默认 Pro/zai-org/GLM-4.7。
+	 * API Key / Base URL 沿用 KnowledgeQaEnum.SILICONFLOW_*。
+	 */
+	CHAT_SILICONFLOW_MODEL_NAME = 'CHAT_SILICONFLOW_MODEL_NAME',
 	/**
 	 * 英语学习词句拉取：硅基流动 Chat 模型名（`/v1/chat/completions`），默认 Pro/zai-org/GLM-4.7。
 	 * API Key 与 Base URL 沿用 KnowledgeQaEnum.SILICONFLOW_*（与知识库 embedding 同源）。
@@ -62,7 +70,10 @@ export enum ModelEnum {
 	ZHIPU_API_KEY = 'ZHIPU_API_KEY',
 	ZHIPU_MODEL_NAME = 'ZHIPU_MODEL_NAME',
 	ZHIPU_BASE_URL = 'ZHIPU_BASE_URL',
-	/** 助手模块专用 GLM 模型名，未配置时回退 ZHIPU_MODEL_NAME 或 glm-4.7 */
+	/**
+	 * 知识库助手 Chat 模型名（硅基流动），默认 Pro/zai-org/GLM-4.7。
+	 * 未配置时回退 CHAT_SILICONFLOW_MODEL_NAME。
+	 */
 	ASSISTANT_GLM_MODEL_NAME = 'ASSISTANT_GLM_MODEL_NAME',
 	/**
 	 * 当前助手所用大模型的「单请求最大输入上下文」token 上限（与智谱文档一致时可不填）。
@@ -99,7 +110,10 @@ export enum KnowledgeQaEnum {
 	 * @see https://docs.siliconflow.cn/cn/api-reference/embeddings/create-embeddings
 	 */
 	KNOWLEDGE_EMBEDDING_MODEL = 'KNOWLEDGE_EMBEDDING_MODEL',
-	/** QA 用的聊天模型名（OpenAI 兼容接口），默认沿用 DEEPSEEK_MODEL_NAME */
+	/**
+	 * 知识库 RAG 问答 Chat 模型名（硅基流动 `/v1/chat/completions`），默认 Pro/zai-org/GLM-4.7。
+	 * API Key / Base URL 沿用 SILICONFLOW_*。
+	 */
 	KNOWLEDGE_QA_MODEL = 'KNOWLEDGE_QA_MODEL',
 	/** 检索 topK，默认 10 */
 	KNOWLEDGE_QA_TOPK = 'KNOWLEDGE_QA_TOPK',

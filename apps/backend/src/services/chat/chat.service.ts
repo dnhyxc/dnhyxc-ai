@@ -20,7 +20,7 @@ import { ConfigService } from '@nestjs/config';
 import { type Queue } from 'bullmq';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { catchError, Observable, Subject } from 'rxjs';
-import { ModelEnum } from 'src/enum/config.enum';
+import { KnowledgeQaEnum, ModelEnum } from 'src/enum/config.enum';
 import { parseFile } from '../../utils/file-parser';
 import { OcrService } from '../ocr/ocr.service';
 import { applyOrganicCitationAnchors } from '../web-search/organic-citation';
@@ -112,15 +112,45 @@ export class ChatService {
 		return fileContents.join('\n');
 	}
 
-	// 初始化模型
+	/**
+	 * 主站 Chat：硅基流动 OpenAI 兼容端点（默认 Pro/zai-org/GLM-4.7）。
+	 */
+	private resolveChatSiliconFlowConfig(): {
+		apiKey: string;
+		baseURL: string;
+		modelName: string;
+	} {
+		const apiKey = (
+			this.configService.get<string>(KnowledgeQaEnum.SILICONFLOW_API_KEY) ||
+			this.configService.get<string>(ModelEnum.DEEPSEEK_API_KEY) ||
+			''
+		).trim();
+		const baseURL = (
+			this.configService.get<string>(KnowledgeQaEnum.SILICONFLOW_BASE_URL) ||
+			this.configService.get<string>(ModelEnum.DEEPSEEK_BASE_URL) ||
+			'https://api.siliconflow.cn/v1'
+		).replace(/\/$/, '');
+		const modelName =
+			this.configService
+				.get<string>(ModelEnum.CHAT_SILICONFLOW_MODEL_NAME)
+				?.trim() ||
+			this.configService.get<string>(ModelEnum.DEEPSEEK_MODEL_NAME)?.trim() ||
+			'Pro/zai-org/GLM-4.7';
+		if (!apiKey) {
+			throw new HttpException(
+				'硅基流动未配置（SILICONFLOW_API_KEY，或兼容 DEEPSEEK_API_KEY），无法发起对话',
+				HttpStatus.SERVICE_UNAVAILABLE,
+			);
+		}
+		return { apiKey, baseURL, modelName };
+	}
+
 	private initModel(options?: {
 		temperature?: number;
 		maxTokens?: number;
 		abortSignal?: AbortSignal;
 	}): ChatOpenAI {
-		const apiKey = this.configService.get(ModelEnum.DEEPSEEK_API_KEY);
-		const baseURL = this.configService.get(ModelEnum.DEEPSEEK_BASE_URL);
-		const modelName = this.configService.get(ModelEnum.DEEPSEEK_MODEL_NAME);
+		const { apiKey, baseURL, modelName } = this.resolveChatSiliconFlowConfig();
 		const llm = new ChatOpenAI({
 			apiKey,
 			modelName,

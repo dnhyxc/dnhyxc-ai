@@ -2,7 +2,7 @@
 
 本轮改动若包含**用户可感知的新功能、体验优化或行为修复**，在写完专题实现文后，须**同步**更新下列两份文档（仍属 `docs/` 内，本 Skill 允许编辑）。
 
-应用内 `/project-guide`、`/update-info` 由前端结构化数据驱动；**本 Skill 默认只维护这两份 Markdown 姊妹稿**。若用户要求线上页一致，需另开任务同步 `projectGuideSections` / `updateInfoSections`（属业务源码，非本 Skill 默认范围）。
+应用内 `/project-guide`、`/update-info` 由前端结构化数据驱动。维护姊妹稿后须**同轮**按 [`product-pages-sync.md`](./product-pages-sync.md) 同步 `updateInfoSections.ts`、`projectGuideSections.ts` 及对应 `*EnOverlay.ts`（共 4 个文件）。
 
 ---
 
@@ -66,4 +66,4 @@
 - [ ] `project-guide.md` 是否补充了「如何用」（若适用）？
 - [ ] 章节编号、§ 交叉引用是否与现有文档一致？
 - [ ] 是否误把专题文中的代码块/路径粘贴进产品向文档？
-- [ ] （提醒用户）应用内结构化数据是否需另开任务与姊妹稿对齐？
+- [ ] `updateInfoSections` / `projectGuideSections`（含英文 overlay）是否已与姊妹稿对齐？

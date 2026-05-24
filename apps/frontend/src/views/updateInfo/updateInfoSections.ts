@@ -170,6 +170,13 @@ const UPDATE_INFO_SECTIONS_ZH: UpdateInfoSection[] = [
 				description:
 					'桌面客户端（Tauri）对话页底部输入区支持文本/语音模式切换、实时听写与停录收尾；停录后不再发起整段二次转写，详见独立页「§11」对应说明。',
 			},
+			{
+				id: 's4-9',
+				title: '对话模型接入统一',
+				dateLabel: '2026-05-21',
+				description:
+					'主站智能对话的后端生成链路统一为硅基流动 OpenAI 兼容接口，默认使用 GLM-4.7 系列模型；流式输出、停止生成、续写与分支等交互方式不变。',
+			},
 		],
 	},
 	{
@@ -478,6 +485,13 @@ const UPDATE_INFO_SECTIONS_ZH: UpdateInfoSection[] = [
 				dateLabel: '2026-05-02',
 				description:
 					'同一文档下可维护多路助手会话并切换历史；区分临时会话与已落库会话的展示与恢复边界，避免切换文档或保存时机导致的会话错绑或流式中断（与「§6」「流式跨文档」条目互补）。',
+			},
+			{
+				id: 's13-3',
+				title: '助手与 RAG 问答模型接入统一',
+				dateLabel: '2026-05-21',
+				description:
+					'知识库文档助手（AI 模式）与 RAG 检索问答的后端生成同样走硅基流动兼容接口；多轮历史、停止生成、检索引用展示与未保存草稿（ephemeral）等行为保持不变。',
 			},
 		],
 	},

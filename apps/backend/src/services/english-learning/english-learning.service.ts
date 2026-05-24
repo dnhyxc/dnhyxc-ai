@@ -630,20 +630,23 @@ export class EnglishLearningService {
 		const apiKey = (
 			this.configService.get<string>(KnowledgeQaEnum.SILICONFLOW_API_KEY) ||
 			this.configService.get<string>(KnowledgeQaEnum.DASHSCOPE_API_KEY) ||
-			this.configService.get<string>(ModelEnum.QWEN_API_KEY) ||
+			this.configService.get<string>(ModelEnum.DEEPSEEK_API_KEY) ||
 			''
 		).trim();
 		const baseURL = (
 			this.configService.get<string>(KnowledgeQaEnum.SILICONFLOW_BASE_URL) ||
+			this.configService.get<string>(ModelEnum.DEEPSEEK_BASE_URL) ||
 			'https://api.siliconflow.cn/v1'
 		).replace(/\/$/, '');
 		const modelName =
 			this.configService
 				.get<string>(ModelEnum.ENGLISH_LEARNING_SILICONFLOW_MODEL_NAME)
-				?.trim() || 'Pro/zai-org/GLM-4.7';
+				?.trim() ||
+			this.configService.get<string>(ModelEnum.DEEPSEEK_MODEL_NAME)?.trim() ||
+			'Pro/zai-org/GLM-4.7';
 		if (!apiKey) {
 			throw new HttpException(
-				'硅基流动未配置（SILICONFLOW_API_KEY，或兼容 DASHSCOPE_API_KEY / QWEN_API_KEY），无法生成学习内容',
+				'硅基流动未配置（SILICONFLOW_API_KEY，或兼容 DEEPSEEK_API_KEY），无法生成学习内容',
 				HttpStatus.SERVICE_UNAVAILABLE,
 			);
 		}

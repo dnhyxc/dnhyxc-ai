@@ -1,6 +1,6 @@
 ---
 name: implementation-doc-from-diff
-description: 基于当前改动（git diff、@ 文件或会话内已达成共识的变更）在 docs/ 下生成「实现思路」专题 Markdown：包含方案说明、关键代码摘录及代码块内详细中文注释；每个代码块上方须标注来源文件（仓库相对路径）与大致位置；新建文档后自动整理 docs/ 索引；若为用户可感知的新功能则按 project-guide.md / project-update-info.md 格式同步姊妹产品文档（正文中不得出现文件路径）；新建文档文件名须简短且贴题；严禁修改业务源码，仅允许新建或编辑文档。适用于用户说「把本次改动写成文档/实现思路文档/只写 docs 不改代码/改动说明落盘到 docs/基于 diff 写文档」等。
+description: 基于当前改动（git diff、@ 文件或会话内已达成共识的变更）在 docs/ 下生成「实现思路」专题 Markdown：包含方案说明、关键代码摘录及代码块内详细中文注释；每个代码块上方须标注来源文件（仓库相对路径）与大致位置；新建文档后自动整理 docs/ 索引；若为用户可感知的新功能则同步 project-guide.md / project-update-info.md（无路径），并自动同步 apps/frontend 内 updateInfo/projectGuide 四套结构化数据与英文 overlay；默认不改其它业务源码。适用于「把本次改动写成文档/实现思路/只写 docs/基于 diff 写文档」等。
 ---
 
 # 基于改动的实现说明文档（implementation-doc-from-diff）
@@ -12,14 +12,19 @@ description: 基于当前改动（git diff、@ 文件或会话内已达成共识
 - **实现思路**：为何这样做、关键决策、数据流与边界。
 - **具体代码**：用 Markdown **围栏代码块**呈现与改动相关的片段；块内附**详细中文注释**（可比仓库源码注释更细，便于单独阅读）。
 - **docs 体系**：新增专题后**自动整理**整个 `docs/` 索引（见 `references/docs-maintenance.md`）。
-- **产品姊妹稿**：若改动包含**用户可感知**的新功能/体验变化，同步更新 `docs/project-guide.md` 与 `docs/project-update-info.md`（格式见 `references/product-user-docs.md`；**这两份正文不得出现文件 路径**）。
-- **只写文档**：**不得**修改业务代码、配置与构建脚本；**仅**在 `docs/`（或用户明确指定的文档目录，且须为文档用途）中新建或更新 `*.md`。
+- **产品姊妹稿**：若改动包含**用户可感知**的新功能/体验变化，同步更新 `docs/project-guide.md` 与 `docs/project-update-info.md`（格式见 `references/product-user-docs.md`；**这两份正文不得出现文件路径**），并**同轮**同步应用内 `/update-info`、`/project-guide` 结构化数据（见 `references/product-pages-sync.md`）。
+- **默认不改其它业务代码**：除步骤 6 允许的前端 4 个姊妹数据文件外，**不得**修改 `apps/**`、`packages/**`、根配置、`scripts/**` 等；**仅**在 `docs/**/*.md`（及步骤 6 列出的前端文件）中新建或更新。
 
 ## 硬约束（必须遵守）
 
-1. **禁止改动非文档代码**
-   - 不得编辑：`apps/**`、`packages/**`、`libs/**`、根配置、`scripts/**` 等实现与工程配置（除非用户 Explicitly 授权 —— 本 Skill 默认**不授权**）。
-   - 允许编辑：`docs/**/*.md`，以及用户点名「仅文档」的同级路径（例如某些 `README.md` 若用户写明）。
+1. **允许改动的路径（白名单）**
+   - `docs/**/*.md`（专题实现文、索引、产品姊妹稿）。
+   - **仅当**更新了 `docs/project-update-info.md` 和/或 `docs/project-guide.md` 时， additionally：
+     - `apps/frontend/src/views/updateInfo/updateInfoSections.ts`
+     - `apps/frontend/src/views/updateInfo/updateInfoSectionsEnOverlay.ts`
+     - `apps/frontend/src/views/projectGuide/projectGuideSections.ts`
+     - `apps/frontend/src/views/projectGuide/projectGuideSectionsEnOverlay.ts`
+   - 不得编辑上述白名单以外的 `apps/**`、`packages/**`、`libs/**`、根配置、`scripts/**`（除非用户 Explicitly 授权扩大范围）。
 
 2. **代码块与源码关系**（仅适用于**专题实现文**，不适用于 `project-guide.md` / `project-update-info.md`）
    - 代码块内容应与仓库**一致**；若因篇幅做省略，用 `// ...` 标明，并在段首说明「摘录」。
@@ -126,16 +131,22 @@ description: 基于当前改动（git diff、@ 文件或会话内已达成共识
 
 格式、章节归属、**禁止出现路径**等细则见 [`references/product-user-docs.md`](references/product-user-docs.md)。
 
-**注意**：
+### 6.1 同步应用内结构化页（姊妹稿有改动时必做）
 
-- 应用内 `/update-info`、`/project-guide` 由前端 `updateInfoSections` / `projectGuideSections` 驱动；本 Skill **默认只改上述两份 Markdown**。完成后在回复中**提醒用户**：若需线上页一致，须另开任务同步结构化数据（属 `apps/frontend`，非本 Skill 默认范围）。
-- `project-guide.md` §14 对开发文档仅保留「查阅仓库内开发文档总索引」级表述，**不写** `docs/` 下具体文件名。
+按 [`references/product-pages-sync.md`](references/product-pages-sync.md) 执行：
+
+1. 以**定稿后的** `project-update-info.md` / `project-guide.md` 为源，更新 `updateInfoSections.ts` / `projectGuideSections.ts`（中文主数据）。
+2. **同 id** 更新 `updateInfoSectionsEnOverlay.ts` / `projectGuideSectionsEnOverlay.ts`（英文 title + description；新章节补 section 标题映射）。
+3. 新增 update-info 条目使用 `{sN}-{下一序号}`；新增 guide 小节使用 `pg-s{N}-{x}`，勿复用已删 id。
+4. 本地预览：切换界面语言访问 `/update-info`、`/project-guide`，确认中英文一致。
+
+**注意**：`project-guide.md` §14 对开发文档仅保留「查阅仓库内开发文档总索引」级表述，**不写** `docs/` 下具体文件名；同步到 `pg-s14-1` 时保持产品向措辞、不写仓库路径。
 
 ### 7) 自检清单（写入前在心里过一遍）
 
 **专题实现文**
 
-- [ ] 是否**没有任何非 docs** 文件被修改？
+- [ ] 是否**仅**改动了 docs 白名单与（若适用）步骤 6.1 列出的 4 个前端姊妹数据文件？
 - [ ] 代码块是否与 diff / 源码对齐？
 - [ ] 是否说明「未涵盖的边角」或「后续可做」？
 - [ ] 新建文档的**文件名**是否**简短**且**准确描述本轮改动**？
@@ -151,6 +162,8 @@ description: 基于当前改动（git diff、@ 文件或会话内已达成共识
 - [ ] `project-update-info.md` 是否已增条目且**无路径/无文件名**？
 - [ ] `project-guide.md` 是否已补充使用说明（若需要操作步骤）？
 - [ ] 是否误将专题文中的路径或代码块粘贴进产品向文档？
+- [ ] `updateInfoSections.ts` / `projectGuideSections.ts` 是否与姊妹稿对齐？
+- [ ] 两个 `*EnOverlay.ts` 是否已为每个新增/修改条目补齐英文？
 
 ## 输出格式建议
 
@@ -192,8 +205,9 @@ description: 基于当前改动（git diff、@ 文件或会话内已达成共识
 | [references/doc-outline.md](references/doc-outline.md) | 专题实现文章节骨架 |
 | [references/docs-maintenance.md](references/docs-maintenance.md) | `docs/` 索引整理与去重 |
 | [references/product-user-docs.md](references/product-user-docs.md) | `project-guide` / `project-update-info` 格式与禁路径 |
+| [references/product-pages-sync.md](references/product-pages-sync.md) | 姊妹稿 → `/update-info`、`/project-guide` 四套 TS 同步规则 |
 
 ## 与相近 Skill 的边界
 
 - **`spec-from-implementation`**：从**现有完整实现**反推可验收 SPEC，偏重规范条款与 checklist。
-- **本 Skill**：从**一轮 diff / 明确改动集合**写**实现说明**，偏重「这轮做了什么 + 注释代码块」，并**整理 docs 索引**、必要时**更新产品姊妹稿**；默认**不写 spec 全套章节**除非用户要求合并。
+- **本 Skill**：从**一轮 diff / 明确改动集合**写**实现说明**，偏重「这轮做了什么 + 注释代码块」，并**整理 docs 索引**、必要时**更新产品姊妹稿及其前端结构化页**；默认**不写 spec 全套章节**除非用户要求合并。

@@ -81,7 +81,7 @@ export const PROJECT_GUIDE_ITEMS_EN: Record<
 	'pg-s4-2': {
 		title: '4.2 Streaming, stop, and continue',
 		description:
-			'Replies stream as they generate. Stop early if you have enough; use continue to extend the current answer. Branches and regeneration live in a message tree; shared read-only pages try to keep order and layout consistent even in complex branch cases.',
+			'Streaming: replies appear as they generate.\nStop: end early if you already have what you need.\nContinue: extend the current answer.\nBranches & regeneration: work in a message tree; shared read-only pages try to keep order and layout consistent in complex branch cases.\nServer-side generation now goes through the SiliconFlow-compatible API; you use Chat the same way—no extra setup.',
 	},
 	'pg-s4-3': {
 		title: '4.3 Web search and citations',
@@ -126,7 +126,7 @@ export const PROJECT_GUIDE_ITEMS_EN: Record<
 	'pg-s5-6': {
 		title: '5.6 In-document AI assistant (logged in)',
 		description:
-			'When logged in, use the Knowledge doc assistant at the bottom of the editor for multi-turn help grounded in the current Markdown. Hidden when logged out. Long threads: use scroll-to-bottom / scroll-to-top near the input; during streaming you can jump back to the latest output. Send selected editor text to the assistant for AI or RAG follow-ups; overlapping selections may be deduped for context (behavior per release). On desktop when logged in, the assistant supports text/voice like Chat and follows UI language.',
+			'When logged in while editing Knowledge, use the doc assistant at the bottom for multi-turn help on the current Markdown—polish, summarize, or Q&A.\nHidden when logged out; local editing still works.\nLong threads: scroll-to-bottom / scroll-to-top near the input; during streaming, scroll back to follow the latest output.\nSend selected text to the assistant for AI or RAG follow-ups; overlapping selections may be deduped (per release).\nMulti-turn: AI mode uses saved session history within the token budget; RAG mode mainly uses retrieved chunks each turn. Backend generation is aligned with main Chat via SiliconFlow; interaction is unchanged.\nDesktop: text/voice input like Chat, follows UI language; dictation fills the input live and stays after you stop recording.',
 	},
 	'pg-s6-1': {
 		title: '6.1 Task lists',

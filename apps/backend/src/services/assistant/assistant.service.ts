@@ -1,4 +1,11 @@
 import { randomUUID } from 'node:crypto';
+import {
+	AIMessage,
+	type AIMessageChunk,
+	HumanMessage,
+	SystemMessage,
+} from '@langchain/core/messages';
+import { ChatOpenAI } from '@langchain/openai';
 import { Cache } from '@nestjs/cache-manager';
 import {
 	BadRequestException,
@@ -13,7 +20,7 @@ import { ConfigService } from '@nestjs/config';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { Observable, type Subscriber } from 'rxjs';
-import { ModelEnum } from 'src/enum/config.enum';
+import { KnowledgeQaEnum, ModelEnum } from 'src/enum/config.enum';
 import { DataSource, Repository } from 'typeorm';
 import { ZhipuStreamData } from '../chat/dto/zhipu-stream-data.dto';
 import {
@@ -32,7 +39,7 @@ import { AssistantSessionListDto } from './dto/assistant-session-list.dto';
 import { CreateAssistantSessionDto } from './dto/create-assistant-session.dto';
 import { ImportAssistantTranscriptDto } from './dto/import-assistant-transcript.dto';
 
-const DEFAULT_SYSTEM_PROMPT = `你是一个通用智能助手，基于智谱 GLM 模型回答用户问题。请做到：准确、有条理、礼貌；不确定时请说明不确定；不要编造事实。`;
+const DEFAULT_SYSTEM_PROMPT = `你是一个通用智能助手。请做到：准确、有条理、礼貌；不确定时请说明不确定；不要编造事实。`;
 
 /** 智谱文档：GLM-4.7 上下文 200K（可被 ASSISTANT_MODEL_MAX_INPUT_TOKENS 覆盖） */
 const GLM_47_DEFAULT_MAX_INPUT_TOKENS = 200_000;
@@ -131,12 +138,165 @@ export class AssistantService {
 		return false;
 	}
 
+	/** 助手流式模型名（硅基流动；用于 token 预算推断与 ChatOpenAI） */
 	private getGlmModelName(): string {
 		return (
-			this.configService.get<string>(ModelEnum.ASSISTANT_GLM_MODEL_NAME) ||
-			this.configService.get<string>(ModelEnum.ZHIPU_MODEL_NAME) ||
-			'glm-4.7'
+			this.configService
+				.get<string>(ModelEnum.ASSISTANT_GLM_MODEL_NAME)
+				?.trim() ||
+			this.configService
+				.get<string>(ModelEnum.CHAT_SILICONFLOW_MODEL_NAME)
+				?.trim() ||
+			'Pro/zai-org/GLM-4.7'
 		);
+	}
+
+	/** 知识库助手：硅基流动凭证（对齐 chat.service / knowledge-qa） */
+	private resolveAssistantSiliconFlowConfig(): {
+		apiKey: string;
+		baseURL: string;
+		modelName: string;
+	} {
+		const apiKey = (
+			this.configService.get<string>(KnowledgeQaEnum.SILICONFLOW_API_KEY) ||
+			this.configService.get<string>(KnowledgeQaEnum.DASHSCOPE_API_KEY) ||
+			this.configService.get<string>(ModelEnum.QWEN_API_KEY) ||
+			this.configService.get<string>(ModelEnum.DEEPSEEK_API_KEY) ||
+			''
+		).trim();
+		const baseURL = (
+			this.configService.get<string>(KnowledgeQaEnum.SILICONFLOW_BASE_URL) ||
+			this.configService.get<string>(ModelEnum.DEEPSEEK_BASE_URL) ||
+			'https://api.siliconflow.cn/v1'
+		).replace(/\/$/, '');
+		const modelName = this.getGlmModelName();
+		if (!apiKey) {
+			throw new HttpException(
+				'硅基流动未配置（SILICONFLOW_API_KEY，或兼容 DASHSCOPE_API_KEY / QWEN_API_KEY / DEEPSEEK_API_KEY），无法使用知识库助手',
+				HttpStatus.SERVICE_UNAVAILABLE,
+			);
+		}
+		return { apiKey, baseURL, modelName };
+	}
+
+	private buildAssistantStreamLlm(options: {
+		temperature?: number;
+		maxTokens?: number;
+		abortSignal?: AbortSignal;
+	}): ChatOpenAI {
+		const { apiKey, baseURL, modelName } =
+			this.resolveAssistantSiliconFlowConfig();
+		return new ChatOpenAI({
+			apiKey,
+			modelName,
+			streaming: true,
+			temperature: options.temperature ?? 0.3,
+			maxTokens: options.maxTokens ?? 4096,
+			configuration: { baseURL },
+			...(options.abortSignal && {
+				callOptions: { signal: options.abortSignal },
+			}),
+		});
+	}
+
+	private toAssistantLangChainMessages(
+		messages: Array<{
+			role: 'system' | 'user' | 'assistant';
+			content: string;
+		}>,
+	): (SystemMessage | HumanMessage | AIMessage)[] {
+		return messages.map((msg) => {
+			if (msg.role === 'system') {
+				return new SystemMessage(msg.content);
+			}
+			if (msg.role === 'assistant') {
+				return new AIMessage(msg.content);
+			}
+			return new HumanMessage(msg.content);
+		});
+	}
+
+	/** 将 LangChain 流式 chunk 映射为前端既有的 ZhipuStreamData 协议 */
+	private mapStreamChunkToZhipuEvents(
+		chunk: AIMessageChunk,
+	): ZhipuStreamData[] {
+		const out: ZhipuStreamData[] = [];
+		const ak = chunk.additional_kwargs ?? {};
+		const reasoningRaw =
+			(typeof ak.reasoning_content === 'string' && ak.reasoning_content) ||
+			(typeof (ak as { reasoning?: unknown }).reasoning === 'string' &&
+				(ak as { reasoning: string }).reasoning);
+		if (reasoningRaw) {
+			out.push({ type: 'thinking', data: reasoningRaw });
+		}
+
+		const content = chunk.content;
+		if (typeof content === 'string' && content) {
+			out.push({ type: 'content', data: content });
+			return out;
+		}
+		if (Array.isArray(content)) {
+			for (const part of content) {
+				if (typeof part === 'string' && part) {
+					out.push({ type: 'content', data: part });
+				} else if (
+					part &&
+					typeof part === 'object' &&
+					'text' in part &&
+					typeof (part as { text?: unknown }).text === 'string'
+				) {
+					const text = (part as { text: string }).text;
+					if (text) out.push({ type: 'content', data: text });
+				}
+			}
+		}
+		return out;
+	}
+
+	/**
+	 * 通过 ChatOpenAI 拉流并下发 ZhipuStreamData；保留 epoch 轮询 abort 与 content 累积回调。
+	 */
+	private async pumpAssistantOpenAiStream(params: {
+		subscriber: Subscriber<ZhipuStreamData>;
+		requestMessages: Array<{
+			role: 'system' | 'user' | 'assistant';
+			content: string;
+		}>;
+		dto: AssistantChatDto;
+		abortController: AbortController;
+		shouldAbort: () => Promise<boolean>;
+		onContentDelta?: (text: string) => void;
+	}): Promise<void> {
+		const {
+			subscriber,
+			requestMessages,
+			dto,
+			abortController,
+			shouldAbort,
+			onContentDelta,
+		} = params;
+
+		const llm = this.buildAssistantStreamLlm({
+			temperature: dto.temperature ?? 0.3,
+			maxTokens: dto.maxTokens ?? 4096,
+			abortSignal: abortController.signal,
+		});
+
+		const stream = await llm.stream(
+			this.toAssistantLangChainMessages(requestMessages),
+		);
+
+		for await (const chunk of stream) {
+			if (await shouldAbort()) {
+				abortController.abort();
+			}
+			for (const evt of this.mapStreamChunkToZhipuEvents(chunk)) {
+				subscriber.next(evt);
+				if (evt.type === 'content' && typeof evt.data === 'string') {
+					onContentDelta?.(evt.data);
+				}
+			}
+		}
 	}
 
 	/**
@@ -153,7 +313,7 @@ export class AssistantService {
 		}
 
 		const name = modelName.toLowerCase();
-		if (name.includes('glm-4.7')) {
+		if (name.includes('glm-4.7') || name.includes('glm-4_7')) {
 			return GLM_47_DEFAULT_MAX_INPUT_TOKENS;
 		}
 		if (name.includes('glm-4')) {
@@ -190,31 +350,6 @@ export class AssistantService {
 		const maxOut = Math.min(Math.max(dto.maxTokens ?? 4096, 1), 131_072);
 		const reserve = this.getStructureReserveTokens();
 		return Math.max(512, inputCap - maxOut - reserve);
-	}
-
-	private parseGlmStreamData(dataStr: string): ZhipuStreamData | null {
-		if (dataStr.trim() === '[DONE]') return null;
-		try {
-			const data = JSON.parse(dataStr);
-			if (data.choices?.[0]?.delta?.content) {
-				return { type: 'content', data: data.choices[0].delta.content };
-			}
-			if (data.choices?.[0]?.message?.content) {
-				return { type: 'content', data: data.choices[0].message.content };
-			}
-			if (data.choices?.[0]?.delta?.reasoning_content) {
-				return {
-					type: 'thinking',
-					data: data.choices[0].delta.reasoning_content,
-				};
-			}
-			if (data.usage) {
-				return { type: 'usage', data: data.usage };
-			}
-			return null;
-		} catch {
-			return null;
-		}
 	}
 
 	private async findLatestSessionIdByKnowledgeArticle(
@@ -610,92 +745,26 @@ export class AssistantService {
 			})),
 		];
 
-		const apiKey = this.configService.get<string>(ModelEnum.ZHIPU_API_KEY);
-		const baseURL =
-			this.configService.get<string>(ModelEnum.ZHIPU_BASE_URL) ||
-			'https://open.bigmodel.cn/api/paas/v4';
-		if (!apiKey) {
-			throw new HttpException(
-				'智谱 API 密钥未配置（ZHIPU_API_KEY）',
-				HttpStatus.SERVICE_UNAVAILABLE,
-			);
-		}
-		const modelName = this.getGlmModelName();
 		const abortController = new AbortController();
-		// 与持久化 stop 一致：用 Redis epoch 做跨实例停止信号；本实例在读循环中轮询 epoch 并 abort。
 		const startEpoch = await this.getEphemeralStreamEpoch(userId, streamId);
-		const url = `${baseURL.replace(/\/$/, '')}/chat/completions`;
-		const response = await fetch(url, {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json',
-				Authorization: `Bearer ${apiKey}`,
-			},
-			body: JSON.stringify({
-				model: modelName,
-				messages: requestMessages,
-				thinking: { type: 'disabled' },
-				stream: true,
-				max_tokens: dto.maxTokens ?? 4096,
-				temperature: dto.temperature ?? 0.3,
-			}),
-			signal: abortController.signal,
-		});
-		if (!response.ok) {
-			const errText = await response.text();
-			throw new HttpException(
-				`智谱 API 请求失败：${response.status} ${errText}`,
-				response.status,
-			);
-		}
-		const reader = response.body?.getReader();
-		if (!reader) {
-			throw new HttpException(
-				'无法读取响应流',
-				HttpStatus.INTERNAL_SERVER_ERROR,
-			);
-		}
-		const decoder = new TextDecoder('utf-8');
-		let buffer = '';
 		try {
-			while (true) {
-				// stop 触发时 epoch 会递增；发现变化即主动 abort（预期中断）
-				const curEpoch = await this.getEphemeralStreamEpoch(userId, streamId);
-				if (curEpoch !== startEpoch) {
-					abortController.abort();
-				}
-				const { done, value } = await reader.read();
-				if (done) break;
-				const chunk = decoder.decode(value, { stream: true });
-				buffer += chunk;
-				const lines = buffer.split('\n');
-				buffer = lines.pop() || '';
-				for (const line of lines) {
-					const trimmed = line.trim();
-					if (!trimmed?.startsWith('data:')) continue;
-					const dataStr = trimmed.slice(5).trim();
-					if (dataStr === '[DONE]') {
-						subscriber.complete();
-						return;
-					}
-					const streamData = this.parseGlmStreamData(dataStr);
-					if (streamData) {
-						subscriber.next(streamData);
-					}
-				}
-			}
-			if (buffer.trim().startsWith('data:')) {
-				const dataStr = buffer.trim().slice(5).trim();
-				if (dataStr !== '[DONE]') {
-					const streamData = this.parseGlmStreamData(dataStr);
-					if (streamData) {
-						subscriber.next(streamData);
-					}
-				}
-			}
+			await this.pumpAssistantOpenAiStream({
+				subscriber,
+				requestMessages,
+				dto,
+				abortController,
+				shouldAbort: async () => {
+					const curEpoch = await this.getEphemeralStreamEpoch(userId, streamId);
+					return curEpoch !== startEpoch;
+				},
+			});
 			subscriber.complete();
-		} finally {
-			reader.releaseLock();
+		} catch (err) {
+			if (this.isAssistantChatStreamUserAbortError(err)) {
+				subscriber.complete();
+				return;
+			}
+			throw err;
 		}
 	}
 
@@ -979,21 +1048,6 @@ export class AssistantService {
 						})),
 					];
 
-					const apiKey = this.configService.get<string>(
-						ModelEnum.ZHIPU_API_KEY,
-					);
-					const baseURL =
-						this.configService.get<string>(ModelEnum.ZHIPU_BASE_URL) ||
-						'https://open.bigmodel.cn/api/paas/v4';
-					if (!apiKey) {
-						throw new HttpException(
-							'智谱 API 密钥未配置（ZHIPU_API_KEY）',
-							HttpStatus.SERVICE_UNAVAILABLE,
-						);
-					}
-
-					const modelName = this.getGlmModelName();
-					// 新流开始：先递增 epoch，使其它实例上仍在跑的同会话流检测到并 abort
 					const epochAtStart = await this.incrementStreamEpoch(sessionId!);
 					await this.cache.set(
 						this.streamBusyKey(sessionId!),
@@ -1002,93 +1056,22 @@ export class AssistantService {
 					);
 					const abortController = new AbortController();
 
-					const url = `${baseURL.replace(/\/$/, '')}/chat/completions`;
-					const response = await fetch(url, {
-						method: 'POST',
-						headers: {
-							'Content-Type': 'application/json',
-							Authorization: `Bearer ${apiKey}`,
+					await this.pumpAssistantOpenAiStream({
+						subscriber,
+						requestMessages,
+						dto,
+						abortController,
+						shouldAbort: async () => {
+							const curEpoch = await this.getStreamEpoch(sessionId!);
+							return curEpoch !== epochAtStart;
 						},
-						body: JSON.stringify({
-							model: modelName,
-							messages: requestMessages,
-							thinking: { type: 'disabled' },
-							stream: true,
-							max_tokens: dto.maxTokens ?? 4096,
-							temperature: dto.temperature ?? 0.3,
-						}),
-						signal: abortController.signal,
+						onContentDelta: (text) => {
+							accumulated += text;
+						},
 					});
 
-					if (!response.ok) {
-						const errText = await response.text();
-						throw new HttpException(
-							`智谱 API 请求失败：${response.status} ${errText}`,
-							response.status,
-						);
-					}
-
-					const reader = response.body?.getReader();
-					if (!reader) {
-						throw new HttpException(
-							'无法读取响应流',
-							HttpStatus.INTERNAL_SERVER_ERROR,
-						);
-					}
-
-					const decoder = new TextDecoder('utf-8');
-					let buffer = '';
-
-					try {
-						while (true) {
-							const curEpoch = await this.getStreamEpoch(sessionId!);
-							if (curEpoch !== epochAtStart) {
-								abortController.abort();
-							}
-							const { done, value } = await reader.read();
-							if (done) break;
-							const chunk = decoder.decode(value, { stream: true });
-							buffer += chunk;
-							const lines = buffer.split('\n');
-							buffer = lines.pop() || '';
-
-							for (const line of lines) {
-								const trimmed = line.trim();
-								if (!trimmed?.startsWith?.('data:')) continue;
-								const dataStr = trimmed.slice(5).trim();
-								if (dataStr === '[DONE]') {
-									await finalizeTurn();
-									subscriber.complete();
-									return;
-								}
-								const streamData = this.parseGlmStreamData(dataStr);
-								if (streamData) {
-									subscriber.next(streamData);
-									if (streamData.type === 'content') {
-										accumulated += streamData.data as string;
-									}
-								}
-							}
-						}
-
-						if (buffer.trim().startsWith('data:')) {
-							const dataStr = buffer.trim().slice(5).trim();
-							if (dataStr !== '[DONE]') {
-								const streamData = this.parseGlmStreamData(dataStr);
-								if (streamData) {
-									subscriber.next(streamData);
-									if (streamData.type === 'content') {
-										accumulated += streamData.data as string;
-									}
-								}
-							}
-						}
-
-						await finalizeTurn();
-						subscriber.complete();
-					} finally {
-						reader.releaseLock();
-					}
+					await finalizeTurn();
+					subscriber.complete();
 				} catch (err: any) {
 					if (!this.isAssistantChatStreamUserAbortError(err)) {
 						this.logger.error?.('[AssistantService] chatStream failed', {

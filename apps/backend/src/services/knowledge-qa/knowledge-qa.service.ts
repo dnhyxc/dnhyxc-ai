@@ -1,5 +1,11 @@
 import { randomUUID } from 'node:crypto';
+import {
+	AIMessage,
+	HumanMessage,
+	SystemMessage,
+} from '@langchain/core/messages';
 import { DynamicTool } from '@langchain/core/tools';
+import { ChatOpenAI } from '@langchain/openai';
 import { Inject, Injectable, type LoggerService } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
@@ -35,32 +41,75 @@ export class KnowledgeQaService {
 		private readonly logger: LoggerService,
 	) {}
 
-	private getGlmModelName(): string {
-		return (
-			this.config.get<string>(KnowledgeQaEnum.KNOWLEDGE_QA_MODEL) ||
-			this.config.get<string>(ModelEnum.ASSISTANT_GLM_MODEL_NAME) ||
-			this.config.get<string>(ModelEnum.ZHIPU_MODEL_NAME) ||
-			'glm-4.7'
-		);
-	}
-
-	private parseGlmStreamDelta(dataStr: string): string | null {
-		if (dataStr.trim() === '[DONE]') return null;
-		try {
-			const data = JSON.parse(dataStr);
-			if (data.choices?.[0]?.delta?.content) {
-				return String(data.choices[0].delta.content);
-			}
-			if (data.choices?.[0]?.message?.content) {
-				return String(data.choices[0].message.content);
-			}
-			return null;
-		} catch {
-			return null;
+	/**
+	 * 知识库 QA：硅基流动凭证（与 embedding / 主 Chat 一致）。
+	 */
+	private resolveKnowledgeQaSiliconFlowConfig(): {
+		apiKey: string;
+		baseURL: string;
+		modelName: string;
+	} {
+		const apiKey = (
+			this.config.get<string>(KnowledgeQaEnum.SILICONFLOW_API_KEY) ||
+			this.config.get<string>(KnowledgeQaEnum.DASHSCOPE_API_KEY) ||
+			this.config.get<string>(ModelEnum.QWEN_API_KEY) ||
+			''
+		).trim();
+		const baseURL = (
+			this.config.get<string>(KnowledgeQaEnum.SILICONFLOW_BASE_URL) ||
+			'https://api.siliconflow.cn/v1'
+		).replace(/\/$/, '');
+		const modelName =
+			this.config.get<string>(KnowledgeQaEnum.KNOWLEDGE_QA_MODEL)?.trim() ||
+			this.config.get<string>(ModelEnum.CHAT_SILICONFLOW_MODEL_NAME)?.trim() ||
+			'Pro/zai-org/GLM-4.7';
+		if (!apiKey) {
+			throw new Error(
+				'硅基流动未配置（SILICONFLOW_API_KEY，或兼容 DASHSCOPE_API_KEY / QWEN_API_KEY），无法进行知识库问答',
+			);
 		}
+		return { apiKey, baseURL, modelName };
 	}
 
-	private async *streamGlmChatCompletions(
+	/** 流式问答用 ChatOpenAI（对齐 english-learning / chat 的硅基接入方式） */
+	private buildKnowledgeQaStreamLlm(options: {
+		temperature?: number;
+		maxTokens?: number;
+		signal?: AbortSignal;
+	}): ChatOpenAI {
+		const { apiKey, baseURL, modelName } =
+			this.resolveKnowledgeQaSiliconFlowConfig();
+		return new ChatOpenAI({
+			apiKey,
+			modelName,
+			streaming: true,
+			temperature: options.temperature ?? 0.2,
+			maxTokens: options.maxTokens ?? 4096,
+			configuration: { baseURL },
+			...(options.signal && {
+				callOptions: { signal: options.signal },
+			}),
+		});
+	}
+
+	private toLangChainMessages(
+		messages: Array<{
+			role: 'system' | 'user' | 'assistant';
+			content: string;
+		}>,
+	): (SystemMessage | HumanMessage | AIMessage)[] {
+		return messages.map((msg) => {
+			if (msg.role === 'system') {
+				return new SystemMessage(msg.content);
+			}
+			if (msg.role === 'assistant') {
+				return new AIMessage(msg.content);
+			}
+			return new HumanMessage(msg.content);
+		});
+	}
+
+	private async *streamChatCompletions(
 		input: {
 			messages: Array<{
 				role: 'system' | 'user' | 'assistant';
@@ -71,65 +120,18 @@ export class KnowledgeQaService {
 		},
 		signal?: AbortSignal,
 	): AsyncGenerator<string> {
-		// 对齐 AssistantService：智谱（GLM）走原生 /chat/completions SSE 流
-		const apiKey = this.config.get<string>(ModelEnum.ZHIPU_API_KEY) || '';
-		const baseURL =
-			this.config.get<string>(ModelEnum.ZHIPU_BASE_URL) ||
-			'https://open.bigmodel.cn/api/paas/v4';
-		if (!apiKey) {
-			throw new Error('智谱 API 密钥未配置（ZHIPU_API_KEY）');
-		}
-		const modelName = this.getGlmModelName();
-		const url = `${baseURL.replace(/\/$/, '')}/chat/completions`;
-
-		const response = await fetch(url, {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json',
-				Authorization: `Bearer ${apiKey}`,
-			},
-			body: JSON.stringify({
-				model: modelName,
-				messages: input.messages,
-				thinking: { type: 'disabled' },
-				stream: true,
-				max_tokens: input.maxTokens ?? 4096,
-				temperature: input.temperature ?? 0.2,
-			}),
-			...(signal ? { signal } : {}),
+		const llm = this.buildKnowledgeQaStreamLlm({
+			temperature: input.temperature,
+			maxTokens: input.maxTokens,
+			signal,
 		});
-		if (!response.ok) {
-			const errText = await response.text();
-			throw new Error(`智谱 API 请求失败：${response.status} ${errText}`);
-		}
-		const reader = response.body?.getReader();
-		if (!reader) throw new Error('无法读取响应流');
+		const stream = await llm.stream(this.toLangChainMessages(input.messages));
 
-		const decoder = new TextDecoder('utf-8');
-		let buffer = '';
-		try {
-			while (true) {
-				const { done, value } = await reader.read();
-				if (done) break;
-				buffer += decoder.decode(value, { stream: true });
-				const lines = buffer.split('\n');
-				buffer = lines.pop() || '';
-				for (const line of lines) {
-					const trimmed = line.trim();
-					if (!trimmed?.startsWith?.('data:')) continue;
-					const dataStr = trimmed.slice(5).trim();
-					const delta = this.parseGlmStreamDelta(dataStr);
-					if (delta) yield delta;
-				}
+		for await (const chunk of stream) {
+			const content = chunk.content;
+			if (typeof content === 'string' && content) {
+				yield content;
 			}
-
-			if (buffer.trim().startsWith('data:')) {
-				const dataStr = buffer.trim().slice(5).trim();
-				const delta = this.parseGlmStreamDelta(dataStr);
-				if (delta) yield delta;
-			}
-		} finally {
-			reader.releaseLock();
 		}
 	}
 
@@ -250,7 +252,7 @@ export class KnowledgeQaService {
 					].join('\n');
 					const user = `问题：${input.question}\n\n已检索到的知识库片段：\n\n${context}`;
 
-					for await (const text of this.streamGlmChatCompletions(
+					for await (const text of this.streamChatCompletions(
 						{
 							messages: [
 								{ role: 'system', content: system },

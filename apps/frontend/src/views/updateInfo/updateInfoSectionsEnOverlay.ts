@@ -129,6 +129,11 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'On the Tauri client, the bottom input supports text/voice modes, live dictation, and stop-recording cleanup; after stop, no second full-audio transcription pass is sent—see Section 11 for details.',
 	},
+	's4-9': {
+		title: 'Unified chat model backend',
+		description:
+			'Main Chat now uses the SiliconFlow OpenAI-compatible API by default (GLM-4.7 family). Streaming, stop, continue, and branching behave the same on your side.',
+	},
 	's5-1': {
 		title: 'Markdown rendering',
 		description:
@@ -309,6 +314,11 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		title: 'Multi-session & persistence',
 		description:
 			'Multiple assistant threads per document with history switching; clear boundaries for temp vs persisted sessions to avoid wrong binding or broken streams when switching docs or saving (complements Section 6 streaming-across-docs).',
+	},
+	's13-3': {
+		title: 'Unified assistant & RAG model backend',
+		description:
+			'Knowledge doc assistant (AI mode) and RAG Q&A now use the same SiliconFlow-compatible backend. Multi-turn history, stop generation, citation display, and ephemeral drafts are unchanged.',
 	},
 	's14-1': {
 		title: 'Sharing & public reading',

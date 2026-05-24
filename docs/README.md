@@ -12,7 +12,7 @@
 |------|------|------|
 | [`frontend/`](./frontend/) | 前端页面、路由鉴权、英语学习、Tauri、七牛展示等 | [frontend/README.md](./frontend/README.md) |
 | [`knowledge/`](./knowledge/) | 知识库、RAG、右侧 Assistant、本地/云端草稿 | [knowledge/README.md](./knowledge/README.md) |
-| [`backend/`](./backend/) | NestJS、部署、Nginx、英语学习后端 | [backend/server-deployment.md](./backend/server-deployment.md)、[backend/nginx.md](./backend/nginx.md) |
+| [`backend/`](./backend/) | NestJS、部署、LLM 接入、英语学习后端 | [backend/README.md](./backend/README.md) |
 | [`monaco/`](./monaco/) | Monaco / Markdown 编辑器行为与修复 | 按文件名检索 |
 | [`mermaid/`](./mermaid/) | Mermaid 围栏、预览缩放、工具栏 | [markdown-zoom-and-preview.md](./mermaid/markdown-zoom-and-preview.md) |
 | [`chat/`](./chat/) | 主站对话、分享、联网搜索 | [chatbot.md](./chat/chatbot.md) |
@@ -32,6 +32,7 @@
 | Tauri macOS 生产包 HTTP 被拦 | [frontend/tauri-macos-ats-http.md](./frontend/tauri-macos-ats-http.md) |
 | 知识库助手流式 Mermaid 不出图 | [knowledge/knowledge-assistant-mermaid-streaming.md](./knowledge/knowledge-assistant-mermaid-streaming.md) |
 | 知识库助手总览 | [knowledge/knowledge-assistant-complete.md](./knowledge/knowledge-assistant-complete.md) |
+| 对话模型统一硅基接入 | [backend/siliconflow-chat-unification.md](./backend/siliconflow-chat-unification.md) |
 
 ---
 
