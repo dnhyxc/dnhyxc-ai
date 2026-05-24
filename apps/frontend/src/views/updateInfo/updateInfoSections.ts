@@ -327,6 +327,13 @@ const UPDATE_INFO_SECTIONS_ZH: UpdateInfoSection[] = [
 				description:
 					'AI 模式助手流式回复不再展示「思考过程」折叠区；「正在生成中…」旁的加载图标可正常旋转，与主站对话体验一致。',
 			},
+			{
+				id: 's6-15',
+				title: '知识库保存前自动格式化',
+				dateLabel: '2026-05-21',
+				description:
+					'手动保存与防抖自动保存在落盘前会先按编辑器「格式化文档」规则整理 Markdown（含代码围栏安全处理），再写入云端或本地文件。',
+			},
 		],
 	},
 	{

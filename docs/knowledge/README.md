@@ -43,6 +43,7 @@
 | [local-folder-and-monaco-sync.md](./local-folder-and-monaco-sync.md) |
 | [knowledge-md-import.md](./knowledge-md-import.md) |
 | [auto-save.md](./auto-save.md) |
+| [knowledge-save-format-before-persist.md](./knowledge-save-format-before-persist.md) | 保存 / 自动保存前先格式化再落库 |
 | [shortcuts.md](./shortcuts.md) |
 | [unauthenticated-local-only.md](./unauthenticated-local-only.md) |
 

@@ -111,7 +111,7 @@ export const PROJECT_GUIDE_ITEMS_EN: Record<
 	'pg-s5-3': {
 		title: '5.3 Save modes',
 		description:
-			'Manual save for explicit checkpoints; overwrite when updating one canonical doc; debounced auto-save after you pause typing to reduce lost work. Long drafts favor auto-save; structured edits may favor manual save.',
+			'Manual save for explicit checkpoints; overwrite when updating one canonical doc; debounced auto-save after you pause typing to reduce lost work. Both manual and auto-save format the document before persisting. Long drafts favor auto-save; structured edits may favor manual save.',
 	},
 	'pg-s5-4': {
 		title: '5.4 Local folders: scan, open, delete, external editors',

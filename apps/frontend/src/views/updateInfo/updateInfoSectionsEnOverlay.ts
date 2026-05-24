@@ -232,6 +232,11 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'AI-mode assistant streaming no longer shows a collapsible “thinking process” block; the loading spinner beside “Generating…” animates correctly, aligned with main Chat behavior.',
 	},
+	's6-15': {
+		title: 'Format before Knowledge save',
+		description:
+			'Manual save and debounced auto-save run the same document formatter as in the editor (including safe fenced-code handling) before writing to cloud or local storage.',
+	},
 	's7-1': {
 		title: 'IME (input method editor) compatibility',
 		description:

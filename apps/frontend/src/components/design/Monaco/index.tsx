@@ -42,6 +42,7 @@ import {
 	type MonacoEditorContextActions,
 } from './contextMenu';
 import {
+	formatEditorContentBeforeSave,
 	registerPrettierFormatProviders,
 	safeFormatMarkdownValue,
 } from './format';
@@ -200,6 +201,8 @@ interface MarkdownEditorProps {
 	 * 知识库自动保存依赖此 ref，否则脏检查会一直认为「与快照一致」而跳过。
 	 */
 	getMarkdownFromEditorRef?: RefObject<(() => string) | null>;
+	/** 保存前异步格式化并同步 onChange，返回格式化后的全文 */
+	formatMarkdownBeforeSaveRef?: RefObject<(() => Promise<string>) | null>;
 	/**
 	 * Monaco 粘性滚动（sticky scroll）开关：
 	 * - true：启用粘性条（顶部钉住外层语法块行）
@@ -283,6 +286,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	autoSaveIntervalSec = 60,
 	onAutoSaveIntervalSecChange,
 	getMarkdownFromEditorRef,
+	formatMarkdownBeforeSaveRef,
 	stickyScrollEnabled = true,
 	stickyScrollScrollWithEditor = true,
 	diffBaselineSource = 'current',
@@ -1361,10 +1365,26 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 				};
 			}
 
+			// 提供格式化 Markdown 内容的 ref，供父组件手动触发保存前格式化操作
+			if (formatMarkdownBeforeSaveRef) {
+				formatMarkdownBeforeSaveRef.current = async () => {
+					// 格式化编辑器内容（如 Markdown 自动走 safeFormat，其它语言由 Monaco 格式化）
+					const v = await formatEditorContentBeforeSave(editor, monaco);
+					// 保存最新格式化后的值
+					lastEmittedRef.current = v;
+					// 如有变更回调函数则触发
+					onChangeRef.current?.(v);
+					return v;
+				};
+			}
+
 			editor.onDidDispose(() => {
 				editorContextActionsRef.current = null;
 				if (getMarkdownFromEditorRef) {
 					getMarkdownFromEditorRef.current = null;
+				}
+				if (formatMarkdownBeforeSaveRef) {
+					formatMarkdownBeforeSaveRef.current = null;
 				}
 				applyEditorLayoutRef.current = null;
 				cancelAnimationFrame(pushRaf);
@@ -1401,7 +1421,12 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 
 			editor.focus();
 		},
-		[getMarkdownFromEditorRef, syncPreviewFromEditor, placeholder],
+		[
+			getMarkdownFromEditorRef,
+			formatMarkdownBeforeSaveRef,
+			syncPreviewFromEditor,
+			placeholder,
+		],
 	);
 
 	useEffect(() => {
@@ -1410,8 +1435,11 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 			if (getMarkdownFromEditorRef) {
 				getMarkdownFromEditorRef.current = null;
 			}
+			if (formatMarkdownBeforeSaveRef) {
+				formatMarkdownBeforeSaveRef.current = null;
+			}
 		};
-	}, [getMarkdownFromEditorRef]);
+	}, [getMarkdownFromEditorRef, formatMarkdownBeforeSaveRef]);
 
 	const focusEditor = useCallback(() => {
 		editorRef.current?.focus();

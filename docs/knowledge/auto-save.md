@@ -1,5 +1,7 @@
 # 知识库：自动保存（防抖）实现思路与代码说明
 
+> **保存前格式化**：手动/自动保存均会先格式化再落库，见 [knowledge-save-format-before-persist.md](./knowledge-save-format-before-persist.md)。
+
 本文记录：在知识编辑页（`apps/frontend/src/views/knowledge/index.tsx`）实现「**停止编辑一段时间后自动保存**」的完整思路、涉及文件、关键代码片段，以及对核心逻辑的逐段逐行说明（行号以文档编写时仓库版本为准，后续如有重构请以实际文件为准）。
 
 ---
@@ -33,7 +35,7 @@
 | ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
 | `apps/frontend/src/views/knowledge/index.tsx`          | 自动保存的调度（防抖定时器）、保存流程抽象（`performSave`）、覆盖保存与自动保存的业务约束                        |
 | `apps/frontend/src/store/knowledge.ts`                 | 自动保存开关与间隔的状态与持久化（`localStorage`），对外提供 setter                                              |
-| `apps/frontend/src/components/design/Monaco/index.tsx` | 底部操作栏 UI（自动保存开关 + 间隔选择）；提供 `getMarkdownFromEditorRef` 以保存前从编辑器取最新正文并同步 flush |
+| `apps/frontend/src/components/design/Monaco/index.tsx` | 底部操作栏 UI；`getMarkdownFromEditorRef` / `formatMarkdownBeforeSaveRef`（保存前格式化并 flush，见 [knowledge-save-format-before-persist.md](./knowledge-save-format-before-persist.md)） |
 
 ---
 

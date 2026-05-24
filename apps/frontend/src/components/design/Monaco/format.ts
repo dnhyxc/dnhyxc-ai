@@ -8,11 +8,11 @@ import * as postcssPluginMod from 'prettier/plugins/postcss';
 import * as typescriptPluginMod from 'prettier/plugins/typescript';
 import * as yamlPluginMod from 'prettier/plugins/yaml';
 import { format } from 'prettier/standalone';
-
 import {
 	joinMarkdownSegments,
 	splitMarkdownFencedBlocks,
 } from '@/utils/markdownFenceLineParser';
+import { normalizeMonacoEol } from './utils';
 
 /** 与 pangu 一致的 CJK Unicode 块，用于轻量「盘古之白」 */
 const PANGU_CJK =
@@ -280,6 +280,53 @@ const LANGUAGES_WITH_FORMAT: string[] = [
 	'yaml',
 	'json',
 ];
+
+/**
+ * 保存前格式化编辑器全文（与右键/⌘⇧F 一致）：Markdown 走 safeFormat，其它语言走 Monaco 内置 formatDocument。
+ * 返回规范化 EOL 后的文本，供父组件写入 store 并落库。
+ * 保存前格式化编辑器全文（与右键/⌘⇧F 一致）：
+ * - Markdown 使用 safeFormatMarkdownValue 进行格式化
+ * - 其他语言使用 Monaco 自带的 formatDocument 动作
+ * - 格式化后统一行尾为 \n，返回值供父组件入库
+ *
+ * @param editor Monaco 编辑器实例
+ * @param monaco Monaco 命名空间
+ * @returns 格式化（规范化行尾）的全文字符串
+ */
+export async function formatEditorContentBeforeSave(
+	editor: Parameters<OnMount>[0],
+	monaco: MonacoApi,
+): Promise<string> {
+	const model = editor.getModel();
+	// 没有 model 时直接取编辑器内容并规范化 EOL
+	if (!model) {
+		return normalizeMonacoEol(editor.getValue());
+	}
+	// 只读时不处理，返回当前值
+	if (editor.getOption(monaco.editor.EditorOption.readOnly)) {
+		return normalizeMonacoEol(model.getValue());
+	}
+
+	// 针对 markdown 特殊处理，手动走 safeFormatMarkdownValue
+	if (model.getLanguageId() === 'markdown') {
+		const next = await safeFormatMarkdownValue(model.getValue());
+		if (next != null) {
+			// 插入 Undo 步，让格式化可撤销
+			editor.pushUndoStop();
+			// 替换全文为格式化后文本（可撤销）
+			editor.executeEdits('dnhyxc-markdown-save-format', [
+				{ range: model.getFullModelRange(), text: next },
+			]);
+			editor.pushUndoStop();
+		}
+	} else {
+		// 其它语言走 Monaco 内置 formatter
+		await editor.getAction('editor.action.formatDocument')?.run();
+	}
+
+	// 统一返回格式化后的文本（规范化行尾）
+	return normalizeMonacoEol(editor.getValue());
+}
 
 export function registerPrettierFormatProviders(monaco: MonacoApi): void {
 	const docProvider = createDocumentFormattingProvider();

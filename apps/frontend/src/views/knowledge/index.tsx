@@ -99,6 +99,10 @@ const Knowledge = observer(() => {
 	markdownAssistantOpenRef.current = markdownAssistantOpen;
 	/** 保存前从 Monaco 同步正文，避免 onChange 经 rAF 合并时 store 滞后导致脏检查误判 */
 	const getMarkdownFromEditorRef = useRef<(() => string) | null>(null);
+	/** 保存前先走 Prettier 安全格式化，再返回全文并同步 store */
+	const formatMarkdownBeforeSaveRef = useRef<(() => Promise<string>) | null>(
+		null,
+	);
 	/**
 	 * 「复制选中内容到助手」重复写入防护：
 	 * - 右键菜单项在同一次点击链路里可能出现两次 onSelect（或与快捷键链路极短时间叠加）
@@ -606,8 +610,6 @@ const Knowledge = observer(() => {
 	 */
 	const performSave = useCallback(
 		async (mode: KnowledgeSaveMode) => {
-			const markdown =
-				getMarkdownFromEditorRef.current?.() ?? knowledgeStore.markdown ?? '';
 			const trimmedTitle = knowledgeStore.knowledgeTitle.trim();
 			if (!trimmedTitle) {
 				if (mode === 'normal') {
@@ -618,70 +620,79 @@ const Knowledge = observer(() => {
 				}
 				return;
 			}
-			if (!markdown) {
-				if (mode === 'normal') {
-					Toast({
-						type: 'warning',
-						title: t('knowledge.validation.contentRequired'),
-					});
-				}
-				return;
-			}
-			const snap = knowledgeStore.knowledgePersistedSnapshot;
-			if (snap.title === trimmedTitle && snap.content === markdown) {
-				return;
-			}
-
-			// 浏览器端未登录：无法写云端也无 Tauri 本地写入，避免仅更新快照造成「已保存」假象
-			if (!isTauriRuntime() && !isCloudLoggedIn) {
-				if (mode === 'normal') {
-					Toast({
-						type: 'warning',
-						title: t('auth.loginRequired'),
-						message: t('knowledge.save.loginTip'),
-					});
-				}
-				return;
-			}
-
-			let tauriPayload: SaveKnowledgeMarkdownPayload | undefined;
-			let tauriTargetExists = false;
-
-			if (isTauriRuntime()) {
-				const diskTitle = knowledgeStore.knowledgeLocalDiskTitle;
-				const previousTitle =
-					knowledgeStore.knowledgeEditingKnowledgeId &&
-					diskTitle &&
-					diskTitle !== trimmedTitle
-						? diskTitle
-						: undefined;
-				const tauriBaseDir = isKnowledgeLocalMarkdownId(
-					knowledgeStore.knowledgeEditingKnowledgeId,
-				)
-					? knowledgeStore.knowledgeLocalDirPath?.trim() || TAURI_KNOWLEDGE_DIR
-					: TAURI_KNOWLEDGE_DIR;
-				tauriPayload = {
-					title: trimmedTitle,
-					content: markdown,
-					filePath: tauriBaseDir,
-					...(previousTitle ? { previousTitle } : {}),
-				};
-				const target = await invokeResolveKnowledgeMarkdownTarget(tauriPayload);
-				tauriTargetExists = target.exists;
-				if (target.exists && !knowledgeStore.knowledgeOverwriteSaveEnabled) {
-					if (mode === 'auto') {
-						return;
-					}
-					knowledgeStore.openKnowledgeOverwriteConfirm(
-						target.path,
-						tauriPayload,
-					);
-					return;
-				}
-			}
 
 			setSaveLoading(true);
 			try {
+				const markdown =
+					(await formatMarkdownBeforeSaveRef.current?.()) ??
+					getMarkdownFromEditorRef.current?.() ??
+					knowledgeStore.markdown ??
+					'';
+
+				if (!markdown) {
+					if (mode === 'normal') {
+						Toast({
+							type: 'warning',
+							title: t('knowledge.validation.contentRequired'),
+						});
+					}
+					return;
+				}
+				const snap = knowledgeStore.knowledgePersistedSnapshot;
+				if (snap.title === trimmedTitle && snap.content === markdown) {
+					return;
+				}
+
+				// 浏览器端未登录：无法写云端也无 Tauri 本地写入，避免仅更新快照造成「已保存」假象
+				if (!isTauriRuntime() && !isCloudLoggedIn) {
+					if (mode === 'normal') {
+						Toast({
+							type: 'warning',
+							title: t('auth.loginRequired'),
+							message: t('knowledge.save.loginTip'),
+						});
+					}
+					return;
+				}
+
+				let tauriPayload: SaveKnowledgeMarkdownPayload | undefined;
+				let tauriTargetExists = false;
+
+				if (isTauriRuntime()) {
+					const diskTitle = knowledgeStore.knowledgeLocalDiskTitle;
+					const previousTitle =
+						knowledgeStore.knowledgeEditingKnowledgeId &&
+						diskTitle &&
+						diskTitle !== trimmedTitle
+							? diskTitle
+							: undefined;
+					const tauriBaseDir = isKnowledgeLocalMarkdownId(
+						knowledgeStore.knowledgeEditingKnowledgeId,
+					)
+						? knowledgeStore.knowledgeLocalDirPath?.trim() ||
+							TAURI_KNOWLEDGE_DIR
+						: TAURI_KNOWLEDGE_DIR;
+					tauriPayload = {
+						title: trimmedTitle,
+						content: markdown,
+						filePath: tauriBaseDir,
+						...(previousTitle ? { previousTitle } : {}),
+					};
+					const target =
+						await invokeResolveKnowledgeMarkdownTarget(tauriPayload);
+					tauriTargetExists = target.exists;
+					if (target.exists && !knowledgeStore.knowledgeOverwriteSaveEnabled) {
+						if (mode === 'auto') {
+							return;
+						}
+						knowledgeStore.openKnowledgeOverwriteConfirm(
+							target.path,
+							tauriPayload,
+						);
+						return;
+					}
+				}
+
 				if (isTauriRuntime() && tauriPayload) {
 					await persistKnowledgeApi();
 					const toWrite = tauriTargetExists
@@ -1177,6 +1188,7 @@ const Knowledge = observer(() => {
 					onChange={handleMarkdownChange}
 					onInsertSelectionToAssistant={onInsertSelectionToAssistant}
 					getMarkdownFromEditorRef={getMarkdownFromEditorRef}
+					formatMarkdownBeforeSaveRef={formatMarkdownBeforeSaveRef}
 					markdownBottomBarShortcutHint={
 						knowledgeChords.toggleMarkdownBottomBar
 					}
