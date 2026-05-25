@@ -1,10 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import { type AIMessageChunk, HumanMessage } from '@langchain/core/messages';
-import { ChatOpenAI } from '@langchain/openai';
+import type { ChatOpenAI } from '@langchain/openai';
 import { Cache } from '@nestjs/cache-manager';
 import {
-	HttpException,
-	HttpStatus,
 	Inject,
 	Injectable,
 	type LoggerService,
@@ -15,8 +13,11 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { createAgent } from 'langchain';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { Observable, type Subscriber } from 'rxjs';
-import { ModelEnum } from 'src/enum/config.enum';
 import { Repository } from 'typeorm';
+import {
+	createLlm,
+	GLM_THINKING_DISABLED_KWARGS,
+} from '../../utils/create-llm';
 import { KnowledgeQaService } from '../knowledge-qa/knowledge-qa.service';
 import { WebSearchService } from '../web-search/web-search.service';
 import type {
@@ -322,19 +323,7 @@ export class AgentService {
 	}
 
 	/**
-	 * 与 Assistant 模块一致：智谱 GLM 模型名解析顺序
-	 */
-	private getGlmModelName(): string {
-		return (
-			this.configService.get<string>(ModelEnum.SILICONFLOW_MODEL_NAME) ||
-			this.configService.get<string>(ModelEnum.DEEPSEEK_MODEL_NAME) ||
-			this.configService.get<string>(ModelEnum.ZHIPU_MODEL_NAME) ||
-			'glm-4.7'
-		);
-	}
-
-	/**
-	 * 构建主模型与摘要模型（智谱 OpenAI 兼容接口 + ChatOpenAI）
+	 * 构建主模型与摘要模型（preset `chat`：与主站对话共用凭证与模型名）
 	 * @param options maxTokens|temperature|signal
 	 */
 	private buildModels(options: {
@@ -342,43 +331,22 @@ export class AgentService {
 		temperature?: number;
 		signal?: AbortSignal;
 	}): { main: ChatOpenAI; summary: ChatOpenAI } {
-		const apiKey = this.configService.get<string>(
-			ModelEnum.SILICONFLOW_API_KEY,
-		);
-		const baseURL =
-			this.configService.get<string>(ModelEnum.SILICONFLOW_BASE_URL) ||
-			'https://open.bigmodel.cn/api/paas/v4';
-		const modelName = this.getGlmModelName();
-		if (!apiKey) {
-			throw new HttpException(
-				'硅基流动 未正确配置（SILICONFLOW_API_KEY）',
-				HttpStatus.SERVICE_UNAVAILABLE,
-			);
-		}
-		// 主模型：用于主会话推理，流式
-		const main = new ChatOpenAI({
-			apiKey,
-			modelName,
+		const main = createLlm(this.configService, {
+			preset: 'chat',
 			streaming: true,
-			temperature: options.temperature ?? 0.3,
-			maxTokens: options.maxTokens ?? 4096,
-			configuration: { baseURL },
-			// 与 assistant.service 中智谱请求一致：关闭 thinking（思考链），避免干扰工具调用与流式正文
-			modelKwargs: { thinking: { type: 'disabled' as const } },
-			...(options.signal && {
-				callOptions: { signal: options.signal },
-			}),
+			temperature: options.temperature,
+			defaultTemperature: 0.3,
+			maxTokens: options.maxTokens,
+			defaultMaxTokens: 4096,
+			abortSignal: options.signal,
+			modelKwargs: GLM_THINKING_DISABLED_KWARGS,
 		});
-		// 摘要模型：非流式、温度低，用于 summarizationMiddleware / 折叠摘要
-		const summary = new ChatOpenAI({
-			apiKey,
-			modelName,
+		const summary = createLlm(this.configService, {
+			preset: 'chat',
 			streaming: false,
 			temperature: 0.2,
 			maxTokens: 2048,
-			configuration: { baseURL },
-			// 与 assistant.service 中智谱请求一致：关闭 thinking（思考链），避免干扰工具调用与流式正文
-			modelKwargs: { thinking: { type: 'disabled' as const } },
+			modelKwargs: GLM_THINKING_DISABLED_KWARGS,
 		});
 		return { main, summary };
 	}

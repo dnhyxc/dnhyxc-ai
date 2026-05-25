@@ -16,6 +16,11 @@ export type SiliconFlowLlmPreset =
 	| 'knowledgeQa'
 	| 'englishLearning';
 
+/** 关闭 GLM thinking 链（Agent / Assistant 工具调用与流式正文） */
+export const GLM_THINKING_DISABLED_KWARGS = {
+	thinking: { type: 'disabled' as const },
+};
+
 export type SiliconFlowCredentials = {
 	apiKey: string;
 	baseURL: string;

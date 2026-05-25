@@ -9,6 +9,7 @@
 | 文档 | 说明 |
 |------|------|
 | **[create-llm.md](./create-llm.md)** | `createLlm` 统一工厂（preset / maxTokens / 排查 400） |
+| **[agent-create-llm-unify.md](./agent-create-llm-unify.md)** | 英语学习 `AgentService` 改 `createLlm` + `preset: 'chat'` |
 | **[siliconflow-chat-unification.md](./siliconflow-chat-unification.md)** | 硅基接入总览 + Assistant SSE |
 | [english-learning-backend-implementation.md](./english-learning-backend-implementation.md) | 英语学习后端总览 |
 | [english-learning-master-agent-web-search-to-llm.md](./english-learning-master-agent-web-search-to-llm.md) | 英语学习 Agent 与联网 |

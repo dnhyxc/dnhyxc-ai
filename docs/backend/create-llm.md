@@ -32,6 +32,7 @@
 | `apps/backend/src/services/assistant/assistant.service.ts` | 删除私有 `buildAssistantStreamLlm`；`preset: 'assistant'` |
 | `apps/backend/src/services/knowledge-qa/knowledge-qa.service.ts` | 删除私有 resolve/build；`preset: 'knowledgeQa'` |
 | `apps/backend/src/services/english-learning/english-learning.service.ts` | 主 Agent 与子模型 JSON 均 `preset: 'englishLearning'` |
+| `apps/backend/src/services/agent/agent.service.ts` | 英语学习页 ReAct Agent SSE：`buildModels` → `createLlm({ preset: 'chat' })`（见 [agent-create-llm-unify.md](./agent-create-llm-unify.md)） |
 | `apps/backend/src/enum/config.enum.ts` | 统一 `SILICONFLOW_MODEL_NAME` / `SILICONFLOW_API_KEY` 等（`DEEPSEEK_*` 标 deprecated） |
 
 ---
@@ -62,6 +63,8 @@ const llm = createLlm(this.configService, {
 | `knowledgeQa` | `KnowledgeQaService` | 硅基 → DashScope → Qwen | 仅硅基 | `SILICONFLOW_MODEL_NAME` → `DEEPSEEK_MODEL_NAME` → `KNOWLEDGE_QA_MODEL` | 普通 `Error` |
 | `englishLearning` | 单词包 Agent / JSON 子模型 | 硅基 → DeepSeek → DashScope | 硅基 → DeepSeek | `SILICONFLOW_MODEL_NAME` → `DEEPSEEK_MODEL_NAME` → 默认 GLM-4.7 | 503 |
 
+**说明**：`AgentService`（`/agent` 流式对话）与主站 Chat **共用** `preset: 'chat'` 的凭证与模型名解析，不单独占 preset；详见 [agent-create-llm-unify.md](./agent-create-llm-unify.md)。
+
 **重要**：当实际请求发往 **硅基流动** `baseURL` 时，`modelName` 必须是硅基支持的 ID（如 `Pro/zai-org/GLM-4.7`）。若仅配置了 `DEEPSEEK_MODEL_NAME=deepseek-chat` 而未配置 `SILICONFLOW_MODEL_NAME`，会触发 **400**（见 §5 排查）。
 
 ### 3.3 `maxTokensPolicy`
@@ -79,9 +82,22 @@ const llm = createLlm(this.configService, {
 
 ## 4. 关键代码与注释
 
+### 4.0 `GLM_THINKING_DISABLED_KWARGS`
+
+**来源**：`apps/backend/src/utils/create-llm.ts`（约 L19–L22）
+
+```typescript
+/** 关闭 GLM thinking 链（Agent / Assistant 工具调用与流式正文） */
+export const GLM_THINKING_DISABLED_KWARGS = {
+  thinking: { type: 'disabled' as const },
+};
+```
+
+`AgentService.buildModels` 通过 `modelKwargs: GLM_THINKING_DISABLED_KWARGS` 传入；Assistant 流式亦可复用同一常量。
+
 ### 4.1 `createLlm` 入口
 
-**来源**：`apps/backend/src/utils/create-llm.ts`（约 L215–L258）
+**来源**：`apps/backend/src/utils/create-llm.ts`（约 L198–L258）
 
 ```typescript
 export function createLlm(
@@ -198,7 +214,7 @@ SILICONFLOW_MODEL_NAME=Pro/zai-org/GLM-4.7
 
 1. 主站 Chat 流式 / 停止 / 续写。
 2. 知识库助手多轮 + 停止；RAG `qa.delta`。
-3. 英语学习：主题单词包流式、JSON 子模型、主 Agent 联网（可选）。
+3. 英语学习：主题单词包流式、JSON 子模型、主 Agent 联网（可选）；页内 ReAct Agent SSE（`AgentService`，见 [agent-create-llm-unify.md](./agent-create-llm-unify.md)）。
 4. 修改 `.env` 后重启 `pnpm server:dev`。
 
 ---
@@ -208,5 +224,6 @@ SILICONFLOW_MODEL_NAME=Pro/zai-org/GLM-4.7
 | 说明 | 路径 |
 |------|------|
 | 工厂实现 | `apps/backend/src/utils/create-llm.ts` |
+| Agent ReAct 接入 | [agent-create-llm-unify.md](./agent-create-llm-unify.md) |
 | 配置枚举 | `apps/backend/src/enum/config.enum.ts` |
 | 硅基接入总览 | [siliconflow-chat-unification.md](./siliconflow-chat-unification.md) |
