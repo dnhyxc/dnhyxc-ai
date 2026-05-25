@@ -123,6 +123,58 @@ export function toUploadPublicPath(absoluteFilePath: string): string {
 	throw new Error(`无法解析上传文件路径: ${absoluteFilePath}`);
 }
 
+/** 剥掉绝对 URL，统一为 /images/... 或 /files/... */
+export function normalizeUploadPublicPath(path: string): string {
+	const trimmed = path?.trim();
+	if (!trimmed) return trimmed;
+
+	const fromAbsolute = trimmed.match(
+		/^https?:\/\/[^/]+(\/(?:images|files)\/.+)$/i,
+	);
+	if (fromAbsolute) {
+		return fromAbsolute[1];
+	}
+
+	if (trimmed.startsWith('/images/') || trimmed.startsWith('/files/')) {
+		return trimmed;
+	}
+
+	return trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+}
+
+/** 将 path 各段 decodeURIComponent，与磁盘中文文件名对齐 */
+export function decodeUploadPublicPath(path: string): string {
+	const normalized = normalizeUploadPublicPath(path);
+	return normalized
+		.split('/')
+		.map((seg) => {
+			if (!seg) return '';
+			try {
+				return decodeURIComponent(seg);
+			} catch {
+				return seg;
+			}
+		})
+		.join('/');
+}
+
+/** 附件公开路径 → 本机绝对路径（供 OCR / 文件解析读盘） */
+export function resolveUploadPublicPathToAbsolute(
+	path: string,
+	fromDirname: string = __dirname,
+): string {
+	const decoded = decodeUploadPublicPath(path);
+	const matched = decoded.match(/^\/(images|files)\/(.+)$/);
+	if (!matched) {
+		throw new Error(`无法解析附件路径: ${path}`);
+	}
+	return resolveStoredUploadAbsolutePath(
+		matched[2],
+		matched[1] as 'images' | 'files',
+		fromDirname,
+	);
+}
+
 export function getAllowedUploadRoots(
 	fromDirname: string = __dirname,
 ): string[] {

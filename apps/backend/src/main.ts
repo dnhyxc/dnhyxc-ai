@@ -9,6 +9,7 @@ import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { AllExceptionFilter } from './filters/all-exception-filter';
+import { serveUploadStaticMiddleware } from './middleware/serve-upload-static.middleware';
 import { getUploadsRoot } from './utils/upload-paths';
 
 async function bootstrap() {
@@ -18,6 +19,11 @@ async function bootstrap() {
 		// Stripe Webhook 签名校验需要原始请求体
 		rawBody: true,
 	});
+
+	const uploadsRoot = getUploadsRoot(__dirname);
+	// 须在 globalPrefix 之前：直接处理 /images、/files（解码中文文件名）
+	app.use(serveUploadStaticMiddleware(uploadsRoot));
+
 	// 设置全局前缀为 api
 	app.setGlobalPrefix('api');
 	const logger = app.get(WINSTON_MODULE_NEST_PROVIDER);
@@ -60,8 +66,8 @@ async function bootstrap() {
 		}),
 	);
 
-	// 静态 uploads：apps/backend/uploads（与 dist 同级）
-	app.useStaticAssets(getUploadsRoot(__dirname));
+	// 静态 uploads 兜底（与 serveUploadStaticMiddleware 同目录）
+	app.useStaticAssets(uploadsRoot);
 
 	// 启用关闭钩子，用于在应用关闭时执行一些操作
 	app.enableShutdownHooks();
@@ -78,8 +84,10 @@ async function bootstrap() {
 
 	SwaggerModule.setup('/api-docs', app, document);
 
-	await app.listen(process.env.PORT ?? 9112);
+	const port = process.env.PORT ?? 9112;
+	await app.listen(port);
 	logger.log(`Application is running on: ${await app.getUrl()}`);
+	logger.log(`Uploads static root: ${uploadsRoot}`);
 }
 
 bootstrap();

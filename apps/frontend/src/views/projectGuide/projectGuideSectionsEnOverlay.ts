@@ -91,7 +91,7 @@ export const PROJECT_GUIDE_ITEMS_EN: Record<
 	'pg-s4-4': {
 		title: '4.4 Attachments and OCR',
 		description:
-			'Upload images or screenshots and ask to extract text, summarize, or turn tables into Markdown. After upload, attachments appear above the input; tap an image card to preview. Chinese filenames are handled automatically; web and desktop can preview in chat without opening a new tab.',
+			'Upload images or screenshots and ask to extract text, summarize, or turn tables into Markdown. After upload, attachments appear above the input; tap an image card to preview. Chinese filenames are handled automatically; web and desktop can preview in chat without opening a new tab. On the production website, preview uses the same site address as chat—no separate static image gateway is usually required. If preview still fails after upgrading, redeploy frontend and backend and restart services.',
 	},
 	'pg-s4-5': {
 		title: '4.5 Desktop voice input (Tauri)',

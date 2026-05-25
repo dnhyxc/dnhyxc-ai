@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { FindOneOptions, In, Repository } from 'typeorm';
+import { decodeUploadPublicPath } from '../../utils/upload-paths';
 import { Attachments } from './attachments.entity';
 import { ChatMessages } from './chat.entity';
 import { CreateSessionDto } from './dto/chat-request.dto';
@@ -226,11 +227,14 @@ export class MessageService {
 			// 如果有附件，保存附件信息
 			if (attachments?.length > 0) {
 				const files = attachments.map((attachment) => {
-					const createdAttachment = this.attachmentsRepository.create({
-						...attachment,
+					return this.attachmentsRepository.create({
+						filename: attachment.filename,
+						originalname: attachment.originalname,
+						mimetype: attachment.mimetype,
+						size: attachment.size,
+						path: decodeUploadPublicPath(attachment.path),
 						message: savedMessage,
 					});
-					return createdAttachment;
 				});
 				await this.attachmentsRepository.save(files);
 			}

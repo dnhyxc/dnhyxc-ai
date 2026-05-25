@@ -1,7 +1,8 @@
 # 对话附件上传与图片预览修复
 
-> **文档角色（主文档）**：聊天附件从上传到预览的 URL 解析、开发代理、生产 Nginx 与后端 CORP（Cross-Origin Resource Policy，跨源资源策略）配置。  
-> **延伸阅读**：[chatbot.md](./chatbot.md) §3.3 附件与 OCR；[../backend/upload-storage-paths.md](../backend/upload-storage-paths.md)（后端 uploads 落盘与 `UPLOAD_ROOT`）；[../frontend/qiniu-dev-http-proxy.md](../frontend/qiniu-dev-http-proxy.md)（七牛展示链，与 uploads 路径无关）。
+> **文档角色（开发态主文档）**：Vite 反代、CORP、开发环境 URL 解析。  
+> **生产 Web / Nginx 400、SSE 路径、/api/upload/serve**：详见 **[chat-upload-access-prod.md](./chat-upload-access-prod.md)**（主文档）。  
+> **延伸阅读**：[chatbot.md](./chatbot.md) §3.3 附件与 OCR；[../backend/upload-storage-paths.md](../backend/upload-storage-paths.md)；[../backend/nginx.md](../backend/nginx.md)；[../frontend/qiniu-dev-http-proxy.md](../frontend/qiniu-dev-http-proxy.md)（七牛，与 uploads 无关）。
 
 ---
 

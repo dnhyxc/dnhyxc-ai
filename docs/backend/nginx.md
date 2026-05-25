@@ -134,17 +134,27 @@ server {
     proxy_pass  https://172.17.0.1:9112;
   }
 
-  location /images/ {
-    root  /usr/local/server/src/upload/images;
-    rewrite  ^/usr/local/server/src/upload/(.*) /$1 break;
-    proxy_pass  http://172.17.0.1:9112;
+  # 附件静态资源：仅反代到 Nest（useStaticAssets 挂载 uploads 根目录）
+  # 勿与 root 混用；旧路径 /usr/local/server/src/upload 已废弃，现用 /usr/local/dnhyxc-ai/server/uploads
+  # 方案 A（推荐）：Nginx 直接读盘，勿与 proxy_pass / root 混用（混用易 400）
+  location ^~ /images/ {
+    alias /usr/local/dnhyxc-ai/server/uploads/images/;
+    add_header Cross-Origin-Resource-Policy cross-origin;
+    expires 7d;
   }
 
-  location /files/ {
-    root  /usr/local/server/src/upload/files;
-    rewrite  ^/usr/local/server/src/upload/(.*) /$1 break;
-    proxy_pass  http://172.17.0.1:9112;
+  location ^~ /files/ {
+    alias /usr/local/dnhyxc-ai/server/uploads/files/;
+    add_header Cross-Origin-Resource-Policy cross-origin;
+    expires 7d;
   }
+
+  # 方案 B：反代到 9112 → Nest（须删掉上面的 root/rewrite，且 9112 用 ^~ /images/ 反代 9226）
+  # location ^~ /images/ {
+  #   proxy_set_header Host $http_host;
+  #   proxy_set_header X-Forwarded-Proto $scheme;
+  #   proxy_pass https://172.17.0.1:9112;
+  # }
 
   error_page  500 502 503 504 /50x.html;
   location = /50x.html {
@@ -158,11 +168,12 @@ server {
 # - 让外部访问 `https://dnhyxc.cn:9112/api/...` 命中后端 NestJS 路由
 # - TLS 由 Nginx 负责（终止 TLS），后端服务继续跑 HTTP
 #
-# 端口规划（避免冲突）：
+# 端口规划（当前生产示例）：
 # - Nginx：listen 9112 ssl（对公网）
-# - NestJS（pm2）：listen 9113（仅本机/内网 HTTP）
+# - NestJS（pm2）：listen 9226（本机 HTTP，与 proxy_pass 一致）
+# - Web 前端：listen 9002 ssl → 反代 /api、/images 到 9112
 #
-# 注意：若后端仍监听 9112，则 Nginx 无法占用 9112；必须把后端端口挪走（例如 9113）。
+# 注意：Nest 不能与本机 9112 端口同时监听；由 Nginx 占 9112 终止 TLS。
 #
 server {
   # 对外 HTTPS 端口：满足 `https://dnhyxc.cn:9112`
@@ -180,6 +191,24 @@ server {
     try_files $uri $uri/ /index.html;
   }
 
+  # 附件：仅反代到 Nest（uploads 由 useStaticAssets 提供，勿写 root/rewrite）
+  # 必须写在 location / 之前，且用 ^~，否则 try_files 会把 /images/xxx 当成前端路由
+  location ^~ /images/ {
+    proxy_set_header Host $http_host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_pass http://127.0.0.1:9226;
+  }
+
+  location ^~ /files/ {
+    proxy_set_header Host $http_host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto https;
+    proxy_pass http://127.0.0.1:9226;
+  }
+
   # 后端 API：/api 前缀与 Nest `app.setGlobalPrefix('api')` 对齐
   location /api/ {
     proxy_set_header Host $http_host;
@@ -188,12 +217,10 @@ server {
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto https;
 
-    # SSE/流式接口建议关闭缓冲，避免“卡住不出字”
     proxy_buffering off;
     proxy_cache off;
 
-    # 反代到本机 HTTP 后端（pm2）：务必与 pm2 的 PORT 保持一致
-    proxy_pass http://127.0.0.1:9113;
+    proxy_pass http://127.0.0.1:9226;
   }
 
   # Web 端 HTTPS 页面加载外部 HTTP 图片（mixed content）兼容

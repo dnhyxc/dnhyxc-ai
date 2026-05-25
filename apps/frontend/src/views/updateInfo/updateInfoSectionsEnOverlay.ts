@@ -137,7 +137,7 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 	's4-10': {
 		title: 'Chat attachment image preview fix',
 		description:
-			'Fixes failed image preview after upload in web and desktop chat (including Chinese filenames and cross-port browser blocking). Attachments preview and download correctly after deploy; production requires frontend redeploy and backend restart.',
+			'Fixes failed image preview after upload on web and desktop (Chinese filenames, cross-port blocking, misconfigured gateways). On production web, attachments load via the same site API route instead of a separate static image path; message payloads use on-disk filenames for OCR. Deploy both frontend and backend and restart; legacy direct /images/ URLs may still need gateway fixes.',
 	},
 	's5-1': {
 		title: 'Markdown rendering',

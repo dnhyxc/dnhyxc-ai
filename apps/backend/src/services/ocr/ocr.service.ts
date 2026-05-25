@@ -8,6 +8,7 @@ import { ConfigService } from '@nestjs/config';
 import { Observable } from 'rxjs';
 import { ModelEnum } from 'src/enum/config.enum';
 // import { Repository } from 'typeorm';
+import { resolveAttachmentBuffer } from '../../utils/file-parser';
 import { CreateOcrDto } from './dto/create-ocr.dto';
 // import { Ocr } from './ocr.entity';
 
@@ -66,6 +67,23 @@ export class OcrService {
 		});
 	}
 
+	/** 支持 https 绝对地址与 /images、/files 相对路径（读本地 uploads） */
+	async pathOrUrlToDataUrl(pathOrUrl: string): Promise<string> {
+		if (/^https?:\/\//i.test(pathOrUrl)) {
+			return (await this.urlToBase64Node(pathOrUrl)) as string;
+		}
+
+		const buffer = await resolveAttachmentBuffer(pathOrUrl);
+		const lower = pathOrUrl.toLowerCase();
+		let contentType = 'application/octet-stream';
+		if (lower.includes('.png')) contentType = 'image/png';
+		else if (lower.includes('.webp')) contentType = 'image/webp';
+		else if (lower.includes('.gif')) contentType = 'image/gif';
+		else if (/\.jpe?g($|\?)/i.test(lower)) contentType = 'image/jpeg';
+
+		return `data:${contentType};base64,${buffer.toString('base64')}`;
+	}
+
 	async imageOcrStream(
 		dto: CreateOcrDto,
 	): Promise<string | Observable<string>> {
@@ -75,7 +93,7 @@ export class OcrService {
 			const systemPrompt =
 				'You are a professional OCR and image understanding assistant. Please analyze the provided image and extract all visible text, numbers, and other content accurately. Return the extracted content in a structured format.';
 
-			const base64Image = await this.urlToBase64Node(dto.url);
+			const base64Image = await this.pathOrUrlToDataUrl(dto.url);
 
 			const messages = [
 				new SystemMessage(systemPrompt),

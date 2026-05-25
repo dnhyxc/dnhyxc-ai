@@ -10,6 +10,7 @@ import {
 } from '../../utils/upload-paths';
 import { UploadController } from './upload.controller';
 import { UploadService } from './upload.service';
+import { UploadPublicController } from './upload-public.controller';
 
 const UPLOAD_IMAGES_DIR = getUploadImagesDir(__dirname);
 const UPLOAD_FILES_DIR = getUploadFilesDir(__dirname);
@@ -47,7 +48,7 @@ const UPLOAD_FILES_DIR = getUploadFilesDir(__dirname);
 			},
 		}),
 	],
-	controllers: [UploadController],
+	controllers: [UploadController, UploadPublicController],
 	providers: [UploadService],
 })
 export class UploadModule {}

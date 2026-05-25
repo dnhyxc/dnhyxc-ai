@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import http from 'node:http';
 import https from 'node:https';
 import { extname } from 'node:path';
@@ -5,6 +6,10 @@ import { InternalServerErrorException } from '@nestjs/common';
 import mammoth from 'mammoth';
 import pdfParse from 'pdf-parse';
 import xlsx from 'xlsx';
+import {
+	normalizeUploadPublicPath,
+	resolveUploadPublicPathToAbsolute,
+} from './upload-paths';
 
 export const urlToBuffer = async (url: string) => {
 	return new Promise((resolve, reject) => {
@@ -25,6 +30,28 @@ export const urlToBuffer = async (url: string) => {
 			})
 			.on('error', reject);
 	});
+};
+
+/** 相对 /images|/files 走读盘；http(s) 走网络拉取 */
+export const resolveAttachmentBuffer = async (
+	pathOrUrl: string,
+): Promise<Buffer> => {
+	const trimmed = pathOrUrl?.trim();
+	if (!trimmed) {
+		throw new InternalServerErrorException('附件路径为空');
+	}
+
+	if (/^https?:\/\//i.test(trimmed)) {
+		return (await urlToBuffer(trimmed)) as Buffer;
+	}
+
+	const normalized = normalizeUploadPublicPath(trimmed);
+	if (normalized.startsWith('/images/') || normalized.startsWith('/files/')) {
+		const absolutePath = resolveUploadPublicPathToAbsolute(trimmed);
+		return readFile(absolutePath);
+	}
+
+	throw new InternalServerErrorException(`无效的附件路径: ${pathOrUrl}`);
 };
 
 // pdf-parse 1.x 为函数式 API：pdfParse(buffer)；2.x 才有 PDFParse 类。
@@ -92,8 +119,7 @@ export const parseFile = async (
 	const extension = mimeType || extname(filePath).toLowerCase();
 
 	try {
-		// const buffer = await readFile(filePath);
-		const buffer = (await urlToBuffer(filePath)) as Buffer;
+		const buffer = await resolveAttachmentBuffer(filePath);
 
 		switch (extension) {
 			case '.pdf':

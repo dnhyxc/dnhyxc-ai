@@ -18,6 +18,7 @@ import {
 	Message,
 	SearchOrganic,
 } from '@/types/chat';
+import { sanitizeAttachmentsForApi } from '@/utils';
 import { streamFetch } from '@/utils/sse';
 import { useMessageTools } from './useMessageTools';
 
@@ -253,7 +254,9 @@ export const useChatCore = (
 			};
 
 			if (userMessage?.attachments?.length) {
-				messageParams.attachments = userMessage?.attachments;
+				messageParams.attachments = sanitizeAttachmentsForApi(
+					userMessage.attachments,
+				);
 			}
 
 			try {
@@ -414,7 +417,9 @@ export const useChatCore = (
 				content,
 				parentId,
 				currentChatId,
-				attachments: files?.length ? files : undefined,
+				attachments: files?.length
+					? sanitizeAttachmentsForApi(files)
+					: undefined,
 				role: role || 'user',
 			});
 
@@ -529,7 +534,7 @@ export const useChatCore = (
 					chatId: userMsgId,
 					content: content || editMsg?.content.trim(),
 					parentId,
-					attachments,
+					attachments: sanitizeAttachmentsForApi(attachments),
 					currentChatId,
 				});
 				userMsg.childrenIds = [assistantMessageId];

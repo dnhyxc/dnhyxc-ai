@@ -34,6 +34,7 @@
 | 知识库助手总览                           | [knowledge/knowledge-assistant-complete.md](./knowledge/knowledge-assistant-complete.md)                           |
 | 对话模型统一硅基接入                     | [backend/siliconflow-chat-unification.md](./backend/siliconflow-chat-unification.md)                               |
 | 聊天附件上传后预览失败 / NotSameOrigin   | [chat/chat-upload-preview.md](./chat/chat-upload-preview.md)                                                       |
+| 线上 `/images/` 400、9002 附件打不开     | [chat/chat-upload-access-prod.md](./chat/chat-upload-access-prod.md) + [backend/nginx.md](./backend/nginx.md)      |
 | 上传落盘路径 / dist 清空丢附件 / UPLOAD_ROOT | [backend/upload-storage-paths.md](./backend/upload-storage-paths.md)                                             |
 | 单词包拉取 400 / 模型名与硅基端点不匹配  | [backend/create-llm.md](./backend/create-llm.md) §5.2                                                              |
 | `createLlm` 工厂与 preset                | [backend/create-llm.md](./backend/create-llm.md)                                                                   |

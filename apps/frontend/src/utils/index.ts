@@ -25,6 +25,8 @@ export {
 	encodeUploadFileUrl,
 	isCrossOriginUploadUrl,
 	resolveUploadedFileUrl,
+	sanitizeAttachmentsForApi,
+	toStorageUploadPath,
 } from './upload-file-url';
 
 /**
