@@ -34,6 +34,10 @@ export enum QiniuEnum {
 
 export enum FileEnum {
 	FILE_ROOT = 'FILE_ROOT',
+	/** 部署根目录（与 dist 同级），如 /usr/local/dnhyxc-ai/server */
+	SERVER_ROOT = 'SERVER_ROOT',
+	/** uploads 绝对路径，优先级高于 SERVER_ROOT + uploads */
+	UPLOAD_ROOT = 'UPLOAD_ROOT',
 }
 
 export enum EmailEnum {

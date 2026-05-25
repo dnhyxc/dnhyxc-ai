@@ -27,10 +27,11 @@
 
 ## 部署
 
-| 文档 |
-|------|
-| [server-deployment.md](./server-deployment.md) |
-| [deploy.md](./deploy.md) |
-| [nginx.md](./nginx.md) |
+| 文档 | 说明 |
+|------|------|
+| [server-deployment.md](./server-deployment.md) | 部署总览 |
+| [deploy.md](./deploy.md) | 部署步骤 |
+| [nginx.md](./nginx.md) | Nginx 与 `/images` 反代 |
+| **[upload-storage-paths.md](./upload-storage-paths.md)** | **本地上传目录与线上 `UPLOAD_ROOT`（主文档）** |
 
 上级索引：[../README.md](../README.md)

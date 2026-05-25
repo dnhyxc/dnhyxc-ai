@@ -1,39 +1,29 @@
 import { randomUUID } from 'node:crypto';
-import { existsSync, mkdirSync } from 'node:fs';
-import { join } from 'node:path';
-// import { extname, join } from 'node:path';
 import { Module } from '@nestjs/common';
 import { MulterModule } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
 import { decodeChineseFilename } from '../../utils';
+import {
+	ensureUploadDir,
+	getUploadFilesDir,
+	getUploadImagesDir,
+} from '../../utils/upload-paths';
 import { UploadController } from './upload.controller';
 import { UploadService } from './upload.service';
+
+const UPLOAD_IMAGES_DIR = getUploadImagesDir(__dirname);
+const UPLOAD_FILES_DIR = getUploadFilesDir(__dirname);
 
 @Module({
 	imports: [
 		MulterModule.register({
 			storage: diskStorage({
-				// destination: join(__dirname, '../../uploads'),
-				// 动态设置文件保存路径
 				destination: (_req, file, cb) => {
-					let uploadPath: string;
+					const uploadPath = file.mimetype.startsWith('image/')
+						? UPLOAD_IMAGES_DIR
+						: UPLOAD_FILES_DIR;
 
-					// 检查文件类型
-					const fileType = file.mimetype;
-
-					if (fileType.startsWith('image/')) {
-						// 图片文件
-						uploadPath = join(__dirname, '../../uploads/images');
-					} else {
-						// 其他文件（如PDF）
-						uploadPath = join(__dirname, '../../uploads/files');
-					}
-
-					// 确保目录存在
-					if (!existsSync(uploadPath)) {
-						mkdirSync(uploadPath, { recursive: true });
-					}
-
+					ensureUploadDir(uploadPath);
 					cb(null, uploadPath);
 				},
 				filename: (_req, file, cb) => {

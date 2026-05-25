@@ -34,6 +34,7 @@
 | 知识库助手总览                           | [knowledge/knowledge-assistant-complete.md](./knowledge/knowledge-assistant-complete.md)                           |
 | 对话模型统一硅基接入                     | [backend/siliconflow-chat-unification.md](./backend/siliconflow-chat-unification.md)                               |
 | 聊天附件上传后预览失败 / NotSameOrigin   | [chat/chat-upload-preview.md](./chat/chat-upload-preview.md)                                                       |
+| 上传落盘路径 / dist 清空丢附件 / UPLOAD_ROOT | [backend/upload-storage-paths.md](./backend/upload-storage-paths.md)                                             |
 | 单词包拉取 400 / 模型名与硅基端点不匹配  | [backend/create-llm.md](./backend/create-llm.md) §5.2                                                              |
 | `createLlm` 工厂与 preset                | [backend/create-llm.md](./backend/create-llm.md)                                                                   |
 | 英语学习 Agent 流式对话接 `createLlm`    | [backend/agent-create-llm-unify.md](./backend/agent-create-llm-unify.md)                                           |
@@ -43,7 +44,7 @@
 ## 文档类型说明
 
 - **实现思路 / 修复记录**：文件名多为 `*-implementation*`、`*-complete*`、具体 bug 描述；含代码摘录与回归建议。
-- **部署 / 运维**：`backend/deploy.md`、`server-deployment.md`、`nginx.md`。
+- **部署 / 运维**：`backend/deploy.md`、`server-deployment.md`、`nginx.md`、`backend/upload-storage-paths.md`。
 - **用户向**：`project-guide.md`（产品教程），应用内「更新说明」与 `meta/` 姊妹维护。
 
 新增专题文档时，请在对应子目录的 `README.md` 中补一行索引，避免只在深层目录孤立存在。

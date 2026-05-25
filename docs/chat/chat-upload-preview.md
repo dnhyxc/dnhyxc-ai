@@ -1,7 +1,7 @@
 # 对话附件上传与图片预览修复
 
 > **文档角色（主文档）**：聊天附件从上传到预览的 URL 解析、开发代理、生产 Nginx 与后端 CORP（Cross-Origin Resource Policy，跨源资源策略）配置。  
-> **延伸阅读**：[chatbot.md](./chatbot.md) §3.3 附件与 OCR；[../frontend/qiniu-dev-http-proxy.md](../frontend/qiniu-dev-http-proxy.md)（七牛展示链，与 uploads 路径无关）。
+> **延伸阅读**：[chatbot.md](./chatbot.md) §3.3 附件与 OCR；[../backend/upload-storage-paths.md](../backend/upload-storage-paths.md)（后端 uploads 落盘与 `UPLOAD_ROOT`）；[../frontend/qiniu-dev-http-proxy.md](../frontend/qiniu-dev-http-proxy.md)（七牛展示链，与 uploads 路径无关）。
 
 ---
 
@@ -32,6 +32,8 @@
 | `apps/frontend/src/components/design/ChatFileList/index.tsx` | 预览/下载 URL 与 blob 策略 |
 | `apps/frontend/vite.config.ts` | `/api`、`/images`、`/files` 代理目标与 API 同源 |
 | `apps/backend/src/main.ts` | `helmet` 的 `crossOriginResourcePolicy: cross-origin` |
+| `apps/backend/src/utils/upload-paths.ts` | uploads 落盘目录（与 dist 同级）；见 [upload-storage-paths.md](../backend/upload-storage-paths.md) |
+| `apps/backend/src/services/upload/upload.module.ts` | multer 写入 `uploads/images`、`uploads/files` |
 
 ---
 
@@ -279,7 +281,7 @@ app.use(
 | 上传入口 | `apps/frontend/src/views/chat/index.tsx` |
 | Vite 代理 | `apps/frontend/vite.config.ts` |
 | 静态目录 | `apps/backend/src/main.ts`（`useStaticAssets`） |
-| 部署 / Nginx | `docs/backend/deploy.md` |
+| 落盘与环境变量 | [backend/upload-storage-paths.md](../backend/upload-storage-paths.md) |
 | 对话总览 | `docs/chat/chatbot.md` |
 
 若与仓库最新源码不一致，以源码为准。

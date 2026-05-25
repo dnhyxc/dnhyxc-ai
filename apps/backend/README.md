@@ -1489,8 +1489,12 @@ DB_DB1_SYNC=true
 LOG_ON=true
 LOG_LEVEL=info
 
-# 文件存储路径
-FILE_ROOT=../../uploads
+# 文件存储路径（相对 SERVER_ROOT 或部署根目录，与 dist 同级）
+FILE_ROOT=uploads
+# 线上部署根目录（与 dist 同级），例：/usr/local/dnhyxc-ai/server
+# SERVER_ROOT=/usr/local/dnhyxc-ai/server
+# 或直接指定 uploads 绝对路径（优先级最高）
+# UPLOAD_ROOT=/usr/local/dnhyxc-ai/server/uploads
 
 # 邮件服务 dnjqczdqtbofbdgd 授权码
 EMAIL_TRANSPORT=smtps://925419516@qq.com:dnjqczdqtbofbdgd@smtp.qq.com
