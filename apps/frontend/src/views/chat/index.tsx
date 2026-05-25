@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils';
 import { uploadFiles } from '@/service';
 import useStore from '@/store';
 import { FileWithPreview, UploadedFile } from '@/types';
+import { resolveUploadedFileUrl } from '@/utils';
 import SessionList from './session-list';
 
 // Chat 主组件
@@ -81,11 +82,15 @@ const Chat = observer(() => {
 					setUploadedFiles((prev) => {
 						return [
 							...prev,
-							...res.data.map((item: UploadedFile) => ({
-								...item,
-								path: import.meta.env.VITE_DEV_DOMAIN + item.path,
-								uuid: uuidv4(),
-							})),
+							...res.data.map((item: UploadedFile) => {
+								const fileUuid = uuidv4();
+								return {
+									...item,
+									path: resolveUploadedFileUrl(item.path),
+									uuid: fileUuid,
+									id: item.id || fileUuid,
+								};
+							}),
 						];
 					});
 					chatInputRef.current?.focus();

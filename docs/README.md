@@ -15,7 +15,7 @@
 | [`backend/`](./backend/)     | NestJS、部署、LLM 接入、英语学习后端            | [backend/README.md](./backend/README.md)                               |
 | [`monaco/`](./monaco/)       | Monaco / Markdown 编辑器行为与修复              | 按文件名检索                                                           |
 | [`mermaid/`](./mermaid/)     | Mermaid 围栏、预览缩放、工具栏                  | [markdown-zoom-and-preview.md](./mermaid/markdown-zoom-and-preview.md) |
-| [`chat/`](./chat/)           | 主站对话、分享、联网搜索                        | [chatbot.md](./chat/chatbot.md)                                        |
+| [`chat/`](./chat/)           | 主站对话、分享、联网搜索、附件预览              | [chat/README.md](./chat/README.md)                                   |
 | [`tools/`](./tools/)         | `@dnhyxc-ai/markdown-kit` 等工具包              | [tools/index.md](./tools/index.md)                                     |
 | [`react/`](./react/)         | React Hooks 专题                                | 按文件名检索                                                           |
 | [`meta/`](./meta/)           | 发布、功能更新说明                              | [meta/project-features-update.md](./meta/project-features-update.md)   |
@@ -33,6 +33,7 @@
 | 知识库助手流式 Mermaid 不出图            | [knowledge/knowledge-assistant-mermaid-streaming.md](./knowledge/knowledge-assistant-mermaid-streaming.md)         |
 | 知识库助手总览                           | [knowledge/knowledge-assistant-complete.md](./knowledge/knowledge-assistant-complete.md)                           |
 | 对话模型统一硅基接入                     | [backend/siliconflow-chat-unification.md](./backend/siliconflow-chat-unification.md)                               |
+| 聊天附件上传后预览失败 / NotSameOrigin   | [chat/chat-upload-preview.md](./chat/chat-upload-preview.md)                                                       |
 | 单词包拉取 400 / 模型名与硅基端点不匹配  | [backend/create-llm.md](./backend/create-llm.md) §5.2                                                              |
 | `createLlm` 工厂与 preset                | [backend/create-llm.md](./backend/create-llm.md)                                                                   |
 | 英语学习 Agent 流式对话接 `createLlm`    | [backend/agent-create-llm-unify.md](./backend/agent-create-llm-unify.md)                                           |

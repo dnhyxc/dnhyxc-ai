@@ -10,6 +10,9 @@ import {
 	createDownloadProgressListener,
 	donwnloadWithUrl,
 	fetchImageAsBlobUrl,
+	isCrossOriginUploadUrl,
+	isTauriRuntime,
+	resolveUploadedFileUrl,
 } from '@/utils';
 
 interface IProps {
@@ -39,17 +42,31 @@ const ChatFileList: React.FC<IProps> = ({
 	}, [data]);
 
 	const getUrl = async () => {
-		if (
-			data.path.includes('http://localhost:') &&
-			data.mimetype.startsWith('image/')
-		) {
-			const res = await fetchImageAsBlobUrl(data.path);
-			if (res) {
-				setBase64Url(res);
-			}
-		} else {
-			setBase64Url(data.path);
+		const fileUrl = resolveUploadedFileUrl(data.path);
+
+		if (!CHAT_IMAGE_VALIDTYPES.includes(data.mimetype)) {
+			setBase64Url(fileUrl);
+			return;
 		}
+
+		const crossOrigin =
+			typeof window !== 'undefined' && isCrossOriginUploadUrl(fileUrl);
+
+		// 跨源（9002 页面 / Tauri WebView 加载 9112 图）：优先 blob，避免 CORP 拦截 <img>
+		if (crossOrigin || isTauriRuntime()) {
+			const blobUrl = await fetchImageAsBlobUrl(fileUrl);
+			if (blobUrl.startsWith('blob:')) {
+				setBase64Url(blobUrl);
+				return;
+			}
+			// blob 失败时不把跨源 URL 直接塞进 <img>（会触发 NotSameOrigin）
+			if (!crossOrigin) {
+				setBase64Url(fileUrl);
+			}
+			return;
+		}
+
+		setBase64Url(fileUrl);
 	};
 
 	useEffect(() => {
@@ -70,7 +87,7 @@ const ChatFileList: React.FC<IProps> = ({
 		e.stopPropagation();
 		setLoading(true);
 		const res = await donwnloadWithUrl({
-			url: file.path,
+			url: resolveUploadedFileUrl(file.path),
 		});
 		setLoading(false);
 		setDownloadProgressInfo([]);

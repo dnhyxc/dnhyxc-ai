@@ -42,8 +42,12 @@ async function bootstrap() {
 	// 全局守卫， 全局守卫有个弊端，无法使用 DI，即无法访问 userService，解决的方式是可以在 app.module.ts 中的 providers 中配置全局守卫
 	// app.useGlobalGuards(new JwtGuard());
 
-	// 配置 helmet 头部安全
-	app.use(helmet());
+	// 配置 helmet：uploads 静态资源需允许跨端口嵌入（9002 页面 / Tauri WebView 加载 9112 图片）
+	app.use(
+		helmet({
+			crossOriginResourcePolicy: { policy: 'cross-origin' },
+		}),
+	);
 
 	// 如果 nginx 配置了反向代理，则需要设置 trust proxy 为 1，没有就不需要设置
 	// app.set('trust proxy', 1);

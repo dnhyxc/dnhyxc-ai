@@ -2,6 +2,8 @@
 
 本文档按**功能维度**说明本仓库 Chatbot 的实现方式，并对应到主要源码位置（路径相对于仓库根目录）。实现上分为：**NestJS 后端**（会话、流式 LLM、队列落库、联网检索）与 **React + MobX 前端**（连接层、纯 UI 视图、SSE 消费、分支对话）。
 
+**延伸阅读**：附件上传 URL 解析、图片预览与生产 Nginx/CORP 排查见 [chat-upload-preview.md](./chat-upload-preview.md)（主文档）；本文件 §3.3 仅概述附件与 OCR 后端逻辑。
+
 ---
 
 ## 1. 架构总览

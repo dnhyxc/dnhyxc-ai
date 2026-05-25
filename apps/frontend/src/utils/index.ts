@@ -21,6 +21,11 @@ export { isTauriRuntime } from './runtime';
 export * from './store';
 export * from './tauri';
 export * from './updater';
+export {
+	encodeUploadFileUrl,
+	isCrossOriginUploadUrl,
+	resolveUploadedFileUrl,
+} from './upload-file-url';
 
 /**
  * 将七牛 HTTP 资源 URL 改写为同源代理路径（展示用，不落库）：
@@ -393,14 +398,20 @@ export const fetchImageAsBlobUrl = async (url: string): Promise<string> => {
 		const response = await platformFetch(url, {
 			method: 'GET',
 		});
-		// response 是标准的 Response 对象
+		if (!response.ok) {
+			return '';
+		}
 		const arrayBuffer = await response.arrayBuffer();
-		const blob = new Blob([arrayBuffer]);
-		const blobUrl = URL.createObjectURL(blob);
-		return blobUrl;
+		const contentType = response.headers.get('content-type') || '';
+		if (contentType.includes('text/html')) {
+			return '';
+		}
+		const blob = new Blob([arrayBuffer], {
+			type: contentType || 'application/octet-stream',
+		});
+		return URL.createObjectURL(blob);
 	} catch (_) {
-		// 如果失败，返回原始 URL
-		return url;
+		return '';
 	}
 };
 

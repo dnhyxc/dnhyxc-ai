@@ -126,7 +126,7 @@ const PROJECT_GUIDE_SECTIONS_ZH: ProjectGuideSection[] = [
 				id: 'pg-s4-4',
 				title: '4.4 附件与 OCR（图片/截图文字）',
 				description:
-					'上传附件后可要求提取文字并总结要点、识别表格并转为 Markdown 表格等。',
+					'上传附件后可要求提取文字并总结要点、识别表格并转为 Markdown 表格等。上传成功后附件出现在输入框上方；图片类附件可点击卡片打开预览。若文件名含中文，预览与下载会自动处理编码；Web 与桌面端均可在对话内直接查看，无需手动复制图片链接到新标签页。',
 			},
 			{
 				id: 'pg-s4-5',

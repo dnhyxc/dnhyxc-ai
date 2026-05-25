@@ -12,6 +12,11 @@ export default defineConfig(({ mode }) => {
 		env.VITE_QINIU_DOMAIN || 'http://tfhx5uh5p.hd-bkt.clouddn.com'
 	).replace(/\/$/, '');
 
+	// 与 VITE_DEV_API_DOMAIN 同源（去掉 /api），避免 API 在 9226 时代理仍指向 9112 导致 ECONNREFUSED → 500
+	const devApiProxyTarget = (
+		env.VITE_DEV_API_DOMAIN || 'http://localhost:9112/api'
+	).replace(/\/api\/?$/, '');
+
 	return {
 		plugins: [react(), tailwindcss(), removeDistMinMapsPlugin()],
 		resolve: {
@@ -52,7 +57,16 @@ export default defineConfig(({ mode }) => {
 			},
 			proxy: {
 				'/api': {
-					target: 'http://localhost:9112',
+					target: devApiProxyTarget,
+					changeOrigin: true,
+				},
+				// 聊天附件等 uploads 静态资源（与 main.ts useStaticAssets 路径一致）
+				'/images': {
+					target: devApiProxyTarget,
+					changeOrigin: true,
+				},
+				'/files': {
+					target: devApiProxyTarget,
 					changeOrigin: true,
 				},
 				// 本地展示七牛 HTTP 图：/ext-img/xxx → VITE_QINIU_DOMAIN/xxx（不改 HTTPS）

@@ -134,6 +134,11 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'Main Chat now uses the SiliconFlow OpenAI-compatible API by default (GLM-4.7 family). Streaming, stop, continue, and branching behave the same on your side.',
 	},
+	's4-10': {
+		title: 'Chat attachment image preview fix',
+		description:
+			'Fixes failed image preview after upload in web and desktop chat (including Chinese filenames and cross-port browser blocking). Attachments preview and download correctly after deploy; production requires frontend redeploy and backend restart.',
+	},
 	's5-1': {
 		title: 'Markdown rendering',
 		description:
