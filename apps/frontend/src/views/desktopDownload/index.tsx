@@ -103,7 +103,7 @@ const DesktopDownloadPage = () => {
 		<div className="flex flex-wrap items-center justify-center gap-3 text-sm text-textcolor/55">
 			<button
 				type="button"
-				className="inline-flex items-center gap-1 underline-offset-4 hover:text-textcolor hover:underline"
+				className="cursor-pointer inline-flex items-center gap-1 underline-offset-4 hover:text-textcolor hover:underline"
 				onClick={() => navigate('/update-info')}
 			>
 				{t('downloadPage.links.releaseNotes')}
@@ -114,7 +114,7 @@ const DesktopDownloadPage = () => {
 			</span>
 			<button
 				type="button"
-				className="inline-flex items-center gap-1 underline-offset-4 hover:text-textcolor hover:underline"
+				className="cursor-pointer inline-flex items-center gap-1 underline-offset-4 hover:text-textcolor hover:underline"
 				onClick={() => navigate('/project-guide')}
 			>
 				{t('downloadPage.links.userGuide')}
@@ -125,7 +125,7 @@ const DesktopDownloadPage = () => {
 			</span>
 			<button
 				type="button"
-				className="inline-flex items-center gap-1 underline-offset-4 hover:text-textcolor hover:underline"
+				className="cursor-pointer inline-flex items-center gap-1 underline-offset-4 hover:text-textcolor hover:underline"
 				onClick={() => navigate('/')}
 			>
 				{t('downloadPage.links.backHome')}
@@ -163,7 +163,7 @@ const DesktopDownloadPage = () => {
 					</div>
 
 					<section className="mx-auto max-w-3xl px-4 pb-10 pt-10 text-center sm:px-6 sm:pt-14">
-						<div className="mb-4 inline-flex items-center gap-2 rounded-full border border-theme/10 bg-theme-white/5 px-3 py-1 text-xs font-medium text-textcolor/70 backdrop-blur-sm">
+						<div className="mb-4 inline-flex items-center gap-2 rounded-full border border-theme/5 bg-theme-white/5 px-3 py-1 text-xs font-medium text-textcolor/70 backdrop-blur-sm">
 							<Sparkles className="size-3.5 text-teal-400/90" />
 							{t('downloadPage.hero.badge')}
 						</div>
@@ -178,13 +178,13 @@ const DesktopDownloadPage = () => {
 						</p>
 
 						<div className="mt-8 flex flex-wrap items-center justify-center gap-2">
-							<span className="rounded-md border border-theme/10 bg-theme-card/80 px-3 py-1.5 font-mono text-xs tabular-nums text-textcolor/80">
+							<span className="rounded-md border border-theme/5 bg-theme-card/80 px-3 py-1.5 font-mono text-xs tabular-nums text-textcolor/80">
 								{t('downloadPage.hero.versionLabel', {
 									version: release.version,
 								})}
 							</span>
 							{pubFormatted ? (
-								<span className="rounded-md border border-theme/10 bg-theme-card/60 px-3 py-1.5 text-xs text-textcolor/55">
+								<span className="rounded-md border border-theme/5 bg-theme-card/60 px-3 py-1.5 text-xs text-textcolor/55">
 									{t('downloadPage.hero.dateLabel', { date: pubFormatted })}
 								</span>
 							) : null}
@@ -194,7 +194,7 @@ const DesktopDownloadPage = () => {
 							<div className="mt-10 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
 								<Button
 									size="lg"
-									className="h-12 min-w-[220px] rounded-lg bg-linear-to-r from-teal-500 to-cyan-600 px-8 text-base font-semibold text-textcolor shadow-lg shadow-teal-500/20 hover:opacity-95"
+									className="h-12 min-w-[220px] rounded-lg bg-linear-to-r from-teal-500 to-cyan-600 px-8 text-base font-semibold text-white shadow-lg shadow-teal-500/20 hover:opacity-85"
 									onClick={() => openExternal(release.macAarch64DmgUrl)}
 								>
 									<Download className="mr-2 size-5" strokeWidth={2} />
@@ -204,7 +204,7 @@ const DesktopDownloadPage = () => {
 									type="button"
 									variant="outline"
 									size="lg"
-									className="h-12 border-theme/15 bg-theme-white/5"
+									className="h-12 border-theme/5 bg-theme/5"
 									onClick={copyDmgUrl}
 								>
 									<Copy className="mr-2 size-4" />
@@ -220,12 +220,12 @@ const DesktopDownloadPage = () => {
 						<div className="mt-8">{secondaryLinks}</div>
 					</section>
 
-					<section className="mx-auto max-w-4xl px-4 py-5 sm:px-5 border border-theme/10 shadow-sm rounded-xl">
-						<p className="mb-4 text-sm font-medium uppercase tracking-wider text-textcolor/40">
+					<section className="mx-auto max-w-4xl px-4 py-5 sm:px-5 border border-theme/5 shadow-sm rounded-xl">
+						<p className="mb-4 text-sm font-medium uppercase tracking-wider text-textcolor/60">
 							{t('downloadPage.platforms.sectionLabel')}
 						</p>
 						<div
-							className="flex justify-start gap-2 mb-5 bg-theme-card/80 backdrop-blur-sm"
+							className="flex justify-start gap-2 mb-5 backdrop-blur-sm"
 							role="tablist"
 							aria-label={t('downloadPage.platforms.sectionLabel')}
 						>
@@ -248,21 +248,21 @@ const DesktopDownloadPage = () => {
 									},
 								] as const
 							).map(({ id, icon: Icon, label }) => (
-								<button
+								<Button
 									key={id}
-									type="button"
+									variant="ghost"
 									role="tab"
 									aria-selected={osTab === id}
 									onClick={() => setOsTab(id)}
 									className={`cursor-pointer flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors sm:flex-none sm:px-6 ${
 										osTab === id
-											? 'bg-theme-background text-textcolor border border-theme/5 bg-linear-to-r from-teal-500 to-cyan-600'
+											? 'bg-theme-background text-white border border-theme/5 bg-linear-to-r from-teal-500 to-cyan-600'
 											: 'text-textcolor/55 hover:text-textcolor/80 border border-theme/5'
 									}`}
 								>
 									<Icon className="size-4 shrink-0 opacity-80" />
 									{label}
-								</button>
+								</Button>
 							))}
 						</div>
 
@@ -279,8 +279,7 @@ const DesktopDownloadPage = () => {
 								<CardContent className="space-y-4">
 									<div className="flex flex-col gap-3 sm:flex-row sm:items-center">
 										<Button
-											type="button"
-											className="w-full sm:w-auto"
+											className="w-full sm:w-auto bg-linear-to-r from-teal-500 to-cyan-600 hover:opacity-85"
 											onClick={() => openExternal(release.macAarch64DmgUrl)}
 										>
 											<Download className="mr-2 size-4" />
@@ -290,7 +289,7 @@ const DesktopDownloadPage = () => {
 											<Button
 												type="button"
 												variant="outline"
-												className="w-full border-theme/15 sm:w-auto"
+												className="w-full border-theme/5 sm:w-auto"
 												onClick={() =>
 													openExternal(release.macAarch64TarGzUrl!)
 												}
@@ -313,7 +312,7 @@ const DesktopDownloadPage = () => {
 											{t('downloadPage.mac.stepUpdater')}
 										</li>
 									</ul>
-									<div className="rounded-lg border border-theme/10 bg-theme-white/5 px-4 py-3">
+									<div className="rounded-lg border border-theme/5 bg-theme-background/5 px-4 py-3">
 										<p className="mb-3 text-sm leading-relaxed text-textcolor/65">
 											{t('downloadPage.mac.historyIntro')}
 										</p>
@@ -322,7 +321,7 @@ const DesktopDownloadPage = () => {
 												type="button"
 												variant="outline"
 												size="sm"
-												className="w-full justify-center border-theme/15 sm:w-auto"
+												className="w-full justify-center border-theme/5 sm:w-auto"
 												onClick={() =>
 													openExternal(getDesktopGithubReleasesPageUrl())
 												}
@@ -333,7 +332,7 @@ const DesktopDownloadPage = () => {
 										</div>
 									</div>
 								</CardContent>
-								<CardFooter className="flex-col items-start gap-1 border-t border-theme/10 pt-6 text-xs leading-relaxed text-textcolor/45">
+								<CardFooter className="flex-col items-start gap-1 border-t border-theme/5 pt-6 text-xs leading-relaxed text-textcolor/45">
 									<p>{t('downloadPage.mac.noteIntel')}</p>
 									<p>{t('downloadPage.mac.noteSource')}</p>
 								</CardFooter>
