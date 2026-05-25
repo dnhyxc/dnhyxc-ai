@@ -3,6 +3,10 @@ import * as React from 'react';
 
 import { cn } from '@/lib/utils';
 
+/** Tooltip 外圈阴影：主题色 theme 10% 透明度（与 bg-theme/10 语义一致） */
+const TOOLTIP_SHADOW_CLASS =
+	'shadow-[0_3px_12px_color-mix(in_oklch,var(--color-theme)_10%,transparent)] drop-shadow-[0_3px_12px_color-mix(in_oklch,var(--color-theme)_10%,transparent)]';
+
 function TooltipProvider({
 	delayDuration = 0,
 	...props
@@ -28,25 +32,44 @@ function TooltipTrigger({
 	return <TooltipPrimitive.Trigger data-slot="tooltip-trigger" {...props} />;
 }
 
+type TooltipContentProps = React.ComponentProps<
+	typeof TooltipPrimitive.Content
+> & {
+	/** 是否显示主题色外阴影（内容区与箭头）；默认关闭 */
+	shadow?: boolean;
+};
+
 function TooltipContent({
 	className,
 	sideOffset = 0,
+	shadow = false,
 	children,
 	...props
-}: React.ComponentProps<typeof TooltipPrimitive.Content>) {
+}: TooltipContentProps) {
 	return (
 		<TooltipPrimitive.Portal>
 			<TooltipPrimitive.Content
 				data-slot="tooltip-content"
 				sideOffset={sideOffset}
 				className={cn(
-					'select-none bg-theme-background/90 text-textcolor animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 z-50 w-fit origin-(--radix-tooltip-content-transform-origin) rounded-md px-3 py-1.5 text-xs text-balance',
+					'select-none text-textcolor z-50 w-fit origin-(--radix-tooltip-content-transform-origin) rounded-md px-3 py-1.5 text-xs text-balance',
+					'bg-theme-background',
+					shadow && TOOLTIP_SHADOW_CLASS,
+					'animate-in fade-in-0 zoom-in-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2',
+					// 关闭时立即隐藏、不做位移动画，避免触发器塌陷时闪到视口 (0,0)
+					'data-[state=closed]:hidden data-[state=closed]:animate-none',
 					className,
 				)}
 				{...props}
 			>
 				{children}
-				<TooltipPrimitive.Arrow className="bg-theme-background/90 fill-theme-background/90 z-50 size-2.5 translate-y-[calc(-50%-2px)] rotate-45 rounded-[2px]" />
+				<TooltipPrimitive.Arrow
+					className={cn(
+						'z-50 size-2.5 translate-y-[calc(-50%-2px)] rotate-45 rounded-[2px]',
+						'bg-theme-background fill-theme-background',
+						shadow && TOOLTIP_SHADOW_CLASS,
+					)}
+				/>
 			</TooltipPrimitive.Content>
 		</TooltipPrimitive.Portal>
 	);

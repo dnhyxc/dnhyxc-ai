@@ -93,18 +93,32 @@ const KnowledgeListRow = (props: KnowledgeListRowProps) => {
 				<div className="flow-root flex-1 min-w-0 max-w-full font-medium wrap-anywhere">
 					{item.title?.trim() || t('knowledge.common.untitled')}
 				</div>
-				<div className="relative flex shrink-0 items-start gap-1">
+				<div
+					className={cn(
+						'flex shrink-0 items-center h-7 gap-0 transition-opacity duration-150',
+						'opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto',
+						showOpenInExternalEditor &&
+							item.localAbsolutePath &&
+							onOpenInExternalEditorClick
+							? 'w-15'
+							: 'w-7',
+					)}
+				>
 					{showOpenInExternalEditor &&
 					item.localAbsolutePath &&
 					onOpenInExternalEditorClick ? (
-						<Tooltip side="left" content={t('knowledge.list.openInEditor')}>
+						<Tooltip
+							side="left"
+							sideOffset={6}
+							delayDuration={200}
+							shadow
+							content={t('knowledge.list.openInEditor')}
+						>
 							<button
 								type="button"
 								aria-label={t('knowledge.list.openInEditor')}
 								className={cn(
-									'absolute right-8 top-0 cursor-pointer shrink-0 h-7 w-7 rounded-md text-textcolor/80 transition-opacity duration-150',
-									'hidden group-hover:flex',
-									'items-center justify-center',
+									'flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-textcolor/80',
 									'hover:text-teal-500 hover:bg-teal-500/10',
 								)}
 								onClick={(e) => {
@@ -124,9 +138,7 @@ const KnowledgeListRow = (props: KnowledgeListRowProps) => {
 								: t('knowledge.list.deleteFromLibraryAria')
 						}
 						className={cn(
-							'absolute right-0 top-0 cursor-pointer items-center justify-center h-7 w-7 rounded-md text-textcolor/80 transition-opacity duration-150',
-							'hidden group-hover:flex',
-							'items-center justify-center',
+							'flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-textcolor/80',
 							'hover:text-destructive hover:bg-destructive/10',
 						)}
 						onClick={(e) => onTrashClick(e, item)}
@@ -658,7 +670,7 @@ const KnowledgeList: React.FC<IProps> = observer(
 										>
 											{t('knowledge.list.pickFolder')}
 										</Button>
-										<Tooltip side="bottom" content={localFolderPath}>
+										<Tooltip shadow side="bottom" content={localFolderPath}>
 											<span className="min-w-0 flex-1 truncate text-xs text-textcolor/50">
 												{localFolderPath}
 											</span>
