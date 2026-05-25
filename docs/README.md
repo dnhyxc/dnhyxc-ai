@@ -8,34 +8,34 @@
 
 ## 按功能域浏览
 
-| 目录 | 说明 | 入口 |
-|------|------|------|
-| [`frontend/`](./frontend/) | 前端页面、路由鉴权、英语学习、Tauri、七牛展示等 | [frontend/README.md](./frontend/README.md) |
-| [`knowledge/`](./knowledge/) | 知识库、RAG、右侧 Assistant、本地/云端草稿 | [knowledge/README.md](./knowledge/README.md) |
-| [`backend/`](./backend/) | NestJS、部署、LLM 接入、英语学习后端 | [backend/README.md](./backend/README.md) |
-| [`monaco/`](./monaco/) | Monaco / Markdown 编辑器行为与修复 | 按文件名检索 |
-| [`mermaid/`](./mermaid/) | Mermaid 围栏、预览缩放、工具栏 | [markdown-zoom-and-preview.md](./mermaid/markdown-zoom-and-preview.md) |
-| [`chat/`](./chat/) | 主站对话、分享、联网搜索 | [chatbot.md](./chat/chatbot.md) |
-| [`tools/`](./tools/) | `@dnhyxc-ai/markdown-kit` 等工具包 | [tools/index.md](./tools/index.md) |
-| [`react/`](./react/) | React Hooks 专题 | 按文件名检索 |
-| [`meta/`](./meta/) | 发布、功能更新说明 | [meta/project-features-update.md](./meta/project-features-update.md) |
-| [`setting/`](./setting/) | 系统快捷键等 | 按文件名检索 |
+| 目录                         | 说明                                            | 入口                                                                   |
+| ---------------------------- | ----------------------------------------------- | ---------------------------------------------------------------------- |
+| [`frontend/`](./frontend/)   | 前端页面、路由鉴权、英语学习、Tauri、七牛展示等 | [frontend/README.md](./frontend/README.md)                             |
+| [`knowledge/`](./knowledge/) | 知识库、RAG、右侧 Assistant、本地/云端草稿      | [knowledge/README.md](./knowledge/README.md)                           |
+| [`backend/`](./backend/)     | NestJS、部署、LLM 接入、英语学习后端            | [backend/README.md](./backend/README.md)                               |
+| [`monaco/`](./monaco/)       | Monaco / Markdown 编辑器行为与修复              | 按文件名检索                                                           |
+| [`mermaid/`](./mermaid/)     | Mermaid 围栏、预览缩放、工具栏                  | [markdown-zoom-and-preview.md](./mermaid/markdown-zoom-and-preview.md) |
+| [`chat/`](./chat/)           | 主站对话、分享、联网搜索                        | [chatbot.md](./chat/chatbot.md)                                        |
+| [`tools/`](./tools/)         | `@dnhyxc-ai/markdown-kit` 等工具包              | [tools/index.md](./tools/index.md)                                     |
+| [`react/`](./react/)         | React Hooks 专题                                | 按文件名检索                                                           |
+| [`meta/`](./meta/)           | 发布、功能更新说明                              | [meta/project-features-update.md](./meta/project-features-update.md)   |
+| [`setting/`](./setting/)     | 系统快捷键等                                    | 按文件名检索                                                           |
 
 ---
 
 ## 常见排查（快捷链）
 
-| 现象 | 优先阅读 |
-|------|----------|
-| 七牛能上传、本地/Tauri 图片不显示（ATS） | [frontend/qiniu-dev-http-proxy.md](./frontend/qiniu-dev-http-proxy.md) |
-| Web HTTPS 头像 mixed content | 同上 + [frontend/route-auth.md](./frontend/route-auth.md) §12 + [backend/nginx.md](./backend/nginx.md) `/ext-img/` |
-| Tauri macOS 生产包 HTTP 被拦 | [frontend/tauri-macos-ats-http.md](./frontend/tauri-macos-ats-http.md) |
-| 知识库助手流式 Mermaid 不出图 | [knowledge/knowledge-assistant-mermaid-streaming.md](./knowledge/knowledge-assistant-mermaid-streaming.md) |
-| 知识库助手总览 | [knowledge/knowledge-assistant-complete.md](./knowledge/knowledge-assistant-complete.md) |
-| 对话模型统一硅基接入 | [backend/siliconflow-chat-unification.md](./backend/siliconflow-chat-unification.md) |
-| 单词包拉取 400 / 模型名与硅基端点不匹配 | [backend/create-llm.md](./backend/create-llm.md) §5.2 |
-| `createLlm` 工厂与 preset | [backend/create-llm.md](./backend/create-llm.md) |
-| 英语学习 Agent 流式对话接 `createLlm` | [backend/agent-create-llm-unify.md](./backend/agent-create-llm-unify.md) |
+| 现象                                     | 优先阅读                                                                                                           |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| 七牛能上传、本地/Tauri 图片不显示（ATS） | [frontend/qiniu-dev-http-proxy.md](./frontend/qiniu-dev-http-proxy.md)                                             |
+| Web HTTPS 头像 mixed content             | 同上 + [frontend/route-auth.md](./frontend/route-auth.md) §12 + [backend/nginx.md](./backend/nginx.md) `/ext-img/` |
+| Tauri macOS 生产包 HTTP 被拦             | [frontend/tauri-macos-ats-http.md](./frontend/tauri-macos-ats-http.md)                                             |
+| 知识库助手流式 Mermaid 不出图            | [knowledge/knowledge-assistant-mermaid-streaming.md](./knowledge/knowledge-assistant-mermaid-streaming.md)         |
+| 知识库助手总览                           | [knowledge/knowledge-assistant-complete.md](./knowledge/knowledge-assistant-complete.md)                           |
+| 对话模型统一硅基接入                     | [backend/siliconflow-chat-unification.md](./backend/siliconflow-chat-unification.md)                               |
+| 单词包拉取 400 / 模型名与硅基端点不匹配  | [backend/create-llm.md](./backend/create-llm.md) §5.2                                                              |
+| `createLlm` 工厂与 preset                | [backend/create-llm.md](./backend/create-llm.md)                                                                   |
+| 英语学习 Agent 流式对话接 `createLlm`    | [backend/agent-create-llm-unify.md](./backend/agent-create-llm-unify.md)                                           |
 
 ---
 
