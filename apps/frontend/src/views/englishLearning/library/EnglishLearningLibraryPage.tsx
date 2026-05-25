@@ -130,7 +130,7 @@ export default function EnglishLearningLibraryPage() {
 							defaultSize="65%"
 							className="min-h-0 min-w-0"
 						>
-							<section className="border-l border-theme/10 flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-theme-background">
+							<section className="border-l border-theme/5 flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-theme-background">
 								{kind === 'vocab' ? (
 									<VocabularyLibraryWordsPanel
 										libraryId={activeLibraryId}

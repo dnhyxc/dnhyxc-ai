@@ -292,9 +292,9 @@ export function VocabularyLibraryListPanel({
 								<div
 									key={lib.id}
 									className={cn(
-										'group relative bg-theme/5 border border-theme/10 flex min-w-0 items-stretch gap-1 overflow-hidden rounded-md transition-colors',
+										'group relative bg-theme/5 border border-theme/5 flex min-w-0 items-stretch gap-1 overflow-hidden rounded-md transition-colors',
 										active
-											? 'border-theme/15 bg-theme/15'
+											? 'border-theme/10 bg-theme/15'
 											: 'hover:border-theme/12 hover:bg-theme/12',
 									)}
 								>

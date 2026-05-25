@@ -112,7 +112,7 @@ function VocabularyPackListInner({ history }: VocabularyPackListProps) {
 						return (
 							<div
 								key={key}
-								className="select-text bg-theme/5 border border-theme/10 mb-0 flex flex-col gap-1.5 rounded-md px-3 pt-2.5 pb-2.5"
+								className="select-text bg-theme/5 border border-theme/5 mb-0 flex flex-col gap-1.5 rounded-md px-3 pt-2.5 pb-2.5"
 							>
 								<div className="flex items-start justify-between gap-2">
 									<div className="min-w-0 flex-1">
