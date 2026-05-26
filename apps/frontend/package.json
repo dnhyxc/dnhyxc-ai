@@ -1,9 +1,9 @@
 {
 	"name": "@dnhyxc-ai/frontend",
 	"private": true,
-	"version": "0.0.1",
+	"version": "1.0.0",
 	"type": "module",
-	"author": "dnhyxc <dnhyxc@gmail.com>",
+	"author": "dnhyxc <dnhyxc@163.com>",
 	"scripts": {
 		"dev": "vite",
 		"test:branch-smoke": "tsx src/hooks/branchLogic.smoke.ts",

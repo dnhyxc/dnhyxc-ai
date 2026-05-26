@@ -1,7 +1,7 @@
 {
 	"name": "dnhyxc-ai",
 	"version": "0.0.1",
-	"description": "",
+	"description": "Dnhyxc AI 全栈 monorepo：流式智能对话、Markdown 知识库与 RAG 文档助手、英语学习（单词包/经典句/Agent）、对话分享；React + Tauri 桌面/Web 客户端，NestJS 后端，支持硅基等 OpenAI 兼容大模型与设置页自定义模型配置。",
 	"type": "module",
 	"scripts": {
 		"dev": "pnpm -C apps/frontend tauri dev",
@@ -37,7 +37,9 @@
 		"test": "pnpm --filter @dnhyxc-ai/markdown-kit test"
 	},
 	"keywords": [],
-	"author": "dnhyxc",
+	"author": "dnhyxc <dnhyxc@163.com>",
+	"homepage": "https://dnhyxc.cn:9002",
+	"repository": "https://github.com/dnhyxc/dnhyxc-ai",
 	"license": "ISC",
 	"packageManager": "pnpm@10.8.1",
 	"devDependencies": {
