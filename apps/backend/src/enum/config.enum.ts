@@ -25,11 +25,21 @@ export enum RedisEnum {
 	REDIS_USERNAME = 'REDIS_USERNAME',
 }
 
-export enum QiniuEnum {
-	ACCESS_KEY = 'ACCESS_KEY',
-	SECRET_KEY = 'SECRET_KEY',
-	BUCKET_NAME = 'BUCKET_NAME',
-	DOMAIN = 'DOMAIN',
+/** 腾讯云 COS（对象存储） */
+export enum CosEnum {
+	COS_SECRET_ID = 'COS_SECRET_ID',
+	COS_SECRET_KEY = 'COS_SECRET_KEY',
+	/** 存储桶名称，格式 BucketName-APPID */
+	COS_BUCKET = 'COS_BUCKET',
+	/** 地域，如 ap-guangzhou */
+	COS_REGION = 'COS_REGION',
+	/**
+	 * 对象对外访问域名（CDN 或默认桶域名），如 https://xxx.cos.ap-guangzhou.myqcloud.com/
+	 * 未配置时由 Bucket + Region 拼接默认域名。
+	 */
+	COS_PUBLIC_DOMAIN = 'COS_PUBLIC_DOMAIN',
+	/** putObject 对象 ACL，默认 public-read（浏览器直读）；私有桶可改为 private 并改用签名 URL */
+	COS_OBJECT_ACL = 'COS_OBJECT_ACL',
 }
 
 export enum FileEnum {

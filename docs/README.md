@@ -2,7 +2,7 @@
 
 本目录存放**实现思路、问题修复记录、部署说明**等专题文档，面向维护者与贡献者。面向最终用户的产品说明见 [`project-guide.md`](./project-guide.md)。
 
-**约定**：文档描述以仓库**当前源码**为准；若与代码冲突，以代码为准。换七牛桶、改 CDN 域名时，需同步 `.env`、`Info.plist`、`capabilities` 与 Nginx（见 [七牛 HTTP 展示代理](./frontend/qiniu-dev-http-proxy.md) §6–§8）。
+**约定**：文档描述以仓库**当前源码**为准；若与代码冲突，以代码为准。换 COS 桶或 CDN 域名时，需同步前后端 `.env`、`Info.plist`、`capabilities` 与 Nginx（见 [COS 对象存储](./backend/cos-object-storage.md) §5、[七牛/COS 展示代理](./frontend/qiniu-dev-http-proxy.md)）。
 
 ---
 
@@ -27,8 +27,10 @@
 
 | 现象                                     | 优先阅读                                                                                                           |
 | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| 七牛能上传、本地/Tauri 图片不显示（ATS） | [frontend/qiniu-dev-http-proxy.md](./frontend/qiniu-dev-http-proxy.md)                                             |
-| Web HTTPS 头像 mixed content             | 同上 + [frontend/route-auth.md](./frontend/route-auth.md) §12 + [backend/nginx.md](./backend/nginx.md) `/ext-img/` |
+| 头像/COS 上传失败 AccessDenied           | [backend/cos-object-storage.md](./backend/cos-object-storage.md) §3.4、§6                                        |
+| COS/七牛 图能传不能显（403 / ATS）       | [backend/cos-object-storage.md](./backend/cos-object-storage.md) §3.3 + [frontend/qiniu-dev-http-proxy.md](./frontend/qiniu-dev-http-proxy.md) |
+| COS 图能预览但下载失败                 | [backend/cos-object-storage.md](./backend/cos-object-storage.md) §3.7、§6 |
+| Web HTTPS 头像 mixed content             | 同上 + [frontend/route-auth.md](./frontend/route-auth.md) §12 + [backend/nginx.md](./backend/nginx.md) `/ext-cos/` |
 | Tauri macOS 生产包 HTTP 被拦             | [frontend/tauri-macos-ats-http.md](./frontend/tauri-macos-ats-http.md)                                             |
 | 知识库助手流式 Mermaid 不出图            | [knowledge/knowledge-assistant-mermaid-streaming.md](./knowledge/knowledge-assistant-mermaid-streaming.md)         |
 | 知识库助手总览                           | [knowledge/knowledge-assistant-complete.md](./knowledge/knowledge-assistant-complete.md)                           |

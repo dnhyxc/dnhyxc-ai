@@ -35,5 +35,6 @@
 | [nginx.md](./nginx.md) | Nginx 与 `/images` 反代 / `alias` |
 | [../chat/chat-upload-access-prod.md](../chat/chat-upload-access-prod.md) | 生产附件 `/api/upload/serve` 与路径规范化 |
 | **[upload-storage-paths.md](./upload-storage-paths.md)** | **本地上传目录与线上 `UPLOAD_ROOT`（主文档）** |
+| **[cos-object-storage.md](./cos-object-storage.md)** | **腾讯云 COS：头像等云上传、`uploadCos`、ACL 与 `/ext-cos` 展示** |
 
 上级索引：[../README.md](../README.md)

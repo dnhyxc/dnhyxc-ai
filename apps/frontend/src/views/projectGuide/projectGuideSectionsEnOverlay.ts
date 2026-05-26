@@ -172,6 +172,11 @@ export const PROJECT_GUIDE_ITEMS_EN: Record<
 		description:
 			'After sign-in: Settings → LLM (/setting/llm). Enable custom LLM, enter API Key, Base URL, and model name, then Save. When the footer shows the active hint, chat, assistant, Q&A, and English learning use that config. Use the eye icon to show/hide the key. Save stays disabled until the switch is on and all fields are filled. Use Restore environment variables to revert to server defaults.',
 	},
+	'pg-s8-4': {
+		title: '8.4 Account avatar (cloud storage)',
+		description:
+			'Open Account or Profile while signed in, choose an image in the avatar area, then save. The sidebar and profile page update together. Use preview or the upload-area download control to save the avatar; you get a success or failure toast. If the image fails to load, try uploading again; on the web, use this site rather than old external links. Chat attachments stay on local server storage.',
+	},
 	'pg-s9-1': {
 		title: '9.1 Why “desktop only”?',
 		description:

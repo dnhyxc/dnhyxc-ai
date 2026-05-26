@@ -1,6 +1,6 @@
 # Tauri macOS：ATS（应用传输安全）与 HTTP 资源
 
-本文说明 **macOS 生产包**中 WKWebView 加载 `http://` 外链被 **ATS（App Transport Security，应用传输安全）** 拦截的原因与策略。**七牛 CDN 展示链、开发态 `/ext-img/` 代理、代码摘录与回归清单**以专题文为准，避免两处重复维护：
+本文说明 **macOS 生产包**中 WKWebView 加载 `http://` 外链被 **ATS（App Transport Security，应用传输安全）** 拦截的原因与策略。**七牛 CDN 展示链、开发态 `/ext-cos/` 代理、代码摘录与回归清单**以专题文为准，避免两处重复维护：
 
 → **[qiniu-dev-http-proxy.md](./qiniu-dev-http-proxy.md)**（主文档）
 
@@ -25,9 +25,9 @@ macOS ATS 默认要求 **HTTPS（TLS）**。Tauri macOS 前端运行在 **WKWebV
 
 | 场景 | 典型处理 |
 |------|----------|
-| **开发**（`pnpm dev` / Tauri dev） | 展示 URL 改写为同源 `/ext-img/`，由 Vite 代理回源 HTTP（见七牛主文档） |
+| **开发**（`pnpm dev` / Tauri dev） | 展示 URL 改写为同源 `/ext-cos/`，由 Vite 代理回源 HTTP（见七牛主文档） |
 | **Tauri 生产** | 无 Vite：展示用原始 HTTP URL + `Info.plist` 对 CDN 域名做 **NSExceptionDomains** |
-| **Web 生产 HTTPS** | `/ext-img/` + Nginx 回源（见 [route-auth.md](./route-auth.md) §12） |
+| **Web 生产 HTTPS** | `/ext-cos/` + Nginx 回源（见 [route-auth.md](./route-auth.md) §12） |
 
 ---
 
@@ -39,9 +39,9 @@ macOS ATS 默认要求 **HTTPS（TLS）**。Tauri macOS 前端运行在 **WKWebV
 
 ### 3.2 当前：按环境分层（本项目）
 
-1. **开发 / Tauri dev**：`resolveQiniuUrlForWebDisplay` + Vite `server.proxy['/ext-img']`（不改持久化 URL）。
+1. **开发 / Tauri dev**：`resolveQiniuUrlForWebDisplay` + Vite `server.proxy['/ext-cos']`（不改持久化 URL）。
 2. **Tauri 生产**：`apps/frontend/src-tauri/Info.plist` 中对 **当前 CDN host** 配置 `NSExceptionAllowsInsecureHTTPLoads`；并配置 `NSAllowsLocalNetworking` 以便 `http://localhost` API。
-3. **Web 生产**：Nginx `location /ext-img/`（[backend/nginx.md](../backend/nginx.md)）。
+3. **Web 生产**：Nginx `location /ext-cos/`（[backend/nginx.md](../backend/nginx.md)）。
 
 完整配置片段、capabilities 白名单、换桶 checklist → [qiniu-dev-http-proxy.md](./qiniu-dev-http-proxy.md) §5–§8。
 
@@ -73,5 +73,5 @@ macOS ATS 默认要求 **HTTPS（TLS）**。Tauri macOS 前端运行在 **WKWebV
 |------|------|
 | [qiniu-dev-http-proxy.md](./qiniu-dev-http-proxy.md) | 实现、代码、环境变量、回归 |
 | [route-auth.md](./route-auth.md) §12 | mixed content 与调用方 |
-| [../backend/nginx.md](../backend/nginx.md) | 生产 `/ext-img/` |
+| [../backend/nginx.md](../backend/nginx.md) | 生产 `/ext-cos/` |
 | [../README.md](../README.md) | 文档总索引 |

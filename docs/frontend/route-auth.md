@@ -278,25 +278,25 @@ if (!response.ok) {
 
 为兼容两端，前端与 Nginx 共同实现：
 
-1. **Nginx 侧**：提供 `https://dnhyxc.cn/ext-img/...` 这样的 HTTPS 代理入口，由 Nginx 去回源七牛的 HTTP 域名。
-2. **前端侧**：Web 生产环境与 **本地开发**（`import.meta.env.DEV`，含 Tauri dev）把以 `VITE_QINIU_DOMAIN` 开头的 URL 改写为 `/ext-img/...`；**Tauri 生产包**仍使用原始 HTTP URL（依赖 Info.plist）。详见 [qiniu-dev-http-proxy.md](./qiniu-dev-http-proxy.md)。
+1. **Nginx 侧**：提供 `https://dnhyxc.cn/ext-cos/...` 这样的 HTTPS 代理入口，由 Nginx 去回源七牛的 HTTP 域名。
+2. **前端侧**：Web 生产环境与 **本地开发**（`import.meta.env.DEV`，含 Tauri dev）把以 `VITE_QINIU_DOMAIN` 开头的 URL 改写为 `/ext-cos/...`；**Tauri 生产包**仍使用原始 HTTP URL（依赖 Info.plist）。详见 [qiniu-dev-http-proxy.md](./qiniu-dev-http-proxy.md)。
 3. **数据层**：用户信息中保存的 `avatar` 字段仍是 **原始七牛地址**，改写仅发生在「展示层」，避免影响后端与其他逻辑。
 
 相关配置/代码：
 
-- Nginx：`docs/backend/nginx.md` 中的 `location /ext-img/`。
+- Nginx：`docs/backend/nginx.md` 中的 `location /ext-cos/`。
 - 前端工具函数：`resolveQiniuUrlForWebDisplay`（`apps/frontend/src/utils/index.ts`）。
 - 使用方：
   - `apps/frontend/src/views/account/index.tsx`（账号设置头像预览）
   - `apps/frontend/src/views/profile/index.tsx`（Profile 演示页面上传预览）
   - `apps/frontend/src/components/design/Sidebar/index.tsx`（侧边栏用户头像）
 
-### 12.2 Nginx `/ext-img/` 代理配置（摘要）
+### 12.2 Nginx `/ext-cos/` 代理配置（摘要）
 
 完整配置见：`docs/backend/nginx.md` 中 `listen 9112 ssl; server_name dnhyxc.cn;` 的 `server` 块。
 
 - `proxy_set_header Host` 与 `proxy_pass` 的 host **必须与** `VITE_QINIU_DOMAIN` 一致（换桶时同步改 Nginx，勿沿用旧桶域名）。
-- 前端把 `http://{CDN}/{key}` 展示为 `https://dnhyxc.cn/ext-img/{key}`。
+- 前端把 `http://{CDN}/{key}` 展示为 `https://dnhyxc.cn/ext-cos/{key}`。
 
 实现细节、Vite 开发代理与 Tauri ATS → [qiniu-dev-http-proxy.md](./qiniu-dev-http-proxy.md)。
 
@@ -306,16 +306,16 @@ if (!response.ok) {
 
 | 环境 | 行为 |
 |------|------|
-| `import.meta.env.DEV`（含 Tauri dev） | 改写为 `/ext-img/{key}`，由 Vite 代理回源七牛 HTTP |
+| `import.meta.env.DEV`（含 Tauri dev） | 改写为 `/ext-cos/{key}`，由 Vite 代理回源七牛 HTTP |
 | Tauri **生产** | 原始 HTTP URL（`Info.plist` ATS 例外） |
-| Web **生产**（HTTPS） | 改写为 `/ext-img/{key}`，由 Nginx 回源 |
+| Web **生产**（HTTPS） | 改写为 `/ext-cos/{key}`，由 Nginx 回源 |
 
 源码与注释见 [qiniu-dev-http-proxy.md](./qiniu-dev-http-proxy.md) §5.1。
 
 **环境变量：**
 
 - `VITE_QINIU_DOMAIN`：七牛 HTTP 源，如 `http://tfhx5uh5p.hd-bkt.clouddn.com/`
-- `VITE_WEB_IMAGE_PROXY_PREFIX`：默认 `/ext-img/`
+- `VITE_COS_PROXY_PREFIX`：默认 `/ext-cos/`
 
 ### 12.4 在账号设置页中使用（`account/index.tsx`）
 
@@ -422,6 +422,6 @@ const observer = useMemo(() => {
 ### 12.6 设计总结
 
 - **安全性**：Web 生产 HTTPS 页面经 Nginx 同源代理加载图片，避免 mixed content。
-- **开发体验**：DEV / Tauri dev 同样走 `/ext-img/`，避免 WKWebView ATS 拦截七牛 HTTP。
+- **开发体验**：DEV / Tauri dev 同样走 `/ext-cos/`，避免 WKWebView ATS 拦截七牛 HTTP。
 - **持久化**：`avatar` 等字段仍为七牛原始 HTTP URL；仅展示层改写。
 - **可维护性**：域名与环境变量集中在 `resolveQiniuUrlForWebDisplay`；换桶见 [qiniu-dev-http-proxy.md](./qiniu-dev-http-proxy.md) §8。

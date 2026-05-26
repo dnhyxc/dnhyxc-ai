@@ -4,16 +4,17 @@
 
 ---
 
-## 七牛 CDN / 图片展示 / ATS（必读簇）
+## COS / 七牛 CDN / 图片展示 / ATS（必读簇）
 
 | 文档 | 角色 |
 |------|------|
-| **[qiniu-dev-http-proxy.md](./qiniu-dev-http-proxy.md)** | **主文档**：开发态 `/ext-img/`、Vite 代理、`resolveQiniuUrlForWebDisplay`、Info.plist、回归清单 |
+| **[../backend/cos-object-storage.md](../backend/cos-object-storage.md)** | **COS 主文档**：`uploadCos`、环境变量、ACL、与本地附件边界 |
+| **[qiniu-dev-http-proxy.md](./qiniu-dev-http-proxy.md)** | **展示代理**：开发态 `/ext-cos/`、`resolveCosUrlForWebDisplay`（含七牛历史说明） |
 | [tauri-macos-ats-http.md](./tauri-macos-ats-http.md) | macOS ATS 概念与生产包策略；实现细节以七牛主文档为准 |
 | [route-auth.md](./route-auth.md) §12 | 路由文档中的 mixed content 摘要 + 调用方列表 |
-| [../backend/nginx.md](../backend/nginx.md) | 生产 `location /ext-img/` |
+| [../backend/nginx.md](../backend/nginx.md) | 生产 `location /ext-cos/` |
 
-**数据流一句话**：持久化存七牛 HTTP 完整 URL；**展示**在 DEV / Web PROD 改写为 `/ext-img/`；Tauri **生产**直链 HTTP + plist 例外。
+**数据流一句话**：持久化存 COS 完整 HTTPS URL；**展示**在 DEV / Web PROD 改写为 `/ext-cos/`；Tauri **生产**直链 COS HTTPS（桶域名须在 allowlist / ATS 策略内）。
 
 ---
 

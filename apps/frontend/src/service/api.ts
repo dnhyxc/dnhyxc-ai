@@ -31,8 +31,8 @@ export const SEND_RESET_PWD_EMAIL = '/auth/sendResetPwdEmail';
 // 修改用户密码
 export const RESET_PASSWORD = '/auth/resetPassword';
 
-// 获取七牛云上传token
-export const GET_UPLOAD_TOKEN = '/upload/getUploadToken';
+// 上传文件到腾讯云 COS
+export const UPLOAD_COS = '/upload/uploadCos';
 
 // 上传文件
 export const UPLOAD_FILE = '/upload/uploadFile';

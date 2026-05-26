@@ -1528,11 +1528,13 @@ SECRET="wO4lVKu2MkW4viddIlLUsJXjyaS36VbXxlHKQSlrboDa7J0NQewZtXkSrfnBGFiY"
 # Redis
 REDIS_URL='redis://127.0.0.1:12029'
 
-# qiniu
-ACCESS_KEY=G4wtUYvoOUDeS0YdYIUqbV-DH3oe8hhjQiBqaG9E
-SECRET_KEY=YvrcD2RzNuClVawTXQ7DzqdZuMI4J5WW_urejemn
-BUCKET_NAME=dnhyxc-ai
-DOMAIN=http://t80w8cw4d.hd-bkt.clouddn.com/
+# 腾讯云 COS（对象存储，头像等走 POST /api/upload/uploadCos）
+COS_SECRET_ID=your_secret_id
+COS_SECRET_KEY=your_secret_key
+COS_BUCKET=your-bucket-1250000000
+COS_REGION=ap-guangzhou
+# 可选：CDN 或默认桶域名，需以 / 结尾或使用 https://...
+COS_PUBLIC_DOMAIN=https://your-bucket-1250000000.cos.ap-guangzhou.myqcloud.com/
 ```
 
 上述操作都完成之后，就可以在 `server` 目录下运行 `node run start:prod` 命令尝试启动服务了。如果没有任何报错，那最好不过，如果有报错，则根据报错内容解决错误即可。没有报错之后，就可以使用 `pm2` 来启动服务了。

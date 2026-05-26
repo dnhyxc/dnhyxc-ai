@@ -223,22 +223,19 @@ server {
     proxy_pass http://127.0.0.1:9226;
   }
 
-  # Web 端 HTTPS 页面加载外部 HTTP 图片（mixed content）兼容
-  # 用法：前端展示为 https://dnhyxc.cn/ext-img/{key}，此处回源七牛 HTTP
-  # Host / proxy_pass 须与 apps/frontend/.env 的 VITE_QINIU_DOMAIN 一致（换桶时同步修改）
-  # 说明：docs/frontend/qiniu-dev-http-proxy.md
-  location /ext-img/ {
-    # 透传 Host，兼容部分对象存储/CDN 回源校验
-    proxy_set_header Host tfhx5uh5p.hd-bkt.clouddn.com;
+  # Web 端 HTTPS 页面加载 COS 等外部对象（mixed content / 私有桶展示）兼容
+  # 用法：前端展示为 https://dnhyxc.cn/ext-cos/{key}（图片、PDF 等），此处回源 COS/CDN
+  # Host / proxy_pass 须与 apps/frontend/.env 的 VITE_COS_PUBLIC_DOMAIN 一致（换桶时同步修改）
+  # 说明：docs/backend/cos-object-storage.md、docs/frontend/qiniu-dev-http-proxy.md
+  location /ext-cos/ {
+    proxy_set_header Host dnhyxc-ai-1313243176.cos.ap-shanghai.myqcloud.com;
     proxy_set_header X-Real-IP $remote_addr;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_set_header X-Forwarded-Proto $scheme;
 
-    # 去掉 /ext-img/ 前缀，回源到外部 HTTP 地址
-    rewrite ^/ext-img/(.*)$ /$1 break;
-    proxy_pass http://tfhx5uh5p.hd-bkt.clouddn.com;
+    rewrite ^/ext-cos/(.*)$ /$1 break;
+    proxy_pass https://dnhyxc-ai-1313243176.cos.ap-shanghai.myqcloud.com;
 
-    # 可选：简单缓存（按需调整）
     add_header Cache-Control "public, max-age=604800";
   }
 }

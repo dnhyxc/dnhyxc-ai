@@ -26,7 +26,7 @@ dnhyxc-ai/
 - **工具库**:
   - crypto-js (加密)
   - js-md5 (MD5 哈希)
-  - qiniu-js (七牛云上传)
+  - 腾讯云 COS（经后端 `/upload/uploadCos` 上传）
   - lucide-react (图标)
 
 ### 后端架构 (NestJS)
@@ -40,7 +40,7 @@ dnhyxc-ai/
 - **日志管理**: Winston
 - **缓存**: Redis (Keyv)
 - **邮件服务**: Nodemailer
-- **文件上传**: Multer + 七牛云
+- **文件上传**: Multer（本地）+ 腾讯云 COS
 - **安全**:
   - Helmet (头部安全)
   - Express Rate Limit (请求限制)
@@ -153,7 +153,7 @@ pnpm m:run
 
 ### 文件管理
 
-- 文件上传 (支持本地和七牛云)
+- 文件上传 (支持本地与腾讯云 COS)
 - 文件下载管理
 - 文件类型验证
 - 上传进度追踪

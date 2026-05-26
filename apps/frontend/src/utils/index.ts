@@ -29,47 +29,193 @@ export {
 	toStorageUploadPath,
 } from './upload-file-url';
 
-/**
- * 将七牛 HTTP 资源 URL 改写为同源代理路径（展示用，不落库）：
- * - **开发**（含 Tauri dev）：走 Vite `/ext-img/` → 七牛 HTTP，避免 macOS ATS 拦截外链
- * - **Web 生产**（HTTPS）：同上，避免 mixed content
- * - **Tauri 生产包**：保持七牛原始 HTTP URL（依赖 Info.plist ATS 例外，七牛仍为 HTTP）
- *
- * 注意：提交/持久化请继续存 `VITE_QINIU_DOMAIN + key` 的原始地址。
- */
-function rewriteQiniuHttpUrlToSameOriginProxy(url: string): string {
-	const qiniuDomainRaw = import.meta.env.VITE_QINIU_DOMAIN || '';
-	const webImageProxyPrefixRaw =
-		import.meta.env.VITE_WEB_IMAGE_PROXY_PREFIX || '/ext-img/';
-	if (!qiniuDomainRaw) return url;
-
-	const normalizedQiniuDomain = qiniuDomainRaw.endsWith('/')
-		? qiniuDomainRaw
-		: `${qiniuDomainRaw}/`;
-	if (!url.startsWith(normalizedQiniuDomain)) return url;
-
-	const normalizedProxyPrefix = webImageProxyPrefixRaw.startsWith('/')
-		? webImageProxyPrefixRaw
-		: `/${webImageProxyPrefixRaw}`;
-	const normalizedProxyPrefixWithSlash = normalizedProxyPrefix.endsWith('/')
-		? normalizedProxyPrefix
-		: `${normalizedProxyPrefix}/`;
-
-	const rawPath = url.slice(normalizedQiniuDomain.length);
-	return `${normalizedProxyPrefixWithSlash}${rawPath}`;
+/** COS / CDN 对外域名（兼容旧 VITE_QINIU_DOMAIN） */
+export function getCosPublicDomainPrefix(): string {
+	const raw =
+		import.meta.env.VITE_COS_PUBLIC_DOMAIN ||
+		import.meta.env.VITE_QINIU_DOMAIN ||
+		'';
+	if (!raw) return '';
+	return raw.endsWith('/') ? raw : `${raw}/`;
 }
 
-export const resolveQiniuUrlForWebDisplay = (url?: string): string => {
+/**
+ * 同源 COS 对象代理路径前缀（图片、PDF 等任意 MIME，展示用不落库）。
+ * 默认 `/ext-cos/`，由 `VITE_COS_PROXY_PREFIX` 配置。
+ */
+export function getCosProxyPrefix(): string {
+	const raw = import.meta.env.VITE_COS_PROXY_PREFIX || '/ext-cos/';
+	const withLeading = raw.startsWith('/') ? raw : `/${raw}`;
+	return withLeading.endsWith('/') ? withLeading : `${withLeading}/`;
+}
+
+/** 无尾部斜杠，供 Vite / Nginx location 匹配 */
+export function getCosProxyPathname(): string {
+	return getCosProxyPrefix().replace(/\/$/, '') || '/ext-cos';
+}
+
+/**
+ * 将 COS/CDN 资源 URL 改写为同源代理路径（展示用，不落库）：
+ * - **开发**（含 Tauri dev）：走 Vite `/ext-cos/` 等前缀回源，避免 ATS / mixed content
+ * - **Web 生产**（HTTPS）：同上（Nginx 需配置同名 location）
+ * - **Tauri 生产包**：使用原始 URL（HTTPS 桶域名需在 Info.plist / allowlist 放行）
+ *
+ * 持久化请存后端返回的完整 `url`（`uploadCos`）。
+ */
+function rewriteCosUrlToSameOriginProxy(url: string): string {
+	const cosDomainRaw = getCosPublicDomainPrefix();
+	const proxyPrefix = getCosProxyPrefix();
+	if (!cosDomainRaw) return url;
+
+	if (!url.startsWith(cosDomainRaw)) return url;
+
+	const rawPath = url.slice(cosDomainRaw.length);
+	return `${proxyPrefix}${rawPath}`;
+}
+
+export const resolveCosUrlForWebDisplay = (url?: string): string => {
 	if (!url) return '';
-	// 本地开发：Tauri WKWebView 也会拦七牛 HTTP，必须走 dev server 代理
 	if (import.meta.env.DEV) {
-		return rewriteQiniuHttpUrlToSameOriginProxy(url);
+		return rewriteCosUrlToSameOriginProxy(url);
 	}
-	// Tauri 生产包无 Vite 代理，继续用原始 HTTP（Info.plist 已放行 CDN 域）
 	if (isTauriRuntime()) return url;
 	if (!import.meta.env.PROD) return url;
-	return rewriteQiniuHttpUrlToSameOriginProxy(url);
+	return rewriteCosUrlToSameOriginProxy(url);
 };
+
+/** @deprecated 使用 resolveCosUrlForWebDisplay */
+export const resolveQiniuUrlForWebDisplay = resolveCosUrlForWebDisplay;
+
+/** 是否为 COS 持久化域名上的对象 URL */
+export function isCosStoredObjectUrl(url: string): boolean {
+	if (!url?.trim()) return false;
+	const prefix = getCosPublicDomainPrefix();
+	if (prefix && url.startsWith(prefix)) return true;
+	return /^https?:\/\/[^/]+\.cos\.[^/]+\.myqcloud\.com\//i.test(url);
+}
+
+/** 是否为同源 COS 代理路径（/ext-cos/...） */
+export function isCosProxyPathUrl(url: string): boolean {
+	if (!url?.trim()) return false;
+	const normalized = url.startsWith('/') ? url : `/${url}`;
+	return normalized.startsWith(getCosProxyPrefix());
+}
+
+/** 从代理路径或 COS 完整 URL 解析对象 key（如 assets/xxx.png） */
+export function extractCosObjectKey(url: string): string | null {
+	const trimmed = url?.trim();
+	if (!trimmed) return null;
+
+	const tryDecodePath = (rawPath: string) => {
+		const cleaned = rawPath.replace(/^\//, '');
+		if (!cleaned.startsWith('assets/')) return null;
+		try {
+			return cleaned
+				.split('/')
+				.map((seg) => decodeURIComponent(seg))
+				.join('/');
+		} catch {
+			return cleaned;
+		}
+	};
+
+	if (isCosProxyPathUrl(trimmed)) {
+		const proxyPrefix = getCosProxyPrefix();
+		return tryDecodePath(trimmed.slice(proxyPrefix.length));
+	}
+
+	if (typeof window !== 'undefined') {
+		try {
+			const u = new URL(trimmed, window.location.origin);
+			const pathname = getCosProxyPathname();
+			if (u.pathname.startsWith(`${pathname}/`)) {
+				return tryDecodePath(u.pathname.slice(pathname.length + 1));
+			}
+		} catch {
+			/* ignore */
+		}
+	}
+
+	const cosPrefix = getCosPublicDomainPrefix();
+	if (cosPrefix && trimmed.startsWith(cosPrefix)) {
+		return tryDecodePath(trimmed.slice(cosPrefix.length));
+	}
+
+	return null;
+}
+
+/** 还原为 COS 桶上的规范 HTTPS URL（供 Tauri download_file 等使用） */
+export function resolveCosCanonicalObjectUrl(url: string): string {
+	if (!url?.trim()) return url;
+	if (url.startsWith('blob:') || url.startsWith('data:')) return url;
+
+	const key = extractCosObjectKey(url);
+	if (!key) return url;
+
+	const domain = getCosPublicDomainPrefix();
+	if (!domain) return url;
+
+	const encodedKey = key
+		.split('/')
+		.map((segment) => encodeURIComponent(segment))
+		.join('/');
+	return `${domain}${encodedKey}`;
+}
+
+/**
+ * 下载用 URL：Web 走同源 /ext-cos 绝对地址；Tauri 走 COS 直链。
+ */
+export function resolveUrlForDownload(url: string): string {
+	if (!url?.trim()) return url;
+	if (url.startsWith('blob:') || url.startsWith('data:')) return url;
+
+	if (isTauriRuntime()) {
+		return resolveCosCanonicalObjectUrl(url);
+	}
+
+	if (isCosProxyPathUrl(url)) {
+		const path = url.startsWith('/') ? url : `/${url}`;
+		if (typeof window !== 'undefined') {
+			return `${window.location.origin}${path}`;
+		}
+		return path;
+	}
+
+	if (isCosStoredObjectUrl(url)) {
+		const proxied = rewriteCosUrlToSameOriginProxy(url);
+		if (proxied.startsWith('/') && typeof window !== 'undefined') {
+			return `${window.location.origin}${proxied}`;
+		}
+		return proxied;
+	}
+
+	return url;
+}
+
+function inferFileNameFromUrl(url: string, fallback = 'download'): string {
+	try {
+		const u = new URL(url, 'http://local.invalid');
+		const last = u.pathname.split('/').filter(Boolean).pop();
+		if (!last) return fallback;
+		return decodeURIComponent(last);
+	} catch {
+		return fallback;
+	}
+}
+
+function shouldDownloadViaFetch(url: string, resolvedUrl: string): boolean {
+	if (isTauriRuntime()) return false;
+	if (url.startsWith('blob:') || url.startsWith('data:')) return false;
+	if (isCosProxyPathUrl(url) || isCosStoredObjectUrl(url)) return true;
+	if (typeof window !== 'undefined') {
+		try {
+			return new URL(resolvedUrl).origin === window.location.origin;
+		} catch {
+			return false;
+		}
+	}
+	return false;
+}
 
 export const setStorage = (key: string, value: string) => {
 	localStorage.setItem(key, value);
@@ -100,14 +246,41 @@ export const downloadFileFromUrl = async (
 	options: DownloadOptions,
 ): Promise<DownloadResult> => {
 	const { url, file_name, overwrite = true, id, max_size, save_dir } = options;
+	const resolvedUrl = resolveUrlForDownload(url);
+	const downloadId = id ?? crypto.randomUUID?.() ?? String(Date.now());
+
 	try {
+		if (shouldDownloadViaFetch(url, resolvedUrl)) {
+			const platformFetch = await getPlatformFetch();
+			const response = await platformFetch(resolvedUrl, { method: 'GET' });
+			if (!response.ok) {
+				throw new Error(`下载失败（HTTP ${response.status}）`);
+			}
+			const contentType = response.headers.get('content-type') || '';
+			if (contentType.includes('text/html')) {
+				throw new Error('下载失败：资源不可用');
+			}
+			const blob = await response.blob();
+			const name =
+				file_name ||
+				inferFileNameFromUrl(resolvedUrl, inferFileNameFromUrl(url));
+			return await downloadBlob(
+				{
+					file_name: name,
+					overwrite,
+					id: downloadId,
+					save_dir,
+				},
+				blob,
+			);
+		}
+
 		if (!isTauriRuntime()) {
 			const a = document.createElement('a');
-			a.href = url;
+			a.href = resolvedUrl;
 			if (file_name) {
 				a.download = file_name;
 			}
-			a.target = '_blank';
 			a.rel = 'noopener noreferrer';
 			document.body.appendChild(a);
 			a.click();
@@ -115,16 +288,16 @@ export const downloadFileFromUrl = async (
 			return {
 				success: 'success',
 				message: '已开始下载',
-				id: options.id,
+				id: downloadId,
 			} as DownloadResult;
 		}
 		const { invoke } = await import('@tauri-apps/api/core');
 		const result: DownloadResult = await invoke('download_file', {
 			options: {
-				url,
-				file_name,
+				url: resolvedUrl,
+				file_name: file_name || inferFileNameFromUrl(resolvedUrl, 'download'),
 				overwrite,
-				id,
+				id: downloadId,
 				max_size,
 				save_dir,
 			},
@@ -134,7 +307,7 @@ export const downloadFileFromUrl = async (
 		return {
 			success: 'error',
 			message: error instanceof Error ? error.message : '下载文件失败',
-			id: options.id,
+			id: downloadId,
 		};
 	}
 };
@@ -363,10 +536,18 @@ export const donwnloadWithUrl = async (
 };
 
 /**
- * 处理图片下载
+ * 处理图片下载（与 Upload 等组件一致：成功/失败 Toast 提示）
  */
-export const handlerDownload = (url: string): void => {
-	downloadFileFromUrl({ url });
+export const handlerDownload = async (
+	url: string,
+	file_name?: string,
+): Promise<DownloadResult> => {
+	const res = await downloadFileFromUrl({ url, file_name });
+	Toast({
+		type: res.success,
+		title: res.message,
+	});
+	return res;
 };
 
 // 设置首字母大写

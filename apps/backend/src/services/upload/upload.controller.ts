@@ -15,10 +15,16 @@ import {
 import { FileInterceptor, FilesInterceptor } from '@nestjs/platform-express';
 import { zip } from 'compressing';
 import type { Response } from 'express';
+import { memoryStorage } from 'multer';
 import { JwtGuard } from '../../guards/jwt.guard';
 import { ResponseInterceptor } from '../../interceptors/response.interceptor';
 import { decodeChineseFilename } from '../../utils';
 import { UploadService } from './upload.service';
+
+const cosMemoryUpload = {
+	storage: memoryStorage(),
+	limits: { fileSize: 1024 * 1024 * 20 },
+};
 
 @Controller('upload')
 // 设置响应拦截器
@@ -27,10 +33,21 @@ import { UploadService } from './upload.service';
 export class UploadController {
 	constructor(private readonly uploadService: UploadService) {}
 
-	// 获取七牛云文件上传token
-	@Get('/getUploadToken')
-	async getUploadToken() {
-		return await this.uploadService.getUploadToken();
+	/** 上传文件到腾讯云 COS（头像、下载页图片等） */
+	@Post('/uploadCos')
+	@UseInterceptors(FileInterceptor('file', cosMemoryUpload))
+	async uploadCos(@UploadedFile() file: Express.Multer.File) {
+		try {
+			return await this.uploadService.uploadObjectToCos(file);
+		} catch (error) {
+			if (error instanceof HttpException) {
+				throw error;
+			}
+			throw new HttpException(
+				error?.message || '上传到 COS 失败',
+				HttpStatus.BAD_REQUEST,
+			);
+		}
 	}
 
 	@Post('/uploadFile')

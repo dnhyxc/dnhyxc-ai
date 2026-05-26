@@ -8,14 +8,23 @@ const host = process.env.TAURI_DEV_HOST;
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
 	const env = loadEnv(mode, process.cwd(), '');
-	const qiniuProxyTarget = (
-		env.VITE_QINIU_DOMAIN || 'http://tfhx5uh5p.hd-bkt.clouddn.com'
+	const cosProxyTarget = (
+		env.VITE_COS_PUBLIC_DOMAIN ||
+		env.VITE_QINIU_DOMAIN ||
+		'https://example.cos.ap-guangzhou.myqcloud.com'
 	).replace(/\/$/, '');
 
 	// 与 VITE_DEV_API_DOMAIN 同源（去掉 /api），避免 API 在 9226 时代理仍指向 9112 导致 ECONNREFUSED → 500
 	const devApiProxyTarget = (
 		env.VITE_DEV_API_DOMAIN || 'http://localhost:9112/api'
 	).replace(/\/api\/?$/, '');
+
+	const cosProxyPrefixRaw = env.VITE_COS_PROXY_PREFIX || '/ext-cos/';
+	const cosProxyPathname =
+		(cosProxyPrefixRaw.startsWith('/')
+			? cosProxyPrefixRaw
+			: `/${cosProxyPrefixRaw}`
+		).replace(/\/$/, '') || '/ext-cos';
 
 	return {
 		plugins: [react(), tailwindcss(), removeDistMinMapsPlugin()],
@@ -69,11 +78,12 @@ export default defineConfig(({ mode }) => {
 					target: devApiProxyTarget,
 					changeOrigin: true,
 				},
-				// 本地展示七牛 HTTP 图：/ext-img/xxx → VITE_QINIU_DOMAIN/xxx（不改 HTTPS）
-				'/ext-img': {
-					target: qiniuProxyTarget,
+				// COS 对象同源代理：/ext-cos/xxx → VITE_COS_PUBLIC_DOMAIN/xxx
+				[cosProxyPathname]: {
+					target: cosProxyTarget,
 					changeOrigin: true,
-					rewrite: (path) => path.replace(/^\/ext-img/, '') || '/',
+					rewrite: (path) =>
+						path.replace(new RegExp(`^${cosProxyPathname}`), '') || '/',
 				},
 			},
 		},

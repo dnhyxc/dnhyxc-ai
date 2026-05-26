@@ -523,12 +523,12 @@ const ImagePreview = forwardRef<ImagePreviewHandle, ImagePreviewProps>(
 			};
 		}, []);
 
-		const onDownload = useCallback(() => {
+		const onDownload = useCallback(async () => {
 			if (download) {
 				download(currentImage);
-			} else {
-				handlerDownload(currentImage.url);
+				return;
 			}
+			await handlerDownload(currentImage.url);
 		}, [download, currentImage]);
 
 		const onRefresh = useCallback(() => {

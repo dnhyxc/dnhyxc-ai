@@ -64,6 +64,11 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'When logged out you can still open home, login, about, share links, the knowledge base (local-only by default—see Section 6), settings and its subpaths, the desktop download landing page, the product guide, legal policies, agreements, and this structured update page. Chat and other signed-in flows stay behind the guard; standalone public routes match Sections 21–22.',
 	},
+	's2-4': {
+		title: 'Avatar storage on Tencent Cloud COS',
+		description:
+			'Profile avatars and similar cloud images are uploaded through the server to Tencent Cloud COS, replacing Qiniu direct upload. The full object URL is saved after upload. On the web, objects are shown via the same-origin /ext-cos/ proxy (not limited to images). Preview and upload-area downloads are fixed with success/failure toasts. Chat attachments stay on local server storage. Deployments need COS credentials and readable objects (public-read or equivalent).',
+	},
 	's3-1': {
 		title: 'One frontend for desktop and browser',
 		description:

@@ -9,7 +9,7 @@ import ICON from '@/assets/icon.png';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import useStore from '@/store';
-import { resolveQiniuUrlForWebDisplay } from '@/utils';
+import { resolveCosUrlForWebDisplay } from '@/utils';
 
 const PROFILE_MEMBERSHIP_BENEFIT_KEYS = [
 	'profile.membership.benefit1',
@@ -65,7 +65,7 @@ const Profile = observer(() => {
 	const profile =
 		rawProfile != null && typeof rawProfile === 'object' ? rawProfile : null;
 	const avatarSrc = profile?.avatar
-		? resolveQiniuUrlForWebDisplay(profile.avatar)
+		? resolveCosUrlForWebDisplay(profile.avatar)
 		: ICON;
 
 	const rolesText = useMemo(() => {

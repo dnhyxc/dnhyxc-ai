@@ -24,7 +24,7 @@ import { useI18n, useStorageInfo } from '@/hooks';
 import { cn } from '@/lib/utils';
 import { hasValidAuthToken } from '@/router/authPaths';
 import useStore from '@/store';
-import { removeStorage, resolveQiniuUrlForWebDisplay } from '@/utils';
+import { removeStorage, resolveCosUrlForWebDisplay } from '@/utils';
 import Image from '../Image';
 import { MENUS } from './enum';
 
@@ -68,7 +68,7 @@ const Sidebar = () => {
 
 	const avatarUrl = useMemo(() => {
 		return storageInfo?.profile?.avatar
-			? resolveQiniuUrlForWebDisplay(storageInfo?.profile?.avatar)
+			? resolveCosUrlForWebDisplay(storageInfo?.profile?.avatar)
 			: ICON;
 	}, [storageInfo?.profile?.avatar]);
 

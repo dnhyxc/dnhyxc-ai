@@ -47,7 +47,6 @@ import {
 	GET_SESSION,
 	GET_SESSION_LIST,
 	GET_SHARE,
-	GET_UPLOAD_TOKEN,
 	GET_USER_PROFILE,
 	GET_USERS,
 	IMAGE_OCR,
@@ -71,6 +70,7 @@ import {
 	UPDATE_EMAIL,
 	UPDATE_SESSION,
 	UPDATE_USER,
+	UPLOAD_COS,
 	UPLOAD_FILE,
 	UPLOAD_FILES,
 } from './api';
@@ -198,9 +198,21 @@ export const getUsers = async () => {
 	return await http.get(GET_USERS);
 };
 
-// 获取七牛云上传token
-export const getUploadToken = async () => {
-	return await http.get(GET_UPLOAD_TOKEN);
+// 上传文件到腾讯云 COS
+export const uploadCosFile = async (
+	file: File,
+	onProgress?: (percent: number) => void,
+) => {
+	return await http.post(
+		UPLOAD_COS,
+		{ file },
+		{
+			headers: {
+				'Content-Type': 'multipart/form-data',
+			},
+			onUploadProgress: onProgress,
+		},
+	);
 };
 
 // 上传文件

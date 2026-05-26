@@ -1,40 +1,101 @@
+import { randomUUID } from 'node:crypto';
 import { existsSync, unlink } from 'node:fs';
-import { extname, resolve } from 'node:path';
+import { basename, extname, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
-import * as qiniu from 'qiniu';
-import { QiniuEnum } from '../../enum/config.enum';
-import { getEnvConfig } from '../../utils';
+import COS from 'cos-nodejs-sdk-v5';
+import { decodeChineseFilename } from '../../utils';
 import {
 	getAllowedUploadRoots,
 	resolveStoredUploadAbsolutePath,
 	toUploadPublicPath,
 } from '../../utils/upload-paths';
+import {
+	assertCosRuntimeConfig,
+	formatCosUploadError,
+	getCosRuntimeConfig,
+} from './cos.config';
 import { IMAGE_EXTS } from './upload.enum';
 
-// 将 unlink 包装为 Promise 以便 async/await 使用
 const unlinkAsync = promisify(unlink);
 
 @Injectable()
 export class UploadService {
-	getUploadToken() {
-		const config = getEnvConfig();
-		const accessKey = config[QiniuEnum.ACCESS_KEY];
-		const secretKey = config[QiniuEnum.SECRET_KEY];
-		const mac = new qiniu.auth.digest.Mac(accessKey, secretKey);
-		const options = {
-			scope: config[QiniuEnum.BUCKET_NAME],
-		};
-		const putPolicy = new qiniu.rs.PutPolicy(options);
-		const uploadToken = putPolicy.uploadToken(mac);
-		if (uploadToken) {
-			return uploadToken;
-		} else {
-			throw new HttpException('获取上传凭证失败', HttpStatus.BAD_REQUEST);
+	private cosClient: COS | null = null;
+
+	private getCosClient(): COS {
+		if (!this.cosClient) {
+			const config = getCosRuntimeConfig();
+			assertCosRuntimeConfig(config);
+			this.cosClient = new COS({
+				SecretId: config.secretId,
+				SecretKey: config.secretKey,
+			});
 		}
+		return this.cosClient;
 	}
 
-	// 获取静态资源访问路径（/images/... 或 /files/...）
+	buildCosObjectKey(originalname: string): string {
+		const safeName = basename(decodeChineseFilename(originalname)).replace(
+			/[/\\]/g,
+			'_',
+		);
+		return `assets/${randomUUID()}_${safeName}`;
+	}
+
+	buildCosPublicUrl(key: string): string {
+		const config = getCosRuntimeConfig();
+		assertCosRuntimeConfig(config);
+		const domain = config.publicDomain.endsWith('/')
+			? config.publicDomain
+			: `${config.publicDomain}/`;
+		const encodedKey = key
+			.replace(/^\//, '')
+			.split('/')
+			.map((segment) => encodeURIComponent(segment))
+			.join('/');
+		return `${domain}${encodedKey}`;
+	}
+
+	async uploadObjectToCos(file: Express.Multer.File) {
+		if (!file?.buffer?.length) {
+			throw new HttpException('上传文件为空', HttpStatus.BAD_REQUEST);
+		}
+
+		const config = getCosRuntimeConfig();
+		assertCosRuntimeConfig(config);
+
+		const key = this.buildCosObjectKey(file.originalname);
+		const cos = this.getCosClient();
+
+		try {
+			await cos.putObject({
+				Bucket: config.bucket,
+				Region: config.region,
+				Key: key,
+				Body: file.buffer,
+				ContentType: file.mimetype || 'application/octet-stream',
+				// 默认公有读，否则浏览器直链 / ext-cos 等同源代理会 403
+				ACL: config.objectAcl,
+			});
+		} catch (error) {
+			throw new HttpException(
+				formatCosUploadError(error),
+				HttpStatus.BAD_GATEWAY,
+			);
+		}
+
+		const originalname = decodeChineseFilename(file.originalname);
+		return {
+			key,
+			url: this.buildCosPublicUrl(key),
+			originalname,
+			filename: basename(key),
+			mimetype: file.mimetype,
+			size: file.size,
+		};
+	}
+
 	getStaticPath(filePath: string, _mimetype: string): string {
 		return toUploadPublicPath(filePath);
 	}
@@ -56,7 +117,6 @@ export class UploadService {
 		throw new HttpException('文件不存在', HttpStatus.BAD_REQUEST);
 	}
 
-	// download
 	download(filename: string, toReplace?: boolean) {
 		const isImage = IMAGE_EXTS.includes(extname(filename).toLowerCase());
 		if (isImage) {

@@ -1,10 +1,12 @@
 # 七牛 HTTP 展示代理（开发 / Web 生产 / Tauri）
 
-> **文档角色**：本专题为七牛 HTTP 展示链的**主文档**（含代码摘录与回归清单）。  
+> **文档角色**：**历史七牛** HTTP 展示链说明；云上传已迁 **腾讯云 COS**，实现与 env 见 [../backend/cos-object-storage.md](../backend/cos-object-storage.md)。  
+> **展示机制仍适用**：持久化存完整对象 URL，DEV/Web 生产用 `/ext-cos/`（COS 对象同源代理，不限图片）+ `VITE_COS_PUBLIC_DOMAIN`（兼容 `VITE_QINIU_DOMAIN`）。**仅** `/ext-cos/`，不再兼容 `/ext-img/`。  
 > **延伸阅读**  
-> - macOS ATS 概念：[tauri-macos-ats-http.md](./tauri-macos-ats-http.md)（指向本文，避免重复）  
-> - 路由鉴权中的 mixed content 摘要：[route-auth.md](./route-auth.md) §12  
-> - Nginx 生产代理：[../backend/nginx.md](../backend/nginx.md) `location /ext-img/`  
+> - COS 上传与 ACL：[../backend/cos-object-storage.md](../backend/cos-object-storage.md)  
+> - macOS ATS 概念：[tauri-macos-ats-http.md](./tauri-macos-ats-http.md)  
+> - 路由鉴权 mixed content 摘要：[route-auth.md](./route-auth.md) §12  
+> - Nginx 生产代理：[../backend/nginx.md](../backend/nginx.md) `location /ext-cos/`  
 > - 文档总索引：[../README.md](../README.md)
 
 ## 1. 背景与目标
@@ -19,7 +21,7 @@
 
 ### 1.2 目标
 
-- **开发态**（含 `pnpm dev` + Tauri dev）：展示层走 **同源** `/ext-img/` 代理到七牛 HTTP，绕过 WKWebView 对外链 HTTP 的 ATS 限制。
+- **开发态**（含 `pnpm dev` + Tauri dev）：展示层走 **同源** `/ext-cos/` 代理到七牛 HTTP，绕过 WKWebView 对外链 HTTP 的 ATS 限制。
 - **持久化**：数据库 / 用户信息仍保存 `http://{bucket}.clouddn.com/{key}` 原始 URL。
 - **Tauri 生产包**：无 Vite 代理时，继续用 **Info.plist** 对当前 CDN 域名做 ATS 例外。
 
@@ -32,7 +34,7 @@
 | 路径 | 说明 |
 |------|------|
 | `apps/frontend/src/utils/index.ts` | `rewriteQiniuHttpUrlToSameOriginProxy` + `resolveQiniuUrlForWebDisplay` 分支 |
-| `apps/frontend/vite.config.ts` | 开发服务器 `/ext-img` → `VITE_QINIU_DOMAIN` 代理 |
+| `apps/frontend/vite.config.ts` | 开发服务器 `/ext-cos` → `VITE_QINIU_DOMAIN` 代理 |
 | `apps/frontend/src/views/download/index.tsx` | 预览列表 `<img>` 走展示 URL 改写 |
 | `apps/frontend/src-tauri/Info.plist` | `NSAllowsLocalNetworking`；CDN 域名 `tfhx5uh5p.hd-bkt.clouddn.com` |
 | `apps/frontend/src-tauri/capabilities/default.json` | Tauri HTTP 插件允许访问的七牛 CDN URL 同步为新桶域 |
@@ -60,8 +62,8 @@ sequenceDiagram
 
   Note over UI,QiniuCDN: 旧逻辑：img.src = http://CDN/key.webp
   UI-xQiniuCDN: ATS 拦截外链 HTTP
-  Note over UI,Vite: 新逻辑：img.src = /ext-img/key.webp
-  UI->>Vite: GET /ext-img/key.webp
+  Note over UI,Vite: 新逻辑：img.src = /ext-cos/key.webp
+  UI->>Vite: GET /ext-cos/key.webp
   Vite->>QiniuCDN: 代理回源 HTTP
   QiniuCDN-->>Vite: 图片字节
   Vite-->>UI: 200 同源响应
@@ -79,7 +81,7 @@ sequenceDiagram
 |------|------|
 | 七牛控制台绑 HTTPS 域名 | 长期推荐，但违背「本地坚持 HTTP」 |
 | 仅扩 Info.plist 放行 CDN | 开发仍可能漏请求；且与生产 Nginx 代理模型不一致 |
-| **Vite `/ext-img/` 代理（采用）** | 与生产 Web 的 `/ext-img/` 模型一致；开发/Tauri dev 同源加载 |
+| **Vite `/ext-cos/` 代理（采用）** | 与生产 Web 的 `/ext-cos/` 模型一致；开发/Tauri dev 同源加载 |
 
 ---
 
@@ -89,13 +91,13 @@ sequenceDiagram
 
 | 环境 | `resolveQiniuUrlForWebDisplay` 行为 |
 |------|-------------------------------------|
-| `import.meta.env.DEV` | 改写为 `/ext-img/{path}`（**含 Tauri dev**） |
+| `import.meta.env.DEV` | 改写为 `/ext-cos/{path}`（**含 Tauri dev**） |
 | Tauri **生产**包 | 返回原始 HTTP URL（依赖 Info.plist） |
-| Web **生产**（HTTPS） | 改写为 `/ext-img/{path}`（Nginx 回源，见 route-auth §12） |
+| Web **生产**（HTTPS） | 改写为 `/ext-cos/{path}`（Nginx 回源，见 route-auth §12） |
 
 ### 4.2 Vite 代理与生产 Nginx 对齐
 
-开发态由 Vite `server.proxy` 承担 Nginx `location /ext-img/` 的职责：`/ext-img/girl-back.webp` → `http://tfhx5uh5p.hd-bkt.clouddn.com/girl-back.webp`。
+开发态由 Vite `server.proxy` 承担 Nginx `location /ext-cos/` 的职责：`/ext-cos/girl-back.webp` → `http://tfhx5uh5p.hd-bkt.clouddn.com/girl-back.webp`。
 
 ### 4.3 Tauri 侧配套
 
@@ -116,8 +118,8 @@ sequenceDiagram
  */
 function rewriteQiniuHttpUrlToSameOriginProxy(url: string): string {
 	const qiniuDomainRaw = import.meta.env.VITE_QINIU_DOMAIN || '';
-	const webImageProxyPrefixRaw =
-		import.meta.env.VITE_WEB_IMAGE_PROXY_PREFIX || '/ext-img/';
+	const proxyPrefixRaw =
+		import.meta.env.VITE_COS_PROXY_PREFIX || '/ext-cos/';
 	if (!qiniuDomainRaw) return url;
 
 	// 规范化域名末尾斜杠，保证 startsWith 判断稳定
@@ -126,10 +128,10 @@ function rewriteQiniuHttpUrlToSameOriginProxy(url: string): string {
 		: `${qiniuDomainRaw}/`;
 	if (!url.startsWith(normalizedQiniuDomain)) return url;
 
-	// 代理前缀：/ext-img/ + 对象 key（如 girl-back.webp）
-	const normalizedProxyPrefix = webImageProxyPrefixRaw.startsWith('/')
-		? webImageProxyPrefixRaw
-		: `/${webImageProxyPrefixRaw}`;
+	// 代理前缀：/ext-cos/ + 对象 key（如 girl-back.webp）
+	const normalizedProxyPrefix = proxyPrefixRaw.startsWith('/')
+		? proxyPrefixRaw
+		: `/${proxyPrefixRaw}`;
 	const normalizedProxyPrefixWithSlash = normalizedProxyPrefix.endsWith('/')
 		? normalizedProxyPrefix
 		: `${normalizedProxyPrefix}/`;
@@ -156,7 +158,7 @@ export const resolveQiniuUrlForWebDisplay = (url?: string): string => {
 
 | 持久化 URL（上传后写入） | 开发态 `<img src>` |
 |--------------------------|-------------------|
-| `http://tfhx5uh5p.hd-bkt.clouddn.com/girl-back.webp` | `/ext-img/girl-back.webp` |
+| `http://tfhx5uh5p.hd-bkt.clouddn.com/girl-back.webp` | `/ext-cos/girl-back.webp` |
 
 ### 5.2 Vite 开发代理
 
@@ -178,11 +180,11 @@ export default defineConfig(({ mode }) => {
 					target: 'http://localhost:9112',
 					changeOrigin: true,
 				},
-				// /ext-img/xxx → {VITE_QINIU_DOMAIN}/xxx，保持 HTTP 回源
-				'/ext-img': {
+				// /ext-cos/xxx → {VITE_QINIU_DOMAIN}/xxx，保持 HTTP 回源
+				'/ext-cos': {
 					target: qiniuProxyTarget,
 					changeOrigin: true,
-					rewrite: (path) => path.replace(/^\/ext-img/, '') || '/',
+					rewrite: (path) => path.replace(/^\/ext-cos/, '') || '/',
 				},
 			},
 		},
@@ -251,7 +253,7 @@ export default defineConfig(({ mode }) => {
 | 变量 | 示例 | 作用 |
 |------|------|------|
 | `VITE_QINIU_DOMAIN` | `http://tfhx5uh5p.hd-bkt.clouddn.com/` | 上传后拼接对象 URL；Vite 代理回源目标 |
-| `VITE_WEB_IMAGE_PROXY_PREFIX` | `/ext-img/` | 展示层改写前缀（默认即可） |
+| `VITE_COS_PROXY_PREFIX` | `/ext-cos/` | 展示层改写前缀（与 Vite / Nginx 同源代理路径一致） |
 
 ---
 
@@ -259,10 +261,10 @@ export default defineConfig(({ mode }) => {
 
 | 场景 | 影响 |
 |------|------|
-| 浏览器 `pnpm dev` | 七牛图走 `/ext-img/`，行为与 Tauri dev 一致 |
+| 浏览器 `pnpm dev` | 七牛图走 `/ext-cos/`，行为与 Tauri dev 一致 |
 | Tauri dev | 同上，解决 ATS 不显示 |
 | Tauri 生产包 | 仍用 HTTP 直链 + Info.plist；**无** Vite 代理 |
-| Web 生产 HTTPS | 行为与改前一致（`/ext-img/` + Nginx） |
+| Web 生产 HTTPS | 行为与改前一致（`/ext-cos/` + Nginx） |
 | 提交给后端的 avatar | **不变**，仍为七牛 HTTP 完整 URL |
 
 **破坏性**：无 API 变更。若某处 `<img>` 未走 `resolveQiniuUrlForWebDisplay`，开发态仍可能 ATS 失败，需补调用。
@@ -271,11 +273,11 @@ export default defineConfig(({ mode }) => {
 
 ## 8. 回归测试建议
 
-1. **Tauri dev**：上传头像 → 侧边栏/账户页立即显示；Network 中图片请求为 `http://127.0.0.1:9002/ext-img/...`，非直连 `clouddn.com`。
+1. **Tauri dev**：上传头像 → 侧边栏/账户页立即显示；Network 中图片请求为 `http://127.0.0.1:9002/ext-cos/...`，非直连 `clouddn.com`。
 2. **浏览器 dev**：同上。
 3. **换桶**：修改 `VITE_QINIU_DOMAIN` 后，同步 `Info.plist`、`capabilities/default.json`，重启 dev。
 4. **Tauri 生产包**：`tauri build` 后无 plist 时 CDN 图应仍能加载（ATS 例外）；有代理需求时用 Web 部署模型。
-5. **持久化**：保存后接口 payload / DB 中 avatar 仍为 `http://tfhx5uh5p.../key`，非 `/ext-img/`。
+5. **持久化**：保存后接口 payload / DB 中 avatar 仍为 `http://tfhx5uh5p.../key`，非 `/ext-cos/`。
 
 ---
 

@@ -50,7 +50,7 @@
 					"url": "https://github.com/*"
 				},
 				{
-					"url": "http://tfhx5uh5p.hd-bkt.clouddn.com/*"
+					"url": "https://*.cos.*.myqcloud.com/*"
 				},
 				{
 					"url": "https://cdn.jsdelivr.net/*"

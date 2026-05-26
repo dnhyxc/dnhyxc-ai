@@ -2,15 +2,14 @@ import { Button } from '@ui/button';
 import { Input } from '@ui/input';
 import { ScrollArea } from '@ui/scroll-area';
 import { Toast } from '@ui/sonner';
-import * as qiniu from 'qiniu-js';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import DragUpload from '@/components/design/DragUpload';
 import {
 	downloadFile as download,
 	downloadZip,
-	getUploadToken,
 	getUserProfile,
+	uploadCosFile,
 } from '@/service';
 import type { DownloadProgress, DownloadResult } from '@/types';
 import {
@@ -22,7 +21,7 @@ import {
 	onCreateWindow,
 	onEmit,
 	onListen,
-	resolveQiniuUrlForWebDisplay,
+	resolveCosUrlForWebDisplay,
 	saveFileWithPicker,
 } from '@/utils';
 import { isTauriRuntime } from '@/utils/runtime';
@@ -165,37 +164,22 @@ const Download = () => {
 		}
 	};
 
-	const observer = useMemo(() => {
-		return {
-			next(res: { total: UploadInfo }) {
-				setUploadInfos((prev) => [res.total, ...prev]);
-			},
-			error() {
-				// ...
-			},
-			complete(res: { key: string; hash: string }) {
-				const url = import.meta.env.VITE_QINIU_DOMAIN + res.key;
-				setDomainUrls((prev) => [url, ...prev]);
-			},
-		};
-	}, []);
-
 	const onSelectFile = () => {
 		fileInputRef?.current?.click();
 	};
 
 	const uploadFile = async (file: File) => {
-		const res = await getUploadToken();
-		const putExtra = {};
-		const config = {};
-		const observable = qiniu.upload(
-			file,
-			file.name,
-			res.data, // token
-			putExtra,
-			config,
-		);
-		observable.subscribe(observer); // 上传开始
+		const size = file.size;
+		const res = await uploadCosFile(file, (percent) => {
+			const loaded = Math.round((size * percent) / 100);
+			setUploadInfos((prev) => [
+				{ percent, loaded, size },
+				...prev.slice(0, 9),
+			]);
+		});
+		if (res?.data?.url) {
+			setDomainUrls((prev) => [res.data.url, ...prev]);
+		}
 	};
 
 	const onUpload = async () => {
@@ -251,7 +235,7 @@ const Download = () => {
 						? domainUrls.map((i, key) => {
 								return (
 									<div key={key}>
-										<img src={resolveQiniuUrlForWebDisplay(i)} alt="图片" />
+										<img src={resolveCosUrlForWebDisplay(i)} alt="图片" />
 									</div>
 								);
 							})

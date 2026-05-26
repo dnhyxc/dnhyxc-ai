@@ -5,15 +5,14 @@ import { RadioGroup, RadioGroupItem } from '@ui/radio-group';
 import { ScrollArea } from '@ui/scroll-area';
 import { Toast } from '@ui/sonner';
 import { SquarePen } from 'lucide-react';
-import * as qiniu from 'qiniu-js';
 import { useEffect, useMemo, useState } from 'react';
 import Model from '@/components/design/Model';
 import Upload from '@/components/design/Upload';
 import { useI18n, useStorageInfo } from '@/hooks';
-import { getUploadToken, updateUser } from '@/service';
+import { updateUser, uploadCosFile } from '@/service';
 import useStore from '@/store';
 import { type FileWithPreview } from '@/types';
-import { resolveQiniuUrlForWebDisplay } from '@/utils';
+import { resolveCosUrlForWebDisplay } from '@/utils';
 import ResetEmailForm from './reset-email-form';
 
 const Account = () => {
@@ -225,35 +224,19 @@ const Account = () => {
 		setOpen(false);
 	};
 
-	const observer = useMemo(() => {
-		return {
-			complete(res: { key: string; hash: string }) {
-				const url = import.meta.env.VITE_QINIU_DOMAIN + res.key;
-				setAccountInfo({
-					...accountInfo,
-					avatar: url,
-				});
-			},
-		};
-	}, [accountInfo]);
-
-	const uploadFile = async (file: File) => {
-		const res = await getUploadToken();
-		const putExtra = {};
-		const config = {};
-		const observable = qiniu.upload(
-			file,
-			file.name,
-			res.data, // token
-			putExtra,
-			config,
-		);
-		observable.subscribe(observer); // 上传开始
+	const uploadAvatarToCos = async (file: File) => {
+		const res = await uploadCosFile(file);
+		if (res?.data?.url) {
+			setAccountInfo((prev) => ({
+				...prev,
+				avatar: res.data.url,
+			}));
+		}
 	};
 
 	const onUpload = async (file: FileWithPreview | FileWithPreview[]) => {
 		const files = Array.isArray(file) ? file : [file];
-		await uploadFile(files[0].file);
+		await uploadAvatarToCos(files[0].file);
 	};
 
 	const onClearFileUrl = () => {
@@ -275,7 +258,7 @@ const Account = () => {
 	};
 
 	const avatarFileUrl = useMemo(
-		() => resolveQiniuUrlForWebDisplay(accountInfo.avatar),
+		() => resolveCosUrlForWebDisplay(accountInfo.avatar),
 		[accountInfo.avatar],
 	);
 
