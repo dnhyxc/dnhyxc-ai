@@ -10,10 +10,9 @@ import { useChatCoreContext } from '@/contexts';
 import { useI18n } from '@/hooks';
 import { useChatCore } from '@/hooks/useChatCore';
 import { cn } from '@/lib/utils';
-import { uploadFiles } from '@/service';
+import { uploadCosChatFiles } from '@/service';
 import useStore from '@/store';
 import { FileWithPreview, UploadedFile } from '@/types';
-import { toStorageUploadPath } from '@/utils';
 import SessionList from './session-list';
 
 // Chat 主组件
@@ -77,20 +76,23 @@ const Chat = observer(() => {
 				setUploadLoading(true);
 				const files = Array.isArray(data) ? data : [data];
 				const fileList = files.map((item) => item.file);
-				const res = await uploadFiles(fileList);
+				const res = await uploadCosChatFiles(fileList);
 				if (res.success) {
 					setUploadedFiles((prev) => {
 						return [
 							...prev,
-							...res.data.map((item: UploadedFile) => {
-								const fileUuid = uuidv4();
-								return {
-									...item,
-									path: toStorageUploadPath(item.path),
-									uuid: fileUuid,
-									id: item.id || fileUuid,
-								};
-							}),
+							...res.data.map(
+								(item: UploadedFile & { key?: string; url?: string }) => {
+									const fileUuid = uuidv4();
+									return {
+										...item,
+										path: item.url || item.path,
+										cosKey: item.key,
+										uuid: fileUuid,
+										id: item.id || fileUuid,
+									};
+								},
+							),
 						];
 					});
 					chatInputRef.current?.focus();

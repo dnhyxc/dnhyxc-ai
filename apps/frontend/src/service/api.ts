@@ -33,6 +33,8 @@ export const RESET_PASSWORD = '/auth/resetPassword';
 
 // 上传文件到腾讯云 COS
 export const UPLOAD_COS = '/upload/uploadCos';
+/** 聊天附件批量上传 COS（前缀 chat/） */
+export const UPLOAD_COS_CHAT_FILES = '/upload/uploadCosChatFiles';
 
 // 上传文件
 export const UPLOAD_FILE = '/upload/uploadFile';

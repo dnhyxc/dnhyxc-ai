@@ -54,8 +54,11 @@ export interface UploadedFile {
 	filename: string;
 	mimetype: string;
 	originalname: string;
+	/** 持久化：COS 为完整 HTTPS URL；历史消息可能仍为 /images、/files */
 	path: string;
 	size: number;
+	/** COS 对象键（chat/… 或 assets/…），删除未发送附件时使用 */
+	cosKey?: string;
 }
 
 export interface ShareInfo {

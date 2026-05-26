@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { FindOneOptions, In, Repository } from 'typeorm';
-import { decodeUploadPublicPath } from '../../utils/upload-paths';
+import { persistAttachmentPath } from '../../utils/upload-paths';
 import { Attachments } from './attachments.entity';
 import { ChatMessages } from './chat.entity';
 import { CreateSessionDto } from './dto/chat-request.dto';
@@ -232,7 +232,7 @@ export class MessageService {
 						originalname: attachment.originalname,
 						mimetype: attachment.mimetype,
 						size: attachment.size,
-						path: decodeUploadPublicPath(attachment.path),
+						path: persistAttachmentPath(attachment.path),
 						message: savedMessage,
 					});
 				});

@@ -12,8 +12,10 @@ import {
 } from '../../utils/upload-paths';
 import {
 	assertCosRuntimeConfig,
+	type CosObjectKeyPrefix,
 	formatCosUploadError,
 	getCosRuntimeConfig,
+	isCosObjectKey,
 } from './cos.config';
 import { IMAGE_EXTS } from './upload.enum';
 
@@ -35,12 +37,15 @@ export class UploadService {
 		return this.cosClient;
 	}
 
-	buildCosObjectKey(originalname: string): string {
+	buildCosObjectKey(
+		originalname: string,
+		prefix: CosObjectKeyPrefix = 'assets',
+	): string {
 		const safeName = basename(decodeChineseFilename(originalname)).replace(
 			/[/\\]/g,
 			'_',
 		);
-		return `assets/${randomUUID()}_${safeName}`;
+		return `${prefix}/${randomUUID()}_${safeName}`;
 	}
 
 	buildCosPublicUrl(key: string): string {
@@ -57,7 +62,10 @@ export class UploadService {
 		return `${domain}${encodedKey}`;
 	}
 
-	async uploadObjectToCos(file: Express.Multer.File) {
+	async uploadObjectToCos(
+		file: Express.Multer.File,
+		prefix: CosObjectKeyPrefix = 'assets',
+	) {
 		if (!file?.buffer?.length) {
 			throw new HttpException('上传文件为空', HttpStatus.BAD_REQUEST);
 		}
@@ -65,7 +73,7 @@ export class UploadService {
 		const config = getCosRuntimeConfig();
 		assertCosRuntimeConfig(config);
 
-		const key = this.buildCosObjectKey(file.originalname);
+		const key = this.buildCosObjectKey(file.originalname, prefix);
 		const cos = this.getCosClient();
 
 		try {
@@ -94,6 +102,41 @@ export class UploadService {
 			mimetype: file.mimetype,
 			size: file.size,
 		};
+	}
+
+	/** 聊天附件批量上传至 COS（前缀 chat/） */
+	async uploadChatAttachmentsToCos(files: Express.Multer.File[]) {
+		if (!files?.length) {
+			throw new HttpException('上传文件为空', HttpStatus.BAD_REQUEST);
+		}
+		return Promise.all(
+			files.map((file) => this.uploadObjectToCos(file, 'chat')),
+		);
+	}
+
+	async deleteCosObject(key: string) {
+		const normalizedKey = key?.replace(/^\//, '').trim();
+		if (!normalizedKey || !isCosObjectKey(normalizedKey)) {
+			throw new HttpException('无效的 COS 对象键', HttpStatus.BAD_REQUEST);
+		}
+
+		const config = getCosRuntimeConfig();
+		assertCosRuntimeConfig(config);
+		const cos = this.getCosClient();
+
+		try {
+			await cos.deleteObject({
+				Bucket: config.bucket,
+				Region: config.region,
+				Key: normalizedKey,
+			});
+			return { message: '删除成功', key: normalizedKey };
+		} catch (error) {
+			throw new HttpException(
+				formatCosUploadError(error),
+				HttpStatus.BAD_GATEWAY,
+			);
+		}
 	}
 
 	getStaticPath(filePath: string, _mimetype: string): string {

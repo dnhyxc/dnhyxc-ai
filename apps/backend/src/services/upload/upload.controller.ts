@@ -33,12 +33,29 @@ const cosMemoryUpload = {
 export class UploadController {
 	constructor(private readonly uploadService: UploadService) {}
 
-	/** 上传文件到腾讯云 COS（头像、下载页图片等） */
+	/** 上传文件到腾讯云 COS（头像、下载页图片等，前缀 assets/） */
 	@Post('/uploadCos')
 	@UseInterceptors(FileInterceptor('file', cosMemoryUpload))
 	async uploadCos(@UploadedFile() file: Express.Multer.File) {
 		try {
-			return await this.uploadService.uploadObjectToCos(file);
+			return await this.uploadService.uploadObjectToCos(file, 'assets');
+		} catch (error) {
+			if (error instanceof HttpException) {
+				throw error;
+			}
+			throw new HttpException(
+				error?.message || '上传到 COS 失败',
+				HttpStatus.BAD_REQUEST,
+			);
+		}
+	}
+
+	/** 聊天附件批量上传至 COS（前缀 chat/） */
+	@Post('/uploadCosChatFiles')
+	@UseInterceptors(FilesInterceptor('files', 20, cosMemoryUpload))
+	async uploadCosChatFiles(@UploadedFiles() files: Express.Multer.File[]) {
+		try {
+			return await this.uploadService.uploadChatAttachmentsToCos(files);
 		} catch (error) {
 			if (error instanceof HttpException) {
 				throw error;
@@ -170,14 +187,22 @@ export class UploadController {
 	}
 
 	@Delete('/deleteFile')
-	async deleteFile(@Query('filename') filename: string) {
+	async deleteFile(
+		@Query('filename') filename?: string,
+		@Query('key') key?: string,
+	) {
 		try {
-			// 简单的文件名校验，防止空字符串
-			if (!filename || filename.trim() === '') {
-				throw new HttpException('文件名不能为空', HttpStatus.BAD_REQUEST);
+			if (key?.trim()) {
+				return await this.uploadService.deleteCosObject(key.trim());
 			}
 
-			// 调用服务层删除逻辑
+			if (!filename || filename.trim() === '') {
+				throw new HttpException(
+					'文件名或 COS 对象键不能为空',
+					HttpStatus.BAD_REQUEST,
+				);
+			}
+
 			return await this.uploadService.deleteFile(filename);
 		} catch (error) {
 			// 如果是 HttpException 直接抛出，否则包装一下

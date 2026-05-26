@@ -3,6 +3,7 @@
 本文记录在「分享」链路中暴露的问题与对应修复方式：
 
 - **分享会话消息顺序**：分享页的对话顺序偶发与 ChatBot 中的展示顺序不一致（尤其是分支/重生成场景）。
+- **分享页用户附件**：`getShare` 未返回 `attachments`，分享页看不到用户上传的文件卡片（见 **§五**）。
 - **用户消息代码块布局**：用户消息中包含代码块时，气泡宽度/对齐与 assistant 不一致，且长行会撑破最大宽度。
 - **知识文章分享（`?type=knowledge`）**：与 Monaco 预览共用 `ParserMarkdownPreviewPane`（`@/components/design/Markdown`）时，**代码块吸顶浮动条（`ChatCodeFloatingToolbar`）**不稳定、**Mermaid 围栏顶栏（`MermaidFenceToolbar`）**不出现的问题；详见 **§三**。
 
@@ -659,6 +660,43 @@ return {
 2. **知识助手**：多轮对话后部分勾选 → 创建分享：顺序与 **`aiMessages`** 自上而下一致。  
 3. **网络面板**：**`GET /share/:id`** 响应体含 **`shareMessageIds`**（新后端）；旧 Redis 条目可能缺该字段，分享页应仍能 **`findLatestBranchSelection`** 渲染。  
 4. **纯展示**：分享页列表应渲染 **`displayMessages`**，且 **`ChatMessageActions`** 的 **`messagesLength`** 与 **`displayMessages.length`** 一致。
+
+---
+
+## 五、分享页返回用户消息附件（`getShare`）
+
+### 1. 问题现象
+
+打开分享链接后，用户消息仅有文字，**看不到**对话里曾上传的图片/文件卡片；`GET /share/:id` 的 `messages[]` 中无 `attachments` 字段，但数据库 `attachments` 表有记录。
+
+### 2. 根因
+
+`MessageService.findMessages` 已 `leftJoinAndSelect('message.attachments')`，数据在实体上存在。  
+`ShareService.resolveShareMessagesBySessionId`（主聊天分支）映射为 DTO 时只写了 `id/chatId/role/content/timestamp`，**未映射 `attachments`**。
+
+### 3. 修复
+
+- 新增 `mapShareAttachments`：输出与前端 `UploadedFile` 对齐（`id`、`uuid`、`path`、`filename`、`originalname`、`mimetype`、`size`）。
+- 每条用户消息（及含附件的任意消息）增加 `attachments: this.mapShareAttachments(m.attachments)`；无附件时不返回该字段或返回 `undefined`。
+
+### 4. 前端
+
+`apps/frontend/src/views/share/index.tsx` 已用 `ChatFileList` 渲染 `message.attachments`；`getFormatMessages` 会透传 `attachments`。  
+附件 `path` 为 COS HTTPS 时由 `resolveAttachmentDisplayUrl` 走 `/ext-cos/`（见 [../backend/cos-object-storage.md](../backend/cos-object-storage.md) §3.8–3.9）。
+
+### 5. 关键代码（后端）
+
+**来源**：`apps/backend/src/services/share/share.service.ts`（`mapShareAttachments`、messages 映射约 L94–L103、L230–L242）
+
+```typescript
+// 说明：与 findMessages 加载的 Attachments 实体对齐前端 UploadedFile
+attachments: this.mapShareAttachments(m.attachments),
+```
+
+### 6. 验证
+
+1. 对话中上传附件并发送 → 创建分享 → 打开分享页：用户消息上方出现附件卡片，可预览/下载。  
+2. 网络面板：`messages` 中带附件的项含 `attachments: [{ path, mimetype, ... }]`。
 
 ---
 

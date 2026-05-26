@@ -67,7 +67,7 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 	's2-4': {
 		title: 'Avatar storage on Tencent Cloud COS',
 		description:
-			'Profile avatars and similar cloud images are uploaded through the server to Tencent Cloud COS, replacing Qiniu direct upload. The full object URL is saved after upload. On the web, objects are shown via the same-origin /ext-cos/ proxy (not limited to images). Preview and upload-area downloads are fixed with success/failure toasts. Chat attachments stay on local server storage. Deployments need COS credentials and readable objects (public-read or equivalent).',
+			'Profile avatars and chat attachments are uploaded through the server to Tencent Cloud COS, replacing Qiniu direct upload and local uploads storage. Full object URLs are saved after upload. On the web, objects use the same-origin /ext-cos/ proxy. Preview and downloads are adapted for COS with success/failure toasts. Deployments need COS credentials and readable objects (public-read or equivalent).',
 	},
 	's3-1': {
 		title: 'One frontend for desktop and browser',
@@ -354,6 +354,11 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		title: 'Sharing & public reading',
 		description:
 			'Share pages offer read-only threads; message order, user-side code layout, knowledge preview, and toolbars align with online chat.',
+	},
+	's14-3': {
+		title: 'Share page shows user attachments',
+		description:
+			'Shared conversation links now include attachment cards on user messages (preview and download), matching the live chat view. Cloud-stored files are shown via the same-site proxy.',
 	},
 	's14-2': {
 		title: 'Chatbot capability areas',

@@ -19,6 +19,7 @@ import { AgentMessage } from '../agent/agent-message.entity';
 import { AgentSession } from '../agent/agent-session.entity';
 import { AssistantMessage } from '../assistant/assistant-message.entity';
 import { AssistantSession } from '../assistant/assistant-session.entity';
+import { Attachments } from '../chat/attachments.entity';
 import { ChatMessages } from '../chat/chat.entity';
 import { MessageService } from '../chat/message.service';
 import { Knowledge } from '../knowledge/knowledge.entity';
@@ -68,6 +69,15 @@ export class ShareService {
 			role: 'user' | 'assistant';
 			content: string;
 			timestamp: number;
+			attachments?: Array<{
+				id: string;
+				uuid: string;
+				path: string;
+				filename: string;
+				originalname: string;
+				mimetype: string;
+				size: number;
+			}>;
 		}>;
 		// share 页还会透传 session（chat 分支为 ChatSessions；assistant 分支不需要）
 		session?: any;
@@ -81,7 +91,7 @@ export class ShareService {
 			return {
 				session,
 				title: session.title || this.generateTitle(session.messages),
-				messages: (session.messages ?? []).map((m: any) => ({
+				messages: (session.messages ?? []).map((m: ChatMessages) => ({
 					id: m.id,
 					chatId: m.chatId,
 					role: (m.role === 'assistant' ? 'assistant' : 'user') as
@@ -89,6 +99,7 @@ export class ShareService {
 						| 'assistant',
 					content: m.content ?? '',
 					timestamp: m.createdAt?.getTime?.() ?? Date.now(),
+					attachments: this.mapShareAttachments(m.attachments),
 				})),
 			};
 		}
@@ -214,6 +225,20 @@ export class ShareService {
 		}
 
 		throw new NotFoundException('会话不存在');
+	}
+
+	/** 分享页 / ChatFileList 所需附件结构（与前端 UploadedFile 对齐） */
+	private mapShareAttachments(attachments?: Attachments[]) {
+		if (!attachments?.length) return undefined;
+		return attachments.map((a) => ({
+			id: String(a.id),
+			uuid: String(a.id),
+			path: a.path,
+			filename: a.filename,
+			originalname: a.originalname ?? a.filename,
+			mimetype: a.mimetype ?? 'application/octet-stream',
+			size: a.size,
+		}));
 	}
 
 	/**

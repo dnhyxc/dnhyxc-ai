@@ -175,7 +175,7 @@ export const PROJECT_GUIDE_ITEMS_EN: Record<
 	'pg-s8-4': {
 		title: '8.4 Account avatar (cloud storage)',
 		description:
-			'Open Account or Profile while signed in, choose an image in the avatar area, then save. The sidebar and profile page update together. Use preview or the upload-area download control to save the avatar; you get a success or failure toast. If the image fails to load, try uploading again; on the web, use this site rather than old external links. Chat attachments stay on local server storage.',
+			'Open Account or Profile while signed in, choose an image in the avatar area, then save. The sidebar and profile page update together. Use preview or the upload-area download control to save the avatar; you get a success or failure toast. If the image fails to load, try uploading again; on the web, use this site rather than old external links. Chat attachments use the same Tencent Cloud COS storage as avatars, shown via the site proxy; legacy local paths in old messages remain read-only compatible.',
 	},
 	'pg-s9-1': {
 		title: '9.1 Why “desktop only”?',
@@ -200,7 +200,7 @@ export const PROJECT_GUIDE_ITEMS_EN: Record<
 	'pg-s11-1': {
 		title: '11.1 Shared sessions (read-only)',
 		description:
-			'Share generates a link for read-only viewing in a browser—no install required. Message order matches the conversation, including branches/regeneration; layout aligns with the online reader.',
+			'Share generates a link for read-only viewing in a browser—no install required. Message order matches the conversation, including branches/regeneration. User message attachments appear as cards with preview and download; layout aligns with the online reader.',
 	},
 	'pg-s11-2': {
 		title: '11.2 Knowledge assistant: AI vs RAG',

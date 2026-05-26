@@ -71,6 +71,7 @@ import {
 	UPDATE_SESSION,
 	UPDATE_USER,
 	UPLOAD_COS,
+	UPLOAD_COS_CHAT_FILES,
 	UPLOAD_FILE,
 	UPLOAD_FILES,
 } from './api';
@@ -215,6 +216,15 @@ export const uploadCosFile = async (
 	);
 };
 
+/** 聊天附件批量上传至 COS（字段 files，与 uploadFiles 一致） */
+export const uploadCosChatFiles = async (files: File[]) => {
+	return await http.post(UPLOAD_COS_CHAT_FILES, files, {
+		headers: {
+			'Content-Type': 'multipart/form-data',
+		},
+	});
+};
+
 // 上传文件
 export const uploadFile = async (file: File) => {
 	return await http.post(
@@ -251,9 +261,15 @@ export const downloadZip = async (filename: string): Promise<any> => {
 	});
 };
 
-export const deleteFile = async (filename: string): Promise<any> => {
+export const deleteFile = async (
+	filename?: string,
+	key?: string,
+): Promise<any> => {
 	return await http.delete(DELETE_FILE, {
-		querys: { filename },
+		querys: {
+			...(filename ? { filename } : {}),
+			...(key ? { key } : {}),
+		},
 	});
 };
 

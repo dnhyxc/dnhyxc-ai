@@ -1,5 +1,4 @@
 import ImagePreview from '@design/ImagePreview';
-import { Toast } from '@ui/index';
 import { CircleX, Download, FileText } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { CHAT_IMAGE_VALIDTYPES } from '@/constant';
@@ -8,11 +7,13 @@ import { deleteFile } from '@/service';
 import { DownloadProgress, UploadedFile } from '@/types';
 import {
 	createDownloadProgressListener,
-	donwnloadWithUrl,
+	extractCosObjectKey,
 	fetchImageAsBlobUrl,
+	handlerDownload,
+	isCosStoredObjectUrl,
 	isCrossOriginUploadUrl,
 	isTauriRuntime,
-	resolveUploadedFileUrl,
+	resolveAttachmentDisplayUrl,
 } from '@/utils';
 
 interface IProps {
@@ -42,7 +43,7 @@ const ChatFileList: React.FC<IProps> = ({
 	}, [data]);
 
 	const getUrl = async () => {
-		const fileUrl = resolveUploadedFileUrl(data.path);
+		const fileUrl = resolveAttachmentDisplayUrl(data.path);
 
 		if (!CHAT_IMAGE_VALIDTYPES.includes(data.mimetype)) {
 			setBase64Url(fileUrl);
@@ -50,16 +51,17 @@ const ChatFileList: React.FC<IProps> = ({
 		}
 
 		const crossOrigin =
-			typeof window !== 'undefined' && isCrossOriginUploadUrl(fileUrl);
+			typeof window !== 'undefined' &&
+			isCrossOriginUploadUrl(fileUrl) &&
+			!isCosStoredObjectUrl(data.path);
 
-		// 跨源（9002 页面 / Tauri WebView 加载 9112 图）：优先 blob，避免 CORP 拦截 <img>
-		if (crossOrigin || isTauriRuntime()) {
+		// 跨源（历史本地上传：9002 页面加载 9112 图）：优先 blob，避免 CORP 拦截 <img>
+		if (crossOrigin || (isTauriRuntime() && !isCosStoredObjectUrl(data.path))) {
 			const blobUrl = await fetchImageAsBlobUrl(fileUrl);
 			if (blobUrl.startsWith('blob:')) {
 				setBase64Url(blobUrl);
 				return;
 			}
-			// blob 失败时不把跨源 URL 直接塞进 <img>（会触发 NotSameOrigin）
 			if (!crossOrigin) {
 				setBase64Url(fileUrl);
 			}
@@ -86,19 +88,21 @@ const ChatFileList: React.FC<IProps> = ({
 	) => {
 		e.stopPropagation();
 		setLoading(true);
-		const res = await donwnloadWithUrl({
-			url: resolveUploadedFileUrl(file.path),
-		});
+		await handlerDownload(
+			resolveAttachmentDisplayUrl(file.path),
+			file.originalname,
+		);
 		setLoading(false);
 		setDownloadProgressInfo([]);
-		Toast({
-			type: res.success,
-			title: res.message.includes('Not Found') ? '文件不存在' : res.message,
-		});
 	};
 
 	const onDelete = async () => {
 		setUploadedFiles?.((prev) => prev.filter((i) => i.uuid !== data.uuid));
+		const cosKey = data.cosKey || extractCosObjectKey(data.path) || undefined;
+		if (cosKey || isCosStoredObjectUrl(data.path)) {
+			await deleteFile(undefined, cosKey);
+			return;
+		}
 		await deleteFile(data.filename);
 	};
 

@@ -87,6 +87,56 @@ export function formatCosUploadError(error: unknown): string {
 	return `${base}${suffix}`;
 }
 
+/** COS 对象键合法前缀（头像 assets、聊天附件 chat） */
+export const COS_OBJECT_KEY_PREFIXES = ['assets', 'chat'] as const;
+
+export type CosObjectKeyPrefix = (typeof COS_OBJECT_KEY_PREFIXES)[number];
+
+export function isCosObjectKey(key: string): boolean {
+	const cleaned = key?.replace(/^\//, '').trim();
+	return COS_OBJECT_KEY_PREFIXES.some((p) => cleaned.startsWith(`${p}/`));
+}
+
+/** 从持久化的完整 URL 或对象键解析 COS Key */
+export function extractCosKeyFromPathOrUrl(pathOrUrl: string): string | null {
+	const trimmed = pathOrUrl?.trim();
+	if (!trimmed) return null;
+
+	if (isCosObjectKey(trimmed)) {
+		return trimmed.replace(/^\//, '');
+	}
+
+	try {
+		const config = getCosRuntimeConfig();
+		if (config.publicDomain && trimmed.startsWith(config.publicDomain)) {
+			const raw = trimmed.slice(config.publicDomain.length).replace(/^\//, '');
+			return decodeCosKeySegments(raw);
+		}
+		const matched = trimmed.match(
+			/^https?:\/\/[^/]+\.cos\.[^/]+\.myqcloud\.com\/(.+)$/i,
+		);
+		if (matched) {
+			return decodeCosKeySegments(matched[1]);
+		}
+	} catch {
+		/* ignore */
+	}
+
+	return null;
+}
+
+function decodeCosKeySegments(encodedKey: string): string | null {
+	try {
+		const key = encodedKey
+			.split('/')
+			.map((seg) => decodeURIComponent(seg))
+			.join('/');
+		return isCosObjectKey(key) ? key : null;
+	} catch {
+		return isCosObjectKey(encodedKey) ? encodedKey : null;
+	}
+}
+
 export function assertCosRuntimeConfig(
 	config: CosRuntimeConfig,
 ): asserts config is CosRuntimeConfig & {

@@ -142,6 +142,18 @@ export function normalizeUploadPublicPath(path: string): string {
 	return trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
 }
 
+/**
+ * 附件落库 path：COS 完整 HTTPS URL 原样保存；本地上传仍 decode /images|/files。
+ */
+export function persistAttachmentPath(path: string): string {
+	const trimmed = path?.trim();
+	if (!trimmed) return trimmed;
+	if (/^https?:\/\//i.test(trimmed)) {
+		return trimmed;
+	}
+	return decodeUploadPublicPath(trimmed);
+}
+
 /** 将 path 各段 decodeURIComponent，与磁盘中文文件名对齐 */
 export function decodeUploadPublicPath(path: string): string {
 	const normalized = normalizeUploadPublicPath(path);

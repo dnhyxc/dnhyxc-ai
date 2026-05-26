@@ -32,6 +32,9 @@ export function isCrossOriginUploadUrl(
  */
 export function toStorageUploadPath(path: string): string {
 	if (!path) return path;
+	if (/^https?:\/\//i.test(path.trim())) {
+		return path.trim();
+	}
 
 	const relative =
 		stripUploadOriginToRelative(path) ??
@@ -58,6 +61,7 @@ export function sanitizeAttachmentsForApi(
 	return attachments.map((a) => ({
 		...a,
 		path: toStorageUploadPath(a.path),
+		cosKey: a.cosKey,
 	}));
 }
 

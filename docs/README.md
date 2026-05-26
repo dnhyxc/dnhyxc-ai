@@ -30,6 +30,7 @@
 | 头像/COS 上传失败 AccessDenied           | [backend/cos-object-storage.md](./backend/cos-object-storage.md) §3.4、§6                                        |
 | COS/七牛 图能传不能显（403 / ATS）       | [backend/cos-object-storage.md](./backend/cos-object-storage.md) §3.3 + [frontend/qiniu-dev-http-proxy.md](./frontend/qiniu-dev-http-proxy.md) |
 | COS 图能预览但下载失败                 | [backend/cos-object-storage.md](./backend/cos-object-storage.md) §3.7、§6 |
+| 分享页无用户消息附件卡片               | [chat/share.md](./chat/share.md) §五 + [backend/cos-object-storage.md](./backend/cos-object-storage.md) §3.9 |
 | Web HTTPS 头像 mixed content             | 同上 + [frontend/route-auth.md](./frontend/route-auth.md) §12 + [backend/nginx.md](./backend/nginx.md) `/ext-cos/` |
 | Tauri macOS 生产包 HTTP 被拦             | [frontend/tauri-macos-ats-http.md](./frontend/tauri-macos-ats-http.md)                                             |
 | 知识库助手流式 Mermaid 不出图            | [knowledge/knowledge-assistant-mermaid-streaming.md](./knowledge/knowledge-assistant-mermaid-streaming.md)         |

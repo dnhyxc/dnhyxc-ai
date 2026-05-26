@@ -1,11 +1,12 @@
 # 腾讯云 COS 对象存储（头像等云上传）
 
-> **文档角色（主文档）**：七牛直传迁移为腾讯云 COS 服务端上传；聊天附件仍走本地上传。  
+> **文档角色（主文档）**：七牛直传迁移为腾讯云 COS；**头像、下载页、智能对话聊天附件**均走后端 `putObject`；文档页等仍可用本地上传。  
 > **延伸阅读**  
 > - 本地上传目录：[upload-storage-paths.md](./upload-storage-paths.md)  
-> - 开发态图片同源代理（沿用 `/ext-cos/`）：[../frontend/qiniu-dev-http-proxy.md](../frontend/qiniu-dev-http-proxy.md)（七牛历史说明，域名变量已改为 COS）  
+> - 开发态同源代理 `/ext-cos/`：[../frontend/qiniu-dev-http-proxy.md](../frontend/qiniu-dev-http-proxy.md)  
 > - 生产 Nginx `/ext-cos/`：[nginx.md](./nginx.md)  
-> - 聊天附件预览（与 COS 无关）：[../chat/chat-upload-preview.md](../chat/chat-upload-preview.md)
+> - 历史本地上传附件排查：[../chat/chat-upload-preview.md](../chat/chat-upload-preview.md)  
+> - 分享页附件透出：[../chat/share.md](./share.md) §五
 
 若与仓库最新源码不一致，以源码为准。
 
@@ -23,7 +24,8 @@
 | 能力 | 存储 | 上传方式 |
 |------|------|----------|
 | 头像、下载页云图 | COS `assets/` 前缀 | `POST /api/upload/uploadCos`（内存 multipart → `putObject`） |
-| 对话附件、本地下载 | `uploads/images`、`uploads/files` | 既有 `POST /api/upload/uploadFile`（multer 落盘） |
+| 智能对话聊天附件 | COS `chat/` 前缀 | `POST /api/upload/uploadCosChatFiles`（批量，同上） |
+| 其它本地上传（如文档页） | `uploads/images`、`uploads/files` | `POST /api/upload/uploadFile`（multer 落盘，未改） |
 
 **持久化**：数据库/用户信息中存后端返回的**完整 HTTPS 对象 URL**（非签名 URL）。  
 **展示**：Web 开发/生产通过 `resolveCosUrlForWebDisplay` 改写为同源 `/ext-cos/`；Tauri 生产包直链 COS HTTPS 域名。
@@ -42,9 +44,13 @@
 
 ### 前端
 
-- `apps/frontend/src/service/api.ts`、`service/index.ts` — `uploadCosFile`
-- `apps/frontend/src/views/account/index.tsx`、`download/index.tsx` — 去掉 `qiniu-js`
-- `apps/frontend/src/utils/index.ts` — `getCosPublicDomainPrefix`、`resolveCosUrlForWebDisplay`
+- `apps/frontend/src/service/api.ts`、`service/index.ts` — `uploadCosFile`、`uploadCosChatFiles`；`deleteFile` 支持 `?key=` 删 COS
+- `apps/frontend/src/views/account/index.tsx`、`download/index.tsx`、`views/chat/index.tsx` — 云上传；对话附件批量 COS
+- `apps/frontend/src/components/design/ChatFileList/index.tsx` — `resolveAttachmentDisplayUrl`、COS 删除/下载
+- `apps/frontend/src/utils/index.ts`、`upload-file-url.ts` — 展示/落库/下载 URL；`extractCosObjectKey` 支持 `chat/`
+- `apps/backend/src/utils/upload-paths.ts` — `persistAttachmentPath`（HTTPS URL 原样落库）
+- `apps/backend/src/services/chat/message.service.ts` — 附件 path 持久化
+- `apps/backend/src/services/share/share.service.ts` — `getShare` 透出 `attachments`
 - `apps/frontend/vite.config.ts` — `/ext-cos` 回源 `VITE_COS_PUBLIC_DOMAIN`
 - `apps/frontend/src-tauri/Info.plist`、`capabilities/default.json` — 七牛 HTTP 例外改为 COS HTTPS 域
 
@@ -59,7 +65,7 @@
 
 ### 3.2 对象键与 URL
 
-- 键名：`assets/{uuid}_{安全化文件名}`，禁止路径穿越（`basename` + 替换 `/` `\`）。
+- 键名：`{prefix}/{uuid}_{安全化文件名}`，`prefix` 为 `assets`（头像等）或 `chat`（对话附件）；禁止路径穿越（`basename` + 替换 `/` `\`）。
 - 对外 URL：`COS_PUBLIC_DOMAIN` + 分段 `encodeURIComponent`（支持文件名中的 `@` 等字符）。
 
 ### 3.3 ACL 与 403
@@ -97,6 +103,20 @@
 
 - **`downloadFileFromUrl`**：先 `resolveUrlForDownload`，COS/同源资源走 fetch；其余仍可用 `<a download>` 或 Tauri 原生下载。
 - **`handlerDownload`**：供 `ImagePreview` 默认下载，结束后 **Toast** 提示成功/失败（与 `Upload` 组件一致）。
+
+### 3.8 聊天附件全量 COS（`chat/` 前缀）
+
+- 对话页 `uploadCosChatFiles` → `POST /upload/uploadCosChatFiles`，与头像共用 memoryStorage（单文件 20MB），对象键 **`chat/{uuid}_{文件名}`**。
+- 消息/SSE 附件 **`path` 存完整 HTTPS URL**；`sanitizeAttachmentsForApi` / `toStorageUploadPath` 对 `https://` 原样透传。
+- **展示**：`resolveAttachmentDisplayUrl` — COS 走 `resolveCosUrlForWebDisplay`（`/ext-cos/`），历史 `/images`、`/files` 仍走 `resolveUploadedFileUrl`。
+- **未发送删除**：`DELETE /upload/deleteFile?key=chat/...`；已发送消息附件不在此删除（仅存库引用）。
+- **推理**：`parseFile` / OCR 的 `resolveAttachmentBuffer` 已支持 `https://`，后端 chat 服务无需改附件解析分支。
+
+### 3.9 分享页附件
+
+- `MessageService.findMessages` 已 `leftJoinAndSelect('message.attachments')`。
+- 原 `ShareService` 映射 `messages` 时丢弃 `attachments`，分享 JSON 无附件卡片。
+- 修复：`mapShareAttachments` 写入与前端 `UploadedFile` 一致字段；分享页 `ChatFileList` 已支持渲染，COS 路径自动走 §3.8 展示链。
 
 ---
 
@@ -290,6 +310,71 @@ const onDownload = useCallback(async () => {
 }, [download, currentImage]);
 ```
 
+### 4.9 聊天附件批量上传
+
+**来源**：`apps/backend/src/services/upload/upload.controller.ts`（`uploadCosChatFiles` 约 L52–L66）
+
+**来源**：`apps/frontend/src/views/chat/index.tsx`（`onUploadFile` 约 L74–95）
+
+```typescript
+// 后端：FilesInterceptor('files') + 与 uploadCos 相同的 memory 限制
+@Post('/uploadCosChatFiles')
+async uploadCosChatFiles(@UploadedFiles() files: Express.Multer.File[]) {
+  return await this.uploadService.uploadChatAttachmentsToCos(files);
+}
+
+// 前端：path 存 url，cosKey 供删除
+const res = await uploadCosChatFiles(fileList);
+path: item.url || item.path,
+cosKey: item.key,
+```
+
+### 4.10 附件落库与展示 URL
+
+**来源**：`apps/backend/src/utils/upload-paths.ts`（`persistAttachmentPath` 约 L145–L155）
+
+**来源**：`apps/frontend/src/utils/index.ts`（`resolveAttachmentDisplayUrl` 约 L147–L156）
+
+```typescript
+// 说明：COS 完整 URL 不再被 normalize 成 /https://...
+export function persistAttachmentPath(path: string): string {
+  if (/^https?:\/\//i.test(path?.trim())) return path.trim();
+  return decodeUploadPublicPath(path);
+}
+
+export function resolveAttachmentDisplayUrl(path: string): string {
+  if (isCosStoredObjectUrl(path) || isCosProxyPathUrl(path)) {
+    return resolveCosUrlForWebDisplay(path);
+  }
+  return resolveUploadedFileUrl(path); // 历史本地上传
+}
+```
+
+### 4.11 分享接口透出附件
+
+**来源**：`apps/backend/src/services/share/share.service.ts`（`mapShareAttachments`、主聊天 messages 映射 约 L94–L103、L230–L242）
+
+```typescript
+// 说明：findMessages 已加载 attachments，映射时补齐前端 UploadedFile 字段
+private mapShareAttachments(attachments?: Attachments[]) {
+  if (!attachments?.length) return undefined;
+  return attachments.map((a) => ({
+    id: String(a.id),
+    uuid: String(a.id),
+    path: a.path,
+    filename: a.filename,
+    originalname: a.originalname ?? a.filename,
+    mimetype: a.mimetype ?? 'application/octet-stream',
+    size: a.size,
+  }));
+}
+
+messages: (session.messages ?? []).map((m) => ({
+  // ...
+  attachments: this.mapShareAttachments(m.attachments),
+})),
+```
+
 ---
 
 ## 5. 部署与环境变量
@@ -320,25 +405,29 @@ VITE_COS_PROXY_PREFIX=/ext-cos/
 |------|-------------|-------------|
 | 上传 API | `GET getUploadToken` + 前端直传 | `POST uploadCos` 经后端 |
 | 依赖 | `qiniu` / `qiniu-js` | `cos-nodejs-sdk-v5` |
-| 聊天附件 | 本地上传 | **不变** |
+| 聊天附件 | `uploadFiles` 本地上传 | `uploadCosChatFiles` → COS `chat/` |
+| 分享页附件 | 接口无 `attachments` 字段 | `getShare` 按消息返回 `attachments` |
 
 破坏性：
 
-- 客户端若仍调用 `getUploadToken` 将 404，须改用 `uploadCosFile`。
+- 客户端若仍调用 `getUploadToken` 将 404，须改用 `uploadCosFile` / `uploadCosChatFiles`。
+- 新上传聊天附件不再写入服务器 `uploads/`；历史 `/images`、`/files` 只读兼容。
 - 若线上曾配置 `/ext-img/` 代理或书签缓存了该前缀，需改为 `/ext-cos/` 或重新上传/刷新展示链。
 
 ---
 
 ## 6. 测试与回归建议
 
-1. 配置 CAM：`cos:PutObject`、`cos:GetObject`（公有读或签名场景）覆盖 `assets/*`。
+1. 配置 CAM：`cos:PutObject`、`cos:GetObject`、`cos:DeleteObject`（未发送附件删除）覆盖 `assets/*` 与 `chat/*`。
 2. 登录 → 账户设置上传头像 → 保存 → 侧栏与资料页预览正常。
 3. 无痕窗口直接打开返回的 `url`：公有读应 **200**；`private` 应为 **403**（符合预期）。
 4. Web HTTPS 站点：头像走 `/ext-cos/`，无 mixed content 报错。
 5. **下载**：`ImagePreview` 大图预览点下载 → Toast 成功；`Upload` 悬停下载 → Toast；Network 中 Web 为同源 `/ext-cos/...` fetch，Tauri 为 COS 直链。
 6. Tauri 生产包：确认 COS 域名在 allowlist；HTTPS 一般无需 ATS 明文例外。
-7. 对话附件上传/预览：确认仍走 `/images`、`/files`，不受 COS 配置影响。
-8. Nginx：确认已配置 `location /ext-cos/`。
+7. 对话：上传图片/JSON → 预览 `/ext-cos/chat/...` → 发送 → 助手能引用附件内容。
+8. 分享：带附件的用户消息创建分享 → `GET /share/:id` 的 `messages[].attachments` 非空 → 分享页可预览/下载。
+9. 历史会话（本地上传 path）：仍可打开附件（若磁盘文件仍在）。
+10. Nginx：确认已配置 `location /ext-cos/`。
 
 ---
 
@@ -350,14 +439,17 @@ VITE_COS_PROXY_PREFIX=/ext-cos/
 | 上传与 URL 构建 | `apps/backend/src/services/upload/upload.service.ts` |
 | 路由 | `apps/backend/src/services/upload/upload.controller.ts` |
 | 前端 API | `apps/frontend/src/service/api.ts`、`service/index.ts` |
-| 展示 / 下载 URL 工具 | `apps/frontend/src/utils/index.ts`（`resolveCosUrlForWebDisplay`、`resolveUrlForDownload`、`handlerDownload`） |
+| 展示 / 下载 URL 工具 | `apps/frontend/src/utils/index.ts`（`resolveAttachmentDisplayUrl`、`resolveUrlForDownload`） |
+| 对话附件 UI | `apps/frontend/src/components/design/ChatFileList/index.tsx`、`views/chat/index.tsx` |
+| 分享附件 | `apps/backend/src/services/share/share.service.ts` |
 | 图片预览下载 | `apps/frontend/src/components/design/ImagePreview/index.tsx` |
 | Vite 代理 | `apps/frontend/vite.config.ts` |
-| 本地上传（不变） | `apps/backend/src/utils/upload-paths.ts`、`docs/backend/upload-storage-paths.md` |
+| 本地上传（文档页等） | `docs/backend/upload-storage-paths.md` |
 
 ---
 
 ## 8. 延伸阅读
 
-- [upload-storage-paths.md](./upload-storage-paths.md) — 聊天附件本地上传
+- [upload-storage-paths.md](./upload-storage-paths.md) — 非 COS 的本地上传
+- [../chat/share.md](../chat/share.md) — 分享顺序与附件 §五
 - [../frontend/qiniu-dev-http-proxy.md](../frontend/qiniu-dev-http-proxy.md) — `/ext-cos/` 与 mixed content（历史七牛语境，机制仍适用 COS）

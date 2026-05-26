@@ -21,6 +21,9 @@ export { isTauriRuntime } from './runtime';
 export * from './store';
 export * from './tauri';
 export * from './updater';
+
+import { resolveUploadedFileUrl } from './upload-file-url';
+
 export {
 	encodeUploadFileUrl,
 	isCrossOriginUploadUrl,
@@ -108,7 +111,7 @@ export function extractCosObjectKey(url: string): string | null {
 
 	const tryDecodePath = (rawPath: string) => {
 		const cleaned = rawPath.replace(/^\//, '');
-		if (!cleaned.startsWith('assets/')) return null;
+		if (!/^(?:assets|chat)\//.test(cleaned)) return null;
 		try {
 			return cleaned
 				.split('/')
@@ -142,6 +145,17 @@ export function extractCosObjectKey(url: string): string | null {
 	}
 
 	return null;
+}
+
+/**
+ * 附件展示 URL：COS 走同源 /ext-cos；历史本地上传仍走 /images、/files 或 upload/serve。
+ */
+export function resolveAttachmentDisplayUrl(path: string): string {
+	if (!path) return path;
+	if (isCosStoredObjectUrl(path) || isCosProxyPathUrl(path)) {
+		return resolveCosUrlForWebDisplay(path);
+	}
+	return resolveUploadedFileUrl(path);
 }
 
 /** 还原为 COS 桶上的规范 HTTPS URL（供 Tauri download_file 等使用） */
