@@ -21,6 +21,7 @@ import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { catchError, Observable, Subject } from 'rxjs';
 import { createLlm } from '../../utils/create-llm';
 import { parseFile } from '../../utils/file-parser';
+import { LlmConfigService } from '../llm-config/llm-config.service';
 import { OcrService } from '../ocr/ocr.service';
 import { applyOrganicCitationAnchors } from '../web-search/organic-citation';
 import { WebSearchService } from '../web-search/web-search.service';
@@ -48,6 +49,7 @@ export class ChatService {
 	constructor(
 		// 存储会话的取消控制器
 		private configService: ConfigService,
+		private readonly llmConfigService: LlmConfigService,
 		private cache: Cache,
 		private messageService: MessageService,
 		// 注入消息存储队列
@@ -222,14 +224,18 @@ Stick strictly to what is visually present.`,
 		// 缓存取消控制器，12 小时后自动过期并清除
 		await this.cache.set(sessionId, cancel$, 12 * 60 * 60 * 1000);
 
-		const llm = createLlm(this.configService, {
-			preset: 'chat',
-			temperature: dto.temperature,
-			maxTokens: dto.maxTokens || 8192, // 65536
-			maxTokensPolicy: 'optional',
-			defaultTemperature: 0.3,
-			abortSignal: abortController.signal,
-		});
+		const llm = createLlm(
+			this.configService,
+			{
+				preset: 'chat',
+				temperature: dto.temperature,
+				maxTokens: dto.maxTokens || 8192, // 65536
+				maxTokensPolicy: 'optional',
+				defaultTemperature: 0.3,
+				abortSignal: abortController.signal,
+			},
+			this.llmConfigService,
+		);
 
 		// 不立即保存用户消息，先缓存到临时变量
 		// 等到收到第一个 AI Token 时再保存（延迟持久化 - 加入队列）
@@ -704,13 +710,17 @@ Stick strictly to what is visually present.`,
 
 	// deepseek 非流失对话
 	async chat(dto: ChatRequestDto): Promise<any> {
-		const llm = createLlm(this.configService, {
-			preset: 'chat',
-			temperature: dto.temperature,
-			maxTokens: dto.maxTokens || 4096,
-			maxTokensPolicy: 'optional',
-			defaultTemperature: 0.3,
-		});
+		const llm = createLlm(
+			this.configService,
+			{
+				preset: 'chat',
+				temperature: dto.temperature,
+				maxTokens: dto.maxTokens || 4096,
+				maxTokensPolicy: 'optional',
+				defaultTemperature: 0.3,
+			},
+			this.llmConfigService,
+		);
 		const sessionId = dto.sessionId || randomUUID();
 
 		// 处理文件附件

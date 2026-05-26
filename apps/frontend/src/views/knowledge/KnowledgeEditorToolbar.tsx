@@ -55,7 +55,7 @@ const KnowledgeEditorToolbar = (props: {
 	const linkBtn =
 		'lucide-stroke-draw-hover flex items-center gap-1 px-0 has-[>svg]:px-0 disabled:hover:text-textcolor' as const;
 	return (
-		<div className="flex items-center pr-3 gap-4">
+		<div className="flex items-center pr-3 gap-3">
 			<Tooltip
 				side="bottom"
 				content={shortcutHintImport ?? t('knowledge.shortcuts.import')}

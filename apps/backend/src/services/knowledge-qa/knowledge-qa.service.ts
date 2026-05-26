@@ -12,6 +12,7 @@ import { Observable } from 'rxjs';
 import { KnowledgeQaEnum } from '../../enum/config.enum';
 import { createLlm } from '../../utils/create-llm';
 import { KnowledgeEmbeddingService } from '../knowledge-embedding/knowledge-embedding.service';
+import { LlmConfigService } from '../llm-config/llm-config.service';
 import { QdrantService } from '../qdrant/qdrant.service';
 
 export type KnowledgeQaEvidence = {
@@ -33,6 +34,7 @@ type QaEvent =
 export class KnowledgeQaService {
 	constructor(
 		private readonly config: ConfigService,
+		private readonly llmConfigService: LlmConfigService,
 		private readonly embedding: KnowledgeEmbeddingService,
 		private readonly qdrant: QdrantService,
 		// 注入 Winston logger
@@ -69,15 +71,19 @@ export class KnowledgeQaService {
 		},
 		signal?: AbortSignal,
 	): AsyncGenerator<string> {
-		const llm = createLlm(this.config, {
-			preset: 'knowledgeQa',
-			temperature: input.temperature,
-			maxTokens: input.maxTokens,
-			defaultTemperature: 0.2,
-			maxTokensPolicy: 'default',
-			defaultMaxTokens: 4096,
-			abortSignal: signal,
-		});
+		const llm = createLlm(
+			this.config,
+			{
+				preset: 'knowledgeQa',
+				temperature: input.temperature,
+				maxTokens: input.maxTokens,
+				defaultTemperature: 0.2,
+				maxTokensPolicy: 'default',
+				defaultMaxTokens: 4096,
+				abortSignal: signal,
+			},
+			this.llmConfigService,
+		);
 		const stream = await llm.stream(this.toLangChainMessages(input.messages));
 
 		for await (const chunk of stream) {

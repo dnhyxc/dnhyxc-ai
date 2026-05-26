@@ -434,6 +434,13 @@ const UPDATE_INFO_SECTIONS_ZH: UpdateInfoSection[] = [
 				dateLabel: '2026-04-14',
 				description: '提示样式与交互统一，错误与信息提示更清晰一致。',
 			},
+			{
+				id: 's9-3',
+				title: '设置内可配置大模型',
+				dateLabel: '2026-05-25',
+				description:
+					'登录后在设置中新增「大模型」页，可填写 API Key、接口地址（Base URL）与模型名称并保存到服务端；开启后对智能对话、知识库助手、知识库问答与英语学习等统一使用该配置；关闭或「恢复环境变量」后仍使用部署时的默认配置。',
+			},
 		],
 	},
 	{

@@ -236,6 +236,12 @@ const PROJECT_GUIDE_SECTIONS_ZH: ProjectGuideSection[] = [
 				description:
 					'需要随时可用：可开启开机自启、关闭时最小化到托盘；更注重资源释放：关闭时直接退出。',
 			},
+			{
+				id: 'pg-s8-3',
+				title: '8.3 大模型（自定义配置）',
+				description:
+					'登录后进入设置 → 大模型（/setting/llm）。开启「使用自定义大模型配置」，填写 API Key、Base URL、模型名称后保存；底部显示「当前自定义配置已生效」即已全局生效。眼睛图标可切换 Key 显示/隐藏。未开启或必填为空时无法保存。需恢复默认时点「恢复环境变量」。',
+			},
 		],
 	},
 	{

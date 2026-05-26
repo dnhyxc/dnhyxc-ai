@@ -38,6 +38,7 @@
 | 上传落盘路径 / dist 清空丢附件 / UPLOAD_ROOT | [backend/upload-storage-paths.md](./backend/upload-storage-paths.md)                                             |
 | 单词包拉取 400 / 模型名与硅基端点不匹配  | [backend/create-llm.md](./backend/create-llm.md) §5.2                                                              |
 | `createLlm` 工厂与 preset                | [backend/create-llm.md](./backend/create-llm.md)                                                                   |
+| 设置页改大模型 Key/URL/模型名            | [backend/llm-runtime-settings.md](./backend/llm-runtime-settings.md)                                             |
 | 英语学习 Agent 流式对话接 `createLlm`    | [backend/agent-create-llm-unify.md](./backend/agent-create-llm-unify.md)                                           |
 
 ---

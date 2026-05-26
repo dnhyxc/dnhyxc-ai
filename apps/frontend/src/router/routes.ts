@@ -32,6 +32,7 @@ import Profile from '@/views/profile';
 import ProjectGuidePage from '@/views/projectGuide';
 import Setting from '@/views/setting';
 import AboutApp from '@/views/setting/about';
+import LlmSetting from '@/views/setting/llm';
 import AppSystem from '@/views/setting/system';
 import ThemeSetting from '@/views/setting/theme';
 import Share from '@/views/share';
@@ -221,6 +222,13 @@ const routes: RouteConfig[] = [
 						Component: ThemeSetting,
 						meta: {
 							titleKey: 'route.setting.theme',
+						},
+					},
+					{
+						path: '/setting/llm',
+						Component: LlmSetting,
+						meta: {
+							titleKey: 'route.setting.llm',
 						},
 					},
 				],

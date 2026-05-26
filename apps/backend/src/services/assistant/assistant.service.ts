@@ -18,6 +18,7 @@ import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { Observable, type Subscriber } from 'rxjs';
 import { ModelEnum } from 'src/enum/config.enum';
+import { LlmConfigService } from 'src/services/llm-config/llm-config.service';
 import {
 	createLlm,
 	getAssistantSiliconFlowModelName,
@@ -62,6 +63,7 @@ export class AssistantService {
 		private readonly dataSource: DataSource,
 		private readonly cache: Cache,
 		private readonly configService: ConfigService,
+		private readonly llmConfigService: LlmConfigService,
 		@Inject(WINSTON_MODULE_NEST_PROVIDER)
 		private readonly logger: LoggerService,
 	) {}
@@ -141,7 +143,10 @@ export class AssistantService {
 
 	/** 助手流式模型名（硅基流动；用于 token 预算推断） */
 	private getGlmModelName(): string {
-		return getAssistantSiliconFlowModelName(this.configService);
+		return getAssistantSiliconFlowModelName(
+			this.configService,
+			this.llmConfigService,
+		);
 	}
 
 	private toAssistantLangChainMessages(
@@ -213,17 +218,21 @@ export class AssistantService {
 			onContentDelta,
 		} = params;
 
-		const llm = createLlm(this.configService, {
-			preset: 'assistant',
-			temperature: dto.temperature ?? 0.3,
-			maxTokens: dto.maxTokens ?? 4096,
-			defaultTemperature: 0.3,
-			maxTokensPolicy: 'default',
-			defaultMaxTokens: 4096,
-			abortSignal: abortController.signal,
-			// GLM 等模型默认会流式返回 reasoning_content；知识库助手不向用户展示思考链
-			modelKwargs: { thinking: { type: 'disabled' as const } },
-		});
+		const llm = createLlm(
+			this.configService,
+			{
+				preset: 'assistant',
+				temperature: dto.temperature ?? 0.3,
+				maxTokens: dto.maxTokens ?? 4096,
+				defaultTemperature: 0.3,
+				maxTokensPolicy: 'default',
+				defaultMaxTokens: 4096,
+				abortSignal: abortController.signal,
+				// GLM 等模型默认会流式返回 reasoning_content；知识库助手不向用户展示思考链
+				modelKwargs: { thinking: { type: 'disabled' as const } },
+			},
+			this.llmConfigService,
+		);
 
 		const stream = await llm.stream(
 			this.toAssistantLangChainMessages(requestMessages),

@@ -167,6 +167,11 @@ export const PROJECT_GUIDE_ITEMS_EN: Record<
 		description:
 			'Balance always-available (launch at login, minimize to tray) vs freeing resources (quit fully on close).',
 	},
+	'pg-s8-3': {
+		title: '8.3 LLM (custom config)',
+		description:
+			'After sign-in: Settings → LLM (/setting/llm). Enable custom LLM, enter API Key, Base URL, and model name, then Save. When the footer shows the active hint, chat, assistant, Q&A, and English learning use that config. Use the eye icon to show/hide the key. Save stays disabled until the switch is on and all fields are filled. Use Restore environment variables to revert to server defaults.',
+	},
 	'pg-s9-1': {
 		title: '9.1 Why “desktop only”?',
 		description:

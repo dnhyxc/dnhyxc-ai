@@ -18,6 +18,7 @@ import { ChatModule } from './services/chat/chat.module';
 import { EnglishLearningModule } from './services/english-learning/english-learning.module';
 import { KnowledgeModule } from './services/knowledge/knowledge.module';
 import { KnowledgeQaModule } from './services/knowledge-qa/knowledge-qa.module';
+import { LlmConfigModule } from './services/llm-config/llm-config.module';
 import { LogsModule } from './services/logs/logs.module';
 import { MailModule } from './services/mail/mail.module';
 import { MenusModule } from './services/menus/menus.module';
@@ -54,6 +55,7 @@ const connections = new Map();
 				return dataSource;
 			},
 		}),
+		LlmConfigModule,
 		// Redis 缓存
 		NestCacheModule.registerAsync({
 			isGlobal: true,

@@ -19,6 +19,7 @@ import {
 	GLM_THINKING_DISABLED_KWARGS,
 } from '../../utils/create-llm';
 import { KnowledgeQaService } from '../knowledge-qa/knowledge-qa.service';
+import { LlmConfigService } from '../llm-config/llm-config.service';
 import { WebSearchService } from '../web-search/web-search.service';
 import type {
 	SerperOrganicItem,
@@ -138,6 +139,7 @@ export class AgentService {
 		private readonly memory: AgentMemoryService, // 管理Agent记忆的服务，处理历史消息等
 		private readonly cache: Cache, // 使用NestJS缓存，存流式状态
 		private readonly configService: ConfigService, // 读取环境配置
+		private readonly llmConfigService: LlmConfigService,
 		private readonly webSearchService: WebSearchService, // 提供Web搜索工具
 		private readonly knowledgeQaService: KnowledgeQaService, // 提供知识库 RAG 工具工厂
 		@Inject(WINSTON_MODULE_NEST_PROVIDER)
@@ -331,23 +333,31 @@ export class AgentService {
 		temperature?: number;
 		signal?: AbortSignal;
 	}): { main: ChatOpenAI; summary: ChatOpenAI } {
-		const main = createLlm(this.configService, {
-			preset: 'chat',
-			streaming: true,
-			temperature: options.temperature,
-			defaultTemperature: 0.3,
-			maxTokens: options.maxTokens,
-			defaultMaxTokens: 4096,
-			abortSignal: options.signal,
-			modelKwargs: GLM_THINKING_DISABLED_KWARGS,
-		});
-		const summary = createLlm(this.configService, {
-			preset: 'chat',
-			streaming: false,
-			temperature: 0.2,
-			maxTokens: 2048,
-			modelKwargs: GLM_THINKING_DISABLED_KWARGS,
-		});
+		const main = createLlm(
+			this.configService,
+			{
+				preset: 'chat',
+				streaming: true,
+				temperature: options.temperature,
+				defaultTemperature: 0.3,
+				maxTokens: options.maxTokens,
+				defaultMaxTokens: 4096,
+				abortSignal: options.signal,
+				modelKwargs: GLM_THINKING_DISABLED_KWARGS,
+			},
+			this.llmConfigService,
+		);
+		const summary = createLlm(
+			this.configService,
+			{
+				preset: 'chat',
+				streaming: false,
+				temperature: 0.2,
+				maxTokens: 2048,
+				modelKwargs: GLM_THINKING_DISABLED_KWARGS,
+			},
+			this.llmConfigService,
+		);
 		return { main, summary };
 	}
 

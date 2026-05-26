@@ -58,5 +58,7 @@
 | [http-network-error-toast.md](./http-network-error-toast.md) | 网络错误提示 |
 | [voice-input-implementation.md](./voice-input-implementation.md) | 语音输入 |
 | [system-shortcuts-conflict-and-toast.md](./system-shortcuts-conflict-and-toast.md) | 快捷键冲突 |
+| [../backend/llm-runtime-settings.md](../backend/llm-runtime-settings.md) | 设置 → 大模型页（`/setting/llm`） |
+
 
 上级索引：[../README.md](../README.md)

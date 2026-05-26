@@ -97,6 +97,10 @@ export const KNOWLEDGE_TRASH_DELETE = '/knowledge/trash/delete';
 export const KNOWLEDGE_TRASH_DELETE_BATCH = '/knowledge/trash/delete-batch';
 
 /** 通用助手（智谱 GLM，多轮 session） 获取助手会话详情与消息（时间正序）*/
+/** 实例级大模型运行时配置（覆盖 createLlm env 回退链） */
+export const SETTINGS_LLM = '/settings/llm';
+export const SETTINGS_LLM_DEFAULTS = '/settings/llm/defaults';
+
 export const ASSISTANT_SESSION = '/assistant/session';
 /** 按知识条目标识拉取该文章下全部会话（历史记录） */
 export const ASSISTANT_SESSIONS_FOR_KNOWLEDGE =

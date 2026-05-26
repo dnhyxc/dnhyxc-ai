@@ -88,7 +88,8 @@ function resolveModelNameFromEnvKeys(
 	return defaultName;
 }
 
-function resolveSiliconFlowCredentials(
+/** 按 env 回退链解析凭证（不含 UI/DB 运行时覆盖） */
+export function resolveSiliconFlowCredentials(
 	config: ConfigService,
 	options: ResolveSiliconFlowOptions,
 ): SiliconFlowCredentials {
@@ -107,10 +108,22 @@ function resolveSiliconFlowCredentials(
 	return { apiKey, baseURL, modelName };
 }
 
+export type LlmCredentialResolver = {
+	resolveSiliconFlowCredentials(
+		config: ConfigService,
+		preset: SiliconFlowLlmPreset,
+	): SiliconFlowCredentials;
+};
+
 /** 知识库助手模型名（token 预算推断，不创建 LLM） */
 export function getAssistantSiliconFlowModelName(
 	config: ConfigService,
+	resolver?: LlmCredentialResolver,
 ): string {
+	if (resolver) {
+		return resolver.resolveSiliconFlowCredentials(config, 'assistant')
+			.modelName;
+	}
 	return resolveModelNameFromEnvKeys(config, [
 		ModelEnum.SILICONFLOW_MODEL_NAME,
 		ModelEnum.DEEPSEEK_MODEL_NAME,
@@ -190,6 +203,12 @@ const siliconFlowResolvePresets: Record<
 	}),
 };
 
+export function siliconFlowResolvePresetsForPreset(
+	preset: SiliconFlowLlmPreset,
+): (config: ConfigService) => ResolveSiliconFlowOptions {
+	return siliconFlowResolvePresets[preset];
+}
+
 /**
  * 创建硅基流动 ChatOpenAI 的统一入口。
  * - `preset`：选择凭证与模型名的解析策略（各业务 env 回退链不同）。
@@ -217,6 +236,7 @@ export type CreateLlmOptions = {
 export function createLlm(
 	config: ConfigService,
 	options: CreateLlmOptions,
+	resolver?: LlmCredentialResolver,
 ): ChatOpenAI {
 	const {
 		preset,
@@ -231,10 +251,12 @@ export function createLlm(
 		modelKwargs,
 	} = options;
 
-	const credentials = resolveSiliconFlowCredentials(
-		config,
-		siliconFlowResolvePresets[preset](config),
-	);
+	const credentials = resolver
+		? resolver.resolveSiliconFlowCredentials(config, preset)
+		: resolveSiliconFlowCredentials(
+				config,
+				siliconFlowResolvePresets[preset](config),
+			);
 	if (modelNameOverride) {
 		credentials.modelName = modelNameOverride;
 	}

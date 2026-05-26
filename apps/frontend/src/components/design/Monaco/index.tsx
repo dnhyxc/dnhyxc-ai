@@ -1555,7 +1555,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 										// 指定受控元素的 ID，以便屏幕阅读器辅助导航关联此按钮和 Markdown 底部操作栏
 										aria-controls={markdownBottomBarId}
 										onClick={toggleMarkdownBottomBar}
-										className="lucide-stroke-draw-hover"
+										className="lucide-stroke-draw-hover px-0 mr-3"
 									>
 										<div className="flex items-center gap-1">
 											{internalMarkdownBottomBarOpen ? (

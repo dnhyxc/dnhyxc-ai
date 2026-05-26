@@ -33,6 +33,7 @@ import {
 	isJsonStringClosingQuoteAt,
 	repairJsonUnescapedInteriorQuotes,
 } from '../../utils/english-pack';
+import { LlmConfigService } from '../llm-config/llm-config.service';
 import {
 	ENGLISH_PACK_MASTER_APPENDIX_CHAR_CAP,
 	ENGLISH_PACK_MASTER_STREAM_CHAR_FUSE,
@@ -218,6 +219,7 @@ export class EnglishLearningService {
 	constructor(
 		private readonly dataSource: DataSource,
 		private readonly configService: ConfigService,
+		private readonly llmConfigService: LlmConfigService,
 		private readonly webSearchService: WebSearchService,
 		private readonly knowledgeQaService: KnowledgeQaService,
 		private readonly knowledgeEmbedding: KnowledgeEmbeddingService,
@@ -1355,15 +1357,19 @@ export class EnglishLearningService {
 
 		try {
 			// 主检索为单次会话，消息量通常达不到摘要中间件触发阈值；不设 summarization，避免误用 AgentMemory 的 token 估算与副模型调用
-			const mainLlm = createLlm(this.configService, {
-				preset: 'englishLearning',
-				maxTokens: 8192,
-				temperature: 0.35,
-				defaultTemperature: 0.35,
-				maxTokensPolicy: 'default',
-				defaultMaxTokens: 8192,
-				abortSignal: combinedSignal,
-			});
+			const mainLlm = createLlm(
+				this.configService,
+				{
+					preset: 'englishLearning',
+					maxTokens: 8192,
+					temperature: 0.35,
+					defaultTemperature: 0.35,
+					maxTokensPolicy: 'default',
+					defaultMaxTokens: 8192,
+					abortSignal: combinedSignal,
+				},
+				this.llmConfigService,
+			);
 
 			// 根据主题推断联网检索时间策略（显式公历 → Tavily 区间；Serper 用粗粒度 tbs）
 			const webSearchTime = this.resolveWebSearchTime(topic);
@@ -2475,19 +2481,23 @@ ${existingHintBlock}
 			32768,
 			Math.max(4096, Math.floor(params.maxTokens)),
 		);
-		const llm = createLlm(this.configService, {
-			preset: 'englishLearning',
-			streaming: false,
-			temperature: 0.35,
-			defaultTemperature: 0.35,
-			maxTokens: capped,
-			maxTokensPolicy: 'default',
-			abortSignal: params.signal,
-			// 设定 LLM 输出格式为 JSON（json_object）：避免自然语言混杂/生成结构可信度更高
-			modelKwargs: {
-				response_format: { type: 'json_object' },
+		const llm = createLlm(
+			this.configService,
+			{
+				preset: 'englishLearning',
+				streaming: false,
+				temperature: 0.35,
+				defaultTemperature: 0.35,
+				maxTokens: capped,
+				maxTokensPolicy: 'default',
+				abortSignal: params.signal,
+				// 设定 LLM 输出格式为 JSON（json_object）：避免自然语言混杂/生成结构可信度更高
+				modelKwargs: {
+					response_format: { type: 'json_object' },
+				},
 			},
-		});
+			this.llmConfigService,
+		);
 		const msgs: BaseMessage[] = [new SystemMessage(params.system)];
 		if (params.priorThread?.length) {
 			msgs.push(

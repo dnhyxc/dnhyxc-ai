@@ -27,6 +27,12 @@ const NavigationMenus = () => {
 				icon: 'icon-theme',
 			},
 			{
+				name: t('setting.menu.llm'),
+				key: 'llm',
+				path: '/setting/llm',
+				icon: 'icon-setting',
+			},
+			{
 				name: t('setting.menu.about'),
 				key: 'about',
 				path: '/setting/about',

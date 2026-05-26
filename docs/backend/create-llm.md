@@ -1,7 +1,7 @@
 # 后端 `createLlm` 统一工厂
 
 > **文档角色**：硅基流动 + LangChain `ChatOpenAI` 的**唯一创建入口**说明。  
-> **延伸阅读**：[siliconflow-chat-unification.md](./siliconflow-chat-unification.md)（业务为何统一硅基、Assistant SSE 等）、[english-learning-gen-robustness.md](./english-learning-gen-robustness.md)（单词包凑条与 JSON 重试）。
+> **延伸阅读**：[siliconflow-chat-unification.md](./siliconflow-chat-unification.md)（业务为何统一硅基、Assistant SSE 等）、[english-learning-gen-robustness.md](./english-learning-gen-robustness.md)（单词包凑条与 JSON 重试）、[llm-runtime-settings.md](./llm-runtime-settings.md)（设置页实例级覆盖 env）。
 
 ## 1. 背景与目标
 

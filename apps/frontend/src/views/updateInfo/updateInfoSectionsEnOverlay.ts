@@ -295,6 +295,11 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		title: 'Unified system toasts',
 		description: 'Consistent toast styling for clearer errors and info.',
 	},
+	's9-3': {
+		title: 'LLM settings in app',
+		description:
+			'New Settings → LLM page: save API Key, Base URL, and model name on the server. When enabled, chat, knowledge assistant, Q&A, and English learning share one config; Restore environment variables reverts to server defaults.',
+	},
 	's10-1': {
 		title: 'Image component improvements',
 		description:
