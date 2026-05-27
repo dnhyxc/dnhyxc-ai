@@ -1,6 +1,6 @@
 ---
 name: implementation-doc-from-diff
-description: 基于当前改动（git diff、@ 文件或会话内已达成共识的变更）在 docs/ 下生成「实现思路」专题 Markdown：包含方案说明、关键代码摘录及代码块内详细中文注释；每个代码块上方须标注来源文件（仓库相对路径）与大致位置；新建文档后自动整理 docs/ 索引；若为用户可感知的新功能则同步 project-guide.md / project-update-info.md（无路径），并自动同步 apps/frontend 内 updateInfo/projectGuide 四套结构化数据与英文 overlay；默认不改其它业务源码。适用于「把本次改动写成文档/实现思路/只写 docs/基于 diff 写文档」等。
+description: 基于当前改动（git diff、@ 文件或会话内已达成共识的变更）在 docs/<功能域>/ 下生成「实现思路」专题 Markdown（按产品能力选简短功能域目录如 chat/cos/llm，不存在则创建目录与 README）；包含方案说明、关键代码摘录及代码块内详细中文注释；每个代码块上方须标注来源文件与大致位置；新建后自动整理 docs/ 索引；若为用户可感知的新功能则同步 project-guide.md / project-update-info.md（无路径）及 apps/frontend 四套姊妹 TS；默认不改其它业务源码。适用于「把本次改动写成文档/实现思路/只写 docs/基于 diff 写文档」等。
 ---
 
 # 基于改动的实现说明文档（implementation-doc-from-diff）
@@ -11,7 +11,7 @@ description: 基于当前改动（git diff、@ 文件或会话内已达成共识
 
 - **实现思路**：为何这样做、关键决策、数据流与边界。
 - **具体代码**：用 Markdown **围栏代码块**呈现与改动相关的片段；块内附**详细中文注释**（可比仓库源码注释更细，便于单独阅读）。
-- **docs 体系**：新增专题后**自动整理**整个 `docs/` 索引（见 `references/docs-maintenance.md`）。
+- **docs 体系**：专题文落在**对应功能域**的 `docs/<功能域>/`（简短目录名；不存在则创建目录与 `README.md`）；新增后**自动整理**索引（见 `references/doc-domain-layout.md`、`references/docs-maintenance.md`）。
 - **产品姊妹稿**：若改动包含**用户可感知**的新功能/体验变化，同步更新 `docs/project-guide.md` 与 `docs/project-update-info.md`（格式见 `references/product-user-docs.md`；**这两份正文不得出现文件路径**），并**同轮**同步应用内 `/update-info`、`/project-guide` 结构化数据（见 `references/product-pages-sync.md`）。
 - **默认不改其它业务代码**：除步骤 6 允许的前端 4 个姊妹数据文件外，**不得**修改 `apps/**`、`packages/**`、根配置、`scripts/**` 等；**仅**在 `docs/**/*.md`（及步骤 6 列出的前端文件）中新建或更新。
 
@@ -44,7 +44,12 @@ description: 基于当前改动（git diff、@ 文件或会话内已达成共识
    - 更新 [`docs/README.md`](../../../../docs/README.md) 与对应 `docs/<领域>/README.md`（规则见 `references/docs-maintenance.md`）。
    - 相关旧专题文：文首补「延伸阅读」或收窄为摘要 + 链到主文档，避免双份维护。
 
-5. **新建文档文件名**
+5. **功能域目录（与文件名并列的硬约束）**
+   - 专题实现文**只能**写在 `docs/<功能域>/` 下，**禁止** `docs/backend/`、`docs/frontend/` 及在 `docs/` 根目录堆放专题（`project-guide.md` / `project-update-info.md` 除外）。
+   - `<功能域>` 须与改动的产品能力一致（见 `references/doc-domain-layout.md` 对照表）；目录名**简短**（如 `chat`、`cos`、`llm`、`ops`、`app`、`english`）。
+   - 若 `docs/<功能域>/` 不存在：**创建目录** + 该域 `README.md`，并在 `docs/README.md` 功能域表登记。
+
+6. **新建文档文件名**
    - 须**简短**且**准确概括本轮改动**（具体规则见下文 **§4 落盘路径与文件名**）；与「只写文档」约束并列，作为落盘时的硬性自检项。
 
 ## 何时启用
@@ -54,7 +59,7 @@ description: 基于当前改动（git diff、@ 文件或会话内已达成共识
 - 「根据本次 / 当前 **改动** 写一份 **实现思路**」
 - 「**git diff** 生成文档」「PR / 分支变更说明写入 **docs**」
 - 「**只生成文档**，**不要改代码**」
-- 「把会话里实现的 XXX 写入 **docs/knowledge**（或 monaco / frontend …）」
+- 「把会话里实现的 XXX 写入 **docs/knowledge**（或 monaco / cos …）」
 
 若用户明确要求**同时改代码**，应**退出**本 Skill 的约束或改用普通 Agent 任务（本 Skill 以「纯文档」为默认）。
 
@@ -69,10 +74,14 @@ description: 基于当前改动（git diff、@ 文件或会话内已达成共识
 3. 当前会话中已落地且用户声明「就是这一轮」的路径列表。
 4. 若无明确范围，运行 `git diff` / `git status`（在许可环境下）缩小文件集合，并向用户确认范围。
 
-### 2) 提炼叙述结构
+### 2) 确定功能域并提炼叙述结构
+
+1. 根据改动内容，从 [`references/doc-domain-layout.md`](references/doc-domain-layout.md) 选定**主功能域** `docs/<功能域>/`（跨域时只选一个主域写专题，它处做链接）。
+2. 若该目录不存在，按该参考文档 **§3** 创建目录与 `README.md`。
 
 至少回答：
 
+- **功能域**：`docs/<功能域>/` 及是否新建目录。
 - **要解决什么问题**（用户视角一句）。
 - **改了哪些地方**（路径清单，用于专题文 §2；**不要**原样粘贴进 `project-guide` / `project-update-info`）。
 - **核心思路**（3～8 条要点，含权衡：为何不用备选方案）。
@@ -98,8 +107,12 @@ description: 基于当前改动（git diff、@ 文件或会话内已达成共识
 
 ### 4) 落盘路径与文件名（必须满足）
 
-- **目录**：专题明确时放在 `docs/<领域>/`（或用户点名的文档目录），与仓库现有风格一致。
-- **文件名简短**：用可读、尽量短的名称；优先 **小写 + 连字符**（kebab-case，连字符命名）或与同目录已有文档一致的习惯；避免堆后缀（如 `-final-v2`）、避免一行塞满多个主题。
+- **目录（功能域，必做）**：
+  - 路径形态固定为 **`docs/<功能域>/<文件名>.md`**。
+  - `<功能域>` 从 [`references/doc-domain-layout.md`](references/doc-domain-layout.md) 选取；**不得**使用 `docs/backend/`、`docs/frontend/`。
+  - 目录不存在则**创建** `docs/<功能域>/` 及 `README.md`，并更新 `docs/README.md`。
+  - 用户点名路径时，仍须落在功能域目录内（例如用户说「写 frontend」→ 按实际能力归入 `app/`、`cos/`、`english/` 等，并在文中说明归类理由）。
+- **文件名简短**：用可读、尽量短的名称；优先 **小写 + 连字符**（kebab-case）；避免堆后缀（如 `-final-v2`）、避免一行塞满多个主题。
 - **文件名贴题**：文件名应概括**本轮改动核心**（读者不看正文也能猜到大方向），例如 `web-search-tavily.md`、`organic-cite-capsules.md`；**禁止**泛名：`notes.md`、`update.md`、`change.md`、`temp.md`。
 - **与正文标题**：文件名不必与 Markdown 一级标题逐字相同；标题可略正式，文件名保持短。
 - **避免**：覆盖广义文件名（如随意替换 `README.md`）；大总览应**追加章节**而非整块替换。
@@ -152,9 +165,14 @@ description: 基于当前改动（git diff、@ 文件或会话内已达成共识
 - [ ] 新建文档的**文件名**是否**简短**且**准确描述本轮改动**？
 - [ ] **每个**代码块上方是否都有**来源路径 + 大致位置**？
 
+**功能域落盘**
+
+- [ ] 专题是否在正确的 `docs/<功能域>/`（未用 `backend/`、`frontend/`、根目录）？
+- [ ] 新功能域是否已创建目录 + `README.md` 并登记 `docs/README.md`？
+
 **docs 整理**
 
-- [ ] `docs/README.md` 与领域 `README.md` 是否已更新？
+- [ ] `docs/README.md` 与功能域 `README.md` 是否已更新？
 - [ ] 是否已去重并补交叉链接？
 
 **产品姊妹稿**（若适用）
@@ -203,6 +221,7 @@ description: 基于当前改动（git diff、@ 文件或会话内已达成共识
 | 文件 | 用途 |
 |------|------|
 | [references/doc-outline.md](references/doc-outline.md) | 专题实现文章节骨架 |
+| [references/doc-domain-layout.md](references/doc-domain-layout.md) | **功能域目录对照、命名、新建目录** |
 | [references/docs-maintenance.md](references/docs-maintenance.md) | `docs/` 索引整理与去重 |
 | [references/product-user-docs.md](references/product-user-docs.md) | `project-guide` / `project-update-info` 格式与禁路径 |
 | [references/product-pages-sync.md](references/product-pages-sync.md) | 姊妹稿 → `/update-info`、`/project-guide` 四套 TS 同步规则 |
