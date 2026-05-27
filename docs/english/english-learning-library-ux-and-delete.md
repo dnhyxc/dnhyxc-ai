@@ -592,9 +592,9 @@ sequenceDiagram
 
 | 说明 | 路径 |
 |------|------|
-| 收藏状态专题（更细） | `docs/frontend/vocab-favorite-status-query.md` |
-| 资源库导入总览（单词） | `docs/frontend/english-learning-library-import.md` |
-| 经典语句库导入 | `docs/frontend/classic-quotes-library-import.md` |
+| 收藏状态专题（更细） | `docs/english/vocab-favorite-status-query.md` |
+| 资源库导入总览（单词） | `docs/english/english-learning-library-import.md` |
+| 经典语句库导入 | `docs/english/classic-quotes-library-import.md` |
 | ScrollArea | `apps/frontend/src/components/ui/scroll-area.tsx` |
 | 增量 Hook | `apps/frontend/src/hooks/useIncrementalVocabFavoriteStatus.ts` |
 | 单词库列表 | `apps/frontend/src/views/englishLearning/library/VocabularyLibraryListPanel.tsx` |

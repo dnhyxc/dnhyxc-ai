@@ -217,7 +217,7 @@ export function scrollPreviewViewportToRevealElement(
 ## 8. 与既有文档的关系
 
 - **`docs/monaco/markdown-split-scroll-sync.md`**：分屏「跟滚」与快照；本文专注 **TOC / `#` 点击** 与 **Layout 误滚**，互补。
-- **`docs/frontend/tauri-browser.md`**：`attachExternalLinkClickInterceptor` 的接入说明；本文补充 **哈希锚点 + `preventDefault`** 的必要性。
+- **`docs/app/tauri-browser.md`**：`attachExternalLinkClickInterceptor` 的接入说明；本文补充 **哈希锚点 + `preventDefault`** 的必要性。
 - **`docs/mermaid/markdown-zoom-and-preview.md` §8**：`ParserMarkdownPreviewPane` 拆岛路径；与本文 **§2.3** 多 `.markdown-body` 根因直接相关。
 
 ---

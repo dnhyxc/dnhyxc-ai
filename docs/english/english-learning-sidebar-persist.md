@@ -10,7 +10,7 @@
 2. **`pendingIntentPrefix`**（快捷意图长文案）在 `englishAgentStore` 变更时**同步写入** `sidebarIntentPrefix`，并在 `resetConversation` / `sendMessage` 清空意图时一并清空镜像。
 3. 英语学习页**挂载时**：若 Pack 中有镜像而 Agent 为空，则**回填** Agent，保证芯片选中态与发送前缀一致。
 
-**说明**：单词包/经典句 **SSE 进度与列表** 的跨路由设计见同目录文档 `docs/frontend/english-pack-stream-store.md`；本文侧重**表单字段 + 意图镜像**本轮增量。
+**说明**：单词包/经典句 **SSE 进度与列表** 的跨路由设计见同目录文档 `docs/english/english-pack-stream-store.md`；本文侧重**表单字段 + 意图镜像**本轮增量。
 
 ## 2. 改动范围
 
@@ -150,6 +150,6 @@ const countInput = EnglishPackStore.classicCountInput;
 | 挂载恢复 | `apps/frontend/src/views/englishLearning/index.tsx` |
 | 单词包视图 | `apps/frontend/src/views/englishLearning/VocabularySection.tsx` |
 | 经典句视图 | `apps/frontend/src/views/englishLearning/ClassicQuotesSection.tsx` |
-| SSE 跨路由 UI（专题文档） | `docs/frontend/english-pack-stream-store.md` |
+| SSE 跨路由 UI（专题文档） | `docs/english/english-pack-stream-store.md` |
 
 若与仓库最新源码不一致，以源码为准。

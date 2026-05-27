@@ -35,7 +35,7 @@
 | 经典句批次实体                                      | `apps/backend/src/services/english-learning/english-classic-quote.entity.ts` |
 | 经典句会话 / 明细实体                               | `english-classic-quotes-pack-session.entity.ts`、`english-classic-quotes-pack-item.entity.ts` |
 | 存储改造迁移                                        | `apps/backend/src/migrations/1779200000000-english-pack-item-rows.ts`        |
-| 工具与主 Agent 数据路径（延伸阅读）                 | `docs/backend/english-learning-master-agent-web-search-to-llm.md`            |
+| 工具与主 Agent 数据路径（延伸阅读）                 | `docs/english/english-learning-master-agent-web-search-to-llm.md`            |
 
 ---
 
@@ -406,7 +406,7 @@ private async runEnglishPackMasterResearchPhase(params: {
 }
 ```
 
-联网结果如何进入大模型（Tool 消息链路）见：`docs/backend/english-learning-master-agent-web-search-to-llm.md`。
+联网结果如何进入大模型（Tool 消息链路）见：`docs/english/english-learning-master-agent-web-search-to-llm.md`。
 
 ---
 
@@ -566,4 +566,4 @@ async saveVocabularyPackBatch(params: {
 | 核心服务                          | `apps/backend/src/services/english-learning/english-learning.service.ts`    |
 | 接口层                            | `apps/backend/src/services/english-learning/english-learning.controller.ts` |
 | 模块                              | `apps/backend/src/services/english-learning/english-learning.module.ts`     |
-| 主 Agent 与 Web Search 注入链说明 | `docs/backend/english-learning-master-agent-web-search-to-llm.md`           |
+| 主 Agent 与 Web Search 注入链说明 | `docs/english/english-learning-master-agent-web-search-to-llm.md`           |

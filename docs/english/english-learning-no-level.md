@@ -27,7 +27,7 @@
 | 前端 SSE 工具 | `apps/frontend/src/utils/englishLearningPackSse.ts` |
 | 前端 API 类型 | `apps/frontend/src/service/index.ts` |
 | 文案 | `apps/frontend/src/i18n/locales/zh-CN.ts`、`en-US.ts` |
-| 总览补充 | `docs/backend/english-learning-backend-implementation.md`（交叉引用 + 概述措辞） |
+| 总览补充 | `docs/english/english-learning-backend-implementation.md`（交叉引用 + 概述措辞） |
 
 ---
 
@@ -257,6 +257,6 @@ export type EnglishVocabularyHistoryEntry = {
 
 | 说明 | 路径 |
 |------|------|
-| 后端总览（已链至本文） | `docs/backend/english-learning-backend-implementation.md` |
-| 子模型线程与 prompt 专题 | `docs/backend/english-learning-submodel-prompt-thread.md` |
-| 主 Agent 检索专题 | `docs/backend/english-learning-master-agent-web-search-to-llm.md` |
+| 后端总览（已链至本文） | `docs/english/english-learning-backend-implementation.md` |
+| 子模型线程与 prompt 专题 | `docs/english/english-learning-submodel-prompt-thread.md` |
+| 主 Agent 检索专题 | `docs/english/english-learning-master-agent-web-search-to-llm.md` |

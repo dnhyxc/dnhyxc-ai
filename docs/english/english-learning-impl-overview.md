@@ -2,7 +2,7 @@
 
 本文基于当前仓库中**英语学习包生成、联网检索、主 Agent 提示与前端学习栏**等相关改动的落地结果整理，便于交接与回归。若与最新源码不一致，以源码为准。
 
-> **专题补充**：主模型「按需联网」的提示词策略另有专文：`docs/backend/english-learning-master-research-web-autonomous.md`。
+> **专题补充**：主模型「按需联网」的提示词策略另有专文：`docs/english/english-learning-master-research-web-autonomous.md`。
 
 ---
 
@@ -33,7 +33,7 @@
 | `apps/frontend/src/i18n/locales/zh-CN.ts`、`en-US.ts` | chip 与 intent 前缀文案。 |
 | `apps/frontend/src/views/englishLearning/VocabularySection.tsx`、`ClassicQuotesSection.tsx` | 与生成流程相关的少量同步（若有）。 |
 
-> **专题补充（单词包词性 pos）**：`docs/backend/english-vocabulary-pos.md` — 拉取词条增加英文词性缩写、全链路解析/收藏/UI/DOCX。
+> **专题补充（单词包词性 pos）**：`docs/english/english-vocabulary-pos.md` — 拉取词条增加英文词性缩写、全链路解析/收藏/UI/DOCX。
 
 ---
 

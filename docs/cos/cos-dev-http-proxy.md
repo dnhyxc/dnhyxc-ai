@@ -1,12 +1,12 @@
 # COS 同源展示代理（开发 / Web 生产 / Tauri）
 
-> **文档角色（主文档）**：腾讯云 COS 对象在浏览器/Tauri 中的**展示 URL** 改写与开发态 Vite 代理；上传走服务端 `uploadCos` / `uploadCosChatFiles`，见 [../backend/cos-object-storage.md](../backend/cos-object-storage.md)。  
+> **文档角色（主文档）**：腾讯云 COS 对象在浏览器/Tauri 中的**展示 URL** 改写与开发态 Vite 代理；上传走服务端 `uploadCos` / `uploadCosChatFiles`，见 [../cos/cos-object-storage.md](../cos/cos-object-storage.md)。  
 > **机制**：持久化存完整 COS HTTPS URL；DEV / Web 生产展示为 `/ext-cos/{key}`；**仅** `/ext-cos/`，不兼容 `/ext-img/`。  
 > **延伸阅读**  
-> - COS 上传、ACL、聊天附件：[../backend/cos-object-storage.md](../backend/cos-object-storage.md)  
+> - COS 上传、ACL、聊天附件：[../cos/cos-object-storage.md](../cos/cos-object-storage.md)  
 > - macOS ATS 概念：[tauri-macos-ats-http.md](./tauri-macos-ats-http.md)  
 > - 路由鉴权 mixed content 摘要：[route-auth.md](./route-auth.md) §12  
-> - 生产 Nginx：`location /ext-cos/` → [../backend/nginx.md](../backend/nginx.md)  
+> - 生产 Nginx：`location /ext-cos/` → [../ops/nginx.md](../ops/nginx.md)  
 > - 文档总索引：[../README.md](../README.md)
 
 若与仓库最新源码不一致，**以源码为准**。
@@ -183,7 +183,7 @@ server: {
 
 **来源**：`apps/frontend/src/utils/index.ts`（`resolveAttachmentDisplayUrl`）
 
-COS 路径用 `resolveCosUrlForWebDisplay`；历史本地上传 `/images`、`/files` 仍走 `resolveUploadedFileUrl`（见 [../backend/cos-object-storage.md](../backend/cos-object-storage.md) §3.8）。
+COS 路径用 `resolveCosUrlForWebDisplay`；历史本地上传 `/images`、`/files` 仍走 `resolveUploadedFileUrl`（见 [../cos/cos-object-storage.md](../cos/cos-object-storage.md) §3.8）。
 
 ---
 
@@ -227,7 +227,7 @@ COS 路径用 `resolveCosUrlForWebDisplay`；历史本地上传 `/images`、`/fi
 |------|------|
 | 展示 URL 工具 | `apps/frontend/src/utils/index.ts` |
 | 开发代理 | `apps/frontend/vite.config.ts` |
-| COS 上传主文档 | `docs/backend/cos-object-storage.md` |
+| COS 上传主文档 | `docs/cos/cos-object-storage.md` |
 | 账户 / 下载页 | `apps/frontend/src/views/account/index.tsx`、`download/index.tsx` |
 | 聊天附件 UI | `apps/frontend/src/components/design/ChatFileList/index.tsx` |
 | Tauri ATS / allowlist | `apps/frontend/src-tauri/Info.plist`、`capabilities/default.json` |

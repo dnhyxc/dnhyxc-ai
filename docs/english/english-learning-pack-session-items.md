@@ -29,7 +29,7 @@
 ### 1.3 非目标
 
 - 不改变 SSE 事件协议与侧栏发起拉取的入口（见 [english-learning-pack-stream-route.md](./english-learning-pack-stream-route.md)）；
-- 不在本文展开主从 Agent / 联网检索实现（见 `docs/backend/english-learning-backend-implementation.md`）。
+- 不在本文展开主从 Agent / 联网检索实现（见 `docs/english/english-learning-backend-implementation.md`）。
 
 **若与仓库最新源码不一致，以源码为准。**
 
@@ -631,7 +631,7 @@ sequenceDiagram
 | 说明 | 路径 |
 |------|------|
 | 结果页独立路由（直播 Store） | [english-learning-pack-stream-route.md](./english-learning-pack-stream-route.md) |
-| 后端模块总览 | [../backend/english-learning-backend-implementation.md](../backend/english-learning-backend-implementation.md) |
+| 后端模块总览 | [../english/english-learning-backend-implementation.md](../english/english-learning-backend-implementation.md) |
 | Session 实体（单词） | `apps/backend/src/services/english-learning/english-vocabulary-pack-session.entity.ts` |
 | Item 实体（单词） | `apps/backend/src/services/english-learning/english-vocabulary-pack-item.entity.ts` |
 | 迁移 | `apps/backend/src/migrations/1779200000000-english-pack-item-rows.ts` |

@@ -35,9 +35,9 @@
 
 **关联文档**（收藏与列表，不含本轮 pos 细节时可对照）：
 
-- `docs/frontend/english-learning-pack-favorites.md`
-- `docs/frontend/english-learning-pack-sse.md`
-- `docs/backend/english-learning-impl-overview.md`
+- `docs/english/english-learning-pack-favorites.md`
+- `docs/english/english-learning-pack-sse.md`
+- `docs/english/english-learning-impl-overview.md`
 
 ---
 
@@ -354,7 +354,7 @@ ALTER TABLE `english_vocabulary_favorite`
 ADD COLUMN `pos` varchar(32) NOT NULL DEFAULT '' AFTER `ipa`;
 ```
 
-或在服务器 `server` 根目录使用项目内生产迁移脚本（见 `docs/backend/server-deployment.md` 与 `package.json` 中 `m:c:prod` / `m:run:prod`），迁移文件需自行按实体生成并放入 **`server/migrations/`**（与 `dist` 分离，避免覆盖）。
+或在服务器 `server` 根目录使用项目内生产迁移脚本（见 `docs/ops/server-deployment.md` 与 `package.json` 中 `m:c:prod` / `m:run:prod`），迁移文件需自行按实体生成并放入 **`server/migrations/`**（与 `dist` 分离，避免覆盖）。
 
 ### 5.2 批次表
 

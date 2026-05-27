@@ -23,7 +23,7 @@
 | 英语学习控制器         | `apps/backend/src/services/english-learning/english-learning.controller.ts`                                           |
 | 英语学习模块           | `apps/backend/src/services/english-learning/english-learning.module.ts`                                               |
 | 英语学习服务           | `apps/backend/src/services/english-learning/english-learning.service.ts`                                              |
-| 后端文档（既有文更新） | `docs/backend/english-learning-gen-robustness.md`                                                                     |
+| 后端文档（既有文更新） | `docs/english/english-learning-gen-robustness.md`                                                                     |
 | 前端常量               | `apps/frontend/src/constant/index.ts`                                                                                 |
 | 前端工具聚合           | `apps/frontend/src/utils/index.ts`                                                                                    |
 | SSE                    | `apps/frontend/src/utils/englishLearningPackSse.ts`                                       |

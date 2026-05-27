@@ -684,4 +684,4 @@ useEffect(() => {
 | 左栏列表 | `apps/frontend/src/views/englishLearning/library/VocabularyLibraryListPanel.tsx` |
 | 右栏语句 | `apps/frontend/src/views/englishLearning/library/ClassicQuotesLibraryWordsPanel.tsx` |
 | 前端 API | `apps/frontend/src/service/api.ts`、`apps/frontend/src/service/index.ts` |
-| 单词库对照文档 | `docs/frontend/english-learning-library-import.md` |
+| 单词库对照文档 | `docs/english/english-learning-library-import.md` |

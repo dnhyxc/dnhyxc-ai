@@ -38,7 +38,7 @@
 | HTTP | `apps/frontend/src/utils/fetch.ts` | 原生 `FormData` 直传 |
 | 文案 | `apps/frontend/src/i18n/locales/zh-CN.ts`、`en-US.ts` | 库/导入相关键 |
 
-**会话早期已落地、本 diff 可能未全部包含**：嵌套路由 `EnglishLearningLayout`、`Header` 面包屑、`DragDropFileUpload` 组件等，见 `docs/frontend/english-learning-json-import.md` 或仓库历史提交。
+**会话早期已落地、本 diff 可能未全部包含**：嵌套路由 `EnglishLearningLayout`、`Header` 面包屑、`DragDropFileUpload` 组件等，见 `docs/english/english-learning-json-import.md` 或仓库历史提交。
 
 ---
 
@@ -507,4 +507,4 @@ if (finalConfig.data instanceof FormData) {
 | 后端 API | `apps/backend/src/services/english-learning/english-learning.controller.ts` |
 | 迁移 | `apps/backend/src/migrations/1778901200000-vocabulary-library-items.ts` |
 | 前端 API | `apps/frontend/src/service/index.ts` |
-| 早期导入/路由文档 | `docs/frontend/english-learning-json-import.md` |
+| 早期导入/路由文档 | `docs/english/english-learning-json-import.md` |

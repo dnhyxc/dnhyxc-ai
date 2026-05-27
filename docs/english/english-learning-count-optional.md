@@ -209,5 +209,5 @@ const abort = await streamEnglishVocabularyPack({
 
 | 说明 | 路径 |
 |------|------|
-| 后端总览（可链至本文） | [`docs/backend/english-learning-backend-implementation.md`](./english-learning-backend-implementation.md) |
-| 去难度专题 | [`docs/backend/english-learning-no-level.md`](./english-learning-no-level.md) |
+| 后端总览（可链至本文） | [`docs/english/english-learning-backend-implementation.md`](./english-learning-backend-implementation.md) |
+| 去难度专题 | [`docs/english/english-learning-no-level.md`](./english-learning-no-level.md) |

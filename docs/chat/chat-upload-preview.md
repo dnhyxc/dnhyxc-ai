@@ -2,7 +2,7 @@
 
 > **文档角色（开发态主文档）**：Vite 反代、CORP、开发环境 URL 解析。  
 > **生产 Web / Nginx 400、SSE 路径、/api/upload/serve**：详见 **[chat-upload-access-prod.md](./chat-upload-access-prod.md)**（主文档）。  
-> **延伸阅读**：[chatbot.md](./chatbot.md) §3.3 附件与 OCR；[../backend/upload-storage-paths.md](../backend/upload-storage-paths.md)；[../backend/nginx.md](../backend/nginx.md)；[../frontend/cos-dev-http-proxy.md](../frontend/cos-dev-http-proxy.md)（COS 展示，与 uploads 无关）。
+> **延伸阅读**：[chatbot.md](./chatbot.md) §3.3 附件与 OCR；[../ops/upload-storage-paths.md](../ops/upload-storage-paths.md)；[../ops/nginx.md](../ops/nginx.md)；[../cos/cos-dev-http-proxy.md](../cos/cos-dev-http-proxy.md)（COS 展示，与 uploads 无关）。
 
 ---
 
@@ -33,7 +33,7 @@
 | `apps/frontend/src/components/design/ChatFileList/index.tsx` | 预览/下载 URL 与 blob 策略 |
 | `apps/frontend/vite.config.ts` | `/api`、`/images`、`/files` 代理目标与 API 同源 |
 | `apps/backend/src/main.ts` | `helmet` 的 `crossOriginResourcePolicy: cross-origin` |
-| `apps/backend/src/utils/upload-paths.ts` | uploads 落盘目录（与 dist 同级）；见 [upload-storage-paths.md](../backend/upload-storage-paths.md) |
+| `apps/backend/src/utils/upload-paths.ts` | uploads 落盘目录（与 dist 同级）；见 [upload-storage-paths.md](../ops/upload-storage-paths.md) |
 | `apps/backend/src/services/upload/upload.module.ts` | multer 写入 `uploads/images`、`uploads/files` |
 
 ---
@@ -282,7 +282,7 @@ app.use(
 | 上传入口 | `apps/frontend/src/views/chat/index.tsx` |
 | Vite 代理 | `apps/frontend/vite.config.ts` |
 | 静态目录 | `apps/backend/src/main.ts`（`useStaticAssets`） |
-| 落盘与环境变量 | [backend/upload-storage-paths.md](../backend/upload-storage-paths.md) |
+| 落盘与环境变量 | [ops/upload-storage-paths.md](../ops/upload-storage-paths.md) |
 | 对话总览 | `docs/chat/chatbot.md` |
 
 若与仓库最新源码不一致，以源码为准。

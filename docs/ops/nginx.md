@@ -226,7 +226,7 @@ server {
   # Web 端 HTTPS 页面加载 COS 等外部对象（mixed content / 私有桶展示）兼容
   # 用法：前端展示为 https://dnhyxc.cn/ext-cos/{key}（图片、PDF 等），此处回源 COS/CDN
   # Host / proxy_pass 须与 apps/frontend/.env 的 VITE_COS_PUBLIC_DOMAIN 一致（换桶时同步修改）
-  # 说明：docs/backend/cos-object-storage.md、docs/frontend/cos-dev-http-proxy.md
+  # 说明：docs/cos/cos-object-storage.md、docs/cos/cos-dev-http-proxy.md
   location /ext-cos/ {
     proxy_set_header Host dnhyxc-ai-1313243176.cos.ap-shanghai.myqcloud.com;
     proxy_set_header X-Real-IP $remote_addr;

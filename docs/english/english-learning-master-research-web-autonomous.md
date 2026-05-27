@@ -1,6 +1,6 @@
 # 英语学习主检索：主模型自主决策是否联网（实现思路）
 
-**关联总览**：联网时间预设（`WebSearchRecencyPreset`）、Serper/Tavily 透传、`agent-tools` 组装、前端学习栏快捷意图等，见 `docs/backend/english-learning-impl-overview.md`。
+**关联总览**：联网时间预设（`WebSearchRecencyPreset`）、Serper/Tavily 透传、`agent-tools` 组装、前端学习栏快捷意图等，见 `docs/english/english-learning-impl-overview.md`。
 
 ## 1. 背景与问题
 
@@ -154,7 +154,7 @@ return [
 
 - **工具组装**：`apps/backend/src/services/agent/agent-tools.ts` 的 `buildAgentLangChainTools` 仍将 `...webSearchService.createLangChainWebSearchTools(...)` 置于列表前部；本次**未**为英语学习单独拆分「无联网」工具列表。  
 - **联网时间策略**：`english-learning.service.ts` 中 `resolveWebSearchTime(topic)` 等逻辑仍在调用 `createLangChainWebSearchTools` 时传入 `recency` / Tavily 日期区间；**仅当模型实际选择 `internet_search`** 时这些参数才会生效。  
-- **关联文档**：历史上有主 Agent 与检索注入链路的说明，可参考 `docs/backend/english-learning-master-agent-web-search-to-llm.md`（若与本文冲突，以本文与当前源码为准）。
+- **关联文档**：历史上有主 Agent 与检索注入链路的说明，可参考 `docs/english/english-learning-master-agent-web-search-to-llm.md`（若与本文冲突，以本文与当前源码为准）。
 
 ## 8. 风险与回归建议
 

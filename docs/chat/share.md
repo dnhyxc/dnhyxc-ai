@@ -682,7 +682,7 @@ return {
 ### 4. 前端
 
 `apps/frontend/src/views/share/index.tsx` 已用 `ChatFileList` 渲染 `message.attachments`；`getFormatMessages` 会透传 `attachments`。  
-附件 `path` 为 COS HTTPS 时由 `resolveAttachmentDisplayUrl` 走 `/ext-cos/`（见 [../backend/cos-object-storage.md](../backend/cos-object-storage.md) §3.8–3.9）。
+附件 `path` 为 COS HTTPS 时由 `resolveAttachmentDisplayUrl` 走 `/ext-cos/`（见 [../cos/cos-object-storage.md](../cos/cos-object-storage.md) §3.8–3.9）。
 
 ### 5. 关键代码（后端）
 

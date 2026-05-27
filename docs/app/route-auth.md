@@ -283,7 +283,7 @@ if (!response.ok) {
 
 相关配置/代码：
 
-- Nginx：`docs/backend/nginx.md` 中的 `location /ext-cos/`。
+- Nginx：`docs/ops/nginx.md` 中的 `location /ext-cos/`。
 - 前端工具函数：`resolveCosUrlForWebDisplay`（`apps/frontend/src/utils/index.ts`）。
 - 使用方：
   - `apps/frontend/src/views/account/index.tsx`（账号设置头像预览）
@@ -292,7 +292,7 @@ if (!response.ok) {
 
 ### 12.2 Nginx `/ext-cos/` 代理配置（摘要）
 
-完整配置见：`docs/backend/nginx.md` 中 `listen 9112 ssl; server_name dnhyxc.cn;` 的 `server` 块。
+完整配置见：`docs/ops/nginx.md` 中 `listen 9112 ssl; server_name dnhyxc.cn;` 的 `server` 块。
 
 - `proxy_set_header Host` 与 `proxy_pass` 的 host **必须与** `VITE_COS_PUBLIC_DOMAIN` 一致（换桶时同步改 Nginx）。
 - 前端把 `https://{bucket}.cos.../{key}` 展示为 `https://{站点}/ext-cos/{key}`。

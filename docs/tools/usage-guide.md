@@ -248,7 +248,7 @@ const parser = new MarkdownParser({
 | 页内锚点 | 外链拦截器跳过 `#`；另用 **冒泡阶段** 在滚动容器内 **`scrollIntoView`**（与 `Monaco/preview` 思路一致） |
 | 代码块工具栏 | `enableChatCodeFenceToolbar` + **`bindMarkdownCodeFenceActions`** + **`downloadMarkdownCodeFenceWith`** 落盘示例 |
 
-桌面端将 `openExternalUrl` 换成 Tauri `plugin-opener` 即可（见 [`frontend/tauri-browser.md`](../frontend/tauri-browser.md)）。本仓库等价实现：`apps/frontend/src/utils/external-link-click.ts`、`open-external.ts`，在 `ChatAssistantMessage`、`Monaco/preview` 已接入。
+桌面端将 `openExternalUrl` 换成 Tauri `plugin-opener` 即可（见 [`frontend/tauri-browser.md`](../app/tauri-browser.md)）。本仓库等价实现：`apps/frontend/src/utils/external-link-click.ts`、`open-external.ts`，在 `ChatAssistantMessage`、`Monaco/preview` 已接入。
 
 #### 建议文件布局
 

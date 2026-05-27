@@ -1,6 +1,6 @@
 # 英语学习后端：拉取包 Session + 明细分行存储改造报告
 
-本文档针对 `apps/backend/src/services/english-learning` 目录下**本轮存储模型改造**作完整说明：改动背景、分步实现（含带中文注释的代码摘录）、影响面、风险与后续优化建议。前端对接见 [../frontend/english-learning-pack-session-items.md](../frontend/english-learning-pack-session-items.md)。
+本文档针对 `apps/backend/src/services/english-learning` 目录下**本轮存储模型改造**作完整说明：改动背景、分步实现（含带中文注释的代码摘录）、影响面、风险与后续优化建议。前端对接见 [../english/english-learning-pack-session-items.md](../english/english-learning-pack-session-items.md)。
 
 **若与仓库最新源码不一致，以源码为准。**
 
@@ -972,8 +972,8 @@ private async loadVocabItemsFromPackSessionPaginated(
 | 说明 | 路径 |
 |------|------|
 | 后端模块总览 | [english-learning-backend-implementation.md](./english-learning-backend-implementation.md) |
-| 前端对接与 UI | [../frontend/english-learning-pack-session-items.md](../frontend/english-learning-pack-session-items.md) |
-| 结果页路由 | [../frontend/english-learning-pack-stream-route.md](../frontend/english-learning-pack-stream-route.md) |
+| 前端对接与 UI | [../english/english-learning-pack-session-items.md](../english/english-learning-pack-session-items.md) |
+| 结果页路由 | [../english/english-learning-pack-stream-route.md](../english/english-learning-pack-stream-route.md) |
 | 迁移脚本 | `apps/backend/src/migrations/1779200000000-english-pack-item-rows.ts` |
 | 服务主文件 | `apps/backend/src/services/english-learning/english-learning.service.ts` |
 | 控制器 | `apps/backend/src/services/english-learning/english-learning.controller.ts` |

@@ -156,4 +156,4 @@ match FileDialog::new().add_filter("Markdown", &["md"]).pick_file() {
 | invoke | `apps/frontend/src/utils/knowledge-save.ts` |
 | Tauri | `apps/frontend/src-tauri/src/command/knowledge.rs` |
 
-英语学习 JSON 导入的同类「严格扩展名 + Tauri 对话框」模式见 [`../frontend/english-learning-json-import.md`](../frontend/english-learning-json-import.md) §7。
+英语学习 JSON 导入的同类「严格扩展名 + Tauri 对话框」模式见 [`../english/english-learning-json-import.md`](../english/english-learning-json-import.md) §7。

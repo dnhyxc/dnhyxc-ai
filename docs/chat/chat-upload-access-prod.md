@@ -1,7 +1,7 @@
 # 对话附件线上访问与路径规范化
 
 > **文档角色（主文档）**：Web 生产环境（如 `9002` 端口）聊天附件预览/下载、SSE 附件路径、Nginx 与 Nest 读盘兜底。  
-> **延伸阅读**：[chat-upload-preview.md](./chat-upload-preview.md)（开发态 Vite 反代与 CORP）；[../backend/upload-storage-paths.md](../backend/upload-storage-paths.md)（落盘目录）；[../backend/nginx.md](../backend/nginx.md)（9002/9112 配置范例）。
+> **延伸阅读**：[chat-upload-preview.md](./chat-upload-preview.md)（开发态 Vite 反代与 CORP）；[../ops/upload-storage-paths.md](../ops/upload-storage-paths.md)（落盘目录）；[../ops/nginx.md](../ops/nginx.md)（9002/9112 配置范例）。
 
 ---
 
@@ -38,7 +38,7 @@
 | `apps/backend/src/middleware/serve-upload-static.middleware.ts` | **新增** `GET /images`、`/files` 中间件 |
 | `apps/backend/src/main.ts` | 注册中间件、`uploadsRoot` 日志 |
 | `apps/backend/src/services/upload/upload.module.ts` | 注册 `UploadPublicController` |
-| `docs/backend/nginx.md` | 9002 `alias` / 9112 反代范例 |
+| `docs/ops/nginx.md` | 9002 `alias` / 9112 反代范例 |
 
 ---
 
@@ -222,8 +222,8 @@ export const resolveAttachmentBuffer = async (pathOrUrl: string): Promise<Buffer
 | 说明 | 路径 |
 |------|------|
 | 开发态预览与 CORP | `docs/chat/chat-upload-preview.md` |
-| uploads 落盘 | `docs/backend/upload-storage-paths.md` |
-| Nginx 范例 | `docs/backend/nginx.md` |
+| uploads 落盘 | `docs/ops/upload-storage-paths.md` |
+| Nginx 范例 | `docs/ops/nginx.md` |
 | 分享页附件 UI | `apps/frontend/src/views/share/index.tsx`（`ChatFileList`，依赖同一 `resolveUploadedFileUrl`） |
 
 若与仓库最新源码不一致，以源码为准。

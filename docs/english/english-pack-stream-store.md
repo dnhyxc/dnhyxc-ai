@@ -207,7 +207,7 @@ return (fromUser?: boolean) => {
 ## 5. 兼容性与影响
 
 - **破坏性**：对外路由无变化；若其他模块曾直接依赖「卸载即停流」的隐含假设，现在流可能仍在后台直到完成或用户停止（与产品设计一致）。
-- **主题与词数**：已迁入 `EnglishPackStore`（`vocabTopic` / `vocabCountInput` 等），与流式字段同属一单例；离开路由再进入时表单可恢复。详见 `docs/frontend/english-learning-sidebar-persist.md`。
+- **主题与词数**：已迁入 `EnglishPackStore`（`vocabTopic` / `vocabCountInput` 等），与流式字段同属一单例；离开路由再进入时表单可恢复。详见 `docs/english/english-learning-sidebar-persist.md`。
 
 ## 6. 建议回归用例
 
@@ -224,6 +224,6 @@ return (fromUser?: boolean) => {
 | 单词包视图 | `apps/frontend/src/views/englishLearning/VocabularySection.tsx` |
 | 经典句视图 | `apps/frontend/src/views/englishLearning/ClassicQuotesSection.tsx` |
 | SSE 客户端 | `apps/frontend/src/utils/englishLearningPackSse.ts` |
-| 左栏表单与意图镜像（专题文档） | `docs/frontend/english-learning-sidebar-persist.md` |
+| 左栏表单与意图镜像（专题文档） | `docs/english/english-learning-sidebar-persist.md` |
 
 若与仓库最新源码不一致，以源码为准。

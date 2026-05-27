@@ -41,7 +41,7 @@ COS 默认桶域名为 HTTPS；保持 `public-read` 或签名策略与 allowlist
 
 1. **开发 / Tauri dev**：`resolveCosUrlForWebDisplay` + Vite `server.proxy['/ext-cos']`（不改持久化 URL）。
 2. **Tauri 生产**：COS HTTPS 直链 + `Info.plist` / `capabilities` allowlist；`NSAllowsLocalNetworking` 用于 `http://localhost` API。
-3. **Web 生产**：Nginx `location /ext-cos/`（[backend/nginx.md](../backend/nginx.md)）。
+3. **Web 生产**：Nginx `location /ext-cos/`（[ops/nginx.md](../ops/nginx.md)）。
 
 完整配置片段、capabilities 白名单、换桶 checklist → [cos-dev-http-proxy.md](./cos-dev-http-proxy.md) §5–§8。
 
@@ -73,5 +73,5 @@ COS 默认桶域名为 HTTPS；保持 `public-read` 或签名策略与 allowlist
 |------|------|
 | [cos-dev-http-proxy.md](./cos-dev-http-proxy.md) | 实现、代码、环境变量、回归 |
 | [route-auth.md](./route-auth.md) §12 | mixed content 与调用方 |
-| [../backend/nginx.md](../backend/nginx.md) | 生产 `/ext-cos/` |
+| [../ops/nginx.md](../ops/nginx.md) | 生产 `/ext-cos/` |
 | [../README.md](../README.md) | 文档总索引 |

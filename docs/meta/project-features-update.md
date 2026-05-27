@@ -24,7 +24,7 @@
 - **HTTP 401 统一处理**：清会话、按需整页回登录，与路由守卫互补。
 - **公开路径白名单**：首页、登录、关于、分享页、设置等可未登录访问。
 
-**文档**：[`frontend/route-auth.md`](../frontend/route-auth.md)
+**文档**：[`app/route-auth.md`](../app/route-auth.md)
 
 ---
 
@@ -34,7 +34,7 @@
 - **网络 / 存储 / 剪贴板 / 下载 / 更新器**等在非 Tauri 环境降级为 Web API 或提示。
 - **避免入口链顶层 await 调 Tauri**，防止浏览器白屏。
 
-**文档**：[`frontend/tauri-browser.md`](../frontend/tauri-browser.md)
+**文档**：[`app/tauri-browser.md`](../app/tauri-browser.md)
 
 ---
 
@@ -146,8 +146,8 @@
 | [meta/update.md](./update.md) | ChatBot 相关近期提交与代码级改动摘录（更新日志向；本文件位于 `docs/meta/`，因此链接目标仍是同目录 `./update.md`） |
 | [tools/index.md](../tools/index.md) | `@dnhyxc-ai/markdown-kit` 包能力、构建、样式与 `MarkdownParser` |
 | [tools/usage-guide.md](../tools/usage-guide.md) | `@dnhyxc-ai/markdown-kit` 使用者上手指南与完整示例 |
-| [frontend/route-auth.md](../frontend/route-auth.md) | 前端路由守卫与 401 鉴权收口 |
-| [frontend/tauri-browser.md](../frontend/tauri-browser.md) | Tauri / 浏览器双端运行改造 |
+| [app/route-auth.md](../app/route-auth.md) | 前端路由守卫与 401 鉴权收口 |
+| [app/tauri-browser.md](../app/tauri-browser.md) | Tauri / 浏览器双端运行改造 |
 | [knowledge/auto-save.md](../knowledge/auto-save.md) | 知识库自动保存（防抖）与保存语义 |
 | [knowledge/shortcuts.md](../knowledge/shortcuts.md) | 知识库页面内快捷键与设置联动 |
 | [knowledge/unauthenticated-local-only.md](../knowledge/unauthenticated-local-only.md) | 未登录仅本地、隐藏回收站等 |

@@ -54,7 +54,7 @@
 
 **未改动**：收藏增删 API、收藏列表页、经典句收藏状态查询（经典句仍走 `fetchEnglishClassicQuoteFavoriteStatus`，逻辑独立）。
 
-**相关旧文档**：`docs/frontend/english-learning-pack-favorites.md` 中 §4.6 仍描述「全量 `useEffect` + 单次 `fetchEnglishVocabularyFavoriteStatus`」，以本文为准。
+**相关旧文档**：`docs/english/english-learning-pack-favorites.md` 中 §4.6 仍描述「全量 `useEffect` + 单次 `fetchEnglishVocabularyFavoriteStatus`」，以本文为准。
 
 ---
 
@@ -514,8 +514,8 @@ sequenceDiagram
 | 资源库右栏 | `apps/frontend/src/views/englishLearning/library/VocabularyLibraryWordsPanel.tsx` |
 | 单词包区 | `apps/frontend/src/views/englishLearning/vocab/VocabularySection.tsx` |
 | 后端 DTO 上限 | `apps/backend/src/services/english-learning/dto/vocabulary-favorite.dto.ts` |
-| 收藏功能总览（旧） | `docs/frontend/english-learning-pack-favorites.md` |
-| 资源库导入 | `docs/frontend/english-learning-library-import.md` |
+| 收藏功能总览（旧） | `docs/english/english-learning-pack-favorites.md` |
+| 资源库导入 | `docs/english/english-learning-library-import.md` |
 
 ---
 

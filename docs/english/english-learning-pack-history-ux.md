@@ -16,7 +16,7 @@
 | 拉取中历史行无进行中标识 | 历史抽屉对进行中 `streamId` 显示 **Spinner**，隐藏删除按钮 |
 | Agent 保存到知识库后仍停留原页 | 追加 markdown 后 `navigate('/knowledge')` |
 
-数据模型（Session + Item + Batch）见 [../backend/english-learning-pack-session-storage.md](../backend/english-learning-pack-session-storage.md)；结果页分页见 [english-learning-pack-session-items.md](./english-learning-pack-session-items.md)。
+数据模型（Session + Item + Batch）见 [../english/english-learning-pack-session-storage.md](../english/english-learning-pack-session-storage.md)；结果页分页见 [english-learning-pack-session-items.md](./english-learning-pack-session-items.md)。
 
 ---
 
@@ -584,7 +584,7 @@ sequenceDiagram
 
 | 说明 | 路径 |
 |------|------|
-| Pack 存储模型 | [../backend/english-learning-pack-session-storage.md](../backend/english-learning-pack-session-storage.md) |
+| Pack 存储模型 | [../english/english-learning-pack-session-storage.md](../english/english-learning-pack-session-storage.md) |
 | 结果页分页前端 | [english-learning-pack-session-items.md](./english-learning-pack-session-items.md) |
 | 结果页路由 | [english-learning-pack-stream-route.md](./english-learning-pack-stream-route.md) |
 | 服务主文件 | `apps/backend/src/services/english-learning/english-learning.service.ts` |
