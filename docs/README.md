@@ -2,7 +2,7 @@
 
 本目录存放**实现思路、问题修复记录、部署说明**等专题文档，面向维护者与贡献者。面向最终用户的产品说明见 [`project-guide.md`](./project-guide.md)。
 
-**约定**：文档描述以仓库**当前源码**为准；若与代码冲突，以代码为准。换 COS 桶或 CDN 域名时，需同步前后端 `.env`、`Info.plist`、`capabilities` 与 Nginx（见 [COS 对象存储](./backend/cos-object-storage.md) §5、[七牛/COS 展示代理](./frontend/qiniu-dev-http-proxy.md)）。
+**约定**：文档描述以仓库**当前源码**为准；若与代码冲突，以代码为准。换 COS 桶或 CDN 域名时，需同步前后端 `.env`、`Info.plist`、`capabilities` 与 Nginx（见 [COS 对象存储](./backend/cos-object-storage.md) §5、[COS 同源展示代理](./frontend/cos-dev-http-proxy.md)）。
 
 ---
 
@@ -10,7 +10,7 @@
 
 | 目录                         | 说明                                            | 入口                                                                   |
 | ---------------------------- | ----------------------------------------------- | ---------------------------------------------------------------------- |
-| [`frontend/`](./frontend/)   | 前端页面、路由鉴权、英语学习、Tauri、七牛展示等 | [frontend/README.md](./frontend/README.md)                             |
+| [`frontend/`](./frontend/)   | 前端页面、路由鉴权、英语学习、Tauri、COS 展示代理等 | [frontend/README.md](./frontend/README.md)                             |
 | [`knowledge/`](./knowledge/) | 知识库、RAG、右侧 Assistant、本地/云端草稿      | [knowledge/README.md](./knowledge/README.md)                           |
 | [`backend/`](./backend/)     | NestJS、部署、LLM 接入、英语学习后端            | [backend/README.md](./backend/README.md)                               |
 | [`monaco/`](./monaco/)       | Monaco / Markdown 编辑器行为与修复              | 按文件名检索                                                           |
@@ -28,7 +28,7 @@
 | 现象                                     | 优先阅读                                                                                                           |
 | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
 | 头像/COS 上传失败 AccessDenied           | [backend/cos-object-storage.md](./backend/cos-object-storage.md) §3.4、§6                                        |
-| COS/七牛 图能传不能显（403 / ATS）       | [backend/cos-object-storage.md](./backend/cos-object-storage.md) §3.3 + [frontend/qiniu-dev-http-proxy.md](./frontend/qiniu-dev-http-proxy.md) |
+| COS 图能传不能显（403 / ATS）            | [backend/cos-object-storage.md](./backend/cos-object-storage.md) §3.3 + [frontend/cos-dev-http-proxy.md](./frontend/cos-dev-http-proxy.md) |
 | COS 图能预览但下载失败                 | [backend/cos-object-storage.md](./backend/cos-object-storage.md) §3.7、§6 |
 | 分享页无用户消息附件卡片               | [chat/share.md](./chat/share.md) §五 + [backend/cos-object-storage.md](./backend/cos-object-storage.md) §3.9 |
 | Web HTTPS 头像 mixed content             | 同上 + [frontend/route-auth.md](./frontend/route-auth.md) §12 + [backend/nginx.md](./backend/nginx.md) `/ext-cos/` |

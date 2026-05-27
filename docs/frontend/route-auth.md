@@ -266,26 +266,25 @@ if (!response.ok) {
 
 ---
 
-## 12. 头像图片 HTTPS/HTTP 混合内容与七牛域名处理
+## 12. 头像与 COS 对象：HTTPS 混合内容与 `/ext-cos/` 代理
 
 ### 12.1 问题背景
 
-- Web 正式站采用 **HTTPS** 部署，但七牛（Qiniu）返回的头像/图片地址为 **HTTP** 域名（`VITE_QINIU_DOMAIN`）。
+- Web 正式站采用 **HTTPS** 部署；头像、附件等持久化为 **COS HTTPS URL**（`VITE_COS_PUBLIC_DOMAIN`）。
 - 浏览器在 HTTPS 页面中加载 HTTP 图片会触发 **mixed content（混合内容）** 策略，可能：
-  - 自动把 `http://` 升级为 `https://`，导致七牛源（仅开了 HTTP）请求失败；
-  - 直接拦截请求，图片不显示。
-- Tauri 客户端运行在桌面 WebView 中，安全策略与浏览器不同，**通常不会强制升级**，所以同一地址在 Tauri 下正常，在 Web 下失败。
+  - 自动把 `http://` 升级为 `https://`，或拦截跨源 COS 直链，导致图片不显示。
+- Tauri 客户端运行在桌面 WebView 中，安全策略与浏览器不同，开发态宜走同源代理。
 
 为兼容两端，前端与 Nginx 共同实现：
 
-1. **Nginx 侧**：提供 `https://dnhyxc.cn/ext-cos/...` 这样的 HTTPS 代理入口，由 Nginx 去回源七牛的 HTTP 域名。
-2. **前端侧**：Web 生产环境与 **本地开发**（`import.meta.env.DEV`，含 Tauri dev）把以 `VITE_QINIU_DOMAIN` 开头的 URL 改写为 `/ext-cos/...`；**Tauri 生产包**仍使用原始 HTTP URL（依赖 Info.plist）。详见 [qiniu-dev-http-proxy.md](./qiniu-dev-http-proxy.md)。
-3. **数据层**：用户信息中保存的 `avatar` 字段仍是 **原始七牛地址**，改写仅发生在「展示层」，避免影响后端与其他逻辑。
+1. **Nginx 侧**：提供 `https://{站点}/ext-cos/...` 的 HTTPS 代理入口，由 Nginx 回源 COS 桶域名。
+2. **前端侧**：Web 生产与 **本地开发**（`import.meta.env.DEV`，含 Tauri dev）将以 `VITE_COS_PUBLIC_DOMAIN` 匹配的 URL 改写为 `/ext-cos/...`；**Tauri 生产包**使用原始 COS HTTPS URL（allowlist）。详见 [cos-dev-http-proxy.md](./cos-dev-http-proxy.md)。
+3. **数据层**：`avatar`、附件等仍存 **完整 COS HTTPS URL**，改写仅发生在「展示层」。
 
 相关配置/代码：
 
 - Nginx：`docs/backend/nginx.md` 中的 `location /ext-cos/`。
-- 前端工具函数：`resolveQiniuUrlForWebDisplay`（`apps/frontend/src/utils/index.ts`）。
+- 前端工具函数：`resolveCosUrlForWebDisplay`（`apps/frontend/src/utils/index.ts`）。
 - 使用方：
   - `apps/frontend/src/views/account/index.tsx`（账号设置头像预览）
   - `apps/frontend/src/views/profile/index.tsx`（Profile 演示页面上传预览）
@@ -295,41 +294,41 @@ if (!response.ok) {
 
 完整配置见：`docs/backend/nginx.md` 中 `listen 9112 ssl; server_name dnhyxc.cn;` 的 `server` 块。
 
-- `proxy_set_header Host` 与 `proxy_pass` 的 host **必须与** `VITE_QINIU_DOMAIN` 一致（换桶时同步改 Nginx，勿沿用旧桶域名）。
-- 前端把 `http://{CDN}/{key}` 展示为 `https://dnhyxc.cn/ext-cos/{key}`。
+- `proxy_set_header Host` 与 `proxy_pass` 的 host **必须与** `VITE_COS_PUBLIC_DOMAIN` 一致（换桶时同步改 Nginx）。
+- 前端把 `https://{bucket}.cos.../{key}` 展示为 `https://{站点}/ext-cos/{key}`。
 
-实现细节、Vite 开发代理与 Tauri ATS → [qiniu-dev-http-proxy.md](./qiniu-dev-http-proxy.md)。
+实现细节、Vite 开发代理与 Tauri ATS → [cos-dev-http-proxy.md](./cos-dev-http-proxy.md)。
 
-### 12.3 前端工具函数：`resolveQiniuUrlForWebDisplay`
+### 12.3 前端工具函数：`resolveCosUrlForWebDisplay`
 
-位置：`apps/frontend/src/utils/index.ts`（**展示用，不落库**）。
+位置：`apps/frontend/src/utils/index.ts`（**展示用，不落库**）。`resolveQiniuUrlForWebDisplay` 为兼容别名。
 
 | 环境 | 行为 |
 |------|------|
-| `import.meta.env.DEV`（含 Tauri dev） | 改写为 `/ext-cos/{key}`，由 Vite 代理回源七牛 HTTP |
-| Tauri **生产** | 原始 HTTP URL（`Info.plist` ATS 例外） |
+| `import.meta.env.DEV`（含 Tauri dev） | 改写为 `/ext-cos/{key}`，由 Vite 代理回源 COS |
+| Tauri **生产** | 原始 COS HTTPS URL（allowlist） |
 | Web **生产**（HTTPS） | 改写为 `/ext-cos/{key}`，由 Nginx 回源 |
 
-源码与注释见 [qiniu-dev-http-proxy.md](./qiniu-dev-http-proxy.md) §5.1。
+源码与注释见 [cos-dev-http-proxy.md](./cos-dev-http-proxy.md) §5.1。
 
 **环境变量：**
 
-- `VITE_QINIU_DOMAIN`：七牛 HTTP 源，如 `http://tfhx5uh5p.hd-bkt.clouddn.com/`
+- `VITE_COS_PUBLIC_DOMAIN`：COS 桶 HTTPS 域名
 - `VITE_COS_PROXY_PREFIX`：默认 `/ext-cos/`
 
 ### 12.4 在账号设置页中使用（`account/index.tsx`）
 
-头像上传完成后，真正保存到用户信息中的 `avatar` 字段依然是 **七牛原始 URL**。只有在展示时，才通过工具函数做改写。
+头像上传完成后，真正保存到用户信息中的 `avatar` 字段依然是 **COS 完整 URL**。只有在展示时，才通过工具函数做改写。
 
 ```tsx
 // apps/frontend/src/views/account/index.tsx
 
-import { resolveQiniuUrlForWebDisplay } from "@/utils";
+import { resolveCosUrlForWebDisplay } from "@/utils";
 
 // ...
 
 const avatarFileUrl = useMemo(
-	() => resolveQiniuUrlForWebDisplay(accountInfo.avatar),
+	() => resolveCosUrlForWebDisplay(accountInfo.avatar),
 	[accountInfo.avatar],
 );
 
@@ -347,7 +346,7 @@ const avatarFileUrl = useMemo(
 
 关键点：
 
-- `accountInfo.avatar` 始终保存七牛原始地址，用于提交给后端、与 `storageInfo.profile.avatar` 比较等逻辑。
+- `accountInfo.avatar` 始终保存 COS 完整地址，用于提交给后端、与 `storageInfo.profile.avatar` 比较等逻辑。
 - `Upload` 组件的 `fileUrl` 使用的是 **展示层 URL**（已按运行环境与代理规则改写）。
 
 ### 12.5 在侧边栏与 Profile 页中使用
@@ -357,11 +356,11 @@ const avatarFileUrl = useMemo(
 ```tsx
 // apps/frontend/src/components/design/Sidebar/index.tsx
 
-import { removeStorage, resolveQiniuUrlForWebDisplay } from "@/utils";
+import { removeStorage, resolveCosUrlForWebDisplay } from "@/utils";
 
 // 顶部头像（侧边栏按钮）
 <Image
-	src={resolveQiniuUrlForWebDisplay(storageInfo?.profile?.avatar)}
+	src={resolveCosUrlForWebDisplay(storageInfo?.profile?.avatar)}
 	fallbackSrc={ICON}
 	showOnError
 	className={
@@ -373,7 +372,7 @@ import { removeStorage, resolveQiniuUrlForWebDisplay } from "@/utils";
 
 // 下拉菜单中的头像
 <img
-	src={resolveQiniuUrlForWebDisplay(storageInfo?.profile?.avatar) || ICON}
+	src={resolveCosUrlForWebDisplay(storageInfo?.profile?.avatar) || ICON}
 	alt=""
 	className={
 		storageInfo?.profile?.avatar
@@ -387,23 +386,10 @@ import { removeStorage, resolveQiniuUrlForWebDisplay } from "@/utils";
 // apps/frontend/src/views/profile/index.tsx（片段）
 
 import { isTauriRuntime } from "@/utils/runtime";
-import { resolveQiniuUrlForWebDisplay } from "@/utils";
+import { resolveCosUrlForWebDisplay } from "@/utils";
 
-// 上传完成时，仍保存七牛原始 URL
-const observer = useMemo(() => {
-	return {
-		next(res: { total: UploadInfo }) {
-			setUploadInfos((prev) => [res.total, ...prev]);
-		},
-		error() {
-			// ...
-		},
-		complete(res: { key: string; hash: string }) {
-			const url = import.meta.env.VITE_QINIU_DOMAIN + res.key;
-			setDomainUrls((prev) => [url, ...prev]);
-		},
-	};
-}, []);
+// 上传完成时，仍保存 COS 完整 URL（uploadCos 返回的 url）
+// ...
 
 // 展示时再做映射
 {
@@ -411,7 +397,7 @@ const observer = useMemo(() => {
 		? domainUrls.map((i, key) => {
 				return (
 					<div key={key}>
-						<img src={resolveQiniuUrlForWebDisplay(i)} alt="图片" />
+						<img src={resolveCosUrlForWebDisplay(i)} alt="图片" />
 					</div>
 				);
 			})
@@ -422,6 +408,6 @@ const observer = useMemo(() => {
 ### 12.6 设计总结
 
 - **安全性**：Web 生产 HTTPS 页面经 Nginx 同源代理加载图片，避免 mixed content。
-- **开发体验**：DEV / Tauri dev 同样走 `/ext-cos/`，避免 WKWebView ATS 拦截七牛 HTTP。
-- **持久化**：`avatar` 等字段仍为七牛原始 HTTP URL；仅展示层改写。
-- **可维护性**：域名与环境变量集中在 `resolveQiniuUrlForWebDisplay`；换桶见 [qiniu-dev-http-proxy.md](./qiniu-dev-http-proxy.md) §8。
+- **开发体验**：DEV / Tauri dev 同样走 `/ext-cos/`，避免跨源与 mixed content。
+- **持久化**：`avatar` 等字段仍为 COS 完整 HTTPS URL；仅展示层改写。
+- **可维护性**：域名与环境变量集中在 `resolveCosUrlForWebDisplay`；换桶见 [cos-dev-http-proxy.md](./cos-dev-http-proxy.md) §8。

@@ -4,13 +4,13 @@
 
 ---
 
-## COS / 七牛 CDN / 图片展示 / ATS（必读簇）
+## COS 展示代理 / ATS（必读簇）
 
 | 文档 | 角色 |
 |------|------|
-| **[../backend/cos-object-storage.md](../backend/cos-object-storage.md)** | **COS 主文档**：`uploadCos`、环境变量、ACL、与本地附件边界 |
-| **[qiniu-dev-http-proxy.md](./qiniu-dev-http-proxy.md)** | **展示代理**：开发态 `/ext-cos/`、`resolveCosUrlForWebDisplay`（含七牛历史说明） |
-| [tauri-macos-ats-http.md](./tauri-macos-ats-http.md) | macOS ATS 概念与生产包策略；实现细节以七牛主文档为准 |
+| **[../backend/cos-object-storage.md](../backend/cos-object-storage.md)** | **COS 主文档**：`uploadCos`、环境变量、ACL、聊天附件 |
+| **[cos-dev-http-proxy.md](./cos-dev-http-proxy.md)** | **展示代理主文档**：`/ext-cos/`、`resolveCosUrlForWebDisplay`、Vite/Nginx |
+| [tauri-macos-ats-http.md](./tauri-macos-ats-http.md) | macOS ATS 概念；实现细节以 cos-dev-http-proxy 为准 |
 | [route-auth.md](./route-auth.md) §12 | 路由文档中的 mixed content 摘要 + 调用方列表 |
 | [../backend/nginx.md](../backend/nginx.md) | 生产 `location /ext-cos/` |
 
@@ -24,7 +24,7 @@
 |------|
 | [tauri-browser.md](./tauri-browser.md) |
 | [tauri-macos-ats-http.md](./tauri-macos-ats-http.md) |
-| [qiniu-dev-http-proxy.md](./qiniu-dev-http-proxy.md) |
+| [cos-dev-http-proxy.md](./cos-dev-http-proxy.md) |
 
 ---
 

@@ -14,7 +14,7 @@
 
 ## 2. 去重与主从分工
 
-- **同一主题只保留一份「实现细节 + 代码摘录」**：例如七牛展示链以 `frontend/qiniu-dev-http-proxy.md` 为主，`route-auth.md` §12、`tauri-macos-ats-http.md` 只保留摘要 + 链接。
+- **同一主题只保留一份「实现细节 + 代码摘录」**：例如 COS 展示代理以 `frontend/cos-dev-http-proxy.md` 为主，`route-auth.md` §12、`tauri-macos-ats-http.md` 只保留摘要 + 链接。
 - **用户向 vs 开发者向**：`project-guide.md` / `project-update-info.md` 不写路径；实现路径写在专题文与 `docs/README.md`。
 - **文件名**：简短 kebab-case，与 SKILL §4 一致；勿用 `notes.md`、`update.md`。
 

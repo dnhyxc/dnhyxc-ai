@@ -1,21 +1,21 @@
 # Tauri macOS：ATS（应用传输安全）与 HTTP 资源
 
-本文说明 **macOS 生产包**中 WKWebView 加载 `http://` 外链被 **ATS（App Transport Security，应用传输安全）** 拦截的原因与策略。**七牛 CDN 展示链、开发态 `/ext-cos/` 代理、代码摘录与回归清单**以专题文为准，避免两处重复维护：
+本文说明 **macOS 生产包**中 WKWebView 加载 `http://` 外链被 **ATS（App Transport Security，应用传输安全）** 拦截的原因与策略。**COS 同源展示链、开发态 `/ext-cos/` 代理、代码摘录与回归清单**以专题文为准，避免两处重复维护：
 
-→ **[qiniu-dev-http-proxy.md](./qiniu-dev-http-proxy.md)**（主文档）
+→ **[cos-dev-http-proxy.md](./cos-dev-http-proxy.md)**（主文档）
 
 ---
 
 ## 1. 现象与报错
 
-生产包或 Tauri dev 加载 `http://` 资源（如七牛 `*.clouddn.com` 图片）时，控制台常见：
+生产包或 Tauri dev 加载不符合 ATS 策略的外链（历史 HTTP CDN 或需代理的 COS 展示）时，控制台常见：
 
 - `App Transport Security policy requires the use of a secure connection`
 - `Failed to load resource: The network connection was lost.`
 
-示例（host 以 `.env` 中 `VITE_QINIU_DOMAIN` 为准，当前桶域多为 `tfhx5uh5p.hd-bkt.clouddn.com`）：
+示例（host 以 `.env` 中 `VITE_COS_PUBLIC_DOMAIN` 为准）：
 
-- `http://tfhx5uh5p.hd-bkt.clouddn.com/128x128@2x.png`
+- `https://{bucket}.cos.{region}.myqcloud.com/assets/avatar.png`
 
 ---
 
@@ -25,8 +25,8 @@ macOS ATS 默认要求 **HTTPS（TLS）**。Tauri macOS 前端运行在 **WKWebV
 
 | 场景 | 典型处理 |
 |------|----------|
-| **开发**（`pnpm dev` / Tauri dev） | 展示 URL 改写为同源 `/ext-cos/`，由 Vite 代理回源 HTTP（见七牛主文档） |
-| **Tauri 生产** | 无 Vite：展示用原始 HTTP URL + `Info.plist` 对 CDN 域名做 **NSExceptionDomains** |
+| **开发**（`pnpm dev` / Tauri dev） | 展示 URL 改写为同源 `/ext-cos/`，由 Vite 代理回源 COS（见 COS 展示主文档） |
+| **Tauri 生产** | 无 Vite：展示用原始 COS HTTPS URL + `Info.plist` / allowlist |
 | **Web 生产 HTTPS** | `/ext-cos/` + Nginx 回源（见 [route-auth.md](./route-auth.md) §12） |
 
 ---
@@ -35,15 +35,15 @@ macOS ATS 默认要求 **HTTPS（TLS）**。Tauri macOS 前端运行在 **WKWebV
 
 ### 3.1 长期：资源域名 HTTPS
 
-七牛控制台绑定 HTTPS 域名后，可逐步取消 HTTP 例外，安全性最好。
+COS 默认桶域名为 HTTPS；保持 `public-read` 或签名策略与 allowlist 同步即可。
 
 ### 3.2 当前：按环境分层（本项目）
 
-1. **开发 / Tauri dev**：`resolveQiniuUrlForWebDisplay` + Vite `server.proxy['/ext-cos']`（不改持久化 URL）。
-2. **Tauri 生产**：`apps/frontend/src-tauri/Info.plist` 中对 **当前 CDN host** 配置 `NSExceptionAllowsInsecureHTTPLoads`；并配置 `NSAllowsLocalNetworking` 以便 `http://localhost` API。
+1. **开发 / Tauri dev**：`resolveCosUrlForWebDisplay` + Vite `server.proxy['/ext-cos']`（不改持久化 URL）。
+2. **Tauri 生产**：COS HTTPS 直链 + `Info.plist` / `capabilities` allowlist；`NSAllowsLocalNetworking` 用于 `http://localhost` API。
 3. **Web 生产**：Nginx `location /ext-cos/`（[backend/nginx.md](../backend/nginx.md)）。
 
-完整配置片段、capabilities 白名单、换桶 checklist → [qiniu-dev-http-proxy.md](./qiniu-dev-http-proxy.md) §5–§8。
+完整配置片段、capabilities 白名单、换桶 checklist → [cos-dev-http-proxy.md](./cos-dev-http-proxy.md) §5–§8。
 
 ### 3.3 不推荐
 
@@ -55,7 +55,7 @@ macOS ATS 默认要求 **HTTPS（TLS）**。Tauri macOS 前端运行在 **WKWebV
 
 - 文件：`apps/frontend/src-tauri/Info.plist`
 - Tauri v2 会合并同目录 `Info.plist` 进 macOS 包。
-- **域名键只写 host**（无 `http://`、无端口）；换桶时与 `VITE_QINIU_DOMAIN`、`capabilities/default.json` 的 `http.allowlist` **同步修改**。
+- **域名键只写 host**（无 `http://`、无端口）；换桶时与 `VITE_COS_PUBLIC_DOMAIN`、`capabilities/default.json` 的 `http.allowlist` **同步修改**。
 
 ---
 
@@ -71,7 +71,7 @@ macOS ATS 默认要求 **HTTPS（TLS）**。Tauri macOS 前端运行在 **WKWebV
 
 | 文档 | 内容 |
 |------|------|
-| [qiniu-dev-http-proxy.md](./qiniu-dev-http-proxy.md) | 实现、代码、环境变量、回归 |
+| [cos-dev-http-proxy.md](./cos-dev-http-proxy.md) | 实现、代码、环境变量、回归 |
 | [route-auth.md](./route-auth.md) §12 | mixed content 与调用方 |
 | [../backend/nginx.md](../backend/nginx.md) | 生产 `/ext-cos/` |
 | [../README.md](../README.md) | 文档总索引 |

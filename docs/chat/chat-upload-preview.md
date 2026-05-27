@@ -2,7 +2,7 @@
 
 > **文档角色（开发态主文档）**：Vite 反代、CORP、开发环境 URL 解析。  
 > **生产 Web / Nginx 400、SSE 路径、/api/upload/serve**：详见 **[chat-upload-access-prod.md](./chat-upload-access-prod.md)**（主文档）。  
-> **延伸阅读**：[chatbot.md](./chatbot.md) §3.3 附件与 OCR；[../backend/upload-storage-paths.md](../backend/upload-storage-paths.md)；[../backend/nginx.md](../backend/nginx.md)；[../frontend/qiniu-dev-http-proxy.md](../frontend/qiniu-dev-http-proxy.md)（七牛，与 uploads 无关）。
+> **延伸阅读**：[chatbot.md](./chatbot.md) §3.3 附件与 OCR；[../backend/upload-storage-paths.md](../backend/upload-storage-paths.md)；[../backend/nginx.md](../backend/nginx.md)；[../frontend/cos-dev-http-proxy.md](../frontend/cos-dev-http-proxy.md)（COS 展示，与 uploads 无关）。
 
 ---
 

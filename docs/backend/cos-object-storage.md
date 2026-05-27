@@ -3,7 +3,7 @@
 > **文档角色（主文档）**：七牛直传迁移为腾讯云 COS；**头像、下载页、智能对话聊天附件**均走后端 `putObject`；文档页等仍可用本地上传。  
 > **延伸阅读**  
 > - 本地上传目录：[upload-storage-paths.md](./upload-storage-paths.md)  
-> - 开发态同源代理 `/ext-cos/`：[../frontend/qiniu-dev-http-proxy.md](../frontend/qiniu-dev-http-proxy.md)  
+> - 开发态同源代理 `/ext-cos/`：[../frontend/cos-dev-http-proxy.md](../frontend/cos-dev-http-proxy.md)  
 > - 生产 Nginx `/ext-cos/`：[nginx.md](./nginx.md)  
 > - 历史本地上传附件排查：[../chat/chat-upload-preview.md](../chat/chat-upload-preview.md)  
 > - 分享页附件透出：[../chat/share.md](./share.md) §五
@@ -78,10 +78,10 @@
 - 上传失败 `AccessDenied`：`headBucket` 可能成功但 `putObject` 失败，多为子账号缺少 `cos:PutObject`。
 - `formatCosUploadError` 会在接口层返回可操作的中文提示。
 
-### 3.5 与七牛展示链的衔接
+### 3.5 展示链与环境变量
 
-- `/ext-cos/` 代理逻辑保留，仅将 `VITE_QINIU_DOMAIN` 换为 `VITE_COS_PUBLIC_DOMAIN`（仍兼容旧变量名读取）。
-- 库内旧七牛 HTTP 头像 URL 在配置旧域名时仍可被 `resolveCosUrlForWebDisplay` 识别。
+- `/ext-cos/` 同源代理以 `VITE_COS_PUBLIC_DOMAIN` 为回源；迁移期仍可读 `VITE_QINIU_DOMAIN`。
+- 库内旧域名 URL 在配置匹配时仍可被 `getCosPublicDomainPrefix` 识别并改写。
 
 ### 3.6 同源代理路径命名（`/ext-cos`）
 
@@ -452,4 +452,4 @@ VITE_COS_PROXY_PREFIX=/ext-cos/
 
 - [upload-storage-paths.md](./upload-storage-paths.md) — 非 COS 的本地上传
 - [../chat/share.md](../chat/share.md) — 分享顺序与附件 §五
-- [../frontend/qiniu-dev-http-proxy.md](../frontend/qiniu-dev-http-proxy.md) — `/ext-cos/` 与 mixed content（历史七牛语境，机制仍适用 COS）
+- [../frontend/cos-dev-http-proxy.md](../frontend/cos-dev-http-proxy.md) — `/ext-cos/` 与 mixed content
