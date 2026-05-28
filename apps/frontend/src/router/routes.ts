@@ -15,14 +15,17 @@ import DesktopDownloadPage from '@/views/desktopDownload';
 import Document from '@/views/document';
 import Download from '@/views/download';
 import EnglishLearning from '@/views/englishLearning';
-import EnglishLearningFavoritesPage from '@/views/englishLearning/favorites/EnglishLearningFavoritesPage';
-import EnglishLearningImportPage from '@/views/englishLearning/import/EnglishLearningImportPage';
+import EnglishLearningFavoritesPage from '@/views/englishLearning/favorites';
+import EnglishLearningImportPage from '@/views/englishLearning/import';
 import EnglishLearningLayout from '@/views/englishLearning/Layout';
-import EnglishLearningLibraryPage from '@/views/englishLearning/library/EnglishLearningLibraryPage';
-import EnglishLearningPackStreamPage from '@/views/englishLearning/pack/EnglishLearningPackStreamPage';
+import EnglishLearningLibraryPage from '@/views/englishLearning/library';
+import EnglishLearningMistakesPage from '@/views/englishLearning/mistakes';
+import EnglishLearningPackStreamPage from '@/views/englishLearning/pack';
 import EnglishLearningPracticePage from '@/views/englishLearning/practice';
-import EnglishGrammarReferencePage from '@/views/englishLearning/reference/EnglishGrammarReferencePage';
-import EnglishMorphologyReferencePage from '@/views/englishLearning/reference/EnglishMorphologyReferencePage';
+import {
+	EnglishGrammarReferencePage,
+	EnglishMorphologyReferencePage,
+} from '@/views/englishLearning/reference';
 import Home from '@/views/home';
 import Knowledge from '@/views/knowledge';
 import LegalServicePolicy from '@/views/legal/servicePolicy';
@@ -157,6 +160,13 @@ const routes: RouteConfig[] = [
 						Component: EnglishLearningFavoritesPage,
 						meta: {
 							titleKey: 'route.englishLearning.favorites.title',
+						},
+					},
+					{
+						path: 'mistakes',
+						Component: EnglishLearningMistakesPage,
+						meta: {
+							titleKey: 'route.englishLearning.mistakes.title',
 						},
 					},
 					{

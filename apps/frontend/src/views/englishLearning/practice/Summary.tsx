@@ -5,6 +5,7 @@ import { ScrollArea, Toast } from '@ui/index';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
+import { batchAddEnglishVocabularyMistakes } from '@/service';
 import {
 	isEnglishTtsSupported,
 	playEnglishPreferred,
@@ -45,6 +46,44 @@ export function Summary({
 	const hasWordList = wrongItems.length > 0 || correctItems.length > 0;
 
 	const [playingKey, setPlayingKey] = useState<string | null>(null);
+	const [saveMistakesLoading, setSaveMistakesLoading] = useState(false);
+
+	const handleSaveMistakes = useCallback(async () => {
+		if (wrongItems.length === 0) return;
+		setSaveMistakesLoading(true);
+		try {
+			const payload = results
+				.filter((r) => !r.correct)
+				.map((r) => ({
+					word: r.item.word,
+					ipa: r.item.ipa,
+					pos: r.item.pos,
+					segmentation: r.item.segmentation,
+					translationZh: r.item.translationZh,
+					example: r.item.example,
+					lastUserInput: r.userInput,
+				}));
+			const res = await batchAddEnglishVocabularyMistakes(payload);
+			const added = res.data?.added ?? 0;
+			const skipped = res.data?.skipped ?? 0;
+			if (added === 0 && skipped > 0) {
+				Toast({
+					type: 'info',
+					title: t('englishLearning.practice.saveMistakesAllSkipped'),
+				});
+			} else {
+				Toast({
+					type: 'success',
+					title: t('englishLearning.practice.saveMistakesSuccess', {
+						added,
+						skipped,
+					}),
+				});
+			}
+		} finally {
+			setSaveMistakesLoading(false);
+		}
+	}, [results, t, wrongItems.length]);
 
 	const toggleWordPlay = useCallback(
 		async (word: string, key: string) => {
@@ -180,10 +219,13 @@ export function Summary({
 					<SummaryActions
 						hasWrongItems={hasWrongList}
 						continueLoading={continueLoading}
+						saveMistakesLoading={saveMistakesLoading}
 						labels={{
 							retryWrong: t('englishLearning.practice.retryWrong'),
 							practiceAgain: t('englishLearning.practice.practiceAgain'),
 							continuePractice: t('englishLearning.practice.continuePractice'),
+							openMistakes: t('englishLearning.mistakes.nav'),
+							saveMistakes: t('englishLearning.practice.saveMistakes'),
 						}}
 						onRetryWrong={() =>
 							onRetryWrong(
@@ -194,6 +236,7 @@ export function Summary({
 						}
 						onBackToSetup={onBackToSetup}
 						onContinuePractice={onContinuePractice}
+						onSaveMistakes={() => void handleSaveMistakes()}
 					/>
 				</div>
 			</PracticeCard>

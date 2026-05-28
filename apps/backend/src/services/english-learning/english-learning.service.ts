@@ -71,6 +71,7 @@ import {
 import { SaveClassicQuotesLibraryDto } from './dto/save-classic-quotes-library.dto';
 import { SaveVocabularyLibraryDto } from './dto/save-vocabulary-library.dto';
 import type { VocabularyFavoriteBodyDto } from './dto/vocabulary-favorite.dto';
+import type { VocabularyMistakeBatchItemDto } from './dto/vocabulary-mistake.dto';
 import {
 	buildClassicQuoteFavoritesDocxBuffer,
 	buildVocabularyFavoritesDocxBuffer,
@@ -95,6 +96,7 @@ import {
 import { EnglishVocabularyFavorite } from './entity/english-vocabulary-favorite.entity';
 import { EnglishVocabularyLibrary } from './entity/english-vocabulary-library.entity';
 import { EnglishVocabularyLibraryItem } from './entity/english-vocabulary-library-item.entity';
+import { EnglishVocabularyMistake } from './entity/english-vocabulary-mistake.entity';
 import { EnglishVocabularyPackItem } from './entity/english-vocabulary-pack-item.entity';
 import { EnglishVocabularyPackSession } from './entity/english-vocabulary-pack-session.entity';
 import {
@@ -235,6 +237,8 @@ export class EnglishLearningService {
 		private readonly packWebSearchRepo: Repository<EnglishPackWebSearchRecord>,
 		@InjectRepository(EnglishVocabularyFavorite)
 		private readonly vocabFavoriteRepo: Repository<EnglishVocabularyFavorite>,
+		@InjectRepository(EnglishVocabularyMistake)
+		private readonly vocabMistakeRepo: Repository<EnglishVocabularyMistake>,
 		@InjectRepository(EnglishClassicQuoteFavorite)
 		private readonly classicQuoteFavoriteRepo: Repository<EnglishClassicQuoteFavorite>,
 		@InjectRepository(EnglishVocabularyLibrary)
@@ -3863,5 +3867,134 @@ ${existingHintBlock}
 			noteZh: r.noteZh ?? '',
 		}));
 		return buildClassicQuoteFavoritesDocxBuffer(list);
+	}
+
+	/**
+	 * 批量加入错题集：库中已存在的 wordKey 跳过，不更新；本轮重复词形只保留一条。
+	 */
+	async batchAddVocabularyMistakes(
+		userId: number,
+		items: VocabularyMistakeBatchItemDto[],
+	): Promise<{ added: number; skipped: number }> {
+		if (!items.length) {
+			return { added: 0, skipped: 0 };
+		}
+
+		const byKey = new Map<string, VocabularyMistakeBatchItemDto>();
+		for (const item of items) {
+			const wordKey = this.normalizeVocabularyFavoriteWordKey(item.word);
+			if (!wordKey) continue;
+			if (!byKey.has(wordKey)) {
+				byKey.set(wordKey, item);
+			}
+		}
+
+		const keys = [...byKey.keys()];
+		if (keys.length === 0) {
+			return { added: 0, skipped: items.length };
+		}
+
+		const existing = await this.vocabMistakeRepo.find({
+			where: { userId, wordKey: In(keys) },
+			select: ['wordKey'],
+		});
+		const existingSet = new Set(existing.map((r) => r.wordKey));
+		const toInsertKeys = keys.filter((k) => !existingSet.has(k));
+
+		if (toInsertKeys.length === 0) {
+			return { added: 0, skipped: keys.length };
+		}
+
+		const rows = toInsertKeys.map((wordKey) => {
+			const item = byKey.get(wordKey)!;
+			return this.vocabMistakeRepo.create({
+				userId,
+				wordKey,
+				word: item.word.trim(),
+				ipa: typeof item.ipa === 'string' ? item.ipa : '',
+				pos: typeof item.pos === 'string' ? item.pos.trim().slice(0, 32) : '',
+				segmentation:
+					typeof item.segmentation === 'string'
+						? item.segmentation.trim().slice(0, 500)
+						: '',
+				translationZh: item.translationZh ?? '',
+				example: item.example ?? '',
+				lastUserInput:
+					typeof item.lastUserInput === 'string'
+						? item.lastUserInput.trim().slice(0, 500)
+						: '',
+			});
+		});
+
+		await this.vocabMistakeRepo.save(rows);
+		return {
+			added: toInsertKeys.length,
+			skipped: keys.length - toInsertKeys.length,
+		};
+	}
+
+	async removeVocabularyMistake(
+		userId: number,
+		id: string,
+	): Promise<{ removed: boolean }> {
+		const r = await this.vocabMistakeRepo.delete({ userId, id });
+		return { removed: (r.affected ?? 0) > 0 };
+	}
+
+	async removeVocabularyMistakesBatch(
+		userId: number,
+		ids: string[],
+	): Promise<{ removedCount: number }> {
+		const unique = [...new Set(ids.map((id) => id.trim()).filter(Boolean))];
+		if (unique.length === 0) {
+			return { removedCount: 0 };
+		}
+		const r = await this.vocabMistakeRepo.delete({
+			userId,
+			id: In(unique),
+		});
+		return { removedCount: r.affected ?? 0 };
+	}
+
+	async listVocabularyMistakesPage(
+		userId: number,
+		opts: { limit: number; offset: number },
+	): Promise<{
+		items: Array<{
+			id: string;
+			word: string;
+			ipa: string;
+			pos: string;
+			segmentation: string;
+			translationZh: string;
+			example: string;
+			lastUserInput: string;
+			createdAt: string;
+		}>;
+		totalCount: number;
+	}> {
+		const [totalCount, rows] = await Promise.all([
+			this.vocabMistakeRepo.count({ where: { userId } }),
+			this.vocabMistakeRepo.find({
+				where: { userId },
+				order: { createdAt: 'DESC' },
+				take: opts.limit,
+				skip: opts.offset,
+			}),
+		]);
+		return {
+			totalCount,
+			items: rows.map((r) => ({
+				id: r.id,
+				word: r.word,
+				ipa: r.ipa ?? '',
+				pos: r.pos ?? '',
+				segmentation: r.segmentation ?? '',
+				translationZh: r.translationZh ?? '',
+				example: r.example ?? '',
+				lastUserInput: r.lastUserInput ?? '',
+				createdAt: r.createdAt.toISOString(),
+			})),
+		};
 	}
 }

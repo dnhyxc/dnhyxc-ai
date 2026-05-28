@@ -17,9 +17,10 @@ import englishAgentStore from '@/store/englishAgent';
 import EnglishPackStore from '@/store/englishPack';
 import { stripAutoFilledIntentName } from '@/utils';
 import { stopAllEnglishPlayback } from '@/utils/englishTts';
-import { AgentPanel } from './agent/AgentPanel';
+import { AgentPanel } from './agent';
 import { ClassicQuotesSection } from './classic/ClassicQuotesSection';
 import FavoriteSession from './favorites/FavoriteSession';
+import { MistakeBookSession } from './mistakes/MistakeBookSession';
 import EnglishSource from './shared/EnglishSource';
 import {
 	EnglishLearningToolbar,
@@ -138,9 +139,10 @@ const EnglishLearning = observer(function EnglishLearning() {
 											)}
 											type="classic"
 										/>
-										<FavoriteSession />
 										<VocabularyPackSection />
 										<ClassicQuotesSection />
+										<FavoriteSession />
+										<MistakeBookSession />
 									</div>
 								</ScrollArea>
 							</aside>

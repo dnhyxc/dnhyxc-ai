@@ -284,7 +284,12 @@ export const PROJECT_GUIDE_ITEMS_EN: Record<
 	'pg-s13-11': {
 		title: '13.11 Dictation & spelling practice',
 		description:
-			'Entries: favorites footer, library list cards (headphones icon on hover), pack results header, vocab history drawer. Setup shows source title and pool word count. Report lists wrong then correct words (green/red border), retry mistakes, continue, re-setup, header back icon. From home history, back returns to English learning home; from stream history, practicing another row keeps the current selection.',
+			'Entries: favorites footer, library (list hover icon and word-list header), pack results header, vocab history drawer, mistake book header. Setup shows source and pool count. Report: accuracy, wrong/correct lists, retry mistakes, continue, re-setup, add to mistake book, open mistake book, header back. From home history, back to English learning home; from mistake book, back to the mistake book page.',
+	},
+	'pg-s13-12': {
+		title: '13.12 Vocabulary mistake book',
+		description:
+			'Open from the English learning sidebar or /english-learning/mistakes. Review saved wrong words, play audio, select loaded rows and remove. Header dictation/spelling uses the mistake book as the word pool. From the practice report, add mistakes then open the book; duplicate word forms are skipped.',
 	},
 	'pg-s14-1': {
 		title: 'Topic notes and release overview',

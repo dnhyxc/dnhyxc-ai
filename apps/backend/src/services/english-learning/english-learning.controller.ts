@@ -54,6 +54,11 @@ import {
 	VocabularyFavoriteStatusDto,
 } from './dto/vocabulary-favorite.dto';
 import {
+	VocabularyMistakeBatchDto,
+	VocabularyMistakeRemoveBatchDto,
+	VocabularyMistakeRemoveDto,
+} from './dto/vocabulary-mistake.dto';
+import {
 	type EnglishLearningPackAgentToolEvent,
 	EnglishLearningService,
 } from './english-learning.service';
@@ -621,6 +626,79 @@ export class EnglishLearningController {
 			await this.englishLearningService.saveImportedClassicQuotesLibrary(
 				userId,
 				dto,
+			);
+		return { success: true, data };
+	}
+
+	/** 分页列出当前用户错题集（按入库时间倒序） */
+	@Get('vocabulary-mistakes')
+	async listVocabularyMistakesPaginated(
+		@Req() req: AuthedRequest,
+		@Query('limit') limitStr?: string,
+		@Query('offset') offsetStr?: string,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const limit = Math.min(
+			100,
+			Math.max(1, Number.parseInt(limitStr ?? '20', 10) || 20),
+		);
+		const offset = Math.max(0, Number.parseInt(offsetStr ?? '0', 10) || 0);
+		const data = await this.englishLearningService.listVocabularyMistakesPage(
+			userId,
+			{ limit, offset },
+		);
+		return { success: true, data };
+	}
+
+	/** 批量加入错题集（已存在词形跳过，不更新） */
+	@Post('vocabulary-mistakes/batch')
+	async batchAddVocabularyMistakes(
+		@Req() req: AuthedRequest,
+		@Body() dto: VocabularyMistakeBatchDto,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const data = await this.englishLearningService.batchAddVocabularyMistakes(
+			userId,
+			dto.items ?? [],
+		);
+		return { success: true, data };
+	}
+
+	@Post('vocabulary-mistakes/remove')
+	async removeVocabularyMistake(
+		@Req() req: AuthedRequest,
+		@Body() dto: VocabularyMistakeRemoveDto,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const data = await this.englishLearningService.removeVocabularyMistake(
+			userId,
+			dto.id,
+		);
+		return { success: true, data };
+	}
+
+	@Post('vocabulary-mistakes/remove-batch')
+	async removeVocabularyMistakesBatch(
+		@Req() req: AuthedRequest,
+		@Body() dto: VocabularyMistakeRemoveBatchDto,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const data =
+			await this.englishLearningService.removeVocabularyMistakesBatch(
+				userId,
+				dto.ids,
 			);
 		return { success: true, data };
 	}

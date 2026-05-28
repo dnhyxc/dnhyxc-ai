@@ -3,10 +3,10 @@
  */
 import Confirm from '@design/Confirm';
 import Loading from '@design/Loading';
-import Tooltip from '@design/Tooltip';
 import { Button, ScrollArea, Spinner, Toast } from '@ui/index';
-import { Headphones, SquareArrowRight, Trash2 } from 'lucide-react';
+import { SquareArrowRight, Trash2 } from 'lucide-react';
 import {
+	type MouseEvent,
 	type UIEventHandler,
 	useCallback,
 	useEffect,
@@ -28,11 +28,7 @@ import {
 	listEnglishClassicQuotesLibraries,
 	listEnglishVocabularyLibraries,
 } from '@/service';
-import {
-	englishPracticePoolKeys,
-	setEnglishPracticePoolMeta,
-} from '@/store/englishPracticePool';
-import { englishPracticeUrl } from '../practice/utils/paths';
+import { EnglishPracticeEntry } from '../shared/practiceEntry';
 
 export type EnglishLibraryListItem =
 	| EnglishVocabularyLibraryListItem
@@ -227,27 +223,6 @@ export function VocabularyLibraryListPanel({
 		}
 	}, [deleteTarget, kind, onLibraryDeleted, selectedId, t]);
 
-	const openVocabLibraryPractice = useCallback(
-		(lib: EnglishVocabularyLibraryListItem) => {
-			const poolTotal = lib.wordCount ?? 0;
-			if (poolTotal <= 0) return;
-			const sourceTitle = lib.title?.trim();
-			setEnglishPracticePoolMeta(englishPracticePoolKeys.library(lib.id), {
-				total: poolTotal,
-				title: sourceTitle,
-			});
-			navigate(
-				englishPracticeUrl({
-					source: 'library',
-					libraryId: lib.id,
-					sourceTitle: sourceTitle || undefined,
-					poolTotal,
-				}),
-			);
-		},
-		[navigate],
-	);
-
 	const showInitialLoading = loading && entries.length === 0;
 	const showEmpty = !loading && entries.length === 0 && !loadingMore;
 
@@ -361,28 +336,23 @@ export function VocabularyLibraryListPanel({
 									</button>
 									<div className="absolute top-0 right-0 mt-1 mr-1 hidden items-center gap-0.5 group-hover:flex">
 										{showPracticeEntry && vocabLib ? (
-											<Tooltip
-												content={t('englishLearning.practice.entry')}
-												side="left"
-												disableHoverableContent
-											>
-												<Button
-													type="button"
-													variant="ghost"
-													size="sm"
-													onClick={(e) => {
-														e.stopPropagation();
-														openVocabLibraryPractice(vocabLib);
-													}}
-													className={cn(
-														'h-7 w-7 shrink-0 rounded-md p-0 transition-colors',
-														'text-textcolor/65 hover:border hover:border-theme/20 hover:bg-theme/10 hover:text-teal-600 dark:hover:text-teal-400',
-													)}
-													aria-label={t('englishLearning.practice.entry')}
-												>
-													<Headphones className="size-3.5" aria-hidden />
-												</Button>
-											</Tooltip>
+											<EnglishPracticeEntry
+												variant="icon"
+												practice={{
+													source: 'library',
+													libraryId: vocabLib.id,
+													sourceTitle: vocabLib.title?.trim() || undefined,
+													poolTotal:
+														vocabLib.wordCount != null && vocabLib.wordCount > 0
+															? vocabLib.wordCount
+															: undefined,
+												}}
+												onBeforeNavigate={(
+													e: MouseEvent<HTMLButtonElement>,
+												) => {
+													e.stopPropagation();
+												}}
+											/>
 										) : null}
 										<Button
 											type="button"

@@ -2,6 +2,7 @@
 
 ## 延伸阅读
 
+- **本轮汇总**（错题集、`EnglishPracticeEntry`、词库右侧练习修复）：[`vocabulary-mistakes-and-shared-ui.md`](./vocabulary-mistakes-and-shared-ui.md)
 - 结算页与单题流程：[`practice-summary-ui.md`](./practice-summary-ui.md)
 - 产品使用说明：[`docs/project-guide.md`](../project-guide.md) §13.11
 - 域总览：[`docs/english/README.md`](./README.md)
@@ -34,7 +35,7 @@
 | `apps/frontend/src/views/englishLearning/practice/types.ts` | `BuildEnglishPracticeSearchParamsInput` 扩展 |
 | `apps/frontend/src/store/englishPracticePool.ts` | 各入口写入/读取 `poolTotal`、标题缓存 |
 
-右侧词条列表（`VocabularyLibraryWordsPanel`）**不再**放置练习入口，避免与左侧词库列表重复。
+右侧词条列表（`VocabularyLibraryWordsPanel`）顶栏已恢复 **听写 / 拼写**（`EnglishPracticeEntry`，`source=library`）；与左侧词库卡片 hover 入口并存，见 [`vocabulary-mistakes-and-shared-ui.md`](./vocabulary-mistakes-and-shared-ui.md)。
 
 ---
 

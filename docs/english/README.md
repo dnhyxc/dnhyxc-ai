@@ -37,10 +37,12 @@
 |------|------|
 | [practice-summary-ui.md](./practice-summary-ui.md) | 听写/拼写练习与结算页 UI、作答明细、统计条 |
 | [practice-entry-navigation.md](./practice-entry-navigation.md) | 多入口（资源库列表/历史抽屉）、设置页词数、返回导航 |
+| [vocabulary-mistakes-and-shared-ui.md](./vocabulary-mistakes-and-shared-ui.md) | 错题集、练习入口组件 `EnglishPracticeEntry`、单词卡片统一 |
 
 | 说明 | 路径 |
 |------|------|
-| 单词听写 / 拼写（纯前端 MVP） | `/english-learning/practice`；入口：收藏、资源库词库列表、词包结果/历史抽屉 |
+| 单词听写 / 拼写 | `/english-learning/practice`；入口：收藏、资源库、词包、历史抽屉、**错题集** |
+| 单词错题集 | `/english-learning/mistakes`；首页侧栏可进入 |
 
 ## TTS / UI / 其它专题
 

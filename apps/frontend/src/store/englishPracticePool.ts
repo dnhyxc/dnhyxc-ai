@@ -8,6 +8,7 @@ const titles = new Map<string, string>();
 
 export const englishPracticePoolKeys = {
 	favorites: 'favorites',
+	mistakes: 'mistakes',
 	library: (libraryId: string) => `library:${libraryId}`,
 	pack: (streamId: string) => `pack:${streamId}`,
 	live: 'live',
@@ -49,6 +50,8 @@ export function resolveEnglishPracticePoolKey(params: {
 	switch (params.source) {
 		case 'favorites':
 			return englishPracticePoolKeys.favorites;
+		case 'mistakes':
+			return englishPracticePoolKeys.mistakes;
 		case 'library': {
 			const id = params.libraryId?.trim();
 			return id ? englishPracticePoolKeys.library(id) : null;

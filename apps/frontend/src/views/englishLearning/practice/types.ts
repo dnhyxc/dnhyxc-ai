@@ -9,7 +9,12 @@ import type { EnglishVocabularyItem } from '@/service';
 
 export type PracticeMode = 'dictation' | 'spelling';
 
-export type PracticeSource = 'favorites' | 'library' | 'pack' | 'live';
+export type PracticeSource =
+	| 'favorites'
+	| 'library'
+	| 'pack'
+	| 'live'
+	| 'mistakes';
 
 export type PracticeOrder = 'random' | 'sequential';
 
@@ -195,14 +200,18 @@ export type WrongListItemProps = {
 export type SummaryActionsProps = {
 	hasWrongItems: boolean;
 	continueLoading: boolean;
+	saveMistakesLoading?: boolean;
 	labels: {
 		retryWrong: string;
 		practiceAgain: string;
 		continuePractice: string;
+		openMistakes: string;
+		saveMistakes: string;
 	};
 	onRetryWrong: () => void;
 	onBackToSetup: () => void;
 	onContinuePractice: () => void;
+	onSaveMistakes?: () => void;
 };
 
 // —— 单题 Session 子组件 ——

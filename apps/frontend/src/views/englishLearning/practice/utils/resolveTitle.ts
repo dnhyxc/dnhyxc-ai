@@ -31,6 +31,8 @@ export async function resolvePracticeSourceTitle(
 	switch (params.source) {
 		case 'favorites':
 			return params.t('englishLearning.practice.sourceFavorites');
+		case 'mistakes':
+			return params.t('englishLearning.practice.sourceMistakes');
 		case 'library': {
 			const libraryId = params.libraryId?.trim();
 			if (!libraryId) {

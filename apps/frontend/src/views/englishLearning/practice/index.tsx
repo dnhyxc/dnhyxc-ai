@@ -24,7 +24,14 @@ import { fetchPracticeContinueQueue } from './utils/fetchWords';
 import { parsePracticePoolTotal } from './utils/paths';
 
 function parseSource(raw: string | null): PracticeSource {
-	if (raw === 'library' || raw === 'pack' || raw === 'live') return raw;
+	if (
+		raw === 'library' ||
+		raw === 'pack' ||
+		raw === 'live' ||
+		raw === 'mistakes'
+	) {
+		return raw;
+	}
 	return 'favorites';
 }
 
@@ -90,6 +97,10 @@ export default function EnglishLearningPracticePage() {
 		}
 		if (initialSource === 'library') {
 			navigate('/english-learning/library');
+			return;
+		}
+		if (initialSource === 'mistakes') {
+			navigate('/english-learning/mistakes');
 			return;
 		}
 		if (initialSource === 'pack') {

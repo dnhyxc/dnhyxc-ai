@@ -3,7 +3,7 @@
  */
 import Loading from '@design/Loading';
 import { Button, ScrollArea, Spinner, Toast } from '@ui/index';
-import { Headphones, Square, Star, Volume2 } from 'lucide-react';
+import { Star } from 'lucide-react';
 import {
 	useCallback,
 	useEffect,
@@ -27,12 +27,12 @@ import {
 	englishPracticePoolKeys,
 	setEnglishPracticePoolMeta,
 } from '@/store/englishPracticePool';
-import { displayIpaWrapped } from '@/utils';
 import {
 	playEnglishPreferred,
 	stopAllEnglishPlayback,
 } from '@/utils/englishTts';
-import { SegmentationLine } from '../shared/SegmentationLine';
+import { EnglishPracticeEntry } from '../shared/practiceEntry';
+import { VocabularyWordCard } from '../shared/VocabularyWordCard';
 import { useLibraryWordsList } from './useLibraryWordsList';
 
 export type VocabularyLibraryWordsPanelProps = {
@@ -194,16 +194,16 @@ export function VocabularyLibraryWordsPanel({
 					</div>
 				</div>
 				<div className="flex shrink-0 items-center gap-3">
-					<button
-						type="button"
-						className="flex items-center gap-1 text-teal-500 hover:text-teal-400 cursor-pointer text-sm"
-						onClick={() => {
-							navigate('/english-learning/favorites');
+					<EnglishPracticeEntry
+						variant="text"
+						disabled={total <= 0}
+						practice={{
+							source: 'library',
+							libraryId,
+							sourceTitle: meta?.title?.trim() || undefined,
+							poolTotal: total > 0 ? total : undefined,
 						}}
-					>
-						<Headphones className="size-4" />
-						{t('englishLearning.practice.entry')}
-					</button>
+					/>
 					<button
 						type="button"
 						className="flex items-center gap-1 text-teal-500 hover:text-teal-400 cursor-pointer text-sm"
@@ -241,91 +241,48 @@ export function VocabularyLibraryWordsPanel({
 									const isFavorited = favoritedWordKeys.has(wordKey);
 									const favBusy = favoriteActionKey === wordKey;
 									return (
-										<div
+										<VocabularyWordCard
 											key={key}
-											className="select-text bg-theme/5 border border-theme/5 flex flex-col gap-1.5 rounded-md px-3 py-2.5"
-										>
-											<div className="flex items-start justify-between gap-2">
-												<div className="min-w-0 flex-1">
-													<div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
-														<div className="truncate text-lg font-semibold text-textcolor">
-															{item.word}
-														</div>
-														{item.pos?.trim() ? (
-															<span className="text-textcolor/55 shrink-0 text-xs font-medium">
-																{item.pos}
-															</span>
-														) : null}
-													</div>
-													<div className="font-mono text-xs leading-snug text-teal-600/90 dark:text-teal-400/90">
-														{displayIpaWrapped(item.ipa)}
-													</div>
-													<SegmentationLine segmentation={item.segmentation} />
-												</div>
-												<div className="flex shrink-0 items-center gap-1">
-													<Button
-														type="button"
-														variant="ghost"
-														size="sm"
-														onClick={() => void toggleWordAudio(item.word, key)}
+											variant="library"
+											data={item}
+											playing={playing}
+											onTogglePlay={() => void toggleWordAudio(item.word, key)}
+											playLabels={{
+												play: t('englishLearning.vocab.playWord'),
+												stop: t('englishLearning.tts.stop'),
+											}}
+											trailingActions={
+												<Button
+													type="button"
+													variant="ghost"
+													size="sm"
+													disabled={favBusy}
+													onClick={() =>
+														void toggleVocabularyFavorite(item, isFavorited)
+													}
+													className={cn(
+														'h-7 w-7 shrink-0 rounded-md border p-0 transition-colors',
+														isFavorited
+															? 'border-amber-400/45 bg-amber-400/12 text-amber-600'
+															: 'border-theme/10 text-textcolor/55 hover:border-theme/20 hover:bg-theme/10 hover:text-amber-600',
+													)}
+													aria-pressed={isFavorited}
+													aria-label={
+														isFavorited
+															? t('englishLearning.vocab.unfavoriteWord')
+															: t('englishLearning.vocab.favoriteWord')
+													}
+												>
+													<Star
 														className={cn(
-															'h-7 w-7 shrink-0 rounded-md border p-2 transition-colors',
-															playing
-																? 'border-teal-500/40 bg-teal-500/15 text-teal-600 dark:text-teal-400'
-																: 'border-theme/10 text-textcolor/60 hover:border-theme/20 hover:bg-theme/10 hover:text-teal-600 dark:hover:text-teal-400',
+															'size-3.5',
+															isFavorited && 'fill-current',
 														)}
-														aria-label={
-															playing
-																? t('englishLearning.tts.stop')
-																: t('englishLearning.vocab.playWord')
-														}
-													>
-														{playing ? (
-															<Square className="size-3.5 fill-current" />
-														) : (
-															<Volume2 className="size-3.5" />
-														)}
-													</Button>
-													<Button
-														type="button"
-														variant="ghost"
-														size="sm"
-														disabled={favBusy}
-														onClick={() =>
-															void toggleVocabularyFavorite(item, isFavorited)
-														}
-														className={cn(
-															'h-7 w-7 shrink-0 rounded-md border p-0 transition-colors',
-															isFavorited
-																? 'border-amber-400/45 bg-amber-400/12 text-amber-600'
-																: 'border-theme/10 text-textcolor/55 hover:border-theme/20 hover:bg-theme/10 hover:text-amber-600',
-														)}
-														aria-pressed={isFavorited}
-														aria-label={
-															isFavorited
-																? t('englishLearning.vocab.unfavoriteWord')
-																: t('englishLearning.vocab.favoriteWord')
-														}
-													>
-														<Star
-															className={cn(
-																'size-3.5',
-																isFavorited && 'fill-current',
-															)}
-															aria-hidden
-														/>
-													</Button>
-												</div>
-											</div>
-											<div className="text-textcolor/95 text-sm leading-snug">
-												{item.translationZh}
-											</div>
-											{item.example?.trim() ? (
-												<div className="text-textcolor/80 text-sm leading-relaxed italic">
-													{item.example}
-												</div>
-											) : null}
-										</div>
+														aria-hidden
+													/>
+												</Button>
+											}
+										/>
 									);
 								})}
 							</div>

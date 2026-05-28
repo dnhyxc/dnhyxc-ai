@@ -3,7 +3,6 @@
  */
 import Loading from '@design/Loading';
 import { ScrollArea } from '@ui/index';
-import { Headphones } from 'lucide-react';
 import { observer } from 'mobx-react';
 import {
 	type UIEventHandler,
@@ -13,7 +12,7 @@ import {
 	useRef,
 	useState,
 } from 'react';
-import { useNavigate, useSearchParams } from 'react-router';
+import { useSearchParams } from 'react-router';
 import { useI18n } from '@/hooks';
 import {
 	getEnglishClassicQuotesHistoryDetail,
@@ -26,7 +25,7 @@ import {
 } from '@/store/englishPracticePool';
 import type { SearchOrganicItem } from '@/types/chat';
 import { mergeEnglishPackWebSearchOrganics } from '@/utils/englishPackWebSearchMerge';
-import { englishPracticeUrl } from '../practice/utils/paths';
+import { EnglishPracticeEntry } from '../shared/practiceEntry';
 import { MasterWebSearchResultsBar } from '../shared/WebSearchResultsBar';
 import { ClassicQuotesPackList } from './ClassicQuotesPackList';
 import { PackStreamHistoryDrawerTrigger } from './PackStreamHistoryDrawerTrigger';
@@ -42,7 +41,6 @@ function parseKind(raw: string | null): PackStreamKind {
 
 function EnglishLearningPackStreamPageInner() {
 	const { t } = useI18n();
-	const navigate = useNavigate();
 	const [searchParams] = useSearchParams();
 	const kind = useMemo(
 		() => parseKind(searchParams.get('kind')),
@@ -236,6 +234,30 @@ function EnglishLearningPackStreamPageInner() {
 		}
 	}, [kind, itemCount, isHistoryView, historyStreamId, practiceSourceTitle]);
 
+	const packPracticeParams = useMemo(() => {
+		if (kind !== 'vocab' || loadedCount <= 0) return null;
+		if (isHistoryView && historyStreamId) {
+			return {
+				source: 'pack' as const,
+				streamId: historyStreamId,
+				sourceTitle: practiceSourceTitle,
+				poolTotal: itemCount > 0 ? itemCount : undefined,
+			};
+		}
+		return {
+			source: 'live' as const,
+			sourceTitle: practiceSourceTitle,
+			poolTotal: itemCount > 0 ? itemCount : undefined,
+		};
+	}, [
+		historyStreamId,
+		isHistoryView,
+		itemCount,
+		kind,
+		loadedCount,
+		practiceSourceTitle,
+	]);
+
 	return (
 		<div className="flex min-h-0 h-full w-full flex-col">
 			<div className="box-border flex h-full min-h-0 w-full min-w-0 flex-col p-5.5 pt-0">
@@ -267,33 +289,12 @@ function EnglishLearningPackStreamPageInner() {
 								<MasterWebSearchResultsBar items={masterSearchOrganic} t={t} />
 							) : null}
 							<div className="flex shrink-0 items-center gap-3">
-								{kind === 'vocab' && loadedCount > 0 ? (
-									<div
-										className="cursor-pointer text-teal-500 hover:text-teal-400 flex items-center shrink-0 gap-1.5 whitespace-nowrap text-sm font-medium"
-										onClick={() =>
-											navigate(
-												englishPracticeUrl(
-													isHistoryView && historyStreamId
-														? {
-																source: 'pack',
-																streamId: historyStreamId,
-																sourceTitle: practiceSourceTitle,
-																poolTotal:
-																	itemCount > 0 ? itemCount : undefined,
-															}
-														: {
-																source: 'live',
-																sourceTitle: practiceSourceTitle,
-																poolTotal:
-																	itemCount > 0 ? itemCount : undefined,
-															},
-												),
-											)
-										}
-									>
-										<Headphones className="size-4" />
-										{t('englishLearning.practice.entry')}
-									</div>
+								{packPracticeParams ? (
+									<EnglishPracticeEntry
+										variant="text"
+										className="shrink-0 gap-1.5 whitespace-nowrap font-medium"
+										practice={packPracticeParams}
+									/>
 								) : null}
 								<PackStreamHistoryDrawerTrigger
 									kind={kind}

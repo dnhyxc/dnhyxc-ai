@@ -16,6 +16,7 @@ import { EnglishVocabularyPackBatch } from './entity/english-vocabulary.entity';
 import { EnglishVocabularyFavorite } from './entity/english-vocabulary-favorite.entity';
 import { EnglishVocabularyLibrary } from './entity/english-vocabulary-library.entity';
 import { EnglishVocabularyLibraryItem } from './entity/english-vocabulary-library-item.entity';
+import { EnglishVocabularyMistake } from './entity/english-vocabulary-mistake.entity';
 import { EnglishVocabularyPackItem } from './entity/english-vocabulary-pack-item.entity';
 import { EnglishVocabularyPackSession } from './entity/english-vocabulary-pack-session.entity';
 
@@ -32,6 +33,7 @@ import { EnglishVocabularyPackSession } from './entity/english-vocabulary-pack-s
 			EnglishClassicQuotesPackItem,
 			EnglishPackWebSearchRecord,
 			EnglishVocabularyFavorite,
+			EnglishVocabularyMistake,
 			EnglishClassicQuoteFavorite,
 			EnglishVocabularyLibrary,
 			EnglishVocabularyLibraryItem,

@@ -1,61 +1,58 @@
 /**
- * 英语学习：单词收藏记录页（滚动分页列表）
+ * 单词错题集列表页主体
  */
 import Confirm from '@design/Confirm';
 import Loading from '@design/Loading';
-import { Button, ScrollArea, Toast } from '@ui/index';
-import { Spinner } from '@ui/spinner';
+import { Button, ScrollArea, Spinner, Toast } from '@ui/index';
 import { Trash2 } from 'lucide-react';
-import type { UIEventHandler } from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
+import type { EnglishVocabularyMistakeListEntry } from '@/service';
 import {
-	downloadEnglishVocabularyFavoritesDocx,
-	type EnglishVocabularyFavoriteListEntry,
-} from '@/service';
-import { isTauriRuntime } from '@/utils';
+	isEnglishTtsSupported,
+	playEnglishPreferred,
+	stopAllEnglishPlayback,
+} from '@/utils/englishTts';
 import { VocabularyWordCard } from '../shared/VocabularyWordCard';
-import { FavoritesPanelFooter } from './FavoritesPanelFooter';
+import { MistakesPanelFooter } from './MistakesPanelFooter';
+import { useVocabularyMistakesList } from './useVocabularyMistakesList';
 
-export type VocabularyFavoritesPanelProps = {
-	entries: EnglishVocabularyFavoriteListEntry[];
-	loading: boolean;
-	loadingMore: boolean;
-	onViewportScroll: UIEventHandler<HTMLDivElement>;
-	playingKey: string | null;
-	onTogglePlayWord: (word: string, key: string) => void | Promise<void>;
-	onBatchRemoveFavorites: (
-		selected: EnglishVocabularyFavoriteListEntry[],
-	) => Promise<void>;
-	/** 服务端收藏总数 */
-	totalCount: number;
+export type VocabularyMistakesPanelProps = {
+	onPracticeState?: (state: {
+		poolTotal: number;
+		practiceDisabled: boolean;
+	}) => void;
 };
 
-export function VocabularyFavoritesPanel({
-	entries,
-	loading,
-	loadingMore,
-	onViewportScroll,
-	playingKey,
-	onTogglePlayWord,
-	onBatchRemoveFavorites,
-	totalCount,
-}: VocabularyFavoritesPanelProps) {
+export function VocabularyMistakesPanel({
+	onPracticeState,
+}: VocabularyMistakesPanelProps) {
 	const { t } = useI18n();
-	const [exportingDocx, setExportingDocx] = useState(false);
+	const {
+		entries,
+		totalCount,
+		loading,
+		loadingMore,
+		onViewportScroll,
+		onBatchRemove,
+	} = useVocabularyMistakesList(true);
+
+	const [playingKey, setPlayingKey] = useState<string | null>(null);
 	const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
 	const [batchRemoving, setBatchRemoving] = useState(false);
 	const [removeConfirmOpen, setRemoveConfirmOpen] = useState(false);
 	const [singleRemoveConfirmOpen, setSingleRemoveConfirmOpen] = useState(false);
 	const [singleRemoveTarget, setSingleRemoveTarget] =
-		useState<EnglishVocabularyFavoriteListEntry | null>(null);
+		useState<EnglishVocabularyMistakeListEntry | null>(null);
 
 	const showInitialLoading = loading && entries.length === 0;
-	const showLoadMoreHint = loadingMore;
 	const showEmpty = !loading && entries.length === 0 && !loadingMore;
-	const exportDisabled =
-		exportingDocx || loading || (!loading && entries.length === 0);
+	const practiceDisabled = loading || totalCount === 0;
+
+	useEffect(() => {
+		onPracticeState?.({ poolTotal: totalCount, practiceDisabled });
+	}, [onPracticeState, totalCount, practiceDisabled]);
 
 	const entryIdSet = useMemo(
 		() => new Set(entries.map((e) => e.id)),
@@ -111,7 +108,7 @@ export function VocabularyFavoritesPanel({
 		if (selectedIds.size === 0) {
 			Toast({
 				type: 'info',
-				title: t('englishLearning.favoritesDrawer.removeNoneHint'),
+				title: t('englishLearning.mistakes.removeNoneHint'),
 			});
 			return;
 		}
@@ -121,7 +118,7 @@ export function VocabularyFavoritesPanel({
 	}, [selectedIds, t]);
 
 	const requestSingleRemove = useCallback(
-		(entry: EnglishVocabularyFavoriteListEntry) => {
+		(entry: EnglishVocabularyMistakeListEntry) => {
 			setRemoveConfirmOpen(false);
 			setSingleRemoveTarget(entry);
 			setSingleRemoveConfirmOpen(true);
@@ -137,14 +134,12 @@ export function VocabularyFavoritesPanel({
 		}
 		setBatchRemoving(true);
 		try {
-			await onBatchRemoveFavorites(toRemove);
+			await onBatchRemove(toRemove);
 			setSelectedIds(new Set());
 			setRemoveConfirmOpen(false);
-			setSingleRemoveConfirmOpen(false);
-			setSingleRemoveTarget(null);
 			Toast({
 				type: 'success',
-				title: t('englishLearning.favoritesDrawer.removeSuccess'),
+				title: t('englishLearning.mistakes.removeBatchSuccess'),
 			});
 		} catch (e) {
 			Toast({
@@ -152,13 +147,13 @@ export function VocabularyFavoritesPanel({
 				title:
 					e instanceof Error
 						? e.message
-						: t('englishLearning.favoritesDrawer.removeFail'),
+						: t('englishLearning.mistakes.removeFail'),
 			});
 			setRemoveConfirmOpen(false);
 		} finally {
 			setBatchRemoving(false);
 		}
-	}, [entries, onBatchRemoveFavorites, selectedIds, t]);
+	}, [entries, onBatchRemove, selectedIds, t]);
 
 	const executeSingleRemoveConfirm = useCallback(async () => {
 		const target = singleRemoveTarget;
@@ -168,7 +163,7 @@ export function VocabularyFavoritesPanel({
 		}
 		setBatchRemoving(true);
 		try {
-			await onBatchRemoveFavorites([target]);
+			await onBatchRemove([target]);
 			setSelectedIds((prev) => {
 				const next = new Set(prev);
 				next.delete(target.id);
@@ -178,7 +173,7 @@ export function VocabularyFavoritesPanel({
 			setSingleRemoveConfirmOpen(false);
 			Toast({
 				type: 'success',
-				title: t('englishLearning.favoritesDrawer.removeOneSuccess'),
+				title: t('englishLearning.mistakes.removeSuccess'),
 			});
 		} catch (e) {
 			Toast({
@@ -186,43 +181,47 @@ export function VocabularyFavoritesPanel({
 				title:
 					e instanceof Error
 						? e.message
-						: t('englishLearning.favoritesDrawer.removeFail'),
+						: t('englishLearning.mistakes.removeFail'),
 			});
 			setSingleRemoveConfirmOpen(false);
 		} finally {
 			setBatchRemoving(false);
 		}
-	}, [onBatchRemoveFavorites, singleRemoveTarget, t]);
+	}, [onBatchRemove, singleRemoveTarget, t]);
 
-	const handleExportDocx = async () => {
-		if (entries.length === 0 && !loading) {
-			Toast({
-				type: 'info',
-				title: t('englishLearning.vocab.exportDocxEmpty'),
-			});
-			return;
-		}
-		setExportingDocx(true);
-		try {
-			await downloadEnglishVocabularyFavoritesDocx();
-			if (!isTauriRuntime()) {
-				Toast({
-					type: 'success',
-					title: t('englishLearning.vocab.exportDocxSuccess'),
-				});
+	const toggleWordPlay = useCallback(
+		async (word: string, key: string) => {
+			if (playingKey === key) {
+				stopAllEnglishPlayback();
+				setPlayingKey(null);
+				return;
 			}
-		} catch (e) {
-			Toast({
-				type: 'error',
-				title:
-					e instanceof Error
-						? e.message
-						: t('englishLearning.vocab.exportDocxFail'),
-			});
-		} finally {
-			setExportingDocx(false);
-		}
-	};
+			if (!isEnglishTtsSupported()) {
+				Toast({
+					type: 'warning',
+					title: t('englishLearning.tts.unsupported'),
+				});
+				return;
+			}
+			stopAllEnglishPlayback();
+			setPlayingKey(key);
+			try {
+				await playEnglishPreferred(word, { preferLocal: true });
+			} catch {
+				Toast({
+					type: 'warning',
+					title: t('englishLearning.tts.unsupported'),
+				});
+			} finally {
+				setPlayingKey((k) => (k === key ? null : k));
+			}
+		},
+		[playingKey, t],
+	);
+
+	useEffect(() => {
+		return () => stopAllEnglishPlayback();
+	}, []);
 
 	const selectionDisabled = loading || batchRemoving;
 	const removeDisabled =
@@ -233,12 +232,12 @@ export function VocabularyFavoritesPanel({
 			<Confirm
 				open={removeConfirmOpen}
 				onOpenChange={setRemoveConfirmOpen}
-				title={t('englishLearning.favoritesDrawer.removeConfirmTitle')}
-				description={t('englishLearning.favoritesDrawer.removeConfirmDesc', {
+				title={t('englishLearning.mistakes.removeBatchConfirmTitle')}
+				description={t('englishLearning.mistakes.removeBatchConfirmDesc', {
 					count: selectedEntries.length,
 				})}
 				descriptionClassName="text-left"
-				confirmText={t('englishLearning.favoritesDrawer.removeConfirmAction')}
+				confirmText={t('englishLearning.mistakes.removeConfirmAction')}
 				cancelText={t('common.cancel')}
 				confirmVariant="destructive"
 				closeOnConfirm={false}
@@ -246,20 +245,20 @@ export function VocabularyFavoritesPanel({
 			/>
 			<Confirm
 				open={singleRemoveConfirmOpen}
-				onOpenChange={(v) => {
-					setSingleRemoveConfirmOpen(v);
-					if (!v) setSingleRemoveTarget(null);
+				onOpenChange={(open) => {
+					setSingleRemoveConfirmOpen(open);
+					if (!open) setSingleRemoveTarget(null);
 				}}
-				title={t('englishLearning.favoritesDrawer.removeOneConfirmTitle')}
+				title={t('englishLearning.mistakes.removeConfirmTitle')}
 				description={
 					singleRemoveTarget
-						? t('englishLearning.favoritesDrawer.removeOneConfirmDescVocab', {
+						? t('englishLearning.mistakes.removeConfirmDesc', {
 								word: singleRemoveTarget.word,
 							})
 						: '\u00a0'
 				}
 				descriptionClassName="text-left"
-				confirmText={t('englishLearning.favoritesDrawer.removeConfirmAction')}
+				confirmText={t('englishLearning.mistakes.removeConfirmAction')}
 				cancelText={t('common.cancel')}
 				confirmVariant="destructive"
 				closeOnConfirm={false}
@@ -272,12 +271,12 @@ export function VocabularyFavoritesPanel({
 				>
 					{showInitialLoading ? (
 						<div className="text-textcolor/60 flex min-h-full flex-1 items-center justify-center text-center text-sm">
-							<Loading text={t('englishLearning.vocab.favoritesLoading')} />
+							<Loading text={t('common.loading')} />
 						</div>
 					) : (
 						<div className="grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
 							{entries.map((row) => {
-								const playKey = `fav-vocab-${row.id}`;
+								const playKey = `mistake-${row.id}`;
 								const playing = playingKey === playKey;
 								return (
 									<VocabularyWordCard
@@ -285,17 +284,15 @@ export function VocabularyFavoritesPanel({
 										variant="selectable"
 										data={row}
 										selection={{
-											controlId: `vocab-fav-${row.id}`,
+											controlId: `mistake-${row.id}`,
 											checked: selectedIds.has(row.id),
 											disabled: selectionDisabled,
 											onCheckedChange: (checked) =>
 												toggleRowSelected(row.id, checked),
-											ariaLabel: `${t('englishLearning.favoritesDrawer.toggleRow')}: ${row.word}`,
+											ariaLabel: `${t('englishLearning.mistakes.toggleRow')}: ${row.word}`,
 										}}
 										playing={playing}
-										onTogglePlay={() =>
-											void onTogglePlayWord(row.word, playKey)
-										}
+										onTogglePlay={() => void toggleWordPlay(row.word, playKey)}
 										playLabels={{
 											play: t('englishLearning.vocab.playWord'),
 											stop: t('englishLearning.tts.stop'),
@@ -311,17 +308,24 @@ export function VocabularyFavoritesPanel({
 													'h-7 w-7 shrink-0 rounded-md border p-2 transition-colors',
 													'border-theme/10 text-textcolor/60 hover:border-destructive/35 hover:bg-destructive/10 hover:text-destructive',
 												)}
-												aria-label={t(
-													'englishLearning.favoritesDrawer.removeOneAction',
-												)}
+												aria-label={t('englishLearning.mistakes.removeAction')}
 											>
 												<Trash2 className="size-3.5" />
 											</Button>
 										}
+										footer={
+											row.lastUserInput?.trim() ? (
+												<div className="text-rose-500/85 text-sm leading-snug">
+													{t('englishLearning.mistakes.lastInput', {
+														answer: row.lastUserInput,
+													})}
+												</div>
+											) : null
+										}
 									/>
 								);
 							})}
-							{showLoadMoreHint ? (
+							{loadingMore ? (
 								<div className="col-span-full text-textcolor/50 flex items-center justify-center gap-1.5 py-2 text-xs">
 									<Spinner className="size-3.5 text-textcolor/50" aria-hidden />
 									{t('common.loadingMore')}
@@ -329,14 +333,14 @@ export function VocabularyFavoritesPanel({
 							) : null}
 							{showEmpty ? (
 								<div className="text-textcolor/60 col-span-full py-12 text-center text-sm">
-									{t('englishLearning.vocab.favoritesEmpty')}
+									{t('englishLearning.mistakes.empty')}
 								</div>
 							) : null}
 						</div>
 					)}
 				</ScrollArea>
-				<FavoritesPanelFooter
-					selectAllId="vocab-fav-select-all"
+				<MistakesPanelFooter
+					selectAllId="mistakes-select-all"
 					showSelection={!showInitialLoading && entries.length > 0}
 					selectAllCheckboxState={selectAllCheckboxState}
 					selectionDisabled={selectionDisabled}
@@ -345,13 +349,6 @@ export function VocabularyFavoritesPanel({
 					removeDisabled={removeDisabled}
 					batchRemoving={batchRemoving}
 					onRequestRemove={requestRemoveConfirm}
-					exportDisabled={exportDisabled}
-					exportingDocx={exportingDocx}
-					onExportDocx={handleExportDocx}
-					exportLabel={t('englishLearning.vocab.exportDocx')}
-					showPracticeEntry
-					practiceDisabled={exportDisabled}
-					practicePoolTotal={totalCount}
 				/>
 			</div>
 		</>

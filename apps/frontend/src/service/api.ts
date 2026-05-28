@@ -154,6 +154,9 @@ export const ENGLISH_LEARNING_VOCABULARY_FAVORITES =
 /** 导出当前用户单词收藏为 Word（DOCX） */
 export const ENGLISH_LEARNING_VOCABULARY_FAVORITES_EXPORT_DOCX =
 	'/english-learning/vocabulary-favorites/export-docx';
+/** 单词错题集：批量加入、分页列表、删除 */
+export const ENGLISH_LEARNING_VOCABULARY_MISTAKES =
+	'/english-learning/vocabulary-mistakes';
 
 /** 英语学习：按主题生成经典语句（译文 + 出处 + 赏析） */
 export const ENGLISH_LEARNING_CLASSIC_QUOTES =

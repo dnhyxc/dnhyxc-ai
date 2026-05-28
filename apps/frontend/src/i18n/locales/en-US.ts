@@ -792,6 +792,7 @@ export const enUS = {
 	'route.englishLearning.import.title': 'Import study data',
 	'route.englishLearning.library.title': 'Library',
 	'route.englishLearning.favorites.title': 'My favorites',
+	'route.englishLearning.mistakes.title': 'Mistake book',
 	'route.englishLearning.stream.title': 'Fetch results',
 	'route.englishLearning.morphology.title': 'Roots & affixes',
 	'route.englishLearning.grammar.title': 'English grammar',
@@ -852,6 +853,40 @@ export const enUS = {
 	'englishLearning.practice.continuePractice': 'Continue practice',
 	'englishLearning.practice.continueEmpty': 'No more new words to practice',
 	'englishLearning.practice.back': 'Back',
+	'englishLearning.practice.saveMistakes': 'Save to mistake book',
+	'englishLearning.practice.saveMistakesSuccess':
+		'Added {added} word(s); {skipped} already in mistake book (skipped)',
+	'englishLearning.practice.saveMistakesAllSkipped':
+		'All wrong words are already in your mistake book.',
+	'englishLearning.practice.saveMistakesFailed': 'Failed to save mistake book',
+	'englishLearning.practice.sourceMistakes': 'Mistake book',
+
+	'englishLearning.mistakes.desc':
+		'Words you misspelled in practice — review with dictation or spelling',
+	'englishLearning.mistakes.nav': 'Open mistake book',
+	'englishLearning.mistakes.pageTitle': 'Vocabulary mistake book',
+	'englishLearning.mistakes.empty':
+		'No mistakes yet. Add wrong words from the practice summary.',
+	'englishLearning.mistakes.listLoadFailed': 'Failed to load mistake book',
+	'englishLearning.mistakes.lastInput': 'Your spelling: {answer}',
+	'englishLearning.mistakes.removeAction': 'Remove from mistake book',
+	'englishLearning.mistakes.removeConfirmTitle': 'Remove from mistake book',
+	'englishLearning.mistakes.removeConfirmDesc':
+		'Remove “{word}” from your mistake book?',
+	'englishLearning.mistakes.removeSuccess': 'Removed from mistake book',
+	'englishLearning.mistakes.selectAllLoaded': 'Select all',
+	'englishLearning.mistakes.selectedCount': '{count} selected',
+	'englishLearning.mistakes.removeSelected': 'Remove selected',
+	'englishLearning.mistakes.removing': 'Removing...',
+	'englishLearning.mistakes.removeBatchSuccess': 'Removed selected mistakes',
+	'englishLearning.mistakes.removeFail': 'Remove failed. Please try again.',
+	'englishLearning.mistakes.removeBatchConfirmTitle':
+		'Remove selected mistakes?',
+	'englishLearning.mistakes.removeBatchConfirmDesc':
+		'This will remove {count} selected mistake(s). This cannot be undone.',
+	'englishLearning.mistakes.removeConfirmAction': 'Remove',
+	'englishLearning.mistakes.removeNoneHint': 'Select items to remove first',
+	'englishLearning.mistakes.toggleRow': 'Select row',
 
 	'englishLearning.source.morphologyLink': 'Roots & affixes',
 	'englishLearning.source.grammarLink': 'Grammar guide',

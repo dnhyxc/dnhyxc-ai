@@ -3,21 +3,15 @@
  */
 import { Drawer } from '@design/Drawer';
 import Loading from '@design/Loading';
-import Tooltip from '@design/Tooltip';
 import { Button, ScrollArea, Spinner } from '@ui/index';
-import { Headphones, Loader2, Trash2 } from 'lucide-react';
+import { Loader2, Trash2 } from 'lucide-react';
 import { observer } from 'mobx-react';
-import { type UIEventHandler, useCallback } from 'react';
-import { useNavigate } from 'react-router';
+import type { MouseEvent, UIEventHandler } from 'react';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import type { EnglishVocabularyHistoryEntry } from '@/service';
 import EnglishPackStore from '@/store/englishPack';
-import {
-	englishPracticePoolKeys,
-	setEnglishPracticePoolMeta,
-} from '@/store/englishPracticePool';
-import { englishPracticeUrl } from '../practice/utils/paths';
+import { EnglishPracticeEntry } from '../shared/practiceEntry';
 
 export type VocabularyHistoryDrawerProps = {
 	open: boolean;
@@ -58,36 +52,6 @@ function VocabularyHistoryDrawerInner({
 	practiceReturnTo,
 }: VocabularyHistoryDrawerProps) {
 	const { t } = useI18n();
-	const navigate = useNavigate();
-
-	const openPackPractice = useCallback(
-		(entry: EnglishVocabularyHistoryEntry) => {
-			const poolTotal = entry.wordCount ?? 0;
-			if (poolTotal <= 0) return;
-			const sourceTitle = entry.topic?.trim();
-			setEnglishPracticePoolMeta(englishPracticePoolKeys.pack(entry.streamId), {
-				total: poolTotal,
-				title: sourceTitle,
-			});
-			const returnStreamId = loadedStreamId?.trim() || undefined;
-			navigate(
-				englishPracticeUrl({
-					source: 'pack',
-					streamId: entry.streamId,
-					sourceTitle: sourceTitle || undefined,
-					poolTotal,
-					returnTo: practiceReturnTo === 'home' ? 'home' : undefined,
-					returnStreamId:
-						practiceReturnTo === 'home'
-							? undefined
-							: returnStreamId && returnStreamId !== entry.streamId
-								? returnStreamId
-								: undefined,
-				}),
-			);
-		},
-		[loadedStreamId, navigate, practiceReturnTo],
-	);
 
 	const showInitialLoading = loading && entries.length === 0;
 	const showLoadMoreHint = loadingMore;
@@ -176,30 +140,34 @@ function VocabularyHistoryDrawerInner({
 									) : (
 										<div className="absolute top-0 right-0 mt-1 mr-1 hidden items-center gap-0.5 group-hover:flex">
 											{showPracticeEntry ? (
-												<Tooltip
-													content={t('englishLearning.practice.entry')}
-													side="left"
-													disableHoverableContent
-												>
-													<Button
-														type="button"
-														variant="ghost"
-														size="sm"
-														disabled={busy || deleting}
-														onClick={(e) => {
-															e.preventDefault();
-															e.stopPropagation();
-															openPackPractice(h);
-														}}
-														className={cn(
-															'h-7 w-7 shrink-0 rounded-md p-0 transition-colors',
-															'text-textcolor/65 hover:border hover:border-theme/20 hover:bg-theme/10 hover:text-teal-600 dark:hover:text-teal-400',
-														)}
-														aria-label={t('englishLearning.practice.entry')}
-													>
-														<Headphones className="size-3.5" aria-hidden />
-													</Button>
-												</Tooltip>
+												<EnglishPracticeEntry
+													variant="icon"
+													disabled={busy || deleting}
+													practice={{
+														source: 'pack',
+														streamId: h.streamId,
+														sourceTitle: h.topic?.trim() || undefined,
+														poolTotal:
+															h.wordCount > 0 ? h.wordCount : undefined,
+														returnTo:
+															practiceReturnTo === 'home' ? 'home' : undefined,
+														returnStreamId:
+															practiceReturnTo === 'home'
+																? undefined
+																: (() => {
+																		const backId = loadedStreamId?.trim();
+																		return backId && backId !== h.streamId
+																			? backId
+																			: undefined;
+																	})(),
+													}}
+													onBeforeNavigate={(
+														e: MouseEvent<HTMLButtonElement>,
+													) => {
+														e.preventDefault();
+														e.stopPropagation();
+													}}
+												/>
 											) : null}
 											<Button
 												type="button"

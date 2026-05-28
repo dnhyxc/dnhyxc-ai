@@ -9,8 +9,10 @@ import {
 	type EnglishVocabularyFavoriteListEntry,
 	type EnglishVocabularyItem,
 	type EnglishVocabularyLibraryItemRow,
+	type EnglishVocabularyMistakeListEntry,
 	listEnglishVocabularyFavorites,
 	listEnglishVocabularyLibraryItems,
+	listEnglishVocabularyMistakes,
 	listEnglishVocabularyPackItems,
 	normalizeEnglishVocabWordKey,
 } from '@/service';
@@ -42,6 +44,16 @@ function toPracticeItem(
 }
 
 function favoriteToItem(row: EnglishVocabularyFavoriteListEntry): PracticeItem {
+	return toPracticeItem(row.word, {
+		ipa: row.ipa,
+		pos: row.pos,
+		segmentation: row.segmentation,
+		translationZh: row.translationZh,
+		example: row.example,
+	});
+}
+
+function mistakeToItem(row: EnglishVocabularyMistakeListEntry): PracticeItem {
 	return toPracticeItem(row.word, {
 		ipa: row.ipa,
 		pos: row.pos,
@@ -399,6 +411,39 @@ async function fetchFavorites(
 	return fetchInitialFromPaginated(fetchPage, total, count, order);
 }
 
+async function fetchMistakes(
+	ctx: PracticeFetchContext,
+	count: number,
+	order: PracticeOrder,
+	cursor: PracticeSessionCursor | null,
+	excludeKeys: readonly string[],
+	poolTotal?: number,
+): Promise<PracticeSessionFetchResult> {
+	const total = resolvePoolTotal(ctx, poolTotal);
+	if (total == null) return { items: [], cursor: emptyCursor() };
+
+	const fetchPage = async (offset: number, limit: number) => {
+		const res = await listEnglishVocabularyMistakes({
+			limit,
+			offset,
+			silent: true,
+		});
+		return { items: (res.data?.items ?? []).map(mistakeToItem) };
+	};
+
+	if (cursor) {
+		return fetchContinueFromPaginated(
+			fetchPage,
+			total,
+			count,
+			order,
+			cursor,
+			excludeKeys,
+		);
+	}
+	return fetchInitialFromPaginated(fetchPage, total, count, order);
+}
+
 async function fetchLibrary(
 	ctx: PracticeFetchContext,
 	count: number,
@@ -506,6 +551,15 @@ function runSessionFetch(
 	switch (params.source) {
 		case 'favorites':
 			return fetchFavorites(
+				ctx,
+				count,
+				params.order,
+				cursor,
+				excludeKeys,
+				params.poolTotal,
+			);
+		case 'mistakes':
+			return fetchMistakes(
 				ctx,
 				count,
 				params.order,

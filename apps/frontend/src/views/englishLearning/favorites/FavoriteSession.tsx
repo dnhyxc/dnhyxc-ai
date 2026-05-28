@@ -10,7 +10,7 @@ const FavoriteSession = () => {
 	const navigate = useNavigate();
 
 	return (
-		<div className="rounded-none p-4 pb-0 @container min-w-0 mt-3.5 mb-3.5">
+		<div className="rounded-none p-4 pb-0 @container min-w-0 mt-3.5">
 			<div className="mb-3.5 flex items-start gap-3">
 				<div
 					className={cn(
@@ -29,7 +29,7 @@ const FavoriteSession = () => {
 					</div>
 				</div>
 			</div>
-			<div className="flex flex-wrap items-center gap-3.5 mt-4">
+			<div className="flex flex-wrap items-center gap-3.5 mt-4.5">
 				<Button
 					type="button"
 					size="sm"

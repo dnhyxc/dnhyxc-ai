@@ -43,6 +43,7 @@ import {
 	ENGLISH_LEARNING_VOCABULARY_LIBRARIES,
 	ENGLISH_LEARNING_VOCABULARY_LIBRARY,
 	ENGLISH_LEARNING_VOCABULARY_LIBRARY_UPLOAD,
+	ENGLISH_LEARNING_VOCABULARY_MISTAKES,
 	ENGLISH_LEARNING_VOCABULARY_PACK,
 	GET_SESSION,
 	GET_SESSION_LIST,
@@ -974,6 +975,67 @@ export type EnglishVocabularyFavoriteListEntry = {
 export type EnglishVocabularyFavoritesPage = {
 	items: EnglishVocabularyFavoriteListEntry[];
 	totalCount: number;
+};
+
+export type EnglishVocabularyMistakeListEntry = {
+	id: string;
+	word: string;
+	ipa: string;
+	pos: string;
+	segmentation: string;
+	translationZh: string;
+	example: string;
+	lastUserInput: string;
+	createdAt: string;
+};
+
+export type EnglishVocabularyMistakesPage = {
+	items: EnglishVocabularyMistakeListEntry[];
+	totalCount: number;
+};
+
+export type EnglishVocabularyMistakeBatchItem = EnglishVocabularyItem & {
+	lastUserInput?: string;
+};
+
+export const batchAddEnglishVocabularyMistakes = async (
+	items: EnglishVocabularyMistakeBatchItem[],
+) => {
+	return await http.post<{ added: number; skipped: number }>(
+		`${ENGLISH_LEARNING_VOCABULARY_MISTAKES}/batch`,
+		{ items },
+	);
+};
+
+export const listEnglishVocabularyMistakes = async (options?: {
+	limit?: number;
+	offset?: number;
+	silent?: boolean;
+}) => {
+	return await http.get<EnglishVocabularyMistakesPage>(
+		ENGLISH_LEARNING_VOCABULARY_MISTAKES,
+		{
+			querys: {
+				limit: options?.limit ?? 20,
+				offset: options?.offset ?? 0,
+			},
+			silent: options?.silent,
+		},
+	);
+};
+
+export const removeEnglishVocabularyMistake = async (id: string) => {
+	return await http.post<{ removed: boolean }>(
+		`${ENGLISH_LEARNING_VOCABULARY_MISTAKES}/remove`,
+		{ id },
+	);
+};
+
+export const removeEnglishVocabularyMistakesBatch = async (ids: string[]) => {
+	return await http.post<{ removedCount: number }>(
+		`${ENGLISH_LEARNING_VOCABULARY_MISTAKES}/remove-batch`,
+		{ ids },
+	);
 };
 
 export const listEnglishVocabularyFavorites = async (options?: {

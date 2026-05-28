@@ -4,6 +4,7 @@
 import { Button, Spinner, Toast } from '@ui/index';
 import {
 	BookMarked,
+	ClipboardList,
 	Headphones,
 	Languages,
 	Library,
@@ -68,6 +69,7 @@ function SourceIcon({ source }: { source: PracticeSource }) {
 	if (source === 'library') return <Library className={className} />;
 	if (source === 'pack') return <Package className={className} />;
 	if (source === 'live') return <Radio className={className} />;
+	if (source === 'mistakes') return <ClipboardList className={className} />;
 	return <BookMarked className={className} />;
 }
 
@@ -95,7 +97,8 @@ export function Setup({
 		() =>
 			initialSource === 'library' ||
 			initialSource === 'pack' ||
-			initialSource === 'live',
+			initialSource === 'live' ||
+			initialSource === 'mistakes',
 		[initialSource],
 	);
 

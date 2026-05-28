@@ -575,4 +575,14 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'Headphones icon on library list cards and vocab history drawer (tooltip: dictation/spelling); setup shows pool word count; back from home history returns to English learning home; practicing another history row from stream page keeps the current selection.',
 	},
+	's24-18': {
+		title: 'Vocabulary mistake book',
+		description:
+			'Save wrong words from the practice report; open the mistake book from the English learning sidebar or /english-learning/mistakes to review, remove, and start dictation/spelling again; a shortcut on the report opens the mistake book.',
+	},
+	's24-19': {
+		title: 'Unified practice entry',
+		description:
+			'Consistent dictation/spelling entry across favorites, library (including the word list header), pack results, and history drawer; the library word list header now practices the current library.',
+	},
 };

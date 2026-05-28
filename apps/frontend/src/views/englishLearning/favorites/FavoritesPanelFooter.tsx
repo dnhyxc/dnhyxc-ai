@@ -5,9 +5,8 @@ import { Checkbox } from '@ui/checkbox';
 import { Button } from '@ui/index';
 import { Label } from '@ui/label';
 import { Spinner } from '@ui/spinner';
-import { useNavigate } from 'react-router';
 import { useI18n } from '@/hooks';
-import { englishPracticeUrl } from '../practice/utils/paths';
+import { EnglishPracticeEntry } from '../shared/practiceEntry';
 
 export type FavoritesPanelFooterProps = {
 	/** 全选 Checkbox 的 id，需与 Label htmlFor 一致 */
@@ -52,7 +51,6 @@ export function FavoritesPanelFooter({
 	practicePoolTotal,
 }: FavoritesPanelFooterProps) {
 	const { t } = useI18n();
-	const navigate = useNavigate();
 
 	return (
 		<footer className="flex h-12 shrink-0 flex-wrap items-center justify-between gap-3 px-5">
@@ -99,25 +97,18 @@ export function FavoritesPanelFooter({
 					)}
 				</Button>
 				{showPracticeEntry ? (
-					<Button
-						size="sm"
+					<EnglishPracticeEntry
+						variant="button"
 						disabled={practiceDisabled}
-						className="shrink-0 gap-1 text-white bg-teal-500 hover:bg-teal-600"
-						onClick={() =>
-							navigate(
-								englishPracticeUrl({
-									source: 'favorites',
-									sourceTitle: t('englishLearning.practice.sourceFavorites'),
-									poolTotal:
-										practicePoolTotal != null && practicePoolTotal > 0
-											? practicePoolTotal
-											: undefined,
-								}),
-							)
-						}
-					>
-						{t('englishLearning.practice.entry')}
-					</Button>
+						practice={{
+							source: 'favorites',
+							sourceTitle: t('englishLearning.practice.sourceFavorites'),
+							poolTotal:
+								practicePoolTotal != null && practicePoolTotal > 0
+									? practicePoolTotal
+									: undefined,
+						}}
+					/>
 				) : null}
 				<Button
 					type="button"
