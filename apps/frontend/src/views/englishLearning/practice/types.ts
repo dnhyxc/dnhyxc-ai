@@ -225,8 +225,15 @@ export type DictationStepProgressProps = {
 	spellStepActive: boolean;
 };
 
+export type PracticeHintFields = {
+	ipa?: string | null;
+	translationZh?: string | null;
+};
+
 export type DictationPromptBodyProps = {
 	hint: string;
+	hintOpen: boolean;
+	hintContent: PracticeHintFields;
 	playing: boolean;
 	playLabel: string;
 	onPlay: () => void;
@@ -252,6 +259,8 @@ export type SpellingPromptBodyProps = {
 	promptLabel: string;
 	translationZh: string;
 	pos?: string;
+	hintOpen: boolean;
+	hintContent: PracticeHintFields;
 };
 
 export type VocabWordPlayButtonProps = {

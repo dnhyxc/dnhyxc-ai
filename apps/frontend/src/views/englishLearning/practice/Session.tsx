@@ -2,11 +2,12 @@
  * 单题练习界面
  */
 import { Button, Input, Label, Toast } from '@ui/index';
-import { Headphones, Languages } from 'lucide-react';
+import { Headphones, Languages, Lightbulb } from 'lucide-react';
 import {
 	type FormEvent,
 	useCallback,
 	useEffect,
+	useMemo,
 	useRef,
 	useState,
 } from 'react';
@@ -29,6 +30,7 @@ import type {
 	SessionProps,
 } from './types';
 import { gradeSpelling } from './utils/grading';
+import { hasPracticeHintContent } from './utils/hint';
 
 /** 整张练习卡片锁定高度（听写/拼写 ↔ 错题切换时总高一致） */
 const SESSION_CARD_H = 'h-[calc(14.625rem+min(14.5rem,38dvh))]';
@@ -48,6 +50,7 @@ export function Session({
 	const [playing, setPlaying] = useState(false);
 	const [dictationSpellStepActive, setDictationSpellStepActive] =
 		useState(false);
+	const [hintOpen, setHintOpen] = useState(false);
 	const inputRef = useRef<HTMLInputElement>(null);
 	const nextButtonRef = useRef<HTMLButtonElement>(null);
 	const autoPlayedKeyRef = useRef<string | null>(null);
@@ -84,6 +87,7 @@ export function Session({
 		setInput('');
 		setLastWrong(null);
 		setDictationSpellStepActive(false);
+		setHintOpen(false);
 		autoPlayedKeyRef.current = null;
 		requestAnimationFrame(() => inputRef.current?.focus());
 	}, [item.key]);
@@ -178,6 +182,19 @@ export function Session({
 			? t('englishLearning.practice.modeDictation')
 			: t('englishLearning.practice.modeSpelling');
 
+	const hintContent = useMemo(
+		() => ({
+			ipa: item.ipa,
+			translationZh: item.translationZh,
+		}),
+		[item.ipa, item.translationZh],
+	);
+
+	const canHint = hasPracticeHintContent(item, mode);
+	const hintButtonLabel = hintOpen
+		? t('englishLearning.practice.hintHide')
+		: t('englishLearning.practice.hintShow');
+
 	const yourAnswerPrefix = t('englishLearning.practice.yourAnswer', {
 		answer: '',
 	});
@@ -207,14 +224,29 @@ export function Session({
 						icon={modeIcon}
 						title={modeTitle}
 						trailing={
-							<span
-								className={cn(
-									'min-w-16 text-right text-sm font-medium',
-									phase === 'revealed' ? 'text-destructive' : 'hidden',
-								)}
-							>
-								{t('englishLearning.practice.incorrect')}
-							</span>
+							phase === 'prompt' ? (
+								<Button
+									variant="link"
+									disabled={!canHint}
+									aria-pressed={hintOpen}
+									aria-label={
+										canHint
+											? hintButtonLabel
+											: t('englishLearning.practice.hintUnavailable')
+									}
+									className="px-0! text-teal-600 hover:text-teal-500 dark:text-teal-400 h-8 shrink-0 gap-1"
+									onClick={() => setHintOpen((v) => !v)}
+								>
+									<Lightbulb className="size-3.5" aria-hidden />
+									<span className="max-w-24 truncate text-sm font-medium">
+										{hintButtonLabel}
+									</span>
+								</Button>
+							) : (
+								<span className="text-destructive min-w-16 text-right text-sm font-medium">
+									{t('englishLearning.practice.incorrect')}
+								</span>
+							)
 						}
 					/>
 					<div className="flex min-h-0 flex-1 flex-col p-4">
@@ -231,6 +263,8 @@ export function Session({
 								{mode === 'dictation' ? (
 									<DictationPromptBody
 										hint={t('englishLearning.practice.dictationHint')}
+										hintOpen={hintOpen}
+										hintContent={hintContent}
 										stepListen={t(
 											'englishLearning.practice.dictationStepListen',
 										)}
@@ -245,6 +279,8 @@ export function Session({
 										promptLabel={t('englishLearning.practice.spellingPrompt')}
 										translationZh={item.translationZh}
 										pos={item.pos}
+										hintOpen={hintOpen}
+										hintContent={hintContent}
 									/>
 								)}
 							</SessionPromptPanel>

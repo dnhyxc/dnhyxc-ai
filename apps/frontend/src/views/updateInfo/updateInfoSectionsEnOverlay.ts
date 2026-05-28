@@ -585,4 +585,9 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'Consistent dictation/spelling entry across favorites, library (including the word list header), pack results, and history drawer; the library word list header now practices the current library.',
 	},
+	's24-20': {
+		title: 'In-session practice hints',
+		description:
+			'While answering dictation or spelling items, use Hint in the card header for clues (dictation: Chinese meaning and IPA; spelling: IPA under the prompt). The English word is not shown; the button is disabled when no clues exist; hints close when you move to the next item.',
+	},
 };

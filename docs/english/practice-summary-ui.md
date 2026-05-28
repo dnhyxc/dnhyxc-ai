@@ -2,6 +2,7 @@
 
 ## 延伸阅读
 
+- 单题「提示」：[`practice-session-hint.md`](./practice-session-hint.md)
 - 入口与返回导航：[`practice-entry-navigation.md`](./practice-entry-navigation.md)
 - 产品使用说明：[`docs/project-guide.md`](../project-guide.md) §13.11
 - 用户向更新条目：[`docs/project-update-info.md`](../project-update-info.md) §24（听写/拼写练习）

@@ -36,6 +36,7 @@
 | 文档 | 说明 |
 |------|------|
 | [practice-summary-ui.md](./practice-summary-ui.md) | 听写/拼写练习与结算页 UI、作答明细、统计条 |
+| [practice-session-hint.md](./practice-session-hint.md) | 单题练习「提示」：听写释义/音标、拼写音标、固定高度无滚动 |
 | [practice-entry-navigation.md](./practice-entry-navigation.md) | 多入口（资源库列表/历史抽屉）、设置页词数、返回导航 |
 | [vocabulary-mistakes-and-shared-ui.md](./vocabulary-mistakes-and-shared-ui.md) | 错题集、练习入口组件 `EnglishPracticeEntry`、单词卡片统一 |
 

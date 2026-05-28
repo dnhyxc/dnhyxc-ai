@@ -284,7 +284,7 @@ export const PROJECT_GUIDE_ITEMS_EN: Record<
 	'pg-s13-11': {
 		title: '13.11 Dictation & spelling practice',
 		description:
-			'Entries: favorites footer, library (list hover icon and word-list header), pack results header, vocab history drawer, mistake book header. Setup shows source and pool count. Report: accuracy, wrong/correct lists, retry mistakes, continue, re-setup, add to mistake book, open mistake book, header back. From home history, back to English learning home; from mistake book, back to the mistake book page.',
+			'Entries: favorites footer, library (list hover icon and word-list header), pack results header, vocab history drawer, mistake book header. Setup shows source and pool count. While answering, use Hint in the card header (dictation: Chinese meaning and IPA; spelling: IPA; English word not shown; closes on next item). Report: accuracy, wrong/correct lists, retry mistakes, continue, re-setup, add to mistake book, open mistake book, header back. From home history, back to English learning home; from mistake book, back to the mistake book page.',
 	},
 	'pg-s13-12': {
 		title: '13.12 Vocabulary mistake book',
