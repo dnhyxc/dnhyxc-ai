@@ -31,6 +31,17 @@
 | [english-learning-favorites-drawer.md](./english-learning-favorites-drawer.md) | 收藏抽屉 |
 | [english-favorites-docx-export.md](./english-favorites-docx-export.md) | 导出 DOCX |
 
+## 练习
+
+| 文档 | 说明 |
+|------|------|
+| [practice-summary-ui.md](./practice-summary-ui.md) | 听写/拼写练习与结算页 UI、作答明细、统计条 |
+| [practice-entry-navigation.md](./practice-entry-navigation.md) | 多入口（资源库列表/历史抽屉）、设置页词数、返回导航 |
+
+| 说明 | 路径 |
+|------|------|
+| 单词听写 / 拼写（纯前端 MVP） | `/english-learning/practice`；入口：收藏、资源库词库列表、词包结果/历史抽屉 |
+
 ## TTS / UI / 其它专题
 
 - TTS：[english-tts-playback.md](./english-tts-playback.md)、[english-tts-cache-consistency.md](./english-tts-cache-consistency.md)

@@ -246,7 +246,7 @@ const DragUpload = forwardRef<ForwardProps, IProps>(
 												/>
 												<Trash2
 													size={20}
-													className="cursor-pointer ml-2 text-textcolor/80 hover:text-red-400"
+													className="cursor-pointer ml-2 text-textcolor/80 hover:text-rose-400"
 													onClick={onRemove}
 												/>
 											</div>

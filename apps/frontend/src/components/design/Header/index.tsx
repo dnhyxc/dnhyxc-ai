@@ -253,7 +253,7 @@ const Header: React.FC<Iprops> = ({ actions = true, ccustomActions }) => {
 								>
 									<Settings className="w-5 h-5" />
 									{storageInfo?.version && autoUpdate ? (
-										<div className="absolute top-3 right-0 w-2 h-2 bg-red-600 rounded-md"></div>
+										<div className="absolute top-3 right-0 w-2 h-2 bg-rose-600 rounded-md"></div>
 									) : null}
 								</div>
 								{ccustomActions}

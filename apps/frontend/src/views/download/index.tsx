@@ -264,7 +264,7 @@ const Download = () => {
 									className={`p-3 rounded border ${
 										result.success
 											? 'bg-green-50 border-green-200'
-											: 'bg-red-50 border-red-200'
+											: 'bg-rose-50 border-rose-200'
 									}`}
 								>
 									<div className="flex justify-between items-center">
@@ -302,7 +302,7 @@ const Download = () => {
 									className={`p-3 rounded border ${
 										result.success
 											? 'bg-green-50 border-green-200'
-											: 'bg-red-50 border-red-200'
+											: 'bg-rose-50 border-rose-200'
 									}`}
 								>
 									<div className="flex justify-between items-center">

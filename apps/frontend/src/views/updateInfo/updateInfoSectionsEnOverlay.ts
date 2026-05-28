@@ -565,4 +565,14 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'Pulled entry grids collapse/expand; new pulls auto-expand; a11y labels follow UI language.',
 	},
+	's24-16': {
+		title: 'Dictation & spelling practice (summary)',
+		description:
+			'Start practice from favorites, library, or pack results; the report shows accuracy and stats, lists both wrong and correct words this round (green/red left border), with retry-mistakes, continue, and re-setup; back is an icon in the report header.',
+	},
+	's24-17': {
+		title: 'Practice entry & return navigation',
+		description:
+			'Headphones icon on library list cards and vocab history drawer (tooltip: dictation/spelling); setup shows pool word count; back from home history returns to English learning home; practicing another history row from stream page keeps the current selection.',
+	},
 };

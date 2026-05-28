@@ -101,7 +101,7 @@ const DocumentProcessor = () => {
 			id: 'pdf',
 			label: 'PDF 文档',
 			icon: FileCheck,
-			color: 'from-red-500 to-orange-500',
+			color: 'from-rose-500 to-orange-500',
 		},
 		{
 			id: 'word',
@@ -328,7 +328,7 @@ const DocumentProcessor = () => {
 											</Switch>
 										</div>
 										<div
-											className={`text-xs ${onlineUrlError ? 'text-red-500' : 'text-textcolor/50'}`}
+											className={`text-xs ${onlineUrlError ? 'text-rose-500' : 'text-textcolor/50'}`}
 										>
 											{fileType
 												? onlineUrlError || '支持合法的在线图片地址'

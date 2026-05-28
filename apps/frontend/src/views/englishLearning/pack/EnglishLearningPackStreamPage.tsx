@@ -3,6 +3,7 @@
  */
 import Loading from '@design/Loading';
 import { ScrollArea } from '@ui/index';
+import { Headphones } from 'lucide-react';
 import { observer } from 'mobx-react';
 import {
 	type UIEventHandler,
@@ -12,15 +13,20 @@ import {
 	useRef,
 	useState,
 } from 'react';
-import { useSearchParams } from 'react-router';
+import { useNavigate, useSearchParams } from 'react-router';
 import { useI18n } from '@/hooks';
 import {
 	getEnglishClassicQuotesHistoryDetail,
 	getEnglishVocabularyHistoryDetail,
 } from '@/service';
 import EnglishPackStore from '@/store/englishPack';
+import {
+	englishPracticePoolKeys,
+	setEnglishPracticePoolMeta,
+} from '@/store/englishPracticePool';
 import type { SearchOrganicItem } from '@/types/chat';
 import { mergeEnglishPackWebSearchOrganics } from '@/utils/englishPackWebSearchMerge';
+import { englishPracticeUrl } from '../practice/utils/paths';
 import { MasterWebSearchResultsBar } from '../shared/WebSearchResultsBar';
 import { ClassicQuotesPackList } from './ClassicQuotesPackList';
 import { PackStreamHistoryDrawerTrigger } from './PackStreamHistoryDrawerTrigger';
@@ -36,6 +42,7 @@ function parseKind(raw: string | null): PackStreamKind {
 
 function EnglishLearningPackStreamPageInner() {
 	const { t } = useI18n();
+	const navigate = useNavigate();
 	const [searchParams] = useSearchParams();
 	const kind = useMemo(
 		() => parseKind(searchParams.get('kind')),
@@ -209,6 +216,25 @@ function EnglishLearningPackStreamPageInner() {
 		(sameActiveSession && (liveOrganic.length > 0 || liveTopic.length > 0));
 	const topic = preferStoreHeader ? liveTopic : historyTopic;
 	const masterSearchOrganic = preferStoreHeader ? liveOrganic : historyOrganic;
+	const practiceSourceTitle = topic.trim() || undefined;
+
+	useEffect(() => {
+		if (kind !== 'vocab' || itemCount <= 0) return;
+		if (isHistoryView && historyStreamId) {
+			setEnglishPracticePoolMeta(
+				englishPracticePoolKeys.pack(historyStreamId),
+				{
+					total: itemCount,
+					title: practiceSourceTitle,
+				},
+			);
+		} else if (!isHistoryView) {
+			setEnglishPracticePoolMeta(englishPracticePoolKeys.live, {
+				total: itemCount,
+				title: practiceSourceTitle,
+			});
+		}
+	}, [kind, itemCount, isHistoryView, historyStreamId, practiceSourceTitle]);
 
 	return (
 		<div className="flex min-h-0 h-full w-full flex-col">
@@ -236,13 +262,45 @@ function EnglishLearningPackStreamPageInner() {
 								</p>
 							) : null}
 						</div>
-						{masterSearchOrganic.length > 0 ? (
-							<MasterWebSearchResultsBar items={masterSearchOrganic} t={t} />
-						) : null}
-						<PackStreamHistoryDrawerTrigger
-							kind={kind}
-							loadedStreamId={historyStreamId}
-						/>
+						<div className="flex items-center gap-3">
+							{masterSearchOrganic.length > 0 ? (
+								<MasterWebSearchResultsBar items={masterSearchOrganic} t={t} />
+							) : null}
+							<div className="flex shrink-0 items-center gap-3">
+								{kind === 'vocab' && loadedCount > 0 ? (
+									<div
+										className="cursor-pointer text-teal-500 hover:text-teal-400 flex items-center shrink-0 gap-1.5 whitespace-nowrap text-sm font-medium"
+										onClick={() =>
+											navigate(
+												englishPracticeUrl(
+													isHistoryView && historyStreamId
+														? {
+																source: 'pack',
+																streamId: historyStreamId,
+																sourceTitle: practiceSourceTitle,
+																poolTotal:
+																	itemCount > 0 ? itemCount : undefined,
+															}
+														: {
+																source: 'live',
+																sourceTitle: practiceSourceTitle,
+																poolTotal:
+																	itemCount > 0 ? itemCount : undefined,
+															},
+												),
+											)
+										}
+									>
+										<Headphones className="size-4" />
+										{t('englishLearning.practice.entry')}
+									</div>
+								) : null}
+								<PackStreamHistoryDrawerTrigger
+									kind={kind}
+									loadedStreamId={historyStreamId}
+								/>
+							</div>
+						</div>
 					</header>
 
 					{showPageLoading ? (

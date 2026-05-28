@@ -30,6 +30,8 @@ export type VocabularyFavoritesPanelProps = {
 	onBatchRemoveFavorites: (
 		selected: EnglishVocabularyFavoriteListEntry[],
 	) => Promise<void>;
+	/** 服务端收藏总数 */
+	totalCount: number;
 };
 
 export function VocabularyFavoritesPanel({
@@ -40,6 +42,7 @@ export function VocabularyFavoritesPanel({
 	playingKey,
 	onTogglePlayWord,
 	onBatchRemoveFavorites,
+	totalCount,
 }: VocabularyFavoritesPanelProps) {
 	const { t } = useI18n();
 	const [exportingDocx, setExportingDocx] = useState(false);
@@ -403,6 +406,9 @@ export function VocabularyFavoritesPanel({
 					exportingDocx={exportingDocx}
 					onExportDocx={handleExportDocx}
 					exportLabel={t('englishLearning.vocab.exportDocx')}
+					showPracticeEntry
+					practiceDisabled={exportDisabled}
+					practicePoolTotal={totalCount}
 				/>
 			</div>
 		</>

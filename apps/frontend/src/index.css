@@ -1115,6 +1115,30 @@ body.theme-beige {
 	}
 }
 
+/* 练习听写：频谱条与旋转光环 */
+@keyframes practice-dictation-bar {
+	0%,
+	100% {
+		transform: scaleY(0.35);
+		opacity: 0.4;
+	}
+	50% {
+		transform: scaleY(1);
+		opacity: 1;
+	}
+}
+
+.practice-dictation-bar {
+	animation: practice-dictation-bar 0.72s ease-in-out infinite;
+	transform-origin: center bottom;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.practice-dictation-bar {
+		animation: none;
+	}
+}
+
 @media (prefers-reduced-motion: no-preference) {
 	.lucide-stroke-draw-hover:hover svg path,
 	.lucide-stroke-draw-hover:hover svg line,

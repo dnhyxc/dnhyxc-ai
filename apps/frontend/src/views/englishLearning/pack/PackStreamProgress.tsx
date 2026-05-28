@@ -88,7 +88,7 @@ function PackStreamProgressInner({ kind }: PackStreamProgressProps) {
 					type="button"
 					size="sm"
 					onClick={onStop}
-					className="h-8 pb-0.5 bg-linear-to-r from-red-600/80 to-red-600/80 hover:bg-linear-to-r hover:from-red-500/80 hover:to-red-600/80 text-white"
+					className="h-8 pb-0.5 bg-linear-to-r from-rose-600/80 to-rose-600/80 hover:bg-linear-to-r hover:from-rose-500/80 hover:to-rose-600/80 text-white"
 				>
 					<Spinner className="size-3.5 shrink-0 text-white" />
 					<span>{t(stopKey)}</span>

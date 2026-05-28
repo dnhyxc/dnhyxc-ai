@@ -85,7 +85,7 @@ const Toast = ({
 }) => {
 	const colors: Record<ToastType, string> = {
 		success: 'text-green-500',
-		error: 'text-red-500',
+		error: 'text-rose-500',
 		warning: 'text-amber-500',
 		info: 'text-gray-500',
 		loading: 'text-gray-500',
@@ -95,7 +95,7 @@ const Toast = ({
 	/** 关闭按钮与对应类型主色一致（Lucide X 使用 currentColor） */
 	const closeButtonTone: Record<ToastType, string> = {
 		success: 'text-green-500 hover:text-green-600',
-		error: 'text-red-500 hover:text-red-600',
+		error: 'text-rose-500 hover:text-rose-600',
 		warning: 'text-amber-500 hover:text-amber-600',
 		info: 'text-gray-500 hover:text-gray-600',
 		loading: 'text-gray-500 hover:text-gray-600',
@@ -130,7 +130,7 @@ const Toast = ({
 								<TriangleAlertIcon color="var(--color-amber-500)" />
 							)}
 							{type === 'error' && (
-								<OctagonXIcon color="var(--color-red-500)" />
+								<OctagonXIcon color="var(--color-rose-500)" />
 							)}
 							{type === 'loading' && (
 								<Loader2Icon color="var(--color-gray-500)" />
@@ -227,8 +227,8 @@ const Toaster = (props: ToasterProps) => {
 				),
 				error: (
 					<OctagonXIcon
-						className="size-4 text-red-500"
-						color="var(--color-red-500)"
+						className="size-4 text-rose-500"
+						color="var(--color-rose-500)"
 					/>
 				),
 				loading: <Loader2Icon className="size-4 animate-spin" />,

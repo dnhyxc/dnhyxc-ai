@@ -3,8 +3,9 @@
  */
 import Confirm from '@design/Confirm';
 import Loading from '@design/Loading';
+import Tooltip from '@design/Tooltip';
 import { Button, ScrollArea, Spinner, Toast } from '@ui/index';
-import { SquareArrowRight, Trash2 } from 'lucide-react';
+import { Headphones, SquareArrowRight, Trash2 } from 'lucide-react';
 import {
 	type UIEventHandler,
 	useCallback,
@@ -27,6 +28,11 @@ import {
 	listEnglishClassicQuotesLibraries,
 	listEnglishVocabularyLibraries,
 } from '@/service';
+import {
+	englishPracticePoolKeys,
+	setEnglishPracticePoolMeta,
+} from '@/store/englishPracticePool';
+import { englishPracticeUrl } from '../practice/utils/paths';
 
 export type EnglishLibraryListItem =
 	| EnglishVocabularyLibraryListItem
@@ -221,6 +227,27 @@ export function VocabularyLibraryListPanel({
 		}
 	}, [deleteTarget, kind, onLibraryDeleted, selectedId, t]);
 
+	const openVocabLibraryPractice = useCallback(
+		(lib: EnglishVocabularyLibraryListItem) => {
+			const poolTotal = lib.wordCount ?? 0;
+			if (poolTotal <= 0) return;
+			const sourceTitle = lib.title?.trim();
+			setEnglishPracticePoolMeta(englishPracticePoolKeys.library(lib.id), {
+				total: poolTotal,
+				title: sourceTitle,
+			});
+			navigate(
+				englishPracticeUrl({
+					source: 'library',
+					libraryId: lib.id,
+					sourceTitle: sourceTitle || undefined,
+					poolTotal,
+				}),
+			);
+		},
+		[navigate],
+	);
+
 	const showInitialLoading = loading && entries.length === 0;
 	const showEmpty = !loading && entries.length === 0 && !loadingMore;
 
@@ -288,6 +315,12 @@ export function VocabularyLibraryListPanel({
 					<div className="@container grid grid-cols-[repeat(auto-fill,minmax(min(100%,11rem),1fr))] gap-4 px-4">
 						{entries.map((lib) => {
 							const active = selectedId === lib.id;
+							const vocabLib =
+								kind === 'vocab'
+									? (lib as EnglishVocabularyLibraryListItem)
+									: null;
+							const wordCount = vocabLib?.wordCount ?? 0;
+							const showPracticeEntry = kind === 'vocab' && wordCount > 0;
 							return (
 								<div
 									key={lib.id}
@@ -303,7 +336,12 @@ export function VocabularyLibraryListPanel({
 										onClick={() => onSelect(lib)}
 										className="flex min-w-0 flex-1 cursor-pointer flex-col gap-1.5 px-3 py-2 text-left"
 									>
-										<div className="text-textcolor line-clamp-2 text-sm font-medium leading-snug mr-6">
+										<div
+											className={cn(
+												'text-textcolor line-clamp-2 text-sm font-medium leading-snug',
+												kind === 'vocab' ? 'mr-14' : 'mr-6',
+											)}
+										>
 											{lib.title || '—'}
 										</div>
 										<div className="text-textcolor/50 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm">
@@ -321,24 +359,53 @@ export function VocabularyLibraryListPanel({
 											</span>
 										</div>
 									</button>
-									<Button
-										type="button"
-										variant="ghost"
-										size="sm"
-										disabled={deleting}
-										onClick={() => requestDeleteLibrary(lib)}
-										className={cn(
-											'absolute top-0 right-0 group-hover:flex hidden mt-1 mr-1 h-7 w-7 shrink-0 rounded-md p-0 transition-colors',
-											'text-textcolor/65 hover:border hover:border-destructive/10 hover:bg-destructive/10 hover:text-destructive',
-										)}
-										aria-label={
-											kind === 'vocab'
-												? t('englishLearning.library.deleteAction')
-												: t('englishLearning.library.deleteActionClassic')
-										}
-									>
-										<Trash2 className="size-3.5" />
-									</Button>
+									<div className="absolute top-0 right-0 mt-1 mr-1 hidden items-center gap-0.5 group-hover:flex">
+										{showPracticeEntry && vocabLib ? (
+											<Tooltip
+												content={t('englishLearning.practice.entry')}
+												side="left"
+												disableHoverableContent
+											>
+												<Button
+													type="button"
+													variant="ghost"
+													size="sm"
+													onClick={(e) => {
+														e.stopPropagation();
+														openVocabLibraryPractice(vocabLib);
+													}}
+													className={cn(
+														'h-7 w-7 shrink-0 rounded-md p-0 transition-colors',
+														'text-textcolor/65 hover:border hover:border-theme/20 hover:bg-theme/10 hover:text-teal-600 dark:hover:text-teal-400',
+													)}
+													aria-label={t('englishLearning.practice.entry')}
+												>
+													<Headphones className="size-3.5" aria-hidden />
+												</Button>
+											</Tooltip>
+										) : null}
+										<Button
+											type="button"
+											variant="ghost"
+											size="sm"
+											disabled={deleting}
+											onClick={(e) => {
+												e.stopPropagation();
+												requestDeleteLibrary(lib);
+											}}
+											className={cn(
+												'h-7 w-7 shrink-0 rounded-md p-0 transition-colors',
+												'text-textcolor/65 hover:border hover:border-destructive/10 hover:bg-destructive/10 hover:text-destructive',
+											)}
+											aria-label={
+												kind === 'vocab'
+													? t('englishLearning.library.deleteAction')
+													: t('englishLearning.library.deleteActionClassic')
+											}
+										>
+											<Trash2 className="size-3.5" />
+										</Button>
+									</div>
 								</div>
 							);
 						})}

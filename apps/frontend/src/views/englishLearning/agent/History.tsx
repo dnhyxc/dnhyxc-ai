@@ -122,7 +122,7 @@ const History = observer(function EnglishLearningAgentHistory(
 									) : (
 										<Button
 											variant="link"
-											className="text-textcolor/70 hover:text-red-500 hover:bg-red-500/10 absolute top-2 right-2 hidden h-7 w-7 cursor-pointer items-center justify-center rounded-md group-hover:flex"
+											className="text-textcolor/70 hover:text-rose-500 hover:bg-rose-500/10 absolute top-2 right-2 hidden h-7 w-7 cursor-pointer items-center justify-center rounded-md group-hover:flex"
 											aria-label={t(
 												'knowledge.assistant.deleteConversationTitle',
 											)}

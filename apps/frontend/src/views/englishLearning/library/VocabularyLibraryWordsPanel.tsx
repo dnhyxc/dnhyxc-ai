@@ -3,7 +3,7 @@
  */
 import Loading from '@design/Loading';
 import { Button, ScrollArea, Spinner, Toast } from '@ui/index';
-import { Square, Star, Volume2 } from 'lucide-react';
+import { Headphones, Square, Star, Volume2 } from 'lucide-react';
 import {
 	useCallback,
 	useEffect,
@@ -23,6 +23,10 @@ import {
 	normalizeEnglishVocabWordKey,
 	removeEnglishVocabularyFavorite,
 } from '@/service';
+import {
+	englishPracticePoolKeys,
+	setEnglishPracticePoolMeta,
+} from '@/store/englishPracticePool';
 import { displayIpaWrapped } from '@/utils';
 import {
 	playEnglishPreferred,
@@ -88,6 +92,19 @@ export function VocabularyLibraryWordsPanel({
 		if (!el || initialScrollTop <= 0) return;
 		el.scrollTop = initialScrollTop;
 	}, [libraryId, initialScrollTop]);
+
+	useEffect(() => {
+		if (!libraryId) return;
+		const meta = libraryMeta ?? resolvedLibrary;
+		const n = meta?.wordCount ?? items.length;
+		const title = (libraryMeta ?? resolvedLibrary)?.title?.trim();
+		if (n > 0 || title) {
+			setEnglishPracticePoolMeta(englishPracticePoolKeys.library(libraryId), {
+				total: n > 0 ? n : undefined,
+				title,
+			});
+		}
+	}, [libraryId, libraryMeta, resolvedLibrary, items.length]);
 
 	const {
 		favoritedWordKeys,
@@ -176,14 +193,27 @@ export function VocabularyLibraryWordsPanel({
 						})}
 					</div>
 				</div>
-				<div
-					className="flex items-center gap-1 text-teal-500 hover:text-teal-400 cursor-pointer text-sm"
-					onClick={() => {
-						navigate('/english-learning/favorites');
-					}}
-				>
-					<Star className="size-4.5" />
-					{t('route.englishLearning.favorites.title')}
+				<div className="flex shrink-0 items-center gap-3">
+					<button
+						type="button"
+						className="flex items-center gap-1 text-teal-500 hover:text-teal-400 cursor-pointer text-sm"
+						onClick={() => {
+							navigate('/english-learning/favorites');
+						}}
+					>
+						<Headphones className="size-4" />
+						{t('englishLearning.practice.entry')}
+					</button>
+					<button
+						type="button"
+						className="flex items-center gap-1 text-teal-500 hover:text-teal-400 cursor-pointer text-sm"
+						onClick={() => {
+							navigate('/english-learning/favorites');
+						}}
+					>
+						<Star className="size-4.5" />
+						{t('englishLearning.practice.favorites')}
+					</button>
 				</div>
 			</div>
 			<ScrollArea

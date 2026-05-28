@@ -5,6 +5,10 @@ import { Toast } from '@ui/index';
 import { useCallback, useEffect, useState } from 'react';
 import { useI18n } from '@/hooks';
 import {
+	englishPracticePoolKeys,
+	setEnglishPracticePoolMeta,
+} from '@/store/englishPracticePool';
+import {
 	playEnglishPreferred,
 	stopAllEnglishPlayback,
 } from '@/utils/englishTts';
@@ -42,6 +46,15 @@ export function VocabularyFavoritesSection({
 			total: totalCount,
 		});
 	}, [entries.length, totalCount, onCountsChange]);
+
+	useEffect(() => {
+		if (totalCount > 0) {
+			setEnglishPracticePoolMeta(englishPracticePoolKeys.favorites, {
+				total: totalCount,
+				title: t('englishLearning.practice.sourceFavorites'),
+			});
+		}
+	}, [totalCount, t]);
 	const [playingKey, setPlayingKey] = useState<string | null>(null);
 
 	const onTogglePlayWord = useCallback(
@@ -72,6 +85,7 @@ export function VocabularyFavoritesSection({
 			entries={entries}
 			loading={loading}
 			loadingMore={loadingMore}
+			totalCount={totalCount}
 			onViewportScroll={onViewportScroll}
 			playingKey={playingKey}
 			onTogglePlayWord={onTogglePlayWord}

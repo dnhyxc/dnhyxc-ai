@@ -13,6 +13,10 @@ import type {
 	EnglishClassicQuotesLibraryListItem,
 	EnglishVocabularyLibraryListItem,
 } from '@/service';
+import {
+	englishPracticePoolKeys,
+	setEnglishPracticePoolMeta,
+} from '@/store/englishPracticePool';
 import { ClassicQuotesLibraryWordsPanel } from './ClassicQuotesLibraryWordsPanel';
 import { invalidateLibraryWordsListCache } from './libraryWordsListCache';
 import {
@@ -91,6 +95,27 @@ export default function EnglishLearningLibraryPage() {
 		kind === 'vocab' && selectedLibrary
 			? (selectedLibrary as EnglishVocabularyLibraryListItem)
 			: null;
+
+	useEffect(() => {
+		if (kind !== 'vocab' || !activeLibraryId) return;
+		const n = vocabLibraryMeta?.wordCount;
+		const title = vocabLibraryMeta?.title?.trim();
+		if ((typeof n === 'number' && n > 0) || title) {
+			setEnglishPracticePoolMeta(
+				englishPracticePoolKeys.library(activeLibraryId),
+				{
+					total: typeof n === 'number' && n > 0 ? n : undefined,
+					title,
+				},
+			);
+		}
+	}, [
+		kind,
+		activeLibraryId,
+		vocabLibraryMeta?.wordCount,
+		vocabLibraryMeta?.title,
+	]);
+
 	const classicLibraryMeta =
 		kind === 'classic' && selectedLibrary
 			? (selectedLibrary as EnglishClassicQuotesLibraryListItem)

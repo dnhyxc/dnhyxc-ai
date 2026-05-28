@@ -281,6 +281,11 @@ export const PROJECT_GUIDE_ITEMS_EN: Record<
 		description:
 			'On desktop, transient list or favorite-status failures may auto-retry read-only calls and show readable toasts instead of raw transport errors. Write actions such as favorite/unfavorite are generally not retried to avoid duplicate side effects.',
 	},
+	'pg-s13-11': {
+		title: '13.11 Dictation & spelling practice',
+		description:
+			'Entries: favorites footer, library list cards (headphones icon on hover), pack results header, vocab history drawer. Setup shows source title and pool word count. Report lists wrong then correct words (green/red border), retry mistakes, continue, re-setup, header back icon. From home history, back returns to English learning home; from stream history, practicing another row keeps the current selection.',
+	},
 	'pg-s14-1': {
 		title: 'Topic notes and release overview',
 		description:

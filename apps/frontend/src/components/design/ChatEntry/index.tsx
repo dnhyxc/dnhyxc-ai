@@ -964,11 +964,11 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 									<Button
 										variant="ghost"
 										onClick={() => stopGenerating?.()}
-										className="lucide-stroke-draw-hover p-0 h-8.5 w-8.5 flex items-center justify-center rounded-full border border-red-500/30 bg-red-500/20 text-red-500 hover:bg-red-500/30 hover:text-red-500 shadow-none [&_svg]:overflow-visible"
+										className="lucide-stroke-draw-hover p-0 h-8.5 w-8.5 flex items-center justify-center rounded-full border border-rose-500/30 bg-rose-500/20 text-rose-500 hover:bg-rose-500/30 hover:text-rose-500 shadow-none [&_svg]:overflow-visible"
 									>
 										<Target
 											className={cn(
-												'h-4 w-4 shrink-0 text-red-500/60',
+												'h-4 w-4 shrink-0 text-rose-500/60',
 												'animate-chat-stop-icon-breathe motion-reduce:animate-none',
 											)}
 										/>

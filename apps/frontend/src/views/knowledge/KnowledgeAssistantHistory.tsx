@@ -109,7 +109,7 @@ const KnowledgeAssistantHistoryDrawer = ({
 									) : (
 										<Button
 											variant="link"
-											className="cursor-pointer absolute right-2 top-2 hidden group-hover:flex items-center justify-center h-7 w-7 rounded-md text-textcolor/70 hover:text-red-500 hover:bg-red-500/10"
+											className="cursor-pointer absolute right-2 top-2 hidden group-hover:flex items-center justify-center h-7 w-7 rounded-md text-textcolor/70 hover:text-rose-500 hover:bg-rose-500/10"
 											aria-label={t(
 												'knowledge.assistant.deleteConversationTitle',
 											)}

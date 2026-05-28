@@ -5,7 +5,9 @@ import { Checkbox } from '@ui/checkbox';
 import { Button } from '@ui/index';
 import { Label } from '@ui/label';
 import { Spinner } from '@ui/spinner';
+import { useNavigate } from 'react-router';
 import { useI18n } from '@/hooks';
+import { englishPracticeUrl } from '../practice/utils/paths';
 
 export type FavoritesPanelFooterProps = {
 	/** 全选 Checkbox 的 id，需与 Label htmlFor 一致 */
@@ -24,6 +26,11 @@ export type FavoritesPanelFooterProps = {
 	onExportDocx: () => void;
 	/** 导出按钮文案（单词 / 经典句 i18n 由父组件传入） */
 	exportLabel: string;
+	/** 单词收藏页：进入听写/拼写练习 */
+	showPracticeEntry?: boolean;
+	practiceDisabled?: boolean;
+	/** 收藏总数，写入练习页 URL 供分页拉词 */
+	practicePoolTotal?: number;
 };
 
 export function FavoritesPanelFooter({
@@ -40,8 +47,12 @@ export function FavoritesPanelFooter({
 	exportingDocx,
 	onExportDocx,
 	exportLabel,
+	showPracticeEntry = false,
+	practiceDisabled = false,
+	practicePoolTotal,
 }: FavoritesPanelFooterProps) {
 	const { t } = useI18n();
+	const navigate = useNavigate();
 
 	return (
 		<footer className="flex h-12 shrink-0 flex-wrap items-center justify-between gap-3 px-5">
@@ -70,13 +81,12 @@ export function FavoritesPanelFooter({
 					</div>
 				) : null}
 			</div>
-			<div className="flex items-center gap-2">
+			<div className="flex flex-wrap items-center justify-end gap-2">
 				<Button
 					type="button"
-					variant="destructive"
 					size="sm"
 					disabled={removeDisabled}
-					className="w-24 shrink-0"
+					className="w-24 shrink-0 pb-1 text-white bg-rose-700 hover:bg-rose-800"
 					onClick={onRequestRemove}
 				>
 					{batchRemoving ? (
@@ -88,6 +98,27 @@ export function FavoritesPanelFooter({
 						t('englishLearning.favoritesDrawer.removeSelected')
 					)}
 				</Button>
+				{showPracticeEntry ? (
+					<Button
+						size="sm"
+						disabled={practiceDisabled}
+						className="shrink-0 gap-1 text-white bg-teal-500 hover:bg-teal-600"
+						onClick={() =>
+							navigate(
+								englishPracticeUrl({
+									source: 'favorites',
+									sourceTitle: t('englishLearning.practice.sourceFavorites'),
+									poolTotal:
+										practicePoolTotal != null && practicePoolTotal > 0
+											? practicePoolTotal
+											: undefined,
+								}),
+							)
+						}
+					>
+						{t('englishLearning.practice.entry')}
+					</Button>
+				) : null}
 				<Button
 					type="button"
 					size="sm"

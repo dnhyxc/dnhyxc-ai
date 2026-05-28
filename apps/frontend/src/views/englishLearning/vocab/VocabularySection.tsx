@@ -468,7 +468,7 @@ function VocabularyPackSectionInner() {
 						className={cn(
 							'h-9 min-w-0 flex-1 rounded-md text-white',
 							loading
-								? 'bg-linear-to-r from-red-600/80 to-red-600/80 hover:bg-linear-to-r hover:from-red-500/80 hover:to-red-600/80'
+								? 'bg-linear-to-r from-rose-600/80 to-rose-600/80 hover:bg-linear-to-r hover:from-rose-500/80 hover:to-rose-600/80'
 								: 'bg-linear-to-r from-teal-500 to-cyan-600 hover:bg-linear-to-r hover:from-teal-400 hover:to-cyan-600',
 						)}
 					>
@@ -510,6 +510,7 @@ function VocabularyPackSectionInner() {
 				onViewportScroll={onHistoryViewportScroll}
 				onSelectEntry={openHistoryDetail}
 				onDeleteEntry={requestDeleteHistory}
+				practiceReturnTo="home"
 			/>
 		</div>
 	);

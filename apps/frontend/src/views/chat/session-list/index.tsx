@@ -198,7 +198,7 @@ const SessionItem = memo<SessionItemProps>(
 							<SquarePen size={18} />
 						</div>
 						<div
-							className="bg-theme-background p-1 ml-2 rounded-sm hover:bg-red-500"
+							className="bg-theme-background p-1 ml-2 rounded-sm hover:bg-rose-500"
 							onClick={(e) => onDelete(e, item)}
 						>
 							<Trash2 size={18} />
