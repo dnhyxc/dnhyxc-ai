@@ -1,13 +1,11 @@
 /**
- * 英语学习：经典句收藏记录页（滚动分页列表）
- * 列表项布局与主区语句卡片一致（含朗读），无收藏按钮；支持多选批量移除收藏。
+ * 经典句收藏页：列表数据、朗读、选择与批量操作
  */
 import Confirm from '@design/Confirm';
 import Loading from '@design/Loading';
 import { Button, ScrollArea, Toast } from '@ui/index';
 import { Spinner } from '@ui/spinner';
 import { Trash2 } from 'lucide-react';
-import type { UIEventHandler } from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
@@ -15,36 +13,39 @@ import {
 	downloadEnglishClassicQuoteFavoritesDocx,
 	type EnglishClassicQuoteFavoriteListEntry,
 } from '@/service';
+import {
+	englishPracticePoolKeys,
+	setEnglishPracticePoolMeta,
+} from '@/store/englishPracticePool';
 import { isTauriRuntime } from '@/utils';
-import { ClassicQuoteCard } from '../shared/ClassicQuoteCard';
-import { FavoritesPanelFooter } from './FavoritesPanelFooter';
+import {
+	playEnglishPreferred,
+	stopAllEnglishPlayback,
+} from '@/utils/englishTts';
+import { ClassicQuoteCard } from '../../shared/ClassicQuoteCard';
+import { FavoritesPanelFooter } from '../components/FavoritesPanelFooter';
+import type { FavoritesListCounts } from '../vocabulary';
+import { useClassicFavoritesList } from './useClassicFavoritesList';
 
-export type ClassicQuotesFavoritesPanelProps = {
-	entries: EnglishClassicQuoteFavoriteListEntry[];
-	totalCount: number;
-	loading: boolean;
-	loadingMore: boolean;
-	onViewportScroll: UIEventHandler<HTMLDivElement>;
-	/** 与主区语句列表共用，保证互斥朗读与停止后 UI 一致 */
-	playingKey: string | null;
-	onTogglePlayQuote: (english: string, key: string) => void | Promise<void>;
-	/** 批量取消收藏（由父组件调用接口并刷新列表） */
-	onBatchRemoveFavorites: (
-		selected: EnglishClassicQuoteFavoriteListEntry[],
-	) => Promise<void>;
+export type ClassicQuotesFavoritesSectionProps = {
+	active: boolean;
+	onCountsChange?: (counts: FavoritesListCounts) => void;
 };
 
-export function ClassicQuotesFavoritesPanel({
-	entries,
-	totalCount,
-	loading,
-	loadingMore,
-	onViewportScroll,
-	playingKey,
-	onTogglePlayQuote,
-	onBatchRemoveFavorites,
-}: ClassicQuotesFavoritesPanelProps) {
+export function ClassicQuotesFavoritesSection({
+	active,
+	onCountsChange,
+}: ClassicQuotesFavoritesSectionProps) {
 	const { t } = useI18n();
+	const {
+		entries,
+		totalCount,
+		loading,
+		loadingMore,
+		onViewportScroll,
+		onBatchRemove,
+	} = useClassicFavoritesList(active);
+
 	const [exportingDocx, setExportingDocx] = useState(false);
 	const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
 	const [batchRemoving, setBatchRemoving] = useState(false);
@@ -52,11 +53,27 @@ export function ClassicQuotesFavoritesPanel({
 	const [singleRemoveConfirmOpen, setSingleRemoveConfirmOpen] = useState(false);
 	const [singleRemoveTarget, setSingleRemoveTarget] =
 		useState<EnglishClassicQuoteFavoriteListEntry | null>(null);
+	const [playingKey, setPlayingKey] = useState<string | null>(null);
+
+	useEffect(() => {
+		onCountsChange?.({
+			loaded: entries.length,
+			total: totalCount,
+		});
+	}, [entries.length, totalCount, onCountsChange]);
+
+	useEffect(() => {
+		if (totalCount > 0) {
+			setEnglishPracticePoolMeta(englishPracticePoolKeys.favorites('classic'), {
+				total: totalCount,
+				title: t('englishLearning.practice.sourceClassicFavorites'),
+			});
+		}
+	}, [totalCount, t]);
 
 	const showInitialLoading = loading && entries.length === 0;
 	const showLoadMoreHint = loadingMore;
 	const showEmpty = !loading && entries.length === 0 && !loadingMore;
-
 	const exportDisabled =
 		exportingDocx || loading || (!loading && entries.length === 0);
 
@@ -64,11 +81,9 @@ export function ClassicQuotesFavoritesPanel({
 		() => new Set(entries.map((e) => e.id)),
 		[entries],
 	);
-
 	const allLoadedSelected =
 		entries.length > 0 && entries.every((e) => selectedIds.has(e.id));
 	const someLoadedSelected = entries.some((e) => selectedIds.has(e.id));
-
 	const selectAllCheckboxState: boolean | 'indeterminate' = allLoadedSelected
 		? true
 		: someLoadedSelected
@@ -112,6 +127,29 @@ export function ClassicQuotesFavoritesPanel({
 		[entries, selectedIds],
 	);
 
+	const onTogglePlayQuote = useCallback(
+		async (english: string, key: string) => {
+			if (playingKey === key) {
+				stopAllEnglishPlayback();
+				setPlayingKey(null);
+				return;
+			}
+			stopAllEnglishPlayback();
+			setPlayingKey(key);
+			try {
+				await playEnglishPreferred(english);
+			} catch {
+				Toast({
+					type: 'warning',
+					title: t('englishLearning.tts.unsupported'),
+				});
+			} finally {
+				setPlayingKey((k) => (k === key ? null : k));
+			}
+		},
+		[playingKey, t],
+	);
+
 	const requestRemoveConfirm = useCallback(() => {
 		if (selectedIds.size === 0) {
 			Toast({
@@ -142,7 +180,7 @@ export function ClassicQuotesFavoritesPanel({
 		}
 		setBatchRemoving(true);
 		try {
-			await onBatchRemoveFavorites(toRemove);
+			await onBatchRemove(toRemove);
 			setSelectedIds(new Set());
 			setRemoveConfirmOpen(false);
 			setSingleRemoveConfirmOpen(false);
@@ -163,7 +201,7 @@ export function ClassicQuotesFavoritesPanel({
 		} finally {
 			setBatchRemoving(false);
 		}
-	}, [entries, onBatchRemoveFavorites, selectedIds, t]);
+	}, [entries, onBatchRemove, selectedIds, t]);
 
 	const executeSingleRemoveConfirm = useCallback(async () => {
 		const target = singleRemoveTarget;
@@ -173,7 +211,7 @@ export function ClassicQuotesFavoritesPanel({
 		}
 		setBatchRemoving(true);
 		try {
-			await onBatchRemoveFavorites([target]);
+			await onBatchRemove([target]);
 			setSelectedIds((prev) => {
 				const next = new Set(prev);
 				next.delete(target.id);
@@ -197,7 +235,7 @@ export function ClassicQuotesFavoritesPanel({
 		} finally {
 			setBatchRemoving(false);
 		}
-	}, [onBatchRemoveFavorites, singleRemoveTarget, t]);
+	}, [onBatchRemove, singleRemoveTarget, t]);
 
 	const handleExportDocx = async () => {
 		if (entries.length === 0 && !loading) {
@@ -210,7 +248,6 @@ export function ClassicQuotesFavoritesPanel({
 		setExportingDocx(true);
 		try {
 			await downloadEnglishClassicQuoteFavoritesDocx();
-			// Web：无内置 Toast；Tauri：`downloadBlob` 已提示（与 Mermaid 工具栏等一致）
 			if (!isTauriRuntime()) {
 				Toast({
 					type: 'success',

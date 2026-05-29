@@ -5,9 +5,12 @@ import { useCallback, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { useI18n } from '@/hooks';
 import { EnglishLearningPanelHeader } from '../shared/EnglishLearningPanelHeader';
-import { ClassicQuotesFavoritesSection } from './ClassicQuotesFavoritesSection';
-import { type FavoritesKind, FavoritesKindTabs } from './FavoritesKindTabs';
-import { VocabularyFavoritesSection } from './VocabularyFavoritesSection';
+import { ClassicQuotesFavoritesSection } from './classic';
+import {
+	type FavoritesKind,
+	FavoritesKindTabs,
+} from './components/FavoritesKindTabs';
+import { VocabularyFavoritesSection } from './vocabulary';
 
 function parseKind(raw: string | null): FavoritesKind {
 	return raw === 'classic' ? 'classic' : 'vocab';

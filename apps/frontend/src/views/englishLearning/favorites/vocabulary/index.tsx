@@ -1,12 +1,11 @@
 /**
- * 英语学习：单词收藏记录页（滚动分页列表）
+ * 单词收藏页：列表数据、朗读、选择与批量操作
  */
 import Confirm from '@design/Confirm';
 import Loading from '@design/Loading';
 import { Button, ScrollArea, Toast } from '@ui/index';
 import { Spinner } from '@ui/spinner';
 import { Trash2 } from 'lucide-react';
-import type { UIEventHandler } from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
@@ -14,35 +13,44 @@ import {
 	downloadEnglishVocabularyFavoritesDocx,
 	type EnglishVocabularyFavoriteListEntry,
 } from '@/service';
+import {
+	englishPracticePoolKeys,
+	setEnglishPracticePoolMeta,
+} from '@/store/englishPracticePool';
 import { isTauriRuntime } from '@/utils';
-import { VocabularyWordCard } from '../shared/VocabularyWordCard';
-import { FavoritesPanelFooter } from './FavoritesPanelFooter';
+import {
+	playEnglishPreferred,
+	stopAllEnglishPlayback,
+} from '@/utils/englishTts';
+import { VocabularyWordCard } from '../../shared/VocabularyWordCard';
+import { FavoritesPanelFooter } from '../components/FavoritesPanelFooter';
+import { useVocabularyFavoritesList } from './useVocabularyFavoritesList';
 
-export type VocabularyFavoritesPanelProps = {
-	entries: EnglishVocabularyFavoriteListEntry[];
-	loading: boolean;
-	loadingMore: boolean;
-	onViewportScroll: UIEventHandler<HTMLDivElement>;
-	playingKey: string | null;
-	onTogglePlayWord: (word: string, key: string) => void | Promise<void>;
-	onBatchRemoveFavorites: (
-		selected: EnglishVocabularyFavoriteListEntry[],
-	) => Promise<void>;
-	/** 服务端收藏总数 */
-	totalCount: number;
+export type FavoritesListCounts = {
+	loaded: number;
+	/** 服务端返回的收藏总数（首屏请求即可得） */
+	total: number;
 };
 
-export function VocabularyFavoritesPanel({
-	entries,
-	loading,
-	loadingMore,
-	onViewportScroll,
-	playingKey,
-	onTogglePlayWord,
-	onBatchRemoveFavorites,
-	totalCount,
-}: VocabularyFavoritesPanelProps) {
+export type VocabularyFavoritesSectionProps = {
+	active: boolean;
+	onCountsChange?: (counts: FavoritesListCounts) => void;
+};
+
+export function VocabularyFavoritesSection({
+	active,
+	onCountsChange,
+}: VocabularyFavoritesSectionProps) {
 	const { t } = useI18n();
+	const {
+		entries,
+		totalCount,
+		loading,
+		loadingMore,
+		onViewportScroll,
+		onBatchRemove,
+	} = useVocabularyFavoritesList(active);
+
 	const [exportingDocx, setExportingDocx] = useState(false);
 	const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
 	const [batchRemoving, setBatchRemoving] = useState(false);
@@ -50,6 +58,23 @@ export function VocabularyFavoritesPanel({
 	const [singleRemoveConfirmOpen, setSingleRemoveConfirmOpen] = useState(false);
 	const [singleRemoveTarget, setSingleRemoveTarget] =
 		useState<EnglishVocabularyFavoriteListEntry | null>(null);
+	const [playingKey, setPlayingKey] = useState<string | null>(null);
+
+	useEffect(() => {
+		onCountsChange?.({
+			loaded: entries.length,
+			total: totalCount,
+		});
+	}, [entries.length, totalCount, onCountsChange]);
+
+	useEffect(() => {
+		if (totalCount > 0) {
+			setEnglishPracticePoolMeta(englishPracticePoolKeys.favorites('vocab'), {
+				total: totalCount,
+				title: t('englishLearning.practice.sourceFavorites'),
+			});
+		}
+	}, [totalCount, t]);
 
 	const showInitialLoading = loading && entries.length === 0;
 	const showLoadMoreHint = loadingMore;
@@ -107,6 +132,29 @@ export function VocabularyFavoritesPanel({
 		[entries, selectedIds],
 	);
 
+	const onTogglePlayWord = useCallback(
+		async (word: string, key: string) => {
+			if (playingKey === key) {
+				stopAllEnglishPlayback();
+				setPlayingKey(null);
+				return;
+			}
+			stopAllEnglishPlayback();
+			setPlayingKey(key);
+			try {
+				await playEnglishPreferred(word, { preferLocal: true });
+			} catch {
+				Toast({
+					type: 'warning',
+					title: t('englishLearning.tts.unsupported'),
+				});
+			} finally {
+				setPlayingKey((k) => (k === key ? null : k));
+			}
+		},
+		[playingKey, t],
+	);
+
 	const requestRemoveConfirm = useCallback(() => {
 		if (selectedIds.size === 0) {
 			Toast({
@@ -137,7 +185,7 @@ export function VocabularyFavoritesPanel({
 		}
 		setBatchRemoving(true);
 		try {
-			await onBatchRemoveFavorites(toRemove);
+			await onBatchRemove(toRemove);
 			setSelectedIds(new Set());
 			setRemoveConfirmOpen(false);
 			setSingleRemoveConfirmOpen(false);
@@ -158,7 +206,7 @@ export function VocabularyFavoritesPanel({
 		} finally {
 			setBatchRemoving(false);
 		}
-	}, [entries, onBatchRemoveFavorites, selectedIds, t]);
+	}, [entries, onBatchRemove, selectedIds, t]);
 
 	const executeSingleRemoveConfirm = useCallback(async () => {
 		const target = singleRemoveTarget;
@@ -168,7 +216,7 @@ export function VocabularyFavoritesPanel({
 		}
 		setBatchRemoving(true);
 		try {
-			await onBatchRemoveFavorites([target]);
+			await onBatchRemove([target]);
 			setSelectedIds((prev) => {
 				const next = new Set(prev);
 				next.delete(target.id);
@@ -192,7 +240,7 @@ export function VocabularyFavoritesPanel({
 		} finally {
 			setBatchRemoving(false);
 		}
-	}, [onBatchRemoveFavorites, singleRemoveTarget, t]);
+	}, [onBatchRemove, singleRemoveTarget, t]);
 
 	const handleExportDocx = async () => {
 		if (entries.length === 0 && !loading) {

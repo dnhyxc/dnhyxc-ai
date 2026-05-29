@@ -17,7 +17,7 @@ import {
 	removeEnglishClassicQuoteFavoritesBatch,
 } from '@/service';
 
-export function useClassicQuoteFavoritesList(active: boolean) {
+export function useClassicFavoritesList(active: boolean) {
 	const { t } = useI18n();
 	const [entries, setEntries] = useState<
 		EnglishClassicQuoteFavoriteListEntry[]
