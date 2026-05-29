@@ -6,7 +6,7 @@ import { observer } from 'mobx-react';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import EnglishPackStore from '@/store/englishPack';
-import type { PackStreamKind } from './PackStreamKindTabs';
+import type { PackStreamKind } from '../types';
 
 type PackStreamProgressProps = {
 	kind: PackStreamKind;

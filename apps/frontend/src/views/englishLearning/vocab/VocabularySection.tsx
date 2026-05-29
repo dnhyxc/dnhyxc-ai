@@ -33,7 +33,7 @@ import EnglishPackStore, {
 import { sanitizeCountDigits } from '@/utils';
 import { streamEnglishVocabularyPack } from '@/utils/englishLearningPackSse';
 import { formatEnglishLearningAgentToolLine } from '../agent/agentToolStatusText';
-import { PackStreamLiveLink } from '../pack/PackStreamLiveLink';
+import { PackStreamLiveLink } from '../pack/components/PackStreamLiveLink';
 import { VocabularyHistoryDrawer } from './VocabularyHistoryDrawer';
 
 export type VocabProgressState = EnglishPackUiProgress;

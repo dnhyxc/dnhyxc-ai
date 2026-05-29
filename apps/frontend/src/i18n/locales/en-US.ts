@@ -796,7 +796,7 @@ export const enUS = {
 	'route.englishLearning.stream.title': 'Fetch results',
 	'route.englishLearning.morphology.title': 'Roots & affixes',
 	'route.englishLearning.grammar.title': 'English grammar',
-	'route.englishLearning.practice.title': 'Dictation & spelling',
+	'route.englishLearning.practice.title': 'Practice dictation & spelling',
 	'route.englishLearning.practice.classicTitle':
 		'Sentence dictation & spelling',
 

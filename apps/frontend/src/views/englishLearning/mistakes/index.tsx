@@ -87,11 +87,13 @@ export default function EnglishLearningMistakesPage() {
 			<div className="box-border flex h-full min-h-0 w-full min-w-0 flex-col p-5.5 pt-0">
 				<div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-md bg-theme-background">
 					<EnglishLearningPanelHeader
-						titleClassName="flex items-center gap-2"
+						titleClassName="flex min-w-0 flex-1 items-center gap-2 overflow-hidden"
 						title={
 							<>
-								{title}
-								<span className="text-textcolor/50 ml-1 text-sm font-normal">
+								<span className="min-w-0 truncate" title={title}>
+									{title}
+								</span>
+								<span className="text-textcolor/50 shrink-0 whitespace-nowrap text-sm font-normal">
 									{t('englishLearning.library.listCount', {
 										count: counts.total,
 										type: countType,

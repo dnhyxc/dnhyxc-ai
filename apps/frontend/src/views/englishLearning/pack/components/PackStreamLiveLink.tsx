@@ -10,7 +10,7 @@ import SearchOrganics from '@/components/design/ChatAssistantMessage/SearchOrgan
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import EnglishPackStore from '@/store/englishPack';
-import type { PackStreamKind } from './PackStreamKindTabs';
+import type { PackStreamKind } from '../types';
 
 type PackStreamLiveLinkProps = {
 	kind: PackStreamKind;

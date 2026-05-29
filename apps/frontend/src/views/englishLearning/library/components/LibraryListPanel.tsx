@@ -1,5 +1,5 @@
 /**
- * 资源库页：左侧已导入单词库列表（滚动分页）
+ * 资源库：左侧库列表（单词 / 经典句，滚动分页）
  */
 import Confirm from '@design/Confirm';
 import Loading from '@design/Loading';
@@ -28,23 +28,12 @@ import {
 	listEnglishClassicQuotesLibraries,
 	listEnglishVocabularyLibraries,
 } from '@/service';
-import { EnglishPracticeEntry } from '../components/practiceEntry';
+import { EnglishPracticeEntry } from '../../components/practiceEntry';
+import type { EnglishLibraryListItem, LibraryKind } from '../types';
+import { getLibraryItemCount } from '../types';
 
-export type EnglishLibraryListItem =
-	| EnglishVocabularyLibraryListItem
-	| EnglishClassicQuotesLibraryListItem;
-
-function getLibraryItemCount(
-	lib: EnglishLibraryListItem,
-	kind: 'vocab' | 'classic',
-): number {
-	return kind === 'vocab'
-		? (lib as EnglishVocabularyLibraryListItem).wordCount
-		: (lib as EnglishClassicQuotesLibraryListItem).quoteCount;
-}
-
-export type VocabularyLibraryListPanelProps = {
-	kind: 'vocab' | 'classic';
+export type LibraryListPanelProps = {
+	kind: LibraryKind;
 	selectedId: string | null;
 	initialLibraryId?: string | null;
 	onSelect: (library: EnglishLibraryListItem) => void;
@@ -60,13 +49,13 @@ function formatLibraryDate(iso: string): string {
 	}
 }
 
-export function VocabularyLibraryListPanel({
+export function LibraryListPanel({
 	kind,
 	selectedId,
 	initialLibraryId,
 	onSelect,
 	onLibraryDeleted,
-}: VocabularyLibraryListPanelProps) {
+}: LibraryListPanelProps) {
 	const { t } = useI18n();
 	const navigate = useNavigate();
 

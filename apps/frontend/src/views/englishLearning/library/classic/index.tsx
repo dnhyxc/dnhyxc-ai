@@ -1,5 +1,5 @@
 /**
- * 资源库页：右侧单词列表（滚动分页加载）
+ * 经典句资源库：右侧语句列表（滚动分页加载）
  */
 import Loading from '@design/Loading';
 import { Button, ScrollArea, Spinner, Toast } from '@ui/index';
@@ -12,16 +12,16 @@ import {
 	useState,
 } from 'react';
 import { useNavigate } from 'react-router';
-import { useI18n, useIncrementalVocabFavoriteStatus } from '@/hooks';
+import { useI18n, useIncrementalClassicQuoteFavoriteStatus } from '@/hooks';
 import { cn } from '@/lib/utils';
-import type { EnglishVocabularyItem } from '@/service';
+import type { EnglishClassicQuoteItem } from '@/service';
 import {
-	addEnglishVocabularyFavorite,
-	type EnglishVocabularyLibraryItemRow,
-	type EnglishVocabularyLibraryListItem,
-	listEnglishVocabularyLibraryItems,
-	normalizeEnglishVocabWordKey,
-	removeEnglishVocabularyFavorite,
+	addEnglishClassicQuoteFavorite,
+	classicQuoteFavoriteContentKey,
+	type EnglishClassicQuotesLibraryItemRow,
+	type EnglishClassicQuotesLibraryListItem,
+	listEnglishClassicQuotesLibraryItems,
+	removeEnglishClassicQuoteFavorite,
 } from '@/service';
 import {
 	englishPracticePoolKeys,
@@ -31,19 +31,19 @@ import {
 	playEnglishPreferred,
 	stopAllEnglishPlayback,
 } from '@/utils/englishTts';
-import { EnglishPracticeEntry } from '../components/practiceEntry';
-import { VocabularyWordCard } from '../components/VocabularyWordCard';
-import { useLibraryWordsList } from './useLibraryWordsList';
+import { ClassicQuoteCard } from '../../components/ClassicQuoteCard';
+import { EnglishPracticeEntry } from '../../components/practiceEntry';
+import { useLibraryWordsList } from '../hooks/useLibraryWordsList';
 
-export type VocabularyLibraryWordsPanelProps = {
+export type ClassicQuotesLibrarySectionProps = {
 	libraryId: string | null;
-	libraryMeta: EnglishVocabularyLibraryListItem | null;
+	libraryMeta: EnglishClassicQuotesLibraryListItem | null;
 };
 
-export function VocabularyLibraryWordsPanel({
+export function ClassicQuotesLibrarySection({
 	libraryId,
 	libraryMeta,
-}: VocabularyLibraryWordsPanelProps) {
+}: ClassicQuotesLibrarySectionProps) {
 	const { t } = useI18n();
 	const navigate = useNavigate();
 	const [playingKey, setPlayingKey] = useState<string | null>(null);
@@ -51,9 +51,9 @@ export function VocabularyLibraryWordsPanel({
 		null,
 	);
 
-	const fetchVocabPage = useCallback(
+	const fetchClassicPage = useCallback(
 		async (id: string, limit: number, offset: number) => {
-			const res = await listEnglishVocabularyLibraryItems(id, {
+			const res = await listEnglishClassicQuotesLibraryItems(id, {
 				limit,
 				offset,
 				silent: true,
@@ -79,12 +79,12 @@ export function VocabularyLibraryWordsPanel({
 		initialScrollTop,
 		onViewportScroll,
 	} = useLibraryWordsList<
-		EnglishVocabularyLibraryItemRow,
-		EnglishVocabularyLibraryListItem
+		EnglishClassicQuotesLibraryItemRow,
+		EnglishClassicQuotesLibraryListItem
 	>({
 		libraryId,
-		cacheNamespace: 'vocab',
-		fetchPage: fetchVocabPage,
+		cacheNamespace: 'classic',
+		fetchPage: fetchClassicPage,
 	});
 
 	useLayoutEffect(() => {
@@ -93,14 +93,21 @@ export function VocabularyLibraryWordsPanel({
 		el.scrollTop = initialScrollTop;
 	}, [libraryId, initialScrollTop]);
 
+	const {
+		favoritedContentKeys,
+		getClassicQuoteFavoriteId,
+		setClassicQuoteFavoriteId,
+		clearClassicQuoteFavorite,
+	} = useIncrementalClassicQuoteFavoriteStatus(items);
+
 	useEffect(() => {
 		if (!libraryId) return;
 		const meta = libraryMeta ?? resolvedLibrary;
-		const n = meta?.wordCount ?? items.length;
+		const n = meta?.quoteCount ?? items.length;
 		const title = (libraryMeta ?? resolvedLibrary)?.title?.trim();
 		if (n > 0 || title) {
 			setEnglishPracticePoolMeta(
-				englishPracticePoolKeys.library(libraryId, 'vocab'),
+				englishPracticePoolKeys.library(libraryId, 'classic'),
 				{
 					total: n > 0 ? n : undefined,
 					title,
@@ -109,20 +116,13 @@ export function VocabularyLibraryWordsPanel({
 		}
 	}, [libraryId, libraryMeta, resolvedLibrary, items.length]);
 
-	const {
-		favoritedWordKeys,
-		getVocabularyFavoriteId,
-		setVocabularyFavoriteId,
-		clearVocabularyFavorite,
-	} = useIncrementalVocabFavoriteStatus(items);
-
 	useEffect(() => {
 		stopAllEnglishPlayback();
 		setPlayingKey(null);
 	}, [libraryId]);
 
-	const toggleWordAudio = useCallback(
-		async (word: string, key: string) => {
+	const toggleQuoteAudio = useCallback(
+		async (text: string, key: string) => {
 			if (playingKey === key) {
 				stopAllEnglishPlayback();
 				setPlayingKey(null);
@@ -131,7 +131,7 @@ export function VocabularyLibraryWordsPanel({
 			stopAllEnglishPlayback();
 			setPlayingKey(key);
 			try {
-				await playEnglishPreferred(word, { preferLocal: true });
+				await playEnglishPreferred(text);
 			} catch {
 				Toast({
 					type: 'warning',
@@ -144,21 +144,21 @@ export function VocabularyLibraryWordsPanel({
 		[playingKey, t],
 	);
 
-	const toggleVocabularyFavorite = useCallback(
-		async (item: EnglishVocabularyItem, currentlyFavorited: boolean) => {
-			const wk = normalizeEnglishVocabWordKey(item.word);
-			if (!wk) return;
-			setFavoriteActionKey(wk);
+	const toggleClassicQuoteFavorite = useCallback(
+		async (item: EnglishClassicQuoteItem, currentlyFavorited: boolean) => {
+			const ck = classicQuoteFavoriteContentKey(item.english);
+			if (!ck) return;
+			setFavoriteActionKey(ck);
 			try {
 				if (currentlyFavorited) {
-					const favoriteId = getVocabularyFavoriteId(wk);
+					const favoriteId = getClassicQuoteFavoriteId(ck);
 					if (!favoriteId) return;
-					await removeEnglishVocabularyFavorite(favoriteId);
-					clearVocabularyFavorite(wk);
+					await removeEnglishClassicQuoteFavorite(favoriteId);
+					clearClassicQuoteFavorite(ck);
 				} else {
-					const res = await addEnglishVocabularyFavorite(item);
+					const res = await addEnglishClassicQuoteFavorite(item);
 					const favoriteId = res.data?.id;
-					if (favoriteId) setVocabularyFavoriteId(wk, favoriteId);
+					if (favoriteId) setClassicQuoteFavoriteId(ck, favoriteId);
 				}
 			} catch {
 				// 错误提示由 http 客户端统一处理
@@ -166,41 +166,51 @@ export function VocabularyLibraryWordsPanel({
 				setFavoriteActionKey(null);
 			}
 		},
-		[getVocabularyFavoriteId, setVocabularyFavoriteId, clearVocabularyFavorite],
+		[
+			getClassicQuoteFavoriteId,
+			setClassicQuoteFavoriteId,
+			clearClassicQuoteFavorite,
+		],
 	);
 
 	if (!libraryId) {
 		return (
 			<div className="text-textcolor/60 flex h-full min-h-0 flex-col items-center justify-center px-6 text-center text-sm">
-				{t('englishLearning.library.selectLibrary')}
+				{t('englishLearning.library.selectLibraryClassic')}
 			</div>
 		);
 	}
 
 	const meta = libraryMeta ?? resolvedLibrary;
 	const title = meta?.title?.trim() || '—';
-	const total = meta?.wordCount ?? items.length;
+	const total = meta?.quoteCount ?? items.length;
 	const showInitialLoading = loading && items.length === 0;
 	const showEmpty = !loading && items.length === 0;
 
 	return (
 		<div className="flex h-full min-h-0 flex-col @container">
-			<div className="h-12 flex px-4.5 py-1 items-center justify-between gap-1 text-textcolor line-clamp-2 text-base">
-				<div className="flex items-center gap-2">
-					{title}
-					<div className="text-textcolor/50 mt-0.5 text-sm">
-						{t('englishLearning.library.wordsHeading', { count: total })} /{' '}
+			<div className="flex h-12 shrink-0 items-center justify-between gap-3 overflow-hidden px-4.5">
+				<div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
+					<span
+						className="text-textcolor min-w-0 truncate text-base font-semibold"
+						title={title}
+					>
+						{title}
+					</span>
+					<span className="text-textcolor/50 shrink-0 whitespace-nowrap text-sm">
+						{t('englishLearning.library.quotesHeading', { count: total })} /{' '}
 						{t('common.loaded', {
 							count: items.length,
-							type: t('common.type-1'),
+							type: t('common.type-2'),
 						})}
-					</div>
+					</span>
 				</div>
-				<div className="flex shrink-0 items-center gap-3">
+				<div className="flex shrink-0 flex-nowrap items-center gap-3">
 					<EnglishPracticeEntry
 						variant="text"
 						disabled={total <= 0}
 						practice={{
+							contentKind: 'classic',
 							source: 'library',
 							libraryId,
 							sourceTitle: meta?.title?.trim() || undefined,
@@ -211,11 +221,11 @@ export function VocabularyLibraryWordsPanel({
 						type="button"
 						className="flex items-center gap-1 text-teal-500 hover:text-teal-400 cursor-pointer text-sm"
 						onClick={() => {
-							navigate('/english-learning/favorites');
+							navigate('/english-learning/favorites?kind=classic');
 						}}
 					>
 						<Star className="size-4.5" />
-						{t('englishLearning.practice.favorites')}
+						{t('route.englishLearning.favorites.title')}
 					</button>
 				</div>
 			</div>
@@ -226,32 +236,43 @@ export function VocabularyLibraryWordsPanel({
 			>
 				{showInitialLoading ? (
 					<div className="text-textcolor/60 flex min-h-full flex-1 items-center justify-center text-center text-sm">
-						<Loading text={t('englishLearning.library.wordsLoading')} />
+						<Loading text={t('englishLearning.library.quotesLoading')} />
 					</div>
 				) : (
 					<>
 						{showEmpty ? (
 							<div className="text-textcolor/60 py-12 text-center text-sm">
-								{t('englishLearning.vocab.empty')}
+								{t('englishLearning.classic.empty')}
 							</div>
 						) : null}
 						{items.length > 0 ? (
-							<div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,16rem),1fr))] gap-4">
+							<div className="grid grid-cols-1 gap-4 @min-[28rem]:grid-cols-2">
 								{items.map((item) => {
-									const key = `${item.id}-${item.word}`;
+									const contentKey = classicQuoteFavoriteContentKey(
+										item.english,
+									);
+									const key = `${item.id}-${contentKey || item.english.slice(0, 48)}`;
 									const playing = playingKey === key;
-									const wordKey = normalizeEnglishVocabWordKey(item.word);
-									const isFavorited = favoritedWordKeys.has(wordKey);
-									const favBusy = favoriteActionKey === wordKey;
+									const isFavorited =
+										contentKey.length > 0 &&
+										favoritedContentKeys.has(contentKey);
+									const favBusy = favoriteActionKey === contentKey;
 									return (
-										<VocabularyWordCard
+										<ClassicQuoteCard
 											key={key}
 											variant="library"
-											data={item}
+											data={{
+												english: item.english,
+												translationZh: item.translationZh,
+												source: item.source,
+												noteZh: item.noteZh,
+											}}
 											playing={playing}
-											onTogglePlay={() => void toggleWordAudio(item.word, key)}
+											onTogglePlay={() =>
+												void toggleQuoteAudio(item.english, key)
+											}
 											playLabels={{
-												play: t('englishLearning.vocab.playWord'),
+												play: t('englishLearning.classic.playQuote'),
 												stop: t('englishLearning.tts.stop'),
 											}}
 											trailingActions={
@@ -259,9 +280,9 @@ export function VocabularyLibraryWordsPanel({
 													type="button"
 													variant="ghost"
 													size="sm"
-													disabled={favBusy}
+													disabled={favBusy || !contentKey}
 													onClick={() =>
-														void toggleVocabularyFavorite(item, isFavorited)
+														void toggleClassicQuoteFavorite(item, isFavorited)
 													}
 													className={cn(
 														'h-7 w-7 shrink-0 rounded-md border p-0 transition-colors',
@@ -272,8 +293,8 @@ export function VocabularyLibraryWordsPanel({
 													aria-pressed={isFavorited}
 													aria-label={
 														isFavorited
-															? t('englishLearning.vocab.unfavoriteWord')
-															: t('englishLearning.vocab.favoriteWord')
+															? t('englishLearning.classic.unfavoriteQuote')
+															: t('englishLearning.classic.favoriteQuote')
 													}
 												>
 													<Star

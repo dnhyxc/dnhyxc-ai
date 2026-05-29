@@ -31,9 +31,9 @@ import {
 	listEnglishVocabularyHistory,
 } from '@/service';
 import EnglishPackStore from '@/store/englishPack';
-import { ClassicQuotesHistoryDrawer } from '../classic/ClassicQuotesHistoryDrawer';
-import { VocabularyHistoryDrawer } from '../vocab/VocabularyHistoryDrawer';
-import type { PackStreamKind } from './PackStreamKindTabs';
+import { ClassicQuotesHistoryDrawer } from '../../classic/ClassicQuotesHistoryDrawer';
+import { VocabularyHistoryDrawer } from '../../vocab/VocabularyHistoryDrawer';
+import type { PackStreamKind } from '../types';
 
 export type PackStreamHistoryDrawerTriggerProps = {
 	kind: PackStreamKind;

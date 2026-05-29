@@ -33,7 +33,7 @@ import EnglishPackStore, {
 import { sanitizeCountDigits } from '@/utils';
 import { streamEnglishClassicQuotes } from '@/utils/englishLearningPackSse';
 import { formatEnglishLearningAgentToolLine } from '../agent/agentToolStatusText';
-import { PackStreamLiveLink } from '../pack/PackStreamLiveLink';
+import { PackStreamLiveLink } from '../pack/components/PackStreamLiveLink';
 import { ClassicQuotesHistoryDrawer } from './ClassicQuotesHistoryDrawer';
 
 export type ClassicQuoteProgressState = EnglishPackUiProgress;

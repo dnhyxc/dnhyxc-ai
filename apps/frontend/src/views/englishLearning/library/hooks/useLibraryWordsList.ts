@@ -18,7 +18,7 @@ import { retryAsync } from '@/utils/retryAsync';
 import {
 	getLibraryWordsListCache,
 	setLibraryWordsListCache,
-} from './libraryWordsListCache';
+} from '../utils/libraryWordsListCache';
 
 export type LibraryWordsListResult<TItem, TLibrary> = {
 	library: TLibrary;

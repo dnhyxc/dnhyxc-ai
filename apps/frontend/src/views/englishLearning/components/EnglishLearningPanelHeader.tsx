@@ -30,7 +30,7 @@ export function EnglishLearningPanelHeader({
 		>
 			<h2
 				className={cn(
-					'text-textcolor min-w-0 text-base font-semibold',
+					'text-textcolor min-w-0 overflow-hidden text-base font-semibold',
 					titleClassName,
 				)}
 			>

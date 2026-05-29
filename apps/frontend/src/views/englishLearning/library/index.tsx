@@ -17,24 +17,17 @@ import {
 	englishPracticePoolKeys,
 	setEnglishPracticePoolMeta,
 } from '@/store/englishPracticePool';
-import { ClassicQuotesLibraryWordsPanel } from './ClassicQuotesLibraryWordsPanel';
-import { invalidateLibraryWordsListCache } from './libraryWordsListCache';
-import {
-	type EnglishLibraryListItem,
-	VocabularyLibraryListPanel,
-} from './VocabularyLibraryListPanel';
-import { VocabularyLibraryWordsPanel } from './VocabularyLibraryWordsPanel';
-
-type LibraryKind = 'vocab' | 'classic';
-
-function parseKind(raw: string | null): LibraryKind {
-	return raw === 'classic' ? 'classic' : 'vocab';
-}
+import { ClassicQuotesLibrarySection } from './classic';
+import { LibraryListPanel } from './components/LibraryListPanel';
+import type { EnglishLibraryListItem, LibraryKind } from './types';
+import { parseLibraryKind } from './types';
+import { invalidateLibraryWordsListCache } from './utils/libraryWordsListCache';
+import { VocabularyLibrarySection } from './vocabulary';
 
 export default function EnglishLearningLibraryPage() {
 	const [searchParams, setSearchParams] = useSearchParams();
 	const kind = useMemo(
-		() => parseKind(searchParams.get('kind')),
+		() => parseLibraryKind(searchParams.get('kind')),
 		[searchParams],
 	);
 
@@ -66,20 +59,14 @@ export default function EnglishLearningLibraryPage() {
 		[kind, setSearchParams],
 	);
 
-	/**
-	 * 当前库被删除时的回调：
-	 * 1. 使该库在词条列表的会话内缓存（滚动、分页等）失效，避免下次切回时误用旧缓存。
-	 * 2. 清除当前已选中的库。
-	 * 3. 从 URL searchParams 中移除 library 字段，防止直接跳回已删除库。
-	 */
 	const onLibraryDeleted = useCallback(
 		(deletedId: string) => {
-			invalidateLibraryWordsListCache(kind, deletedId); // 使会话缓存失效
-			setSelectedLibrary(null); // 清除当前选中库
+			invalidateLibraryWordsListCache(kind, deletedId);
+			setSelectedLibrary(null);
 			setSearchParams(
 				(prev) => {
 					const next = new URLSearchParams(prev);
-					next.delete('library'); // 从 URL 参数中移除已删除库
+					next.delete('library');
 					return next;
 				},
 				{ replace: true },
@@ -140,7 +127,7 @@ export default function EnglishLearningLibraryPage() {
 									'flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-theme-background',
 								)}
 							>
-								<VocabularyLibraryListPanel
+								<LibraryListPanel
 									kind={kind}
 									selectedId={activeLibraryId}
 									initialLibraryId={listBootLibraryId}
@@ -157,12 +144,12 @@ export default function EnglishLearningLibraryPage() {
 						>
 							<section className="border-l border-theme/5 flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-theme-background">
 								{kind === 'vocab' ? (
-									<VocabularyLibraryWordsPanel
+									<VocabularyLibrarySection
 										libraryId={activeLibraryId}
 										libraryMeta={vocabLibraryMeta}
 									/>
 								) : (
-									<ClassicQuotesLibraryWordsPanel
+									<ClassicQuotesLibrarySection
 										libraryId={activeLibraryId}
 										libraryMeta={classicLibraryMeta}
 									/>
@@ -175,3 +162,6 @@ export default function EnglishLearningLibraryPage() {
 		</div>
 	);
 }
+
+// 供外部类型引用（如导入页）
+export type { EnglishLibraryListItem, LibraryKind };

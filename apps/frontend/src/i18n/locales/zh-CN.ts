@@ -708,7 +708,7 @@ export const zhCN = {
 	'route.englishLearning.stream.title': '拉取结果',
 	'route.englishLearning.morphology.title': '词根词缀大全',
 	'route.englishLearning.grammar.title': '英语语法大全',
-	'route.englishLearning.practice.title': '单词听写与拼写',
+	'route.englishLearning.practice.title': '听写与拼写练习',
 	'route.englishLearning.practice.classicTitle': '语句听写与拼写',
 
 	'englishLearning.practice.entry': '听写 / 拼写',
