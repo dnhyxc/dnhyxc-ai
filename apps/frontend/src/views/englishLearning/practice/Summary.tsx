@@ -5,7 +5,10 @@ import { ScrollArea, Toast } from '@ui/index';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
-import { batchAddEnglishVocabularyMistakes } from '@/service';
+import {
+	batchAddEnglishClassicQuoteMistakes,
+	batchAddEnglishVocabularyMistakes,
+} from '@/service';
 import {
 	isEnglishTtsSupported,
 	playEnglishPreferred,
@@ -19,6 +22,7 @@ import {
 } from './components/summary';
 import type { SummaryProps } from './types';
 import { shufflePracticeItems } from './utils/grading';
+import { getPracticeAnswerText, isPracticeClassicItem } from './utils/item';
 
 export function Summary({
 	results,
@@ -48,25 +52,52 @@ export function Summary({
 	const [playingKey, setPlayingKey] = useState<string | null>(null);
 	const [saveMistakesLoading, setSaveMistakesLoading] = useState(false);
 
+	const mistakesPath =
+		config.contentKind === 'classic'
+			? '/english-learning/mistakes?kind=classic'
+			: '/english-learning/mistakes?kind=vocab';
+
 	const handleSaveMistakes = useCallback(async () => {
 		if (wrongItems.length === 0) return;
 		setSaveMistakesLoading(true);
 		try {
-			const payload = results
-				.filter((r) => !r.correct)
-				.map((r) => ({
-					word: r.item.word,
-					ipa: r.item.ipa,
-					pos: r.item.pos,
-					segmentation: r.item.segmentation,
-					translationZh: r.item.translationZh,
-					example: r.item.example,
-					lastUserInput: r.userInput,
-				}));
-			const res = await batchAddEnglishVocabularyMistakes(payload);
+			const wrongResults = results.filter((r) => !r.correct);
+			const res =
+				config.contentKind === 'classic'
+					? await batchAddEnglishClassicQuoteMistakes(
+							wrongResults.map((r) => {
+								if (!isPracticeClassicItem(r.item)) {
+									throw new Error('invalid classic practice item');
+								}
+								return {
+									english: r.item.english,
+									translationZh: r.item.translationZh,
+									source: r.item.source,
+									noteZh: r.item.noteZh,
+									lastUserInput: r.userInput,
+								};
+							}),
+						)
+					: await batchAddEnglishVocabularyMistakes(
+							wrongResults.map((r) => {
+								if (r.item.contentKind !== 'vocab') {
+									throw new Error('invalid vocab practice item');
+								}
+								return {
+									word: r.item.word,
+									ipa: r.item.ipa,
+									pos: r.item.pos,
+									segmentation: r.item.segmentation,
+									translationZh: r.item.translationZh,
+									example: r.item.example,
+									lastUserInput: r.userInput,
+								};
+							}),
+						);
 			const added = res.data?.added ?? 0;
+			const updated = res.data?.updated ?? 0;
 			const skipped = res.data?.skipped ?? 0;
-			if (added === 0 && skipped > 0) {
+			if (added === 0 && updated === 0 && skipped > 0) {
 				Toast({
 					type: 'info',
 					title: t('englishLearning.practice.saveMistakesAllSkipped'),
@@ -74,8 +105,10 @@ export function Summary({
 			} else {
 				Toast({
 					type: 'success',
-					title: t('englishLearning.practice.saveMistakesSuccess', {
+					title: t('englishLearning.practice.saveMistakesSuccessTitle'),
+					message: t('englishLearning.practice.saveMistakesSuccess', {
 						added,
+						updated,
 						skipped,
 					}),
 				});
@@ -83,7 +116,7 @@ export function Summary({
 		} finally {
 			setSaveMistakesLoading(false);
 		}
-	}, [results, t, wrongItems.length]);
+	}, [config.contentKind, results, t, wrongItems.length]);
 
 	const toggleWordPlay = useCallback(
 		async (word: string, key: string) => {
@@ -186,9 +219,13 @@ export function Summary({
 										variant="wrong"
 										playing={playingKey === item.key}
 										onTogglePlay={() =>
-											void toggleWordPlay(item.word, item.key)
+											void toggleWordPlay(getPracticeAnswerText(item), item.key)
 										}
-										playLabel={t('englishLearning.vocab.playWord')}
+										playLabel={
+											config.contentKind === 'classic'
+												? t('englishLearning.classic.playQuote')
+												: t('englishLearning.vocab.playWord')
+										}
 										stopLabel={t('englishLearning.tts.stop')}
 									/>
 								))}
@@ -199,9 +236,13 @@ export function Summary({
 										variant="correct"
 										playing={playingKey === item.key}
 										onTogglePlay={() =>
-											void toggleWordPlay(item.word, item.key)
+											void toggleWordPlay(getPracticeAnswerText(item), item.key)
 										}
-										playLabel={t('englishLearning.vocab.playWord')}
+										playLabel={
+											config.contentKind === 'classic'
+												? t('englishLearning.classic.playQuote')
+												: t('englishLearning.vocab.playWord')
+										}
 										stopLabel={t('englishLearning.tts.stop')}
 									/>
 								))}
@@ -224,7 +265,10 @@ export function Summary({
 							retryWrong: t('englishLearning.practice.retryWrong'),
 							practiceAgain: t('englishLearning.practice.practiceAgain'),
 							continuePractice: t('englishLearning.practice.continuePractice'),
-							openMistakes: t('englishLearning.mistakes.nav'),
+							openMistakes:
+								config.contentKind === 'classic'
+									? t('englishLearning.mistakes.classicNav')
+									: t('englishLearning.mistakes.vocabNav'),
 							saveMistakes: t('englishLearning.practice.saveMistakes'),
 						}}
 						onRetryWrong={() =>
@@ -236,6 +280,7 @@ export function Summary({
 						}
 						onBackToSetup={onBackToSetup}
 						onContinuePractice={onContinuePractice}
+						mistakesPath={mistakesPath}
 						onSaveMistakes={() => void handleSaveMistakes()}
 					/>
 				</div>

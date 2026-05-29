@@ -6,6 +6,7 @@ import { Button } from '@ui/index';
 import { Label } from '@ui/label';
 import { Spinner } from '@ui/spinner';
 import { useI18n } from '@/hooks';
+import type { PracticeContentKind } from '../practice/types';
 import { EnglishPracticeEntry } from '../shared/practiceEntry';
 
 export type FavoritesPanelFooterProps = {
@@ -25,8 +26,9 @@ export type FavoritesPanelFooterProps = {
 	onExportDocx: () => void;
 	/** 导出按钮文案（单词 / 经典句 i18n 由父组件传入） */
 	exportLabel: string;
-	/** 单词收藏页：进入听写/拼写练习 */
+	/** 收藏页：进入听写/拼写练习 */
 	showPracticeEntry?: boolean;
+	practiceContentKind?: PracticeContentKind;
 	practiceDisabled?: boolean;
 	/** 收藏总数，写入练习页 URL 供分页拉词 */
 	practicePoolTotal?: number;
@@ -47,6 +49,7 @@ export function FavoritesPanelFooter({
 	onExportDocx,
 	exportLabel,
 	showPracticeEntry = false,
+	practiceContentKind = 'vocab',
 	practiceDisabled = false,
 	practicePoolTotal,
 }: FavoritesPanelFooterProps) {
@@ -99,10 +102,15 @@ export function FavoritesPanelFooter({
 				{showPracticeEntry ? (
 					<EnglishPracticeEntry
 						variant="button"
+						showIcon={false}
 						disabled={practiceDisabled}
 						practice={{
+							contentKind: practiceContentKind,
 							source: 'favorites',
-							sourceTitle: t('englishLearning.practice.sourceFavorites'),
+							sourceTitle:
+								practiceContentKind === 'classic'
+									? t('englishLearning.practice.sourceClassicFavorites')
+									: t('englishLearning.practice.sourceFavorites'),
 							poolTotal:
 								practicePoolTotal != null && practicePoolTotal > 0
 									? practicePoolTotal

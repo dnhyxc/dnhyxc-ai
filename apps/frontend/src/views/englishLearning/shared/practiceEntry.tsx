@@ -35,6 +35,7 @@ export function openEnglishPractice(
 ): void {
 	if (options?.syncPoolMeta !== false) {
 		const key = resolveEnglishPracticePoolKey({
+			contentKind: practice.contentKind,
 			source: practice.source,
 			libraryId: practice.libraryId,
 			streamId: practice.streamId,
@@ -65,6 +66,7 @@ export type EnglishPracticeEntryProps = {
 	variant?: EnglishPracticeEntryVariant;
 	className?: string;
 	iconClassName?: string;
+	/** 是否在文案旁显示耳机图标；footer 等纯文字按钮传 false */
 	showIcon?: boolean;
 	/** 覆盖默认 i18n 文案；icon 变体同时作为 aria-label */
 	label?: string;
@@ -145,6 +147,7 @@ export function EnglishPracticeEntry({
 		/>
 	) : null;
 
+	const withLabel = variant !== 'icon';
 	const content =
 		children ??
 		(variant === 'icon' ? (
@@ -152,9 +155,10 @@ export function EnglishPracticeEntry({
 		) : (
 			<>
 				{icon}
-				{entryLabel}
+				{withLabel ? entryLabel : null}
 			</>
 		));
+	const iconGap = showIcon && withLabel ? 'gap-1' : undefined;
 
 	if (variant === 'text') {
 		return (
@@ -163,7 +167,8 @@ export function EnglishPracticeEntry({
 				disabled={disabled}
 				aria-label={ariaLabel}
 				className={cn(
-					'flex items-center gap-1 text-sm text-teal-500 hover:text-teal-400',
+					'flex items-center text-sm text-teal-500 hover:text-teal-400',
+					iconGap,
 					disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
 					className,
 				)}
@@ -213,7 +218,8 @@ export function EnglishPracticeEntry({
 				disabled={disabled}
 				aria-label={ariaLabel}
 				className={cn(
-					'shrink-0 gap-1 text-white bg-teal-500 hover:bg-teal-600',
+					'shrink-0 text-white bg-teal-500 hover:bg-teal-600',
+					iconGap,
 					className,
 				)}
 				onClick={handleClick}
@@ -231,7 +237,8 @@ export function EnglishPracticeEntry({
 			disabled={disabled}
 			aria-label={ariaLabel}
 			className={cn(
-				'shrink-0 gap-1 px-0! text-teal-500 hover:text-teal-400',
+				'shrink-0 px-0! text-teal-500 hover:text-teal-400',
+				iconGap,
 				className,
 			)}
 			onClick={handleClick}

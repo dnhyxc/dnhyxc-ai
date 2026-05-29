@@ -3,9 +3,11 @@
  */
 
 import type { HTMLAttributes, ReactNode } from 'react';
-import type { EnglishVocabularyItem } from '@/service';
+import type { EnglishClassicQuoteItem, EnglishVocabularyItem } from '@/service';
 
 // —— 领域模型 ——
+
+export type PracticeContentKind = 'vocab' | 'classic';
 
 export type PracticeMode = 'dictation' | 'spelling';
 
@@ -18,10 +20,19 @@ export type PracticeSource =
 
 export type PracticeOrder = 'random' | 'sequential';
 
-export type PracticeItem = EnglishVocabularyItem & {
+export type PracticeVocabItem = EnglishVocabularyItem & {
+	contentKind: 'vocab';
 	/** 去重键，与收藏 wordKey 一致 */
 	key: string;
 };
+
+export type PracticeClassicItem = EnglishClassicQuoteItem & {
+	contentKind: 'classic';
+	/** 去重键，与经典句收藏 contentKey 一致 */
+	key: string;
+};
+
+export type PracticeItem = PracticeVocabItem | PracticeClassicItem;
 
 export type PracticeCountOption = 10 | 20 | 30 | 40 | 50;
 
@@ -37,6 +48,7 @@ export type PracticeSessionFetchResult = {
 };
 
 export type PracticeSetupConfig = {
+	contentKind: PracticeContentKind;
 	mode: PracticeMode;
 	source: PracticeSource;
 	order: PracticeOrder;
@@ -58,6 +70,7 @@ export type PracticePhase = 'setup' | 'running' | 'summary';
 // —— 路由 / 链接 ——
 
 export type BuildEnglishPracticeSearchParamsInput = {
+	contentKind?: PracticeContentKind;
 	source: PracticeSource;
 	mode?: PracticeMode;
 	libraryId?: string;
@@ -77,12 +90,14 @@ export type BuildEnglishPracticeSearchParamsInput = {
 export type PracticePaginatedPage = { items: PracticeItem[] };
 
 export type PracticeFetchContext = {
+	contentKind: PracticeContentKind;
 	source: PracticeSource;
 	libraryId?: string;
 	streamId?: string;
 };
 
 export type PracticeSessionParams = {
+	contentKind: PracticeContentKind;
 	source: PracticeSource;
 	count: number;
 	order: PracticeOrder;
@@ -96,6 +111,7 @@ export type PracticeSessionParams = {
 // —— 来源标题解析 ——
 
 export type ResolvePracticeSourceTitleParams = {
+	contentKind: PracticeContentKind;
 	source: PracticeSource;
 	libraryId?: string;
 	streamId?: string;
@@ -137,6 +153,7 @@ export type PracticeCardProps = {
 // —— 各阶段页面 ——
 
 export type SetupProps = {
+	initialContentKind: PracticeContentKind;
 	initialSource: PracticeSource;
 	initialMode: PracticeMode;
 	initialLibraryId?: string;
@@ -201,6 +218,7 @@ export type SummaryActionsProps = {
 	hasWrongItems: boolean;
 	continueLoading: boolean;
 	saveMistakesLoading?: boolean;
+	mistakesPath?: string;
 	labels: {
 		retryWrong: string;
 		practiceAgain: string;
@@ -228,6 +246,8 @@ export type DictationStepProgressProps = {
 export type PracticeHintFields = {
 	ipa?: string | null;
 	translationZh?: string | null;
+	source?: string | null;
+	noteZh?: string | null;
 };
 
 export type DictationPromptBodyProps = {
@@ -271,10 +291,17 @@ export type VocabWordPlayButtonProps = {
 };
 
 export type WordAnswerDetailProps = {
-	item: PracticeItem;
+	item: PracticeVocabItem;
 	correctAnswerLabel: string;
 	showDivider?: boolean;
 	wordRowTrailing?: ReactNode;
+};
+
+export type SentenceAnswerDetailProps = {
+	item: PracticeClassicItem;
+	correctAnswerLabel: string;
+	showDivider?: boolean;
+	sentenceRowTrailing?: ReactNode;
 };
 
 export type RevealedPanelInnerProps = {

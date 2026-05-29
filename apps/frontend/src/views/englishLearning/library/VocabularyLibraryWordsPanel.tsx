@@ -99,10 +99,13 @@ export function VocabularyLibraryWordsPanel({
 		const n = meta?.wordCount ?? items.length;
 		const title = (libraryMeta ?? resolvedLibrary)?.title?.trim();
 		if (n > 0 || title) {
-			setEnglishPracticePoolMeta(englishPracticePoolKeys.library(libraryId), {
-				total: n > 0 ? n : undefined,
-				title,
-			});
+			setEnglishPracticePoolMeta(
+				englishPracticePoolKeys.library(libraryId, 'vocab'),
+				{
+					total: n > 0 ? n : undefined,
+					title,
+				},
+			);
 		}
 	}, [libraryId, libraryMeta, resolvedLibrary, items.length]);
 

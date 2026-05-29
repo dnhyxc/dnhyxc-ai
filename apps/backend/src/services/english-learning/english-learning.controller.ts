@@ -40,6 +40,11 @@ import {
 	ClassicQuoteFavoriteStatusDto,
 } from './dto/classic-quote-favorite.dto';
 import {
+	ClassicQuoteMistakeBatchDto,
+	ClassicQuoteMistakeRemoveBatchDto,
+	ClassicQuoteMistakeRemoveDto,
+} from './dto/classic-quote-mistake.dto';
+import {
 	GenerateClassicQuotesDto,
 	GenerateVocabularyDto,
 	resolveClassicQuotesPackTargetCount,
@@ -697,6 +702,79 @@ export class EnglishLearningController {
 		}
 		const data =
 			await this.englishLearningService.removeVocabularyMistakesBatch(
+				userId,
+				dto.ids,
+			);
+		return { success: true, data };
+	}
+
+	/** 分页列出当前用户语句错题集（按入库时间倒序） */
+	@Get('classic-quote-mistakes')
+	async listClassicQuoteMistakesPaginated(
+		@Req() req: AuthedRequest,
+		@Query('limit') limitStr?: string,
+		@Query('offset') offsetStr?: string,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const limit = Math.min(
+			100,
+			Math.max(1, Number.parseInt(limitStr ?? '20', 10) || 20),
+		);
+		const offset = Math.max(0, Number.parseInt(offsetStr ?? '0', 10) || 0);
+		const data = await this.englishLearningService.listClassicQuoteMistakesPage(
+			userId,
+			{ limit, offset },
+		);
+		return { success: true, data };
+	}
+
+	/** 批量加入语句错题集（已存在内容键跳过，不更新） */
+	@Post('classic-quote-mistakes/batch')
+	async batchAddClassicQuoteMistakes(
+		@Req() req: AuthedRequest,
+		@Body() dto: ClassicQuoteMistakeBatchDto,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const data = await this.englishLearningService.batchAddClassicQuoteMistakes(
+			userId,
+			dto.items ?? [],
+		);
+		return { success: true, data };
+	}
+
+	@Post('classic-quote-mistakes/remove')
+	async removeClassicQuoteMistake(
+		@Req() req: AuthedRequest,
+		@Body() dto: ClassicQuoteMistakeRemoveDto,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const data = await this.englishLearningService.removeClassicQuoteMistake(
+			userId,
+			dto.id,
+		);
+		return { success: true, data };
+	}
+
+	@Post('classic-quote-mistakes/remove-batch')
+	async removeClassicQuoteMistakesBatch(
+		@Req() req: AuthedRequest,
+		@Body() dto: ClassicQuoteMistakeRemoveBatchDto,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const data =
+			await this.englishLearningService.removeClassicQuoteMistakesBatch(
 				userId,
 				dto.ids,
 			);

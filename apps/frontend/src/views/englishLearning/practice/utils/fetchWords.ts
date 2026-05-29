@@ -6,15 +6,20 @@
  * - **继续练习**：顺序拉下一页；随机拉未使用过的页码；均排除已练 wordKey。
  */
 import {
+	type EnglishClassicQuoteFavoriteListEntry,
+	type EnglishClassicQuoteMistakeListEntry,
+	type EnglishClassicQuotesLibraryItemRow,
 	type EnglishVocabularyFavoriteListEntry,
-	type EnglishVocabularyItem,
 	type EnglishVocabularyLibraryItemRow,
 	type EnglishVocabularyMistakeListEntry,
+	listEnglishClassicQuoteFavorites,
+	listEnglishClassicQuoteMistakes,
+	listEnglishClassicQuotesLibraryItems,
+	listEnglishClassicQuotesPackItems,
 	listEnglishVocabularyFavorites,
 	listEnglishVocabularyLibraryItems,
 	listEnglishVocabularyMistakes,
 	listEnglishVocabularyPackItems,
-	normalizeEnglishVocabWordKey,
 } from '@/service';
 import EnglishPackStore from '@/store/englishPack';
 import {
@@ -23,6 +28,7 @@ import {
 	setEnglishPracticePoolTotal,
 } from '@/store/englishPracticePool';
 import type {
+	PracticeContentKind,
 	PracticeFetchContext,
 	PracticeItem,
 	PracticeOrder,
@@ -32,19 +38,14 @@ import type {
 	PracticeSessionParams,
 	PracticeSource,
 } from '../types';
+import { toPracticeClassicItem, toPracticeVocabItem } from './item';
 
 export const PRACTICE_MAX_WORDS = 50;
 
-function toPracticeItem(
-	word: string,
-	fields: Omit<EnglishVocabularyItem, 'word'>,
+function vocabFavoriteToItem(
+	row: EnglishVocabularyFavoriteListEntry,
 ): PracticeItem {
-	const key = normalizeEnglishVocabWordKey(word);
-	return { word, ...fields, key };
-}
-
-function favoriteToItem(row: EnglishVocabularyFavoriteListEntry): PracticeItem {
-	return toPracticeItem(row.word, {
+	return toPracticeVocabItem(row.word, {
 		ipa: row.ipa,
 		pos: row.pos,
 		segmentation: row.segmentation,
@@ -53,8 +54,10 @@ function favoriteToItem(row: EnglishVocabularyFavoriteListEntry): PracticeItem {
 	});
 }
 
-function mistakeToItem(row: EnglishVocabularyMistakeListEntry): PracticeItem {
-	return toPracticeItem(row.word, {
+function vocabMistakeToItem(
+	row: EnglishVocabularyMistakeListEntry,
+): PracticeItem {
+	return toPracticeVocabItem(row.word, {
 		ipa: row.ipa,
 		pos: row.pos,
 		segmentation: row.segmentation,
@@ -63,13 +66,48 @@ function mistakeToItem(row: EnglishVocabularyMistakeListEntry): PracticeItem {
 	});
 }
 
-function libraryRowToItem(row: EnglishVocabularyLibraryItemRow): PracticeItem {
-	return toPracticeItem(row.word, {
+function vocabLibraryRowToItem(
+	row: EnglishVocabularyLibraryItemRow,
+): PracticeItem {
+	return toPracticeVocabItem(row.word, {
 		ipa: row.ipa,
 		pos: row.pos,
 		segmentation: row.segmentation,
 		translationZh: row.translationZh,
 		example: row.example,
+	});
+}
+
+function classicFavoriteToItem(
+	row: EnglishClassicQuoteFavoriteListEntry,
+): PracticeItem {
+	return toPracticeClassicItem({
+		english: row.english,
+		translationZh: row.translationZh,
+		source: row.source,
+		noteZh: row.noteZh,
+	});
+}
+
+function classicMistakeToItem(
+	row: EnglishClassicQuoteMistakeListEntry,
+): PracticeItem {
+	return toPracticeClassicItem({
+		english: row.english,
+		translationZh: row.translationZh,
+		source: row.source,
+		noteZh: row.noteZh,
+	});
+}
+
+function classicLibraryRowToItem(
+	row: EnglishClassicQuotesLibraryItemRow,
+): PracticeItem {
+	return toPracticeClassicItem({
+		english: row.english,
+		translationZh: row.translationZh,
+		source: row.source,
+		noteZh: row.noteZh,
 	});
 }
 
@@ -173,7 +211,10 @@ function resolvePoolTotal(
 		return poolTotal;
 	}
 	if (ctx.source === 'live') {
-		const n = EnglishPackStore.vocabItems.length;
+		const n =
+			ctx.contentKind === 'classic'
+				? EnglishPackStore.classicItems.length
+				: EnglishPackStore.vocabItems.length;
 		return n > 0 ? n : undefined;
 	}
 	const key = resolveEnglishPracticePoolKey(ctx);
@@ -181,10 +222,22 @@ function resolvePoolTotal(
 	return getEnglishPracticePoolTotal(key);
 }
 
-function buildLivePool(): PracticeItem[] {
+function buildLivePool(contentKind: PracticeContentKind): PracticeItem[] {
+	if (contentKind === 'classic') {
+		return dedupeItems(
+			EnglishPackStore.classicItems.map((row) =>
+				toPracticeClassicItem({
+					english: row.english,
+					translationZh: row.translationZh,
+					source: row.source,
+					noteZh: row.noteZh,
+				}),
+			),
+		);
+	}
 	return dedupeItems(
 		EnglishPackStore.vocabItems.map((row) =>
-			toPracticeItem(row.word, {
+			toPracticeVocabItem(row.word, {
 				ipa: row.ipa,
 				pos: row.pos,
 				segmentation: row.segmentation,
@@ -293,10 +346,11 @@ async function fetchContinueFromPaginated(
 }
 
 function fetchLiveInitial(
+	contentKind: PracticeContentKind,
 	count: number,
 	order: PracticeOrder,
 ): PracticeSessionFetchResult {
-	const pool = buildLivePool();
+	const pool = buildLivePool(contentKind);
 	if (pool.length === 0) return { items: [], cursor: emptyCursor() };
 
 	const total = pool.length;
@@ -315,12 +369,13 @@ function fetchLiveInitial(
 }
 
 function fetchLiveContinue(
+	contentKind: PracticeContentKind,
 	count: number,
 	order: PracticeOrder,
 	cursor: PracticeSessionCursor,
 	excludeKeys: readonly string[],
 ): PracticeSessionFetchResult {
-	const pool = buildLivePool();
+	const pool = buildLivePool(contentKind);
 	if (pool.length === 0) return { items: [], cursor };
 
 	const total = pool.length;
@@ -390,12 +445,20 @@ async function fetchFavorites(
 	if (total == null) return { items: [], cursor: emptyCursor() };
 
 	const fetchPage = async (offset: number, limit: number) => {
+		if (ctx.contentKind === 'classic') {
+			const res = await listEnglishClassicQuoteFavorites({
+				limit,
+				offset,
+				silent: true,
+			});
+			return { items: (res.data?.items ?? []).map(classicFavoriteToItem) };
+		}
 		const res = await listEnglishVocabularyFavorites({
 			limit,
 			offset,
 			silent: true,
 		});
-		return { items: (res.data?.items ?? []).map(favoriteToItem) };
+		return { items: (res.data?.items ?? []).map(vocabFavoriteToItem) };
 	};
 
 	if (cursor) {
@@ -423,12 +486,20 @@ async function fetchMistakes(
 	if (total == null) return { items: [], cursor: emptyCursor() };
 
 	const fetchPage = async (offset: number, limit: number) => {
+		if (ctx.contentKind === 'classic') {
+			const res = await listEnglishClassicQuoteMistakes({
+				limit,
+				offset,
+				silent: true,
+			});
+			return { items: (res.data?.items ?? []).map(classicMistakeToItem) };
+		}
 		const res = await listEnglishVocabularyMistakes({
 			limit,
 			offset,
 			silent: true,
 		});
-		return { items: (res.data?.items ?? []).map(mistakeToItem) };
+		return { items: (res.data?.items ?? []).map(vocabMistakeToItem) };
 	};
 
 	if (cursor) {
@@ -459,12 +530,20 @@ async function fetchLibrary(
 	if (total == null) return { items: [], cursor: emptyCursor() };
 
 	const fetchPage = async (offset: number, limit: number) => {
+		if (ctx.contentKind === 'classic') {
+			const res = await listEnglishClassicQuotesLibraryItems(libraryId, {
+				limit,
+				offset,
+				silent: true,
+			});
+			return { items: (res.data?.items ?? []).map(classicLibraryRowToItem) };
+		}
 		const res = await listEnglishVocabularyLibraryItems(libraryId, {
 			limit,
 			offset,
 			silent: true,
 		});
-		return { items: (res.data?.items ?? []).map(libraryRowToItem) };
+		return { items: (res.data?.items ?? []).map(vocabLibraryRowToItem) };
 	};
 
 	if (cursor) {
@@ -495,12 +574,27 @@ async function fetchPack(
 	if (total == null) return { items: [], cursor: emptyCursor() };
 
 	const fetchPage = async (offset: number, limit: number) => {
+		if (ctx.contentKind === 'classic') {
+			const res = await listEnglishClassicQuotesPackItems(streamId, {
+				limit,
+				offset,
+			});
+			const items = (res.data?.items ?? []).map((row) =>
+				toPracticeClassicItem({
+					english: row.english,
+					translationZh: row.translationZh,
+					source: row.source,
+					noteZh: row.noteZh,
+				}),
+			);
+			return { items };
+		}
 		const res = await listEnglishVocabularyPackItems(streamId, {
 			limit,
 			offset,
 		});
 		const items = (res.data?.items ?? []).map((row) =>
-			toPracticeItem(row.word, {
+			toPracticeVocabItem(row.word, {
 				ipa: row.ipa,
 				pos: row.pos,
 				segmentation: row.segmentation,
@@ -525,15 +619,16 @@ async function fetchPack(
 }
 
 function fetchLive(
+	contentKind: PracticeContentKind,
 	count: number,
 	order: PracticeOrder,
 	cursor: PracticeSessionCursor | null,
 	excludeKeys: readonly string[],
 ): PracticeSessionFetchResult {
 	if (cursor) {
-		return fetchLiveContinue(count, order, cursor, excludeKeys);
+		return fetchLiveContinue(contentKind, count, order, cursor, excludeKeys);
 	}
-	return fetchLiveInitial(count, order);
+	return fetchLiveInitial(contentKind, count, order);
 }
 
 function runSessionFetch(
@@ -541,6 +636,7 @@ function runSessionFetch(
 ): Promise<PracticeSessionFetchResult> {
 	const count = Math.min(params.count, PRACTICE_MAX_WORDS);
 	const ctx: PracticeFetchContext = {
+		contentKind: params.contentKind,
 		source: params.source,
 		libraryId: params.libraryId,
 		streamId: params.streamId,
@@ -587,7 +683,7 @@ function runSessionFetch(
 			);
 		case 'live':
 			return Promise.resolve(
-				fetchLive(count, params.order, cursor, excludeKeys),
+				fetchLive(params.contentKind, count, params.order, cursor, excludeKeys),
 			);
 		default:
 			return Promise.resolve({ items: [], cursor: emptyCursor() });
@@ -617,6 +713,7 @@ export async function fetchPracticeContinueQueue(
 
 /** @deprecated 使用 fetchPracticeSessionQueue */
 export async function fetchPracticeWordPool(params: {
+	contentKind?: PracticeContentKind;
 	source: PracticeSource;
 	maxWords: number;
 	libraryId?: string;
@@ -624,6 +721,7 @@ export async function fetchPracticeWordPool(params: {
 	order?: PracticeOrder;
 }): Promise<PracticeItem[]> {
 	const { items } = await fetchPracticeSessionQueue({
+		contentKind: params.contentKind ?? 'vocab',
 		source: params.source,
 		count: params.maxWords,
 		order: params.order ?? 'sequential',

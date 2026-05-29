@@ -60,6 +60,7 @@ import {
 	TOPIC_PACK_STALL_BATCH_FLOOR,
 	TOPIC_PACK_STALL_BATCH_STEP,
 } from './constant';
+import type { ClassicQuoteMistakeBatchItemDto } from './dto/classic-quote-mistake.dto';
 import {
 	ENGLISH_CLASSIC_QUOTES_GENERATION_MAX,
 	ENGLISH_VOCAB_GENERATION_MAX,
@@ -81,6 +82,7 @@ import {
 	EnglishClassicQuotePackBatch,
 } from './entity/english-classic-quote.entity';
 import { EnglishClassicQuoteFavorite } from './entity/english-classic-quote-favorite.entity';
+import { EnglishClassicQuoteMistake } from './entity/english-classic-quote-mistake.entity';
 import { EnglishClassicQuotesLibrary } from './entity/english-classic-quotes-library.entity';
 import { EnglishClassicQuotesLibraryItem } from './entity/english-classic-quotes-library-item.entity';
 import { EnglishClassicQuotesPackItem } from './entity/english-classic-quotes-pack-item.entity';
@@ -241,6 +243,8 @@ export class EnglishLearningService {
 		private readonly vocabMistakeRepo: Repository<EnglishVocabularyMistake>,
 		@InjectRepository(EnglishClassicQuoteFavorite)
 		private readonly classicQuoteFavoriteRepo: Repository<EnglishClassicQuoteFavorite>,
+		@InjectRepository(EnglishClassicQuoteMistake)
+		private readonly classicQuoteMistakeRepo: Repository<EnglishClassicQuoteMistake>,
 		@InjectRepository(EnglishVocabularyLibrary)
 		private readonly vocabLibraryRepo: Repository<EnglishVocabularyLibrary>,
 		@InjectRepository(EnglishVocabularyLibraryItem)
@@ -3591,6 +3595,13 @@ ${existingHintBlock}
 		return word.trim().toLowerCase();
 	}
 
+	private normalizeMistakeLastUserInput(
+		raw: string | undefined,
+		maxLen: number,
+	): string {
+		return typeof raw === 'string' ? raw.trim().slice(0, maxLen) : '';
+	}
+
 	/**
 	 * 收藏单词：同一用户同一规范化词形仅保留一行；已存在则返回 created=false，不报错。
 	 */
@@ -3870,14 +3881,14 @@ ${existingHintBlock}
 	}
 
 	/**
-	 * 批量加入错题集：库中已存在的 wordKey 跳过，不更新；本轮重复词形只保留一条。
+	 * 批量加入错题集：新词形插入；已存在且本轮错拼不同则更新 lastUserInput；错拼相同则跳过。
 	 */
 	async batchAddVocabularyMistakes(
 		userId: number,
 		items: VocabularyMistakeBatchItemDto[],
-	): Promise<{ added: number; skipped: number }> {
+	): Promise<{ added: number; updated: number; skipped: number }> {
 		if (!items.length) {
-			return { added: 0, skipped: 0 };
+			return { added: 0, updated: 0, skipped: 0 };
 		}
 
 		const byKey = new Map<string, VocabularyMistakeBatchItemDto>();
@@ -3891,45 +3902,69 @@ ${existingHintBlock}
 
 		const keys = [...byKey.keys()];
 		if (keys.length === 0) {
-			return { added: 0, skipped: items.length };
+			return { added: 0, updated: 0, skipped: items.length };
 		}
 
 		const existing = await this.vocabMistakeRepo.find({
 			where: { userId, wordKey: In(keys) },
-			select: ['wordKey'],
+			select: ['id', 'wordKey', 'lastUserInput'],
 		});
-		const existingSet = new Set(existing.map((r) => r.wordKey));
-		const toInsertKeys = keys.filter((k) => !existingSet.has(k));
+		const existingByKey = new Map(existing.map((r) => [r.wordKey, r] as const));
 
-		if (toInsertKeys.length === 0) {
-			return { added: 0, skipped: keys.length };
+		const toInsertKeys = keys.filter((k) => !existingByKey.has(k));
+		const toUpdate: Array<{ id: string; lastUserInput: string }> = [];
+
+		for (const wordKey of keys) {
+			const row = existingByKey.get(wordKey);
+			if (!row) continue;
+			const item = byKey.get(wordKey)!;
+			const nextInput = this.normalizeMistakeLastUserInput(
+				item.lastUserInput,
+				500,
+			);
+			const prevInput = (row.lastUserInput ?? '').trim();
+			if (nextInput !== prevInput) {
+				toUpdate.push({ id: row.id, lastUserInput: nextInput });
+			}
 		}
 
-		const rows = toInsertKeys.map((wordKey) => {
-			const item = byKey.get(wordKey)!;
-			return this.vocabMistakeRepo.create({
-				userId,
-				wordKey,
-				word: item.word.trim(),
-				ipa: typeof item.ipa === 'string' ? item.ipa : '',
-				pos: typeof item.pos === 'string' ? item.pos.trim().slice(0, 32) : '',
-				segmentation:
-					typeof item.segmentation === 'string'
-						? item.segmentation.trim().slice(0, 500)
-						: '',
-				translationZh: item.translationZh ?? '',
-				example: item.example ?? '',
-				lastUserInput:
-					typeof item.lastUserInput === 'string'
-						? item.lastUserInput.trim().slice(0, 500)
-						: '',
+		if (toInsertKeys.length > 0) {
+			const rows = toInsertKeys.map((wordKey) => {
+				const item = byKey.get(wordKey)!;
+				return this.vocabMistakeRepo.create({
+					userId,
+					wordKey,
+					word: item.word.trim(),
+					ipa: typeof item.ipa === 'string' ? item.ipa : '',
+					pos: typeof item.pos === 'string' ? item.pos.trim().slice(0, 32) : '',
+					segmentation:
+						typeof item.segmentation === 'string'
+							? item.segmentation.trim().slice(0, 500)
+							: '',
+					translationZh: item.translationZh ?? '',
+					example: item.example ?? '',
+					lastUserInput: this.normalizeMistakeLastUserInput(
+						item.lastUserInput,
+						500,
+					),
+				});
 			});
-		});
+			await this.vocabMistakeRepo.save(rows);
+		}
 
-		await this.vocabMistakeRepo.save(rows);
+		if (toUpdate.length > 0) {
+			await this.vocabMistakeRepo.save(
+				toUpdate.map(({ id, lastUserInput }) =>
+					this.vocabMistakeRepo.create({ id, lastUserInput }),
+				),
+			);
+		}
+
+		const skipped = keys.length - toInsertKeys.length - toUpdate.length;
 		return {
 			added: toInsertKeys.length,
-			skipped: keys.length - toInsertKeys.length,
+			updated: toUpdate.length,
+			skipped,
 		};
 	}
 
@@ -3992,6 +4027,152 @@ ${existingHintBlock}
 				segmentation: r.segmentation ?? '',
 				translationZh: r.translationZh ?? '',
 				example: r.example ?? '',
+				lastUserInput: r.lastUserInput ?? '',
+				createdAt: r.createdAt.toISOString(),
+			})),
+		};
+	}
+
+	/**
+	 * 批量加入语句错题集：新句插入；已存在且本轮错拼不同则更新 lastUserInput；错拼相同则跳过。
+	 */
+	async batchAddClassicQuoteMistakes(
+		userId: number,
+		items: ClassicQuoteMistakeBatchItemDto[],
+	): Promise<{ added: number; updated: number; skipped: number }> {
+		if (!items.length) {
+			return { added: 0, updated: 0, skipped: 0 };
+		}
+
+		const byKey = new Map<string, ClassicQuoteMistakeBatchItemDto>();
+		for (const item of items) {
+			const contentKey = this.classicQuoteFavoriteContentKey(item.english);
+			if (!contentKey) continue;
+			if (!byKey.has(contentKey)) {
+				byKey.set(contentKey, item);
+			}
+		}
+
+		const keys = [...byKey.keys()];
+		if (keys.length === 0) {
+			return { added: 0, updated: 0, skipped: items.length };
+		}
+
+		const existing = await this.classicQuoteMistakeRepo.find({
+			where: { userId, contentKey: In(keys) },
+			select: ['id', 'contentKey', 'lastUserInput'],
+		});
+		const existingByKey = new Map(
+			existing.map((r) => [r.contentKey, r] as const),
+		);
+
+		const toInsertKeys = keys.filter((k) => !existingByKey.has(k));
+		const toUpdate: Array<{ id: string; lastUserInput: string }> = [];
+
+		for (const contentKey of keys) {
+			const row = existingByKey.get(contentKey);
+			if (!row) continue;
+			const item = byKey.get(contentKey)!;
+			const nextInput = this.normalizeMistakeLastUserInput(
+				item.lastUserInput,
+				12000,
+			);
+			const prevInput = (row.lastUserInput ?? '').trim();
+			if (nextInput !== prevInput) {
+				toUpdate.push({ id: row.id, lastUserInput: nextInput });
+			}
+		}
+
+		if (toInsertKeys.length > 0) {
+			const rows = toInsertKeys.map((contentKey) => {
+				const item = byKey.get(contentKey)!;
+				return this.classicQuoteMistakeRepo.create({
+					userId,
+					contentKey,
+					english: item.english.trim(),
+					translationZh: item.translationZh ?? '',
+					source: typeof item.source === 'string' ? item.source : '',
+					noteZh: item.noteZh ?? '',
+					lastUserInput: this.normalizeMistakeLastUserInput(
+						item.lastUserInput,
+						12000,
+					),
+				});
+			});
+			await this.classicQuoteMistakeRepo.save(rows);
+		}
+
+		if (toUpdate.length > 0) {
+			await this.classicQuoteMistakeRepo.save(
+				toUpdate.map(({ id, lastUserInput }) =>
+					this.classicQuoteMistakeRepo.create({ id, lastUserInput }),
+				),
+			);
+		}
+
+		const skipped = keys.length - toInsertKeys.length - toUpdate.length;
+		return {
+			added: toInsertKeys.length,
+			updated: toUpdate.length,
+			skipped,
+		};
+	}
+
+	async removeClassicQuoteMistake(
+		userId: number,
+		id: string,
+	): Promise<{ removed: boolean }> {
+		const r = await this.classicQuoteMistakeRepo.delete({ userId, id });
+		return { removed: (r.affected ?? 0) > 0 };
+	}
+
+	async removeClassicQuoteMistakesBatch(
+		userId: number,
+		ids: string[],
+	): Promise<{ removedCount: number }> {
+		const unique = [...new Set(ids.map((id) => id.trim()).filter(Boolean))];
+		if (unique.length === 0) {
+			return { removedCount: 0 };
+		}
+		const r = await this.classicQuoteMistakeRepo.delete({
+			userId,
+			id: In(unique),
+		});
+		return { removedCount: r.affected ?? 0 };
+	}
+
+	async listClassicQuoteMistakesPage(
+		userId: number,
+		opts: { limit: number; offset: number },
+	): Promise<{
+		items: Array<{
+			id: string;
+			english: string;
+			translationZh: string;
+			source: string;
+			noteZh: string;
+			lastUserInput: string;
+			createdAt: string;
+		}>;
+		totalCount: number;
+	}> {
+		const [totalCount, rows] = await Promise.all([
+			this.classicQuoteMistakeRepo.count({ where: { userId } }),
+			this.classicQuoteMistakeRepo.find({
+				where: { userId },
+				order: { createdAt: 'DESC' },
+				take: opts.limit,
+				skip: opts.offset,
+			}),
+		]);
+		return {
+			totalCount,
+			items: rows.map((r) => ({
+				id: r.id,
+				english: r.english,
+				translationZh: r.translationZh ?? '',
+				source: r.source ?? '',
+				noteZh: r.noteZh ?? '',
 				lastUserInput: r.lastUserInput ?? '',
 				createdAt: r.createdAt.toISOString(),
 			})),

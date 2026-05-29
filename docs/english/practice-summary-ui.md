@@ -28,7 +28,7 @@
 | `apps/frontend/src/views/englishLearning/practice/components/shell/PracticePageShell.tsx` | 顶栏：结算阶段左侧返回图标 |
 | `apps/frontend/src/views/englishLearning/practice/Setup.tsx` | 设置题量、顺序、开始练习 |
 | `apps/frontend/src/views/englishLearning/practice/Session.tsx` | **单题 UI、判分、下一题 / 查看结果** |
-| `apps/frontend/src/views/englishLearning/practice/utils/grading.ts` | 拼写规范化与 `gradeSpelling` |
+| `apps/frontend/src/views/englishLearning/practice/utils/grading.ts` | 拼写规范化与 `gradeSpelling`（单词句末标点；经典句全标点忽略，见 [`classic-practice-and-mistakes.md`](./classic-practice-and-mistakes.md) §3.7） |
 | `apps/frontend/src/views/englishLearning/practice/utils/fetchWords.ts` | 词表拉取、继续练习去重 |
 | `apps/frontend/src/store/englishPracticePool.ts` | 会话内已练 key 集合（继续练习） |
 | `apps/frontend/src/i18n/locales/zh-CN.ts` / `en-US.ts` | 练习与结算文案 |
@@ -260,16 +260,26 @@ export function normalizeSpellingAnswer(raw: string): string {
 }
 
 /**
- * 判分：规范化后的用户输入与标准 word 必须完全一致
- * 空输入或空标准词直接判错（返回 false）
+ * 判分：单词 normalizeVocabSpellingAnswer（含句末标点剥离）；
+ * 经典句 normalizeSentenceSpellingAnswer（再去全部标点）。
+ * Session 对 classic 传 compareAsSentence: true。
  */
-export function gradeSpelling(userInput: string, expectedWord: string): boolean {
-  const u = normalizeSpellingAnswer(userInput);
-  const e = normalizeSpellingAnswer(expectedWord);
+export function gradeSpelling(
+  userInput: string,
+  expectedWord: string,
+  options?: { compareAsSentence?: boolean },
+): boolean {
+  const normalize = options?.compareAsSentence
+    ? normalizeSentenceSpellingAnswer
+    : normalizeVocabSpellingAnswer;
+  const u = normalize(userInput);
+  const e = normalize(expectedWord);
   if (!u || !e) return false;
   return u === e;
 }
 ```
+
+> 完整实现与边界见 [`classic-practice-and-mistakes.md`](./classic-practice-and-mistakes.md) §4.3–§4.4；若与仓库最新 `grading.ts` 不一致，以源码为准。
 
 ### 5.4 Session：换题重置、判分提交、下一题与 Enter
 

@@ -217,17 +217,17 @@ function EnglishLearningPackStreamPageInner() {
 	const practiceSourceTitle = topic.trim() || undefined;
 
 	useEffect(() => {
-		if (kind !== 'vocab' || itemCount <= 0) return;
+		if (itemCount <= 0) return;
 		if (isHistoryView && historyStreamId) {
 			setEnglishPracticePoolMeta(
-				englishPracticePoolKeys.pack(historyStreamId),
+				englishPracticePoolKeys.pack(historyStreamId, kind),
 				{
 					total: itemCount,
 					title: practiceSourceTitle,
 				},
 			);
 		} else if (!isHistoryView) {
-			setEnglishPracticePoolMeta(englishPracticePoolKeys.live, {
+			setEnglishPracticePoolMeta(englishPracticePoolKeys.live(kind), {
 				total: itemCount,
 				title: practiceSourceTitle,
 			});
@@ -235,9 +235,10 @@ function EnglishLearningPackStreamPageInner() {
 	}, [kind, itemCount, isHistoryView, historyStreamId, practiceSourceTitle]);
 
 	const packPracticeParams = useMemo(() => {
-		if (kind !== 'vocab' || loadedCount <= 0) return null;
+		if (loadedCount <= 0) return null;
 		if (isHistoryView && historyStreamId) {
 			return {
+				contentKind: kind,
 				source: 'pack' as const,
 				streamId: historyStreamId,
 				sourceTitle: practiceSourceTitle,
@@ -245,6 +246,7 @@ function EnglishLearningPackStreamPageInner() {
 			};
 		}
 		return {
+			contentKind: kind,
 			source: 'live' as const,
 			sourceTitle: practiceSourceTitle,
 			poolTotal: itemCount > 0 ? itemCount : undefined,

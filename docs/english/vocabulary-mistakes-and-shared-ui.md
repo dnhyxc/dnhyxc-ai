@@ -2,6 +2,7 @@
 
 ## 延伸阅读
 
+- **经典句**练习与语句错题集（本轮主文档）：[`classic-practice-and-mistakes.md`](./classic-practice-and-mistakes.md)
 - 听写/拼写多入口与返回：[`practice-entry-navigation.md`](./practice-entry-navigation.md)（URL 与 `returnTo` 约定；本轮入口 UI 已收敛至 `EnglishPracticeEntry`）
 - 结算页 UI：[`practice-summary-ui.md`](./practice-summary-ui.md)
 - 产品使用：[`docs/project-guide.md`](../project-guide.md) §13.11
@@ -36,10 +37,10 @@
 
 | 路径 | 说明 |
 |------|------|
-| `apps/frontend/src/views/englishLearning/mistakes/index.tsx` | 路由页：标题 + 页头练习入口 |
-| `apps/frontend/src/views/englishLearning/mistakes/VocabularyMistakesPanel.tsx` | 列表、勾选、移除、TTS |
-| `apps/frontend/src/views/englishLearning/mistakes/MistakesPanelFooter.tsx` | 底栏全选/批量移除（练习入口已移至页头） |
-| `apps/frontend/src/views/englishLearning/mistakes/MistakeBookSession.tsx` | 首页侧栏入口 |
+| `apps/frontend/src/views/englishLearning/mistakes/index.tsx` | **统一错题集页**（`?kind=`、顶栏 Tab；见 [`classic-practice-and-mistakes.md`](./classic-practice-and-mistakes.md) §3.5） |
+| `apps/frontend/src/views/englishLearning/mistakes/vocabulary/VocabularyMistakesPanel.tsx` | 单词列表、勾选、移除、TTS |
+| `apps/frontend/src/views/englishLearning/mistakes/components/MistakesPanelFooter.tsx` | 底栏：全选、移除所选、听写/拼写 |
+| `apps/frontend/src/views/englishLearning/mistakes/components/MistakeBookSession.tsx` | 首页侧栏入口 |
 | `apps/frontend/src/views/englishLearning/mistakes/useVocabularyMistakesList.ts` | 分页拉取 |
 
 ### 2.3 前端 — 练习与结算
@@ -72,11 +73,13 @@
 |------|------|
 | **结算页** | 组装本轮错题快照（含 `lastUserInput`），调用 `POST …/vocabulary-mistakes/batch` |
 | **Controller** | 鉴权、分页参数裁剪、`class-validator` 校验 DTO |
-| **Service** | `wordKey` 归一化、请求内去重、与库内已有词形比对、批量 `INSERT` |
+| **Service** | `wordKey` 归一化、请求内去重；新键 `INSERT`；已存在且 `lastUserInput` 不同则 **仅更新错拼** |
 | **Entity / DB** | 每用户每 `wordKey` 唯一一行；存单词展示快照，不关联词包/词库外键 |
 | **错题集页 / 练习** | `GET` 分页列表；练习拉词复用同一列表 API（`source=mistakes`） |
 
-设计取舍：**错题行是快照**，不反向更新词包条目；已入库词形再次「加入错题集」**跳过且不覆盖**（避免用旧练习结果覆盖用户手动维护的错题记录）。若需更新释义，应先移除再重新加入。
+设计取舍：**错题行是快照**（词面/释义等不因 batch 覆盖）；已入库词形再次加入时，若本轮 **错拼与库中不同** 则更新 `lastUserInput`，相同则跳过。释义等字段变更需先移除再重新加入。
+
+> 语句错题集对称逻辑见 [`classic-practice-and-mistakes.md`](./classic-practice-and-mistakes.md) §3.9、§4.5（含 `updated` 计数与仅更新 `lastUserInput` 的完整代码注释）。
 
 ### 3.2 练习来源 `mistakes`
 
@@ -121,7 +124,7 @@
 | `POST` | `/english-learning/vocabulary-mistakes/remove` | 按 `id` 删除一条 |
 | `POST` | `/english-learning/vocabulary-mistakes/remove-batch` | 按 `ids[]` 批量删除 |
 
-批量加入响应：`{ added: number; skipped: number }`。`skipped` 含「请求内重复合并」与「库内已存在」两类，前端 Toast 据此提示。
+批量加入响应：`{ added: number; updated: number; skipped: number }`。`updated` 为已存在行仅刷新错拼；`skipped` 为错拼未变或请求内重复合并。
 
 ### 4.2 数据表与 TypeORM 实体
 

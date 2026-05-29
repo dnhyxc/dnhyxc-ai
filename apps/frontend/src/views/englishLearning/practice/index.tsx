@@ -21,6 +21,7 @@ import type {
 	PracticeSource,
 } from './types';
 import { fetchPracticeContinueQueue } from './utils/fetchWords';
+import { parsePracticeContentKind } from './utils/item';
 import { parsePracticePoolTotal } from './utils/paths';
 
 function parseSource(raw: string | null): PracticeSource {
@@ -52,6 +53,10 @@ export default function EnglishLearningPracticePage() {
 	const navigate = useNavigate();
 	const [searchParams] = useSearchParams();
 
+	const initialContentKind = useMemo(
+		() => parsePracticeContentKind(searchParams.get('contentKind')),
+		[searchParams],
+	);
 	const initialSource = useMemo(
 		() => parseSource(searchParams.get('source')),
 		[searchParams],
@@ -91,29 +96,39 @@ export default function EnglishLearningPracticePage() {
 			navigate('/english-learning');
 			return;
 		}
+		const kind = initialContentKind;
 		if (initialSource === 'favorites') {
-			navigate('/english-learning/favorites?kind=vocab');
+			navigate(
+				`/english-learning/favorites?kind=${kind === 'classic' ? 'classic' : 'vocab'}`,
+			);
 			return;
 		}
 		if (initialSource === 'library') {
-			navigate('/english-learning/library');
+			navigate(
+				`/english-learning/library?kind=${kind === 'classic' ? 'classic' : 'vocab'}`,
+			);
 			return;
 		}
 		if (initialSource === 'mistakes') {
-			navigate('/english-learning/mistakes');
+			navigate(
+				kind === 'classic'
+					? '/english-learning/mistakes?kind=classic'
+					: '/english-learning/mistakes?kind=vocab',
+			);
 			return;
 		}
 		if (initialSource === 'pack') {
 			const backStreamId = initialReturnStreamId || initialStreamId;
 			if (backStreamId) {
 				navigate(
-					`/english-learning/stream?kind=vocab&streamId=${encodeURIComponent(backStreamId)}`,
+					`/english-learning/stream?kind=${kind === 'classic' ? 'classic' : 'vocab'}&streamId=${encodeURIComponent(backStreamId)}`,
 				);
 				return;
 			}
 		}
 		navigate('/english-learning');
 	}, [
+		initialContentKind,
 		initialReturnStreamId,
 		initialSource,
 		initialStreamId,
@@ -147,6 +162,7 @@ export default function EnglishLearningPracticePage() {
 			) as PracticeCountOption;
 			const nextConfig: PracticeSetupConfig = {
 				...config,
+				contentKind: config.contentKind,
 				count,
 			};
 			setConfig(nextConfig);
@@ -164,6 +180,7 @@ export default function EnglishLearningPracticePage() {
 		setContinueLoading(true);
 		try {
 			const { items, cursor } = await fetchPracticeContinueQueue({
+				contentKind: config.contentKind,
 				source: config.source,
 				count: config.count,
 				order: config.order,
@@ -227,10 +244,16 @@ export default function EnglishLearningPracticePage() {
 	const currentItem = queue[index];
 
 	const shellTitle = useMemo(() => {
-		if (phase === 'setup') return t('englishLearning.practice.setupTitle');
+		if (phase === 'setup') {
+			return initialContentKind === 'classic'
+				? t('englishLearning.practice.classicSetupTitle')
+				: t('englishLearning.practice.setupTitle');
+		}
 		if (phase === 'summary') return t('englishLearning.practice.summaryTitle');
-		return t('route.englishLearning.practice.title');
-	}, [phase, t]);
+		return initialContentKind === 'classic'
+			? t('route.englishLearning.practice.classicTitle')
+			: t('route.englishLearning.practice.title');
+	}, [initialContentKind, phase, t]);
 
 	const shellSubtitle = useMemo(() => {
 		if (phase !== 'running' || !config) return undefined;
@@ -256,6 +279,7 @@ export default function EnglishLearningPracticePage() {
 		>
 			{phase === 'setup' ? (
 				<Setup
+					initialContentKind={initialContentKind}
 					initialSource={initialSource}
 					initialMode={initialMode}
 					initialLibraryId={initialLibraryId}

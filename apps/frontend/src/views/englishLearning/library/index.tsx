@@ -102,7 +102,7 @@ export default function EnglishLearningLibraryPage() {
 		const title = vocabLibraryMeta?.title?.trim();
 		if ((typeof n === 'number' && n > 0) || title) {
 			setEnglishPracticePoolMeta(
-				englishPracticePoolKeys.library(activeLibraryId),
+				englishPracticePoolKeys.library(activeLibraryId, 'vocab'),
 				{
 					total: typeof n === 'number' && n > 0 ? n : undefined,
 					title,

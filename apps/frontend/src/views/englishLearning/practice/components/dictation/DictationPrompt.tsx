@@ -141,8 +141,10 @@ function DictationHintPanel({
 	const { t } = useI18n();
 	const translation = hintContent.translationZh?.trim();
 	const ipaText = hintContent.ipa?.trim();
+	const source = hintContent.source?.trim();
+	const noteZh = hintContent.noteZh?.trim();
 
-	if (!translation && !ipaText) return null;
+	if (!translation && !ipaText && !source && !noteZh) return null;
 
 	return (
 		<div
@@ -162,6 +164,16 @@ function DictationHintPanel({
 			{ipaText ? (
 				<p className="font-mono text-xs leading-snug text-teal-600/90 line-clamp-2 dark:text-teal-400/90">
 					{displayIpaWrapped(ipaText)}
+				</p>
+			) : null}
+			{source ? (
+				<p className="text-textcolor/65 line-clamp-2 text-xs leading-snug">
+					{source}
+				</p>
+			) : null}
+			{noteZh ? (
+				<p className="text-textcolor/60 line-clamp-3 text-xs leading-relaxed italic">
+					{noteZh}
 				</p>
 			) : null}
 		</div>

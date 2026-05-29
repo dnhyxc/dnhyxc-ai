@@ -6,6 +6,8 @@ import { Button } from '@ui/index';
 import { Label } from '@ui/label';
 import { Spinner } from '@ui/spinner';
 import { useI18n } from '@/hooks';
+import type { PracticeContentKind } from '../../practice/types';
+import { EnglishPracticeEntry } from '../../shared/practiceEntry';
 
 export type MistakesPanelFooterProps = {
 	selectAllId: string;
@@ -17,6 +19,11 @@ export type MistakesPanelFooterProps = {
 	removeDisabled: boolean;
 	batchRemoving: boolean;
 	onRequestRemove: () => void;
+	/** 底栏右侧：听写/拼写（与收藏页一致） */
+	showPracticeEntry?: boolean;
+	practiceContentKind?: PracticeContentKind;
+	practiceDisabled?: boolean;
+	practicePoolTotal?: number;
 };
 
 export function MistakesPanelFooter({
@@ -29,8 +36,17 @@ export function MistakesPanelFooter({
 	removeDisabled,
 	batchRemoving,
 	onRequestRemove,
+	showPracticeEntry = false,
+	practiceContentKind = 'vocab',
+	practiceDisabled = false,
+	practicePoolTotal,
 }: MistakesPanelFooterProps) {
 	const { t } = useI18n();
+
+	const practiceSourceTitle =
+		practiceContentKind === 'classic'
+			? t('englishLearning.practice.sourceClassicMistakes')
+			: t('englishLearning.practice.sourceMistakes');
 
 	return (
 		<footer className="flex h-12 shrink-0 flex-wrap items-center justify-between gap-3 px-5">
@@ -76,6 +92,22 @@ export function MistakesPanelFooter({
 						t('englishLearning.mistakes.removeSelected')
 					)}
 				</Button>
+				{showPracticeEntry ? (
+					<EnglishPracticeEntry
+						variant="button"
+						showIcon={false}
+						disabled={practiceDisabled}
+						practice={{
+							contentKind: practiceContentKind,
+							source: 'mistakes',
+							sourceTitle: practiceSourceTitle,
+							poolTotal:
+								practicePoolTotal != null && practicePoolTotal > 0
+									? practicePoolTotal
+									: undefined,
+						}}
+					/>
+				) : null}
 			</div>
 		</footer>
 	);

@@ -4,11 +4,9 @@
  */
 import Confirm from '@design/Confirm';
 import Loading from '@design/Loading';
-import { Checkbox } from '@ui/checkbox';
 import { Button, ScrollArea, Toast } from '@ui/index';
-import { Label } from '@ui/label';
 import { Spinner } from '@ui/spinner';
-import { Square, Trash2, Volume2 } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 import type { UIEventHandler } from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useI18n } from '@/hooks';
@@ -18,10 +16,12 @@ import {
 	type EnglishClassicQuoteFavoriteListEntry,
 } from '@/service';
 import { isTauriRuntime } from '@/utils';
+import { ClassicQuoteCard } from '../shared/ClassicQuoteCard';
 import { FavoritesPanelFooter } from './FavoritesPanelFooter';
 
 export type ClassicQuotesFavoritesPanelProps = {
 	entries: EnglishClassicQuoteFavoriteListEntry[];
+	totalCount: number;
 	loading: boolean;
 	loadingMore: boolean;
 	onViewportScroll: UIEventHandler<HTMLDivElement>;
@@ -36,6 +36,7 @@ export type ClassicQuotesFavoritesPanelProps = {
 
 export function ClassicQuotesFavoritesPanel({
 	entries,
+	totalCount,
 	loading,
 	loadingMore,
 	onViewportScroll,
@@ -294,90 +295,51 @@ export function ClassicQuotesFavoritesPanel({
 								const playKey = `fav-classic-${row.id}`;
 								const playing = playingKey === playKey;
 								return (
-									<div
+									<ClassicQuoteCard
 										key={row.id}
-										className="select-text bg-theme/5 border border-theme/5 flex min-w-0 flex-col gap-1.5 rounded-md px-3 py-2.5"
-									>
-										<div className="flex gap-2">
-											<div className="flex shrink-0 items-start pt-1">
-												<Checkbox
-													id={`classic-fav-${row.id}`}
-													className="cursor-pointer"
-													checked={selectedIds.has(row.id)}
-													disabled={selectionDisabled}
-													onCheckedChange={(v) =>
-														toggleRowSelected(row.id, v === true)
-													}
-													aria-label={`${t('englishLearning.favoritesDrawer.toggleRow')}: ${row.english.slice(0, 120)}`}
-												/>
-											</div>
-											<div className="min-w-0 flex-1 flex flex-col">
-												<div className="flex items-start justify-between gap-2">
-													<div className="text-textcolor min-w-0 flex-1 text-base font-semibold leading-snug">
-														<Label
-															htmlFor={`classic-fav-${row.id}`}
-															className="select-text cursor-pointer text-base font-semibold text-textcolor"
-														>
-															{row.english}
-														</Label>
-													</div>
-													<div className="flex shrink-0 items-center gap-1 transition-opacity duration-200">
-														<Button
-															type="button"
-															variant="ghost"
-															size="sm"
-															onClick={() =>
-																void onTogglePlayQuote(row.english, playKey)
-															}
-															className={cn(
-																'h-7 w-7 shrink-0 rounded-md border p-2 transition-colors @min-[26rem]:border-theme/15 @min-[26rem]:p-1.5',
-																playing
-																	? 'border-violet-500/40 bg-violet-500/15 text-violet-600 dark:text-violet-400'
-																	: 'border-theme/12 text-textcolor/60 hover:border-theme/20 hover:bg-theme/10 hover:text-violet-600 dark:hover:text-violet-400',
-															)}
-															aria-label={
-																playing
-																	? t('englishLearning.tts.stop')
-																	: t('englishLearning.classic.playQuote')
-															}
-														>
-															{playing ? (
-																<Square className="size-3.5 fill-current" />
-															) : (
-																<Volume2 className="size-3.5" />
-															)}
-														</Button>
-														<Button
-															type="button"
-															variant="ghost"
-															size="sm"
-															disabled={selectionDisabled}
-															onClick={() => requestSingleRemove(row)}
-															className={cn(
-																'h-7 w-7 shrink-0 rounded-md border p-2 transition-colors @min-[26rem]:border-theme/15 @min-[26rem]:p-1.5',
-																'border-theme/12 text-textcolor/60 hover:border-destructive/35 hover:bg-destructive/10 hover:text-destructive',
-															)}
-															aria-label={t(
-																'englishLearning.favoritesDrawer.removeOneAction',
-															)}
-														>
-															<Trash2 className="size-3.5" />
-														</Button>
-													</div>
-												</div>
-												<div className="text-textcolor/90 text-sm leading-snug mt-1">
-													{row.translationZh}
-												</div>
-												<div className="text-textcolor/70 text-xs my-1">
-													{t('englishLearning.classic.sourceLabel')}
-													{row.source || '—'}
-												</div>
-												<div className="text-textcolor/70 text-xs leading-relaxed italic">
-													{row.noteZh}
-												</div>
-											</div>
-										</div>
-									</div>
+										variant="selectable"
+										forceNote
+										data={{
+											english: row.english,
+											translationZh: row.translationZh,
+											source: row.source,
+											noteZh: row.noteZh,
+										}}
+										selection={{
+											controlId: `classic-fav-${row.id}`,
+											checked: selectedIds.has(row.id),
+											disabled: selectionDisabled,
+											onCheckedChange: (checked) =>
+												toggleRowSelected(row.id, checked),
+											ariaLabel: `${t('englishLearning.favoritesDrawer.toggleRow')}: ${row.english.slice(0, 120)}`,
+										}}
+										playing={playing}
+										onTogglePlay={() =>
+											void onTogglePlayQuote(row.english, playKey)
+										}
+										playLabels={{
+											play: t('englishLearning.classic.playQuote'),
+											stop: t('englishLearning.tts.stop'),
+										}}
+										trailingActions={
+											<Button
+												type="button"
+												variant="ghost"
+												size="sm"
+												disabled={selectionDisabled}
+												onClick={() => requestSingleRemove(row)}
+												className={cn(
+													'h-7 w-7 shrink-0 rounded-md border p-2 transition-colors',
+													'border-theme/12 text-textcolor/60 hover:border-destructive/35 hover:bg-destructive/10 hover:text-destructive',
+												)}
+												aria-label={t(
+													'englishLearning.favoritesDrawer.removeOneAction',
+												)}
+											>
+												<Trash2 className="size-3.5" />
+											</Button>
+										}
+									/>
 								);
 							})}
 							{showLoadMoreHint ? (
@@ -396,6 +358,10 @@ export function ClassicQuotesFavoritesPanel({
 				</ScrollArea>
 				<FavoritesPanelFooter
 					selectAllId="classic-fav-select-all"
+					showPracticeEntry
+					practiceContentKind="classic"
+					practiceDisabled={loading || totalCount === 0}
+					practicePoolTotal={totalCount}
 					showSelection={!showInitialLoading && entries.length > 0}
 					selectAllCheckboxState={selectAllCheckboxState}
 					selectionDisabled={selectionDisabled}

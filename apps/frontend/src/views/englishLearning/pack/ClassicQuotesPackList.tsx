@@ -2,7 +2,7 @@
  * 经典句拉取结果列表：直播订阅 EnglishPackStore；历史模式按 streamId 分页 API
  */
 import { Button, Spinner, Toast } from '@ui/index';
-import { Square, Star, Volume2 } from 'lucide-react';
+import { Star } from 'lucide-react';
 import { observer } from 'mobx-react';
 import { useCallback, useState } from 'react';
 import { useI18n, useIncrementalClassicQuoteFavoriteStatus } from '@/hooks';
@@ -18,6 +18,7 @@ import {
 	playEnglishPreferred,
 	stopAllEnglishPlayback,
 } from '@/utils/englishTts';
+import { ClassicQuoteCard } from '../shared/ClassicQuoteCard';
 import type { useClassicQuotesPackHistoryList } from './useClassicQuotesPackHistoryList';
 
 export type ClassicQuotesPackListProps = {
@@ -111,77 +112,51 @@ function ClassicQuotesPackListInner({ history }: ClassicQuotesPackListProps) {
 						contentKey.length > 0 && favoritedContentKeys.has(contentKey);
 					const favBusy = favoriteActionKey === contentKey;
 					return (
-						<div
+						<ClassicQuoteCard
 							key={key}
-							className="bg-theme/5 border border-theme/5 flex flex-col gap-1.5 rounded-md px-3 py-2.5"
-						>
-							<div className="flex items-start justify-between gap-2">
-								<div className="text-textcolor min-w-0 flex-1 text-base font-medium leading-snug">
-									{item.english}
-								</div>
-								<div className="flex shrink-0 items-center gap-1">
-									<Button
-										type="button"
-										variant="ghost"
-										size="sm"
-										onClick={() => void toggleQuoteAudio(item.english, key)}
-										className={cn(
-											'h-7 w-7 shrink-0 rounded-md border p-2 transition-colors',
-											playing
-												? 'border-violet-500/40 bg-violet-500/15 text-violet-600 dark:text-violet-400'
-												: 'border-theme/12 text-textcolor/60 hover:border-theme/20 hover:bg-theme/10 hover:text-violet-600 dark:hover:text-violet-400',
-										)}
-										aria-label={
-											playing
-												? t('englishLearning.tts.stop')
-												: t('englishLearning.classic.playQuote')
-										}
-									>
-										{playing ? (
-											<Square className="size-3.5 fill-current" />
-										) : (
-											<Volume2 className="size-3.5" />
-										)}
-									</Button>
-									<Button
-										type="button"
-										variant="ghost"
-										size="sm"
-										disabled={favBusy || !contentKey}
-										onClick={() =>
-											void toggleClassicQuoteFavorite(item, isFavorited)
-										}
-										className={cn(
-											'h-7 w-7 shrink-0 rounded-md border p-0 transition-colors',
-											isFavorited
-												? 'border-amber-400/45 bg-amber-400/12 text-amber-600 dark:text-amber-400'
-												: 'border-theme/12 text-textcolor/55 hover:border-theme/20 hover:bg-theme/10 hover:text-amber-600',
-										)}
-										aria-pressed={isFavorited}
-										aria-label={
-											isFavorited
-												? t('englishLearning.classic.unfavoriteQuote')
-												: t('englishLearning.classic.favoriteQuote')
-										}
-									>
-										<Star
-											className={cn('size-3.5', isFavorited && 'fill-current')}
-											aria-hidden
-										/>
-									</Button>
-								</div>
-							</div>
-							<div className="text-textcolor/90 text-sm leading-snug">
-								{item.translationZh}
-							</div>
-							<div className="text-textcolor/70 text-xs">
-								{t('englishLearning.classic.sourceLabel')}
-								{item.source || '—'}
-							</div>
-							<div className="text-textcolor/70 text-xs leading-relaxed italic">
-								{item.noteZh}
-							</div>
-						</div>
+							variant="library"
+							forceNote
+							data={{
+								english: item.english,
+								translationZh: item.translationZh,
+								source: item.source,
+								noteZh: item.noteZh,
+							}}
+							playing={playing}
+							onTogglePlay={() => void toggleQuoteAudio(item.english, key)}
+							playLabels={{
+								play: t('englishLearning.classic.playQuote'),
+								stop: t('englishLearning.tts.stop'),
+							}}
+							trailingActions={
+								<Button
+									type="button"
+									variant="ghost"
+									size="sm"
+									disabled={favBusy || !contentKey}
+									onClick={() =>
+										void toggleClassicQuoteFavorite(item, isFavorited)
+									}
+									className={cn(
+										'h-7 w-7 shrink-0 rounded-md border p-0 transition-colors',
+										isFavorited
+											? 'border-amber-400/45 bg-amber-400/12 text-amber-600 dark:text-amber-400'
+											: 'border-theme/12 text-textcolor/55 hover:border-theme/20 hover:bg-theme/10 hover:text-amber-600',
+									)}
+									aria-pressed={isFavorited}
+									aria-label={
+										isFavorited
+											? t('englishLearning.classic.unfavoriteQuote')
+											: t('englishLearning.classic.favoriteQuote')
+									}
+								>
+									<Star
+										className={cn('size-3.5', isFavorited && 'fill-current')}
+										aria-hidden
+									/>
+								</Button>
+							}
+						/>
 					);
 				})}
 			</div>

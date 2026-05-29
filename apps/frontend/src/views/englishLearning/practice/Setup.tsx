@@ -74,6 +74,7 @@ function SourceIcon({ source }: { source: PracticeSource }) {
 }
 
 export function Setup({
+	initialContentKind,
 	initialSource,
 	initialMode,
 	initialLibraryId,
@@ -107,6 +108,7 @@ export function Setup({
 			return initialPoolTotal;
 		}
 		const key = resolveEnglishPracticePoolKey({
+			contentKind: initialContentKind,
 			source,
 			libraryId: initialLibraryId,
 			streamId: initialStreamId,
@@ -116,11 +118,20 @@ export function Setup({
 			if (cached != null) return cached;
 		}
 		if (source === 'live') {
-			const n = EnglishPackStore.vocabItems.length;
+			const n =
+				initialContentKind === 'classic'
+					? EnglishPackStore.classicItems.length
+					: EnglishPackStore.vocabItems.length;
 			return n > 0 ? n : undefined;
 		}
 		return undefined;
-	}, [initialPoolTotal, source, initialLibraryId, initialStreamId]);
+	}, [
+		initialContentKind,
+		initialPoolTotal,
+		source,
+		initialLibraryId,
+		initialStreamId,
+	]);
 
 	const sourceHeaderBody = (
 		<div className="flex min-w-0 flex-1 items-center justify-between gap-3">
@@ -134,9 +145,13 @@ export function Setup({
 			</div>
 			{poolTotalDisplay != null ? (
 				<span className="text-textcolor/75 shrink-0 text-sm font-medium tabular-nums">
-					{t('englishLearning.vocab.historyWords', {
-						count: poolTotalDisplay,
-					})}
+					{initialContentKind === 'classic'
+						? t('englishLearning.classic.historySentences', {
+								count: poolTotalDisplay,
+							})
+						: t('englishLearning.vocab.historyWords', {
+								count: poolTotalDisplay,
+							})}
 				</span>
 			) : null}
 		</div>
@@ -146,6 +161,7 @@ export function Setup({
 		let cancelled = false;
 		void (async () => {
 			const title = await resolvePracticeSourceTitle({
+				contentKind: initialContentKind,
 				source,
 				libraryId: initialLibraryId,
 				streamId: initialStreamId,
@@ -157,7 +173,14 @@ export function Setup({
 		return () => {
 			cancelled = true;
 		};
-	}, [source, initialLibraryId, initialStreamId, initialSourceTitle, t]);
+	}, [
+		initialContentKind,
+		source,
+		initialLibraryId,
+		initialStreamId,
+		initialSourceTitle,
+		t,
+	]);
 
 	const onStart = useCallback(async () => {
 		if (startInFlightRef.current) return;
@@ -165,6 +188,7 @@ export function Setup({
 		setLoading(true);
 		try {
 			const config: PracticeSetupConfig = {
+				contentKind: initialContentKind,
 				mode,
 				source,
 				order,
@@ -174,6 +198,7 @@ export function Setup({
 				poolTotal: initialPoolTotal,
 			};
 			const { items, cursor } = await fetchPracticeSessionQueue({
+				contentKind: initialContentKind,
 				source,
 				count,
 				order,
@@ -204,6 +229,7 @@ export function Setup({
 		}
 	}, [
 		count,
+		initialContentKind,
 		initialLibraryId,
 		initialPoolTotal,
 		initialStreamId,

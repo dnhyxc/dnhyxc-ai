@@ -1,34 +1,53 @@
 /**
  * 拼写判分与题序工具
  *
- * 功能：规范化用户输入（去空格、小写、统一引号）后与标准 word 严格比对；
- * 提供 shufflePracticeItems 供随机出题或错题重练时打乱顺序。
+ * 单词：规范化 + 忽略句末标点；语句：另忽略全部标点（保留字母、数字与空格）。
  */
-/** 规范化用户拼写输入，用于与标准答案比较 */
+/** 规范化用户拼写输入，用于与标准答案比较（单词 / 语句共用基底） */
 export function normalizeSpellingAnswer(raw: string): string {
 	return raw.trim().toLowerCase().replace(/[''']/g, "'").replace(/\s+/g, ' ');
 }
 
+/** 去除句末标点及紧跟其前的多余空格（不影响词内撇号等） */
+function stripTrailingPunctuation(s: string): string {
+	return s.replace(/[\s.,!?;:'"”“」』）\])}…—–-]+$/u, '').trim();
+}
+
+/** 单词判分：小写、统一引号与空格，并忽略句末标点 */
+export function normalizeVocabSpellingAnswer(raw: string): string {
+	return stripTrailingPunctuation(normalizeSpellingAnswer(raw));
+}
+
+/**
+ * 语句判分用规范化：小写、统一引号与空格后，移除全部标点再比对。
+ */
+export function normalizeSentenceSpellingAnswer(raw: string): string {
+	return stripTrailingPunctuation(normalizeSpellingAnswer(raw))
+		.replace(/[^\p{L}\p{N}\s]/gu, '')
+		.replace(/\s+/g, ' ')
+		.trim();
+}
+
+export type GradeSpellingOptions = {
+	/** 经典句整句练习：忽略标点，大小写已在 normalize 中处理 */
+	compareAsSentence?: boolean;
+};
+
 /**
  * 对用户的拼写输入进行判分
- *
- * 逻辑流程：
- * 1. 首先使用 normalizeSpellingAnswer 对用户输入和标准答案进行规范化处理（去除首尾空格、转小写、统一引号、压缩空格）。
- * 2. 若任一处理结果为空（如输入为空字符串），直接返回 false（判定为错误答案）。
- * 3. 比较规范化后的字符串，完全相同则判为正确，返回 true，否则返回 false。
- *
- * @param userInput 用户输入的拼写
- * @param expectedWord 正确答案单词
- * @returns 是否答对（完全一致为 true，否则 false）
  */
 export function gradeSpelling(
 	userInput: string,
 	expectedWord: string,
+	options?: GradeSpellingOptions,
 ): boolean {
-	const u = normalizeSpellingAnswer(userInput); // 规范化用户输入
-	const e = normalizeSpellingAnswer(expectedWord); // 规范化标准答案
-	if (!u || !e) return false; // 输入或标准答案为空时，直接判错
-	return u === e; // 严格一致即为正确
+	const normalize = options?.compareAsSentence
+		? normalizeSentenceSpellingAnswer
+		: normalizeVocabSpellingAnswer;
+	const u = normalize(userInput);
+	const e = normalize(expectedWord);
+	if (!u || !e) return false;
+	return u === e;
 }
 
 /**

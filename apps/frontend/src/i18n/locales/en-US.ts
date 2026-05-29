@@ -797,9 +797,23 @@ export const enUS = {
 	'route.englishLearning.morphology.title': 'Roots & affixes',
 	'route.englishLearning.grammar.title': 'English grammar',
 	'route.englishLearning.practice.title': 'Dictation & spelling',
+	'route.englishLearning.practice.classicTitle':
+		'Sentence dictation & spelling',
 
 	'englishLearning.practice.entry': 'Practice',
 	'englishLearning.practice.setupTitle': 'Word practice',
+	'englishLearning.practice.classicSetupTitle': 'Sentence practice',
+	'englishLearning.practice.classicDictationHint':
+		'Listen and type the full sentence below',
+	'englishLearning.practice.classicSpellingPrompt':
+		'Read the Chinese meaning and type the full English sentence',
+	'englishLearning.practice.classicInputPlaceholder':
+		'Type the English sentence',
+	'englishLearning.practice.sourceClassicFavorites': 'Classic quote favorites',
+	'englishLearning.practice.sourceClassicMistakes': 'Sentence mistake book',
+	'englishLearning.practice.sourceClassicLibrary': 'Current quote library',
+	'englishLearning.practice.sourceClassicPack': 'This quote pack',
+	'englishLearning.practice.sourceClassicLive': 'Current quote pack (live)',
 	'englishLearning.practice.modeLabel': 'Mode',
 	'englishLearning.practice.modeDictation': 'Dictation',
 	'englishLearning.practice.modeSpelling': 'Spelling',
@@ -861,17 +875,27 @@ export const enUS = {
 	'englishLearning.practice.continueEmpty': 'No more new words to practice',
 	'englishLearning.practice.back': 'Back',
 	'englishLearning.practice.saveMistakes': 'Save to mistake book',
+	'englishLearning.practice.saveMistakesSuccessTitle':
+		'Save mistake book successfully',
 	'englishLearning.practice.saveMistakesSuccess':
-		'Added {added} word(s); {skipped} already in mistake book (skipped)',
+		'Added {added}, updated spelling {updated}, unchanged {skipped}',
 	'englishLearning.practice.saveMistakesAllSkipped':
-		'All wrong words are already in your mistake book.',
+		'All wrong items are already in the mistake book with the same spelling',
 	'englishLearning.practice.saveMistakesFailed': 'Failed to save mistake book',
 	'englishLearning.practice.sourceMistakes': 'Mistake book',
 
 	'englishLearning.mistakes.desc':
 		'Words you misspelled in practice — review with dictation or spelling',
-	'englishLearning.mistakes.nav': 'Open mistake book',
-	'englishLearning.mistakes.pageTitle': 'Vocabulary mistake book',
+	'englishLearning.mistakes.homeDesc':
+		'View vocabulary and sentence mistake book',
+	'englishLearning.mistakes.vocabNav': 'Vocabulary mistakes',
+	'englishLearning.mistakes.classicNav': 'Sentence mistakes',
+	'englishLearning.mistakes.classicEmpty':
+		'No sentence mistakes yet. Add them from the practice summary after a session.',
+	'englishLearning.mistakes.classicListLoadFailed':
+		'Failed to load sentence mistakes',
+	'englishLearning.mistakes.classicRemoveConfirmDesc':
+		'Remove "{english}" from the mistake book?',
 	'englishLearning.mistakes.empty':
 		'No mistakes yet. Add wrong words from the practice summary.',
 	'englishLearning.mistakes.listLoadFailed': 'Failed to load mistake book',
@@ -1203,6 +1227,7 @@ export const enUS = {
 	'englishLearning.classic.favoritesLoaded': 'Loaded into quote list',
 	'englishLearning.classic.historyEmpty': 'No records yet',
 	'englishLearning.classic.historyQuotes': '{count} lines',
+	'englishLearning.classic.historySentences': '{count} sentences',
 	'englishLearning.classic.historyLoaded': 'Loaded this list',
 	'englishLearning.classic.historyLoading': 'Loading history…',
 	'englishLearning.classic.historyStreaming': 'Generating',

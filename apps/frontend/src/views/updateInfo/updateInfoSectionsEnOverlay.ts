@@ -590,4 +590,29 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'While answering dictation or spelling items, use Hint in the card header for clues (dictation: Chinese meaning and IPA; spelling: IPA under the prompt). The English word is not shown; the button is disabled when no clues exist; hints close when you move to the next item.',
 	},
+	's24-21': {
+		title: 'Classic quote dictation & spelling',
+		description:
+			'Start practice from classic favorites, the quotes library, pack results, or the classic history drawer. Shares setup and summary with vocabulary practice. Hints may show Chinese meaning, source, or notes—never the English sentence before reveal.',
+	},
+	's24-22': {
+		title: 'Classic quote mistake book',
+		description:
+			'Save wrong sentences to the shared mistake book page with tabs and footer actions. Re-saving updates last wrong spelling when it differs.',
+	},
+	's24-23': {
+		title: 'Practice setup pool units',
+		description:
+			'On the dictation/spelling setup screen, the pool size shows “N words” or “N sentences” depending on vocabulary vs classic quote practice.',
+	},
+	's24-24': {
+		title: 'Relaxed classic quote grading',
+		description:
+			'Classic dictation/spelling ignores case and punctuation; vocabulary practice also ignores trailing punctuation, reducing false negatives.',
+	},
+	's24-25': {
+		title: 'Mistake book spelling refresh',
+		description:
+			'When saving to the mistake book again, if the wrong spelling differs from what was stored, only “last wrong input” is updated; word/sentence snapshots are unchanged.',
+	},
 };

@@ -54,6 +54,7 @@ export function SummaryActions({
 	hasWrongItems,
 	continueLoading,
 	saveMistakesLoading = false,
+	mistakesPath = '/english-learning/mistakes',
 	labels,
 	onRetryWrong,
 	onBackToSetup,
@@ -118,7 +119,7 @@ export function SummaryActions({
 				type="button"
 				variant="ghost"
 				className={ACTION_BTN_TONE.openMistakes}
-				onClick={() => navigate('/english-learning/mistakes')}
+				onClick={() => navigate(mistakesPath)}
 			>
 				<ClipboardList className="size-3.5 shrink-0" aria-hidden />
 				<span className="truncate">{labels.openMistakes}</span>

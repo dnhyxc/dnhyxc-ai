@@ -13,6 +13,8 @@ export function SpellingPromptBody({
 	hintContent,
 }: SpellingPromptBodyProps) {
 	const ipaText = hintContent.ipa?.trim();
+	const sourceText = hintContent.source?.trim();
+	const noteText = hintContent.noteZh?.trim();
 	const posText = pos?.trim();
 
 	return (
@@ -49,6 +51,22 @@ export function SpellingPromptBody({
 						aria-live="polite"
 					>
 						{displayIpaWrapped(ipaText)}
+					</p>
+				) : null}
+				{hintOpen && !ipaText && sourceText ? (
+					<p
+						className="text-textcolor/65 mt-2.5 shrink-0 line-clamp-2 text-xs leading-snug"
+						aria-live="polite"
+					>
+						{sourceText}
+					</p>
+				) : null}
+				{hintOpen && !ipaText && noteText ? (
+					<p
+						className="text-textcolor/60 mt-1.5 shrink-0 line-clamp-3 text-xs leading-relaxed italic"
+						aria-live="polite"
+					>
+						{noteText}
 					</p>
 				) : null}
 			</div>

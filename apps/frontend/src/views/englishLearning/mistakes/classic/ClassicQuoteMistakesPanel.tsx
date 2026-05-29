@@ -1,5 +1,5 @@
 /**
- * 单词错题集列表页主体
+ * 语句错题集列表页主体
  */
 import Confirm from '@design/Confirm';
 import Loading from '@design/Loading';
@@ -8,26 +8,30 @@ import { Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
-import type { EnglishVocabularyMistakeListEntry } from '@/service';
+import type { EnglishClassicQuoteMistakeListEntry } from '@/service';
 import {
 	isEnglishTtsSupported,
 	playEnglishPreferred,
 	stopAllEnglishPlayback,
 } from '@/utils/englishTts';
-import { VocabularyWordCard } from '../shared/VocabularyWordCard';
-import { MistakesPanelFooter } from './MistakesPanelFooter';
-import { useVocabularyMistakesList } from './useVocabularyMistakesList';
+import { ClassicQuoteCard } from '../../shared/ClassicQuoteCard';
+import { MistakesPanelFooter } from '../components/MistakesPanelFooter';
+import { useClassicQuoteMistakesList } from './useClassicQuoteMistakesList';
 
-export type VocabularyMistakesPanelProps = {
-	onPracticeState?: (state: {
-		poolTotal: number;
-		practiceDisabled: boolean;
-	}) => void;
+export type MistakesListCounts = {
+	loaded: number;
+	total: number;
 };
 
-export function VocabularyMistakesPanel({
-	onPracticeState,
-}: VocabularyMistakesPanelProps) {
+export type ClassicQuoteMistakesPanelProps = {
+	active?: boolean;
+	onCountsChange?: (counts: MistakesListCounts) => void;
+};
+
+export function ClassicQuoteMistakesPanel({
+	active = true,
+	onCountsChange,
+}: ClassicQuoteMistakesPanelProps) {
 	const { t } = useI18n();
 	const {
 		entries,
@@ -36,7 +40,7 @@ export function VocabularyMistakesPanel({
 		loadingMore,
 		onViewportScroll,
 		onBatchRemove,
-	} = useVocabularyMistakesList(true);
+	} = useClassicQuoteMistakesList(active);
 
 	const [playingKey, setPlayingKey] = useState<string | null>(null);
 	const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
@@ -44,15 +48,15 @@ export function VocabularyMistakesPanel({
 	const [removeConfirmOpen, setRemoveConfirmOpen] = useState(false);
 	const [singleRemoveConfirmOpen, setSingleRemoveConfirmOpen] = useState(false);
 	const [singleRemoveTarget, setSingleRemoveTarget] =
-		useState<EnglishVocabularyMistakeListEntry | null>(null);
+		useState<EnglishClassicQuoteMistakeListEntry | null>(null);
 
 	const showInitialLoading = loading && entries.length === 0;
 	const showEmpty = !loading && entries.length === 0 && !loadingMore;
 	const practiceDisabled = loading || totalCount === 0;
 
 	useEffect(() => {
-		onPracticeState?.({ poolTotal: totalCount, practiceDisabled });
-	}, [onPracticeState, totalCount, practiceDisabled]);
+		onCountsChange?.({ loaded: entries.length, total: totalCount });
+	}, [entries.length, totalCount, onCountsChange]);
 
 	const entryIdSet = useMemo(
 		() => new Set(entries.map((e) => e.id)),
@@ -118,7 +122,7 @@ export function VocabularyMistakesPanel({
 	}, [selectedIds, t]);
 
 	const requestSingleRemove = useCallback(
-		(entry: EnglishVocabularyMistakeListEntry) => {
+		(entry: EnglishClassicQuoteMistakeListEntry) => {
 			setRemoveConfirmOpen(false);
 			setSingleRemoveTarget(entry);
 			setSingleRemoveConfirmOpen(true);
@@ -189,8 +193,8 @@ export function VocabularyMistakesPanel({
 		}
 	}, [onBatchRemove, singleRemoveTarget, t]);
 
-	const toggleWordPlay = useCallback(
-		async (word: string, key: string) => {
+	const toggleQuotePlay = useCallback(
+		async (english: string, key: string) => {
 			if (playingKey === key) {
 				stopAllEnglishPlayback();
 				setPlayingKey(null);
@@ -206,7 +210,7 @@ export function VocabularyMistakesPanel({
 			stopAllEnglishPlayback();
 			setPlayingKey(key);
 			try {
-				await playEnglishPreferred(word, { preferLocal: true });
+				await playEnglishPreferred(english);
 			} catch {
 				Toast({
 					type: 'warning',
@@ -252,8 +256,8 @@ export function VocabularyMistakesPanel({
 				title={t('englishLearning.mistakes.removeConfirmTitle')}
 				description={
 					singleRemoveTarget
-						? t('englishLearning.mistakes.removeConfirmDesc', {
-								word: singleRemoveTarget.word,
+						? t('englishLearning.mistakes.classicRemoveConfirmDesc', {
+								english: singleRemoveTarget.english,
 							})
 						: '\u00a0'
 				}
@@ -274,27 +278,34 @@ export function VocabularyMistakesPanel({
 							<Loading text={t('common.loading')} />
 						</div>
 					) : (
-						<div className="grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+						<div className="grid grid-cols-1 gap-4 @min-[28rem]:grid-cols-2">
 							{entries.map((row) => {
-								const playKey = `mistake-${row.id}`;
+								const playKey = `classic-mistake-${row.id}`;
 								const playing = playingKey === playKey;
 								return (
-									<VocabularyWordCard
+									<ClassicQuoteCard
 										key={row.id}
 										variant="selectable"
-										data={row}
+										data={{
+											english: row.english,
+											translationZh: row.translationZh,
+											source: row.source,
+											noteZh: row.noteZh,
+										}}
 										selection={{
-											controlId: `mistake-${row.id}`,
+											controlId: `classic-mistake-${row.id}`,
 											checked: selectedIds.has(row.id),
 											disabled: selectionDisabled,
 											onCheckedChange: (checked) =>
 												toggleRowSelected(row.id, checked),
-											ariaLabel: `${t('englishLearning.mistakes.toggleRow')}: ${row.word}`,
+											ariaLabel: `${t('englishLearning.mistakes.toggleRow')}: ${row.english.slice(0, 120)}`,
 										}}
 										playing={playing}
-										onTogglePlay={() => void toggleWordPlay(row.word, playKey)}
+										onTogglePlay={() =>
+											void toggleQuotePlay(row.english, playKey)
+										}
 										playLabels={{
-											play: t('englishLearning.vocab.playWord'),
+											play: t('englishLearning.classic.playQuote'),
 											stop: t('englishLearning.tts.stop'),
 										}}
 										trailingActions={
@@ -326,21 +337,21 @@ export function VocabularyMistakesPanel({
 								);
 							})}
 							{loadingMore ? (
-								<div className="col-span-full text-textcolor/50 flex items-center justify-center gap-1.5 py-2 text-xs">
+								<div className="col-span-full text-textcolor/50 flex items-center justify-center gap-1.5 py-4 text-xs">
 									<Spinner className="size-3.5 text-textcolor/50" aria-hidden />
 									{t('common.loadingMore')}
 								</div>
 							) : null}
 							{showEmpty ? (
 								<div className="text-textcolor/60 col-span-full py-12 text-center text-sm">
-									{t('englishLearning.mistakes.empty')}
+									{t('englishLearning.mistakes.classicEmpty')}
 								</div>
 							) : null}
 						</div>
 					)}
 				</ScrollArea>
 				<MistakesPanelFooter
-					selectAllId="mistakes-select-all"
+					selectAllId="classic-mistakes-select-all"
 					showSelection={!showInitialLoading && entries.length > 0}
 					selectAllCheckboxState={selectAllCheckboxState}
 					selectionDisabled={selectionDisabled}
@@ -349,6 +360,10 @@ export function VocabularyMistakesPanel({
 					removeDisabled={removeDisabled}
 					batchRemoving={batchRemoving}
 					onRequestRemove={requestRemoveConfirm}
+					showPracticeEntry
+					practiceContentKind="classic"
+					practiceDisabled={practiceDisabled}
+					practicePoolTotal={totalCount}
 				/>
 			</div>
 		</>

@@ -49,7 +49,7 @@ export function VocabularyFavoritesSection({
 
 	useEffect(() => {
 		if (totalCount > 0) {
-			setEnglishPracticePoolMeta(englishPracticePoolKeys.favorites, {
+			setEnglishPracticePoolMeta(englishPracticePoolKeys.favorites('vocab'), {
 				total: totalCount,
 				title: t('englishLearning.practice.sourceFavorites'),
 			});

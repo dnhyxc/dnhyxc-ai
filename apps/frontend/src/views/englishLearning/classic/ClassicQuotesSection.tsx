@@ -504,6 +504,7 @@ function ClassicQuotesSectionInner() {
 				onViewportScroll={onHistoryViewportScroll}
 				onSelectEntry={openHistoryDetail}
 				onDeleteEntry={requestDeleteHistory}
+				practiceReturnTo="home"
 			/>
 		</div>
 	);

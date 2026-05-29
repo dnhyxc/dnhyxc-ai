@@ -38,12 +38,13 @@
 | [practice-summary-ui.md](./practice-summary-ui.md) | 听写/拼写练习与结算页 UI、作答明细、统计条 |
 | [practice-session-hint.md](./practice-session-hint.md) | 单题练习「提示」：听写释义/音标、拼写音标、固定高度无滚动 |
 | [practice-entry-navigation.md](./practice-entry-navigation.md) | 多入口（资源库列表/历史抽屉）、设置页词数、返回导航 |
-| [vocabulary-mistakes-and-shared-ui.md](./vocabulary-mistakes-and-shared-ui.md) | 错题集、练习入口组件 `EnglishPracticeEntry`、单词卡片统一 |
+| [vocabulary-mistakes-and-shared-ui.md](./vocabulary-mistakes-and-shared-ui.md) | **单词**错题集、练习入口组件 `EnglishPracticeEntry`、单词卡片统一 |
+| [classic-practice-and-mistakes.md](./classic-practice-and-mistakes.md) | **经典句**练习、`contentKind=classic`、语句错题集、判分与 batch 更新错拼 |
 
 | 说明 | 路径 |
 |------|------|
-| 单词听写 / 拼写 | `/english-learning/practice`；入口：收藏、资源库、词包、历史抽屉、**错题集** |
-| 单词错题集 | `/english-learning/mistakes`；首页侧栏可进入 |
+| 听写 / 拼写 | `/english-learning/practice`；`contentKind=vocab`（默认）或 `classic`；设置页总量显示「词」/「句」 |
+| 错题集（单词/语句） | `/english-learning/mistakes?kind=vocab\|classic`；顶栏 Tab + 底栏练习；`/mistakes/classic` 会 replace |
 
 ## TTS / UI / 其它专题
 

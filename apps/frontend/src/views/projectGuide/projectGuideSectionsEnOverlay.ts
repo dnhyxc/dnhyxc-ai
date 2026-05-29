@@ -282,14 +282,19 @@ export const PROJECT_GUIDE_ITEMS_EN: Record<
 			'On desktop, transient list or favorite-status failures may auto-retry read-only calls and show readable toasts instead of raw transport errors. Write actions such as favorite/unfavorite are generally not retried to avoid duplicate side effects.',
 	},
 	'pg-s13-11': {
-		title: '13.11 Dictation & spelling practice',
+		title: '13.11 Dictation & spelling (vocab & classic quotes)',
 		description:
-			'Entries: favorites footer, library (list hover icon and word-list header), pack results header, vocab history drawer, mistake book header. Setup shows source and pool count. While answering, use Hint in the card header (dictation: Chinese meaning and IPA; spelling: IPA; English word not shown; closes on next item). Report: accuracy, wrong/correct lists, retry mistakes, continue, re-setup, add to mistake book, open mistake book, header back. From home history, back to English learning home; from mistake book, back to the mistake book page.',
+			'Vocab and classic entries as in the Chinese guide. Setup pool size as “N words” or “N sentences”. Grading ignores case; vocab also ignores trailing punctuation, classic quotes ignore all punctuation. Saving to the mistake book updates last wrong spelling when it changed.',
 	},
 	'pg-s13-12': {
-		title: '13.12 Vocabulary mistake book',
+		title: '13.12 Mistake book (vocab & classic)',
 		description:
-			'Open from the English learning sidebar or /english-learning/mistakes. Review saved wrong words, play audio, select loaded rows and remove. Header dictation/spelling uses the mistake book as the word pool. From the practice report, add mistakes then open the book; duplicate word forms are skipped.',
+			'Sidebar or in-page tabs; total/loaded counts; remove and footer practice. Re-saving updates last wrong input when spelling differs; snapshots unchanged.',
+	},
+	'pg-s13-13': {
+		title: '13.13 Classic mistake row fields',
+		description:
+			'Classic rows show English, Chinese meaning, source, notes, and last wrong input; play reads the full sentence. See §13.12 for navigation and actions.',
 	},
 	'pg-s14-1': {
 		title: 'Topic notes and release overview',

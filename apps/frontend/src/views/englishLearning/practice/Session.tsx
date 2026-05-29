@@ -30,7 +30,8 @@ import type {
 	SessionProps,
 } from './types';
 import { gradeSpelling } from './utils/grading';
-import { hasPracticeHintContent } from './utils/hint';
+import { buildPracticeHintContent, hasPracticeHintContent } from './utils/hint';
+import { getPracticeAnswerText, isPracticeClassicItem } from './utils/item';
 
 /** 整张练习卡片锁定高度（听写/拼写 ↔ 错题切换时总高一致） */
 const SESSION_CARD_H = 'h-[calc(14.625rem+min(14.5rem,38dvh))]';
@@ -55,6 +56,8 @@ export function Session({
 	const nextButtonRef = useRef<HTMLButtonElement>(null);
 	const autoPlayedKeyRef = useRef<string | null>(null);
 
+	const answerText = getPracticeAnswerText(item);
+
 	const playWord = useCallback(async () => {
 		if (!isEnglishTtsSupported()) {
 			Toast({
@@ -71,7 +74,7 @@ export function Session({
 		stopAllEnglishPlayback();
 		setPlaying(true);
 		try {
-			await playEnglishPreferred(item.word, { preferLocal: true });
+			await playEnglishPreferred(answerText, { preferLocal: true });
 		} catch {
 			Toast({
 				type: 'warning',
@@ -80,7 +83,7 @@ export function Session({
 		} finally {
 			setPlaying(false);
 		}
-	}, [item.word, playing, t]);
+	}, [answerText, playing, t]);
 
 	useEffect(() => {
 		setPhase('prompt');
@@ -115,7 +118,9 @@ export function Session({
 			if (phase !== 'prompt') return;
 			const trimmed = input.trim();
 			if (!trimmed) return;
-			const correct = gradeSpelling(trimmed, item.word);
+			const correct = gradeSpelling(trimmed, answerText, {
+				compareAsSentence: isPracticeClassicItem(item),
+			});
 			const attempt: PracticeAttemptResult = {
 				item,
 				userInput: trimmed,
@@ -130,7 +135,7 @@ export function Session({
 			setLastWrong(attempt);
 			setPhase('revealed');
 		},
-		[completeStep, input, item, phase],
+		[answerText, completeStep, input, item, phase],
 	);
 
 	const onNext = useCallback(() => {
@@ -182,13 +187,8 @@ export function Session({
 			? t('englishLearning.practice.modeDictation')
 			: t('englishLearning.practice.modeSpelling');
 
-	const hintContent = useMemo(
-		() => ({
-			ipa: item.ipa,
-			translationZh: item.translationZh,
-		}),
-		[item.ipa, item.translationZh],
-	);
+	const hintContent = useMemo(() => buildPracticeHintContent(item), [item]);
+	const isClassic = isPracticeClassicItem(item);
 
 	const canHint = hasPracticeHintContent(item, mode);
 	const hintButtonLabel = hintOpen
@@ -262,7 +262,11 @@ export function Session({
 							>
 								{mode === 'dictation' ? (
 									<DictationPromptBody
-										hint={t('englishLearning.practice.dictationHint')}
+										hint={
+											isClassic
+												? t('englishLearning.practice.classicDictationHint')
+												: t('englishLearning.practice.dictationHint')
+										}
 										hintOpen={hintOpen}
 										hintContent={hintContent}
 										stepListen={t(
@@ -276,9 +280,13 @@ export function Session({
 									/>
 								) : (
 									<SpellingPromptBody
-										promptLabel={t('englishLearning.practice.spellingPrompt')}
+										promptLabel={
+											isClassic
+												? t('englishLearning.practice.classicSpellingPrompt')
+												: t('englishLearning.practice.spellingPrompt')
+										}
 										translationZh={item.translationZh}
-										pos={item.pos}
+										pos={isClassic ? undefined : item.pos}
 										hintOpen={hintOpen}
 										hintContent={hintContent}
 									/>
@@ -324,7 +332,11 @@ export function Session({
 											}
 										}}
 										onBlur={() => setDictationSpellStepActive(false)}
-										placeholder={t('englishLearning.practice.inputPlaceholder')}
+										placeholder={
+											isClassic
+												? t('englishLearning.practice.classicInputPlaceholder')
+												: t('englishLearning.practice.inputPlaceholder')
+										}
 										spellCheck={false}
 										autoComplete="off"
 										autoCapitalize="off"

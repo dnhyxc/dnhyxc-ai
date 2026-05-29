@@ -6,11 +6,12 @@ import Loading from '@design/Loading';
 import { Button, ScrollArea, Spinner } from '@ui/index';
 import { Loader2, Trash2 } from 'lucide-react';
 import { observer } from 'mobx-react';
-import { type UIEventHandler } from 'react';
+import { type MouseEvent, type UIEventHandler } from 'react';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import type { EnglishClassicQuoteHistoryEntry } from '@/service';
 import EnglishPackStore from '@/store/englishPack';
+import { EnglishPracticeEntry } from '../shared/practiceEntry';
 
 export type ClassicQuotesHistoryDrawerProps = {
 	open: boolean;
@@ -24,6 +25,8 @@ export type ClassicQuotesHistoryDrawerProps = {
 	onViewportScroll: UIEventHandler<HTMLDivElement>;
 	onSelectEntry: (streamId: string) => void | Promise<void>;
 	onDeleteEntry: (entry: EnglishClassicQuoteHistoryEntry) => void;
+	/** 从 /english-learning 首页历史抽屉进入练习时，返回应回到首页 */
+	practiceReturnTo?: 'home';
 };
 
 function formatHistoryLineDate(iso: string): string {
@@ -46,6 +49,7 @@ function ClassicQuotesHistoryDrawerInner({
 	onViewportScroll,
 	onSelectEntry,
 	onDeleteEntry,
+	practiceReturnTo,
 }: ClassicQuotesHistoryDrawerProps) {
 	const { t } = useI18n();
 
@@ -78,11 +82,12 @@ function ClassicQuotesHistoryDrawerInner({
 							const isStreaming =
 								EnglishPackStore.classicLoading &&
 								EnglishPackStore.classicActiveStreamId === h.streamId;
+							const showPracticeEntry = h.quoteCount > 0;
 							return (
 								<div
 									key={h.streamId}
 									className={cn(
-										'group flex items-stretch gap-0.5 overflow-hidden rounded-md',
+										'group relative flex min-w-0 items-stretch overflow-hidden rounded-md',
 										active ? 'bg-theme/10' : 'hover:bg-theme/10',
 									)}
 								>
@@ -92,7 +97,12 @@ function ClassicQuotesHistoryDrawerInner({
 										onClick={() => void onSelectEntry(h.streamId)}
 										className="flex min-w-0 flex-1 cursor-pointer flex-col gap-0.5 p-2 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-60"
 									>
-										<div className="text-textcolor line-clamp-2 w-full min-w-0 max-w-full text-sm font-medium wrap-anywhere leading-snug mb-1">
+										<div
+											className={cn(
+												'text-textcolor line-clamp-2 w-full min-w-0 max-w-full text-sm font-medium wrap-anywhere leading-snug mb-1',
+												showPracticeEntry && 'mr-14',
+											)}
+										>
 											{h.topic || '—'}
 										</div>
 										<div className="text-textcolor/50 flex w-full flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
@@ -122,26 +132,63 @@ function ClassicQuotesHistoryDrawerInner({
 									{isStreaming ? (
 										<div
 											role="status"
-											className="my-1 mr-1 flex h-7 w-7 shrink-0 items-center justify-center"
+											className="absolute top-0 right-0 my-1 mr-1 flex h-7 w-7 shrink-0 items-center justify-center"
 											aria-label={t('englishLearning.classic.historyStreaming')}
 										>
 											<Spinner className="size-4 shrink-0 text-violet-600 dark:text-violet-400" />
 										</div>
 									) : (
-										<Button
-											type="button"
-											variant="ghost"
-											size="sm"
-											disabled={busy || deleting}
-											className="group-hover:flex hidden items-center justify-center text-textcolor/65 hover:text-destructive hover:bg-destructive/10 border border-transparent hover:border-destructive/35 my-1 mr-1 h-7 w-7 shrink-0 p-0"
-											aria-label={t('englishLearning.packHistory.deleteAction')}
-											onClick={(e) => {
-												e.stopPropagation();
-												onDeleteEntry(h);
-											}}
-										>
-											<Trash2 className="size-4" aria-hidden />
-										</Button>
+										<div className="absolute top-0 right-0 mt-1 mr-1 hidden items-center gap-0.5 group-hover:flex">
+											{showPracticeEntry ? (
+												<EnglishPracticeEntry
+													variant="icon"
+													disabled={busy || deleting}
+													practice={{
+														contentKind: 'classic',
+														source: 'pack',
+														streamId: h.streamId,
+														sourceTitle: h.topic?.trim() || undefined,
+														poolTotal:
+															h.quoteCount > 0 ? h.quoteCount : undefined,
+														returnTo:
+															practiceReturnTo === 'home' ? 'home' : undefined,
+														returnStreamId:
+															practiceReturnTo === 'home'
+																? undefined
+																: (() => {
+																		const backId = loadedStreamId?.trim();
+																		return backId && backId !== h.streamId
+																			? backId
+																			: undefined;
+																	})(),
+													}}
+													onBeforeNavigate={(
+														e: MouseEvent<HTMLButtonElement>,
+													) => {
+														e.stopPropagation();
+													}}
+												/>
+											) : null}
+											<Button
+												type="button"
+												variant="ghost"
+												size="sm"
+												disabled={busy || deleting}
+												className={cn(
+													'h-7 w-7 shrink-0 rounded-md p-0 transition-colors',
+													'text-textcolor/65 hover:border hover:border-destructive/10 hover:bg-destructive/10 hover:text-destructive',
+												)}
+												aria-label={t(
+													'englishLearning.packHistory.deleteAction',
+												)}
+												onClick={(e) => {
+													e.stopPropagation();
+													onDeleteEntry(h);
+												}}
+											>
+												<Trash2 className="size-3.5" aria-hidden />
+											</Button>
+										</div>
 									)}
 								</div>
 							);

@@ -17,7 +17,7 @@ export class VocabularyMistakeBatchItemDto extends VocabularyFavoriteBodyDto {
 	lastUserInput?: string;
 }
 
-/** 结算页批量加入错题集（已存在词形跳过，不更新） */
+/** 结算页批量加入错题集（已存在词形：错拼不同则更新 lastUserInput） */
 export class VocabularyMistakeBatchDto {
 	@IsArray()
 	@ArrayMaxSize(50)

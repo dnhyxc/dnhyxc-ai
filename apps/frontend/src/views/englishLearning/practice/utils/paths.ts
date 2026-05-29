@@ -32,6 +32,10 @@ export function buildEnglishPracticeSearchParams(
 	// 必填参数：source
 	params.set('source', input.source);
 
+	if (input.contentKind === 'classic') {
+		params.set('contentKind', 'classic');
+	}
+
 	// 可选参数：mode
 	if (input.mode) params.set('mode', input.mode);
 

@@ -5,6 +5,7 @@ import { Button } from '@ui/index';
 import { Square, Volume2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { WrongListItemProps } from '../../types';
+import { getPracticeAnswerText } from '../../utils/item';
 
 export function WrongListItem({
 	item,
@@ -25,8 +26,8 @@ export function WrongListItem({
 			)}
 		>
 			<div className="h-full min-w-0 flex flex-col justify-between flex-1 select-text">
-				<div className="truncate text-base font-semibold text-textcolor">
-					{item.word}
+				<div className="line-clamp-2 text-base font-semibold text-textcolor">
+					{getPracticeAnswerText(item)}
 				</div>
 				{item.translationZh?.trim() ? (
 					<p className="text-textcolor/65 mt-0.5 line-clamp-2 text-sm leading-snug">

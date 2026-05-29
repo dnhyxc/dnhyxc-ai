@@ -7,6 +7,7 @@ import { EnglishLearningService } from './english-learning.service';
 import { EnglishLearningStreamAbortRegistry } from './english-learning-stream-abort.registry';
 import { EnglishClassicQuotePackBatch } from './entity/english-classic-quote.entity';
 import { EnglishClassicQuoteFavorite } from './entity/english-classic-quote-favorite.entity';
+import { EnglishClassicQuoteMistake } from './entity/english-classic-quote-mistake.entity';
 import { EnglishClassicQuotesLibrary } from './entity/english-classic-quotes-library.entity';
 import { EnglishClassicQuotesLibraryItem } from './entity/english-classic-quotes-library-item.entity';
 import { EnglishClassicQuotesPackItem } from './entity/english-classic-quotes-pack-item.entity';
@@ -35,6 +36,7 @@ import { EnglishVocabularyPackSession } from './entity/english-vocabulary-pack-s
 			EnglishVocabularyFavorite,
 			EnglishVocabularyMistake,
 			EnglishClassicQuoteFavorite,
+			EnglishClassicQuoteMistake,
 			EnglishVocabularyLibrary,
 			EnglishVocabularyLibraryItem,
 			EnglishClassicQuotesLibrary,

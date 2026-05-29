@@ -170,6 +170,13 @@ const routes: RouteConfig[] = [
 						},
 					},
 					{
+						path: 'mistakes/classic',
+						Component: EnglishLearningMistakesPage,
+						meta: {
+							titleKey: 'route.englishLearning.mistakes.title',
+						},
+					},
+					{
 						path: 'practice',
 						Component: EnglishLearningPracticePage,
 						meta: {

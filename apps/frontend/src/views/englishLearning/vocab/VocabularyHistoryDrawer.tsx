@@ -164,7 +164,6 @@ function VocabularyHistoryDrawerInner({
 													onBeforeNavigate={(
 														e: MouseEvent<HTMLButtonElement>,
 													) => {
-														e.preventDefault();
 														e.stopPropagation();
 													}}
 												/>

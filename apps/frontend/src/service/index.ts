@@ -31,6 +31,7 @@ import {
 	DELETE_SESSION,
 	DOWNLOAD_FILE,
 	DOWNLOAD_ZIP_FILE,
+	ENGLISH_LEARNING_CLASSIC_QUOTE_MISTAKES,
 	ENGLISH_LEARNING_CLASSIC_QUOTES_FAVORITES,
 	ENGLISH_LEARNING_CLASSIC_QUOTES_FAVORITES_EXPORT_DOCX,
 	ENGLISH_LEARNING_CLASSIC_QUOTES_HISTORY,
@@ -1001,7 +1002,7 @@ export type EnglishVocabularyMistakeBatchItem = EnglishVocabularyItem & {
 export const batchAddEnglishVocabularyMistakes = async (
 	items: EnglishVocabularyMistakeBatchItem[],
 ) => {
-	return await http.post<{ added: number; skipped: number }>(
+	return await http.post<{ added: number; updated: number; skipped: number }>(
 		`${ENGLISH_LEARNING_VOCABULARY_MISTAKES}/batch`,
 		{ items },
 	);
@@ -1034,6 +1035,65 @@ export const removeEnglishVocabularyMistake = async (id: string) => {
 export const removeEnglishVocabularyMistakesBatch = async (ids: string[]) => {
 	return await http.post<{ removedCount: number }>(
 		`${ENGLISH_LEARNING_VOCABULARY_MISTAKES}/remove-batch`,
+		{ ids },
+	);
+};
+
+export type EnglishClassicQuoteMistakeListEntry = {
+	id: string;
+	english: string;
+	translationZh: string;
+	source: string;
+	noteZh: string;
+	lastUserInput: string;
+	createdAt: string;
+};
+
+export type EnglishClassicQuoteMistakesPage = {
+	items: EnglishClassicQuoteMistakeListEntry[];
+	totalCount: number;
+};
+
+export type EnglishClassicQuoteMistakeBatchItem = EnglishClassicQuoteItem & {
+	lastUserInput?: string;
+};
+
+export const batchAddEnglishClassicQuoteMistakes = async (
+	items: EnglishClassicQuoteMistakeBatchItem[],
+) => {
+	return await http.post<{ added: number; updated: number; skipped: number }>(
+		`${ENGLISH_LEARNING_CLASSIC_QUOTE_MISTAKES}/batch`,
+		{ items },
+	);
+};
+
+export const listEnglishClassicQuoteMistakes = async (options?: {
+	limit?: number;
+	offset?: number;
+	silent?: boolean;
+}) => {
+	return await http.get<EnglishClassicQuoteMistakesPage>(
+		ENGLISH_LEARNING_CLASSIC_QUOTE_MISTAKES,
+		{
+			querys: {
+				limit: options?.limit ?? 20,
+				offset: options?.offset ?? 0,
+			},
+			silent: options?.silent,
+		},
+	);
+};
+
+export const removeEnglishClassicQuoteMistake = async (id: string) => {
+	return await http.post<{ removed: boolean }>(
+		`${ENGLISH_LEARNING_CLASSIC_QUOTE_MISTAKES}/remove`,
+		{ id },
+	);
+};
+
+export const removeEnglishClassicQuoteMistakesBatch = async (ids: string[]) => {
+	return await http.post<{ removedCount: number }>(
+		`${ENGLISH_LEARNING_CLASSIC_QUOTE_MISTAKES}/remove-batch`,
 		{ ids },
 	);
 };

@@ -294,8 +294,12 @@ export function VocabularyLibraryListPanel({
 								kind === 'vocab'
 									? (lib as EnglishVocabularyLibraryListItem)
 									: null;
-							const wordCount = vocabLib?.wordCount ?? 0;
-							const showPracticeEntry = kind === 'vocab' && wordCount > 0;
+							const classicLib =
+								kind === 'classic'
+									? (lib as EnglishClassicQuotesLibraryListItem)
+									: null;
+							const itemCount = getLibraryItemCount(lib, kind);
+							const showPracticeEntry = itemCount > 0;
 							return (
 								<div
 									key={lib.id}
@@ -314,7 +318,7 @@ export function VocabularyLibraryListPanel({
 										<div
 											className={cn(
 												'text-textcolor line-clamp-2 text-sm font-medium leading-snug',
-												kind === 'vocab' ? 'mr-14' : 'mr-6',
+												showPracticeEntry ? 'mr-14' : 'mr-6',
 											)}
 										>
 											{lib.title || '—'}
@@ -345,6 +349,27 @@ export function VocabularyLibraryListPanel({
 													poolTotal:
 														vocabLib.wordCount != null && vocabLib.wordCount > 0
 															? vocabLib.wordCount
+															: undefined,
+												}}
+												onBeforeNavigate={(
+													e: MouseEvent<HTMLButtonElement>,
+												) => {
+													e.stopPropagation();
+												}}
+											/>
+										) : null}
+										{showPracticeEntry && classicLib ? (
+											<EnglishPracticeEntry
+												variant="icon"
+												practice={{
+													contentKind: 'classic',
+													source: 'library',
+													libraryId: classicLib.id,
+													sourceTitle: classicLib.title?.trim() || undefined,
+													poolTotal:
+														classicLib.quoteCount != null &&
+														classicLib.quoteCount > 0
+															? classicLib.quoteCount
 															: undefined,
 												}}
 												onBeforeNavigate={(

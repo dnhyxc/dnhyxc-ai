@@ -2,6 +2,8 @@
  * 错题揭示 — 你的答案 + 正确答案
  */
 import type { RevealedPanelInnerProps } from '../../types';
+import { isPracticeClassicItem } from '../../utils/item';
+import { SentenceAnswerDetail } from './SentenceAnswerDetail';
 import { WordAnswerDetail } from './WordAnswerDetail';
 
 export function RevealedPanelInner({
@@ -17,12 +19,21 @@ export function RevealedPanelInner({
 				<span>{yourAnswerPrefix}</span>
 				<span className="text-lg font-medium text-rose-500">{wrongInput}</span>
 			</p>
-			<WordAnswerDetail
-				item={item}
-				showDivider={false}
-				correctAnswerLabel={correctAnswerLabel}
-				wordRowTrailing={playButton}
-			/>
+			{isPracticeClassicItem(item) ? (
+				<SentenceAnswerDetail
+					item={item}
+					showDivider={false}
+					correctAnswerLabel={correctAnswerLabel}
+					sentenceRowTrailing={playButton}
+				/>
+			) : (
+				<WordAnswerDetail
+					item={item}
+					showDivider={false}
+					correctAnswerLabel={correctAnswerLabel}
+					wordRowTrailing={playButton}
+				/>
+			)}
 		</>
 	);
 }
