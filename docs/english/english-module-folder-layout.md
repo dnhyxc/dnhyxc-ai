@@ -1,222 +1,289 @@
-# 英语学习模块目录整理（components / reference / favorites）
+# 英语学习模块目录整理与顶栏布局
 
-> **文档角色**：说明 `englishLearning` 前端子模块在 2026-05 一轮**纯结构整理**后的目录约定与 import 路径；**不改变**路由、API 与用户可见行为。  
-> **延伸阅读**：[vocabulary-mistakes-and-shared-ui.md](./vocabulary-mistakes-and-shared-ui.md)（横切 UI 组件职责）、[classic-practice-and-mistakes.md](./classic-practice-and-mistakes.md)（收藏/错题面板）。
+> **文档角色**：`englishLearning` 前端子模块的**目录约定**（对齐 `favorites` 分域结构）及多页**顶栏单行截断**规则；路由与 API 不变。  
+> **延伸阅读**：[vocabulary-mistakes-and-shared-ui.md](./vocabulary-mistakes-and-shared-ui.md)、[classic-practice-and-mistakes.md](./classic-practice-and-mistakes.md)、[english-learning-pack-stream-route.md](./english-learning-pack-stream-route.md)。
 
 ---
 
 ## 1. 背景与目标
 
-英语学习页面积累多个子功能（主区 Agent、词包、收藏、错题、练习、参考资料）。此前存在三类可维护性问题：
+英语学习包含主区拉取、独立路由页（收藏 / 错题 / 资源库 / 拉取结果 / 练习等）。此前问题：
 
-1. **横切 UI 目录名 `shared/`** 与各子模块已有的 `components/`（如 `favorites/components`）语义重复，新人难以判断「该放哪一层」。
-2. **参考资料 `reference/`** 根目录堆叠 `dataSource.ts`（语法 + 词形合计约 1.3 万行）、`types.ts`、`grammarData.ts` 等，语法与词形边界不清。
-3. **收藏子页** 曾拆 `*Panel.tsx` + `index.tsx` 两层，逻辑薄、跳转成本高（已在 commit `498ca0c3` 将 Panel 并入 `index.tsx`，本轮文档一并登记目录约定）。
+1. **横切 UI** 放在 `shared/`，与各子模块已有 `components/` 命名冲突。
+2. **参考资料** 根目录单文件 `dataSource.ts` 过大，语法与词形未分域。
+3. **收藏 / 拉取结果 / 资源库** 等存在 `*Panel.tsx` + 薄 `index.tsx` 双层，维护成本高。
+4. **主区** `vocab/`、`classic/` 与 `favorites/classic` 等命名并列，缺少统一「主区拉取」命名空间。
+5. **顶栏** 长标题或长库名时换行、溢出，挤压右侧操作区。
 
-本轮目标：**按产品子域收拢文件、统一命名**，import 批量替换；**零产品行为变更**。
+本轮：**按产品子域收拢目录** + **统一顶栏 flex 截断**；行为与 URL 保持不变（拉取结果页移除顶栏 kind Tab 为体验收敛，kind 仍由 URL 带入）。
 
 ---
 
-## 2. 改动范围
+## 2. 改动范围（目录）
 
-### 2.1 `shared/` → `components/`（模块级横切 UI）
+### 2.1 模块根 `components/`（原 `shared/`）
 
-| 操作 | 路径 |
+| 文件 | 职责 |
 |------|------|
-| 重命名目录 | `apps/frontend/src/views/englishLearning/shared/` → `.../components/` |
-| 更新 import | 约 18 处：`../shared/`、`../../shared/`、`./shared/` → 对应 `components/` |
+| `ClassicQuoteCard.tsx`、`VocabularyWordCard.tsx` | 列表卡片 |
+| `EnglishLearningPanelHeader.tsx` | 收藏 / 错题 / 拉取结果顶栏壳 |
+| `EnglishSource.tsx`、`LearningToolbar.tsx` | 主区左侧 |
+| `practiceEntry.tsx`、`WebSearchResultsBar.tsx`、`SegmentationLine.tsx` | 练习入口、联网条、分词行 |
 
-`components/` 内文件（名称不变）：
+### 2.2 `reference/`（grammar / morphology 分域）
 
-- `ClassicQuoteCard.tsx`、`EnglishLearningPanelHeader.tsx`、`EnglishSource.tsx`
-- `LearningToolbar.tsx`、`SegmentationLine.tsx`、`VocabularyWordCard.tsx`
-- `WebSearchResultsBar.tsx`、`practiceEntry.tsx`
-
-### 2.2 `reference/` 按 grammar / morphology 分域
-
-| 原路径（删除或迁出） | 新路径 |
-|----------------------|--------|
-| `reference/dataSource.ts` | `reference/grammar/dataSource.ts`、`reference/morphology/dataSource.ts` |
-| `reference/types.ts` | `reference/grammar/types.ts`、`reference/morphology/types.ts` |
-| `reference/grammarData.ts` | `reference/grammar/grammarData.ts` |
-| `reference/morphologyData.ts` | `reference/morphology/morphologyData.ts` |
-| `reference/GrammarPointBlock.tsx` | `reference/grammar/GrammarPointBlock.tsx` |
-| `reference/ReferencePageShell.tsx` | `reference/components/ReferencePageShell.tsx` |
-| `reference/referenceNavItemClass.ts` | `reference/utils/referenceNavItemClass.ts` |
-
-保留：`reference/index.tsx`（仍导出 `EnglishGrammarReferencePage`、`EnglishMorphologyReferencePage`）；路由 `reference/grammar`、`reference/morphology` **不变**。
-
-### 2.3 收藏页（前序 commit，结构约定）
-
-| 路径 | 约定 |
+| 迁出 | 迁入 |
 |------|------|
-| `favorites/vocabulary/index.tsx` | 列表 + 选择 + 导出 + 底栏，**单文件** |
-| `favorites/classic/index.tsx` | 同上 |
-| `favorites/vocabulary/useVocabularyFavoritesList.ts` | 分页与 API |
-| `favorites/classic/useClassicFavoritesList.ts` | 分页与 API |
+| `reference/dataSource.ts` | `grammar/dataSource.ts`、`morphology/dataSource.ts` |
+| `reference/types.ts` | `grammar/types.ts`、`morphology/types.ts` |
+| `GrammarPointBlock.tsx`、`grammarData.ts` | `grammar/` |
+| `morphologyData.ts` | `morphology/` |
+| `ReferencePageShell.tsx` | `reference/components/` |
+| `referenceNavItemClass.ts` | `reference/utils/` |
 
-已删除：`VocabularyFavoritesPanel.tsx`、`ClassicQuotesFavoritesPanel.tsx`。
+`reference/index.tsx` 仍 barrel 导出两页路由组件。
+
+### 2.3 `favorites/`（对齐 favorites 范式）
+
+```
+favorites/
+├── index.tsx                 # kind + 顶栏 + 切换 Section
+├── components/               # FavoritesKindTabs、FavoritesPanelFooter、FavoriteSession
+├── vocabulary/
+│   ├── index.tsx             # 列表 + 选择 + 导出（原 Panel 并入）
+│   └── useVocabularyFavoritesList.ts
+└── classic/
+    ├── index.tsx
+    └── useClassicFavoritesList.ts
+```
+
+### 2.4 `pack/`（拉取结果 `/english-learning/stream`）
+
+```
+pack/
+├── index.tsx                 # 顶栏 + 按 kind 挂载 Section（无顶栏 kind Tab）
+├── types.ts                  # PackStreamKind、PackStreamSectionSnapshot
+├── components/               # Progress、LiveLink、HistoryDrawerTrigger、usePackStreamHistoryList
+├── hooks/                    # useVocabularyPackHistoryList、useClassicQuotesPackHistoryList
+├── vocabulary/index.tsx      # VocabularyPackSection（原 VocabularyPackList + 页内逻辑）
+└── classic/index.tsx         # ClassicQuotesPackSection
+```
+
+已删除：`PackStreamKindTabs.tsx`、`VocabularyPackList.tsx`、`ClassicQuotesPackList.tsx`；`PackStreamKind` 类型迁至 `types.ts`。
+
+### 2.5 `library/`（资源库）
+
+```
+library/
+├── index.tsx                 # 左右 Resizable + kind / library URL
+├── types.ts                  # LibraryKind、EnglishLibraryListItem、parseLibraryKind
+├── components/
+│   ├── LibraryListPanel.tsx  # 左侧库列表（原 VocabularyLibraryListPanel）
+│   ├── useLibraryWordsList.ts
+│   └── libraryWordsListCache.ts
+├── vocabulary/index.tsx      # VocabularyLibrarySection
+└── classic/index.tsx         # ClassicQuotesLibrarySection
+```
+
+### 2.6 `sections/`（主区左侧拉取，原 `vocab/` + `classic/`）
+
+```
+sections/
+├── vocabulary/
+│   ├── index.tsx             # 导出 VocabularyPackSection（按主题拉取单词）
+│   └── VocabularyHistoryDrawer.tsx
+└── classic/
+    ├── index.tsx             # 导出 ClassicQuotesSection
+    └── ClassicQuotesHistoryDrawer.tsx
+```
+
+主区 `englishLearning/index.tsx` 改为 `./sections/vocabulary`、`./sections/classic`。  
+`pack/components/PackStreamHistoryDrawerTrigger.tsx` 历史抽屉从 `../../sections/...` 引用。
+
+### 2.7 顶栏布局（多页，见 §3）
+
+| 页面 | 文件 |
+|------|------|
+| 收藏 / 错题 | `favorites/index.tsx`、`mistakes/index.tsx` |
+| 拉取结果 | `pack/index.tsx` |
+| 资源库右栏 | `library/vocabulary/index.tsx`、`library/classic/index.tsx` |
+| 共用壳 | `components/EnglishLearningPanelHeader.tsx` |
 
 ---
 
 ## 3. 实现思路
 
-### 3.1 为何用 `components/` 而非 `shared/`
+### 3.1 子域目录命名约定
 
-- 与 `favorites/components`、`mistakes/components`、`practice/components` **同级命名**，表示「本模块内复用的展示组件」。
-- `reference/components/` 仅服务参考资料两页，**不**与模块根 `components/` 混用——前者是 reference 子域私有壳层。
+与 `favorites`、`pack`、`library`、`mistakes` 一致：
 
-### 3.2 参考资料数据拆分
+- **根 `index.tsx`**：路由入口、URL 参数、顶栏（或分栏壳）。
+- **`components/`**：仅该子域私有 UI（Tab、底栏、历史抽屉触发器等）。
+- **`vocabulary/` / `classic/`**：按 `kind` 拆分的业务 Section + 专用 hook。
+- **模块根 `components/`**：跨子域复用的卡片、顶栏壳、练习入口等。
 
-- 原 `dataSource.ts` 为 `{ grammar, morphology }` 单对象；拆开后各子域 `dataSource.ts` 直接 `export const grammarDataSource` / `morphologyDataSource`，由同目录 `grammarData.ts` / `morphologyData.ts` 消费。
-- **类型**随数据走：`GrammarReference` 仅在 `grammar/types.ts`；`MorphologyReference` 仅在 `morphology/types.ts`，避免交叉 import。
-- 静态 JSON 体量不变，仅**物理文件**分离，便于按需打开编辑器、减少 merge 冲突面。
+`mistakes/` 仍保留 `mistakes/classic/`（错题面板），与 `sections/classic`（主区拉取）职责不同，**不合并**。
 
-### 3.3 import 约定（整理后）
+### 3.2 拉取结果页不再顶栏切换 kind
 
-| 引用方所在目录 | 引用模块根 `components/` | 引用 reference 壳层 |
-|----------------|--------------------------|---------------------|
-| `englishLearning/index.tsx` | `./components/EnglishSource` | — |
-| `favorites/vocabulary/index.tsx` | `../../components/VocabularyWordCard` | — |
-| `pack/VocabularyPackList.tsx` | `../components/VocabularyWordCard` | — |
-| `reference/grammar/index.tsx` | — | `../components/ReferencePageShell`、`../utils/referenceNavItemClass` |
+- `kind` 由进入 URL `?kind=vocab|classic` 决定（主区或其它入口带入）。
+- 移除 `PackStreamKindTabs`，避免在结果页切到另一类时列表为空。
+- 子 Section 通过 `onSnapshotChange` 向 `pack/index.tsx` 上报计数、主题、练习参数，供顶栏展示。
 
-### 3.4 未改动的边界
+### 3.3 顶栏单行与截断（flex 约束）
 
-- 路由表 `apps/frontend/src/router/routes.ts` 仍从 `@/views/englishLearning/reference` 具名导入两页。
-- 组件 props、练习入口 URL、参考资料 `?section=` 查询参数语义不变。
-- **不**更新 `project-guide.md` / `project-update-info.md`（用户无感知）。
+**问题**：`shrink-0` + 无 `truncate` 的长标题会把计数挤到行尾或换行；`line-clamp-2` 会让资源库标题折两行。
+
+**规则**：
+
+| 元素 | class 要点 |
+|------|------------|
+| 标题区容器 | `min-w-0 flex-1 overflow-hidden`，`flex items-center gap-2` |
+| 主标题 / 库名 | `min-w-0 truncate`，必要时 `title={全文}` |
+| 计数文案 | `shrink-0 whitespace-nowrap`，紧跟标题后 |
+| 主题（仅拉取结果） | `min-w-0 truncate`，在页面标题与计数之间 |
+| 右侧操作 | `shrink-0 flex-nowrap` |
+| `EnglishLearningPanelHeader` 的 `h2` | `overflow-hidden` |
+
+**不适用** `flex-1` 放在标题上（会把计数顶到右侧）；计数始终紧挨可截断标题。
+
+### 3.4 未改动边界
+
+- 路由路径、`contentKind`、练习池 key、后端 API 不变。
+- `mistakes/classic/` 仍为错题集，非 `sections/classic`。
 
 ---
 
 ## 4. 关键代码与注释
 
-### 4.1 模块入口：横切组件 import
+### 4.1 主区挂载 sections
 
-**来源**：`apps/frontend/src/views/englishLearning/index.tsx`（约 L24–L28）
-
-```tsx
-// 主区左侧：资料源切换（词包 / 经典句等）
-import EnglishSource from './components/EnglishSource';
-// 主区右侧：Agent 工具栏（快捷意图、模式）
-import {
-	EnglishLearningToolbar,
-	type QuickIntentInputSyncPayload,
-} from './components/LearningToolbar';
-```
-
-### 4.2 子页引用统一单词卡片
-
-**来源**：`apps/frontend/src/views/englishLearning/favorites/vocabulary/index.tsx`（约 L25–L27）
+**来源**：`apps/frontend/src/views/englishLearning/index.tsx`（约 L21–L29、L142–L143）
 
 ```tsx
-// 自模块根 components/ 引入横切卡片（相对 favorites/vocabulary 上两级）
-import { VocabularyWordCard } from '../../components/VocabularyWordCard';
-// favorites 子域私有底栏仍在 favorites/components/
-import { FavoritesPanelFooter } from '../components/FavoritesPanelFooter';
+// 主区左侧：按主题拉取（原 ./vocab、./classic 目录）
+import { ClassicQuotesSection } from './sections/classic';
+import { VocabularyPackSection } from './sections/vocabulary';
+
+// ScrollArea 内与 EnglishSource、FavoriteSession 并列
+<VocabularyPackSection />
+<ClassicQuotesSection />
 ```
 
-### 4.3 参考资料：语法页本地聚合
+### 4.2 收藏顶栏：标题截断 + 计数紧跟
 
-**来源**：`apps/frontend/src/views/englishLearning/reference/grammar/index.tsx`（约 L13–L23）
+**来源**：`apps/frontend/src/views/englishLearning/favorites/index.tsx`（约 L60–L78）
 
 ```tsx
-// 语法域私有：知识点块、导航构建、静态数据
-import { GrammarPointBlock } from './GrammarPointBlock';
-import {
-	buildGrammarNavItems,
-	buildGrammarNavRows,
-	findGrammarNavBySectionId,
-	grammarReference,
-	resolveGrammarSection,
-} from './grammarData';
-// reference 子域共享壳与导航样式（非 englishLearning 根 components）
-import { ReferencePageShell } from '../components/ReferencePageShell';
-import { referenceNavItemClass } from '../utils/referenceNavItemClass';
-import type { GrammarSubsection } from './types';
+<EnglishLearningPanelHeader
+  titleClassName="flex min-w-0 flex-1 items-center gap-2 overflow-hidden"
+  title={
+    <>
+      {/* 长标题可收缩并省略，悬停看全文 */}
+      <span className="min-w-0 truncate" title={title}>
+        {title}
+      </span>
+      {/* 计数不换行，紧挨标题 */}
+      <span className="text-textcolor/50 shrink-0 whitespace-nowrap text-sm font-normal">
+        {t('englishLearning.library.listCount', { count: counts.total, type: countType })}{' '}
+        / {t('common.loaded', { count: counts.loaded, type: countType })}
+      </span>
+    </>
+  }
+  trailing={<FavoritesKindTabs kind={kind} onSelectKind={onSelectKind} />}
+/>
 ```
 
-### 4.4 语法静态数据独立导出
+### 4.3 拉取结果顶栏（无 kind Tab）
 
-**来源**：`apps/frontend/src/views/englishLearning/reference/grammar/dataSource.ts`（约 L1–L10，摘录）
+**来源**：`apps/frontend/src/views/englishLearning/pack/index.tsx`（约 L62–L105，摘录）
 
-```ts
-/**
- * 英语学习参考静态数据 — 语法
- * 由原 reference/dataSource.ts 的 grammar 字段拆出，内容未改。
- */
-import type { GrammarReference } from './types';
-
-export const grammarDataSource = {
-	title: '英语语法大全',
-	description: '系统全面的英语语法参考，涵盖词法、句法、时态、语态、从句、非谓语等所有核心语法板块',
-	parts: [
-		// ... 各 part / chapter / section 树（约 3000 行）
-	],
-} as GrammarReference;
+```tsx
+<EnglishLearningPanelHeader
+  titleClassName="flex min-w-0 flex-1 items-center gap-2 overflow-hidden"
+  title={
+    <>
+      <span className="shrink-0 whitespace-nowrap">{title}</span>
+      {topic ? (
+        <span className="text-textcolor/80 min-w-0 truncate text-sm font-normal" title={...}>
+          {t('englishLearning.stream.topicLabel')}: {topic}
+        </span>
+      ) : null}
+      <span className="text-textcolor/50 shrink-0 whitespace-nowrap text-sm font-normal">
+        {/* 共 N / 已加载 N */}
+      </span>
+    </>
+  }
+  trailing={
+    <div className="flex shrink-0 flex-nowrap items-center justify-end gap-3">
+      {/* 联网条、练习入口、历史记录；已无 PackStreamKindTabs */}
+    </div>
+  }
+/>
 ```
 
-### 4.5 语法导航层消费本地 dataSource
+### 4.4 资源库右栏顶栏
 
-**来源**：`apps/frontend/src/views/englishLearning/reference/grammar/grammarData.ts`（约 L1–L24）
+**来源**：`apps/frontend/src/views/englishLearning/library/vocabulary/index.tsx`（约 L188–L204）
 
-```ts
-import { grammarDataSource } from './dataSource';
-import type { GrammarNavItem, GrammarReference, GrammarSection } from './types';
-
-/** 对外仍暴露 grammarReference，页面与其它模块无感 */
-export const grammarReference: GrammarReference = grammarDataSource;
-
-export function buildGrammarNavItems(): GrammarNavItem[] {
-	const items: GrammarNavItem[] = [];
-	// 遍历 parts → chapters → sections，扁平化为左侧导航项
-	grammarDataSource.parts.forEach((part, partIndex) => {
-		part.chapters.forEach((chapter, chapterIndex) => {
-			chapter.sections.forEach((section, sectionIndex) => {
-				items.push({
-					sectionId: section.id,
-					label: section.title,
-					depth: 2,
-					partIndex,
-					chapterIndex,
-					sectionIndex,
-				});
-			});
-		});
-	});
-	return items;
-}
+```tsx
+<div className="flex h-12 shrink-0 items-center justify-between gap-3 overflow-hidden px-4.5">
+  <div className="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
+    <span className="text-textcolor min-w-0 truncate text-base font-semibold" title={title}>
+      {title}
+    </span>
+    <span className="text-textcolor/50 shrink-0 whitespace-nowrap text-sm">
+      {/* wordsHeading + loaded */}
+    </span>
+  </div>
+  <div className="flex shrink-0 flex-nowrap items-center gap-3">
+    {/* 听写/拼写、收藏 */}
+  </div>
+</div>
 ```
 
-### 4.6 词形域对称结构
+### 4.5 顶栏壳 overflow
 
-**来源**：`apps/frontend/src/views/englishLearning/reference/morphology/morphologyData.ts`（约 L1–L11）
+**来源**：`apps/frontend/src/views/englishLearning/components/EnglishLearningPanelHeader.tsx`（约 L31–L35）
 
-```ts
-import { morphologyDataSource } from './dataSource';
-import type { MorphologyReference, MorphologySectionKey } from './types';
-
-/** 词根词缀三块：prefixes / suffixes / roots */
-export const morphologyReference: MorphologyReference = morphologyDataSource;
-
-export const MORPHOLOGY_SECTION_KEYS: MorphologySectionKey[] = [
-	'prefixes',
-	'suffixes',
-	'roots',
-];
+```tsx
+<h2
+  className={cn(
+    'text-textcolor min-w-0 overflow-hidden text-base font-semibold',
+    titleClassName,
+  )}
+>
+  {title}
+</h2>
 ```
 
-### 4.7 参考资料 barrel 导出不变
+### 4.6 PackStreamKind 类型归位
 
-**来源**：`apps/frontend/src/views/englishLearning/reference/index.tsx`（全文）
+**来源**：`apps/frontend/src/views/englishLearning/pack/types.ts`（约 L1–L5）
 
 ```ts
-/**
- * 英语学习参考资料入口：词根词缀、语法大全
- * 路由层继续 import { EnglishGrammarReferencePage, ... } from '@/views/englishLearning/reference'
- */
-export { default as EnglishGrammarReferencePage } from './grammar';
-export { default as EnglishMorphologyReferencePage } from './morphology';
+/** 拉取结果 / 历史抽屉共用：由 URL ?kind= 解析，不再提供顶栏 Tab 切换 */
+export type PackStreamKind = 'vocab' | 'classic';
+```
+
+### 4.7 历史抽屉与 sections 相对路径
+
+主区迁入 `sections/` 后，目录加深一层，Section 内对 `agent/`、`pack/` 的 import 需多一级 `../`；拉取结果页历史抽屉改从 sections 引用，避免 `pack` 再依赖已删除的 `vocab/`、`classic/` 根目录。
+
+**来源**：`apps/frontend/src/views/englishLearning/pack/components/PackStreamHistoryDrawerTrigger.tsx`（约 L34–L36）
+
+```tsx
+// 按 kind 渲染主区同款历史抽屉（与 sections 内抽屉 UI 一致）
+import { ClassicQuotesHistoryDrawer } from '../../sections/classic/ClassicQuotesHistoryDrawer';
+import { VocabularyHistoryDrawer } from '../../sections/vocabulary/VocabularyHistoryDrawer';
+```
+
+**来源**：`apps/frontend/src/views/englishLearning/sections/vocabulary/index.tsx`（约 L35–L37）
+
+```tsx
+// 说明：从 sections/vocabulary 出发，回到 englishLearning 根下 agent、pack 需 ../../
+import { formatEnglishLearningAgentToolLine } from '../../agent/agentToolStatusText';
+import { PackStreamLiveLink } from '../../pack/components/PackStreamLiveLink';
 ```
 
 ---
@@ -225,18 +292,18 @@ export { default as EnglishMorphologyReferencePage } from './morphology';
 
 | 维度 | 影响 |
 |------|------|
-| 用户可见 UI | 无 |
-| 路由 / URL | 无 |
-| 后端 API | 无 |
-| 开发者 | 旧路径 `shared/`、`reference/dataSource.ts` 等 **失效**；全文搜索应改用上表新路径 |
-| 文档 | 历史专题文中 `shared/` 路径需改为 `components/`（见各文「延伸阅读」或本表） |
+| 路由 / URL | 无路径变更；`stream?kind=`、`library?kind=` 等照旧 |
+| 拉取结果 UX | 页内**不可**再切换单词/语句 Tab，需从主区或历史入口带 `kind` 进入 |
+| 顶栏 UX | 长标题省略号；计数紧贴标题；右侧按钮不换行 |
+| 开发者 | 旧 import 路径失效：`shared/`、`vocab/`、`classic/`（主区）、`pack/*PackList`、`reference/dataSource.ts` 等 |
 
-**建议回归**（smoke）：
+**建议回归**：
 
-1. 主区 `/english-learning`：左侧 `EnglishSource`、工具栏、词包/经典句切换。
-2. 收藏 `/english-learning/favorites?kind=vocab|classic`：卡片、朗读、底栏练习入口。
-3. 参考资料 `/english-learning/reference/grammar`、`.../morphology`：左侧导航、右侧正文、词形例词朗读。
-4. 练习揭示区：分词行 `SegmentationLine` 仍正常显示。
+1. 主区 `/english-learning`：单词/语句拉取、历史抽屉、跳转拉取结果。
+2. `/english-learning/stream?kind=vocab|classic`：顶栏、历史、练习入口；长主题截断。
+3. `/english-learning/favorites`、`/mistakes`：长标题 + 右侧 Tab。
+4. `/english-learning/library`：长库名右栏顶栏。
+5. `/english-learning/reference/grammar|morphology`。
 
 ---
 
@@ -244,12 +311,15 @@ export { default as EnglishMorphologyReferencePage } from './morphology';
 
 | 说明 | 路径 |
 |------|------|
-| 模块级横切 UI | `apps/frontend/src/views/englishLearning/components/` |
-| 参考资料入口 | `apps/frontend/src/views/englishLearning/reference/index.tsx` |
-| 语法参考 | `apps/frontend/src/views/englishLearning/reference/grammar/` |
-| 词形参考 | `apps/frontend/src/views/englishLearning/reference/morphology/` |
-| 参考页壳 / 导航样式 | `reference/components/ReferencePageShell.tsx`、`reference/utils/referenceNavItemClass.ts` |
-| 单词收藏页 | `apps/frontend/src/views/englishLearning/favorites/vocabulary/index.tsx` |
-| 经典句收藏页 | `apps/frontend/src/views/englishLearning/favorites/classic/index.tsx` |
+| 模块横切 UI | `apps/frontend/src/views/englishLearning/components/` |
+| 主区拉取 | `apps/frontend/src/views/englishLearning/sections/vocabulary/`、`sections/classic/` |
+| 拉取结果 | `apps/frontend/src/views/englishLearning/pack/` |
+| 资源库 | `apps/frontend/src/views/englishLearning/library/` |
+| 收藏 | `apps/frontend/src/views/englishLearning/favorites/` |
+| 参考资料 | `apps/frontend/src/views/englishLearning/reference/` |
+| 顶栏壳 | `apps/frontend/src/views/englishLearning/components/EnglishLearningPanelHeader.tsx` |
+| 历史抽屉（主区 + stream 共用） | `sections/vocabulary/VocabularyHistoryDrawer.tsx`、`sections/classic/ClassicQuotesHistoryDrawer.tsx`；stream 侧经 `pack/components/PackStreamHistoryDrawerTrigger.tsx` |
+
+**落地提交（便于对照 diff）**：`05540031`、`c197b46d`（`feat: 文件夹文件调整`，含 `components/`、`reference/`、`pack/`、`library/`、`favorites` 顶栏等）；`sections/` 迁移与上述 import 修正通常与这两笔同 PR 或紧随其后提交。
 
 若与仓库最新源码不一致，以源码为准。

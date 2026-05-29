@@ -18,7 +18,6 @@ import EnglishPackStore from '@/store/englishPack';
 import { stripAutoFilledIntentName } from '@/utils';
 import { stopAllEnglishPlayback } from '@/utils/englishTts';
 import { AgentPanel } from './agent';
-import { ClassicQuotesSection } from './classic/ClassicQuotesSection';
 import EnglishSource from './components/EnglishSource';
 import {
 	EnglishLearningToolbar,
@@ -26,7 +25,8 @@ import {
 } from './components/LearningToolbar';
 import FavoriteSession from './favorites/components/FavoriteSession';
 import { MistakeBookSession } from './mistakes/components/MistakeBookSession';
-import { VocabularyPackSection } from './vocab/VocabularySection';
+import { ClassicQuotesSection } from './sections/classic';
+import { VocabularyPackSection } from './sections/vocabulary';
 
 const EnglishLearning = observer(function EnglishLearning() {
 	const { t } = useI18n();

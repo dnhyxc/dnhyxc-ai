@@ -1,5 +1,7 @@
 # 英语学习：拉取历史交互与删除实现说明
 
+> **路径更新**：主区与历史抽屉已迁至 `sections/vocabulary`、`sections/classic`；结果页结构见 [english-module-folder-layout.md](./english-module-folder-layout.md)。下文若仍写 `vocab/`、`VocabularyPackList`，以主文档为准。
+
 ## 1. 背景与目标
 
 本轮改动围绕「单词包 / 经典句包」**历史生成记录**与**进行中拉取**两类场景，解决以下产品问题：

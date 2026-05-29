@@ -11,7 +11,7 @@ import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import type { EnglishVocabularyHistoryEntry } from '@/service';
 import EnglishPackStore from '@/store/englishPack';
-import { EnglishPracticeEntry } from '../components/practiceEntry';
+import { EnglishPracticeEntry } from '../../components/practiceEntry';
 
 export type VocabularyHistoryDrawerProps = {
 	open: boolean;

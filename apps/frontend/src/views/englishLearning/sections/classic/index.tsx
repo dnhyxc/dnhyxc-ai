@@ -1,9 +1,9 @@
 /**
- * 按主题拉取结构化单词资料（IPA / 释义 / 例句），逐词朗读。
+ * 按主题拉取英文经典语句（译文、出处、赏析），可朗读原句。
  */
 import Confirm from '@design/Confirm';
 import { Button, Input, Spinner, Toast } from '@ui/index';
-import { BookText } from 'lucide-react';
+import { BookMarked } from 'lucide-react';
 import { observer } from 'mobx-react';
 import {
 	type UIEventHandler,
@@ -15,47 +15,47 @@ import {
 import { useLocation, useNavigate } from 'react-router';
 import {
 	COUNT_PRESETS,
+	HISTORY_PAGE_SIZE,
+	QUOTE_COUNT_MAX,
+	QUOTE_COUNT_MIN,
 	SCROLL_LOAD_THRESHOLD_PX,
-	VOCAB_COUNT_MAX,
-	VOCAB_COUNT_MIN,
-	VOCAB_HISTORY_PAGE_SIZE,
 } from '@/constant';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
-import type { EnglishVocabularyHistoryEntry } from '@/service';
+import type { EnglishClassicQuoteHistoryEntry } from '@/service';
 import {
-	deleteEnglishVocabularyPackHistory,
-	listEnglishVocabularyHistory,
+	deleteEnglishClassicQuotesPackHistory,
+	listEnglishClassicQuotesHistory,
 } from '@/service';
 import EnglishPackStore, {
 	type EnglishPackUiProgress,
 } from '@/store/englishPack';
 import { sanitizeCountDigits } from '@/utils';
-import { streamEnglishVocabularyPack } from '@/utils/englishLearningPackSse';
-import { formatEnglishLearningAgentToolLine } from '../agent/agentToolStatusText';
-import { PackStreamLiveLink } from '../pack/components/PackStreamLiveLink';
-import { VocabularyHistoryDrawer } from './VocabularyHistoryDrawer';
+import { streamEnglishClassicQuotes } from '@/utils/englishLearningPackSse';
+import { formatEnglishLearningAgentToolLine } from '../../agent/agentToolStatusText';
+import { PackStreamLiveLink } from '../../pack/components/PackStreamLiveLink';
+import { ClassicQuotesHistoryDrawer } from './ClassicQuotesHistoryDrawer';
 
-export type VocabProgressState = EnglishPackUiProgress;
+export type ClassicQuoteProgressState = EnglishPackUiProgress;
 
-function VocabularyPackSectionInner() {
+function ClassicQuotesSectionInner() {
 	const { t } = useI18n();
 	const navigate = useNavigate();
 	const location = useLocation();
-	const loading = EnglishPackStore.vocabLoading;
 
-	const topic = EnglishPackStore.vocabTopic;
-	const countInput = EnglishPackStore.vocabCountInput;
+	const loading = EnglishPackStore.classicLoading;
+	const topic = EnglishPackStore.classicTopic;
+	const countInput = EnglishPackStore.classicCountInput;
 
 	const [historyDrawerOpen, setHistoryDrawerOpen] = useState(false);
 	const [historyEntries, setHistoryEntries] = useState<
-		EnglishVocabularyHistoryEntry[]
+		EnglishClassicQuoteHistoryEntry[]
 	>([]);
 	const [historyLoading, setHistoryLoading] = useState(false);
 	const [historyLoadingMore, setHistoryLoadingMore] = useState(false);
 	const [loadedStreamId, setLoadedStreamId] = useState<string | null>(null);
 	const [historyDeleteTarget, setHistoryDeleteTarget] =
-		useState<EnglishVocabularyHistoryEntry | null>(null);
+		useState<EnglishClassicQuoteHistoryEntry | null>(null);
 	const [historyDeleteConfirmOpen, setHistoryDeleteConfirmOpen] =
 		useState(false);
 	const [deletingHistoryStreamId, setDeletingHistoryStreamId] = useState<
@@ -71,7 +71,6 @@ function VocabularyPackSectionInner() {
 		historyDrawerOpenRef.current = historyDrawerOpen;
 	}, [historyDrawerOpen]);
 
-	/** 抽屉内历史列表：从第一页重拉（与知识库 refreshList 语义对齐） */
 	const fetchHistoryFirstPage = useCallback(async () => {
 		historyFetchingMoreRef.current = false;
 		setHistoryLoading(true);
@@ -80,14 +79,14 @@ function VocabularyPackSectionInner() {
 		historyHasMoreRef.current = true;
 		setHistoryEntries([]);
 		try {
-			const res = await listEnglishVocabularyHistory({
-				limit: VOCAB_HISTORY_PAGE_SIZE,
+			const res = await listEnglishClassicQuotesHistory({
+				limit: HISTORY_PAGE_SIZE,
 				offset: 0,
 			});
 			const list = Array.isArray(res.data) ? res.data : [];
 			setHistoryEntries(list);
 			historyOffsetRef.current = list.length;
-			historyHasMoreRef.current = list.length >= VOCAB_HISTORY_PAGE_SIZE;
+			historyHasMoreRef.current = list.length >= HISTORY_PAGE_SIZE;
 		} catch {
 			setHistoryEntries([]);
 			historyHasMoreRef.current = false;
@@ -108,8 +107,8 @@ function VocabularyPackSectionInner() {
 		setHistoryLoadingMore(true);
 		const offset = historyOffsetRef.current;
 		try {
-			const res = await listEnglishVocabularyHistory({
-				limit: VOCAB_HISTORY_PAGE_SIZE,
+			const res = await listEnglishClassicQuotesHistory({
+				limit: HISTORY_PAGE_SIZE,
 				offset,
 			});
 			const chunk = Array.isArray(res.data) ? res.data : [];
@@ -119,7 +118,7 @@ function VocabularyPackSectionInner() {
 			}
 			setHistoryEntries((prev) => [...prev, ...chunk]);
 			historyOffsetRef.current += chunk.length;
-			historyHasMoreRef.current = chunk.length >= VOCAB_HISTORY_PAGE_SIZE;
+			historyHasMoreRef.current = chunk.length >= HISTORY_PAGE_SIZE;
 		} catch {
 			historyHasMoreRef.current = false;
 		} finally {
@@ -149,14 +148,14 @@ function VocabularyPackSectionInner() {
 			setLoadedStreamId(streamId);
 			setHistoryDrawerOpen(false);
 			navigate(
-				`/english-learning/stream?kind=vocab&streamId=${encodeURIComponent(streamId)}`,
+				`/english-learning/stream?kind=classic&streamId=${encodeURIComponent(streamId)}`,
 			);
 		},
 		[navigate],
 	);
 
 	const requestDeleteHistory = useCallback(
-		(entry: EnglishVocabularyHistoryEntry) => {
+		(entry: EnglishClassicQuoteHistoryEntry) => {
 			setHistoryDeleteTarget(entry);
 			setHistoryDeleteConfirmOpen(true);
 		},
@@ -172,13 +171,13 @@ function VocabularyPackSectionInner() {
 		setDeletingHistoryStreamId(target.streamId);
 		try {
 			if (
-				EnglishPackStore.vocabActiveStreamId === target.streamId &&
-				EnglishPackStore.vocabLoading
+				EnglishPackStore.classicActiveStreamId === target.streamId &&
+				EnglishPackStore.classicLoading
 			) {
-				EnglishPackStore.vocabCancelByUser();
+				EnglishPackStore.classicCancelByUser();
 			}
-			await deleteEnglishVocabularyPackHistory(target.streamId);
-			EnglishPackStore.vocabClearSessionIfDeleted(target.streamId);
+			await deleteEnglishClassicQuotesPackHistory(target.streamId);
+			EnglishPackStore.classicClearSessionIfDeleted(target.streamId);
 			setHistoryEntries((prev) =>
 				prev.filter((e) => e.streamId !== target.streamId),
 			);
@@ -212,57 +211,56 @@ function VocabularyPackSectionInner() {
 	]);
 
 	const cancelGenerate = useCallback(() => {
-		EnglishPackStore.vocabCancelByUser();
+		EnglishPackStore.classicCancelByUser();
 	}, []);
 
-	// 拉取单词表
 	const onGenerate = useCallback(async () => {
 		const req = topic.trim();
 		if (!req) {
 			Toast({
 				type: 'warning',
-				title: t('englishLearning.vocab.topicRequired'),
+				title: t('englishLearning.classic.topicRequired'),
 			});
 			return;
 		}
-		let effectiveTarget = VOCAB_COUNT_MAX;
+		let effectiveTarget = QUOTE_COUNT_MAX;
 		const body: { topic: string; count?: number } = { topic: req };
 		if (countInput.trim() !== '') {
 			const n = Number.parseInt(countInput, 10);
-			if (!Number.isFinite(n) || n < VOCAB_COUNT_MIN || n > VOCAB_COUNT_MAX) {
+			if (!Number.isFinite(n) || n < QUOTE_COUNT_MIN || n > QUOTE_COUNT_MAX) {
 				Toast({
 					type: 'warning',
-					title: t('englishLearning.vocab.countInvalid'),
+					title: t('englishLearning.classic.countInvalid'),
 				});
 				return;
 			}
-			effectiveTarget = Math.min(VOCAB_COUNT_MAX, Math.max(VOCAB_COUNT_MIN, n));
+			effectiveTarget = Math.min(QUOTE_COUNT_MAX, Math.max(QUOTE_COUNT_MIN, n));
 			body.count = effectiveTarget;
 		}
 
-		const myGen = EnglishPackStore.startVocabStream(effectiveTarget);
+		const myGen = EnglishPackStore.startClassicStream(effectiveTarget);
 
-		const abort = await streamEnglishVocabularyPack({
+		const abort = await streamEnglishClassicQuotes({
 			body,
 			callbacks: {
 				onProgress: (p) => {
-					EnglishPackStore.vocabNoteStreamId(p.streamId);
-					EnglishPackStore.vocabOnProgress(myGen, p);
+					EnglishPackStore.classicNoteStreamId(p.streamId);
+					EnglishPackStore.classicOnProgress(myGen, p);
 				},
 				onAgentTool: (ev) => {
 					if (ev.phase === 'organic' && ev.organic?.length) {
-						EnglishPackStore.vocabOnAgentTool(myGen, null, ev.organic);
+						EnglishPackStore.classicOnAgentTool(myGen, null, ev.organic);
 						return;
 					}
-					EnglishPackStore.vocabOnAgentTool(
+					EnglishPackStore.classicOnAgentTool(
 						myGen,
 						formatEnglishLearningAgentToolLine(t, ev),
 						[],
 					);
 				},
 				onChunk: ({ items: delta, streamId }) => {
-					EnglishPackStore.vocabNoteStreamId(streamId);
-					EnglishPackStore.vocabOnChunk(myGen, delta);
+					EnglishPackStore.classicNoteStreamId(streamId);
+					EnglishPackStore.classicOnChunk(myGen, delta);
 				},
 				onDone: ({
 					items: list,
@@ -272,18 +270,18 @@ function VocabularyPackSectionInner() {
 					itemCount,
 					streamId,
 				}) => {
-					EnglishPackStore.vocabNoteStreamId(streamId);
-					if (myGen !== EnglishPackStore.vocabStreamGenId) return;
+					EnglishPackStore.classicNoteStreamId(streamId);
+					if (myGen !== EnglishPackStore.classicStreamGenId) return;
 					const finalList =
 						itemsOmitted &&
 						list.length === 0 &&
-						EnglishPackStore.vocabItems.length > 0
-							? EnglishPackStore.vocabItems.slice(
+						EnglishPackStore.classicItems.length > 0
+							? EnglishPackStore.classicItems.slice(
 									0,
 									Number.isFinite(itemCount) ? itemCount : requested,
 								)
 							: list;
-					EnglishPackStore.vocabOnDone(myGen, finalList);
+					EnglishPackStore.classicOnDone(myGen, finalList);
 					setLoadedStreamId(null);
 					if (historyDrawerOpenRef.current) {
 						void fetchHistoryFirstPage();
@@ -291,19 +289,19 @@ function VocabularyPackSectionInner() {
 					if (finalList.length === 0) {
 						Toast({
 							type: 'info',
-							title: t('englishLearning.vocab.empty'),
+							title: t('englishLearning.classic.empty'),
 						});
 					} else if (fromDatabase) {
 						Toast({
 							type: 'success',
-							title: t('englishLearning.vocab.fromDatabase', {
+							title: t('englishLearning.classic.fromDatabase', {
 								count: String(finalList.length),
 							}),
 						});
 					} else if (finalList.length < requested) {
 						Toast({
 							type: 'info',
-							title: t('englishLearning.vocab.partialResult', {
+							title: t('englishLearning.classic.partialResult', {
 								got: finalList.length,
 								want: requested,
 							}),
@@ -311,30 +309,30 @@ function VocabularyPackSectionInner() {
 					}
 				},
 				onError: (msg) => {
-					if (myGen !== EnglishPackStore.vocabStreamGenId) return;
-					EnglishPackStore.vocabOnError(myGen);
+					if (myGen !== EnglishPackStore.classicStreamGenId) return;
+					EnglishPackStore.classicOnError(myGen);
 					Toast({ type: 'error', title: msg });
 				},
 				onUserAbort: () => {
-					if (myGen !== EnglishPackStore.vocabStreamGenId) return;
-					EnglishPackStore.vocabOnUserAbort(myGen);
+					if (myGen !== EnglishPackStore.classicStreamGenId) return;
+					EnglishPackStore.classicOnUserAbort(myGen);
 					Toast({
 						type: 'info',
-						title: t('englishLearning.vocab.aborted'),
+						title: t('englishLearning.classic.aborted'),
 					});
 				},
 				onIncomplete: () => {
-					if (myGen !== EnglishPackStore.vocabStreamGenId) return;
-					EnglishPackStore.vocabOnIncomplete(myGen);
+					if (myGen !== EnglishPackStore.classicStreamGenId) return;
+					EnglishPackStore.classicOnIncomplete(myGen);
 					Toast({
 						type: 'warning',
-						title: t('englishLearning.vocab.streamDisconnected'),
+						title: t('englishLearning.classic.streamDisconnected'),
 					});
 				},
 			},
 		});
-		if (myGen === EnglishPackStore.vocabStreamGenId) {
-			EnglishPackStore.setVocabAbort(abort);
+		if (myGen === EnglishPackStore.classicStreamGenId) {
+			EnglishPackStore.setClassicAbort(abort);
 		}
 	}, [topic, countInput, t, fetchHistoryFirstPage]);
 
@@ -344,15 +342,15 @@ function VocabularyPackSectionInner() {
 		}
 		const n = Number.parseInt(countInput, 10);
 		if (!Number.isFinite(n)) {
-			EnglishPackStore.setVocabCountInput('');
+			EnglishPackStore.setClassicCountInput('');
 			return;
 		}
-		const clamped = Math.min(VOCAB_COUNT_MAX, Math.max(VOCAB_COUNT_MIN, n));
-		EnglishPackStore.setVocabCountInput(String(clamped));
+		const clamped = Math.min(QUOTE_COUNT_MAX, Math.max(QUOTE_COUNT_MIN, n));
+		EnglishPackStore.setClassicCountInput(String(clamped));
 	}, [countInput]);
 
 	return (
-		<div className="rounded-none p-4 pb-0 @container min-w-0 mt-3.5 mb-7.5">
+		<div className="rounded-none @container min-w-0 px-4 pb-0">
 			<Confirm
 				open={historyDeleteConfirmOpen}
 				onOpenChange={(open) => {
@@ -362,9 +360,9 @@ function VocabularyPackSectionInner() {
 				title={t('englishLearning.packHistory.deleteConfirmTitle')}
 				description={
 					historyDeleteTarget
-						? t('englishLearning.packHistory.deleteConfirmDesc', {
+						? t('englishLearning.packHistory.deleteConfirmDescClassic', {
 								topic: historyDeleteTarget.topic || '—',
-								count: historyDeleteTarget.wordCount,
+								count: historyDeleteTarget.quoteCount,
 							})
 						: '\u00a0'
 				}
@@ -376,33 +374,30 @@ function VocabularyPackSectionInner() {
 				onConfirm={() => void executeDeleteHistory()}
 			/>
 			<div className="mb-3.5 flex items-start gap-3">
-				<div className="bg-linear-to-r from-teal-500 to-cyan-600 @min-[26rem]:size-10 flex size-10 shrink-0 items-center justify-center rounded-md">
-					<BookText
-						className="text-white @min-[26rem]:size-6 size-6"
-						aria-hidden
-					/>
+				<div className="bg-linear-to-r from-violet-500 to-indigo-600 @min-[26rem]:size-11 flex size-10 shrink-0 items-center justify-center rounded-md">
+					<BookMarked className="text-white size-6" aria-hidden />
 				</div>
 				<div className="min-w-0 flex-1 flex flex-col justify-between">
-					<div className="text-textcolor font-semibold leading-tight">
-						{t('englishLearning.vocab.title')}
+					<div className="text-textcolor leading-tight font-semibold tracking-tight">
+						{t('englishLearning.classic.title')}
 					</div>
 					<div className="h-5 text-textcolor/50 mt-1 text-xs leading-relaxed">
-						{t('englishLearning.vocab.descShort')}
+						{t('englishLearning.classic.descShort')}
 					</div>
 				</div>
 			</div>
 
 			<label
-				htmlFor="english-vocab-topic"
+				htmlFor="english-classic-topic"
 				className="text-textcolor/45 mb-1.5 block text-sm font-medium"
 			>
-				{t('englishLearning.vocab.topicFieldLabel')}
+				{t('englishLearning.classic.topicFieldLabel')}
 			</label>
 			<Input
-				id="english-vocab-topic"
+				id="english-classic-topic"
 				value={topic}
-				onChange={(e) => EnglishPackStore.setVocabTopic(e.target.value)}
-				placeholder={t('englishLearning.vocab.topicPlaceholder')}
+				onChange={(e) => EnglishPackStore.setClassicTopic(e.target.value)}
+				placeholder={t('englishLearning.classic.topicPlaceholder')}
 				className="h-9 w-full border-theme/5 bg-theme/5 focus-visible:border-theme/10 focus-visible:ring-0 mt-0.5 mb-3.5"
 				disabled={loading}
 			/>
@@ -410,19 +405,19 @@ function VocabularyPackSectionInner() {
 			<div className="space-y-3">
 				<div className="w-full min-w-0">
 					<label
-						htmlFor="english-vocab-count"
+						htmlFor="english-classic-count"
 						className="text-textcolor/45 mb-1.5 block text-sm font-medium"
 					>
-						{t('englishLearning.vocab.count')}
+						{t('englishLearning.classic.count')}
 					</label>
 					<Input
-						id="english-vocab-count"
+						id="english-classic-count"
 						autoComplete="off"
-						aria-describedby="english-vocab-count-hint"
-						placeholder={t('englishLearning.vocab.countPlaceholder')}
+						aria-describedby="english-classic-count-hint"
+						placeholder={t('englishLearning.classic.countPlaceholder')}
 						value={countInput}
 						onChange={(e) =>
-							EnglishPackStore.setVocabCountInput(
+							EnglishPackStore.setClassicCountInput(
 								sanitizeCountDigits(e.target.value),
 							)
 						}
@@ -431,28 +426,28 @@ function VocabularyPackSectionInner() {
 						className="mt-0.5 h-9 w-full border-theme/5 bg-theme/5 focus-visible:border-theme/10 focus-visible:ring-0"
 					/>
 					<div
-						id="english-vocab-count-hint"
+						id="english-classic-count-hint"
 						className="text-textcolor/40 mt-2 mb-0.5 text-xs leading-snug"
 					>
-						{t('englishLearning.vocab.countHint')}
+						{t('englishLearning.classic.countHint')}
 					</div>
 					<div className="mt-2 mb-5 flex flex-wrap gap-2 justify-between">
-						{COUNT_PRESETS.map((n) => (
+						{COUNT_PRESETS.map((n: (typeof COUNT_PRESETS)[number]) => (
 							<Button
 								key={n}
 								size="sm"
 								variant="outline"
 								disabled={loading}
 								onClick={() =>
-									EnglishPackStore.setVocabCountInput(
+									EnglishPackStore.setClassicCountInput(
 										countInput === String(n) ? '' : String(n),
 									)
 								}
 								className={cn(
-									'flex-1 rounded-md border bg-teal-500/15 hover:bg-teal-500/20 px-0 py-1 text-xs font-medium transition-colors',
+									'flex-1 rounded-md border bg-violet-500/15 hover:bg-violet-500/20 px-0 py-1 text-xs font-medium transition-colors',
 									countInput === String(n)
-										? 'border-teal-500/35 text-teal-500 bg-teal-500/20'
-										: 'border-teal-500/10 text-textcolor hover:border-teal-500/20 hover:text-teal-500 hover:bg-teal-500/20',
+										? 'border-violet-500/35 text-violet-500 bg-violet-500/20'
+										: 'border-violet-500/10 text-textcolor hover:border-violet-500/20 hover:text-violet-500 hover:bg-violet-500/20',
 								)}
 							>
 								{n}
@@ -462,43 +457,42 @@ function VocabularyPackSectionInner() {
 				</div>
 				<div className="flex min-w-0 items-stretch gap-3.5">
 					<Button
-						type="button"
 						size="sm"
 						onClick={() => (loading ? cancelGenerate() : void onGenerate())}
 						className={cn(
 							'h-9 min-w-0 flex-1 rounded-md text-white',
 							loading
 								? 'bg-linear-to-r from-rose-600/80 to-rose-600/80 hover:bg-linear-to-r hover:from-rose-500/80 hover:to-rose-600/80'
-								: 'bg-linear-to-r from-teal-500 to-cyan-600 hover:bg-linear-to-r hover:from-teal-400 hover:to-cyan-600',
+								: 'bg-linear-to-r from-violet-600 to-indigo-600 hover:bg-linear-to-r hover:from-violet-400 hover:to-indigo-600',
 						)}
 					>
 						{loading ? (
 							<>
 								<Spinner className="size-4 shrink-0 text-white" />
 								<span className="truncate">
-									{t('englishLearning.vocab.stop')}
+									{t('englishLearning.classic.stop')}
 								</span>
 							</>
 						) : (
 							<span className="truncate">
-								{t('englishLearning.vocab.generate')}
+								{t('englishLearning.classic.generate')}
 							</span>
 						)}
 					</Button>
 					<Button
-						type="button"
 						size="sm"
 						onClick={() => setHistoryDrawerOpen(true)}
-						className="flex-1 text-white hover:bg-linear-to-r hover:from-teal-400 hover:to-cyan-600 bg-linear-to-r from-teal-500 to-cyan-600 h-9 shrink-0 whitespace-nowrap rounded-md"
+						className="flex-1 text-white hover:bg-linear-to-r hover:from-indigo-400 hover:to-indigo-600 bg-linear-to-r from-violet-600 to-indigo-600 h-9 shrink-0 whitespace-nowrap rounded-md"
 					>
 						<span className="max-[380px]:sr-only">
-							{t('englishLearning.vocab.historyOpenDrawer')}
+							{t('englishLearning.classic.historyOpenDrawer')}
 						</span>
 					</Button>
 				</div>
-				<PackStreamLiveLink kind="vocab" />
+				<PackStreamLiveLink kind="classic" />
 			</div>
-			<VocabularyHistoryDrawer
+
+			<ClassicQuotesHistoryDrawer
 				open={historyDrawerOpen}
 				onOpenChange={setHistoryDrawerOpen}
 				entries={historyEntries}
@@ -516,4 +510,4 @@ function VocabularyPackSectionInner() {
 	);
 }
 
-export const VocabularyPackSection = observer(VocabularyPackSectionInner);
+export const ClassicQuotesSection = observer(ClassicQuotesSectionInner);

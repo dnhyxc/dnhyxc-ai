@@ -79,10 +79,10 @@ flowchart LR
 
 抽取 `SegmentationLine`：`segmentation` 有 trim 后非空才渲染一行，避免空 div 占位；各列表可传不同 `className` 适配间距。
 
-### 3.5 目录：`shared/` 而非 `components/`
+### 3.5 目录：`components/`（原 `shared/`）
 
 - 该组件被 **资源库**、**单词包**、**收藏** 三处列表共用，不属于单一页面域。
-- 与模块内其它横切 UI（`EnglishSource`、`LearningToolbar`、`WebSearchResultsBar`）一致，放在 `englishLearning/components/`。
+- 与模块内其它横切 UI（`EnglishSource`、`LearningToolbar`、`WebSearchResultsBar`）一致，放在 `englishLearning/components/`。详见 [english-module-folder-layout.md](./english-module-folder-layout.md)。
 - 引用方统一：`import { SegmentationLine } from '../components/SegmentationLine'`（相对各子目录 `library/`、`pack/`、`favorites/`）。
 
 ---

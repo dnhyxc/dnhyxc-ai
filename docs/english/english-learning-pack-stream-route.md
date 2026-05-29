@@ -1,5 +1,8 @@
 # 英语学习：拉取结果独立路由与跨页实时同步
 
+> **文档角色**：记录 2026-05 初版「独立 `/stream` 路由 + Store 同步」方案。  
+> **当前目录与组件名**以 [english-module-folder-layout.md](./english-module-folder-layout.md) 为准：下文 §2、§4 中的 `vocab/`、`VocabularyPackList`、`PackStreamKindTabs` 等路径**已迁移或删除**，阅读实现时请对照主文档，勿按本文路径找文件。
+
 ## 1. 背景与目标
 
 ### 1.1 要解决的问题
@@ -22,9 +25,10 @@
 - **SSE 协议与后端生成逻辑**不变（参见 [english-learning-pack-sse.md](./english-learning-pack-sse.md)、[english-learning-topic-match-db-sse.md](./english-learning-topic-match-db-sse.md)）；
 - **拉取仍由侧栏 Section 发起**：`streamEnglishVocabularyPack` / `streamEnglishClassicQuotes` 未迁移到结果页。
 
-### 1.4 延伸阅读（存储与历史分页）
+### 1.4 延伸阅读
 
-历史会话 **Session + 明细分行**、分页 API、结果页 Loading/空态与「空数据不报错」见：[english-learning-pack-session-items.md](./english-learning-pack-session-items.md)。
+- 历史会话分页、Loading/空态：[english-learning-pack-session-items.md](./english-learning-pack-session-items.md)。
+- **目录重组**（`pack/vocabulary|classic`、`sections/`、顶栏截断、移除结果页 kind Tab）：[english-module-folder-layout.md](./english-module-folder-layout.md)。
 
 ---
 

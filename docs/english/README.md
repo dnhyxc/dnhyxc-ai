@@ -50,7 +50,7 @@
 
 | 文档 | 说明 |
 |------|------|
-| [english-module-folder-layout.md](./english-module-folder-layout.md) | **模块目录整理**：`shared/`→`components/`、参考资料 grammar/morphology 分域、收藏页单文件结构 |
+| [english-module-folder-layout.md](./english-module-folder-layout.md) | **模块目录**：`components/`、`reference/`、`favorites`/`pack`/`library`/`sections` 分域；顶栏单行截断 |
 
 ## TTS / UI / 其它专题
 
