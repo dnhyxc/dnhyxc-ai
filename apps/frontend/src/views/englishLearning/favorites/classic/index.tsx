@@ -22,7 +22,7 @@ import {
 	playEnglishPreferred,
 	stopAllEnglishPlayback,
 } from '@/utils/englishTts';
-import { ClassicQuoteCard } from '../../shared/ClassicQuoteCard';
+import { ClassicQuoteCard } from '../../components/ClassicQuoteCard';
 import { FavoritesPanelFooter } from '../components/FavoritesPanelFooter';
 import type { FavoritesListCounts } from '../vocabulary';
 import { useClassicFavoritesList } from './useClassicFavoritesList';

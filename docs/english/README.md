@@ -46,6 +46,12 @@
 | 听写 / 拼写 | `/english-learning/practice`；`contentKind=vocab`（默认）或 `classic`；设置页总量显示「词」/「句」 |
 | 错题集（单词/语句） | `/english-learning/mistakes?kind=vocab\|classic`；顶栏 Tab + 底栏练习；`/mistakes/classic` 会 replace |
 
+## UI / 目录约定
+
+| 文档 | 说明 |
+|------|------|
+| [english-module-folder-layout.md](./english-module-folder-layout.md) | **模块目录整理**：`shared/`→`components/`、参考资料 grammar/morphology 分域、收藏页单文件结构 |
+
 ## TTS / UI / 其它专题
 
 - TTS：[english-tts-playback.md](./english-tts-playback.md)、[english-tts-cache-consistency.md](./english-tts-cache-consistency.md)

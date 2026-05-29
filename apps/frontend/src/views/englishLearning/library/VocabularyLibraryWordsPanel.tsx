@@ -31,8 +31,8 @@ import {
 	playEnglishPreferred,
 	stopAllEnglishPlayback,
 } from '@/utils/englishTts';
-import { EnglishPracticeEntry } from '../shared/practiceEntry';
-import { VocabularyWordCard } from '../shared/VocabularyWordCard';
+import { EnglishPracticeEntry } from '../components/practiceEntry';
+import { VocabularyWordCard } from '../components/VocabularyWordCard';
 import { useLibraryWordsList } from './useLibraryWordsList';
 
 export type VocabularyLibraryWordsPanelProps = {

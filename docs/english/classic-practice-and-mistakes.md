@@ -59,7 +59,7 @@
 | `apps/frontend/src/views/englishLearning/mistakes/components/MistakesKindTabs.tsx` | 顶栏单词/语句 Tab |
 | `apps/frontend/src/views/englishLearning/mistakes/components/MistakesPanelFooter.tsx` | 底栏：全选、移除所选、听写/拼写 |
 | `apps/frontend/src/views/englishLearning/mistakes/components/MistakeBookSession.tsx` | 首页侧栏双入口 → `?kind=vocab|classic` |
-| `apps/frontend/src/views/englishLearning/shared/EnglishLearningPanelHeader.tsx` | 收藏/错题共用顶栏壳 |
+| `apps/frontend/src/views/englishLearning/components/EnglishLearningPanelHeader.tsx` | 收藏/错题共用顶栏壳 |
 | `apps/frontend/src/router/routes.ts` | `mistakes` 与 `mistakes/classic` 同组件（后者 replace 到 `?kind=classic`） |
 | `apps/frontend/src/service/index.ts` | 语句错题 API |
 
@@ -67,7 +67,7 @@
 
 | 路径 | 说明 |
 |------|------|
-| `apps/frontend/src/views/englishLearning/shared/ClassicQuoteCard.tsx` | 经典句统一卡片（新建） |
+| `apps/frontend/src/views/englishLearning/components/ClassicQuoteCard.tsx` | 经典句统一卡片（新建） |
 | `apps/frontend/src/views/englishLearning/favorites/ClassicQuotesFavoritesPanel.tsx` | 迁移至 `ClassicQuoteCard` |
 | `apps/frontend/src/views/englishLearning/library/ClassicQuotesLibraryWordsPanel.tsx` | 同上 + 练习入口 |
 | `apps/frontend/src/views/englishLearning/pack/ClassicQuotesPackList.tsx` | 同上 |
@@ -523,9 +523,9 @@ onBeforeNavigate={(e: MouseEvent<HTMLButtonElement>) => {
 | 语句错题实体 | `apps/backend/src/services/english-learning/entity/english-classic-quote-mistake.entity.ts` |
 | 练习编排 | `apps/frontend/src/views/englishLearning/practice/index.tsx` |
 | 拉词 | `apps/frontend/src/views/englishLearning/practice/utils/fetchWords.ts` |
-| 统一语句卡片 | `apps/frontend/src/views/englishLearning/shared/ClassicQuoteCard.tsx` |
+| 统一语句卡片 | `apps/frontend/src/views/englishLearning/components/ClassicQuoteCard.tsx` |
 | 错题集统一页 | `apps/frontend/src/views/englishLearning/mistakes/index.tsx` |
-| 面板顶栏 | `apps/frontend/src/views/englishLearning/shared/EnglishLearningPanelHeader.tsx` |
-| 练习入口组件 | `apps/frontend/src/views/englishLearning/shared/practiceEntry.tsx` |
+| 面板顶栏 | `apps/frontend/src/views/englishLearning/components/EnglishLearningPanelHeader.tsx` |
+| 练习入口组件 | `apps/frontend/src/views/englishLearning/components/practiceEntry.tsx` |
 
 若与仓库最新源码不一致，以源码为准。

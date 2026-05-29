@@ -14,7 +14,7 @@ import {
 	playEnglishPreferred,
 	stopAllEnglishPlayback,
 } from '@/utils/englishTts';
-import { ClassicQuoteCard } from '../../shared/ClassicQuoteCard';
+import { ClassicQuoteCard } from '../../components/ClassicQuoteCard';
 import { MistakesPanelFooter } from '../components/MistakesPanelFooter';
 import { useClassicQuoteMistakesList } from './useClassicQuoteMistakesList';
 

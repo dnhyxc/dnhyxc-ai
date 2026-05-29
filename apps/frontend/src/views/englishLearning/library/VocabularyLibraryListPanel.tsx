@@ -28,7 +28,7 @@ import {
 	listEnglishClassicQuotesLibraries,
 	listEnglishVocabularyLibraries,
 } from '@/service';
-import { EnglishPracticeEntry } from '../shared/practiceEntry';
+import { EnglishPracticeEntry } from '../components/practiceEntry';
 
 export type EnglishLibraryListItem =
 	| EnglishVocabularyLibraryListItem

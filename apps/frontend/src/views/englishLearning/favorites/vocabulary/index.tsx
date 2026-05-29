@@ -22,7 +22,7 @@ import {
 	playEnglishPreferred,
 	stopAllEnglishPlayback,
 } from '@/utils/englishTts';
-import { VocabularyWordCard } from '../../shared/VocabularyWordCard';
+import { VocabularyWordCard } from '../../components/VocabularyWordCard';
 import { FavoritesPanelFooter } from '../components/FavoritesPanelFooter';
 import { useVocabularyFavoritesList } from './useVocabularyFavoritesList';
 

@@ -18,7 +18,7 @@ import {
 	playEnglishPreferred,
 	stopAllEnglishPlayback,
 } from '@/utils/englishTts';
-import { VocabularyWordCard } from '../shared/VocabularyWordCard';
+import { VocabularyWordCard } from '../components/VocabularyWordCard';
 import type { useVocabularyPackHistoryList } from './useVocabularyPackHistoryList';
 
 export type VocabularyPackListProps = {

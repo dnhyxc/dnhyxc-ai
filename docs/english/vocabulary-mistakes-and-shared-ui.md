@@ -6,7 +6,7 @@
 - 听写/拼写多入口与返回：[`practice-entry-navigation.md`](./practice-entry-navigation.md)（URL 与 `returnTo` 约定；本轮入口 UI 已收敛至 `EnglishPracticeEntry`）
 - 结算页 UI：[`practice-summary-ui.md`](./practice-summary-ui.md)
 - 产品使用：[`docs/project-guide.md`](../project-guide.md) §13.11
-- 域索引：[`docs/english/README.md`](./README.md)
+- **模块目录**（`shared/`→`components/`）：[`english-module-folder-layout.md`](./english-module-folder-layout.md)
 
 ---
 
@@ -47,7 +47,7 @@
 
 | 路径 | 说明 |
 |------|------|
-| `apps/frontend/src/views/englishLearning/shared/practiceEntry.tsx` | `EnglishPracticeEntry`、`openEnglishPractice` |
+| `apps/frontend/src/views/englishLearning/components/practiceEntry.tsx` | `EnglishPracticeEntry`、`openEnglishPractice` |
 | `apps/frontend/src/views/englishLearning/practice/Summary.tsx` | 结算页「加入错题集」 |
 | `apps/frontend/src/views/englishLearning/practice/components/summary/SummaryActions.tsx` | 「进入错题集」等底栏按钮 |
 | `apps/frontend/src/views/englishLearning/practice/utils/fetchWords.ts` | `source: 'mistakes'` 拉词 |
@@ -57,7 +57,7 @@
 
 | 路径 | 说明 |
 |------|------|
-| `apps/frontend/src/views/englishLearning/shared/VocabularyWordCard.tsx` | 统一单词卡片 |
+| `apps/frontend/src/views/englishLearning/components/VocabularyWordCard.tsx` | 统一单词卡片 |
 | `apps/frontend/src/views/englishLearning/library/VocabularyLibraryWordsPanel.tsx` | 修复练习跳转（`source=library`） |
 | `apps/frontend/src/views/englishLearning/favorites/`、`pack/`、`library/`、`reference/`、`agent/`、`import/` | 页面文件更名为各目录 `index.tsx` |
 | `apps/frontend/src/router/routes.ts` | `/english-learning/mistakes` |
@@ -512,7 +512,7 @@ sequenceDiagram
 
 ### 5.1 统一练习跳转
 
-**来源**：`apps/frontend/src/views/englishLearning/shared/practiceEntry.tsx`（约 L31–L49，`openEnglishPractice`）
+**来源**：`apps/frontend/src/views/englishLearning/components/practiceEntry.tsx`（约 L31–L49，`openEnglishPractice`）
 
 ```typescript
 export function openEnglishPractice(
@@ -578,7 +578,7 @@ const res = await batchAddEnglishVocabularyMistakes(payload);
 
 ### 5.4 单词卡片变体
 
-**来源**：`apps/frontend/src/views/englishLearning/shared/VocabularyWordCard.tsx`（约 L36–L49，Props 摘要）
+**来源**：`apps/frontend/src/views/englishLearning/components/VocabularyWordCard.tsx`（约 L36–L49，Props 摘要）
 
 ```typescript
 export type VocabularyWordCardProps = {
@@ -623,9 +623,9 @@ export type VocabularyWordCardProps = {
 | 错题 Service / Controller | `english-learning.service.ts`、`english-learning.controller.ts` |
 | 建表迁移 | `apps/backend/src/migrations/1779968095480-error.ts` |
 | 前端 API | `apps/frontend/src/service/index.ts`（`batchAdd*` / `list*` / `remove*`） |
-| 练习入口组件 | `apps/frontend/src/views/englishLearning/shared/practiceEntry.tsx` |
+| 练习入口组件 | `apps/frontend/src/views/englishLearning/components/practiceEntry.tsx` |
 | 错题集页 | `apps/frontend/src/views/englishLearning/mistakes/` |
 | 练习拉词 | `apps/frontend/src/views/englishLearning/practice/utils/fetchWords.ts` |
-| 单词卡片 | `apps/frontend/src/views/englishLearning/shared/VocabularyWordCard.tsx` |
+| 单词卡片 | `apps/frontend/src/views/englishLearning/components/VocabularyWordCard.tsx` |
 
 若与仓库最新源码不一致，以源码为准。

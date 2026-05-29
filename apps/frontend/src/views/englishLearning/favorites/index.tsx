@@ -4,7 +4,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { useI18n } from '@/hooks';
-import { EnglishLearningPanelHeader } from '../shared/EnglishLearningPanelHeader';
+import { EnglishLearningPanelHeader } from '../components/EnglishLearningPanelHeader';
 import { ClassicQuotesFavoritesSection } from './classic';
 import {
 	type FavoritesKind,

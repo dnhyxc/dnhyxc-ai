@@ -31,8 +31,8 @@ import {
 	playEnglishPreferred,
 	stopAllEnglishPlayback,
 } from '@/utils/englishTts';
-import { ClassicQuoteCard } from '../shared/ClassicQuoteCard';
-import { EnglishPracticeEntry } from '../shared/practiceEntry';
+import { ClassicQuoteCard } from '../components/ClassicQuoteCard';
+import { EnglishPracticeEntry } from '../components/practiceEntry';
 import { useLibraryWordsList } from './useLibraryWordsList';
 
 export type ClassicQuotesLibraryWordsPanelProps = {

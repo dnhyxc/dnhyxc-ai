@@ -37,8 +37,8 @@
 | 前端类型 | `apps/frontend/src/service/index.ts` |
 | 导入页 | `EnglishLearningImportPage.tsx` |
 | SSE 解析 | `englishLearningPackSse.ts` |
-| 展示组件 | `apps/frontend/src/views/englishLearning/shared/VocabularySegmentationLine.tsx` |
-| 列表 UI | `VocabularyLibraryWordsPanel.tsx`、`VocabularyPackList.tsx`、`VocabularyFavoritesPanel.tsx` |
+| 展示组件 | `apps/frontend/src/views/englishLearning/components/SegmentationLine.tsx` |
+| 列表 UI | `VocabularyLibraryWordsPanel.tsx`、`VocabularyPackList.tsx`、`favorites/vocabulary/index.tsx` |
 | 文案 | `zh-CN.ts`、`en-US.ts`（`hintVocab`、示例 JSON） |
 
 **未改**：经典句导入结构；`segmentation` 仅作用于单词（vocabulary）链路。
@@ -77,13 +77,13 @@ flowchart LR
 
 ### 3.4 展示层
 
-抽取 `VocabularySegmentationLine`：`segmentation` 有 trim 后非空才渲染一行，避免空 div 占位；各列表可传不同 `className` 适配间距。
+抽取 `SegmentationLine`：`segmentation` 有 trim 后非空才渲染一行，避免空 div 占位；各列表可传不同 `className` 适配间距。
 
 ### 3.5 目录：`shared/` 而非 `components/`
 
 - 该组件被 **资源库**、**单词包**、**收藏** 三处列表共用，不属于单一页面域。
-- 与模块内其它横切 UI（`EnglishSource`、`LearningToolbar`、`WebSearchResultsBar`）一致，放在 `englishLearning/shared/`。
-- 引用方统一：`import { VocabularySegmentationLine } from '../shared/VocabularySegmentationLine'`（相对各子目录 `library/`、`pack/`、`favorites/`）。
+- 与模块内其它横切 UI（`EnglishSource`、`LearningToolbar`、`WebSearchResultsBar`）一致，放在 `englishLearning/components/`。
+- 引用方统一：`import { SegmentationLine } from '../components/SegmentationLine'`（相对各子目录 `library/`、`pack/`、`favorites/`）。
 
 ---
 
@@ -217,11 +217,11 @@ const onPreviewEditorChange = useCallback((next: string) => {
 
 ### 4.4 前端：列表展示组件
 
-**来源**：`apps/frontend/src/views/englishLearning/shared/VocabularySegmentationLine.tsx`（全文）
+**来源**：`apps/frontend/src/views/englishLearning/components/SegmentationLine.tsx`（全文）
 
 ```tsx
 /** 单词音节划分展示行（有 content 时渲染） */
-export function VocabularySegmentationLine({
+export function SegmentationLine({
   segmentation,
   className = 'text-textcolor/85 text-sm leading-snug my-1',
 }: {
@@ -237,13 +237,13 @@ export function VocabularySegmentationLine({
 **来源**：`apps/frontend/src/views/englishLearning/library/VocabularyLibraryWordsPanel.tsx`（import 与用法，约 L28–L31、音标块内）
 
 ```tsx
-import { VocabularySegmentationLine } from '../shared/VocabularySegmentationLine';
+import { SegmentationLine } from '../components/SegmentationLine';
 // ...
 {displayIpaWrapped(item.ipa)}
-<VocabularySegmentationLine segmentation={item.segmentation} />
+<SegmentationLine segmentation={item.segmentation} />
 ```
 
-`VocabularyPackList`、`VocabularyFavoritesPanel` 同样从 `../shared/VocabularySegmentationLine` 引入，渲染位置均在音标下方。
+`VocabularyPackList`、收藏页单词列表同样从 `../components/SegmentationLine` 引入，渲染位置均在音标下方。目录约定见 [english-module-folder-layout.md](./english-module-folder-layout.md)。
 
 ### 4.5 导入 JSON 示例（页面顶栏）
 
@@ -307,5 +307,5 @@ import { VocabularySegmentationLine } from '../shared/VocabularySegmentationLine
 | 服务主逻辑 | `apps/backend/src/services/english-learning/english-learning.service.ts` |
 | 库词条实体 | `apps/backend/src/services/english-learning/entity/english-vocabulary-library-item.entity.ts` |
 | 导入页 | `apps/frontend/src/views/englishLearning/import/EnglishLearningImportPage.tsx` |
-| 展示组件 | `apps/frontend/src/views/englishLearning/shared/VocabularySegmentationLine.tsx` |
+| 展示组件 | `apps/frontend/src/views/englishLearning/components/SegmentationLine.tsx` |
 | 前端类型 | `apps/frontend/src/service/index.ts` |

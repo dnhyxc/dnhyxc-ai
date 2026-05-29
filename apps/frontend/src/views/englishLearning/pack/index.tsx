@@ -25,8 +25,8 @@ import {
 } from '@/store/englishPracticePool';
 import type { SearchOrganicItem } from '@/types/chat';
 import { mergeEnglishPackWebSearchOrganics } from '@/utils/englishPackWebSearchMerge';
-import { EnglishPracticeEntry } from '../shared/practiceEntry';
-import { MasterWebSearchResultsBar } from '../shared/WebSearchResultsBar';
+import { EnglishPracticeEntry } from '../components/practiceEntry';
+import { MasterWebSearchResultsBar } from '../components/WebSearchResultsBar';
 import { ClassicQuotesPackList } from './ClassicQuotesPackList';
 import { PackStreamHistoryDrawerTrigger } from './PackStreamHistoryDrawerTrigger';
 import type { PackStreamKind } from './PackStreamKindTabs';

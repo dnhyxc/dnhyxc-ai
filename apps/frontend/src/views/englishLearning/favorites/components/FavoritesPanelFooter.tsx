@@ -6,8 +6,8 @@ import { Button } from '@ui/index';
 import { Label } from '@ui/label';
 import { Spinner } from '@ui/spinner';
 import { useI18n } from '@/hooks';
+import { EnglishPracticeEntry } from '../../components/practiceEntry';
 import type { PracticeContentKind } from '../../practice/types';
-import { EnglishPracticeEntry } from '../../shared/practiceEntry';
 
 export type FavoritesPanelFooterProps = {
 	/** 全选 Checkbox 的 id，需与 Label htmlFor 一致 */

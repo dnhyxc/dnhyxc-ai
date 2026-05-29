@@ -1,8 +1,8 @@
-import { dataSource } from './dataSource';
+import { morphologyDataSource } from './dataSource';
 import type { MorphologyReference, MorphologySectionKey } from './types';
 
-/** 词根词缀参考数据（来自 `dataSource.morphology`） */
-export const morphologyReference: MorphologyReference = dataSource.morphology;
+/** 词根词缀参考数据（来自 `morphologyDataSource`） */
+export const morphologyReference: MorphologyReference = morphologyDataSource;
 
 export const MORPHOLOGY_SECTION_KEYS: MorphologySectionKey[] = [
 	'prefixes',
@@ -33,7 +33,7 @@ export function parseMorphologyNavSelection(
 		sectionRaw === 'suffixes' || sectionRaw === 'roots'
 			? sectionRaw
 			: 'prefixes';
-	const section = dataSource.morphology[sectionKey];
+	const section = morphologyDataSource[sectionKey];
 	const n = categoryRaw == null ? 0 : parseInt(categoryRaw, 10);
 	const categoryIndex =
 		Number.isFinite(n) && n >= 0

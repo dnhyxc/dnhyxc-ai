@@ -17,15 +17,15 @@ import {
 	playEnglishPreferred,
 	stopAllEnglishPlayback,
 } from '@/utils/englishTts';
+import { ReferencePageShell } from '../components/ReferencePageShell';
+import { referenceNavItemClass } from '../utils/referenceNavItemClass';
 import {
 	getMorphologyAffixLabel,
 	MORPHOLOGY_SECTION_KEYS,
 	morphologyReference,
 	parseMorphologyNavSelection,
-} from '../morphologyData';
-import { ReferencePageShell } from '../ReferencePageShell';
-import { referenceNavItemClass } from '../referenceNavItemClass';
-import type { MorphologySectionKey } from '../types';
+} from './morphologyData';
+import type { MorphologySectionKey } from './types';
 
 export default function EnglishMorphologyReferencePage() {
 	const { t } = useI18n();

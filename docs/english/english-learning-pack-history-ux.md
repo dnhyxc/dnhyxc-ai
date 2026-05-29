@@ -45,8 +45,8 @@
 | `apps/frontend/src/views/englishLearning/pack/PackStreamLiveLink.tsx` | 跳转结果页携带 `streamId` |
 | `apps/frontend/src/views/englishLearning/import/EnglishLearningImportPage.tsx` | 文件名 → 导入标题 |
 | `apps/frontend/src/i18n/locales/zh-CN.ts`、`en-US.ts` | `packHistory.delete*`、`vocab/classic.historyStreaming` |
-| `apps/frontend/src/views/englishLearning/shared/EnglishSource.tsx` | 导入示例 JSON 与预览区渐变样式 |
-| `apps/frontend/src/views/englishLearning/shared/LearningToolbar.tsx` | 侧栏快捷意图与模式按钮配色微调 |
+| `apps/frontend/src/views/englishLearning/components/EnglishSource.tsx` | 导入示例 JSON 与预览区渐变样式 |
+| `apps/frontend/src/views/englishLearning/components/LearningToolbar.tsx` | 侧栏快捷意图与模式按钮配色微调 |
 | `apps/frontend/src/components/ui/checkbox.tsx` | 边框透明度 `border-theme/20` |
 
 ---

@@ -19,13 +19,13 @@ import { stripAutoFilledIntentName } from '@/utils';
 import { stopAllEnglishPlayback } from '@/utils/englishTts';
 import { AgentPanel } from './agent';
 import { ClassicQuotesSection } from './classic/ClassicQuotesSection';
-import FavoriteSession from './favorites/components/FavoriteSession';
-import { MistakeBookSession } from './mistakes/components/MistakeBookSession';
-import EnglishSource from './shared/EnglishSource';
+import EnglishSource from './components/EnglishSource';
 import {
 	EnglishLearningToolbar,
 	type QuickIntentInputSyncPayload,
-} from './shared/LearningToolbar';
+} from './components/LearningToolbar';
+import FavoriteSession from './favorites/components/FavoriteSession';
+import { MistakeBookSession } from './mistakes/components/MistakeBookSession';
 import { VocabularyPackSection } from './vocab/VocabularySection';
 
 const EnglishLearning = observer(function EnglishLearning() {

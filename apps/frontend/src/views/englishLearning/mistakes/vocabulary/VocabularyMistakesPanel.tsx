@@ -14,7 +14,7 @@ import {
 	playEnglishPreferred,
 	stopAllEnglishPlayback,
 } from '@/utils/englishTts';
-import { VocabularyWordCard } from '../../shared/VocabularyWordCard';
+import { VocabularyWordCard } from '../../components/VocabularyWordCard';
 import { MistakesPanelFooter } from '../components/MistakesPanelFooter';
 import { useVocabularyMistakesList } from './useVocabularyMistakesList';
 

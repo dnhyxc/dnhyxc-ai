@@ -3,7 +3,7 @@
  */
 import { cn } from '@/lib/utils';
 import { displayIpaWrapped } from '@/utils';
-import { SegmentationLine } from '../../../shared/SegmentationLine';
+import { SegmentationLine } from '../../../components/SegmentationLine';
 import type { WordAnswerDetailProps } from '../../types';
 
 export function WordAnswerDetail({

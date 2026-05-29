@@ -1,12 +1,12 @@
-import { dataSource } from './dataSource';
+import { grammarDataSource } from './dataSource';
 import type { GrammarNavItem, GrammarReference, GrammarSection } from './types';
 
-/** 语法参考数据（来自 `dataSource.grammar`） */
-export const grammarReference: GrammarReference = dataSource.grammar;
+/** 语法参考数据（来自 `grammarDataSource`） */
+export const grammarReference: GrammarReference = grammarDataSource;
 
 export function buildGrammarNavItems(): GrammarNavItem[] {
 	const items: GrammarNavItem[] = [];
-	dataSource.grammar.parts.forEach((part, partIndex) => {
+	grammarDataSource.parts.forEach((part, partIndex) => {
 		part.chapters.forEach((chapter, chapterIndex) => {
 			chapter.sections.forEach((section, sectionIndex) => {
 				items.push({
@@ -43,7 +43,7 @@ export function resolveGrammarSection(
 	chapterIndex: number,
 	sectionIndex: number,
 ): GrammarSection | null {
-	const part = dataSource.grammar.parts[partIndex];
+	const part = grammarDataSource.parts[partIndex];
 	const chapter = part?.chapters[chapterIndex];
 	return chapter?.sections[sectionIndex] ?? null;
 }

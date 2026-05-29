@@ -10,17 +10,17 @@ import {
 	ResizablePanelGroup,
 } from '@/components/ui/resizable';
 import { useI18n } from '@/hooks';
-import { GrammarPointBlock } from '../GrammarPointBlock';
+import { ReferencePageShell } from '../components/ReferencePageShell';
+import { referenceNavItemClass } from '../utils/referenceNavItemClass';
+import { GrammarPointBlock } from './GrammarPointBlock';
 import {
 	buildGrammarNavItems,
 	buildGrammarNavRows,
 	findGrammarNavBySectionId,
 	grammarReference,
 	resolveGrammarSection,
-} from '../grammarData';
-import { ReferencePageShell } from '../ReferencePageShell';
-import { referenceNavItemClass } from '../referenceNavItemClass';
-import type { GrammarSubsection } from '../types';
+} from './grammarData';
+import type { GrammarSubsection } from './types';
 
 function GrammarSubsectionBlock({ node }: { node: GrammarSubsection }) {
 	return (

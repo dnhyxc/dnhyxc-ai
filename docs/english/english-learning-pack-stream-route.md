@@ -48,7 +48,7 @@
 
 - `apps/frontend/src/store/englishPack.ts` — 跨路由 MobX 状态；
 - `apps/frontend/src/utils/englishLearningPackSse.ts` — SSE 解析；
-- `apps/frontend/src/views/englishLearning/shared/WebSearchResultsBar.tsx` — 结果页列表内联网抽屉（复用 `SearchOrganics`）。
+- `apps/frontend/src/views/englishLearning/components/WebSearchResultsBar.tsx` — 结果页列表内联网抽屉（复用 `SearchOrganics`）。
 
 ---
 

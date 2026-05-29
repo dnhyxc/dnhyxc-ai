@@ -18,7 +18,7 @@ import {
 	playEnglishPreferred,
 	stopAllEnglishPlayback,
 } from '@/utils/englishTts';
-import { ClassicQuoteCard } from '../shared/ClassicQuoteCard';
+import { ClassicQuoteCard } from '../components/ClassicQuoteCard';
 import type { useClassicQuotesPackHistoryList } from './useClassicQuotesPackHistoryList';
 
 export type ClassicQuotesPackListProps = {

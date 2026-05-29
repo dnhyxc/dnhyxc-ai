@@ -8,7 +8,7 @@ import {
 	englishPracticePoolKeys,
 	setEnglishPracticePoolMeta,
 } from '@/store/englishPracticePool';
-import { EnglishLearningPanelHeader } from '../shared/EnglishLearningPanelHeader';
+import { EnglishLearningPanelHeader } from '../components/EnglishLearningPanelHeader';
 import { ClassicQuoteMistakesPanel } from './classic/ClassicQuoteMistakesPanel';
 import {
 	type MistakesKind,
