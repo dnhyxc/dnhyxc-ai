@@ -284,7 +284,7 @@ export const PROJECT_GUIDE_ITEMS_EN: Record<
 	'pg-s13-11': {
 		title: '13.11 Dictation & spelling (vocab & classic quotes)',
 		description:
-			'Vocab and classic entries as in the Chinese guide. Setup pool size as “N words” or “N sentences”. Grading ignores case; vocab also ignores trailing punctuation, classic quotes ignore all punctuation. Saving to the mistake book updates last wrong spelling when it changed.',
+			'Entries and grading as in the Chinese guide. First wrong: hints + playback without English answer; full reveal after Show answer or 2nd wrong. Try again/Next; arrows ←→↑↓; dictation triple-play; spelling hint playback. Summary and mistake book unchanged.',
 	},
 	'pg-s13-12': {
 		title: '13.12 Mistake book (vocab & classic)',

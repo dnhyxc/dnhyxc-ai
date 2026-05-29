@@ -15,7 +15,7 @@ const DICTATION_EQUALIZER_DELAYS = [
 	0, 0.09, 0.18, 0.05, 0.14, 0.22, 0.07, 0.16, 0.11,
 ] as const;
 
-function DictationEqualizer({
+export function DictationEqualizer({
 	playing,
 	className,
 }: {
@@ -41,7 +41,7 @@ function DictationEqualizer({
 	);
 }
 
-function DictationPlayButton({
+export function DictationPlayButton({
 	playing,
 	playLabel,
 	onPlay,
@@ -133,7 +133,7 @@ function DictationStepProgress({
 }
 
 /** 听写提示：中文释义 + 音标（无英文词面） */
-function DictationHintPanel({
+export function DictationHintPanel({
 	hintContent,
 }: {
 	hintContent: PracticeHintFields;
@@ -235,14 +235,6 @@ function DictationPromptDefault({
 				<div className="mt-2 w-full max-w-44">
 					<DictationEqualizer playing={playing} className="h-8" />
 				</div>
-				<p
-					className={cn(
-						'mt-1.5 text-center text-xs font-medium',
-						playing ? 'text-teal-400' : 'text-textcolor/55',
-					)}
-				>
-					{playLabel}
-				</p>
 			</div>
 			<div className="shrink-0 px-5">
 				<p className="text-textcolor/55 mx-auto max-w-xs text-center text-[11px] leading-relaxed">

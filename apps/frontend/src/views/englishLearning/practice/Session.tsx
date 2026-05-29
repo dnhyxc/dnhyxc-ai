@@ -13,12 +13,18 @@ import {
 } from 'react';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
+import { displayIpaWrapped } from '@/utils';
 import {
 	isEnglishTtsSupported,
 	playEnglishPreferred,
 	stopAllEnglishPlayback,
 } from '@/utils/englishTts';
-import { DictationPromptBody } from './components/dictation/DictationPrompt';
+import {
+	DictationEqualizer,
+	DictationHintPanel,
+	DictationPlayButton,
+	DictationPromptBody,
+} from './components/dictation/DictationPrompt';
 import { RevealedPanelInner, VocabWordPlayButton } from './components/reveal';
 import { SessionPromptPanel } from './components/session/SessionPromptPanel';
 import { SessionStageHeader } from './components/session/SessionStageHeader';
@@ -35,6 +41,15 @@ import { getPracticeAnswerText, isPracticeClassicItem } from './utils/item';
 
 /** 整张练习卡片锁定高度（听写/拼写 ↔ 错题切换时总高一致） */
 const SESSION_CARD_H = 'h-[calc(14.625rem+min(14.5rem,38dvh))]';
+/** 听写自动/手动播放：次数与间隔（毫秒） */
+const DICTATION_PLAY_COUNT = 3;
+const DICTATION_PLAY_GAP_MS = 3000;
+
+function sleepMs(ms: number): Promise<void> {
+	return new Promise((resolve) => {
+		window.setTimeout(resolve, ms);
+	});
+}
 /** 会话组件 */
 export function Session({
 	mode,
@@ -45,6 +60,7 @@ export function Session({
 	const { t } = useI18n();
 	const [phase, setPhase] = useState<PracticeItemPhase>('prompt');
 	const [input, setInput] = useState('');
+	const [wrongAttemptCount, setWrongAttemptCount] = useState(0);
 	const [lastWrong, setLastWrong] = useState<PracticeAttemptResult | null>(
 		null,
 	);
@@ -53,10 +69,30 @@ export function Session({
 		useState(false);
 	const [hintOpen, setHintOpen] = useState(false);
 	const inputRef = useRef<HTMLInputElement>(null);
-	const nextButtonRef = useRef<HTMLButtonElement>(null);
 	const autoPlayedKeyRef = useRef<string | null>(null);
+	/** 递增以取消进行中的听写连播（含间隔等待） */
+	const dictationPlayRunRef = useRef(0);
 
 	const answerText = getPracticeAnswerText(item);
+
+	const cancelDictationPlay = useCallback(() => {
+		dictationPlayRunRef.current += 1;
+		stopAllEnglishPlayback();
+	}, []);
+
+	const playDictationSequence = useCallback(
+		async (runId: number) => {
+			for (let i = 0; i < DICTATION_PLAY_COUNT; i += 1) {
+				if (dictationPlayRunRef.current !== runId) return;
+				await playEnglishPreferred(answerText, { preferLocal: true });
+				if (dictationPlayRunRef.current !== runId) return;
+				if (i < DICTATION_PLAY_COUNT - 1) {
+					await sleepMs(DICTATION_PLAY_GAP_MS);
+				}
+			}
+		},
+		[answerText],
+	);
 
 	const playWord = useCallback(async () => {
 		if (!isEnglishTtsSupported()) {
@@ -67,27 +103,46 @@ export function Session({
 			return;
 		}
 		if (playing) {
-			stopAllEnglishPlayback();
+			cancelDictationPlay();
 			setPlaying(false);
 			return;
 		}
+
+		dictationPlayRunRef.current += 1;
+		const runId = dictationPlayRunRef.current;
 		stopAllEnglishPlayback();
 		setPlaying(true);
 		try {
-			await playEnglishPreferred(answerText, { preferLocal: true });
+			if (mode === 'dictation') {
+				await playDictationSequence(runId);
+			} else {
+				await playEnglishPreferred(answerText, { preferLocal: true });
+			}
 		} catch {
 			Toast({
 				type: 'warning',
 				title: t('englishLearning.tts.unsupported'),
 			});
 		} finally {
-			setPlaying(false);
+			if (dictationPlayRunRef.current === runId) {
+				setPlaying(false);
+			}
 		}
-	}, [answerText, playing, t]);
+	}, [
+		answerText,
+		cancelDictationPlay,
+		mode,
+		playDictationSequence,
+		playing,
+		t,
+	]);
 
 	useEffect(() => {
+		dictationPlayRunRef.current += 1;
+		setPlaying(false);
 		setPhase('prompt');
 		setInput('');
+		setWrongAttemptCount(0);
 		setLastWrong(null);
 		setDictationSpellStepActive(false);
 		setHintOpen(false);
@@ -102,14 +157,20 @@ export function Session({
 		void playWord();
 	}, [item.key, mode, playWord]);
 
-	useEffect(() => () => stopAllEnglishPlayback(), []);
+	useEffect(
+		() => () => {
+			cancelDictationPlay();
+		},
+		[cancelDictationPlay],
+	);
 
 	const completeStep = useCallback(
 		(result: PracticeAttemptResult) => {
-			stopAllEnglishPlayback();
+			cancelDictationPlay();
+			setPlaying(false);
 			onStepComplete(result);
 		},
-		[onStepComplete],
+		[cancelDictationPlay, onStepComplete],
 	);
 
 	const onSubmit = useCallback(
@@ -130,12 +191,30 @@ export function Session({
 				completeStep(attempt);
 				return;
 			}
-			stopAllEnglishPlayback();
+			cancelDictationPlay();
 			setPlaying(false);
 			setLastWrong(attempt);
-			setPhase('revealed');
+			const nextAttempt = wrongAttemptCount + 1;
+			setWrongAttemptCount(nextAttempt);
+			if (nextAttempt >= 2) {
+				setPhase('revealed');
+			} else {
+				setPhase('soft_wrong');
+				if (hasPracticeHintContent(item, mode)) {
+					setHintOpen(true);
+				}
+			}
 		},
-		[answerText, completeStep, input, item, phase],
+		[
+			answerText,
+			cancelDictationPlay,
+			completeStep,
+			input,
+			item,
+			mode,
+			phase,
+			wrongAttemptCount,
+		],
 	);
 
 	const onNext = useCallback(() => {
@@ -144,37 +223,93 @@ export function Session({
 		}
 	}, [completeStep, lastWrong]);
 
+	/** 软揭示态：主动查看正确答案 */
+	const onRevealAnswer = useCallback(() => {
+		cancelDictationPlay();
+		setPlaying(false);
+		setPhase('revealed');
+	}, [cancelDictationPlay]);
+
+	/** 答错后回到作答区重新作答（不换题、不记入结算） */
+	const onRetryCurrent = useCallback(() => {
+		cancelDictationPlay();
+		setPlaying(false);
+		setLastWrong(null);
+		setPhase('prompt');
+		setInput('');
+		setDictationSpellStepActive(false);
+		if (mode === 'dictation') {
+			void playWord();
+		}
+		requestAnimationFrame(() => inputRef.current?.focus());
+	}, [cancelDictationPlay, mode, playWord]);
+
 	useEffect(() => {
-		if (phase !== 'revealed' || !lastWrong) return;
+		if ((phase !== 'soft_wrong' && phase !== 'revealed') || !lastWrong) return;
 
 		inputRef.current?.blur();
 
 		const onKeyDown = (e: KeyboardEvent) => {
-			if (e.key !== 'Enter' || e.repeat) return;
+			if (e.repeat) return;
 			const target = e.target as HTMLElement | null;
-			if (target?.id === 'practice-spelling-input') {
-				e.preventDefault();
-				onNext();
-				return;
-			}
 			const tag = target?.tagName;
 			if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
-			e.preventDefault();
-			onNext();
+
+			if (phase === 'soft_wrong') {
+				if (e.key === 'ArrowLeft') {
+					e.preventDefault();
+					void playWord();
+					return;
+				}
+				if (e.key === 'ArrowRight') {
+					e.preventDefault();
+					onRevealAnswer();
+					return;
+				}
+				if (e.key === 'ArrowUp') {
+					e.preventDefault();
+					onRetryCurrent();
+					return;
+				}
+				if (e.key === 'ArrowDown') {
+					e.preventDefault();
+					onNext();
+				}
+				return;
+			}
+
+			if (e.key === 'ArrowUp') {
+				e.preventDefault();
+				onRetryCurrent();
+				return;
+			}
+			if (e.key === 'ArrowDown') {
+				e.preventDefault();
+				onNext();
+			}
 		};
 
 		window.addEventListener('keydown', onKeyDown);
-		requestAnimationFrame(() => nextButtonRef.current?.focus());
-
 		return () => window.removeEventListener('keydown', onKeyDown);
-	}, [phase, lastWrong, onNext]);
+	}, [
+		phase,
+		lastWrong,
+		mode,
+		onNext,
+		onRevealAnswer,
+		onRetryCurrent,
+		playWord,
+	]);
 
 	const playLabel = playing
 		? t('englishLearning.tts.stop')
 		: t('englishLearning.practice.playAgain');
 
 	const showSessionCard =
-		phase === 'prompt' || (phase === 'revealed' && lastWrong != null);
+		phase === 'prompt' ||
+		((phase === 'soft_wrong' || phase === 'revealed') && lastWrong != null);
+
+	const showWrongActions = phase === 'soft_wrong' || phase === 'revealed';
 
 	const modeIcon =
 		mode === 'dictation' ? (
@@ -189,6 +324,10 @@ export function Session({
 
 	const hintContent = useMemo(() => buildPracticeHintContent(item), [item]);
 	const isClassic = isPracticeClassicItem(item);
+
+	const spellingHintIpa = hintContent.ipa?.trim();
+	const spellingHintSource = hintContent.source?.trim();
+	const spellingHintNote = hintContent.noteZh?.trim();
 
 	const canHint = hasPracticeHintContent(item, mode);
 	const hintButtonLabel = hintOpen
@@ -210,6 +349,20 @@ export function Session({
 		/>
 	);
 
+	const softWrongPlayBlock = (
+		<div className="mt-2 flex flex-col items-center gap-2">
+			<DictationPlayButton
+				playing={playing}
+				playLabel={playLabel}
+				onPlay={() => void playWord()}
+				size="strip"
+			/>
+			<div className="min-h-5 w-full max-w-44">
+				<DictationEqualizer playing={playing} className="h-5 w-full" />
+			</div>
+		</div>
+	);
+
 	return (
 		<div className={cn(PRACTICE_PAGE_CONTENT_CLASS, 'flex flex-col gap-4')}>
 			{showSessionCard ? (
@@ -218,7 +371,7 @@ export function Session({
 						'border-theme/10 flex flex-col overflow-hidden p-0 shadow-sm',
 						SESSION_CARD_H,
 					)}
-					role={phase === 'revealed' ? 'status' : undefined}
+					role={showWrongActions ? 'status' : undefined}
 				>
 					<SessionStageHeader
 						icon={modeIcon}
@@ -289,8 +442,67 @@ export function Session({
 										pos={isClassic ? undefined : item.pos}
 										hintOpen={hintOpen}
 										hintContent={hintContent}
+										playing={playing}
+										playLabel={playLabel}
+										onPlay={() => void playWord()}
 									/>
 								)}
+							</SessionPromptPanel>
+							<SessionPromptPanel
+								scrollable
+								fillHeight
+								className={cn(phase !== 'soft_wrong' && 'hidden')}
+								aria-hidden={phase !== 'soft_wrong'}
+							>
+								<div className="flex h-full min-h-0 flex-col items-center justify-center gap-3 text-center">
+									<p className="text-textcolor/80 flex flex-wrap items-baseline justify-center gap-x-1 gap-y-0.5 text-sm">
+										<span>{yourAnswerPrefix}</span>
+										<span className="text-lg font-medium text-rose-500">
+											{revealedWrongInput}
+										</span>
+									</p>
+									{canHint && hintOpen ? (
+										mode === 'dictation' ? (
+											<DictationHintPanel hintContent={hintContent} />
+										) : (
+											<div
+												className="flex w-full min-w-0 flex-col items-center gap-2 px-2"
+												aria-live="polite"
+											>
+												{spellingHintIpa ? (
+													<p className="font-mono text-xs leading-snug text-teal-600/90 line-clamp-2 dark:text-teal-400/90">
+														{displayIpaWrapped(spellingHintIpa)}
+													</p>
+												) : null}
+												{!spellingHintIpa && spellingHintSource ? (
+													<p className="text-textcolor/65 line-clamp-2 text-xs leading-snug">
+														{spellingHintSource}
+													</p>
+												) : null}
+												{!spellingHintIpa && spellingHintNote ? (
+													<p className="text-textcolor/60 line-clamp-3 text-xs leading-relaxed italic">
+														{spellingHintNote}
+													</p>
+												) : null}
+												{softWrongPlayBlock}
+											</div>
+										)
+									) : mode === 'spelling' ? (
+										softWrongPlayBlock
+									) : null}
+									<p className="text-textcolor/60 max-w-sm text-sm">
+										{t('englishLearning.practice.softWrongHint')}
+									</p>
+									{mode === 'dictation' ? softWrongPlayBlock : null}
+									<Button
+										type="button"
+										variant="link"
+										className="text-teal-600 hover:text-teal-500 dark:text-teal-400 h-8 px-0!"
+										onClick={onRevealAnswer}
+									>
+										{t('englishLearning.practice.showAnswer')}
+									</Button>
+								</div>
 							</SessionPromptPanel>
 							<SessionPromptPanel
 								scrollable
@@ -312,7 +524,7 @@ export function Session({
 						className="border-theme/10 shrink-0 border-t px-4 pb-4 transition-none"
 						onSubmit={onSubmit}
 					>
-						{phase === 'prompt' ? (
+						<div className={cn(phase !== 'prompt' && 'hidden')}>
 							<div className="flex flex-col gap-3 pt-3">
 								<div className="flex flex-col gap-2.5">
 									<Label
@@ -340,31 +552,41 @@ export function Session({
 										spellCheck={false}
 										autoComplete="off"
 										autoCapitalize="off"
-										className="border-theme/20 border bg-theme-background h-10 text-base shadow-none focus-visible:shadow-none focus-visible:ring-0"
+										className="border-theme/20 border bg-theme-background h-10 text-base shadow-none transition-none focus-visible:shadow-none focus-visible:ring-0"
 									/>
 								</div>
 								<Button
 									type="submit"
-									className="h-10 w-full"
+									className="h-10 w-full transition-none"
 									disabled={!input.trim()}
 								>
 									{t('englishLearning.practice.check')}
 								</Button>
 							</div>
-						) : (
-							<div className="pt-4">
-								<Button
-									ref={nextButtonRef}
-									type="button"
-									className="h-10 w-full"
-									onClick={onNext}
-								>
-									{isLastQuestion
-										? t('englishLearning.practice.viewResults')
-										: t('englishLearning.practice.next')}
-								</Button>
-							</div>
-						)}
+						</div>
+						<div
+							className={cn(
+								'grid grid-cols-2 gap-2 pt-4 transition-none',
+								!showWrongActions && 'hidden',
+							)}
+						>
+							<Button
+								type="button"
+								className="h-10 w-full transition-none"
+								onClick={onRetryCurrent}
+							>
+								{t('englishLearning.practice.tryAgain')}
+							</Button>
+							<Button
+								type="button"
+								className="h-10 w-full transition-none"
+								onClick={onNext}
+							>
+								{isLastQuestion
+									? t('englishLearning.practice.viewResults')
+									: t('englishLearning.practice.next')}
+							</Button>
+						</div>
 					</form>
 				</PracticeCard>
 			) : null}

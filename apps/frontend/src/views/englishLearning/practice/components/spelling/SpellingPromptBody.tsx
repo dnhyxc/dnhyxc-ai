@@ -4,6 +4,10 @@
 import { cn } from '@/lib/utils';
 import { displayIpaWrapped } from '@/utils';
 import type { SpellingPromptBodyProps } from '../../types';
+import {
+	DictationEqualizer,
+	DictationPlayButton,
+} from '../dictation/DictationPrompt';
 
 export function SpellingPromptBody({
 	promptLabel,
@@ -11,6 +15,9 @@ export function SpellingPromptBody({
 	pos,
 	hintOpen,
 	hintContent,
+	playing,
+	playLabel,
+	onPlay,
 }: SpellingPromptBodyProps) {
 	const ipaText = hintContent.ipa?.trim();
 	const sourceText = hintContent.source?.trim();
@@ -30,7 +37,8 @@ export function SpellingPromptBody({
 				</p>
 				<p
 					className={cn(
-						'text-textcolor shrink-0 font-semibold leading-snug text-2xl py-2',
+						'text-textcolor shrink-0 font-semibold leading-snug py-2',
+						hintOpen ? 'text-lg' : 'text-xl',
 					)}
 				>
 					{translationZh}
@@ -68,6 +76,19 @@ export function SpellingPromptBody({
 					>
 						{noteText}
 					</p>
+				) : null}
+				{hintOpen ? (
+					<div className="mt-3 flex shrink-0 flex-col items-center gap-2">
+						<DictationPlayButton
+							playing={playing}
+							playLabel={playLabel}
+							onPlay={onPlay}
+							size="strip"
+						/>
+						<div className="min-h-5 w-full max-w-44">
+							<DictationEqualizer playing={playing} className="h-5 w-full" />
+						</div>
+					</div>
 				) : null}
 			</div>
 		</div>

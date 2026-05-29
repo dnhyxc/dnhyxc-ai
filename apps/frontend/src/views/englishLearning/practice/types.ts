@@ -234,7 +234,7 @@ export type SummaryActionsProps = {
 
 // —— 单题 Session 子组件 ——
 
-export type PracticeItemPhase = 'prompt' | 'revealed';
+export type PracticeItemPhase = 'prompt' | 'soft_wrong' | 'revealed';
 
 export type DictationStepProgressProps = {
 	stepListen: string;
@@ -281,6 +281,9 @@ export type SpellingPromptBodyProps = {
 	pos?: string;
 	hintOpen: boolean;
 	hintContent: PracticeHintFields;
+	playing: boolean;
+	playLabel: string;
+	onPlay: () => void;
 };
 
 export type VocabWordPlayButtonProps = {

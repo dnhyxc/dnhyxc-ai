@@ -846,6 +846,11 @@ export const enUS = {
 	'englishLearning.practice.inputLabel': 'Your spelling',
 	'englishLearning.practice.inputPlaceholder': 'Type the English word',
 	'englishLearning.practice.check': 'Check',
+	'englishLearning.practice.tryAgain': 'Try again',
+	'englishLearning.practice.showAnswer': 'Show answer',
+	'englishLearning.practice.softWrongHint':
+		'You can try again or view the correct answer before continuing.',
+	'englishLearning.practice.previous': 'Previous',
 	'englishLearning.practice.next': 'Next',
 	'englishLearning.practice.viewResults': 'View practice results',
 	'englishLearning.practice.incorrect': 'Spelling error',

@@ -752,6 +752,11 @@ export const zhCN = {
 	'englishLearning.practice.inputLabel': '你的拼写',
 	'englishLearning.practice.inputPlaceholder': '输入英文单词',
 	'englishLearning.practice.check': '检查',
+	'englishLearning.practice.tryAgain': '再试一次',
+	'englishLearning.practice.showAnswer': '看答案',
+	'englishLearning.practice.softWrongHint':
+		'可再试一次，也可以查看正确答案后继续',
+	'englishLearning.practice.previous': '上一题',
 	'englishLearning.practice.next': '下一题',
 	'englishLearning.practice.viewResults': '查看练习结果',
 	'englishLearning.practice.incorrect': '拼写错误',

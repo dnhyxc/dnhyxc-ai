@@ -3,6 +3,7 @@
 ## 延伸阅读
 
 - 练习模块总览：[`practice-summary-ui.md`](./practice-summary-ui.md)
+- 答错重答 / 键盘 / 播放：[`practice-session-controls.md`](./practice-session-controls.md)（含两档揭示 `soft_wrong`）
 - 入口与导航：[`practice-entry-navigation.md`](./practice-entry-navigation.md)
 - 前端 SPEC 蓝图：`apps/frontend/specs/english-learning-practice-session-hint.md`（实现对照，非用户文档）
 - 产品说明：[`docs/project-guide.md`](../project-guide.md) §13.11；更新条目：[`docs/project-update-info.md`](../project-update-info.md) §24

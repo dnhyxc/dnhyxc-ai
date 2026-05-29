@@ -615,4 +615,9 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'When saving to the mistake book again, if the wrong spelling differs from what was stored, only “last wrong input” is updated; word/sentence snapshots are unchanged.',
 	},
+	's24-26': {
+		title: 'Two-tier wrong answer & playback',
+		description:
+			'First wrong: hints + playback, no English answer; full reveal after Show answer or 2nd wrong. Try again/Next; arrow keys ←→↑↓; dictation triple-play ~3s gaps; spelling hints include playback.',
+	},
 };
