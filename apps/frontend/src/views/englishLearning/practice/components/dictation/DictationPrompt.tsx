@@ -2,6 +2,7 @@
  * 听写题 — 步骤条、播放；展开提示时在固定高度内分区展示（无滚动）
  */
 import { Square, Volume2 } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import { displayIpaWrapped } from '@/utils';
@@ -11,9 +12,7 @@ import type {
 	PracticeHintFields,
 } from '../../types';
 
-const DICTATION_EQUALIZER_DELAYS = [
-	0, 0.09, 0.18, 0.05, 0.14, 0.22, 0.07, 0.16, 0.11,
-] as const;
+const DICTATION_EQUALIZER_BAR_COUNT = 9;
 
 export function DictationEqualizer({
 	playing,
@@ -24,18 +23,15 @@ export function DictationEqualizer({
 }) {
 	return (
 		<div
-			className={cn('flex h-5 items-end justify-center gap-0.5', className)}
+			className={cn(
+				'practice-dictation-equalizer flex h-5 items-end justify-center gap-0.5',
+				playing && 'practice-dictation-equalizer--playing',
+				className,
+			)}
 			aria-hidden
 		>
-			{DICTATION_EQUALIZER_DELAYS.map((delay, index) => (
-				<span
-					key={index}
-					className={cn(
-						'w-0.5 rounded-full bg-linear-to-t from-teal-600/50 to-teal-300/90 sm:w-1',
-						playing ? 'practice-dictation-bar h-3.5' : 'h-1.5 opacity-35',
-					)}
-					style={playing ? { animationDelay: `${delay}s` } : undefined}
-				/>
+			{Array.from({ length: DICTATION_EQUALIZER_BAR_COUNT }, (_, index) => (
+				<span key={index} className="practice-dictation-bar" />
 			))}
 		</div>
 	);
@@ -50,12 +46,18 @@ export function DictationPlayButton({
 	playing: boolean;
 	playLabel: string;
 	onPlay: () => void;
-	size?: 'hero' | 'strip';
+	size?: 'hero' | 'medium' | 'strip';
 }) {
-	const isStrip = size === 'strip';
-	const outer = isStrip ? 'size-10' : 'size-14';
-	const inner = isStrip ? 'size-8' : 'size-12';
-	const icon = isStrip ? 'size-3.5' : 'size-5';
+	const outer =
+		size === 'hero' ? 'size-14' : size === 'medium' ? 'size-12' : 'size-10';
+	const inner =
+		size === 'hero' ? 'size-12' : size === 'medium' ? 'size-10' : 'size-8';
+	const icon =
+		size === 'hero' ? 'size-5' : size === 'medium' ? 'size-4' : 'size-3.5';
+	const playingHalo =
+		size === 'hero'
+			? 'bg-teal-500/15 ring-2 ring-teal-500/25'
+			: 'bg-teal-500/15 ring-1 ring-inset ring-teal-500/35';
 
 	return (
 		<button
@@ -63,7 +65,7 @@ export function DictationPlayButton({
 			onClick={onPlay}
 			aria-label={playLabel}
 			className={cn(
-				'group relative flex shrink-0 cursor-pointer items-center justify-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-teal-500/40',
+				'group relative isolate flex shrink-0 cursor-pointer items-center justify-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-teal-500/40',
 				outer,
 			)}
 		>
@@ -71,18 +73,18 @@ export function DictationPlayButton({
 				className={cn(
 					'absolute inset-0 rounded-full',
 					playing
-						? 'bg-teal-500/15 ring-2 ring-teal-500/25 motion-reduce:ring-0'
+						? cn(playingHalo, 'motion-reduce:ring-0')
 						: 'bg-teal-500/8 opacity-0 group-hover:opacity-100',
 				)}
 				aria-hidden
 			/>
 			<span
 				className={cn(
-					'relative z-10 flex items-center justify-center rounded-full border-2 shadow-md group-active:scale-[0.97]',
+					'relative z-10 flex items-center justify-center rounded-full border-2 group-active:scale-[0.97]',
 					inner,
 					playing
-						? 'border-teal-500/40 bg-teal-500/15 text-teal-600 dark:text-teal-400'
-						: 'border-white/15 bg-linear-to-br from-teal-500 to-cyan-600 text-white shadow-teal-500/25',
+						? 'border-teal-500/40 bg-teal-500/15 text-teal-600 shadow-sm dark:text-teal-400'
+						: 'border-white/15 bg-linear-to-br from-teal-500 to-cyan-600 text-white shadow-md shadow-teal-500/25',
 				)}
 			>
 				{playing ? (
@@ -135,47 +137,186 @@ function DictationStepProgress({
 /** 听写提示：中文释义 + 音标（无英文词面） */
 export function DictationHintPanel({
 	hintContent,
+	variant = 'default',
+	align = 'center',
 }: {
 	hintContent: PracticeHintFields;
+	/** compact：固定高度内截断；softWrong：首次答错面板，字号与间距更大 */
+	variant?: 'default' | 'compact' | 'softWrong';
+	/** start：与播放钮横排时左对齐，减少无效留白 */
+	align?: 'center' | 'start';
 }) {
 	const { t } = useI18n();
 	const translation = hintContent.translationZh?.trim();
 	const ipaText = hintContent.ipa?.trim();
 	const source = hintContent.source?.trim();
 	const noteZh = hintContent.noteZh?.trim();
+	const compact = variant === 'compact';
+	const softWrong = variant === 'softWrong';
+	const start = align === 'start';
 
 	if (!translation && !ipaText && !source && !noteZh) return null;
 
+	/** 软揭示：出处与说明合并为一行，减少纵向占用 */
+	const softWrongMeta =
+		softWrong && (source || noteZh)
+			? [source, noteZh].filter(Boolean).join(' · ')
+			: null;
+
 	return (
 		<div
-			className="flex w-full min-h-0 flex-col items-center justify-between gap-2 px-3 text-center"
+			className={cn(
+				'flex w-full min-w-0 flex-col text-center',
+				start ? 'items-start text-left' : 'items-center',
+				softWrong
+					? 'shrink-0 gap-1.5'
+					: compact
+						? 'min-h-0 gap-1 overflow-hidden'
+						: 'justify-between gap-2 px-3',
+			)}
 			aria-live="polite"
 		>
 			{translation ? (
-				<div className="flex w-full min-w-0 flex-col gap-2">
-					<span className="text-textcolor/45 text-xs font-medium tracking-wide">
-						{t('englishLearning.practice.hintLabelTranslation')}
-					</span>
-					<p className="text-textcolor line-clamp-3 text-sm font-semibold leading-snug">
-						{translation}
-					</p>
-				</div>
+				softWrong ? (
+					<div className="flex w-full shrink-0 flex-col items-center gap-0.5">
+						<span className="text-textcolor/45 text-[11px] font-medium tracking-wide">
+							{t('englishLearning.practice.hintLabelTranslation')}
+						</span>
+						<p className="text-textcolor w-full text-center text-sm font-semibold leading-snug line-clamp-2">
+							{translation}
+						</p>
+					</div>
+				) : compact ? (
+					start ? (
+						<p className="text-textcolor line-clamp-2 w-full text-sm font-semibold leading-snug">
+							<span className="text-textcolor/45 me-1 text-[10px] font-medium tracking-wide">
+								{t('englishLearning.practice.hintLabelTranslation')}
+							</span>
+							{translation}
+						</p>
+					) : (
+						<div className="flex w-full flex-col items-center gap-0.5">
+							<span className="text-textcolor/45 text-[10px] font-medium tracking-wide">
+								{t('englishLearning.practice.hintLabelTranslation')}
+							</span>
+							<p className="text-textcolor line-clamp-2 text-sm font-semibold leading-snug">
+								{translation}
+							</p>
+						</div>
+					)
+				) : (
+					<div className="flex w-full min-w-0 flex-col gap-2">
+						<span className="text-textcolor/45 text-xs font-medium tracking-wide">
+							{t('englishLearning.practice.hintLabelTranslation')}
+						</span>
+						<p className="text-textcolor line-clamp-3 text-sm font-semibold leading-snug">
+							{translation}
+						</p>
+					</div>
+				)
 			) : null}
 			{ipaText ? (
-				<p className="font-mono text-xs leading-snug text-teal-600/90 line-clamp-2 dark:text-teal-400/90">
+				<p
+					className={cn(
+						'w-full shrink-0 text-center font-mono text-teal-600/90 dark:text-teal-400/90',
+						softWrong
+							? 'line-clamp-1 text-xs leading-snug'
+							: compact
+								? 'line-clamp-1 text-[11px] leading-snug'
+								: 'line-clamp-2 text-xs leading-snug',
+					)}
+				>
 					{displayIpaWrapped(ipaText)}
 				</p>
 			) : null}
-			{source ? (
-				<p className="text-textcolor/65 line-clamp-2 text-xs leading-snug">
-					{source}
-				</p>
-			) : null}
-			{noteZh ? (
-				<p className="text-textcolor/60 line-clamp-3 text-xs leading-relaxed italic">
-					{noteZh}
-				</p>
-			) : null}
+			{softWrong ? (
+				softWrongMeta ? (
+					<p className="text-textcolor/60 w-full shrink-0 text-center text-[11px] leading-snug italic line-clamp-2">
+						{softWrongMeta}
+					</p>
+				) : null
+			) : (
+				<>
+					{source ? (
+						<p
+							className={cn(
+								'w-full shrink-0 text-center text-textcolor/65',
+								compact
+									? 'line-clamp-1 text-[11px] leading-snug'
+									: 'line-clamp-2 text-xs leading-snug',
+							)}
+						>
+							{source}
+						</p>
+					) : null}
+					{noteZh ? (
+						<p
+							className={cn(
+								'w-full shrink-0 text-center italic text-textcolor/60',
+								compact
+									? 'line-clamp-2 text-[10px] leading-snug'
+									: 'line-clamp-3 text-xs leading-relaxed',
+							)}
+						>
+							{noteZh}
+						</p>
+					) : null}
+				</>
+			)}
+		</div>
+	);
+}
+
+/** 播放钮外圈光晕需留白，避免被 overflow-hidden 父级裁切 */
+export function DictationPlaySlot({
+	children,
+	className,
+}: {
+	children: ReactNode;
+	className?: string;
+}) {
+	return (
+		<div
+			className={cn(
+				'flex shrink-0 flex-col items-center gap-1.5 overflow-visible px-2.5 py-2',
+				className,
+			)}
+		>
+			{children}
+		</div>
+	);
+}
+
+/** 听写首次答错：播放 + 提示，适配固定卡片高度、无滚动 */
+export function DictationSoftWrongHintBlock({
+	hintContent,
+	playing,
+	playLabel,
+	onPlay,
+}: {
+	hintContent: PracticeHintFields;
+	playing: boolean;
+	playLabel: string;
+	onPlay: () => void;
+}) {
+	return (
+		<div className="flex w-full max-h-full min-h-0 flex-col items-center gap-2">
+			<DictationPlaySlot>
+				<DictationPlayButton
+					playing={playing}
+					playLabel={playLabel}
+					onPlay={onPlay}
+					size="medium"
+				/>
+				<DictationEqualizer playing={playing} className="h-4 w-32" />
+			</DictationPlaySlot>
+			<div className="w-full min-h-0 overflow-hidden">
+				<DictationHintPanel
+					hintContent={hintContent}
+					variant="softWrong"
+					align="center"
+				/>
+			</div>
 		</div>
 	);
 }
@@ -225,14 +366,14 @@ function DictationPromptDefault({
 }) {
 	return (
 		<>
-			<div className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden px-5">
+			<div className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-hidden px-5 mb-3">
 				<DictationPlayButton
 					playing={playing}
 					playLabel={playLabel}
 					onPlay={onPlay}
 					size="hero"
 				/>
-				<div className="mt-2 w-full max-w-44">
+				<div className="mt-1 w-full max-w-44">
 					<DictationEqualizer playing={playing} className="h-8" />
 				</div>
 			</div>

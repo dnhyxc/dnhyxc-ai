@@ -21,9 +21,10 @@ import {
 } from '@/utils/englishTts';
 import {
 	DictationEqualizer,
-	DictationHintPanel,
 	DictationPlayButton,
+	DictationPlaySlot,
 	DictationPromptBody,
+	DictationSoftWrongHintBlock,
 } from './components/dictation/DictationPrompt';
 import { RevealedPanelInner, VocabWordPlayButton } from './components/reveal';
 import { SessionPromptPanel } from './components/session/SessionPromptPanel';
@@ -94,48 +95,45 @@ export function Session({
 		[answerText],
 	);
 
-	const playWord = useCallback(async () => {
-		if (!isEnglishTtsSupported()) {
-			Toast({
-				type: 'warning',
-				title: t('englishLearning.tts.unsupported'),
-			});
-			return;
-		}
-		if (playing) {
-			cancelDictationPlay();
-			setPlaying(false);
-			return;
-		}
-
-		dictationPlayRunRef.current += 1;
-		const runId = dictationPlayRunRef.current;
-		stopAllEnglishPlayback();
-		setPlaying(true);
-		try {
-			if (mode === 'dictation') {
-				await playDictationSequence(runId);
-			} else {
-				await playEnglishPreferred(answerText, { preferLocal: true });
+	const playWord = useCallback(
+		async (options?: { force?: boolean }) => {
+			if (!isEnglishTtsSupported()) {
+				Toast({
+					type: 'warning',
+					title: t('englishLearning.tts.unsupported'),
+				});
+				return;
 			}
-		} catch {
-			Toast({
-				type: 'warning',
-				title: t('englishLearning.tts.unsupported'),
-			});
-		} finally {
-			if (dictationPlayRunRef.current === runId) {
+			// 说明：重试时 playing 可能尚未置 false，force 跳过「再点即停」分支
+			if (playing && !options?.force) {
+				cancelDictationPlay();
 				setPlaying(false);
+				return;
 			}
-		}
-	}, [
-		answerText,
-		cancelDictationPlay,
-		mode,
-		playDictationSequence,
-		playing,
-		t,
-	]);
+
+			dictationPlayRunRef.current += 1;
+			const runId = dictationPlayRunRef.current;
+			stopAllEnglishPlayback();
+			setPlaying(true);
+			try {
+				if (mode === 'dictation') {
+					await playDictationSequence(runId);
+				} else {
+					await playEnglishPreferred(answerText, { preferLocal: true });
+				}
+			} catch {
+				Toast({
+					type: 'warning',
+					title: t('englishLearning.tts.unsupported'),
+				});
+			} finally {
+				if (dictationPlayRunRef.current === runId) {
+					setPlaying(false);
+				}
+			}
+		},
+		[answerText, cancelDictationPlay, mode, playDictationSequence, playing, t],
+	);
 
 	useEffect(() => {
 		dictationPlayRunRef.current += 1;
@@ -239,7 +237,7 @@ export function Session({
 		setInput('');
 		setDictationSpellStepActive(false);
 		if (mode === 'dictation') {
-			void playWord();
+			void playWord({ force: true });
 		}
 		requestAnimationFrame(() => inputRef.current?.focus());
 	}, [cancelDictationPlay, mode, playWord]);
@@ -350,17 +348,15 @@ export function Session({
 	);
 
 	const softWrongPlayBlock = (
-		<div className="mt-2 flex flex-col items-center gap-2">
+		<DictationPlaySlot>
 			<DictationPlayButton
 				playing={playing}
 				playLabel={playLabel}
 				onPlay={() => void playWord()}
-				size="strip"
+				size="medium"
 			/>
-			<div className="min-h-5 w-full max-w-44">
-				<DictationEqualizer playing={playing} className="h-5 w-full" />
-			</div>
-		</div>
+			<DictationEqualizer playing={playing} className="h-4 w-32" />
+		</DictationPlaySlot>
 	);
 
 	return (
@@ -449,59 +445,70 @@ export function Session({
 								)}
 							</SessionPromptPanel>
 							<SessionPromptPanel
-								scrollable
 								fillHeight
-								className={cn(phase !== 'soft_wrong' && 'hidden')}
+								className={cn(
+									phase !== 'soft_wrong' && 'hidden',
+									'items-center border-0 bg-transparent p-0 shadow-none',
+								)}
 								aria-hidden={phase !== 'soft_wrong'}
 							>
-								<div className="flex h-full min-h-0 flex-col items-center justify-center gap-3 text-center">
-									<p className="text-textcolor/80 flex flex-wrap items-baseline justify-center gap-x-1 gap-y-0.5 text-sm">
-										<span>{yourAnswerPrefix}</span>
-										<span className="text-lg font-medium text-rose-500">
-											{revealedWrongInput}
-										</span>
-									</p>
-									{canHint && hintOpen ? (
-										mode === 'dictation' ? (
-											<DictationHintPanel hintContent={hintContent} />
-										) : (
-											<div
-												className="flex w-full min-w-0 flex-col items-center gap-2 px-2"
-												aria-live="polite"
+								<div className="flex h-full min-h-0 w-full flex-col overflow-hidden px-4 py-2">
+									<div className="mx-auto flex h-full w-full max-w-sm flex-col items-center justify-between text-center">
+										<p className="text-textcolor/80 flex w-full shrink-0 flex-wrap items-baseline justify-center gap-x-1.5 text-sm leading-snug">
+											<span>{yourAnswerPrefix}</span>
+											<span className="text-base font-medium text-rose-500">
+												{revealedWrongInput}
+											</span>
+										</p>
+										<div className="flex min-h-0 w-full flex-1 flex-col items-center justify-center py-1">
+											{canHint && hintOpen ? (
+												mode === 'dictation' ? (
+													<DictationSoftWrongHintBlock
+														hintContent={hintContent}
+														playing={playing}
+														playLabel={playLabel}
+														onPlay={() => void playWord()}
+													/>
+												) : (
+													<div
+														className="flex max-h-full w-full min-h-0 flex-col items-center gap-2"
+														aria-live="polite"
+													>
+														{softWrongPlayBlock}
+														<div className="flex w-full min-h-0 flex-col items-center gap-1 overflow-hidden text-center">
+															{spellingHintIpa ? (
+																<p className="w-full shrink-0 text-center font-mono text-xs leading-snug text-teal-600/90 line-clamp-1 dark:text-teal-400/90">
+																	{displayIpaWrapped(spellingHintIpa)}
+																</p>
+															) : null}
+															{spellingHintSource || spellingHintNote ? (
+																<p className="text-textcolor/60 w-full shrink-0 text-center text-[11px] leading-snug italic line-clamp-2">
+																	{[spellingHintSource, spellingHintNote]
+																		.filter(Boolean)
+																		.join(' · ')}
+																</p>
+															) : null}
+														</div>
+													</div>
+												)
+											) : (
+												softWrongPlayBlock
+											)}
+										</div>
+										<div className="flex w-full shrink-0 flex-col items-center gap-1">
+											<p className="text-textcolor/55 mx-auto max-w-68 text-center text-[11px] leading-snug line-clamp-2">
+												{t('englishLearning.practice.softWrongHint')}
+											</p>
+											<Button
+												type="button"
+												variant="link"
+												className="text-teal-600 hover:text-teal-500 dark:text-teal-400 h-7 shrink-0 px-0! text-sm"
+												onClick={onRevealAnswer}
 											>
-												{spellingHintIpa ? (
-													<p className="font-mono text-xs leading-snug text-teal-600/90 line-clamp-2 dark:text-teal-400/90">
-														{displayIpaWrapped(spellingHintIpa)}
-													</p>
-												) : null}
-												{!spellingHintIpa && spellingHintSource ? (
-													<p className="text-textcolor/65 line-clamp-2 text-xs leading-snug">
-														{spellingHintSource}
-													</p>
-												) : null}
-												{!spellingHintIpa && spellingHintNote ? (
-													<p className="text-textcolor/60 line-clamp-3 text-xs leading-relaxed italic">
-														{spellingHintNote}
-													</p>
-												) : null}
-												{softWrongPlayBlock}
-											</div>
-										)
-									) : mode === 'spelling' ? (
-										softWrongPlayBlock
-									) : null}
-									<p className="text-textcolor/60 max-w-sm text-sm">
-										{t('englishLearning.practice.softWrongHint')}
-									</p>
-									{mode === 'dictation' ? softWrongPlayBlock : null}
-									<Button
-										type="button"
-										variant="link"
-										className="text-teal-600 hover:text-teal-500 dark:text-teal-400 h-8 px-0!"
-										onClick={onRevealAnswer}
-									>
-										{t('englishLearning.practice.showAnswer')}
-									</Button>
+												{t('englishLearning.practice.showAnswer')}
+											</Button>
+										</div>
+									</div>
 								</div>
 							</SessionPromptPanel>
 							<SessionPromptPanel

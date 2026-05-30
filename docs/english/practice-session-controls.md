@@ -18,6 +18,9 @@
 4. **听写三连播**：进题、再听一遍、再试一次（听写）时连续 **3 次**朗读，间隔 **3 秒**，可停止。
 5. **看中写播放**：顶栏「提示」展开、首次答错提示区均含听写同款圆形播放钮；**看答案** 时停止播放。
 6. **UI**：底栏「再试一次」与「下一题」同为主按钮样式；播放钮下方无「再听一遍/停止」文案；看中写主释义字号略缩小。
+7. **软揭示布局**：固定卡片高度内 **上—中—下** 分布（答案 / 播放+提示 / 引导），无滚动条；出处与说明合并展示；播放钮用 `DictationPlaySlot` 避免外圈被裁切。
+8. **音波动画**：CSS 改为 **height 关键帧** + `nth-child` 延迟，修复播放时频谱条卡住。
+9. **再试播放**：听写答错页点 **再试一次** 时 `playWord({ force: true })`，立即重新 **三连播**（即使上一刻仍在播放）。
 
 ---
 
@@ -27,8 +30,9 @@
 |------|------|
 | `apps/frontend/src/views/englishLearning/practice/Session.tsx` | 三态 `phase`、连播、键盘、软揭示 UI |
 | `apps/frontend/src/views/englishLearning/practice/types.ts` | `PracticeItemPhase` 增加 `soft_wrong`；`SpellingPromptBodyProps` 播放 props |
-| `apps/frontend/src/views/englishLearning/practice/components/dictation/DictationPrompt.tsx` | 导出 `DictationPlayButton` / `DictationHintPanel`；默认播放区去掉底部文案 |
+| `apps/frontend/src/views/englishLearning/practice/components/dictation/DictationPrompt.tsx` | 播放钮三档尺寸、`DictationPlaySlot`、`DictationSoftWrongHintBlock`、`softWrong` 提示变体 |
 | `apps/frontend/src/views/englishLearning/practice/components/spelling/SpellingPromptBody.tsx` | 提示展开时播放钮；释义 `text-xl` / 展开后 `text-lg` |
+| `apps/frontend/src/index.css` | `.practice-dictation-equalizer` 频谱条动画 |
 | `apps/frontend/src/i18n/locales/zh-CN.ts`、`en-US.ts` | `tryAgain`、`showAnswer`、`softWrongHint` 等 |
 
 ---
@@ -70,8 +74,27 @@
 
 ### 3.5 播放 UI 复用
 
-- 听写作答、软揭示、看中写提示区共用 `DictationPlayButton`（`strip` 或 `hero`）+ `DictationEqualizer`。
+- 听写作答、软揭示、看中写提示区共用 `DictationPlayButton`（`hero` / `medium` / `strip`）+ `DictationEqualizer`。
+- 软揭示播放外包一层 **`DictationPlaySlot`**（`overflow-visible` + 内边距），`medium` 播放态用 **`ring-inset`**，避免外圈被父级 `overflow-hidden` 裁切。
 - 完整揭示区单词卡仍用 `VocabWordPlayButton`。
+
+### 3.6 软揭示面板布局（无滚动）
+
+- 外层 `justify-between`：顶栏「你的答案」、中间 `flex-1 justify-center`、底栏引导 + **看答案**。
+- 听写中间区用 **`DictationSoftWrongHintBlock`**；拼写同理，出处/说明合并为一行 `·` 连接。
+- 提示文案 `variant="softWrong"`：`line-clamp` 控制行数，不依赖 `flex-1` 挤压（避免文字叠成一条线）。
+
+### 3.7 再试一次与强制连播
+
+- `onRetryCurrent` 先 `cancelDictationPlay()`，听写再 `playWord({ force: true })`。
+- **原因**：`setPlaying(false)` 异步，`playWord()` 若仍读到 `playing === true` 会走进「再点即停」分支而不开播。
+- `force: true` 跳过 toggle，与进题自动播放一样走 `playDictationSequence`（3 次 + 间隔 3s）。
+
+### 3.8 音波动画（`index.css`）
+
+- 弃用 `transform: scaleY` + 固定 `h-*`（部分浏览器会卡住满高条）。
+- 改为动画 **`height`**；延迟写在 `.practice-dictation-equalizer > .practice-dictation-bar:nth-child(n)`，避免 React 内联 `animationDelay` 重渲染打断动画。
+- 容器类 `practice-dictation-equalizer--playing` 控制播放态。
 
 ---
 
@@ -184,76 +207,82 @@ useEffect(() => {
 }, [item.key, mode, playWord]);
 ```
 
-### 4.4 提交检查与两档答错分流
+### 4.4 `playWord` 与 `force` 重播
 
-**来源**：`apps/frontend/src/views/englishLearning/practice/Session.tsx`（`onSubmit`，约 L173–L215）
+**来源**：`apps/frontend/src/views/englishLearning/practice/Session.tsx`（`playWord`，约 L98–L143）
 
 ```typescript
-const onSubmit = useCallback((e?: FormEvent) => {
-  e?.preventDefault();
-  if (phase !== 'prompt') return; // 说明：软揭示/完整揭示时底栏无输入区，此处双保险
-  const trimmed = input.trim();
-  if (!trimmed) return;
-
-  const correct = gradeSpelling(trimmed, answerText, {
-    compareAsSentence: isPracticeClassicItem(item),
-  });
-  const attempt: PracticeAttemptResult = { item, userInput: trimmed, correct };
-
-  if (correct) {
-    completeStep(attempt); // 答对：写入 results 并换题
-    return;
-  }
-
-  // 说明：答错先停播，避免软揭示态仍背景朗读
-  cancelDictationPlay();
-  setPlaying(false);
-  setLastWrong(attempt);
-
-  const nextAttempt = wrongAttemptCount + 1;
-  setWrongAttemptCount(nextAttempt);
-
-  if (nextAttempt >= 2) {
-    setPhase('revealed'); // 本题第 2 次错 → 直接完整揭示
-  } else {
-    setPhase('soft_wrong'); // 第 1 次错 → 软揭示
-    if (hasPracticeHintContent(item, mode)) {
-      setHintOpen(true); // 有线索则自动展开（仍不显示英文词面）
+const playWord = useCallback(
+  async (options?: { force?: boolean }) => {
+    if (!isEnglishTtsSupported()) { /* Toast */ return; }
+    // 说明：重试时 playing 可能尚未 false，force 跳过「再点即停」
+    if (playing && !options?.force) {
+      cancelDictationPlay();
+      setPlaying(false);
+      return;
     }
-  }
-}, [/* … */]);
+    dictationPlayRunRef.current += 1;
+    const runId = dictationPlayRunRef.current;
+    stopAllEnglishPlayback();
+    setPlaying(true);
+    try {
+      if (mode === 'dictation') {
+        await playDictationSequence(runId); // 3 连播
+      } else {
+        await playEnglishPreferred(answerText, { preferLocal: true });
+      }
+    } finally {
+      if (dictationPlayRunRef.current === runId) setPlaying(false);
+    }
+  },
+  [/* answerText, mode, playing, … */],
+);
 ```
 
 ### 4.5 再试一次、下一题、看答案
 
-**来源**：`apps/frontend/src/views/englishLearning/practice/Session.tsx`（约 L217–L242）
+**来源**：`apps/frontend/src/views/englishLearning/practice/Session.tsx`（约 L221–L250）
 
 ```typescript
 const onNext = useCallback(() => {
-  // 说明：带 lastWrong 完成本题（记错题）并交给父组件推进 index
   if (lastWrong) completeStep(lastWrong);
 }, [completeStep, lastWrong]);
 
-/** 软揭示态：主动查看正确答案 */
 const onRevealAnswer = useCallback(() => {
-  cancelDictationPlay(); // 说明：看答案必须停播
+  cancelDictationPlay();
   setPlaying(false);
   setPhase('revealed');
 }, [cancelDictationPlay]);
 
-/** 答错后回到作答区重新作答（不换题、不记入结算） */
 const onRetryCurrent = useCallback(() => {
   cancelDictationPlay();
   setPlaying(false);
-  setLastWrong(null);       // 说明：清除错题快照，底栏回到输入+检查
+  setLastWrong(null);
   setPhase('prompt');
   setInput('');
-  // 说明：wrongAttemptCount 不清零 → 再错会直接进入 revealed
   if (mode === 'dictation') {
-    void playWord();        // 听写再试：重新三连播
+    void playWord({ force: true }); // 听写：立即重新三连播
   }
   requestAnimationFrame(() => inputRef.current?.focus());
 }, [cancelDictationPlay, mode, playWord]);
+```
+
+### 4.5b 提交检查与两档答错分流
+
+**来源**：`apps/frontend/src/views/englishLearning/practice/Session.tsx`（`onSubmit` 错答分支，约 L177–L207）
+
+```typescript
+// 说明：仅 prompt 阶段可提交；答错先停播
+cancelDictationPlay();
+setLastWrong(attempt);
+const nextAttempt = wrongAttemptCount + 1;
+setWrongAttemptCount(nextAttempt);
+if (nextAttempt >= 2) {
+  setPhase('revealed');
+} else {
+  setPhase('soft_wrong');
+  if (hasPracticeHintContent(item, mode)) setHintOpen(true);
+}
 ```
 
 ### 4.6 键盘：软揭示与完整揭示
@@ -312,43 +341,54 @@ useEffect(() => {
 }, [phase, lastWrong, onNext, onRevealAnswer, onRetryCurrent, playWord]);
 ```
 
-### 4.7 三面板叠放与软揭示 UI
+### 4.7 软揭示面板布局
 
-**来源**：`apps/frontend/src/views/englishLearning/practice/Session.tsx`（约 L349–L517）
+**来源**：`apps/frontend/src/views/englishLearning/practice/Session.tsx`（`soft_wrong` `SessionPromptPanel`，约 L449–L520）
 
 ```tsx
-/** 说明：软揭示共用播放块——听写放提示下方，看中写可单独出现 */
-const softWrongPlayBlock = (
-  <div className="mt-2 flex flex-col items-center gap-2">
-    <DictationPlayButton playing={playing} playLabel={playLabel}
-      onPlay={() => void playWord()} size="strip" />
-    <DictationEqualizer playing={playing} className="h-5 w-full" />
+// 说明：固定高度、无滚动；上中下三段
+<div className="flex h-full flex-col overflow-hidden px-4 py-2">
+  <div className="mx-auto flex h-full max-w-sm flex-col justify-between">
+    <p>你的答案 + 错词红色</p>
+    <div className="flex flex-1 flex-col items-center justify-center py-1">
+      {mode === 'dictation' ? (
+        <DictationSoftWrongHintBlock … />
+      ) : (
+        <DictationPlaySlot>…</DictationPlaySlot> + 音标/合并出处说明
+      )}
+    </div>
+    <div>
+      <p>{softWrongHint}</p>
+      <Button onClick={onRevealAnswer}>看答案</Button>
+    </div>
   </div>
-);
-
-// 说明：grid 三格同位叠放，用 hidden 切换，避免高度动画
-<div className="grid … *:col-start-1 *:row-start-1">
-  {/* prompt：听写 DictationPromptBody / 拼写 SpellingPromptBody */}
-  <SessionPromptPanel className={cn(phase !== 'prompt' && 'hidden')} … />
-
-  {/* soft_wrong：只标红用户答案 + 提示 + 播放，无 RevealedPanelInner */}
-  <SessionPromptPanel className={cn(phase !== 'soft_wrong' && 'hidden')} …>
-    <p>…<span className="text-rose-500">{revealedWrongInput}</span></p>
-    {canHint && hintOpen ? (
-      mode === 'dictation'
-        ? <DictationHintPanel hintContent={hintContent} />
-        : /* 拼写：音标/出处 + softWrongPlayBlock */
-    ) : mode === 'spelling' ? softWrongPlayBlock : null}
-    <p>{t('englishLearning.practice.softWrongHint')}</p>
-    {mode === 'dictation' ? softWrongPlayBlock : null}
-    <Button onClick={onRevealAnswer}>{t('…showAnswer')}</Button>
-  </SessionPromptPanel>
-
-  {/* revealed：完整对错 + VocabWordPlayButton */}
-  <SessionPromptPanel className={cn(phase !== 'revealed' && 'hidden')} …>
-    <RevealedPanelInner … playButton={wordPlayButton} />
-  </SessionPromptPanel>
 </div>
+```
+
+**来源**：`apps/frontend/src/views/englishLearning/practice/components/dictation/DictationPrompt.tsx`（`DictationSoftWrongHintBlock`、`DictationPlaySlot`，约 L270–L320）
+
+```tsx
+export function DictationPlaySlot({ children }) {
+  return (
+    <div className="flex shrink-0 flex-col items-center gap-1.5 overflow-visible px-2.5 py-2">
+      {children}
+    </div>
+  );
+}
+
+export function DictationSoftWrongHintBlock({ hintContent, playing, playLabel, onPlay }) {
+  return (
+    <div className="flex w-full max-h-full flex-col items-center gap-2">
+      <DictationPlaySlot>
+        <DictationPlayButton size="medium" … />
+        <DictationEqualizer className="h-4 w-32" />
+      </DictationPlaySlot>
+      <div className="w-full min-h-0 overflow-hidden">
+        <DictationHintPanel variant="softWrong" … />
+      </div>
+    </div>
+  );
+}
 ```
 
 ### 4.8 底栏：检查 / 再试一次 / 下一题
@@ -382,28 +422,19 @@ const softWrongPlayBlock = (
 </form>
 ```
 
-### 4.9 听写播放钮（可复用）
+### 4.9 听写播放钮三档尺寸
 
-**来源**：`apps/frontend/src/views/englishLearning/practice/components/dictation/DictationPrompt.tsx`（`DictationPlayButton`，约 L44–L96）
+**来源**：`apps/frontend/src/views/englishLearning/practice/components/dictation/DictationPrompt.tsx`（`DictationPlayButton`，约 L39–L95）
 
 ```tsx
-export function DictationPlayButton({
-  playing, playLabel, onPlay, size = 'hero',
-}: { /* … */ size?: 'hero' | 'strip' }) {
-  const isStrip = size === 'strip';
-  // 说明：hero=作答区大圆钮；strip=提示/软揭示小圆钮
-  return (
-    <button type="button" onClick={onPlay} aria-label={playLabel}
-      className={cn('… rounded-full …', isStrip ? 'size-10' : 'size-14')}>
-      <span className="…">
-        {playing
-          ? <Square className="fill-current" />   // 停止图标
-          : <Volume2 />}                          // 播放图标
-      </span>
-      {/* 说明：无可见 playLabel 文案，仅 aria-label 供读屏 */}
-    </button>
-  );
-}
+// hero：听写作答大钮；medium：软揭示；strip：展开提示条
+size?: 'hero' | 'medium' | 'strip';
+const outer = size === 'hero' ? 'size-14' : size === 'medium' ? 'size-12' : 'size-10';
+// 说明：medium/strip 播放态用 ring-inset，光晕不溢出按钮外框
+const playingHalo =
+  size === 'hero'
+    ? 'bg-teal-500/15 ring-2 ring-teal-500/25'
+    : 'bg-teal-500/15 ring-1 ring-inset ring-teal-500/35';
 ```
 
 **来源**：同上文件（`DictationPromptDefault`，约 L214–L245）
@@ -449,15 +480,33 @@ function DictationPromptDefault({ hint, playing, playLabel, onPlay }) {
 ) : null}
 ```
 
-### 4.11 文案（i18n）
+### 4.12 频谱条动画 CSS
 
-**来源**：`apps/frontend/src/i18n/locales/zh-CN.ts`（`englishLearning.practice` 段，约 L755–L757）
+**来源**：`apps/frontend/src/index.css`（约 L1118–1190）
+
+```css
+/* 说明：动画 height 而非 scaleY，避免与固定高度冲突导致卡住 */
+@keyframes practice-dictation-bar {
+  0%, 100% { height: 0.375rem; opacity: 0.4; }
+  50% { height: 0.875rem; opacity: 1; }
+}
+.practice-dictation-equalizer--playing > .practice-dictation-bar {
+  animation: practice-dictation-bar 0.72s ease-in-out infinite;
+}
+/* 说明：nth-child 写死 animation-delay，避免 React style 重渲染打断 */
+```
+
+### 4.13 软揭示提示 `softWrong` 变体
+
+**来源**：`apps/frontend/src/views/englishLearning/practice/components/dictation/DictationPrompt.tsx`（`DictationHintPanel`，约 L155–L260）
 
 ```typescript
-'englishLearning.practice.tryAgain': '再试一次',
-'englishLearning.practice.showAnswer': '看答案',
-'englishLearning.practice.softWrongHint': '可再试一次，也可以查看正确答案后继续',
-// 说明：playAgain / stop 仍用于播放钮 aria-label；previous 键保留未用于底栏
+// 说明：出处 + 说明合并，减少经典句占高
+const softWrongMeta =
+  softWrong && (source || noteZh)
+    ? [source, noteZh].filter(Boolean).join(' · ')
+    : null;
+// 渲染：释义 line-clamp-2；音标 line-clamp-1；softWrongMeta line-clamp-2
 ```
 
 ---
@@ -470,15 +519,18 @@ function DictationPromptDefault({ hint, playing, playLabel, onPlay }) {
 | 第二次答错 / 看答案后 | 与旧版「一次错即揭示」一致 |
 | 看中写 | 无三连播；提示与软揭示均可播放 |
 | 听写时长 | 每轮连播最长约 3 次 + 2×3s 间隔 |
-| i18n | `tryAgain`、`showAnswer`、`softWrongHint`（`previous` 键保留未删） |
+| 音波动画 | `index.css` 高度关键帧；播放中应持续起伏 |
+| 再试连播 | 答错页播放中点再试一次 → 停播后立即 3 连播 |
+| i18n | `tryAgain`、`showAnswer`、`softWrongHint` |
 
 **建议回归**：
 
 1. 看中写 / 听写：第一次错 → 无英文答案、有提示与播放；**→** 或第二次错 → 完整揭示。
 2. **看答案** 时连播应立即停止。
-3. 看中写顶栏「提示」展开 → 有播放钮；**←** 在软揭示可播。
-4. 再试一次 → 输入清空；听写再试触发三连播。
-5. 底栏两钮样式一致；听写播放区无底部文字。
+3. 听写**答错页播放中**点 **再试一次** → 立即重新三连播（非仅停止）。
+4. 软揭示：无滚动条；播放钮外圈完整；音标/出处不被压成一条线。
+5. 播放中音波条动画正常，不卡住。
+6. 底栏两钮样式一致；听写作答区播放区无底部「再听一遍」文字。
 
 ---
 
@@ -491,5 +543,6 @@ function DictationPromptDefault({ hint, playing, playLabel, onPlay }) {
 | 拼写题干 | `apps/frontend/src/views/englishLearning/practice/components/spelling/SpellingPromptBody.tsx` |
 | 提示可用性 | `apps/frontend/src/views/englishLearning/practice/utils/hint.ts` |
 | TTS | `apps/frontend/src/utils/englishTts.ts` |
+| 频谱动画 | `apps/frontend/src/index.css` |
 
 若与仓库最新源码不一致，以源码为准。

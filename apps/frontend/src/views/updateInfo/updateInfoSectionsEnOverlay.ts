@@ -618,6 +618,6 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 	's24-26': {
 		title: 'Two-tier wrong answer & playback',
 		description:
-			'First wrong: hints + playback, no English answer; full reveal after Show answer or 2nd wrong. Try again/Next; arrow keys ←→↑↓; dictation triple-play ~3s gaps; spelling hints include playback.',
+			'First wrong: hints + playback, no English answer; full reveal after Show answer or 2nd wrong. Try again/Next; arrow keys ←→↑↓; dictation triple-play; retry restarts triple-play immediately; stable soft-reveal layout.',
 	},
 };
