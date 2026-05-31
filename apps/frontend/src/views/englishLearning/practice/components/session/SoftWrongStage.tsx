@@ -8,7 +8,6 @@ import { displayIpaWrapped } from '@/utils';
 import type { PracticeHintFields } from '../../types';
 import { countPracticeHintFields } from '../../utils/hint';
 import {
-	FIELD_GRID,
 	FieldCells,
 	PRACTICE_PANEL_SHELL,
 	PracticeShowAnswerButton,
@@ -114,17 +113,12 @@ function PracticeSoftWrongStage({
 	const hintCount = countPracticeHintFields(hintContent);
 	const compact = hintCount >= 3;
 	const hintRows = buildHintRows(hintContent, t, compact);
-	const totalRows = 1 + hintRows.length;
 
 	return (
 		<div className={PRACTICE_PANEL_SHELL}>
-			<div className="px-1 flex h-full min-h-0 flex-1 flex-col overflow-hidden pb-5">
+			<div className="px-1 flex h-full min-h-0 flex-1 flex-col overflow-hidden">
 				<div
-					className={cn(
-						FIELD_GRID,
-						'h-full min-h-0 flex-1 gap-y-2',
-						totalRows <= 2 ? 'content-center' : 'content-between',
-					)}
+					className="min-h-0 flex-1 overflow-y-auto"
 					role="status"
 					aria-live="polite"
 				>

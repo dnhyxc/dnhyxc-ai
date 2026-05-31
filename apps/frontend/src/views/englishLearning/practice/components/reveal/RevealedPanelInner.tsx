@@ -13,7 +13,6 @@ import type {
 } from '../../types';
 import { isPracticeClassicItem } from '../../utils/item';
 import {
-	FIELD_GRID,
 	FieldCells,
 	PRACTICE_PANEL_SHELL,
 	PracticeRevealedListenFooter,
@@ -278,10 +277,8 @@ export function RevealedPanelInner({
 
 	// 计算要展示详细信息的数量（如释义/例句/笔记等）
 	const detailCount = countRevealedDetailFields(item);
-	// 总行数 = 错误答案 + 详细信息
-	const totalRows = 1 + detailCount;
 	// 详细项 >= 4 行时采用紧凑显示
-	const compact = totalRows >= 4;
+	const compact = detailCount >= 3;
 
 	// 根据题型（classic/word）分别生成详细信息行
 	const detailRows = isPracticeClassicItem(item)
@@ -291,13 +288,9 @@ export function RevealedPanelInner({
 	return (
 		<div className={PRACTICE_PANEL_SHELL}>
 			{/* 主容器，设置 padding 并使内容撑满高度 */}
-			<div className="p-1 flex h-full min-h-0 flex-1 flex-col overflow-hidden pb-5">
+			<div className="px-1 flex h-full min-h-0 flex-1 flex-col overflow-hidden">
 				<div
-					className={cn(
-						FIELD_GRID,
-						'h-full min-h-0 flex-1 gap-y-2',
-						totalRows <= 2 ? 'content-center' : 'content-between', // 少行居中，多行“首尾对齐”
-					)}
+					className="min-h-0 flex-1 overflow-y-auto"
 					role="status"
 					aria-live="polite"
 				>

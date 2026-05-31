@@ -15,15 +15,15 @@ export const PRACTICE_PANEL_SHELL =
 	'flex h-full min-h-0 w-full flex-col overflow-hidden rounded-[inherit] bg-linear-to-b from-teal-500/6 via-theme-background to-theme-background p-3';
 
 export const FIELD_GRID =
-	'grid w-full grid-cols-[5.25rem_minmax(0,1fr)] items-baseline gap-x-3.5';
+	'grid w-full grid-cols-[4rem_minmax(0,1fr)] items-baseline gap-x-5';
 
 export const LABEL_CELL =
-	'text-textcolor/45 text-sm font-medium leading-snug [font-family:var(--font-family)]';
+	'text-textcolor/45 block w-full text-justify text-sm font-medium leading-snug tracking-normal [text-align-last:justify] [font-family:var(--font-family)]';
 
 export const VALUE_CELL =
 	'text-textcolor min-w-0 text-base leading-snug wrap-break-word [font-family:var(--font-family)]';
 
-/** 网格字段：标签 + 值 */
+/** 网格字段：标签 + 值（行间 mb-3，末行不留底距） */
 export function FieldCells({
 	label,
 	children,
@@ -34,10 +34,10 @@ export function FieldCells({
 	valueClassName?: string;
 }) {
 	return (
-		<>
+		<div className={cn(FIELD_GRID, 'mb-3 last:mb-0')}>
 			<span className={LABEL_CELL}>{label}</span>
 			<div className={cn(VALUE_CELL, valueClassName)}>{children}</div>
-		</>
+		</div>
 	);
 }
 
