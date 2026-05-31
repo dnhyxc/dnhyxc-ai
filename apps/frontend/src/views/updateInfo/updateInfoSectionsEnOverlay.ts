@@ -620,4 +620,9 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'First wrong: hints + playback, no English answer; full reveal after Show answer or 2nd wrong. Try again/Next; arrow keys ←→↑↓; dictation triple-play; retry restarts triple-play immediately; stable soft-reveal layout.',
 	},
+	's24-27': {
+		title: 'Wrong-answer panel & shortcut help',
+		description:
+			'After first wrong or reveal: field-style hints; footer play, guidance, circular Show answer matching play button. Header shows word vs sentence mode. ? icon lists shortcuts by phase. Dictation triple-play only on initial main play when hint is closed; other play and ← are single; ← works while answering and after reveal.',
+	},
 };

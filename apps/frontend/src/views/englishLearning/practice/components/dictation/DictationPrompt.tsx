@@ -37,6 +37,69 @@ export function DictationEqualizer({
 	);
 }
 
+function dictationCircleButtonMetrics(size: 'hero' | 'medium' | 'strip') {
+	return {
+		outer:
+			size === 'hero' ? 'size-14' : size === 'medium' ? 'size-12' : 'size-10',
+		inner:
+			size === 'hero' ? 'size-12' : size === 'medium' ? 'size-10' : 'size-8',
+		activeHalo:
+			size === 'hero'
+				? 'bg-teal-500/15 ring-2 ring-teal-500/25'
+				: 'bg-teal-500/15 ring-1 ring-inset ring-teal-500/35',
+	};
+}
+
+/** 听写/练习 — 与播放钮一致的圆形操作按钮 */
+export function DictationCircleButton({
+	ariaLabel,
+	onClick,
+	size = 'hero',
+	active = false,
+	children,
+}: {
+	ariaLabel: string;
+	onClick: () => void;
+	size?: 'hero' | 'medium' | 'strip';
+	active?: boolean;
+	children: ReactNode;
+}) {
+	const { outer, inner, activeHalo } = dictationCircleButtonMetrics(size);
+
+	return (
+		<button
+			type="button"
+			onClick={onClick}
+			aria-label={ariaLabel}
+			className={cn(
+				'group relative isolate flex shrink-0 cursor-pointer items-center justify-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-teal-500/40',
+				outer,
+			)}
+		>
+			<span
+				className={cn(
+					'absolute inset-0 rounded-full',
+					active
+						? cn(activeHalo, 'motion-reduce:ring-0')
+						: 'bg-teal-500/8 opacity-0 group-hover:opacity-100',
+				)}
+				aria-hidden
+			/>
+			<span
+				className={cn(
+					'relative z-10 flex items-center justify-center rounded-full border-2 group-active:scale-[0.97]',
+					inner,
+					active
+						? 'border-teal-500/40 bg-teal-500/15 text-teal-600 shadow-sm dark:text-teal-400'
+						: 'border-white/15 bg-linear-to-br from-teal-500 to-cyan-600 text-white shadow-md shadow-teal-500/25',
+				)}
+			>
+				{children}
+			</span>
+		</button>
+	);
+}
+
 export function DictationPlayButton({
 	playing,
 	playLabel,
@@ -48,52 +111,22 @@ export function DictationPlayButton({
 	onPlay: () => void;
 	size?: 'hero' | 'medium' | 'strip';
 }) {
-	const outer =
-		size === 'hero' ? 'size-14' : size === 'medium' ? 'size-12' : 'size-10';
-	const inner =
-		size === 'hero' ? 'size-12' : size === 'medium' ? 'size-10' : 'size-8';
 	const icon =
 		size === 'hero' ? 'size-5' : size === 'medium' ? 'size-4' : 'size-3.5';
-	const playingHalo =
-		size === 'hero'
-			? 'bg-teal-500/15 ring-2 ring-teal-500/25'
-			: 'bg-teal-500/15 ring-1 ring-inset ring-teal-500/35';
 
 	return (
-		<button
-			type="button"
+		<DictationCircleButton
+			ariaLabel={playLabel}
 			onClick={onPlay}
-			aria-label={playLabel}
-			className={cn(
-				'group relative isolate flex shrink-0 cursor-pointer items-center justify-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-teal-500/40',
-				outer,
-			)}
+			size={size}
+			active={playing}
 		>
-			<span
-				className={cn(
-					'absolute inset-0 rounded-full',
-					playing
-						? cn(playingHalo, 'motion-reduce:ring-0')
-						: 'bg-teal-500/8 opacity-0 group-hover:opacity-100',
-				)}
-				aria-hidden
-			/>
-			<span
-				className={cn(
-					'relative z-10 flex items-center justify-center rounded-full border-2 group-active:scale-[0.97]',
-					inner,
-					playing
-						? 'border-teal-500/40 bg-teal-500/15 text-teal-600 shadow-sm dark:text-teal-400'
-						: 'border-white/15 bg-linear-to-br from-teal-500 to-cyan-600 text-white shadow-md shadow-teal-500/25',
-				)}
-			>
-				{playing ? (
-					<Square className={cn(icon, 'fill-current')} />
-				) : (
-					<Volume2 className={icon} />
-				)}
-			</span>
-		</button>
+			{playing ? (
+				<Square className={cn(icon, 'fill-current')} />
+			) : (
+				<Volume2 className={icon} />
+			)}
+		</DictationCircleButton>
 	);
 }
 
@@ -169,7 +202,7 @@ export function DictationHintPanel({
 				'flex w-full min-w-0 flex-col text-center',
 				start ? 'items-start text-left' : 'items-center',
 				softWrong
-					? 'shrink-0 gap-1.5'
+					? 'min-h-0 shrink gap-1.5 overflow-hidden'
 					: compact
 						? 'min-h-0 gap-1 overflow-hidden'
 						: 'justify-between gap-2 px-3',
@@ -178,11 +211,11 @@ export function DictationHintPanel({
 		>
 			{translation ? (
 				softWrong ? (
-					<div className="flex w-full shrink-0 flex-col items-center gap-0.5">
-						<span className="text-textcolor/45 text-[11px] font-medium tracking-wide">
+					<div className="flex w-full shrink-0 flex-col items-center gap-1">
+						<span className="text-teal-700/55 dark:text-teal-300/55 text-[10px] font-semibold tracking-[0.12em] uppercase">
 							{t('englishLearning.practice.hintLabelTranslation')}
 						</span>
-						<p className="text-textcolor w-full text-center text-sm font-semibold leading-snug line-clamp-2">
+						<p className="text-textcolor line-clamp-4 w-full text-center text-sm font-semibold leading-snug">
 							{translation}
 						</p>
 					</div>
@@ -220,7 +253,7 @@ export function DictationHintPanel({
 					className={cn(
 						'w-full shrink-0 text-center font-mono text-teal-600/90 dark:text-teal-400/90',
 						softWrong
-							? 'line-clamp-1 text-xs leading-snug'
+							? 'text-xs leading-snug'
 							: compact
 								? 'line-clamp-1 text-[11px] leading-snug'
 								: 'line-clamp-2 text-xs leading-snug',
@@ -231,7 +264,7 @@ export function DictationHintPanel({
 			) : null}
 			{softWrong ? (
 				softWrongMeta ? (
-					<p className="text-textcolor/60 w-full shrink-0 text-center text-[11px] leading-snug italic line-clamp-2">
+					<p className="text-textcolor/60 line-clamp-3 w-full shrink-0 text-center text-[11px] leading-snug italic">
 						{softWrongMeta}
 					</p>
 				) : null
@@ -283,40 +316,6 @@ export function DictationPlaySlot({
 			)}
 		>
 			{children}
-		</div>
-	);
-}
-
-/** 听写首次答错：播放 + 提示，适配固定卡片高度、无滚动 */
-export function DictationSoftWrongHintBlock({
-	hintContent,
-	playing,
-	playLabel,
-	onPlay,
-}: {
-	hintContent: PracticeHintFields;
-	playing: boolean;
-	playLabel: string;
-	onPlay: () => void;
-}) {
-	return (
-		<div className="flex w-full max-h-full min-h-0 flex-col items-center gap-2">
-			<DictationPlaySlot>
-				<DictationPlayButton
-					playing={playing}
-					playLabel={playLabel}
-					onPlay={onPlay}
-					size="medium"
-				/>
-				<DictationEqualizer playing={playing} className="h-4 w-32" />
-			</DictationPlaySlot>
-			<div className="w-full min-h-0 overflow-hidden">
-				<DictationHintPanel
-					hintContent={hintContent}
-					variant="softWrong"
-					align="center"
-				/>
-			</div>
 		</div>
 	);
 }

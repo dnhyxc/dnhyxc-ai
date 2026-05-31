@@ -133,6 +133,11 @@ export type PracticePageShellProps = {
 	contentLayout?: 'center' | 'fill';
 };
 
+export type PracticeShortcutsMenuProps = {
+	/** 进行中练习模式；未传时展示完整说明（含听写 ←） */
+	practiceMode?: PracticeMode;
+};
+
 export type PracticeSegmentOption<T extends string> = {
 	value: T;
 	label: string;
@@ -308,9 +313,11 @@ export type SentenceAnswerDetailProps = {
 };
 
 export type RevealedPanelInnerProps = {
-	yourAnswerPrefix: string;
+	answerLabel: string;
 	wrongInput: string;
 	item: PracticeItem;
 	correctAnswerLabel: string;
-	playButton: ReactNode;
+	playing: boolean;
+	playLabel: string;
+	onPlay: () => void;
 };

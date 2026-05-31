@@ -2,6 +2,7 @@
 
 ## 延伸阅读
 
+- 答错/揭示面板 UI、快捷键菜单、播放策略细化：[practice-wrong-panel-shortcuts.md](./practice-wrong-panel-shortcuts.md)（**主文档**）
 - 单题「提示」：[practice-session-hint.md](./practice-session-hint.md)
 - 结算与入口：[practice-summary-ui.md](./practice-summary-ui.md)、[practice-entry-navigation.md](./practice-entry-navigation.md)
 - TTS 播放竞态：[english-tts-playback.md](./english-tts-playback.md)
@@ -14,13 +15,13 @@
 
 1. **两档答错（方案 B）**：首次答错**不展示英文正确答案**，仅标红你的答案 + 自动展开提示 + 可播放；第二次答错或点 **看答案** 才完整揭示。
 2. **再试一次**：软揭示 / 完整揭示均可回到本题重新作答（清空输入、不换题、不提前记入结算）。
-3. **键盘**：作答 **Enter** 仅检查；首次答错 **←** 播放、**→** 看答案、**↑** 再试一次、**↓** 下一题；完整揭示 **↑/↓** 为再试 / 下一题。
-4. **听写三连播**：进题、再听一遍、再试一次（听写）时连续 **3 次**朗读，间隔 **3 秒**，可停止。
+3. **键盘**：听写作答 **←** 播放（与主播放钮一致，未展开提示时三连播）；作答 **Enter** 仅检查；首次答错 **←** 播放、**→** 看答案、**↑** 再试一次、**↓** 下一题；完整揭示 **←** 播放、**↑/↓** 为再试 / 下一题。
+4. **听写三连播**：听写作答页**进题/换题/再试**与未展开提示时的**主播放钮**、作答中 **←** 均为连续 **3 次**（间隔 **3 秒**）；展开提示后手动播放、答错/看答案页及拼写模式为**单次**。
 5. **看中写播放**：顶栏「提示」展开、首次答错提示区均含听写同款圆形播放钮；**看答案** 时停止播放。
 6. **UI**：底栏「再试一次」与「下一题」同为主按钮样式；播放钮下方无「再听一遍/停止」文案；看中写主释义字号略缩小。
 7. **软揭示布局**：固定卡片高度内 **上—中—下** 分布（答案 / 播放+提示 / 引导），无滚动条；出处与说明合并展示；播放钮用 `DictationPlaySlot` 避免外圈被裁切。
 8. **音波动画**：CSS 改为 **height 关键帧** + `nth-child` 延迟，修复播放时频谱条卡住。
-9. **再试播放**：听写答错页点 **再试一次** 时 `playWord({ force: true })`，立即重新 **三连播**（即使上一刻仍在播放）。
+9. **再试播放**：听写点 **再试一次** 时 `playWord({ force: true, sequence: true })` 为**三连播**（即使上一刻仍在播放）。
 
 ---
 
@@ -58,19 +59,21 @@
 
 | 阶段 | 按键 | 行为 |
 |------|------|------|
+| `prompt`（听写） | ← | 播放 / 停止（未展开提示时三连播，否则单次） |
 | `prompt` | Enter | 检查 |
-| `soft_wrong` | ← | 播放 / 停止（听写三连播或看中写单次） |
+| `soft_wrong` | ← | 播放 / 停止（单次） |
 | `soft_wrong` | → | 看答案（`onRevealAnswer`，**先停止播放**） |
 | `soft_wrong` | ↑ / ↓ | 再试一次 / 下一题 |
+| `revealed` | ← | 播放 / 停止（单次） |
 | `revealed` | ↑ / ↓ | 再试一次 / 下一题 |
 
 焦点在 `INPUT` / `TEXTAREA` / `SELECT` 时不拦截方向键。
 
 ### 3.4 听写连播与取消
 
-- `DICTATION_PLAY_COUNT = 3`、`DICTATION_PLAY_GAP_MS = 3000`。
+- `DICTATION_PLAY_COUNT = 3`、`DICTATION_PLAY_GAP_MS = 3000`；仅 `playWord({ sequence: true })` 走三连播。
 - `dictationPlayRunRef` + `cancelDictationPlay()` 取消朗读与 `sleepMs` 等待。
-- 看中写 `playWord` 仍为单次 `playEnglishPreferred`。
+- 其余听写/看中写播放均为单次 `playEnglishPreferred`。
 
 ### 3.5 播放 UI 复用
 
@@ -88,7 +91,7 @@
 
 - `onRetryCurrent` 先 `cancelDictationPlay()`，听写再 `playWord({ force: true })`。
 - **原因**：`setPlaying(false)` 异步，`playWord()` 若仍读到 `playing === true` 会走进「再点即停」分支而不开播。
-- `force: true` 跳过 toggle，与进题自动播放一样走 `playDictationSequence`（3 次 + 间隔 3s）。
+- `force: true` 跳过 toggle；再试一次为单次播放，不触发三连播。
 
 ### 3.8 音波动画（`index.css`）
 
@@ -99,6 +102,8 @@
 ---
 
 ## 4. 关键代码与注释
+
+> **答错/揭示面板、快捷键菜单、三连播门控**的完整源码摘录（含 `PracticeFieldGrid`、`SoftWrongStage`、`RevealedPanelInner`、`DictationCircleButton`、`PracticeShortcutsMenu` 等）见 [practice-wrong-panel-shortcuts.md §4](./practice-wrong-panel-shortcuts.md#4-关键代码与注释)。本节保留 Session 核心流程与听写作答区摘录。
 
 ### 4.1 类型：`PracticeItemPhase` 与拼写 props
 
@@ -198,7 +203,7 @@ const playWord = useCallback(async () => {
   }
 }, [/* answerText, mode, playing, … */]);
 
-// 说明：听写进题自动触发一次 playWord（内含三连播）
+// 说明：听写换题后自动三连播 playWord({ force: true, sequence: true })
 useEffect(() => {
   if (mode !== 'dictation') return;
   if (autoPlayedKeyRef.current === item.key) return;
@@ -261,7 +266,7 @@ const onRetryCurrent = useCallback(() => {
   setPhase('prompt');
   setInput('');
   if (mode === 'dictation') {
-    void playWord({ force: true }); // 听写：立即重新三连播
+    void playWord({ force: true, sequence: true }); // 听写：立即三连播
   }
   requestAnimationFrame(() => inputRef.current?.focus());
 }, [cancelDictationPlay, mode, playWord]);
@@ -527,7 +532,7 @@ const softWrongMeta =
 
 1. 看中写 / 听写：第一次错 → 无英文答案、有提示与播放；**→** 或第二次错 → 完整揭示。
 2. **看答案** 时连播应立即停止。
-3. 听写**答错页播放中**点 **再试一次** → 立即重新三连播（非仅停止）。
+3. 听写**答错页播放中**点 **再试一次** → 回到作答页并三连播（非仅停止）。
 4. 软揭示：无滚动条；播放钮外圈完整；音标/出处不被压成一条线。
 5. 播放中音波条动画正常，不卡住。
 6. 底栏两钮样式一致；听写作答区播放区无底部「再听一遍」文字。

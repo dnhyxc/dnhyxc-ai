@@ -1,0 +1,141 @@
+/**
+ * 练习卡 — 共享「标签 | 内容」网格与听音底栏（软揭示 / 完整揭示）
+ */
+import { Eye } from 'lucide-react';
+import type { ReactNode } from 'react';
+import { cn } from '@/lib/utils';
+import {
+	DictationCircleButton,
+	DictationEqualizer,
+	DictationPlayButton,
+	DictationPlaySlot,
+} from '../dictation/DictationPrompt';
+
+export const PRACTICE_PANEL_SHELL =
+	'flex h-full min-h-0 w-full flex-col overflow-hidden rounded-[inherit] bg-linear-to-b from-teal-500/6 via-theme-background to-theme-background p-3';
+
+export const FIELD_GRID =
+	'grid w-full grid-cols-[5.25rem_minmax(0,1fr)] items-baseline gap-x-3.5';
+
+export const LABEL_CELL =
+	'text-textcolor/45 text-sm font-medium leading-snug [font-family:var(--font-family)]';
+
+export const VALUE_CELL =
+	'text-textcolor min-w-0 text-base leading-snug wrap-break-word [font-family:var(--font-family)]';
+
+/** 网格字段：标签 + 值 */
+export function FieldCells({
+	label,
+	children,
+	valueClassName,
+}: {
+	label: string;
+	children: ReactNode;
+	valueClassName?: string;
+}) {
+	return (
+		<>
+			<span className={LABEL_CELL}>{label}</span>
+			<div className={cn(VALUE_CELL, valueClassName)}>{children}</div>
+		</>
+	);
+}
+
+/** 第二阶段软揭示：左播放 · 中音浪+引导 · 右看答案 */
+export function PracticeSoftWrongListenFooter({
+	playing,
+	playLabel,
+	onPlay,
+	guidance,
+	trailing,
+}: {
+	playing: boolean;
+	playLabel: string;
+	onPlay: () => void;
+	guidance: string;
+	trailing: ReactNode;
+}) {
+	return (
+		<div className="mt-auto shrink-0 pt-4">
+			<div className="flex items-center gap-2">
+				<DictationPlaySlot className="shrink-0 px-0 py-0">
+					<DictationPlayButton
+						playing={playing}
+						playLabel={playLabel}
+						onPlay={onPlay}
+						size="medium"
+					/>
+				</DictationPlaySlot>
+
+				<div className="flex min-h-9 min-w-0 flex-1 flex-col items-center justify-center gap-1.5">
+					<DictationEqualizer
+						playing={playing}
+						className="h-5 w-36 justify-center sm:w-44"
+					/>
+					<p className="text-textcolor/50 max-w-xs text-center text-[11px] leading-relaxed">
+						{guidance}
+					</p>
+				</div>
+
+				<div className="flex shrink-0 items-center">{trailing}</div>
+			</div>
+		</div>
+	);
+}
+
+/** 完整揭示：左右布局 — 左播放、右音浪（整行拉满） */
+export function PracticeRevealedListenFooter({
+	playing,
+	playLabel,
+	onPlay,
+}: {
+	playing: boolean;
+	playLabel: string;
+	onPlay: () => void;
+}) {
+	return (
+		<div className="mt-auto w-full shrink-0 pt-4">
+			<div className="flex w-full items-center justify-between gap-3 pr-1">
+				<DictationPlaySlot className="shrink-0 px-0 py-0">
+					<DictationPlayButton
+						playing={playing}
+						playLabel={playLabel}
+						onPlay={onPlay}
+						size="medium"
+					/>
+				</DictationPlaySlot>
+				<div className="flex min-h-5 min-w-0 flex-1 justify-end ps-2">
+					<DictationEqualizer
+						playing={playing}
+						className="h-5 w-full max-w-44 justify-end"
+					/>
+				</div>
+			</div>
+		</div>
+	);
+}
+
+/** 软揭示底栏 — 看答案（圆形，样式与播放钮一致） */
+export function PracticeShowAnswerButton({
+	label,
+	onClick,
+}: {
+	label: string;
+	onClick: () => void;
+}) {
+	const useIcon = label.length > 4;
+
+	return (
+		<DictationPlaySlot className="shrink-0 px-0 py-0">
+			<DictationCircleButton ariaLabel={label} onClick={onClick} size="medium">
+				{useIcon ? (
+					<Eye className="size-4" aria-hidden />
+				) : (
+					<span className="px-0.5 text-center text-[10px] leading-none font-semibold tracking-tight">
+						{label}
+					</span>
+				)}
+			</DictationCircleButton>
+		</DictationPlaySlot>
+	);
+}

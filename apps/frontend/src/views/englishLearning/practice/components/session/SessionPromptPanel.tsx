@@ -5,6 +5,7 @@ import { ScrollArea } from '@ui/index';
 import { cn } from '@/lib/utils';
 import type { SessionPromptPanelProps } from '../../types';
 
+/** 单题练习卡 — 中间提示区壳（答题 / 错题叠层） */
 export function SessionPromptPanel({
 	children,
 	className,

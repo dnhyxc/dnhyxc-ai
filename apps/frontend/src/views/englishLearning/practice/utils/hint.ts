@@ -22,6 +22,20 @@ export function hasPracticeHintContent(
 	return hasIpa;
 }
 
+export function countPracticeHintFields(content: {
+	translationZh?: string | null;
+	ipa?: string | null;
+	source?: string | null;
+	noteZh?: string | null;
+}): number {
+	let count = 0;
+	if (content.translationZh?.trim()) count += 1;
+	if (content.ipa?.trim()) count += 1;
+	if (content.source?.trim()) count += 1;
+	if (content.noteZh?.trim()) count += 1;
+	return count;
+}
+
 export function buildPracticeHintContent(item: PracticeItem): {
 	ipa?: string | null;
 	translationZh?: string | null;

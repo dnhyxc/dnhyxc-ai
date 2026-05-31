@@ -13,22 +13,16 @@ import {
 } from 'react';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
-import { displayIpaWrapped } from '@/utils';
 import {
 	isEnglishTtsSupported,
 	playEnglishPreferred,
 	stopAllEnglishPlayback,
 } from '@/utils/englishTts';
-import {
-	DictationEqualizer,
-	DictationPlayButton,
-	DictationPlaySlot,
-	DictationPromptBody,
-	DictationSoftWrongHintBlock,
-} from './components/dictation/DictationPrompt';
-import { RevealedPanelInner, VocabWordPlayButton } from './components/reveal';
+import { DictationPromptBody } from './components/dictation/DictationPrompt';
+import { RevealedPanelInner } from './components/reveal';
 import { SessionPromptPanel } from './components/session/SessionPromptPanel';
 import { SessionStageHeader } from './components/session/SessionStageHeader';
+import { DictationSoftWrongStage } from './components/session/SoftWrongStage';
 import { PRACTICE_PAGE_CONTENT_CLASS, PracticeCard } from './components/shell';
 import { SpellingPromptBody } from './components/spelling/SpellingPromptBody';
 import type {
@@ -70,7 +64,6 @@ export function Session({
 		useState(false);
 	const [hintOpen, setHintOpen] = useState(false);
 	const inputRef = useRef<HTMLInputElement>(null);
-	const autoPlayedKeyRef = useRef<string | null>(null);
 	/** 递增以取消进行中的听写连播（含间隔等待） */
 	const dictationPlayRunRef = useRef(0);
 
@@ -96,7 +89,12 @@ export function Session({
 	);
 
 	const playWord = useCallback(
-		async (options?: { force?: boolean }) => {
+		async (options?: {
+			/** 跳过「再点即停」，用于换题/再试后立刻开播 */
+			force?: boolean;
+			/** 听写三连播（进题自动播放、主播放钮未展开提示时） */
+			sequence?: boolean;
+		}) => {
 			if (!isEnglishTtsSupported()) {
 				Toast({
 					type: 'warning',
@@ -115,8 +113,10 @@ export function Session({
 			const runId = dictationPlayRunRef.current;
 			stopAllEnglishPlayback();
 			setPlaying(true);
+			const useDictationSequence =
+				mode === 'dictation' && options?.sequence === true;
 			try {
-				if (mode === 'dictation') {
+				if (useDictationSequence) {
 					await playDictationSequence(runId);
 				} else {
 					await playEnglishPreferred(answerText, { preferLocal: true });
@@ -135,8 +135,12 @@ export function Session({
 		[answerText, cancelDictationPlay, mode, playDictationSequence, playing, t],
 	);
 
+	const playWordRef = useRef(playWord);
+	playWordRef.current = playWord;
+
+	/** 换题：停播并重置；听写作答页自动三连播，拼写/错题页不自动播 */
 	useEffect(() => {
-		dictationPlayRunRef.current += 1;
+		cancelDictationPlay();
 		setPlaying(false);
 		setPhase('prompt');
 		setInput('');
@@ -144,16 +148,11 @@ export function Session({
 		setLastWrong(null);
 		setDictationSpellStepActive(false);
 		setHintOpen(false);
-		autoPlayedKeyRef.current = null;
+		if (mode === 'dictation') {
+			void playWordRef.current({ force: true, sequence: true });
+		}
 		requestAnimationFrame(() => inputRef.current?.focus());
-	}, [item.key]);
-
-	useEffect(() => {
-		if (mode !== 'dictation') return;
-		if (autoPlayedKeyRef.current === item.key) return;
-		autoPlayedKeyRef.current = item.key;
-		void playWord();
-	}, [item.key, mode, playWord]);
+	}, [item.key, mode, cancelDictationPlay]);
 
 	useEffect(
 		() => () => {
@@ -216,10 +215,11 @@ export function Session({
 	);
 
 	const onNext = useCallback(() => {
-		if (lastWrong) {
-			completeStep(lastWrong);
-		}
-	}, [completeStep, lastWrong]);
+		if (!lastWrong) return;
+		cancelDictationPlay();
+		setPlaying(false);
+		completeStep(lastWrong);
+	}, [cancelDictationPlay, completeStep, lastWrong]);
 
 	/** 软揭示态：主动查看正确答案 */
 	const onRevealAnswer = useCallback(() => {
@@ -237,28 +237,44 @@ export function Session({
 		setInput('');
 		setDictationSpellStepActive(false);
 		if (mode === 'dictation') {
-			void playWord({ force: true });
+			void playWord({ force: true, sequence: true });
 		}
 		requestAnimationFrame(() => inputRef.current?.focus());
 	}, [cancelDictationPlay, mode, playWord]);
 
 	useEffect(() => {
-		if ((phase !== 'soft_wrong' && phase !== 'revealed') || !lastWrong) return;
+		if (phase === 'soft_wrong' || phase === 'revealed') {
+			inputRef.current?.blur();
+		}
+	}, [phase]);
 
-		inputRef.current?.blur();
-
+	useEffect(() => {
 		const onKeyDown = (e: KeyboardEvent) => {
 			if (e.repeat) return;
 			const target = e.target as HTMLElement | null;
 			const tag = target?.tagName;
-			if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+			const inField = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
+
+			// 听写作答页：← 与主播放钮一致（未展开提示时三连播）
+			if (phase === 'prompt' && mode === 'dictation' && e.key === 'ArrowLeft') {
+				e.preventDefault();
+				void playWord({ sequence: !hintOpen });
+				return;
+			}
+
+			if ((phase !== 'soft_wrong' && phase !== 'revealed') || !lastWrong) {
+				return;
+			}
+
+			if (inField) return;
+
+			if (e.key === 'ArrowLeft') {
+				e.preventDefault();
+				void playWord();
+				return;
+			}
 
 			if (phase === 'soft_wrong') {
-				if (e.key === 'ArrowLeft') {
-					e.preventDefault();
-					void playWord();
-					return;
-				}
 				if (e.key === 'ArrowRight') {
 					e.preventDefault();
 					onRevealAnswer();
@@ -293,6 +309,7 @@ export function Session({
 		phase,
 		lastWrong,
 		mode,
+		hintOpen,
 		onNext,
 		onRevealAnswer,
 		onRetryCurrent,
@@ -315,49 +332,30 @@ export function Session({
 		) : (
 			<Languages className="size-4" />
 		);
-	const modeTitle =
-		mode === 'dictation'
-			? t('englishLearning.practice.modeDictation')
-			: t('englishLearning.practice.modeSpelling');
-
-	const hintContent = useMemo(() => buildPracticeHintContent(item), [item]);
 	const isClassic = isPracticeClassicItem(item);
 
-	const spellingHintIpa = hintContent.ipa?.trim();
-	const spellingHintSource = hintContent.source?.trim();
-	const spellingHintNote = hintContent.noteZh?.trim();
+	const modeTitle =
+		mode === 'dictation'
+			? isClassic
+				? t('englishLearning.practice.modeDictationClassic')
+				: t('englishLearning.practice.modeDictationVocab')
+			: isClassic
+				? t('englishLearning.practice.modeSpellingClassic')
+				: t('englishLearning.practice.modeSpellingVocab');
+
+	const hintContent = useMemo(() => buildPracticeHintContent(item), [item]);
 
 	const canHint = hasPracticeHintContent(item, mode);
 	const hintButtonLabel = hintOpen
 		? t('englishLearning.practice.hintHide')
 		: t('englishLearning.practice.hintShow');
 
-	const yourAnswerPrefix = t('englishLearning.practice.yourAnswer', {
-		answer: '',
-	});
+	const yourAnswerLabel = t('englishLearning.practice.yourAnswerLabel');
 	const correctAnswerLabel = t('englishLearning.practice.correctAnswer');
 	const revealedWrongInput = lastWrong?.userInput || input.trim() || '\u00A0';
 
-	const wordPlayButton = (
-		<VocabWordPlayButton
-			playing={playing}
-			playAriaLabel={t('englishLearning.vocab.playWord')}
-			stopAriaLabel={t('englishLearning.tts.stop')}
-			onPlay={() => void playWord()}
-		/>
-	);
-
-	const softWrongPlayBlock = (
-		<DictationPlaySlot>
-			<DictationPlayButton
-				playing={playing}
-				playLabel={playLabel}
-				onPlay={() => void playWord()}
-				size="medium"
-			/>
-			<DictationEqualizer playing={playing} className="h-4 w-32" />
-		</DictationPlaySlot>
-	);
+	const softWrongGuidance = t('englishLearning.practice.softWrongHint');
+	const showAnswerLabel = t('englishLearning.practice.showAnswer');
 
 	return (
 		<div className={cn(PRACTICE_PAGE_CONTENT_CLASS, 'flex flex-col gap-4')}>
@@ -398,8 +396,14 @@ export function Session({
 							)
 						}
 					/>
-					<div className="flex min-h-0 flex-1 flex-col p-4">
+					<div
+						className={cn(
+							'flex min-h-0 flex-1 flex-col',
+							phase === 'soft_wrong' || phase === 'revealed' ? 'p-3' : 'p-4',
+						)}
+					>
 						<div className="grid min-h-0 flex-1 w-full transition-none *:col-start-1 *:row-start-1 *:h-full *:min-h-0">
+							{/* 听写：DictationPromptBody；拼写：SpellingPromptBody 显示中文释义 */}
 							<SessionPromptPanel
 								fillHeight
 								className={cn(
@@ -409,6 +413,7 @@ export function Session({
 								)}
 								aria-hidden={phase !== 'prompt'}
 							>
+								{/* 听写：DictationPromptBody，dictation 听写模式，spelling 拼写模式 */}
 								{mode === 'dictation' ? (
 									<DictationPromptBody
 										hint={
@@ -425,7 +430,7 @@ export function Session({
 										spellStepActive={dictationSpellStepActive}
 										playing={playing}
 										playLabel={playLabel}
-										onPlay={() => void playWord()}
+										onPlay={() => void playWord({ sequence: !hintOpen })}
 									/>
 								) : (
 									<SpellingPromptBody
@@ -444,85 +449,44 @@ export function Session({
 									/>
 								)}
 							</SessionPromptPanel>
+							{/* 软揭示：DictationSoftWrongStage */}
 							<SessionPromptPanel
 								fillHeight
 								className={cn(
 									phase !== 'soft_wrong' && 'hidden',
-									'items-center border-0 bg-transparent p-0 shadow-none',
+									'justify-stretch overflow-hidden border-0 bg-transparent p-0 shadow-none',
 								)}
 								aria-hidden={phase !== 'soft_wrong'}
 							>
-								<div className="flex h-full min-h-0 w-full flex-col overflow-hidden px-4 py-2">
-									<div className="mx-auto flex h-full w-full max-w-sm flex-col items-center justify-between text-center">
-										<p className="text-textcolor/80 flex w-full shrink-0 flex-wrap items-baseline justify-center gap-x-1.5 text-sm leading-snug">
-											<span>{yourAnswerPrefix}</span>
-											<span className="text-base font-medium text-rose-500">
-												{revealedWrongInput}
-											</span>
-										</p>
-										<div className="flex min-h-0 w-full flex-1 flex-col items-center justify-center py-1">
-											{canHint && hintOpen ? (
-												mode === 'dictation' ? (
-													<DictationSoftWrongHintBlock
-														hintContent={hintContent}
-														playing={playing}
-														playLabel={playLabel}
-														onPlay={() => void playWord()}
-													/>
-												) : (
-													<div
-														className="flex max-h-full w-full min-h-0 flex-col items-center gap-2"
-														aria-live="polite"
-													>
-														{softWrongPlayBlock}
-														<div className="flex w-full min-h-0 flex-col items-center gap-1 overflow-hidden text-center">
-															{spellingHintIpa ? (
-																<p className="w-full shrink-0 text-center font-mono text-xs leading-snug text-teal-600/90 line-clamp-1 dark:text-teal-400/90">
-																	{displayIpaWrapped(spellingHintIpa)}
-																</p>
-															) : null}
-															{spellingHintSource || spellingHintNote ? (
-																<p className="text-textcolor/60 w-full shrink-0 text-center text-[11px] leading-snug italic line-clamp-2">
-																	{[spellingHintSource, spellingHintNote]
-																		.filter(Boolean)
-																		.join(' · ')}
-																</p>
-															) : null}
-														</div>
-													</div>
-												)
-											) : (
-												softWrongPlayBlock
-											)}
-										</div>
-										<div className="flex w-full shrink-0 flex-col items-center gap-1">
-											<p className="text-textcolor/55 mx-auto max-w-68 text-center text-[11px] leading-snug line-clamp-2">
-												{t('englishLearning.practice.softWrongHint')}
-											</p>
-											<Button
-												type="button"
-												variant="link"
-												className="text-teal-600 hover:text-teal-500 dark:text-teal-400 h-7 shrink-0 px-0! text-sm"
-												onClick={onRevealAnswer}
-											>
-												{t('englishLearning.practice.showAnswer')}
-											</Button>
-										</div>
-									</div>
-								</div>
+								<DictationSoftWrongStage
+									answerLabel={yourAnswerLabel}
+									wrongInput={revealedWrongInput}
+									hintContent={canHint ? hintContent : {}}
+									playing={playing}
+									playLabel={playLabel}
+									onPlay={() => void playWord()}
+									guidance={softWrongGuidance}
+									showAnswerLabel={showAnswerLabel}
+									onShowAnswer={onRevealAnswer}
+								/>
 							</SessionPromptPanel>
+							{/* 完整揭示：RevealedPanelInner */}
 							<SessionPromptPanel
-								scrollable
 								fillHeight
-								className={cn(phase !== 'revealed' && 'hidden')}
+								className={cn(
+									phase !== 'revealed' && 'hidden',
+									'justify-stretch overflow-hidden border-0 bg-transparent p-0 shadow-none',
+								)}
 								aria-hidden={phase !== 'revealed'}
 							>
 								<RevealedPanelInner
-									yourAnswerPrefix={yourAnswerPrefix}
+									answerLabel={yourAnswerLabel}
 									wrongInput={revealedWrongInput}
 									item={item}
 									correctAnswerLabel={correctAnswerLabel}
-									playButton={wordPlayButton}
+									playing={playing}
+									playLabel={playLabel}
+									onPlay={() => void playWord()}
 								/>
 							</SessionPromptPanel>
 						</div>

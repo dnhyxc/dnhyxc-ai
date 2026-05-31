@@ -7,6 +7,7 @@ import { useNavigate, useSearchParams } from 'react-router';
 import { useI18n } from '@/hooks';
 import { stopAllEnglishPlayback } from '@/utils/englishTts';
 import { PracticePageShell } from './components/shell';
+import { PracticeShortcutsMenu } from './components/shell/PracticeShortcutsMenu';
 import { Session } from './Session';
 import { Setup } from './Setup';
 import { Summary } from './Summary';
@@ -276,6 +277,11 @@ export default function EnglishLearningPracticePage() {
 					: undefined
 			}
 			backLabel={t('englishLearning.practice.back')}
+			headerRight={
+				<PracticeShortcutsMenu
+					practiceMode={phase === 'running' ? config?.mode : undefined}
+				/>
+			}
 		>
 			{phase === 'setup' ? (
 				<Setup
