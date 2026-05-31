@@ -630,4 +630,9 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'If audio is playing on the first-wrong screen, tapping Show answer or → to open the full reveal does not stop it—the same utterance keeps playing; both screens share play state until you stop or it finishes.',
 	},
+	's24-29': {
+		title: 'Wrong-screen shortcuts & Previous question',
+		description:
+			'Play/stop is Shift + Space. On wrong screens: ↑ previous question, ← try again, → show answer, ↓ next. Footer Previous button when not on the first item. See ? menu for the full list.',
+	},
 };

@@ -59,13 +59,13 @@
 
 | 阶段 | 按键 | 行为 |
 |------|------|------|
-| `prompt`（听写） | ← | 播放 / 停止（未展开提示时三连播，否则单次） |
+| 各阶段 | Shift + 空格 | 播放 / 停止（听写作答未展开提示时三连播） |
 | `prompt` | Enter | 检查 |
-| `soft_wrong` | ← | 播放 / 停止（单次） |
-| `soft_wrong` | → | 看答案（`onRevealAnswer`，**不打断**进行中播放） |
-| `soft_wrong` | ↑ / ↓ | 再试一次 / 下一题 |
-| `revealed` | ← | 播放 / 停止（单次） |
-| `revealed` | ↑ / ↓ | 再试一次 / 下一题 |
+| `soft_wrong` / `revealed` | Shift + 空格 | 播放 / 停止（单次） |
+| `soft_wrong` / `revealed` | ↑ | 上一题（非首题，见 [practice-keyboard-previous.md](./practice-keyboard-previous.md)） |
+| `soft_wrong` / `revealed` | ← | 再试一次 |
+| `soft_wrong` | → | 看答案（不打断播放） |
+| `soft_wrong` / `revealed` | ↓ | 下一题 |
 
 焦点在 `INPUT` / `TEXTAREA` / `SELECT` 时不拦截方向键。
 

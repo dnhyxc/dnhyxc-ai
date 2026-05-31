@@ -23,10 +23,16 @@ import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import type { PracticeShortcutsMenuProps } from '../../types';
 
-type PracticeShortcutKey = 'enter' | 'left' | 'right' | 'up' | 'down';
+type PracticeShortcutKey =
+	| 'enter'
+	| 'shiftSpace'
+	| 'left'
+	| 'right'
+	| 'up'
+	| 'down';
 
 const PRACTICE_SHORTCUT_ICONS: Record<
-	PracticeShortcutKey,
+	Exclude<PracticeShortcutKey, 'shiftSpace'>,
 	{ Icon: LucideIcon; ariaKey: string }
 > = {
 	enter: {
@@ -48,13 +54,30 @@ const PRACTICE_SHORTCUT_ICONS: Record<
 	},
 };
 
+const KEY_BADGE =
+	'border-theme/15 bg-theme/5 text-textcolor/80 rounded px-1 py-px text-[10px] font-medium leading-none';
+
 function ShortcutKeyIcon({
 	shortcutKey,
 }: {
 	shortcutKey: PracticeShortcutKey;
 }) {
-	const { Icon, ariaKey } = PRACTICE_SHORTCUT_ICONS[shortcutKey];
 	const { t } = useI18n();
+	if (shortcutKey === 'shiftSpace') {
+		return (
+			<span
+				className="inline-flex shrink-0 items-center gap-0.5"
+				role="img"
+				aria-label={t('englishLearning.practice.shortcuts.keyShiftSpace')}
+			>
+				<kbd className={KEY_BADGE}>Shift</kbd>
+				<kbd className={KEY_BADGE}>
+					{t('englishLearning.practice.shortcuts.keySpace')}
+				</kbd>
+			</span>
+		);
+	}
+	const { Icon, ariaKey } = PRACTICE_SHORTCUT_ICONS[shortcutKey];
 	return (
 		<span
 			className="text-textcolor/90 inline-flex size-4 shrink-0 items-center justify-center"
@@ -123,7 +146,7 @@ export function PracticeShortcutsMenu({
 		if (practiceMode !== 'spelling') {
 			promptRows.push({
 				label: t('englishLearning.practice.shortcuts.play'),
-				keys: ['left'],
+				keys: ['shiftSpace'],
 			});
 		}
 
@@ -137,15 +160,19 @@ export function PracticeShortcutsMenu({
 				rows: [
 					{
 						label: t('englishLearning.practice.shortcuts.play'),
-						keys: ['left'],
+						keys: ['shiftSpace'],
 					},
 					{
 						label: t('englishLearning.practice.shortcuts.showAnswer'),
 						keys: ['right'],
 					},
 					{
-						label: t('englishLearning.practice.shortcuts.retry'),
+						label: t('englishLearning.practice.shortcuts.previous'),
 						keys: ['up'],
+					},
+					{
+						label: t('englishLearning.practice.shortcuts.retry'),
+						keys: ['left'],
 					},
 					{
 						label: t('englishLearning.practice.shortcuts.next'),
@@ -158,11 +185,15 @@ export function PracticeShortcutsMenu({
 				rows: [
 					{
 						label: t('englishLearning.practice.shortcuts.play'),
-						keys: ['left'],
+						keys: ['shiftSpace'],
+					},
+					{
+						label: t('englishLearning.practice.shortcuts.previous'),
+						keys: ['up'],
 					},
 					{
 						label: t('englishLearning.practice.shortcuts.retry'),
-						keys: ['up'],
+						keys: ['left'],
 					},
 					{
 						label: t('englishLearning.practice.shortcuts.next'),

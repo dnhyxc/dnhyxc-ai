@@ -177,6 +177,10 @@ export type SessionProps = {
 	item: PracticeItem;
 	/** 当前题为本轮最后一题（答错揭示后按钮文案为「查看练习结果」） */
 	isLastQuestion?: boolean;
+	/** 是否可回到上一题（非本轮第一题） */
+	canGoPrevious?: boolean;
+	/** 从错题态切回上一题（由父级递减 index 并截断 results） */
+	onGoPrevious?: () => void;
 	onStepComplete: (result: PracticeAttemptResult) => void;
 };
 

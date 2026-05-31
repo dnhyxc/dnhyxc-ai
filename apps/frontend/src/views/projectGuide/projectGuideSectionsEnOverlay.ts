@@ -284,7 +284,7 @@ export const PROJECT_GUIDE_ITEMS_EN: Record<
 	'pg-s13-11': {
 		title: '13.11 Dictation & spelling (vocab & classic quotes)',
 		description:
-			'Entries and grading as in the Chinese guide. Header shows word vs sentence mode. First wrong: field hints + circular Show answer; full reveal field layout. Show answer or → does not stop audio already playing. Arrows: ← while answering dictation and after reveal; ←→↑↓ on wrong screens. Dictation triple-play on new question, retry, and initial main play when hint is closed; single play on wrong screens. ? icon lists shortcuts. Summary and mistake book unchanged.',
+			'Entries and grading as in the Chinese guide. Header shows word vs sentence mode. First wrong: field hints + circular Show answer; full reveal field layout. Show answer or → does not stop audio already playing. Footer Previous when not on the first item. Shift+Space play/stop; on wrong screens ↑ previous, ← try again, → show answer, ↓ next. Dictation triple-play on new question, retry, and main play when hint is closed. ? icon lists shortcuts. Summary and mistake book unchanged.',
 	},
 	'pg-s13-12': {
 		title: '13.12 Mistake book (vocab & classic)',

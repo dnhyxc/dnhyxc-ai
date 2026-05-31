@@ -242,6 +242,16 @@ export default function EnglishLearningPracticePage() {
 		});
 	}, []);
 
+	const onGoPrevious = useCallback(() => {
+		stopAllEnglishPlayback();
+		setIndex((i) => {
+			if (i <= 0) return 0;
+			const prev = i - 1;
+			setResults((r) => r.slice(0, prev));
+			return prev;
+		});
+	}, []);
+
 	const currentItem = queue[index];
 
 	const shellTitle = useMemo(() => {
@@ -300,6 +310,8 @@ export default function EnglishLearningPracticePage() {
 					mode={config.mode}
 					item={currentItem}
 					isLastQuestion={index >= queue.length - 1}
+					canGoPrevious={index > 0}
+					onGoPrevious={onGoPrevious}
 					onStepComplete={onStepComplete}
 				/>
 			) : null}

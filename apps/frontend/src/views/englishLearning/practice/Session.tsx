@@ -33,6 +33,7 @@ import type {
 import { gradeSpelling } from './utils/grading';
 import { buildPracticeHintContent, hasPracticeHintContent } from './utils/hint';
 import { getPracticeAnswerText, isPracticeClassicItem } from './utils/item';
+import { isPracticePlayShortcut } from './utils/keyboard';
 
 /** 整张练习卡片锁定高度（听写/拼写 ↔ 错题切换时总高一致） */
 const SESSION_CARD_H = 'h-[calc(14.625rem+min(14.5rem,38dvh))]';
@@ -50,6 +51,8 @@ export function Session({
 	mode,
 	item,
 	isLastQuestion = false,
+	canGoPrevious = false,
+	onGoPrevious,
 	onStepComplete,
 }: SessionProps) {
 	const { t } = useI18n();
@@ -221,6 +224,13 @@ export function Session({
 		completeStep(lastWrong);
 	}, [cancelDictationPlay, completeStep, lastWrong]);
 
+	const onPreviousQuestion = useCallback(() => {
+		if (!canGoPrevious || !onGoPrevious) return;
+		cancelDictationPlay();
+		setPlaying(false);
+		onGoPrevious();
+	}, [canGoPrevious, cancelDictationPlay, onGoPrevious]);
+
 	/** 软揭示 → 完整揭示：仅切阶段，不 cancel，与两页共用 playing / playWord */
 	const onRevealAnswer = useCallback(() => {
 		setPhase('revealed');
@@ -253,11 +263,22 @@ export function Session({
 			const tag = target?.tagName;
 			const inField = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
 
-			// 听写作答页：← 与主播放钮一致（未展开提示时三连播）
-			if (phase === 'prompt' && mode === 'dictation' && e.key === 'ArrowLeft') {
-				e.preventDefault();
-				void playWord({ sequence: !hintOpen });
-				return;
+			// 播放：Shift + 空格（作答页在输入框内也响应）
+			if (isPracticePlayShortcut(e)) {
+				if (phase === 'prompt') {
+					e.preventDefault();
+					if (mode === 'dictation') {
+						void playWord({ sequence: !hintOpen });
+					} else {
+						void playWord();
+					}
+					return;
+				}
+				if ((phase === 'soft_wrong' || phase === 'revealed') && lastWrong) {
+					e.preventDefault();
+					void playWord();
+					return;
+				}
 			}
 
 			if ((phase !== 'soft_wrong' && phase !== 'revealed') || !lastWrong) {
@@ -268,33 +289,22 @@ export function Session({
 
 			if (e.key === 'ArrowLeft') {
 				e.preventDefault();
-				void playWord();
-				return;
-			}
-
-			if (phase === 'soft_wrong') {
-				if (e.key === 'ArrowRight') {
-					e.preventDefault();
-					onRevealAnswer();
-					return;
-				}
-				if (e.key === 'ArrowUp') {
-					e.preventDefault();
-					onRetryCurrent();
-					return;
-				}
-				if (e.key === 'ArrowDown') {
-					e.preventDefault();
-					onNext();
-				}
-				return;
-			}
-
-			if (e.key === 'ArrowUp') {
-				e.preventDefault();
 				onRetryCurrent();
 				return;
 			}
+
+			if (e.key === 'ArrowUp' && canGoPrevious) {
+				e.preventDefault();
+				onPreviousQuestion();
+				return;
+			}
+
+			if (phase === 'soft_wrong' && e.key === 'ArrowRight') {
+				e.preventDefault();
+				onRevealAnswer();
+				return;
+			}
+
 			if (e.key === 'ArrowDown') {
 				e.preventDefault();
 				onNext();
@@ -304,11 +314,13 @@ export function Session({
 		window.addEventListener('keydown', onKeyDown);
 		return () => window.removeEventListener('keydown', onKeyDown);
 	}, [
+		canGoPrevious,
 		phase,
 		lastWrong,
 		mode,
 		hintOpen,
 		onNext,
+		onPreviousQuestion,
 		onRevealAnswer,
 		onRetryCurrent,
 		playWord,
@@ -535,7 +547,8 @@ export function Session({
 						</div>
 						<div
 							className={cn(
-								'grid grid-cols-2 gap-2 pt-4 transition-none',
+								'grid gap-2 pt-4 transition-none',
+								canGoPrevious ? 'grid-cols-3' : 'grid-cols-2',
 								!showWrongActions && 'hidden',
 							)}
 						>
@@ -546,6 +559,15 @@ export function Session({
 							>
 								{t('englishLearning.practice.tryAgain')}
 							</Button>
+							{canGoPrevious ? (
+								<Button
+									type="button"
+									className="h-10 w-full transition-none"
+									onClick={onPreviousQuestion}
+								>
+									{t('englishLearning.practice.previous')}
+								</Button>
+							) : null}
 							<Button
 								type="button"
 								className="h-10 w-full transition-none"

@@ -40,6 +40,7 @@
 | [practice-session-controls.md](./practice-session-controls.md) | 两档答错、再试连播、软揭示布局、音波动画、播放钮 |
 | [practice-wrong-panel-shortcuts.md](./practice-wrong-panel-shortcuts.md) | **答错/揭示面板 UI**、播放单次/三连播策略、顶栏快捷键 ? 菜单 |
 | [practice-reveal-playback-continuity.md](./practice-reveal-playback-continuity.md) | 软揭示 → 完整揭示**播放不中断**（共用 Session `playing` / `playWord`） |
+| [practice-keyboard-previous.md](./practice-keyboard-previous.md) | **Shift+空格** 播放、**上一题** 与方向键 **↑←→↓** 重映射 |
 | [practice-entry-navigation.md](./practice-entry-navigation.md) | 多入口（资源库列表/历史抽屉）、设置页词数、返回导航 |
 | [vocabulary-mistakes-and-shared-ui.md](./vocabulary-mistakes-and-shared-ui.md) | **单词**错题集、练习入口组件 `EnglishPracticeEntry`、单词卡片统一 |
 | [classic-practice-and-mistakes.md](./classic-practice-and-mistakes.md) | **经典句**练习、`contentKind=classic`、语句错题集、判分与 batch 更新错拼 |

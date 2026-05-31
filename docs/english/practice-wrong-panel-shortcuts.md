@@ -4,6 +4,7 @@
 
 - [practice-session-controls.md](./practice-session-controls.md) — 两档答错、键盘总表、连播取消（本轮已同步部分表述）
 - [practice-reveal-playback-continuity.md](./practice-reveal-playback-continuity.md) — 软揭示 → 完整揭示**播放不中断**
+- [practice-keyboard-previous.md](./practice-keyboard-previous.md) — **Shift+空格** 播放、**↑上一题 / ←再试** 键盘与底栏
 - [practice-session-hint.md](./practice-session-hint.md) — 作答阶段「提示」展开
 - [practice-summary-ui.md](./practice-summary-ui.md) — 结算页
 
@@ -19,8 +20,8 @@
 2. **底栏听音区**：软揭示为左播放 · 中音浪+引导 · 右「看答案」；完整揭示为左播放 · 右音浪。
 3. **顶栏模式标题**区分「单词听写/语句听写」与「单词看中写/语句看中写」。
 4. **播放次数**：仅初始听写页**未展开提示时的大号播放钮**三连播，其余场景（进题自动播放、答错页、快捷键、再试一次等）均为**单次**。
-5. **键盘**：听写作答页支持 **←** 播放；完整揭示页支持 **←**；错题阶段 **←→↑↓** 逻辑不变。
-6. **快捷键说明**：练习页顶栏 **?** 下拉展示分阶段快捷键，按键用 lucide 方向键图标。
+5. **键盘**：播放为 **Shift + 空格**；错题阶段 **↑** 上一题、**←** 再试、**→** 看答案、**↓** 下一题（详见 [practice-keyboard-previous.md](./practice-keyboard-previous.md)）。
+6. **快捷键说明**：练习页顶栏 **?** 下拉展示分阶段快捷键（含 Shift+空格 徽章与方向键图标）。
 
 ---
 
@@ -56,12 +57,13 @@
 - `playWord(options?: { force?, sequence? })` 仅在 `mode === 'dictation' && sequence === true` 时走 `playDictationSequence`（3 次 + 间隔）。
 - 听写作答页进题/换题/再试一次：`playWord({ force: true, sequence: true })`，**三连播**。
 - 初始听写主钮：`onPlay={() => void playWord({ sequence: !hintOpen })}`（展开提示后单次）。
-- 答错页、完整揭示、拼写作答、快捷键 ←（错题阶段）：不传 `sequence`，**单次**。
+- 答错页、完整揭示、拼写作答、快捷键播放：不传 `sequence`，**单次**。
 
-### 3.3 键盘监听合并
+### 3.3 键盘与上一题
 
-- 同一 `useEffect` 内：`prompt + dictation + ArrowLeft` → `playWord({ sequence: !hintOpen })`（输入框内也响应，避免焦点在输入框时无法听音）。
-- `soft_wrong` / `revealed`：非输入框焦点时 `←` 播放；软揭示额外 `→↑↓`；揭示 `↑↓`。
+- 播放：**Shift + 空格**（`utils/keyboard.ts`）；作答页输入框内也可触发。
+- 错题阶段（非输入框）：**↑** 上一题、**←** 再试、**→** 看答案（软揭示）、**↓** 下一题。
+- 完整说明见 [practice-keyboard-previous.md](./practice-keyboard-previous.md)。
 
 ### 3.4 快捷键说明菜单
 
