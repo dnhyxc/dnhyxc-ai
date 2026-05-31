@@ -14,7 +14,8 @@
 		"release-kit.config.example.json"
 	],
 	"scripts": {
-		"build": "tsc -p tsconfig.build.json",
+		"clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
+		"build": "pnpm run clean && tsc -p tsconfig.build.json",
 		"prepublishOnly": "pnpm run build"
 	},
 	"engines": {

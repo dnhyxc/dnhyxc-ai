@@ -221,12 +221,10 @@ export function Session({
 		completeStep(lastWrong);
 	}, [cancelDictationPlay, completeStep, lastWrong]);
 
-	/** 软揭示态：主动查看正确答案 */
+	/** 软揭示 → 完整揭示：仅切阶段，不 cancel，与两页共用 playing / playWord */
 	const onRevealAnswer = useCallback(() => {
-		cancelDictationPlay();
-		setPlaying(false);
 		setPhase('revealed');
-	}, [cancelDictationPlay]);
+	}, []);
 
 	/** 答错后回到作答区重新作答（不换题、不记入结算） */
 	const onRetryCurrent = useCallback(() => {

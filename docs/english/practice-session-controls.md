@@ -62,7 +62,7 @@
 | `prompt`（听写） | ← | 播放 / 停止（未展开提示时三连播，否则单次） |
 | `prompt` | Enter | 检查 |
 | `soft_wrong` | ← | 播放 / 停止（单次） |
-| `soft_wrong` | → | 看答案（`onRevealAnswer`，**先停止播放**） |
+| `soft_wrong` | → | 看答案（`onRevealAnswer`，**不打断**进行中播放） |
 | `soft_wrong` | ↑ / ↓ | 再试一次 / 下一题 |
 | `revealed` | ← | 播放 / 停止（单次） |
 | `revealed` | ↑ / ↓ | 再试一次 / 下一题 |
@@ -254,10 +254,8 @@ const onNext = useCallback(() => {
 }, [completeStep, lastWrong]);
 
 const onRevealAnswer = useCallback(() => {
-  cancelDictationPlay();
-  setPlaying(false);
-  setPhase('revealed');
-}, [cancelDictationPlay]);
+  setPhase('revealed'); // 说明：不 cancel，软揭示与完整揭示共用 playing / playWord
+}, []);
 
 const onRetryCurrent = useCallback(() => {
   cancelDictationPlay();
@@ -314,7 +312,7 @@ useEffect(() => {
       }
       if (e.key === 'ArrowRight') {
         e.preventDefault();
-        onRevealAnswer();     // → 看答案（内部会停播）
+        onRevealAnswer();     // → 看答案（不打断播放，见 practice-reveal-playback-continuity.md）
         return;
       }
       if (e.key === 'ArrowUp') {

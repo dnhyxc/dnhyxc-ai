@@ -625,4 +625,9 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'After first wrong or reveal: field-style hints; footer play, guidance, circular Show answer matching play button. Header shows word vs sentence mode. ? icon lists shortcuts by phase. Dictation triple-play only on initial main play when hint is closed; other play and ← are single; ← works while answering and after reveal.',
 	},
+	's24-28': {
+		title: 'Playback continues after Show answer',
+		description:
+			'If audio is playing on the first-wrong screen, tapping Show answer or → to open the full reveal does not stop it—the same utterance keeps playing; both screens share play state until you stop or it finishes.',
+	},
 };

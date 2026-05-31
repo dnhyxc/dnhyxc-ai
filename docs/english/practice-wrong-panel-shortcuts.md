@@ -3,6 +3,7 @@
 ## 延伸阅读
 
 - [practice-session-controls.md](./practice-session-controls.md) — 两档答错、键盘总表、连播取消（本轮已同步部分表述）
+- [practice-reveal-playback-continuity.md](./practice-reveal-playback-continuity.md) — 软揭示 → 完整揭示**播放不中断**
 - [practice-session-hint.md](./practice-session-hint.md) — 作答阶段「提示」展开
 - [practice-summary-ui.md](./practice-summary-ui.md) — 结算页
 
@@ -574,7 +575,7 @@ headerRight={
 | 行为变化 | 听写作答页进题/换题/再试为**三连播**；答错页、揭示页、拼写模式为**单次**；主播放钮未展开提示时仍为三连播 |
 | 键盘 | 听写作答页新增 **←**；揭示页新增 **←**（与 2026-05-29 前仅软揭示有 ← 的文档差异，以源码为准） |
 | 拼写模式 | 快捷键菜单不展示作答中 **←** 行 |
-| 回归建议 | 听写：进题听 1 次、主钮 3 次、展开提示后播放 1 次；软揭示/揭示 ← 与按钮；? 菜单滚动与左右边距；经典句/单词标题文案 |
+| 回归建议 | 听写：进题/换题三连播、主钮未展开提示三连播；软揭示播放中 **看答案** 不中断；软揭示/揭示 ← 与按钮；? 菜单与字段表布局 |
 
 ---
 
