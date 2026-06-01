@@ -1,7 +1,7 @@
 /**
  * 单题练习界面
  */
-import { Button, Input, Label, Toast } from '@ui/index';
+import { Button, Input, Label } from '@ui/index';
 import { Headphones, Languages, Lightbulb } from 'lucide-react';
 import {
 	type FormEvent,
@@ -13,18 +13,17 @@ import {
 } from 'react';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
-import {
-	isEnglishTtsSupported,
-	playEnglishPreferred,
-	stopAllEnglishPlayback,
-} from '@/utils/englishTts';
-import { DictationPromptBody } from './components/dictation/DictationPrompt';
+import { DictationPromptBody, SpellingPromptBody } from './components/prompt';
 import { RevealedPanelInner } from './components/reveal';
 import { SessionPromptPanel } from './components/session/SessionPromptPanel';
 import { SessionStageHeader } from './components/session/SessionStageHeader';
-import { DictationSoftWrongStage } from './components/session/SoftWrongStage';
-import { PRACTICE_PAGE_CONTENT_CLASS, PracticeCard } from './components/shell';
-import { SpellingPromptBody } from './components/spelling/SpellingPromptBody';
+import { SessionWrongActions } from './components/session/SessionWrongActions';
+import { SoftWrongStage } from './components/session/SoftWrongStage';
+import { PracticeCard } from './components/shell';
+import { PRACTICE_PAGE_CONTENT_CLASS, SESSION_CARD_H } from './constants';
+import { usePracticeItemReset } from './hooks/usePracticeItemReset';
+import { usePracticePlayback } from './hooks/usePracticePlayback';
+import { usePracticeSessionKeyboard } from './hooks/usePracticeSessionKeyboard';
 import type {
 	PracticeAttemptResult,
 	PracticeItemPhase,
@@ -33,20 +32,7 @@ import type {
 import { gradeSpelling } from './utils/grading';
 import { buildPracticeHintContent, hasPracticeHintContent } from './utils/hint';
 import { getPracticeAnswerText, isPracticeClassicItem } from './utils/item';
-import { isPracticePlayShortcut } from './utils/keyboard';
 
-/** 整张练习卡片锁定高度（听写/拼写 ↔ 错题切换时总高一致） */
-const SESSION_CARD_H = 'h-[calc(14.625rem+min(14.5rem,38dvh))]';
-/** 听写自动/手动播放：次数与间隔（毫秒） */
-const DICTATION_PLAY_COUNT = 3;
-const DICTATION_PLAY_GAP_MS = 3000;
-
-function sleepMs(ms: number): Promise<void> {
-	return new Promise((resolve) => {
-		window.setTimeout(resolve, ms);
-	});
-}
-/** 会话组件 */
 export function Session({
 	mode,
 	item,
@@ -62,107 +48,40 @@ export function Session({
 	const [lastWrong, setLastWrong] = useState<PracticeAttemptResult | null>(
 		null,
 	);
-	const [playing, setPlaying] = useState(false);
 	const [dictationSpellStepActive, setDictationSpellStepActive] =
 		useState(false);
 	const [hintOpen, setHintOpen] = useState(false);
 	const inputRef = useRef<HTMLInputElement>(null);
-	/** 递增以取消进行中的听写连播（含间隔等待） */
-	const dictationPlayRunRef = useRef(0);
 
 	const answerText = getPracticeAnswerText(item);
 
-	const cancelDictationPlay = useCallback(() => {
-		dictationPlayRunRef.current += 1;
-		stopAllEnglishPlayback();
-	}, []);
+	const {
+		playing,
+		setPlaying,
+		playLabel,
+		playWord,
+		playWordRef,
+		cancelDictationPlay,
+	} = usePracticePlayback({ mode, answerText, t });
 
-	const playDictationSequence = useCallback(
-		async (runId: number) => {
-			for (let i = 0; i < DICTATION_PLAY_COUNT; i += 1) {
-				if (dictationPlayRunRef.current !== runId) return;
-				await playEnglishPreferred(answerText, { preferLocal: true });
-				if (dictationPlayRunRef.current !== runId) return;
-				if (i < DICTATION_PLAY_COUNT - 1) {
-					await sleepMs(DICTATION_PLAY_GAP_MS);
-				}
-			}
-		},
-		[answerText],
-	);
-
-	const playWord = useCallback(
-		async (options?: {
-			/** 跳过「再点即停」，用于换题/再试后立刻开播 */
-			force?: boolean;
-			/** 听写三连播（进题自动播放、主播放钮未展开提示时） */
-			sequence?: boolean;
-		}) => {
-			if (!isEnglishTtsSupported()) {
-				Toast({
-					type: 'warning',
-					title: t('englishLearning.tts.unsupported'),
-				});
-				return;
-			}
-			// 说明：重试时 playing 可能尚未置 false，force 跳过「再点即停」分支
-			if (playing && !options?.force) {
-				cancelDictationPlay();
-				setPlaying(false);
-				return;
-			}
-
-			dictationPlayRunRef.current += 1;
-			const runId = dictationPlayRunRef.current;
-			stopAllEnglishPlayback();
-			setPlaying(true);
-			const useDictationSequence =
-				mode === 'dictation' && options?.sequence === true;
-			try {
-				if (useDictationSequence) {
-					await playDictationSequence(runId);
-				} else {
-					await playEnglishPreferred(answerText, { preferLocal: true });
-				}
-			} catch {
-				Toast({
-					type: 'warning',
-					title: t('englishLearning.tts.unsupported'),
-				});
-			} finally {
-				if (dictationPlayRunRef.current === runId) {
-					setPlaying(false);
-				}
-			}
-		},
-		[answerText, cancelDictationPlay, mode, playDictationSequence, playing, t],
-	);
-
-	const playWordRef = useRef(playWord);
-	playWordRef.current = playWord;
-
-	/** 换题：停播并重置；听写作答页自动三连播，拼写/错题页不自动播 */
-	useEffect(() => {
-		cancelDictationPlay();
-		setPlaying(false);
+	const resetItemState = useCallback(() => {
 		setPhase('prompt');
 		setInput('');
 		setWrongAttemptCount(0);
 		setLastWrong(null);
 		setDictationSpellStepActive(false);
 		setHintOpen(false);
-		if (mode === 'dictation') {
-			void playWordRef.current({ force: true, sequence: true });
-		}
-		requestAnimationFrame(() => inputRef.current?.focus());
-	}, [item.key, mode, cancelDictationPlay]);
+	}, []);
 
-	useEffect(
-		() => () => {
-			cancelDictationPlay();
-		},
-		[cancelDictationPlay],
-	);
+	usePracticeItemReset({
+		itemKey: item.key,
+		mode,
+		cancelDictationPlay,
+		setPlaying,
+		resetState: resetItemState,
+		playWordRef,
+		inputRef,
+	});
 
 	const completeStep = useCallback(
 		(result: PracticeAttemptResult) => {
@@ -170,7 +89,7 @@ export function Session({
 			setPlaying(false);
 			onStepComplete(result);
 		},
-		[cancelDictationPlay, onStepComplete],
+		[cancelDictationPlay, onStepComplete, setPlaying],
 	);
 
 	const onSubmit = useCallback(
@@ -213,6 +132,7 @@ export function Session({
 			item,
 			mode,
 			phase,
+			setPlaying,
 			wrongAttemptCount,
 		],
 	);
@@ -222,21 +142,19 @@ export function Session({
 		cancelDictationPlay();
 		setPlaying(false);
 		completeStep(lastWrong);
-	}, [cancelDictationPlay, completeStep, lastWrong]);
+	}, [cancelDictationPlay, completeStep, lastWrong, setPlaying]);
 
 	const onPreviousQuestion = useCallback(() => {
 		if (!canGoPrevious || !onGoPrevious) return;
 		cancelDictationPlay();
 		setPlaying(false);
 		onGoPrevious();
-	}, [canGoPrevious, cancelDictationPlay, onGoPrevious]);
+	}, [canGoPrevious, cancelDictationPlay, onGoPrevious, setPlaying]);
 
-	/** 软揭示 → 完整揭示：仅切阶段，不 cancel，与两页共用 playing / playWord */
 	const onRevealAnswer = useCallback(() => {
 		setPhase('revealed');
 	}, []);
 
-	/** 答错后回到作答区重新作答（不换题、不记入结算） */
 	const onRetryCurrent = useCallback(() => {
 		cancelDictationPlay();
 		setPlaying(false);
@@ -248,7 +166,7 @@ export function Session({
 			void playWord({ force: true, sequence: true });
 		}
 		requestAnimationFrame(() => inputRef.current?.focus());
-	}, [cancelDictationPlay, mode, playWord]);
+	}, [cancelDictationPlay, mode, playWord, setPlaying]);
 
 	useEffect(() => {
 		if (phase === 'soft_wrong' || phase === 'revealed') {
@@ -256,79 +174,18 @@ export function Session({
 		}
 	}, [phase]);
 
-	useEffect(() => {
-		const onKeyDown = (e: KeyboardEvent) => {
-			if (e.repeat) return;
-			const target = e.target as HTMLElement | null;
-			const tag = target?.tagName;
-			const inField = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
-
-			// 播放：Shift + 空格（作答页在输入框内也响应）
-			if (isPracticePlayShortcut(e)) {
-				if (phase === 'prompt') {
-					e.preventDefault();
-					if (mode === 'dictation') {
-						void playWord({ sequence: !hintOpen });
-					} else {
-						void playWord();
-					}
-					return;
-				}
-				if ((phase === 'soft_wrong' || phase === 'revealed') && lastWrong) {
-					e.preventDefault();
-					void playWord();
-					return;
-				}
-			}
-
-			if ((phase !== 'soft_wrong' && phase !== 'revealed') || !lastWrong) {
-				return;
-			}
-
-			if (inField) return;
-
-			if (e.key === 'ArrowLeft') {
-				e.preventDefault();
-				onRetryCurrent();
-				return;
-			}
-
-			if (e.key === 'ArrowUp' && canGoPrevious) {
-				e.preventDefault();
-				onPreviousQuestion();
-				return;
-			}
-
-			if (phase === 'soft_wrong' && e.key === 'ArrowRight') {
-				e.preventDefault();
-				onRevealAnswer();
-				return;
-			}
-
-			if (e.key === 'ArrowDown') {
-				e.preventDefault();
-				onNext();
-			}
-		};
-
-		window.addEventListener('keydown', onKeyDown);
-		return () => window.removeEventListener('keydown', onKeyDown);
-	}, [
-		canGoPrevious,
+	usePracticeSessionKeyboard({
 		phase,
-		lastWrong,
 		mode,
 		hintOpen,
-		onNext,
+		lastWrong,
+		canGoPrevious,
+		playWord,
+		onRetryCurrent,
 		onPreviousQuestion,
 		onRevealAnswer,
-		onRetryCurrent,
-		playWord,
-	]);
-
-	const playLabel = playing
-		? t('englishLearning.tts.stop')
-		: t('englishLearning.practice.playAgain');
+		onNext,
+	});
 
 	const showSessionCard =
 		phase === 'prompt' ||
@@ -413,7 +270,6 @@ export function Session({
 						)}
 					>
 						<div className="grid min-h-0 flex-1 w-full transition-none *:col-start-1 *:row-start-1 *:h-full *:min-h-0">
-							{/* 听写：DictationPromptBody；拼写：SpellingPromptBody 显示中文释义 */}
 							<SessionPromptPanel
 								fillHeight
 								className={cn(
@@ -423,7 +279,6 @@ export function Session({
 								)}
 								aria-hidden={phase !== 'prompt'}
 							>
-								{/* 听写：DictationPromptBody，dictation 听写模式，spelling 拼写模式 */}
 								{mode === 'dictation' ? (
 									<DictationPromptBody
 										hint={
@@ -459,7 +314,6 @@ export function Session({
 									/>
 								)}
 							</SessionPromptPanel>
-							{/* 软揭示：DictationSoftWrongStage */}
 							<SessionPromptPanel
 								fillHeight
 								className={cn(
@@ -468,7 +322,7 @@ export function Session({
 								)}
 								aria-hidden={phase !== 'soft_wrong'}
 							>
-								<DictationSoftWrongStage
+								<SoftWrongStage
 									answerLabel={yourAnswerLabel}
 									wrongInput={revealedWrongInput}
 									hintContent={canHint ? hintContent : {}}
@@ -480,7 +334,6 @@ export function Session({
 									onShowAnswer={onRevealAnswer}
 								/>
 							</SessionPromptPanel>
-							{/* 完整揭示：RevealedPanelInner */}
 							<SessionPromptPanel
 								fillHeight
 								className={cn(
@@ -545,39 +398,20 @@ export function Session({
 								</Button>
 							</div>
 						</div>
-						<div
-							className={cn(
-								'grid gap-2 pt-4 transition-none',
-								canGoPrevious ? 'grid-cols-3' : 'grid-cols-2',
-								!showWrongActions && 'hidden',
-							)}
-						>
-							<Button
-								type="button"
-								className="h-10 w-full transition-none"
-								onClick={onRetryCurrent}
-							>
-								{t('englishLearning.practice.tryAgain')}
-							</Button>
-							{canGoPrevious ? (
-								<Button
-									type="button"
-									className="h-10 w-full transition-none"
-									onClick={onPreviousQuestion}
-								>
-									{t('englishLearning.practice.previous')}
-								</Button>
-							) : null}
-							<Button
-								type="button"
-								className="h-10 w-full transition-none"
-								onClick={onNext}
-							>
-								{isLastQuestion
+						<SessionWrongActions
+							visible={showWrongActions}
+							canGoPrevious={canGoPrevious}
+							tryAgainLabel={t('englishLearning.practice.tryAgain')}
+							previousLabel={t('englishLearning.practice.previous')}
+							nextLabel={
+								isLastQuestion
 									? t('englishLearning.practice.viewResults')
-									: t('englishLearning.practice.next')}
-							</Button>
-						</div>
+									: t('englishLearning.practice.next')
+							}
+							onRetry={onRetryCurrent}
+							onPrevious={onPreviousQuestion}
+							onNext={onNext}
+						/>
 					</form>
 				</PracticeCard>
 			) : null}

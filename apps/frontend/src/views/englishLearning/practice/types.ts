@@ -280,7 +280,6 @@ export type SessionStageHeaderProps = {
 export type SessionPromptPanelProps = {
 	children: ReactNode;
 	className?: string;
-	scrollable?: boolean;
 	fillHeight?: boolean;
 };
 
@@ -293,27 +292,6 @@ export type SpellingPromptBodyProps = {
 	playing: boolean;
 	playLabel: string;
 	onPlay: () => void;
-};
-
-export type VocabWordPlayButtonProps = {
-	playing: boolean;
-	playAriaLabel: string;
-	stopAriaLabel: string;
-	onPlay: () => void;
-};
-
-export type WordAnswerDetailProps = {
-	item: PracticeVocabItem;
-	correctAnswerLabel: string;
-	showDivider?: boolean;
-	wordRowTrailing?: ReactNode;
-};
-
-export type SentenceAnswerDetailProps = {
-	item: PracticeClassicItem;
-	correctAnswerLabel: string;
-	showDivider?: boolean;
-	sentenceRowTrailing?: ReactNode;
 };
 
 export type RevealedPanelInnerProps = {

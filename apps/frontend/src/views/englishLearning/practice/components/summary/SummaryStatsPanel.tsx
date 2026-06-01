@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 import { SUMMARY_ACCENT_TONE } from './metricTone';
 import { SummaryMetric } from './SummaryMetric';
 
-export type SummaryStatsPanelProps = {
+type SummaryStatsPanelProps = {
 	accuracyPct: number;
 	correctCount: number;
 	wrongCount: number;

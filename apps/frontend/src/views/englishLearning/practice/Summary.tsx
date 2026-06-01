@@ -14,12 +14,13 @@ import {
 	playEnglishPreferred,
 	stopAllEnglishPlayback,
 } from '@/utils/englishTts';
-import { PRACTICE_PAGE_CONTENT_CLASS, PracticeCard } from './components/shell';
+import { PracticeCard } from './components/shell';
 import {
 	SummaryActions,
 	SummaryStatsPanel,
 	WrongListItem,
 } from './components/summary';
+import { PRACTICE_PAGE_CONTENT_CLASS } from './constants';
 import type { SummaryProps } from './types';
 import { shufflePracticeItems } from './utils/grading';
 import { getPracticeAnswerText, isPracticeClassicItem } from './utils/item';

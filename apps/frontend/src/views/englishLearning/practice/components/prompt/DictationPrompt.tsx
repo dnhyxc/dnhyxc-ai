@@ -167,135 +167,50 @@ function DictationStepProgress({
 	);
 }
 
-/** 听写提示：中文释义 + 音标（无英文词面） */
-export function DictationHintPanel({
+/** 听写展开提示：中文释义 + 音标等（无英文词面） */
+function DictationHintPanel({
 	hintContent,
-	variant = 'default',
-	align = 'center',
 }: {
 	hintContent: PracticeHintFields;
-	/** compact：固定高度内截断；softWrong：首次答错面板，字号与间距更大 */
-	variant?: 'default' | 'compact' | 'softWrong';
-	/** start：与播放钮横排时左对齐，减少无效留白 */
-	align?: 'center' | 'start';
 }) {
 	const { t } = useI18n();
 	const translation = hintContent.translationZh?.trim();
 	const ipaText = hintContent.ipa?.trim();
 	const source = hintContent.source?.trim();
 	const noteZh = hintContent.noteZh?.trim();
-	const compact = variant === 'compact';
-	const softWrong = variant === 'softWrong';
-	const start = align === 'start';
 
 	if (!translation && !ipaText && !source && !noteZh) return null;
 
-	/** 软揭示：出处与说明合并为一行，减少纵向占用 */
-	const softWrongMeta =
-		softWrong && (source || noteZh)
-			? [source, noteZh].filter(Boolean).join(' · ')
-			: null;
-
 	return (
 		<div
-			className={cn(
-				'flex w-full min-w-0 flex-col text-center',
-				start ? 'items-start text-left' : 'items-center',
-				softWrong
-					? 'min-h-0 shrink gap-1.5 overflow-hidden'
-					: compact
-						? 'min-h-0 gap-1 overflow-hidden'
-						: 'justify-between gap-2 px-3',
-			)}
+			className="flex w-full min-w-0 flex-col items-center justify-between gap-2 px-3 text-center"
 			aria-live="polite"
 		>
 			{translation ? (
-				softWrong ? (
-					<div className="flex w-full shrink-0 flex-col items-center gap-1">
-						<span className="text-teal-700/55 dark:text-teal-300/55 text-[10px] font-semibold tracking-[0.12em] uppercase">
-							{t('englishLearning.practice.hintLabelTranslation')}
-						</span>
-						<p className="text-textcolor line-clamp-4 w-full text-center text-sm font-semibold leading-snug">
-							{translation}
-						</p>
-					</div>
-				) : compact ? (
-					start ? (
-						<p className="text-textcolor line-clamp-2 w-full text-sm font-semibold leading-snug">
-							<span className="text-textcolor/45 me-1 text-[10px] font-medium tracking-wide">
-								{t('englishLearning.practice.hintLabelTranslation')}
-							</span>
-							{translation}
-						</p>
-					) : (
-						<div className="flex w-full flex-col items-center gap-0.5">
-							<span className="text-textcolor/45 text-[10px] font-medium tracking-wide">
-								{t('englishLearning.practice.hintLabelTranslation')}
-							</span>
-							<p className="text-textcolor line-clamp-2 text-sm font-semibold leading-snug">
-								{translation}
-							</p>
-						</div>
-					)
-				) : (
-					<div className="flex w-full min-w-0 flex-col gap-2">
-						<span className="text-textcolor/45 text-xs font-medium tracking-wide">
-							{t('englishLearning.practice.hintLabelTranslation')}
-						</span>
-						<p className="text-textcolor line-clamp-3 text-sm font-semibold leading-snug">
-							{translation}
-						</p>
-					</div>
-				)
+				<div className="flex w-full min-w-0 flex-col gap-2">
+					<span className="text-textcolor/45 text-xs font-medium tracking-wide">
+						{t('englishLearning.practice.hintLabelTranslation')}
+					</span>
+					<p className="text-textcolor line-clamp-3 text-sm font-semibold leading-snug">
+						{translation}
+					</p>
+				</div>
 			) : null}
 			{ipaText ? (
-				<p
-					className={cn(
-						'w-full shrink-0 text-center font-mono text-teal-600/90 dark:text-teal-400/90',
-						softWrong
-							? 'text-xs leading-snug'
-							: compact
-								? 'line-clamp-1 text-[11px] leading-snug'
-								: 'line-clamp-2 text-xs leading-snug',
-					)}
-				>
+				<p className="w-full shrink-0 text-center font-mono text-xs leading-snug text-teal-600/90 line-clamp-2 dark:text-teal-400/90">
 					{displayIpaWrapped(ipaText)}
 				</p>
 			) : null}
-			{softWrong ? (
-				softWrongMeta ? (
-					<p className="text-textcolor/60 line-clamp-3 w-full shrink-0 text-center text-[11px] leading-snug italic">
-						{softWrongMeta}
-					</p>
-				) : null
-			) : (
-				<>
-					{source ? (
-						<p
-							className={cn(
-								'w-full shrink-0 text-center text-textcolor/65',
-								compact
-									? 'line-clamp-1 text-[11px] leading-snug'
-									: 'line-clamp-2 text-xs leading-snug',
-							)}
-						>
-							{source}
-						</p>
-					) : null}
-					{noteZh ? (
-						<p
-							className={cn(
-								'w-full shrink-0 text-center italic text-textcolor/60',
-								compact
-									? 'line-clamp-2 text-[10px] leading-snug'
-									: 'line-clamp-3 text-xs leading-relaxed',
-							)}
-						>
-							{noteZh}
-						</p>
-					) : null}
-				</>
-			)}
+			{source ? (
+				<p className="text-textcolor/65 w-full shrink-0 text-center text-xs leading-snug line-clamp-2">
+					{source}
+				</p>
+			) : null}
+			{noteZh ? (
+				<p className="text-textcolor/60 w-full shrink-0 text-center text-xs leading-relaxed italic line-clamp-3">
+					{noteZh}
+				</p>
+			) : null}
 		</div>
 	);
 }

@@ -1,5 +1,9 @@
 /**
- * 练习卡 — 共享「标签 | 内容」网格与听音底栏（软揭示 / 完整揭示）
+ * 练习卡字段网格与听音底栏（软揭示 / 完整揭示共用）
+ *
+ * - FieldCells：标签 | 内容 两行网格
+ * - PRACTICE_PANEL_SHELL：渐变面板壳
+ * - PracticeSoftWrongListenFooter / PracticeRevealedListenFooter：底栏播放区
  */
 import { Eye } from 'lucide-react';
 import type { ReactNode } from 'react';
@@ -9,18 +13,18 @@ import {
 	DictationEqualizer,
 	DictationPlayButton,
 	DictationPlaySlot,
-} from '../dictation/DictationPrompt';
+} from '../prompt/DictationPrompt';
 
 export const PRACTICE_PANEL_SHELL =
 	'flex h-full min-h-0 w-full flex-col overflow-hidden rounded-[inherit] bg-linear-to-b from-teal-500/6 via-theme-background to-theme-background p-3';
 
-export const FIELD_GRID =
+const FIELD_GRID =
 	'grid w-full grid-cols-[4rem_minmax(0,1fr)] items-baseline gap-x-5';
 
-export const LABEL_CELL =
+const LABEL_CELL =
 	'text-textcolor/45 block w-full text-justify text-sm font-medium leading-snug tracking-normal [text-align-last:justify] [font-family:var(--font-family)]';
 
-export const VALUE_CELL =
+const VALUE_CELL =
 	'text-textcolor min-w-0 text-base leading-snug wrap-break-word [font-family:var(--font-family)]';
 
 /** 网格字段：标签 + 值（行间 mb-3，末行不留底距） */

@@ -26,13 +26,14 @@ import type { PracticeShortcutsMenuProps } from '../../types';
 type PracticeShortcutKey =
 	| 'enter'
 	| 'shiftSpace'
+	| 'space'
 	| 'left'
 	| 'right'
 	| 'up'
 	| 'down';
 
 const PRACTICE_SHORTCUT_ICONS: Record<
-	Exclude<PracticeShortcutKey, 'shiftSpace'>,
+	Exclude<PracticeShortcutKey, 'shiftSpace' | 'space'>,
 	{ Icon: LucideIcon; ariaKey: string }
 > = {
 	enter: {
@@ -75,6 +76,16 @@ function ShortcutKeyIcon({
 					{t('englishLearning.practice.shortcuts.keySpace')}
 				</kbd>
 			</span>
+		);
+	}
+	if (shortcutKey === 'space') {
+		return (
+			<kbd
+				className={KEY_BADGE}
+				aria-label={t('englishLearning.practice.shortcuts.keySpace')}
+			>
+				{t('englishLearning.practice.shortcuts.keySpace')}
+			</kbd>
 		);
 	}
 	const { Icon, ariaKey } = PRACTICE_SHORTCUT_ICONS[shortcutKey];
@@ -137,6 +148,9 @@ export function PracticeShortcutsMenu({
 	type ShortcutRowDef = { label: string; keys: PracticeShortcutKey[] };
 
 	const sections = useMemo((): { title: string; rows: ShortcutRowDef[] }[] => {
+		const playKeysWrong: PracticeShortcutKey[] =
+			practiceMode === 'spelling' ? ['shiftSpace'] : ['space'];
+
 		const promptRows: ShortcutRowDef[] = [
 			{
 				label: t('englishLearning.practice.shortcuts.check'),
@@ -160,7 +174,7 @@ export function PracticeShortcutsMenu({
 				rows: [
 					{
 						label: t('englishLearning.practice.shortcuts.play'),
-						keys: ['shiftSpace'],
+						keys: playKeysWrong,
 					},
 					{
 						label: t('englishLearning.practice.shortcuts.showAnswer'),
@@ -185,7 +199,7 @@ export function PracticeShortcutsMenu({
 				rows: [
 					{
 						label: t('englishLearning.practice.shortcuts.play'),
-						keys: ['shiftSpace'],
+						keys: playKeysWrong,
 					},
 					{
 						label: t('englishLearning.practice.shortcuts.previous'),

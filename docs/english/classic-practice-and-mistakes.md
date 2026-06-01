@@ -46,7 +46,7 @@
 | `apps/frontend/src/views/englishLearning/practice/utils/fetchWords.ts` | 按 `contentKind` 分支拉收藏/错题/资源库/词包/live |
 | `apps/frontend/src/views/englishLearning/practice/utils/hint.ts` | 语句听写/拼写提示字段（释义、出处、赏析） |
 | `apps/frontend/src/views/englishLearning/practice/Session.tsx`、`Summary.tsx` | 语句作答校验、结算加入语句错题集 |
-| `apps/frontend/src/views/englishLearning/practice/components/reveal/SentenceAnswerDetail.tsx` | 揭示面板语句详情 |
+| `apps/frontend/src/views/englishLearning/practice/components/reveal/revealedDetailRows.tsx` | 完整揭示经典句网格字段（`buildClassicRevealedDetailRows`） |
 | `apps/frontend/src/store/englishPracticePool.ts` | 池 key 前缀 `classic:` / `vocab:` |
 
 ### 2.3 前端 — 错题集与入口

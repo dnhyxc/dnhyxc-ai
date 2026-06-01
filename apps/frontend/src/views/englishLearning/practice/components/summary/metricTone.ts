@@ -3,7 +3,7 @@
  */
 import type { SummaryMetricTone } from '../../types';
 
-export type SummaryMetricToneStyle = {
+type SummaryMetricToneStyle = {
 	shell: string;
 	label: string;
 	value: string;

@@ -4,10 +4,7 @@
 import { cn } from '@/lib/utils';
 import { displayIpaWrapped } from '@/utils';
 import type { SpellingPromptBodyProps } from '../../types';
-import {
-	DictationEqualizer,
-	DictationPlayButton,
-} from '../dictation/DictationPrompt';
+import { DictationEqualizer, DictationPlayButton } from './DictationPrompt';
 
 export function SpellingPromptBody({
 	promptLabel,

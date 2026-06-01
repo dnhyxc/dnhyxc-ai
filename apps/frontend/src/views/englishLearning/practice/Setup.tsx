@@ -26,11 +26,8 @@ import {
 	getEnglishPracticePoolTotal,
 	resolveEnglishPracticePoolKey,
 } from '@/store/englishPracticePool';
-import {
-	PRACTICE_PAGE_CONTENT_CLASS,
-	PracticeCard,
-	PracticeSegmented,
-} from './components/shell';
+import { PracticeCard, PracticeSegmented } from './components/shell';
+import { PRACTICE_PAGE_CONTENT_CLASS } from './constants';
 import type {
 	PracticeCountOption,
 	PracticeMode,

@@ -1,12 +1,14 @@
 /**
- * 首次答错（软揭示）— 网格字段 + 底栏听音与看答案
+ * 首次答错（软揭示）— 你的答案 + 提示字段 + 底栏（播放 / 看答案）
  */
-import type { ReactNode } from 'react';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
-import { displayIpaWrapped } from '@/utils';
 import type { PracticeHintFields } from '../../types';
-import { countPracticeHintFields } from '../../utils/hint';
+import { buildHintFieldRows } from './HintFieldRows';
+import {
+	isPracticePanelCompact,
+	PracticeScrollableFieldStack,
+} from './PanelLayout';
 import {
 	FieldCells,
 	PRACTICE_PANEL_SHELL,
@@ -14,79 +16,7 @@ import {
 	PracticeSoftWrongListenFooter,
 } from './PracticeFieldGrid';
 
-function buildHintRows(
-	hintContent: PracticeHintFields,
-	t: ReturnType<typeof useI18n>['t'],
-	compact: boolean,
-): { label: string; value: ReactNode; valueClassName?: string }[] {
-	const translation = hintContent.translationZh?.trim();
-	const ipaText = hintContent.ipa?.trim();
-	const source = hintContent.source?.trim();
-	const noteZh = hintContent.noteZh?.trim();
-	const body = cn(
-		'leading-snug [font-family:var(--font-family)]',
-		compact ? 'text-sm' : 'text-base',
-	);
-	const rows: { label: string; value: ReactNode; valueClassName?: string }[] =
-		[];
-
-	if (translation) {
-		rows.push({
-			label: t('englishLearning.practice.hintLabelTranslation'),
-			value: (
-				<span className={cn('font-semibold', body, compact && 'line-clamp-4')}>
-					{translation}
-				</span>
-			),
-		});
-	}
-	if (ipaText) {
-		rows.push({
-			label: t('englishLearning.practice.hintLabelIpa'),
-			value: (
-				<span
-					className={cn(
-						'font-mono text-teal-600/85 dark:text-teal-400/85',
-						body,
-					)}
-				>
-					{displayIpaWrapped(ipaText)}
-				</span>
-			),
-		});
-	}
-	if (source) {
-		rows.push({
-			label: t('englishLearning.practice.hintLabelSource'),
-			value: (
-				<span
-					className={cn('text-textcolor/75', body, compact && 'line-clamp-3')}
-				>
-					{source}
-				</span>
-			),
-		});
-	}
-	if (noteZh) {
-		rows.push({
-			label: t('englishLearning.practice.hintLabelNote'),
-			value: (
-				<span
-					className={cn(
-						'text-textcolor/70 italic',
-						body,
-						compact && 'line-clamp-3',
-					)}
-				>
-					{noteZh}
-				</span>
-			),
-		});
-	}
-	return rows;
-}
-
-type PracticeSoftWrongStageProps = {
+type SoftWrongStageProps = {
 	answerLabel: string;
 	wrongInput: string;
 	hintContent: PracticeHintFields;
@@ -98,7 +28,7 @@ type PracticeSoftWrongStageProps = {
 	onShowAnswer: () => void;
 };
 
-function PracticeSoftWrongStage({
+export function SoftWrongStage({
 	answerLabel,
 	wrongInput,
 	hintContent,
@@ -108,38 +38,31 @@ function PracticeSoftWrongStage({
 	guidance,
 	showAnswerLabel,
 	onShowAnswer,
-}: PracticeSoftWrongStageProps) {
+}: SoftWrongStageProps) {
 	const { t } = useI18n();
-	const hintCount = countPracticeHintFields(hintContent);
-	const compact = hintCount >= 3;
-	const hintRows = buildHintRows(hintContent, t, compact);
+
+	const draftHintRows = buildHintFieldRows(hintContent, t, false);
+	const compact = isPracticePanelCompact(draftHintRows.length);
+	const hintRows = compact
+		? buildHintFieldRows(hintContent, t, true)
+		: draftHintRows;
 
 	return (
 		<div className={PRACTICE_PANEL_SHELL}>
-			<div className="px-1 flex h-full min-h-0 flex-1 flex-col overflow-hidden">
-				<div
-					className="min-h-0 flex-1 overflow-y-auto"
-					role="status"
-					aria-live="polite"
+			<PracticeScrollableFieldStack>
+				<FieldCells
+					label={answerLabel}
+					valueClassName="text-rose-500 font-semibold"
 				>
-					<FieldCells
-						label={answerLabel}
-						valueClassName="text-rose-500 font-semibold"
-					>
-						<span className={cn(compact && 'line-clamp-3')}>{wrongInput}</span>
-					</FieldCells>
+					<span className={cn(compact && 'line-clamp-3')}>{wrongInput}</span>
+				</FieldCells>
 
-					{hintRows.map((row) => (
-						<FieldCells
-							key={row.label}
-							label={row.label}
-							valueClassName={row.valueClassName}
-						>
-							{row.value}
-						</FieldCells>
-					))}
-				</div>
-			</div>
+				{hintRows.map((row) => (
+					<FieldCells key={row.label} label={row.label}>
+						{row.value}
+					</FieldCells>
+				))}
+			</PracticeScrollableFieldStack>
 
 			<PracticeSoftWrongListenFooter
 				playing={playing}
@@ -156,6 +79,3 @@ function PracticeSoftWrongStage({
 		</div>
 	);
 }
-
-export const DictationSoftWrongStage = PracticeSoftWrongStage;
-export const SpellingSoftWrongStage = PracticeSoftWrongStage;
