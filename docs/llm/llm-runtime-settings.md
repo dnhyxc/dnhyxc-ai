@@ -71,6 +71,10 @@ createLlm(config, options, llmConfigService?)
 - API Key 输入框默认 `password`，右侧 **Eye / EyeOff** 切换明文；加载后回填服务端 `apiKey`。
 - 底部左侧展示「当前自定义配置已生效」/ 不完整提示，与保存、恢复按钮同一行。
 
+### 3.5 设置页 UI 增强（2026-05）
+
+Base URL / 模型名改为可输入 Combobox + 硅基/DeepSeek 预设联动；未保存 Key 时回显 `VITE_SILICONFLOW_API_KEY`。详见 **[llm-setting-ui-presets.md](./llm-setting-ui-presets.md)**（主文档）；本节不再重复 Combobox 实现细节。
+
 ---
 
 ## 4. 关键代码与注释

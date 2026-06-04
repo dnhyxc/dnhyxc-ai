@@ -305,6 +305,11 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'New Settings → LLM page: save API Key, Base URL, and model name on the server. When enabled, chat, knowledge assistant, Q&A, and English learning share one config; Restore environment variables reverts to server defaults.',
 	},
+	's9-4': {
+		title: 'LLM settings page UX',
+		description:
+			'Base URL and model name accept direct typing or presets (SiliconFlow / DeepSeek) via the button beside the field; choosing one preset pairs the other field. The footer active hint shows the current model name. A local default API Key may pre-fill on first visit; after save, the server copy applies.',
+	},
 	's10-1': {
 		title: 'Image component improvements',
 		description:

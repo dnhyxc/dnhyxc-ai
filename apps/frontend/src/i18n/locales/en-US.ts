@@ -97,7 +97,16 @@ export const enUS = {
 	'setting.llm.connectionDesc':
 		'Please fill in the API Key, Base URL, and model name of the OpenAI-compatible interface.',
 	'setting.llm.baseUrl': 'Base URL',
+	'setting.llm.baseUrlPlaceholder': 'Enter base URL',
+	'setting.llm.openPresets': 'Choose preset',
+	'setting.llm.presetOrCustomHint':
+		'Type directly in the field, or use the button on the right for presets',
+	'setting.llm.baseUrlOption.siliconflow': 'SiliconFlow (api.siliconflow.cn)',
+	'setting.llm.baseUrlOption.deepseek': 'DeepSeek (api.deepseek.com)',
 	'setting.llm.modelName': 'Model name',
+	'setting.llm.modelNamePlaceholder': 'Enter model name',
+	'setting.llm.modelOption.glm47': 'Pro/zai-org/GLM-4.7',
+	'setting.llm.modelOption.deepseekChat': 'deepseek-chat',
 	'setting.llm.apiKey': 'API Key',
 	'setting.llm.apiKeyPlaceholder': 'Enter API Key',
 	'setting.llm.showApiKey': 'Show API Key',
@@ -108,7 +117,7 @@ export const enUS = {
 	'setting.llm.clear': 'Restore default configuration',
 	'setting.llm.saveSuccess': 'LLM settings saved',
 	'setting.llm.clearSuccess': 'Reverted to environment variables',
-	'setting.llm.activeHint': 'Custom LLM settings are active',
+	'setting.llm.activeHint': '{modelName} model configuration is in use',
 	'setting.llm.incompleteHint':
 		'Enabled but incomplete; still using environment variables',
 	'setting.theme.colorTitle': 'Color themes',

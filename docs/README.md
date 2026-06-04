@@ -44,6 +44,7 @@
 | 本地上传落盘 / UPLOAD_ROOT | [ops/upload-storage-paths.md](./ops/upload-storage-paths.md) |
 | `createLlm` / 400 | [llm/create-llm.md](./llm/create-llm.md) |
 | 设置页大模型 Key | [llm/llm-runtime-settings.md](./llm/llm-runtime-settings.md) |
+| 设置页预设 / Combobox | [llm/llm-setting-ui-presets.md](./llm/llm-setting-ui-presets.md) |
 | 英语学习 Agent + LLM | [llm/agent-create-llm-unify.md](./llm/agent-create-llm-unify.md) |
 
 ---

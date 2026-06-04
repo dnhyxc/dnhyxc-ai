@@ -1,4 +1,5 @@
 import { Button } from '@ui/button';
+import { CreatableCombobox } from '@ui/combobox';
 import { Spinner, Switch, Toast } from '@ui/index';
 import { Input } from '@ui/input';
 import { Label } from '@ui/label';
@@ -17,17 +18,101 @@ import {
 const fieldInputClass =
 	'flex-1 min-w-0 border border-theme/20 bg-transparent shadow-none focus-visible:ring-0 focus-visible:border-theme/40';
 
+/** 服务商联动预设：选 Base URL 或模型名称中的任一项时，另一项同步为配对值 */
+const LLM_PROVIDER_PRESETS = [
+	{
+		baseUrl: 'https://api.siliconflow.cn/v1',
+		modelName: 'Pro/zai-org/GLM-4.7',
+		baseUrlLabelKey: 'setting.llm.baseUrlOption.siliconflow' as const,
+		modelLabelKey: 'setting.llm.modelOption.glm47' as const,
+	},
+	{
+		baseUrl: 'https://api.deepseek.com',
+		modelName: 'deepseek-chat',
+		baseUrlLabelKey: 'setting.llm.baseUrlOption.deepseek' as const,
+		modelLabelKey: 'setting.llm.modelOption.deepseekChat' as const,
+	},
+] as const;
+
+const DEFAULT_LLM_BASE_URL = LLM_PROVIDER_PRESETS[0].baseUrl;
+const DEFAULT_LLM_MODEL = LLM_PROVIDER_PRESETS[0].modelName;
+
+const LLM_BASE_URL_TO_MODEL: ReadonlyMap<string, string> = new Map(
+	LLM_PROVIDER_PRESETS.map((p) => [p.baseUrl, p.modelName]),
+);
+
+const LLM_MODEL_TO_BASE_URL: ReadonlyMap<string, string> = new Map(
+	LLM_PROVIDER_PRESETS.map((p) => [p.modelName, p.baseUrl]),
+);
+
+function resolveTextField(raw: string | undefined, fallback: string): string {
+	const trimmed = raw?.trim() ?? '';
+	return trimmed.length > 0 ? trimmed : fallback;
+}
+
+function readEnvSiliconflowApiKey(): string {
+	const raw = import.meta.env.VITE_SILICONFLOW_API_KEY;
+	return typeof raw === 'string' ? raw.trim() : '';
+}
+
+/** 未在服务端保存 API Key 时，回显 .env 中的 VITE_SILICONFLOW_API_KEY */
+const DEFAULT_LLM_API_KEY = readEnvSiliconflowApiKey();
+
+function resolveApiKeyFields(savedFromServer: string | undefined | null): {
+	displayKey: string;
+	savedKey: string;
+} {
+	const saved = (savedFromServer ?? '').trim();
+	if (saved) {
+		return { displayKey: saved, savedKey: saved };
+	}
+	return {
+		displayKey: DEFAULT_LLM_API_KEY,
+		savedKey: '',
+	};
+}
+
 const LlmSetting = () => {
 	const { t } = useI18n();
 	const [loading, setLoading] = useState(true);
 	const [saving, setSaving] = useState(false);
 	const [view, setView] = useState<LlmSettingsView | null>(null);
 	const [enabled, setEnabled] = useState(false);
-	const [baseUrl, setBaseUrl] = useState('');
-	const [modelName, setModelName] = useState('');
-	const [apiKey, setApiKey] = useState('');
+	const [baseUrl, setBaseUrl] = useState<string>(DEFAULT_LLM_BASE_URL);
+	const [modelName, setModelName] = useState<string>(DEFAULT_LLM_MODEL);
+	const [apiKey, setApiKey] = useState(DEFAULT_LLM_API_KEY);
 	const [savedApiKey, setSavedApiKey] = useState('');
 	const [showApiKey, setShowApiKey] = useState(false);
+
+	const baseUrlOptions = useMemo(
+		() =>
+			LLM_PROVIDER_PRESETS.map((preset) => ({
+				value: preset.baseUrl,
+				label: t(preset.baseUrlLabelKey),
+			})),
+		[t],
+	);
+
+	const modelOptions = useMemo(
+		() =>
+			LLM_PROVIDER_PRESETS.map((preset) => ({
+				value: preset.modelName,
+				label: t(preset.modelLabelKey),
+			})),
+		[t],
+	);
+
+	const onBaseUrlChange = useCallback((next: string) => {
+		setBaseUrl(next);
+		const pairedModel = LLM_BASE_URL_TO_MODEL.get(next.trim());
+		if (pairedModel) setModelName(pairedModel);
+	}, []);
+
+	const onModelNameChange = useCallback((next: string) => {
+		setModelName(next);
+		const pairedBase = LLM_MODEL_TO_BASE_URL.get(next.trim());
+		if (pairedBase) setBaseUrl(pairedBase);
+	}, []);
 
 	const load = useCallback(async () => {
 		setLoading(true);
@@ -42,12 +127,12 @@ const LlmSetting = () => {
 				const fallbackBase =
 					defaultsRes.success && defaultsRes.data?.baseUrl
 						? defaultsRes.data.baseUrl
-						: 'https://api.siliconflow.cn/v1';
-				setBaseUrl(res.data.baseUrl || fallbackBase);
-				setModelName(res.data.modelName || 'Pro/zai-org/GLM-4.7');
-				const key = res.data.apiKey ?? '';
-				setSavedApiKey(key);
-				setApiKey(key);
+						: DEFAULT_LLM_BASE_URL;
+				setBaseUrl(resolveTextField(res.data.baseUrl, fallbackBase));
+				setModelName(resolveTextField(res.data.modelName, DEFAULT_LLM_MODEL));
+				const { displayKey, savedKey } = resolveApiKeyFields(res.data.apiKey);
+				setSavedApiKey(savedKey);
+				setApiKey(displayKey);
 				setShowApiKey(false);
 			}
 		} finally {
@@ -80,9 +165,9 @@ const LlmSetting = () => {
 			});
 			if (res.success && res.data) {
 				setView(res.data);
-				const key = res.data.apiKey ?? '';
-				setSavedApiKey(key);
-				setApiKey(key);
+				const { displayKey, savedKey } = resolveApiKeyFields(res.data.apiKey);
+				setSavedApiKey(savedKey);
+				setApiKey(displayKey);
 				setShowApiKey(false);
 				Toast({
 					type: 'success',
@@ -101,10 +186,10 @@ const LlmSetting = () => {
 			if (res.success && res.data) {
 				setView(res.data);
 				setEnabled(false);
-				setBaseUrl('');
-				setModelName('');
+				setBaseUrl(DEFAULT_LLM_BASE_URL);
+				setModelName(DEFAULT_LLM_MODEL);
 				setSavedApiKey('');
-				setApiKey('');
+				setApiKey(DEFAULT_LLM_API_KEY);
 				setShowApiKey(false);
 				Toast({
 					type: 'success',
@@ -207,30 +292,36 @@ const LlmSetting = () => {
 									<Label htmlFor="llm-base-url" className="shrink-0 sm:w-15">
 										{t('setting.llm.baseUrl')}
 									</Label>
-									<Input
-										id="llm-base-url"
-										value={baseUrl}
-										onChange={(e) => setBaseUrl(e.target.value)}
-										placeholder="https://api.siliconflow.cn/v1"
-										disabled={!enabled || saving}
-										autoComplete="off"
-										className={fieldInputClass}
-									/>
+									<div className="min-w-0 flex-1">
+										<CreatableCombobox
+											id="llm-base-url"
+											value={baseUrl}
+											onChange={onBaseUrlChange}
+											options={baseUrlOptions}
+											placeholder={t('setting.llm.baseUrlPlaceholder')}
+											presetsAriaLabel={t('setting.llm.openPresets')}
+											disabled={!enabled || saving}
+											inputClassName={fieldInputClass}
+										/>
+									</div>
 								</div>
 
 								<div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
 									<Label htmlFor="llm-model" className="shrink-0 sm:w-15">
 										{t('setting.llm.modelName')}
 									</Label>
-									<Input
-										id="llm-model"
-										value={modelName}
-										onChange={(e) => setModelName(e.target.value)}
-										placeholder="Pro/zai-org/GLM-4.7"
-										disabled={!enabled || saving}
-										autoComplete="off"
-										className={fieldInputClass}
-									/>
+									<div className="min-w-0 flex-1">
+										<CreatableCombobox
+											id="llm-model"
+											value={modelName}
+											onChange={onModelNameChange}
+											options={modelOptions}
+											placeholder={t('setting.llm.modelNamePlaceholder')}
+											presetsAriaLabel={t('setting.llm.openPresets')}
+											disabled={!enabled || saving}
+											inputClassName={fieldInputClass}
+										/>
+									</div>
 								</div>
 							</div>
 						</div>
@@ -240,7 +331,10 @@ const LlmSetting = () => {
 								<p className="min-w-0 flex-1 text-sm">
 									{view?.active ? (
 										<span className="text-teal-500">
-											{t('setting.llm.activeHint')}
+											{t('setting.llm.activeHint', {
+												modelName:
+													view.modelName?.trim() || modelName.trim() || '—',
+											})}
 										</span>
 									) : view?.enabled && !view.active ? (
 										<span className="text-textcolor/60">
