@@ -35,6 +35,7 @@
 
 | 文档 | 说明 |
 |------|------|
+| [practice-review-srs.md](./practice-review-srs.md) | **今日复习（SRS）**、侧栏整合、复习设置页入口、随机分页补足 |
 | [practice-summary-ui.md](./practice-summary-ui.md) | 听写/拼写练习与结算页 UI、作答明细、统计条 |
 | [practice-session-hint.md](./practice-session-hint.md) | 单题练习「提示」：听写释义/音标、拼写音标、固定高度无滚动 |
 | [practice-session-controls.md](./practice-session-controls.md) | 两档答错、再试连播、软揭示布局、音波动画、播放钮 |

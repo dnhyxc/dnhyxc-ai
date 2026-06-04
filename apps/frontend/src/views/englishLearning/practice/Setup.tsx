@@ -4,6 +4,7 @@
 import { Button, Spinner, Toast } from '@ui/index';
 import {
 	BookMarked,
+	CalendarClock,
 	ClipboardList,
 	Headphones,
 	Languages,
@@ -67,6 +68,7 @@ function SourceIcon({ source }: { source: PracticeSource }) {
 	if (source === 'pack') return <Package className={className} />;
 	if (source === 'live') return <Radio className={className} />;
 	if (source === 'mistakes') return <ClipboardList className={className} />;
+	if (source === 'review') return <CalendarClock className={className} />;
 	return <BookMarked className={className} />;
 }
 
@@ -96,9 +98,12 @@ export function Setup({
 			initialSource === 'library' ||
 			initialSource === 'pack' ||
 			initialSource === 'live' ||
-			initialSource === 'mistakes',
+			initialSource === 'mistakes' ||
+			initialSource === 'review',
 		[initialSource],
 	);
+
+	const hideOrderPicker = source === 'review';
 
 	const poolTotalDisplay = useMemo(() => {
 		if (initialPoolTotal != null && initialPoolTotal > 0) {
@@ -298,7 +303,12 @@ export function Setup({
 						</div>
 					</div>
 
-					<div className="grid gap-5 sm:grid-cols-2">
+					<div
+						className={cn(
+							'grid gap-5',
+							hideOrderPicker ? undefined : 'sm:grid-cols-2',
+						)}
+					>
 						<SetupSection label={t('englishLearning.practice.countLabel')}>
 							<div className={SETUP_SEGMENTED_PANEL_CLASS}>
 								<PracticeSegmented
@@ -311,24 +321,26 @@ export function Setup({
 								/>
 							</div>
 						</SetupSection>
-						<SetupSection label={t('englishLearning.practice.orderLabel')}>
-							<div className={SETUP_SEGMENTED_PANEL_CLASS}>
-								<PracticeSegmented
-									value={order}
-									options={[
-										{
-											value: 'random',
-											label: t('englishLearning.practice.orderRandom'),
-										},
-										{
-											value: 'sequential',
-											label: t('englishLearning.practice.orderSequential'),
-										},
-									]}
-									onChange={setOrder}
-								/>
-							</div>
-						</SetupSection>
+						{hideOrderPicker ? null : (
+							<SetupSection label={t('englishLearning.practice.orderLabel')}>
+								<div className={SETUP_SEGMENTED_PANEL_CLASS}>
+									<PracticeSegmented
+										value={order}
+										options={[
+											{
+												value: 'random',
+												label: t('englishLearning.practice.orderRandom'),
+											},
+											{
+												value: 'sequential',
+												label: t('englishLearning.practice.orderSequential'),
+											},
+										]}
+										onChange={setOrder}
+									/>
+								</div>
+							</SetupSection>
+						)}
 					</div>
 				</div>
 

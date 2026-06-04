@@ -42,6 +42,10 @@ export async function resolvePracticeSourceTitle(
 			return isClassic
 				? params.t('englishLearning.practice.sourceClassicMistakes')
 				: params.t('englishLearning.practice.sourceMistakes');
+		case 'review':
+			return isClassic
+				? params.t('englishLearning.practice.sourceClassicReview')
+				: params.t('englishLearning.practice.sourceReview');
 		case 'library': {
 			const libraryId = params.libraryId?.trim();
 			if (!libraryId) {

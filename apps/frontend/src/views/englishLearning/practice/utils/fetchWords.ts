@@ -1,7 +1,7 @@
 /**
  * 练习词表拉取
  *
- * - **随机**：按 store 总数与题量划分页码（offset = 页码 × 题量），单次拉取 limit=题量。
+ * - **随机**：按 store 总数与题量划分页码（offset = 页码 × 题量）；若命中页不足题量（如最后一页），继续拉其它页补足。
  * - **顺序**：从 offset=0 起，每页步长等于题量。
  * - **继续练习**：顺序拉下一页；随机拉未使用过的页码；均排除已练 wordKey。
  */
@@ -12,6 +12,7 @@ import {
 	type EnglishVocabularyFavoriteListEntry,
 	type EnglishVocabularyLibraryItemRow,
 	type EnglishVocabularyMistakeListEntry,
+	getEnglishPracticeReviewQueue,
 	listEnglishClassicQuoteFavorites,
 	listEnglishClassicQuoteMistakes,
 	listEnglishClassicQuotesLibraryItems,
@@ -166,22 +167,97 @@ function pickRandomPageIndexExcluding(
 	return available[Math.floor(Math.random() * available.length)]!;
 }
 
-function cursorAfterPage(
+function cursorAfterPages(
 	order: PracticeOrder,
-	pageIndex: number,
+	hitPageIndices: readonly number[],
 	prev: PracticeSessionCursor,
 ): PracticeSessionCursor {
+	if (hitPageIndices.length === 0) return prev;
 	if (order === 'sequential') {
+		const maxPage = Math.max(...hitPageIndices);
 		return {
-			nextSequentialPageIndex: pageIndex + 1,
+			nextSequentialPageIndex: maxPage + 1,
 			usedRandomPageIndices: prev.usedRandomPageIndices,
 		};
 	}
 	const used = new Set(prev.usedRandomPageIndices);
-	used.add(pageIndex);
+	for (const pageIndex of hitPageIndices) used.add(pageIndex);
 	return {
 		nextSequentialPageIndex: prev.nextSequentialPageIndex,
 		usedRandomPageIndices: [...used],
+	};
+}
+
+function buildRandomPageTryOrder(total: number, pageSize: number): number[] {
+	const pageCount = getPageCount(total, pageSize);
+	const first = pickRandomPageIndex(total, pageSize);
+	const order: number[] = [first];
+	for (let i = 0; i < pageCount; i += 1) {
+		if (i !== first) order.push(i);
+	}
+	return order;
+}
+
+function buildSequentialPageTryOrder(pageCount: number): number[] {
+	return Array.from({ length: pageCount }, (_, i) => i);
+}
+
+function buildContinueRandomPageTryOrder(
+	total: number,
+	pageSize: number,
+	cursor: PracticeSessionCursor,
+): number[] {
+	const pageCount = getPageCount(total, pageSize);
+	const freshPage = pickRandomPageIndexExcluding(
+		total,
+		pageSize,
+		cursor.usedRandomPageIndices,
+	);
+	const tryOrder: number[] = [];
+	if (freshPage != null) tryOrder.push(freshPage);
+	for (let i = 0; i < pageCount; i += 1) {
+		if (!tryOrder.includes(i)) tryOrder.push(i);
+	}
+	return tryOrder;
+}
+
+async function collectSessionFromPaginatedPages(
+	fetchPage: (offset: number, limit: number) => Promise<PracticePaginatedPage>,
+	total: number,
+	pageSize: number,
+	pageIndices: readonly number[],
+	order: PracticeOrder,
+	cursor: PracticeSessionCursor,
+	excludeKeys: ReadonlySet<string>,
+): Promise<PracticeSessionFetchResult | null> {
+	const acc: PracticeItem[] = [];
+	const hitPages: number[] = [];
+
+	for (const pageIndex of pageIndices) {
+		if (acc.length >= pageSize) break;
+		const page = await fetchPage(
+			pageOffset(pageIndex, pageSize),
+			pageLimit(pageIndex, pageSize, total),
+		);
+		const exclude = new Set(excludeKeys);
+		for (const item of acc) {
+			if (item.key) exclude.add(item.key);
+		}
+		const chunk = filterUnpracticed(
+			dedupeItems(page.items),
+			exclude,
+			pageSize - acc.length,
+		);
+		if (chunk.length > 0) {
+			hitPages.push(pageIndex);
+			acc.push(...chunk);
+		}
+	}
+
+	if (acc.length === 0 || hitPages.length === 0) return null;
+	return {
+		items: acc.slice(0, pageSize),
+		cursor: cursorAfterPages(order, hitPages, cursor),
 	};
 }
 
@@ -248,15 +324,6 @@ function buildLivePool(contentKind: PracticeContentKind): PracticeItem[] {
 	);
 }
 
-function fetchLivePageItems(
-	pool: PracticeItem[],
-	pageIndex: number,
-	pageSize: number,
-): PracticeItem[] {
-	const start = pageOffset(pageIndex, pageSize);
-	return pool.slice(start, start + pageLimit(pageIndex, pageSize, pool.length));
-}
-
 async function fetchInitialFromPaginated(
 	fetchPage: (offset: number, limit: number) => Promise<PracticePaginatedPage>,
 	total: number,
@@ -264,20 +331,21 @@ async function fetchInitialFromPaginated(
 	order: PracticeOrder,
 ): Promise<PracticeSessionFetchResult> {
 	const pageSize = sessionPageSize(count, total);
-	const pageIndex =
-		order === 'random' ? pickRandomPageIndex(total, pageSize) : 0;
-	const page = await fetchPage(
-		pageOffset(pageIndex, pageSize),
-		pageLimit(pageIndex, pageSize, total),
+	const pageCount = getPageCount(total, pageSize);
+	const pageIndices =
+		order === 'random'
+			? buildRandomPageTryOrder(total, pageSize)
+			: buildSequentialPageTryOrder(pageCount);
+	const result = await collectSessionFromPaginatedPages(
+		fetchPage,
+		total,
+		pageSize,
+		pageIndices,
+		order,
+		emptyCursor(),
+		new Set(),
 	);
-	const items = dedupeItems(page.items).slice(0, pageSize);
-	return {
-		items,
-		cursor: cursorAfterPage(order, pageIndex, {
-			nextSequentialPageIndex: 0,
-			usedRandomPageIndices: [],
-		}),
-	};
+	return result ?? { items: [], cursor: emptyCursor() };
 }
 
 async function fetchContinueFromPaginated(
@@ -288,144 +356,27 @@ async function fetchContinueFromPaginated(
 	cursor: PracticeSessionCursor,
 	excludeKeys: readonly string[],
 ): Promise<PracticeSessionFetchResult> {
-	const exclude = new Set(excludeKeys);
 	const pageSize = sessionPageSize(count, total);
 	const pageCount = getPageCount(total, pageSize);
-
-	const collectFromPages = async (
-		pageIndices: number[],
-		orderForCursor: PracticeOrder,
-	): Promise<PracticeSessionFetchResult | null> => {
-		const acc: PracticeItem[] = [];
-		let lastHitPage = -1;
-		for (const pageIndex of pageIndices) {
-			if (acc.length >= pageSize) break;
-			const page = await fetchPage(
-				pageOffset(pageIndex, pageSize),
-				pageLimit(pageIndex, pageSize, total),
-			);
-			const chunk = filterUnpracticed(
-				page.items,
-				exclude,
-				pageSize - acc.length,
-			);
-			if (chunk.length > 0) {
-				lastHitPage = pageIndex;
-				acc.push(...chunk);
-			}
-		}
-		if (acc.length === 0 || lastHitPage < 0) return null;
-		return {
-			items: acc.slice(0, pageSize),
-			cursor: cursorAfterPage(orderForCursor, lastHitPage, cursor),
-		};
-	};
-
-	if (order === 'sequential') {
-		const indices: number[] = [];
-		for (let i = cursor.nextSequentialPageIndex; i < pageCount; i += 1) {
-			indices.push(i);
-		}
-		const result = await collectFromPages(indices, 'sequential');
-		return result ?? { items: [], cursor };
-	}
-
-	const freshPage = pickRandomPageIndexExcluding(
-		total,
-		pageSize,
-		cursor.usedRandomPageIndices,
-	);
-	const tryOrder: number[] = [];
-	if (freshPage != null) tryOrder.push(freshPage);
-	for (let i = 0; i < pageCount; i += 1) {
-		if (!tryOrder.includes(i)) tryOrder.push(i);
-	}
-
-	const result = await collectFromPages(tryOrder, 'random');
-	return result ?? { items: [], cursor };
-}
-
-function fetchLiveInitial(
-	contentKind: PracticeContentKind,
-	count: number,
-	order: PracticeOrder,
-): PracticeSessionFetchResult {
-	const pool = buildLivePool(contentKind);
-	if (pool.length === 0) return { items: [], cursor: emptyCursor() };
-
-	const total = pool.length;
-	const pageSize = sessionPageSize(count, total);
-	const pageIndex =
-		order === 'random' ? pickRandomPageIndex(total, pageSize) : 0;
-	const items = fetchLivePageItems(pool, pageIndex, pageSize).slice(
-		0,
-		pageSize,
-	);
-
-	return {
-		items,
-		cursor: cursorAfterPage(order, pageIndex, emptyCursor()),
-	};
-}
-
-function fetchLiveContinue(
-	contentKind: PracticeContentKind,
-	count: number,
-	order: PracticeOrder,
-	cursor: PracticeSessionCursor,
-	excludeKeys: readonly string[],
-): PracticeSessionFetchResult {
-	const pool = buildLivePool(contentKind);
-	if (pool.length === 0) return { items: [], cursor };
-
-	const total = pool.length;
 	const exclude = new Set(excludeKeys);
-	const pageSize = sessionPageSize(count, total);
-	const pageCount = getPageCount(total, pageSize);
 
-	const collectFromLivePages = (
-		pageIndices: number[],
-		orderForCursor: PracticeOrder,
-	): PracticeSessionFetchResult | null => {
-		const acc: PracticeItem[] = [];
-		let lastHitPage = -1;
-		for (const pageIndex of pageIndices) {
-			if (acc.length >= pageSize) break;
-			const slice = fetchLivePageItems(pool, pageIndex, pageSize);
-			const chunk = filterUnpracticed(slice, exclude, pageSize - acc.length);
-			if (chunk.length > 0) {
-				lastHitPage = pageIndex;
-				acc.push(...chunk);
-			}
-		}
-		if (acc.length === 0 || lastHitPage < 0) return null;
-		return {
-			items: acc.slice(0, pageSize),
-			cursor: cursorAfterPage(orderForCursor, lastHitPage, cursor),
-		};
-	};
+	const pageIndices =
+		order === 'sequential'
+			? Array.from(
+					{ length: Math.max(0, pageCount - cursor.nextSequentialPageIndex) },
+					(_, i) => cursor.nextSequentialPageIndex + i,
+				)
+			: buildContinueRandomPageTryOrder(total, pageSize, cursor);
 
-	if (order === 'sequential') {
-		const indices: number[] = [];
-		for (let i = cursor.nextSequentialPageIndex; i < pageCount; i += 1) {
-			indices.push(i);
-		}
-		const result = collectFromLivePages(indices, 'sequential');
-		return result ?? { items: [], cursor };
-	}
-
-	const freshPage = pickRandomPageIndexExcluding(
+	const result = await collectSessionFromPaginatedPages(
+		fetchPage,
 		total,
 		pageSize,
-		cursor.usedRandomPageIndices,
+		pageIndices,
+		order,
+		cursor,
+		exclude,
 	);
-	const tryOrder: number[] = [];
-	if (freshPage != null) tryOrder.push(freshPage);
-	for (let i = 0; i < pageCount; i += 1) {
-		if (!tryOrder.includes(i)) tryOrder.push(i);
-	}
-
-	const result = collectFromLivePages(tryOrder, 'random');
 	return result ?? { items: [], cursor };
 }
 
@@ -618,17 +569,63 @@ async function fetchPack(
 	return fetchInitialFromPaginated(fetchPage, total, count, order);
 }
 
-function fetchLive(
+async function fetchReview(
+	contentKind: PracticeContentKind,
+	count: number,
+	excludeKeys: readonly string[],
+): Promise<PracticeSessionFetchResult> {
+	const res = await getEnglishPracticeReviewQueue({
+		contentKind,
+		count: Math.min(count, PRACTICE_MAX_WORDS),
+		excludeKeys: [...excludeKeys],
+	});
+	const raw = res.data?.items ?? [];
+	const items = dedupeItems(
+		raw.map((row) =>
+			row.contentKind === 'classic'
+				? toPracticeClassicItem({
+						english: row.english,
+						translationZh: row.translationZh,
+						source: row.source,
+						noteZh: row.noteZh,
+					})
+				: toPracticeVocabItem(row.word, {
+						ipa: row.ipa,
+						pos: row.pos,
+						segmentation: row.segmentation,
+						translationZh: row.translationZh,
+						example: row.example,
+					}),
+		),
+	);
+	return { items, cursor: emptyCursor() };
+}
+
+async function fetchLive(
 	contentKind: PracticeContentKind,
 	count: number,
 	order: PracticeOrder,
 	cursor: PracticeSessionCursor | null,
 	excludeKeys: readonly string[],
-): PracticeSessionFetchResult {
+): Promise<PracticeSessionFetchResult> {
+	const pool = buildLivePool(contentKind);
+	if (pool.length === 0) return { items: [], cursor: emptyCursor() };
+
+	const fetchPage = async (offset: number, limit: number) => ({
+		items: pool.slice(offset, offset + limit),
+	});
+
 	if (cursor) {
-		return fetchLiveContinue(contentKind, count, order, cursor, excludeKeys);
+		return fetchContinueFromPaginated(
+			fetchPage,
+			pool.length,
+			count,
+			order,
+			cursor,
+			excludeKeys,
+		);
 	}
-	return fetchLiveInitial(contentKind, count, order);
+	return fetchInitialFromPaginated(fetchPage, pool.length, count, order);
 }
 
 function runSessionFetch(
@@ -682,9 +679,15 @@ function runSessionFetch(
 				params.poolTotal,
 			);
 		case 'live':
-			return Promise.resolve(
-				fetchLive(params.contentKind, count, params.order, cursor, excludeKeys),
+			return fetchLive(
+				params.contentKind,
+				count,
+				params.order,
+				cursor,
+				excludeKeys,
 			);
+		case 'review':
+			return fetchReview(params.contentKind, count, excludeKeys);
 		default:
 			return Promise.resolve({ items: [], cursor: emptyCursor() });
 	}

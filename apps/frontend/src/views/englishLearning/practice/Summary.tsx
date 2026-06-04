@@ -2,18 +2,20 @@
  * 练习结算页
  */
 import { ScrollArea, Toast } from '@ui/index';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import {
 	batchAddEnglishClassicQuoteMistakes,
 	batchAddEnglishVocabularyMistakes,
+	recordEnglishPracticeReviewAttempts,
 } from '@/service';
 import {
 	isEnglishTtsSupported,
 	playEnglishPreferred,
 	stopAllEnglishPlayback,
 } from '@/utils/englishTts';
+import { dispatchEnglishReviewSummaryRefresh } from '../sidebar';
 import { PracticeCard } from './components/shell';
 import {
 	SummaryActions,
@@ -53,13 +55,15 @@ export function Summary({
 	const [playingKey, setPlayingKey] = useState<string | null>(null);
 	const [saveMistakesLoading, setSaveMistakesLoading] = useState(false);
 
+	const isReviewSession = config.source === 'review';
 	const mistakesPath =
 		config.contentKind === 'classic'
 			? '/english-learning/mistakes?kind=classic'
 			: '/english-learning/mistakes?kind=vocab';
+	const reviewRecordedRef = useRef<string | null>(null);
 
 	const handleSaveMistakes = useCallback(async () => {
-		if (wrongItems.length === 0) return;
+		if (isReviewSession || wrongItems.length === 0) return;
 		setSaveMistakesLoading(true);
 		try {
 			const wrongResults = results.filter((r) => !r.correct);
@@ -117,7 +121,42 @@ export function Summary({
 		} finally {
 			setSaveMistakesLoading(false);
 		}
-	}, [config.contentKind, results, t, wrongItems.length]);
+	}, [config.contentKind, isReviewSession, results, t, wrongItems.length]);
+
+	useEffect(() => {
+		if (!isReviewSession || results.length === 0) return;
+		const signature = results
+			.map((r) => `${r.item.key}:${r.correct ? 1 : 0}`)
+			.join('|');
+		if (reviewRecordedRef.current === signature) return;
+		reviewRecordedRef.current = signature;
+
+		let cancelled = false;
+		void (async () => {
+			try {
+				await recordEnglishPracticeReviewAttempts(
+					results.map((r) => ({
+						contentKind: r.item.contentKind,
+						itemKey: r.item.key,
+						correct: r.correct,
+					})),
+				);
+				if (!cancelled) {
+					dispatchEnglishReviewSummaryRefresh();
+				}
+			} catch {
+				if (!cancelled) {
+					Toast({
+						type: 'warning',
+						title: t('englishLearning.practice.reviewRecordFailed'),
+					});
+				}
+			}
+		})();
+		return () => {
+			cancelled = true;
+		};
+	}, [isReviewSession, results, t]);
 
 	const toggleWordPlay = useCallback(
 		async (word: string, key: string) => {
@@ -265,7 +304,9 @@ export function Summary({
 						labels={{
 							retryWrong: t('englishLearning.practice.retryWrong'),
 							practiceAgain: t('englishLearning.practice.practiceAgain'),
-							continuePractice: t('englishLearning.practice.continuePractice'),
+							continuePractice: isReviewSession
+								? t('englishLearning.practice.continueReview')
+								: t('englishLearning.practice.continuePractice'),
 							openMistakes:
 								config.contentKind === 'classic'
 									? t('englishLearning.mistakes.classicNav')
@@ -282,7 +323,9 @@ export function Summary({
 						onBackToSetup={onBackToSetup}
 						onContinuePractice={onContinuePractice}
 						mistakesPath={mistakesPath}
-						onSaveMistakes={() => void handleSaveMistakes()}
+						onSaveMistakes={
+							isReviewSession ? undefined : () => void handleSaveMistakes()
+						}
 					/>
 				</div>
 			</PracticeCard>

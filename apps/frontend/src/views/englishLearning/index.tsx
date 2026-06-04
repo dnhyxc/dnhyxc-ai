@@ -18,15 +18,10 @@ import EnglishPackStore from '@/store/englishPack';
 import { stripAutoFilledIntentName } from '@/utils';
 import { stopAllEnglishPlayback } from '@/utils/englishTts';
 import { AgentPanel } from './agent';
-import EnglishSource from './components/EnglishSource';
 import {
-	EnglishLearningToolbar,
+	EnglishLearningSidebar,
 	type QuickIntentInputSyncPayload,
-} from './components/LearningToolbar';
-import FavoriteSession from './favorites/components/FavoriteSession';
-import { MistakeBookSession } from './mistakes/components/MistakeBookSession';
-import { ClassicQuotesSection } from './sections/classic';
-import { VocabularyPackSection } from './sections/vocabulary';
+} from './sidebar';
 
 const EnglishLearning = observer(function EnglishLearning() {
 	const { t } = useI18n();
@@ -124,25 +119,9 @@ const EnglishLearning = observer(function EnglishLearning() {
 							>
 								<ScrollArea className="h-full py-4">
 									<div className="flex min-h-0 flex-1 flex-col">
-										<EnglishLearningToolbar
+										<EnglishLearningSidebar
 											onQuickIntentInputSync={onQuickIntentInputSync}
 										/>
-										<EnglishSource
-											title={t('englishLearning.library.vocab.title')}
-											description={t('englishLearning.library.vocab.descShort')}
-											type="vocab"
-										/>
-										<EnglishSource
-											title={t('englishLearning.library.classic.title')}
-											description={t(
-												'englishLearning.library.classic.descShort',
-											)}
-											type="classic"
-										/>
-										<VocabularyPackSection />
-										<ClassicQuotesSection />
-										<FavoriteSession />
-										<MistakeBookSession />
 									</div>
 								</ScrollArea>
 							</aside>

@@ -50,6 +50,10 @@ import {
 	resolveClassicQuotesPackTargetCount,
 	resolveVocabularyPackTargetCount,
 } from './dto/generate-vocabulary.dto';
+import {
+	PracticeReviewQueueQueryDto,
+	PracticeReviewRecordDto,
+} from './dto/practice-review.dto';
 import { SaveClassicQuotesLibraryDto } from './dto/save-classic-quotes-library.dto';
 import { SaveVocabularyLibraryDto } from './dto/save-vocabulary-library.dto';
 import {
@@ -632,6 +636,57 @@ export class EnglishLearningController {
 				userId,
 				dto,
 			);
+		return { success: true, data };
+	}
+
+	@Get('practice/review/summary')
+	async getPracticeReviewSummary(@Req() req: AuthedRequest) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const data =
+			await this.englishLearningService.getPracticeReviewSummary(userId);
+		return { success: true, data };
+	}
+
+	@Get('practice/review/queue')
+	async getPracticeReviewQueue(
+		@Req() req: AuthedRequest,
+		@Query() query: PracticeReviewQueueQueryDto,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const excludeKeys = (query.excludeKeys ?? '')
+			.split(',')
+			.map((k) => k.trim())
+			.filter(Boolean);
+		const data = await this.englishLearningService.getPracticeReviewQueue(
+			userId,
+			{
+				contentKind: query.contentKind,
+				count: query.count ?? 20,
+				excludeKeys,
+			},
+		);
+		return { success: true, data };
+	}
+
+	@Post('practice/review/record')
+	async recordPracticeReviewAttempts(
+		@Req() req: AuthedRequest,
+		@Body() dto: PracticeReviewRecordDto,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const data = await this.englishLearningService.recordPracticeReviewAttempts(
+			userId,
+			dto.attempts,
+		);
 		return { success: true, data };
 	}
 

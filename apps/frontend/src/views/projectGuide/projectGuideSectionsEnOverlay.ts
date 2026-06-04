@@ -291,6 +291,11 @@ export const PROJECT_GUIDE_ITEMS_EN: Record<
 		description:
 			'Sidebar or in-page tabs; total/loaded counts; remove and footer practice. Re-saving updates last wrong input when spelling differs; snapshots unchanged.',
 	},
+	'pg-s13-14': {
+		title: "13.14 Today's review (spaced repetition)",
+		description:
+			"On the English learning home sidebar, Today's review shows due counts for vocabulary and sentences. New mistakes or changed misspellings join today's queue; correct answers remove them. Tap to open the practice setup page (mode and count). The queue is due-order only. After a session, the next review time updates and counts refresh; Back returns to the home page. Continue practice draws more due items if any remain.",
+	},
 	'pg-s13-13': {
 		title: '13.13 Classic mistake row fields',
 		description:

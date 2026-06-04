@@ -30,7 +30,8 @@ function parseSource(raw: string | null): PracticeSource {
 		raw === 'library' ||
 		raw === 'pack' ||
 		raw === 'live' ||
-		raw === 'mistakes'
+		raw === 'mistakes' ||
+		raw === 'review'
 	) {
 		return raw;
 	}
@@ -118,6 +119,10 @@ export default function EnglishLearningPracticePage() {
 			);
 			return;
 		}
+		if (initialSource === 'review') {
+			navigate('/english-learning');
+			return;
+		}
 		if (initialSource === 'pack') {
 			const backStreamId = initialReturnStreamId || initialStreamId;
 			if (backStreamId) {
@@ -194,7 +199,10 @@ export default function EnglishLearningPracticePage() {
 			if (items.length === 0) {
 				Toast({
 					type: 'warning',
-					title: t('englishLearning.practice.continueEmpty'),
+					title:
+						config.source === 'review'
+							? t('englishLearning.practice.continueReviewEmpty')
+							: t('englishLearning.practice.continueEmpty'),
 				});
 				return;
 			}
@@ -256,6 +264,9 @@ export default function EnglishLearningPracticePage() {
 
 	const shellTitle = useMemo(() => {
 		if (phase === 'setup') {
+			if (initialSource === 'review') {
+				return t('route.englishLearning.review.title');
+			}
 			return initialContentKind === 'classic'
 				? t('englishLearning.practice.classicSetupTitle')
 				: t('englishLearning.practice.setupTitle');
@@ -264,7 +275,7 @@ export default function EnglishLearningPracticePage() {
 		return initialContentKind === 'classic'
 			? t('route.englishLearning.practice.classicTitle')
 			: t('route.englishLearning.practice.title');
-	}, [initialContentKind, phase, t]);
+	}, [initialContentKind, initialSource, phase, t]);
 
 	const shellSubtitle = useMemo(() => {
 		if (phase !== 'running' || !config) return undefined;

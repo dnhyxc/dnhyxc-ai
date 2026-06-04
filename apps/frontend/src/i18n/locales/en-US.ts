@@ -793,6 +793,7 @@ export const enUS = {
 	'route.englishLearning.library.title': 'Library',
 	'route.englishLearning.favorites.title': 'My favorites',
 	'route.englishLearning.mistakes.title': 'Mistake book',
+	'route.englishLearning.review.title': "Today's review",
 	'route.englishLearning.stream.title': 'Fetch results',
 	'route.englishLearning.morphology.title': 'Roots & affixes',
 	'route.englishLearning.grammar.title': 'English grammar',
@@ -916,6 +917,18 @@ export const enUS = {
 		'All wrong items are already in the mistake book with the same spelling',
 	'englishLearning.practice.saveMistakesFailed': 'Failed to save mistake book',
 	'englishLearning.practice.sourceMistakes': 'Mistake book',
+	'englishLearning.practice.sourceReview': "Today's review (vocabulary)",
+	'englishLearning.practice.sourceClassicReview': "Today's review (sentences)",
+	'englishLearning.practice.continueReview': 'Continue review',
+	'englishLearning.practice.continueReviewEmpty':
+		'No more items due for review today',
+	'englishLearning.practice.reviewRecordFailed':
+		'Failed to save review progress. Try again later.',
+
+	'englishLearning.review.homeDesc': '{count} due for review today',
+	'englishLearning.review.loadingDue': 'Loading due count…',
+	'englishLearning.review.vocabNav': 'Vocabulary ({count})',
+	'englishLearning.review.classicNav': 'Sentences ({count})',
 
 	'englishLearning.mistakes.desc':
 		'Words you misspelled in practice — review with dictation or spelling',

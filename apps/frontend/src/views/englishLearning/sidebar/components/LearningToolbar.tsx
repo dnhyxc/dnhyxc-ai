@@ -3,11 +3,13 @@
  */
 import { CircleChevronDown, CircleChevronRight, Cog } from 'lucide-react';
 import { observer } from 'mobx-react';
-import { type ReactNode, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import englishAgentStore from '@/store/englishAgent';
+import { ENGLISH_SIDEBAR_ICON_GRADIENT } from '../sidebarAccents';
+import { SidebarPanel } from './SidebarPanel';
 
 const chipDefs = [
 	{
@@ -62,26 +64,17 @@ const chipDefs = [
 	},
 ] as const;
 
-/** 折叠态默认展示的快捷意图条数（展开后展示全部） */
 const QUICK_INTENTS_COLLAPSED_VISIBLE = 2;
+
+const TOOLBAR_CHIP_BASE =
+	'bg-linear-to-r from-lime-600 to-green-700 text-lime-50 hover:bg-linear-to-r hover:from-lime-400 hover:to-green-500 hover:text-lime-800';
+const TOOLBAR_CHIP_SELECTED =
+	'bg-linear-to-r from-lime-400 to-green-500 text-lime-800';
 
 /** 快捷意图与输入框联动：选中填入意图名，取消选中时由父级移除自动填入片段 */
 export type QuickIntentInputSyncPayload =
 	| { mode: 'select'; label: string }
 	| { mode: 'clear' };
-
-/** 左栏内统一卡片容器 */
-function SidebarPanel({
-	children,
-	className,
-}: {
-	children: ReactNode;
-	className?: string;
-}) {
-	return (
-		<div className={cn('rounded-none px-4 pb-3', className)}>{children}</div>
-	);
-}
 
 type EnglishLearningToolbarProps = {
 	onQuickIntentInputSync?: (payload: QuickIntentInputSyncPayload) => void;
@@ -105,9 +98,13 @@ export const EnglishLearningToolbar = observer(function EnglishLearningToolbar({
 
 	return (
 		<SidebarPanel className="min-w-0">
-			{/* 标题区 */}
 			<div className="mb-2.5 flex items-start gap-3">
-				<div className="flex size-10 shrink-0 items-center justify-center rounded-md bg-linear-to-r from-lime-600 to-green-700">
+				<div
+					className={cn(
+						'flex size-10 shrink-0 items-center justify-center rounded-md',
+						ENGLISH_SIDEBAR_ICON_GRADIENT.toolbar,
+					)}
+				>
 					<Cog className="size-6 text-white" aria-hidden />
 				</div>
 				<div className="min-w-0">
@@ -120,10 +117,6 @@ export const EnglishLearningToolbar = observer(function EnglishLearningToolbar({
 				</div>
 			</div>
 
-			{/*
-			 * 快捷意图：默认折叠仅展示前 2 条；点击右侧与单词列表一致的箭头展开全部。
-			 * 条数不超过 2 时不显示折叠按钮。网格按容器宽度弹性列数。
-			 */}
 			<div className="min-w-0">
 				<div className="mb-0.5 flex min-h-6 items-center justify-between gap-2">
 					<div className="text-textcolor/45 flex items-center gap-1.5 text-sm font-medium tracking-wide">
@@ -172,10 +165,9 @@ export const EnglishLearningToolbar = observer(function EnglishLearningToolbar({
 								variant="outline"
 								aria-pressed={selected}
 								className={cn(
-									'h-9 border-none bg-linear-to-r from-lime-600 to-green-700 text-lime-50',
-									'hover:bg-linear-to-r hover:from-lime-400 hover:to-green-500 hover:text-lime-800',
-									selected &&
-										'bg-linear-to-r from-lime-400 to-green-500 text-lime-800',
+									'h-9 border-none',
+									TOOLBAR_CHIP_BASE,
+									selected && TOOLBAR_CHIP_SELECTED,
 								)}
 								onClick={() => {
 									if (selected) {

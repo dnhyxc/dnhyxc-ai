@@ -635,4 +635,14 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'Play/stop is Shift + Space. On wrong screens: ↑ previous question, ← try again, → show answer, ↓ next. Footer Previous button when not on the first item. See ? menu for the full list.',
 	},
+	's24-30': {
+		title: "Today's review (spaced repetition)",
+		description:
+			"The English learning home sidebar shows Today's review with due counts for vocabulary and sentences. New mistakes or changed misspellings enter the schedule; correct answers remove items from today's queue. Opens the practice setup page to choose mode and count; the due count refreshes after you finish.",
+	},
+	's24-31': {
+		title: 'Random practice fills short pages',
+		description:
+			'When random order hits a page with fewer items than your chosen count, the app fetches more pages until the session is full or the pool is exhausted.',
+	},
 };

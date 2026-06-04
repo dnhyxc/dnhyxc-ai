@@ -16,7 +16,8 @@ export type PracticeSource =
 	| 'library'
 	| 'pack'
 	| 'live'
-	| 'mistakes';
+	| 'mistakes'
+	| 'review';
 
 export type PracticeOrder = 'random' | 'sequential';
 

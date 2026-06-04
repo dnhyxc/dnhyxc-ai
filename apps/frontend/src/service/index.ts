@@ -37,6 +37,7 @@ import {
 	ENGLISH_LEARNING_CLASSIC_QUOTES_HISTORY,
 	ENGLISH_LEARNING_CLASSIC_QUOTES_LIBRARIES,
 	ENGLISH_LEARNING_CLASSIC_QUOTES_LIBRARY_UPLOAD,
+	ENGLISH_LEARNING_PRACTICE_REVIEW,
 	ENGLISH_LEARNING_STREAM_CANCEL,
 	ENGLISH_LEARNING_VOCABULARY_FAVORITES,
 	ENGLISH_LEARNING_VOCABULARY_FAVORITES_EXPORT_DOCX,
@@ -1036,6 +1037,61 @@ export const removeEnglishVocabularyMistakesBatch = async (ids: string[]) => {
 	return await http.post<{ removedCount: number }>(
 		`${ENGLISH_LEARNING_VOCABULARY_MISTAKES}/remove-batch`,
 		{ ids },
+	);
+};
+
+export type EnglishPracticeReviewSummary = {
+	vocabDue: number;
+	classicDue: number;
+};
+
+export type EnglishPracticeReviewQueueItem =
+	| (EnglishVocabularyItem & { contentKind: 'vocab'; key: string })
+	| (EnglishClassicQuoteItem & { contentKind: 'classic'; key: string });
+
+export type EnglishPracticeReviewRecordItem = {
+	contentKind: 'vocab' | 'classic';
+	itemKey: string;
+	correct: boolean;
+};
+
+export const getEnglishPracticeReviewSummary = async (options?: {
+	silent?: boolean;
+}) => {
+	return await http.get<EnglishPracticeReviewSummary>(
+		`${ENGLISH_LEARNING_PRACTICE_REVIEW}/summary`,
+		{ silent: options?.silent },
+	);
+};
+
+export const getEnglishPracticeReviewQueue = async (options: {
+	contentKind: 'vocab' | 'classic';
+	count?: number;
+	excludeKeys?: string[];
+	silent?: boolean;
+}) => {
+	const excludeKeys = options.excludeKeys?.filter(Boolean) ?? [];
+	return await http.get<{ items: EnglishPracticeReviewQueueItem[] }>(
+		`${ENGLISH_LEARNING_PRACTICE_REVIEW}/queue`,
+		{
+			querys: {
+				contentKind: options.contentKind,
+				count: options.count ?? 20,
+				...(excludeKeys.length > 0
+					? { excludeKeys: excludeKeys.join(',') }
+					: {}),
+			},
+			silent: options?.silent,
+		},
+	);
+};
+
+export const recordEnglishPracticeReviewAttempts = async (
+	attempts: EnglishPracticeReviewRecordItem[],
+) => {
+	return await http.post<{ updated: number }>(
+		`${ENGLISH_LEARNING_PRACTICE_REVIEW}/record`,
+		{ attempts },
 	);
 };
 

@@ -1,12 +1,16 @@
-import { Layers } from 'lucide-react';
+import { ClipboardList } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { Button } from '@/components/ui';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
+import {
+	ENGLISH_SIDEBAR_BTN_GRADIENT,
+	ENGLISH_SIDEBAR_ICON_GRADIENT,
+} from '../sidebarAccents';
 
-const FavoriteSession = () => {
+/** 首页侧栏：错题集 */
+export function MistakeBookSession() {
 	const { t } = useI18n();
-
 	const navigate = useNavigate();
 
 	return (
@@ -15,17 +19,17 @@ const FavoriteSession = () => {
 				<div
 					className={cn(
 						'flex size-10 shrink-0 items-center justify-center rounded-md',
-						'bg-linear-to-r from-orange-500 to-yellow-500',
+						ENGLISH_SIDEBAR_ICON_GRADIENT.mistakes,
 					)}
 				>
-					<Layers className="text-white size-6" aria-hidden />
+					<ClipboardList className="size-6 text-white" aria-hidden />
 				</div>
 				<div className="min-w-0 flex-1 flex flex-col justify-between">
 					<div className="text-textcolor font-semibold leading-tight">
-						{t('route.englishLearning.favorites.title')}
+						{t('route.englishLearning.mistakes.title')}
 					</div>
 					<div className="h-5 flex items-center justify-between gap-2 text-textcolor/50 mt-1 text-xs leading-snug">
-						{t('englishLearning.favorites.desc')}
+						{t('englishLearning.mistakes.homeDesc')}
 					</div>
 				</div>
 			</div>
@@ -35,30 +39,24 @@ const FavoriteSession = () => {
 					size="sm"
 					className={cn(
 						'h-9 min-w-0 flex-1 gap-2 rounded-md px-3 text-white',
-						'bg-linear-to-r from-orange-500 to-yellow-500 hover:bg-linear-to-r hover:from-orange-400 hover:to-yellow-500',
+						ENGLISH_SIDEBAR_BTN_GRADIENT.mistakes,
 					)}
-					onClick={() => {
-						navigate('/english-learning/favorites?kind=vocab');
-					}}
+					onClick={() => navigate('/english-learning/mistakes?kind=vocab')}
 				>
-					{t('englishLearning.favorites.vocab.nav')}
+					{t('englishLearning.mistakes.vocabNav')}
 				</Button>
 				<Button
 					type="button"
 					size="sm"
 					className={cn(
 						'h-9 min-w-0 flex-1 gap-2 rounded-md px-3 text-white',
-						'bg-linear-to-r from-orange-500 to-yellow-500 hover:bg-linear-to-r hover:from-orange-400 hover:to-yellow-500',
+						ENGLISH_SIDEBAR_BTN_GRADIENT.mistakes,
 					)}
-					onClick={() => {
-						navigate('/english-learning/favorites?kind=classic');
-					}}
+					onClick={() => navigate('/english-learning/mistakes?kind=classic')}
 				>
-					{t('englishLearning.favorites.classic.nav')}
+					{t('englishLearning.mistakes.classicNav')}
 				</Button>
 			</div>
 		</div>
 	);
-};
-
-export default FavoriteSession;
+}

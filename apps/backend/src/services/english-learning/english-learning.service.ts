@@ -17,7 +17,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { createAgent, toolCallLimitMiddleware } from 'langchain';
-import { DataSource, In, Repository } from 'typeorm';
+import { DataSource, In, LessThanOrEqual, Not, Repository } from 'typeorm';
 import { buildAgentLangChainTools } from '../../services/agent/agent-tools';
 import { KnowledgeEmbeddingService } from '../../services/knowledge-embedding/knowledge-embedding.service';
 import { KnowledgeQaService } from '../../services/knowledge-qa/knowledge-qa.service';
@@ -69,6 +69,7 @@ import {
 	resolveClassicQuotesPackTargetCount,
 	resolveVocabularyPackTargetCount,
 } from './dto/generate-vocabulary.dto';
+import type { PracticeReviewRecordItemDto } from './dto/practice-review.dto';
 import { SaveClassicQuotesLibraryDto } from './dto/save-classic-quotes-library.dto';
 import { SaveVocabularyLibraryDto } from './dto/save-vocabulary-library.dto';
 import type { VocabularyFavoriteBodyDto } from './dto/vocabulary-favorite.dto';
@@ -77,6 +78,11 @@ import {
 	buildClassicQuoteFavoritesDocxBuffer,
 	buildVocabularyFavoritesDocxBuffer,
 } from './english-favorites-docx.builder';
+import {
+	applyReviewSrs,
+	defaultReviewStateForNewMistake,
+	parseEaseFactor,
+} from './english-practice-review.srs';
 import {
 	type EnglishClassicQuoteItemJson,
 	EnglishClassicQuotePackBatch,
@@ -91,6 +97,7 @@ import {
 	EnglishPackWebSearchRecord,
 	type EnglishPackWebSearchRoundJson,
 } from './entity/english-pack-web-search.entity';
+import { EnglishPracticeReviewState } from './entity/english-practice-review-state.entity';
 import {
 	EnglishVocabularyPackBatch,
 	type EnglishVocabularyPackItemJson,
@@ -253,6 +260,8 @@ export class EnglishLearningService {
 		private readonly classicQuotesLibraryRepo: Repository<EnglishClassicQuotesLibrary>,
 		@InjectRepository(EnglishClassicQuotesLibraryItem)
 		private readonly classicQuotesLibraryItemRepo: Repository<EnglishClassicQuotesLibraryItem>,
+		@InjectRepository(EnglishPracticeReviewState)
+		private readonly practiceReviewStateRepo: Repository<EnglishPracticeReviewState>,
 	) {}
 
 	/** 中止类异常：用户断开 SSE / 显式 cancel / LangChain 链取消 */
@@ -3913,6 +3922,7 @@ ${existingHintBlock}
 
 		const toInsertKeys = keys.filter((k) => !existingByKey.has(k));
 		const toUpdate: Array<{ id: string; lastUserInput: string }> = [];
+		const toUpdateKeys: string[] = [];
 
 		for (const wordKey of keys) {
 			const row = existingByKey.get(wordKey);
@@ -3925,6 +3935,7 @@ ${existingHintBlock}
 			const prevInput = (row.lastUserInput ?? '').trim();
 			if (nextInput !== prevInput) {
 				toUpdate.push({ id: row.id, lastUserInput: nextInput });
+				toUpdateKeys.push(wordKey);
 			}
 		}
 
@@ -3961,6 +3972,11 @@ ${existingHintBlock}
 		}
 
 		const skipped = keys.length - toInsertKeys.length - toUpdate.length;
+		await this.markMistakesDueForReview(userId, 'vocab', [
+			...toInsertKeys,
+			...toUpdateKeys,
+		]);
+
 		return {
 			added: toInsertKeys.length,
 			updated: toUpdate.length,
@@ -3972,7 +3988,18 @@ ${existingHintBlock}
 		userId: number,
 		id: string,
 	): Promise<{ removed: boolean }> {
+		const row = await this.vocabMistakeRepo.findOne({
+			where: { userId, id },
+			select: ['wordKey'],
+		});
 		const r = await this.vocabMistakeRepo.delete({ userId, id });
+		if ((r.affected ?? 0) > 0 && row?.wordKey) {
+			await this.practiceReviewStateRepo.delete({
+				userId,
+				contentKind: 'vocab',
+				itemKey: row.wordKey,
+			});
+		}
 		return { removed: (r.affected ?? 0) > 0 };
 	}
 
@@ -3984,10 +4011,22 @@ ${existingHintBlock}
 		if (unique.length === 0) {
 			return { removedCount: 0 };
 		}
+		const rows = await this.vocabMistakeRepo.find({
+			where: { userId, id: In(unique) },
+			select: ['wordKey'],
+		});
 		const r = await this.vocabMistakeRepo.delete({
 			userId,
 			id: In(unique),
 		});
+		const wordKeys = rows.map((row) => row.wordKey).filter(Boolean);
+		if (wordKeys.length > 0) {
+			await this.practiceReviewStateRepo.delete({
+				userId,
+				contentKind: 'vocab',
+				itemKey: In(wordKeys),
+			});
+		}
 		return { removedCount: r.affected ?? 0 };
 	}
 
@@ -4068,6 +4107,7 @@ ${existingHintBlock}
 
 		const toInsertKeys = keys.filter((k) => !existingByKey.has(k));
 		const toUpdate: Array<{ id: string; lastUserInput: string }> = [];
+		const toUpdateKeys: string[] = [];
 
 		for (const contentKey of keys) {
 			const row = existingByKey.get(contentKey);
@@ -4080,6 +4120,7 @@ ${existingHintBlock}
 			const prevInput = (row.lastUserInput ?? '').trim();
 			if (nextInput !== prevInput) {
 				toUpdate.push({ id: row.id, lastUserInput: nextInput });
+				toUpdateKeys.push(contentKey);
 			}
 		}
 
@@ -4111,6 +4152,11 @@ ${existingHintBlock}
 		}
 
 		const skipped = keys.length - toInsertKeys.length - toUpdate.length;
+		await this.markMistakesDueForReview(userId, 'classic', [
+			...toInsertKeys,
+			...toUpdateKeys,
+		]);
+
 		return {
 			added: toInsertKeys.length,
 			updated: toUpdate.length,
@@ -4122,7 +4168,18 @@ ${existingHintBlock}
 		userId: number,
 		id: string,
 	): Promise<{ removed: boolean }> {
+		const row = await this.classicQuoteMistakeRepo.findOne({
+			where: { userId, id },
+			select: ['contentKey'],
+		});
 		const r = await this.classicQuoteMistakeRepo.delete({ userId, id });
+		if ((r.affected ?? 0) > 0 && row?.contentKey) {
+			await this.practiceReviewStateRepo.delete({
+				userId,
+				contentKind: 'classic',
+				itemKey: row.contentKey,
+			});
+		}
 		return { removed: (r.affected ?? 0) > 0 };
 	}
 
@@ -4134,10 +4191,22 @@ ${existingHintBlock}
 		if (unique.length === 0) {
 			return { removedCount: 0 };
 		}
+		const rows = await this.classicQuoteMistakeRepo.find({
+			where: { userId, id: In(unique) },
+			select: ['contentKey'],
+		});
 		const r = await this.classicQuoteMistakeRepo.delete({
 			userId,
 			id: In(unique),
 		});
+		const contentKeys = rows.map((row) => row.contentKey).filter(Boolean);
+		if (contentKeys.length > 0) {
+			await this.practiceReviewStateRepo.delete({
+				userId,
+				contentKind: 'classic',
+				itemKey: In(contentKeys),
+			});
+		}
 		return { removedCount: r.affected ?? 0 };
 	}
 
@@ -4177,5 +4246,248 @@ ${existingHintBlock}
 				createdAt: r.createdAt.toISOString(),
 			})),
 		};
+	}
+
+	/** 错题新入库 / 错拼更新：标记为今日待复习（不触碰仅跳过的旧错题） */
+	private async markMistakesDueForReview(
+		userId: number,
+		contentKind: 'vocab' | 'classic',
+		itemKeys: string[],
+	): Promise<void> {
+		const unique = [...new Set(itemKeys.map((k) => k.trim()).filter(Boolean))];
+		if (unique.length === 0) return;
+
+		const now = new Date();
+		const defaults = defaultReviewStateForNewMistake();
+
+		for (const itemKey of unique) {
+			let state = await this.practiceReviewStateRepo.findOne({
+				where: { userId, contentKind, itemKey },
+			});
+			if (!state) {
+				state = this.practiceReviewStateRepo.create({
+					userId,
+					contentKind,
+					itemKey,
+					nextReviewAt: defaults.nextReviewAt,
+					intervalDays: defaults.intervalDays,
+					repetitions: defaults.repetitions,
+					easeFactor: defaults.easeFactor.toFixed(2),
+					lastResult: 'wrong',
+					lastPracticedAt: null,
+				});
+			} else {
+				state.nextReviewAt = now;
+				state.intervalDays = 0;
+				state.repetitions = 0;
+				state.lastResult = 'wrong';
+			}
+			await this.practiceReviewStateRepo.save(state);
+		}
+	}
+
+	/** 今日待复习数量：仅统计已到期且错题仍存在的条目 */
+	async getPracticeReviewSummary(userId: number): Promise<{
+		vocabDue: number;
+		classicDue: number;
+	}> {
+		const now = new Date();
+		const [vocabDue, classicDue] = await Promise.all([
+			this.countDueReviewJoined(userId, 'vocab', now),
+			this.countDueReviewJoined(userId, 'classic', now),
+		]);
+		return { vocabDue, classicDue };
+	}
+
+	private async countDueReviewJoined(
+		userId: number,
+		contentKind: 'vocab' | 'classic',
+		now: Date,
+	): Promise<number> {
+		const qb = this.practiceReviewStateRepo
+			.createQueryBuilder('rs')
+			.where('rs.userId = :userId', { userId })
+			.andWhere('rs.contentKind = :contentKind', { contentKind })
+			.andWhere('rs.nextReviewAt <= :now', { now });
+
+		if (contentKind === 'vocab') {
+			qb.innerJoin(
+				EnglishVocabularyMistake,
+				'm',
+				'm.userId = rs.userId AND m.wordKey = rs.itemKey',
+			);
+		} else {
+			qb.innerJoin(
+				EnglishClassicQuoteMistake,
+				'm',
+				'm.userId = rs.userId AND m.contentKey = rs.itemKey',
+			);
+		}
+
+		return qb.getCount();
+	}
+
+	async getPracticeReviewQueue(
+		userId: number,
+		opts: {
+			contentKind: 'vocab' | 'classic';
+			count: number;
+			excludeKeys?: string[];
+		},
+	): Promise<{
+		items: Array<
+			| {
+					contentKind: 'vocab';
+					key: string;
+					word: string;
+					ipa: string;
+					pos: string;
+					segmentation: string;
+					translationZh: string;
+					example: string;
+			  }
+			| {
+					contentKind: 'classic';
+					key: string;
+					english: string;
+					translationZh: string;
+					source: string;
+					noteZh: string;
+			  }
+		>;
+	}> {
+		const now = new Date();
+		const exclude = new Set(
+			(opts.excludeKeys ?? []).map((k) => k.trim()).filter(Boolean),
+		);
+		const take = Math.min(50, Math.max(1, opts.count)) + exclude.size;
+
+		const states = await this.practiceReviewStateRepo.find({
+			where: {
+				userId,
+				contentKind: opts.contentKind,
+				nextReviewAt: LessThanOrEqual(now),
+				...(exclude.size > 0 ? { itemKey: Not(In([...exclude])) } : {}),
+			},
+			order: { nextReviewAt: 'ASC' },
+			take,
+		});
+
+		const picked = states
+			.filter((s) => !exclude.has(s.itemKey))
+			.slice(0, Math.min(50, Math.max(1, opts.count)));
+
+		if (picked.length === 0) {
+			return { items: [] };
+		}
+
+		const keys = picked.map((s) => s.itemKey);
+
+		if (opts.contentKind === 'vocab') {
+			const rows = await this.vocabMistakeRepo.find({
+				where: { userId, wordKey: In(keys) },
+			});
+			const byKey = new Map(rows.map((r) => [r.wordKey, r] as const));
+			const items: Array<{
+				contentKind: 'vocab';
+				key: string;
+				word: string;
+				ipa: string;
+				pos: string;
+				segmentation: string;
+				translationZh: string;
+				example: string;
+			}> = [];
+			for (const s of picked) {
+				const row = byKey.get(s.itemKey);
+				if (!row) continue;
+				items.push({
+					contentKind: 'vocab',
+					key: row.wordKey,
+					word: row.word,
+					ipa: row.ipa ?? '',
+					pos: row.pos ?? '',
+					segmentation: row.segmentation ?? '',
+					translationZh: row.translationZh ?? '',
+					example: row.example ?? '',
+				});
+			}
+			return { items };
+		}
+
+		const rows = await this.classicQuoteMistakeRepo.find({
+			where: { userId, contentKey: In(keys) },
+		});
+		const byKey = new Map(rows.map((r) => [r.contentKey, r] as const));
+		const items: Array<{
+			contentKind: 'classic';
+			key: string;
+			english: string;
+			translationZh: string;
+			source: string;
+			noteZh: string;
+		}> = [];
+		for (const s of picked) {
+			const row = byKey.get(s.itemKey);
+			if (!row) continue;
+			items.push({
+				contentKind: 'classic',
+				key: row.contentKey,
+				english: row.english,
+				translationZh: row.translationZh ?? '',
+				source: row.source ?? '',
+				noteZh: row.noteZh ?? '',
+			});
+		}
+		return { items };
+	}
+
+	/** 复习练习结算：按对错更新 next_review_at，答对后移出「今日待复习」 */
+	async recordPracticeReviewAttempts(
+		userId: number,
+		attempts: PracticeReviewRecordItemDto[],
+	): Promise<{ updated: number }> {
+		if (!attempts.length) {
+			return { updated: 0 };
+		}
+		let updated = 0;
+		for (const attempt of attempts) {
+			const itemKey = attempt.itemKey?.trim();
+			if (!itemKey) continue;
+			const contentKind = attempt.contentKind;
+			let state = await this.practiceReviewStateRepo.findOne({
+				where: { userId, contentKind, itemKey },
+			});
+			const ease = parseEaseFactor(state?.easeFactor);
+			const out = applyReviewSrs({
+				repetitions: state?.repetitions ?? 0,
+				intervalDays: state?.intervalDays ?? 0,
+				easeFactor: ease,
+				correct: attempt.correct,
+			});
+			if (!state) {
+				state = this.practiceReviewStateRepo.create({
+					userId,
+					contentKind,
+					itemKey,
+					nextReviewAt: out.nextReviewAt,
+					intervalDays: out.intervalDays,
+					repetitions: out.repetitions,
+					easeFactor: out.easeFactor.toFixed(2),
+					lastResult: out.lastResult,
+					lastPracticedAt: new Date(),
+				});
+			} else {
+				state.nextReviewAt = out.nextReviewAt;
+				state.intervalDays = out.intervalDays;
+				state.repetitions = out.repetitions;
+				state.easeFactor = out.easeFactor.toFixed(2);
+				state.lastResult = out.lastResult;
+				state.lastPracticedAt = new Date();
+			}
+			await this.practiceReviewStateRepo.save(state);
+			updated += 1;
+		}
+		return { updated };
 	}
 }
