@@ -55,6 +55,7 @@ export const enUS = {
 	'nav.englishLearning': 'English',
 	'nav.pay': 'Membership',
 	'nav.profile': 'Profile',
+	'nav.switchAccount': 'Switch account',
 
 	'profile.section.basic': 'Profile details',
 	'profile.section.voice': 'Voice input',

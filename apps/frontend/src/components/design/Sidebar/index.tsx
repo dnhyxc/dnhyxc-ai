@@ -6,6 +6,7 @@ import {
 	DropdownMenuTrigger,
 } from '@ui/dropdown-menu';
 import {
+	ArrowLeftRight,
 	BookOpenText,
 	Bot,
 	CircleUserRound,
@@ -139,6 +140,13 @@ const Sidebar = () => {
 							>
 								<CircleUserRound className="text-textcolor group-hover:text-theme" />
 								{t('nav.profile')}
+							</DropdownMenuItem>
+							<DropdownMenuItem
+								className="text-textcolor focus:text-theme flex justify-between items-center cursor-pointer group"
+								onClick={() => onJump('/login')}
+							>
+								<ArrowLeftRight className="text-textcolor group-hover:text-theme" />
+								{t('nav.switchAccount')}
 							</DropdownMenuItem>
 							<DropdownMenuItem
 								className="min-w-20 text-textcolor focus:text-theme flex justify-between items-center cursor-pointer group"

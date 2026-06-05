@@ -52,6 +52,7 @@ export const zhCN = {
 	'nav.englishLearning': '英语学习',
 	'nav.pay': '会员充值',
 	'nav.profile': '我的主页',
+	'nav.switchAccount': '切换账号',
 
 	'profile.section.basic': '基本信息',
 	'profile.section.voice': '语音转换',
