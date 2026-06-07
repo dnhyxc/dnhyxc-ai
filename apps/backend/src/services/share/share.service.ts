@@ -98,7 +98,7 @@ export class ShareService {
 						| 'user'
 						| 'assistant',
 					content: m.content ?? '',
-					timestamp: m.createdAt?.getTime?.() ?? Date.now(),
+					timestamp: this.toEpochMs(m.createdAt),
 					attachments: this.mapShareAttachments(m.attachments),
 				})),
 			};
@@ -136,8 +136,8 @@ export class ShareService {
 					const ai = orderIndex.get(a.id);
 					const bi = orderIndex.get(b.id);
 					if (ai == null && bi == null) {
-						const at = a.createdAt?.getTime?.() ?? 0;
-						const bt = b.createdAt?.getTime?.() ?? 0;
+						const at = this.toEpochMs(a.createdAt, 0);
+						const bt = this.toEpochMs(b.createdAt, 0);
 						if (at !== bt) return at - bt;
 						return String(a.id).localeCompare(String(b.id));
 					}
@@ -154,7 +154,7 @@ export class ShareService {
 					| 'user'
 					| 'assistant',
 				content: m.content ?? '',
-				timestamp: m.createdAt?.getTime?.() ?? Date.now(),
+				timestamp: this.toEpochMs(m.createdAt),
 			}));
 			return {
 				title:
@@ -196,8 +196,8 @@ export class ShareService {
 					const ai = orderIndex.get(a.id);
 					const bi = orderIndex.get(b.id);
 					if (ai == null && bi == null) {
-						const at = a.createdAt?.getTime?.() ?? 0;
-						const bt = b.createdAt?.getTime?.() ?? 0;
+						const at = this.toEpochMs(a.createdAt, 0);
+						const bt = this.toEpochMs(b.createdAt, 0);
 						if (at !== bt) return at - bt;
 						return String(a.id).localeCompare(String(b.id));
 					}
@@ -214,7 +214,7 @@ export class ShareService {
 					| 'user'
 					| 'assistant',
 				content: m.content ?? '',
-				timestamp: m.createdAt?.getTime?.() ?? Date.now(),
+				timestamp: this.toEpochMs(m.createdAt),
 			}));
 			return {
 				title:
@@ -225,6 +225,18 @@ export class ShareService {
 		}
 
 		throw new NotFoundException('会话不存在');
+	}
+
+	/** 将 DB/TypeORM 日期字段统一转为毫秒时间戳（兼容 Date、ISO 字符串、MySQL datetime 字符串） */
+	private toEpochMs(
+		value: Date | string | number | null | undefined,
+		fallback = Date.now(),
+	): number {
+		if (value == null) return fallback;
+		if (typeof value === 'number' && Number.isFinite(value)) return value;
+		const ms =
+			value instanceof Date ? value.getTime() : new Date(value).getTime();
+		return Number.isFinite(ms) ? ms : fallback;
 	}
 
 	/** 分享页 / ChatFileList 所需附件结构（与前端 UploadedFile 对齐） */
@@ -338,8 +350,9 @@ export class ShareService {
 					id: row.id,
 					title: row.title,
 					content: row.content ?? '',
-					createdAt: row.createdAt?.getTime?.() ?? Date.now(),
-					updatedAt: row.updatedAt?.getTime?.() ?? Date.now(),
+					// 与知识库列表一致：JSON 序列化 Date → ISO 字符串，前端 formatDate 按本地时区展示
+					createdAt: row.createdAt,
+					updatedAt: row.updatedAt,
 				},
 			} as any;
 		}

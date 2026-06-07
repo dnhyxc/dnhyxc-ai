@@ -34,6 +34,7 @@
 | COS 能传不能显（403 / ATS） | [cos/cos-object-storage.md](./cos/cos-object-storage.md) §3.3 + [cos/cos-dev-http-proxy.md](./cos/cos-dev-http-proxy.md) |
 | COS 能预览但下载失败 | [cos/cos-object-storage.md](./cos/cos-object-storage.md) §3.7 |
 | 分享页无用户附件 | [chat/share.md](./chat/share.md) §五 + [cos/cos-object-storage.md](./cos/cos-object-storage.md) §3.9 |
+| 知识分享「更新时间」差 8h（如凌晨变 18 点） | [chat/share-knowledge-timezone.md](./chat/share-knowledge-timezone.md) |
 | Web HTTPS mixed content | 同上 + [app/route-auth.md](./app/route-auth.md) §12 + [ops/nginx.md](./ops/nginx.md) |
 | Tauri macOS ATS | [app/tauri-macos-ats-http.md](./app/tauri-macos-ats-http.md) |
 | 知识库助手 Mermaid 流式 | [knowledge/knowledge-assistant-mermaid-streaming.md](./knowledge/knowledge-assistant-mermaid-streaming.md) |

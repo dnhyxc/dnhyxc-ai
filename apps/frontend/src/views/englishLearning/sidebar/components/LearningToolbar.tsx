@@ -97,7 +97,7 @@ export const EnglishLearningToolbar = observer(function EnglishLearningToolbar({
 	}, [quickIntentsExpanded, showIntentExpandToggle]);
 
 	return (
-		<SidebarPanel className="min-w-0">
+		<SidebarPanel className="min-w-0 pt-4">
 			<div className="mb-2.5 flex items-start gap-3">
 				<div
 					className={cn(

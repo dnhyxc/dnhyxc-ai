@@ -365,6 +365,11 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'Shared conversation links now include attachment cards on user messages (preview and download), matching the live chat view. Cloud-stored files are shown via the same-site proxy.',
 	},
+	's14-4': {
+		title: 'Knowledge article share: updated time display',
+		description:
+			'Fixed shared knowledge articles showing “Updated” about 8 hours off from when you saved (e.g. early morning saved as evening). Matches the cloud knowledge library list.',
+	},
 	's14-2': {
 		title: 'Chatbot capability areas',
 		description:

@@ -12,6 +12,7 @@ import { EnglishClassicQuotesLibrary } from './entity/english-classic-quotes-lib
 import { EnglishClassicQuotesLibraryItem } from './entity/english-classic-quotes-library-item.entity';
 import { EnglishClassicQuotesPackItem } from './entity/english-classic-quotes-pack-item.entity';
 import { EnglishClassicQuotesPackSession } from './entity/english-classic-quotes-pack-session.entity';
+import { EnglishDailyMemorizeRecord } from './entity/english-daily-memorize-record.entity';
 import { EnglishPackWebSearchRecord } from './entity/english-pack-web-search.entity';
 import { EnglishPracticeReviewState } from './entity/english-practice-review-state.entity';
 import { EnglishVocabularyPackBatch } from './entity/english-vocabulary.entity';
@@ -37,6 +38,7 @@ import { EnglishVocabularyPackSession } from './entity/english-vocabulary-pack-s
 			EnglishVocabularyFavorite,
 			EnglishVocabularyMistake,
 			EnglishPracticeReviewState,
+			EnglishDailyMemorizeRecord,
 			EnglishClassicQuoteFavorite,
 			EnglishClassicQuoteMistake,
 			EnglishVocabularyLibrary,

@@ -157,6 +157,8 @@ export const ENGLISH_LEARNING_VOCABULARY_FAVORITES_EXPORT_DOCX =
 /** 间隔复习：今日待复习统计、拉题、结算上报 */
 export const ENGLISH_LEARNING_PRACTICE_REVIEW =
 	'/english-learning/practice/review';
+export const ENGLISH_LEARNING_PRACTICE_DAILY =
+	'/english-learning/practice/daily';
 /** 单词错题集：批量加入、分页列表、删除 */
 export const ENGLISH_LEARNING_VOCABULARY_MISTAKES =
 	'/english-learning/vocabulary-mistakes';

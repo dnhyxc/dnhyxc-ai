@@ -6,6 +6,7 @@
 - **分享页用户附件**：`getShare` 未返回 `attachments`，分享页看不到用户上传的文件卡片（见 **§五**）。
 - **用户消息代码块布局**：用户消息中包含代码块时，气泡宽度/对齐与 assistant 不一致，且长行会撑破最大宽度。
 - **知识文章分享（`?type=knowledge`）**：与 Monaco 预览共用 `ParserMarkdownPreviewPane`（`@/components/design/Markdown`）时，**代码块吸顶浮动条（`ChatCodeFloatingToolbar`）**不稳定、**Mermaid 围栏顶栏（`MermaidFenceToolbar`）**不出现的问题；详见 **§三**。
+- **知识文章「更新时间」时区偏移（如凌晨 2 点显示成 18 点）**：根因在 MySQL 连接未配置 `timezone: 'Z'` 导致 TIMESTAMP 读偏移；分享 API 与列表对齐、前端 `formatDate` 等见 **[share-knowledge-timezone.md](./share-knowledge-timezone.md)**（主文档）。
 
 ---
 

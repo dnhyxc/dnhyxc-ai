@@ -31,6 +31,7 @@ function parseSource(raw: string | null): PracticeSource {
 		raw === 'pack' ||
 		raw === 'live' ||
 		raw === 'mistakes' ||
+		raw === 'dailyMemorize' ||
 		raw === 'review'
 	) {
 		return raw;
@@ -117,6 +118,10 @@ export default function EnglishLearningPracticePage() {
 					? '/english-learning/mistakes?kind=classic'
 					: '/english-learning/mistakes?kind=vocab',
 			);
+			return;
+		}
+		if (initialSource === 'dailyMemorize') {
+			navigate('/english-learning/daily/records');
 			return;
 		}
 		if (initialSource === 'review') {

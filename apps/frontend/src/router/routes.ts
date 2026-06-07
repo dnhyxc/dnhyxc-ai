@@ -15,6 +15,8 @@ import DesktopDownloadPage from '@/views/desktopDownload';
 import Document from '@/views/document';
 import Download from '@/views/download';
 import EnglishLearning from '@/views/englishLearning';
+import EnglishLearningDailyPage from '@/views/englishLearning/daily';
+import EnglishLearningDailyRecordsPage from '@/views/englishLearning/daily/records';
 import EnglishLearningFavoritesPage from '@/views/englishLearning/favorites';
 import EnglishLearningImportPage from '@/views/englishLearning/import';
 import EnglishLearningLayout from '@/views/englishLearning/Layout';
@@ -181,6 +183,20 @@ const routes: RouteConfig[] = [
 						Component: EnglishLearningPracticePage,
 						meta: {
 							titleKey: 'route.englishLearning.practice.title',
+						},
+					},
+					{
+						path: 'daily',
+						Component: EnglishLearningDailyPage,
+						meta: {
+							titleKey: 'route.englishLearning.daily.title',
+						},
+					},
+					{
+						path: 'daily/records',
+						Component: EnglishLearningDailyRecordsPage,
+						meta: {
+							titleKey: 'englishLearning.daily.recordsTitle',
 						},
 					},
 					{

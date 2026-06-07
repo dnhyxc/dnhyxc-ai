@@ -17,6 +17,7 @@ export type PracticeSource =
 	| 'pack'
 	| 'live'
 	| 'mistakes'
+	| 'dailyMemorize'
 	| 'review';
 
 export type PracticeOrder = 'random' | 'sequential';

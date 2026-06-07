@@ -3,11 +3,13 @@
  *
  * 色相分配原则：
  * - 上区冷色：lime / cyan·blue / indigo·blue / teal·cyan / violet·indigo
+ * - 今日记词：emerald·teal（与词包区色相相邻）
  * - 今日复习：玫瑰金（粉金渐变，侧栏唯一）
  * - 下区暖色：橙→黄(收藏)、玫→橙(错题)
  */
 export const ENGLISH_SIDEBAR_ICON_GRADIENT = {
 	toolbar: 'bg-linear-to-r from-lime-600 to-green-700',
+	daily: 'bg-linear-to-r from-emerald-500 to-teal-600',
 	vocabSource: 'bg-linear-to-r from-cyan-500 to-blue-600',
 	classicSource: 'bg-linear-to-r from-indigo-500 to-blue-600',
 	vocabPack: 'bg-linear-to-r from-teal-500 to-cyan-600',
@@ -20,6 +22,8 @@ export const ENGLISH_SIDEBAR_ICON_GRADIENT = {
 export const ENGLISH_SIDEBAR_BTN_GRADIENT = {
 	toolbar:
 		'bg-linear-to-r from-lime-600 to-green-700 hover:bg-linear-to-r hover:from-lime-400 hover:to-green-500',
+	daily:
+		'bg-linear-to-r from-emerald-500 to-teal-600 hover:bg-linear-to-r hover:from-emerald-400 hover:to-teal-500',
 	vocabSource:
 		'bg-linear-to-r from-cyan-500 to-blue-600 hover:bg-linear-to-r hover:from-cyan-400 hover:to-blue-600',
 	classicSource:
@@ -34,4 +38,14 @@ export const ENGLISH_SIDEBAR_BTN_GRADIENT = {
 		'bg-linear-to-r from-orange-500 to-yellow-500 hover:bg-linear-to-r hover:from-orange-400 hover:to-yellow-500',
 	mistakes:
 		'bg-linear-to-r from-rose-500 to-orange-500 hover:bg-linear-to-r hover:from-rose-400 hover:to-orange-500',
+} as const;
+
+/** 侧栏文字链渐变（与对应入口 icon / 按钮色相一致） */
+export const ENGLISH_SIDEBAR_TEXT_LINK_GRADIENT = {
+	daily:
+		'bg-linear-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 bg-clip-text text-transparent',
+	vocab:
+		'bg-linear-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 bg-clip-text text-transparent',
+	classic:
+		'bg-linear-to-r from-indigo-500 to-blue-600 hover:from-indigo-400 hover:to-blue-500 bg-clip-text text-transparent',
 } as const;

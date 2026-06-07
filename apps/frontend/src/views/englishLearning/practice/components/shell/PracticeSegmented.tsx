@@ -28,7 +28,7 @@ export function PracticeSegmented<T extends string>({
 						aria-selected={active}
 						onClick={() => onChange(opt.value)}
 						className={cn(
-							'min-w-0 flex-1 cursor-pointer rounded-md px-3 py-2 text-sm font-medium transition-colors',
+							'inline-flex h-8 min-w-0 flex-1 cursor-pointer items-center justify-center rounded-sm px-3 text-sm font-medium leading-none transition-colors',
 							active
 								? 'bg-teal-600 text-textcolor shadow-sm'
 								: 'text-textcolor/65 hover:bg-theme/10 hover:text-textcolor',

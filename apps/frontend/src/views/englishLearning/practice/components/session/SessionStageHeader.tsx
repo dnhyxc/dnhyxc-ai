@@ -16,7 +16,9 @@ export function SessionStageHeader({
 			<span className="text-textcolor min-w-0 flex-1 text-sm font-semibold">
 				{title}
 			</span>
-			{trailing ? <div className="shrink-0">{trailing}</div> : null}
+			{trailing ? (
+				<div className="flex shrink-0 items-center">{trailing}</div>
+			) : null}
 		</div>
 	);
 }

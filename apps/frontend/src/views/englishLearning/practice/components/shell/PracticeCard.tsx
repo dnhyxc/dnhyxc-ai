@@ -11,7 +11,10 @@ export function PracticeCard({
 }: PracticeCardProps) {
 	return (
 		<div
-			className={cn('bg-theme/5 border border-theme/5 rounded-md', className)}
+			className={cn(
+				'select-text bg-theme/5 border border-theme/5 rounded-md',
+				className,
+			)}
 			{...rest}
 		>
 			{children}

@@ -11,6 +11,7 @@ import {
 	Library,
 	Package,
 	Radio,
+	Sparkles,
 } from 'lucide-react';
 import {
 	type ReactNode,
@@ -43,7 +44,9 @@ import { resolvePracticeSourceTitle } from './utils/resolveTitle';
 const COUNT_OPTIONS: PracticeCountOption[] = [10, 20, 30, 40, 50];
 
 const SETUP_SEGMENTED_PANEL_CLASS =
-	'border-theme/10 bg-theme-background rounded-lg border p-1 shadow-sm';
+	'border-theme/10 bg-theme-background rounded-lg border p-1 shadow-sm [&_[role=tab]]:h-9 [&_[role=tab]]:min-h-9 [&_[role=tab]]:py-0';
+
+const SETUP_SEGMENTED_INNER_CLASS = 'border-0 bg-transparent p-0 shadow-none';
 
 function SetupSection({
 	label,
@@ -68,6 +71,7 @@ function SourceIcon({ source }: { source: PracticeSource }) {
 	if (source === 'pack') return <Package className={className} />;
 	if (source === 'live') return <Radio className={className} />;
 	if (source === 'mistakes') return <ClipboardList className={className} />;
+	if (source === 'dailyMemorize') return <Sparkles className={className} />;
 	if (source === 'review') return <CalendarClock className={className} />;
 	return <BookMarked className={className} />;
 }
@@ -99,6 +103,7 @@ export function Setup({
 			initialSource === 'pack' ||
 			initialSource === 'live' ||
 			initialSource === 'mistakes' ||
+			initialSource === 'dailyMemorize' ||
 			initialSource === 'review',
 		[initialSource],
 	);
@@ -287,6 +292,7 @@ export function Setup({
 						</div>
 						<div className={SETUP_SEGMENTED_PANEL_CLASS}>
 							<PracticeSegmented
+								className={SETUP_SEGMENTED_INNER_CLASS}
 								value={mode}
 								options={[
 									{
@@ -312,6 +318,7 @@ export function Setup({
 						<SetupSection label={t('englishLearning.practice.countLabel')}>
 							<div className={SETUP_SEGMENTED_PANEL_CLASS}>
 								<PracticeSegmented
+									className={SETUP_SEGMENTED_INNER_CLASS}
 									value={String(count)}
 									options={COUNT_OPTIONS.map((n) => ({
 										value: String(n),
@@ -325,6 +332,7 @@ export function Setup({
 							<SetupSection label={t('englishLearning.practice.orderLabel')}>
 								<div className={SETUP_SEGMENTED_PANEL_CLASS}>
 									<PracticeSegmented
+										className={SETUP_SEGMENTED_INNER_CLASS}
 										value={order}
 										options={[
 											{

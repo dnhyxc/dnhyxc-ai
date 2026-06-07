@@ -17,7 +17,14 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { createAgent, toolCallLimitMiddleware } from 'langchain';
-import { DataSource, In, LessThanOrEqual, Not, Repository } from 'typeorm';
+import {
+	DataSource,
+	In,
+	LessThanOrEqual,
+	Not,
+	Repository,
+	SelectQueryBuilder,
+} from 'typeorm';
 import { buildAgentLangChainTools } from '../../services/agent/agent-tools';
 import { KnowledgeEmbeddingService } from '../../services/knowledge-embedding/knowledge-embedding.service';
 import { KnowledgeQaService } from '../../services/knowledge-qa/knowledge-qa.service';
@@ -69,7 +76,10 @@ import {
 	resolveClassicQuotesPackTargetCount,
 	resolveVocabularyPackTargetCount,
 } from './dto/generate-vocabulary.dto';
-import type { PracticeReviewRecordItemDto } from './dto/practice-review.dto';
+import type {
+	PracticeDailyRecordDto,
+	PracticeReviewRecordItemDto,
+} from './dto/practice-review.dto';
 import { SaveClassicQuotesLibraryDto } from './dto/save-classic-quotes-library.dto';
 import { SaveVocabularyLibraryDto } from './dto/save-vocabulary-library.dto';
 import type { VocabularyFavoriteBodyDto } from './dto/vocabulary-favorite.dto';
@@ -93,6 +103,7 @@ import { EnglishClassicQuotesLibrary } from './entity/english-classic-quotes-lib
 import { EnglishClassicQuotesLibraryItem } from './entity/english-classic-quotes-library-item.entity';
 import { EnglishClassicQuotesPackItem } from './entity/english-classic-quotes-pack-item.entity';
 import { EnglishClassicQuotesPackSession } from './entity/english-classic-quotes-pack-session.entity';
+import { EnglishDailyMemorizeRecord } from './entity/english-daily-memorize-record.entity';
 import {
 	EnglishPackWebSearchRecord,
 	type EnglishPackWebSearchRoundJson,
@@ -262,6 +273,8 @@ export class EnglishLearningService {
 		private readonly classicQuotesLibraryItemRepo: Repository<EnglishClassicQuotesLibraryItem>,
 		@InjectRepository(EnglishPracticeReviewState)
 		private readonly practiceReviewStateRepo: Repository<EnglishPracticeReviewState>,
+		@InjectRepository(EnglishDailyMemorizeRecord)
+		private readonly dailyMemorizeRecordRepo: Repository<EnglishDailyMemorizeRecord>,
 	) {}
 
 	/** 中止类异常：用户断开 SSE / 显式 cancel / LangChain 链取消 */
@@ -4442,6 +4455,135 @@ ${existingHintBlock}
 		return { items };
 	}
 
+	/**
+	 * 今日记词场次结算。
+	 * 词汇库随机练完：写入错题集（供「今日复习」听写/拼写）、记词记录与 SRS
+	 */
+	async recordDailyMemorizeAttempts(
+		userId: number,
+		dto: PracticeDailyRecordDto,
+	): Promise<{
+		updated: number;
+		mistakeAdded: number;
+		mistakeSkipped: number;
+	}> {
+		let mistakeAdded = 0;
+		let mistakeSkipped = 0;
+		if (dto.vocabItems?.length) {
+			const res = await this.batchAddVocabularyMistakes(userId, dto.vocabItems);
+			mistakeAdded = res.added;
+			mistakeSkipped = res.skipped;
+			await this.upsertDailyMemorizeRecords(
+				userId,
+				dto.vocabItems,
+				dto.attempts,
+			);
+		}
+		const { updated } = await this.recordPracticeReviewAttempts(
+			userId,
+			dto.attempts,
+		);
+		return { updated, mistakeAdded, mistakeSkipped };
+	}
+
+	private async upsertDailyMemorizeRecords(
+		userId: number,
+		vocabItems: VocabularyMistakeBatchItemDto[],
+		attempts: PracticeReviewRecordItemDto[],
+	): Promise<void> {
+		const correctByKey = new Map<string, boolean>();
+		for (const attempt of attempts) {
+			if (attempt.contentKind !== 'vocab') continue;
+			const key = attempt.itemKey?.trim();
+			if (!key) continue;
+			correctByKey.set(key, attempt.correct);
+		}
+		const now = new Date();
+		const seenWordKeys = new Set<string>();
+		for (const item of vocabItems) {
+			const wordKey = this.normalizeVocabularyFavoriteWordKey(item.word);
+			if (!wordKey || seenWordKeys.has(wordKey)) continue;
+			seenWordKeys.add(wordKey);
+			const lastCorrect = correctByKey.get(wordKey) ?? false;
+			let row = await this.dailyMemorizeRecordRepo.findOne({
+				where: { userId, wordKey },
+			});
+			if (!row) {
+				row = this.dailyMemorizeRecordRepo.create({
+					userId,
+					wordKey,
+					word: item.word.trim(),
+					ipa: typeof item.ipa === 'string' ? item.ipa : '',
+					pos: typeof item.pos === 'string' ? item.pos.trim().slice(0, 32) : '',
+					segmentation:
+						typeof item.segmentation === 'string'
+							? item.segmentation.trim().slice(0, 500)
+							: '',
+					translationZh: item.translationZh ?? '',
+					example: item.example ?? '',
+					lastCorrect,
+					practicedAt: now,
+				});
+			} else {
+				row.word = item.word.trim();
+				row.ipa = typeof item.ipa === 'string' ? item.ipa : '';
+				row.pos =
+					typeof item.pos === 'string' ? item.pos.trim().slice(0, 32) : '';
+				row.segmentation =
+					typeof item.segmentation === 'string'
+						? item.segmentation.trim().slice(0, 500)
+						: '';
+				row.translationZh = item.translationZh ?? '';
+				row.example = item.example ?? '';
+				row.lastCorrect = lastCorrect;
+				row.practicedAt = now;
+			}
+			await this.dailyMemorizeRecordRepo.save(row);
+		}
+	}
+
+	async listDailyMemorizeRecordsPage(
+		userId: number,
+		opts: { limit: number; offset: number },
+	): Promise<{
+		items: Array<{
+			id: string;
+			word: string;
+			ipa: string;
+			pos: string;
+			segmentation: string;
+			translationZh: string;
+			example: string;
+			lastCorrect: boolean;
+			practicedAt: string;
+		}>;
+		totalCount: number;
+	}> {
+		const [totalCount, rows] = await Promise.all([
+			this.dailyMemorizeRecordRepo.count({ where: { userId } }),
+			this.dailyMemorizeRecordRepo.find({
+				where: { userId },
+				order: { practicedAt: 'DESC' },
+				take: opts.limit,
+				skip: opts.offset,
+			}),
+		]);
+		return {
+			totalCount,
+			items: rows.map((r) => ({
+				id: r.id,
+				word: r.word,
+				ipa: r.ipa ?? '',
+				pos: r.pos ?? '',
+				segmentation: r.segmentation ?? '',
+				translationZh: r.translationZh ?? '',
+				example: r.example ?? '',
+				lastCorrect: r.lastCorrect,
+				practicedAt: r.practicedAt.toISOString(),
+			})),
+		};
+	}
+
 	/** 复习练习结算：按对错更新 next_review_at，答对后移出「今日待复习」 */
 	async recordPracticeReviewAttempts(
 		userId: number,
@@ -4489,5 +4631,219 @@ ${existingHintBlock}
 			updated += 1;
 		}
 		return { updated };
+	}
+
+	private mapVocabLibraryItemToDailyItem(row: EnglishVocabularyLibraryItem) {
+		return {
+			contentKind: 'vocab' as const,
+			key: this.normalizeVocabularyFavoriteWordKey(row.word),
+			word: row.word,
+			ipa: row.ipa ?? '',
+			pos: row.pos ?? '',
+			segmentation: row.segmentation ?? '',
+			translationZh: row.translationZh ?? '',
+			example: row.example ?? '',
+		};
+	}
+
+	/** 词汇库词条规范化 key（与 `normalizeVocabularyFavoriteWordKey` 对齐，用于 SQL 表达式） */
+	private libraryMemorizeWordKeySql(alias: string): string {
+		return `LOWER(TRIM(${alias}.word))`;
+	}
+
+	/**
+	 * 跨库合并后的「可随机词汇」查询基座：
+	 * - 用户全部词汇库包（不按 libraryId 过滤）
+	 * - 有中文释义
+	 * - 尚未进入复习计划
+	 */
+	private createLibraryMemorizeEligibleQueryBuilder(
+		userId: number,
+		alias = 'item',
+		options?: { exclude?: Set<string>; usedKeys?: Set<string> },
+	): SelectQueryBuilder<EnglishVocabularyLibraryItem> {
+		const wordKey = this.libraryMemorizeWordKeySql(alias);
+		const qb = this.vocabLibraryItemRepo.createQueryBuilder(alias);
+		qb.where(`${alias}.userId = :userId`, { userId });
+		qb.andWhere(`TRIM(${alias}.translationZh) <> ''`);
+		qb.leftJoin(
+			EnglishPracticeReviewState,
+			'rs',
+			`rs.userId = ${alias}.userId AND rs.contentKind = :vocabKind AND rs.itemKey = ${wordKey}`,
+			{ vocabKind: 'vocab' },
+		);
+		qb.andWhere('rs.id IS NULL');
+		const excludeKeys = [
+			...(options?.exclude ? [...options.exclude] : []),
+			...(options?.usedKeys ? [...options.usedKeys] : []),
+		];
+		if (excludeKeys.length > 0) {
+			qb.andWhere(`${wordKey} NOT IN (:...excludeKeys)`, { excludeKeys });
+		}
+		return qb;
+	}
+
+	/** 跨库合并、去重后的可随机词条数（用于 summary.libraryCount） */
+	private async countLibraryMemorizeCandidates(
+		userId: number,
+	): Promise<number> {
+		const wordKey = this.libraryMemorizeWordKeySql('item');
+		const qb = this.createLibraryMemorizeEligibleQueryBuilder(userId, 'item');
+		qb.select(`COUNT(DISTINCT ${wordKey})`, 'cnt');
+		const raw = await qb.getRawOne<{ cnt: string }>();
+		return Number(raw?.cnt ?? 0);
+	}
+
+	/** 今日记词：词汇库随机可抽词数（间隔复习由 practice/review 负责） */
+	async getDailyMemorizeSummary(userId: number): Promise<{
+		todayCount: number;
+		dueCount: number;
+		libraryCount: number;
+		memorizedCount: number;
+		newFavoriteCount: number;
+	}> {
+		const [libraryCount, memorizedCount] = await Promise.all([
+			this.countLibraryMemorizeCandidates(userId),
+			this.dailyMemorizeRecordRepo.count({ where: { userId } }),
+		]);
+		const todayCount = Math.min(50, libraryCount);
+
+		return {
+			todayCount,
+			dueCount: 0,
+			libraryCount,
+			memorizedCount,
+			newFavoriteCount: 0,
+		};
+	}
+
+	/**
+	 * 重置词汇库记词进度：清空记词记录，并移除对应词的错题集与间隔复习状态，
+	 * 使这些词可再次进入词汇库随机池。
+	 */
+	async resetDailyMemorizeLibraryProgress(userId: number): Promise<{
+		recordsRemoved: number;
+		reviewStatesRemoved: number;
+		mistakesRemoved: number;
+	}> {
+		const rows = await this.dailyMemorizeRecordRepo.find({
+			where: { userId },
+			select: ['wordKey'],
+		});
+		const wordKeys = [
+			...new Set(rows.map((r) => r.wordKey.trim()).filter(Boolean)),
+		];
+
+		const recordsResult = await this.dailyMemorizeRecordRepo.delete({
+			userId,
+		});
+
+		let reviewStatesRemoved = 0;
+		let mistakesRemoved = 0;
+		if (wordKeys.length > 0) {
+			const rsResult = await this.practiceReviewStateRepo.delete({
+				userId,
+				contentKind: 'vocab',
+				itemKey: In(wordKeys),
+			});
+			reviewStatesRemoved = rsResult.affected ?? 0;
+			const mistakeResult = await this.vocabMistakeRepo.delete({
+				userId,
+				wordKey: In(wordKeys),
+			});
+			mistakesRemoved = mistakeResult.affected ?? 0;
+		}
+
+		return {
+			recordsRemoved: recordsResult.affected ?? 0,
+			reviewStatesRemoved,
+			mistakesRemoved,
+		};
+	}
+
+	private async pickLibraryMemorizeItems(
+		userId: number,
+		limit: number,
+		exclude: Set<string>,
+		usedKeys: Set<string>,
+	): Promise<
+		Array<{
+			contentKind: 'vocab';
+			key: string;
+			word: string;
+			ipa: string;
+			pos: string;
+			segmentation: string;
+			translationZh: string;
+			example: string;
+		}>
+	> {
+		const items: Array<{
+			contentKind: 'vocab';
+			key: string;
+			word: string;
+			ipa: string;
+			pos: string;
+			segmentation: string;
+			translationZh: string;
+			example: string;
+		}> = [];
+		const wordKey = this.libraryMemorizeWordKeySql('item');
+		const dedupeQb = this.createLibraryMemorizeEligibleQueryBuilder(
+			userId,
+			'item',
+			{ exclude, usedKeys },
+		);
+		dedupeQb.select('MIN(item.id)', 'pickId').groupBy(wordKey);
+
+		const rows = await this.vocabLibraryItemRepo
+			.createQueryBuilder('item')
+			.innerJoin(`(${dedupeQb.getQuery()})`, 'dedup', 'dedup.pickId = item.id')
+			.setParameters(dedupeQb.getParameters())
+			.orderBy('RAND()')
+			.take(limit)
+			.getMany();
+
+		for (const row of rows) {
+			const mapped = this.mapVocabLibraryItemToDailyItem(row);
+			if (!mapped.key || usedKeys.has(mapped.key)) continue;
+			items.push(mapped);
+			usedKeys.add(mapped.key);
+		}
+		return items;
+	}
+
+	async getDailyMemorizeQueue(
+		userId: number,
+		opts: {
+			count: number;
+			excludeKeys?: string[];
+			source?: 'review' | 'library';
+		},
+	): Promise<{
+		items: Array<{
+			contentKind: 'vocab';
+			key: string;
+			word: string;
+			ipa: string;
+			pos: string;
+			segmentation: string;
+			translationZh: string;
+			example: string;
+		}>;
+	}> {
+		const exclude = new Set(
+			(opts.excludeKeys ?? []).map((k) => k.trim()).filter(Boolean),
+		);
+		const limit = Math.min(50, Math.max(1, opts.count));
+		const usedKeys = new Set<string>();
+		const items = await this.pickLibraryMemorizeItems(
+			userId,
+			limit,
+			exclude,
+			usedKeys,
+		);
+
+		return { items };
 	}
 }

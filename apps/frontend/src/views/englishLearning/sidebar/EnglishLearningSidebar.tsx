@@ -1,6 +1,7 @@
 import { useI18n } from '@/hooks';
 import { ClassicQuotesSection } from '../sections/classic';
 import { VocabularyPackSection } from '../sections/vocabulary';
+import { DailySession } from './components/DailySession';
 import { EnglishSource } from './components/EnglishSource';
 import { FavoriteSession } from './components/FavoriteSession';
 import {
@@ -22,6 +23,7 @@ export function EnglishLearningSidebar({
 
 	return (
 		<>
+			<DailySession />
 			<EnglishLearningToolbar onQuickIntentInputSync={onQuickIntentInputSync} />
 			<EnglishSource
 				type="vocab"

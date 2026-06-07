@@ -37,6 +37,7 @@ import {
 	ENGLISH_LEARNING_CLASSIC_QUOTES_HISTORY,
 	ENGLISH_LEARNING_CLASSIC_QUOTES_LIBRARIES,
 	ENGLISH_LEARNING_CLASSIC_QUOTES_LIBRARY_UPLOAD,
+	ENGLISH_LEARNING_PRACTICE_DAILY,
 	ENGLISH_LEARNING_PRACTICE_REVIEW,
 	ENGLISH_LEARNING_STREAM_CANCEL,
 	ENGLISH_LEARNING_VOCABULARY_FAVORITES,
@@ -1092,6 +1093,115 @@ export const recordEnglishPracticeReviewAttempts = async (
 	return await http.post<{ updated: number }>(
 		`${ENGLISH_LEARNING_PRACTICE_REVIEW}/record`,
 		{ attempts },
+	);
+};
+
+export type EnglishDailyMemorizeSummary = {
+	todayCount: number;
+	dueCount: number;
+	/** 词汇库中可随机补位的词条数（尚未进入复习计划） */
+	libraryCount: number;
+	/** 已写入记词记录的词条数 */
+	memorizedCount: number;
+	/** @deprecated 今日记词已改为复习 + 词汇库随机，保留字段兼容 */
+	newFavoriteCount: number;
+};
+
+export type EnglishDailyMemorizeResetResult = {
+	recordsRemoved: number;
+	reviewStatesRemoved: number;
+	mistakesRemoved: number;
+};
+
+export const resetEnglishDailyMemorizeLibrary = async () => {
+	return await http.post<EnglishDailyMemorizeResetResult>(
+		`${ENGLISH_LEARNING_PRACTICE_DAILY}/reset`,
+	);
+};
+
+export type EnglishDailyMemorizeItem = EnglishVocabularyItem & {
+	contentKind: 'vocab';
+	key: string;
+};
+
+export const getEnglishDailyMemorizeSummary = async (options?: {
+	silent?: boolean;
+}) => {
+	return await http.get<EnglishDailyMemorizeSummary>(
+		`${ENGLISH_LEARNING_PRACTICE_DAILY}/summary`,
+		{ silent: options?.silent },
+	);
+};
+
+export const getEnglishDailyMemorizeQueue = async (options?: {
+	count?: number;
+	source?: 'library';
+	excludeKeys?: string[];
+	silent?: boolean;
+}) => {
+	const excludeKeys = options?.excludeKeys?.filter(Boolean) ?? [];
+	return await http.get<{ items: EnglishDailyMemorizeItem[] }>(
+		`${ENGLISH_LEARNING_PRACTICE_DAILY}/queue`,
+		{
+			querys: {
+				count: options?.count ?? 5,
+				...(options?.source ? { source: options.source } : {}),
+				...(excludeKeys.length > 0
+					? { excludeKeys: excludeKeys.join(',') }
+					: {}),
+			},
+			silent: options?.silent,
+		},
+	);
+};
+
+export type EnglishDailyMemorizeRecordPayload = {
+	source: 'library';
+	attempts: EnglishPracticeReviewRecordItem[];
+	vocabItems?: EnglishVocabularyMistakeBatchItem[];
+};
+
+export const recordEnglishDailyMemorizeAttempts = async (
+	payload: EnglishDailyMemorizeRecordPayload,
+) => {
+	return await http.post<{
+		updated: number;
+		mistakeAdded: number;
+		mistakeSkipped: number;
+	}>(`${ENGLISH_LEARNING_PRACTICE_DAILY}/record`, payload);
+};
+
+export type EnglishDailyMemorizeRecordEntry = {
+	id: string;
+	word: string;
+	ipa: string;
+	pos: string;
+	segmentation: string;
+	translationZh: string;
+	example: string;
+	lastCorrect: boolean;
+	practicedAt: string;
+};
+
+export type EnglishDailyMemorizeRecordsPage = {
+	items: EnglishDailyMemorizeRecordEntry[];
+	totalCount: number;
+};
+
+export const listEnglishDailyMemorizeRecords = async (options?: {
+	limit?: number;
+	offset?: number;
+	silent?: boolean;
+}) => {
+	return await http.get<EnglishDailyMemorizeRecordsPage>(
+		`${ENGLISH_LEARNING_PRACTICE_DAILY}/records`,
+		{
+			querys: {
+				limit: options?.limit ?? 50,
+				offset: options?.offset ?? 0,
+			},
+			silent: options?.silent,
+		},
 	);
 };
 

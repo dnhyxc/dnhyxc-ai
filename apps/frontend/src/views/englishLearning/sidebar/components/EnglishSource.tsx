@@ -8,14 +8,8 @@ import { cn } from '@/lib/utils';
 import {
 	ENGLISH_SIDEBAR_BTN_GRADIENT,
 	ENGLISH_SIDEBAR_ICON_GRADIENT,
+	ENGLISH_SIDEBAR_TEXT_LINK_GRADIENT,
 } from '../sidebarAccents';
-
-const SOURCE_LINK_GRADIENT = {
-	vocab:
-		'bg-linear-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 bg-clip-text text-transparent',
-	classic:
-		'bg-linear-to-r from-indigo-500 to-blue-600 hover:from-indigo-400 hover:to-blue-500 bg-clip-text text-transparent',
-} as const;
 
 const SOURCE_EXAMPLE_PANEL = {
 	vocab: 'bg-linear-to-r from-cyan-500/8 to-blue-600/8 border-blue-500/10',
@@ -89,16 +83,15 @@ export function EnglishSource({
 					)}
 				</div>
 				<div className="min-w-0 flex-1 flex flex-col justify-between">
-					<div className="text-textcolor font-semibold leading-tight">
-						{title}
-					</div>
-					<div className="h-5 flex items-center justify-between gap-2 text-textcolor/50 mt-1 text-xs leading-snug">
-						{description}
+					<div className="flex items-center justify-between gap-2">
+						<div className="text-textcolor min-w-0 font-semibold leading-tight">
+							{title}
+						</div>
 						<button
 							type="button"
 							className={cn(
-								'shrink-0 cursor-pointer',
-								SOURCE_LINK_GRADIENT[type],
+								'shrink-0 cursor-pointer text-xs leading-snug',
+								ENGLISH_SIDEBAR_TEXT_LINK_GRADIENT[type],
 							)}
 							onClick={() =>
 								navigate(
@@ -113,6 +106,11 @@ export function EnglishSource({
 								: t('englishLearning.source.grammarLink')}
 						</button>
 					</div>
+					{description ? (
+						<div className="text-textcolor/50 mt-1 flex h-5 items-center gap-2 text-xs leading-snug">
+							{description}
+						</div>
+					) : null}
 				</div>
 			</div>
 			<div>
@@ -127,7 +125,7 @@ export function EnglishSource({
 				<ScrollArea
 					scrollbars="both"
 					className={cn(
-						'px-2 py-[9px] bg-theme/5 border mb-5 max-h-50 w-full min-w-0 rounded-md',
+						'px-2 py-[9.5px] bg-theme/5 border mb-5 max-h-50 w-full min-w-0 rounded-md',
 						SOURCE_EXAMPLE_PANEL[type],
 					)}
 					viewportClassName="[&>div]:!block [&>div]:w-max"

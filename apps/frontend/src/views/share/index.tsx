@@ -17,6 +17,7 @@ import { useMessageTools } from '@/hooks/useMessageTools';
 import { cn } from '@/lib/utils';
 import { getShare } from '@/service';
 import type { Message, Session } from '@/types/chat';
+import { formatDate } from '@/utils';
 
 /** 判定「已到底」允许的像素误差（避免子像素取整导致箭头来回跳） */
 const SCROLL_BOTTOM_THRESHOLD = 48;
@@ -83,8 +84,8 @@ const SessionShare = () => {
 		id: string;
 		title: string | null;
 		content: string;
-		createdAt: number;
-		updatedAt: number;
+		createdAt: string | number;
+		updatedAt: string | number;
 	} | null>(null);
 
 	const { buildMessageList, getFormatMessages } = useMessageTools();
@@ -158,8 +159,8 @@ const SessionShare = () => {
 								id: string;
 								title: string | null;
 								content: string;
-								createdAt: number;
-								updatedAt: number;
+								createdAt: string | number;
+								updatedAt: string | number;
 							})
 						: null,
 				);
@@ -282,7 +283,7 @@ const SessionShare = () => {
 							</div>
 							<div className="text-xs text-textcolor/50 mb-3">
 								{t('share.knowledge.updatedAt', {
-									time: new Date(knowledgeData.updatedAt).toLocaleString(),
+									time: formatDate(String(knowledgeData.updatedAt ?? '')),
 								})}
 							</div>
 							<div className="bg-theme/5 border border-theme/10 rounded-md p-3 mb-4 last:mb-2">

@@ -803,6 +803,7 @@ export const enUS = {
 	'route.englishLearning.library.title': 'Library',
 	'route.englishLearning.favorites.title': 'My favorites',
 	'route.englishLearning.mistakes.title': 'Mistake book',
+	'route.englishLearning.daily.title': 'Daily words',
 	'route.englishLearning.review.title': "Today's review",
 	'route.englishLearning.stream.title': 'Fetch results',
 	'route.englishLearning.morphology.title': 'Roots & affixes',
@@ -927,6 +928,7 @@ export const enUS = {
 		'All wrong items are already in the mistake book with the same spelling',
 	'englishLearning.practice.saveMistakesFailed': 'Failed to save mistake book',
 	'englishLearning.practice.sourceMistakes': 'Mistake book',
+	'englishLearning.practice.sourceDailyMemorize': 'Word log',
 	'englishLearning.practice.sourceReview': "Today's review (vocabulary)",
 	'englishLearning.practice.sourceClassicReview': "Today's review (sentences)",
 	'englishLearning.practice.continueReview': 'Continue review',
@@ -934,6 +936,66 @@ export const enUS = {
 		'No more items due for review today',
 	'englishLearning.practice.reviewRecordFailed':
 		'Failed to save review progress. Try again later.',
+
+	'englishLearning.daily.loading': 'Preparing today’s cards…',
+	'englishLearning.daily.sidebarDesc': 'Listen & pick — about {count} words',
+	'englishLearning.daily.sidebarDescSplit':
+		'Review {dueCount} · Library {libraryCount}',
+	'englishLearning.daily.sidebarDescLibrary':
+		'{poolCount} unlearned in library · {sessionCount} per round',
+	'englishLearning.daily.sidebarDescLibraryEmpty':
+		'No new words in your libraries',
+	'englishLearning.daily.wordsPerRoundTrigger': 'Words per round',
+	'englishLearning.daily.wordsPerRoundTitle': 'Words per round',
+	'englishLearning.daily.wordsPerRoundDesc':
+		'Same options as word practice. Applies on your next session.',
+	'englishLearning.daily.resetLibrary': 'Reset',
+	'englishLearning.daily.resetting': 'Resetting…',
+	'englishLearning.daily.resetConfirmTitle': 'Reset library memorization?',
+	'englishLearning.daily.resetConfirmDesc':
+		'This clears {count} word log entries and removes those words from your mistake book and review schedule, so they can be picked from the library again.',
+	'englishLearning.daily.resetConfirmAction': 'Reset',
+	'englishLearning.daily.resetSuccess': 'Reset {count} word log entries',
+	'englishLearning.daily.resetSuccessGuest':
+		'Local memorization progress reset',
+	'englishLearning.daily.resetFailed': 'Reset failed. Try again later.',
+	'englishLearning.daily.memorizedLink': 'Word log',
+	'englishLearning.daily.recordsTitle': 'Word log',
+	'englishLearning.daily.recordsLoading': 'Loading word log…',
+	'englishLearning.daily.recordsEmpty':
+		'No words from library random practice yet',
+	'englishLearning.daily.recordsLoadFailed': 'Failed to load word log',
+	'englishLearning.daily.sectionLabel': "Today's cards",
+	'englishLearning.daily.startShort': 'Start {count} words',
+	'englishLearning.daily.introTitle': 'A few minutes a day, words stick',
+	'englishLearning.daily.introDesc':
+		'About {count} words today — listen, read the meaning, pick one answer.',
+	'englishLearning.daily.introDescSplit':
+		'Review {dueCount} due · Library random {libraryCount}',
+	'englishLearning.daily.introHint':
+		'Recognition only — no spelling. Use Today’s review for dictation later.',
+	'englishLearning.daily.sessionTitle': 'Daily words',
+	'englishLearning.daily.sessionTitleReview': 'Due review',
+	'englishLearning.daily.sessionTitleLibrary': 'Read & memorize',
+	'englishLearning.daily.studyLabel': 'Listen & read',
+	'englishLearning.daily.quizLabel': 'Pick the meaning',
+	'englishLearning.daily.quizHint': 'Which is the correct meaning in Chinese?',
+	'englishLearning.daily.hintLabelWord': 'Word',
+	'englishLearning.daily.start': 'Start {count} words',
+	'englishLearning.daily.startReview': 'Review due ({count})',
+	'englishLearning.daily.startLibrary': 'Start memorizing',
+	'englishLearning.daily.guestHint':
+		'Built-in high-frequency words when signed out; sign in to sync favorites and review.',
+	'englishLearning.daily.startQuiz': 'Quiz me',
+	'englishLearning.daily.quizPrompt': 'What does “{word}” mean?',
+	'englishLearning.daily.feedbackCorrect': 'Nice — got it!',
+	'englishLearning.daily.feedbackWrong': 'No worries — you’ll see it again',
+	'englishLearning.daily.nextWord': 'Next word',
+	'englishLearning.daily.finish': 'Done for today',
+	'englishLearning.daily.doneTitle': 'That’s enough for today',
+	'englishLearning.daily.doneDesc':
+		'When due, practice dictation under Today’s review — we handle the schedule.',
+	'englishLearning.daily.backHome': 'Back to English',
 
 	'englishLearning.review.homeDesc': '{count} due for review today',
 	'englishLearning.review.loadingDue': 'Loading due count…',

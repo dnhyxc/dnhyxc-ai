@@ -51,6 +51,8 @@ import {
 	resolveVocabularyPackTargetCount,
 } from './dto/generate-vocabulary.dto';
 import {
+	PracticeDailyQueueQueryDto,
+	PracticeDailyRecordDto,
 	PracticeReviewQueueQueryDto,
 	PracticeReviewRecordDto,
 } from './dto/practice-review.dto';
@@ -686,6 +688,96 @@ export class EnglishLearningController {
 		const data = await this.englishLearningService.recordPracticeReviewAttempts(
 			userId,
 			dto.attempts,
+		);
+		return { success: true, data };
+	}
+
+	@Get('practice/daily/summary')
+	async getDailyMemorizeSummary(@Req() req: AuthedRequest) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const data =
+			await this.englishLearningService.getDailyMemorizeSummary(userId);
+		return { success: true, data };
+	}
+
+	@Get('practice/daily/queue')
+	async getDailyMemorizeQueue(
+		@Req() req: AuthedRequest,
+		@Query() query: PracticeDailyQueueQueryDto,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const excludeKeys = (query.excludeKeys ?? '')
+			.split(',')
+			.map((k) => k.trim())
+			.filter(Boolean);
+		const data = await this.englishLearningService.getDailyMemorizeQueue(
+			userId,
+			{
+				count: query.count ?? 5,
+				excludeKeys,
+			},
+		);
+		return { success: true, data };
+	}
+
+	@Post('practice/daily/record')
+	async recordDailyMemorizeAttempts(
+		@Req() req: AuthedRequest,
+		@Body() dto: PracticeDailyRecordDto,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const data = await this.englishLearningService.recordDailyMemorizeAttempts(
+			userId,
+			dto,
+		);
+		return { success: true, data };
+	}
+
+	/** 词汇库随机记词记录（按最近练习时间倒序） */
+	/** 重置词汇库记词进度（记词记录 + 对应复习/错题） */
+	@Post('practice/daily/reset')
+	async resetDailyMemorizeLibrary(@Req() req: AuthedRequest) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const data =
+			await this.englishLearningService.resetDailyMemorizeLibraryProgress(
+				userId,
+			);
+		return { success: true, data };
+	}
+
+	@Get('practice/daily/records')
+	async listDailyMemorizeRecords(
+		@Req() req: AuthedRequest,
+		@Query('limit') limitStr?: string,
+		@Query('offset') offsetStr?: string,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const limit = Math.min(
+			100,
+			Math.max(1, Number.parseInt(limitStr ?? '50', 10) || 50),
+		);
+		const offset = Math.max(0, Number.parseInt(offsetStr ?? '0', 10) || 0);
+		const data = await this.englishLearningService.listDailyMemorizeRecordsPage(
+			userId,
+			{
+				limit,
+				offset,
+			},
 		);
 		return { success: true, data };
 	}

@@ -15,4 +15,5 @@
 | [../ops/upload-storage-paths.md](../ops/upload-storage-paths.md) | 后端 uploads 落盘、`UPLOAD_ROOT`、与 dist 同级 |
 | [web-search.md](./web-search.md) | 联网搜索与引用 |
 | [share.md](./share.md) | 会话分享（顺序、附件、排版） |
+| [share-knowledge-timezone.md](./share-knowledge-timezone.md) | **知识文章分享**「更新时间」MySQL 时区 ±8h 修复 |
 | [chat-update.md](./chat-update.md) | Chat 重构与性能相关记录 |

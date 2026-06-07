@@ -17,6 +17,11 @@ export const typeOrmConfig = {
 	username: config[ConfigEnum.DB_USERNAME],
 	password: config[ConfigEnum.DB_PASSWORD],
 	database: config[ConfigEnum.DB_DATABASE],
+	/** 与 mysql2 一致按 UTC 读写 TIMESTAMP，避免东八区环境下读写偏移 8h（如凌晨 2 点显示成 18 点） */
+	timezone: 'Z',
+	extra: {
+		timezone: 'Z',
+	},
 	entities: entitiesDir, // 通过便利查找所有的 entity.ts 中的实体，设置到数据库中。使用 autoLoadEntities 更加便捷
 	synchronize: config[ConfigEnum.DB_SYNC] === 'true', // 首次使用 true，表示自动将实体类同步到数据库
 	// 开发环境设置为 true，开启 SQL 语句日志，即所有的 SQL 语句都会打印日志，便于开发调试

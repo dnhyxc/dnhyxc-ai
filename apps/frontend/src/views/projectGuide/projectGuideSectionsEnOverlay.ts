@@ -200,7 +200,7 @@ export const PROJECT_GUIDE_ITEMS_EN: Record<
 	'pg-s11-1': {
 		title: '11.1 Shared sessions (read-only)',
 		description:
-			'Share generates a link for read-only viewing in a browser—no install required. Message order matches the conversation, including branches/regeneration. User message attachments appear as cards with preview and download; layout aligns with the online reader.',
+			'Share generates a link for read-only viewing in a browser—no install required. Message order matches the conversation, including branches/regeneration. User message attachments appear as cards with preview and download; layout aligns with the online reader. Saved cloud knowledge articles can use a knowledge share link; the “Updated” line matches the cloud library list—save to the library before sharing.',
 	},
 	'pg-s11-2': {
 		title: '11.2 Knowledge assistant: AI vs RAG',

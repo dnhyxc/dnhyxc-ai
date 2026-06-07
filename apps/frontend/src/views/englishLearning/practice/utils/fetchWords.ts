@@ -9,6 +9,7 @@ import {
 	type EnglishClassicQuoteFavoriteListEntry,
 	type EnglishClassicQuoteMistakeListEntry,
 	type EnglishClassicQuotesLibraryItemRow,
+	type EnglishDailyMemorizeRecordEntry,
 	type EnglishVocabularyFavoriteListEntry,
 	type EnglishVocabularyLibraryItemRow,
 	type EnglishVocabularyMistakeListEntry,
@@ -17,6 +18,7 @@ import {
 	listEnglishClassicQuoteMistakes,
 	listEnglishClassicQuotesLibraryItems,
 	listEnglishClassicQuotesPackItems,
+	listEnglishDailyMemorizeRecords,
 	listEnglishVocabularyFavorites,
 	listEnglishVocabularyLibraryItems,
 	listEnglishVocabularyMistakes,
@@ -57,6 +59,18 @@ function vocabFavoriteToItem(
 
 function vocabMistakeToItem(
 	row: EnglishVocabularyMistakeListEntry,
+): PracticeItem {
+	return toPracticeVocabItem(row.word, {
+		ipa: row.ipa,
+		pos: row.pos,
+		segmentation: row.segmentation,
+		translationZh: row.translationZh,
+		example: row.example,
+	});
+}
+
+function vocabDailyMemorizeToItem(
+	row: EnglishDailyMemorizeRecordEntry,
 ): PracticeItem {
 	return toPracticeVocabItem(row.word, {
 		ipa: row.ipa,
@@ -425,6 +439,44 @@ async function fetchFavorites(
 	return fetchInitialFromPaginated(fetchPage, total, count, order);
 }
 
+async function fetchDailyMemorize(
+	ctx: PracticeFetchContext,
+	count: number,
+	order: PracticeOrder,
+	cursor: PracticeSessionCursor | null,
+	excludeKeys: readonly string[],
+	poolTotal?: number,
+): Promise<PracticeSessionFetchResult> {
+	if (ctx.contentKind === 'classic') {
+		return { items: [], cursor: emptyCursor() };
+	}
+	const total = resolvePoolTotal(ctx, poolTotal);
+	if (total == null) return { items: [], cursor: emptyCursor() };
+
+	const fetchPage = async (offset: number, limit: number) => {
+		const res = await listEnglishDailyMemorizeRecords({
+			limit,
+			offset,
+			silent: true,
+		});
+		return {
+			items: (res.data?.items ?? []).map(vocabDailyMemorizeToItem),
+		};
+	};
+
+	if (cursor) {
+		return fetchContinueFromPaginated(
+			fetchPage,
+			total,
+			count,
+			order,
+			cursor,
+			excludeKeys,
+		);
+	}
+	return fetchInitialFromPaginated(fetchPage, total, count, order);
+}
+
 async function fetchMistakes(
 	ctx: PracticeFetchContext,
 	count: number,
@@ -653,6 +705,15 @@ function runSessionFetch(
 			);
 		case 'mistakes':
 			return fetchMistakes(
+				ctx,
+				count,
+				params.order,
+				cursor,
+				excludeKeys,
+				params.poolTotal,
+			);
+		case 'dailyMemorize':
+			return fetchDailyMemorize(
 				ctx,
 				count,
 				params.order,
