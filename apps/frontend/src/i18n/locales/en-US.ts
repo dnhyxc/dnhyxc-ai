@@ -1160,7 +1160,7 @@ export const enUS = {
 	'englishLearning.quickIntentsCollapse': 'Collapse quick intents',
 	'englishLearning.quickIntentsExpand': 'Expand quick intents',
 	'englishLearning.intro':
-		'On the left, pick quick intents to steer the topic or attach study material; on the right, ask in natural language in the input—for lookups, translation, short passages, or literature guidance. Content already in your knowledge base is retrieved and cited first when it applies.',
+		'On the left, pick a quick intent to steer each turn—vocabulary, morphology, collocations, confusable words, pronunciation, speaking, translation, close reading, literature guidance, or grammar. Click the same chip again to clear; your choice is attached to the next message.',
 	'englishLearning.disclaimer':
 		'Translations and explanations are for learning only—please proofread important texts. Literature guidance respects copyright; prefer summaries and discussion prompts.',
 	'englishLearning.newChat': 'New chat',

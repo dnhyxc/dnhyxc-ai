@@ -1042,7 +1042,7 @@ export const zhCN = {
 	'englishLearning.quickIntentsCollapse': '收起快捷意图',
 	'englishLearning.quickIntentsExpand': '展开快捷意图',
 	'englishLearning.intro':
-		'左侧点选「快捷意图」可限定对话方向或附带学习素材，右侧在输入框用自然语言提问即可，适合查词、翻译、短文赏析与名著导读等。已在知识库入库的内容，Agent 会在相关时优先检索并引用。',
+		'左侧点选「快捷意图」可设定本轮学习方向，涵盖单词背诵、词根词缀、固定搭配、易混辨析、发音规律、口语演练、翻译对照、短文精读、名著导读与语法讲解；再次点击同一项可取消，选中内容会在你下次发送时自动附带。',
 	'englishLearning.disclaimer':
 		'翻译与讲解仅供学习参考，重要文件请人工校对；名著导读遵守版权，长文以摘要与讨论为主。',
 	'englishLearning.newChat': '新对话',
