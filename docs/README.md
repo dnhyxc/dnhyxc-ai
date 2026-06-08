@@ -47,6 +47,7 @@
 | 设置页大模型 Key | [llm/llm-runtime-settings.md](./llm/llm-runtime-settings.md) |
 | 设置页预设 / Combobox | [llm/llm-setting-ui-presets.md](./llm/llm-setting-ui-presets.md) |
 | 英语学习 Agent + LLM | [llm/agent-create-llm-unify.md](./llm/agent-create-llm-unify.md) |
+| 今日记词无词可抽 / 时间不对 | [english/daily-memorize-implementation.md](./english/daily-memorize-implementation.md) §9 |
 
 ---
 
