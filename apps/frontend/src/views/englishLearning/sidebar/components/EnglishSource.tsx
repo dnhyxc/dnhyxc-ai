@@ -90,7 +90,7 @@ export function EnglishSource({
 						<button
 							type="button"
 							className={cn(
-								'shrink-0 cursor-pointer text-xs leading-snug',
+								'shrink-0 cursor-pointer text-sm leading-snug',
 								ENGLISH_SIDEBAR_TEXT_LINK_GRADIENT[type],
 							)}
 							onClick={() =>

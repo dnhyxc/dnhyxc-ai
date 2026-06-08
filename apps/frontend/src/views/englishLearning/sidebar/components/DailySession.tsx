@@ -137,7 +137,7 @@ export function DailySession() {
 								type="button"
 								disabled={!canReset || resetting || loading}
 								className={cn(
-									'text-xs leading-snug',
+									'text-sm leading-snug',
 									!canReset || resetting || loading
 										? 'text-textcolor/35 cursor-not-allowed'
 										: cn(
