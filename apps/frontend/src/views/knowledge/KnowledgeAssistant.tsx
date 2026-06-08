@@ -776,11 +776,11 @@ const KnowledgeAssistant = observer(
 						*/}
 						<ScrollArea
 							ref={scrollViewportRef}
-							className="min-h-0 min-w-0 w-full flex-1 border-0 mb-0.5"
+							className="min-h-0 min-w-0 w-full flex-1 mb-0.5"
 							viewportClassName="pb-1 [overflow-anchor:none]"
 							{...scrollAreaHandlers}
 						>
-							<div className="relative mx-auto flex min-h-0 w-full min-w-0 max-w-3xl flex-col pt-4 pl-4 pr-4 select-none">
+							<div className="relative mx-auto flex min-h-0 w-full min-w-0 max-w-3xl flex-col pt-4 px-3.5 select-none">
 								{messages.map((message, index) => (
 									<KnowledgeMessageBubble
 										key={message.chatId}

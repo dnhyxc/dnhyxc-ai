@@ -472,11 +472,11 @@ export const AgentPanel = observer(function AgentPanel({
 						*/}
 					<ScrollArea
 						ref={scrollViewportRef}
-						className="mb-0.5 min-h-0 min-w-0 w-full flex-1 border-0"
+						className="mb-0.5 min-h-0 min-w-0 w-full flex-1"
 						viewportClassName="pb-1 [overflow-anchor:none]"
 						{...scrollAreaHandlers}
 					>
-						<div className="relative mx-auto flex min-h-0 w-full min-w-0 max-w-3xl flex-col select-none pt-4.5 px-4.5">
+						<div className="relative mx-auto flex min-h-0 w-full min-w-0 max-w-3xl flex-col select-none pt-4.5 px-4">
 							{messages.map((m, index) => (
 								<EnglishLearningMessageRow
 									key={m.chatId}
