@@ -54,7 +54,7 @@ function PackStreamProgressInner({ kind }: PackStreamProgressProps) {
 	};
 
 	return (
-		<div className="border border-theme/10 space-y-3 rounded-md bg-theme-secondary/40 px-4 py-3">
+		<div className="border border-theme/10 space-y-3 rounded-md bg-theme-secondary/40 px-4 py-3 mb-4">
 			{agentToolLine ? (
 				<div className={cn('text-xs leading-snug', accentText)}>
 					{agentToolLine}

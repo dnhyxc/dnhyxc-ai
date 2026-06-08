@@ -313,7 +313,7 @@ function ClassicQuotesPackSectionInner({
 			className="min-h-0 flex-1 pb-4"
 			onScroll={snapshot.onHistoryViewportScroll}
 		>
-			<div className="space-y-5 px-4 pt-4">
+			<div className="space-y-5 px-4">
 				{isLiveStreamView || !isHistoryView ? (
 					<PackStreamProgress kind="classic" />
 				) : null}
