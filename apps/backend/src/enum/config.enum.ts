@@ -83,6 +83,14 @@ export enum ModelEnum {
 	ZHIPU_API_KEY = 'ZHIPU_API_KEY',
 	ZHIPU_MODEL_NAME = 'ZHIPU_MODEL_NAME',
 	ZHIPU_BASE_URL = 'ZHIPU_BASE_URL',
+
+	/**
+	 * 智谱 GLM 模型名，默认 glm-4.7-flash。
+	 * API Key / Base URL 沿用 KnowledgeQaEnum.SILICONFLOW_*。
+	 */
+	GLM_API_KEY = 'GLM_API_KEY',
+	GLM_BASE_URL = 'GLM_BASE_URL',
+	GLM_MODEL_NAME = 'GLM_MODEL_NAME',
 	/**
 	 * 当前助手所用大模型的「单请求最大输入上下文」token 上限（与智谱文档一致时可不填）。
 	 * 未配置时按 ASSISTANT_GLM_MODEL_NAME 推断（如 glm-4.7 默认 200000）。

@@ -125,6 +125,7 @@ export function getAssistantSiliconFlowModelName(
 			.modelName;
 	}
 	return resolveModelNameFromEnvKeys(config, [
+		ModelEnum.GLM_MODEL_NAME,
 		ModelEnum.SILICONFLOW_MODEL_NAME,
 		ModelEnum.DEEPSEEK_MODEL_NAME,
 	]);
@@ -135,13 +136,19 @@ const siliconFlowResolvePresets: Record<
 	(config: ConfigService) => ResolveSiliconFlowOptions
 > = {
 	chat: () => ({
-		apiKeyEnvKeys: [ModelEnum.SILICONFLOW_API_KEY, ModelEnum.DEEPSEEK_API_KEY],
+		apiKeyEnvKeys: [
+			ModelEnum.GLM_API_KEY,
+			ModelEnum.SILICONFLOW_API_KEY,
+			ModelEnum.DEEPSEEK_API_KEY,
+		],
 		baseUrlEnvKeys: [
+			ModelEnum.GLM_BASE_URL,
 			ModelEnum.SILICONFLOW_BASE_URL,
 			ModelEnum.DEEPSEEK_BASE_URL,
 		],
 		resolveModelName: (c) =>
 			resolveModelNameFromEnvKeys(c, [
+				ModelEnum.GLM_MODEL_NAME,
 				ModelEnum.SILICONFLOW_MODEL_NAME,
 				ModelEnum.DEEPSEEK_MODEL_NAME,
 			]),
@@ -151,12 +158,14 @@ const siliconFlowResolvePresets: Record<
 
 	assistant: () => ({
 		apiKeyEnvKeys: [
+			ModelEnum.GLM_API_KEY,
 			ModelEnum.SILICONFLOW_API_KEY,
 			ModelEnum.DEEPSEEK_API_KEY,
 			KnowledgeQaEnum.DASHSCOPE_API_KEY,
 			ModelEnum.QWEN_API_KEY,
 		],
 		baseUrlEnvKeys: [
+			ModelEnum.GLM_BASE_URL,
 			ModelEnum.SILICONFLOW_BASE_URL,
 			ModelEnum.DEEPSEEK_BASE_URL,
 		],
@@ -167,13 +176,15 @@ const siliconFlowResolvePresets: Record<
 
 	knowledgeQa: () => ({
 		apiKeyEnvKeys: [
+			ModelEnum.GLM_API_KEY,
 			ModelEnum.SILICONFLOW_API_KEY,
 			KnowledgeQaEnum.DASHSCOPE_API_KEY,
 			ModelEnum.QWEN_API_KEY,
 		],
-		baseUrlEnvKeys: [ModelEnum.SILICONFLOW_BASE_URL],
+		baseUrlEnvKeys: [ModelEnum.GLM_BASE_URL, ModelEnum.SILICONFLOW_BASE_URL],
 		resolveModelName: (c) =>
 			resolveModelNameFromEnvKeys(c, [
+				ModelEnum.GLM_MODEL_NAME,
 				ModelEnum.SILICONFLOW_MODEL_NAME,
 				ModelEnum.DEEPSEEK_MODEL_NAME,
 				KnowledgeQaEnum.KNOWLEDGE_QA_MODEL,
@@ -185,16 +196,19 @@ const siliconFlowResolvePresets: Record<
 
 	englishLearning: () => ({
 		apiKeyEnvKeys: [
+			ModelEnum.GLM_API_KEY,
 			ModelEnum.SILICONFLOW_API_KEY,
 			ModelEnum.DEEPSEEK_API_KEY,
 			KnowledgeQaEnum.DASHSCOPE_API_KEY,
 		],
 		baseUrlEnvKeys: [
+			ModelEnum.GLM_BASE_URL,
 			ModelEnum.SILICONFLOW_BASE_URL,
 			ModelEnum.DEEPSEEK_BASE_URL,
 		],
 		resolveModelName: (c) =>
 			resolveModelNameFromEnvKeys(c, [
+				ModelEnum.GLM_MODEL_NAME,
 				ModelEnum.SILICONFLOW_MODEL_NAME,
 				ModelEnum.DEEPSEEK_MODEL_NAME,
 			]),

@@ -18,7 +18,7 @@ import { ConfigService } from '@nestjs/config';
 import { type Queue } from 'bullmq';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import { Observable, Subject } from 'rxjs';
-import { ModelEnum } from 'src/enum/config.enum';
+import { ModelEnum } from '../../enum/config.enum';
 import { parseFile } from '../../utils/file-parser';
 import { MessageRole } from './chat.entity';
 import { ChatContinueDto } from './dto/chat-continue.dto';
