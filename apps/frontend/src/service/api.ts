@@ -55,10 +55,12 @@ export const IMAGE_OCR = '/ocr/imageOcr';
 // 停止模型调用
 export const STOP_SSE = '/chat/stopSse';
 
-/** 语音转写：录音上传 → 硅基流动 ASR（与 chat 路由解耦） */
+/** 语音转写：录音上传 -> 硅基流动 ASR（与 chat 路由解耦） */
 export const SPEECH_TRANSCRIPTION = '/speech-transcription/transcription';
-/** 云端文本转语音（硅基流动，需 SILICONFLOW_API_KEY） */
+/** 云端文本转语音（Minimax t2a_v3），返回 mp3 二进制 */
 export const SPEECH_TTS = '/speech-transcription/speech';
+/** 查询后端是否配置了 Minimax TTS */
+export const SPEECH_TTS_STATUS = '/speech-transcription/speech/status';
 
 // 创建会话
 export const CREATE_SESSION = '/chat/createSession';

@@ -78,6 +78,14 @@ export enum ModelEnum {
 	 * 单次请求可用 ChatRequestDto.webSearchProvider 覆盖。
 	 */
 	WEB_SEARCH_DEFAULT_PROVIDER = 'WEB_SEARCH_DEFAULT_PROVIDER',
+	/** Minimax（语音合成）API Key，用于 t2a_v3 文本转语音 */
+	MINIMAX_API_KEY = 'MINIMAX_API_KEY',
+	/** Minimax Group ID，用于 t2a_v3 鉴权（与 MINIMAX_API_KEY 配合使用） */
+	MINIMAX_GROUP_ID = 'MINIMAX_GROUP_ID',
+	/** Minimax 文本转语音模型名（默认 speech-2.4-thinking-pro） */
+	MINIMAX_TTS_MODEL_NAME = 'MINIMAX_TTS_MODEL_NAME',
+	/** Minimax 文本转语音说话人/音色（默认 female-zhongjixiuxian-yufu） */
+	MINIMAX_TTS_VOICE_ID = 'MINIMAX_TTS_VOICE_ID',
 }
 
 export enum QdrantEnum {
