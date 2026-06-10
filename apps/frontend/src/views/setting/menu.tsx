@@ -49,7 +49,7 @@ const NavigationMenus = () => {
 	);
 
 	return (
-		<nav className="w-full relative border-b border-theme/50 after:content-[''] after:absolute after:bottom-0 after:right-0 after:w-full after:h-[8px] after:rounded-tr-[25px] after:bg-linear-to-r after:from-transparent after:to-theme after:max-w-[50vw]">
+		<nav className="w-full relative border-b border-theme/35 after:content-[''] after:absolute after:bottom-0 after:right-0 after:w-full after:h-[8px] after:rounded-tr-[25px] after:bg-linear-to-r after:from-transparent after:to-theme after:max-w-[42vw]">
 			<NavigationMenu className="w-full">
 				<NavigationMenuList className="flex-wrap">
 					{menus.map((i) => {

@@ -134,7 +134,7 @@ export class MinimaxTtsService {
 			voiceId:
 				dto.voiceId?.trim() ||
 				(this.trimEnv(MinimaxEnum.MINIMAX_TTS_VOICE_ID) ??
-					'English_radiant_girl'),
+					'English_captivating_female1'),
 			speed: dto.speed ?? 1,
 			vol: dto.vol ?? 1,
 			pitch: dto.pitch ?? 0,

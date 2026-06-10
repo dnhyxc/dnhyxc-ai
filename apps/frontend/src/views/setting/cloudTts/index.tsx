@@ -6,16 +6,19 @@ import { Input, Label, Switch } from '@ui/index';
 import {
 	Select,
 	SelectContent,
+	SelectGroup,
 	SelectItem,
+	SelectLabel,
 	SelectTrigger,
 	SelectValue,
 } from '@ui/select';
 import { Minus, Plus, Volume2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+	getMinimaxTtsEnglishVoicesByGender,
+	getMinimaxTtsVoiceDisplayName,
 	MINIMAX_TTS_AUDIO_FORMATS,
 	MINIMAX_TTS_EMOTIONS,
-	MINIMAX_TTS_ENGLISH_VOICES,
 	MINIMAX_TTS_LANGUAGE_BOOST_VALUES,
 	MINIMAX_TTS_MODELS,
 } from '@/constants/minimaxTts';
@@ -186,6 +189,81 @@ function PrefSelectField({
 	);
 }
 
+function formatVoiceOptionLabel(name: string, id: string): string {
+	return `${name} · ${id}`;
+}
+
+function VoiceSelectField({
+	id,
+	label,
+	value,
+	onValueChange,
+	disabled,
+	labelClassName,
+}: {
+	id: string;
+	label: string;
+	value: string;
+	onValueChange: (value: string) => void;
+	disabled?: boolean;
+	labelClassName: string;
+}) {
+	const { t, locale } = useI18n();
+	const { female, male } = useMemo(
+		() => getMinimaxTtsEnglishVoicesByGender(),
+		[],
+	);
+
+	const voiceLabel = (voice: (typeof female)[number]) =>
+		formatVoiceOptionLabel(
+			getMinimaxTtsVoiceDisplayName(voice, locale),
+			voice.id,
+		);
+
+	return (
+		<div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+			<Label htmlFor={id} className={labelClassName}>
+				{label}
+			</Label>
+			<div className="min-w-0 flex-1">
+				<Select value={value} onValueChange={onValueChange} disabled={disabled}>
+					<SelectTrigger id={id} className={cn(fieldInputClass, 'w-full')}>
+						<SelectValue />
+					</SelectTrigger>
+					<SelectContent position="popper" className="max-h-80">
+						<SelectGroup>
+							<SelectLabel>
+								{t('setting.cloudTts.voiceGroup.female')}
+							</SelectLabel>
+							{female.map((voice) => (
+								<SelectItem
+									key={voice.id}
+									value={voice.id}
+									textValue={voiceLabel(voice)}
+								>
+									{voiceLabel(voice)}
+								</SelectItem>
+							))}
+						</SelectGroup>
+						<SelectGroup>
+							<SelectLabel>{t('setting.cloudTts.voiceGroup.male')}</SelectLabel>
+							{male.map((voice) => (
+								<SelectItem
+									key={voice.id}
+									value={voice.id}
+									textValue={voiceLabel(voice)}
+								>
+									{voiceLabel(voice)}
+								</SelectItem>
+							))}
+						</SelectGroup>
+					</SelectContent>
+				</Select>
+			</div>
+		</div>
+	);
+}
+
 const CloudTtsSetting = () => {
 	const { t, locale } = useI18n();
 	const fieldLabelClass = useMemo(() => getFieldLabelClass(locale), [locale]);
@@ -204,15 +282,6 @@ const CloudTtsSetting = () => {
 
 	const modelOptions = useMemo(
 		() => MINIMAX_TTS_MODELS.map((value) => ({ value, label: value })),
-		[],
-	);
-
-	const voiceOptions = useMemo(
-		() =>
-			MINIMAX_TTS_ENGLISH_VOICES.map(({ id, name }) => ({
-				value: id,
-				label: `${name} · ${id}`,
-			})),
 		[],
 	);
 
@@ -318,12 +387,11 @@ const CloudTtsSetting = () => {
 						labelClassName={fieldLabelClass}
 					/>
 
-					<PrefSelectField
+					<VoiceSelectField
 						id="cloud-tts-voice"
 						label={t('setting.cloudTts.voiceId')}
 						value={prefs.voiceId}
 						onValueChange={(voiceId) => patch({ voiceId })}
-						options={voiceOptions}
 						disabled={fieldsDisabled}
 						labelClassName={fieldLabelClass}
 					/>

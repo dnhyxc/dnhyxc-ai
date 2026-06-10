@@ -158,6 +158,8 @@ export const zhCN = {
 	'setting.cloudTts.openPresets': '选择预设',
 	'setting.cloudTts.model': '模型',
 	'setting.cloudTts.voiceId': '音色类别',
+	'setting.cloudTts.voiceGroup.female': '女性',
+	'setting.cloudTts.voiceGroup.male': '男性',
 	'setting.cloudTts.speed': '语速',
 	'setting.cloudTts.vol': '音量',
 	'setting.cloudTts.pitch': '音高',

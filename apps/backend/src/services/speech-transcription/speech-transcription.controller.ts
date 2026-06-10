@@ -60,7 +60,7 @@ export class SpeechTranscriptionController {
 	}
 
 	/**
-	 * MiniMax T2A 非流式：默认 speech-2.8-hd + English_radiant_girl，请求体可覆盖音色/语速等。
+	 * MiniMax T2A 非流式：默认 speech-2.8-hd + English_captivating_female1，请求体可覆盖音色/语速等。
 	 * @see https://platform.minimaxi.com/docs/api-reference/speech-t2a-http
 	 */
 	@Post('minimax/speech')

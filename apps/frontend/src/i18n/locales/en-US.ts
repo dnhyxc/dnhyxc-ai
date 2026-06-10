@@ -166,6 +166,8 @@ export const enUS = {
 	'setting.cloudTts.openPresets': 'Choose preset',
 	'setting.cloudTts.model': 'Model',
 	'setting.cloudTts.voiceId': 'Voice category',
+	'setting.cloudTts.voiceGroup.female': 'Female',
+	'setting.cloudTts.voiceGroup.male': 'Male',
 	'setting.cloudTts.speed': 'Speed',
 	'setting.cloudTts.vol': 'Volume',
 	'setting.cloudTts.pitch': 'Pitch',

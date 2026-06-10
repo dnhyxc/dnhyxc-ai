@@ -181,6 +181,6 @@ export enum MinimaxEnum {
 	MINIMAX_TTS_BASE_URL = 'MINIMAX_TTS_BASE_URL',
 	/** 默认 speech-2.8-hd */
 	MINIMAX_TTS_MODEL = 'MINIMAX_TTS_MODEL',
-	/** 默认 English_radiant_girl */
+	/** 默认 English_captivating_female1 */
 	MINIMAX_TTS_VOICE_ID = 'MINIMAX_TTS_VOICE_ID',
 }
