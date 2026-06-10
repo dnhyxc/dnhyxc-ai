@@ -18,6 +18,7 @@ import Stripe from 'stripe';
 
 import { JwtGuard } from '../../guards/jwt.guard';
 import { ResponseInterceptor } from '../../interceptors/response.interceptor';
+import { CompleteCheckoutMembershipDto } from './dto/complete-checkout-membership.dto';
 import { CreateCheckoutSessionDto } from './dto/create-checkout-session.dto';
 import { PayService } from './pay.service';
 
@@ -44,6 +45,27 @@ export class PayController {
 		}
 		const result = await this.payService.createCheckoutSession(dto, userId);
 		return result;
+	}
+
+	/** 内嵌 Stripe Checkout 支付完成后确认开通会员（Webhook 未到时前端兜底） */
+	@Post('completeMembership')
+	@UseGuards(JwtGuard)
+	@UseInterceptors(ResponseInterceptor)
+	@UsePipes(
+		new ValidationPipe({
+			transform: true,
+			whitelist: true,
+		}),
+	)
+	async completeMembership(
+		@Body() dto: CompleteCheckoutMembershipDto,
+		@Req() req: Request & { user?: { userId?: number } },
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('无法识别当前用户');
+		}
+		return this.payService.completeCheckoutMembership(dto.sessionId, userId);
 	}
 
 	/**

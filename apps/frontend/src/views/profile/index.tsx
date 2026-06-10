@@ -20,6 +20,14 @@ const PROFILE_MEMBERSHIP_BENEFIT_KEYS = [
 /** 从登录/用户信息中推断是否为付费会员（兼容多种后端字段命名） */
 function isPaidMemberFromUserInfo(u: object): boolean {
 	const r = u as Record<string, unknown>;
+	const expiresRaw = r.memberExpiresAt ?? r.memberExpireAt;
+	if (expiresRaw != null && String(expiresRaw).trim() !== '') {
+		const exp = new Date(String(expiresRaw));
+		if (!Number.isNaN(exp.getTime())) {
+			return exp.getTime() > Date.now();
+		}
+	}
+
 	if (r.isMember === true || r.member === true || r.vip === true) return true;
 
 	const levelPositive = (v: unknown) =>
@@ -60,6 +68,7 @@ const Profile = observer(() => {
 	const navigate = useNavigate();
 
 	const u = userStore.userInfo;
+
 	const rawProfile = u?.profile;
 	// 接口或历史缓存可能缺少 profile / 为 null，避免对 null 做属性访问（Safari 等会报「null is not an object」）
 	const profile =
@@ -100,6 +109,29 @@ const Profile = observer(() => {
 		() => (u && typeof u === 'object' ? isPaidMemberFromUserInfo(u) : false),
 		[u],
 	);
+
+	const memberExpiresLabel = useMemo(() => {
+		if (!isPaidMember || !u || typeof u !== 'object') return null;
+		const raw =
+			(u as { memberExpiresAt?: string | null }).memberExpiresAt ??
+			(u as { memberExpireAt?: string | null }).memberExpireAt;
+		if (raw == null || String(raw).trim() === '') return null;
+		const exp = new Date(String(raw));
+		if (Number.isNaN(exp.getTime())) return null;
+		const dateStr =
+			locale === 'zh-CN'
+				? exp.toLocaleDateString('zh-CN', {
+						year: 'numeric',
+						month: 'long',
+						day: 'numeric',
+					})
+				: exp.toLocaleDateString(undefined, {
+						year: 'numeric',
+						month: 'short',
+						day: 'numeric',
+					});
+		return t('profile.membership.expiresAt', { date: dateStr });
+	}, [isPaidMember, u, locale, t]);
 
 	const infoRows = useMemo(
 		() => [
@@ -154,8 +186,8 @@ const Profile = observer(() => {
 
 	return (
 		<div className="flex h-full w-full flex-col overflow-hidden m-0">
-			<ScrollArea className="h-full w-full overflow-y-auto p-2.5 pt-0 rounded-none">
-				<div className="mx-auto flex w-full max-w-3xl flex-col gap-5 pb-10">
+			<ScrollArea className="h-full w-full overflow-y-auto px-2.5 rounded-none">
+				<div className="mx-auto flex w-full max-w-3xl flex-col gap-5 pb-13">
 					{/* 资料大卡：渐变顶栏 + 头像叠层 */}
 					<section
 						className={cn(
@@ -216,9 +248,15 @@ const Profile = observer(() => {
 												</span>
 											)}
 										</div>
-										<p className="truncate text-base text-textcolor/70">
-											{u?.email || '—'}
-										</p>
+										{isPaidMember && memberExpiresLabel ? (
+											<p className="text-sm text-amber-800/80 dark:text-amber-200/80">
+												{memberExpiresLabel}
+											</p>
+										) : !isPaidMember ? (
+											<p className="text-sm text-textcolor/70">
+												{t('profile.membership.nonMemberHint')}
+											</p>
+										) : null}
 									</div>
 									<div className="flex flex-wrap items-center justify-center gap-3 sm:justify-start">
 										<Button
@@ -233,6 +271,7 @@ const Profile = observer(() => {
 										<Button
 											variant="default"
 											size="sm"
+											disabled={isPaidMember}
 											className="cursor-pointer gap-1.5 font-semibold shadow-sm"
 											onClick={() => navigate('/pay')}
 										>

@@ -2,6 +2,7 @@ import CryptoJS from 'crypto-js';
 import {
 	FAVORITE_STATUS_HTTP_BATCH_CONCURRENCY,
 	FAVORITE_STATUS_HTTP_BATCH_SIZE,
+	MEMBERSHIP_PLAN_CODES,
 	VOCAB_FAVORITE_STATUS_BATCH_SIZE,
 } from '@/constants';
 import {
@@ -23,6 +24,7 @@ import {
 	ASSISTANT_SESSION_IMPORT_TRANSCRIPT,
 	ASSISTANT_SESSIONS_FOR_KNOWLEDGE,
 	ASSISTANT_STOP,
+	COMPLETE_CHECKOUT_MEMBERSHIP,
 	CREATE_CHECKOUT_SESSION,
 	CREATE_SESSION,
 	CREATE_SHARE,
@@ -1530,9 +1532,9 @@ export const updateSession = async (
 
 /** Stripe Checkout：创建支付会话（需已登录，后端需配置 STRIPE_SECRET_KEY） */
 export const createCheckoutSession = async (params: {
-	amount: number;
-	currency: string;
-	productName?: string;
+	/** 会员套餐 code，价格由服务端按套餐定价 */
+	membershipPlan: (typeof MEMBERSHIP_PLAN_CODES)[number];
+	currency?: string;
 	/** true：内嵌收银台（完成后不整页跳转）；false/不传：跳转托管页 */
 	embedded?: boolean;
 	successUrl?: string;
@@ -1543,7 +1545,24 @@ export const createCheckoutSession = async (params: {
 		url: string | null;
 		sessionId: string;
 		clientSecret: string | null;
-	}>(CREATE_CHECKOUT_SESSION, params);
+	}>(CREATE_CHECKOUT_SESSION, {
+		currency: params.currency ?? 'cny',
+		membershipPlan: params.membershipPlan,
+		embedded: params.embedded,
+		successUrl: params.successUrl,
+		cancelUrl: params.cancelUrl,
+	});
+};
+
+/** Stripe 内嵌支付完成后确认开通会员 */
+export const completeCheckoutMembership = async (params: {
+	sessionId: string;
+}) => {
+	return await http.post<{
+		isMember: boolean;
+		membershipType: string;
+		memberExpiresAt: string | null;
+	}>(COMPLETE_CHECKOUT_MEMBERSHIP, params);
 };
 
 // 创建会话分享

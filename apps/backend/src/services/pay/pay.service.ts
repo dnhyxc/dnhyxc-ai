@@ -1,5 +1,6 @@
 import {
 	BadRequestException,
+	ForbiddenException,
 	Injectable,
 	Logger,
 	ServiceUnavailableException,
@@ -10,6 +11,12 @@ import Stripe from 'stripe';
 
 import { StripeEnum } from '../../enum/config.enum';
 import { CreateCheckoutSessionDto } from './dto/create-checkout-session.dto';
+import {
+	DEFAULT_MEMBERSHIP_TYPE,
+	getMembershipPlan,
+	resolveMembershipDays,
+} from './membership.constants';
+import { MembershipService } from './membership.service';
 
 @Injectable()
 export class PayService {
@@ -18,7 +25,10 @@ export class PayService {
 	/** 密钥填错时的说明（例如把 pk_ 当成了 Secret） */
 	private readonly stripeConfigHint: string | null;
 
-	constructor(private readonly config: ConfigService) {
+	constructor(
+		private readonly config: ConfigService,
+		private readonly membershipService: MembershipService,
+	) {
 		const raw = this.config.get<string>(StripeEnum.STRIPE_SECRET_KEY);
 		const secret = raw?.trim();
 		if (!secret) {
@@ -58,14 +68,32 @@ export class PayService {
 		clientSecret: string | null;
 	}> {
 		const stripe = this.getStripe();
+		const plan = dto.membershipPlan
+			? getMembershipPlan(dto.membershipPlan)
+			: null;
+		if (dto.membershipPlan && !plan) {
+			throw new BadRequestException('无效的会员套餐');
+		}
+
+		const currency = plan ? 'cny' : dto.currency;
+		const unitAmount = plan ? plan.amountMinorUnits : dto.amount;
+		if (unitAmount == null || unitAmount < 1) {
+			throw new BadRequestException('缺少有效支付金额');
+		}
+		const productName =
+			plan?.defaultProductName ?? dto.productName ?? '订单支付';
+		const membershipDays = plan
+			? plan.durationDays
+			: resolveMembershipDays(dto.membershipDays);
+
 		const line_items = [
 			{
 				quantity: 1,
 				price_data: {
-					currency: dto.currency,
-					unit_amount: dto.amount,
+					currency,
+					unit_amount: unitAmount,
 					product_data: {
-						name: dto.productName ?? '订单支付',
+						name: productName,
 					},
 				},
 			},
@@ -76,6 +104,9 @@ export class PayService {
 			client_reference_id: String(userId),
 			metadata: {
 				userId: String(userId),
+				membershipDays: String(membershipDays),
+				membershipType: DEFAULT_MEMBERSHIP_TYPE,
+				...(plan ? { membershipPlan: plan.code } : {}),
 			},
 		};
 
@@ -129,13 +160,73 @@ export class PayService {
 		switch (event.type) {
 			case 'checkout.session.completed': {
 				const session = event.data.object as Stripe.Checkout.Session;
-				this.logger.log(
-					`Stripe checkout.session.completed session=${session.id} userId=${session.metadata?.userId ?? session.client_reference_id ?? '-'}`,
-				);
+				await this.grantMembershipFromCheckoutSession(session);
 				break;
 			}
 			default:
 				break;
 		}
+	}
+
+	/** 内嵌收银台完成后由前端携带 sessionId 调用，与 Webhook 共用幂等开通逻辑 */
+	async completeCheckoutMembership(
+		sessionId: string,
+		userId: number,
+	): Promise<{
+		isMember: boolean;
+		membershipType: string;
+		memberExpiresAt: Date | null;
+	}> {
+		const stripe = this.getStripe();
+		const session = await stripe.checkout.sessions.retrieve(sessionId);
+		if (session.payment_status !== 'paid') {
+			throw new BadRequestException('订单尚未支付完成');
+		}
+		const meta = this.membershipService.parseStripeSessionMembership(
+			session.metadata ?? undefined,
+		);
+		const sessionUserId =
+			meta.userId ??
+			(session.client_reference_id
+				? Number.parseInt(session.client_reference_id, 10)
+				: Number.NaN);
+		if (!Number.isFinite(sessionUserId) || sessionUserId !== userId) {
+			throw new ForbiddenException('无权确认该支付会话');
+		}
+		return this.membershipService.grantAfterPayment(userId, {
+			grantId: session.id,
+			membershipDays: meta.membershipDays,
+			membershipType: meta.membershipType,
+		});
+	}
+
+	private async grantMembershipFromCheckoutSession(
+		session: Stripe.Checkout.Session,
+	): Promise<void> {
+		if (session.payment_status !== 'paid') {
+			this.logger.warn(
+				`Skip membership grant: session=${session.id} payment_status=${session.payment_status}`,
+			);
+			return;
+		}
+		const meta = this.membershipService.parseStripeSessionMembership(
+			session.metadata ?? undefined,
+		);
+		const userId =
+			meta.userId ??
+			(session.client_reference_id
+				? Number.parseInt(session.client_reference_id, 10)
+				: Number.NaN);
+		if (!Number.isFinite(userId)) {
+			this.logger.warn(
+				`Stripe checkout.session.completed missing userId session=${session.id}`,
+			);
+			return;
+		}
+		await this.membershipService.grantAfterPayment(userId, {
+			grantId: session.id,
+			membershipDays: meta.membershipDays,
+			membershipType: meta.membershipType,
+		});
 	}
 }

@@ -182,6 +182,11 @@ export const PROJECT_GUIDE_ITEMS_EN: Record<
 		description:
 			'Open Account or Profile while signed in, choose an image in the avatar area, then save. The sidebar and profile page update together. Use preview or the upload-area download control to save the avatar; you get a success or failure toast. If the image fails to load, try uploading again; on the web, use this site rather than old external links. Chat attachments use the same Tencent Cloud COS storage as avatars, shown via the site proxy; legacy local paths in old messages remain read-only compatible.',
 	},
+	'pg-s8-6': {
+		title: '8.6 Membership billing (Stripe)',
+		description:
+			'After sign-in, open /pay (or tap Buy membership on /profile). Pick Monthly ¥9.9 (30 days), Quarterly ¥25.9 (90 days), or Annual ¥99.9 (365 days)—fixed prices, not editable. Open embedded checkout to pay with Stripe; on success you are redirected to profile with badge and expiry. Renewals stack after the current expiry; when membership lapses, profile shows non-member state and you can purchase again.',
+	},
 	'pg-s9-1': {
 		title: '9.1 Why “desktop only”?',
 		description:

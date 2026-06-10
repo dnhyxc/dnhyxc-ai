@@ -1,77 +1,80 @@
 import type { StripeEmbeddedCheckout } from '@stripe/stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
 import { Button } from '@ui/button';
-import { Input } from '@ui/input';
 import { Label } from '@ui/label';
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from '@ui/select';
 import { Toast } from '@ui/sonner';
 import { motion } from 'framer-motion';
-import { CreditCard, Loader2, Lock, ShieldCheck, X } from 'lucide-react';
+import {
+	Check,
+	CreditCard,
+	Crown,
+	Loader2,
+	Lock,
+	ShieldCheck,
+	X,
+} from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
-import { Link } from 'react-router';
+import { Link, useNavigate } from 'react-router';
+import {
+	DEFAULT_MEMBERSHIP_PLAN,
+	formatMembershipPriceYuan,
+	MEMBERSHIP_PLAN_LIST,
+	type MembershipPlanCode,
+} from '@/constants/membershipPlans';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
-import { createCheckoutSession } from '@/service';
+import { completeCheckoutMembership, createCheckoutSession } from '@/service';
+import useStore from '@/store';
 import { getStorage } from '@/utils';
 
-const CURRENCIES = [
-	{ value: 'cny', zeroDecimal: false },
-	{ value: 'usd', zeroDecimal: false },
-	{ value: 'eur', zeroDecimal: false },
-	{ value: 'hkd', zeroDecimal: false },
-	{ value: 'gbp', zeroDecimal: false },
-	{ value: 'jpy', zeroDecimal: true },
-] as const;
-
-function toStripeMinorUnits(majorAmount: number, zeroDecimal: boolean): number {
-	if (!Number.isFinite(majorAmount) || majorAmount <= 0) return 0;
-	if (zeroDecimal) return Math.round(majorAmount);
-	return Math.round(majorAmount * 100);
-}
+const PLAN_I18N: Record<MembershipPlanCode, { label: string; desc: string }> = {
+	membership_monthly: {
+		label: 'pay.plan.monthly.label',
+		desc: 'pay.plan.monthly.desc',
+	},
+	membership_quarterly: {
+		label: 'pay.plan.quarterly.label',
+		desc: 'pay.plan.quarterly.desc',
+	},
+	membership_yearly: {
+		label: 'pay.plan.yearly.label',
+		desc: 'pay.plan.yearly.desc',
+	},
+};
 
 const Pay = () => {
 	const { t } = useI18n();
-	const [currency, setCurrency] =
-		useState<(typeof CURRENCIES)[number]['value']>('cny');
-	const [majorAmount, setMajorAmount] = useState<string>('9.99');
-	const defaultProductName = t('pay.productName.default');
-	const defaultProductNameRef = useRef(defaultProductName);
-	const [productName, setProductName] = useState(defaultProductName);
+	const { userStore } = useStore();
+	const navigate = useNavigate();
+	const [selectedPlan, setSelectedPlan] = useState<MembershipPlanCode>(
+		DEFAULT_MEMBERSHIP_PLAN,
+	);
 	const [loading, setLoading] = useState(false);
 	const [embeddedOpen, setEmbeddedOpen] = useState(false);
 
 	const checkoutRef = useRef<StripeEmbeddedCheckout | null>(null);
-	/** Stripe mount 目标（仅内层，避免 iframe 贴满外层导致底边无空隙） */
+	const checkoutSessionIdRef = useRef<string | null>(null);
 	const containerRef = useRef<HTMLDivElement>(null);
-	/** 带内边距的外壳，白底收银台与圆角容器底部之间留出灰色「呼吸区」 */
 	const stripeHostRef = useRef<HTMLDivElement>(null);
 	const timerRef = useRef<NodeJS.Timeout | null>(null);
 
 	const token = getStorage('token');
-	const zeroDecimal = useMemo(
-		() => CURRENCIES.find((c) => c.value === currency)?.zeroDecimal ?? false,
-		[currency],
+
+	const selectedPlanDef = useMemo(
+		() => MEMBERSHIP_PLAN_LIST.find((p) => p.code === selectedPlan)!,
+		[selectedPlan],
 	);
 
-	// 若用户未手动改过商品说明，则随语言切换更新默认值
-	useEffect(() => {
-		const prevDefault = defaultProductNameRef.current;
-		defaultProductNameRef.current = defaultProductName;
-		setProductName((prev) =>
-			prev === prevDefault ? defaultProductName : prev,
-		);
-	}, [defaultProductName]);
+	const selectedPlanLabel = t(PLAN_I18N[selectedPlan].label);
+	const selectedPlanPrice = t('pay.plan.price', {
+		price: formatMembershipPriceYuan(selectedPlanDef.priceYuan),
+	});
 
 	const destroyEmbedded = useCallback(() => {
 		checkoutRef.current?.destroy();
 		checkoutRef.current = null;
+		checkoutSessionIdRef.current = null;
 		setEmbeddedOpen(false);
 		if (timerRef.current) {
 			clearTimeout(timerRef.current);
@@ -95,29 +98,17 @@ const Pay = () => {
 			});
 			return;
 		}
-		const parsed = zeroDecimal
-			? Number.parseInt(majorAmount, 10)
-			: Number.parseFloat(majorAmount);
-		if (!Number.isFinite(parsed) || parsed <= 0) {
-			Toast({ type: 'error', title: t('pay.toast.invalidAmount') });
-			return;
-		}
-		const amount = toStripeMinorUnits(parsed, zeroDecimal);
-		if (amount < 1) {
-			Toast({ type: 'error', title: t('pay.toast.amountTooSmall') });
-			return;
-		}
 		setLoading(true);
 		try {
 			destroyEmbedded();
 			const res = await createCheckoutSession({
-				amount,
-				currency,
-				productName: productName.trim() || undefined,
+				membershipPlan: selectedPlan,
+				currency: 'cny',
 				embedded: true,
 			});
 			const clientSecret = res.data?.clientSecret;
-			if (!clientSecret) {
+			const sessionId = res.data?.sessionId;
+			if (!clientSecret || !sessionId) {
 				Toast({
 					type: 'error',
 					title: t('pay.toast.clientSecretMissing.title'),
@@ -125,6 +116,7 @@ const Pay = () => {
 				});
 				return;
 			}
+			checkoutSessionIdRef.current = sessionId;
 
 			const stripe = await loadStripe(pk);
 			if (!stripe) {
@@ -135,12 +127,38 @@ const Pay = () => {
 			const checkout = await stripe.initEmbeddedCheckout({
 				clientSecret,
 				onComplete: () => {
+					const sid = checkoutSessionIdRef.current;
 					destroyEmbedded();
-					Toast({
-						type: 'success',
-						title: t('pay.toast.paid.title'),
-						message: t('pay.toast.paid.message'),
-					});
+					void (async () => {
+						try {
+							if (sid) {
+								const membershipRes = await completeCheckoutMembership({
+									sessionId: sid,
+								});
+								const payload = membershipRes.data;
+								if (payload) {
+									userStore.setUserInfo({
+										...userStore.userInfo,
+										isMember: payload.isMember,
+										membershipType: payload.membershipType,
+										memberExpiresAt: payload.memberExpiresAt,
+									});
+								}
+							}
+							Toast({
+								type: 'success',
+								title: t('pay.toast.paid.title'),
+								message: t('pay.toast.paid.membershipMessage'),
+							});
+						} catch {
+							Toast({
+								type: 'success',
+								title: t('pay.toast.paid.title'),
+								message: t('pay.toast.paid.message'),
+							});
+						}
+						navigate('/profile');
+					})();
 				},
 			});
 			checkoutRef.current = checkout;
@@ -157,7 +175,6 @@ const Pay = () => {
 				return;
 			}
 			checkout.mount(el);
-			// 等内嵌 iframe 占位后再滚到主内容区顶部（Outlet 为 overflow-y-auto）
 			timerRef.current = setTimeout(() => {
 				host.scrollIntoView({
 					behavior: 'smooth',
@@ -168,25 +185,11 @@ const Pay = () => {
 		} finally {
 			setLoading(false);
 		}
-	}, [
-		token,
-		zeroDecimal,
-		majorAmount,
-		currency,
-		productName,
-		destroyEmbedded,
-		t,
-	]);
+	}, [token, selectedPlan, destroyEmbedded, t, userStore, navigate]);
 
 	return (
 		<div className="relative min-h-full bg-theme-gradient">
-			<div
-				className="pointer-events-none absolute inset-0 opacity-[0.45]"
-				// style={{
-				// 	background:
-				// 		"radial-gradient(ellipse 80% 60% at 20% 0%, oklch(0.72 0.14 165 / 0.22), transparent 55%), radial-gradient(ellipse 70% 50% at 100% 20%, oklch(0.65 0.12 250 / 0.12), transparent 50%)",
-				// }}
-			/>
+			<div className="pointer-events-none absolute inset-0 opacity-[0.45]" />
 			<div className="relative mx-auto flex max-w-2xl flex-col gap-8 px-6 py-10">
 				<motion.header
 					initial={{ opacity: 0, y: 12 }}
@@ -221,57 +224,63 @@ const Pay = () => {
 					) : (
 						<>
 							<div className="space-y-5">
-								<div className="space-y-2">
-									<Label htmlFor="pay-currency">{t('pay.form.currency')}</Label>
-									<Select
-										value={currency}
-										onValueChange={(v) =>
-											setCurrency(v as (typeof CURRENCIES)[number]['value'])
-										}
-										disabled={embeddedOpen}
+								<div className="space-y-3">
+									<Label>{t('pay.form.plan')}</Label>
+									<div
+										className="grid gap-3 sm:grid-cols-3"
+										role="radiogroup"
+										aria-label={t('pay.form.plan')}
 									>
-										<SelectTrigger id="pay-currency" className="w-full">
-											<SelectValue
-												placeholder={t('pay.form.currency.placeholder')}
-											/>
-										</SelectTrigger>
-										<SelectContent position="popper">
-											{CURRENCIES.map((c) => (
-												<SelectItem key={c.value} value={c.value}>
-													{t(`pay.currency.${c.value}`) ??
-														c.value.toUpperCase()}
-												</SelectItem>
-											))}
-										</SelectContent>
-									</Select>
-								</div>
-								<div className="space-y-2">
-									<Label htmlFor="pay-amount">
-										{t('pay.form.amount', {
-											format: zeroDecimal
-												? t('pay.form.amount.format.integer')
-												: t('pay.form.amount.format.decimal2'),
+										{MEMBERSHIP_PLAN_LIST.map((plan) => {
+											const selected = selectedPlan === plan.code;
+											const priceText = t('pay.plan.price', {
+												price: formatMembershipPriceYuan(plan.priceYuan),
+											});
+											return (
+												<button
+													key={plan.code}
+													type="button"
+													disabled={embeddedOpen}
+													role="radio"
+													aria-checked={selected}
+													onClick={() => setSelectedPlan(plan.code)}
+													className={cn(
+														'relative flex flex-col items-start gap-2 rounded-md border p-4 text-left transition-colors',
+														'hover:border-emerald-500/40 hover:bg-emerald-500/5',
+														selected
+															? 'border-emerald-600 bg-emerald-500/10 ring-1 ring-emerald-600/30'
+															: 'border-theme/15 bg-theme-secondary/40',
+														embeddedOpen && 'pointer-events-none opacity-60',
+													)}
+												>
+													{selected ? (
+														<span className="absolute right-3 top-3 inline-flex size-5 items-center justify-center rounded-full bg-emerald-600 text-white">
+															<Check className="size-3" strokeWidth={3} />
+														</span>
+													) : null}
+													<span className="inline-flex items-center gap-1.5 text-sm font-semibold text-textcolor">
+														<Crown
+															className="size-4 shrink-0 text-amber-600 dark:text-amber-400"
+															aria-hidden
+														/>
+														{t(PLAN_I18N[plan.code].label)}
+													</span>
+													<span className="text-2xl font-bold tracking-tight text-textcolor">
+														{priceText}
+													</span>
+													<span className="text-xs text-muted-foreground">
+														{t(PLAN_I18N[plan.code].desc)}
+													</span>
+												</button>
+											);
 										})}
-									</Label>
-									<Input
-										id="pay-amount"
-										type="number"
-										step={zeroDecimal ? '1' : '0.01'}
-										min={zeroDecimal ? '1' : '0.01'}
-										value={majorAmount}
-										disabled={embeddedOpen}
-										onChange={(e) => setMajorAmount(e.target.value)}
-									/>
-								</div>
-								<div className="space-y-2">
-									<Label htmlFor="pay-product">{t('pay.form.product')}</Label>
-									<Input
-										id="pay-product"
-										placeholder={t('pay.form.product.placeholder')}
-										value={productName}
-										disabled={embeddedOpen}
-										onChange={(e) => setProductName(e.target.value)}
-									/>
+									</div>
+									<p className="text-sm text-muted-foreground">
+										{t('pay.plan.selectedSummary', {
+											label: selectedPlanLabel,
+											price: selectedPlanPrice,
+										})}
+									</p>
 								</div>
 								<div className="flex flex-wrap gap-2">
 									<Button

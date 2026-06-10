@@ -2,6 +2,8 @@ import type { HighlightJsThemeId } from '@dnhyxc-ai/markdown-kit';
 
 import type { ThemeName } from '@/hooks/theme';
 
+export * from './membershipPlans';
+
 export const BASE_URL = import.meta.env.PROD
 	? import.meta.env.VITE_PROD_API_DOMAIN
 	: import.meta.env.VITE_DEV_API_DOMAIN;

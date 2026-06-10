@@ -16,8 +16,8 @@ function createDefaultUserInfo() {
 		profile: {
 			id: 0,
 			gender: 0,
-			email: '',
 			avatar: '',
+			address: '',
 		},
 	};
 }

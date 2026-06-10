@@ -73,6 +73,10 @@ export const enUS = {
 	'profile.membership.benefit3':
 		'Benefits evolve with the product; exact quota and terms are shown on the billing page.',
 	'profile.actions.buyMembership': 'Buy membership',
+	'profile.actions.renewMembership': 'Renew membership',
+	'profile.membership.expiresAt': 'Valid until {date}',
+	'profile.membership.nonMemberHint':
+		"You aren't a member yet. Purchase membership to unlock premium benefits.",
 	'profile.actions.editAccount': 'Edit account',
 	'profile.actions.goPay': 'Go to billing',
 	'profile.empty.title': 'No profile data yet',
@@ -1525,12 +1529,24 @@ export const enUS = {
 	'pay.toast.stripeLoadFailed': 'Failed to load Stripe.js.',
 	'pay.toast.paid.title': 'Payment completed',
 	'pay.toast.paid.message': 'Thanks for your support.',
+	'pay.toast.paid.membershipMessage':
+		'Membership is active. View benefits on your profile.',
 	'pay.toast.mountNodeNotReady': 'Mount node is not ready.',
 
 	'pay.badge.stripeEmbedded': 'Stripe embedded checkout',
-	'pay.title': 'Checkout',
+	'pay.title': 'Membership billing',
 	'pay.loginRequiredHint': 'You need to sign in before starting a payment.',
 	'pay.goLogin': 'Go to sign in',
+
+	'pay.form.plan': 'Choose a plan',
+	'pay.plan.monthly.label': 'Monthly',
+	'pay.plan.monthly.desc': '30 days of membership',
+	'pay.plan.quarterly.label': 'Quarterly',
+	'pay.plan.quarterly.desc': '90 days of membership',
+	'pay.plan.yearly.label': 'Annual',
+	'pay.plan.yearly.desc': '365 days of membership',
+	'pay.plan.price': '¥{price}',
+	'pay.plan.selectedSummary': 'Selected: {label} · {price}',
 
 	'pay.form.currency': 'Currency',
 	'pay.form.currency.placeholder': 'Select currency',

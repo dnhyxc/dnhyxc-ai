@@ -90,6 +90,8 @@ export const GET_SHARE = '/share/get';
 
 // Stripe：创建 Checkout 会话（需登录）
 export const CREATE_CHECKOUT_SESSION = '/pay/createCheckoutSession';
+// 完成会员支付
+export const COMPLETE_CHECKOUT_MEMBERSHIP = '/pay/completeMembership';
 
 // 知识库（与 knowledge.controller 路径一致，全局前缀 api 由 BASE_URL 侧拼接）
 export const KNOWLEDGE_SAVE = '/knowledge/save';

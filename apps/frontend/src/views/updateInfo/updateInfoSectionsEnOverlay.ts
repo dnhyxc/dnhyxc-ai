@@ -69,6 +69,11 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'Profile avatars and chat attachments are uploaded through the server to Tencent Cloud COS, replacing Qiniu direct upload and local uploads storage. Full object URLs are saved after upload. On the web, objects use the same-origin /ext-cos/ proxy. Preview and downloads are adapted for COS with success/failure toasts. Deployments need COS credentials and readable objects (public-read or equivalent).',
 	},
+	's2-5': {
+		title: 'Stripe membership billing (three plans)',
+		description:
+			'After sign-in, open /pay to choose Monthly (¥9.9), Quarterly (¥25.9), or Annual (¥99.9)—fixed prices, not editable—via Stripe embedded checkout. Successful payment activates or extends membership (stacked from the current expiry) and redirects to /profile for badge and validity. When membership expires, profile/login reflects non-member state with upgrade guidance.',
+	},
 	's3-1': {
 		title: 'One frontend for desktop and browser',
 		description:

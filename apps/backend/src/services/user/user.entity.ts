@@ -34,6 +34,18 @@ export class User {
 	@CreateDateColumn({ type: 'timestamp' }) // 自动创建一个自增的时间戳
 	createTime: Date;
 
+	/** 是否为有效会员（开通时置 true；到期后可由定时任务或读时校正） */
+	@Column({ type: 'boolean', default: false })
+	isMember!: boolean;
+
+	/** 会员类型，如 free / premium */
+	@Column({ type: 'varchar', length: 32, default: 'free' })
+	membershipType!: string;
+
+	/** 会员到期时间；null 表示未开通 */
+	@Column({ type: 'timestamp', nullable: true })
+	memberExpiresAt!: Date | null;
+
 	// 表示一个用户对应多个日志信息，即建立一个 typescript 与数据库之间的关联关系，相当于建立了一个 mapping
 	@OneToMany(
 		() => Logs,

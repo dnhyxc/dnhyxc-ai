@@ -90,26 +90,103 @@ export class UserService {
 	}
 
 	findByUsername(username: string): Promise<User | null> {
-		return this.userRepository.findOne({
-			where: { username },
-			// 同时查询出 roles，如果需要查询出 roles 下的 menus，需要通过 menus.role
-			relations: ['roles', 'roles.menus', 'profile'],
-		});
+		return this.userRepository
+			.findOne({
+				where: { username },
+				relations: ['roles', 'roles.menus', 'profile'],
+			})
+			.then((user) => (user ? this.syncMembershipIfExpired(user) : null));
 	}
 
 	findByEmail(email: string): Promise<User | null> {
-		return this.userRepository.findOne({
-			where: { email },
-			// 同时查询出 roles，如果需要查询出 roles 下的 menus，需要通过 menus.role
-			relations: ['roles', 'roles.menus', 'profile'],
-		});
+		return this.userRepository
+			.findOne({
+				where: { email },
+				relations: ['roles', 'roles.menus', 'profile'],
+			})
+			.then((user) => (user ? this.syncMembershipIfExpired(user) : null));
 	}
 
 	findOne(id: number): Promise<User | null> {
-		return this.userRepository.findOne({
-			where: { id },
-			relations: ['profile'],
-		});
+		return this.userRepository
+			.findOne({
+				where: { id },
+				relations: ['profile'],
+			})
+			.then((user) => (user ? this.syncMembershipIfExpired(user) : null));
+	}
+
+	/** 会员是否在有效期内（以 memberExpiresAt 为准；null 且 isMember 视为未设到期） */
+	isMembershipActive(user: User, now = new Date()): boolean {
+		if (!user.isMember) return false;
+		if (user.memberExpiresAt == null) return true;
+		return user.memberExpiresAt > now;
+	}
+
+	/**
+	 * 读用户时若已过期则写回 DB：isMember=false、membershipType=free。
+	 * memberExpiresAt 保留，便于展示「已于 xx 到期」。
+	 */
+	async syncMembershipIfExpired(user: User): Promise<User> {
+		if (this.isMembershipActive(user)) return user;
+		if (!user.isMember && user.membershipType === 'free') return user;
+		user.isMember = false;
+		user.membershipType = 'free';
+		return this.userRepository.save(user);
+	}
+
+	/** 批量将已到期会员置为非会员（可挂定时任务或运维脚本） */
+	async expireDueMemberships(): Promise<number> {
+		const now = new Date();
+		const result = await this.userRepository
+			.createQueryBuilder()
+			.update(User)
+			.set({ isMember: false, membershipType: 'free' })
+			.where('isMember = :active', { active: true })
+			.andWhere('memberExpiresAt IS NOT NULL')
+			.andWhere('memberExpiresAt <= :now', { now })
+			.execute();
+		return result.affected ?? 0;
+	}
+
+	/** 支付成功后开通/续期会员（在现有到期日上叠加时长） */
+	async grantMembership(
+		userId: number,
+		opts: {
+			durationDays: number;
+			membershipType?: string;
+		},
+	): Promise<User> {
+		const user = await this.userRepository.findOne({ where: { id: userId } });
+		if (!user) {
+			throw new NotFoundException('用户不存在');
+		}
+		const now = new Date();
+		const base =
+			user.memberExpiresAt && user.memberExpiresAt > now
+				? user.memberExpiresAt
+				: now;
+		const expires = new Date(
+			base.getTime() + opts.durationDays * 24 * 60 * 60 * 1000,
+		);
+		user.isMember = true;
+		user.membershipType = opts.membershipType ?? 'premium';
+		user.memberExpiresAt = expires;
+		return this.userRepository.save(user);
+	}
+
+	/** 返回前端可合并的会员字段（含到期判定，不要求 DB 已先 sync） */
+	toMembershipPayload(user: User): {
+		isMember: boolean;
+		membershipType: string;
+		memberExpiresAt: Date | null;
+	} {
+		const active = this.isMembershipActive(user);
+		return {
+			isMember: active,
+			membershipType: active ? user.membershipType : 'free',
+			memberExpiresAt: user.memberExpiresAt,
+		};
 	}
 
 	async create(user: Partial<User>): Promise<User> {
@@ -194,12 +271,14 @@ export class UserService {
 
 	// 查询相关联的 profile
 	findProfile(id: number) {
-		return this.userRepository.findOne({
-			where: { id },
-			relations: {
-				profile: true,
-			},
-		});
+		return this.userRepository
+			.findOne({
+				where: { id },
+				relations: {
+					profile: true,
+				},
+			})
+			.then((user) => (user ? this.syncMembershipIfExpired(user) : null));
 	}
 
 	// 查询 logs
