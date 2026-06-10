@@ -70,7 +70,7 @@ createLlm(config, { preset, userId, ... }, llmConfigService)
 
 ### 3.4 前端设置页
 
-- `observer` + `userStore.userInfo` 计算 `isMember`，与后端 `isMembershipActive` 对齐。
+- 使用公共 Hook **`useMembershipActive()`**（`apps/frontend/src/hooks/useMembershipActive.ts`）判定有效会员，与后端 `isMembershipActive` 及资料页一致；详见 [../pay/membership-active-hook.md](../pay/membership-active-hook.md)。
 - `getProviderDefaults(isMember)`：会员默认硅基 URL/模型/Key，非会员默认 GLM。
 - 预设列表增加**智谱 GLM**；切换 Base URL 或模型名称时 `resetApiKey()` 清空 Key。
 - 本地开发可通过 `VITE_GLM_*`、`VITE_SILICONFLOW_*` 预填（须 `VITE_` 前缀方可在浏览器读取）。

@@ -7,6 +7,7 @@ export * from './theme';
 export * from './useIncrementalClassicQuoteFavoriteStatus';
 export * from './useIncrementalVocabFavoriteStatus';
 export * from './useMarkdownHashLinkViewportScroll';
+export * from './useMembershipActive';
 export * from './useMermaidImagePreview';
 export * from './useShareFlow';
 export * from './useShareSelection.ts';

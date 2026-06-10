@@ -6,7 +6,7 @@ import { observer } from 'mobx-react';
 import { useMemo } from 'react';
 import { useNavigate } from 'react-router';
 import ICON from '@/assets/icon.png';
-import { useI18n } from '@/hooks';
+import { useI18n, useMembershipActive } from '@/hooks';
 import { cn } from '@/lib/utils';
 import useStore from '@/store';
 import { resolveCosUrlForWebDisplay } from '@/utils';
@@ -16,41 +16,6 @@ const PROFILE_MEMBERSHIP_BENEFIT_KEYS = [
 	'profile.membership.benefit2',
 	'profile.membership.benefit3',
 ] as const;
-
-/** 从登录/用户信息中推断是否为付费会员（兼容多种后端字段命名） */
-function isPaidMemberFromUserInfo(u: object): boolean {
-	const r = u as Record<string, unknown>;
-	const expiresRaw = r.memberExpiresAt ?? r.memberExpireAt;
-	if (expiresRaw != null && String(expiresRaw).trim() !== '') {
-		const exp = new Date(String(expiresRaw));
-		if (!Number.isNaN(exp.getTime())) {
-			return exp.getTime() > Date.now();
-		}
-	}
-
-	if (r.isMember === true || r.member === true || r.vip === true) return true;
-
-	const levelPositive = (v: unknown) =>
-		(typeof v === 'number' && v > 0) ||
-		(typeof v === 'string' &&
-			v.trim() !== '' &&
-			v !== '0' &&
-			!/^(free|none)$/i.test(v.trim()));
-
-	if (
-		levelPositive(r.membershipLevel) ||
-		levelPositive(r.memberLevel) ||
-		levelPositive(r.vipLevel)
-	)
-		return true;
-
-	const typeRaw = r.membershipType ?? r.memberType ?? r.userMemberType;
-	if (typeof typeRaw === 'string') {
-		const s = typeRaw.trim().toLowerCase();
-		if (['vip', 'pro', 'paid', 'premium', 'plus'].includes(s)) return true;
-	}
-	return false;
-}
 
 function genderLabel(
 	gender: unknown,
@@ -66,6 +31,8 @@ const Profile = observer(() => {
 	const { userStore } = useStore();
 	const { t, locale } = useI18n();
 	const navigate = useNavigate();
+	const { isMemberActive: isPaidMember, memberExpiresAt } =
+		useMembershipActive();
 
 	const u = userStore.userInfo;
 
@@ -105,33 +72,22 @@ const Profile = observer(() => {
 		return trimmed ? trimmed : '—';
 	}, [profile, u]);
 
-	const isPaidMember = useMemo(
-		() => (u && typeof u === 'object' ? isPaidMemberFromUserInfo(u) : false),
-		[u],
-	);
-
 	const memberExpiresLabel = useMemo(() => {
-		if (!isPaidMember || !u || typeof u !== 'object') return null;
-		const raw =
-			(u as { memberExpiresAt?: string | null }).memberExpiresAt ??
-			(u as { memberExpireAt?: string | null }).memberExpireAt;
-		if (raw == null || String(raw).trim() === '') return null;
-		const exp = new Date(String(raw));
-		if (Number.isNaN(exp.getTime())) return null;
+		if (!isPaidMember || !memberExpiresAt) return null;
 		const dateStr =
 			locale === 'zh-CN'
-				? exp.toLocaleDateString('zh-CN', {
+				? memberExpiresAt.toLocaleDateString('zh-CN', {
 						year: 'numeric',
 						month: 'long',
 						day: 'numeric',
 					})
-				: exp.toLocaleDateString(undefined, {
+				: memberExpiresAt.toLocaleDateString(undefined, {
 						year: 'numeric',
 						month: 'short',
 						day: 'numeric',
 					});
 		return t('profile.membership.expiresAt', { date: dateStr });
-	}, [isPaidMember, u, locale, t]);
+	}, [isPaidMember, memberExpiresAt, locale, t]);
 
 	const infoRows = useMemo(
 		() => [
@@ -226,13 +182,15 @@ const Profile = observer(() => {
 												<span
 													className={cn(
 														'inline-flex shrink-0 items-center gap-1 rounded-full border px-2.5 py-0.5',
-														'border-amber-500/40 bg-amber-500/12 text-xs font-semibold',
-														'text-amber-900 dark:text-amber-200',
+														'border-amber-400/80 bg-amber-400/25 text-xs font-bold tracking-wide',
+														'text-amber-600 shadow-[0_0_14px_rgba(251,191,36,0.35)]',
+														'dark:border-amber-400/70 dark:bg-amber-400/20 dark:text-amber-400',
+														'dark:shadow-[0_0_16px_rgba(251,191,36,0.5)]',
 													)}
 												>
 													<Crown
-														className="size-3.5 shrink-0 opacity-90"
-														strokeWidth={2}
+														className="size-3.5 shrink-0 text-amber-600 dark:text-amber-400"
+														strokeWidth={2.25}
 														aria-hidden
 													/>
 													{t('profile.badge.member')}
@@ -249,7 +207,12 @@ const Profile = observer(() => {
 											)}
 										</div>
 										{isPaidMember && memberExpiresLabel ? (
-											<p className="text-sm text-amber-800/80 dark:text-amber-200/80">
+											<p
+												className={cn(
+													'text-sm font-semibold text-amber-600',
+													'dark:text-amber-400 dark:drop-shadow-[0_0_12px_rgba(251,191,36,0.45)]',
+												)}
+											>
 												{memberExpiresLabel}
 											</p>
 										) : !isPaidMember ? (

@@ -1,7 +1,7 @@
 # Stripe 会员充值与开通实现说明
 
 > **文档角色**：本轮「会员三档套餐 + Stripe 支付成功开通会员 + 资料页展示 + 到期校正 + 支付后跳转个人主页」的**主实现文**。  
-> **延伸阅读**：微信扫码通道规划见仓库 `apps/backend/specs/yungouos-wechat-native-membership.md`（未在本轮落地）。
+> **延伸阅读**：微信扫码通道规划见仓库 `apps/backend/specs/yungouos-wechat-native-membership.md`（未在本轮落地）；前端会员判定与资料页金色标识见 [membership-active-hook.md](./membership-active-hook.md)。
 
 ---
 
@@ -49,7 +49,9 @@
 |------|------|
 | `apps/frontend/src/constants/membershipPlans.ts` | **新建**：与后端一致的套餐展示数据 |
 | `apps/frontend/src/views/pay/index.tsx` | 三档卡片选套餐；支付完成开通并跳转 profile |
-| `apps/frontend/src/views/profile/index.tsx` | 会员徽章、到期/非会员文案、购买按钮状态 |
+| `apps/frontend/src/views/profile/index.tsx` | 会员徽章、到期/非会员文案、购买按钮状态；**见** [membership-active-hook.md](./membership-active-hook.md) |
+| `apps/frontend/src/hooks/useMembershipActive.ts` | **新建**：统一会员判定 Hook（资料页、LLM 设置页） |
+| `apps/frontend/src/views/setting/llm/index.tsx` | 按会员状态默认硅基 / GLM（使用 Hook） |
 | `apps/frontend/src/service/index.ts` | `createCheckoutSession` 传 `membershipPlan`；`completeCheckoutMembership` |
 | `apps/frontend/src/service/api.ts` | `COMPLETE_CHECKOUT_MEMBERSHIP` |
 | `apps/frontend/src/i18n/locales/zh-CN.ts` / `en-US.ts` | 套餐、资料页、支付 Toast 文案 |

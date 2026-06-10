@@ -185,7 +185,7 @@ export const PROJECT_GUIDE_ITEMS_EN: Record<
 	'pg-s8-6': {
 		title: '8.6 Membership billing (Stripe)',
 		description:
-			'After sign-in, open /pay (or tap Buy membership on /profile). Pick Monthly ¥9.9 (30 days), Quarterly ¥25.9 (90 days), or Annual ¥99.9 (365 days)—fixed prices, not editable. Open embedded checkout to pay with Stripe; on success you are redirected to profile with badge and expiry. Renewals stack after the current expiry; when membership lapses, profile shows non-member state and you can purchase again.',
+			'After sign-in, open /pay (or tap Buy membership on /profile). Pick Monthly ¥9.9 (30 days), Quarterly ¥25.9 (90 days), or Annual ¥99.9 (365 days)—fixed prices, not editable. Open embedded checkout to pay with Stripe; on success you are redirected to profile with a gold Member badge and gold “Valid until …” line. Renewals stack after the current expiry; when membership lapses, profile shows non-member state and you can purchase again.',
 	},
 	'pg-s9-1': {
 		title: '9.1 Why “desktop only”?',

@@ -79,6 +79,11 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'When you sign out, sign in with another account, or the session ends with 401 in the same browser tab, client-side display cache for the previous account is cleared—including unsaved knowledge drafts, document assistant and RAG chats, English learning Agent threads, and in-progress vocabulary/classic streams—so you do not see another user’s content. Updating profile or membership for the same user id does not trigger a reset.',
 	},
+	's2-7': {
+		title: 'Profile membership badge styling',
+		description:
+			'On /profile, active members see a high-contrast gold “Member” badge and gold “Valid until …” line for easier reading on dark backgrounds. Membership detection is unified on the client and stays aligned with LLM default presets for members vs non-members.',
+	},
 	's3-1': {
 		title: 'One frontend for desktop and browser',
 		description:

@@ -23,7 +23,7 @@
 | [`react/`](./react/) | React Hooks 专题 | 按文件名检索 |
 | [`setting/`](./setting/) | 系统快捷键 | [setting/system-shortcuts-implementation-record.md](./setting/system-shortcuts-implementation-record.md) |
 | [`meta/`](./meta/) | 发布与更新同步 | [meta/project-features-update.md](./meta/project-features-update.md) |
-| [`pay/`](./pay/) | Stripe 会员充值、开通与到期 | [pay/stripe-membership-billing.md](./pay/stripe-membership-billing.md) |
+| [`pay/`](./pay/) | Stripe 会员充值、开通与到期 | [pay/stripe-membership-billing.md](./pay/stripe-membership-billing.md)、[pay/membership-active-hook.md](./pay/membership-active-hook.md) |
 
 ---
 

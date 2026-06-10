@@ -6,7 +6,7 @@ import { Label } from '@ui/label';
 import { Eye, EyeOff } from 'lucide-react';
 import { observer } from 'mobx-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useI18n } from '@/hooks';
+import { useI18n, useMembershipActive } from '@/hooks';
 import { cn } from '@/lib/utils';
 import {
 	clearLlmSettings,
@@ -14,7 +14,6 @@ import {
 	type LlmSettingsView,
 	updateLlmSettings,
 } from '@/service/llmSettings';
-import useStore from '@/store';
 
 const fieldInputClass =
 	'flex-1 min-w-0 border border-theme/20 bg-transparent shadow-none focus-visible:ring-0 focus-visible:border-theme/40';
@@ -44,16 +43,6 @@ function readEnvSiliconflowBaseUrl(): string {
 
 function readEnvSiliconflowModelName(): string {
 	return readEnvTrimmed('VITE_SILICONFLOW_MODEL_NAME') || 'Pro/zai-org/GLM-4.7';
-}
-
-/** 与后端 UserService.isMembershipActive 对齐 */
-function isMembershipActiveFromUserInfo(u: object): boolean {
-	const r = u as Record<string, unknown>;
-	if (r.isMember !== true) return false;
-	const expiresRaw = r.memberExpiresAt ?? r.memberExpireAt;
-	if (expiresRaw == null || String(expiresRaw).trim() === '') return true;
-	const exp = new Date(String(expiresRaw));
-	return !Number.isNaN(exp.getTime()) && exp.getTime() > Date.now();
 }
 
 type LlmProviderDefaults = {
@@ -140,11 +129,7 @@ function resolveApiKeyFields(
 
 const LlmSetting = observer(() => {
 	const { t } = useI18n();
-	const { userStore } = useStore();
-	const isMember = useMemo(
-		() => isMembershipActiveFromUserInfo(userStore.userInfo),
-		[userStore.userInfo],
-	);
+	const { isMemberActive: isMember } = useMembershipActive();
 	const providerDefaults = useMemo(
 		() => getProviderDefaults(isMember),
 		[isMember],
