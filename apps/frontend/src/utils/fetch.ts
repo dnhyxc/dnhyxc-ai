@@ -1,5 +1,5 @@
 import { Toast } from '@ui/sonner';
-import { BASE_URL } from '@/constant';
+import { BASE_URL } from '@/constants';
 import { translateSync } from '@/i18n';
 import { notifyUnauthorized } from '@/router/authSession';
 import {

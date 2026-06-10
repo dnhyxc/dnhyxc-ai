@@ -655,4 +655,14 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'When random order hits a page with fewer items than your chosen count, the app fetches more pages until the session is full or the pool is exhausted.',
 	},
+	's24-32': {
+		title: 'Cloud playback prefers MiniMax streaming TTS',
+		description:
+			'When MiniMax is enabled on the server, cloud playback for sentences and longer text starts faster with more natural English. If MiniMax is unavailable, billing fails, or upstream errors occur, playback falls back to the previous cloud TTS; repeated plays of the same line still use cache.',
+	},
+	's24-33': {
+		title: 'Settings: Cloud playback',
+		description:
+			'Separate from LLM settings. Toggle custom playback parameters (model, English voices, speed/volume/pitch, emotion, audio format, language boost, and advanced sample-rate options). Changes save locally with preview and restore-default; when off, server defaults apply.',
+	},
 };

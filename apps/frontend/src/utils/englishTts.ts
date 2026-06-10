@@ -4,9 +4,13 @@
  * 云端 CosyVoice2 无 seed，同一句会随机漂移；对规范化文本做 MP3 缓存以保证重复播放读音一致。
  * 本机无法直接调用 macOS「翻译/词典」弹窗 API；初始默认 Karen 女声，可用 setPreferredLocalEnglishVoiceKey 切换。
  */
-import { BASE_URL } from '@/constant';
-import { SPEECH_TTS } from '@/service/api';
+import { BASE_URL } from '@/constants';
+import { SPEECH_MINIMAX_TTS_STREAM, SPEECH_TTS } from '@/service/api';
 import { getPlatformFetch } from '@/utils/fetch';
+import {
+	buildMinimaxTtsCacheKeySuffix,
+	buildMinimaxTtsRequestExtras,
+} from '@/utils/minimaxTtsPrefs';
 
 export function isEnglishTtsSupported(): boolean {
 	return (
@@ -334,10 +338,11 @@ function touchCloudTtsCache(key: string, audio: ArrayBuffer): void {
 }
 
 function getCloudTtsFromCache(plain: string): Blob | null {
-	const hit = cloudTtsAudioCache.get(plain);
+	const cacheKey = plain + buildMinimaxTtsCacheKeySuffix();
+	const hit = cloudTtsAudioCache.get(cacheKey);
 	if (!hit) return null;
-	cloudTtsAudioCache.delete(plain);
-	cloudTtsAudioCache.set(plain, hit);
+	cloudTtsAudioCache.delete(cacheKey);
+	cloudTtsAudioCache.set(cacheKey, hit);
 	return new Blob([hit], { type: 'audio/mpeg' });
 }
 
@@ -397,7 +402,31 @@ export function stopAllEnglishPlayback(): void {
 	stopPlaybackMediaOnly();
 }
 
+async function readResponseBodyAsArrayBuffer(
+	res: Response,
+): Promise<ArrayBuffer> {
+	const reader = res.body?.getReader();
+	if (!reader) {
+		return res.arrayBuffer();
+	}
+	const parts: Uint8Array[] = [];
+	while (true) {
+		const { done, value } = await reader.read();
+		if (done) break;
+		if (value?.length) parts.push(value);
+	}
+	const total = parts.reduce((sum, part) => sum + part.length, 0);
+	const merged = new Uint8Array(total);
+	let offset = 0;
+	for (const part of parts) {
+		merged.set(part, offset);
+		offset += part.length;
+	}
+	return merged.buffer;
+}
+
 async function fetchCloudTtsBlob(plain: string): Promise<Blob> {
+	const cacheKey = plain + buildMinimaxTtsCacheKeySuffix();
 	const cached = getCloudTtsFromCache(plain);
 	if (cached) {
 		return cached;
@@ -408,20 +437,33 @@ async function fetchCloudTtsBlob(plain: string): Promise<Blob> {
 		throw new Error('NO_TOKEN');
 	}
 	const platformFetch = await getPlatformFetch();
-	const res = await platformFetch(BASE_URL + SPEECH_TTS, {
+	const headers = {
+		Authorization: `Bearer ${token}`,
+		'Content-Type': 'application/json',
+	};
+
+	// 优先 MiniMax 流式 TTS（首包更快）；未配置 MINIMAX 时回退硅基 /speech
+	let res = await platformFetch(BASE_URL + SPEECH_MINIMAX_TTS_STREAM, {
 		method: 'POST',
-		headers: {
-			Authorization: `Bearer ${token}`,
-			'Content-Type': 'application/json',
-		},
-		body: JSON.stringify({ text: plain }),
+		headers,
+		body: JSON.stringify({ text: plain, ...buildMinimaxTtsRequestExtras() }),
 	});
+
+	// MiniMax 未配置(503)、鉴权失败(401)、账户/上游异常(502 如 1008 余额不足) 时回退硅基 TTS
+	if (res.status === 503 || res.status === 401 || res.status === 502) {
+		res = await platformFetch(BASE_URL + SPEECH_TTS, {
+			method: 'POST',
+			headers,
+			body: JSON.stringify({ text: plain }),
+		});
+	}
+
 	if (!res.ok) {
 		throw new Error(`TTS_HTTP_${res.status}`);
 	}
-	const blob = await res.blob();
-	const buf = await blob.arrayBuffer();
-	touchCloudTtsCache(plain, buf);
+
+	const buf = await readResponseBodyAsArrayBuffer(res);
+	touchCloudTtsCache(cacheKey, buf);
 	return new Blob([buf], { type: 'audio/mpeg' });
 }
 

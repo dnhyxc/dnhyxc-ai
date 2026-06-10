@@ -1,7 +1,7 @@
 import ImagePreview from '@design/ImagePreview';
 import { CircleX, Download, FileText } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { CHAT_IMAGE_VALIDTYPES } from '@/constant';
+import { CHAT_IMAGE_VALIDTYPES } from '@/constants';
 import { cn } from '@/lib/utils';
 import { deleteFile } from '@/service';
 import { DownloadProgress, UploadedFile } from '@/types';

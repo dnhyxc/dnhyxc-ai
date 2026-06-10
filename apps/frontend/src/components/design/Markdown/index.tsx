@@ -21,7 +21,7 @@ import {
 	useRef,
 	useState,
 } from 'react';
-import { getChatMarkdownHighlightTheme } from '@/constant';
+import { getChatMarkdownHighlightTheme } from '@/constants';
 import {
 	useMarkdownHashLinkViewportScroll,
 	useMermaidDiagramClickPreview,

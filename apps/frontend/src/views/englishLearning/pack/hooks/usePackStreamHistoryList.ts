@@ -8,7 +8,7 @@ import {
 	useRef,
 	useState,
 } from 'react';
-import { SCROLL_LOAD_THRESHOLD_PX } from '@/constant';
+import { SCROLL_LOAD_THRESHOLD_PX } from '@/constants';
 
 export type PackStreamHistoryPageResult<T> = {
 	items: T[];

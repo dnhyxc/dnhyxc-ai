@@ -1,4 +1,4 @@
-import { BASE_URL } from '@/constant';
+import { BASE_URL } from '@/constants';
 import type { UploadedFile } from '@/types';
 import { isTauriRuntime } from './runtime';
 

@@ -3,7 +3,7 @@
  * 两套事件前缀（`vocab.*` / `classic.*`）仅配置与 `parseItems` 不同，读流与 abort 逻辑一致，便于维护。
  */
 import { Toast } from '@ui/index';
-import { BASE_URL } from '@/constant';
+import { BASE_URL } from '@/constants';
 import { notifyUnauthorized } from '@/router/authSession';
 import {
 	type EnglishClassicQuoteItem,

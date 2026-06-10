@@ -1,6 +1,7 @@
 # 云端 TTS 同句读音一致：前后端 MP3 缓存
 
 > 播放世代、`preferLocal` 单词本机优先见 [`english-tts-playback.md`](./english-tts-playback.md)。  
+> **MiniMax 流式 TTS 与硅基回退**见 [`minimax-cloud-tts.md`](./minimax-cloud-tts.md)。  
 > 硅基 TTS 接入与默认音色见 `apps/backend/src/services/speech-transcription/siliconflow-transcription.service.ts`。
 
 ## 1. 背景与目标

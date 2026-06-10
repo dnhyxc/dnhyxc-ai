@@ -19,7 +19,7 @@ import {
 	VOCAB_COUNT_MAX,
 	VOCAB_COUNT_MIN,
 	VOCAB_HISTORY_PAGE_SIZE,
-} from '@/constant';
+} from '@/constants';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import type { EnglishVocabularyHistoryEntry } from '@/service';

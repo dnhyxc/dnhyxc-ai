@@ -3,7 +3,7 @@ import {
 	FAVORITE_STATUS_HTTP_BATCH_CONCURRENCY,
 	FAVORITE_STATUS_HTTP_BATCH_SIZE,
 	VOCAB_FAVORITE_STATUS_BATCH_SIZE,
-} from '@/constant';
+} from '@/constants';
 import {
 	type KnowledgeListItem,
 	type KnowledgeRecord,

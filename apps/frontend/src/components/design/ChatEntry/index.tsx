@@ -31,7 +31,7 @@ import {
 	CHAT_VALIDTYPES,
 	PROFILE_VOICE_CONVERSION_CHANGED_EVENT,
 	PROFILE_VOICE_CONVERSION_ENABLED_KEY,
-} from '@/constant';
+} from '@/constants';
 import { cn } from '@/lib/utils';
 import { transcribeSpeechAudio } from '@/service';
 import { FileWithPreview, UploadedFile } from '@/types';

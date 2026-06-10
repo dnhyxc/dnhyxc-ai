@@ -2,7 +2,7 @@
  * 知识库助手 SSE 客户端：协议说明见 `docs/knowledge/knowledge-assistant-complete.md` §7。
  */
 import { Toast } from '@ui/index';
-import { BASE_URL } from '@/constant';
+import { BASE_URL } from '@/constants';
 import { notifyUnauthorized } from '@/router/authSession';
 import { getPlatformFetch } from '@/utils/fetch';
 

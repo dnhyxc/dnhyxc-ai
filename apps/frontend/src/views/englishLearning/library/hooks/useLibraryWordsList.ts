@@ -12,7 +12,7 @@ import {
 import {
 	SCROLL_LOAD_THRESHOLD_PX,
 	VOCAB_LIBRARY_ITEMS_PAGE_SIZE,
-} from '@/constant';
+} from '@/constants';
 import { useI18n } from '@/hooks';
 import { retryAsync } from '@/utils/retryAsync';
 import {

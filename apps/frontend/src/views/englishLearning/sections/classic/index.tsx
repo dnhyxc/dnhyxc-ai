@@ -19,7 +19,7 @@ import {
 	QUOTE_COUNT_MAX,
 	QUOTE_COUNT_MIN,
 	SCROLL_LOAD_THRESHOLD_PX,
-} from '@/constant';
+} from '@/constants';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import type { EnglishClassicQuoteHistoryEntry } from '@/service';

@@ -33,6 +33,12 @@ const NavigationMenus = () => {
 				icon: 'icon-setting',
 			},
 			{
+				name: t('setting.menu.cloudTts'),
+				key: 'cloud-tts',
+				path: '/setting/cloud-tts',
+				icon: 'icon-setting',
+			},
+			{
 				name: t('setting.menu.about'),
 				key: 'about',
 				path: '/setting/about',

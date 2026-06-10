@@ -17,7 +17,7 @@ import {
 	useState,
 } from 'react';
 import { useNavigate } from 'react-router';
-import { getChatMarkdownHighlightTheme } from '@/constant';
+import { getChatMarkdownHighlightTheme } from '@/constants';
 import { useChatCoreContext } from '@/contexts';
 import { useI18n } from '@/hooks';
 import { useTheme } from '@/hooks/theme';

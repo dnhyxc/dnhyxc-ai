@@ -48,6 +48,8 @@
 | 设置页预设 / Combobox | [llm/llm-setting-ui-presets.md](./llm/llm-setting-ui-presets.md) |
 | 英语学习 Agent + LLM | [llm/agent-create-llm-unify.md](./llm/agent-create-llm-unify.md) |
 | 今日记词无词可抽 / 时间不对 | [english/daily-memorize-implementation.md](./english/daily-memorize-implementation.md) §9 |
+| 云端朗读 404 / MiniMax 502 余额不足 | [english/minimax-cloud-tts.md](./english/minimax-cloud-tts.md) §12 |
+| 设置页云端朗读参数不生效 / 改音色仍播旧音 | [english/cloud-tts-settings.md](./english/cloud-tts-settings.md) §5–§6 |
 
 ---
 

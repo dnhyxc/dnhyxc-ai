@@ -1,5 +1,5 @@
 import { Toast } from '@ui/index';
-import { BASE_URL } from '@/constant';
+import { BASE_URL } from '@/constants';
 import { notifyUnauthorized } from '@/router/authSession';
 import { FinishInfo, SearchOrganic, SearchOrganicItem } from '@/types/chat';
 import { getPlatformFetch, http } from '@/utils/fetch';

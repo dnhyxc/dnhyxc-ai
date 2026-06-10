@@ -60,7 +60,13 @@
 
 ## TTS / UI / 其它专题
 
-- TTS：[english-tts-playback.md](./english-tts-playback.md)、[english-tts-cache-consistency.md](./english-tts-cache-consistency.md)
+| 文档 | 说明 |
+|------|------|
+| [minimax-cloud-tts.md](./minimax-cloud-tts.md) | **MiniMax 流式 TTS** 完整实现（§11 逐函数注释代码 + 排查） |
+| [cloud-tts-settings.md](./cloud-tts-settings.md) | **设置页云端朗读**：用户偏好 localStorage、请求合并、UI 与 ScrollArea |
+| [english-tts-playback.md](./english-tts-playback.md) | 播放世代、单词本机优先 |
+| [english-tts-cache-consistency.md](./english-tts-cache-consistency.md) | 云端同句 MP3 LRU |
+| [english-tts-local-voice.md](./english-tts-local-voice.md) | 系统设置本机音色 |
 - 列表/UI：[english-learning-list-network-retry.md](./english-learning-list-network-retry.md)、[english-learning-vocab-ui-refactor.md](./english-learning-vocab-ui-refactor.md)
 - 完整列表：`ls docs/english/*.md`
 

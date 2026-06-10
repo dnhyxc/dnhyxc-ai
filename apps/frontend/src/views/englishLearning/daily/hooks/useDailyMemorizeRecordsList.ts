@@ -9,7 +9,7 @@ import {
 	useRef,
 	useState,
 } from 'react';
-import { SCROLL_LOAD_THRESHOLD_PX, VOCAB_HISTORY_PAGE_SIZE } from '@/constant';
+import { SCROLL_LOAD_THRESHOLD_PX, VOCAB_HISTORY_PAGE_SIZE } from '@/constants';
 import { useI18n } from '@/hooks';
 import {
 	type EnglishDailyMemorizeRecordEntry,

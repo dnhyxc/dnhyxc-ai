@@ -2,7 +2,7 @@
  * 单词包历史会话明细分页
  */
 import { useCallback } from 'react';
-import { PACK_ITEMS_PAGE_SIZE } from '@/constant';
+import { PACK_ITEMS_PAGE_SIZE } from '@/constants';
 import {
 	type EnglishVocabularyItem,
 	listEnglishVocabularyPackItems,

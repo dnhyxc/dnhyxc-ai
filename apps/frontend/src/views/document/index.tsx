@@ -23,7 +23,7 @@ import {
 	Sparkles,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { getChatMarkdownHighlightTheme } from '@/constant';
+import { getChatMarkdownHighlightTheme } from '@/constants';
 import { useTheme } from '@/hooks/theme';
 import { uploadFile } from '@/service';
 import { isValidImageUrl } from '@/utils';

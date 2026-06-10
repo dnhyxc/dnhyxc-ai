@@ -171,3 +171,16 @@ export enum KnowledgeQaEnum {
 	/** @deprecated 请改用 KNOWLEDGE_RERANK_MODEL */
 	DASHSCOPE_RERANK_MODEL_NAME = 'DASHSCOPE_RERANK_MODEL_NAME',
 }
+
+/** MiniMax T2A 语音合成（speech-transcription/minimax/*） */
+export enum MinimaxEnum {
+	MINIMAX_API_KEY = 'MINIMAX_API_KEY',
+	/** 部分账号需在 Header 传 Group-Id */
+	MINIMAX_GROUP_ID = 'MINIMAX_GROUP_ID',
+	/** API 根路径，默认 https://api.minimaxi.com；备用 https://api-bj.minimaxi.com */
+	MINIMAX_TTS_BASE_URL = 'MINIMAX_TTS_BASE_URL',
+	/** 默认 speech-2.8-hd */
+	MINIMAX_TTS_MODEL = 'MINIMAX_TTS_MODEL',
+	/** 默认 English_radiant_girl */
+	MINIMAX_TTS_VOICE_ID = 'MINIMAX_TTS_VOICE_ID',
+}

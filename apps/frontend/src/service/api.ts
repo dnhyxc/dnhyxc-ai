@@ -61,6 +61,11 @@ export const STOP_SSE = '/chat/stopSse';
 export const SPEECH_TRANSCRIPTION = '/speech-transcription/transcription';
 /** 云端文本转语音（硅基流动，需 SILICONFLOW_API_KEY） */
 export const SPEECH_TTS = '/speech-transcription/speech';
+/** MiniMax T2A 流式 TTS（speech-2.8-hd，需 MINIMAX_API_KEY） */
+export const SPEECH_MINIMAX_TTS_STREAM =
+	'/speech-transcription/minimax/speech/stream';
+/** MiniMax T2A 非流式 TTS */
+export const SPEECH_MINIMAX_TTS = '/speech-transcription/minimax/speech';
 
 // 创建会话
 export const CREATE_SESSION = '/chat/createSession';

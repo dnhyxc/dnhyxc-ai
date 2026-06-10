@@ -2,7 +2,7 @@
  * 知识库 RAG 问答 SSE：对齐后端 `KnowledgeQaController` 的 `@Sse()` 行协议（`data: JSON`）。
  */
 import { Toast } from '@ui/index';
-import { BASE_URL } from '@/constant';
+import { BASE_URL } from '@/constants';
 import { notifyUnauthorized } from '@/router/authSession';
 import { getPlatformFetch } from '@/utils/fetch';
 

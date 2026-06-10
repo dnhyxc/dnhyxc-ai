@@ -29,7 +29,7 @@ import {
 	useState,
 } from 'react';
 import { createPortal } from 'react-dom';
-import { getChatMarkdownHighlightTheme } from '@/constant';
+import { getChatMarkdownHighlightTheme } from '@/constants';
 import { useMarkdownHashLinkViewportScroll } from '@/hooks';
 import { useTheme } from '@/hooks/theme';
 import { cn } from '@/lib/utils';

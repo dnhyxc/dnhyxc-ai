@@ -84,6 +84,7 @@ export const zhCN = {
 	'setting.menu.language': '语言设置',
 	'setting.menu.about': '关于应用',
 	'setting.menu.llm': '模型配置',
+	'setting.menu.cloudTts': '云端朗读',
 	'setting.llm.title': '大模型配置',
 	'setting.llm.desc':
 		'开启并填写 API Key、Base URL、模型名称后，将覆盖服务器环境变量，统一用于对话、知识库助手、问答与英语学习等模块。关闭或清空后恢复使用 .env 配置。',
@@ -114,6 +115,71 @@ export const zhCN = {
 	'setting.llm.clearSuccess': '已恢复使用环境变量',
 	'setting.llm.activeHint': '{modelName} 模型配置生效中',
 	'setting.llm.incompleteHint': '已开启但配置不完整，仍使用环境变量',
+	/** 云端朗读 */
+	'setting.cloudTts.title': '云端朗读',
+	'setting.cloudTts.desc':
+		'开启后，英语学习等场景的云端朗读将使用下列参数；关闭则使用服务端默认音色与模型。',
+	'setting.cloudTts.paramsTitle': '朗读参数',
+	'setting.cloudTts.paramsDesc': '音色、语速与音频格式等，可按需调整。',
+	'setting.cloudTts.paramsHelpAria': '查看朗读参数字段说明',
+	'setting.cloudTts.paramsHelpTitle': '字段说明',
+	'setting.cloudTts.fieldHelp.model':
+		'云端朗读合成模型，如 speech-2.8-hd（音质更好）或 turbo 系列（更快）。',
+	'setting.cloudTts.fieldHelp.voiceId':
+		'朗读音色，决定由谁朗读；从预设列表中选择即可。',
+	'setting.cloudTts.fieldHelp.speed': '语速，范围 0.5–2，1 为正常速度。',
+	'setting.cloudTts.fieldHelp.vol':
+		'音量，范围 0.01–10；默认 5，数值越大越响（1 为标准音量）。',
+	'setting.cloudTts.fieldHelp.pitch':
+		'音高，范围 -12–12，0 为标准；正数更尖、更亮，负数更低沉。',
+	'setting.cloudTts.fieldHelp.emotionIntro':
+		'可选情感风格；选「无」则使用音色默认表现。',
+	'setting.cloudTts.emotion.happy': '开心',
+	'setting.cloudTts.emotion.sad': '难过',
+	'setting.cloudTts.emotion.angry': '生气',
+	'setting.cloudTts.emotion.fearful': '害怕',
+	'setting.cloudTts.emotion.disgusted': '厌恶',
+	'setting.cloudTts.emotion.surprised': '惊讶',
+	'setting.cloudTts.emotion.calm': '中性',
+	'setting.cloudTts.emotion.fluent': '生动',
+	'setting.cloudTts.fieldHelp.format':
+		'输出音频格式，mp3 通用；pcm、wav 等可按播放器或下游需求选择。',
+	'setting.cloudTts.fieldHelp.languageBoost':
+		'告诉朗读引擎按哪种语言优化发音，减少读错语言、口音偏调等问题。文本以英文为主时选「英语」，以中文为主时选「中文」；语言混杂或不确定时选「自动」。',
+	'setting.cloudTts.fieldHelp.sampleRate':
+		'采样率（Hz），默认 32000；越高潜在细节越多，文件通常更大。',
+	'setting.cloudTts.fieldHelp.bitrate':
+		'比特率，影响压缩音质与体积，默认 128000。',
+	'setting.cloudTts.fieldHelp.channel':
+		'声道数：1 为单声道（推荐），2 为立体声；朗读场景一般保持 1 即可。',
+	'setting.cloudTts.enabledLabel': '使用自定义朗读参数',
+	'setting.cloudTts.enabledHelp':
+		'参数保存在本机浏览器，立即生效；修改后同一句会重新合成。',
+	'setting.cloudTts.openPresets': '选择预设',
+	'setting.cloudTts.model': '模型',
+	'setting.cloudTts.voiceId': '音色类别',
+	'setting.cloudTts.speed': '语速',
+	'setting.cloudTts.vol': '音量',
+	'setting.cloudTts.pitch': '音高',
+	'setting.cloudTts.emotion': '情感',
+	'setting.cloudTts.emotionNone': '无（默认）',
+	'setting.cloudTts.format': '音频格式',
+	'setting.cloudTts.languageBoost': '语言增强',
+	'setting.cloudTts.languageBoostOption.auto': '自动',
+	'setting.cloudTts.languageBoostOption.English': '英语',
+	'setting.cloudTts.languageBoostOption.Chinese': '中文',
+	'setting.cloudTts.sampleRate': '采样率',
+	'setting.cloudTts.bitrate': '比特率',
+	'setting.cloudTts.channel': '声道',
+	'setting.cloudTts.advancedHint': '以下为高级音频参数，一般保持默认即可。',
+	'setting.cloudTts.reset': '恢复默认参数',
+	'setting.cloudTts.decreaseValue': '减小{label}',
+	'setting.cloudTts.increaseValue': '增大{label}',
+	'setting.cloudTts.preview': '云端试听',
+	'setting.cloudTts.previewText':
+		'This is a preview of the cloud reading effect with the parameters set above.',
+
+	/** 主题设置 */
 	'setting.theme.colorTitle': '彩色主题',
 	'setting.theme.color.white': '白色',
 	'setting.theme.color.black': '黑色',
@@ -1241,6 +1307,7 @@ export const zhCN = {
 	'route.setting.about': '关于应用',
 	'route.setting.theme': '主题设置',
 	'route.setting.llm': '大模型配置',
+	'route.setting.cloudTts': '云端朗读',
 	'route.setting.language': '语言设置',
 	'route.legal.servicePolicy': '用户服务政策',
 	'route.legal.userAgreement': '用户服务协议',

@@ -17,7 +17,7 @@ import { useNavigate } from 'react-router';
 import {
 	SCROLL_LOAD_THRESHOLD_PX,
 	VOCAB_LIBRARY_LIST_PAGE_SIZE,
-} from '@/constant';
+} from '@/constants';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import {

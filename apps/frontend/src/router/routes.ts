@@ -38,6 +38,7 @@ import Profile from '@/views/profile';
 import ProjectGuidePage from '@/views/projectGuide';
 import Setting from '@/views/setting';
 import AboutApp from '@/views/setting/about';
+import CloudTtsSetting from '@/views/setting/cloudTts';
 import LlmSetting from '@/views/setting/llm';
 import AppSystem from '@/views/setting/system';
 import ThemeSetting from '@/views/setting/theme';
@@ -270,6 +271,13 @@ const routes: RouteConfig[] = [
 						Component: LlmSetting,
 						meta: {
 							titleKey: 'route.setting.llm',
+						},
+					},
+					{
+						path: '/setting/cloud-tts',
+						Component: CloudTtsSetting,
+						meta: {
+							titleKey: 'route.setting.cloudTts',
 						},
 					},
 				],

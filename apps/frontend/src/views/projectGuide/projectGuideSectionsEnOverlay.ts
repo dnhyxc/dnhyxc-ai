@@ -173,7 +173,12 @@ export const PROJECT_GUIDE_ITEMS_EN: Record<
 			'After sign-in: Settings → LLM (/setting/llm). Enable custom LLM, then fill API Key (a local default may pre-fill on first visit; after save, your account settings apply), Base URL, and model name.\nType directly or use the button beside Base URL / model to pick SiliconFlow or DeepSeek presets; one side updates the other. You can still type other providers manually.\nSave when the footer shows the active hint with the model name—chat, assistant, Q&A, and English learning then share that config. Use the eye icon to show/hide the key. Save stays disabled until the switch is on and all fields are filled. Use Restore environment variables to revert to server defaults.',
 	},
 	'pg-s8-4': {
-		title: '8.4 Account avatar (cloud storage)',
+		title: '8.4 Cloud playback',
+		description:
+			'After sign-in: Settings → Cloud playback (/setting/cloud-tts). Enable custom playback parameters to adjust model, voice, speed, volume, pitch, emotion, format, and language boost; advanced sample rate / bitrate / channel fields usually stay at defaults.\nUse ? beside Playback parameters for field help. Preview plays a sample with current settings; Restore defaults resets the form without turning the switch off. When off, server defaults apply; when on, preferences stay on this device and apply to cloud playback; upstream failures still fall back to the previous cloud TTS.',
+	},
+	'pg-s8-5': {
+		title: '8.5 Account avatar (cloud storage)',
 		description:
 			'Open Account or Profile while signed in, choose an image in the avatar area, then save. The sidebar and profile page update together. Use preview or the upload-area download control to save the avatar; you get a success or failure toast. If the image fails to load, try uploading again; on the web, use this site rather than old external links. Chat attachments use the same Tencent Cloud COS storage as avatars, shown via the site proxy; legacy local paths in old messages remain read-only compatible.',
 	},

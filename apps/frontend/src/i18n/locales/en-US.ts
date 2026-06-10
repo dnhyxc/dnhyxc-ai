@@ -88,6 +88,7 @@ export const enUS = {
 	'setting.menu.language': 'Language',
 	'setting.menu.about': 'About',
 	'setting.menu.llm': 'Model configuration',
+	'setting.menu.cloudTts': 'Cloud playback',
 	'setting.llm.title': 'LLM configuration',
 	'setting.llm.desc':
 		'When enabled with API Key, Base URL, and model name, these values override server environment variables for chat, assistant, RAG, and English learning. Clear to use .env again.',
@@ -121,6 +122,71 @@ export const enUS = {
 	'setting.llm.activeHint': '{modelName} model configuration is in use',
 	'setting.llm.incompleteHint':
 		'Enabled but incomplete; still using environment variables',
+	'setting.cloudTts.title': 'Cloud playback',
+	'setting.cloudTts.desc':
+		'When enabled, cloud playback in English learning uses the parameters below. When off, server defaults apply.',
+	'setting.cloudTts.paramsTitle': 'Playback parameters',
+	'setting.cloudTts.paramsDesc':
+		'Voice, speed, audio format, and related options.',
+	'setting.cloudTts.paramsHelpAria': 'Playback parameter field help',
+	'setting.cloudTts.paramsHelpTitle': 'Field reference',
+	'setting.cloudTts.fieldHelp.model':
+		'Cloud synthesis model, e.g. speech-2.8-hd (higher quality) or turbo (faster).',
+	'setting.cloudTts.fieldHelp.voiceId':
+		'Voice used for playback; choose from the preset list.',
+	'setting.cloudTts.fieldHelp.speed':
+		'Speech rate from 0.5 to 2; 1 is normal speed.',
+	'setting.cloudTts.fieldHelp.vol':
+		'Volume from 0.01 to 10; default 5—louder values increase output (1 is standard volume).',
+	'setting.cloudTts.fieldHelp.pitch':
+		'Pitch from -12 to 12; 0 is neutral—positive is higher, negative is lower.',
+	'setting.cloudTts.fieldHelp.emotionIntro':
+		'Optional emotional style; choose none to omit and use the voice default.',
+	'setting.cloudTts.emotion.happy': 'Happy',
+	'setting.cloudTts.emotion.sad': 'Sad',
+	'setting.cloudTts.emotion.angry': 'Angry',
+	'setting.cloudTts.emotion.fearful': 'Fearful',
+	'setting.cloudTts.emotion.disgusted': 'Disgusted',
+	'setting.cloudTts.emotion.surprised': 'Surprised',
+	'setting.cloudTts.emotion.calm': 'Neutral',
+	'setting.cloudTts.emotion.fluent': 'Lively',
+	'setting.cloudTts.fieldHelp.format':
+		'Output format; mp3 is universal—pcm/wav if your player or pipeline needs them.',
+	'setting.cloudTts.fieldHelp.languageBoost':
+		'Tells the engine which language to optimize pronunciation for, reducing misread language or odd accent. Choose English or Chinese when the text is mostly one language; use Auto when mixed or unsure.',
+	'setting.cloudTts.fieldHelp.sampleRate':
+		'Sample rate in Hz; default 32000. Higher can mean more detail and larger files.',
+	'setting.cloudTts.fieldHelp.bitrate':
+		'Bitrate affects compressed quality and file size; default 128000.',
+	'setting.cloudTts.fieldHelp.channel':
+		'1 = mono (recommended for narration), 2 = stereo.',
+	'setting.cloudTts.enabledLabel': 'Use custom playback parameters',
+	'setting.cloudTts.enabledHelp':
+		'Stored in this browser and applied immediately; changing settings re-synthesizes the same line.',
+	'setting.cloudTts.openPresets': 'Choose preset',
+	'setting.cloudTts.model': 'Model',
+	'setting.cloudTts.voiceId': 'Voice category',
+	'setting.cloudTts.speed': 'Speed',
+	'setting.cloudTts.vol': 'Volume',
+	'setting.cloudTts.pitch': 'Pitch',
+	'setting.cloudTts.emotion': 'Emotion',
+	'setting.cloudTts.emotionNone': 'None (default)',
+	'setting.cloudTts.format': 'Audio format',
+	'setting.cloudTts.languageBoost': 'Language boost',
+	'setting.cloudTts.languageBoostOption.auto': 'Auto',
+	'setting.cloudTts.languageBoostOption.English': 'English',
+	'setting.cloudTts.languageBoostOption.Chinese': 'Chinese',
+	'setting.cloudTts.sampleRate': 'Sample rate',
+	'setting.cloudTts.bitrate': 'Bitrate',
+	'setting.cloudTts.channel': 'Channels',
+	'setting.cloudTts.advancedHint':
+		'Advanced audio parameters; defaults are usually fine.',
+	'setting.cloudTts.reset': 'Reset to defaults',
+	'setting.cloudTts.decreaseValue': 'Decrease {label}',
+	'setting.cloudTts.increaseValue': 'Increase {label}',
+	'setting.cloudTts.preview': 'Cloud preview',
+	'setting.cloudTts.previewText':
+		'This is a preview of the cloud reading effect with the parameters set above.',
 	'setting.theme.colorTitle': 'Color themes',
 	'setting.theme.color.white': 'White',
 	'setting.theme.color.black': 'Black',
@@ -1366,6 +1432,7 @@ export const enUS = {
 	'route.setting.about': 'About',
 	'route.setting.theme': 'Theme',
 	'route.setting.llm': 'LLM settings',
+	'route.setting.cloudTts': 'Cloud playback',
 	'route.setting.language': 'Language',
 	'route.legal.servicePolicy': 'User service policy',
 	'route.legal.userAgreement': 'User service agreement',

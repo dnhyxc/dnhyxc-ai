@@ -9,7 +9,7 @@ import {
 	useRef,
 	useState,
 } from 'react';
-import { HISTORY_PAGE_SIZE, SCROLL_LOAD_THRESHOLD_PX } from '@/constant';
+import { HISTORY_PAGE_SIZE, SCROLL_LOAD_THRESHOLD_PX } from '@/constants';
 import { useI18n } from '@/hooks';
 import {
 	type EnglishClassicQuoteFavoriteListEntry,

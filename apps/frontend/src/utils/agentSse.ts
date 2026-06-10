@@ -2,7 +2,7 @@
  * LangChain Agent SSE：对齐 `AgentController.chatSse` 的 `data: JSON` 行协议（含 content / tool / done）。
  */
 import { Toast } from '@ui/index';
-import { BASE_URL } from '@/constant';
+import { BASE_URL } from '@/constants';
 import { notifyUnauthorized } from '@/router/authSession';
 import { AGENT_SSE } from '@/service/api';
 import type { SearchOrganicItem } from '@/types/chat';
