@@ -116,6 +116,19 @@ export class UserService {
 			.then((user) => (user ? this.syncMembershipIfExpired(user) : null));
 	}
 
+	/** 会员是否在有效期内（读库并校正过期状态） */
+	async isUserMembershipActive(userId?: number | null): Promise<boolean> {
+		if (userId == null || !Number.isFinite(userId) || userId <= 0) {
+			return false;
+		}
+		const user = await this.userRepository.findOne({
+			where: { id: userId },
+		});
+		if (!user) return false;
+		const synced = await this.syncMembershipIfExpired(user);
+		return this.isMembershipActive(synced);
+	}
+
 	/** 会员是否在有效期内（以 memberExpiresAt 为准；null 且 isMember 视为未设到期） */
 	isMembershipActive(user: User, now = new Date()): boolean {
 		if (!user.isMember) return false;

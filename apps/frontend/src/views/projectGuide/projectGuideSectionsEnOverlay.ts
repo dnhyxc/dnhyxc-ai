@@ -170,7 +170,7 @@ export const PROJECT_GUIDE_ITEMS_EN: Record<
 	'pg-s8-3': {
 		title: '8.3 LLM (custom config)',
 		description:
-			'After sign-in: Settings → LLM (/setting/llm). Enable custom LLM, then fill API Key (a local default may pre-fill on first visit; after save, your account settings apply), Base URL, and model name.\nType directly or use the button beside Base URL / model to pick SiliconFlow or DeepSeek presets; one side updates the other. You can still type other providers manually.\nSave when the footer shows the active hint with the model name—chat, assistant, Q&A, and English learning then share that config. Use the eye icon to show/hide the key. Save stays disabled until the switch is on and all fields are filled. Use Restore environment variables to revert to server defaults.',
+			'After sign-in: Settings → LLM (/setting/llm). Enable custom LLM, then fill API Key (a local default may pre-fill on first visit; after save, only your account applies), Base URL, and model name.\nType directly or use the button beside Base URL / model to pick Zhipu GLM, SiliconFlow, or DeepSeek presets; switching preset or model clears the API Key so you must enter the matching provider key.\nSave when the footer shows the active hint with the model name—chat, assistant, Q&A, and English learning use that config for your account only. Without custom config: active members default to SiliconFlow; non-members default to Zhipu GLM. Use the eye icon to show/hide the key. Save stays disabled until the switch is on and all fields are filled. Use Restore default to revert.',
 	},
 	'pg-s8-4': {
 		title: '8.4 Cloud playback',

@@ -7,10 +7,12 @@ import {
 	Param,
 	Post,
 	Query,
+	Req,
 	Sse,
 	UseGuards,
 	UseInterceptors,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import { catchError, concat, map, Observable, of } from 'rxjs';
 import { JwtGuard } from 'src/guards/jwt.guard';
 import { ChatService } from './chat.service';
@@ -21,6 +23,9 @@ import { HistoryDto, MessageDto } from './dto/message.dto';
 import { UpdateChatDto } from './dto/update-chat.dto';
 import { GlmChatService } from './glm.service';
 import { MessageService } from './message.service';
+
+type AuthedRequest = Request & { user?: { userId: number } };
+
 @Controller('chat')
 @UseInterceptors(ClassSerializerInterceptor)
 @UseGuards(JwtGuard)
@@ -39,9 +44,13 @@ export class ChatController {
 	@Post('/sse')
 	@Sse()
 	async chatStream(
+		@Req() req: AuthedRequest,
 		@Body() chatRequestDto: ChatRequestDto,
 	): Promise<Observable<any>> {
-		const source$ = (await this.chatService.chatStream(chatRequestDto)).pipe(
+		const userId = req.user?.userId;
+		const source$ = (
+			await this.chatService.chatStream(chatRequestDto, userId)
+		).pipe(
 			map((chunk) => {
 				return {
 					data: {
@@ -75,8 +84,12 @@ export class ChatController {
 
 	@Post('/continueSse')
 	@Sse()
-	async continueStream(@Body() dto: ChatContinueDto): Promise<Observable<any>> {
-		const source$ = (await this.chatService.continueStream(dto)).pipe(
+	async continueStream(
+		@Req() req: AuthedRequest,
+		@Body() dto: ChatContinueDto,
+	): Promise<Observable<any>> {
+		const userId = req.user?.userId;
+		const source$ = (await this.chatService.continueStream(dto, userId)).pipe(
 			map((chunk) => {
 				return {
 					data: {
@@ -133,9 +146,12 @@ export class ChatController {
 	}
 
 	@Post('/message')
-	async chat(@Body() chatRequestDto: ChatRequestDto) {
-		const result = await this.chatService.chat(chatRequestDto);
-		return result;
+	async chat(
+		@Req() req: AuthedRequest,
+		@Body() chatRequestDto: ChatRequestDto,
+	) {
+		const userId = req.user?.userId;
+		return this.chatService.chat(chatRequestDto, userId);
 	}
 
 	@Get('session/:sessionId')

@@ -108,9 +108,11 @@ export const enUS = {
 	'setting.llm.presetOrCustomHint':
 		'Type directly in the field, or use the button on the right for presets',
 	'setting.llm.baseUrlOption.siliconflow': 'SiliconFlow (api.siliconflow.cn)',
+	'setting.llm.baseUrlOption.glm': 'Zhipu GLM (open.bigmodel.cn)',
 	'setting.llm.baseUrlOption.deepseek': 'DeepSeek (api.deepseek.com)',
 	'setting.llm.modelName': 'Model name',
 	'setting.llm.modelNamePlaceholder': 'Enter model name',
+	'setting.llm.modelOption.glmFlash': 'glm-4.7-flash',
 	'setting.llm.modelOption.glm47': 'Pro/zai-org/GLM-4.7',
 	'setting.llm.modelOption.deepseekChat': 'deepseek-chat',
 	'setting.llm.apiKey': 'API Key',

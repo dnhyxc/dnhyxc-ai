@@ -201,7 +201,10 @@ Stick strictly to what is visually present.`,
 	}
 
 	// deepseek 流式对话
-	async chatStream(dto: ChatRequestDto): Promise<Observable<any>> {
+	async chatStream(
+		dto: ChatRequestDto,
+		userId?: number,
+	): Promise<Observable<any>> {
 		const sessionId = dto.sessionId;
 
 		// 创建 AbortController 用于立即停止大模型生成
@@ -224,10 +227,11 @@ Stick strictly to what is visually present.`,
 		// 缓存取消控制器，12 小时后自动过期并清除
 		await this.cache.set(sessionId, cancel$, 12 * 60 * 60 * 1000);
 
-		const llm = createLlm(
+		const llm = await createLlm(
 			this.configService,
 			{
 				preset: 'chat',
+				userId,
 				temperature: dto.temperature,
 				maxTokens: dto.maxTokens || 8192, // 65536
 				maxTokensPolicy: 'optional',
@@ -667,13 +671,16 @@ Stick strictly to what is visually present.`,
 		};
 	}
 
-	async continueStream({
-		sessionId,
-		parentId,
-		userMessage,
-		assistantMessage,
-		isRegenerate,
-	}: ChatContinueDto): Promise<Observable<any>> {
+	async continueStream(
+		{
+			sessionId,
+			parentId,
+			userMessage,
+			assistantMessage,
+			isRegenerate,
+		}: ChatContinueDto,
+		userId?: number,
+	): Promise<Observable<any>> {
 		// 简化提示词，因为 chatStream 中已经将 partialContent 作为 Assistant 消息注入上下文
 		// 这里只需要告诉模型"继续"即可，不需要再重复内容，避免模型困惑或重复生成
 		const userContent =
@@ -705,15 +712,16 @@ Stick strictly to what is visually present.`,
 		// 调用现有的 chatStream 方法
 		// chatStream 内部会检测到 sessionId 对应的 session 有 partialContent
 		// 从而自动激活续写逻辑（注入历史、修改 System Prompt）
-		return this.chatStream(continueDto);
+		return this.chatStream(continueDto, userId);
 	}
 
 	// deepseek 非流失对话
-	async chat(dto: ChatRequestDto): Promise<any> {
-		const llm = createLlm(
+	async chat(dto: ChatRequestDto, userId?: number): Promise<any> {
+		const llm = await createLlm(
 			this.configService,
 			{
 				preset: 'chat',
+				userId,
 				temperature: dto.temperature,
 				maxTokens: dto.maxTokens || 4096,
 				maxTokensPolicy: 'optional',

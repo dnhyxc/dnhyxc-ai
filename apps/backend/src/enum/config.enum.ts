@@ -75,6 +75,10 @@ export enum ModelEnum {
 	 * API Key / Base URL 沿用 KnowledgeQaEnum.SILICONFLOW_*。
 	 */
 	SILICONFLOW_MODEL_NAME = 'SILICONFLOW_MODEL_NAME',
+	/** 硅基流动 API Key（Bearer），用于知识库 embedding + rerank */
+	SILICONFLOW_API_KEY = 'SILICONFLOW_API_KEY',
+	/** 硅基流动 API 根路径，默认 https://api.siliconflow.cn/v1 */
+	SILICONFLOW_BASE_URL = 'SILICONFLOW_BASE_URL',
 	/**
 	 * 英语学习词句拉取：硅基流动 Chat 模型名（`/v1/chat/completions`），默认 Pro/zai-org/GLM-4.7。
 	 * API Key 与 Base URL 沿用 KnowledgeQaEnum.SILICONFLOW_*（与知识库 embedding 同源）。
@@ -111,10 +115,6 @@ export enum ModelEnum {
 	 * 单次请求可用 ChatRequestDto.webSearchProvider 覆盖。
 	 */
 	WEB_SEARCH_DEFAULT_PROVIDER = 'WEB_SEARCH_DEFAULT_PROVIDER',
-	/** 硅基流动 API Key（Bearer），用于知识库 embedding + rerank */
-	SILICONFLOW_API_KEY = 'SILICONFLOW_API_KEY',
-	/** 硅基流动 API 根路径，默认 https://api.siliconflow.cn/v1 */
-	SILICONFLOW_BASE_URL = 'SILICONFLOW_BASE_URL',
 }
 
 export enum QdrantEnum {

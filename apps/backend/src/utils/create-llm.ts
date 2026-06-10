@@ -1,12 +1,18 @@
 import { ChatOpenAI } from '@langchain/openai';
 import { HttpException, HttpStatus } from '@nestjs/common';
 import type { ConfigService } from '@nestjs/config';
-import { KnowledgeQaEnum, ModelEnum } from '../enum/config.enum';
+import { ModelEnum } from '../enum/config.enum';
 
-/** 硅基流动 OpenAI 兼容 API 默认根路径 */
+/** 智谱 GLM OpenAI 兼容 API 默认根路径 */
+export const DEFAULT_GLM_BASE_URL = 'https://open.bigmodel.cn/api/paas/v4';
+
+/** 各模块未配置 GLM_MODEL_NAME 时的默认值 */
+export const DEFAULT_GLM_MODEL_NAME = 'glm-4.7-flash';
+
+/** 硅基流动 OpenAI 兼容 API 默认根路径（有效会员默认凭证） */
 export const DEFAULT_SILICONFLOW_BASE_URL = 'https://api.siliconflow.cn/v1';
 
-/** 各模块未配置模型名时的默认值 */
+/** 各模块未配置 SILICONFLOW_MODEL_NAME 时的默认值（有效会员） */
 export const DEFAULT_SILICONFLOW_MODEL_NAME = 'Pro/zai-org/GLM-4.7';
 
 /** 凭证解析预设（与业务模块一一对应） */
@@ -79,13 +85,63 @@ function resolveBaseUrl(
 function resolveModelNameFromEnvKeys(
 	config: ConfigService,
 	keys: readonly string[],
-	defaultName = DEFAULT_SILICONFLOW_MODEL_NAME,
+	defaultName = DEFAULT_GLM_MODEL_NAME,
 ): string {
 	for (const key of keys) {
 		const value = trimConfigValue(config, key);
 		if (value) return value;
 	}
 	return defaultName;
+}
+
+const GLM_ENV_API_KEY_KEYS = [ModelEnum.GLM_API_KEY] as const;
+const GLM_ENV_BASE_URL_KEYS = [ModelEnum.GLM_BASE_URL] as const;
+const GLM_ENV_MODEL_NAME_KEYS = [ModelEnum.GLM_MODEL_NAME] as const;
+
+const SILICONFLOW_ENV_API_KEY_KEYS = [ModelEnum.SILICONFLOW_API_KEY] as const;
+const SILICONFLOW_ENV_BASE_URL_KEYS = [ModelEnum.SILICONFLOW_BASE_URL] as const;
+const SILICONFLOW_ENV_MODEL_NAME_KEYS = [
+	ModelEnum.SILICONFLOW_MODEL_NAME,
+] as const;
+
+function resolveGlmModelNameFromEnv(config: ConfigService): string {
+	return resolveModelNameFromEnvKeys(config, GLM_ENV_MODEL_NAME_KEYS);
+}
+
+function resolveSiliconFlowModelNameFromEnv(config: ConfigService): string {
+	return resolveModelNameFromEnvKeys(
+		config,
+		SILICONFLOW_ENV_MODEL_NAME_KEYS,
+		DEFAULT_SILICONFLOW_MODEL_NAME,
+	);
+}
+
+function buildGlmEnvPresetOptions(
+	missingApiKeyMessage: string,
+	onMissingApiKey?: MissingApiKeyHandler,
+): ResolveSiliconFlowOptions {
+	return {
+		apiKeyEnvKeys: GLM_ENV_API_KEY_KEYS,
+		baseUrlEnvKeys: GLM_ENV_BASE_URL_KEYS,
+		defaultBaseUrl: DEFAULT_GLM_BASE_URL,
+		resolveModelName: resolveGlmModelNameFromEnv,
+		missingApiKeyMessage,
+		onMissingApiKey,
+	};
+}
+
+function buildSiliconFlowEnvPresetOptions(
+	missingApiKeyMessage: string,
+	onMissingApiKey?: MissingApiKeyHandler,
+): ResolveSiliconFlowOptions {
+	return {
+		apiKeyEnvKeys: SILICONFLOW_ENV_API_KEY_KEYS,
+		baseUrlEnvKeys: SILICONFLOW_ENV_BASE_URL_KEYS,
+		defaultBaseUrl: DEFAULT_SILICONFLOW_BASE_URL,
+		resolveModelName: resolveSiliconFlowModelNameFromEnv,
+		missingApiKeyMessage,
+		onMissingApiKey,
+	};
 }
 
 /** 按 env 回退链解析凭证（不含 UI/DB 运行时覆盖） */
@@ -97,7 +153,7 @@ export function resolveSiliconFlowCredentials(
 	const baseURL = resolveBaseUrl(
 		config,
 		options.baseUrlEnvKeys,
-		options.defaultBaseUrl ?? DEFAULT_SILICONFLOW_BASE_URL,
+		options.defaultBaseUrl ?? DEFAULT_GLM_BASE_URL,
 	);
 	const modelName = options.resolveModelName(config);
 	if (!apiKey) {
@@ -112,109 +168,77 @@ export type LlmCredentialResolver = {
 	resolveSiliconFlowCredentials(
 		config: ConfigService,
 		preset: SiliconFlowLlmPreset,
-	): SiliconFlowCredentials;
+		userId?: number,
+	): Promise<SiliconFlowCredentials>;
 };
 
 /** 知识库助手模型名（token 预算推断，不创建 LLM） */
-export function getAssistantSiliconFlowModelName(
+export async function getAssistantSiliconFlowModelName(
 	config: ConfigService,
 	resolver?: LlmCredentialResolver,
-): string {
+	userId?: number,
+): Promise<string> {
 	if (resolver) {
-		return resolver.resolveSiliconFlowCredentials(config, 'assistant')
-			.modelName;
+		const credentials = await resolver.resolveSiliconFlowCredentials(
+			config,
+			'assistant',
+			userId,
+		);
+		return credentials.modelName;
 	}
-	return resolveModelNameFromEnvKeys(config, [
-		ModelEnum.GLM_MODEL_NAME,
-		ModelEnum.SILICONFLOW_MODEL_NAME,
-		ModelEnum.DEEPSEEK_MODEL_NAME,
-	]);
+	return resolveGlmModelNameFromEnv(config);
 }
 
 const siliconFlowResolvePresets: Record<
 	SiliconFlowLlmPreset,
 	(config: ConfigService) => ResolveSiliconFlowOptions
 > = {
-	chat: () => ({
-		apiKeyEnvKeys: [
-			ModelEnum.GLM_API_KEY,
-			ModelEnum.SILICONFLOW_API_KEY,
-			ModelEnum.DEEPSEEK_API_KEY,
-		],
-		baseUrlEnvKeys: [
-			ModelEnum.GLM_BASE_URL,
-			ModelEnum.SILICONFLOW_BASE_URL,
-			ModelEnum.DEEPSEEK_BASE_URL,
-		],
-		resolveModelName: (c) =>
-			resolveModelNameFromEnvKeys(c, [
-				ModelEnum.GLM_MODEL_NAME,
-				ModelEnum.SILICONFLOW_MODEL_NAME,
-				ModelEnum.DEEPSEEK_MODEL_NAME,
-			]),
-		missingApiKeyMessage:
-			'硅基流动未配置（SILICONFLOW_API_KEY，或兼容 DEEPSEEK_API_KEY），无法发起对话',
-	}),
+	chat: () =>
+		buildGlmEnvPresetOptions(
+			'未配置 GLM_API_KEY，无法发起对话；可在设置页启用「自定义大模型配置」使用其它模型',
+		),
 
-	assistant: () => ({
-		apiKeyEnvKeys: [
-			ModelEnum.GLM_API_KEY,
-			ModelEnum.SILICONFLOW_API_KEY,
-			ModelEnum.DEEPSEEK_API_KEY,
-			KnowledgeQaEnum.DASHSCOPE_API_KEY,
-			ModelEnum.QWEN_API_KEY,
-		],
-		baseUrlEnvKeys: [
-			ModelEnum.GLM_BASE_URL,
-			ModelEnum.SILICONFLOW_BASE_URL,
-			ModelEnum.DEEPSEEK_BASE_URL,
-		],
-		resolveModelName: getAssistantSiliconFlowModelName,
-		missingApiKeyMessage:
-			'硅基流动未配置（SILICONFLOW_API_KEY，或兼容 DASHSCOPE_API_KEY / QWEN_API_KEY / DEEPSEEK_API_KEY），无法使用知识库助手',
-	}),
+	assistant: () =>
+		buildGlmEnvPresetOptions(
+			'未配置 GLM_API_KEY，无法使用知识库助手；可在设置页启用「自定义大模型配置」',
+		),
 
-	knowledgeQa: () => ({
-		apiKeyEnvKeys: [
-			ModelEnum.GLM_API_KEY,
-			ModelEnum.SILICONFLOW_API_KEY,
-			KnowledgeQaEnum.DASHSCOPE_API_KEY,
-			ModelEnum.QWEN_API_KEY,
-		],
-		baseUrlEnvKeys: [ModelEnum.GLM_BASE_URL, ModelEnum.SILICONFLOW_BASE_URL],
-		resolveModelName: (c) =>
-			resolveModelNameFromEnvKeys(c, [
-				ModelEnum.GLM_MODEL_NAME,
-				ModelEnum.SILICONFLOW_MODEL_NAME,
-				ModelEnum.DEEPSEEK_MODEL_NAME,
-				KnowledgeQaEnum.KNOWLEDGE_QA_MODEL,
-			]),
-		missingApiKeyMessage:
-			'硅基流动未配置（SILICONFLOW_API_KEY，或兼容 DASHSCOPE_API_KEY / QWEN_API_KEY），无法进行知识库问答',
-		onMissingApiKey: throwSiliconFlowError,
-	}),
+	knowledgeQa: () =>
+		buildGlmEnvPresetOptions(
+			'未配置 GLM_API_KEY，无法进行知识库问答；可在设置页启用「自定义大模型配置」',
+			throwSiliconFlowError,
+		),
 
-	englishLearning: () => ({
-		apiKeyEnvKeys: [
-			ModelEnum.GLM_API_KEY,
-			ModelEnum.SILICONFLOW_API_KEY,
-			ModelEnum.DEEPSEEK_API_KEY,
-			KnowledgeQaEnum.DASHSCOPE_API_KEY,
-		],
-		baseUrlEnvKeys: [
-			ModelEnum.GLM_BASE_URL,
-			ModelEnum.SILICONFLOW_BASE_URL,
-			ModelEnum.DEEPSEEK_BASE_URL,
-		],
-		resolveModelName: (c) =>
-			resolveModelNameFromEnvKeys(c, [
-				ModelEnum.GLM_MODEL_NAME,
-				ModelEnum.SILICONFLOW_MODEL_NAME,
-				ModelEnum.DEEPSEEK_MODEL_NAME,
-			]),
-		missingApiKeyMessage:
-			'硅基流动未配置（SILICONFLOW_API_KEY，或兼容 DEEPSEEK_API_KEY），无法生成学习内容',
-	}),
+	englishLearning: () =>
+		buildGlmEnvPresetOptions(
+			'未配置 GLM_API_KEY，无法生成学习内容；可在设置页启用「自定义大模型配置」',
+		),
+};
+
+const memberSiliconFlowResolvePresets: Record<
+	SiliconFlowLlmPreset,
+	(config: ConfigService) => ResolveSiliconFlowOptions
+> = {
+	chat: () =>
+		buildSiliconFlowEnvPresetOptions(
+			'未配置 SILICONFLOW_API_KEY，无法发起对话；可在设置页启用「自定义大模型配置」使用其它模型',
+		),
+
+	assistant: () =>
+		buildSiliconFlowEnvPresetOptions(
+			'未配置 SILICONFLOW_API_KEY，无法使用知识库助手；可在设置页启用「自定义大模型配置」',
+		),
+
+	knowledgeQa: () =>
+		buildSiliconFlowEnvPresetOptions(
+			'未配置 SILICONFLOW_API_KEY，无法进行知识库问答；可在设置页启用「自定义大模型配置」',
+			throwSiliconFlowError,
+		),
+
+	englishLearning: () =>
+		buildSiliconFlowEnvPresetOptions(
+			'未配置 SILICONFLOW_API_KEY，无法生成学习内容；可在设置页启用「自定义大模型配置」',
+		),
 };
 
 export function siliconFlowResolvePresetsForPreset(
@@ -223,13 +247,21 @@ export function siliconFlowResolvePresetsForPreset(
 	return siliconFlowResolvePresets[preset];
 }
 
+export function memberSiliconFlowResolvePresetsForPreset(
+	preset: SiliconFlowLlmPreset,
+): (config: ConfigService) => ResolveSiliconFlowOptions {
+	return memberSiliconFlowResolvePresets[preset];
+}
+
 /**
- * 创建硅基流动 ChatOpenAI 的统一入口。
- * - `preset`：选择凭证与模型名的解析策略（各业务 env 回退链不同）。
- * - 其余字段：透传为 ChatOpenAI 构造参数，由各调用方按原逻辑传入。
+ * 创建 ChatOpenAI 的统一入口。
+ * - 非会员默认 GLM_*；有效会员默认 SILICONFLOW_*；设置页自定义配置经 resolver 覆盖（优先级最高）。
+ * - `userId`：各调用方传入当前登录用户 ID，供 resolver 判定会员并选择默认 env 凭证。
  */
 export type CreateLlmOptions = {
 	preset: SiliconFlowLlmPreset;
+	/** 当前登录用户 ID，用于会员默认 SILICONFLOW 凭证 */
+	userId?: number;
 	/** 覆盖预设解析出的 modelName（如英语学习 summary 专用模型） */
 	modelName?: string;
 	streaming?: boolean;
@@ -247,13 +279,14 @@ export type CreateLlmOptions = {
 	modelKwargs?: Record<string, unknown>;
 };
 
-export function createLlm(
+export async function createLlm(
 	config: ConfigService,
 	options: CreateLlmOptions,
 	resolver?: LlmCredentialResolver,
-): ChatOpenAI {
+): Promise<ChatOpenAI> {
 	const {
 		preset,
+		userId,
 		modelName: modelNameOverride,
 		streaming = true,
 		temperature,
@@ -266,7 +299,7 @@ export function createLlm(
 	} = options;
 
 	const credentials = resolver
-		? resolver.resolveSiliconFlowCredentials(config, preset)
+		? await resolver.resolveSiliconFlowCredentials(config, preset, userId)
 		: resolveSiliconFlowCredentials(
 				config,
 				siliconFlowResolvePresets[preset](config),
@@ -275,12 +308,30 @@ export function createLlm(
 		credentials.modelName = modelNameOverride;
 	}
 
+	console.log(credentials, 'credentials');
+
 	const maxTokensField =
 		maxTokensPolicy === 'optional'
 			? maxTokens !== undefined
 				? { maxTokens }
 				: {}
 			: { maxTokens: maxTokens ?? defaultMaxTokens };
+
+	console.log(
+		{
+			apiKey: credentials.apiKey,
+			modelName: credentials.modelName,
+			streaming,
+			temperature: temperature ?? defaultTemperature,
+			...maxTokensField,
+			configuration: { baseURL: credentials.baseURL },
+			...(modelKwargs && { modelKwargs }),
+			...(abortSignal && {
+				callOptions: { signal: abortSignal },
+			}),
+		},
+		'createLlm',
+	);
 
 	return new ChatOpenAI({
 		apiKey: credentials.apiKey,

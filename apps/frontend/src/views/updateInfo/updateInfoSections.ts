@@ -462,6 +462,13 @@ const UPDATE_INFO_SECTIONS_ZH: UpdateInfoSection[] = [
 				description:
 					'Base URL 与模型名称支持在输入框内直接填写，也可通过右侧按钮选择硅基流动或 DeepSeek 预设并自动配对地址与模型；底部生效提示会显示当前模型名称；首次填写时若本地已配置默认 API Key 会自动填入（保存后仍以服务端记录为准）。',
 			},
+			{
+				id: 's9-5',
+				title: '大模型按账号配置与会员默认模型',
+				dateLabel: '2026-06-08',
+				description:
+					'设置页保存的大模型 API Key、Base URL 与模型名称按登录账号独立存储，不再全站共用。未开启自定义时，有效会员默认使用硅基流动模型，非会员默认使用智谱 GLM；预设增加智谱 GLM。切换 Base URL 或模型名称时会自动清空 API Key，避免误用其它服务商密钥。',
+			},
 		],
 	},
 	{

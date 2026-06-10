@@ -1,10 +1,10 @@
 import { Column, Entity, PrimaryColumn, UpdateDateColumn } from 'typeorm';
 
-/** 实例级硅基/OpenAI 兼容 LLM 运行时配置（单行 singleton） */
+/** 用户级 OpenAI 兼容 LLM 运行时配置（每用户一行） */
 @Entity('llm_runtime_config')
 export class LlmRuntimeConfig {
-	@PrimaryColumn({ type: 'int', default: 1 })
-	id!: number;
+	@PrimaryColumn({ name: 'user_id', type: 'int' })
+	userId!: number;
 
 	@Column({ type: 'boolean', default: false })
 	enabled!: boolean;
@@ -17,9 +17,6 @@ export class LlmRuntimeConfig {
 
 	@Column({ name: 'api_key_enc', type: 'text', nullable: true })
 	apiKeyEnc!: string | null;
-
-	@Column({ name: 'updated_by', type: 'int', nullable: true })
-	updatedBy!: number | null;
 
 	@UpdateDateColumn({ name: 'updated_at', type: 'timestamp' })
 	updatedAt!: Date;

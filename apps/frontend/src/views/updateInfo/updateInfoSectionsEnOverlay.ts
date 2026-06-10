@@ -315,6 +315,11 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'Base URL and model name accept direct typing or presets (SiliconFlow / DeepSeek) via the button beside the field; choosing one preset pairs the other field. The footer active hint shows the current model name. A local default API Key may pre-fill on first visit; after save, the server copy applies.',
 	},
+	's9-5': {
+		title: 'Per-account LLM settings and member defaults',
+		description:
+			'LLM API Key, Base URL, and model name in Settings are stored per signed-in account, not shared site-wide. Without custom config, active members default to SiliconFlow models and non-members to Zhipu GLM; presets include Zhipu GLM. Switching Base URL or model clears the API Key to avoid using the wrong provider key.',
+	},
 	's10-1': {
 		title: 'Image component improvements',
 		description:

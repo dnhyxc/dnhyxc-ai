@@ -1,7 +1,9 @@
 # 设置页大模型运行时配置（实例级覆盖 `createLlm`）
 
 > **文档角色**：本轮在设置中新增「大模型」页，服务端持久化 API Key / Base URL / 模型名，并在 `createLlm` 解析时优先于 `.env` preset 回退链。  
-> **延伸阅读**：[create-llm.md](./create-llm.md)（工厂与 preset）、[siliconflow-chat-unification.md](./siliconflow-chat-unification.md)（硅基接入背景）。
+> **延伸阅读**：[membership-per-user-llm.md](./membership-per-user-llm.md)（**按用户配置 + 会员默认硅基/非会员 GLM**，当前主文档）、[create-llm.md](./create-llm.md)（工厂与 preset）、[siliconflow-chat-unification.md](./siliconflow-chat-unification.md)（硅基接入背景）。
+
+> **注意**：下文「单行 singleton / 全站共用」描述已被 [membership-per-user-llm.md](./membership-per-user-llm.md) 取代；请以该文为准。
 
 若与仓库最新源码不一致，**以源码为准**。
 

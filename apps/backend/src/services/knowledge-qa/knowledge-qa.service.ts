@@ -69,12 +69,14 @@ export class KnowledgeQaService {
 			temperature?: number;
 			maxTokens?: number;
 		},
+		userId?: number,
 		signal?: AbortSignal,
 	): AsyncGenerator<string> {
-		const llm = createLlm(
+		const llm = await createLlm(
 			this.config,
 			{
 				preset: 'knowledgeQa',
+				userId,
 				temperature: input.temperature,
 				maxTokens: input.maxTokens,
 				defaultTemperature: 0.2,
@@ -220,6 +222,7 @@ export class KnowledgeQaService {
 							temperature: 0.2,
 							maxTokens: 4096,
 						},
+						input.authorId,
 						abortController.signal,
 					)) {
 						if (text) subscriber.next({ type: 'qa.delta', content: text });

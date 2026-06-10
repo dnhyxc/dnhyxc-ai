@@ -5,6 +5,7 @@ import {
 	Get,
 	Put,
 	Req,
+	UnauthorizedException,
 	UseGuards,
 	UseInterceptors,
 } from '@nestjs/common';
@@ -14,6 +15,16 @@ import { ResponseInterceptor } from '../../interceptors/response.interceptor';
 import { UpsertLlmConfigDto } from './dto/upsert-llm-config.dto';
 import { LlmConfigService } from './llm-config.service';
 
+type AuthedRequest = Request & { user?: { userId?: number } };
+
+function requireUserId(req: AuthedRequest): number {
+	const userId = req.user?.userId;
+	if (userId == null || !Number.isFinite(userId) || userId <= 0) {
+		throw new UnauthorizedException('请先登录后再试');
+	}
+	return userId;
+}
+
 @Controller('settings/llm')
 @UseGuards(JwtGuard)
 @UseInterceptors(ResponseInterceptor)
@@ -21,8 +32,8 @@ export class LlmConfigController {
 	constructor(private readonly llmConfigService: LlmConfigService) {}
 
 	@Get()
-	getConfig() {
-		return this.llmConfigService.getPublicView();
+	getConfig(@Req() req: AuthedRequest) {
+		return this.llmConfigService.getPublicView(requireUserId(req));
 	}
 
 	@Get('defaults')
@@ -33,22 +44,12 @@ export class LlmConfigController {
 	}
 
 	@Put()
-	update(@Body() dto: UpsertLlmConfigDto, @Req() req: Request) {
-		const userId =
-			typeof (req as Request & { user?: { userId?: number } }).user?.userId ===
-			'number'
-				? (req as Request & { user: { userId: number } }).user.userId
-				: undefined;
-		return this.llmConfigService.upsert(dto, userId);
+	update(@Body() dto: UpsertLlmConfigDto, @Req() req: AuthedRequest) {
+		return this.llmConfigService.upsert(dto, requireUserId(req));
 	}
 
 	@Delete()
-	clear(@Req() req: Request) {
-		const userId =
-			typeof (req as Request & { user?: { userId?: number } }).user?.userId ===
-			'number'
-				? (req as Request & { user: { userId: number } }).user.userId
-				: undefined;
-		return this.llmConfigService.clear(userId);
+	clear(@Req() req: AuthedRequest) {
+		return this.llmConfigService.clear(requireUserId(req));
 	}
 }

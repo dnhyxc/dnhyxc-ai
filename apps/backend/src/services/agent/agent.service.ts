@@ -328,15 +328,19 @@ export class AgentService {
 	 * 构建主模型与摘要模型（preset `chat`：与主站对话共用凭证与模型名）
 	 * @param options maxTokens|temperature|signal
 	 */
-	private buildModels(options: {
-		maxTokens?: number;
-		temperature?: number;
-		signal?: AbortSignal;
-	}): { main: ChatOpenAI; summary: ChatOpenAI } {
-		const main = createLlm(
+	private async buildModels(
+		userId: number,
+		options: {
+			maxTokens?: number;
+			temperature?: number;
+			signal?: AbortSignal;
+		},
+	): Promise<{ main: ChatOpenAI; summary: ChatOpenAI }> {
+		const main = await createLlm(
 			this.configService,
 			{
 				preset: 'chat',
+				userId,
 				streaming: true,
 				temperature: options.temperature,
 				defaultTemperature: 0.3,
@@ -347,10 +351,11 @@ export class AgentService {
 			},
 			this.llmConfigService,
 		);
-		const summary = createLlm(
+		const summary = await createLlm(
 			this.configService,
 			{
 				preset: 'chat',
+				userId,
 				streaming: false,
 				temperature: 0.2,
 				maxTokens: 2048,
@@ -519,11 +524,14 @@ export class AgentService {
 			);
 
 			// （6）构建主模型与摘要模型
-			const { main: mainLlm, summary: summaryLlm } = this.buildModels({
-				maxTokens: dto.maxTokens,
-				temperature: dto.temperature,
-				signal: abortController.signal,
-			});
+			const { main: mainLlm, summary: summaryLlm } = await this.buildModels(
+				userId,
+				{
+					maxTokens: dto.maxTokens,
+					temperature: dto.temperature,
+					signal: abortController.signal,
+				},
+			);
 
 			// （7）拼装工具集（见 agent-langchain-tools.ts）
 			const tools = buildAgentLangChainTools(

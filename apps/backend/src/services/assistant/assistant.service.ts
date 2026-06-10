@@ -141,11 +141,12 @@ export class AssistantService {
 		return false;
 	}
 
-	/** 助手流式模型名（硅基流动；用于 token 预算推断） */
-	private getGlmModelName(): string {
+	/** 助手流式模型名（用于 token 预算推断） */
+	private async getGlmModelName(userId?: number): Promise<string> {
 		return getAssistantSiliconFlowModelName(
 			this.configService,
 			this.llmConfigService,
+			userId,
 		);
 	}
 
@@ -205,6 +206,7 @@ export class AssistantService {
 			content: string;
 		}>;
 		dto: AssistantChatDto;
+		userId?: number;
 		abortController: AbortController;
 		shouldAbort: () => Promise<boolean>;
 		onContentDelta?: (text: string) => void;
@@ -213,15 +215,17 @@ export class AssistantService {
 			subscriber,
 			requestMessages,
 			dto,
+			userId,
 			abortController,
 			shouldAbort,
 			onContentDelta,
 		} = params;
 
-		const llm = createLlm(
+		const llm = await createLlm(
 			this.configService,
 			{
 				preset: 'assistant',
+				userId,
 				temperature: dto.temperature ?? 0.3,
 				maxTokens: dto.maxTokens ?? 4096,
 				defaultTemperature: 0.3,
@@ -284,8 +288,11 @@ export class AssistantService {
 	 * 模型最大输入 − 本次 max_tokens（输出占用）− system/结构预留；
 	 * 若配置了 ASSISTANT_MAX_CONTEXT_TOKENS，则再与上述结果取 min（不超过模型官方上限）。
 	 */
-	private getHistoryTurnBudgetTokens(dto: AssistantChatDto): number {
-		const modelName = this.getGlmModelName();
+	private async getHistoryTurnBudgetTokens(
+		dto: AssistantChatDto,
+		userId?: number,
+	): Promise<number> {
+		const modelName = await this.getGlmModelName(userId);
 		let inputCap = this.getModelOfficialMaxInputTokens(modelName);
 
 		const clampRaw = this.configService.get<string>(
@@ -678,7 +685,7 @@ export class AssistantService {
 	): Promise<void> {
 		const { streamId, userId } = options;
 		const allTurns = this.buildEphemeralTurns(dto);
-		const budget = this.getHistoryTurnBudgetTokens(dto);
+		const budget = await this.getHistoryTurnBudgetTokens(dto, userId);
 		let contextTurns = takeRecentMessagesWithinTokenBudget(allTurns, budget);
 		if (contextTurns.length === 0 && allTurns.length > 0) {
 			const last = allTurns[allTurns.length - 1]!;
@@ -704,6 +711,7 @@ export class AssistantService {
 				subscriber,
 				requestMessages,
 				dto,
+				userId,
 				abortController,
 				shouldAbort: async () => {
 					const curEpoch = await this.getEphemeralStreamEpoch(userId, streamId);
@@ -976,7 +984,7 @@ export class AssistantService {
 						dto.extraUserContentForModel,
 					);
 
-					const budget = this.getHistoryTurnBudgetTokens(dto);
+					const budget = await this.getHistoryTurnBudgetTokens(dto, userId);
 					let contextTurns = takeRecentMessagesWithinTokenBudget(
 						allTurnsForModel,
 						budget,
@@ -1012,6 +1020,7 @@ export class AssistantService {
 						subscriber,
 						requestMessages,
 						dto,
+						userId,
 						abortController,
 						shouldAbort: async () => {
 							const curEpoch = await this.getStreamEpoch(sessionId!);

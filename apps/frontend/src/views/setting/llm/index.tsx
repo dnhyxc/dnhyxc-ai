@@ -4,22 +4,88 @@ import { Spinner, Switch, Toast } from '@ui/index';
 import { Input } from '@ui/input';
 import { Label } from '@ui/label';
 import { Eye, EyeOff } from 'lucide-react';
+import { observer } from 'mobx-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import {
 	clearLlmSettings,
 	getLlmSettings,
-	getLlmSettingsDefaults,
 	type LlmSettingsView,
 	updateLlmSettings,
 } from '@/service/llmSettings';
+import useStore from '@/store';
 
 const fieldInputClass =
 	'flex-1 min-w-0 border border-theme/20 bg-transparent shadow-none focus-visible:ring-0 focus-visible:border-theme/40';
 
+function readEnvTrimmed(key: keyof ImportMetaEnv): string {
+	const raw = import.meta.env[key];
+	return typeof raw === 'string' ? raw.trim() : '';
+}
+
+function readEnvGlmBaseUrl(): string {
+	return (
+		readEnvTrimmed('VITE_GLM_BASE_URL') ||
+		'https://open.bigmodel.cn/api/paas/v4'
+	);
+}
+
+function readEnvGlmModelName(): string {
+	return readEnvTrimmed('VITE_GLM_MODEL_NAME') || 'glm-4.7-flash';
+}
+
+function readEnvSiliconflowBaseUrl(): string {
+	return (
+		readEnvTrimmed('VITE_SILICONFLOW_BASE_URL') ||
+		'https://api.siliconflow.cn/v1'
+	);
+}
+
+function readEnvSiliconflowModelName(): string {
+	return readEnvTrimmed('VITE_SILICONFLOW_MODEL_NAME') || 'Pro/zai-org/GLM-4.7';
+}
+
+/** 与后端 UserService.isMembershipActive 对齐 */
+function isMembershipActiveFromUserInfo(u: object): boolean {
+	const r = u as Record<string, unknown>;
+	if (r.isMember !== true) return false;
+	const expiresRaw = r.memberExpiresAt ?? r.memberExpireAt;
+	if (expiresRaw == null || String(expiresRaw).trim() === '') return true;
+	const exp = new Date(String(expiresRaw));
+	return !Number.isNaN(exp.getTime()) && exp.getTime() > Date.now();
+}
+
+type LlmProviderDefaults = {
+	baseUrl: string;
+	modelName: string;
+	apiKey: string;
+};
+
+/** 有效会员默认硅基流动，否则默认 GLM（与后端 createLlm 一致） */
+function getProviderDefaults(isMember: boolean): LlmProviderDefaults {
+	if (isMember) {
+		return {
+			baseUrl: readEnvSiliconflowBaseUrl(),
+			modelName: readEnvSiliconflowModelName(),
+			apiKey: readEnvSiliconflowApiKey(),
+		};
+	}
+	return {
+		baseUrl: readEnvGlmBaseUrl(),
+		modelName: readEnvGlmModelName(),
+		apiKey: readEnvGlmApiKey(),
+	};
+}
+
 /** 服务商联动预设：选 Base URL 或模型名称中的任一项时，另一项同步为配对值 */
 const LLM_PROVIDER_PRESETS = [
+	{
+		baseUrl: readEnvGlmBaseUrl(),
+		modelName: readEnvGlmModelName(),
+		baseUrlLabelKey: 'setting.llm.baseUrlOption.glm' as const,
+		modelLabelKey: 'setting.llm.modelOption.glmFlash' as const,
+	},
 	{
 		baseUrl: 'https://api.siliconflow.cn/v1',
 		modelName: 'Pro/zai-org/GLM-4.7',
@@ -33,9 +99,6 @@ const LLM_PROVIDER_PRESETS = [
 		modelLabelKey: 'setting.llm.modelOption.deepseekChat' as const,
 	},
 ] as const;
-
-const DEFAULT_LLM_BASE_URL = LLM_PROVIDER_PRESETS[0].baseUrl;
-const DEFAULT_LLM_MODEL = LLM_PROVIDER_PRESETS[0].modelName;
 
 const LLM_BASE_URL_TO_MODEL: ReadonlyMap<string, string> = new Map(
 	LLM_PROVIDER_PRESETS.map((p) => [p.baseUrl, p.modelName]),
@@ -51,14 +114,17 @@ function resolveTextField(raw: string | undefined, fallback: string): string {
 }
 
 function readEnvSiliconflowApiKey(): string {
-	const raw = import.meta.env.VITE_SILICONFLOW_API_KEY;
-	return typeof raw === 'string' ? raw.trim() : '';
+	return readEnvTrimmed('VITE_SILICONFLOW_API_KEY');
 }
 
-/** 未在服务端保存 API Key 时，回显 .env 中的 VITE_SILICONFLOW_API_KEY */
-const DEFAULT_LLM_API_KEY = readEnvSiliconflowApiKey();
+function readEnvGlmApiKey(): string {
+	return readEnvTrimmed('VITE_GLM_API_KEY');
+}
 
-function resolveApiKeyFields(savedFromServer: string | undefined | null): {
+function resolveApiKeyFields(
+	savedFromServer: string | undefined | null,
+	defaultApiKey: string,
+): {
 	displayKey: string;
 	savedKey: string;
 } {
@@ -67,20 +133,29 @@ function resolveApiKeyFields(savedFromServer: string | undefined | null): {
 		return { displayKey: saved, savedKey: saved };
 	}
 	return {
-		displayKey: DEFAULT_LLM_API_KEY,
+		displayKey: defaultApiKey,
 		savedKey: '',
 	};
 }
 
-const LlmSetting = () => {
+const LlmSetting = observer(() => {
 	const { t } = useI18n();
+	const { userStore } = useStore();
+	const isMember = useMemo(
+		() => isMembershipActiveFromUserInfo(userStore.userInfo),
+		[userStore.userInfo],
+	);
+	const providerDefaults = useMemo(
+		() => getProviderDefaults(isMember),
+		[isMember],
+	);
 	const [loading, setLoading] = useState(true);
 	const [saving, setSaving] = useState(false);
 	const [view, setView] = useState<LlmSettingsView | null>(null);
 	const [enabled, setEnabled] = useState(false);
-	const [baseUrl, setBaseUrl] = useState<string>(DEFAULT_LLM_BASE_URL);
-	const [modelName, setModelName] = useState<string>(DEFAULT_LLM_MODEL);
-	const [apiKey, setApiKey] = useState(DEFAULT_LLM_API_KEY);
+	const [baseUrl, setBaseUrl] = useState(providerDefaults.baseUrl);
+	const [modelName, setModelName] = useState(providerDefaults.modelName);
+	const [apiKey, setApiKey] = useState(providerDefaults.apiKey);
 	const [savedApiKey, setSavedApiKey] = useState('');
 	const [showApiKey, setShowApiKey] = useState(false);
 
@@ -102,35 +177,51 @@ const LlmSetting = () => {
 		[t],
 	);
 
-	const onBaseUrlChange = useCallback((next: string) => {
-		setBaseUrl(next);
-		const pairedModel = LLM_BASE_URL_TO_MODEL.get(next.trim());
-		if (pairedModel) setModelName(pairedModel);
+	const resetApiKey = useCallback(() => {
+		setApiKey('');
+		setSavedApiKey('');
+		setShowApiKey(false);
 	}, []);
 
-	const onModelNameChange = useCallback((next: string) => {
-		setModelName(next);
-		const pairedBase = LLM_MODEL_TO_BASE_URL.get(next.trim());
-		if (pairedBase) setBaseUrl(pairedBase);
-	}, []);
+	const onBaseUrlChange = useCallback(
+		(next: string) => {
+			if (next.trim() === baseUrl.trim()) return;
+			setBaseUrl(next);
+			resetApiKey();
+			const pairedModel = LLM_BASE_URL_TO_MODEL.get(next.trim());
+			if (pairedModel) setModelName(pairedModel);
+		},
+		[baseUrl, resetApiKey],
+	);
+
+	const onModelNameChange = useCallback(
+		(next: string) => {
+			if (next.trim() === modelName.trim()) return;
+			setModelName(next);
+			resetApiKey();
+			const pairedBase = LLM_MODEL_TO_BASE_URL.get(next.trim());
+			if (pairedBase) setBaseUrl(pairedBase);
+		},
+		[modelName, resetApiKey],
+	);
 
 	const load = useCallback(async () => {
 		setLoading(true);
 		try {
-			const [res, defaultsRes] = await Promise.all([
-				getLlmSettings(),
-				getLlmSettingsDefaults(),
-			]);
+			const [res] = await Promise.all([getLlmSettings()]);
 			if (res.success && res.data) {
 				setView(res.data);
 				setEnabled(res.data.enabled);
-				const fallbackBase =
-					defaultsRes.success && defaultsRes.data?.baseUrl
-						? defaultsRes.data.baseUrl
-						: DEFAULT_LLM_BASE_URL;
-				setBaseUrl(resolveTextField(res.data.baseUrl, fallbackBase));
-				setModelName(resolveTextField(res.data.modelName, DEFAULT_LLM_MODEL));
-				const { displayKey, savedKey } = resolveApiKeyFields(res.data.apiKey);
+				setBaseUrl(
+					resolveTextField(res.data.baseUrl, providerDefaults.baseUrl),
+				);
+				setModelName(
+					resolveTextField(res.data.modelName, providerDefaults.modelName),
+				);
+				const { displayKey, savedKey } = resolveApiKeyFields(
+					res.data.apiKey,
+					providerDefaults.apiKey,
+				);
 				setSavedApiKey(savedKey);
 				setApiKey(displayKey);
 				setShowApiKey(false);
@@ -138,7 +229,7 @@ const LlmSetting = () => {
 		} finally {
 			setLoading(false);
 		}
-	}, []);
+	}, [providerDefaults]);
 
 	useEffect(() => {
 		void load();
@@ -165,7 +256,10 @@ const LlmSetting = () => {
 			});
 			if (res.success && res.data) {
 				setView(res.data);
-				const { displayKey, savedKey } = resolveApiKeyFields(res.data.apiKey);
+				const { displayKey, savedKey } = resolveApiKeyFields(
+					res.data.apiKey,
+					providerDefaults.apiKey,
+				);
 				setSavedApiKey(savedKey);
 				setApiKey(displayKey);
 				setShowApiKey(false);
@@ -186,10 +280,10 @@ const LlmSetting = () => {
 			if (res.success && res.data) {
 				setView(res.data);
 				setEnabled(false);
-				setBaseUrl(DEFAULT_LLM_BASE_URL);
-				setModelName(DEFAULT_LLM_MODEL);
+				setBaseUrl(providerDefaults.baseUrl);
+				setModelName(providerDefaults.modelName);
 				setSavedApiKey('');
-				setApiKey(DEFAULT_LLM_API_KEY);
+				setApiKey(providerDefaults.apiKey);
 				setShowApiKey(false);
 				Toast({
 					type: 'success',
@@ -375,6 +469,6 @@ const LlmSetting = () => {
 			</div>
 		</div>
 	);
-};
+});
 
 export default LlmSetting;

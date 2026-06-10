@@ -1387,10 +1387,11 @@ export class EnglishLearningService {
 
 		try {
 			// 主检索为单次会话，消息量通常达不到摘要中间件触发阈值；不设 summarization，避免误用 AgentMemory 的 token 估算与副模型调用
-			const mainLlm = createLlm(
+			const mainLlm = await createLlm(
 				this.configService,
 				{
 					preset: 'englishLearning',
+					userId,
 					maxTokens: 8192,
 					temperature: 0.35,
 					defaultTemperature: 0.35,
@@ -2498,6 +2499,7 @@ ${existingHintBlock}
 		system: string;
 		user: string;
 		maxTokens: number;
+		userId?: number;
 		priorThread?: BaseMessage[];
 		/** 与 SSE / 显式 cancel 联动，中止子模型 HTTP 请求 */
 		signal?: AbortSignal;
@@ -2511,10 +2513,11 @@ ${existingHintBlock}
 			32768,
 			Math.max(4096, Math.floor(params.maxTokens)),
 		);
-		const llm = createLlm(
+		const llm = await createLlm(
 			this.configService,
 			{
 				preset: 'englishLearning',
+				userId: params.userId,
 				streaming: false,
 				temperature: 0.35,
 				defaultTemperature: 0.35,
@@ -2786,6 +2789,7 @@ ${existingHintBlock}
 								system: systemThisRound,
 								user: userForModel,
 								maxTokens: maxTok,
+								userId: context?.userId,
 								priorThread:
 									context?.userId != null ? packAgentThread : undefined,
 								signal: context?.signal,
@@ -3162,6 +3166,7 @@ ${existingHintBlock}
 								system: systemThisRound,
 								user: userForModel,
 								maxTokens: maxTok,
+								userId: context?.userId,
 								priorThread:
 									context?.userId != null ? packAgentThread : undefined,
 								signal: context?.signal,
