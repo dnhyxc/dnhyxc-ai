@@ -81,7 +81,7 @@ export function hasValidAuthToken(): boolean {
 实现要点：
 
 - **`handlingUnauthorized`**：短时间内防重复进入（避免连续 401 多次 `replace`）。
-- **同步**删除 `localStorage` 的 `token`、`userInfo`，并 `dispatchEvent('userInfoChanged')`，保证与 `useStorageInfo` 等监听一致；**避免**先 `replace` 再异步清理导致清理未执行完。
+- **同步**删除 `localStorage` 的 `token`、`userInfo`，调用 **`resetUserState()`** 清空与用户绑定的前端 MobX 缓存（知识库草稿、助手对话、英语 Agent 等，详见 [user-switch-state-reset.md](./user-switch-state-reset.md)），并 `dispatchEvent('userInfoChanged')`，保证与 `useStorageInfo` 等监听一致；**避免**先 `replace` 再异步清理导致清理未执行完。
 - **`http.setAuthToken('')`、`userStore.clearUserInfo()`** 使用 **动态 `import()`**，减轻与 `fetch` / `store` 的静态循环依赖风险。
 - **仅在「当前路径需要登录」且非 `/login`** 时 `window.location.replace('/login')`：用户在**公开首页** `/` 上某接口 401 时，只清会话、**不**强制跳登录页。
 
@@ -89,6 +89,7 @@ export function hasValidAuthToken(): boolean {
 // apps/frontend/src/router/authSession.ts
 
 import { requiresAuthForPath } from "@/router/authPaths";
+import { resetUserState } from "@/store/resetUserState";
 
 let handlingUnauthorized = false;
 
@@ -102,6 +103,7 @@ export function notifyUnauthorized(): void {
 	// 须同步清理，避免随后 location.replace 导致异步任务未执行完
 	localStorage.removeItem("token");
 	localStorage.removeItem("userInfo");
+	resetUserState();
 	window.dispatchEvent(new Event("userInfoChanged"));
 
 	void import("@/utils/fetch").then(({ http }) => http.setAuthToken(""));

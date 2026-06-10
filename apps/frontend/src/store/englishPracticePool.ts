@@ -54,6 +54,12 @@ export function getEnglishPracticePoolTitle(key: string): string | undefined {
 	return titles.get(key);
 }
 
+/** 切换账号时清空练习页标题/总量缓存 */
+export function clearEnglishPracticePoolCache(): void {
+	totals.clear();
+	titles.clear();
+}
+
 export function resolveEnglishPracticePoolKey(params: {
 	contentKind?: PracticeContentKind;
 	source: PracticeSource;

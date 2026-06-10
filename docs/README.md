@@ -53,6 +53,7 @@
 | 云端朗读 404 / MiniMax 502 余额不足 | [english/minimax-cloud-tts.md](./english/minimax-cloud-tts.md) §12 |
 | 设置页云端朗读参数不生效 / 改音色仍播旧音 | [english/cloud-tts-settings.md](./english/cloud-tts-settings.md) §5–§6 |
 | 支付成功但资料页仍非会员 / 到期仍显示会员 | [pay/stripe-membership-billing.md](./pay/stripe-membership-billing.md) §6–§7 |
+| 换号后仍看到上一账号的草稿或助手对话 | [app/user-switch-state-reset.md](./app/user-switch-state-reset.md) |
 
 ---
 

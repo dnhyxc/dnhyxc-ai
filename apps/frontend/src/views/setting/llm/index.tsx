@@ -342,6 +342,42 @@ const LlmSetting = observer(() => {
 							</div>
 
 							<div className="mt-3.5 flex flex-col gap-4 px-8.5 text-sm">
+								<div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+									<Label htmlFor="llm-base-url" className="shrink-0 sm:w-15">
+										{t('setting.llm.baseUrl')}
+									</Label>
+									<div className="min-w-0 flex-1">
+										<CreatableCombobox
+											id="llm-base-url"
+											value={baseUrl}
+											onChange={onBaseUrlChange}
+											options={baseUrlOptions}
+											placeholder={t('setting.llm.baseUrlPlaceholder')}
+											presetsAriaLabel={t('setting.llm.openPresets')}
+											disabled={!enabled || saving}
+											inputClassName={fieldInputClass}
+										/>
+									</div>
+								</div>
+
+								<div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+									<Label htmlFor="llm-model" className="shrink-0 sm:w-15">
+										{t('setting.llm.modelName')}
+									</Label>
+									<div className="min-w-0 flex-1">
+										<CreatableCombobox
+											id="llm-model"
+											value={modelName}
+											onChange={onModelNameChange}
+											options={modelOptions}
+											placeholder={t('setting.llm.modelNamePlaceholder')}
+											presetsAriaLabel={t('setting.llm.openPresets')}
+											disabled={!enabled || saving}
+											inputClassName={fieldInputClass}
+										/>
+									</div>
+								</div>
+
 								<div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:gap-4">
 									<Label
 										htmlFor="llm-api-key"
@@ -379,42 +415,6 @@ const LlmSetting = observer(() => {
 												<Eye className="size-4" aria-hidden />
 											)}
 										</Button>
-									</div>
-								</div>
-
-								<div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
-									<Label htmlFor="llm-base-url" className="shrink-0 sm:w-15">
-										{t('setting.llm.baseUrl')}
-									</Label>
-									<div className="min-w-0 flex-1">
-										<CreatableCombobox
-											id="llm-base-url"
-											value={baseUrl}
-											onChange={onBaseUrlChange}
-											options={baseUrlOptions}
-											placeholder={t('setting.llm.baseUrlPlaceholder')}
-											presetsAriaLabel={t('setting.llm.openPresets')}
-											disabled={!enabled || saving}
-											inputClassName={fieldInputClass}
-										/>
-									</div>
-								</div>
-
-								<div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
-									<Label htmlFor="llm-model" className="shrink-0 sm:w-15">
-										{t('setting.llm.modelName')}
-									</Label>
-									<div className="min-w-0 flex-1">
-										<CreatableCombobox
-											id="llm-model"
-											value={modelName}
-											onChange={onModelNameChange}
-											options={modelOptions}
-											placeholder={t('setting.llm.modelNamePlaceholder')}
-											presetsAriaLabel={t('setting.llm.openPresets')}
-											disabled={!enabled || saving}
-											inputClassName={fieldInputClass}
-										/>
 									</div>
 								</div>
 							</div>

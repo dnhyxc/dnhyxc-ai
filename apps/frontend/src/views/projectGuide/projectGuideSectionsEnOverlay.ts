@@ -202,6 +202,12 @@ export const PROJECT_GUIDE_ITEMS_EN: Record<
 		description:
 			'Ask the model for conclusions, key points, and todos; paste into Knowledge; add your context and final decisions.',
 	},
+	'pg-s9-4': {
+		title:
+			'9.4 Will I still see the previous account’s content after switching?',
+		description:
+			'No—in the same browser tab without a full reload. When you sign out, sign in with another account, or the session is cleared after 401, client-side display cache for the previous account is reset (unsaved knowledge drafts, document assistant and RAG chats, English Agent threads, in-progress vocabulary/classic streams, etc.). Updating profile or membership for the same user does not clear your work. If something looks wrong, refresh or sign in again.',
+	},
 	'pg-s10-1': {
 		title: 'Terms',
 		description:

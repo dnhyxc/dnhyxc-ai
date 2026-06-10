@@ -512,6 +512,35 @@ class EnglishPack {
 			this.classicAbort = null;
 		});
 	}
+
+	/** 切换账号：中止流式任务并清空跨路由 UI 状态 */
+	resetOnUserSwitch(): void {
+		this.vocabAbort?.(true);
+		this.classicAbort?.(true);
+		runInAction(() => {
+			this.vocabStreamGenId = 0;
+			this.vocabLoading = false;
+			this.vocabProgress = null;
+			this.vocabItems = [];
+			this.vocabAgentToolLine = null;
+			this.vocabMasterSearchOrganic = [];
+			this.vocabAbort = null;
+			this.vocabActiveStreamId = null;
+			this.classicStreamGenId = 0;
+			this.classicLoading = false;
+			this.classicProgress = null;
+			this.classicItems = [];
+			this.classicAgentToolLine = null;
+			this.classicMasterSearchOrganic = [];
+			this.classicAbort = null;
+			this.classicActiveStreamId = null;
+			this.sidebarIntentPrefix = '';
+			this.vocabTopic = '';
+			this.vocabCountInput = '';
+			this.classicTopic = '';
+			this.classicCountInput = '';
+		});
+	}
 }
 
 // 单例导出，始终唯一

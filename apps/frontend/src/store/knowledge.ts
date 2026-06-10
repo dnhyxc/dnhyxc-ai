@@ -14,7 +14,7 @@ import type {
 	KnowledgeTrashListItem,
 } from '@/types';
 import type { SaveKnowledgeMarkdownPayload } from '@/utils/knowledge-save';
-import userStore from './user';
+import { getLoggedInUserId } from './loggedInUserId';
 
 const DEFAULT_PAGE_SIZE = 20;
 /** 距底部小于该像素时触发加载下一页 */
@@ -336,7 +336,8 @@ class KnowledgeStore {
 	};
 
 	async fetchPage(page: number, append: boolean): Promise<void> {
-		if (!userStore.userInfo.id) {
+		const authorId = getLoggedInUserId();
+		if (!authorId) {
 			return Toast({
 				type: 'error',
 				title: '请先登录',
@@ -352,7 +353,7 @@ class KnowledgeStore {
 				pageNo: page,
 				pageSize: this.pageSize,
 				title: this.titleKeyword.trim() || undefined,
-				authorId: userStore.userInfo.id,
+				authorId,
 			});
 			if (!res.success || !res.data) {
 				return;
@@ -376,7 +377,8 @@ class KnowledgeStore {
 	}
 
 	async fetchTrashPage(page: number, append: boolean): Promise<void> {
-		if (!userStore.userInfo.id) {
+		const authorId = getLoggedInUserId();
+		if (!authorId) {
 			return Toast({
 				type: 'error',
 				title: '请先登录',
@@ -392,7 +394,7 @@ class KnowledgeStore {
 				pageNo: page,
 				pageSize: this.trashPageSize,
 				title: this.trashTitleKeyword.trim() || undefined,
-				authorId: userStore.userInfo.id,
+				authorId,
 			});
 			if (!res.success || !res.data) {
 				return;
@@ -427,7 +429,7 @@ class KnowledgeStore {
 
 	/** 拉取单条详情（含正文），用于点击列表进入编辑 */
 	async fetchDetail(id: string): Promise<KnowledgeRecord | null> {
-		if (!userStore.userInfo.id) {
+		if (!getLoggedInUserId()) {
 			return null;
 		}
 		const res = await getKnowledgeDetail(id);
@@ -497,6 +499,18 @@ class KnowledgeStore {
 		this.titleKeyword = '';
 		this.loading = false;
 		this.loadingMore = false;
+	}
+
+	/** 切换账号：清空编辑器草稿与列表/回收站缓存 */
+	resetOnUserSwitch(): void {
+		this.clearKnowledgeDraft();
+		this.reset();
+		this.trashList = [];
+		this.trashTotal = 0;
+		this.trashPageNo = 1;
+		this.trashTitleKeyword = '';
+		this.trashLoading = false;
+		this.trashLoadingMore = false;
 	}
 }
 

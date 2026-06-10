@@ -123,6 +123,8 @@ export interface AssistantStoreApi {
 		options?: { extraUserContentForModel?: string },
 	): Promise<void>;
 	stopGenerating(): Promise<void>;
+	/** 切换账号：中止全部助手 SSE 并清空内存会话 */
+	resetOnUserSwitch(): void;
 
 	isStreamingForDocumentKey(documentKey: string): boolean;
 	scheduleEphemeralFlushAfterStreaming(
@@ -1744,6 +1746,31 @@ export class AssistantStore {
 		} catch {
 			// 无进行中时后端返回失败，忽略
 		}
+	}
+
+	/** 切换账号：中止全部 SSE，清空文档/会话维度的内存状态 */
+	resetOnUserSwitch(): void {
+		for (const state of Object.values(this.stateByDocument)) {
+			this.stopStreamingForDocumentState(state, {
+				stopBackend: false,
+				markStopped: true,
+			});
+		}
+		for (const state of Object.values(this.stateBySession)) {
+			state.abortStream?.();
+		}
+		runInAction(() => {
+			this.activeDocumentKey = '';
+			this.stateByDocument = {};
+			this.sessionByDocument = {};
+			this.activeSessionByDocument = {};
+			this.sessionsByDocument = {};
+			this.sessionsPageByDocument = {};
+			this.historySessionLoadingByDocument = {};
+			this.historySessionLoadingMoreByDocument = {};
+			this.stateBySession = {};
+			this.knowledgeAssistantPersistenceAllowed = true;
+		});
 	}
 }
 

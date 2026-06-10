@@ -1,4 +1,5 @@
 import { requiresAuthForPath } from '@/router/authPaths';
+import { resetUserState } from '@/store/resetUserState';
 
 let handlingUnauthorized = false;
 
@@ -12,6 +13,7 @@ export function notifyUnauthorized(): void {
 	// 须同步清理，避免随后 location.replace 导致异步任务未执行完
 	localStorage.removeItem('token');
 	localStorage.removeItem('userInfo');
+	resetUserState();
 	window.dispatchEvent(new Event('userInfoChanged'));
 
 	void import('@/utils/fetch').then(({ http }) => http.setAuthToken(''));

@@ -74,6 +74,11 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'After sign-in, open /pay to choose Monthly (¥9.9), Quarterly (¥25.9), or Annual (¥99.9)—fixed prices, not editable—via Stripe embedded checkout. Successful payment activates or extends membership (stacked from the current expiry) and redirects to /profile for badge and validity. When membership expires, profile/login reflects non-member state with upgrade guidance.',
 	},
+	's2-6': {
+		title: 'Clear local cache on account switch',
+		description:
+			'When you sign out, sign in with another account, or the session ends with 401 in the same browser tab, client-side display cache for the previous account is cleared—including unsaved knowledge drafts, document assistant and RAG chats, English learning Agent threads, and in-progress vocabulary/classic streams—so you do not see another user’s content. Updating profile or membership for the same user id does not trigger a reset.',
+	},
 	's3-1': {
 		title: 'One frontend for desktop and browser',
 		description:

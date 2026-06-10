@@ -2,7 +2,8 @@ import { makeAutoObservable } from 'mobx';
 
 import { getStorage, removeStorage, setStorage } from '@/utils';
 
-const USER_INFO_STORAGE_KEY = 'userInfo';
+import { USER_INFO_STORAGE_KEY } from './loggedInUserId';
+import { resetUserState } from './resetUserState';
 
 function createDefaultUserInfo() {
 	return {
@@ -23,6 +24,11 @@ function createDefaultUserInfo() {
 }
 
 type UserInfoShape = ReturnType<typeof createDefaultUserInfo>;
+
+function normalizeUserId(info: UserInfoShape | null | undefined): number {
+	const id = Number(info?.id);
+	return Number.isFinite(id) && id > 0 ? id : 0;
+}
 
 function readUserInfoFromStorage(): UserInfoShape | null {
 	const raw = getStorage(USER_INFO_STORAGE_KEY);
@@ -59,14 +65,26 @@ class UserStore {
 	}
 
 	setUserInfo(userInfo: any) {
+		const prevId = normalizeUserId(this.userInfo);
+		const nextId = normalizeUserId(userInfo as UserInfoShape);
+		if (prevId !== nextId) {
+			resetUserState();
+		}
 		this.userInfo = userInfo as UserInfoShape;
 		setStorage(USER_INFO_STORAGE_KEY, JSON.stringify(userInfo));
+		if (typeof window !== 'undefined') {
+			window.dispatchEvent(new Event('userInfoChanged'));
+		}
 	}
 
 	/** 登出等场景：清空内存并与 localStorage 一致 */
 	clearUserInfo() {
+		const hadUser = normalizeUserId(this.userInfo) > 0;
 		this.userInfo = createDefaultUserInfo();
 		removeStorage(USER_INFO_STORAGE_KEY);
+		if (hadUser) {
+			resetUserState();
+		}
 	}
 }
 
