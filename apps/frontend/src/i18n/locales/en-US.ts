@@ -92,7 +92,7 @@ export const enUS = {
 	'setting.menu.language': 'Language',
 	'setting.menu.about': 'About',
 	'setting.menu.llm': 'Model configuration',
-	'setting.menu.cloudTts': 'Cloud playback',
+	'setting.menu.cloudTts': 'Voice settings',
 	'setting.llm.title': 'LLM configuration',
 	'setting.llm.desc':
 		'When enabled with API Key, Base URL, and model name, these values override server environment variables for chat, assistant, RAG, and English learning. Clear to use .env again.',
@@ -128,7 +128,7 @@ export const enUS = {
 	'setting.llm.activeHint': '{modelName} model configuration is in use',
 	'setting.llm.incompleteHint':
 		'Enabled but incomplete; still using environment variables',
-	'setting.cloudTts.title': 'Cloud playback',
+	'setting.cloudTts.title': 'Cloud voice settings',
 	'setting.cloudTts.desc':
 		'When enabled, cloud playback in English learning uses the parameters below. When off, server defaults apply.',
 	'setting.cloudTts.paramsTitle': 'Playback parameters',
@@ -256,9 +256,9 @@ export const enUS = {
 	'setting.system.close.minimizeToTray': 'Minimize to tray and keep running',
 	'setting.system.close.quit': 'Quit the app',
 
-	'setting.system.localTts.title': 'English learning (local voice)',
+	'setting.system.localTts.title': 'Local voice settings',
 	'setting.system.localTts.desc':
-		'read-aloud uses local speech. Voices are grouped as female and male; Auto still prefers a female voice. Full sentences prefer cloud TTS when available.',
+		'English learning uses local browser speech. Pick a voice from female/male groups and preview. Preferences are saved on this device for the signed-in account.',
 	'setting.system.localTts.voiceLabel': 'Voice',
 	'setting.system.localTts.autoOption': 'Default (Karen)',
 	'setting.system.localTts.groupFemale': 'Female',
@@ -1440,7 +1440,7 @@ export const enUS = {
 	'route.setting.about': 'About',
 	'route.setting.theme': 'Theme',
 	'route.setting.llm': 'LLM settings',
-	'route.setting.cloudTts': 'Cloud playback',
+	'route.setting.cloudTts': 'Voice settings',
 	'route.setting.language': 'Language',
 	'route.legal.servicePolicy': 'User service policy',
 	'route.legal.userAgreement': 'User service agreement',

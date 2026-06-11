@@ -698,16 +698,16 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 	's24-34': {
 		title: 'Cloud playback prefs sync by account',
 		description:
-			'Custom cloud playback parameters moved from browser-only storage to your account in the cloud. The same account sees the same settings on different computers or browsers. Local Web Speech voice in System settings stays on each device only.',
+			'Custom cloud playback parameters moved from browser-only storage to your account in the cloud. The same account sees the same settings on different computers or browsers. Local Web Speech voice on the Voice settings page stays on each device only.',
 	},
 	's24-35': {
-		title: 'Cloud playback settings for members only',
+		title: 'Unified voice settings page',
 		description:
-			'Only active members see Cloud playback in Settings; the menu entry is hidden for others and direct links return to the settings home. Non-members can still use local Web Speech playback in English learning (System settings voice).',
+			'Settings tab Voice settings is visible to everyone. The top section is local voice settings; active members also get cloud voice settings below. The local voice block was removed from System settings.',
 	},
 	's24-36': {
 		title: 'Local playback voice per account',
 		description:
-			'Local English Web Speech voice in System settings is stored separately per signed-in account in the same browser. After switching accounts, the dropdown and playback use that account’s preference without overwriting others (device-only, not synced across devices).',
+			'Local English Web Speech voice on the Voice settings page is stored separately per signed-in account in the same browser. After switching accounts, the dropdown and playback use that account’s preference without overwriting others (device-only, not synced across devices).',
 	},
 };

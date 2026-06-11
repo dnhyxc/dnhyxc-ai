@@ -1,6 +1,6 @@
 # 英语学习：本机 TTS 音色设置与默认 Karen
 
-> **文档角色（主文档）**：系统设置中的 Web Speech 英语音色、按账号分键持久化、设置页 UI 与换号同步。  
+> **文档角色**：本机 Web Speech 音色、按账号分键、**语音设置页**上方区块 UI。  
 > **延伸阅读**：[`english-tts-playback.md`](./english-tts-playback.md)（播放世代与会员云端策略）、[`cloud-tts-prefs-db.md`](./cloud-tts-prefs-db.md)（云端朗读偏好入库，与本机音色分离）、[`../app/user-switch-state-reset.md`](../app/user-switch-state-reset.md)（换号清内存态；本机音色键**不**清）。
 
 若与仓库最新源码不一致，**以源码为准**。
@@ -11,7 +11,7 @@
 
 ### 1.1 产品需求
 
-- 在**系统设置**中选择本机 Web Speech 英语音色并试听；单词场景 `preferLocal: true` 时使用该偏好。
+- 在**设置 → 语音设置**中配置本机 Web Speech 英语音色并试听；单词场景 `preferLocal: true` 时使用该偏好。
 - 默认女声为 **Karen**；首次为某账号写入默认 key，避免「只有点选后才生效」。
 - **按登录账号隔离**：同一浏览器内 A/B 换号后，各自的本机音色偏好互不覆盖；设置页下拉框与播放一致。
 
@@ -20,8 +20,10 @@
 | 维度 | 本机 Web Speech | 云端 MiniMax 等 |
 |------|-----------------|-----------------|
 | 存储 | `localStorage` 键 `english_learning_local_tts_voice:{userId}` | 表 `minimax_tts_user_config` |
-| 设置入口 | 系统设置 → 本机朗读 | 设置 → 云端朗读（**会员**） |
+| 设置入口 | **设置 → 语音设置** →「本机语音设置」（页面上方） | 同页 **「云端语音设置」**（**会员**，页面下方） |
 | 换号 | 读对应 `:userId` 键，UI 随 `loggedInUserId` 刷新 | 服务端 JWT + 内存缓存 |
+
+> 页面整合说明见 [`voice-settings-page.md`](./voice-settings-page.md)。
 
 ---
 
@@ -30,9 +32,8 @@
 | 说明 | 路径 |
 |------|------|
 | TTS 核心（分键、legacy 迁移、换号清 voice 缓存） | `apps/frontend/src/utils/englishTts.ts` |
-| 系统设置 UI（`observer` + 单一 `useEffect`） | `apps/frontend/src/views/setting/system/TtsVoiceSetting.tsx` |
+| 本机 UI（`observer` + 单一 `useEffect`） | `apps/frontend/src/views/setting/cloudTts/LocalTtsVoiceSetting.tsx` |
 | 用户 id 与分键工具 | `apps/frontend/src/store/loggedInUserId.ts` |
-| 设置页挂载 | `apps/frontend/src/views/setting/system/index.tsx` |
 
 ---
 
@@ -51,7 +52,7 @@
 - `readPreferredVoiceKeyFromStorage()` 检测 `getLoggedInUserId()` 变化时调用 `resetCachedEnglishVoice()`，避免仍用上一账号解析出的 `SpeechSynthesisVoice`
 - **`resetUserState()` 不删除**本机音色 localStorage（设备级、按账号分键保留，与 UI 偏好类键策略一致）
 
-### 3.3 系统设置 UI（TtsVoiceSetting）
+### 3.3 语音设置页 UI（LocalTtsVoiceSetting）
 
 - **DropdownMenu + RadioGroup**，分组女声/男声；试听 `playEnglishPreferred(..., { preferLocal: true })`
 - **`observer`**：订阅 `userStore.userInfo`，换号后 `loggedInUserId` 可靠更新
@@ -101,10 +102,12 @@ function readPreferredVoiceKeyFromStorage(): string | null {
 
 ### 4.2 设置页：合并 effect + observer
 
-**来源**：`apps/frontend/src/views/setting/system/TtsVoiceSetting.tsx`（约 L70–L131）
+**来源**：`apps/frontend/src/views/setting/cloudTts/LocalTtsVoiceSetting.tsx`（约 L70–L131）
 
 ```typescript
-export const TtsVoiceSetting = observer(function TtsVoiceSetting() {
+export const LocalTtsVoiceSetting = observer(function LocalTtsVoiceSetting({
+	showDivider = false,
+}: { showDivider?: boolean }) {
 	const { userStore } = useStore();
 	const loggedInUserId = userStore.userInfo?.id ?? getLoggedInUserId();
 
@@ -128,7 +131,7 @@ export const TtsVoiceSetting = observer(function TtsVoiceSetting() {
 
 ### 4.3 用户切换音色
 
-**来源**：`apps/frontend/src/views/setting/system/TtsVoiceSetting.tsx`（`onVoiceChange` 附近）
+**来源**：`apps/frontend/src/views/setting/cloudTts/LocalTtsVoiceSetting.tsx`（`onVoiceChange` 附近）
 
 ```typescript
 if (value === LOCAL_ENGLISH_TTS_VOICE_AUTO) {
@@ -168,4 +171,5 @@ if (value === LOCAL_ENGLISH_TTS_VOICE_AUTO) {
 |------|------|
 | 分键工具 | `apps/frontend/src/store/loggedInUserId.ts` |
 | 播放与会员云端 | `apps/frontend/src/utils/englishTts.ts` |
-| 设置 UI | `apps/frontend/src/views/setting/system/TtsVoiceSetting.tsx` |
+| 设置 UI | `apps/frontend/src/views/setting/cloudTts/LocalTtsVoiceSetting.tsx` |
+| 页面整合 | [`voice-settings-page.md`](./voice-settings-page.md) |

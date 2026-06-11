@@ -1,5 +1,5 @@
 /**
- * 系统设置：英语学习本机朗读音色选择与试听
+ * 设置 → 朗读：本机 Web Speech 音色选择与试听（会员页面上方；非会员为唯一区块）
  */
 import { Button } from '@ui/button';
 import {
@@ -16,6 +16,7 @@ import { ChevronDown, Volume2 } from 'lucide-react';
 import { observer } from 'mobx-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useI18n } from '@/hooks';
+import { cn } from '@/lib/utils';
 import useStore from '@/store';
 import { getLoggedInUserId } from '@/store/loggedInUserId';
 import type { LocalEnglishVoiceOption } from '@/utils/englishTts';
@@ -67,7 +68,11 @@ function VoiceDropdownGroup({
 	);
 }
 
-export const TtsVoiceSetting = observer(function TtsVoiceSetting() {
+export const LocalTtsVoiceSetting = observer(function LocalTtsVoiceSetting({
+	showDivider = false,
+}: {
+	showDivider?: boolean;
+}) {
 	const { t } = useI18n();
 	const { userStore } = useStore();
 	const loggedInUserId = userStore.userInfo?.id ?? getLoggedInUserId();
@@ -160,7 +165,12 @@ export const TtsVoiceSetting = observer(function TtsVoiceSetting() {
 	const hasFemaleGroup = voiceGroups.female.length > 0;
 
 	return (
-		<div className="my-3.5 border-b border-theme/20 pb-4.5 w-full">
+		<div
+			className={cn(
+				'w-full',
+				showDivider ? 'border-b border-theme/20 pb-4.5' : 'pb-4.5',
+			)}
+		>
 			<div className="text-md font-bold">
 				{t('setting.system.localTts.title')}
 			</div>
@@ -176,7 +186,7 @@ export const TtsVoiceSetting = observer(function TtsVoiceSetting() {
 					{t('setting.system.localTts.noVoices')}
 				</p>
 			) : (
-				<div className="flex flex-wrap items-center gap-3 mt-3.5 px-8.5 text-sm">
+				<div className="mt-3.5 flex flex-wrap items-center gap-3 px-8.5 text-sm">
 					<Label id="local-english-tts-voice" className="shrink-0">
 						{t('setting.system.localTts.voiceLabel')}
 					</Label>
@@ -186,7 +196,7 @@ export const TtsVoiceSetting = observer(function TtsVoiceSetting() {
 								variant="link"
 								size="sm"
 								aria-labelledby="local-english-tts-voice"
-								className="w-[min(100%,15rem)] border border-theme/20 justify-between gap-2 font-normal shadow-none focus-visible:ring-0 focus-visible:border-theme/20 hover:border-theme/20 focus:border-theme/20 data-[state=open]:border-theme/20 data-[state=open]:ring-0"
+								className="w-[min(100%,15rem)] justify-between gap-2 border border-theme/20 font-normal shadow-none hover:border-theme/20 focus:border-theme/20 focus-visible:border-theme/20 focus-visible:ring-0 data-[state=open]:border-theme/20 data-[state=open]:ring-0"
 							>
 								<span className="truncate">{selectedLabel}</span>
 								<ChevronDown

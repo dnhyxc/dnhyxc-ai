@@ -43,7 +43,7 @@
 | `apps/frontend/src/store/user.ts` | 登录后 `prefetchMinimaxTtsUserPrefs` |
 | `apps/frontend/src/store/resetUserState.ts` | 换号清 TTS 偏好缓存 |
 
-**未入库**：`apps/frontend/src/views/setting/system/TtsVoiceSetting.tsx` 所管本机英语音色。
+**未入库**：`apps/frontend/src/views/setting/cloudTts/LocalTtsVoiceSetting.tsx` 所管本机英语音色。
 
 ---
 

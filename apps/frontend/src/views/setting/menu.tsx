@@ -3,19 +3,17 @@ import {
 	NavigationMenuItem,
 	NavigationMenuList,
 } from '@ui/navigation-menu';
-import { observer } from 'mobx-react';
 import { useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router';
-import { useI18n, useMembershipActive } from '@/hooks';
+import { useI18n } from '@/hooks';
 
-const NavigationMenus = observer(() => {
+const NavigationMenus = () => {
 	const { pathname } = useLocation();
 	const navigate = useNavigate();
 	const { t } = useI18n();
-	const { isMemberActive } = useMembershipActive();
 
-	const menus = useMemo(() => {
-		const all = [
+	const menus = useMemo(
+		() => [
 			{
 				name: t('setting.menu.system'),
 				key: 'system',
@@ -46,11 +44,9 @@ const NavigationMenus = observer(() => {
 				path: '/setting/about',
 				icon: 'icon-about',
 			},
-		];
-		return isMemberActive
-			? all
-			: all.filter((item) => item.key !== 'cloud-tts');
-	}, [t, isMemberActive]);
+		],
+		[t],
+	);
 
 	return (
 		<nav className="w-full relative border-b border-theme/35 after:content-[''] after:absolute after:bottom-0 after:right-0 after:w-full after:h-[8px] after:rounded-tr-[25px] after:bg-linear-to-r after:from-transparent after:to-theme after:max-w-[42vw]">
@@ -75,6 +71,6 @@ const NavigationMenus = observer(() => {
 			</NavigationMenu>
 		</nav>
 	);
-});
+};
 
 export default NavigationMenus;

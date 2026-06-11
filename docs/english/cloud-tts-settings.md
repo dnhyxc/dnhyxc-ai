@@ -1,6 +1,7 @@
-# 设置页「云端朗读」与用户偏好
+# 设置页「云端语音设置」与用户偏好
 
-> **主文档（存储与账号同步）**：[`cloud-tts-prefs-db.md`](./cloud-tts-prefs-db.md) — 偏好已迁入数据库 `minimax_tts_user_config`，按登录账号跨设备同步。  
+> **文档角色（主文档）**：**设置 → 语音设置** 页内「云端语音设置」区块；会员可见，参数存服务端。本机区块见 [`voice-settings-page.md`](./voice-settings-page.md)、[`english-tts-local-voice.md`](./english-tts-local-voice.md)。  
+> **存储与账号同步**：[`cloud-tts-prefs-db.md`](./cloud-tts-prefs-db.md)  
 > 后端 MiniMax 流式合成、硅基回退与 LRU 见 [`minimax-cloud-tts.md`](./minimax-cloud-tts.md)。  
 > 播放世代、单词本机优先见 [`english-tts-playback.md`](./english-tts-playback.md)。
 
@@ -14,9 +15,9 @@
 
 | 维度 | 改前 | 改后 |
 |------|------|------|
-| 朗读参数 | 仅服务端 `.env` 默认（model / voice / 语速等） | 用户可在 **设置 → 云端朗读** 保存偏好，**开启开关后**随每次云端朗读请求发送 |
+| 朗读参数 | 仅服务端 `.env` 默认（model / voice / 语速等） | 会员在 **设置 → 语音设置** 下方「云端语音设置」保存偏好，**开启开关后**随每次云端朗读请求发送 |
 | 存储 | 曾用 `localStorage` | **账号级数据库**（见 [`cloud-tts-prefs-db.md`](./cloud-tts-prefs-db.md)） |
-| 设置入口 | 与大模型配置混在同一页或不可配 | **独立路由** `/setting/cloud-tts`，与大模型页并列 |
+| 设置入口 | 与大模型配置混在同一页或不可配 | **语音设置** `/setting/cloud-tts`（本机在上、云端在下，见 [`voice-settings-page.md`](./voice-settings-page.md)） |
 | 音色列表 | 单一默认 `English_radiant_girl` | 下拉 **45 个英文系统音色**（与官方 ID 对齐） |
 | 前端缓存 | key 仅纯文本 | 自定义参数开启时，key 追加 **userId + 参数 JSON 后缀** |
 | 界面文案 | 曾暴露服务商名称 | 产品向文案统一为 **「云端朗读」**，字段说明不含品牌 |
@@ -34,7 +35,8 @@
 
 | 路径 | 职责 |
 |------|------|
-| `apps/frontend/src/views/setting/cloudTts/index.tsx` | 设置页 UI：开关、表单、试听/恢复默认 |
+| `apps/frontend/src/views/setting/cloudTts/index.tsx` | 语音设置页：本机 + 会员云端 UI |
+| `apps/frontend/src/views/setting/cloudTts/LocalTtsVoiceSetting.tsx` | 本机语音设置区块 |
 | `apps/frontend/src/views/setting/cloudTts/ParamsHelpPopover.tsx` | 字段说明 Popover（ScrollArea 滚动） |
 | `apps/frontend/src/utils/minimaxTtsPrefs.ts` | 服务端同步、内存缓存、合并请求体、缓存 key 后缀 |
 | `apps/frontend/src/constants/minimaxTts.ts` | 模型/音色/情感/格式/语言增强白名单 |

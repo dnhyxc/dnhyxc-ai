@@ -88,7 +88,7 @@ export const zhCN = {
 	'setting.menu.language': '语言设置',
 	'setting.menu.about': '关于应用',
 	'setting.menu.llm': '模型配置',
-	'setting.menu.cloudTts': '云端朗读',
+	'setting.menu.cloudTts': '语音设置',
 	'setting.llm.title': '大模型配置',
 	'setting.llm.desc':
 		'开启并填写 API Key、Base URL、模型名称后，将覆盖服务器环境变量，统一用于对话、知识库助手、问答与英语学习等模块。关闭或清空后恢复使用 .env 配置。',
@@ -122,7 +122,7 @@ export const zhCN = {
 	'setting.llm.activeHint': '{modelName} 模型配置生效中',
 	'setting.llm.incompleteHint': '已开启但配置不完整，仍使用环境变量',
 	/** 云端朗读 */
-	'setting.cloudTts.title': '云端朗读',
+	'setting.cloudTts.title': '云端语音设置',
 	'setting.cloudTts.desc':
 		'开启后，英语学习等场景的云端朗读将使用下列参数；关闭则使用服务端默认音色与模型。',
 	'setting.cloudTts.paramsTitle': '朗读参数',
@@ -243,9 +243,9 @@ export const zhCN = {
 	'setting.system.close.minimizeToTray': '最小化到托盘，不退出程序',
 	'setting.system.close.quit': '退出程序',
 
-	'setting.system.localTts.title': '英语学习本机语音',
+	'setting.system.localTts.title': '本机语音设置',
 	'setting.system.localTts.desc':
-		'朗读使用浏览器本机语音；下拉按女声、男声分组，可选具体音色并试听。自动模式仍默认优先女声。句子朗读仍优先云端合成。',
+		'英语学习使用浏览器本机语音；下拉按女声、男声分组，可选具体音色并试听。偏好按当前登录账号保存在本设备。',
 	'setting.system.localTts.voiceLabel': '朗读音色',
 	'setting.system.localTts.autoOption': '默认（Karen）',
 	'setting.system.localTts.groupFemale': '女声',
@@ -1315,7 +1315,7 @@ export const zhCN = {
 	'route.setting.about': '关于应用',
 	'route.setting.theme': '主题设置',
 	'route.setting.llm': '大模型配置',
-	'route.setting.cloudTts': '云端朗读',
+	'route.setting.cloudTts': '语音设置',
 	'route.setting.language': '语言设置',
 	'route.legal.servicePolicy': '用户服务政策',
 	'route.legal.userAgreement': '用户服务协议',

@@ -173,9 +173,9 @@ export const PROJECT_GUIDE_ITEMS_EN: Record<
 			'After sign-in: Settings → LLM (/setting/llm). Enable custom LLM, then fill API Key (a local default may pre-fill on first visit; after save, only your account applies), Base URL, and model name.\nType directly or use the button beside Base URL / model to pick Zhipu GLM, SiliconFlow, or DeepSeek presets; switching preset or model clears the API Key so you must enter the matching provider key.\nSave when the footer shows the active hint with the model name—chat, assistant, Q&A, and English learning use that config for your account only. Without custom config: active members default to SiliconFlow; non-members default to Zhipu GLM. Use the eye icon to show/hide the key. Save stays disabled until the switch is on and all fields are filled. Use Restore default to revert.',
 	},
 	'pg-s8-4': {
-		title: '8.4 Cloud playback',
+		title: '8.4 Voice settings',
 		description:
-			'Active members: Settings → Cloud playback (/setting/cloud-tts). Non-members do not see this entry; English learning still supports local Web Speech via System settings voice.\nEnable custom playback parameters to adjust model, voice, speed, volume, pitch, emotion, format, and language boost; advanced sample rate / bitrate / channel fields usually stay at defaults.\nUse ? beside Playback parameters for field help. Preview plays a sample with current settings; Restore defaults resets the form without turning the switch off. When off, server defaults apply; when on, preferences are saved to your account (sync across devices on the same account) and apply to cloud playback; upstream failures still fall back to the previous cloud TTS.',
+			'Settings → Voice settings (/setting/cloud-tts), available to all users. Top: Local voice settings—pick browser voices by female/male groups, preview, prefs saved per account on this device.\nActive members also see Cloud voice settings below: enable custom playback parameters for model, voice, speed, volume, pitch, emotion, format, language boost, etc. Use ? beside Playback parameters for help. Cloud preview and restore-default apply to the cloud block; when off, server defaults apply; when on, prefs sync across devices for the same account.',
 	},
 	'pg-s8-5': {
 		title: '8.5 Account avatar (cloud storage)',
