@@ -55,11 +55,11 @@ export function DailyIntroPanel({ starting, onStart }: DailyIntroPanelProps) {
 				</div>
 
 				<div className="border-theme/10 border-t px-4 py-4">
-					<div className={cn(DAILY_FOOTER_PANEL_CLASS, 'p-2')}>
+					<div className={DAILY_FOOTER_PANEL_CLASS}>
 						<Button
 							type="button"
 							className={cn(
-								'h-10 w-full gap-1.5 text-sm',
+								'h-10 w-full gap-2',
 								PRACTICE_PRIMARY_ACTION_BTN_CLASS,
 							)}
 							disabled={starting}

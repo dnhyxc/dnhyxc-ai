@@ -1,7 +1,7 @@
 # 今日记词（Daily Memorize）前后端实现说明
 
 > **文档角色**：面向产品、测试与维护者；用「白话 + 流程图 + 带注释代码」说明 **今日记词** 从侧栏入口到记词记录页的完整链路。  
-> **延伸阅读**：[practice-review-srs.md](./practice-review-srs.md)（今日复习 SRS）、[english-learning-backend-implementation.md](./english-learning-backend-implementation.md)
+> **延伸阅读**：[practice-review-srs.md](./practice-review-srs.md)（今日复习 SRS）、[english-learning-backend-implementation.md](./english-learning-backend-implementation.md)、[daily-quiz-distractors-ui.md](./daily-quiz-distractors-ui.md)（四选一干扰项与底栏 UX，2026-06-08）
 
 ---
 
@@ -718,33 +718,22 @@ const onContinue = useCallback(async () => {
 
 ### 6.7 四选一干扰项怎么生成？
 
-从 **本轮其它词** 的中文释义里随机挑 3 个当干扰项；不够则用「学习、城市、电脑…」等兜底，最后与正确答案一起 **Fisher-Yates 洗牌**，避免正确答案总在第一个。
+**2026-06-08 起**：不再纯随机。同轮内对已出现过的干扰项释义降权；优先选 **同词性、释义长度接近、与答案有少量汉字重叠** 的项。详见 **[daily-quiz-distractors-ui.md](./daily-quiz-distractors-ui.md)**。
 
-**来源**：`apps/frontend/src/views/englishLearning/daily/utils/buildQuizOptions.ts`（约 L36–L74）
+以下为旧版随机逻辑摘要（仅供对照历史行为）：
+
+从 **本轮其它词** 的中文释义里随机挑 3 个当干扰项；不够则用兜底词，最后与正确答案一起洗牌。
+
+**来源（当前实现）**：`apps/frontend/src/views/englishLearning/daily/utils/buildQuizOptions.ts`（约 L78–L128）
 
 ```typescript
-export function buildQuizOptions(card: DailyVocabCard, pool: DailyVocabCard[]) {
-	// ① 从本轮其它词取中文释义，去重、去掉与正确答案相同的项
-	const distractors = pool
-		.filter((w) => w.key !== card.key && w.translationZh.trim())
-		.map((w) => w.translationZh.trim());
-	const unique = [...new Set(distractors)].filter((t) => t !== card.translationZh.trim());
-
-	// ② 打乱后取 3 个；不足则从 fallback 兜底词补齐
-	const picked = shuffle(unique).slice(0, 3);
-	const fallback = ['学习', '城市', '电脑', '天气', '音乐', '旅行', '家庭'];
-	for (const label of shuffle(fallback)) {
-		if (picked.length >= 3) break;
-		if (label === card.translationZh.trim() || picked.includes(label)) continue;
-		picked.push(label);
-	}
-
-	// ③ 1 个正确 + 3 个干扰，再整体 shuffle 输出
-	const options = [
-		{ id: 'correct', label: card.translationZh.trim(), correct: true },
-		...picked.map((label, i) => ({ id: `d${i}`, label, correct: false })),
-	];
-	return shuffle(options);
+export function buildQuizOptions(
+	card: DailyVocabCard,
+	pool: DailyVocabCard[],
+	options?: BuildQuizOptionsParams,
+) {
+	const used = options?.usedDistractorLabels ?? new Set<string>();
+	// 按 scoreDistractor 排序取 top3，传入 used 避免同轮重复
 }
 ```
 

@@ -312,6 +312,11 @@ export const PROJECT_GUIDE_ITEMS_EN: Record<
 		description:
 			"On the English learning home sidebar, Today's review shows due counts for vocabulary and sentences. New mistakes or changed misspellings join today's queue; correct answers remove them. Tap to open the practice setup page (mode and count). The queue is due-order only. After a session, the next review time updates and counts refresh; Back returns to the home page. Continue practice draws more due items if any remain.",
 	},
+	'pg-s13-15': {
+		title: '13.15 Daily memorize',
+		description:
+			'On the English learning home sidebar, Daily memorize lets you set words per round and start. Flow: intro → recognition → Test me (multiple choice) → feedback → next word. Distractors favor similar part of speech and definition length with less repetition within one round. Start memorizing footer spacing matches dictation/spelling setup; Test me and related buttons are full-width without an extra dark bordered gap.',
+	},
 	'pg-s13-13': {
 		title: '13.13 Classic mistake row fields',
 		description:

@@ -274,7 +274,8 @@ export const enUS = {
 	'setting.system.localTts.genderTag.female': 'Female',
 	'setting.system.localTts.genderTag.male': 'Male',
 	'setting.system.localTts.preview': 'Preview',
-	'setting.system.localTts.previewText': 'Hello, this is a voice preview.',
+	'setting.system.localTts.previewText':
+		'This is a preview of the cloud reading effect with the parameters set above.',
 	'setting.system.localTts.unsupported':
 		'Local speech synthesis is not available in this environment.',
 	'setting.system.localTts.noVoices':

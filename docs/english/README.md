@@ -36,6 +36,7 @@
 | 文档 | 说明 |
 |------|------|
 | [daily-memorize-implementation.md](./daily-memorize-implementation.md) | **今日记词**：词汇库随机抽词、认读/四选一、记词记录与 SRS（前后端详解） |
+| [daily-quiz-distractors-ui.md](./daily-quiz-distractors-ui.md) | **今日记词 UX**：四选一干扰项迷惑度/去重、底栏按钮间距 |
 | [practice-review-srs.md](./practice-review-srs.md) | **今日复习（SRS）**、侧栏整合、复习设置页入口、随机分页补足 |
 | [practice-summary-ui.md](./practice-summary-ui.md) | 听写/拼写练习与结算页 UI、作答明细、统计条 |
 | [practice-session-hint.md](./practice-session-hint.md) | 单题练习「提示」：听写释义/音标、拼写音标、固定高度无滚动 |

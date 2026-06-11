@@ -261,7 +261,8 @@ export const zhCN = {
 	'setting.system.localTts.genderTag.female': '女声',
 	'setting.system.localTts.genderTag.male': '男声',
 	'setting.system.localTts.preview': '试听',
-	'setting.system.localTts.previewText': 'Hello, this is a voice preview.',
+	'setting.system.localTts.previewText':
+		'This is a preview of the cloud reading effect with the parameters set above.',
 	'setting.system.localTts.unsupported': '当前环境不支持本机语音合成。',
 	'setting.system.localTts.noVoices':
 		'未检测到英语语音，请在系统「辅助功能 → 朗读内容」中下载语音后重试。',

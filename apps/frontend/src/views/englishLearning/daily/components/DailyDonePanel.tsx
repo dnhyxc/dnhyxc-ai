@@ -29,11 +29,11 @@ export function DailyDonePanel({ onBackHome }: DailyDonePanelProps) {
 					</p>
 				</div>
 				<div className="border-theme/10 border-t px-4 py-4">
-					<div className={cn(DAILY_FOOTER_PANEL_CLASS, 'flex gap-2 p-2')}>
+					<div className={cn(DAILY_FOOTER_PANEL_CLASS, 'flex gap-2')}>
 						<Button
 							type="button"
 							className={cn(
-								'h-10 min-w-0 flex-1 text-sm',
+								'h-10 min-w-0 flex-1 gap-2',
 								PRACTICE_PRIMARY_ACTION_BTN_CLASS,
 							)}
 							onClick={onBackHome}
@@ -43,7 +43,7 @@ export function DailyDonePanel({ onBackHome }: DailyDonePanelProps) {
 						<Button
 							type="button"
 							className={cn(
-								'h-10 min-w-0 flex-1 text-sm',
+								'h-10 min-w-0 flex-1 gap-2',
 								PRACTICE_PRIMARY_ACTION_BTN_CLASS,
 							)}
 							onClick={() => navigate('/english-learning/daily/records')}

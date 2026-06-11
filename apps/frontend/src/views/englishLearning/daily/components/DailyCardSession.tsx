@@ -3,7 +3,7 @@
  */
 import { Button, Spinner } from '@ui/index';
 import { Sparkles } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import { recordEnglishDailyMemorizeAttempts } from '@/service';
@@ -17,7 +17,7 @@ import {
 	SESSION_CARD_H,
 } from '../../practice/constants';
 import { dispatchEnglishReviewSummaryRefresh } from '../../sidebar/reviewEvents';
-import { DAILY_FOOTER_PANEL_CLASS, QUIZ_OPTION_CLASS } from '../constants';
+import { QUIZ_OPTION_CLASS } from '../constants';
 import { useDailyPlayback } from '../hooks/useDailyPlayback';
 import { useDailySessionKeyboard } from '../hooks/useDailySessionKeyboard';
 import type { DailyCardStep, DailyQuizOption, DailyVocabCard } from '../types';
@@ -47,6 +47,7 @@ export function DailyCardSession({ cards, onComplete }: DailyCardSessionProps) {
 	const [lastCorrect, setLastCorrect] = useState(false);
 	const [pendingRecords, setPendingRecords] = useState<PendingRecord[]>([]);
 	const [submitting, setSubmitting] = useState(false);
+	const usedDistractorLabelsRef = useRef(new Set<string>());
 
 	const card = cards[index];
 
@@ -54,6 +55,10 @@ export function DailyCardSession({ cards, onComplete }: DailyCardSessionProps) {
 		word: card?.word ?? '',
 		t,
 	});
+
+	useEffect(() => {
+		usedDistractorLabelsRef.current.clear();
+	}, [cards]);
 
 	useEffect(() => {
 		if (!card) return;
@@ -65,7 +70,15 @@ export function DailyCardSession({ cards, onComplete }: DailyCardSessionProps) {
 
 	const onStartQuiz = useCallback(() => {
 		if (!card) return;
-		setQuizOptions(buildQuizOptions(card, cards));
+		const options = buildQuizOptions(card, cards, {
+			usedDistractorLabels: usedDistractorLabelsRef.current,
+		});
+		for (const opt of options) {
+			if (!opt.correct) {
+				usedDistractorLabelsRef.current.add(opt.label);
+			}
+		}
+		setQuizOptions(options);
 		setStep('quiz');
 	}, [card, cards]);
 
@@ -260,26 +273,25 @@ export function DailyCardSession({ cards, onComplete }: DailyCardSessionProps) {
 
 				{step === 'study' || step === 'feedback' ? (
 					<div className="border-theme/10 shrink-0 border-t px-4 py-4">
-						<div className={DAILY_FOOTER_PANEL_CLASS}>
-							<Button
-								type="button"
-								className={cn('h-10 w-full', PRACTICE_PRIMARY_ACTION_BTN_CLASS)}
-								disabled={step === 'feedback' && submitting}
-								onClick={
-									step === 'study' ? onStartQuiz : () => void onContinue()
-								}
-							>
-								{step === 'study' ? (
-									t('englishLearning.daily.startQuiz')
-								) : submitting ? (
-									<Spinner className="size-4 text-white" />
-								) : index >= cards.length - 1 ? (
-									t('englishLearning.daily.finish')
-								) : (
-									t('englishLearning.daily.nextWord')
-								)}
-							</Button>
-						</div>
+						<Button
+							type="button"
+							className={cn(
+								'h-10 w-full gap-2',
+								PRACTICE_PRIMARY_ACTION_BTN_CLASS,
+							)}
+							disabled={step === 'feedback' && submitting}
+							onClick={step === 'study' ? onStartQuiz : () => void onContinue()}
+						>
+							{step === 'study' ? (
+								t('englishLearning.daily.startQuiz')
+							) : submitting ? (
+								<Spinner className="size-4 text-white" />
+							) : index >= cards.length - 1 ? (
+								t('englishLearning.daily.finish')
+							) : (
+								t('englishLearning.daily.nextWord')
+							)}
+						</Button>
 					</div>
 				) : null}
 			</PracticeCard>

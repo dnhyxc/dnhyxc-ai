@@ -164,7 +164,7 @@ export const LocalTtsVoiceSetting = observer(function LocalTtsVoiceSetting({
 		stopAllEnglishPlayback();
 		setPreviewing(true);
 		try {
-			await playEnglishPreferred(t('setting.system.localTts.previewText'), {
+			await playEnglishPreferred(t('setting.cloudTts.previewText'), {
 				preferLocal: true,
 			});
 		} finally {

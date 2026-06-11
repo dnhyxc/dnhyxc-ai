@@ -725,4 +725,9 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'Active members can use mutually exclusive switches “Use local voice for playback” and “Use cloud voice for playback” under Voice settings to choose the default medium for English learning speaker buttons; preference is saved per account and syncs across devices. Non-members remain local-only.',
 	},
+	's24-39': {
+		title: 'Daily memorize quiz distractors and footer buttons',
+		description:
+			'After recognition in Daily memorize, multiple-choice distractors favor similar part of speech and definition length, with less repetition of the same wrong option within one round. The Start memorizing footer spacing aligns with dictation/spelling setup; Test me and related primary buttons no longer sit inside an extra dark bordered gap.',
+	},
 };
