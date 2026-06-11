@@ -4,7 +4,10 @@ import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import { hasValidAuthToken } from '@/router/authPaths';
 import { PracticeCard } from '../../practice/components/shell';
-import { PRACTICE_PAGE_CONTENT_CLASS } from '../../practice/constants';
+import {
+	PRACTICE_PAGE_CONTENT_CLASS,
+	PRACTICE_PRIMARY_ACTION_BTN_CLASS,
+} from '../../practice/constants';
 import { DAILY_FOOTER_PANEL_CLASS } from '../constants';
 import { useDailyWordCount } from '../hooks/useDailyWordCount';
 
@@ -55,13 +58,16 @@ export function DailyIntroPanel({ starting, onStart }: DailyIntroPanelProps) {
 					<div className={cn(DAILY_FOOTER_PANEL_CLASS, 'p-2')}>
 						<Button
 							type="button"
-							className="h-10 w-full gap-1.5 text-sm"
+							className={cn(
+								'h-10 w-full gap-1.5 text-sm',
+								PRACTICE_PRIMARY_ACTION_BTN_CLASS,
+							)}
 							disabled={starting}
 							onClick={onStart}
 						>
 							{starting ? (
 								<>
-									<Spinner className="size-4" />
+									<Spinner className="size-4 text-white" />
 									{t('englishLearning.daily.loading')}
 								</>
 							) : (

@@ -20,7 +20,11 @@ import { SessionStageHeader } from './components/session/SessionStageHeader';
 import { SessionWrongActions } from './components/session/SessionWrongActions';
 import { SoftWrongStage } from './components/session/SoftWrongStage';
 import { PracticeCard } from './components/shell';
-import { PRACTICE_PAGE_CONTENT_CLASS, SESSION_CARD_H } from './constants';
+import {
+	PRACTICE_PAGE_CONTENT_CLASS,
+	PRACTICE_PRIMARY_ACTION_BTN_CLASS,
+	SESSION_CARD_H,
+} from './constants';
 import { usePracticeItemReset } from './hooks/usePracticeItemReset';
 import { usePracticePlayback } from './hooks/usePracticePlayback';
 import { usePracticeSessionKeyboard } from './hooks/usePracticeSessionKeyboard';
@@ -391,7 +395,10 @@ export function Session({
 								</div>
 								<Button
 									type="submit"
-									className="h-10 w-full transition-none"
+									className={cn(
+										'h-10 w-full transition-none',
+										PRACTICE_PRIMARY_ACTION_BTN_CLASS,
+									)}
 									disabled={!input.trim()}
 								>
 									{t('englishLearning.practice.check')}

@@ -13,6 +13,7 @@ import { SessionStageHeader } from '../../practice/components/session/SessionSta
 import { PracticeCard } from '../../practice/components/shell';
 import {
 	PRACTICE_PAGE_CONTENT_CLASS,
+	PRACTICE_PRIMARY_ACTION_BTN_CLASS,
 	SESSION_CARD_H,
 } from '../../practice/constants';
 import { dispatchEnglishReviewSummaryRefresh } from '../../sidebar/reviewEvents';
@@ -262,7 +263,7 @@ export function DailyCardSession({ cards, onComplete }: DailyCardSessionProps) {
 						<div className={DAILY_FOOTER_PANEL_CLASS}>
 							<Button
 								type="button"
-								className="h-10 w-full"
+								className={cn('h-10 w-full', PRACTICE_PRIMARY_ACTION_BTN_CLASS)}
 								disabled={step === 'feedback' && submitting}
 								onClick={
 									step === 'study' ? onStartQuiz : () => void onContinue()
@@ -271,7 +272,7 @@ export function DailyCardSession({ cards, onComplete }: DailyCardSessionProps) {
 								{step === 'study' ? (
 									t('englishLearning.daily.startQuiz')
 								) : submitting ? (
-									<Spinner className="size-4" />
+									<Spinner className="size-4 text-white" />
 								) : index >= cards.length - 1 ? (
 									t('englishLearning.daily.finish')
 								) : (

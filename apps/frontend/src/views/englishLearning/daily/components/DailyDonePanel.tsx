@@ -3,7 +3,10 @@ import { useNavigate } from 'react-router';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import { PracticeCard } from '../../practice/components/shell';
-import { PRACTICE_PAGE_CONTENT_CLASS } from '../../practice/constants';
+import {
+	PRACTICE_PAGE_CONTENT_CLASS,
+	PRACTICE_PRIMARY_ACTION_BTN_CLASS,
+} from '../../practice/constants';
 import { DAILY_FOOTER_PANEL_CLASS } from '../constants';
 
 type DailyDonePanelProps = {
@@ -29,14 +32,20 @@ export function DailyDonePanel({ onBackHome }: DailyDonePanelProps) {
 					<div className={cn(DAILY_FOOTER_PANEL_CLASS, 'flex gap-2 p-2')}>
 						<Button
 							type="button"
-							className="h-10 min-w-0 flex-1 text-sm"
+							className={cn(
+								'h-10 min-w-0 flex-1 text-sm',
+								PRACTICE_PRIMARY_ACTION_BTN_CLASS,
+							)}
 							onClick={onBackHome}
 						>
 							{t('englishLearning.daily.backHome')}
 						</Button>
 						<Button
 							type="button"
-							className="h-10 min-w-0 flex-1 text-sm"
+							className={cn(
+								'h-10 min-w-0 flex-1 text-sm',
+								PRACTICE_PRIMARY_ACTION_BTN_CLASS,
+							)}
 							onClick={() => navigate('/english-learning/daily/records')}
 						>
 							{t('englishLearning.daily.memorizedLink')}

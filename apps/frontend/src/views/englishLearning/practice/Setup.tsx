@@ -29,7 +29,10 @@ import {
 	resolveEnglishPracticePoolKey,
 } from '@/store/englishPracticePool';
 import { PracticeCard, PracticeSegmented } from './components/shell';
-import { PRACTICE_PAGE_CONTENT_CLASS } from './constants';
+import {
+	PRACTICE_PAGE_CONTENT_CLASS,
+	PRACTICE_PRIMARY_ACTION_BTN_CLASS,
+} from './constants';
 import type {
 	PracticeCountOption,
 	PracticeMode,
@@ -356,13 +359,16 @@ export function Setup({
 					<div className={SETUP_SEGMENTED_PANEL_CLASS}>
 						<Button
 							type="button"
-							className="h-10 w-full gap-2"
+							className={cn(
+								'h-10 w-full gap-2',
+								PRACTICE_PRIMARY_ACTION_BTN_CLASS,
+							)}
 							disabled={loading}
 							onClick={() => void onStart()}
 						>
 							{loading ? (
 								<>
-									<Spinner className="size-4" />
+									<Spinner className="size-4 text-white" />
 									{t('englishLearning.practice.loadingWords')}
 								</>
 							) : (

@@ -1,5 +1,6 @@
 import { Button } from '@ui/index';
 import { cn } from '@/lib/utils';
+import { PRACTICE_PRIMARY_ACTION_BTN_CLASS } from '../../constants';
 
 type SessionWrongActionsProps = {
 	visible: boolean;
@@ -32,7 +33,10 @@ export function SessionWrongActions({
 		>
 			<Button
 				type="button"
-				className="h-10 w-full transition-none"
+				className={cn(
+					'h-10 w-full transition-none',
+					PRACTICE_PRIMARY_ACTION_BTN_CLASS,
+				)}
 				onClick={onRetry}
 			>
 				{tryAgainLabel}
@@ -40,7 +44,10 @@ export function SessionWrongActions({
 			{canGoPrevious ? (
 				<Button
 					type="button"
-					className="h-10 w-full transition-none"
+					className={cn(
+						'h-10 w-full transition-none',
+						PRACTICE_PRIMARY_ACTION_BTN_CLASS,
+					)}
 					onClick={onPrevious}
 				>
 					{previousLabel}
@@ -48,7 +55,10 @@ export function SessionWrongActions({
 			) : null}
 			<Button
 				type="button"
-				className="h-10 w-full transition-none"
+				className={cn(
+					'h-10 w-full transition-none',
+					PRACTICE_PRIMARY_ACTION_BTN_CLASS,
+				)}
 				onClick={onNext}
 			>
 				{nextLabel}
