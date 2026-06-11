@@ -350,7 +350,7 @@ function ClassicQuotesSectionInner() {
 	}, [countInput]);
 
 	return (
-		<div className="rounded-none @container min-w-0 px-4 pb-0">
+		<div className="rounded-none @container min-w-0">
 			<Confirm
 				open={historyDeleteConfirmOpen}
 				onOpenChange={(open) => {

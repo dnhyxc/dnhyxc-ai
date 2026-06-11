@@ -9,7 +9,5 @@ export function SidebarPanel({
 	children: ReactNode;
 	className?: string;
 }) {
-	return (
-		<div className={cn('rounded-none px-4 pb-3', className)}>{children}</div>
-	);
+	return <div className={cn('rounded-none pb-3', className)}>{children}</div>;
 }

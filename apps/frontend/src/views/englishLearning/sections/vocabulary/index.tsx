@@ -352,7 +352,7 @@ function VocabularyPackSectionInner() {
 	}, [countInput]);
 
 	return (
-		<div className="rounded-none p-4 pb-0 @container min-w-0 mt-3.5 mb-7.5">
+		<div className="rounded-none py-4 @container min-w-0 mt-3.5 mb-7.5">
 			<Confirm
 				open={historyDeleteConfirmOpen}
 				onOpenChange={(open) => {

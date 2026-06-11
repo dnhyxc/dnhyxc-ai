@@ -10,7 +10,7 @@ import {
 	getEnglishDailyMemorizeSummary,
 	resetEnglishDailyMemorizeLibrary,
 } from '@/service';
-import { DailyWordsPerRoundPopover } from '../../daily/components/DailyWordsPerRoundPopover';
+import { DailyWordsPerRoundPicker } from '../../daily/components/DailyWordsPerRoundPicker';
 import { useDailyWordCount } from '../../daily/hooks/useDailyWordCount';
 import {
 	countStarterLibraryEligible,
@@ -127,31 +127,8 @@ export function DailySession() {
 					<Sparkles className="size-6 text-white" aria-hidden />
 				</div>
 				<div className="min-w-0 flex-1 flex flex-col justify-between">
-					<div className="flex items-center justify-between gap-2">
-						<div className="text-textcolor min-w-0 font-semibold leading-tight">
-							{t('route.englishLearning.daily.title')}
-						</div>
-						<div className="flex shrink-0 items-center gap-3">
-							<DailyWordsPerRoundPopover />
-							<button
-								type="button"
-								disabled={!canReset || resetting || loading}
-								className={cn(
-									'text-sm leading-snug',
-									!canReset || resetting || loading
-										? 'text-textcolor/35 cursor-not-allowed'
-										: cn(
-												'cursor-pointer',
-												ENGLISH_SIDEBAR_TEXT_LINK_GRADIENT.daily,
-											),
-								)}
-								onClick={() => setResetConfirmOpen(true)}
-							>
-								{resetting
-									? t('englishLearning.daily.resetting')
-									: t('englishLearning.daily.resetLibrary')}
-							</button>
-						</div>
+					<div className="text-textcolor min-w-0 font-semibold leading-tight">
+						{t('route.englishLearning.daily.title')}
 					</div>
 					<div className="text-textcolor/50 mt-1 flex h-5 items-center gap-2 text-xs leading-snug">
 						{loading ? (
@@ -170,7 +147,30 @@ export function DailySession() {
 					</div>
 				</div>
 			</div>
-			<div className="mt-4.5 flex flex-wrap items-center gap-3.5">
+			<DailyWordsPerRoundPicker
+				className="mt-4.5"
+				headerRight={
+					<button
+						type="button"
+						disabled={!canReset || resetting || loading}
+						className={cn(
+							'shrink-0 text-sm leading-snug',
+							!canReset || resetting || loading
+								? 'text-textcolor/35 cursor-not-allowed'
+								: cn(
+										'cursor-pointer',
+										ENGLISH_SIDEBAR_TEXT_LINK_GRADIENT.daily,
+									),
+						)}
+						onClick={() => setResetConfirmOpen(true)}
+					>
+						{resetting
+							? t('englishLearning.daily.resetting')
+							: t('englishLearning.daily.resetLibrary')}
+					</button>
+				}
+			/>
+			<div className="mt-3 flex flex-wrap items-center gap-3.5">
 				<Button
 					type="button"
 					size="sm"

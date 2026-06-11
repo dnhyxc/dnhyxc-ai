@@ -117,7 +117,10 @@ const EnglishLearning = observer(function EnglishLearning() {
 									'flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-theme-background',
 								)}
 							>
-								<ScrollArea className="h-full py-4">
+								<ScrollArea
+									className="h-full p-4"
+									viewportClassName="rounded-md"
+								>
 									<div className="flex min-h-0 flex-1 flex-col">
 										<EnglishLearningSidebar
 											onQuickIntentInputSync={onQuickIntentInputSync}

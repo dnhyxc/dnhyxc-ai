@@ -45,7 +45,7 @@ export function ReviewSession() {
 	const totalDue = vocabDue + classicDue;
 
 	return (
-		<div className="rounded-none p-4 pb-0 @container min-w-0 mt-3.5">
+		<div className="rounded-none pt-4 @container min-w-0 mt-3.5">
 			<div className="mb-3.5 flex items-start gap-3">
 				<div
 					className={cn(

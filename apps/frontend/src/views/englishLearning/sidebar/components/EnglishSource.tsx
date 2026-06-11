@@ -65,7 +65,7 @@ export function EnglishSource({
 	return (
 		<div
 			className={cn(
-				'rounded-none p-4 pb-0 @container min-w-0',
+				'rounded-none pt-4 @container min-w-0',
 				isVocab ? 'mt-0' : 'mt-3.5',
 			)}
 		>
@@ -83,28 +83,8 @@ export function EnglishSource({
 					)}
 				</div>
 				<div className="min-w-0 flex-1 flex flex-col justify-between">
-					<div className="flex items-center justify-between gap-2">
-						<div className="text-textcolor min-w-0 font-semibold leading-tight">
-							{title}
-						</div>
-						<button
-							type="button"
-							className={cn(
-								'shrink-0 cursor-pointer text-sm leading-snug',
-								ENGLISH_SIDEBAR_TEXT_LINK_GRADIENT[type],
-							)}
-							onClick={() =>
-								navigate(
-									isVocab
-										? '/english-learning/reference/morphology'
-										: '/english-learning/reference/grammar',
-								)
-							}
-						>
-							{isVocab
-								? t('englishLearning.source.morphologyLink')
-								: t('englishLearning.source.grammarLink')}
-						</button>
+					<div className="text-textcolor min-w-0 font-semibold leading-tight">
+						{title}
 					</div>
 					{description ? (
 						<div className="text-textcolor/50 mt-1 flex h-5 items-center gap-2 text-xs leading-snug">
@@ -114,18 +94,38 @@ export function EnglishSource({
 				</div>
 			</div>
 			<div>
-				<label
-					htmlFor={isVocab ? 'english-vocab-topic' : 'english-classic-topic'}
-					className="text-textcolor/45 mb-2 block text-sm font-medium"
-				>
-					{isVocab
-						? t('englishLearning.import.dataExample')
-						: t('englishLearning.import.dataExampleClassic')}
-				</label>
+				<div className="mb-2 flex items-center justify-between gap-2">
+					<label
+						htmlFor={isVocab ? 'english-vocab-topic' : 'english-classic-topic'}
+						className="text-textcolor/45 text-sm font-medium tracking-wide"
+					>
+						{isVocab
+							? t('englishLearning.import.dataExample')
+							: t('englishLearning.import.dataExampleClassic')}
+					</label>
+					<button
+						type="button"
+						className={cn(
+							'shrink-0 cursor-pointer text-sm leading-snug',
+							ENGLISH_SIDEBAR_TEXT_LINK_GRADIENT[type],
+						)}
+						onClick={() =>
+							navigate(
+								isVocab
+									? '/english-learning/reference/morphology'
+									: '/english-learning/reference/grammar',
+							)
+						}
+					>
+						{isVocab
+							? t('englishLearning.source.morphologyLink')
+							: t('englishLearning.source.grammarLink')}
+					</button>
+				</div>
 				<ScrollArea
 					scrollbars="both"
 					className={cn(
-						'px-2 py-[9.5px] bg-theme/5 border mb-5 max-h-50 w-full min-w-0 rounded-md',
+						'p-1 bg-theme/5 border mb-5 max-h-50 w-full min-w-0 rounded-md',
 						SOURCE_EXAMPLE_PANEL[type],
 					)}
 					viewportClassName="[&>div]:!block [&>div]:w-max"

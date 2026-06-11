@@ -13,6 +13,7 @@ import {
 } from '@ui/dropdown-menu';
 import { Switch } from '@ui/index';
 import { Label } from '@ui/label';
+import { ScrollArea } from '@ui/scroll-area';
 import { ChevronDown, Volume2 } from 'lucide-react';
 import { observer } from 'mobx-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -171,6 +172,21 @@ export const LocalTtsVoiceSetting = observer(function LocalTtsVoiceSetting({
 		}
 	}, [supported, previewing, t]);
 
+	const handleVoiceMenuWheel = useCallback(
+		(event: React.WheelEvent<HTMLDivElement>) => {
+			event.stopPropagation();
+			event.currentTarget.scrollTop += event.deltaY;
+		},
+		[],
+	);
+
+	const handleVoiceMenuWheelCapture = useCallback(
+		(event: React.WheelEvent<HTMLDivElement>) => {
+			event.stopPropagation();
+		},
+		[],
+	);
+
 	const hasMaleGroup = voiceGroups.male.length > 0;
 	const hasFemaleGroup = voiceGroups.female.length > 0;
 
@@ -239,37 +255,44 @@ export const LocalTtsVoiceSetting = observer(function LocalTtsVoiceSetting({
 						</DropdownMenuTrigger>
 						<DropdownMenuContent
 							align="start"
-							className="max-h-72 w-[min(100%,20rem)]"
+							className="w-[min(100%,20rem)] overflow-hidden p-0"
 						>
-							<DropdownMenuRadioGroup
-								value={selected}
-								onValueChange={onVoiceChange}
+							<ScrollArea
+								className="max-h-72 w-full min-h-0 border-0"
+								viewportClassName="max-h-72 box-border py-1 pe-3 ps-1 [&>div]:min-h-0!"
+								onWheel={handleVoiceMenuWheel}
+								onWheelCapture={handleVoiceMenuWheelCapture}
 							>
-								<DropdownMenuRadioItem
-									value={LOCAL_ENGLISH_TTS_VOICE_AUTO}
-									className="px-2 pl-2 [&>span:first-child]:hidden"
+								<DropdownMenuRadioGroup
+									value={selected}
+									onValueChange={onVoiceChange}
 								>
-									{t('setting.system.localTts.autoOption')}
-								</DropdownMenuRadioItem>
-								{hasFemaleGroup || hasMaleGroup ? (
-									<DropdownMenuSeparator />
-								) : null}
-								<VoiceDropdownGroup
-									label={t('setting.system.localTts.groupFemale')}
-									voices={voiceGroups.female}
-									genderTagKey="female"
-									t={t}
-								/>
-								{hasFemaleGroup && hasMaleGroup ? (
-									<DropdownMenuSeparator />
-								) : null}
-								<VoiceDropdownGroup
-									label={t('setting.system.localTts.groupMale')}
-									voices={voiceGroups.male}
-									genderTagKey="male"
-									t={t}
-								/>
-							</DropdownMenuRadioGroup>
+									<DropdownMenuRadioItem
+										value={LOCAL_ENGLISH_TTS_VOICE_AUTO}
+										className="px-2 pl-2 [&>span:first-child]:hidden"
+									>
+										{t('setting.system.localTts.autoOption')}
+									</DropdownMenuRadioItem>
+									{hasFemaleGroup || hasMaleGroup ? (
+										<DropdownMenuSeparator />
+									) : null}
+									<VoiceDropdownGroup
+										label={t('setting.system.localTts.groupFemale')}
+										voices={voiceGroups.female}
+										genderTagKey="female"
+										t={t}
+									/>
+									{hasFemaleGroup && hasMaleGroup ? (
+										<DropdownMenuSeparator />
+									) : null}
+									<VoiceDropdownGroup
+										label={t('setting.system.localTts.groupMale')}
+										voices={voiceGroups.male}
+										genderTagKey="male"
+										t={t}
+									/>
+								</DropdownMenuRadioGroup>
+							</ScrollArea>
 						</DropdownMenuContent>
 					</DropdownMenu>
 					<Button
