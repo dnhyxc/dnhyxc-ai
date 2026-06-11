@@ -257,7 +257,7 @@ function VocabularyPackSectionInner({
 			stopAllEnglishPlayback();
 			setPlayingKey(key);
 			try {
-				await playEnglishPreferred(word, { preferLocal: true });
+				await playEnglishPreferred(word);
 			} catch {
 				Toast({
 					type: 'warning',

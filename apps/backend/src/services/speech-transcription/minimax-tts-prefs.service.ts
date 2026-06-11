@@ -6,6 +6,7 @@ import { MinimaxTtsUserConfig } from './minimax-tts-user-config.entity';
 
 export type MinimaxTtsPrefsView = {
 	enabled: boolean;
+	playbackSource: 'local' | 'cloud';
 	model: string;
 	voiceId: string;
 	speed: number;
@@ -21,6 +22,7 @@ export type MinimaxTtsPrefsView = {
 
 export const DEFAULT_MINIMAX_TTS_PREFS: MinimaxTtsPrefsView = {
 	enabled: false,
+	playbackSource: 'cloud',
 	model: 'speech-2.8-hd',
 	voiceId: 'English_captivating_female1',
 	speed: 1,
@@ -54,9 +56,14 @@ export class MinimaxTtsPrefsService {
 		return e;
 	}
 
+	private normalizePlaybackSource(raw?: string): 'local' | 'cloud' {
+		return raw === 'local' ? 'local' : 'cloud';
+	}
+
 	private rowToView(row: MinimaxTtsUserConfig): MinimaxTtsPrefsView {
 		return {
 			enabled: Boolean(row.enabled),
+			playbackSource: this.normalizePlaybackSource(row.playbackSource),
 			model: row.model?.trim() || DEFAULT_MINIMAX_TTS_PREFS.model,
 			voiceId: row.voiceId?.trim() || DEFAULT_MINIMAX_TTS_PREFS.voiceId,
 			speed: row.speed ?? DEFAULT_MINIMAX_TTS_PREFS.speed,
@@ -90,6 +97,7 @@ export class MinimaxTtsPrefsService {
 			row = this.repo.create({ userId: uid });
 		}
 		row.enabled = Boolean(dto.enabled);
+		row.playbackSource = dto.playbackSource === 'local' ? 'local' : 'cloud';
 		row.model = dto.model;
 		row.voiceId = dto.voiceId.trim();
 		row.speed = dto.speed;

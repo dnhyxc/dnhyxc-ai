@@ -1,11 +1,12 @@
-# 英语学习朗读：播放世代与单词本机优先
+# 英语学习朗读：播放世代与异步丢弃
 
-> 网络列表重试、收藏分页见 [`english-learning-list-network-retry.md`](./english-learning-list-network-retry.md)。  
+> **文档角色**：`playbackGeneration` 播放世代、快速连点防串音。  
+> **按会员选路（单词/语句/练习统一云端或本机）**见 [`tts-membership-routing.md`](./tts-membership-routing.md)。  
 > 收藏抽屉与主列表共用朗读见 [`english-learning-favorites-drawer.md`](./english-learning-favorites-drawer.md)。  
 > **云端同句读音一致（MP3 LRU 缓存）**见 [`english-tts-cache-consistency.md`](./english-tts-cache-consistency.md)。  
 > **MiniMax 流式 TTS 与硅基回退**见 [`minimax-cloud-tts.md`](./minimax-cloud-tts.md)。  
 > **设置页用户偏好**见 [`cloud-tts-settings.md`](./cloud-tts-settings.md)。  
-> **系统设置本机音色（默认 Karen、Dropdown 选择）**见 [`english-tts-local-voice.md`](./english-tts-local-voice.md)。
+> **本机 Web Speech 音色**见 [`english-tts-local-voice.md`](./english-tts-local-voice.md)。
 
 ## 1. 背景与目标
 
@@ -16,15 +17,13 @@
 - **旧请求晚到**：云端 TTS 的 MP3 在用户已点下一条后才开始播放，两条声音叠在一起；
 - **单词走云端延迟高**：单个单词也走硅基云端 TTS，首包慢、且占用远程带宽。
 
-### 1.2 本轮目标
+### 1.2 本轮目标（播放世代）
 
 | 层级 | 目标 |
 |------|------|
 | `englishTts.ts` | 引入 **`playbackGeneration`（播放世代）**，新播放 / `stopAll` 时作废上一轮异步结果 |
-| `playEnglishPreferred` | 新增 **`preferLocal: true`**：单词场景优先本机 Web Speech，不支持则 `NO_TTS` |
-| 单词相关页面 | 调用 `playEnglishPreferred(word, { preferLocal: true })` |
 
-**未改**：经典句、长句仍默认 **云端 TTS → 失败回退本机**（`preferLocal` 默认 `false`）。
+**朗读选路（会员云端 / 非会员本机）**已迁至 [`tts-membership-routing.md`](./tts-membership-routing.md)；本文不再维护「单词 `preferLocal: true`」策略。
 
 若与仓库最新源码不一致，**以源码为准**。
 
@@ -67,14 +66,16 @@ sequenceDiagram
 
 **为何 `playCloudMp3Blob` 内用 `stopPlaybackMediaOnly` 而非 `stopAll`**：同一会话内从云端切到本机回退时，只需清介质，不应再递增世代导致当前 generation 失效。
 
-### 3.2 `preferLocal`：单词 vs 句子
+### 3.2 `preferLocal` 与会员选路
 
-| `preferLocal` | 策略 | 典型场景 |
-|---------------|------|----------|
-| `false`（默认） | 先 `POST` 云端 TTS → 失败再本机 Web Speech | 经典句、长文本 |
-| `true` | 仅本机 Web Speech；不支持则 `throw new Error('NO_TTS')` | 单个单词 |
+**当前产品策略**见 [`tts-membership-routing.md`](./tts-membership-routing.md)：
 
-单词不请求云端，减少延迟与远程失败面；句子仍保留云端音质优先。
+| `preferLocal` | 策略 |
+|---------------|------|
+| 省略 | 有效会员 → 云端 TTS（失败回退本机）；非会员 → 本机 |
+| `true` | 强制本机（如本机音色设置试听） |
+
+历史上曾用 `preferLocal: true` 让单词走本机；该策略已废弃。
 
 ### 3.3 与列表网络问题的关系
 
@@ -202,15 +203,9 @@ export async function playEnglishPreferred(
 }
 ```
 
-### 4.4 页面接入：单词 `preferLocal`
+### 4.4 页面接入（选路）
 
-**来源**：`apps/frontend/src/views/englishLearning/favorites/VocabularyFavoritesSection.tsx`（约 L54–L58）
-
-```typescript
-await playEnglishPreferred(word, { preferLocal: true });
-```
-
-同模式已用于：`VocabularyLibraryWordsPanel`、`VocabularyPackList`、`EnglishMorphologyReferencePage`。经典句面板仍使用 `playEnglishPreferred(english)`（默认云端优先）。
+单词/练习等页面的 **`preferLocal: true` 已移除**；默认按会员选路，见 [`tts-membership-routing.md`](./tts-membership-routing.md) §4.4。
 
 ---
 
@@ -218,9 +213,9 @@ await playEnglishPreferred(word, { preferLocal: true });
 
 | 项 | 说明 |
 |----|------|
-| API | 无后端变更；`playEnglishPreferred` 第二参数可选，旧调用仍兼容 |
-| 单词朗读 | 无云端 TTS 时依赖本机 Web Speech；无 TTS 能力时仍 Toast `NO_TTS` |
-| 句子朗读 | 行为与改前一致（云端 → 回退） |
+| API | 无后端变更；`playEnglishPreferred` 第二参数可选 |
+| 朗读选路 | 见 [`tts-membership-routing.md`](./tts-membership-routing.md) |
+| 播放世代 | 快速连点仍丢弃过期异步结果 |
 | 竞态 | 快速连点仅最后一条有效播放，旧 Promise 静默结束 |
 
 ---

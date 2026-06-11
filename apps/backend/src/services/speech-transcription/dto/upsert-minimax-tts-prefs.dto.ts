@@ -39,6 +39,10 @@ export class UpsertMinimaxTtsPrefsDto {
 	enabled!: boolean;
 
 	@IsString()
+	@IsIn(['local', 'cloud'])
+	playbackSource!: 'local' | 'cloud';
+
+	@IsString()
 	@IsIn(MINIMAX_TTS_MODELS)
 	model!: (typeof MINIMAX_TTS_MODELS)[number];
 

@@ -1,7 +1,8 @@
 # 语音设置页整合（本机 + 云端）
 
 > **文档角色（主文档）**：设置顶栏「语音设置」统一入口；本机 Web Speech 与会员云端 MiniMax 参数同页分区展示。  
-> **延伸阅读**：[`english-tts-local-voice.md`](./english-tts-local-voice.md)（本机分键与 UI）、[`cloud-tts-settings.md`](./cloud-tts-settings.md)（云端表单与 ScrollArea）、[`cloud-tts-prefs-db.md`](./cloud-tts-prefs-db.md)（云端偏好入库）。
+> **端到端全景**：[`tts-end-to-end-guide.md`](./tts-end-to-end-guide.md)  
+> **延伸阅读**：[`tts-playback-source.md`](./tts-playback-source.md)（会员本机/云端 Switch）、[`english-tts-local-voice.md`](./english-tts-local-voice.md)（本机分键与 UI）、[`cloud-tts-settings.md`](./cloud-tts-settings.md)（云端表单与 ScrollArea）、[`cloud-tts-prefs-db.md`](./cloud-tts-prefs-db.md)（云端偏好入库）。
 
 若与仓库最新源码不一致，**以源码为准**。
 
@@ -61,6 +62,17 @@
 
 - 本机区块不依赖云端 API，**立即可交互**。
 - 会员云端区仍 `ensureMinimaxTtsUserPrefsLoaded`；加载中仅云端区 Spinner，不阻塞本机区。
+
+### 3.4 会员朗读介质 Switch（playbackSource）
+
+**有效会员**在本机区与云端区各有一个 Switch，共用账号字段 `playbackSource`（`local` | `cloud`），互斥：
+
+| 区块 | Switch 文案 | 开 = |
+|------|-------------|------|
+| 本机语音设置 | 使用本机语音朗读 | `local` |
+| 云端语音设置 | 使用云端语音朗读 | `cloud`（并 `enabled: true`） |
+
+非会员不展示 Switch。英语学习喇叭选路见 [`tts-playback-source.md`](./tts-playback-source.md)、[`tts-membership-routing.md`](./tts-membership-routing.md)。云端参数表单在 `playbackSource !== 'cloud'` 时禁用（半透明、不可点）。
 
 ---
 

@@ -340,6 +340,11 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'LLM API Key, Base URL, and model name in Settings are stored per signed-in account, not shared site-wide. Without custom config, active members default to SiliconFlow models and non-members to Zhipu GLM; presets include Zhipu GLM. Switching Base URL or model clears the API Key to avoid using the wrong provider key.',
 	},
+	's9-6': {
+		title: 'LLM settings: save to enable',
+		description:
+			'Settings → LLM no longer has a separate “use custom LLM” switch. Fill API Key, Base URL, and model name, then Save to enable custom config; the footer shows the active model in green or the default model in gray. Restore default turns off custom config and reverts to member-based defaults. Unsaved edits or incomplete fields show hints and keep Save disabled.',
+	},
 	's10-1': {
 		title: 'Image component improvements',
 		description:
@@ -709,5 +714,15 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		title: 'Local playback voice per account',
 		description:
 			'Local English Web Speech voice on the Voice settings page is stored separately per signed-in account in the same browser. After switching accounts, the dropdown and playback use that account’s preference without overwriting others (device-only, not synced across devices).',
+	},
+	's24-37': {
+		title: 'English playback routed by membership',
+		description:
+			'Speaker playback across English learning—words, sentences, dictation/spelling practice, daily review, etc.: active members default to cloud synthesis (falls back to local Web Speech when cloud is unavailable); non-members default to browser local voice. Aligns with local/cloud settings under Voice settings.',
+	},
+	's24-38': {
+		title: 'Members can choose local or cloud playback',
+		description:
+			'Active members can use mutually exclusive switches “Use local voice for playback” and “Use cloud voice for playback” under Voice settings to choose the default medium for English learning speaker buttons; preference is saved per account and syncs across devices. Non-members remain local-only.',
 	},
 };

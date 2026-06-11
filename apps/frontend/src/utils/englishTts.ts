@@ -1,7 +1,7 @@
 /**
- * 英语学习朗读：有效会员默认优先云端 TTS，失败则本机 Web Speech；
- * 非会员仅使用本机 Web Speech，不请求 TTS 接口。
- * `preferLocal: true` 时始终优先本机（适合单词），不支持则抛错。
+ * 英语学习朗读：有效会员默认走云端 TTS（单词/语句/练习统一），失败则回退本机 Web Speech；
+ * 非会员默认仅本机 Web Speech，不请求 TTS 接口。
+ * `preferLocal: true` 时强制本机（如本机音色设置页试听）；默认按会员状态选路。
  * 云端 CosyVoice2 无 seed，同一句会随机漂移；对规范化文本做 MP3 缓存以保证重复播放读音一致。
  * 本机无法直接调用 macOS「翻译/词典」弹窗 API；初始默认 Karen 女声，可用 setPreferredLocalEnglishVoiceKey 切换。
  */
@@ -18,6 +18,7 @@ import {
 	buildMinimaxTtsCacheKeySuffix,
 	buildMinimaxTtsRequestExtras,
 	ensureMinimaxTtsUserPrefsLoaded,
+	loadMinimaxTtsUserPrefs,
 } from '@/utils/minimaxTtsPrefs';
 
 export function isEnglishTtsSupported(): boolean {
@@ -339,7 +340,7 @@ export type SpeakEnglishOptions = {
 };
 
 export type PlayEnglishPreferredOptions = {
-	/** 为 true 时优先本机 Web Speech（单词）；默认 false 为优先云端 TTS（句子） */
+	/** 为 true 时强制本机 Web Speech（如本机音色设置试听）；省略时会员走云端、非会员走本机 */
 	preferLocal?: boolean;
 	/** 本机朗读时透传给 Web Speech */
 	speak?: SpeakEnglishOptions;
@@ -393,6 +394,30 @@ function isCloudEnglishTtsAllowed(): boolean {
 	} catch {
 		return false;
 	}
+}
+
+/** 会员可走云端；非会员需本机 Web Speech 可用 */
+export function isEnglishPlaybackAvailable(): boolean {
+	if (!isCloudEnglishTtsAllowed()) {
+		return isEnglishTtsSupported();
+	}
+	if (!shouldUseCloudEnglishTts()) {
+		return isEnglishTtsSupported();
+	}
+	return true;
+}
+
+/** 会员朗读选路：读内存缓存中的 playbackSource；非会员恒 false */
+function shouldUseCloudEnglishTts(
+	options?: PlayEnglishPreferredOptions,
+): boolean {
+	if (options?.preferLocal === true) return false;
+	if (options?.preferLocal === false) {
+		return isCloudEnglishTtsAllowed();
+	}
+	if (!isCloudEnglishTtsAllowed()) return false;
+	const prefs = loadMinimaxTtsUserPrefs();
+	return prefs.playbackSource !== 'local';
 }
 
 function isPlaybackGenerationActive(generation: number): boolean {
@@ -588,7 +613,9 @@ function speakOneUtterance(
 
 		// 略慢于 1.0，长句更清晰；与系统词典语速接近
 		utter.rate = options?.rate ?? 0.9;
+		// 音高（pitch）：默认为 1，表示正常音高。（可通过 options.pitch 覆盖）
 		utter.pitch = options?.pitch ?? 1;
+		// 音量（volume）：默认为 1（可能是自定义规范，原生取值范围是 0~1），可通过 options.volume 覆盖
 		utter.volume = options?.volume ?? 1;
 
 		utter.onend = () => resolve();
@@ -663,8 +690,7 @@ export async function playEnglishPreferred(
 
 	const generation = beginPlaybackSession();
 	const speakOpts = options?.speak;
-	const preferLocal = options?.preferLocal === true;
-	const useCloud = !preferLocal && isCloudEnglishTtsAllowed();
+	const useCloud = shouldUseCloudEnglishTts(options);
 
 	if (!useCloud) {
 		if (!isPlaybackGenerationActive(generation)) return;

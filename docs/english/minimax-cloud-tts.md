@@ -1,6 +1,7 @@
 # MiniMax 云端流式 TTS 接入与硅基回退（完整实现说明）
 
 > 播放世代、单词本机优先见 [`english-tts-playback.md`](./english-tts-playback.md)。  
+> **端到端全景（非技术可读 + 逐行注释）**见 [`tts-end-to-end-guide.md`](./tts-end-to-end-guide.md)。  
 > 前后端 MP3 LRU 缓存原理见 [`english-tts-cache-consistency.md`](./english-tts-cache-consistency.md)。  
 > **设置页用户偏好**（账号级 DB、请求体合并、45 音色 UI）见 [`cloud-tts-settings.md`](./cloud-tts-settings.md) 与 [`cloud-tts-prefs-db.md`](./cloud-tts-prefs-db.md)。  
 > 本专题 **§11** 从仓库源码自动生成「**每行代码上一行 // 注释**」的完整实现；与前文 §3–§10 规格对照阅读。

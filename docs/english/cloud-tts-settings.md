@@ -1,6 +1,7 @@
 # 设置页「云端语音设置」与用户偏好
 
 > **文档角色（主文档）**：**设置 → 语音设置** 页内「云端语音设置」区块；会员可见，参数存服务端。本机区块见 [`voice-settings-page.md`](./voice-settings-page.md)、[`english-tts-local-voice.md`](./english-tts-local-voice.md)。  
+> **朗读介质 Switch**：[`tts-playback-source.md`](./tts-playback-source.md)  
 > **存储与账号同步**：[`cloud-tts-prefs-db.md`](./cloud-tts-prefs-db.md)  
 > 后端 MiniMax 流式合成、硅基回退与 LRU 见 [`minimax-cloud-tts.md`](./minimax-cloud-tts.md)。  
 > 播放世代、单词本机优先见 [`english-tts-playback.md`](./english-tts-playback.md)。

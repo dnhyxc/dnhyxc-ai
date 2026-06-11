@@ -3,6 +3,7 @@ import { SETTINGS_CLOUD_TTS } from './api';
 
 export type CloudTtsSettingsView = {
 	enabled: boolean;
+	playbackSource: 'local' | 'cloud';
 	model: string;
 	voiceId: string;
 	speed: number;

@@ -10,7 +10,7 @@ import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import type { EnglishClassicQuoteMistakeListEntry } from '@/service';
 import {
-	isEnglishTtsSupported,
+	isEnglishPlaybackAvailable,
 	playEnglishPreferred,
 	stopAllEnglishPlayback,
 } from '@/utils/englishTts';
@@ -200,7 +200,7 @@ export function ClassicQuoteMistakesPanel({
 				setPlayingKey(null);
 				return;
 			}
-			if (!isEnglishTtsSupported()) {
+			if (!isEnglishPlaybackAvailable()) {
 				Toast({
 					type: 'warning',
 					title: t('englishLearning.tts.unsupported'),

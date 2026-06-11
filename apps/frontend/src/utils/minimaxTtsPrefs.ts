@@ -25,6 +25,7 @@ export type MinimaxTtsUserPrefs = CloudTtsSettingsView;
 
 export const DEFAULT_MINIMAX_TTS_USER_PREFS: MinimaxTtsUserPrefs = {
 	enabled: false,
+	playbackSource: 'cloud',
 	model: DEFAULT_MINIMAX_TTS_MODEL,
 	voiceId: DEFAULT_MINIMAX_TTS_VOICE_ID,
 	speed: 1,
@@ -71,6 +72,7 @@ export function normalizeMinimaxTtsUserPrefs(
 	const format = pickString(o.format, 'mp3', 16);
 	return {
 		enabled: Boolean(o.enabled),
+		playbackSource: o.playbackSource === 'local' ? 'local' : 'cloud',
 		model: (MINIMAX_TTS_MODELS as readonly string[]).includes(model)
 			? model
 			: DEFAULT_MINIMAX_TTS_MODEL,

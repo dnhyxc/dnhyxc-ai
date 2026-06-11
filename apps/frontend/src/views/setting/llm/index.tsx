@@ -1,6 +1,6 @@
 import { Button } from '@ui/button';
 import { CreatableCombobox } from '@ui/combobox';
-import { Spinner, Switch, Toast } from '@ui/index';
+import { Spinner, Toast } from '@ui/index';
 import { Input } from '@ui/input';
 import { Label } from '@ui/label';
 import { Eye, EyeOff } from 'lucide-react';
@@ -137,7 +137,6 @@ const LlmSetting = observer(() => {
 	const [loading, setLoading] = useState(true);
 	const [saving, setSaving] = useState(false);
 	const [view, setView] = useState<LlmSettingsView | null>(null);
-	const [enabled, setEnabled] = useState(false);
 	const [baseUrl, setBaseUrl] = useState(providerDefaults.baseUrl);
 	const [modelName, setModelName] = useState(providerDefaults.modelName);
 	const [apiKey, setApiKey] = useState(providerDefaults.apiKey);
@@ -196,7 +195,6 @@ const LlmSetting = observer(() => {
 			const [res] = await Promise.all([getLlmSettings()]);
 			if (res.success && res.data) {
 				setView(res.data);
-				setEnabled(res.data.enabled);
 				setBaseUrl(
 					resolveTextField(res.data.baseUrl, providerDefaults.baseUrl),
 				);
@@ -228,13 +226,117 @@ const LlmSetting = observer(() => {
 		);
 	}, [apiKey, baseUrl, modelName]);
 
+	const hasUnsavedChanges = useMemo(() => {
+		if (!view?.active) return false;
+		const savedBase = resolveTextField(view.baseUrl, providerDefaults.baseUrl);
+		const savedModel = resolveTextField(
+			view.modelName,
+			providerDefaults.modelName,
+		);
+		const savedKeyDisplay = savedApiKey || providerDefaults.apiKey;
+		return (
+			baseUrl.trim() !== savedBase.trim() ||
+			modelName.trim() !== savedModel.trim() ||
+			apiKey.trim() !== savedKeyDisplay.trim()
+		);
+	}, [
+		apiKey,
+		baseUrl,
+		modelName,
+		providerDefaults.apiKey,
+		providerDefaults.baseUrl,
+		providerDefaults.modelName,
+		savedApiKey,
+		view,
+	]);
+
+	/** 未启用自定义时，表单与基线一致则视为「无待保存修改」（含恢复默认后的预填项） */
+	const inactiveFormBaseline = useMemo(() => {
+		const hasStoredFields =
+			Boolean(view?.baseUrl?.trim()) ||
+			Boolean(view?.modelName?.trim()) ||
+			Boolean(savedApiKey);
+		if (hasStoredFields) {
+			return {
+				baseUrl: resolveTextField(view?.baseUrl, providerDefaults.baseUrl),
+				modelName: resolveTextField(
+					view?.modelName,
+					providerDefaults.modelName,
+				),
+				apiKey: savedApiKey || providerDefaults.apiKey,
+			};
+		}
+		return {
+			baseUrl: providerDefaults.baseUrl,
+			modelName: providerDefaults.modelName,
+			apiKey: providerDefaults.apiKey,
+		};
+	}, [providerDefaults, savedApiKey, view?.baseUrl, view?.modelName]);
+
+	const hasDraftChanges = useMemo(() => {
+		if (view?.active) return hasUnsavedChanges;
+		return (
+			baseUrl.trim() !== inactiveFormBaseline.baseUrl.trim() ||
+			modelName.trim() !== inactiveFormBaseline.modelName.trim() ||
+			apiKey.trim() !== inactiveFormBaseline.apiKey.trim()
+		);
+	}, [
+		apiKey,
+		baseUrl,
+		hasUnsavedChanges,
+		inactiveFormBaseline,
+		modelName,
+		view?.active,
+	]);
+
+	const canSubmitSave = canSave && hasDraftChanges;
+
+	const footerHint = useMemo(() => {
+		if (view?.active && !hasDraftChanges) {
+			return {
+				tone: 'active' as const,
+				message: t('setting.llm.activeHint', {
+					modelName: view.modelName?.trim() || modelName.trim() || '—',
+				}),
+			};
+		}
+		if (!hasDraftChanges) {
+			return {
+				tone: 'default' as const,
+				message: t('setting.llm.defaultHint', {
+					modelName: providerDefaults.modelName.trim() || '—',
+				}),
+			};
+		}
+		if (!canSave) {
+			return {
+				tone: 'default' as const,
+				message: t('setting.llm.incompleteDraftHint'),
+			};
+		}
+		return {
+			tone: 'pending' as const,
+			message: view?.active
+				? t('setting.llm.unsavedHint')
+				: t('setting.llm.readyToSaveHint'),
+		};
+	}, [
+		canSave,
+		hasDraftChanges,
+		modelName,
+		providerDefaults.modelName,
+		t,
+		view?.active,
+		view?.modelName,
+	]);
+
 	const onSave = async () => {
 		setSaving(true);
 		try {
 			const trimmedKey = apiKey.trim();
 			const keyUnchanged = trimmedKey === savedApiKey.trim();
 			const res = await updateLlmSettings({
-				enabled,
+				enabled: true,
 				baseUrl: baseUrl.trim(),
 				modelName: modelName.trim(),
 				...(!keyUnchanged && trimmedKey ? { apiKey: trimmedKey } : {}),
@@ -264,7 +366,6 @@ const LlmSetting = observer(() => {
 			const res = await clearLlmSettings();
 			if (res.success && res.data) {
 				setView(res.data);
-				setEnabled(false);
 				setBaseUrl(providerDefaults.baseUrl);
 				setModelName(providerDefaults.modelName);
 				setSavedApiKey('');
@@ -274,7 +375,6 @@ const LlmSetting = observer(() => {
 					type: 'success',
 					title: t('setting.llm.clearSuccess'),
 				});
-				void load();
 			}
 		} finally {
 			setSaving(false);
@@ -289,34 +389,13 @@ const LlmSetting = observer(() => {
 					<div className="my-2 px-8.5 text-xs text-textcolor/55">
 						{t('setting.llm.desc')}
 					</div>
-
-					{loading ? (
-						<p className="mt-3.5 px-8.5 text-sm text-textcolor/70">
-							{t('common.loading')}
-						</p>
-					) : (
-						<div className="mt-3.5 flex items-center justify-between gap-4 px-8.5 text-sm">
-							<div className="min-w-0 flex-1">
-								<Label
-									htmlFor="llm-enabled"
-									className="cursor-pointer text-sm font-medium"
-								>
-									{t('setting.llm.enabledLabel')}
-								</Label>
-								<p className="mt-1 text-xs text-textcolor/55">
-									{t('setting.llm.enabledHelp')}
-								</p>
-							</div>
-							<Switch
-								id="llm-enabled"
-								checked={enabled}
-								onCheckedChange={setEnabled}
-							/>
-						</div>
-					)}
 				</div>
 
-				{!loading ? (
+				{loading ? (
+					<p className="mt-3.5 px-8.5 text-sm text-textcolor/70">
+						{t('common.loading')}
+					</p>
+				) : (
 					<>
 						<div className="my-3.5 w-full border-b border-theme/20 pb-4.5">
 							<div className="text-md font-bold">
@@ -339,7 +418,7 @@ const LlmSetting = observer(() => {
 											options={baseUrlOptions}
 											placeholder={t('setting.llm.baseUrlPlaceholder')}
 											presetsAriaLabel={t('setting.llm.openPresets')}
-											disabled={!enabled || saving}
+											disabled={saving}
 											inputClassName={fieldInputClass}
 										/>
 									</div>
@@ -357,7 +436,7 @@ const LlmSetting = observer(() => {
 											options={modelOptions}
 											placeholder={t('setting.llm.modelNamePlaceholder')}
 											presetsAriaLabel={t('setting.llm.openPresets')}
-											disabled={!enabled || saving}
+											disabled={saving}
 											inputClassName={fieldInputClass}
 										/>
 									</div>
@@ -377,7 +456,7 @@ const LlmSetting = observer(() => {
 											value={apiKey}
 											onChange={(e) => setApiKey(e.target.value)}
 											placeholder={t('setting.llm.apiKeyPlaceholder')}
-											disabled={!enabled || saving}
+											disabled={saving}
 											autoComplete="new-password"
 											className={cn(fieldInputClass, 'pr-10')}
 										/>
@@ -386,7 +465,7 @@ const LlmSetting = observer(() => {
 											variant="ghost"
 											size="icon"
 											className="absolute top-1/2 right-1.5 size-6 -translate-y-1/2 text-textcolor/55 hover:text-textcolor"
-											disabled={!enabled || saving || !apiKey}
+											disabled={saving || !apiKey}
 											aria-label={
 												showApiKey
 													? t('setting.llm.hideApiKey')
@@ -408,18 +487,16 @@ const LlmSetting = observer(() => {
 						<div className="mt-3.5 w-full pb-4.5">
 							<div className="flex flex-wrap items-center justify-between gap-3">
 								<p className="min-w-0 flex-1 text-sm">
-									{view?.active ? (
-										<span className="text-teal-500">
-											{t('setting.llm.activeHint', {
-												modelName:
-													view.modelName?.trim() || modelName.trim() || '—',
-											})}
-										</span>
-									) : view?.enabled && !view.active ? (
-										<span className="text-textcolor/60">
-											{t('setting.llm.incompleteHint')}
-										</span>
-									) : null}
+									<span
+										className={cn(
+											footerHint.tone === 'active' && 'text-teal-500',
+											footerHint.tone === 'pending' &&
+												'text-amber-600 dark:text-amber-400',
+											footerHint.tone === 'default' && 'text-textcolor/60',
+										)}
+									>
+										{footerHint.message}
+									</span>
 								</p>
 								<div className="flex shrink-0 flex-wrap items-center">
 									<Button
@@ -440,7 +517,7 @@ const LlmSetting = observer(() => {
 											'ml-3 min-w-24 cursor-pointer',
 											saving && 'disabled:opacity-100',
 										)}
-										disabled={saving || !canSave}
+										disabled={saving || !canSubmitSave}
 										onClick={() => void onSave()}
 									>
 										{saving ? <Spinner className="size-4" /> : null}
@@ -450,7 +527,7 @@ const LlmSetting = observer(() => {
 							</div>
 						</div>
 					</>
-				) : null}
+				)}
 			</div>
 		</div>
 	);

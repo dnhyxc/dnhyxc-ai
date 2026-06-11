@@ -1,7 +1,7 @@
 import { Toast } from '@ui/index';
 import { useCallback, useEffect, useState } from 'react';
 import {
-	isEnglishTtsSupported,
+	isEnglishPlaybackAvailable,
 	playEnglishPreferred,
 	stopAllEnglishPlayback,
 } from '@/utils/englishTts';
@@ -24,7 +24,7 @@ export function useDailyPlayback(args: {
 	const playWord = useCallback(
 		async (options?: PlayOptions) => {
 			if (!word.trim()) return;
-			if (!isEnglishTtsSupported()) {
+			if (!isEnglishPlaybackAvailable()) {
 				Toast({
 					type: 'warning',
 					title: t('englishLearning.tts.unsupported'),
@@ -39,7 +39,7 @@ export function useDailyPlayback(args: {
 			stopAllEnglishPlayback();
 			setPlaying(true);
 			try {
-				await playEnglishPreferred(word, { preferLocal: true });
+				await playEnglishPreferred(word);
 			} finally {
 				setPlaying(false);
 			}

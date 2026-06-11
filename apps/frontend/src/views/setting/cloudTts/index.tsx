@@ -310,6 +310,24 @@ const CloudTtsSetting = observer(() => {
 		(partial: Partial<MinimaxTtsUserPrefs>) => {
 			setPrefs((prev) => {
 				const next = { ...prev, ...partial };
+				if (partial.playbackSource === 'cloud') {
+					next.enabled = true;
+				}
+				if (
+					'model' in partial ||
+					'voiceId' in partial ||
+					'speed' in partial ||
+					'vol' in partial ||
+					'pitch' in partial ||
+					'emotion' in partial ||
+					'format' in partial ||
+					'languageBoost' in partial ||
+					'sampleRate' in partial ||
+					'bitrate' in partial ||
+					'channel' in partial
+				) {
+					next.enabled = true;
+				}
 				if (loggedInUserId > 0) {
 					void saveMinimaxTtsUserPrefs(next, loggedInUserId);
 				}
@@ -372,7 +390,8 @@ const CloudTtsSetting = observer(() => {
 		}
 	};
 
-	const fieldsDisabled = loading || !prefs.enabled || previewing;
+	const fieldsDisabled =
+		loading || prefs.playbackSource !== 'cloud' || previewing;
 
 	const pageShellClass =
 		'm-2 mx-auto flex h-full w-full max-w-3xl flex-col items-center justify-center';
@@ -380,7 +399,13 @@ const CloudTtsSetting = observer(() => {
 	return (
 		<div className={pageShellClass}>
 			<div className="w-full">
-				<LocalTtsVoiceSetting showDivider={isMemberActive} />
+				<LocalTtsVoiceSetting
+					showDivider={isMemberActive}
+					isMemberActive={isMemberActive}
+					playbackSource={prefs.playbackSource}
+					onPlaybackSourceChange={(source) => patch({ playbackSource: source })}
+					playbackPrefsLoading={loading}
+				/>
 
 				{isMemberActive ? (
 					loading ? (
@@ -400,19 +425,24 @@ const CloudTtsSetting = observer(() => {
 								<div className="mt-3.5 flex items-center justify-between gap-4 px-8.5 text-sm">
 									<div className="min-w-0 flex-1">
 										<Label
-											htmlFor="cloud-tts-enabled"
+											htmlFor="cloud-tts-playback"
 											className="cursor-pointer text-sm font-medium"
 										>
-											{t('setting.cloudTts.enabledLabel')}
+											{t('setting.cloudTts.playbackLabel')}
 										</Label>
 										<p className="mt-1 text-xs text-textcolor/55">
-											{t('setting.cloudTts.enabledHelp')}
+											{t('setting.cloudTts.playbackHelp')}
 										</p>
 									</div>
 									<Switch
-										id="cloud-tts-enabled"
-										checked={prefs.enabled}
-										onCheckedChange={(enabled) => patch({ enabled })}
+										id="cloud-tts-playback"
+										checked={prefs.playbackSource === 'cloud'}
+										onCheckedChange={(checked) =>
+											patch({
+												playbackSource: checked ? 'cloud' : 'local',
+												enabled: checked,
+											})
+										}
 									/>
 								</div>
 							</div>
@@ -420,7 +450,8 @@ const CloudTtsSetting = observer(() => {
 							<div
 								className={cn(
 									'my-3.5 flex flex-col gap-4 px-8.5 text-sm',
-									!prefs.enabled && 'pointer-events-none opacity-50',
+									prefs.playbackSource !== 'cloud' &&
+										'pointer-events-none opacity-50',
 								)}
 							>
 								<div className="flex items-center gap-1">
@@ -580,7 +611,7 @@ const CloudTtsSetting = observer(() => {
 											'ml-3 min-w-24 cursor-pointer gap-1.5',
 											previewing && 'disabled:opacity-100',
 										)}
-										disabled={previewing || !prefs.enabled}
+										disabled={previewing || prefs.playbackSource !== 'cloud'}
 										onClick={() => void onPreview()}
 									>
 										<Volume2 className="size-4" aria-hidden />

@@ -1,7 +1,7 @@
 # 大模型设置页：预设联动、可输入 Combobox 与 API Key 环境默认
 
 > **文档角色**：本轮**前端**设置页 `/setting/llm` 的体验与表单逻辑增强（不含后端 `llm_runtime_config` 变更）。  
-> **延伸阅读**：[llm-runtime-settings.md](./llm-runtime-settings.md)（持久化、`createLlm` 快照）、[create-llm.md](./create-llm.md)（工厂与 env 回退链）。
+> **延伸阅读**：[llm-setting-save-flow.md](./llm-setting-save-flow.md)（保存即启用与底部四态）、[llm-runtime-settings.md](./llm-runtime-settings.md)（持久化、`createLlm` 快照）、[create-llm.md](./create-llm.md)（工厂与 env 回退链）。
 
 若与仓库最新源码不一致，**以源码为准**。
 

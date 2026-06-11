@@ -47,6 +47,15 @@ export class MinimaxTtsUserConfig {
 	@Column({ type: 'int', default: 1 })
 	channel!: number;
 
+	/** 会员朗读选路：local 本机 Web Speech，cloud 云端 TTS */
+	@Column({
+		name: 'playback_source',
+		type: 'varchar',
+		length: 16,
+		default: 'cloud',
+	})
+	playbackSource!: 'local' | 'cloud';
+
 	@UpdateDateColumn({ name: 'updated_at', type: 'timestamp' })
 	updatedAt!: Date;
 }

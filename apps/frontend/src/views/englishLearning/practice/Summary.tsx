@@ -11,7 +11,7 @@ import {
 	recordEnglishPracticeReviewAttempts,
 } from '@/service';
 import {
-	isEnglishTtsSupported,
+	isEnglishPlaybackAvailable,
 	playEnglishPreferred,
 	stopAllEnglishPlayback,
 } from '@/utils/englishTts';
@@ -165,7 +165,7 @@ export function Summary({
 				setPlayingKey(null);
 				return;
 			}
-			if (!isEnglishTtsSupported()) {
+			if (!isEnglishPlaybackAvailable()) {
 				Toast({
 					type: 'warning',
 					title: t('englishLearning.tts.unsupported'),
@@ -175,7 +175,7 @@ export function Summary({
 			stopAllEnglishPlayback();
 			setPlayingKey(key);
 			try {
-				await playEnglishPreferred(word, { preferLocal: true });
+				await playEnglishPreferred(word);
 			} catch {
 				Toast({
 					type: 'warning',

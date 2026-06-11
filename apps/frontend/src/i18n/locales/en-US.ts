@@ -95,13 +95,10 @@ export const enUS = {
 	'setting.menu.cloudTts': 'Voice settings',
 	'setting.llm.title': 'LLM configuration',
 	'setting.llm.desc':
-		'When enabled with API Key, Base URL, and model name, these values override server environment variables for chat, assistant, RAG, and English learning. Clear to use .env again.',
-	'setting.llm.enabledLabel': 'Use custom LLM settings',
-	'setting.llm.enabledHelp':
-		'All three fields are required; incomplete settings will not override env.',
+		'Fill in API Key, Base URL, and model name, then click Save to enable custom LLM settings for chat, assistant, RAG, and English learning. Restore default turns off custom config and uses membership-based defaults.',
 	'setting.llm.connectionTitle': 'Connection',
 	'setting.llm.connectionDesc':
-		'Please fill in the API Key, Base URL, and model name of the OpenAI-compatible interface.',
+		'Enter the API Key, Base URL, and model name for your OpenAI-compatible endpoint, then save at the bottom.',
 	'setting.llm.baseUrl': 'Base URL',
 	'setting.llm.baseUrlPlaceholder': 'Enter base URL',
 	'setting.llm.openPresets': 'Choose preset',
@@ -126,11 +123,16 @@ export const enUS = {
 	'setting.llm.saveSuccess': 'LLM settings saved',
 	'setting.llm.clearSuccess': 'Reverted to environment variables',
 	'setting.llm.activeHint': '{modelName} model configuration is in use',
+	'setting.llm.unsavedHint': 'Unsaved changes—please save',
+	'setting.llm.readyToSaveHint': 'Save to apply your custom model',
+	'setting.llm.incompleteDraftHint':
+		'Complete all three fields, then save to apply the model',
+	'setting.llm.defaultHint': 'Default {modelName} model is in use',
 	'setting.llm.incompleteHint':
 		'Enabled but incomplete; still using environment variables',
 	'setting.cloudTts.title': 'Cloud voice settings',
 	'setting.cloudTts.desc':
-		'When enabled, cloud playback in English learning uses the parameters below. When off, server defaults apply.',
+		'When on, speaker buttons use cloud synthesis with the parameters below; when off, playback uses local Web Speech (mutually exclusive with Local voice settings above). Restore default parameters keeps cloud routing but uses server defaults.',
 	'setting.cloudTts.paramsTitle': 'Playback parameters',
 	'setting.cloudTts.paramsDesc':
 		'Voice, speed, audio format, and related options.',
@@ -168,7 +170,10 @@ export const enUS = {
 		'1 = mono (recommended for narration), 2 = stereo.',
 	'setting.cloudTts.enabledLabel': 'Use custom playback parameters',
 	'setting.cloudTts.enabledHelp':
-		'Stored in this browser and applied immediately; changing settings re-synthesizes the same line.',
+		'When on, cloud playback uses the parameters below; when off, server defaults apply.',
+	'setting.cloudTts.playbackLabel': 'Use cloud voice for playback',
+	'setting.cloudTts.playbackHelp':
+		'Mutually exclusive with “Use local voice for playback” above; the parameter form applies when this is on.',
 	'setting.cloudTts.openPresets': 'Choose preset',
 	'setting.cloudTts.model': 'Model',
 	'setting.cloudTts.voiceId': 'Voice category',
@@ -259,6 +264,9 @@ export const enUS = {
 	'setting.system.localTts.title': 'Local voice settings',
 	'setting.system.localTts.desc':
 		'English learning uses local browser speech. Pick a voice from female/male groups and preview. Preferences are saved on this device for the signed-in account.',
+	'setting.system.localTts.enabledLabel': 'Use local voice for playback',
+	'setting.system.localTts.enabledHelp':
+		'When on, speaker buttons in English learning use the local voice above. Mutually exclusive with Cloud voice settings below. Non-members always use local playback.',
 	'setting.system.localTts.voiceLabel': 'Voice',
 	'setting.system.localTts.autoOption': 'Default (Karen)',
 	'setting.system.localTts.groupFemale': 'Female',

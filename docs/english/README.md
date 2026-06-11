@@ -68,7 +68,10 @@
 | [english-tts-local-voice.md](./english-tts-local-voice.md) | **本机 Web Speech 音色**、按账号分键 |
 | [cloud-tts-prefs-db.md](./cloud-tts-prefs-db.md) | **偏好入库**：`minimax_tts_user_config`、API、跨设备同步 |
 | [../app/login-cloud-tts-prefetch-401.md](../app/login-cloud-tts-prefetch-401.md) | **登录 401 误登出**（预拉取与 token 时序） |
-| [english-tts-playback.md](./english-tts-playback.md) | 播放世代、单词本机优先 |
+| [tts-end-to-end-guide.md](./tts-end-to-end-guide.md) | **TTS 端到端全景**：非技术可读 + 前后端逐行注释代码 |
+| [tts-membership-routing.md](./tts-membership-routing.md) | **按会员选路**：单词/语句/练习统一云端或本机 |
+| [tts-playback-source.md](./tts-playback-source.md) | **会员本机/云端 Switch** 与 `playbackSource` 入库 |
+| [english-tts-playback.md](./english-tts-playback.md) | 播放世代、异步丢弃 |
 | [english-tts-cache-consistency.md](./english-tts-cache-consistency.md) | 云端同句 MP3 LRU |
 - 列表/UI：[english-learning-list-network-retry.md](./english-learning-list-network-retry.md)、[english-learning-vocab-ui-refactor.md](./english-learning-vocab-ui-refactor.md)
 - 完整列表：`ls docs/english/*.md`

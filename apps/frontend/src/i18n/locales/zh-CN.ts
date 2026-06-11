@@ -91,12 +91,10 @@ export const zhCN = {
 	'setting.menu.cloudTts': '语音设置',
 	'setting.llm.title': '大模型配置',
 	'setting.llm.desc':
-		'开启并填写 API Key、Base URL、模型名称后，将覆盖服务器环境变量，统一用于对话、知识库助手、问答与英语学习等模块。关闭或清空后恢复使用 .env 配置。',
-	'setting.llm.enabledLabel': '使用自定义大模型配置',
-	'setting.llm.enabledHelp': '需同时填写三项；未填全时不会覆盖现有环境变量。',
+		'填写 API Key、Base URL 与模型名称后，点击「保存模型配置」即可启用自定义大模型（对话、知识库助手、问答、英语学习等模块共用）。「恢复默认配置」将关闭自定义并回到按会员状态使用的默认模型。',
 	'setting.llm.connectionTitle': '连接参数',
 	'setting.llm.connectionDesc':
-		'请填写 OpenAI 兼容接口的 API Key、Base URL 与 模型名称。',
+		'请填写 OpenAI 兼容接口的 API Key、Base URL 与模型名称，填写完成后点底部保存。',
 	'setting.llm.baseUrl': 'Base URL',
 	'setting.llm.baseUrlPlaceholder': '输入 Base URL',
 	'setting.llm.openPresets': '选择预设',
@@ -120,11 +118,15 @@ export const zhCN = {
 	'setting.llm.saveSuccess': '大模型配置已保存',
 	'setting.llm.clearSuccess': '已恢复使用环境变量',
 	'setting.llm.activeHint': '{modelName} 模型配置生效中',
+	'setting.llm.unsavedHint': '有未保存更改，请保存',
+	'setting.llm.readyToSaveHint': '可保存设置让自定义模型生效',
+	'setting.llm.incompleteDraftHint': '请补全三项内容后再保存让模型生效',
+	'setting.llm.defaultHint': '当前默认 {modelName} 模型生效中',
 	'setting.llm.incompleteHint': '已开启但配置不完整，仍使用环境变量',
 	/** 云端朗读 */
 	'setting.cloudTts.title': '云端语音设置',
 	'setting.cloudTts.desc':
-		'开启后，英语学习等场景的云端朗读将使用下列参数；关闭则使用服务端默认音色与模型。',
+		'开启后，英语学习等场景的喇叭统一走云端合成，并可调整下方朗读参数；关闭则与上方「本机语音设置」互斥，改走本机朗读。点「恢复默认参数」可恢复服务端默认合成（仍保持云端选路）。',
 	'setting.cloudTts.paramsTitle': '朗读参数',
 	'setting.cloudTts.paramsDesc': '音色、语速与音频格式等，可按需调整。',
 	'setting.cloudTts.paramsHelpAria': '查看朗读参数字段说明',
@@ -160,7 +162,10 @@ export const zhCN = {
 		'声道数：1 为单声道（推荐），2 为立体声；朗读场景一般保持 1 即可。',
 	'setting.cloudTts.enabledLabel': '使用自定义朗读参数',
 	'setting.cloudTts.enabledHelp':
-		'参数保存在本机浏览器，立即生效；修改后同一句会重新合成。',
+		'开启后，云端朗读使用下方参数；关闭时使用服务端默认合成。',
+	'setting.cloudTts.playbackLabel': '使用云端语音朗读',
+	'setting.cloudTts.playbackHelp':
+		'与上方「使用本机语音朗读」互斥；开启后下方参数表单生效。',
 	'setting.cloudTts.openPresets': '选择预设',
 	'setting.cloudTts.model': '模型',
 	'setting.cloudTts.voiceId': '音色类别',
@@ -246,6 +251,9 @@ export const zhCN = {
 	'setting.system.localTts.title': '本机语音设置',
 	'setting.system.localTts.desc':
 		'英语学习使用浏览器本机语音；下拉按女声、男声分组，可选具体音色并试听。偏好按当前登录账号保存在本设备。',
+	'setting.system.localTts.enabledLabel': '使用本机语音朗读',
+	'setting.system.localTts.enabledHelp':
+		'开启后，英语学习中的喇叭统一使用上方本机音色；与下方「云端语音设置」开关互斥。非会员始终使用本机朗读。',
 	'setting.system.localTts.voiceLabel': '朗读音色',
 	'setting.system.localTts.autoOption': '默认（Karen）',
 	'setting.system.localTts.groupFemale': '女声',
