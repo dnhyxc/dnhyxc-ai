@@ -106,9 +106,9 @@ const LoginForm: React.FC<IProps> = ({ onForgetPwd }) => {
 				captchaId: captchaInfo.captchaId,
 			});
 			if (res.success) {
-				userStore.setUserInfo(res.data);
 				setStorage('token', res.data.access_token);
 				http.setAuthToken(res.data.access_token);
+				userStore.setUserInfo(res.data);
 				navigate('/');
 				onForgetPwd(false);
 			}

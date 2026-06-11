@@ -1,72 +1,171 @@
 # 英语学习：本机 TTS 音色设置与默认 Karen
 
-> 播放世代、单词本机优先、云端缓存见 [`english-tts-playback.md`](./english-tts-playback.md)、[`english-tts-cache-consistency.md`](./english-tts-cache-consistency.md)。
+> **文档角色（主文档）**：系统设置中的 Web Speech 英语音色、按账号分键持久化、设置页 UI 与换号同步。  
+> **延伸阅读**：[`english-tts-playback.md`](./english-tts-playback.md)（播放世代与会员云端策略）、[`cloud-tts-prefs-db.md`](./cloud-tts-prefs-db.md)（云端朗读偏好入库，与本机音色分离）、[`../app/user-switch-state-reset.md`](../app/user-switch-state-reset.md)（换号清内存态；本机音色键**不**清）。
+
+若与仓库最新源码不一致，**以源码为准**。
+
+---
 
 ## 1. 背景与目标
 
-用户希望在**系统设置**中选择本机 Web Speech 英语音色并试听；单词场景 `preferLocal: true` 时使用该偏好。默认女声由 **Moira** 调整为 **Karen**，且首次进入应用即写入 `localStorage`，避免「只有点选后才生效」。
+### 1.1 产品需求
+
+- 在**系统设置**中选择本机 Web Speech 英语音色并试听；单词场景 `preferLocal: true` 时使用该偏好。
+- 默认女声为 **Karen**；首次为某账号写入默认 key，避免「只有点选后才生效」。
+- **按登录账号隔离**：同一浏览器内 A/B 换号后，各自的本机音色偏好互不覆盖；设置页下拉框与播放一致。
+
+### 1.2 与云端朗读的边界
+
+| 维度 | 本机 Web Speech | 云端 MiniMax 等 |
+|------|-----------------|-----------------|
+| 存储 | `localStorage` 键 `english_learning_local_tts_voice:{userId}` | 表 `minimax_tts_user_config` |
+| 设置入口 | 系统设置 → 本机朗读 | 设置 → 云端朗读（**会员**） |
+| 换号 | 读对应 `:userId` 键，UI 随 `loggedInUserId` 刷新 | 服务端 JWT + 内存缓存 |
+
+---
 
 ## 2. 改动范围
 
 | 说明 | 路径 |
 |------|------|
-| TTS 核心 | `apps/frontend/src/utils/englishTts.ts` |
-| 系统设置 UI | `apps/frontend/src/views/setting/system/TtsVoiceSetting.tsx`（新建） |
+| TTS 核心（分键、legacy 迁移、换号清 voice 缓存） | `apps/frontend/src/utils/englishTts.ts` |
+| 系统设置 UI（`observer` + 单一 `useEffect`） | `apps/frontend/src/views/setting/system/TtsVoiceSetting.tsx` |
+| 用户 id 与分键工具 | `apps/frontend/src/store/loggedInUserId.ts` |
 | 设置页挂载 | `apps/frontend/src/views/setting/system/index.tsx` |
-| i18n | `apps/frontend/src/i18n/locales/zh-CN.ts`、`en-US.ts` |
+
+---
 
 ## 3. 实现思路
 
-### 3.1 默认与持久化
+### 3.1 默认与按账号持久化
 
 - **`DEFAULT_LOCAL_ENGLISH_TTS_VOICE_KEY = 'karen'`**
-- **`ensureDefaultLocalEnglishVoicePreference()`**：无 `english_learning_local_tts_voice` 时写入 `karen`
-- **`PREFERRED_LOCAL_ENGLISH_FEMALE_VOICES`** 回退顺序：`karen` → `moira` → …
+- 存储键：`userScopedStorageKey('english_learning_local_tts_voice', userId)` → `english_learning_local_tts_voice:123`
+- **`ensureDefaultLocalEnglishVoicePreference()`**：当前 userId 无配置时写入 `karen`（须已登录，`userId > 0`）
+- **Legacy 一次性迁移**：若仍存在无后缀旧键 `english_learning_local_tts_voice`，首次读取时复制到 `:userId` 并删除旧键
+- 选「默认（Karen）」：`setPreferredLocalEnglishVoiceKey(null)` 写回默认 key
 
-选「默认（Karen）」时 `setPreferredLocalEnglishVoiceKey(null)` 会恢复并写回默认 key。
+### 3.2 换号与内存缓存
 
-### 3.2 系统设置 UI
+- `readPreferredVoiceKeyFromStorage()` 检测 `getLoggedInUserId()` 变化时调用 `resetCachedEnglishVoice()`，避免仍用上一账号解析出的 `SpeechSynthesisVoice`
+- **`resetUserState()` 不删除**本机音色 localStorage（设备级、按账号分键保留，与 UI 偏好类键策略一致）
 
-- 使用 **DropdownMenu + RadioGroup**（非 Select），分组展示女声/男声（`classifyEnglishVoiceGender` 过滤 `unknown`）
-- 试听：`playEnglishPreferred(previewText, { preferLocal: true })`
-- 触发器样式：无阴影、边框颜色在 focus/hover/open 时保持 `border-theme/20`
+### 3.3 系统设置 UI（TtsVoiceSetting）
 
-### 3.3 与朗读调用的关系
+- **DropdownMenu + RadioGroup**，分组女声/男声；试听 `playEnglishPreferred(..., { preferLocal: true })`
+- **`observer`**：订阅 `userStore.userInfo`，换号后 `loggedInUserId` 可靠更新
+- **单一 `useEffect`**，依赖 `[refreshVoices, loggedInUserId]`：
+  - 挂载 / 换号：`warmupEnglishTtsVoices()` + `refreshVoices()`（从分键读偏好并更新 `selected`）
+  - 监听 `speechSynthesis` 的 `voiceschanged`
+  - **避免**原先两个 effect 在挂载时重复调用 `refreshVoices()`
 
-`resolveVoiceKeyForPlayback()` 在每次本机播放前解析关键字并匹配 `speechSynthesis.getVoices()`；未改云端 TTS 路径。
+### 3.4 与朗读调用的关系
 
-## 4. 关键代码
+`resolveVoiceKeyForPlayback()` 在每次本机播放前解析关键字并匹配 `getVoices()`；有效会员的云端路径见 `english-tts-playback.md`，与本节无关。
 
-**来源**：`apps/frontend/src/utils/englishTts.ts`（约 L83–L90、L163–L179）
+---
+
+## 4. 关键代码与注释
+
+### 4.1 按 userId 分键与 legacy 迁移
+
+**来源**：`apps/frontend/src/utils/englishTts.ts`（约 L178–L214）
 
 ```typescript
-// 说明：默认关键字与女声回退列表首位均为 karen
-export const DEFAULT_LOCAL_ENGLISH_TTS_VOICE_KEY = 'karen';
+function localVoiceStorageKey(userId?: number): string {
+	// 说明：与 LLM / cloud-tts 分键同一套 userScopedStorageKey
+	return userScopedStorageKey(LOCAL_ENGLISH_TTS_VOICE_KEY, userId);
+}
 
-export const PREFERRED_LOCAL_ENGLISH_FEMALE_VOICES = [
-	'karen',
-	'moira',
+function readPreferredVoiceKeyFromStorage(): string | null {
+	const userId = getLoggedInUserId();
+	if (userId !== cachedVoicePrefUserId) {
+		cachedVoicePrefUserId = userId;
+		resetCachedEnglishVoice(); // 说明：换号后丢弃上一账号缓存的 Voice 对象
+	}
+	if (userId <= 0) return null;
+	const scopedKey = localVoiceStorageKey(userId);
+	let raw = localStorage.getItem(scopedKey);
+	if (!raw) {
+		const legacy = localStorage.getItem(LOCAL_ENGLISH_TTS_VOICE_KEY);
+		if (legacy) {
+			localStorage.setItem(scopedKey, legacy);
+			localStorage.removeItem(LOCAL_ENGLISH_TTS_VOICE_KEY);
+			raw = legacy;
+		}
+	}
 	// ...
-];
-```
-
-**来源**：`apps/frontend/src/views/setting/system/TtsVoiceSetting.tsx`（`DropdownMenuRadioGroup` 与 `onVoiceChange`，组件中部）
-
-```typescript
-// 说明：LOCAL_ENGLISH_TTS_VOICE_AUTO 表示恢复默认 Karen；否则按 voiceURI 持久化
-if (value === LOCAL_ENGLISH_TTS_VOICE_AUTO) {
-	setPreferredLocalEnglishVoiceKey(null);
-} else {
-	setPreferredLocalEnglishVoiceByUri(value);
 }
 ```
 
-## 5. 回归建议
+### 4.2 设置页：合并 effect + observer
+
+**来源**：`apps/frontend/src/views/setting/system/TtsVoiceSetting.tsx`（约 L70–L131）
+
+```typescript
+export const TtsVoiceSetting = observer(function TtsVoiceSetting() {
+	const { userStore } = useStore();
+	const loggedInUserId = userStore.userInfo?.id ?? getLoggedInUserId();
+
+	const refreshVoices = useCallback(() => {
+		// 说明：内部 getPreferredLocalEnglishVoiceKey() 已按当前 userId 读分键
+		setVoices(listLocalEnglishVoices());
+		// ... 同步 selected 下拉状态
+	}, []);
+
+	useEffect(() => {
+		warmupEnglishTtsVoices();
+		refreshVoices();
+		const onVoicesChanged = () => refreshVoices();
+		window.speechSynthesis.addEventListener('voiceschanged', onVoicesChanged);
+		return () => {
+			window.speechSynthesis.removeEventListener('voiceschanged', onVoicesChanged);
+		};
+	}, [refreshVoices, loggedInUserId]); // 说明：换号时再 refresh 一次，挂载只执行一轮
+});
+```
+
+### 4.3 用户切换音色
+
+**来源**：`apps/frontend/src/views/setting/system/TtsVoiceSetting.tsx`（`onVoiceChange` 附近）
+
+```typescript
+if (value === LOCAL_ENGLISH_TTS_VOICE_AUTO) {
+	setPreferredLocalEnglishVoiceKey(null); // 恢复 Karen 默认
+} else {
+	setPreferredLocalEnglishVoiceByUri(value); // 写入当前 userId 分键
+}
+```
+
+---
+
+## 5. 兼容性与影响
+
+| 场景 | 行为 |
+|------|------|
+| 老用户仅有无后缀 localStorage 键 | 首次登录后自动迁到 `:userId` |
+| 同浏览器换号 | 下拉框与朗读各读各账号键，不串号 |
+| 登出 / `resetUserState` | 清 Agent、草稿等内存态；**保留**各账号本机音色键 |
+| 未登录 | 不写默认 Karen；`readPreferredVoiceKeyFromStorage` 返回 null |
+
+---
+
+## 6. 回归建议
 
 | 场景 | 预期 |
 |------|------|
-| 首次打开设置 | 显示默认 Karen，试听可用 |
+| 账号 A 选男声 → 换号 B → 再回 A | A 仍为男声，B 为 B 的配置或默认 Karen |
+| 停留在系统设置页换号 | 下拉框随 `loggedInUserId` 更新（需 `observer`） |
+| 首次打开设置（已登录） | 显示默认或已保存音色，试听可用 |
 | 切换音色后单词朗读 | 资源库/收藏喇叭使用新音色 |
-| 清 localStorage 后 | 再次进入恢复 karen |
 
-若与仓库最新源码不一致，**以源码为准**。
+---
+
+## 7. 相关源码路径
+
+| 说明 | 路径 |
+|------|------|
+| 分键工具 | `apps/frontend/src/store/loggedInUserId.ts` |
+| 播放与会员云端 | `apps/frontend/src/utils/englishTts.ts` |
+| 设置 UI | `apps/frontend/src/views/setting/system/TtsVoiceSetting.tsx` |

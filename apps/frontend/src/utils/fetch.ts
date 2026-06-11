@@ -531,7 +531,7 @@ class HttpClient {
 				const isUnauthorized =
 					response?.status === 401 || requestError.code === 401;
 
-				if (isUnauthorized) {
+				if (isUnauthorized && !finalConfig.silent) {
 					this.setAuthToken('');
 					notifyUnauthorized();
 				}

@@ -175,7 +175,7 @@ export const PROJECT_GUIDE_ITEMS_EN: Record<
 	'pg-s8-4': {
 		title: '8.4 Cloud playback',
 		description:
-			'After sign-in: Settings → Cloud playback (/setting/cloud-tts). Enable custom playback parameters to adjust model, voice, speed, volume, pitch, emotion, format, and language boost; advanced sample rate / bitrate / channel fields usually stay at defaults.\nUse ? beside Playback parameters for field help. Preview plays a sample with current settings; Restore defaults resets the form without turning the switch off. When off, server defaults apply; when on, preferences stay on this device and apply to cloud playback; upstream failures still fall back to the previous cloud TTS.',
+			'Active members: Settings → Cloud playback (/setting/cloud-tts). Non-members do not see this entry; English learning still supports local Web Speech via System settings voice.\nEnable custom playback parameters to adjust model, voice, speed, volume, pitch, emotion, format, and language boost; advanced sample rate / bitrate / channel fields usually stay at defaults.\nUse ? beside Playback parameters for field help. Preview plays a sample with current settings; Restore defaults resets the form without turning the switch off. When off, server defaults apply; when on, preferences are saved to your account (sync across devices on the same account) and apply to cloud playback; upstream failures still fall back to the previous cloud TTS.',
 	},
 	'pg-s8-5': {
 		title: '8.5 Account avatar (cloud storage)',

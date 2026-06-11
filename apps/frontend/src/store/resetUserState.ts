@@ -1,3 +1,4 @@
+import { clearMinimaxTtsUserPrefsCache } from '@/utils/minimaxTtsPrefs';
 import assistantStore from './assistant';
 import englishAgentStore from './englishAgent';
 import EnglishPackStore from './englishPack';
@@ -21,6 +22,7 @@ export function resetUserState(): void {
 		EnglishPackStore.resetOnUserSwitch();
 		knowledgeStore.resetOnUserSwitch();
 		clearEnglishPracticePoolCache();
+		clearMinimaxTtsUserPrefsCache();
 	} finally {
 		resetting = false;
 	}

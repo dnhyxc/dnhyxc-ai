@@ -13,8 +13,11 @@ import {
 } from '@ui/dropdown-menu';
 import { Label } from '@ui/label';
 import { ChevronDown, Volume2 } from 'lucide-react';
+import { observer } from 'mobx-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useI18n } from '@/hooks';
+import useStore from '@/store';
+import { getLoggedInUserId } from '@/store/loggedInUserId';
 import type { LocalEnglishVoiceOption } from '@/utils/englishTts';
 import {
 	getActiveLocalEnglishVoiceUri,
@@ -64,8 +67,10 @@ function VoiceDropdownGroup({
 	);
 }
 
-export function TtsVoiceSetting() {
+export const TtsVoiceSetting = observer(function TtsVoiceSetting() {
 	const { t } = useI18n();
+	const { userStore } = useStore();
+	const loggedInUserId = userStore.userInfo?.id ?? getLoggedInUserId();
 	const [supported, setSupported] = useState(() => isEnglishTtsSupported());
 	const [voices, setVoices] = useState<LocalEnglishVoiceOption[]>([]);
 	const [selected, setSelected] = useState(LOCAL_ENGLISH_TTS_VOICE_AUTO);
@@ -123,7 +128,7 @@ export function TtsVoiceSetting() {
 				);
 			}
 		};
-	}, [refreshVoices]);
+	}, [refreshVoices, loggedInUserId]);
 
 	const onVoiceChange = useCallback(
 		(value: string) => {
@@ -240,4 +245,4 @@ export function TtsVoiceSetting() {
 			)}
 		</div>
 	);
-}
+});

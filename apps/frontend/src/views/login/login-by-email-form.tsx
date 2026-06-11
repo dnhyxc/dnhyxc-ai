@@ -66,9 +66,9 @@ const LoginByEmailForm: React.FC<IProps> = () => {
 			verifyCodeKey,
 		});
 		if (res.success) {
-			userStore.setUserInfo(res.data);
 			setStorage('token', res.data.access_token);
 			http.setAuthToken(res.data.access_token);
+			userStore.setUserInfo(res.data);
 			navigate('/');
 		}
 	};

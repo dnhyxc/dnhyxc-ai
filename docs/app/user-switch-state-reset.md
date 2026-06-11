@@ -32,6 +32,7 @@
 
 - 主站 **Chatbot** `chatStore` 的全局重置（若需可按同模式扩展 `resetUserState`）
 - 用户 UI 偏好（知识库自动保存开关等 `localStorage` 项）— 仍按设备保留
+- **本机英语音色**（`english_learning_local_tts_voice:{userId}`）— 按账号分键保存在 localStorage，换号时**不**删除；见 [`../english/english-tts-local-voice.md`](../english/english-tts-local-voice.md)
 
 ---
 

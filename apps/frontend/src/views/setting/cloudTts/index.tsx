@@ -1,8 +1,8 @@
 /**
- * 设置 → 云端朗读：朗读参数（localStorage，随 englishTts 请求发送）
+ * 设置 → 云端朗读：会员专属；朗读参数存服务端，随 englishTts 云端请求发送
  */
 import { Button } from '@ui/button';
-import { Input, Label, Switch } from '@ui/index';
+import { Input, Label, Spinner, Switch } from '@ui/index';
 import {
 	Select,
 	SelectContent,
@@ -13,7 +13,9 @@ import {
 	SelectValue,
 } from '@ui/select';
 import { Minus, Plus, Volume2 } from 'lucide-react';
+import { observer } from 'mobx-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Navigate } from 'react-router';
 import {
 	getMinimaxTtsEnglishVoicesByGender,
 	getMinimaxTtsVoiceDisplayName,
@@ -22,16 +24,20 @@ import {
 	MINIMAX_TTS_LANGUAGE_BOOST_VALUES,
 	MINIMAX_TTS_MODELS,
 } from '@/constants/minimaxTts';
-import { useI18n } from '@/hooks';
+import { useI18n, useMembershipActive } from '@/hooks';
 import { cn } from '@/lib/utils';
+import useStore from '@/store';
+import { getLoggedInUserId } from '@/store/loggedInUserId';
 import {
 	playEnglishPreferred,
 	stopAllEnglishPlayback,
 } from '@/utils/englishTts';
 import {
 	DEFAULT_MINIMAX_TTS_USER_PREFS,
+	ensureMinimaxTtsUserPrefsLoaded,
 	loadMinimaxTtsUserPrefs,
 	type MinimaxTtsUserPrefs,
+	resetMinimaxTtsUserPrefs,
 	saveMinimaxTtsUserPrefs,
 } from '@/utils/minimaxTtsPrefs';
 import { ParamsHelpPopover } from './ParamsHelpPopover';
@@ -264,21 +270,54 @@ function VoiceSelectField({
 	);
 }
 
-const CloudTtsSetting = () => {
+const CloudTtsSetting = observer(() => {
 	const { t, locale } = useI18n();
+	const { isMemberActive } = useMembershipActive();
+	const { userStore } = useStore();
+	const loggedInUserId = userStore.userInfo?.id ?? getLoggedInUserId();
 	const fieldLabelClass = useMemo(() => getFieldLabelClass(locale), [locale]);
 	const [prefs, setPrefs] = useState<MinimaxTtsUserPrefs>(() =>
 		loadMinimaxTtsUserPrefs(),
 	);
+	const [loading, setLoading] = useState(true);
 	const [previewing, setPreviewing] = useState(false);
 
 	useEffect(() => {
-		saveMinimaxTtsUserPrefs(prefs);
-	}, [prefs]);
+		if (!isMemberActive) {
+			setLoading(false);
+			return;
+		}
+		if (loggedInUserId <= 0) {
+			setPrefs({ ...DEFAULT_MINIMAX_TTS_USER_PREFS });
+			setLoading(false);
+			return;
+		}
+		let cancelled = false;
+		setLoading(true);
+		void ensureMinimaxTtsUserPrefsLoaded(loggedInUserId)
+			.then((next) => {
+				if (!cancelled) setPrefs(next);
+			})
+			.finally(() => {
+				if (!cancelled) setLoading(false);
+			});
+		return () => {
+			cancelled = true;
+		};
+	}, [loggedInUserId, isMemberActive]);
 
-	const patch = useCallback((partial: Partial<MinimaxTtsUserPrefs>) => {
-		setPrefs((prev) => ({ ...prev, ...partial }));
-	}, []);
+	const patch = useCallback(
+		(partial: Partial<MinimaxTtsUserPrefs>) => {
+			setPrefs((prev) => {
+				const next = { ...prev, ...partial };
+				if (loggedInUserId > 0) {
+					void saveMinimaxTtsUserPrefs(next, loggedInUserId);
+				}
+				return next;
+			});
+		},
+		[loggedInUserId],
+	);
 
 	const modelOptions = useMemo(
 		() => MINIMAX_TTS_MODELS.map((value) => ({ value, label: value })),
@@ -314,7 +353,10 @@ const CloudTtsSetting = () => {
 	);
 
 	const onReset = () => {
-		setPrefs({ ...DEFAULT_MINIMAX_TTS_USER_PREFS });
+		void (async () => {
+			const next = await resetMinimaxTtsUserPrefs(loggedInUserId);
+			setPrefs(next);
+		})();
 	};
 
 	const onPreview = async () => {
@@ -330,209 +372,221 @@ const CloudTtsSetting = () => {
 		}
 	};
 
-	const fieldsDisabled = !prefs.enabled || previewing;
+	const fieldsDisabled = loading || !prefs.enabled || previewing;
+
+	if (!isMemberActive) {
+		return <Navigate to="/setting" replace />;
+	}
 
 	return (
 		<div className="m-2 mx-auto flex h-full w-full max-w-3xl flex-col items-center justify-center">
-			<div className="w-full">
-				<div className="w-full border-b border-theme/20 pb-4.5">
-					<div className="text-md font-bold">{t('setting.cloudTts.title')}</div>
-					<div className="my-2 px-8.5 text-xs text-textcolor/55">
-						{t('setting.cloudTts.desc')}
+			{loading ? (
+				<div className="flex items-center justify-center py-16">
+					<Spinner className="size-8" />
+				</div>
+			) : (
+				<div className="w-full">
+					<div className="w-full border-b border-theme/20 pb-4.5">
+						<div className="text-md font-bold">
+							{t('setting.cloudTts.title')}
+						</div>
+						<div className="my-2 px-8.5 text-xs text-textcolor/55">
+							{t('setting.cloudTts.desc')}
+						</div>
+
+						<div className="mt-3.5 flex items-center justify-between gap-4 px-8.5 text-sm">
+							<div className="min-w-0 flex-1">
+								<Label
+									htmlFor="cloud-tts-enabled"
+									className="cursor-pointer text-sm font-medium"
+								>
+									{t('setting.cloudTts.enabledLabel')}
+								</Label>
+								<p className="mt-1 text-xs text-textcolor/55">
+									{t('setting.cloudTts.enabledHelp')}
+								</p>
+							</div>
+							<Switch
+								id="cloud-tts-enabled"
+								checked={prefs.enabled}
+								onCheckedChange={(enabled) => patch({ enabled })}
+							/>
+						</div>
 					</div>
 
-					<div className="mt-3.5 flex items-center justify-between gap-4 px-8.5 text-sm">
-						<div className="min-w-0 flex-1">
-							<Label
-								htmlFor="cloud-tts-enabled"
-								className="cursor-pointer text-sm font-medium"
-							>
-								{t('setting.cloudTts.enabledLabel')}
-							</Label>
-							<p className="mt-1 text-xs text-textcolor/55">
-								{t('setting.cloudTts.enabledHelp')}
-							</p>
+					<div
+						className={cn(
+							'my-3.5 flex flex-col gap-4 px-8.5 text-sm',
+							!prefs.enabled && 'pointer-events-none opacity-50',
+						)}
+					>
+						<div className="flex items-center gap-1">
+							<div className="text-md font-bold">
+								{t('setting.cloudTts.paramsTitle')}
+							</div>
+							<ParamsHelpPopover />
 						</div>
-						<Switch
-							id="cloud-tts-enabled"
-							checked={prefs.enabled}
-							onCheckedChange={(enabled) => patch({ enabled })}
+						<p className="text-xs text-textcolor/55">
+							{t('setting.cloudTts.paramsDesc')}
+						</p>
+
+						<PrefSelectField
+							id="cloud-tts-model"
+							label={t('setting.cloudTts.model')}
+							value={prefs.model}
+							onValueChange={(model) => patch({ model })}
+							options={modelOptions}
+							disabled={fieldsDisabled}
+							labelClassName={fieldLabelClass}
+						/>
+
+						<VoiceSelectField
+							id="cloud-tts-voice"
+							label={t('setting.cloudTts.voiceId')}
+							value={prefs.voiceId}
+							onValueChange={(voiceId) => patch({ voiceId })}
+							disabled={fieldsDisabled}
+							labelClassName={fieldLabelClass}
+						/>
+
+						<NumberField
+							id="cloud-tts-speed"
+							label={t('setting.cloudTts.speed')}
+							value={prefs.speed}
+							min={0.5}
+							max={2}
+							step={0.1}
+							disabled={fieldsDisabled}
+							labelClassName={fieldLabelClass}
+							onChange={(speed) => patch({ speed })}
+						/>
+						<NumberField
+							id="cloud-tts-vol"
+							label={t('setting.cloudTts.vol')}
+							value={prefs.vol}
+							min={0.01}
+							max={10}
+							step={0.1}
+							disabled={fieldsDisabled}
+							labelClassName={fieldLabelClass}
+							onChange={(vol) => patch({ vol })}
+						/>
+						<NumberField
+							id="cloud-tts-pitch"
+							label={t('setting.cloudTts.pitch')}
+							value={prefs.pitch}
+							min={-12}
+							max={12}
+							step={1}
+							disabled={fieldsDisabled}
+							labelClassName={fieldLabelClass}
+							onChange={(pitch) => patch({ pitch })}
+						/>
+
+						<PrefSelectField
+							id="cloud-tts-emotion"
+							label={t('setting.cloudTts.emotion')}
+							value={prefs.emotion || EMOTION_NONE}
+							onValueChange={(emotion) =>
+								patch({ emotion: emotion === EMOTION_NONE ? '' : emotion })
+							}
+							options={emotionOptions}
+							disabled={fieldsDisabled}
+							labelClassName={fieldLabelClass}
+						/>
+
+						<PrefSelectField
+							id="cloud-tts-format"
+							label={t('setting.cloudTts.format')}
+							value={prefs.format}
+							onValueChange={(format) => patch({ format })}
+							options={formatOptions}
+							disabled={fieldsDisabled}
+							labelClassName={fieldLabelClass}
+						/>
+
+						<PrefSelectField
+							id="cloud-tts-lang-boost"
+							label={t('setting.cloudTts.languageBoost')}
+							value={prefs.languageBoost}
+							onValueChange={(languageBoost) => patch({ languageBoost })}
+							options={languageBoostOptions}
+							disabled={fieldsDisabled}
+							labelClassName={fieldLabelClass}
+						/>
+
+						<p className="text-xs text-textcolor/55">
+							{t('setting.cloudTts.advancedHint')}
+						</p>
+						<NumberField
+							id="cloud-tts-sample-rate"
+							label={t('setting.cloudTts.sampleRate')}
+							value={prefs.sampleRate}
+							min={8000}
+							max={44100}
+							step={1000}
+							disabled={fieldsDisabled}
+							labelClassName={fieldLabelClass}
+							onChange={(sampleRate) => patch({ sampleRate })}
+						/>
+						<NumberField
+							id="cloud-tts-bitrate"
+							label={t('setting.cloudTts.bitrate')}
+							value={prefs.bitrate}
+							min={32000}
+							max={256000}
+							step={1000}
+							disabled={fieldsDisabled}
+							labelClassName={fieldLabelClass}
+							onChange={(bitrate) => patch({ bitrate })}
+						/>
+						<NumberField
+							id="cloud-tts-channel"
+							label={t('setting.cloudTts.channel')}
+							value={prefs.channel}
+							min={1}
+							max={2}
+							step={1}
+							disabled={fieldsDisabled}
+							labelClassName={fieldLabelClass}
+							onChange={(channel) => patch({ channel: channel === 2 ? 2 : 1 })}
 						/>
 					</div>
-				</div>
 
-				<div
-					className={cn(
-						'my-3.5 flex flex-col gap-4 px-8.5 text-sm',
-						!prefs.enabled && 'pointer-events-none opacity-50',
-					)}
-				>
-					<div className="flex items-center gap-1">
-						<div className="text-md font-bold">
-							{t('setting.cloudTts.paramsTitle')}
+					<div className="mt-3.5 flex flex-wrap items-center justify-end px-8.5 pb-4.5">
+						<div className="flex shrink-0 flex-wrap items-center">
+							<Button
+								type="button"
+								variant="outline"
+								size="sm"
+								className={cn(
+									'min-w-24 cursor-pointer border border-theme/20',
+									previewing && 'disabled:opacity-100',
+								)}
+								disabled={previewing}
+								onClick={onReset}
+							>
+								{t('setting.cloudTts.reset')}
+							</Button>
+							<Button
+								type="button"
+								size="sm"
+								className={cn(
+									'ml-3 min-w-24 cursor-pointer gap-1.5',
+									previewing && 'disabled:opacity-100',
+								)}
+								disabled={previewing || !prefs.enabled}
+								onClick={() => void onPreview()}
+							>
+								<Volume2 className="size-4" aria-hidden />
+								{t('setting.cloudTts.preview')}
+							</Button>
 						</div>
-						<ParamsHelpPopover />
-					</div>
-					<p className="text-xs text-textcolor/55">
-						{t('setting.cloudTts.paramsDesc')}
-					</p>
-
-					<PrefSelectField
-						id="cloud-tts-model"
-						label={t('setting.cloudTts.model')}
-						value={prefs.model}
-						onValueChange={(model) => patch({ model })}
-						options={modelOptions}
-						disabled={fieldsDisabled}
-						labelClassName={fieldLabelClass}
-					/>
-
-					<VoiceSelectField
-						id="cloud-tts-voice"
-						label={t('setting.cloudTts.voiceId')}
-						value={prefs.voiceId}
-						onValueChange={(voiceId) => patch({ voiceId })}
-						disabled={fieldsDisabled}
-						labelClassName={fieldLabelClass}
-					/>
-
-					<NumberField
-						id="cloud-tts-speed"
-						label={t('setting.cloudTts.speed')}
-						value={prefs.speed}
-						min={0.5}
-						max={2}
-						step={0.1}
-						disabled={fieldsDisabled}
-						labelClassName={fieldLabelClass}
-						onChange={(speed) => patch({ speed })}
-					/>
-					<NumberField
-						id="cloud-tts-vol"
-						label={t('setting.cloudTts.vol')}
-						value={prefs.vol}
-						min={0.01}
-						max={10}
-						step={0.1}
-						disabled={fieldsDisabled}
-						labelClassName={fieldLabelClass}
-						onChange={(vol) => patch({ vol })}
-					/>
-					<NumberField
-						id="cloud-tts-pitch"
-						label={t('setting.cloudTts.pitch')}
-						value={prefs.pitch}
-						min={-12}
-						max={12}
-						step={1}
-						disabled={fieldsDisabled}
-						labelClassName={fieldLabelClass}
-						onChange={(pitch) => patch({ pitch })}
-					/>
-
-					<PrefSelectField
-						id="cloud-tts-emotion"
-						label={t('setting.cloudTts.emotion')}
-						value={prefs.emotion || EMOTION_NONE}
-						onValueChange={(emotion) =>
-							patch({ emotion: emotion === EMOTION_NONE ? '' : emotion })
-						}
-						options={emotionOptions}
-						disabled={fieldsDisabled}
-						labelClassName={fieldLabelClass}
-					/>
-
-					<PrefSelectField
-						id="cloud-tts-format"
-						label={t('setting.cloudTts.format')}
-						value={prefs.format}
-						onValueChange={(format) => patch({ format })}
-						options={formatOptions}
-						disabled={fieldsDisabled}
-						labelClassName={fieldLabelClass}
-					/>
-
-					<PrefSelectField
-						id="cloud-tts-lang-boost"
-						label={t('setting.cloudTts.languageBoost')}
-						value={prefs.languageBoost}
-						onValueChange={(languageBoost) => patch({ languageBoost })}
-						options={languageBoostOptions}
-						disabled={fieldsDisabled}
-						labelClassName={fieldLabelClass}
-					/>
-
-					<p className="text-xs text-textcolor/55">
-						{t('setting.cloudTts.advancedHint')}
-					</p>
-					<NumberField
-						id="cloud-tts-sample-rate"
-						label={t('setting.cloudTts.sampleRate')}
-						value={prefs.sampleRate}
-						min={8000}
-						max={44100}
-						step={1000}
-						disabled={fieldsDisabled}
-						labelClassName={fieldLabelClass}
-						onChange={(sampleRate) => patch({ sampleRate })}
-					/>
-					<NumberField
-						id="cloud-tts-bitrate"
-						label={t('setting.cloudTts.bitrate')}
-						value={prefs.bitrate}
-						min={32000}
-						max={256000}
-						step={1000}
-						disabled={fieldsDisabled}
-						labelClassName={fieldLabelClass}
-						onChange={(bitrate) => patch({ bitrate })}
-					/>
-					<NumberField
-						id="cloud-tts-channel"
-						label={t('setting.cloudTts.channel')}
-						value={prefs.channel}
-						min={1}
-						max={2}
-						step={1}
-						disabled={fieldsDisabled}
-						labelClassName={fieldLabelClass}
-						onChange={(channel) => patch({ channel: channel === 2 ? 2 : 1 })}
-					/>
-				</div>
-
-				<div className="mt-3.5 flex flex-wrap items-center justify-end px-8.5 pb-4.5">
-					<div className="flex shrink-0 flex-wrap items-center">
-						<Button
-							type="button"
-							variant="outline"
-							size="sm"
-							className={cn(
-								'min-w-24 cursor-pointer border border-theme/20',
-								previewing && 'disabled:opacity-100',
-							)}
-							disabled={previewing}
-							onClick={onReset}
-						>
-							{t('setting.cloudTts.reset')}
-						</Button>
-						<Button
-							type="button"
-							size="sm"
-							className={cn(
-								'ml-3 min-w-24 cursor-pointer gap-1.5',
-								previewing && 'disabled:opacity-100',
-							)}
-							disabled={previewing || !prefs.enabled}
-							onClick={() => void onPreview()}
-						>
-							<Volume2 className="size-4" aria-hidden />
-							{t('setting.cloudTts.preview')}
-						</Button>
 					</div>
 				</div>
-			</div>
+			)}
 		</div>
 	);
-};
+});
 
 export default CloudTtsSetting;

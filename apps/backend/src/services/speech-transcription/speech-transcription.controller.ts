@@ -4,6 +4,7 @@ import {
 	ClassSerializerInterceptor,
 	Controller,
 	Post,
+	Req,
 	Res,
 	StreamableFile,
 	UploadedFile,
@@ -11,12 +12,14 @@ import {
 	UseInterceptors,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import type { Response } from 'express';
+import type { Request, Response } from 'express';
 import { memoryStorage } from 'multer';
 import { JwtGuard } from 'src/guards/jwt.guard';
 import { MinimaxTtsDto } from './dto/minimax-tts.dto';
 import { MinimaxTtsService } from './minimax-tts.service';
 import { SiliconflowTranscriptionService } from './siliconflow-transcription.service';
+
+type AuthedRequest = Request & { user?: { userId?: number } };
 
 /**
  * 语音转文字 HTTP 接口（与 Chat / Knowledge 等业务解耦，仅做上传与 ASR）。
@@ -64,10 +67,10 @@ export class SpeechTranscriptionController {
 	 * @see https://platform.minimaxi.com/docs/api-reference/speech-t2a-http
 	 */
 	@Post('minimax/speech')
-	async minimaxSpeech(@Body() body: MinimaxTtsDto) {
-		console.log('minimaxSpeech body', body);
+	async minimaxSpeech(@Body() body: MinimaxTtsDto, @Req() req: AuthedRequest) {
+		const userId = req.user?.userId;
 		const resolved = this.minimaxTtsService.resolveOptions(body);
-		const buffer = await this.minimaxTtsService.synthesizeSpeech(body);
+		const buffer = await this.minimaxTtsService.synthesizeSpeech(body, userId);
 		return new StreamableFile(buffer, {
 			type: this.minimaxTtsService.resolveContentType(resolved.format),
 		});
@@ -79,8 +82,10 @@ export class SpeechTranscriptionController {
 	@Post('minimax/speech/stream')
 	async minimaxSpeechStream(
 		@Body() body: MinimaxTtsDto,
+		@Req() req: AuthedRequest,
 		@Res({ passthrough: false }) res: Response,
 	) {
+		const userId = req.user?.userId;
 		const resolved = this.minimaxTtsService.resolveOptions(body);
 		res.status(200);
 		res.setHeader(
@@ -91,7 +96,10 @@ export class SpeechTranscriptionController {
 		res.setHeader('X-Content-Type-Options', 'nosniff');
 
 		try {
-			for await (const chunk of this.minimaxTtsService.streamSpeech(body)) {
+			for await (const chunk of this.minimaxTtsService.streamSpeech(
+				body,
+				userId,
+			)) {
 				res.write(chunk);
 			}
 		} catch (err) {

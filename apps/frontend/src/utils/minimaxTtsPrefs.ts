@@ -7,26 +7,21 @@ import {
 	MINIMAX_TTS_LANGUAGE_BOOST_VALUES,
 	MINIMAX_TTS_MODELS,
 } from '@/constants/minimaxTts';
+import {
+	type CloudTtsSettingsView,
+	clearCloudTtsSettings,
+	getCloudTtsSettings,
+	updateCloudTtsSettings,
+} from '@/service/cloudTtsSettings';
+import {
+	getLoggedInUserId,
+	userScopedStorageKey,
+} from '@/store/loggedInUserId';
 
-const STORAGE_KEY = 'english_learning_minimax_tts_prefs';
+/** 旧版 localStorage 键（仅用于一次性迁移到服务端） */
+const LEGACY_STORAGE_KEY = 'english_learning_minimax_tts_prefs';
 
-export type MinimaxTtsUserPrefs = {
-	/** 为 true 时请求体携带下列字段，覆盖服务端 env 默认 */
-	enabled: boolean;
-	model: string;
-	voiceId: string;
-	speed: number;
-	vol: number;
-	pitch: number;
-	/** 空字符串表示不传 emotion */
-	emotion: string;
-	format: string;
-	/** MiniMax language_boost；默认 auto */
-	languageBoost: string;
-	sampleRate: number;
-	bitrate: number;
-	channel: 1 | 2;
-};
+export type MinimaxTtsUserPrefs = CloudTtsSettingsView;
 
 export const DEFAULT_MINIMAX_TTS_USER_PREFS: MinimaxTtsUserPrefs = {
 	enabled: false,
@@ -42,6 +37,10 @@ export const DEFAULT_MINIMAX_TTS_USER_PREFS: MinimaxTtsUserPrefs = {
 	bitrate: 128_000,
 	channel: 1,
 };
+
+let cachedUserId = 0;
+let cachedPrefs: MinimaxTtsUserPrefs = { ...DEFAULT_MINIMAX_TTS_USER_PREFS };
+let loadPromise: Promise<MinimaxTtsUserPrefs> | null = null;
 
 function clampNumber(
 	raw: unknown,
@@ -61,7 +60,9 @@ function pickString(raw: unknown, fallback: string, maxLen = 128): string {
 	return trimmed.slice(0, maxLen);
 }
 
-function normalizePrefs(raw: unknown): MinimaxTtsUserPrefs {
+export function normalizeMinimaxTtsUserPrefs(
+	raw: unknown,
+): MinimaxTtsUserPrefs {
 	if (!raw || typeof raw !== 'object') {
 		return { ...DEFAULT_MINIMAX_TTS_USER_PREFS };
 	}
@@ -86,14 +87,14 @@ function normalizePrefs(raw: unknown): MinimaxTtsUserPrefs {
 			? format
 			: 'mp3',
 		languageBoost: (() => {
-			const raw = pickString(o.languageBoost, '', 32);
-			if (!raw) return DEFAULT_MINIMAX_TTS_LANGUAGE_BOOST;
+			const rawBoost = pickString(o.languageBoost, '', 32);
+			if (!rawBoost) return DEFAULT_MINIMAX_TTS_LANGUAGE_BOOST;
 			const normalized =
-				raw.toLowerCase() === 'english'
+				rawBoost.toLowerCase() === 'english'
 					? 'English'
-					: raw.toLowerCase() === 'chinese'
+					: rawBoost.toLowerCase() === 'chinese'
 						? 'Chinese'
-						: raw;
+						: rawBoost;
 			return (MINIMAX_TTS_LANGUAGE_BOOST_VALUES as readonly string[]).includes(
 				normalized,
 			)
@@ -106,22 +107,133 @@ function normalizePrefs(raw: unknown): MinimaxTtsUserPrefs {
 	};
 }
 
-export function loadMinimaxTtsUserPrefs(): MinimaxTtsUserPrefs {
-	if (typeof window === 'undefined') {
-		return { ...DEFAULT_MINIMAX_TTS_USER_PREFS };
-	}
+function setCache(
+	userId: number,
+	prefs: MinimaxTtsUserPrefs,
+): MinimaxTtsUserPrefs {
+	const normalized = normalizeMinimaxTtsUserPrefs(prefs);
+	cachedUserId = userId;
+	cachedPrefs = normalized;
+	return normalized;
+}
+
+export function clearMinimaxTtsUserPrefsCache(): void {
+	cachedUserId = 0;
+	cachedPrefs = { ...DEFAULT_MINIMAX_TTS_USER_PREFS };
+	loadPromise = null;
+}
+
+function readLegacyLocalPrefs(userId: number): MinimaxTtsUserPrefs | null {
+	if (typeof window === 'undefined' || userId <= 0) return null;
 	try {
-		const raw = localStorage.getItem(STORAGE_KEY);
-		if (!raw) return { ...DEFAULT_MINIMAX_TTS_USER_PREFS };
-		return normalizePrefs(JSON.parse(raw));
+		const scopedKey = userScopedStorageKey(LEGACY_STORAGE_KEY, userId);
+		const raw =
+			localStorage.getItem(scopedKey) ??
+			localStorage.getItem(LEGACY_STORAGE_KEY);
+		if (!raw) return null;
+		return normalizeMinimaxTtsUserPrefs(JSON.parse(raw));
 	} catch {
-		return { ...DEFAULT_MINIMAX_TTS_USER_PREFS };
+		return null;
 	}
 }
 
-export function saveMinimaxTtsUserPrefs(prefs: MinimaxTtsUserPrefs): void {
-	if (typeof window === 'undefined') return;
-	localStorage.setItem(STORAGE_KEY, JSON.stringify(normalizePrefs(prefs)));
+function removeLegacyLocalPrefs(userId: number): void {
+	if (typeof window === 'undefined' || userId <= 0) return;
+	localStorage.removeItem(userScopedStorageKey(LEGACY_STORAGE_KEY, userId));
+	localStorage.removeItem(LEGACY_STORAGE_KEY);
+}
+
+async function migrateLegacyLocalPrefsIfAny(
+	userId: number,
+): Promise<MinimaxTtsUserPrefs | null> {
+	const legacy = readLegacyLocalPrefs(userId);
+	if (!legacy) return null;
+	const res = await updateCloudTtsSettings(legacy, { silent: true });
+	removeLegacyLocalPrefs(userId);
+	return normalizeMinimaxTtsUserPrefs(res.data);
+}
+
+/** 同步读取内存缓存；未加载时返回默认值 */
+export function loadMinimaxTtsUserPrefs(userId?: number): MinimaxTtsUserPrefs {
+	const id = userId ?? getLoggedInUserId();
+	if (id > 0 && cachedUserId === id) {
+		return { ...cachedPrefs };
+	}
+	return { ...DEFAULT_MINIMAX_TTS_USER_PREFS };
+}
+
+/** 从服务端拉取并写入内存缓存（含 localStorage 一次性迁移） */
+export async function ensureMinimaxTtsUserPrefsLoaded(
+	userId?: number,
+): Promise<MinimaxTtsUserPrefs> {
+	const id = userId ?? getLoggedInUserId();
+	if (id <= 0) {
+		return { ...DEFAULT_MINIMAX_TTS_USER_PREFS };
+	}
+	if (cachedUserId === id && !loadPromise) {
+		return { ...cachedPrefs };
+	}
+	if (loadPromise) {
+		return loadPromise;
+	}
+
+	loadPromise = (async () => {
+		try {
+			const migrated = await migrateLegacyLocalPrefsIfAny(id);
+			if (migrated) {
+				return setCache(id, migrated);
+			}
+			const res = await getCloudTtsSettings({ silent: true });
+			return setCache(id, normalizeMinimaxTtsUserPrefs(res.data));
+		} catch {
+			const legacy = readLegacyLocalPrefs(id);
+			if (legacy) {
+				return setCache(id, legacy);
+			}
+			return setCache(id, DEFAULT_MINIMAX_TTS_USER_PREFS);
+		} finally {
+			loadPromise = null;
+		}
+	})();
+
+	return loadPromise;
+}
+
+/** 登录后预拉取，不阻塞 UI */
+export function prefetchMinimaxTtsUserPrefs(userId?: number): void {
+	void ensureMinimaxTtsUserPrefsLoaded(userId);
+}
+
+/** 设置页保存到服务端并更新内存缓存 */
+export async function saveMinimaxTtsUserPrefs(
+	prefs: MinimaxTtsUserPrefs,
+	userId?: number,
+): Promise<MinimaxTtsUserPrefs> {
+	const id = userId ?? getLoggedInUserId();
+	if (id <= 0) {
+		return normalizeMinimaxTtsUserPrefs(prefs);
+	}
+	const body = normalizeMinimaxTtsUserPrefs(prefs);
+	const res = await updateCloudTtsSettings(body);
+	removeLegacyLocalPrefs(id);
+	return setCache(id, normalizeMinimaxTtsUserPrefs(res.data));
+}
+
+/** 恢复默认并删除服务端记录 */
+export async function resetMinimaxTtsUserPrefs(
+	userId?: number,
+): Promise<MinimaxTtsUserPrefs> {
+	const id = userId ?? getLoggedInUserId();
+	if (id <= 0) {
+		return { ...DEFAULT_MINIMAX_TTS_USER_PREFS };
+	}
+	try {
+		const res = await clearCloudTtsSettings();
+		removeLegacyLocalPrefs(id);
+		return setCache(id, normalizeMinimaxTtsUserPrefs(res.data));
+	} catch {
+		return setCache(id, DEFAULT_MINIMAX_TTS_USER_PREFS);
+	}
 }
 
 /** 供 fetchCloudTtsBlob 合并进 POST body（不含 text） */
@@ -148,5 +260,7 @@ export function buildMinimaxTtsRequestExtras(): Record<string, unknown> {
 export function buildMinimaxTtsCacheKeySuffix(): string {
 	const prefs = loadMinimaxTtsUserPrefs();
 	if (!prefs.enabled) return '';
-	return JSON.stringify(buildMinimaxTtsRequestExtras());
+	const userId = getLoggedInUserId();
+	const userPart = userId > 0 ? String(userId) : '0';
+	return `${userPart}\u0001${JSON.stringify(buildMinimaxTtsRequestExtras())}`;
 }

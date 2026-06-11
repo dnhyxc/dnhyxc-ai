@@ -90,7 +90,7 @@ sequenceDiagram
 
 1. **服务端定价**：防篡改；前端不传 `amount`。
 2. **双通道开通**：Webhook 可靠；`completeMembership` 供内嵌 Checkout 即时反馈（本地未配 Webhook 时仍可用）。
-3. **幂等键**：Redis `pay:membership:grant:{stripeSessionId}`，同一 Session 重复回调不重复加时。
+3. **幂等键**：Redis `pay:membership:grant:{stripeSessionId}` **+** 数据库表 `membership_payment_grant` 唯一 `grant_id`。Webhook 与 `completeCheckoutMembership` 并发时，仅靠 Redis get/set 可能双次加时；**先 insert 幂等行再 `grantMembership`**（见 [`membership-grant-idempotency.md`](./membership-grant-idempotency.md)）。
 4. **续期规则**：若当前 `memberExpiresAt > now`，在新到期日上**叠加**套餐天数，而非从「今天」重算。
 5. **到期校正**：读用户时 `syncMembershipIfExpired`，写回 `isMember=false`、`membershipType=free`，保留 `memberExpiresAt` 供展示。
 

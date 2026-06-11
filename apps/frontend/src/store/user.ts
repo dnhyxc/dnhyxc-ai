@@ -1,6 +1,8 @@
 import { makeAutoObservable } from 'mobx';
 
+import { isMembershipActiveFromUserInfo } from '@/hooks/useMembershipActive';
 import { getStorage, removeStorage, setStorage } from '@/utils';
+import { prefetchMinimaxTtsUserPrefs } from '@/utils/minimaxTtsPrefs';
 
 import { USER_INFO_STORAGE_KEY } from './loggedInUserId';
 import { resetUserState } from './resetUserState';
@@ -61,6 +63,10 @@ class UserStore {
 		const stored = readUserInfoFromStorage();
 		if (stored) {
 			this.userInfo = stored;
+			const id = normalizeUserId(stored);
+			if (id > 0) {
+				prefetchMinimaxTtsUserPrefs(id);
+			}
 		}
 	}
 
@@ -72,6 +78,9 @@ class UserStore {
 		}
 		this.userInfo = userInfo as UserInfoShape;
 		setStorage(USER_INFO_STORAGE_KEY, JSON.stringify(userInfo));
+		if (nextId > 0 && isMembershipActiveFromUserInfo(userInfo)) {
+			prefetchMinimaxTtsUserPrefs(nextId);
+		}
 		if (typeof window !== 'undefined') {
 			window.dispatchEvent(new Event('userInfoChanged'));
 		}

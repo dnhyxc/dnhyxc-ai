@@ -52,8 +52,10 @@
 | 今日记词无词可抽 / 时间不对 | [english/daily-memorize-implementation.md](./english/daily-memorize-implementation.md) §9 |
 | 云端朗读 404 / MiniMax 502 余额不足 | [english/minimax-cloud-tts.md](./english/minimax-cloud-tts.md) §12 |
 | 设置页云端朗读参数不生效 / 改音色仍播旧音 | [english/cloud-tts-settings.md](./english/cloud-tts-settings.md) §5–§6 |
+| 换设备后云端朗读参数丢失 / 需账号同步 | [english/cloud-tts-prefs-db.md](./english/cloud-tts-prefs-db.md) |
 | 支付成功但资料页仍非会员 / 到期仍显示会员 | [pay/stripe-membership-billing.md](./pay/stripe-membership-billing.md) §6–§7 |
 | 换号后仍看到上一账号的草稿或助手对话 | [app/user-switch-state-reset.md](./app/user-switch-state-reset.md) |
+| 登录成功瞬间又回到登录页 / cloud-tts 401 | [app/login-cloud-tts-prefetch-401.md](./app/login-cloud-tts-prefetch-401.md) |
 
 ---
 

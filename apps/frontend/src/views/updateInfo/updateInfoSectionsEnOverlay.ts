@@ -84,6 +84,16 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'On /profile, active members see a high-contrast gold “Member” badge and gold “Valid until …” line for easier reading on dark backgrounds. Membership detection is unified on the client and stays aligned with LLM default presets for members vs non-members.',
 	},
+	's2-8': {
+		title: 'Membership grant idempotency fix',
+		description:
+			'Fixes duplicate membership duration when Stripe webhook and checkout completion ran concurrently (e.g. monthly plan showing about one extra month). New payments no longer stack twice; contact support if a past account was over-credited.',
+	},
+	's2-9': {
+		title: 'Fix sign-in immediately logging you out',
+		description:
+			'After cloud TTS preferences were synced to your account, some users were sent back to the login page right after a successful sign-in while background sync ran without credentials. Login order and member-only prefetch are adjusted so the session stays active in production.',
+	},
 	's3-1': {
 		title: 'One frontend for desktop and browser',
 		description:
@@ -683,6 +693,21 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 	's24-33': {
 		title: 'Settings: Cloud playback',
 		description:
-			'Separate from LLM settings. Toggle custom playback parameters (model, English voices, speed/volume/pitch, emotion, audio format, language boost, and advanced sample-rate options). Changes save locally with preview and restore-default; when off, server defaults apply.',
+			'Separate from LLM settings. Toggle custom playback parameters (model, English voices, speed/volume/pitch, emotion, audio format, language boost, and advanced sample-rate options). Changes save to your account (sync across devices); preview and restore-default supported; when off, server defaults apply.',
+	},
+	's24-34': {
+		title: 'Cloud playback prefs sync by account',
+		description:
+			'Custom cloud playback parameters moved from browser-only storage to your account in the cloud. The same account sees the same settings on different computers or browsers. Local Web Speech voice in System settings stays on each device only.',
+	},
+	's24-35': {
+		title: 'Cloud playback settings for members only',
+		description:
+			'Only active members see Cloud playback in Settings; the menu entry is hidden for others and direct links return to the settings home. Non-members can still use local Web Speech playback in English learning (System settings voice).',
+	},
+	's24-36': {
+		title: 'Local playback voice per account',
+		description:
+			'Local English Web Speech voice in System settings is stored separately per signed-in account in the same browser. After switching accounts, the dropdown and playback use that account’s preference without overwriting others (device-only, not synced across devices).',
 	},
 };

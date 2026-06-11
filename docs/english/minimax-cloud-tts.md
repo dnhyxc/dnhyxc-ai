@@ -2,7 +2,7 @@
 
 > 播放世代、单词本机优先见 [`english-tts-playback.md`](./english-tts-playback.md)。  
 > 前后端 MP3 LRU 缓存原理见 [`english-tts-cache-consistency.md`](./english-tts-cache-consistency.md)。  
-> **设置页用户偏好**（localStorage、请求体合并、45 音色 UI）见 [`cloud-tts-settings.md`](./cloud-tts-settings.md)。  
+> **设置页用户偏好**（账号级 DB、请求体合并、45 音色 UI）见 [`cloud-tts-settings.md`](./cloud-tts-settings.md) 与 [`cloud-tts-prefs-db.md`](./cloud-tts-prefs-db.md)。  
 > 本专题 **§11** 从仓库源码自动生成「**每行代码上一行 // 注释**」的完整实现；与前文 §3–§10 规格对照阅读。
 
 若与仓库最新源码不一致，**以源码为准**。

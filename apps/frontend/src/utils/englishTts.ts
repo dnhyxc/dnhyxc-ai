@@ -1,15 +1,23 @@
 /**
- * 英语学习朗读：默认优先云端 TTS，失败则本机 Web Speech；
- * `preferLocal: true` 时优先本机（适合单词），不支持则抛错。
+ * 英语学习朗读：有效会员默认优先云端 TTS，失败则本机 Web Speech；
+ * 非会员仅使用本机 Web Speech，不请求 TTS 接口。
+ * `preferLocal: true` 时始终优先本机（适合单词），不支持则抛错。
  * 云端 CosyVoice2 无 seed，同一句会随机漂移；对规范化文本做 MP3 缓存以保证重复播放读音一致。
  * 本机无法直接调用 macOS「翻译/词典」弹窗 API；初始默认 Karen 女声，可用 setPreferredLocalEnglishVoiceKey 切换。
  */
 import { BASE_URL } from '@/constants';
+import { isMembershipActiveFromUserInfo } from '@/hooks/useMembershipActive';
 import { SPEECH_MINIMAX_TTS_STREAM, SPEECH_TTS } from '@/service/api';
+import {
+	getLoggedInUserId,
+	USER_INFO_STORAGE_KEY,
+	userScopedStorageKey,
+} from '@/store/loggedInUserId';
 import { getPlatformFetch } from '@/utils/fetch';
 import {
 	buildMinimaxTtsCacheKeySuffix,
 	buildMinimaxTtsRequestExtras,
+	ensureMinimaxTtsUserPrefsLoaded,
 } from '@/utils/minimaxTtsPrefs';
 
 export function isEnglishTtsSupported(): boolean {
@@ -161,14 +169,34 @@ export function classifyEnglishVoiceGender(
 }
 
 let cachedEnglishVoice: SpeechSynthesisVoice | null | undefined;
+let cachedVoicePrefUserId = 0;
 
 function normalizeVoiceKey(input: string): string {
 	return input.trim().toLowerCase();
 }
 
+function localVoiceStorageKey(userId?: number): string {
+	return userScopedStorageKey(LOCAL_ENGLISH_TTS_VOICE_KEY, userId);
+}
+
 function readPreferredVoiceKeyFromStorage(): string | null {
 	if (typeof window === 'undefined') return null;
-	const raw = localStorage.getItem(LOCAL_ENGLISH_TTS_VOICE_KEY);
+	const userId = getLoggedInUserId();
+	if (userId !== cachedVoicePrefUserId) {
+		cachedVoicePrefUserId = userId;
+		resetCachedEnglishVoice();
+	}
+	if (userId <= 0) return null;
+	const scopedKey = localVoiceStorageKey(userId);
+	let raw = localStorage.getItem(scopedKey);
+	if (!raw) {
+		const legacy = localStorage.getItem(LOCAL_ENGLISH_TTS_VOICE_KEY);
+		if (legacy) {
+			localStorage.setItem(scopedKey, legacy);
+			localStorage.removeItem(LOCAL_ENGLISH_TTS_VOICE_KEY);
+			raw = legacy;
+		}
+	}
 	if (!raw?.trim()) return null;
 	return normalizeVoiceKey(raw);
 }
@@ -176,9 +204,11 @@ function readPreferredVoiceKeyFromStorage(): string | null {
 /** 无用户配置时写入并固定使用 Karen */
 function ensureDefaultLocalEnglishVoicePreference(): void {
 	if (typeof window === 'undefined') return;
+	const userId = getLoggedInUserId();
+	if (userId <= 0) return;
 	if (!readPreferredVoiceKeyFromStorage()) {
 		localStorage.setItem(
-			LOCAL_ENGLISH_TTS_VOICE_KEY,
+			localVoiceStorageKey(userId),
 			DEFAULT_LOCAL_ENGLISH_TTS_VOICE_KEY,
 		);
 	}
@@ -351,6 +381,20 @@ function readToken(): string {
 	return localStorage.getItem('token')?.trim() || '';
 }
 
+/** 当前登录用户是否为有效会员（读 localStorage userInfo，与资料页 / LLM 判定一致） */
+function isCloudEnglishTtsAllowed(): boolean {
+	if (typeof window === 'undefined') return false;
+	const raw = localStorage.getItem(USER_INFO_STORAGE_KEY);
+	if (!raw?.trim()) return false;
+	try {
+		return isMembershipActiveFromUserInfo(
+			JSON.parse(raw) as Record<string, unknown>,
+		);
+	} catch {
+		return false;
+	}
+}
+
 function isPlaybackGenerationActive(generation: number): boolean {
 	return generation === playbackGeneration;
 }
@@ -426,6 +470,7 @@ async function readResponseBodyAsArrayBuffer(
 }
 
 async function fetchCloudTtsBlob(plain: string): Promise<Blob> {
+	await ensureMinimaxTtsUserPrefsLoaded();
 	const cacheKey = plain + buildMinimaxTtsCacheKeySuffix();
 	const cached = getCloudTtsFromCache(plain);
 	if (cached) {
@@ -618,8 +663,10 @@ export async function playEnglishPreferred(
 
 	const generation = beginPlaybackSession();
 	const speakOpts = options?.speak;
+	const preferLocal = options?.preferLocal === true;
+	const useCloud = !preferLocal && isCloudEnglishTtsAllowed();
 
-	if (options?.preferLocal) {
+	if (!useCloud) {
 		if (!isPlaybackGenerationActive(generation)) return;
 		if (!isEnglishTtsSupported()) {
 			throw new Error('NO_TTS');
@@ -670,15 +717,15 @@ export function getPreferredLocalEnglishVoiceKey(): string | null {
  */
 export function setPreferredLocalEnglishVoiceKey(key: string | null): void {
 	if (typeof window === 'undefined') return;
+	const userId = getLoggedInUserId();
+	if (userId <= 0) return;
 	resetCachedEnglishVoice();
+	const storageKey = localVoiceStorageKey(userId);
 	if (!key?.trim()) {
-		localStorage.setItem(
-			LOCAL_ENGLISH_TTS_VOICE_KEY,
-			DEFAULT_LOCAL_ENGLISH_TTS_VOICE_KEY,
-		);
+		localStorage.setItem(storageKey, DEFAULT_LOCAL_ENGLISH_TTS_VOICE_KEY);
 		return;
 	}
-	localStorage.setItem(LOCAL_ENGLISH_TTS_VOICE_KEY, normalizeVoiceKey(key));
+	localStorage.setItem(storageKey, normalizeVoiceKey(key));
 }
 
 const GENDER_SORT_ORDER: Record<LocalEnglishVoiceGender, number> = {

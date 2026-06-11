@@ -153,9 +153,11 @@ export class MinimaxTtsService {
 	/**
 	 * 根据 TTS 参数生成可唯一标识缓存的 key（全拼连接）
 	 * @param resolved TTS 参数
+	 * @param userId 登录用户 id，避免同设备多账号共用 LRU 条目
 	 */
-	private buildCacheKey(resolved: MinimaxTtsResolved): string {
+	private buildCacheKey(resolved: MinimaxTtsResolved, userId?: number): string {
 		return [
+			userId != null && userId > 0 ? String(userId) : '0',
 			resolved.model,
 			resolved.voiceId,
 			String(resolved.speed),
@@ -396,9 +398,9 @@ export class MinimaxTtsService {
 	 * @param dto 入口参数
 	 * @returns 音频 Buffer
 	 */
-	async synthesizeSpeech(dto: MinimaxTtsDto): Promise<Buffer> {
+	async synthesizeSpeech(dto: MinimaxTtsDto, userId?: number): Promise<Buffer> {
 		const resolved = this.resolveOptions(dto);
-		const cacheKey = this.buildCacheKey(resolved);
+		const cacheKey = this.buildCacheKey(resolved, userId);
 		const cached = this.getFromCache(cacheKey);
 		if (cached) return Buffer.from(cached);
 
@@ -447,9 +449,12 @@ export class MinimaxTtsService {
 	 * 命中缓存则只 yield 一次全部音频（保持接口一致性）
 	 * @param dto 入口参数
 	 */
-	async *streamSpeech(dto: MinimaxTtsDto): AsyncGenerator<Buffer> {
+	async *streamSpeech(
+		dto: MinimaxTtsDto,
+		userId?: number,
+	): AsyncGenerator<Buffer> {
 		const resolved = this.resolveOptions(dto);
-		const cacheKey = this.buildCacheKey(resolved);
+		const cacheKey = this.buildCacheKey(resolved, userId);
 		const cached = this.getFromCache(cacheKey);
 		if (cached?.length) {
 			yield cached;

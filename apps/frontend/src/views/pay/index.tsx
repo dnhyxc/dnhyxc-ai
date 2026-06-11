@@ -13,6 +13,7 @@ import {
 	ShieldCheck,
 	X,
 } from 'lucide-react';
+import { toJS } from 'mobx';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { Link, useNavigate } from 'react-router';
@@ -55,6 +56,7 @@ const Pay = () => {
 
 	const checkoutRef = useRef<StripeEmbeddedCheckout | null>(null);
 	const checkoutSessionIdRef = useRef<string | null>(null);
+	const completingRef = useRef(false);
 	const containerRef = useRef<HTMLDivElement>(null);
 	const stripeHostRef = useRef<HTMLDivElement>(null);
 	const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -72,9 +74,14 @@ const Pay = () => {
 	});
 
 	const destroyEmbedded = useCallback(() => {
-		checkoutRef.current?.destroy();
+		try {
+			checkoutRef.current?.destroy();
+		} catch {
+			// Stripe iframe 可能已自行卸载（HTTP 本地 dev 下跨域收尾常见）
+		}
 		checkoutRef.current = null;
 		checkoutSessionIdRef.current = null;
+		completingRef.current = false;
 		setEmbeddedOpen(false);
 		if (timerRef.current) {
 			clearTimeout(timerRef.current);
@@ -127,8 +134,9 @@ const Pay = () => {
 			const checkout = await stripe.initEmbeddedCheckout({
 				clientSecret,
 				onComplete: () => {
+					if (completingRef.current) return;
+					completingRef.current = true;
 					const sid = checkoutSessionIdRef.current;
-					destroyEmbedded();
 					void (async () => {
 						try {
 							if (sid) {
@@ -138,7 +146,7 @@ const Pay = () => {
 								const payload = membershipRes.data;
 								if (payload) {
 									userStore.setUserInfo({
-										...userStore.userInfo,
+										...toJS(userStore.userInfo),
 										isMember: payload.isMember,
 										membershipType: payload.membershipType,
 										memberExpiresAt: payload.memberExpiresAt,
@@ -157,7 +165,8 @@ const Pay = () => {
 								message: t('pay.toast.paid.message'),
 							});
 						}
-						navigate('/profile');
+						// 不在 onComplete 内 destroy：Stripe 仍在 iframe 内收尾，立即 destroy 易导致 WebView 空白
+						navigate('/profile', { replace: true });
 					})();
 				},
 			});
