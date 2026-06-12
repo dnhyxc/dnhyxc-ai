@@ -317,6 +317,11 @@ export const PROJECT_GUIDE_ITEMS_EN: Record<
 		description:
 			'On the English learning home sidebar, Daily memorize lets you set words per round and start. Flow: intro → recognition → Test me (multiple choice) → feedback → next word. Distractors favor similar part of speech and definition length with less repetition within one round. Start memorizing footer spacing matches dictation/spelling setup; Test me and related buttons are full-width without an extra dark bordered gap.',
 	},
+	'pg-s13-16': {
+		title: '13.16 Library edit and public libraries',
+		description:
+			'On vocabulary or quotes library lists, hover or select a card and use Edit (owners on private libraries; super admins on public ones). Rename up to 50 characters with a live count; only the owner can save. Press Enter in the dialog to save when there are changes. Super administrators can toggle Make public library so all signed-in users can browse and practice; new libraries stay private until published. You can delete only libraries you own. A Public badge appears on published libraries for all users.',
+	},
 	'pg-s13-13': {
 		title: '13.13 Classic mistake row fields',
 		description:

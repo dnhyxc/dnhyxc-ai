@@ -653,6 +653,8 @@ export type EnglishVocabularyLibraryListItem = {
 	title: string;
 	wordCount: number;
 	createdAt: string;
+	isPublic?: boolean;
+	isOwned?: boolean;
 };
 
 export type EnglishVocabularyLibraryItemRow = EnglishVocabularyItem & {
@@ -683,6 +685,30 @@ export const deleteEnglishVocabularyLibrary = async (libraryId: string) => {
 		{
 			params: [libraryId],
 		},
+	);
+};
+
+/** 超级管理员：设置单词库是否对全站公开 */
+export const patchEnglishVocabularyLibraryVisibility = async (
+	libraryId: string,
+	isPublic: boolean,
+) => {
+	return await http.patch<EnglishVocabularyLibraryListItem>(
+		ENGLISH_LEARNING_VOCABULARY_LIBRARIES,
+		{ isPublic },
+		{ params: [libraryId, 'visibility'] },
+	);
+};
+
+/** 更新单词库标题（仅创建者） */
+export const patchEnglishVocabularyLibraryTitle = async (
+	libraryId: string,
+	title: string,
+) => {
+	return await http.patch<EnglishVocabularyLibraryListItem>(
+		ENGLISH_LEARNING_VOCABULARY_LIBRARIES,
+		{ title },
+		{ params: [libraryId, 'title'] },
 	);
 };
 
@@ -729,6 +755,8 @@ export type EnglishClassicQuotesLibraryListItem = {
 	title: string;
 	quoteCount: number;
 	createdAt: string;
+	isPublic?: boolean;
+	isOwned?: boolean;
 };
 
 export type EnglishClassicQuotesLibraryItemRow = {
@@ -763,6 +791,30 @@ export const deleteEnglishClassicQuotesLibrary = async (libraryId: string) => {
 		{
 			params: [libraryId],
 		},
+	);
+};
+
+/** 超级管理员：设置经典语句库是否对全站公开 */
+export const patchEnglishClassicQuotesLibraryVisibility = async (
+	libraryId: string,
+	isPublic: boolean,
+) => {
+	return await http.patch<EnglishClassicQuotesLibraryListItem>(
+		ENGLISH_LEARNING_CLASSIC_QUOTES_LIBRARIES,
+		{ isPublic },
+		{ params: [libraryId, 'visibility'] },
+	);
+};
+
+/** 更新经典语句库标题（仅创建者） */
+export const patchEnglishClassicQuotesLibraryTitle = async (
+	libraryId: string,
+	title: string,
+) => {
+	return await http.patch<EnglishClassicQuotesLibraryListItem>(
+		ENGLISH_LEARNING_CLASSIC_QUOTES_LIBRARIES,
+		{ title },
+		{ params: [libraryId, 'title'] },
 	);
 };
 

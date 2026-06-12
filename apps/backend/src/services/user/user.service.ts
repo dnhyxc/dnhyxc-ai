@@ -129,6 +129,16 @@ export class UserService {
 		return this.isMembershipActive(synced);
 	}
 
+	/** 是否拥有超级管理员角色（id=1 或 name 为「超级管理员」） */
+	async userHasSuperAdminRole(userId: number): Promise<boolean> {
+		const user = await this.userRepository.findOne({
+			where: { id: userId },
+			relations: ['roles'],
+		});
+		if (!user?.roles?.length) return false;
+		return user.roles.some((r) => r.id === 1 || r.name === '超级管理员');
+	}
+
 	/** 会员是否在有效期内（以 memberExpiresAt 为准；null 且 isMember 视为未设到期） */
 	isMembershipActive(user: User, now = new Date()): boolean {
 		if (!user.isMember) return false;

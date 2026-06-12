@@ -14,6 +14,7 @@ import { EnglishClassicQuotesLibraryItem } from './english-classic-quotes-librar
  */
 @Entity('english_classic_quotes_library')
 @Index('idx_ecql_user_created', ['userId', 'createdAt'])
+@Index('idx_ecql_public', ['isPublic'])
 export class EnglishClassicQuotesLibrary {
 	@PrimaryGeneratedColumn('uuid')
 	id!: string;
@@ -26,6 +27,10 @@ export class EnglishClassicQuotesLibrary {
 
 	@Column({ name: 'quote_count', type: 'int' })
 	quoteCount!: number;
+
+	/** 为 true 时全站用户可读、可用于练习抽题 */
+	@Column({ name: 'is_public', type: 'boolean', default: false })
+	isPublic!: boolean;
 
 	@CreateDateColumn({ name: 'created_at', type: 'timestamp' })
 	createdAt!: Date;

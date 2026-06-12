@@ -730,4 +730,9 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'After recognition in Daily memorize, multiple-choice distractors favor similar part of speech and definition length, with less repetition of the same wrong option within one round. The Start memorizing footer spacing aligns with dictation/spelling setup; Test me and related primary buttons no longer sit inside an extra dark bordered gap.',
 	},
+	's24-40': {
+		title: 'Library edit and public libraries',
+		description:
+			'Hover a library card to edit (owners on private libraries; super admins on public ones). Owners can rename a library (character count shown, up to 50); press Enter in the dialog to save when there are changes. Super administrators can mark a library as public so all signed-in users can browse and practice; others cannot delete a public library they do not own. A Public badge appears on published libraries for all users. New imports stay private until manually published.',
+	},
 };

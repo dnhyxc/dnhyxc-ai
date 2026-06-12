@@ -6,6 +6,7 @@ export * from './i18n';
 export * from './theme';
 export * from './useIncrementalClassicQuoteFavoriteStatus';
 export * from './useIncrementalVocabFavoriteStatus';
+export * from './useIsSuperAdmin';
 export * from './useMarkdownHashLinkViewportScroll';
 export * from './useMembershipActive';
 export * from './useMermaidImagePreview';

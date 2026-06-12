@@ -14,6 +14,7 @@ import { EnglishVocabularyLibraryItem } from './english-vocabulary-library-item.
  */
 @Entity('english_vocabulary_library')
 @Index('idx_evl_user_created', ['userId', 'createdAt'])
+@Index('idx_evl_public', ['isPublic'])
 export class EnglishVocabularyLibrary {
 	@PrimaryGeneratedColumn('uuid')
 	id!: string;
@@ -26,6 +27,10 @@ export class EnglishVocabularyLibrary {
 
 	@Column({ name: 'word_count', type: 'int' })
 	wordCount!: number;
+
+	/** 为 true 时全站用户可读、可用于记词/练习抽题 */
+	@Column({ name: 'is_public', type: 'boolean', default: false })
+	isPublic!: boolean;
 
 	@CreateDateColumn({ name: 'created_at', type: 'timestamp' })
 	createdAt!: Date;

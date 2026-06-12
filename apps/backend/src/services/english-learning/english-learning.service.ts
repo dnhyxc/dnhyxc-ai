@@ -8,6 +8,7 @@ import {
 } from '@langchain/core/messages';
 import {
 	BadRequestException,
+	ForbiddenException,
 	HttpException,
 	HttpStatus,
 	Injectable,
@@ -41,6 +42,7 @@ import {
 	repairJsonUnescapedInteriorQuotes,
 } from '../../utils/english-pack';
 import { LlmConfigService } from '../llm-config/llm-config.service';
+import { UserService } from '../user/user.service';
 import {
 	ENGLISH_PACK_MASTER_APPENDIX_CHAR_CAP,
 	ENGLISH_PACK_MASTER_STREAM_CHAR_FUSE,
@@ -82,6 +84,8 @@ import type {
 } from './dto/practice-review.dto';
 import { SaveClassicQuotesLibraryDto } from './dto/save-classic-quotes-library.dto';
 import { SaveVocabularyLibraryDto } from './dto/save-vocabulary-library.dto';
+import { UpdateLibraryTitleDto } from './dto/update-library-title.dto';
+import { UpdateLibraryVisibilityDto } from './dto/update-library-visibility.dto';
 import type { VocabularyFavoriteBodyDto } from './dto/vocabulary-favorite.dto';
 import type { VocabularyMistakeBatchItemDto } from './dto/vocabulary-mistake.dto';
 import {
@@ -174,6 +178,8 @@ export type VocabularyLibraryListItem = {
 	title: string;
 	wordCount: number;
 	createdAt: string;
+	isPublic: boolean;
+	isOwned: boolean;
 };
 
 /** 单词库内单条词条（分页列表） */
@@ -188,6 +194,8 @@ export type ClassicQuotesLibraryListItem = {
 	title: string;
 	quoteCount: number;
 	createdAt: string;
+	isPublic: boolean;
+	isOwned: boolean;
 };
 
 /** 经典语句库内单条（分页列表） */
@@ -275,6 +283,7 @@ export class EnglishLearningService {
 		private readonly practiceReviewStateRepo: Repository<EnglishPracticeReviewState>,
 		@InjectRepository(EnglishDailyMemorizeRecord)
 		private readonly dailyMemorizeRecordRepo: Repository<EnglishDailyMemorizeRecord>,
+		private readonly userService: UserService,
 	) {}
 
 	/** 中止类异常：用户断开 SSE / 显式 cancel / LangChain 链取消 */
@@ -1961,6 +1970,36 @@ ${existingHintBlock}
 		return lib;
 	}
 
+	private async assertVocabularyLibraryReadable(
+		userId: number,
+		libraryId: string,
+	): Promise<EnglishVocabularyLibrary> {
+		const lib = await this.vocabLibraryRepo.findOne({
+			where: [
+				{ id: libraryId, userId },
+				{ id: libraryId, isPublic: true },
+			],
+		});
+		if (!lib) {
+			throw new NotFoundException('单词库不存在或无权访问');
+		}
+		return lib;
+	}
+
+	private mapVocabularyLibraryListItem(
+		row: EnglishVocabularyLibrary,
+		viewerUserId: number,
+	): VocabularyLibraryListItem {
+		return {
+			id: row.id,
+			title: row.title,
+			wordCount: row.wordCount,
+			createdAt: row.createdAt.toISOString(),
+			isPublic: row.isPublic,
+			isOwned: row.userId === viewerUserId,
+		};
+	}
+
 	/**
 	 * 事务写入：先落库元数据，再批量插入词条行（支持后续分页查询）。
 	 */
@@ -2023,25 +2062,55 @@ ${existingHintBlock}
 		return { deleted: true };
 	}
 
-	/** 分页列出当前用户的单词库（包） */
+	/** 分页列出当前用户可见的单词库（自有 + 公共） */
 	async listVocabularyLibraries(
 		userId: number,
 		options?: { limit?: number; offset?: number },
 	): Promise<VocabularyLibraryListItem[]> {
 		const limit = Math.min(100, Math.max(1, options?.limit ?? 20));
 		const offset = Math.max(0, options?.offset ?? 0);
-		const rows = await this.vocabLibraryRepo.find({
-			where: { userId },
-			order: { createdAt: 'DESC' },
-			take: limit,
-			skip: offset,
+		const rows = await this.vocabLibraryRepo
+			.createQueryBuilder('lib')
+			.where('(lib.userId = :userId OR lib.isPublic = true)', { userId })
+			.orderBy('lib.createdAt', 'DESC')
+			.take(limit)
+			.skip(offset)
+			.getMany();
+		return rows.map((r) => this.mapVocabularyLibraryListItem(r, userId));
+	}
+
+	async updateVocabularyLibraryVisibility(
+		userId: number,
+		libraryId: string,
+		dto: UpdateLibraryVisibilityDto,
+	): Promise<VocabularyLibraryListItem> {
+		if (!(await this.userService.userHasSuperAdminRole(userId))) {
+			throw new ForbiddenException('需要超级管理员权限');
+		}
+		const lib = await this.vocabLibraryRepo.findOne({
+			where: { id: libraryId },
 		});
-		return rows.map((r) => ({
-			id: r.id,
-			title: r.title,
-			wordCount: r.wordCount,
-			createdAt: r.createdAt.toISOString(),
-		}));
+		if (!lib) {
+			throw new NotFoundException('单词库不存在');
+		}
+		lib.isPublic = dto.isPublic;
+		const saved = await this.vocabLibraryRepo.save(lib);
+		return this.mapVocabularyLibraryListItem(saved, userId);
+	}
+
+	async updateVocabularyLibraryTitle(
+		userId: number,
+		libraryId: string,
+		dto: UpdateLibraryTitleDto,
+	): Promise<VocabularyLibraryListItem> {
+		const lib = await this.assertVocabularyLibraryOwned(userId, libraryId);
+		const t = dto.title.trim().slice(0, 200);
+		if (!t) {
+			throw new BadRequestException('标题不能为空');
+		}
+		lib.title = t;
+		const saved = await this.vocabLibraryRepo.save(lib);
+		return this.mapVocabularyLibraryListItem(saved, userId);
 	}
 
 	/** 分页列出某单词库内的词条（按 sort_order 升序） */
@@ -2053,24 +2122,19 @@ ${existingHintBlock}
 		library: VocabularyLibraryListItem;
 		items: VocabularyLibraryItemDto[];
 	}> {
-		const lib = await this.assertVocabularyLibraryOwned(userId, libraryId);
+		const lib = await this.assertVocabularyLibraryReadable(userId, libraryId);
 		const limit = Math.min(200, Math.max(1, options?.limit ?? 50));
 		const offset = Math.max(0, options?.offset ?? 0);
 
 		const rows = await this.vocabLibraryItemRepo.find({
-			where: { libraryId, userId },
+			where: { libraryId },
 			order: { sortOrder: 'ASC' },
 			take: limit,
 			skip: offset,
 		});
 
 		return {
-			library: {
-				id: lib.id,
-				title: lib.title,
-				wordCount: lib.wordCount,
-				createdAt: lib.createdAt.toISOString(),
-			},
+			library: this.mapVocabularyLibraryListItem(lib, userId),
 			items: rows.map((r) => this.mapLibraryItemRow(r)),
 		};
 	}
@@ -2204,6 +2268,37 @@ ${existingHintBlock}
 		return lib;
 	}
 
+	private async assertClassicQuotesLibraryReadable(
+		userId: number,
+		libraryId: string,
+	): Promise<EnglishClassicQuotesLibrary> {
+		const lib = await this.classicQuotesLibraryRepo.findOne({
+			where: [
+				{ id: libraryId, userId },
+				{ id: libraryId, isPublic: true },
+			],
+		});
+		if (!lib) {
+			throw new NotFoundException('经典语句库不存在或无权访问');
+		}
+		return lib;
+	}
+
+	// 映射经典语句库列表项
+	private mapClassicQuotesLibraryListItem(
+		row: EnglishClassicQuotesLibrary,
+		viewerUserId: number,
+	): ClassicQuotesLibraryListItem {
+		return {
+			id: row.id,
+			title: row.title,
+			quoteCount: row.quoteCount,
+			createdAt: row.createdAt.toISOString(),
+			isPublic: row.isPublic,
+			isOwned: row.userId === viewerUserId,
+		};
+	}
+
 	private async persistClassicQuotesLibrary(
 		userId: number,
 		title: string,
@@ -2263,18 +2358,48 @@ ${existingHintBlock}
 	): Promise<ClassicQuotesLibraryListItem[]> {
 		const limit = Math.min(100, Math.max(1, options?.limit ?? 20));
 		const offset = Math.max(0, options?.offset ?? 0);
-		const rows = await this.classicQuotesLibraryRepo.find({
-			where: { userId },
-			order: { createdAt: 'DESC' },
-			take: limit,
-			skip: offset,
+		const rows = await this.classicQuotesLibraryRepo
+			.createQueryBuilder('lib')
+			.where('(lib.userId = :userId OR lib.isPublic = true)', { userId })
+			.orderBy('lib.createdAt', 'DESC')
+			.take(limit)
+			.skip(offset)
+			.getMany();
+		return rows.map((r) => this.mapClassicQuotesLibraryListItem(r, userId));
+	}
+
+	async updateClassicQuotesLibraryVisibility(
+		userId: number,
+		libraryId: string,
+		dto: UpdateLibraryVisibilityDto,
+	): Promise<ClassicQuotesLibraryListItem> {
+		if (!(await this.userService.userHasSuperAdminRole(userId))) {
+			throw new ForbiddenException('需要超级管理员权限');
+		}
+		const lib = await this.classicQuotesLibraryRepo.findOne({
+			where: { id: libraryId },
 		});
-		return rows.map((r) => ({
-			id: r.id,
-			title: r.title,
-			quoteCount: r.quoteCount,
-			createdAt: r.createdAt.toISOString(),
-		}));
+		if (!lib) {
+			throw new NotFoundException('经典语句库不存在');
+		}
+		lib.isPublic = dto.isPublic;
+		const saved = await this.classicQuotesLibraryRepo.save(lib);
+		return this.mapClassicQuotesLibraryListItem(saved, userId);
+	}
+
+	async updateClassicQuotesLibraryTitle(
+		userId: number,
+		libraryId: string,
+		dto: UpdateLibraryTitleDto,
+	): Promise<ClassicQuotesLibraryListItem> {
+		const lib = await this.assertClassicQuotesLibraryOwned(userId, libraryId);
+		const t = dto.title.trim().slice(0, 200);
+		if (!t) {
+			throw new BadRequestException('标题不能为空');
+		}
+		lib.title = t;
+		const saved = await this.classicQuotesLibraryRepo.save(lib);
+		return this.mapClassicQuotesLibraryListItem(saved, userId);
 	}
 
 	async listClassicQuotesLibraryItems(
@@ -2285,24 +2410,22 @@ ${existingHintBlock}
 		library: ClassicQuotesLibraryListItem;
 		items: ClassicQuotesLibraryItemDto[];
 	}> {
-		const lib = await this.assertClassicQuotesLibraryOwned(userId, libraryId);
+		const lib = await this.assertClassicQuotesLibraryReadable(
+			userId,
+			libraryId,
+		);
 		const limit = Math.min(200, Math.max(1, options?.limit ?? 50));
 		const offset = Math.max(0, options?.offset ?? 0);
 
 		const rows = await this.classicQuotesLibraryItemRepo.find({
-			where: { libraryId, userId },
+			where: { libraryId },
 			order: { sortOrder: 'ASC' },
 			take: limit,
 			skip: offset,
 		});
 
 		return {
-			library: {
-				id: lib.id,
-				title: lib.title,
-				quoteCount: lib.quoteCount,
-				createdAt: lib.createdAt.toISOString(),
-			},
+			library: this.mapClassicQuotesLibraryListItem(lib, userId),
 			items: rows.map((r) => this.mapClassicLibraryItemRow(r)),
 		};
 	}
@@ -4669,13 +4792,20 @@ ${existingHintBlock}
 	): SelectQueryBuilder<EnglishVocabularyLibraryItem> {
 		const wordKey = this.libraryMemorizeWordKeySql(alias);
 		const qb = this.vocabLibraryItemRepo.createQueryBuilder(alias);
-		qb.where(`${alias}.userId = :userId`, { userId });
+		qb.innerJoin(
+			EnglishVocabularyLibrary,
+			'lib',
+			`lib.id = ${alias}.libraryId`,
+		);
+		qb.where(`(${alias}.userId = :userId OR lib.isPublic = true)`, {
+			userId,
+		});
 		qb.andWhere(`TRIM(${alias}.translationZh) <> ''`);
 		qb.leftJoin(
 			EnglishPracticeReviewState,
 			'rs',
-			`rs.userId = ${alias}.userId AND rs.contentKind = :vocabKind AND rs.itemKey = ${wordKey}`,
-			{ vocabKind: 'vocab' },
+			`rs.userId = :userId AND rs.contentKind = :vocabKind AND rs.itemKey = ${wordKey}`,
+			{ userId, vocabKind: 'vocab' },
 		);
 		qb.andWhere('rs.id IS NULL');
 		const excludeKeys = [

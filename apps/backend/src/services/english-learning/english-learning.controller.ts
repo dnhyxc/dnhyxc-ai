@@ -13,6 +13,7 @@ import {
 	Header,
 	HttpException,
 	Param,
+	Patch,
 	Post,
 	Query,
 	Req,
@@ -58,6 +59,8 @@ import {
 } from './dto/practice-review.dto';
 import { SaveClassicQuotesLibraryDto } from './dto/save-classic-quotes-library.dto';
 import { SaveVocabularyLibraryDto } from './dto/save-vocabulary-library.dto';
+import { UpdateLibraryTitleDto } from './dto/update-library-title.dto';
+import { UpdateLibraryVisibilityDto } from './dto/update-library-visibility.dto';
 import {
 	VocabularyFavoriteBodyDto,
 	VocabularyFavoriteRemoveBatchDto,
@@ -413,6 +416,45 @@ export class EnglishLearningController {
 		return { success: true, data };
 	}
 
+	/** 超级管理员：设置单词库是否对全站公开 */
+	@Patch('vocabulary-libraries/:libraryId/visibility')
+	async updateVocabularyLibraryVisibility(
+		@Req() req: AuthedRequest,
+		@Param('libraryId') libraryId: string,
+		@Body() dto: UpdateLibraryVisibilityDto,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const data =
+			await this.englishLearningService.updateVocabularyLibraryVisibility(
+				userId,
+				libraryId,
+				dto,
+			);
+		return { success: true, data };
+	}
+
+	/** 更新单词库标题（仅创建者） */
+	@Patch('vocabulary-libraries/:libraryId/title')
+	async updateVocabularyLibraryTitle(
+		@Req() req: AuthedRequest,
+		@Param('libraryId') libraryId: string,
+		@Body() dto: UpdateLibraryTitleDto,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const data = await this.englishLearningService.updateVocabularyLibraryTitle(
+			userId,
+			libraryId,
+			dto,
+		);
+		return { success: true, data };
+	}
+
 	/** 分页列出某单词库内的词条（按导入顺序 sort_order 升序） */
 	@Get('vocabulary-libraries/:libraryId/items')
 	async listVocabularyLibraryItems(
@@ -544,6 +586,46 @@ export class EnglishLearningController {
 			userId,
 			libraryId,
 		);
+		return { success: true, data };
+	}
+
+	/** 超级管理员：设置经典语句库是否对全站公开 */
+	@Patch('classic-quotes-libraries/:libraryId/visibility')
+	async updateClassicQuotesLibraryVisibility(
+		@Req() req: AuthedRequest,
+		@Param('libraryId') libraryId: string,
+		@Body() dto: UpdateLibraryVisibilityDto,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const data =
+			await this.englishLearningService.updateClassicQuotesLibraryVisibility(
+				userId,
+				libraryId,
+				dto,
+			);
+		return { success: true, data };
+	}
+
+	/** 更新经典语句库标题（仅创建者） */
+	@Patch('classic-quotes-libraries/:libraryId/title')
+	async updateClassicQuotesLibraryTitle(
+		@Req() req: AuthedRequest,
+		@Param('libraryId') libraryId: string,
+		@Body() dto: UpdateLibraryTitleDto,
+	) {
+		const userId = req.user?.userId;
+		if (userId == null) {
+			throw new UnauthorizedException('未授权');
+		}
+		const data =
+			await this.englishLearningService.updateClassicQuotesLibraryTitle(
+				userId,
+				libraryId,
+				dto,
+			);
 		return { success: true, data };
 	}
 

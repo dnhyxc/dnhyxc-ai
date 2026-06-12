@@ -27,6 +27,7 @@
 | [english-learning-library-import.md](./english-learning-library-import.md) | 资源库导入 |
 | [english-learning-json-import.md](./english-learning-json-import.md) | JSON 导入 |
 | [classic-quotes-library-import.md](./classic-quotes-library-import.md) | 经典句库 |
+| [library-public-edit.md](./library-public-edit.md) | **资源库编辑**：重命名、Enter 保存、超管设公共库、列表权限 |
 | [vocab-favorite-status-query.md](./vocab-favorite-status-query.md) | 收藏状态查询 |
 | [english-learning-favorites-drawer.md](./english-learning-favorites-drawer.md) | 收藏抽屉 |
 | [english-favorites-docx-export.md](./english-favorites-docx-export.md) | 导出 DOCX |

@@ -177,7 +177,7 @@ function validateImportPreview(
 	};
 }
 
-export default function EnglishLearningImportPage() {
+const EnglishLearningImportPage = () => {
 	const { t } = useI18n();
 	const { theme } = useTheme();
 	const navigate = useNavigate();
@@ -234,7 +234,7 @@ export default function EnglishLearningImportPage() {
 				return;
 			}
 			setFileReadError(false);
-			setImportTitle(fileNameWithoutExtension(file.name).slice(0, 100));
+			setImportTitle(fileNameWithoutExtension(file.name).slice(0, 50));
 			const reader = new FileReader();
 			reader.onload = () => {
 				const text = typeof reader.result === 'string' ? reader.result : '';
@@ -486,7 +486,7 @@ export default function EnglishLearningImportPage() {
 										<NotebookPen size={18} className="text-textcolor" />
 										<Input
 											value={importTitle}
-											maxLength={100}
+											maxLength={50}
 											onChange={(e) => setImportTitle(e.target.value)}
 											placeholder={t('englishLearning.import.titlePlaceholder')}
 											className="md:text-base h-full mr-5 border-0 bg-transparent pr-2 text-textcolor shadow-none placeholder:text-sm placeholder:text-textcolor/60 focus-visible:border-0 focus-visible:ring-0"
@@ -561,4 +561,6 @@ export default function EnglishLearningImportPage() {
 			</div>
 		</div>
 	);
-}
+};
+
+export default EnglishLearningImportPage;

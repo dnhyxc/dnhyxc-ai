@@ -1209,6 +1209,27 @@ export const enUS = {
 	'englishLearning.library.deleting': 'Deleting…',
 	'englishLearning.library.deleteSuccess': 'Library deleted',
 	'englishLearning.library.deleteSuccessClassic': 'Quotes library deleted',
+	'englishLearning.library.editAction': 'Edit library',
+	'englishLearning.library.editActionClassic': 'Edit quotes library',
+	'englishLearning.library.publicBadge': 'Public',
+	'englishLearning.library.visibilityDialogTitle': 'Edit vocabulary library',
+	'englishLearning.library.visibilityDialogTitleClassic': 'Edit quotes library',
+	'englishLearning.library.visibilityLibrarySummary':
+		'"{title}" — {count} words. ',
+	'englishLearning.library.visibilityLibrarySummaryClassic':
+		'"{title}" — {count} quotes. ',
+	'englishLearning.library.editTitleLabel': 'Library name',
+	'englishLearning.library.editTitlePlaceholder': 'Enter library name',
+	'englishLearning.library.editTitleRequired': 'Name is required',
+	'englishLearning.library.editTitleReadonlyHint':
+		'Only the owner can rename this library',
+	'englishLearning.library.editSaveSuccess': 'Library title updated',
+	'englishLearning.library.visibilityPublicLabel': 'Make public library',
+	'englishLearning.library.visibilityPublicHelp':
+		'When on, every signed-in user can see and use it in Library. When off, only the owner can access it.',
+	'englishLearning.library.visibilitySaveAction': 'Save',
+	'englishLearning.library.visibilitySaving': 'Saving…',
+	'englishLearning.library.visibilitySaveSuccess': 'Library visibility updated',
 	'englishLearning.library.goImport': 'Go to import',
 	'englishLearning.library.selectLibrary':
 		'Select a vocabulary library on the left',

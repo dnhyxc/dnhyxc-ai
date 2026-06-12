@@ -4,7 +4,8 @@
 import Confirm from '@design/Confirm';
 import Loading from '@design/Loading';
 import { Button, ScrollArea, Spinner, Toast } from '@ui/index';
-import { SquareArrowRight, Trash2 } from 'lucide-react';
+import { SquareArrowRight, SquarePen, Trash2 } from 'lucide-react';
+import { observer } from 'mobx-react';
 import {
 	type MouseEvent,
 	type UIEventHandler,
@@ -18,7 +19,7 @@ import {
 	SCROLL_LOAD_THRESHOLD_PX,
 	VOCAB_LIBRARY_LIST_PAGE_SIZE,
 } from '@/constants';
-import { useI18n } from '@/hooks';
+import { useI18n, useIsSuperAdmin } from '@/hooks';
 import { cn } from '@/lib/utils';
 import {
 	deleteEnglishClassicQuotesLibrary,
@@ -31,6 +32,7 @@ import {
 import { EnglishPracticeEntry } from '../../components/practiceEntry';
 import type { EnglishLibraryListItem, LibraryKind } from '../types';
 import { getLibraryItemCount } from '../types';
+import { LibraryEditDialog } from './LibraryEditDialog';
 
 export type LibraryListPanelProps = {
 	kind: LibraryKind;
@@ -49,7 +51,7 @@ function formatLibraryDate(iso: string): string {
 	}
 }
 
-export function LibraryListPanel({
+export const LibraryListPanel = observer(function LibraryListPanel({
 	kind,
 	selectedId,
 	initialLibraryId,
@@ -58,6 +60,7 @@ export function LibraryListPanel({
 }: LibraryListPanelProps) {
 	const { t } = useI18n();
 	const navigate = useNavigate();
+	const isSuperAdmin = useIsSuperAdmin();
 
 	const [entries, setEntries] = useState<EnglishLibraryListItem[]>([]);
 	const [loading, setLoading] = useState(false);
@@ -66,6 +69,9 @@ export function LibraryListPanel({
 	const [deleteTarget, setDeleteTarget] =
 		useState<EnglishLibraryListItem | null>(null);
 	const [deleting, setDeleting] = useState(false);
+	const [visibilityOpen, setVisibilityOpen] = useState(false);
+	const [visibilityTarget, setVisibilityTarget] =
+		useState<EnglishLibraryListItem | null>(null);
 	const offsetRef = useRef(0);
 	const hasMoreRef = useRef(true);
 	const fetchingMoreRef = useRef(false);
@@ -170,6 +176,23 @@ export function LibraryListPanel({
 		setDeleteConfirmOpen(true);
 	}, []);
 
+	const requestEditLibrary = useCallback((lib: EnglishLibraryListItem) => {
+		setVisibilityTarget(lib);
+		setVisibilityOpen(true);
+	}, []);
+
+	const handleVisibilitySaved = useCallback(
+		(updated: EnglishLibraryListItem) => {
+			setEntries((prev) =>
+				prev.map((entry) => (entry.id === updated.id ? updated : entry)),
+			);
+			if (selectedId === updated.id) {
+				onSelectRef.current(updated);
+			}
+		},
+		[selectedId],
+	);
+
 	const executeDeleteLibrary = useCallback(async () => {
 		const target = deleteTarget;
 		if (!target) {
@@ -217,6 +240,16 @@ export function LibraryListPanel({
 
 	return (
 		<div className="flex h-full min-h-0 flex-col">
+			<LibraryEditDialog
+				open={visibilityOpen}
+				onOpenChange={(open) => {
+					setVisibilityOpen(open);
+					if (!open) setVisibilityTarget(null);
+				}}
+				kind={kind}
+				library={visibilityTarget}
+				onSaved={handleVisibilitySaved}
+			/>
 			<Confirm
 				open={deleteConfirmOpen}
 				onOpenChange={(open) => {
@@ -289,6 +322,22 @@ export function LibraryListPanel({
 									: null;
 							const itemCount = getLibraryItemCount(lib, kind);
 							const showPracticeEntry = itemCount > 0;
+							const canDelete = lib.isOwned !== false;
+							const showEdit = lib.isPublic
+								? isSuperAdmin
+								: lib.isOwned !== false;
+							const actionCount =
+								(showPracticeEntry ? 1 : 0) +
+								(showEdit ? 1 : 0) +
+								(canDelete ? 1 : 0);
+							const titleRightMargin =
+								actionCount >= 3
+									? 'mr-[4.75rem]'
+									: actionCount === 2
+										? 'mr-14'
+										: actionCount === 1
+											? 'mr-8'
+											: '';
 							return (
 								<div
 									key={lib.id}
@@ -306,11 +355,18 @@ export function LibraryListPanel({
 									>
 										<div
 											className={cn(
-												'text-textcolor line-clamp-2 text-sm font-medium leading-snug',
-												showPracticeEntry ? 'mr-14' : 'mr-6',
+												'flex min-w-0 items-center gap-1.5',
+												titleRightMargin,
 											)}
 										>
-											{lib.title || '—'}
+											{lib.isPublic ? (
+												<span className="mt-0.5 shrink-0 rounded bg-teal-500/15 px-1.5 py-1 text-xs font-medium leading-none text-teal-500">
+													{t('englishLearning.library.publicBadge')}
+												</span>
+											) : null}
+											<span className="text-textcolor line-clamp-2 min-w-0 flex-1 text-sm font-medium leading-snug">
+												{lib.title || '—'}
+											</span>
 										</div>
 										<div className="text-textcolor/50 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm">
 											<span>
@@ -327,7 +383,7 @@ export function LibraryListPanel({
 											</span>
 										</div>
 									</button>
-									<div className="absolute top-0 right-0 mt-1 mr-1 hidden items-center gap-0.5 group-hover:flex">
+									<div className="absolute top-0 right-0 mt-1 mr-1 items-center gap-0.5 hidden group-hover:flex">
 										{showPracticeEntry && vocabLib ? (
 											<EnglishPracticeEntry
 												variant="icon"
@@ -340,6 +396,7 @@ export function LibraryListPanel({
 															? vocabLib.wordCount
 															: undefined,
 												}}
+												className="text-textcolor/65 hover:border hover:border-teal-500/15 hover:bg-teal-500/10 hover:text-teal-500"
 												onBeforeNavigate={(
 													e: MouseEvent<HTMLButtonElement>,
 												) => {
@@ -361,6 +418,7 @@ export function LibraryListPanel({
 															? classicLib.quoteCount
 															: undefined,
 												}}
+												className="text-textcolor/65 hover:border hover:border-teal-500/15 hover:bg-teal-500/10 hover:text-teal-500"
 												onBeforeNavigate={(
 													e: MouseEvent<HTMLButtonElement>,
 												) => {
@@ -368,27 +426,49 @@ export function LibraryListPanel({
 												}}
 											/>
 										) : null}
-										<Button
-											type="button"
-											variant="ghost"
-											size="sm"
-											disabled={deleting}
-											onClick={(e) => {
-												e.stopPropagation();
-												requestDeleteLibrary(lib);
-											}}
-											className={cn(
-												'h-7 w-7 shrink-0 rounded-md p-0 transition-colors',
-												'text-textcolor/65 hover:border hover:border-destructive/10 hover:bg-destructive/10 hover:text-destructive',
-											)}
-											aria-label={
-												kind === 'vocab'
-													? t('englishLearning.library.deleteAction')
-													: t('englishLearning.library.deleteActionClassic')
-											}
-										>
-											<Trash2 className="size-3.5" />
-										</Button>
+										{showEdit ? (
+											<Button
+												variant="ghost"
+												size="sm"
+												onClick={(e) => {
+													e.stopPropagation();
+													requestEditLibrary(lib);
+												}}
+												className={cn(
+													'h-7 w-7 shrink-0 rounded-md p-0 transition-colors',
+													'text-textcolor/65 hover:border hover:border-blue-500/15 hover:bg-blue-500/10 hover:text-blue-500',
+												)}
+												aria-label={
+													kind === 'vocab'
+														? t('englishLearning.library.editAction')
+														: t('englishLearning.library.editActionClassic')
+												}
+											>
+												<SquarePen className="size-3.5 mt-0.5" />
+											</Button>
+										) : null}
+										{canDelete ? (
+											<Button
+												variant="ghost"
+												size="sm"
+												disabled={deleting}
+												onClick={(e) => {
+													e.stopPropagation();
+													requestDeleteLibrary(lib);
+												}}
+												className={cn(
+													'h-7 w-7 shrink-0 rounded-md p-0 transition-colors',
+													'text-textcolor/65 hover:border hover:border-destructive/10 hover:bg-destructive/10 hover:text-destructive',
+												)}
+												aria-label={
+													kind === 'vocab'
+														? t('englishLearning.library.deleteAction')
+														: t('englishLearning.library.deleteActionClassic')
+												}
+											>
+												<Trash2 className="size-3.5" />
+											</Button>
+										) : null}
 									</div>
 								</div>
 							);
@@ -423,4 +503,4 @@ export function LibraryListPanel({
 			</ScrollArea>
 		</div>
 	);
-}
+});
