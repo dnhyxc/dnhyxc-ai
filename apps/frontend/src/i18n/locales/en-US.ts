@@ -130,6 +130,48 @@ export const enUS = {
 	'setting.llm.defaultHint': 'Default {modelName} model is in use',
 	'setting.llm.incompleteHint':
 		'Enabled but incomplete; still using environment variables',
+	'setting.llm.vectorTitle': 'Vector model configuration',
+	'setting.llm.vectorDesc':
+		'Embedding and rerank models for Knowledge indexing and RAG. Saved separately from chat LLM settings above. Provide full URLs for both embeddings and rerank endpoints.',
+	'setting.llm.vectorEmbeddingUrl': 'Embedding URL',
+	'setting.llm.vectorEmbeddingUrlPlaceholder': 'Full embeddings endpoint URL',
+	'setting.llm.vectorEmbeddingUrlOption.siliconflow':
+		'SiliconFlow embeddings (api.siliconflow.cn/v1/embeddings)',
+	'setting.llm.vectorRerankUrl': 'Rerank URL',
+	'setting.llm.vectorRerankUrlPlaceholder': 'Full rerank endpoint URL',
+	'setting.llm.vectorRerankUrlOption.siliconflow':
+		'SiliconFlow rerank (api.siliconflow.cn/v1/rerank)',
+	'setting.llm.vectorEmbeddingModel': 'Embedding model',
+	'setting.llm.vectorEmbeddingModelPlaceholder': 'Embedding model name',
+	'setting.llm.vectorModelOption.bgeLargeZh': 'BAAI/bge-large-zh-v1.5',
+	'setting.llm.vectorModelOption.qwen3Emb': 'Qwen/Qwen3-Embedding-4B',
+	'setting.llm.vectorRerankModel': 'Rerank model',
+	'setting.llm.vectorRerankModelPlaceholder': 'Rerank model name',
+	'setting.llm.vectorRerankOption.bgeReranker': 'BAAI/bge-reranker-v2-m3',
+	'setting.llm.vectorRerankOption.qwen3Rerank': 'Qwen/Qwen3-Reranker-4B',
+	'setting.llm.vectorCollectionName': 'Vector collection name',
+	'setting.llm.vectorCollectionNamePlaceholder': 'Qdrant collection name',
+	'setting.llm.vectorCollectionOption.default':
+		'knowledge_chunks_v2 (default 1024-dim)',
+	'setting.llm.vectorCollectionOption.qwen3':
+		'knowledge_chunks_qwen3_2560 (2560-dim)',
+	'setting.llm.vectorSearchProfilesTitle': 'Collections included in search',
+	'setting.llm.vectorSearchProfilesDesc':
+		'Each save records collections below; RAG always searches them plus the system default bge collection (knowledge_chunks_v2), even if not listed here.',
+	'setting.llm.vectorApiKey': 'API Key',
+	'setting.llm.vectorSave': 'Save vector configuration',
+	'setting.llm.vectorClear': 'Restore vector defaults',
+	'setting.llm.vectorSaveSuccess': 'Vector settings saved',
+	'setting.llm.vectorClearSuccess': 'Vector settings reverted to defaults',
+	'setting.llm.vectorActiveHint':
+		'{embeddingModel} vector configuration is in use',
+	'setting.llm.vectorUnsavedHint': 'Unsaved vector changes—please save',
+	'setting.llm.vectorReadyToSaveHint':
+		'Save to apply your vector configuration',
+	'setting.llm.vectorIncompleteDraftHint':
+		'Complete all vector fields before saving',
+	'setting.llm.vectorDefaultHint':
+		'Using default vector model {embeddingModel}',
 	'setting.cloudTts.title': 'Cloud voice settings',
 	'setting.cloudTts.desc':
 		'When on, speaker buttons use cloud synthesis with the parameters below; when off, playback uses local Web Speech (mutually exclusive with Local voice settings above). Restore default parameters keeps cloud routing but uses server defaults.',

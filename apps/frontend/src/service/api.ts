@@ -109,6 +109,7 @@ export const KNOWLEDGE_TRASH_DELETE_BATCH = '/knowledge/trash/delete-batch';
 /** 实例级大模型运行时配置（覆盖 createLlm env 回退链） */
 export const SETTINGS_LLM = '/settings/llm';
 export const SETTINGS_LLM_DEFAULTS = '/settings/llm/defaults';
+export const SETTINGS_LLM_VECTOR = '/settings/llm/vector';
 /** 云端朗读（MiniMax）用户偏好 */
 export const SETTINGS_CLOUD_TTS = '/settings/cloud-tts';
 

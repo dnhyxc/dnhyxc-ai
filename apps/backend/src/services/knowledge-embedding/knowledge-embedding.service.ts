@@ -8,12 +8,20 @@ import { ConfigService } from '@nestjs/config';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 // 引入本项目配置枚举
 import {
+	DEFAULT_KNOWLEDGE_EMBEDDING_MODEL,
+	DEFAULT_KNOWLEDGE_RERANK_MODEL,
 	KNOWLEDGE_EMBEDDING_BATCH_SIZE,
 	type KnowledgeVectorApiConfig,
 	type KnowledgeVectorTier,
 	resolveKnowledgeEmbeddingApiConfig,
 	resolveKnowledgeRerankApiConfig,
 } from '../../utils/create-llm';
+import { LlmConfigService } from '../llm-config/llm-config.service';
+import type { VectorRuntimeSnapshot } from '../llm-config/llm-runtime-snapshot.store';
+import {
+	mergeVectorSearchProfile,
+	type VectorSearchProfile,
+} from '../llm-config/llm-vector-profile';
 // 引入 Qdrant 服务与 payload 类型
 import {
 	type QdrantKnowledgePayload,
@@ -76,6 +84,7 @@ export class KnowledgeEmbeddingService {
 		private readonly config: ConfigService,
 		private readonly qdrant: QdrantService,
 		private readonly userService: UserService,
+		private readonly llmConfigService: LlmConfigService,
 		@Inject(WINSTON_MODULE_NEST_PROVIDER)
 		private readonly logger: LoggerService,
 	) {}
@@ -89,6 +98,73 @@ export class KnowledgeEmbeddingService {
 		return (await this.userService.isUserMembershipActive(authorId))
 			? 'member'
 			: 'default';
+	}
+
+	private async resolveEmbeddingApiConfig(
+		authorId?: number | null,
+		tier?: KnowledgeVectorTier,
+	): Promise<KnowledgeVectorApiConfig> {
+		const override =
+			await this.llmConfigService.resolveKnowledgeVectorApiConfigForUser(
+				authorId,
+				'embedding',
+			);
+		if (override) return override;
+		const t = tier ?? (await this.resolveTierForAuthor(authorId));
+		return resolveKnowledgeEmbeddingApiConfig(this.config, t);
+	}
+
+	private async resolveRerankApiConfig(
+		authorId?: number | null,
+		tier?: KnowledgeVectorTier,
+	): Promise<KnowledgeVectorApiConfig> {
+		const override =
+			await this.llmConfigService.resolveKnowledgeVectorApiConfigForUser(
+				authorId,
+				'rerank',
+			);
+		if (override) return override;
+		const t = tier ?? (await this.resolveTierForAuthor(authorId));
+		return resolveKnowledgeRerankApiConfig(this.config, t);
+	}
+
+	private async resolveCollectionName(
+		authorId?: number | null,
+		tier?: KnowledgeVectorTier,
+	): Promise<string> {
+		const custom =
+			await this.llmConfigService.resolveKnowledgeCollectionNameForUser(
+				authorId,
+			);
+		if (custom) return custom;
+		const t = tier ?? (await this.resolveTierForAuthor(authorId));
+		return this.qdrant.getKnowledgeCollectionName(t);
+	}
+
+	private async resolveChunkTierForAuthor(
+		authorId?: number | null,
+	): Promise<KnowledgeVectorTier> {
+		const snap =
+			await this.llmConfigService.getActiveVectorSnapshotForUser(authorId);
+		if (snap) {
+			return /qwen3/i.test(snap.embeddingModel) ? 'member' : 'default';
+		}
+		return this.resolveTierForAuthor(authorId);
+	}
+
+	/** 用户已保存的向量库档位 + 系统默认 bge 库（即使用户未单独保存） */
+	private buildVectorSearchProfilesForRag(
+		vectorSnap: VectorRuntimeSnapshot,
+	): VectorSearchProfile[] {
+		const systemDefaultProfile: VectorSearchProfile = {
+			collectionName: this.qdrant.getKnowledgeCollectionName('default'),
+			embeddingModel: DEFAULT_KNOWLEDGE_EMBEDDING_MODEL,
+			rerankModel: DEFAULT_KNOWLEDGE_RERANK_MODEL,
+		};
+		return mergeVectorSearchProfile(
+			vectorSnap.searchProfiles,
+			systemDefaultProfile,
+		);
 	}
 
 	private mergeSearchHits(
@@ -262,20 +338,24 @@ export class KnowledgeEmbeddingService {
 	// 对外暴露：生成单条 query 向量（供 QA 等模块复用）
 	async embedQuery(
 		text: string,
-		options?: { tier?: KnowledgeVectorTier },
+		options?: { tier?: KnowledgeVectorTier; authorId?: number | null },
 	): Promise<number[]> {
-		const tier = options?.tier ?? 'default';
-		const apiConfig = resolveKnowledgeEmbeddingApiConfig(this.config, tier);
+		const apiConfig = await this.resolveEmbeddingApiConfig(
+			options?.authorId,
+			options?.tier,
+		);
 		return this.createEmbeddingsClient(apiConfig).embedQuery(text);
 	}
 
 	// 对外暴露：批量生成 document 向量（供入库等流程复用）
 	async embedDocuments(
 		texts: string[],
-		options?: { tier?: KnowledgeVectorTier },
+		options?: { tier?: KnowledgeVectorTier; authorId?: number | null },
 	): Promise<number[][]> {
-		const tier = options?.tier ?? 'default';
-		const apiConfig = resolveKnowledgeEmbeddingApiConfig(this.config, tier);
+		const apiConfig = await this.resolveEmbeddingApiConfig(
+			options?.authorId,
+			options?.tier,
+		);
 		return this.createEmbeddingsClient(apiConfig).embedDocuments(texts);
 	}
 
@@ -293,13 +373,54 @@ export class KnowledgeEmbeddingService {
 			id: string | number;
 		}>
 	> {
+		const vectorSnap =
+			await this.llmConfigService.getActiveVectorSnapshotForUser(
+				input.authorId,
+			);
+		if (vectorSnap) {
+			const profiles = this.buildVectorSearchProfilesForRag(vectorSnap);
+
+			console.log(profiles, 'profiles');
+
+			const batches = await Promise.all(
+				profiles.map(async (profile) => {
+					const apiConfig: KnowledgeVectorApiConfig = {
+						apiKey: vectorSnap.apiKey,
+						baseURL: vectorSnap.baseUrl,
+						model: profile.embeddingModel,
+					};
+					const qvec = await this.createEmbeddingsClient(apiConfig).embedQuery(
+						input.question,
+					);
+					if (!qvec.length) return [];
+					try {
+						return await this.qdrant.searchKnowledgeChunks({
+							vector: qvec,
+							topK: input.topK,
+							authorId: input.authorId,
+							collectionName: profile.collectionName,
+						});
+					} catch {
+						return [];
+					}
+				}),
+			);
+
+			console.log(batches, 'batches');
+
+			return this.mergeSearchHits(batches, input.topK);
+		}
+
 		const tier = await this.resolveTierForAuthor(input.authorId);
 		const tiers: KnowledgeVectorTier[] =
 			tier === 'member' ? ['member', 'default'] : ['default'];
-
+		console.log(tiers, 'tiers');
 		const batches = await Promise.all(
 			tiers.map(async (t) => {
-				const qvec = await this.embedQuery(input.question, { tier: t });
+				const qvec = await this.embedQuery(input.question, {
+					tier: t,
+					authorId: input.authorId,
+				});
 				if (!qvec.length) return [];
 				const collectionName = this.qdrant.getKnowledgeCollectionName(t);
 				try {
@@ -314,6 +435,8 @@ export class KnowledgeEmbeddingService {
 				}
 			}),
 		);
+
+		console.log(batches, 'batches-searchKnowledgeChunksForAuthor');
 
 		return this.mergeSearchHits(batches, input.topK);
 	}
@@ -363,7 +486,20 @@ export class KnowledgeEmbeddingService {
 	}
 
 	// 对外暴露：删除某篇知识库文档在向量库中的全部 points（供回收站物理删除等场景使用）
-	async deleteKnowledgeVectors(input: { knowledgeId: string }): Promise<void> {
+	async deleteKnowledgeVectors(input: {
+		knowledgeId: string;
+		authorId?: number | null;
+	}): Promise<void> {
+		const customNames =
+			await this.llmConfigService.resolveKnowledgeCollectionNamesForUser(
+				input.authorId,
+			);
+		for (const name of customNames) {
+			await this.qdrant.deleteKnowledgePointsByKnowledgeId(
+				input.knowledgeId,
+				name,
+			);
+		}
 		await this.qdrant.deleteKnowledgePointsByKnowledgeId(input.knowledgeId);
 	}
 
@@ -380,10 +516,8 @@ export class KnowledgeEmbeddingService {
 		topN?: number;
 		authorId?: number;
 	}): Promise<KnowledgeRerankResult[]> {
-		const tier = await this.resolveTierForAuthor(input.authorId);
-		const { apiKey, model, baseURL } = resolveKnowledgeRerankApiConfig(
-			this.config,
-			tier,
+		const { apiKey, model, baseURL } = await this.resolveRerankApiConfig(
+			input.authorId,
 		);
 
 		const query = (input.query ?? '').trim();
@@ -552,27 +686,33 @@ export class KnowledgeEmbeddingService {
 	}): Promise<{ contentHash: string; chunkCount: number }> {
 		const title = (input.title ?? '').trim() || '未命名';
 		const contentHash = sha256(`${title}\n\n${input.content ?? ''}`);
-		const tier = await this.resolveTierForAuthor(input.authorId);
+		const chunkTier = await this.resolveChunkTierForAuthor(input.authorId);
 		const chunks = this.chunkMarkdown({
 			title,
 			content: input.content ?? '',
-			tier,
+			tier: chunkTier,
 		});
 		if (chunks.length === 0) {
-			await this.deleteKnowledgeVectors({ knowledgeId: input.knowledgeId });
+			await this.deleteKnowledgeVectors({
+				knowledgeId: input.knowledgeId,
+				authorId: input.authorId,
+			});
 			return { contentHash, chunkCount: 0 };
 		}
 
 		const vectors = await this.embedDocuments(
 			chunks.map((c) => c.text),
-			{ tier },
+			{ authorId: input.authorId },
 		);
 		const vectorSize = vectors[0]?.length ?? 0;
 		if (vectorSize <= 0) {
 			throw new Error('embedding 向量维度为 0');
 		}
 
-		const collectionName = this.qdrant.getKnowledgeCollectionName(tier);
+		const collectionName = await this.resolveCollectionName(
+			input.authorId,
+			chunkTier,
+		);
 
 		/**
 		 * 为什么这里选择“先删除，再写入（delete + upsert）”？
@@ -589,7 +729,10 @@ export class KnowledgeEmbeddingService {
 			vectorSize,
 			collectionName,
 		});
-		await this.deleteKnowledgeVectors({ knowledgeId: input.knowledgeId });
+		await this.deleteKnowledgeVectors({
+			knowledgeId: input.knowledgeId,
+			authorId: input.authorId,
+		});
 
 		const createdAt = input.createdAt.toISOString();
 		const updatedAt = input.updatedAt.toISOString();

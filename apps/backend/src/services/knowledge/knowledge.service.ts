@@ -214,6 +214,7 @@ export class KnowledgeService {
 			// 物理删除回收站条目时，同步清理该知识条目在向量库中的残留
 			await this.embeddingService.deleteKnowledgeVectors({
 				knowledgeId: trashRow.originalId,
+				authorId: trashRow.authorId,
 			});
 			const articleId = assistantArticleIdForTrashRow(id);
 			await assistantSessionRepo.delete({ knowledgeArticleId: articleId });
@@ -244,13 +245,15 @@ export class KnowledgeService {
 				const trashRepo = manager.getRepository(KnowledgeTrash);
 				const assistantSessionRepo = manager.getRepository(AssistantSession);
 				const rows = await trashRepo.find({
-					select: { id: true, originalId: true },
+					select: { id: true, originalId: true, authorId: true },
 					where: { id: In(uniq) },
 				});
-				const originalIds = rows.map((r) => r.originalId).filter(Boolean);
-				// 批量物理删除回收站条目时，批量清理向量库残留（按 originalId）
-				for (const knowledgeId of Array.from(new Set(originalIds))) {
-					await this.embeddingService.deleteKnowledgeVectors({ knowledgeId });
+				for (const row of rows) {
+					if (!row.originalId) continue;
+					await this.embeddingService.deleteKnowledgeVectors({
+						knowledgeId: row.originalId,
+						authorId: row.authorId,
+					});
 				}
 				for (const tid of uniq) {
 					await assistantSessionRepo.delete({

@@ -13,6 +13,7 @@ import type { Request } from 'express';
 import { JwtGuard } from '../../guards/jwt.guard';
 import { ResponseInterceptor } from '../../interceptors/response.interceptor';
 import { UpsertLlmConfigDto } from './dto/upsert-llm-config.dto';
+import { UpsertLlmVectorConfigDto } from './dto/upsert-llm-vector-config.dto';
 import { LlmConfigService } from './llm-config.service';
 
 type AuthedRequest = Request & { user?: { userId?: number } };
@@ -40,7 +41,21 @@ export class LlmConfigController {
 	getDefaults() {
 		return {
 			baseUrl: this.llmConfigService.getDefaultBaseUrlHint(),
+			vector: this.llmConfigService.getDefaultVectorHints(),
 		};
+	}
+
+	@Put('vector')
+	updateVector(
+		@Body() dto: UpsertLlmVectorConfigDto,
+		@Req() req: AuthedRequest,
+	) {
+		return this.llmConfigService.upsertVector(dto, requireUserId(req));
+	}
+
+	@Delete('vector')
+	clearVector(@Req() req: AuthedRequest) {
+		return this.llmConfigService.clearVector(requireUserId(req));
 	}
 
 	@Put()

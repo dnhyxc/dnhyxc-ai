@@ -277,6 +277,11 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'Fixes cloud vectorization failures on save (e.g. HTTP 404 or invalid parameters) that blocked RAG retrieval; long articles and the default non-member embedding model now use shorter chunks per tier to reduce indexing errors.',
 	},
+	's6-17': {
+		title: 'Knowledge RAG multi-collection search',
+		description:
+			'With custom vector settings enabled, Knowledge RAG searches all vector collections you have saved in parallel and always includes the system default bge collection, so older articles remain findable after you switch models; new saves still go to the currently selected collection.',
+	},
 	's7-1': {
 		title: 'IME (input method editor) compatibility',
 		description:
@@ -350,6 +355,11 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'Settings → LLM no longer has a separate “use custom LLM” switch. Fill API Key, Base URL, and model name, then Save to enable custom config; the footer shows the active model in green or the default model in gray. Restore default turns off custom config and reverts to member-based defaults. Unsaved edits or incomplete fields show hints and keep Save disabled.',
 	},
+	's9-7': {
+		title: 'Vector model settings',
+		description:
+			'The LLM settings page adds a Vector model block below chat LLM: API Key, Embedding / Rerank endpoint URLs, embedding and rerank model names, and collection name—saved and restored separately from chat LLM. Each save records collections you have used; the page lists collections included in RAG search, which always also queries the system default bge collection.',
+	},
 	's10-1': {
 		title: 'Image component improvements',
 		description:
@@ -394,6 +404,11 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		title: 'Unified assistant & RAG model backend',
 		description:
 			'Knowledge doc assistant (AI mode) and RAG Q&A now use the same SiliconFlow-compatible backend. Multi-turn history, stop generation, citation display, and ephemeral drafts are unchanged.',
+	},
+	's13-4': {
+		title: 'Multi-collection RAG with custom vectors',
+		description:
+			'When custom vector settings are enabled, RAG searches saved collections in parallel and always queries the system default bge collection; ties to Section 9 vector settings and Section 6 vector indexing.',
 	},
 	's14-1': {
 		title: 'Sharing & public reading',

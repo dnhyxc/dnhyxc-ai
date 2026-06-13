@@ -48,6 +48,7 @@
 | 知识库向量 404 / 400 入库失败 | [knowledge/siliconflow-vector-full-url.md](./knowledge/siliconflow-vector-full-url.md) |
 | 知识库向量 Key/模型 | [knowledge/knowledge-vector-create-llm.md](./knowledge/knowledge-vector-create-llm.md) |
 | 会员知识库向量双库 | [knowledge/knowledge-member-vector-tier.md](./knowledge/knowledge-member-vector-tier.md) |
+| 用户自定义向量与多库 RAG | [knowledge/user-vector-rag-config.md](./knowledge/user-vector-rag-config.md) |
 | 设置页大模型 Key | [llm/llm-runtime-settings.md](./llm/llm-runtime-settings.md) |
 | 按用户 / 会员默认模型 | [llm/membership-per-user-llm.md](./llm/membership-per-user-llm.md) |
 | 设置页预设 / Combobox | [llm/llm-setting-ui-presets.md](./llm/llm-setting-ui-presets.md) |

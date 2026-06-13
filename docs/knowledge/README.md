@@ -14,6 +14,7 @@
 | [siliconflow-vector-full-url.md](./siliconflow-vector-full-url.md) | **向量完整 URL**（`SILICONFLOW_EMBEDDING_URL` / 分片档位 / 入库 400 修复） |
 | [knowledge-vector-create-llm.md](./knowledge-vector-create-llm.md) | **向量 embedding/rerank 凭证**收敛至 `create-llm` |
 | [knowledge-member-vector-tier.md](./knowledge-member-vector-tier.md) | **会员 Qwen3 向量 + 双 collection 检索**（兼容 1024 存量） |
+| [user-vector-rag-config.md](./user-vector-rag-config.md) | **用户向量设置 + 多库 RAG**（独立保存、profiles 累积、系统默认 bge 始终检索） |
 | [knowledge-rag-qa-assistant-frontend.md](./knowledge-rag-qa-assistant-frontend.md) | RAG 问答前端 |
 | [rag-retrieval-nestjs-react-qdrant.md](./rag-retrieval-nestjs-react-qdrant.md) | Qdrant 检索链路 |
 

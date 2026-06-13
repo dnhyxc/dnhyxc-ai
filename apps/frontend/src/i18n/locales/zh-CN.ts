@@ -123,6 +123,44 @@ export const zhCN = {
 	'setting.llm.incompleteDraftHint': '请补全三项内容后再保存让模型生效',
 	'setting.llm.defaultHint': '当前默认 {modelName} 模型生效中',
 	'setting.llm.incompleteHint': '已开启但配置不完整，仍使用环境变量',
+	'setting.llm.vectorTitle': '向量模型配置',
+	'setting.llm.vectorDesc':
+		'用于知识库入库与 RAG 检索的 embedding / rerank 模型；与上方对话大模型配置独立保存。请分别填写 embedding 与 rerank 的完整接口地址。',
+	'setting.llm.vectorEmbeddingUrl': 'Embedding URL',
+	'setting.llm.vectorEmbeddingUrlPlaceholder': '输入 embedding 完整接口地址',
+	'setting.llm.vectorEmbeddingUrlOption.siliconflow':
+		'硅基流动 embeddings（api.siliconflow.cn/v1/embeddings）',
+	'setting.llm.vectorRerankUrl': 'Rerank URL',
+	'setting.llm.vectorRerankUrlPlaceholder': '输入 rerank 完整接口地址',
+	'setting.llm.vectorRerankUrlOption.siliconflow':
+		'硅基流动 rerank（api.siliconflow.cn/v1/rerank）',
+	'setting.llm.vectorEmbeddingModel': '向量模型名称',
+	'setting.llm.vectorEmbeddingModelPlaceholder': '输入 embedding 模型名称',
+	'setting.llm.vectorModelOption.bgeLargeZh': 'BAAI/bge-large-zh-v1.5',
+	'setting.llm.vectorModelOption.qwen3Emb': 'Qwen/Qwen3-Embedding-4B',
+	'setting.llm.vectorRerankModel': '重排模型名称',
+	'setting.llm.vectorRerankModelPlaceholder': '输入 rerank 模型名称',
+	'setting.llm.vectorRerankOption.bgeReranker': 'BAAI/bge-reranker-v2-m3',
+	'setting.llm.vectorRerankOption.qwen3Rerank': 'Qwen/Qwen3-Reranker-4B',
+	'setting.llm.vectorCollectionName': '向量库名称',
+	'setting.llm.vectorCollectionNamePlaceholder': 'Qdrant collection 名称',
+	'setting.llm.vectorCollectionOption.default':
+		'knowledge_chunks_v2（默认 1024 维）',
+	'setting.llm.vectorCollectionOption.qwen3':
+		'knowledge_chunks_qwen3_2560（2560 维）',
+	'setting.llm.vectorSearchProfilesTitle': '已纳入检索的向量库',
+	'setting.llm.vectorSearchProfilesDesc':
+		'每次保存会累积记录向量库与对应模型；RAG 检索时并行查询下列库，并始终包含系统默认 bge 库（knowledge_chunks_v2）。',
+	'setting.llm.vectorApiKey': 'API Key',
+	'setting.llm.vectorSave': '保存向量配置',
+	'setting.llm.vectorClear': '恢复向量默认',
+	'setting.llm.vectorSaveSuccess': '向量模型配置已保存',
+	'setting.llm.vectorClearSuccess': '已恢复向量环境变量默认',
+	'setting.llm.vectorActiveHint': '{embeddingModel} 向量配置生效中',
+	'setting.llm.vectorUnsavedHint': '向量配置有未保存更改，请保存',
+	'setting.llm.vectorReadyToSaveHint': '可保存向量配置让自定义模型生效',
+	'setting.llm.vectorIncompleteDraftHint': '请补全向量配置各项后再保存',
+	'setting.llm.vectorDefaultHint': '当前使用默认向量模型 {embeddingModel}',
 	/** 云端朗读 */
 	'setting.cloudTts.title': '云端语音设置',
 	'setting.cloudTts.desc':

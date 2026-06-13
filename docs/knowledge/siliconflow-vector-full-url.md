@@ -3,6 +3,7 @@
 > **文档角色**：本轮主文档——embedding / rerank **完整请求 URL** 环境变量、`KnowledgeVectorApiConfig` 字段语义、入库分片与请求健壮性。  
 > **凭证解析总览**（与 Chat 工厂关系、Key 回退链）见 [knowledge-vector-create-llm.md](./knowledge-vector-create-llm.md)。  
 > **会员 Qwen3 双库 / tier** 见 [knowledge-member-vector-tier.md](./knowledge-member-vector-tier.md)。  
+> **用户设置页独立向量配置与多库 RAG** 见 [user-vector-rag-config.md](./user-vector-rag-config.md)。  
 > 若与仓库最新源码不一致，**以源码为准**。
 
 ---
