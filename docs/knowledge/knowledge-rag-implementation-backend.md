@@ -1,7 +1,7 @@
 ### 知识库 RAG（Retrieval Augmented Generation，检索增强生成）后端实现思路
 
 > 覆盖模块：`apps/backend/src/services/knowledge`、`knowledge-embedding`、`knowledge-qa`、`qdrant`。  
-> **向量 embedding/rerank 凭证**（SILICONFLOW_*、`KNOWLEDGE_EMBEDDING_MODEL` 等）见主文档 [knowledge-vector-create-llm.md](./knowledge-vector-create-llm.md)；本文 §4.3 等 DashScope 描述可能滞后，以该文与源码为准。  
+> **向量 embedding/rerank 凭证**（SILICONFLOW_*、`KNOWLEDGE_EMBEDDING_MODEL` 等）见 [knowledge-vector-create-llm.md](./knowledge-vector-create-llm.md)；**会员 Qwen3 + 双 Qdrant collection** 见 [knowledge-member-vector-tier.md](./knowledge-member-vector-tier.md)。本文 §4.3 等 DashScope 描述可能滞后，以该文与源码为准。  
 > 说明：文内引用的代码均为**现有代码片段**（用“代码引用块”表示）；额外的“逐点注释/伪代码”仅写在文档里，不会写回仓库源码。
 
 ---

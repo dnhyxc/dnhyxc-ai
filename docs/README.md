@@ -46,6 +46,7 @@
 | 本地上传落盘 / UPLOAD_ROOT | [ops/upload-storage-paths.md](./ops/upload-storage-paths.md) |
 | `createLlm` / 400 | [llm/create-llm.md](./llm/create-llm.md) |
 | 知识库向量 Key/模型 | [knowledge/knowledge-vector-create-llm.md](./knowledge/knowledge-vector-create-llm.md) |
+| 会员知识库向量双库 | [knowledge/knowledge-member-vector-tier.md](./knowledge/knowledge-member-vector-tier.md) |
 | 设置页大模型 Key | [llm/llm-runtime-settings.md](./llm/llm-runtime-settings.md) |
 | 按用户 / 会员默认模型 | [llm/membership-per-user-llm.md](./llm/membership-per-user-llm.md) |
 | 设置页预设 / Combobox | [llm/llm-setting-ui-presets.md](./llm/llm-setting-ui-presets.md) |

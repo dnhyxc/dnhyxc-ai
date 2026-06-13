@@ -1,6 +1,7 @@
 # 知识库向量凭证收敛至 `create-llm`
 
-> **文档角色**：本轮改动的**主文档**——embedding / rerank 的 API Key、Base URL、模型名、endpoint 如何从环境变量解析，以及 `KnowledgeEmbeddingService` 如何消费。  
+> **文档角色**：embedding / rerank **凭证解析**（API Key、模型名、endpoint）与 `KnowledgeEmbeddingService` 的基础消费方式。  
+> **会员双库 / Qwen3 档位**见主文档 [knowledge-member-vector-tier.md](./knowledge-member-vector-tier.md)。  
 > **延伸阅读**：[knowledge-rag-implementation-backend.md](./knowledge-rag-implementation-backend.md)（RAG 全链路）、[../llm/create-llm.md](../llm/create-llm.md)（Chat `createLlm` 工厂）、[../llm/siliconflow-chat-unification.md](../llm/siliconflow-chat-unification.md)（硅基接入总览）。  
 > 若与仓库最新源码不一致，**以源码为准**。
 

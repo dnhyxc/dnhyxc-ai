@@ -6,6 +6,7 @@ import { ConfigService } from '@nestjs/config';
 import { QdrantClient } from '@qdrant/js-client-rest';
 // 本项目配置枚举：包含 QDRANT_* 环境变量键名
 import { QdrantEnum } from '../../enum/config.enum';
+import type { KnowledgeVectorTier } from '../../utils/create-llm';
 
 // 写入 Qdrant 的 payload（载荷）：随向量一起存储的业务字段
 export type QdrantKnowledgePayload = {
@@ -39,25 +40,36 @@ export class QdrantService {
 		private readonly config: ConfigService,
 	) {}
 
-	// 获取“知识库分片向量”所在的 collection 名
-	getKnowledgeCollectionName(): string {
-		// return：优先使用配置，未配置则回落默认值
+	// 获取「知识库分片向量」所在的 collection 名（按向量档位区分维度）
+	getKnowledgeCollectionName(tier: KnowledgeVectorTier = 'default'): string {
+		if (tier === 'member') {
+			return (
+				this.config.get<string>(
+					QdrantEnum.QDRANT_KNOWLEDGE_COLLECTION_MEMBER,
+				) || 'knowledge_chunks_qwen3_2560'
+			);
+		}
 		return (
-			//【重要维护说明】：当需要更换向量模型时，如果向量维度发生变化，需要将 QDRANT_KNOWLEDGE_COLLECTION 设置为新的集合名称，并删除旧的集合。
-			// QDRANT_KNOWLEDGE_COLLECTION：可按环境区分
 			this.config.get<string>(QdrantEnum.QDRANT_KNOWLEDGE_COLLECTION) ||
-			// 默认 collection：知识库 chunk 向量与 payload
 			'knowledge_chunks_v2'
 		);
 	}
 
+	/** 所有知识库向量 collection（删除文档时需双库清理） */
+	getAllKnowledgeCollectionNames(): string[] {
+		return [
+			this.getKnowledgeCollectionName('default'),
+			this.getKnowledgeCollectionName('member'),
+		];
+	}
+
 	// 确保 collection 存在：不存在则创建（幂等）
 	async ensureKnowledgeCollection(options: {
-		// 向量维度：必须与当前 embedding 模型输出维度一致（如 BAAI/bge-large-zh-v1.5 为 1024）
 		vectorSize: number;
+		collectionName?: string;
 	}): Promise<void> {
-		// 获取 collection 名
-		const name = this.getKnowledgeCollectionName();
+		const name =
+			options.collectionName ?? this.getKnowledgeCollectionName('default');
 		// try：若 collection 已存在则直接结束
 		try {
 			// 读取 collection 元信息（存在则成功）
@@ -72,45 +84,46 @@ export class QdrantService {
 	}
 
 	// 删除某篇知识库文档的全部向量点
-	async deleteKnowledgePointsByKnowledgeId(knowledgeId: string): Promise<void> {
-		// 获取 collection 名
-		const name = this.getKnowledgeCollectionName();
-		// 执行 delete：按 filter 批量删除（无需逐条 id）
-		await this.client.delete(name, {
-			// Qdrant filter DSL
-			filter: {
-				// must：payload.knowledgeId 必须等于指定值
-				must: [{ key: 'knowledgeId', match: { value: knowledgeId } }],
-			},
-		});
+	async deleteKnowledgePointsByKnowledgeId(
+		knowledgeId: string,
+		collectionName?: string,
+	): Promise<void> {
+		const names = collectionName
+			? [collectionName]
+			: this.getAllKnowledgeCollectionNames();
+		for (const name of names) {
+			try {
+				await this.client.delete(name, {
+					filter: {
+						must: [{ key: 'knowledgeId', match: { value: knowledgeId } }],
+					},
+				});
+			} catch {
+				// collection 可能尚未创建，忽略
+			}
+		}
 	}
 
 	// upsert：存在则更新，不存在则插入（幂等写入）
 	async upsertKnowledgeChunks(input: {
-		// points：批量点列表
 		points: Array<{
-			// 点 ID：建议使用 UUID，唯一标识一个 chunk
 			id: string;
-			// 向量：embedding 输出，长度 = vectorSize
 			vector: number[];
-			// payload：业务字段（证据/过滤/回溯）
 			payload: QdrantKnowledgePayload;
 		}>;
+		collectionName?: string;
 	}): Promise<void> {
-		// 获取 collection 名
-		const name = this.getKnowledgeCollectionName();
-		// 调用 Qdrant upsert 写入
+		const name =
+			input.collectionName ?? this.getKnowledgeCollectionName('default');
 		await this.client.upsert(name, { points: input.points });
 	}
 
 	// 向量检索：根据 query 向量召回最相似的 topK 个分片
 	async searchKnowledgeChunks(input: {
-		// query 向量：问题/查询文本的 embedding
 		vector: number[];
-		// 召回数量：limit
 		topK: number;
-		// 可选：按作者过滤（只搜自己的知识库）
 		authorId?: number | null;
+		collectionName?: string;
 	}): Promise<
 		// 每条结果包含 score、payload、id
 		Array<{
@@ -122,9 +135,8 @@ export class QdrantService {
 			id: string | number;
 		}>
 	> {
-		// collection 名
-		const name = this.getKnowledgeCollectionName();
-
+		const name =
+			input.collectionName ?? this.getKnowledgeCollectionName('default');
 		// 若传了 authorId，则构造 filter；否则不加 filter
 		const filter = input.authorId
 			? {

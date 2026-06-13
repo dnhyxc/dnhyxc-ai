@@ -162,6 +162,18 @@ export type KnowledgeVectorApiConfig = {
 	endpoint: string; // API 路径（全路径，baseURL+path）
 };
 
+/** 知识库向量：非会员默认 embedding / rerank 模型 */
+export const DEFAULT_KNOWLEDGE_EMBEDDING_MODEL = 'BAAI/bge-large-zh-v1.5';
+export const DEFAULT_KNOWLEDGE_RERANK_MODEL = 'BAAI/bge-reranker-v2-m3';
+
+/** 有效会员默认 embedding / rerank 模型（硅基流动） */
+export const DEFAULT_MEMBER_KNOWLEDGE_EMBEDDING_MODEL =
+	'Qwen/Qwen3-Embedding-4B';
+export const DEFAULT_MEMBER_KNOWLEDGE_RERANK_MODEL = 'Qwen/Qwen3-Reranker-4B';
+
+/** 知识库向量凭证档位：default=非会员 bge 1024；member=会员 Qwen3 2560 */
+export type KnowledgeVectorTier = 'default' | 'member';
+
 /** 知识库向量模式预设：embedding 或 rerank */
 type KnowledgeVectorPreset = 'embedding' | 'rerank';
 
@@ -353,37 +365,51 @@ export function memberSiliconFlowResolvePresetsForPreset(
 }
 
 /**
- * @description 知识库向量调度方案预设
- * - embedding: 向量嵌入
- * - rerank: 重排序
- * 每种模式定义了环境 key/默认模型/api 路径
+ * @description 知识库向量调度方案预设（按会员档位）
+ * - default: BAAI/bge-large-zh-v1.5 + bge-reranker（1024 维库）
+ * - member: Qwen3-Embedding-4B + Qwen3-Reranker-4B（2560 维库）
  */
 const KNOWLEDGE_VECTOR_PRESETS: Record<
-	KnowledgeVectorPreset,
-	{ modelKey: string; defaultModel: string; path: string }
+	KnowledgeVectorTier,
+	Record<
+		KnowledgeVectorPreset,
+		{ modelKey: string; defaultModel: string; path: string }
+	>
 > = {
-	embedding: {
-		modelKey: KnowledgeQaEnum.KNOWLEDGE_EMBEDDING_MODEL,
-		defaultModel: 'BAAI/bge-large-zh-v1.5',
-		path: '/embeddings',
+	default: {
+		embedding: {
+			modelKey: KnowledgeQaEnum.KNOWLEDGE_EMBEDDING_MODEL,
+			defaultModel: DEFAULT_KNOWLEDGE_EMBEDDING_MODEL,
+			path: '/embeddings',
+		},
+		rerank: {
+			modelKey: KnowledgeQaEnum.KNOWLEDGE_RERANK_MODEL,
+			defaultModel: DEFAULT_KNOWLEDGE_RERANK_MODEL,
+			path: '/rerank',
+		},
 	},
-	rerank: {
-		modelKey: KnowledgeQaEnum.KNOWLEDGE_RERANK_MODEL,
-		defaultModel: 'BAAI/bge-reranker-v2-m3',
-		path: '/rerank',
+	member: {
+		embedding: {
+			modelKey: KnowledgeQaEnum.KNOWLEDGE_EMBEDDING_MODEL_MEMBER,
+			defaultModel: DEFAULT_MEMBER_KNOWLEDGE_EMBEDDING_MODEL,
+			path: '/embeddings',
+		},
+		rerank: {
+			modelKey: KnowledgeQaEnum.KNOWLEDGE_RERANK_MODEL_MEMBER,
+			defaultModel: DEFAULT_MEMBER_KNOWLEDGE_RERANK_MODEL,
+			path: '/rerank',
+		},
 	},
 };
 
 /**
  * @description 解析知识库向量 API 调用详细配置
- * @param config: 配置服务
- * @param preset: embedding/rerank
  */
 function resolveKnowledgeVectorApiConfig(
 	config: ConfigService,
 	preset: KnowledgeVectorPreset,
+	tier: KnowledgeVectorTier = 'default',
 ): KnowledgeVectorApiConfig {
-	// 尝试多种可兼容 API key 方案：优先 SILICONFLOW，其次 QWEN（兼容达摩院通道）
 	const apiKey = resolveFirstTrimmed(config, [
 		ModelEnum.SILICONFLOW_API_KEY,
 		ModelEnum.QWEN_API_KEY,
@@ -398,26 +424,27 @@ function resolveKnowledgeVectorApiConfig(
 			'缺少 SILICONFLOW_API_KEY（或兼容项 DASHSCOPE_API_KEY / QWEN_API_KEY），无法进行知识库向量检索',
 		);
 	}
-	const { modelKey, defaultModel, path } = KNOWLEDGE_VECTOR_PRESETS[preset];
+	const { modelKey, defaultModel, path } =
+		KNOWLEDGE_VECTOR_PRESETS[tier][preset];
 	const model = trimConfigValue(config, modelKey) || defaultModel;
 	return { apiKey, baseURL, model, endpoint: `${baseURL}${path}` };
 }
 
-/**
- * @description 解析知识库 embedding API 配置
- * @param config: 配置服务
- * @returns embedding 的知识库 API 配置
- */
-export const resolveKnowledgeEmbeddingApiConfig = (config: ConfigService) =>
-	resolveKnowledgeVectorApiConfig(config, 'embedding');
+/** 解析知识库 embedding API 配置（tier：default | member） */
+export function resolveKnowledgeEmbeddingApiConfig(
+	config: ConfigService,
+	tier: KnowledgeVectorTier = 'default',
+): KnowledgeVectorApiConfig {
+	return resolveKnowledgeVectorApiConfig(config, 'embedding', tier);
+}
 
-/**
- * @description 解析知识库 rerank API 配置
- * @param config: 配置服务
- * @returns rerank 的知识库 API 配置
- */
-export const resolveKnowledgeRerankApiConfig = (config: ConfigService) =>
-	resolveKnowledgeVectorApiConfig(config, 'rerank');
+/** 解析知识库 rerank API 配置（tier：default | member） */
+export function resolveKnowledgeRerankApiConfig(
+	config: ConfigService,
+	tier: KnowledgeVectorTier = 'default',
+): KnowledgeVectorApiConfig {
+	return resolveKnowledgeVectorApiConfig(config, 'rerank', tier);
+}
 
 /**
  * @description 创建 ChatOpenAI 的统一入口。

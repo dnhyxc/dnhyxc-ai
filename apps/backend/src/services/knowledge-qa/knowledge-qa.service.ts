@@ -13,7 +13,6 @@ import { KnowledgeQaEnum } from '../../enum/config.enum';
 import { createLlm } from '../../utils/create-llm';
 import { KnowledgeEmbeddingService } from '../knowledge-embedding/knowledge-embedding.service';
 import { LlmConfigService } from '../llm-config/llm-config.service';
-import { QdrantService } from '../qdrant/qdrant.service';
 
 export type KnowledgeQaEvidence = {
 	knowledgeId: string;
@@ -36,10 +35,7 @@ export class KnowledgeQaService {
 		private readonly config: ConfigService,
 		private readonly llmConfigService: LlmConfigService,
 		private readonly embedding: KnowledgeEmbeddingService,
-		private readonly qdrant: QdrantService,
-		// 注入 Winston logger
 		@Inject(WINSTON_MODULE_NEST_PROVIDER)
-		// logger 实例
 		private readonly logger: LoggerService,
 	) {}
 
@@ -111,12 +107,10 @@ export class KnowledgeQaService {
 			params.topK ??
 			Number(this.config.get<string>(KnowledgeQaEnum.KNOWLEDGE_QA_TOPK) || 10);
 
-		const qvec = await this.embedding.embedQuery(params.question);
-
-		const hits = await this.qdrant.searchKnowledgeChunks({
-			vector: qvec,
-			topK,
+		const hits = await this.embedding.searchKnowledgeChunksForAuthor({
+			question: params.question,
 			authorId: params.authorId,
+			topK,
 		});
 
 		let evidences: KnowledgeQaEvidence[] = hits.map((h) => ({
@@ -136,6 +130,7 @@ export class KnowledgeQaService {
 					query: params.question,
 					documents: docs,
 					topN: Math.min(evidences.length, topK),
+					authorId: params.authorId,
 				});
 				if (reranked.length > 0) {
 					const used = new Set<number>();

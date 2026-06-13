@@ -9,6 +9,8 @@ import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 // 引入本项目配置枚举
 import {
 	KNOWLEDGE_EMBEDDING_BATCH_SIZE,
+	type KnowledgeVectorApiConfig,
+	type KnowledgeVectorTier,
 	resolveKnowledgeEmbeddingApiConfig,
 	resolveKnowledgeRerankApiConfig,
 } from '../../utils/create-llm';
@@ -17,6 +19,7 @@ import {
 	type QdrantKnowledgePayload,
 	QdrantService,
 } from '../qdrant/qdrant.service';
+import { UserService } from '../user/user.service';
 
 // 知识库切分后的分片结构
 export type KnowledgeChunk = {
@@ -64,32 +67,72 @@ function sha256(text: string): string {
 /**
  * 知识库 embedding 与 Qdrant 入库服务（一期：同步实现；后续可接 BullMQ 任务化）。
  *
- * 向量与重排：凭证由 `create-llm` 的 `resolveKnowledgeEmbeddingApiConfig` / `resolveKnowledgeRerankApiConfig` 解析（SILICONFLOW_*）。
+ * 向量与重排：凭证由 `create-llm` 解析；非会员 bge 1024 库，有效会员 Qwen3 2560 库 + 双路检索旧库。
  */
 @Injectable()
 export class KnowledgeEmbeddingService {
 	// 构造函数：注入 Config/Qdrant/Logger
 	constructor(
-		// 配置服务
 		private readonly config: ConfigService,
-		// 向量库服务
 		private readonly qdrant: QdrantService,
-		// 注入 Winston logger
+		private readonly userService: UserService,
 		@Inject(WINSTON_MODULE_NEST_PROVIDER)
-		// logger 实例
 		private readonly logger: LoggerService,
 	) {}
 
+	private async resolveTierForAuthor(
+		authorId?: number | null,
+	): Promise<KnowledgeVectorTier> {
+		if (authorId == null || !Number.isFinite(authorId) || authorId <= 0) {
+			return 'default';
+		}
+		return (await this.userService.isUserMembershipActive(authorId))
+			? 'member'
+			: 'default';
+	}
+
+	private mergeSearchHits(
+		batches: Array<
+			Array<{
+				score: number;
+				payload: QdrantKnowledgePayload;
+				id: string | number;
+			}>
+		>,
+		topK: number,
+	): Array<{
+		score: number;
+		payload: QdrantKnowledgePayload;
+		id: string | number;
+	}> {
+		const byKey = new Map<
+			string,
+			{
+				score: number;
+				payload: QdrantKnowledgePayload;
+				id: string | number;
+			}
+		>();
+		for (const hits of batches) {
+			for (const h of hits) {
+				const key = `${h.payload.knowledgeId}:${h.payload.chunkIndex}`;
+				const prev = byKey.get(key);
+				if (!prev || h.score > prev.score) {
+					byKey.set(key, h);
+				}
+			}
+		}
+		return [...byKey.values()].sort((a, b) => b.score - a.score).slice(0, topK);
+	}
+
 	// 创建 embedding 客户端：封装硅基流动 `/v1/embeddings`（OpenAI 兼容）、重试与解析
-	private createEmbeddingsClient(): {
+	private createEmbeddingsClient(apiConfig: KnowledgeVectorApiConfig): {
 		// 单条 query 向量
 		embedQuery: (text: string) => Promise<number[]>;
 		// 批量 document 向量
 		embedDocuments: (texts: string[]) => Promise<number[][]>;
 	} {
-		const { apiKey, model, endpoint } = resolveKnowledgeEmbeddingApiConfig(
-			this.config,
-		);
+		const { apiKey, model, endpoint } = apiConfig;
 
 		// 单次请求：对一批 texts 做向量化（OpenAI 兼容：input 可为 string 或 string[]）
 		const callOnce = async (texts: string[]): Promise<number[][]> => {
@@ -212,13 +255,62 @@ export class KnowledgeEmbeddingService {
 	}
 
 	// 对外暴露：生成单条 query 向量（供 QA 等模块复用）
-	async embedQuery(text: string): Promise<number[]> {
-		return this.createEmbeddingsClient().embedQuery(text);
+	async embedQuery(
+		text: string,
+		options?: { tier?: KnowledgeVectorTier },
+	): Promise<number[]> {
+		const tier = options?.tier ?? 'default';
+		const apiConfig = resolveKnowledgeEmbeddingApiConfig(this.config, tier);
+		return this.createEmbeddingsClient(apiConfig).embedQuery(text);
 	}
 
 	// 对外暴露：批量生成 document 向量（供入库等流程复用）
-	async embedDocuments(texts: string[]): Promise<number[][]> {
-		return this.createEmbeddingsClient().embedDocuments(texts);
+	async embedDocuments(
+		texts: string[],
+		options?: { tier?: KnowledgeVectorTier },
+	): Promise<number[][]> {
+		const tier = options?.tier ?? 'default';
+		const apiConfig = resolveKnowledgeEmbeddingApiConfig(this.config, tier);
+		return this.createEmbeddingsClient(apiConfig).embedDocuments(texts);
+	}
+
+	/**
+	 * RAG 向量召回：非会员仅搜 bge 库；有效会员同时搜 Qwen3 2560 库与 bge 库（兼容未迁移存量）。
+	 */
+	async searchKnowledgeChunksForAuthor(input: {
+		question: string;
+		authorId: number;
+		topK: number;
+	}): Promise<
+		Array<{
+			score: number;
+			payload: QdrantKnowledgePayload;
+			id: string | number;
+		}>
+	> {
+		const tier = await this.resolveTierForAuthor(input.authorId);
+		const tiers: KnowledgeVectorTier[] =
+			tier === 'member' ? ['member', 'default'] : ['default'];
+
+		const batches = await Promise.all(
+			tiers.map(async (t) => {
+				const qvec = await this.embedQuery(input.question, { tier: t });
+				if (!qvec.length) return [];
+				const collectionName = this.qdrant.getKnowledgeCollectionName(t);
+				try {
+					return await this.qdrant.searchKnowledgeChunks({
+						vector: qvec,
+						topK: input.topK,
+						authorId: input.authorId,
+						collectionName,
+					});
+				} catch {
+					return [];
+				}
+			}),
+		);
+
+		return this.mergeSearchHits(batches, input.topK);
 	}
 
 	/**
@@ -281,9 +373,12 @@ export class KnowledgeEmbeddingService {
 		query: string;
 		documents: string[];
 		topN?: number;
+		authorId?: number;
 	}): Promise<KnowledgeRerankResult[]> {
+		const tier = await this.resolveTierForAuthor(input.authorId);
 		const { apiKey, model, endpoint } = resolveKnowledgeRerankApiConfig(
 			this.config,
+			tier,
 		);
 
 		const query = (input.query ?? '').trim();
@@ -453,11 +548,17 @@ export class KnowledgeEmbeddingService {
 			return { contentHash, chunkCount: 0 };
 		}
 
-		const vectors = await this.embedDocuments(chunks.map((c) => c.text));
+		const tier = await this.resolveTierForAuthor(input.authorId);
+		const vectors = await this.embedDocuments(
+			chunks.map((c) => c.text),
+			{ tier },
+		);
 		const vectorSize = vectors[0]?.length ?? 0;
 		if (vectorSize <= 0) {
 			throw new Error('embedding 向量维度为 0');
 		}
+
+		const collectionName = this.qdrant.getKnowledgeCollectionName(tier);
 
 		/**
 		 * 为什么这里选择“先删除，再写入（delete + upsert）”？
@@ -470,7 +571,10 @@ export class KnowledgeEmbeddingService {
 		 *
 		 * 对于知识库入库这种“写入频率低、查询频率高”的场景，优先选择正确性与实现简单性。
 		 */
-		await this.qdrant.ensureKnowledgeCollection({ vectorSize });
+		await this.qdrant.ensureKnowledgeCollection({
+			vectorSize,
+			collectionName,
+		});
 		await this.deleteKnowledgeVectors({ knowledgeId: input.knowledgeId });
 
 		const createdAt = input.createdAt.toISOString();
@@ -490,7 +594,7 @@ export class KnowledgeEmbeddingService {
 			return { id: randomUUID(), vector: vectors[i]!, payload };
 		});
 
-		await this.qdrant.upsertKnowledgeChunks({ points });
+		await this.qdrant.upsertKnowledgeChunks({ points, collectionName });
 		return { contentHash, chunkCount: points.length };
 	}
 

@@ -122,6 +122,8 @@ export enum QdrantEnum {
 	QDRANT_URL = 'QDRANT_URL',
 	/** collection 名，默认 knowledge_chunks_v1 */
 	QDRANT_KNOWLEDGE_COLLECTION = 'QDRANT_KNOWLEDGE_COLLECTION',
+	/** 有效会员知识库向量 collection（Qwen3-Embedding-4B，2560 维） */
+	QDRANT_KNOWLEDGE_COLLECTION_MEMBER = 'QDRANT_KNOWLEDGE_COLLECTION_MEMBER',
 }
 
 export enum KnowledgeQaEnum {
@@ -130,6 +132,20 @@ export enum KnowledgeQaEnum {
 	 * @see https://docs.siliconflow.cn/cn/api-reference/embeddings/create-embeddings
 	 */
 	KNOWLEDGE_EMBEDDING_MODEL = 'KNOWLEDGE_EMBEDDING_MODEL',
+	/**
+	 * 有效会员知识库 embedding 模型（硅基 `/v1/embeddings`），默认 Qwen/Qwen3-Embedding-4B（2560 维）
+	 */
+	KNOWLEDGE_EMBEDDING_MODEL_MEMBER = 'KNOWLEDGE_EMBEDDING_MODEL_MEMBER',
+	/**
+	 * 知识库 rerank 模型名（硅基流动 `/v1/rerank`），默认 BAAI/bge-reranker-v2-m3
+	 * @see https://docs.siliconflow.cn/cn/api-reference/rerank/create-rerank
+	 */
+	KNOWLEDGE_RERANK_MODEL = 'KNOWLEDGE_RERANK_MODEL',
+	/**
+	 * 有效会员知识库 rerank 模型（硅基 `/v1/rerank`），默认 Qwen/Qwen3-Reranker-4B
+	 */
+	KNOWLEDGE_RERANK_MODEL_MEMBER = 'KNOWLEDGE_RERANK_MODEL_MEMBER',
+
 	/**
 	 * 知识库 RAG 问答 Chat 模型名（硅基流动 `/v1/chat/completions`），默认 Pro/zai-org/GLM-5.1。
 	 * API Key / Base URL 沿用 SILICONFLOW_*。
@@ -159,11 +175,6 @@ export enum KnowledgeQaEnum {
 	SILICONFLOW_TTS_MODEL = 'SILICONFLOW_TTS_MODEL',
 	/** 预置音色，如 FunAudioLLM/CosyVoice2-0.5B:claire（女声） */
 	SILICONFLOW_TTS_VOICE = 'SILICONFLOW_TTS_VOICE',
-	/**
-	 * 知识库 rerank 模型名（硅基流动 `/v1/rerank`），默认 BAAI/bge-reranker-v2-m3
-	 * @see https://docs.siliconflow.cn/cn/api-reference/rerank/create-rerank
-	 */
-	KNOWLEDGE_RERANK_MODEL = 'KNOWLEDGE_RERANK_MODEL',
 }
 
 /** MiniMax T2A 语音合成（speech-transcription/minimax/*） */
