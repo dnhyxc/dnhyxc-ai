@@ -164,12 +164,6 @@ export enum KnowledgeQaEnum {
 	 * @see https://docs.siliconflow.cn/cn/api-reference/rerank/create-rerank
 	 */
 	KNOWLEDGE_RERANK_MODEL = 'KNOWLEDGE_RERANK_MODEL',
-	/** @deprecated 仅作兼容：未配置 SILICONFLOW_API_KEY 时可临时沿用旧键名 */
-	DASHSCOPE_API_KEY = 'DASHSCOPE_API_KEY',
-	/** @deprecated 硅基流动接入后不再使用 DashScope base URL */
-	DASHSCOPE_BASE_URL = 'DASHSCOPE_BASE_URL',
-	/** @deprecated 请改用 KNOWLEDGE_RERANK_MODEL */
-	DASHSCOPE_RERANK_MODEL_NAME = 'DASHSCOPE_RERANK_MODEL_NAME',
 }
 
 /** MiniMax T2A 语音合成（speech-transcription/minimax/*） */

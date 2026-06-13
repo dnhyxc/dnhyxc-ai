@@ -128,9 +128,7 @@ export class SiliconflowTranscriptionService {
 			return Buffer.from(cached);
 		}
 
-		const apiKey =
-			this.config.get<string>(ModelEnum.SILICONFLOW_API_KEY) ||
-			this.config.get<string>(KnowledgeQaEnum.DASHSCOPE_API_KEY);
+		const apiKey = this.config.get<string>(ModelEnum.SILICONFLOW_API_KEY);
 		if (!apiKey?.trim()) {
 			throw new HttpException(
 				'未配置 SILICONFLOW_API_KEY，无法进行语音合成',
@@ -176,9 +174,7 @@ export class SiliconflowTranscriptionService {
 	}
 
 	async transcribe(file: Express.Multer.File): Promise<{ text: string }> {
-		const apiKey =
-			this.config.get<string>(ModelEnum.SILICONFLOW_API_KEY) ||
-			this.config.get<string>(KnowledgeQaEnum.DASHSCOPE_API_KEY);
+		const apiKey = this.config.get<string>(ModelEnum.SILICONFLOW_API_KEY);
 		if (!apiKey?.trim()) {
 			throw new HttpException(
 				'未配置 SILICONFLOW_API_KEY，无法进行语音识别',

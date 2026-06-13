@@ -83,12 +83,9 @@ export class KnowledgeEmbeddingService {
 		// 批量 document 向量
 		embedDocuments: (texts: string[]) => Promise<number[][]>;
 	} {
-		// 读取 API Key：优先 SILICONFLOW_API_KEY，兼容旧环境 DASHSCOPE_API_KEY / QWEN_API_KEY
-		const apiKey =
-			this.config.get<string>(ModelEnum.SILICONFLOW_API_KEY) ||
-			this.config.get<string>(KnowledgeQaEnum.DASHSCOPE_API_KEY) ||
-			this.config.get<string>(ModelEnum.QWEN_API_KEY) ||
-			'';
+		// 读取 API Key：优先 SILICONFLOW_API_KEY
+		const apiKey = this.config.get<string>(ModelEnum.SILICONFLOW_API_KEY);
+		('');
 		const baseURL = (
 			this.config.get<string>(ModelEnum.SILICONFLOW_BASE_URL) ||
 			'https://api.siliconflow.cn/v1'
@@ -103,6 +100,8 @@ export class KnowledgeEmbeddingService {
 			'BAAI/bge-large-zh-v1.5';
 
 		const endpoint = `${baseURL}/embeddings`;
+
+		console.log({ apiKey, baseURL, model, endpoint }, 'createEmbeddingsClient');
 
 		// 单次请求：对一批 texts 做向量化（OpenAI 兼容：input 可为 string 或 string[]）
 		const callOnce = async (texts: string[]): Promise<number[][]> => {
@@ -296,11 +295,7 @@ export class KnowledgeEmbeddingService {
 		documents: string[];
 		topN?: number;
 	}): Promise<KnowledgeRerankResult[]> {
-		const apiKey =
-			this.config.get<string>(ModelEnum.SILICONFLOW_API_KEY) ||
-			this.config.get<string>(KnowledgeQaEnum.DASHSCOPE_API_KEY) ||
-			this.config.get<string>(ModelEnum.QWEN_API_KEY) ||
-			'';
+		const apiKey = this.config.get<string>(ModelEnum.SILICONFLOW_API_KEY) || '';
 		if (!apiKey) {
 			throw new Error(
 				'缺少 SILICONFLOW_API_KEY（或兼容项 DASHSCOPE_API_KEY / QWEN_API_KEY），无法进行 rerank',
@@ -309,7 +304,6 @@ export class KnowledgeEmbeddingService {
 
 		const model =
 			this.config.get<string>(KnowledgeQaEnum.KNOWLEDGE_RERANK_MODEL) ||
-			this.config.get<string>(KnowledgeQaEnum.DASHSCOPE_RERANK_MODEL_NAME) ||
 			'BAAI/bge-reranker-v2-m3';
 
 		const baseURL = (
@@ -318,6 +312,8 @@ export class KnowledgeEmbeddingService {
 		).replace(/\/$/, '');
 
 		const endpoint = `${baseURL}/rerank`;
+
+		console.log({ apiKey, baseURL, model, endpoint }, 'rerank');
 
 		const query = (input.query ?? '').trim();
 		const documents = (input.documents ?? []).map((d) => String(d ?? ''));
