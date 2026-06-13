@@ -634,7 +634,8 @@ const KnowledgeAssistant = observer(
 						<button
 							type="button"
 							className={cn(
-								'absolute bottom-full right-4 z-10 mb-[17px] flex h-8.5 w-8.5 cursor-pointer items-center justify-center rounded-full border border-theme/5 bg-theme/5 text-textcolor/70 backdrop-blur-[2px] hover:bg-theme/15',
+								'absolute bottom-[calc(100%+1.2rem)] right-4 z-10 flex h-8.5 w-8.5 cursor-pointer items-center justify-center rounded-full border border-theme/5 bg-theme/5 text-textcolor/70 backdrop-blur-[2px] hover:bg-theme/15',
+
 								'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-theme/40',
 							)}
 							aria-label={
