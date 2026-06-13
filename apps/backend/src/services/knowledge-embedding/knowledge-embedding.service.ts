@@ -125,17 +125,22 @@ export class KnowledgeEmbeddingService {
 		return [...byKey.values()].sort((a, b) => b.score - a.score).slice(0, topK);
 	}
 
-	// 创建 embedding 客户端：封装硅基流动 `/v1/embeddings`（OpenAI 兼容）、重试与解析
+	// 创建 embedding 客户端：请求 URL 为 SILICONFLOW_EMBEDDING_URL 完整地址
 	private createEmbeddingsClient(apiConfig: KnowledgeVectorApiConfig): {
 		// 单条 query 向量
 		embedQuery: (text: string) => Promise<number[]>;
 		// 批量 document 向量
 		embedDocuments: (texts: string[]) => Promise<number[][]>;
 	} {
-		const { apiKey, model, endpoint } = apiConfig;
+		const { apiKey, model, baseURL } = apiConfig;
 
 		// 单次请求：对一批 texts 做向量化（OpenAI 兼容：input 可为 string 或 string[]）
 		const callOnce = async (texts: string[]): Promise<number[][]> => {
+			const sanitized = texts
+				.map((t) => String(t ?? '').trim())
+				.filter((t) => t.length > 0);
+			if (sanitized.length === 0) return [];
+
 			const maxAttempts = 3;
 			for (let attempt = 1; attempt <= maxAttempts; attempt++) {
 				const controller = new AbortController();
@@ -143,7 +148,7 @@ export class KnowledgeEmbeddingService {
 				try {
 					let resp: Response;
 					try {
-						resp = await fetch(endpoint, {
+						resp = await fetch(baseURL, {
 							method: 'POST',
 							headers: {
 								Authorization: `Bearer ${apiKey}`,
@@ -151,7 +156,7 @@ export class KnowledgeEmbeddingService {
 							},
 							body: JSON.stringify({
 								model,
-								input: texts.length === 1 ? texts[0] : texts,
+								input: sanitized.length === 1 ? sanitized[0] : sanitized,
 								encoding_format: 'float',
 							}),
 							signal: controller.signal,
@@ -164,7 +169,7 @@ export class KnowledgeEmbeddingService {
 								: e?.cause
 									? String(e.cause)
 									: '';
-						const msg = `SiliconFlow 向量请求网络错误：${e?.message || String(err)}${causeMsg ? `（cause: ${causeMsg}）` : ''}；endpoint=${endpoint}；attempt=${attempt}/${maxAttempts}`;
+						const msg = `SiliconFlow 向量请求网络错误：${e?.message || String(err)}${causeMsg ? `（cause: ${causeMsg}）` : ''}；url=${baseURL}；attempt=${attempt}/${maxAttempts}`;
 						if (attempt === maxAttempts) throw new Error(msg);
 						await new Promise((r) => setTimeout(r, 300 * attempt));
 						continue;
@@ -182,7 +187,7 @@ export class KnowledgeEmbeddingService {
 									? String(e.cause)
 									: '';
 						throw new Error(
-							`SiliconFlow 读取响应失败：${e?.message || String(err)}${causeMsg ? `（cause: ${causeMsg}）` : ''}；endpoint=${endpoint}`,
+							`SiliconFlow 读取响应失败：${e?.message || String(err)}${causeMsg ? `（cause: ${causeMsg}）` : ''}；url=${baseURL}`,
 						);
 					}
 
@@ -200,7 +205,7 @@ export class KnowledgeEmbeddingService {
 							rawText ||
 							`HTTP ${resp.status}`;
 						throw new Error(
-							`SiliconFlow 向量请求失败：${msg}；status=${resp.status}；endpoint=${endpoint}`,
+							`SiliconFlow 向量请求失败：${msg}；status=${resp.status}；url=${baseURL}；model=${model}；batch=${sanitized.length}；maxLen=${Math.max(...sanitized.map((t) => t.length))}`,
 						);
 					}
 
@@ -209,7 +214,7 @@ export class KnowledgeEmbeddingService {
 						throw new Error(
 							`SiliconFlow 返回结构不包含 data[]：${JSON.stringify(
 								Object.keys(json || {}),
-							)}；endpoint=${endpoint}`,
+							)}；url=${baseURL}`,
 						);
 					}
 
@@ -223,7 +228,7 @@ export class KnowledgeEmbeddingService {
 					});
 					if (vectors.some((v: any) => !Array.isArray(v))) {
 						throw new Error(
-							`SiliconFlow 返回的 embedding 向量解析失败；endpoint=${endpoint}`,
+							`SiliconFlow 返回的 embedding 向量解析失败；url=${baseURL}`,
 						);
 					}
 					return vectors as number[][];
@@ -376,7 +381,7 @@ export class KnowledgeEmbeddingService {
 		authorId?: number;
 	}): Promise<KnowledgeRerankResult[]> {
 		const tier = await this.resolveTierForAuthor(input.authorId);
-		const { apiKey, model, endpoint } = resolveKnowledgeRerankApiConfig(
+		const { apiKey, model, baseURL } = resolveKnowledgeRerankApiConfig(
 			this.config,
 			tier,
 		);
@@ -403,7 +408,7 @@ export class KnowledgeEmbeddingService {
 			try {
 				let resp: Response;
 				try {
-					resp = await fetch(endpoint, {
+					resp = await fetch(baseURL, {
 						method: 'POST',
 						headers: {
 							Authorization: `Bearer ${apiKey}`,
@@ -425,7 +430,7 @@ export class KnowledgeEmbeddingService {
 							: e?.cause
 								? String(e.cause)
 								: '';
-					const msg = `SiliconFlow rerank 请求网络错误：${e?.message || String(err)}${causeMsg ? `（cause: ${causeMsg}）` : ''}；endpoint=${endpoint}；attempt=${attempt}/${maxAttempts}`;
+					const msg = `SiliconFlow rerank 请求网络错误：${e?.message || String(err)}${causeMsg ? `（cause: ${causeMsg}）` : ''}；url=${baseURL}；attempt=${attempt}/${maxAttempts}`;
 					if (attempt === maxAttempts) throw new Error(msg);
 					await new Promise((r) => setTimeout(r, 300 * attempt));
 					continue;
@@ -446,7 +451,7 @@ export class KnowledgeEmbeddingService {
 						rawText ||
 						`HTTP ${resp.status}`;
 					throw new Error(
-						`SiliconFlow rerank 请求失败：${msg}；status=${resp.status}；endpoint=${endpoint}`,
+						`SiliconFlow rerank 请求失败：${msg}；status=${resp.status}；url=${baseURL}`,
 					);
 				}
 
@@ -459,7 +464,7 @@ export class KnowledgeEmbeddingService {
 					throw new Error(
 						`SiliconFlow rerank 返回结构不包含 results：${JSON.stringify(
 							Object.keys(json || {}),
-						)}；endpoint=${endpoint}`,
+						)}；url=${baseURL}`,
 					);
 				}
 
@@ -489,14 +494,19 @@ export class KnowledgeEmbeddingService {
 		throw new Error('SiliconFlow rerank 请求失败：未知错误');
 	}
 
-	// Markdown 切分：标题优先、长度兜底、带 overlap
-	chunkMarkdown(input: { title: string; content: string }): KnowledgeChunk[] {
+	// Markdown 切分：标题优先、长度兜底、带 overlap（按向量档位控制长度）
+	chunkMarkdown(input: {
+		title: string;
+		content: string;
+		tier?: KnowledgeVectorTier;
+	}): KnowledgeChunk[] {
+		const tier = input.tier ?? 'default';
 		const raw = `${input.title?.trim() || ''}\n\n${input.content ?? ''}`.trim();
 		if (!raw) return [];
 
-		// 单条分片不宜过长：默认 embedding 模型 BAAI/bge-large-zh-v1.5 单条约 512 tokens 上限（硅基流动文档）
-		const target = 450;
-		const overlap = 72;
+		// bge 系列单条约 512 tokens；Qwen3-Embedding 支持更长上下文
+		const target = tier === 'member' ? 2000 : 400;
+		const overlap = tier === 'member' ? 128 : 64;
 		const lines = raw.split(/\r?\n/);
 
 		const blocks: string[] = [];
@@ -542,13 +552,17 @@ export class KnowledgeEmbeddingService {
 	}): Promise<{ contentHash: string; chunkCount: number }> {
 		const title = (input.title ?? '').trim() || '未命名';
 		const contentHash = sha256(`${title}\n\n${input.content ?? ''}`);
-		const chunks = this.chunkMarkdown({ title, content: input.content ?? '' });
+		const tier = await this.resolveTierForAuthor(input.authorId);
+		const chunks = this.chunkMarkdown({
+			title,
+			content: input.content ?? '',
+			tier,
+		});
 		if (chunks.length === 0) {
 			await this.deleteKnowledgeVectors({ knowledgeId: input.knowledgeId });
 			return { contentHash, chunkCount: 0 };
 		}
 
-		const tier = await this.resolveTierForAuthor(input.authorId);
 		const vectors = await this.embedDocuments(
 			chunks.map((c) => c.text),
 			{ tier },

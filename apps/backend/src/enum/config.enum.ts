@@ -79,6 +79,10 @@ export enum ModelEnum {
 	SILICONFLOW_API_KEY = 'SILICONFLOW_API_KEY',
 	/** 硅基流动 API 根路径，默认 https://api.siliconflow.cn/v1 */
 	SILICONFLOW_BASE_URL = 'SILICONFLOW_BASE_URL',
+	/** 知识库 embedding 完整请求 URL，默认 https://api.siliconflow.cn/v1/embeddings */
+	SILICONFLOW_EMBEDDING_URL = 'SILICONFLOW_EMBEDDING_URL',
+	/** 知识库 rerank 完整请求 URL，默认 https://api.siliconflow.cn/v1/rerank */
+	SILICONFLOW_RERANK_URL = 'SILICONFLOW_RERANK_URL',
 	/**
 	 * 英语学习词句拉取：硅基流动 Chat 模型名（`/v1/chat/completions`），默认 Pro/zai-org/GLM-5.1。
 	 * API Key 与 Base URL 沿用 KnowledgeQaEnum.SILICONFLOW_*（与知识库 embedding 同源）。

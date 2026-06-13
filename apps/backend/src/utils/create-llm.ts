@@ -12,6 +12,12 @@ export const DEFAULT_GLM_MODEL_NAME = 'glm-4.7-flash';
 /** 硅基流动 OpenAI 兼容 API 默认根路径（有效会员默认凭证） */
 export const DEFAULT_SILICONFLOW_BASE_URL = 'https://api.siliconflow.cn/v1';
 
+/** 硅基流动 embedding / rerank 默认完整请求 URL */
+export const DEFAULT_SILICONFLOW_EMBEDDING_URL =
+	'https://api.siliconflow.cn/v1/embeddings';
+export const DEFAULT_SILICONFLOW_RERANK_URL =
+	'https://api.siliconflow.cn/v1/rerank';
+
 /** 各模块未配置 SILICONFLOW_MODEL_NAME 时的默认值（有效会员） */
 export const DEFAULT_SILICONFLOW_MODEL_NAME = 'Pro/zai-org/GLM-5.1';
 
@@ -154,12 +160,12 @@ export const KNOWLEDGE_EMBEDDING_BATCH_SIZE = 32;
 
 /**
  * @description 知识库向量 API 调用配置
+ * - baseURL：完整请求 URL（来自 SILICONFLOW_EMBEDDING_URL / SILICONFLOW_RERANK_URL）
  */
 export type KnowledgeVectorApiConfig = {
 	apiKey: string;
 	baseURL: string;
 	model: string;
-	endpoint: string; // API 路径（全路径，baseURL+path）
 };
 
 /** 知识库向量：非会员默认 embedding / rerank 模型 */
@@ -369,36 +375,43 @@ export function memberSiliconFlowResolvePresetsForPreset(
  * - default: BAAI/bge-large-zh-v1.5 + bge-reranker（1024 维库）
  * - member: Qwen3-Embedding-4B + Qwen3-Reranker-4B（2560 维库）
  */
-const KNOWLEDGE_VECTOR_PRESETS: Record<
+const KNOWLEDGE_VECTOR_MODEL_PRESETS: Record<
 	KnowledgeVectorTier,
-	Record<
-		KnowledgeVectorPreset,
-		{ modelKey: string; defaultModel: string; path: string }
-	>
+	Record<KnowledgeVectorPreset, { modelKey: string; defaultModel: string }>
 > = {
 	default: {
 		embedding: {
 			modelKey: KnowledgeQaEnum.KNOWLEDGE_EMBEDDING_MODEL,
 			defaultModel: DEFAULT_KNOWLEDGE_EMBEDDING_MODEL,
-			path: '/embeddings',
 		},
 		rerank: {
 			modelKey: KnowledgeQaEnum.KNOWLEDGE_RERANK_MODEL,
 			defaultModel: DEFAULT_KNOWLEDGE_RERANK_MODEL,
-			path: '/rerank',
 		},
 	},
 	member: {
 		embedding: {
 			modelKey: KnowledgeQaEnum.KNOWLEDGE_EMBEDDING_MODEL_MEMBER,
 			defaultModel: DEFAULT_MEMBER_KNOWLEDGE_EMBEDDING_MODEL,
-			path: '/embeddings',
 		},
 		rerank: {
 			modelKey: KnowledgeQaEnum.KNOWLEDGE_RERANK_MODEL_MEMBER,
 			defaultModel: DEFAULT_MEMBER_KNOWLEDGE_RERANK_MODEL,
-			path: '/rerank',
 		},
+	},
+};
+
+const KNOWLEDGE_VECTOR_URL_PRESETS: Record<
+	KnowledgeVectorPreset,
+	{ urlEnvKeys: readonly string[]; defaultUrl: string }
+> = {
+	embedding: {
+		urlEnvKeys: [ModelEnum.SILICONFLOW_EMBEDDING_URL],
+		defaultUrl: DEFAULT_SILICONFLOW_EMBEDDING_URL,
+	},
+	rerank: {
+		urlEnvKeys: [ModelEnum.SILICONFLOW_RERANK_URL],
+		defaultUrl: DEFAULT_SILICONFLOW_RERANK_URL,
 	},
 };
 
@@ -414,20 +427,22 @@ function resolveKnowledgeVectorApiConfig(
 		ModelEnum.SILICONFLOW_API_KEY,
 		ModelEnum.QWEN_API_KEY,
 	]);
-	const baseURL = resolveBaseUrl(
-		config,
-		SILICONFLOW_ENV_BASE_URL_KEYS,
-		DEFAULT_SILICONFLOW_BASE_URL,
-	);
 	if (!apiKey) {
 		throw new Error(
 			'缺少 SILICONFLOW_API_KEY（或兼容项 DASHSCOPE_API_KEY / QWEN_API_KEY），无法进行知识库向量检索',
 		);
 	}
-	const { modelKey, defaultModel, path } =
-		KNOWLEDGE_VECTOR_PRESETS[tier][preset];
-	const model = trimConfigValue(config, modelKey) || defaultModel;
-	return { apiKey, baseURL, model, endpoint: `${baseURL}${path}` };
+	const { modelKey, defaultModel } =
+		KNOWLEDGE_VECTOR_MODEL_PRESETS[tier][preset];
+	const { urlEnvKeys, defaultUrl } = KNOWLEDGE_VECTOR_URL_PRESETS[preset];
+	const model = resolveFirstTrimmed(config, [modelKey]) || defaultModel;
+	const baseURL = resolveFirstTrimmed(config, urlEnvKeys) || defaultUrl;
+	if (!baseURL) {
+		throw new Error(
+			`缺少 ${urlEnvKeys[0]}（知识库 ${preset} 完整请求 URL），无法进行知识库向量检索`,
+		);
+	}
+	return { apiKey, baseURL, model };
 }
 
 /** 解析知识库 embedding API 配置（tier：default | member） */

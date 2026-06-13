@@ -272,6 +272,11 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'Manual save and debounced auto-save run the same document formatter as in the editor (including safe fenced-code handling) before writing to cloud or local storage.',
 	},
+	's6-16': {
+		title: 'Knowledge vector indexing reliability',
+		description:
+			'Fixes cloud vectorization failures on save (e.g. HTTP 404 or invalid parameters) that blocked RAG retrieval; long articles and the default non-member embedding model now use shorter chunks per tier to reduce indexing errors.',
+	},
 	's7-1': {
 		title: 'IME (input method editor) compatibility',
 		description:
