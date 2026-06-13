@@ -34,6 +34,17 @@ import { sanitizeCountDigits } from '@/utils';
 import { streamEnglishVocabularyPack } from '@/utils/englishLearningPackSse';
 import { formatEnglishLearningAgentToolLine } from '../../agent/agentToolStatusText';
 import { PackStreamLiveLink } from '../../pack/components/PackStreamLiveLink';
+import { EnglishSidebarHeader } from '../../sidebar/components/EnglishSidebarHeader';
+import { SidebarPanel } from '../../sidebar/components/SidebarPanel';
+import {
+	ENGLISH_SIDEBAR_BTN_GRADIENT,
+	ENGLISH_SIDEBAR_ICON_GRADIENT,
+} from '../../sidebar/sidebarAccents';
+import {
+	SIDEBAR_ACTIONS_ROW,
+	SIDEBAR_BTN_GAP,
+	SIDEBAR_BTN_PRIMARY_BASE,
+} from '../../sidebar/tokens';
 import { VocabularyHistoryDrawer } from './VocabularyHistoryDrawer';
 
 export type VocabProgressState = EnglishPackUiProgress;
@@ -352,7 +363,7 @@ function VocabularyPackSectionInner() {
 	}, [countInput]);
 
 	return (
-		<div className="rounded-none py-4 @container min-w-0 mt-3.5 mb-7.5">
+		<SidebarPanel className="@container min-w-0">
 			<Confirm
 				open={historyDeleteConfirmOpen}
 				onOpenChange={(open) => {
@@ -375,22 +386,12 @@ function VocabularyPackSectionInner() {
 				closeOnConfirm={false}
 				onConfirm={() => void executeDeleteHistory()}
 			/>
-			<div className="mb-3.5 flex items-start gap-3">
-				<div className="bg-linear-to-r from-teal-500 to-cyan-600 @min-[26rem]:size-10 flex size-10 shrink-0 items-center justify-center rounded-md">
-					<BookText
-						className="text-white @min-[26rem]:size-6 size-6"
-						aria-hidden
-					/>
-				</div>
-				<div className="min-w-0 flex-1 flex flex-col justify-between">
-					<div className="text-textcolor font-semibold leading-tight">
-						{t('englishLearning.vocab.title')}
-					</div>
-					<div className="h-5 text-textcolor/50 mt-1 text-xs leading-relaxed">
-						{t('englishLearning.vocab.descShort')}
-					</div>
-				</div>
-			</div>
+			<EnglishSidebarHeader
+				icon={BookText}
+				iconGradient={ENGLISH_SIDEBAR_ICON_GRADIENT.vocabPack}
+				title={t('englishLearning.vocab.title')}
+				description={t('englishLearning.vocab.descShort')}
+			/>
 
 			<label
 				htmlFor="english-vocab-topic"
@@ -436,7 +437,12 @@ function VocabularyPackSectionInner() {
 					>
 						{t('englishLearning.vocab.countHint')}
 					</div>
-					<div className="mt-2 mb-5 flex flex-wrap gap-2 justify-between">
+					<div
+						className={cn(
+							'mt-2 mb-3 flex flex-wrap justify-between',
+							SIDEBAR_BTN_GAP,
+						)}
+					>
 						{COUNT_PRESETS.map((n) => (
 							<Button
 								key={n}
@@ -460,16 +466,16 @@ function VocabularyPackSectionInner() {
 						))}
 					</div>
 				</div>
-				<div className="flex min-w-0 items-stretch gap-3.5">
+				<div className={SIDEBAR_ACTIONS_ROW}>
 					<Button
 						type="button"
 						size="sm"
 						onClick={() => (loading ? cancelGenerate() : void onGenerate())}
 						className={cn(
-							'h-9 min-w-0 flex-1 rounded-md text-white',
+							SIDEBAR_BTN_PRIMARY_BASE,
 							loading
 								? 'bg-linear-to-r from-rose-600/80 to-rose-600/80 hover:bg-linear-to-r hover:from-rose-500/80 hover:to-rose-600/80'
-								: 'bg-linear-to-r from-teal-500 to-cyan-600 hover:bg-linear-to-r hover:from-teal-400 hover:to-cyan-600',
+								: ENGLISH_SIDEBAR_BTN_GRADIENT.vocabPack,
 						)}
 					>
 						{loading ? (
@@ -489,7 +495,11 @@ function VocabularyPackSectionInner() {
 						type="button"
 						size="sm"
 						onClick={() => setHistoryDrawerOpen(true)}
-						className="flex-1 text-white hover:bg-linear-to-r hover:from-teal-400 hover:to-cyan-600 bg-linear-to-r from-teal-500 to-cyan-600 h-9 shrink-0 whitespace-nowrap rounded-md"
+						className={cn(
+							SIDEBAR_BTN_PRIMARY_BASE,
+							'shrink-0 whitespace-nowrap',
+							ENGLISH_SIDEBAR_BTN_GRADIENT.vocabPack,
+						)}
 					>
 						<span className="max-[380px]:sr-only">
 							{t('englishLearning.vocab.historyOpenDrawer')}
@@ -512,7 +522,7 @@ function VocabularyPackSectionInner() {
 				onDeleteEntry={requestDeleteHistory}
 				practiceReturnTo="home"
 			/>
-		</div>
+		</SidebarPanel>
 	);
 }
 

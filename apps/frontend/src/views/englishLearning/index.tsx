@@ -114,7 +114,7 @@ const EnglishLearning = observer(function EnglishLearning() {
 						>
 							<aside
 								className={cn(
-									'flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-theme-background',
+									'flex h-full min-h-0 min-w-0 flex-col overflow-hidden border-r border-theme/5 bg-theme-background',
 								)}
 							>
 								<ScrollArea

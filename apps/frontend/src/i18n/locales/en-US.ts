@@ -1181,9 +1181,13 @@ export const enUS = {
 	'englishLearning.import.saveClassicSuccess':
 		'Saved {count} quote(s) to your quotes library',
 	'englishLearning.import.saveClassicLoading': 'Saving...',
-	'englishLearning.import.dataExample': 'Import word json example',
+	'englishLearning.import.dataExample': 'Expand import word json example',
 	'englishLearning.import.dataExampleClassic':
-		'Import classic quotes json example',
+		'Expand import classic quotes json example',
+	'englishLearning.import.dataExampleCollapse':
+		'Collapse import word json example',
+	'englishLearning.import.dataExampleClassicCollapse':
+		'Collapse import classic quotes json example',
 
 	'englishLearning.library.favorites': 'Favorites',
 	'englishLearning.library.vocab.title': 'Vocabulary library',
@@ -1362,11 +1366,10 @@ export const enUS = {
 		'e.g. travel phrases, business verbs, IELTS collocations, easily confused pairs…',
 	'englishLearning.vocab.topicRequired': 'Enter a topic or learning goal first',
 	'englishLearning.vocab.count': 'Count (optional)',
-	'englishLearning.vocab.countPlaceholder': 'Empty = fetch up to 12000',
+	'englishLearning.vocab.countPlaceholder': 'Empty = max per request',
 	'englishLearning.vocab.countHint':
-		'Leave empty to use the per-request maximum on the server; if set, use a whole number from 1 to 12000, or a preset',
-	'englishLearning.vocab.countInvalid':
-		'When set, count must be a whole number from 1 to 12000; leave the field empty for maximum',
+		'Leave empty for the server per-request limit; enter 1–12000, or tap a preset',
+	'englishLearning.vocab.countInvalid': 'Use 1–12000, or leave empty',
 	'englishLearning.vocab.progress':
 		'{collected} / {target} words · batch {round}',
 	'englishLearning.vocab.fromDatabase':
@@ -1415,11 +1418,10 @@ export const enUS = {
 		'e.g. courage quotes, Pride & Prejudice lines, speech highlights, Shakespeare…',
 	'englishLearning.classic.topicRequired': 'Enter a topic or angle first',
 	'englishLearning.classic.count': 'Count (optional)',
-	'englishLearning.classic.countPlaceholder': 'Empty = fetch up to 6000',
+	'englishLearning.classic.countPlaceholder': 'Empty = max per request',
 	'englishLearning.classic.countHint':
-		'Leave empty to use the per-request maximum on the server; if set, use a whole number from 1 to 6000, or a preset',
-	'englishLearning.classic.countInvalid':
-		'When set, count must be a whole number from 1 to 6000; leave the field empty for maximum',
+		'Leave empty for the server per-request limit; enter 1–6000, or tap a preset',
+	'englishLearning.classic.countInvalid': 'Use 1–6000, or leave empty',
 	'englishLearning.classic.progress':
 		'{collected} / {target} lines · batch {round}',
 	'englishLearning.classic.partialResult':

@@ -2,6 +2,7 @@ import { Button } from '@ui/button';
 import { type ReactNode } from 'react';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
+import { SIDEBAR_BTN_GAP } from '@/views/englishLearning/sidebar/tokens';
 import {
 	DAILY_COUNT_PRESET_BTN_CLASS,
 	DAILY_COUNT_PRESET_BTN_SELECTED_CLASS,
@@ -35,7 +36,12 @@ export function DailyWordsPerRoundPicker({
 				</p>
 				{headerRight}
 			</div>
-			<div className="mt-2 flex flex-wrap justify-between gap-2">
+			<div
+				className={cn(
+					'mt-2 mb-3 flex flex-wrap justify-between',
+					SIDEBAR_BTN_GAP,
+				)}
+			>
 				{DAILY_WORD_COUNT_OPTIONS.map((count) => {
 					const selected = wordCount === count;
 					return (

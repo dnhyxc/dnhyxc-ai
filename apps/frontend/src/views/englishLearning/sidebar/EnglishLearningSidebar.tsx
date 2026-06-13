@@ -10,6 +10,7 @@ import {
 } from './components/LearningToolbar';
 import { MistakeBookSession } from './components/MistakeBookSession';
 import { ReviewSession } from './components/ReviewSession';
+import { SIDEBAR_SECTION_STACK } from './tokens';
 
 type EnglishLearningSidebarProps = {
 	onQuickIntentInputSync?: (payload: QuickIntentInputSyncPayload) => void;
@@ -22,7 +23,7 @@ export function EnglishLearningSidebar({
 	const { t } = useI18n();
 
 	return (
-		<>
+		<div className={SIDEBAR_SECTION_STACK}>
 			<DailySession />
 			<EnglishLearningToolbar onQuickIntentInputSync={onQuickIntentInputSync} />
 			<EnglishSource
@@ -40,6 +41,6 @@ export function EnglishLearningSidebar({
 			<FavoriteSession />
 			<ReviewSession />
 			<MistakeBookSession />
-		</>
+		</div>
 	);
 }

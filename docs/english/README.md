@@ -58,6 +58,7 @@
 
 | 文档 | 说明 |
 |------|------|
+| [sidebar-ui-unify.md](./sidebar-ui-unify.md) | **首页侧栏 UI 统一**：卡片/按钮 token、`Header`/`Actions`、导入示例折叠、chip 网格 |
 | [english-module-folder-layout.md](./english-module-folder-layout.md) | **模块目录**：`components/`、`reference/`、`favorites`/`pack`/`library`/`sections` 分域；顶栏单行截断 |
 
 ## TTS / UI / 其它专题

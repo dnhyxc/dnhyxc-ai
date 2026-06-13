@@ -1,15 +1,22 @@
 import { ScrollArea } from '@ui/scroll-area';
-import { Layers, Layers2 } from 'lucide-react';
-import { useMemo } from 'react';
+import {
+	CircleChevronDown,
+	CircleChevronRight,
+	Layers,
+	Layers2,
+} from 'lucide-react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { Button } from '@/components/ui';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import {
-	ENGLISH_SIDEBAR_BTN_GRADIENT,
 	ENGLISH_SIDEBAR_ICON_GRADIENT,
 	ENGLISH_SIDEBAR_TEXT_LINK_GRADIENT,
 } from '../sidebarAccents';
+import { SIDEBAR_LABEL } from '../tokens';
+import { EnglishSidebarActions } from './EnglishSidebarActions';
+import { EnglishSidebarHeader } from './EnglishSidebarHeader';
+import { SidebarPanel } from './SidebarPanel';
 
 const SOURCE_EXAMPLE_PANEL = {
 	vocab: 'bg-linear-to-r from-cyan-500/8 to-blue-600/8 border-blue-500/10',
@@ -58,51 +65,57 @@ export function EnglishSource({
 	const iconGradient = isVocab
 		? ENGLISH_SIDEBAR_ICON_GRADIENT.vocabSource
 		: ENGLISH_SIDEBAR_ICON_GRADIENT.classicSource;
-	const btnGradient = isVocab
-		? ENGLISH_SIDEBAR_BTN_GRADIENT.vocabSource
-		: ENGLISH_SIDEBAR_BTN_GRADIENT.classicSource;
+	const gradientKey = isVocab ? 'vocabSource' : 'classicSource';
+	const Icon = isVocab ? Layers : Layers2;
+	const exampleLabelExpanded = isVocab
+		? t('englishLearning.import.dataExampleCollapse')
+		: t('englishLearning.import.dataExampleClassicCollapse');
+	const exampleLabelCollapsed = isVocab
+		? t('englishLearning.import.dataExample')
+		: t('englishLearning.import.dataExampleClassic');
+	const [exampleExpanded, setExampleExpanded] = useState(false);
+	const exampleLabel = exampleExpanded
+		? exampleLabelExpanded
+		: exampleLabelCollapsed;
 
 	return (
-		<div
-			className={cn(
-				'rounded-none pt-4 @container min-w-0',
-				isVocab ? 'mt-0' : 'mt-3.5',
-			)}
-		>
-			<div className="mb-3.5 flex items-start gap-3">
+		<SidebarPanel className="@container min-w-0">
+			<EnglishSidebarHeader
+				icon={Icon}
+				iconGradient={iconGradient}
+				title={title ?? ''}
+				description={description}
+			/>
+			<div>
 				<div
 					className={cn(
-						'flex size-10 shrink-0 items-center justify-center rounded-md',
-						iconGradient,
+						'flex items-center justify-between gap-2',
+						exampleExpanded ? 'mb-2' : 'mb-2',
 					)}
 				>
-					{isVocab ? (
-						<Layers className="text-white size-6" aria-hidden />
-					) : (
-						<Layers2 className="text-white size-6" aria-hidden />
-					)}
-				</div>
-				<div className="min-w-0 flex-1 flex flex-col justify-between">
-					<div className="text-textcolor min-w-0 font-semibold leading-tight">
-						{title}
-					</div>
-					{description ? (
-						<div className="text-textcolor/50 mt-1 flex h-5 items-center gap-2 text-xs leading-snug">
-							{description}
-						</div>
-					) : null}
-				</div>
-			</div>
-			<div>
-				<div className="mb-2 flex items-center justify-between gap-2">
-					<label
-						htmlFor={isVocab ? 'english-vocab-topic' : 'english-classic-topic'}
-						className="text-textcolor/45 text-sm font-medium tracking-wide"
+					<button
+						type="button"
+						className={cn(
+							SIDEBAR_LABEL,
+							'inline-flex min-w-0 cursor-pointer items-center gap-1.5 text-left transition-colors hover:text-textcolor/65',
+						)}
+						aria-expanded={exampleExpanded}
+						aria-label={exampleLabel}
+						onClick={() => setExampleExpanded((v) => !v)}
 					>
-						{isVocab
-							? t('englishLearning.import.dataExample')
-							: t('englishLearning.import.dataExampleClassic')}
-					</label>
+						{exampleExpanded ? (
+							<CircleChevronDown
+								className="size-4 shrink-0 transition-transform duration-200"
+								aria-hidden
+							/>
+						) : (
+							<CircleChevronRight
+								className="size-4 shrink-0 transition-transform duration-200"
+								aria-hidden
+							/>
+						)}
+						<span className="min-w-0 truncate">{exampleLabel}</span>
+					</button>
 					<button
 						type="button"
 						className={cn(
@@ -122,49 +135,42 @@ export function EnglishSource({
 							: t('englishLearning.source.grammarLink')}
 					</button>
 				</div>
-				<ScrollArea
-					scrollbars="both"
-					className={cn(
-						'p-1 bg-theme/5 border mb-5 max-h-50 w-full min-w-0 rounded-md',
-						SOURCE_EXAMPLE_PANEL[type],
-					)}
-					viewportClassName="[&>div]:!block [&>div]:w-max"
-				>
-					<pre
-						className={cn('m-0 w-max text-xs leading-relaxed whitespace-pre')}
+				{exampleExpanded ? (
+					<ScrollArea
+						scrollbars="both"
+						className={cn(
+							'p-1 bg-theme/5 border mb-3 max-h-50 w-full min-w-0 rounded-md',
+							SOURCE_EXAMPLE_PANEL[type],
+						)}
+						viewportClassName="[&>div]:!block [&>div]:w-max"
 					>
-						{JSON.stringify(exampleJson, null, 2)}
-					</pre>
-				</ScrollArea>
+						<pre
+							className={cn('m-0 w-max text-xs leading-relaxed whitespace-pre')}
+						>
+							{JSON.stringify(exampleJson, null, 2)}
+						</pre>
+					</ScrollArea>
+				) : null}
 			</div>
-			<div className="flex flex-wrap items-center gap-3.5">
-				<Button
-					type="button"
-					size="sm"
-					className={cn(
-						'h-9 min-w-0 flex-1 gap-2 rounded-md px-3 text-white',
-						btnGradient,
-					)}
-					onClick={() => navigate(`/english-learning/import?kind=${type}`)}
-				>
-					{isVocab
-						? t('englishLearning.vocab.import')
-						: t('englishLearning.classic.import')}
-				</Button>
-				<Button
-					type="button"
-					size="sm"
-					className={cn(
-						'h-9 min-w-0 flex-1 gap-2 rounded-md px-3 text-white',
-						btnGradient,
-					)}
-					onClick={() => navigate(`/english-learning/library?kind=${type}`)}
-				>
-					{isVocab
-						? t('englishLearning.library.vocab.bank')
-						: t('englishLearning.library.classic.bank')}
-				</Button>
-			</div>
-		</div>
+			<EnglishSidebarActions
+				className="mt-0"
+				actions={[
+					{
+						label: isVocab
+							? t('englishLearning.vocab.import')
+							: t('englishLearning.classic.import'),
+						onClick: () => navigate(`/english-learning/import?kind=${type}`),
+						gradientKey,
+					},
+					{
+						label: isVocab
+							? t('englishLearning.library.vocab.bank')
+							: t('englishLearning.library.classic.bank'),
+						onClick: () => navigate(`/english-learning/library?kind=${type}`),
+						gradientKey,
+					},
+				]}
+			/>
+		</SidebarPanel>
 	);
 }

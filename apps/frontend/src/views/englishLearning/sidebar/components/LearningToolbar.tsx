@@ -9,6 +9,8 @@ import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import englishAgentStore from '@/store/englishAgent';
 import { ENGLISH_SIDEBAR_ICON_GRADIENT } from '../sidebarAccents';
+import { SIDEBAR_BTN_GAP } from '../tokens';
+import { EnglishSidebarHeader } from './EnglishSidebarHeader';
 import { SidebarPanel } from './SidebarPanel';
 
 const chipDefs = [
@@ -71,6 +73,13 @@ const TOOLBAR_CHIP_BASE =
 const TOOLBAR_CHIP_SELECTED =
 	'bg-linear-to-r from-lime-400 to-green-500 text-lime-800';
 
+/** 与改版前一致：窄侧栏双列；足够宽时 auto-fill 多列 */
+const TOOLBAR_CHIP_GRID = cn(
+	'grid min-w-0 grid-cols-2',
+	SIDEBAR_BTN_GAP,
+	'@min-[22rem]:grid-cols-[repeat(auto-fill,minmax(min(100%,7.25rem),1fr))]',
+);
+
 /** 快捷意图与输入框联动：选中填入意图名，取消选中时由父级移除自动填入片段 */
 export type QuickIntentInputSyncPayload =
 	| { mode: 'select'; label: string }
@@ -97,25 +106,14 @@ export const EnglishLearningToolbar = observer(function EnglishLearningToolbar({
 	}, [quickIntentsExpanded, showIntentExpandToggle]);
 
 	return (
-		<SidebarPanel className="min-w-0 pt-4">
-			<div className="mb-2.5 flex items-start gap-3">
-				<div
-					className={cn(
-						'flex size-10 shrink-0 items-center justify-center rounded-md',
-						ENGLISH_SIDEBAR_ICON_GRADIENT.toolbar,
-					)}
-				>
-					<Cog className="size-6 text-white" aria-hidden />
-				</div>
-				<div className="min-w-0">
-					<div className="text-textcolor leading-tight font-semibold tracking-tight">
-						{t('englishLearning.quickIntents')}
-					</div>
-					<div className="text-textcolor/50 mt-1 text-xs leading-snug">
-						{t('englishLearning.toolbarSubtitleShort')}
-					</div>
-				</div>
-			</div>
+		<SidebarPanel className="@container min-w-0">
+			<EnglishSidebarHeader
+				icon={Cog}
+				iconGradient={ENGLISH_SIDEBAR_ICON_GRADIENT.toolbar}
+				title={t('englishLearning.quickIntents')}
+				description={t('englishLearning.toolbarSubtitleShort')}
+				className="mb-2"
+			/>
 
 			<div className="min-w-0">
 				<div className="mb-0.5 flex min-h-6 items-center justify-between gap-2">
@@ -150,12 +148,7 @@ export const EnglishLearningToolbar = observer(function EnglishLearningToolbar({
 						</Button>
 					) : null}
 				</div>
-				<div
-					className={cn(
-						'grid min-w-0 gap-3.5',
-						'grid-cols-[repeat(auto-fill,minmax(min(100%,7.25rem),1fr))]',
-					)}
-				>
+				<div className={TOOLBAR_CHIP_GRID}>
 					{visibleChipDefs.map((c) => {
 						const prefix = t(c.prefixKey);
 						const selected = englishAgentStore.pendingIntentPrefix === prefix;

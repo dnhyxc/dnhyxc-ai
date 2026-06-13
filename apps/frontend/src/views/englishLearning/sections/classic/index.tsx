@@ -34,6 +34,17 @@ import { sanitizeCountDigits } from '@/utils';
 import { streamEnglishClassicQuotes } from '@/utils/englishLearningPackSse';
 import { formatEnglishLearningAgentToolLine } from '../../agent/agentToolStatusText';
 import { PackStreamLiveLink } from '../../pack/components/PackStreamLiveLink';
+import { EnglishSidebarHeader } from '../../sidebar/components/EnglishSidebarHeader';
+import { SidebarPanel } from '../../sidebar/components/SidebarPanel';
+import {
+	ENGLISH_SIDEBAR_BTN_GRADIENT,
+	ENGLISH_SIDEBAR_ICON_GRADIENT,
+} from '../../sidebar/sidebarAccents';
+import {
+	SIDEBAR_ACTIONS_ROW,
+	SIDEBAR_BTN_GAP,
+	SIDEBAR_BTN_PRIMARY_BASE,
+} from '../../sidebar/tokens';
 import { ClassicQuotesHistoryDrawer } from './ClassicQuotesHistoryDrawer';
 
 export type ClassicQuoteProgressState = EnglishPackUiProgress;
@@ -350,7 +361,7 @@ function ClassicQuotesSectionInner() {
 	}, [countInput]);
 
 	return (
-		<div className="rounded-none @container min-w-0">
+		<SidebarPanel className="@container min-w-0">
 			<Confirm
 				open={historyDeleteConfirmOpen}
 				onOpenChange={(open) => {
@@ -373,19 +384,12 @@ function ClassicQuotesSectionInner() {
 				closeOnConfirm={false}
 				onConfirm={() => void executeDeleteHistory()}
 			/>
-			<div className="mb-3.5 flex items-start gap-3">
-				<div className="bg-linear-to-r from-violet-500 to-indigo-600 @min-[26rem]:size-11 flex size-10 shrink-0 items-center justify-center rounded-md">
-					<BookMarked className="text-white size-6" aria-hidden />
-				</div>
-				<div className="min-w-0 flex-1 flex flex-col justify-between">
-					<div className="text-textcolor leading-tight font-semibold tracking-tight">
-						{t('englishLearning.classic.title')}
-					</div>
-					<div className="h-5 text-textcolor/50 mt-1 text-xs leading-relaxed">
-						{t('englishLearning.classic.descShort')}
-					</div>
-				</div>
-			</div>
+			<EnglishSidebarHeader
+				icon={BookMarked}
+				iconGradient={ENGLISH_SIDEBAR_ICON_GRADIENT.classicPack}
+				title={t('englishLearning.classic.title')}
+				description={t('englishLearning.classic.descShort')}
+			/>
 
 			<label
 				htmlFor="english-classic-topic"
@@ -431,7 +435,12 @@ function ClassicQuotesSectionInner() {
 					>
 						{t('englishLearning.classic.countHint')}
 					</div>
-					<div className="mt-2 mb-5 flex flex-wrap gap-2 justify-between">
+					<div
+						className={cn(
+							'mt-2 mb-3 flex flex-wrap justify-between',
+							SIDEBAR_BTN_GAP,
+						)}
+					>
 						{COUNT_PRESETS.map((n: (typeof COUNT_PRESETS)[number]) => (
 							<Button
 								key={n}
@@ -455,15 +464,15 @@ function ClassicQuotesSectionInner() {
 						))}
 					</div>
 				</div>
-				<div className="flex min-w-0 items-stretch gap-3.5">
+				<div className={SIDEBAR_ACTIONS_ROW}>
 					<Button
 						size="sm"
 						onClick={() => (loading ? cancelGenerate() : void onGenerate())}
 						className={cn(
-							'h-9 min-w-0 flex-1 rounded-md text-white',
+							SIDEBAR_BTN_PRIMARY_BASE,
 							loading
 								? 'bg-linear-to-r from-rose-600/80 to-rose-600/80 hover:bg-linear-to-r hover:from-rose-500/80 hover:to-rose-600/80'
-								: 'bg-linear-to-r from-violet-600 to-indigo-600 hover:bg-linear-to-r hover:from-violet-400 hover:to-indigo-600',
+								: ENGLISH_SIDEBAR_BTN_GRADIENT.classicPack,
 						)}
 					>
 						{loading ? (
@@ -482,7 +491,11 @@ function ClassicQuotesSectionInner() {
 					<Button
 						size="sm"
 						onClick={() => setHistoryDrawerOpen(true)}
-						className="flex-1 text-white hover:bg-linear-to-r hover:from-indigo-400 hover:to-indigo-600 bg-linear-to-r from-violet-600 to-indigo-600 h-9 shrink-0 whitespace-nowrap rounded-md"
+						className={cn(
+							SIDEBAR_BTN_PRIMARY_BASE,
+							'shrink-0 whitespace-nowrap',
+							ENGLISH_SIDEBAR_BTN_GRADIENT.classicPack,
+						)}
 					>
 						<span className="max-[380px]:sr-only">
 							{t('englishLearning.classic.historyOpenDrawer')}
@@ -506,7 +519,7 @@ function ClassicQuotesSectionInner() {
 				onDeleteEntry={requestDeleteHistory}
 				practiceReturnTo="home"
 			/>
-		</div>
+		</SidebarPanel>
 	);
 }
 

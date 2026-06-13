@@ -322,6 +322,11 @@ export const PROJECT_GUIDE_ITEMS_EN: Record<
 		description:
 			'On vocabulary or quotes library lists, hover or select a card and use Edit (owners on private libraries; super admins on public ones). Rename up to 50 characters with a live count; only the owner can save. Press Enter in the dialog to save when there are changes. Super administrators can toggle Make public library so all signed-in users can browse and practice; new libraries stay private until published. You can delete only libraries you own. A Public badge appears on published libraries for all users.',
 	},
+	'pg-s13-17': {
+		title: '13.17 Home sidebar layout and interaction',
+		description:
+			'Each left-sidebar feature (daily memorize, quick intents, libraries, topic pulls, favorites, today review, mistake books, etc.) sits in its own card with a colored icon beside the title—subtle borders and light fills aligned with the Agent panel, while button colors stay per block. JSON format examples in library cards are collapsed by default; tap the label to expand or collapse. Quick intents show a few chips first; when expanded, chips use two columns in a narrow sidebar and add columns when the panel is wider.',
+	},
 	'pg-s13-13': {
 		title: '13.13 Classic mistake row fields',
 		description:

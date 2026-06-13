@@ -735,4 +735,9 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'Hover a library card to edit (owners on private libraries; super admins on public ones). Owners can rename a library (character count shown, up to 50); press Enter in the dialog to save when there are changes. Super administrators can mark a library as public so all signed-in users can browse and practice; others cannot delete a public library they do not own. A Public badge appears on published libraries for all users. New imports stay private until manually published.',
 	},
+	's24-41': {
+		title: 'English learning home sidebar visual unify',
+		description:
+			'Left sidebar blocks (daily memorize, quick intents, vocab/quotes libraries, topic pulls, favorites, today review, mistake books, etc.) now share one card and button spec aligned with the Agent and knowledge sidebars—subtle borders and light fills—while keeping each block’s icon and button colors. JSON import examples in library cards are collapsed by default; tap the label to expand or collapse. Quick-intent chips stay two columns in a narrow sidebar and add columns when the panel is wider.',
+	},
 };

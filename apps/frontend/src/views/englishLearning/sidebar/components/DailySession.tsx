@@ -1,5 +1,5 @@
 import Confirm from '@design/Confirm';
-import { Button, Spinner, Toast } from '@ui/index';
+import { Spinner, Toast } from '@ui/index';
 import { Sparkles } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
@@ -22,10 +22,11 @@ import {
 	ENGLISH_REVIEW_SUMMARY_REFRESH,
 } from '../reviewEvents';
 import {
-	ENGLISH_SIDEBAR_BTN_GRADIENT,
 	ENGLISH_SIDEBAR_ICON_GRADIENT,
 	ENGLISH_SIDEBAR_TEXT_LINK_GRADIENT,
 } from '../sidebarAccents';
+import { EnglishSidebarActions } from './EnglishSidebarActions';
+import { EnglishSidebarHeader } from './EnglishSidebarHeader';
 import { SidebarPanel } from './SidebarPanel';
 
 /** 首页侧栏：今日记词 */
@@ -117,38 +118,28 @@ export function DailySession() {
 				closeOnConfirm={false}
 				onConfirm={() => void onConfirmReset()}
 			/>
-			<div className="mb-3.5 flex items-start gap-3">
-				<div
-					className={cn(
-						'flex size-10 shrink-0 items-center justify-center rounded-md',
-						ENGLISH_SIDEBAR_ICON_GRADIENT.daily,
-					)}
-				>
-					<Sparkles className="size-6 text-white" aria-hidden />
-				</div>
-				<div className="min-w-0 flex-1 flex flex-col justify-between">
-					<div className="text-textcolor min-w-0 font-semibold leading-tight">
-						{t('route.englishLearning.daily.title')}
-					</div>
-					<div className="text-textcolor/50 mt-1 flex h-5 items-center gap-2 text-xs leading-snug">
-						{loading ? (
-							<span className="inline-flex items-start gap-1.5">
-								<Spinner className="size-3 text-textcolor/50 mt-0.5" />
-								{t('englishLearning.daily.loading')}
-							</span>
-						) : libraryCount <= 0 ? (
-							t('englishLearning.daily.sidebarDescLibraryEmpty')
-						) : (
-							t('englishLearning.daily.sidebarDescLibrary', {
-								poolCount: libraryCount,
-								sessionCount: libraryPickCount,
-							})
-						)}
-					</div>
-				</div>
-			</div>
+			<EnglishSidebarHeader
+				icon={Sparkles}
+				iconGradient={ENGLISH_SIDEBAR_ICON_GRADIENT.daily}
+				title={t('route.englishLearning.daily.title')}
+				description={
+					loading ? (
+						<span className="inline-flex items-start gap-1.5">
+							<Spinner className="size-3 text-textcolor/50 mt-0.5" />
+							{t('englishLearning.daily.loading')}
+						</span>
+					) : libraryCount <= 0 ? (
+						t('englishLearning.daily.sidebarDescLibraryEmpty')
+					) : (
+						t('englishLearning.daily.sidebarDescLibrary', {
+							poolCount: libraryCount,
+							sessionCount: libraryPickCount,
+						})
+					)
+				}
+			/>
 			<DailyWordsPerRoundPicker
-				className="mt-4.5"
+				className="mt-3"
 				headerRight={
 					<button
 						type="button"
@@ -170,31 +161,21 @@ export function DailySession() {
 					</button>
 				}
 			/>
-			<div className="mt-3 flex flex-wrap items-center gap-3.5">
-				<Button
-					type="button"
-					size="sm"
-					disabled={loading || (isLoggedIn && libraryPickCount <= 0)}
-					className={cn(
-						'h-9 min-w-0 flex-1 gap-1.5 rounded-md px-2 text-sm text-white',
-						ENGLISH_SIDEBAR_BTN_GRADIENT.daily,
-					)}
-					onClick={() => navigate('/english-learning/daily')}
-				>
-					{t('englishLearning.daily.startLibrary')}
-				</Button>
-				<Button
-					type="button"
-					size="sm"
-					className={cn(
-						'h-9 min-w-0 flex-1 gap-1.5 rounded-md px-2 text-sm text-white',
-						ENGLISH_SIDEBAR_BTN_GRADIENT.daily,
-					)}
-					onClick={() => navigate('/english-learning/daily/records')}
-				>
-					{t('englishLearning.daily.memorizedLink')}
-				</Button>
-			</div>
+			<EnglishSidebarActions
+				actions={[
+					{
+						label: t('englishLearning.daily.startLibrary'),
+						onClick: () => navigate('/english-learning/daily'),
+						disabled: loading || (isLoggedIn && libraryPickCount <= 0),
+						gradientKey: 'daily',
+					},
+					{
+						label: t('englishLearning.daily.memorizedLink'),
+						onClick: () => navigate('/english-learning/daily/records'),
+						gradientKey: 'daily',
+					},
+				]}
+			/>
 		</SidebarPanel>
 	);
 }
