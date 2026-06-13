@@ -69,6 +69,10 @@ export class LlmRuntimeConfig {
 	@Column({ name: 'vector_search_profiles', type: 'json', nullable: true })
 	vectorSearchProfiles!: VectorSearchProfile[] | null;
 
+	/** 超级管理员：仅使用 BGE 向量库与模型（不检索其它 collection） */
+	@Column({ name: 'vector_bge_only', type: 'boolean', default: false })
+	vectorBgeOnly!: boolean;
+
 	@UpdateDateColumn({ name: 'updated_at', type: 'timestamp' })
 	updatedAt!: Date;
 }

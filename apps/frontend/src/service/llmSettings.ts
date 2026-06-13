@@ -29,6 +29,9 @@ export type LlmSettingsView = {
 	vectorApiKey: string;
 	vectorApiKeyMask: string | null;
 	vectorActive: boolean;
+	vectorBgeOnly: boolean;
+	/** 超级管理员已开启全站仅 BGE 向量库 */
+	vectorBgeOnlyGlobal: boolean;
 };
 
 export type UpsertLlmSettingsBody = {
@@ -46,6 +49,7 @@ export type UpsertLlmVectorSettingsBody = {
 	rerankModel?: string;
 	collectionName?: string;
 	apiKey?: string;
+	bgeOnly?: boolean;
 };
 
 export type LlmSettingsDefaultsView = {

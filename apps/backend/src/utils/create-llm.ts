@@ -158,6 +158,16 @@ const SILICONFLOW_ENV_MODEL_NAME_KEYS = [
 /** 单次 embeddings 请求 input 数组最大条数（硅基流动文档限制） */
 export const KNOWLEDGE_EMBEDDING_BATCH_SIZE = 32;
 
+/** bge-large-zh 单条约 512 tokens，中文按字符保守上限（入库前二次截断） */
+export const KNOWLEDGE_BGE_EMBEDDING_MAX_CHARS = 200;
+
+/** bge 模型单次请求条数（略小于硅基文档 32，降低批量失败率） */
+export const KNOWLEDGE_BGE_EMBEDDING_BATCH_SIZE = 8;
+
+/** default 档位分片目标字数（须低于 BGE token 上限） */
+export const KNOWLEDGE_DEFAULT_CHUNK_TARGET_CHARS = 200;
+export const KNOWLEDGE_DEFAULT_CHUNK_OVERLAP_CHARS = 32;
+
 /**
  * @description 知识库向量 API 调用配置
  * - baseURL：完整请求 URL（来自 SILICONFLOW_EMBEDDING_URL / SILICONFLOW_RERANK_URL）

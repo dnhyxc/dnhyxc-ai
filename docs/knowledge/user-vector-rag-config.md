@@ -1,7 +1,7 @@
 # 知识库：用户向量配置与多库 RAG 检索
 
 > **文档角色**：本轮主文档——设置页**独立向量模型配置**、`vector_search_profiles` 累积、RAG **多向量库并行检索**及**系统默认 bge 库**始终纳入检索。  
-> **延伸阅读**：[siliconflow-vector-full-url.md](./siliconflow-vector-full-url.md)（完整 URL / 分片档位）、[knowledge-member-vector-tier.md](./knowledge-member-vector-tier.md)（会员 Qwen3 双库）、[knowledge-vector-create-llm.md](./knowledge-vector-create-llm.md)（凭证与 `create-llm`）、[../llm/llm-runtime-settings.md](../llm/llm-runtime-settings.md)（对话 LLM 运行时配置）。  
+> **延伸阅读**：[siliconflow-vector-full-url.md](./siliconflow-vector-full-url.md)（完整 URL / 分片档位）、[knowledge-member-vector-tier.md](./knowledge-member-vector-tier.md)（会员 Qwen3 双库）、[knowledge-vector-create-llm.md](./knowledge-vector-create-llm.md)（凭证与 `create-llm`）、[vector-bge-global-round.md](./vector-bge-global-round.md)（全站仅 BGE、入库分批、会员默认 4B 库）、[../llm/llm-runtime-settings.md](../llm/llm-runtime-settings.md)（对话 LLM 运行时配置）。  
 > 若与仓库最新源码不一致，**以源码为准**。
 
 ---

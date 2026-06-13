@@ -64,6 +64,10 @@ export type LlmConfigPublicView = {
 	vectorApiKeyMask: string | null;
 	/** 当前是否会对知识库向量链路生效 */
 	vectorActive: boolean;
+	/** 超级管理员「仅 BGE 向量库」开关（当前用户存库值） */
+	vectorBgeOnly: boolean;
+	/** 站点级：任一超级管理员已开启仅 BGE 时为 true（用于隐藏普通用户向量设置） */
+	vectorBgeOnlyGlobal: boolean;
 };
 
 @Injectable()
@@ -92,6 +96,13 @@ export class LlmConfigService {
 
 	private normalizeBaseUrl(url: string): string {
 		return url.trim().replace(/\/$/, '');
+	}
+
+	private getDefaultKnowledgeCollectionName(): string {
+		return (
+			this.configService.get<string>('QDRANT_KNOWLEDGE_COLLECTION')?.trim() ||
+			'knowledge_chunks_v2'
+		);
 	}
 
 	private decryptStoredKey(enc: string | null | undefined): string {
@@ -233,6 +244,53 @@ export class LlmConfigService {
 		return this.loadVectorSnapshotFromDb(userId);
 	}
 
+	/** 站点级：超级管理员已开启「仅 BGE 向量库」时，全员走向量 BGE 单库 */
+	async isGlobalVectorBgeOnlyEnabled(): Promise<boolean> {
+		const rows = await this.repo.find({
+			where: { vectorBgeOnly: true },
+			select: { userId: true },
+		});
+		for (const row of rows) {
+			if (await this.userService.userHasSuperAdminRole(row.userId)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/** 开启全站仅 BGE 的超级管理员向量快照（全员共用其 API Key / URL） */
+	private async getGlobalVectorBgeProviderSnapshot(): Promise<VectorRuntimeSnapshot | null> {
+		const rows = await this.repo.find({
+			where: { vectorBgeOnly: true },
+			select: { userId: true },
+		});
+		for (const row of rows) {
+			if (!(await this.userService.userHasSuperAdminRole(row.userId))) {
+				continue;
+			}
+			const snap = await this.getActiveVectorSnapshotForUser(row.userId);
+			if (snap) return snap;
+		}
+		return null;
+	}
+
+	/** 知识库向量是否仅走 BGE 单库（全站策略或超级管理员个人开关） */
+	async isVectorBgeOnlyActiveForUser(
+		userId: number | null | undefined,
+	): Promise<boolean> {
+		if (await this.isGlobalVectorBgeOnlyEnabled()) {
+			return true;
+		}
+		if (userId == null || !Number.isFinite(userId) || userId <= 0) {
+			return false;
+		}
+		if (!(await this.userService.userHasSuperAdminRole(userId))) {
+			return false;
+		}
+		const row = await this.repo.findOne({ where: { userId } });
+		return Boolean(row?.vectorBgeOnly);
+	}
+
 	/** 供 createLlm 使用：用户自定义配置 > 有效会员 SILICONFLOW_* > 非会员 GLM_* */
 	async resolveSiliconFlowCredentials(
 		config: ConfigService,
@@ -256,16 +314,41 @@ export class LlmConfigService {
 
 	/**
 	 * 供知识库 embedding / rerank 使用：用户向量设置 > 环境变量 + 会员档位
+	 * 全站仅 BGE 时统一使用开启该策略的超级管理员向量凭证，忽略文章作者自己的向量配置。
 	 */
 	async resolveKnowledgeVectorApiConfigForUser(
 		userId: number | null | undefined,
 		preset: 'embedding' | 'rerank',
 	): Promise<KnowledgeVectorApiConfig | null> {
+		if (await this.isGlobalVectorBgeOnlyEnabled()) {
+			const providerSnap = await this.getGlobalVectorBgeProviderSnapshot();
+			if (!providerSnap) return null;
+			const baseURL =
+				preset === 'embedding'
+					? providerSnap.baseUrl
+					: providerSnap.rerankBaseUrl;
+			const model =
+				preset === 'embedding'
+					? DEFAULT_KNOWLEDGE_EMBEDDING_MODEL
+					: DEFAULT_KNOWLEDGE_RERANK_MODEL;
+			return {
+				apiKey: providerSnap.apiKey,
+				baseURL,
+				model,
+			};
+		}
+
 		const snap = await this.getActiveVectorSnapshotForUser(userId);
 		if (!snap) return null;
+		const bgeOnly = await this.isVectorBgeOnlyActiveForUser(userId);
 		const baseURL = preset === 'embedding' ? snap.baseUrl : snap.rerankBaseUrl;
-		const model =
-			preset === 'embedding' ? snap.embeddingModel : snap.rerankModel;
+		const model = bgeOnly
+			? preset === 'embedding'
+				? DEFAULT_KNOWLEDGE_EMBEDDING_MODEL
+				: DEFAULT_KNOWLEDGE_RERANK_MODEL
+			: preset === 'embedding'
+				? snap.embeddingModel
+				: snap.rerankModel;
 		return {
 			apiKey: snap.apiKey,
 			baseURL,
@@ -276,6 +359,9 @@ export class LlmConfigService {
 	async resolveKnowledgeCollectionNamesForUser(
 		userId: number | null | undefined,
 	): Promise<string[]> {
+		if (await this.isVectorBgeOnlyActiveForUser(userId)) {
+			return [this.getDefaultKnowledgeCollectionName()];
+		}
 		const snap = await this.getActiveVectorSnapshotForUser(userId);
 		if (!snap) return [];
 		const names = snap.searchProfiles
@@ -288,6 +374,9 @@ export class LlmConfigService {
 	async resolveKnowledgeCollectionNameForUser(
 		userId: number | null | undefined,
 	): Promise<string | null> {
+		if (await this.isVectorBgeOnlyActiveForUser(userId)) {
+			return this.getDefaultKnowledgeCollectionName();
+		}
 		const snap = await this.getActiveVectorSnapshotForUser(userId);
 		if (snap) return snap.collectionName;
 		return null;
@@ -314,6 +403,8 @@ export class LlmConfigService {
 				vectorApiKey: '',
 				vectorApiKeyMask: null,
 				vectorActive: false,
+				vectorBgeOnly: false,
+				vectorBgeOnlyGlobal: false,
 			};
 		}
 		const chatSnap = this.rowToChatSnapshot(row);
@@ -346,13 +437,19 @@ export class LlmConfigService {
 			vectorApiKeyMask:
 				vectorConfigured && vectorSnap ? maskApiKey(vectorSnap.apiKey) : null,
 			vectorActive,
+			vectorBgeOnly: Boolean(row.vectorBgeOnly),
+			vectorBgeOnlyGlobal: false,
 		};
 	}
 
 	async getPublicView(userId?: number): Promise<LlmConfigPublicView> {
 		const uid = this.assertUserId(userId);
 		const row = await this.repo.findOne({ where: { userId: uid } });
-		return this.buildPublicView(row);
+		const vectorBgeOnlyGlobal = await this.isGlobalVectorBgeOnlyEnabled();
+		return {
+			...this.buildPublicView(row),
+			vectorBgeOnlyGlobal,
+		};
 	}
 
 	private assertValidHttpUrl(url: string, label: string): string {
@@ -452,11 +549,19 @@ export class LlmConfigService {
 		userId?: number,
 	): Promise<LlmConfigPublicView> {
 		const uid = this.assertUserId(userId);
+		const isSuperAdmin = await this.userService.userHasSuperAdminRole(uid);
 		let row = await this.repo.findOne({ where: { userId: uid } });
+
+		if (dto.bgeOnly === true && !isSuperAdmin) {
+			throw new BadRequestException('仅超级管理员可设置仅 BGE 向量模式');
+		}
 
 		if (!dto.enabled) {
 			if (row) {
 				row.vectorEnabled = false;
+				if (dto.bgeOnly === false) {
+					row.vectorBgeOnly = false;
+				}
 				await this.repo.save(row);
 				this.commitVectorSnapshot(uid, this.rowToVectorSnapshot(row));
 			} else {
@@ -467,6 +572,12 @@ export class LlmConfigService {
 
 		row = await this.ensureRow(uid);
 
+		const bgeOnly =
+			dto.bgeOnly !== undefined ? dto.bgeOnly : Boolean(row.vectorBgeOnly);
+		if (bgeOnly && !isSuperAdmin) {
+			throw new BadRequestException('仅超级管理员可启用仅 BGE 向量模式');
+		}
+
 		const baseUrl = this.assertValidHttpUrl(
 			dto.baseUrl ?? DEFAULT_SILICONFLOW_EMBEDDING_URL,
 			'Embedding 接口地址',
@@ -475,16 +586,23 @@ export class LlmConfigService {
 			dto.rerankUrl ?? DEFAULT_SILICONFLOW_RERANK_URL,
 			'Rerank 接口地址',
 		);
-		const embeddingModel = (dto.embeddingModel ?? '').trim();
-		const rerankModel = (dto.rerankModel ?? '').trim();
-		const collectionName = this.assertValidCollectionName(
+		let embeddingModel = (dto.embeddingModel ?? '').trim();
+		let rerankModel = (dto.rerankModel ?? '').trim();
+		let collectionName = this.assertValidCollectionName(
 			dto.collectionName ?? '',
 		);
-		if (!embeddingModel) {
-			throw new BadRequestException('请填写向量模型名称');
-		}
-		if (!rerankModel) {
-			throw new BadRequestException('请填写重排模型名称');
+
+		if (bgeOnly) {
+			embeddingModel = DEFAULT_KNOWLEDGE_EMBEDDING_MODEL;
+			rerankModel = DEFAULT_KNOWLEDGE_RERANK_MODEL;
+			collectionName = this.getDefaultKnowledgeCollectionName();
+		} else {
+			if (!embeddingModel) {
+				throw new BadRequestException('请填写向量模型名称');
+			}
+			if (!rerankModel) {
+				throw new BadRequestException('请填写重排模型名称');
+			}
 		}
 
 		const currentProfile = buildVectorSearchProfile({
@@ -496,10 +614,9 @@ export class LlmConfigService {
 			throw new BadRequestException('向量库与模型配置不完整');
 		}
 		const existingProfiles = this.parseProfilesFromRow(row);
-		const mergedProfiles = mergeVectorSearchProfile(
-			existingProfiles,
-			currentProfile,
-		);
+		const mergedProfiles = bgeOnly
+			? [currentProfile]
+			: mergeVectorSearchProfile(existingProfiles, currentProfile);
 
 		const apiKeyInput = dto.apiKey?.trim() ?? '';
 		let vectorApiKeyEnc = row.vectorApiKeyEnc;
@@ -510,6 +627,7 @@ export class LlmConfigService {
 		}
 
 		row.vectorEnabled = true;
+		row.vectorBgeOnly = bgeOnly;
 		row.vectorBaseUrl = baseUrl;
 		row.vectorRerankUrl = rerankUrl;
 		row.vectorEmbeddingModel = embeddingModel;
@@ -570,6 +688,7 @@ export class LlmConfigService {
 			row.vectorCollectionName = '';
 			row.vectorApiKeyEnc = null;
 			row.vectorSearchProfiles = null;
+			row.vectorBgeOnly = false;
 			if (hasChat) {
 				await this.repo.save(row);
 			} else {

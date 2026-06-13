@@ -10,6 +10,12 @@ import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 import {
 	DEFAULT_KNOWLEDGE_EMBEDDING_MODEL,
 	DEFAULT_KNOWLEDGE_RERANK_MODEL,
+	DEFAULT_MEMBER_KNOWLEDGE_EMBEDDING_MODEL,
+	DEFAULT_MEMBER_KNOWLEDGE_RERANK_MODEL,
+	KNOWLEDGE_BGE_EMBEDDING_BATCH_SIZE,
+	KNOWLEDGE_BGE_EMBEDDING_MAX_CHARS,
+	KNOWLEDGE_DEFAULT_CHUNK_OVERLAP_CHARS,
+	KNOWLEDGE_DEFAULT_CHUNK_TARGET_CHARS,
 	KNOWLEDGE_EMBEDDING_BATCH_SIZE,
 	type KnowledgeVectorApiConfig,
 	type KnowledgeVectorTier,
@@ -72,6 +78,29 @@ function sha256(text: string): string {
 	return h.digest('hex');
 }
 
+/** 入库 / Qdrant payload：剔除 NUL、非法 Unicode 与孤立 surrogate（分片截断 emoji 时会产生） */
+function sanitizeKnowledgeStorageText(text: string): string {
+	return String(text ?? '')
+		.replace(/\0/g, '')
+		.replace(/\uFFFE|\uFFFF/g, '')
+		.replace(/[\uD800-\uDFFF]/g, '');
+}
+
+/** 按字符分片时避免在 UTF-16 surrogate 对中间切断 */
+function sliceUtf16Safe(text: string, start: number, end: number): string {
+	let s = Math.max(0, start);
+	let e = Math.min(text.length, end);
+	if (s > 0 && s < text.length) {
+		const lead = text.charCodeAt(s);
+		if (lead >= 0xdc00 && lead <= 0xdfff) s++;
+	}
+	if (e > s && e <= text.length) {
+		const trail = text.charCodeAt(e - 1);
+		if (trail >= 0xd800 && trail <= 0xdbff) e--;
+	}
+	return text.slice(s, e);
+}
+
 /**
  * 知识库 embedding 与 Qdrant 入库服务（一期：同步实现；后续可接 BullMQ 任务化）。
  *
@@ -104,28 +133,49 @@ export class KnowledgeEmbeddingService {
 		authorId?: number | null,
 		tier?: KnowledgeVectorTier,
 	): Promise<KnowledgeVectorApiConfig> {
+		const bgeOnly =
+			await this.llmConfigService.isVectorBgeOnlyActiveForUser(authorId);
+		const t = bgeOnly
+			? 'default'
+			: (tier ?? (await this.resolveTierForAuthor(authorId)));
 		const override =
 			await this.llmConfigService.resolveKnowledgeVectorApiConfigForUser(
 				authorId,
 				'embedding',
 			);
-		if (override) return override;
-		const t = tier ?? (await this.resolveTierForAuthor(authorId));
-		return resolveKnowledgeEmbeddingApiConfig(this.config, t);
+		const config =
+			override ?? resolveKnowledgeEmbeddingApiConfig(this.config, t);
+		if (bgeOnly) {
+			return {
+				...config,
+				model: DEFAULT_KNOWLEDGE_EMBEDDING_MODEL,
+			};
+		}
+		return config;
 	}
 
 	private async resolveRerankApiConfig(
 		authorId?: number | null,
 		tier?: KnowledgeVectorTier,
 	): Promise<KnowledgeVectorApiConfig> {
+		const bgeOnly =
+			await this.llmConfigService.isVectorBgeOnlyActiveForUser(authorId);
+		const t = bgeOnly
+			? 'default'
+			: (tier ?? (await this.resolveTierForAuthor(authorId)));
 		const override =
 			await this.llmConfigService.resolveKnowledgeVectorApiConfigForUser(
 				authorId,
 				'rerank',
 			);
-		if (override) return override;
-		const t = tier ?? (await this.resolveTierForAuthor(authorId));
-		return resolveKnowledgeRerankApiConfig(this.config, t);
+		const config = override ?? resolveKnowledgeRerankApiConfig(this.config, t);
+		if (bgeOnly) {
+			return {
+				...config,
+				model: DEFAULT_KNOWLEDGE_RERANK_MODEL,
+			};
+		}
+		return config;
 	}
 
 	private async resolveCollectionName(
@@ -144,6 +194,9 @@ export class KnowledgeEmbeddingService {
 	private async resolveChunkTierForAuthor(
 		authorId?: number | null,
 	): Promise<KnowledgeVectorTier> {
+		if (await this.llmConfigService.isVectorBgeOnlyActiveForUser(authorId)) {
+			return 'default';
+		}
 		const snap =
 			await this.llmConfigService.getActiveVectorSnapshotForUser(authorId);
 		if (snap) {
@@ -152,19 +205,29 @@ export class KnowledgeEmbeddingService {
 		return this.resolveTierForAuthor(authorId);
 	}
 
-	/** 用户已保存的向量库档位 + 系统默认 bge 库（即使用户未单独保存） */
-	private buildVectorSearchProfilesForRag(
+	/** 用户已保存档位 + 系统默认 bge 库；有效会员额外并入会员默认 Qwen3-4B 库 */
+	private async buildVectorSearchProfilesForRag(
 		vectorSnap: VectorRuntimeSnapshot,
-	): VectorSearchProfile[] {
+		authorId: number,
+	): Promise<VectorSearchProfile[]> {
 		const systemDefaultProfile: VectorSearchProfile = {
 			collectionName: this.qdrant.getKnowledgeCollectionName('default'),
 			embeddingModel: DEFAULT_KNOWLEDGE_EMBEDDING_MODEL,
 			rerankModel: DEFAULT_KNOWLEDGE_RERANK_MODEL,
 		};
-		return mergeVectorSearchProfile(
+		let profiles = mergeVectorSearchProfile(
 			vectorSnap.searchProfiles,
 			systemDefaultProfile,
 		);
+		if (await this.userService.isUserMembershipActive(authorId)) {
+			const memberDefaultProfile: VectorSearchProfile = {
+				collectionName: this.qdrant.getKnowledgeCollectionName('member'),
+				embeddingModel: DEFAULT_MEMBER_KNOWLEDGE_EMBEDDING_MODEL,
+				rerankModel: DEFAULT_MEMBER_KNOWLEDGE_RERANK_MODEL,
+			};
+			profiles = mergeVectorSearchProfile(profiles, memberDefaultProfile);
+		}
+		return profiles;
 	}
 
 	private mergeSearchHits(
@@ -209,13 +272,26 @@ export class KnowledgeEmbeddingService {
 		embedDocuments: (texts: string[]) => Promise<number[][]>;
 	} {
 		const { apiKey, model, baseURL } = apiConfig;
+		const isBgeModel = /bge-large-zh/i.test(model);
+		const embeddingBatchSize = isBgeModel
+			? KNOWLEDGE_BGE_EMBEDDING_BATCH_SIZE
+			: KNOWLEDGE_EMBEDDING_BATCH_SIZE;
+
+		const normalizeEmbeddingInput = (text: string): string => {
+			let t = sanitizeKnowledgeStorageText(text).trim();
+			if (!t) return '';
+			if (isBgeModel && t.length > KNOWLEDGE_BGE_EMBEDDING_MAX_CHARS) {
+				t = t.slice(0, KNOWLEDGE_BGE_EMBEDDING_MAX_CHARS);
+			}
+			return t;
+		};
 
 		// 单次请求：对一批 texts 做向量化（OpenAI 兼容：input 可为 string 或 string[]）
 		const callOnce = async (texts: string[]): Promise<number[][]> => {
-			const sanitized = texts
-				.map((t) => String(t ?? '').trim())
+			const capped = texts
+				.map((t) => normalizeEmbeddingInput(t))
 				.filter((t) => t.length > 0);
-			if (sanitized.length === 0) return [];
+			if (capped.length === 0) return [];
 
 			const maxAttempts = 3;
 			for (let attempt = 1; attempt <= maxAttempts; attempt++) {
@@ -232,7 +308,7 @@ export class KnowledgeEmbeddingService {
 							},
 							body: JSON.stringify({
 								model,
-								input: sanitized.length === 1 ? sanitized[0] : sanitized,
+								input: capped.length === 1 ? capped[0] : capped,
 								encoding_format: 'float',
 							}),
 							signal: controller.signal,
@@ -280,8 +356,19 @@ export class KnowledgeEmbeddingService {
 							json?.error?.message ||
 							rawText ||
 							`HTTP ${resp.status}`;
+						const invalidParam =
+							resp.status === 400 && /invalid|参数/i.test(String(msg));
+						if (invalidParam && capped.length > 1) {
+							const mid = Math.ceil(capped.length / 2);
+							const left = await callOnce(capped.slice(0, mid));
+							const right = await callOnce(capped.slice(mid));
+							return [...left, ...right];
+						}
+						if (invalidParam && capped.length === 1 && capped[0].length > 128) {
+							return await callOnce([capped[0].slice(0, 128)]);
+						}
 						throw new Error(
-							`SiliconFlow 向量请求失败：${msg}；status=${resp.status}；url=${baseURL}；model=${model}；batch=${sanitized.length}；maxLen=${Math.max(...sanitized.map((t) => t.length))}`,
+							`SiliconFlow 向量请求失败：${msg}；status=${resp.status}；url=${baseURL}；model=${model}；batch=${capped.length}；maxLen=${Math.max(...capped.map((t) => t.length))}`,
 						);
 					}
 
@@ -307,6 +394,11 @@ export class KnowledgeEmbeddingService {
 							`SiliconFlow 返回的 embedding 向量解析失败；url=${baseURL}`,
 						);
 					}
+					if (vectors.length !== capped.length) {
+						throw new Error(
+							`SiliconFlow 返回向量条数与请求不一致：got=${vectors.length} expected=${capped.length}；url=${baseURL}；model=${model}`,
+						);
+					}
 					return vectors as number[][];
 				} finally {
 					clearTimeout(timeout);
@@ -315,11 +407,11 @@ export class KnowledgeEmbeddingService {
 			throw new Error('SiliconFlow 向量请求失败：未知错误');
 		};
 
-		// 分批调用：硅基流动单请求 input 数组最多 32 条（见官方文档）
+		// 分批调用：硅基流动单请求 input 数组最多 32 条；bge 使用更小批量
 		const callBatched = async (texts: string[]): Promise<number[][]> => {
 			const out: number[][] = [];
-			for (let i = 0; i < texts.length; i += KNOWLEDGE_EMBEDDING_BATCH_SIZE) {
-				const batch = texts.slice(i, i + KNOWLEDGE_EMBEDDING_BATCH_SIZE);
+			for (let i = 0; i < texts.length; i += embeddingBatchSize) {
+				const batch = texts.slice(i, i + embeddingBatchSize);
 				const vecs = await callOnce(batch);
 				out.push(...vecs);
 			}
@@ -373,15 +465,40 @@ export class KnowledgeEmbeddingService {
 			id: string | number;
 		}>
 	> {
+		if (
+			await this.llmConfigService.isVectorBgeOnlyActiveForUser(input.authorId)
+		) {
+			const collectionName = await this.resolveCollectionName(
+				input.authorId,
+				'default',
+			);
+			const qvec = await this.embedQuery(input.question, {
+				tier: 'default',
+				authorId: input.authorId,
+			});
+			if (!qvec.length) return [];
+			try {
+				return await this.qdrant.searchKnowledgeChunks({
+					vector: qvec,
+					topK: input.topK,
+					authorId: input.authorId,
+					collectionName,
+				});
+			} catch {
+				return [];
+			}
+		}
+
 		const vectorSnap =
 			await this.llmConfigService.getActiveVectorSnapshotForUser(
 				input.authorId,
 			);
 		if (vectorSnap) {
-			const profiles = this.buildVectorSearchProfilesForRag(vectorSnap);
-
-			console.log(profiles, 'profiles');
-
+			const profiles = await this.buildVectorSearchProfilesForRag(
+				vectorSnap,
+				input.authorId,
+			);
+			console.log(profiles, 'profiles-searchKnowledgeChunksForAuthor');
 			const batches = await Promise.all(
 				profiles.map(async (profile) => {
 					const apiConfig: KnowledgeVectorApiConfig = {
@@ -406,15 +523,13 @@ export class KnowledgeEmbeddingService {
 				}),
 			);
 
-			console.log(batches, 'batches');
-
 			return this.mergeSearchHits(batches, input.topK);
 		}
 
 		const tier = await this.resolveTierForAuthor(input.authorId);
 		const tiers: KnowledgeVectorTier[] =
 			tier === 'member' ? ['member', 'default'] : ['default'];
-		console.log(tiers, 'tiers');
+		console.log(tiers, 'tiers-searchKnowledgeChunksForAuthor');
 		const batches = await Promise.all(
 			tiers.map(async (t) => {
 				const qvec = await this.embedQuery(input.question, {
@@ -435,8 +550,6 @@ export class KnowledgeEmbeddingService {
 				}
 			}),
 		);
-
-		console.log(batches, 'batches-searchKnowledgeChunksForAuthor');
 
 		return this.mergeSearchHits(batches, input.topK);
 	}
@@ -639,8 +752,10 @@ export class KnowledgeEmbeddingService {
 		if (!raw) return [];
 
 		// bge 系列单条约 512 tokens；Qwen3-Embedding 支持更长上下文
-		const target = tier === 'member' ? 2000 : 400;
-		const overlap = tier === 'member' ? 128 : 64;
+		const target =
+			tier === 'member' ? 2000 : KNOWLEDGE_DEFAULT_CHUNK_TARGET_CHARS;
+		const overlap =
+			tier === 'member' ? 128 : KNOWLEDGE_DEFAULT_CHUNK_OVERLAP_CHARS;
 		const lines = raw.split(/\r?\n/);
 
 		const blocks: string[] = [];
@@ -657,6 +772,7 @@ export class KnowledgeEmbeddingService {
 
 		const chunks: string[] = [];
 		for (const b of blocks) {
+			if (!b) continue;
 			if (b.length <= target) {
 				chunks.push(b);
 				continue;
@@ -664,7 +780,7 @@ export class KnowledgeEmbeddingService {
 			let i = 0;
 			while (i < b.length) {
 				const end = Math.min(b.length, i + target);
-				const piece = b.slice(i, end).trim();
+				const piece = sliceUtf16Safe(b, i, end).trim();
 				if (piece) chunks.push(piece);
 				i = end - overlap;
 				if (i < 0) i = 0;
@@ -702,8 +818,13 @@ export class KnowledgeEmbeddingService {
 
 		const vectors = await this.embedDocuments(
 			chunks.map((c) => c.text),
-			{ authorId: input.authorId },
+			{ authorId: input.authorId, tier: chunkTier },
 		);
+		if (vectors.length !== chunks.length) {
+			throw new Error(
+				`embedding 向量条数与分片不一致：vectors=${vectors.length} chunks=${chunks.length}`,
+			);
+		}
 		const vectorSize = vectors[0]?.length ?? 0;
 		if (vectorSize <= 0) {
 			throw new Error('embedding 向量维度为 0');
@@ -741,9 +862,9 @@ export class KnowledgeEmbeddingService {
 			const payload: QdrantKnowledgePayload = {
 				knowledgeId: input.knowledgeId,
 				authorId: input.authorId ?? null,
-				title,
+				title: sanitizeKnowledgeStorageText(title),
 				chunkIndex: c.chunkIndex,
-				text: c.text,
+				text: sanitizeKnowledgeStorageText(c.text),
 				contentHash,
 				createdAt,
 				updatedAt,

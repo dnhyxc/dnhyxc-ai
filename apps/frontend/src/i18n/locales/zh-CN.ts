@@ -125,13 +125,13 @@ export const zhCN = {
 	'setting.llm.incompleteHint': '已开启但配置不完整，仍使用环境变量',
 	'setting.llm.vectorTitle': '向量模型配置',
 	'setting.llm.vectorDesc':
-		'用于知识库入库与 RAG 检索的 embedding / rerank 模型；与上方对话大模型配置独立保存。请分别填写 embedding 与 rerank 的完整接口地址。',
-	'setting.llm.vectorEmbeddingUrl': 'Embedding URL',
-	'setting.llm.vectorEmbeddingUrlPlaceholder': '输入 embedding 完整接口地址',
+		'用于知识库入库与 RAG 检索的 embedding / rerank 模型。请分别填写 embedding 与 rerank 的完整接口地址。',
+	'setting.llm.vectorEmbeddingUrl': '向量模型 URL',
+	'setting.llm.vectorEmbeddingUrlPlaceholder': '输入向量模型完整接口地址',
 	'setting.llm.vectorEmbeddingUrlOption.siliconflow':
 		'硅基流动 embeddings（api.siliconflow.cn/v1/embeddings）',
-	'setting.llm.vectorRerankUrl': 'Rerank URL',
-	'setting.llm.vectorRerankUrlPlaceholder': '输入 rerank 完整接口地址',
+	'setting.llm.vectorRerankUrl': '重排模型 URL',
+	'setting.llm.vectorRerankUrlPlaceholder': '输入重排模型完整接口地址',
 	'setting.llm.vectorRerankUrlOption.siliconflow':
 		'硅基流动 rerank（api.siliconflow.cn/v1/rerank）',
 	'setting.llm.vectorEmbeddingModel': '向量模型名称',
@@ -161,6 +161,11 @@ export const zhCN = {
 	'setting.llm.vectorReadyToSaveHint': '可保存向量配置让自定义模型生效',
 	'setting.llm.vectorIncompleteDraftHint': '请补全向量配置各项后再保存',
 	'setting.llm.vectorDefaultHint': '当前使用默认向量模型 {embeddingModel}',
+	'setting.llm.vectorBgeOnlyLabel': '仅使用 BGE 向量库',
+	'setting.llm.vectorBgeOnlyDesc':
+		'开启后入库、RAG 检索与重排固定为 BAAI/bge-large-zh-v1.5、BAAI/bge-reranker-v2-m3、knowledge_chunks_v2，不再查询其它向量库。',
+	'setting.llm.vectorBgeOnlyActiveHint':
+		'仅 BGE 向量库模式生效中（knowledge_chunks_v2）',
 	/** 云端朗读 */
 	'setting.cloudTts.title': '云端语音设置',
 	'setting.cloudTts.desc':

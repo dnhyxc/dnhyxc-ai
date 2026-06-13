@@ -397,6 +397,20 @@ const UPDATE_INFO_SECTIONS_ZH: UpdateInfoSection[] = [
 				description:
 					'在设置中启用自定义向量配置后，知识库 RAG 会并行检索你曾保存过的全部向量库，并始终包含系统默认 bge 库，切换向量模型后旧库中的文章仍可被检索到；新文章仍写入当前选定的向量库。',
 			},
+			{
+				id: 's6-18',
+				title: '知识库全站仅 BGE 与入库稳定性',
+				dateLabel: '2026-06-13',
+				description:
+					'超级管理员可在大模型设置中开启「仅使用 BGE 向量库」，开启后全员知识库向量化与 RAG 统一走系统 BGE 库与模型；修复全站 BGE 下长文（含 emoji）保存向量化失败，以及 BGE 小分片导致单次写入过大的问题。',
+			},
+			{
+				id: 's6-19',
+				title: '会员默认向量库纳入 RAG',
+				dateLabel: '2026-06-13',
+				description:
+					'有效会员在已保存自定义向量后，RAG 除你的向量库与系统 bge 库外，会自动并行检索会员默认 Qwen3 向量库，减少漏检存量。',
+			},
 		],
 	},
 	{
@@ -525,6 +539,13 @@ const UPDATE_INFO_SECTIONS_ZH: UpdateInfoSection[] = [
 				description:
 					'大模型设置页下方新增向量模型区块，可填写 API Key、Embedding / Rerank 接口地址、向量与重排模型名、向量库名；与对话大模型分开保存、分开恢复，互不影响。每次保存会累积记录曾使用过的向量库；页面列出已纳入检索的向量库，RAG 并行检索并始终包含系统默认 bge 库。',
 			},
+			{
+				id: 's9-8',
+				title: '向量设置保存与表单体验',
+				dateLabel: '2026-06-13',
+				description:
+					'修复非超级管理员保存向量配置被拒的问题；接口地址文案改为「向量模型 URL」「重排模型 URL」；大模型与向量区块表单项对齐更一致。',
+			},
 		],
 	},
 	{
@@ -617,7 +638,7 @@ const UPDATE_INFO_SECTIONS_ZH: UpdateInfoSection[] = [
 				title: '自定义向量下的多库 RAG',
 				dateLabel: '2026-06-13',
 				description:
-					'启用向量模型自定义后，RAG 会对保存过的各向量库并行检索，并始终查询系统默认 bge 库；与 §9 向量设置及 §6 向量化入库衔接。',
+					'启用向量模型自定义后，RAG 会对保存过的各向量库并行检索，并始终查询系统默认 bge 库；有效会员还会自动纳入会员默认 Qwen3 向量库；与 §9 向量设置及 §6 向量化入库衔接。',
 			},
 		],
 	},

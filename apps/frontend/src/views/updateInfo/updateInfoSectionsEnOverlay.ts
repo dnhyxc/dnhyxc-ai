@@ -282,6 +282,16 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'With custom vector settings enabled, Knowledge RAG searches all vector collections you have saved in parallel and always includes the system default bge collection, so older articles remain findable after you switch models; new saves still go to the currently selected collection.',
 	},
+	's6-18': {
+		title: 'Site-wide BGE-only mode & indexing stability',
+		description:
+			'Super admins can enable “BGE vector collection only” on the LLM settings page; when on, all users index and retrieve via the system BGE collection and models. Fixes vectorization failures on long articles (including emoji) under site-wide BGE and oversized single upserts from small BGE chunks.',
+	},
+	's6-19': {
+		title: 'Member default vector collection in RAG',
+		description:
+			'Active members who saved custom vector settings also get the member default Qwen3 vector collection merged into parallel RAG search, alongside their collections and the system bge collection, reducing missed hits in older data.',
+	},
 	's7-1': {
 		title: 'IME (input method editor) compatibility',
 		description:
@@ -360,6 +370,11 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'The LLM settings page adds a Vector model block below chat LLM: API Key, Embedding / Rerank endpoint URLs, embedding and rerank model names, and collection name—saved and restored separately from chat LLM. Each save records collections you have used; the page lists collections included in RAG search, which always also queries the system default bge collection.',
 	},
+	's9-8': {
+		title: 'Vector settings save & form UX',
+		description:
+			'Fixes non–super-admin users being blocked when saving vector settings; endpoint labels now read “Vector model URL” and “Rerank model URL”; LLM and vector form rows use more consistent label width and alignment.',
+	},
 	's10-1': {
 		title: 'Image component improvements',
 		description:
@@ -408,7 +423,7 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 	's13-4': {
 		title: 'Multi-collection RAG with custom vectors',
 		description:
-			'When custom vector settings are enabled, RAG searches saved collections in parallel and always queries the system default bge collection; ties to Section 9 vector settings and Section 6 vector indexing.',
+			'When custom vector settings are enabled, RAG searches saved collections in parallel and always queries the system default bge collection; active members also get the member default Qwen3 collection merged in; ties to Section 9 vector settings and Section 6 vector indexing.',
 	},
 	's14-1': {
 		title: 'Sharing & public reading',

@@ -1,12 +1,12 @@
 import { Button } from '@ui/button';
 import { CreatableCombobox } from '@ui/combobox';
-import { Spinner, Toast } from '@ui/index';
+import { Spinner, Switch, Toast } from '@ui/index';
 import { Input } from '@ui/input';
 import { Label } from '@ui/label';
 import { Eye, EyeOff } from 'lucide-react';
 import { observer } from 'mobx-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useI18n, useMembershipActive } from '@/hooks';
+import { useI18n, useIsSuperAdmin, useMembershipActive } from '@/hooks';
 import { cn } from '@/lib/utils';
 import {
 	clearLlmSettings,
@@ -20,6 +20,16 @@ import {
 
 const fieldInputClass =
 	'flex-1 min-w-0 border border-theme/20 bg-transparent shadow-none focus-visible:ring-0 focus-visible:border-theme/40';
+
+/** 大模型 / 向量设置表单项：label 固定宽度、单行、与输入框间距一致 */
+const LLM_FORM_ROW_CLASS =
+	'flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4';
+
+function getLlmFormLabelClass(locale: string) {
+	return locale === 'zh-CN'
+		? 'shrink-0 inline-block whitespace-nowrap sm:w-[6.5em] sm:min-w-[6.5em] text-justify [text-align-last:justify]'
+		: 'shrink-0 inline-block whitespace-nowrap sm:w-32 sm:min-w-32 text-end';
+}
 
 function readEnvTrimmed(key: keyof ImportMetaEnv): string {
 	const raw = import.meta.env[key];
@@ -199,8 +209,13 @@ function resolveApiKeyFields(
 }
 
 const LlmSetting = observer(() => {
-	const { t } = useI18n();
+	const { t, locale } = useI18n();
+	const llmFormLabelClass = useMemo(
+		() => getLlmFormLabelClass(locale),
+		[locale],
+	);
 	const { isMemberActive: isMember } = useMembershipActive();
+	const isSuperAdmin = useIsSuperAdmin();
 	const providerDefaults = useMemo(
 		() => getProviderDefaults(isMember),
 		[isMember],
@@ -208,6 +223,10 @@ const LlmSetting = observer(() => {
 	const [loading, setLoading] = useState(true);
 	const [saving, setSaving] = useState(false);
 	const [view, setView] = useState<LlmSettingsView | null>(null);
+	const showVectorSection = useMemo(
+		() => isSuperAdmin || !view?.vectorBgeOnlyGlobal,
+		[isSuperAdmin, view?.vectorBgeOnlyGlobal],
+	);
 	const [baseUrl, setBaseUrl] = useState(providerDefaults.baseUrl);
 	const [modelName, setModelName] = useState(providerDefaults.modelName);
 	const [apiKey, setApiKey] = useState(providerDefaults.apiKey);
@@ -236,6 +255,7 @@ const LlmSetting = observer(() => {
 	const [savedVectorApiKey, setSavedVectorApiKey] = useState('');
 	const [showVectorApiKey, setShowVectorApiKey] = useState(false);
 	const [vectorSaving, setVectorSaving] = useState(false);
+	const [vectorBgeOnly, setVectorBgeOnly] = useState(false);
 
 	const baseUrlOptions = useMemo(
 		() =>
@@ -426,6 +446,7 @@ const LlmSetting = observer(() => {
 				setSavedVectorApiKey(vectorKey.savedKey);
 				setVectorApiKey(vectorKey.displayKey);
 				setShowVectorApiKey(false);
+				setVectorBgeOnly(Boolean(res.data.vectorBgeOnly));
 			}
 		} finally {
 			setLoading(false);
@@ -551,6 +572,7 @@ const LlmSetting = observer(() => {
 		);
 		const savedKeyDisplay = savedVectorApiKey || readEnvSiliconflowApiKey();
 		return (
+			vectorBgeOnly !== Boolean(view.vectorBgeOnly) ||
 			vectorBaseUrl.trim() !== savedBase.trim() ||
 			vectorRerankUrl.trim() !== savedRerankUrl.trim() ||
 			vectorEmbeddingModel.trim() !== savedEmb.trim() ||
@@ -562,6 +584,7 @@ const LlmSetting = observer(() => {
 		savedVectorApiKey,
 		vectorApiKey,
 		vectorBaseUrl,
+		vectorBgeOnly,
 		vectorCollectionName,
 		vectorDefaults,
 		vectorEmbeddingModel,
@@ -598,6 +621,7 @@ const LlmSetting = observer(() => {
 					vectorDefaults.collectionName,
 				),
 				apiKey: savedVectorApiKey || readEnvSiliconflowApiKey(),
+				bgeOnly: Boolean(view?.vectorBgeOnly),
 			};
 		}
 		return {
@@ -607,12 +631,14 @@ const LlmSetting = observer(() => {
 			rerankModel: vectorDefaults.rerankModel,
 			collectionName: vectorDefaults.collectionName,
 			apiKey: readEnvSiliconflowApiKey(),
+			bgeOnly: false,
 		};
 	}, [savedVectorApiKey, vectorDefaults, view]);
 
 	const hasVectorDraftChanges = useMemo(() => {
 		if (view?.vectorActive) return hasVectorUnsavedChanges;
 		return (
+			vectorBgeOnly !== inactiveVectorBaseline.bgeOnly ||
 			vectorBaseUrl.trim() !== inactiveVectorBaseline.baseUrl.trim() ||
 			vectorRerankUrl.trim() !== inactiveVectorBaseline.rerankUrl.trim() ||
 			vectorEmbeddingModel.trim() !==
@@ -627,6 +653,7 @@ const LlmSetting = observer(() => {
 		inactiveVectorBaseline,
 		vectorApiKey,
 		vectorBaseUrl,
+		vectorBgeOnly,
 		vectorCollectionName,
 		vectorEmbeddingModel,
 		vectorRerankModel,
@@ -676,6 +703,12 @@ const LlmSetting = observer(() => {
 	]);
 
 	const vectorFooterHint = useMemo(() => {
+		if (view?.vectorActive && view.vectorBgeOnly && !hasVectorDraftChanges) {
+			return {
+				tone: 'active' as const,
+				message: t('setting.llm.vectorBgeOnlyActiveHint'),
+			};
+		}
 		if (view?.vectorActive && !hasVectorDraftChanges) {
 			return {
 				tone: 'active' as const,
@@ -780,6 +813,7 @@ const LlmSetting = observer(() => {
 				embeddingModel: vectorEmbeddingModel.trim(),
 				rerankModel: vectorRerankModel.trim(),
 				collectionName: vectorCollectionName.trim(),
+				...(isSuperAdmin ? { bgeOnly: vectorBgeOnly } : {}),
 				...(!keyUnchanged && trimmedKey ? { apiKey: trimmedKey } : {}),
 			});
 			if (res.success && res.data) {
@@ -791,6 +825,7 @@ const LlmSetting = observer(() => {
 				setSavedVectorApiKey(vectorKey.savedKey);
 				setVectorApiKey(vectorKey.displayKey);
 				setShowVectorApiKey(false);
+				setVectorBgeOnly(Boolean(res.data.vectorBgeOnly));
 				Toast({
 					type: 'success',
 					title: t('setting.llm.vectorSaveSuccess'),
@@ -815,6 +850,7 @@ const LlmSetting = observer(() => {
 				setSavedVectorApiKey('');
 				setVectorApiKey(readEnvSiliconflowApiKey());
 				setShowVectorApiKey(false);
+				setVectorBgeOnly(false);
 				Toast({
 					type: 'success',
 					title: t('setting.llm.vectorClearSuccess'),
@@ -850,8 +886,8 @@ const LlmSetting = observer(() => {
 							</div>
 
 							<div className="mt-3.5 flex flex-col gap-4 px-8.5 text-sm">
-								<div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
-									<Label htmlFor="llm-base-url" className="shrink-0 sm:w-15">
+								<div className={LLM_FORM_ROW_CLASS}>
+									<Label htmlFor="llm-base-url" className={llmFormLabelClass}>
 										{t('setting.llm.baseUrl')}
 									</Label>
 									<div className="min-w-0 flex-1">
@@ -868,8 +904,8 @@ const LlmSetting = observer(() => {
 									</div>
 								</div>
 
-								<div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
-									<Label htmlFor="llm-model" className="shrink-0 sm:w-15">
+								<div className={LLM_FORM_ROW_CLASS}>
+									<Label htmlFor="llm-model" className={llmFormLabelClass}>
 										{t('setting.llm.modelName')}
 									</Label>
 									<div className="min-w-0 flex-1">
@@ -886,11 +922,8 @@ const LlmSetting = observer(() => {
 									</div>
 								</div>
 
-								<div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:gap-4">
-									<Label
-										htmlFor="llm-api-key"
-										className="shrink-0 pt-2 sm:w-15"
-									>
+								<div className={LLM_FORM_ROW_CLASS}>
+									<Label htmlFor="llm-api-key" className={llmFormLabelClass}>
 										{t('setting.llm.apiKey')}
 									</Label>
 									<div className="relative min-w-0 flex-1">
@@ -971,254 +1004,303 @@ const LlmSetting = observer(() => {
 							</div>
 						</div>
 
-						<div className="my-3.5 w-full border-b border-theme/20 pb-4.5">
-							<div className="text-md font-bold">
-								{t('setting.llm.vectorTitle')}
-							</div>
-							<div className="my-2 px-8.5 text-xs text-textcolor/55">
-								{t('setting.llm.vectorDesc')}
-							</div>
-
-							<div className="mt-3.5 flex flex-col gap-4 px-8.5 text-sm">
-								<div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
-									<Label htmlFor="vector-base-url" className="shrink-0 sm:w-24">
-										{t('setting.llm.vectorEmbeddingUrl')}
-									</Label>
-									<div className="min-w-0 flex-1">
-										<CreatableCombobox
-											id="vector-base-url"
-											value={vectorBaseUrl}
-											onChange={(next) => {
-												if (next.trim() === vectorBaseUrl.trim()) return;
-												setVectorBaseUrl(next);
-												resetVectorApiKey();
-											}}
-											options={vectorBaseUrlOptions}
-											placeholder={t(
-												'setting.llm.vectorEmbeddingUrlPlaceholder',
-											)}
-											presetsAriaLabel={t('setting.llm.openPresets')}
-											disabled={saving || vectorSaving}
-											inputClassName={fieldInputClass}
-										/>
+						{showVectorSection ? (
+							<>
+								<div className="my-3.5 w-full border-b border-theme/20 pb-4.5">
+									<div className="text-md font-bold">
+										{t('setting.llm.vectorTitle')}
 									</div>
-								</div>
-
-								<div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
-									<Label
-										htmlFor="vector-rerank-url"
-										className="shrink-0 sm:w-24"
-									>
-										{t('setting.llm.vectorRerankUrl')}
-									</Label>
-									<div className="min-w-0 flex-1">
-										<CreatableCombobox
-											id="vector-rerank-url"
-											value={vectorRerankUrl}
-											onChange={(next) => {
-												if (next.trim() === vectorRerankUrl.trim()) return;
-												setVectorRerankUrl(next);
-												resetVectorApiKey();
-											}}
-											options={vectorRerankUrlOptions}
-											placeholder={t('setting.llm.vectorRerankUrlPlaceholder')}
-											presetsAriaLabel={t('setting.llm.openPresets')}
-											disabled={saving || vectorSaving}
-											inputClassName={fieldInputClass}
-										/>
+									<div className="my-2 px-8.5 text-xs text-textcolor/55">
+										{t('setting.llm.vectorDesc')}
 									</div>
-								</div>
 
-								<div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
-									<Label
-										htmlFor="vector-embedding-model"
-										className="shrink-0 sm:w-24"
-									>
-										{t('setting.llm.vectorEmbeddingModel')}
-									</Label>
-									<div className="min-w-0 flex-1">
-										<CreatableCombobox
-											id="vector-embedding-model"
-											value={vectorEmbeddingModel}
-											onChange={onVectorEmbeddingModelChange}
-											options={vectorEmbeddingModelOptions}
-											placeholder={t(
-												'setting.llm.vectorEmbeddingModelPlaceholder',
-											)}
-											presetsAriaLabel={t('setting.llm.openPresets')}
-											disabled={saving || vectorSaving}
-											inputClassName={fieldInputClass}
-										/>
-									</div>
-								</div>
-
-								<div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
-									<Label
-										htmlFor="vector-rerank-model"
-										className="shrink-0 sm:w-24"
-									>
-										{t('setting.llm.vectorRerankModel')}
-									</Label>
-									<div className="min-w-0 flex-1">
-										<CreatableCombobox
-											id="vector-rerank-model"
-											value={vectorRerankModel}
-											onChange={(next) => {
-												if (next.trim() === vectorRerankModel.trim()) return;
-												setVectorRerankModel(next);
-												resetVectorApiKey();
-											}}
-											options={vectorRerankModelOptions}
-											placeholder={t(
-												'setting.llm.vectorRerankModelPlaceholder',
-											)}
-											presetsAriaLabel={t('setting.llm.openPresets')}
-											disabled={saving || vectorSaving}
-											inputClassName={fieldInputClass}
-										/>
-									</div>
-								</div>
-
-								<div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
-									<Label
-										htmlFor="vector-collection"
-										className="shrink-0 sm:w-24"
-									>
-										{t('setting.llm.vectorCollectionName')}
-									</Label>
-									<div className="min-w-0 flex-1">
-										<CreatableCombobox
-											id="vector-collection"
-											value={vectorCollectionName}
-											onChange={(next) => {
-												if (next.trim() === vectorCollectionName.trim()) return;
-												setVectorCollectionName(next);
-												resetVectorApiKey();
-											}}
-											options={vectorCollectionOptions}
-											placeholder={t(
-												'setting.llm.vectorCollectionNamePlaceholder',
-											)}
-											presetsAriaLabel={t('setting.llm.openPresets')}
-											disabled={saving || vectorSaving}
-											inputClassName={fieldInputClass}
-										/>
-									</div>
-								</div>
-
-								<div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:gap-4">
-									<Label
-										htmlFor="vector-api-key"
-										className="shrink-0 pt-2 sm:w-24"
-									>
-										{t('setting.llm.vectorApiKey')}
-									</Label>
-									<div className="relative min-w-0 flex-1">
-										<Input
-											id="vector-api-key"
-											type={showVectorApiKey ? 'text' : 'password'}
-											value={vectorApiKey}
-											onChange={(e) => setVectorApiKey(e.target.value)}
-											placeholder={t('setting.llm.apiKeyPlaceholder')}
-											disabled={saving || vectorSaving}
-											autoComplete="new-password"
-											className={cn(fieldInputClass, 'pr-10')}
-										/>
-										<Button
-											type="button"
-											variant="ghost"
-											size="icon"
-											className="absolute top-1/2 right-1.5 size-6 -translate-y-1/2 text-textcolor/55 hover:text-textcolor"
-											disabled={vectorSaving || saving || !vectorApiKey}
-											aria-label={
-												showVectorApiKey
-													? t('setting.llm.hideApiKey')
-													: t('setting.llm.showApiKey')
-											}
-											onClick={() => setShowVectorApiKey((v) => !v)}
-										>
-											{showVectorApiKey ? (
-												<EyeOff className="size-4" aria-hidden />
-											) : (
-												<Eye className="size-4" aria-hidden />
-											)}
-										</Button>
-									</div>
-								</div>
-
-								{view?.vectorSearchProfiles &&
-									view.vectorSearchProfiles.length > 0 && (
-										<div className="rounded-md border border-theme/15 bg-theme/5 px-3 py-2.5">
-											<div className="text-sm font-medium text-textcolor/80">
-												{t('setting.llm.vectorSearchProfilesTitle')}
+									{isSuperAdmin ? (
+										<div className="mx-8.5 mb-3 mt-4 flex items-start justify-between gap-4 rounded-md border border-theme/15 bg-theme/5 px-3 py-2.5">
+											<div className="min-w-0">
+												<Label
+													htmlFor="vector-bge-only"
+													className="text-sm font-medium text-textcolor/85"
+												>
+													{t('setting.llm.vectorBgeOnlyLabel')}
+												</Label>
+												<p className="mt-1 text-xs text-textcolor/55">
+													{t('setting.llm.vectorBgeOnlyDesc')}
+												</p>
 											</div>
-											<p className="mt-2 text-xs text-textcolor/55">
-												{t('setting.llm.vectorSearchProfilesDesc')}
-											</p>
-											<div className="mt-2 space-y-1.5 text-xs text-textcolor/75">
-												{view.vectorSearchProfiles.map((p) => (
-													<div
-														key={p.collectionName}
-														className="font-mono leading-relaxed"
-													>
-														<span className="text-textcolor/90">
-															{p.collectionName}
-														</span>
-														<span className="text-textcolor/50">
-															{' '}
-															· {p.embeddingModel}
-														</span>
-													</div>
-												))}
+											<Switch
+												id="vector-bge-only"
+												checked={vectorBgeOnly}
+												onCheckedChange={(checked) => {
+													setVectorBgeOnly(checked);
+													if (checked) {
+														setVectorEmbeddingModel(
+															FALLBACK_VECTOR_DEFAULTS.embeddingModel,
+														);
+														setVectorRerankModel(
+															FALLBACK_VECTOR_DEFAULTS.rerankModel,
+														);
+														setVectorCollectionName(
+															FALLBACK_VECTOR_DEFAULTS.collectionName,
+														);
+													}
+												}}
+												disabled={saving || vectorSaving}
+											/>
+										</div>
+									) : null}
+
+									<div className="mt-3.5 flex flex-col gap-4 px-8.5 text-sm">
+										<div className={LLM_FORM_ROW_CLASS}>
+											<Label
+												htmlFor="vector-base-url"
+												className={llmFormLabelClass}
+											>
+												{t('setting.llm.vectorEmbeddingUrl')}
+											</Label>
+											<div className="min-w-0 flex-1">
+												<CreatableCombobox
+													id="vector-base-url"
+													value={vectorBaseUrl}
+													onChange={(next) => {
+														if (next.trim() === vectorBaseUrl.trim()) return;
+														setVectorBaseUrl(next);
+														resetVectorApiKey();
+													}}
+													options={vectorBaseUrlOptions}
+													placeholder={t(
+														'setting.llm.vectorEmbeddingUrlPlaceholder',
+													)}
+													presetsAriaLabel={t('setting.llm.openPresets')}
+													disabled={saving || vectorSaving}
+													inputClassName={fieldInputClass}
+												/>
 											</div>
 										</div>
-									)}
-							</div>
-						</div>
 
-						<div className="mt-3.5 w-full pb-4.5">
-							<div className="flex flex-wrap items-center justify-between gap-3">
-								<p className="min-w-0 flex-1 text-sm">
-									<span
-										className={cn(
-											vectorFooterHint.tone === 'active' && 'text-teal-500',
-											vectorFooterHint.tone === 'pending' &&
-												'text-amber-600 dark:text-amber-400',
-											vectorFooterHint.tone === 'default' &&
-												'text-textcolor/60',
-										)}
-									>
-										{vectorFooterHint.message}
-									</span>
-								</p>
-								<div className="flex shrink-0 flex-wrap items-center">
-									<Button
-										size="sm"
-										variant="outline"
-										className={cn(
-											'min-w-24 cursor-pointer border border-theme/20',
-											vectorSaving && 'disabled:opacity-100',
-										)}
-										disabled={saving || vectorSaving}
-										onClick={() => void onClearVector()}
-									>
-										{t('setting.llm.vectorClear')}
-									</Button>
-									<Button
-										size="sm"
-										className={cn(
-											'ml-3 min-w-24 cursor-pointer',
-											vectorSaving && 'disabled:opacity-100',
-										)}
-										disabled={saving || vectorSaving || !canSubmitVectorSave}
-										onClick={() => void onSaveVector()}
-									>
-										{vectorSaving ? <Spinner className="size-4" /> : null}
-										{t('setting.llm.vectorSave')}
-									</Button>
+										<div className={LLM_FORM_ROW_CLASS}>
+											<Label
+												htmlFor="vector-rerank-url"
+												className={llmFormLabelClass}
+											>
+												{t('setting.llm.vectorRerankUrl')}
+											</Label>
+											<div className="min-w-0 flex-1">
+												<CreatableCombobox
+													id="vector-rerank-url"
+													value={vectorRerankUrl}
+													onChange={(next) => {
+														if (next.trim() === vectorRerankUrl.trim()) return;
+														setVectorRerankUrl(next);
+														resetVectorApiKey();
+													}}
+													options={vectorRerankUrlOptions}
+													placeholder={t(
+														'setting.llm.vectorRerankUrlPlaceholder',
+													)}
+													presetsAriaLabel={t('setting.llm.openPresets')}
+													disabled={saving || vectorSaving}
+													inputClassName={fieldInputClass}
+												/>
+											</div>
+										</div>
+
+										<div className={LLM_FORM_ROW_CLASS}>
+											<Label
+												htmlFor="vector-embedding-model"
+												className={llmFormLabelClass}
+											>
+												{t('setting.llm.vectorEmbeddingModel')}
+											</Label>
+											<div className="min-w-0 flex-1">
+												<CreatableCombobox
+													id="vector-embedding-model"
+													value={vectorEmbeddingModel}
+													onChange={onVectorEmbeddingModelChange}
+													options={vectorEmbeddingModelOptions}
+													placeholder={t(
+														'setting.llm.vectorEmbeddingModelPlaceholder',
+													)}
+													presetsAriaLabel={t('setting.llm.openPresets')}
+													disabled={saving || vectorSaving || vectorBgeOnly}
+													inputClassName={fieldInputClass}
+												/>
+											</div>
+										</div>
+
+										<div className={LLM_FORM_ROW_CLASS}>
+											<Label
+												htmlFor="vector-rerank-model"
+												className={llmFormLabelClass}
+											>
+												{t('setting.llm.vectorRerankModel')}
+											</Label>
+											<div className="min-w-0 flex-1">
+												<CreatableCombobox
+													id="vector-rerank-model"
+													value={vectorRerankModel}
+													onChange={(next) => {
+														if (next.trim() === vectorRerankModel.trim())
+															return;
+														setVectorRerankModel(next);
+														resetVectorApiKey();
+													}}
+													options={vectorRerankModelOptions}
+													placeholder={t(
+														'setting.llm.vectorRerankModelPlaceholder',
+													)}
+													presetsAriaLabel={t('setting.llm.openPresets')}
+													disabled={saving || vectorSaving || vectorBgeOnly}
+													inputClassName={fieldInputClass}
+												/>
+											</div>
+										</div>
+
+										<div className={LLM_FORM_ROW_CLASS}>
+											<Label
+												htmlFor="vector-collection"
+												className={llmFormLabelClass}
+											>
+												{t('setting.llm.vectorCollectionName')}
+											</Label>
+											<div className="min-w-0 flex-1">
+												<CreatableCombobox
+													id="vector-collection"
+													value={vectorCollectionName}
+													onChange={(next) => {
+														if (next.trim() === vectorCollectionName.trim())
+															return;
+														setVectorCollectionName(next);
+														resetVectorApiKey();
+													}}
+													options={vectorCollectionOptions}
+													placeholder={t(
+														'setting.llm.vectorCollectionNamePlaceholder',
+													)}
+													presetsAriaLabel={t('setting.llm.openPresets')}
+													disabled={saving || vectorSaving || vectorBgeOnly}
+													inputClassName={fieldInputClass}
+												/>
+											</div>
+										</div>
+
+										<div className={LLM_FORM_ROW_CLASS}>
+											<Label
+												htmlFor="vector-api-key"
+												className={llmFormLabelClass}
+											>
+												{t('setting.llm.vectorApiKey')}
+											</Label>
+											<div className="relative min-w-0 flex-1">
+												<Input
+													id="vector-api-key"
+													type={showVectorApiKey ? 'text' : 'password'}
+													value={vectorApiKey}
+													onChange={(e) => setVectorApiKey(e.target.value)}
+													placeholder={t('setting.llm.apiKeyPlaceholder')}
+													disabled={saving || vectorSaving}
+													autoComplete="new-password"
+													className={cn(fieldInputClass, 'pr-10')}
+												/>
+												<Button
+													type="button"
+													variant="ghost"
+													size="icon"
+													className="absolute top-1/2 right-1.5 size-6 -translate-y-1/2 text-textcolor/55 hover:text-textcolor"
+													disabled={vectorSaving || saving || !vectorApiKey}
+													aria-label={
+														showVectorApiKey
+															? t('setting.llm.hideApiKey')
+															: t('setting.llm.showApiKey')
+													}
+													onClick={() => setShowVectorApiKey((v) => !v)}
+												>
+													{showVectorApiKey ? (
+														<EyeOff className="size-4" aria-hidden />
+													) : (
+														<Eye className="size-4" aria-hidden />
+													)}
+												</Button>
+											</div>
+										</div>
+
+										{!vectorBgeOnly &&
+											view?.vectorSearchProfiles &&
+											view.vectorSearchProfiles.length > 0 && (
+												<div className="rounded-md border border-theme/15 bg-theme/5 px-3 py-2.5">
+													<div className="text-sm font-medium text-textcolor/80">
+														{t('setting.llm.vectorSearchProfilesTitle')}
+													</div>
+													<p className="mt-2 text-xs text-textcolor/55">
+														{t('setting.llm.vectorSearchProfilesDesc')}
+													</p>
+													<div className="mt-2 space-y-1.5 text-xs text-textcolor/75">
+														{view.vectorSearchProfiles.map((p) => (
+															<div
+																key={p.collectionName}
+																className="font-mono leading-relaxed"
+															>
+																<span className="text-textcolor/90">
+																	{p.collectionName}
+																</span>
+																<span className="text-textcolor/50">
+																	{' '}
+																	· {p.embeddingModel}
+																</span>
+															</div>
+														))}
+													</div>
+												</div>
+											)}
+									</div>
 								</div>
-							</div>
-						</div>
+
+								<div className="mt-3.5 w-full pb-4.5">
+									<div className="flex flex-wrap items-center justify-between gap-3">
+										<p className="min-w-0 flex-1 text-sm">
+											<span
+												className={cn(
+													vectorFooterHint.tone === 'active' && 'text-teal-500',
+													vectorFooterHint.tone === 'pending' &&
+														'text-amber-600 dark:text-amber-400',
+													vectorFooterHint.tone === 'default' &&
+														'text-textcolor/60',
+												)}
+											>
+												{vectorFooterHint.message}
+											</span>
+										</p>
+										<div className="flex shrink-0 flex-wrap items-center">
+											<Button
+												size="sm"
+												variant="outline"
+												className={cn(
+													'min-w-24 cursor-pointer border border-theme/20',
+													vectorSaving && 'disabled:opacity-100',
+												)}
+												disabled={saving || vectorSaving}
+												onClick={() => void onClearVector()}
+											>
+												{t('setting.llm.vectorClear')}
+											</Button>
+											<Button
+												size="sm"
+												className={cn(
+													'ml-3 min-w-24 cursor-pointer',
+													vectorSaving && 'disabled:opacity-100',
+												)}
+												disabled={
+													saving || vectorSaving || !canSubmitVectorSave
+												}
+												onClick={() => void onSaveVector()}
+											>
+												{vectorSaving ? <Spinner className="size-4" /> : null}
+												{t('setting.llm.vectorSave')}
+											</Button>
+										</div>
+									</div>
+								</div>
+							</>
+						) : null}
 					</>
 				)}
 			</div>

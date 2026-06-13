@@ -132,13 +132,13 @@ export const enUS = {
 		'Enabled but incomplete; still using environment variables',
 	'setting.llm.vectorTitle': 'Vector model configuration',
 	'setting.llm.vectorDesc':
-		'Embedding and rerank models for Knowledge indexing and RAG. Saved separately from chat LLM settings above. Provide full URLs for both embeddings and rerank endpoints.',
-	'setting.llm.vectorEmbeddingUrl': 'Embedding URL',
-	'setting.llm.vectorEmbeddingUrlPlaceholder': 'Full embeddings endpoint URL',
+		'Embedding and rerank models for Knowledge indexing and RAG. Provide full URLs for both embeddings and rerank endpoints.',
+	'setting.llm.vectorEmbeddingUrl': 'Vector model URL',
+	'setting.llm.vectorEmbeddingUrlPlaceholder': 'Full vector model endpoint URL',
 	'setting.llm.vectorEmbeddingUrlOption.siliconflow':
 		'SiliconFlow embeddings (api.siliconflow.cn/v1/embeddings)',
-	'setting.llm.vectorRerankUrl': 'Rerank URL',
-	'setting.llm.vectorRerankUrlPlaceholder': 'Full rerank endpoint URL',
+	'setting.llm.vectorRerankUrl': 'Rerank model URL',
+	'setting.llm.vectorRerankUrlPlaceholder': 'Full rerank model endpoint URL',
 	'setting.llm.vectorRerankUrlOption.siliconflow':
 		'SiliconFlow rerank (api.siliconflow.cn/v1/rerank)',
 	'setting.llm.vectorEmbeddingModel': 'Embedding model',
@@ -172,6 +172,11 @@ export const enUS = {
 		'Complete all vector fields before saving',
 	'setting.llm.vectorDefaultHint':
 		'Using default vector model {embeddingModel}',
+	'setting.llm.vectorBgeOnlyLabel': 'BGE vector collection only',
+	'setting.llm.vectorBgeOnlyDesc':
+		'When enabled, indexing, RAG retrieval, and rerank use only BAAI/bge-large-zh-v1.5, BAAI/bge-reranker-v2-m3, and knowledge_chunks_v2—no other collections are queried.',
+	'setting.llm.vectorBgeOnlyActiveHint':
+		'BGE-only vector mode active (knowledge_chunks_v2)',
 	'setting.cloudTts.title': 'Cloud voice settings',
 	'setting.cloudTts.desc':
 		'When on, speaker buttons use cloud synthesis with the parameters below; when off, playback uses local Web Speech (mutually exclusive with Local voice settings above). Restore default parameters keeps cloud routing but uses server defaults.',

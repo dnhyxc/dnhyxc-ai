@@ -28,6 +28,9 @@ export type QdrantKnowledgePayload = {
 	updatedAt: string;
 };
 
+/** 单次 upsert 点数上限（避免请求体超过 Qdrant/网关约 1.2MB 限制；BGE 小分片长文易触发） */
+const KNOWLEDGE_QDRANT_UPSERT_BATCH_SIZE = 64;
+
 // 声明可注入服务：让 NestJS 能通过 DI（依赖注入）创建并管理该类实例
 @Injectable()
 // Qdrant 访问层：封装 collection 名、建表、写入、检索等操作
@@ -115,7 +118,16 @@ export class QdrantService {
 	}): Promise<void> {
 		const name =
 			input.collectionName ?? this.getKnowledgeCollectionName('default');
-		await this.client.upsert(name, { points: input.points });
+		const points = input.points;
+		if (points.length === 0) return;
+		for (
+			let i = 0;
+			i < points.length;
+			i += KNOWLEDGE_QDRANT_UPSERT_BATCH_SIZE
+		) {
+			const batch = points.slice(i, i + KNOWLEDGE_QDRANT_UPSERT_BATCH_SIZE);
+			await this.client.upsert(name, { points: batch });
+		}
 	}
 
 	// 向量检索：根据 query 向量召回最相似的 topK 个分片

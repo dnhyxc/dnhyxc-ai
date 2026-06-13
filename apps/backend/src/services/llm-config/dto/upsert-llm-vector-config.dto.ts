@@ -40,4 +40,9 @@ export class UpsertLlmVectorConfigDto {
 	@IsString()
 	@MaxLength(512)
 	apiKey?: string;
+
+	/** 仅超级管理员可设置：强制 BGE 单库单向量操作 */
+	@IsOptional()
+	@IsBoolean()
+	bgeOnly?: boolean;
 }
