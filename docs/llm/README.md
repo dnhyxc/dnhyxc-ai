@@ -11,7 +11,8 @@
 | [agent-create-llm-unify.md](./agent-create-llm-unify.md) | 英语学习 Agent 接 `createLlm` |
 | [llm-setting-ui-presets.md](./llm-setting-ui-presets.md) | 设置页预设联动、Combobox、API Key 前端 env 默认 |
 | [llm-setting-save-flow.md](./llm-setting-save-flow.md) | **保存即启用**、底部四态提示、恢复默认 |
+| [knowledge-vector-create-llm.md](../knowledge/knowledge-vector-create-llm.md) | 知识库向量 embedding/rerank 凭证（`create-llm` 侧） |
 
-知识库向量与 RAG 见 [../knowledge/README.md](../knowledge/README.md)。
+知识库向量与 RAG 全链路见 [../knowledge/README.md](../knowledge/README.md)。
 
 上级：[../README.md](../README.md)

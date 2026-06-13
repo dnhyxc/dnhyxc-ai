@@ -224,6 +224,7 @@ SILICONFLOW_MODEL_NAME=Pro/zai-org/GLM-5.1
 | 说明 | 路径 |
 |------|------|
 | 工厂实现 | `apps/backend/src/utils/create-llm.ts` |
+| 知识库向量 embedding/rerank 凭证 | [../knowledge/knowledge-vector-create-llm.md](../knowledge/knowledge-vector-create-llm.md) |
 | Agent ReAct 接入 | [agent-create-llm-unify.md](./agent-create-llm-unify.md) |
 | 配置枚举 | `apps/backend/src/enum/config.enum.ts` |
 | 硅基接入总览 | [siliconflow-chat-unification.md](./siliconflow-chat-unification.md) |

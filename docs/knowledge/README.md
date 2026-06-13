@@ -11,6 +11,7 @@
 | **[knowledge-assistant-complete.md](./knowledge-assistant-complete.md)** | 右侧 Assistant **总览**（状态机、SSE、持久化、UI） |
 | [siliconflow-chat-unification.md](../llm/siliconflow-chat-unification.md) | 助手 / RAG / 主 Chat **LLM 接入**（硅基 + ChatOpenAI） |
 | [knowledge-rag-implementation-backend.md](./knowledge-rag-implementation-backend.md) | RAG 后端实现 |
+| [knowledge-vector-create-llm.md](./knowledge-vector-create-llm.md) | **向量 embedding/rerank 凭证**收敛至 `create-llm` |
 | [knowledge-rag-qa-assistant-frontend.md](./knowledge-rag-qa-assistant-frontend.md) | RAG 问答前端 |
 | [rag-retrieval-nestjs-react-qdrant.md](./rag-retrieval-nestjs-react-qdrant.md) | Qdrant 检索链路 |
 

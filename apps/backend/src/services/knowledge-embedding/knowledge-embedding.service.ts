@@ -7,7 +7,11 @@ import { ConfigService } from '@nestjs/config';
 // 引入 Winston 注入 token
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
 // 引入本项目配置枚举
-import { KnowledgeQaEnum, ModelEnum } from '../../enum/config.enum';
+import {
+	KNOWLEDGE_EMBEDDING_BATCH_SIZE,
+	resolveKnowledgeEmbeddingApiConfig,
+	resolveKnowledgeRerankApiConfig,
+} from '../../utils/create-llm';
 // 引入 Qdrant 服务与 payload 类型
 import {
 	type QdrantKnowledgePayload,
@@ -60,7 +64,7 @@ function sha256(text: string): string {
 /**
  * 知识库 embedding 与 Qdrant 入库服务（一期：同步实现；后续可接 BullMQ 任务化）。
  *
- * 向量与重排：经硅基流动（SiliconFlow）OpenAI 兼容接口 `/v1/embeddings`、`/v1/rerank` 接入。
+ * 向量与重排：凭证由 `create-llm` 的 `resolveKnowledgeEmbeddingApiConfig` / `resolveKnowledgeRerankApiConfig` 解析（SILICONFLOW_*）。
  */
 @Injectable()
 export class KnowledgeEmbeddingService {
@@ -83,25 +87,9 @@ export class KnowledgeEmbeddingService {
 		// 批量 document 向量
 		embedDocuments: (texts: string[]) => Promise<number[][]>;
 	} {
-		// 读取 API Key：优先 SILICONFLOW_API_KEY
-		const apiKey = this.config.get<string>(ModelEnum.SILICONFLOW_API_KEY);
-		('');
-		const baseURL = (
-			this.config.get<string>(ModelEnum.SILICONFLOW_BASE_URL) ||
-			'https://api.siliconflow.cn/v1'
-		).replace(/\/$/, '');
-		if (!apiKey) {
-			throw new Error(
-				'缺少 SILICONFLOW_API_KEY（或兼容项 DASHSCOPE_API_KEY / QWEN_API_KEY），无法进行知识库向量入库',
-			);
-		}
-		const model =
-			this.config.get<string>(KnowledgeQaEnum.KNOWLEDGE_EMBEDDING_MODEL) ||
-			'BAAI/bge-large-zh-v1.5';
-
-		const endpoint = `${baseURL}/embeddings`;
-
-		console.log({ apiKey, baseURL, model, endpoint }, 'createEmbeddingsClient');
+		const { apiKey, model, endpoint } = resolveKnowledgeEmbeddingApiConfig(
+			this.config,
+		);
 
 		// 单次请求：对一批 texts 做向量化（OpenAI 兼容：input 可为 string 或 string[]）
 		const callOnce = async (texts: string[]): Promise<number[][]> => {
@@ -206,9 +194,8 @@ export class KnowledgeEmbeddingService {
 		// 分批调用：硅基流动单请求 input 数组最多 32 条（见官方文档）
 		const callBatched = async (texts: string[]): Promise<number[][]> => {
 			const out: number[][] = [];
-			const batchSize = 32;
-			for (let i = 0; i < texts.length; i += batchSize) {
-				const batch = texts.slice(i, i + batchSize);
+			for (let i = 0; i < texts.length; i += KNOWLEDGE_EMBEDDING_BATCH_SIZE) {
+				const batch = texts.slice(i, i + KNOWLEDGE_EMBEDDING_BATCH_SIZE);
 				const vecs = await callOnce(batch);
 				out.push(...vecs);
 			}
@@ -295,25 +282,9 @@ export class KnowledgeEmbeddingService {
 		documents: string[];
 		topN?: number;
 	}): Promise<KnowledgeRerankResult[]> {
-		const apiKey = this.config.get<string>(ModelEnum.SILICONFLOW_API_KEY) || '';
-		if (!apiKey) {
-			throw new Error(
-				'缺少 SILICONFLOW_API_KEY（或兼容项 DASHSCOPE_API_KEY / QWEN_API_KEY），无法进行 rerank',
-			);
-		}
-
-		const model =
-			this.config.get<string>(KnowledgeQaEnum.KNOWLEDGE_RERANK_MODEL) ||
-			'BAAI/bge-reranker-v2-m3';
-
-		const baseURL = (
-			this.config.get<string>(ModelEnum.SILICONFLOW_BASE_URL) ||
-			'https://api.siliconflow.cn/v1'
-		).replace(/\/$/, '');
-
-		const endpoint = `${baseURL}/rerank`;
-
-		console.log({ apiKey, baseURL, model, endpoint }, 'rerank');
+		const { apiKey, model, endpoint } = resolveKnowledgeRerankApiConfig(
+			this.config,
+		);
 
 		const query = (input.query ?? '').trim();
 		const documents = (input.documents ?? []).map((d) => String(d ?? ''));
