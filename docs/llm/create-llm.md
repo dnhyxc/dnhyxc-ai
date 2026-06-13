@@ -58,14 +58,14 @@ const llm = createLlm(this.configService, {
 
 | preset | 典型调用方 | API Key 回退（顺序） | Base URL 回退 | 模型名回退（顺序） | 缺 Key 时 |
 |--------|------------|----------------------|---------------|-------------------|-----------|
-| `chat` | `ChatService` | `SILICONFLOW_API_KEY` → `DEEPSEEK_API_KEY` | `SILICONFLOW_BASE_URL` → `DEEPSEEK_BASE_URL` | `SILICONFLOW_MODEL_NAME` → `DEEPSEEK_MODEL_NAME` → 默认 GLM-4.7 | `HttpException` 503 |
+| `chat` | `ChatService` | `SILICONFLOW_API_KEY` → `DEEPSEEK_API_KEY` | `SILICONFLOW_BASE_URL` → `DEEPSEEK_BASE_URL` | `SILICONFLOW_MODEL_NAME` → `DEEPSEEK_MODEL_NAME` → 默认 GLM-5.1 | `HttpException` 503 |
 | `assistant` | `AssistantService` | 硅基 → DeepSeek → DashScope → Qwen | 硅基 → DeepSeek | `getAssistantSiliconFlowModelName`（硅基模型名 → DeepSeek 模型名） | 503 |
 | `knowledgeQa` | `KnowledgeQaService` | 硅基 → DashScope → Qwen | 仅硅基 | `SILICONFLOW_MODEL_NAME` → `DEEPSEEK_MODEL_NAME` → `KNOWLEDGE_QA_MODEL` | 普通 `Error` |
-| `englishLearning` | 单词包 Agent / JSON 子模型 | 硅基 → DeepSeek → DashScope | 硅基 → DeepSeek | `SILICONFLOW_MODEL_NAME` → `DEEPSEEK_MODEL_NAME` → 默认 GLM-4.7 | 503 |
+| `englishLearning` | 单词包 Agent / JSON 子模型 | 硅基 → DeepSeek → DashScope | 硅基 → DeepSeek | `SILICONFLOW_MODEL_NAME` → `DEEPSEEK_MODEL_NAME` → 默认 GLM-5.1 | 503 |
 
 **说明**：`AgentService`（`/agent` 流式对话）与主站 Chat **共用** `preset: 'chat'` 的凭证与模型名解析，不单独占 preset；详见 [agent-create-llm-unify.md](./agent-create-llm-unify.md)。
 
-**重要**：当实际请求发往 **硅基流动** `baseURL` 时，`modelName` 必须是硅基支持的 ID（如 `Pro/zai-org/GLM-4.7`）。若仅配置了 `DEEPSEEK_MODEL_NAME=deepseek-chat` 而未配置 `SILICONFLOW_MODEL_NAME`，会触发 **400**（见 §5 排查）。
+**重要**：当实际请求发往 **硅基流动** `baseURL` 时，`modelName` 必须是硅基支持的 ID（如 `Pro/zai-org/GLM-5.1`）。若仅配置了 `DEEPSEEK_MODEL_NAME=deepseek-chat` 而未配置 `SILICONFLOW_MODEL_NAME`，会触发 **400**（见 §5 排查）。
 
 ### 3.3 `maxTokensPolicy`
 
@@ -195,7 +195,7 @@ const llm = createLlm(this.configService, {
 ```bash
 SILICONFLOW_API_KEY=sk-...
 SILICONFLOW_BASE_URL=https://api.siliconflow.cn/v1
-SILICONFLOW_MODEL_NAME=Pro/zai-org/GLM-4.7
+SILICONFLOW_MODEL_NAME=Pro/zai-org/GLM-5.1
 ```
 
 可选：`KNOWLEDGE_QA_MODEL` 覆盖 RAG 问答模型名。

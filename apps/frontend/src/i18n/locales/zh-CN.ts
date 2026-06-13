@@ -105,7 +105,7 @@ export const zhCN = {
 	'setting.llm.modelName': '模型名称',
 	'setting.llm.modelNamePlaceholder': '输入模型名称',
 	'setting.llm.modelOption.glmFlash': 'glm-4.7-flash',
-	'setting.llm.modelOption.glm47': 'Pro/zai-org/GLM-4.7',
+	'setting.llm.modelOption.glm51': 'Pro/zai-org/GLM-5.1',
 	'setting.llm.modelOption.deepseekChat': 'deepseek-chat',
 	'setting.llm.apiKey': 'API Key',
 	'setting.llm.apiKeyPlaceholder': '请输入 API Key',

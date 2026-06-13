@@ -71,7 +71,7 @@ export enum ModelEnum {
 	/** @deprecated */
 	DEEPSEEK_BASE_URL = 'DEEPSEEK_BASE_URL',
 	/**
-	 * 主站 Chat 流式对话：硅基流动 Chat 模型名，默认 Pro/zai-org/GLM-4.7。
+	 * 主站 Chat 流式对话：硅基流动 Chat 模型名，默认 Pro/zai-org/GLM-5.1。
 	 * API Key / Base URL 沿用 KnowledgeQaEnum.SILICONFLOW_*。
 	 */
 	SILICONFLOW_MODEL_NAME = 'SILICONFLOW_MODEL_NAME',
@@ -80,7 +80,7 @@ export enum ModelEnum {
 	/** 硅基流动 API 根路径，默认 https://api.siliconflow.cn/v1 */
 	SILICONFLOW_BASE_URL = 'SILICONFLOW_BASE_URL',
 	/**
-	 * 英语学习词句拉取：硅基流动 Chat 模型名（`/v1/chat/completions`），默认 Pro/zai-org/GLM-4.7。
+	 * 英语学习词句拉取：硅基流动 Chat 模型名（`/v1/chat/completions`），默认 Pro/zai-org/GLM-5.1。
 	 * API Key 与 Base URL 沿用 KnowledgeQaEnum.SILICONFLOW_*（与知识库 embedding 同源）。
 	 * @see https://docs.siliconflow.cn/cn/api-reference/chat-completions/chat-completions
 	 */
@@ -131,7 +131,7 @@ export enum KnowledgeQaEnum {
 	 */
 	KNOWLEDGE_EMBEDDING_MODEL = 'KNOWLEDGE_EMBEDDING_MODEL',
 	/**
-	 * 知识库 RAG 问答 Chat 模型名（硅基流动 `/v1/chat/completions`），默认 Pro/zai-org/GLM-4.7。
+	 * 知识库 RAG 问答 Chat 模型名（硅基流动 `/v1/chat/completions`），默认 Pro/zai-org/GLM-5.1。
 	 * API Key / Base URL 沿用 SILICONFLOW_*。
 	 */
 	KNOWLEDGE_QA_MODEL = 'KNOWLEDGE_QA_MODEL',

@@ -162,7 +162,7 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 	's4-9': {
 		title: 'Unified chat model backend',
 		description:
-			'Main Chat now uses the SiliconFlow OpenAI-compatible API by default (GLM-4.7 family). Streaming, stop, continue, and branching behave the same on your side.',
+			'Main Chat now uses the SiliconFlow OpenAI-compatible API by default (GLM-5.1 family). Streaming, stop, continue, and branching behave the same on your side.',
 	},
 	's4-10': {
 		title: 'Chat attachment image preview fix',

@@ -18,9 +18,9 @@
 ### 1.2 目标
 
 - **可输入 + 预设**：左侧直接编辑，右侧按钮展开与输入框**同宽**的预设列表。
-- **服务商联动**：选中硅基 URL 时自动配对 GLM-4.7；选中 DeepSeek URL 时自动配对 `deepseek-chat`（反向选模型亦同步 URL）。
+- **服务商联动**：选中硅基 URL 时自动配对 GLM-5.1；选中 DeepSeek URL 时自动配对 `deepseek-chat`（反向选模型亦同步 URL）。
 - **API Key 默认**：服务端无已保存 Key 时，回显构建时注入的 `VITE_SILICONFLOW_API_KEY`（仅开发/内网默认，会打进前端包）。
-- **生效文案**：底部提示展示当前模型名，如「Pro/zai-org/GLM-4.7 模型配置生效中」。
+- **生效文案**：底部提示展示当前模型名，如「Pro/zai-org/GLM-5.1 模型配置生效中」。
 
 ---
 
@@ -79,9 +79,9 @@
 const LLM_PROVIDER_PRESETS = [
 	{
 		baseUrl: 'https://api.siliconflow.cn/v1',
-		modelName: 'Pro/zai-org/GLM-4.7',
+		modelName: 'Pro/zai-org/GLM-5.1',
 		baseUrlLabelKey: 'setting.llm.baseUrlOption.siliconflow' as const,
-		modelLabelKey: 'setting.llm.modelOption.glm47' as const,
+		modelLabelKey: 'setting.llm.modelOption.glm51' as const,
 	},
 	{
 		baseUrl: 'https://api.deepseek.com',

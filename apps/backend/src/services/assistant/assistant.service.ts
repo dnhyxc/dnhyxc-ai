@@ -43,8 +43,8 @@ import { ImportAssistantTranscriptDto } from './dto/import-assistant-transcript.
 
 const DEFAULT_SYSTEM_PROMPT = `你是一个通用智能助手。请做到：准确、有条理、礼貌；不确定时请说明不确定；不要编造事实。`;
 
-/** 智谱文档：GLM-4.7 上下文 200K（可被 ASSISTANT_MODEL_MAX_INPUT_TOKENS 覆盖） */
-const GLM_47_DEFAULT_MAX_INPUT_TOKENS = 200_000;
+/** 智谱 GLM-4.7 / GLM-5.1 文档：上下文约 200K（可被 ASSISTANT_MODEL_MAX_INPUT_TOKENS 覆盖） */
+const GLM_DEFAULT_MAX_INPUT_TOKENS = 200_000;
 
 /** 除 system 正文外，为 role/JSON 等预留的 token（相对 200K 很小，仅防越界） */
 const MESSAGE_FRAMING_OVERHEAD = 256;
@@ -269,8 +269,13 @@ export class AssistantService {
 		}
 
 		const name = modelName.toLowerCase();
-		if (name.includes('glm-4.7') || name.includes('glm-4_7')) {
-			return GLM_47_DEFAULT_MAX_INPUT_TOKENS;
+		if (
+			name.includes('glm-4.7') ||
+			name.includes('glm-4_7') ||
+			name.includes('glm-5.1') ||
+			name.includes('glm-5_1')
+		) {
+			return GLM_DEFAULT_MAX_INPUT_TOKENS;
 		}
 		if (name.includes('glm-4')) {
 			return 128_000;

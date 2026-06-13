@@ -13,7 +13,7 @@ export const DEFAULT_GLM_MODEL_NAME = 'glm-4.7-flash';
 export const DEFAULT_SILICONFLOW_BASE_URL = 'https://api.siliconflow.cn/v1';
 
 /** 各模块未配置 SILICONFLOW_MODEL_NAME 时的默认值（有效会员） */
-export const DEFAULT_SILICONFLOW_MODEL_NAME = 'Pro/zai-org/GLM-4.7';
+export const DEFAULT_SILICONFLOW_MODEL_NAME = 'Pro/zai-org/GLM-5.1';
 
 /** 凭证解析预设（与业务模块一一对应） */
 export type SiliconFlowLlmPreset =

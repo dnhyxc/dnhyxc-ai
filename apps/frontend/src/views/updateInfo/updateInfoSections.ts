@@ -217,7 +217,7 @@ const UPDATE_INFO_SECTIONS_ZH: UpdateInfoSection[] = [
 				title: '对话模型接入统一',
 				dateLabel: '2026-05-21',
 				description:
-					'主站智能对话的后端生成链路统一为硅基流动 OpenAI 兼容接口，默认使用 GLM-4.7 系列模型；流式输出、停止生成、续写与分支等交互方式不变。',
+					'主站智能对话的后端生成链路统一为硅基流动 OpenAI 兼容接口，默认使用 GLM-5.1 系列模型；流式输出、停止生成、续写与分支等交互方式不变。',
 			},
 			{
 				id: 's4-10',

@@ -13,7 +13,7 @@
 ### 1.2 目标
 
 - 上述 **Chat completion** 类能力统一走 **硅基流动（SiliconFlow）** OpenAI 兼容端点 + LangChain **`ChatOpenAI`** + **`llm.stream()`**。
-- 默认模型 **`Pro/zai-org/GLM-4.7`**，与英语学习 Agent 已有实践一致。
+- 默认模型 **`Pro/zai-org/GLM-5.1`**，与英语学习 Agent 已有实践一致。
 - **不改变**对外 API、SSE 事件形态、会话落库、停止生成（Redis epoch）、多轮历史裁剪等业务行为。
 
 若与仓库最新源码不一致，**以源码为准**。
@@ -76,7 +76,7 @@ flowchart LR
 - Chat：`SILICONFLOW_API_KEY` → `DEEPSEEK_API_KEY`
 - Assistant / QA：`SILICONFLOW_API_KEY` → `DASHSCOPE_API_KEY` → `QWEN_API_KEY` →（Assistant 另含）`DEEPSEEK_API_KEY`
 - 英语学习词句包：`SILICONFLOW_API_KEY` → `DASHSCOPE_API_KEY` → `DEEPSEEK_API_KEY`（Base URL 可回退 `DEEPSEEK_BASE_URL`）
-- 模型名未配置时默认 **`Pro/zai-org/GLM-4.7`**
+- 模型名未配置时默认 **`Pro/zai-org/GLM-5.1`**
 
 ### 3.3 与「记忆」的关系
 
@@ -122,7 +122,7 @@ private resolveChatSiliconFlowConfig(): {
   const modelName =
     this.configService.get<string>(ModelEnum.CHAT_SILICONFLOW_MODEL_NAME)?.trim() ||
     this.configService.get<string>(ModelEnum.DEEPSEEK_MODEL_NAME)?.trim() ||
-    'Pro/zai-org/GLM-4.7';
+    'Pro/zai-org/GLM-5.1';
   // 说明：无 Key 时抛 503，避免静默失败
   if (!apiKey) {
     throw new HttpException(
@@ -249,7 +249,7 @@ const modelName =
   this.configService
     .get<string>(ModelEnum.ENGLISH_LEARNING_SILICONFLOW_MODEL_NAME)?.trim() ||
   this.configService.get<string>(ModelEnum.DEEPSEEK_MODEL_NAME)?.trim() ||
-  'Pro/zai-org/GLM-4.7';
+  'Pro/zai-org/GLM-5.1';
 ```
 
 ### 4.5 配置枚举
@@ -262,7 +262,7 @@ DEEPSEEK_API_KEY = 'DEEPSEEK_API_KEY',
 // ...
 CHAT_SILICONFLOW_MODEL_NAME = 'CHAT_SILICONFLOW_MODEL_NAME',
 ENGLISH_LEARNING_SILICONFLOW_MODEL_NAME = 'ENGLISH_LEARNING_SILICONFLOW_MODEL_NAME',
-/** 知识库助手 Chat 模型名（硅基流动），默认 Pro/zai-org/GLM-4.7 */
+/** 知识库助手 Chat 模型名（硅基流动），默认 Pro/zai-org/GLM-5.1 */
 ASSISTANT_GLM_MODEL_NAME = 'ASSISTANT_GLM_MODEL_NAME',
 ```
 
@@ -274,7 +274,7 @@ ASSISTANT_GLM_MODEL_NAME = 'ASSISTANT_GLM_MODEL_NAME',
 |------|------|
 | **API 契约** | HTTP 路径、DTO、SSE 字段不变 |
 | **破坏性** | 部署须配置 `SILICONFLOW_API_KEY`（或各模块声明的兼容 Key）；未配置时 503/错误文案 |
-| **回答风格** | 模型由智谱直连 / DeepSeek 换为硅基 `Pro/zai-org/GLM-4.7`，内容可能略有差异 |
+| **回答风格** | 模型由智谱直连 / DeepSeek 换为硅基 `Pro/zai-org/GLM-5.1`，内容可能略有差异 |
 | **ZHIPU_API_KEY** | 主 Chat/Assistant/RAG 对话**不再依赖**；其它仍用智谱的模块（若有）不受影响 |
 
 ---
