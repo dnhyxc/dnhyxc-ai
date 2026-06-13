@@ -308,8 +308,6 @@ export async function createLlm(
 		credentials.modelName = modelNameOverride;
 	}
 
-	console.log(credentials, 'credentials');
-
 	const maxTokensField =
 		maxTokensPolicy === 'optional'
 			? maxTokens !== undefined

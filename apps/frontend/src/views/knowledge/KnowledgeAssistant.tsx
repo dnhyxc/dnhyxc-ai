@@ -719,7 +719,7 @@ const KnowledgeAssistant = observer(
 					</div>
 				) : isRagMode && !ragMessages.length ? (
 					<div className="max-w-3xl mx-auto text-textcolor/70 flex flex-1 justify-center items-start text-sm pt-4 pl-4 pr-4">
-						<div className="w-full flex gap-2 border border-theme/5 bg-theme/5 p-3 rounded-md">
+						<div className="w-full flex gap-2 border border-theme/5 bg-theme/2 p-3 rounded-md">
 							<BookOpen size={18} className="mt-[3px] shrink-0 text-teal-500" />
 							<div className="flex-1 text-sm leading-relaxed">
 								{t('knowledge.assistant.ragIntro')}
@@ -736,7 +736,7 @@ const KnowledgeAssistant = observer(
 											key={item.kind}
 											type="button"
 											className={cn(
-												'flex-1 flex items-start gap-2 border border-theme/5 bg-theme/5 text-textcolor hover:bg-theme/15 pt-2 pb-3 pl-2 pr-2.5 rounded-md cursor-pointer text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-theme/40',
+												'flex-1 flex items-start gap-2 border border-theme/5 bg-theme/2 text-textcolor hover:bg-theme/15 pt-2 pb-3 pl-2 pr-2.5 rounded-md cursor-pointer text-left outline-none transition-colors focus-visible:ring-2 focus-visible:ring-theme/40',
 												(assistantStore.isSending ||
 													assistantStore.isHistoryLoading ||
 													assistantStore.isStreaming) &&
@@ -759,7 +759,7 @@ const KnowledgeAssistant = observer(
 							</div>
 						) : (
 							<div className="max-w-3xl w-full mx-auto pl-4 pr-4">
-								<div className="w-full flex justify-between bg-theme/5 p-2 rounded-md border border-theme/5">
+								<div className="w-full flex justify-between bg-theme/2 p-2 rounded-md border border-theme/5">
 									<Sparkles size={18} className="mr-2 text-teal-500 mt-0.5" />
 									<div className="flex-1">
 										{t('knowledge.assistant.aiIntro')}

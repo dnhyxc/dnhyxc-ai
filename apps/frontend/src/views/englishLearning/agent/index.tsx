@@ -405,7 +405,7 @@ export const AgentPanel = observer(function AgentPanel({
 						setInput={setInput}
 						className="w-full px-0 pb-4.5"
 						textareaClassName="min-h-12 rounded-md"
-						inputWrapClassName="border-theme/5"
+						inputWrapClassName="border-theme/5 bg-theme/5"
 						sendMessage={handleSendMessage}
 						placeholder={t('englishLearning.placeholder')}
 						disableTextInput={false}
@@ -448,7 +448,7 @@ export const AgentPanel = observer(function AgentPanel({
 				</div>
 			) : messages.length === 0 ? (
 				<div className="text-textcolor/70 mx-auto flex max-w-3xl w-full flex-1 flex-col justify-between self-stretch pt-4.5 px-4.5 text-sm">
-					<div className="border-theme/5 bg-theme/2 flex w-full gap-2 rounded-md border p-3">
+					<div className="border-theme/5 bg-theme/5 flex w-full gap-2 rounded-md border p-3">
 						<Atom
 							size={18}
 							className="mt-[3px] shrink-0 text-teal-500 opacity-80"

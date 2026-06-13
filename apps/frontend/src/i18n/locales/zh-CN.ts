@@ -1028,7 +1028,7 @@ export const zhCN = {
 	'englishLearning.stream.vocab.pageTitle': '单词拉取结果',
 	'englishLearning.stream.classic.pageTitle': '语句拉取结果',
 	'englishLearning.stream.topicLabel': '主题',
-	'englishLearning.stream.openLivePage': '查看实时列表',
+	'englishLearning.stream.openLivePage': '实时列表',
 	'englishLearning.stream.liveSummaryCount':
 		'已拉取 {count} 条，可在独立页实时查看',
 	'englishLearning.stream.liveSummaryProgress':

@@ -479,12 +479,12 @@ function VocabularyPackSectionInner() {
 						)}
 					>
 						{loading ? (
-							<>
+							<div className="flex items-center gap-2">
 								<Spinner className="size-4 shrink-0 text-white" />
 								<span className="truncate">
 									{t('englishLearning.vocab.stop')}
 								</span>
-							</>
+							</div>
 						) : (
 							<span className="truncate">
 								{t('englishLearning.vocab.generate')}

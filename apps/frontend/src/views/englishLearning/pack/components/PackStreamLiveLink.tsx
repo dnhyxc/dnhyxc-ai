@@ -68,7 +68,7 @@ function PackStreamLiveLinkInner({ kind, className }: PackStreamLiveLinkProps) {
 	return (
 		<div
 			className={cn(
-				'rounded-md border px-3 py-2.5 space-y-2',
+				'rounded-md border px-2 pt-1.5 pb-2 space-y-2',
 				accentBorder,
 				className,
 			)}
