@@ -58,6 +58,7 @@
 ### 3.3 附件与 OCR
 
 - **`buildAttachmentMessage`**：对 `attachments` 分流——图片 mime（png/jpeg/webp）走 `ocrService.imageOcrStream`（非流式模式取整段描述），其它文件走 `parseFile`。合并为一条 `role` 可配置的消息（常为 `user` 或 `system`），提示模型仅依据附件或按需忽略。
+- **OCR 后端**：`imageOcrStream` 经 `createLlm({ preset: 'ocr' })` 固定使用服务端 `GLM_*` 与默认视觉模型 **GLM-4.6V-Flash**，**不走**设置页自定义大模型；详见 [llm/ocr-create-llm-glm.md](../llm/ocr-create-llm-glm.md)。
 - **`processFileAttachments`**：非流式 `chat` 路径用，批量读文件拼成系统提示文本。
 
 ### 3.4 流式对话 `chatStream`（要点）

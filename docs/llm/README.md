@@ -9,6 +9,7 @@
 | [llm-runtime-settings.md](./llm-runtime-settings.md) | 设置页持久化、Key 回显、向量 tier 联动（主文档） |
 | [siliconflow-chat-unification.md](./siliconflow-chat-unification.md) | 主对话 / 助手硅基接入总览 |
 | [agent-create-llm-unify.md](./agent-create-llm-unify.md) | 英语学习 Agent 接 `createLlm` |
+| [ocr-create-llm-glm.md](./ocr-create-llm-glm.md) | **图片 OCR** 接 `createLlm`、智谱 GLM-4.6V-Flash |
 | [llm-setting-ui-presets.md](./llm-setting-ui-presets.md) | 设置页预设联动、Combobox（Key 行为见 runtime-settings） |
 | [llm-setting-save-flow.md](./llm-setting-save-flow.md) | **保存即启用**、底部四态提示、恢复默认 |
 | [knowledge-member-vector-tier.md](../knowledge/knowledge-member-vector-tier.md) | 会员 Qwen3 向量 + 双 Qdrant 检索 |

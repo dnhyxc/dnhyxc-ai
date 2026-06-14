@@ -45,6 +45,7 @@
 | 生产 `/images/` 400 | [chat/chat-upload-access-prod.md](./chat/chat-upload-access-prod.md) + [ops/nginx.md](./ops/nginx.md) |
 | 本地上传落盘 / UPLOAD_ROOT | [ops/upload-storage-paths.md](./ops/upload-storage-paths.md) |
 | `createLlm` / 400 | [llm/create-llm.md](./llm/create-llm.md) |
+| 图片 OCR / 附件识图 | [llm/ocr-create-llm-glm.md](./llm/ocr-create-llm-glm.md) |
 | 知识库向量 404 / 400 入库失败 | [knowledge/siliconflow-vector-full-url.md](./knowledge/siliconflow-vector-full-url.md) |
 | 知识库向量 Key/模型 | [knowledge/knowledge-vector-create-llm.md](./knowledge/knowledge-vector-create-llm.md) |
 | 会员知识库向量双库 | [knowledge/knowledge-member-vector-tier.md](./knowledge/knowledge-member-vector-tier.md) |

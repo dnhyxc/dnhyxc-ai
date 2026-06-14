@@ -9,6 +9,9 @@ export const DEFAULT_GLM_BASE_URL = 'https://open.bigmodel.cn/api/paas/v4';
 /** 各模块未配置 GLM_MODEL_NAME 时的默认值 */
 export const DEFAULT_GLM_MODEL_NAME = 'glm-4.7-flash';
 
+/** 图片 OCR 默认视觉模型（智谱 GLM-4.6V-Flash） */
+export const DEFAULT_OCR_GLM_MODEL_NAME = 'GLM-4.6V-Flash';
+
 /** 硅基流动 OpenAI 兼容 API 默认根路径（有效会员默认凭证） */
 export const DEFAULT_SILICONFLOW_BASE_URL = 'https://api.siliconflow.cn/v1';
 
@@ -27,12 +30,14 @@ export const DEFAULT_SILICONFLOW_MODEL_NAME = 'Pro/zai-org/GLM-5.1';
  * - assistant: 知识库助手
  * - knowledgeQa: 知识库问答
  * - englishLearning: 英语学习
+ * - ocr: 图片 OCR（固定 GLM_* 环境变量 + GLM-4.6V-Flash，不走设置页覆盖）
  */
 export type SiliconFlowLlmPreset =
 	| 'chat'
 	| 'assistant'
 	| 'knowledgeQa'
-	| 'englishLearning';
+	| 'englishLearning'
+	| 'ocr';
 
 /**
  * @description 配置传递到 ChatOpenAI 禁用 thinking 链（agent/assistant 工具链和正文流式调用会关闭）
@@ -148,6 +153,7 @@ function resolveModelNameFromEnvKeys(
 const GLM_ENV_API_KEY_KEYS = [ModelEnum.GLM_API_KEY] as const;
 const GLM_ENV_BASE_URL_KEYS = [ModelEnum.GLM_BASE_URL] as const;
 const GLM_ENV_MODEL_NAME_KEYS = [ModelEnum.GLM_MODEL_NAME] as const;
+const GLM_OCR_MODEL_NAME_KEYS = [ModelEnum.GLM_OCR_MODEL_NAME] as const;
 
 const SILICONFLOW_ENV_API_KEY_KEYS = [ModelEnum.SILICONFLOW_API_KEY] as const;
 const SILICONFLOW_ENV_BASE_URL_KEYS = [ModelEnum.SILICONFLOW_BASE_URL] as const;
@@ -200,6 +206,15 @@ function resolveGlmModelNameFromEnv(config: ConfigService): string {
 	return resolveModelNameFromEnvKeys(config, GLM_ENV_MODEL_NAME_KEYS);
 }
 
+/** OCR 视觉模型：优先 GLM_OCR_MODEL_NAME，否则 GLM-4.6V-Flash */
+function resolveOcrGlmModelNameFromEnv(config: ConfigService): string {
+	return resolveModelNameFromEnvKeys(
+		config,
+		GLM_OCR_MODEL_NAME_KEYS,
+		DEFAULT_OCR_GLM_MODEL_NAME,
+	);
+}
+
 /**
  * @description 获取 SiliconFlow 环境模型名（优先 env key，否则默认值）
  */
@@ -244,6 +259,23 @@ function buildSiliconFlowEnvPresetOptions(
 		baseUrlEnvKeys: SILICONFLOW_ENV_BASE_URL_KEYS,
 		defaultBaseUrl: DEFAULT_SILICONFLOW_BASE_URL,
 		resolveModelName: resolveSiliconFlowModelNameFromEnv,
+		missingApiKeyMessage,
+		onMissingApiKey,
+	};
+}
+
+/**
+ * @description 构建 OCR 凭证解析 preset：GLM_API_KEY / GLM_BASE_URL + GLM-4.6V-Flash
+ */
+function buildGlmOcrEnvPresetOptions(
+	missingApiKeyMessage: string,
+	onMissingApiKey?: MissingApiKeyHandler,
+): ResolveSiliconFlowOptions {
+	return {
+		apiKeyEnvKeys: GLM_ENV_API_KEY_KEYS,
+		baseUrlEnvKeys: GLM_ENV_BASE_URL_KEYS,
+		defaultBaseUrl: DEFAULT_GLM_BASE_URL,
+		resolveModelName: resolveOcrGlmModelNameFromEnv,
 		missingApiKeyMessage,
 		onMissingApiKey,
 	};
@@ -334,6 +366,11 @@ const siliconFlowResolvePresets: Record<
 		buildGlmEnvPresetOptions(
 			'未配置 GLM_API_KEY，无法生成学习内容；可在设置页启用「自定义大模型配置」',
 		),
+	ocr: () =>
+		buildGlmOcrEnvPresetOptions(
+			'未配置 GLM_API_KEY，无法进行图片 OCR',
+			throwSiliconFlowError,
+		),
 };
 
 /**
@@ -359,6 +396,11 @@ const memberSiliconFlowResolvePresets: Record<
 	englishLearning: () =>
 		buildSiliconFlowEnvPresetOptions(
 			'未配置 SILICONFLOW_API_KEY，无法生成学习内容；可在设置页启用「自定义大模型配置」',
+		),
+	ocr: () =>
+		buildGlmOcrEnvPresetOptions(
+			'未配置 GLM_API_KEY，无法进行图片 OCR',
+			throwSiliconFlowError,
 		),
 };
 

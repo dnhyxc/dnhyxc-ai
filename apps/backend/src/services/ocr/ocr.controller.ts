@@ -6,10 +6,12 @@ import {
 	Get,
 	Param,
 	Post,
+	Req,
 	Sse,
 	UseGuards,
 	UseInterceptors,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import {
 	catchError,
 	concat,
@@ -25,6 +27,8 @@ import { SwaggerController } from '../user/user.swagger';
 import { CreateOcrDto } from './dto/create-ocr.dto';
 import { OcrService } from './ocr.service';
 
+type AuthedRequest = Request & { user?: { userId?: number } };
+
 @Controller('ocr')
 @SwaggerController()
 @UseGuards(JwtGuard)
@@ -34,9 +38,12 @@ export class OcrController {
 
 	@Post('/imageOcr')
 	@Sse()
-	imageOcr(@Body() dto: CreateOcrDto): Observable<any> {
-		// 使用 defer 延迟执行
-		return defer(() => this.ocrService.imageOcrStream(dto)).pipe(
+	imageOcr(
+		@Body() dto: CreateOcrDto,
+		@Req() req: AuthedRequest,
+	): Observable<any> {
+		const userId = req.user?.userId;
+		return defer(() => this.ocrService.imageOcrStream(dto, userId)).pipe(
 			mergeMap((stream) => {
 				// 将流转换为 Observable
 				const dataStream = from(stream).pipe(

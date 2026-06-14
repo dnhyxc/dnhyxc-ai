@@ -4,13 +4,10 @@ import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { ChatOpenAI } from '@langchain/openai';
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-// import { InjectRepository } from '@nestjs/typeorm';
 import { Observable } from 'rxjs';
-import { ModelEnum } from 'src/enum/config.enum';
-// import { Repository } from 'typeorm';
+import { createLlm } from '../../utils/create-llm';
 import { resolveAttachmentBuffer } from '../../utils/file-parser';
 import { CreateOcrDto } from './dto/create-ocr.dto';
-// import { Ocr } from './ocr.entity';
 
 @Injectable()
 export class OcrService {
@@ -20,23 +17,15 @@ export class OcrService {
 		private configService: ConfigService,
 	) {}
 
-	initLLM(): ChatOpenAI {
-		const apiKey = this.configService.get(ModelEnum.QWEN_API_KEY);
-		const baseURL = this.configService.get(ModelEnum.QWEN_BASE_URL);
-		const modelName = this.configService.get(ModelEnum.QWEN_MODEL_NAME);
-
-		const llm = new ChatOpenAI({
-			apiKey,
-			modelName,
-			streaming: true,
-			configuration: {
-				baseURL,
-			},
+	/** 固定使用 GLM_API_KEY / GLM_BASE_URL + GLM-4.6V-Flash（createLlm preset: ocr） */
+	private async createOcrLlm(): Promise<ChatOpenAI> {
+		return createLlm(this.configService, {
+			preset: 'ocr',
 			temperature: 0,
+			defaultTemperature: 0,
 			maxTokens: 4096,
+			streaming: true,
 		});
-
-		return llm;
 	}
 
 	async urlToBase64Node(url: string) {
@@ -86,9 +75,10 @@ export class OcrService {
 
 	async imageOcrStream(
 		dto: CreateOcrDto,
+		_userId?: number,
 	): Promise<string | Observable<string>> {
 		try {
-			const llm = this.initLLM();
+			const llm = await this.createOcrLlm();
 
 			const systemPrompt =
 				'You are a professional OCR and image understanding assistant. Please analyze the provided image and extract all visible text, numbers, and other content accurately. Return the extracted content in a structured format.';

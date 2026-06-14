@@ -99,6 +99,8 @@ export enum ModelEnum {
 	GLM_API_KEY = 'GLM_API_KEY',
 	GLM_BASE_URL = 'GLM_BASE_URL',
 	GLM_MODEL_NAME = 'GLM_MODEL_NAME',
+	/** 图片 OCR 视觉模型名，未配置时默认 GLM-4.6V-Flash */
+	GLM_OCR_MODEL_NAME = 'GLM_OCR_MODEL_NAME',
 	/**
 	 * 当前助手所用大模型的「单请求最大输入上下文」token 上限（与智谱文档一致时可不填）。
 	 * 未配置时按 ASSISTANT_GLM_MODEL_NAME 推断（如 glm-4.7 默认 200000）。

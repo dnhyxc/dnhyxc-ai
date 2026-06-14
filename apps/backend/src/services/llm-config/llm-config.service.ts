@@ -297,6 +297,13 @@ export class LlmConfigService {
 		preset: SiliconFlowLlmPreset,
 		userId?: number,
 	): Promise<SiliconFlowCredentials> {
+		/** OCR 固定走 GLM_* + GLM-4.6V-Flash，不受设置页自定义大模型覆盖 */
+		if (preset === 'ocr') {
+			return resolveEnvSiliconFlowCredentials(
+				config,
+				siliconFlowResolvePresetsForPreset('ocr')(config),
+			);
+		}
 		const snapshot = await this.getActiveChatSnapshotForUser(userId);
 		if (snapshot) {
 			return {

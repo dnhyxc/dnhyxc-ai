@@ -169,6 +169,11 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'Fixes failed image preview after upload on web and desktop (Chinese filenames, cross-port blocking, misconfigured gateways). On production web, attachments load via the same site API route instead of a separate static image path; message payloads use on-disk filenames for OCR. Deploy both frontend and backend and restart; legacy direct /images/ URLs may still need gateway fixes.',
 	},
+	's4-11': {
+		title: 'Image attachment text recognition',
+		description:
+			'Before you send a message with image attachments, the server uses a Zhipu vision model to extract on-screen text and scene description, then passes that to the chat model. This step is independent of the chat model you pick in Settings. Self-hosted deployments must configure a Zhipu API credential on the server; otherwise image attachments may not be understood correctly.',
+	},
 	's5-1': {
 		title: 'Markdown rendering',
 		description:

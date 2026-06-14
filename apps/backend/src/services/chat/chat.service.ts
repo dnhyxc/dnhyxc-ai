@@ -138,6 +138,7 @@ export class ChatService {
 		attachments: { path: string; mimetype: string }[],
 		promptSuffix: string,
 		role?: MessageRole,
+		userId?: number,
 	): Promise<ChatMessageDto | null> {
 		if (!attachments || attachments.length === 0) {
 			return null;
@@ -153,13 +154,16 @@ export class ChatService {
 			if (IMAGE_TYPES.includes(attachment.mimetype)) {
 				imagePromises.push(
 					this.ocrService
-						.imageOcrStream({
-							url: attachment.path,
-							prompt: `Please describe **only the actual content** in this image in full detail, including all text, objects, people, colors, layout, position, and scene elements.
+						.imageOcrStream(
+							{
+								url: attachment.path,
+								prompt: `Please describe **only the actual content** in this image in full detail, including all text, objects, people, colors, layout, position, and scene elements.
 Do **not** add any information, reasoning, interpretation, or content that does not exist in the image.
 Stick strictly to what is visually present.`,
-							stream: false,
-						})
+								stream: false,
+							},
+							userId,
+						)
 						.then((content) => `文件 ${attachment.path} 内容:\n${content}\n`),
 				);
 			} else {
@@ -290,6 +294,7 @@ Stick strictly to what is visually present.`,
 							dto.attachments,
 							dto.messages?.[0]?.content,
 							MessageRole.USER,
+							userId,
 						);
 						if (attachmentMsg) {
 							enhancedMessages = [attachmentMsg];
@@ -374,6 +379,8 @@ Stick strictly to what is visually present.`,
 						const attachmentMsg = await this.buildAttachmentMessage(
 							attachments,
 							`First, assess whether the user's query is relevant to the provided attachments. If relevant, answer strictly based on the attachment content. If irrelevant, ignore the attachments and respond using your general knowledge. Do not force connections to unrelated file content.`.trim(),
+							undefined,
+							userId,
 						);
 						if (attachmentMsg) {
 							enhancedMessages = [attachmentMsg, ...enhancedMessages];
