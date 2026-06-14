@@ -61,22 +61,19 @@ function readEnvSiliconflowModelName(): string {
 type LlmProviderDefaults = {
 	baseUrl: string;
 	modelName: string;
-	apiKey: string;
 };
 
-/** 有效会员默认硅基流动，否则默认 GLM（与后端 createLlm 一致） */
+/** 有效会员默认硅基流动，否则默认 GLM（与后端 createLlm 一致；不含 API Key） */
 function getProviderDefaults(isMember: boolean): LlmProviderDefaults {
 	if (isMember) {
 		return {
 			baseUrl: readEnvSiliconflowBaseUrl(),
 			modelName: readEnvSiliconflowModelName(),
-			apiKey: readEnvSiliconflowApiKey(),
 		};
 	}
 	return {
 		baseUrl: readEnvGlmBaseUrl(),
 		modelName: readEnvGlmModelName(),
-		apiKey: readEnvGlmApiKey(),
 	};
 }
 
@@ -138,74 +135,84 @@ const VECTOR_RERANK_URL_PRESETS = [
 	},
 ] as const;
 
-const VECTOR_EMBEDDING_MODEL_PRESETS = [
+/** 向量 embedding / rerank / collection 三套预设联动 */
+const VECTOR_TIER_PRESETS = [
 	{
-		modelName: 'BAAI/bge-large-zh-v1.5',
-		labelKey: 'setting.llm.vectorModelOption.bgeLargeZh' as const,
+		embeddingModel: 'BAAI/bge-large-zh-v1.5',
+		rerankModel: 'BAAI/bge-reranker-v2-m3',
 		collectionName: 'knowledge_chunks_v2',
+		embeddingLabelKey: 'setting.llm.vectorModelOption.bgeLargeZh' as const,
+		rerankLabelKey: 'setting.llm.vectorRerankOption.bgeReranker' as const,
+		collectionLabelKey: 'setting.llm.vectorCollectionOption.default' as const,
 	},
 	{
-		modelName: 'Qwen/Qwen3-Embedding-4B',
-		labelKey: 'setting.llm.vectorModelOption.qwen3Emb' as const,
+		embeddingModel: 'Qwen/Qwen3-Embedding-4B',
+		rerankModel: 'Qwen/Qwen3-Reranker-4B',
 		collectionName: 'knowledge_chunks_qwen3_2560',
+		embeddingLabelKey: 'setting.llm.vectorModelOption.qwen3Emb' as const,
+		rerankLabelKey: 'setting.llm.vectorRerankOption.qwen3Rerank' as const,
+		collectionLabelKey: 'setting.llm.vectorCollectionOption.qwen3' as const,
 	},
 ] as const;
 
-const VECTOR_RERANK_MODEL_PRESETS = [
-	{
-		modelName: 'BAAI/bge-reranker-v2-m3',
-		labelKey: 'setting.llm.vectorRerankOption.bgeReranker' as const,
-	},
-	{
-		modelName: 'Qwen/Qwen3-Reranker-4B',
-		labelKey: 'setting.llm.vectorRerankOption.qwen3Rerank' as const,
-	},
-] as const;
+type VectorTierPreset = (typeof VECTOR_TIER_PRESETS)[number];
 
-const VECTOR_COLLECTION_PRESETS = [
-	{
-		collectionName: 'knowledge_chunks_v2',
-		labelKey: 'setting.llm.vectorCollectionOption.default' as const,
-	},
-	{
-		collectionName: 'knowledge_chunks_qwen3_2560',
-		labelKey: 'setting.llm.vectorCollectionOption.qwen3' as const,
-	},
-] as const;
+const VECTOR_EMBEDDING_MODEL_PRESETS = VECTOR_TIER_PRESETS.map((p) => ({
+	modelName: p.embeddingModel,
+	labelKey: p.embeddingLabelKey,
+	collectionName: p.collectionName,
+}));
 
-const VECTOR_EMBEDDING_MODEL_TO_COLLECTION: ReadonlyMap<string, string> =
-	new Map(
-		VECTOR_EMBEDDING_MODEL_PRESETS.map((p) => [p.modelName, p.collectionName]),
-	);
+const VECTOR_RERANK_MODEL_PRESETS = VECTOR_TIER_PRESETS.map((p) => ({
+	modelName: p.rerankModel,
+	labelKey: p.rerankLabelKey,
+}));
+
+const VECTOR_COLLECTION_PRESETS = VECTOR_TIER_PRESETS.map((p) => ({
+	collectionName: p.collectionName,
+	labelKey: p.collectionLabelKey,
+}));
+
+const VECTOR_TIER_BY_EMBEDDING: ReadonlyMap<string, VectorTierPreset> = new Map(
+	VECTOR_TIER_PRESETS.map((p) => [p.embeddingModel, p]),
+);
+
+const VECTOR_TIER_BY_RERANK: ReadonlyMap<string, VectorTierPreset> = new Map(
+	VECTOR_TIER_PRESETS.map((p) => [p.rerankModel, p]),
+);
+
+const VECTOR_TIER_BY_COLLECTION: ReadonlyMap<string, VectorTierPreset> =
+	new Map(VECTOR_TIER_PRESETS.map((p) => [p.collectionName, p]));
+
+function resolveVectorTierByEmbedding(
+	model: string,
+): VectorTierPreset | undefined {
+	return VECTOR_TIER_BY_EMBEDDING.get(model.trim());
+}
+
+function resolveVectorTierByRerank(
+	model: string,
+): VectorTierPreset | undefined {
+	return VECTOR_TIER_BY_RERANK.get(model.trim());
+}
+
+function resolveVectorTierByCollection(
+	name: string,
+): VectorTierPreset | undefined {
+	return VECTOR_TIER_BY_COLLECTION.get(name.trim());
+}
 
 function resolveTextField(raw: string | undefined, fallback: string): string {
 	const trimmed = raw?.trim() ?? '';
 	return trimmed.length > 0 ? trimmed : fallback;
 }
 
-function readEnvSiliconflowApiKey(): string {
-	return readEnvTrimmed('VITE_SILICONFLOW_API_KEY');
-}
-
-function readEnvGlmApiKey(): string {
-	return readEnvTrimmed('VITE_GLM_API_KEY');
-}
-
-function resolveApiKeyFields(
-	savedFromServer: string | undefined | null,
-	defaultApiKey: string,
-): {
+function resolveApiKeyFields(savedFromServer: string | undefined | null): {
 	displayKey: string;
 	savedKey: string;
 } {
 	const saved = (savedFromServer ?? '').trim();
-	if (saved) {
-		return { displayKey: saved, savedKey: saved };
-	}
-	return {
-		displayKey: defaultApiKey,
-		savedKey: '',
-	};
+	return { displayKey: saved, savedKey: saved };
 }
 
 const LlmSetting = observer(() => {
@@ -229,7 +236,7 @@ const LlmSetting = observer(() => {
 	);
 	const [baseUrl, setBaseUrl] = useState(providerDefaults.baseUrl);
 	const [modelName, setModelName] = useState(providerDefaults.modelName);
-	const [apiKey, setApiKey] = useState(providerDefaults.apiKey);
+	const [apiKey, setApiKey] = useState('');
 	const [savedApiKey, setSavedApiKey] = useState('');
 	const [showApiKey, setShowApiKey] = useState(false);
 
@@ -251,7 +258,7 @@ const LlmSetting = observer(() => {
 	const [vectorCollectionName, setVectorCollectionName] = useState(
 		FALLBACK_VECTOR_DEFAULTS.collectionName,
 	);
-	const [vectorApiKey, setVectorApiKey] = useState(readEnvSiliconflowApiKey());
+	const [vectorApiKey, setVectorApiKey] = useState('');
 	const [savedVectorApiKey, setSavedVectorApiKey] = useState('');
 	const [showVectorApiKey, setShowVectorApiKey] = useState(false);
 	const [vectorSaving, setVectorSaving] = useState(false);
@@ -320,51 +327,69 @@ const LlmSetting = observer(() => {
 		[t],
 	);
 
-	const resetApiKey = useCallback(() => {
-		setApiKey('');
-		setSavedApiKey('');
-		setShowApiKey(false);
-	}, []);
-
 	const onBaseUrlChange = useCallback(
 		(next: string) => {
 			if (next.trim() === baseUrl.trim()) return;
 			setBaseUrl(next);
-			resetApiKey();
 			const pairedModel = LLM_BASE_URL_TO_MODEL.get(next.trim());
 			if (pairedModel) setModelName(pairedModel);
 		},
-		[baseUrl, resetApiKey],
+		[baseUrl],
 	);
 
 	const onModelNameChange = useCallback(
 		(next: string) => {
 			if (next.trim() === modelName.trim()) return;
 			setModelName(next);
-			resetApiKey();
 			const pairedBase = LLM_MODEL_TO_BASE_URL.get(next.trim());
 			if (pairedBase) setBaseUrl(pairedBase);
 		},
-		[modelName, resetApiKey],
+		[modelName],
 	);
-
-	const resetVectorApiKey = useCallback(() => {
-		setVectorApiKey('');
-		setSavedVectorApiKey('');
-		setShowVectorApiKey(false);
-	}, []);
 
 	const onVectorEmbeddingModelChange = useCallback(
 		(next: string) => {
 			if (next.trim() === vectorEmbeddingModel.trim()) return;
+			const tier = resolveVectorTierByEmbedding(next);
+			if (tier) {
+				setVectorEmbeddingModel(tier.embeddingModel);
+				setVectorRerankModel(tier.rerankModel);
+				setVectorCollectionName(tier.collectionName);
+				return;
+			}
 			setVectorEmbeddingModel(next);
-			resetVectorApiKey();
-			const pairedCollection = VECTOR_EMBEDDING_MODEL_TO_COLLECTION.get(
-				next.trim(),
-			);
-			if (pairedCollection) setVectorCollectionName(pairedCollection);
 		},
-		[resetVectorApiKey, vectorEmbeddingModel],
+		[vectorEmbeddingModel],
+	);
+
+	const onVectorRerankModelChange = useCallback(
+		(next: string) => {
+			if (next.trim() === vectorRerankModel.trim()) return;
+			const tier = resolveVectorTierByRerank(next);
+			if (tier) {
+				setVectorEmbeddingModel(tier.embeddingModel);
+				setVectorRerankModel(tier.rerankModel);
+				setVectorCollectionName(tier.collectionName);
+				return;
+			}
+			setVectorRerankModel(next);
+		},
+		[vectorRerankModel],
+	);
+
+	const onVectorCollectionNameChange = useCallback(
+		(next: string) => {
+			if (next.trim() === vectorCollectionName.trim()) return;
+			const tier = resolveVectorTierByCollection(next);
+			if (tier) {
+				setVectorEmbeddingModel(tier.embeddingModel);
+				setVectorRerankModel(tier.rerankModel);
+				setVectorCollectionName(tier.collectionName);
+				return;
+			}
+			setVectorCollectionName(next);
+		},
+		[vectorCollectionName],
 	);
 
 	const applyVectorDefaults = useCallback(
@@ -418,10 +443,7 @@ const LlmSetting = observer(() => {
 				setModelName(
 					resolveTextField(res.data.modelName, providerDefaults.modelName),
 				);
-				const { displayKey, savedKey } = resolveApiKeyFields(
-					res.data.apiKey,
-					providerDefaults.apiKey,
-				);
+				const { displayKey, savedKey } = resolveApiKeyFields(res.data.apiKey);
 				setSavedApiKey(savedKey);
 				setApiKey(displayKey);
 				setShowApiKey(false);
@@ -439,10 +461,7 @@ const LlmSetting = observer(() => {
 				setVectorCollectionName(
 					resolveTextField(res.data.vectorCollectionName, vd.collectionName),
 				);
-				const vectorKey = resolveApiKeyFields(
-					res.data.vectorApiKey,
-					readEnvSiliconflowApiKey(),
-				);
+				const vectorKey = resolveApiKeyFields(res.data.vectorApiKey);
 				setSavedVectorApiKey(vectorKey.savedKey);
 				setVectorApiKey(vectorKey.displayKey);
 				setShowVectorApiKey(false);
@@ -472,7 +491,7 @@ const LlmSetting = observer(() => {
 			view.modelName,
 			providerDefaults.modelName,
 		);
-		const savedKeyDisplay = savedApiKey || providerDefaults.apiKey;
+		const savedKeyDisplay = savedApiKey;
 		return (
 			baseUrl.trim() !== savedBase.trim() ||
 			modelName.trim() !== savedModel.trim() ||
@@ -482,7 +501,6 @@ const LlmSetting = observer(() => {
 		apiKey,
 		baseUrl,
 		modelName,
-		providerDefaults.apiKey,
 		providerDefaults.baseUrl,
 		providerDefaults.modelName,
 		savedApiKey,
@@ -502,13 +520,13 @@ const LlmSetting = observer(() => {
 					view?.modelName,
 					providerDefaults.modelName,
 				),
-				apiKey: savedApiKey || providerDefaults.apiKey,
+				apiKey: savedApiKey,
 			};
 		}
 		return {
 			baseUrl: providerDefaults.baseUrl,
 			modelName: providerDefaults.modelName,
-			apiKey: providerDefaults.apiKey,
+			apiKey: '',
 		};
 	}, [providerDefaults, savedApiKey, view?.baseUrl, view?.modelName]);
 
@@ -570,7 +588,7 @@ const LlmSetting = observer(() => {
 			view.vectorCollectionName,
 			vectorDefaults.collectionName,
 		);
-		const savedKeyDisplay = savedVectorApiKey || readEnvSiliconflowApiKey();
+		const savedKeyDisplay = savedVectorApiKey;
 		return (
 			vectorBgeOnly !== Boolean(view.vectorBgeOnly) ||
 			vectorBaseUrl.trim() !== savedBase.trim() ||
@@ -620,8 +638,7 @@ const LlmSetting = observer(() => {
 					view?.vectorCollectionName,
 					vectorDefaults.collectionName,
 				),
-				apiKey: savedVectorApiKey || readEnvSiliconflowApiKey(),
-				bgeOnly: Boolean(view?.vectorBgeOnly),
+				apiKey: savedVectorApiKey,
 			};
 		}
 		return {
@@ -630,7 +647,7 @@ const LlmSetting = observer(() => {
 			embeddingModel: vectorDefaults.embeddingModel,
 			rerankModel: vectorDefaults.rerankModel,
 			collectionName: vectorDefaults.collectionName,
-			apiKey: readEnvSiliconflowApiKey(),
+			apiKey: '',
 			bgeOnly: false,
 		};
 	}, [savedVectorApiKey, vectorDefaults, view]);
@@ -763,10 +780,7 @@ const LlmSetting = observer(() => {
 			});
 			if (res.success && res.data) {
 				setView(res.data);
-				const { displayKey, savedKey } = resolveApiKeyFields(
-					res.data.apiKey,
-					providerDefaults.apiKey,
-				);
+				const { displayKey, savedKey } = resolveApiKeyFields(res.data.apiKey);
 				setSavedApiKey(savedKey);
 				setApiKey(displayKey);
 				setShowApiKey(false);
@@ -789,7 +803,7 @@ const LlmSetting = observer(() => {
 				setBaseUrl(providerDefaults.baseUrl);
 				setModelName(providerDefaults.modelName);
 				setSavedApiKey('');
-				setApiKey(providerDefaults.apiKey);
+				setApiKey('');
 				setShowApiKey(false);
 				Toast({
 					type: 'success',
@@ -818,10 +832,7 @@ const LlmSetting = observer(() => {
 			});
 			if (res.success && res.data) {
 				setView(res.data);
-				const vectorKey = resolveApiKeyFields(
-					res.data.vectorApiKey,
-					readEnvSiliconflowApiKey(),
-				);
+				const vectorKey = resolveApiKeyFields(res.data.vectorApiKey);
 				setSavedVectorApiKey(vectorKey.savedKey);
 				setVectorApiKey(vectorKey.displayKey);
 				setShowVectorApiKey(false);
@@ -848,7 +859,7 @@ const LlmSetting = observer(() => {
 				setVectorRerankModel(vectorDefaults.rerankModel);
 				setVectorCollectionName(vectorDefaults.collectionName);
 				setSavedVectorApiKey('');
-				setVectorApiKey(readEnvSiliconflowApiKey());
+				setVectorApiKey('');
 				setShowVectorApiKey(false);
 				setVectorBgeOnly(false);
 				Toast({
@@ -1033,15 +1044,14 @@ const LlmSetting = observer(() => {
 												onCheckedChange={(checked) => {
 													setVectorBgeOnly(checked);
 													if (checked) {
-														setVectorEmbeddingModel(
+														const bgeTier = resolveVectorTierByEmbedding(
 															FALLBACK_VECTOR_DEFAULTS.embeddingModel,
 														);
-														setVectorRerankModel(
-															FALLBACK_VECTOR_DEFAULTS.rerankModel,
-														);
-														setVectorCollectionName(
-															FALLBACK_VECTOR_DEFAULTS.collectionName,
-														);
+														if (bgeTier) {
+															setVectorEmbeddingModel(bgeTier.embeddingModel);
+															setVectorRerankModel(bgeTier.rerankModel);
+															setVectorCollectionName(bgeTier.collectionName);
+														}
 													}
 												}}
 												disabled={saving || vectorSaving}
@@ -1064,7 +1074,6 @@ const LlmSetting = observer(() => {
 													onChange={(next) => {
 														if (next.trim() === vectorBaseUrl.trim()) return;
 														setVectorBaseUrl(next);
-														resetVectorApiKey();
 													}}
 													options={vectorBaseUrlOptions}
 													placeholder={t(
@@ -1091,7 +1100,6 @@ const LlmSetting = observer(() => {
 													onChange={(next) => {
 														if (next.trim() === vectorRerankUrl.trim()) return;
 														setVectorRerankUrl(next);
-														resetVectorApiKey();
 													}}
 													options={vectorRerankUrlOptions}
 													placeholder={t(
@@ -1138,12 +1146,7 @@ const LlmSetting = observer(() => {
 												<CreatableCombobox
 													id="vector-rerank-model"
 													value={vectorRerankModel}
-													onChange={(next) => {
-														if (next.trim() === vectorRerankModel.trim())
-															return;
-														setVectorRerankModel(next);
-														resetVectorApiKey();
-													}}
+													onChange={onVectorRerankModelChange}
 													options={vectorRerankModelOptions}
 													placeholder={t(
 														'setting.llm.vectorRerankModelPlaceholder',
@@ -1166,12 +1169,7 @@ const LlmSetting = observer(() => {
 												<CreatableCombobox
 													id="vector-collection"
 													value={vectorCollectionName}
-													onChange={(next) => {
-														if (next.trim() === vectorCollectionName.trim())
-															return;
-														setVectorCollectionName(next);
-														resetVectorApiKey();
-													}}
+													onChange={onVectorCollectionNameChange}
 													options={vectorCollectionOptions}
 													placeholder={t(
 														'setting.llm.vectorCollectionNamePlaceholder',

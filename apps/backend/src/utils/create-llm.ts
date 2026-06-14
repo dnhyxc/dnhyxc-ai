@@ -552,16 +552,16 @@ export async function createLlm(
 				: {}
 			: { maxTokens: maxTokens ?? defaultMaxTokens };
 
-	// 日志详细输出当前 LLM 选用的所有主要配置（便于排查和回溯调用链）
+	// 日志输出当前 LLM 配置（不记录完整 apiKey）
 	console.log(
 		{
-			apiKey: credentials.apiKey,
+			apiKeyConfigured: Boolean(credentials.apiKey?.trim()),
 			modelName: credentials.modelName,
 			streaming,
 			temperature: temperature ?? defaultTemperature,
 			...maxTokensField,
 			configuration: { baseURL: credentials.baseURL },
-			...(modelKwargs && { modelKwargs }), // 有 modelKwargs 时才附加
+			...(modelKwargs && { modelKwargs }),
 			...(abortSignal && {
 				callOptions: { signal: abortSignal },
 			}),

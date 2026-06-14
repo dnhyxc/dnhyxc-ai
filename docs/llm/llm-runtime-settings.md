@@ -1,9 +1,9 @@
-# 设置页大模型运行时配置（实例级覆盖 `createLlm`）
+# 设置页大模型运行时配置（按用户覆盖 `createLlm`）
 
-> **文档角色**：本轮在设置中新增「大模型」页，服务端持久化 API Key / Base URL / 模型名，并在 `createLlm` 解析时优先于 `.env` preset 回退链。  
-> **延伸阅读**：[membership-per-user-llm.md](./membership-per-user-llm.md)（**按用户配置 + 会员默认硅基/非会员 GLM**，当前主文档）、[create-llm.md](./create-llm.md)（工厂与 preset）、[siliconflow-chat-unification.md](./siliconflow-chat-unification.md)（硅基接入背景）。
+> **文档角色**：设置页 `/setting/llm` 的**持久化、运行时解析与表单交互**主文档——含对话大模型与向量模型两区块；API Key 回显策略、预设联动、向量 tier 三字段联动等近期 UX 以 **§3.4–§3.6** 为准。  
+> **延伸阅读**：[membership-per-user-llm.md](./membership-per-user-llm.md)（按用户 DB + 会员默认硅基/非会员 GLM）、[llm-setting-ui-presets.md](./llm-setting-ui-presets.md)（Combobox 与预设表）、[llm-setting-save-flow.md](./llm-setting-save-flow.md)（保存即启用与底部四态）、[../knowledge/vector-bge-global-round.md](../knowledge/vector-bge-global-round.md)（全站 BGE、向量入库与 RAG）、[create-llm.md](./create-llm.md)（工厂与 env 回退链）。
 
-> **注意**：下文「单行 singleton / 全站共用」描述已被 [membership-per-user-llm.md](./membership-per-user-llm.md) 取代；请以该文为准。
+> **注意**：下文早期「单行 singleton / 全站共用」已由 [membership-per-user-llm.md](./membership-per-user-llm.md) 取代；请以按用户 `llm_runtime_config` 为准。
 
 若与仓库最新源码不一致，**以源码为准**。
 
@@ -11,152 +11,197 @@
 
 ## 1. 背景与目标
 
-### 1.1 问题
+### 1.1 持久化与运行时（基线）
 
-运维与自托管用户希望**不改服务器 `.env`、不重启**即可在 UI 中切换硅基（或其它 OpenAI 兼容）凭证；且主站对话、知识库助手、RAG、英语学习、Agent 等应**共用一套**三元组，避免各模块 env 回退链不一致。
+运维与自托管用户希望在 UI 中配置 OpenAI 兼容凭证，且主站对话、知识库助手、RAG、英语学习、Agent 等**共用**用户保存的三元组（或走会员/env 默认），避免各模块 env 回退链不一致。
 
-### 1.2 目标
+### 1.2 本轮 UX（2026-06）
 
-- 登录用户通过 **`/setting/llm`** 配置并持久化。
-- **未开启**或三字段未齐：行为与改前完全一致（仍走 `siliconFlowResolvePresets` + env）。
-- **已开启且齐全**：所有 `createLlm` / `getAssistantSiliconFlowModelName` 注入处统一使用 DB 配置。
-- API Key 加密落库；设置页可回显完整 Key（需 HTTPS），支持显示/隐藏切换。
+| 诉求 | 实现要点 |
+|------|----------|
+| API Key 不要「默认自动填」 | 设置页**不回显** `VITE_*` / 服务端 `.env`；仅当用户曾在设置页保存且 `GET` 返回 `apiKey` 时回显 |
+| 切换模型/预设不清 Key | 改 Base URL、模型名、向量模型/重排/库名时**保留**当前输入框中的 Key |
+| 向量三字段联动 | embedding / rerank / collection 两套 tier 预设任改其一，另两项同步 |
+| 日志安全 | `createLlm` 调试日志只打 `apiKeyConfigured`，不打印完整 Key |
+
+**边界**：未在设置页保存时，服务端运行时仍可从 **`.env`** 解析 Key 调用模型（与 UI 是否展示无关）。
 
 ---
 
-## 2. 改动范围
+## 2. 改动范围（累计 + 本轮）
 
 | 路径 | 说明 |
 |------|------|
-| `apps/backend/src/services/llm-config/*` | Entity、加解密、`LlmConfigService`、Controller、全局 `LlmConfigModule` |
-| `apps/backend/src/services/llm-config/llm-runtime-snapshot.store.ts` | 进程内共享快照（避免多 Provider 实例 `this.snapshot` 不同步） |
-| `apps/backend/src/migrations/1780200000000-llm-runtime-config.ts` | 表 `llm_runtime_config`（singleton `id=1`） |
-| `apps/backend/src/utils/create-llm.ts` | 可选第三参 `LlmCredentialResolver`；导出 `LlmCredentialResolver` 类型 |
-| `apps/backend/src/app.module.ts` | `LlmConfigModule` 置于 `TypeOrmModule.forRootAsync` 之后 |
-| `chat` / `assistant` / `knowledge-qa` / `english-learning` / `agent` 各 Service | 注入 `LlmConfigService` 并传入 `createLlm` |
-| `apps/frontend/src/views/setting/llm/index.tsx` | 设置子页 UI |
-| `apps/frontend/src/service/llmSettings.ts` | API 封装 |
-| `apps/frontend/src/views/setting/menu.tsx`、`router/routes.ts` | 菜单与路由 |
-| `apps/frontend/src/views/setting/theme/index.tsx` | 主题页顶距与色块网格布局（与设置页版式对齐，无功能耦合） |
-| `apps/frontend/src/i18n/locales/zh-CN.ts`、`en-US.ts` | 文案 |
+| `apps/backend/src/services/llm-config/*` | 按用户持久化、加解密、`vectorBgeOnlyGlobal` 等 |
+| `apps/backend/src/utils/create-llm.ts` | `LlmCredentialResolver`、日志不写完整 Key |
+| `apps/frontend/src/views/setting/llm/index.tsx` | 双区块 UI、联动、Key 回显、向量 tier |
+| `apps/frontend/src/service/llmSettings.ts` | `LlmSettingsView`、`UpsertLlmVectorSettingsBody` |
+| `chat` / `assistant` / `knowledge-qa` / `english-learning` / `agent` | 注入 `LlmConfigService` 传入 `createLlm` |
+
+向量入库、全站 BGE、多库 RAG 见 [../knowledge/vector-bge-global-round.md](../knowledge/vector-bge-global-round.md)。
 
 ---
 
 ## 3. 实现思路
 
-### 3.1 持久化与加密
+### 3.1 持久化与加密（摘要）
 
-- 表 **`llm_runtime_config`** 单行：`enabled`、`base_url`、`model_name`、`api_key_enc`（AES-256-GCM）。
-- 加密密钥：`LLM_CONFIG_ENCRYPTION_KEY`，否则回退 `SECRET`（开发缺省有占位，生产应配置独立密钥）。
-- `GET /api/settings/llm` 返回完整 `apiKey`（仅 JWT 登录可读）、`active`（是否已对 `createLlm` 生效）、`apiKeyMask`（可选展示）。
+- 表 **`llm_runtime_config`** 按 **`user_id`** 一行：对话字段 + 向量字段 + `vector_bge_only`、`vector_search_profiles` 等。
+- API Key 字段 AES-256-GCM 加密；`GET /api/settings/llm` 在已配置时返回完整 `apiKey` / `vectorApiKey`（须 JWT）。
+- `PUT` 时省略 `apiKey` 或传空且已有密文 → **保留**已存 Key（见 DTO 注释）。
 
-### 3.2 运行时快照优先级
+### 3.2 运行时凭证优先级（摘要）
 
 ```text
-createLlm(config, options, llmConfigService?)
-  → llmConfigService.resolveSiliconFlowCredentials(config, preset)
-       → getLlmRuntimeSnapshot() 且 enabled+三字段齐全 → 返回 DB 三元组
-       → 否则 → resolveEnvSiliconFlowCredentials(preset 对应 env 回退链)
+createLlm(..., llmConfigService)
+  → resolveSiliconFlowCredentials：用户 DB 快照（active）> 有效会员 SILICONFLOW_* > 非会员 GLM_*
+知识库向量：resolveKnowledgeVectorApiConfigForUser（含全站 BGE 超管凭证）> env 档位
 ```
 
-- **不按 preset 分套 UI 配置**：开启后 Chat / Assistant / knowledgeQa / englishLearning 共用同一套 Key、Base URL、Model。
-- 各业务传入的 `options.modelName` **覆盖**仍保留（如英语学习 JSON 子模型）。
+详见 [membership-per-user-llm.md](./membership-per-user-llm.md)、[create-llm.md](./create-llm.md)。
 
-### 3.3 进程内共享 store
+### 3.3 API Key 回显策略（设置页）
 
-保存配置时 `setLlmRuntimeSnapshot(activeSnap)`；解析时 `getLlmRuntimeSnapshot()`。避免「PUT 请求所在 Service 实例已更新、Chat 请求实例仍为 null」的问题。
+| 场景 | 大模型 Key | 向量 Key |
+|------|------------|----------|
+| 首次打开、从未保存 | 空 | 空 |
+| 已保存 | `GET` 返回的 `apiKey` | `GET` 返回的 `vectorApiKey` |
+| 「恢复默认」后 | 清空 | 清空 |
+| 本地 `VITE_GLM_API_KEY` / `VITE_SILICONFLOW_API_KEY` | **不用于**输入框默认或回退对比 |
 
-### 3.4 前端交互要点
+`getProviderDefaults(isMember)` 只提供 **Base URL + 模型名**（与后端默认模型一致），**不含** apiKey。
 
-- 保存：须开启自定义且 **apiKey、baseUrl、modelName** 均非空，否则保存按钮禁用。
-- 未改 Key 再保存：前端比对 `savedApiKey`，相同则不提交 `apiKey` 字段，后端保留密文。
-- API Key 输入框默认 `password`，右侧 **Eye / EyeOff** 切换明文；加载后回填服务端 `apiKey`。
-- 底部左侧展示「当前自定义配置已生效」/ 不完整提示，与保存、恢复按钮同一行。
+**来源**：`apps/frontend/src/views/setting/llm/index.tsx`（`getProviderDefaults`、`resolveApiKeyFields`，约 L61–78、L205–211）
 
-### 3.5 设置页 UI 增强（2026-05）
+```typescript
+type LlmProviderDefaults = { baseUrl: string; modelName: string };
 
-Base URL / 模型名改为可输入 Combobox + 硅基/DeepSeek 预设联动；未保存 Key 时回显 `VITE_SILICONFLOW_API_KEY`。详见 **[llm-setting-ui-presets.md](./llm-setting-ui-presets.md)**（主文档）；本节不再重复 Combobox 实现细节。
+function getProviderDefaults(isMember: boolean): LlmProviderDefaults {
+  // 说明：仅 URL/模型，不从 VITE_* 注入 Key
+  if (isMember) {
+    return { baseUrl: readEnvSiliconflowBaseUrl(), modelName: readEnvSiliconflowModelName() };
+  }
+  return { baseUrl: readEnvGlmBaseUrl(), modelName: readEnvGlmModelName() };
+}
+
+function resolveApiKeyFields(savedFromServer: string | undefined | null) {
+  const saved = (savedFromServer ?? '').trim();
+  // 说明：无 saved 则 displayKey 也为空，不回退 env
+  return { displayKey: saved, savedKey: saved };
+}
+```
+
+初始 state：`useState('')`；未保存变更对比用 `savedApiKey` / `savedVectorApiKey` 本身，不与 env 比较。
+
+### 3.4 大模型预设联动且保留 Key
+
+- `LLM_PROVIDER_PRESETS`：智谱 GLM、硅基、DeepSeek 的 URL ↔ 模型双向 Map。
+- `onBaseUrlChange` / `onModelNameChange`：命中预设时同步另一字段；**已移除** `resetApiKey()`。
+- 保存：`trimmedKey === savedApiKey` 时不提交 `apiKey` 字段。
+
+**来源**：`apps/frontend/src/views/setting/llm/index.tsx`（约 L325–343）
+
+```typescript
+const onBaseUrlChange = useCallback((next: string) => {
+  if (next.trim() === baseUrl.trim()) return;
+  setBaseUrl(next);
+  const pairedModel = LLM_BASE_URL_TO_MODEL.get(next.trim());
+  if (pairedModel) setModelName(pairedModel);
+  // 说明：不再清空 apiKey
+}, [baseUrl]);
+```
+
+### 3.5 向量 tier 三字段联动
+
+统一表 `VECTOR_TIER_PRESETS`：
+
+| embedding | rerank | collection |
+|-----------|--------|------------|
+| `BAAI/bge-large-zh-v1.5` | `BAAI/bge-reranker-v2-m3` | `knowledge_chunks_v2` |
+| `Qwen/Qwen3-Embedding-4B` | `Qwen/Qwen3-Reranker-4B` | `knowledge_chunks_qwen3_2560` |
+
+从预设下拉（或输入与预设完全一致）修改 **向量模型名称 / 重排模型名称 / 向量库名称** 任一时，通过 `VECTOR_TIER_BY_*` 同步另两项；**不清空**向量 API Key。手输非预设值只改当前字段。
+
+**来源**：`apps/frontend/src/views/setting/llm/index.tsx`（`VECTOR_TIER_PRESETS`、`onVectorEmbeddingModelChange` 等，约 L138–200、L345–378）
+
+```typescript
+const onVectorEmbeddingModelChange = useCallback((next: string) => {
+  const tier = resolveVectorTierByEmbedding(next);
+  if (tier) {
+    setVectorEmbeddingModel(tier.embeddingModel);
+    setVectorRerankModel(tier.rerankModel);
+    setVectorCollectionName(tier.collectionName);
+    return;
+  }
+  setVectorEmbeddingModel(next);
+}, [vectorEmbeddingModel]);
+```
+
+`onVectorRerankModelChange`、`onVectorCollectionNameChange` 对称实现。
+
+### 3.6 `createLlm` 日志
+
+调试 `console.log` 使用 `apiKeyConfigured: Boolean(credentials.apiKey?.trim())`，避免日志泄露完整 Key。运行时仍向 `ChatOpenAI` 传入真实 `apiKey`。
+
+**来源**：`apps/backend/src/utils/create-llm.ts`（`createLlm` 内，约 L555–570）
+
+```typescript
+console.log(
+  {
+    apiKeyConfigured: Boolean(credentials.apiKey?.trim()),
+    modelName: credentials.modelName,
+    // ...
+  },
+  'createLlm',
+);
+```
+
+### 3.7 保存与底部提示（摘要）
+
+- 大模型：**保存即启用**（无单独开关）；`canSave` 要求三项非空；向量区块独立 `canSubmitVectorSave`。
+- 向量：超管 `bgeOnly` 仅超管提交；非超管不传 `bgeOnly` 字段。详见 [llm-setting-save-flow.md](./llm-setting-save-flow.md)、[../knowledge/vector-bge-global-round.md](../knowledge/vector-bge-global-round.md)。
 
 ---
 
 ## 4. 关键代码与注释
 
-### 4.1 快照提交与解析
+### 4.1 前端保存大模型（Key 可选提交）
 
-**来源**：`apps/backend/src/services/llm-config/llm-config.service.ts`（约 L95–L123）
-
-```typescript
-// 说明：reloadSnapshot 从 DB 解密后写入进程级 store，不依赖单个 Service 实例字段
-private commitSnapshot(snap: LlmRuntimeSnapshot | null): void {
-	const active = this.isSnapshotActive(snap) ? snap : null;
-	setLlmRuntimeSnapshot(active);
-}
-
-resolveSiliconFlowCredentials(config, preset) {
-	const snapshot = getLlmRuntimeSnapshot();
-	if (this.isSnapshotActive(snapshot)) {
-		return {
-			apiKey: snapshot.apiKey,
-			baseURL: snapshot.baseUrl,
-			modelName: snapshot.modelName,
-		};
-	}
-	return resolveEnvSiliconFlowCredentials(
-		config,
-		siliconFlowResolvePresetsForPreset(preset)(config),
-	);
-}
-```
-
-### 4.2 `createLlm` 接入覆盖层
-
-**来源**：`apps/backend/src/utils/create-llm.ts`（约 L254–L259）
+**来源**：`apps/frontend/src/views/setting/llm/index.tsx`（`onSave`，约 L765–775）
 
 ```typescript
-// 说明：第三参为 LlmConfigService 时走运行时覆盖；省略则与历史行为一致
-const credentials = resolver
-	? resolver.resolveSiliconFlowCredentials(config, preset)
-	: resolveSiliconFlowCredentials(
-			config,
-			siliconFlowResolvePresets[preset](config),
-		);
-```
-
-### 4.3 HTTP API
-
-**来源**：`apps/backend/src/services/llm-config/llm-config.controller.ts`（全文）
-
-```typescript
-// 说明：均需 JwtGuard；路径前缀为全局 /api
-// GET    /settings/llm
-// GET    /settings/llm/defaults   → 默认 baseUrl 提示
-// PUT    /settings/llm            → UpsertLlmConfigDto
-// DELETE /settings/llm            → 清空并恢复仅 env
-```
-
-### 4.4 前端保存条件
-
-**来源**：`apps/frontend/src/views/setting/llm/index.tsx`（约 L62–L75、底部按钮区）
-
-```typescript
-// 说明：未开启自定义或任一必填为空则不可保存
-const canSave = useMemo(() => {
-	if (!enabled) return false;
-	return (
-		apiKey.trim().length > 0 &&
-		baseUrl.trim().length > 0 &&
-		modelName.trim().length > 0
-	);
-}, [enabled, apiKey, baseUrl, modelName]);
-
-// 说明：Key 未变时不 PUT apiKey，避免用脱敏串覆盖密文
+const trimmedKey = apiKey.trim();
 const keyUnchanged = trimmedKey === savedApiKey.trim();
 await updateLlmSettings({
-	enabled,
-	baseUrl: baseUrl.trim(),
-	modelName: modelName.trim(),
-	...(!keyUnchanged && trimmedKey ? { apiKey: trimmedKey } : {}),
+  enabled: true,
+  baseUrl: baseUrl.trim(),
+  modelName: modelName.trim(),
+  // 说明：Key 未改则不 PUT，后端保留密文
+  ...(!keyUnchanged && trimmedKey ? { apiKey: trimmedKey } : {}),
 });
+```
+
+### 4.2 HTTP API（对话 + 向量）
+
+**来源**：`apps/backend/src/services/llm-config/llm-config.controller.ts`
+
+```typescript
+// GET    /settings/llm          → LlmSettingsView（含 vector*、vectorBgeOnlyGlobal）
+// GET    /settings/llm/defaults → baseUrl / 向量默认 URL/模型/库名（不含 Key）
+// PUT    /settings/llm
+// DELETE /settings/llm
+// PUT    /settings/llm/vector
+// DELETE /settings/llm/vector
+```
+
+### 4.3 `createLlm` 接入 resolver
+
+**来源**：`apps/backend/src/utils/create-llm.ts`（约 L534–540）
+
+```typescript
+const credentials = resolver
+  ? await resolver.resolveSiliconFlowCredentials(config, preset, userId)
+  : resolveSiliconFlowCredentials(config, siliconFlowResolvePresets[preset](config));
 ```
 
 ---
@@ -165,20 +210,22 @@ await updateLlmSettings({
 
 | 场景 | 行为 |
 |------|------|
-| 未配置 / `enabled=false` | 与改前一致，各 preset 各自 env 回退链 |
-| `enabled=true` 且三字段齐全 | 全站 LLM 调用统一用 DB 配置 |
-| 关闭 UI 覆盖 | `DELETE` 或 `enabled:false` 清空生效配置，回退 env |
-| Assistant token 预算 | `getAssistantSiliconFlowModelName` 同样传入 `llmConfigService` |
+| 未在设置页保存 Key | UI 为空；服务端仍可用 `.env` Key 调模型 |
+| 已保存 Key | UI 与 `GET` 回显一致；切换预设不清空 |
+| 向量 tier 预设 | 三字段同步；自定义 tier 字符串不强制联动 |
+| 恢复默认 | 对话/向量 Key 均清空为 `''` |
+| 旧文档「VITE 自动填入 / 切换清空 Key」 | **已废弃**，以本文 §3.3–§3.5 为准 |
 
 ---
 
 ## 6. 测试与回归建议
 
-1. 迁移：执行 `1780200000000-llm-runtime-config`（或团队等价 migration），确认表存在。
-2. 设置页保存后，`GET` 返回 `active: true`；发起主站对话应使用自定义模型（可故意填无效 Key 验证 401）。
-3. 重启后端进程后无需再保存，启动 `onModuleInit` 应 `reloadSnapshot` 生效。
-4. 「恢复环境变量」后对话应恢复 `.env` 行为。
-5. 知识库助手、英语学习拉包、Agent 各抽一条路径验证。
+1. 新用户打开设置页：Key 为空；保存后刷新仍回显。
+2. 切换智谱/硅基/DeepSeek 预设：URL 与模型联动，Key **保持不变**。
+3. 向量：选 BGE tier 再选 Qwen3 tier，三字段齐变，向量 Key 不变。
+4. 保存时 Key 未改：请求体无 `apiKey`，后端密文不变。
+5. 恢复默认后 Key 为空；对话回退 env（若 `.env` 有 Key）。
+6. 全站 BGE、向量保存权限：见 [../knowledge/vector-bge-global-round.md](../knowledge/vector-bge-global-round.md)。
 
 ---
 
@@ -186,7 +233,10 @@ await updateLlmSettings({
 
 | 说明 | 路径 |
 |------|------|
+| Combobox 与预设 UI | [llm-setting-ui-presets.md](./llm-setting-ui-presets.md) |
+| 按用户 + 会员默认 | [membership-per-user-llm.md](./membership-per-user-llm.md) |
+| 向量全站 BGE / RAG | [../knowledge/vector-bge-global-round.md](../knowledge/vector-bge-global-round.md) |
 | createLlm 工厂 | [create-llm.md](./create-llm.md) |
-| 设置路由（需登录） | `apps/frontend/src/router/routes.ts` |
-| 产品向更新说明 | [../project-update-info.md](../project-update-info.md) §9 |
-| 产品向使用指南 | [../project-guide.md](../project-guide.md) §8.3 |
+| 设置页组件 | `apps/frontend/src/views/setting/llm/index.tsx` |
+| 产品更新 | [../project-update-info.md](../project-update-info.md) §9 |
+| 产品指南 | [../project-guide.md](../project-guide.md) §8.3 |

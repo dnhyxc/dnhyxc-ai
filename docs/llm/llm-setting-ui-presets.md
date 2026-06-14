@@ -1,7 +1,9 @@
 # 大模型设置页：预设联动、可输入 Combobox 与 API Key 环境默认
 
-> **文档角色**：本轮**前端**设置页 `/setting/llm` 的体验与表单逻辑增强（不含后端 `llm_runtime_config` 变更）。  
-> **延伸阅读**：[llm-setting-save-flow.md](./llm-setting-save-flow.md)（保存即启用与底部四态）、[llm-runtime-settings.md](./llm-runtime-settings.md)（持久化、`createLlm` 快照）、[create-llm.md](./create-llm.md)（工厂与 env 回退链）。
+> **文档角色**：本轮**前端**设置页 `/setting/llm` 的 Combobox 与服务商预设联动（不含后端持久化变更）。  
+> **延伸阅读**：[llm-setting-save-flow.md](./llm-setting-save-flow.md)、[llm-runtime-settings.md](./llm-runtime-settings.md)（**API Key 回显、向量 tier 联动、切换不清 Key** — 主文档）、[create-llm.md](./create-llm.md)。
+
+> **API Key 与 env**：早期版本用 `VITE_SILICONFLOW_API_KEY` 预填并在切换预设时清空 Key；**当前行为**见 [llm-runtime-settings.md](./llm-runtime-settings.md) §3.3–§3.5（仅接口回显已保存 Key，切换保留 Key）。
 
 若与仓库最新源码不一致，**以源码为准**。
 
@@ -13,13 +15,13 @@
 
 - Base URL / 模型名原先为纯文本框，硅基与 DeepSeek 需手抄地址，易填错且两项不一致。
 - 设置页在 `ScrollArea` 内，若用 Radix Popover 做下拉，列表易错位到视口左上角。
-- 未在服务端保存过 API Key 时输入框为空，本地开发需在页面重复粘贴 `.env` 中的硅基 Key。
+- 未在服务端保存过 API Key 时输入框为空，本地开发需在页面填写 Key 并保存（**不再**从 `VITE_*` 自动填入）。
 
 ### 1.2 目标
 
 - **可输入 + 预设**：左侧直接编辑，右侧按钮展开与输入框**同宽**的预设列表。
 - **服务商联动**：选中硅基 URL 时自动配对 GLM-5.1；选中 DeepSeek URL 时自动配对 `deepseek-chat`（反向选模型亦同步 URL）。
-- **API Key 默认**：服务端无已保存 Key 时，回显构建时注入的 `VITE_SILICONFLOW_API_KEY`（仅开发/内网默认，会打进前端包）。
+- **API Key**：仅回显服务端已保存 Key；切换预设**不清空** Key（详见 [llm-runtime-settings.md](./llm-runtime-settings.md) §3.3–§3.4）。
 - **生效文案**：底部提示展示当前模型名，如「Pro/zai-org/GLM-5.1 模型配置生效中」。
 
 ---
@@ -51,10 +53,12 @@
 | 字段 | 含义 |
 |------|------|
 | `savedApiKey` | 服务端已持久化的 Key（空表示从未保存） |
-| `apiKey`（展示） | 有 `saved` 用服务端；否则用 `DEFAULT_LLM_API_KEY`（来自 `import.meta.env`） |
+| `apiKey`（展示） | 仅等于 `savedApiKey`（来自 `GET`）；**不回退** `VITE_*` |
 
 - **保存**：`trimmedKey === savedApiKey.trim()` 时不提交 `apiKey`，避免无意义覆写密文。
-- **恢复默认**：清空服务端配置后，`setApiKey(DEFAULT_LLM_API_KEY)`，再 `load()` 对齐视图。
+- **恢复默认**：`setApiKey('')`，不再写入 env 默认 Key。
+
+完整策略见 [llm-runtime-settings.md](./llm-runtime-settings.md) §3.3。
 
 ### 3.3 CreatableCombobox 不用 Popover
 

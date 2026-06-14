@@ -498,7 +498,6 @@ export class KnowledgeEmbeddingService {
 				vectorSnap,
 				input.authorId,
 			);
-			console.log(profiles, 'profiles-searchKnowledgeChunksForAuthor');
 			const batches = await Promise.all(
 				profiles.map(async (profile) => {
 					const apiConfig: KnowledgeVectorApiConfig = {
@@ -529,7 +528,6 @@ export class KnowledgeEmbeddingService {
 		const tier = await this.resolveTierForAuthor(input.authorId);
 		const tiers: KnowledgeVectorTier[] =
 			tier === 'member' ? ['member', 'default'] : ['default'];
-		console.log(tiers, 'tiers-searchKnowledgeChunksForAuthor');
 		const batches = await Promise.all(
 			tiers.map(async (t) => {
 				const qvec = await this.embedQuery(input.question, {

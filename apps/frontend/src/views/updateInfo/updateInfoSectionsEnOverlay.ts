@@ -375,6 +375,11 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'Fixes non–super-admin users being blocked when saving vector settings; endpoint labels now read “Vector model URL” and “Rerank model URL”; LLM and vector form rows use more consistent label width and alignment.',
 	},
+	's9-9': {
+		title: 'LLM & vector Key echo and presets',
+		description:
+			'API Keys are no longer auto-filled from local build-time env; they echo only after you saved them in Settings and the API returns them. Switching chat or vector presets or linked vector model / rerank / collection fields no longer clears keys already entered; BGE and Qwen3 preset tiers keep the three vector fields paired.',
+	},
 	's10-1': {
 		title: 'Image component improvements',
 		description:
