@@ -92,6 +92,10 @@ export function getUploadFilesDir(fromDirname: string = __dirname): string {
 	return join(getUploadsRoot(fromDirname), 'files');
 }
 
+export function getEbookFilesDir(fromDirname: string = __dirname): string {
+	return join(getUploadsRoot(fromDirname), 'ebooks');
+}
+
 export function ensureUploadDir(dir: string): void {
 	if (!existsSync(dir)) {
 		mkdirSync(dir, { recursive: true });

@@ -1,5 +1,6 @@
 import CryptoJS from 'crypto-js';
 import {
+	BASE_URL,
 	FAVORITE_STATUS_HTTP_BATCH_CONCURRENCY,
 	FAVORITE_STATUS_HTTP_BATCH_SIZE,
 	MEMBERSHIP_PLAN_CODES,
@@ -13,9 +14,10 @@ import {
 import type { SearchOrganicItem } from '@/types/chat';
 import { downloadBlob } from '@/utils';
 import type { EnglishPackWebSearchRoundDto } from '@/utils/englishPackWebSearchMerge';
-import { http } from '@/utils/fetch';
+import { getPlatformFetch, http } from '@/utils/fetch';
 import { retryAsync, runTasksWithConcurrency } from '@/utils/retryAsync';
 import { isTauriRuntime } from '@/utils/runtime';
+import type { Book, EbookShelfData, Prog } from '@/views/ebook/types';
 import {
 	AGENT_SESSION,
 	AGENT_SESSIONS,
@@ -33,6 +35,12 @@ import {
 	DELETE_SESSION,
 	DOWNLOAD_FILE,
 	DOWNLOAD_ZIP_FILE,
+	EBOOK_ADD_PATH,
+	EBOOK_DELETE,
+	EBOOK_FILE,
+	EBOOK_PROGRESS,
+	EBOOK_SHELF,
+	EBOOK_UPLOAD,
 	ENGLISH_LEARNING_CLASSIC_QUOTE_MISTAKES,
 	ENGLISH_LEARNING_CLASSIC_QUOTES_FAVORITES,
 	ENGLISH_LEARNING_CLASSIC_QUOTES_FAVORITES_EXPORT_DOCX,
@@ -1757,4 +1765,66 @@ export const deleteKnowledgeTrashBatch = async (ids: string[]) => {
 	return await http.post<{ affected: number }>(KNOWLEDGE_TRASH_DELETE_BATCH, {
 		ids,
 	});
+};
+
+/** GET /ebook/shelf：书架与阅读进度 */
+export const loadEbookShelf = async (): Promise<EbookShelfData> => {
+	const res = await http.get<EbookShelfData>(EBOOK_SHELF, { silent: true });
+	return res.data;
+};
+
+/** POST /ebook/add-path：登记桌面路径 */
+export const addEbookFromPath = async (
+	path: string,
+	fmt: Book['fmt'],
+	title?: string,
+): Promise<Book> => {
+	const res = await http.post<Book>(EBOOK_ADD_PATH, { path, fmt, title });
+	return res.data;
+};
+
+/** POST /ebook/upload：Web 上传入库 */
+export const uploadEbookFile = async (file: File): Promise<Book> => {
+	const mb = file.size / (1024 * 1024);
+	if (mb > 80) {
+		throw new Error('Web 端单本不超过 80MB，请使用桌面客户端打开大文件');
+	}
+	const res = await http.post<Book>(
+		EBOOK_UPLOAD,
+		{ file },
+		{
+			headers: { 'Content-Type': 'multipart/form-data' },
+			onUploadProgress: undefined,
+		},
+	);
+	return res.data;
+};
+
+/** PUT /ebook/progress：保存阅读进度 */
+export const saveEbookProgress = async (prog: Prog): Promise<void> => {
+	await http.put(EBOOK_PROGRESS, {
+		bookId: prog.bookId,
+		epubCfi: prog.epubCfi,
+		pdfPage: prog.pdfPage,
+		percent: prog.percent,
+	});
+};
+
+/** DELETE /ebook/delete/:id */
+export const removeEbook = async (bookId: string): Promise<void> => {
+	await http.delete(EBOOK_DELETE, { params: [bookId] });
+};
+
+/** GET /ebook/file/:id：读取服务端存储的电子书字节 */
+export const fetchEbookBytes = async (bookId: string): Promise<ArrayBuffer> => {
+	const token =
+		typeof window !== 'undefined' ? localStorage.getItem('token') || '' : '';
+	const fetchImpl = await getPlatformFetch();
+	const res = await fetchImpl(`${BASE_URL}${EBOOK_FILE}/${bookId}`, {
+		headers: token ? { Authorization: `Bearer ${token}` } : {},
+	});
+	if (!res.ok) {
+		throw new Error('无法加载电子书文件');
+	}
+	return await res.arrayBuffer();
 };

@@ -16,6 +16,7 @@ export function isPublicPath(pathname: string): boolean {
 	)
 		return true;
 	if (pathname === '/knowledge') return true;
+	if (pathname === '/ebook' || pathname.startsWith('/ebook/')) return true;
 	if (pathname === '/setting' || pathname.startsWith('/setting/')) return true;
 	// /share/:shareId
 	if (/^\/share\/[^/]+\/?$/.test(pathname)) return true;

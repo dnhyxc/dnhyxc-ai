@@ -29,6 +29,7 @@ use command::common::{
 use command::download::{
     download_blob, download_file, download_files, get_file_info, save_file_with_picker,
 };
+use command::ebook::{pick_ebook_file, read_ebook_file};
 use command::knowledge::{
     delete_knowledge_markdown, list_knowledge_markdown_files, open_knowledge_markdown_in_editor,
     read_knowledge_markdown_file, resolve_knowledge_markdown_target,
@@ -69,6 +70,8 @@ pub fn run() {
             read_english_learning_import_json_file, // 读取导入用 .json
             select_directory,      // 选择目录
             save_file_with_picker, // 通用保存
+            pick_ebook_file,         // 选择 epub / pdf
+            read_ebook_file,         // 读取电子书字节
             resolve_knowledge_markdown_target, // 知识保存：解析目标路径、是否已存在
             save_knowledge_markdown, // 知识页 Markdown 写入
             delete_knowledge_markdown, // 知识页 Markdown 删除

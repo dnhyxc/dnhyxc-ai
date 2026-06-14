@@ -17,6 +17,7 @@ export const PROJECT_GUIDE_SECTION_TITLES_EN: Record<string, string> = {
 	'pg-s13': '13. English learning (word packs, quotes, favorites)',
 	'pg-s14': '14. Going deeper',
 	'pg-s15': '15. About window and legal pages',
+	'pg-s16': '16. E-books (bookshelf & reader)',
 };
 
 export const PROJECT_GUIDE_ITEMS_EN: Record<
@@ -351,5 +352,15 @@ export const PROJECT_GUIDE_ITEMS_EN: Record<
 		title: '15.3 Product guide (standalone structured page)',
 		description:
 			'Home “Learn more” opens this guide in the default browser or a new tab. Route /project-guide; full-page scroll; logged-out OK. Header title plus language toggle (?lang=), same pattern as legal standalone pages. Structured sections like release notes; keep frontend guide modules (including English overlay) in sync when this prose changes.',
+	},
+	'pg-s16-1': {
+		title: '16.1 Bookshelf and importing',
+		description:
+			'Entry: sidebar Bookshelf or /ebook. Managing the shelf, uploads, and progress sync requires sign-in; the page may open when logged out but shelf features will not work.\nDesktop (Tauri): Open local file and pick epub or pdf; the book is added and opens immediately (file stays on disk; only the path is registered).\nBrowser: Import file uploads epub/pdf to your account shelf, then opens the reader.\nShelf cards: title, format (EPUB/PDF), progress; Read to open; Remove asks for confirmation.',
+	},
+	'pg-s16-2': {
+		title: '16.2 Reading, TOC, and page turns',
+		description:
+			'Reader header: Back returns to the shelf; center shows the book title; right side has page turns and (EPUB) table of contents.\nProgress saves automatically while reading; reopening the same book restores position when possible.\nKeyboard: ↑ or ← previous page; ↓ or → next page. Ignored when the TOC drawer is open or focus is in an input.\nMain app header shows Bookshelf > Reading; the book title appears in the reader header.',
 	},
 };

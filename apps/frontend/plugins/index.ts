@@ -1,6 +1,88 @@
 import fs from 'node:fs';
+import { createRequire } from 'node:module';
 import path from 'node:path';
-import type { Plugin, ResolvedConfig } from 'vite';
+import type { Connect, Plugin, ResolvedConfig } from 'vite';
+
+const PDFJS_MIME: Record<string, string> = {
+	'.wasm': 'application/wasm',
+	'.js': 'application/javascript',
+	'.mjs': 'application/javascript',
+	'.bcmap': 'application/octet-stream',
+};
+
+function copyPdfjsDir(
+	configRoot: string,
+	subdir: 'wasm' | 'cmaps',
+	publicSubdir: string,
+) {
+	const require = createRequire(path.join(configRoot, 'package.json'));
+	const pdfjsRoot = path.dirname(require.resolve('pdfjs-dist/package.json'));
+	const src = path.join(pdfjsRoot, subdir);
+	const dest = path.join(configRoot, 'public', publicSubdir);
+	if (!fs.existsSync(src)) return;
+	fs.mkdirSync(dest, { recursive: true });
+	fs.cpSync(src, dest, { recursive: true, force: true });
+}
+
+function pdfjsStaticMiddleware(
+	urlPrefix: string,
+	rootDir: string,
+): Connect.NextHandleFunction {
+	return (req, res, next) => {
+		const raw = req.url?.split('?')[0] ?? '';
+		if (!raw.startsWith(urlPrefix)) return next();
+		const rel = decodeURIComponent(raw.slice(urlPrefix.length));
+		if (!rel || rel.includes('..')) return next();
+		const filePath = path.join(rootDir, rel);
+		if (!fs.existsSync(filePath) || !fs.statSync(filePath).isFile()) {
+			return next();
+		}
+		const ext = path.extname(filePath);
+		res.setHeader(
+			'Content-Type',
+			PDFJS_MIME[ext] ?? 'application/octet-stream',
+		);
+		fs.createReadStream(filePath).pipe(res);
+	};
+}
+
+/**
+ * pdf.js v6 解码 JBIG2 等需 wasm/cmaps：
+ * - 开发：中间件直接从 node_modules 提供（不依赖 public 热更新）
+ * - 构建：复制到 public，随 dist 分发
+ */
+export function copyPdfjsAssetsPlugin(): Plugin {
+	let configRoot = '';
+	let wasmDir = '';
+	let cmapsDir = '';
+
+	return {
+		name: 'copy-pdfjs-assets',
+		enforce: 'pre',
+		configResolved(config: ResolvedConfig) {
+			configRoot = config.root;
+			const require = createRequire(path.join(config.root, 'package.json'));
+			const pdfjsRoot = path.dirname(
+				require.resolve('pdfjs-dist/package.json'),
+			);
+			wasmDir = path.join(pdfjsRoot, 'wasm');
+			cmapsDir = path.join(pdfjsRoot, 'cmaps');
+		},
+		configureServer(server) {
+			server.middlewares.use(pdfjsStaticMiddleware('/pdfjs-wasm/', wasmDir));
+			server.middlewares.use(pdfjsStaticMiddleware('/pdfjs-cmaps/', cmapsDir));
+		},
+		configurePreviewServer(server) {
+			server.middlewares.use(pdfjsStaticMiddleware('/pdfjs-wasm/', wasmDir));
+			server.middlewares.use(pdfjsStaticMiddleware('/pdfjs-cmaps/', cmapsDir));
+		},
+		buildStart() {
+			if (!configRoot) return;
+			copyPdfjsDir(configRoot, 'wasm', 'pdfjs-wasm');
+			copyPdfjsDir(configRoot, 'cmaps', 'pdfjs-cmaps');
+		},
+	};
+}
 
 export function removeDistMinMapsPlugin(): Plugin {
 	let resolvedOutDir = '';

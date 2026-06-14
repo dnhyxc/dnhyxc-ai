@@ -14,6 +14,9 @@ import Coding from '@/views/coding';
 import DesktopDownloadPage from '@/views/desktopDownload';
 import Document from '@/views/document';
 import Download from '@/views/download';
+import Ebook from '@/views/ebook';
+import EbookLayout from '@/views/ebook/layout';
+import EbookRead from '@/views/ebook/read';
 import EnglishLearning from '@/views/englishLearning';
 import EnglishLearningDailyPage from '@/views/englishLearning/daily';
 import EnglishLearningDailyRecordsPage from '@/views/englishLearning/daily/records';
@@ -129,6 +132,29 @@ const routes: RouteConfig[] = [
 				meta: {
 					titleKey: 'route.knowledge.title',
 				},
+			},
+			{
+				path: '/ebook',
+				Component: EbookLayout,
+				meta: {
+					titleKey: 'route.ebook.title',
+				},
+				children: [
+					{
+						index: true,
+						Component: Ebook,
+						meta: {
+							titleKey: 'route.ebook.title',
+						},
+					},
+					{
+						path: 'read/:bookId',
+						Component: EbookRead,
+						meta: {
+							titleKey: 'route.ebook.read',
+						},
+					},
+				],
 			},
 			{
 				path: '/english-learning',

@@ -51,6 +51,7 @@ export const enUS = {
 	// 导航栏文案
 	'nav.home': 'Home',
 	'nav.knowledge': 'Knowledge',
+	'nav.ebook': 'Bookshelf',
 	'nav.chat': 'Smart Chat',
 	'nav.englishLearning': 'English',
 	'nav.pay': 'Membership',
@@ -1513,6 +1514,30 @@ export const enUS = {
 	'route.coding.title': 'Coding',
 	'route.profile.title': 'Profile',
 	'route.knowledge.title': 'Knowledge',
+	'route.ebook.title': 'Bookshelf',
+	'route.ebook.read': 'Reading',
+
+	'ebook.shelf.title': 'Ebook shelf',
+	'ebook.shelf.hint':
+		'EPUB and PDF. Desktop: open local files. Web: import a file.',
+	'ebook.shelf.hintTauri':
+		'EPUB and PDF. Use the button above to open a local file.',
+	'ebook.shelf.hintWeb': 'EPUB and PDF. Use the button above to import a file.',
+	'ebook.shelf.pickLocal': 'Open local file',
+	'ebook.shelf.pickFile': 'Import file',
+	'ebook.shelf.empty': 'No books yet. Import one to start.',
+	'ebook.shelf.progress': 'About {pct}% read',
+	'ebook.shelf.read': 'Start reading',
+	'ebook.shelf.continue': 'Continue',
+	'ebook.shelf.deleteConfirmTitle': 'Remove this book?',
+	'ebook.shelf.deleteConfirmDesc':
+		'「{title}」 and its reading progress will be removed. This cannot be undone.',
+	'ebook.read.missing': 'Book not found',
+	'ebook.read.backShelf': 'Back to shelf',
+	'ebook.read.toc': 'Contents',
+	'ebook.read.prev': 'Previous',
+	'ebook.read.next': 'Next',
+	'ebook.err.open': 'Failed to open',
 	'route.account.title': 'Account',
 	'route.pay.title': 'Membership',
 	'route.setting.title': 'Settings',

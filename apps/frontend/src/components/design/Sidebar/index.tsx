@@ -7,6 +7,7 @@ import {
 } from '@ui/dropdown-menu';
 import {
 	ArrowLeftRight,
+	BookMarked,
 	BookOpenText,
 	Bot,
 	CircleUserRound,
@@ -45,6 +46,7 @@ const Sidebar = () => {
 		Bot: <Bot />,
 		Codesandbox: <Codesandbox />,
 		BookOpenText: <BookOpenText />,
+		BookMarked: <BookMarked />,
 		WalletCards: <WalletCards />,
 		Vegan: <Vegan />,
 	};

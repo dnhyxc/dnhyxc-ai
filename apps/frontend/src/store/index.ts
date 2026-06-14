@@ -10,6 +10,7 @@ import { createContext, useContext } from 'react';
 import AssistantStore from './assistant';
 import AuthStore from './auth';
 import ChatStore from './chat';
+import EbookStore from './ebook';
 import KnowledgeStore from './knowledge';
 import UserStore from './user';
 
@@ -19,6 +20,7 @@ class RootStore {
 	chatStore = ChatStore;
 	knowledgeStore = KnowledgeStore;
 	assistantStore = AssistantStore;
+	ebookStore = EbookStore;
 }
 
 const store = new RootStore();

@@ -10,6 +10,8 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+public/pdfjs-wasm
+public/pdfjs-cmaps
 *.local
 
 # Editor directories and files

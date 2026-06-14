@@ -24,6 +24,7 @@
 | [`setting/`](./setting/) | 系统快捷键 | [setting/system-shortcuts-implementation-record.md](./setting/system-shortcuts-implementation-record.md) |
 | [`meta/`](./meta/) | 发布与更新同步 | [meta/project-features-update.md](./meta/project-features-update.md) |
 | [`pay/`](./pay/) | Stripe 会员充值、开通与到期 | [pay/stripe-membership-billing.md](./pay/stripe-membership-billing.md)、[pay/membership-active-hook.md](./pay/membership-active-hook.md) |
+| [`ebook/`](./ebook/) | 电子书书架、EPUB/PDF 阅读与进度 | [ebook/README.md](./ebook/README.md) |
 
 ---
 
@@ -64,6 +65,8 @@
 | 支付成功但资料页仍非会员 / 到期仍显示会员 | [pay/stripe-membership-billing.md](./pay/stripe-membership-billing.md) §6–§7 |
 | 换号后仍看到上一账号的草稿或助手对话 | [app/user-switch-state-reset.md](./app/user-switch-state-reset.md) |
 | 登录成功瞬间又回到登录页 / cloud-tts 401 | [app/login-cloud-tts-prefetch-401.md](./app/login-cloud-tts-prefetch-401.md) |
+| 阅读页顶栏显示「智能对话」而非书架 | [ebook/ebook-reader-shelf.md](./ebook/ebook-reader-shelf.md) §3.4、[app/route-auth.md](./app/route-auth.md) |
+| Web 无法打开「本地路径」电子书 | [ebook/ebook-reader-shelf.md](./ebook/ebook-reader-shelf.md) §3.2（设计：仅 Tauri 读盘） |
 
 ---
 

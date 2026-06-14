@@ -176,6 +176,19 @@ export const ENGLISH_LEARNING_VOCABULARY_MISTAKES =
 export const ENGLISH_LEARNING_CLASSIC_QUOTE_MISTAKES =
 	'/english-learning/classic-quote-mistakes';
 
+/** 电子书：书架列表与阅读进度 */
+export const EBOOK_SHELF = '/ebook/shelf';
+/** 电子书：从桌面路径登记（Tauri） */
+export const EBOOK_ADD_PATH = '/ebook/add-path';
+/** 电子书：上传文件入库 */
+export const EBOOK_UPLOAD = '/ebook/upload';
+/** 电子书：更新阅读进度 */
+export const EBOOK_PROGRESS = '/ebook/progress';
+/** 电子书：删除书籍 */
+export const EBOOK_DELETE = '/ebook/delete';
+/** 电子书：下载已入库文件字节 */
+export const EBOOK_FILE = '/ebook/file';
+
 /** 英语学习：按主题生成经典语句（译文 + 出处 + 赏析） */
 export const ENGLISH_LEARNING_CLASSIC_QUOTES =
 	'/english-learning/classic-quotes';

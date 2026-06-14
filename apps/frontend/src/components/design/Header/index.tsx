@@ -1,6 +1,6 @@
 import { ChevronRight, Languages, Settings, Shirt } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router';
+import { matchPath, useLocation, useNavigate } from 'react-router';
 import { useI18n, useStorageInfo } from '@/hooks';
 import routes, { type RouteConfig } from '@/router/routes';
 import { checkVersion, getValue, removeStorage, setStorage } from '@/utils';
@@ -12,6 +12,9 @@ interface Iprops {
 
 /** 顶栏面包屑单项：titleKey 走 i18n，path 为可导航的绝对 pathname */
 type HeaderBreadcrumbCrumb = { titleKey: string; path: string };
+
+const pathMatches = (pattern: string, pathname: string) =>
+	matchPath({ path: pattern, end: true }, pathname) != null;
 
 const Header: React.FC<Iprops> = ({ actions = true, ccustomActions }) => {
 	const [autoUpdate, setAutoUpdate] = useState(false);
@@ -77,7 +80,7 @@ const Header: React.FC<Iprops> = ({ actions = true, ccustomActions }) => {
 		): string | undefined => {
 			for (const route of routeList) {
 				const absolute = resolveAbsolute(route, parentBase);
-				if (absolute === pathname) {
+				if (absolute && pathMatches(absolute, pathname)) {
 					const m = metaOf(route);
 					if (m) return m;
 				}
@@ -137,7 +140,7 @@ const Header: React.FC<Iprops> = ({ actions = true, ccustomActions }) => {
 					if (hit) return hit;
 				}
 
-				if (absolute === pathname && titleK && absolute) {
+				if (absolute && titleK && pathMatches(absolute, pathname)) {
 					return [
 						...prefix,
 						{

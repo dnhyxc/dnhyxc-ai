@@ -32,6 +32,7 @@ export const UPDATE_INFO_SECTION_TITLES_EN: Record<string, string> = {
 	s22: '22. Product guide page & home entry',
 	s23: '23. Home “Quick start” & sign-up entry',
 	s24: '24. English learning (vocabulary packs, quotes & favorites)',
+	s25: '25. E-books (bookshelf & reader)',
 };
 
 /** 条目标题与描述（key = bullet.id） */
@@ -789,5 +790,25 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		title: 'English learning home sidebar visual unify',
 		description:
 			'Left sidebar blocks (daily memorize, quick intents, vocab/quotes libraries, topic pulls, favorites, today review, mistake books, etc.) now share one card and button spec aligned with the Agent and knowledge sidebars—subtle borders and light fills—while keeping each block’s icon and button colors. JSON import examples in library cards are collapsed by default; tap the label to expand or collapse. Quick-intent chips stay two columns in a narrow sidebar and add columns when the panel is wider.',
+	},
+	's25-1': {
+		title: 'E-book bookshelf',
+		description:
+			'New Bookshelf entry in the sidebar (/ebook). Signed-in users can manage EPUB/PDF: cards show title, format, and progress; open to read or remove with confirmation.',
+	},
+	's25-2': {
+		title: 'Desktop vs browser import',
+		description:
+			'Desktop (Tauri): Open local file to pick epub/pdf; the app registers the path and reads from disk (file is not copied to the server). Browser: Import file uploads to your account shelf. About 120MB per file.',
+	},
+	's25-3': {
+		title: 'EPUB/PDF reading and progress',
+		description:
+			'Reader supports page turns and percent progress; EPUB has a table of contents; reading position (EPUB locator / PDF page) syncs when signed in and restores on reopen.',
+	},
+	's25-4': {
+		title: 'Reader UX',
+		description:
+			'Reader header: back, title, page turns and (EPUB) TOC. Keyboard ↑/← previous page, ↓/→ next page (ignored when TOC is open or an input is focused). Main header breadcrumb shows Bookshelf > Reading instead of the default app title.',
 	},
 };

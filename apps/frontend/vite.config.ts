@@ -1,7 +1,7 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig, loadEnv } from 'vite';
-import { removeDistMinMapsPlugin } from './plugins';
+import { copyPdfjsAssetsPlugin, removeDistMinMapsPlugin } from './plugins';
 
 const host = process.env.TAURI_DEV_HOST;
 
@@ -27,7 +27,12 @@ export default defineConfig(({ mode }) => {
 		).replace(/\/$/, '') || '/ext-cos';
 
 	return {
-		plugins: [react(), tailwindcss(), removeDistMinMapsPlugin()],
+		plugins: [
+			react(),
+			tailwindcss(),
+			copyPdfjsAssetsPlugin(),
+			removeDistMinMapsPlugin(),
+		],
 		resolve: {
 			alias: {
 				'@': '/src',
