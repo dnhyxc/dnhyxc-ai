@@ -55,11 +55,12 @@ export function EbookShelfBookCard({
 						sideOffset={6}
 						delayDuration={300}
 						shadow
+						className="max-w-[min(100vw-2rem,18rem)] w-auto whitespace-normal text-left wrap-break-word leading-snug"
 						content={book.title}
 					>
 						<button
 							type="button"
-							className="min-w-0 flex-1 overflow-hidden text-left text-sm font-medium leading-snug hover:underline"
+							className="min-w-0 flex-1 overflow-hidden text-left text-sm font-medium leading-snug"
 							onClick={() => onOpen(book.id)}
 						>
 							<span className="text-textcolor line-clamp-2 wrap-break-word">

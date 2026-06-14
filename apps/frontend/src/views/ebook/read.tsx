@@ -240,7 +240,7 @@ function EbookReadPage() {
 			contentPadding={false}
 			header={
 				<EbookPanelHeader
-					className="pl-5 pr-3"
+					className="pl-4.5 pr-2.5"
 					title={book.title}
 					trailing={epubHeaderTrailing}
 				/>

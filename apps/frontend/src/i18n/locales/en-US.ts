@@ -1520,12 +1520,11 @@ export const enUS = {
 	'ebook.shelf.title': 'Ebook shelf',
 	'ebook.shelf.hint':
 		'EPUB and PDF. Desktop: open local files. Web: import a file.',
-	'ebook.shelf.hintTauri':
-		'EPUB and PDF. Use the button above to open a local file.',
-	'ebook.shelf.hintWeb': 'EPUB and PDF. Use the button above to import a file.',
+	'ebook.shelf.hintTauri': 'Support epub and pdf. Click to open a local file',
+	'ebook.shelf.hintWeb': 'Support epub and pdf. Click to import a file',
 	'ebook.shelf.pickLocal': 'Open local file',
 	'ebook.shelf.pickFile': 'Import file',
-	'ebook.shelf.empty': 'No books yet. Import one to start.',
+	'ebook.shelf.empty': 'No books yet.',
 	'ebook.shelf.progress': 'About {pct}% read',
 	'ebook.shelf.read': 'Start reading',
 	'ebook.shelf.continue': 'Continue',

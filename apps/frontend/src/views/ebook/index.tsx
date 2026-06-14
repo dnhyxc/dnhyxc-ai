@@ -105,7 +105,7 @@ function EbookShelfPage() {
 				contentPadding={false}
 				header={
 					<EbookPanelHeader
-						className="px-5"
+						className="px-4.5"
 						title={
 							<>
 								{t('ebook.shelf.title')}
@@ -117,44 +117,48 @@ function EbookShelfPage() {
 							</>
 						}
 						trailing={
-							isTauri ? (
-								<Button
-									variant="link"
-									size="sm"
-									className="gap-1.5 px-0!"
-									onClick={onPickTauri}
-								>
-									<FolderOpen className="size-4" aria-hidden />
-									{t('ebook.shelf.pickLocal')}
-								</Button>
-							) : (
-								<>
+							<div className="flex min-w-0 items-center justify-end gap-2">
+								<span className="mr-1.5 text-textcolor/55 min-w-0 max-w-[min(100vw-10rem,16rem)] text-right text-xs leading-snug wrap-break-word">
+									{isTauri
+										? t('ebook.shelf.hintTauri')
+										: t('ebook.shelf.hintWeb')}
+								</span>
+								{isTauri ? (
 									<Button
 										variant="link"
 										size="sm"
-										className="gap-1.5 px-0!"
-										onClick={onPickWeb}
+										className="shrink-0 gap-1.5 px-0!"
+										onClick={onPickTauri}
 									>
-										<BookOpen className="size-4" aria-hidden />
-										{t('ebook.shelf.pickFile')}
+										<FolderOpen className="size-4" aria-hidden />
+										{t('ebook.shelf.pickLocal')}
 									</Button>
-									<input
-										ref={fileRef}
-										type="file"
-										accept=".epub,.pdf"
-										className="hidden"
-										onChange={(e) => onFile(e.target.files)}
-									/>
-								</>
-							)
+								) : (
+									<>
+										<Button
+											variant="link"
+											size="sm"
+											className="shrink-0 gap-1.5 px-0!"
+											onClick={onPickWeb}
+										>
+											<BookOpen className="size-4" aria-hidden />
+											{t('ebook.shelf.pickFile')}
+										</Button>
+										<input
+											ref={fileRef}
+											type="file"
+											accept=".epub,.pdf"
+											className="hidden"
+											onChange={(e) => onFile(e.target.files)}
+										/>
+									</>
+								)}
+							</div>
 						}
 					/>
 				}
 			>
-				<ScrollArea className="min-h-0 flex-1 px-4.5 py-4">
-					<p className="text-textcolor/55 mb-4 text-sm">
-						{isTauri ? t('ebook.shelf.hintTauri') : t('ebook.shelf.hintWeb')}
-					</p>
+				<ScrollArea className="min-h-0 flex-1 px-4 py-4">
 					{showInitialLoading ? (
 						<div className="text-textcolor/60 flex flex-1 flex-col items-center justify-center py-12 text-center text-sm">
 							<Loading text={t('common.loading')} />
