@@ -297,6 +297,11 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'Active members who saved custom vector settings also get the member default Qwen3 vector collection merged into parallel RAG search, alongside their collections and the system bge collection, reducing missed hits in older data.',
 	},
+	's6-20': {
+		title: 'Knowledge vector chunk boundary fix',
+		description:
+			'Fixes mid-word truncation when vectorizing long articles and code samples (e.g. console.log split into ole.log). Code blocks are split by line first, including closing ``` on the same line. Re-save existing articles to refresh stored chunks used in retrieval.',
+	},
 	's7-1': {
 		title: 'IME (input method editor) compatibility',
 		description:

@@ -274,11 +274,11 @@ async upsertKnowledgeChunks(input): Promise<void> {
 
 ### 4.5 Unicode 安全分片与 payload 清洗（后端）
 
+> **分片语义边界、代码围栏、按行切分、overlap 对齐**的完整方案见 [knowledge-chunk-boundaries.md](./knowledge-chunk-boundaries.md)。本节仅保留 Unicode 切片摘录。
+
 #### 4.5.1 分片边界：`sliceUtf16Safe`
 
-JavaScript 字符串按 UTF-16 码元索引；在 200 字符处切分可能落在 emoji 的 surrogate 对中间，产生**孤立 surrogate**。写入 Qdrant JSON payload 时可能 400。
-
-**来源**：`apps/backend/src/services/knowledge-embedding/knowledge-embedding.service.ts`（约 L89–101、`chunkMarkdown` 约 L784–788）
+**来源**：`apps/backend/src/utils/knowledge-chunk.ts`（约 L1–14）；原内联于 `knowledge-embedding.service.ts` 已迁出。
 
 ```typescript
 function sliceUtf16Safe(text: string, start: number, end: number): string {

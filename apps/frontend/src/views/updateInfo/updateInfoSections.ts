@@ -418,6 +418,13 @@ const UPDATE_INFO_SECTIONS_ZH: UpdateInfoSection[] = [
 				description:
 					'有效会员在已保存自定义向量后，RAG 除你的向量库与系统 bge 库外，会自动并行检索会员默认 Qwen3 向量库，减少漏检存量。',
 			},
+			{
+				id: 's6-20',
+				title: '知识库向量分片语义修复',
+				dateLabel: '2026-06-13',
+				description:
+					'修复长文与代码示例在向量化时被拦腰截断（如 console.log 变成 ole.log）；代码块优先按行切分并识别行尾闭合的代码围栏。已有文章需重新保存后，检索上下文才会更新。',
+			},
 		],
 	},
 	{

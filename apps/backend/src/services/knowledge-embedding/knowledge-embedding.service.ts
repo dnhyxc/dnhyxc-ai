@@ -22,6 +22,7 @@ import {
 	resolveKnowledgeEmbeddingApiConfig,
 	resolveKnowledgeRerankApiConfig,
 } from '../../utils/create-llm';
+import { splitMarkdownAwareBlock } from '../../utils/knowledge-chunk';
 import { LlmConfigService } from '../llm-config/llm-config.service';
 import type { VectorRuntimeSnapshot } from '../llm-config/llm-runtime-snapshot.store';
 import {
@@ -84,21 +85,6 @@ function sanitizeKnowledgeStorageText(text: string): string {
 		.replace(/\0/g, '')
 		.replace(/\uFFFE|\uFFFF/g, '')
 		.replace(/[\uD800-\uDFFF]/g, '');
-}
-
-/** 按字符分片时避免在 UTF-16 surrogate 对中间切断 */
-function sliceUtf16Safe(text: string, start: number, end: number): string {
-	let s = Math.max(0, start);
-	let e = Math.min(text.length, end);
-	if (s > 0 && s < text.length) {
-		const lead = text.charCodeAt(s);
-		if (lead >= 0xdc00 && lead <= 0xdfff) s++;
-	}
-	if (e > s && e <= text.length) {
-		const trail = text.charCodeAt(e - 1);
-		if (trail >= 0xd800 && trail <= 0xdbff) e--;
-	}
-	return text.slice(s, e);
 }
 
 /**
@@ -775,15 +761,7 @@ export class KnowledgeEmbeddingService {
 				chunks.push(b);
 				continue;
 			}
-			let i = 0;
-			while (i < b.length) {
-				const end = Math.min(b.length, i + target);
-				const piece = sliceUtf16Safe(b, i, end).trim();
-				if (piece) chunks.push(piece);
-				i = end - overlap;
-				if (i < 0) i = 0;
-				if (end === b.length) break;
-			}
+			chunks.push(...splitMarkdownAwareBlock(b, target, overlap));
 		}
 
 		return chunks.map((text, idx) => ({ chunkIndex: idx, text }));
