@@ -356,11 +356,16 @@ export const PROJECT_GUIDE_ITEMS_EN: Record<
 	'pg-s16-1': {
 		title: '16.1 Bookshelf and importing',
 		description:
-			'Entry: sidebar Bookshelf or /ebook. Managing the shelf, uploads, and progress sync requires sign-in; the page may open when logged out but shelf features will not work.\nDesktop (Tauri): Open local file and pick epub or pdf; the book is added and opens immediately (file stays on disk; only the path is registered).\nBrowser: Import file uploads epub/pdf to your account shelf, then opens the reader.\nShelf cards: title, format (EPUB/PDF), progress; Read to open; Remove asks for confirmation.',
+			'Entry: sidebar Bookshelf or /ebook. Managing the shelf, uploads, and progress sync requires sign-in; the page may open when logged out but shelf features will not work.\nDesktop (Tauri): Open local file and pick epub or pdf; the book is added to the shelf (file stays on disk; only the path is registered) without auto-opening the reader.\nBrowser: Import file uploads epub/pdf to your account shelf; you stay on the shelf and tap Read on the card to open.\nShelf cards: vertical layout with title, format (EPUB/PDF), four-edge progress ring, and Read/Continue; long titles show in a tooltip on hover; Remove asks for confirmation.',
 	},
 	'pg-s16-2': {
 		title: '16.2 Reading, TOC, and page turns',
 		description:
-			'Reader header: Back returns to the shelf; center shows the book title; right side has page turns and (EPUB) table of contents.\nProgress saves automatically while reading; reopening the same book restores position when possible.\nKeyboard: ↑ or ← previous page; ↓ or → next page. Ignored when the TOC drawer is open or focus is in an input.\nMain app header shows Bookshelf > Reading; the book title appears in the reader header.',
+			'Reader header: Back returns to the shelf; center shows the book title; right side has previous/next and TOC for both EPUB and PDF (PDF TOC uses embedded bookmarks; empty message when none).\nPDF page numbers appear between the header page-turn buttons (no footer bar).\nProgress saves automatically while reading; reopening the same book restores position when possible.\nEPUB text color follows Settings → theme: light text on the black theme, dark text on other themes.\nKeyboard: ↑ or ← previous page; ↓ or → next page. Ignored when the TOC drawer is open or focus is in an input.\nMain app header shows Bookshelf > Reading; the book title appears in the reader header.',
+	},
+	'pg-s16-3': {
+		title: '16.3 EPUB reader settings (EPUB only)',
+		description:
+			'Entry: while reading EPUB, Reading settings (bolt icon) next to TOC in the reader header.\nAdjust font size, line spacing, text color (including follow theme), and reading background (paper, dark, sepia, etc.).\nPage flow: Paginated (screen-by-screen) or Continuous scroll (vertical). In continuous scroll, reaching the bottom or top of a chapter moves to the next or previous chapter; header page-turn buttons still work.\nRestore defaults at the bottom of the panel.\nPreferences are stored in this browser only; switching devices or clearing site data resets them. Changing page flow briefly reloads the book while trying to keep your position.',
 	},
 };

@@ -70,9 +70,13 @@ class EbookStore {
 	}
 
 	saveProg(patch: Omit<Prog, 'updatedAt'>): void {
+		const prev = this.progMap[patch.bookId];
 		const next: Prog = {
-			...patch,
+			bookId: patch.bookId,
 			updatedAt: new Date().toISOString(),
+			epubCfi: patch.epubCfi ?? prev?.epubCfi,
+			pdfPage: patch.pdfPage ?? prev?.pdfPage,
+			percent: patch.percent !== undefined ? patch.percent : prev?.percent,
 		};
 		runInAction(() => {
 			this.progMap[patch.bookId] = next;

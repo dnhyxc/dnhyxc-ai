@@ -35,7 +35,7 @@ export function EbookPanelHeader({
 				</div>
 			</div>
 			{trailing ? (
-				<div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+				<div className="flex shrink-0 flex-wrap items-center justify-end gap-1">
 					{trailing}
 				</div>
 			) : null}

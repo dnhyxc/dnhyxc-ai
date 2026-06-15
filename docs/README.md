@@ -66,7 +66,8 @@
 | 换号后仍看到上一账号的草稿或助手对话 | [app/user-switch-state-reset.md](./app/user-switch-state-reset.md) |
 | 登录成功瞬间又回到登录页 / cloud-tts 401 | [app/login-cloud-tts-prefetch-401.md](./app/login-cloud-tts-prefetch-401.md) |
 | 阅读页顶栏显示「智能对话」而非书架 | [ebook/ebook-reader-shelf.md](./ebook/ebook-reader-shelf.md) §3.4、[app/route-auth.md](./app/route-auth.md) |
-| Web 无法打开「本地路径」电子书 | [ebook/ebook-reader-shelf.md](./ebook/ebook-reader-shelf.md) §3.2（设计：仅 Tauri 读盘） |
+| PDF 目录跳转报 canvas 并发渲染错误 | [ebook/shelf-reader-polish.md](./ebook/shelf-reader-polish.md) §3.6 |
+| EPUB 连续滚动无法自动进入下一章 | [ebook/epub-reader-settings-scroll.md](./ebook/epub-reader-settings-scroll.md) §3.2 |
 
 ---
 

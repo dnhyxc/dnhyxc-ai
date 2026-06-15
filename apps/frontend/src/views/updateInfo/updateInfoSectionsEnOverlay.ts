@@ -811,4 +811,14 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'Reader header: back, title, page turns and (EPUB) TOC. Keyboard ↑/← previous page, ↓/→ next page (ignored when TOC is open or an input is focused). Main header breadcrumb shows Bookshelf > Reading instead of the default app title.',
 	},
+	's25-5': {
+		title: 'Bookshelf and reader polish',
+		description:
+			'Vertical shelf cards with a four-edge progress ring and EPUB/PDF color accents; open/import adds to the shelf without auto-opening the reader—tap Read or Continue on the card. PDF reader header matches EPUB: page turns, page numbers, and TOC from embedded bookmarks (empty state when none). Fixed render errors when jumping via TOC quickly. EPUB text color follows the app theme (light on black theme, dark on others); smoother page turns and progress saving.',
+	},
+	's25-6': {
+		title: 'EPUB reader settings and continuous scroll',
+		description:
+			'EPUB reader header adds Reading settings next to TOC: font size, line spacing, text color, reading background, and paginated vs continuous scroll; preferences are stored locally. In continuous scroll, reaching the bottom or top of a chapter automatically moves to the next or previous chapter without repeated page-turn clicks.',
+	},
 };

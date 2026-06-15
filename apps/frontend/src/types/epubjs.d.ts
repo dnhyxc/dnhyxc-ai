@@ -1,7 +1,7 @@
 declare module 'epubjs' {
-	import type { Book, Rendition } from 'epubjs/types';
+	import type { Book, Location, Rendition } from 'epubjs/types';
 
-	export type { Book, Rendition };
+	export type { Book, Location, Rendition };
 
 	export default function ePub(
 		urlOrData: string | ArrayBuffer | Blob,

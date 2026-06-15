@@ -11,10 +11,18 @@ import ebookStore from '@/store/ebook';
 import { EbookPageShell } from './components/EbookPageShell';
 import { EbookPanelHeader } from './components/EbookPanelHeader';
 import { EpubPane } from './components/EpubPane';
+import { EpubReaderSettingsPopover } from './components/EpubReaderSettingsPopover';
 import { EpubTocDrawer } from './components/EpubTocDrawer';
 import { PdfPane } from './components/PdfPane';
 import type { EpubToc } from './types';
+import {
+	DEFAULT_EPUB_READER_SETTINGS,
+	type EpubReaderSettings,
+	loadEpubReaderSettings,
+	saveEpubReaderSettings,
+} from './utils/epubReaderSettings';
 import { resolveOpen } from './utils/io';
+import { parsePdfPageHref } from './utils/pdfOutline';
 
 function EbookReadPage() {
 	const { bookId = '' } = useParams();
@@ -26,14 +34,24 @@ function EbookReadPage() {
 	const [open, setOpen] = useState<ArrayBuffer | null>(null);
 	const [toc, setToc] = useState<EpubToc[]>([]);
 	const [tocOpen, setTocOpen] = useState(false);
+	const [epubSettingsOpen, setEpubSettingsOpen] = useState(false);
+	const [epubSettings, setEpubSettings] = useState<EpubReaderSettings>(
+		loadEpubReaderSettings,
+	);
 	const epubNavRef = useRef<{
 		prev: () => Promise<void>;
 		next: () => Promise<void>;
 		go: (href: string) => Promise<void>;
 	} | null>(null);
 	const [epubNavReady, setEpubNavReady] = useState(false);
-	const pdfNavRef = useRef<{ prev: () => void; next: () => void } | null>(null);
+	const pdfNavRef = useRef<{
+		prev: () => void;
+		next: () => void;
+		go: (page: number) => void;
+	} | null>(null);
 	const [pdfNavReady, setPdfNavReady] = useState(false);
+	const [pdfPage, setPdfPage] = useState(0);
+	const [pdfTotal, setPdfTotal] = useState(0);
 	const progTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
 	useEffect(() => {
@@ -44,10 +62,13 @@ function EbookReadPage() {
 		if (!book) return;
 		let cancelled = false;
 		setOpen(null);
+		setToc([]);
 		setEpubNavReady(false);
-		setPdfNavReady(false);
 		epubNavRef.current = null;
 		pdfNavRef.current = null;
+		setPdfNavReady(false);
+		setPdfPage(0);
+		setPdfTotal(0);
 		(async () => {
 			try {
 				const data = await resolveOpen(book.src, book.fmt, book.id);
@@ -63,7 +84,7 @@ function EbookReadPage() {
 		return () => {
 			cancelled = true;
 		};
-	}, [book, t]);
+	}, [book]);
 
 	const saveCfi = useCallback(
 		(cfi: string, percent?: number) => {
@@ -107,13 +128,43 @@ function EbookReadPage() {
 		[],
 	);
 
+	const onEpubNavReset = useCallback(() => {
+		epubNavRef.current = null;
+		setEpubNavReady(false);
+	}, []);
+
 	const onPdfReady = useCallback(
-		(api: { prev: () => void; next: () => void }) => {
+		(api: {
+			prev: () => void;
+			next: () => void;
+			go: (page: number) => void;
+		}) => {
 			pdfNavRef.current = api;
-			setPdfNavReady(true);
 		},
 		[],
 	);
+
+	const onPdfPageState = useCallback((page: number, total: number) => {
+		setPdfPage(page);
+		setPdfTotal(total);
+		setPdfNavReady(total > 0);
+	}, []);
+
+	const patchEpubSettings = useCallback(
+		(patch: Partial<EpubReaderSettings>) => {
+			setEpubSettings((prev) => {
+				const next = { ...prev, ...patch };
+				saveEpubReaderSettings(next);
+				return next;
+			});
+		},
+		[],
+	);
+
+	const resetEpubSettings = useCallback(() => {
+		setEpubSettings(DEFAULT_EPUB_READER_SETTINGS);
+		saveEpubReaderSettings(DEFAULT_EPUB_READER_SETTINGS);
+	}, []);
 
 	useEffect(() => {
 		if (!book || !open) return;
@@ -121,6 +172,7 @@ function EbookReadPage() {
 		const onKeyDown = (e: KeyboardEvent) => {
 			if (e.repeat) return;
 			if (tocOpen) return;
+			if (epubSettingsOpen) return;
 
 			const target = e.target as HTMLElement | null;
 			const tag = target?.tagName;
@@ -137,23 +189,23 @@ function EbookReadPage() {
 			const isNext = e.key === 'ArrowDown' || e.key === 'ArrowRight';
 			if (!isPrev && !isNext) return;
 
-			if (book.fmt === 'epub' && epubNavReady && epubNavRef.current) {
+			if (book.fmt === 'epub' && epubNavRef.current) {
 				e.preventDefault();
 				if (isPrev) void epubNavRef.current.prev();
 				else void epubNavRef.current.next();
 				return;
 			}
 
-			if (book.fmt === 'pdf' && pdfNavReady && pdfNavRef.current) {
+			if (book.fmt === 'pdf' && pdfNavRef.current) {
 				e.preventDefault();
 				if (isPrev) pdfNavRef.current.prev();
 				else pdfNavRef.current.next();
 			}
 		};
 
-		window.addEventListener('keydown', onKeyDown);
-		return () => window.removeEventListener('keydown', onKeyDown);
-	}, [book, open, tocOpen, epubNavReady, pdfNavReady]);
+		window.addEventListener('keydown', onKeyDown, true);
+		return () => window.removeEventListener('keydown', onKeyDown, true);
+	}, [book, open, tocOpen, epubSettingsOpen]);
 
 	if (!book) {
 		return (
@@ -176,6 +228,24 @@ function EbookReadPage() {
 	const epubHeaderTrailing =
 		book.fmt === 'epub' ? (
 			<>
+				<Tooltip
+					side="bottom"
+					sideOffset={6}
+					delayDuration={200}
+					shadow
+					content={t('ebook.read.toc')}
+				>
+					<Button
+						type="button"
+						variant="ghost"
+						size="icon-sm"
+						className="text-textcolor/80"
+						onClick={() => setTocOpen(true)}
+						aria-label={t('ebook.read.toc')}
+					>
+						<List className="size-4" />
+					</Button>
+				</Tooltip>
 				<Tooltip
 					side="bottom"
 					sideOffset={6}
@@ -214,6 +284,61 @@ function EbookReadPage() {
 						<ChevronRight className="size-4" />
 					</Button>
 				</Tooltip>
+				<EpubReaderSettingsPopover
+					settings={epubSettings}
+					onChange={patchEpubSettings}
+					onReset={resetEpubSettings}
+					open={epubSettingsOpen}
+					onOpenChange={setEpubSettingsOpen}
+					disabled={!epubNavReady}
+				/>
+			</>
+		) : null;
+
+	const pdfHeaderTrailing =
+		book.fmt === 'pdf' ? (
+			<>
+				<Tooltip
+					side="bottom"
+					sideOffset={6}
+					delayDuration={200}
+					shadow
+					content={t('ebook.read.prev')}
+				>
+					<Button
+						type="button"
+						variant="ghost"
+						size="icon-sm"
+						className="text-textcolor/80"
+						disabled={!pdfNavReady || pdfPage <= 0}
+						aria-label={t('ebook.read.prev')}
+						onClick={() => pdfNavRef.current?.prev()}
+					>
+						<ChevronLeft className="size-4" />
+					</Button>
+				</Tooltip>
+				<span className="text-textcolor/55 min-w-14 text-center tabular-nums text-xs">
+					{pdfTotal > 0 ? `${pdfPage + 1} / ${pdfTotal}` : '—'}
+				</span>
+				<Tooltip
+					side="bottom"
+					sideOffset={6}
+					delayDuration={200}
+					shadow
+					content={t('ebook.read.next')}
+				>
+					<Button
+						type="button"
+						variant="ghost"
+						size="icon-sm"
+						className="text-textcolor/80"
+						disabled={!pdfNavReady || pdfPage >= pdfTotal - 1}
+						aria-label={t('ebook.read.next')}
+						onClick={() => pdfNavRef.current?.next()}
+					>
+						<ChevronRight className="size-4" />
+					</Button>
+				</Tooltip>
 				<Tooltip
 					side="bottom"
 					sideOffset={6}
@@ -226,6 +351,7 @@ function EbookReadPage() {
 						variant="ghost"
 						size="icon-sm"
 						className="text-textcolor/80"
+						disabled={!pdfNavReady}
 						onClick={() => setTocOpen(true)}
 						aria-label={t('ebook.read.toc')}
 					>
@@ -235,6 +361,8 @@ function EbookReadPage() {
 			</>
 		) : null;
 
+	const headerTrailing = epubHeaderTrailing ?? pdfHeaderTrailing;
+
 	return (
 		<EbookPageShell
 			contentPadding={false}
@@ -242,7 +370,7 @@ function EbookReadPage() {
 				<EbookPanelHeader
 					className="pl-4.5 pr-2.5"
 					title={book.title}
-					trailing={epubHeaderTrailing}
+					trailing={headerTrailing}
 				/>
 			}
 		>
@@ -255,15 +383,20 @@ function EbookReadPage() {
 					<EpubPane
 						open={open}
 						startCfi={prog?.epubCfi}
+						readerSettings={epubSettings}
 						onCfi={saveCfi}
 						onToc={setToc}
 						onReady={onEpubReady}
+						onNavReset={onEpubNavReset}
+						keyboardNavEnabled={!tocOpen && !epubSettingsOpen}
 					/>
 				) : (
 					<PdfPane
 						open={open}
 						startPage={prog?.pdfPage ?? 0}
 						onPage={savePage}
+						onPageState={onPdfPageState}
+						onToc={setToc}
 						onReady={onPdfReady}
 					/>
 				)}
@@ -273,7 +406,14 @@ function EbookReadPage() {
 				open={tocOpen}
 				onOpenChange={setTocOpen}
 				items={toc}
-				onSelect={(href) => epubNavRef.current?.go(href)}
+				onSelect={(href) => {
+					const pdfPage = parsePdfPageHref(href);
+					if (pdfPage != null) {
+						pdfNavRef.current?.go(pdfPage);
+						return;
+					}
+					void epubNavRef.current?.go(href);
+				}}
 			/>
 		</EbookPageShell>
 	);

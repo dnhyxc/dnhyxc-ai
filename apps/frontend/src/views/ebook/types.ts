@@ -21,7 +21,7 @@ export type Prog = {
 	updatedAt: string;
 };
 
-export type EpubToc = { label: string; href: string };
+export type EpubToc = { label: string; href?: string; depth?: number };
 
 export type EbookShelfData = {
 	books: Book[];

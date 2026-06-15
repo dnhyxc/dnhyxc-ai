@@ -28,8 +28,7 @@ function EbookShelfPage() {
 
 	const onPickTauri = async () => {
 		try {
-			const book = await ebookStore.addFromTauri();
-			if (book) onOpen(book.id);
+			await ebookStore.addFromTauri();
 		} catch (e) {
 			Toast({
 				type: 'error',
@@ -45,8 +44,7 @@ function EbookShelfPage() {
 		const file = list?.[0];
 		if (!file) return;
 		try {
-			const book = await ebookStore.addFromFile(file);
-			onOpen(book.id);
+			await ebookStore.addFromFile(file);
 		} catch (e) {
 			Toast({
 				type: 'error',
@@ -168,7 +166,7 @@ function EbookShelfPage() {
 							{t('ebook.shelf.empty')}
 						</div>
 					) : (
-						<div className="grid w-full gap-4 grid-cols-[repeat(auto-fit,minmax(min(100%,15rem),1fr))]">
+						<div className="grid w-full gap-3 sm:gap-4 grid-cols-[repeat(auto-fill,minmax(min(100%,9.5rem),1fr))]">
 							{ebookStore.books.map((b) => (
 								<EbookShelfBookCard
 									key={b.id}
