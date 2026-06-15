@@ -110,6 +110,25 @@ export interface RequestError {
 }
 
 /** 将后端/网络错误统一解析为 Toast 展示文案（与请求 catch 分支语义一致） */
+export function getRequestErrorMessage(err: unknown): string {
+	if (err && typeof err === 'object' && 'message' in err && 'code' in err) {
+		return resolveRequestErrorToastTitle(err as RequestError);
+	}
+	if (err && typeof err === 'object' && 'message' in err) {
+		const m = (err as { message?: unknown }).message;
+		if (typeof m === 'string' && m.trim()) {
+			return m.trim();
+		}
+	}
+	if (err instanceof Error && err.message.trim()) {
+		return err.message.trim();
+	}
+	if (typeof err === 'string' && err.trim()) {
+		return err.trim();
+	}
+	return translateSync('common.requestFailed');
+}
+
 function resolveRequestErrorToastTitle(requestError: RequestError): string {
 	const candidates = [
 		normalizeErrorMessage(

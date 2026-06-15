@@ -176,8 +176,10 @@ export const ENGLISH_LEARNING_VOCABULARY_MISTAKES =
 export const ENGLISH_LEARNING_CLASSIC_QUOTE_MISTAKES =
 	'/english-learning/classic-quote-mistakes';
 
-/** 电子书：书架列表与阅读进度 */
+/** 电子书：书架列表与阅读进度（分页） */
 export const EBOOK_SHELF = '/ebook/shelf';
+/** 电子书：单本书详情（阅读页直链等） */
+export const EBOOK_BOOK = '/ebook/book';
 /** 电子书：从桌面路径登记（Tauri） */
 export const EBOOK_ADD_PATH = '/ebook/add-path';
 /** 电子书：上传文件入库 */

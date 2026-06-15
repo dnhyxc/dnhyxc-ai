@@ -1,36 +1,126 @@
+import { Toast } from '@ui/index';
 import { makeAutoObservable, runInAction } from 'mobx';
+import type { UIEventHandler } from 'react';
+import { EBOOK_SHELF_PAGE_SIZE, SCROLL_LOAD_THRESHOLD_PX } from '@/constants';
 import {
 	addEbookFromPath,
+	getEbookBook,
 	loadEbookShelf,
 	removeEbook,
 	saveEbookProgress,
 	uploadEbookFile,
 } from '@/service';
-import type { Book, Prog } from '@/views/ebook/types';
-import { pickTauri } from '@/views/ebook/utils/io';
+import { getRequestErrorMessage } from '@/utils/fetch';
+import type { Book, BookFmt, Prog } from '@/views/ebook/types';
+import { pickTauri, tauriPickedFileToUpload } from '@/views/ebook/utils/io';
+
+export type EbookUploadPhase = 'reading' | 'uploading';
+
+export type EbookUploadState = {
+	phase: EbookUploadPhase;
+	fileName: string;
+	percent: number;
+	bookId?: string;
+};
 
 class EbookStore {
 	books: Book[] = [];
+	/** 阅读页直链等场景下的书籍缓存（不一定在已加载分页中） */
+	bookCache: Record<string, Book> = {};
 	progMap: Record<string, Prog> = {};
+	total = 0;
+	pageNo = 1;
+	pageSize = EBOOK_SHELF_PAGE_SIZE;
 	ready = false;
+	loading = false;
+	loadingMore = false;
 	busy = false;
+	uploadState: EbookUploadState | null = null;
 
 	constructor() {
 		makeAutoObservable(this);
 	}
 
+	get hasMore(): boolean {
+		return this.books.length < this.total;
+	}
+
 	async hydrate(): Promise<void> {
+		await this.fetchPage(1, false);
+	}
+
+	async fetchPage(page: number, append: boolean): Promise<void> {
+		if (append) {
+			this.loadingMore = true;
+		} else {
+			this.loading = true;
+		}
 		try {
-			const { books, progMap } = await loadEbookShelf();
+			const data = await loadEbookShelf({
+				pageNo: page,
+				pageSize: this.pageSize,
+			});
 			runInAction(() => {
-				this.books = books;
-				this.progMap = progMap;
+				this.total = data.total;
+				this.pageNo = page;
+				if (append) {
+					const existingIds = new Set(this.books.map((b) => b.id));
+					const merged = [...this.books];
+					for (const book of data.books) {
+						if (!existingIds.has(book.id)) {
+							existingIds.add(book.id);
+							merged.push(book);
+						}
+					}
+					this.books = merged;
+				} else {
+					this.books = data.books;
+				}
+				this.progMap = { ...this.progMap, ...data.progMap };
 				this.ready = true;
 			});
 		} catch {
 			runInAction(() => {
 				this.ready = true;
 			});
+		} finally {
+			runInAction(() => {
+				this.loading = false;
+				this.loadingMore = false;
+			});
+		}
+	}
+
+	async loadMore(): Promise<void> {
+		if (!this.hasMore || this.loading || this.loadingMore) {
+			return;
+		}
+		await this.fetchPage(this.pageNo + 1, true);
+	}
+
+	/** 绑定到书架 ScrollArea Viewport 的 onScroll */
+	onShelfViewportScroll: UIEventHandler<HTMLDivElement> = (e) => {
+		const el = e.currentTarget;
+		const rest = el.scrollHeight - el.scrollTop - el.clientHeight;
+		if (rest < SCROLL_LOAD_THRESHOLD_PX) {
+			void this.loadMore();
+		}
+	};
+
+	async fetchBookIfMissing(bookId: string): Promise<Book | undefined> {
+		const hit = this.bookById(bookId);
+		if (hit) return hit;
+		try {
+			const { book, prog } = await getEbookBook(bookId);
+			runInAction(() => {
+				this.bookCache[book.id] = book;
+				if (prog) {
+					this.progMap[book.id] = prog;
+				}
+			});
+			return book;
+		} catch {
+			return undefined;
 		}
 	}
 
@@ -38,34 +128,82 @@ class EbookStore {
 		return this.progMap[bookId];
 	}
 
+	clearUploadState(): void {
+		this.uploadState = null;
+		this.busy = false;
+	}
+
 	async addFromTauri(): Promise<Book | null> {
 		const picked = await pickTauri();
 		if (!picked) return null;
-		const dup = this.books.find(
-			(b) => b.src.kind === 'path' && b.src.path === picked.path,
-		);
-		if (dup) return dup;
 
+		const fileName = picked.path.split(/[/\\]/).pop() ?? `book.${picked.fmt}`;
 		const book = await addEbookFromPath(picked.path, picked.fmt);
+
 		runInAction(() => {
+			const existed = this.books.some((b) => b.id === book.id);
 			this.books = [book, ...this.books.filter((b) => b.id !== book.id)];
+			if (!existed) {
+				this.total += 1;
+			}
+			this.bookCache[book.id] = book;
+			this.busy = true;
+			this.uploadState = {
+				phase: 'reading',
+				fileName,
+				percent: 0,
+				bookId: book.id,
+			};
 		});
+
+		void uploadBookToCloud(this, book.id, picked.path, picked.fmt);
 		return book;
 	}
 
 	async addFromFile(file: File): Promise<Book> {
-		const book = await uploadEbookFile(file);
 		runInAction(() => {
-			this.books = [book, ...this.books.filter((b) => b.id !== book.id)];
+			this.busy = true;
+			this.uploadState = {
+				phase: 'uploading',
+				fileName: file.name,
+				percent: this.uploadState?.percent ?? 0,
+			};
 		});
-		return book;
+
+		try {
+			const book = await uploadEbookFile(file, {
+				onProgress: (percent) => {
+					runInAction(() => {
+						if (this.uploadState) {
+							this.uploadState.phase = 'uploading';
+							this.uploadState.percent = percent;
+						}
+					});
+				},
+			});
+			runInAction(() => {
+				const existed = this.books.some((b) => b.id === book.id);
+				this.books = [book, ...this.books.filter((b) => b.id !== book.id)];
+				if (!existed) {
+					this.total += 1;
+				}
+				this.bookCache[book.id] = book;
+				this.clearUploadState();
+			});
+			return book;
+		} catch (e) {
+			runInAction(() => this.clearUploadState());
+			throw e;
+		}
 	}
 
 	async remove(bookId: string): Promise<void> {
 		await removeEbook(bookId);
 		runInAction(() => {
 			this.books = this.books.filter((b) => b.id !== bookId);
+			delete this.bookCache[bookId];
 			delete this.progMap[bookId];
+			this.total = Math.max(0, this.total - 1);
 		});
 	}
 
@@ -85,9 +223,59 @@ class EbookStore {
 	}
 
 	bookById(id: string): Book | undefined {
-		return this.books.find((b) => b.id === id);
+		return this.books.find((b) => b.id === id) ?? this.bookCache[id];
 	}
 }
 
 const ebookStore = new EbookStore();
+
+async function uploadBookToCloud(
+	store: EbookStore,
+	bookId: string,
+	path: string,
+	fmt: BookFmt,
+): Promise<void> {
+	try {
+		const file = await tauriPickedFileToUpload(path, fmt);
+		runInAction(() => {
+			if (store.uploadState?.bookId === bookId) {
+				store.uploadState.phase = 'uploading';
+				store.uploadState.percent = 0;
+			}
+		});
+
+		const updated = await uploadEbookFile(file, {
+			bookId,
+			onProgress: (percent) => {
+				runInAction(() => {
+					if (store.uploadState?.bookId === bookId) {
+						store.uploadState.phase = 'uploading';
+						store.uploadState.percent = percent;
+					}
+				});
+			},
+		});
+
+		runInAction(() => {
+			store.books = store.books.map((b) => (b.id === bookId ? updated : b));
+			store.bookCache[bookId] = updated;
+			if (store.uploadState?.bookId === bookId) {
+				store.clearUploadState();
+			}
+		});
+	} catch (err) {
+		runInAction(() => {
+			if (store.uploadState?.bookId === bookId) {
+				store.clearUploadState();
+			}
+		});
+		const reason = getRequestErrorMessage(err);
+		Toast({
+			type: 'warning',
+			title: '云端备份失败',
+			message: `${reason}。已加载本地书籍，可以继续阅读`,
+		});
+	}
+}
+
 export default ebookStore;

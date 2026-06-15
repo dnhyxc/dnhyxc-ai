@@ -1,7 +1,9 @@
 export type BookFmt = 'epub' | 'pdf';
 
 /** 书籍文件来源：桌面路径 / 服务端存储 */
-export type BookSrc = { kind: 'path'; path: string } | { kind: 'store' };
+export type BookSrc =
+	| { kind: 'path'; path: string }
+	| { kind: 'store'; localPath?: string };
 
 export type Book = {
 	id: string;
@@ -26,4 +28,12 @@ export type EpubToc = { label: string; href?: string; depth?: number };
 export type EbookShelfData = {
 	books: Book[];
 	progMap: Record<string, Prog>;
+	total: number;
+	pageNo: number;
+	pageSize: number;
+};
+
+export type EbookBookDetail = {
+	book: Book;
+	prog?: Prog;
 };

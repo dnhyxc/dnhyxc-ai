@@ -30,6 +30,7 @@ function EbookReadPage() {
 	const { t } = useI18n();
 	const book = ebookStore.bookById(bookId);
 	const prog = ebookStore.progOf(bookId);
+	const [bookResolving, setBookResolving] = useState(false);
 
 	const [open, setOpen] = useState<ArrayBuffer | null>(null);
 	const [toc, setToc] = useState<EpubToc[]>([]);
@@ -55,8 +56,24 @@ function EbookReadPage() {
 	const progTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
 	useEffect(() => {
-		if (!ebookStore.ready) ebookStore.hydrate();
-	}, []);
+		if (!bookId) return;
+		let cancelled = false;
+		void (async () => {
+			if (!ebookStore.ready) {
+				await ebookStore.hydrate();
+			}
+			if (cancelled || ebookStore.bookById(bookId)) return;
+			setBookResolving(true);
+			try {
+				await ebookStore.fetchBookIfMissing(bookId);
+			} finally {
+				if (!cancelled) setBookResolving(false);
+			}
+		})();
+		return () => {
+			cancelled = true;
+		};
+	}, [bookId]);
 
 	useEffect(() => {
 		if (!book) return;
@@ -208,6 +225,15 @@ function EbookReadPage() {
 	}, [book, open, tocOpen, epubSettingsOpen]);
 
 	if (!book) {
+		if (bookResolving || !ebookStore.ready) {
+			return (
+				<EbookPageShell>
+					<div className="text-textcolor/60 flex flex-1 flex-col items-center justify-center py-12 text-center text-sm">
+						<Loading text={t('common.loading')} />
+					</div>
+				</EbookPageShell>
+			);
+		}
 		return (
 			<EbookPageShell>
 				<div className="text-textcolor/60 flex flex-1 flex-col items-center justify-center gap-3 py-12 text-center text-sm">

@@ -4,16 +4,15 @@ import {
 	Popover,
 	PopoverContent,
 	PopoverTrigger,
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
+	ScrollArea,
 } from '@ui/index';
-import { Bolt } from 'lucide-react';
+import { Bolt, GalleryHorizontal, type LucideIcon, Scroll } from 'lucide-react';
+import { useCallback } from 'react';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import {
+	EPUB_BG_THEME_OPTIONS,
+	EPUB_TEXT_COLOR_OPTIONS,
 	type EpubReaderBgTheme,
 	type EpubReaderPageFlow,
 	type EpubReaderSettings,
@@ -29,6 +28,140 @@ export type EpubReaderSettingsPopoverProps = {
 	disabled?: boolean;
 };
 
+function BgThemeSwatches({
+	value,
+	onChange,
+}: {
+	value: EpubReaderBgTheme;
+	onChange: (id: EpubReaderBgTheme) => void;
+}) {
+	const { t } = useI18n();
+
+	return (
+		<div className="grid grid-cols-6 gap-2">
+			{EPUB_BG_THEME_OPTIONS.map((opt) => {
+				const selected = value === opt.id;
+				const label = t(`ebook.read.settings.bgTheme.${opt.id}`);
+				return (
+					<button
+						key={opt.id}
+						type="button"
+						title={label}
+						aria-label={label}
+						aria-pressed={selected}
+						className={cn(
+							'ring-theme/25 relative size-9 rounded-lg ring-1 transition',
+							selected && 'ring-teal-600 ring-2',
+							opt.id === 'default' &&
+								'bg-theme-background from-theme/8 to-theme/20 bg-linear-to-br',
+							opt.id === 'night' && 'ring-theme/40',
+						)}
+						style={opt.bgColor ? { backgroundColor: opt.bgColor } : undefined}
+						onClick={() => onChange(opt.id)}
+					>
+						{opt.id === 'default' ? (
+							<span className="text-textcolor/45 absolute inset-0 flex items-center justify-center text-[10px] font-medium">
+								Aa
+							</span>
+						) : null}
+					</button>
+				);
+			})}
+		</div>
+	);
+}
+
+function TextColorSwatches({
+	value,
+	onChange,
+}: {
+	value: EpubReaderTextColor;
+	onChange: (id: EpubReaderTextColor) => void;
+}) {
+	const { t } = useI18n();
+
+	return (
+		<div className="grid grid-cols-6 gap-2">
+			{EPUB_TEXT_COLOR_OPTIONS.map((opt) => {
+				const selected = value === opt.id;
+				const label = t(`ebook.read.settings.textColor.${opt.id}`);
+				const isAuto = opt.id === 'auto';
+				return (
+					<button
+						key={opt.id}
+						type="button"
+						title={label}
+						aria-label={label}
+						aria-pressed={selected}
+						className={cn(
+							'ring-theme/25 bg-theme-background relative flex size-9 items-center justify-center rounded-lg ring-1 transition',
+							selected && 'ring-teal-600 ring-2',
+							isAuto && 'from-theme/8 to-theme/20 bg-linear-to-br',
+						)}
+						onClick={() => onChange(opt.id)}
+					>
+						<span
+							className={cn('text-sm font-medium', isAuto && 'text-textcolor')}
+							style={opt.color ? { color: opt.color } : undefined}
+						>
+							Aa
+						</span>
+					</button>
+				);
+			})}
+		</div>
+	);
+}
+
+const PAGE_FLOW_OPTIONS: {
+	id: EpubReaderPageFlow;
+	Icon: LucideIcon;
+}[] = [
+	{ id: 'scrolled', Icon: Scroll },
+	{ id: 'paginated', Icon: GalleryHorizontal },
+];
+
+function PageFlowToggle({
+	value,
+	onChange,
+}: {
+	value: EpubReaderPageFlow;
+	onChange: (id: EpubReaderPageFlow) => void;
+}) {
+	const { t } = useI18n();
+
+	return (
+		<div
+			className="bg-theme/8 ring-theme/15 flex rounded-lg p-0.5 ring-1"
+			role="group"
+			aria-label={t('ebook.read.settings.pageFlow')}
+		>
+			{PAGE_FLOW_OPTIONS.map(({ id, Icon }) => {
+				const selected = value === id;
+				const label = t(`ebook.read.settings.pageFlow.${id}`);
+				return (
+					<button
+						key={id}
+						type="button"
+						aria-pressed={selected}
+						title={label}
+						onClick={() => onChange(id)}
+						className={cn(
+							'flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-2 text-xs transition',
+							selected
+								? 'bg-theme-background text-textcolor shadow-sm'
+								: 'text-textcolor/55 hover:text-textcolor/80',
+						)}
+					>
+						<Icon className="size-3.5 shrink-0" aria-hidden />
+						<span className="leading-tight">{label}</span>
+					</button>
+				);
+			})}
+		</div>
+	);
+}
+
 export function EpubReaderSettingsPopover({
 	settings,
 	onChange,
@@ -38,6 +171,18 @@ export function EpubReaderSettingsPopover({
 	disabled,
 }: EpubReaderSettingsPopoverProps) {
 	const { t } = useI18n();
+
+	const handleWheel = useCallback((event: React.WheelEvent<HTMLDivElement>) => {
+		event.stopPropagation();
+		event.currentTarget.scrollTop += event.deltaY;
+	}, []);
+
+	const handleWheelCapture = useCallback(
+		(event: React.WheelEvent<HTMLDivElement>) => {
+			event.stopPropagation();
+		},
+		[],
+	);
 
 	return (
 		<Popover open={open} onOpenChange={onOpenChange}>
@@ -61,154 +206,110 @@ export function EpubReaderSettingsPopover({
 				align="end"
 				side="bottom"
 				sideOffset={8}
-				className="w-72 p-4"
+				className="w-80 overflow-hidden p-0"
 			>
-				<div className="flex flex-col gap-4">
-					<p className="text-textcolor text-sm font-medium">
-						{t('ebook.read.settings')}
-					</p>
+				<ScrollArea
+					className="max-h-[min(85vh,33.78rem)] w-full"
+					viewportClassName="max-h-[min(85vh,33.78rem)] [&>div]:min-h-0!"
+					onWheel={handleWheel}
+					onWheelCapture={handleWheelCapture}
+				>
+					<div className="flex flex-col gap-4 p-4 pt-3 pb-5">
+						<p className="text-textcolor text-sm font-medium">
+							{t('ebook.read.settings')}
+						</p>
 
-					<div className="flex flex-col gap-2">
-						<div className="flex items-center justify-between gap-2">
-							<Label htmlFor="epub-font-size" className="text-xs">
-								{t('ebook.read.settings.fontSize')}
-							</Label>
-							<span className="text-textcolor/55 tabular-nums text-xs">
-								{settings.fontSize}%
-							</span>
+						<div className="flex flex-col gap-2">
+							<div className="flex items-center justify-between gap-2">
+								<Label htmlFor="epub-font-size" className="text-xs">
+									{t('ebook.read.settings.fontSize')}
+								</Label>
+								<span className="text-textcolor/55 tabular-nums text-xs">
+									{settings.fontSize}%
+								</span>
+							</div>
+							<input
+								id="epub-font-size"
+								type="range"
+								min={80}
+								max={160}
+								step={5}
+								value={settings.fontSize}
+								className="accent-teal-600 w-full"
+								onChange={(e) => onChange({ fontSize: Number(e.target.value) })}
+							/>
 						</div>
-						<input
-							id="epub-font-size"
-							type="range"
-							min={80}
-							max={160}
-							step={5}
-							value={settings.fontSize}
-							className="accent-teal-600 w-full"
-							onChange={(e) => onChange({ fontSize: Number(e.target.value) })}
-						/>
-					</div>
 
-					<div className="flex flex-col gap-2">
-						<div className="flex items-center justify-between gap-2">
-							<Label htmlFor="epub-line-height" className="text-xs">
-								{t('ebook.read.settings.lineHeight')}
-							</Label>
-							<span className="text-textcolor/55 tabular-nums text-xs">
-								{settings.lineHeight.toFixed(1)}
-							</span>
+						<div className="flex flex-col gap-2">
+							<div className="flex items-center justify-between gap-2">
+								<Label htmlFor="epub-line-height" className="text-xs">
+									{t('ebook.read.settings.lineHeight')}
+								</Label>
+								<span className="text-textcolor/55 tabular-nums text-xs">
+									{settings.lineHeight.toFixed(1)}
+								</span>
+							</div>
+							<input
+								id="epub-line-height"
+								type="range"
+								min={1.2}
+								max={2.4}
+								step={0.1}
+								value={settings.lineHeight}
+								className="accent-teal-600 w-full"
+								onChange={(e) =>
+									onChange({ lineHeight: Number(e.target.value) })
+								}
+							/>
 						</div>
-						<input
-							id="epub-line-height"
-							type="range"
-							min={1.2}
-							max={2.4}
-							step={0.1}
-							value={settings.lineHeight}
-							className="accent-teal-600 w-full"
-							onChange={(e) => onChange({ lineHeight: Number(e.target.value) })}
-						/>
-					</div>
 
-					<div className="flex flex-col gap-1.5">
-						<Label className="text-xs">
-							{t('ebook.read.settings.pageFlow')}
-						</Label>
-						<Select
-							value={settings.pageFlow}
-							onValueChange={(value) =>
-								onChange({ pageFlow: value as EpubReaderPageFlow })
-							}
+						<div className="flex flex-col gap-3">
+							<Label className="text-xs">
+								{t('ebook.read.settings.pageFlow')}
+							</Label>
+							<PageFlowToggle
+								value={settings.pageFlow}
+								onChange={(pageFlow) => onChange({ pageFlow })}
+							/>
+						</div>
+
+						<div className="flex flex-col gap-3">
+							<Label className="text-xs">
+								{t('ebook.read.settings.bgTheme')}
+							</Label>
+							<BgThemeSwatches
+								value={settings.bgTheme}
+								onChange={(bgTheme) => onChange({ bgTheme })}
+							/>
+							<p className="text-textcolor/50 text-[11px] leading-snug">
+								{t(`ebook.read.settings.bgTheme.${settings.bgTheme}`)}
+							</p>
+						</div>
+
+						<div className="flex flex-col gap-3">
+							<Label className="text-xs">
+								{t('ebook.read.settings.textColor')}
+							</Label>
+							<TextColorSwatches
+								value={settings.textColor}
+								onChange={(textColor) => onChange({ textColor })}
+							/>
+							<p className="text-textcolor/50 text-[11px] leading-snug">
+								{t(`ebook.read.settings.textColor.${settings.textColor}`)}
+							</p>
+						</div>
+
+						<Button
+							type="button"
+							variant="secondary"
+							size="sm"
+							className="w-full mt-0.5"
+							onClick={onReset}
 						>
-							<SelectTrigger size="sm" className="w-full">
-								<SelectValue />
-							</SelectTrigger>
-							<SelectContent>
-								<SelectItem value="paginated">
-									{t('ebook.read.settings.pageFlow.paginated')}
-								</SelectItem>
-								<SelectItem value="scrolled">
-									{t('ebook.read.settings.pageFlow.scrolled')}
-								</SelectItem>
-							</SelectContent>
-						</Select>
+							{t('ebook.read.settings.reset')}
+						</Button>
 					</div>
-
-					<div className="flex flex-col gap-1.5">
-						<Label className="text-xs">
-							{t('ebook.read.settings.textColor')}
-						</Label>
-						<Select
-							value={settings.textColor}
-							onValueChange={(value) =>
-								onChange({
-									textColor: value as EpubReaderTextColor,
-								})
-							}
-						>
-							<SelectTrigger size="sm" className="w-full">
-								<SelectValue />
-							</SelectTrigger>
-							<SelectContent>
-								<SelectItem value="auto">
-									{t('ebook.read.settings.textColor.auto')}
-								</SelectItem>
-								<SelectItem value="dark">
-									{t('ebook.read.settings.textColor.dark')}
-								</SelectItem>
-								<SelectItem value="light">
-									{t('ebook.read.settings.textColor.light')}
-								</SelectItem>
-								<SelectItem value="sepia">
-									{t('ebook.read.settings.textColor.sepia')}
-								</SelectItem>
-							</SelectContent>
-						</Select>
-					</div>
-
-					<div className="flex flex-col gap-1.5">
-						<Label className="text-xs">
-							{t('ebook.read.settings.bgTheme')}
-						</Label>
-						<Select
-							value={settings.bgTheme}
-							onValueChange={(value) =>
-								onChange({ bgTheme: value as EpubReaderBgTheme })
-							}
-						>
-							<SelectTrigger size="sm" className="w-full">
-								<SelectValue />
-							</SelectTrigger>
-							<SelectContent>
-								<SelectItem value="default">
-									{t('ebook.read.settings.bgTheme.default')}
-								</SelectItem>
-								<SelectItem value="paper">
-									{t('ebook.read.settings.bgTheme.paper')}
-								</SelectItem>
-								<SelectItem value="dark">
-									{t('ebook.read.settings.bgTheme.dark')}
-								</SelectItem>
-								<SelectItem value="sepia">
-									{t('ebook.read.settings.bgTheme.sepia')}
-								</SelectItem>
-								<SelectItem value="green">
-									{t('ebook.read.settings.bgTheme.green')}
-								</SelectItem>
-							</SelectContent>
-						</Select>
-					</div>
-
-					<Button
-						type="button"
-						variant="secondary"
-						size="sm"
-						className="w-full"
-						onClick={onReset}
-					>
-						{t('ebook.read.settings.reset')}
-					</Button>
-				</div>
+				</ScrollArea>
 			</PopoverContent>
 		</Popover>
 	);

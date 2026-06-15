@@ -1,8 +1,10 @@
 import type { RenderTask } from 'pdfjs-dist';
 import { useEffect, useRef, useState } from 'react';
+import { cn } from '@/lib/utils';
 import type { EpubToc } from '../types';
 import { loadPdfOutlineToc } from '../utils/pdfOutline';
 import { pdfjs, pdfLoadOptions } from '../utils/pdfSetup';
+import { READER_NATIVE_SCROLLBAR } from '../utils/readerScrollbar';
 
 /** 拷贝一份独立字节，避免 pdf.js worker 转移后原 buffer 被 detach */
 function cloneBytes(src: ArrayBuffer): Uint8Array {
@@ -156,7 +158,12 @@ export function PdfPane({
 	return (
 		<div className="flex h-full min-h-0 flex-col">
 			{err ? <p className="text-destructive p-4 text-sm">{err}</p> : null}
-			<div className="bg-theme/5 flex flex-1 min-h-0 justify-center overflow-auto p-4">
+			<div
+				className={cn(
+					'bg-theme/5 flex flex-1 min-h-0 justify-center overflow-auto p-4',
+					READER_NATIVE_SCROLLBAR,
+				)}
+			>
 				<canvas
 					ref={canvasRef}
 					className="max-w-full rounded-md bg-white shadow-sm ring-1 ring-theme/10"

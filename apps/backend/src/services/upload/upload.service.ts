@@ -114,6 +114,36 @@ export class UploadService {
 		);
 	}
 
+	/** 从 COS 读取对象字节（电子书下载等） */
+	async getObjectBuffer(key: string): Promise<Buffer> {
+		const normalizedKey = key?.replace(/^\//, '').trim();
+		if (!normalizedKey || !isCosObjectKey(normalizedKey)) {
+			throw new HttpException('无效的 COS 对象键', HttpStatus.BAD_REQUEST);
+		}
+
+		const config = getCosRuntimeConfig();
+		assertCosRuntimeConfig(config);
+		const cos = this.getCosClient();
+
+		try {
+			const result = await cos.getObject({
+				Bucket: config.bucket,
+				Region: config.region,
+				Key: normalizedKey,
+			});
+			const body = result.Body as Buffer | Uint8Array | undefined;
+			if (!body) {
+				throw new Error('COS 对象为空');
+			}
+			return Buffer.isBuffer(body) ? body : Buffer.from(body);
+		} catch (error) {
+			throw new HttpException(
+				formatCosUploadError(error),
+				HttpStatus.BAD_GATEWAY,
+			);
+		}
+	}
+
 	async deleteCosObject(key: string) {
 		const normalizedKey = key?.replace(/^\//, '').trim();
 		if (!normalizedKey || !isCosObjectKey(normalizedKey)) {

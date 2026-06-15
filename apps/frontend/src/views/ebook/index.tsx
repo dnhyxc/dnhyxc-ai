@@ -1,6 +1,6 @@
 import Confirm from '@design/Confirm';
 import Loading from '@design/Loading';
-import { Button, ScrollArea } from '@ui/index';
+import { Button, ScrollArea, Spinner } from '@ui/index';
 import { Toast } from '@ui/sonner';
 import { BookOpen, FolderOpen } from 'lucide-react';
 import { observer } from 'mobx-react';
@@ -12,6 +12,7 @@ import { isTauriRuntime } from '@/utils/runtime';
 import { EbookPageShell } from './components/EbookPageShell';
 import { EbookPanelHeader } from './components/EbookPanelHeader';
 import { EbookShelfBookCard } from './components/EbookShelfBookCard';
+import { EbookShelfUploadBanner } from './components/EbookShelfUploadBanner';
 
 function EbookShelfPage() {
 	const { t } = useI18n();
@@ -74,10 +75,13 @@ function EbookShelfPage() {
 		}
 	}, [deleteBookId]);
 
-	const showInitialLoading = !ebookStore.ready;
-	const showEmpty = ebookStore.ready && ebookStore.books.length === 0;
+	const showInitialLoading = !ebookStore.ready && ebookStore.loading;
+	const showEmpty =
+		ebookStore.ready && ebookStore.total === 0 && !ebookStore.loading;
+	const showLoadMoreHint = ebookStore.loadingMore;
 
 	const isTauri = isTauriRuntime();
+	const uploading = ebookStore.busy;
 
 	return (
 		<>
@@ -109,7 +113,7 @@ function EbookShelfPage() {
 								{t('ebook.shelf.title')}
 								{ebookStore.ready ? (
 									<span className="text-textcolor/50 ml-1 text-sm font-normal">
-										（{ebookStore.books.length}）
+										（{ebookStore.total}）
 									</span>
 								) : null}
 							</>
@@ -126,6 +130,7 @@ function EbookShelfPage() {
 										variant="link"
 										size="sm"
 										className="shrink-0 gap-1.5 px-0!"
+										disabled={uploading}
 										onClick={onPickTauri}
 									>
 										<FolderOpen className="size-4" aria-hidden />
@@ -137,6 +142,7 @@ function EbookShelfPage() {
 											variant="link"
 											size="sm"
 											className="shrink-0 gap-1.5 px-0!"
+											disabled={uploading}
 											onClick={onPickWeb}
 										>
 											<BookOpen className="size-4" aria-hidden />
@@ -156,7 +162,13 @@ function EbookShelfPage() {
 					/>
 				}
 			>
-				<ScrollArea className="min-h-0 flex-1 px-4 py-4">
+				<ScrollArea
+					className="min-h-0 flex-1 px-4 py-4"
+					onScroll={ebookStore.onShelfViewportScroll}
+				>
+					{ebookStore.uploadState ? (
+						<EbookShelfUploadBanner state={ebookStore.uploadState} />
+					) : null}
 					{showInitialLoading ? (
 						<div className="text-textcolor/60 flex flex-1 flex-col items-center justify-center py-12 text-center text-sm">
 							<Loading text={t('common.loading')} />
@@ -166,17 +178,25 @@ function EbookShelfPage() {
 							{t('ebook.shelf.empty')}
 						</div>
 					) : (
-						<div className="grid w-full gap-3 sm:gap-4 grid-cols-[repeat(auto-fill,minmax(min(100%,9.5rem),1fr))]">
-							{ebookStore.books.map((b) => (
-								<EbookShelfBookCard
-									key={b.id}
-									book={b}
-									prog={ebookStore.progOf(b.id)}
-									onOpen={onOpen}
-									onRemove={onRequestRemove}
-								/>
-							))}
-						</div>
+						<>
+							<div className="grid w-full gap-3 sm:gap-4 grid-cols-[repeat(auto-fill,minmax(min(100%,9.5rem),1fr))]">
+								{ebookStore.books.map((b) => (
+									<EbookShelfBookCard
+										key={b.id}
+										book={b}
+										prog={ebookStore.progOf(b.id)}
+										onOpen={onOpen}
+										onRemove={onRequestRemove}
+									/>
+								))}
+							</div>
+							{showLoadMoreHint ? (
+								<div className="text-textcolor/50 flex items-center justify-center gap-1.5 py-4 text-xs">
+									<Spinner className="size-3.5 text-textcolor/50" aria-hidden />
+									{t('common.loadingMore')}
+								</div>
+							) : null}
+						</>
 					)}
 				</ScrollArea>
 			</EbookPageShell>

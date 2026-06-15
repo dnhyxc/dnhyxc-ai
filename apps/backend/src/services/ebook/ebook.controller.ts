@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto';
 import {
 	BadRequestException,
 	Body,
@@ -9,6 +8,7 @@ import {
 	ParseUUIDPipe,
 	Post,
 	Put,
+	Query,
 	Req,
 	Res,
 	UnauthorizedException,
@@ -18,12 +18,12 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { Request, Response } from 'express';
-import { diskStorage } from 'multer';
+import { memoryStorage } from 'multer';
 import { JwtGuard } from 'src/guards/jwt.guard';
 import { ResponseInterceptor } from '../../interceptors/response.interceptor';
 import { decodeChineseFilename } from '../../utils';
-import { ensureUploadDir, getEbookFilesDir } from '../../utils/upload-paths';
 import { AddEbookPathDto } from './dto/add-ebook-path.dto';
+import { QueryEbookShelfDto } from './dto/query-ebook-shelf.dto';
 import { SaveEbookProgressDto } from './dto/save-ebook-progress.dto';
 import { EbookService } from './ebook.service';
 
@@ -31,33 +31,23 @@ type AuthedRequest = Request & { user?: { userId: number } };
 
 const EBOOK_MAX_BYTES = 120 * 1024 * 1024;
 
-function ebookUploadMulterOptions() {
-	return {
-		storage: diskStorage({
-			destination: (_req, _file, cb) => {
-				const dir = getEbookFilesDir(__dirname);
-				ensureUploadDir(dir);
-				cb(null, dir);
-			},
-			filename: (_req, file, cb) => {
-				const originalname = decodeChineseFilename(file.originalname);
-				cb(null, `${randomUUID()}_${originalname}`);
-			},
-		}),
-		limits: { fileSize: EBOOK_MAX_BYTES },
-		fileFilter: (
-			_req: Request,
-			file: Express.Multer.File,
-			cb: (error: Error | null, accept: boolean) => void,
-		) => {
-			const lower = file.originalname.toLowerCase();
-			if (lower.endsWith('.epub') || lower.endsWith('.pdf')) {
-				cb(null, true);
-			} else {
-				cb(new BadRequestException('仅支持 epub / pdf'), false);
-			}
-		},
-	};
+const ebookMemoryUpload = {
+	storage: memoryStorage(),
+	limits: { fileSize: EBOOK_MAX_BYTES },
+};
+
+function ebookFileFilter(
+	_req: Request,
+	file: Express.Multer.File,
+	cb: (error: Error | null, accept: boolean) => void,
+) {
+	const originalname = decodeChineseFilename(file.originalname);
+	const lower = originalname.toLowerCase();
+	if (lower.endsWith('.epub') || lower.endsWith('.pdf')) {
+		cb(null, true);
+	} else {
+		cb(new BadRequestException('仅支持 epub / pdf'), false);
+	}
 }
 
 @Controller('ebook')
@@ -75,8 +65,17 @@ export class EbookController {
 
 	@Get('shelf')
 	@UseInterceptors(ResponseInterceptor)
-	async shelf(@Req() req: AuthedRequest) {
-		return this.ebookService.getShelf(this.userId(req));
+	async shelf(@Req() req: AuthedRequest, @Query() query: QueryEbookShelfDto) {
+		return this.ebookService.getShelf(this.userId(req), query);
+	}
+
+	@Get('book/:id')
+	@UseInterceptors(ResponseInterceptor)
+	async getBook(
+		@Req() req: AuthedRequest,
+		@Param('id', ParseUUIDPipe) id: string,
+	) {
+		return this.ebookService.getBook(this.userId(req), id);
 	}
 
 	@Post('add-path')
@@ -87,14 +86,21 @@ export class EbookController {
 
 	@Post('upload')
 	@UseInterceptors(
-		FileInterceptor('file', ebookUploadMulterOptions()),
+		FileInterceptor('file', {
+			...ebookMemoryUpload,
+			fileFilter: ebookFileFilter,
+		}),
 		ResponseInterceptor,
 	)
 	async upload(
 		@Req() req: AuthedRequest,
 		@UploadedFile() file: Express.Multer.File,
+		@Body('bookId') bookId?: string,
 	) {
-		return this.ebookService.addFromUpload(this.userId(req), file);
+		const trimmed = typeof bookId === 'string' ? bookId.trim() : undefined;
+		return this.ebookService.addFromUpload(this.userId(req), file, {
+			bookId: trimmed || undefined,
+		});
 	}
 
 	@Put('progress')
@@ -120,8 +126,12 @@ export class EbookController {
 		@Res() res: Response,
 	) {
 		const userId = this.userId(req);
-		const { abs, fmt } = await this.ebookService.getFileForDownload(userId, id);
-		res.setHeader('Content-Type', this.ebookService.getEbookMime(fmt));
-		res.sendFile(abs);
+		const payload = await this.ebookService.getFileForDownload(userId, id);
+		res.setHeader('Content-Type', this.ebookService.getEbookMime(payload.fmt));
+		if (payload.kind === 'disk') {
+			res.sendFile(payload.abs);
+			return;
+		}
+		res.send(payload.buffer);
 	}
 }

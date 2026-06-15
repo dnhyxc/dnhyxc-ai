@@ -17,7 +17,12 @@ import type { EnglishPackWebSearchRoundDto } from '@/utils/englishPackWebSearchM
 import { getPlatformFetch, http } from '@/utils/fetch';
 import { retryAsync, runTasksWithConcurrency } from '@/utils/retryAsync';
 import { isTauriRuntime } from '@/utils/runtime';
-import type { Book, EbookShelfData, Prog } from '@/views/ebook/types';
+import type {
+	Book,
+	EbookBookDetail,
+	EbookShelfData,
+	Prog,
+} from '@/views/ebook/types';
 import {
 	AGENT_SESSION,
 	AGENT_SESSIONS,
@@ -36,6 +41,7 @@ import {
 	DOWNLOAD_FILE,
 	DOWNLOAD_ZIP_FILE,
 	EBOOK_ADD_PATH,
+	EBOOK_BOOK,
 	EBOOK_DELETE,
 	EBOOK_FILE,
 	EBOOK_PROGRESS,
@@ -1767,9 +1773,25 @@ export const deleteKnowledgeTrashBatch = async (ids: string[]) => {
 	});
 };
 
-/** GET /ebook/shelf：书架与阅读进度 */
-export const loadEbookShelf = async (): Promise<EbookShelfData> => {
-	const res = await http.get<EbookShelfData>(EBOOK_SHELF, { silent: true });
+/** GET /ebook/shelf：书架与阅读进度（分页） */
+export const loadEbookShelf = async (params?: {
+	pageNo?: number;
+	pageSize?: number;
+}): Promise<EbookShelfData> => {
+	const res = await http.get<EbookShelfData>(EBOOK_SHELF, {
+		querys: params,
+		silent: true,
+	});
+	return res.data;
+};
+
+/** GET /ebook/book/:id：单本书详情（含进度） */
+export const getEbookBook = async (
+	bookId: string,
+): Promise<EbookBookDetail> => {
+	const res = await http.get<EbookBookDetail>(`${EBOOK_BOOK}/${bookId}`, {
+		silent: true,
+	});
 	return res.data;
 };
 
@@ -1783,20 +1805,26 @@ export const addEbookFromPath = async (
 	return res.data;
 };
 
-/** POST /ebook/upload：Web 上传入库 */
-export const uploadEbookFile = async (file: File): Promise<Book> => {
+/** POST /ebook/upload：上传入库；bookId 用于桌面先登记路径后绑定云端 */
+export const uploadEbookFile = async (
+	file: File,
+	options?: {
+		bookId?: string;
+		onProgress?: (percent: number) => void;
+	},
+): Promise<Book> => {
 	const mb = file.size / (1024 * 1024);
-	if (mb > 80) {
-		throw new Error('Web 端单本不超过 80MB，请使用桌面客户端打开大文件');
+	if (mb > 120) {
+		throw new Error('单本不超过 120MB');
 	}
-	const res = await http.post<Book>(
-		EBOOK_UPLOAD,
-		{ file },
-		{
-			headers: { 'Content-Type': 'multipart/form-data' },
-			onUploadProgress: undefined,
-		},
-	);
+	const payload: { file: File; bookId?: string } = { file };
+	if (options?.bookId) {
+		payload.bookId = options.bookId;
+	}
+	const res = await http.post<Book>(EBOOK_UPLOAD, payload, {
+		headers: { 'Content-Type': 'multipart/form-data' },
+		onUploadProgress: options?.onProgress,
+	});
 	return res.data;
 };
 

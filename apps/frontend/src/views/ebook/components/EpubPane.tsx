@@ -8,9 +8,10 @@ import type { EpubToc } from '../types';
 import {
 	applyEpubReaderAppearance,
 	type EpubReaderSettings,
-	epubReaderHostBgClass,
+	resolveEpubBgColor,
 } from '../utils/epubReaderSettings';
 import { attachEpubScrolledEdgeNav } from '../utils/epubScrolledNav';
+import { READER_NATIVE_SCROLLBAR_EPUB_CONTAINER } from '../utils/readerScrollbar';
 
 type NavApi = {
 	prev: () => Promise<void>;
@@ -78,6 +79,10 @@ export function EpubPane({
 }: Props) {
 	const { theme: appTheme } = useTheme();
 	const [appThemeName, setAppThemeName] = useState<ThemeName>(appTheme);
+	const readerBgColor = resolveEpubBgColor(
+		readerSettings.bgTheme,
+		appThemeName,
+	);
 	const readerSettingsRef = useRef(readerSettings);
 	const appThemeRef = useRef<ThemeName>(appTheme);
 	const hostRef = useRef<HTMLDivElement>(null);
@@ -329,18 +334,11 @@ export function EpubPane({
 				className={cn(
 					'h-full min-h-0 w-full overflow-hidden rounded-b-md ring-1 ring-theme/10',
 					readerSettings.pageFlow === 'paginated' && 'min-h-[320px]',
-					epubReaderHostBgClass(readerSettings.bgTheme),
 					// 连续滚动：美化 epub.js 内部 .epub-container 原生滚动条
-					readerSettings.pageFlow === 'scrolled' && [
-						'[&_.epub-container]:[scrollbar-width:thin]',
-						'[&_.epub-container]:[scrollbar-color:color-mix(in_oklch,var(--theme-border)_60%,transparent)_transparent]',
-						'[&_.epub-container::-webkit-scrollbar]:w-2',
-						'[&_.epub-container::-webkit-scrollbar-track]:bg-transparent',
-						'[&_.epub-container::-webkit-scrollbar-thumb]:rounded-full',
-						'[&_.epub-container::-webkit-scrollbar-thumb]:bg-theme-border/60',
-						'hover:[&_.epub-container::-webkit-scrollbar-thumb]:bg-theme-border',
-					],
+					readerSettings.pageFlow === 'scrolled' &&
+						READER_NATIVE_SCROLLBAR_EPUB_CONTAINER,
 				)}
+				style={{ backgroundColor: readerBgColor }}
 			/>
 		</div>
 	);

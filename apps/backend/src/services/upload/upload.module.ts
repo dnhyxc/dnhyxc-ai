@@ -50,5 +50,6 @@ const UPLOAD_FILES_DIR = getUploadFilesDir(__dirname);
 	],
 	controllers: [UploadController, UploadPublicController],
 	providers: [UploadService],
+	exports: [UploadService],
 })
 export class UploadModule {}

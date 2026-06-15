@@ -68,6 +68,8 @@
 | 阅读页顶栏显示「智能对话」而非书架 | [ebook/ebook-reader-shelf.md](./ebook/ebook-reader-shelf.md) §3.4、[app/route-auth.md](./app/route-auth.md) |
 | PDF 目录跳转报 canvas 并发渲染错误 | [ebook/shelf-reader-polish.md](./ebook/shelf-reader-polish.md) §3.6 |
 | EPUB 连续滚动无法自动进入下一章 | [ebook/epub-reader-settings-scroll.md](./ebook/epub-reader-settings-scroll.md) §3.2 |
+| 桌面大文件上传中无法阅读 / 超 120MB 打不开 | [ebook/ebook-cos-local-shelf.md](./ebook/ebook-cos-local-shelf.md) §3.1–§3.2 |
+| 阅读背景色不生效 | [ebook/ebook-cos-local-shelf.md](./ebook/ebook-cos-local-shelf.md) §3.4 |
 
 ---
 

@@ -821,4 +821,19 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'EPUB reader header adds Reading settings next to TOC: font size, line spacing, text color, reading background, and paginated vs continuous scroll; preferences are stored locally. In continuous scroll, reaching the bottom or top of a chapter automatically moves to the next or previous chapter without repeated page-turn clicks.',
 	},
+	's25-7': {
+		title: 'Desktop cloud backup and local-first reading',
+		description:
+			'On desktop, opening a local file adds the book to the shelf immediately so you can read right away, while a cloud backup runs in the background (progress bar for large files). Reading prefers the local file; browser import or unavailable local files fall back to cloud. Progress stays tied to one book. Local open up to about 512MB; cloud upload about 120MB per file.',
+	},
+	's25-8': {
+		title: 'Shelf scroll loading and reader settings polish',
+		description:
+			'Bookshelf loads more as you scroll; the header shows total book count. EPUB reading settings offer 12 background and 12 text colors (swatch picker); continuous scroll is the default page flow with a segmented toggle; the settings panel uses the app ScrollArea scrollbar style.',
+	},
+	's25-9': {
+		title: 'PDF reader scrollbar styling',
+		description:
+			'When scrolling long PDF pages in the reader, the scrollbar uses a thin, theme-colored style consistent with EPUB continuous scroll.',
+	},
 };

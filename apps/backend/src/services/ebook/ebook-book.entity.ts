@@ -34,7 +34,7 @@ export class EbookBook {
 	@Column({ type: 'varchar', length: 1024, name: 'local_path', nullable: true })
 	localPath: string | null;
 
-	/** 服务端落盘相对路径（uploads/ebooks/...） */
+	/** 云端对象键（COS ebooks/ 前缀）或历史本地上传相对路径 uploads/ebooks/... */
 	@Column({ type: 'varchar', length: 512, name: 'file_path', nullable: true })
 	filePath: string | null;
 

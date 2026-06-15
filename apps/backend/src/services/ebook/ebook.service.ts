@@ -9,7 +9,10 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { decodeChineseFilename } from '../../utils';
 import { getUploadsRoot } from '../../utils/upload-paths';
+import { isCosObjectKey } from '../upload/cos.config';
+import { UploadService } from '../upload/upload.service';
 import { AddEbookPathDto } from './dto/add-ebook-path.dto';
+import { QueryEbookShelfDto } from './dto/query-ebook-shelf.dto';
 import { SaveEbookProgressDto } from './dto/save-ebook-progress.dto';
 import { EbookBook } from './ebook-book.entity';
 import { EbookProgress } from './ebook-progress.entity';
@@ -19,7 +22,7 @@ export type EbookBookDto = {
 	fmt: 'epub' | 'pdf';
 	title: string;
 	author?: string;
-	src: { kind: 'path'; path: string } | { kind: 'store' };
+	src: { kind: 'path'; path: string } | { kind: 'store'; localPath?: string };
 	size?: number;
 	addedAt: string;
 };
@@ -31,6 +34,23 @@ export type EbookProgDto = {
 	percent?: number;
 	updatedAt: string;
 };
+
+export type EbookShelfPageDto = {
+	books: EbookBookDto[];
+	progMap: Record<string, EbookProgDto>;
+	total: number;
+	pageNo: number;
+	pageSize: number;
+};
+
+export type EbookBookDetailDto = {
+	book: EbookBookDto;
+	prog?: EbookProgDto;
+};
+
+export type EbookFilePayload =
+	| { kind: 'disk'; abs: string; fmt: 'epub' | 'pdf' }
+	| { kind: 'buffer'; buffer: Buffer; fmt: 'epub' | 'pdf' };
 
 function titleFromPath(path: string): string {
 	const name = path.split(/[/\\]/).pop() ?? path;
@@ -45,6 +65,10 @@ function fmtFromName(name: string): 'epub' | 'pdf' | null {
 	return null;
 }
 
+function isCosEbookKey(filePath: string): boolean {
+	return isCosObjectKey(filePath) && filePath.startsWith('ebooks/');
+}
+
 @Injectable()
 export class EbookService {
 	constructor(
@@ -52,13 +76,20 @@ export class EbookService {
 		private readonly bookRepo: Repository<EbookBook>,
 		@InjectRepository(EbookProgress)
 		private readonly progRepo: Repository<EbookProgress>,
+		private readonly uploadService: UploadService,
 	) {}
 
 	private toBookDto(book: EbookBook): EbookBookDto {
-		const src: EbookBookDto['src'] =
-			book.srcKind === 'path' && book.localPath
-				? { kind: 'path', path: book.localPath }
+		let src: EbookBookDto['src'];
+		if (book.filePath) {
+			src = book.localPath
+				? { kind: 'store', localPath: book.localPath }
 				: { kind: 'store' };
+		} else if (book.localPath) {
+			src = { kind: 'path', path: book.localPath };
+		} else {
+			src = { kind: 'store' };
+		}
 
 		const dto: EbookBookDto = {
 			id: book.id,
@@ -83,10 +114,20 @@ export class EbookService {
 		return dto;
 	}
 
-	async getShelf(userId: number) {
-		const books = await this.bookRepo.find({
+	async getShelf(
+		userId: number,
+		query: QueryEbookShelfDto = {},
+	): Promise<EbookShelfPageDto> {
+		const pageNo = query.pageNo ?? 1;
+		const pageSize = query.pageSize ?? 20;
+		const take = pageSize;
+		const skip = (pageNo - 1) * take;
+
+		const [books, total] = await this.bookRepo.findAndCount({
 			where: { userId },
 			order: { createdAt: 'DESC' },
+			take,
+			skip,
 		});
 		const ids = books.map((b) => b.id);
 		const progresses =
@@ -102,9 +143,29 @@ export class EbookService {
 		return {
 			books: books.map((b) => this.toBookDto(b)),
 			progMap,
+			total,
+			pageNo,
+			pageSize,
 		};
 	}
 
+	async getBook(userId: number, bookId: string): Promise<EbookBookDetailDto> {
+		const book = await this.bookRepo.findOne({
+			where: { id: bookId, userId },
+		});
+		if (!book) {
+			throw new NotFoundException('书籍不存在');
+		}
+		const prog = await this.progRepo.findOne({
+			where: { bookId, userId },
+		});
+		return {
+			book: this.toBookDto(book),
+			prog: prog ? this.toProgDto(prog) : undefined,
+		};
+	}
+
+	/** 登记桌面本地路径，先上架；后台上传 COS 后保留 localPath */
 	async addFromPath(
 		userId: number,
 		dto: AddEbookPathDto,
@@ -119,7 +180,7 @@ export class EbookService {
 		}
 
 		const dup = await this.bookRepo.findOne({
-			where: { userId, srcKind: 'path', localPath: path },
+			where: { userId, localPath: path },
 		});
 		if (dup) {
 			return this.toBookDto(dup);
@@ -140,25 +201,47 @@ export class EbookService {
 	async addFromUpload(
 		userId: number,
 		file: Express.Multer.File,
+		opts?: { bookId?: string },
 	): Promise<EbookBookDto> {
-		if (!file?.path) {
+		if (!file?.buffer?.length) {
 			throw new BadRequestException('请上传 epub / pdf 文件');
 		}
-		const fmt = fmtFromName(file.originalname);
+		const originalname = decodeChineseFilename(file.originalname);
+		const fmt = fmtFromName(originalname);
 		if (!fmt) {
 			throw new BadRequestException('仅支持 epub / pdf');
 		}
-		const originalname = decodeChineseFilename(file.originalname);
-		const title = titleFromPath(originalname).slice(0, 512);
-		const relPath = `ebooks/${file.filename}`;
 
+		const cosResult = await this.uploadService.uploadObjectToCos(
+			file,
+			'ebooks',
+		);
+
+		if (opts?.bookId) {
+			const book = await this.bookRepo.findOne({
+				where: { id: opts.bookId, userId },
+			});
+			if (!book) {
+				throw new NotFoundException('书籍不存在');
+			}
+			if (book.fmt !== fmt) {
+				throw new BadRequestException('文件格式与已登记书籍不一致');
+			}
+			book.filePath = cosResult.key;
+			book.srcKind = 'store';
+			book.size = String(cosResult.size);
+			await this.bookRepo.save(book);
+			return this.toBookDto(book);
+		}
+
+		const title = titleFromPath(originalname).slice(0, 512);
 		const book = this.bookRepo.create({
 			userId,
 			fmt,
 			title,
 			srcKind: 'store',
-			filePath: relPath,
-			size: String(file.size),
+			filePath: cosResult.key,
+			size: String(cosResult.size),
 		});
 		await this.bookRepo.save(book);
 		return this.toBookDto(book);
@@ -170,12 +253,20 @@ export class EbookService {
 			throw new NotFoundException('书籍不存在');
 		}
 		if (book.srcKind === 'store' && book.filePath) {
-			const abs = join(getUploadsRoot(__dirname), book.filePath);
-			if (existsSync(abs)) {
+			if (isCosEbookKey(book.filePath)) {
 				try {
-					unlinkSync(abs);
+					await this.uploadService.deleteCosObject(book.filePath);
 				} catch {
-					// 磁盘删除失败不阻塞
+					// COS 删除失败不阻塞移出书架
+				}
+			} else {
+				const abs = join(getUploadsRoot(__dirname), book.filePath);
+				if (existsSync(abs)) {
+					try {
+						unlinkSync(abs);
+					} catch {
+						// ignore
+					}
 				}
 			}
 		}
@@ -213,16 +304,23 @@ export class EbookService {
 	async getFileForDownload(
 		userId: number,
 		bookId: string,
-	): Promise<{ abs: string; fmt: 'epub' | 'pdf' }> {
+	): Promise<EbookFilePayload> {
 		const book = await this.bookRepo.findOne({ where: { id: bookId, userId } });
 		if (!book || book.srcKind !== 'store' || !book.filePath) {
 			throw new NotFoundException('文件不存在');
 		}
-		const abs = join(getUploadsRoot(__dirname), book.filePath);
-		if (!existsSync(abs)) {
-			throw new NotFoundException('文件不存在');
+
+		const localAbs = join(getUploadsRoot(__dirname), book.filePath);
+		if (existsSync(localAbs)) {
+			return { kind: 'disk', abs: localAbs, fmt: book.fmt };
 		}
-		return { abs, fmt: book.fmt };
+
+		if (isCosEbookKey(book.filePath)) {
+			const buffer = await this.uploadService.getObjectBuffer(book.filePath);
+			return { kind: 'buffer', buffer, fmt: book.fmt };
+		}
+
+		throw new NotFoundException('文件不存在');
 	}
 
 	getEbookMime(fmt: 'epub' | 'pdf'): string {
