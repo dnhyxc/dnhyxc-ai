@@ -836,4 +836,9 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'When scrolling long PDF pages in the reader, the scrollbar uses a thin, theme-colored style consistent with EPUB continuous scroll.',
 	},
+	's25-10': {
+		title: 'PDF fit width and scroll page turns',
+		description:
+			'PDFs default to fit the reader width. Header zoom out/in and percentage (100% = fit width); preference is stored locally. On long pages, scroll to the top or bottom, pause, then scroll again to go to the previous or next page—fast flick scrolling will not skip multiple pages. Header and keyboard page turns still work.',
+	},
 };

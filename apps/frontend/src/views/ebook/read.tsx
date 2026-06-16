@@ -2,7 +2,7 @@ import Loading from '@design/Loading';
 import Tooltip from '@design/Tooltip';
 import { Button } from '@ui/index';
 import { Toast } from '@ui/sonner';
-import { ChevronLeft, ChevronRight, List } from 'lucide-react';
+import { ChevronLeft, ChevronRight, List, Minus, Plus } from 'lucide-react';
 import { observer } from 'mobx-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
@@ -23,6 +23,14 @@ import {
 } from './utils/epubReaderSettings';
 import { resolveOpen } from './utils/io';
 import { parsePdfPageHref } from './utils/pdfOutline';
+import {
+	loadPdfZoom,
+	PDF_ZOOM_MAX,
+	PDF_ZOOM_MIN,
+	PDF_ZOOM_STEP,
+	savePdfZoom,
+	stepPdfZoom,
+} from './utils/pdfReaderSettings';
 
 function EbookReadPage() {
 	const { bookId = '' } = useParams();
@@ -53,6 +61,7 @@ function EbookReadPage() {
 	const [pdfNavReady, setPdfNavReady] = useState(false);
 	const [pdfPage, setPdfPage] = useState(0);
 	const [pdfTotal, setPdfTotal] = useState(0);
+	const [pdfZoom, setPdfZoom] = useState(loadPdfZoom);
 	const progTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
 	useEffect(() => {
@@ -181,6 +190,14 @@ function EbookReadPage() {
 	const resetEpubSettings = useCallback(() => {
 		setEpubSettings(DEFAULT_EPUB_READER_SETTINGS);
 		saveEpubReaderSettings(DEFAULT_EPUB_READER_SETTINGS);
+	}, []);
+
+	const patchPdfZoom = useCallback((delta: number) => {
+		setPdfZoom((prev) => {
+			const next = stepPdfZoom(prev, delta);
+			savePdfZoom(next);
+			return next;
+		});
 	}, []);
 
 	useEffect(() => {
@@ -321,9 +338,55 @@ function EbookReadPage() {
 			</>
 		) : null;
 
+	const pdfZoomLabel = `${Math.round(pdfZoom * 100)}%`;
+
 	const pdfHeaderTrailing =
 		book.fmt === 'pdf' ? (
 			<>
+				<Tooltip
+					side="bottom"
+					sideOffset={6}
+					delayDuration={200}
+					shadow
+					content={t('ebook.read.pdfZoomOut')}
+				>
+					<Button
+						type="button"
+						variant="ghost"
+						size="icon-sm"
+						className="text-textcolor/80"
+						disabled={!pdfNavReady || pdfZoom <= PDF_ZOOM_MIN}
+						aria-label={t('ebook.read.pdfZoomOut')}
+						onClick={() => patchPdfZoom(-PDF_ZOOM_STEP)}
+					>
+						<Minus className="size-4" />
+					</Button>
+				</Tooltip>
+				<span
+					className="text-textcolor/55 min-w-10 text-center tabular-nums text-xs"
+					title={t('ebook.read.pdfZoomHint')}
+				>
+					{pdfZoomLabel}
+				</span>
+				<Tooltip
+					side="bottom"
+					sideOffset={6}
+					delayDuration={200}
+					shadow
+					content={t('ebook.read.pdfZoomIn')}
+				>
+					<Button
+						type="button"
+						variant="ghost"
+						size="icon-sm"
+						className="text-textcolor/80"
+						disabled={!pdfNavReady || pdfZoom >= PDF_ZOOM_MAX}
+						aria-label={t('ebook.read.pdfZoomIn')}
+						onClick={() => patchPdfZoom(PDF_ZOOM_STEP)}
+					>
+						<Plus className="size-4" />
+					</Button>
+				</Tooltip>
 				<Tooltip
 					side="bottom"
 					sideOffset={6}
@@ -420,6 +483,7 @@ function EbookReadPage() {
 					<PdfPane
 						open={open}
 						startPage={prog?.pdfPage ?? 0}
+						zoomMultiplier={pdfZoom}
 						onPage={savePage}
 						onPageState={onPdfPageState}
 						onToc={setToc}

@@ -1575,6 +1575,10 @@ export const enUS = {
 	'ebook.read.settings.reset': 'Reset to default',
 	'ebook.read.prev': 'Previous',
 	'ebook.read.next': 'Next',
+	'ebook.read.pdfZoomIn': 'Zoom in',
+	'ebook.read.pdfZoomOut': 'Zoom out',
+	'ebook.read.pdfZoomHint':
+		'Scale relative to fit width; 100% fills the reader width',
 	'ebook.err.open': 'Failed to open',
 	'route.account.title': 'Account',
 	'route.pay.title': 'Membership',

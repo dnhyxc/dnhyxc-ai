@@ -50,7 +50,7 @@ function BgThemeSwatches({
 						aria-label={label}
 						aria-pressed={selected}
 						className={cn(
-							'ring-theme/25 relative size-9 rounded-lg ring-1 transition',
+							'cursor-pointer ring-theme/25 relative size-9 rounded-lg ring-1 transition',
 							selected && 'ring-teal-600 ring-2',
 							opt.id === 'default' &&
 								'bg-theme-background from-theme/8 to-theme/20 bg-linear-to-br',
@@ -94,7 +94,7 @@ function TextColorSwatches({
 						aria-label={label}
 						aria-pressed={selected}
 						className={cn(
-							'ring-theme/25 bg-theme-background relative flex size-9 items-center justify-center rounded-lg ring-1 transition',
+							'cursor-pointer ring-theme/25 bg-theme-background relative flex size-9 items-center justify-center rounded-lg ring-1 transition',
 							selected && 'ring-teal-600 ring-2',
 							isAuto && 'from-theme/8 to-theme/20 bg-linear-to-br',
 						)}
@@ -147,7 +147,7 @@ function PageFlowToggle({
 						title={label}
 						onClick={() => onChange(id)}
 						className={cn(
-							'flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-2 text-xs transition',
+							'cursor-pointer flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-2 text-xs transition',
 							selected
 								? 'bg-theme-background text-textcolor shadow-sm'
 								: 'text-textcolor/55 hover:text-textcolor/80',
