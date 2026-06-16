@@ -7,12 +7,12 @@ import {
 } from '@ui/dropdown-menu';
 import {
 	ArrowLeftRight,
-	BookMarked,
 	BookOpenText,
 	Bot,
 	CircleUserRound,
 	Codesandbox,
 	House,
+	LibraryBig,
 	LogOut,
 	Package,
 	SquareArrowRight,
@@ -46,7 +46,7 @@ const Sidebar = () => {
 		Bot: <Bot />,
 		Codesandbox: <Codesandbox />,
 		BookOpenText: <BookOpenText />,
-		BookMarked: <BookMarked />,
+		LibraryBig: <LibraryBig />,
 		WalletCards: <WalletCards />,
 		Vegan: <Vegan />,
 	};

@@ -12,6 +12,8 @@ export type Book = {
 	author?: string;
 	src: BookSrc;
 	size?: number;
+	/** /images/ebook-cover_*.jpg 等相对路径 */
+	coverUrl?: string;
 	addedAt: string;
 };
 

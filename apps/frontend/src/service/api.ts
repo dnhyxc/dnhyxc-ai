@@ -186,6 +186,10 @@ export const EBOOK_ADD_PATH = '/ebook/add-path';
 export const EBOOK_UPLOAD = '/ebook/upload';
 /** 电子书：更新阅读进度 */
 export const EBOOK_PROGRESS = '/ebook/progress';
+/** 电子书：更新书名 */
+export const EBOOK_TITLE = '/ebook/title';
+/** 电子书：上传书架封面（multipart → uploads/images） */
+export const EBOOK_COVER = '/ebook/cover';
 /** 电子书：删除书籍 */
 export const EBOOK_DELETE = '/ebook/delete';
 /** 电子书：下载已入库文件字节 */

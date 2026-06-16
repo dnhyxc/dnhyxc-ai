@@ -7,11 +7,14 @@ import {
 	getEbookBook,
 	loadEbookShelf,
 	removeEbook,
+	saveEbookCover,
 	saveEbookProgress,
+	updateEbookTitle,
 	uploadEbookFile,
 } from '@/service';
 import { getRequestErrorMessage } from '@/utils/fetch';
 import type { Book, BookFmt, Prog } from '@/views/ebook/types';
+import { fileToCoverFile } from '@/views/ebook/utils/coverImage';
 import { pickTauri, tauriPickedFileToUpload } from '@/views/ebook/utils/io';
 
 export type EbookUploadPhase = 'reading' | 'uploading';
@@ -204,6 +207,23 @@ class EbookStore {
 			delete this.bookCache[bookId];
 			delete this.progMap[bookId];
 			this.total = Math.max(0, this.total - 1);
+		});
+	}
+
+	async setCover(bookId: string, file: File): Promise<void> {
+		const coverFile = await fileToCoverFile(file);
+		const updated = await saveEbookCover(bookId, coverFile);
+		runInAction(() => {
+			this.books = this.books.map((b) => (b.id === bookId ? updated : b));
+			this.bookCache[bookId] = updated;
+		});
+	}
+
+	async updateTitle(bookId: string, title: string): Promise<void> {
+		const updated = await updateEbookTitle(bookId, title);
+		runInAction(() => {
+			this.books = this.books.map((b) => (b.id === bookId ? updated : b));
+			this.bookCache[bookId] = updated;
 		});
 	}
 

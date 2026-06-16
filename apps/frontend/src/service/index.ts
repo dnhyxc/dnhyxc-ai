@@ -42,10 +42,12 @@ import {
 	DOWNLOAD_ZIP_FILE,
 	EBOOK_ADD_PATH,
 	EBOOK_BOOK,
+	EBOOK_COVER,
 	EBOOK_DELETE,
 	EBOOK_FILE,
 	EBOOK_PROGRESS,
 	EBOOK_SHELF,
+	EBOOK_TITLE,
 	EBOOK_UPLOAD,
 	ENGLISH_LEARNING_CLASSIC_QUOTE_MISTAKES,
 	ENGLISH_LEARNING_CLASSIC_QUOTES_FAVORITES,
@@ -1836,6 +1838,30 @@ export const saveEbookProgress = async (prog: Prog): Promise<void> => {
 		pdfPage: prog.pdfPage,
 		percent: prog.percent,
 	});
+};
+
+/** PUT /ebook/title：更新书名 */
+export const updateEbookTitle = async (
+	bookId: string,
+	title: string,
+): Promise<Book> => {
+	const res = await http.put<Book>(EBOOK_TITLE, { bookId, title });
+	return res.data;
+};
+
+/** PUT /ebook/cover/:id：上传书架封面到服务器 uploads/images */
+export const saveEbookCover = async (
+	bookId: string,
+	file: File,
+): Promise<Book> => {
+	const res = await http.put<Book>(
+		`${EBOOK_COVER}/${bookId}`,
+		{ file },
+		{
+			headers: { 'Content-Type': 'multipart/form-data' },
+		},
+	);
+	return res.data;
 };
 
 /** DELETE /ebook/delete/:id */

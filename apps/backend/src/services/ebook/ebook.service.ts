@@ -8,12 +8,16 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { decodeChineseFilename } from '../../utils';
-import { getUploadsRoot } from '../../utils/upload-paths';
+import {
+	getUploadsRoot,
+	normalizeUploadPublicPath,
+} from '../../utils/upload-paths';
 import { isCosObjectKey } from '../upload/cos.config';
 import { UploadService } from '../upload/upload.service';
 import { AddEbookPathDto } from './dto/add-ebook-path.dto';
 import { QueryEbookShelfDto } from './dto/query-ebook-shelf.dto';
 import { SaveEbookProgressDto } from './dto/save-ebook-progress.dto';
+import { UpdateEbookTitleDto } from './dto/update-ebook-title.dto';
 import { EbookBook } from './ebook-book.entity';
 import { EbookProgress } from './ebook-progress.entity';
 
@@ -24,6 +28,7 @@ export type EbookBookDto = {
 	author?: string;
 	src: { kind: 'path'; path: string } | { kind: 'store'; localPath?: string };
 	size?: number;
+	coverUrl?: string;
 	addedAt: string;
 };
 
@@ -100,6 +105,7 @@ export class EbookService {
 		};
 		if (book.author) dto.author = book.author;
 		if (book.size != null) dto.size = Number(book.size);
+		if (book.coverPath) dto.coverUrl = book.coverPath;
 		return dto;
 	}
 
@@ -270,8 +276,62 @@ export class EbookService {
 				}
 			}
 		}
+		await this.tryDeleteCoverFile(book.coverPath);
 		await this.progRepo.delete({ bookId, userId });
 		await this.bookRepo.delete({ id: bookId, userId });
+	}
+
+	async saveCover(
+		userId: number,
+		bookId: string,
+		file: Express.Multer.File,
+	): Promise<EbookBookDto> {
+		if (!file?.path) {
+			throw new BadRequestException('请上传封面图片');
+		}
+		const book = await this.bookRepo.findOne({
+			where: { id: bookId, userId },
+		});
+		if (!book) {
+			throw new NotFoundException('书籍不存在');
+		}
+		const coverPath = normalizeUploadPublicPath(
+			this.uploadService.getStaticPath(file.path, file.mimetype),
+		);
+		await this.tryDeleteCoverFile(book.coverPath);
+		book.coverPath = coverPath;
+		await this.bookRepo.save(book);
+		return this.toBookDto(book);
+	}
+
+	private async tryDeleteCoverFile(coverPath: string | null): Promise<void> {
+		if (!coverPath) return;
+		const matched = coverPath.match(/^\/images\/([^/]+)$/);
+		if (!matched) return;
+		try {
+			await this.uploadService.deleteFile(matched[1]);
+		} catch {
+			// 旧封面删除失败不阻塞
+		}
+	}
+
+	async updateTitle(
+		userId: number,
+		dto: UpdateEbookTitleDto,
+	): Promise<EbookBookDto> {
+		const title = dto.title.trim();
+		if (!title) {
+			throw new BadRequestException('书名不能为空');
+		}
+		const book = await this.bookRepo.findOne({
+			where: { id: dto.bookId, userId },
+		});
+		if (!book) {
+			throw new NotFoundException('书籍不存在');
+		}
+		book.title = title.slice(0, 512);
+		await this.bookRepo.save(book);
+		return this.toBookDto(book);
 	}
 
 	async saveProgress(

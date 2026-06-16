@@ -799,7 +799,7 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 	's25-2': {
 		title: 'Desktop vs browser import',
 		description:
-			'Desktop (Tauri): Open local file to pick epub/pdf; the app registers the path and reads from disk (file is not copied to the server). Browser: Import file uploads to your account shelf. About 120MB per file.',
+			'Desktop (Tauri): Select local file to pick epub/pdf; the app registers the path and reads from disk (file is not copied to the server). Browser: Import file uploads to your account shelf. About 120MB per file.',
 	},
 	's25-3': {
 		title: 'EPUB/PDF reading and progress',
@@ -840,5 +840,10 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		title: 'PDF fit width and scroll page turns',
 		description:
 			'PDFs default to fit the reader width. Header zoom out/in and percentage (100% = fit width); preference is stored locally. On long pages, scroll to the top or bottom, pause, then scroll again to go to the previous or next page—fast flick scrolling will not skip multiple pages. Header and keyboard page turns still work.',
+	},
+	's25-11': {
+		title: 'Shelf cover and title editing',
+		description:
+			'Shelf cards support custom covers (JPG/PNG/WebP via the bottom-left control on hover) and inline title editing (tap the title below the card, Enter to save) with success toasts. With a cover, the card shows the image; without, EPUB/PDF color placeholders remain. Hover the card for Read/Continue, progress, or Remove. Desktop import button label is now Select local file.',
 	},
 };

@@ -41,6 +41,10 @@ export class EbookBook {
 	@Column({ type: 'bigint', nullable: true })
 	size: string | null;
 
+	/** 书架封面：/images/ebook-cover_*.jpg 等相对路径 */
+	@Column({ type: 'varchar', length: 512, name: 'cover_path', nullable: true })
+	coverPath: string | null;
+
 	@CreateDateColumn({ name: 'created_at', type: 'timestamp' })
 	createdAt: Date;
 

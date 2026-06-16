@@ -75,6 +75,40 @@ function EbookShelfPage() {
 		}
 	}, [deleteBookId]);
 
+	const onSetCover = useCallback(
+		async (bookId: string, file: File) => {
+			try {
+				await ebookStore.setCover(bookId, file);
+				Toast({ type: 'success', title: t('ebook.shelf.coverSaved') });
+			} catch (e) {
+				Toast({
+					type: 'error',
+					title: t('ebook.shelf.coverFailed'),
+					message: e instanceof Error ? e.message : String(e),
+				});
+				throw e;
+			}
+		},
+		[t],
+	);
+
+	const onUpdateTitle = useCallback(
+		async (bookId: string, title: string) => {
+			try {
+				await ebookStore.updateTitle(bookId, title);
+				Toast({ type: 'success', title: t('ebook.shelf.titleSaved') });
+			} catch (e) {
+				Toast({
+					type: 'error',
+					title: t('ebook.shelf.titleFailed'),
+					message: e instanceof Error ? e.message : String(e),
+				});
+				throw e;
+			}
+		},
+		[t],
+	);
+
 	const showInitialLoading = !ebookStore.ready && ebookStore.loading;
 	const showEmpty =
 		ebookStore.ready && ebookStore.total === 0 && !ebookStore.loading;
@@ -187,6 +221,8 @@ function EbookShelfPage() {
 										prog={ebookStore.progOf(b.id)}
 										onOpen={onOpen}
 										onRemove={onRequestRemove}
+										onSetCover={onSetCover}
+										onUpdateTitle={onUpdateTitle}
 									/>
 								))}
 							</div>
