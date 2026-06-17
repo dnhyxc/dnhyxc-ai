@@ -12,8 +12,10 @@ import {
 	AssistantFooter,
 	AssistantMessageRow,
 	AssistantSessionEntryToolbar,
+	AssistantShareBar,
 	AssistantShell,
 	type SelectMessageByChatId,
+	useAssistantShare,
 } from '@/components/design/Assistant';
 import ChatEntry from '@/components/design/ChatEntry';
 import Loading from '@/components/design/Loading';
@@ -22,10 +24,6 @@ import { useAssistantCopy, useAssistantScroll, useI18n } from '@/hooks';
 import useStore from '@/store';
 import ebookAssistantStore from '@/store/ebookAssistant';
 import type { Message } from '@/types/chat';
-import {
-	EbookAssistantShareBar,
-	useEbookAssistantShare,
-} from './EbookAssistantShareBar';
 
 export type EbookAssistantProps = {
 	bookId: string;
@@ -65,9 +63,11 @@ const EbookAssistantInner = observer(function EbookAssistantInner({
 		onShare,
 		setShareModelVisible,
 		shareChatNode,
-	} = useEbookAssistantShare({
+	} = useAssistantShare({
 		messages: aiMessages,
-		isLoggedIn,
+		sessionId: ebookAssistantStore.activeSessionId,
+		sessionType: 'ebook',
+		enabled: isLoggedIn && Boolean(ebookAssistantStore.activeSessionId),
 	});
 
 	const onSaveToKnowledge = useCallback(
@@ -186,8 +186,9 @@ const EbookAssistantInner = observer(function EbookAssistantInner({
 			}}
 		>
 			{allowAiShare && shareSelection.isSharing ? (
-				<EbookAssistantShareBar
+				<AssistantShareBar
 					messages={aiMessages}
+					checkboxId="ebook-assistant-share-all"
 					shareSelection={shareSelection}
 					shareFlow={shareFlow}
 					setShareModelVisible={setShareModelVisible}

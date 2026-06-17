@@ -484,7 +484,7 @@ const onCreateShare = useCallback(async () => {
 
 ### 4.4 前端：知识库助手 — 传入 `orderedMessageIds`
 
-文件：`apps/frontend/src/views/knowledge/KnowledgeAssistantShareBar.tsx`
+文件：`apps/frontend/src/components/design/Assistant/useAssistantShare.tsx`（知识库接入见 `KnowledgeAssistant.tsx`；**详 [assistant-share-bar.md](./assistant-share-bar.md)**）
 
 ```tsx
 <ShareChat

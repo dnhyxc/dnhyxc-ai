@@ -34,7 +34,8 @@
 | `apps/frontend/src/hooks/useAssistantScroll.ts` | 流式贴底、ScrollFab |
 | `apps/frontend/src/hooks/useAssistantCopy.ts` | 复制反馈 |
 | `apps/frontend/src/views/ebook/components/EbookAssistant.tsx` | 阅读助手业务壳 |
-| `apps/frontend/src/views/ebook/components/EbookAssistantShareBar.tsx` | 分享 hook + 底栏 |
+| `apps/frontend/src/components/design/Assistant/ShareBar.tsx` | 分享底栏 UI（`AssistantShareBar`） |
+| `apps/frontend/src/components/design/Assistant/useAssistantShare.tsx` | 分享 hook（三端复用） |
 | `apps/frontend/src/views/ebook/components/EbookReadSplitLayout.tsx` | 左读右助手分栏 |
 | `apps/frontend/src/views/ebook/read.tsx` | 宿主：助手 state、顶栏、键盘、EPUB/PDF 分流 |
 | `apps/frontend/src/views/ebook/utils/buildPdfContextMenuItems.ts` | PDF 声明式右键菜单 |
@@ -328,7 +329,7 @@ await ebookAssistantStore.sendMessage(text, {
 **Footer 双态**（对齐知识库 / 英语）：
 
 - 正常：`ChatEntry` + `AssistantSessionEntryToolbar store="ebook"`  
-- 分享中：`EbookAssistantShareBar` 替换 ChatEntry；`shareChatNode`（`ShareChat` modal）挂在 Footer 内
+- 分享中：`AssistantShareBar` 替换 ChatEntry；`shareChatNode`（`ShareChat` modal）挂在 Footer 内
 
 **`loading` 策略**：仅用 `isSending`，不用 `isHistoryLoading` 禁用输入——历史加载时仍可编辑草稿，且 focus 时 textarea 非 disabled。
 
@@ -455,17 +456,19 @@ onSelect: (event) => {
 
 ### 4.9 分享：`sessionType=ebook`（前后端）
 
-#### 4.9.1 前端 `useEbookAssistantShare`
+#### 4.9.1 前端分享（`useAssistantShare`）
 
-**启用条件**：`isLoggedIn && ebookAssistantStore.activeSessionId`。
+> **统一实现**：三端已收敛至 `@/components/design/Assistant` 的 `useAssistantShare` + `AssistantShareBar`，详见 [../chat/assistant-share-bar.md](../chat/assistant-share-bar.md)。
 
-**流程**（对齐 `useSessionShare` / 知识库 `useKnowledgeAssistantShare`）：
+**启用条件**：`isLoggedIn && ebookAssistantStore.activeSessionId`（在 `EbookAssistant.tsx` 传入 `enabled`）。
+
+**流程**（与知识库 / 英语 Agent 一致）：
 
 1. 用户点 AI 消息 **分享** → `onShare(message)`  
 2. `shareSelection.setIsSharing(true)`  
 3. `resolveSharePairFromList` 得到 `[userMsgId, assistantMsgId]`  
 4. `replaceCheckedMessages(pair)` + microtask/rAF **重放**（避免分享态切换覆盖选中）  
-5. Footer 显示 `EbookAssistantShareBar`；点「创建链接」→ `ShareChat` modal  
+5. Footer 显示 `AssistantShareBar`；点「创建链接」→ `ShareChat` modal  
 6. `createShare({ chatSessionId: activeSessionId, sessionType: 'ebook', messageIds })`
 
 **`orderedMessageIds`**：传 `messages.map(m => m.chatId)`，保证分享页顺序与 UI 一致。
@@ -1113,7 +1116,7 @@ useLayoutEffect(() => {
 | 前端 Store | `apps/frontend/src/store/ebookAssistant.ts` |
 | 公共 Assistant UI | `apps/frontend/src/components/design/Assistant/` |
 | 阅读助手壳 | `apps/frontend/src/views/ebook/components/EbookAssistant.tsx` |
-| 分享 hook | `apps/frontend/src/views/ebook/components/EbookAssistantShareBar.tsx` |
+| 分享 hook / 底栏 | `apps/frontend/src/components/design/Assistant/useAssistantShare.tsx`、`ShareBar.tsx`（详 [../chat/assistant-share-bar.md](../chat/assistant-share-bar.md)） |
 | 阅读页宿主 | `apps/frontend/src/views/ebook/read.tsx` |
 | 分栏布局 | `apps/frontend/src/views/ebook/components/EbookReadSplitLayout.tsx` |
 | PDF 右键菜单 | `apps/frontend/src/views/ebook/utils/buildPdfContextMenuItems.ts` |

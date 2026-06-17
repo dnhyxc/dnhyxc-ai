@@ -15,7 +15,7 @@
 | 路径 | 变更概要 |
 |------|-----------|
 | `apps/frontend/src/views/knowledge/KnowledgeAssistant.tsx` | 会话列结构：`ScrollArea` 全宽；`max-w-3xl` 仅作用于滚动内容与 footer；`conversationColumnActive`；`renderAssistantFooter`；FAB 定位容器与 `right-4`。 |
-| `apps/frontend/src/views/knowledge/KnowledgeAssistantShareBar.tsx` | 根容器去掉 `max-w-3xl mx-auto`，宽度由外层栏承接。 |
+| `apps/frontend/src/components/design/Assistant/ShareBar.tsx` | 分享底栏（原 KnowledgeAssistantShareBar 已合并） |
 | `apps/frontend/src/components/design/ChatEntry/index.tsx` | 内层栏增加 `w-full`、`min-w-0 flex-1`，与「max-w-3xl + 撑满」语义一致，避免嵌套 flex 下卡片收缩。 |
 | `apps/frontend/src/components/design/ChatTextArea/index.tsx` | 包裹输入的 `ScrollArea` 增加 `border-0`，避免默认 `border-2` 占用水平尺寸。 |
 
@@ -110,7 +110,9 @@ FAB 若相对 **`w-full` footer** 使用 **`right-0`**，会贴 **面板最右**
 </ScrollArea>
 ```
 
-### 4.5 `KnowledgeAssistantShareBar.tsx`
+### 4.5 `AssistantShareBar`（原 KnowledgeAssistantShareBar）
+
+> 现位于 `apps/frontend/src/components/design/Assistant/ShareBar.tsx`，见 [../chat/assistant-share-bar.md](../chat/assistant-share-bar.md)。
 
 ```tsx
 // 说明：去掉 max-w-3xl mx-auto，由 KnowledgeAssistant 外层「内容栏」统一限宽，避免双重 max-width。
@@ -130,7 +132,7 @@ FAB 若相对 **`w-full` footer** 使用 **`right-0`**，会贴 **面板最右**
   - 滚动条是否在 **右侧面板最右缘**；
   - 输入框与消息 **左右边线**是否一致；
   - **置顶/置底**切换时 FAB 是否在 **内容栏右缘**（与输入框右对齐）。
-- RAG / AI 模式切换、**分享流程**（`KnowledgeAssistantShareBar`）布局是否正常。
+- RAG / AI 模式切换、**分享流程**（`AssistantShareBar`）布局是否正常。
 - 主聊天页底部 **ChatEntry** 宽度是否与消息区直觉一致（快速 smoke）。
 
 ## 7. 相关源码路径
@@ -138,7 +140,7 @@ FAB 若相对 **`w-full` footer** 使用 **`right-0`**，会贴 **面板最右**
 | 说明 | 路径 |
 |------|------|
 | 知识库助手布局与 footer | `apps/frontend/src/views/knowledge/KnowledgeAssistant.tsx` |
-| 分享顶栏 | `apps/frontend/src/views/knowledge/KnowledgeAssistantShareBar.tsx` |
+| 分享顶栏 | `apps/frontend/src/components/design/Assistant/ShareBar.tsx` |
 | 通用输入组件 | `apps/frontend/src/components/design/ChatEntry/index.tsx` |
 | 输入框 ScrollArea | `apps/frontend/src/components/design/ChatTextArea/index.tsx` |
 | ScrollArea 封装 | `apps/frontend/src/components/ui/scroll-area.tsx` |

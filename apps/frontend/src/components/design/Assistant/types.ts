@@ -8,6 +8,50 @@ import type {
 import type { StickToBottomScrollViewportHandlers } from '@/hooks/useStickToBottomScroll';
 import type { ChatI18nT, Message } from '@/types/chat';
 
+export type AssistantShareSessionType = 'assistant' | 'agent' | 'ebook';
+
+export type AssistantShareSelectionState = {
+	checkedMessages: Set<string>;
+	selectedPairCount: number;
+	replaceCheckedMessages: (ids: string[]) => void;
+	isAllChecked: (messages?: Message[]) => boolean;
+	setAllCheckedMessages: (messages?: Message[]) => void;
+	clearAllCheckedMessages: () => void;
+};
+
+export type AssistantShareFlowControls = {
+	onCancelShare: () => void;
+};
+
+export type AssistantShareBarProps = {
+	messages: Message[];
+	shareSelection: AssistantShareSelectionState;
+	shareFlow: AssistantShareFlowControls;
+	setShareModelVisible: Dispatch<SetStateAction<boolean>>;
+	/** Checkbox / label 的 htmlFor，各场景需唯一 id */
+	checkboxId?: string;
+	/** 默认 chat.share.selectAll */
+	selectAllLabelKey?: string;
+	/** 默认 chat.share.createLink */
+	createLinkLabelKey?: string;
+	className?: string;
+};
+
+export type UseAssistantShareResult = {
+	allowAiShare: boolean;
+	/** 含 onCancelShare 等；ShareBar 仅依赖 onCancelShare */
+	shareFlow: AssistantShareFlowControls;
+	shareSelection: AssistantShareSelectionState & {
+		isSharing: boolean;
+		setIsSharing: (v: boolean) => void;
+	};
+	onShare: (message?: Message) => void;
+	shareModelVisible: boolean;
+	setShareModelVisible: Dispatch<SetStateAction<boolean>>;
+	onCloseShareModel: () => void;
+	shareChatNode: ReactNode | null;
+};
+
 export type ScrollFabMode = 'hidden' | 'toBottom' | 'toTop';
 
 export type ScrollFabProps = {

@@ -1154,11 +1154,13 @@ export function useShareFlow<TMessage extends { chatId: string }>({
 }
 ```
 
-##### 8.2.2.2 知识库侧接入：`useKnowledgeAssistantShare` + `KnowledgeAssistantShareBar`（逐行注释）
+##### 8.2.2.2 知识库侧接入：`useAssistantShare` + `AssistantShareBar`
 
-文件：`apps/frontend/src/views/knowledge/KnowledgeAssistantShareBar.tsx`。
+> **2026-06 更新**：原 `KnowledgeAssistantShareBar.tsx` / `useKnowledgeAssistantShare` 已删除，逻辑迁入公共层。主文档：[../chat/assistant-share-bar.md](../chat/assistant-share-bar.md)；接入代码见 `KnowledgeAssistant.tsx` 内 `useAssistantShare({ sessionType: 'assistant', ... })`。
 
-知识库侧把“是否允许分享、成对勾选策略、ShareChat 弹窗节点”等集中到 `useKnowledgeAssistantShare`，`KnowledgeAssistant.tsx` 仅做接线，降低维护成本。
+文件（历史）：~~`apps/frontend/src/views/knowledge/KnowledgeAssistantShareBar.tsx`~~。
+
+知识库侧把“是否允许分享、成对勾选策略、ShareChat 弹窗节点”等集中到 **`useAssistantShare`（页面级只调用一次）**，`KnowledgeAssistant.tsx` 仅做接线。
 
 ```tsx
 // 文件：apps/frontend/src/views/knowledge/KnowledgeAssistantShareBar.tsx（节选 + 逐行注释）
@@ -2354,7 +2356,7 @@ bottomBarAssistantNode={
 | 前端消息操作条（通用） | `apps/frontend/src/components/design/ChatMessageActions/index.tsx`（流式时禁用复制/保存；详 **§8.2.1**）                                                                                                                      |
 | 前端消息气泡（知识助手） | `apps/frontend/src/views/knowledge/KnowledgeMessageBubble.tsx`（单条消息渲染 + 操作条显隐 + 分享透传兜底；详 **§8.2、§8.2.3**）                                                                                               |
 | 前端分享状态机（通用） | `apps/frontend/src/hooks/useShareSelection.ts`、`apps/frontend/src/hooks/useShareFlow.ts`（ChatBot 与助手共用；详 **§8.2.2.1**）                                                                                               |
-| 前端助手分享 UI        | `apps/frontend/src/views/knowledge/KnowledgeAssistantShareBar.tsx`（`useKnowledgeAssistantShare` + 分享底栏；详 **§8.2.2.2**）                                                                                                 |
+| 前端助手分享 UI        | `apps/frontend/src/components/design/Assistant/ShareBar.tsx` + `useAssistantShare.tsx`（详 [../chat/assistant-share-bar.md](../chat/assistant-share-bar.md)）                                                                                                 |
 | 分享弹窗（复用）        | `apps/frontend/src/views/chat/share/index.tsx`（支持 `sessionId/sessionType`；详 **§8.2.2.3**）                                                                                                                                |
 | 前端知识页              | `apps/frontend/src/views/knowledge/index.tsx`                                                                                                                                                                                  |
 | 前端常量                | `apps/frontend/src/views/knowledge/constants.ts`（`KNOWLEDGE_ASSISTANT_PROMPTS`、`KnowledgeAssistantPromptKind`、本地目录常量等）                                                                                                  |

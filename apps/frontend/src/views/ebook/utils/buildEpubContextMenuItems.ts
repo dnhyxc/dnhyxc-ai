@@ -78,6 +78,7 @@ export function buildEpubContextMenuItems({
 		label: t('ebook.read.toc'),
 		onSelect: () => actionsRef.current?.openToc(),
 	});
+	items.push({ type: 'separator', id: 'sep-exit' });
 	items.push({
 		type: 'item',
 		id: 'settings',

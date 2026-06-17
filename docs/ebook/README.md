@@ -12,6 +12,7 @@
 | [pdf-reader-fit-scroll.md](./pdf-reader-fit-scroll.md) | **增量**：PDF 适应宽度、顶栏缩放、滚动换页（停稳后翻页） |
 | [epub-assistant-context-menu.md](./epub-assistant-context-menu.md) | **增量**：EPUB 右键菜单、智能助手分栏（对齐知识库助手 UI 与流式贴底） |
 | [ebook-moke-assistant.md](./ebook-moke-assistant.md) | **主文档（本轮）**：MOKE 独立后端与会话、公共 Assistant 层、PDF 接入 / 右键菜单、分享保存、分栏与顶栏体验 |
+| [../chat/assistant-share-bar.md](../chat/assistant-share-bar.md) | **关联**：助手分享底栏与 `useAssistantShare`（知识库 / 英语 / 电子书三端统一） |
 | [../knowledge/assistant-insert-focus.md](../knowledge/assistant-insert-focus.md) | **关联**：选区写入助手后聚焦与 IME 修复（知识库 + 电子书 MOKE 问书） |
 
 **延伸阅读**：上传目录与 `uploads/ebooks` 落盘见 [ops/upload-storage-paths.md](../ops/upload-storage-paths.md)；路由鉴权与公开路径见 [app/route-auth.md](../app/route-auth.md)。EPUB 右键初版见 [epub-assistant-context-menu.md](./epub-assistant-context-menu.md)；**本轮 MOKE / PDF 完整说明**见 [ebook-moke-assistant.md](./ebook-moke-assistant.md)。

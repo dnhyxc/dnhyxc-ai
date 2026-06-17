@@ -21,8 +21,10 @@ import {
 	AssistantFooter,
 	AssistantMessageRow,
 	AssistantSessionEntryToolbar,
+	AssistantShareBar,
 	AssistantShell,
 	type SelectMessageByChatId,
+	useAssistantShare,
 } from '@/components/design/Assistant';
 import ChatEntry from '@/components/design/ChatEntry';
 import { useAssistantCopy, useAssistantScroll, useI18n } from '@/hooks';
@@ -36,10 +38,6 @@ import {
 	KNOWLEDGE_ASSISTANT_PROMPTS,
 	type KnowledgeAssistantPromptKind,
 } from './constants';
-import {
-	KnowledgeAssistantShareBar,
-	useKnowledgeAssistantShare,
-} from './KnowledgeAssistantShareBar';
 import {
 	buildKnowledgeAssistantDocumentMessage,
 	documentHasCanonicalTocHeading,
@@ -474,10 +472,15 @@ const KnowledgeAssistant = observer(
 			onShare,
 			setShareModelVisible,
 			shareChatNode,
-		} = useKnowledgeAssistantShare({
-			aiMessages,
-			isLoggedIn,
-			isRagMode,
+		} = useAssistantShare({
+			messages: aiMessages,
+			sessionId: assistantStore.activeSessionId,
+			sessionType: 'assistant',
+			enabled:
+				!isRagMode &&
+				isLoggedIn &&
+				assistantStore.knowledgeAssistantPersistenceAllowed &&
+				Boolean(assistantStore.activeSessionId),
 		});
 
 		/** 当前为「会话列表 + 底部输入」视图（与加载中 / 空状态引导互斥） */
@@ -499,8 +502,11 @@ const KnowledgeAssistant = observer(
 				}}
 			>
 				{allowAiShare && shareSelection.isSharing ? (
-					<KnowledgeAssistantShareBar
-						aiMessages={aiMessages}
+					<AssistantShareBar
+						messages={aiMessages}
+						checkboxId="knowledge-assistant-share-all"
+						selectAllLabelKey="knowledge.assistant.share.selectAll"
+						createLinkLabelKey="knowledge.assistant.share.createLink"
 						shareSelection={shareSelection}
 						shareFlow={shareFlow}
 						setShareModelVisible={setShareModelVisible}

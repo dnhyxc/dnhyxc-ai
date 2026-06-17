@@ -20,15 +20,16 @@ import {
 	AssistantFooter,
 	AssistantMessageRow,
 	AssistantSessionEntryToolbar,
+	AssistantShareBar,
 	AssistantShell,
 	type SelectMessageByChatId,
+	useAssistantShare,
 } from '@/components/design/Assistant';
 import { useAssistantCopy, useAssistantScroll, useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import useStore from '@/store';
 import englishAgentStore from '@/store/englishAgent';
 import type { Message } from '@/types/chat';
-import { ShareBar, useSessionShare } from './ShareBar';
 
 export type AgentPanelProps = {
 	input: string;
@@ -75,10 +76,11 @@ export const AgentPanel = observer(function AgentPanel({
 		onShare,
 		setShareModelVisible,
 		shareChatNode,
-	} = useSessionShare({
+	} = useAssistantShare({
 		messages,
 		sessionId: englishAgentStore.sessionId,
-		isLoggedIn,
+		sessionType: 'agent',
+		enabled: isLoggedIn && Boolean(englishAgentStore.sessionId),
 	});
 
 	const onSaveToKnowledge = useCallback(
@@ -149,8 +151,9 @@ export const AgentPanel = observer(function AgentPanel({
 			}}
 		>
 			{allowAiShare && shareSelection.isSharing ? (
-				<ShareBar
+				<AssistantShareBar
 					messages={messages}
+					checkboxId="english-learning-agent-share-all"
 					shareSelection={shareSelection}
 					shareFlow={shareFlow}
 					setShareModelVisible={setShareModelVisible}

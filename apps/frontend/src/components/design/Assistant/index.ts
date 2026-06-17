@@ -8,6 +8,7 @@ export type {
 	AssistantSessionStoreKind,
 } from './SessionEntryToolbar';
 export { AssistantSessionEntryToolbar } from './SessionEntryToolbar';
+export { AssistantShareBar } from './ShareBar';
 export { AssistantShell } from './Shell';
 export type {
 	AssistantEntryToolbarHistoryInject,
@@ -20,10 +21,17 @@ export type {
 	AssistantMessageRowProps,
 	AssistantMessageVariant,
 	AssistantSessionRow,
+	AssistantShareBarProps,
+	AssistantShareFlowControls,
 	AssistantShareSelection,
+	AssistantShareSelectionState,
+	AssistantShareSessionType,
 	AssistantShellProps,
 	ScrollFabMode,
 	ScrollFabProps,
 	SelectMessageByChatId,
+	UseAssistantShareResult,
 } from './types';
+export type { UseAssistantShareParams } from './useAssistantShare.tsx';
+export { useAssistantShare } from './useAssistantShare.tsx';
 export { buildMessageRev, buildStreamTick } from './utils';
