@@ -48,7 +48,7 @@ class EbookStore {
 		return this.books.length < this.safeTotal();
 	}
 
-	private safeTotal(): number {
+	safeTotal(): number {
 		return Number.isFinite(this.total) && this.total >= 0 ? this.total : 0;
 	}
 
