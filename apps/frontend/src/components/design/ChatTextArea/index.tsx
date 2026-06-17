@@ -111,7 +111,8 @@ const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 						placeholder={placeholder}
 						spellCheck={false}
 						className={cn(
-							'flex-1 min-h-16 resize-none border-none shadow-none focus-visible:ring-transparent',
+							'flex-1 resize-none border-none shadow-none focus-visible:ring-transparent',
+							textareaClassName ? null : 'min-h-16',
 							textareaClassName,
 						)}
 						disabled={isEditMode ? Boolean(loading) : chatInputDisabled}

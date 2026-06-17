@@ -26,7 +26,14 @@ import {
 	Square,
 	Target,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+	useCallback,
+	useEffect,
+	useLayoutEffect,
+	useMemo,
+	useRef,
+	useState,
+} from 'react';
 import {
 	CHAT_VALIDTYPES,
 	PROFILE_VOICE_CONVERSION_CHANGED_EVENT,
@@ -157,6 +164,8 @@ interface ChatEntryProps {
 	t?: ChatEntryT;
 	/** 输入框包裹样式 */
 	inputWrapClassName?: string;
+	/** 递增时在 input 同步后聚焦并将光标置于末尾（如预填摘录） */
+	focusInputAtEndKey?: number;
 }
 
 const ChatEntry: React.FC<ChatEntryProps> = ({
@@ -184,7 +193,28 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 	placeholder: placeholderProp,
 	t,
 	inputWrapClassName,
+	focusInputAtEndKey,
 }) => {
+	const internalTextareaRef = useRef<HTMLTextAreaElement>(null);
+	const textareaRef = chatInputRef ?? internalTextareaRef;
+	const consumedFocusAtEndKeyRef = useRef(0);
+
+	// 仅在 focusInputAtEndKey 递增时聚焦一次；不可依赖 input 反复 setSelectionRange（会破坏 IME/正常输入）
+	useLayoutEffect(() => {
+		if (!focusInputAtEndKey) return;
+		if (focusInputAtEndKey <= consumedFocusAtEndKeyRef.current) return;
+		if (!input.length) return;
+
+		const el = textareaRef.current;
+		if (!el?.value.length) return;
+
+		consumedFocusAtEndKeyRef.current = focusInputAtEndKey;
+		const len = el.value.length;
+		el.focus({ preventScroll: true });
+		el.setSelectionRange(len, len);
+		el.scrollTop = el.scrollHeight;
+	}, [focusInputAtEndKey, input, textareaRef]);
+
 	const scrollContainer = useRef<HTMLDivElement>(null);
 	const itemRefs = useRef<(HTMLDivElement | null)[]>([]);
 	// 记录当前聚焦/锚点的索引，初始为 0
@@ -529,8 +559,8 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 		mediaRecorderRef.current = null;
 		stopMediaTracks();
 		setVoiceRecording(false);
-		chatInputRef?.current?.focus();
-	}, [chatInputRef, stopMediaTracks]);
+		textareaRef.current?.focus();
+	}, [textareaRef, stopMediaTracks]);
 
 	/**
 	 * 停止当前语音识别会话：关菜单、停录并丢弃未完成音频（不调用转写接口）；不改变输入模式（仍为语音时可继续点麦开录）。
@@ -700,7 +730,7 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 			// 发送消息，并重置语音相关状态
 			await sendMessageWithVoiceReset();
 			// 重新聚焦到输入框
-			chatInputRef?.current?.focus();
+			textareaRef.current?.focus();
 			return;
 		}
 		// Tauri + 语音输入模式
@@ -719,13 +749,13 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 			// 如果输入框中已有内容（可能来源于语音识别或手动输入），点击主按钮则发送消息，并重置语音相关状态
 			await sendMessageWithVoiceReset();
 			// 发送后重新聚焦输入框，方便用户继续输入
-			chatInputRef?.current?.focus();
+			textareaRef.current?.focus();
 			return;
 		}
 		// 以上条件都未命中，发起新的语音捕获
 		await startVoiceCapture();
 	}, [
-		chatInputRef,
+		textareaRef,
 		disableTextInput,
 		finalizeVoiceAndTranscribe,
 		input,
@@ -864,7 +894,7 @@ const ChatEntry: React.FC<ChatEntryProps> = ({
 
 						{/* 复用 ChatTextArea 组件 */}
 						<ChatTextArea
-							ref={chatInputRef}
+							ref={textareaRef}
 							mode="chat"
 							placeholder={chatTextAreaPlaceholder}
 							input={input}

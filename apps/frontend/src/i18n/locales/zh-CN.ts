@@ -510,7 +510,7 @@ export const zhCN = {
 		'确定要删除这个会话吗？此操作无法撤销。',
 	'chat.sessionList.toast.titleUpdated': '会话标题更新成功',
 	'chat.share.selectAll': '全选',
-	'chat.share.selectedPairs': '已选择 {count} 组对话',
+	'chat.share.selectedPairs': '已选 {count} 组',
 	'chat.share.createLink': '创建分享链接',
 	'chat.newSession.welcomeTitle': '欢迎来到 dnhyxc-ai 智能聊天',
 	'chat.newSession.welcomeHint': '有什么我可以帮您的？',
@@ -763,7 +763,6 @@ export const zhCN = {
 		'请先在左侧编辑器输入正文后再向我提问',
 
 	'knowledge.assistant.share.selectAll': '全选',
-	'knowledge.assistant.share.selectedPairs': '已选择 {count} 组对话',
 	'knowledge.assistant.share.createLink': '创建分享链接',
 
 	'knowledge.trash.title': '回收站',
@@ -1455,13 +1454,14 @@ export const zhCN = {
 	'ebook.read.pdfZoomOut': '缩小',
 	'ebook.read.pdfZoomHint': '相对适应宽度的缩放比例，100% 为满宽显示',
 	'ebook.read.contextMenu.copy': '复制',
-	'ebook.read.contextMenu.selectAll': '全选',
 	'ebook.read.contextMenu.assistant': '智能助手',
-	'ebook.read.contextMenu.askSelection': 'AI 问书',
-	'ebook.read.assistant.close': '关闭智能助手',
+	'ebook.read.contextMenu.askSelection': 'MOKE 问书',
+	'ebook.read.assistant.close': '关闭 MOKE 智能助手',
+	'ebook.read.assistant.open': '开启 MOKE 智能助手',
+	'ebook.read.assistant.toggleAria': '开关 MOKE 智能助手',
 	'ebook.read.assistant.intro':
-		'可向 AI 提问关于《{title}》的内容、背景与读后感；选中正文后右键可使用「AI 问书」。',
-	'ebook.read.assistant.placeholder': '向 AI 提问本书相关内容…',
+		'向 MOKE 智能助手提问关于《{title}》的内容、背景与读后感，也可以让 MOKE 智能助手梳理章节要点或解释疑难段落。选中正文后右键使用「MOKE 问书」，可带着上下文提问。',
+	'ebook.read.assistant.placeholder': '向 MOKE 智能助手提问本书相关内容…',
 	'ebook.read.assistant.systemHint':
 		'用户正在阅读电子书《{title}》。请结合书籍语境作答；若用户引用摘录，请优先解释该段含义与上下文。',
 	'ebook.read.assistant.askSelectionDraft': '请解释以下书中摘录：\n\n> {quote}',

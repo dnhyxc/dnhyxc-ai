@@ -26,6 +26,8 @@ export type MonacoEditorContextActions = {
 	 * 注意：只处理**非空选区**；空选区（仅光标）应视为无效，不做“复制整行”的降级。
 	 */
 	sendSelectionToAssistant?: () => void;
+	/** 仅右键菜单项触发「复制到助手」前调用（快捷键不走此路径） */
+	onBeforeSendSelectionViaContextMenu?: () => void;
 };
 
 /**
@@ -95,7 +97,10 @@ export function buildMonacoEditorContextMenuItems(input: {
 			id: 'sendSelectionToAssistant',
 			label: '复制选中内容到助手',
 			shortcut: shortcutHintCtrlOrCmdShiftV(),
-			onSelect: () => actionsRef.current?.sendSelectionToAssistant?.(),
+			onSelect: () => {
+				actionsRef.current?.onBeforeSendSelectionViaContextMenu?.();
+				actionsRef.current?.sendSelectionToAssistant?.();
+			},
 		});
 	}
 
@@ -130,6 +135,8 @@ export function injectMonacoEditorContextActions(input: {
 	getSelectedTextOnlyFromSelections: () => string;
 	/** 外部接入：将选区写入助手输入框（实现由知识库页面决定） */
 	onInsertSelectionToAssistant?: (text: string) => void;
+	/** 仅右键菜单「复制到助手」前调用（快捷键不触发） */
+	onBeforeSendSelectionViaContextMenu?: () => void;
 	rangeForCutWhenCursorOnly: (
 		sel: NonNullable<
 			ReturnType<Parameters<OnMount>[0]['getSelections']>
@@ -149,6 +156,7 @@ export function injectMonacoEditorContextActions(input: {
 		getCopyTextFromSelections,
 		getSelectedTextOnlyFromSelections,
 		onInsertSelectionToAssistant,
+		onBeforeSendSelectionViaContextMenu,
 		rangeForCutWhenCursorOnly,
 		copyToClipboard,
 		pasteFromClipboard,
@@ -222,5 +230,6 @@ export function injectMonacoEditorContextActions(input: {
 					onInsertSelectionToAssistant(text);
 				}
 			: undefined,
+		onBeforeSendSelectionViaContextMenu,
 	};
 }

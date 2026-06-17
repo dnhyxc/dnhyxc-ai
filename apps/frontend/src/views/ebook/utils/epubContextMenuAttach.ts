@@ -11,7 +11,6 @@ export type EpubReaderContextMenuPayload = {
 	clientX: number;
 	clientY: number;
 	selectedText: string;
-	selectAll: () => void;
 	copySelection: () => void;
 };
 
@@ -26,14 +25,6 @@ function toViewportPoint(e: MouseEvent, win: Window): { x: number; y: number } {
 
 function readSelectionText(win: Window): string {
 	return (win.getSelection()?.toString() ?? '').trim();
-}
-
-function selectAllInDocument(doc: Document, win: Window): void {
-	const range = doc.createRange();
-	range.selectNodeContents(doc.body);
-	const sel = win.getSelection();
-	sel?.removeAllRanges();
-	sel?.addRange(range);
 }
 
 /**
@@ -60,7 +51,6 @@ export function attachEpubIframeContextMenu(
 				clientX: x,
 				clientY: y,
 				selectedText,
-				selectAll: () => selectAllInDocument(doc, win),
 				copySelection: () => {
 					const text = readSelectionText(win);
 					if (!text) return;

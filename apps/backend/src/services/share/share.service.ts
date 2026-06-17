@@ -22,6 +22,8 @@ import { AssistantSession } from '../assistant/assistant-session.entity';
 import { Attachments } from '../chat/attachments.entity';
 import { ChatMessages } from '../chat/chat.entity';
 import { MessageService } from '../chat/message.service';
+import { EbookAssistantMessage } from '../ebook-assistant/ebook-assistant-message.entity';
+import { EbookAssistantSession } from '../ebook-assistant/ebook-assistant-session.entity';
 import { Knowledge } from '../knowledge/knowledge.entity';
 import {
 	CreateShareDto,
@@ -50,6 +52,10 @@ export class ShareService {
 		private readonly agentSessionRepo: Repository<AgentSession>,
 		@InjectRepository(AgentMessage)
 		private readonly agentMessageRepo: Repository<AgentMessage>,
+		@InjectRepository(EbookAssistantSession)
+		private readonly ebookAssistantSessionRepo: Repository<EbookAssistantSession>,
+		@InjectRepository(EbookAssistantMessage)
+		private readonly ebookAssistantMessageRepo: Repository<EbookAssistantMessage>,
 		@InjectRepository(Knowledge)
 		private readonly knowledgeRepo: Repository<Knowledge>,
 	) {}
@@ -59,7 +65,7 @@ export class ShareService {
 	 */
 	private async resolveShareMessagesBySessionId(params: {
 		sessionId: string;
-		sessionType: 'chat' | 'assistant' | 'agent';
+		sessionType: 'chat' | 'assistant' | 'agent' | 'ebook';
 		messageIds?: string[];
 	}): Promise<{
 		title: string;
@@ -175,6 +181,66 @@ export class ShareService {
 			}
 
 			const qb = this.agentMessageRepo
+				.createQueryBuilder('m')
+				.select(['m.id', 'm.role', 'm.content', 'm.createdAt'])
+				.where('m.session_id = :sid', { sid: params.sessionId });
+
+			if (params.messageIds?.length) {
+				qb.andWhere('m.id IN (:...ids)', { ids: params.messageIds });
+			}
+
+			const rows = await qb
+				.orderBy('m.created_at', 'ASC')
+				.addOrderBy("CASE WHEN m.role = 'user' THEN 0 ELSE 1 END", 'ASC')
+				.addOrderBy('m.id', 'ASC')
+				.getMany();
+
+			let orderedRows = rows;
+			if (params.messageIds?.length) {
+				const orderIndex = new Map(params.messageIds.map((id, i) => [id, i]));
+				orderedRows = [...rows].sort((a, b) => {
+					const ai = orderIndex.get(a.id);
+					const bi = orderIndex.get(b.id);
+					if (ai == null && bi == null) {
+						const at = this.toEpochMs(a.createdAt, 0);
+						const bt = this.toEpochMs(b.createdAt, 0);
+						if (at !== bt) return at - bt;
+						return String(a.id).localeCompare(String(b.id));
+					}
+					if (ai == null) return 1;
+					if (bi == null) return -1;
+					return ai - bi;
+				});
+			}
+
+			const messages = orderedRows.map((m) => ({
+				id: m.id,
+				chatId: m.id,
+				role: (m.role === 'assistant' ? 'assistant' : 'user') as
+					| 'user'
+					| 'assistant',
+				content: m.content ?? '',
+				timestamp: this.toEpochMs(m.createdAt),
+			}));
+			return {
+				title:
+					session.title ||
+					this.generateTitle(messages as unknown as ChatMessages[]),
+				messages,
+			};
+		}
+
+		// 4) 电子书阅读助手：ebook_assistant_sessions / ebook_assistant_messages
+		if (params.sessionType === 'ebook') {
+			const session = await this.ebookAssistantSessionRepo.findOne({
+				where: { id: params.sessionId },
+				select: ['id', 'title', 'createdAt', 'updatedAt'],
+			});
+			if (!session) {
+				throw new NotFoundException('会话不存在');
+			}
+
+			const qb = this.ebookAssistantMessageRepo
 				.createQueryBuilder('m')
 				.select(['m.id', 'm.role', 'm.content', 'm.createdAt'])
 				.where('m.session_id = :sid', { sid: params.sessionId });

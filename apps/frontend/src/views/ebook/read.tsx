@@ -2,7 +2,14 @@ import Loading from '@design/Loading';
 import Tooltip from '@design/Tooltip';
 import { Button } from '@ui/index';
 import { Toast } from '@ui/sonner';
-import { ChevronLeft, ChevronRight, List, Minus, Plus } from 'lucide-react';
+import {
+	Bot,
+	ChevronLeft,
+	ChevronRight,
+	List,
+	Minus,
+	Plus,
+} from 'lucide-react';
 import { observer } from 'mobx-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
@@ -26,6 +33,10 @@ import {
 	buildEpubContextMenuItems,
 	type EpubReaderContextActions,
 } from './utils/buildEpubContextMenuItems';
+import {
+	buildPdfContextMenuItems,
+	type PdfReaderContextActions,
+} from './utils/buildPdfContextMenuItems';
 import {
 	DEFAULT_EPUB_READER_SETTINGS,
 	type EpubReaderSettings,
@@ -76,13 +87,14 @@ function EbookReadPage() {
 	const [pdfZoom, setPdfZoom] = useState(loadPdfZoom);
 	const [assistantOpen, setAssistantOpen] = useState(false);
 	const [assistantInput, setAssistantInput] = useState('');
+	const [focusInputAtEndKey, setFocusInputAtEndKey] = useState(0);
 	const [contextMenu, setContextMenu] =
 		useState<EpubReaderContextMenuState | null>(null);
 	const contextActionsRef = useRef<EpubReaderContextActions | null>(null);
+	const pdfContextActionsRef = useRef<PdfReaderContextActions | null>(null);
 	const contextPayloadRef = useRef<{
 		selectedText: string;
 		copySelection: () => void;
-		selectAll: () => void;
 	} | null>(null);
 	const progTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -233,11 +245,16 @@ function EbookReadPage() {
 		setAssistantOpen(true);
 	}, []);
 
+	const toggleAssistant = useCallback(() => {
+		setAssistantOpen((prev) => !prev);
+	}, []);
+
 	const openAssistantWithSelection = useCallback(
 		(selectedText: string) => {
 			const quote = selectedText.trim();
 			if (!quote) return;
 			openAssistant(t('ebook.read.assistant.askSelectionDraft', { quote }));
+			setFocusInputAtEndKey((n) => n + 1);
 		},
 		[openAssistant, t],
 	);
@@ -247,27 +264,36 @@ function EbookReadPage() {
 		contextPayloadRef.current = null;
 	}, []);
 
+	const showReaderContextMenu = useCallback(
+		(payload: { clientX: number; clientY: number; hasSelection?: boolean }) => {
+			setContextMenu({
+				open: true,
+				x: payload.clientX,
+				y: payload.clientY,
+				hasSelection: Boolean(payload.hasSelection),
+			});
+		},
+		[],
+	);
+
 	const showEpubContextMenu = useCallback(
 		(payload: {
 			clientX: number;
 			clientY: number;
 			selectedText: string;
 			copySelection: () => void;
-			selectAll: () => void;
 		}) => {
 			contextPayloadRef.current = {
 				selectedText: payload.selectedText,
 				copySelection: payload.copySelection,
-				selectAll: payload.selectAll,
 			};
-			setContextMenu({
-				open: true,
-				x: payload.clientX,
-				y: payload.clientY,
+			showReaderContextMenu({
+				clientX: payload.clientX,
+				clientY: payload.clientY,
 				hasSelection: Boolean(payload.selectedText.trim()),
 			});
 		},
-		[],
+		[showReaderContextMenu],
 	);
 
 	const onHostContextMenu = useCallback(
@@ -283,17 +309,21 @@ function EbookReadPage() {
 					if (!selectedText) return;
 					void copyToClipboard(selectedText);
 				},
-				selectAll: () => {
-					const sel = window.getSelection();
-					if (!sel || !document.body) return;
-					const range = document.createRange();
-					range.selectNodeContents(document.body);
-					sel.removeAllRanges();
-					sel.addRange(range);
-				},
 			});
 		},
 		[book?.fmt, showEpubContextMenu],
+	);
+
+	const onPdfContextMenu = useCallback(
+		(e: React.MouseEvent<HTMLDivElement>) => {
+			if (book?.fmt !== 'pdf') return;
+			e.preventDefault();
+			showReaderContextMenu({
+				clientX: e.clientX,
+				clientY: e.clientY,
+			});
+		},
+		[book?.fmt, showReaderContextMenu],
 	);
 
 	contextActionsRef.current = {
@@ -302,11 +332,11 @@ function EbookReadPage() {
 			if (!payload?.selectedText.trim()) return;
 			void copyToClipboard(payload.selectedText);
 		},
-		selectAll: () => contextPayloadRef.current?.selectAll(),
 		openAssistant: () => openAssistant(),
 		askAboutSelection: () => {
 			const text = contextPayloadRef.current?.selectedText ?? '';
-			openAssistantWithSelection(text);
+			// 等 Radix 右键菜单关闭并释放 focus trap 后再打开助手并聚焦输入框
+			window.setTimeout(() => openAssistantWithSelection(text), 0);
 		},
 		openToc: () => setTocOpen(true),
 		openSettings: () => setEpubSettingsOpen(true),
@@ -319,15 +349,40 @@ function EbookReadPage() {
 		backToShelf: () => nav('/ebook'),
 	};
 
-	const epubContextMenuItems = useMemo(
-		() =>
-			buildEpubContextMenuItems({
-				hasSelection: contextMenu?.hasSelection ?? false,
-				actionsRef: contextActionsRef,
+	pdfContextActionsRef.current = {
+		openAssistant: () => openAssistant(),
+		zoomIn: () => patchPdfZoom(PDF_ZOOM_STEP),
+		zoomOut: () => patchPdfZoom(-PDF_ZOOM_STEP),
+		prevPage: () => pdfNavRef.current?.prev(),
+		nextPage: () => pdfNavRef.current?.next(),
+		openToc: () => setTocOpen(true),
+	};
+
+	const contextMenuItems = useMemo(() => {
+		if (book?.fmt === 'pdf') {
+			return buildPdfContextMenuItems({
+				actionsRef: pdfContextActionsRef,
+				canZoomIn: pdfNavReady && pdfZoom < PDF_ZOOM_MAX,
+				canZoomOut: pdfNavReady && pdfZoom > PDF_ZOOM_MIN,
+				canPrev: pdfNavReady && pdfPage > 0,
+				canNext: pdfNavReady && pdfPage < pdfTotal - 1,
 				t,
-			}),
-		[contextMenu?.hasSelection, t],
-	);
+			});
+		}
+		return buildEpubContextMenuItems({
+			hasSelection: contextMenu?.hasSelection ?? false,
+			actionsRef: contextActionsRef,
+			t,
+		});
+	}, [
+		book?.fmt,
+		contextMenu?.hasSelection,
+		pdfNavReady,
+		pdfPage,
+		pdfTotal,
+		pdfZoom,
+		t,
+	]);
 
 	useEffect(() => {
 		if (!book || !open) return;
@@ -336,6 +391,7 @@ function EbookReadPage() {
 			if (e.repeat) return;
 			if (tocOpen) return;
 			if (epubSettingsOpen) return;
+			if (assistantOpen) return;
 
 			const target = e.target as HTMLElement | null;
 			const tag = target?.tagName;
@@ -368,7 +424,7 @@ function EbookReadPage() {
 
 		window.addEventListener('keydown', onKeyDown, true);
 		return () => window.removeEventListener('keydown', onKeyDown, true);
-	}, [book, open, tocOpen, epubSettingsOpen]);
+	}, [book, open, tocOpen, epubSettingsOpen, assistantOpen]);
 
 	if (!book) {
 		if (bookResolving || !ebookStore.ready) {
@@ -405,19 +461,29 @@ function EbookReadPage() {
 					sideOffset={6}
 					delayDuration={200}
 					shadow
-					content={t('ebook.read.toc')}
+					content={
+						assistantOpen
+							? t('ebook.read.assistant.close')
+							: t('ebook.read.assistant.open')
+					}
 				>
 					<Button
 						type="button"
 						variant="ghost"
 						size="icon-sm"
-						className="text-textcolor/80"
-						onClick={() => setTocOpen(true)}
-						aria-label={t('ebook.read.toc')}
+						className={cn(
+							assistantOpen
+								? 'bg-theme/15 text-teal-500'
+								: 'text-textcolor/80 hover:text-teal-500',
+						)}
+						aria-pressed={assistantOpen}
+						aria-label={t('ebook.read.assistant.toggleAria')}
+						onClick={toggleAssistant}
 					>
-						<List className="size-4" />
+						<Bot className="size-4.5" />
 					</Button>
 				</Tooltip>
+
 				<Tooltip
 					side="bottom"
 					sideOffset={6}
@@ -429,7 +495,7 @@ function EbookReadPage() {
 						type="button"
 						variant="ghost"
 						size="icon-sm"
-						className="text-textcolor/80"
+						className="text-textcolor/80 hover:text-teal-500"
 						disabled={!epubNavReady}
 						aria-label={t('ebook.read.prev')}
 						onClick={() => epubNavRef.current?.prev()}
@@ -448,7 +514,7 @@ function EbookReadPage() {
 						type="button"
 						variant="ghost"
 						size="icon-sm"
-						className="text-textcolor/80"
+						className="text-textcolor/80 hover:text-teal-500"
 						disabled={!epubNavReady}
 						aria-label={t('ebook.read.next')}
 						onClick={() => epubNavRef.current?.next()}
@@ -464,6 +530,24 @@ function EbookReadPage() {
 					onOpenChange={setEpubSettingsOpen}
 					disabled={!epubNavReady}
 				/>
+				<Tooltip
+					side="bottom"
+					sideOffset={6}
+					delayDuration={200}
+					shadow
+					content={t('ebook.read.toc')}
+				>
+					<Button
+						type="button"
+						variant="ghost"
+						size="icon-sm"
+						className="text-textcolor/80 hover:text-teal-500"
+						onClick={() => setTocOpen(true)}
+						aria-label={t('ebook.read.toc')}
+					>
+						<List className="size-4" />
+					</Button>
+				</Tooltip>
 			</>
 		) : null;
 
@@ -477,13 +561,40 @@ function EbookReadPage() {
 					sideOffset={6}
 					delayDuration={200}
 					shadow
+					content={
+						assistantOpen
+							? t('ebook.read.assistant.close')
+							: t('ebook.read.assistant.open')
+					}
+				>
+					<Button
+						type="button"
+						variant="ghost"
+						size="icon-sm"
+						className={cn(
+							assistantOpen
+								? 'bg-theme/15 text-teal-500'
+								: 'text-textcolor/80 hover:text-teal-500',
+						)}
+						aria-pressed={assistantOpen}
+						aria-label={t('ebook.read.assistant.toggleAria')}
+						onClick={toggleAssistant}
+					>
+						<Bot className="size-4.5" />
+					</Button>
+				</Tooltip>
+				<Tooltip
+					side="bottom"
+					sideOffset={6}
+					delayDuration={200}
+					shadow
 					content={t('ebook.read.pdfZoomOut')}
 				>
 					<Button
 						type="button"
 						variant="ghost"
 						size="icon-sm"
-						className="text-textcolor/80"
+						className="text-textcolor/80 hover:text-teal-500"
 						disabled={!pdfNavReady || pdfZoom <= PDF_ZOOM_MIN}
 						aria-label={t('ebook.read.pdfZoomOut')}
 						onClick={() => patchPdfZoom(-PDF_ZOOM_STEP)}
@@ -508,7 +619,7 @@ function EbookReadPage() {
 						type="button"
 						variant="ghost"
 						size="icon-sm"
-						className="text-textcolor/80"
+						className="text-textcolor/80 hover:text-teal-500"
 						disabled={!pdfNavReady || pdfZoom >= PDF_ZOOM_MAX}
 						aria-label={t('ebook.read.pdfZoomIn')}
 						onClick={() => patchPdfZoom(PDF_ZOOM_STEP)}
@@ -527,7 +638,7 @@ function EbookReadPage() {
 						type="button"
 						variant="ghost"
 						size="icon-sm"
-						className="text-textcolor/80"
+						className="text-textcolor/80 hover:text-teal-500"
 						disabled={!pdfNavReady || pdfPage <= 0}
 						aria-label={t('ebook.read.prev')}
 						onClick={() => pdfNavRef.current?.prev()}
@@ -549,7 +660,7 @@ function EbookReadPage() {
 						type="button"
 						variant="ghost"
 						size="icon-sm"
-						className="text-textcolor/80"
+						className="text-textcolor/80 hover:text-teal-500"
 						disabled={!pdfNavReady || pdfPage >= pdfTotal - 1}
 						aria-label={t('ebook.read.next')}
 						onClick={() => pdfNavRef.current?.next()}
@@ -568,7 +679,7 @@ function EbookReadPage() {
 						type="button"
 						variant="ghost"
 						size="icon-sm"
-						className="text-textcolor/80"
+						className="text-textcolor/80 hover:text-teal-500"
 						disabled={!pdfNavReady}
 						onClick={() => setTocOpen(true)}
 						aria-label={t('ebook.read.toc')}
@@ -588,7 +699,7 @@ function EbookReadPage() {
 				<EbookPanelHeader
 					className="pl-5 pr-2.5"
 					title={
-						<div className="flex items-center gap-1.5">
+						<div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-hidden">
 							{openSource ? (
 								<span
 									className={cn(
@@ -603,7 +714,7 @@ function EbookReadPage() {
 										: t('ebook.read.sourceOnline')}
 								</span>
 							) : null}
-							<span className="min-w-0 truncate">{book.title}</span>
+							<span className="min-w-0 flex-1 truncate">{book.title}</span>
 						</div>
 					}
 					trailing={headerTrailing}
@@ -622,6 +733,7 @@ function EbookReadPage() {
 						bookTitle={book.title}
 						assistantInput={assistantInput}
 						onAssistantInputChange={setAssistantInput}
+						focusInputAtEndKey={focusInputAtEndKey}
 					>
 						<div
 							className="flex h-full min-h-0 flex-1 flex-col"
@@ -643,15 +755,29 @@ function EbookReadPage() {
 						</div>
 					</EbookReadSplitLayout>
 				) : (
-					<PdfPane
-						open={open}
-						startPage={prog?.pdfPage ?? 0}
-						zoomMultiplier={pdfZoom}
-						onPage={savePage}
-						onPageState={onPdfPageState}
-						onToc={setToc}
-						onReady={onPdfReady}
-					/>
+					<EbookReadSplitLayout
+						assistantOpen={assistantOpen}
+						bookId={book.id}
+						bookTitle={book.title}
+						assistantInput={assistantInput}
+						onAssistantInputChange={setAssistantInput}
+						focusInputAtEndKey={focusInputAtEndKey}
+					>
+						<div
+							className="flex h-full min-h-0 flex-1 flex-col"
+							onContextMenu={onPdfContextMenu}
+						>
+							<PdfPane
+								open={open}
+								startPage={prog?.pdfPage ?? 0}
+								zoomMultiplier={pdfZoom}
+								onPage={savePage}
+								onPageState={onPdfPageState}
+								onToc={setToc}
+								onReady={onPdfReady}
+							/>
+						</div>
+					</EbookReadSplitLayout>
 				)}
 			</div>
 
@@ -669,10 +795,10 @@ function EbookReadPage() {
 				}}
 			/>
 
-			{book.fmt === 'epub' ? (
+			{book.fmt === 'epub' || book.fmt === 'pdf' ? (
 				<EpubReaderContextMenu
 					state={contextMenu}
-					items={epubContextMenuItems}
+					items={contextMenuItems}
 					onOpenChange={(open) => {
 						if (!open) closeContextMenu();
 					}}

@@ -4,6 +4,8 @@ import { isTauriRuntime } from '@/utils/runtime';
 
 export * from './i18n';
 export * from './theme';
+export * from './useAssistantCopy';
+export * from './useAssistantScroll';
 export * from './useIncrementalClassicQuoteFavoriteStatus';
 export * from './useIncrementalVocabFavoriteStatus';
 export * from './useIsSuperAdmin';

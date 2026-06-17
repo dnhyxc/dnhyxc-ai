@@ -316,6 +316,8 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	const editorContextActionsRef = useRef<MonacoEditorContextActions | null>(
 		null,
 	);
+	/** 右键菜单「复制到助手」后拦截 Radix onCloseAutoFocus，避免焦点回到 Monaco */
+	const sendSelectionViaContextMenuRef = useRef(false);
 	/** 包裹 Editor 的宿主，用于测量 client 尺寸并显式 layout（Tauri 全屏恢复后避免沿用旧宽度） */
 	const editorHostRef = useRef<HTMLDivElement | null>(null);
 	/** onMount 内赋值，供 useLayoutEffect 在 height / 视图切换后触发与挂载时相同的 layout 逻辑 */
@@ -491,6 +493,12 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 			}),
 		[readOnly, language, onInsertSelectionToAssistant],
 	);
+
+	const handleEditorContextMenuCloseAutoFocus = useCallback((event: Event) => {
+		if (!sendSelectionViaContextMenuRef.current) return;
+		event.preventDefault();
+		sendSelectionViaContextMenuRef.current = false;
+	}, []);
 
 	const markdownDiffEntryEligible = useMemo(
 		() =>
@@ -1178,6 +1186,9 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 				 * - 若不传，则右键菜单不会出现“发送到助手”的动作/或该动作为空实现
 				 */
 				onInsertSelectionToAssistant,
+				onBeforeSendSelectionViaContextMenu: () => {
+					sendSelectionViaContextMenuRef.current = true;
+				},
 				/**
 				 * Cut 语义：无选区剪切时的删除范围
 				 * - 尽量对齐 VS Code：光标处剪切整行（含换行处理）
@@ -1582,7 +1593,11 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 				>
 					{/* 非 Markdown：保持单栏编辑器渲染 */}
 					{!isMarkdown ? (
-						<QuickContextMenu items={editorContextMenuItems} triggerAsChild>
+						<QuickContextMenu
+							items={editorContextMenuItems}
+							triggerAsChild
+							onCloseAutoFocus={handleEditorContextMenuCloseAutoFocus}
+						>
 							<div
 								ref={editorHostRef}
 								className="box-border h-full min-h-0 min-w-0 max-w-full w-full overflow-hidden contain-[inline-size]"
@@ -1643,6 +1658,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 									<QuickContextMenu
 										items={editorContextMenuItems}
 										triggerAsChild
+										onCloseAutoFocus={handleEditorContextMenuCloseAutoFocus}
 									>
 										<div
 											ref={editorHostRef}

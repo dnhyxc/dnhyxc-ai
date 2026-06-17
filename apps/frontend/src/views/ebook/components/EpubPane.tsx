@@ -348,7 +348,7 @@ export function EpubPane({
 			<div
 				ref={hostRef}
 				className={cn(
-					'h-full min-h-0 w-full overflow-hidden rounded-b-md ring-1 ring-theme/10',
+					'h-full min-h-0 w-full overflow-hidden ring-1 ring-theme/10',
 					readerSettings.pageFlow === 'paginated' && 'min-h-[320px]',
 					// 连续滚动：美化 epub.js 内部 .epub-container 原生滚动条
 					readerSettings.pageFlow === 'scrolled' &&

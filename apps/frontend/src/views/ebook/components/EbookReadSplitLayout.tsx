@@ -15,6 +15,7 @@ export type EbookReadSplitLayoutProps = {
 	bookTitle: string;
 	assistantInput: string;
 	onAssistantInputChange: (value: string) => void;
+	focusInputAtEndKey?: number;
 	children: ReactNode;
 };
 
@@ -27,6 +28,7 @@ export function EbookReadSplitLayout({
 	bookTitle,
 	assistantInput,
 	onAssistantInputChange,
+	focusInputAtEndKey,
 	children,
 }: EbookReadSplitLayoutProps) {
 	const panelGroupRef = useRef<GroupImperativeHandle | null>(null);
@@ -73,13 +75,16 @@ export function EbookReadSplitLayout({
 			>
 				<div className="border-theme/10 flex h-full min-h-0 min-w-0 flex-col overflow-hidden border-l contain-[inline-size]">
 					<div className="min-h-0 flex-1 overflow-hidden">
-						<EbookAssistant
-							bookId={bookId}
-							bookTitle={bookTitle}
-							active={assistantOpen}
-							input={assistantInput}
-							onInputChange={onAssistantInputChange}
-						/>
+						{/* 与知识库一致：面板关闭时不挂载助手，避免在 0 高度容器内布局后再展开导致 ChatEntry 抖动 */}
+						{assistantOpen ? (
+							<EbookAssistant
+								bookId={bookId}
+								bookTitle={bookTitle}
+								input={assistantInput}
+								onInputChange={onAssistantInputChange}
+								focusInputAtEndKey={focusInputAtEndKey}
+							/>
+						) : null}
 					</div>
 				</div>
 			</ResizablePanel>

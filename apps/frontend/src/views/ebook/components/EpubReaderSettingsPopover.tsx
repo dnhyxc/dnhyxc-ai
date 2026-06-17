@@ -192,7 +192,7 @@ export function EpubReaderSettingsPopover({
 					variant="ghost"
 					size="icon-sm"
 					className={cn(
-						'text-textcolor/80',
+						'text-textcolor/80 hover:text-teal-500',
 						open && 'bg-theme/10 text-textcolor',
 					)}
 					disabled={disabled}

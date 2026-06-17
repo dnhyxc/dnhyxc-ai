@@ -8,6 +8,8 @@ import { Attachments } from '../chat/attachments.entity';
 import { ChatMessages } from '../chat/chat.entity';
 import { ChatModule } from '../chat/chat.module';
 import { ChatSessions } from '../chat/session.entity';
+import { EbookAssistantMessage } from '../ebook-assistant/ebook-assistant-message.entity';
+import { EbookAssistantSession } from '../ebook-assistant/ebook-assistant-session.entity';
 import { Knowledge } from '../knowledge/knowledge.entity';
 import { ShareController } from './share.controller';
 import { ShareService } from './share.service';
@@ -25,6 +27,8 @@ import { ShareService } from './share.service';
 			AssistantMessage,
 			AgentSession,
 			AgentMessage,
+			EbookAssistantSession,
+			EbookAssistantMessage,
 			Knowledge,
 		]),
 	],

@@ -34,6 +34,7 @@
 | [knowledge-assistant-stream-ux.md](./knowledge-assistant-stream-ux.md) | 流式：隐藏思考链、Spinner 动画 |
 | [knowledge-assistant-layout-scrollbar-alignment.md](./knowledge-assistant-layout-scrollbar-alignment.md) | 滚动条对齐 |
 | [knowledge-editor-send-selection-to-assistant-dedupe.md](./knowledge-editor-send-selection-to-assistant-dedupe.md) | 选中发送到助手去重 |
+| [assistant-insert-focus.md](./assistant-insert-focus.md) | 复制到助手后自动聚焦输入框（右键 + 快捷键） |
 | [knowledge-assistant-insert-selection-ai-rag.md](./knowledge-assistant-insert-selection-ai-rag.md) | 选中写入 AI/RAG 输入框 |
 | [knowledge-assistant-multi-session-frontend-implementation.md](./knowledge-assistant-multi-session-frontend-implementation.md) | 多会话前端 |
 | [knowledge-assistant-multi-session-backend-implementation.md](./knowledge-assistant-multi-session-backend-implementation.md) | 多会话后端 |

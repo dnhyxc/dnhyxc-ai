@@ -303,6 +303,16 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'Fixes mid-word truncation when vectorizing long articles and code samples (e.g. console.log split into ole.log). Code blocks are split by line first, including closing ``` on the same line. Re-save existing articles to refresh stored chunks used in retrieval.',
 	},
+	's6-21': {
+		title: 'Auto-focus assistant input after sending selection',
+		description:
+			'After copying selected Markdown text to the document assistant (context menu or ⌘/Ctrl+Shift+V), the assistant input is focused with the caret at the end of the inserted text so you can continue typing follow-up questions.',
+	},
+	's6-22': {
+		title: 'CJK input fix after assistant auto-focus',
+		description:
+			'Fixes duplicated pinyin/Latin characters when typing in Chinese IME after auto-focus following copy-to-assistant; EPUB MOKE ask-about-selection prefills benefit as well.',
+	},
 	's7-1': {
 		title: 'IME (input method editor) compatibility',
 		description:
@@ -847,8 +857,28 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 			'Shelf cards support custom covers (JPG/PNG/WebP via the bottom-left control on hover) and inline title editing (tap the title below the card, Enter to save) with success toasts. With a cover, the card shows the image; without, EPUB/PDF color placeholders remain. Hover the card for Read/Continue, progress, or Remove. Desktop import button label is now Select local file.',
 	},
 	's25-12': {
-		title: 'EPUB context menu and reading assistant',
+		title: 'EPUB context menu and MOKE reading assistant',
 		description:
-			'While reading EPUB, right-click in the body for a menu: Reading assistant, page turns, TOC, and settings when nothing is selected; Copy, Ask AI about selection, and Select all when text is selected. The assistant opens in a right-side split pane (same layout as the knowledge-base assistant, draggable width) with multi-turn chat and streaming replies—no extra header button. Sign-in required.',
+			'While reading EPUB, right-click in the body: Reading assistant, page turns, TOC, and settings when nothing is selected; Copy, MOKE ask-about-selection, and Select all when text is selected. Open the right split pane via the header Bot icon or the menu (same layout as the knowledge-base assistant, draggable width, ~50% default). Multi-turn chat and streaming replies. Sign-in required.',
+	},
+	's25-13': {
+		title: 'MOKE assistant on PDF',
+		description:
+			'PDF reading adds the header Bot control and Right-click → Reading assistant for the same right split pane. No ask-about-selection yet because PDF text cannot be selected. One independent conversation session per book, separate from the knowledge-base document assistant.',
+	},
+	's25-14': {
+		title: 'PDF reading context menu',
+		description:
+			'Right-click in the PDF reader for Reading assistant, TOC, zoom in/out (menu stays open for repeated zoom), and previous/next page.',
+	},
+	's25-15': {
+		title: 'MOKE assistant: save and share',
+		description:
+			'From ebook assistant AI replies: Save to knowledge base (opens the knowledge editor) or share the current Q&A pair as a read-only link.',
+	},
+	's25-16': {
+		title: 'Long book titles in reader header',
+		description:
+			'Very long titles truncate with an ellipsis in the reader header so they do not cover page-turn or TOC controls.',
 	},
 };

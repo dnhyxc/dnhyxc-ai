@@ -33,13 +33,13 @@ export class CreateShareDto {
 
 	@ApiPropertyOptional({
 		description:
-			'会话类型：chat=主聊天，assistant=知识库助手，agent=LangChain Agent 专项（如英语学习）；不填默认 chat',
+			'会话类型：chat=主聊天，assistant=知识库助手，agent=LangChain Agent 专项（如英语学习），ebook=电子书阅读助手；不填默认 chat',
 		example: 'chat',
-		enum: ['chat', 'assistant', 'agent'],
+		enum: ['chat', 'assistant', 'agent', 'ebook'],
 	})
-	@IsIn(['chat', 'assistant', 'agent'])
+	@IsIn(['chat', 'assistant', 'agent', 'ebook'])
 	@IsOptional()
-	sessionType?: 'chat' | 'assistant' | 'agent';
+	sessionType?: 'chat' | 'assistant' | 'agent' | 'ebook';
 
 	@ApiProperty({
 		description: '消息ID列表，指定要分享的消息',
@@ -168,7 +168,7 @@ export interface ShareCacheData {
 	/** 分享目标类型：session / knowledge */
 	shareType?: 'session' | 'knowledge';
 	/** 可选：用于 getShare 时直接选择数据源 */
-	sessionType?: 'chat' | 'assistant' | 'agent';
+	sessionType?: 'chat' | 'assistant' | 'agent' | 'ebook';
 	messageIds?: string[];
 	createdAt: number;
 	expiresAt: number | null;

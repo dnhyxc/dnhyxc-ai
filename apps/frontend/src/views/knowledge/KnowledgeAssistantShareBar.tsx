@@ -153,7 +153,7 @@ export function KnowledgeAssistantShareBar({
 				</div>
 				<div className="border-l border-textcolor/50 h-3" />
 				<div>
-					{t('knowledge.assistant.share.selectedPairs', {
+					{t('chat.share.selectedPairs', {
 						count: shareSelection.selectedPairCount,
 					})}
 				</div>

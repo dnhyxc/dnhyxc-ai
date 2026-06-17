@@ -4,7 +4,7 @@
 
 大模型已改为硅基流动 + LangChain `ChatOpenAI` 流式接入，详见 [siliconflow-chat-unification.md](../llm/siliconflow-chat-unification.md)；下文若仍写「智谱 fetch」请以该文为准。
 
-**相关文档**：目录索引见 [README.md](./README.md)；持久化与数据落点的专题摘要仍保留在 `knowledge-assistant-ephemeral-persistence.md`（可与本文对照）；**以本文为权威总览**。编辑器「复制选中内容到助手」写入当前 **AI / RAG** 输入框的实现见 `knowledge-assistant-insert-selection-ai-rag.md`，重复点击防护见 `knowledge-editor-send-selection-to-assistant-dedupe.md`。
+**相关文档**：目录索引见 [README.md](./README.md)；持久化与数据落点的专题摘要仍保留在 `knowledge-assistant-ephemeral-persistence.md`（可与本文对照）；**以本文为权威总览**。编辑器「复制选中内容到助手」写入当前 **AI / RAG** 输入框的实现见 `knowledge-assistant-insert-selection-ai-rag.md`，重复点击防护见 `knowledge-editor-send-selection-to-assistant-dedupe.md`，复制后**自动聚焦输入框**见 `assistant-insert-focus.md`。
 
 **问题修复记录**：
 

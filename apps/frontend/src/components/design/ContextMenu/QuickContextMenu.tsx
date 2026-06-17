@@ -23,6 +23,8 @@ export interface QuickContextMenuProps {
 	contentClassName?: string;
 	/** 透传 Radix Root */
 	onOpenChange?: (open: boolean) => void;
+	/** 菜单关闭时 Radix 默认会把焦点还给 Trigger；可 preventDefault 后自行聚焦 */
+	onCloseAutoFocus?: (event: Event) => void;
 	modal?: boolean;
 }
 
@@ -74,6 +76,7 @@ export const QuickContextMenu = React.memo(function QuickContextMenu({
 	triggerAsChild = true,
 	contentClassName,
 	onOpenChange,
+	onCloseAutoFocus,
 	modal,
 }: QuickContextMenuProps) {
 	return (
@@ -81,7 +84,10 @@ export const QuickContextMenu = React.memo(function QuickContextMenu({
 			<ContextMenuTrigger asChild={triggerAsChild}>
 				{children}
 			</ContextMenuTrigger>
-			<ContextMenuContent className={contentClassName}>
+			<ContextMenuContent
+				className={contentClassName}
+				onCloseAutoFocus={onCloseAutoFocus}
+			>
 				<QuickMenuEntries entries={items} />
 			</ContextMenuContent>
 		</ContextMenu>

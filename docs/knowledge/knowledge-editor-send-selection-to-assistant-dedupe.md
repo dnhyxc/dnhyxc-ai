@@ -4,7 +4,8 @@
 
 Monaco 侧右键菜单与快捷键的拼接方式见：`docs/monaco/markdown-editor-context-menu.md`。
 
-**补充**：插入目标已按当前助手面板 **AI / RAG** 分流写入不同输入框（受控 `assistantInput` vs `ragAssistantInput`），详见 **`docs/knowledge/knowledge-assistant-insert-selection-ai-rag.md`**。
+**补充**：插入目标已按当前助手面板 **AI / RAG** 分流写入不同输入框（受控 `assistantInput` vs `ragAssistantInput`），详见 **`docs/knowledge/knowledge-assistant-insert-selection-ai-rag.md`**。  
+**补充**：复制到助手后的**自动聚焦**（右键菜单与快捷键、Radix `onCloseAutoFocus` 拦截）见 **`docs/knowledge/assistant-insert-focus.md`**。
 
 ---
 

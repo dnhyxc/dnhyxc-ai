@@ -73,6 +73,8 @@ const Knowledge = observer(() => {
 	const { theme } = useTheme();
 	const [assistantInput, setAssistantInput] = useState('');
 	const [ragAssistantInput, setRagAssistantInput] = useState('');
+	/** 递增时在 ChatEntry 同步 input 后聚焦并将光标置于末尾（对齐 ebook MOKE 问书） */
+	const [focusInputAtEndKey, setFocusInputAtEndKey] = useState(0);
 	/** 与 KnowledgeAssistant 内 AI/RAG 切换同步，供「复制选中内容到助手」写入对应输入框 */
 	const knowledgeAssistantModeRef = useRef<KnowledgeAssistantMode>(
 		readKnowledgeAssistantPanelMode(),
@@ -113,6 +115,10 @@ const Knowledge = observer(() => {
 	const lastAssistantInsertRef = useRef<{ text: string; at: number } | null>(
 		null,
 	);
+
+	const scheduleAssistantInputFocus = useCallback(() => {
+		window.setTimeout(() => setFocusInputAtEndKey((n) => n + 1), 0);
+	}, []);
 
 	const [knowledgeChords, setKnowledgeChords] = useState<{
 		save: string;
@@ -205,7 +211,7 @@ const Knowledge = observer(() => {
 	 * 4. 若上一条插入内容与当前相同，且两次操作间隔小于 160ms，则不做任何处理（防抖以避免短时间内重复插入）。
 	 * 5. 否则，记录本次插入内容和时间。
 	 * 6. 按当前助手模式写入 AI 输入框或 RAG 输入框；若已有内容则用两行换行追加，否则直接写入。
-	 * 7. 如助手面板未打开，在本轮 microtask 末尾自动展开助手面板（不阻塞主流程）。
+	 * 7. 同步打开助手面板并在内容写入后聚焦（右键菜单由 Monaco 拦截 onCloseAutoFocus 防止焦点回 Monaco）。
 	 */
 	const flushAssistantInsertFromEditor = useCallback(() => {
 		// 重置动画帧调用的 id，防止残留
@@ -235,11 +241,10 @@ const Knowledge = observer(() => {
 			setAssistantInput((prev) => appendBlock(prev));
 		}
 
-		// 如果助手面板当前是关闭状态，则在微任务末尾打开
-		if (!markdownAssistantOpenRef.current) {
-			queueMicrotask(() => setMarkdownAssistantOpen(true));
-		}
-	}, []);
+		// 对齐 ebook openAssistant：同步打开面板；内容写入后再聚焦（右键路径由 Monaco 拦截 onCloseAutoFocus）
+		setMarkdownAssistantOpen(true);
+		scheduleAssistantInputFocus();
+	}, [scheduleAssistantInputFocus]);
 
 	// 将编辑器选区写入助手输入框
 	const onInsertSelectionToAssistant = useCallback(
@@ -254,11 +259,14 @@ const Knowledge = observer(() => {
 			getMarkdownFromEditorRef.current?.();
 			const next = (text ?? '').trim();
 			if (!next) return;
-			pendingAssistantInsertRef.current = next;
-			cancelAnimationFrame(assistantInsertFlushRafRef.current);
-			assistantInsertFlushRafRef.current = requestAnimationFrame(() => {
-				flushAssistantInsertFromEditor();
-			});
+			// 对齐 ebook：等 Monaco 右键菜单/命令释放焦点后再写入并聚焦
+			window.setTimeout(() => {
+				pendingAssistantInsertRef.current = next;
+				cancelAnimationFrame(assistantInsertFlushRafRef.current);
+				assistantInsertFlushRafRef.current = requestAnimationFrame(() => {
+					flushAssistantInsertFromEditor();
+				});
+			}, 0);
 		},
 		[flushAssistantInsertFromEditor],
 	);
@@ -1273,6 +1281,7 @@ const Knowledge = observer(() => {
 								setInput={setAssistantInput}
 								ragInput={ragAssistantInput}
 								setRagInput={setRagAssistantInput}
+								focusInputAtEndKey={focusInputAtEndKey}
 								onAssistantModeChange={(mode) => {
 									knowledgeAssistantModeRef.current = mode;
 								}}

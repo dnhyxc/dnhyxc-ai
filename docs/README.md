@@ -53,6 +53,7 @@
 | 用户自定义向量与多库 RAG | [knowledge/user-vector-rag-config.md](./knowledge/user-vector-rag-config.md) |
 | 全站 BGE / 入库 Bad Request | [knowledge/vector-bge-global-round.md](./knowledge/vector-bge-global-round.md) |
 | 向量分片 ole.log / 代码截断 | [knowledge/knowledge-chunk-boundaries.md](./knowledge/knowledge-chunk-boundaries.md) |
+| 复制到助手后输入框不聚焦 | [knowledge/assistant-insert-focus.md](./knowledge/assistant-insert-focus.md) |
 | 设置页大模型 Key | [llm/llm-runtime-settings.md](./llm/llm-runtime-settings.md) |
 | 按用户 / 会员默认模型 | [llm/membership-per-user-llm.md](./llm/membership-per-user-llm.md) |
 | 设置页预设 / Combobox | [llm/llm-setting-ui-presets.md](./llm/llm-setting-ui-presets.md) |
@@ -71,7 +72,9 @@
 | 桌面大文件上传中无法阅读 / 超 120MB 打不开 | [ebook/ebook-cos-local-shelf.md](./ebook/ebook-cos-local-shelf.md) §3.1–§3.2 |
 | 阅读背景色不生效 | [ebook/ebook-cos-local-shelf.md](./ebook/ebook-cos-local-shelf.md) §3.4 |
 | PDF 页面太小 / 猛滚连跳多页 | [ebook/pdf-reader-fit-scroll.md](./ebook/pdf-reader-fit-scroll.md) §3.1–§3.3 |
-| EPUB 右键无菜单 / 助手与知识库样式不一致 | [ebook/epub-assistant-context-menu.md](./ebook/epub-assistant-context-menu.md) |
+| EPUB 右键无菜单 / 助手与知识库样式不一致 | [ebook/epub-assistant-context-menu.md](./ebook/epub-assistant-context-menu.md)、[ebook/ebook-moke-assistant.md](./ebook/ebook-moke-assistant.md) |
+| PDF 无 MOKE 助手 / PDF 右键菜单 | [ebook/ebook-moke-assistant.md](./ebook/ebook-moke-assistant.md) |
+| 复制到助手后输入中文乱码 | [knowledge/assistant-insert-focus.md](./knowledge/assistant-insert-focus.md) §5.1 |
 
 ---
 

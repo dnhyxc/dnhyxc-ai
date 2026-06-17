@@ -41,6 +41,10 @@ import {
 	DOWNLOAD_FILE,
 	DOWNLOAD_ZIP_FILE,
 	EBOOK_ADD_PATH,
+	EBOOK_ASSISTANT_SESSION,
+	EBOOK_ASSISTANT_SESSION_FOR_BOOK,
+	EBOOK_ASSISTANT_SESSIONS_FOR_BOOK,
+	EBOOK_ASSISTANT_STOP,
 	EBOOK_BOOK,
 	EBOOK_COVER,
 	EBOOK_DELETE,
@@ -442,6 +446,86 @@ export const stopAssistantStream = async (payload: {
 	return await http.post<{ success: boolean; message: string }>(
 		ASSISTANT_STOP,
 		payload,
+	);
+};
+
+/** ---------- 电子书阅读助手（独立会话表）---------- */
+
+export type EbookAssistantSessionDetailPayload = {
+	session: {
+		sessionId: string;
+		bookId: string;
+		title: string | null;
+		createdAt: string;
+		updatedAt: string;
+	} | null;
+	messages: Array<{
+		id: string;
+		turnId: string | null;
+		role: string;
+		content: string;
+		createdAt: string;
+	}>;
+};
+
+export type EbookAssistantSessionListItem = {
+	sessionId: string;
+	title: string | null;
+	createdAt: string;
+	updatedAt: string;
+};
+
+export const createEbookAssistantSession = async (body: {
+	bookId: string;
+	title?: string;
+	forceNew?: boolean;
+}) => {
+	return await http.post<{
+		sessionId: string;
+		title: string | null;
+		bookId: string;
+	}>(EBOOK_ASSISTANT_SESSION, body);
+};
+
+export const getEbookAssistantSessionsByBook = async (
+	bookId: string,
+	params?: { pageNo?: number; pageSize?: number },
+) => {
+	return await http.get<{
+		bookId: string;
+		list: EbookAssistantSessionListItem[];
+		total?: number;
+		pageNo?: number;
+		pageSize?: number;
+	}>(EBOOK_ASSISTANT_SESSIONS_FOR_BOOK, {
+		querys: { bookId, ...(params ?? {}) },
+	});
+};
+
+export const getEbookAssistantSessionByBook = async (bookId: string) => {
+	return await http.get<EbookAssistantSessionDetailPayload | null>(
+		EBOOK_ASSISTANT_SESSION_FOR_BOOK,
+		{ querys: { bookId } },
+	);
+};
+
+export const getEbookAssistantSessionDetail = async (sessionId: string) => {
+	return await http.get<EbookAssistantSessionDetailPayload>(
+		EBOOK_ASSISTANT_SESSION,
+		{ params: [sessionId] },
+	);
+};
+
+export const deleteEbookAssistantSession = async (sessionId: string) => {
+	return await http.delete<{ sessionId: string }>(EBOOK_ASSISTANT_SESSION, {
+		params: [sessionId],
+	});
+};
+
+export const stopEbookAssistantStream = async (body: { sessionId: string }) => {
+	return await http.post<{ success: boolean; message: string }>(
+		EBOOK_ASSISTANT_STOP,
+		body,
 	);
 };
 
@@ -1638,7 +1722,7 @@ export const createShare = async (params: {
 	chatSessionId: string;
 	messageIds?: string[] | undefined;
 	baseUrl?: string;
-	sessionType?: 'chat' | 'assistant' | 'agent';
+	sessionType?: 'chat' | 'assistant' | 'agent' | 'ebook';
 	/** session=会话分享（默认）；knowledge=知识文章分享 */
 	shareType?: 'session' | 'knowledge';
 }) => {

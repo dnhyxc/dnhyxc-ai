@@ -16,6 +16,7 @@ import { AssistantModule } from './services/assistant/assistant.module';
 import { AuthModule } from './services/auth/auth.module';
 import { ChatModule } from './services/chat/chat.module';
 import { EbookModule } from './services/ebook/ebook.module';
+import { EbookAssistantModule } from './services/ebook-assistant/ebook-assistant.module';
 import { EnglishLearningModule } from './services/english-learning/english-learning.module';
 import { KnowledgeModule } from './services/knowledge/knowledge.module';
 import { KnowledgeQaModule } from './services/knowledge-qa/knowledge-qa.module';
@@ -93,6 +94,7 @@ const connections = new Map();
 		SpeechTranscriptionModule,
 		EnglishLearningModule,
 		EbookModule,
+		EbookAssistantModule,
 		WebSearchModule,
 		ChatModule,
 		QdrantModule,

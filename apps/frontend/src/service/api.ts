@@ -123,6 +123,15 @@ export const ASSISTANT_SESSION_IMPORT_TRANSCRIPT =
 export const ASSISTANT_SSE = '/assistant/sse';
 export const ASSISTANT_STOP = '/assistant/stop';
 
+/** 电子书阅读助手（独立会话表） */
+export const EBOOK_ASSISTANT_SESSION = '/ebook-assistant/session';
+export const EBOOK_ASSISTANT_SESSIONS_FOR_BOOK =
+	'/ebook-assistant/sessions/for-book';
+export const EBOOK_ASSISTANT_SESSION_FOR_BOOK =
+	'/ebook-assistant/session/for-book';
+export const EBOOK_ASSISTANT_SSE = '/ebook-assistant/sse';
+export const EBOOK_ASSISTANT_STOP = '/ebook-assistant/stop';
+
 /** LangChain Agent（工具调用 + SSE） */
 export const AGENT_SESSION = '/agent/session';
 export const AGENT_SESSIONS = '/agent/sessions';
