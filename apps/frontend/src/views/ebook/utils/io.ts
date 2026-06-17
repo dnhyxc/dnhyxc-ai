@@ -42,16 +42,24 @@ export function resolveLocalPath(src: BookSrc): string | undefined {
 	return src.localPath;
 }
 
+export type EbookOpenSource = 'local' | 'online';
+
+export type EbookOpenResult = {
+	data: ArrayBuffer;
+	source: EbookOpenSource;
+};
+
 /** 统一解析为 epub.js / pdf.js 可用的 ArrayBuffer（桌面端优先本地，失败再拉云端） */
 export async function resolveOpen(
 	src: BookSrc,
 	_fmt: BookFmt,
 	bookId?: string,
-): Promise<ArrayBuffer> {
+): Promise<EbookOpenResult> {
 	const localPath = resolveLocalPath(src);
 	if (localPath && isTauriRuntime()) {
 		try {
-			return await readTauriBytes(localPath, false);
+			const data = await readTauriBytes(localPath, false);
+			return { data, source: 'local' };
 		} catch {
 			// 本地文件不可用（移动/删除）时回退云端
 		}
@@ -65,7 +73,8 @@ export async function resolveOpen(
 		);
 	}
 
-	return await fetchEbookBytes(bookId);
+	const data = await fetchEbookBytes(bookId);
+	return { data, source: 'online' };
 }
 
 export async function pickTauri(): Promise<{

@@ -109,6 +109,10 @@ function EbookShelfPage() {
 		[t],
 	);
 
+	const shelfTotal =
+		Number.isFinite(ebookStore.total) && ebookStore.total > 0
+			? ebookStore.total
+			: null;
 	const showInitialLoading = !ebookStore.ready && ebookStore.loading;
 	const showEmpty =
 		ebookStore.ready && ebookStore.total === 0 && !ebookStore.loading;
@@ -145,9 +149,9 @@ function EbookShelfPage() {
 						title={
 							<>
 								{t('ebook.shelf.title')}
-								{ebookStore.ready ? (
+								{shelfTotal != null ? (
 									<span className="text-textcolor/50 ml-1 text-sm font-normal">
-										（{ebookStore.total}）
+										（{shelfTotal}）
 									</span>
 								) : null}
 							</>

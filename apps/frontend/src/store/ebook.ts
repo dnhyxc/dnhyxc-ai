@@ -45,7 +45,11 @@ class EbookStore {
 	}
 
 	get hasMore(): boolean {
-		return this.books.length < this.total;
+		return this.books.length < this.safeTotal();
+	}
+
+	private safeTotal(): number {
+		return Number.isFinite(this.total) && this.total >= 0 ? this.total : 0;
 	}
 
 	async hydrate(): Promise<void> {
@@ -64,7 +68,9 @@ class EbookStore {
 				pageSize: this.pageSize,
 			});
 			runInAction(() => {
-				this.total = data.total;
+				const nextTotal = Number(data.total);
+				this.total =
+					Number.isFinite(nextTotal) && nextTotal >= 0 ? nextTotal : 0;
 				this.pageNo = page;
 				if (append) {
 					const existingIds = new Set(this.books.map((b) => b.id));
@@ -147,7 +153,7 @@ class EbookStore {
 			const existed = this.books.some((b) => b.id === book.id);
 			this.books = [book, ...this.books.filter((b) => b.id !== book.id)];
 			if (!existed) {
-				this.total += 1;
+				this.total = this.safeTotal() + 1;
 			}
 			this.bookCache[book.id] = book;
 			this.busy = true;
@@ -188,7 +194,7 @@ class EbookStore {
 				const existed = this.books.some((b) => b.id === book.id);
 				this.books = [book, ...this.books.filter((b) => b.id !== book.id)];
 				if (!existed) {
-					this.total += 1;
+					this.total = this.safeTotal() + 1;
 				}
 				this.bookCache[book.id] = book;
 				this.clearUploadState();
@@ -206,7 +212,7 @@ class EbookStore {
 			this.books = this.books.filter((b) => b.id !== bookId);
 			delete this.bookCache[bookId];
 			delete this.progMap[bookId];
-			this.total = Math.max(0, this.total - 1);
+			this.total = Math.max(0, this.safeTotal() - 1);
 		});
 	}
 

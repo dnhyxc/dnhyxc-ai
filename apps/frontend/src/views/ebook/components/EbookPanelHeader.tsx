@@ -26,7 +26,7 @@ export function EbookPanelHeader({
 			<div className="flex min-w-0 flex-1 items-center gap-1.5">
 				{leading}
 				<div className="min-w-0">
-					<h1 className="text-textcolor truncate text-base font-semibold">
+					<h1 className="text-textcolor flex min-w-0 items-center gap-1.5 text-base font-semibold">
 						{title}
 					</h1>
 					{subtitle ? (

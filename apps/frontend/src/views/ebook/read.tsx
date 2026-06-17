@@ -7,6 +7,7 @@ import { observer } from 'mobx-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { useI18n } from '@/hooks';
+import { cn } from '@/lib/utils';
 import ebookStore from '@/store/ebook';
 import { EbookPageShell } from './components/EbookPageShell';
 import { EbookPanelHeader } from './components/EbookPanelHeader';
@@ -21,7 +22,7 @@ import {
 	loadEpubReaderSettings,
 	saveEpubReaderSettings,
 } from './utils/epubReaderSettings';
-import { resolveOpen } from './utils/io';
+import { type EbookOpenSource, resolveOpen } from './utils/io';
 import { parsePdfPageHref } from './utils/pdfOutline';
 import {
 	loadPdfZoom,
@@ -41,6 +42,7 @@ function EbookReadPage() {
 	const [bookResolving, setBookResolving] = useState(false);
 
 	const [open, setOpen] = useState<ArrayBuffer | null>(null);
+	const [openSource, setOpenSource] = useState<EbookOpenSource | null>(null);
 	const [toc, setToc] = useState<EpubToc[]>([]);
 	const [tocOpen, setTocOpen] = useState(false);
 	const [epubSettingsOpen, setEpubSettingsOpen] = useState(false);
@@ -88,6 +90,7 @@ function EbookReadPage() {
 		if (!book) return;
 		let cancelled = false;
 		setOpen(null);
+		setOpenSource(null);
 		setToc([]);
 		setEpubNavReady(false);
 		epubNavRef.current = null;
@@ -97,8 +100,11 @@ function EbookReadPage() {
 		setPdfTotal(0);
 		(async () => {
 			try {
-				const data = await resolveOpen(book.src, book.fmt, book.id);
-				if (!cancelled) setOpen(data);
+				const result = await resolveOpen(book.src, book.fmt, book.id);
+				if (!cancelled) {
+					setOpen(result.data);
+					setOpenSource(result.source);
+				}
 			} catch (e) {
 				Toast({
 					type: 'error',
@@ -457,8 +463,26 @@ function EbookReadPage() {
 			contentPadding={false}
 			header={
 				<EbookPanelHeader
-					className="pl-4.5 pr-2.5"
-					title={book.title}
+					className="pl-5 pr-2.5"
+					title={
+						<div className="flex items-center gap-1.5">
+							{openSource ? (
+								<span
+									className={cn(
+										'shrink-0 rounded px-1.5 h-5.5 pb-px mt-px flex items-center justify-center text-xs font-medium leading-none',
+										openSource === 'local'
+											? 'bg-emerald-500/15 text-emerald-600'
+											: 'bg-sky-500/15 text-sky-600',
+									)}
+								>
+									{openSource === 'local'
+										? t('ebook.read.sourceLocal')
+										: t('ebook.read.sourceOnline')}
+								</span>
+							) : null}
+							<span className="min-w-0 truncate">{book.title}</span>
+						</div>
+					}
 					trailing={headerTrailing}
 				/>
 			}

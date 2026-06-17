@@ -1544,6 +1544,8 @@ export const enUS = {
 	'ebook.shelf.titleSaved': 'Title updated',
 	'ebook.shelf.titleFailed': 'Failed to update title',
 	'ebook.read.missing': 'Book not found',
+	'ebook.read.sourceLocal': 'Local',
+	'ebook.read.sourceOnline': 'Online',
 	'ebook.read.backShelf': 'Back to shelf',
 	'ebook.read.toc': 'Contents',
 	'ebook.read.tocEmpty': 'No table of contents in this file.',

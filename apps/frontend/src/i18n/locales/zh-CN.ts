@@ -1411,6 +1411,8 @@ export const zhCN = {
 	'ebook.shelf.titleSaved': '书名已更新',
 	'ebook.shelf.titleFailed': '书名更新失败',
 	'ebook.read.missing': '未找到该书籍',
+	'ebook.read.sourceLocal': '本地',
+	'ebook.read.sourceOnline': '在线',
 	'ebook.read.backShelf': '返回书架',
 	'ebook.read.toc': '目录',
 	'ebook.read.tocEmpty': '该文件没有目录。',
