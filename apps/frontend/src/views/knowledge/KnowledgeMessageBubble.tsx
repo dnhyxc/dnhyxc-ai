@@ -13,7 +13,7 @@ export interface KnowledgeAssistantMessageBubbleProps {
 	messagesLength: number;
 	isCopyedId: string;
 	onCopy: (content: string, chatId: string) => void;
-	onSaveToKnowledge: (message: Message) => void;
+	onSaveToKnowledge?: (message: Message) => void;
 	/** 与 ScrollArea Viewport ref 一致，供助手消息内代码块吸顶条与 MdPreview 懒挂载 */
 	scrollViewportRef: RefObject<HTMLElement | null>;
 }

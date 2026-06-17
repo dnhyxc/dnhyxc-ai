@@ -6,6 +6,10 @@ import { cn } from '@/lib/utils';
 import { onListen } from '@/utils';
 import type { EpubToc } from '../types';
 import {
+	attachEpubIframeContextMenu,
+	type EpubReaderContextMenuPayload,
+} from '../utils/epubContextMenuAttach';
+import {
 	applyEpubReaderAppearance,
 	type EpubReaderSettings,
 	resolveEpubBgColor,
@@ -30,6 +34,8 @@ type Props = {
 	onNavReset?: () => void;
 	/** 目录打开等场景下禁用翻页快捷键 */
 	keyboardNavEnabled?: boolean;
+	/** EPUB iframe 内右键菜单 */
+	onReaderContextMenu?: (payload: EpubReaderContextMenuPayload) => void;
 };
 
 /** epub.js 全书百分比需 locations.generate；未就绪时用 spine 索引粗估 */
@@ -76,6 +82,7 @@ export function EpubPane({
 	onReady,
 	onNavReset,
 	keyboardNavEnabled = true,
+	onReaderContextMenu,
 }: Props) {
 	const { theme: appTheme } = useTheme();
 	const [appThemeName, setAppThemeName] = useState<ThemeName>(appTheme);
@@ -94,6 +101,7 @@ export function EpubPane({
 	const onTocRef = useRef(onToc);
 	const onReadyRef = useRef(onReady);
 	const onNavResetRef = useRef(onNavReset);
+	const onReaderContextMenuRef = useRef(onReaderContextMenu);
 	const keyboardNavEnabledRef = useRef(keyboardNavEnabled);
 	const openRef = useRef<ArrayBuffer | null>(null);
 	const initialCfiRef = useRef<string | undefined>(undefined);
@@ -132,6 +140,7 @@ export function EpubPane({
 	onTocRef.current = onToc;
 	onReadyRef.current = onReady;
 	onNavResetRef.current = onNavReset;
+	onReaderContextMenuRef.current = onReaderContextMenu;
 	keyboardNavEnabledRef.current = keyboardNavEnabled;
 
 	// 仅在换书（open 变化）时记录起始 CFI，避免翻页保存进度后整书重载闪烁
@@ -186,6 +195,7 @@ export function EpubPane({
 		let book: Book | null = null;
 		let rend: Rendition | null = null;
 		let detachScrolledNav: (() => void) | undefined;
+		let detachContextMenu: (() => void) | undefined;
 		onNavResetRef.current?.();
 		readyRef.current = false;
 		locationsReadyRef.current = false;
@@ -238,6 +248,11 @@ export function EpubPane({
 				rendRef.current = rend;
 				rend.on('relocated', relocate);
 				rend.on('keydown', onRenditionKeyDown);
+				if (onReaderContextMenuRef.current) {
+					detachContextMenu = attachEpubIframeContextMenu(rend, (payload) => {
+						onReaderContextMenuRef.current?.(payload);
+					});
+				}
 
 				await rend.display(initialCfi ?? undefined);
 				if (destroyed) return;
@@ -307,6 +322,7 @@ export function EpubPane({
 
 		return () => {
 			destroyed = true;
+			detachContextMenu?.();
 			detachScrolledNav?.();
 			readyRef.current = false;
 			locationsReadyRef.current = false;

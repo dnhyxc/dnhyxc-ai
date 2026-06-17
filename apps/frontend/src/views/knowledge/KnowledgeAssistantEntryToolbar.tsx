@@ -28,6 +28,8 @@ export interface KnowledgeAssistantEntryToolbarProps {
 	flushScrollToBottom: () => void;
 	assistantMode: KnowledgeAssistantMode['id'];
 	setAssistantMode: (m: KnowledgeAssistantMode['id']) => void;
+	/** 是否展示 AI / RAG 模式切换（电子书助手等场景可关闭） */
+	showAssistantModeSwitch?: boolean;
 }
 
 export const KnowledgeAssistantEntryToolbar = observer(
@@ -41,6 +43,7 @@ export const KnowledgeAssistantEntryToolbar = observer(
 		flushScrollToBottom,
 		assistantMode,
 		setAssistantMode,
+		showAssistantModeSwitch = true,
 	}: KnowledgeAssistantEntryToolbarProps) {
 		const { t } = useI18n();
 		const sessionList = assistantStore.sessionListForActiveDocument;
@@ -154,23 +157,25 @@ export const KnowledgeAssistantEntryToolbar = observer(
 								</Button>
 							</>
 						) : null}
-						{KNOWLEDGE_ASSISTANT_MODES.map((item) => (
-							<Button
-								key={item.id}
-								variant="link"
-								size="sm"
-								className={cn(
-									'px-2.5 border border-theme/5',
-									assistantMode === item.id
-										? 'text-teal-500 bg-theme/5'
-										: 'text-textcolor/80 hover:bg-theme/5',
-								)}
-								onClick={() => setAssistantMode(item.id)}
-							>
-								<item.icon />
-								{t(item.labelKey)}
-							</Button>
-						))}
+						{showAssistantModeSwitch
+							? KNOWLEDGE_ASSISTANT_MODES.map((item) => (
+									<Button
+										key={item.id}
+										variant="link"
+										size="sm"
+										className={cn(
+											'px-2.5 border border-theme/5',
+											assistantMode === item.id
+												? 'text-teal-500 bg-theme/5'
+												: 'text-textcolor/80 hover:bg-theme/5',
+										)}
+										onClick={() => setAssistantMode(item.id)}
+									>
+										<item.icon />
+										{t(item.labelKey)}
+									</Button>
+								))
+							: null}
 					</div>
 				) : null}
 				<KnowledgeAssistantHistory

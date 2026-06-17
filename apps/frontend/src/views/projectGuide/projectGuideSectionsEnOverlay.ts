@@ -368,4 +368,9 @@ export const PROJECT_GUIDE_ITEMS_EN: Record<
 		description:
 			'Entry: while reading EPUB, Reading settings (bolt icon) next to TOC in the reader header.\nAdjust font size and line spacing; 12 reading backgrounds and 12 text colors (swatch picker, including follow app/theme). Follow app uses the same background as Settings → theme colors.\nPage flow: Continuous scroll (default; vertical; auto next/prev chapter at chapter edges) or Paginated (screen-by-screen). Two side-by-side buttons replace the old dropdown.\nRestore defaults at the bottom of the panel (defaults to continuous scroll).\nPreferences are stored on this device only; changing page flow briefly reloads the book while trying to keep your position. The panel scrolls with the app ScrollArea style when there are many options.',
 	},
+	'pg-s16-4': {
+		title: '16.4 EPUB reading assistant (EPUB only)',
+		description:
+			'Entry: right-click in the EPUB body (no separate assistant button in the header).\nNo selection: menu includes Reading assistant, previous/next page, TOC, reading settings, back to shelf, etc.\nWith selection: also Copy, Ask AI about selection (opens the right assistant with the excerpt prefilled), Select all.\nLayout: like the knowledge-base smart assistant—reader on the left, assistant on the right, draggable split; not a modal or drawer.\nRequires sign-in; ask about the book, context, or takeaways. Streaming scroll behavior matches the knowledge assistant. One conversation session per book.\nKeyboard: when the assistant is open and the input is focused, EPUB page-turn shortcuts (↑/←/↓/→) are ignored.',
+	},
 };

@@ -71,6 +71,7 @@
 | 桌面大文件上传中无法阅读 / 超 120MB 打不开 | [ebook/ebook-cos-local-shelf.md](./ebook/ebook-cos-local-shelf.md) §3.1–§3.2 |
 | 阅读背景色不生效 | [ebook/ebook-cos-local-shelf.md](./ebook/ebook-cos-local-shelf.md) §3.4 |
 | PDF 页面太小 / 猛滚连跳多页 | [ebook/pdf-reader-fit-scroll.md](./ebook/pdf-reader-fit-scroll.md) §3.1–§3.3 |
+| EPUB 右键无菜单 / 助手与知识库样式不一致 | [ebook/epub-assistant-context-menu.md](./ebook/epub-assistant-context-menu.md) |
 
 ---
 

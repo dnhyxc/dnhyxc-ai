@@ -1588,6 +1588,18 @@ export const enUS = {
 	'ebook.read.pdfZoomOut': 'Zoom out',
 	'ebook.read.pdfZoomHint':
 		'Scale relative to fit width; 100% fills the reader width',
+	'ebook.read.contextMenu.copy': 'Copy',
+	'ebook.read.contextMenu.selectAll': 'Select all',
+	'ebook.read.contextMenu.assistant': 'Reading assistant',
+	'ebook.read.contextMenu.askSelection': 'Ask AI about selection',
+	'ebook.read.assistant.close': 'Close reading assistant',
+	'ebook.read.assistant.intro':
+		'Ask AI about “{title}”, its themes, or your takeaways. Right-click a selection and choose “Ask AI about selection”.',
+	'ebook.read.assistant.placeholder': 'Ask about this book…',
+	'ebook.read.assistant.systemHint':
+		'The user is reading the ebook “{title}”. Answer in that context; when they quote a passage, explain it and its surrounding context first.',
+	'ebook.read.assistant.askSelectionDraft':
+		'Please explain this excerpt from the book:\n\n> {quote}',
 	'ebook.err.open': 'Failed to open',
 	'route.account.title': 'Account',
 	'route.pay.title': 'Membership',

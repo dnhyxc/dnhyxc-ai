@@ -10,5 +10,6 @@
 | [epub-reader-settings-scroll.md](./epub-reader-settings-scroll.md) | **增量**：EPUB 阅读设置（字号/行距/颜色/背景/翻页方式）、连续滚动章节衔接 |
 | [ebook-cos-local-shelf.md](./ebook-cos-local-shelf.md) | **增量**：COS 云端备份、桌面本地优先、书架分页、阅读设置 12 色块、PDF/EPUB 滚动条统一 |
 | [pdf-reader-fit-scroll.md](./pdf-reader-fit-scroll.md) | **增量**：PDF 适应宽度、顶栏缩放、滚动换页（停稳后翻页） |
+| [epub-assistant-context-menu.md](./epub-assistant-context-menu.md) | **增量**：EPUB 右键菜单、智能助手分栏（对齐知识库助手 UI 与流式贴底） |
 
 **延伸阅读**：上传目录与 `uploads/ebooks` 落盘见 [ops/upload-storage-paths.md](../ops/upload-storage-paths.md)；路由鉴权与公开路径见 [app/route-auth.md](../app/route-auth.md)。

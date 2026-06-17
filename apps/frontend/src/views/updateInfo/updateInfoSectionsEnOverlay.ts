@@ -846,4 +846,9 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'Shelf cards support custom covers (JPG/PNG/WebP via the bottom-left control on hover) and inline title editing (tap the title below the card, Enter to save) with success toasts. With a cover, the card shows the image; without, EPUB/PDF color placeholders remain. Hover the card for Read/Continue, progress, or Remove. Desktop import button label is now Select local file.',
 	},
+	's25-12': {
+		title: 'EPUB context menu and reading assistant',
+		description:
+			'While reading EPUB, right-click in the body for a menu: Reading assistant, page turns, TOC, and settings when nothing is selected; Copy, Ask AI about selection, and Select all when text is selected. The assistant opens in a right-side split pane (same layout as the knowledge-base assistant, draggable width) with multi-turn chat and streaming replies—no extra header button. Sign-in required.',
+	},
 };

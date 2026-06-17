@@ -4,18 +4,28 @@ import { Button } from '@ui/index';
 import { Toast } from '@ui/sonner';
 import { ChevronLeft, ChevronRight, List, Minus, Plus } from 'lucide-react';
 import { observer } from 'mobx-react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import ebookStore from '@/store/ebook';
+import { copyToClipboard } from '@/utils/clipboard';
 import { EbookPageShell } from './components/EbookPageShell';
 import { EbookPanelHeader } from './components/EbookPanelHeader';
+import { EbookReadSplitLayout } from './components/EbookReadSplitLayout';
 import { EpubPane } from './components/EpubPane';
+import {
+	EpubReaderContextMenu,
+	type EpubReaderContextMenuState,
+} from './components/EpubReaderContextMenu';
 import { EpubReaderSettingsPopover } from './components/EpubReaderSettingsPopover';
 import { EpubTocDrawer } from './components/EpubTocDrawer';
 import { PdfPane } from './components/PdfPane';
 import type { EpubToc } from './types';
+import {
+	buildEpubContextMenuItems,
+	type EpubReaderContextActions,
+} from './utils/buildEpubContextMenuItems';
 import {
 	DEFAULT_EPUB_READER_SETTINGS,
 	type EpubReaderSettings,
@@ -64,6 +74,16 @@ function EbookReadPage() {
 	const [pdfPage, setPdfPage] = useState(0);
 	const [pdfTotal, setPdfTotal] = useState(0);
 	const [pdfZoom, setPdfZoom] = useState(loadPdfZoom);
+	const [assistantOpen, setAssistantOpen] = useState(false);
+	const [assistantInput, setAssistantInput] = useState('');
+	const [contextMenu, setContextMenu] =
+		useState<EpubReaderContextMenuState | null>(null);
+	const contextActionsRef = useRef<EpubReaderContextActions | null>(null);
+	const contextPayloadRef = useRef<{
+		selectedText: string;
+		copySelection: () => void;
+		selectAll: () => void;
+	} | null>(null);
 	const progTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
 	useEffect(() => {
@@ -205,6 +225,109 @@ function EbookReadPage() {
 			return next;
 		});
 	}, []);
+
+	const openAssistant = useCallback((draft?: string) => {
+		if (draft?.trim()) {
+			setAssistantInput(draft.trim());
+		}
+		setAssistantOpen(true);
+	}, []);
+
+	const openAssistantWithSelection = useCallback(
+		(selectedText: string) => {
+			const quote = selectedText.trim();
+			if (!quote) return;
+			openAssistant(t('ebook.read.assistant.askSelectionDraft', { quote }));
+		},
+		[openAssistant, t],
+	);
+
+	const closeContextMenu = useCallback(() => {
+		setContextMenu(null);
+		contextPayloadRef.current = null;
+	}, []);
+
+	const showEpubContextMenu = useCallback(
+		(payload: {
+			clientX: number;
+			clientY: number;
+			selectedText: string;
+			copySelection: () => void;
+			selectAll: () => void;
+		}) => {
+			contextPayloadRef.current = {
+				selectedText: payload.selectedText,
+				copySelection: payload.copySelection,
+				selectAll: payload.selectAll,
+			};
+			setContextMenu({
+				open: true,
+				x: payload.clientX,
+				y: payload.clientY,
+				hasSelection: Boolean(payload.selectedText.trim()),
+			});
+		},
+		[],
+	);
+
+	const onHostContextMenu = useCallback(
+		(e: React.MouseEvent<HTMLDivElement>) => {
+			if (book?.fmt !== 'epub') return;
+			e.preventDefault();
+			const selectedText = window.getSelection()?.toString()?.trim() ?? '';
+			showEpubContextMenu({
+				clientX: e.clientX,
+				clientY: e.clientY,
+				selectedText,
+				copySelection: () => {
+					if (!selectedText) return;
+					void copyToClipboard(selectedText);
+				},
+				selectAll: () => {
+					const sel = window.getSelection();
+					if (!sel || !document.body) return;
+					const range = document.createRange();
+					range.selectNodeContents(document.body);
+					sel.removeAllRanges();
+					sel.addRange(range);
+				},
+			});
+		},
+		[book?.fmt, showEpubContextMenu],
+	);
+
+	contextActionsRef.current = {
+		copy: () => {
+			const payload = contextPayloadRef.current;
+			if (!payload?.selectedText.trim()) return;
+			void copyToClipboard(payload.selectedText);
+		},
+		selectAll: () => contextPayloadRef.current?.selectAll(),
+		openAssistant: () => openAssistant(),
+		askAboutSelection: () => {
+			const text = contextPayloadRef.current?.selectedText ?? '';
+			openAssistantWithSelection(text);
+		},
+		openToc: () => setTocOpen(true),
+		openSettings: () => setEpubSettingsOpen(true),
+		prevPage: () => {
+			void epubNavRef.current?.prev();
+		},
+		nextPage: () => {
+			void epubNavRef.current?.next();
+		},
+		backToShelf: () => nav('/ebook'),
+	};
+
+	const epubContextMenuItems = useMemo(
+		() =>
+			buildEpubContextMenuItems({
+				hasSelection: contextMenu?.hasSelection ?? false,
+				actionsRef: contextActionsRef,
+				t,
+			}),
+		[contextMenu?.hasSelection, t],
+	);
 
 	useEffect(() => {
 		if (!book || !open) return;
@@ -493,16 +616,32 @@ function EbookReadPage() {
 						<Loading text={t('common.loading')} />
 					</div>
 				) : book.fmt === 'epub' ? (
-					<EpubPane
-						open={open}
-						startCfi={prog?.epubCfi}
-						readerSettings={epubSettings}
-						onCfi={saveCfi}
-						onToc={setToc}
-						onReady={onEpubReady}
-						onNavReset={onEpubNavReset}
-						keyboardNavEnabled={!tocOpen && !epubSettingsOpen}
-					/>
+					<EbookReadSplitLayout
+						assistantOpen={assistantOpen}
+						bookId={book.id}
+						bookTitle={book.title}
+						assistantInput={assistantInput}
+						onAssistantInputChange={setAssistantInput}
+					>
+						<div
+							className="flex h-full min-h-0 flex-1 flex-col"
+							onContextMenu={onHostContextMenu}
+						>
+							<EpubPane
+								open={open}
+								startCfi={prog?.epubCfi}
+								readerSettings={epubSettings}
+								onCfi={saveCfi}
+								onToc={setToc}
+								onReady={onEpubReady}
+								onNavReset={onEpubNavReset}
+								keyboardNavEnabled={
+									!tocOpen && !epubSettingsOpen && !assistantOpen
+								}
+								onReaderContextMenu={showEpubContextMenu}
+							/>
+						</div>
+					</EbookReadSplitLayout>
 				) : (
 					<PdfPane
 						open={open}
@@ -529,6 +668,16 @@ function EbookReadPage() {
 					void epubNavRef.current?.go(href);
 				}}
 			/>
+
+			{book.fmt === 'epub' ? (
+				<EpubReaderContextMenu
+					state={contextMenu}
+					items={epubContextMenuItems}
+					onOpenChange={(open) => {
+						if (!open) closeContextMenu();
+					}}
+				/>
+			) : null}
 		</EbookPageShell>
 	);
 }

@@ -1454,6 +1454,17 @@ export const zhCN = {
 	'ebook.read.pdfZoomIn': '放大',
 	'ebook.read.pdfZoomOut': '缩小',
 	'ebook.read.pdfZoomHint': '相对适应宽度的缩放比例，100% 为满宽显示',
+	'ebook.read.contextMenu.copy': '复制',
+	'ebook.read.contextMenu.selectAll': '全选',
+	'ebook.read.contextMenu.assistant': '智能助手',
+	'ebook.read.contextMenu.askSelection': 'AI 问书',
+	'ebook.read.assistant.close': '关闭智能助手',
+	'ebook.read.assistant.intro':
+		'可向 AI 提问关于《{title}》的内容、背景与读后感；选中正文后右键可使用「AI 问书」。',
+	'ebook.read.assistant.placeholder': '向 AI 提问本书相关内容…',
+	'ebook.read.assistant.systemHint':
+		'用户正在阅读电子书《{title}》。请结合书籍语境作答；若用户引用摘录，请优先解释该段含义与上下文。',
+	'ebook.read.assistant.askSelectionDraft': '请解释以下书中摘录：\n\n> {quote}',
 	'ebook.err.open': '打开失败',
 	'route.account.title': '账号设置',
 	'route.pay.title': '会员充值',
