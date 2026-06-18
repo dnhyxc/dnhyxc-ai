@@ -25,7 +25,14 @@ export type Prog = {
 	updatedAt: string;
 };
 
-export type EpubToc = { label: string; href?: string; depth?: number };
+/** 阅读页目录项（EPUB nav / PDF outline 共用） */
+export type EbookTocItem = {
+	label: string;
+	href?: string;
+	depth?: number;
+	/** EPUB：对应 spine 索引，用于目录高亮 */
+	spineIndex?: number;
+};
 
 export type EbookShelfData = {
 	books: Book[];

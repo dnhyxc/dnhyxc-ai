@@ -1369,6 +1369,13 @@ const UPDATE_INFO_SECTIONS_ZH: UpdateInfoSection[] = [
 				description:
 					'登出、换号登录或会话失效时，会清空上一账号的书架缓存并重新加载当前账号书籍列表，避免误显示他人书架。',
 			},
+			{
+				id: 's25-20',
+				title: '阅读目录当前章节高亮',
+				dateLabel: '2026-06-17',
+				description:
+					'阅读 EPUB 或 PDF 时打开目录抽屉，会高亮并滚动到当前所在章节（PDF 为书签对应条目），便于在长目录中定位阅读位置。',
+			},
 		],
 	},
 ];

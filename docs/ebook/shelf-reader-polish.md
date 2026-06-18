@@ -1,7 +1,7 @@
 # 书架与阅读体验增强（卡片 UI、PDF 目录、主题文字）
 
 > **文档角色**：本轮在 [ebook-reader-shelf.md](./ebook-reader-shelf.md) 主链路之上的**增量专题**，覆盖书架卡片、导入行为、EPUB/PDF 阅读交互与 PDF 大纲解析。  
-> **延伸阅读**：[ebook-reader-shelf.md](./ebook-reader-shelf.md)（全链路）；[epub-reader-settings-scroll.md](./epub-reader-settings-scroll.md)（EPUB 阅读设置与连续滚动）；PDF 目录跳转 canvas 报错见本文 §5.2。
+> **延伸阅读**：[ebook-reader-shelf.md](./ebook-reader-shelf.md)（全链路）；[epub-reader-settings-scroll.md](./epub-reader-settings-scroll.md)（EPUB 阅读设置与连续滚动）；[ebook-toc-active-highlight.md](./ebook-toc-active-highlight.md)（目录当前章节高亮，`EbookTocDrawer`）；PDF 目录跳转 canvas 报错见本文 §5.2。
 
 ## 1. 背景与目标
 

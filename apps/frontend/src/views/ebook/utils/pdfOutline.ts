@@ -1,5 +1,5 @@
 import type { PDFDocumentProxy } from 'pdfjs-dist';
-import type { EpubToc } from '../types';
+import type { EbookTocItem } from '../types';
 
 const PDF_PAGE_HREF_PREFIX = 'pdf-page:';
 
@@ -80,14 +80,14 @@ async function flattenOutline(
 	doc: PDFDocumentProxy,
 	items: OutlineItem[],
 	depth = 0,
-): Promise<EpubToc[]> {
-	const result: EpubToc[] = [];
+): Promise<EbookTocItem[]> {
+	const result: EbookTocItem[] = [];
 	for (const item of items) {
 		const label = item.title?.trim();
 		if (!label) continue;
 
 		const pageIndex = await resolveDestPageIndex(doc, item.dest);
-		const entry: EpubToc = { label, depth };
+		const entry: EbookTocItem = { label, depth };
 		if (pageIndex != null) {
 			entry.href = pdfPageHref(pageIndex);
 		}
@@ -103,7 +103,7 @@ async function flattenOutline(
 /** 从 PDF 书签/大纲生成目录项；无大纲时返回空数组 */
 export async function loadPdfOutlineToc(
 	doc: PDFDocumentProxy,
-): Promise<EpubToc[]> {
+): Promise<EbookTocItem[]> {
 	try {
 		const outline = await doc.getOutline();
 		if (!outline?.length) return [];

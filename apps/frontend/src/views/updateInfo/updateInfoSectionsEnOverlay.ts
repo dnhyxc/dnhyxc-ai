@@ -896,4 +896,9 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'After sign-out, switching accounts, or session expiry, the previous account’s bookshelf cache is cleared and the current account’s list is loaded again.',
 	},
+	's25-20': {
+		title: 'TOC highlights current chapter',
+		description:
+			'When you open the table of contents while reading EPUB or PDF, the entry for your current position is highlighted and scrolled into view (PDF uses bookmark entries).',
+	},
 };

@@ -1,26 +1,39 @@
 /**
- * 电子书阅读：EPUB 目录抽屉
+ * 电子书阅读：EPUB / PDF 共用目录抽屉
  */
 import { Drawer } from '@design/Drawer';
 import { ScrollArea } from '@ui/index';
+import { useEffect, useRef } from 'react';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
-import type { EpubToc } from '../types';
+import type { EbookTocItem } from '../types';
 
-export type EpubTocDrawerProps = {
+export type EbookTocDrawerProps = {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
-	items: EpubToc[];
+	items: EbookTocItem[];
+	/** 当前阅读位置对应的目录项索引；无匹配时为 -1 */
+	activeIndex?: number;
 	onSelect: (href: string) => void;
 };
 
-export function EpubTocDrawer({
+export function EbookTocDrawer({
 	open,
 	onOpenChange,
 	items,
+	activeIndex = -1,
 	onSelect,
-}: EpubTocDrawerProps) {
+}: EbookTocDrawerProps) {
 	const { t } = useI18n();
+	const activeItemRef = useRef<HTMLButtonElement>(null);
+
+	useEffect(() => {
+		if (!open || activeIndex < 0) return;
+		const id = requestAnimationFrame(() => {
+			activeItemRef.current?.scrollIntoView({ block: 'nearest' });
+		});
+		return () => cancelAnimationFrame(id);
+	}, [open, activeIndex, items]);
 
 	return (
 		<Drawer
@@ -37,18 +50,23 @@ export function EpubTocDrawer({
 								{t('ebook.read.tocEmpty')}
 							</p>
 						) : (
-							items.map((item) => {
+							items.map((item, index) => {
 								const clickable = Boolean(item.href);
+								const isActive = index === activeIndex;
 								return (
 									<button
-										key={`${item.href ?? 'nohref'}-${item.label}-${item.depth ?? 0}`}
+										key={`${item.href ?? 'nohref'}-${item.label}-${item.depth ?? 0}-${index}`}
+										ref={isActive ? activeItemRef : undefined}
 										type="button"
 										disabled={!clickable}
+										aria-current={isActive ? 'location' : undefined}
 										className={cn(
-											'text-textcolor w-full rounded-md px-2 py-2 text-left text-sm',
+											'cursor-pointer text-textcolor w-full rounded-md px-2 py-2 text-left text-sm',
 											clickable
 												? 'transition-colors hover:bg-theme/10'
 												: 'text-textcolor/45 cursor-default',
+											isActive &&
+												'bg-theme/15 text-theme font-medium hover:bg-theme/15',
 										)}
 										style={
 											item.depth

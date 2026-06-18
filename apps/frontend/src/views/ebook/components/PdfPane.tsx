@@ -1,7 +1,7 @@
 import type { RenderTask } from 'pdfjs-dist';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
-import type { EpubToc } from '../types';
+import type { EbookTocItem } from '../types';
 import { loadPdfOutlineToc } from '../utils/pdfOutline';
 import { DEFAULT_PDF_ZOOM } from '../utils/pdfReaderSettings';
 import { attachPdfScrolledEdgeNav } from '../utils/pdfScrolledNav';
@@ -38,7 +38,7 @@ type Props = {
 	zoomMultiplier?: number;
 	onPage: (page: number, percent?: number) => void;
 	onPageState?: (page: number, total: number) => void;
-	onToc?: (items: EpubToc[]) => void;
+	onToc?: (items: EbookTocItem[]) => void;
 	onReady?: (api: {
 		prev: () => void;
 		next: () => void;

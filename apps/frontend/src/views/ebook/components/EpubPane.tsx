@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { type ThemeName, useTheme } from '@/hooks';
 import { cn } from '@/lib/utils';
 import { onListen } from '@/utils';
-import type { EpubToc } from '../types';
+import type { EbookTocItem } from '../types';
 import {
 	attachEpubIframeContextMenu,
 	type EpubReaderContextMenuPayload,
@@ -15,6 +15,7 @@ import {
 	resolveEpubBgColor,
 } from '../utils/epubReaderSettings';
 import { attachEpubScrolledEdgeNav } from '../utils/epubScrolledNav';
+import { resolveSpineIndexForHref } from '../utils/epubSpineIndex';
 import { READER_NATIVE_SCROLLBAR_EPUB_CONTAINER } from '../utils/readerScrollbar';
 
 type NavApi = {
@@ -27,8 +28,8 @@ type Props = {
 	open: ArrayBuffer;
 	startCfi?: string;
 	readerSettings: EpubReaderSettings;
-	onCfi: (cfi: string, percent?: number) => void;
-	onToc?: (items: EpubToc[]) => void;
+	onCfi: (cfi: string, percent?: number, spineIndex?: number) => void;
+	onToc?: (items: EbookTocItem[]) => void;
 	onReady?: (api: NavApi) => void;
 	/** EPUB 重载前通知父级清空导航 API（避免快捷键指向已销毁的 rendition） */
 	onNavReset?: () => void;
@@ -160,7 +161,7 @@ export function EpubPane({
 			loc,
 			locationsReadyRef.current,
 		);
-		onCfiRef.current(cfi, pct);
+		onCfiRef.current(cfi, pct, loc.start?.index);
 	}, []);
 
 	const onRenditionKeyDown = useCallback((e: KeyboardEvent) => {
@@ -283,9 +284,13 @@ export function EpubPane({
 				});
 
 				const nav = await book.loaded.navigation;
-				const toc: EpubToc[] = (nav.toc ?? []).map((t) => ({
+				const spineBook = book;
+				const toc: EbookTocItem[] = (nav.toc ?? []).map((t) => ({
 					label: t.label?.trim() || t.href,
 					href: t.href,
+					spineIndex: t.href
+						? resolveSpineIndexForHref(spineBook, t.href)
+						: undefined,
 				}));
 				if (!destroyed) onTocRef.current?.(toc);
 

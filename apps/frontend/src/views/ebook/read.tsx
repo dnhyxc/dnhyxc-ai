@@ -20,15 +20,15 @@ import { copyToClipboard } from '@/utils/clipboard';
 import { EbookPageShell } from './components/EbookPageShell';
 import { EbookPanelHeader } from './components/EbookPanelHeader';
 import { EbookReadSplitLayout } from './components/EbookReadSplitLayout';
+import { EbookTocDrawer } from './components/EbookTocDrawer';
 import { EpubPane } from './components/EpubPane';
 import {
 	EpubReaderContextMenu,
 	type EpubReaderContextMenuState,
 } from './components/EpubReaderContextMenu';
 import { EpubReaderSettingsPopover } from './components/EpubReaderSettingsPopover';
-import { EpubTocDrawer } from './components/EpubTocDrawer';
 import { PdfPane } from './components/PdfPane';
-import type { EpubToc } from './types';
+import type { EbookTocItem } from './types';
 import {
 	buildEpubContextMenuItems,
 	type EpubReaderContextActions,
@@ -53,6 +53,7 @@ import {
 	savePdfZoom,
 	stepPdfZoom,
 } from './utils/pdfReaderSettings';
+import { findActiveTocItemIndex } from './utils/tocActiveIndex';
 
 function EbookReadPage() {
 	const { bookId = '' } = useParams();
@@ -64,7 +65,7 @@ function EbookReadPage() {
 
 	const [open, setOpen] = useState<ArrayBuffer | null>(null);
 	const [openSource, setOpenSource] = useState<EbookOpenSource | null>(null);
-	const [toc, setToc] = useState<EpubToc[]>([]);
+	const [tocItems, setTocItems] = useState<EbookTocItem[]>([]);
 	const [tocOpen, setTocOpen] = useState(false);
 	const [epubSettingsOpen, setEpubSettingsOpen] = useState(false);
 	const [epubSettings, setEpubSettings] = useState<EpubReaderSettings>(
@@ -84,6 +85,9 @@ function EbookReadPage() {
 	const [pdfNavReady, setPdfNavReady] = useState(false);
 	const [pdfPage, setPdfPage] = useState(0);
 	const [pdfTotal, setPdfTotal] = useState(0);
+	const [epubSpineIndex, setEpubSpineIndex] = useState<number | undefined>(
+		undefined,
+	);
 	const [pdfZoom, setPdfZoom] = useState(loadPdfZoom);
 	const [assistantOpen, setAssistantOpen] = useState(false);
 	const [assistantInput, setAssistantInput] = useState('');
@@ -123,13 +127,14 @@ function EbookReadPage() {
 		let cancelled = false;
 		setOpen(null);
 		setOpenSource(null);
-		setToc([]);
+		setTocItems([]);
 		setEpubNavReady(false);
 		epubNavRef.current = null;
 		pdfNavRef.current = null;
 		setPdfNavReady(false);
 		setPdfPage(0);
 		setPdfTotal(0);
+		setEpubSpineIndex(undefined);
 		(async () => {
 			try {
 				const result = await resolveOpen(book.src, book.fmt, book.id);
@@ -151,8 +156,11 @@ function EbookReadPage() {
 	}, [book]);
 
 	const saveCfi = useCallback(
-		(cfi: string, percent?: number) => {
+		(cfi: string, percent?: number, spineIndex?: number) => {
 			if (!book) return;
+			if (spineIndex != null && Number.isFinite(spineIndex)) {
+				setEpubSpineIndex(spineIndex);
+			}
 			if (progTimer.current) clearTimeout(progTimer.current);
 			progTimer.current = setTimeout(() => {
 				ebookStore.saveProg({
@@ -163,6 +171,15 @@ function EbookReadPage() {
 			}, 800);
 		},
 		[book],
+	);
+
+	const activeTocIndex = useMemo(
+		() =>
+			findActiveTocItemIndex(
+				tocItems,
+				book?.fmt === 'pdf' ? { pdfPage } : { epubSpineIndex: epubSpineIndex },
+			),
+		[tocItems, book?.fmt, pdfPage, epubSpineIndex],
 	);
 
 	const savePage = useCallback(
@@ -744,7 +761,7 @@ function EbookReadPage() {
 								startCfi={prog?.epubCfi}
 								readerSettings={epubSettings}
 								onCfi={saveCfi}
-								onToc={setToc}
+								onToc={setTocItems}
 								onReady={onEpubReady}
 								onNavReset={onEpubNavReset}
 								keyboardNavEnabled={
@@ -773,7 +790,7 @@ function EbookReadPage() {
 								zoomMultiplier={pdfZoom}
 								onPage={savePage}
 								onPageState={onPdfPageState}
-								onToc={setToc}
+								onToc={setTocItems}
 								onReady={onPdfReady}
 							/>
 						</div>
@@ -781,10 +798,11 @@ function EbookReadPage() {
 				)}
 			</div>
 
-			<EpubTocDrawer
+			<EbookTocDrawer
 				open={tocOpen}
 				onOpenChange={setTocOpen}
-				items={toc}
+				items={tocItems}
+				activeIndex={activeTocIndex}
 				onSelect={(href) => {
 					const pdfPage = parsePdfPageHref(href);
 					if (pdfPage != null) {

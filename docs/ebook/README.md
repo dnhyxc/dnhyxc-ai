@@ -14,6 +14,7 @@
 | [ebook-moke-assistant.md](./ebook-moke-assistant.md) | **主文档（本轮）**：MOKE 独立后端与会话、公共 Assistant 层、PDF 接入 / 右键菜单、分享保存、分栏与顶栏体验 |
 | [ebook-local-path-dedup.md](./ebook-local-path-dedup.md) | **增量**：按 `local_path` 查库，重复选同一路径不再 COS 上传 |
 | [ebook-membership-upload.md](./ebook-membership-upload.md) | **增量**：会员专属云端上传；Web 非会员拦截；COS-only 存储 |
+| [ebook-toc-active-highlight.md](./ebook-toc-active-highlight.md) | **增量**：目录抽屉当前章节高亮（EPUB/PDF 共用 `EbookTocDrawer`） |
 | [../chat/assistant-share-bar.md](../chat/assistant-share-bar.md) | **关联**：助手分享底栏与 `useAssistantShare`（知识库 / 英语 / 电子书三端统一） |
 | [../knowledge/assistant-insert-focus.md](../knowledge/assistant-insert-focus.md) | **关联**：选区写入助手后聚焦与 IME 修复（知识库 + 电子书 MOKE 问书） |
 
