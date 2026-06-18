@@ -1513,14 +1513,23 @@ export const enUS = {
 	'route.coding.title': 'Coding',
 	'route.profile.title': 'Profile',
 	'route.knowledge.title': 'Knowledge',
-	'route.ebook.title': 'Bookshelf',
+	'route.ebook.title': 'Moke BookHouse',
 	'route.ebook.read': 'Reading',
 
-	'ebook.shelf.title': 'Ebook shelf',
+	'ebook.shelf.title': 'My bookshelf',
 	'ebook.shelf.hint':
-		'EPUB and PDF. Desktop: open local files. Web: import a file.',
-	'ebook.shelf.hintTauri': 'Support epub and pdf. Click to select a local file',
-	'ebook.shelf.hintWeb': 'Support epub and pdf. Click to import a file',
+		'EPUB and PDF. Desktop: open local files. Web: import a file. (Upload to cloud after membership)',
+	'ebook.shelf.hintTauri':
+		'Support epub and pdf. Local file only for non-members. (Upload to cloud after membership)',
+	'ebook.shelf.hintTauriMember':
+		'Support epub and pdf. Imports are backed up to the cloud.',
+	'ebook.shelf.hintWeb':
+		'Web import requires membership; desktop can read local files',
+	'ebook.shelf.hintWebMember':
+		'Support epub and pdf. Imports are backed up to the cloud.',
+	'ebook.shelf.membershipRequiredUploadTitle': 'Membership required',
+	'ebook.shelf.membershipRequiredUploadMessage':
+		'Uploading books to the cloud is a member benefit. Please subscribe before importing.',
 	'ebook.shelf.pickLocal': 'Select local file',
 	'ebook.shelf.pickFile': 'Import file',
 	'ebook.shelf.empty': 'No books yet.',
@@ -1542,6 +1551,9 @@ export const enUS = {
 	'ebook.shelf.editTitleHint': 'Click to edit: {title}',
 	'ebook.shelf.titleSaved': 'Title updated',
 	'ebook.shelf.titleFailed': 'Failed to update title',
+	'ebook.shelf.alreadyImportedTitle': 'Already on shelf',
+	'ebook.shelf.alreadyImportedMessage':
+		'This book is already on your shelf. No need to upload again.',
 	'ebook.read.missing': 'Book not found',
 	'ebook.read.sourceLocal': 'Local',
 	'ebook.read.sourceOnline': 'Online',
@@ -1601,6 +1613,8 @@ export const enUS = {
 	'ebook.read.assistant.askSelectionDraft':
 		'Please explain this excerpt from the book:\n\n> {quote}',
 	'ebook.err.open': 'Failed to open',
+	'ebook.err.loadFailed':
+		'Unable to load this book. Please check whether it still exists.',
 	'route.account.title': 'Account',
 	'route.pay.title': 'Membership',
 	'route.setting.title': 'Settings',

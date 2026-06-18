@@ -2,8 +2,10 @@ import { Toast } from '@ui/index';
 import { makeAutoObservable, runInAction } from 'mobx';
 import type { UIEventHandler } from 'react';
 import { EBOOK_SHELF_PAGE_SIZE, SCROLL_LOAD_THRESHOLD_PX } from '@/constants';
+import { translateSync } from '@/i18n';
 import {
 	addEbookFromPath,
+	findEbookByLocalPath,
 	getEbookBook,
 	loadEbookShelf,
 	removeEbook,
@@ -13,9 +15,18 @@ import {
 	uploadEbookFile,
 } from '@/service';
 import { getRequestErrorMessage } from '@/utils/fetch';
+import { isMembershipActiveFromUserInfo } from '@/utils/membershipActive';
 import type { Book, BookFmt, Prog } from '@/views/ebook/types';
 import { fileToCoverFile } from '@/views/ebook/utils/coverImage';
 import { pickTauri, tauriPickedFileToUpload } from '@/views/ebook/utils/io';
+import { getLoggedInUserInfoFromStorage } from './loggedInUserId';
+
+export const EBOOK_UPLOAD_MEMBERSHIP_REQUIRED =
+	'EBOOK_UPLOAD_MEMBERSHIP_REQUIRED';
+
+function shouldUploadEbookToCos(): boolean {
+	return isMembershipActiveFromUserInfo(getLoggedInUserInfoFromStorage());
+}
 
 export type EbookUploadPhase = 'reading' | 'uploading';
 
@@ -84,8 +95,8 @@ class EbookStore {
 					this.books = merged;
 				} else {
 					this.books = data.books;
+					this.progMap = data.progMap ?? {};
 				}
-				this.progMap = { ...this.progMap, ...data.progMap };
 				this.ready = true;
 			});
 		} catch {
@@ -142,12 +153,31 @@ class EbookStore {
 		this.busy = false;
 	}
 
+	/** 切换账号 / 登出：清空书架缓存，下次进入重新拉取当前用户数据 */
+	resetOnUserSwitch(): void {
+		this.books = [];
+		this.bookCache = {};
+		this.progMap = {};
+		this.total = 0;
+		this.pageNo = 1;
+		this.ready = false;
+		this.loading = false;
+		this.loadingMore = false;
+		this.clearUploadState();
+	}
+
 	async addFromTauri(): Promise<Book | null> {
 		const picked = await pickTauri();
 		if (!picked) return null;
 
 		const fileName = picked.path.split(/[/\\]/).pop() ?? `book.${picked.fmt}`;
-		const book = await addEbookFromPath(picked.path, picked.fmt);
+		const uploadToCos = shouldUploadEbookToCos();
+		const existingByPath = uploadToCos
+			? await findEbookByLocalPath(picked.path)
+			: null;
+
+		const book =
+			existingByPath ?? (await addEbookFromPath(picked.path, picked.fmt));
 
 		runInAction(() => {
 			const existed = this.books.some((b) => b.id === book.id);
@@ -156,20 +186,38 @@ class EbookStore {
 				this.total = this.safeTotal() + 1;
 			}
 			this.bookCache[book.id] = book;
-			this.busy = true;
-			this.uploadState = {
-				phase: 'reading',
-				fileName,
-				percent: 0,
-				bookId: book.id,
-			};
 		});
 
-		void uploadBookToCloud(this, book.id, picked.path, picked.fmt);
+		if (existingByPath) {
+			Toast({
+				type: 'info',
+				title: translateSync('ebook.shelf.alreadyImportedTitle'),
+				message: translateSync('ebook.shelf.alreadyImportedMessage'),
+			});
+			return book;
+		}
+
+		if (uploadToCos) {
+			runInAction(() => {
+				this.busy = true;
+				this.uploadState = {
+					phase: 'reading',
+					fileName,
+					percent: 0,
+					bookId: book.id,
+				};
+			});
+			void uploadBookToCloud(this, book.id, picked.path, picked.fmt);
+		}
+
 		return book;
 	}
 
 	async addFromFile(file: File): Promise<Book> {
+		if (!shouldUploadEbookToCos()) {
+			throw new Error(EBOOK_UPLOAD_MEMBERSHIP_REQUIRED);
+		}
+
 		runInAction(() => {
 			this.busy = true;
 			this.uploadState = {

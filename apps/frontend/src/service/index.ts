@@ -6,6 +6,7 @@ import {
 	MEMBERSHIP_PLAN_CODES,
 	VOCAB_FAVORITE_STATUS_BATCH_SIZE,
 } from '@/constants';
+import { translateSync } from '@/i18n';
 import {
 	type KnowledgeListItem,
 	type KnowledgeRecord,
@@ -46,6 +47,7 @@ import {
 	EBOOK_ASSISTANT_SESSIONS_FOR_BOOK,
 	EBOOK_ASSISTANT_STOP,
 	EBOOK_BOOK,
+	EBOOK_BY_LOCAL_PATH,
 	EBOOK_COVER,
 	EBOOK_DELETE,
 	EBOOK_FILE,
@@ -1881,6 +1883,17 @@ export const getEbookBook = async (
 	return res.data;
 };
 
+/** GET /ebook/by-local-path：按 local_path 查是否已登记 */
+export const findEbookByLocalPath = async (
+	path: string,
+): Promise<Book | null> => {
+	const res = await http.get<{ book: Book | null }>(EBOOK_BY_LOCAL_PATH, {
+		querys: { path },
+		silent: true,
+	});
+	return res.data?.book ?? null;
+};
+
 /** POST /ebook/add-path：登记桌面路径 */
 export const addEbookFromPath = async (
 	path: string,
@@ -1962,7 +1975,7 @@ export const fetchEbookBytes = async (bookId: string): Promise<ArrayBuffer> => {
 		headers: token ? { Authorization: `Bearer ${token}` } : {},
 	});
 	if (!res.ok) {
-		throw new Error('无法加载电子书文件');
+		throw new Error(translateSync('ebook.err.loadFailed'));
 	}
 	return await res.arrayBuffer();
 };

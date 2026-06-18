@@ -1,5 +1,6 @@
 import { motion, Variants } from 'framer-motion';
 import { FC, useMemo } from 'react';
+import { useI18n } from '@/hooks';
 
 interface LoadingProps {
 	text?: string;
@@ -29,7 +30,7 @@ const Loading: FC<LoadingProps> = ({
 	size = 75,
 }) => {
 	const textArray = text.split('');
-
+	const { t } = useI18n();
 	// 核心逻辑：优化尺寸计算，解决中心点太小的问题
 	const config = useMemo(() => {
 		const scale = size / 80;
@@ -94,10 +95,9 @@ const Loading: FC<LoadingProps> = ({
 						className="w-full h-full"
 						viewBox="0 0 100 100"
 						role="img"
-						aria-label="加载中"
+						aria-label={t('common.loading')}
 						preserveAspectRatio="xMidYMid meet"
 					>
-						<title>加载动画</title>
 						<defs>
 							<filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
 								<feGaussianBlur stdDeviation="2.5" result="coloredBlur" />

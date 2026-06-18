@@ -78,7 +78,7 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 	's2-6': {
 		title: 'Clear local cache on account switch',
 		description:
-			'When you sign out, sign in with another account, or the session ends with 401 in the same browser tab, client-side display cache for the previous account is cleared—including unsaved knowledge drafts, document assistant and RAG chats, English learning Agent threads, and in-progress vocabulary/classic streams—so you do not see another user’s content. Updating profile or membership for the same user id does not trigger a reset.',
+			'When you sign out, sign in with another account, or the session ends with 401 in the same browser tab, client-side display cache for the previous account is cleared—including unsaved knowledge drafts, document assistant and RAG chats, English learning Agent threads, in-progress vocabulary/classic streams, the ebook bookshelf list, and MOKE reader assistant state—so you do not see another user’s content. Updating profile or membership for the same user id does not trigger a reset.',
 	},
 	's2-7': {
 		title: 'Profile membership badge styling',
@@ -880,5 +880,20 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		title: 'Long book titles in reader header',
 		description:
 			'Very long titles truncate with an ellipsis in the reader header so they do not cover page-turn or TOC controls.',
+	},
+	's25-17': {
+		title: 'Cloud backup requires membership',
+		description:
+			'Browser import of epub/pdf requires an active membership. On desktop, non-members can still add a local path and read locally without cloud backup. Member uploads are stored in cloud object storage only.',
+	},
+	's25-18': {
+		title: 'Same local path not re-uploaded',
+		description:
+			'On desktop, if a member selects a local file whose path is already on the shelf, an info message says the book is already there and no duplicate cloud upload starts.',
+	},
+	's25-19': {
+		title: 'Bookshelf refreshes after account switch',
+		description:
+			'After sign-out, switching accounts, or session expiry, the previous account’s bookshelf cache is cleared and the current account’s list is loaded again.',
 	},
 };

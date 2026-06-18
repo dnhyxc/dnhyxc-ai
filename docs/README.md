@@ -70,6 +70,10 @@
 | PDF 目录跳转报 canvas 并发渲染错误 | [ebook/shelf-reader-polish.md](./ebook/shelf-reader-polish.md) §3.6 |
 | EPUB 连续滚动无法自动进入下一章 | [ebook/epub-reader-settings-scroll.md](./ebook/epub-reader-settings-scroll.md) §3.2 |
 | 桌面大文件上传中无法阅读 / 超 120MB 打不开 | [ebook/ebook-cos-local-shelf.md](./ebook/ebook-cos-local-shelf.md) §3.1–§3.2 |
+| 非会员 Web 无法导入 / 会员才云端备份 | [ebook/ebook-membership-upload.md](./ebook/ebook-membership-upload.md) |
+| 重复选同一路径仍上传 | [ebook/ebook-local-path-dedup.md](./ebook/ebook-local-path-dedup.md) |
+| 刷新报 `getStorage` 未初始化 | [app/membership-store-circular-deps.md](./app/membership-store-circular-deps.md) |
+| 换号后书架仍是上一账号 | [app/user-switch-state-reset.md](./app/user-switch-state-reset.md) |
 | 阅读背景色不生效 | [ebook/ebook-cos-local-shelf.md](./ebook/ebook-cos-local-shelf.md) §3.4 |
 | PDF 页面太小 / 猛滚连跳多页 | [ebook/pdf-reader-fit-scroll.md](./ebook/pdf-reader-fit-scroll.md) §3.1–§3.3 |
 | EPUB 右键无菜单 / 助手与知识库样式不一致 | [ebook/epub-assistant-context-menu.md](./ebook/epub-assistant-context-menu.md)、[ebook/ebook-moke-assistant.md](./ebook/ebook-moke-assistant.md) |

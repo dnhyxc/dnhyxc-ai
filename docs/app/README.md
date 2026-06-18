@@ -5,7 +5,8 @@
 | 文档 | 说明 |
 |------|------|
 | [route-auth.md](./route-auth.md) | 路由守卫、401、公开路径；§12 COS mixed content |
-| [user-switch-state-reset.md](./user-switch-state-reset.md) | 切换账号 / 登出 / 401 时清空前端用户态缓存 |
+| [user-switch-state-reset.md](./user-switch-state-reset.md) | 切换账号 / 登出 / 401 时清空前端用户态缓存（含书架） |
+| [membership-store-circular-deps.md](./membership-store-circular-deps.md) | **增量**：会员纯函数下沉，修复 Store 循环依赖与 `getStorage` TDZ |
 | [login-cloud-tts-prefetch-401.md](./login-cloud-tts-prefetch-401.md) | **登录瞬间 401 被踢出**：cloud-tts 预拉取与 token 时序 |
 | [i18n-zh-en-implementation-guide.md](./i18n-zh-en-implementation-guide.md) | 中英文界面 |
 | [home-steps-register-login-query.md](./home-steps-register-login-query.md) | 注册登录与 URL 参数 |

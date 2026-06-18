@@ -23,6 +23,8 @@
 - **英语学习 Agent** 会话列表与聊天
 - 单词包 / 经典句 **EnglishPack** 流式进度与表单
 - 练习页标题 / 词量 **englishPracticePool** 元数据
+- **电子书书架** 已加载列表、阅读进度缓存、上传进度条状态
+- **电子书 MOKE 阅读助手** 当前书会话
 
 ### 目标
 
@@ -48,6 +50,11 @@
 | `apps/frontend/src/store/assistant.ts` | `resetOnUserSwitch()` |
 | `apps/frontend/src/store/englishPack.ts` | `resetOnUserSwitch()` |
 | `apps/frontend/src/store/englishPracticePool.ts` | `clearEnglishPracticePoolCache()` |
+| `apps/frontend/src/store/ebook.ts` | `resetOnUserSwitch()`；书架页 `useEffect([userId])` 重新 `hydrate()` |
+| `apps/frontend/src/store/ebookAssistant.ts` | `resetForBook()`（切换用户时清空阅读助手） |
+| `apps/frontend/src/views/ebook/index.tsx` | 监听 `userId`，换号后拉取新账号书架 |
+
+**延伸阅读（电子书域）**：[../ebook/ebook-local-path-dedup.md](../ebook/ebook-local-path-dedup.md)、[../ebook/ebook-membership-upload.md](../ebook/ebook-membership-upload.md)
 
 ---
 
@@ -66,9 +73,12 @@
 
 4. **循环依赖修复**  
    初版 `user.ts → resetUserState → knowledge → userStore` 曾导致 `getStorage` TDZ 报错。  
-   `knowledge.ts` 改为 `getLoggedInUserId()`（读 `localStorage`），不再静态 import `userStore`。
+   Store 链上模块改用 `loggedInUserId` / `membershipActive` 纯函数，详见 [membership-store-circular-deps.md](./membership-store-circular-deps.md)。
 
-5. **Assistant 停止策略**  
+5. **电子书书架**  
+   `resetUserState` 调用 `ebookStore.resetOnUserSwitch()` 与 `ebookAssistantStore.resetForBook()`；书架页监听 `userId` 变化后 `hydrate()` 拉取新账号列表。
+
+6. **Assistant 停止策略**  
    `resetOnUserSwitch` 仅断前端 SSE 并清空内存映射，`stopBackend: false`（换号后旧 token 已失效，无需再调后端 stop）。
 
 ---
@@ -81,6 +91,8 @@
 
 ```typescript
 import assistantStore from './assistant';
+import ebookAssistantStore from './ebookAssistant';
+import ebookStore from './ebook';
 import EnglishPackStore from './englishPack';
 import englishAgentStore from './englishAgent';
 import { clearEnglishPracticePoolCache } from './englishPracticePool';
@@ -95,10 +107,12 @@ export function resetUserState(): void {
 	resetting = true;
 	try {
 		assistantStore.resetOnUserSwitch();
-		knowledgeRagQaStore.resetConversation(); // 已有方法：断 SSE + 清 messages
+		knowledgeRagQaStore.resetConversation();
 		englishAgentStore.resetConversation();
 		EnglishPackStore.resetOnUserSwitch();
 		knowledgeStore.resetOnUserSwitch();
+		ebookStore.resetOnUserSwitch();
+		ebookAssistantStore.resetForBook();
 		clearEnglishPracticePoolCache();
 	} finally {
 		resetting = false;
@@ -231,7 +245,8 @@ resetOnUserSwitch(): void {
 1. 账号 A 登录 → 知识库写草稿、助手发消息、英语 Agent 聊天 → 登出 → 账号 B 登录：上述区域应为空或重新拉取 B 的数据。  
 2. 账号 A 支付续会员：`setUserInfo` 同 id，助手/草稿**不应**被清空。  
 3. 受保护页 token 过期触发 401：不应残留 A 的助手气泡。  
-4. 刷新页面：行为与改前一致（持久化仍靠服务端 + localStorage 的 `userInfo`）。
+4. 刷新页面：行为与改前一致（持久化仍靠服务端 + localStorage 的 `userInfo`）。  
+5. 账号 A 有书架书籍 → 换账号 B：书架应显示 B 的数据，不应残留 A 的卡片或进度环。
 
 ---
 

@@ -26,6 +26,7 @@ import { ResponseInterceptor } from '../../interceptors/response.interceptor';
 import { decodeChineseFilename } from '../../utils';
 import { ensureUploadDir, getUploadImagesDir } from '../../utils/upload-paths';
 import { AddEbookPathDto } from './dto/add-ebook-path.dto';
+import { QueryEbookByLocalPathDto } from './dto/query-ebook-by-local-path.dto';
 import { QueryEbookShelfDto } from './dto/query-ebook-shelf.dto';
 import { SaveEbookProgressDto } from './dto/save-ebook-progress.dto';
 import { UpdateEbookTitleDto } from './dto/update-ebook-title.dto';
@@ -115,6 +116,19 @@ export class EbookController {
 		@Param('id', ParseUUIDPipe) id: string,
 	) {
 		return this.ebookService.getBook(this.userId(req), id);
+	}
+
+	@Get('by-local-path')
+	@UseInterceptors(ResponseInterceptor)
+	async byLocalPath(
+		@Req() req: AuthedRequest,
+		@Query() query: QueryEbookByLocalPathDto,
+	) {
+		const book = await this.ebookService.findBookByLocalPath(
+			this.userId(req),
+			query.path,
+		);
+		return { book };
 	}
 
 	@Post('add-path')

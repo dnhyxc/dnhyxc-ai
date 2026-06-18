@@ -1,7 +1,6 @@
 import { makeAutoObservable } from 'mobx';
-
-import { isMembershipActiveFromUserInfo } from '@/hooks/useMembershipActive';
 import { getStorage, removeStorage, setStorage } from '@/utils';
+import { isMembershipActiveFromUserInfo } from '@/utils/membershipActive';
 import { prefetchMinimaxTtsUserPrefs } from '@/utils/minimaxTtsPrefs';
 
 import { USER_INFO_STORAGE_KEY } from './loggedInUserId';

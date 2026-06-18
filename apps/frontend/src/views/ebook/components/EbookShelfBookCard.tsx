@@ -277,7 +277,7 @@ export function EbookShelfBookCard({
 
 				<div
 					className={cn(
-						'absolute inset-0 z-2 bg-theme-background/12 backdrop-blur-md backdrop-saturate-150',
+						'absolute inset-0 z-2 bg-theme-background/12 backdrop-blur-md backdrop-saturate-150 rounded-md',
 						SHELF_HOVER_FADE,
 						'pointer-events-none group-hover:pointer-events-auto group-focus-within:pointer-events-auto',
 					)}

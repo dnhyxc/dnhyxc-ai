@@ -19,3 +19,21 @@ export function getLoggedInUserId(): number {
 		return 0;
 	}
 }
+
+/** 读取 localStorage 中的 userInfo 对象（避免 store 模块循环依赖 userStore） */
+export function getLoggedInUserInfoFromStorage(): Record<
+	string,
+	unknown
+> | null {
+	if (typeof window === 'undefined') return null;
+	const raw = localStorage.getItem(USER_INFO_STORAGE_KEY);
+	if (!raw?.trim()) return null;
+	try {
+		const parsed = JSON.parse(raw) as unknown;
+		return parsed && typeof parsed === 'object'
+			? (parsed as Record<string, unknown>)
+			: null;
+	} catch {
+		return null;
+	}
+}

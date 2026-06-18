@@ -6,8 +6,9 @@ import { BookOpen, FolderOpen } from 'lucide-react';
 import { observer } from 'mobx-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { useI18n } from '@/hooks';
-import ebookStore from '@/store/ebook';
+import { useI18n, useMembershipActive } from '@/hooks';
+import useStore from '@/store';
+import ebookStore, { EBOOK_UPLOAD_MEMBERSHIP_REQUIRED } from '@/store/ebook';
 import { isTauriRuntime } from '@/utils/runtime';
 import { EbookPageShell } from './components/EbookPageShell';
 import { EbookPanelHeader } from './components/EbookPanelHeader';
@@ -16,12 +17,16 @@ import { EbookShelfUploadBanner } from './components/EbookShelfUploadBanner';
 
 function EbookShelfPage() {
 	const { t } = useI18n();
+	const { isMemberActive } = useMembershipActive();
+	const { userStore } = useStore();
+	const userId = Number(userStore.userInfo?.id) || 0;
 	const nav = useNavigate();
 	const fileRef = useRef<HTMLInputElement>(null);
 
 	useEffect(() => {
-		if (!ebookStore.ready) ebookStore.hydrate();
-	}, []);
+		if (userId <= 0) return;
+		void ebookStore.hydrate();
+	}, [userId]);
 
 	const onOpen = (bookId: string) => {
 		nav(`/ebook/read/${bookId}`);
@@ -39,19 +44,49 @@ function EbookShelfPage() {
 		}
 	};
 
-	const onPickWeb = () => fileRef.current?.click();
+	const onPickWeb = () => {
+		if (!isMemberActive) {
+			Toast({
+				type: 'warning',
+				title: t('ebook.shelf.membershipRequiredUploadTitle'),
+				message: t('ebook.shelf.membershipRequiredUploadMessage'),
+			});
+			return;
+		}
+		fileRef.current?.click();
+	};
 
 	const onFile = async (list: FileList | null) => {
 		const file = list?.[0];
 		if (!file) return;
+		if (!isMemberActive) {
+			Toast({
+				type: 'warning',
+				title: t('ebook.shelf.membershipRequiredUploadTitle'),
+				message: t('ebook.shelf.membershipRequiredUploadMessage'),
+			});
+			if (fileRef.current) fileRef.current.value = '';
+			return;
+		}
 		try {
 			await ebookStore.addFromFile(file);
 		} catch (e) {
-			Toast({
-				type: 'error',
-				title: t('ebook.err.open'),
-				message: e instanceof Error ? e.message : String(e),
-			});
+			if (
+				e instanceof Error &&
+				e.message === EBOOK_UPLOAD_MEMBERSHIP_REQUIRED
+			) {
+				Toast({
+					type: 'warning',
+					title: t('ebook.shelf.membershipRequiredUploadTitle'),
+					message: t('ebook.shelf.membershipRequiredUploadMessage'),
+				});
+			} else {
+				Toast({
+					type: 'error',
+					title: t('ebook.err.open'),
+					message: e instanceof Error ? e.message : String(e),
+				});
+			}
 		}
 		if (fileRef.current) fileRef.current.value = '';
 	};
@@ -158,10 +193,14 @@ function EbookShelfPage() {
 						}
 						trailing={
 							<div className="flex min-w-0 items-center justify-end gap-2">
-								<span className="mr-1.5 text-textcolor/55 min-w-0 max-w-[min(100vw-10rem,16rem)] text-right text-xs leading-snug wrap-break-word">
+								<span className="mr-1.5 text-textcolor/55 min-w-0 text-right text-xs leading-snug wrap-break-word">
 									{isTauri
-										? t('ebook.shelf.hintTauri')
-										: t('ebook.shelf.hintWeb')}
+										? isMemberActive
+											? t('ebook.shelf.hintTauriMember')
+											: t('ebook.shelf.hintTauri')
+										: isMemberActive
+											? t('ebook.shelf.hintWebMember')
+											: t('ebook.shelf.hintWeb')}
 								</span>
 								{isTauri ? (
 									<Button

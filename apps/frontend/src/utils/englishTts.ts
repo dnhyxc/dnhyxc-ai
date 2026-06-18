@@ -6,7 +6,6 @@
  * 本机无法直接调用 macOS「翻译/词典」弹窗 API；初始默认 Karen 女声，可用 setPreferredLocalEnglishVoiceKey 切换。
  */
 import { BASE_URL } from '@/constants';
-import { isMembershipActiveFromUserInfo } from '@/hooks/useMembershipActive';
 import { SPEECH_MINIMAX_TTS_STREAM, SPEECH_TTS } from '@/service/api';
 import {
 	getLoggedInUserId,
@@ -14,6 +13,7 @@ import {
 	userScopedStorageKey,
 } from '@/store/loggedInUserId';
 import { getPlatformFetch } from '@/utils/fetch';
+import { isMembershipActiveFromUserInfo } from '@/utils/membershipActive';
 import {
 	buildMinimaxTtsCacheKeySuffix,
 	buildMinimaxTtsRequestExtras,

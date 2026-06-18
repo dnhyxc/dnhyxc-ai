@@ -1,19 +1,16 @@
-import { existsSync, unlinkSync } from 'node:fs';
-import { join } from 'node:path';
 import {
 	BadRequestException,
+	ForbiddenException,
 	Injectable,
 	NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { decodeChineseFilename } from '../../utils';
-import {
-	getUploadsRoot,
-	normalizeUploadPublicPath,
-} from '../../utils/upload-paths';
+import { normalizeUploadPublicPath } from '../../utils/upload-paths';
 import { isCosObjectKey } from '../upload/cos.config';
 import { UploadService } from '../upload/upload.service';
+import { UserService } from '../user/user.service';
 import { AddEbookPathDto } from './dto/add-ebook-path.dto';
 import { QueryEbookShelfDto } from './dto/query-ebook-shelf.dto';
 import { SaveEbookProgressDto } from './dto/save-ebook-progress.dto';
@@ -82,6 +79,7 @@ export class EbookService {
 		@InjectRepository(EbookProgress)
 		private readonly progRepo: Repository<EbookProgress>,
 		private readonly uploadService: UploadService,
+		private readonly userService: UserService,
 	) {}
 
 	private toBookDto(book: EbookBook): EbookBookDto {
@@ -171,6 +169,21 @@ export class EbookService {
 		};
 	}
 
+	/** 按桌面 local_path 查找当前用户是否已登记该书 */
+	async findBookByLocalPath(
+		userId: number,
+		path: string,
+	): Promise<EbookBookDto | null> {
+		const trimmed = path.trim();
+		if (!trimmed) {
+			return null;
+		}
+		const book = await this.bookRepo.findOne({
+			where: { userId, localPath: trimmed },
+		});
+		return book ? this.toBookDto(book) : null;
+	}
+
 	/** 登记桌面本地路径，先上架；后台上传 COS 后保留 localPath */
 	async addFromPath(
 		userId: number,
@@ -218,10 +231,12 @@ export class EbookService {
 			throw new BadRequestException('仅支持 epub / pdf');
 		}
 
-		const cosResult = await this.uploadService.uploadObjectToCos(
-			file,
-			'ebooks',
-		);
+		const isMember = await this.userService.isUserMembershipActive(userId);
+		if (!isMember) {
+			throw new ForbiddenException('开通会员后可上传书籍至云端');
+		}
+
+		const stored = await this.storeEbookToCos(file);
 
 		if (opts?.bookId) {
 			const book = await this.bookRepo.findOne({
@@ -233,9 +248,9 @@ export class EbookService {
 			if (book.fmt !== fmt) {
 				throw new BadRequestException('文件格式与已登记书籍不一致');
 			}
-			book.filePath = cosResult.key;
+			book.filePath = stored.filePath;
 			book.srcKind = 'store';
-			book.size = String(cosResult.size);
+			book.size = String(stored.size);
 			await this.bookRepo.save(book);
 			return this.toBookDto(book);
 		}
@@ -246,11 +261,20 @@ export class EbookService {
 			fmt,
 			title,
 			srcKind: 'store',
-			filePath: cosResult.key,
-			size: String(cosResult.size),
+			filePath: stored.filePath,
+			size: String(stored.size),
 		});
 		await this.bookRepo.save(book);
 		return this.toBookDto(book);
+	}
+
+	/** 会员：上传至 COS ebooks/ 前缀 */
+	private async storeEbookToCos(file: Express.Multer.File) {
+		const cosResult = await this.uploadService.uploadObjectToCos(
+			file,
+			'ebooks',
+		);
+		return { filePath: cosResult.key, size: cosResult.size };
 	}
 
 	async remove(userId: number, bookId: string): Promise<void> {
@@ -259,26 +283,21 @@ export class EbookService {
 			throw new NotFoundException('书籍不存在');
 		}
 		if (book.srcKind === 'store' && book.filePath) {
-			if (isCosEbookKey(book.filePath)) {
-				try {
-					await this.uploadService.deleteCosObject(book.filePath);
-				} catch {
-					// COS 删除失败不阻塞移出书架
-				}
-			} else {
-				const abs = join(getUploadsRoot(__dirname), book.filePath);
-				if (existsSync(abs)) {
-					try {
-						unlinkSync(abs);
-					} catch {
-						// ignore
-					}
-				}
-			}
+			await this.tryDeleteStoredEbookFile(book.filePath);
 		}
 		await this.tryDeleteCoverFile(book.coverPath);
 		await this.progRepo.delete({ bookId, userId });
 		await this.bookRepo.delete({ id: bookId, userId });
+	}
+
+	/** 删除 COS 上的电子书对象（filePath 为 ebooks/ 对象键） */
+	private async tryDeleteStoredEbookFile(filePath: string): Promise<void> {
+		if (!isCosEbookKey(filePath)) return;
+		try {
+			await this.uploadService.deleteCosObject(filePath);
+		} catch {
+			// COS 删除失败不阻塞移出书架
+		}
 	}
 
 	async saveCover(
@@ -370,17 +389,12 @@ export class EbookService {
 			throw new NotFoundException('文件不存在');
 		}
 
-		const localAbs = join(getUploadsRoot(__dirname), book.filePath);
-		if (existsSync(localAbs)) {
-			return { kind: 'disk', abs: localAbs, fmt: book.fmt };
+		if (!isCosEbookKey(book.filePath)) {
+			throw new NotFoundException('云端文件不存在');
 		}
 
-		if (isCosEbookKey(book.filePath)) {
-			const buffer = await this.uploadService.getObjectBuffer(book.filePath);
-			return { kind: 'buffer', buffer, fmt: book.fmt };
-		}
-
-		throw new NotFoundException('文件不存在');
+		const buffer = await this.uploadService.getObjectBuffer(book.filePath);
+		return { kind: 'buffer', buffer, fmt: book.fmt };
 	}
 
 	getEbookMime(fmt: 'epub' | 'pdf'): string {

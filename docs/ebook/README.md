@@ -12,6 +12,8 @@
 | [pdf-reader-fit-scroll.md](./pdf-reader-fit-scroll.md) | **增量**：PDF 适应宽度、顶栏缩放、滚动换页（停稳后翻页） |
 | [epub-assistant-context-menu.md](./epub-assistant-context-menu.md) | **增量**：EPUB 右键菜单、智能助手分栏（对齐知识库助手 UI 与流式贴底） |
 | [ebook-moke-assistant.md](./ebook-moke-assistant.md) | **主文档（本轮）**：MOKE 独立后端与会话、公共 Assistant 层、PDF 接入 / 右键菜单、分享保存、分栏与顶栏体验 |
+| [ebook-local-path-dedup.md](./ebook-local-path-dedup.md) | **增量**：按 `local_path` 查库，重复选同一路径不再 COS 上传 |
+| [ebook-membership-upload.md](./ebook-membership-upload.md) | **增量**：会员专属云端上传；Web 非会员拦截；COS-only 存储 |
 | [../chat/assistant-share-bar.md](../chat/assistant-share-bar.md) | **关联**：助手分享底栏与 `useAssistantShare`（知识库 / 英语 / 电子书三端统一） |
 | [../knowledge/assistant-insert-focus.md](../knowledge/assistant-insert-focus.md) | **关联**：选区写入助手后聚焦与 IME 修复（知识库 + 电子书 MOKE 问书） |
 
