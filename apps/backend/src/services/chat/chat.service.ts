@@ -18,9 +18,12 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { type Queue } from 'bullmq';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
-import { catchError, Observable, Subject } from 'rxjs';
+import { catchError, Observable } from 'rxjs';
+import {
+	MAX_ATTACHMENTS_PARSE_PER_TURN,
+	parseAttachmentForChat,
+} from '../../utils/attachment-parse';
 import { createLlm } from '../../utils/create-llm';
-import { parseFile } from '../../utils/file-parser';
 import { LlmConfigService } from '../llm-config/llm-config.service';
 import { OcrService } from '../ocr/ocr.service';
 import { applyOrganicCitationAnchors } from '../web-search/organic-citation';
@@ -30,6 +33,7 @@ import type {
 	WebSearchOrganicItem,
 } from '../web-search/web-search.types';
 import { MessageRole } from './chat.entity';
+import { ChatStreamRegistry } from './chat-stream.registry';
 import { ChatContinueDto } from './dto/chat-continue.dto';
 import { ChatMessageDto } from './dto/chat-message.dto';
 import { ChatRequestDto } from './dto/chat-request.dto';
@@ -43,15 +47,12 @@ export class ChatService {
 		(HumanMessage | SystemMessage | AIMessage)[]
 	> = new Map();
 
-	// 存储会话的 AbortController，用于立即停止大模型生成
-	private abortControllers = new Map<string, AbortController>();
-
 	constructor(
-		// 存储会话的取消控制器
 		private configService: ConfigService,
 		private readonly llmConfigService: LlmConfigService,
 		private cache: Cache,
 		private messageService: MessageService,
+		private readonly streamRegistry: ChatStreamRegistry,
 		// 注入消息存储队列
 		@InjectQueue('chat-message-queue')
 		private readonly messageQueue: Queue,
@@ -104,9 +105,13 @@ export class ChatService {
 			return '';
 		}
 
+		const uniquePaths = [
+			...new Set(filePaths.map((p) => p.trim()).filter(Boolean)),
+		].slice(0, MAX_ATTACHMENTS_PARSE_PER_TURN);
+
 		const fileContents = await Promise.all(
-			filePaths.map(async (filePath) => {
-				const content = await parseFile(filePath);
+			uniquePaths.map(async (filePath) => {
+				const content = await parseAttachmentForChat(filePath, this.cache);
 				return `文件 ${filePath} 内容:\n${content}\n`;
 			}),
 		);
@@ -168,7 +173,7 @@ Stick strictly to what is visually present.`,
 				);
 			} else {
 				filePromises.push(
-					parseFile(attachment.path).then(
+					parseAttachmentForChat(attachment.path, this.cache).then(
 						(content) => `文件 ${attachment.path} 内容:\n${content}\n`,
 					),
 				);
@@ -211,25 +216,9 @@ Stick strictly to what is visually present.`,
 	): Promise<Observable<any>> {
 		const sessionId = dto.sessionId;
 
-		// 创建 AbortController 用于立即停止大模型生成
-		const abortController = new AbortController();
-		this.abortControllers.set(sessionId, abortController);
-
-		// 从 redis 中获取，如果已有相同会话的流，先取消它
-		const existingCancelController = (await this.cache.get(
-			sessionId,
-		)) as Subject<void>;
-
-		if (existingCancelController) {
-			existingCancelController.next();
-			existingCancelController.complete();
-			this.cleanupSession(sessionId);
-		}
-
-		// 创建取消控制器
-		const cancel$ = new Subject<void>();
-		// 缓存取消控制器，12 小时后自动过期并清除
-		await this.cache.set(sessionId, cancel$, 12 * 60 * 60 * 1000);
+		this.streamRegistry.cancelActive(sessionId);
+		const streamHandle = this.streamRegistry.register(sessionId);
+		const { cancel$, abortController } = streamHandle;
 
 		const llm = await createLlm(
 			this.configService,
@@ -360,22 +349,18 @@ Stick strictly to what is visually present.`,
 						}
 					}
 
-					// 获取历史消息，从 memeries.messages 中提取所有包含附件的消息，通过 ASC 排序，防止消息顺序错乱导致大模型已读乱回
-					const memeries = await this.messageService.findOneSession(sessionId, {
-						relations: ['messages'],
-						order: {
-							messages: {
-								createdAt: 'ASC',
-							},
-						},
-					});
+					// 仅载入最近消息；附件引用单独轻量查询
+					const memeries =
+						await this.messageService.findSessionForChatContext(sessionId);
 
-					// 从 memeries.messages 中提取所有包含附件的消息
-					const attachments = (memeries?.messages ?? []).flatMap(
-						(m) => m.attachments ?? [],
-					);
+					const attachments = !dto.attachments?.length
+						? await this.messageService.findDistinctSessionAttachments(
+								sessionId,
+								MAX_ATTACHMENTS_PARSE_PER_TURN,
+							)
+						: [];
 
-					if (!dto.attachments && attachments && attachments?.length > 0) {
+					if (!dto.attachments?.length && attachments.length > 0) {
 						const attachmentMsg = await this.buildAttachmentMessage(
 							attachments,
 							`First, assess whether the user's query is relevant to the provided attachments. If relevant, answer strictly based on the attachment content. If irrelevant, ignore the attachments and respond using your general knowledge. Do not force connections to unrelated file content.`.trim(),
@@ -625,7 +610,7 @@ Stick strictly to what is visually present.`,
 						subscriber.error(error);
 					}
 				} finally {
-					this.cleanupSession(sessionId);
+					this.streamRegistry.release(sessionId, streamHandle.id);
 				}
 			})();
 		}).pipe(
@@ -638,39 +623,20 @@ Stick strictly to what is visually present.`,
 		);
 	}
 
-	async cleanupSession(sessionId: string) {
-		this.abortControllers.delete(sessionId);
-		await this.cache.del(sessionId);
+	async cleanupSession(sessionId: string, handleId?: number) {
+		this.streamRegistry.release(sessionId, handleId);
 	}
 
 	async stopStream(
 		sessionId: string,
 	): Promise<{ success: boolean; message: string }> {
-		const cancelController = (await this.cache.get(sessionId)) as Subject<void>;
-
-		// 如果缓存中没有取消控制器，但会话标记为活跃，说明正在初始化
-		if (!cancelController) {
+		const stopped = this.streamRegistry.stop(sessionId);
+		if (!stopped) {
 			return {
 				success: false,
 				message: '会话不存在或已完成',
 			};
 		}
-
-		// 1. 首先触发 AbortController 立即停止大模型生成
-		const abortController = this.abortControllers.get(sessionId);
-		if (abortController) {
-			abortController.abort('用户手动停止');
-			this.abortControllers.delete(sessionId);
-		}
-
-		// 2. 然后触发 RxJS Subject 取消流式处理
-		if (cancelController) {
-			cancelController.next();
-			cancelController.complete();
-		}
-
-		// 清理会话状态
-		this.cleanupSession(sessionId);
 
 		return {
 			success: true,

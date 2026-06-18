@@ -134,7 +134,7 @@ export function splitLongTextBlock(
 ): string[] {
 	const chunks: string[] = [];
 	let i = 0;
-	while (i < text.length) {
+	while (i < text.length && chunks.length < KNOWLEDGE_CHUNK_MAX_PIECES) {
 		const chunkStart = i;
 		const preferredEnd = Math.min(text.length, i + target);
 		const minEnd = Math.min(
@@ -158,6 +158,9 @@ export function splitLongTextBlock(
 	return chunks;
 }
 
+/** 单次分片产出上限，防止死循环或超大文档撑爆堆 */
+export const KNOWLEDGE_CHUNK_MAX_PIECES = 5000;
+
 /** Markdown 代码围栏内按行打包，不在行内切断 */
 export function splitByLinesOnly(
 	text: string,
@@ -171,6 +174,8 @@ export function splitByLinesOnly(
 	let startLine = 0;
 
 	while (startLine < lines.length) {
+		if (chunks.length >= KNOWLEDGE_CHUNK_MAX_PIECES) break;
+
 		let endLine = startLine;
 		let len = 0;
 
@@ -185,7 +190,11 @@ export function splitByLinesOnly(
 		if (endLine === startLine) {
 			const lone = lines[startLine]!;
 			if (lone.length > target) {
-				chunks.push(...splitLongTextBlock(lone, target, overlap));
+				const parts = splitLongTextBlock(lone, target, overlap);
+				for (const p of parts) {
+					if (chunks.length >= KNOWLEDGE_CHUNK_MAX_PIECES) break;
+					chunks.push(p);
+				}
 			} else if (lone) {
 				chunks.push(lone);
 			}
@@ -203,7 +212,8 @@ export function splitByLinesOnly(
 			olen += lines[endLine - back]!.length + 1;
 		}
 		const nextStart = endLine - back;
-		startLine = nextStart >= startLine ? nextStart : endLine;
+		// 单行 chunk 时 overlap 回退会等于 startLine，导致死循环 → Invalid array length / OOM
+		startLine = nextStart > startLine ? nextStart : endLine;
 	}
 
 	return chunks;
@@ -311,15 +321,19 @@ export function splitMarkdownAwareBlock(
 
 	const chunks: string[] = [];
 	for (const section of splitMarkdownSections(text)) {
+		if (chunks.length >= KNOWLEDGE_CHUNK_MAX_PIECES) break;
 		if (!section.text) continue;
 		if (section.text.length <= target) {
 			chunks.push(section.text);
 			continue;
 		}
-		if (section.kind === 'code') {
-			chunks.push(...splitByLinesOnly(section.text, target, overlap));
-		} else {
-			chunks.push(...splitMultilineSection(section.text, target, overlap));
+		const parts =
+			section.kind === 'code'
+				? splitByLinesOnly(section.text, target, overlap)
+				: splitMultilineSection(section.text, target, overlap);
+		for (const p of parts) {
+			if (chunks.length >= KNOWLEDGE_CHUNK_MAX_PIECES) break;
+			chunks.push(p);
 		}
 	}
 	return chunks;

@@ -205,6 +205,12 @@ export const EBOOK_COVER = '/ebook/cover';
 export const EBOOK_DELETE = '/ebook/delete';
 /** 电子书：下载已入库文件字节 */
 export const EBOOK_FILE = '/ebook/file';
+/** 电子书：分类统计 */
+export const EBOOK_CATEGORIES_SUMMARY = '/ebook/categories/summary';
+/** 电子书：分类 CRUD */
+export const EBOOK_CATEGORIES = '/ebook/categories';
+/** 电子书：书籍归属分类 */
+export const EBOOK_BOOK_CATEGORY = '/ebook/book';
 
 /** 英语学习：按主题生成经典语句（译文 + 出处 + 赏析） */
 export const ENGLISH_LEARNING_CLASSIC_QUOTES =

@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { FindOneOptions, In, Repository } from 'typeorm';
+import { dedupeAttachmentsByPath } from '../../utils/attachment-parse';
 import { persistAttachmentPath } from '../../utils/upload-paths';
 import { Attachments } from './attachments.entity';
 import { ChatMessages } from './chat.entity';
@@ -9,6 +10,9 @@ import { CreateSessionDto } from './dto/chat-request.dto';
 import { HistoryDto, MessageDto, SaveDto } from './dto/message.dto';
 import { UpdateChatDto } from './dto/update-chat.dto';
 import { ChatSessions } from './session.entity';
+
+/** 单次 LLM 请求载入的历史消息条数上限 */
+const CHAT_CONTEXT_MESSAGE_LIMIT = 60;
 
 @Injectable()
 export class MessageService {
@@ -33,6 +37,47 @@ export class MessageService {
 			relations: options?.relations,
 			order: options?.order,
 		});
+	}
+
+	/** 仅取最近 N 条消息供 LLM 上下文，避免长会话整表载入撑爆堆 */
+	async findSessionForChatContext(
+		sessionId: string,
+		messageLimit = CHAT_CONTEXT_MESSAGE_LIMIT,
+	): Promise<ChatSessions | null> {
+		const session = await this.chatSessionsRepository.findOne({
+			where: { id: sessionId },
+		});
+		if (!session) return null;
+
+		const messages = await this.chatMessagesRepository.find({
+			where: { sessionId },
+			order: { createdAt: 'DESC' },
+			take: messageLimit,
+		});
+		messages.reverse();
+		session.messages = messages;
+		return session;
+	}
+
+	/** 会话内去重后的附件引用（轻量查询，不加载全部消息） */
+	async findDistinctSessionAttachments(
+		sessionId: string,
+		limit = 8,
+	): Promise<{ path: string; mimetype: string }[]> {
+		const rows = await this.attachmentsRepository
+			.createQueryBuilder('a')
+			.innerJoin('a.message', 'm')
+			.where('m.sessionId = :sessionId', { sessionId })
+			.orderBy('a.createdAt', 'DESC')
+			.limit(32)
+			.getMany();
+
+		return dedupeAttachmentsByPath(
+			rows.map((r) => ({
+				path: r.path,
+				mimetype: r.mimetype ?? '',
+			})),
+		).slice(0, limit);
 	}
 
 	// 获取单个消息（通过id）
@@ -275,16 +320,12 @@ export class MessageService {
 	}
 
 	getHistory(dto: HistoryDto) {
-		const { pageSize = 9999, pageNo = 1 } = dto;
-		const take = pageSize || 10;
-		const skip = ((pageNo || 1) - 1) * take;
+		const pageSize = Math.min(dto.pageSize ?? 20, 100);
+		const pageNo = dto.pageNo ?? 1;
+		const take = pageSize;
+		const skip = (pageNo - 1) * take;
 		return this.chatMessagesRepository.findAndCount({
-			// where: {
-			//   session: {
-			//     userId: dto.userId,
-			//   },
-			// },
-			relations: ['session', 'messages.attachments'],
+			relations: ['session', 'attachments'],
 			take,
 			skip,
 			order: {

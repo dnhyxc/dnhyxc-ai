@@ -20,15 +20,24 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import type { Request, Response } from 'express';
-import { diskStorage, memoryStorage } from 'multer';
+import { diskStorage } from 'multer';
 import { JwtGuard } from 'src/guards/jwt.guard';
 import { ResponseInterceptor } from '../../interceptors/response.interceptor';
 import { decodeChineseFilename } from '../../utils';
-import { ensureUploadDir, getUploadImagesDir } from '../../utils/upload-paths';
+import {
+	ensureUploadDir,
+	getEbookFilesDir,
+	getUploadImagesDir,
+} from '../../utils/upload-paths';
 import { AddEbookPathDto } from './dto/add-ebook-path.dto';
+import { AssignEbookCategoryDto } from './dto/assign-ebook-category.dto';
+import { CreateEbookCategoryDto } from './dto/create-ebook-category.dto';
 import { QueryEbookByLocalPathDto } from './dto/query-ebook-by-local-path.dto';
+import { QueryEbookCategoriesSummaryDto } from './dto/query-ebook-categories-summary.dto';
 import { QueryEbookShelfDto } from './dto/query-ebook-shelf.dto';
+import { ReorderEbookCategoriesDto } from './dto/reorder-ebook-categories.dto';
 import { SaveEbookProgressDto } from './dto/save-ebook-progress.dto';
+import { UpdateEbookCategoryDto } from './dto/update-ebook-category.dto';
 import { UpdateEbookTitleDto } from './dto/update-ebook-title.dto';
 import { EbookService } from './ebook.service';
 
@@ -38,8 +47,20 @@ const EBOOK_MAX_BYTES = 120 * 1024 * 1024;
 const EBOOK_COVER_MAX_BYTES = 2 * 1024 * 1024;
 const EBOOK_COVER_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 
-const ebookMemoryUpload = {
-	storage: memoryStorage(),
+const ebookFileUpload = {
+	storage: diskStorage({
+		destination: (_req, _file, cb) => {
+			const dir = getEbookFilesDir(__dirname);
+			ensureUploadDir(dir);
+			cb(null, dir);
+		},
+		filename: (_req, file, cb) => {
+			const originalname = decodeChineseFilename(file.originalname);
+			const ext = extname(originalname).toLowerCase();
+			const safeExt = ['.epub', '.pdf'].includes(ext) ? ext : '.bin';
+			cb(null, `ebook_${randomUUID()}${safeExt}`);
+		},
+	}),
 	limits: { fileSize: EBOOK_MAX_BYTES },
 };
 
@@ -109,6 +130,68 @@ export class EbookController {
 		return this.ebookService.getShelf(this.userId(req), query);
 	}
 
+	@Get('categories/summary')
+	@UseInterceptors(ResponseInterceptor)
+	async categoriesSummary(
+		@Req() req: AuthedRequest,
+		@Query() query: QueryEbookCategoriesSummaryDto,
+	) {
+		return this.ebookService.getCategoriesSummary(this.userId(req), query);
+	}
+
+	@Post('categories')
+	@UseInterceptors(ResponseInterceptor)
+	async createCategory(
+		@Req() req: AuthedRequest,
+		@Body() dto: CreateEbookCategoryDto,
+	) {
+		return this.ebookService.createCategory(this.userId(req), dto);
+	}
+
+	@Put('categories/reorder')
+	@UseInterceptors(ResponseInterceptor)
+	async reorderCategories(
+		@Req() req: AuthedRequest,
+		@Body() dto: ReorderEbookCategoriesDto,
+	) {
+		await this.ebookService.reorderCategories(this.userId(req), dto);
+		return { ok: true };
+	}
+
+	@Put('categories/:id')
+	@UseInterceptors(ResponseInterceptor)
+	async updateCategory(
+		@Req() req: AuthedRequest,
+		@Param('id', ParseUUIDPipe) id: string,
+		@Body() dto: UpdateEbookCategoryDto,
+	) {
+		return this.ebookService.updateCategory(this.userId(req), id, dto);
+	}
+
+	@Delete('categories/:id')
+	@UseInterceptors(ResponseInterceptor)
+	async removeCategory(
+		@Req() req: AuthedRequest,
+		@Param('id', ParseUUIDPipe) id: string,
+	) {
+		await this.ebookService.removeCategory(this.userId(req), id);
+		return { id };
+	}
+
+	@Put('book/:id/category')
+	@UseInterceptors(ResponseInterceptor)
+	async assignBookCategory(
+		@Req() req: AuthedRequest,
+		@Param('id', ParseUUIDPipe) id: string,
+		@Body() dto: AssignEbookCategoryDto,
+	) {
+		return this.ebookService.assignBookCategory(
+			this.userId(req),
+			id,
+			dto.categoryId ?? null,
+		);
+	}
+
 	@Get('book/:id')
 	@UseInterceptors(ResponseInterceptor)
 	async getBook(
@@ -140,7 +223,7 @@ export class EbookController {
 	@Post('upload')
 	@UseInterceptors(
 		FileInterceptor('file', {
-			...ebookMemoryUpload,
+			...ebookFileUpload,
 			fileFilter: ebookFileFilter,
 		}),
 		ResponseInterceptor,
@@ -149,10 +232,14 @@ export class EbookController {
 		@Req() req: AuthedRequest,
 		@UploadedFile() file: Express.Multer.File,
 		@Body('bookId') bookId?: string,
+		@Body('categoryId') categoryId?: string,
 	) {
 		const trimmed = typeof bookId === 'string' ? bookId.trim() : undefined;
+		const catTrimmed =
+			typeof categoryId === 'string' ? categoryId.trim() : undefined;
 		return this.ebookService.addFromUpload(this.userId(req), file, {
 			bookId: trimmed || undefined,
+			categoryId: catTrimmed || undefined,
 		});
 	}
 
@@ -200,13 +287,6 @@ export class EbookController {
 		@Param('id', ParseUUIDPipe) id: string,
 		@Res() res: Response,
 	) {
-		const userId = this.userId(req);
-		const payload = await this.ebookService.getFileForDownload(userId, id);
-		res.setHeader('Content-Type', this.ebookService.getEbookMime(payload.fmt));
-		if (payload.kind === 'disk') {
-			res.sendFile(payload.abs);
-			return;
-		}
-		res.send(payload.buffer);
+		await this.ebookService.pipeFileToResponse(this.userId(req), id, res);
 	}
 }

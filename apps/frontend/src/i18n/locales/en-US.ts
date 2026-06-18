@@ -1514,6 +1514,7 @@ export const enUS = {
 	'route.profile.title': 'Profile',
 	'route.knowledge.title': 'Knowledge',
 	'route.ebook.title': 'Moke BookHouse',
+	'route.ebook.shelf': 'My bookshelf',
 	'route.ebook.read': 'Reading',
 
 	'ebook.shelf.title': 'My bookshelf',
@@ -1553,7 +1554,18 @@ export const enUS = {
 	'ebook.shelf.titleFailed': 'Failed to update title',
 	'ebook.shelf.alreadyImportedTitle': 'Already on shelf',
 	'ebook.shelf.alreadyImportedMessage':
-		'This book is already on your shelf. No need to upload again.',
+		'This book is already on your shelf; no need to upload again.',
+	'ebook.shelf.category.all': 'All',
+	'ebook.shelf.category.uncategorized': 'Uncategorized',
+	'ebook.shelf.category.manage': 'Manage categories',
+	'ebook.shelf.category.add': 'Add category',
+	'ebook.shelf.category.rename': 'Rename',
+	'ebook.shelf.category.delete': 'Delete category',
+	'ebook.shelf.category.deleteConfirm':
+		'Books in this category will move to Uncategorized.',
+	'ebook.shelf.category.move': 'Move to category',
+	'ebook.shelf.category.empty': 'No books in this category.',
+	'ebook.shelf.category.duplicateName': 'Category name already exists',
 	'ebook.read.missing': 'Book not found',
 	'ebook.read.sourceLocal': 'Local',
 	'ebook.read.sourceOnline': 'Online',

@@ -8,6 +8,7 @@
 | [deploy.md](./deploy.md) | 部署步骤 |
 | [nginx.md](./nginx.md) | Nginx：`/api`、`/images`、`/ext-cos/` 等 |
 | [upload-storage-paths.md](./upload-storage-paths.md) | **本地上传** `uploads/`、`UPLOAD_ROOT`（聊天附件已迁 COS，见 [../cos/cos-object-storage.md](../cos/cos-object-storage.md)） |
+| [trust-proxy-rate-limit.md](./trust-proxy-rate-limit.md) | 生产 **trust proxy** + rate-limit 标准头（修复 X-Forwarded-For 报错） |
 
 相关：[../chat/chat-upload-access-prod.md](../chat/chat-upload-access-prod.md)
 

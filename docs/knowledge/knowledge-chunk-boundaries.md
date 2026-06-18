@@ -1,7 +1,7 @@
 # 知识库向量分片（Chunk）实现方案
 
 > **文档角色**：知识库入库前 **Markdown → 分片（chunk）→ embedding → Qdrant payload** 的**主文档**（语义边界、代码围栏、overlap）。  
-> **延伸阅读**：[vector-bge-global-round.md](./vector-bge-global-round.md)（BGE 档位 200 字、分批 upsert、Unicode 清洗）、[siliconflow-vector-full-url.md](./siliconflow-vector-full-url.md)（`chunkMarkdown` 与档位）、[knowledge-rag-implementation-backend.md](./knowledge-rag-implementation-backend.md)（RAG 检索消费 `payload.text`）。
+> **延伸阅读**：[knowledge-chunk-infinite-loop-oom.md](./knowledge-chunk-infinite-loop-oom.md)（**分片死循环 / OOM** 修复）、[vector-bge-global-round.md](./vector-bge-global-round.md)（BGE 档位 200 字、分批 upsert、Unicode 清洗）、[siliconflow-vector-full-url.md](./siliconflow-vector-full-url.md)（`chunkMarkdown` 与档位）、[knowledge-rag-implementation-backend.md](./knowledge-rag-implementation-backend.md)（RAG 检索消费 `payload.text`）。
 
 ## 1. 背景与目标
 

@@ -55,14 +55,18 @@ async function bootstrap() {
 		}),
 	);
 
-	// 如果 nginx 配置了反向代理，则需要设置 trust proxy 为 1，没有就不需要设置
-	// app.set('trust proxy', 1);
+	// nginx 反向代理时需信任 X-Forwarded-*，否则 rate-limit 会抛 ERR_ERL_UNEXPECTED_X_FORWARDED_FOR
+	if (process.env.NODE_ENV === 'production') {
+		app.set('trust proxy', 1);
+	}
 
 	// 配置 rateLimit 中间件，限制请求次数
 	app.use(
 		rateLimit({
 			windowMs: 1 * 60 * 1000, // 1 minutes
 			max: 300, // limit each IP to 300 requests per windowMs
+			standardHeaders: true,
+			legacyHeaders: false,
 		}),
 	);
 

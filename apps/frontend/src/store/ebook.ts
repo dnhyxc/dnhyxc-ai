@@ -5,18 +5,30 @@ import { EBOOK_SHELF_PAGE_SIZE, SCROLL_LOAD_THRESHOLD_PX } from '@/constants';
 import { translateSync } from '@/i18n';
 import {
 	addEbookFromPath,
+	assignEbookBookCategory,
+	createEbookCategory,
 	findEbookByLocalPath,
 	getEbookBook,
+	loadEbookCategoriesSummary,
 	loadEbookShelf,
 	removeEbook,
+	removeEbookCategory,
+	reorderEbookCategories,
 	saveEbookCover,
 	saveEbookProgress,
+	updateEbookCategory,
 	updateEbookTitle,
 	uploadEbookFile,
 } from '@/service';
 import { getRequestErrorMessage } from '@/utils/fetch';
 import { isMembershipActiveFromUserInfo } from '@/utils/membershipActive';
-import type { Book, BookFmt, Prog } from '@/views/ebook/types';
+import type {
+	Book,
+	BookFmt,
+	EbookCategory,
+	EbookShelfCategoryKey,
+	Prog,
+} from '@/views/ebook/types';
 import { fileToCoverFile } from '@/views/ebook/utils/coverImage';
 import { pickTauri, tauriPickedFileToUpload } from '@/views/ebook/utils/io';
 import { getLoggedInUserInfoFromStorage } from './loggedInUserId';
@@ -26,6 +38,52 @@ export const EBOOK_UPLOAD_MEMBERSHIP_REQUIRED =
 
 function shouldUploadEbookToCos(): boolean {
 	return isMembershipActiveFromUserInfo(getLoggedInUserInfoFromStorage());
+}
+
+function loggedInUserId(): number {
+	return Number(getLoggedInUserInfoFromStorage()?.id) || 0;
+}
+
+function lastCategoryStorageKey(userId: number): string {
+	return `dnhyxc_ebook_last_category_v1:${userId}`;
+}
+
+function readLastImportCategoryId(userId: number): string | null {
+	if (userId <= 0) return null;
+	try {
+		return localStorage.getItem(lastCategoryStorageKey(userId));
+	} catch {
+		return null;
+	}
+}
+
+function writeLastImportCategoryId(
+	userId: number,
+	categoryId: string | null,
+): void {
+	if (userId <= 0) return;
+	try {
+		if (categoryId) {
+			localStorage.setItem(lastCategoryStorageKey(userId), categoryId);
+		} else {
+			localStorage.removeItem(lastCategoryStorageKey(userId));
+		}
+	} catch {
+		// ignore
+	}
+}
+
+function shelfQueryFromKey(key: EbookShelfCategoryKey): {
+	categoryId?: string;
+	uncategorizedOnly?: boolean;
+} {
+	if (key.kind === 'category') {
+		return { categoryId: key.categoryId };
+	}
+	if (key.kind === 'uncategorized') {
+		return { uncategorizedOnly: true };
+	}
+	return {};
 }
 
 export type EbookUploadPhase = 'reading' | 'uploading';
@@ -39,7 +97,6 @@ export type EbookUploadState = {
 
 class EbookStore {
 	books: Book[] = [];
-	/** 阅读页直链等场景下的书籍缓存（不一定在已加载分页中） */
 	bookCache: Record<string, Book> = {};
 	progMap: Record<string, Prog> = {};
 	total = 0;
@@ -50,6 +107,14 @@ class EbookStore {
 	loadingMore = false;
 	busy = false;
 	uploadState: EbookUploadState | null = null;
+
+	categories: EbookCategory[] = [];
+	uncategorizedCount = 0;
+	totalBookCount = 0;
+	activeCategoryKey: EbookShelfCategoryKey = { kind: 'all' };
+	categoriesLoading = false;
+
+	shelfFetchSeq = 0;
 
 	constructor() {
 		makeAutoObservable(this);
@@ -63,11 +128,60 @@ class EbookStore {
 		return Number.isFinite(this.total) && this.total >= 0 ? this.total : 0;
 	}
 
+	bookMatchesActiveCategory(categoryId?: string | null): boolean {
+		const key = this.activeCategoryKey;
+		if (key.kind === 'all') return true;
+		if (key.kind === 'uncategorized') {
+			return categoryId == null;
+		}
+		return categoryId === key.categoryId;
+	}
+
+	resolveImportCategoryId(): string | undefined {
+		const key = this.activeCategoryKey;
+		if (key.kind === 'category') {
+			return key.categoryId;
+		}
+		const userId = loggedInUserId();
+		const last = readLastImportCategoryId(userId);
+		if (last && this.categories.some((c) => c.id === last)) {
+			return last;
+		}
+		return undefined;
+	}
+
 	async hydrate(): Promise<void> {
-		await this.fetchPage(1, false);
+		await Promise.all([this.fetchCategories(), this.fetchPage(1, false)]);
+	}
+
+	async fetchCategories(): Promise<void> {
+		this.categoriesLoading = true;
+		try {
+			const data = await loadEbookCategoriesSummary();
+			runInAction(() => {
+				this.categories = data.categories;
+				this.uncategorizedCount = data.uncategorizedCount;
+				this.totalBookCount = data.totalBookCount;
+			});
+		} catch {
+			// 分类加载失败不阻塞书架
+		} finally {
+			runInAction(() => {
+				this.categoriesLoading = false;
+			});
+		}
+	}
+
+	setActiveCategoryKey(key: EbookShelfCategoryKey): void {
+		this.activeCategoryKey = key;
+		if (key.kind === 'category') {
+			writeLastImportCategoryId(loggedInUserId(), key.categoryId);
+		}
+		void this.fetchPage(1, false);
 	}
 
 	async fetchPage(page: number, append: boolean): Promise<void> {
+		const seq = ++this.shelfFetchSeq;
 		if (append) {
 			this.loadingMore = true;
 		} else {
@@ -77,7 +191,9 @@ class EbookStore {
 			const data = await loadEbookShelf({
 				pageNo: page,
 				pageSize: this.pageSize,
+				...shelfQueryFromKey(this.activeCategoryKey),
 			});
+			if (seq !== this.shelfFetchSeq) return;
 			runInAction(() => {
 				const nextTotal = Number(data.total);
 				this.total =
@@ -100,14 +216,17 @@ class EbookStore {
 				this.ready = true;
 			});
 		} catch {
+			if (seq !== this.shelfFetchSeq) return;
 			runInAction(() => {
 				this.ready = true;
 			});
 		} finally {
-			runInAction(() => {
-				this.loading = false;
-				this.loadingMore = false;
-			});
+			if (seq === this.shelfFetchSeq) {
+				runInAction(() => {
+					this.loading = false;
+					this.loadingMore = false;
+				});
+			}
 		}
 	}
 
@@ -118,7 +237,6 @@ class EbookStore {
 		await this.fetchPage(this.pageNo + 1, true);
 	}
 
-	/** 绑定到书架 ScrollArea Viewport 的 onScroll */
 	onShelfViewportScroll: UIEventHandler<HTMLDivElement> = (e) => {
 		const el = e.currentTarget;
 		const rest = el.scrollHeight - el.scrollTop - el.clientHeight;
@@ -153,7 +271,6 @@ class EbookStore {
 		this.busy = false;
 	}
 
-	/** 切换账号 / 登出：清空书架缓存，下次进入重新拉取当前用户数据 */
 	resetOnUserSwitch(): void {
 		this.books = [];
 		this.bookCache = {};
@@ -163,7 +280,90 @@ class EbookStore {
 		this.ready = false;
 		this.loading = false;
 		this.loadingMore = false;
+		this.categories = [];
+		this.uncategorizedCount = 0;
+		this.totalBookCount = 0;
+		this.activeCategoryKey = { kind: 'all' };
 		this.clearUploadState();
+	}
+
+	mergeBookIntoShelf(book: Book, isNew: boolean): void {
+		this.bookCache[book.id] = book;
+		if (!this.bookMatchesActiveCategory(book.categoryId)) {
+			return;
+		}
+		const existed = this.books.some((b) => b.id === book.id);
+		this.books = [book, ...this.books.filter((b) => b.id !== book.id)];
+		if (!existed && isNew) {
+			this.total = this.safeTotal() + 1;
+		}
+	}
+
+	async createCategory(name: string): Promise<EbookCategory> {
+		const created = await createEbookCategory(name);
+		await this.fetchCategories();
+		return created;
+	}
+
+	async renameCategory(id: string, name: string): Promise<void> {
+		await updateEbookCategory(id, { name });
+		await this.fetchCategories();
+	}
+
+	async deleteCategory(id: string): Promise<void> {
+		await removeEbookCategory(id);
+		runInAction(() => {
+			if (
+				this.activeCategoryKey.kind === 'category' &&
+				this.activeCategoryKey.categoryId === id
+			) {
+				this.activeCategoryKey = { kind: 'all' };
+			}
+			const clearCat = (b: Book): Book =>
+				b.categoryId === id ? { ...b, categoryId: null } : b;
+			this.books = this.books.map(clearCat);
+			for (const bookId of Object.keys(this.bookCache)) {
+				const hit = this.bookCache[bookId];
+				if (hit?.categoryId === id) {
+					this.bookCache[bookId] = clearCat(hit);
+				}
+			}
+		});
+		await Promise.all([this.fetchCategories(), this.fetchPage(1, false)]);
+	}
+
+	async moveCategory(id: string, direction: 'up' | 'down'): Promise<void> {
+		const idx = this.categories.findIndex((c) => c.id === id);
+		if (idx < 0) return;
+		const swapWith = direction === 'up' ? idx - 1 : idx + 1;
+		if (swapWith < 0 || swapWith >= this.categories.length) return;
+		const ordered = [...this.categories];
+		const tmp = ordered[idx];
+		ordered[idx] = ordered[swapWith];
+		ordered[swapWith] = tmp;
+		await reorderEbookCategories(ordered.map((c) => c.id));
+		await this.fetchCategories();
+	}
+
+	async assignBookCategory(
+		bookId: string,
+		categoryId: string | null,
+	): Promise<void> {
+		const updated = await assignEbookBookCategory(bookId, categoryId);
+		runInAction(() => {
+			const stays = this.bookMatchesActiveCategory(updated.categoryId);
+			if (stays) {
+				this.books = this.books.map((b) => (b.id === bookId ? updated : b));
+			} else {
+				const had = this.books.some((b) => b.id === bookId);
+				this.books = this.books.filter((b) => b.id !== bookId);
+				if (had) {
+					this.total = Math.max(0, this.safeTotal() - 1);
+				}
+			}
+			this.bookCache[bookId] = updated;
+		});
+		void this.fetchCategories();
 	}
 
 	async addFromTauri(): Promise<Book | null> {
@@ -175,17 +375,20 @@ class EbookStore {
 		const existingByPath = uploadToCos
 			? await findEbookByLocalPath(picked.path)
 			: null;
+		const importCategoryId = this.resolveImportCategoryId();
 
 		const book =
-			existingByPath ?? (await addEbookFromPath(picked.path, picked.fmt));
+			existingByPath ??
+			(await addEbookFromPath(
+				picked.path,
+				picked.fmt,
+				undefined,
+				importCategoryId,
+			));
 
 		runInAction(() => {
-			const existed = this.books.some((b) => b.id === book.id);
-			this.books = [book, ...this.books.filter((b) => b.id !== book.id)];
-			if (!existed) {
-				this.total = this.safeTotal() + 1;
-			}
-			this.bookCache[book.id] = book;
+			const isNew = !existingByPath;
+			this.mergeBookIntoShelf(book, isNew);
 		});
 
 		if (existingByPath) {
@@ -196,6 +399,8 @@ class EbookStore {
 			});
 			return book;
 		}
+
+		void this.fetchCategories();
 
 		if (uploadToCos) {
 			runInAction(() => {
@@ -218,6 +423,8 @@ class EbookStore {
 			throw new Error(EBOOK_UPLOAD_MEMBERSHIP_REQUIRED);
 		}
 
+		const importCategoryId = this.resolveImportCategoryId();
+
 		runInAction(() => {
 			this.busy = true;
 			this.uploadState = {
@@ -229,6 +436,7 @@ class EbookStore {
 
 		try {
 			const book = await uploadEbookFile(file, {
+				categoryId: importCategoryId,
 				onProgress: (percent) => {
 					runInAction(() => {
 						if (this.uploadState) {
@@ -240,13 +448,10 @@ class EbookStore {
 			});
 			runInAction(() => {
 				const existed = this.books.some((b) => b.id === book.id);
-				this.books = [book, ...this.books.filter((b) => b.id !== book.id)];
-				if (!existed) {
-					this.total = this.safeTotal() + 1;
-				}
-				this.bookCache[book.id] = book;
+				this.mergeBookIntoShelf(book, !existed);
 				this.clearUploadState();
 			});
+			void this.fetchCategories();
 			return book;
 		} catch (e) {
 			runInAction(() => this.clearUploadState());
@@ -262,6 +467,7 @@ class EbookStore {
 			delete this.progMap[bookId];
 			this.total = Math.max(0, this.safeTotal() - 1);
 		});
+		void this.fetchCategories();
 	}
 
 	async setCover(bookId: string, file: File): Promise<void> {

@@ -1,11 +1,25 @@
 import Tooltip from '@design/Tooltip';
-import { Input, Spinner } from '@ui/index';
-import { BookOpen, FileText, ImagePlus, Play, Trash2 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import {
+	Input,
+	Popover,
+	PopoverContent,
+	PopoverTrigger,
+	ScrollArea,
+	Spinner,
+} from '@ui/index';
+import {
+	BookOpen,
+	FileText,
+	FolderInput,
+	ImagePlus,
+	Play,
+	Trash2,
+} from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import { resolveUploadedFileUrl } from '@/utils/upload-file-url';
-import type { Book, Prog } from '../types';
+import type { Book, EbookCategory, Prog } from '../types';
 
 function byFmt<T>(fmt: Book['fmt'], epub: T, pdf: T): T {
 	return fmt === 'epub' ? epub : pdf;
@@ -36,10 +50,12 @@ function roundedRectStrokePath(
 export type EbookShelfBookCardProps = {
 	book: Book;
 	prog?: Prog;
+	categories?: EbookCategory[];
 	onOpen: (bookId: string) => void;
 	onRemove: (bookId: string) => void;
 	onSetCover?: (bookId: string, file: File) => Promise<void>;
 	onUpdateTitle?: (bookId: string, title: string) => Promise<void>;
+	onMoveCategory?: (bookId: string, categoryId: string | null) => Promise<void>;
 };
 
 const SHELF_HOVER_FADE = cn(
@@ -63,6 +79,23 @@ function shelfCornerBtnClass(danger?: boolean) {
 		danger
 			? 'hover:bg-destructive/12 hover:text-destructive hover:ring-destructive/25'
 			: 'hover:bg-theme-background/60 hover:text-textcolor hover:ring-theme/18',
+	);
+}
+
+function shelfTitleActionBtnClass(disabled?: boolean, hoverColor?: boolean) {
+	return cn(
+		'inline-flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md',
+		'text-textcolor/70 transition-colors hover:bg-transparent hover:text-textcolor',
+		disabled && 'pointer-events-none opacity-50',
+		hoverColor && 'hover:text-teal-500',
+	);
+}
+
+function categoryMenuItemClass(active?: boolean): string {
+	return cn(
+		'flex min-w-0 w-full cursor-pointer items-center rounded-sm px-2 py-1.5 text-left text-sm transition-colors',
+		'hover:bg-theme/5 focus-visible:bg-theme/5 focus-visible:outline-none',
+		active && 'pointer-events-none opacity-50',
 	);
 }
 
@@ -130,10 +163,12 @@ function EbookShelfBorderProgress({
 export function EbookShelfBookCard({
 	book,
 	prog,
+	categories = [],
 	onOpen,
 	onRemove,
 	onSetCover,
 	onUpdateTitle,
+	onMoveCategory,
 }: EbookShelfBookCardProps) {
 	const { t } = useI18n();
 	const coverInputRef = useRef<HTMLInputElement>(null);
@@ -142,6 +177,8 @@ export function EbookShelfBookCard({
 	const [editingTitle, setEditingTitle] = useState(false);
 	const [titleDraft, setTitleDraft] = useState(book.title);
 	const [titleSaving, setTitleSaving] = useState(false);
+	const [categoryBusy, setCategoryBusy] = useState(false);
+	const [categoryMenuOpen, setCategoryMenuOpen] = useState(false);
 	const pct = prog?.percent;
 	const fmtLabel = book.fmt === 'epub' ? 'EPUB' : 'PDF';
 	const openLabel = prog ? t('ebook.shelf.continue') : t('ebook.shelf.read');
@@ -189,6 +226,105 @@ export function EbookShelfBookCard({
 		setTitleDraft(book.title);
 		setEditingTitle(true);
 	};
+
+	const handleCategoryMenuWheel = useCallback(
+		(event: React.WheelEvent<HTMLDivElement>) => {
+			event.stopPropagation();
+			event.currentTarget.scrollTop += event.deltaY;
+		},
+		[],
+	);
+
+	const handleCategoryMenuWheelCapture = useCallback(
+		(event: React.WheelEvent<HTMLDivElement>) => {
+			event.stopPropagation();
+		},
+		[],
+	);
+
+	const assignCategory = (categoryId: string | null) => {
+		if (!onMoveCategory || categoryBusy) return;
+		setCategoryMenuOpen(false);
+		setCategoryBusy(true);
+		void onMoveCategory(book.id, categoryId).finally(() =>
+			setCategoryBusy(false),
+		);
+	};
+
+	const showMoveCategory = Boolean(onMoveCategory && categories.length > 0);
+
+	const moveCategoryMenu = showMoveCategory ? (
+		<Popover open={categoryMenuOpen} onOpenChange={setCategoryMenuOpen}>
+			<Tooltip
+				side="top"
+				sideOffset={4}
+				delayDuration={200}
+				shadow
+				content={t('ebook.shelf.category.move')}
+			>
+				<PopoverTrigger asChild>
+					<button
+						type="button"
+						className={shelfTitleActionBtnClass(categoryBusy, !categoryBusy)}
+						aria-label={t('ebook.shelf.category.move')}
+						aria-expanded={categoryMenuOpen}
+						disabled={categoryBusy}
+						onClick={(e) => e.stopPropagation()}
+					>
+						{categoryBusy ? (
+							<Spinner className="size-3.5 text-textcolor -mr-1" aria-hidden />
+						) : (
+							<FolderInput className="size-4.5 -mr-1" aria-hidden />
+						)}
+					</button>
+				</PopoverTrigger>
+			</Tooltip>
+			<PopoverContent
+				align="end"
+				side="bottom"
+				sideOffset={6}
+				className="w-48 overflow-hidden p-0"
+			>
+				<p className="border-theme/10 text-textcolor border-b px-3 py-3.5 text-xs font-medium">
+					{t('ebook.shelf.category.move')}
+				</p>
+				<ScrollArea
+					className="max-h-56 w-full"
+					viewportClassName="max-h-56 [&>div]:min-h-0!"
+					onWheel={handleCategoryMenuWheel}
+					onWheelCapture={handleCategoryMenuWheelCapture}
+				>
+					<div className="flex min-w-0 flex-col gap-0.5 p-1 pb-2">
+						{categories.map((cat) => {
+							const selected = book.categoryId === cat.id;
+							return (
+								<button
+									key={cat.id}
+									type="button"
+									className={categoryMenuItemClass(selected)}
+									disabled={selected}
+									onClick={() => assignCategory(cat.id)}
+								>
+									<span className="min-w-0 truncate">{cat.name}</span>
+								</button>
+							);
+						})}
+						<div className="bg-theme/10 my-1 h-px" aria-hidden />
+						<button
+							type="button"
+							className={categoryMenuItemClass(book.categoryId == null)}
+							disabled={book.categoryId == null}
+							onClick={() => assignCategory(null)}
+						>
+							<span className="min-w-0 truncate">
+								{t('ebook.shelf.category.uncategorized')}
+							</span>
+						</button>
+					</div>
+				</ScrollArea>
+			</PopoverContent>
+		</Popover>
+	) : null;
 
 	return (
 		<div className="flex w-full min-w-0 flex-col gap-1.5">
@@ -317,22 +453,24 @@ export function EbookShelfBookCard({
 							>
 								{fmtLabel}
 							</span>
-							<Tooltip
-								side="bottom"
-								sideOffset={6}
-								delayDuration={200}
-								shadow
-								content={t('common.delete')}
-							>
-								<button
-									type="button"
-									className={shelfCornerBtnClass(true)}
-									aria-label={t('common.delete')}
-									onClick={() => onRemove(book.id)}
+							<div className="flex items-center gap-1">
+								<Tooltip
+									side="bottom"
+									sideOffset={6}
+									delayDuration={200}
+									shadow
+									content={t('common.delete')}
 								>
-									<Trash2 className="size-3.5" aria-hidden />
-								</button>
-							</Tooltip>
+									<button
+										type="button"
+										className={shelfCornerBtnClass(true)}
+										aria-label={t('common.delete')}
+										onClick={() => onRemove(book.id)}
+									>
+										<Trash2 className="size-3.5" aria-hidden />
+									</button>
+								</Tooltip>
+							</div>
 						</div>
 
 						<div className="flex min-h-0 items-center justify-center">
@@ -440,7 +578,7 @@ export function EbookShelfBookCard({
 				</div>
 			</div>
 
-			<div className="h-7 w-full min-w-0">
+			<div className="flex h-7 w-full min-w-0 items-center gap-1">
 				{editingTitle ? (
 					<Input
 						autoFocus
@@ -448,7 +586,7 @@ export function EbookShelfBookCard({
 						disabled={titleSaving}
 						maxLength={100}
 						className={cn(
-							'h-full min-h-0 w-full rounded px-1.5 py-0 text-sm leading-none shadow-none',
+							'h-full min-h-0 min-w-0 flex-1 rounded px-1.5 py-0 text-sm leading-none shadow-none',
 							'border-theme/5 bg-theme/5 focus-visible:border-theme/10 focus-visible:ring-0',
 						)}
 						aria-label={t('ebook.shelf.editTitle')}
@@ -470,32 +608,35 @@ export function EbookShelfBookCard({
 						}}
 					/>
 				) : (
-					<Tooltip
-						side="top"
-						sideOffset={4}
-						delayDuration={300}
-						shadow
-						className="max-w-[min(100vw-2rem,16rem)] w-auto whitespace-normal text-left wrap-break-word leading-snug"
-						content={
-							onUpdateTitle
-								? t('ebook.shelf.editTitleHint', { title: book.title })
-								: book.title
-						}
-					>
-						<button
-							type="button"
-							className={cn(
-								'flex h-full w-full min-w-0 items-center px-0.5 text-left',
-								onUpdateTitle && 'cursor-text hover:text-textcolor',
-							)}
-							disabled={!onUpdateTitle}
-							onClick={startTitleEdit}
+					<>
+						<Tooltip
+							side="top"
+							sideOffset={4}
+							delayDuration={300}
+							shadow
+							className="max-w-[min(100vw-2rem,16rem)] w-auto whitespace-normal text-left wrap-break-word leading-snug"
+							content={
+								onUpdateTitle
+									? t('ebook.shelf.editTitleHint', { title: book.title })
+									: book.title
+							}
 						>
-							<span className="text-textcolor/80 block min-w-0 truncate text-sm font-medium leading-none">
-								{book.title}
-							</span>
-						</button>
-					</Tooltip>
+							<button
+								type="button"
+								className={cn(
+									'flex h-full min-w-0 flex-1 items-center px-0.5 text-left',
+									onUpdateTitle && 'cursor-text hover:text-textcolor',
+								)}
+								disabled={!onUpdateTitle}
+								onClick={startTitleEdit}
+							>
+								<span className="text-textcolor/85 block min-w-0 truncate text-sm font-medium leading-none">
+									{book.title}
+								</span>
+							</button>
+						</Tooltip>
+						{moveCategoryMenu}
+					</>
 				)}
 			</div>
 		</div>

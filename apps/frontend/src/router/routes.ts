@@ -144,7 +144,7 @@ const routes: RouteConfig[] = [
 						index: true,
 						Component: Ebook,
 						meta: {
-							titleKey: 'route.ebook.title',
+							titleKey: 'route.ebook.shelf',
 						},
 					},
 					{

@@ -1,5 +1,12 @@
-import { Type } from 'class-transformer';
-import { IsNumber, IsOptional, Max, Min } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+import {
+	IsBoolean,
+	IsNumber,
+	IsOptional,
+	IsUUID,
+	Max,
+	Min,
+} from 'class-validator';
 
 /** 书架列表查询（分页） */
 export class QueryEbookShelfDto {
@@ -15,4 +22,13 @@ export class QueryEbookShelfDto {
 	@Min(1)
 	@Max(100)
 	pageSize?: number;
+
+	@IsOptional()
+	@IsUUID()
+	categoryId?: string;
+
+	@IsOptional()
+	@Transform(({ value }) => value === 'true' || value === true)
+	@IsBoolean()
+	uncategorizedOnly?: boolean;
 }

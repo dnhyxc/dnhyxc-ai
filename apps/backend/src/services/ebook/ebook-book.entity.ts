@@ -45,6 +45,10 @@ export class EbookBook {
 	@Column({ type: 'varchar', length: 512, name: 'cover_path', nullable: true })
 	coverPath: string | null;
 
+	/** 书架分类；NULL 表示未分类 */
+	@Column({ type: 'uuid', name: 'category_id', nullable: true })
+	categoryId: string | null;
+
 	@CreateDateColumn({ name: 'created_at', type: 'timestamp' })
 	createdAt: Date;
 

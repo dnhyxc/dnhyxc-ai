@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises';
+import { readFile, stat } from 'node:fs/promises';
 import http from 'node:http';
 import https from 'node:https';
 import { extname } from 'node:path';
@@ -11,21 +11,59 @@ import {
 	resolveUploadPublicPathToAbsolute,
 } from './upload-paths';
 
-export const urlToBuffer = async (url: string) => {
+/** 允许进入解析管道的最大字节（聊天附件，非电子书整文件下载） */
+export const MAX_ATTACHMENT_BYTES = 15 * 1024 * 1024;
+
+/** 解析后写入 prompt 的最大字符，防止 pdf 文本撑爆 V8 数组上限 */
+export const MAX_ATTACHMENT_TEXT_CHARS = 300_000;
+
+function assertWithinParseLimit(byteSize: number, label: string): void {
+	if (byteSize > MAX_ATTACHMENT_BYTES) {
+		const mb = Math.round(MAX_ATTACHMENT_BYTES / 1024 / 1024);
+		throw new InternalServerErrorException(
+			`${label} 超过解析大小上限（${mb}MB）`,
+		);
+	}
+}
+
+function capParsedText(text: string): string {
+	if (text.length <= MAX_ATTACHMENT_TEXT_CHARS) return text;
+	return `${text.slice(0, MAX_ATTACHMENT_TEXT_CHARS)}\n...[内容已截断]`;
+}
+
+export const urlToBuffer = async (
+	url: string,
+	maxBytes: number = MAX_ATTACHMENT_BYTES,
+): Promise<Buffer> => {
 	return new Promise((resolve, reject) => {
 		const protocol = url.startsWith('https') ? https : http;
 
 		protocol
 			.get(url, (response) => {
-				const chunks: any[] = [];
+				const contentLength = Number(response.headers['content-length']);
+				if (Number.isFinite(contentLength) && contentLength > maxBytes) {
+					response.resume();
+					reject(new InternalServerErrorException('远程文件超过解析大小上限'));
+					return;
+				}
 
-				response.on('data', (chunk) => {
+				const chunks: Buffer[] = [];
+				let total = 0;
+
+				response.on('data', (chunk: Buffer) => {
+					total += chunk.length;
+					if (total > maxBytes) {
+						response.destroy();
+						reject(
+							new InternalServerErrorException('远程文件超过解析大小上限'),
+						);
+						return;
+					}
 					chunks.push(chunk);
 				});
 
 				response.on('end', () => {
-					const buffer = Buffer.concat(chunks);
-					resolve(buffer);
+					resolve(Buffer.concat(chunks));
 				});
 			})
 			.on('error', reject);
@@ -42,12 +80,14 @@ export const resolveAttachmentBuffer = async (
 	}
 
 	if (/^https?:\/\//i.test(trimmed)) {
-		return (await urlToBuffer(trimmed)) as Buffer;
+		return urlToBuffer(trimmed);
 	}
 
 	const normalized = normalizeUploadPublicPath(trimmed);
 	if (normalized.startsWith('/images/') || normalized.startsWith('/files/')) {
 		const absolutePath = resolveUploadPublicPathToAbsolute(trimmed);
+		const fileStat = await stat(absolutePath);
+		assertWithinParseLimit(fileStat.size, '附件');
 		return readFile(absolutePath);
 	}
 
@@ -61,7 +101,7 @@ const parsePdf = async (
 ): Promise<string> => {
 	try {
 		const result = await pdfParse(buffer);
-		return result.text ?? '';
+		return capParsedText(result.text ?? '');
 	} catch (error) {
 		const message = error instanceof Error ? error.message : String(error);
 		throw new InternalServerErrorException(
@@ -73,7 +113,7 @@ const parsePdf = async (
 const parseDocx = async (buffer: Buffer): Promise<string> => {
 	try {
 		const result = await mammoth.extractRawText({ buffer });
-		return result.value;
+		return capParsedText(result.value);
 	} catch (error) {
 		throw new InternalServerErrorException(
 			`DOCX 解析失败: ${error.message}. 请确保已安装 mammoth 库: npm install mammoth`,
@@ -96,7 +136,7 @@ const parseExcel = async (buffer: Buffer): Promise<string> => {
 			text += `工作表: ${sheetName}\n${sheetText}\n\n`;
 		});
 
-		return text.trim();
+		return capParsedText(text.trim());
 	} catch (error) {
 		throw new InternalServerErrorException(
 			`Excel 解析失败: ${error.message}. 请确保已安装 xlsx 库: npm install xlsx`,
@@ -105,7 +145,7 @@ const parseExcel = async (buffer: Buffer): Promise<string> => {
 };
 
 const parseText = async (buffer: Buffer): Promise<string> => {
-	return buffer.toString('utf-8');
+	return capParsedText(buffer.toString('utf-8'));
 };
 
 const parseMarkdown = async (buffer: Buffer): Promise<string> => {

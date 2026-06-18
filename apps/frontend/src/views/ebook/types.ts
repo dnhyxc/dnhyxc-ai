@@ -15,6 +15,27 @@ export type Book = {
 	/** /images/ebook-cover_*.jpg 等相对路径 */
 	coverUrl?: string;
 	addedAt: string;
+	categoryId?: string | null;
+};
+
+/** 书架分类 */
+export type EbookCategory = {
+	id: string;
+	name: string;
+	sortOrder: number;
+	bookCount: number;
+};
+
+/** 书架 Tab：全部 | 某分类 | 未分类 */
+export type EbookShelfCategoryKey =
+	| { kind: 'all' }
+	| { kind: 'category'; categoryId: string }
+	| { kind: 'uncategorized' };
+
+export type EbookCategoriesSummary = {
+	categories: EbookCategory[];
+	uncategorizedCount: number;
+	totalBookCount: number;
 };
 
 export type Prog = {

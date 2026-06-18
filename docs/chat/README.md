@@ -18,3 +18,4 @@
 | [assistant-share-bar.md](./assistant-share-bar.md) | **增量**：助手分享底栏与 `useAssistantShare` 统一（知识库 / 英语 Agent / 电子书） |
 | [share-knowledge-timezone.md](./share-knowledge-timezone.md) | **知识文章分享**「更新时间」MySQL 时区 ±8h 修复 |
 | [chat-update.md](./chat-update.md) | Chat 重构与性能相关记录 |
+| [chat-memory-oom.md](./chat-memory-oom.md) | **对话堆 OOM**：流式 Registry、附件缓存与解析上限、上下文 60 条 |

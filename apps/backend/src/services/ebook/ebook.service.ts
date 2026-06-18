@@ -1,21 +1,30 @@
+import { unlink } from 'node:fs';
+import { promisify } from 'node:util';
 import {
 	BadRequestException,
+	ConflictException,
 	ForbiddenException,
 	Injectable,
 	NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import type { Response } from 'express';
+import { FindOptionsWhere, In, IsNull, Repository } from 'typeorm';
 import { decodeChineseFilename } from '../../utils';
 import { normalizeUploadPublicPath } from '../../utils/upload-paths';
 import { isCosObjectKey } from '../upload/cos.config';
 import { UploadService } from '../upload/upload.service';
 import { UserService } from '../user/user.service';
 import { AddEbookPathDto } from './dto/add-ebook-path.dto';
+import { CreateEbookCategoryDto } from './dto/create-ebook-category.dto';
+import { QueryEbookCategoriesSummaryDto } from './dto/query-ebook-categories-summary.dto';
 import { QueryEbookShelfDto } from './dto/query-ebook-shelf.dto';
+import { ReorderEbookCategoriesDto } from './dto/reorder-ebook-categories.dto';
 import { SaveEbookProgressDto } from './dto/save-ebook-progress.dto';
+import { UpdateEbookCategoryDto } from './dto/update-ebook-category.dto';
 import { UpdateEbookTitleDto } from './dto/update-ebook-title.dto';
 import { EbookBook } from './ebook-book.entity';
+import { EbookCategory } from './ebook-category.entity';
 import { EbookProgress } from './ebook-progress.entity';
 
 export type EbookBookDto = {
@@ -27,6 +36,20 @@ export type EbookBookDto = {
 	size?: number;
 	coverUrl?: string;
 	addedAt: string;
+	categoryId?: string | null;
+};
+
+export type EbookCategoryDto = {
+	id: string;
+	name: string;
+	sortOrder: number;
+	bookCount: number;
+};
+
+export type EbookCategoriesSummaryDto = {
+	categories: EbookCategoryDto[];
+	uncategorizedCount: number;
+	totalBookCount: number;
 };
 
 export type EbookProgDto = {
@@ -52,7 +75,9 @@ export type EbookBookDetailDto = {
 
 export type EbookFilePayload =
 	| { kind: 'disk'; abs: string; fmt: 'epub' | 'pdf' }
-	| { kind: 'buffer'; buffer: Buffer; fmt: 'epub' | 'pdf' };
+	| { kind: 'cos'; key: string; fmt: 'epub' | 'pdf' };
+
+const unlinkAsync = promisify(unlink);
 
 function titleFromPath(path: string): string {
 	const name = path.split(/[/\\]/).pop() ?? path;
@@ -71,6 +96,13 @@ function isCosEbookKey(filePath: string): boolean {
 	return isCosObjectKey(filePath) && filePath.startsWith('ebooks/');
 }
 
+const MAX_EBOOK_CATEGORIES = 50;
+
+const DEFAULT_CATEGORY_NAMES: Record<'zh-CN' | 'en-US', string[]> = {
+	'zh-CN': ['技术', '学习', '文学', '工作', '其他'],
+	'en-US': ['Tech', 'Learning', 'Literature', 'Work', 'Other'],
+};
+
 @Injectable()
 export class EbookService {
 	constructor(
@@ -78,6 +110,8 @@ export class EbookService {
 		private readonly bookRepo: Repository<EbookBook>,
 		@InjectRepository(EbookProgress)
 		private readonly progRepo: Repository<EbookProgress>,
+		@InjectRepository(EbookCategory)
+		private readonly categoryRepo: Repository<EbookCategory>,
 		private readonly uploadService: UploadService,
 		private readonly userService: UserService,
 	) {}
@@ -104,6 +138,8 @@ export class EbookService {
 		if (book.author) dto.author = book.author;
 		if (book.size != null) dto.size = Number(book.size);
 		if (book.coverPath) dto.coverUrl = book.coverPath;
+		if (book.categoryId != null) dto.categoryId = book.categoryId;
+		else dto.categoryId = null;
 		return dto;
 	}
 
@@ -122,13 +158,32 @@ export class EbookService {
 		userId: number,
 		query: QueryEbookShelfDto = {},
 	): Promise<EbookShelfPageDto> {
+		if (query.categoryId && query.uncategorizedOnly) {
+			throw new BadRequestException(
+				'categoryId 与 uncategorizedOnly 不能同时使用',
+			);
+		}
+
 		const pageNo = query.pageNo ?? 1;
 		const pageSize = query.pageSize ?? 20;
 		const take = pageSize;
 		const skip = (pageNo - 1) * take;
 
+		const where: FindOptionsWhere<EbookBook> = { userId };
+		if (query.categoryId) {
+			const cat = await this.categoryRepo.findOne({
+				where: { id: query.categoryId, userId },
+			});
+			if (!cat) {
+				throw new NotFoundException('分类不存在');
+			}
+			where.categoryId = query.categoryId;
+		} else if (query.uncategorizedOnly) {
+			where.categoryId = IsNull();
+		}
+
 		const [books, total] = await this.bookRepo.findAndCount({
-			where: { userId },
+			where,
 			order: { createdAt: 'DESC' },
 			take,
 			skip,
@@ -206,12 +261,14 @@ export class EbookService {
 		}
 
 		const title = (dto.title?.trim() || titleFromPath(path)).slice(0, 512);
+		const categoryId = await this.resolveUserCategoryId(userId, dto.categoryId);
 		const book = this.bookRepo.create({
 			userId,
 			fmt,
 			title,
 			srcKind: 'path',
 			localPath: path,
+			categoryId,
 		});
 		await this.bookRepo.save(book);
 		return this.toBookDto(book);
@@ -220,9 +277,9 @@ export class EbookService {
 	async addFromUpload(
 		userId: number,
 		file: Express.Multer.File,
-		opts?: { bookId?: string },
+		opts?: { bookId?: string; categoryId?: string },
 	): Promise<EbookBookDto> {
-		if (!file?.buffer?.length) {
+		if (!file?.path || !file.size) {
 			throw new BadRequestException('请上传 epub / pdf 文件');
 		}
 		const originalname = decodeChineseFilename(file.originalname);
@@ -236,8 +293,21 @@ export class EbookService {
 			throw new ForbiddenException('开通会员后可上传书籍至云端');
 		}
 
-		const stored = await this.storeEbookToCos(file);
+		try {
+			const stored = await this.storeEbookToCos(file);
+			return await this.saveUploadedBook(userId, file, fmt, stored, opts);
+		} finally {
+			await this.tryDeleteTempUpload(file.path);
+		}
+	}
 
+	private async saveUploadedBook(
+		userId: number,
+		file: Express.Multer.File,
+		fmt: 'epub' | 'pdf',
+		stored: { filePath: string; size: number },
+		opts?: { bookId?: string; categoryId?: string },
+	): Promise<EbookBookDto> {
 		if (opts?.bookId) {
 			const book = await this.bookRepo.findOne({
 				where: { id: opts.bookId, userId },
@@ -255,7 +325,12 @@ export class EbookService {
 			return this.toBookDto(book);
 		}
 
+		const originalname = decodeChineseFilename(file.originalname);
 		const title = titleFromPath(originalname).slice(0, 512);
+		const categoryId = await this.resolveUserCategoryId(
+			userId,
+			opts?.categoryId,
+		);
 		const book = this.bookRepo.create({
 			userId,
 			fmt,
@@ -263,17 +338,30 @@ export class EbookService {
 			srcKind: 'store',
 			filePath: stored.filePath,
 			size: String(stored.size),
+			categoryId,
 		});
 		await this.bookRepo.save(book);
 		return this.toBookDto(book);
 	}
 
-	/** 会员：上传至 COS ebooks/ 前缀 */
+	private async tryDeleteTempUpload(path: string | undefined): Promise<void> {
+		if (!path) return;
+		try {
+			await unlinkAsync(path);
+		} catch {
+			// 临时文件清理失败不阻塞主流程
+		}
+	}
+
+	/** 会员：流式上传至 COS ebooks/ 前缀 */
 	private async storeEbookToCos(file: Express.Multer.File) {
-		const cosResult = await this.uploadService.uploadObjectToCos(
-			file,
-			'ebooks',
-		);
+		const cosResult = await this.uploadService.uploadLocalFileToCos({
+			localPath: file.path,
+			originalname: file.originalname,
+			mimetype: file.mimetype,
+			size: file.size,
+			prefix: 'ebooks',
+		});
 		return { filePath: cosResult.key, size: cosResult.size };
 	}
 
@@ -393,11 +481,228 @@ export class EbookService {
 			throw new NotFoundException('云端文件不存在');
 		}
 
-		const buffer = await this.uploadService.getObjectBuffer(book.filePath);
-		return { kind: 'buffer', buffer, fmt: book.fmt };
+		return { kind: 'cos', key: book.filePath, fmt: book.fmt };
+	}
+
+	async pipeFileToResponse(
+		userId: number,
+		bookId: string,
+		res: Response,
+	): Promise<void> {
+		const payload = await this.getFileForDownload(userId, bookId);
+		res.setHeader('Content-Type', this.getEbookMime(payload.fmt));
+		if (payload.kind === 'disk') {
+			res.sendFile(payload.abs);
+			return;
+		}
+		await this.uploadService.pipeObjectToWritable(payload.key, res);
 	}
 
 	getEbookMime(fmt: 'epub' | 'pdf'): string {
 		return fmt === 'pdf' ? 'application/pdf' : 'application/epub+zip';
+	}
+
+	private normalizeCategoryName(name: string): string {
+		return name.trim();
+	}
+
+	private async resolveUserCategoryId(
+		userId: number,
+		categoryId?: string | null,
+	): Promise<string | null> {
+		if (!categoryId) return null;
+		const cat = await this.categoryRepo.findOne({
+			where: { id: categoryId, userId },
+		});
+		if (!cat) {
+			throw new BadRequestException('分类不存在');
+		}
+		return cat.id;
+	}
+
+	private async assertCategoryNameUnique(
+		userId: number,
+		name: string,
+		excludeId?: string,
+	): Promise<void> {
+		const normalized = this.normalizeCategoryName(name);
+		if (!normalized) {
+			throw new BadRequestException('分类名称不能为空');
+		}
+		const rows = await this.categoryRepo
+			.createQueryBuilder('c')
+			.where('c.user_id = :userId', { userId })
+			.andWhere('LOWER(c.name) = LOWER(:name)', { name: normalized })
+			.getMany();
+		const dup = rows.find((r) => r.id !== excludeId);
+		if (dup) {
+			throw new ConflictException('分类名称已存在');
+		}
+	}
+
+	private async ensureDefaultCategories(
+		userId: number,
+		locale?: 'zh-CN' | 'en-US',
+	): Promise<void> {
+		const count = await this.categoryRepo.count({ where: { userId } });
+		if (count > 0) return;
+		const lang = locale === 'en-US' ? 'en-US' : 'zh-CN';
+		const names = DEFAULT_CATEGORY_NAMES[lang];
+		const rows = names.map((name, index) =>
+			this.categoryRepo.create({ userId, name, sortOrder: index }),
+		);
+		await this.categoryRepo.save(rows);
+	}
+
+	async getCategoriesSummary(
+		userId: number,
+		query: QueryEbookCategoriesSummaryDto = {},
+	): Promise<EbookCategoriesSummaryDto> {
+		await this.ensureDefaultCategories(userId, query.locale);
+		const categories = await this.categoryRepo.find({
+			where: { userId },
+			order: { sortOrder: 'ASC', createdAt: 'ASC' },
+		});
+		const countRows = await this.bookRepo
+			.createQueryBuilder('b')
+			.select('b.category_id', 'categoryId')
+			.addSelect('COUNT(*)', 'cnt')
+			.where('b.user_id = :userId', { userId })
+			.groupBy('b.category_id')
+			.getRawMany<{ categoryId: string | null; cnt: string }>();
+		const countMap = new Map<string, number>();
+		let uncategorizedCount = 0;
+		for (const row of countRows) {
+			const cnt = Number(row.cnt) || 0;
+			if (row.categoryId == null) {
+				uncategorizedCount = cnt;
+			} else {
+				countMap.set(row.categoryId, cnt);
+			}
+		}
+		const totalBookCount = await this.bookRepo.count({ where: { userId } });
+		return {
+			categories: categories.map((c) => ({
+				id: c.id,
+				name: c.name,
+				sortOrder: c.sortOrder,
+				bookCount: countMap.get(c.id) ?? 0,
+			})),
+			uncategorizedCount,
+			totalBookCount,
+		};
+	}
+
+	async createCategory(
+		userId: number,
+		dto: CreateEbookCategoryDto,
+	): Promise<EbookCategoryDto> {
+		const name = this.normalizeCategoryName(dto.name);
+		if (!name) {
+			throw new BadRequestException('分类名称不能为空');
+		}
+		const total = await this.categoryRepo.count({ where: { userId } });
+		if (total >= MAX_EBOOK_CATEGORIES) {
+			throw new BadRequestException(`最多创建 ${MAX_EBOOK_CATEGORIES} 个分类`);
+		}
+		await this.assertCategoryNameUnique(userId, name);
+		const maxSort = await this.categoryRepo
+			.createQueryBuilder('c')
+			.select('MAX(c.sort_order)', 'max')
+			.where('c.user_id = :userId', { userId })
+			.getRawOne<{ max: string | null }>();
+		const sortOrder = (Number(maxSort?.max) || 0) + 1;
+		const row = this.categoryRepo.create({ userId, name, sortOrder });
+		await this.categoryRepo.save(row);
+		return {
+			id: row.id,
+			name: row.name,
+			sortOrder: row.sortOrder,
+			bookCount: 0,
+		};
+	}
+
+	async updateCategory(
+		userId: number,
+		categoryId: string,
+		dto: UpdateEbookCategoryDto,
+	): Promise<EbookCategoryDto> {
+		const row = await this.categoryRepo.findOne({
+			where: { id: categoryId, userId },
+		});
+		if (!row) {
+			throw new NotFoundException('分类不存在');
+		}
+		if (dto.name !== undefined) {
+			const name = this.normalizeCategoryName(dto.name);
+			if (!name) {
+				throw new BadRequestException('分类名称不能为空');
+			}
+			await this.assertCategoryNameUnique(userId, name, categoryId);
+			row.name = name;
+		}
+		if (dto.sortOrder !== undefined) {
+			row.sortOrder = dto.sortOrder;
+		}
+		await this.categoryRepo.save(row);
+		const bookCount = await this.bookRepo.count({
+			where: { userId, categoryId: row.id },
+		});
+		return {
+			id: row.id,
+			name: row.name,
+			sortOrder: row.sortOrder,
+			bookCount,
+		};
+	}
+
+	async removeCategory(userId: number, categoryId: string): Promise<void> {
+		const row = await this.categoryRepo.findOne({
+			where: { id: categoryId, userId },
+		});
+		if (!row) {
+			throw new NotFoundException('分类不存在');
+		}
+		// 迁移未建 FK ON DELETE SET NULL，删除前显式归入未分类
+		await this.bookRepo.update({ userId, categoryId }, { categoryId: null });
+		await this.categoryRepo.remove(row);
+	}
+
+	async reorderCategories(
+		userId: number,
+		dto: ReorderEbookCategoriesDto,
+	): Promise<void> {
+		const rows = await this.categoryRepo.find({ where: { userId } });
+		const idSet = new Set(rows.map((r) => r.id));
+		if (dto.orderedIds.some((id) => !idSet.has(id))) {
+			throw new BadRequestException('orderedIds 包含无效分类');
+		}
+		if (dto.orderedIds.length !== rows.length) {
+			throw new BadRequestException('orderedIds 须包含全部分类');
+		}
+		const orderMap = new Map(dto.orderedIds.map((id, index) => [id, index]));
+		for (const row of rows) {
+			row.sortOrder = orderMap.get(row.id) ?? row.sortOrder;
+		}
+		await this.categoryRepo.save(rows);
+	}
+
+	async assignBookCategory(
+		userId: number,
+		bookId: string,
+		categoryId: string | null,
+	): Promise<EbookBookDto> {
+		const book = await this.bookRepo.findOne({ where: { id: bookId, userId } });
+		if (!book) {
+			throw new NotFoundException('书籍不存在');
+		}
+		if (categoryId) {
+			await this.resolveUserCategoryId(userId, categoryId);
+			book.categoryId = categoryId;
+		} else {
+			book.categoryId = null;
+		}
+		await this.bookRepo.save(book);
+		return this.toBookDto(book);
 	}
 }

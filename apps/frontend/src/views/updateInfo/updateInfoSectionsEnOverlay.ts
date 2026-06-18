@@ -175,6 +175,11 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'Before you send a message with image attachments, the server uses a Zhipu vision model to extract on-screen text and scene description, then passes that to the chat model. This step is independent of the chat model you pick in Settings. Self-hosted deployments must configure a Zhipu API credential on the server; otherwise image attachments may not be understood correctly.',
 	},
+	's4-12': {
+		title: 'Long chats and attachment parsing stability',
+		description:
+			'Fixes server memory growth and crashes with multi-turn chats that include PDF/Excel attachments, and fixes broken Stop or mid-reply cutoffs when sending two messages in quick succession. Parsed attachment text is cached per path with size limits; very long sessions only send recent turns to the model.',
+	},
 	's5-1': {
 		title: 'Markdown rendering',
 		description:
@@ -312,6 +317,11 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		title: 'CJK input fix after assistant auto-focus',
 		description:
 			'Fixes duplicated pinyin/Latin characters when typing in Chinese IME after auto-focus following copy-to-assistant; EPUB MOKE ask-about-selection prefills benefit as well.',
+	},
+	's6-23': {
+		title: 'Knowledge save / vector indexing stability',
+		description:
+			'Fixes vector indexing failures (e.g. Invalid array length) or server crashes on some short or list-style Markdown saves. Chunking now always advances each iteration and caps pieces per article. Re-save affected articles if indexing failed before.',
 	},
 	's7-1': {
 		title: 'IME (input method editor) compatibility',
@@ -900,5 +910,15 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		title: 'TOC highlights current chapter',
 		description:
 			'When you open the table of contents while reading EPUB or PDF, the entry for your current position is highlighted and scrolled into view (PDF uses bookmark entries).',
+	},
+	's25-21': {
+		title: 'Bookshelf categories',
+		description:
+			'The app header shows Moke BookHouse > My Bookshelf (same breadcrumb style as Moke BookHouse > Reading). The shelf toolbar has Manage categories, category tabs (All / custom / Uncategorized, horizontally scrollable), and Import (hover for hints). Create, rename, delete, and reorder categories; move books via the folder icon to the right of the title under each card; deleting a category moves its books to Uncategorized. Imports default to the selected category (last choice remembered). Categories refresh when you switch accounts.',
+	},
+	's25-22': {
+		title: 'Large-file cloud backup stability',
+		description:
+			'For members uploading or downloading ~100MB epub/pdf files, the server uses streaming I/O instead of loading whole files into memory, reducing upload failures and process crashes. Reading and download behavior is unchanged.',
 	},
 };

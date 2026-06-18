@@ -6,7 +6,7 @@ import {
 	MEMBERSHIP_PLAN_CODES,
 	VOCAB_FAVORITE_STATUS_BATCH_SIZE,
 } from '@/constants';
-import { translateSync } from '@/i18n';
+import { getActiveLocale, translateSync } from '@/i18n';
 import {
 	type KnowledgeListItem,
 	type KnowledgeRecord,
@@ -21,6 +21,8 @@ import { isTauriRuntime } from '@/utils/runtime';
 import type {
 	Book,
 	EbookBookDetail,
+	EbookCategoriesSummary,
+	EbookCategory,
 	EbookShelfData,
 	Prog,
 } from '@/views/ebook/types';
@@ -47,7 +49,10 @@ import {
 	EBOOK_ASSISTANT_SESSIONS_FOR_BOOK,
 	EBOOK_ASSISTANT_STOP,
 	EBOOK_BOOK,
+	EBOOK_BOOK_CATEGORY,
 	EBOOK_BY_LOCAL_PATH,
+	EBOOK_CATEGORIES,
+	EBOOK_CATEGORIES_SUMMARY,
 	EBOOK_COVER,
 	EBOOK_DELETE,
 	EBOOK_FILE,
@@ -1865,11 +1870,77 @@ export const deleteKnowledgeTrashBatch = async (ids: string[]) => {
 export const loadEbookShelf = async (params?: {
 	pageNo?: number;
 	pageSize?: number;
+	categoryId?: string;
+	uncategorizedOnly?: boolean;
 }): Promise<EbookShelfData> => {
 	const res = await http.get<EbookShelfData>(EBOOK_SHELF, {
 		querys: params,
 		silent: true,
 	});
+	return res.data;
+};
+
+/** GET /ebook/categories/summary：分类列表与计数 */
+export const loadEbookCategoriesSummary =
+	async (): Promise<EbookCategoriesSummary> => {
+		const res = await http.get<EbookCategoriesSummary>(
+			EBOOK_CATEGORIES_SUMMARY,
+			{
+				querys: { locale: getActiveLocale() },
+				silent: true,
+			},
+		);
+		return res.data;
+	};
+
+/** POST /ebook/categories */
+export const createEbookCategory = async (
+	name: string,
+): Promise<EbookCategory> => {
+	const res = await http.post<EbookCategory>(
+		EBOOK_CATEGORIES,
+		{ name },
+		{ silent: true },
+	);
+	return res.data;
+};
+
+/** PUT /ebook/categories/:id */
+export const updateEbookCategory = async (
+	id: string,
+	patch: { name?: string; sortOrder?: number },
+): Promise<EbookCategory> => {
+	const res = await http.put<EbookCategory>(
+		`${EBOOK_CATEGORIES}/${id}`,
+		patch,
+		{ silent: true },
+	);
+	return res.data;
+};
+
+/** DELETE /ebook/categories/:id */
+export const removeEbookCategory = async (id: string): Promise<void> => {
+	await http.delete(EBOOK_CATEGORIES, { params: [id], silent: true });
+};
+
+/** PUT /ebook/categories/reorder */
+export const reorderEbookCategories = async (
+	orderedIds: string[],
+): Promise<void> => {
+	await http.put(`${EBOOK_CATEGORIES}/reorder`, { orderedIds });
+};
+
+/** PUT /ebook/book/:id/category */
+export const assignEbookBookCategory = async (
+	bookId: string,
+	categoryId: string | null,
+): Promise<Book> => {
+	const res = await http.put<Book>(
+		`${EBOOK_BOOK_CATEGORY}/${bookId}/category`,
+		{
+			categoryId,
+		},
+	);
 	return res.data;
 };
 
@@ -1899,8 +1970,17 @@ export const addEbookFromPath = async (
 	path: string,
 	fmt: Book['fmt'],
 	title?: string,
+	categoryId?: string,
 ): Promise<Book> => {
-	const res = await http.post<Book>(EBOOK_ADD_PATH, { path, fmt, title });
+	const body: {
+		path: string;
+		fmt: Book['fmt'];
+		title?: string;
+		categoryId?: string;
+	} = { path, fmt };
+	if (title) body.title = title;
+	if (categoryId) body.categoryId = categoryId;
+	const res = await http.post<Book>(EBOOK_ADD_PATH, body);
 	return res.data;
 };
 
@@ -1909,6 +1989,7 @@ export const uploadEbookFile = async (
 	file: File,
 	options?: {
 		bookId?: string;
+		categoryId?: string;
 		onProgress?: (percent: number) => void;
 	},
 ): Promise<Book> => {
@@ -1916,9 +1997,14 @@ export const uploadEbookFile = async (
 	if (mb > 120) {
 		throw new Error('单本不超过 120MB');
 	}
-	const payload: { file: File; bookId?: string } = { file };
+	const payload: { file: File; bookId?: string; categoryId?: string } = {
+		file,
+	};
 	if (options?.bookId) {
 		payload.bookId = options.bookId;
+	}
+	if (options?.categoryId) {
+		payload.categoryId = options.categoryId;
 	}
 	const res = await http.post<Book>(EBOOK_UPLOAD, payload, {
 		headers: { 'Content-Type': 'multipart/form-data' },

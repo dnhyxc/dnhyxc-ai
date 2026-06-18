@@ -12,6 +12,7 @@
 |------|------|----------|
 | 后端 API | HTTP/SSE 入口、DTO 校验、把业务委托给 Service | `apps/backend/src/services/chat/chat.controller.ts` |
 | 对话核心 | DeepSeek（LangChain `ChatOpenAI`）流式/非流式、附件增强、Serper 联网、取消与续写 | `apps/backend/src/services/chat/chat.service.ts` |
+| 流式取消 | 进程内 `ChatStreamRegistry`（`cancel$` + `AbortController`，禁止 Subject 进 Redis） | `apps/backend/src/services/chat/chat-stream.registry.ts`；OOM/竞态见 [chat-memory-oom.md](./chat-memory-oom.md) |
 | 智谱备选流 | 另一路 GLM 流式（队列入队用户消息等） | `apps/backend/src/services/chat/glm.service.ts` |
 | 持久化 | TypeORM 读写会话与消息；`saveMessage` 含分支字段与续写追加 | `apps/backend/src/services/chat/message.service.ts` |
 | 异步落库 | BullMQ 队列 `chat-message-queue`，同 `chatId` 内存锁串行 | `apps/backend/src/services/chat/chat-message.processor.ts` |

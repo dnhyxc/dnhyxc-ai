@@ -17,10 +17,14 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { type Queue } from 'bullmq';
 import { WINSTON_MODULE_NEST_PROVIDER } from 'nest-winston';
-import { Observable, Subject } from 'rxjs';
+import { Observable } from 'rxjs';
 import { ModelEnum } from '../../enum/config.enum';
-import { parseFile } from '../../utils/file-parser';
+import {
+	MAX_ATTACHMENTS_PARSE_PER_TURN,
+	parseAttachmentForChat,
+} from '../../utils/attachment-parse';
 import { MessageRole } from './chat.entity';
+import { ChatStreamRegistry } from './chat-stream.registry';
 import { ChatContinueDto } from './dto/chat-continue.dto';
 import { ChatMessageDto } from './dto/chat-message.dto';
 import { ChatRequestDto } from './dto/chat-request.dto';
@@ -34,13 +38,10 @@ export class GlmChatService {
 		(HumanMessage | SystemMessage | AIMessage)[]
 	> = new Map();
 
-	// 存储会话的 AbortController，用于立即停止大模型生成
-	private abortControllers = new Map<string, AbortController>();
-
 	constructor(
-		// 存储会话的取消控制器
 		private configService: ConfigService,
 		private cache: Cache,
+		private readonly streamRegistry: ChatStreamRegistry,
 		// 注入消息存储队列
 		@InjectQueue('chat-message-queue')
 		private readonly messageQueue: Queue,
@@ -53,9 +54,13 @@ export class GlmChatService {
 			return '';
 		}
 
+		const uniquePaths = [
+			...new Set(filePaths.map((p) => p.trim()).filter(Boolean)),
+		].slice(0, MAX_ATTACHMENTS_PARSE_PER_TURN);
+
 		const fileContents = await Promise.all(
-			filePaths.map(async (filePath) => {
-				const content = await parseFile(filePath);
+			uniquePaths.map(async (filePath) => {
+				const content = await parseAttachmentForChat(filePath, this.cache);
 				return `文件 ${filePath} 内容:\n${content}\n`;
 			}),
 		);
@@ -144,39 +149,20 @@ export class GlmChatService {
 		}
 	}
 
-	async cleanupSession(sessionId: string) {
-		this.abortControllers.delete(sessionId);
-		await this.cache.del(sessionId);
+	async cleanupSession(sessionId: string, handleId?: number) {
+		this.streamRegistry.release(sessionId, handleId);
 	}
 
 	async stopStream(
 		sessionId: string,
 	): Promise<{ success: boolean; message: string }> {
-		const cancelController = (await this.cache.get(sessionId)) as Subject<void>;
-
-		// 如果缓存中没有取消控制器，但会话标记为活跃，说明正在初始化
-		if (!cancelController) {
+		const stopped = this.streamRegistry.stop(sessionId);
+		if (!stopped) {
 			return {
 				success: false,
 				message: '会话不存在或已完成',
 			};
 		}
-
-		// 1. 首先触发 AbortController 立即停止大模型生成
-		const abortController = this.abortControllers.get(sessionId);
-		if (abortController) {
-			abortController.abort('用户手动停止');
-			this.abortControllers.delete(sessionId);
-		}
-
-		// 2. 然后触发 RxJS Subject 取消流式处理
-		if (cancelController) {
-			cancelController.next();
-			cancelController.complete();
-		}
-
-		// 清理会话状态
-		this.cleanupSession(sessionId);
 
 		return {
 			success: true,
@@ -232,9 +218,9 @@ export class GlmChatService {
 	glmChatStream(dto: ChatRequestDto): Observable<ZhipuStreamData> {
 		const sessionId = dto.sessionId || randomUUID();
 
-		// 创建 AbortController 用于智谱 API
-		const abortController = new AbortController();
-		this.abortControllers.set(sessionId, abortController);
+		this.streamRegistry.cancelActive(sessionId);
+		const streamHandle = this.streamRegistry.register(sessionId);
+		const { abortController } = streamHandle;
 
 		return new Observable<ZhipuStreamData>((subscriber) => {
 			(async () => {
@@ -526,6 +512,8 @@ export class GlmChatService {
 					}
 				} catch (error) {
 					subscriber.error(error);
+				} finally {
+					this.streamRegistry.release(sessionId, streamHandle.id);
 				}
 			})();
 		});

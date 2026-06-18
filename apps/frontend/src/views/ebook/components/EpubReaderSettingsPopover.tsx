@@ -303,7 +303,7 @@ export function EpubReaderSettingsPopover({
 							type="button"
 							variant="secondary"
 							size="sm"
-							className="w-full mt-0.5"
+							className="w-full mt-0.5 bg-teal-600 hover:bg-teal-500"
 							onClick={onReset}
 						>
 							{t('ebook.read.settings.reset')}

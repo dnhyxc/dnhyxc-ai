@@ -53,6 +53,9 @@
 | 用户自定义向量与多库 RAG | [knowledge/user-vector-rag-config.md](./knowledge/user-vector-rag-config.md) |
 | 全站 BGE / 入库 Bad Request | [knowledge/vector-bge-global-round.md](./knowledge/vector-bge-global-round.md) |
 | 向量分片 ole.log / 代码截断 | [knowledge/knowledge-chunk-boundaries.md](./knowledge/knowledge-chunk-boundaries.md) |
+| 保存知识库后 `Invalid array length` / Node OOM | [knowledge/knowledge-chunk-infinite-loop-oom.md](./knowledge/knowledge-chunk-infinite-loop-oom.md) |
+| 对话运行久后 Node OOM / 附件重复解析 | [chat/chat-memory-oom.md](./chat/chat-memory-oom.md) |
+| 生产 rate-limit `ERR_ERL_UNEXPECTED_X_FORWARDED_FOR` | [ops/trust-proxy-rate-limit.md](./ops/trust-proxy-rate-limit.md) |
 | 复制到助手后输入框不聚焦 | [knowledge/assistant-insert-focus.md](./knowledge/assistant-insert-focus.md) |
 | 设置页大模型 Key | [llm/llm-runtime-settings.md](./llm/llm-runtime-settings.md) |
 | 按用户 / 会员默认模型 | [llm/membership-per-user-llm.md](./llm/membership-per-user-llm.md) |

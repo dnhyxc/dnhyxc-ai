@@ -9,6 +9,13 @@ import {
 	DialogTitle,
 	DialogTrigger,
 } from '@ui/dialog';
+import { cn } from '@/lib/utils';
+
+/** Model 弹层遮罩：适度压暗 + 极轻背景模糊（便于仍看清下层内容） */
+const MODEL_OVERLAY_CLASS = cn(
+	'bg-theme-background/35',
+	'supports-[backdrop-filter:blur(0)]:backdrop-blur-[2px]',
+);
 
 interface IProps {
 	open: boolean;
@@ -54,6 +61,7 @@ const Model: React.FC<IProps> = ({
 			{trigger ? <DialogTrigger asChild>{trigger}</DialogTrigger> : null}
 			<DialogContent
 				showCloseButton={showCloseIcon}
+				overlayClassName={MODEL_OVERLAY_CLASS}
 				style={{ maxWidth: width, height }}
 			>
 				{header ? (

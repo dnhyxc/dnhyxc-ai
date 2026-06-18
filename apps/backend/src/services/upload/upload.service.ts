@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import { existsSync, unlink } from 'node:fs';
+import { createReadStream, existsSync, unlink } from 'node:fs';
 import { basename, extname, resolve } from 'node:path';
+import type { Writable } from 'node:stream';
 import { promisify } from 'node:util';
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import COS from 'cos-nodejs-sdk-v5';
@@ -35,6 +36,14 @@ export class UploadService {
 			});
 		}
 		return this.cosClient;
+	}
+
+	private normalizeCosObjectKey(key: string): string {
+		const normalizedKey = key?.replace(/^\//, '').trim();
+		if (!normalizedKey || !isCosObjectKey(normalizedKey)) {
+			throw new HttpException('无效的 COS 对象键', HttpStatus.BAD_REQUEST);
+		}
+		return normalizedKey;
 	}
 
 	buildCosObjectKey(
@@ -114,13 +123,39 @@ export class UploadService {
 		);
 	}
 
-	/** 从 COS 读取对象字节（电子书下载等） */
-	async getObjectBuffer(key: string): Promise<Buffer> {
-		const normalizedKey = key?.replace(/^\//, '').trim();
-		if (!normalizedKey || !isCosObjectKey(normalizedKey)) {
-			throw new HttpException('无效的 COS 对象键', HttpStatus.BAD_REQUEST);
-		}
+	/** 从 COS 流式写出到可写流（避免大文件整包进内存） */
+	async pipeObjectToWritable(key: string, writable: Writable): Promise<void> {
+		const normalizedKey = this.normalizeCosObjectKey(key);
+		const config = getCosRuntimeConfig();
+		assertCosRuntimeConfig(config);
+		const cos = this.getCosClient();
 
+		try {
+			await new Promise<void>((resolve, reject) => {
+				cos.getObject(
+					{
+						Bucket: config.bucket,
+						Region: config.region,
+						Key: normalizedKey,
+						Output: writable,
+					},
+					(err) => {
+						if (err) reject(err);
+						else resolve();
+					},
+				);
+			});
+		} catch (error) {
+			throw new HttpException(
+				formatCosUploadError(error),
+				HttpStatus.BAD_GATEWAY,
+			);
+		}
+	}
+
+	/** 从 COS 读取对象字节（小对象场景；大文件请用 pipeObjectToWritable） */
+	async getObjectBuffer(key: string): Promise<Buffer> {
+		const normalizedKey = this.normalizeCosObjectKey(key);
 		const config = getCosRuntimeConfig();
 		assertCosRuntimeConfig(config);
 		const cos = this.getCosClient();
@@ -142,6 +177,61 @@ export class UploadService {
 				HttpStatus.BAD_GATEWAY,
 			);
 		}
+	}
+
+	/** 从本地文件流式上传至 COS（避免 multer 整包进内存） */
+	async uploadLocalFileToCos(params: {
+		localPath: string;
+		originalname: string;
+		mimetype?: string;
+		size: number;
+		prefix: CosObjectKeyPrefix;
+	}) {
+		if (!params.localPath || params.size <= 0) {
+			throw new HttpException('上传文件为空', HttpStatus.BAD_REQUEST);
+		}
+
+		const config = getCosRuntimeConfig();
+		assertCosRuntimeConfig(config);
+
+		const key = this.buildCosObjectKey(params.originalname, params.prefix);
+		const cos = this.getCosClient();
+		const body = createReadStream(params.localPath);
+
+		try {
+			await new Promise<void>((resolve, reject) => {
+				cos.putObject(
+					{
+						Bucket: config.bucket,
+						Region: config.region,
+						Key: key,
+						Body: body,
+						ContentLength: params.size,
+						ContentType: params.mimetype || 'application/octet-stream',
+						ACL: config.objectAcl,
+					},
+					(err) => {
+						if (err) reject(err);
+						else resolve();
+					},
+				);
+			});
+		} catch (error) {
+			throw new HttpException(
+				formatCosUploadError(error),
+				HttpStatus.BAD_GATEWAY,
+			);
+		}
+
+		const originalname = decodeChineseFilename(params.originalname);
+		return {
+			key,
+			url: this.buildCosPublicUrl(key),
+			originalname,
+			filename: basename(key),
+			mimetype: params.mimetype,
+			size: params.size,
+		};
 	}
 
 	async deleteCosObject(key: string) {
