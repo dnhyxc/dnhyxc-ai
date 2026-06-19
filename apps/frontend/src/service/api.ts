@@ -203,6 +203,8 @@ export const EBOOK_TITLE = '/ebook/title';
 export const EBOOK_COVER = '/ebook/cover';
 /** 电子书：删除书籍 */
 export const EBOOK_DELETE = '/ebook/delete';
+/** 电子书：读书想法 */
+export const EBOOK_THOUGHTS = '/ebook/thoughts';
 /** 电子书：下载已入库文件字节 */
 export const EBOOK_FILE = '/ebook/file';
 /** 电子书：分类统计 */

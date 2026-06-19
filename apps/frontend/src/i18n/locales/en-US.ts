@@ -1612,6 +1612,7 @@ export const enUS = {
 	'ebook.read.pdfZoomHint':
 		'Scale relative to fit width; 100% fills the reader width',
 	'ebook.read.contextMenu.copy': 'Copy',
+	'ebook.read.contextMenu.addThought': 'Add note',
 	'ebook.read.contextMenu.assistant': 'Reading assistant',
 	'ebook.read.contextMenu.askSelection': 'Ask MOKE about selection',
 	'ebook.read.assistant.close': 'Close MOKE assistant',
@@ -1624,6 +1625,23 @@ export const enUS = {
 		'The user is reading the ebook “{title}”. Answer in that context; when they quote a passage, explain it and its surrounding context first.',
 	'ebook.read.assistant.askSelectionDraft':
 		'Please explain this excerpt from the book:\n\n> {quote}',
+	'ebook.read.thought.createTitle': 'Add note',
+	'ebook.read.thought.viewTitle': 'Reading note',
+	'ebook.read.thought.editTitle': 'Edit note',
+	'ebook.read.thought.label': 'Your note',
+	'ebook.read.thought.placeholder': 'Write your thoughts…',
+	'ebook.read.thought.save': 'Save',
+	'ebook.read.thought.cancel': 'Cancel',
+	'ebook.read.thought.delete': 'Delete',
+	'ebook.read.thought.edit': 'Edit',
+	'ebook.read.thought.empty': 'No content',
+	'ebook.read.thought.cfiFailed':
+		'Could not locate the selection. Right-click inside the book text to add a note.',
+	'ebook.read.thought.loadFailed': 'Failed to load reading notes',
+	'ebook.read.thought.saveFailed': 'Failed to save note',
+	'ebook.read.thought.deleteFailed': 'Failed to delete note',
+	'ebook.read.thought.listTitle': '{count} notes on this passage',
+	'ebook.read.thought.unknownUser': 'Unknown user',
 	'ebook.err.open': 'Failed to open',
 	'ebook.err.loadFailed':
 		'Unable to load this book. Please check whether it still exists.',

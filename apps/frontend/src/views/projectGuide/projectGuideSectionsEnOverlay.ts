@@ -378,4 +378,9 @@ export const PROJECT_GUIDE_ITEMS_EN: Record<
 		description:
 			'Entry: right-click inside the PDF reading area.\nItems (top to bottom): Reading assistant → TOC → Zoom in/out → Previous/Next page.\nRepeated zoom clicks keep the menu open; TOC and page turns match the header controls.',
 	},
+	'pg-s16-6': {
+		title: '16.6 EPUB reading notes (EPUB only)',
+		description:
+			'Entry: while reading EPUB, select text → right-click → Write note.\nMark: after saving, a subtle amber dashed underline appears under the passage; it is restored when you reopen the book.\nView: tap the underline to open the list for that selection first (username and time, newest first—even a single note); tap an item for details; closing details returns to the list when you came from it.\nOverlapping selections: nested overlaps show one visible underline; tapping shorter nested text still opens that selection’s list.\nSelection: releasing after drag-select does not open the list—tap the underline intentionally.\nEdit/delete: edit body or delete in the details dialog.\nSign-in & sync: sign-in required; notes live on your account and sync across devices; deleting the book from the shelf removes its notes.\nPDF text cannot be selected yet—reading notes are EPUB-only; independent from MOKE ask-about-selection (16.4).',
+	},
 };

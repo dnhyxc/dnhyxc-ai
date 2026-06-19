@@ -24,6 +24,7 @@ import type {
 	EbookCategoriesSummary,
 	EbookCategory,
 	EbookShelfData,
+	EbookThought,
 	Prog,
 } from '@/views/ebook/types';
 import {
@@ -58,6 +59,7 @@ import {
 	EBOOK_FILE,
 	EBOOK_PROGRESS,
 	EBOOK_SHELF,
+	EBOOK_THOUGHTS,
 	EBOOK_TITLE,
 	EBOOK_UPLOAD,
 	ENGLISH_LEARNING_CLASSIC_QUOTE_MISTAKES,
@@ -2045,6 +2047,42 @@ export const saveEbookCover = async (
 		},
 	);
 	return res.data;
+};
+
+/** GET /ebook/thoughts/:bookId */
+export const fetchEbookThoughts = async (
+	bookId: string,
+): Promise<EbookThought[]> => {
+	const res = await http.get<EbookThought[]>(`${EBOOK_THOUGHTS}/${bookId}`);
+	return res.data;
+};
+
+/** POST /ebook/thoughts */
+export const createEbookThought = async (body: {
+	bookId: string;
+	cfiRange: string;
+	quote: string;
+	content: string;
+}): Promise<EbookThought> => {
+	const res = await http.post<EbookThought>(EBOOK_THOUGHTS, body);
+	return res.data;
+};
+
+/** PUT /ebook/thoughts/:id */
+export const updateEbookThought = async (
+	thoughtId: string,
+	body: { content: string },
+): Promise<EbookThought> => {
+	const res = await http.put<EbookThought>(
+		`${EBOOK_THOUGHTS}/${thoughtId}`,
+		body,
+	);
+	return res.data;
+};
+
+/** DELETE /ebook/thoughts/:id */
+export const deleteEbookThought = async (thoughtId: string): Promise<void> => {
+	await http.delete(EBOOK_THOUGHTS, { params: [thoughtId] });
 };
 
 /** DELETE /ebook/delete/:id */

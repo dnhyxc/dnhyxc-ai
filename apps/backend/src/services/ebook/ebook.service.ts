@@ -14,18 +14,22 @@ import { decodeChineseFilename } from '../../utils';
 import { normalizeUploadPublicPath } from '../../utils/upload-paths';
 import { isCosObjectKey } from '../upload/cos.config';
 import { UploadService } from '../upload/upload.service';
+import { User } from '../user/user.entity';
 import { UserService } from '../user/user.service';
 import { AddEbookPathDto } from './dto/add-ebook-path.dto';
 import { CreateEbookCategoryDto } from './dto/create-ebook-category.dto';
+import { CreateEbookThoughtDto } from './dto/create-ebook-thought.dto';
 import { QueryEbookCategoriesSummaryDto } from './dto/query-ebook-categories-summary.dto';
 import { QueryEbookShelfDto } from './dto/query-ebook-shelf.dto';
 import { ReorderEbookCategoriesDto } from './dto/reorder-ebook-categories.dto';
 import { SaveEbookProgressDto } from './dto/save-ebook-progress.dto';
 import { UpdateEbookCategoryDto } from './dto/update-ebook-category.dto';
+import { UpdateEbookThoughtDto } from './dto/update-ebook-thought.dto';
 import { UpdateEbookTitleDto } from './dto/update-ebook-title.dto';
 import { EbookBook } from './ebook-book.entity';
 import { EbookCategory } from './ebook-category.entity';
 import { EbookProgress } from './ebook-progress.entity';
+import { EbookThought } from './ebook-thought.entity';
 
 export type EbookBookDto = {
 	id: string;
@@ -73,6 +77,18 @@ export type EbookBookDetailDto = {
 	prog?: EbookProgDto;
 };
 
+export type EbookThoughtDto = {
+	id: string;
+	userId: number;
+	cfiRange: string;
+	quote: string;
+	content: string;
+	/** 由 userId 在查询时从 user 表实时解析，不写入 ebook_thought */
+	username: string;
+	createdAt: string;
+	updatedAt: string;
+};
+
 export type EbookFilePayload =
 	| { kind: 'disk'; abs: string; fmt: 'epub' | 'pdf' }
 	| { kind: 'cos'; key: string; fmt: 'epub' | 'pdf' };
@@ -112,6 +128,10 @@ export class EbookService {
 		private readonly progRepo: Repository<EbookProgress>,
 		@InjectRepository(EbookCategory)
 		private readonly categoryRepo: Repository<EbookCategory>,
+		@InjectRepository(EbookThought)
+		private readonly thoughtRepo: Repository<EbookThought>,
+		@InjectRepository(User)
+		private readonly userRepo: Repository<User>,
 		private readonly uploadService: UploadService,
 		private readonly userService: UserService,
 	) {}
@@ -374,6 +394,7 @@ export class EbookService {
 			await this.tryDeleteStoredEbookFile(book.filePath);
 		}
 		await this.tryDeleteCoverFile(book.coverPath);
+		await this.thoughtRepo.delete({ bookId, userId });
 		await this.progRepo.delete({ bookId, userId });
 		await this.bookRepo.delete({ id: bookId, userId });
 	}
@@ -704,5 +725,117 @@ export class EbookService {
 		}
 		await this.bookRepo.save(book);
 		return this.toBookDto(book);
+	}
+
+	private toThoughtDto(row: EbookThought, username: string): EbookThoughtDto {
+		return {
+			id: row.id,
+			userId: row.userId,
+			cfiRange: row.cfiRange,
+			quote: row.quote,
+			content: row.content,
+			username,
+			createdAt: row.createdAt.toISOString(),
+			updatedAt: row.updatedAt.toISOString(),
+		};
+	}
+
+	/** 按 userId 批量查 user 表，username 每次响应时实时解析 */
+	private async buildUsernameMap(
+		userIds: number[],
+	): Promise<Map<number, string>> {
+		const unique = [...new Set(userIds.filter((id) => id > 0))];
+		const map = new Map<number, string>();
+		if (unique.length === 0) return map;
+
+		const users = await this.userRepo.find({
+			where: { id: In(unique) },
+			select: { id: true, username: true },
+		});
+		for (const user of users) {
+			map.set(user.id, user.username);
+		}
+		for (const id of unique) {
+			if (!map.has(id)) map.set(id, String(id));
+		}
+		return map;
+	}
+
+	private async toThoughtDtoWithUsername(
+		row: EbookThought,
+		usernameMap?: Map<number, string>,
+	): Promise<EbookThoughtDto> {
+		const map = usernameMap ?? (await this.buildUsernameMap([row.userId]));
+		return this.toThoughtDto(row, map.get(row.userId) ?? String(row.userId));
+	}
+
+	private async assertBookOwned(
+		userId: number,
+		bookId: string,
+	): Promise<EbookBook> {
+		const book = await this.bookRepo.findOne({ where: { id: bookId, userId } });
+		if (!book) {
+			throw new NotFoundException('书籍不存在');
+		}
+		return book;
+	}
+
+	async listThoughts(
+		userId: number,
+		bookId: string,
+	): Promise<EbookThoughtDto[]> {
+		await this.assertBookOwned(userId, bookId);
+		const rows = await this.thoughtRepo.find({
+			where: { userId, bookId },
+			order: { createdAt: 'DESC' },
+		});
+		const usernameMap = await this.buildUsernameMap(
+			rows.map((row) => row.userId),
+		);
+		return Promise.all(
+			rows.map((row) => this.toThoughtDtoWithUsername(row, usernameMap)),
+		);
+	}
+
+	async createThought(
+		userId: number,
+		dto: CreateEbookThoughtDto,
+	): Promise<EbookThoughtDto> {
+		await this.assertBookOwned(userId, dto.bookId);
+		const row = this.thoughtRepo.create({
+			userId,
+			bookId: dto.bookId,
+			cfiRange: dto.cfiRange.trim(),
+			quote: dto.quote.trim(),
+			content: dto.content.trim(),
+		});
+		await this.thoughtRepo.save(row);
+		return this.toThoughtDtoWithUsername(row);
+	}
+
+	async updateThought(
+		userId: number,
+		thoughtId: string,
+		dto: UpdateEbookThoughtDto,
+	): Promise<EbookThoughtDto> {
+		const row = await this.thoughtRepo.findOne({
+			where: { id: thoughtId, userId },
+		});
+		if (!row) {
+			throw new NotFoundException('想法不存在');
+		}
+		row.content = dto.content.trim();
+		await this.thoughtRepo.save(row);
+		return this.toThoughtDtoWithUsername(row);
+	}
+
+	async removeThought(userId: number, thoughtId: string): Promise<void> {
+		const row = await this.thoughtRepo.findOne({
+			where: { id: thoughtId, userId },
+		});
+		if (!row) {
+			throw new NotFoundException('想法不存在');
+		}
+		await this.thoughtRepo.delete({ id: thoughtId, userId });
 	}
 }

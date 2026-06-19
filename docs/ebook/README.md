@@ -17,6 +17,7 @@
 | [ebook-toc-active-highlight.md](./ebook-toc-active-highlight.md) | **增量**：目录抽屉当前章节高亮（EPUB/PDF 共用 `EbookTocDrawer`） |
 | [ebook-shelf-category.md](./ebook-shelf-category.md) | **增量**：书架分类（面包屑、Tab Rail、Model 管理弹窗、书名行移动 Popover、删分类归入未分类） |
 | [ebook-cos-stream-io.md](./ebook-cos-stream-io.md) | **增量**：COS 流式上传/下载，避免大文件整包进内存 |
+| [epub-reading-thoughts.md](./epub-reading-thoughts.md) | **增量（本轮）**：EPUB 读书想法（服务端存储、虚线下划线、重叠去重、统一点击列表、选区防误触） |
 | [../chat/assistant-share-bar.md](../chat/assistant-share-bar.md) | **关联**：助手分享底栏与 `useAssistantShare`（知识库 / 英语 / 电子书三端统一） |
 | [../knowledge/assistant-insert-focus.md](../knowledge/assistant-insert-focus.md) | **关联**：选区写入助手后聚焦与 IME 修复（知识库 + 电子书 MOKE 问书） |
 

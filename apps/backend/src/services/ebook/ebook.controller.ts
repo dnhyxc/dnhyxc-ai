@@ -32,12 +32,14 @@ import {
 import { AddEbookPathDto } from './dto/add-ebook-path.dto';
 import { AssignEbookCategoryDto } from './dto/assign-ebook-category.dto';
 import { CreateEbookCategoryDto } from './dto/create-ebook-category.dto';
+import { CreateEbookThoughtDto } from './dto/create-ebook-thought.dto';
 import { QueryEbookByLocalPathDto } from './dto/query-ebook-by-local-path.dto';
 import { QueryEbookCategoriesSummaryDto } from './dto/query-ebook-categories-summary.dto';
 import { QueryEbookShelfDto } from './dto/query-ebook-shelf.dto';
 import { ReorderEbookCategoriesDto } from './dto/reorder-ebook-categories.dto';
 import { SaveEbookProgressDto } from './dto/save-ebook-progress.dto';
 import { UpdateEbookCategoryDto } from './dto/update-ebook-category.dto';
+import { UpdateEbookThoughtDto } from './dto/update-ebook-thought.dto';
 import { UpdateEbookTitleDto } from './dto/update-ebook-title.dto';
 import { EbookService } from './ebook.service';
 
@@ -278,6 +280,44 @@ export class EbookController {
 		@Param('id', ParseUUIDPipe) id: string,
 	) {
 		await this.ebookService.remove(this.userId(req), id);
+		return { id };
+	}
+
+	@Get('thoughts/:bookId')
+	@UseInterceptors(ResponseInterceptor)
+	async listThoughts(
+		@Req() req: AuthedRequest,
+		@Param('bookId', ParseUUIDPipe) bookId: string,
+	) {
+		return this.ebookService.listThoughts(this.userId(req), bookId);
+	}
+
+	@Post('thoughts')
+	@UseInterceptors(ResponseInterceptor)
+	async createThought(
+		@Req() req: AuthedRequest,
+		@Body() dto: CreateEbookThoughtDto,
+	) {
+		return this.ebookService.createThought(this.userId(req), dto);
+	}
+
+	@Put('thoughts/:id')
+	@UseInterceptors(ResponseInterceptor)
+	async updateThought(
+		@Req() req: AuthedRequest,
+		@Param('id', ParseUUIDPipe) id: string,
+		@Body() dto: UpdateEbookThoughtDto,
+	) {
+		return this.ebookService.updateThought(this.userId(req), id, dto);
+	}
+
+	@Delete('thoughts/:id')
+	@UseInterceptors(ResponseInterceptor)
+	async removeThought(
+		@Req() req: AuthedRequest,
+		@Param('id', ParseUUIDPipe) id: string,
+	) {
+		await this.ebookService.removeThought(this.userId(req), id);
 		return { id };
 	}
 

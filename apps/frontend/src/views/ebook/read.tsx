@@ -15,8 +15,15 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
+import {
+	createEbookThought,
+	deleteEbookThought,
+	fetchEbookThoughts,
+	updateEbookThought,
+} from '@/service';
 import ebookStore from '@/store/ebook';
 import { copyToClipboard } from '@/utils/clipboard';
+import { getRequestErrorMessage } from '@/utils/fetch';
 import { EbookPageShell } from './components/EbookPageShell';
 import { EbookPanelHeader } from './components/EbookPanelHeader';
 import { EbookReadSplitLayout } from './components/EbookReadSplitLayout';
@@ -27,8 +34,10 @@ import {
 	type EpubReaderContextMenuState,
 } from './components/EpubReaderContextMenu';
 import { EpubReaderSettingsPopover } from './components/EpubReaderSettingsPopover';
+import { EpubThoughtDialog } from './components/EpubThoughtDialog';
+import { EpubThoughtListDialog } from './components/EpubThoughtListDialog';
 import { PdfPane } from './components/PdfPane';
-import type { EbookTocItem } from './types';
+import type { EbookThought, EbookTocItem } from './types';
 import {
 	buildEpubContextMenuItems,
 	type EpubReaderContextActions,
@@ -98,8 +107,26 @@ function EbookReadPage() {
 	const pdfContextActionsRef = useRef<PdfReaderContextActions | null>(null);
 	const contextPayloadRef = useRef<{
 		selectedText: string;
+		cfiRange?: string;
 		copySelection: () => void;
 	} | null>(null);
+	const [thoughts, setThoughts] = useState<EbookThought[]>([]);
+	const [thoughtDialogOpen, setThoughtDialogOpen] = useState(false);
+	const [thoughtDialogMode, setThoughtDialogMode] = useState<
+		'create' | 'view' | 'edit'
+	>('create');
+	const [thoughtSaving, setThoughtSaving] = useState(false);
+	const [thoughtListOpen, setThoughtListOpen] = useState(false);
+	const [thoughtListGroup, setThoughtListGroup] = useState<EbookThought[]>([]);
+	const returnToListCfiRef = useRef<string | null>(null);
+	const [thoughtDraft, setThoughtDraft] = useState({
+		id: '',
+		quote: '',
+		cfiRange: '',
+		content: '',
+		username: '',
+		updatedAt: '',
+	});
 	const progTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
 	useEffect(() => {
@@ -121,6 +148,119 @@ function EbookReadPage() {
 			cancelled = true;
 		};
 	}, [bookId]);
+
+	useEffect(() => {
+		if (!bookId) {
+			setThoughts([]);
+			return;
+		}
+		let cancelled = false;
+		void fetchEbookThoughts(bookId)
+			.then((list) => {
+				if (!cancelled) setThoughts(list);
+			})
+			.catch((e) => {
+				if (!cancelled) {
+					Toast({
+						type: 'error',
+						title: t('ebook.read.thought.loadFailed'),
+						message: getRequestErrorMessage(e),
+					});
+				}
+			});
+		return () => {
+			cancelled = true;
+		};
+	}, [bookId, t]);
+
+	const openViewThought = useCallback(
+		(thought: EbookThought, fromList = false) => {
+			if (fromList) {
+				returnToListCfiRef.current = thought.cfiRange;
+				setThoughtListOpen(false);
+			} else {
+				returnToListCfiRef.current = null;
+			}
+			setThoughtDraft({
+				id: thought.id,
+				quote: thought.quote,
+				cfiRange: thought.cfiRange,
+				content: thought.content,
+				username: thought.username,
+				updatedAt: thought.updatedAt,
+			});
+			setThoughtDialogMode('view');
+			setThoughtDialogOpen(true);
+		},
+		[],
+	);
+
+	useEffect(() => {
+		if (thoughtDialogOpen) return;
+		const cfiRange = returnToListCfiRef.current;
+		if (!cfiRange) return;
+		returnToListCfiRef.current = null;
+		const next = thoughts.filter((t) => t.cfiRange === cfiRange);
+		if (next.length > 0) {
+			setThoughtListGroup(next);
+			setThoughtListOpen(true);
+		}
+	}, [thoughtDialogOpen, thoughts]);
+
+	const openThoughtGroup = useCallback((group: EbookThought[]) => {
+		if (group.length === 0) return;
+		setThoughtListGroup(group);
+		setThoughtListOpen(true);
+	}, []);
+
+	const saveThought = useCallback(async () => {
+		const content = thoughtDraft.content.trim();
+		if (!content || !thoughtDraft.cfiRange || !bookId || thoughtSaving) {
+			return;
+		}
+		setThoughtSaving(true);
+		try {
+			if (thoughtDialogMode === 'create') {
+				const item = await createEbookThought({
+					bookId,
+					cfiRange: thoughtDraft.cfiRange,
+					quote: thoughtDraft.quote,
+					content,
+				});
+				setThoughts((prev) => [item, ...prev]);
+			} else if (thoughtDraft.id) {
+				const item = await updateEbookThought(thoughtDraft.id, { content });
+				setThoughts((prev) => prev.map((t) => (t.id === item.id ? item : t)));
+			}
+			setThoughtDialogOpen(false);
+		} catch (e) {
+			Toast({
+				type: 'error',
+				title: t('ebook.read.thought.saveFailed'),
+				message: getRequestErrorMessage(e),
+			});
+		} finally {
+			setThoughtSaving(false);
+		}
+	}, [bookId, t, thoughtDialogMode, thoughtDraft, thoughtSaving]);
+
+	const deleteThought = useCallback(async () => {
+		if (!thoughtDraft.id || thoughtSaving) return;
+		setThoughtSaving(true);
+		try {
+			await deleteEbookThought(thoughtDraft.id);
+			setThoughts((prev) => prev.filter((t) => t.id !== thoughtDraft.id));
+			setThoughtDialogOpen(false);
+		} catch (e) {
+			Toast({
+				type: 'error',
+				title: t('ebook.read.thought.deleteFailed'),
+				message: getRequestErrorMessage(e),
+			});
+		} finally {
+			setThoughtSaving(false);
+		}
+	}, [t, thoughtDraft.id, thoughtSaving]);
 
 	useEffect(() => {
 		if (!book) return;
@@ -278,7 +418,6 @@ function EbookReadPage() {
 
 	const closeContextMenu = useCallback(() => {
 		setContextMenu(null);
-		contextPayloadRef.current = null;
 	}, []);
 
 	const showReaderContextMenu = useCallback(
@@ -298,16 +437,19 @@ function EbookReadPage() {
 			clientX: number;
 			clientY: number;
 			selectedText: string;
+			cfiRange?: string;
 			copySelection: () => void;
 		}) => {
+			const hasSelection = Boolean(payload.selectedText.trim());
 			contextPayloadRef.current = {
 				selectedText: payload.selectedText,
+				cfiRange: payload.cfiRange,
 				copySelection: payload.copySelection,
 			};
 			showReaderContextMenu({
 				clientX: payload.clientX,
 				clientY: payload.clientY,
-				hasSelection: Boolean(payload.selectedText.trim()),
+				hasSelection,
 			});
 		},
 		[showReaderContextMenu],
@@ -348,6 +490,33 @@ function EbookReadPage() {
 			const payload = contextPayloadRef.current;
 			if (!payload?.selectedText.trim()) return;
 			void copyToClipboard(payload.selectedText);
+		},
+		addThought: () => {
+			const payload = contextPayloadRef.current;
+			const quote = payload?.selectedText.trim() ?? '';
+			const cfiRange = payload?.cfiRange;
+			if (!quote) return;
+			if (!cfiRange) {
+				window.setTimeout(() => {
+					Toast({
+						type: 'error',
+						title: t('ebook.read.thought.cfiFailed'),
+					});
+				}, 0);
+				return;
+			}
+			window.setTimeout(() => {
+				setThoughtDraft({
+					id: '',
+					quote,
+					cfiRange,
+					content: '',
+					username: '',
+					updatedAt: '',
+				});
+				setThoughtDialogMode('create');
+				setThoughtDialogOpen(true);
+			}, 0);
 		},
 		openAssistant: () => openAssistant(),
 		askAboutSelection: () => {
@@ -768,6 +937,9 @@ function EbookReadPage() {
 									!tocOpen && !epubSettingsOpen && !assistantOpen
 								}
 								onReaderContextMenu={showEpubContextMenu}
+								thoughts={thoughts}
+								onThoughtClick={openViewThought}
+								onThoughtGroupClick={openThoughtGroup}
 							/>
 						</div>
 					</EbookReadSplitLayout>
@@ -821,6 +993,39 @@ function EbookReadPage() {
 						if (!open) closeContextMenu();
 					}}
 				/>
+			) : null}
+
+			{book.fmt === 'epub' ? (
+				<>
+					<EpubThoughtListDialog
+						open={thoughtListOpen}
+						onOpenChange={setThoughtListOpen}
+						thoughts={thoughtListGroup}
+						onSelect={(thought) => openViewThought(thought, true)}
+					/>
+					<EpubThoughtDialog
+						open={thoughtDialogOpen}
+						onOpenChange={setThoughtDialogOpen}
+						mode={thoughtDialogMode}
+						quote={thoughtDraft.quote}
+						content={thoughtDraft.content}
+						username={thoughtDraft.username}
+						updatedAt={thoughtDraft.updatedAt}
+						onContentChange={(content) =>
+							setThoughtDraft((d) => ({ ...d, content }))
+						}
+						onSave={saveThought}
+						onDelete={
+							thoughtDialogMode !== 'create' ? deleteThought : undefined
+						}
+						onEdit={
+							thoughtDialogMode === 'view'
+								? () => setThoughtDialogMode('edit')
+								: undefined
+						}
+						saving={thoughtSaving}
+					/>
+				</>
 			) : null}
 		</EbookPageShell>
 	);

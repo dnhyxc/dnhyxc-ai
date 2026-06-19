@@ -1,16 +1,18 @@
 import type { Rendition } from 'epubjs';
 
+import { copyToClipboard } from '@/utils/clipboard';
+
 type EpubIframeContents = {
 	document: Document;
 	window: Window;
+	cfiFromRange: (range: Range, ignoreClass?: string) => string;
 };
-
-import { copyToClipboard } from '@/utils/clipboard';
 
 export type EpubReaderContextMenuPayload = {
 	clientX: number;
 	clientY: number;
 	selectedText: string;
+	cfiRange?: string;
 	copySelection: () => void;
 };
 
@@ -25,6 +27,31 @@ function toViewportPoint(e: MouseEvent, win: Window): { x: number; y: number } {
 
 function readSelectionText(win: Window): string {
 	return (win.getSelection()?.toString() ?? '').trim();
+}
+
+function resolveSelectionCfiRange(
+	rend: Rendition,
+	win: Window,
+	range: Range,
+): string | undefined {
+	const raw = rend.getContents();
+	const list: EpubIframeContents[] = Array.isArray(raw)
+		? raw
+		: raw
+			? [raw as EpubIframeContents]
+			: [];
+
+	const matching = list.filter((c) => c.window === win);
+	const candidates = matching.length > 0 ? matching : list;
+
+	for (const contents of candidates) {
+		try {
+			return contents.cfiFromRange(range);
+		} catch {
+			// try next chapter iframe
+		}
+	}
+	return undefined;
 }
 
 /**
@@ -46,11 +73,20 @@ export function attachEpubIframeContextMenu(
 			e.preventDefault();
 			e.stopPropagation();
 			const selectedText = readSelectionText(win);
+			let cfiRange: string | undefined;
+			const sel = win.getSelection();
+			if (sel && sel.rangeCount > 0) {
+				const range = sel.getRangeAt(0);
+				if (!range.collapsed) {
+					cfiRange = resolveSelectionCfiRange(rend, win, range);
+				}
+			}
 			const { x, y } = toViewportPoint(e, win);
 			onMenu({
 				clientX: x,
 				clientY: y,
 				selectedText,
+				cfiRange,
 				copySelection: () => {
 					const text = readSelectionText(win);
 					if (!text) return;
@@ -67,9 +103,9 @@ export function attachEpubIframeContextMenu(
 
 	const existing = rend.getContents();
 	if (Array.isArray(existing)) {
-		for (const item of existing) bindContents(item);
+		for (const item of existing) bindContents(item as EpubIframeContents);
 	} else if (existing) {
-		bindContents(existing);
+		bindContents(existing as EpubIframeContents);
 	}
 
 	return () => {

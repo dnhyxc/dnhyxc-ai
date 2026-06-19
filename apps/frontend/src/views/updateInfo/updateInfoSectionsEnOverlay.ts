@@ -921,4 +921,9 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'For members uploading or downloading ~100MB epub/pdf files, the server uses streaming I/O instead of loading whole files into memory, reducing upload failures and process crashes. Reading and download behavior is unchanged.',
 	},
+	's25-23': {
+		title: 'EPUB reading notes',
+		description:
+			'While reading EPUB, select text and choose Write note from the context menu. Saved passages show a subtle amber dashed underline; tap to view, edit, or delete. Multiple notes per passage (newest first, with username). Tapping the underline opens the list first (even for a single note). Nested overlapping selections show one visible underline; drag-select release does not open the list. Sign-in required; notes are stored on your account and removed when you delete the book. EPUB only; PDF is not supported yet.',
+	},
 };

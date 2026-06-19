@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { type ThemeName, useTheme } from '@/hooks';
 import { cn } from '@/lib/utils';
 import { onListen } from '@/utils';
-import type { EbookTocItem } from '../types';
+import type { EbookThought, EbookTocItem } from '../types';
 import {
 	attachEpubIframeContextMenu,
 	type EpubReaderContextMenuPayload,
@@ -16,6 +16,7 @@ import {
 } from '../utils/epubReaderSettings';
 import { attachEpubScrolledEdgeNav } from '../utils/epubScrolledNav';
 import { resolveSpineIndexForHref } from '../utils/epubSpineIndex';
+import { syncEpubThoughtUnderlines } from '../utils/epubThoughtAnnotations';
 import { READER_NATIVE_SCROLLBAR_EPUB_CONTAINER } from '../utils/readerScrollbar';
 
 type NavApi = {
@@ -37,6 +38,10 @@ type Props = {
 	keyboardNavEnabled?: boolean;
 	/** EPUB iframe 内右键菜单 */
 	onReaderContextMenu?: (payload: EpubReaderContextMenuPayload) => void;
+	/** 读书想法（下划线标注） */
+	thoughts?: EbookThought[];
+	onThoughtClick?: (thought: EbookThought) => void;
+	onThoughtGroupClick?: (thoughts: EbookThought[]) => void;
 };
 
 /** epub.js 全书百分比需 locations.generate；未就绪时用 spine 索引粗估 */
@@ -84,6 +89,9 @@ export function EpubPane({
 	onNavReset,
 	keyboardNavEnabled = true,
 	onReaderContextMenu,
+	thoughts = [],
+	onThoughtClick,
+	onThoughtGroupClick,
 }: Props) {
 	const { theme: appTheme } = useTheme();
 	const [appThemeName, setAppThemeName] = useState<ThemeName>(appTheme);
@@ -103,12 +111,16 @@ export function EpubPane({
 	const onReadyRef = useRef(onReady);
 	const onNavResetRef = useRef(onNavReset);
 	const onReaderContextMenuRef = useRef(onReaderContextMenu);
+	const onThoughtClickRef = useRef(onThoughtClick);
+	const onThoughtGroupClickRef = useRef(onThoughtGroupClick);
+	const appliedThoughtsRef = useRef<Map<string, string[]>>(new Map());
 	const keyboardNavEnabledRef = useRef(keyboardNavEnabled);
 	const openRef = useRef<ArrayBuffer | null>(null);
 	const initialCfiRef = useRef<string | undefined>(undefined);
 	const currentCfiRef = useRef<string | undefined>(undefined);
 	const lateStartCfiAppliedRef = useRef(false);
 	const [err, setErr] = useState<string | null>(null);
+	const [rendReady, setRendReady] = useState(false);
 
 	readerSettingsRef.current = readerSettings;
 	appThemeRef.current = appThemeName;
@@ -142,6 +154,8 @@ export function EpubPane({
 	onReadyRef.current = onReady;
 	onNavResetRef.current = onNavReset;
 	onReaderContextMenuRef.current = onReaderContextMenu;
+	onThoughtClickRef.current = onThoughtClick;
+	onThoughtGroupClickRef.current = onThoughtGroupClick;
 	keyboardNavEnabledRef.current = keyboardNavEnabled;
 
 	// 仅在换书（open 变化）时记录起始 CFI，避免翻页保存进度后整书重载闪烁
@@ -189,6 +203,21 @@ export function EpubPane({
 	}, [startCfi]);
 
 	useEffect(() => {
+		const rend = rendRef.current;
+		if (!rend || !rendReady) return;
+
+		return syncEpubThoughtUnderlines(
+			rend,
+			thoughts,
+			{
+				onThoughtClick: (thought) => onThoughtClickRef.current?.(thought),
+				onThoughtGroupClick: (group) => onThoughtGroupClickRef.current?.(group),
+			},
+			appliedThoughtsRef.current,
+		);
+	}, [thoughts, rendReady]);
+
+	useEffect(() => {
 		const el = hostRef.current;
 		if (!el) return;
 
@@ -199,6 +228,8 @@ export function EpubPane({
 		let detachContextMenu: (() => void) | undefined;
 		onNavResetRef.current?.();
 		readyRef.current = false;
+		setRendReady(false);
+		appliedThoughtsRef.current.clear();
 		locationsReadyRef.current = false;
 		bookRef.current = null;
 		rendRef.current = null;
@@ -263,6 +294,7 @@ export function EpubPane({
 				if (destroyed) return;
 
 				readyRef.current = true;
+				setRendReady(true);
 
 				if (pageFlow === 'scrolled') {
 					detachScrolledNav = attachEpubScrolledEdgeNav(rend, () => destroyed);
@@ -330,6 +362,8 @@ export function EpubPane({
 			detachContextMenu?.();
 			detachScrolledNav?.();
 			readyRef.current = false;
+			setRendReady(false);
+			appliedThoughtsRef.current.clear();
 			locationsReadyRef.current = false;
 			bookRef.current = null;
 			ro.disconnect();

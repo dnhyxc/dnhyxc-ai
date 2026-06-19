@@ -8,6 +8,7 @@ function shortcutHintCtrlOrCmd(key: string): string {
 
 export type EpubReaderContextActions = {
 	copy: () => void;
+	addThought: () => void;
 	openAssistant: () => void;
 	askAboutSelection: () => void;
 	openToc: () => void;
@@ -45,6 +46,12 @@ export function buildEpubContextMenuItems({
 			label: t('ebook.read.contextMenu.askSelection'),
 			onSelect: () => actionsRef.current?.askAboutSelection(),
 		});
+		items.push({
+			type: 'item',
+			id: 'addThought',
+			label: t('ebook.read.contextMenu.addThought'),
+			onSelect: () => actionsRef.current?.addThought(),
+		});
 		items.push({ type: 'separator', id: 'sep-after-selection' });
 	}
 
@@ -78,14 +85,14 @@ export function buildEpubContextMenuItems({
 		label: t('ebook.read.toc'),
 		onSelect: () => actionsRef.current?.openToc(),
 	});
-	items.push({ type: 'separator', id: 'sep-exit' });
+	items.push({ type: 'separator', id: 'sep-settings' });
 	items.push({
 		type: 'item',
 		id: 'settings',
 		label: t('ebook.read.settings'),
 		onSelect: () => actionsRef.current?.openSettings(),
 	});
-	items.push({ type: 'separator', id: 'sep-exit' });
+	items.push({ type: 'separator', id: 'sep-back' });
 	items.push({
 		type: 'item',
 		id: 'backShelf',

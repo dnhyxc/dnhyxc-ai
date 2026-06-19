@@ -67,3 +67,18 @@ export type EbookBookDetail = {
 	book: Book;
 	prog?: Prog;
 };
+
+/** EPUB 读书想法（服务端存储，按 CFI 定位） */
+export type EbookThought = {
+	id: string;
+	userId: number;
+	cfiRange: string;
+	/** 选中的原文摘录 */
+	quote: string;
+	/** 用户想法正文 */
+	content: string;
+	/** 服务端按 userId 实时解析，非持久化字段 */
+	username: string;
+	createdAt: string;
+	updatedAt: string;
+};
