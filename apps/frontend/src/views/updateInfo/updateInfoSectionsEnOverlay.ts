@@ -180,6 +180,11 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'Fixes server memory growth and crashes with multi-turn chats that include PDF/Excel attachments, and fixes broken Stop or mid-reply cutoffs when sending two messages in quick succession. Parsed attachment text is cached per path with size limits; very long sessions only send recent turns to the model.',
 	},
+	's4-13': {
+		title: 'Horizontal scroll for code blocks during streaming',
+		description:
+			'Fixes fenced code blocks in assistant messages that could not be scrolled sideways reliably while the reply was still streaming—including after the closing fence when the model kept writing prose below. Copy, download, and the code toolbar behave as before.',
+	},
 	's5-1': {
 		title: 'Markdown rendering',
 		description:
@@ -322,6 +327,16 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		title: 'Knowledge save / vector indexing stability',
 		description:
 			'Fixes vector indexing failures (e.g. Invalid array length) or server crashes on some short or list-style Markdown saves. Chunking now always advances each iteration and caps pieces per article. Re-save affected articles if indexing failed before.',
+	},
+	's6-24': {
+		title: 'Cloud save for long knowledge articles',
+		description:
+			'Fixes cloud knowledge saves failing when article body exceeded about 100KB. Saves now align with the per-article limit (about 5MB); long Markdown articles persist normally.',
+	},
+	's6-25': {
+		title: 'Assistant keeps scroll position after streaming ends',
+		description:
+			'Fixes Knowledge doc assistant, ebook MOKE assistant, and English-learning Agent jumping to the bottom after streaming when you had scrolled up to read history. Scroll back to the bottom or tap “Scroll to bottom” to resume following new output.',
 	},
 	's7-1': {
 		title: 'IME (input method editor) compatibility',
@@ -925,5 +940,15 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		title: 'EPUB reading notes',
 		description:
 			'While reading EPUB, select text and choose Write note from the context menu. Saved passages show a subtle amber dashed underline; tap to view, edit, or delete. Multiple notes per passage (newest first, with username). Tapping the underline opens the list first (even for a single note). Nested overlapping selections show one visible underline; drag-select release does not open the list. Sign-in required; notes are stored on your account and removed when you delete the book. EPUB only; PDF is not supported yet.',
+	},
+	's25-24': {
+		title: 'EPUB reading notes UI refresh',
+		description:
+			'Note list, details, and compose move to the right reading column (mutually exclusive with MK ask-about-selection; same resizable slot). Header shows title and note count; quote cards offer copy, write note, and MK ask shortcuts; a floating toolbar complements the context menu. Enter saves, Shift/Ctrl/Cmd+Enter inserts new lines with the input fixed at the panel footer. Fixes wrong list after writing on a different passage and occasional crashes after save.',
+	},
+	's25-25': {
+		title: 'EPUB selection floating toolbar visuals',
+		description:
+			'The floating toolbar above selected text uses a frosted panel and theme-aware downward shadow so edges stay clear on dark reading backgrounds and colored themes; the caret matches the panel with consistent rounded corners. After copy, a brief “Copied” state shows before the selection clears.',
 	},
 };

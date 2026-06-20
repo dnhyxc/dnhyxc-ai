@@ -168,7 +168,7 @@ export type AssistantEntryToolbarHistoryInject = {
 	isHistoryDrawerOpen: boolean;
 	setIsHistoryDrawerOpen: Dispatch<SetStateAction<boolean>>;
 	enableStreamStickToBottom: () => void;
-	flushScrollToBottom: () => void;
+	flushScrollToBottom: (options?: { force?: boolean }) => void;
 	setDeleteTargetSessionId: Dispatch<SetStateAction<string | null>>;
 	setDeleteConfirmOpen: Dispatch<SetStateAction<boolean>>;
 } & AssistantEntryToolbarHistoryState;
@@ -185,7 +185,7 @@ export type AssistantEntryToolbarProps = {
 	isHistoryDrawerOpen: boolean;
 	setIsHistoryDrawerOpen: Dispatch<SetStateAction<boolean>>;
 	enableStreamStickToBottom: () => void;
-	flushScrollToBottom: () => void;
+	flushScrollToBottom: (options?: { force?: boolean }) => void;
 	history: AssistantEntryToolbarHistoryState;
 	onNewConversation: () => void | Promise<void>;
 	onDeleteSession: (sessionId: string) => void | Promise<void>;

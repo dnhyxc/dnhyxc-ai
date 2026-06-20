@@ -7,40 +7,32 @@ import {
 	ResizablePanelGroup,
 } from '@/components/ui/resizable';
 import { cn } from '@/lib/utils';
-import { EbookAssistant } from './EbookAssistant';
 
 export type EbookReadSplitLayoutProps = {
-	assistantOpen: boolean;
-	bookId: string;
-	bookTitle: string;
-	assistantInput: string;
-	onAssistantInputChange: (value: string) => void;
-	focusInputAtEndKey?: number;
+	/** 右侧分栏是否展开（MOKE 助手或读书想法） */
+	sidePanelOpen: boolean;
+	sidePanel: ReactNode;
 	children: ReactNode;
 };
 
 /**
- * 电子书阅读页分栏：左阅读、右智能助手（布局对齐知识库 MarkdownEditor + KnowledgeAssistant）。
+ * 电子书阅读页分栏：左阅读、右 MOKE 助手 / 读书想法（互斥，同栏位）。
  */
 export function EbookReadSplitLayout({
-	assistantOpen,
-	bookId,
-	bookTitle,
-	assistantInput,
-	onAssistantInputChange,
-	focusInputAtEndKey,
+	sidePanelOpen,
+	sidePanel,
 	children,
 }: EbookReadSplitLayoutProps) {
 	const panelGroupRef = useRef<GroupImperativeHandle | null>(null);
 	const lastSplitLayoutRef = useRef<Layout>({ reader: 58, assistant: 42 });
 
 	useEffect(() => {
-		if (!assistantOpen) {
+		if (!sidePanelOpen) {
 			panelGroupRef.current?.setLayout({ reader: 100, assistant: 0 });
 			return;
 		}
 		panelGroupRef.current?.setLayout(lastSplitLayoutRef.current);
-	}, [assistantOpen]);
+	}, [sidePanelOpen]);
 
 	return (
 		<ResizablePanelGroup
@@ -49,7 +41,7 @@ export function EbookReadSplitLayout({
 			className="h-full min-h-0 min-w-0"
 			groupRef={panelGroupRef}
 			onLayoutChanged={(layout) => {
-				if (assistantOpen) lastSplitLayoutRef.current = layout;
+				if (sidePanelOpen) lastSplitLayoutRef.current = layout;
 			}}
 		>
 			<ResizablePanel
@@ -62,7 +54,7 @@ export function EbookReadSplitLayout({
 			</ResizablePanel>
 			<ResizableHandle
 				withHandle
-				className={cn('w-0', !assistantOpen && 'pointer-events-none opacity-0')}
+				className={cn('w-0', !sidePanelOpen && 'pointer-events-none opacity-0')}
 			/>
 			<ResizablePanel
 				id="assistant"
@@ -70,21 +62,12 @@ export function EbookReadSplitLayout({
 				minSize={0}
 				className={cn(
 					'min-h-0 min-w-0',
-					!assistantOpen && 'pointer-events-none opacity-0',
+					!sidePanelOpen && 'pointer-events-none opacity-0',
 				)}
 			>
 				<div className="border-theme/10 flex h-full min-h-0 min-w-0 flex-col overflow-hidden border-l contain-[inline-size]">
 					<div className="min-h-0 flex-1 overflow-hidden">
-						{/* 与知识库一致：面板关闭时不挂载助手，避免在 0 高度容器内布局后再展开导致 ChatEntry 抖动 */}
-						{assistantOpen ? (
-							<EbookAssistant
-								bookId={bookId}
-								bookTitle={bookTitle}
-								input={assistantInput}
-								onInputChange={onAssistantInputChange}
-								focusInputAtEndKey={focusInputAtEndKey}
-							/>
-						) : null}
+						{sidePanelOpen ? sidePanel : null}
 					</div>
 				</div>
 			</ResizablePanel>

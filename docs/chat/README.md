@@ -19,3 +19,4 @@
 | [share-knowledge-timezone.md](./share-knowledge-timezone.md) | **知识文章分享**「更新时间」MySQL 时区 ±8h 修复 |
 | [chat-update.md](./chat-update.md) | Chat 重构与性能相关记录 |
 | [chat-memory-oom.md](./chat-memory-oom.md) | **对话堆 OOM**：流式 Registry、附件缓存与解析上限、上下文 60 条 |
+| [streaming-code-block-scroll.md](./streaming-code-block-scroll.md) | **流式代码块横滚**：拆段渲染、`StreamingCodeFenceBlock` 冻结 DOM |

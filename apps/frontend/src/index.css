@@ -102,6 +102,24 @@ body {
 			max-width: 100%;
 		}
 
+		/* 流式拆段：各 part 并列子节点，须用 gap 补足 .markdown-body 内的块级间距 */
+		.streaming-md-body.streaming-md-body--streaming {
+			display: flex;
+			flex-direction: column;
+			gap: 1em;
+		}
+
+		.streaming-md-body.streaming-md-body--streaming
+			> [data-streaming-code-fence] {
+			display: flow-root;
+		}
+
+		.streaming-md-body.streaming-md-body--streaming
+			> [data-streaming-code-fence]
+			> .chat-md-code-block {
+			margin-block: 0;
+		}
+
 		.markdown-body {
 			background-color: transparent;
 			min-width: 0;
@@ -425,11 +443,21 @@ body {
 	--sidebar-accent-foreground: oklch(0.21 0.034 264.665);
 	--sidebar-border: oklch(0.928 0.006 264.531);
 	--sidebar-ring: oklch(0.707 0.022 261.325);
-	--shadow-2: 0 0 2px rgba(0, 0, 0, 0.2);
-	--shadow-4: 0 0 4px rgba(0, 0, 0, 0.2);
-	--shadow-6: 0 0 6px rgba(0, 0, 0, 0.2);
-	--shadow-8: 0 0 8px rgba(0, 0, 0, 0.2);
-	--shadow-10: 0 0 10px rgba(0, 0, 0, 0.2);
+	--shadow-color-2: rgba(0, 0, 0, 0.2);
+	--shadow-color-4: rgba(0, 0, 0, 0.2);
+	--shadow-color-6: rgba(0, 0, 0, 0.2);
+	--shadow-color-8: rgba(0, 0, 0, 0.2);
+	--shadow-color-10: rgba(0, 0, 0, 0.2);
+	--shadow-2: 0 0 2px var(--shadow-color-2);
+	--shadow-4: 0 0 4px var(--shadow-color-4);
+	--shadow-6: 0 0 6px var(--shadow-color-6);
+	--shadow-8: 0 0 8px var(--shadow-color-8);
+	--shadow-10: 0 0 10px var(--shadow-color-10);
+	--shadow-drop-2: 0 2px 4px var(--shadow-color-2);
+	--shadow-drop-4: 0 3px 6px var(--shadow-color-4);
+	--shadow-drop-6: 0 4px 8px var(--shadow-color-6);
+	--shadow-drop-8: 0 4px 9px var(--shadow-color-8);
+	--shadow-drop-10: 0 4px 10px var(--shadow-color-10);
 	--font-family: "手札体-简";
 	--theme-color: oklch(100% 0.00011 271.152);
 	--theme-background: oklch(1 0 0);
@@ -506,11 +534,21 @@ body {
 	--sidebar-accent-foreground: oklch(0.985 0.002 247.839);
 	--sidebar-border: oklch(1 0 0 / 10%);
 	--sidebar-ring: oklch(0.551 0.027 264.364);
-	--shadow-2: 0 0 2px rgba(255, 255, 255, 0.5);
-	--shadow-4: 0 0 4px rgba(255, 255, 255, 0.5);
-	--shadow-6: 0 0 6px rgba(255, 255, 255, 0.5);
-	--shadow-8: 0 0 8px rgba(255, 255, 255, 0.5);
-	--shadow-10: 0 0 10px rgba(255, 255, 255, 0.5);
+	--shadow-color-2: rgba(255, 255, 255, 0.28);
+	--shadow-color-4: rgba(255, 255, 255, 0.28);
+	--shadow-color-6: rgba(255, 255, 255, 0.28);
+	--shadow-color-8: rgba(255, 255, 255, 0.28);
+	--shadow-color-10: rgba(255, 255, 255, 0.28);
+	--shadow-2: 0 0 2px var(--shadow-color-2);
+	--shadow-4: 0 0 4px var(--shadow-color-4);
+	--shadow-6: 0 0 6px var(--shadow-color-6);
+	--shadow-8: 0 0 8px var(--shadow-color-8);
+	--shadow-10: 0 0 10px var(--shadow-color-10);
+	--shadow-drop-2: 0 2px 4px var(--shadow-color-2);
+	--shadow-drop-4: 0 3px 6px var(--shadow-color-4);
+	--shadow-drop-6: 0 4px 8px var(--shadow-color-6);
+	--shadow-drop-8: 0 4px 9px var(--shadow-color-8);
+	--shadow-drop-10: 0 4px 10px var(--shadow-color-10);
 	--theme-color: oklch(0.928 0.006 264.531);
 	--theme-background: oklch(0.13 0.028 261.692);
 	--theme-card: oklch(0.21 0.034 264.665);
@@ -553,6 +591,21 @@ body {
 }
 
 .theme-white {
+	--shadow-color-2: rgba(0, 0, 0, 0.2);
+	--shadow-color-4: rgba(0, 0, 0, 0.2);
+	--shadow-color-6: rgba(0, 0, 0, 0.2);
+	--shadow-color-8: rgba(0, 0, 0, 0.2);
+	--shadow-color-10: rgba(0, 0, 0, 0.2);
+	--shadow-2: 0 0 2px var(--shadow-color-2);
+	--shadow-4: 0 0 4px var(--shadow-color-4);
+	--shadow-6: 0 0 6px var(--shadow-color-6);
+	--shadow-8: 0 0 8px var(--shadow-color-8);
+	--shadow-10: 0 0 10px var(--shadow-color-10);
+	--shadow-drop-2: 0 2px 4px var(--shadow-color-2);
+	--shadow-drop-4: 0 3px 6px var(--shadow-color-4);
+	--shadow-drop-6: 0 4px 8px var(--shadow-color-6);
+	--shadow-drop-8: 0 4px 9px var(--shadow-color-8);
+	--shadow-drop-10: 0 4px 10px var(--shadow-color-10);
 	--theme-color: oklch(0.15 0.02 264.665);
 	--theme-background: oklch(1 0 0);
 	--theme-secondary: oklch(0.95 0.00845 271.331);
@@ -591,6 +644,21 @@ body {
 }
 
 .theme-black {
+	--shadow-color-2: rgba(255, 255, 255, 0.28);
+	--shadow-color-4: rgba(255, 255, 255, 0.28);
+	--shadow-color-6: rgba(255, 255, 255, 0.28);
+	--shadow-color-8: rgba(255, 255, 255, 0.28);
+	--shadow-color-10: rgba(255, 255, 255, 0.28);
+	--shadow-2: 0 0 2px var(--shadow-color-2);
+	--shadow-4: 0 0 4px var(--shadow-color-4);
+	--shadow-6: 0 0 6px var(--shadow-color-6);
+	--shadow-8: 0 0 8px var(--shadow-color-8);
+	--shadow-10: 0 0 10px var(--shadow-color-10);
+	--shadow-drop-2: 0 2px 4px var(--shadow-color-2);
+	--shadow-drop-4: 0 3px 6px var(--shadow-color-4);
+	--shadow-drop-6: 0 4px 8px var(--shadow-color-6);
+	--shadow-drop-8: 0 4px 9px var(--shadow-color-8);
+	--shadow-drop-10: 0 4px 10px var(--shadow-color-10);
 	/*
 	 * 深色锚点 + 极少掺白：卡片/光晕只做极弱层次，避免整体发灰发亮。
 	 * 仍从单一 --theme-seed 用 color-mix 衍生，与 THEMES.black 气质一致。
@@ -669,6 +737,21 @@ body {
 }
 
 .theme-purple {
+	--shadow-color-2: rgba(0, 0, 0, 0.2);
+	--shadow-color-4: rgba(0, 0, 0, 0.2);
+	--shadow-color-6: rgba(0, 0, 0, 0.2);
+	--shadow-color-8: rgba(0, 0, 0, 0.2);
+	--shadow-color-10: rgba(0, 0, 0, 0.2);
+	--shadow-2: 0 0 2px var(--shadow-color-2);
+	--shadow-4: 0 0 4px var(--shadow-color-4);
+	--shadow-6: 0 0 6px var(--shadow-color-6);
+	--shadow-8: 0 0 8px var(--shadow-color-8);
+	--shadow-10: 0 0 10px var(--shadow-color-10);
+	--shadow-drop-2: 0 2px 4px var(--shadow-color-2);
+	--shadow-drop-4: 0 3px 6px var(--shadow-color-4);
+	--shadow-drop-6: 0 4px 8px var(--shadow-color-6);
+	--shadow-drop-8: 0 4px 9px var(--shadow-color-8);
+	--shadow-drop-10: 0 4px 10px var(--shadow-color-10);
 	--theme-color: oklch(0.55 0.12 293.83);
 	--theme-background: oklch(0.99 0.005 293.83);
 	--theme-card: oklch(1 0 0);
@@ -705,6 +788,21 @@ body {
 }
 
 .theme-blue-1 {
+	--shadow-color-2: rgba(0, 0, 0, 0.2);
+	--shadow-color-4: rgba(0, 0, 0, 0.2);
+	--shadow-color-6: rgba(0, 0, 0, 0.2);
+	--shadow-color-8: rgba(0, 0, 0, 0.2);
+	--shadow-color-10: rgba(0, 0, 0, 0.2);
+	--shadow-2: 0 0 2px var(--shadow-color-2);
+	--shadow-4: 0 0 4px var(--shadow-color-4);
+	--shadow-6: 0 0 6px var(--shadow-color-6);
+	--shadow-8: 0 0 8px var(--shadow-color-8);
+	--shadow-10: 0 0 10px var(--shadow-color-10);
+	--shadow-drop-2: 0 2px 4px var(--shadow-color-2);
+	--shadow-drop-4: 0 3px 6px var(--shadow-color-4);
+	--shadow-drop-6: 0 4px 8px var(--shadow-color-6);
+	--shadow-drop-8: 0 4px 9px var(--shadow-color-8);
+	--shadow-drop-10: 0 4px 10px var(--shadow-color-10);
 	--theme-color: oklch(0.55 0.12 261.83);
 	--theme-background: oklch(0.99 0.005 261.83);
 	--theme-card: oklch(1 0 0);
@@ -741,6 +839,21 @@ body {
 }
 
 .theme-blue-2 {
+	--shadow-color-2: rgba(0, 0, 0, 0.2);
+	--shadow-color-4: rgba(0, 0, 0, 0.2);
+	--shadow-color-6: rgba(0, 0, 0, 0.2);
+	--shadow-color-8: rgba(0, 0, 0, 0.2);
+	--shadow-color-10: rgba(0, 0, 0, 0.2);
+	--shadow-2: 0 0 2px var(--shadow-color-2);
+	--shadow-4: 0 0 4px var(--shadow-color-4);
+	--shadow-6: 0 0 6px var(--shadow-color-6);
+	--shadow-8: 0 0 8px var(--shadow-color-8);
+	--shadow-10: 0 0 10px var(--shadow-color-10);
+	--shadow-drop-2: 0 2px 4px var(--shadow-color-2);
+	--shadow-drop-4: 0 3px 6px var(--shadow-color-4);
+	--shadow-drop-6: 0 4px 8px var(--shadow-color-6);
+	--shadow-drop-8: 0 4px 9px var(--shadow-color-8);
+	--shadow-drop-10: 0 4px 10px var(--shadow-color-10);
 	--theme-color: oklch(59.015% 0.18409 269.469);
 	--theme-background: oklch(0.99 0.005 248.83);
 	--theme-card: oklch(1 0 0);
@@ -777,6 +890,21 @@ body {
 }
 
 .theme-blue-3 {
+	--shadow-color-2: rgba(0, 0, 0, 0.2);
+	--shadow-color-4: rgba(0, 0, 0, 0.2);
+	--shadow-color-6: rgba(0, 0, 0, 0.2);
+	--shadow-color-8: rgba(0, 0, 0, 0.2);
+	--shadow-color-10: rgba(0, 0, 0, 0.2);
+	--shadow-2: 0 0 2px var(--shadow-color-2);
+	--shadow-4: 0 0 4px var(--shadow-color-4);
+	--shadow-6: 0 0 6px var(--shadow-color-6);
+	--shadow-8: 0 0 8px var(--shadow-color-8);
+	--shadow-10: 0 0 10px var(--shadow-color-10);
+	--shadow-drop-2: 0 2px 4px var(--shadow-color-2);
+	--shadow-drop-4: 0 3px 6px var(--shadow-color-4);
+	--shadow-drop-6: 0 4px 8px var(--shadow-color-6);
+	--shadow-drop-8: 0 4px 9px var(--shadow-color-8);
+	--shadow-drop-10: 0 4px 10px var(--shadow-color-10);
 	--theme-color: oklch(0.55 0.12 225.83);
 	--theme-background: oklch(0.99 0.005 225.83);
 	--theme-card: oklch(1 0 0);
@@ -813,6 +941,21 @@ body {
 }
 
 .theme-green {
+	--shadow-color-2: rgba(0, 0, 0, 0.2);
+	--shadow-color-4: rgba(0, 0, 0, 0.2);
+	--shadow-color-6: rgba(0, 0, 0, 0.2);
+	--shadow-color-8: rgba(0, 0, 0, 0.2);
+	--shadow-color-10: rgba(0, 0, 0, 0.2);
+	--shadow-2: 0 0 2px var(--shadow-color-2);
+	--shadow-4: 0 0 4px var(--shadow-color-4);
+	--shadow-6: 0 0 6px var(--shadow-color-6);
+	--shadow-8: 0 0 8px var(--shadow-color-8);
+	--shadow-10: 0 0 10px var(--shadow-color-10);
+	--shadow-drop-2: 0 2px 4px var(--shadow-color-2);
+	--shadow-drop-4: 0 3px 6px var(--shadow-color-4);
+	--shadow-drop-6: 0 4px 8px var(--shadow-color-6);
+	--shadow-drop-8: 0 4px 9px var(--shadow-color-8);
+	--shadow-drop-10: 0 4px 10px var(--shadow-color-10);
 	--theme-color: oklch(51.289% 0.15865 139.724);
 	--theme-background: oklch(94.916% 0.03977 137.32);
 	--theme-card: oklch(1 0 0);
@@ -856,6 +999,21 @@ body {
 }
 
 .theme-orange {
+	--shadow-color-2: rgba(0, 0, 0, 0.2);
+	--shadow-color-4: rgba(0, 0, 0, 0.2);
+	--shadow-color-6: rgba(0, 0, 0, 0.2);
+	--shadow-color-8: rgba(0, 0, 0, 0.2);
+	--shadow-color-10: rgba(0, 0, 0, 0.2);
+	--shadow-2: 0 0 2px var(--shadow-color-2);
+	--shadow-4: 0 0 4px var(--shadow-color-4);
+	--shadow-6: 0 0 6px var(--shadow-color-6);
+	--shadow-8: 0 0 8px var(--shadow-color-8);
+	--shadow-10: 0 0 10px var(--shadow-color-10);
+	--shadow-drop-2: 0 2px 4px var(--shadow-color-2);
+	--shadow-drop-4: 0 3px 6px var(--shadow-color-4);
+	--shadow-drop-6: 0 4px 8px var(--shadow-color-6);
+	--shadow-drop-8: 0 4px 9px var(--shadow-color-8);
+	--shadow-drop-10: 0 4px 10px var(--shadow-color-10);
 	--theme-color: oklch(0.81287 0.15333 71.151);
 	--theme-background: oklch(0.99 0.02708 83.52);
 	--theme-card: oklch(1 0 0);
@@ -892,6 +1050,21 @@ body {
 }
 
 .theme-red {
+	--shadow-color-2: rgba(0, 0, 0, 0.2);
+	--shadow-color-4: rgba(0, 0, 0, 0.2);
+	--shadow-color-6: rgba(0, 0, 0, 0.2);
+	--shadow-color-8: rgba(0, 0, 0, 0.2);
+	--shadow-color-10: rgba(0, 0, 0, 0.2);
+	--shadow-2: 0 0 2px var(--shadow-color-2);
+	--shadow-4: 0 0 4px var(--shadow-color-4);
+	--shadow-6: 0 0 6px var(--shadow-color-6);
+	--shadow-8: 0 0 8px var(--shadow-color-8);
+	--shadow-10: 0 0 10px var(--shadow-color-10);
+	--shadow-drop-2: 0 2px 4px var(--shadow-color-2);
+	--shadow-drop-4: 0 3px 6px var(--shadow-color-4);
+	--shadow-drop-6: 0 4px 8px var(--shadow-color-6);
+	--shadow-drop-8: 0 4px 9px var(--shadow-color-8);
+	--shadow-drop-10: 0 4px 10px var(--shadow-color-10);
 	--theme-color: oklch(0.55 0.12 10.83);
 	--theme-background: oklch(0.99 0.005 10.83);
 	--theme-card: oklch(1 0 0);
@@ -928,6 +1101,21 @@ body {
 }
 
 .theme-beige {
+	--shadow-color-2: rgba(0, 0, 0, 0.2);
+	--shadow-color-4: rgba(0, 0, 0, 0.2);
+	--shadow-color-6: rgba(0, 0, 0, 0.2);
+	--shadow-color-8: rgba(0, 0, 0, 0.2);
+	--shadow-color-10: rgba(0, 0, 0, 0.2);
+	--shadow-2: 0 0 2px var(--shadow-color-2);
+	--shadow-4: 0 0 4px var(--shadow-color-4);
+	--shadow-6: 0 0 6px var(--shadow-color-6);
+	--shadow-8: 0 0 8px var(--shadow-color-8);
+	--shadow-10: 0 0 10px var(--shadow-color-10);
+	--shadow-drop-2: 0 2px 4px var(--shadow-color-2);
+	--shadow-drop-4: 0 3px 6px var(--shadow-color-4);
+	--shadow-drop-6: 0 4px 8px var(--shadow-color-6);
+	--shadow-drop-8: 0 4px 9px var(--shadow-color-8);
+	--shadow-drop-10: 0 4px 10px var(--shadow-color-10);
 	--theme-color: oklch(0.55 0.06 80.83);
 	--theme-background: oklch(0.99 0.005 80.83);
 	--theme-card: oklch(1 0 0);
@@ -990,6 +1178,16 @@ body.theme-beige {
 }
 
 @theme inline {
+	--shadow-drop-2: var(--shadow-drop-2);
+	--shadow-drop-4: var(--shadow-drop-4);
+	--shadow-drop-6: var(--shadow-drop-6);
+	--shadow-drop-8: var(--shadow-drop-8);
+	--shadow-drop-10: var(--shadow-drop-10);
+	--shadow-2: var(--shadow-2);
+	--shadow-4: var(--shadow-4);
+	--shadow-6: var(--shadow-6);
+	--shadow-8: var(--shadow-8);
+	--shadow-10: var(--shadow-10);
 	--radius-sm: calc(var(--radius) - 4px);
 	--radius-md: calc(var(--radius) - 2px);
 	--radius-lg: var(--radius);

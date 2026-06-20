@@ -54,7 +54,9 @@
 | 全站 BGE / 入库 Bad Request | [knowledge/vector-bge-global-round.md](./knowledge/vector-bge-global-round.md) |
 | 向量分片 ole.log / 代码截断 | [knowledge/knowledge-chunk-boundaries.md](./knowledge/knowledge-chunk-boundaries.md) |
 | 保存知识库后 `Invalid array length` / Node OOM | [knowledge/knowledge-chunk-infinite-loop-oom.md](./knowledge/knowledge-chunk-infinite-loop-oom.md) |
+| 云端保存知识库报「请求体过大」/ PayloadTooLarge | [knowledge/knowledge-save-body-limit.md](./knowledge/knowledge-save-body-limit.md) |
 | 对话运行久后 Node OOM / 附件重复解析 | [chat/chat-memory-oom.md](./chat/chat-memory-oom.md) |
+| 流式输出时代码块无法横向滚动 | [chat/streaming-code-block-scroll.md](./chat/streaming-code-block-scroll.md) |
 | 生产 rate-limit `ERR_ERL_UNEXPECTED_X_FORWARDED_FOR` | [ops/trust-proxy-rate-limit.md](./ops/trust-proxy-rate-limit.md) |
 | 复制到助手后输入框不聚焦 | [knowledge/assistant-insert-focus.md](./knowledge/assistant-insert-focus.md) |
 | 设置页大模型 Key | [llm/llm-runtime-settings.md](./llm/llm-runtime-settings.md) |
@@ -82,6 +84,7 @@
 | EPUB 右键无菜单 / 助手与知识库样式不一致 | [ebook/epub-assistant-context-menu.md](./ebook/epub-assistant-context-menu.md)、[ebook/ebook-moke-assistant.md](./ebook/ebook-moke-assistant.md) |
 | 目录打开但看不出当前读到哪一章 | [ebook/ebook-toc-active-highlight.md](./ebook/ebook-toc-active-highlight.md) |
 | PDF 无 MOKE 助手 / PDF 右键菜单 | [ebook/ebook-moke-assistant.md](./ebook/ebook-moke-assistant.md) |
+| 保存读书想法后阅读页白屏 / 下划线异常 | [ebook/epub-thought-underlines-sync.md](./ebook/epub-thought-underlines-sync.md) |
 | 复制到助手后输入中文乱码 | [knowledge/assistant-insert-focus.md](./knowledge/assistant-insert-focus.md) §5.1 |
 
 ---

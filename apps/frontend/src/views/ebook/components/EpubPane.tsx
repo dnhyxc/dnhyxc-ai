@@ -15,14 +15,24 @@ import {
 	resolveEpubBgColor,
 } from '../utils/epubReaderSettings';
 import { attachEpubScrolledEdgeNav } from '../utils/epubScrolledNav';
+import {
+	attachEpubSelectionPopBar,
+	clearEpubTextSelection,
+	type EpubSelectionPopBarPayload,
+} from '../utils/epubSelectionToolbarAttach';
 import { resolveSpineIndexForHref } from '../utils/epubSpineIndex';
-import { syncEpubThoughtUnderlines } from '../utils/epubThoughtAnnotations';
+import {
+	applyEpubThoughtUnderlines,
+	installEpubThoughtUnderlineListeners,
+	teardownAppliedThoughtUnderlines,
+} from '../utils/epubThoughtAnnotations';
 import { READER_NATIVE_SCROLLBAR_EPUB_CONTAINER } from '../utils/readerScrollbar';
 
 type NavApi = {
 	prev: () => Promise<void>;
 	next: () => Promise<void>;
 	go: (href: string) => Promise<void>;
+	clearTextSelection: () => void;
 };
 
 type Props = {
@@ -38,6 +48,8 @@ type Props = {
 	keyboardNavEnabled?: boolean;
 	/** EPUB iframe 内右键菜单 */
 	onReaderContextMenu?: (payload: EpubReaderContextMenuPayload) => void;
+	/** 选区结束后的浮动操作条 */
+	onSelectionPopBar?: (payload: EpubSelectionPopBarPayload | null) => void;
 	/** 读书想法（下划线标注） */
 	thoughts?: EbookThought[];
 	onThoughtClick?: (thought: EbookThought) => void;
@@ -89,6 +101,7 @@ export function EpubPane({
 	onNavReset,
 	keyboardNavEnabled = true,
 	onReaderContextMenu,
+	onSelectionPopBar,
 	thoughts = [],
 	onThoughtClick,
 	onThoughtGroupClick,
@@ -111,8 +124,10 @@ export function EpubPane({
 	const onReadyRef = useRef(onReady);
 	const onNavResetRef = useRef(onNavReset);
 	const onReaderContextMenuRef = useRef(onReaderContextMenu);
+	const onSelectionPopBarRef = useRef(onSelectionPopBar);
 	const onThoughtClickRef = useRef(onThoughtClick);
 	const onThoughtGroupClickRef = useRef(onThoughtGroupClick);
+	const thoughtsRef = useRef(thoughts);
 	const appliedThoughtsRef = useRef<Map<string, string[]>>(new Map());
 	const keyboardNavEnabledRef = useRef(keyboardNavEnabled);
 	const openRef = useRef<ArrayBuffer | null>(null);
@@ -154,8 +169,10 @@ export function EpubPane({
 	onReadyRef.current = onReady;
 	onNavResetRef.current = onNavReset;
 	onReaderContextMenuRef.current = onReaderContextMenu;
+	onSelectionPopBarRef.current = onSelectionPopBar;
 	onThoughtClickRef.current = onThoughtClick;
 	onThoughtGroupClickRef.current = onThoughtGroupClick;
+	thoughtsRef.current = thoughts;
 	keyboardNavEnabledRef.current = keyboardNavEnabled;
 
 	// 仅在换书（open 变化）时记录起始 CFI，避免翻页保存进度后整书重载闪烁
@@ -206,15 +223,25 @@ export function EpubPane({
 		const rend = rendRef.current;
 		if (!rend || !rendReady) return;
 
-		return syncEpubThoughtUnderlines(
+		return installEpubThoughtUnderlineListeners(rend, {
+			getThoughts: () => thoughtsRef.current ?? [],
+			onThoughtClick: (thought) => onThoughtClickRef.current?.(thought),
+			onThoughtGroupClick: (group) => onThoughtGroupClickRef.current?.(group),
+		});
+	}, [rendReady]);
+
+	useEffect(() => {
+		const rend = rendRef.current;
+		if (!rend || !rendReady) return;
+
+		applyEpubThoughtUnderlines(
 			rend,
-			thoughts,
-			{
-				onThoughtClick: (thought) => onThoughtClickRef.current?.(thought),
-				onThoughtGroupClick: (group) => onThoughtGroupClickRef.current?.(group),
-			},
+			thoughts ?? [],
 			appliedThoughtsRef.current,
 		);
+		return () => {
+			teardownAppliedThoughtUnderlines(rend, appliedThoughtsRef.current);
+		};
 	}, [thoughts, rendReady]);
 
 	useEffect(() => {
@@ -226,6 +253,7 @@ export function EpubPane({
 		let rend: Rendition | null = null;
 		let detachScrolledNav: (() => void) | undefined;
 		let detachContextMenu: (() => void) | undefined;
+		let detachSelectionPopBar: (() => void) | undefined;
 		onNavResetRef.current?.();
 		readyRef.current = false;
 		setRendReady(false);
@@ -285,6 +313,9 @@ export function EpubPane({
 						onReaderContextMenuRef.current?.(payload);
 					});
 				}
+				detachSelectionPopBar = attachEpubSelectionPopBar(rend, (payload) => {
+					onSelectionPopBarRef.current?.(payload);
+				});
 
 				await rend.display(initialCfi ?? undefined);
 				if (destroyed) return;
@@ -312,6 +343,10 @@ export function EpubPane({
 					go: async (href) => {
 						if (!rendRef.current) return;
 						await rendRef.current.display(href);
+					},
+					clearTextSelection: () => {
+						if (!rendRef.current) return;
+						clearEpubTextSelection(rendRef.current);
 					},
 				});
 
@@ -360,6 +395,7 @@ export function EpubPane({
 		return () => {
 			destroyed = true;
 			detachContextMenu?.();
+			detachSelectionPopBar?.();
 			detachScrolledNav?.();
 			readyRef.current = false;
 			setRendReady(false);

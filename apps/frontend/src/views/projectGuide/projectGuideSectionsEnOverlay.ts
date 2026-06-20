@@ -82,7 +82,7 @@ export const PROJECT_GUIDE_ITEMS_EN: Record<
 	'pg-s4-2': {
 		title: '4.2 Streaming, stop, and continue',
 		description:
-			'Streaming: replies appear as they generate.\nStop: end early if you already have what you need.\nContinue: extend the current answer.\nBranches & regeneration: work in a message tree; shared read-only pages try to keep order and layout consistent in complex branch cases.\nServer-side generation now goes through the SiliconFlow-compatible API; you use Chat the same way—no extra setup.',
+			'Streaming: replies appear as they generate.\nStop: end early if you already have what you need.\nContinue: extend the current answer.\nCode block horizontal scroll: while a reply is streaming, scroll sideways inside a fenced code block to read long lines; this works even after the closing fence if the model keeps writing prose below.\nBranches & regeneration: work in a message tree; shared read-only pages try to keep order and layout consistent in complex branch cases.\nServer-side generation now goes through the SiliconFlow-compatible API; you use Chat the same way—no extra setup.',
 	},
 	'pg-s4-3': {
 		title: '4.3 Web search and citations',
@@ -127,7 +127,7 @@ export const PROJECT_GUIDE_ITEMS_EN: Record<
 	'pg-s5-6': {
 		title: '5.6 In-document AI assistant (logged in)',
 		description:
-			'When logged in while editing Knowledge, use the doc assistant at the bottom for multi-turn help on the current Markdown—polish, summarize, or Q&A.\nHidden when logged out; local editing still works.\nLong threads: scroll-to-bottom / scroll-to-top near the input; during streaming, scroll back to follow the latest output.\nSend selected text to the assistant (context menu or ⌘/Ctrl+Shift+V) for AI or RAG follow-ups; the input auto-focuses with the caret at the end of the inserted text; overlapping selections may be deduped (per release).\nMulti-turn: AI mode uses saved session history within the token budget; RAG mode mainly uses retrieved chunks each turn. Backend generation is aligned with main Chat via SiliconFlow; interaction is unchanged.\nDesktop: text/voice input like Chat, follows UI language; dictation fills the input live and stays after you stop recording.\nGenerate outline: in AI mode (not RAG), use “Generate outline”; the TOC is prepended or the top heading is normalized to “## 目录”; skipped if that heading already exists; anchor-only lists get the heading only.\nStreaming: no “thinking process” block; the generating spinner animates correctly.',
+			'When logged in while editing Knowledge, use the doc assistant at the bottom for multi-turn help on the current Markdown—polish, summarize, or Q&A.\nHidden when logged out; local editing still works.\nLong threads: scroll-to-bottom / scroll-to-top near the input; during streaming, scroll back to follow the latest output; after streaming ends, if you had scrolled up to stop auto-follow, the list stays where you left it.\nSend selected text to the assistant (context menu or ⌘/Ctrl+Shift+V) for AI or RAG follow-ups; the input auto-focuses with the caret at the end of the inserted text; overlapping selections may be deduped (per release).\nMulti-turn: AI mode uses saved session history within the token budget; RAG mode mainly uses retrieved chunks each turn. Backend generation is aligned with main Chat via SiliconFlow; interaction is unchanged.\nDesktop: text/voice input like Chat, follows UI language; dictation fills the input live and stays after you stop recording.\nGenerate outline: in AI mode (not RAG), use “Generate outline”; the TOC is prepended or the top heading is normalized to “## 目录”; skipped if that heading already exists; anchor-only lists get the heading only.\nStreaming: no “thinking process” block; the generating spinner animates correctly.',
 	},
 	'pg-s6-1': {
 		title: '6.1 Task lists',
@@ -141,7 +141,7 @@ export const PROJECT_GUIDE_ITEMS_EN: Record<
 	'pg-s6-3': {
 		title: '6.3 Code blocks',
 		description:
-			'Paste commands and snippets with language-specific highlighting.',
+			'Paste commands and snippets with language-specific highlighting. During streaming chat replies, scroll horizontally inside a code block when lines are wider than the pane.',
 	},
 	'pg-s6-4': {
 		title: '6.4 Mermaid',
@@ -286,7 +286,7 @@ export const PROJECT_GUIDE_ITEMS_EN: Record<
 	'pg-s13-8': {
 		title: '13.8 English-learning Agent (multi-session)',
 		description:
-			'Agent chat supports multiple sessions with a paginated history drawer; “New chat” clears the view and creates the server session on first send. Quick intents affect only the current turn, not stored transcript. Saving to the knowledge base may navigate you there to continue editing.',
+			'Agent chat supports multiple sessions with a paginated history drawer; “New chat” clears the view and creates the server session on first send. Scroll-to-bottom / scroll-to-top near the input; scrolling up during streaming stops auto-follow and your position is kept after streaming ends. Quick intents affect only the current turn, not stored transcript. Saving to the knowledge base may navigate you there to continue editing.',
 	},
 	'pg-s13-9': {
 		title: '13.9 List and left-rail UX details',
@@ -371,7 +371,7 @@ export const PROJECT_GUIDE_ITEMS_EN: Record<
 	'pg-s16-4': {
 		title: '16.4 MOKE reading assistant (EPUB & PDF)',
 		description:
-			'Entry: while reading EPUB or PDF, tap the Bot icon in the reader header, or Right-click → Reading assistant in the reading area. EPUB also supports body right-click (assistant in the menu; MOKE ask-about-selection when text is selected).\nLayout: reader left, MOKE assistant right, draggable split (~50% each by default); not a modal or drawer.\nRequires sign-in; ask about the book, context, or takeaways. Streaming scroll matches the knowledge assistant. One independent session per book.\nAI reply actions: copy, Save to knowledge base (opens the knowledge editor), or Share the current Q&A pair.\nPDF: no ask-about-selection because PDF text cannot be selected; other assistant features match EPUB.\nKeyboard: when the assistant is open and the input is focused, page-turn shortcuts (↑/←/↓/→) are ignored.',
+			'Entry: while reading EPUB or PDF, tap the Bot icon in the reader header, or Right-click → Reading assistant in the reading area. EPUB also supports body right-click (assistant in the menu; MOKE ask-about-selection when text is selected).\nLayout: reader left, MOKE assistant right, draggable split (~50% each by default); not a modal or drawer.\nRequires sign-in; ask about the book, context, or takeaways. Streaming scroll matches the knowledge assistant (scroll up to stop auto-follow; position kept after streaming ends). One independent session per book.\nAI reply actions: copy, Save to knowledge base (opens the knowledge editor), or Share the current Q&A pair.\nPDF: no ask-about-selection because PDF text cannot be selected; other assistant features match EPUB.\nKeyboard: when the assistant is open and the input is focused, page-turn shortcuts (↑/←/↓/→) are ignored.',
 	},
 	'pg-s16-5': {
 		title: '16.5 PDF reading context menu (PDF only)',
@@ -381,6 +381,6 @@ export const PROJECT_GUIDE_ITEMS_EN: Record<
 	'pg-s16-6': {
 		title: '16.6 EPUB reading notes (EPUB only)',
 		description:
-			'Entry: while reading EPUB, select text → right-click → Write note.\nMark: after saving, a subtle amber dashed underline appears under the passage; it is restored when you reopen the book.\nView: tap the underline to open the list for that selection first (username and time, newest first—even a single note); tap an item for details; closing details returns to the list when you came from it.\nOverlapping selections: nested overlaps show one visible underline; tapping shorter nested text still opens that selection’s list.\nSelection: releasing after drag-select does not open the list—tap the underline intentionally.\nEdit/delete: edit body or delete in the details dialog.\nSign-in & sync: sign-in required; notes live on your account and sync across devices; deleting the book from the shelf removes its notes.\nPDF text cannot be selected yet—reading notes are EPUB-only; independent from MOKE ask-about-selection (16.4).',
+			'Entry: select text → floating toolbar or right-click → Write note; or tap the dashed underline to open the list.\nThe floating toolbar uses a frosted panel so it stays readable on dark reading backgrounds and colored themes; after copy, a brief Copied state shows before the selection clears.\nUI: list, details, and compose use the right reading column (mutually exclusive with 16.4 MK ask-about-selection; same resizable slot). Header shows title and note count; close on top-right; Cancel/Save at the panel footer when composing, Delete/Edit when viewing.\nList & details: avatar, username, publish time, and body; quote card shortcuts for copy, write note, and MK ask (see 16.4).\nCompose/edit: up to 500 characters; Enter to save, Shift/Ctrl/Cmd+Enter for new lines; input fixed at the panel footer with quote/details scrolling above.\nMark: amber dashed underline after save; restored when reopening the book.\nView: tap underline → list first (even one note) → item for details; closing details returns to the list when opened from it.\nOverlapping selections: one visible underline for nested overlaps; shorter nested text still opens its list.\nSelection: drag-release does not open the list—tap the underline intentionally.\nSign-in & sync: sign-in required; notes on your account; deleting the book removes its notes.\nPDF not supported yet; independent from MK ask-about-selection.',
 	},
 };

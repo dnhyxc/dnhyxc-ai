@@ -20,7 +20,7 @@ export type AssistantSessionEntryToolbarProps = {
 	isHistoryDrawerOpen: boolean;
 	setIsHistoryDrawerOpen: Dispatch<SetStateAction<boolean>>;
 	enableStreamStickToBottom: () => void;
-	flushScrollToBottom: () => void;
+	flushScrollToBottom: (options?: { force?: boolean }) => void;
 	layout?: 'knowledge' | 'english';
 	extraActions?: ReactNode;
 	/** english：新对话草稿创建后的业务回调 */

@@ -20,6 +20,10 @@ async function bootstrap() {
 		rawBody: true,
 	});
 
+	// 默认 JSON 上限 100kb；知识库 content 允许至 5MB（见 SaveKnowledgeDto）
+	app.useBodyParser('json', { limit: '6mb' });
+	app.useBodyParser('urlencoded', { limit: '6mb', extended: true });
+
 	const uploadsRoot = getUploadsRoot(__dirname);
 	// 须在 globalPrefix 之前：直接处理 /images、/files（解码中文文件名）
 	app.use(serveUploadStaticMiddleware(uploadsRoot));

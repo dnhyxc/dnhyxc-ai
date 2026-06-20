@@ -2,16 +2,14 @@
  * 正文：优先用 `MarkdownParser.splitForMermaidIslands`（markdown-it parse）拆出 ```mermaid 岛，
  * 普通 markdown 段仍走 `parser.render`，保证列表内代码块等边界与渲染器一致。
  *
- * 流式尾部「未闭合 mermaid 围栏」不会产生 fence token：用按行围栏解析规则仅探测尾部开放 mermaid，
- * 将其从 markdown 段中剥离出来交给 MermaidFenceIsland，既能边输出边出图，也不会破坏普通代码块渲染。
+ * 流式阶段：
+ * - 代码围栏 → StreamingCodeFenceBlock（稳定 fenceKey，闭合后冻结 DOM）
+ * - 正文段 → StableMarkdownChunk memo，仅尾段增长
  */
 
 import { MermaidFenceIsland } from '@design/MermaidFenceIsland';
 import { MermaidFenceToolbarActions } from '@design/MermaidFenceToolbar';
-import type {
-	MarkdownMermaidSplitPart,
-	MarkdownParser,
-} from '@dnhyxc-ai/markdown-kit';
+import type { MarkdownParser } from '@dnhyxc-ai/markdown-kit';
 import { memo, type RefObject, useMemo } from 'react';
 import { useMermaidImagePreview } from '@/hooks/useMermaidImagePreview';
 import { cn } from '@/lib/utils';
@@ -19,8 +17,11 @@ import { ChatI18nT } from '@/types/chat';
 import {
 	hashText,
 	mermaidStreamingFallbackHtml,
+	type StreamingBodyPart,
 	splitForMermaidIslandsWithOpenTail,
+	splitStreamingBodyParts,
 } from '@/utils/splitMarkdownFences';
+import { StreamingCodeFenceBlock } from './StreamingCodeFenceBlock';
 
 export type StreamingMarkdownBodyProps = {
 	markdown: string;
@@ -28,17 +29,44 @@ export type StreamingMarkdownBodyProps = {
 	className?: string;
 	preferDark: boolean;
 	isStreaming: boolean;
-	/** 每块 Mermaid 的默认展示模式（不传则默认图）；每块仍可独立切换 */
 	defaultMermaidViewMode?: 'diagram' | 'code';
 	containerRef?: RefObject<HTMLDivElement | null>;
-	/** i18n 翻译函数（可选）；不传则沿用 MermaidFenceToolbarActions 的默认中文文案 */
 	t?: ChatI18nT;
-	/**
-	 * 对 markdown-it 产出 HTML 的后处理（例如联网引用占位符 → <a>）。
-	 * 仅在 `type==='markdown'` 片段上调用，不会影响 ```mermaid``` 岛。
-	 */
 	renderedMarkdownHtmlPostProcess?: (html: string) => string;
 };
+
+type StableMarkdownChunkProps = {
+	partKey: string;
+	text: string;
+	parser: MarkdownParser;
+	renderedMarkdownHtmlPostProcess?: (html: string) => string;
+};
+
+function StableMarkdownChunkInner({
+	text,
+	parser,
+	renderedMarkdownHtmlPostProcess,
+}: StableMarkdownChunkProps) {
+	const html = useMemo(() => {
+		let out = parser.render(text);
+		if (renderedMarkdownHtmlPostProcess) {
+			out = renderedMarkdownHtmlPostProcess(out);
+		}
+		return out;
+	}, [text, parser, renderedMarkdownHtmlPostProcess]);
+
+	return <div dangerouslySetInnerHTML={{ __html: html }} />;
+}
+
+const StableMarkdownChunk = memo(
+	StableMarkdownChunkInner,
+	(prev, next) =>
+		prev.partKey === next.partKey &&
+		prev.text === next.text &&
+		prev.parser === next.parser &&
+		prev.renderedMarkdownHtmlPostProcess ===
+			next.renderedMarkdownHtmlPostProcess,
+);
 
 function StreamingMarkdownBodyInner({
 	markdown,
@@ -51,39 +79,43 @@ function StreamingMarkdownBodyInner({
 	t,
 	renderedMarkdownHtmlPostProcess,
 }: StreamingMarkdownBodyProps) {
-	const { parts, openMermaidId } = useMemo(() => {
-		const split = splitForMermaidIslandsWithOpenTail({
-			markdown,
-			parser,
-			// 与 Monaco 预览一致：始终探测尾部开放 mermaid；闭合围栏仍走 parser 完整块
-			enableOpenTail: true,
-			openMermaidIdPrefix: 'mmd-open-line-',
-		});
+	const streamBundle = useMemo(() => {
 		if (!isStreaming) {
+			const split = splitForMermaidIslandsWithOpenTail({
+				markdown,
+				parser,
+				enableOpenTail: true,
+				openMermaidIdPrefix: 'mmd-open-line-',
+			});
 			return {
-				...split,
 				parts: split.parts.map((p) =>
-					p.type === 'mermaid' ? { ...p, complete: true } : p,
+					p.type === 'mermaid'
+						? { type: 'mermaid' as const, text: p.text, complete: true }
+						: {
+								type: 'markdown' as const,
+								text: p.text,
+								partKey: `md-${hashText(p.text)}`,
+							},
 				),
-				openMermaidId: null,
+				openMermaidId: null as string | null,
 			};
 		}
-		return split;
+		return splitStreamingBodyParts(markdown, parser, 'mmd-open-line-');
 	}, [markdown, parser, isStreaming]);
+
+	const { parts, openMermaidId } = streamBundle;
 
 	const { openMermaidPreview, mermaidImagePreviewModal } =
 		useMermaidImagePreview(t);
 
 	const renderMermaidPart = (
-		part: Extract<MarkdownMermaidSplitPart, { type: 'mermaid' }>,
+		part: Extract<StreamingBodyPart, { type: 'mermaid' }>,
 		i: number,
 	) => {
-		// Mermaid：每块独立切换（图/代码）
 		const blockId = part.complete
 			? `mmd-${hashText(part.text)}`
 			: (openMermaidId ?? `mmd-open-${i}`);
 
-		// 顶栏交互在 MermaidFenceToolbarActions 内；下方内容由 mode 决定
 		return (
 			<MermaidFenceToolbarActions
 				key={`mm-wrap-${blockId}`}
@@ -114,15 +146,50 @@ function StreamingMarkdownBodyInner({
 	};
 
 	return (
-		<div ref={containerRef} className={cn('streaming-md-body', className)}>
-			{parts.map((part: MarkdownMermaidSplitPart, i: number) => {
+		<div
+			ref={containerRef}
+			className={cn(
+				'streaming-md-body',
+				isStreaming && 'streaming-md-body--streaming',
+				className,
+			)}
+		>
+			{parts.map((part: StreamingBodyPart, i: number) => {
+				if (part.type === 'codeFence') {
+					return (
+						<StreamingCodeFenceBlock
+							key={part.fenceKey}
+							fenceKey={part.fenceKey}
+							lang={part.lang}
+							body={part.body}
+							complete={part.complete}
+							parser={parser}
+						/>
+					);
+				}
 				if (part.type === 'markdown') {
+					if (isStreaming) {
+						return (
+							<StableMarkdownChunk
+								key={part.partKey}
+								partKey={part.partKey}
+								text={part.text}
+								parser={parser}
+								renderedMarkdownHtmlPostProcess={
+									renderedMarkdownHtmlPostProcess
+								}
+							/>
+						);
+					}
 					let html = parser.render(part.text);
 					if (renderedMarkdownHtmlPostProcess) {
 						html = renderedMarkdownHtmlPostProcess(html);
 					}
 					return (
-						<div key={`md-${i}`} dangerouslySetInnerHTML={{ __html: html }} />
+						<div
+							key={part.partKey}
+							dangerouslySetInnerHTML={{ __html: html }}
+						/>
 					);
 				}
 				return renderMermaidPart(part, i);
@@ -151,7 +218,6 @@ function areStreamingMarkdownBodyPropsEqual(
 	);
 }
 
-/** 与父级（如角标悬浮 state）解耦，避免无关节点重绘时用 innerHTML 冲掉正文内已改写的合并胶囊 */
 export const StreamingMarkdownBody = memo(
 	StreamingMarkdownBodyInner,
 	areStreamingMarkdownBodyPropsEqual,

@@ -1,7 +1,7 @@
 // components/ChatTextArea.tsx
 
 import { Button, ScrollArea, Textarea } from '@ui/index';
-import React, { forwardRef, useRef } from 'react';
+import React, { forwardRef, useLayoutEffect, useRef } from 'react';
 import { useEntry } from '@/hooks/useEntry'; // 根据实际路径调整
 import { cn } from '@/lib/utils';
 import { ChatI18nT, Message } from '@/types/chat'; // 根据实际路径调整
@@ -35,6 +35,9 @@ interface ChatTextAreaProps {
 	disableTextInput?: boolean;
 	/** i18n 翻译函数（可选）；不传则沿用组件内默认中文文案 */
 	t?: ChatI18nT;
+	maxLength?: number;
+	onScrollAreaWheel?: React.WheelEventHandler<HTMLDivElement>;
+	onScrollAreaWheelCapture?: React.WheelEventHandler<HTMLDivElement>;
 }
 
 const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
@@ -53,6 +56,9 @@ const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 			textareaClassName,
 			disableTextInput = false,
 			t,
+			maxLength,
+			onScrollAreaWheel,
+			onScrollAreaWheelCapture,
 		},
 		ref,
 	) => {
@@ -85,26 +91,69 @@ const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
 		const placeholder =
 			placeholderProp ?? t?.('chat.textArea.placeholder') ?? '请输入您的问题';
 
-		const onScrollTo = () => {
-			scrollRef.current?.scrollTo({
-				top: scrollRef.current.scrollHeight + 100,
+		const scrollInputToBottom = () => {
+			const scroll = () => {
+				const viewport = scrollRef.current;
+				if (viewport) {
+					viewport.scrollTop = viewport.scrollHeight;
+				}
+				const el = typeof ref !== 'function' ? ref?.current : null;
+				if (el) {
+					el.scrollTop = el.scrollHeight;
+				}
+			};
+			requestAnimationFrame(() => {
+				scroll();
+				requestAnimationFrame(scroll);
 			});
 		};
+
+		// 受控 value 更新后（如 Shift+Enter 换行）再滚到底，避免光标被挡在视口外
+		useLayoutEffect(() => {
+			const el = typeof ref !== 'function' ? ref?.current : null;
+			if (!el || document.activeElement !== el) return;
+			const atEnd =
+				el.selectionStart === el.value.length &&
+				el.selectionEnd === el.value.length;
+			if (!atEnd) return;
+
+			const viewport = scrollRef.current;
+			if (viewport) {
+				viewport.scrollTop = viewport.scrollHeight;
+			}
+			el.scrollTop = el.scrollHeight;
+			requestAnimationFrame(() => {
+				if (viewport) {
+					viewport.scrollTop = viewport.scrollHeight;
+				}
+				el.scrollTop = el.scrollHeight;
+			});
+		}, [value, ref]);
 
 		return (
 			<>
 				<ScrollArea
 					ref={scrollRef}
-					className={`flex max-h-35 w-full flex-col overflow-y-auto border-0 ${className || ''}`}
+					className={cn(
+						'flex max-h-35 w-full flex-col overflow-y-auto border-0',
+						className,
+					)}
+					onWheel={onScrollAreaWheel}
+					onWheelCapture={onScrollAreaWheelCapture}
 				>
 					<Textarea
 						ref={ref}
 						value={value}
+						maxLength={maxLength}
 						onChange={
 							isEditMode ? handleEditChange : (e) => setInput?.(e.target.value)
 						}
 						onKeyDown={(e) =>
-							handleKeyDown(e, isEditMode ? editMessage : null, onScrollTo)
+							handleKeyDown(
+								e,
+								isEditMode ? editMessage : null,
+								scrollInputToBottom,
+							)
 						}
 						onCompositionStart={handleCompositionStart}
 						onCompositionEnd={handleCompositionEnd}

@@ -17,8 +17,12 @@
 | [ebook-toc-active-highlight.md](./ebook-toc-active-highlight.md) | **增量**：目录抽屉当前章节高亮（EPUB/PDF 共用 `EbookTocDrawer`） |
 | [ebook-shelf-category.md](./ebook-shelf-category.md) | **增量**：书架分类（面包屑、Tab Rail、Model 管理弹窗、书名行移动 Popover、删分类归入未分类） |
 | [ebook-cos-stream-io.md](./ebook-cos-stream-io.md) | **增量**：COS 流式上传/下载，避免大文件整包进内存 |
-| [epub-reading-thoughts.md](./epub-reading-thoughts.md) | **增量（本轮）**：EPUB 读书想法（服务端存储、虚线下划线、重叠去重、统一点击列表、选区防误触） |
+| [epub-reading-thoughts.md](./epub-reading-thoughts.md) | **数据层**：服务端存储、虚线下划线、重叠去重、选区防误触 |
+| [epub-thought-side-panel.md](./epub-thought-side-panel.md) | **当前 UI**：读书想法右侧分栏（与 MK 问书互斥）、footer 固定输入 |
+| [epub-selection-popbar-visual.md](./epub-selection-popbar-visual.md) | **增量**：选区浮动 PopBar 毛玻璃/箭头/主题定向阴影与 `--shadow-drop-*` 令牌 |
+| [epub-thought-underlines-sync.md](./epub-thought-underlines-sync.md) | **增量**：下划线批注与监听拆分，修复保存/切章偶发白屏 |
+| [epub-thought-drawer.md](./epub-thought-drawer.md) | **已废弃归档**：全屏底部 Sheet 抽屉（组件已删，勿作实现依据） |
 | [../chat/assistant-share-bar.md](../chat/assistant-share-bar.md) | **关联**：助手分享底栏与 `useAssistantShare`（知识库 / 英语 / 电子书三端统一） |
 | [../knowledge/assistant-insert-focus.md](../knowledge/assistant-insert-focus.md) | **关联**：选区写入助手后聚焦与 IME 修复（知识库 + 电子书 MOKE 问书） |
 
-**延伸阅读**：上传目录与 `uploads/ebooks` 落盘见 [ops/upload-storage-paths.md](../ops/upload-storage-paths.md)；路由鉴权与公开路径见 [app/route-auth.md](../app/route-auth.md)。EPUB 右键初版见 [epub-assistant-context-menu.md](./epub-assistant-context-menu.md)；**本轮 MOKE / PDF 完整说明**见 [ebook-moke-assistant.md](./ebook-moke-assistant.md)。
+**延伸阅读**：上传目录与 `uploads/ebooks` 落盘见 [ops/upload-storage-paths.md](../ops/upload-storage-paths.md)；路由鉴权与公开路径见 [app/route-auth.md](../app/route-auth.md)。EPUB 右键见 [epub-assistant-context-menu.md](./epub-assistant-context-menu.md)；MOKE / PDF 见 [ebook-moke-assistant.md](./ebook-moke-assistant.md)。**读书想法 UI 以 [epub-thought-side-panel.md](./epub-thought-side-panel.md) 为准**（全屏抽屉已废弃，见 [epub-thought-drawer.md](./epub-thought-drawer.md) 归档）。

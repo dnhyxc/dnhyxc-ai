@@ -85,8 +85,15 @@ export type EbookThoughtDto = {
 	content: string;
 	/** 由 userId 在查询时从 user 表实时解析，不写入 ebook_thought */
 	username: string;
+	/** 由 userId 关联 profile 实时解析 */
+	avatar: string;
 	createdAt: string;
 	updatedAt: string;
+};
+
+type EbookThoughtUserInfo = {
+	username: string;
+	avatar: string;
 };
 
 export type EbookFilePayload =
@@ -727,46 +734,59 @@ export class EbookService {
 		return this.toBookDto(book);
 	}
 
-	private toThoughtDto(row: EbookThought, username: string): EbookThoughtDto {
+	private toThoughtDto(
+		row: EbookThought,
+		user: EbookThoughtUserInfo,
+	): EbookThoughtDto {
 		return {
 			id: row.id,
 			userId: row.userId,
 			cfiRange: row.cfiRange,
 			quote: row.quote,
 			content: row.content,
-			username,
+			username: user.username,
+			avatar: user.avatar,
 			createdAt: row.createdAt.toISOString(),
 			updatedAt: row.updatedAt.toISOString(),
 		};
 	}
 
-	/** 按 userId 批量查 user 表，username 每次响应时实时解析 */
-	private async buildUsernameMap(
+	/** 按 userId 批量查 user + profile，username/avatar 每次响应时实时解析 */
+	private async buildUserInfoMap(
 		userIds: number[],
-	): Promise<Map<number, string>> {
+	): Promise<Map<number, EbookThoughtUserInfo>> {
 		const unique = [...new Set(userIds.filter((id) => id > 0))];
-		const map = new Map<number, string>();
+		const map = new Map<number, EbookThoughtUserInfo>();
 		if (unique.length === 0) return map;
 
 		const users = await this.userRepo.find({
 			where: { id: In(unique) },
-			select: { id: true, username: true },
+			relations: ['profile'],
 		});
 		for (const user of users) {
-			map.set(user.id, user.username);
+			map.set(user.id, {
+				username: user.username,
+				avatar: user.profile?.avatar ?? '',
+			});
 		}
 		for (const id of unique) {
-			if (!map.has(id)) map.set(id, String(id));
+			if (!map.has(id)) {
+				map.set(id, { username: String(id), avatar: '' });
+			}
 		}
 		return map;
 	}
 
 	private async toThoughtDtoWithUsername(
 		row: EbookThought,
-		usernameMap?: Map<number, string>,
+		userInfoMap?: Map<number, EbookThoughtUserInfo>,
 	): Promise<EbookThoughtDto> {
-		const map = usernameMap ?? (await this.buildUsernameMap([row.userId]));
-		return this.toThoughtDto(row, map.get(row.userId) ?? String(row.userId));
+		const map = userInfoMap ?? (await this.buildUserInfoMap([row.userId]));
+		const info = map.get(row.userId) ?? {
+			username: String(row.userId),
+			avatar: '',
+		};
+		return this.toThoughtDto(row, info);
 	}
 
 	private async assertBookOwned(
@@ -789,11 +809,11 @@ export class EbookService {
 			where: { userId, bookId },
 			order: { createdAt: 'DESC' },
 		});
-		const usernameMap = await this.buildUsernameMap(
+		const userInfoMap = await this.buildUserInfoMap(
 			rows.map((row) => row.userId),
 		);
 		return Promise.all(
-			rows.map((row) => this.toThoughtDtoWithUsername(row, usernameMap)),
+			rows.map((row) => this.toThoughtDtoWithUsername(row, userInfoMap)),
 		);
 	}
 

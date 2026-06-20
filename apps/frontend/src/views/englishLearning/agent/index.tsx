@@ -104,16 +104,8 @@ export const AgentPanel = observer(function AgentPanel({
 	const idleFlushKey = useMemo((): string | null => {
 		if (isHydrating) return null;
 		if (messages.length === 0) return null;
-		const first = messages[0];
-		const last = messages[messages.length - 1];
-		return `${englishAgentStore.sessionId ?? 'none'}-${messages.length}-${first?.chatId ?? ''}-${last?.chatId ?? ''}`;
-	}, [
-		isHydrating,
-		englishAgentStore.sessionId,
-		messages.length,
-		messages[0]?.chatId,
-		messages[messages.length - 1]?.chatId,
-	]);
+		return `${englishAgentStore.sessionId ?? 'none'}-${messages.length}`;
+	}, [isHydrating, englishAgentStore.sessionId, messages.length]);
 
 	const {
 		viewportRef: scrollViewportRef,
@@ -217,7 +209,7 @@ export const AgentPanel = observer(function AgentPanel({
 				loadingText={t('englishLearning.loading')}
 				hasMessages={messages.length > 0}
 				emptyState={
-					<div className="text-textcolor/70 mx-auto flex max-w-3xl w-full flex-1 flex-col justify-between self-stretch pt-4.5 px-4.5 text-sm">
+					<div className="text-textcolor/70 mx-auto flex max-w-3xl w-full flex-1 flex-col justify-between self-stretch px-4.5 text-sm">
 						<div className="border-theme/5 bg-theme/5 flex w-full gap-2 rounded-md border p-3">
 							<Atom
 								size={18}
@@ -238,7 +230,8 @@ export const AgentPanel = observer(function AgentPanel({
 				}
 				viewportRef={scrollViewportRef}
 				scrollAreaHandlers={scrollAreaHandlers}
-				messageContainerClassName="pt-4.5 px-4"
+				className="mt-4.5"
+				messageContainerClassName="px-4.5 pt-0"
 				messageList={messages.map((m, index) => (
 					<AssistantMessageRow
 						key={m.chatId}

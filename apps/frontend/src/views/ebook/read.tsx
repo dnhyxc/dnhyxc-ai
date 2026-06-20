@@ -24,6 +24,7 @@ import {
 import ebookStore from '@/store/ebook';
 import { copyToClipboard } from '@/utils/clipboard';
 import { getRequestErrorMessage } from '@/utils/fetch';
+import { EbookAssistant } from './components/EbookAssistant';
 import { EbookPageShell } from './components/EbookPageShell';
 import { EbookPanelHeader } from './components/EbookPanelHeader';
 import { EbookReadSplitLayout } from './components/EbookReadSplitLayout';
@@ -34,8 +35,12 @@ import {
 	type EpubReaderContextMenuState,
 } from './components/EpubReaderContextMenu';
 import { EpubReaderSettingsPopover } from './components/EpubReaderSettingsPopover';
-import { EpubThoughtDialog } from './components/EpubThoughtDialog';
-import { EpubThoughtListDialog } from './components/EpubThoughtListDialog';
+import {
+	EpubSelectionPopBar,
+	type EpubSelectionPopBarState,
+} from './components/EpubSelectionPopBar';
+import { EpubThought } from './components/EpubThought';
+import { EpubThoughtList } from './components/EpubThoughtList';
 import { PdfPane } from './components/PdfPane';
 import type { EbookThought, EbookTocItem } from './types';
 import {
@@ -52,6 +57,7 @@ import {
 	loadEpubReaderSettings,
 	saveEpubReaderSettings,
 } from './utils/epubReaderSettings';
+import type { EpubSelectionPopBarPayload } from './utils/epubSelectionToolbarAttach';
 import { type EbookOpenSource, resolveOpen } from './utils/io';
 import { parsePdfPageHref } from './utils/pdfOutline';
 import {
@@ -84,6 +90,7 @@ function EbookReadPage() {
 		prev: () => Promise<void>;
 		next: () => Promise<void>;
 		go: (href: string) => Promise<void>;
+		clearTextSelection: () => void;
 	} | null>(null);
 	const [epubNavReady, setEpubNavReady] = useState(false);
 	const pdfNavRef = useRef<{
@@ -118,6 +125,10 @@ function EbookReadPage() {
 	const [thoughtSaving, setThoughtSaving] = useState(false);
 	const [thoughtListOpen, setThoughtListOpen] = useState(false);
 	const [thoughtListGroup, setThoughtListGroup] = useState<EbookThought[]>([]);
+	const [thoughtComposeScrollKey, setThoughtComposeScrollKey] = useState(0);
+	const [selectionPopBar, setSelectionPopBar] =
+		useState<EpubSelectionPopBarState | null>(null);
+	const selectionPopBarRef = useRef<EpubSelectionPopBarPayload | null>(null);
 	const returnToListCfiRef = useRef<string | null>(null);
 	const [thoughtDraft, setThoughtDraft] = useState({
 		id: '',
@@ -125,6 +136,8 @@ function EbookReadPage() {
 		cfiRange: '',
 		content: '',
 		username: '',
+		avatar: '',
+		createdAt: '',
 		updatedAt: '',
 	});
 	const progTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -175,6 +188,7 @@ function EbookReadPage() {
 
 	const openViewThought = useCallback(
 		(thought: EbookThought, fromList = false) => {
+			setAssistantOpen(false);
 			if (fromList) {
 				returnToListCfiRef.current = thought.cfiRange;
 				setThoughtListOpen(false);
@@ -187,6 +201,8 @@ function EbookReadPage() {
 				cfiRange: thought.cfiRange,
 				content: thought.content,
 				username: thought.username,
+				avatar: thought.avatar,
+				createdAt: thought.createdAt,
 				updatedAt: thought.updatedAt,
 			});
 			setThoughtDialogMode('view');
@@ -207,8 +223,69 @@ function EbookReadPage() {
 		}
 	}, [thoughtDialogOpen, thoughts]);
 
+	const openCreateThought = useCallback(
+		(quote: string, cfiRange?: string) => {
+			const trimmed = quote.trim();
+			if (!trimmed) return;
+			if (!cfiRange) {
+				Toast({
+					type: 'error',
+					title: t('ebook.read.thought.cfiFailed'),
+				});
+				return;
+			}
+			setAssistantOpen(false);
+			setSelectionPopBar(null);
+			selectionPopBarRef.current = null;
+			// 发布后 / 关闭写想法页时回到当前引用段落的列表（避免仍显示上一段列表）
+			returnToListCfiRef.current = cfiRange;
+			setThoughtListOpen(false);
+			setThoughtDraft({
+				id: '',
+				quote: trimmed,
+				cfiRange,
+				content: '',
+				username: '',
+				avatar: '',
+				createdAt: '',
+				updatedAt: '',
+			});
+			setThoughtDialogMode('create');
+			setThoughtDialogOpen(true);
+			setThoughtComposeScrollKey((key) => key + 1);
+		},
+		[t],
+	);
+
+	const onSelectionPopBarChange = useCallback(
+		(payload: EpubSelectionPopBarPayload | null) => {
+			if (!payload) {
+				setSelectionPopBar(null);
+				selectionPopBarRef.current = null;
+				return;
+			}
+			selectionPopBarRef.current = payload;
+			setSelectionPopBar({ ...payload, open: true });
+		},
+		[],
+	);
+
+	const onSelectionPopBarWriteThought = useCallback(() => {
+		const payload = selectionPopBarRef.current;
+		if (!payload) return;
+		openCreateThought(payload.selectedText, payload.cfiRange);
+	}, [openCreateThought]);
+
+	useEffect(() => {
+		if (thoughtDialogOpen || thoughtListOpen || contextMenu?.open) {
+			setSelectionPopBar(null);
+			selectionPopBarRef.current = null;
+		}
+	}, [thoughtDialogOpen, thoughtListOpen, contextMenu?.open]);
+
 	const openThoughtGroup = useCallback((group: EbookThought[]) => {
 		if (group.length === 0) return;
+		setAssistantOpen(false);
 		setThoughtListGroup(group);
 		setThoughtListOpen(true);
 	}, []);
@@ -227,7 +304,15 @@ function EbookReadPage() {
 					quote: thoughtDraft.quote,
 					content,
 				});
-				setThoughts((prev) => [item, ...prev]);
+				setThoughts((prev) => {
+					const updated = [item, ...prev];
+					setThoughtListGroup(
+						updated.filter((thought) => thought.cfiRange === item.cfiRange),
+					);
+					return updated;
+				});
+				setThoughtListOpen(true);
+				returnToListCfiRef.current = null;
 			} else if (thoughtDraft.id) {
 				const item = await updateEbookThought(thoughtDraft.id, { content });
 				setThoughts((prev) => prev.map((t) => (t.id === item.id ? item : t)));
@@ -342,12 +427,19 @@ function EbookReadPage() {
 			prev: () => Promise<void>;
 			next: () => Promise<void>;
 			go: (href: string) => Promise<void>;
+			clearTextSelection: () => void;
 		}) => {
 			epubNavRef.current = api;
 			setEpubNavReady(true);
 		},
 		[],
 	);
+
+	const clearEpubSelection = useCallback(() => {
+		epubNavRef.current?.clearTextSelection();
+		setSelectionPopBar(null);
+		selectionPopBarRef.current = null;
+	}, []);
 
 	const onEpubNavReset = useCallback(() => {
 		epubNavRef.current = null;
@@ -396,6 +488,8 @@ function EbookReadPage() {
 	}, []);
 
 	const openAssistant = useCallback((draft?: string) => {
+		setThoughtListOpen(false);
+		setThoughtDialogOpen(false);
 		if (draft?.trim()) {
 			setAssistantInput(draft.trim());
 		}
@@ -403,7 +497,13 @@ function EbookReadPage() {
 	}, []);
 
 	const toggleAssistant = useCallback(() => {
-		setAssistantOpen((prev) => !prev);
+		setAssistantOpen((prev) => {
+			if (!prev) {
+				setThoughtListOpen(false);
+				setThoughtDialogOpen(false);
+			}
+			return !prev;
+		});
 	}, []);
 
 	const openAssistantWithSelection = useCallback(
@@ -416,12 +516,191 @@ function EbookReadPage() {
 		[openAssistant, t],
 	);
 
+	const onSelectionPopBarCopy = useCallback(() => {
+		const payload = selectionPopBarRef.current;
+		if (!payload?.selectedText.trim()) return;
+		void copyToClipboard(payload.selectedText);
+		setSelectionPopBar(null);
+		selectionPopBarRef.current = null;
+	}, []);
+
+	const onSelectionPopBarAskBook = useCallback(() => {
+		const payload = selectionPopBarRef.current;
+		const text = payload?.selectedText ?? '';
+		setSelectionPopBar(null);
+		selectionPopBarRef.current = null;
+		window.setTimeout(() => openAssistantWithSelection(text), 0);
+	}, [openAssistantWithSelection]);
+
+	const selectionPopBarLabels = useMemo(
+		() => ({
+			copy: t('ebook.read.contextMenu.copy'),
+			copied: t('chat.codeToolbar.copied'),
+			underline: t('ebook.read.selectionPop.underline'),
+			writeThought: t('ebook.read.contextMenu.addThought'),
+			share: t('ebook.read.selectionPop.share'),
+			askBook: t('ebook.read.selectionPop.askBook'),
+			listen: t('ebook.read.selectionPop.listen'),
+		}),
+		[t],
+	);
+
+	const thoughtDrawerLabels = useMemo(
+		() => ({
+			...selectionPopBarLabels,
+			share: t('ebook.read.selectionPop.shareShort'),
+		}),
+		[selectionPopBarLabels, t],
+	);
+
+	const thoughtListQuoteActions = useMemo(() => {
+		const first = thoughtListGroup[0];
+		if (!first?.quote.trim()) return null;
+		const quote = first.quote;
+		const cfiRange = first.cfiRange;
+		return {
+			labels: thoughtDrawerLabels,
+			onCopy: () => void copyToClipboard(quote),
+			onWriteThought: () => {
+				returnToListCfiRef.current = cfiRange;
+				setThoughtListOpen(false);
+				openCreateThought(quote, cfiRange);
+			},
+			onAskBook: () => {
+				setThoughtListOpen(false);
+				window.setTimeout(() => openAssistantWithSelection(quote), 0);
+			},
+		};
+	}, [
+		thoughtListGroup,
+		thoughtDrawerLabels,
+		openCreateThought,
+		openAssistantWithSelection,
+	]);
+
+	const thoughtDialogQuoteActions = useMemo(() => {
+		const quote = thoughtDraft.quote.trim();
+		if (!quote) return null;
+		return {
+			labels: thoughtDrawerLabels,
+			onCopy: () => void copyToClipboard(thoughtDraft.quote),
+			onWriteThought: () => {
+				if (thoughtDialogOpen && thoughtDialogMode === 'create') {
+					setThoughtComposeScrollKey((key) => key + 1);
+					return;
+				}
+				setThoughtDialogOpen(false);
+				openCreateThought(thoughtDraft.quote, thoughtDraft.cfiRange);
+			},
+			onAskBook: () => {
+				setThoughtDialogOpen(false);
+				window.setTimeout(
+					() => openAssistantWithSelection(thoughtDraft.quote),
+					0,
+				);
+			},
+		};
+	}, [
+		thoughtDraft.quote,
+		thoughtDraft.cfiRange,
+		thoughtDialogMode,
+		thoughtDialogOpen,
+		thoughtDrawerLabels,
+		openCreateThought,
+		openAssistantWithSelection,
+	]);
+
+	const thoughtPanelOpen = thoughtListOpen || thoughtDialogOpen;
+	const sidePanelOpen = assistantOpen || thoughtPanelOpen;
+
+	const closeThoughtDialog = useCallback(() => {
+		setThoughtDialogOpen(false);
+	}, []);
+
+	const closeThoughtList = useCallback(() => {
+		setThoughtListOpen(false);
+	}, []);
+
+	const sidePanel = useMemo(() => {
+		if (!book) return null;
+		if (assistantOpen) {
+			return (
+				<EbookAssistant
+					bookId={book.id}
+					bookTitle={book.title}
+					input={assistantInput}
+					onInputChange={setAssistantInput}
+					focusInputAtEndKey={focusInputAtEndKey}
+				/>
+			);
+		}
+		if (thoughtDialogOpen) {
+			return (
+				<EpubThought
+					onClose={closeThoughtDialog}
+					mode={thoughtDialogMode}
+					scrollToComposeKey={thoughtComposeScrollKey}
+					quote={thoughtDraft.quote}
+					content={thoughtDraft.content}
+					username={thoughtDraft.username}
+					avatar={thoughtDraft.avatar}
+					createdAt={thoughtDraft.createdAt}
+					updatedAt={thoughtDraft.updatedAt}
+					quoteActions={thoughtDialogQuoteActions}
+					onContentChange={(content) =>
+						setThoughtDraft((d) => ({ ...d, content }))
+					}
+					onSave={saveThought}
+					onDelete={thoughtDialogMode !== 'create' ? deleteThought : undefined}
+					onEdit={
+						thoughtDialogMode === 'view'
+							? () => setThoughtDialogMode('edit')
+							: undefined
+					}
+					saving={thoughtSaving}
+				/>
+			);
+		}
+		if (thoughtListOpen) {
+			return (
+				<EpubThoughtList
+					onClose={closeThoughtList}
+					thoughts={thoughtListGroup}
+					onSelect={(thought) => openViewThought(thought, true)}
+					quoteActions={thoughtListQuoteActions}
+				/>
+			);
+		}
+		return null;
+	}, [
+		book,
+		assistantOpen,
+		assistantInput,
+		closeThoughtDialog,
+		closeThoughtList,
+		deleteThought,
+		focusInputAtEndKey,
+		openViewThought,
+		saveThought,
+		thoughtComposeScrollKey,
+		thoughtDialogMode,
+		thoughtDialogOpen,
+		thoughtDialogQuoteActions,
+		thoughtDraft,
+		thoughtListGroup,
+		thoughtListOpen,
+		thoughtListQuoteActions,
+		thoughtSaving,
+	]);
+
 	const closeContextMenu = useCallback(() => {
 		setContextMenu(null);
 	}, []);
 
 	const showReaderContextMenu = useCallback(
 		(payload: { clientX: number; clientY: number; hasSelection?: boolean }) => {
+			setSelectionPopBar(null);
+			selectionPopBarRef.current = null;
 			setContextMenu({
 				open: true,
 				x: payload.clientX,
@@ -490,49 +769,47 @@ function EbookReadPage() {
 			const payload = contextPayloadRef.current;
 			if (!payload?.selectedText.trim()) return;
 			void copyToClipboard(payload.selectedText);
+			clearEpubSelection();
 		},
 		addThought: () => {
 			const payload = contextPayloadRef.current;
 			const quote = payload?.selectedText.trim() ?? '';
 			const cfiRange = payload?.cfiRange;
 			if (!quote) return;
-			if (!cfiRange) {
-				window.setTimeout(() => {
-					Toast({
-						type: 'error',
-						title: t('ebook.read.thought.cfiFailed'),
-					});
-				}, 0);
-				return;
-			}
+			clearEpubSelection();
 			window.setTimeout(() => {
-				setThoughtDraft({
-					id: '',
-					quote,
-					cfiRange,
-					content: '',
-					username: '',
-					updatedAt: '',
-				});
-				setThoughtDialogMode('create');
-				setThoughtDialogOpen(true);
+				openCreateThought(quote, cfiRange);
 			}, 0);
 		},
-		openAssistant: () => openAssistant(),
+		openAssistant: () => {
+			clearEpubSelection();
+			openAssistant();
+		},
 		askAboutSelection: () => {
 			const text = contextPayloadRef.current?.selectedText ?? '';
-			// 等 Radix 右键菜单关闭并释放 focus trap 后再打开助手并聚焦输入框
+			clearEpubSelection();
 			window.setTimeout(() => openAssistantWithSelection(text), 0);
 		},
-		openToc: () => setTocOpen(true),
-		openSettings: () => setEpubSettingsOpen(true),
+		openToc: () => {
+			clearEpubSelection();
+			setTocOpen(true);
+		},
+		openSettings: () => {
+			clearEpubSelection();
+			setEpubSettingsOpen(true);
+		},
 		prevPage: () => {
+			clearEpubSelection();
 			void epubNavRef.current?.prev();
 		},
 		nextPage: () => {
+			clearEpubSelection();
 			void epubNavRef.current?.next();
 		},
-		backToShelf: () => nav('/ebook'),
+		backToShelf: () => {
+			clearEpubSelection();
+			nav('/ebook');
+		},
 	};
 
 	pdfContextActionsRef.current = {
@@ -577,7 +854,7 @@ function EbookReadPage() {
 			if (e.repeat) return;
 			if (tocOpen) return;
 			if (epubSettingsOpen) return;
-			if (assistantOpen) return;
+			if (assistantOpen || thoughtPanelOpen) return;
 
 			const target = e.target as HTMLElement | null;
 			const tag = target?.tagName;
@@ -610,7 +887,7 @@ function EbookReadPage() {
 
 		window.addEventListener('keydown', onKeyDown, true);
 		return () => window.removeEventListener('keydown', onKeyDown, true);
-	}, [book, open, tocOpen, epubSettingsOpen, assistantOpen]);
+	}, [book, open, tocOpen, epubSettingsOpen, assistantOpen, thoughtPanelOpen]);
 
 	if (!book) {
 		if (bookResolving || !ebookStore.ready) {
@@ -914,12 +1191,8 @@ function EbookReadPage() {
 					</div>
 				) : book.fmt === 'epub' ? (
 					<EbookReadSplitLayout
-						assistantOpen={assistantOpen}
-						bookId={book.id}
-						bookTitle={book.title}
-						assistantInput={assistantInput}
-						onAssistantInputChange={setAssistantInput}
-						focusInputAtEndKey={focusInputAtEndKey}
+						sidePanelOpen={sidePanelOpen}
+						sidePanel={sidePanel}
 					>
 						<div
 							className="flex h-full min-h-0 flex-1 flex-col"
@@ -934,9 +1207,10 @@ function EbookReadPage() {
 								onReady={onEpubReady}
 								onNavReset={onEpubNavReset}
 								keyboardNavEnabled={
-									!tocOpen && !epubSettingsOpen && !assistantOpen
+									!tocOpen && !epubSettingsOpen && !sidePanelOpen
 								}
 								onReaderContextMenu={showEpubContextMenu}
+								onSelectionPopBar={onSelectionPopBarChange}
 								thoughts={thoughts}
 								onThoughtClick={openViewThought}
 								onThoughtGroupClick={openThoughtGroup}
@@ -945,12 +1219,18 @@ function EbookReadPage() {
 					</EbookReadSplitLayout>
 				) : (
 					<EbookReadSplitLayout
-						assistantOpen={assistantOpen}
-						bookId={book.id}
-						bookTitle={book.title}
-						assistantInput={assistantInput}
-						onAssistantInputChange={setAssistantInput}
-						focusInputAtEndKey={focusInputAtEndKey}
+						sidePanelOpen={assistantOpen}
+						sidePanel={
+							assistantOpen ? (
+								<EbookAssistant
+									bookId={book.id}
+									bookTitle={book.title}
+									input={assistantInput}
+									onInputChange={setAssistantInput}
+									focusInputAtEndKey={focusInputAtEndKey}
+								/>
+							) : null
+						}
 					>
 						<div
 							className="flex h-full min-h-0 flex-1 flex-col"
@@ -996,36 +1276,14 @@ function EbookReadPage() {
 			) : null}
 
 			{book.fmt === 'epub' ? (
-				<>
-					<EpubThoughtListDialog
-						open={thoughtListOpen}
-						onOpenChange={setThoughtListOpen}
-						thoughts={thoughtListGroup}
-						onSelect={(thought) => openViewThought(thought, true)}
-					/>
-					<EpubThoughtDialog
-						open={thoughtDialogOpen}
-						onOpenChange={setThoughtDialogOpen}
-						mode={thoughtDialogMode}
-						quote={thoughtDraft.quote}
-						content={thoughtDraft.content}
-						username={thoughtDraft.username}
-						updatedAt={thoughtDraft.updatedAt}
-						onContentChange={(content) =>
-							setThoughtDraft((d) => ({ ...d, content }))
-						}
-						onSave={saveThought}
-						onDelete={
-							thoughtDialogMode !== 'create' ? deleteThought : undefined
-						}
-						onEdit={
-							thoughtDialogMode === 'view'
-								? () => setThoughtDialogMode('edit')
-								: undefined
-						}
-						saving={thoughtSaving}
-					/>
-				</>
+				<EpubSelectionPopBar
+					state={selectionPopBar}
+					labels={selectionPopBarLabels}
+					onCopy={onSelectionPopBarCopy}
+					onWriteThought={onSelectionPopBarWriteThought}
+					onAskBook={onSelectionPopBarAskBook}
+					onClearSelection={clearEpubSelection}
+				/>
 			) : null}
 		</EbookPageShell>
 	);

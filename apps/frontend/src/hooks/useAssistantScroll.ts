@@ -34,7 +34,7 @@ export type UseAssistantScrollResult = {
 	scrollAreaHandlers: StickToBottomScrollViewportHandlers;
 	enableStickToBottom: () => void;
 	disableStickToBottom: () => void;
-	flushScrollToBottom: () => void;
+	flushScrollToBottom: (options?: { force?: boolean }) => void;
 	streamTick: string;
 	scrollFabMode: ScrollFabMode;
 	onScrollFabClick: () => void;

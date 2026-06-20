@@ -118,7 +118,7 @@ const EnglishLearning = observer(function EnglishLearning() {
 								)}
 							>
 								<ScrollArea
-									className="h-full p-4"
+									className="h-full p-4.5"
 									viewportClassName="rounded-md"
 								>
 									<div className="flex min-h-0 flex-1 flex-col">

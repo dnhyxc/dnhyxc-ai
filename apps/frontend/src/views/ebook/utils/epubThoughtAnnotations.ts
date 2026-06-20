@@ -94,6 +94,9 @@ export const EPUB_THOUGHT_UNDERLINE_HIT_STYLES: Record<string, string> = {
  * @param doc 待操作的目标文档（默认为全局 document，可用于 iframe 内容文档）
  */
 function ensureThoughtUnderlineStyles(doc: Document = document): void {
+	const head = doc.head ?? doc.documentElement;
+	if (!head) return;
+
 	// 查找唯一标识的 <style> 标签，用于避免重复插入
 	let style = doc.getElementById(
 		EPUB_THOUGHT_UNDERLINE_STYLE_ID,
@@ -102,10 +105,35 @@ function ensureThoughtUnderlineStyles(doc: Document = document): void {
 		// 若未找到，创建新的 <style> 节点并设定唯一 id，插入到 <head>
 		style = doc.createElement('style');
 		style.id = EPUB_THOUGHT_UNDERLINE_STYLE_ID;
-		doc.head.appendChild(style);
+		head.appendChild(style);
 	}
 	// 始终将样式内容设置为最新下划线样式，确保主题或配置变动时及时刷新
 	style.textContent = EPUB_THOUGHT_UNDERLINE_CSS;
+}
+
+function getRenditionContentsList(rend?: Rendition): EpubIframeContents[] {
+	if (!rend) return [];
+	const raw = rend.getContents();
+	return Array.isArray(raw)
+		? (raw as EpubIframeContents[])
+		: raw
+			? [raw as EpubIframeContents]
+			: [];
+}
+
+function patchAllThoughtUnderlineMarks(rend?: Rendition): void {
+	const docs = new Set<Document>([document]);
+	for (const contents of getRenditionContentsList(rend)) {
+		if (contents.document) docs.add(contents.document);
+	}
+	for (const doc of docs) {
+		try {
+			ensureThoughtUnderlineStyles(doc);
+			patchThoughtUnderlineMarks(doc);
+		} catch {
+			// iframe 卸载或文档不可用时忽略
+		}
+	}
 }
 
 /**
@@ -189,15 +217,22 @@ function patchThoughtUnderlineMarks(root: ParentNode = document): void {
  * - ensureThoughtUnderlineStyles()：注入自定义 CSS，仅插入一次。
  * - patchThoughtUnderlineMarks()：遍历所有 EPUB 想法下划线组件的 rect/line，定位和样式 patch。
  */
-function schedulePatchThoughtUnderlineMarks(): void {
+function schedulePatchThoughtUnderlineMarks(rend?: Rendition): () => void {
+	let cancelled = false;
 	requestAnimationFrame(() => {
+		if (cancelled) return;
 		requestAnimationFrame(() => {
-			// 注入自定义样式（保证只执行一次）
-			ensureThoughtUnderlineStyles();
-			// patch rect/line 坐标与可见性
-			patchThoughtUnderlineMarks();
+			if (cancelled) return;
+			try {
+				patchAllThoughtUnderlineMarks(rend);
+			} catch {
+				// rendition 销毁后 rAF 仍可能触发，忽略即可
+			}
 		});
 	});
+	return () => {
+		cancelled = true;
+	};
 }
 
 /**
@@ -340,6 +375,11 @@ function attachThoughtMarkClickGuard(rend: Rendition): () => void {
 	 * 并确保恢复 pointer-events:auto 强制回归可交互状态。
 	 */
 	return () => {
+		try {
+			rend.hooks.content.deregister(bindContents);
+		} catch {
+			// rendition 已销毁时忽略
+		}
 		for (const fn of contentCleanups.values()) fn(); // 调用所有解绑逻辑
 		contentCleanups.clear();
 		document.removeEventListener('pointerup', onSelectionPointerUp, true);
@@ -429,20 +469,24 @@ function resolveCfiDomRange(rend: Rendition, cfiRange: string): Range | null {
  * @returns 若 inner 严格在 outer 区间内部则返回 true，否则返回 false
  */
 function isDomRangeStrictlyContained(inner: Range, outer: Range): boolean {
-	// 检查 inner 的起点是否大于等于 outer 起点
-	const startsAfterOrEqual =
-		inner.compareBoundaryPoints(Range.START_TO_START, outer) >= 0;
-	// 检查 inner 的终点是否小于等于 outer 终点
-	const endsBeforeOrEqual =
-		inner.compareBoundaryPoints(Range.END_TO_END, outer) <= 0;
-	// 如起点早于 outer 或终点晚于 outer，则不被包含
-	if (!startsAfterOrEqual || !endsBeforeOrEqual) return false;
-	// 检查两端是否与 outer 完全重合
-	const sameStart =
-		inner.compareBoundaryPoints(Range.START_TO_START, outer) === 0;
-	const sameEnd = inner.compareBoundaryPoints(Range.END_TO_END, outer) === 0;
-	// 只要存在一端不同即可认定被严格包含
-	return !(sameStart && sameEnd);
+	try {
+		// 检查 inner 的起点是否大于等于 outer 起点
+		const startsAfterOrEqual =
+			inner.compareBoundaryPoints(Range.START_TO_START, outer) >= 0;
+		// 检查 inner 的终点是否小于等于 outer 终点
+		const endsBeforeOrEqual =
+			inner.compareBoundaryPoints(Range.END_TO_END, outer) <= 0;
+		// 如起点早于 outer 或终点晚于 outer，则不被包含
+		if (!startsAfterOrEqual || !endsBeforeOrEqual) return false;
+		// 检查两端是否与 outer 完全重合
+		const sameStart =
+			inner.compareBoundaryPoints(Range.START_TO_START, outer) === 0;
+		const sameEnd = inner.compareBoundaryPoints(Range.END_TO_END, outer) === 0;
+		// 只要存在一端不同即可认定被严格包含
+		return !(sameStart && sameEnd);
+	} catch {
+		return false;
+	}
 }
 
 /**
@@ -587,6 +631,138 @@ function computeLineVisibleCfis(
  * @param appliedRef 外部引用：cfiRange => 当前生效的 thoughtId 数组（用于管理与清理残留 old 标记）
  * @returns          返回一个用于销毁（unmount）时解绑所有监听与标记的函数
  */
+/**
+ * 仅同步下划线批注（thoughts 变化时调用，不重复注册 hooks）
+ */
+export function applyEpubThoughtUnderlines(
+	rend: Rendition,
+	thoughts: EbookThought[],
+	appliedRef: Map<string, string[]>,
+): void {
+	try {
+		ensureThoughtUnderlineStyles();
+	} catch {
+		return;
+	}
+
+	const grouped = groupThoughtsByCfi(thoughts);
+	const nextCfis = new Set(grouped.keys());
+
+	for (const cfiRange of [...appliedRef.keys()]) {
+		if (!nextCfis.has(cfiRange)) {
+			try {
+				rend.annotations.remove(cfiRange, 'underline');
+			} catch {
+				// ignore
+			}
+			appliedRef.delete(cfiRange);
+		}
+	}
+
+	const sortedEntries = sortCfiGroupsForUnderlineStack([...grouped.entries()]);
+	const lineVisibleCfis = computeLineVisibleCfis(sortedEntries, rend);
+
+	for (const [cfiRange, group] of sortedEntries) {
+		const thoughtIds = group.map((t) => t.id);
+		const showLine = lineVisibleCfis.has(cfiRange);
+
+		try {
+			rend.annotations.remove(cfiRange, 'underline');
+			rend.annotations.underline(
+				cfiRange,
+				{
+					thoughtIds,
+					[THOUGHT_MARK_DATA_SHOW_LINE]: showLine ? '1' : '0',
+				},
+				undefined,
+				EPUB_THOUGHT_UNDERLINE_CLASS,
+				showLine
+					? EPUB_THOUGHT_UNDERLINE_STYLES
+					: EPUB_THOUGHT_UNDERLINE_HIT_STYLES,
+			);
+			appliedRef.set(cfiRange, thoughtIds);
+		} catch {
+			appliedRef.delete(cfiRange);
+		}
+	}
+
+	schedulePatchThoughtUnderlineMarks(rend);
+}
+
+/** 移除当前 appliedRef 中记录的全部下划线 */
+export function teardownAppliedThoughtUnderlines(
+	rend: Rendition,
+	appliedRef: Map<string, string[]>,
+): void {
+	for (const cfiRange of [...appliedRef.keys()]) {
+		try {
+			rend.annotations.remove(cfiRange, 'underline');
+		} catch {
+			// rendition 可能已销毁
+		}
+	}
+	appliedRef.clear();
+}
+
+export type EpubThoughtUnderlineListenerOptions = EpubThoughtClickHandlers & {
+	getThoughts: () => EbookThought[];
+};
+
+/**
+ * 安装下划线交互与样式 patch 监听（rendReady 后调用一次即可）
+ */
+export function installEpubThoughtUnderlineListeners(
+	rend: Rendition,
+	options: EpubThoughtUnderlineListenerOptions,
+): () => void {
+	const cancelScheduledPatches: (() => void)[] = [];
+	const schedulePatch = () => {
+		cancelScheduledPatches.push(schedulePatchThoughtUnderlineMarks(rend));
+	};
+
+	const onContent = () => {
+		schedulePatch();
+	};
+	rend.hooks.content.register(onContent);
+
+	const onRelocated = () => {
+		schedulePatch();
+	};
+	rend.on('relocated', onRelocated);
+
+	const onMarkClicked = (cfiRange: string, data: { thoughtIds?: string[] }) => {
+		if (hasTextSelectionInRend(rend)) return;
+		const thoughts = options.getThoughts();
+		const ids = data?.thoughtIds ?? [];
+		const matched =
+			ids.length > 0
+				? thoughts.filter((t) => ids.includes(t.id))
+				: thoughts.filter((t) => t.cfiRange === cfiRange);
+		if (matched.length === 0) return;
+		options.onThoughtGroupClick(matched);
+	};
+	rend.on('markClicked', onMarkClicked);
+
+	const detachMarkClickGuard = attachThoughtMarkClickGuard(rend);
+	schedulePatch();
+
+	return () => {
+		for (const cancel of cancelScheduledPatches) cancel();
+		cancelScheduledPatches.length = 0;
+		detachMarkClickGuard();
+		try {
+			rend.hooks.content.deregister(onContent);
+			rend.off('relocated', onRelocated);
+			rend.off('markClicked', onMarkClicked);
+		} catch {
+			// rendition 已销毁时忽略
+		}
+	};
+}
+
+/**
+ * @deprecated 请改用 applyEpubThoughtUnderlines + installEpubThoughtUnderlineListeners
+ */
 export function syncEpubThoughtUnderlines(
 	rend: Rendition,
 	thoughts: EbookThought[],
@@ -594,117 +770,17 @@ export function syncEpubThoughtUnderlines(
 	/** cfiRange -> 该段下所有 thoughtId（顺序与 thoughts 一致） */
 	appliedRef: Map<string, string[]>,
 ): () => void {
-	// 注入/确保下划线的基础样式，全局只注入一次
-	ensureThoughtUnderlineStyles();
+	const getThoughtsRef = { current: thoughts };
+	getThoughtsRef.current = thoughts;
 
-	// 将所有读书想法按 CFI 分组，Map<string, EbookThought[]>
-	const grouped = groupThoughtsByCfi(thoughts);
+	applyEpubThoughtUnderlines(rend, thoughts, appliedRef);
+	const detachListeners = installEpubThoughtUnderlineListeners(rend, {
+		...handlers,
+		getThoughts: () => getThoughtsRef.current,
+	});
 
-	// 收集当前所有的 cfi（Set 方便后续对比已应用/废弃项）
-	const nextCfis = new Set(grouped.keys());
-
-	// 移除已被废弃（已不存在于本次分组）的旧标记，防止残留
-	for (const cfiRange of [...appliedRef.keys()]) {
-		if (!nextCfis.has(cfiRange)) {
-			rend.annotations.remove(cfiRange, 'underline');
-			appliedRef.delete(cfiRange);
-		}
-	}
-
-	// 为下划线堆栈排序：短范围的排在后面，优先渲染大块背景、响应堆叠点击
-	// sortedEntries: Array<[cfiRange, group]>
-	const sortedEntries = sortCfiGroupsForUnderlineStack([...grouped.entries()]);
-
-	// 计算哪些 cfiRange 需要渲染真正可见的下划线（未被其它更大的区间“严格包含”）
-	const lineVisibleCfis = computeLineVisibleCfis(sortedEntries, rend);
-
-	// 遍历每段，更新/绘制下划线批注（underline annotation）
-	for (const [cfiRange, group] of sortedEntries) {
-		// 提取该段所有的 thoughtId（用于后续点击查询/高亮/弹窗一致性）
-		const thoughtIds = group.map((t) => t.id);
-
-		// 判断该 cfiRange 是否需要渲染下划线（最外层，未被包含）
-		const showLine = lineVisibleCfis.has(cfiRange);
-
-		// 先删除已存在的同类 underline，防止样式和数据混乱
-		rend.annotations.remove(cfiRange, 'underline');
-
-		// 新增 underline 标记，附带 thoughtIds、是否可见、对应的样式
-		rend.annotations.underline(
-			cfiRange,
-			{
-				thoughtIds, // 用于多条想法命中与弹窗
-				[THOUGHT_MARK_DATA_SHOW_LINE]: showLine ? '1' : '0', // 标记可见性
-			},
-			undefined, // epub.js 默认 callback，无需
-			EPUB_THOUGHT_UNDERLINE_CLASS, // 标记 class，方便样式 patch
-			showLine
-				? EPUB_THOUGHT_UNDERLINE_STYLES // 可见虚线样式
-				: EPUB_THOUGHT_UNDERLINE_HIT_STYLES, // 仅透明命中，不显示线
-		);
-		// 记录到 appliedRef，便于后续统一管理、回收
-		appliedRef.set(cfiRange, thoughtIds);
-	}
-
-	// 异步 patch SVG 下划线样式（保证深色、主题变化等样式不穿透）
-	schedulePatchThoughtUnderlineMarks();
-
-	/**
-	 * 阅读器内容 hook：在 epub 内容加载/切章节后，再 patch 一次标记样式（防止 patch 早于内容插入）
-	 */
-	const onContent = () => {
-		schedulePatchThoughtUnderlineMarks();
-	};
-	rend.hooks.content.register(onContent);
-
-	/**
-	 * 定位（翻页、scrollTo cfi）后，也 patch 一次，防止 underline 丢失或样式错乱
-	 */
-	const onRelocated = () => {
-		schedulePatchThoughtUnderlineMarks();
-	};
-	rend.on('relocated', onRelocated);
-
-	/**
-	 * 下划线命中后的点击事件处理逻辑
-	 * - 若当前存在文本选区，则不触发（避免读者在选字拖动时误点弹窗）
-	 * - 根据 thoughtIds 或 cfiRange 找出对应想法组
-	 * - 回调 handlers.onThoughtGroupClick，交由 UI 展现弹窗/列表等
-	 */
-	const onMarkClicked = (cfiRange: string, data: { thoughtIds?: string[] }) => {
-		// 若有文本选择（如拖拽选区中），直接忽略点击事件
-		if (hasTextSelectionInRend(rend)) return;
-		const ids = data?.thoughtIds ?? [];
-		// 优先用批注自带的 thoughtIds 精确查找，否则兜底查 cfiRange
-		const matched =
-			ids.length > 0
-				? thoughts.filter((t) => ids.includes(t.id))
-				: thoughts.filter((t) => t.cfiRange === cfiRange);
-		if (matched.length === 0) return; // 极端兜底，正常不会进入
-		handlers.onThoughtGroupClick(matched);
-	};
-
-	// 注册下划线点击事件（由 epub.js 统一发出）
-	rend.on('markClicked', onMarkClicked);
-
-	// 修复/兜底方案：部分平台下点击有穿透问题，需手动 attach click guard
-	const detachMarkClickGuard = attachThoughtMarkClickGuard(rend);
-
-	/**
-	 * 返回解绑函数，清理本轮的所有 hooks、监听与批注
-	 */
 	return () => {
-		// 移除 click 穿透守卫
-		detachMarkClickGuard();
-		// 注销内容/定位 hooks
-		rend.hooks.content.deregister(onContent);
-		rend.off('relocated', onRelocated);
-		rend.off('markClicked', onMarkClicked);
-		// 移除所有当前已知 cfiRange 的 underline
-		for (const cfiRange of appliedRef.keys()) {
-			rend.annotations.remove(cfiRange, 'underline');
-		}
-		// 清空引用表
-		appliedRef.clear();
+		detachListeners();
+		teardownAppliedThoughtUnderlines(rend, appliedRef);
 	};
 }

@@ -11,6 +11,7 @@
 - `knowledge-assistant-streaming-across-documents.md`：修复「流式输出时切换文档再切回」导致只剩“思考中...”与停止的问题（前端状态机按文档隔离 + 稳定 key + 回调绑定）。
 - `knowledge-assistant-streaming-across-documents.md`：修复「首次保存时若仍在流式：保存不应终止流式，且不应绑定不完整会话」的问题（延迟迁入 pendingEphemeralFlush，流式结束后再 flush）。
 - [`knowledge-assistant-mermaid-streaming.md`](./knowledge-assistant-mermaid-streaming.md)：修复助手（及共用 `ChatAssistantMessage` 的 Chat）流式 ` ```mermaid ` 不出图——`isStreaming` 与 `part.complete` 对齐、DSL 括号/冒号规范化、`enableOpenTail` 与开放尾收尾、布局 `min-w-0` 等（详见该文）。
+- [`assistant-stream-end-scroll-pin.md`](./assistant-stream-end-scroll-pin.md)：修复知识库 / 电子书 MOKE / 英语学习助手在流式中上滑打断贴底后，流式结束仍被拽回底部（`userPinnedAwayRef`、`idleFlushKey` 去 `chatId`、`flushScrollToBottom` 门禁）。
 
 ---
 

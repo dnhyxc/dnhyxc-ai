@@ -206,22 +206,18 @@ const KnowledgeAssistant = observer(
 		const ragMessages = knowledgeRagQaStore.messages;
 		const messages = isRagMode ? ragMessages : aiMessages;
 
-		/** AI 模式非流式就绪贴底签名，交给 `useAssistantScroll.idleFlushKey`（RAG 传 null 以清除内部记忆） */
+		/** AI 模式非流式就绪贴底签名（会话 + 条数；不含 chatId，避免流式落库换 id 误触发滚底） */
 		const aiIdleFlushKey = useMemo((): string | null => {
 			if (isRagMode) return null;
 			if (assistantStore.isHistoryLoading) return null;
 			if (aiMessages.length === 0) return null;
-			const first = aiMessages[0];
-			const last = aiMessages[aiMessages.length - 1];
-			return `${documentKey}-${assistantStore.activeSessionId ?? ''}-${aiMessages.length}-${first?.chatId ?? ''}-${last?.chatId ?? ''}`;
+			return `${documentKey}-${assistantStore.activeSessionId ?? ''}-${aiMessages.length}`;
 		}, [
 			isRagMode,
 			documentKey,
 			assistantStore.activeSessionId,
 			assistantStore.isHistoryLoading,
 			aiMessages.length,
-			aiMessages[0]?.chatId,
-			aiMessages[aiMessages.length - 1]?.chatId,
 		]);
 
 		const {

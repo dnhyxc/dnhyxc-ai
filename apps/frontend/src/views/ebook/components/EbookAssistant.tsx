@@ -91,16 +91,12 @@ const EbookAssistantInner = observer(function EbookAssistantInner({
 	const aiIdleFlushKey = useMemo((): string | null => {
 		if (ebookAssistantStore.isHistoryLoading) return null;
 		if (aiMessages.length === 0) return null;
-		const first = aiMessages[0];
-		const last = aiMessages[aiMessages.length - 1];
-		return `${bookId}-${ebookAssistantStore.activeSessionId ?? ''}-${aiMessages.length}-${first?.chatId ?? ''}-${last?.chatId ?? ''}`;
+		return `${bookId}-${ebookAssistantStore.activeSessionId ?? ''}-${aiMessages.length}`;
 	}, [
 		bookId,
 		ebookAssistantStore.activeSessionId,
 		ebookAssistantStore.isHistoryLoading,
 		aiMessages.length,
-		aiMessages[0]?.chatId,
-		aiMessages[aiMessages.length - 1]?.chatId,
 	]);
 
 	const {

@@ -255,6 +255,136 @@ export function hashText(s: string): string {
 	return (h >>> 0).toString(36);
 }
 
+/** 流式尾部未闭合的非 mermaid 围栏（用于 GrowingCodeFence，避免整段 innerHTML 刷新 pre） */
+export function splitStreamingOpenCodeTail(markdown: string): {
+	prefix: string;
+	openCode: { lang: string; body: string } | null;
+} {
+	if (!markdown) {
+		return { prefix: '', openCode: null };
+	}
+	const normalized = markdown.replace(/\r\n/g, '\n');
+	const segments = splitMarkdownFencedBlocks(normalized);
+	const last = segments[segments.length - 1];
+	if (!last?.fenced || last.complete) {
+		return { prefix: markdown, openCode: null };
+	}
+	const firstLine = last.text.split('\n')[0] ?? '';
+	const openMatch = /^(\s*)(`{3,})([^`]*)$/.exec(firstLine.trimEnd());
+	const lang = (openMatch?.[3] ?? '').trim().split(/\s+/)[0] || 'text';
+	const body = last.text.split('\n').slice(1).join('\n');
+	if (isMermaidFenceLang(lang.toLowerCase(), body)) {
+		return { prefix: markdown, openCode: null };
+	}
+	const fenceIdx = normalized.lastIndexOf(last.text);
+	const prefix = fenceIdx >= 0 ? normalized.slice(0, fenceIdx) : '';
+	return { prefix, openCode: { lang, body } };
+}
+
+/** 流式正文拆段：每个非 mermaid 围栏独立成 StreamingCodeFenceBlock，闭合后冻结 DOM */
+export type StreamingBodyPart =
+	| { type: 'markdown'; text: string; partKey: string }
+	| { type: 'mermaid'; text: string; complete: boolean }
+	| {
+			type: 'codeFence';
+			fenceKey: string;
+			lang: string;
+			body: string;
+			complete: boolean;
+	  };
+
+function segmentsToFenceStableParts(
+	markdown: string,
+	parser: MarkdownParser,
+): StreamingBodyPart[] {
+	if (!markdown) return [];
+	const segments = splitMarkdownFencedBlocks(markdown.replace(/\r\n/g, '\n'));
+	const parts: StreamingBodyPart[] = [];
+	let proseBuf = '';
+	let fenceIndex = 0;
+
+	const flushProse = () => {
+		if (!proseBuf) return;
+		for (const p of parser.splitForMermaidIslands(proseBuf)) {
+			if (p.type === 'markdown') {
+				parts.push({
+					type: 'markdown',
+					text: p.text,
+					partKey: `md-${hashText(p.text)}`,
+				});
+			} else {
+				parts.push({ type: 'mermaid', text: p.text, complete: true });
+			}
+		}
+		proseBuf = '';
+	};
+
+	for (const seg of segments) {
+		if (!seg.fenced) {
+			proseBuf += seg.text;
+			continue;
+		}
+		flushProse();
+		const lines = seg.text.split('\n');
+		const firstLine = lines[0] ?? '';
+		const openMatch = /^(\s*)(`{3,})([^`]*)$/.exec(firstLine.trimEnd());
+		const lang =
+			(openMatch?.[3] ?? '').trim().split(/\s+/)[0]?.toLowerCase() ?? '';
+		const body =
+			seg.complete && lines.length >= 2
+				? lines.slice(1, -1).join('\n')
+				: lines.slice(1).join('\n');
+		if (isMermaidFenceLang(lang, body)) {
+			parts.push({
+				type: 'mermaid',
+				text: body,
+				complete: seg.complete,
+			});
+		} else {
+			parts.push({
+				type: 'codeFence',
+				fenceKey: `code-fence-${fenceIndex++}`,
+				lang: (openMatch?.[3] ?? '').trim().split(/\s+/)[0] || 'text',
+				body,
+				complete: seg.complete,
+			});
+		}
+	}
+	flushProse();
+	return parts;
+}
+
+/**
+ * 流式阶段统一拆段：
+ * - 开放 mermaid 尾 → 前缀稳定段 + 开放 mermaid 岛
+ * - 非 mermaid 围栏 → StreamingCodeFenceBlock（按序号稳定 key，闭合后冻结）
+ * - 其余正文 → markdown 段 memo
+ */
+export function splitStreamingBodyParts(
+	markdown: string,
+	parser: MarkdownParser,
+	openMermaidIdPrefix: string,
+): {
+	parts: StreamingBodyPart[];
+	openMermaidId: string | null;
+} {
+	const openMermaid = splitOpenMermaidTail(markdown);
+	if (openMermaid) {
+		return {
+			parts: [
+				...segmentsToFenceStableParts(openMermaid.prefix, parser),
+				{ type: 'mermaid', text: openMermaid.body, complete: false },
+			],
+			openMermaidId: `${openMermaidIdPrefix}${openMermaid.openLine}`,
+		};
+	}
+
+	return {
+		parts: segmentsToFenceStableParts(markdown, parser),
+		openMermaidId: null,
+	};
+}
+
 /**
  * 若全文末尾存在「未闭合的非 mermaid 代码围栏」，临时补上闭合行。
  * 否则 markdown-it 会把围栏后的所有内容吞进 code，表现为正文下方大块空白；

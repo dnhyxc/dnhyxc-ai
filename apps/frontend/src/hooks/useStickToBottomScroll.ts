@@ -63,8 +63,8 @@ export interface UseStickToBottomScrollResult {
 	enableStickToBottom: () => void;
 	/** 取消自动贴底 */
 	disableStickToBottom: () => void;
-	/** 单次滚到物理底部，不修改是否跟底的内部状态 */
-	flushScrollToBottom: () => void;
+	/** 单次滚到物理底部，不修改是否跟底的内部状态；默认尊重用户打断，传 `{ force: true }` 用于切换会话/历史就绪 */
+	flushScrollToBottom: (options?: { force?: boolean }) => void;
 }
 
 /**
@@ -89,6 +89,8 @@ export function useStickToBottomScroll(
 
 	const viewportRef = useRef<HTMLDivElement>(null);
 	const stickToBottomRef = useRef(true);
+	/** 用户于流式中主动上滑/滚轮打断后置位；恢复贴底前不再因 idleFlush / 流式结束布局变化自动滚底 */
+	const userPinnedAwayRef = useRef(false);
 	const suppressStickFromViewportScrollRef = useRef(false);
 	const lastViewportScrollTopRef = useRef<number | null>(null);
 	const idleFlushAppliedKeyRef = useRef<string | null>(null);
@@ -97,21 +99,30 @@ export function useStickToBottomScroll(
 		if (resetKey === undefined || resetKey === null) return;
 		if (typeof resetKey === 'string' && resetKey === '') return;
 		stickToBottomRef.current = true;
+		userPinnedAwayRef.current = false;
 		lastViewportScrollTopRef.current = null;
 	}, [resetKey]);
 
-	const flushScrollToBottom = useCallback(() => {
+	const flushScrollToBottom = useCallback((options?: { force?: boolean }) => {
 		const vp = viewportRef.current;
 		if (!vp) return;
+		if (
+			!options?.force &&
+			(userPinnedAwayRef.current || !stickToBottomRef.current)
+		) {
+			return;
+		}
 		vp.scrollTop = vp.scrollHeight;
 	}, []);
 
 	const enableStickToBottom = useCallback(() => {
 		stickToBottomRef.current = true;
+		userPinnedAwayRef.current = false;
 	}, []);
 
 	const disableStickToBottom = useCallback(() => {
 		stickToBottomRef.current = false;
+		userPinnedAwayRef.current = true;
 	}, []);
 
 	const onScroll = useCallback<UIEventHandler<HTMLDivElement>>(() => {
@@ -132,14 +143,19 @@ export function useStickToBottomScroll(
 
 		if (isStreaming && userScrolledUp) {
 			stickToBottomRef.current = false;
+			userPinnedAwayRef.current = true;
 			return;
 		}
 
 		if (distanceFromBottom <= resumeWithinBottomPx) {
 			if (!isStreaming) {
+				if (!userPinnedAwayRef.current) {
+					stickToBottomRef.current = true;
+				}
+			} else if (userScrolledDown || distanceFromBottom <= 8) {
+				// 流式：主动下滚或已贴物理底部（含拖滚动条到底）时恢复跟滚
 				stickToBottomRef.current = true;
-			} else if (userScrolledDown) {
-				stickToBottomRef.current = true;
+				userPinnedAwayRef.current = false;
 			}
 			return;
 		}
@@ -153,20 +169,46 @@ export function useStickToBottomScroll(
 
 	const onWheelCapture = useCallback<WheelEventHandler<HTMLDivElement>>(
 		(e) => {
-			if (!interruptOnWheelUpWhileStreaming || !isStreaming) return;
+			if (!isStreaming) return;
+			const target = e.target;
+			if (
+				target instanceof Element &&
+				target.closest('.chat-md-code-block, [data-streaming-code-fence]')
+			) {
+				const absX = Math.abs(e.deltaX);
+				const absY = Math.abs(e.deltaY);
+				// 代码块内横滚或向上滚：打断贴底；向下滚交给 onScroll 在触底时恢复
+				if (absX > absY || e.deltaY < 0) {
+					stickToBottomRef.current = false;
+					userPinnedAwayRef.current = true;
+				}
+				return;
+			}
+			if (!interruptOnWheelUpWhileStreaming) return;
 			if (e.deltaY < 0) {
 				stickToBottomRef.current = false;
+				userPinnedAwayRef.current = true;
 			}
 		},
 		[interruptOnWheelUpWhileStreaming, isStreaming],
 	);
 
-	const onPointerDownCapture = useCallback<
-		PointerEventHandler<HTMLDivElement>
-	>(() => {
-		if (!interruptOnPointerDownWhileStreaming || !isStreaming) return;
-		stickToBottomRef.current = false;
-	}, [interruptOnPointerDownWhileStreaming, isStreaming]);
+	const onPointerDownCapture = useCallback<PointerEventHandler<HTMLDivElement>>(
+		(e) => {
+			if (!interruptOnPointerDownWhileStreaming || !isStreaming) return;
+			const target = e.target;
+			// 代码块内点击/拖 pre 横滚条：不解除贴底，便于横滚后仍可通过滚到底恢复跟滚
+			if (
+				target instanceof Element &&
+				target.closest('.chat-md-code-block, [data-streaming-code-fence]')
+			) {
+				return;
+			}
+			stickToBottomRef.current = false;
+			userPinnedAwayRef.current = true;
+		},
+		[interruptOnPointerDownWhileStreaming, isStreaming],
+	);
 
 	useLayoutEffect(() => {
 		if (!isStreaming) return;
@@ -193,13 +235,14 @@ export function useStickToBottomScroll(
 		idleFlushAppliedKeyRef.current = idleFlushKeyProp;
 
 		stickToBottomRef.current = true;
-		flushScrollToBottom();
+		userPinnedAwayRef.current = false;
+		flushScrollToBottom({ force: true });
 		requestAnimationFrame(() => {
-			flushScrollToBottom();
+			flushScrollToBottom({ force: true });
 			requestAnimationFrame(() => {
-				flushScrollToBottom();
+				flushScrollToBottom({ force: true });
 				window.setTimeout(() => {
-					flushScrollToBottom();
+					flushScrollToBottom({ force: true });
 				}, 0);
 			});
 		});

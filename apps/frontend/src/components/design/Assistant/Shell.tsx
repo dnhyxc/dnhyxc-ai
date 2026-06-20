@@ -52,7 +52,7 @@ export function AssistantShell({
 						>
 							<div
 								className={cn(
-									'relative mx-auto flex min-h-0 w-full min-w-0 max-w-3xl flex-col px-3.5 pt-4 select-none',
+									'relative mx-auto flex min-h-0 w-full min-w-0 max-w-3xl flex-col px-4 pt-4 select-none',
 									messageContainerClassName,
 								)}
 							>

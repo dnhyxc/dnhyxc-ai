@@ -79,6 +79,7 @@ export type EbookThought = {
 	content: string;
 	/** 服务端按 userId 实时解析，非持久化字段 */
 	username: string;
+	avatar: string;
 	createdAt: string;
 	updatedAt: string;
 };

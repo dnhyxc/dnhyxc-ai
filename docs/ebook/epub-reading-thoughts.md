@@ -2,9 +2,18 @@
 
 ## 文档角色
 
-**主文档（本轮）**：EPUB 阅读页「写想法 / 查看 / 编辑 / 删除」全链路——数据库持久化、API、阅读区虚线下划线、Model 弹窗与右键菜单集成；含**重叠选区去重**、**点击/选区防误触**、**统一列表入口**等交互细节。
+**主文档（数据与下划线）**：EPUB 阅读页「写想法 / 查看 / 编辑 / 删除」——数据库持久化、API、阅读区虚线下划线；含**重叠选区去重**、**点击/选区防误触**、**统一列表入口**等交互细节。弹窗/底部抽屉等 **UI 容器已废弃**，见下。
 
-**延伸阅读**：[epub-assistant-context-menu.md](./epub-assistant-context-menu.md)（EPUB 右键与 CFI 选区）、[ebook-reader-shelf.md](./ebook-reader-shelf.md)（阅读页总览）。
+**延伸阅读（UI，按当前产品阅读顺序）**：
+
+| 文档 | 说明 |
+|------|------|
+| [epub-thought-side-panel.md](./epub-thought-side-panel.md) | **当前主 UI**：右侧分栏（与 MK 问书互斥） |
+| [epub-selection-popbar-visual.md](./epub-selection-popbar-visual.md) | 选区浮动 PopBar 视觉与阴影令牌 |
+| [epub-thought-underlines-sync.md](./epub-thought-underlines-sync.md) | 下划线同步稳定性 |
+| [epub-assistant-context-menu.md](./epub-assistant-context-menu.md) | EPUB 右键与 CFI 选区 |
+| [epub-thought-drawer.md](./epub-thought-drawer.md) | **已废弃归档**（全屏底部抽屉，勿作实现依据） |
+| [ebook-reader-shelf.md](./ebook-reader-shelf.md) | 阅读页总览 |
 
 ---
 
@@ -29,7 +38,7 @@
 | DTO / API | `dto/create-ebook-thought.dto.ts`、`dto/update-ebook-thought.dto.ts`、`ebook.controller.ts`、`ebook.service.ts`、`ebook.module.ts` |
 | 前端类型与 API | `apps/frontend/src/views/ebook/types.ts`、`apps/frontend/src/service/api.ts`、`index.ts` |
 | 阅读页集成 | `apps/frontend/src/views/ebook/read.tsx` |
-| 弹窗 UI | `components/EpubThoughtDialog.tsx`、`EpubThoughtListDialog.tsx` |
+| 右侧面板 UI | `components/EpubThought.tsx`、`EpubThoughtList.tsx`、`EpubThoughtPanelShell.tsx`、`EpubThoughtParts.tsx` |
 | 下划线与点击 | `utils/epubThoughtAnnotations.ts`、`components/EpubPane.tsx` |
 | 右键菜单 | `utils/buildEpubContextMenuItems.ts`、`utils/epubContextMenuAttach.ts` |
 | i18n | `apps/frontend/src/i18n/locales/zh-CN.ts`、`en-US.ts` |
@@ -51,7 +60,7 @@
 8. **点击交互**：
    - **无论 1 条还是多条**，点击下划线**先打开想法列表**，再点列表项进详情（与多条逻辑一致）。
    - **拖动选字松手**时 marks-pane 可能误触 `markClicked`：iframe 内 `mousedown` 临时 `pointer-events: none`，`pointerup` 后恢复；且 `markClicked` 时若存在非空选区则忽略。
-9. **弹窗**：统一 `@design/Model`；列表/详情 ScrollArea 贴边滚动；从列表进详情后关闭详情**回到列表**（`returnToListCfiRef`）。
+9. **右侧面板**：列表 / 详情 / 写想法在 `EbookReadSplitLayout` 的 `sidePanel` 内（与 MK 问书互斥）；`EpubThoughtPanelShell` 统一顶栏与滚动区；从列表进详情后关闭详情**回到列表**（`returnToListCfiRef`）。UI 细节见 [epub-thought-side-panel.md](./epub-thought-side-panel.md)。
 10. **写想法入口**：EPUB 右键选中文字 →「写想法」；`contextPayloadRef` 在菜单动作时同步读取，避免菜单关闭清空 payload。
 
 ---
@@ -301,7 +310,7 @@ const onMarkClicked = ( // epub.js markClicked 事件处理器
 	cfiRange: string, // epub.js 传来的被点击批注 CFI
 	data: { thoughtIds?: string[] }, // underline 注册时写入的 data
 ) => { // 处理器函数体
-	if (hasTextSelectionInRend(rend)) return; // 用户仍在选区中则不弹窗（双保险）
+	if (hasTextSelectionInRend(rend)) return; // 用户仍在选区中则不打开面板（双保险）
 	const ids = data?.thoughtIds ?? []; // 优先用 mark 上携带的 id 列表
 	const matched = // 解析本次点击应对应的想法数组
 		ids.length > 0
@@ -317,8 +326,8 @@ const onMarkClicked = ( // epub.js markClicked 事件处理器
 ```typescript
 const openThoughtGroup = useCallback((group: EbookThought[]) => { // 下划线点击后的统一入口
 	if (group.length === 0) return; // 空组不处理
-	setThoughtListGroup(group); // 写入列表弹窗数据源
-	setThoughtListOpen(true); // 打开 EpubThoughtListDialog（单条也先列表）
+	setThoughtListGroup(group); // 写入列表面板数据源
+	setThoughtListOpen(true); // 打开 EpubThoughtList（单条也先列表）
 }, []); // 无外部依赖，回调引用稳定
 ```
 
@@ -396,17 +405,17 @@ useEffect(() => { // 副作用：拉取服务端想法列表
 	}; // cleanup 结束
 }, [bookId, t]); // bookId 变化重新拉取；t 用于 i18n 错误文案
 
-const openViewThought = useCallback( // 打开想法详情弹窗
+const openViewThought = useCallback( // 打开想法详情面板
 	(thought: EbookThought, // 要查看/编辑的想法
-	fromList = false, // 是否从列表弹窗点进（决定关闭详情后是否回到列表）
+	fromList = false, // 是否从列表面板点进（决定关闭详情后是否回到列表）
 ) => { // 回调函数体
 	if (fromList) { // 从列表进入详情
 		returnToListCfiRef.current = thought.cfiRange; // 记住 CFI，关闭详情后恢复列表
-		setThoughtListOpen(false); // 暂时关闭列表，避免双弹窗
+		setThoughtListOpen(false); // 暂时关闭列表，避免列表与详情同屏叠层
 	} else { // 非列表路径（如将来扩展直达详情）
 		returnToListCfiRef.current = null; // 清空 ref，关闭详情不回列表
 	} // if fromList 结束
-	setThoughtDraft({ // 写入弹窗受控表单
+	setThoughtDraft({ // 写入详情面板受控表单
 		id: thought.id, // 想法 id，编辑/删除时用
 		quote: thought.quote, // 原文摘录
 		cfiRange: thought.cfiRange, // CFI，保存时不变
@@ -415,12 +424,12 @@ const openViewThought = useCallback( // 打开想法详情弹窗
 		updatedAt: thought.updatedAt, // 最后更新时间
 	}); // setThoughtDraft 结束
 	setThoughtDialogMode('view'); // 只读查看模式（可切 edit）
-	setThoughtDialogOpen(true); // 打开 EpubThoughtDialog
+	setThoughtDialogOpen(true); // 打开 EpubThought（右侧分栏详情）
 	}, // useCallback 函数体结束
 	[], // 空依赖：回调稳定
 ); // openViewThought 结束
 
-// 详情弹窗关闭后：若来自列表则重新打开同 CFI 的想法列表
+// 详情面板关闭后：若来自列表则重新打开同 CFI 的想法列表
 useEffect(() => { // 监听详情关闭 + thoughts 变化
 	if (thoughtDialogOpen) return; // 详情仍打开时不处理
 	const cfiRange = returnToListCfiRef.current; // 读取关闭前要回到的 CFI
@@ -429,7 +438,7 @@ useEffect(() => { // 监听详情关闭 + thoughts 变化
 	const next = thoughts.filter((t) => t.cfiRange === cfiRange); // 按 CFI 筛同段想法
 	if (next.length > 0) { // 该段仍有想法（可能删到 0 条）
 		setThoughtListGroup(next); // 刷新列表数据（含编辑/删除后的最新 thoughts）
-		setThoughtListOpen(true); // 再次打开列表弹窗
+		setThoughtListOpen(true); // 再次打开列表面板
 	} // if next.length 结束
 }, [thoughtDialogOpen, thoughts]); // 依赖 thoughts：删除最后一条后 next 为空则不打开
 ```
@@ -443,7 +452,7 @@ useEffect(() => { // 监听详情关闭 + thoughts 变化
 | 登录 | 未登录调用想法 API 会 401；阅读 EPUB 本身不强制登录，写想法需登录。 |
 | 存储 | 想法在服务端；**不**再使用 localStorage。 |
 | 删书 | 该书下当前用户想法一并删除。 |
-| PDF | 无想法 UI；`read.tsx` 仅在 `book.fmt === 'epub'` 时挂载弹窗。 |
+| PDF | 无想法 UI；`read.tsx` 仅在 `book.fmt === 'epub'` 时挂载右侧分栏想法面板。 |
 | 重叠选区 | **嵌套**（子串/包含）只显示最外层一条可见线；**部分重叠且互不包含**时重叠段仍可能各有一段线（未做区间切分合并）。 |
 | 性能 | 想法按 CFI 去重绘制；SVG patch 在 `content`/`relocated` 触发；一般单书想法量可接受。 |
 
@@ -454,7 +463,7 @@ useEffect(() => { // 监听详情关闭 + thoughts 变化
 1. EPUB 选中文字 → 右键「写想法」→ 保存 → 出现琥珀虚线下划线。
 2. 同段写第二条 → 仍一条可见下划线 → 点击**先出列表**（含仅 1 条）→ 进详情 → 关闭回到列表。
 3. 对「黑美人」「傻皇帝与黑美人」「一 傻皇帝与黑美人」分别写想法 → 整句**仅一条**可见虚线 → 点「黑美人」出短选区列表、点仅长选区覆盖处出对应列表。
-4. 拖动选字结束**不**弹想法列表；**主动点击**下划线才弹。
+4. 拖动选字结束**不**打开想法列表；**主动点击**下划线才打开。
 5. 编辑 / 删除想法后下划线与列表同步。
 6. 删书后重新打开：该书记录与下划线均消失。
 7. 深色 / 浅色阅读背景、连续滚动与分页模式下划线可见且可点。
@@ -470,6 +479,6 @@ useEffect(() => { // 监听详情关闭 + thoughts 变化
 | 控制器 | `apps/backend/src/services/ebook/ebook.controller.ts` |
 | 下划线同步 | `apps/frontend/src/views/ebook/utils/epubThoughtAnnotations.ts` |
 | 阅读页状态机 | `apps/frontend/src/views/ebook/read.tsx` |
-| 详情 / 列表弹窗 | `apps/frontend/src/views/ebook/components/EpubThoughtDialog.tsx`、`EpubThoughtListDialog.tsx` |
+| 详情 / 列表面板 | `apps/frontend/src/views/ebook/components/EpubThought.tsx`、`EpubThoughtList.tsx`、`EpubThoughtPanelShell.tsx`、`EpubThoughtParts.tsx` |
 
 若与仓库最新源码不一致，以源码为准。

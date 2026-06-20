@@ -34,6 +34,7 @@
 | [knowledge-assistant-outline-toc-prepend.md](./knowledge-assistant-outline-toc-prepend.md) | 「生成目录」文首写入 / 补 `## 目录`（三分支） |
 | [knowledge-assistant-stream-ux.md](./knowledge-assistant-stream-ux.md) | 流式：隐藏思考链、Spinner 动画 |
 | [knowledge-assistant-layout-scrollbar-alignment.md](./knowledge-assistant-layout-scrollbar-alignment.md) | 滚动条对齐 |
+| [assistant-stream-end-scroll-pin.md](./assistant-stream-end-scroll-pin.md) | **流式结束后误滚底**（idleFlushKey / userPinnedAway / 条带 flush） |
 | [knowledge-editor-send-selection-to-assistant-dedupe.md](./knowledge-editor-send-selection-to-assistant-dedupe.md) | 选中发送到助手去重 |
 | [assistant-insert-focus.md](./assistant-insert-focus.md) | 复制到助手后自动聚焦输入框（右键 + 快捷键） |
 | [knowledge-assistant-insert-selection-ai-rag.md](./knowledge-assistant-insert-selection-ai-rag.md) | 选中写入 AI/RAG 输入框 |
@@ -52,6 +53,7 @@
 | [knowledge-md-import.md](./knowledge-md-import.md) |
 | [auto-save.md](./auto-save.md) |
 | [knowledge-save-format-before-persist.md](./knowledge-save-format-before-persist.md) | 保存 / 自动保存前先格式化再落库 |
+| [knowledge-save-body-limit.md](./knowledge-save-body-limit.md) | 云端保存请求体上限与 DTO 对齐（修复 PayloadTooLargeError） |
 | [shortcuts.md](./shortcuts.md) |
 | [unauthenticated-local-only.md](./unauthenticated-local-only.md) |
 

@@ -8,6 +8,7 @@ type ScrollAreaScrollbars = 'vertical' | 'horizontal' | 'both';
 interface ScrollAreaProps
 	extends React.ComponentProps<typeof ScrollAreaPrimitive.Root> {
 	viewportClassName?: string;
+	scrollbarClassName?: string;
 	dataTauriDragRegion?: boolean;
 	onScroll?: React.UIEventHandler<HTMLDivElement>;
 	onWheel?: React.WheelEventHandler<HTMLDivElement>;
@@ -23,6 +24,7 @@ const ScrollArea = React.forwardRef<HTMLDivElement, ScrollAreaProps>(
 			className,
 			children,
 			viewportClassName,
+			scrollbarClassName,
 			dataTauriDragRegion,
 			onScroll,
 			onWheel,
@@ -40,7 +42,7 @@ const ScrollArea = React.forwardRef<HTMLDivElement, ScrollAreaProps>(
 			<ScrollAreaPrimitive.Root
 				data-slot="scroll-area"
 				className={cn(
-					'relative min-w-0 overflow-hidden border-2 border-transparent bg-transparent',
+					'relative min-w-0 overflow-hidden border-0 border-transparent bg-transparent',
 					className,
 				)}
 				{...props}
@@ -62,8 +64,10 @@ const ScrollArea = React.forwardRef<HTMLDivElement, ScrollAreaProps>(
 				>
 					{children}
 				</ScrollAreaPrimitive.Viewport>
-				{showVertical ? <ScrollBar /> : null}
-				{showHorizontal ? <ScrollBar orientation="horizontal" /> : null}
+				{showVertical ? <ScrollBar className={scrollbarClassName} /> : null}
+				{showHorizontal ? (
+					<ScrollBar orientation="horizontal" className={scrollbarClassName} />
+				) : null}
 				<ScrollAreaPrimitive.Corner />
 			</ScrollAreaPrimitive.Root>
 		);
@@ -76,7 +80,10 @@ function ScrollBar({
 	className,
 	orientation = 'vertical',
 	...props
-}: React.ComponentProps<typeof ScrollAreaPrimitive.ScrollAreaScrollbar>) {
+}: {
+	className?: string;
+	orientation?: 'vertical' | 'horizontal';
+} & React.ComponentProps<typeof ScrollAreaPrimitive.ScrollAreaScrollbar>) {
 	return (
 		<ScrollAreaPrimitive.ScrollAreaScrollbar
 			data-slot="scroll-area-scrollbar"
@@ -84,7 +91,7 @@ function ScrollBar({
 			className={cn(
 				'flex touch-none transition-colors select-none',
 				orientation === 'vertical' &&
-					'h-full w-1.5 border-l border-l-transparent',
+					'pr-px h-full w-2 border-l border-l-transparent',
 				orientation === 'horizontal' &&
 					'h-1.5 flex-col border-t border-t-transparent',
 				className,
