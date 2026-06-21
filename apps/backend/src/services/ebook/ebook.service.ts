@@ -18,16 +18,19 @@ import { User } from '../user/user.entity';
 import { UserService } from '../user/user.service';
 import { AddEbookPathDto } from './dto/add-ebook-path.dto';
 import { CreateEbookCategoryDto } from './dto/create-ebook-category.dto';
+import { CreateEbookHighlightDto } from './dto/create-ebook-highlight.dto';
 import { CreateEbookThoughtDto } from './dto/create-ebook-thought.dto';
 import { QueryEbookCategoriesSummaryDto } from './dto/query-ebook-categories-summary.dto';
 import { QueryEbookShelfDto } from './dto/query-ebook-shelf.dto';
 import { ReorderEbookCategoriesDto } from './dto/reorder-ebook-categories.dto';
 import { SaveEbookProgressDto } from './dto/save-ebook-progress.dto';
 import { UpdateEbookCategoryDto } from './dto/update-ebook-category.dto';
+import { UpdateEbookHighlightDto } from './dto/update-ebook-highlight.dto';
 import { UpdateEbookThoughtDto } from './dto/update-ebook-thought.dto';
 import { UpdateEbookTitleDto } from './dto/update-ebook-title.dto';
 import { EbookBook } from './ebook-book.entity';
 import { EbookCategory } from './ebook-category.entity';
+import { EbookHighlight } from './ebook-highlight.entity';
 import { EbookProgress } from './ebook-progress.entity';
 import { EbookThought } from './ebook-thought.entity';
 
@@ -91,6 +94,17 @@ export type EbookThoughtDto = {
 	updatedAt: string;
 };
 
+export type EbookHighlightDto = {
+	id: string;
+	userId: number;
+	cfiRange: string;
+	quote: string;
+	style: 'highlight' | 'underline' | 'wavy';
+	color: 'pink' | 'purple' | 'blue' | 'green' | 'yellow';
+	createdAt: string;
+	updatedAt: string;
+};
+
 type EbookThoughtUserInfo = {
 	username: string;
 	avatar: string;
@@ -137,6 +151,8 @@ export class EbookService {
 		private readonly categoryRepo: Repository<EbookCategory>,
 		@InjectRepository(EbookThought)
 		private readonly thoughtRepo: Repository<EbookThought>,
+		@InjectRepository(EbookHighlight)
+		private readonly highlightRepo: Repository<EbookHighlight>,
 		@InjectRepository(User)
 		private readonly userRepo: Repository<User>,
 		private readonly uploadService: UploadService,
@@ -402,6 +418,7 @@ export class EbookService {
 		}
 		await this.tryDeleteCoverFile(book.coverPath);
 		await this.thoughtRepo.delete({ bookId, userId });
+		await this.highlightRepo.delete({ bookId, userId });
 		await this.progRepo.delete({ bookId, userId });
 		await this.bookRepo.delete({ id: bookId, userId });
 	}
@@ -857,5 +874,86 @@ export class EbookService {
 			throw new NotFoundException('想法不存在');
 		}
 		await this.thoughtRepo.delete({ id: thoughtId, userId });
+	}
+
+	private toHighlightDto(row: EbookHighlight): EbookHighlightDto {
+		return {
+			id: row.id,
+			userId: row.userId,
+			cfiRange: row.cfiRange,
+			quote: row.quote,
+			style: row.style as EbookHighlightDto['style'],
+			color: row.color as EbookHighlightDto['color'],
+			createdAt: row.createdAt.toISOString(),
+			updatedAt: row.updatedAt.toISOString(),
+		};
+	}
+
+	async listHighlights(
+		userId: number,
+		bookId: string,
+	): Promise<EbookHighlightDto[]> {
+		await this.assertBookOwned(userId, bookId);
+		const rows = await this.highlightRepo.find({
+			where: { userId, bookId },
+			order: { createdAt: 'DESC' },
+		});
+		return rows.map((row) => this.toHighlightDto(row));
+	}
+
+	async createHighlight(
+		userId: number,
+		dto: CreateEbookHighlightDto,
+	): Promise<EbookHighlightDto> {
+		await this.assertBookOwned(userId, dto.bookId);
+		const cfiRange = dto.cfiRange.trim();
+		const existing = await this.highlightRepo.findOne({
+			where: { userId, bookId: dto.bookId, cfiRange },
+		});
+		if (existing) {
+			existing.quote = dto.quote.trim();
+			existing.style = dto.style;
+			existing.color = dto.color;
+			await this.highlightRepo.save(existing);
+			return this.toHighlightDto(existing);
+		}
+		const row = this.highlightRepo.create({
+			userId,
+			bookId: dto.bookId,
+			cfiRange,
+			quote: dto.quote.trim(),
+			style: dto.style,
+			color: dto.color,
+		});
+		await this.highlightRepo.save(row);
+		return this.toHighlightDto(row);
+	}
+
+	async updateHighlight(
+		userId: number,
+		highlightId: string,
+		dto: UpdateEbookHighlightDto,
+	): Promise<EbookHighlightDto> {
+		const row = await this.highlightRepo.findOne({
+			where: { id: highlightId, userId },
+		});
+		if (!row) {
+			throw new NotFoundException('划线不存在');
+		}
+		if (dto.quote !== undefined) row.quote = dto.quote.trim();
+		if (dto.style !== undefined) row.style = dto.style;
+		if (dto.color !== undefined) row.color = dto.color;
+		await this.highlightRepo.save(row);
+		return this.toHighlightDto(row);
+	}
+
+	async removeHighlight(userId: number, highlightId: string): Promise<void> {
+		const row = await this.highlightRepo.findOne({
+			where: { id: highlightId, userId },
+		});
+		if (!row) {
+			throw new NotFoundException('划线不存在');
+		}
+		await this.highlightRepo.delete({ id: highlightId, userId });
 	}
 }

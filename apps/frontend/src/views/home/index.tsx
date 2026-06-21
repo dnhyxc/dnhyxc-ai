@@ -152,18 +152,18 @@ const Home = () => {
 			<ScrollArea className="relative z-1 h-full w-full rounded-b-md">
 				<div className="relative min-h-full w-full">
 					{/* 首屏：单一「欢迎」容器，内含标题区 + 三大入口，占满 Outlet 可视高度 */}
-					<section className="mx-auto w-full max-w-6xl px-3 pb-2 sm:px-5">
+					<section className="mx-auto w-full px-5.5">
 						<motion.div
 							initial={{ opacity: 0, y: 20 }}
 							animate={{ opacity: 1, y: 0 }}
 							transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
-							className="relative flex min-h-0 w-full max-w-6xl flex-1 flex-col overflow-hidden rounded-md bg-linear-to-b from-theme-white/[0.07] to-theme-white/2 backdrop-blur-xl"
+							className="relative flex min-h-0 w-full flex-1 flex-col overflow-hidden rounded-md bg-linear-to-b from-theme-white/[0.07] to-theme-white/2 backdrop-blur-xl"
 							style={{
 								fontFamily: '"Noto Sans SC", system-ui, sans-serif',
 							}}
 						>
 							{/* 顶栏：品牌 + 主文案 + 操作（与入口同属一个欢迎模块） */}
-							<header className="relative z-10 shrink-0 px-3 pb-4 pt-4 sm:px-2 sm:pb-5 sm:pt-5 md:px-6 md:pt-6 bg-theme-background/80 border-b border-theme/3">
+							<header className="relative z-10 shrink-0 pb-4.5 pt-4 md:px-6 md:pt-6 bg-theme-background/80 border-b border-theme/3">
 								<div className="flex flex-col gap-5">
 									<div className="min-w-0 flex-1">
 										<motion.div
@@ -184,7 +184,7 @@ const Home = () => {
 											initial={{ opacity: 0, y: 14 }}
 											animate={{ opacity: 1, y: 0 }}
 											transition={{ delay: 0.12, duration: 0.45 }}
-											className="mt-5 text-balance text-2xl font-extrabold leading-[1.1] tracking-tight text-theme-white sm:text-3xl md:text-4xl lg:text-[2.35rem]"
+											className="mt-6 text-balance text-2xl font-extrabold leading-[1.1] tracking-tight text-theme-white sm:text-3xl md:text-4xl lg:text-[2.35rem]"
 											style={{
 												fontFamily: '"Syne", "Noto Sans SC", sans-serif',
 											}}
@@ -237,7 +237,7 @@ const Home = () => {
 							</header>
 
 							{/* 三大入口：与欢迎同属一块，纵向吃满剩余高度 */}
-							<div className="relative z-10 grid min-h-0 flex-1 auto-rows-fr grid-cols-1 p-3 sm:p-4 md:grid-cols-3 md:divide-x md:divide-y-0 md:divide-theme/2 md:p-0">
+							<div className="relative z-10 grid min-h-0 flex-1 auto-rows-fr grid-cols-1 p-3 md:grid-cols-3 md:divide-x md:divide-y-0 md:divide-theme/2 md:p-0">
 								{FEATURES.map((feature, tileIndex) => (
 									<motion.div
 										key={feature.title}
@@ -298,8 +298,8 @@ const Home = () => {
 					</section>
 
 					{/* 下方内容在 ScrollArea 内滚动 */}
-					<div className="relative mx-auto w-full max-w-6xl space-y-5 px-3 pt-3 sm:px-5">
-						<div className="relative overflow-hidden rounded-md bg-theme-background/80 p-6 backdrop-blur-xl ">
+					<div className="relative mx-auto w-full space-y-5.5 px-5.5 py-5.5">
+						<div className="relative overflow-hidden rounded-md bg-theme-background/80 p-6 backdrop-blur-xl">
 							<motion.h3
 								initial={{ opacity: 0, y: 16 }}
 								whileInView={{ opacity: 1, y: 0 }}
@@ -342,7 +342,7 @@ const Home = () => {
 							whileInView={{ opacity: 1, y: 0 }}
 							viewport={{ once: true, margin: '-40px' }}
 							transition={{ duration: 0.4 }}
-							className="relative mb-5 overflow-hidden rounded-md bg-theme-background/80 p-6 backdrop-blur-xl"
+							className="relative overflow-hidden rounded-md bg-theme-background/80 p-6 backdrop-blur-xl"
 						>
 							<div className="pointer-events-none absolute right-0 top-0 h-32 w-32 rounded-full bg-linear-to-br from-teal-500/12 to-transparent blur-3xl" />
 							<h3

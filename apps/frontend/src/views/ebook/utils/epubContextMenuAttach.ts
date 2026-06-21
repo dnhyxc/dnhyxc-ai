@@ -1,11 +1,11 @@
 import type { Rendition } from 'epubjs';
 
 import { copyToClipboard } from '@/utils/clipboard';
+import { resolveSelectionCfiRange } from './epubRangeGeometry';
 
 type EpubIframeContents = {
 	document: Document;
 	window: Window;
-	cfiFromRange: (range: Range, ignoreClass?: string) => string;
 };
 
 export type EpubReaderContextMenuPayload = {
@@ -27,31 +27,6 @@ function toViewportPoint(e: MouseEvent, win: Window): { x: number; y: number } {
 
 function readSelectionText(win: Window): string {
 	return (win.getSelection()?.toString() ?? '').trim();
-}
-
-function resolveSelectionCfiRange(
-	rend: Rendition,
-	win: Window,
-	range: Range,
-): string | undefined {
-	const raw = rend.getContents();
-	const list: EpubIframeContents[] = Array.isArray(raw)
-		? raw
-		: raw
-			? [raw as EpubIframeContents]
-			: [];
-
-	const matching = list.filter((c) => c.window === win);
-	const candidates = matching.length > 0 ? matching : list;
-
-	for (const contents of candidates) {
-		try {
-			return contents.cfiFromRange(range);
-		} catch {
-			// try next chapter iframe
-		}
-	}
-	return undefined;
 }
 
 /**

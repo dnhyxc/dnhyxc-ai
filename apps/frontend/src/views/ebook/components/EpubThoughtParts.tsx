@@ -11,10 +11,74 @@ import ICON from '@/assets/icon.png';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import { formatDate, resolveCosUrlForWebDisplay } from '@/utils';
+import type { EpubHighlightColorId, EpubHighlightStyle } from '../types';
+import { EPUB_HIGHLIGHT_COLOR_OPTIONS } from '../utils/epubUserHighlights';
 import {
 	EpubQuoteActionBar,
 	type EpubQuoteActionBarProps,
 } from './EpubQuoteActionBar';
+
+const COLOR_BY_ID = Object.fromEntries(
+	EPUB_HIGHLIGHT_COLOR_OPTIONS.map((item) => [item.id, item]),
+) as Record<
+	EpubHighlightColorId,
+	(typeof EPUB_HIGHLIGHT_COLOR_OPTIONS)[number]
+>;
+
+function EpubHighlightedQuoteText({
+	quote,
+	highlight,
+	onHighlightClick,
+}: {
+	quote: string;
+	highlight?: { style: EpubHighlightStyle; color: EpubHighlightColorId } | null;
+	onHighlightClick?: () => void;
+}) {
+	const palette = highlight ? COLOR_BY_ID[highlight.color] : undefined;
+	const interactive = Boolean(onHighlightClick);
+	const showHighlightVisual = Boolean(highlight && palette);
+
+	return (
+		<span
+			role={interactive ? 'button' : undefined}
+			tabIndex={interactive ? 0 : undefined}
+			onClick={interactive ? onHighlightClick : undefined}
+			onKeyDown={
+				interactive
+					? (e) => {
+							if (e.key === 'Enter' || e.key === ' ') {
+								e.preventDefault();
+								onHighlightClick?.();
+							}
+						}
+					: undefined
+			}
+			className={cn(
+				showHighlightVisual && 'rounded-sm transition-colors',
+				showHighlightVisual && highlight?.style === 'highlight' && 'px-0.5',
+				showHighlightVisual &&
+					highlight?.style === 'underline' &&
+					'underline decoration-2 underline-offset-[5px]',
+				showHighlightVisual &&
+					highlight?.style === 'wavy' &&
+					'underline decoration-wavy decoration-2 underline-offset-[5px]',
+				interactive && 'cursor-pointer hover:opacity-90',
+			)}
+			style={{
+				backgroundColor:
+					showHighlightVisual && highlight?.style === 'highlight'
+						? palette?.fill
+						: undefined,
+				textDecorationColor:
+					showHighlightVisual && highlight?.style !== 'highlight'
+						? palette?.stroke
+						: undefined,
+			}}
+		>
+			{quote}
+		</span>
+	);
+}
 
 const QUOTE_CLAMP_LINES = 3;
 
@@ -64,6 +128,8 @@ function useQuoteExcerptClamp(quote: string) {
 type QuoteCardProps = {
 	quote: string;
 	quoteActions?: EpubQuoteActionBarProps | null;
+	/** 在书中对应正文上方打开 PopBar */
+	onQuoteHighlightClick?: () => void;
 	title?: string;
 	count?: number;
 	onClose?: () => void;
@@ -143,6 +209,7 @@ function ThoughtUserMeta({
 export function EpubThoughtQuoteCard({
 	quote,
 	quoteActions,
+	onQuoteHighlightClick,
 	title,
 	count,
 	onClose,
@@ -154,6 +221,12 @@ export function EpubThoughtQuoteCard({
 	const showHeader = Boolean(title || onClose);
 	const { wrapperRef, textRef, expanded, setExpanded, overflows } =
 		useQuoteExcerptClamp(quote);
+
+	const openPopBarAtBook = () => {
+		onQuoteHighlightClick?.();
+	};
+
+	const drawerQuoteActions = quoteActions;
 
 	if (!hasQuote && !showHeader) return null;
 
@@ -258,7 +331,12 @@ export function EpubThoughtQuoteCard({
 						>
 							『
 						</span>
-						{quote}
+						<EpubHighlightedQuoteText
+							quote={quote}
+							onHighlightClick={
+								onQuoteHighlightClick ? openPopBarAtBook : undefined
+							}
+						/>
 						<span
 							aria-hidden
 							className="text-textcolor/35 font-bold select-none"
@@ -268,10 +346,10 @@ export function EpubThoughtQuoteCard({
 					</p>
 				</figure>
 			) : null}
-			{quoteActions && hasQuote ? (
+			{drawerQuoteActions && hasQuote ? (
 				<div className={cn(quoteCardBarRowClass, 'border-theme/10 border-t')}>
 					<EpubQuoteActionBar
-						{...quoteActions}
+						{...drawerQuoteActions}
 						variant="drawer"
 						className="min-w-0 flex-1"
 					/>

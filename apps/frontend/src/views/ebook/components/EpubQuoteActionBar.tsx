@@ -6,6 +6,7 @@ import {
 	MessageSquarePlus,
 	Search,
 	Share2,
+	Strikethrough,
 } from 'lucide-react';
 import {
 	type ReactNode,
@@ -21,6 +22,7 @@ export type EpubQuoteActionBarLabels = {
 	/** 复制成功后的按钮文案，默认与 MOKE 助手「已复制」一致 */
 	copied?: string;
 	underline: string;
+	removeUnderline: string;
 	writeThought: string;
 	share: string;
 	askBook: string;
@@ -32,33 +34,82 @@ export type EpubQuoteActionBarProps = {
 	onCopy: () => void;
 	onWriteThought: () => void;
 	onAskBook: () => void;
+	onUnderline?: () => void;
+	onRemoveUnderline?: () => void;
+	/** 当前选区是否已有用户划线 */
+	hasHighlight?: boolean;
 	variant?: 'floating' | 'inline' | 'drawer';
-	/** 浮动条：任意按钮点击后回调（含暂未接入的操作项） */
+	/** 浮动条：任意按钮点击后回调（不含划线相关操作） */
 	onAnyAction?: () => void;
 	className?: string;
 };
 
 type BarVariant = NonNullable<EpubQuoteActionBarProps['variant']>;
 type ActionId = Exclude<keyof EpubQuoteActionBarLabels, 'copied'>;
+/** 划线 / 删除划线互斥，占同一工具栏槽位 */
+type HighlightToggleSlot = 'highlightToggle';
+type RenderActionId = ActionId | HighlightToggleSlot;
+
+/** 点击后不收起选区 / PopBar 的操作 */
+const PRESERVE_SELECTION_ACTIONS = new Set<ActionId>([
+	'underline',
+	'removeUnderline',
+	'share',
+	'listen',
+]);
 
 const ACTION_ORDER: Record<BarVariant, ActionId[]> = {
-	drawer: ['copy', 'underline', 'writeThought', 'share', 'askBook', 'listen'],
-	inline: ['copy', 'writeThought', 'askBook', 'underline', 'share', 'listen'],
-	floating: ['copy', 'underline', 'writeThought', 'share', 'askBook', 'listen'],
+	drawer: [
+		'copy',
+		'underline',
+		'removeUnderline',
+		'writeThought',
+		'share',
+		'askBook',
+		'listen',
+	],
+	inline: [
+		'copy',
+		'writeThought',
+		'askBook',
+		'underline',
+		'removeUnderline',
+		'share',
+		'listen',
+	],
+	floating: [
+		'copy',
+		'underline',
+		'removeUnderline',
+		'writeThought',
+		'share',
+		'askBook',
+		'listen',
+	],
 };
 
-const ACTION_ICONS: Record<Exclude<ActionId, 'listen'>, LucideIcon> = {
+const ACTION_ICONS: Partial<Record<ActionId, LucideIcon>> = {
 	copy: Copy,
 	underline: ALargeSmall,
+	removeUnderline: Strikethrough,
 	writeThought: MessageSquarePlus,
 	share: Share2,
 	askBook: Search,
 };
 
 const HANDLER_PROP: Partial<
-	Record<ActionId, 'onCopy' | 'onWriteThought' | 'onAskBook'>
+	Record<
+		ActionId,
+		| 'onCopy'
+		| 'onWriteThought'
+		| 'onAskBook'
+		| 'onUnderline'
+		| 'onRemoveUnderline'
+	>
 > = {
 	copy: 'onCopy',
+	underline: 'onUnderline',
+	removeUnderline: 'onRemoveUnderline',
 	writeThought: 'onWriteThought',
 	askBook: 'onAskBook',
 };
@@ -166,7 +217,44 @@ function renderActionIcon(
 		return <span className={LISTEN_CLASS[variant]}>听</span>;
 	}
 	const Icon = ACTION_ICONS[id];
+	if (!Icon) return null;
 	return <Icon className={ICON_CLASS[variant]} aria-hidden />;
+}
+
+/** 将 underline / removeUnderline 合并为单一槽位，按 hasHighlight 切换展示 */
+function buildRenderActions(
+	variant: BarVariant,
+	onUnderline?: () => void,
+	onRemoveUnderline?: () => void,
+): RenderActionId[] {
+	const result: RenderActionId[] = [];
+	let highlightSlotAdded = false;
+
+	for (const id of ACTION_ORDER[variant]) {
+		if (id === 'underline' || id === 'removeUnderline') {
+			if (highlightSlotAdded) continue;
+			if (!onUnderline && !onRemoveUnderline) continue;
+			highlightSlotAdded = true;
+			result.push('highlightToggle');
+			continue;
+		}
+		result.push(id);
+	}
+
+	return result;
+}
+
+function resolveHighlightToggleAction(
+	hasHighlight: boolean,
+	onUnderline?: () => void,
+	onRemoveUnderline?: () => void,
+): { id: ActionId; handler?: () => void } | null {
+	if (hasHighlight) {
+		if (!onRemoveUnderline) return null;
+		return { id: 'removeUnderline', handler: onRemoveUnderline };
+	}
+	if (!onUnderline) return null;
+	return { id: 'underline', handler: onUnderline };
 }
 
 /** 段落引用下方的操作条（与选区 PopBar 同款操作） */
@@ -175,6 +263,9 @@ export function EpubQuoteActionBar({
 	onCopy,
 	onWriteThought,
 	onAskBook,
+	onUnderline,
+	onRemoveUnderline,
+	hasHighlight = false,
 	variant = 'inline',
 	onAnyAction,
 	className,
@@ -204,11 +295,17 @@ export function EpubQuoteActionBar({
 		onCopy: handleCopy,
 		onWriteThought,
 		onAskBook,
+		onUnderline,
+		onRemoveUnderline,
 	} as const;
 
 	const buildOnClick = (id: ActionId, handler?: () => void) => {
 		const action = id === 'copy' ? handleCopy : handler;
-		if (variant === 'floating' && onAnyAction) {
+		if (
+			variant === 'floating' &&
+			onAnyAction &&
+			!PRESERVE_SELECTION_ACTIONS.has(id)
+		) {
 			return () => {
 				action?.();
 				if (id === 'copy') {
@@ -221,26 +318,53 @@ export function EpubQuoteActionBar({
 		return action;
 	};
 
+	const renderActions = buildRenderActions(
+		variant,
+		onUnderline,
+		onRemoveUnderline,
+	);
+	const highlightToggle = resolveHighlightToggleAction(
+		hasHighlight,
+		onUnderline,
+		onRemoveUnderline,
+	);
+
 	return (
 		<div
 			className={cn(CONTAINER_CLASS[variant], className)}
 			role="toolbar"
 			aria-label={labels.writeThought}
 		>
-			{ACTION_ORDER[variant].map((id) => {
-				const handlerProp = HANDLER_PROP[id];
+			{renderActions.map((slot) => {
+				if (slot === 'highlightToggle') {
+					if (!highlightToggle) return null;
+					const { id, handler } = highlightToggle;
+					const onClick = buildOnClick(id, handler);
+					return (
+						<QuoteActionItem
+							key="highlightToggle"
+							variant={variant}
+							label={labels[id]}
+							onClick={onClick}
+						>
+							{renderActionIcon(id, variant, false)}
+						</QuoteActionItem>
+					);
+				}
+
+				const handlerProp = HANDLER_PROP[slot];
 				const handler = handlerProp ? actionHandlers[handlerProp] : undefined;
-				const onClick = buildOnClick(id, handler);
-				const isCopy = id === 'copy';
+				const onClick = buildOnClick(slot, handler);
+				const isCopy = slot === 'copy';
 				return (
 					<QuoteActionItem
-						key={id}
+						key={slot}
 						variant={variant}
-						label={isCopy && copySucceeded ? copiedLabel : labels[id]}
+						label={isCopy && copySucceeded ? copiedLabel : labels[slot]}
 						onClick={onClick}
 						copied={isCopy && copySucceeded}
 					>
-						{renderActionIcon(id, variant, isCopy && copySucceeded)}
+						{renderActionIcon(slot, variant, isCopy && copySucceeded)}
 					</QuoteActionItem>
 				);
 			})}

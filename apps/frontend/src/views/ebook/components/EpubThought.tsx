@@ -30,6 +30,7 @@ type Props = {
 	onEdit?: () => void;
 	saving?: boolean;
 	quoteActions?: EpubQuoteActionBarProps | null;
+	onQuoteHighlightClick?: () => void;
 };
 
 const THOUGHT_TEXTAREA_CLASS = cn(
@@ -52,6 +53,7 @@ export function EpubThought({
 	onEdit,
 	saving = false,
 	quoteActions,
+	onQuoteHighlightClick,
 }: Props) {
 	const textareaRef = useRef<HTMLTextAreaElement>(null);
 	const scrollRef = useRef<HTMLDivElement>(null);
@@ -141,6 +143,7 @@ export function EpubThought({
 				onClose={onClose}
 				closeMode={mode === 'view' ? 'view' : 'edit'}
 				quoteActions={quoteActions}
+				onQuoteHighlightClick={onQuoteHighlightClick}
 				className={readOnly ? undefined : 'border-b border-theme/10'}
 			/>
 

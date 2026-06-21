@@ -4,6 +4,8 @@
 
 **主文档（数据与下划线）**：EPUB 阅读页「写想法 / 查看 / 编辑 / 删除」——数据库持久化、API、阅读区虚线下划线；含**重叠选区去重**、**点击/选区防误触**、**统一列表入口**等交互细节。弹窗/底部抽屉等 **UI 容器已废弃**，见下。
 
+**逐步拆解（推荐）**：[epub-thought-underline-impl.md](./epub-thought-underline-impl.md)（想法虚线全流程 + 逐行注释代码）。用户彩色划线见 [epub-user-highlight-impl.md](./epub-user-highlight-impl.md)。
+
 **延伸阅读（UI，按当前产品阅读顺序）**：
 
 | 文档 | 说明 |
@@ -453,7 +455,7 @@ useEffect(() => { // 监听详情关闭 + thoughts 变化
 | 存储 | 想法在服务端；**不**再使用 localStorage。 |
 | 删书 | 该书下当前用户想法一并删除。 |
 | PDF | 无想法 UI；`read.tsx` 仅在 `book.fmt === 'epub'` 时挂载右侧分栏想法面板。 |
-| 重叠选区 | **嵌套**（子串/包含）只显示最外层一条可见线；**部分重叠且互不包含**时重叠段仍可能各有一段线（未做区间切分合并）。 |
+| 重叠选区 | **嵌套**（子串/包含）只显示最外层一条可见线；**部分相交**时重叠段只画一条虚线（patch 层 blocker，见 [epub-thought-partial-overlap.md](./epub-thought-partial-overlap.md)）。 |
 | 性能 | 想法按 CFI 去重绘制；SVG patch 在 `content`/`relocated` 触发；一般单书想法量可接受。 |
 
 ---

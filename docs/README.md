@@ -85,6 +85,10 @@
 | 目录打开但看不出当前读到哪一章 | [ebook/ebook-toc-active-highlight.md](./ebook/ebook-toc-active-highlight.md) |
 | PDF 无 MOKE 助手 / PDF 右键菜单 | [ebook/ebook-moke-assistant.md](./ebook/ebook-moke-assistant.md) |
 | 保存读书想法后阅读页白屏 / 下划线异常 | [ebook/epub-thought-underlines-sync.md](./ebook/epub-thought-underlines-sync.md) |
+| EPUB 用户划线与想法虚线如何实现 / 重叠合并 | [ebook/epub-user-highlight-impl.md](./ebook/epub-user-highlight-impl.md)、[ebook/epub-thought-underline-impl.md](./ebook/epub-thought-underline-impl.md) |
+| EPUB 划线同名句子误删 / PopBar 划线与删除状态不对 | [ebook/epub-highlight-dom-match.md](./ebook/epub-highlight-dom-match.md) |
+| EPUB PopBar 闪烁 / 划线卡顿 / 工具条空档 | [ebook/epub-popbar-perf-ux.md](./ebook/epub-popbar-perf-ux.md) |
+| 两次想法选区相交时虚线叠成双线 | [ebook/epub-thought-partial-overlap.md](./ebook/epub-thought-partial-overlap.md) |
 | 复制到助手后输入中文乱码 | [knowledge/assistant-insert-focus.md](./knowledge/assistant-insert-focus.md) §5.1 |
 
 ---

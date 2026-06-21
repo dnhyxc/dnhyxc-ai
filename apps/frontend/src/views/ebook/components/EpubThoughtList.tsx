@@ -9,6 +9,7 @@ type Props = {
 	thoughts: EbookThought[];
 	onSelect: (thought: EbookThought) => void;
 	quoteActions?: EpubQuoteActionBarProps | null;
+	onQuoteHighlightClick?: () => void;
 };
 
 /** 同一段落有多条想法时，右侧分栏列表 */
@@ -17,6 +18,7 @@ export function EpubThoughtList({
 	thoughts,
 	onSelect,
 	quoteActions,
+	onQuoteHighlightClick,
 }: Props) {
 	const { t } = useI18n();
 	const quote = thoughts[0]?.quote ?? '';
@@ -31,6 +33,7 @@ export function EpubThoughtList({
 				onClose={onClose}
 				closeMode="view"
 				quoteActions={quoteActions}
+				onQuoteHighlightClick={onQuoteHighlightClick}
 			/>
 
 			{thoughts.map((thought) => (

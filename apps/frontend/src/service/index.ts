@@ -25,6 +25,7 @@ import type {
 	EbookCategory,
 	EbookShelfData,
 	EbookThought,
+	EbookUserHighlight,
 	Prog,
 } from '@/views/ebook/types';
 import {
@@ -57,6 +58,7 @@ import {
 	EBOOK_COVER,
 	EBOOK_DELETE,
 	EBOOK_FILE,
+	EBOOK_HIGHLIGHTS,
 	EBOOK_PROGRESS,
 	EBOOK_SHELF,
 	EBOOK_THOUGHTS,
@@ -2083,6 +2085,51 @@ export const updateEbookThought = async (
 /** DELETE /ebook/thoughts/:id */
 export const deleteEbookThought = async (thoughtId: string): Promise<void> => {
 	await http.delete(EBOOK_THOUGHTS, { params: [thoughtId] });
+};
+
+/** GET /ebook/highlights/:bookId */
+export const fetchEbookHighlights = async (
+	bookId: string,
+): Promise<EbookUserHighlight[]> => {
+	const res = await http.get<EbookUserHighlight[]>(
+		`${EBOOK_HIGHLIGHTS}/${bookId}`,
+	);
+	return res.data;
+};
+
+/** POST /ebook/highlights */
+export const createEbookHighlight = async (body: {
+	bookId: string;
+	cfiRange: string;
+	quote: string;
+	style: EbookUserHighlight['style'];
+	color: EbookUserHighlight['color'];
+}): Promise<EbookUserHighlight> => {
+	const res = await http.post<EbookUserHighlight>(EBOOK_HIGHLIGHTS, body);
+	return res.data;
+};
+
+/** PUT /ebook/highlights/:id */
+export const updateEbookHighlight = async (
+	highlightId: string,
+	body: {
+		quote?: string;
+		style?: EbookUserHighlight['style'];
+		color?: EbookUserHighlight['color'];
+	},
+): Promise<EbookUserHighlight> => {
+	const res = await http.put<EbookUserHighlight>(
+		`${EBOOK_HIGHLIGHTS}/${highlightId}`,
+		body,
+	);
+	return res.data;
+};
+
+/** DELETE /ebook/highlights/:id */
+export const deleteEbookHighlight = async (
+	highlightId: string,
+): Promise<void> => {
+	await http.delete(EBOOK_HIGHLIGHTS, { params: [highlightId] });
 };
 
 /** DELETE /ebook/delete/:id */

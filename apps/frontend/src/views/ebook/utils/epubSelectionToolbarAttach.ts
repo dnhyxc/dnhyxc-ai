@@ -1,10 +1,10 @@
 import type { Rendition } from 'epubjs';
+import { resolveSelectionCfiRange } from './epubRangeGeometry';
 import { getEpubScrollContainer } from './epubScrolledNav';
 
 type EpubIframeContents = {
 	document: Document;
 	window: Window;
-	cfiFromRange: (range: Range, ignoreClass?: string) => string;
 };
 
 export type EpubSelectionPopBarPayload = {
@@ -15,6 +15,17 @@ export type EpubSelectionPopBarPayload = {
 	selectedText: string;
 	cfiRange?: string;
 };
+
+/** 划线/想法 mark 点击打开 PopBar 后，避免选区监听误关 */
+let suppressDismissUntil = 0;
+
+export function suppressEpubSelectionPopBarDismiss(ms = 450): void {
+	suppressDismissUntil = Date.now() + ms;
+}
+
+function shouldSuppressDismiss(): boolean {
+	return Date.now() < suppressDismissUntil;
+}
 
 function readSelectionText(win: Window): string {
 	return (win.getSelection()?.toString() ?? '').trim();
@@ -41,31 +52,6 @@ export function clearEpubTextSelection(rend: Rendition): void {
 	} catch {
 		// ignore
 	}
-}
-
-function resolveSelectionCfiRange(
-	rend: Rendition,
-	win: Window,
-	range: Range,
-): string | undefined {
-	const raw = rend.getContents();
-	const list: EpubIframeContents[] = Array.isArray(raw)
-		? raw
-		: raw
-			? [raw as EpubIframeContents]
-			: [];
-
-	const matching = list.filter((c) => c.window === win);
-	const candidates = matching.length > 0 ? matching : list;
-
-	for (const contents of candidates) {
-		try {
-			return contents.cfiFromRange(range);
-		} catch {
-			// try next chapter iframe
-		}
-	}
-	return undefined;
 }
 
 function toIframeViewportOffset(win: Window): { x: number; y: number } {
@@ -124,6 +110,20 @@ function unionRectBounds(rects: DOMRect[]) {
 	return { left, top, right };
 }
 
+/** 多行选区 / 划线：focus 行顶（仅非 collapsed 选区时） */
+function resolvePopBarAnchorLineTop(
+	win: Window,
+	range: Range,
+	visibleRects: DOMRect[],
+): number {
+	const sel = win.getSelection();
+	if (sel && !sel.isCollapsed) {
+		const focusRect = readCollapsedRangeRect(range, isSelectionBackward(sel));
+		if (focusRect) return focusRect.top;
+	}
+	return visibleRects[0]!.top;
+}
+
 function rangeToViewportAnchor(
 	win: Window,
 	range: Range,
@@ -140,20 +140,11 @@ function rangeToViewportAnchor(
 	}
 
 	if (visibleRects.length > 1) {
-		const sel = win.getSelection();
-		const focusRect = sel
-			? readCollapsedRangeRect(range, isSelectionBackward(sel))
-			: null;
-		const anchorLineTop = focusRect?.top ?? visibleRects[0]!.top;
-		const lineRects = visibleRects.filter(
-			(rect) => Math.abs(rect.top - anchorLineTop) < 4,
-		);
-		const line = unionRectBounds(
-			lineRects.length > 0 ? lineRects : visibleRects,
-		);
+		const bounds = unionRectBounds(visibleRects);
+		const lineTop = resolvePopBarAnchorLineTop(win, range, visibleRects);
 		return {
-			centerX: offset.x + (line.left + line.right) / 2,
-			top: offset.y + line.top,
+			centerX: offset.x + (bounds.left + bounds.right) / 2,
+			top: offset.y + lineTop,
 		};
 	}
 
@@ -218,6 +209,7 @@ export function attachEpubSelectionPopBar(
 	let suppressEmitUntil = 0;
 
 	const hidePopBar = () => {
+		if (shouldSuppressDismiss()) return;
 		cancelAnimationFrame(rafId);
 		rafId = 0;
 		window.clearTimeout(keyboardEmitTimer);
@@ -262,8 +254,8 @@ export function attachEpubSelectionPopBar(
 					return;
 				}
 				const active = readActiveSelection(rend);
+				// 简单点击（无文字选区）不应关闭由划线 mark 打开的 PopBar
 				if (!active) {
-					onChange(null);
 					return;
 				}
 				const anchor = rangeToViewportAnchor(active.win, active.range);
@@ -302,6 +294,8 @@ export function attachEpubSelectionPopBar(
 				return;
 			}
 			if (!readActiveSelection(rend)) {
+				// mousedown→click 定位光标时会先产生 collapsed 选区，此时 selecting 仍为 true
+				if (selecting || shouldSuppressDismiss()) return;
 				onChange(null);
 				return;
 			}
@@ -376,5 +370,47 @@ export function attachEpubSelectionPopBar(
 		for (const fn of contentCleanups.values()) fn();
 		contentCleanups.clear();
 		onChange(null);
+	};
+}
+
+/** 根据 EPUB CFI 对应 DOM Range 计算 PopBar 锚点（点击划线/想法 mark 时用） */
+export function buildEpubPopBarPayloadFromCfiRange(
+	rend: Rendition,
+	cfiRange: string,
+	quote: string,
+	resolveRange: (rend: Rendition, cfi: string) => Range | null,
+): EpubSelectionPopBarPayload {
+	const range = resolveRange(rend, cfiRange);
+	if (range) {
+		const win = range.startContainer.ownerDocument?.defaultView;
+		if (win) {
+			const anchor = rangeToViewportAnchor(win, range);
+			if (anchor) {
+				return {
+					x: anchor.centerX,
+					y: anchor.top,
+					selectedText: quote,
+					cfiRange,
+				};
+			}
+		}
+	}
+	return {
+		x: window.innerWidth / 2,
+		y: Math.min(window.innerHeight * 0.35, 240),
+		selectedText: quote,
+		cfiRange,
+	};
+}
+
+/** 侧栏引用块等元素上方 PopBar 锚点 */
+export function buildPopBarAnchorFromElement(el: HTMLElement): {
+	x: number;
+	y: number;
+} {
+	const rect = el.getBoundingClientRect();
+	return {
+		x: rect.left + rect.width / 2,
+		y: rect.top,
 	};
 }

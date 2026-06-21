@@ -32,6 +32,7 @@ import {
 import { AddEbookPathDto } from './dto/add-ebook-path.dto';
 import { AssignEbookCategoryDto } from './dto/assign-ebook-category.dto';
 import { CreateEbookCategoryDto } from './dto/create-ebook-category.dto';
+import { CreateEbookHighlightDto } from './dto/create-ebook-highlight.dto';
 import { CreateEbookThoughtDto } from './dto/create-ebook-thought.dto';
 import { QueryEbookByLocalPathDto } from './dto/query-ebook-by-local-path.dto';
 import { QueryEbookCategoriesSummaryDto } from './dto/query-ebook-categories-summary.dto';
@@ -39,6 +40,7 @@ import { QueryEbookShelfDto } from './dto/query-ebook-shelf.dto';
 import { ReorderEbookCategoriesDto } from './dto/reorder-ebook-categories.dto';
 import { SaveEbookProgressDto } from './dto/save-ebook-progress.dto';
 import { UpdateEbookCategoryDto } from './dto/update-ebook-category.dto';
+import { UpdateEbookHighlightDto } from './dto/update-ebook-highlight.dto';
 import { UpdateEbookThoughtDto } from './dto/update-ebook-thought.dto';
 import { UpdateEbookTitleDto } from './dto/update-ebook-title.dto';
 import { EbookService } from './ebook.service';
@@ -318,6 +320,44 @@ export class EbookController {
 		@Param('id', ParseUUIDPipe) id: string,
 	) {
 		await this.ebookService.removeThought(this.userId(req), id);
+		return { id };
+	}
+
+	@Get('highlights/:bookId')
+	@UseInterceptors(ResponseInterceptor)
+	async listHighlights(
+		@Req() req: AuthedRequest,
+		@Param('bookId', ParseUUIDPipe) bookId: string,
+	) {
+		return this.ebookService.listHighlights(this.userId(req), bookId);
+	}
+
+	@Post('highlights')
+	@UseInterceptors(ResponseInterceptor)
+	async createHighlight(
+		@Req() req: AuthedRequest,
+		@Body() dto: CreateEbookHighlightDto,
+	) {
+		return this.ebookService.createHighlight(this.userId(req), dto);
+	}
+
+	@Put('highlights/:id')
+	@UseInterceptors(ResponseInterceptor)
+	async updateHighlight(
+		@Req() req: AuthedRequest,
+		@Param('id', ParseUUIDPipe) id: string,
+		@Body() dto: UpdateEbookHighlightDto,
+	) {
+		return this.ebookService.updateHighlight(this.userId(req), id, dto);
+	}
+
+	@Delete('highlights/:id')
+	@UseInterceptors(ResponseInterceptor)
+	async removeHighlight(
+		@Req() req: AuthedRequest,
+		@Param('id', ParseUUIDPipe) id: string,
+	) {
+		await this.ebookService.removeHighlight(this.userId(req), id);
 		return { id };
 	}
 

@@ -6,6 +6,7 @@ import { EbookController } from './ebook.controller';
 import { EbookService } from './ebook.service';
 import { EbookBook } from './ebook-book.entity';
 import { EbookCategory } from './ebook-category.entity';
+import { EbookHighlight } from './ebook-highlight.entity';
 import { EbookProgress } from './ebook-progress.entity';
 import { EbookThought } from './ebook-thought.entity';
 
@@ -16,6 +17,7 @@ import { EbookThought } from './ebook-thought.entity';
 			EbookProgress,
 			EbookCategory,
 			EbookThought,
+			EbookHighlight,
 			User,
 		]),
 		UploadModule,

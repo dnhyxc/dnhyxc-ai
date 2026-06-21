@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { type ThemeName, useTheme } from '@/hooks';
 import { cn } from '@/lib/utils';
 import { onListen } from '@/utils';
-import type { EbookThought, EbookTocItem } from '../types';
+import type { EbookThought, EbookTocItem, EbookUserHighlight } from '../types';
 import {
 	attachEpubIframeContextMenu,
 	type EpubReaderContextMenuPayload,
@@ -22,10 +22,16 @@ import {
 } from '../utils/epubSelectionToolbarAttach';
 import { resolveSpineIndexForHref } from '../utils/epubSpineIndex';
 import {
-	applyEpubThoughtUnderlines,
 	installEpubThoughtUnderlineListeners,
 	teardownAppliedThoughtUnderlines,
 } from '../utils/epubThoughtAnnotations';
+import {
+	installEpubReadingMarkClickListeners,
+	installEpubUserHighlightPatchListeners,
+	resetEpubReadingAnnotationSyncState,
+	syncEpubReadingAnnotations,
+	teardownAppliedUserHighlights,
+} from '../utils/epubUserHighlights';
 import { READER_NATIVE_SCROLLBAR_EPUB_CONTAINER } from '../utils/readerScrollbar';
 
 type NavApi = {
@@ -33,6 +39,8 @@ type NavApi = {
 	next: () => Promise<void>;
 	go: (href: string) => Promise<void>;
 	clearTextSelection: () => void;
+	getRendition: () => Rendition | null;
+	syncReadingAnnotations: (nextHighlights?: EbookUserHighlight[]) => void;
 };
 
 type Props = {
@@ -54,6 +62,12 @@ type Props = {
 	thoughts?: EbookThought[];
 	onThoughtClick?: (thought: EbookThought) => void;
 	onThoughtGroupClick?: (thoughts: EbookThought[]) => void;
+	onUserHighlightPopBar?: (
+		payload: EpubSelectionPopBarPayload,
+		highlight: EbookUserHighlight,
+	) => void;
+	/** 用户划线（高亮 / 下划线 / 波浪线） */
+	highlights?: EbookUserHighlight[];
 };
 
 /** epub.js 全书百分比需 locations.generate；未就绪时用 spine 索引粗估 */
@@ -105,6 +119,8 @@ export function EpubPane({
 	thoughts = [],
 	onThoughtClick,
 	onThoughtGroupClick,
+	onUserHighlightPopBar,
+	highlights = [],
 }: Props) {
 	const { theme: appTheme } = useTheme();
 	const [appThemeName, setAppThemeName] = useState<ThemeName>(appTheme);
@@ -127,8 +143,11 @@ export function EpubPane({
 	const onSelectionPopBarRef = useRef(onSelectionPopBar);
 	const onThoughtClickRef = useRef(onThoughtClick);
 	const onThoughtGroupClickRef = useRef(onThoughtGroupClick);
+	const onUserHighlightPopBarRef = useRef(onUserHighlightPopBar);
 	const thoughtsRef = useRef(thoughts);
-	const appliedThoughtsRef = useRef<Map<string, string[]>>(new Map());
+	const highlightsRef = useRef(highlights);
+	const appliedThoughtsRef = useRef<Map<string, string>>(new Map());
+	const appliedHighlightsRef = useRef<Map<string, string>>(new Map());
 	const keyboardNavEnabledRef = useRef(keyboardNavEnabled);
 	const openRef = useRef<ArrayBuffer | null>(null);
 	const initialCfiRef = useRef<string | undefined>(undefined);
@@ -172,7 +191,9 @@ export function EpubPane({
 	onSelectionPopBarRef.current = onSelectionPopBar;
 	onThoughtClickRef.current = onThoughtClick;
 	onThoughtGroupClickRef.current = onThoughtGroupClick;
+	onUserHighlightPopBarRef.current = onUserHighlightPopBar;
 	thoughtsRef.current = thoughts;
+	highlightsRef.current = highlights;
 	keyboardNavEnabledRef.current = keyboardNavEnabled;
 
 	// 仅在换书（open 变化）时记录起始 CFI，避免翻页保存进度后整书重载闪烁
@@ -234,15 +255,34 @@ export function EpubPane({
 		const rend = rendRef.current;
 		if (!rend || !rendReady) return;
 
-		applyEpubThoughtUnderlines(
+		return installEpubReadingMarkClickListeners(rend, {
+			getThoughts: () => thoughtsRef.current ?? [],
+			getHighlights: () => highlightsRef.current ?? [],
+			onThoughtGroupClick: (group) => onThoughtGroupClickRef.current?.(group),
+			onUserHighlightPopBar: (payload, highlight) =>
+				onUserHighlightPopBarRef.current?.(payload, highlight),
+		});
+	}, [rendReady]);
+
+	useEffect(() => {
+		const rend = rendRef.current;
+		if (!rend || !rendReady) return;
+
+		return installEpubUserHighlightPatchListeners(rend);
+	}, [rendReady]);
+
+	useEffect(() => {
+		const rend = rendRef.current;
+		if (!rend || !rendReady) return;
+
+		syncEpubReadingAnnotations(
 			rend,
 			thoughts ?? [],
+			highlights ?? [],
 			appliedThoughtsRef.current,
+			appliedHighlightsRef.current,
 		);
-		return () => {
-			teardownAppliedThoughtUnderlines(rend, appliedThoughtsRef.current);
-		};
-	}, [thoughts, rendReady]);
+	}, [thoughts, highlights, rendReady]);
 
 	useEffect(() => {
 		const el = hostRef.current;
@@ -258,6 +298,8 @@ export function EpubPane({
 		readyRef.current = false;
 		setRendReady(false);
 		appliedThoughtsRef.current.clear();
+		appliedHighlightsRef.current.clear();
+		resetEpubReadingAnnotationSyncState();
 		locationsReadyRef.current = false;
 		bookRef.current = null;
 		rendRef.current = null;
@@ -348,6 +390,18 @@ export function EpubPane({
 						if (!rendRef.current) return;
 						clearEpubTextSelection(rendRef.current);
 					},
+					getRendition: () => rendRef.current,
+					syncReadingAnnotations: (nextHighlights) => {
+						const r = rendRef.current;
+						if (!r) return;
+						syncEpubReadingAnnotations(
+							r,
+							thoughtsRef.current ?? [],
+							nextHighlights ?? highlightsRef.current ?? [],
+							appliedThoughtsRef.current,
+							appliedHighlightsRef.current,
+						);
+					},
 				});
 
 				const nav = await book.loaded.navigation;
@@ -400,11 +454,15 @@ export function EpubPane({
 			readyRef.current = false;
 			setRendReady(false);
 			appliedThoughtsRef.current.clear();
+			appliedHighlightsRef.current.clear();
+			resetEpubReadingAnnotationSyncState();
 			locationsReadyRef.current = false;
 			bookRef.current = null;
 			ro.disconnect();
 			try {
 				if (rend) {
+					teardownAppliedThoughtUnderlines(rend, appliedThoughtsRef.current);
+					teardownAppliedUserHighlights(rend, appliedHighlightsRef.current);
 					rend.off('relocated', relocate);
 					rend.off('keydown', onRenditionKeyDown);
 					rend.destroy();

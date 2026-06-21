@@ -951,4 +951,24 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'The floating toolbar above selected text uses a frosted panel and theme-aware downward shadow so edges stay clear on dark reading backgrounds and colored themes; the caret matches the panel with consistent rounded corners. After copy, a brief “Copied” state shows before the selection clears.',
 	},
+	's25-26': {
+		title: 'EPUB user highlights',
+		description:
+			'While reading EPUB, select text and use Highlight on the floating toolbar—background fill, straight underline, or wavy underline in five colors. Tap an existing mark to change style or remove it. Adjacent or overlapping highlights merge into one; the latest style wins. Sign-in required; highlights sync to your account and are removed when you delete the book. Can coexist with reading-note underlines. EPUB only; PDF not supported yet.',
+	},
+	's25-27': {
+		title: 'EPUB highlight matching improvements',
+		description:
+			'Highlights are matched by position in the text—duplicate sentences in the same chapter no longer delete or merge each other by mistake. The toolbar shows Remove highlight when the whole selection is already highlighted, and Highlight when the selection is mixed or not highlighted yet.',
+	},
+	's25-28': {
+		title: 'EPUB selection toolbar UX improvements',
+		description:
+			'Highlights, removals, and reading notes apply to the page more smoothly. The toolbar no longer flashes when switching between Highlight and Remove highlight, and the action row no longer shows empty placeholder gaps.',
+	},
+	's25-29': {
+		title: 'EPUB reading-note partial overlap fix',
+		description:
+			'When you add a second reading note on text that partially overlaps an earlier note, the overlapping stretch no longer shows two stacked dashed underlines. Each selection can still be tapped to open its own note list.',
+	},
 };

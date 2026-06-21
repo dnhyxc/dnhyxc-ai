@@ -83,3 +83,25 @@ export type EbookThought = {
 	createdAt: string;
 	updatedAt: string;
 };
+
+/** EPUB 用户划线样式（选区高亮 / 直线下划线 / 波浪线） */
+export type EpubHighlightStyle = 'highlight' | 'underline' | 'wavy';
+
+export type EpubHighlightColorId =
+	| 'pink'
+	| 'purple'
+	| 'blue'
+	| 'green'
+	| 'yellow';
+
+/** EPUB 用户划线（服务端存储，按 CFI 定位） */
+export type EbookUserHighlight = {
+	id: string;
+	userId: number;
+	cfiRange: string;
+	quote: string;
+	style: EpubHighlightStyle;
+	color: EpubHighlightColorId;
+	createdAt: string;
+	updatedAt: string;
+};

@@ -20,9 +20,14 @@
 | [epub-reading-thoughts.md](./epub-reading-thoughts.md) | **数据层**：服务端存储、虚线下划线、重叠去重、选区防误触 |
 | [epub-thought-side-panel.md](./epub-thought-side-panel.md) | **当前 UI**：读书想法右侧分栏（与 MK 问书互斥）、footer 固定输入 |
 | [epub-selection-popbar-visual.md](./epub-selection-popbar-visual.md) | **增量**：选区浮动 PopBar 毛玻璃/箭头/主题定向阴影与 `--shadow-drop-*` 令牌 |
+| [epub-user-highlight-impl.md](./epub-user-highlight-impl.md) | **主文档（用户划线）**：彩色高亮/下划线/波浪线、重叠合并、PopBar、与想法协同（逐步拆解 + 逐行注释代码） |
+| [epub-highlight-dom-match.md](./epub-highlight-dom-match.md) | **增量**：划线按 CFI/DOM 命中，避免 quote 同名跨位置误删/误合并；PopBar 划线/删除划线覆盖度规则 |
+| [epub-popbar-perf-ux.md](./epub-popbar-perf-ux.md) | **增量**：PopBar 防闪烁、划线 sync 增量 apply、highlightToggle 单槽位、重复 sync 去除 |
+| [epub-thought-underline-impl.md](./epub-thought-underline-impl.md) | **主文档（想法虚线）**：分组、嵌套去重、选区防误触、与用户划线叠加（逐步拆解 + 逐行注释代码） |
+| [epub-thought-partial-overlap.md](./epub-thought-partial-overlap.md) | **增量**：部分相交的想法选区 patch 层 blocker 去重，避免重叠段双线叠加 |
 | [epub-thought-underlines-sync.md](./epub-thought-underlines-sync.md) | **增量**：下划线批注与监听拆分，修复保存/切章偶发白屏 |
 | [epub-thought-drawer.md](./epub-thought-drawer.md) | **已废弃归档**：全屏底部 Sheet 抽屉（组件已删，勿作实现依据） |
 | [../chat/assistant-share-bar.md](../chat/assistant-share-bar.md) | **关联**：助手分享底栏与 `useAssistantShare`（知识库 / 英语 / 电子书三端统一） |
 | [../knowledge/assistant-insert-focus.md](../knowledge/assistant-insert-focus.md) | **关联**：选区写入助手后聚焦与 IME 修复（知识库 + 电子书 MOKE 问书） |
 
-**延伸阅读**：上传目录与 `uploads/ebooks` 落盘见 [ops/upload-storage-paths.md](../ops/upload-storage-paths.md)；路由鉴权与公开路径见 [app/route-auth.md](../app/route-auth.md)。EPUB 右键见 [epub-assistant-context-menu.md](./epub-assistant-context-menu.md)；MOKE / PDF 见 [ebook-moke-assistant.md](./ebook-moke-assistant.md)。**读书想法 UI 以 [epub-thought-side-panel.md](./epub-thought-side-panel.md) 为准**（全屏抽屉已废弃，见 [epub-thought-drawer.md](./epub-thought-drawer.md) 归档）。
+**延伸阅读**：上传目录与 `uploads/ebooks` 落盘见 [ops/upload-storage-paths.md](../ops/upload-storage-paths.md)；路由鉴权与公开路径见 [app/route-auth.md](../app/route-auth.md)。EPUB 右键见 [epub-assistant-context-menu.md](./epub-assistant-context-menu.md)；MOKE / PDF 见 [ebook-moke-assistant.md](./ebook-moke-assistant.md)。**读书想法 UI 以 [epub-thought-side-panel.md](./epub-thought-side-panel.md) 为准**（全屏抽屉已废弃，见 [epub-thought-drawer.md](./epub-thought-drawer.md) 归档）。**用户划线与想法虚线的完整实现说明**见 [epub-user-highlight-impl.md](./epub-user-highlight-impl.md) 与 [epub-thought-underline-impl.md](./epub-thought-underline-impl.md)。

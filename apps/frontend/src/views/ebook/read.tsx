@@ -16,9 +16,13 @@ import { useNavigate, useParams } from 'react-router';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import {
+	createEbookHighlight,
 	createEbookThought,
+	deleteEbookHighlight,
 	deleteEbookThought,
+	fetchEbookHighlights,
 	fetchEbookThoughts,
+	updateEbookHighlight,
 	updateEbookThought,
 } from '@/service';
 import ebookStore from '@/store/ebook';
@@ -42,7 +46,13 @@ import {
 import { EpubThought } from './components/EpubThought';
 import { EpubThoughtList } from './components/EpubThoughtList';
 import { PdfPane } from './components/PdfPane';
-import type { EbookThought, EbookTocItem } from './types';
+import type {
+	EbookThought,
+	EbookTocItem,
+	EbookUserHighlight,
+	EpubHighlightColorId,
+	EpubHighlightStyle,
+} from './types';
 import {
 	buildEpubContextMenuItems,
 	type EpubReaderContextActions,
@@ -51,13 +61,30 @@ import {
 	buildPdfContextMenuItems,
 	type PdfReaderContextActions,
 } from './utils/buildPdfContextMenuItems';
+import { cfiFromDomRange, trimSelectionRange } from './utils/epubRangeGeometry';
 import {
 	DEFAULT_EPUB_READER_SETTINGS,
 	type EpubReaderSettings,
 	loadEpubReaderSettings,
 	saveEpubReaderSettings,
 } from './utils/epubReaderSettings';
-import type { EpubSelectionPopBarPayload } from './utils/epubSelectionToolbarAttach';
+import {
+	buildEpubPopBarPayloadFromCfiRange,
+	type EpubSelectionPopBarPayload,
+	suppressEpubSelectionPopBarDismiss,
+} from './utils/epubSelectionToolbarAttach';
+import {
+	buildMergedHighlightTarget,
+	findAllUserHighlightsCoveringCfi,
+	findAllUserHighlightsForSelection,
+	findHighlightsStrictlyContainedIn,
+	findUserHighlightByCfi,
+	findUserHighlightCoveringCfi,
+	findUserHighlightForSelection,
+	isSelectionFullyHighlighted,
+	resolveCfiDomRange,
+	resolveMergedOverlappingHighlight,
+} from './utils/epubUserHighlights';
 import { type EbookOpenSource, resolveOpen } from './utils/io';
 import { parsePdfPageHref } from './utils/pdfOutline';
 import {
@@ -91,6 +118,8 @@ function EbookReadPage() {
 		next: () => Promise<void>;
 		go: (href: string) => Promise<void>;
 		clearTextSelection: () => void;
+		getRendition: () => import('epubjs').Rendition | null;
+		syncReadingAnnotations: (nextHighlights?: EbookUserHighlight[]) => void;
 	} | null>(null);
 	const [epubNavReady, setEpubNavReady] = useState(false);
 	const pdfNavRef = useRef<{
@@ -129,6 +158,13 @@ function EbookReadPage() {
 	const [selectionPopBar, setSelectionPopBar] =
 		useState<EpubSelectionPopBarState | null>(null);
 	const selectionPopBarRef = useRef<EpubSelectionPopBarPayload | null>(null);
+	const [highlights, setHighlights] = useState<EbookUserHighlight[]>([]);
+	const [highlightStyle, setHighlightStyle] =
+		useState<EpubHighlightStyle>('highlight');
+	const [highlightColor, setHighlightColor] =
+		useState<EpubHighlightColorId>('pink');
+	const highlightsRef = useRef(highlights);
+	highlightsRef.current = highlights;
 	const returnToListCfiRef = useRef<string | null>(null);
 	const [thoughtDraft, setThoughtDraft] = useState({
 		id: '',
@@ -185,6 +221,383 @@ function EbookReadPage() {
 			cancelled = true;
 		};
 	}, [bookId, t]);
+
+	useEffect(() => {
+		if (!bookId) {
+			setHighlights([]);
+			return;
+		}
+		let cancelled = false;
+		void fetchEbookHighlights(bookId)
+			.then((list) => {
+				if (!cancelled) setHighlights(list);
+			})
+			.catch((e) => {
+				if (!cancelled) {
+					Toast({
+						type: 'error',
+						title: t('ebook.read.highlight.loadFailed'),
+						message: getRequestErrorMessage(e),
+					});
+				}
+			});
+		return () => {
+			cancelled = true;
+		};
+	}, [bookId, t]);
+
+	const selectionFullyHighlighted = useMemo(() => {
+		if (!selectionPopBar?.cfiRange) return false;
+		const rend = epubNavRef.current?.getRendition() ?? undefined;
+		return isSelectionFullyHighlighted(
+			highlights,
+			selectionPopBar.cfiRange,
+			selectionPopBar.selectedText,
+			rend,
+		);
+	}, [highlights, selectionPopBar, epubNavReady]);
+
+	const upsertHighlightForQuote = useCallback(
+		async (
+			cfiRange: string,
+			quote: string,
+			style: EpubHighlightStyle,
+			color: EpubHighlightColorId,
+		): Promise<EbookUserHighlight | null> => {
+			if (!cfiRange || !bookId) return null;
+
+			const rend = epubNavRef.current?.getRendition() ?? undefined;
+			let targetCfi = cfiRange;
+			let targetQuote = quote;
+			const removeIds = new Set<string>();
+
+			if (rend) {
+				const resolved = resolveCfiDomRange(rend, cfiRange);
+				if (resolved) {
+					const normalized = trimSelectionRange(resolved);
+					targetCfi = cfiFromDomRange(rend, normalized) ?? cfiRange.trim();
+					targetQuote = normalized.toString().trim() || quote.trim();
+				}
+
+				const merged = resolveMergedOverlappingHighlight(
+					rend,
+					targetCfi,
+					targetQuote,
+					highlightsRef.current,
+				);
+				targetCfi = merged.cfiRange;
+				targetQuote = merged.quote;
+				for (const id of merged.removeHighlightIds) {
+					removeIds.add(id);
+				}
+			}
+
+			const superseded = findHighlightsStrictlyContainedIn(
+				{ cfiRange: targetCfi, quote: targetQuote },
+				highlightsRef.current.filter((h) => !h.id || !removeIds.has(h.id)),
+			);
+			for (const item of superseded) {
+				if (item.id) removeIds.add(item.id);
+			}
+
+			// 合并删除仅依赖 DOM 相交/相接（resolveMergedOverlappingHighlight）与严格包含，
+			// 不用 quote 子串（如单字「曹」）避免误并 distant 划线
+			if (rend && removeIds.size > 0) {
+				const mergeTargets = highlightsRef.current.filter(
+					(h) => h.id && removeIds.has(h.id),
+				);
+				const mergedTarget = buildMergedHighlightTarget(
+					rend,
+					targetCfi,
+					targetQuote,
+					mergeTargets,
+				);
+				targetCfi = mergedTarget.cfiRange;
+				targetQuote = mergedTarget.quote;
+			}
+
+			try {
+				if (removeIds.size === 0) {
+					const existingExact = findUserHighlightByCfi(
+						highlightsRef.current,
+						targetCfi,
+					);
+
+					const item = existingExact?.id
+						? await updateEbookHighlight(existingExact.id, {
+								quote: targetQuote,
+								style,
+								color,
+							})
+						: await createEbookHighlight({
+								bookId,
+								cfiRange: targetCfi,
+								quote: targetQuote,
+								style,
+								color,
+							});
+
+					const next = [
+						...highlightsRef.current.filter((h) => h.id !== item.id),
+						item,
+					];
+					highlightsRef.current = next;
+					setHighlights(next);
+					return item;
+				}
+
+				await Promise.all([...removeIds].map((id) => deleteEbookHighlight(id)));
+				const item = await createEbookHighlight({
+					bookId,
+					cfiRange: targetCfi,
+					quote: targetQuote,
+					style,
+					color,
+				});
+				const next = [
+					...highlightsRef.current.filter((h) => !removeIds.has(h.id)),
+					item,
+				];
+				highlightsRef.current = next;
+				setHighlights(next);
+				return item;
+			} catch (e) {
+				Toast({
+					type: 'error',
+					title: t('ebook.read.highlight.saveFailed'),
+					message: getRequestErrorMessage(e),
+				});
+				return null;
+			}
+		},
+		[bookId, t],
+	);
+
+	const upsertSelectionHighlight = useCallback(
+		async (style: EpubHighlightStyle, color: EpubHighlightColorId) => {
+			const payload = selectionPopBarRef.current;
+			if (!payload?.cfiRange) return null;
+			const item = await upsertHighlightForQuote(
+				payload.cfiRange,
+				payload.selectedText,
+				style,
+				color,
+			);
+			if (!item) return null;
+
+			const nextPayload: EpubSelectionPopBarPayload = {
+				...payload,
+				cfiRange: item.cfiRange,
+				selectedText: item.quote?.trim() || payload.selectedText,
+			};
+			selectionPopBarRef.current = nextPayload;
+			setHighlightStyle(item.style);
+			setHighlightColor(item.color);
+			setSelectionPopBar({ ...nextPayload, open: true });
+			return item;
+		},
+		[upsertHighlightForQuote],
+	);
+
+	const onApplyHighlight = useCallback(() => {
+		void upsertSelectionHighlight(highlightStyle, highlightColor);
+	}, [highlightColor, highlightStyle, upsertSelectionHighlight]);
+
+	const removeHighlightsForQuote = useCallback(
+		async (cfiRange: string, quote: string) => {
+			const rend = epubNavRef.current?.getRendition() ?? undefined;
+			const existing = findAllUserHighlightsCoveringCfi(
+				highlightsRef.current,
+				cfiRange,
+				quote,
+				rend,
+			);
+			if (existing.length === 0) return;
+
+			const removeIds = new Set(
+				existing.map((item) => item.id).filter(Boolean) as string[],
+			);
+			try {
+				await Promise.all([...removeIds].map((id) => deleteEbookHighlight(id)));
+				const next = highlightsRef.current.filter((h) => !removeIds.has(h.id));
+				highlightsRef.current = next;
+				setHighlights(next);
+			} catch (e) {
+				Toast({
+					type: 'error',
+					title: t('ebook.read.highlight.deleteFailed'),
+					message: getRequestErrorMessage(e),
+				});
+			}
+		},
+		[t],
+	);
+
+	const removeHighlightForQuote = removeHighlightsForQuote;
+
+	const onUserHighlightPopBar = useCallback(
+		(payload: EpubSelectionPopBarPayload, highlight: EbookUserHighlight) => {
+			suppressEpubSelectionPopBarDismiss();
+			setAssistantOpen(false);
+			selectionPopBarRef.current = payload;
+			setHighlightStyle(highlight.style);
+			setHighlightColor(highlight.color);
+			setSelectionPopBar({ ...payload, open: true });
+		},
+		[],
+	);
+
+	/** 侧栏：定位正文并打开 PopBar；ensureHighlight 为 true 时在无划线时自动创建 */
+	const openHighlightPopBarAtBookContent = useCallback(
+		(
+			cfiRange: string,
+			quote: string,
+			options?: { ensureHighlight?: boolean },
+		) => {
+			void (async () => {
+				const rend = epubNavRef.current?.getRendition() ?? null;
+				if (!rend || !bookId) return;
+
+				if (!resolveCfiDomRange(rend, cfiRange)) {
+					try {
+						await rend.display(cfiRange);
+						await new Promise<void>((resolve) => {
+							requestAnimationFrame(() => {
+								requestAnimationFrame(() => resolve());
+							});
+						});
+					} catch {
+						// 无法定位到该 CFI 时仍尝试用 fallback 锚点
+					}
+				}
+
+				let highlight = findUserHighlightCoveringCfi(
+					highlightsRef.current,
+					cfiRange,
+					quote,
+					rend,
+				);
+
+				if (options?.ensureHighlight) {
+					const created = await upsertHighlightForQuote(
+						cfiRange,
+						quote,
+						highlightStyle,
+						highlightColor,
+					);
+					if (created) {
+						highlight = created;
+						await new Promise<void>((resolve) => {
+							requestAnimationFrame(() => {
+								requestAnimationFrame(() => resolve());
+							});
+						});
+					}
+				} else if (highlight) {
+					setHighlightStyle(highlight.style);
+					setHighlightColor(highlight.color);
+				}
+
+				const payload = buildEpubPopBarPayloadFromCfiRange(
+					rend,
+					highlight?.cfiRange ?? cfiRange,
+					highlight?.quote ?? quote,
+					resolveCfiDomRange,
+				);
+				setAssistantOpen(false);
+				selectionPopBarRef.current = payload;
+				if (highlight) {
+					setHighlightStyle(highlight.style);
+					setHighlightColor(highlight.color);
+				}
+				setSelectionPopBar({ ...payload, open: true });
+			})();
+		},
+		[bookId, highlightColor, highlightStyle, upsertHighlightForQuote],
+	);
+
+	const onRemoveHighlight = useCallback(async () => {
+		const payload = selectionPopBarRef.current;
+		if (!payload?.cfiRange) return;
+		const rend = epubNavRef.current?.getRendition() ?? undefined;
+		const existing = findAllUserHighlightsForSelection(
+			highlightsRef.current,
+			payload.cfiRange,
+			payload.selectedText,
+			rend,
+		);
+		if (existing.length === 0) return;
+
+		const removeIds = new Set(
+			existing.map((item) => item.id).filter(Boolean) as string[],
+		);
+		try {
+			await Promise.all([...removeIds].map((id) => deleteEbookHighlight(id)));
+			const next = highlightsRef.current.filter((h) => !removeIds.has(h.id));
+			highlightsRef.current = next;
+			setHighlights(next);
+		} catch (e) {
+			Toast({
+				type: 'error',
+				title: t('ebook.read.highlight.deleteFailed'),
+				message: getRequestErrorMessage(e),
+			});
+		}
+	}, [t]);
+
+	const onHighlightStyleChange = useCallback(
+		(style: EpubHighlightStyle) => {
+			setHighlightStyle(style);
+			const payload = selectionPopBarRef.current;
+			if (!payload?.cfiRange) return;
+			const rend = epubNavRef.current?.getRendition() ?? undefined;
+			if (
+				!isSelectionFullyHighlighted(
+					highlightsRef.current,
+					payload.cfiRange,
+					payload.selectedText,
+					rend,
+				) &&
+				findAllUserHighlightsForSelection(
+					highlightsRef.current,
+					payload.cfiRange,
+					payload.selectedText,
+					rend,
+				).length === 0
+			) {
+				return;
+			}
+			void upsertSelectionHighlight(style, highlightColor);
+		},
+		[highlightColor, upsertSelectionHighlight],
+	);
+
+	const onHighlightColorChange = useCallback(
+		(color: EpubHighlightColorId) => {
+			setHighlightColor(color);
+			const payload = selectionPopBarRef.current;
+			if (!payload?.cfiRange) return;
+			const rend = epubNavRef.current?.getRendition() ?? undefined;
+			if (
+				!isSelectionFullyHighlighted(
+					highlightsRef.current,
+					payload.cfiRange,
+					payload.selectedText,
+					rend,
+				) &&
+				findAllUserHighlightsForSelection(
+					highlightsRef.current,
+					payload.cfiRange,
+					payload.selectedText,
+					rend,
+				).length === 0
+			) {
+				return;
+			}
+			void upsertSelectionHighlight(highlightStyle, color);
+		},
+		[highlightStyle, upsertSelectionHighlight],
+	);
 
 	const openViewThought = useCallback(
 		(thought: EbookThought, fromList = false) => {
@@ -265,6 +678,21 @@ function EbookReadPage() {
 				return;
 			}
 			selectionPopBarRef.current = payload;
+			const existing = payload.cfiRange
+				? findUserHighlightForSelection(
+						highlightsRef.current,
+						payload.cfiRange,
+						payload.selectedText,
+						epubNavRef.current?.getRendition() ?? undefined,
+					)
+				: undefined;
+			if (existing) {
+				setHighlightStyle(existing.style);
+				setHighlightColor(existing.color);
+			} else {
+				setHighlightStyle('highlight');
+				setHighlightColor('pink');
+			}
 			setSelectionPopBar({ ...payload, open: true });
 		},
 		[],
@@ -277,11 +705,11 @@ function EbookReadPage() {
 	}, [openCreateThought]);
 
 	useEffect(() => {
-		if (thoughtDialogOpen || thoughtListOpen || contextMenu?.open) {
+		if (thoughtDialogOpen || contextMenu?.open) {
 			setSelectionPopBar(null);
 			selectionPopBarRef.current = null;
 		}
-	}, [thoughtDialogOpen, thoughtListOpen, contextMenu?.open]);
+	}, [thoughtDialogOpen, contextMenu?.open]);
 
 	const openThoughtGroup = useCallback((group: EbookThought[]) => {
 		if (group.length === 0) return;
@@ -428,6 +856,8 @@ function EbookReadPage() {
 			next: () => Promise<void>;
 			go: (href: string) => Promise<void>;
 			clearTextSelection: () => void;
+			getRendition: () => import('epubjs').Rendition | null;
+			syncReadingAnnotations: (nextHighlights?: EbookUserHighlight[]) => void;
 		}) => {
 			epubNavRef.current = api;
 			setEpubNavReady(true);
@@ -537,10 +967,15 @@ function EbookReadPage() {
 			copy: t('ebook.read.contextMenu.copy'),
 			copied: t('chat.codeToolbar.copied'),
 			underline: t('ebook.read.selectionPop.underline'),
+			removeUnderline: t('ebook.read.selectionPop.removeUnderline'),
 			writeThought: t('ebook.read.contextMenu.addThought'),
 			share: t('ebook.read.selectionPop.share'),
 			askBook: t('ebook.read.selectionPop.askBook'),
 			listen: t('ebook.read.selectionPop.listen'),
+			styleHighlight: t('ebook.read.selectionPop.styleHighlight'),
+			styleUnderline: t('ebook.read.selectionPop.styleUnderline'),
+			styleWavy: t('ebook.read.selectionPop.styleWavy'),
+			colorPrefix: t('ebook.read.selectionPop.colorPrefix'),
 		}),
 		[t],
 	);
@@ -558,9 +993,22 @@ function EbookReadPage() {
 		if (!first?.quote.trim()) return null;
 		const quote = first.quote;
 		const cfiRange = first.cfiRange;
+		const rend = epubNavRef.current?.getRendition() ?? undefined;
+		const highlight = findUserHighlightCoveringCfi(
+			highlights,
+			cfiRange,
+			quote,
+			rend,
+		);
 		return {
 			labels: thoughtDrawerLabels,
+			hasHighlight: Boolean(highlight),
 			onCopy: () => void copyToClipboard(quote),
+			onUnderline: () =>
+				openHighlightPopBarAtBookContent(cfiRange, quote, {
+					ensureHighlight: true,
+				}),
+			onRemoveUnderline: () => void removeHighlightForQuote(cfiRange, quote),
 			onWriteThought: () => {
 				returnToListCfiRef.current = cfiRange;
 				setThoughtListOpen(false);
@@ -573,17 +1021,36 @@ function EbookReadPage() {
 		};
 	}, [
 		thoughtListGroup,
+		highlights,
+		epubNavReady,
 		thoughtDrawerLabels,
 		openCreateThought,
 		openAssistantWithSelection,
+		removeHighlightForQuote,
+		openHighlightPopBarAtBookContent,
 	]);
 
 	const thoughtDialogQuoteActions = useMemo(() => {
 		const quote = thoughtDraft.quote.trim();
 		if (!quote) return null;
+		const cfiRange = thoughtDraft.cfiRange;
+		const rend = epubNavRef.current?.getRendition() ?? undefined;
+		const highlight = findUserHighlightCoveringCfi(
+			highlights,
+			cfiRange,
+			thoughtDraft.quote,
+			rend,
+		);
 		return {
 			labels: thoughtDrawerLabels,
+			hasHighlight: Boolean(highlight),
 			onCopy: () => void copyToClipboard(thoughtDraft.quote),
+			onUnderline: () =>
+				openHighlightPopBarAtBookContent(cfiRange, thoughtDraft.quote, {
+					ensureHighlight: true,
+				}),
+			onRemoveUnderline: () =>
+				void removeHighlightForQuote(cfiRange, thoughtDraft.quote),
 			onWriteThought: () => {
 				if (thoughtDialogOpen && thoughtDialogMode === 'create') {
 					setThoughtComposeScrollKey((key) => key + 1);
@@ -603,11 +1070,15 @@ function EbookReadPage() {
 	}, [
 		thoughtDraft.quote,
 		thoughtDraft.cfiRange,
+		highlights,
+		epubNavReady,
 		thoughtDialogMode,
 		thoughtDialogOpen,
 		thoughtDrawerLabels,
 		openCreateThought,
 		openAssistantWithSelection,
+		removeHighlightForQuote,
+		openHighlightPopBarAtBookContent,
 	]);
 
 	const thoughtPanelOpen = thoughtListOpen || thoughtDialogOpen;
@@ -647,6 +1118,12 @@ function EbookReadPage() {
 					createdAt={thoughtDraft.createdAt}
 					updatedAt={thoughtDraft.updatedAt}
 					quoteActions={thoughtDialogQuoteActions}
+					onQuoteHighlightClick={() =>
+						openHighlightPopBarAtBookContent(
+							thoughtDraft.cfiRange,
+							thoughtDraft.quote,
+						)
+					}
 					onContentChange={(content) =>
 						setThoughtDraft((d) => ({ ...d, content }))
 					}
@@ -668,6 +1145,11 @@ function EbookReadPage() {
 					thoughts={thoughtListGroup}
 					onSelect={(thought) => openViewThought(thought, true)}
 					quoteActions={thoughtListQuoteActions}
+					onQuoteHighlightClick={() => {
+						const first = thoughtListGroup[0];
+						if (!first) return;
+						openHighlightPopBarAtBookContent(first.cfiRange, first.quote);
+					}}
 				/>
 			);
 		}
@@ -690,6 +1172,7 @@ function EbookReadPage() {
 		thoughtListGroup,
 		thoughtListOpen,
 		thoughtListQuoteActions,
+		openHighlightPopBarAtBookContent,
 		thoughtSaving,
 	]);
 
@@ -1212,8 +1695,10 @@ function EbookReadPage() {
 								onReaderContextMenu={showEpubContextMenu}
 								onSelectionPopBar={onSelectionPopBarChange}
 								thoughts={thoughts}
+								highlights={highlights}
 								onThoughtClick={openViewThought}
 								onThoughtGroupClick={openThoughtGroup}
+								onUserHighlightPopBar={onUserHighlightPopBar}
 							/>
 						</div>
 					</EbookReadSplitLayout>
@@ -1279,7 +1764,14 @@ function EbookReadPage() {
 				<EpubSelectionPopBar
 					state={selectionPopBar}
 					labels={selectionPopBarLabels}
+					selectionFullyHighlighted={selectionFullyHighlighted}
+					highlightStyle={highlightStyle}
+					highlightColor={highlightColor}
+					onHighlightStyleChange={onHighlightStyleChange}
+					onHighlightColorChange={onHighlightColorChange}
 					onCopy={onSelectionPopBarCopy}
+					onApplyHighlight={onApplyHighlight}
+					onRemoveHighlight={onRemoveHighlight}
 					onWriteThought={onSelectionPopBarWriteThought}
 					onAskBook={onSelectionPopBarAskBook}
 					onClearSelection={clearEpubSelection}

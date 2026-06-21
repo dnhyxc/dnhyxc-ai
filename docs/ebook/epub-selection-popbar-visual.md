@@ -4,6 +4,8 @@
 
 **增量专题**：在 [epub-thought-side-panel.md](./epub-thought-side-panel.md) 已引入的选区浮动条（`EpubSelectionPopBar`）之上，专门说明 **视觉层** 的迭代：毛玻璃面板、SVG 箭头、四角圆角、主题化定向阴影，以及 `index.css` 中 `--shadow-*` 令牌拆分。
 
+**2026-06 结构变更**：工具条主体与箭头测量已抽至 `EpubSelectionPopBarPanel.tsx`；性能与防闪烁见 **[epub-popbar-perf-ux.md](./epub-popbar-perf-ux.md)**。
+
 **延伸阅读**：[epub-thought-side-panel.md](./epub-thought-side-panel.md)（分栏与工具条挂载）、[epub-reading-thoughts.md](./epub-reading-thoughts.md)（写想法数据流）、[epub-assistant-context-menu.md](./epub-assistant-context-menu.md)（右键与选区坐标）。
 
 若与仓库最新源码不一致，**以源码为准**。
