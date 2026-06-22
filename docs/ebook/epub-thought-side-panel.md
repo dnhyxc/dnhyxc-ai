@@ -6,7 +6,7 @@
 
 > 全屏底部 **Sheet 抽屉**方案已废弃，组件自仓库删除；仅作历史说明见 [epub-thought-drawer.md](./epub-thought-drawer.md)（归档，勿按此文实现）。
 
-**延伸阅读**：[epub-reading-thoughts.md](./epub-reading-thoughts.md)（API、下划线、重叠去重）、[epub-selection-popbar-visual.md](./epub-selection-popbar-visual.md)（选区浮动条视觉）、[epub-thought-underlines-sync.md](./epub-thought-underlines-sync.md)（下划线同步）、[ebook-moke-assistant.md](./ebook-moke-assistant.md)（右侧助手分栏）。
+**延伸阅读**：[epub-reading-thoughts.md](./epub-reading-thoughts.md)（API、下划线、重叠去重）、[epub-thought-cluster-bridging.md](./epub-thought-cluster-bridging.md)（**点击聚合 / 桥接规则**，列表引用区与分组展示）、[epub-selection-popbar-visual.md](./epub-selection-popbar-visual.md)（选区浮动条视觉）、[epub-thought-underlines-sync.md](./epub-thought-underlines-sync.md)（下划线同步）、[ebook-moke-assistant.md](./ebook-moke-assistant.md)（右侧助手分栏）。
 
 ---
 
@@ -188,7 +188,8 @@ returnToListCfiRef.current = null;
 
 - **破坏性**：已删除 Model 弹窗、全屏 BottomSheet 及 `EpubThoughtDrawerParts`；当前仅保留分栏内 `EpubThought*` + `EpubThoughtPanelShell` / `EpubThoughtParts`。
 - **PDF**：读书想法仍仅 EPUB；PDF 分栏仍只挂载 MOKE 助手。
-- **行为保持**：下划线点击仍先开列表；`returnToListCfiRef` 回退逻辑与早期弹窗/抽屉轮次一致，并修复跨段列表错位。
+- **行为保持**：下划线点击仍先开列表；`returnToListClusterRef` 回退逻辑与早期弹窗/抽屉轮次一致，并修复跨段列表错位。
+- **点击聚合（2026-06-22）**：列表由 `EbookThoughtClickCluster` 驱动（`thoughtListCluster`），不再按单一 CFI 分组 `thoughtListGroup` 打开。嵌套选区、相邻短语桥接、引用区切换等规则见 **[epub-thought-cluster-bridging.md](./epub-thought-cluster-bridging.md)**（主文档）；本节 §4 代码摘录中若仍出现 `thoughtListGroup`，以 cluster 实现为准。
 
 ---
 
@@ -196,6 +197,7 @@ returnToListCfiRef.current = null;
 
 - 打开想法 → 关闭 → 再打开 MK 问书，分栏宽度是否恢复上次拖拽比例。
 - A 段列表 → 选 B 段写想法 → 保存 → 应显示 B 段列表。
+- 嵌套选区（整段 + 子句）点击任一处 → 引用区默认整段、列表含全部相关想法（见 [epub-thought-cluster-bridging.md](./epub-thought-cluster-bridging.md) §9）。
 - 写想法页引用区再点「写想法」：输入框应聚焦并滚到底。
 - 侧栏打开时 EPUB 翻页快捷键应禁用；关闭后恢复。
 - 选区浮动条与右侧面板、右键菜单不应同时遮挡。

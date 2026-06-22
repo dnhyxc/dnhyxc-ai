@@ -976,4 +976,9 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'After adding a user highlight or saving a reading note, marks appear on the page much sooner and scrolling stays responsive during sync—even when the book already has many marks.',
 	},
+	's25-31': {
+		title: 'EPUB reading-note click aggregation',
+		description:
+			'Tapping a dashed reading-note underline opens a sidebar that intelligently aggregates related notes: nested selections (whole paragraph plus sub-phrases) default to the full excerpt with every note listed; adjacent phrases merge only when punctuation or line breaks between them also have notes—unannotated gaps stay separate. Tap a note in the list to switch the quote excerpt; multiple selection groups show section headers.',
+	},
 };
