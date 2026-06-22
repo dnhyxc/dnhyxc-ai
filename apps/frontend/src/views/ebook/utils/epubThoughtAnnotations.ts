@@ -1,7 +1,8 @@
 import type { Rendition } from 'epubjs';
 import type { EbookThought } from '../types';
 import {
-	resolveHighlightSvgLineSegments,
+	resolveCfiDomRange,
+	resolveMarkSvgLineSegments,
 	type SvgLineSegment,
 } from './epubRangeGeometry';
 
@@ -27,10 +28,6 @@ export type EpubThoughtClickHandlers = {
 	 * @param thoughts 同一段落下（同一 cfiRange）全部想法
 	 */
 	onThoughtGroupClick: (thoughts: EbookThought[]) => void;
-};
-
-type ContentsWithRange = EpubIframeContents & {
-	range: (cfi: string) => Range | null;
 };
 
 export const EPUB_THOUGHT_UNDERLINE_CLASS = 'moke-epub-thought-ul';
@@ -173,6 +170,40 @@ function patchAllThoughtUnderlineMarks(rend?: Rendition): void {
 			patchThoughtUnderlineMarks(doc, rend);
 		} catch {
 			// iframe 卸载或文档不可用时忽略
+		}
+	}
+}
+
+/** 将想法 mark 移到 marks-pane 末尾，保证叠放在用户划线之上且无需 remove+readd 全部想法 */
+export function restackThoughtMarkGroups(rend?: Rendition): void {
+	const docs = new Set<Document>([document]);
+	for (const contents of getRenditionContentsList(rend)) {
+		if (contents.document) docs.add(contents.document);
+	}
+
+	for (const doc of docs) {
+		try {
+			for (const pane of doc.querySelectorAll('.marks-pane')) {
+				const groups = [
+					...pane.querySelectorAll(
+						`g.${EPUB_THOUGHT_UNDERLINE_CLASS}, g[ref="${EPUB_THOUGHT_UNDERLINE_CLASS}"]`,
+					),
+				] as SVGElement[];
+				groups.sort((left, right) => {
+					const spanDiff =
+						thoughtMarkSpanLength(right) - thoughtMarkSpanLength(left);
+					if (spanDiff !== 0) return spanDiff;
+					return (
+						(left.dataset.epubcfi?.length ?? 0) -
+						(right.dataset.epubcfi?.length ?? 0)
+					);
+				});
+				for (const group of groups) {
+					pane.appendChild(group);
+				}
+			}
+		} catch {
+			// iframe 卸载时忽略
 		}
 	}
 }
@@ -415,21 +446,15 @@ type PreparedThoughtMark = {
 	lines: NodeListOf<Element>;
 };
 
-/** patch 阶段估算选区跨度，与 sortCfiGroupsForUnderlineStack 一致优先用 quote 字符数 */
-function thoughtMarkSpanLength(groupEl: SVGElement, rend?: Rendition): number {
-	const cfi = groupEl.dataset.epubcfi?.trim() ?? '';
-	if (cfi && rend) {
-		const range = resolveCfiDomRange(rend, cfi);
-		const quote = range?.toString().trim();
-		if (quote && quote.length > 0) return quote.length;
-	}
-
+/** patch 阶段估算选区跨度，与 sortCfiGroupsForUnderlineStack 一致；用 rect 宽度避免 CFI→DOM */
+function thoughtMarkSpanLength(groupEl: SVGElement): number {
 	let widthSum = 0;
 	for (const rect of groupEl.querySelectorAll('rect')) {
 		const parsed = parseSvgMarkRect(rect as SVGRectElement);
 		if (parsed) widthSum += parsed.width;
 	}
 	if (widthSum > 0) return widthSum;
+	const cfi = groupEl.dataset.epubcfi?.trim() ?? '';
 	return cfi.length;
 }
 
@@ -475,7 +500,7 @@ function prepareThoughtUnderlineMark(
 		node.remove();
 	});
 
-	const segments = resolveHighlightSvgLineSegments(rend, groupEl, cfi);
+	const segments = resolveMarkSvgLineSegments(rend, groupEl, cfi);
 	const rects = syncThoughtMarkRects(groupEl, segments);
 	const lines = groupEl.querySelectorAll('line');
 
@@ -492,7 +517,7 @@ function prepareThoughtUnderlineMark(
 		groupEl,
 		showLine,
 		cfi,
-		span: thoughtMarkSpanLength(groupEl, rend),
+		span: thoughtMarkSpanLength(groupEl),
 		rects,
 		lines,
 	};
@@ -798,36 +823,6 @@ function sortCfiGroupsForUnderlineStack(
 		if (spanDiff !== 0) return spanDiff;
 		return a[0].length - b[0].length;
 	});
-}
-
-/**
- * 根据给定的 cfiRange 字符串，从 epub.js 的 Rendition 实例中解析得到对应的 DOM Range 对象。
- * 支持章节在单或多 iframe（多章节并存）场景，遍历每个 iframe contents 查找匹配的 Range。
- *
- * @param rend - epub.js 的 Rendition 实例
- * @param cfiRange - EPUB CFI 选区范围字符串
- * @returns {Range | null} DOM Range 对象，如果无法解析则返回 null
- */
-function resolveCfiDomRange(rend: Rendition, cfiRange: string): Range | null {
-	// 获取当前章节对应的 iframe contents，可能为单个对象或对象数组
-	const raw = rend.getContents();
-	const list: ContentsWithRange[] = Array.isArray(raw)
-		? (raw as ContentsWithRange[])
-		: raw
-			? [raw as ContentsWithRange]
-			: [];
-	// 遍历所有 contents，尝试在其范围内解析该 CFI
-	for (const contents of list) {
-		try {
-			// contents.range 是 epub.js 注入的方法，根据 CFI 返回对应的 Range
-			const range = contents.range?.(cfiRange);
-			if (range) return range; // 首个成功解析到的 Range 即返回
-		} catch {
-			// 其它章节 iframe 无法解析当前 CFI——此为正常情况，忽略异常继续其他 contents
-		}
-	}
-	// 所有 contents 均未解析成功，返回 null
-	return null;
 }
 
 /**

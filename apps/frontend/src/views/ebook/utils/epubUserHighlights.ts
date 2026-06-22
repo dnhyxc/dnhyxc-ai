@@ -6,11 +6,14 @@ import type {
 	EpubHighlightStyle,
 } from '../types';
 import {
+	beginEpubAnnotationSyncScope,
 	cfiFromDomRange,
+	endEpubAnnotationSyncScope,
 	getAccurateRangeLineClientRects,
+	getAccurateRangeLineClientRectsCached,
 	isPointInRangeTextBand,
 	resolveCfiDomRange,
-	resolveHighlightSvgLineSegments,
+	resolveMarkSvgLineSegments,
 	type SvgLineSegment,
 	trimSelectionRange,
 } from './epubRangeGeometry';
@@ -24,6 +27,7 @@ import {
 	hasTextSelectionInRend,
 	parseSvgMarkRect,
 	patchEpubThoughtUnderlineMarks,
+	restackThoughtMarkGroups,
 	setUserHighlightBlockerSourcesForThoughtPatch,
 	type UserHighlightBlockerSource,
 } from './epubThoughtAnnotations';
@@ -181,7 +185,7 @@ function patchUserHighlightMarks(
 		}
 
 		const cfi = groupEl.dataset.epubcfi?.trim();
-		const segments = resolveHighlightSvgLineSegments(rend, groupEl, cfi);
+		const segments = resolveMarkSvgLineSegments(rend, groupEl, cfi);
 		const rects = syncHighlightMarkRects(groupEl, segments);
 
 		const lines = groupEl.querySelectorAll('line');
@@ -2185,35 +2189,37 @@ export function syncEpubReadingAnnotations(
 	appliedThoughtsRef: Map<string, string>,
 	appliedHighlightsRef: Map<string, string>,
 ): void {
-	setUserHighlightBlockerSourcesForThoughtPatch([]);
-	const highlightPlan = buildHighlightRenderPlan(rend, highlights);
-	applyEpubUserHighlights(
-		rend,
-		highlights,
-		appliedHighlightsRef,
-		highlightPlan,
-	);
-	const visibleHighlights = highlightPlan.coalesced.filter((item) =>
-		highlightPlan.visibleCfis.has(item.cfiRange),
-	);
-	const highlightCfiSignature = buildVisibleHighlightCfiSignature(
-		highlightPlan.coalesced,
-		highlightPlan.visibleCfis,
-	);
-	if (highlightCfiSignature !== previousVisibleHighlightCfiSignature) {
-		invalidateAllThoughtMarksForRestack(thoughts, appliedThoughtsRef);
-		previousVisibleHighlightCfiSignature = highlightCfiSignature;
+	beginEpubAnnotationSyncScope();
+	try {
+		setUserHighlightBlockerSourcesForThoughtPatch([]);
+		const highlightPlan = buildHighlightRenderPlan(rend, highlights);
+		applyEpubUserHighlights(
+			rend,
+			highlights,
+			appliedHighlightsRef,
+			highlightPlan,
+		);
+		const visibleHighlights = highlightPlan.coalesced.filter((item) =>
+			highlightPlan.visibleCfis.has(item.cfiRange),
+		);
+		const suppressed = getThoughtCfisSuppressedByHighlights(
+			thoughts,
+			visibleHighlights,
+			rend,
+		);
+		invalidateThoughtMarksWithChangedSuppression(
+			suppressed,
+			appliedThoughtsRef,
+		);
+		applyEpubThoughtUnderlines(rend, thoughts, appliedThoughtsRef, suppressed);
+		setUserHighlightBlockerSourcesForThoughtPatch(
+			collectUserHighlightBlockerSources(rend),
+		);
+		// 用户主动保存/划线后同步 patch，避免 rAF 双帧等待且立刻可见
+		runEpubReadingAnnotationPatch(rend);
+	} finally {
+		endEpubAnnotationSyncScope();
 	}
-	const suppressed = getThoughtCfisSuppressedByHighlights(
-		thoughts,
-		visibleHighlights,
-		rend,
-	);
-	applyEpubThoughtUnderlines(rend, thoughts, appliedThoughtsRef, suppressed);
-	setUserHighlightBlockerSourcesForThoughtPatch(
-		collectUserHighlightBlockerSources(rend),
-	);
-	patchEpubReadingAnnotations(rend);
 }
 
 let readingAnnotationPatchRaf = 0;
@@ -2226,53 +2232,46 @@ function runEpubReadingAnnotationPatch(rend: Rendition): void {
 			collectUserHighlightBlockerSources(rend),
 		);
 		patchEpubThoughtUnderlineMarks(rend);
+		restackThoughtMarkGroups(rend);
 	} catch {
 		// rendition 已销毁
 	}
 }
 
-/** 上一次 sync 时的可见用户划线 CFI 集合，用于检测增删后重排想法 mark 层级 */
-let previousVisibleHighlightCfiSignature = '';
+/** 上一次 sync 时因用户划线而隐藏虚线的 CFI，用于仅增量失效 showLine 变化的 mark */
+let previousThoughtSuppressedCfis = new Set<string>();
 
 export function resetEpubReadingAnnotationSyncState(): void {
-	previousVisibleHighlightCfiSignature = '';
+	previousThoughtSuppressedCfis = new Set();
 }
 
-function buildVisibleHighlightCfiSignature(
-	highlights: EbookUserHighlight[],
-	visibleCfis: Set<string>,
-): string {
-	return highlights
-		.map((item) => item.cfiRange.trim())
-		.filter((cfi) => cfi && visibleCfis.has(cfi))
-		.sort()
-		.join('\n');
-}
-
-/** 用户划线集合变化后，清空 appliedRef，迫使想法按 sortCfiGroupsForUnderlineStack 完整重绘 */
-function invalidateAllThoughtMarksForRestack(
-	thoughts: EbookThought[],
+function invalidateThoughtMarksWithChangedSuppression(
+	suppressedLineCfis: Set<string>,
 	appliedThoughtsRef: Map<string, string>,
 ): void {
-	const activeCfis = new Set(
-		thoughts.map((t) => t.cfiRange.trim()).filter(Boolean),
-	);
 	for (const cfi of [...appliedThoughtsRef.keys()]) {
-		if (activeCfis.has(cfi)) {
+		const wasSuppressed = previousThoughtSuppressedCfis.has(cfi);
+		const nowSuppressed = suppressedLineCfis.has(cfi);
+		if (wasSuppressed !== nowSuppressed) {
 			appliedThoughtsRef.delete(cfi);
 		}
 	}
+	previousThoughtSuppressedCfis = new Set(suppressedLineCfis);
 }
 
 function isDomRangeFullyCoveredByHighlightClientRects(
+	thoughtCfi: string,
 	thoughtRange: Range,
+	highlightCfi: string,
 	highlightRange: Range,
 ): boolean {
-	const thoughtRects = [...thoughtRange.getClientRects()].filter(
-		(rect) => rect.width > 0.5 && rect.height > 0.5,
+	const thoughtRects = getAccurateRangeLineClientRectsCached(
+		`thought:${thoughtCfi}`,
+		thoughtRange,
 	);
-	const highlightRects = [...highlightRange.getClientRects()].filter(
-		(rect) => rect.width > 0.5 && rect.height > 0.5,
+	const highlightRects = getAccurateRangeLineClientRectsCached(
+		`highlight:${highlightCfi}`,
+		highlightRange,
 	);
 	if (thoughtRects.length === 0 || highlightRects.length === 0) return false;
 
@@ -2358,7 +2357,12 @@ export function isThoughtCfiCoveredByUserHighlight(
 	if (thoughtRange && highlightRange) {
 		if (isDomRangeStrictlyContained(thoughtRange, highlightRange)) return true;
 		if (
-			isDomRangeFullyCoveredByHighlightClientRects(thoughtRange, highlightRange)
+			isDomRangeFullyCoveredByHighlightClientRects(
+				thoughtKey,
+				thoughtRange,
+				highlightKey,
+				highlightRange,
+			)
 		) {
 			return true;
 		}

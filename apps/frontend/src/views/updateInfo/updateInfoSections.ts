@@ -1474,6 +1474,13 @@ const UPDATE_INFO_SECTIONS_ZH: UpdateInfoSection[] = [
 				description:
 					'对已有想法的段落再次写想法，且两次选区部分相交时，重叠段不再叠加两条虚线；各选区仍可分别点击打开对应列表。',
 			},
+			{
+				id: 's25-30',
+				title: 'EPUB 划线与想法同步性能',
+				dateLabel: '2026-06-22',
+				description:
+					'新增用户划线或保存想法后，正文标记更快出现，同步过程中不再长时间阻塞滚动；书中已有较多标记时体验明显改善。',
+			},
 		],
 	},
 ];

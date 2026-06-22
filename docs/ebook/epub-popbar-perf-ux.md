@@ -9,6 +9,7 @@
 - [epub-highlight-dom-match.md](./epub-highlight-dom-match.md) — PopBar **按钮态**（何时显示划线 vs 删除）与 **DOM 命中** 逻辑
 - [epub-user-highlight-impl.md](./epub-user-highlight-impl.md) — 用户划线全链路主文档
 - [epub-selection-popbar-visual.md](./epub-selection-popbar-visual.md) — 毛玻璃 / 阴影 / 箭头视觉（箭头测量已迁至 `EpubSelectionPopBarPanel`）
+- [epub-annotation-sync-perf.md](./epub-annotation-sync-perf.md) — **2026-06-22** sync 主线程优化（patch 快路径、想法 DOM restack、即时 patch）
 
 ---
 

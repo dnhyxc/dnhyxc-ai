@@ -297,6 +297,76 @@ export function resolveHighlightSvgLineSegments(
 	);
 }
 
+/** 从 mark 上 epub.js 已写入的 SVG rect 读取线段（patch 热路径，避免 CFI→DOM→getClientRects） */
+export function readMarkSvgLineSegmentsFromRects(
+	group: Element,
+): SvgLineSegment[] {
+	const segments: SvgLineSegment[] = [];
+	for (const node of group.querySelectorAll('rect')) {
+		if (!(node instanceof SVGRectElement)) continue;
+		const x = Number.parseFloat(node.getAttribute('x') ?? 'NaN');
+		const y = Number.parseFloat(node.getAttribute('y') ?? 'NaN');
+		const width = Number.parseFloat(node.getAttribute('width') ?? 'NaN');
+		const height = Number.parseFloat(node.getAttribute('height') ?? 'NaN');
+		if (
+			!Number.isFinite(x) ||
+			!Number.isFinite(y) ||
+			!Number.isFinite(width) ||
+			!Number.isFinite(height) ||
+			width <= 0.5 ||
+			height <= 0.5
+		) {
+			continue;
+		}
+		segments.push({ x, y, width, height });
+	}
+	return segments;
+}
+
+/**
+ * patch 阶段解析 mark 线段：优先用 marks-pane 已有 rect（滚动时由 epub.js 同步）；
+ * 仅在没有有效 rect 时回退到 CFI 精确几何（如新 mark 首帧）。
+ */
+export function resolveMarkSvgLineSegments(
+	rend: Rendition | undefined,
+	group: Element,
+	cfiRange?: string,
+): SvgLineSegment[] {
+	const existing = readMarkSvgLineSegmentsFromRects(group);
+	if (existing.length > 0) return existing;
+	return resolveHighlightSvgLineSegments(rend, group, cfiRange);
+}
+
+let syncCfiRangeCache: Map<string, Range | null> | null = null;
+let syncAccurateClientRectCache: Map<string, DOMRect[]> | null = null;
+
+/** sync 批处理开始时启用 CFI / clientRect 缓存，避免 O(n²) 重复解析 */
+export function beginEpubAnnotationSyncScope(): void {
+	syncCfiRangeCache = new Map();
+	syncAccurateClientRectCache = new Map();
+}
+
+export function endEpubAnnotationSyncScope(): void {
+	syncCfiRangeCache = null;
+	syncAccurateClientRectCache = null;
+}
+
+/** sync 阶段带缓存的精确 client rect（供想法被用户划线覆盖判定复用） */
+export function getAccurateRangeLineClientRectsCached(
+	cfiKey: string,
+	range: Range | null,
+): DOMRect[] {
+	if (!range) return [];
+	if (syncAccurateClientRectCache) {
+		const cached = syncAccurateClientRectCache.get(cfiKey);
+		if (cached) return cached;
+		const rects = getAccurateRangeLineClientRects(range);
+		syncAccurateClientRectCache.set(cfiKey, rects);
+		return rects;
+	}
+	return getAccurateRangeLineClientRects(range);
+}
+
 export function resolveSelectionCfiRange(
 	rend: Rendition,
 	win: Window,
@@ -324,6 +394,22 @@ export function resolveSelectionCfiRange(
 }
 
 export function resolveCfiDomRange(
+	rend: Rendition,
+	cfiRange: string,
+): Range | null {
+	const key = cfiRange.trim();
+	if (syncCfiRangeCache && key) {
+		if (syncCfiRangeCache.has(key)) {
+			return syncCfiRangeCache.get(key) ?? null;
+		}
+		const resolved = resolveCfiDomRangeUncached(rend, key);
+		syncCfiRangeCache.set(key, resolved);
+		return resolved;
+	}
+	return resolveCfiDomRangeUncached(rend, cfiRange);
+}
+
+function resolveCfiDomRangeUncached(
 	rend: Rendition,
 	cfiRange: string,
 ): Range | null {

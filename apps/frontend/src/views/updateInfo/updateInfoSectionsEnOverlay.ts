@@ -971,4 +971,9 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'When you add a second reading note on text that partially overlaps an earlier note, the overlapping stretch no longer shows two stacked dashed underlines. Each selection can still be tapped to open its own note list.',
 	},
+	's25-30': {
+		title: 'EPUB highlight and note sync performance',
+		description:
+			'After adding a user highlight or saving a reading note, marks appear on the page much sooner and scrolling stays responsive during sync—even when the book already has many marks.',
+	},
 };
