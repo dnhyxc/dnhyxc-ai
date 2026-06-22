@@ -1,5 +1,9 @@
 import type { Rendition } from 'epubjs';
-import { resolveSelectionCfiRange } from './epubRangeGeometry';
+import {
+	getAccurateRangeLineClientRects,
+	normalizeSelectionRangeForEpub,
+	resolveSelectionCfiRange,
+} from './epubRangeGeometry';
 import { getEpubScrollContainer } from './epubScrolledNav';
 
 type EpubIframeContents = {
@@ -92,12 +96,6 @@ function readCollapsedRangeRect(
 	return null;
 }
 
-function collectVisibleRangeRects(range: Range): DOMRect[] {
-	return [...range.getClientRects()].filter(
-		(rect) => rect.width > 0 && rect.height > 0,
-	);
-}
-
 function unionRectBounds(rects: DOMRect[]) {
 	let left = Number.POSITIVE_INFINITY;
 	let top = Number.POSITIVE_INFINITY;
@@ -129,7 +127,8 @@ function rangeToViewportAnchor(
 	range: Range,
 ): { centerX: number; top: number } | null {
 	const offset = toIframeViewportOffset(win);
-	const visibleRects = collectVisibleRangeRects(range);
+	const normalized = normalizeSelectionRangeForEpub(range) ?? range;
+	const visibleRects = getAccurateRangeLineClientRects(normalized);
 
 	if (visibleRects.length === 1) {
 		const rect = visibleRects[0]!;
@@ -188,7 +187,9 @@ function readActiveSelection(
 		if (range.collapsed) continue;
 		const text = readSelectionText(win);
 		if (!text) continue;
-		return { win, text, range };
+		const normalized = normalizeSelectionRangeForEpub(range);
+		if (!normalized) continue;
+		return { win, text, range: normalized };
 	}
 	return null;
 }

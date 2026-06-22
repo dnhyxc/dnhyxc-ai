@@ -88,8 +88,9 @@
 | EPUB 用户划线与想法虚线如何实现 / 重叠合并 | [ebook/epub-user-highlight-impl.md](./ebook/epub-user-highlight-impl.md)、[ebook/epub-thought-underline-impl.md](./ebook/epub-thought-underline-impl.md) |
 | EPUB 划线同名句子误删 / PopBar 划线与删除状态不对 | [ebook/epub-highlight-dom-match.md](./ebook/epub-highlight-dom-match.md) |
 | EPUB PopBar 闪烁 / 划线卡顿 / 工具条空档 | [ebook/epub-popbar-perf-ux.md](./ebook/epub-popbar-perf-ux.md) |
-| 划线/写想法后数秒才出现线、同步时页面卡死 | [ebook/epub-annotation-sync-perf.md](./ebook/epub-annotation-sync-perf.md) |
+| 划线/写想法后数秒才出现线、同步时页面卡死；反向选到空行后应用卡死 | [ebook/epub-annotation-sync-perf.md](./ebook/epub-annotation-sync-perf.md) |
 | 两次想法选区相交时虚线叠成双线 | [ebook/epub-thought-partial-overlap.md](./ebook/epub-thought-partial-overlap.md) |
+| 点击想法列表引用合并/拆分不对（A、B、标点、换行桥接） | [ebook/epub-thought-cluster-bridging.md](./ebook/epub-thought-cluster-bridging.md) |
 | 复制到助手后输入中文乱码 | [knowledge/assistant-insert-focus.md](./knowledge/assistant-insert-focus.md) §5.1 |
 
 ---

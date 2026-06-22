@@ -144,7 +144,9 @@ type ThoughtCardProps = {
 	createdAt?: string;
 	children: ReactNode;
 	className?: string;
+	selected?: boolean;
 	onClick?: () => void;
+	onDoubleClick?: () => void;
 };
 
 /** 引用卡片顶栏 / 底栏操作条统一行高 */
@@ -366,7 +368,9 @@ export function EpubThoughtItemCard({
 	createdAt,
 	children,
 	className,
+	selected,
 	onClick,
+	onDoubleClick,
 }: ThoughtCardProps) {
 	const Comp = onClick ? 'button' : 'div';
 
@@ -374,10 +378,13 @@ export function EpubThoughtItemCard({
 		<Comp
 			type={onClick ? 'button' : undefined}
 			onClick={onClick}
+			onDoubleClick={onDoubleClick}
+			data-selected={selected ? 'true' : undefined}
 			className={cn(
 				'p-4 text-left transition-colors border-t border-theme/10',
 				onClick &&
 					'cursor-pointer hover:bg-theme/10 outline-none focus:outline-none focus-visible:outline-none focus-visible:ring-0',
+				selected && 'bg-theme/12',
 				className,
 			)}
 		>

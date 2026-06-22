@@ -18,8 +18,11 @@ function getRenditionContentsList(rend?: Rendition): EpubIframeContents[] {
 			: [];
 }
 
+const TRIM_BOUNDARY_MAX_STEPS = 8192;
+
 function trimBoundary(range: Range, fromStart: boolean): void {
-	while (true) {
+	let steps = 0;
+	while (steps++ < TRIM_BOUNDARY_MAX_STEPS) {
 		const text = range.toString();
 		if (!text) return;
 
@@ -77,6 +80,110 @@ export function trimSelectionRange(range: Range): Range {
 	return trimmed;
 }
 
+/** 文档序下一节点（深度优先） */
+function nextNodeInDocumentOrder(node: Node): Node | null {
+	if (node.firstChild) return node.firstChild;
+	let current: Node | null = node;
+	while (current) {
+		if (current.nextSibling) return current.nextSibling;
+		current = current.parentNode;
+	}
+	return null;
+}
+
+function getFirstNodeInRange(range: Range): Node | null {
+	const { startContainer, startOffset } = range;
+	if (startContainer.nodeType === Node.TEXT_NODE) {
+		return startContainer;
+	}
+	const child = startContainer.childNodes[startOffset];
+	if (child) return child;
+	if (startOffset > 0) {
+		const prev = startContainer.childNodes[startOffset - 1];
+		if (prev) return nextNodeInDocumentOrder(prev);
+	}
+	return nextNodeInDocumentOrder(startContainer);
+}
+
+function isNodeAfterRangeEnd(node: Node, range: Range): boolean {
+	const end = range.endContainer;
+	if (node === end) return false;
+	return Boolean(
+		end.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING,
+	);
+}
+
+/** 沿文档序遍历 Range 内文本节点（O(选区跨度)，避免章级 TreeWalker + intersectsNode） */
+export function forEachTextNodeInRange(
+	range: Range,
+	visit: (node: Text, start: number, end: number) => void,
+): void {
+	const endContainer = range.endContainer;
+	const endOffset = range.endOffset;
+
+	let current: Node | null = getFirstNodeInRange(range);
+
+	while (current) {
+		if (current.nodeType === Node.TEXT_NODE) {
+			const textNode = current as Text;
+			const start = current === range.startContainer ? range.startOffset : 0;
+			const end = current === range.endContainer ? endOffset : textNode.length;
+			if (start < end) {
+				visit(textNode, start, end);
+			}
+		}
+
+		if (current === endContainer) break;
+
+		const next = nextNodeInDocumentOrder(current);
+		if (!next || isNodeAfterRangeEnd(next, range)) break;
+		current = next;
+	}
+}
+
+/**
+ * 将选区收拢到首尾非空白字符，跳过空行/块级边界。
+ * 反向拖选到空行时 Range 的 commonAncestor 常升到章容器，不可再用整棵 TreeWalker。
+ */
+export function snapSelectionRangeToTextContent(range: Range): Range | null {
+	const doc = range.startContainer.ownerDocument;
+	if (!doc) return null;
+
+	let firstNode: Text | null = null;
+	let firstOffset = 0;
+	let lastNode: Text | null = null;
+	let lastOffset = 0;
+
+	forEachTextNodeInRange(range, (node, start, end) => {
+		for (let offset = start; offset < end; offset++) {
+			const ch = node.data[offset];
+			if (!ch || /\s/u.test(ch)) continue;
+			if (!firstNode) {
+				firstNode = node;
+				firstOffset = offset;
+			}
+			lastNode = node;
+			lastOffset = offset + 1;
+		}
+	});
+
+	if (!firstNode || !lastNode) return null;
+
+	const snapped = doc.createRange();
+	snapped.setStart(firstNode, firstOffset);
+	snapped.setEnd(lastNode, lastOffset);
+	return snapped;
+}
+
+/** 规范化文字选区：收拢正文边界并去掉首尾空白，供 CFI / PopBar 使用 */
+export function normalizeSelectionRangeForEpub(range: Range): Range | null {
+	const snapped = snapSelectionRangeToTextContent(range);
+	if (!snapped) return null;
+	const trimmed = trimSelectionRange(snapped);
+	if (!trimmed.toString().trim()) return null;
+	return trimmed;
+}
+
 function getCaretClientRect(range: Range): DOMRect | null {
 	const rects = [...range.getClientRects()].filter(
 		(r) => r.width > 0.5 || r.height > 0.5,
@@ -126,31 +233,8 @@ function collectRangeTextClientRects(range: Range): DOMRect[] {
 	if (!doc) return [];
 
 	const rects: DOMRect[] = [];
-	const walker = doc.createTreeWalker(
-		range.commonAncestorContainer,
-		NodeFilter.SHOW_TEXT,
-		{
-			acceptNode(node) {
-				try {
-					return range.intersectsNode(node)
-						? NodeFilter.FILTER_ACCEPT
-						: NodeFilter.FILTER_REJECT;
-				} catch {
-					return NodeFilter.FILTER_REJECT;
-				}
-			},
-		},
-	);
 
-	for (
-		let node = walker.nextNode() as Text | null;
-		node;
-		node = walker.nextNode() as Text | null
-	) {
-		const start = node === range.startContainer ? range.startOffset : 0;
-		const end = node === range.endContainer ? range.endOffset : node.length;
-		if (start >= end) continue;
-
+	forEachTextNodeInRange(range, (node, start, end) => {
 		const segment = doc.createRange();
 		segment.setStart(node, start);
 		segment.setEnd(node, end);
@@ -159,7 +243,7 @@ function collectRangeTextClientRects(range: Range): DOMRect[] {
 				rects.push(rect);
 			}
 		}
-	}
+	});
 
 	return preferLeafLineClientRects(rects);
 }
@@ -324,8 +408,9 @@ export function readMarkSvgLineSegmentsFromRects(
 }
 
 /**
- * patch 阶段解析 mark 线段：优先用 marks-pane 已有 rect（滚动时由 epub.js 同步）；
- * 仅在没有有效 rect 时回退到 CFI 精确几何（如新 mark 首帧）。
+ * patch 阶段解析 mark 线段。
+ * 跨段落选区时 epub.js rect 会含段落间空行；有 CFI 时用精确文本行几何校正。
+ * 校正后 rect 行数稳定时仍走读 rect 快路径（滚动性能）。
  */
 export function resolveMarkSvgLineSegments(
 	rend: Rendition | undefined,
@@ -333,6 +418,18 @@ export function resolveMarkSvgLineSegments(
 	cfiRange?: string,
 ): SvgLineSegment[] {
 	const existing = readMarkSvgLineSegmentsFromRects(group);
+
+	if (rend && cfiRange?.trim()) {
+		const accurate = resolveHighlightSvgLineSegments(rend, group, cfiRange);
+		if (accurate.length > 0) {
+			// 行数一致说明已校正过（含滚动同步），直接读 rect 属性
+			if (existing.length === accurate.length) {
+				return existing;
+			}
+			return accurate;
+		}
+	}
+
 	if (existing.length > 0) return existing;
 	return resolveHighlightSvgLineSegments(rend, group, cfiRange);
 }
@@ -372,7 +469,8 @@ export function resolveSelectionCfiRange(
 	win: Window,
 	range: Range,
 ): string | undefined {
-	const normalized = trimSelectionRange(range);
+	const normalized = normalizeSelectionRangeForEpub(range);
+	if (!normalized) return undefined;
 	const raw = rend.getContents();
 	const list: EpubIframeContents[] = Array.isArray(raw)
 		? (raw as EpubIframeContents[])

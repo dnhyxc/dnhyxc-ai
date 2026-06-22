@@ -1,6 +1,7 @@
 import type { Rendition } from 'epubjs';
 import type {
 	EbookThought,
+	EbookThoughtClickCluster,
 	EbookUserHighlight,
 	EpubHighlightColorId,
 	EpubHighlightStyle,
@@ -8,13 +9,16 @@ import type {
 import {
 	beginEpubAnnotationSyncScope,
 	cfiFromDomRange,
+	EPUB_ANNOTATION_IGNORE_CLASS,
 	endEpubAnnotationSyncScope,
+	forEachTextNodeInRange,
 	getAccurateRangeLineClientRects,
 	getAccurateRangeLineClientRectsCached,
 	isPointInRangeTextBand,
 	resolveCfiDomRange,
 	resolveMarkSvgLineSegments,
 	type SvgLineSegment,
+	snapSelectionRangeToTextContent,
 	trimSelectionRange,
 } from './epubRangeGeometry';
 import {
@@ -31,6 +35,10 @@ import {
 	setUserHighlightBlockerSourcesForThoughtPatch,
 	type UserHighlightBlockerSource,
 } from './epubThoughtAnnotations';
+import {
+	buildThoughtClickClusterFromCandidates,
+	expandClusterFromMarkSeed,
+} from './epubThoughtCluster';
 
 type EpubIframeContents = {
 	document: Document;
@@ -589,7 +597,7 @@ function attachUserHighlightReaderClickListener(
 	rend: Rendition,
 	getHighlights: () => EbookUserHighlight[],
 	getThoughts: () => EbookThought[],
-	onThoughtGroupClick: (group: EbookThought[]) => void,
+	onThoughtClusterClick: (cluster: EbookThoughtClickCluster) => void,
 	onHighlightHit: (
 		highlight: EbookUserHighlight,
 		anchor?: HighlightHitAnchor,
@@ -612,11 +620,14 @@ function attachUserHighlightReaderClickListener(
 			thoughts,
 		);
 		if (thoughtCandidates.length > 0) {
-			const group = resolveThoughtGroupAtClick(rend, thoughtCandidates, false);
-			if (group.length > 0) {
-				onThoughtGroupClick(group);
-				return;
-			}
+			scheduleThoughtClusterClick(
+				rend,
+				thoughts,
+				thoughtCandidates,
+				false,
+				onThoughtClusterClick,
+			);
+			return;
 		}
 
 		const highlights = getHighlights();
@@ -1472,39 +1483,19 @@ function isDomRangeFullyCoveredByHighlightRanges(
 ): boolean {
 	if (covers.length === 0) return false;
 
-	const doc = outer.startContainer.ownerDocument;
-	if (!doc) return false;
-
-	const walker = doc.createTreeWalker(
-		outer.commonAncestorContainer,
-		NodeFilter.SHOW_TEXT,
-		{
-			acceptNode(node) {
-				try {
-					return outer.intersectsNode(node)
-						? NodeFilter.FILTER_ACCEPT
-						: NodeFilter.FILTER_REJECT;
-				} catch {
-					return NodeFilter.FILTER_REJECT;
-				}
-			},
-		},
-	);
-
-	for (
-		let node = walker.nextNode() as Text | null;
-		node;
-		node = walker.nextNode() as Text | null
-	) {
-		const start = node === outer.startContainer ? outer.startOffset : 0;
-		const end = node === outer.endContainer ? outer.endOffset : node.length;
+	let fullyCovered = true;
+	forEachTextNodeInRange(outer, (node, start, end) => {
+		if (!fullyCovered) return;
 		for (let offset = start; offset < end; offset++) {
 			const ch = node.data[offset];
 			if (ch && /\s/u.test(ch)) continue;
-			if (!isDomPointInsideAnyRange(node, offset, covers)) return false;
+			if (!isDomPointInsideAnyRange(node, offset, covers)) {
+				fullyCovered = false;
+				return;
+			}
 		}
-	}
-	return true;
+	});
+	return fullyCovered;
 }
 
 export type SelectionHighlightCoverage = 'none' | 'partial' | 'full';
@@ -1546,7 +1537,9 @@ export function resolveSelectionHighlightCoverage(
 	const subjectRange = resolveCfiDomRange(rend, cfiRange.trim());
 	if (!subjectRange) return 'partial';
 
-	const normalized = trimSelectionRange(subjectRange);
+	const normalized =
+		snapSelectionRangeToTextContent(subjectRange) ??
+		trimSelectionRange(subjectRange);
 	const coverRanges = buildHighlightCoverRangesInSelection(
 		matched,
 		normalized,
@@ -1838,13 +1831,22 @@ export function findThoughtsForHighlightMark(
 	);
 }
 
-function thoughtGroupSpanLength(group: EbookThought[]): number {
-	const quote = group[0]?.quote?.trim();
-	if (quote && quote.length > 0) return quote.length;
-	return group[0]?.cfiRange.length ?? 0;
-}
-
 const THOUGHT_CLICK_SLOP_BELOW_PX = 8;
+
+/** 当前 iframe 章节 spine hint，用于点击命中时过滤其它章节想法 */
+function getContentsSpineHint(contents: ContentsWithCfi): string | null {
+	try {
+		const doc = contents.document;
+		const body = doc.body ?? doc.documentElement;
+		const range = doc.createRange();
+		range.selectNodeContents(body);
+		range.collapse(true);
+		const cfi = contents.cfiFromRange(range, EPUB_ANNOTATION_IGNORE_CLASS);
+		return extractCfiSpineHint(cfi);
+	} catch {
+		return null;
+	}
+}
 
 function isClickInThoughtCfiRange(
 	rend: Rendition,
@@ -1901,9 +1903,11 @@ function findThoughtsAtClickPoint(
 	}
 
 	const matched: EbookThought[] = [];
+	const spineHint = getContentsSpineHint(contents);
 	for (const [, group] of grouped) {
 		const cfi = group[0]?.cfiRange.trim();
 		if (!cfi) continue;
+		if (spineHint && extractCfiSpineHint(cfi) !== spineHint) continue;
 		if (isClickInThoughtCfiRange(rend, contents, clientX, clientY, cfi)) {
 			matched.push(...group);
 		}
@@ -1911,57 +1915,62 @@ function findThoughtsAtClickPoint(
 	return matched;
 }
 
-/** 同一点命中多组想法时，取 span 最短（最内层）且 DOM 包含点击点的分组 */
-function resolveThoughtGroupAtClick(
+/** 同一点命中多组想法时，聚合为连通 cluster（引用区取全部 CFI 的 DOM 并集） */
+function resolveThoughtClickCluster(
 	rend: Rendition,
+	allThoughts: EbookThought[],
 	candidates: EbookThought[],
-	fallbackToOutermost = false,
-): EbookThought[] {
-	if (candidates.length === 0) return [];
+	fromMarkSeed: boolean,
+): EbookThoughtClickCluster | null {
+	if (candidates.length === 0) return null;
 
-	const byCfi = new Map<string, EbookThought[]>();
-	for (const thought of candidates) {
-		const cfi = thought.cfiRange.trim();
-		if (!cfi) continue;
-		const list = byCfi.get(cfi) ?? [];
-		list.push(thought);
-		byCfi.set(cfi, list);
+	if (fromMarkSeed) {
+		const click = lastReaderClickPoint;
+		const contents =
+			click && Date.now() - click.at <= 800
+				? getContentsWithCfiForDocument(rend, click.document)
+				: null;
+		const isClickInCfi =
+			contents && click
+				? (cfi: string) =>
+						isClickInThoughtCfiRange(
+							rend,
+							contents,
+							click.clientX,
+							click.clientY,
+							cfi,
+						)
+				: undefined;
+		return expandClusterFromMarkSeed(
+			rend,
+			allThoughts,
+			candidates,
+			isClickInCfi,
+		);
 	}
 
-	const click = lastReaderClickPoint;
-	if (click && Date.now() - click.at <= 800) {
-		const contents = getContentsWithCfiForDocument(rend, click.document);
-		if (contents) {
-			const hitGroups: EbookThought[][] = [];
-			for (const [, group] of byCfi) {
-				const cfi = group[0]?.cfiRange.trim();
-				if (!cfi) continue;
-				if (
-					isClickInThoughtCfiRange(
-						rend,
-						contents,
-						click.clientX,
-						click.clientY,
-						cfi,
-					)
-				) {
-					hitGroups.push(group);
-				}
-			}
-			if (hitGroups.length > 0) {
-				hitGroups.sort(
-					(a, b) => thoughtGroupSpanLength(a) - thoughtGroupSpanLength(b),
-				);
-				return hitGroups[0] ?? [];
-			}
+	return buildThoughtClickClusterFromCandidates(rend, allThoughts, candidates);
+}
+
+/** 下一帧再聚类并打开列表，避免在 pointer 回调里长时间占用主线程 */
+function scheduleThoughtClusterClick(
+	rend: Rendition,
+	allThoughts: EbookThought[],
+	candidates: EbookThought[],
+	fromMarkSeed: boolean,
+	onThoughtClusterClick: (cluster: EbookThoughtClickCluster) => void,
+): void {
+	requestAnimationFrame(() => {
+		const cluster = resolveThoughtClickCluster(
+			rend,
+			allThoughts,
+			candidates,
+			fromMarkSeed,
+		);
+		if (cluster && cluster.allThoughts.length > 0) {
+			onThoughtClusterClick(cluster);
 		}
-	}
-
-	if (!fallbackToOutermost) return [];
-
-	const groups = [...byCfi.values()];
-	groups.sort((a, b) => thoughtGroupSpanLength(b) - thoughtGroupSpanLength(a));
-	return groups[0] ?? [];
+	});
 }
 
 type HighlightHitAnchor = {
@@ -2016,7 +2025,7 @@ function buildPopBarPayloadForHighlightHit(
 export type EpubReadingMarkClickOptions = {
 	getThoughts: () => EbookThought[];
 	getHighlights: () => EbookUserHighlight[];
-	onThoughtGroupClick: (group: EbookThought[]) => void;
+	onThoughtClusterClick: (cluster: EbookThoughtClickCluster) => void;
 	onUserHighlightPopBar: (
 		payload: EpubSelectionPopBarPayload,
 		highlight: EbookUserHighlight,
@@ -2051,11 +2060,14 @@ export function installEpubReadingMarkClickListeners(
 				thoughts,
 			);
 			if (atClick.length > 0) {
-				const group = resolveThoughtGroupAtClick(rend, atClick, false);
-				if (group.length > 0) {
-					options.onThoughtGroupClick(group);
-					return;
-				}
+				scheduleThoughtClusterClick(
+					rend,
+					thoughts,
+					atClick,
+					false,
+					options.onThoughtClusterClick,
+				);
+				return;
 			}
 		}
 
@@ -2100,7 +2112,7 @@ export function installEpubReadingMarkClickListeners(
 		rend,
 		options.getHighlights,
 		options.getThoughts,
-		options.onThoughtGroupClick,
+		options.onThoughtClusterClick,
 		dispatchHighlightHit,
 	);
 
@@ -2136,11 +2148,14 @@ export function installEpubReadingMarkClickListeners(
 				: thoughts.filter((t) => t.cfiRange.trim() === cfiRange.trim());
 
 		if (matchedThoughts.length > 0) {
-			const group = resolveThoughtGroupAtClick(rend, matchedThoughts, false);
-			if (group.length > 0) {
-				options.onThoughtGroupClick(group);
-				return;
-			}
+			scheduleThoughtClusterClick(
+				rend,
+				thoughts,
+				matchedThoughts,
+				true,
+				options.onThoughtClusterClick,
+			);
+			return;
 		}
 
 		tryDispatchUserHighlightAtRecentClick(

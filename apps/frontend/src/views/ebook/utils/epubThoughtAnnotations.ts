@@ -1,5 +1,5 @@
 import type { Rendition } from 'epubjs';
-import type { EbookThought } from '../types';
+import type { EbookThought, EbookThoughtClickCluster } from '../types';
 import {
 	resolveCfiDomRange,
 	resolveMarkSvgLineSegments,
@@ -15,7 +15,7 @@ type EpubIframeContents = {
  * EPUB 想法下划线点击事件处理器类型定义
  *
  * - onThoughtClick：点击某一条想法（下划线）时的事件回调，通常用于弹出该条想法详情、编辑等操作。
- * - onThoughtGroupClick：同一段（同一 cfiRange）可能存在多条想法，点击下划线分组时触发，传递该段落下所有想法，通常弹出多条列表。
+ * - onThoughtClusterClick：嵌套选区点击时触发，传递聚合后的想法簇（含最外层引用与全部分组）。
  */
 export type EpubThoughtClickHandlers = {
 	/**
@@ -24,10 +24,10 @@ export type EpubThoughtClickHandlers = {
 	 */
 	onThoughtClick: (thought: EbookThought) => void;
 	/**
-	 * 点击包含多条想法的 cfiRange 下划线分组时触发
-	 * @param thoughts 同一段落下（同一 cfiRange）全部想法
+	 * 点击想法下划线时触发（含嵌套选区聚合）
+	 * @param cluster 本次点击范围内的想法簇
 	 */
-	onThoughtGroupClick: (thoughts: EbookThought[]) => void;
+	onThoughtClusterClick: (cluster: EbookThoughtClickCluster) => void;
 };
 
 export const EPUB_THOUGHT_UNDERLINE_CLASS = 'moke-epub-thought-ul';
@@ -918,6 +918,23 @@ function isQuoteStrictlyNested(
  * @param rend - epub.js 渲染引擎，用于解析 CFI -> DOM 区间
  * @returns inner 是否被 outer 严格包含
  */
+/** 判断 inner CFI 是否被 outer CFI 严格包含（供下划线 apply 与想法 cluster 复用） */
+export function isThoughtCfiRangeStrictlyContained(
+	inner: string,
+	outer: string,
+	innerGroup: EbookThought[],
+	outerGroup: EbookThought[],
+	rend: Rendition,
+): boolean {
+	return isCfiRangeStrictlyContained(
+		inner,
+		outer,
+		innerGroup,
+		outerGroup,
+		rend,
+	);
+}
+
 function isCfiRangeStrictlyContained(
 	inner: string,
 	outer: string,

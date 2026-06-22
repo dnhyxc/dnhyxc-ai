@@ -1661,6 +1661,9 @@ export const enUS = {
 	'ebook.read.thought.closeView': 'Close reading note',
 	'ebook.read.thought.closeEdit': 'Close note editor',
 	'ebook.read.thought.unknownUser': 'Unknown user',
+	'ebook.read.thought.clusterExcerpt': 'Excerpt ({length} chars)',
+	'ebook.read.thought.viewDetail': 'View note',
+	'ebook.read.thought.selectedQuoteHint': 'Showing quote for selected note',
 	'ebook.err.open': 'Failed to open',
 	'ebook.err.loadFailed':
 		'Unable to load this book. Please check whether it still exists.',

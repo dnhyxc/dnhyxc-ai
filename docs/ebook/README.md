@@ -23,9 +23,10 @@
 | [epub-user-highlight-impl.md](./epub-user-highlight-impl.md) | **主文档（用户划线）**：彩色高亮/下划线/波浪线、重叠合并、PopBar、与想法协同（逐步拆解 + 逐行注释代码） |
 | [epub-highlight-dom-match.md](./epub-highlight-dom-match.md) | **增量**：划线按 CFI/DOM 命中，避免 quote 同名跨位置误删/误合并；PopBar 划线/删除划线覆盖度规则 |
 | [epub-popbar-perf-ux.md](./epub-popbar-perf-ux.md) | **增量**：PopBar 防闪烁、划线 sync 增量 apply、highlightToggle 单槽位、重复 sync 去除 |
-| [epub-annotation-sync-perf.md](./epub-annotation-sync-perf.md) | **增量**：划线/想法 sync 主线程优化（patch 快路径、CFI 缓存、想法 DOM restack、即时 patch） |
+| [epub-annotation-sync-perf.md](./epub-annotation-sync-perf.md) | **增量**：划线/想法 sync 主线程优化（patch 快路径、CFI 缓存、想法 DOM restack、即时 patch）；**选区落空行卡死**修复（`forEachTextNodeInRange`） |
 | [epub-thought-underline-impl.md](./epub-thought-underline-impl.md) | **主文档（想法虚线）**：分组、嵌套去重、选区防误触、与用户划线叠加（逐步拆解 + 逐行注释代码） |
 | [epub-thought-partial-overlap.md](./epub-thought-partial-overlap.md) | **增量**：部分相交的想法选区 patch 层 blocker 去重，避免重叠段双线叠加 |
+| [epub-thought-cluster-bridging.md](./epub-thought-cluster-bridging.md) | **主文档（想法桥接）**：点击聚合规则（A/B/标点/换行何时合并）、连通图 v5、逐行注释代码 |
 | [epub-thought-underlines-sync.md](./epub-thought-underlines-sync.md) | **增量**：下划线批注与监听拆分，修复保存/切章偶发白屏 |
 | [epub-thought-drawer.md](./epub-thought-drawer.md) | **已废弃归档**：全屏底部 Sheet 抽屉（组件已删，勿作实现依据） |
 | [../chat/assistant-share-bar.md](../chat/assistant-share-bar.md) | **关联**：助手分享底栏与 `useAssistantShare`（知识库 / 英语 / 电子书三端统一） |

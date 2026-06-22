@@ -84,6 +84,31 @@ export type EbookThought = {
 	updatedAt: string;
 };
 
+/** 同一 cfiRange 下的想法分组（数据库粒度不变） */
+export type EbookThoughtQuoteGroup = {
+	cfiRange: string;
+	quote: string;
+	thoughts: EbookThought[];
+	/** quote 字符数；无 quote 时回退 cfiRange.length */
+	spanLength: number;
+};
+
+/**
+ * 一次正文点击解析出的「想法簇」
+ * —— 可包含多个严格嵌套（或部分相交）的 quote 分组
+ */
+export type EbookThoughtClickCluster = {
+	/** 引用区默认展示的最外层 cfi / quote */
+	primaryCfiRange: string;
+	primaryQuote: string;
+	/** 按 span 从长到短排序的选区分组 */
+	quoteGroups: EbookThoughtQuoteGroup[];
+	/** 扁平列表：UI 渲染用 */
+	allThoughts: EbookThought[];
+	/** 列表内当前聚焦的想法 id；undefined 时使用 primaryQuote */
+	selectedThoughtId?: string;
+};
+
 /** EPUB 用户划线样式（选区高亮 / 直线下划线 / 波浪线） */
 export type EpubHighlightStyle = 'highlight' | 'underline' | 'wavy';
 

@@ -4,7 +4,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { type ThemeName, useTheme } from '@/hooks';
 import { cn } from '@/lib/utils';
 import { onListen } from '@/utils';
-import type { EbookThought, EbookTocItem, EbookUserHighlight } from '../types';
+import type {
+	EbookThought,
+	EbookThoughtClickCluster,
+	EbookTocItem,
+	EbookUserHighlight,
+} from '../types';
 import {
 	attachEpubIframeContextMenu,
 	type EpubReaderContextMenuPayload,
@@ -61,7 +66,7 @@ type Props = {
 	/** 读书想法（下划线标注） */
 	thoughts?: EbookThought[];
 	onThoughtClick?: (thought: EbookThought) => void;
-	onThoughtGroupClick?: (thoughts: EbookThought[]) => void;
+	onThoughtClusterClick?: (cluster: EbookThoughtClickCluster) => void;
 	onUserHighlightPopBar?: (
 		payload: EpubSelectionPopBarPayload,
 		highlight: EbookUserHighlight,
@@ -118,7 +123,7 @@ export function EpubPane({
 	onSelectionPopBar,
 	thoughts = [],
 	onThoughtClick,
-	onThoughtGroupClick,
+	onThoughtClusterClick,
 	onUserHighlightPopBar,
 	highlights = [],
 }: Props) {
@@ -142,7 +147,7 @@ export function EpubPane({
 	const onReaderContextMenuRef = useRef(onReaderContextMenu);
 	const onSelectionPopBarRef = useRef(onSelectionPopBar);
 	const onThoughtClickRef = useRef(onThoughtClick);
-	const onThoughtGroupClickRef = useRef(onThoughtGroupClick);
+	const onThoughtClusterClickRef = useRef(onThoughtClusterClick);
 	const onUserHighlightPopBarRef = useRef(onUserHighlightPopBar);
 	const thoughtsRef = useRef(thoughts);
 	const highlightsRef = useRef(highlights);
@@ -190,7 +195,7 @@ export function EpubPane({
 	onReaderContextMenuRef.current = onReaderContextMenu;
 	onSelectionPopBarRef.current = onSelectionPopBar;
 	onThoughtClickRef.current = onThoughtClick;
-	onThoughtGroupClickRef.current = onThoughtGroupClick;
+	onThoughtClusterClickRef.current = onThoughtClusterClick;
 	onUserHighlightPopBarRef.current = onUserHighlightPopBar;
 	thoughtsRef.current = thoughts;
 	highlightsRef.current = highlights;
@@ -247,7 +252,8 @@ export function EpubPane({
 		return installEpubThoughtUnderlineListeners(rend, {
 			getThoughts: () => thoughtsRef.current ?? [],
 			onThoughtClick: (thought) => onThoughtClickRef.current?.(thought),
-			onThoughtGroupClick: (group) => onThoughtGroupClickRef.current?.(group),
+			onThoughtClusterClick: (cluster) =>
+				onThoughtClusterClickRef.current?.(cluster),
 		});
 	}, [rendReady]);
 
@@ -258,7 +264,8 @@ export function EpubPane({
 		return installEpubReadingMarkClickListeners(rend, {
 			getThoughts: () => thoughtsRef.current ?? [],
 			getHighlights: () => highlightsRef.current ?? [],
-			onThoughtGroupClick: (group) => onThoughtGroupClickRef.current?.(group),
+			onThoughtClusterClick: (cluster) =>
+				onThoughtClusterClickRef.current?.(cluster),
 			onUserHighlightPopBar: (payload, highlight) =>
 				onUserHighlightPopBarRef.current?.(payload, highlight),
 		});
