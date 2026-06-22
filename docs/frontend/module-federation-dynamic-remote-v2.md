@@ -82,15 +82,311 @@ monorepo-root/
 │               └── UserAvatar.vue
 │
 └── packages/
-    ├── mf-config/                        # 公共 shared 配置
-    │   └── src/shared.js
+    ├── mf-config/                        # ⭐ shared 配置公共包（所有项目复用）
+    │   ├── src/
+    │   │   ├── shared.js                # 智能生成 shared 配置
+    │   │   └── webpack-plugin.js        # 便利层：new MfWebpackPlugin()
+    │   ├── index.js                     # 统一导出
+    │   └── package.json
     └── mf-manifest/                      # CI 脚本生成 manifest
         └── scripts/generate-manifest.js
 ```
 
 ---
 
-## 3. 基础依赖版本
+## 3. mf-config 公共包：把 shared 配置抽成独立包
+
+> **为什么要抽成包？**
+> - DRY：每个 Remote 都要重复配 `react / react-dom` 的 `singleton + requiredVersion`
+> - 版本对齐：升级 `react@18.2.0 → 18.3.0` 只需改一个包
+> - 降低接入门槛：新团队只需要填 `name + exposes`，不需要知道 shared 怎么配
+
+### 3.1 packages/mf-config/package.json
+
+```json
+{
+  "name": "@xxx/mf-config",
+  "version": "1.0.0",
+  "private": true,
+  "main": "index.js",
+  "peerDependencies": {
+    "react": ">=17.0.0",
+    "react-dom": ">=17.0.0"
+  }
+}
+```
+
+### 3.2 packages/mf-config/src/shared.js（核心逻辑）
+
+```js
+// packages/mf-config/src/shared.js
+/**
+ * 智能生成 shared 配置。
+ *
+ * 工作原理：
+ * 1. 读取调用方项目的 package.json，取出 react / react-dom 版本
+ * 2. 自动识别有哪些库需要被 share（react/react-dom 固定；可选支持 react-router-dom / vue）
+ * 3. 返回符合 ModuleFederationPlugin 要求的 shared 对象
+ *
+ * 用法：
+ *   const { createShared } = require('@xxx/mf-config');
+ *   new ModuleFederationPlugin({
+ *     name: 'checkout',
+ *     shared: createShared({ reactRouter: true }),
+ *   })
+ */
+function loadPackageJson(cwd) {
+  try {
+    return require(`${cwd}/package.json`);
+  } catch {
+    return {};
+  }
+}
+
+function extractVersion(pkg, name) {
+  const dep = pkg.dependencies?.[name] || pkg.peerDependencies?.[name];
+  // 支持 ^18.2.0 或 18.2.0 两种格式
+  if (dep) return dep.replace(/^[\^~>=<]/, '').trim();
+  return undefined;
+}
+
+/**
+ * @param {Object} opts
+ * @param {string}  [opts.cwd=process.cwd()]  调用方项目路径
+ * @param {boolean} [opts.reactRouter=false] 是否 share react-router-dom
+ * @param {boolean} [opts.vue=false]         是否 share vue（Remote 是 Vue 应用时用）
+ * @param {string[]} [opts.extra=[]]          额外要 share 的包名，如 ['lodash', 'axios']
+ * @param {boolean} [opts.eager=false]       是否全部 eager（Host 推荐 true，Remote 推荐 false）
+ */
+function createShared(opts = {}) {
+  const {
+    cwd = process.cwd(),
+    reactRouter = false,
+    vue = false,
+    extra = [],
+    eager = false,
+  } = opts;
+
+  const pkg = loadPackageJson(cwd);
+
+  const shared = {};
+
+  // React 三件套（固定）
+  shared.react = {
+    singleton: true,
+    requiredVersion: extractVersion(pkg, 'react'),
+    ...(eager && { eager: true }),
+  };
+  shared['react-dom'] = {
+    singleton: true,
+    requiredVersion: extractVersion(pkg, 'react-dom'),
+    ...(eager && { eager: true }),
+  };
+
+  // react-router-dom（可选，Host 必备）
+  if (reactRouter) {
+    shared['react-router-dom'] = {
+      singleton: true,
+      requiredVersion: extractVersion(pkg, 'react-router-dom'),
+      ...(eager && { eager: true }),
+    };
+  }
+
+  // Vue（可选，Remote 是 Vue 时必备）
+  if (vue) {
+    shared.vue = {
+      singleton: true,
+      requiredVersion: extractVersion(pkg, 'vue'),
+      ...(eager && { eager: true }),
+    };
+  }
+
+  // 额外包（按需，非 singleton）
+  extra.forEach((name) => {
+    shared[name] = {
+      requiredVersion: extractVersion(pkg, name),
+      // 非 singleton：允许各自带自己的版本
+    };
+  });
+
+  return shared;
+}
+
+module.exports = { createShared };
+```
+
+### 3.3 packages/mf-config/src/webpack-plugin.js（便利层）
+
+如果觉得 `createShared` 还要手动套 `ModuleFederationPlugin` 太繁琐，可以用这个便利层：
+
+```js
+// packages/mf-config/src/webpack-plugin.js
+const { ModuleFederationPlugin } = require('webpack').container;
+const { createShared } = require('./shared');
+
+class MfWebpackPlugin {
+  /**
+   * @param {Object} opts
+   * @param {string}  opts.name         容器名（必填）
+   * @param {Object}  opts.exposes       模块暴露（Host 端可省略）
+   * @param {boolean} [opts.isHost=true]  是 Host（eager=true）还是 Remote（eager=false）
+   * @param {boolean} [opts.reactRouter]  是否 share react-router-dom
+   * @param {boolean} [opts.vue]         是否 share vue
+   * @param {string[]} [opts.extra]       额外 share 的包
+   */
+  constructor(opts = {}) {
+    const {
+      name,
+      filename = 'remoteEntry.js',
+      exposes = {},
+      isHost = true,
+      reactRouter = false,
+      vue = false,
+      extra = [],
+    } = opts;
+
+    if (!name) throw new Error('MfWebpackPlugin: name 是必填参数');
+
+    this._plugin = new ModuleFederationPlugin({
+      name,
+      filename,
+      exposes: Object.keys(exposes).length > 0 ? exposes : undefined,
+      shared: createShared({
+        reactRouter,
+        vue,
+        extra,
+        eager: isHost,
+      }),
+    });
+  }
+
+  apply(compiler) {
+    this._plugin.apply(compiler);
+  }
+}
+
+module.exports = { MfWebpackPlugin };
+```
+
+### 3.4 packages/mf-config/index.js
+
+```js
+// packages/mf-config/index.js
+const { createShared } = require('./src/shared');
+const { MfWebpackPlugin } = require('./src/webpack-plugin');
+
+module.exports = { createShared, MfWebpackPlugin };
+```
+
+### 3.5 用法对比
+
+**抽出来之前：每个项目都要写这么一坨**
+
+```js
+// apps/team-checkout/webpack.config.js
+const pkg = require('./package.json');
+new ModuleFederationPlugin({
+  name: 'checkout',
+  shared: {
+    react: { singleton: true, requiredVersion: pkg.dependencies.react },
+    'react-dom': { singleton: true, requiredVersion: pkg.dependencies['react-dom'] },
+    'react-router-dom': { singleton: true, requiredVersion: pkg.dependencies['react-router-dom'] },
+  },
+}),
+```
+
+**抽出来之后——两种用法：**
+
+**用法 A：便利层 `MfWebpackPlugin`（推荐，最简洁）**
+
+```js
+// apps/team-checkout/webpack.config.js
+const { MfWebpackPlugin } = require('@xxx/mf-config');
+
+module.exports = {
+  plugins: [
+    new MfWebpackPlugin({
+      name: 'checkout',                       // ⭐ 唯一必填
+      exposes: {
+        './CheckoutPage':  './src/exposes/CheckoutPage.jsx',
+        './PaymentButton': './src/exposes/PaymentButton.jsx',
+      },
+      reactRouter: true,                      // ⭐ 加这一个 flag 即可
+      // isHost 默认为 true
+    }),
+  ],
+};
+```
+
+**用法 B：纯函数 `createShared`（需要更多控制时）**
+
+```js
+// apps/shell/webpack.config.js
+const { createShared } = require('@xxx/mf-config');
+const { ModuleFederationPlugin } = require('webpack').container;
+
+module.exports = {
+  plugins: [
+    new ModuleFederationPlugin({
+      name: 'shell',
+      remotes: { _placeholder: '_placeholder@about:blank' },
+      shared: createShared({ reactRouter: true, vue: false }),
+    }),
+  ],
+};
+```
+
+### 3.6 Remote 是 Vue 应用时
+
+```js
+// apps/team-user/webpack.config.js
+const { MfWebpackPlugin } = require('@xxx/mf-config');
+
+module.exports = {
+  plugins: [
+    new MfWebpackPlugin({
+      name: 'userCenter',
+      vue: true,                             // ⭐ 切 Vue 模式
+      // 不需要 reactRouter
+    }),
+  ],
+};
+```
+
+### 3.7 CI 发包流程
+
+```bash
+# 1. mf-config 改完后 publish（内部私有包）
+cd packages/mf-config
+npm version patch
+npm publish --registry https://npm.xxx.com/
+
+# 2. 各 Remote 项目更新依赖
+cd apps/team-checkout
+npm install @xxx/mf-config@latest
+
+# 3. react 版本升级：只改 mf-config 这一个包
+cd packages/mf-config
+# src/shared.js 逻辑不变（自动从 package.json 读版本）
+# → 发布后所有 Remote 统一拿到新版本
+npm version minor && npm publish
+```
+
+### 3.8 哪些放包里，哪些不放
+
+| 内容 | 放 mf-config | 原因 |
+|---|---|---|
+| `react / react-dom` shared（singleton + requiredVersion） | ✅ 必抽 | 每个 Remote 都要，版本要统一 |
+| `react-router-dom` shared | ✅ 必抽 | Host 必备，Remote 可选 |
+| `vue` shared | ✅ 必抽 | Remote 是 Vue 时必备 |
+| `_placeholder` 占位符 | ✅ 必抽 | Host 必备 |
+| `exposes` | ❌ 不抽 | 每个 Remote 都不一样 |
+| `name / filename` | ❌ 不抽 | 每个 Remote 都不一样 |
+| Remote 端的 `output.publicPath = 'auto'` | ❌ 不抽 | 属于 webpack output 配置 |
+
+---
+
+## 4. 基础依赖版本
 
 ```json
 // apps/shell/package.json
@@ -152,9 +448,9 @@ monorepo-root/
 
 ---
 
-## 4. Host 应用（Shell）完整配置
+## 5. Host 应用（Shell）完整配置
 
-### 4.1 webpack.config.js
+### 5.1 webpack.config.js
 
 ```js
 // apps/shell/webpack.config.js
@@ -265,7 +561,7 @@ module.exports = {
 };
 ```
 
-### 4.2 src/index.js（异步入口）
+### 5.2 src/index.js（异步入口）
 
 ```js
 // apps/shell/src/index.js
@@ -274,7 +570,7 @@ module.exports = {
 import('./bootstrap');
 ```
 
-### 4.3 src/bootstrap.jsx（应用启动）
+### 5.3 src/bootstrap.jsx（应用启动）
 
 ```jsx
 // apps/shell/src/bootstrap.jsx
@@ -392,7 +688,7 @@ const linkStyle = { color: '#fff', textDecoration: 'none' };
 ReactDOM.createRoot(document.getElementById('root')).render(<App />);
 ```
 
-### 4.4 src/mf/loadRemote.js（动态注入 script）
+### 5.4 src/mf/loadRemote.js（动态注入 script）
 
 ```js
 // apps/shell/src/mf/loadRemote.js
@@ -454,7 +750,7 @@ export async function loadRemote({ name, url, scope = 'default' }) {
 }
 ```
 
-### 4.5 src/mf/loadRemoteModule.js（真正拿组件）
+### 5.5 src/mf/loadRemoteModule.js（真正拿组件）
 
 ```js
 // apps/shell/src/mf/loadRemoteModule.js
@@ -503,7 +799,7 @@ export async function useRemote({ name, url, module: modKey }) {
 }
 ```
 
-### 4.6 src/mf/manifest.js（获取运行时路由表）
+### 5.6 src/mf/manifest.js（获取运行时路由表）
 
 ```js
 // apps/shell/src/mf/manifest.js
@@ -545,7 +841,7 @@ export async function fetchRemoteManifest(manifestUrl = DEFAULT_MANIFEST_PATH) {
 }
 ```
 
-### 4.7 src/mf/registerRoutes.js（注册成 React Router 可用对象）
+### 5.7 src/mf/registerRoutes.js（注册成 React Router 可用对象）
 
 ```jsx
 // apps/shell/src/mf/registerRoutes.js
@@ -575,7 +871,7 @@ export async function buildRemoteRoutes(manifestUrl) {
 export { loadRemote, loadRemoteModule, useRemote, fetchRemoteManifest };
 ```
 
-### 4.8 src/mf/index.js（统一导出）
+### 5.8 src/mf/index.js（统一导出）
 
 ```js
 // apps/shell/src/mf/index.js
@@ -585,7 +881,7 @@ export * from './manifest';
 export * from './registerRoutes';
 ```
 
-### 4.9 src/components/RemoteFallback.jsx（ErrorBoundary）
+### 5.9 src/components/RemoteFallback.jsx（ErrorBoundary）
 
 ```jsx
 // apps/shell/src/components/RemoteFallback.jsx
@@ -629,7 +925,7 @@ export default class RemoteFallback extends Component {
 }
 ```
 
-### 4.10 src/components/RemoteRoute.jsx（Suspense）
+### 5.10 src/components/RemoteRoute.jsx（Suspense）
 
 ```jsx
 // apps/shell/src/components/RemoteRoute.jsx
@@ -644,7 +940,7 @@ export default function RemoteRoute({ children, fallback }) {
 }
 ```
 
-### 4.11 src/index.css
+### 5.11 src/index.css
 
 ```css
 body {
@@ -655,7 +951,7 @@ body {
 * { box-sizing: border-box; }
 ```
 
-### 4.12 public/index.html
+### 5.12 public/index.html
 
 ```html
 <!doctype html>
@@ -671,7 +967,7 @@ body {
 </html>
 ```
 
-### 4.13 Shell 端的环境变量（process.env 注入，让 URL 可配置）
+### 5.13 Shell 端的环境变量（process.env 注入，让 URL 可配置）
 
 webpack 5 推荐用 `EnvironmentPlugin`（或 `DefinePlugin`）注入 `process.env.xxx`。关键点：
 - **不要把 URL 写死在代码里**，这样本地/测试/生产可以指向不同的远程地址；
@@ -757,7 +1053,7 @@ export async function fetchRemoteManifest(manifestUrl = DEFAULT_MANIFEST_PATH) {
 }
 ```
 
-### 4.14 public/remote-manifest.json（⭐ 运行时路由表）
+### 5.14 public/remote-manifest.json（⭐ 运行时路由表）
 
 ```json
 {
@@ -785,9 +1081,9 @@ export async function fetchRemoteManifest(manifestUrl = DEFAULT_MANIFEST_PATH) {
 
 ---
 
-## 5. 远程应用 A：team-checkout（React）
+## 6. 远程应用 A：team-checkout（React）
 
-### 5.1 webpack.config.js
+### 6.1 webpack.config.js
 
 ```js
 // apps/team-checkout/webpack.config.js
@@ -837,7 +1133,7 @@ module.exports = {
   plugins: [
     new ModuleFederationPlugin({
       name: 'checkout',                                   // ⭐ 必须和 manifest 的 name 一致
-      filename: 'remoteEntry.js',                         // ⭐ Host 请求的就是它
+      filename: 'remoteEntry.js',
       exposes: {
         './CheckoutPage':  './src/exposes/CheckoutPage.jsx',
         './PaymentButton': './src/exposes/PaymentButton.jsx',
@@ -864,19 +1160,19 @@ module.exports = {
     historyApiFallback: true,
     hot: true,
     client: { overlay: { errors: true, warnings: false } },
-    headers: { 'Access-Control-Allow-Origin': '*' },          // ⭐ 允许 Shell 跨域请求
+    headers: { 'Access-Control-Allow-Origin': '*' },
   },
 };
 ```
 
-### 5.2 src/index.js
+### 6.2 src/index.js
 
 ```js
 // apps/team-checkout/src/index.js
 import('./bootstrap');
 ```
 
-### 5.3 src/bootstrap.jsx
+### 6.3 src/bootstrap.jsx
 
 ```jsx
 // apps/team-checkout/src/bootstrap.jsx
@@ -895,7 +1191,7 @@ if (document.getElementById('root')) {
 }
 ```
 
-### 5.4 src/exposes/CheckoutPage.jsx
+### 6.4 src/exposes/CheckoutPage.jsx
 
 ```jsx
 // apps/team-checkout/src/exposes/CheckoutPage.jsx
@@ -920,7 +1216,7 @@ export default function CheckoutPage() {
 }
 ```
 
-### 5.5 src/exposes/PaymentButton.jsx
+### 6.5 src/exposes/PaymentButton.jsx
 
 ```jsx
 // apps/team-checkout/src/exposes/PaymentButton.jsx
@@ -948,9 +1244,9 @@ export default function PaymentButton({ amount = 0, label = '立即支付', onPa
 
 ---
 
-## 6. 远程应用 B：team-user（Vue 示例）
+## 7. 远程应用 B：team-user（Vue 示例）
 
-### 6.1 package.json（关键依赖）
+### 7.1 package.json（关键依赖）
 
 ```json
 {
@@ -975,7 +1271,7 @@ export default function PaymentButton({ amount = 0, label = '立即支付', onPa
 }
 ```
 
-### 6.2 webpack.config.js
+### 7.2 webpack.config.js
 
 ```js
 // apps/team-user/webpack.config.js
@@ -1042,7 +1338,7 @@ module.exports = {
 };
 ```
 
-### 6.3 src/index.js & src/bootstrap.js
+### 7.3 src/index.js & src/bootstrap.js
 
 ```js
 // apps/team-user/src/index.js
@@ -1065,7 +1361,7 @@ if (document.getElementById('root')) {
 }
 ```
 
-### 6.4 src/exposes/ProfilePage.js（函数式组件）
+### 7.4 src/exposes/ProfilePage.js（函数式组件）
 
 ```js
 // apps/team-user/src/exposes/ProfilePage.js
@@ -1110,7 +1406,7 @@ export default ProfilePage;
 export { ProfilePage };
 ```
 
-### 6.5 在 React Shell 里渲染 Vue 组件（生产级 Adapter）
+### 7.5 在 React Shell 里渲染 Vue 组件（生产级 Adapter）
 
 上面给的 ProfilePage 只是个 `setup 函数，直接丢到 `React.lazy` 里会因为 Vue 和 React 的渲染模型不同而出问题。生产上必须把 Vue 组件包一层 React Bridge。
 
@@ -1231,7 +1527,7 @@ export default function VueBridge({ name, url, module: modKey, props = {} }) {
 </RemoteFallback>
 ```
 
-### 6.6 public/index.html
+### 7.6 public/index.html
 
 ```html
 <!doctype html>
@@ -1248,11 +1544,11 @@ export default function VueBridge({ name, url, module: modKey, props = {} }) {
 
 ---
 
-## 7. 使用方视角：在业务组件里手动加载远程模块
+## 8. 使用方视角：在业务组件里手动加载远程模块
 
 前面讲了"manifest 驱动的动态路由"。但更常见的场景是——**业务页面里主动 import 一个远程模块**，比如订单页要加载 checkout 的按钮组件。下面给两套写法。
 
-### 7.1 写法 A：最直接的 React.lazy + useRemote（推荐）
+### 8.1 写法 A：最直接的 React.lazy + useRemote（推荐）
 
 ```jsx
 // apps/shell/src/views/OrderPage.jsx
@@ -1303,7 +1599,7 @@ export default function OrderPage() {
 }
 ```
 
-### 7.2 写法 B：通过 manifest 按 name 查 URL（更符合"新 Remote 不改 Host"）
+### 8.2 写法 B：通过 manifest 按 name 查 URL（更符合"新 Remote 不改 Host"）
 
 如果你连"写死 `checkout` 的 URL"都不想做——用 manifest 查询：
 
@@ -1342,7 +1638,7 @@ export function useRemoteByName({ name, module: modKey }) {
 // );
 ```
 
-### 7.3 完整的"Checkout 流程"示例：订单页 + 结账页串联
+### 8.3 完整的"Checkout 流程"示例：订单页 + 结账页串联
 
 ```jsx
 // apps/shell/src/views/OrderPage.jsx
@@ -1397,7 +1693,7 @@ export default function OrderPage() {
 >
 > URL 去哪里找？manifest 里查。构建期要不要改？不要。只要 manifest 里有这个 name，Shell 就能跑起来。
 
-### 7.4 路由级远程：在 bootstrap.jsx 中根据 manifest 自动生成路由
+### 8.4 路由级远程：在 bootstrap.jsx 中根据 manifest 自动生成路由
 
 这是实现"新 Remote 不改 Host 代码"的关键。下面给出一个**最终版**的 bootstrap.jsx：
 
@@ -1559,7 +1855,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(<App />);
 
 ---
 
-## 8. 部署流程（"新远程上线"只需 4 步）
+## 10. 部署流程（"新远程上线"只需 4 步）
 
 ### 步骤 1：开发并部署远程应用
 
@@ -1693,7 +1989,7 @@ server {
 
 ---
 
-## 10. 完整开发与生产启动流程
+## 12. 完整开发与生产启动流程
 
 ### 开发模式
 
@@ -1731,7 +2027,7 @@ cd apps/shell && npm run build
 
 ---
 
-## 11. CI 脚本：自动生成 manifest
+## 13. CI 脚本：自动生成 manifest
 
 ```js
 // packages/mf-manifest/scripts/generate-manifest.js
@@ -1784,7 +2080,7 @@ main();
 
 ---
 
-## 12. 常见问题排查速查表
+## 14. 常见问题排查速查表
 
 | # | 现象 | 原因 | 解决 |
 |---|------|------|------|
@@ -1801,7 +2097,7 @@ main();
 
 ---
 
-## 13. 真正"热插拔"：部署新远程不需重构建 Shell 的流程总结
+## 15. 真正"热插拔"：部署新远程不需重构建 Shell 的流程总结
 
 1. **开发**：新团队开发新 Remote 应用，MF Plugin 配好 `name / exposes / shared`
 2. **构建**：`npm run build`，产出 `remoteEntry.js` 和 chunk
@@ -1817,7 +2113,7 @@ main();
 
 ---
 
-## 14. 进阶：用外部配置中心提供 manifest（更极致的热插拔）
+## 16. 进阶：用外部配置中心提供 manifest（更极致的热插拔）
 
 如果你想做到"发布新远程连 Shell 的静态文件都不碰"，可以把 manifest 放到独立 URL，Shell 启动时从那里拉：
 
@@ -1847,7 +2143,7 @@ export async function fetchRemoteManifest() {
 
 ---
 
-## 15. 预加载：把 remoteEntry.js 放到"首屏不卡，但点击就秒开"
+## 17. 预加载：把 remoteEntry.js 放到"首屏不卡，但点击就秒开"
 
 策略：**在 Shell 首屏渲染完成后（idle 阶段），把 manifest 中全部远程的 remoteEntry.js 预加载到内存**。这样用户跳转到新路由时不会看到"加载中..."。
 
@@ -1901,7 +2197,7 @@ if (process.env.MF_PRELOAD_ALL !== 'false') {
 
 ---
 
-## 16. 灰度发布：给部分用户上新版远程
+## 18. 灰度发布：给部分用户上新版远程
 
 思路：**manifest 里每条 remote 提供 `versions[]`，每条有 `percent、url、env`**，Shell 根据 `userId` 或 `sessionId` 做 bucket，选择对应版本。
 
@@ -1974,7 +2270,7 @@ export async function fetchRemoteManifest(manifestUrl = DEFAULT_MANIFEST_PATH, s
 
 ---
 
-## 17. manifest hash 校验 + 安全边界
+## 19. manifest hash 校验 + 安全边界
 
 因为 manifest 本质是"运行时路由表"，一旦被篡改后果严重。生产上推荐两种防护：
 
@@ -2008,7 +2304,7 @@ export async function loadRemote({ name, url, scope = 'default' }) {
 
 ---
 
-## 18. 最小可验证闭环 checklist（"新 Remote 不改 Host 也能上线"）
+## 20. 最小可验证闭环 checklist（"新 Remote 不改 Host 也能上线"）
 
 下面是一份可以直接贴到 PR 里当 checklist 的列表。**只要你逐项做过，就可以宣称自己实现了真正的动态远程**：
 
