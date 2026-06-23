@@ -1,0 +1,11 @@
+---
+description: React 前端编码：design 组件优先，其次 ui，否则自建；简洁命名；遵循 Ponytail。
+globs: apps/frontend/**/*
+alwaysApply: true
+---
+
+写 **apps/frontend** 代码时遵循 `.cursor/skills/frontend-react/SKILL.md`：
+
+1. 组件：**design → ui → 自建**（例：Button 用 ui，Loading/Confirm 用 design）。
+2. 命名：简洁、语义清晰，避免过长标识符。
+3. 实现：遵循 Ponytail 最少必要代码（与 ponytail 规则一致）。

@@ -213,6 +213,18 @@ function containsClientRect(outer: DOMRect, inner: DOMRect): boolean {
 	);
 }
 
+function containsNonWhitespaceText(
+	node: Text,
+	start: number,
+	end: number,
+): boolean {
+	for (let i = start; i < end; i++) {
+		const ch = node.data[i];
+		if (ch && !/\s/u.test(ch)) return true;
+	}
+	return false;
+}
+
 /** 去掉 marks-pane 会误删的「大行块 rect」，保留逐行 client rect */
 function preferLeafLineClientRects(rects: DOMRect[]): DOMRect[] {
 	if (rects.length <= 1) return rects;
@@ -235,6 +247,8 @@ function collectRangeTextClientRects(range: Range): DOMRect[] {
 	const rects: DOMRect[] = [];
 
 	forEachTextNodeInRange(range, (node, start, end) => {
+		if (!containsNonWhitespaceText(node, start, end)) return;
+
 		const segment = doc.createRange();
 		segment.setStart(node, start);
 		segment.setEnd(node, end);
@@ -369,8 +383,10 @@ export function resolveHighlightSvgLineSegments(
 ): SvgLineSegment[] {
 	if (!rend || !cfiRange?.trim()) return [];
 
-	const range = resolveCfiDomRange(rend, cfiRange.trim());
-	if (!range) return [];
+	const rawRange = resolveCfiDomRange(rend, cfiRange.trim());
+	if (!rawRange) return [];
+
+	const range = normalizeSelectionRangeForEpub(rawRange) ?? rawRange;
 
 	const svg = findMarksPaneSvg(group);
 	const container = svg ? findMarksPaneContainer(svg) : null;
@@ -422,8 +438,11 @@ export function resolveMarkSvgLineSegments(
 	if (rend && cfiRange?.trim()) {
 		const accurate = resolveHighlightSvgLineSegments(rend, group, cfiRange);
 		if (accurate.length > 0) {
-			// 行数一致说明已校正过（含滚动同步），直接读 rect 属性
-			if (existing.length === accurate.length) {
+			// 行数一致且总宽接近说明已校正（滚动 patch 快路径）；否则用精确几何替换 epub.js 空行 rect
+			if (
+				existing.length === accurate.length &&
+				segmentsRoughlyMatch(existing, accurate)
+			) {
 				return existing;
 			}
 			return accurate;
@@ -432,6 +451,16 @@ export function resolveMarkSvgLineSegments(
 
 	if (existing.length > 0) return existing;
 	return resolveHighlightSvgLineSegments(rend, group, cfiRange);
+}
+
+function segmentsRoughlyMatch(
+	existing: SvgLineSegment[],
+	accurate: SvgLineSegment[],
+): boolean {
+	if (existing.length !== accurate.length) return false;
+	const sumWidth = (segments: SvgLineSegment[]) =>
+		segments.reduce((sum, s) => sum + s.width, 0);
+	return Math.abs(sumWidth(existing) - sumWidth(accurate)) < 1;
 }
 
 let syncCfiRangeCache: Map<string, Range | null> | null = null;

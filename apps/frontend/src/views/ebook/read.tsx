@@ -647,18 +647,38 @@ function EbookReadPage() {
 		[],
 	);
 
+	/** 从列表快照恢复侧栏；按列表「共 N 条」判断，无数据则收起 */
+	const restoreThoughtListFromSnapshot = useCallback(
+		(snapshot: EbookThoughtClickCluster, nextThoughts: EbookThought[]) => {
+			const rend = epubNavRef.current?.getRendition() ?? undefined;
+			const reconciled = reconcileThoughtClickCluster(
+				snapshot,
+				nextThoughts,
+				rend,
+			);
+			if (reconciled && reconciled.allThoughts.length > 0) {
+				setThoughtListCluster(reconciled);
+				setThoughtListOpen(true);
+			} else {
+				setThoughtListCluster(null);
+				setThoughtListOpen(false);
+			}
+		},
+		[],
+	);
+
 	useEffect(() => {
 		if (thoughtDialogOpen) return;
 		const snapshot = returnToListClusterRef.current;
 		if (!snapshot) return;
 		returnToListClusterRef.current = null;
-		const rend = epubNavRef.current?.getRendition() ?? undefined;
-		const reconciled = reconcileThoughtClickCluster(snapshot, thoughts, rend);
-		if (reconciled && reconciled.allThoughts.length > 0) {
-			setThoughtListCluster(reconciled);
-			setThoughtListOpen(true);
-		}
-	}, [thoughtDialogOpen, thoughts, epubNavReady]);
+		restoreThoughtListFromSnapshot(snapshot, thoughts);
+	}, [
+		thoughtDialogOpen,
+		thoughts,
+		epubNavReady,
+		restoreThoughtListFromSnapshot,
+	]);
 
 	const openCreateThought = useCallback(
 		(quote: string, cfiRange?: string) => {
@@ -807,7 +827,13 @@ function EbookReadPage() {
 		setThoughtSaving(true);
 		try {
 			await deleteEbookThought(thoughtDraft.id);
-			setThoughts((prev) => prev.filter((t) => t.id !== thoughtDraft.id));
+			const nextThoughts = thoughts.filter((t) => t.id !== thoughtDraft.id);
+			const listSnapshot = returnToListClusterRef.current;
+			if (listSnapshot) {
+				returnToListClusterRef.current = null;
+				restoreThoughtListFromSnapshot(listSnapshot, nextThoughts);
+			}
+			setThoughts(nextThoughts);
 			setThoughtDialogOpen(false);
 		} catch (e) {
 			Toast({
@@ -818,7 +844,13 @@ function EbookReadPage() {
 		} finally {
 			setThoughtSaving(false);
 		}
-	}, [t, thoughtDraft.id, thoughtSaving]);
+	}, [
+		t,
+		thoughtDraft.id,
+		thoughtSaving,
+		thoughts,
+		restoreThoughtListFromSnapshot,
+	]);
 
 	useEffect(() => {
 		if (!book) return;
@@ -1147,6 +1179,7 @@ function EbookReadPage() {
 
 	const closeThoughtList = useCallback(() => {
 		setThoughtListOpen(false);
+		setThoughtListCluster(null);
 	}, []);
 
 	const sidePanel = useMemo(() => {

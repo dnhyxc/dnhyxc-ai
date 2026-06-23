@@ -94,6 +94,8 @@
 | 想法侧栏引用区划线/删除划线状态不对（部分已划仍显示删除）         | [ebook/epub-thought-quote-highlight-toggle.md](./ebook/epub-thought-quote-highlight-toggle.md)                                                           |
 | 拖拽分栏 EPUB 白屏 / 拖拽时彩色划线消失                           | [ebook/epub-split-soft-resize.md](./ebook/epub-split-soft-resize.md)                                                                                     |
 | 想法列表单击应进详情 / 分组摘录展开                               | [ebook/epub-thought-list-ui.md](./ebook/epub-thought-list-ui.md)                                                                                         |
+| 跨段落写想法时空行也出现虚线                                      | [ebook/epub-thought-underline-empty-gap.md](./ebook/epub-thought-underline-empty-gap.md)                                                                 |
+| 删想法列表最后一条后侧栏空白不收起 / 详情正文比列表下垂             | [ebook/epub-thought-list-delete-close.md](./ebook/epub-thought-list-delete-close.md)                                                                     |
 | EPUB 阅读背景与顶栏/侧栏色差                                      | [ebook/epub-reader-surface-bg.md](./ebook/epub-reader-surface-bg.md)                                                                                     |
 | EPUB 阅读设置无法点击正文关闭                                     | [ebook/epub-reader-settings-dismiss.md](./ebook/epub-reader-settings-dismiss.md)                                                                         |
 | 复制到助手后输入中文乱码                                          | [knowledge/assistant-insert-focus.md](./knowledge/assistant-insert-focus.md) §5.1                                                                        |

@@ -1006,4 +1006,14 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'While the reading settings panel is open, tapping the left reading area (book body) closes the panel—you no longer need to tap the header settings button again.',
 	},
+	's25-37': {
+		title: 'EPUB reading notes: no underline on blank lines',
+		description:
+			'When writing reading notes across multiple paragraphs, blank lines between paragraphs no longer show an amber dashed underline—only lines with actual text are marked.',
+	},
+	's25-38': {
+		title: 'EPUB notes list: close panel after deleting last note',
+		description:
+			'When you open a note from the list and delete the last remaining note, the reading-notes side panel closes instead of staying open empty. If other notes remain, you return to the updated list. Note body alignment matches the list when entering details.',
+	},
 };

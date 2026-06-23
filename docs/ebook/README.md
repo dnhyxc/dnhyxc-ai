@@ -28,6 +28,8 @@
 | [epub-thought-partial-overlap.md](./epub-thought-partial-overlap.md)             | **增量**：部分相交的想法选区 patch 层 blocker 去重，避免重叠段双线叠加                                                                          |
 | [epub-thought-cluster-bridging.md](./epub-thought-cluster-bridging.md)           | **主文档（想法桥接）**：点击聚合规则（A/B/标点/换行何时合并）、连通图 v5、逐行注释代码                                                          |
 | [epub-thought-list-ui.md](./epub-thought-list-ui.md)                               | **增量**：想法列表单击进详情、分组摘录展开、引用 clamp 泛化；移除列表内选中与引用点击回书                                                       |
+| [epub-thought-underline-empty-gap.md](./epub-thought-underline-empty-gap.md)       | **增量**：跨段落写想法时空行不再画虚线（空白文本片段过滤 + mark 校正快路径）                                                                  |
+| [epub-thought-list-delete-close.md](./epub-thought-list-delete-close.md)           | **增量**：删列表最后一条收起侧栏；详情正文与列表行高对齐                                                                                      |
 | [epub-thought-quote-highlight-toggle.md](./epub-thought-quote-highlight-toggle.md) | **增量**：侧栏引用区划线/删除划线与 PopBar 对齐的 full 覆盖度判定                                                                               |
 | [epub-split-soft-resize.md](./epub-split-soft-resize.md)                           | **增量**：EPUB 分栏拖拽 soft resize（rAF 合并、即时 patch 划线、松手 full sync，避免白屏）                                                      |
 | [epub-reader-surface-bg.md](./epub-reader-surface-bg.md)                           | **增量**：阅读背景 CSS 变量同步顶栏、右栏、MOKE/想法侧栏与设置 Popover                                                                          |
