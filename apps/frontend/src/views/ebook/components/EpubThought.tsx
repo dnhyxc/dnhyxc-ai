@@ -153,7 +153,7 @@ export function EpubThought({
 					avatar={avatar}
 					createdAt={createdAt}
 				>
-					<p className="text-textcolor whitespace-pre-wrap text-[16px] leading-[1.8]">
+					<p className="text-textcolor whitespace-pre-wrap text-sm leading-[1.8]">
 						{content.trim() || t('ebook.read.thought.empty')}
 					</p>
 					{onDelete || onEdit ? (

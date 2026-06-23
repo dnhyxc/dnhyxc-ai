@@ -12,6 +12,12 @@ import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import { formatDate, resolveCosUrlForWebDisplay } from '@/utils';
 import type { EpubHighlightColorId, EpubHighlightStyle } from '../types';
+import {
+	epubReaderSurfaceFadeFromClass,
+	epubReaderSurfaceHoverClass,
+	epubReaderSurfaceMutedClass,
+	epubReaderSurfaceSelectedClass,
+} from '../utils/epubReaderSettings';
 import { EPUB_HIGHLIGHT_COLOR_OPTIONS } from '../utils/epubUserHighlights';
 import {
 	EpubQuoteActionBar,
@@ -82,15 +88,23 @@ function EpubHighlightedQuoteText({
 
 const QUOTE_CLAMP_LINES = 3;
 
-function useQuoteExcerptClamp(quote: string) {
+function lineClampClass(clampLines: number) {
+	return clampLines === 1 ? 'line-clamp-1' : 'line-clamp-3';
+}
+
+function useQuoteExcerptClamp(
+	resetKey: string,
+	clampLines = QUOTE_CLAMP_LINES,
+) {
 	const wrapperRef = useRef<HTMLDivElement>(null);
 	const textRef = useRef<HTMLParagraphElement>(null);
 	const [expanded, setExpanded] = useState(false);
 	const [overflows, setOverflows] = useState(false);
+	const clampClass = lineClampClass(clampLines);
 
 	useEffect(() => {
 		setExpanded(false);
-	}, [quote]);
+	}, [resetKey]);
 
 	useLayoutEffect(() => {
 		const wrapper = wrapperRef.current;
@@ -108,21 +122,150 @@ function useQuoteExcerptClamp(quote: string) {
 			clone.style.cssText =
 				'position:absolute;visibility:hidden;pointer-events:none;height:auto;max-height:none;overflow:visible;display:block;-webkit-line-clamp:unset;';
 			clone.style.width = `${width}px`;
-			clone.classList.remove('line-clamp-3');
+			clone.classList.remove('line-clamp-1', 'line-clamp-3');
 			wrapper.appendChild(clone);
 			const fullHeight = clone.scrollHeight;
 			clone.remove();
 
-			setOverflows(fullHeight > lineHeight * QUOTE_CLAMP_LINES + 1);
+			setOverflows(fullHeight > lineHeight * clampLines + 1);
 		};
 
 		measure();
 		const ro = new ResizeObserver(measure);
 		ro.observe(wrapper);
 		return () => ro.disconnect();
-	}, [quote]);
+	}, [resetKey, clampLines]);
 
-	return { wrapperRef, textRef, expanded, setExpanded, overflows };
+	return { wrapperRef, textRef, expanded, setExpanded, overflows, clampClass };
+}
+
+/** 顶部引用区：底部文字展开/收起 */
+function EpubExcerptExpandLink({
+	expanded,
+	onToggle,
+	className,
+}: {
+	expanded: boolean;
+	onToggle: () => void;
+	className?: string;
+}) {
+	const { t } = useI18n();
+
+	return (
+		<button
+			type="button"
+			className={cn(
+				'bg-transparent text-textcolor/45 hover:text-textcolor/75 cursor-pointer text-xs',
+				className,
+			)}
+			aria-expanded={expanded}
+			onClick={onToggle}
+		>
+			{expanded
+				? t('ebook.read.thought.quoteCollapse')
+				: t('ebook.read.thought.quoteExpand')}
+		</button>
+	);
+}
+
+/** 折叠时在末尾叠加渐变，提示下方还有内容（仅顶部引用区） */
+function EpubExcerptClampFade({ fromClassName }: { fromClassName: string }) {
+	return (
+		<div
+			aria-hidden
+			className={cn(
+				'pointer-events-none absolute inset-x-0 bottom-0 h-7 bg-linear-to-t to-transparent',
+				fromClassName,
+			)}
+		/>
+	);
+}
+
+/** 分组摘录：圆形展开/收起 */
+function EpubExcerptExpandToggle({
+	expanded,
+	onToggle,
+	className,
+}: {
+	expanded: boolean;
+	onToggle: () => void;
+	className?: string;
+}) {
+	const { t } = useI18n();
+
+	return (
+		<Tooltip
+			side="top"
+			sideOffset={6}
+			delayDuration={200}
+			shadow
+			content={
+				expanded
+					? t('ebook.read.thought.quoteCollapse')
+					: t('ebook.read.thought.quoteExpand')
+			}
+		>
+			<button
+				type="button"
+				className={cn(
+					'-mr-2 text-textcolor/45 hover:text-textcolor shrink-0 cursor-pointer rounded-sm p-1 transition-colors',
+					className,
+				)}
+				aria-label={
+					expanded
+						? t('ebook.read.thought.quoteCollapse')
+						: t('ebook.read.thought.quoteExpand')
+				}
+				aria-expanded={expanded}
+				onClick={onToggle}
+			>
+				{expanded ? (
+					<CircleChevronUp className="size-4.5" aria-hidden />
+				) : (
+					<CircleChevronDown className="size-4.5" aria-hidden />
+				)}
+			</button>
+		</Tooltip>
+	);
+}
+
+/** 想法列表分组摘录：单行省略，右侧展开/收起 */
+export function EpubThoughtClusterExcerpt({
+	spanLength,
+	quote,
+}: {
+	spanLength: number;
+	quote: string;
+}) {
+	const { t } = useI18n();
+	const resetKey = `${spanLength}:${quote}`;
+	const { wrapperRef, textRef, expanded, setExpanded, overflows, clampClass } =
+		useQuoteExcerptClamp(resetKey, 1);
+
+	return (
+		<div className="text-textcolor/55 border-theme/10 flex items-center gap-0.5 border-t px-4 py-2 text-xs">
+			<div ref={wrapperRef} className="min-w-0 flex-1">
+				<p
+					ref={textRef}
+					className={cn('min-h-lh leading-normal', !expanded && clampClass)}
+				>
+					{t('ebook.read.thought.clusterExcerpt', { length: spanLength })}
+					<span className="text-textcolor/40 mx-1">·</span>
+					<span className="text-textcolor/65 italic">{quote}</span>
+				</p>
+			</div>
+			<div className="flex w-[26px] shrink-0 items-center justify-center">
+				{overflows ? (
+					<EpubExcerptExpandToggle
+						expanded={expanded}
+						onToggle={() => setExpanded((value) => !value)}
+					/>
+				) : (
+					<span className="size-[26px] shrink-0" aria-hidden />
+				)}
+			</div>
+		</div>
+	);
 }
 
 type QuoteCardProps = {
@@ -146,11 +289,10 @@ type ThoughtCardProps = {
 	className?: string;
 	selected?: boolean;
 	onClick?: () => void;
-	onDoubleClick?: () => void;
 };
 
 /** 引用卡片顶栏 / 底栏操作条统一行高 */
-const quoteCardBarRowClass = 'flex h-[52px] shrink-0 items-center';
+const quoteCardBarRowClass = 'flex h-[50px] shrink-0 items-center';
 
 export function ThoughtUserAvatar({
 	avatar,
@@ -221,7 +363,7 @@ export function EpubThoughtQuoteCard({
 	const { t } = useI18n();
 	const hasQuote = Boolean(quote.trim());
 	const showHeader = Boolean(title || onClose);
-	const { wrapperRef, textRef, expanded, setExpanded, overflows } =
+	const { wrapperRef, textRef, expanded, setExpanded, overflows, clampClass } =
 		useQuoteExcerptClamp(quote);
 
 	const openPopBarAtBook = () => {
@@ -253,41 +395,10 @@ export function EpubThoughtQuoteCard({
 							</span>
 						) : null}
 					</div>
-					<div className="flex shrink-0 items-center gap-0.5">
-						{overflows && hasQuote ? (
-							<Tooltip
-								side="top"
-								sideOffset={6}
-								delayDuration={200}
-								shadow
-								content={
-									expanded
-										? t('ebook.read.thought.quoteCollapse')
-										: t('ebook.read.thought.quoteExpand')
-								}
-							>
-								<button
-									type="button"
-									className="text-textcolor/60 hover:text-textcolor shrink-0 cursor-pointer rounded-sm p-1 transition-colors"
-									aria-label={
-										expanded
-											? t('ebook.read.thought.quoteCollapse')
-											: t('ebook.read.thought.quoteExpand')
-									}
-									aria-expanded={expanded}
-									onClick={() => setExpanded((v) => !v)}
-								>
-									{expanded ? (
-										<CircleChevronUp className="size-4.5" aria-hidden />
-									) : (
-										<CircleChevronDown className="size-4.5" aria-hidden />
-									)}
-								</button>
-							</Tooltip>
-						) : null}
+					<div className="flex shrink-0 items-center">
 						{onClose ? (
 							<Tooltip
-								side="top"
+								side="left"
 								sideOffset={6}
 								delayDuration={200}
 								shadow
@@ -299,7 +410,7 @@ export function EpubThoughtQuoteCard({
 							>
 								<button
 									type="button"
-									className="text-textcolor/60 hover:text-textcolor -mr-1 shrink-0 cursor-pointer rounded-sm p-1 transition-colors"
+									className="text-textcolor/45 hover:text-textcolor -mr-1 shrink-0 cursor-pointer rounded-sm p-1 transition-colors"
 									onClick={onClose}
 									aria-label={
 										closeMode === 'edit'
@@ -316,40 +427,60 @@ export function EpubThoughtQuoteCard({
 			) : null}
 			{hasQuote ? (
 				<figure
-					ref={wrapperRef}
 					className="px-4 pb-3 pt-2"
 					aria-label={t('ebook.read.thought.bookExcerpt')}
 				>
-					<p
-						ref={textRef}
-						className={cn(
-							'text-textcolor/85 font-serif leading-[1.85] wrap-break-word',
-							overflows && !expanded && 'line-clamp-3',
-						)}
-					>
-						<span
-							aria-hidden
-							className="text-textcolor/35 font-bold select-none"
-						>
-							『
-						</span>
-						<EpubHighlightedQuoteText
-							quote={quote}
-							onHighlightClick={
-								onQuoteHighlightClick ? openPopBarAtBook : undefined
-							}
-						/>
-						<span
-							aria-hidden
-							className="text-textcolor/35 font-bold select-none"
-						>
-							』
-						</span>
-					</p>
+					<div ref={wrapperRef} className="min-w-0">
+						<div className="relative">
+							<p
+								ref={textRef}
+								className={cn(
+									'text-textcolor/85 font-serif leading-[1.85] wrap-break-word',
+									overflows && !expanded && clampClass,
+								)}
+							>
+								<span
+									aria-hidden
+									className="text-textcolor/35 font-bold select-none"
+								>
+									『
+								</span>
+								<EpubHighlightedQuoteText
+									quote={quote}
+									onHighlightClick={
+										onQuoteHighlightClick ? openPopBarAtBook : undefined
+									}
+								/>
+								<span
+									aria-hidden
+									className="text-textcolor/35 font-bold select-none"
+								>
+									』
+								</span>
+							</p>
+							{overflows && !expanded ? (
+								<EpubExcerptClampFade
+									fromClassName={epubReaderSurfaceFadeFromClass}
+								/>
+							) : null}
+						</div>
+						{overflows ? (
+							<div className="flex justify-end pt-1">
+								<EpubExcerptExpandLink
+									expanded={expanded}
+									onToggle={() => setExpanded((value) => !value)}
+								/>
+							</div>
+						) : null}
+					</div>
 				</figure>
 			) : null}
 			{drawerQuoteActions && hasQuote ? (
-				<div className={cn(quoteCardBarRowClass, 'border-theme/10 border-t')}>
+				<div
+					className={cn(
+						'flex h-[51px] shrink-0 items-center border-theme/10 border-t pb-0.5',
+					)}
+				>
 					<EpubQuoteActionBar
 						{...drawerQuoteActions}
 						variant="drawer"
@@ -370,21 +501,15 @@ export function EpubThoughtItemCard({
 	className,
 	selected,
 	onClick,
-	onDoubleClick,
 }: ThoughtCardProps) {
-	const Comp = onClick ? 'button' : 'div';
-
 	return (
-		<Comp
-			type={onClick ? 'button' : undefined}
+		<div
 			onClick={onClick}
-			onDoubleClick={onDoubleClick}
 			data-selected={selected ? 'true' : undefined}
 			className={cn(
 				'p-4 text-left transition-colors border-t border-theme/10',
-				onClick &&
-					'cursor-pointer hover:bg-theme/10 outline-none focus:outline-none focus-visible:outline-none focus-visible:ring-0',
-				selected && 'bg-theme/12',
+				onClick && cn('cursor-pointer', epubReaderSurfaceHoverClass),
+				selected && epubReaderSurfaceSelectedClass,
 				className,
 			)}
 		>
@@ -394,7 +519,7 @@ export function EpubThoughtItemCard({
 				createdAt={createdAt}
 			/>
 			{children}
-		</Comp>
+		</div>
 	);
 }
 
@@ -427,7 +552,12 @@ export function EpubThoughtComposeCard({
 					mode={mode}
 				/>
 			) : null}
-			<div className="bg-theme/2 flex h-28 flex-col overflow-hidden">
+			<div
+				className={cn(
+					'flex h-28 flex-col overflow-hidden',
+					epubReaderSurfaceMutedClass,
+				)}
+			>
 				<div className="min-h-0 flex-1">{children}</div>
 				{actions ? (
 					<div className="mb-1 flex shrink-0 items-center justify-end gap-2 p-2.5">

@@ -17,6 +17,10 @@ import {
 	type EpubReaderPageFlow,
 	type EpubReaderSettings,
 	type EpubReaderTextColor,
+	epubReaderSurfaceBgClass,
+	epubReaderSurfaceMutedClass,
+	getEpubReaderSurfaceCssVars,
+	resolveEpubReaderSurfaceBackground,
 } from '../utils/epubReaderSettings';
 
 export type EpubReaderSettingsPopoverProps = {
@@ -50,7 +54,7 @@ function BgThemeSwatches({
 						aria-label={label}
 						aria-pressed={selected}
 						className={cn(
-							'cursor-pointer ring-theme/25 relative size-9 rounded-lg ring-1 transition',
+							'cursor-pointer ring-theme/25 relative w-auto h-9 rounded-lg ring-1 transition',
 							selected && 'ring-teal-600 ring-2',
 							opt.id === 'default' &&
 								'bg-theme-background from-theme/8 to-theme/20 bg-linear-to-br',
@@ -94,7 +98,7 @@ function TextColorSwatches({
 						aria-label={label}
 						aria-pressed={selected}
 						className={cn(
-							'cursor-pointer ring-theme/25 bg-theme-background relative flex size-9 items-center justify-center rounded-lg ring-1 transition',
+							'cursor-pointer ring-theme/25 bg-theme-background relative flex w-auto h-9 items-center justify-center rounded-lg ring-1 transition',
 							selected && 'ring-teal-600 ring-2',
 							isAuto && 'from-theme/8 to-theme/20 bg-linear-to-br',
 						)}
@@ -132,7 +136,10 @@ function PageFlowToggle({
 
 	return (
 		<div
-			className="bg-theme/8 ring-theme/15 flex rounded-lg p-0.5 ring-1"
+			className={cn(
+				'ring-theme/15 flex rounded-lg p-0.5 ring-1',
+				epubReaderSurfaceMutedClass,
+			)}
 			role="group"
 			aria-label={t('ebook.read.settings.pageFlow')}
 		>
@@ -149,7 +156,7 @@ function PageFlowToggle({
 						className={cn(
 							'cursor-pointer flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-2 text-xs transition',
 							selected
-								? 'bg-theme-background text-textcolor shadow-sm'
+								? cn(epubReaderSurfaceBgClass, 'text-textcolor shadow-sm')
 								: 'text-textcolor/55 hover:text-textcolor/80',
 						)}
 					>
@@ -206,7 +213,14 @@ export function EpubReaderSettingsPopover({
 				align="end"
 				side="bottom"
 				sideOffset={8}
-				className="w-80 overflow-hidden p-0"
+				className={cn(
+					'w-80 overflow-hidden p-0 border-theme/10',
+					epubReaderSurfaceBgClass,
+				)}
+				style={{
+					...getEpubReaderSurfaceCssVars(settings.bgTheme),
+					backgroundColor: resolveEpubReaderSurfaceBackground(settings.bgTheme),
+				}}
 			>
 				<ScrollArea
 					className="max-h-[min(85vh,33.78rem)] w-full"
@@ -303,7 +317,7 @@ export function EpubReaderSettingsPopover({
 							type="button"
 							variant="secondary"
 							size="sm"
-							className="w-full mt-0.5 bg-teal-600 hover:bg-teal-500"
+							className="w-full mt-0.5 text-white bg-teal-600 hover:bg-teal-500"
 							onClick={onReset}
 						>
 							{t('ebook.read.settings.reset')}

@@ -6,6 +6,7 @@ import type {
 } from '../types';
 import {
 	beginEpubAnnotationSyncScope,
+	cfiFromDomRange,
 	endEpubAnnotationSyncScope,
 	resolveCfiDomRange,
 } from './epubRangeGeometry';
@@ -33,37 +34,31 @@ export function thoughtGroupSpanLength(group: EbookThought[]): number {
 
 function sortThoughtsByCreatedAtDesc(thoughts: EbookThought[]): EbookThought[] {
 	return [...thoughts].sort(
-		(a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+		(a, b) => getThoughtCreatedAtTime(b) - getThoughtCreatedAtTime(a),
 	);
 }
 
-function compareQuoteGroupsForSort(
-	left: EbookThoughtQuoteGroup,
-	right: EbookThoughtQuoteGroup,
-	rend?: Rendition,
-): number {
-	const spanDiff = right.spanLength - left.spanLength;
-	if (spanDiff !== 0) return spanDiff;
+function getThoughtCreatedAtTime(thought: EbookThought): number {
+	const time = new Date(thought.createdAt).getTime();
+	return Number.isFinite(time) ? time : 0;
+}
 
-	const cfiLenDiff = right.cfiRange.length - left.cfiRange.length;
-	if (cfiLenDiff !== 0) return cfiLenDiff;
-
-	if (rend) {
-		const leftRange = resolveCfiDomRange(rend, left.cfiRange);
-		const rightRange = resolveCfiDomRange(rend, right.cfiRange);
-		if (leftRange && rightRange) {
-			try {
-				return leftRange.compareBoundaryPoints(
-					Range.START_TO_START,
-					rightRange,
-				);
-			} catch {
-				// compare 失败时保持顺序
-			}
-		}
+function getQuoteGroupNewestTime(group: EbookThoughtQuoteGroup): number {
+	let newest = 0;
+	for (const thought of group.thoughts) {
+		newest = Math.max(newest, getThoughtCreatedAtTime(thought));
 	}
+	return newest;
+}
 
-	return 0;
+/** 侧栏列表：各摘录分组按组内最新想法时间倒序 */
+function sortQuoteGroupsByNewestThoughtDesc(
+	quoteGroups: EbookThoughtQuoteGroup[],
+): void {
+	quoteGroups.sort(
+		(left, right) =>
+			getQuoteGroupNewestTime(right) - getQuoteGroupNewestTime(left),
+	);
 }
 
 function buildQuoteGroup(
@@ -456,79 +451,6 @@ function mergeDomRangeUnion(ranges: Range[]): Range | null {
 	}
 }
 
-function quoteGroupsHaveStrictNesting(
-	rend: Rendition,
-	quoteGroups: EbookThoughtQuoteGroup[],
-): boolean {
-	for (let i = 0; i < quoteGroups.length; i++) {
-		for (let j = 0; j < quoteGroups.length; j++) {
-			if (i === j) continue;
-			const a = quoteGroups[i]!;
-			const b = quoteGroups[j]!;
-			if (
-				isThoughtCfiRangeStrictlyContained(
-					a.cfiRange,
-					b.cfiRange,
-					a.thoughts,
-					b.thoughts,
-					rend,
-				) ||
-				isThoughtCfiRangeStrictlyContained(
-					b.cfiRange,
-					a.cfiRange,
-					b.thoughts,
-					a.thoughts,
-					rend,
-				)
-			) {
-				return true;
-			}
-		}
-	}
-	return false;
-}
-
-/** 嵌套按 span 降序；相邻链按文档序，便于侧栏与引用区阅读顺序一致 */
-function sortQuoteGroupsForCluster(
-	quoteGroups: EbookThoughtQuoteGroup[],
-	rend?: Rendition,
-	resolvedByCfi?: Map<string, Range | null>,
-): void {
-	const resolveGroupRange = (cfiRange: string): Range | null => {
-		if (!rend) return null;
-		const cached = resolvedByCfi?.get(cfiRange);
-		if (cached !== undefined) return cached;
-		return resolveCfiDomRange(rend, cfiRange);
-	};
-
-	const hasNesting =
-		rend !== undefined && quoteGroupsHaveStrictNesting(rend, quoteGroups);
-	if (hasNesting) {
-		quoteGroups.sort((left, right) =>
-			compareQuoteGroupsForSort(left, right, rend),
-		);
-		return;
-	}
-	quoteGroups.sort((left, right) => {
-		if (rend) {
-			const leftRange = resolveGroupRange(left.cfiRange);
-			const rightRange = resolveGroupRange(right.cfiRange);
-			if (leftRange && rightRange) {
-				try {
-					const pos = leftRange.compareBoundaryPoints(
-						Range.START_TO_START,
-						rightRange,
-					);
-					if (pos !== 0) return pos;
-				} catch {
-					// compare 失败时回退 span 排序
-				}
-			}
-		}
-		return compareQuoteGroupsForSort(left, right, rend);
-	});
-}
-
 /** 多分组 cluster：引用区为 DOM 并集文本；primaryCfi 取 span 最长分组（避免 union→CFI 回写） */
 function pickPrimaryCfiFromQuoteGroups(
 	quoteGroups: EbookThoughtQuoteGroup[],
@@ -614,18 +536,19 @@ export function buildThoughtClickCluster(
 		}
 	}
 
-	sortQuoteGroupsForCluster(quoteGroups, rend, resolvedByCfi);
+	sortQuoteGroupsByNewestThoughtDesc(quoteGroups);
 
 	const primaryDisplay = resolveClusterPrimaryDisplay(
 		rend,
 		quoteGroups,
 		resolvedByCfi,
 	);
+	const flattenedThoughts = quoteGroups.flatMap((group) => group.thoughts);
 	return {
 		primaryCfiRange: primaryDisplay.primaryCfiRange,
 		primaryQuote: primaryDisplay.primaryQuote,
 		quoteGroups,
-		allThoughts: quoteGroups.flatMap((group) => group.thoughts),
+		allThoughts: sortThoughtsByCreatedAtDesc(flattenedThoughts),
 		selectedThoughtId,
 	};
 }
@@ -741,4 +664,30 @@ export function getThoughtClusterDisplayCfi(
 		if (selected?.cfiRange.trim()) return selected.cfiRange.trim();
 	}
 	return cluster.primaryCfiRange;
+}
+
+/** 侧栏引用区划线判定/操作所用的 CFI + quote（聚合引用时用 DOM 并集，避免 partial 误判） */
+export function getThoughtClusterHighlightSubject(
+	cluster: EbookThoughtClickCluster,
+	rend?: Rendition,
+): { cfiRange: string; quote: string } {
+	const quote = getThoughtClusterDisplayQuote(cluster).trim();
+	const cfiRange = getThoughtClusterDisplayCfi(cluster);
+	if (!rend || !quote) return { cfiRange, quote };
+
+	if (cluster.quoteGroups.length > 1 && !cluster.selectedThoughtId) {
+		const ranges = cluster.quoteGroups
+			.map((group) => resolveCfiDomRange(rend, group.cfiRange))
+			.filter((range): range is Range => range !== null);
+		const union = mergeDomRangeUnion(ranges);
+		const unionQuote = union?.toString().trim();
+		if (union && unionQuote && unionQuote === quote) {
+			const unionCfi = cfiFromDomRange(rend, union);
+			if (unionCfi) {
+				return { cfiRange: unionCfi, quote: unionQuote };
+			}
+		}
+	}
+
+	return { cfiRange, quote };
 }

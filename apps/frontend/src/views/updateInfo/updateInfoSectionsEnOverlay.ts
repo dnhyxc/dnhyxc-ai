@@ -979,6 +979,31 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 	's25-31': {
 		title: 'EPUB reading-note click aggregation',
 		description:
-			'Tapping a dashed reading-note underline opens a sidebar that intelligently aggregates related notes: nested selections (whole paragraph plus sub-phrases) default to the full excerpt with every note listed; adjacent phrases merge only when punctuation or line breaks between them also have notes—unannotated gaps stay separate. Tap a note in the list to switch the quote excerpt; multiple selection groups show section headers.',
+			'Tapping a dashed reading-note underline opens a sidebar that intelligently aggregates related notes: nested selections (whole paragraph plus sub-phrases) default to the full excerpt with every note listed; adjacent phrases merge only when punctuation or line breaks between them also have notes—unannotated gaps stay separate. Multiple selection groups show section headers.',
+	},
+	's25-32': {
+		title: 'EPUB reading-notes sidebar highlight coverage',
+		description:
+			'The Highlight / Remove highlight buttons in the reading-notes sidebar quote area match the selection toolbar: Remove highlight appears only when the entire displayed quote excerpt is already highlighted; if any part is not highlighted (e.g. only the second half), Highlight is shown and adds a highlight for the full excerpt.',
+	},
+	's25-33': {
+		title: 'EPUB split-panel drag reading-area polish',
+		description:
+			'While dragging the MOKE assistant or reading-notes split width, the EPUB text reflows smoothly without white-screen flashes; user color highlights stay visible during the drag.',
+	},
+	's25-34': {
+		title: 'EPUB reading-notes list interaction polish',
+		description:
+			'A single tap on a note in the list opens its details directly (no longer switches the quote excerpt). Group section headers support expand/collapse for long excerpts, aligned with the top quote card; the list quote area no longer jumps to the in-book PopBar on tap.',
+	},
+	's25-35': {
+		title: 'EPUB reading background synced across the page',
+		description:
+			'After you change Reading background in settings, the header, reading-notes / MOKE assistant side panel, settings panel, and EPUB body share the same background. Follow app still matches Settings → theme colors.',
+	},
+	's25-36': {
+		title: 'EPUB settings: tap the reader to close',
+		description:
+			'While the reading settings panel is open, tapping the left reading area (book body) closes the panel—you no longer need to tap the header settings button again.',
 	},
 };

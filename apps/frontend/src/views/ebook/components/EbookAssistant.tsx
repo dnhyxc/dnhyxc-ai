@@ -21,9 +21,14 @@ import ChatEntry from '@/components/design/ChatEntry';
 import Loading from '@/components/design/Loading';
 import { Toast } from '@/components/ui';
 import { useAssistantCopy, useAssistantScroll, useI18n } from '@/hooks';
+import { cn } from '@/lib/utils';
 import useStore from '@/store';
 import ebookAssistantStore from '@/store/ebookAssistant';
 import type { Message } from '@/types/chat';
+import {
+	epubReaderSurfaceMutedClass,
+	epubReaderSurfaceOverlayClass,
+} from '../utils/epubReaderSettings';
 
 export type EbookAssistantProps = {
 	bookId: string;
@@ -233,13 +238,23 @@ const EbookAssistantInner = observer(function EbookAssistantInner({
 			emptyState={
 				<div className="relative flex min-h-0 w-full flex-1 flex-col pt-4">
 					{historyLoading ? (
-						<div className="absolute inset-0 z-10 flex items-center justify-center bg-theme-background/80 text-sm text-textcolor/70">
+						<div
+							className={cn(
+								'absolute inset-0 z-10 flex items-center justify-center text-sm text-textcolor/70',
+								epubReaderSurfaceOverlayClass,
+							)}
+						>
 							<Loading text={t('knowledge.assistant.loadingConversation')} />
 						</div>
 					) : null}
 					<div className="text-textcolor/70 flex justify-center items-start text-sm">
 						<div className="max-w-3xl w-full mx-auto pl-4 pr-4">
-							<div className="flex w-full justify-between rounded-md border border-theme/5 bg-theme/2 p-2">
+							<div
+								className={cn(
+									'flex w-full justify-between rounded-md border border-theme/5 p-2',
+									epubReaderSurfaceMutedClass,
+								)}
+							>
 								<Sparkles
 									size={18}
 									className="mr-2 mt-0.5 shrink-0 text-teal-500"

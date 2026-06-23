@@ -1,6 +1,6 @@
 ---
 name: implementation-doc-from-diff
-description: 基于当前改动（git diff、@ 文件或会话内已达成共识的变更）在 docs/<功能域>/ 下生成「实现思路」专题 Markdown（按产品能力选简短功能域目录如 chat/cos/llm，不存在则创建目录与 README）；**一轮改动含多个独立功能实现时，须拆成多篇专题文分别落盘，禁止堆在同一文件**；包含方案说明、关键代码摘录及代码块内详细中文注释；每个代码块上方须标注来源文件与大致位置；新建后自动整理 docs/ 索引；若为用户可感知的新功能则同步 project-guide.md / project-update-info.md（无路径）及 apps/frontend 四套姊妹 TS；默认不改其它业务源码。适用于「把本次改动写成文档/实现思路/只写 docs/基于 diff 写文档」等。
+description: 基于当前改动（git diff、@ 文件或会话内已达成共识的变更）在 docs/<功能域>/ 下生成「实现思路」专题 Markdown；一轮多项独立功能须拆多篇；含改动前/改动后成对对比、**完整符号定义**摘录；代码块内**每一行源码上方**须有**详细**中文注释（100% 覆盖，禁止只注释关键行）；无「讲解：」前缀；每个代码块标注来源；自动整理 docs 索引；用户可感知改动则同步姊妹稿与四套 TS；默认不改业务源码。适用于「把本次改动写成文档/实现思路/只写 docs」等。
 ---
 
 # 基于改动的实现说明文档（implementation-doc-from-diff）
@@ -10,7 +10,7 @@ description: 基于当前改动（git diff、@ 文件或会话内已达成共识
 把**当前一轮改动**整理成可归档、可交接的说明文档：
 
 - **实现思路**：为何这样做、关键决策、数据流与边界。
-- **具体代码**：用 Markdown **围栏代码块**呈现与改动相关的片段；块内附**详细中文注释**（可比仓库源码注释更细，便于单独阅读）。
+- **具体代码**：围栏代码块须**改动前/改动后成对**（`code-before-after.md`）、**完整符号定义**（`code-symbol-scope.md`），且**每一行源码**正上方一行**详细**中文注释——**100% 覆盖**，禁止只注释关键行或改动行（`code-line-comments.md` §1、§1.2）；不加 `讲解：` 前缀。
 - **docs 体系**：专题文落在**对应功能域**的 `docs/<功能域>/`（简短目录名；不存在则创建目录与 `README.md`）；**多个独立功能实现须分别写入不同文件**（见硬约束 §7）；新增后**自动整理**索引（见 `references/doc-domain-layout.md`、`references/docs-maintenance.md`）。
 - **产品姊妹稿**：若改动包含**用户可感知**的新功能/体验变化，同步更新 `docs/project-guide.md` 与 `docs/project-update-info.md`（格式见 `references/product-user-docs.md`；**这两份正文不得出现文件路径**），并**同轮**同步应用内 `/update-info`、`/project-guide` 结构化数据（见 `references/product-pages-sync.md`）。
 - **默认不改其它业务代码**：除步骤 6 允许的前端 4 个姊妹数据文件外，**不得**修改 `apps/**`、`packages/**`、根配置、`scripts/**` 等；**仅**在 `docs/**/*.md`（及步骤 6 列出的前端文件）中新建或更新。
@@ -27,12 +27,17 @@ description: 基于当前改动（git diff、@ 文件或会话内已达成共识
    - 不得编辑上述白名单以外的 `apps/**`、`packages/**`、`libs/**`、根配置、`scripts/**`（除非用户 Explicitly 授权扩大范围）。
 
 2. **代码块与源码关系**（仅适用于**专题实现文**，不适用于 `project-guide.md` / `project-update-info.md`）
-   - 代码块内容应与仓库**一致**；若因篇幅做省略，用 `// ...` 标明，并在段首说明「摘录」。
-   - 代码块内注释统一使用**中文**；保留英文技术术语，**首次出现可加括号中文释义**。
+   - **改动前 / 改动后成对对比（必做）**：diff 中有实质改动的函数、方法、hook、组件片段、配置块等，文档中须以**同一对比范围**各贴一块「改动前」与「改动后」代码；禁止只贴最新实现并用 prose 代替旧代码。取材：`git diff` 的 `-`/`+` 侧、`git show HEAD:<path>`（或 diff 基线 commit）与当前文件。纯新增 / 纯删除 / 仅格式化等例外见 [`references/code-before-after.md`](references/code-before-after.md) §4。
+   - **完整符号边界（必做）**：代码块须从**符号声明行**写到该符号**闭合**（函数签名→`}`；`useMemo`/`useCallback`→`}, [deps]);`；组件→组件函数闭合）。**禁止**仅贴函数体、`useMemo` 回调内部或孤立 `return { … }` 而无外层定义；小节标题中的符号名须在代码块内**可见**。细则与反例见 [`references/code-symbol-scope.md`](references/code-symbol-scope.md)。
+   - 代码块内容应与对应版本**一致**；若因篇幅做省略，用 `// ...` 标明，并在段首说明「摘录」；**前后两块摘录范围须对称**（**同一完整符号**、相同上下文切口）；**不得**用省略代替声明行或 hook 闭合。
+   - **逐行上方详细注释（必做，100%）**：围栏代码块内**每一行源码**正上一行须为讲解注释（`code-line-comments.md` §6 豁免除外）。须覆盖 §1.1 清单及 **§1.3**（`return` 对象每个属性行、`onCopy` 等回调属性及回调体内每一行、`useMemo` deps 每个元素行）。**禁止**只注释 `hasHighlight` 等 diff 字段而裸贴回调方法。落盘前 §1.2 扫描 + §1.3 复核。
+   - 讲解注释统一使用**中文**；保留英文技术术语，**首次出现可加括号中文释义**。仓库源码自带的行内/块注释保留在原位置，讲解注释作为其**上方额外行**追加，不篡改源码正文。
    - **每个**围栏代码块**正上方**（紧挨 ``` 之前）须有一段**来源标注**，写清：
      - **仓库相对路径**（从仓库根算起，如 `apps/frontend/src/utils/foo.ts`）；
-     - **大致位置**：优先 **`约 L起始–L结束` 行号**（与当时源码一致即可）；若不便给行号，则写 **符号名**（函数 / 组件 / hook 名）+ 一句方位（如「文件前部 import 之后」）。
-   - 同一小节内连续多个代码块：**各自**单独标注来源，不得省略。
+     - **版本侧**：`**改动前**`（基线 / 提交前）或 `**改动后**`（当前源码）；
+     - **大致位置**：优先 **`约 L起始–L结束` 行号**（改动前对应基线行号、改动后对应当前行号）；若不便给行号，则写 **符号名**（函数 / 组件 / hook 名）+ 一句方位。
+   - 同一对比组内「改动前」「改动后」各一块；多组对比时每组**各自**标注来源，不得省略。
+   - 对比组末尾可加一两句**变更摘要**，点出删/增/改焦点。
    - 文末可加一句：**若与仓库最新源码不一致，以源码为准**。
 
 3. **语言与链接**
@@ -82,6 +87,8 @@ description: 基于当前改动（git diff、@ 文件或会话内已达成共识
 3. 当前会话中已落地且用户声明「就是这一轮」的路径列表。
 4. 若无明确范围，运行 `git diff` / `git status`（在许可环境下）缩小文件集合，并向用户确认范围。
 
+为编写「改动前」代码块，须同时保留**基线侧**素材：`git diff`（`-` 行）、`git show HEAD:<path>`，或 `git diff <base>...HEAD -- <path>`；与当前文件（改动后）对照后再落笔。
+
 ### 2) 拆分功能单元并确定落盘计划
 
 1. 通读 diff / 改动清单，列出**独立功能单元**（见硬约束 §7）；若 ≥2 个，为**每个单元**单独规划一篇专题（功能域 + 文件名 + 标题）。
@@ -100,19 +107,20 @@ description: 基于当前改动（git diff、@ 文件或会话内已达成共识
 
 可参考 `references/doc-outline.md` 的章节骨架。
 
-### 3) 编写「带详细注释的代码块」
+### 3) 编写「改动前 / 改动后对比 + 逐行详细注释」代码块
 
-对每条关键逻辑：
+对 diff 中每条**实质改动**的逻辑单元：
 
-1. 选取**最短可读**片段（函数体、分支、`useEffect`、`addCommand` 注册块等）。
-2. **在开启围栏（```）之前**写来源行，格式示例（二选一或组合）：  
-   - `**来源**：\`apps/frontend/src/components/Foo.tsx\`（约 L42–L88）`  
-   - `**来源**：\`packages/bar/src/x.ts\`（\`resolveUrl\` 函数附近）`
-3. 在围栏代码块中使用**讲解版注释**：
-   - 行内：`// 说明：……`
-   - 块级：关键分支前用 `/** … */` 概括意图。
-4. 多个文件拆成 **### 小节**（如「前端 `index.tsx`」「Monaco `commands.ts`」）；小节标题可与路径呼应，但**不能替代**每个代码块上方的来源标注。
-5. **禁止**把机密（密钥、token、隐私 URL）写入文档。
+1. 确定**对比范围**：**完整符号定义**（`code-symbol-scope.md`）；小节标题符号名须在块内可见。
+2. **先写改动前、再写改动后**（推荐）：
+   - 来源标注 + 围栏代码块：基线 / 当前源码。
+3. **逐行注释（必做，与写源码交错或写完后补全）**：
+   - **每一行源码**上一行**详细**注释；**含** `return` 对象每个属性（`onCopy` 等回调行 + 回调体内每一行）、`useMemo` deps 每一行（`code-line-comments.md` §1.3）。
+4. **逐行审计（落盘前必做）**：§1.2 扫描；**重点复核** §1.3 回调属性与 deps 是否漏注。
+5. 大段未改上下文：`// ...（未改动）` **对称**省略，省略行上一行说明范围。
+6. 对比组末尾：**变更摘要**（1～2 句）。
+7. **例外**：纯新增 / 纯删除 / 仅格式化（`code-before-after.md` §4）。
+8. **禁止**机密信息。
 
 ### 4) 落盘路径与文件名（必须满足）
 
@@ -131,11 +139,11 @@ description: 基于当前改动（git diff、@ 文件或会话内已达成共识
 
 示例（仅说明意图，按实际改动选题名）：
 
-| 不佳（过长 / 泛 / 多主题） | 更佳（短 + 贴题 + 单功能） |
-|---------------------------|---------------------------|
-| `web-search-organic-citations-implementation-notes.md` | `web-search-organics.md` |
-| `monaco-preview-fix-implementation.md` | `monaco-preview-hash-scroll.md` |
-| `pr-123-all-changes.md` | 拆成 `assistant-share-bar.md` + `ebook-local-path-dedup.md` 等 |
+| 不佳（过长 / 泛 / 多主题）                             | 更佳（短 + 贴题 + 单功能）                                     |
+| ------------------------------------------------------ | -------------------------------------------------------------- |
+| `web-search-organic-citations-implementation-notes.md` | `web-search-organics.md`                                       |
+| `monaco-preview-fix-implementation.md`                 | `monaco-preview-hash-scroll.md`                                |
+| `pr-123-all-changes.md`                                | 拆成 `assistant-share-bar.md` + `ebook-local-path-dedup.md` 等 |
 
 ### 5) 整理整个 `docs/` 目录（新增或显著更新专题时必做）
 
@@ -150,10 +158,10 @@ description: 基于当前改动（git diff、@ 文件或会话内已达成共识
 
 当本轮包含**新功能、体验优化或用户可见修复**时，在专题文与索引整理完成后，更新：
 
-| 文件 | 作用 |
-|------|------|
+| 文件                                                                     | 作用                                                 |
+| ------------------------------------------------------------------------ | ---------------------------------------------------- |
 | [`docs/project-update-info.md`](../../../../docs/project-update-info.md) | 「新增/优化了什么」— bullet + `（更新：YYYY-MM-DD）` |
-| [`docs/project-guide.md`](../../../../docs/project-guide.md) | 「怎么用」— 教程章节/小节 |
+| [`docs/project-guide.md`](../../../../docs/project-guide.md)             | 「怎么用」— 教程章节/小节                            |
 
 格式、章节归属、**禁止出现路径**等细则见 [`references/product-user-docs.md`](references/product-user-docs.md)。
 
@@ -176,10 +184,20 @@ description: 基于当前改动（git diff、@ 文件或会话内已达成共识
 - [ ] 若 diff 含**多个独立功能**，是否已**拆成多篇**专题（**禁止**全部堆在同一文件）？
 - [ ] 每一篇是否只描述**一项**功能（同一功能的前后端/多模块可在一篇内分节）？
 - [ ] 跨功能文档是否在文首互链，且**未**在单篇中重复粘贴其它功能的实现细节？
-- [ ] 代码块是否与 diff / 源码对齐？
+- [ ] 实质改动的逻辑单元是否均有**改动前 + 改动后**成对代码块（非仅贴最新版）？
+- [ ] 前后块是否**同一完整符号**（含声明与闭合，非仅函数体），且 `// ...` 摘录是否对称？
+- [ ] 代码块是否从**符号声明**起笔，`useMemo` 等是否含 `}, [deps]);`？小节标题符号名是否在块内可见？
+- [ ] 「改动前」是否来自 git 基线 / diff `-` 侧，而非臆造？
+- [ ] 纯新增 / 纯删除 / 仅格式化是否按 `code-before-after.md` §4 处理？
+- [ ] 代码块是否与 diff / 对应版本源码对齐？
+- [ ] 改动前、改动后每个代码块是否 **100% 逐行**注释（§1.2 扫描通过，非仅关键行）？
+- [ ] `return` 对象内 **onCopy / onUnderline 等每个回调属性行**及回调体内、`deps` 每个元素行是否均已注释（§1.3）？
+- [ ] 是否无空洞套话、无「一块注释管多行」？
+- [ ] `// ...` 省略行是否也有上一行说明？
 - [ ] 是否说明「未涵盖的边角」或「后续可做」？
 - [ ] 每篇新建文档的**文件名**是否**简短**且**准确描述该篇功能**？
-- [ ] **每个**代码块上方是否都有**来源路径 + 大致位置**？
+- [ ] **每个**代码块上方是否都有**改动前/改动后 + 来源路径 + 大致位置**？
+- [ ] 文档层注释是否**未**使用 `讲解：` / `说明：` 前缀（见 `code-line-comments.md` §7）？
 
 **功能域落盘**
 
@@ -201,48 +219,84 @@ description: 基于当前改动（git diff、@ 文件或会话内已达成共识
 
 ## 输出格式建议
 
-```markdown
+````markdown
 # <标题>
 
 ## 1. 背景与目标
+
 ...
 
 ## 2. 改动范围
+
 - `path/a`
 - `path/b`
 
 ## 3. 实现思路
+
 ...
 
-## 4. 关键代码与注释
+## 4. 关键代码对比与注释
 
-### 4.x <文件角色>
+### 4.x `<符号名>`（`相对路径/到/文件.ext`）
 
-**来源**：`相对路径/到/文件.ext`（约 Lxx–Lyy 或 `符号名` 附近）
+**对比范围**：例如 `function resolveUrl` 全函数（摘录说明）。
+
+**改动前** · `相对路径/到/文件.ext`（基线，约 L42–L58）
 
 ```typescript
-// 中文注释讲解……
+// 函数签名与参数含义（旧版）
+function oldImpl(input: string) {
+	// 该分支在旧版中的行为与局限
+	if (input.startsWith("http")) return input;
+	// 旧版对相对路径的处理方式
+	return input;
+}
 ```
 
+**改动后** · `相对路径/到/文件.ext`（当前，约 L42–L65）
+
+```typescript
+// 相对旧版新增的可选 base 参数
+function newImpl(input: string, base?: string) {
+	// 与旧版相同的全局 URL 短路逻辑
+	if (input.startsWith("http")) return input;
+	// 新增分支——有 base 时拼接相对路径
+	if (base && !input.startsWith("/")) return join(base, input);
+	// 其余情况回退
+	return input;
+}
+```
+
+**变更摘要**：……
+
 ## 5. 兼容性与影响
+
 ...
 
 ## 6. 相关源码路径
+
 | 说明 | 路径 |
-|------|------|
-```
+| ---- | ---- |
+
+---
+
+（若与仓库最新源码不一致，以源码为准）
+````
 
 ## 参考文件
 
-| 文件 | 用途 |
-|------|------|
-| [references/doc-outline.md](references/doc-outline.md) | 专题实现文章节骨架 |
-| [references/doc-domain-layout.md](references/doc-domain-layout.md) | **功能域目录对照、命名、新建目录** |
-| [references/docs-maintenance.md](references/docs-maintenance.md) | `docs/` 索引整理与去重 |
-| [references/product-user-docs.md](references/product-user-docs.md) | `project-guide` / `project-update-info` 格式与禁路径 |
+| 文件                                                                 | 用途                                                       |
+| -------------------------------------------------------------------- | ---------------------------------------------------------- |
+| [references/doc-outline.md](references/doc-outline.md)               | 专题实现文章节骨架                                         |
+| [references/code-before-after.md](references/code-before-after.md)   | **改动前/改动后**对比格式、取材与例外                      |
+| [references/code-line-comments.md](references/code-line-comments.md) | **100% 逐行上方**详细注释、§1.2 扫描与反例 |
+| [references/code-symbol-scope.md](references/code-symbol-scope.md)   | **完整符号边界**（声明→闭合，禁止仅函数体）                |
+| [references/doc-domain-layout.md](references/doc-domain-layout.md)   | **功能域目录对照、命名、新建目录**                         |
+| [references/docs-maintenance.md](references/docs-maintenance.md)     | `docs/` 索引整理与去重                                     |
+| [references/product-user-docs.md](references/product-user-docs.md)   | `project-guide` / `project-update-info` 格式与禁路径       |
 | [references/product-pages-sync.md](references/product-pages-sync.md) | 姊妹稿 → `/update-info`、`/project-guide` 四套 TS 同步规则 |
 
 ## 与相近 Skill 的边界
 
 - **`spec-from-implementation`**：从**现有完整实现**反推可验收 SPEC，偏重规范条款与 checklist。
-- **本 Skill**：从**一轮 diff / 明确改动集合**写**实现说明**，偏重「每项功能做了什么 + 注释代码块」；**多项独立功能须多篇专题**；并**整理 docs 索引**、必要时**更新产品姊妹稿及其前端结构化页**；默认**不写 spec 全套章节**除非用户要求合并。
+- **本 Skill**：从**一轮 diff** 写实现说明，含**改动前后对比**、**完整符号**摘录、**每一行源码上方详细注释（100%）**；多篇专题；整理 docs 索引；必要时更新姊妹稿；默认不写 spec 全套。

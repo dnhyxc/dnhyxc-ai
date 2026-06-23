@@ -6,7 +6,7 @@
 
 > 全屏底部 **Sheet 抽屉**方案已废弃，组件自仓库删除；仅作历史说明见 [epub-thought-drawer.md](./epub-thought-drawer.md)（归档，勿按此文实现）。
 
-**延伸阅读**：[epub-reading-thoughts.md](./epub-reading-thoughts.md)（API、下划线、重叠去重）、[epub-thought-cluster-bridging.md](./epub-thought-cluster-bridging.md)（**点击聚合 / 桥接规则**，列表引用区与分组展示）、[epub-selection-popbar-visual.md](./epub-selection-popbar-visual.md)（选区浮动条视觉）、[epub-thought-underlines-sync.md](./epub-thought-underlines-sync.md)（下划线同步）、[ebook-moke-assistant.md](./ebook-moke-assistant.md)（右侧助手分栏）。
+**延伸阅读**：[epub-reading-thoughts.md](./epub-reading-thoughts.md)（API、下划线、重叠去重）、[epub-thought-cluster-bridging.md](./epub-thought-cluster-bridging.md)（**点击聚合 / 桥接规则**，列表引用区与分组展示）、[epub-thought-list-ui.md](./epub-thought-list-ui.md)（**列表单击进详情**、分组摘录展开、clamp 复用）、[epub-thought-quote-highlight-toggle.md](./epub-thought-quote-highlight-toggle.md)（引用区划线覆盖度）、[epub-split-soft-resize.md](./epub-split-soft-resize.md)（分栏软重排）、[epub-selection-popbar-visual.md](./epub-selection-popbar-visual.md)（选区浮动条视觉）、[epub-thought-underlines-sync.md](./epub-thought-underlines-sync.md)（下划线同步）、[ebook-moke-assistant.md](./ebook-moke-assistant.md)（右侧助手分栏）。
 
 ---
 

@@ -115,26 +115,15 @@ export function resolveEpubTextColor(
 	return TEXT_COLOR_MAP[textColor];
 }
 
-/** 读取当前应用主题背景（--theme-background） */
-export function resolveAppThemeBackground(appTheme: ThemeName): string {
-	if (typeof window !== 'undefined') {
-		const css = getComputedStyle(document.body)
-			.getPropertyValue('--theme-background')
-			.trim();
-		if (css) return css;
-	}
-	return appTheme === 'black' ? '#1a1a1a' : '#fafafa';
-}
-
 export function resolveEpubBgColor(
 	bgTheme: EpubReaderBgTheme,
-	appTheme: ThemeName,
+	_appTheme?: ThemeName,
 ): string {
 	if (bgTheme === 'default') {
-		return resolveAppThemeBackground(appTheme);
+		return 'transparent';
 	}
 	const opt = EPUB_BG_THEME_OPTIONS.find((o) => o.id === bgTheme);
-	return opt?.bgColor ?? resolveAppThemeBackground(appTheme);
+	return opt?.bgColor ?? 'transparent';
 }
 
 /** 阅读区实际背景色 */
@@ -145,10 +134,59 @@ export function resolveEpubReaderBackground(
 	return resolveEpubBgColor(bgTheme, appTheme);
 }
 
+/** EPUB 阅读页壳层/侧栏共用的表面背景 CSS 变量名 */
+export const EPUB_READER_SURFACE_CSS_VAR = '--epub-reader-surface-bg';
+
+/**
+ * 页面壳、顶栏、侧栏与阅读区共用的表面背景。
+ * default 跟随应用主题；其余与 iframe 内阅读背景一致。
+ */
+export function resolveEpubReaderSurfaceBackground(
+	bgTheme: EpubReaderBgTheme,
+): string {
+	if (bgTheme === 'default') {
+		return 'var(--theme-background)';
+	}
+	return resolveEpubBgColor(bgTheme);
+}
+
+/** 挂到阅读页壳层根节点，供子树 Tailwind 任意值引用 */
+export function getEpubReaderSurfaceCssVars(
+	bgTheme: EpubReaderBgTheme,
+): Record<string, string> {
+	return {
+		[EPUB_READER_SURFACE_CSS_VAR]: resolveEpubReaderSurfaceBackground(bgTheme),
+	};
+}
+
+/** 阅读页统一表面背景（需配合 getEpubReaderSurfaceCssVars） */
+export const epubReaderSurfaceBgClass =
+	'bg-[var(--epub-reader-surface-bg,var(--color-theme-background))]';
+
+/** 略深于表面的 muted 层（替代 bg-theme/2） */
+export const epubReaderSurfaceMutedClass =
+	'bg-[color-mix(in_oklch,var(--epub-reader-surface-bg,var(--color-theme-background))_92%,var(--color-theme)_8%)]';
+
+/** 列表选中态（替代 bg-theme/12） */
+export const epubReaderSurfaceSelectedClass =
+	'bg-[color-mix(in_oklch,var(--epub-reader-surface-bg,var(--color-theme-background))_88%,var(--color-theme)_12%)]';
+
+/** 列表 hover（替代 hover:bg-theme/10） */
+export const epubReaderSurfaceHoverClass =
+	'hover:bg-[color-mix(in_oklch,var(--epub-reader-surface-bg,var(--color-theme-background))_90%,var(--color-theme)_10%)]';
+
+/** 引用折叠渐变起点（替代 from-theme-background） */
+export const epubReaderSurfaceFadeFromClass =
+	'from-[var(--epub-reader-surface-bg,var(--color-theme-background))]';
+
+/** 加载遮罩（替代 bg-theme-background/80） */
+export const epubReaderSurfaceOverlayClass =
+	'bg-[color-mix(in_oklch,var(--epub-reader-surface-bg,var(--color-theme-background))_80%,transparent)]';
+
 /** @deprecated 请用 resolveEpubBgColor + inline style */
 export function epubReaderHostBgClass(bgTheme: EpubReaderBgTheme): string {
 	if (bgTheme === 'default') {
-		return 'bg-theme-background';
+		return 'transparent';
 	}
 	return '';
 }

@@ -73,6 +73,8 @@ import { cfiFromDomRange, trimSelectionRange } from './utils/epubRangeGeometry';
 import {
 	DEFAULT_EPUB_READER_SETTINGS,
 	type EpubReaderSettings,
+	epubReaderSurfaceBgClass,
+	getEpubReaderSurfaceCssVars,
 	loadEpubReaderSettings,
 	saveEpubReaderSettings,
 } from './utils/epubReaderSettings';
@@ -84,8 +86,7 @@ import {
 import {
 	buildSingleCfiCluster,
 	extractCfiSpineHint,
-	getThoughtClusterDisplayCfi,
-	getThoughtClusterDisplayQuote,
+	getThoughtClusterHighlightSubject,
 	invalidateThoughtClusterConnectivityCache,
 	reconcileThoughtClickCluster,
 } from './utils/epubThoughtCluster';
@@ -747,12 +748,6 @@ function EbookReadPage() {
 		[],
 	);
 
-	const selectThoughtInList = useCallback((thought: EbookThought) => {
-		setThoughtListCluster((prev) =>
-			prev ? { ...prev, selectedThoughtId: thought.id } : prev,
-		);
-	}, []);
-
 	const saveThought = useCallback(async () => {
 		const content = thoughtDraft.content.trim();
 		if (!content || !thoughtDraft.cfiRange || !bookId || thoughtSaving) {
@@ -959,6 +954,10 @@ function EbookReadPage() {
 		saveEpubReaderSettings(DEFAULT_EPUB_READER_SETTINGS);
 	}, []);
 
+	const closeEpubSettings = useCallback(() => {
+		setEpubSettingsOpen(false);
+	}, []);
+
 	const patchPdfZoom = useCallback((delta: number) => {
 		setPdfZoom((prev) => {
 			const next = stepPdfZoom(prev, delta);
@@ -1040,25 +1039,26 @@ function EbookReadPage() {
 
 	const thoughtListQuoteActions = useMemo(() => {
 		if (!thoughtListCluster) return null;
-		const quote = getThoughtClusterDisplayQuote(thoughtListCluster);
-		const cfiRange = getThoughtClusterDisplayCfi(thoughtListCluster);
-		if (!quote.trim()) return null;
 		const rend = epubNavRef.current?.getRendition() ?? undefined;
+		const { cfiRange, quote } = getThoughtClusterHighlightSubject(
+			thoughtListCluster,
+			rend,
+		);
+		if (!quote.trim()) return null;
 		const spineHint = extractCfiSpineHint(cfiRange);
 		const chapterHighlights = spineHint
 			? highlights.filter(
 					(item) => extractCfiSpineHint(item.cfiRange) === spineHint,
 				)
 			: highlights;
-		const highlight = findUserHighlightCoveringCfi(
-			chapterHighlights,
-			cfiRange,
-			quote,
-			rend,
-		);
 		return {
 			labels: thoughtDrawerLabels,
-			hasHighlight: Boolean(highlight),
+			hasHighlight: isSelectionFullyHighlighted(
+				chapterHighlights,
+				cfiRange,
+				quote,
+				rend,
+			),
 			onCopy: () => void copyToClipboard(quote),
 			onUnderline: () =>
 				openHighlightPopBarAtBookContent(cfiRange, quote, {
@@ -1093,15 +1093,14 @@ function EbookReadPage() {
 		if (!quote) return null;
 		const cfiRange = thoughtDraft.cfiRange;
 		const rend = epubNavRef.current?.getRendition() ?? undefined;
-		const highlight = findUserHighlightCoveringCfi(
-			highlights,
-			cfiRange,
-			thoughtDraft.quote,
-			rend,
-		);
 		return {
 			labels: thoughtDrawerLabels,
-			hasHighlight: Boolean(highlight),
+			hasHighlight: isSelectionFullyHighlighted(
+				highlights,
+				cfiRange,
+				thoughtDraft.quote,
+				rend,
+			),
 			onCopy: () => void copyToClipboard(thoughtDraft.quote),
 			onUnderline: () =>
 				openHighlightPopBarAtBookContent(cfiRange, thoughtDraft.quote, {
@@ -1201,14 +1200,8 @@ function EbookReadPage() {
 				<EpubThoughtList
 					onClose={closeThoughtList}
 					cluster={thoughtListCluster}
-					onSelectThought={selectThoughtInList}
 					onOpenThoughtDetail={(thought) => openViewThought(thought, true)}
 					quoteActions={thoughtListQuoteActions}
-					onQuoteHighlightClick={() => {
-						const quote = getThoughtClusterDisplayQuote(thoughtListCluster);
-						const cfiRange = getThoughtClusterDisplayCfi(thoughtListCluster);
-						openHighlightPopBarAtBookContent(cfiRange, quote);
-					}}
 				/>
 			);
 		}
@@ -1231,7 +1224,6 @@ function EbookReadPage() {
 		thoughtListCluster,
 		thoughtListOpen,
 		thoughtListQuoteActions,
-		selectThoughtInList,
 		openHighlightPopBarAtBookContent,
 		thoughtSaving,
 	]);
@@ -1431,6 +1423,14 @@ function EbookReadPage() {
 		window.addEventListener('keydown', onKeyDown, true);
 		return () => window.removeEventListener('keydown', onKeyDown, true);
 	}, [book, open, tocOpen, epubSettingsOpen, assistantOpen, thoughtPanelOpen]);
+
+	const epubSurfaceProps = useMemo(() => {
+		if (book?.fmt !== 'epub') return undefined;
+		return {
+			surfaceClassName: epubReaderSurfaceBgClass,
+			surfaceStyle: getEpubReaderSurfaceCssVars(epubSettings.bgTheme),
+		};
+	}, [book?.fmt, epubSettings.bgTheme]);
 
 	if (!book) {
 		if (bookResolving || !ebookStore.ready) {
@@ -1701,6 +1701,8 @@ function EbookReadPage() {
 	return (
 		<EbookPageShell
 			contentPadding={false}
+			surfaceClassName={epubSurfaceProps?.surfaceClassName}
+			surfaceStyle={epubSurfaceProps?.surfaceStyle}
 			header={
 				<EbookPanelHeader
 					className="pl-5 pr-2.5"
@@ -1740,6 +1742,9 @@ function EbookReadPage() {
 						<div
 							className="flex h-full min-h-0 flex-1 flex-col"
 							onContextMenu={onHostContextMenu}
+							onPointerDown={() => {
+								if (epubSettingsOpen) closeEpubSettings();
+							}}
 						>
 							<EpubPane
 								open={open}
@@ -1753,6 +1758,9 @@ function EbookReadPage() {
 									!tocOpen && !epubSettingsOpen && !sidePanelOpen
 								}
 								onReaderContextMenu={showEpubContextMenu}
+								onReaderPointerDown={
+									epubSettingsOpen ? closeEpubSettings : undefined
+								}
 								onSelectionPopBar={onSelectionPopBarChange}
 								thoughts={thoughts}
 								highlights={highlights}

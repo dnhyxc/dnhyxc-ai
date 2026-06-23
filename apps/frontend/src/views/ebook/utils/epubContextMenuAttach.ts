@@ -88,3 +88,38 @@ export function attachEpubIframeContextMenu(
 		cleanups.clear();
 	};
 }
+
+/**
+ * 监听 epub.js 各章节 iframe 内的 pointer 按下（用于关闭浮层等）。
+ * iframe 内事件不会冒泡到顶层，需单独挂载。
+ */
+export function attachEpubIframePointerDown(
+	rend: Rendition,
+	onPointerDown: () => void,
+): () => void {
+	const cleanups = new Map<EpubIframeContents, () => void>();
+
+	const bindContents = (contents: EpubIframeContents) => {
+		if (cleanups.has(contents)) return;
+		const doc = contents.document;
+		const handler = () => onPointerDown();
+		doc.addEventListener('mousedown', handler, true);
+		cleanups.set(contents, () =>
+			doc.removeEventListener('mousedown', handler, true),
+		);
+	};
+
+	rend.hooks.content.register(bindContents);
+
+	const existing = rend.getContents();
+	if (Array.isArray(existing)) {
+		for (const item of existing) bindContents(item as EpubIframeContents);
+	} else if (existing) {
+		bindContents(existing as EpubIframeContents);
+	}
+
+	return () => {
+		for (const fn of cleanups.values()) fn();
+		cleanups.clear();
+	};
+}

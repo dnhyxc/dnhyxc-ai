@@ -2337,8 +2337,16 @@ function collectUserHighlightBlockerSources(
 /** 滚动/翻页后仅 patch 样式，不 remove+readd（避免闪烁） */
 export function patchEpubReadingAnnotations(
 	rend: Rendition,
-	options?: { defer?: boolean },
+	options?: { defer?: boolean; sync?: boolean },
 ): void {
+	if (options?.sync) {
+		cancelAnimationFrame(readingAnnotationPatchRaf);
+		readingAnnotationPatchRaf = 0;
+		pendingReadingAnnotationFullPatch = false;
+		runEpubReadingAnnotationPatch(rend);
+		return;
+	}
+
 	if (options?.defer) {
 		pendingReadingAnnotationFullPatch = true;
 	}

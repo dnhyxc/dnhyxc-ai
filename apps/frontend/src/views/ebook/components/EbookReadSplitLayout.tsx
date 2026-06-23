@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import type { GroupImperativeHandle, Layout } from 'react-resizable-panels';
 import {
 	ResizableHandle,
@@ -7,6 +7,11 @@ import {
 	ResizablePanelGroup,
 } from '@/components/ui/resizable';
 import { cn } from '@/lib/utils';
+import {
+	beginEbookSplitPanelPointerDrag,
+	endEbookSplitPanelPointerDrag,
+	notifyEbookSplitPanelResizeEnd,
+} from '../utils/ebookSplitResize';
 
 export type EbookReadSplitLayoutProps = {
 	/** 右侧分栏是否展开（MOKE 助手或读书想法） */
@@ -25,13 +30,35 @@ export function EbookReadSplitLayout({
 }: EbookReadSplitLayoutProps) {
 	const panelGroupRef = useRef<GroupImperativeHandle | null>(null);
 	const lastSplitLayoutRef = useRef<Layout>({ reader: 58, assistant: 42 });
+	const splitPointerActiveRef = useRef(false);
+
+	const finishSplitPointerDrag = useCallback(() => {
+		if (!splitPointerActiveRef.current) return;
+		splitPointerActiveRef.current = false;
+		endEbookSplitPanelPointerDrag();
+	}, []);
+
+	useEffect(() => {
+		const onPointerUp = () => finishSplitPointerDrag();
+		window.addEventListener('pointerup', onPointerUp);
+		window.addEventListener('pointercancel', onPointerUp);
+		return () => {
+			window.removeEventListener('pointerup', onPointerUp);
+			window.removeEventListener('pointercancel', onPointerUp);
+		};
+	}, [finishSplitPointerDrag]);
 
 	useEffect(() => {
 		if (!sidePanelOpen) {
 			panelGroupRef.current?.setLayout({ reader: 100, assistant: 0 });
-			return;
+		} else {
+			panelGroupRef.current?.setLayout(lastSplitLayoutRef.current);
 		}
-		panelGroupRef.current?.setLayout(lastSplitLayoutRef.current);
+		// 程序化开关侧栏后补一次 EPUB 真 resize
+		const raf = requestAnimationFrame(() => {
+			notifyEbookSplitPanelResizeEnd();
+		});
+		return () => cancelAnimationFrame(raf);
 	}, [sidePanelOpen]);
 
 	return (
@@ -42,6 +69,7 @@ export function EbookReadSplitLayout({
 			groupRef={panelGroupRef}
 			onLayoutChanged={(layout) => {
 				if (sidePanelOpen) lastSplitLayoutRef.current = layout;
+				finishSplitPointerDrag();
 			}}
 		>
 			<ResizablePanel
@@ -55,6 +83,10 @@ export function EbookReadSplitLayout({
 			<ResizableHandle
 				withHandle
 				className={cn('w-0', !sidePanelOpen && 'pointer-events-none opacity-0')}
+				onPointerDown={() => {
+					splitPointerActiveRef.current = true;
+					beginEbookSplitPanelPointerDrag();
+				}}
 			/>
 			<ResizablePanel
 				id="assistant"

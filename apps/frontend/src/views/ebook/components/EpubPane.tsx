@@ -10,14 +10,16 @@ import type {
 	EbookTocItem,
 	EbookUserHighlight,
 } from '../types';
+import { subscribeEbookSplitPanelResizeEnd } from '../utils/ebookSplitResize';
 import {
 	attachEpubIframeContextMenu,
+	attachEpubIframePointerDown,
 	type EpubReaderContextMenuPayload,
 } from '../utils/epubContextMenuAttach';
 import {
 	applyEpubReaderAppearance,
 	type EpubReaderSettings,
-	resolveEpubBgColor,
+	resolveEpubReaderSurfaceBackground,
 } from '../utils/epubReaderSettings';
 import { attachEpubScrolledEdgeNav } from '../utils/epubScrolledNav';
 import {
@@ -25,6 +27,7 @@ import {
 	clearEpubTextSelection,
 	type EpubSelectionPopBarPayload,
 } from '../utils/epubSelectionToolbarAttach';
+import { softResizeEpubRendition } from '../utils/epubSoftResize';
 import { resolveSpineIndexForHref } from '../utils/epubSpineIndex';
 import {
 	installEpubThoughtUnderlineListeners,
@@ -33,6 +36,7 @@ import {
 import {
 	installEpubReadingMarkClickListeners,
 	installEpubUserHighlightPatchListeners,
+	patchEpubReadingAnnotations,
 	resetEpubReadingAnnotationSyncState,
 	syncEpubReadingAnnotations,
 	teardownAppliedUserHighlights,
@@ -61,6 +65,8 @@ type Props = {
 	keyboardNavEnabled?: boolean;
 	/** EPUB iframe 内右键菜单 */
 	onReaderContextMenu?: (payload: EpubReaderContextMenuPayload) => void;
+	/** iframe 内按下时回调（如关闭阅读设置浮层） */
+	onReaderPointerDown?: () => void;
 	/** 选区结束后的浮动操作条 */
 	onSelectionPopBar?: (payload: EpubSelectionPopBarPayload | null) => void;
 	/** 读书想法（下划线标注） */
@@ -120,6 +126,7 @@ export function EpubPane({
 	onNavReset,
 	keyboardNavEnabled = true,
 	onReaderContextMenu,
+	onReaderPointerDown,
 	onSelectionPopBar,
 	thoughts = [],
 	onThoughtClick,
@@ -129,9 +136,8 @@ export function EpubPane({
 }: Props) {
 	const { theme: appTheme } = useTheme();
 	const [appThemeName, setAppThemeName] = useState<ThemeName>(appTheme);
-	const readerBgColor = resolveEpubBgColor(
+	const readerBgColor = resolveEpubReaderSurfaceBackground(
 		readerSettings.bgTheme,
-		appThemeName,
 	);
 	const readerSettingsRef = useRef(readerSettings);
 	const appThemeRef = useRef<ThemeName>(appTheme);
@@ -145,6 +151,7 @@ export function EpubPane({
 	const onReadyRef = useRef(onReady);
 	const onNavResetRef = useRef(onNavReset);
 	const onReaderContextMenuRef = useRef(onReaderContextMenu);
+	const onReaderPointerDownRef = useRef(onReaderPointerDown);
 	const onSelectionPopBarRef = useRef(onSelectionPopBar);
 	const onThoughtClickRef = useRef(onThoughtClick);
 	const onThoughtClusterClickRef = useRef(onThoughtClusterClick);
@@ -193,6 +200,7 @@ export function EpubPane({
 	onReadyRef.current = onReady;
 	onNavResetRef.current = onNavReset;
 	onReaderContextMenuRef.current = onReaderContextMenu;
+	onReaderPointerDownRef.current = onReaderPointerDown;
 	onSelectionPopBarRef.current = onSelectionPopBar;
 	onThoughtClickRef.current = onThoughtClick;
 	onThoughtClusterClickRef.current = onThoughtClusterClick;
@@ -277,6 +285,15 @@ export function EpubPane({
 
 		return installEpubUserHighlightPatchListeners(rend);
 	}, [rendReady]);
+
+	useEffect(() => {
+		const rend = rendRef.current;
+		if (!rend || !rendReady || !onReaderPointerDown) return;
+
+		return attachEpubIframePointerDown(rend, () => {
+			onReaderPointerDownRef.current?.();
+		});
+	}, [rendReady, onReaderPointerDown]);
 
 	useEffect(() => {
 		const rend = rendRef.current;
@@ -440,20 +457,57 @@ export function EpubPane({
 			}
 		})();
 
-		const ro = new ResizeObserver(() => {
-			if (!readyRef.current || !hostRef.current || !rendRef.current) return;
-			try {
-				rendRef.current.resize(
-					hostRef.current.clientWidth,
-					hostRef.current.clientHeight,
-				);
-			} catch {
-				// ignore
+		let resizeRaf: number | null = null;
+
+		const applyHostResize = () => {
+			if (!hostRef.current || !readyRef.current || !rendRef.current) return;
+			const w = Math.max(hostRef.current.clientWidth, 320);
+			const h = Math.max(hostRef.current.clientHeight, 320);
+			const rend = rendRef.current;
+			if (!softResizeEpubRendition(rend, w, h)) {
+				try {
+					rend.resize(w, h);
+				} catch {
+					// ignore
+				}
 			}
+			// soft resize 会触发 marks-pane.render() 重建 highlight rect（无 fill）；
+			// underline 自带 stroke 仍可见，用户划线需立即 patch 恢复样式
+			patchEpubReadingAnnotations(rend, { sync: true });
+		};
+
+		const scheduleHostResize = () => {
+			if (resizeRaf != null) cancelAnimationFrame(resizeRaf);
+			resizeRaf = requestAnimationFrame(() => {
+				resizeRaf = null;
+				applyHostResize();
+			});
+		};
+
+		const settleHostResize = () => {
+			applyHostResize();
+			const rend = rendRef.current;
+			if (!rend || !readyRef.current) return;
+			syncEpubReadingAnnotations(
+				rend,
+				thoughtsRef.current ?? [],
+				highlightsRef.current ?? [],
+				appliedThoughtsRef.current,
+				appliedHighlightsRef.current,
+			);
+		};
+
+		const ro = new ResizeObserver(() => {
+			scheduleHostResize();
 		});
 		ro.observe(el);
 
+		const unsubSplitResizeEnd =
+			subscribeEbookSplitPanelResizeEnd(settleHostResize);
+
 		return () => {
+			if (resizeRaf != null) cancelAnimationFrame(resizeRaf);
+			unsubSplitResizeEnd();
 			destroyed = true;
 			detachContextMenu?.();
 			detachSelectionPopBar?.();
@@ -483,7 +537,7 @@ export function EpubPane({
 	}, [open, readerSettings.pageFlow, relocate, onRenditionKeyDown]);
 
 	return (
-		<div className="relative h-full min-h-0 w-full bg-theme/5">
+		<div className="relative h-full min-h-0 w-full">
 			{err ? <p className="text-destructive p-4 text-sm">{err}</p> : null}
 			<div
 				ref={hostRef}

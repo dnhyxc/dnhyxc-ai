@@ -3,7 +3,7 @@
 > **文档角色**：专门解释「点击阅读页某段划线想法时，侧栏引用区与想法列表应展示哪些内容」——尤其是 **A 与 B 何时合并、何时分开**（俗称「桥接」）。  
 > **读者**：产品、测试、非前端开发同学也可阅读；涉及少量浏览器术语（选区、段落）会用人话解释。  
 > **规范对照**：[`apps/frontend/specs/epub-thought-nested-cluster-list.md`](../../apps/frontend/specs/epub-thought-nested-cluster-list.md) §5.7。  
-> **延伸阅读**：[epub-thought-side-panel.md](./epub-thought-side-panel.md)（侧栏 UI）、[epub-annotation-sync-perf.md](./epub-annotation-sync-perf.md)（性能与点击不卡顿）、[epub-thought-partial-overlap.md](./epub-thought-partial-overlap.md)（部分重叠选区）。
+> **延伸阅读**：[epub-thought-side-panel.md](./epub-thought-side-panel.md)（侧栏 UI）、[epub-thought-list-ui.md](./epub-thought-list-ui.md)（列表单击进详情与分组摘录展开）、[epub-annotation-sync-perf.md](./epub-annotation-sync-perf.md)（性能与点击不卡顿）、[epub-thought-partial-overlap.md](./epub-thought-partial-overlap.md)（部分重叠选区）。
 
 若下文代码块与仓库最新源码不一致，**以源码为准**。
 

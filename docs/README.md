@@ -8,90 +8,95 @@
 
 ## 功能域目录（简短命名）
 
-| 目录 | 说明 | 入口 |
-|------|------|------|
-| [`chat/`](./chat/) | 主站对话、分享、联网、附件 | [chat/README.md](./chat/README.md) |
-| [`knowledge/`](./knowledge/) | 知识库、RAG、文档助手 | [knowledge/README.md](./knowledge/README.md) |
-| [`english/`](./english/) | 英语学习（词包、收藏、TTS、Agent） | [english/README.md](./english/README.md) |
-| [`cos/`](./cos/) | 腾讯云 COS 上传与 `/ext-cos/` 展示 | [cos/README.md](./cos/README.md) |
-| [`llm/`](./llm/) | 大模型接入（硅基、`createLlm`、设置页） | [llm/README.md](./llm/README.md) |
-| [`ops/`](./ops/) | 部署、Nginx、本地上传目录 | [ops/README.md](./ops/README.md) |
-| [`app/`](./app/) | 前端壳层：路由鉴权、Tauri、i18n | [app/README.md](./app/README.md) |
-| [`monaco/`](./monaco/) | Monaco / Markdown 编辑器 | 按文件名检索 |
-| [`mermaid/`](./mermaid/) | Mermaid 围栏与预览 | [mermaid/markdown-zoom-and-preview.md](./mermaid/markdown-zoom-and-preview.md) |
-| [`tools/`](./tools/) | `@dnhyxc-ai/markdown-kit` | [tools/index.md](./tools/index.md) |
-| [`react/`](./react/) | React Hooks 专题 | 按文件名检索 |
-| [`setting/`](./setting/) | 系统快捷键 | [setting/system-shortcuts-implementation-record.md](./setting/system-shortcuts-implementation-record.md) |
-| [`meta/`](./meta/) | 发布与更新同步 | [meta/project-features-update.md](./meta/project-features-update.md) |
-| [`pay/`](./pay/) | Stripe 会员充值、开通与到期 | [pay/stripe-membership-billing.md](./pay/stripe-membership-billing.md)、[pay/membership-active-hook.md](./pay/membership-active-hook.md) |
-| [`ebook/`](./ebook/) | 电子书书架、EPUB/PDF 阅读与进度 | [ebook/README.md](./ebook/README.md) |
+| 目录                         | 说明                                    | 入口                                                                                                                                     |
+| ---------------------------- | --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| [`chat/`](./chat/)           | 主站对话、分享、联网、附件              | [chat/README.md](./chat/README.md)                                                                                                       |
+| [`knowledge/`](./knowledge/) | 知识库、RAG、文档助手                   | [knowledge/README.md](./knowledge/README.md)                                                                                             |
+| [`english/`](./english/)     | 英语学习（词包、收藏、TTS、Agent）      | [english/README.md](./english/README.md)                                                                                                 |
+| [`cos/`](./cos/)             | 腾讯云 COS 上传与 `/ext-cos/` 展示      | [cos/README.md](./cos/README.md)                                                                                                         |
+| [`llm/`](./llm/)             | 大模型接入（硅基、`createLlm`、设置页） | [llm/README.md](./llm/README.md)                                                                                                         |
+| [`ops/`](./ops/)             | 部署、Nginx、本地上传目录               | [ops/README.md](./ops/README.md)                                                                                                         |
+| [`app/`](./app/)             | 前端壳层：路由鉴权、Tauri、i18n         | [app/README.md](./app/README.md)                                                                                                         |
+| [`monaco/`](./monaco/)       | Monaco / Markdown 编辑器                | 按文件名检索                                                                                                                             |
+| [`mermaid/`](./mermaid/)     | Mermaid 围栏与预览                      | [mermaid/markdown-zoom-and-preview.md](./mermaid/markdown-zoom-and-preview.md)                                                           |
+| [`tools/`](./tools/)         | `@dnhyxc-ai/markdown-kit`               | [tools/index.md](./tools/index.md)                                                                                                       |
+| [`react/`](./react/)         | React Hooks 专题                        | 按文件名检索                                                                                                                             |
+| [`setting/`](./setting/)     | 系统快捷键                              | [setting/system-shortcuts-implementation-record.md](./setting/system-shortcuts-implementation-record.md)                                 |
+| [`meta/`](./meta/)           | 发布与更新同步                          | [meta/project-features-update.md](./meta/project-features-update.md)                                                                     |
+| [`pay/`](./pay/)             | Stripe 会员充值、开通与到期             | [pay/stripe-membership-billing.md](./pay/stripe-membership-billing.md)、[pay/membership-active-hook.md](./pay/membership-active-hook.md) |
+| [`ebook/`](./ebook/)         | 电子书书架、EPUB/PDF 阅读与进度         | [ebook/README.md](./ebook/README.md)                                                                                                     |
 
 ---
 
 ## 常见排查
 
-| 现象 | 优先阅读 |
-|------|----------|
-| COS 上传 AccessDenied | [cos/cos-object-storage.md](./cos/cos-object-storage.md) §3.4、§6 |
-| COS 能传不能显（403 / ATS） | [cos/cos-object-storage.md](./cos/cos-object-storage.md) §3.3 + [cos/cos-dev-http-proxy.md](./cos/cos-dev-http-proxy.md) |
-| COS 能预览但下载失败 | [cos/cos-object-storage.md](./cos/cos-object-storage.md) §3.7 |
-| 分享页无用户附件 | [chat/share.md](./chat/share.md) §五 + [cos/cos-object-storage.md](./cos/cos-object-storage.md) §3.9 |
-| 知识分享「更新时间」差 8h（如凌晨变 18 点） | [chat/share-knowledge-timezone.md](./chat/share-knowledge-timezone.md) |
-| Web HTTPS mixed content | 同上 + [app/route-auth.md](./app/route-auth.md) §12 + [ops/nginx.md](./ops/nginx.md) |
-| Tauri macOS ATS | [app/tauri-macos-ats-http.md](./app/tauri-macos-ats-http.md) |
-| 知识库助手 Mermaid 流式 | [knowledge/knowledge-assistant-mermaid-streaming.md](./knowledge/knowledge-assistant-mermaid-streaming.md) |
-| 知识库助手总览 | [knowledge/knowledge-assistant-complete.md](./knowledge/knowledge-assistant-complete.md) |
-| 对话硅基接入 | [llm/siliconflow-chat-unification.md](./llm/siliconflow-chat-unification.md) |
-| 聊天附件预览失败 | [chat/chat-upload-preview.md](./chat/chat-upload-preview.md) |
-| 生产 `/images/` 400 | [chat/chat-upload-access-prod.md](./chat/chat-upload-access-prod.md) + [ops/nginx.md](./ops/nginx.md) |
-| 本地上传落盘 / UPLOAD_ROOT | [ops/upload-storage-paths.md](./ops/upload-storage-paths.md) |
-| `createLlm` / 400 | [llm/create-llm.md](./llm/create-llm.md) |
-| 图片 OCR / 附件识图 | [llm/ocr-create-llm-glm.md](./llm/ocr-create-llm-glm.md) |
-| 知识库向量 404 / 400 入库失败 | [knowledge/siliconflow-vector-full-url.md](./knowledge/siliconflow-vector-full-url.md) |
-| 知识库向量 Key/模型 | [knowledge/knowledge-vector-create-llm.md](./knowledge/knowledge-vector-create-llm.md) |
-| 会员知识库向量双库 | [knowledge/knowledge-member-vector-tier.md](./knowledge/knowledge-member-vector-tier.md) |
-| 用户自定义向量与多库 RAG | [knowledge/user-vector-rag-config.md](./knowledge/user-vector-rag-config.md) |
-| 全站 BGE / 入库 Bad Request | [knowledge/vector-bge-global-round.md](./knowledge/vector-bge-global-round.md) |
-| 向量分片 ole.log / 代码截断 | [knowledge/knowledge-chunk-boundaries.md](./knowledge/knowledge-chunk-boundaries.md) |
-| 保存知识库后 `Invalid array length` / Node OOM | [knowledge/knowledge-chunk-infinite-loop-oom.md](./knowledge/knowledge-chunk-infinite-loop-oom.md) |
-| 云端保存知识库报「请求体过大」/ PayloadTooLarge | [knowledge/knowledge-save-body-limit.md](./knowledge/knowledge-save-body-limit.md) |
-| 对话运行久后 Node OOM / 附件重复解析 | [chat/chat-memory-oom.md](./chat/chat-memory-oom.md) |
-| 流式输出时代码块无法横向滚动 | [chat/streaming-code-block-scroll.md](./chat/streaming-code-block-scroll.md) |
-| 生产 rate-limit `ERR_ERL_UNEXPECTED_X_FORWARDED_FOR` | [ops/trust-proxy-rate-limit.md](./ops/trust-proxy-rate-limit.md) |
-| 复制到助手后输入框不聚焦 | [knowledge/assistant-insert-focus.md](./knowledge/assistant-insert-focus.md) |
-| 设置页大模型 Key | [llm/llm-runtime-settings.md](./llm/llm-runtime-settings.md) |
-| 按用户 / 会员默认模型 | [llm/membership-per-user-llm.md](./llm/membership-per-user-llm.md) |
-| 设置页预设 / Combobox | [llm/llm-setting-ui-presets.md](./llm/llm-setting-ui-presets.md) |
-| 英语学习 Agent + LLM | [llm/agent-create-llm-unify.md](./llm/agent-create-llm-unify.md) |
-| 今日记词无词可抽 / 时间不对 | [english/daily-memorize-implementation.md](./english/daily-memorize-implementation.md) §9 |
-| 云端朗读 404 / MiniMax 502 余额不足 | [english/minimax-cloud-tts.md](./english/minimax-cloud-tts.md) §12 |
-| 设置页云端朗读参数不生效 / 改音色仍播旧音 | [english/cloud-tts-settings.md](./english/cloud-tts-settings.md) §5–§6 |
-| 换设备后云端朗读参数丢失 / 需账号同步 | [english/cloud-tts-prefs-db.md](./english/cloud-tts-prefs-db.md) |
-| TTS 从点喇叭到出声（前后端全链路） | [english/tts-end-to-end-guide.md](./english/tts-end-to-end-guide.md) |
-| 支付成功但资料页仍非会员 / 到期仍显示会员 | [pay/stripe-membership-billing.md](./pay/stripe-membership-billing.md) §6–§7 |
-| 换号后仍看到上一账号的草稿或助手对话 | [app/user-switch-state-reset.md](./app/user-switch-state-reset.md) |
-| 登录成功瞬间又回到登录页 / cloud-tts 401 | [app/login-cloud-tts-prefetch-401.md](./app/login-cloud-tts-prefetch-401.md) |
-| 阅读页顶栏显示「智能对话」而非书架 | [ebook/ebook-reader-shelf.md](./ebook/ebook-reader-shelf.md) §3.4、[app/route-auth.md](./app/route-auth.md) |
-| PDF 目录跳转报 canvas 并发渲染错误 | [ebook/shelf-reader-polish.md](./ebook/shelf-reader-polish.md) §3.6 |
-| EPUB 连续滚动无法自动进入下一章 | [ebook/epub-reader-settings-scroll.md](./ebook/epub-reader-settings-scroll.md) §3.2 |
-| 桌面大文件上传中无法阅读 / 超 120MB 打不开 | [ebook/ebook-cos-local-shelf.md](./ebook/ebook-cos-local-shelf.md) §3.1–§3.2 |
-| 非会员 Web 无法导入 / 会员才云端备份 | [ebook/ebook-membership-upload.md](./ebook/ebook-membership-upload.md) |
-| 重复选同一路径仍上传 | [ebook/ebook-local-path-dedup.md](./ebook/ebook-local-path-dedup.md) |
-| 刷新报 `getStorage` 未初始化 | [app/membership-store-circular-deps.md](./app/membership-store-circular-deps.md) |
-| 换号后书架仍是上一账号 | [app/user-switch-state-reset.md](./app/user-switch-state-reset.md) |
-| 阅读背景色不生效 | [ebook/ebook-cos-local-shelf.md](./ebook/ebook-cos-local-shelf.md) §3.4 |
-| PDF 页面太小 / 猛滚连跳多页 | [ebook/pdf-reader-fit-scroll.md](./ebook/pdf-reader-fit-scroll.md) §3.1–§3.3 |
-| EPUB 右键无菜单 / 助手与知识库样式不一致 | [ebook/epub-assistant-context-menu.md](./ebook/epub-assistant-context-menu.md)、[ebook/ebook-moke-assistant.md](./ebook/ebook-moke-assistant.md) |
-| 目录打开但看不出当前读到哪一章 | [ebook/ebook-toc-active-highlight.md](./ebook/ebook-toc-active-highlight.md) |
-| PDF 无 MOKE 助手 / PDF 右键菜单 | [ebook/ebook-moke-assistant.md](./ebook/ebook-moke-assistant.md) |
-| 保存读书想法后阅读页白屏 / 下划线异常 | [ebook/epub-thought-underlines-sync.md](./ebook/epub-thought-underlines-sync.md) |
-| EPUB 用户划线与想法虚线如何实现 / 重叠合并 | [ebook/epub-user-highlight-impl.md](./ebook/epub-user-highlight-impl.md)、[ebook/epub-thought-underline-impl.md](./ebook/epub-thought-underline-impl.md) |
-| EPUB 划线同名句子误删 / PopBar 划线与删除状态不对 | [ebook/epub-highlight-dom-match.md](./ebook/epub-highlight-dom-match.md) |
-| EPUB PopBar 闪烁 / 划线卡顿 / 工具条空档 | [ebook/epub-popbar-perf-ux.md](./ebook/epub-popbar-perf-ux.md) |
-| 划线/写想法后数秒才出现线、同步时页面卡死；反向选到空行后应用卡死 | [ebook/epub-annotation-sync-perf.md](./ebook/epub-annotation-sync-perf.md) |
-| 两次想法选区相交时虚线叠成双线 | [ebook/epub-thought-partial-overlap.md](./ebook/epub-thought-partial-overlap.md) |
-| 点击想法列表引用合并/拆分不对（A、B、标点、换行桥接） | [ebook/epub-thought-cluster-bridging.md](./ebook/epub-thought-cluster-bridging.md) |
-| 复制到助手后输入中文乱码 | [knowledge/assistant-insert-focus.md](./knowledge/assistant-insert-focus.md) §5.1 |
+| 现象                                                              | 优先阅读                                                                                                                                                 |
+| ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| COS 上传 AccessDenied                                             | [cos/cos-object-storage.md](./cos/cos-object-storage.md) §3.4、§6                                                                                        |
+| COS 能传不能显（403 / ATS）                                       | [cos/cos-object-storage.md](./cos/cos-object-storage.md) §3.3 + [cos/cos-dev-http-proxy.md](./cos/cos-dev-http-proxy.md)                                 |
+| COS 能预览但下载失败                                              | [cos/cos-object-storage.md](./cos/cos-object-storage.md) §3.7                                                                                            |
+| 分享页无用户附件                                                  | [chat/share.md](./chat/share.md) §五 + [cos/cos-object-storage.md](./cos/cos-object-storage.md) §3.9                                                     |
+| 知识分享「更新时间」差 8h（如凌晨变 18 点）                       | [chat/share-knowledge-timezone.md](./chat/share-knowledge-timezone.md)                                                                                   |
+| Web HTTPS mixed content                                           | 同上 + [app/route-auth.md](./app/route-auth.md) §12 + [ops/nginx.md](./ops/nginx.md)                                                                     |
+| Tauri macOS ATS                                                   | [app/tauri-macos-ats-http.md](./app/tauri-macos-ats-http.md)                                                                                             |
+| 知识库助手 Mermaid 流式                                           | [knowledge/knowledge-assistant-mermaid-streaming.md](./knowledge/knowledge-assistant-mermaid-streaming.md)                                               |
+| 知识库助手总览                                                    | [knowledge/knowledge-assistant-complete.md](./knowledge/knowledge-assistant-complete.md)                                                                 |
+| 对话硅基接入                                                      | [llm/siliconflow-chat-unification.md](./llm/siliconflow-chat-unification.md)                                                                             |
+| 聊天附件预览失败                                                  | [chat/chat-upload-preview.md](./chat/chat-upload-preview.md)                                                                                             |
+| 生产 `/images/` 400                                               | [chat/chat-upload-access-prod.md](./chat/chat-upload-access-prod.md) + [ops/nginx.md](./ops/nginx.md)                                                    |
+| 本地上传落盘 / UPLOAD_ROOT                                        | [ops/upload-storage-paths.md](./ops/upload-storage-paths.md)                                                                                             |
+| `createLlm` / 400                                                 | [llm/create-llm.md](./llm/create-llm.md)                                                                                                                 |
+| 图片 OCR / 附件识图                                               | [llm/ocr-create-llm-glm.md](./llm/ocr-create-llm-glm.md)                                                                                                 |
+| 知识库向量 404 / 400 入库失败                                     | [knowledge/siliconflow-vector-full-url.md](./knowledge/siliconflow-vector-full-url.md)                                                                   |
+| 知识库向量 Key/模型                                               | [knowledge/knowledge-vector-create-llm.md](./knowledge/knowledge-vector-create-llm.md)                                                                   |
+| 会员知识库向量双库                                                | [knowledge/knowledge-member-vector-tier.md](./knowledge/knowledge-member-vector-tier.md)                                                                 |
+| 用户自定义向量与多库 RAG                                          | [knowledge/user-vector-rag-config.md](./knowledge/user-vector-rag-config.md)                                                                             |
+| 全站 BGE / 入库 Bad Request                                       | [knowledge/vector-bge-global-round.md](./knowledge/vector-bge-global-round.md)                                                                           |
+| 向量分片 ole.log / 代码截断                                       | [knowledge/knowledge-chunk-boundaries.md](./knowledge/knowledge-chunk-boundaries.md)                                                                     |
+| 保存知识库后 `Invalid array length` / Node OOM                    | [knowledge/knowledge-chunk-infinite-loop-oom.md](./knowledge/knowledge-chunk-infinite-loop-oom.md)                                                       |
+| 云端保存知识库报「请求体过大」/ PayloadTooLarge                   | [knowledge/knowledge-save-body-limit.md](./knowledge/knowledge-save-body-limit.md)                                                                       |
+| 对话运行久后 Node OOM / 附件重复解析                              | [chat/chat-memory-oom.md](./chat/chat-memory-oom.md)                                                                                                     |
+| 流式输出时代码块无法横向滚动                                      | [chat/streaming-code-block-scroll.md](./chat/streaming-code-block-scroll.md)                                                                             |
+| 生产 rate-limit `ERR_ERL_UNEXPECTED_X_FORWARDED_FOR`              | [ops/trust-proxy-rate-limit.md](./ops/trust-proxy-rate-limit.md)                                                                                         |
+| 复制到助手后输入框不聚焦                                          | [knowledge/assistant-insert-focus.md](./knowledge/assistant-insert-focus.md)                                                                             |
+| 设置页大模型 Key                                                  | [llm/llm-runtime-settings.md](./llm/llm-runtime-settings.md)                                                                                             |
+| 按用户 / 会员默认模型                                             | [llm/membership-per-user-llm.md](./llm/membership-per-user-llm.md)                                                                                       |
+| 设置页预设 / Combobox                                             | [llm/llm-setting-ui-presets.md](./llm/llm-setting-ui-presets.md)                                                                                         |
+| 英语学习 Agent + LLM                                              | [llm/agent-create-llm-unify.md](./llm/agent-create-llm-unify.md)                                                                                         |
+| 今日记词无词可抽 / 时间不对                                       | [english/daily-memorize-implementation.md](./english/daily-memorize-implementation.md) §9                                                                |
+| 云端朗读 404 / MiniMax 502 余额不足                               | [english/minimax-cloud-tts.md](./english/minimax-cloud-tts.md) §12                                                                                       |
+| 设置页云端朗读参数不生效 / 改音色仍播旧音                         | [english/cloud-tts-settings.md](./english/cloud-tts-settings.md) §5–§6                                                                                   |
+| 换设备后云端朗读参数丢失 / 需账号同步                             | [english/cloud-tts-prefs-db.md](./english/cloud-tts-prefs-db.md)                                                                                         |
+| TTS 从点喇叭到出声（前后端全链路）                                | [english/tts-end-to-end-guide.md](./english/tts-end-to-end-guide.md)                                                                                     |
+| 支付成功但资料页仍非会员 / 到期仍显示会员                         | [pay/stripe-membership-billing.md](./pay/stripe-membership-billing.md) §6–§7                                                                             |
+| 换号后仍看到上一账号的草稿或助手对话                              | [app/user-switch-state-reset.md](./app/user-switch-state-reset.md)                                                                                       |
+| 登录成功瞬间又回到登录页 / cloud-tts 401                          | [app/login-cloud-tts-prefetch-401.md](./app/login-cloud-tts-prefetch-401.md)                                                                             |
+| 阅读页顶栏显示「智能对话」而非书架                                | [ebook/ebook-reader-shelf.md](./ebook/ebook-reader-shelf.md) §3.4、[app/route-auth.md](./app/route-auth.md)                                              |
+| PDF 目录跳转报 canvas 并发渲染错误                                | [ebook/shelf-reader-polish.md](./ebook/shelf-reader-polish.md) §3.6                                                                                      |
+| EPUB 连续滚动无法自动进入下一章                                   | [ebook/epub-reader-settings-scroll.md](./ebook/epub-reader-settings-scroll.md) §3.2                                                                      |
+| 桌面大文件上传中无法阅读 / 超 120MB 打不开                        | [ebook/ebook-cos-local-shelf.md](./ebook/ebook-cos-local-shelf.md) §3.1–§3.2                                                                             |
+| 非会员 Web 无法导入 / 会员才云端备份                              | [ebook/ebook-membership-upload.md](./ebook/ebook-membership-upload.md)                                                                                   |
+| 重复选同一路径仍上传                                              | [ebook/ebook-local-path-dedup.md](./ebook/ebook-local-path-dedup.md)                                                                                     |
+| 刷新报 `getStorage` 未初始化                                      | [app/membership-store-circular-deps.md](./app/membership-store-circular-deps.md)                                                                         |
+| 换号后书架仍是上一账号                                            | [app/user-switch-state-reset.md](./app/user-switch-state-reset.md)                                                                                       |
+| 阅读背景色不生效                                                  | [ebook/ebook-cos-local-shelf.md](./ebook/ebook-cos-local-shelf.md) §3.4                                                                                  |
+| PDF 页面太小 / 猛滚连跳多页                                       | [ebook/pdf-reader-fit-scroll.md](./ebook/pdf-reader-fit-scroll.md) §3.1–§3.3                                                                             |
+| EPUB 右键无菜单 / 助手与知识库样式不一致                          | [ebook/epub-assistant-context-menu.md](./ebook/epub-assistant-context-menu.md)、[ebook/ebook-moke-assistant.md](./ebook/ebook-moke-assistant.md)         |
+| 目录打开但看不出当前读到哪一章                                    | [ebook/ebook-toc-active-highlight.md](./ebook/ebook-toc-active-highlight.md)                                                                             |
+| PDF 无 MOKE 助手 / PDF 右键菜单                                   | [ebook/ebook-moke-assistant.md](./ebook/ebook-moke-assistant.md)                                                                                         |
+| 保存读书想法后阅读页白屏 / 下划线异常                             | [ebook/epub-thought-underlines-sync.md](./ebook/epub-thought-underlines-sync.md)                                                                         |
+| EPUB 用户划线与想法虚线如何实现 / 重叠合并                        | [ebook/epub-user-highlight-impl.md](./ebook/epub-user-highlight-impl.md)、[ebook/epub-thought-underline-impl.md](./ebook/epub-thought-underline-impl.md) |
+| EPUB 划线同名句子误删 / PopBar 划线与删除状态不对                 | [ebook/epub-highlight-dom-match.md](./ebook/epub-highlight-dom-match.md)                                                                                 |
+| EPUB PopBar 闪烁 / 划线卡顿 / 工具条空档                          | [ebook/epub-popbar-perf-ux.md](./ebook/epub-popbar-perf-ux.md)                                                                                           |
+| 划线/写想法后数秒才出现线、同步时页面卡死；反向选到空行后应用卡死 | [ebook/epub-annotation-sync-perf.md](./ebook/epub-annotation-sync-perf.md)                                                                               |
+| 两次想法选区相交时虚线叠成双线                                    | [ebook/epub-thought-partial-overlap.md](./ebook/epub-thought-partial-overlap.md)                                                                         |
+| 点击想法列表引用合并/拆分不对（A、B、标点、换行桥接）             | [ebook/epub-thought-cluster-bridging.md](./ebook/epub-thought-cluster-bridging.md)                                                                       |
+| 想法侧栏引用区划线/删除划线状态不对（部分已划仍显示删除）         | [ebook/epub-thought-quote-highlight-toggle.md](./ebook/epub-thought-quote-highlight-toggle.md)                                                           |
+| 拖拽分栏 EPUB 白屏 / 拖拽时彩色划线消失                           | [ebook/epub-split-soft-resize.md](./ebook/epub-split-soft-resize.md)                                                                                     |
+| 想法列表单击应进详情 / 分组摘录展开                               | [ebook/epub-thought-list-ui.md](./ebook/epub-thought-list-ui.md)                                                                                         |
+| EPUB 阅读背景与顶栏/侧栏色差                                      | [ebook/epub-reader-surface-bg.md](./ebook/epub-reader-surface-bg.md)                                                                                     |
+| EPUB 阅读设置无法点击正文关闭                                     | [ebook/epub-reader-settings-dismiss.md](./ebook/epub-reader-settings-dismiss.md)                                                                         |
+| 复制到助手后输入中文乱码                                          | [knowledge/assistant-insert-focus.md](./knowledge/assistant-insert-focus.md) §5.1                                                                        |
 
 ---
 
