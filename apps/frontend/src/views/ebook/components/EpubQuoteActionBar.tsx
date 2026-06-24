@@ -34,6 +34,7 @@ export type EpubQuoteActionBarProps = {
 	onCopy: () => void;
 	onWriteThought: () => void;
 	onAskBook: () => void;
+	onShare?: () => void;
 	onUnderline?: () => void;
 	onRemoveUnderline?: () => void;
 	/** 当前选区是否已有用户划线 */
@@ -103,6 +104,7 @@ const HANDLER_PROP: Partial<
 		| 'onCopy'
 		| 'onWriteThought'
 		| 'onAskBook'
+		| 'onShare'
 		| 'onUnderline'
 		| 'onRemoveUnderline'
 	>
@@ -112,6 +114,7 @@ const HANDLER_PROP: Partial<
 	removeUnderline: 'onRemoveUnderline',
 	writeThought: 'onWriteThought',
 	askBook: 'onAskBook',
+	share: 'onShare',
 };
 
 const CONTAINER_CLASS: Record<BarVariant, string> = {
@@ -263,6 +266,7 @@ export function EpubQuoteActionBar({
 	onCopy,
 	onWriteThought,
 	onAskBook,
+	onShare,
 	onUnderline,
 	onRemoveUnderline,
 	hasHighlight = false,
@@ -295,6 +299,7 @@ export function EpubQuoteActionBar({
 		onCopy: handleCopy,
 		onWriteThought,
 		onAskBook,
+		onShare,
 		onUnderline,
 		onRemoveUnderline,
 	} as const;

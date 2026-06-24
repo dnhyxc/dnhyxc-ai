@@ -30,6 +30,10 @@
 | [epub-thought-list-ui.md](./epub-thought-list-ui.md)                               | **增量**：想法列表单击进详情、分组摘录展开、引用 clamp 泛化；移除列表内选中与引用点击回书                                                       |
 | [epub-thought-underline-empty-gap.md](./epub-thought-underline-empty-gap.md)       | **增量**：跨段落写想法时空行不再画虚线（空白文本片段过滤 + mark 校正快路径）                                                                  |
 | [epub-thought-list-delete-close.md](./epub-thought-list-delete-close.md)           | **增量**：删列表最后一条收起侧栏；详情正文与列表行高对齐                                                                                      |
+| [epub-quote-share.md](./epub-quote-share.md)                                       | **增量**：书摘分享图片（Canvas 日历卡、复制/下载、多样式居中、PopBar/想法入口）                                                               |
+| [epub-side-panel-moke.md](./epub-side-panel-moke.md)                               | **增量**：MK 问书与右侧分栏统一开启/关闭（无闪烁、列表关闭无留白、划线不误关助手）                                                            |
+| [epub-context-menu-popbar.md](./epub-context-menu-popbar.md)                       | **增量**：右键菜单与选区 PopBar（关菜单不闪、无选区不自动点词）                                                                               |
+| [epub-thought-quote-viewport.md](./epub-thought-quote-viewport.md)                 | **增量**：想法侧栏开合后左侧引用段落保持视口可见（CFI 锚点 + 分栏 resize 后 scroll 校正）                                                    |
 | [epub-thought-quote-highlight-toggle.md](./epub-thought-quote-highlight-toggle.md) | **增量**：侧栏引用区划线/删除划线与 PopBar 对齐的 full 覆盖度判定                                                                               |
 | [epub-split-soft-resize.md](./epub-split-soft-resize.md)                           | **增量**：EPUB 分栏拖拽 soft resize（rAF 合并、即时 patch 划线、松手 full sync，避免白屏）                                                      |
 | [epub-reader-surface-bg.md](./epub-reader-surface-bg.md)                           | **增量**：阅读背景 CSS 变量同步顶栏、右栏、MOKE/想法侧栏与设置 Popover                                                                          |

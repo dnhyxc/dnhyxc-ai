@@ -1,6 +1,10 @@
 import type { ReactNode } from 'react';
-import { useCallback, useEffect, useRef } from 'react';
-import type { GroupImperativeHandle, Layout } from 'react-resizable-panels';
+import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
+import type {
+	GroupImperativeHandle,
+	Layout,
+	PanelImperativeHandle,
+} from 'react-resizable-panels';
 import {
 	ResizableHandle,
 	ResizablePanel,
@@ -29,6 +33,7 @@ export function EbookReadSplitLayout({
 	children,
 }: EbookReadSplitLayoutProps) {
 	const panelGroupRef = useRef<GroupImperativeHandle | null>(null);
+	const assistantPanelRef = useRef<PanelImperativeHandle | null>(null);
 	const lastSplitLayoutRef = useRef<Layout>({ reader: 58, assistant: 42 });
 	const splitPointerActiveRef = useRef(false);
 
@@ -48,13 +53,30 @@ export function EbookReadSplitLayout({
 		};
 	}, [finishSplitPointerDrag]);
 
-	useEffect(() => {
+	useLayoutEffect(() => {
 		if (!sidePanelOpen) {
-			panelGroupRef.current?.setLayout({ reader: 100, assistant: 0 });
-		} else {
-			panelGroupRef.current?.setLayout(lastSplitLayoutRef.current);
+			const collapse = () => {
+				assistantPanelRef.current?.collapse();
+				panelGroupRef.current?.setLayout({ reader: 100, assistant: 0 });
+			};
+			collapse();
+			let raf2 = 0;
+			const raf1 = requestAnimationFrame(() => {
+				collapse();
+				raf2 = requestAnimationFrame(() => {
+					collapse();
+					notifyEbookSplitPanelResizeEnd();
+				});
+			});
+			return () => {
+				cancelAnimationFrame(raf1);
+				cancelAnimationFrame(raf2);
+			};
 		}
-		// 程序化开关侧栏后补一次 EPUB 真 resize
+		if (assistantPanelRef.current?.isCollapsed()) {
+			assistantPanelRef.current.expand();
+		}
+		panelGroupRef.current?.setLayout(lastSplitLayoutRef.current);
 		const raf = requestAnimationFrame(() => {
 			notifyEbookSplitPanelResizeEnd();
 		});
@@ -90,18 +112,18 @@ export function EbookReadSplitLayout({
 			/>
 			<ResizablePanel
 				id="assistant"
+				panelRef={assistantPanelRef}
+				collapsible
+				collapsedSize={0}
 				defaultSize={42}
 				minSize={0}
-				className={cn(
-					'min-h-0 min-w-0',
-					!sidePanelOpen && 'pointer-events-none opacity-0',
-				)}
+				className={cn('min-h-0 min-w-0', !sidePanelOpen && 'hidden')}
 			>
-				<div className="border-theme/10 flex h-full min-h-0 min-w-0 flex-col overflow-hidden border-l contain-[inline-size]">
-					<div className="min-h-0 flex-1 overflow-hidden">
-						{sidePanelOpen ? sidePanel : null}
+				{sidePanelOpen ? (
+					<div className="border-theme/10 flex h-full min-h-0 min-w-0 flex-col overflow-hidden border-l contain-[inline-size]">
+						<div className="min-h-0 flex-1 overflow-hidden">{sidePanel}</div>
 					</div>
-				</div>
+				) : null}
 			</ResizablePanel>
 		</ResizablePanelGroup>
 	);

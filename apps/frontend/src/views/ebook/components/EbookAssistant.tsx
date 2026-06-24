@@ -25,10 +25,7 @@ import { cn } from '@/lib/utils';
 import useStore from '@/store';
 import ebookAssistantStore from '@/store/ebookAssistant';
 import type { Message } from '@/types/chat';
-import {
-	epubReaderSurfaceMutedClass,
-	epubReaderSurfaceOverlayClass,
-} from '../utils/epubReaderSettings';
+import { epubReaderSurfaceOverlayClass } from '../utils/epubReaderSettings';
 
 export type EbookAssistantProps = {
 	bookId: string;
@@ -249,12 +246,7 @@ const EbookAssistantInner = observer(function EbookAssistantInner({
 					) : null}
 					<div className="text-textcolor/70 flex justify-center items-start text-sm">
 						<div className="max-w-3xl w-full mx-auto pl-4 pr-4">
-							<div
-								className={cn(
-									'flex w-full justify-between rounded-md border border-theme/5 p-2',
-									epubReaderSurfaceMutedClass,
-								)}
-							>
+							<div className="flex w-full justify-between rounded-md border border-theme/5 p-2">
 								<Sparkles
 									size={18}
 									className="mr-2 mt-0.5 shrink-0 text-teal-500"

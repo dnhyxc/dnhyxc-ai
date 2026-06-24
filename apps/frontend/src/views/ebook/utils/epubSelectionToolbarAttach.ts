@@ -1,5 +1,9 @@
 import type { Rendition } from 'epubjs';
 import {
+	extractQuoteSegmentsFromRange,
+	type QuoteShareRun,
+} from './epubQuoteShareStyled';
+import {
 	getAccurateRangeLineClientRects,
 	normalizeSelectionRangeForEpub,
 	resolveSelectionCfiRange,
@@ -17,6 +21,8 @@ export type EpubSelectionPopBarPayload = {
 	/** 选区顶边（相对视口，px）；工具栏显示在其上方 */
 	y: number;
 	selectedText: string;
+	/** 保留原文字号/字重的样式片段 */
+	quoteSegments?: QuoteShareRun[];
 	cfiRange?: string;
 };
 
@@ -208,13 +214,25 @@ export function attachEpubSelectionPopBar(
 	let keyboardEmitTimer = 0;
 	let selecting = false;
 	let suppressEmitUntil = 0;
+	/** 右键菜单手势：mouseup 早于 contextmenu，须跳过 emit 避免 PopBar 闪一下再关 */
+	let contextMenuGesture = false;
 
-	const hidePopBar = () => {
-		if (shouldSuppressDismiss()) return;
+	const clearPendingEmit = () => {
 		cancelAnimationFrame(rafId);
 		rafId = 0;
 		window.clearTimeout(keyboardEmitTimer);
 		keyboardEmitTimer = 0;
+	};
+
+	const hidePopBar = () => {
+		if (shouldSuppressDismiss()) return;
+		clearPendingEmit();
+		onChange(null);
+	};
+
+	/** 右键菜单等场景：必须关 PopBar，不受 suppressDismiss 影响 */
+	const forceHidePopBar = () => {
+		clearPendingEmit();
 		onChange(null);
 	};
 
@@ -264,29 +282,68 @@ export function attachEpubSelectionPopBar(
 					onChange(null);
 					return;
 				}
+				// 抛出当前激活选区信息，供外部响应（如展示 PopBar 工具栏等）
 				onChange({
+					// PopBar 横向居中显示的坐标（选区矩形中心 X 坐标）
 					x: anchor.centerX,
+					// PopBar 纵向基准点（选区矩形顶端 Y 坐标）
 					y: anchor.top,
+					// 选中的纯文本内容
 					selectedText: active.text,
+					// 选区中的富文本片段（含原 DOM 字号、样式等，供生成高保真分享卡片用）
+					quoteSegments: extractQuoteSegmentsFromRange(
+						active.range,
+						active.win,
+					),
+					// 选区对应的 EPUB CFI 范围，便于定位和后续引用
 					cfiRange: resolveSelectionCfiRange(rend, active.win, active.range),
 				});
 			});
 		});
 	};
 
+	/**
+	 * 监听并处理 epub iframe 内部 selection 相关事件，确保 PopBar 出现/消失逻辑准确
+	 * @param contents - 当前 EPUB 渲染页的 iframe contents 对象
+	 */
 	const bindContents = (contents: EpubIframeContents) => {
+		// 若当前 contents 已经绑定过事件，则跳过，防止重复注册
 		if (contentCleanups.has(contents)) return;
 		const doc = contents.document;
 
-		const onPointerDown = () => {
-			selecting = true;
-			hidePopBar();
+		/**
+		 * 指针按下事件：用于标记用户正在进行拖选或其他操作，提前隐藏 PopBar，避免误触
+		 * - 鼠标右键时（button === 2），标记为 contextMenuGesture，抑制短时间内 PopBar 显示
+		 * - 设置 suppressEmitUntil，给出 600ms 抑制窗口（避免右键呼出菜单引发不必要的 selection 反馈）
+		 * - selecting=true 用于追踪当前是否有拖选操作
+		 */
+		const onPointerDown = (e: Event) => {
+			if (e instanceof MouseEvent && e.button === 2) {
+				// 右键点击，进入 context menu 手势状态
+				contextMenuGesture = true;
+				// 短暂抑制 emitSelection，避免右键菜单期间出 PopBar
+				suppressEmitUntil = Date.now() + 600;
+			}
+			selecting = true; // 标记为正在拖选
+			hidePopBar(); // 立即隐藏 PopBar
 		};
 
-		const onPointerUp = () => {
-			if (!selecting) return;
-			selecting = false;
-			emitSelection();
+		/**
+		 * 指针松开事件：结束拖选流程
+		 * - 只有在 selecting 标记为 true 时才响应（即必须是之前 pointerDown 开始的拖选）
+		 * - 若处于 contextMenuGesture（右键菜单）状态或本次是右键松开，则忽略（避免误触发 PopBar）
+		 * - 正常松开则触发 emitSelection，让选区工具栏弹出
+		 */
+		const onPointerUp = (e: Event) => {
+			if (!selecting) return; // 并非拖选流程，无需处理
+			selecting = false; // 重置 selecting 状态
+			if (
+				contextMenuGesture || // 处于 context menu 手势状态
+				(e instanceof MouseEvent && e.button === 2) // 或本次是右键松开
+			) {
+				return; // 此类操作不触发 PopBar
+			}
+			emitSelection(); // 拖选结束后，根据当前选区展示 PopBar
 		};
 
 		const onSelectionChange = () => {
@@ -308,7 +365,11 @@ export function attachEpubSelectionPopBar(
 			}, 200);
 		};
 
-		const onContextMenu = () => hidePopBar();
+		const onContextMenu = () => {
+			contextMenuGesture = false;
+			suppressEmitUntil = Date.now() + 600;
+			forceHidePopBar();
+		};
 
 		doc.addEventListener('mousedown', onPointerDown, true);
 		doc.addEventListener('touchstart', onPointerDown, true);
@@ -391,6 +452,7 @@ export function buildEpubPopBarPayloadFromCfiRange(
 					x: anchor.centerX,
 					y: anchor.top,
 					selectedText: quote,
+					quoteSegments: extractQuoteSegmentsFromRange(range, win),
 					cfiRange,
 				};
 			}

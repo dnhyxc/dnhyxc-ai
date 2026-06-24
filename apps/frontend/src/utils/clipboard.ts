@@ -34,6 +34,62 @@ export const copyToClipboard = async (text: string): Promise<void> => {
 	await writeClipText(text);
 };
 
+/** 将 Canvas 生成的 PNG 写入剪贴板（Safari 须在点击回调内同步调用 write，Blob 用 ClipboardItem Promise 延迟） */
+export function copyCanvasToClipboard(
+	canvas: HTMLCanvasElement,
+): Promise<void> {
+	if (isTauriRuntime()) {
+		return copyCanvasToClipboardTauri(canvas);
+	}
+	if (!navigator.clipboard?.write || typeof ClipboardItem === 'undefined') {
+		return Promise.reject(new Error('剪贴板不可用'));
+	}
+	// 同步调用 write，不在此前 await；toBlob 放进 ClipboardItem Promise
+	return navigator.clipboard.write([
+		new ClipboardItem({
+			'image/png': canvasToPngBlob(canvas),
+		}),
+	]);
+}
+
+async function copyCanvasToClipboardTauri(
+	canvas: HTMLCanvasElement,
+): Promise<void> {
+	const blob = await canvasToPngBlob(canvas);
+	const { Image } = await import('@tauri-apps/api/image');
+	const { writeImage } = await import('@tauri-apps/plugin-clipboard-manager');
+	const image = await Image.fromBytes(await blob.arrayBuffer());
+	await writeImage(image);
+}
+
+/** 将已有图片 Blob 写入剪贴板 */
+export async function copyImageToClipboard(blob: Blob): Promise<void> {
+	if (isTauriRuntime()) {
+		const { Image } = await import('@tauri-apps/api/image');
+		const { writeImage } = await import('@tauri-apps/plugin-clipboard-manager');
+		const image = await Image.fromBytes(await blob.arrayBuffer());
+		await writeImage(image);
+		return;
+	}
+	if (!navigator.clipboard?.write || typeof ClipboardItem === 'undefined') {
+		throw new Error('剪贴板不可用');
+	}
+	await navigator.clipboard.write([
+		new ClipboardItem({
+			'image/png': Promise.resolve(blob),
+		}),
+	]);
+}
+
+function canvasToPngBlob(canvas: HTMLCanvasElement): Promise<Blob> {
+	return new Promise((resolve, reject) => {
+		canvas.toBlob((result) => {
+			if (result) resolve(result);
+			else reject(new Error('剪贴板不可用'));
+		}, 'image/png');
+	});
+}
+
 export const pasteFromClipboard = async (): Promise<string> => {
 	return readClipText();
 };

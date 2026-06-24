@@ -1016,4 +1016,24 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'When you open a note from the list and delete the last remaining note, the reading-notes side panel closes instead of staying open empty. If other notes remain, you return to the updated list. Note body alignment matches the list when entering details.',
 	},
+	's25-39': {
+		title: 'EPUB quote share image',
+		description:
+			'While reading EPUB, tap Share quote on the selection toolbar or in the reading-notes quote area to generate a calendar-style quote card image. Copy the image to paste into WeChat and similar apps, or download a PNG; font sizes and weights are preserved when possible.',
+	},
+	's25-40': {
+		title: 'EPUB MK ask & right side panel UX',
+		description:
+			'Header Bot, MK ask, and reading-notes side panel now share one right-column flow—opening MK from the notes list no longer flickers; closing MK fully collapses the panel when empty or returns to notes when applicable; closing the notes list restores full-width reading with no blank right column; user highlights no longer dismiss MK while it is open.',
+	},
+	's25-41': {
+		title: 'EPUB context menu & selection toolbar',
+		description:
+			'Opening the context menu closes the selection toolbar immediately without flicker; right-click without a prior manual selection no longer auto-highlights a word—the menu shows the no-selection items; copy, MK ask, and write note still work after you drag-select first.',
+	},
+	's25-42': {
+		title: 'EPUB reading-notes quote stays in view',
+		description:
+			'When you open or close the reading-notes side panel, the quoted passage in the left EPUB view stays on screen instead of scrolling away after the column resizes—easier to edit alongside the sidebar.',
+	},
 };

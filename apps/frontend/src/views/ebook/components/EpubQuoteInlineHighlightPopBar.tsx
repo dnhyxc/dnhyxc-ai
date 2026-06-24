@@ -46,7 +46,7 @@ export function EpubQuoteInlineHighlightPopBar({
 				sideOffset={8}
 				collisionPadding={12}
 				className={cn(
-					'group/pop z-[60] w-auto border-0 bg-transparent p-0 shadow-none outline-none',
+					'group/pop z-60 w-auto border-0 bg-transparent p-0 shadow-none outline-none',
 				)}
 				onOpenAutoFocus={(e) => e.preventDefault()}
 				onCloseAutoFocus={(e) => e.preventDefault()}

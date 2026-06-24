@@ -15,7 +15,6 @@ import type { EpubHighlightColorId, EpubHighlightStyle } from '../types';
 import {
 	epubReaderSurfaceFadeFromClass,
 	epubReaderSurfaceHoverClass,
-	epubReaderSurfaceMutedClass,
 	epubReaderSurfaceSelectedClass,
 } from '../utils/epubReaderSettings';
 import { EPUB_HIGHLIGHT_COLOR_OPTIONS } from '../utils/epubUserHighlights';
@@ -552,12 +551,7 @@ export function EpubThoughtComposeCard({
 					mode={mode}
 				/>
 			) : null}
-			<div
-				className={cn(
-					'flex h-28 flex-col overflow-hidden',
-					epubReaderSurfaceMutedClass,
-				)}
-			>
+			<div className="flex h-28 flex-col overflow-hidden">
 				<div className="min-h-0 flex-1">{children}</div>
 				{actions ? (
 					<div className="mb-1 flex shrink-0 items-center justify-end gap-2 p-2.5">

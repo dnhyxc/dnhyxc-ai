@@ -96,6 +96,10 @@
 | 想法列表单击应进详情 / 分组摘录展开                               | [ebook/epub-thought-list-ui.md](./ebook/epub-thought-list-ui.md)                                                                                         |
 | 跨段落写想法时空行也出现虚线                                      | [ebook/epub-thought-underline-empty-gap.md](./ebook/epub-thought-underline-empty-gap.md)                                                                 |
 | 删想法列表最后一条后侧栏空白不收起 / 详情正文比列表下垂             | [ebook/epub-thought-list-delete-close.md](./ebook/epub-thought-list-delete-close.md)                                                                     |
+| 书摘分享图片 / 复制到微信                                         | [ebook/epub-quote-share.md](./ebook/epub-quote-share.md)                                                                                                 |
+| MK 问书关闭后右侧空白 / 想法列表关后留白 / 开 MK 闪烁           | [ebook/epub-side-panel-moke.md](./ebook/epub-side-panel-moke.md)                                                                                         |
+| 右键菜单 PopBar 闪烁 / 无选区右键自动点词                         | [ebook/epub-context-menu-popbar.md](./ebook/epub-context-menu-popbar.md)                                                                                 |
+| 开/关想法侧栏后左侧引用段滚出屏幕                                 | [ebook/epub-thought-quote-viewport.md](./ebook/epub-thought-quote-viewport.md)                                                                           |
 | EPUB 阅读背景与顶栏/侧栏色差                                      | [ebook/epub-reader-surface-bg.md](./ebook/epub-reader-surface-bg.md)                                                                                     |
 | EPUB 阅读设置无法点击正文关闭                                     | [ebook/epub-reader-settings-dismiss.md](./ebook/epub-reader-settings-dismiss.md)                                                                         |
 | 复制到助手后输入中文乱码                                          | [knowledge/assistant-insert-focus.md](./knowledge/assistant-insert-focus.md) §5.1                                                                        |

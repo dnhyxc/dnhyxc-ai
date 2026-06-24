@@ -41,6 +41,7 @@ import { EbookPanelHeader } from './components/EbookPanelHeader';
 import { EbookReadSplitLayout } from './components/EbookReadSplitLayout';
 import { EbookTocDrawer } from './components/EbookTocDrawer';
 import { EpubPane } from './components/EpubPane';
+import { EpubQuoteShareDialog } from './components/EpubQuoteShareDialog';
 import {
 	EpubReaderContextMenu,
 	type EpubReaderContextMenuState,
@@ -69,6 +70,11 @@ import {
 	buildPdfContextMenuItems,
 	type PdfReaderContextActions,
 } from './utils/buildPdfContextMenuItems';
+import { subscribeEbookSplitPanelResizeEnd } from './utils/ebookSplitResize';
+import {
+	extractQuoteSegmentsFromRange,
+	type QuoteShareRun,
+} from './utils/epubQuoteShareStyled';
 import { cfiFromDomRange, trimSelectionRange } from './utils/epubRangeGeometry';
 import {
 	DEFAULT_EPUB_READER_SETTINGS,
@@ -78,6 +84,7 @@ import {
 	loadEpubReaderSettings,
 	saveEpubReaderSettings,
 } from './utils/epubReaderSettings';
+import { scrollEpubCfiIntoView } from './utils/epubScrolledNav';
 import {
 	buildEpubPopBarPayloadFromCfiRange,
 	type EpubSelectionPopBarPayload,
@@ -156,6 +163,7 @@ function EbookReadPage() {
 	const [focusInputAtEndKey, setFocusInputAtEndKey] = useState(0);
 	const [contextMenu, setContextMenu] =
 		useState<EpubReaderContextMenuState | null>(null);
+	const contextMenuOpenRef = useRef(false);
 	const contextActionsRef = useRef<EpubReaderContextActions | null>(null);
 	const pdfContextActionsRef = useRef<PdfReaderContextActions | null>(null);
 	const contextPayloadRef = useRef<{
@@ -178,6 +186,12 @@ function EbookReadPage() {
 	const [selectionPopBar, setSelectionPopBar] =
 		useState<EpubSelectionPopBarState | null>(null);
 	const selectionPopBarRef = useRef<EpubSelectionPopBarPayload | null>(null);
+	const [quoteShareOpen, setQuoteShareOpen] = useState(false);
+	const quoteShareOpenRef = useRef(false);
+	const [quoteShareText, setQuoteShareText] = useState('');
+	const [quoteShareSegments, setQuoteShareSegments] = useState<
+		QuoteShareRun[] | undefined
+	>();
 	const [highlights, setHighlights] = useState<EbookUserHighlight[]>([]);
 	const [highlightStyle, setHighlightStyle] =
 		useState<EpubHighlightStyle>('highlight');
@@ -186,6 +200,8 @@ function EbookReadPage() {
 	const highlightsRef = useRef(highlights);
 	highlightsRef.current = highlights;
 	const returnToListClusterRef = useRef<EbookThoughtClickCluster | null>(null);
+	/** 想法侧栏开合时保持左侧引用段落在视口内（分栏 resize 后回滚） */
+	const thoughtQuoteAnchorCfiRef = useRef<string | undefined>(undefined);
 	const [thoughtDraft, setThoughtDraft] = useState({
 		id: '',
 		quote: '',
@@ -197,6 +213,10 @@ function EbookReadPage() {
 		updatedAt: '',
 	});
 	const progTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+	useEffect(() => {
+		quoteShareOpenRef.current = quoteShareOpen;
+	}, [quoteShareOpen]);
 
 	useEffect(() => {
 		if (!bookId) return;
@@ -459,7 +479,6 @@ function EbookReadPage() {
 	const onUserHighlightPopBar = useCallback(
 		(payload: EpubSelectionPopBarPayload, highlight: EbookUserHighlight) => {
 			suppressEpubSelectionPopBarDismiss();
-			setAssistantOpen(false);
 			selectionPopBarRef.current = payload;
 			setHighlightStyle(highlight.style);
 			setHighlightColor(highlight.color);
@@ -525,7 +544,6 @@ function EbookReadPage() {
 					highlight?.quote ?? quote,
 					resolveCfiDomRange,
 				);
-				setAssistantOpen(false);
 				selectionPopBarRef.current = payload;
 				if (highlight) {
 					setHighlightStyle(highlight.style);
@@ -691,6 +709,7 @@ function EbookReadPage() {
 				});
 				return;
 			}
+			thoughtQuoteAnchorCfiRef.current = cfiRange.trim();
 			setAssistantOpen(false);
 			setSelectionPopBar(null);
 			selectionPopBarRef.current = null;
@@ -718,10 +737,13 @@ function EbookReadPage() {
 	const onSelectionPopBarChange = useCallback(
 		(payload: EpubSelectionPopBarPayload | null) => {
 			if (!payload) {
+				// 分享弹窗打开时 iframe 选区会失焦，勿误关 PopBar
+				if (quoteShareOpenRef.current) return;
 				setSelectionPopBar(null);
 				selectionPopBarRef.current = null;
 				return;
 			}
+			if (contextMenuOpenRef.current) return;
 			selectionPopBarRef.current = payload;
 			const existing = payload.cfiRange
 				? findUserHighlightForSelection(
@@ -759,6 +781,11 @@ function EbookReadPage() {
 	const openThoughtCluster = useCallback(
 		(cluster: EbookThoughtClickCluster) => {
 			if (cluster.allThoughts.length === 0) return;
+			const rend = epubNavRef.current?.getRendition() ?? undefined;
+			const { cfiRange } = getThoughtClusterHighlightSubject(cluster, rend);
+			if (cfiRange.trim()) {
+				thoughtQuoteAnchorCfiRef.current = cfiRange.trim();
+			}
 			startTransition(() => {
 				setAssistantOpen(false);
 				setThoughtListCluster({ ...cluster, selectedThoughtId: undefined });
@@ -999,8 +1026,6 @@ function EbookReadPage() {
 	}, []);
 
 	const openAssistant = useCallback((draft?: string) => {
-		setThoughtListOpen(false);
-		setThoughtDialogOpen(false);
 		if (draft?.trim()) {
 			setAssistantInput(draft.trim());
 		}
@@ -1008,14 +1033,14 @@ function EbookReadPage() {
 	}, []);
 
 	const toggleAssistant = useCallback(() => {
-		setAssistantOpen((prev) => {
-			if (!prev) {
+		setAssistantOpen((wasOpen) => {
+			if (wasOpen && thoughtListOpen && !thoughtListClusterRef.current) {
 				setThoughtListOpen(false);
-				setThoughtDialogOpen(false);
+				setThoughtListCluster(null);
 			}
-			return !prev;
+			return !wasOpen;
 		});
-	}, []);
+	}, [thoughtListOpen]);
 
 	const openAssistantWithSelection = useCallback(
 		(selectedText: string) => {
@@ -1026,6 +1051,47 @@ function EbookReadPage() {
 		},
 		[openAssistant, t],
 	);
+
+	const resolveQuoteShareSegments = useCallback(
+		(opts?: { segments?: QuoteShareRun[]; cfiRange?: string }) => {
+			if (opts?.segments?.length) return opts.segments;
+			const cfiRange = opts?.cfiRange?.trim();
+			if (!cfiRange) return undefined;
+			const rend = epubNavRef.current?.getRendition();
+			if (!rend) return undefined;
+			const range = resolveCfiDomRange(rend, cfiRange);
+			if (!range) return undefined;
+			const win = range.startContainer.ownerDocument?.defaultView;
+			if (!win) return undefined;
+			const segments = extractQuoteSegmentsFromRange(range, win);
+			return segments.length ? segments : undefined;
+		},
+		[epubNavReady],
+	);
+
+	const openQuoteShare = useCallback(
+		(
+			text: string,
+			opts?: { segments?: QuoteShareRun[]; cfiRange?: string },
+		) => {
+			const quote = text.trim();
+			if (!quote) return;
+			setQuoteShareText(quote);
+			setQuoteShareSegments(resolveQuoteShareSegments(opts));
+			setQuoteShareOpen(true);
+		},
+		[resolveQuoteShareSegments],
+	);
+
+	const onSelectionPopBarShare = useCallback(() => {
+		const payload = selectionPopBarRef.current;
+		if (!payload?.selectedText.trim()) return;
+		suppressEpubSelectionPopBarDismiss();
+		openQuoteShare(payload.selectedText, {
+			segments: payload.quoteSegments,
+			cfiRange: payload.cfiRange,
+		});
+	}, [openQuoteShare]);
 
 	const onSelectionPopBarCopy = useCallback(() => {
 		const payload = selectionPopBarRef.current;
@@ -1040,7 +1106,7 @@ function EbookReadPage() {
 		const text = payload?.selectedText ?? '';
 		setSelectionPopBar(null);
 		selectionPopBarRef.current = null;
-		window.setTimeout(() => openAssistantWithSelection(text), 0);
+		openAssistantWithSelection(text);
 	}, [openAssistantWithSelection]);
 
 	const selectionPopBarLabels = useMemo(
@@ -1061,14 +1127,6 @@ function EbookReadPage() {
 		[t],
 	);
 
-	const thoughtDrawerLabels = useMemo(
-		() => ({
-			...selectionPopBarLabels,
-			share: t('ebook.read.selectionPop.shareShort'),
-		}),
-		[selectionPopBarLabels, t],
-	);
-
 	const thoughtListQuoteActions = useMemo(() => {
 		if (!thoughtListCluster) return null;
 		const rend = epubNavRef.current?.getRendition() ?? undefined;
@@ -1084,7 +1142,7 @@ function EbookReadPage() {
 				)
 			: highlights;
 		return {
-			labels: thoughtDrawerLabels,
+			labels: selectionPopBarLabels,
 			hasHighlight: isSelectionFullyHighlighted(
 				chapterHighlights,
 				cfiRange,
@@ -1105,19 +1163,20 @@ function EbookReadPage() {
 				openCreateThought(quote, cfiRange);
 			},
 			onAskBook: () => {
-				setThoughtListOpen(false);
-				window.setTimeout(() => openAssistantWithSelection(quote), 0);
+				openAssistantWithSelection(quote);
 			},
+			onShare: () => openQuoteShare(quote, { cfiRange }),
 		};
 	}, [
 		thoughtListCluster,
 		highlights,
 		epubNavReady,
-		thoughtDrawerLabels,
+		selectionPopBarLabels,
 		openCreateThought,
 		openAssistantWithSelection,
 		removeHighlightForQuote,
 		openHighlightPopBarAtBookContent,
+		openQuoteShare,
 	]);
 
 	const thoughtDialogQuoteActions = useMemo(() => {
@@ -1126,7 +1185,7 @@ function EbookReadPage() {
 		const cfiRange = thoughtDraft.cfiRange;
 		const rend = epubNavRef.current?.getRendition() ?? undefined;
 		return {
-			labels: thoughtDrawerLabels,
+			labels: selectionPopBarLabels,
 			hasHighlight: isSelectionFullyHighlighted(
 				highlights,
 				cfiRange,
@@ -1149,12 +1208,12 @@ function EbookReadPage() {
 				openCreateThought(thoughtDraft.quote, thoughtDraft.cfiRange);
 			},
 			onAskBook: () => {
-				setThoughtDialogOpen(false);
-				window.setTimeout(
-					() => openAssistantWithSelection(thoughtDraft.quote),
-					0,
-				);
+				openAssistantWithSelection(thoughtDraft.quote);
 			},
+			onShare: () =>
+				openQuoteShare(thoughtDraft.quote, {
+					cfiRange: thoughtDraft.cfiRange,
+				}),
 		};
 	}, [
 		thoughtDraft.quote,
@@ -1163,21 +1222,82 @@ function EbookReadPage() {
 		epubNavReady,
 		thoughtDialogMode,
 		thoughtDialogOpen,
-		thoughtDrawerLabels,
+		selectionPopBarLabels,
 		openCreateThought,
 		openAssistantWithSelection,
 		removeHighlightForQuote,
 		openHighlightPopBarAtBookContent,
+		openQuoteShare,
 	]);
 
-	const thoughtPanelOpen = thoughtListOpen || thoughtDialogOpen;
-	const sidePanelOpen = assistantOpen || thoughtPanelOpen;
+	const thoughtPanelOpen =
+		thoughtDialogOpen || (thoughtListOpen && thoughtListCluster != null);
+
+	const syncThoughtQuoteAnchorCfi = useCallback(() => {
+		if (thoughtDialogOpen && thoughtDraft.cfiRange?.trim()) {
+			thoughtQuoteAnchorCfiRef.current = thoughtDraft.cfiRange.trim();
+			return;
+		}
+		if (thoughtListOpen && thoughtListCluster) {
+			const rend = epubNavRef.current?.getRendition() ?? undefined;
+			const { cfiRange } = getThoughtClusterHighlightSubject(
+				thoughtListCluster,
+				rend,
+			);
+			if (cfiRange.trim()) {
+				thoughtQuoteAnchorCfiRef.current = cfiRange.trim();
+			}
+		}
+	}, [
+		thoughtDialogOpen,
+		thoughtDraft.cfiRange,
+		thoughtListOpen,
+		thoughtListCluster,
+		epubNavReady,
+	]);
+
+	const scrollThoughtQuoteAnchorIntoView = useCallback(() => {
+		if (book?.fmt !== 'epub') return;
+		const cfi = thoughtQuoteAnchorCfiRef.current;
+		if (!cfi) return;
+		const rend = epubNavRef.current?.getRendition();
+		if (!rend) return;
+		scrollEpubCfiIntoView(rend, cfi);
+	}, [book?.fmt, epubNavReady]);
+
+	useEffect(() => {
+		if (book?.fmt !== 'epub') return;
+		return subscribeEbookSplitPanelResizeEnd(scrollThoughtQuoteAnchorIntoView);
+	}, [book?.fmt, scrollThoughtQuoteAnchorIntoView]);
+
+	useEffect(() => {
+		if (book?.fmt !== 'epub') return;
+		if (thoughtPanelOpen) syncThoughtQuoteAnchorCfi();
+		let raf2 = 0;
+		const raf1 = requestAnimationFrame(() => {
+			raf2 = requestAnimationFrame(scrollThoughtQuoteAnchorIntoView);
+		});
+		return () => {
+			cancelAnimationFrame(raf1);
+			cancelAnimationFrame(raf2);
+		};
+	}, [
+		book?.fmt,
+		thoughtPanelOpen,
+		thoughtDialogOpen,
+		thoughtListOpen,
+		thoughtListCluster,
+		thoughtDraft.cfiRange,
+		syncThoughtQuoteAnchorCfi,
+		scrollThoughtQuoteAnchorIntoView,
+	]);
 
 	const closeThoughtDialog = useCallback(() => {
 		setThoughtDialogOpen(false);
 	}, []);
 
 	const closeThoughtList = useCallback(() => {
+		returnToListClusterRef.current = null;
 		setThoughtListOpen(false);
 		setThoughtListCluster(null);
 	}, []);
@@ -1261,12 +1381,34 @@ function EbookReadPage() {
 		thoughtSaving,
 	]);
 
+	/** 右侧分栏：与 state 标志对齐，避免 open 标志与 cluster 错位时仍占位 */
+	const sidePanelOpen =
+		assistantOpen ||
+		thoughtDialogOpen ||
+		(Boolean(thoughtListOpen) && thoughtListCluster != null);
+	const sidePanelSlotKey = assistantOpen
+		? 'assistant'
+		: thoughtDialogOpen
+			? 'thought-dialog'
+			: 'thought-list';
+	const sidePanelSlot =
+		sidePanel != null ? (
+			<div
+				key={sidePanelSlotKey}
+				className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden"
+			>
+				{sidePanel}
+			</div>
+		) : null;
+
 	const closeContextMenu = useCallback(() => {
+		contextMenuOpenRef.current = false;
 		setContextMenu(null);
 	}, []);
 
 	const showReaderContextMenu = useCallback(
 		(payload: { clientX: number; clientY: number; hasSelection?: boolean }) => {
+			contextMenuOpenRef.current = true;
 			setSelectionPopBar(null);
 			selectionPopBarRef.current = null;
 			setContextMenu({
@@ -1770,7 +1912,7 @@ function EbookReadPage() {
 				) : book.fmt === 'epub' ? (
 					<EbookReadSplitLayout
 						sidePanelOpen={sidePanelOpen}
-						sidePanel={sidePanel}
+						sidePanel={sidePanelSlot}
 					>
 						<div
 							className="flex h-full min-h-0 flex-1 flex-col"
@@ -1875,7 +2017,19 @@ function EbookReadPage() {
 					onRemoveHighlight={onRemoveHighlight}
 					onWriteThought={onSelectionPopBarWriteThought}
 					onAskBook={onSelectionPopBarAskBook}
+					onShare={onSelectionPopBarShare}
 					onClearSelection={clearEpubSelection}
+				/>
+			) : null}
+
+			{book ? (
+				<EpubQuoteShareDialog
+					open={quoteShareOpen}
+					onOpenChange={setQuoteShareOpen}
+					quote={quoteShareText}
+					quoteSegments={quoteShareSegments}
+					bookTitle={book.title}
+					author={book.author}
 				/>
 			) : null}
 		</EbookPageShell>
