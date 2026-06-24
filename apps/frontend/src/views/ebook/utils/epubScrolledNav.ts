@@ -12,38 +12,76 @@ type EpubManager = {
 	check?: () => Promise<unknown>;
 };
 
-/** epub.js 连续滚动时的实际滚动容器 */
+/**
+ * 获取 epub.js 连续滚动模式下的实际滚动容器 HTMLElement
+ * - 由于 oepub.js 的 Rendition.manager 实现为私有属性，这里只能用类型断言强行访问
+ * - manager?.container 指向渲染所有章节的主滚动 <div>，用于手动定位/滚动
+ * - 若未初始化或非连续滚动，则为 null
+ * @param rend epub.js 的 Rendition 实例
+ * @returns 主滚动容器 HTMLElement，若不可用则返回 null
+ */
 export function getEpubScrollContainer(rend: Rendition): HTMLElement | null {
+	// 类型断言获取私有 manager 属性（oepubjs 未暴露正式类型）
 	const manager = (rend as unknown as { manager?: EpubManager }).manager;
+	// 返回 epub 连续滚动容器，若 manager 不存在则返回 null
 	return manager?.container ?? null;
 }
 
+/**
+ * 尝试获取 epub.js Rendition 实例的内部 manager（通常为 ContinuousViewManager 实例）
+ * - 仅用于需要底层滚动/检查的极少场景
+ * - 若当前不是连续滚动模式，可能返回 null
+ * @param rend epub.js 的 Rendition 实例
+ * @returns manager 对象或 null
+ */
 function getManager(rend: Rendition): EpubManager | null {
+	// 类型断言强行访问私有 manager 属性，未初始化场景返回 null
 	return (rend as unknown as { manager?: EpubManager }).manager ?? null;
 }
 
+/**
+ * 检查当前滚动容器（epub 连续滚动的主 div）是否已滚动到顶部/底部
+ * - 小于等于 SCROLL_EDGE_PX 像素视为到顶，反之到底
+ * - 用于避免过度卷动边缘，以及判定是否可以继续向上/下滚动
+ * @param container 连续滚动 epub 内容容器 HTMLElement
+ * @returns { atTop: boolean, atBottom: boolean } 顶/底边界状态
+ */
 function scrollEdges(container: HTMLElement) {
 	const { scrollTop, scrollHeight, clientHeight } = container;
 	return {
+		// 离顶部 ≤ SCROLL_EDGE_PX 视为到顶
 		atTop: scrollTop <= SCROLL_EDGE_PX,
+		// 底部实际滚动位置 ≥ 总高度-边距 视为到底
 		atBottom: scrollTop + clientHeight >= scrollHeight - SCROLL_EDGE_PX,
 	};
 }
 
+/**
+ * 计算给定 Range 在主页面中的绝对 top/bottom 坐标（像素值）
+ * 主要用于确定被引用 range 是否进入可视区域、以及需不需要额外滚动以避开边界
+ * @param range 文档内的 DOM Range
+ * @param iframe 承载该 range 的 iframe 元素（epubjs 内文通常在 iframe 渲染）
+ * @returns { top: number, bottom: number } 绝对页面像素坐标，对应 range 在主页面窗口的上下边界
+ */
 function readRangeViewportBounds(range: Range, iframe: HTMLIFrameElement) {
+	// 先尝试取 range 的整体矩形，适用于 range 覆盖一定内容长度（存在 width/height）
 	const rect = range.getBoundingClientRect();
 	if (rect.width > 0 || rect.height > 0) {
+		// 计算方式：range.rect （相对所在 iframe），加上 iframe 本身在主页面上的 rect.top
 		const iframeRect = iframe.getBoundingClientRect();
 		return {
-			top: iframeRect.top + rect.top,
-			bottom: iframeRect.top + rect.bottom,
+			top: iframeRect.top + rect.top, // range 顶部在主页面的像素坐标
+			bottom: iframeRect.top + rect.bottom, // range 底部在主页面的像素坐标
 		};
 	}
+	// 若 range 没有可见内容（如零宽度：可能是 caret 选区/空 range）需特殊处理
+	// 此处用 collapse(true) 得到起始点的光标位置
 	const caret = range.cloneRange();
 	caret.collapse(true);
 	const caretRect = caret.getBoundingClientRect();
 	const iframeRect = iframe.getBoundingClientRect();
 	const y = iframeRect.top + caretRect.top;
+	// 若高度为 0，也给予至少 1 px 高，避免上下边界重叠导致数学判断问题
 	return { top: y, bottom: y + Math.max(caretRect.height, 1) };
 }
 

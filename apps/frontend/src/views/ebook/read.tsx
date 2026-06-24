@@ -673,27 +673,38 @@ function EbookReadPage() {
 		],
 	);
 
+	// 用于移除当前选中的高亮内容
 	const onRemoveHighlight = useCallback(async () => {
+		// 获取当前 PopBar 的 payload，包含高亮的 cfiRange 及选中文本信息
 		const payload = selectionPopBarRef.current;
+		// 若没有 cfiRange，说明没有可删除的高亮，直接返回
 		if (!payload?.cfiRange) return;
+		// 获取当前 epub 的 rendition 实例，如果还没有则为 undefined
 		const rend = epubNavRef.current?.getRendition() ?? undefined;
+		// 查找所有与当前选区相关的用户高亮（可能存在多个重叠的高亮）
 		const existing = findAllUserHighlightsForSelection(
 			highlightsRef.current,
 			payload.cfiRange,
 			payload.selectedText,
 			rend,
 		);
+		// 如果没有相关高亮，直接返回
 		if (existing.length === 0) return;
 
+		// 收集所有找到的高亮 id，准备批量删除
 		const removeIds = new Set(
 			existing.map((item) => item.id).filter(Boolean) as string[],
 		);
 		try {
+			// 并发删除所有高亮（请求后端），如果有任何一个失败会被 catch 捕获
 			await Promise.all([...removeIds].map((id) => deleteEbookHighlight(id)));
+			// 过滤掉已删除的高亮，构造下一步保留的高亮数组
 			const next = highlightsRef.current.filter((h) => !removeIds.has(h.id));
+			// 更新高亮 ref 和状态
 			highlightsRef.current = next;
 			setHighlights(next);
 		} catch (e) {
+			// 删除失败时弹出错误提示，显示本地化的失败信息和具体的错误内容
 			Toast({
 				type: 'error',
 				title: t('ebook.read.highlight.deleteFailed'),
@@ -702,12 +713,19 @@ function EbookReadPage() {
 		}
 	}, [t]);
 
+	// 用于处理高亮样式切换（例如更改为下划线、背景等），会在弹出操作栏中触发
 	const onHighlightStyleChange = useCallback(
 		(style: EpubHighlightStyle) => {
+			// 更新当前选中高亮样式到状态（React 状态，一般用于渲染和后续操作）
 			setHighlightStyle(style);
+			// 获取弹出栏当前的 payload，其中包含当前用户选中的 CFI 区间和选中文本
 			const payload = selectionPopBarRef.current;
+			// 如果没有 cfiRange，说明当前没有可变更样式的高亮，直接返回
 			if (!payload?.cfiRange) return;
+			// 尝试获取 epub 的 rendition 实例（用于后续高亮定位、查找等操作）
 			const rend = epubNavRef.current?.getRendition() ?? undefined;
+			// 判断当前选区是否"完全高亮"（即选区内所有内容是否都被高亮）
+			// 若不是全部高亮，并且查找不到任何与当前选区匹配的用户高亮，则无需操作，直接返回
 			if (
 				!isSelectionFullyHighlighted(
 					highlightsRef.current,
@@ -724,17 +742,31 @@ function EbookReadPage() {
 			) {
 				return;
 			}
+			// 如果存在高亮，或当前选区已完全高亮，则调用方法更新高亮样式
+			// upsertSelectionHighlight 会异步提交样式变化，可以用 void 忽略返回值（无须等待结束）
 			void upsertSelectionHighlight(style, highlightColor);
 		},
+		// 依赖项中包含高亮颜色和处理高亮变更的逻辑
 		[highlightColor, upsertSelectionHighlight],
 	);
 
+	// 用于处理高亮颜色的变更（如切换黄/粉/蓝/紫标注色），通常在高亮弹出栏中点击颜色按钮触发
 	const onHighlightColorChange = useCallback(
 		(color: EpubHighlightColorId) => {
+			// 更新当前选中高亮颜色到 React 状态，（影响实时 UI 展示及后续高亮操作）
 			setHighlightColor(color);
+
+			// 获取当前弹出栏的 payload 信息，包括用户所选区域的 cfiRange 和相关文本
 			const payload = selectionPopBarRef.current;
+
+			// 如果当前 selection 没有 cfiRange，说明未选中文本，不做任何处理直接返回
 			if (!payload?.cfiRange) return;
+
+			// 获取 epub 的 rendition 实例（用于检查高亮、定位等）
 			const rend = epubNavRef.current?.getRendition() ?? undefined;
+
+			// 判断当前选区是否为「完全高亮」，
+			// 若不是，并且在当前选区找不到任何用户高亮，则说明用户操作无效，直接返回
 			if (
 				!isSelectionFullyHighlighted(
 					highlightsRef.current,
@@ -751,36 +783,53 @@ function EbookReadPage() {
 			) {
 				return;
 			}
+
+			// 若选区有高亮或已完全高亮，则实际调用高亮更新方法，
+			// 传入当前的高亮样式和要设置的新颜色。upsertSelectionHighlight 返回 Promise，这里直接忽略（无需等待）。
 			void upsertSelectionHighlight(highlightStyle, color);
 		},
+		// 依赖于当前高亮样式、upsertSelectionHighlight 函数
 		[highlightStyle, upsertSelectionHighlight],
 	);
 
+	// 用于打开「想法详情」弹窗的回调方法。思路：设定弹窗内容，关闭侧栏（如有），准备后续还原快照等动作
 	const openViewThought = useCallback(
+		// thought: 当前要查看的想法对象；fromList: 是否由列表跳转（默认为 false）
 		(thought: EbookThought, fromList = false) => {
+			// 打开想法详情时总是关闭助手侧栏
 			setAssistantOpen(false);
+
+			// 如果是通过列表点击跳转到详情，则需要保存当前列表快照以便后续返回
 			if (fromList) {
+				// thoughtListClusterRef.current 记录了当前思考列表的快照，如存在则用于还原
 				if (thoughtListClusterRef.current) {
+					// 记录当前思考列表快照到 returnToListClusterRef 备用
 					returnToListClusterRef.current = thoughtListClusterRef.current;
 				}
+				// 跳转到详情时将思考列表（侧栏）收起
 				setThoughtListOpen(false);
 			} else {
+				// 非从列表跳转进入时，重置还原列表快照记录
 				returnToListClusterRef.current = null;
 			}
+
+			// 在状态中准备当前要查看的想法草稿，用于弹窗内容显示
 			setThoughtDraft({
-				id: thought.id,
-				quote: thought.quote,
-				cfiRange: thought.cfiRange,
-				content: thought.content,
-				username: thought.username,
-				avatar: thought.avatar,
-				createdAt: thought.createdAt,
-				updatedAt: thought.updatedAt,
+				id: thought.id, // 想法唯一 id
+				quote: thought.quote, // 被标注引用的文本内容
+				cfiRange: thought.cfiRange, // CFI 定位范围，用于定位电子书位置
+				content: thought.content, // 想法正文内容
+				username: thought.username, // 用户名
+				avatar: thought.avatar, // 用户头像
+				createdAt: thought.createdAt, // 创建时间
+				updatedAt: thought.updatedAt, // 更新时间
 			});
+			// 将弹窗模式设为「查看」模式，后续可切换为编辑、创建等其它模式
 			setThoughtDialogMode('view');
+			// 打开想法详情弹窗（展示/渲染）
 			setThoughtDialogOpen(true);
 		},
-		[],
+		[], // 没有外部依赖，函数只在首次渲染时生成一次
 	);
 
 	/** 从列表快照恢复侧栏；按列表「共 N 条」判断，无数据则收起 */

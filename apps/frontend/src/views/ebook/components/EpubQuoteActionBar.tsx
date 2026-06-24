@@ -43,9 +43,9 @@ export type EpubQuoteActionBarProps = {
 	 * variant 表示操作条的展现形态，有三种形式以适应不同场景：
 	 * - 'floating'：悬浮于页面上，通常跟随选区出现，操作区域紧凑，常用于段落引用、选区弹出等场合
 	 * - 'inline'：内嵌于内容流中（比如段落下方），在不遮挡内容的同时便于连续操作，适合摘录后展示操作
-	 * - 'drawer'：展示于抽屉或侧边栏顶部等显著位置，操作空间更宽裕，适合批量/高级操作场景
+	 * - 'panel'：右侧想法分栏内引用区底栏，全宽平铺操作按钮
 	 */
-	variant?: 'floating' | 'inline' | 'drawer';
+	variant?: 'floating' | 'inline' | 'panel';
 	/** 浮动条：任意按钮点击后回调（不含划线相关操作） */
 	onAnyAction?: () => void;
 	className?: string;
@@ -67,7 +67,7 @@ const PRESERVE_SELECTION_ACTIONS = new Set<ActionId>([
 ]);
 
 const ACTION_ORDER: Record<BarVariant, ActionId[]> = {
-	drawer: [
+	panel: [
 		'copy',
 		'underline',
 		'removeUnderline',
@@ -125,26 +125,26 @@ const HANDLER_PROP: Partial<
 };
 
 const CONTAINER_CLASS: Record<BarVariant, string> = {
-	drawer: 'flex h-full w-full min-w-0 items-stretch',
+	panel: 'flex h-full w-full min-w-0 items-stretch',
 	inline:
 		'flex w-full min-w-0 items-stretch overflow-hidden rounded-md border border-theme/10 bg-theme/5',
 	floating: 'flex items-center px-0.5',
 };
 
 const ICON_CLASS: Record<BarVariant, string> = {
-	drawer: 'stroke-[1.5]',
+	panel: 'stroke-[1.5]',
 	inline: 'stroke-[1.75]',
 	floating: 'size-4 stroke-[1.75]',
 };
 
 const LISTEN_CLASS: Record<BarVariant, string> = {
-	drawer: 'text-sm font-semibold leading-none',
+	panel: 'text-sm font-semibold leading-none',
 	inline: 'text-[11px] font-semibold leading-none',
 	floating: 'text-sm font-semibold leading-none',
 };
 
 const ITEM_BUTTON_CLASS: Record<BarVariant, string> = {
-	drawer:
+	panel:
 		'flex min-w-0 flex-1 flex-col items-center justify-center gap-0.5 outline-none focus:outline-none focus-visible:outline-none focus-visible:ring-0 transition-colors',
 	inline:
 		'flex min-w-0 flex-1 flex-col items-center justify-center gap-1 border-theme/10 border-r py-2 px-0.5 text-xs transition-colors last:border-r-0',
@@ -153,19 +153,19 @@ const ITEM_BUTTON_CLASS: Record<BarVariant, string> = {
 };
 
 const ITEM_ACTIVE_CLASS: Record<BarVariant, string> = {
-	drawer: 'text-textcolor/80 hover:text-teal-500 cursor-pointer',
+	panel: 'text-textcolor/80 hover:text-teal-500 cursor-pointer',
 	inline: 'text-textcolor/80 hover:text-teal-500',
 	floating: 'cursor-pointer text-textcolor/80 hover:text-teal-500',
 };
 
 const ITEM_DISABLED_CLASS: Record<BarVariant, string> = {
-	drawer: 'text-textcolor/50 cursor-default',
+	panel: 'text-textcolor/50 cursor-default',
 	inline: 'cursor-default text-textcolor/50',
 	floating: 'cursor-default text-textcolor/80',
 };
 
 const ICON_WRAP_CLASS: Record<BarVariant, string> = {
-	drawer: 'flex size-4 items-center justify-center [&_svg]:size-4',
+	panel: 'flex size-4 items-center justify-center [&_svg]:size-4',
 	inline: 'flex size-4 shrink-0 items-center justify-center [&_svg]:size-4',
 	floating: 'flex h-4 w-4 items-center justify-center',
 };
@@ -173,7 +173,7 @@ const ICON_WRAP_CLASS: Record<BarVariant, string> = {
 const COPY_SUCCESS_MS = 1000;
 
 const LABEL_CLASS: Record<BarVariant, string> = {
-	drawer: 'w-full text-center text-xs pt-0.5 leading-tight',
+	panel: 'w-full text-center text-xs pt-0.5 leading-tight',
 	inline: 'w-full text-center text-xs pt-0.5 leading-tight',
 	floating: 'w-full text-center text-xs leading-none pt-1',
 };

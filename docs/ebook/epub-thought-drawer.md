@@ -37,7 +37,7 @@
 | `EpubThoughtDrawerParts.tsx` | `EpubThoughtParts.tsx` |
 | Model 弹窗 / Sheet 全屏 | `EbookReadSplitLayout` 的 `sidePanel` |
 
-**仍保留的命名**：`EpubQuoteActionBar` 的 `variant="drawer"` 指 **右侧面板内引用区操作条布局**（非底部 Sheet），与已废弃的「全屏抽屉」无关。
+**仍保留的命名**：`EpubQuoteActionBar` 的 `variant="panel"` 指 **右侧面板内引用区操作条布局**（非底部 Sheet），与已废弃的「全屏抽屉」无关。
 
 ---
 

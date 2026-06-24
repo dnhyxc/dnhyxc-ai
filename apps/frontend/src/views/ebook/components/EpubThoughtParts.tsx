@@ -369,7 +369,7 @@ export function EpubThoughtQuoteCard({
 		onQuoteHighlightClick?.();
 	};
 
-	const drawerQuoteActions = quoteActions;
+	const panelQuoteActions = quoteActions;
 
 	if (!hasQuote && !showHeader) return null;
 
@@ -474,15 +474,15 @@ export function EpubThoughtQuoteCard({
 					</div>
 				</figure>
 			) : null}
-			{drawerQuoteActions && hasQuote ? (
+			{panelQuoteActions && hasQuote ? (
 				<div
 					className={cn(
 						'flex h-[51px] shrink-0 items-center border-theme/10 border-t pb-0.5',
 					)}
 				>
 					<EpubQuoteActionBar
-						{...drawerQuoteActions}
-						variant="drawer"
+						{...panelQuoteActions}
+						variant="panel"
 						className="min-w-0 flex-1"
 					/>
 				</div>
