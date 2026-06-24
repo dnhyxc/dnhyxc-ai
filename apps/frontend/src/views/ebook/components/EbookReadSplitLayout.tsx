@@ -24,6 +24,8 @@ export type EbookReadSplitLayoutProps = {
 	children: ReactNode;
 };
 
+const CLOSED_LAYOUT: Layout = { reader: 100, assistant: 0 };
+
 /**
  * 电子书阅读页分栏：左阅读、右 MOKE 助手 / 读书想法（互斥，同栏位）。
  */
@@ -36,11 +38,19 @@ export function EbookReadSplitLayout({
 	const assistantPanelRef = useRef<PanelImperativeHandle | null>(null);
 	const lastSplitLayoutRef = useRef<Layout>({ reader: 58, assistant: 42 });
 	const splitPointerActiveRef = useRef(false);
+	const sidePanelOpenRef = useRef(sidePanelOpen);
+	sidePanelOpenRef.current = sidePanelOpen;
 
 	const finishSplitPointerDrag = useCallback(() => {
 		if (!splitPointerActiveRef.current) return;
 		splitPointerActiveRef.current = false;
 		endEbookSplitPanelPointerDrag();
+	}, []);
+
+	/** 收起右侧分栏并让左侧占满（同步调用，对齐 Monaco edit 模式） */
+	const applyClosedLayout = useCallback(() => {
+		assistantPanelRef.current?.collapse();
+		panelGroupRef.current?.setLayout(CLOSED_LAYOUT);
 	}, []);
 
 	useEffect(() => {
@@ -55,23 +65,13 @@ export function EbookReadSplitLayout({
 
 	useLayoutEffect(() => {
 		if (!sidePanelOpen) {
-			const collapse = () => {
-				assistantPanelRef.current?.collapse();
-				panelGroupRef.current?.setLayout({ reader: 100, assistant: 0 });
-			};
-			collapse();
-			let raf2 = 0;
-			const raf1 = requestAnimationFrame(() => {
-				collapse();
-				raf2 = requestAnimationFrame(() => {
-					collapse();
-					notifyEbookSplitPanelResizeEnd();
-				});
+			applyClosedLayout();
+			// ponytail: 仅一帧补刀 + 通知 EPUB resize；勿用 hidden 藏 panel（会打断 collapse）
+			const raf = requestAnimationFrame(() => {
+				applyClosedLayout();
+				notifyEbookSplitPanelResizeEnd();
 			});
-			return () => {
-				cancelAnimationFrame(raf1);
-				cancelAnimationFrame(raf2);
-			};
+			return () => cancelAnimationFrame(raf);
 		}
 		if (assistantPanelRef.current?.isCollapsed()) {
 			assistantPanelRef.current.expand();
@@ -81,7 +81,7 @@ export function EbookReadSplitLayout({
 			notifyEbookSplitPanelResizeEnd();
 		});
 		return () => cancelAnimationFrame(raf);
-	}, [sidePanelOpen]);
+	}, [sidePanelOpen, applyClosedLayout]);
 
 	return (
 		<ResizablePanelGroup
@@ -90,7 +90,11 @@ export function EbookReadSplitLayout({
 			className="h-full min-h-0 min-w-0"
 			groupRef={panelGroupRef}
 			onLayoutChanged={(layout) => {
-				if (sidePanelOpen) lastSplitLayoutRef.current = layout;
+				if (sidePanelOpenRef.current) {
+					lastSplitLayoutRef.current = layout;
+				} else if ((layout.assistant ?? 0) > 0) {
+					applyClosedLayout();
+				}
 				finishSplitPointerDrag();
 			}}
 		>
@@ -117,7 +121,10 @@ export function EbookReadSplitLayout({
 				collapsedSize={0}
 				defaultSize={42}
 				minSize={0}
-				className={cn('min-h-0 min-w-0', !sidePanelOpen && 'hidden')}
+				className={cn(
+					'min-h-0 min-w-0 overflow-hidden',
+					!sidePanelOpen && 'pointer-events-none opacity-0',
+				)}
 			>
 				{sidePanelOpen ? (
 					<div className="border-theme/10 flex h-full min-h-0 min-w-0 flex-col overflow-hidden border-l contain-[inline-size]">

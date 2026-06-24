@@ -100,6 +100,7 @@
 | MK 问书关闭后右侧空白 / 想法列表关后留白 / 开 MK 闪烁           | [ebook/epub-side-panel-moke.md](./ebook/epub-side-panel-moke.md)                                                                                         |
 | 右键菜单 PopBar 闪烁 / 无选区右键自动点词                         | [ebook/epub-context-menu-popbar.md](./ebook/epub-context-menu-popbar.md)                                                                                 |
 | 开/关想法侧栏后左侧引用段滚出屏幕                                 | [ebook/epub-thought-quote-viewport.md](./ebook/epub-thought-quote-viewport.md)                                                                           |
+| 关闭想法列表后右侧空白 / 左侧未立即全宽                           | [ebook/epub-split-panel-collapse.md](./ebook/epub-split-panel-collapse.md)                                                                               |
 | EPUB 阅读背景与顶栏/侧栏色差                                      | [ebook/epub-reader-surface-bg.md](./ebook/epub-reader-surface-bg.md)                                                                                     |
 | EPUB 阅读设置无法点击正文关闭                                     | [ebook/epub-reader-settings-dismiss.md](./ebook/epub-reader-settings-dismiss.md)                                                                         |
 | 复制到助手后输入中文乱码                                          | [knowledge/assistant-insert-focus.md](./knowledge/assistant-insert-focus.md) §5.1                                                                        |

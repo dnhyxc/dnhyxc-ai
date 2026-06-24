@@ -4,7 +4,7 @@
 
 **增量专题**：统一顶栏 Bot、PopBar「MK 问书」、想法侧栏「MK 问书」的右侧分栏显隐；修复关闭 MK 后空白分栏、想法列表切换闪烁、划线误关助手等问题。
 
-**延伸阅读**：[epub-thought-side-panel.md](./epub-thought-side-panel.md)、[epub-split-soft-resize.md](./epub-split-soft-resize.md)、[epub-quote-share.md](./epub-quote-share.md)、[epub-thought-list-delete-close.md](./epub-thought-list-delete-close.md)、[epub-context-menu-popbar.md](./epub-context-menu-popbar.md)、[epub-thought-quote-viewport.md](./epub-thought-quote-viewport.md)。
+**延伸阅读**：[epub-thought-side-panel.md](./epub-thought-side-panel.md)、[epub-split-soft-resize.md](./epub-split-soft-resize.md)、[epub-quote-share.md](./epub-quote-share.md)、[epub-thought-list-delete-close.md](./epub-thought-list-delete-close.md)、[epub-context-menu-popbar.md](./epub-context-menu-popbar.md)、[epub-thought-quote-viewport.md](./epub-thought-quote-viewport.md)、[epub-split-panel-collapse.md](./epub-split-panel-collapse.md)（**关闭侧栏全宽恢复**，§4.5 三帧方案已 supersede）。
 
 ---
 
@@ -204,6 +204,8 @@ const sidePanelSlot =
 ---
 
 ### 4.5 `EbookReadSplitLayout` 收起逻辑
+
+> **已 supersede**：三帧 `collapse` + `hidden` 方案仍偶发空白/延迟。当前实现见 **[epub-split-panel-collapse.md](./epub-split-panel-collapse.md)**（`applyClosedLayout`、`opacity-0`、`onLayoutChanged` 兜底）。下文保留历史对比供 diff 追溯。
 
 **改动前** · 基线（约 L51–L62）
 

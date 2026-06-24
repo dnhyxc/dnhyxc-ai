@@ -1036,4 +1036,9 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'When you open or close the reading-notes side panel, the quoted passage in the left EPUB view stays on screen instead of scrolling away after the column resizes—easier to edit alongside the sidebar.',
 	},
+	's25-43': {
+		title: 'EPUB split panel close layout fix',
+		description:
+			'After closing the reading-notes list or MK ask side panel, the left reading column returns to full width immediately—no sporadic blank right column and no multi-frame delay.',
+	},
 };
