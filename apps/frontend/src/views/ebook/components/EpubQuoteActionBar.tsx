@@ -39,6 +39,12 @@ export type EpubQuoteActionBarProps = {
 	onRemoveUnderline?: () => void;
 	/** 当前选区是否已有用户划线 */
 	hasHighlight?: boolean;
+	/**
+	 * variant 表示操作条的展现形态，有三种形式以适应不同场景：
+	 * - 'floating'：悬浮于页面上，通常跟随选区出现，操作区域紧凑，常用于段落引用、选区弹出等场合
+	 * - 'inline'：内嵌于内容流中（比如段落下方），在不遮挡内容的同时便于连续操作，适合摘录后展示操作
+	 * - 'drawer'：展示于抽屉或侧边栏顶部等显著位置，操作空间更宽裕，适合批量/高级操作场景
+	 */
 	variant?: 'floating' | 'inline' | 'drawer';
 	/** 浮动条：任意按钮点击后回调（不含划线相关操作） */
 	onAnyAction?: () => void;
@@ -53,6 +59,7 @@ type RenderActionId = ActionId | HighlightToggleSlot;
 
 /** 点击后不收起选区 / PopBar 的操作 */
 const PRESERVE_SELECTION_ACTIONS = new Set<ActionId>([
+	'copy',
 	'underline',
 	'removeUnderline',
 	'share',

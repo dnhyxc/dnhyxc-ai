@@ -499,8 +499,34 @@ function EbookReadPage() {
 		void upsertSelectionHighlight(highlightStyle, highlightColor);
 	}, [highlightColor, highlightStyle, upsertSelectionHighlight]);
 
+	/** 引用 CFI 已渲染并滚入左侧阅读视口（侧栏划线/删线、分栏 resize 后复用） */
+	const ensureQuoteCfiInViewport = useCallback(
+		async (cfiRange: string) => {
+			if (book?.fmt !== 'epub') return;
+			const cfi = cfiRange.trim();
+			if (!cfi) return;
+			const rend = epubNavRef.current?.getRendition();
+			if (!rend) return;
+			if (!resolveCfiDomRange(rend, cfi)) {
+				try {
+					await rend.display(cfi);
+					await new Promise<void>((resolve) => {
+						requestAnimationFrame(() => {
+							requestAnimationFrame(() => resolve());
+						});
+					});
+				} catch {
+					// 定位失败时 scroll 为 no-op
+				}
+			}
+			scrollEpubCfiIntoView(rend, cfi);
+		},
+		[book?.fmt, epubNavReady],
+	);
+
 	const removeHighlightsForQuote = useCallback(
 		async (cfiRange: string, quote: string) => {
+			await ensureQuoteCfiInViewport(cfiRange);
 			const rend = epubNavRef.current?.getRendition() ?? undefined;
 			const existing = findAllUserHighlightsCoveringCfi(
 				highlightsRef.current,
@@ -526,7 +552,7 @@ function EbookReadPage() {
 				});
 			}
 		},
-		[t],
+		[t, ensureQuoteCfiInViewport],
 	);
 
 	const removeHighlightForQuote = removeHighlightsForQuote;
@@ -584,21 +610,7 @@ function EbookReadPage() {
 				const rend = epubNavRef.current?.getRendition() ?? null;
 				if (!rend || !bookId) return;
 
-				// 确保内容已渲染到当前 cfiRange，如果未渲染则跳转并等待页面稳定
-				if (!resolveCfiDomRange(rend, cfiRange)) {
-					try {
-						// 跳转到 cfiRange 对应页面
-						await rend.display(cfiRange);
-						// 利用两帧 requestAnimationFrame，保证 DOM 已经完全渲染
-						await new Promise<void>((resolve) => {
-							requestAnimationFrame(() => {
-								requestAnimationFrame(() => resolve());
-							});
-						});
-					} catch {
-						// 定位失败时也继续后续流程，视为兜底
-					}
-				}
+				await ensureQuoteCfiInViewport(cfiRange);
 
 				// 检查当前位置是否已经有用户高亮（通过 cfi 和 quote 匹配）
 				let highlight = findUserHighlightCoveringCfi(
@@ -646,11 +658,19 @@ function EbookReadPage() {
 					setHighlightStyle(highlight.style);
 					setHighlightColor(highlight.color);
 				}
+				const targetCfi = highlight?.cfiRange ?? cfiRange;
+				scrollEpubCfiIntoView(rend, targetCfi);
 				// 打开 PopBar，展示工具栏
 				setSelectionPopBar({ ...payload, open: true });
 			})();
 		},
-		[bookId, highlightColor, highlightStyle, upsertHighlightForQuote],
+		[
+			bookId,
+			highlightColor,
+			highlightStyle,
+			upsertHighlightForQuote,
+			ensureQuoteCfiInViewport,
+		],
 	);
 
 	const onRemoveHighlight = useCallback(async () => {
@@ -1194,9 +1214,8 @@ function EbookReadPage() {
 	const onSelectionPopBarCopy = useCallback(() => {
 		const payload = selectionPopBarRef.current;
 		if (!payload?.selectedText.trim()) return;
+		suppressEpubSelectionPopBarDismiss();
 		void copyToClipboard(payload.selectedText);
-		setSelectionPopBar(null);
-		selectionPopBarRef.current = null;
 	}, []);
 
 	const onSelectionPopBarAskBook = useCallback(() => {
@@ -1355,13 +1374,10 @@ function EbookReadPage() {
 	]);
 
 	const scrollThoughtQuoteAnchorIntoView = useCallback(() => {
-		if (book?.fmt !== 'epub') return;
 		const cfi = thoughtQuoteAnchorCfiRef.current;
 		if (!cfi) return;
-		const rend = epubNavRef.current?.getRendition();
-		if (!rend) return;
-		scrollEpubCfiIntoView(rend, cfi);
-	}, [book?.fmt, epubNavReady]);
+		void ensureQuoteCfiInViewport(cfi);
+	}, [ensureQuoteCfiInViewport]);
 
 	useEffect(() => {
 		if (book?.fmt !== 'epub') return;

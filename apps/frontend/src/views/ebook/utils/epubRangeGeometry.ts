@@ -520,19 +520,35 @@ export function resolveSelectionCfiRange(
 	return undefined;
 }
 
+/**
+ * 通过 cfiRange 定位并解析出对应的 DOM Range 区间
+ * - 内部支持用 syncCfiRangeCache 做缓存，加速高频查找
+ * - 先查缓存有无，如果已缓存则直接返回
+ * - 否则尝试解析并写入缓存，最后返回解析结果
+ * - 若缓存未启用，则直接走 uncached 逻辑
+ * @param rend Rendition 实例（epubjs 渲染器）
+ * @param cfiRange EPUB 的 CFI 字符串，标识具体文本区间
+ * @returns 对应的 Range 对象，若无法解析则为 null
+ */
 export function resolveCfiDomRange(
 	rend: Rendition,
 	cfiRange: string,
 ): Range | null {
+	// 去掉 CFI 字符串首尾空白，避免意外缓存 key 失效
 	const key = cfiRange.trim();
+
+	// 若当前在 annotation sync 阶段且有缓存
 	if (syncCfiRangeCache && key) {
+		// 查找缓存，命中直接返回缓存结果（可能为 null：显式表明“解析失败”也会缓存）
 		if (syncCfiRangeCache.has(key)) {
 			return syncCfiRangeCache.get(key) ?? null;
 		}
+		// 未命中缓存时解析，解析结果也写入缓存（容错：解析失败也缓存 null，避免重复尝试）
 		const resolved = resolveCfiDomRangeUncached(rend, key);
 		syncCfiRangeCache.set(key, resolved);
 		return resolved;
 	}
+	// 非 sync 阶段跳过缓存，直接走 uncached 解析
 	return resolveCfiDomRangeUncached(rend, cfiRange);
 }
 
