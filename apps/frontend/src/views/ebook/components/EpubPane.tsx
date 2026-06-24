@@ -308,72 +308,87 @@ export function EpubPane({
 		);
 	}, [thoughts, highlights, rendReady]);
 
+	// EPUB 渲染器主生命周期副作用
 	useEffect(() => {
-		const el = hostRef.current;
-		if (!el) return;
+		const el = hostRef.current; // 获取渲染节点
+		if (!el) return; // DOM 节点未挂载时直接返回
 
-		let destroyed = false;
-		let book: Book | null = null;
-		let rend: Rendition | null = null;
-		let detachScrolledNav: (() => void) | undefined;
-		let detachContextMenu: (() => void) | undefined;
-		let detachSelectionPopBar: (() => void) | undefined;
+		let destroyed = false; // 标记该 Effect 是否已被清理，以避免异步流程完成时“已读已写”崩溃
+		let book: Book | null = null; // epub.js Book 实例
+		let rend: Rendition | null = null; // epub.js Rendition 实例
+		let detachScrolledNav: (() => void) | undefined; // 连续滚动模式下的纵向边缘导航事件解绑方法
+		let detachContextMenu: (() => void) | undefined; // contextmenu 事件解绑
+		let detachSelectionPopBar: (() => void) | undefined; // 选区浮条事件解绑
+
+		// 清空所有关联状态，准备重新加载
 		onNavResetRef.current?.();
 		readyRef.current = false;
 		setRendReady(false);
-		appliedThoughtsRef.current.clear();
-		appliedHighlightsRef.current.clear();
-		resetEpubReadingAnnotationSyncState();
+		appliedThoughtsRef.current.clear(); // 清除已应用的思考（下划线等）
+		appliedHighlightsRef.current.clear(); // 清除已应用的高亮
+		resetEpubReadingAnnotationSyncState(); // 清除同步状态
 		locationsReadyRef.current = false;
 		bookRef.current = null;
 		rendRef.current = null;
-		setErr(null);
+		setErr(null); // 清除上一轮错误提示
 
+		// 计算初始 CFI（定位阅读位置）
 		const initialCfi =
 			currentCfiRef.current ?? initialCfiRef.current ?? undefined;
-		const pageFlow = readerSettingsRef.current.pageFlow;
+		const pageFlow = readerSettingsRef.current.pageFlow; // 获取当前排版模式（分页、连续滚动等）
 
+		// 上报当前位置到外部，例如用于更新“百分比”显示等
 		const reportCurrentLocation = async () => {
 			if (!rend || destroyed) return;
 			try {
 				const loc = (await Promise.resolve(
 					rend.currentLocation(),
 				)) as unknown as Location | undefined;
-				if (loc?.start?.cfi) relocate(loc);
+				if (loc?.start?.cfi) relocate(loc); // 通知父层 location 变更
 			} catch {
-				// ignore
+				// 忽略异常
 			}
 		};
 
+		// 以下为异步立即执行函数，负责初始化 epub.js
 		(async () => {
 			try {
+				// 1. 实例化书籍对象，读取并解析二进制 EPUB
 				book = ePub(open, {
 					openAs: 'binary',
-					replacements: 'blobUrl',
+					replacements: 'blobUrl', // 图片用 blob 方案提升兼容性
 				});
 				bookRef.current = book;
-				await book.opened;
-				if (destroyed || !book) return;
+				await book.opened; // 等待书籍完全打开
+				if (destroyed || !book) return; // 清理后提前退
 
+				// 2. 计算渲染区域尺寸，为 epub.js 创建合适的视口
 				const w = Math.max(el.clientWidth, 320) || 640;
 				const h = Math.max(el.clientHeight, 320) || 480;
 
+				// 3. 创建渲染器，并配置模式参数
 				rend = book.renderTo(el, {
 					width: w,
 					height: h,
-					flow: pageFlow,
-					manager: pageFlow === 'scrolled' ? 'continuous' : 'default',
-					spread: 'none',
-					allowScriptedContent: true,
+					flow: pageFlow, // 'paginated'、'scrolled'
+					manager: pageFlow === 'scrolled' ? 'continuous' : 'default', // 连续滚动用 continuous
+					spread: 'none', // 不做双页分栏
+					allowScriptedContent: true, // 允许内容内 JS，便于交互
 				});
+				// 4. 应用主题与外观（夜间模式、字号等）
 				applyEpubReaderAppearance(
 					rend,
 					readerSettingsRef.current,
 					appThemeRef.current,
 				);
+				// 绑定到 ref，便于后续副作用访问
 				rendRef.current = rend;
+
+				// 5. 绑定翻页、键盘等常规事件
 				rend.on('relocated', relocate);
 				rend.on('keydown', onRenditionKeyDown);
+
+				// 6. 条件绑定 contextmenu 和选区浮条事件
 				if (onReaderContextMenuRef.current) {
 					detachContextMenu = attachEpubIframeContextMenu(rend, (payload) => {
 						onReaderContextMenuRef.current?.(payload);
@@ -383,20 +398,25 @@ export function EpubPane({
 					onSelectionPopBarRef.current?.(payload);
 				});
 
+				// 7. 初始定位到指定 CFI（阅读进度或跳转）
 				await rend.display(initialCfi ?? undefined);
 				if (destroyed) return;
 				if (initialCfi) lateStartCfiAppliedRef.current = true;
 
+				// 8. 等待书籍内容全量解析
 				await book.ready;
 				if (destroyed) return;
 
+				// 9. 标记渲染器可用，允许加载批注等后续逻辑
 				readyRef.current = true;
 				setRendReady(true);
 
+				// 10. 连续滚动模式下，启用边缘跳章
 				if (pageFlow === 'scrolled') {
 					detachScrolledNav = attachEpubScrolledEdgeNav(rend, () => destroyed);
 				}
 
+				// 11. 通知外部 EPUB 已经 ready（支持翻页、跳转等操作）
 				onReadyRef.current?.({
 					prev: async () => {
 						if (!readyRef.current || !rendRef.current) return;
@@ -428,10 +448,11 @@ export function EpubPane({
 					},
 				});
 
+				// 12. 读取目录导航信息，回调传递数据给父层
 				const nav = await book.loaded.navigation;
 				const spineBook = book;
 				const toc: EbookTocItem[] = (nav.toc ?? []).map((t) => ({
-					label: t.label?.trim() || t.href,
+					label: t.label?.trim() || t.href, // 目录名默认去空格，否则用链接
 					href: t.href,
 					spineIndex: t.href
 						? resolveSpineIndexForHref(spineBook, t.href)
@@ -439,9 +460,9 @@ export function EpubPane({
 				}));
 				if (!destroyed) onTocRef.current?.(toc);
 
-				// 后台生成 locations，完成后刷新全书百分比
+				// 13. 启动后台分页索引生成，生成成功则刷新全书百分比进度
 				void book.locations
-					.generate(1600)
+					.generate(1600) // 建议分块点数，1600 为常用默认
 					.then(() => {
 						if (destroyed) return;
 						locationsReadyRef.current = true;
@@ -451,31 +472,36 @@ export function EpubPane({
 						// 部分 EPUB 生成失败时仍依赖 spine 索引回退
 					});
 			} catch (e) {
+				// 任何异常都上报为错误提示（避免应用崩溃）
 				if (!destroyed) {
 					setErr(e instanceof Error ? e.message : 'EPUB 打开失败');
 				}
 			}
 		})();
 
-		let resizeRaf: number | null = null;
+		// ============================ 页面尺寸自适应机制 ============================
+		let resizeRaf: number | null = null; // 防抖计时器
 
+		// 实际尺寸应用及高亮样式恢复
 		const applyHostResize = () => {
+			// 节点未就绪或渲染器尚未 Ready 时直接忽略
 			if (!hostRef.current || !readyRef.current || !rendRef.current) return;
 			const w = Math.max(hostRef.current.clientWidth, 320);
 			const h = Math.max(hostRef.current.clientHeight, 320);
 			const rend = rendRef.current;
+			// 优先使用 softResize 尝试温和调整（部分内容重排避免闪屏）
 			if (!softResizeEpubRendition(rend, w, h)) {
 				try {
-					rend.resize(w, h);
+					rend.resize(w, h); // 兜底：完整 resize
 				} catch {
-					// ignore
+					// 忽略 resize 闪断异常
 				}
 			}
-			// soft resize 会触发 marks-pane.render() 重建 highlight rect（无 fill）；
-			// underline 自带 stroke 仍可见，用户划线需立即 patch 恢复样式
+			// soft resize 可能令高亮失色/划线消失，需立即恢复批注样式
 			patchEpubReadingAnnotations(rend, { sync: true });
 		};
 
+		// 封装动画帧防抖批量 resize
 		const scheduleHostResize = () => {
 			if (resizeRaf != null) cancelAnimationFrame(resizeRaf);
 			resizeRaf = requestAnimationFrame(() => {
@@ -484,6 +510,7 @@ export function EpubPane({
 			});
 		};
 
+		// 手动触发 resize 并强制同步批注渲染
 		const settleHostResize = () => {
 			applyHostResize();
 			const rend = rendRef.current;
@@ -497,21 +524,28 @@ export function EpubPane({
 			);
 		};
 
+		// 14. 监听容器变化（如分栏、拖动等），自动刷新排版
 		const ro = new ResizeObserver(() => {
 			scheduleHostResize();
 		});
-		ro.observe(el);
+		ro.observe(el); // 监听 EPUB 容器 div 异步变化
 
 		const unsubSplitResizeEnd =
-			subscribeEbookSplitPanelResizeEnd(settleHostResize);
+			subscribeEbookSplitPanelResizeEnd(settleHostResize); // 参与 SplitPanel 拖动事件
 
+		// ============================ 清理函数（副作用回收） ============================
 		return () => {
+			// 停止尺寸动画帧
 			if (resizeRaf != null) cancelAnimationFrame(resizeRaf);
 			unsubSplitResizeEnd();
-			destroyed = true;
+			destroyed = true; // 标记 Effect 结束，后续异步流程可以短路
+
+			// 卸载各种外部事件
 			detachContextMenu?.();
 			detachSelectionPopBar?.();
 			detachScrolledNav?.();
+
+			// 清理所有外部状态、批注等
 			readyRef.current = false;
 			setRendReady(false);
 			appliedThoughtsRef.current.clear();
@@ -519,21 +553,24 @@ export function EpubPane({
 			resetEpubReadingAnnotationSyncState();
 			locationsReadyRef.current = false;
 			bookRef.current = null;
-			ro.disconnect();
+			ro.disconnect(); // 解绑 ResizeObserver
+
+			// 尝试销毁 epub.js 实例及批注残留
 			try {
 				if (rend) {
-					teardownAppliedThoughtUnderlines(rend, appliedThoughtsRef.current);
-					teardownAppliedUserHighlights(rend, appliedHighlightsRef.current);
+					teardownAppliedThoughtUnderlines(rend, appliedThoughtsRef.current); // 清除批注下划线
+					teardownAppliedUserHighlights(rend, appliedHighlightsRef.current); // 清除用户高亮
 					rend.off('relocated', relocate);
 					rend.off('keydown', onRenditionKeyDown);
 					rend.destroy();
 				}
 				if (book) book.destroy();
 			} catch {
-				// ignore
+				// 忽略销毁时报错
 			}
 			rendRef.current = null;
 		};
+		// 依赖项包含 open（文件内容）、排版模式、翻页监听、键盘监听等
 	}, [open, readerSettings.pageFlow, relocate, onRenditionKeyDown]);
 
 	return (

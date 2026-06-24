@@ -29,15 +29,45 @@ export type EpubSelectionPopBarPayload = {
 /** 划线/想法 mark 点击打开 PopBar 后，避免选区监听误关 */
 let suppressDismissUntil = 0;
 
+/**
+ * 抑制 EPUB 选区工具栏（PopBar）自动消失一段时间。
+ *
+ * 常用于划线后点击 mark 按钮时，避免短时间内由于选区监听导致工具栏被误关闭。
+ *
+ * @param ms 抑制时长（毫秒），默认为 450ms，足够用户操作弹窗内的按钮。
+ *
+ * 该函数通过将 suppressDismissUntil 设为当前时间 + ms，
+ * 其他逻辑可通过 shouldSuppressDismiss() 判断是否需要临时关闭自动隐藏行为。
+ */
 export function suppressEpubSelectionPopBarDismiss(ms = 450): void {
 	suppressDismissUntil = Date.now() + ms;
 }
 
+/**
+ * 判断是否应临时抑制 EPUB 选区工具栏（PopBar）自动消失。
+ *
+ * suppressEpubSelectionPopBarDismiss 会设置 suppressDismissUntil 为“当前时间 + 指定毫秒数”，
+ * 该函数判断当前是否还在抑制期内。常用于点击划线/标记等操作后，
+ * 在弹窗按钮短时间交互过程中，避免工具栏被误自动关闭。
+ *
+ * @returns 若当前处于抑制期内，返回 true，否则返回 false。
+ */
 function shouldSuppressDismiss(): boolean {
+	// 只要 suppressDismissUntil 还未到期，就应暂不自动关闭
 	return Date.now() < suppressDismissUntil;
 }
 
+/**
+ * 读取指定窗口当前选中的文本内容。
+ *
+ * 会自动调用 getSelection，并提取选区内文本，如果当前没有选区则返回空字符串。
+ * 最终返回会自动修剪首尾空白字符。
+ *
+ * @param win 目标 window（通常为 iframe 内文档的 window）
+ * @returns 当前选区的文本内容（已去首尾空白），若无选中则为 ''
+ */
 function readSelectionText(win: Window): string {
+	// 调用 window.getSelection() 获取当前选区，提取文本并修剪
 	return (win.getSelection()?.toString() ?? '').trim();
 }
 

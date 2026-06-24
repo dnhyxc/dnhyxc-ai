@@ -298,6 +298,17 @@ function EbookReadPage() {
 		);
 	}, [highlights, selectionPopBar, epubNavReady]);
 
+	/**
+	 * 针对指定 cfiRange + quote 的选区，执行高亮的新增/合并/更新流程，保证无重叠、无重复、最精确划线
+	 * - 支持合并相邻、重叠、被包含的划线，高亮文本自动规范化
+	 * - 支持重叠划线的合并删除（先删后建），避免同一区域保留多条无意义划线
+	 *
+	 * @param cfiRange - 本次高亮的选区 CFI 字符串（唯一定位选区）
+	 * @param quote - 选区原始文本
+	 * @param style - 高亮样式（荧光、下划线等）
+	 * @param color - 高亮颜色 ID
+	 * @returns 新建/更新的高亮对象，失败时返回 null
+	 */
 	const upsertHighlightForQuote = useCallback(
 		async (
 			cfiRange: string,
@@ -305,48 +316,64 @@ function EbookReadPage() {
 			style: EpubHighlightStyle,
 			color: EpubHighlightColorId,
 		): Promise<EbookUserHighlight | null> => {
+			// 基本校验，无选区或无 bookId 不处理
 			if (!cfiRange || !bookId) return null;
 
+			// 当前 epub 渲染器实例（如存在）
 			const rend = epubNavRef.current?.getRendition() ?? undefined;
+			// 存储本次最终确定的 cfi & quote
 			let targetCfi = cfiRange;
 			let targetQuote = quote;
+			// 需删除的重叠高亮 id 集合
 			const removeIds = new Set<string>();
 
+			// -------（1）标准化选区 + 查找 DOM 重叠/合并 -------
 			if (rend) {
+				// 尝试解析当前 cfiRange 对应 domRange
 				const resolved = resolveCfiDomRange(rend, cfiRange);
 				if (resolved) {
+					// 对 domRange 归一化，去除多余空白等
 					const normalized = trimSelectionRange(resolved);
+					// 重新计算 CFI，保证与实际 dom 对齐，避免多余重叠
 					targetCfi = cfiFromDomRange(rend, normalized) ?? cfiRange.trim();
+					// 取标准文本
 					targetQuote = normalized.toString().trim() || quote.trim();
 				}
 
+				// 查找所有与当前 CFI/quote 重叠、相接的高亮（用于合并连片的选择）
 				const merged = resolveMergedOverlappingHighlight(
 					rend,
 					targetCfi,
 					targetQuote,
 					highlightsRef.current,
 				);
+				// 更新合并后的目标 cfi/quote，准备实际保存
 				targetCfi = merged.cfiRange;
 				targetQuote = merged.quote;
+				// 合并目标中需删除的旧高亮收集
 				for (const id of merged.removeHighlightIds) {
 					removeIds.add(id);
 				}
 			}
 
+			// -------（2）查找被完全包含于此次选区的旧高亮，也一并移除 -------
 			const superseded = findHighlightsStrictlyContainedIn(
 				{ cfiRange: targetCfi, quote: targetQuote },
+				// 已确定将要被删除的先排除避免重复
 				highlightsRef.current.filter((h) => !h.id || !removeIds.has(h.id)),
 			);
 			for (const item of superseded) {
 				if (item.id) removeIds.add(item.id);
 			}
 
-			// 合并删除仅依赖 DOM 相交/相接（resolveMergedOverlappingHighlight）与严格包含，
-			// 不用 quote 子串（如单字「曹」）避免误并 distant 划线
+			// -------（3）如有合并并删除多个高亮，根据新一组目标再次归一化 cfi/quote -------
+			// 仅依赖 DOM 合并和严格包含（不比对 quote 子串，避免选错）
 			if (rend && removeIds.size > 0) {
+				// 获取所有待合并的高亮对象
 				const mergeTargets = highlightsRef.current.filter(
 					(h) => h.id && removeIds.has(h.id),
 				);
+				// 使用所有合并对象重新计算合并目标（位置更准）
 				const mergedTarget = buildMergedHighlightTarget(
 					rend,
 					targetCfi,
@@ -358,19 +385,23 @@ function EbookReadPage() {
 			}
 
 			try {
+				// -------（4）无重叠（只需新增或更新一个高亮） -------
 				if (removeIds.size === 0) {
+					// 检查是不是当前 cfi 已有同样的高亮（完全覆盖）
 					const existingExact = findUserHighlightByCfi(
 						highlightsRef.current,
 						targetCfi,
 					);
 
 					const item = existingExact?.id
-						? await updateEbookHighlight(existingExact.id, {
+						? // 已有则直接更新内容/样式/颜色
+							await updateEbookHighlight(existingExact.id, {
 								quote: targetQuote,
 								style,
 								color,
 							})
-						: await createEbookHighlight({
+						: // 没有则直接新建
+							await createEbookHighlight({
 								bookId,
 								cfiRange: targetCfi,
 								quote: targetQuote,
@@ -378,6 +409,7 @@ function EbookReadPage() {
 								color,
 							});
 
+					// 刷新本地高亮缓存并触发界面刷新
 					const next = [
 						...highlightsRef.current.filter((h) => h.id !== item.id),
 						item,
@@ -387,6 +419,7 @@ function EbookReadPage() {
 					return item;
 				}
 
+				// -------（5）如需清理（即有多余重叠/包裹的高亮）先删除再新建 -------
 				await Promise.all([...removeIds].map((id) => deleteEbookHighlight(id)));
 				const item = await createEbookHighlight({
 					bookId,
@@ -395,6 +428,7 @@ function EbookReadPage() {
 					style,
 					color,
 				});
+				// 刷新高亮缓存及列表：移除删除目标，加入新高亮
 				const next = [
 					...highlightsRef.current.filter((h) => !removeIds.has(h.id)),
 					item,
@@ -403,6 +437,7 @@ function EbookReadPage() {
 				setHighlights(next);
 				return item;
 			} catch (e) {
+				// 错误处理，弹窗提示
 				Toast({
 					type: 'error',
 					title: t('ebook.read.highlight.saveFailed'),
@@ -414,27 +449,47 @@ function EbookReadPage() {
 		[bookId, t],
 	);
 
+	/**
+	 * 针对当前选区（selectionPopBarRef 所指内容）执行高亮「新增/更新」操作。
+	 * - 若已存在该选区的划线，则覆盖其 style/color，否则新建高亮
+	 * - 完成后刷新界面划线状态，更新 PopBar，并同步最新高亮文本（去除首尾空白）
+	 *
+	 * @param style - 用户选定的高亮类型（如荧光/下划线）
+	 * @param color - 高亮颜色 ID
+	 * @returns 新增或更新的高亮对象（失败返回 null）
+	 */
 	const upsertSelectionHighlight = useCallback(
 		async (style: EpubHighlightStyle, color: EpubHighlightColorId) => {
+			// 1. 拿到当前 PopBar 的 payload（包含选区 cfiRange、原始文本等）
 			const payload = selectionPopBarRef.current;
-			if (!payload?.cfiRange) return null;
+			if (!payload?.cfiRange) return null; // 没有选区（异常情况），直接退出
+
+			// 2. 执行高亮 upsert（即根据 cfi + 选中文本覆盖/新增高亮）
 			const item = await upsertHighlightForQuote(
 				payload.cfiRange,
 				payload.selectedText,
 				style,
 				color,
 			);
-			if (!item) return null;
+			if (!item) return null; // 失败直接退出
 
+			// 3. 抑制 PopBar「自动关闭」机制，避免界面跳动
+			suppressEpubSelectionPopBarDismiss();
+			// 4. 清除 Webview 选区（高亮后默认取消实际文本反选）
+			epubNavRef.current?.clearTextSelection();
+
+			// 5. 生成最新 PopBar payload：使用高亮实际返回的 cfiRange/quote 修正内容
 			const nextPayload: EpubSelectionPopBarPayload = {
 				...payload,
 				cfiRange: item.cfiRange,
 				selectedText: item.quote?.trim() || payload.selectedText,
 			};
+			// 6. 全面刷新当前界面「高亮状态」及 PopBar
 			selectionPopBarRef.current = nextPayload;
 			setHighlightStyle(item.style);
 			setHighlightColor(item.color);
 			setSelectionPopBar({ ...nextPayload, open: true });
+			// 7. 返回新增/更新后的高亮对象
 			return item;
 		},
 		[upsertHighlightForQuote],
@@ -476,18 +531,48 @@ function EbookReadPage() {
 
 	const removeHighlightForQuote = removeHighlightsForQuote;
 
+	/**
+	 * 用户点击高亮时，弹出 PopBar 工具栏并设置对应状态
+	 *
+	 * 1. 抑制 PopBar 自动消失，避免交互过程中被关闭
+	 * 2. 保存当前 PopBar payload 到 ref，便于后续操作使用
+	 * 3. 恢复当前高亮的样式和颜色（高亮按钮和面板需依赖）
+	 * 4. 设置 PopBar 状态为打开，并传递 payload
+	 *
+	 * @param payload PopBar 展示所需的基本定位/文本参数
+	 * @param highlight 当前用户的高亮对象（含样式/颜色）
+	 */
 	const onUserHighlightPopBar = useCallback(
 		(payload: EpubSelectionPopBarPayload, highlight: EbookUserHighlight) => {
-			suppressEpubSelectionPopBarDismiss();
-			selectionPopBarRef.current = payload;
-			setHighlightStyle(highlight.style);
-			setHighlightColor(highlight.color);
-			setSelectionPopBar({ ...payload, open: true });
+			suppressEpubSelectionPopBarDismiss(); // 1. 抑制自动消失
+			selectionPopBarRef.current = payload; // 2. 存ref
+			setHighlightStyle(highlight.style); // 3. 设置样式
+			setHighlightColor(highlight.color); // 3. 设置颜色
+			setSelectionPopBar({ ...payload, open: true }); // 4. PopBar 开启
 		},
 		[],
 	);
 
-	/** 侧栏：定位正文并打开 PopBar；ensureHighlight 为 true 时在无划线时自动创建 */
+	/**
+	 * 在正文指定 cfiRange 及 quote 处打开高亮 PopBar 工具栏。
+	 *
+	 * 功能说明：
+	 * - 定位到指定 cfiRange，如当前未渲染则先跳转、强制刷新视图；
+	 * - 如目标处已有高亮，则恢复高亮样式和颜色；
+	 * - 如 options.ensureHighlight 为 true 且没高亮，则自动创建高亮并应用默认样式；
+	 * - 始终构造 PopBar payload 并显示弹窗，便于后续操控。
+	 *
+	 * 重要流程：
+	 * 1. 若页面未渲染到相应位置，先异步跳转并等待页面准备完成；
+	 * 2. 查找当前位置是否已经有用户高亮（通过 cfi + quote 匹配）；
+	 * 3. 若需要则自动创建高亮，完成后等待高亮渲染完毕（保证样式正确）；
+	 * 4. 始终构造并显示 PopBar，selection 状态写入 ref 并弹出工具栏。
+	 * 5. 若命中高亮，则 PopBar 弹出时样式同步为当前高亮样式。
+	 *
+	 * @param cfiRange 定位的内容片段范围（EPUB CFI）
+	 * @param quote    高亮对应的文本内容
+	 * @param options  可选参数，如 ensureHighlight：无高亮时是否自动创建
+	 */
 	const openHighlightPopBarAtBookContent = useCallback(
 		(
 			cfiRange: string,
@@ -495,22 +580,27 @@ function EbookReadPage() {
 			options?: { ensureHighlight?: boolean },
 		) => {
 			void (async () => {
+				// 获取 epub 渲染器，如果未挂载或无 bookId 则直接返回
 				const rend = epubNavRef.current?.getRendition() ?? null;
 				if (!rend || !bookId) return;
 
+				// 确保内容已渲染到当前 cfiRange，如果未渲染则跳转并等待页面稳定
 				if (!resolveCfiDomRange(rend, cfiRange)) {
 					try {
+						// 跳转到 cfiRange 对应页面
 						await rend.display(cfiRange);
+						// 利用两帧 requestAnimationFrame，保证 DOM 已经完全渲染
 						await new Promise<void>((resolve) => {
 							requestAnimationFrame(() => {
 								requestAnimationFrame(() => resolve());
 							});
 						});
 					} catch {
-						// 无法定位到该 CFI 时仍尝试用 fallback 锚点
+						// 定位失败时也继续后续流程，视为兜底
 					}
 				}
 
+				// 检查当前位置是否已经有用户高亮（通过 cfi 和 quote 匹配）
 				let highlight = findUserHighlightCoveringCfi(
 					highlightsRef.current,
 					cfiRange,
@@ -518,6 +608,7 @@ function EbookReadPage() {
 					rend,
 				);
 
+				// 如果需要保证有高亮：无高亮时自动创建一个，并等待渲染完成
 				if (options?.ensureHighlight) {
 					const created = await upsertHighlightForQuote(
 						cfiRange,
@@ -527,28 +618,35 @@ function EbookReadPage() {
 					);
 					if (created) {
 						highlight = created;
+						// 等待渲染同步，确保高亮已成功渲染
 						await new Promise<void>((resolve) => {
 							requestAnimationFrame(() => {
 								requestAnimationFrame(() => resolve());
 							});
 						});
 					}
-				} else if (highlight) {
+				}
+				// 如果已有高亮，则恢复其样式与颜色
+				else if (highlight) {
 					setHighlightStyle(highlight.style);
 					setHighlightColor(highlight.color);
 				}
 
+				// 生成 PopBar 的展示定位 payload，优先用（新）高亮的 cfi/quote
 				const payload = buildEpubPopBarPayloadFromCfiRange(
 					rend,
 					highlight?.cfiRange ?? cfiRange,
 					highlight?.quote ?? quote,
 					resolveCfiDomRange,
 				);
+				// 记录当前 PopBar 的 payload 到 ref
 				selectionPopBarRef.current = payload;
+				// 再次同步样式（保险多次，兼容 ensureHighlight 和已存在高亮两种场景）
 				if (highlight) {
 					setHighlightStyle(highlight.style);
 					setHighlightColor(highlight.color);
 				}
+				// 打开 PopBar，展示工具栏
 				setSelectionPopBar({ ...payload, open: true });
 			})();
 		},
