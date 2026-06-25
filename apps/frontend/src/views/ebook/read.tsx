@@ -804,13 +804,11 @@ function EbookReadPage() {
 
 			// 如果是通过列表点击跳转到详情，则需要保存当前列表快照以便后续返回
 			if (fromList) {
-				// thoughtListClusterRef.current 记录了当前思考列表的快照，如存在则用于还原
 				if (thoughtListClusterRef.current) {
-					// 记录当前思考列表快照到 returnToListClusterRef 备用
 					returnToListClusterRef.current = thoughtListClusterRef.current;
 				}
-				// 跳转到详情时将思考列表（侧栏）收起
 				setThoughtListOpen(false);
+				setThoughtListCluster(null);
 			} else {
 				// 非从列表跳转进入时，重置还原列表快照记录
 				returnToListClusterRef.current = null;
@@ -1019,28 +1017,46 @@ function EbookReadPage() {
 		}
 	}, [bookId, t, thoughtDialogMode, thoughtDraft, thoughtSaving]);
 
+	// 删除读书想法的回调函数，使用useCallback保证依赖变化时更新
 	const deleteThought = useCallback(async () => {
+		// 若当前没有选中的想法id或正在保存中，则终止操作
 		if (!thoughtDraft.id || thoughtSaving) return;
+		// 标记正在进行保存操作，避免并发
 		setThoughtSaving(true);
 		try {
+			// 调用删除API删除当前想法
 			await deleteEbookThought(thoughtDraft.id);
+			// 过滤掉刚删除的想法，得到新的想法列表
 			const nextThoughts = thoughts.filter((t) => t.id !== thoughtDraft.id);
-			const listSnapshot = returnToListClusterRef.current;
+			// 获取用来还原列表聚合快照的引用，如果returnToListClusterRef没有快照则用当前聚合快照
+			const listSnapshot =
+				returnToListClusterRef.current ?? thoughtListClusterRef.current;
+			// 清空returnToListClusterRef，避免影响后续聚类回溯
+			returnToListClusterRef.current = null;
 			if (listSnapshot) {
-				returnToListClusterRef.current = null;
+				// 如果有快照，根据最新想法列表还原聚合数据
 				restoreThoughtListFromSnapshot(listSnapshot, nextThoughts);
+			} else {
+				// 没有快照时，清空聚类数据，并关闭想法侧栏
+				setThoughtListCluster(null);
+				setThoughtListOpen(false);
 			}
+			// 更新状态：移除已删除想法后的想法列表
 			setThoughts(nextThoughts);
+			// 关闭编辑/创建想法弹窗
 			setThoughtDialogOpen(false);
 		} catch (e) {
+			// 捕获异常，弹出错误提示
 			Toast({
 				type: 'error',
 				title: t('ebook.read.thought.deleteFailed'),
 				message: getRequestErrorMessage(e),
 			});
 		} finally {
+			// 不论成功或失败，均重置保存状态
 			setThoughtSaving(false);
 		}
+		// 依赖项：翻译函数、选中想法id、保存状态、想法列表、快照还原函数
 	}, [
 		t,
 		thoughtDraft.id,
@@ -1570,7 +1586,7 @@ function EbookReadPage() {
 		thoughtSaving,
 	]);
 
-	/** 右侧分栏：与 state 标志对齐，避免 open 标志与 cluster 错位时仍占位 */
+	/** 右侧分栏开关与 state 对齐 */
 	const sidePanelOpen =
 		assistantOpen ||
 		thoughtDialogOpen ||

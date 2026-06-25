@@ -4,7 +4,7 @@
 
 **增量专题**：选区 / 想法侧栏「分享书摘」生成微信读书式日历卡片 PNG，弹窗预览、复制到剪贴板、下载；保留 EPUB 原文字号比例的多样式居中绘制。
 
-**延伸阅读**：[epub-side-panel-moke.md](./epub-side-panel-moke.md)（右侧分栏与 PopBar 共存）、[epub-context-menu-popbar.md](./epub-context-menu-popbar.md)、[epub-thought-side-panel.md](./epub-thought-side-panel.md)、[epub-user-highlight-impl.md](./epub-user-highlight-impl.md)。
+**延伸阅读**：[epub-read-split-panel.md](./epub-read-split-panel.md)（右侧分栏与 PopBar 共存）、[epub-context-menu-popbar.md](./epub-context-menu-popbar.md)、[epub-thought-side-panel.md](./epub-thought-side-panel.md)、[epub-user-highlight-impl.md](./epub-user-highlight-impl.md)。
 
 ---
 

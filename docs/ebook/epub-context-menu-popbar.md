@@ -4,7 +4,7 @@
 
 **增量专题**：修复 EPUB 阅读时「右键打开菜单 PopBar 先关再开闪烁」与「未手动选中时右键自动点词」两类体验问题；与选区工具条、自定义右键菜单的状态协同。
 
-**延伸阅读**：[epub-assistant-context-menu.md](./epub-assistant-context-menu.md)、[epub-popbar-perf-ux.md](./epub-popbar-perf-ux.md)、[epub-side-panel-moke.md](./epub-side-panel-moke.md)。
+**延伸阅读**：[epub-assistant-context-menu.md](./epub-assistant-context-menu.md)、[epub-popbar-perf-ux.md](./epub-popbar-perf-ux.md)、[epub-read-split-panel.md](./epub-read-split-panel.md)。
 
 ---
 

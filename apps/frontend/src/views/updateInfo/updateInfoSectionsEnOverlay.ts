@@ -1056,4 +1056,9 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'While reading EPUB, tap Listen on the selection toolbar or on the quote footer in the reading-notes list or details to hear the selected or quoted text; the button shows Stop while playing—tap again to stop. Chinese excerpts are more reliable with the browser’s built-in speech on desktop.',
 	},
+	's25-45': {
+		title: 'EPUB split close & delete last note blank fix',
+		description:
+			'After closing the reading-notes list or MK ask side panel, deleting the last note from the list, or a dev hot reload, the left reading column returns to full width with no blank right column.',
+	},
 };

@@ -4,7 +4,7 @@
 
 **增量专题**：从想法列表进入详情删除**最后一条**时，按列表「共 N 条」判断并**收起右侧分栏**（避免空白侧栏）；关闭列表时清空 cluster；详情正文样式与列表项对齐，消除进入详情时的下垂感。
 
-**姊妹文档**：[epub-thought-list-ui.md](./epub-thought-list-ui.md)、[epub-thought-side-panel.md](./epub-thought-side-panel.md)。
+**姊妹文档**：[epub-thought-list-ui.md](./epub-thought-list-ui.md)、[epub-thought-side-panel.md](./epub-thought-side-panel.md)、[epub-read-split-panel.md](./epub-read-split-panel.md)（分栏 state 与布局，**以该文为准**）。
 
 ---
 

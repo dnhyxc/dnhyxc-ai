@@ -4,7 +4,7 @@
 
 **增量专题**：打开或关闭 **读书想法** 右侧分栏（列表 / 写想法 / 详情）时，左侧 EPUB 正文因分栏宽度变化会 **soft resize 重排**，原先选中的 **引用段落** 容易滚出当前屏幕；本轮在分栏布局稳定后按 **CFI 锚点** 对连续滚动容器做 **最小 scrollTop 修正**，使引用内容始终留在视口内。
 
-**延伸阅读**：[epub-thought-side-panel.md](./epub-thought-side-panel.md)、[epub-split-soft-resize.md](./epub-split-soft-resize.md)、[epub-side-panel-moke.md](./epub-side-panel-moke.md)、[epub-thought-cluster-bridging.md](./epub-thought-cluster-bridging.md)。
+**延伸阅读**：[epub-thought-side-panel.md](./epub-thought-side-panel.md)、[epub-split-soft-resize.md](./epub-split-soft-resize.md)、[epub-read-split-panel.md](./epub-read-split-panel.md)、[epub-thought-cluster-bridging.md](./epub-thought-cluster-bridging.md)。
 
 ---
 
@@ -270,7 +270,7 @@ const closeThoughtDialog = useCallback(() => {
 }, []);
 ```
 
-**变更摘要**：引入锚点 ref 与双通道触发（resize 结束 + 面板 state 双 rAF）；关面板时 **保留** ref 以便全宽恢复后仍校正；`thoughtPanelOpen` 与 cluster 对齐避免空列表占位（与 [epub-side-panel-moke.md](./epub-side-panel-moke.md) 一致）。
+**变更摘要**：引入锚点 ref 与双通道触发（resize 结束 + 面板 state 双 rAF）；关面板时 **保留** ref 以便全宽恢复后仍校正；`thoughtPanelOpen` 与 cluster 对齐避免空列表占位（与 [epub-read-split-panel.md](./epub-read-split-panel.md) 一致）。
 
 ---
 
@@ -423,7 +423,7 @@ const openThoughtCluster = useCallback(
 1. 连续滚动 EPUB：拖选 → **写想法** → 引用段仍在屏内；保存后关侧栏仍可见。
 2. 点 **虚线下划线** 开列表 → 关列表右上角 → 引用段不跑飞。
 3. 列表 → 详情 → 关详情回列表：引用段稳定。
-4. 与 [epub-side-panel-moke.md](./epub-side-panel-moke.md) 叠加：列表开 MK 再关 MK，引用仍可见。
+4. 与 [epub-read-split-panel.md](./epub-read-split-panel.md) 叠加：列表开 MK 再关 MK，引用仍可见。
 5. 分页模式：开/关想法侧栏无报错、无异常跳动。
 
 ---
