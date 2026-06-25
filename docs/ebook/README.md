@@ -31,8 +31,7 @@
 | [epub-thought-underline-empty-gap.md](./epub-thought-underline-empty-gap.md)       | **增量**：跨段落写想法时空行不再画虚线（空白文本片段过滤 + mark 校正快路径）                                                                  |
 | [epub-thought-list-delete-close.md](./epub-thought-list-delete-close.md)           | **增量**：删列表最后一条收起侧栏；详情正文与列表行高对齐                                                                                      |
 | [epub-quote-share.md](./epub-quote-share.md)                                       | **增量**：书摘分享图片（Canvas 日历卡、复制/下载、多样式居中、PopBar/想法入口）                                                               |
-| [epub-side-panel-moke.md](./epub-side-panel-moke.md)                               | **增量**：MK 问书与右侧分栏统一开启/关闭（无闪烁、列表关闭无留白、划线不误关助手）                                                            |
-| [epub-split-panel-collapse.md](./epub-split-panel-collapse.md)                     | **增量**：关闭侧栏后左侧立即全宽（去 hidden、单帧 collapse、layout 兜底）                                                                   |
+| [epub-read-split-panel.md](./epub-read-split-panel.md)                             | **主文档（当前）**：MK 问书与读书想法右侧分栏 state + 布局收起（条件卸载右栏、删最后一条、热更新全宽）                                      |
 | [epub-context-menu-popbar.md](./epub-context-menu-popbar.md)                       | **增量**：右键菜单与选区 PopBar（关菜单不闪、无选区不自动点词）                                                                               |
 | [epub-quote-listen.md](./epub-quote-listen.md)                                     | **增量**：引用「听当前」朗读（PopBar/想法三入口、英语学习 TTS、本机中英分句与音色修复）                                                       |
 | [epub-listen-sentence-bg.md](./epub-listen-sentence-bg.md)                         | **增量**：听当前逐句播放背景（独立浮层、TTS 节奏回调、与用户划线解耦）                                                                        |

@@ -1057,8 +1057,8 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 			'While reading EPUB, tap Listen on the selection toolbar or on the quote footer in the reading-notes list or details to hear the selected or quoted text; the button shows Stop while playing—tap again to stop. Chinese excerpts are more reliable with the browser’s built-in speech on desktop.',
 	},
 	's25-45': {
-		title: 'EPUB Listen: sentence highlight',
+		title: 'EPUB split close & delete last note blank fix',
 		description:
-			'While Listen is playing, the sentence currently being read is shown with a light yellow background; the tint clears when that sentence finishes and moves to the next; stopping or finishing the whole passage removes all tint. Does not remove or block user highlights or reading-note underlines.',
+			'After closing the reading-notes list or MK ask side panel, deleting the last note from the list, or a dev hot reload, the left reading column returns to full width with no blank right column.',
 	},
 };

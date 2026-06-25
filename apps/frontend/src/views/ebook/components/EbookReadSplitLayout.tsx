@@ -1,16 +1,11 @@
 import type { ReactNode } from 'react';
 import { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
-import type {
-	GroupImperativeHandle,
-	Layout,
-	PanelImperativeHandle,
-} from 'react-resizable-panels';
+import type { GroupImperativeHandle, Layout } from 'react-resizable-panels';
 import {
 	ResizableHandle,
 	ResizablePanel,
 	ResizablePanelGroup,
 } from '@/components/ui/resizable';
-import { cn } from '@/lib/utils';
 import {
 	beginEbookSplitPanelPointerDrag,
 	endEbookSplitPanelPointerDrag,
@@ -24,10 +19,9 @@ export type EbookReadSplitLayoutProps = {
 	children: ReactNode;
 };
 
-const CLOSED_LAYOUT: Layout = { reader: 100, assistant: 0 };
-
 /**
  * 电子书阅读页分栏：左阅读、右 MOKE 助手 / 读书想法（互斥，同栏位）。
+ * ponytail: 关闭时不挂右栏 panel，避免 collapse/setLayout 偶发失效留空白列。
  */
 export function EbookReadSplitLayout({
 	sidePanelOpen,
@@ -35,7 +29,6 @@ export function EbookReadSplitLayout({
 	children,
 }: EbookReadSplitLayoutProps) {
 	const panelGroupRef = useRef<GroupImperativeHandle | null>(null);
-	const assistantPanelRef = useRef<PanelImperativeHandle | null>(null);
 	const lastSplitLayoutRef = useRef<Layout>({ reader: 58, assistant: 42 });
 	const splitPointerActiveRef = useRef(false);
 	const sidePanelOpenRef = useRef(sidePanelOpen);
@@ -45,12 +38,6 @@ export function EbookReadSplitLayout({
 		if (!splitPointerActiveRef.current) return;
 		splitPointerActiveRef.current = false;
 		endEbookSplitPanelPointerDrag();
-	}, []);
-
-	/** 收起右侧分栏并让左侧占满（同步调用，对齐 Monaco edit 模式） */
-	const applyClosedLayout = useCallback(() => {
-		assistantPanelRef.current?.collapse();
-		panelGroupRef.current?.setLayout(CLOSED_LAYOUT);
 	}, []);
 
 	useEffect(() => {
@@ -64,24 +51,18 @@ export function EbookReadSplitLayout({
 	}, [finishSplitPointerDrag]);
 
 	useLayoutEffect(() => {
+		const done = () => notifyEbookSplitPanelResizeEnd();
 		if (!sidePanelOpen) {
-			applyClosedLayout();
-			// ponytail: 仅一帧补刀 + 通知 EPUB resize；勿用 hidden 藏 panel（会打断 collapse）
-			const raf = requestAnimationFrame(() => {
-				applyClosedLayout();
-				notifyEbookSplitPanelResizeEnd();
-			});
+			const raf = requestAnimationFrame(done);
 			return () => cancelAnimationFrame(raf);
 		}
-		if (assistantPanelRef.current?.isCollapsed()) {
-			assistantPanelRef.current.expand();
-		}
-		panelGroupRef.current?.setLayout(lastSplitLayoutRef.current);
 		const raf = requestAnimationFrame(() => {
-			notifyEbookSplitPanelResizeEnd();
+			if (!sidePanelOpenRef.current) return;
+			panelGroupRef.current?.setLayout(lastSplitLayoutRef.current);
+			done();
 		});
 		return () => cancelAnimationFrame(raf);
-	}, [sidePanelOpen, applyClosedLayout]);
+	}, [sidePanelOpen]);
 
 	return (
 		<ResizablePanelGroup
@@ -92,8 +73,6 @@ export function EbookReadSplitLayout({
 			onLayoutChanged={(layout) => {
 				if (sidePanelOpenRef.current) {
 					lastSplitLayoutRef.current = layout;
-				} else if ((layout.assistant ?? 0) > 0) {
-					applyClosedLayout();
 				}
 				finishSplitPointerDrag();
 			}}
@@ -106,32 +85,28 @@ export function EbookReadSplitLayout({
 			>
 				{children}
 			</ResizablePanel>
-			<ResizableHandle
-				withHandle
-				className={cn('w-0', !sidePanelOpen && 'pointer-events-none opacity-0')}
-				onPointerDown={() => {
-					splitPointerActiveRef.current = true;
-					beginEbookSplitPanelPointerDrag();
-				}}
-			/>
-			<ResizablePanel
-				id="assistant"
-				panelRef={assistantPanelRef}
-				collapsible
-				collapsedSize={0}
-				defaultSize={42}
-				minSize={0}
-				className={cn(
-					'min-h-0 min-w-0 overflow-hidden',
-					!sidePanelOpen && 'pointer-events-none opacity-0',
-				)}
-			>
-				{sidePanelOpen ? (
-					<div className="border-theme/10 flex h-full min-h-0 min-w-0 flex-col overflow-hidden border-l contain-[inline-size]">
-						<div className="min-h-0 flex-1 overflow-hidden">{sidePanel}</div>
-					</div>
-				) : null}
-			</ResizablePanel>
+			{sidePanelOpen ? (
+				<>
+					<ResizableHandle
+						withHandle
+						className="w-0"
+						onPointerDown={() => {
+							splitPointerActiveRef.current = true;
+							beginEbookSplitPanelPointerDrag();
+						}}
+					/>
+					<ResizablePanel
+						id="assistant"
+						defaultSize={42}
+						minSize={0}
+						className="min-h-0 min-w-0 overflow-hidden"
+					>
+						<div className="border-theme/10 flex h-full min-h-0 min-w-0 flex-col overflow-hidden border-l contain-[inline-size]">
+							<div className="min-h-0 flex-1 overflow-hidden">{sidePanel}</div>
+						</div>
+					</ResizablePanel>
+				</>
+			) : null}
 		</ResizablePanelGroup>
 	);
 }
