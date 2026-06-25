@@ -393,4 +393,9 @@ export const PROJECT_GUIDE_ITEMS_EN: Record<
 		description:
 			'Entry: while reading EPUB, select text → floating toolbar → Share quote; or tap Share quote on the quote card footer in the reading-notes list or details.\nGeneration: opens a Share quote dialog with an auto-generated calendar-style card showing today’s date, the excerpt, book title, and Moke BookHouse branding; font sizes and weights are preserved when possible.\nActions: copy the image to the system clipboard to paste into WeChat and similar apps, or download a PNG file.\nNotes: the selection toolbar can stay visible while the share dialog is open; the MK assistant side panel is unaffected. PDF quote share is not supported yet.',
 	},
+	'pg-s16-9': {
+		title: '16.9 EPUB quote “Listen” (EPUB only)',
+		description:
+			'Entry: while reading EPUB, select text → floating toolbar → Listen; or tap Listen on the quote card footer in the reading-notes list or details.\nPlayback: same TTS stack as English learning (active members default to cloud voice; local browser speech when not a member or when cloud fails). The button shows Stop while playing—tap again to stop.\nNotes: the selection toolbar can stay visible when you tap Listen (same as Copy and Highlight); the MK assistant side panel is unaffected. PDF has no Listen entry yet.',
+	},
 };

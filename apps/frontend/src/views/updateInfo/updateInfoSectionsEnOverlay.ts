@@ -1041,4 +1041,9 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'After closing the reading-notes list or MK ask side panel, the left reading column returns to full width immediately—no sporadic blank right column and no multi-frame delay.',
 	},
+	's25-44': {
+		title: 'EPUB quote “Listen”',
+		description:
+			'While reading EPUB, tap Listen on the selection toolbar or on the quote footer in the reading-notes list or details to hear the selected or quoted text; the button shows Stop while playing—tap again to stop. Chinese excerpts are more reliable with the browser’s built-in speech on desktop.',
+	},
 };

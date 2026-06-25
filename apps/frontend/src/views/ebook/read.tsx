@@ -54,6 +54,7 @@ import {
 import { EpubThought } from './components/EpubThought';
 import { EpubThoughtList } from './components/EpubThoughtList';
 import { PdfPane } from './components/PdfPane';
+import { useEbookQuoteListen } from './hooks';
 import type {
 	EbookThought,
 	EbookThoughtClickCluster,
@@ -122,9 +123,11 @@ import {
 import { findActiveTocItemIndex } from './utils/tocActiveIndex';
 
 function EbookReadPage() {
+	const { t } = useI18n();
 	const { bookId = '' } = useParams();
 	const nav = useNavigate();
-	const { t } = useI18n();
+	const { toggleListen, listenLabel } = useEbookQuoteListen(t);
+
 	const book = ebookStore.bookById(bookId);
 	const prog = ebookStore.progOf(bookId);
 	const [bookResolving, setBookResolving] = useState(false);
@@ -1267,6 +1270,13 @@ function EbookReadPage() {
 		void copyToClipboard(payload.selectedText);
 	}, []);
 
+	const onSelectionPopBarListen = useCallback(() => {
+		const payload = selectionPopBarRef.current;
+		if (!payload?.selectedText.trim()) return;
+		suppressEpubSelectionPopBarDismiss();
+		void toggleListen(payload.selectedText, 'popbar');
+	}, [toggleListen]);
+
 	const onSelectionPopBarAskBook = useCallback(() => {
 		const payload = selectionPopBarRef.current;
 		const text = payload?.selectedText ?? '';
@@ -1284,13 +1294,13 @@ function EbookReadPage() {
 			writeThought: t('ebook.read.contextMenu.addThought'),
 			share: t('ebook.read.selectionPop.share'),
 			askBook: t('ebook.read.selectionPop.askBook'),
-			listen: t('ebook.read.selectionPop.listen'),
+			listen: listenLabel('popbar', t('ebook.read.selectionPop.listen')),
 			styleHighlight: t('ebook.read.selectionPop.styleHighlight'),
 			styleUnderline: t('ebook.read.selectionPop.styleUnderline'),
 			styleWavy: t('ebook.read.selectionPop.styleWavy'),
 			colorPrefix: t('ebook.read.selectionPop.colorPrefix'),
 		}),
-		[t],
+		[t, listenLabel],
 	);
 
 	const thoughtListQuoteActions = useMemo(() => {
@@ -1301,6 +1311,7 @@ function EbookReadPage() {
 			rend,
 		);
 		if (!quote.trim()) return null;
+		const listenKey = `thought-list:${cfiRange}`;
 		const spineHint = extractCfiSpineHint(cfiRange);
 		const chapterHighlights = spineHint
 			? highlights.filter(
@@ -1308,7 +1319,10 @@ function EbookReadPage() {
 				)
 			: highlights;
 		return {
-			labels: selectionPopBarLabels,
+			labels: {
+				...selectionPopBarLabels,
+				listen: listenLabel(listenKey, t('ebook.read.selectionPop.listen')),
+			},
 			hasHighlight: isSelectionFullyHighlighted(
 				chapterHighlights,
 				cfiRange,
@@ -1332,6 +1346,7 @@ function EbookReadPage() {
 				openAssistantWithSelection(quote);
 			},
 			onShare: () => openQuoteShare(quote, { cfiRange }),
+			onListen: () => void toggleListen(quote, listenKey),
 		};
 	}, [
 		thoughtListCluster,
@@ -1343,15 +1358,22 @@ function EbookReadPage() {
 		removeHighlightForQuote,
 		openHighlightPopBarAtBookContent,
 		openQuoteShare,
+		toggleListen,
+		listenLabel,
+		t,
 	]);
 
 	const thoughtDialogQuoteActions = useMemo(() => {
 		const quote = thoughtDraft.quote.trim();
 		if (!quote) return null;
 		const cfiRange = thoughtDraft.cfiRange;
+		const listenKey = `thought-dialog:${cfiRange}`;
 		const rend = epubNavRef.current?.getRendition() ?? undefined;
 		return {
-			labels: selectionPopBarLabels,
+			labels: {
+				...selectionPopBarLabels,
+				listen: listenLabel(listenKey, t('ebook.read.selectionPop.listen')),
+			},
 			hasHighlight: isSelectionFullyHighlighted(
 				highlights,
 				cfiRange,
@@ -1380,6 +1402,7 @@ function EbookReadPage() {
 				openQuoteShare(thoughtDraft.quote, {
 					cfiRange: thoughtDraft.cfiRange,
 				}),
+			onListen: () => void toggleListen(thoughtDraft.quote, listenKey),
 		};
 	}, [
 		thoughtDraft.quote,
@@ -1394,6 +1417,9 @@ function EbookReadPage() {
 		removeHighlightForQuote,
 		openHighlightPopBarAtBookContent,
 		openQuoteShare,
+		toggleListen,
+		listenLabel,
+		t,
 	]);
 
 	const thoughtPanelOpen =
@@ -2181,6 +2207,7 @@ function EbookReadPage() {
 					onWriteThought={onSelectionPopBarWriteThought}
 					onAskBook={onSelectionPopBarAskBook}
 					onShare={onSelectionPopBarShare}
+					onListen={onSelectionPopBarListen}
 					onClearSelection={clearEpubSelection}
 				/>
 			) : null}

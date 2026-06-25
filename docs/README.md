@@ -97,6 +97,7 @@
 | 跨段落写想法时空行也出现虚线                                      | [ebook/epub-thought-underline-empty-gap.md](./ebook/epub-thought-underline-empty-gap.md)                                                                 |
 | 删想法列表最后一条后侧栏空白不收起 / 详情正文比列表下垂             | [ebook/epub-thought-list-delete-close.md](./ebook/epub-thought-list-delete-close.md)                                                                     |
 | 书摘分享图片 / 复制到微信                                         | [ebook/epub-quote-share.md](./ebook/epub-quote-share.md)                                                                                                 |
+| EPUB「听当前」无声 / 中文书摘本机不读                             | [ebook/epub-quote-listen.md](./ebook/epub-quote-listen.md)                                                                                               |
 | MK 问书关闭后右侧空白 / 想法列表关后留白 / 开 MK 闪烁           | [ebook/epub-side-panel-moke.md](./ebook/epub-side-panel-moke.md)                                                                                         |
 | 右键菜单 PopBar 闪烁 / 无选区右键自动点词                         | [ebook/epub-context-menu-popbar.md](./ebook/epub-context-menu-popbar.md)                                                                                 |
 | 开/关想法侧栏后左侧引用段滚出屏幕                                 | [ebook/epub-thought-quote-viewport.md](./ebook/epub-thought-quote-viewport.md)                                                                           |

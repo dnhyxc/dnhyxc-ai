@@ -27,6 +27,7 @@ export type EpubSelectionPopBarPanelProps = {
 	onWriteThought: () => void;
 	onAskBook: () => void;
 	onShare?: () => void;
+	onListen?: () => void;
 	onClearSelection?: () => void;
 	/** 是否展示样式/颜色条；默认 true */
 	showHighlightStyleBar?: boolean;
@@ -106,6 +107,7 @@ export function EpubSelectionPopBarPanel({
 	onWriteThought,
 	onAskBook,
 	onShare,
+	onListen,
 	onClearSelection,
 	caretAnchorX,
 	variant = 'floating',
@@ -168,6 +170,7 @@ export function EpubSelectionPopBarPanel({
 					onWriteThought={onWriteThought}
 					onAskBook={onAskBook}
 					onShare={onShare}
+					onListen={onListen}
 					onAnyAction={onClearSelection}
 				/>
 			</div>

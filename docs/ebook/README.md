@@ -34,6 +34,7 @@
 | [epub-side-panel-moke.md](./epub-side-panel-moke.md)                               | **增量**：MK 问书与右侧分栏统一开启/关闭（无闪烁、列表关闭无留白、划线不误关助手）                                                            |
 | [epub-split-panel-collapse.md](./epub-split-panel-collapse.md)                     | **增量**：关闭侧栏后左侧立即全宽（去 hidden、单帧 collapse、layout 兜底）                                                                   |
 | [epub-context-menu-popbar.md](./epub-context-menu-popbar.md)                       | **增量**：右键菜单与选区 PopBar（关菜单不闪、无选区不自动点词）                                                                               |
+| [epub-quote-listen.md](./epub-quote-listen.md)                                     | **增量**：引用「听当前」朗读（PopBar/想法三入口、英语学习 TTS、本机中英分句与音色修复）                                                       |
 | [epub-thought-quote-viewport.md](./epub-thought-quote-viewport.md)                 | **增量**：想法侧栏开合后左侧引用段落保持视口可见（CFI 锚点 + 分栏 resize 后 scroll 校正）                                                    |
 | [epub-thought-quote-highlight-toggle.md](./epub-thought-quote-highlight-toggle.md) | **增量**：侧栏引用区划线/删除划线与 PopBar 对齐的 full 覆盖度判定                                                                               |
 | [epub-split-soft-resize.md](./epub-split-soft-resize.md)                           | **增量**：EPUB 分栏拖拽 soft resize（rAF 合并、即时 patch 划线、松手 full sync，避免白屏）                                                      |

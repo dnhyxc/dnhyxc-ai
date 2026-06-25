@@ -28,6 +28,7 @@ type Props = {
 	onWriteThought: () => void;
 	onAskBook: () => void;
 	onShare?: () => void;
+	onListen?: () => void;
 	onClearSelection?: () => void;
 };
 
@@ -49,6 +50,7 @@ export function EpubSelectionPopBar({
 	onWriteThought,
 	onAskBook,
 	onShare,
+	onListen,
 	onClearSelection,
 }: Props) {
 	const [visible, setVisible] = useState(false);
@@ -113,6 +115,7 @@ export function EpubSelectionPopBar({
 					onWriteThought={onWriteThought}
 					onAskBook={onAskBook}
 					onShare={onShare}
+					onListen={onListen}
 					onClearSelection={onClearSelection}
 					caretAnchorX={state.x}
 				/>

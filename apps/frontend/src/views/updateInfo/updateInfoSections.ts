@@ -1572,6 +1572,13 @@ const UPDATE_INFO_SECTIONS_ZH: UpdateInfoSection[] = [
 				description:
 					'关闭读书想法列表或 MK 问书右侧分栏后，左侧阅读区立即恢复全宽，不再偶发右侧空白列，也不再延迟数帧才变宽。',
 			},
+			{
+				id: 's25-44',
+				title: 'EPUB 引用「听当前」',
+				dateLabel: '2026-06-24',
+				description:
+					'阅读 EPUB 时可在选区浮动工具条、读书想法列表或详情引用底栏点击听当前朗读选中或引用文字；播放中按钮变为停止，再次点击停止；中文书摘在本机浏览器朗读更稳定。',
+			},
 		],
 	},
 ];

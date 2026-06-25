@@ -49,44 +49,91 @@ type TtsCadenceChunk = { text: string; pauseAfterMs: number };
 
 const PAUSE_AFTER_SENTENCE_MS = 480;
 const PAUSE_AFTER_CLAUSE_MS = 300;
+/** 单段 utterance 过长时浏览器本机 TTS 易截断或静默失败 */
+const MAX_UTTERANCE_CHARS = 120;
+
+/** 文本是否以 CJK 为主（用于本机朗读选中文音色） */
+function isPredominantlyCjk(text: string): boolean {
+	let cjk = 0;
+	let letters = 0;
+	for (const ch of text) {
+		if (/[\u4e00-\u9fff\u3400-\u4dbf\uf900-\ufaff]/.test(ch)) cjk += 1;
+		else if (/[A-Za-z]/.test(ch)) letters += 1;
+	}
+	return cjk > 0 && cjk >= letters;
+}
+
+function splitLongText(text: string, maxLen: number): string[] {
+	if (text.length <= maxLen) return [text];
+	const parts: string[] = [];
+	let rest = text;
+	while (rest.length > maxLen) {
+		let cut = maxLen;
+		if (/[\u4e00-\u9fff]/.test(rest)) {
+			cut = maxLen;
+		} else {
+			const space = rest.lastIndexOf(' ', maxLen);
+			if (space > maxLen / 2) cut = space;
+		}
+		const piece = rest.slice(0, cut).trim();
+		if (piece) parts.push(piece);
+		rest = rest.slice(cut).trim();
+	}
+	if (rest) parts.push(rest);
+	return parts.length > 0 ? parts : [text];
+}
 
 /**
- * 按句末 / 逗号分层切分，段间插入不同时长停顿（无法调用系统「翻译」弹窗 API，靠停顿模拟顿挫）
+ * 按句末 / 逗号分层切分（中英标点），段间插入停顿；过长段再硬切避免本机 TTS 失败
  */
 function splitTextForTtsCadence(text: string): TtsCadenceChunk[] {
 	const trimmed = text.trim();
 	if (!trimmed) return [];
-	if (!/[.!?;,]/.test(trimmed) && trimmed.length < 72) {
+
+	const hasEnSentence = /[.!?]/.test(trimmed);
+	const hasCnSentence = /[。！？]/.test(trimmed);
+	const hasClause = /[,;，；：:]/.test(trimmed);
+
+	if (
+		!hasEnSentence &&
+		!hasCnSentence &&
+		!hasClause &&
+		trimmed.length < MAX_UTTERANCE_CHARS
+	) {
 		return [{ text: trimmed, pauseAfterMs: 0 }];
 	}
 
 	const sentences = trimmed
-		.split(/(?<=[.!?])\s+/)
+		.split(/(?<=[.!?。！？])\s*/)
 		.map((s) => s.trim())
 		.filter(Boolean);
-	if (sentences.length === 0) {
-		return [{ text: trimmed, pauseAfterMs: 0 }];
-	}
+	const sentenceParts = sentences.length > 0 ? sentences : [trimmed];
 
 	const chunks: TtsCadenceChunk[] = [];
-	for (let si = 0; si < sentences.length; si += 1) {
-		const sent = sentences[si];
+	for (let si = 0; si < sentenceParts.length; si += 1) {
+		const sent = sentenceParts[si];
 		const clauses = sent
-			.split(/(?<=[,;:])\s+/)
+			.split(/(?<=[,;，；：:])\s+/)
 			.map((s) => s.trim())
 			.filter(Boolean);
 		const parts = clauses.length > 0 ? clauses : [sent];
 		for (let ci = 0; ci < parts.length; ci += 1) {
-			const lastClause = ci === parts.length - 1;
-			const lastSentence = si === sentences.length - 1;
-			chunks.push({
-				text: parts[ci],
-				pauseAfterMs: !lastClause
-					? PAUSE_AFTER_CLAUSE_MS
-					: !lastSentence
-						? PAUSE_AFTER_SENTENCE_MS
-						: 0,
-			});
+			const subChunks = splitLongText(parts[ci], MAX_UTTERANCE_CHARS);
+			for (let sub = 0; sub < subChunks.length; sub += 1) {
+				const lastClause = ci === parts.length - 1;
+				const lastSentence = si === sentenceParts.length - 1;
+				const lastSub = sub === subChunks.length - 1;
+				chunks.push({
+					text: subChunks[sub],
+					pauseAfterMs: !lastSub
+						? PAUSE_AFTER_CLAUSE_MS
+						: !lastClause
+							? PAUSE_AFTER_CLAUSE_MS
+							: !lastSentence
+								? PAUSE_AFTER_SENTENCE_MS
+								: 0,
+				});
+			}
 		}
 	}
 	return chunks.length > 0 ? chunks : [{ text: trimmed, pauseAfterMs: 0 }];
@@ -293,14 +340,15 @@ function pauseMs(ms: number): Promise<void> {
 
 function pickEnglishVoice(): SpeechSynthesisVoice | null {
 	if (!isEnglishTtsSupported()) return null;
-	if (cachedEnglishVoice !== undefined) {
-		return cachedEnglishVoice;
-	}
 
 	const voices = window.speechSynthesis.getVoices();
 	if (!voices.length) {
-		cachedEnglishVoice = null;
+		// 音色列表尚未就绪，勿缓存 null（否则后续朗读永远无 voice）
 		return null;
+	}
+
+	if (cachedEnglishVoice !== undefined) {
+		return cachedEnglishVoice;
 	}
 
 	const activeKey = resolveVoiceKeyForPlayback();
@@ -327,6 +375,40 @@ function pickEnglishVoice(): SpeechSynthesisVoice | null {
 
 	cachedEnglishVoice = best;
 	return best;
+}
+
+function scoreChineseVoice(voice: SpeechSynthesisVoice): number {
+	const lang = voice.lang.toLowerCase();
+	if (!lang.startsWith('zh')) return -1;
+	let score = 0;
+	if (voice.localService) score += 40;
+	if (lang.includes('cn') || lang.includes('hans')) score += 20;
+	if (lang.includes('tw') || lang.includes('hant')) score += 8;
+	if (voice.name.toLowerCase().includes('tingting')) score += 15;
+	return score;
+}
+
+function pickChineseVoice(): SpeechSynthesisVoice | null {
+	if (!isEnglishTtsSupported()) return null;
+	const voices = window.speechSynthesis.getVoices();
+	if (!voices.length) return null;
+	let best: SpeechSynthesisVoice | null = null;
+	let bestScore = -1;
+	for (const v of voices) {
+		const score = scoreChineseVoice(v);
+		if (score > bestScore) {
+			bestScore = score;
+			best = v;
+		}
+	}
+	return best;
+}
+
+function pickVoiceForChunk(chunkText: string): SpeechSynthesisVoice | null {
+	if (isPredominantlyCjk(chunkText)) {
+		return pickChineseVoice() ?? pickEnglishVoice();
+	}
+	return pickEnglishVoice();
 }
 
 function resetCachedEnglishVoice(): void {
@@ -603,12 +685,13 @@ function speakOneUtterance(
 		}
 
 		const utter = new SpeechSynthesisUtterance(plain);
-		utter.lang = 'en-US';
-
-		const voice = pickEnglishVoice();
+		const voice = pickVoiceForChunk(plain);
 		if (voice) {
 			utter.voice = voice;
-			utter.lang = voice.lang || 'en-US';
+			utter.lang =
+				voice.lang || (isPredominantlyCjk(plain) ? 'zh-CN' : 'en-US');
+		} else {
+			utter.lang = isPredominantlyCjk(plain) ? 'zh-CN' : 'en-US';
 		}
 
 		// 略慢于 1.0，长句更清晰；与系统词典语速接近
@@ -621,6 +704,8 @@ function speakOneUtterance(
 		utter.onend = () => resolve();
 		utter.onerror = () => resolve();
 		window.speechSynthesis.speak(utter);
+		// Chrome 等浏览器在长文本分段时可能挂起，轻触 resume 保证后续段能播
+		window.speechSynthesis.resume();
 	});
 }
 
@@ -655,6 +740,7 @@ async function speakEnglishTextWithGeneration(
 
 	await waitForVoicesReady();
 	if (!isPlaybackGenerationActive(generation)) return;
+	resetCachedEnglishVoice();
 
 	const chunks = splitTextForTtsCadence(plain);
 	const chunkRate = chunks.length > 1 ? 0.86 : 0.9;
