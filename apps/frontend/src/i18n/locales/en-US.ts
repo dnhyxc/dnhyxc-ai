@@ -1634,6 +1634,9 @@ export const enUS = {
 	'ebook.read.quoteShare.brand': 'Moke Reading',
 	'ebook.read.selectionPop.askBook': 'Ask MK',
 	'ebook.read.selectionPop.listen': 'Listen',
+	'ebook.read.listen.followResume': 'Follow playback',
+	'ebook.read.listen.followResumeAria':
+		'Scroll to the playing passage and resume auto-follow',
 	'ebook.read.contextMenu.addThought': 'Add note',
 	'ebook.read.contextMenu.assistant': 'Reading assistant',
 	'ebook.read.contextMenu.askSelection': 'Ask MK about selection',

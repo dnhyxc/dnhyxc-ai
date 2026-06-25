@@ -103,6 +103,7 @@
 | 书摘分享图片 / 复制到微信                                         | [ebook/epub-quote-share.md](./ebook/epub-quote-share.md)                                                                                                 |
 | EPUB「听当前」无声 / 中文书摘本机不读                             | [ebook/epub-quote-listen.md](./ebook/epub-quote-listen.md)                                                                                               |
 | 听当前无逐句淡黄底 / Safari 无背景                                | [ebook/epub-listen-sentence-bg.md](./ebook/epub-listen-sentence-bg.md)                                                                                   |
+| 听当前跨段多句同时高亮 / 换句背景不消                               | [ebook/epub-listen-host-overlay.md](./ebook/epub-listen-host-overlay.md)                                                                                 |
 | 听当前后划线重复 / 无法取消划线                                   | [ebook/epub-listen-user-highlight-reconcile.md](./ebook/epub-listen-user-highlight-reconcile.md)                                                         |
 | MK 问书关闭后右侧空白 / 想法列表关后留白 / 开 MK 闪烁 / 删最后一条后未全宽 | [ebook/epub-read-split-panel.md](./ebook/epub-read-split-panel.md)                                                                                       |
 | 右键菜单 PopBar 闪烁 / 无选区右键自动点词                         | [ebook/epub-context-menu-popbar.md](./ebook/epub-context-menu-popbar.md)                                                                                 |

@@ -2,6 +2,8 @@
 
 ## 延伸阅读
 
+- [EPUB 听当前：滚动容器浮层与跨段句间清除](epub-listen-host-overlay.md) — **当前绘制层**：host 浮层、句 index 清除（替代下文 §1 三层绘制描述）
+- [EPUB 听当前播放自动跟随 FAB](epub-listen-auto-follow-fab.md) — 手动滚动打断与回位按钮
 - [EPUB 引用「听当前」](epub-quote-listen.md) — 三入口朗读、TTS 复用
 - [EPUB 听当前与用户划线 DOM 协调](epub-listen-user-highlight-reconcile.md) — 播放层与用户划线隔离
 - [EPUB 用户划线实现](epub-user-highlight-impl.md) — marks-pane 批注（与播放层解耦）

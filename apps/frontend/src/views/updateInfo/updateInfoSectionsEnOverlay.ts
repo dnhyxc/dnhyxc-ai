@@ -1076,4 +1076,14 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'After highlighting then Listen, or re-highlighting a wider selection, highlights no longer duplicate and cancel still works; when playback ends, highlights and thought underlines return to a consistent state.',
 	},
+	's25-49': {
+		title: 'EPUB Listen cross-paragraph highlight fix',
+		description:
+			'When Listen spans line breaks or two paragraphs, the previous sentence yellow tint clears as soon as the next sentence starts—no more multiple sentences staying highlighted until playback finishes.',
+	},
+	's25-50': {
+		title: 'EPUB Listen auto-scroll follow',
+		description:
+			'While Listen plays a long selection, the current sentence scrolls into view automatically. Manual scroll or wheel pauses follow; a bottom-right button returns to the playing passage and resumes auto-follow.',
+	},
 };

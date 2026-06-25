@@ -1494,6 +1494,8 @@ export const zhCN = {
 	'ebook.read.quoteShare.brand': '墨客读书',
 	'ebook.read.selectionPop.askBook': 'MK 问书',
 	'ebook.read.selectionPop.listen': '听当前',
+	'ebook.read.listen.followResume': '回到播放位置',
+	'ebook.read.listen.followResumeAria': '滚动到正在播放的内容并恢复自动跟随',
 	'ebook.read.contextMenu.addThought': '写想法',
 	'ebook.read.contextMenu.assistant': '智能助手',
 	'ebook.read.contextMenu.askSelection': 'MK 问书',

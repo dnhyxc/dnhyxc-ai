@@ -77,16 +77,17 @@ export function useEbookQuoteListen(
 				await playEnglishPreferred(spokenRaw, {
 					onCadenceChunk: (event) => {
 						if (!rend) return;
-						if (event.phase === 'start') {
-							showEpubListenPlainSpan(
-								event.sentencePlainStart,
-								event.sentencePlainEnd,
-							);
+						if (event.phase === 'end') {
+							if (event.isLastInSentence) {
+								clearEpubListenSentenceOverlay();
+							}
 							return;
 						}
-						if (event.isLastInSentence) {
-							clearEpubListenSentenceOverlay();
-						}
+						showEpubListenPlainSpan(
+							event.sentencePlainStart,
+							event.sentencePlainEnd,
+							event.sentenceIndex,
+						);
 					},
 				});
 			} catch {

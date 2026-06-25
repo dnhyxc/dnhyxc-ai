@@ -38,7 +38,9 @@
 | [epub-read-split-panel.md](./epub-read-split-panel.md)                             | **主文档（当前）**：MK 问书与读书想法右侧分栏 state + 布局收起（条件卸载右栏、删最后一条、热更新全宽）                                      |
 | [epub-context-menu-popbar.md](./epub-context-menu-popbar.md)                       | **增量**：右键菜单与选区 PopBar（关菜单不闪、无选区不自动点词）                                                                               |
 | [epub-quote-listen.md](./epub-quote-listen.md)                                     | **增量**：引用「听当前」朗读（PopBar/想法三入口、英语学习 TTS、本机中英分句与音色修复）                                                       |
-| [epub-listen-sentence-bg.md](./epub-listen-sentence-bg.md)                         | **增量**：听当前逐句播放背景（CSS Highlight / 独立批注 / div 三层、plain 偏移、选区缓存）                                                       |
+| [epub-listen-sentence-bg.md](./epub-listen-sentence-bg.md)                         | **增量**：听当前逐句播放背景（plain 偏移、选区缓存；**绘制层见 host 浮层专题**）                                                               |
+| [epub-listen-host-overlay.md](./epub-listen-host-overlay.md)                       | **增量**：听当前 host 浮层绘制与跨段句间清除（替代 iframe 三层 mark）                                                                          |
+| [epub-listen-auto-follow-fab.md](./epub-listen-auto-follow-fab.md)                   | **增量**：听当前播放自动滚入视口、手动滚动打断与右下角回位 FAB                                                                                 |
 | [epub-listen-user-highlight-reconcile.md](./epub-listen-user-highlight-reconcile.md) | **增量**：听当前与用户划线 DOM 协调（reconcile 孤儿 mark、apply 存在性校验、播完 sync）                                                       |
 | [epub-thought-quote-viewport.md](./epub-thought-quote-viewport.md)                 | **增量**：想法侧栏开合后左侧引用段落保持视口可见（CFI 锚点 + 分栏 resize 后 scroll 校正）                                                    |
 | [epub-thought-quote-highlight-toggle.md](./epub-thought-quote-highlight-toggle.md) | **增量**：侧栏引用区划线/删除划线与 PopBar 对齐的 full 覆盖度判定                                                                               |

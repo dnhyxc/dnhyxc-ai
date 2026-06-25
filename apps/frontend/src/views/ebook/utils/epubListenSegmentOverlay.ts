@@ -1,46 +1,32 @@
 /**
  * EPUB「听当前」播放背景
  *
- * 绘制优先级：CSS Highlight API → epub.js highlight（独立 class，按 Annotation detach）
- * → iframe body 浮层。禁止 rend.annotations.remove(cfi,'highlight')，避免误删用户划线。
+ * 在 epub.js 滚动容器上挂单一浮层（不写入 iframe annotation / CSS Highlight），
+ * 换句时 replaceChildren 整层替换，避免跨段落 mark 残留。
  */
 import type { Rendition } from 'epubjs';
 import { stripMarkdownForTts } from '@/utils/englishTts';
 import {
-	cfiFromDomRange,
 	forEachTextNodeInRange,
 	getAccurateRangeLineClientRects,
 	normalizeSelectionRangeForEpub,
 	resolveCfiDomRange,
 } from './epubRangeGeometry';
-import { scrollEpubRangeIntoView } from './epubScrolledNav';
+import {
+	getEpubScrollContainer,
+	scrollEpubRangeIntoView,
+} from './epubScrolledNav';
 
 export const EPUB_LISTEN_SEGMENT_FILL = 'rgba(251, 231, 128, 0.28)';
 
 export const EPUB_LISTEN_HIGHLIGHT_CLASS = 'moke-epub-listen-bg';
 
-const LISTEN_CSS_HIGHLIGHT_NAME = 'moke-epub-listen-seg';
-const LISTEN_STYLE_ID = 'moke-epub-listen-seg-style';
+const LISTEN_ROOT_ID = 'moke-epub-listen-host-overlay';
 const LISTEN_OVERLAY_ID = 'moke-epub-listen-overlay';
 
-const LISTEN_HIGHLIGHT_STYLES: Record<string, string> = {
-	fill: EPUB_LISTEN_SEGMENT_FILL,
-	'fill-opacity': '1',
-	stroke: 'transparent',
-	'stroke-width': '0',
-	'mix-blend-mode': 'normal',
-};
-
-const LISTEN_DOM_SELECTOR = `g.${EPUB_LISTEN_HIGHLIGHT_CLASS}, g[ref="${EPUB_LISTEN_HIGHLIGHT_CLASS}"]`;
+const LISTEN_DOM_SELECTOR = `g.${EPUB_LISTEN_HIGHLIGHT_CLASS}, g[ref="${EPUB_LISTEN_HIGHLIGHT_CLASS}"], g[ref*="${EPUB_LISTEN_HIGHLIGHT_CLASS}"], g[class*="${EPUB_LISTEN_HIGHLIGHT_CLASS}"]`;
 
 type EpubContents = { document: Document; window: Window };
-
-type EpubListenAnnotation = {
-	cfiRange: string;
-	type: string;
-	sectionIndex: number;
-	detach: (view: { index: number }) => void;
-};
 
 type PlainCompactMap = {
 	trimmed: string;
@@ -57,14 +43,99 @@ type ListenSession = {
 	epoch: number;
 	plainStart: number;
 	plainEnd: number;
+	/** 为 false 时播放换句不再自动滚入视口（用户手动滚动后） */
+	autoFollow: boolean;
+	/** 与 TTS sentenceIndex 对齐，用于换句时清上一句背景 */
+	lastSentenceIndex: number;
+};
+
+export type EpubListenAutoFollowState = {
+	active: boolean;
+	autoFollow: boolean;
 };
 
 let session: ListenSession | null = null;
 let overlayEpoch = 0;
 let relayoutRaf = 0;
 let detachRelayout: (() => void) | null = null;
-let activeListenAnnotation: EpubListenAnnotation | null = null;
+let detachScrollGuard: (() => void) | null = null;
 let rememberedPopBarRange: Range | null = null;
+let programmaticScroll = 0;
+/** 递增以丢弃过期的滚动后重绘 */
+let paintSerial = 0;
+
+const followListeners = new Set<(state: EpubListenAutoFollowState) => void>();
+
+function emitAutoFollowState(): void {
+	const state: EpubListenAutoFollowState = {
+		active: session != null,
+		autoFollow: session?.autoFollow ?? true,
+	};
+	for (const fn of followListeners) fn(state);
+}
+
+export function subscribeEpubListenAutoFollow(
+	listener: (state: EpubListenAutoFollowState) => void,
+): () => void {
+	followListeners.add(listener);
+	emitAutoFollowState();
+	return () => followListeners.delete(listener);
+}
+
+function pauseListenAutoFollow(): void {
+	if (!session?.autoFollow) return;
+	session.autoFollow = false;
+	emitAutoFollowState();
+}
+
+async function withProgrammaticScroll<T>(run: () => Promise<T>): Promise<T> {
+	programmaticScroll += 1;
+	try {
+		return await run();
+	} finally {
+		requestAnimationFrame(() => {
+			programmaticScroll = Math.max(0, programmaticScroll - 1);
+		});
+	}
+}
+
+function attachListenScrollGuard(rend: Rendition): () => void {
+	const cleanups: (() => void)[] = [];
+
+	const onUserScrollIntent = () => {
+		if (programmaticScroll > 0) return;
+		pauseListenAutoFollow();
+	};
+
+	const bindScrollTarget = (target: EventTarget | null | undefined) => {
+		if (!target) return;
+		target.addEventListener('scroll', onUserScrollIntent, { passive: true });
+		cleanups.push(() =>
+			target.removeEventListener('scroll', onUserScrollIntent),
+		);
+	};
+
+	const container = getEpubScrollContainer(rend);
+	if (container) {
+		bindScrollTarget(container);
+		container.addEventListener('wheel', onUserScrollIntent, { passive: true });
+		cleanups.push(() =>
+			container.removeEventListener('wheel', onUserScrollIntent),
+		);
+	}
+
+	const bindContents = (contents: EpubContents) => {
+		const doc = contents.document;
+		bindScrollTarget(doc.scrollingElement ?? doc.documentElement);
+	};
+
+	rend.hooks.content.register(bindContents);
+	for (const item of getContents(rend)) bindContents(item);
+
+	return () => {
+		for (const fn of cleanups) fn();
+	};
+}
 
 export function rememberEpubPopBarSelectionRange(range: Range | null): void {
 	rememberedPopBarRange =
@@ -127,168 +198,166 @@ export function cloneEpubListenSelectionRange(
 	return cloneActiveEpubSelection(rend);
 }
 
-type CssHighlightRegistry = {
-	set: (name: string, value: unknown) => void;
-	delete: (name: string) => void;
-};
-
-function getCssHighlightRegistry(doc: Document): CssHighlightRegistry | null {
-	const css = (
-		doc.defaultView as Window & { CSS?: { highlights?: CssHighlightRegistry } }
-	)?.CSS;
-	return css?.highlights ?? null;
-}
-
-function ensureListenCssHighlightStyle(doc: Document): void {
-	const head = doc.head ?? doc.documentElement;
-	if (!head || doc.getElementById(LISTEN_STYLE_ID)) return;
-	const style = doc.createElement('style');
-	style.id = LISTEN_STYLE_ID;
-	style.textContent = `
-::highlight(${LISTEN_CSS_HIGHLIGHT_NAME}) {
-	background-color: ${EPUB_LISTEN_SEGMENT_FILL};
-	color: inherit;
-}
-`;
-	head.appendChild(style);
-}
-
-function clearCssListenHighlight(rend: Rendition): void {
+function collectListenDocuments(rend: Rendition): Set<Document> {
+	const docs = new Set<Document>([document]);
 	for (const { document: doc } of getContents(rend)) {
-		getCssHighlightRegistry(doc)?.delete(LISTEN_CSS_HIGHLIGHT_NAME);
+		if (doc) docs.add(doc);
 	}
+	return docs;
 }
 
-function paintCssListenHighlight(range: Range): boolean {
+function resolveListenOverlayHost(rend: Rendition): HTMLElement | null {
+	return (
+		getEpubScrollContainer(rend) ??
+		(rend as unknown as { manager?: { container?: HTMLElement } }).manager
+			?.container ??
+		null
+	);
+}
+
+function rangeLineRectsInHost(
+	range: Range,
+	host: HTMLElement,
+): Array<{ left: number; top: number; width: number; height: number }> {
+	const lineRects = getAccurateRangeLineClientRects(range);
+	if (!lineRects.length) return [];
+
 	const doc = range.startContainer.ownerDocument;
-	if (!doc) return false;
-	const registry = getCssHighlightRegistry(doc);
-	const HighlightCtor = (
-		doc.defaultView as Window & {
-			Highlight?: new (...ranges: Range[]) => unknown;
-		}
-	)?.Highlight;
-	if (!registry || !HighlightCtor) return false;
+	const iframe = doc?.defaultView?.frameElement as HTMLIFrameElement | null;
+	const iframeRect = iframe?.getBoundingClientRect();
+	const hostRect = host.getBoundingClientRect();
 
-	ensureListenCssHighlightStyle(doc);
-	registry.set(LISTEN_CSS_HIGHLIGHT_NAME, new HighlightCtor(range));
-	return true;
-}
-
-function removeListenDomGroups(rend: Rendition): void {
-	for (const { document: doc } of getContents(rend)) {
-		doc.querySelectorAll(LISTEN_DOM_SELECTOR).forEach((g) => {
-			g.remove();
-		});
-	}
-}
-
-/** 仅 detach 播放批注对象，不走 annotations.remove(cfi,'highlight') */
-function detachActiveListenAnnotation(rend: Rendition): void {
-	const ann = activeListenAnnotation;
-	activeListenAnnotation = null;
-	if (!ann) return;
-
-	const views = (
-		rend as Rendition & { views?: () => Array<{ index: number }> }
-	).views?.();
-	views?.forEach((view) => {
-		const viewIndex = (view as { index?: number }).index;
-		if (viewIndex === undefined || ann.sectionIndex !== viewIndex) return;
-		ann.detach({ index: viewIndex });
+	return lineRects.map((r) => {
+		const viewportLeft = iframeRect ? r.left + iframeRect.left : r.left;
+		const viewportTop = iframeRect ? r.top + iframeRect.top : r.top;
+		return {
+			left: viewportLeft - hostRect.left + host.scrollLeft,
+			top: viewportTop - hostRect.top + host.scrollTop,
+			width: r.width,
+			height: r.height,
+		};
 	});
+}
 
-	const store = (
-		rend.annotations as Rendition['annotations'] & {
-			_annotations?: Record<string, unknown>;
-			_annotationsBySectionIndex?: Record<string, string[]>;
-		}
-	)._annotations;
-	const hash = encodeURI(`${ann.cfiRange}${ann.type}`);
-	if (store && hash in store) {
-		delete store[hash];
-		const bySection = (
-			rend.annotations as Rendition['annotations'] & {
-				_annotationsBySectionIndex?: Record<string, string[]>;
+function ensureListenOverlayRoot(rend: Rendition): HTMLElement | null {
+	const host = resolveListenOverlayHost(rend);
+	if (!host) return null;
+
+	if (getComputedStyle(host).position === 'static') {
+		host.style.position = 'relative';
+	}
+
+	let root = host.querySelector<HTMLElement>(`#${LISTEN_ROOT_ID}`);
+	if (!root) {
+		root = document.createElement('div');
+		root.id = LISTEN_ROOT_ID;
+		root.style.cssText =
+			'position:absolute;left:0;top:0;pointer-events:none;z-index:5;overflow:visible;';
+		host.appendChild(root);
+	}
+
+	root.style.width = `${Math.max(host.scrollWidth, host.clientWidth)}px`;
+	root.style.height = `${Math.max(host.scrollHeight, host.clientHeight)}px`;
+	return root;
+}
+
+/** 清掉历史 annotation / CSS Highlight / iframe 内旧实现残留 */
+function purgeLegacyListenLayers(rend: Rendition): void {
+	const cssName = 'moke-epub-listen-seg';
+	for (const doc of collectListenDocuments(rend)) {
+		const css = (
+			doc.defaultView as Window & {
+				CSS?: { highlights?: { delete: (n: string) => void } };
 			}
-		)._annotationsBySectionIndex;
-		const section = bySection?.[ann.sectionIndex];
-		if (section) {
-			bySection[ann.sectionIndex] = section.filter((h) => h !== hash);
+		)?.CSS;
+		css?.highlights?.delete(cssName);
+		doc.getElementById(LISTEN_STYLE_ID)?.remove();
+	}
+
+	purgeAllListenAnnotations(rend);
+
+	for (const doc of collectListenDocuments(rend)) {
+		try {
+			doc.querySelectorAll(LISTEN_DOM_SELECTOR).forEach((g) => {
+				g.remove();
+			});
+			for (const pane of doc.querySelectorAll('.marks-pane')) {
+				pane.querySelectorAll(LISTEN_DOM_SELECTOR).forEach((g) => {
+					g.remove();
+				});
+			}
+			doc.getElementById(LISTEN_OVERLAY_ID)?.remove();
+		} catch {
+			// iframe 卸载时忽略
 		}
 	}
 }
 
-function clearDivListenOverlay(rend: Rendition): void {
-	for (const { document: doc } of getContents(rend)) {
-		doc.getElementById(LISTEN_OVERLAY_ID)?.remove();
+const LISTEN_STYLE_ID = 'moke-epub-listen-seg-style';
+
+function purgeAllListenAnnotations(rend: Rendition): void {
+	const annApi = rend.annotations as Rendition['annotations'] & {
+		_annotations?: Record<
+			string,
+			{
+				className?: string;
+				sectionIndex: number;
+				detach: (view: { index: number }) => void;
+			}
+		>;
+		_annotationsBySectionIndex?: Record<string, string[]>;
+	};
+	const store = annApi._annotations;
+	if (!store) return;
+
+	const views =
+		(
+			rend as Rendition & { views?: () => Array<{ index: number }> }
+		).views?.() ?? [];
+
+	for (const hash of Object.keys({ ...store })) {
+		const ann = store[hash];
+		if (ann?.className !== EPUB_LISTEN_HIGHLIGHT_CLASS) continue;
+		for (const view of views) {
+			const idx = (view as { index?: number }).index;
+			if (idx !== undefined && ann.sectionIndex === idx) {
+				ann.detach({ index: idx });
+			}
+		}
+		delete store[hash];
+		const bySection = annApi._annotationsBySectionIndex;
+		if (bySection?.[ann.sectionIndex]) {
+			bySection[ann.sectionIndex] = bySection[ann.sectionIndex].filter(
+				(h) => h !== hash,
+			);
+		}
 	}
 }
 
 function clearListenPaint(rend: Rendition): void {
-	clearCssListenHighlight(rend);
-	detachActiveListenAnnotation(rend);
-	removeListenDomGroups(rend);
-	clearDivListenOverlay(rend);
-}
-
-function applyListenAnnotation(rend: Rendition, range: Range): boolean {
-	const cfi = cfiFromDomRange(rend, range);
-	if (!cfi) return false;
-
-	try {
-		const ann = rend.annotations.highlight(
-			cfi,
-			{ listen: '1' },
-			() => {},
-			EPUB_LISTEN_HIGHLIGHT_CLASS,
-			LISTEN_HIGHLIGHT_STYLES,
-		) as unknown as EpubListenAnnotation;
-		activeListenAnnotation = ann;
-		return true;
-	} catch {
-		return false;
-	}
-}
-
-function paintDivListenOverlay(range: Range): boolean {
-	const doc = range.startContainer.ownerDocument;
-	if (!doc?.body) return false;
-
-	const rects = getAccurateRangeLineClientRects(range);
-	if (!rects.length) return false;
-
-	let root = doc.getElementById(LISTEN_OVERLAY_ID);
-	if (!root) {
-		root = doc.createElement('div');
-		root.id = LISTEN_OVERLAY_ID;
-		root.style.cssText =
-			'position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;z-index:1;overflow:visible;';
-		doc.body.appendChild(root);
-	}
-	root.replaceChildren();
-
-	const win = doc.defaultView;
-	const scrollX = win?.scrollX ?? 0;
-	const scrollY = win?.scrollY ?? 0;
-
-	for (const rect of rects) {
-		const block = doc.createElement('div');
-		block.style.cssText = `position:absolute;background:${EPUB_LISTEN_SEGMENT_FILL};pointer-events:none;border-radius:1px;`;
-		block.style.left = `${rect.left + scrollX}px`;
-		block.style.top = `${rect.top + scrollY}px`;
-		block.style.width = `${rect.width}px`;
-		block.style.height = `${rect.height}px`;
-		root.appendChild(block);
-	}
-	return true;
+	purgeLegacyListenLayers(rend);
+	resolveListenOverlayHost(rend)
+		?.querySelector(`#${LISTEN_ROOT_ID}`)
+		?.replaceChildren();
 }
 
 function paintListenRange(rend: Rendition, range: Range): void {
 	clearListenPaint(rend);
-	if (paintCssListenHighlight(range)) return;
-	if (applyListenAnnotation(rend, range)) return;
-	paintDivListenOverlay(range);
+
+	const root = ensureListenOverlayRoot(rend);
+	const host = resolveListenOverlayHost(rend);
+	if (!root || !host) return;
+
+	const rects = rangeLineRectsInHost(range, host);
+	for (const rect of rects) {
+		const block = document.createElement('div');
+		block.style.cssText = `position:absolute;background:${EPUB_LISTEN_SEGMENT_FILL};pointer-events:none;border-radius:1px;`;
+		block.style.left = `${rect.left}px`;
+		block.style.top = `${rect.top}px`;
+		block.style.width = `${rect.width}px`;
+		block.style.height = `${rect.height}px`;
+		root.appendChild(block);
+	}
 }
 
 function buildCompactIndex(outer: Range): {
@@ -380,6 +449,14 @@ function resolveSessionOuter(active: ListenSession): Range | null {
 function paintPlainSpan(plainStart: number, plainEnd: number): void {
 	if (!session || plainStart >= plainEnd) return;
 
+	const isNewSpan =
+		session.plainStart !== plainStart || session.plainEnd !== plainEnd;
+
+	// 新句/新 span 前先清掉旧层（避免跨段时上一句 mark 残留）
+	if (isNewSpan) {
+		clearListenPaint(session.rend);
+	}
+
 	const outer = resolveSessionOuter(session);
 	if (!outer) return;
 
@@ -389,17 +466,17 @@ function paintPlainSpan(plainStart: number, plainEnd: number): void {
 	const range = plainSliceToRange(map, plainStart, plainEnd);
 	if (!range) return;
 
-	const isNewSpan =
-		session.plainStart !== plainStart || session.plainEnd !== plainEnd;
-
 	paintListenRange(session.rend, range);
 	session.plainStart = plainStart;
 	session.plainEnd = plainEnd;
 
-	if (isNewSpan) {
+	if (isNewSpan && session.autoFollow) {
 		const { rend, cfi, epoch } = session;
-		void scrollEpubRangeIntoView(rend, range, cfi).then((ok) => {
+		const serial = ++paintSerial;
+		void withProgrammaticScroll(async () => {
+			const ok = await scrollEpubRangeIntoView(rend, range, cfi);
 			if (!ok || !session || session.epoch !== epoch) return;
+			if (serial !== paintSerial) return;
 			if (session.plainStart !== plainStart || session.plainEnd !== plainEnd) {
 				return;
 			}
@@ -461,9 +538,39 @@ export function beginEpubListenOverlaySession(
 		epoch: overlayEpoch,
 		plainStart: -1,
 		plainEnd: -1,
+		autoFollow: true,
+		lastSentenceIndex: -1,
 	};
 
 	detachRelayout = attachRelayoutListeners(rend);
+	detachScrollGuard = attachListenScrollGuard(rend);
+	emitAutoFollowState();
+}
+
+/** 恢复播放内容自动滚入视口，并立即滚到当前句 */
+export function resumeEpubListenAutoFollow(): void {
+	if (!session) return;
+	session.autoFollow = true;
+	emitAutoFollowState();
+
+	const { plainStart, plainEnd } = session;
+	if (plainStart < 0 || plainEnd <= plainStart) return;
+
+	const outer = resolveSessionOuter(session);
+	if (!outer) return;
+	const map = buildPlainCompactMap(outer, session.plain);
+	if (!map) return;
+	const range = plainSliceToRange(map, plainStart, plainEnd);
+	if (!range) return;
+
+	const { rend, cfi, epoch } = session;
+	void withProgrammaticScroll(async () => {
+		await scrollEpubRangeIntoView(rend, range, cfi);
+		if (!session || session.epoch !== epoch) return;
+		if (session.plainStart !== plainStart || session.plainEnd !== plainEnd)
+			return;
+		paintPlainSpan(plainStart, plainEnd);
+	});
 }
 
 export function resolveEpubListenPlain(
@@ -485,8 +592,19 @@ export function resolveEpubListenPlain(
 export function showEpubListenPlainSpan(
 	plainStart: number,
 	plainEnd: number,
+	sentenceIndex = 0,
 ): void {
 	if (!session) return;
+	if (
+		session.lastSentenceIndex >= 0 &&
+		sentenceIndex !== session.lastSentenceIndex
+	) {
+		paintSerial += 1;
+		clearListenPaint(session.rend);
+		session.plainStart = -1;
+		session.plainEnd = -1;
+	}
+	session.lastSentenceIndex = sentenceIndex;
 	paintPlainSpan(plainStart, plainEnd);
 }
 
@@ -511,11 +629,13 @@ export function clearEpubListenSegmentOverlay(): void {
 
 	overlayEpoch += 1;
 	session = null;
-	activeListenAnnotation = null;
 	detachRelayout?.();
 	detachRelayout = null;
+	detachScrollGuard?.();
+	detachScrollGuard = null;
 	cancelAnimationFrame(relayoutRaf);
 	relayoutRaf = 0;
+	emitAutoFollowState();
 }
 
 if (!EPUB_LISTEN_SEGMENT_FILL.includes('0.28')) {

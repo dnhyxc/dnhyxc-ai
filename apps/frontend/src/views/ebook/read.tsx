@@ -40,6 +40,7 @@ import { EbookPageShell } from './components/EbookPageShell';
 import { EbookPanelHeader } from './components/EbookPanelHeader';
 import { EbookReadSplitLayout } from './components/EbookReadSplitLayout';
 import { EbookTocDrawer } from './components/EbookTocDrawer';
+import { EpubListenFollowFab } from './components/EpubListenFollowFab';
 import { EpubPane } from './components/EpubPane';
 import { EpubQuoteShareDialog } from './components/EpubQuoteShareDialog';
 import {
@@ -2140,7 +2141,7 @@ function EbookReadPage() {
 						sidePanel={sidePanelSlot}
 					>
 						<div
-							className="flex h-full min-h-0 flex-1 flex-col"
+							className="relative flex h-full min-h-0 flex-1 flex-col"
 							onContextMenu={onHostContextMenu}
 							onPointerDown={() => {
 								if (epubSettingsOpen) closeEpubSettings();
@@ -2168,6 +2169,7 @@ function EbookReadPage() {
 								onThoughtClusterClick={openThoughtCluster}
 								onUserHighlightPopBar={onUserHighlightPopBar}
 							/>
+							<EpubListenFollowFab />
 						</div>
 					</EbookReadSplitLayout>
 				) : (
