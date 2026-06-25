@@ -4,6 +4,7 @@
 > **朗读介质 Switch**：[`tts-playback-source.md`](./tts-playback-source.md)  
 > **存储与账号同步**：[`cloud-tts-prefs-db.md`](./cloud-tts-prefs-db.md)  
 > 后端 MiniMax 流式合成、硅基回退与 LRU 见 [`minimax-cloud-tts.md`](./minimax-cloud-tts.md)。  
+> 中文系统音色与语言增强联动见 [`minimax-chinese-voices.md`](./minimax-chinese-voices.md)。  
 > 播放世代、单词本机优先见 [`english-tts-playback.md`](./english-tts-playback.md)。
 
 若与仓库最新源码不一致，**以源码为准**。
@@ -19,7 +20,7 @@
 | 朗读参数 | 仅服务端 `.env` 默认（model / voice / 语速等） | 会员在 **设置 → 语音设置** 下方「云端语音设置」保存偏好，**开启开关后**随每次云端朗读请求发送 |
 | 存储 | 曾用 `localStorage` | **账号级数据库**（见 [`cloud-tts-prefs-db.md`](./cloud-tts-prefs-db.md)） |
 | 设置入口 | 与大模型配置混在同一页或不可配 | **语音设置** `/setting/cloud-tts`（本机在上、云端在下，见 [`voice-settings-page.md`](./voice-settings-page.md)） |
-| 音色列表 | 单一默认 `English_radiant_girl` | 下拉 **45 个英文系统音色**（与官方 ID 对齐） |
+| 音色列表 | 单一默认 `English_radiant_girl` | 下拉 **45 个英文** + **64 个中文**系统音色（与官方 ID 对齐）；随 **语言增强** 筛选 |
 | 前端缓存 | key 仅纯文本 | 自定义参数开启时，key 追加 **userId + 参数 JSON 后缀** |
 | 界面文案 | 曾暴露服务商名称 | 产品向文案统一为 **「云端朗读」**，字段说明不含品牌 |
 

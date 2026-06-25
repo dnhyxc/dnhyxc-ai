@@ -826,6 +826,11 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'Left sidebar blocks (daily memorize, quick intents, vocab/quotes libraries, topic pulls, favorites, today review, mistake books, etc.) now share one card and button spec aligned with the Agent and knowledge sidebars—subtle borders and light fills—while keeping each block’s icon and button colors. JSON import examples in library cards are collapsed by default; tap the label to expand or collapse. Quick-intent chips stay two columns in a narrow sidebar and add columns when the panel is wider.',
 	},
+	's24-42': {
+		title: 'Cloud Chinese voices',
+		description:
+			'Active members: in Settings → Voice settings → Cloud voice, set Language boost to Chinese to pick from 64 Chinese system voices (Mandarin and Cantonese); English boost shows English voices only. When you change language boost, an incompatible voice resets to that language’s default.',
+	},
 	's25-1': {
 		title: 'E-book bookshelf',
 		description:

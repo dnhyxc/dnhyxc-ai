@@ -67,6 +67,7 @@
 |------|------|
 | [minimax-cloud-tts.md](./minimax-cloud-tts.md) | **MiniMax 流式 TTS** 完整实现（§11 逐函数注释代码 + 排查） |
 | [cloud-tts-settings.md](./cloud-tts-settings.md) | **设置页云端朗读**：UI、请求合并、ScrollArea |
+| [minimax-chinese-voices.md](./minimax-chinese-voices.md) | **增量**：云端 MiniMax 中文系统音色（64 项）与语言增强联动 |
 | [voice-settings-page.md](./voice-settings-page.md) | **语音设置页**：本机 + 云端分区、菜单与文案 |
 | [english-tts-local-voice.md](./english-tts-local-voice.md) | **本机 Web Speech 音色**、按账号分键 |
 | [cloud-tts-prefs-db.md](./cloud-tts-prefs-db.md) | **偏好入库**：`minimax_tts_user_config`、API、跨设备同步 |

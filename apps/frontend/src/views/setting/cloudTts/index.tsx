@@ -16,12 +16,16 @@ import { Minus, Plus, Volume2 } from 'lucide-react';
 import { observer } from 'mobx-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-	getMinimaxTtsEnglishVoicesByGender,
+	defaultMinimaxTtsVoiceIdForLanguageBoost,
 	getMinimaxTtsVoiceDisplayName,
+	getMinimaxTtsVoicesByGender,
+	getMinimaxTtsVoicesForLanguageBoost,
 	MINIMAX_TTS_AUDIO_FORMATS,
 	MINIMAX_TTS_EMOTIONS,
 	MINIMAX_TTS_LANGUAGE_BOOST_VALUES,
 	MINIMAX_TTS_MODELS,
+	type MinimaxTtsLanguageBoost,
+	type MinimaxTtsVoice,
 } from '@/constants/minimaxTts';
 import { useI18n, useMembershipActive } from '@/hooks';
 import { cn } from '@/lib/utils';
@@ -206,6 +210,7 @@ function VoiceSelectField({
 	onValueChange,
 	disabled,
 	labelClassName,
+	languageBoost,
 }: {
 	id: string;
 	label: string;
@@ -213,14 +218,19 @@ function VoiceSelectField({
 	onValueChange: (value: string) => void;
 	disabled?: boolean;
 	labelClassName: string;
+	languageBoost: MinimaxTtsLanguageBoost;
 }) {
 	const { t, locale } = useI18n();
+	const voices = useMemo(
+		() => getMinimaxTtsVoicesForLanguageBoost(languageBoost),
+		[languageBoost],
+	);
 	const { female, male } = useMemo(
-		() => getMinimaxTtsEnglishVoicesByGender(),
-		[],
+		() => getMinimaxTtsVoicesByGender(voices),
+		[voices],
 	);
 
-	const voiceLabel = (voice: (typeof female)[number]) =>
+	const voiceLabel = (voice: MinimaxTtsVoice) =>
 		formatVoiceOptionLabel(
 			getMinimaxTtsVoiceDisplayName(voice, locale),
 			voice.id,
@@ -481,6 +491,7 @@ const CloudTtsSetting = observer(() => {
 									onValueChange={(voiceId) => patch({ voiceId })}
 									disabled={fieldsDisabled}
 									labelClassName={fieldLabelClass}
+									languageBoost={prefs.languageBoost as MinimaxTtsLanguageBoost}
 								/>
 
 								<NumberField
@@ -543,7 +554,15 @@ const CloudTtsSetting = observer(() => {
 									id="cloud-tts-lang-boost"
 									label={t('setting.cloudTts.languageBoost')}
 									value={prefs.languageBoost}
-									onValueChange={(languageBoost) => patch({ languageBoost })}
+									onValueChange={(languageBoost) => {
+										const boost = languageBoost as MinimaxTtsLanguageBoost;
+										const voices = getMinimaxTtsVoicesForLanguageBoost(boost);
+										const voiceIds = new Set(voices.map((v) => v.id));
+										const voiceId = voiceIds.has(prefs.voiceId)
+											? prefs.voiceId
+											: defaultMinimaxTtsVoiceIdForLanguageBoost(boost);
+										patch({ languageBoost: boost, voiceId });
+									}}
 									options={languageBoostOptions}
 									disabled={fieldsDisabled}
 									labelClassName={fieldLabelClass}

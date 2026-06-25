@@ -66,6 +66,7 @@
 | 今日记词无词可抽 / 时间不对                                       | [english/daily-memorize-implementation.md](./english/daily-memorize-implementation.md) §9                                                                |
 | 云端朗读 404 / MiniMax 502 余额不足                               | [english/minimax-cloud-tts.md](./english/minimax-cloud-tts.md) §12                                                                                       |
 | 设置页云端朗读参数不生效 / 改音色仍播旧音                         | [english/cloud-tts-settings.md](./english/cloud-tts-settings.md) §5–§6                                                                                   |
+| 语言增强中文但音色列表仍是英文                                    | [english/minimax-chinese-voices.md](./english/minimax-chinese-voices.md)                                                                                 |
 | 换设备后云端朗读参数丢失 / 需账号同步                             | [english/cloud-tts-prefs-db.md](./english/cloud-tts-prefs-db.md)                                                                                         |
 | TTS 从点喇叭到出声（前后端全链路）                                | [english/tts-end-to-end-guide.md](./english/tts-end-to-end-guide.md)                                                                                     |
 | 支付成功但资料页仍非会员 / 到期仍显示会员                         | [pay/stripe-membership-billing.md](./pay/stripe-membership-billing.md) §6–§7                                                                             |
