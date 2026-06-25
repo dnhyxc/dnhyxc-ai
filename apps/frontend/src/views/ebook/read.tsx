@@ -126,7 +126,10 @@ function EbookReadPage() {
 	const { t } = useI18n();
 	const { bookId = '' } = useParams();
 	const nav = useNavigate();
-	const { toggleListen, listenLabel } = useEbookQuoteListen(t);
+	const { toggleListen, listenLabel } = useEbookQuoteListen(
+		t,
+		() => epubNavRef.current?.getRendition() ?? null,
+	);
 
 	const book = ebookStore.bookById(bookId);
 	const prog = ebookStore.progOf(bookId);
@@ -1274,7 +1277,7 @@ function EbookReadPage() {
 		const payload = selectionPopBarRef.current;
 		if (!payload?.selectedText.trim()) return;
 		suppressEpubSelectionPopBarDismiss();
-		void toggleListen(payload.selectedText, 'popbar');
+		void toggleListen(payload.selectedText, 'popbar', payload.cfiRange);
 	}, [toggleListen]);
 
 	const onSelectionPopBarAskBook = useCallback(() => {
@@ -1346,7 +1349,7 @@ function EbookReadPage() {
 				openAssistantWithSelection(quote);
 			},
 			onShare: () => openQuoteShare(quote, { cfiRange }),
-			onListen: () => void toggleListen(quote, listenKey),
+			onListen: () => void toggleListen(quote, listenKey, cfiRange),
 		};
 	}, [
 		thoughtListCluster,
@@ -1402,7 +1405,8 @@ function EbookReadPage() {
 				openQuoteShare(thoughtDraft.quote, {
 					cfiRange: thoughtDraft.cfiRange,
 				}),
-			onListen: () => void toggleListen(thoughtDraft.quote, listenKey),
+			onListen: () =>
+				void toggleListen(thoughtDraft.quote, listenKey, thoughtDraft.cfiRange),
 		};
 	}, [
 		thoughtDraft.quote,

@@ -429,12 +429,101 @@ export type SpeakEnglishOptions = {
 	volume?: number;
 };
 
+/** TTS 节奏分段播放事件（供电子书逐句高亮等） */
+export type TtsCadenceChunkEvent = {
+	phase: 'start' | 'end';
+	index: number;
+	text: string;
+	sentenceIndex: number;
+	isLastInSentence: boolean;
+};
+
 export type PlayEnglishPreferredOptions = {
 	/** 为 true 时强制本机 Web Speech（如本机音色设置试听）；省略时会员走云端、非会员走本机 */
 	preferLocal?: boolean;
 	/** 本机朗读时透传给 Web Speech */
 	speak?: SpeakEnglishOptions;
+	/** 每个 TTS 节奏段开始/结束（句内子句不重复触发句末） */
+	onCadenceChunk?: (event: TtsCadenceChunkEvent) => void;
 };
+
+type CadencePlaybackHooks = Pick<PlayEnglishPreferredOptions, 'onCadenceChunk'>;
+
+function buildSentenceOffsetSpans(
+	plain: string,
+): Array<{ start: number; end: number }> {
+	const trimmed = plain.trim();
+	if (!trimmed) return [];
+	const parts = trimmed
+		.split(/(?<=[.!?。！？])\s*/)
+		.map((s) => s.trim())
+		.filter(Boolean);
+	if (!parts.length) return [{ start: 0, end: trimmed.length }];
+
+	const spans: Array<{ start: number; end: number }> = [];
+	let searchFrom = 0;
+	for (const part of parts) {
+		const idx = trimmed.indexOf(part, searchFrom);
+		if (idx < 0) continue;
+		spans.push({ start: idx, end: idx + part.length });
+		searchFrom = idx + part.length;
+	}
+	return spans.length > 0 ? spans : [{ start: 0, end: trimmed.length }];
+}
+
+function sentenceIndexAtOffset(
+	spans: Array<{ start: number; end: number }>,
+	offset: number,
+): number {
+	for (let i = 0; i < spans.length; i += 1) {
+		const span = spans[i]!;
+		if (offset >= span.start && offset < span.end) return i;
+	}
+	return Math.max(0, spans.length - 1);
+}
+
+function buildChunkOffsetMeta(plain: string, chunks: TtsCadenceChunk[]) {
+	let searchPos = 0;
+	return chunks.map((chunk) => {
+		const idx = plain.indexOf(chunk.text, searchPos);
+		const start = idx >= 0 ? idx : searchPos;
+		const end = start + chunk.text.length;
+		searchPos = end;
+		return { start, end };
+	});
+}
+
+function emitCadenceChunk(
+	hooks: CadencePlaybackHooks | undefined,
+	plain: string,
+	chunks: TtsCadenceChunk[],
+	index: number,
+	phase: TtsCadenceChunkEvent['phase'],
+): void {
+	const onCadenceChunk = hooks?.onCadenceChunk;
+	if (!onCadenceChunk) return;
+
+	const chunk = chunks[index];
+	if (!chunk) return;
+
+	const sentences = buildSentenceOffsetSpans(plain);
+	const offsets = buildChunkOffsetMeta(plain, chunks);
+	const { start } = offsets[index] ?? { start: 0 };
+	const sentenceIndex = sentenceIndexAtOffset(sentences, start);
+	const nextStart = offsets[index + 1]?.start;
+	const isLastInSentence =
+		index === chunks.length - 1 ||
+		(nextStart !== undefined &&
+			sentenceIndexAtOffset(sentences, nextStart) !== sentenceIndex);
+
+	onCadenceChunk({
+		phase,
+		index,
+		text: chunk.text,
+		sentenceIndex,
+		isLastInSentence,
+	});
+}
 
 let cloudAudio: HTMLAudioElement | null = null;
 let cloudObjectUrl: string | null = null;
@@ -711,6 +800,7 @@ async function playCloudTtsReady(
 async function playCloudTtsCadenceSegments(
 	plain: string,
 	generation: number,
+	hooks?: CadencePlaybackHooks,
 ): Promise<void> {
 	const chunks = splitTextForTtsCadence(plain);
 	if (chunks.length === 0) return;
@@ -719,9 +809,12 @@ async function playCloudTtsCadenceSegments(
 		chunks.length === 1 &&
 		chunks[0].text.length <= MAX_SINGLE_CLOUD_TTS_CHARS
 	) {
+		emitCadenceChunk(hooks, plain, chunks, 0, 'start');
 		const ready = await startCloudTts(chunks[0].text);
 		if (!isPlaybackGenerationActive(generation)) return;
 		await playCloudTtsReady(ready, generation);
+		if (!isPlaybackGenerationActive(generation)) return;
+		emitCadenceChunk(hooks, plain, chunks, 0, 'end');
 		return;
 	}
 
@@ -738,6 +831,8 @@ async function playCloudTtsCadenceSegments(
 			if (!isPlaybackGenerationActive(generation)) return;
 		}
 
+		emitCadenceChunk(hooks, plain, chunks, i, 'start');
+
 		const ready = await pendingReady!;
 		if (!isPlaybackGenerationActive(generation)) return;
 
@@ -745,6 +840,8 @@ async function playCloudTtsCadenceSegments(
 			i + 1 < chunks.length ? startCloudTts(chunks[i + 1].text) : null;
 
 		await playCloudTtsReady(ready, generation);
+		if (!isPlaybackGenerationActive(generation)) return;
+		emitCadenceChunk(hooks, plain, chunks, i, 'end');
 	}
 }
 
@@ -840,7 +937,7 @@ function waitForVoicesReady(): Promise<void> {
 async function speakEnglishTextWithGeneration(
 	text: string,
 	generation: number,
-	options?: SpeakEnglishOptions,
+	options?: SpeakEnglishOptions & CadencePlaybackHooks,
 ): Promise<void> {
 	if (!isEnglishTtsSupported()) return;
 
@@ -862,10 +959,14 @@ async function speakEnglishTextWithGeneration(
 			await pauseMs(prevPause);
 			if (!isPlaybackGenerationActive(generation)) return;
 		}
+		emitCadenceChunk(options, plain, chunks, i, 'start');
 		await speakOneUtterance(chunk.text, generation, {
-			...options,
 			rate: options?.rate ?? chunkRate,
+			pitch: options?.pitch,
+			volume: options?.volume,
 		});
+		if (!isPlaybackGenerationActive(generation)) return;
+		emitCadenceChunk(options, plain, chunks, i, 'end');
 	}
 }
 
@@ -887,25 +988,34 @@ export async function playEnglishPreferred(
 	const generation = beginPlaybackSession();
 	const speakOpts = options?.speak;
 	const useCloud = shouldUseCloudEnglishTts(options);
+	const cadenceHooks: CadencePlaybackHooks = {
+		onCadenceChunk: options?.onCadenceChunk,
+	};
 
 	if (!useCloud) {
 		if (!isPlaybackGenerationActive(generation)) return;
 		if (!isEnglishTtsSupported()) {
 			throw new Error('NO_TTS');
 		}
-		await speakEnglishTextWithGeneration(rawText, generation, speakOpts);
+		await speakEnglishTextWithGeneration(rawText, generation, {
+			...speakOpts,
+			...cadenceHooks,
+		});
 		return;
 	}
 
 	try {
-		await playCloudTtsCadenceSegments(plain, generation);
+		await playCloudTtsCadenceSegments(plain, generation, cadenceHooks);
 		return;
 	} catch {
 		if (!isPlaybackGenerationActive(generation)) return;
 		if (!isEnglishTtsSupported()) {
 			throw new Error('NO_TTS');
 		}
-		await speakEnglishTextWithGeneration(rawText, generation, speakOpts);
+		await speakEnglishTextWithGeneration(rawText, generation, {
+			...speakOpts,
+			...cadenceHooks,
+		});
 	}
 }
 

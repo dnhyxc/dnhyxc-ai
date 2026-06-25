@@ -6,6 +6,7 @@
 - [EPUB 想法侧栏](epub-thought-drawer.md) — 列表/详情引用底栏 `variant="panel"`
 - 英语学习 TTS 能力见 `docs/english/` 相关专题；本实现复用 `playEnglishPreferred` / `stopAllEnglishPlayback`
 - [云端长文分段流水线](../english/cloud-tts-segment-pipeline.md) — 长书摘云端首声加速（分段 + 预取）
+- [听当前逐句播放背景](epub-listen-sentence-bg.md) — 朗读时当前句淡黄底、与划线解耦的浮层实现
 
 ## 1. 背景与目标
 
