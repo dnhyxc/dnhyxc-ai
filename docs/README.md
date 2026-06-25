@@ -92,6 +92,7 @@
 | EPUB PopBar 闪烁 / 划线卡顿 / 工具条空档                          | [ebook/epub-popbar-perf-ux.md](./ebook/epub-popbar-perf-ux.md)                                                                                           |
 | 划线/写想法后数秒才出现线、同步时页面卡死；反向选到空行后应用卡死 | [ebook/epub-annotation-sync-perf.md](./ebook/epub-annotation-sync-perf.md)                                                                               |
 | 两次想法选区相交时虚线叠成双线                                    | [ebook/epub-thought-partial-overlap.md](./ebook/epub-thought-partial-overlap.md)                                                                         |
+| 段落内写想法无虚线 / 用户下划线误扣相邻想法虚线                   | [ebook/epub-thought-user-highlight-overlap.md](./ebook/epub-thought-user-highlight-overlap.md)                                                           |
 | 点击想法列表引用合并/拆分不对（A、B、标点、换行桥接）             | [ebook/epub-thought-cluster-bridging.md](./ebook/epub-thought-cluster-bridging.md)                                                                       |
 | 想法侧栏引用区划线/删除划线状态不对（部分已划仍显示删除）         | [ebook/epub-thought-quote-highlight-toggle.md](./ebook/epub-thought-quote-highlight-toggle.md)                                                           |
 | 拖拽分栏 EPUB 白屏 / 拖拽时彩色划线消失                           | [ebook/epub-split-soft-resize.md](./ebook/epub-split-soft-resize.md)                                                                                     |

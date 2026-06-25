@@ -1061,4 +1061,9 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'After closing the reading-notes list or MK ask side panel, deleting the last note from the list, or a dev hot reload, the left reading column returns to full width with no blank right column.',
 	},
+	's25-46': {
+		title: 'EPUB thought dashes vs user underlines overlap fix',
+		description:
+			'Amber thought underlines show when you annotate a single sentence inside a paragraph. User straight underlines cover thought dashes only where they overlap; non-overlapping dashes remain. Background highlights and wavy underlines still coexist correctly with thought dashes.',
+	},
 };

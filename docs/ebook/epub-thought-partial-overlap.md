@@ -4,7 +4,7 @@
 
 **增量专题**：修复两次「写想法」选区**部分相交**（非严格嵌套）时，重叠段琥珀虚线**双线叠加**变粗的问题。
 
-**延伸阅读**：[epub-thought-underline-impl.md](./epub-thought-underline-impl.md)（想法虚线主文档）、[epub-user-highlight-impl.md](./epub-user-highlight-impl.md)（用户划线重叠合并与 blocker 机制）、[epub-reading-thoughts.md](./epub-reading-thoughts.md)（数据层与嵌套去重）。
+**延伸阅读**：[epub-thought-underline-impl.md](./epub-thought-underline-impl.md)（想法虚线主文档）、[epub-thought-user-highlight-overlap.md](./epub-thought-user-highlight-overlap.md)（与用户划线叠加、短选区先画）、[epub-user-highlight-impl.md](./epub-user-highlight-impl.md)（用户划线重叠合并与 blocker 机制）、[epub-reading-thoughts.md](./epub-reading-thoughts.md)（数据层与嵌套去重）。
 
 ---
 

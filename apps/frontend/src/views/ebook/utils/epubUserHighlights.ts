@@ -72,6 +72,7 @@ const COLOR_BY_ID = Object.fromEntries(
 >;
 
 const UNDERLINE_OFFSET_PX = 2;
+const MIN_USER_HIGHLIGHT_BLOCKER_PX = 2;
 const WAVY_PATH_CLASS = 'moke-epub-user-hl-wave';
 /** 一个完整波浪周期约等于一字宽（典型 EPUB 正文字号） */
 const WAVY_WAVELENGTH_PX = 16;
@@ -2214,23 +2215,10 @@ export function syncEpubReadingAnnotations(
 			appliedHighlightsRef,
 			highlightPlan,
 		);
-		const visibleHighlights = highlightPlan.coalesced.filter((item) =>
-			highlightPlan.visibleCfis.has(item.cfiRange),
-		);
-		const suppressed = getThoughtCfisSuppressedByHighlights(
-			thoughts,
-			visibleHighlights,
-			rend,
-		);
-		invalidateThoughtMarksWithChangedSuppression(
-			suppressed,
-			appliedThoughtsRef,
-		);
-		applyEpubThoughtUnderlines(rend, thoughts, appliedThoughtsRef, suppressed);
+		applyEpubThoughtUnderlines(rend, thoughts, appliedThoughtsRef);
 		setUserHighlightBlockerSourcesForThoughtPatch(
 			collectUserHighlightBlockerSources(rend),
 		);
-		// 用户主动保存/划线后同步 patch，避免 rAF 双帧等待且立刻可见
 		runEpubReadingAnnotationPatch(rend);
 	} finally {
 		endEpubAnnotationSyncScope();
@@ -2248,30 +2236,14 @@ function runEpubReadingAnnotationPatch(rend: Rendition): void {
 		);
 		patchEpubThoughtUnderlineMarks(rend);
 		restackThoughtMarkGroups(rend);
+		restackUserHighlightMarkGroups(rend);
 	} catch {
 		// rendition 已销毁
 	}
 }
 
-/** 上一次 sync 时因用户划线而隐藏虚线的 CFI，用于仅增量失效 showLine 变化的 mark */
-let previousThoughtSuppressedCfis = new Set<string>();
-
 export function resetEpubReadingAnnotationSyncState(): void {
-	previousThoughtSuppressedCfis = new Set();
-}
-
-function invalidateThoughtMarksWithChangedSuppression(
-	suppressedLineCfis: Set<string>,
-	appliedThoughtsRef: Map<string, string>,
-): void {
-	for (const cfi of [...appliedThoughtsRef.keys()]) {
-		const wasSuppressed = previousThoughtSuppressedCfis.has(cfi);
-		const nowSuppressed = suppressedLineCfis.has(cfi);
-		if (wasSuppressed !== nowSuppressed) {
-			appliedThoughtsRef.delete(cfi);
-		}
-	}
-	previousThoughtSuppressedCfis = new Set(suppressedLineCfis);
+	// 保留导出供 EpubPane 卸载时调用
 }
 
 function isDomRangeFullyCoveredByHighlightClientRects(
@@ -2319,9 +2291,29 @@ function collectUserHighlightBlockerSources(
 		try {
 			doc.querySelectorAll(USER_HIGHLIGHT_SELECTOR).forEach((group) => {
 				const cfi = (group as SVGElement).dataset.epubcfi?.trim() ?? '';
+				const el = group as SVGElement;
+				const style = (el.dataset[DATA_STYLE] ??
+					'highlight') as EpubHighlightStyle;
 				const rects = [...group.querySelectorAll('rect')]
 					.map((rect) => parseSvgMarkRect(rect as SVGRectElement))
 					.filter((rect): rect is NonNullable<typeof rect> => rect !== null);
+				// ponytail: 波浪线用 path 扣减；下划线只用 rect（epub.js 遗留 line 常比 rect 更宽，会误扣想法虚线）
+				if (style === 'wavy') {
+					for (const node of group.querySelectorAll(
+						`path.${WAVY_PATH_CLASS}`,
+					)) {
+						if (!(node instanceof SVGPathElement)) continue;
+						const box = node.getBBox();
+						if (box.width >= MIN_USER_HIGHLIGHT_BLOCKER_PX && box.height > 0) {
+							rects.push({
+								x: box.x,
+								y: box.y,
+								width: box.width,
+								height: box.height,
+							});
+						}
+					}
+				}
 				if (rects.length > 0) {
 					sources.push({ cfi, rects });
 				}
@@ -2332,6 +2324,26 @@ function collectUserHighlightBlockerSources(
 	}
 
 	return sources;
+}
+
+/** 用户划线置于想法 mark 之上，重叠处由用户 stroke 盖住想法虚线 */
+export function restackUserHighlightMarkGroups(rend?: Rendition): void {
+	const docs = new Set<Document>([document]);
+	for (const contents of getRenditionContentsList(rend)) {
+		if (contents.document) docs.add(contents.document);
+	}
+
+	for (const doc of docs) {
+		try {
+			for (const pane of doc.querySelectorAll('.marks-pane')) {
+				for (const group of pane.querySelectorAll(USER_HIGHLIGHT_SELECTOR)) {
+					pane.appendChild(group);
+				}
+			}
+		} catch {
+			// iframe 卸载时忽略
+		}
+	}
 }
 
 /** 滚动/翻页后仅 patch 样式，不 remove+readd（避免闪烁） */
@@ -2391,33 +2403,6 @@ export function isThoughtCfiCoveredByUserHighlight(
 		}
 	}
 	return false;
-}
-
-export function getThoughtCfisSuppressedByHighlights(
-	thoughts: EbookThought[],
-	highlights: EbookUserHighlight[],
-	rend: Rendition,
-): Set<string> {
-	const suppressed = new Set<string>();
-	if (highlights.length === 0 || thoughts.length === 0) return suppressed;
-
-	const grouped = new Map<string, EbookThought[]>();
-	for (const thought of thoughts) {
-		const key = thought.cfiRange.trim();
-		if (!key) continue;
-		const list = grouped.get(key) ?? [];
-		list.push(thought);
-		grouped.set(key, list);
-	}
-
-	for (const cfiRange of grouped.keys()) {
-		const covered = highlights.some((highlight) =>
-			isThoughtCfiCoveredByUserHighlight(cfiRange, highlight, rend),
-		);
-		if (covered) suppressed.add(cfiRange);
-	}
-
-	return suppressed;
 }
 
 export function installEpubUserHighlightPatchListeners(

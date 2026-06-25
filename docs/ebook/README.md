@@ -26,6 +26,7 @@
 | [epub-annotation-sync-perf.md](./epub-annotation-sync-perf.md)                   | **增量**：划线/想法 sync 主线程优化（patch 快路径、CFI 缓存、想法 DOM restack、即时 patch）；**选区落空行卡死**修复（`forEachTextNodeInRange`） |
 | [epub-thought-underline-impl.md](./epub-thought-underline-impl.md)               | **主文档（想法虚线）**：分组、嵌套去重、选区防误触、与用户划线叠加（逐步拆解 + 逐行注释代码）                                                   |
 | [epub-thought-partial-overlap.md](./epub-thought-partial-overlap.md)             | **增量**：部分相交的想法选区 patch 层 blocker 去重，避免重叠段双线叠加                                                                          |
+| [epub-thought-user-highlight-overlap.md](./epub-thought-user-highlight-overlap.md) | **增量**：想法虚线与用户划线叠加修复（句内虚线、下划线误扣、restack + patch blocker）                                                         |
 | [epub-thought-cluster-bridging.md](./epub-thought-cluster-bridging.md)           | **主文档（想法桥接）**：点击聚合规则（A/B/标点/换行何时合并）、连通图 v5、逐行注释代码                                                          |
 | [epub-thought-list-ui.md](./epub-thought-list-ui.md)                               | **增量**：想法列表单击进详情、分组摘录展开、引用 clamp 泛化；移除列表内选中与引用点击回书                                                       |
 | [epub-thought-underline-empty-gap.md](./epub-thought-underline-empty-gap.md)       | **增量**：跨段落写想法时空行不再画虚线（空白文本片段过滤 + mark 校正快路径）                                                                  |

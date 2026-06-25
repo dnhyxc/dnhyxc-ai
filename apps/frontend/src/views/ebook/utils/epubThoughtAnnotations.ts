@@ -174,7 +174,7 @@ function patchAllThoughtUnderlineMarks(rend?: Rendition): void {
 	}
 }
 
-/** 将想法 mark 移到 marks-pane 末尾，保证叠放在用户划线之上且无需 remove+readd 全部想法 */
+/** 将想法 mark 在 marks-pane 内按跨度排序（短选区在上层，便于点击） */
 export function restackThoughtMarkGroups(rend?: Rendition): void {
 	const docs = new Set<Document>([document]);
 	for (const contents of getRenditionContentsList(rend)) {
@@ -208,33 +208,13 @@ export function restackThoughtMarkGroups(rend?: Rendition): void {
 	}
 }
 
-/** 由 epubUserHighlights 在 patch 前注入：当前有效用户划线的 DOM 热区 */
+/** 由 epubUserHighlights 在 patch 前注入：用户划线 SVG 热区，用于扣减重叠的想法虚线段 */
 let userHighlightBlockerSources: UserHighlightBlockerSource[] = [];
 
 export function setUserHighlightBlockerSourcesForThoughtPatch(
 	sources: UserHighlightBlockerSource[],
 ): void {
 	userHighlightBlockerSources = sources;
-}
-
-/** @deprecated 使用 setUserHighlightBlockerSourcesForThoughtPatch */
-export function setUserHighlightClientBlockersForThoughtPatch(
-	blockers: DOMRect[],
-): void {
-	userHighlightBlockerSources =
-		blockers.length > 0
-			? [
-					{
-						cfi: '',
-						rects: blockers.map((rect) => ({
-							x: rect.left,
-							y: rect.top,
-							width: rect.width,
-							height: rect.height,
-						})),
-					},
-				]
-			: [];
 }
 
 /** 滚动/翻页后 patch 想法下划线 DOM，不重绘批注 */
@@ -484,9 +464,10 @@ function compareThoughtMarksForLineDrawOrder(
 	if (!left.showLine && !right.showLine) return 0;
 	if (!left.showLine) return 1;
 	if (!right.showLine) return -1;
-	const spanDiff = right.span - left.span;
+	// ponytail: 较短选区先画线，较长选区后画并扣减重叠（句子级不被整段盖住）
+	const spanDiff = left.span - right.span;
 	if (spanDiff !== 0) return spanDiff;
-	return left.cfi.length - right.cfi.length;
+	return right.cfi.length - left.cfi.length;
 }
 
 function prepareThoughtUnderlineMark(
@@ -567,7 +548,7 @@ function patchThoughtUnderlineMarks(
 		prepareThoughtUnderlineMark(groupEl, rend),
 	);
 
-	// 与用户划线 coalesce 类似：较长选区先占线，较短/后绘制的重叠区间不再重复画虚线
+	// 较短选区先画；用户划线 blocker 扣重叠段，thoughtBlockers 扣想法间重叠
 	const thoughtLineBlockerSources: UserHighlightBlockerSource[] = [];
 	const lineSegmentsByGroup = new Map<SVGElement, ThoughtLineSegment[][]>();
 	const drawOrder = [...prepared].sort(compareThoughtMarksForLineDrawOrder);
@@ -963,59 +944,6 @@ function isCfiRangeStrictlyContained(
 	return extractCfiSpineHint(inner) === extractCfiSpineHint(outer);
 }
 
-/**
- * 计算哪些 CFI 区间应当绘制可见的下划线（即未被其它更大的选区“严格包含”，避免重复覆盖等视觉问题）。
- *
- * 具体逻辑说明：
- * - 遍历所有已分组的 [CFI, 该CFI的thought列表]（entries）；
- * - 对于每一个当前的 cfi，判断它是否被其它 cfi（otherCfi）“严格包含”：
- *   - 只要找到任何一个 otherCfi 满足 `isCfiRangeStrictlyContained(cfi, otherCfi, group, otherGroup, rend)` 为真，则视为 cfi 被其完全包裹。
- *   - 被包裹的 cfi 就不需要绘制可见的下划线，只用于命中点击等透明命中层。
- * - 最后返回所有未被包裹（即不被其它任何 cfi 严格包含）的 cfi 组成的 Set。
- *
- * 这种判定只画最外层可见下划线，嵌套选区只响应点击（避免多层多条虚线重叠）。
- *
- * @param entries - 所有 [cfi, group] 组合（每个 group 下至少有一个 thought）
- * @param rend - epub.js Rendition 实例，用于解析 cfi 到 DOM 区间
- * @returns 返回应绘制下划线的 cfi 字符串集合
- */
-function computeLineVisibleCfis(
-	entries: [string, EbookThought[]][],
-	rend: Rendition,
-): Set<string> {
-	const visible = new Set<string>(); // 用于保存需要绘制下划线的 cfi
-
-	for (const [cfi, group] of entries) {
-		// 检查当前 cfi 是否被其它 cfi 严格包含
-		const contained = entries.some(
-			([otherCfi, otherGroup]) =>
-				otherCfi !== cfi &&
-				isCfiRangeStrictlyContained(cfi, otherCfi, group, otherGroup, rend),
-		);
-		// 如果没有被任何其它 cfi 包裹，则加入可见集合
-		if (!contained) visible.add(cfi);
-	}
-	return visible;
-}
-
-/**
- * 同步 EPUB 阅读器中“想法”下划线标记的主函数。
- *
- * 功能与流程：
- * 1. 根据传入的 thoughts 对象（每条读书想法及其 cfi 范围），分组、去重并决定每一段内容是否需要渲染下划线（避免内层多余重叠）。
- * 2. 对于每一个分组（一个 cfiRange 下的多条想法），在 epub.js 注释/标注层中绘制下划线（或仅透明命中区）。
- * 3. 样式动态控制：外层下划线可见，内层只负责命中点击，不可见。
- * 4. 保证 appliedRef 为全量有效标记映射，并清理已经无效的下划线。
- * 5. 挂载 hooks：页面内容渲染/render 之后，以及定位/翻页后，均自动重新 patch 虚线样式，保证任意视图下标记始终一致。
- * 6. 点击事件处理：避免文本二次选区时误触，并根据 cfi 或 thoughtIds 匹配所有相关想法，传出给调用方用于弹窗列表。
- * 7. 返回一个解绑/销毁函数：清理所有注入、监听及标记（react 组件卸载、切换书籍/章节时调用）。
- *
- * @param rend       epub.js Rendition 实例，负责文档渲染与批注
- * @param thoughts   当前页面所有的“想法”对象列表
- * @param handlers   用户点击下划线时的回调（通常打开弹窗、列表等）
- * @param appliedRef 外部引用：cfiRange => 当前生效的 thoughtId 数组（用于管理与清理残留 old 标记）
- * @returns          返回一个用于销毁（unmount）时解绑所有监听与标记的函数
- */
 function buildThoughtUnderlineSignature(
 	thoughtIds: string[],
 	showLine: boolean,
@@ -1025,12 +953,12 @@ function buildThoughtUnderlineSignature(
 
 /**
  * 仅同步下划线批注（thoughts 变化时调用，不重复注册 hooks）
+ * ponytail: 每条想法都画可见虚线；嵌套/重叠由 patch 短选区先画 + thoughtBlockers 去重。
  */
 export function applyEpubThoughtUnderlines(
 	rend: Rendition,
 	thoughts: EbookThought[],
 	appliedRef: Map<string, string>,
-	suppressedLineCfis: Set<string> = new Set(),
 ): void {
 	try {
 		ensureThoughtUnderlineStyles();
@@ -1053,12 +981,10 @@ export function applyEpubThoughtUnderlines(
 	}
 
 	const sortedEntries = sortCfiGroupsForUnderlineStack([...grouped.entries()]);
-	const lineVisibleCfis = computeLineVisibleCfis(sortedEntries, rend);
 
 	for (const [cfiRange, group] of sortedEntries) {
 		const thoughtIds = group.map((t) => t.id);
-		const showLine =
-			lineVisibleCfis.has(cfiRange) && !suppressedLineCfis.has(cfiRange);
+		const showLine = true;
 		const nextSig = buildThoughtUnderlineSignature(thoughtIds, showLine);
 		if (appliedRef.get(cfiRange) === nextSig) continue;
 
@@ -1072,9 +998,7 @@ export function applyEpubThoughtUnderlines(
 				},
 				undefined,
 				EPUB_THOUGHT_UNDERLINE_CLASS,
-				showLine
-					? EPUB_THOUGHT_UNDERLINE_STYLES
-					: EPUB_THOUGHT_UNDERLINE_HIT_STYLES,
+				EPUB_THOUGHT_UNDERLINE_STYLES,
 			);
 			appliedRef.set(cfiRange, nextSig);
 		} catch {

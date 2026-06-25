@@ -272,14 +272,13 @@ function computeLineVisibleCfis( // 算出哪些 cfi 需要画 **可见** 虚线
 
 ## 9. 与用户划线的叠加
 
-当用户在某段加了**彩色背景高亮**且完全盖住想法选区时：
+**当前实现（2026-06-25 起）**见 [epub-thought-user-highlight-overlap.md](./epub-thought-user-highlight-overlap.md)。要点：
 
-1. `syncEpubReadingAnnotations` 调用 `getThoughtCfisSuppressedByHighlights`。
-2. 用 `getClientRects` 比较想法 Range 与用户划线 Range 的屏幕矩形。
-3. 若想法每一行矩形都落在划线矩形内 → 该想法 CFI 加入 `suppressed`。
-4. `applyEpubThoughtUnderlines(..., suppressed)` → `showLine=false`，虚线隐藏，但 mark 仍在（点击逻辑另述）。
+1. **apply 层**：每条想法恒 `showLine=true`，不再使用 `getThoughtCfisSuppressedByHighlights` 整段 hide。
+2. **patch 层**：`collectUserHighlightBlockerSources` 用用户划线 SVG **rect**（波浪线另加 path bbox）水平扣减重叠段想法虚线；**不读** epub.js 遗留 `<line>`（下划线误扣）。
+3. **叠放**：`restackUserHighlightMarkGroups` 使用户 mark 位于想法 mark 之上，重叠处由用户 stroke 盖住。
 
-详见 [epub-user-highlight-impl.md](./epub-user-highlight-impl.md) §8。
+PopBar/侧栏「是否已全部划线」仍用 `isThoughtCfiCoveredByUserHighlight` 等工具，与渲染 suppress 解耦。详见 [epub-user-highlight-impl.md](./epub-user-highlight-impl.md) §8。
 
 ---
 

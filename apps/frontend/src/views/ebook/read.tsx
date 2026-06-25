@@ -973,11 +973,22 @@ function EbookReadPage() {
 		}
 		setThoughtSaving(true);
 		try {
+			let cfiRange = thoughtDraft.cfiRange;
+			let quote = thoughtDraft.quote;
+			const rend = epubNavRef.current?.getRendition();
+			if (rend) {
+				const resolved = resolveCfiDomRange(rend, cfiRange);
+				if (resolved) {
+					const normalized = trimSelectionRange(resolved);
+					cfiRange = cfiFromDomRange(rend, normalized) ?? cfiRange.trim();
+					quote = normalized.toString().trim() || quote.trim();
+				}
+			}
 			if (thoughtDialogMode === 'create') {
 				const item = await createEbookThought({
 					bookId,
-					cfiRange: thoughtDraft.cfiRange,
-					quote: thoughtDraft.quote,
+					cfiRange,
+					quote,
 					content,
 				});
 				setThoughts((prev) => {
