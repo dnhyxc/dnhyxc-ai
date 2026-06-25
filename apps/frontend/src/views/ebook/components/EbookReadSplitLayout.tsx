@@ -53,7 +53,15 @@ export function EbookReadSplitLayout({
 	useLayoutEffect(() => {
 		const done = () => notifyEbookSplitPanelResizeEnd();
 		if (!sidePanelOpen) {
-			const raf = requestAnimationFrame(done);
+			// 右栏卸载后须显式把 reader 扩到 100%，否则 flex 仍可能保留上次 58/42
+			const raf = requestAnimationFrame(() => {
+				try {
+					panelGroupRef.current?.setLayout({ reader: 100 });
+				} catch {
+					// ponytail: 分组 panel 数变化时 setLayout 可能短暂失败，下一帧 layout effect 会再试
+				}
+				done();
+			});
 			return () => cancelAnimationFrame(raf);
 		}
 		const raf = requestAnimationFrame(() => {

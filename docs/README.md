@@ -87,7 +87,8 @@
 | 目录打开但看不出当前读到哪一章                                    | [ebook/ebook-toc-active-highlight.md](./ebook/ebook-toc-active-highlight.md)                                                                             |
 | PDF 无 MOKE 助手 / PDF 右键菜单                                   | [ebook/ebook-moke-assistant.md](./ebook/ebook-moke-assistant.md)                                                                                         |
 | 保存读书想法后阅读页白屏 / 下划线异常                             | [ebook/epub-thought-underlines-sync.md](./ebook/epub-thought-underlines-sync.md)                                                                         |
-| EPUB 用户划线与想法虚线如何实现 / 重叠合并                        | [ebook/epub-user-highlight-impl.md](./ebook/epub-user-highlight-impl.md)、[ebook/epub-thought-underline-impl.md](./ebook/epub-thought-underline-impl.md) |
+| EPUB 用户划线如何实现（**唯一主文档**）                           | [ebook/developer/epub-user-highlight-dev.md](./ebook/developer/epub-user-highlight-dev.md)（**从 §0 读起**） |
+| EPUB 想法添加与虚线如何实现（**唯一主文档**）                     | [ebook/developer/epub-thought-add-underline-dev.md](./ebook/developer/epub-thought-add-underline-dev.md)（**从 §0 读起**） |
 | EPUB 划线同名句子误删 / PopBar 划线与删除状态不对                 | [ebook/epub-highlight-dom-match.md](./ebook/epub-highlight-dom-match.md)                                                                                 |
 | EPUB PopBar 闪烁 / 划线卡顿 / 工具条空档                          | [ebook/epub-popbar-perf-ux.md](./ebook/epub-popbar-perf-ux.md)                                                                                           |
 | 划线/写想法后数秒才出现线、同步时页面卡死；反向选到空行后应用卡死 | [ebook/epub-annotation-sync-perf.md](./ebook/epub-annotation-sync-perf.md)                                                                               |
@@ -101,6 +102,8 @@
 | 删想法列表最后一条后侧栏空白不收起 / 详情正文比列表下垂             | [ebook/epub-thought-list-delete-close.md](./ebook/epub-thought-list-delete-close.md)                                                                     |
 | 书摘分享图片 / 复制到微信                                         | [ebook/epub-quote-share.md](./ebook/epub-quote-share.md)                                                                                                 |
 | EPUB「听当前」无声 / 中文书摘本机不读                             | [ebook/epub-quote-listen.md](./ebook/epub-quote-listen.md)                                                                                               |
+| 听当前无逐句淡黄底 / Safari 无背景                                | [ebook/epub-listen-sentence-bg.md](./ebook/epub-listen-sentence-bg.md)                                                                                   |
+| 听当前后划线重复 / 无法取消划线                                   | [ebook/epub-listen-user-highlight-reconcile.md](./ebook/epub-listen-user-highlight-reconcile.md)                                                         |
 | MK 问书关闭后右侧空白 / 想法列表关后留白 / 开 MK 闪烁 / 删最后一条后未全宽 | [ebook/epub-read-split-panel.md](./ebook/epub-read-split-panel.md)                                                                                       |
 | 右键菜单 PopBar 闪烁 / 无选区右键自动点词                         | [ebook/epub-context-menu-popbar.md](./ebook/epub-context-menu-popbar.md)                                                                                 |
 | 开/关想法侧栏后左侧引用段滚出屏幕                                 | [ebook/epub-thought-quote-viewport.md](./ebook/epub-thought-quote-viewport.md)                                                                           |

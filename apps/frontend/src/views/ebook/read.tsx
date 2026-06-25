@@ -72,6 +72,7 @@ import {
 	type PdfReaderContextActions,
 } from './utils/buildPdfContextMenuItems';
 import { subscribeEbookSplitPanelResizeEnd } from './utils/ebookSplitResize';
+import { getRememberedEpubPopBarSelectionRange } from './utils/epubListenSegmentOverlay';
 import {
 	extractQuoteSegmentsFromRange,
 	type QuoteShareRun,
@@ -129,6 +130,7 @@ function EbookReadPage() {
 	const { toggleListen, listenLabel } = useEbookQuoteListen(
 		t,
 		() => epubNavRef.current?.getRendition() ?? null,
+		() => epubNavRef.current?.syncReadingAnnotations(),
 	);
 
 	const book = ebookStore.bookById(bookId);
@@ -848,10 +850,11 @@ function EbookReadPage() {
 			if (reconciled && reconciled.allThoughts.length > 0) {
 				setThoughtListCluster(reconciled);
 				setThoughtListOpen(true);
-			} else {
-				setThoughtListCluster(null);
-				setThoughtListOpen(false);
+				return true;
 			}
+			setThoughtListCluster(null);
+			setThoughtListOpen(false);
+			return false;
 		},
 		[],
 	);
@@ -1045,19 +1048,14 @@ function EbookReadPage() {
 			// 获取用来还原列表聚合快照的引用，如果returnToListClusterRef没有快照则用当前聚合快照
 			const listSnapshot =
 				returnToListClusterRef.current ?? thoughtListClusterRef.current;
-			// 清空returnToListClusterRef，避免影响后续聚类回溯
 			returnToListClusterRef.current = null;
 			if (listSnapshot) {
-				// 如果有快照，根据最新想法列表还原聚合数据
 				restoreThoughtListFromSnapshot(listSnapshot, nextThoughts);
 			} else {
-				// 没有快照时，清空聚类数据，并关闭想法侧栏
 				setThoughtListCluster(null);
 				setThoughtListOpen(false);
 			}
-			// 更新状态：移除已删除想法后的想法列表
 			setThoughts(nextThoughts);
-			// 关闭编辑/创建想法弹窗
 			setThoughtDialogOpen(false);
 		} catch (e) {
 			// 捕获异常，弹出错误提示
@@ -1304,7 +1302,12 @@ function EbookReadPage() {
 		const payload = selectionPopBarRef.current;
 		if (!payload?.selectedText.trim()) return;
 		suppressEpubSelectionPopBarDismiss();
-		void toggleListen(payload.selectedText, 'popbar', payload.cfiRange);
+		void toggleListen(
+			payload.selectedText,
+			'popbar',
+			payload.cfiRange,
+			getRememberedEpubPopBarSelectionRange(),
+		);
 	}, [toggleListen]);
 
 	const onSelectionPopBarAskBook = useCallback(() => {
@@ -1453,15 +1456,19 @@ function EbookReadPage() {
 		t,
 	]);
 
-	const thoughtPanelOpen =
-		thoughtDialogOpen || (thoughtListOpen && thoughtListCluster != null);
+	const thoughtListPanelOpen =
+		thoughtListOpen &&
+		thoughtListCluster != null &&
+		thoughtListCluster.allThoughts.length > 0;
+
+	const thoughtPanelOpen = thoughtDialogOpen || thoughtListPanelOpen;
 
 	const syncThoughtQuoteAnchorCfi = useCallback(() => {
 		if (thoughtDialogOpen && thoughtDraft.cfiRange?.trim()) {
 			thoughtQuoteAnchorCfiRef.current = thoughtDraft.cfiRange.trim();
 			return;
 		}
-		if (thoughtListOpen && thoughtListCluster) {
+		if (thoughtListPanelOpen && thoughtListCluster) {
 			const rend = epubNavRef.current?.getRendition() ?? undefined;
 			const { cfiRange } = getThoughtClusterHighlightSubject(
 				thoughtListCluster,
@@ -1474,7 +1481,7 @@ function EbookReadPage() {
 	}, [
 		thoughtDialogOpen,
 		thoughtDraft.cfiRange,
-		thoughtListOpen,
+		thoughtListPanelOpen,
 		thoughtListCluster,
 		epubNavReady,
 	]);
@@ -1505,7 +1512,7 @@ function EbookReadPage() {
 		book?.fmt,
 		thoughtPanelOpen,
 		thoughtDialogOpen,
-		thoughtListOpen,
+		thoughtListPanelOpen,
 		thoughtListCluster,
 		thoughtDraft.cfiRange,
 		syncThoughtQuoteAnchorCfi,
@@ -1568,7 +1575,7 @@ function EbookReadPage() {
 				/>
 			);
 		}
-		if (thoughtListOpen && thoughtListCluster) {
+		if (thoughtListPanelOpen && thoughtListCluster) {
 			return (
 				<EpubThoughtList
 					onClose={closeThoughtList}
@@ -1595,7 +1602,7 @@ function EbookReadPage() {
 		thoughtDialogQuoteActions,
 		thoughtDraft,
 		thoughtListCluster,
-		thoughtListOpen,
+		thoughtListPanelOpen,
 		thoughtListQuoteActions,
 		openHighlightPopBarAtBookContent,
 		thoughtSaving,
@@ -1603,9 +1610,7 @@ function EbookReadPage() {
 
 	/** 右侧分栏开关与 state 对齐 */
 	const sidePanelOpen =
-		assistantOpen ||
-		thoughtDialogOpen ||
-		(Boolean(thoughtListOpen) && thoughtListCluster != null);
+		assistantOpen || thoughtDialogOpen || thoughtListPanelOpen;
 	const sidePanelSlotKey = assistantOpen
 		? 'assistant'
 		: thoughtDialogOpen

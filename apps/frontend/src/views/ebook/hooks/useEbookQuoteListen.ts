@@ -5,20 +5,21 @@ import {
 	isEnglishPlaybackAvailable,
 	playEnglishPreferred,
 	stopAllEnglishPlayback,
-	stripMarkdownForTts,
 	warmupEnglishTtsVoices,
 } from '@/utils/englishTts';
 import {
 	beginEpubListenOverlaySession,
 	clearEpubListenSegmentOverlay,
 	clearEpubListenSentenceOverlay,
-	showEpubListenSentence,
+	resolveEpubListenPlain,
+	showEpubListenPlainSpan,
 } from '../utils/epubListenSegmentOverlay';
 
 /** 电子书引用/选区朗读：复用英语学习 TTS（本机 / 云端偏好） */
 export function useEbookQuoteListen(
 	t: (key: string) => string,
 	getRendition?: () => Rendition | null,
+	onListenSessionEnd?: () => void,
 ) {
 	const [playingKey, setPlayingKey] = useState<string | null>(null);
 
@@ -31,12 +32,18 @@ export function useEbookQuoteListen(
 	}, []);
 
 	const toggleListen = useCallback(
-		async (text: string, key: string, cfiRange?: string) => {
+		async (
+			text: string,
+			key: string,
+			cfiRange?: string,
+			frozenRange?: Range | null,
+		) => {
 			const trimmed = text.trim();
 			if (!trimmed) return;
 			if (playingKey === key) {
 				stopAllEnglishPlayback();
 				clearEpubListenSegmentOverlay();
+				onListenSessionEnd?.();
 				setPlayingKey(null);
 				return;
 			}
@@ -52,18 +59,29 @@ export function useEbookQuoteListen(
 			setPlayingKey(key);
 
 			const rend = getRendition?.() ?? null;
-			const cfi = cfiRange?.trim();
-			const plain = stripMarkdownForTts(trimmed);
-			if (rend && cfi && plain) {
-				beginEpubListenOverlaySession(rend, cfi, plain);
+			const cfi = cfiRange?.trim() ?? '';
+			const { plain, selectionRange, spokenRaw } = resolveEpubListenPlain(
+				rend,
+				trimmed,
+				frozenRange,
+			);
+
+			if (rend && plain) {
+				beginEpubListenOverlaySession(rend, plain, {
+					cfi,
+					selectionRange,
+				});
 			}
 
 			try {
-				await playEnglishPreferred(trimmed, {
+				await playEnglishPreferred(spokenRaw, {
 					onCadenceChunk: (event) => {
-						if (!rend || !cfi) return;
+						if (!rend) return;
 						if (event.phase === 'start') {
-							showEpubListenSentence(event.sentenceIndex);
+							showEpubListenPlainSpan(
+								event.sentencePlainStart,
+								event.sentencePlainEnd,
+							);
 							return;
 						}
 						if (event.isLastInSentence) {
@@ -78,10 +96,11 @@ export function useEbookQuoteListen(
 				});
 			} finally {
 				clearEpubListenSegmentOverlay();
+				onListenSessionEnd?.();
 				setPlayingKey((k) => (k === key ? null : k));
 			}
 		},
-		[getRendition, playingKey, t],
+		[getRendition, onListenSessionEnd, playingKey, t],
 	);
 
 	const listenLabel = useCallback(

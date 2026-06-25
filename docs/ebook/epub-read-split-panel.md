@@ -27,14 +27,14 @@
 **State（`read.tsx`）**
 
 - 打开 MK 时若先 `setThoughtListOpen(false)`，分栏先收再开 → 闪烁。
-- `sidePanelOpen` 与 `thoughtListOpen` / `cluster` 错位（列表已关但 cluster 仍在）。
+- `sidePanelOpen` 与 `thoughtListOpen` / `cluster` 错位（列表已关但 cluster 仍在；**删最后一条** 后 `cluster` 空壳仍满足旧条件）。
 - 删除想法时仅读 `returnToListClusterRef`，从划线进详情时快照缺失。
 - 划线 PopBar 路径 `setAssistantOpen(false)` 误关 MK。
 
 **Layout（`EbookReadSplitLayout.tsx`）**
 
 - 曾用常驻 `assistant` panel + `collapse()` / `setLayout(100/0)`：`hidden`、`opacity-0`、多帧 rAF 均 **偶发不收宽**。
-- 对 **仅 1 个 panel** 的分组调用 `setLayout({ reader:58, assistant:42 })` 会抛 `Invalid 1 panel layout`。
+- 条件卸载右栏 panel 后 **未** `setLayout({ reader: 100 })`，reader 仍约 58%。
 
 ### 1.3 目标
 
@@ -42,8 +42,8 @@
 |----|------|
 | 打开 MK | 只 `setAssistantOpen(true)`，**不**清想法 state；`sidePanel` 优先级切到助手 |
 | 关闭 MK | `setAssistantOpen(false)`；有想法列表/详情则回退显示 |
-| `sidePanelOpen` | `assistantOpen \|\| thoughtDialogOpen \|\| (thoughtListOpen && cluster)` |
-| 布局关闭 | **`sidePanelOpen` 为 false 时不挂载** handle + assistant panel，reader 天然 100% |
+| `sidePanelOpen` | `assistantOpen \|\| thoughtDialogOpen \|\| thoughtListPanelOpen`（列表须 `allThoughts.length > 0`） |
+| 布局关闭 | **`sidePanelOpen` 为 false 时不挂载** handle + assistant panel；**且** rAF 内 `setLayout({ reader: 100 })` |
 | 布局打开 | rAF 内且 `sidePanelOpenRef` 仍为 true 时 `setLayout(lastSplitLayoutRef)` |
 | 删除想法 | 快照 `returnToListClusterRef ?? thoughtListClusterRef`；`fromList` 进详情时清 cluster |
 
@@ -204,19 +204,67 @@ if (listSnapshot) {
 
 ---
 
-### 4.6 `EbookReadSplitLayout`（当前，约 L22–L112）
+### 4.6 `thoughtListPanelOpen`（`apps/frontend/src/views/ebook/read.tsx`）
 
-**改动前** · collapse 方案（已废弃）：常驻 assistant + `applyClosedLayout` + `opacity-0`。
+**对比范围**：想法列表侧栏是否挂载的派生 state（约 L1459–L1613 摘录）。
 
-**改动后** · 条件卸载
+**改动前** · 基线，约 L1456–L1613（摘录）
 
 ```typescript
-export function EbookReadSplitLayout({ sidePanelOpen, sidePanel, children }) {
-	const panelGroupRef = useRef<GroupImperativeHandle | null>(null);
-	const lastSplitLayoutRef = useRef<Layout>({ reader: 58, assistant: 42 });
-	const sidePanelOpenRef = useRef(sidePanelOpen);
-	sidePanelOpenRef.current = sidePanelOpen;
+	// 想法面板开：详情弹层 或 列表开且 cluster 非 null（含空列表 cluster）
+	const thoughtPanelOpen =
+		thoughtDialogOpen || (thoughtListOpen && thoughtListCluster != null);
 
+	// syncThoughtQuoteAnchorCfi 内
+		if (thoughtListOpen && thoughtListCluster) {
+			// ...
+		}
+	// useEffect deps 含 thoughtListOpen
+
+	// sidePanel 渲染
+		if (thoughtListOpen && thoughtListCluster) {
+			return ( <EpubThoughtList ... /> );
+		}
+
+	// sidePanelOpen
+	const sidePanelOpen =
+		assistantOpen ||
+		thoughtDialogOpen ||
+		(Boolean(thoughtListOpen) && thoughtListCluster != null);
+```
+
+**改动后** · 当前，约 L1459–L1613（摘录）
+
+```typescript
+	// 列表侧栏仅在有至少一条想法时挂载（删最后一条后 cluster 可能暂留空壳）
+	const thoughtListPanelOpen =
+		thoughtListOpen &&
+		thoughtListCluster != null &&
+		thoughtListCluster.allThoughts.length > 0;
+
+	const thoughtPanelOpen = thoughtDialogOpen || thoughtListPanelOpen;
+
+		if (thoughtListPanelOpen && thoughtListCluster) {
+			// syncThoughtQuoteAnchorCfi / sidePanel 同上条件
+		}
+
+	const sidePanelOpen =
+		assistantOpen ||
+		thoughtDialogOpen ||
+		thoughtListPanelOpen;
+```
+
+**变更摘要**：`thoughtListOpen && cluster` 改为还要求 `allThoughts.length > 0`，避免删光后仍占分栏 slot。
+
+---
+
+### 4.7 `EbookReadSplitLayout` `useLayoutEffect`（`apps/frontend/src/views/ebook/components/EbookReadSplitLayout.tsx`）
+
+**对比范围**：`useLayoutEffect` 闭包（约 L53–L73）。
+
+**改动前** · 条件卸载但未 reset layout，约 L53–L65
+
+```typescript
 	useLayoutEffect(() => {
 		const done = () => notifyEbookSplitPanelResizeEnd();
 		if (!sidePanelOpen) {
@@ -230,25 +278,36 @@ export function EbookReadSplitLayout({ sidePanelOpen, sidePanel, children }) {
 		});
 		return () => cancelAnimationFrame(raf);
 	}, [sidePanelOpen]);
-
-	return (
-		<ResizablePanelGroup groupRef={panelGroupRef} onLayoutChanged={(layout) => {
-			if (sidePanelOpenRef.current) lastSplitLayoutRef.current = layout;
-			finishSplitPointerDrag();
-		}}>
-			<ResizablePanel id="reader" defaultSize={58} minSize={30}>{children}</ResizablePanel>
-			{sidePanelOpen ? (
-				<>
-					<ResizableHandle withHandle className="w-0" onPointerDown={...} />
-					<ResizablePanel id="assistant" defaultSize={42} minSize={0}>
-						<div className="border-l ...">{sidePanel}</div>
-					</ResizablePanel>
-				</>
-			) : null}
-		</ResizablePanelGroup>
-	);
-}
 ```
+
+**改动后** · 关闭时显式 `reader: 100`，约 L53–L73
+
+```typescript
+	useLayoutEffect(() => {
+		const done = () => notifyEbookSplitPanelResizeEnd();
+		if (!sidePanelOpen) {
+			const raf = requestAnimationFrame(() => {
+				try {
+					panelGroupRef.current?.setLayout({ reader: 100 });
+				} catch {
+					// ponytail: 分组 panel 数变化时 setLayout 可能短暂失败，下一帧 layout effect 会再试
+				}
+				done();
+			});
+			return () => cancelAnimationFrame(raf);
+		}
+		const raf = requestAnimationFrame(() => {
+			if (!sidePanelOpenRef.current) return;
+			panelGroupRef.current?.setLayout(lastSplitLayoutRef.current);
+			done();
+		});
+		return () => cancelAnimationFrame(raf);
+	}, [sidePanelOpen]);
+```
+
+**变更摘要**：右栏卸载后 flex 仍可能保留 58/42，关闭分支内 `setLayout({ reader: 100 })` 强制全宽。
+
+**组件结构（条件卸载）**：`sidePanelOpen` 为 false 时不挂载 handle + assistant panel（见 §3.2），与上段 layout reset 配合。
 
 ---
 

@@ -1,6 +1,6 @@
 import type { Rendition } from 'epubjs';
 
-import { resolveCfiDomRange } from './epubRangeGeometry';
+import { cfiFromDomRange, resolveCfiDomRange } from './epubRangeGeometry';
 
 const SCROLL_EDGE_PX = 16;
 /** 分栏开合后保持引用段落在视口内的上下留白 */
@@ -85,66 +85,127 @@ function readRangeViewportBounds(range: Range, iframe: HTMLIFrameElement) {
 	return { top: y, bottom: y + Math.max(caretRect.height, 1) };
 }
 
-/**
- * 将指定 CFI 范围（cfiRange）对应的正文片段滚动到 epub 连续滚动容器的可视区域内。
- * 用于分栏宽度变化等场景，确保被引用的段落不会因布局变化而被挤出可视范围。
- *
- * 简要逻辑：
- *   1. 校验 CFI 有效性，解析对应 DOM Range。
- *   2. 获取实际滚动容器（容纳所有分页的滚动 div)。
- *   3. 定位 CFI 所在的 iframe，并读取 range 在主页面的绝对可视坐标(top/bottom)。
- *   4. 计算该 range 边界与容器视口的相对距离。
- *   5. 若未达到指定留白边距（QUOTE_VIEW_MARGIN_PX），则滚动使其进入视口且留白，避免被边缘裁剪。
- *   6. 若无需滚动则直接返回 true（已在合适视图内）；否则直接调整 scrollTop。
- *
- * @param rend epub.js 的 Rendition 实例
- * @param cfiRange 需要滚动到视图的 epub CFI 范围字符串
- * @returns boolean 是否滚动/定位成功（即 CFI 有效且属于连续滚动模式的 epub 容器）
- */
-export function scrollEpubCfiIntoView(
+function isDomRangeInReaderView(
 	rend: Rendition,
-	cfiRange: string,
+	range: Range,
+	marginPx: number,
 ): boolean {
-	// 去空白，防止传入非法或全空字符串
-	const key = cfiRange.trim();
-	if (!key) return false;
-
-	// 通过 CFI 定位到正文中的 DOM range，找不到则无操作
-	const range = resolveCfiDomRange(rend, key);
-	if (!range) return false;
-
-	// 获取当前 epub 滚动容器，仅在连续滚动模式有效，若无则表明当前并非该模式
-	const container = getEpubScrollContainer(rend);
-	if (!container) return false;
-
-	// 获取 range 对应节点所在的 iframe（epub 正文实际是 iframe 内渲染的）
 	const win = range.startContainer.ownerDocument?.defaultView;
 	const iframe = win?.frameElement as HTMLIFrameElement | null;
 	if (!iframe) return false;
 
-	// 计算 range 在主页面上的绝对像素 top/bottom 坐标
+	const { top, bottom } = readRangeViewportBounds(range, iframe);
+	const container = getEpubScrollContainer(rend);
+	const boundsRect = container
+		? container.getBoundingClientRect()
+		: iframe.getBoundingClientRect();
+
+	return (
+		top >= boundsRect.top + marginPx && bottom <= boundsRect.bottom - marginPx
+	);
+}
+
+/**
+ * 连续滚动：将 DOM Range 滚入阅读容器视口（带上下留白）
+ *
+ * @param rend    EPUB.js 的 Rendition 实例，用于定位阅读容器
+ * @param range   需要滚入视口的 DOM Range（一般在 EPUB iframe 内文）
+ * @returns       是否已成功滚入（若因参数/环境异常返回 false）
+ */
+export function scrollEpubDomRangeIntoView(
+	rend: Rendition,
+	range: Range,
+): boolean {
+	// 获取当前 EPUB 阅读器的 scroll 容器（通常仅在连续滚动模式下存在）
+	const container = getEpubScrollContainer(rend);
+	// 若未找到 scroll 容器，表明当前不支持连续滚动，直接返回 false
+	if (!container) return false;
+
+	// 获取 range 所在文档的 window 对象（通常为 iframe 的 window）
+	const win = range.startContainer.ownerDocument?.defaultView;
+	// 通过 window.frameElement 拿到所属 iframe 元素
+	const iframe = win?.frameElement as HTMLIFrameElement | null;
+	// 若找不到所属 iframe，则无法计算跨 iframe 的绝对位置，返回 false
+	if (!iframe) return false;
+
+	// 计算 range 在主页面上的像素 top/bottom 坐标（绝对位置，含跨 iframe 偏移）
 	const { top, bottom } = readRangeViewportBounds(range, iframe);
 
-	// 获取滚动容器在页面上的坐标，便于后续比较范围与容器的可见关系
+	// 获取容器的可视区域（主页面上的 DOMRect）
 	const containerRect = container.getBoundingClientRect();
 
 	let delta = 0;
-
-	// 如果 range 顶距离容器视口顶不足预留边距，则向上滚动，露出更多内容（让正文头部带足够 margin）
+	// 若 range 顶部已超出容器上边缘（含留白），需向上滚动
 	if (top < containerRect.top + QUOTE_VIEW_MARGIN_PX) {
 		delta = top - containerRect.top - QUOTE_VIEW_MARGIN_PX;
-	}
-	// 如果 range 底部距离容器视口底不足预留边距，则向下滚动（正文贴近底部时也需露边距）
-	else if (bottom > containerRect.bottom - QUOTE_VIEW_MARGIN_PX) {
+		// 否则，若底部超出容器下边缘（含留白），需向下滚动
+	} else if (bottom > containerRect.bottom - QUOTE_VIEW_MARGIN_PX) {
 		delta = bottom - containerRect.bottom + QUOTE_VIEW_MARGIN_PX;
 	}
 
-	// 若无需滚动（已在合适范围内），直接返回 true（相当于 noop）
+	// 若无需滚动（range 已完全在留白包裹的可见容器内），直接返回 true
 	if (delta === 0) return true;
-
-	// 实际滚动滚动容器，通过调整 scrollTop 保证内容进入可视范围
+	// 根据计算的 delta 调整容器 scrollTop，令内容刚好滚入并预留边距
 	container.scrollTop += delta;
 	return true;
+}
+
+/**
+ * 听当前 / 引用定位：Range 不在视口内时滚入可见区域。
+ * 连续滚动调容器 scrollTop；分页模式 rend.display(cfi) 翻页。
+ */
+export async function scrollEpubRangeIntoView(
+	rend: Rendition,
+	range: Range,
+	fallbackCfi?: string,
+): Promise<boolean> {
+	try {
+		if (isDomRangeInReaderView(rend, range, QUOTE_VIEW_MARGIN_PX)) {
+			return true;
+		}
+	} catch {
+		return false;
+	}
+
+	if (getEpubScrollContainer(rend)) {
+		return scrollEpubDomRangeIntoView(rend, range);
+	}
+
+	const cfi = cfiFromDomRange(rend, range)?.trim() || fallbackCfi?.trim();
+	if (!cfi) return false;
+
+	try {
+		await rend.display(cfi);
+		await new Promise<void>((resolve) => {
+			requestAnimationFrame(() => {
+				requestAnimationFrame(() => resolve());
+			});
+		});
+	} catch {
+		return false;
+	}
+
+	const resolved = resolveCfiDomRange(rend, cfi);
+	if (!resolved) return true;
+	try {
+		return isDomRangeInReaderView(rend, resolved, QUOTE_VIEW_MARGIN_PX);
+	} catch {
+		return true;
+	}
+}
+
+/** 将 CFI 对应正文滚入视口（仅连续滚动；分页请用 scrollEpubRangeIntoView） */
+export function scrollEpubCfiIntoView(
+	rend: Rendition,
+	cfiRange: string,
+): boolean {
+	const key = cfiRange.trim();
+	if (!key) return false;
+
+	const range = resolveCfiDomRange(rend, key);
+	if (!range) return false;
+
+	return scrollEpubDomRangeIntoView(rend, range);
 }
 
 /** 连续滚动：滚到顶/底时衔接相邻 spine（优先 manager.check，回退 prev/next） */

@@ -2,126 +2,61 @@
 
 ## 延伸阅读
 
-- [EPUB 引用「听当前」](epub-quote-listen.md) — 三入口朗读、TTS 复用与本机分句修复
-- [云端长文分段流水线](../english/cloud-tts-segment-pipeline.md) — 云端按节奏段合成与预取
-- [EPUB 用户划线实现](epub-user-highlight-impl.md) — marks-pane 批注与用户高亮（与本播放层解耦）
+- [EPUB 引用「听当前」](epub-quote-listen.md) — 三入口朗读、TTS 复用
+- [EPUB 听当前与用户划线 DOM 协调](epub-listen-user-highlight-reconcile.md) — 播放层与用户划线隔离
+- [EPUB 用户划线实现](epub-user-highlight-impl.md) — marks-pane 批注（与播放层解耦）
 
 ## 1. 背景与目标
 
-**用户视角**：EPUB「听当前」朗读时，希望当前正在读的**那一句话**在正文上有淡黄色底提示；一句播完底色消失，下一句再亮；播放结束或点停止后底色全部清除；播放过程中手动划线、想法下划线不被清除或误删。
+**用户视角**：EPUB「听当前」朗读时，当前句应有淡黄底 `rgba(251, 231, 128, 0.28)`；句末清除、下一句再亮；停止后全清；不破坏用户划线。
+
+**旧版问题**：
+
+1. 仅 body 浮层 + 预解析句 Range：relayout/无 marks-pane 时整段或无背景。
+2. 按句索引 `showEpubListenSentence(i)` 与 TTS plain 偏移不对齐。
+3. PopBar 点「听当前」时浏览器选区可能已 collapse，定位失败。
 
 **目标**：
 
-1. **逐句高亮**：与 TTS 节奏段对齐，按「句」显示/清除 `rgba(251, 231, 128, 0.28)` 背景，句内逗号子段不重复叠色。
-2. **与划线解耦**：不调用 `rend.annotations`、不写 marks-pane 用户批注；独立 HTML 浮层 `#moke-epub-listen-overlay`。
-3. **TTS 回调**：在共享 `englishTts.ts` 增加 `onCadenceChunk`，本机与云端分段播放均可驱动 UI。
-4. **生命周期可靠**：停止、播完、离开阅读页均清除播放层；`overlayEpoch` 防止 relayout 竞态重绘。
-
-**未纳入**：`epubUserHighlights.ts` 本轮仅缩进/格式调整，与播放背景无关。
+1. **三层绘制**：CSS Highlight API → 独立 class 的 epub highlight（`moke-epub-listen-bg`）→ body 绝对定位 div 回退。
+2. **plain 偏移驱动**：TTS `onCadenceChunk` 携带 `sentencePlainStart/End`，DOM 用 compact 映射定位。
+3. **选区缓存**：PopBar 弹出时 `rememberEpubPopBarSelectionRange`，朗读用 frozen Range。
+4. **清除隔离**：`detachActiveListenAnnotation` 只 detach 播放对象，**禁止** `annotations.remove(cfi,'highlight')`。
 
 ## 2. 改动范围
 
 | 路径 | 说明 |
 | ---- | ---- |
-| `apps/frontend/src/utils/englishTts.ts` | `TtsCadenceChunkEvent`、`onCadenceChunk`、句索引与 emit |
-| `apps/frontend/src/views/ebook/utils/epubListenSegmentOverlay.ts` | **新增**：播放浮层会话、句 DOM 映射、绘制/清除 |
-| `apps/frontend/src/views/ebook/hooks/useEbookQuoteListen.ts` | 接入 overlay + `cfiRange` + 节奏回调 |
-| `apps/frontend/src/views/ebook/read.tsx` | 传入 `getRendition`、三处 `cfiRange` |
+| `apps/frontend/src/utils/englishTts.ts` | `TtsCadenceChunkEvent` plain 偏移、`buildSentenceOffsetSpans` 导出 |
+| `apps/frontend/src/views/ebook/utils/epubListenSegmentOverlay.ts` | 三层绘制、plain 映射、选区缓存 |
+| `apps/frontend/src/views/ebook/hooks/useEbookQuoteListen.ts` | plain span 回调、frozen Range、播完 sync |
+| `apps/frontend/src/views/ebook/utils/epubSelectionToolbarAttach.ts` | PopBar 时缓存选区 |
+| `apps/frontend/src/views/ebook/read.tsx` | PopBar 传 frozen Range |
 
 ## 3. 实现思路
 
-1. **数据流**：`toggleListen(text, key, cfiRange)` → `stripMarkdownForTts` 得 plain → `beginEpubListenOverlaySession` 预解析每句 `Range` → `playEnglishPreferred({ onCadenceChunk })` → `start` 时 `showEpubListenSentence(i)`，`end` 且 `isLastInSentence` 时 `clearEpubListenSentenceOverlay` → `finally` 时 `clearEpubListenSegmentOverlay`。
-2. **句界**：与 TTS 相同正则 `(?<=[.!?。！？])\s*` 切句；TTS 子句（逗号段）共享同一句索引，句末最后一个 chunk 的 `end` 才清底色。
-3. **DOM 映射**：`locateSentenceInRange` 在选区 `Range` 内按去空白紧凑串 `indexOf` 定位子句（对齐 `epubUserHighlights` 的 quote 定位思路）。
-4. **绘制**：`getAccurateRangeLineClientRects` → iframe `body` 下固定定位 `div` 块；`pointer-events: none`；`z-index: 0` 置于正文之下、不挡点击。
-5. **清除范围**：仅 `#moke-epub-listen-overlay` 及遗留 `moke-epub-listen-seg*`；**不**选择 `moke-epub-user-hl` / `moke-epub-thought-ul`。
-6. **权衡**：不用 epub 批注槽位，避免与用户划线 sync 互相 purge；代价是同区域可能与用户底色视觉叠色（数据仍独立）。
+1. **数据流**：`toggleListen(text, key, cfi, frozenRange)` → `resolveEpubListenPlain` 得 plain + selectionRange → `beginEpubListenOverlaySession` → `playEnglishPreferred({ onCadenceChunk })` → `start` 时 `showEpubListenPlainSpan(sentencePlainStart, sentencePlainEnd)` → 句末 `clearEpubListenSentenceOverlay` → `finally` 全清 + `onListenSessionEnd`。
+2. **DOM 映射**：`buildPlainCompactMap` 在 outer Range 内建去空白 compact 串与 Text 点表；`plainSliceToRange` 按 plain 偏移切 Range。
+3. **绘制优先级**：`paintListenRange` 先 CSS Highlight（Chrome 等），再独立 highlight 批注，最后 div overlay（Safari 等）。
+4. **relayout**：监听 `relocated`/`rendered`，按 session 内 `plainStart/plainEnd` 重绘当前句。
+5. **spokenRaw**：优先用选区 `toString()`，与正文所见一致，避免 PopBar 文本与 DOM 偏差。
 
 ## 4. 关键代码对比与注释
 
 ### 4.1 `useEbookQuoteListen`（`apps/frontend/src/views/ebook/hooks/useEbookQuoteListen.ts`）
 
-**对比范围**：完整 hook（约 L1–L94）。
+**对比范围**：完整 hook（L1–闭合）。
 
-**改动前** · `apps/frontend/src/views/ebook/hooks/useEbookQuoteListen.ts`（基线）
-
-```typescript
-// 朗读失败时 Toast 提示
-import { Toast } from '@ui/sonner';
-// React 状态与副作用
-import { useCallback, useEffect, useState } from 'react';
-// 英语学习 TTS 栈
-import {
-	isEnglishPlaybackAvailable,
-	playEnglishPreferred,
-	stopAllEnglishPlayback,
-	warmupEnglishTtsVoices,
-} from '@/utils/englishTts';
-
-/** 电子书引用/选区朗读：复用英语学习 TTS（本机 / 云端偏好） */
-export function useEbookQuoteListen(t: (key: string) => string) {
-	// 当前播放会话 key（popbar / thought-list / thought-dialog）
-	const [playingKey, setPlayingKey] = useState<string | null>(null);
-
-	// 挂载预热 voices；卸载时停止朗读
-	useEffect(() => {
-		warmupEnglishTtsVoices();
-		return () => stopAllEnglishPlayback();
-	}, []);
-
-	// 切换播放/停止
-	const toggleListen = useCallback(
-		async (text: string, key: string) => {
-			const trimmed = text.trim();
-			if (!trimmed) return;
-			if (playingKey === key) {
-				stopAllEnglishPlayback();
-				setPlayingKey(null);
-				return;
-			}
-			if (!isEnglishPlaybackAvailable()) {
-				Toast({
-					type: 'warning',
-					title: t('englishLearning.tts.unsupported'),
-				});
-				return;
-			}
-			stopAllEnglishPlayback();
-			setPlayingKey(key);
-			try {
-				await playEnglishPreferred(trimmed);
-			} catch {
-				Toast({
-					type: 'warning',
-					title: t('englishLearning.tts.unsupported'),
-				});
-			} finally {
-				setPlayingKey((k) => (k === key ? null : k));
-			}
-		},
-		[playingKey, t],
-	);
-
-	const listenLabel = useCallback(
-		(key: string, defaultLabel: string) =>
-			playingKey === key ? t('englishLearning.tts.stop') : defaultLabel,
-		[playingKey, t],
-	);
-
-	return { toggleListen, playingKey, listenLabel };
-}
-```
-
-**改动后** · 同文件（当前，约 L1–L94）
+**改动前** · 基线，约 L1–L94
 
 ```typescript
-// 朗读失败时 Toast 提示
+// Toast 用于朗读不可用提示
 import { Toast } from '@ui/sonner';
-// epub.js 渲染实例类型
+// epub.js Rendition 类型
 import type { Rendition } from 'epubjs';
-// React 状态与副作用
+// React 状态与副作用、回调
 import { useCallback, useEffect, useState } from 'react';
-// 英语学习 TTS 栈（含 stripMarkdown 与节奏回调）
+// 英语学习 TTS 能力：可用性、播放、停止、strip plain、预热音色
 import {
 	isEnglishPlaybackAvailable,
 	playEnglishPreferred,
@@ -129,7 +64,7 @@ import {
 	stripMarkdownForTts,
 	warmupEnglishTtsVoices,
 } from '@/utils/englishTts';
-// 播放背景浮层：会话、逐句显示、清除
+// 播放浮层：会话开始、全清、句清、按句索引显示（旧 API）
 import {
 	beginEpubListenOverlaySession,
 	clearEpubListenSegmentOverlay,
@@ -142,19 +77,19 @@ export function useEbookQuoteListen(
 	t: (key: string) => string,
 	getRendition?: () => Rendition | null,
 ) {
-	// 当前播放会话 key（popbar / thought-list / thought-dialog）
+	// 当前正在播放的入口 key（popbar / 想法列表等）
 	const [playingKey, setPlayingKey] = useState<string | null>(null);
 
-	// 挂载预热；卸载时停止 TTS 并拆除播放浮层
 	useEffect(() => {
+		// 挂载时预热 Web Speech 音色列表
 		warmupEnglishTtsVoices();
 		return () => {
+			// 卸载时停止播放并清除播放浮层
 			stopAllEnglishPlayback();
 			clearEpubListenSegmentOverlay();
 		};
 	}, []);
 
-	// 切换播放/停止；可选 cfiRange 驱动正文逐句底色
 	const toggleListen = useCallback(
 		async (text: string, key: string, cfiRange?: string) => {
 			const trimmed = text.trim();
@@ -219,81 +154,140 @@ export function useEbookQuoteListen(
 }
 ```
 
-**变更摘要**：新增 `getRendition` 与第三参 `cfiRange`；朗读前后维护 overlay 会话；`onCadenceChunk` 驱动逐句底色。
+**改动后** · 当前，约 L1–L113
+
+```typescript
+// Toast 用于朗读不可用提示
+import { Toast } from '@ui/sonner';
+// epub.js Rendition 类型
+import type { Rendition } from 'epubjs';
+// React 状态与副作用、回调
+import { useCallback, useEffect, useState } from 'react';
+// 英语学习 TTS：不再在此 hook 内 stripMarkdown（改由 resolveEpubListenPlain）
+import {
+	isEnglishPlaybackAvailable,
+	playEnglishPreferred,
+	stopAllEnglishPlayback,
+	warmupEnglishTtsVoices,
+} from '@/utils/englishTts';
+// 播放浮层：plain 解析、plain span 显示、会话 API
+import {
+	beginEpubListenOverlaySession,
+	clearEpubListenSegmentOverlay,
+	clearEpubListenSentenceOverlay,
+	resolveEpubListenPlain,
+	showEpubListenPlainSpan,
+} from '../utils/epubListenSegmentOverlay';
+
+/** 电子书引用/选区朗读：复用英语学习 TTS（本机 / 云端偏好） */
+export function useEbookQuoteListen(
+	t: (key: string) => string,
+	getRendition?: () => Rendition | null,
+	onListenSessionEnd?: () => void,
+) {
+	const [playingKey, setPlayingKey] = useState<string | null>(null);
+
+	useEffect(() => {
+		warmupEnglishTtsVoices();
+		return () => {
+			stopAllEnglishPlayback();
+			clearEpubListenSegmentOverlay();
+		};
+	}, []);
+
+	const toggleListen = useCallback(
+		async (
+			text: string,
+			key: string,
+			cfiRange?: string,
+			frozenRange?: Range | null,
+		) => {
+			const trimmed = text.trim();
+			if (!trimmed) return;
+			if (playingKey === key) {
+				stopAllEnglishPlayback();
+				clearEpubListenSegmentOverlay();
+				onListenSessionEnd?.();
+				setPlayingKey(null);
+				return;
+			}
+			if (!isEnglishPlaybackAvailable()) {
+				Toast({
+					type: 'warning',
+					title: t('englishLearning.tts.unsupported'),
+				});
+				return;
+			}
+			stopAllEnglishPlayback();
+			clearEpubListenSegmentOverlay();
+			setPlayingKey(key);
+
+			const rend = getRendition?.() ?? null;
+			const cfi = cfiRange?.trim() ?? '';
+			const { plain, selectionRange, spokenRaw } = resolveEpubListenPlain(
+				rend,
+				trimmed,
+				frozenRange,
+			);
+
+			if (rend && plain) {
+				beginEpubListenOverlaySession(rend, plain, {
+					cfi,
+					selectionRange,
+				});
+			}
+
+			try {
+				await playEnglishPreferred(spokenRaw, {
+					onCadenceChunk: (event) => {
+						if (!rend) return;
+						if (event.phase === 'start') {
+							showEpubListenPlainSpan(
+								event.sentencePlainStart,
+								event.sentencePlainEnd,
+							);
+							return;
+						}
+						if (event.isLastInSentence) {
+							clearEpubListenSentenceOverlay();
+						}
+					},
+				});
+			} catch {
+				Toast({
+					type: 'warning',
+					title: t('englishLearning.tts.unsupported'),
+				});
+			} finally {
+				clearEpubListenSegmentOverlay();
+				onListenSessionEnd?.();
+				setPlayingKey((k) => (k === key ? null : k));
+			}
+		},
+		[getRendition, onListenSessionEnd, playingKey, t],
+	);
+
+	const listenLabel = useCallback(
+		(key: string, defaultLabel: string) =>
+			playingKey === key ? t('englishLearning.tts.stop') : defaultLabel,
+		[playingKey, t],
+	);
+
+	return { toggleListen, playingKey, listenLabel };
+}
+```
+
+**变更摘要**：新增 `frozenRange` 与 `onListenSessionEnd`；会话改 plain+选区；回调改用 `sentencePlainStart/End`；TTS 文本用 `spokenRaw`。
 
 ---
 
-### 4.2 `TtsCadenceChunkEvent` 与 `emitCadenceChunk`（`apps/frontend/src/utils/englishTts.ts`）
+### 4.2 `emitCadenceChunk`（`apps/frontend/src/utils/englishTts.ts`）
 
-**对比范围**：纯新增（基线无对应符号）。
+**对比范围**：完整函数（约 L504–L542）。
 
-**改动后** · `apps/frontend/src/utils/englishTts.ts`（当前，约 L432–L519）
+**改动前** · 基线，约 L496–L527
 
 ```typescript
-/** TTS 节奏分段播放事件（供电子书逐句高亮等） */
-export type TtsCadenceChunkEvent = {
-	phase: 'start' | 'end';
-	index: number;
-	text: string;
-	sentenceIndex: number;
-	isLastInSentence: boolean;
-};
-
-export type PlayEnglishPreferredOptions = {
-	/** 为 true 时强制本机 Web Speech（如本机音色设置试听）；省略时会员走云端、非会员走本机 */
-	preferLocal?: boolean;
-	/** 本机朗读时透传给 Web Speech */
-	speak?: SpeakEnglishOptions;
-	/** 每个 TTS 节奏段开始/结束（句内子句不重复触发句末） */
-	onCadenceChunk?: (event: TtsCadenceChunkEvent) => void;
-};
-
-type CadencePlaybackHooks = Pick<PlayEnglishPreferredOptions, 'onCadenceChunk'>;
-
-function buildSentenceOffsetSpans(
-	plain: string,
-): Array<{ start: number; end: number }> {
-	const trimmed = plain.trim();
-	if (!trimmed) return [];
-	const parts = trimmed
-		.split(/(?<=[.!?。！？])\s*/)
-		.map((s) => s.trim())
-		.filter(Boolean);
-	if (!parts.length) return [{ start: 0, end: trimmed.length }];
-
-	const spans: Array<{ start: number; end: number }> = [];
-	let searchFrom = 0;
-	for (const part of parts) {
-		const idx = trimmed.indexOf(part, searchFrom);
-		if (idx < 0) continue;
-		spans.push({ start: idx, end: idx + part.length });
-		searchFrom = idx + part.length;
-	}
-	return spans.length > 0 ? spans : [{ start: 0, end: trimmed.length }];
-}
-
-function sentenceIndexAtOffset(
-	spans: Array<{ start: number; end: number }>,
-	offset: number,
-): number {
-	for (let i = 0; i < spans.length; i += 1) {
-		const span = spans[i]!;
-		if (offset >= span.start && offset < span.end) return i;
-	}
-	return Math.max(0, spans.length - 1);
-}
-
-function buildChunkOffsetMeta(plain: string, chunks: TtsCadenceChunk[]) {
-	let searchPos = 0;
-	return chunks.map((chunk) => {
-		const idx = plain.indexOf(chunk.text, searchPos);
-		const start = idx >= 0 ? idx : searchPos;
-		const end = start + chunk.text.length;
-		searchPos = end;
-		return { start, end };
-	});
-}
-
 function emitCadenceChunk(
 	hooks: CadencePlaybackHooks | undefined,
 	plain: string,
@@ -327,15 +321,112 @@ function emitCadenceChunk(
 }
 ```
 
-**变更摘要**：导出节奏事件类型；`playEnglishPreferred` / 本机 / 云端分段循环在每段前后 `emitCadenceChunk`（`speakEnglishTextWithGeneration`、`playCloudTtsCadenceSegments` 内插入，此处略）。
+**改动后** · 当前，约 L504–L542
+
+```typescript
+function emitCadenceChunk(
+	hooks: CadencePlaybackHooks | undefined,
+	plain: string,
+	chunks: TtsCadenceChunk[],
+	index: number,
+	phase: TtsCadenceChunkEvent['phase'],
+): void {
+	const onCadenceChunk = hooks?.onCadenceChunk;
+	if (!onCadenceChunk) return;
+
+	const chunk = chunks[index];
+	if (!chunk) return;
+
+	const sentences = buildSentenceOffsetSpans(plain);
+	const offsets = buildChunkOffsetMeta(plain, chunks);
+	const { start, end } = offsets[index] ?? { start: 0, end: chunk.text.length };
+	const sentenceIndex = sentenceIndexAtOffset(sentences, start);
+	const sentSpan = sentences[sentenceIndex] ?? {
+		start: 0,
+		end: plain.trim().length,
+	};
+	const nextStart = offsets[index + 1]?.start;
+	const isLastInSentence =
+		index === chunks.length - 1 ||
+		(nextStart !== undefined &&
+			sentenceIndexAtOffset(sentences, nextStart) !== sentenceIndex);
+
+	onCadenceChunk({
+		phase,
+		index,
+		text: chunk.text,
+		sentenceIndex,
+		isLastInSentence,
+		plainStart: start,
+		plainEnd: end,
+		sentencePlainStart: sentSpan.start,
+		sentencePlainEnd: sentSpan.end,
+	});
+}
+```
+
+**变更摘要**：事件增加 plain 与整句偏移；`sentenceIndexAtOffset` 改为从后向前匹配，避免句界歧义。
 
 ---
 
-### 4.3 播放浮层导出 API（`apps/frontend/src/views/ebook/utils/epubListenSegmentOverlay.ts`）
+### 4.3 `paintListenRange`（`apps/frontend/src/views/ebook/utils/epubListenSegmentOverlay.ts`）
 
-**对比范围**：纯新增模块；下列为四个导出符号（约 L224–L286）。
+**对比范围**：新函数 vs 旧版 `paintRangeOverlay`（摘录绘制入口）。
 
-**改动后** · `apps/frontend/src/views/ebook/utils/epubListenSegmentOverlay.ts`（当前）
+**改动前** · 基线 `paintRangeOverlay` + `clearListenOverlayVisual`，约 L155–L195（摘录）
+
+```typescript
+// 旧版：仅 body 下 fixed 浮层，每句预解析 Range 传入
+function paintRangeOverlay(range: Range, epoch: number): void {
+	if (epoch !== overlayEpoch || !session) return;
+	// ... 取 doc、getAccurateRangeLineClientRects ...
+	clearListenOverlayInDoc(doc);
+	// 创建 fixed inset:0 根节点，append 多个 fixed 色块
+	// doc.body.appendChild(root);
+	// paintedDocs.add(doc);
+}
+
+function clearListenOverlayVisual(): void {
+	for (const doc of paintedDocs) {
+		try {
+			clearListenOverlayInDoc(doc);
+		} catch {
+			// iframe 已卸载
+		}
+	}
+	paintedDocs.clear();
+}
+```
+
+**改动后** · 当前 `paintListenRange`，约 L226–L290
+
+```typescript
+// 清除所有播放绘制层（CSS / 独立 annotation / DOM group / div overlay）
+function clearListenPaint(rend: Rendition): void {
+	clearCssListenHighlight(rend);
+	detachActiveListenAnnotation(rend);
+	removeListenDomGroups(rend);
+	clearDivListenOverlay(rend);
+}
+
+// 三层回退：CSS Highlight → 独立 highlight 批注 → body div
+function paintListenRange(rend: Rendition, range: Range): void {
+	clearListenPaint(rend);
+	if (paintCssListenHighlight(range)) return;
+	if (applyListenAnnotation(rend, range)) return;
+	paintDivListenOverlay(range);
+}
+```
+
+**变更摘要**：由单一 fixed 浮层改为三层回退；清除走 `detachActiveListenAnnotation`，不按 CFI 全局 remove。
+
+---
+
+### 4.4 `beginEpubListenOverlaySession`（同文件）
+
+**对比范围**：完整导出函数。
+
+**改动前** · 基线，约 L248–L276
 
 ```typescript
 /** 朗读开始前：按 TTS plain 文本预解析各句 DOM 范围 */
@@ -368,107 +459,70 @@ export function beginEpubListenOverlaySession(
 
 	detachRelayout = attachRelayoutListeners(rend, epoch);
 }
+```
 
-/** 当前句开始播放：仅高亮该句 */
-export function showEpubListenSentence(sentenceIndex: number): void {
-	if (!session || sentenceIndex < 0) return;
-	session.activeSentence = sentenceIndex;
-	paintActiveSentence(session.epoch);
-}
+**改动后** · 当前，约 L412–L444
 
-/** 当前句播放结束：去除播放背景（不影响用户划线） */
-export function clearEpubListenSentenceOverlay(): void {
-	if (session) session.activeSentence = -1;
-	clearListenOverlayVisual();
-}
+```typescript
+export function beginEpubListenOverlaySession(
+	rend: Rendition,
+	plainText: string,
+	opts?: { cfi?: string; selectionRange?: Range | null },
+): void {
+	const plain = plainText.trim();
+	if (!plain) return;
 
-/** 朗读结束 / 停止：拆除会话并清除播放层 */
-export function clearEpubListenSegmentOverlay(): void {
+	clearEpubListenSegmentOverlay();
 	overlayEpoch += 1;
-	const rend = session?.rend ?? null;
-	session = null;
-	detachRelayout?.();
-	detachRelayout = null;
-	cancelAnimationFrame(relayoutRaf);
-	relayoutRaf = 0;
 
-	for (const doc of collectDocsForClear(rend)) {
-		try {
-			clearListenOverlayInDoc(doc);
-		} catch {
-			// iframe 已卸载
-		}
-	}
-	paintedDocs.clear();
+	const selectionRange =
+		opts?.selectionRange && isRangeConnected(opts.selectionRange)
+			? opts.selectionRange.cloneRange()
+			: (() => {
+					const cfi = opts?.cfi?.trim() ?? '';
+					if (!cfi) return null;
+					const fromCfi = resolveCfiDomRange(rend, cfi);
+					return fromCfi ? fromCfi.cloneRange() : null;
+				})();
+
+	session = {
+		rend,
+		plain,
+		cfi: opts?.cfi?.trim() ?? '',
+		selectionRange,
+		epoch: overlayEpoch,
+		plainStart: -1,
+		plainEnd: -1,
+	};
+
+	detachRelayout = attachRelayoutListeners(rend);
 }
 ```
 
-**变更摘要**：模块级会话 + `overlayEpoch`；`paintRangeOverlay` 仅操作 `#moke-epub-listen-overlay`；`clearListenOverlayInDoc` 不触碰用户/想法 marks。
-
----
-
-### 4.4 `read.tsx` 接线（`apps/frontend/src/views/ebook/read.tsx`）
-
-**对比范围**：hook 调用与三处 `toggleListen` 传参。
-
-**改动前** · 摘录
-
-```typescript
-const { toggleListen, listenLabel } = useEbookQuoteListen(t);
-// ...
-void toggleListen(payload.selectedText, 'popbar');
-// ...
-onListen: () => void toggleListen(quote, listenKey),
-// ...
-onListen: () => void toggleListen(thoughtDraft.quote, listenKey),
-```
-
-**改动后** · 摘录
-
-```typescript
-const { toggleListen, listenLabel } = useEbookQuoteListen(
-	t,
-	() => epubNavRef.current?.getRendition() ?? null,
-);
-// ...
-void toggleListen(payload.selectedText, 'popbar', payload.cfiRange);
-// ...
-onListen: () => void toggleListen(quote, listenKey, cfiRange),
-// ...
-onListen: () =>
-	void toggleListen(thoughtDraft.quote, listenKey, thoughtDraft.cfiRange),
-```
-
-**变更摘要**：向 hook 提供 rendition 与 CFI，供 overlay 定位正文。
+**变更摘要**：不再预解析句 Range 数组；会话存 plain + 选区/CFI，播放时按偏移即时 `plainSliceToRange`。
 
 ## 5. 兼容性与影响
 
-| 对象 | 影响 |
-| ---- | ---- |
-| 用户划线数据/API | **无**；不读写 `highlights`、不调用 `annotations.highlight` |
-| 想法下划线 | **无**；不参与 `getThoughtCfisSuppressedByHighlights` |
-| 点击命中 | **无**；浮层 `pointer-events: none` |
-| 同区域视觉 | 可能与用户底色半透明叠色；删除播放层不影响用户 mark |
-| 英语学习其它喇叭 | **无**；`onCadenceChunk` 可选，默认不传 |
-| 无 `cfiRange` | 仅朗读、无播放底色（行为与旧版一致） |
+- `showEpubListenSentence` 保留为空实现，避免旧调用方编译失败。
+- Safari 等无 CSS Highlight 时自动走 highlight 批注或 div 层。
+- 与用户划线冲突修复见 [epub-listen-user-highlight-reconcile.md](epub-listen-user-highlight-reconcile.md)。
 
-## 6. 风险与回归建议
+## 6. 回归建议
 
-1. PopBar / 想法列表 / 详情三入口：多句书摘逐句亮灭、停止后无残留黄底。
-2. 播放中划线、删划线：用户 mark 正常；停止后仅黄底消失。
-3. 云端长文分段 + 本机朗读：句内多 chunk 不叠色，句间有短暂无底色间隔。
-4. 滚动 / 翻章：播放中底色随 `relocated`/`rendered` 重定位。
-5. 重复句在同一选区内：`locateSentenceInRange` 取首次 `indexOf`（已知局限）。
+1. PopBar 选段听当前：逐句淡黄底，句间切换正常。
+2. 想法引用底栏听当前：无选区时用 CFI 定位。
+3. 播放中翻页/relayout：当前句底色跟随。
+4. 停止/播完：底色全清，用户划线仍在。
+5. Chrome / Safari 各测一层回退是否可见。
 
 ## 7. 相关源码路径
 
 | 说明 | 路径 |
 | ---- | ---- |
-| TTS 节奏回调 | `apps/frontend/src/utils/englishTts.ts` |
 | 播放浮层 | `apps/frontend/src/views/ebook/utils/epubListenSegmentOverlay.ts` |
+| TTS 节奏事件 | `apps/frontend/src/utils/englishTts.ts` |
 | 朗读 hook | `apps/frontend/src/views/ebook/hooks/useEbookQuoteListen.ts` |
-| 阅读页接线 | `apps/frontend/src/views/ebook/read.tsx` |
-| 既有听当前专题 | `docs/ebook/epub-quote-listen.md` |
+| PopBar 选区缓存 | `apps/frontend/src/views/ebook/utils/epubSelectionToolbarAttach.ts` |
 
 ---
 

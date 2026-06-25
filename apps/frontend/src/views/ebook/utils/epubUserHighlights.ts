@@ -79,31 +79,54 @@ const WAVY_WAVELENGTH_PX = 16;
 const WAVY_AMPLITUDE_PX = 1.2;
 const WAVY_SAMPLE_STEP_PX = 2;
 
-/** 沿 baseline 生成平滑正弦波浪下划线路径 */
+/**
+ * 沿 baseline 生成平滑正弦波浪下划线路径
+ * @param startX 波浪线起点的 X 坐标（SVG 坐标系）
+ * @param baseY  波浪线基线的 Y 坐标（SVG 坐标系，通常为行底部）
+ * @param width  波浪线的总长度（即高亮文本宽度）
+ * @returns      符合 SVG <path> d 属性规范的路径字符串
+ *
+ * 实现思路：
+ * - 若宽度 width 非正，直接返回空字符串
+ * - 路径起点先定位到 (startX, baseY)
+ * - 按 WAVY_SAMPLE_STEP_PX 为采样步长，基于正弦函数周期平滑生成若干采样点
+ * - 每一采样点都通过 L 指令连接到下一个波峰/波谷
+ * - 波浪幅度 WAVY_AMPLITUDE_PX，周期 WAVY_WAVELENGTH_PX
+ * - 最后一段若不是整步，则补一段精确到终点
+ */
 function buildWavyUnderlinePath(
 	startX: number,
 	baseY: number,
 	width: number,
 ): string {
+	// 若宽度为 0 或负数，不生成任何路径
 	if (width <= 0) return '';
+	// 起始路径：移动到起点 (startX, baseY)
 	let d = `M ${startX} ${baseY}`;
+	// 从起点累加 offset，按固定采样步长绘制每个波浪折线段
 	for (
 		let offset = WAVY_SAMPLE_STEP_PX;
 		offset <= width;
 		offset += WAVY_SAMPLE_STEP_PX
 	) {
+		// y = baseY + 振幅 * 正弦相位
 		const y =
 			baseY +
 			WAVY_AMPLITUDE_PX * Math.sin((2 * Math.PI * offset) / WAVY_WAVELENGTH_PX);
+		// 跳到 (startX + offset, y) 形成波浪
 		d += ` L ${startX + offset} ${y}`;
 	}
+	// 处理最后一个不满整数采样步长的尾部（避免丢失残余段）
 	const tail = width % WAVY_SAMPLE_STEP_PX;
 	if (tail > 0.01) {
+		// 终点 Y 坐标同理：根据 width 计算正弦相位
 		const y =
 			baseY +
 			WAVY_AMPLITUDE_PX * Math.sin((2 * Math.PI * width) / WAVY_WAVELENGTH_PX);
+		// 连线到最后终点
 		d += ` L ${startX + width} ${y}`;
 	}
+	// 返回完整 SVG path d 字符串，可供 <path d={...} /> 渲染
 	return d;
 }
 
@@ -122,17 +145,154 @@ function getRenditionContentsList(rend?: Rendition): EpubIframeContents[] {
 			: [];
 }
 
+/** 遍历当前 Rendition 下所有含用户划线 mark 的文档（包括主文档和各 EPUB iframe） */
+function iterHighlightDocuments(rend: Rendition): Document[] {
+	// 初始化文档集合，主页面 document 总是在内
+	const docs = new Set<Document>([document]);
+	// 遍历 rendition 的所有子内容（通常为每个 EPUB 页面对应的 iframe）
+	for (const contents of getRenditionContentsList(rend)) {
+		// 若有有效文档（内容尚在 DOM 中未被销毁），则加入集合
+		if (contents.document) docs.add(contents.document);
+	}
+	// 转换为数组返回，确保每个文档独立、无重复
+	return [...docs];
+}
+
+/**
+ * 检查当前 renditon 中的某个 CFI 是否已存在对应的用户划线 mark
+ * @param rend 当前电子书 rendition 实例
+ * @param cfiRange 用户划线对应的 epubcfi 字符串（唯一定位标注）
+ * @returns 是否存在对应 DOM mark
+ */
+function isUserHighlightMarkPresent(
+	rend: Rendition,
+	cfiRange: string,
+): boolean {
+	// 规范化 CFI（去除空白，避免因格式不一致匹配失败）
+	const cfi = cfiRange.trim();
+	// 若无有效 CFI，则视为不存在
+	if (!cfi) return false;
+	// 遍历所有相关文档（主文档+每个阅读 iframe 文档）
+	for (const doc of iterHighlightDocuments(rend)) {
+		// 查找所有可能的用户划线分组（用于 highlight mark 聚合，class/ref 等 selector）
+		for (const group of doc.querySelectorAll(USER_HIGHLIGHT_SELECTOR)) {
+			// 判断该 mark 是否与目标 CFI 匹配，dataset.epubcfi 标识对应 mark
+			if ((group as SVGElement).dataset.epubcfi?.trim() === cfi) {
+				// 找到即返回 true
+				return true;
+			}
+		}
+	}
+	// 未找到任何匹配 mark
+	return false;
+}
+
+/**
+ * 直接移除 DOM 上与指定 CFI 匹配的所有用户划线 mark 分组
+ * 用途：epub.js removeHighlight 漏删孤儿 mark 时补救——确保不会残留无主划线 mark
+ * @param rend 当前电子书 rendition 实例，用于获取所有相关文档（主文档和各 iframe 子文档）
+ * @param cfiRange 目标用户划线的 epubcfi 字符串（唯一定位标注，需与 mark dataset.epubcfi 一致）
+ */
+function removeUserHighlightMarkGroupsByCfi(
+	rend: Rendition, // 电子书渲染上下文，用于查找所有主/子文档
+	cfiRange: string, // 需移除的用户划线 CFI（如未传/空字符串则直接跳过）
+): void {
+	// 去除 CFI 首尾空白，统一格式，避免因前后多余空格导致无法匹配
+	const cfi = cfiRange.trim();
+	// 若未提供有效 CFI，直接返回，无需处理（防止误删全部划线 mark）
+	if (!cfi) return;
+	// 遍历当前 rendition 管理下的所有文档实例（主页面及所有 epub 的 iframe 子页面）
+	for (const doc of iterHighlightDocuments(rend)) {
+		// 在当前文档内查找所有用户划线分组（如 <g class="moke-epub-user-highlight-mark"> ... </g>）
+		doc.querySelectorAll(USER_HIGHLIGHT_SELECTOR).forEach((group) => {
+			// 取出 mark 分组上的 epubcfi 标识（唯一定位），去除空白再做比对
+			if ((group as SVGElement).dataset.epubcfi?.trim() === cfi) {
+				// 若该 mark 的 CFI 与目标一致，则从 DOM 树移除当前分组节点（彻底清理，不留空壳）
+				group.remove();
+			}
+		});
+	}
+}
+
+/**
+ * 清理不在 keepCfis 内的孤儿 mark，并对同一 CFI 去重
+ *
+ * 作用：
+ * 1. 删除所有不在 keepCfis 列表中的用户划线 mark 分组（即渲染层无配对数据的残留 DOM 元素，确保 DOM 状态与 highlight 数据一致，防止“孤儿”划线导致表现异常）。
+ * 2. 对每个 CFI 保留至多一个 mark 分组（如果因渲染或旧残留出现同一 CFI 多 mark，去重只留第一个，避免叠加闪烁或点击异常）。
+ *
+ * @param rend       当前电子书 rendition 实例，迭代主文档与所有 iframe 子文档以遍历全部 mark 元素。
+ * @param keepCfis   Set<string>，仅保留的有效 CFI 集合。只有在该集合内的 mark 会被保留，其余全部清理。
+ */
+function reconcileUserHighlightMarkDom(
+	rend: Rendition,
+	keepCfis: Set<string>,
+): void {
+	// 遍历当前电子书渲染上下文包含的所有文档（主文档以及每个章节/分页的 iframe 子文档）
+	for (const doc of iterHighlightDocuments(rend)) {
+		// 构建一个 Map：以 CFI 为键，记录每个 CFI 在文档下出现的所有 mark 分组数组
+		const byCfi = new Map<string, Element[]>();
+		// 查找该文档下的所有用户高亮 mark 分组（<g class="...">）
+		doc.querySelectorAll(USER_HIGHLIGHT_SELECTOR).forEach((group) => {
+			// 取出当前分组上的 CFI 属性、去除空白
+			const cfi = (group as SVGElement).dataset.epubcfi?.trim() ?? '';
+			// 没有有效 CFI（如 DOM 脏数据、结构异常等），直接删除该节点
+			if (!cfi) {
+				group.remove();
+				return;
+			}
+			// 按 cfi 收集所有分组
+			const list = byCfi.get(cfi) ?? [];
+			list.push(group);
+			byCfi.set(cfi, list);
+		});
+		// 遍历 Map 的每一组（每组同一 CFI 的所有分组）
+		for (const [cfi, groups] of byCfi) {
+			// 若当前 cfi 不在应保留集合内，则其所有分组均为“孤儿”，全部删除
+			if (!keepCfis.has(cfi)) {
+				groups.forEach((g) => {
+					g.remove();
+				});
+				continue;
+			}
+			// 否则属于合法高亮，只保留第 0 个，其余 mark 为重复冗余，逐个删除
+			for (let i = 1; i < groups.length; i += 1) {
+				groups[i]!.remove();
+			}
+		}
+	}
+}
+
+/**
+ * 确保用户高亮（划线）SVG 样式已注入当前文档（用于规范高亮的外观风格，保证一致渲染体验）。
+ *
+ * - 作用：
+ *   1. 仅为用户划线相关 SVG 元素注入特殊样式，防止 EPUB 内嵌样式或第三方 CSS 干扰表现。
+ *   2. 标准化 rect、line、wavy path 线型形态（如透明描边/圆角/无填充/平滑连接）。
+ * - 场景：
+ *   - 主文档或每个章节 iframe 载入后调用，防止样式重复注入或遗漏。
+ *
+ * @param doc   当前操作的文档对象，默认为全局 document，也可传入分章节 iframe 的 document。
+ */
 function ensureUserHighlightStyles(doc: Document = document): void {
+	// 取 head 节点。若无则取根元素（兼容部分旧式 EPUB）作为父节点
 	const head = doc.head ?? doc.documentElement;
+	// 若找不到可注入 style 的上级，直接退出
 	if (!head) return;
 
+	// 查询是否已存在指定 ID 的全局 style 节点，避免重复注入
 	let style = doc.getElementById(STYLE_ID) as HTMLStyleElement | null;
 	if (!style) {
+		// 若未注入则新建 style 节点
 		style = doc.createElement('style');
 		style.id = STYLE_ID;
 		head.appendChild(style);
 	}
 
+	// 注入/刷新用户高亮 SVG 样式表：
+	// - <rect>: 隐藏描边（stroke），仅保留填充色（防止出现多余边框线，影响视觉一致性）
+	// - <line>: 虚线两端采用圆角，保证收尾平滑
+	// - <path .wavy>: 波浪线不填充，曲线连接圆滑自然
 	style.textContent = `
 ${USER_HIGHLIGHT_SELECTOR} > rect {
 	stroke: transparent !important;
@@ -175,51 +335,69 @@ function setSvgAttrIfChanged(el: Element, name: string, value: string): void {
 	}
 }
 
+// 批量修补（刷新）所有用户高亮 SVG 分组的标注样式和内容
 function patchUserHighlightMarks(
-	root: ParentNode = document,
-	metaByCfi: Map<string, EbookUserHighlight> = highlightMetaByCfi,
-	rend?: Rendition,
+	root: ParentNode = document, // SVG 根节点，默认整个文档
+	metaByCfi: Map<string, EbookUserHighlight> = highlightMetaByCfi, // CFI 到高亮元数据的映射，默认全局
+	rend?: Rendition, // 可选：epubjs 的渲染实例
 ): void {
+	// 查找该区域内所有高亮分组 <g class="epub-user-highlight">
 	const groups = root.querySelectorAll(USER_HIGHLIGHT_SELECTOR);
 
+	// 逐个高亮分组进行处理
 	groups.forEach((g) => {
 		const groupEl = g as SVGElement;
+		// 解析当前分组的展示样式（高亮/下划线/波浪线）和颜色
 		const { style, color: colorId } = resolveHighlightMetaFromGroup(
 			g,
 			metaByCfi,
 		);
 		const palette = COLOR_BY_ID[colorId] ?? COLOR_BY_ID.pink;
+		// 禁用事件穿透到高亮层，避免高亮遮挡影响文本操作
 		if (groupEl.style.pointerEvents !== 'none') {
 			groupEl.style.pointerEvents = 'none';
 		}
 
+		// 当前分组关联的 epubcfi 标记，唯一定位
 		const cfi = groupEl.dataset.epubcfi?.trim();
+		// 获取该分组的所有线段坐标信息（每一行高亮的几何数据）
 		const segments = resolveMarkSvgLineSegments(rend, groupEl, cfi);
+		// 按行创建/同步高亮矩形（每段文本一块 rect）
 		const rects = syncHighlightMarkRects(groupEl, segments);
 
+		// 获取所有下划线/波浪线的 <line> 元素
 		const lines = groupEl.querySelectorAll('line');
 
+		// 样式：扁平高亮块（高亮黄/粉/绿等）
 		if (style === 'highlight') {
+			// 波浪线路径全部清除（高亮块无需 path 线）
 			groupEl.querySelectorAll(`path.${WAVY_PATH_CLASS}`).forEach((node) => {
 				node.remove();
 			});
+			// 下划线全部隐藏（透明），仅保留高亮块
 			lines.forEach((line) => {
 				setSvgAttrIfChanged(line, 'stroke', 'transparent');
 				setSvgAttrIfChanged(line, 'stroke-opacity', '0');
 			});
-		} else if (style === 'underline') {
+		}
+		// 样式：普通下划线（直线模式，非波浪线）
+		else if (style === 'underline') {
+			// 下划线同样需要清除波浪线 path，避免叠加
 			groupEl.querySelectorAll(`path.${WAVY_PATH_CLASS}`).forEach((node) => {
 				node.remove();
 			});
 		}
 
+		// 实时再获取所有 path.wavy 元素，用于波浪线处理
 		const wavyPaths = groupEl.querySelectorAll(`path.${WAVY_PATH_CLASS}`);
 
+		// 遍历每一个高亮“行”对应的矩形和线
 		rects.forEach((rect, index) => {
 			const segment = readHighlightSegment(rect, segments[index]);
 			const { x, y, width, height } = segment;
-			const lineY = y + height + UNDERLINE_OFFSET_PX;
+			const lineY = y + height + UNDERLINE_OFFSET_PX; // 下划线 y 坐标，位于行底部下方
 
+			// 普通高亮块：设置填充色、全不透明、无边框，直接返回
 			if (style === 'highlight') {
 				setSvgAttrIfChanged(rect, 'fill', palette.fill);
 				setSvgAttrIfChanged(rect, 'fill-opacity', '1');
@@ -228,18 +406,22 @@ function patchUserHighlightMarks(
 				return;
 			}
 
+			// 其它类型统一做成透明块，无边框、填充透明色，用于承载“下划线”或“波浪线”
 			setSvgAttrIfChanged(rect, 'stroke', 'transparent');
 			setSvgAttrIfChanged(rect, 'stroke-width', '0');
 			setSvgAttrIfChanged(rect, 'fill', 'currentColor');
 			setSvgAttrIfChanged(rect, 'fill-opacity', '0.001');
 
+			// 波浪线模式：为每块生成/更新 path 曲线路径
 			if (style === 'wavy') {
 				const line = lines[index] as SVGLineElement | undefined;
 				if (line) {
+					// 若有原线，强制隐藏（仅显示波浪线）
 					setSvgAttrIfChanged(line, 'stroke', 'transparent');
 					setSvgAttrIfChanged(line, 'stroke-opacity', '0');
 				}
 
+				// 获取本“行”已存在的 path 元素，若无则新建之
 				let path = wavyPaths[index] as SVGPathElement | undefined;
 				if (!path) {
 					path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
@@ -247,6 +429,7 @@ function patchUserHighlightMarks(
 					groupEl.appendChild(path);
 				}
 				const geometryKey = `${x}|${lineY}|${width}`;
+				// 仅在几何数据变化时重设路径
 				if (path.dataset.geometryKey !== geometryKey) {
 					path.dataset.geometryKey = geometryKey;
 					path.setAttribute('d', buildWavyUnderlinePath(x, lineY, width));
@@ -258,12 +441,15 @@ function patchUserHighlightMarks(
 				return;
 			}
 
+			// 其它类型：“普通下划线”处理（非波浪线）
 			let line = lines[index] as SVGLineElement | undefined;
 			if (!line) {
+				// 若无已有 line，动态插入新的 line 元素
 				line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
 				groupEl.appendChild(line);
 			}
 
+			// 仅当线的 geometry 发生变化时，才重设其坐标属性
 			const x2 = x + width;
 			const lineGeometryKey = `${x}|${x2}|${lineY}`;
 			if (line.dataset.geometryKey !== lineGeometryKey) {
@@ -273,6 +459,7 @@ function patchUserHighlightMarks(
 				line.setAttribute('y1', String(lineY));
 				line.setAttribute('y2', String(lineY));
 			}
+			// 按高亮指定颜色渲染主下划线（圆角，实线，略带透明度，宽度 2px）
 			setSvgAttrIfChanged(line, 'stroke', palette.stroke);
 			setSvgAttrIfChanged(line, 'stroke-opacity', '0.95');
 			setSvgAttrIfChanged(line, 'stroke-width', '2');
@@ -280,6 +467,7 @@ function patchUserHighlightMarks(
 			setSvgAttrIfChanged(line, 'stroke-linecap', 'round');
 		});
 
+		// 若标注类型是波浪线，则多余的 path（大于高亮行数）需要移除
 		if (style === 'wavy') {
 			groupEl
 				.querySelectorAll(`path.${WAVY_PATH_CLASS}`)
@@ -288,6 +476,7 @@ function patchUserHighlightMarks(
 				});
 		}
 
+		// 多出来的 line（高亮行数少于原有线数量），全部设为透明隐藏
 		for (let index = rects.length; index < lines.length; index++) {
 			const line = lines[index] as SVGLineElement;
 			setSvgAttrIfChanged(line, 'stroke', 'transparent');
@@ -296,11 +485,22 @@ function patchUserHighlightMarks(
 	});
 }
 
+/**
+ * 从 SVG 高亮 rect 元素中读取其几何信息，返回作为线段段落（SvgLineSegment）对象。
+ * - 若提供 fallback，则直接返回 fallback（覆盖 rect 读取，常用于无有效 rect 时的回退）。
+ * - 否则依次读取 x/y/width/height 属性，不存在则默认为 0。
+ *
+ * @param rect     SVGRectElement，需要读取坐标和尺寸属性的高亮矩形
+ * @param fallback 可选回退对象，若传入则优先直接返回
+ * @returns        包含 x/y/width/height 坐标与尺寸的线段结构体
+ */
 function readHighlightSegment(
 	rect: SVGRectElement,
 	fallback?: SvgLineSegment,
 ): SvgLineSegment {
+	// 若传入 fallback，则不用判断 rect 属性，直接返回 fallback
 	if (fallback) return fallback;
+	// 从 rect 属性提取 x/y/width/height，全部以浮点数返回，缺省为 0
 	return {
 		x: Number.parseFloat(rect.getAttribute('x') ?? '0'),
 		y: Number.parseFloat(rect.getAttribute('y') ?? '0'),
@@ -309,26 +509,44 @@ function readHighlightSegment(
 	};
 }
 
+/**
+ * 同步高亮分组 group 内的 <rect> 高亮块，确保和 segments 长度与位置完全一致。
+ * - 若原有 rect 数量不足，则补充新 rect 元素节点到 group。
+ * - 若原有 rect 数量多余，则多余的 rect 会被移除。
+ * - 遍历 segments 并设置 rect 的 x/y/width/height 四个属性，始终保持与 segments 对齐。
+ *
+ * @param group    SVG <g> 高亮分组元素（作为 rect 容器）
+ * @param segments 每一行文本高亮对应的几何信息数组（段落线段）
+ * @returns        rects 处理后的 <rect> 节点数组，顺序与 segments 一致
+ */
 function syncHighlightMarkRects(
 	group: SVGElement,
 	segments: SvgLineSegment[],
 ): SVGRectElement[] {
+	// 获取当前 group 下所有 rect 节点，并只保留 SVGRectElement 类型（防止有其它自定义节点）
 	const existing = [...group.querySelectorAll('rect')].filter(
 		(rect): rect is SVGRectElement => rect instanceof SVGRectElement,
 	);
+
+	// 若 segments 为空（无高亮行），直接返回现有 rects，无需更改
 	if (segments.length === 0) {
 		return existing;
 	}
 
 	const rects: SVGRectElement[] = [];
 
+	// 遍历每个高亮行 segment，依次同步 rect 节点及其几何属性
 	for (let index = 0; index < segments.length; index++) {
+		// 当前高亮段的几何信息
 		const segment = segments[index]!;
+		// 如果已有 rect 节点则复用，否则新建
 		let rect = existing[index];
 		if (!rect) {
+			// 不足时创建新的 <rect>，并插入 group（放在最前，避免后续节点遮盖）
 			rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
 			group.insertBefore(rect, group.firstChild);
 		}
+		// 更新/设定 rect 的 x/y/width/height 属性
 		setSvgAttrIfChanged(rect, 'x', String(segment.x));
 		setSvgAttrIfChanged(rect, 'y', String(segment.y));
 		setSvgAttrIfChanged(rect, 'width', String(segment.width));
@@ -336,10 +554,12 @@ function syncHighlightMarkRects(
 		rects.push(rect);
 	}
 
+	// 多出来的旧 rects（比 segments 多），全部移除
 	for (let index = segments.length; index < existing.length; index++) {
 		existing[index]?.remove();
 	}
 
+	// 返回所有与 segments 对齐的新 rects
 	return rects;
 }
 
@@ -850,6 +1070,8 @@ function purgeStaleUserHighlightAnnotations(
 			removeUserHighlightAnnotation(rend, cfiRange, appliedRef);
 		}
 	}
+
+	reconcileUserHighlightMarkDom(rend, keepCfis);
 }
 
 export function applyEpubUserHighlights(
@@ -879,7 +1101,12 @@ export function applyEpubUserHighlights(
 		if (!visibleCfis.has(item.cfiRange)) continue;
 
 		const nextSig = buildHighlightApplySignature(item);
-		if (appliedRef.get(item.cfiRange) === nextSig) continue;
+		if (
+			appliedRef.get(item.cfiRange) === nextSig &&
+			isUserHighlightMarkPresent(rend, item.cfiRange)
+		) {
+			continue;
+		}
 
 		removeUserHighlightAnnotation(rend, item.cfiRange, appliedRef);
 		try {
@@ -909,6 +1136,7 @@ function removeUserHighlightAnnotation(
 	} catch {
 		// ignore
 	}
+	removeUserHighlightMarkGroupsByCfi(rend, cfiRange);
 	appliedRef.delete(cfiRange);
 }
 
@@ -920,6 +1148,17 @@ export function teardownAppliedUserHighlights(
 		removeUserHighlightAnnotation(rend, cfiRange, appliedRef);
 	}
 	appliedRef.clear();
+}
+
+export function invalidateAppliedUserHighlightsMissingDom(
+	rend: Rendition,
+	appliedRef: Map<string, string>,
+): void {
+	for (const cfi of [...appliedRef.keys()]) {
+		if (!isUserHighlightMarkPresent(rend, cfi)) {
+			appliedRef.delete(cfi);
+		}
+	}
 }
 
 export function findUserHighlightByCfi(
@@ -2207,6 +2446,7 @@ export function syncEpubReadingAnnotations(
 ): void {
 	beginEpubAnnotationSyncScope();
 	try {
+		invalidateAppliedUserHighlightsMissingDom(rend, appliedHighlightsRef);
 		setUserHighlightBlockerSourcesForThoughtPatch([]);
 		const highlightPlan = buildHighlightRenderPlan(rend, highlights);
 		applyEpubUserHighlights(

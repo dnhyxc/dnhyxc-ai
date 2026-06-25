@@ -1066,4 +1066,14 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'Amber thought underlines show when you annotate a single sentence inside a paragraph. User straight underlines cover thought dashes only where they overlap; non-overlapping dashes remain. Background highlights and wavy underlines still coexist correctly with thought dashes.',
 	},
+	's25-47': {
+		title: 'EPUB Listen sentence highlight while playing',
+		description:
+			'While Listen is reading aloud, the sentence being spoken shows a soft yellow background; it clears when that sentence finishes and moves to the next; stopping or finishing clears all playback highlights without affecting your highlights or thought underlines.',
+	},
+	's25-48': {
+		title: 'EPUB Listen vs user highlight conflict fix',
+		description:
+			'After highlighting then Listen, or re-highlighting a wider selection, highlights no longer duplicate and cancel still works; when playback ends, highlights and thought underlines return to a consistent state.',
+	},
 };

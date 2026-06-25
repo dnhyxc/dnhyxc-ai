@@ -1,4 +1,5 @@
 import type { Rendition } from 'epubjs';
+import { rememberEpubPopBarSelectionRange } from './epubListenSegmentOverlay';
 import {
 	extractQuoteSegmentsFromRange,
 	type QuoteShareRun,
@@ -313,6 +314,7 @@ export function attachEpubSelectionPopBar(
 					return;
 				}
 				// 抛出当前激活选区信息，供外部响应（如展示 PopBar 工具栏等）
+				rememberEpubPopBarSelectionRange(active.range);
 				onChange({
 					// PopBar 横向居中显示的坐标（选区矩形中心 X 坐标）
 					x: anchor.centerX,
@@ -474,6 +476,7 @@ export function buildEpubPopBarPayloadFromCfiRange(
 ): EpubSelectionPopBarPayload {
 	const range = resolveRange(rend, cfiRange);
 	if (range) {
+		rememberEpubPopBarSelectionRange(range);
 		const win = range.startContainer.ownerDocument?.defaultView;
 		if (win) {
 			const anchor = rangeToViewportAnchor(win, range);

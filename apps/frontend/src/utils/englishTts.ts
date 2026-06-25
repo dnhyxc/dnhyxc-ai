@@ -436,6 +436,12 @@ export type TtsCadenceChunkEvent = {
 	text: string;
 	sentenceIndex: number;
 	isLastInSentence: boolean;
+	/** 当前 chunk 在 stripMarkdownForTts 后 plain 内的 [start, end) */
+	plainStart: number;
+	plainEnd: number;
+	/** 当前句在 plain 内的 [start, end)（与 sentenceIndex 对齐） */
+	sentencePlainStart: number;
+	sentencePlainEnd: number;
 };
 
 export type PlayEnglishPreferredOptions = {
@@ -449,7 +455,8 @@ export type PlayEnglishPreferredOptions = {
 
 type CadencePlaybackHooks = Pick<PlayEnglishPreferredOptions, 'onCadenceChunk'>;
 
-function buildSentenceOffsetSpans(
+/** 与 TTS sentenceIndex 对齐的句界（plain 内 start/end 偏移） */
+export function buildSentenceOffsetSpans(
 	plain: string,
 ): Array<{ start: number; end: number }> {
 	const trimmed = plain.trim();
@@ -475,11 +482,12 @@ function sentenceIndexAtOffset(
 	spans: Array<{ start: number; end: number }>,
 	offset: number,
 ): number {
-	for (let i = 0; i < spans.length; i += 1) {
+	if (spans.length === 0) return 0;
+	for (let i = spans.length - 1; i >= 0; i -= 1) {
 		const span = spans[i]!;
-		if (offset >= span.start && offset < span.end) return i;
+		if (offset >= span.start) return i;
 	}
-	return Math.max(0, spans.length - 1);
+	return 0;
 }
 
 function buildChunkOffsetMeta(plain: string, chunks: TtsCadenceChunk[]) {
@@ -508,8 +516,12 @@ function emitCadenceChunk(
 
 	const sentences = buildSentenceOffsetSpans(plain);
 	const offsets = buildChunkOffsetMeta(plain, chunks);
-	const { start } = offsets[index] ?? { start: 0 };
+	const { start, end } = offsets[index] ?? { start: 0, end: chunk.text.length };
 	const sentenceIndex = sentenceIndexAtOffset(sentences, start);
+	const sentSpan = sentences[sentenceIndex] ?? {
+		start: 0,
+		end: plain.trim().length,
+	};
 	const nextStart = offsets[index + 1]?.start;
 	const isLastInSentence =
 		index === chunks.length - 1 ||
@@ -522,6 +534,10 @@ function emitCadenceChunk(
 		text: chunk.text,
 		sentenceIndex,
 		isLastInSentence,
+		plainStart: start,
+		plainEnd: end,
+		sentencePlainStart: sentSpan.start,
+		sentencePlainEnd: sentSpan.end,
 	});
 }
 
