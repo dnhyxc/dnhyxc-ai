@@ -831,6 +831,11 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'Active members: in Settings → Voice settings → Cloud voice, set Language boost to Chinese to pick from 64 Chinese system voices (Mandarin and Cantonese); English boost shows English voices only. When you change language boost, an incompatible voice resets to that language’s default.',
 	},
+	's24-43': {
+		title: 'Faster cloud TTS for long passages',
+		description:
+			'With cloud voice enabled, longer text (e.g. e-book quote excerpts, long classic sentences) is synthesized in sentence-sized segments—the first segment starts playing as soon as it is ready, and the next segment is prefetched while the current one plays. Short words and phrases still use a single request. Same behavior for Listen on EPUB quotes and English learning play buttons.',
+	},
 	's25-1': {
 		title: 'E-book bookshelf',
 		description:

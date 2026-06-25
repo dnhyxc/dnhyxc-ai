@@ -5,6 +5,7 @@
 - [EPUB 选区浮动工具条](epub-selection-popbar.md) — PopBar 入口与 `suppressEpubSelectionPopBarDismiss`
 - [EPUB 想法侧栏](epub-thought-drawer.md) — 列表/详情引用底栏 `variant="panel"`
 - 英语学习 TTS 能力见 `docs/english/` 相关专题；本实现复用 `playEnglishPreferred` / `stopAllEnglishPlayback`
+- [云端长文分段流水线](../english/cloud-tts-segment-pipeline.md) — 长书摘云端首声加速（分段 + 预取）
 
 ## 1. 背景与目标
 

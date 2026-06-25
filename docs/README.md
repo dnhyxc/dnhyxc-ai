@@ -68,6 +68,7 @@
 | 设置页云端朗读参数不生效 / 改音色仍播旧音                         | [english/cloud-tts-settings.md](./english/cloud-tts-settings.md) §5–§6                                                                                   |
 | 语言增强中文但音色列表仍是英文                                    | [english/minimax-chinese-voices.md](./english/minimax-chinese-voices.md)                                                                                 |
 | 换设备后云端朗读参数丢失 / 需账号同步                             | [english/cloud-tts-prefs-db.md](./english/cloud-tts-prefs-db.md)                                                                                         |
+| 长文云端朗读首声慢 / 播放中无声卡住                         | [english/cloud-tts-segment-pipeline.md](./english/cloud-tts-segment-pipeline.md) §3、§6；分段预取细节 [cloud-tts-cadence-prefetch.md](./english/cloud-tts-cadence-prefetch.md) |
 | TTS 从点喇叭到出声（前后端全链路）                                | [english/tts-end-to-end-guide.md](./english/tts-end-to-end-guide.md)                                                                                     |
 | 支付成功但资料页仍非会员 / 到期仍显示会员                         | [pay/stripe-membership-billing.md](./pay/stripe-membership-billing.md) §6–§7                                                                             |
 | 换号后仍看到上一账号的草稿或助手对话                              | [app/user-switch-state-reset.md](./app/user-switch-state-reset.md)                                                                                       |
