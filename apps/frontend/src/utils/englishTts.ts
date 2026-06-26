@@ -111,15 +111,15 @@ function splitTextForTtsCadence(text: string): TtsCadenceChunk[] {
 		return [{ text: trimmed, pauseAfterMs: 0 }];
 	}
 
-	const sentences = trimmed
-		.split(/(?<=[.!?。！？])\s*/)
-		.map((s) => s.trim())
+	const sentenceSpans = buildSentenceOffsetSpans(trimmed);
+	const sentenceParts = sentenceSpans
+		.map(({ start, end }) => trimmed.slice(start, end).trim())
 		.filter(Boolean);
-	const sentenceParts = sentences.length > 0 ? sentences : [trimmed];
+	const sentenceUnits = sentenceParts.length > 0 ? sentenceParts : [trimmed];
 
 	const chunks: TtsCadenceChunk[] = [];
-	for (let si = 0; si < sentenceParts.length; si += 1) {
-		const sent = sentenceParts[si];
+	for (let si = 0; si < sentenceUnits.length; si += 1) {
+		const sent = sentenceUnits[si];
 		const clauses = sent
 			.split(/(?<=[,;，；：:])\s+/)
 			.map((s) => s.trim())
@@ -129,7 +129,7 @@ function splitTextForTtsCadence(text: string): TtsCadenceChunk[] {
 			const subChunks = splitLongText(parts[ci], MAX_UTTERANCE_CHARS);
 			for (let sub = 0; sub < subChunks.length; sub += 1) {
 				const lastClause = ci === parts.length - 1;
-				const lastSentence = si === sentenceParts.length - 1;
+				const lastSentence = si === sentenceUnits.length - 1;
 				const lastSub = sub === subChunks.length - 1;
 				chunks.push({
 					text: subChunks[sub],
@@ -455,26 +455,64 @@ export type PlayEnglishPreferredOptions = {
 
 type CadencePlaybackHooks = Pick<PlayEnglishPreferredOptions, 'onCadenceChunk'>;
 
-/** 与 TTS sentenceIndex 对齐的句界（plain 内 start/end 偏移） */
+/** 句末边界（trimmed plain 内下标，不含边界字符之后的内容） */
+function sentenceBoundaryEnd(trimmed: string, i: number): number {
+	const ch = trimmed[i];
+	if (!ch) return -1;
+	if (/[.!?。！？；]/.test(ch)) return i + 1;
+	// Unicode 省略号（… / …… 均在此截断）
+	if (ch === '\u2026') {
+		let j = i + 1;
+		while (j < trimmed.length && trimmed[j] === '\u2026') j += 1;
+		return j;
+	}
+	// ASCII 省略号
+	if (ch === '.' && trimmed.startsWith('......', i)) return i + 6;
+	if (ch === '.' && trimmed.startsWith('...', i) && trimmed[i + 3] !== '.') {
+		return i + 3;
+	}
+	return -1;
+}
+
+/** 与 DOM 锚点 / TTS sentenceIndex 对齐的句界（plain 内 start/end 偏移） */
 export function buildSentenceOffsetSpans(
 	plain: string,
 ): Array<{ start: number; end: number }> {
 	const trimmed = plain.trim();
 	if (!trimmed) return [];
-	const parts = trimmed
-		.split(/(?<=[.!?。！？])\s*/)
-		.map((s) => s.trim())
-		.filter(Boolean);
-	if (!parts.length) return [{ start: 0, end: trimmed.length }];
 
 	const spans: Array<{ start: number; end: number }> = [];
-	let searchFrom = 0;
-	for (const part of parts) {
-		const idx = trimmed.indexOf(part, searchFrom);
-		if (idx < 0) continue;
-		spans.push({ start: idx, end: idx + part.length });
-		searchFrom = idx + part.length;
+	let rawStart = 0;
+
+	for (let i = 0; i < trimmed.length; i += 1) {
+		const boundary = sentenceBoundaryEnd(trimmed, i);
+		if (boundary < 0) continue;
+
+		const slice = trimmed.slice(rawStart, boundary);
+		const content = slice.trim();
+		if (content) {
+			const lead = slice.length - slice.trimStart().length;
+			const trail = slice.length - slice.trimEnd().length;
+			spans.push({ start: rawStart + lead, end: boundary - trail });
+		}
+
+		rawStart = boundary;
+		while (rawStart < trimmed.length && /\s/u.test(trimmed[rawStart]!)) {
+			rawStart += 1;
+		}
+		i = boundary - 1;
 	}
+
+	if (rawStart < trimmed.length) {
+		const tail = trimmed.slice(rawStart).trim();
+		if (tail) {
+			const lead =
+				trimmed.slice(rawStart).length -
+				trimmed.slice(rawStart).trimStart().length;
+			spans.push({ start: rawStart + lead, end: trimmed.length });
+		}
+	}
+
 	return spans.length > 0 ? spans : [{ start: 0, end: trimmed.length }];
 }
 
@@ -1044,6 +1082,21 @@ export function warmupEnglishTtsVoices(): void {
 		resetCachedEnglishVoice();
 		void window.speechSynthesis.getVoices();
 	});
+}
+
+/** 须在用户点击同步调用，降低后续 async TTS / Audio 被 autoplay 策略拦截的概率 */
+export function primeEnglishPlaybackForUserGesture(): void {
+	if (typeof window === 'undefined') return;
+	warmupEnglishTtsVoices();
+	try {
+		window.speechSynthesis?.resume();
+		const unlock = new SpeechSynthesisUtterance('\u200b');
+		unlock.volume = 0;
+		unlock.rate = 10;
+		window.speechSynthesis?.speak(unlock);
+	} catch {
+		// 部分环境无 speechSynthesis
+	}
 }
 
 /** 当前选中的本机英语音色名 */

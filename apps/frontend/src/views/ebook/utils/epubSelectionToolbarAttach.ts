@@ -1,3 +1,27 @@
+/**
+ * 本文件负责 EPUB 阅读器选区工具栏（PopBar）的选区监听、高亮同步、跨 iframe 定位与弹出区域计算等交互辅助逻辑。
+ *
+ * 主要实现要点包括：
+ *
+ * 1. 选区归一化与高亮区块解析
+ *    - 基于 normalizeSelectionRangeForEpub 对用户选区范围（Range）做规范化处理，去除无意义前后空白，保证高亮/取词准确。
+ *    - 结合 extractQuoteSegmentsFromRange 和 getAccurateRangeLineClientRects，拆分并定位多行/多节点选区下的精准可视矩形，用于高亮渲染和工具栏锚点定位。
+ *
+ * 2. CFI/跨 iframe 映射与存储
+ *    - 采用 resolveSelectionCfiRange 实现 DOM 选区和 EPUB CFI（标准定位符）间的双向解析，适配多 iframe、多章节场景下的选区高亮与位置还原。
+ *    - 监听并记忆手动选区（rememberEpubPopBarSelectionRange），实现 PopBar 弹出/消失后的选区智能还原体验。
+ *
+ * 3. 工具栏位置与选区信息汇聚
+ *    - 提供 EpubSelectionPopBarPayload 类型，统一包含选区中心点坐标、文本内容、样式片段、CFI 字符串等核心属性，服务于工具栏弹窗精准对齐与上下文操作。
+ *
+ * 4. 选区监听与消失抑制
+ *    - 设计 suppressEpubSelectionPopBarDismiss 与 shouldSuppressDismiss 方案，抑制划线/想法等选区操作时工具栏被误关闭，提高多步交互容错体验。
+ *
+ * 5. 支持滚动型与分页型阅读器多容器适配
+ *    - 兼容 getEpubScrollContainer 获取容器，自动区分分页（iframe）与滚动排版下的选区区域定位与行为差异。
+ *
+ * 应用场景覆盖：选区划线/想法、引用分享、选区 PopBar 工具栏、多 iframe/多章节联动、高亮同步、异步状态还原等 EPUB 阅读器内复杂选区交互。
+ */
 import type { Rendition } from 'epubjs';
 import { rememberEpubPopBarSelectionRange } from './epubListenSegmentOverlay';
 import {

@@ -49,6 +49,7 @@ type NavApi = {
 	go: (href: string) => Promise<void>;
 	clearTextSelection: () => void;
 	getRendition: () => Rendition | null;
+	getBook: () => Book | null;
 	syncReadingAnnotations: (nextHighlights?: EbookUserHighlight[]) => void;
 };
 
@@ -435,6 +436,7 @@ export function EpubPane({
 						clearEpubTextSelection(rendRef.current);
 					},
 					getRendition: () => rendRef.current,
+					getBook: () => bookRef.current,
 					syncReadingAnnotations: (nextHighlights) => {
 						const r = rendRef.current;
 						if (!r) return;

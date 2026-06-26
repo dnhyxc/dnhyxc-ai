@@ -8,9 +8,14 @@ import {
 	warmupEnglishTtsVoices,
 } from '@/utils/englishTts';
 import {
+	invokeStopChapterListen,
+	registerQuoteListenStop,
+} from '../utils/epubListenController';
+import {
 	beginEpubListenOverlaySession,
+	clearActiveListenHighlight,
 	clearEpubListenSegmentOverlay,
-	clearEpubListenSentenceOverlay,
+	getEpubListenSessionPlain,
 	resolveEpubListenPlain,
 	showEpubListenPlainSpan,
 } from '../utils/epubListenSegmentOverlay';
@@ -25,7 +30,13 @@ export function useEbookQuoteListen(
 
 	useEffect(() => {
 		warmupEnglishTtsVoices();
+		registerQuoteListenStop(() => {
+			stopAllEnglishPlayback();
+			clearEpubListenSegmentOverlay();
+			setPlayingKey(null);
+		});
 		return () => {
+			registerQuoteListenStop(null);
 			stopAllEnglishPlayback();
 			clearEpubListenSegmentOverlay();
 		};
@@ -47,6 +58,7 @@ export function useEbookQuoteListen(
 				setPlayingKey(null);
 				return;
 			}
+			invokeStopChapterListen();
 			if (!isEnglishPlaybackAvailable()) {
 				Toast({
 					type: 'warning',
@@ -60,7 +72,7 @@ export function useEbookQuoteListen(
 
 			const rend = getRendition?.() ?? null;
 			const cfi = cfiRange?.trim() ?? '';
-			const { plain, selectionRange, spokenRaw } = resolveEpubListenPlain(
+			const { plain, selectionRange } = resolveEpubListenPlain(
 				rend,
 				trimmed,
 				frozenRange,
@@ -73,13 +85,15 @@ export function useEbookQuoteListen(
 				});
 			}
 
+			const speakPlain = getEpubListenSessionPlain() ?? plain;
+
 			try {
-				await playEnglishPreferred(spokenRaw, {
+				await playEnglishPreferred(speakPlain, {
 					onCadenceChunk: (event) => {
 						if (!rend) return;
 						if (event.phase === 'end') {
 							if (event.isLastInSentence) {
-								clearEpubListenSentenceOverlay();
+								clearActiveListenHighlight(rend);
 							}
 							return;
 						}

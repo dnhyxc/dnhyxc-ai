@@ -3,6 +3,8 @@
 ## 延伸阅读
 
 - [EPUB 听当前：滚动容器浮层与跨段句间清除](epub-listen-host-overlay.md) — 播放背景绘制与句间清除
+- [EPUB 边听边读开发者手册](developer/epub-listen-dev.md) — 听当前 + 听书完整实现（§5.3 自动跟随、§8.7 scroll guard）
+- [EPUB 边听边读「听书」](epub-chapter-listen.md) — 顶栏听书、播放条与听书视口跟随（共用本 FAB）
 - [EPUB「听当前」逐句播放背景](epub-listen-sentence-bg.md) — plain 偏移与 TTS 数据流
 - [EPUB 连续滚动章节衔接](epub-reader-settings-scroll.md) — `.epub-container` 滚动模式
 

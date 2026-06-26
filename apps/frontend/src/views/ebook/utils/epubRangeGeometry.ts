@@ -1,3 +1,28 @@
+/**
+ * 本文件负责实现 EPUB 阅读器中与 CFI（EPUB 坐标）与 DOM 区间（Range）互相定位、映射及可视区域计算等相关的核心工具函数。
+ *
+ * 主要实现逻辑和能力如下：
+ *
+ * 1. CFI 与 Range 的双向解析与缓存
+ *    - 提供根据 CFI 字符串解析出对应 DOM Range 的高性能工具，并支持 sync 阶段缓存，加速高频查找与高亮定位。
+ *    - 支持根据 DOM Range 反推 EPUB CFI 区间，保证多 iframe、跨章节的范围都能严格按 EPUB 标准可定位与恢复。
+ *
+ * 2. 精确坐标与高亮区块计算
+ *    - 实现了多场景下区分每一行文本的 getAccurateRangeLineClientRects，支持多容器、跨行的精准可视范围检测。
+ *    - 对高亮或遮罩覆盖应用需求场景做了针对性优化（如：与用户手动选区、TTS 切句的区域精确对齐）。
+ *
+ * 3. 选区 Range 规范化处理
+ *    - 提供 normalizeSelectionRangeForEpub 工具，对任意选区严格规范化，避免选区因 DOM 结构或空白影响 CFI 生成与后续恢复。
+ *
+ * 4. 利用多级缓存提升性能
+ *    - 针对高频操作场景，利用缓存（如 syncAccurateClientRectCache、syncCfiRangeCache）显著减少重复 DOM/CFI 解析，保障交互丝滑。
+ *    - 兼容多 iframe、章节并发处理，健壮性与性能兼备。
+ *
+ * 5. 其他辅助操作
+ *    - 提供 Range 边界裁剪、逐字精确步进、遍历范围文本节点等基础能力，统一服务于高亮、注释、听读等外围功能。
+ *
+ * 适用场景涵盖：高亮渲染、注释业务、朗读高亮、区域同步、跨章节/跨 iframe 定位与 UI 覆盖等 EPUB 阅读核心复杂交互需求。
+ */
 import type { Rendition } from 'epubjs';
 
 type EpubIframeContents = {
@@ -7,6 +32,20 @@ type EpubIframeContents = {
 };
 
 export const EPUB_ANNOTATION_IGNORE_CLASS = 'epubjs-hl';
+
+export type EpubRenditionView = {
+	index?: number;
+	contents?: { document?: Document };
+};
+
+/** epub.js views() 返回 Views 集合对象，须 .all() 展开为数组 */
+export function getRenditionViewsList(rend?: Rendition): EpubRenditionView[] {
+	if (!rend) return [];
+	const raw = rend.views();
+	if (!raw) return [];
+	if (Array.isArray(raw)) return raw as EpubRenditionView[];
+	return (raw as { all?: () => EpubRenditionView[] }).all?.() ?? [];
+}
 
 function getRenditionContentsList(rend?: Rendition): EpubIframeContents[] {
 	if (!rend) return [];
@@ -387,12 +426,20 @@ export function resolveHighlightSvgLineSegments(
 	if (!rawRange) return [];
 
 	const range = normalizeSelectionRangeForEpub(rawRange) ?? rawRange;
+	return resolveDomRangeSvgLineSegments(group, range);
+}
 
+/** 直接用 DOM Range 计算 mark 多行 rect（听书 patch 用，避免 CFI 往返截断） */
+export function resolveDomRangeSvgLineSegments(
+	group: Element,
+	range: Range,
+): SvgLineSegment[] {
+	const normalized = normalizeSelectionRangeForEpub(range) ?? range;
 	const svg = findMarksPaneSvg(group);
 	const container = svg ? findMarksPaneContainer(svg) : null;
 	if (!svg || !container) return [];
 
-	return getAccurateRangeLineClientRects(range).map((rect) =>
+	return getAccurateRangeLineClientRects(normalized).map((rect) =>
 		clientRectToSvgLocalSegment(rect, svg, container),
 	);
 }

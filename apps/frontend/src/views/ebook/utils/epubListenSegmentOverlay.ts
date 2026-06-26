@@ -1,14 +1,37 @@
 /**
- * EPUB「听当前」播放背景
+ * EPUB 听书/听当前段落「句级滚动」管理模块
  *
- * 在 epub.js 滚动容器上挂单一浮层（不写入 iframe annotation / CSS Highlight），
- * 换句时 replaceChildren 整层替换，避免跨段落 mark 残留。
+ * 主要功能：
+ * 1. 维护当前听书（或听当前）会话，基于 plain 文本句表精准定位与管理章节内所有句子的 Range。
+ * 2. 支持自动跟随（autoFollow）：每句播放时监听句索引变化，确保当前句 DOM Range 自动滚入 EPUB 视口。
+ * 3. 仅负责句表索引与滚动逻辑，不处理任何视觉高亮、背景渲染；所有高亮完全交由 epubListenMarkHighlight
+ *    实现（包括 SVG patch 或 epub.js annotation）。
+ * 4. 提供 session 生命周期管理：句表初始化、句索引跳转、Range 记忆和恢复、滚动控制、防止滚动冲突等辅助能力。
+ *
+ * 使用说明：
+ * - 外部调用 showListenMarkHighlight/clearListenMarkHighlight 控制句级高亮。
+ * - 调整 autoFollow 状态及当前播放索引，可自动滚动目标句。
+ * - 内部自动协调与 EPUB 滚动容器的交互，避免过度触发 scroll 事件影响阅读体验。
+ *
+ * 设计边界：
+ * - 本模块绝不直接操作视觉高亮（包括样式注入、SVG 绘制等）。
+ * - 仅当句表合理初始化/同步时，方提供精确的句级滚动能力。
+ * - 非句表（如全文 TTS）或 DOM 缺失时不会影响主流程，但部分滚动功能受限。
  */
 import type { Rendition } from 'epubjs';
 import { stripMarkdownForTts } from '@/utils/englishTts';
 import {
-	forEachTextNodeInRange,
-	getAccurateRangeLineClientRects,
+	clearListenMarkHighlight,
+	showListenMarkHighlight,
+} from './epubListenMarkHighlight';
+import {
+	anchorToRange,
+	buildDomSentenceIndex,
+	type DomListenSentence,
+	sentenceToRange,
+} from './epubListenSentenceIndex';
+import {
+	cfiFromDomRange,
 	normalizeSelectionRangeForEpub,
 	resolveCfiDomRange,
 } from './epubRangeGeometry';
@@ -17,53 +40,37 @@ import {
 	scrollEpubRangeIntoView,
 } from './epubScrolledNav';
 
-export const EPUB_LISTEN_SEGMENT_FILL = 'rgba(251, 231, 128, 0.28)';
-
-export const EPUB_LISTEN_HIGHLIGHT_CLASS = 'moke-epub-listen-bg';
-
-const LISTEN_ROOT_ID = 'moke-epub-listen-host-overlay';
-const LISTEN_OVERLAY_ID = 'moke-epub-listen-overlay';
-
-const LISTEN_DOM_SELECTOR = `g.${EPUB_LISTEN_HIGHLIGHT_CLASS}, g[ref="${EPUB_LISTEN_HIGHLIGHT_CLASS}"], g[ref*="${EPUB_LISTEN_HIGHLIGHT_CLASS}"], g[class*="${EPUB_LISTEN_HIGHLIGHT_CLASS}"]`;
-
-type EpubContents = { document: Document; window: Window };
-
-type PlainCompactMap = {
-	trimmed: string;
-	anchor: number;
-	compact: string;
-	points: Array<{ node: Text; offset: number; ch: string }>;
-};
-
-type ListenSession = {
-	rend: Rendition;
-	plain: string;
-	cfi: string;
-	selectionRange: Range | null;
-	epoch: number;
-	plainStart: number;
-	plainEnd: number;
-	/** 为 false 时播放换句不再自动滚入视口（用户手动滚动后） */
-	autoFollow: boolean;
-	/** 与 TTS sentenceIndex 对齐，用于换句时清上一句背景 */
-	lastSentenceIndex: number;
-};
+export {
+	EPUB_LISTEN_HIGHLIGHT_CLASS,
+	EPUB_LISTEN_SEGMENT_FILL,
+} from './epubListenMarkHighlight';
 
 export type EpubListenAutoFollowState = {
 	active: boolean;
 	autoFollow: boolean;
 };
 
+type ListenSession = {
+	rend: Rendition;
+	plain: string;
+	cfi: string;
+	outerRange: Range | null;
+	sentences: DomListenSentence[];
+	epoch: number;
+	autoFollow: boolean;
+	lastSentenceIndex: number;
+	/** 听书等无句表 session：直接存当前句 DOM Range 供滚入视口 */
+	activeDomRange: Range | null;
+};
+
 let session: ListenSession | null = null;
 let overlayEpoch = 0;
-let relayoutRaf = 0;
-let detachRelayout: (() => void) | null = null;
 let detachScrollGuard: (() => void) | null = null;
 let rememberedPopBarRange: Range | null = null;
 let programmaticScroll = 0;
-/** 递增以丢弃过期的滚动后重绘 */
-let paintSerial = 0;
-
+let userScrolling = false;
+let scrollSettleTimer = 0;
+let pendingFollowScroll = false;
 const followListeners = new Set<(state: EpubListenAutoFollowState) => void>();
 
 function emitAutoFollowState(): void {
@@ -82,59 +89,36 @@ export function subscribeEpubListenAutoFollow(
 	return () => followListeners.delete(listener);
 }
 
-function pauseListenAutoFollow(): void {
-	if (!session?.autoFollow) return;
-	session.autoFollow = false;
-	emitAutoFollowState();
-}
-
-async function withProgrammaticScroll<T>(run: () => Promise<T>): Promise<T> {
-	programmaticScroll += 1;
+function isRangeConnected(range: Range | null): range is Range {
+	if (!range) return false;
 	try {
-		return await run();
-	} finally {
-		requestAnimationFrame(() => {
-			programmaticScroll = Math.max(0, programmaticScroll - 1);
-		});
+		void range.startContainer.nodeName;
+		return true;
+	} catch {
+		return false;
 	}
 }
 
-function attachListenScrollGuard(rend: Rendition): () => void {
-	const cleanups: (() => void)[] = [];
+function getContents(
+	rend: Rendition,
+): Array<{ document: Document; window: Window }> {
+	const raw = rend.getContents();
+	return Array.isArray(raw)
+		? raw
+		: raw
+			? [raw as { document: Document; window: Window }]
+			: [];
+}
 
-	const onUserScrollIntent = () => {
-		if (programmaticScroll > 0) return;
-		pauseListenAutoFollow();
-	};
-
-	const bindScrollTarget = (target: EventTarget | null | undefined) => {
-		if (!target) return;
-		target.addEventListener('scroll', onUserScrollIntent, { passive: true });
-		cleanups.push(() =>
-			target.removeEventListener('scroll', onUserScrollIntent),
-		);
-	};
-
-	const container = getEpubScrollContainer(rend);
-	if (container) {
-		bindScrollTarget(container);
-		container.addEventListener('wheel', onUserScrollIntent, { passive: true });
-		cleanups.push(() =>
-			container.removeEventListener('wheel', onUserScrollIntent),
-		);
+export function cloneActiveEpubSelection(rend: Rendition): Range | null {
+	for (const { window: w } of getContents(rend)) {
+		const sel = w.getSelection();
+		if (!sel || sel.isCollapsed || !sel.rangeCount) continue;
+		const raw = sel.getRangeAt(0);
+		if (!raw.toString().trim()) continue;
+		return normalizeSelectionRangeForEpub(raw) ?? raw.cloneRange();
 	}
-
-	const bindContents = (contents: EpubContents) => {
-		const doc = contents.document;
-		bindScrollTarget(doc.scrollingElement ?? doc.documentElement);
-	};
-
-	rend.hooks.content.register(bindContents);
-	for (const item of getContents(rend)) bindContents(item);
-
-	return () => {
-		for (const fn of cleanups) fn();
-	};
+	return null;
 }
 
 export function rememberEpubPopBarSelectionRange(range: Range | null): void {
@@ -150,363 +134,195 @@ export function getRememberedEpubPopBarSelectionRange(): Range | null {
 	return rememberedPopBarRange.cloneRange();
 }
 
-function getContents(rend?: Rendition | null): EpubContents[] {
-	if (!rend) return [];
-	const raw = rend.getContents();
-	return Array.isArray(raw)
-		? (raw as EpubContents[])
-		: raw
-			? [raw as EpubContents]
-			: [];
+function rebuildSessionSentences(active: ListenSession): void {
+	if (!active.outerRange?.startContainer.isConnected) return;
+	const stale = active.sentences.some(
+		(s) => s.anchor && !anchorToRange(s.anchor),
+	);
+	if (!stale && active.sentences.length > 0) return;
+	const index = buildDomSentenceIndex(active.outerRange);
+	active.sentences = index.sentences;
+	if (index.plain) active.plain = index.plain;
 }
 
-function isRangeConnected(range: Range | null): range is Range {
-	if (!range) return false;
+function resolveSentenceRange(
+	active: ListenSession,
+	sentenceIndex: number,
+): Range | null {
+	if (!active.outerRange?.startContainer.isConnected) return null;
+
+	rebuildSessionSentences(active);
+
+	const sent = active.sentences[sentenceIndex];
+	if (!sent) return null;
+	return sentenceToRange(sent);
+}
+
+/**
+ * 判断两个 DOM Range 是否“等价”（即起止节点和偏移量均一致）。
+ * 适用于比较某一选区是否与当前活跃 Range 为同一 DOM 区段，
+ * 针对跨文档、不可访问或处于异常状态的 range，捕获异常并安全返回 false。
+ *
+ * @param a 第一个 Range 对象
+ * @param b 第二个 Range 对象
+ * @returns 两 Range 的起止节点和偏移量完全一致时返回 true，否则返回 false
+ */
+function rangesEqual(a: Range, b: Range): boolean {
 	try {
-		void range.startContainer.nodeName;
-		return true;
+		// 判断 start/end 节点引用及 offset 是否完全一致
+		return (
+			a.startContainer === b.startContainer && // 起始节点相同
+			a.startOffset === b.startOffset && // 起始偏移量相同
+			a.endContainer === b.endContainer && // 终止节点相同
+			a.endOffset === b.endOffset // 终止偏移量相同
+		);
 	} catch {
+		// 若任一 Range 已被销毁或跨域异常，安全降级为不等价
 		return false;
 	}
 }
 
-function normalizeComparable(text: string): string {
-	return text
-		.normalize('NFKC')
-		.replace(/[\u200B-\u200D\uFEFF]/g, '')
-		.replace(/\s+/gu, '');
-}
+/**
+ * 获取当前活跃的朗读（听书）DOM Range。
+ * 优先返回当前句子的区间，否则若无句索引，但有活跃 DOM Range，则返回其克隆。
+ * 主要用于朗读进度关联的可视区选取。
+ *
+ * 1. 若 session 不存在，直接返回 null。
+ * 2. 若 session.lastSentenceIndex ≥ 0，返回当前句（lastSentenceIndex 所指向）的 Range，优先保证句级定位。
+ * 3. 如无可用句索引但 activeDomRange 仍然连接在文档结构上，则克隆并返回该 Range（避免 Range 被外部改动影响）。
+ * 4. 均不满足则返回 null。
+ *
+ * @returns {Range | null} 当前朗读句子的 DOM Range，或未激活时为 null
+ */
+function resolveActiveListenDomRange(): Range | null {
+	// 若无 session（未启动朗读），无法确定活跃 Range，直接返回 null
+	if (!session) return null;
 
-export function cloneActiveEpubSelection(rend: Rendition): Range | null {
-	for (const { window: win } of getContents(rend)) {
-		const sel = win.getSelection?.();
-		if (!sel || sel.rangeCount === 0 || sel.isCollapsed) continue;
-		const raw = sel.getRangeAt(0);
-		const normalized = normalizeSelectionRangeForEpub(raw) ?? raw;
-		if (!normalized.toString().trim()) continue;
-		return normalized.cloneRange();
+	// 若当前有有效句索引，则直接解析该句对应的 DOM Range
+	if (session.lastSentenceIndex >= 0) {
+		return resolveSentenceRange(session, session.lastSentenceIndex);
 	}
+
+	// 若没有句索引，但 session 记录了一个仍连接在文档的 Range，返回其副本
+	if (isRangeConnected(session.activeDomRange)) {
+		return session.activeDomRange.cloneRange();
+	}
+
+	// 以上条件均不满足（无句索引，无有效 DOM Range），返回 null
 	return null;
 }
 
-/** @deprecated 使用 cloneActiveEpubSelection */
-export function cloneEpubListenSelectionRange(
-	rend: Rendition,
-	plain: string,
-): Range | null {
-	void plain;
-	return cloneActiveEpubSelection(rend);
-}
-
-function collectListenDocuments(rend: Rendition): Set<Document> {
-	const docs = new Set<Document>([document]);
-	for (const { document: doc } of getContents(rend)) {
-		if (doc) docs.add(doc);
-	}
-	return docs;
-}
-
-function resolveListenOverlayHost(rend: Rendition): HTMLElement | null {
-	return (
-		getEpubScrollContainer(rend) ??
-		(rend as unknown as { manager?: { container?: HTMLElement } }).manager
-			?.container ??
-		null
-	);
-}
-
-function rangeLineRectsInHost(
-	range: Range,
-	host: HTMLElement,
-): Array<{ left: number; top: number; width: number; height: number }> {
-	const lineRects = getAccurateRangeLineClientRects(range);
-	if (!lineRects.length) return [];
-
-	const doc = range.startContainer.ownerDocument;
-	const iframe = doc?.defaultView?.frameElement as HTMLIFrameElement | null;
-	const iframeRect = iframe?.getBoundingClientRect();
-	const hostRect = host.getBoundingClientRect();
-
-	return lineRects.map((r) => {
-		const viewportLeft = iframeRect ? r.left + iframeRect.left : r.left;
-		const viewportTop = iframeRect ? r.top + iframeRect.top : r.top;
-		return {
-			left: viewportLeft - hostRect.left + host.scrollLeft,
-			top: viewportTop - hostRect.top + host.scrollTop,
-			width: r.width,
-			height: r.height,
-		};
-	});
-}
-
-function ensureListenOverlayRoot(rend: Rendition): HTMLElement | null {
-	const host = resolveListenOverlayHost(rend);
-	if (!host) return null;
-
-	if (getComputedStyle(host).position === 'static') {
-		host.style.position = 'relative';
-	}
-
-	let root = host.querySelector<HTMLElement>(`#${LISTEN_ROOT_ID}`);
-	if (!root) {
-		root = document.createElement('div');
-		root.id = LISTEN_ROOT_ID;
-		root.style.cssText =
-			'position:absolute;left:0;top:0;pointer-events:none;z-index:5;overflow:visible;';
-		host.appendChild(root);
-	}
-
-	root.style.width = `${Math.max(host.scrollWidth, host.clientWidth)}px`;
-	root.style.height = `${Math.max(host.scrollHeight, host.clientHeight)}px`;
-	return root;
-}
-
-/** 清掉历史 annotation / CSS Highlight / iframe 内旧实现残留 */
-function purgeLegacyListenLayers(rend: Rendition): void {
-	const cssName = 'moke-epub-listen-seg';
-	for (const doc of collectListenDocuments(rend)) {
-		const css = (
-			doc.defaultView as Window & {
-				CSS?: { highlights?: { delete: (n: string) => void } };
-			}
-		)?.CSS;
-		css?.highlights?.delete(cssName);
-		doc.getElementById(LISTEN_STYLE_ID)?.remove();
-	}
-
-	purgeAllListenAnnotations(rend);
-
-	for (const doc of collectListenDocuments(rend)) {
-		try {
-			doc.querySelectorAll(LISTEN_DOM_SELECTOR).forEach((g) => {
-				g.remove();
-			});
-			for (const pane of doc.querySelectorAll('.marks-pane')) {
-				pane.querySelectorAll(LISTEN_DOM_SELECTOR).forEach((g) => {
-					g.remove();
-				});
-			}
-			doc.getElementById(LISTEN_OVERLAY_ID)?.remove();
-		} catch {
-			// iframe 卸载时忽略
-		}
-	}
-}
-
-const LISTEN_STYLE_ID = 'moke-epub-listen-seg-style';
-
-function purgeAllListenAnnotations(rend: Rendition): void {
-	const annApi = rend.annotations as Rendition['annotations'] & {
-		_annotations?: Record<
-			string,
-			{
-				className?: string;
-				sectionIndex: number;
-				detach: (view: { index: number }) => void;
-			}
-		>;
-		_annotationsBySectionIndex?: Record<string, string[]>;
-	};
-	const store = annApi._annotations;
-	if (!store) return;
-
-	const views =
-		(
-			rend as Rendition & { views?: () => Array<{ index: number }> }
-		).views?.() ?? [];
-
-	for (const hash of Object.keys({ ...store })) {
-		const ann = store[hash];
-		if (ann?.className !== EPUB_LISTEN_HIGHLIGHT_CLASS) continue;
-		for (const view of views) {
-			const idx = (view as { index?: number }).index;
-			if (idx !== undefined && ann.sectionIndex === idx) {
-				ann.detach({ index: idx });
-			}
-		}
-		delete store[hash];
-		const bySection = annApi._annotationsBySectionIndex;
-		if (bySection?.[ann.sectionIndex]) {
-			bySection[ann.sectionIndex] = bySection[ann.sectionIndex].filter(
-				(h) => h !== hash,
-			);
-		}
-	}
-}
-
-function clearListenPaint(rend: Rendition): void {
-	purgeLegacyListenLayers(rend);
-	resolveListenOverlayHost(rend)
-		?.querySelector(`#${LISTEN_ROOT_ID}`)
-		?.replaceChildren();
-}
-
-function paintListenRange(rend: Rendition, range: Range): void {
-	clearListenPaint(rend);
-
-	const root = ensureListenOverlayRoot(rend);
-	const host = resolveListenOverlayHost(rend);
-	if (!root || !host) return;
-
-	const rects = rangeLineRectsInHost(range, host);
-	for (const rect of rects) {
-		const block = document.createElement('div');
-		block.style.cssText = `position:absolute;background:${EPUB_LISTEN_SEGMENT_FILL};pointer-events:none;border-radius:1px;`;
-		block.style.left = `${rect.left}px`;
-		block.style.top = `${rect.top}px`;
-		block.style.width = `${rect.width}px`;
-		block.style.height = `${rect.height}px`;
-		root.appendChild(block);
-	}
-}
-
-function buildCompactIndex(outer: Range): {
-	compact: string;
-	points: Array<{ node: Text; offset: number; ch: string }>;
-} {
-	const doc = outer.startContainer.ownerDocument;
-	if (!doc) return { compact: '', points: [] };
-
-	const points: Array<{ node: Text; offset: number; ch: string }> = [];
-	forEachTextNodeInRange(outer, (node, start, end) => {
-		for (let offset = start; offset < end; offset += 1) {
-			const ch = node.data[offset];
-			if (!ch || /\s/u.test(ch)) continue;
-			points.push({ node, offset, ch: normalizeComparable(ch) });
-		}
-	});
-	return { compact: points.map((p) => p.ch).join(''), points };
-}
-
-function buildPlainCompactMap(
-	outer: Range,
-	plain: string,
-): PlainCompactMap | null {
-	const trimmed = plain.trim();
-	const plainNorm = normalizeComparable(trimmed);
-	if (!plainNorm) return null;
-
-	const { compact, points } = buildCompactIndex(outer);
-	if (!compact) return null;
-
-	let anchor = compact.indexOf(plainNorm);
-	if (anchor < 0) {
-		for (let len = plainNorm.length; len >= 16; len -= 12) {
-			anchor = compact.indexOf(plainNorm.slice(0, len));
-			if (anchor >= 0) break;
-		}
-	}
-	if (anchor < 0) return null;
-
-	return { trimmed, anchor, compact, points };
-}
-
-function plainSliceToRange(
-	map: PlainCompactMap,
-	start: number,
-	end: number,
-): Range | null {
-	if (start >= end || end > map.trimmed.length) return null;
-
-	const beforeLen = normalizeComparable(map.trimmed.slice(0, start)).length;
-	const sliceNorm = normalizeComparable(map.trimmed.slice(start, end));
-	if (!sliceNorm) return null;
-
-	const cStart = map.anchor + beforeLen;
-	if (map.compact.slice(cStart, cStart + sliceNorm.length) !== sliceNorm) {
-		return null;
-	}
-
-	const first = map.points[cStart];
-	const last = map.points[cStart + sliceNorm.length - 1];
-	if (!first || !last) return null;
-
-	const doc = first.node.ownerDocument;
-	if (!doc) return null;
-
-	const range = doc.createRange();
-	range.setStart(first.node, first.offset);
-	range.setEnd(last.node, last.offset + 1);
-	return range;
-}
-
-function resolveSessionOuter(active: ListenSession): Range | null {
-	if (isRangeConnected(active.selectionRange)) {
-		return active.selectionRange;
-	}
-	active.selectionRange = null;
-
-	const cfi = active.cfi.trim();
-	if (!cfi) return cloneActiveEpubSelection(active.rend);
-
-	const fromCfi = resolveCfiDomRange(active.rend, cfi);
-	if (fromCfi) {
-		return normalizeSelectionRangeForEpub(fromCfi) ?? fromCfi;
-	}
-	return cloneActiveEpubSelection(active.rend);
-}
-
-function paintPlainSpan(plainStart: number, plainEnd: number): void {
-	if (!session || plainStart >= plainEnd) return;
-
-	const isNewSpan =
-		session.plainStart !== plainStart || session.plainEnd !== plainEnd;
-
-	// 新句/新 span 前先清掉旧层（避免跨段时上一句 mark 残留）
-	if (isNewSpan) {
-		clearListenPaint(session.rend);
-	}
-
-	const outer = resolveSessionOuter(session);
-	if (!outer) return;
-
-	const map = buildPlainCompactMap(outer, session.plain);
-	if (!map) return;
-
-	const range = plainSliceToRange(map, plainStart, plainEnd);
-	if (!range) return;
-
-	paintListenRange(session.rend, range);
-	session.plainStart = plainStart;
-	session.plainEnd = plainEnd;
-
-	if (isNewSpan && session.autoFollow) {
-		const { rend, cfi, epoch } = session;
-		const serial = ++paintSerial;
-		void withProgrammaticScroll(async () => {
-			const ok = await scrollEpubRangeIntoView(rend, range, cfi);
-			if (!ok || !session || session.epoch !== epoch) return;
-			if (serial !== paintSerial) return;
-			if (session.plainStart !== plainStart || session.plainEnd !== plainEnd) {
-				return;
-			}
-			paintPlainSpan(plainStart, plainEnd);
+async function withProgrammaticScroll<T>(run: () => Promise<T>): Promise<T> {
+	programmaticScroll += 1;
+	try {
+		return await run();
+	} finally {
+		requestAnimationFrame(() => {
+			programmaticScroll = Math.max(0, programmaticScroll - 1);
 		});
 	}
 }
 
-function relayoutActive(): void {
-	if (!session || session.plainStart >= session.plainEnd) return;
-	paintPlainSpan(session.plainStart, session.plainEnd);
+function scrollActiveListenIntoView(): void {
+	if (!session) return;
+	const range = resolveActiveListenDomRange();
+	if (!range) return;
+	const { rend, cfi, epoch } = session;
+	void withProgrammaticScroll(async () => {
+		await scrollEpubRangeIntoView(rend, range, cfi);
+		if (!session || session.epoch !== epoch) return;
+	});
 }
 
-function attachRelayoutListeners(rend: Rendition): () => void {
-	const schedule = () => {
-		cancelAnimationFrame(relayoutRaf);
-		relayoutRaf = requestAnimationFrame(relayoutActive);
-	};
-	rend.on('relocated', schedule);
-	rend.on('rendered', schedule);
-	return () => {
-		cancelAnimationFrame(relayoutRaf);
-		relayoutRaf = 0;
-		try {
-			rend.off('relocated', schedule);
-			rend.off('rendered', schedule);
-		} catch {
-			// rendition 已销毁
+function pauseListenAutoFollow(): void {
+	if (!session?.autoFollow) return;
+	session.autoFollow = false;
+	emitAutoFollowState();
+}
+
+function scheduleScrollSettle(): void {
+	clearTimeout(scrollSettleTimer);
+	scrollSettleTimer = window.setTimeout(() => {
+		userScrolling = false;
+		if (!pendingFollowScroll || !session?.autoFollow) {
+			pendingFollowScroll = false;
+			return;
 		}
+		pendingFollowScroll = false;
+		scrollActiveListenIntoView();
+	}, 150);
+}
+
+function attachListenScrollGuard(rend: Rendition): () => void {
+	const cleanups: (() => void)[] = [];
+	const onUserScrollIntent = () => {
+		if (programmaticScroll > 0) return;
+		userScrolling = true;
+		pauseListenAutoFollow();
+		scheduleScrollSettle();
 	};
+	const bind = (target: EventTarget | null | undefined) => {
+		if (!target) return;
+		target.addEventListener('scroll', onUserScrollIntent, { passive: true });
+		cleanups.push(() =>
+			target.removeEventListener('scroll', onUserScrollIntent),
+		);
+	};
+	const container = getEpubScrollContainer(rend);
+	if (container) {
+		bind(container);
+		container.addEventListener('wheel', onUserScrollIntent, { passive: true });
+		cleanups.push(() =>
+			container.removeEventListener('wheel', onUserScrollIntent),
+		);
+	}
+	const bindContents = (contents: { document: Document }) => {
+		bind(
+			contents.document.scrollingElement ?? contents.document.documentElement,
+		);
+	};
+	rend.hooks.content.register(bindContents);
+	for (const item of getContents(rend)) bindContents(item);
+	return () => {
+		for (const fn of cleanups) fn();
+	};
+}
+
+function requestListenAutoFollowScroll(): void {
+	if (!session?.autoFollow) return;
+	if (userScrolling) {
+		pendingFollowScroll = true;
+		scheduleScrollSettle();
+		return;
+	}
+	scrollActiveListenIntoView();
+}
+
+function resolveListenSessionSelectionRange(
+	rend: Rendition,
+	opts?: { cfi?: string; selectionRange?: Range | null },
+): Range | null {
+	if (opts?.selectionRange && isRangeConnected(opts.selectionRange)) {
+		return opts.selectionRange.cloneRange();
+	}
+	const cfi = opts?.cfi?.trim() ?? '';
+	if (!cfi) return null;
+	const fromCfi = resolveCfiDomRange(rend, cfi);
+	return fromCfi ? fromCfi.cloneRange() : null;
+}
+
+function paintSentence(sentenceIndex: number): void {
+	if (!session || sentenceIndex < 0) return;
+
+	const range = resolveSentenceRange(session, sentenceIndex);
+	if (!range) return;
+
+	const isNew = session.lastSentenceIndex !== sentenceIndex;
+	session.lastSentenceIndex = sentenceIndex;
+	// 换句先清再画，避免 …… 句与中间句叠层
+	if (isNew) clearListenMarkHighlight(session.rend);
+	showListenMarkHighlight(session.rend, range);
+	if (isNew && session.autoFollow) requestListenAutoFollowScroll();
 }
 
 export function beginEpubListenOverlaySession(
@@ -514,98 +330,213 @@ export function beginEpubListenOverlaySession(
 	plainText: string,
 	opts?: { cfi?: string; selectionRange?: Range | null },
 ): void {
-	const plain = plainText.trim();
+	const preserveAutoFollow = session?.autoFollow ?? true;
+	clearEpubListenSegmentOverlay();
+
+	const outerRange = resolveListenSessionSelectionRange(rend, opts);
+	let plain = plainText.trim();
+	let sentences: DomListenSentence[] = [];
+	if (outerRange) {
+		const index = buildDomSentenceIndex(outerRange);
+		sentences = index.sentences;
+		if (index.plain) plain = index.plain;
+	}
 	if (!plain) return;
 
-	clearEpubListenSegmentOverlay();
 	overlayEpoch += 1;
-
-	const selectionRange =
-		opts?.selectionRange && isRangeConnected(opts.selectionRange)
-			? opts.selectionRange.cloneRange()
-			: (() => {
-					const cfi = opts?.cfi?.trim() ?? '';
-					if (!cfi) return null;
-					const fromCfi = resolveCfiDomRange(rend, cfi);
-					return fromCfi ? fromCfi.cloneRange() : null;
-				})();
-
 	session = {
 		rend,
 		plain,
-		cfi: opts?.cfi?.trim() ?? '',
-		selectionRange,
+		cfi:
+			opts?.cfi?.trim() ??
+			(outerRange ? (cfiFromDomRange(rend, outerRange) ?? '') : ''),
+		outerRange,
+		sentences,
 		epoch: overlayEpoch,
-		plainStart: -1,
-		plainEnd: -1,
-		autoFollow: true,
+		autoFollow: preserveAutoFollow,
 		lastSentenceIndex: -1,
+		activeDomRange: null,
 	};
-
-	detachRelayout = attachRelayoutListeners(rend);
 	detachScrollGuard = attachListenScrollGuard(rend);
 	emitAutoFollowState();
 }
 
-/** 恢复播放内容自动滚入视口，并立即滚到当前句 */
 export function resumeEpubListenAutoFollow(): void {
 	if (!session) return;
 	session.autoFollow = true;
+	pendingFollowScroll = false;
 	emitAutoFollowState();
-
-	const { plainStart, plainEnd } = session;
-	if (plainStart < 0 || plainEnd <= plainStart) return;
-
-	const outer = resolveSessionOuter(session);
-	if (!outer) return;
-	const map = buildPlainCompactMap(outer, session.plain);
-	if (!map) return;
-	const range = plainSliceToRange(map, plainStart, plainEnd);
-	if (!range) return;
-
-	const { rend, cfi, epoch } = session;
-	void withProgrammaticScroll(async () => {
-		await scrollEpubRangeIntoView(rend, range, cfi);
-		if (!session || session.epoch !== epoch) return;
-		if (session.plainStart !== plainStart || session.plainEnd !== plainEnd)
-			return;
-		paintPlainSpan(plainStart, plainEnd);
-	});
+	scrollActiveListenIntoView();
 }
 
+/**
+ * 确保章节级 DOM 听书 Session 存在（如果不存在则新建）。
+ *
+ * 主要用途：
+ * - 章节/区段高亮（非句级）场景下维护一个 session 状态，以便后续操作（如滚动、高亮等）有据可循。
+ * - 若 session 已存在且符合条件（相同 Rendition 且内容字段均为空），则直接复用当前 session。
+ * - 否则清理上一次的 session，并初始化一个空的章节级 session。
+ *
+ * @param rend - 当前章节对应的 EPUB Rendition 实例
+ * @returns 新建或复用的章节级 ListenSession 对象
+ */
+function ensureChapterDomListenSession(rend: Rendition): ListenSession {
+	// 若当前 session 已初始化且：
+	// 1. rend 与期望相同
+	// 2. 没有句表（plain/outerRange 均为空，sentences 长度为 0）
+	// 则复用已有 session，无需重新构建
+	if (
+		session?.rend === rend &&
+		!session.plain &&
+		!session.outerRange &&
+		!session.sentences.length
+	) {
+		return session;
+	}
+	// 记录 autoFollow 现有状态，后续初始化需保留
+	const preserveAutoFollow = session?.autoFollow ?? true;
+	// 清除旧的听书区段 overlay（保证唯一性）
+	clearEpubListenSegmentOverlay();
+	// 更新全局 epoch（用于标记 session 版本/变更）
+	overlayEpoch += 1;
+	// 构建新的章节 ListenSession（所有内容清空，适用于段/区块高亮模式）
+	session = {
+		rend, // 关联的 EPUB Rendition
+		plain: '', // 不涉及原文句表（空字符串）
+		cfi: '', // 不涉及 CFI（空字符串）
+		outerRange: null, // 不涉及章节主外层选区
+		sentences: [], // 不涉及句子列表（空数组）
+		epoch: overlayEpoch, // 版本标记
+		autoFollow: preserveAutoFollow, // 恢复 autoFollow 状态
+		lastSentenceIndex: -1, // 没有句索引，设为 -1
+		activeDomRange: null, // 活动区段 DOM Range 清空
+	};
+	// 重新绑定滚动拦截器（用于 autoFollow、用户手动滚动检测）
+	detachScrollGuard = attachListenScrollGuard(rend);
+	// 向监听方同步 autoFollow 状态
+	emitAutoFollowState();
+	// 返回当前 session
+	return session;
+}
+
+/**
+ * 将指定 DOM Range 显示为当前 EPUB 听书“活跃区段”/高亮句。
+ *
+ * 整体步骤：
+ * 1. 检查目标 Range 是否仍挂载在文档内（避免已被移除的区段）。
+ * 2. 对目标 Range 进行标准化（兼容 epub.js 的特殊选区），以获得规范的区段用于后续高亮。
+ * 3. 通过 ensureChapterDomListenSession 获取或初始化当前章节的听书/听段 session 信息。
+ * 4. 判断本次要高亮的 snapspped Range 是否与 session 记录的上一次区段（activeDomRange）等价，
+ *    - 不等价或首次高亮时，清除历史残留高亮（clearListenMarkHighlight），保证当前高亮唯一。
+ * 5. 无论新旧都更新 session 信息（active.lastSentenceIndex 置为 -1，activeDomRange 替换为最新副本）。
+ * 6. 始终显示区段高亮（showListenMarkHighlight）。
+ * 7. 若为新高亮且自动跟随（autoFollow）启用，则请求自动滚动目标区段进视口。
+ *
+ * @param rend    EPUB Rendition 实例
+ * @param range   需高亮的 DOM 区段
+ */
+export function showEpubListenDomRange(rend: Rendition, range: Range): void {
+	// 若目标区段已失联，则不做任何操作
+	if (!isRangeConnected(range)) return;
+
+	// 规范化 Range，确保选区具有一致坐标（去除 HTML markup、跨文档副本等差异性）
+	const snapped =
+		normalizeSelectionRangeForEpub(range.cloneRange()) ?? range.cloneRange();
+
+	// 获取当前章节的 session，若无则初始化一个 Dummy Session
+	const active = ensureChapterDomListenSession(rend);
+
+	// 记录本次高亮前的 activeDomRange 用于对比是否要重置高亮
+	const prev = active.activeDomRange;
+
+	// 若 activeDomRange 尚未存在，或与当前 snapped 区段不完全等价，认为是“新的高亮”需要清除旧高亮
+	const isNew = !prev || !rangesEqual(prev, snapped);
+
+	// 清零句索引（本模式为段/选区高亮，不对应具体句；如需句索引由外层逻辑维护）
+	active.lastSentenceIndex = -1;
+
+	// 更新 session 中当前活跃的 DOM Range，存副本避免受后续外部更改污染
+	active.activeDomRange = snapped.cloneRange();
+
+	// 若是新高亮，需要清除所有上一次的视觉高亮以避免重影/残留
+	if (isNew) clearListenMarkHighlight(rend);
+
+	// 显示当前 snapped 区段的高亮效果（具体渲染交由 epubListenMarkHighlight 实现）
+	showListenMarkHighlight(rend, snapped);
+
+	// 若新高亮且处于自动跟随（autoFollow）状态，则请求自动滚动，确保区段近视口
+	if (isNew && active.autoFollow) requestListenAutoFollowScroll();
+}
+
+/** 听书启动：注册滚动监听，首句高亮前即可响应用户打断与 FAB */
+export function beginChapterListenAutoFollow(rend: Rendition): void {
+	const active = ensureChapterDomListenSession(rend);
+	active.autoFollow = true;
+	emitAutoFollowState();
+}
+
+export function syncChapterListenScrollSession(
+	rend: Rendition,
+	range: Range,
+): void {
+	showEpubListenDomRange(rend, range);
+}
+
+/**
+ * 获取 EPUB 听书可用于 TTS（文本转语音）的纯文本字符串，并返回相关 Range。
+ *
+ * 依据优先级，决定最终使用的选区范围和用于朗读的文本：
+ * 1. 若传入的 frozenRange 存在且已连接到文档，优先选用其克隆副本；
+ * 2. 否则尝试恢复上次存储的 PopBar 选区 Range；
+ * 3. 如均无，则若传入 rend，克隆此 Rendition 内当前的 Selection；
+ * 4. 若最终无 Range（如无选区），则回退为 fallbackText 原始文本（去除空白）。
+ *
+ * 处理后会将 Range (selectionRange) 与其提取的原始文本 (spokenRaw)，再对文本做 stripMarkdownForTts，得到最终可 TTS 的 plain 纯文本。
+ *
+ * @param rend        目标 EPUB Rendition 实例，用于跨文档查找当前选区
+ * @param fallbackText 默认回退字符串（例如无选区或不可用时）
+ * @param frozenRange  固定（已捕获或记忆）的 DOM Range，用于优先选取朗读目标区间
+ * @returns { plain, selectionRange, spokenRaw }
+ *   plain           ：处理后的、去除Markdown等杂质的 TTS 纯文本
+ *   selectionRange  ：实际用于提取文本的 Range，可能为 null
+ *   spokenRaw       ：从 Range 提取出的原始文本（或 fallbackText 去空白）
+ */
 export function resolveEpubListenPlain(
 	rend: Rendition | null,
 	fallbackText: string,
 	frozenRange?: Range | null,
 ): { plain: string; selectionRange: Range | null; spokenRaw: string } {
+	// 先对传入 fallbackText 去掉首尾空白
 	const trimmed = fallbackText.trim();
+
+	// 尝试获取优先级最高的 Range：已连接的 frozenRange > 记忆的 PopBar 选区 > 当前 rendition 的选区 > null
 	const selectionRange =
 		frozenRange && isRangeConnected(frozenRange)
-			? frozenRange.cloneRange()
-			: (getRememberedEpubPopBarSelectionRange() ??
-				(rend ? cloneActiveEpubSelection(rend) : null));
+			? // 如果 frozenRange 存在且已接入 DOM，则克隆此 Range
+				frozenRange.cloneRange()
+			: // 否则尝试回退
+				(getRememberedEpubPopBarSelectionRange() ?? // 优先取记忆中的 PopBar 选区
+				(rend ? cloneActiveEpubSelection(rend) : null)); // 再看是否能从当前 Rendition 得到活跃选区
+
+	// 用选区 Range 提取原始文本（若无 Range 或选区内容为空，则使用 fallbackText.trim()）
 	const spokenRaw = selectionRange?.toString().trim() || trimmed;
+
+	// 去掉 Markdown 标记等杂质，得到最终用于 TTS 的纯文本 plain
 	const plain = stripMarkdownForTts(spokenRaw);
+
+	// 返回最终提取结果
 	return { plain, selectionRange, spokenRaw };
 }
 
 export function showEpubListenPlainSpan(
-	plainStart: number,
-	plainEnd: number,
+	_plainStart: number,
+	_plainEnd: number,
 	sentenceIndex = 0,
 ): void {
+	void _plainStart;
+	void _plainEnd;
 	if (!session) return;
-	if (
-		session.lastSentenceIndex >= 0 &&
-		sentenceIndex !== session.lastSentenceIndex
-	) {
-		paintSerial += 1;
-		clearListenPaint(session.rend);
-		session.plainStart = -1;
-		session.plainEnd = -1;
-	}
-	session.lastSentenceIndex = sentenceIndex;
-	paintPlainSpan(plainStart, plainEnd);
+	paintSentence(sentenceIndex);
 }
 
 export function showEpubListenSentence(
@@ -616,28 +547,34 @@ export function showEpubListenSentence(
 	void _chunkText;
 }
 
+export function getEpubListenSessionPlain(): string | null {
+	return session?.plain ?? null;
+}
+
+export function clearActiveListenHighlight(rend?: Rendition): void {
+	const target = rend ?? session?.rend;
+	if (!target) return;
+	clearListenMarkHighlight(target);
+	if (session) {
+		session.lastSentenceIndex = -1;
+		session.activeDomRange = null;
+	}
+}
+
 export function clearEpubListenSentenceOverlay(): void {
-	if (!session) return;
-	clearListenPaint(session.rend);
-	session.plainStart = -1;
-	session.plainEnd = -1;
+	clearActiveListenHighlight();
 }
 
 export function clearEpubListenSegmentOverlay(): void {
 	const rend = session?.rend ?? null;
-	if (rend) clearListenPaint(rend);
-
+	clearListenMarkHighlight(rend ?? undefined);
 	overlayEpoch += 1;
 	session = null;
-	detachRelayout?.();
-	detachRelayout = null;
 	detachScrollGuard?.();
 	detachScrollGuard = null;
-	cancelAnimationFrame(relayoutRaf);
-	relayoutRaf = 0;
+	clearTimeout(scrollSettleTimer);
+	scrollSettleTimer = 0;
+	userScrolling = false;
+	pendingFollowScroll = false;
 	emitAutoFollowState();
-}
-
-if (!EPUB_LISTEN_SEGMENT_FILL.includes('0.28')) {
-	throw new Error('[epubListenSegmentOverlay] 播放背景色透明度异常');
 }

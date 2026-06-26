@@ -1086,4 +1086,9 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'While Listen plays a long selection, the current sentence scrolls into view automatically. Manual scroll or wheel pauses follow; a bottom-right button returns to the playing passage and resumes auto-follow.',
 	},
+	's25-51': {
+		title: 'EPUB listen while reading',
+		description:
+			'While reading EPUB, tap Listen to book in the header to hear continuous sentence-by-sentence TTS from your current position. A bottom bar offers pause/resume, prev/next sentence, and speed. Current sentence gets a light yellow tint and auto-scrolls into view; manual scroll pauses follow and a bottom-right button returns to the playing line. Mutually exclusive with quote Listen; TOC jumps resume from the new location. EPUB only.',
+	},
 };

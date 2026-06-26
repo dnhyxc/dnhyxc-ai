@@ -1,3 +1,31 @@
+/**
+ * 本文件实现了 EPUB 阅读器的设置管理与主题样式方案，核心包含：
+ *
+ * 1. 设置项类型定义
+ *    - 包括阅读背景（EpubReaderBgTheme）、文字颜色（EpubReaderTextColor）、分页方式（EpubReaderPageFlow）等多种类型及对应选项集合。
+ *    - 用 TypeScript 类型明确限制各设置项的合法取值，防止异常输入。
+ *
+ * 2. 主题方案枚举与属性
+ *    - 提供多款主流阅读背景主题（如纸张、夜间、护眼绿等），对齐 Kindle、iBooks、微信读书体验。
+ *    - 对每种主题配置具体的背景色（bgColor），支持 default 跟随应用主题自动切换，其余颜色写死保证一致表现。
+ *
+ * 3. 设置读取与存储
+ *    - 通过 localStorage 长久保存用户自定义的阅读设置，首次或失效时自动回退默认设置，保证兼容全量老数据。
+ *    - 对字体大小、行距等数值项做 clamp 限定，防止极端值带来的渲染异常。
+ *
+ * 4. CSS 变量与样式方案
+ *    - 提供阅读页主背景（surface）相关的 CSS 变量、Tailwind 类名及渐变处理，便于整站各层（页壳/侧栏/正文区）复用统一风格。
+ *    - 强调 default 主题模式严格跟随全局应用 theme，其余 theme 直接映射到固定颜色，兼容单独调亮/护眼等需求。
+ *
+ * 5. 兼容性/历史兼容
+ *    - 内建 bgTheme 迁移与取值容错，保障版本升级或字段变更时数据不丢失、体验不中断。
+ *
+ * 主要出口：
+ *   - 类型定义：EpubReaderSettings、EpubReaderBgTheme、EpubReaderTextColor、EpubReaderPageFlow 等
+ *   - 设置读取/落盘方法：loadEpubReaderSettings
+ *   - 主题色解析函数：resolveEpubBgColor、resolveEpubReaderSurfaceBackground
+ *   - CSS 变量与 Tailwind 类名常量：getEpubReaderSurfaceCssVars、epubReaderSurfaceBgClass 等
+ */
 import type { Rendition } from 'epubjs';
 import type { ThemeName } from '@/hooks';
 

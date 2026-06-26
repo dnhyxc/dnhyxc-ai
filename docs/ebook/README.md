@@ -18,7 +18,8 @@
 | [ebook-shelf-category.md](./ebook-shelf-category.md)                             | **增量**：书架分类（面包屑、Tab Rail、Model 管理弹窗、书名行移动 Popover、删分类归入未分类）                                                    |
 | [ebook-cos-stream-io.md](./ebook-cos-stream-io.md)                               | **增量**：COS 流式上传/下载，避免大文件整包进内存                                                                                               |
 | [epub-reading-thoughts.md](./epub-reading-thoughts.md)                           | **数据层**：服务端存储、虚线下划线、重叠去重、选区防误触                                                                                        |
-| [developer/README.md](./developer/README.md)                                       | **开发者手册索引**（想法 + 用户划线）                                                                                                           |
+| [developer/README.md](./developer/README.md)                                       | **开发者手册索引**（听读 + 想法 + 用户划线）                                                                                                    |
+| [developer/epub-listen-dev.md](./developer/epub-listen-dev.md)                   | **唯一主文档（听当前 + 听书）**：架构、调用链、M1–M5 从零、逐行注释源码                                                                       |
 | [developer/epub-thought-add-underline-dev.md](./developer/epub-thought-add-underline-dev.md) | **唯一主文档（想法）**：§0 从何下手 + §2 白话思路 + §3–§19                                                                                      |
 | [developer/epub-user-highlight-dev.md](./developer/epub-user-highlight-dev.md)   | **唯一主文档（用户划线）**：§0–§18 白话思路 + 重叠合并 + PopBar + 与想法共存                                                                    |
 | [epub-thought-side-panel.md](./epub-thought-side-panel.md)                       | **当前 UI**：读书想法右侧分栏（与 MK 问书互斥）、footer 固定输入                                                                                |
@@ -41,7 +42,9 @@
 | [epub-listen-sentence-bg.md](./epub-listen-sentence-bg.md)                         | **增量**：听当前逐句播放背景（plain 偏移、选区缓存；**绘制层见 host 浮层专题**）                                                               |
 | [epub-listen-host-overlay.md](./epub-listen-host-overlay.md)                       | **增量**：听当前 host 浮层绘制与跨段句间清除（替代 iframe 三层 mark）                                                                          |
 | [epub-listen-auto-follow-fab.md](./epub-listen-auto-follow-fab.md)                   | **增量**：听当前播放自动滚入视口、手动滚动打断与右下角回位 FAB                                                                                 |
+| [epub-chapter-listen.md](./epub-chapter-listen.md)                                   | **增量**：EPUB 边听边读 MVP（innerText 播放、TreeWalker 句 Range、`epubListenMarkHighlight` 背景、顶栏听书与底部播放条） |
 | [epub-listen-user-highlight-reconcile.md](./epub-listen-user-highlight-reconcile.md) | **增量**：听当前与用户划线 DOM 协调（reconcile 孤儿 mark、apply 存在性校验、播完 sync）                                                       |
+| [../Influence-point/epub-listen-bg-vs-annotations.md](../Influence-point/epub-listen-bg-vs-annotations.md) | **影响点**：播放背景色 vs 用户划线 / 想法划线（现行隔离与历史风险）                                                                           |
 | [epub-thought-quote-viewport.md](./epub-thought-quote-viewport.md)                 | **增量**：想法侧栏开合后左侧引用段落保持视口可见（CFI 锚点 + 分栏 resize 后 scroll 校正）                                                    |
 | [epub-thought-quote-highlight-toggle.md](./epub-thought-quote-highlight-toggle.md) | **增量**：侧栏引用区划线/删除划线与 PopBar 对齐的 full 覆盖度判定                                                                               |
 | [epub-split-soft-resize.md](./epub-split-soft-resize.md)                           | **增量**：EPUB 分栏拖拽 soft resize（rAF 合并、即时 patch 划线、松手 full sync，避免白屏）                                                      |

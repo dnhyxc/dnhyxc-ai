@@ -6,6 +6,7 @@ import {
 	Bot,
 	ChevronLeft,
 	ChevronRight,
+	Headphones,
 	List,
 	Minus,
 	Plus,
@@ -41,6 +42,7 @@ import { EbookPanelHeader } from './components/EbookPanelHeader';
 import { EbookReadSplitLayout } from './components/EbookReadSplitLayout';
 import { EbookTocDrawer } from './components/EbookTocDrawer';
 import { EpubListenFollowFab } from './components/EpubListenFollowFab';
+import { EpubListenPlayerBar } from './components/EpubListenPlayerBar';
 import { EpubPane } from './components/EpubPane';
 import { EpubQuoteShareDialog } from './components/EpubQuoteShareDialog';
 import {
@@ -55,7 +57,7 @@ import {
 import { EpubThought } from './components/EpubThought';
 import { EpubThoughtList } from './components/EpubThoughtList';
 import { PdfPane } from './components/PdfPane';
-import { useEbookQuoteListen } from './hooks';
+import { useEbookQuoteListen, useEpubChapterListen } from './hooks';
 import type {
 	EbookThought,
 	EbookThoughtClickCluster,
@@ -128,14 +130,27 @@ function EbookReadPage() {
 	const { t } = useI18n();
 	const { bookId = '' } = useParams();
 	const nav = useNavigate();
+	const book = ebookStore.bookById(bookId);
+	const prog = ebookStore.progOf(bookId);
+	const currentEpubCfiRef = useRef(prog?.epubCfi ?? '');
+	const epubSpineIndexRef = useRef<number | undefined>(undefined);
+
+	const epubNavRef = useRef<{
+		prev: () => Promise<void>;
+		next: () => Promise<void>;
+		go: (href: string) => Promise<void>;
+		clearTextSelection: () => void;
+		getRendition: () => import('epubjs').Rendition | null;
+		getBook: () => import('epubjs').Book | null;
+		syncReadingAnnotations: (nextHighlights?: EbookUserHighlight[]) => void;
+	} | null>(null);
+
 	const { toggleListen, listenLabel } = useEbookQuoteListen(
 		t,
 		() => epubNavRef.current?.getRendition() ?? null,
 		() => epubNavRef.current?.syncReadingAnnotations(),
 	);
 
-	const book = ebookStore.bookById(bookId);
-	const prog = ebookStore.progOf(bookId);
 	const [bookResolving, setBookResolving] = useState(false);
 
 	const [open, setOpen] = useState<ArrayBuffer | null>(null);
@@ -146,14 +161,6 @@ function EbookReadPage() {
 	const [epubSettings, setEpubSettings] = useState<EpubReaderSettings>(
 		loadEpubReaderSettings,
 	);
-	const epubNavRef = useRef<{
-		prev: () => Promise<void>;
-		next: () => Promise<void>;
-		go: (href: string) => Promise<void>;
-		clearTextSelection: () => void;
-		getRendition: () => import('epubjs').Rendition | null;
-		syncReadingAnnotations: (nextHighlights?: EbookUserHighlight[]) => void;
-	} | null>(null);
 	const [epubNavReady, setEpubNavReady] = useState(false);
 	const pdfNavRef = useRef<{
 		prev: () => void;
@@ -166,6 +173,15 @@ function EbookReadPage() {
 	const [epubSpineIndex, setEpubSpineIndex] = useState<number | undefined>(
 		undefined,
 	);
+
+	const chapterListen = useEpubChapterListen(
+		t,
+		() => epubNavRef.current?.getRendition() ?? null,
+		() => currentEpubCfiRef.current || prog?.epubCfi,
+		() => epubNavRef.current?.syncReadingAnnotations(),
+		() => epubSpineIndexRef.current ?? epubSpineIndex,
+	);
+
 	const [pdfZoom, setPdfZoom] = useState(loadPdfZoom);
 	const [assistantOpen, setAssistantOpen] = useState(false);
 	const [assistantInput, setAssistantInput] = useState('');
@@ -1114,7 +1130,9 @@ function EbookReadPage() {
 	const saveCfi = useCallback(
 		(cfi: string, percent?: number, spineIndex?: number) => {
 			if (!book) return;
+			if (cfi.trim()) currentEpubCfiRef.current = cfi;
 			if (spineIndex != null && Number.isFinite(spineIndex)) {
+				epubSpineIndexRef.current = spineIndex;
 				setEpubSpineIndex(spineIndex);
 			}
 			if (progTimer.current) clearTimeout(progTimer.current);
@@ -1160,6 +1178,7 @@ function EbookReadPage() {
 			go: (href: string) => Promise<void>;
 			clearTextSelection: () => void;
 			getRendition: () => import('epubjs').Rendition | null;
+			getBook: () => import('epubjs').Book | null;
 			syncReadingAnnotations: (nextHighlights?: EbookUserHighlight[]) => void;
 		}) => {
 			epubNavRef.current = api;
@@ -1896,6 +1915,39 @@ function EbookReadPage() {
 					sideOffset={6}
 					delayDuration={200}
 					shadow
+					content={
+						chapterListen.isActive
+							? t('ebook.read.listenBook.stop')
+							: t('ebook.read.listenBook')
+					}
+				>
+					<Button
+						type="button"
+						variant="ghost"
+						size="icon-sm"
+						className={cn(
+							chapterListen.isActive
+								? 'bg-theme/15 text-teal-500'
+								: 'text-textcolor/80 hover:text-teal-500',
+						)}
+						aria-pressed={chapterListen.isActive}
+						aria-label={
+							chapterListen.isActive
+								? t('ebook.read.listenBook.stop')
+								: t('ebook.read.listenBook')
+						}
+						disabled={!epubNavReady}
+						onClick={chapterListen.toggleChapterListen}
+					>
+						<Headphones className="size-4" />
+					</Button>
+				</Tooltip>
+
+				<Tooltip
+					side="bottom"
+					sideOffset={6}
+					delayDuration={200}
+					shadow
 					content={t('ebook.read.prev')}
 				>
 					<Button
@@ -2141,35 +2193,49 @@ function EbookReadPage() {
 						sidePanel={sidePanelSlot}
 					>
 						<div
-							className="relative flex h-full min-h-0 flex-1 flex-col"
+							className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden"
 							onContextMenu={onHostContextMenu}
 							onPointerDown={() => {
 								if (epubSettingsOpen) closeEpubSettings();
 							}}
 						>
-							<EpubPane
-								open={open}
-								startCfi={prog?.epubCfi}
-								readerSettings={epubSettings}
-								onCfi={saveCfi}
-								onToc={setTocItems}
-								onReady={onEpubReady}
-								onNavReset={onEpubNavReset}
-								keyboardNavEnabled={
-									!tocOpen && !epubSettingsOpen && !sidePanelOpen
-								}
-								onReaderContextMenu={showEpubContextMenu}
-								onReaderPointerDown={
-									epubSettingsOpen ? closeEpubSettings : undefined
-								}
-								onSelectionPopBar={onSelectionPopBarChange}
-								thoughts={thoughts}
-								highlights={highlights}
-								onThoughtClick={openViewThought}
-								onThoughtClusterClick={openThoughtCluster}
-								onUserHighlightPopBar={onUserHighlightPopBar}
+							<div className="relative h-full min-h-0 flex-1 overflow-hidden">
+								<EpubPane
+									open={open}
+									startCfi={prog?.epubCfi}
+									readerSettings={epubSettings}
+									onCfi={saveCfi}
+									onToc={setTocItems}
+									onReady={onEpubReady}
+									onNavReset={onEpubNavReset}
+									keyboardNavEnabled={
+										!tocOpen && !epubSettingsOpen && !sidePanelOpen
+									}
+									onReaderContextMenu={showEpubContextMenu}
+									onReaderPointerDown={
+										epubSettingsOpen ? closeEpubSettings : undefined
+									}
+									onSelectionPopBar={onSelectionPopBarChange}
+									thoughts={thoughts}
+									highlights={highlights}
+									onThoughtClick={openViewThought}
+									onThoughtClusterClick={openThoughtCluster}
+									onUserHighlightPopBar={onUserHighlightPopBar}
+								/>
+								<EpubListenFollowFab />
+							</div>
+							<EpubListenPlayerBar
+								status={chapterListen.status}
+								spineIndex={chapterListen.spineIndex}
+								sentenceIndex={chapterListen.sentenceIndex}
+								sentenceCount={chapterListen.sentenceCount}
+								rate={chapterListen.rate}
+								onTogglePlay={chapterListen.togglePlay}
+								onStop={chapterListen.stop}
+								onPrevSentence={chapterListen.prevSentence}
+								onNextSentence={chapterListen.nextSentence}
+								onRateChange={chapterListen.setRate}
 							/>
-							<EpubListenFollowFab />
 						</div>
 					</EbookReadSplitLayout>
 				) : (
@@ -2216,7 +2282,12 @@ function EbookReadPage() {
 						pdfNavRef.current?.go(pdfPage);
 						return;
 					}
-					void epubNavRef.current?.go(href);
+					void (async () => {
+						await epubNavRef.current?.go(href);
+						if (chapterListen.isActive) {
+							chapterListen.syncToCurrentView();
+						}
+					})();
 				}}
 			/>
 

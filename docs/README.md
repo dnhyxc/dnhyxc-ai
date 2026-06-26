@@ -25,6 +25,7 @@
 | [`meta/`](./meta/)           | 发布与更新同步                          | [meta/project-features-update.md](./meta/project-features-update.md)                                                                     |
 | [`pay/`](./pay/)             | Stripe 会员充值、开通与到期             | [pay/stripe-membership-billing.md](./pay/stripe-membership-billing.md)、[pay/membership-active-hook.md](./pay/membership-active-hook.md) |
 | [`ebook/`](./ebook/)         | 电子书书架、EPUB/PDF 阅读与进度         | [ebook/README.md](./ebook/README.md)                                                                                                     |
+| [`Influence-point/`](./Influence-point/) | 跨功能改动影响面分析              | [Influence-point/README.md](./Influence-point/README.md)                                                                                 |
 
 ---
 
@@ -102,6 +103,7 @@
 | 删想法列表最后一条后侧栏空白不收起 / 详情正文比列表下垂             | [ebook/epub-thought-list-delete-close.md](./ebook/epub-thought-list-delete-close.md)                                                                     |
 | 书摘分享图片 / 复制到微信                                         | [ebook/epub-quote-share.md](./ebook/epub-quote-share.md)                                                                                                 |
 | EPUB「听当前」无声 / 中文书摘本机不读                             | [ebook/epub-quote-listen.md](./ebook/epub-quote-listen.md)                                                                                               |
+| EPUB 边听边读 / 顶栏听书 / 播放条                                 | [ebook/epub-chapter-listen.md](./ebook/epub-chapter-listen.md)                                                                                            |
 | 听当前无逐句淡黄底 / Safari 无背景                                | [ebook/epub-listen-sentence-bg.md](./ebook/epub-listen-sentence-bg.md)                                                                                   |
 | 听当前跨段多句同时高亮 / 换句背景不消                               | [ebook/epub-listen-host-overlay.md](./ebook/epub-listen-host-overlay.md)                                                                                 |
 | 听当前后划线重复 / 无法取消划线                                   | [ebook/epub-listen-user-highlight-reconcile.md](./ebook/epub-listen-user-highlight-reconcile.md)                                                         |
