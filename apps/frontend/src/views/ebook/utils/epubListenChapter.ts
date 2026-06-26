@@ -1,22 +1,28 @@
 /**
- * 听书可见节：同步读 viewport iframe，正文用 innerText（与 TTS 同源）。
+ * 听书：可见节 innerText 抽取、节级句 DOM Range 索引、章节衔接等待。
+ * 播放背景绘制与 autoFollow 见 epubListenSegmentOverlay + epubListenMarkHighlight。
  */
 import type { Rendition } from 'epubjs';
 import {
 	buildSentenceOffsetSpans,
 	stripMarkdownForTts,
 } from '@/utils/englishTts';
-import { indexChapterSentenceRanges } from './epubListenChapterHighlight';
+import { clearListenMarkHighlight } from './epubListenMarkHighlight';
+import { syncChapterListenScrollSession } from './epubListenSegmentOverlay';
 import { getRenditionViewsList, resolveCfiDomRange } from './epubRangeGeometry';
 import { getEpubScrollContainer } from './epubScrolledNav';
 
 const MAX_PLAIN_CHARS = 50_000;
+const SECTION_ADVANCE_MS = 4000;
+const RELOCATE_WAIT_MS = 900;
 
 export type VisibleListenSection = {
 	plain: string;
 	outerRange: Range;
 	spineIndex: number;
 };
+
+type TextPos = { node: Text; offset: number };
 
 function sectionPlain(doc: Document): string {
 	return stripMarkdownForTts(
@@ -125,6 +131,126 @@ export function extractVisibleListenSection(
 	};
 }
 
+function bodyFromOuter(outerRange: Range): HTMLElement | null {
+	const doc = outerRange.startContainer.ownerDocument;
+	return doc?.body ?? null;
+}
+
+function listBodyTextPositions(body: HTMLElement): TextPos[] {
+	const positions: TextPos[] = [];
+	const walker = body.ownerDocument.createTreeWalker(
+		body,
+		NodeFilter.SHOW_TEXT,
+	);
+	let node = walker.nextNode() as Text | null;
+	while (node) {
+		for (let offset = 0; offset < node.length; offset += 1) {
+			positions.push({ node, offset });
+		}
+		node = walker.nextNode() as Text | null;
+	}
+	return positions;
+}
+
+function normForMatch(text: string): string {
+	return stripMarkdownForTts(text).replace(/\s+/g, ' ').trim();
+}
+
+function buildNormStream(positions: TextPos[]): {
+	norm: string;
+	map: number[];
+} {
+	let norm = '';
+	const map: number[] = [];
+	for (let pi = 0; pi < positions.length; pi += 1) {
+		const ch = positions[pi]!.node.data[positions[pi]!.offset]!;
+		if (/\s/u.test(ch)) {
+			if (norm.length > 0 && norm.at(-1) !== ' ') {
+				norm += ' ';
+				map.push(pi);
+			}
+			continue;
+		}
+		norm += ch;
+		map.push(pi);
+	}
+	return { norm, map };
+}
+
+function rangeFromPosSpan(
+	positions: TextPos[],
+	startPi: number,
+	endPi: number,
+): Range | null {
+	const first = positions[startPi];
+	const last = positions[endPi];
+	if (!first || !last) return null;
+	const doc = first.node.ownerDocument;
+	if (!doc) return null;
+	const range = doc.createRange();
+	range.setStart(first.node, first.offset);
+	range.setEnd(last.node, last.offset + 1);
+	return range;
+}
+
+/** 节级一次遍历：为每句预建 DOM Range（顺序匹配 TTS 句文本） */
+export function indexChapterSentenceRanges(
+	outerRange: Range,
+	plain: string,
+): Array<Range | null> {
+	const trimmed = plain.trim();
+	const sentences = buildSentenceOffsetSpans(trimmed);
+	if (!sentences.length) return [];
+
+	const body = bodyFromOuter(outerRange);
+	if (!body) return sentences.map(() => null);
+
+	const positions = listBodyTextPositions(body);
+	if (!positions.length) return sentences.map(() => null);
+
+	const { norm, map } = buildNormStream(positions);
+	if (!norm) return sentences.map(() => null);
+
+	let cursor = 0;
+	return sentences.map((sent) => {
+		const needle = normForMatch(trimmed.slice(sent.start, sent.end));
+		if (!needle) return null;
+
+		let idx = norm.indexOf(needle, cursor);
+		if (idx < 0 && needle.length >= 8) {
+			const head = needle.slice(0, Math.min(24, needle.length));
+			idx = norm.indexOf(head, cursor);
+			if (idx >= 0 && norm.slice(idx, idx + needle.length) !== needle) {
+				idx = -1;
+			}
+		}
+		if (idx < 0) return null;
+
+		const startPi = map[idx];
+		const endPi = map[idx + needle.length - 1];
+		if (startPi == null || endPi == null) return null;
+
+		const range = rangeFromPosSpan(positions, startPi, endPi);
+		if (range) cursor = idx + needle.length;
+		return range;
+	});
+}
+
+export function showChapterListenSentenceHighlight(
+	rend: Rendition,
+	range: Range,
+): void {
+	syncChapterListenScrollSession(rend, range);
+}
+
+export function clearChapterListenSentenceHighlight(rend?: Rendition): void {
+	clearListenMarkHighlight(rend);
+}
+
+export function teardownChapterListenHighlight(rend?: Rendition): void {
+	clearListenMarkHighlight(rend);
+}
+
 /** 根据 CFI 定位起始句 */
 export function resolveListenStartSentence(
 	rend: Rendition,
@@ -155,9 +281,6 @@ export function resolveListenStartSentence(
 	}
 	return 0;
 }
-
-const SECTION_ADVANCE_MS = 4000;
-const RELOCATE_WAIT_MS = 900;
 
 export function waitForRelocated(
 	rend: Rendition,
@@ -210,5 +333,5 @@ export function waitForNextSection(
 }
 
 if (buildSentenceOffsetSpans('测试。下一句。').length < 2) {
-	throw new Error('[epubListenVisibleSection] 句界拆分异常');
+	throw new Error('[epubListenChapter] 句界拆分异常');
 }

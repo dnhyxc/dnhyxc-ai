@@ -8,14 +8,12 @@ import {
 	warmupEnglishTtsVoices,
 } from '@/utils/englishTts';
 import {
-	invokeStopChapterListen,
-	registerQuoteListenStop,
-} from '../utils/epubListenController';
-import {
 	beginEpubListenOverlaySession,
 	clearActiveListenHighlight,
 	clearEpubListenSegmentOverlay,
 	getEpubListenSessionPlain,
+	invokeStopChapterListen,
+	registerQuoteListenStop,
 	resolveEpubListenPlain,
 	showEpubListenPlainSpan,
 } from '../utils/epubListenSegmentOverlay';

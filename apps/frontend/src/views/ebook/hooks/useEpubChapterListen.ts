@@ -1,20 +1,3 @@
-/**
- * 主要功能与实现说明：
- *
- * 1. 提供听书（TTS 逐句朗读）状态的管理（idle、loading、playing、paused），并同步 UI；
- * 2. 控制朗读的起始、暂停、恢复、停止，能自动切换章节、句子，实现全章节顺畅衔接的连续朗读体验；
- * 3. 自动定位当前 EPUB 的可见章节与段落，按视口与上下文动态提取纯文本、句子分割与 Range 映射；
- * 4. 负责与底层 TTS 播放器及英语朗读引擎的集成，包括句级高亮、速率调节、全书跳转/跟随；
- * 5. 通过监听用户操作、滚动、章节切换等，动态刷新听书高亮区域及播放状态；
- * 6. 兼容按需自动跟随高亮、弹窗提示、以及错误/边界条件下的提示管理（如章节结束、朗读不可用等）；
- *
- * 依赖组件：
- * - @ui/sonner：用于 UI 层的全局提示
- * - epubjs：底层 EPUB 电子书解析与渲染引擎
- * - ../utils/englishTts、epubListenChapterHighlight、epubListenSegmentOverlay 等工具函数
- *
- * 该模块以 hook 形式（useEpubChapterListen）对外，便于在 React 组件中调用和绑定章节朗读相关逻辑。
- */
 import { Toast } from '@ui/sonner';
 import type { Rendition } from 'epubjs';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -29,24 +12,20 @@ import {
 } from '@/utils/englishTts';
 import {
 	clearChapterListenSentenceHighlight,
+	extractVisibleListenSection,
 	indexChapterSentenceRanges,
+	resolveListenStartSentence,
 	showChapterListenSentenceHighlight,
 	teardownChapterListenHighlight,
-} from '../utils/epubListenChapterHighlight';
-import {
-	invokeStopQuoteListen,
-	registerChapterListenStop,
-} from '../utils/epubListenController';
+	waitForNextSection,
+	waitForRelocated,
+} from '../utils/epubListenChapter';
 import {
 	beginChapterListenAutoFollow,
 	clearEpubListenSegmentOverlay,
+	invokeStopQuoteListen,
+	registerChapterListenStop,
 } from '../utils/epubListenSegmentOverlay';
-import {
-	extractVisibleListenSection,
-	resolveListenStartSentence,
-	waitForNextSection,
-	waitForRelocated,
-} from '../utils/epubListenVisibleSection';
 
 export type ChapterListenStatus = 'idle' | 'loading' | 'playing' | 'paused';
 
@@ -75,7 +54,9 @@ type SectionCtx = {
 	spineIndex: number;
 };
 
-/** EPUB 从当前可见位置连续听书（innerText 抽正文 + playEnglishPreferred） */
+/**
+ * EPUB 从当前可见位置连续听书（innerText 抽正文 + playEnglishPreferred）
+ */
 export function useEpubChapterListen(
 	t: (key: string) => string,
 	getRendition: () => Rendition | null,

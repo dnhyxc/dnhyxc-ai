@@ -29,7 +29,7 @@
 |------|------|------|
 | 绘制 | `apps/frontend/src/views/ebook/utils/epubListenMarkHighlight.ts` | 单例浮层：SVG `g.moke-epub-listen-bg` 或 iframe `#moke-epub-listen-iframe-layer` |
 | 编排（听当前） | `epubListenSegmentOverlay.ts` | session、`paintSentence`、`onCadenceChunk` 驱动换句 |
-| 编排（听书） | `epubListenChapterHighlight.ts` → `syncChapterListenScrollSession` | 每句 `showEpubListenDomRange` |
+| 编排（听书） | `epubListenChapter.ts` → `syncChapterListenScrollSession`（`epubListenSegmentOverlay`） | 每句 `showEpubListenDomRange` |
 | 滚动 / FAB | `epubListenSegmentOverlay.ts` | `autoFollow`、`activeDomRange`，与用户/想法无关 |
 
 ### 2.2 绘制与清除规则
@@ -241,7 +241,7 @@ flowchart LR
 |------|------|
 | 播放背景绘制/清除 | `apps/frontend/src/views/ebook/utils/epubListenMarkHighlight.ts` |
 | 听当前/听书 session + 滚动 | `apps/frontend/src/views/ebook/utils/epubListenSegmentOverlay.ts` |
-| 听书句 Range → 背景 | `apps/frontend/src/views/ebook/utils/epubListenChapterHighlight.ts` |
+| 听书句 Range → 背景 | `apps/frontend/src/views/ebook/utils/epubListenChapter.ts` + `epubListenSegmentOverlay.ts` |
 | 用户划线 sync | `apps/frontend/src/views/ebook/utils/epubUserHighlights.ts` |
 | 想法虚线 sync | `apps/frontend/src/views/ebook/utils/epubThoughtAnnotations.ts` |
 | 统一 sync 入口 | `syncEpubReadingAnnotations`（`epubUserHighlights.ts`） |
@@ -259,6 +259,10 @@ flowchart LR
 **不会**改变用户/想法的保存、apply、删除、点击、重叠合并逻辑。**会**在同区域产生 **临时视觉叠层**，停止播放并清除 listen 层后恢复。
 
 **唯一需要持续警惕的**，是维护播放清除逻辑时不退回「按 CFI 无差别 remove highlight」的旧路径——那是历史上真实影响用户划线的根因，现行代码已通过 class 过滤与 reconcile/sync 兜底规避。
+
+## 延伸阅读
+
+- [EPUB 听读 utils 文件合并影响点](./epub-listen-utils-consolidation.md) — 7→3 文件重构、import 路径对照（与播放背景隔离分析无关）
 
 ---
 
