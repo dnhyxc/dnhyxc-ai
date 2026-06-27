@@ -1101,4 +1101,9 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'While Listen or listen-while-reading is playing, opening or closing the reading-thoughts sidebar, dragging the MOKE/thoughts split, or narrowing the window keeps the light-yellow sentence highlight aligned with the reflowed text instead of drifting or disappearing. Independent of user highlights and thought underlines.',
 	},
+	's25-54': {
+		title: 'EPUB quote Listen shares bottom bar',
+		description:
+			'While quote Listen is playing, the same bottom bar as listen-while-reading appears with pause/resume, stop, previous/next sentence, sentence list jump, and speed 0.75×–3×. PopBar and reading-notes quote entries are unchanged; mutually exclusive with listen-while-reading.',
+	},
 };

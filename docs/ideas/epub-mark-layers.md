@@ -6,6 +6,7 @@
 
 ## 延伸阅读
 
+- [epub-mark-epubjs-primitives.md](./epub-mark-epubjs-primitives.md) — **epub.js 原语详解**：选区、文本提取、CFI、annotations、marks-pane（本文偏架构编排）
 - [developer/epub-mark-layers-shared.md](../ebook/developer/epub-mark-layers-shared.md) — 已实现符号级对照表（维护定位）
 - [Influence-point/epub-listen-bg-vs-annotations.md](../Influence-point/epub-listen-bg-vs-annotations.md) — 播放层 vs 划线层影响面
 - [epub-user-highlight-dev.md](../ebook/developer/epub-user-highlight-dev.md) / [epub-thought-add-underline-dev.md](../ebook/developer/epub-thought-add-underline-dev.md) / [epub-listen-dev.md](../ebook/developer/epub-listen-dev.md) — 各层开发者手册

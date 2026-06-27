@@ -145,12 +145,6 @@ function EbookReadPage() {
 		syncReadingAnnotations: (nextHighlights?: EbookUserHighlight[]) => void;
 	} | null>(null);
 
-	const { toggleListen, listenLabel } = useEbookQuoteListen(
-		t,
-		() => epubNavRef.current?.getRendition() ?? null,
-		() => epubNavRef.current?.syncReadingAnnotations(),
-	);
-
 	const [bookResolving, setBookResolving] = useState(false);
 
 	const [open, setOpen] = useState<ArrayBuffer | null>(null);
@@ -181,6 +175,19 @@ function EbookReadPage() {
 		() => epubNavRef.current?.syncReadingAnnotations(),
 		() => epubSpineIndexRef.current ?? epubSpineIndex,
 	);
+
+	const { toggleListen, listenLabel, ...quoteListen } = useEbookQuoteListen(
+		t,
+		() => epubNavRef.current?.getRendition() ?? null,
+		() => epubNavRef.current?.syncReadingAnnotations(),
+		() => epubSpineIndexRef.current ?? epubSpineIndex,
+	);
+
+	const epubListenBar = chapterListen.isActive
+		? chapterListen
+		: quoteListen.isActive
+			? quoteListen
+			: chapterListen;
 
 	const [pdfZoom, setPdfZoom] = useState(loadPdfZoom);
 	const [assistantOpen, setAssistantOpen] = useState(false);
@@ -2225,18 +2232,18 @@ function EbookReadPage() {
 								<EpubListenFollowFab />
 							</div>
 							<EpubListenPlayerBar
-								status={chapterListen.status}
-								spineIndex={chapterListen.spineIndex}
-								sentenceIndex={chapterListen.sentenceIndex}
-								sentenceCount={chapterListen.sentenceCount}
-								sentenceLabels={chapterListen.sentenceLabels}
-								rate={chapterListen.rate}
-								onTogglePlay={chapterListen.togglePlay}
-								onStop={chapterListen.stop}
-								onPrevSentence={chapterListen.prevSentence}
-								onNextSentence={chapterListen.nextSentence}
-								onGoToSentence={chapterListen.goToSentence}
-								onRateChange={chapterListen.setRate}
+								status={epubListenBar.status}
+								spineIndex={epubListenBar.spineIndex}
+								sentenceIndex={epubListenBar.sentenceIndex}
+								sentenceCount={epubListenBar.sentenceCount}
+								sentenceLabels={epubListenBar.sentenceLabels}
+								rate={epubListenBar.rate}
+								onTogglePlay={epubListenBar.togglePlay}
+								onStop={epubListenBar.stop}
+								onPrevSentence={epubListenBar.prevSentence}
+								onNextSentence={epubListenBar.nextSentence}
+								onGoToSentence={epubListenBar.goToSentence}
+								onRateChange={epubListenBar.setRate}
 							/>
 						</div>
 					</EbookReadSplitLayout>

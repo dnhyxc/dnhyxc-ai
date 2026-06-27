@@ -50,38 +50,59 @@ function isVisibleTextNode(node: Text): boolean {
 	return !el.closest('script, style, noscript, [hidden], svg');
 }
 
+/**
+ * 提取 Range 区间内的纯文本流及字符到 DOM Text 节点的映射点列表
+ * - 跳过不可见文本节点
+ * - 合并所有空白字符为单一空格
+ * - points 中的每项与 plain 的每个字符一一对应
+ * - 空白合并保证 TTS（语音合成）所需的 plain、位置与原 DOM 匹配
+ *
+ * @param outer - 要遍历的 DOM Range 区间
+ * @returns 纯文本流 plain 及其每一字符对应的 DOM Text 节点与 offset（points）
+ */
 function collectPlainStream(outer: Range): {
 	plain: string;
 	points: TextPoint[];
 } {
+	// points: 纯文本每一字符对应的 { node, offset } 映射
 	const points: TextPoint[] = [];
+	// plain: 去除多余空白后的纯文本
 	let plain = '';
+	// pendingSpace: 标记上一次遇到空白，等待下个非空字符合并为 1 个空格
 	let pendingSpace = false;
 
+	// 遍历 outer Range 内的所有文本节点 (每次传入节点及本节点区间范围)
 	forEachTextNodeInRange(outer, (node, start, end) => {
+		// 跳过 script/style/svg/隐藏节点等不可见 text
 		if (!isVisibleTextNode(node)) return;
+		// 遍历该文本节点的每个字符索引
 		for (let offset = start; offset < end; offset += 1) {
 			const ch = node.data[offset];
-			if (!ch) continue;
+			if (!ch) continue; // 防御
+			// 如遇 unicode 空白字符则等待合并
 			if (/\s/u.test(ch)) {
 				if (plain.length > 0) pendingSpace = true;
 				continue;
 			}
+			// 若之前遇到空白，遇到第一个非空白字符时合并为 1 个空格，并记录其点
 			if (pendingSpace) {
 				plain += ' ';
 				points.push({ node, offset });
 				pendingSpace = false;
 			}
+			// 添加当前字符及其位置
 			plain += ch;
 			points.push({ node, offset });
 		}
 	});
 
+	// 末尾多余空格与点剔除，保证纯文本尾部无多余空间
 	while (plain.endsWith(' ')) {
 		plain = plain.slice(0, -1);
 		points.pop();
 	}
 
+	// 返回合并空白后的纯文本及其对应字符点映射
 	return { plain, points };
 }
 
@@ -135,28 +156,46 @@ function sentencesWithoutAnchors(trimmed: string): DomListenSentence[] {
 		.filter((s) => s.spokenRaw);
 }
 
+/**
+ * 根据传入的 Range，提取纯文本和每句话（带锚点）的列表
+ * @param outer - DOM Range，待分句的文本区间
+ * @returns 包含去空白的纯文本以及按句切分的数组，含每句在原 DOM 的锚点信息
+ */
 function buildDomSentenceIndex(outer: Range): {
 	plain: string;
 	sentences: DomListenSentence[];
 } {
+	// 从 Range 中提取所有文本及其对应 DOM 位置点
 	const { plain, points } = collectPlainStream(outer);
+	// 去除前后空白，获得 trimmed 纯文本
 	const trimmed = plain.trim();
+	// 若去空白后文本为空，直接返回空结构
 	if (!trimmed) return { plain: '', sentences: [] };
 
+	// 计算前导空白字符数量
 	const lead = plain.length - plain.trimStart().length;
+	// 修剪 points，使其只覆盖 trimmed 部分（去除前后空白对应的点）
 	const trimmedPoints = points.slice(lead, lead + trimmed.length);
+	// 如果修正后 points 长度与 trimmed 不符，放弃锚点，仅返回纯文本分句
 	if (trimmedPoints.length !== trimmed.length) {
 		return { plain: trimmed, sentences: sentencesWithoutAnchors(trimmed) };
 	}
 
+	// 存储分句及其锚点
 	const sentences: DomListenSentence[] = [];
+	// 对 trimmed 进行分句，遍历每个句子的起止 offset
 	for (const { start, end } of buildSentenceOffsetSpans(trimmed)) {
+		// 提取该句的原始文本并去除前后空白
 		const spokenRaw = trimmed.slice(start, end).trim();
+		// 如果句子内容为空，跳过
 		if (!spokenRaw) continue;
+		// 尝试根据 points 计算该句的锚点
 		const anchor = anchorFromPoints(trimmedPoints, trimmed, start, end);
+		// 将结果加入 sentences 数组
 		sentences.push({ spokenRaw, anchor });
 	}
 
+	// 返回最终的纯文本和分句数组
 	return { plain: trimmed, sentences };
 }
 
@@ -576,6 +615,44 @@ export function showEpubListenSentence(
 
 export function getEpubListenSessionPlain(): string | null {
 	return session?.plain ?? null;
+}
+
+/** 听当前播放条：句数与预览文案 */
+export function getEpubListenSessionMeta(): {
+	plain: string;
+	sentenceCount: number;
+	sentenceLabels: string[];
+} | null {
+	// 如果当前没有 session，则返回 null，表示没有正在播放的内容
+	if (!session) return null;
+	// 对每个句子，去除 Markdown 标记后作为标签；如为空则显示为省略号
+	const sentenceLabels = session.sentences.map((s) => {
+		// 用 stripMarkdownForTts 去除句子的 Markdown 标记，并去除首尾空白
+		const label = stripMarkdownForTts(s.spokenRaw).trim();
+		// 若清理后为空字符串，则使用 '…' 代替
+		return label || '…';
+	});
+	// 返回包括纯文本、句子数、预览标签等 meta 信息
+	return {
+		plain: session.plain, // 当前播放的纯文本内容
+		sentenceCount: session.sentences.length, // 句子的总数量
+		sentenceLabels, // 每一句的清理后预览标签
+	};
+}
+
+/** 获取指定句子的 TTS 原始文本（去除 Markdown 标记）
+ * @param index - 句子的索引（从 0 开始）
+ * @returns 经 stripMarkdownForTts 处理、已去空白的字符串；若无该句则返回 null
+ */
+export function getEpubListenSentenceSpokenRaw(index: number): string | null {
+	// 从 session 中获取第 index 个句子
+	const sent = session?.sentences[index];
+	// 如果不存在该句，返回 null
+	if (!sent) return null;
+	// 去除 Markdown 标记并去除首尾空白
+	const raw = stripMarkdownForTts(sent.spokenRaw).trim();
+	// 若清理后为空字符串，返回 null，否则返回处理后的文本
+	return raw || null;
 }
 
 export function clearActiveListenHighlight(rend?: Rendition): void {
