@@ -248,6 +248,11 @@ export const PROJECT_GUIDE_ITEMS_EN: Record<
 		description:
 			'Format supported fenced languages when available; nested fences may need backup or incremental paste.',
 	},
+	'pg-s12-5': {
+		title: 'Preview/edit & document assistant',
+		description:
+			'Full-width preview; with the assistant open, toggling preview/edit keeps the panel and switches the left pane while preserving scroll when possible; leaving split for full preview also keeps scroll where feasible.',
+	},
 	'pg-s13-1': {
 		title: '13.1 Word packs and classic lines (streaming)',
 		description:

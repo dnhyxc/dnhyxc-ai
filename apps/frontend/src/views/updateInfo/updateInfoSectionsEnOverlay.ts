@@ -373,6 +373,11 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'Diff and the main editor share sticky-scroll; sticky bar backgrounds align with global styles and theme tokens to reduce glass-theme tint issues.',
 	},
+	's7-8': {
+		title: 'Preview/edit & document assistant panel',
+		description:
+			'Full-width preview without an empty right pane; with the assistant open, preview stays on the left in preview mode and the editor in edit mode; toggling preview/edit keeps the panel open and preserves scroll position where possible.',
+	},
 	's8-1': {
 		title: 'Mermaid interaction',
 		description: 'Zoom and preview affordances for complex diagrams.',

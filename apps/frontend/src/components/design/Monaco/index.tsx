@@ -12,7 +12,6 @@ import { PanelTopClose, PanelTopOpen } from 'lucide-react';
 import {
 	type RefObject,
 	useCallback,
-	useDeferredValue,
 	useEffect,
 	useId,
 	useLayoutEffect,
@@ -298,7 +297,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	/** 底部 Markdown 操作条是否展开（受控或未传 props 时内部 state） */
 	const [internalMarkdownBottomBarOpen, setInternalMarkdownBottomBarOpen] =
 		useState(false);
-	const [viewMode, setViewMode] = useState<MarkdownViewMode>('edit');
+	const [viewMode, setViewModeState] = useState<MarkdownViewMode>('edit');
 	const [splitScrollFollowMode, setSplitScrollFollowMode] =
 		useState<MarkdownSplitScrollFollowMode>('none');
 	/** Diff 左侧（original）对照文本：进入 splitDiff 时从当前编辑器快照 */
@@ -365,6 +364,8 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	 * - 退出 splitDiff 时 capture 当次 session 的 modelPath，并在双 rAF 后 dispose
 	 */
 	const prevViewModeRef = useRef<MarkdownViewMode>(viewMode);
+	/** split→全屏预览：右侧预览 DOM 与左栏不同实例，仅拷贝 scrollTop */
+	const pendingSplitPreviewScrollTopRef = useRef<number | null>(null);
 	// 将底部操作栏快捷键的注册收敛到 useMarkdownBottomBarShortcuts：
 	// - chord 读取与热更新在 hook 内完成
 	// - window keydown(capture) 绑定在 hook 内完成
@@ -403,6 +404,11 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	const assistantRightPaneActive = Boolean(
 		bottomBarAssistantNode && markdownAssistantOpen,
 	);
+	/** 纯编辑 / 纯预览（无助手）时折叠右侧栏；分屏 / Diff / 助手时展开 */
+	const markdownRightPaneVisible =
+		assistantRightPaneActive ||
+		viewMode === 'split' ||
+		viewMode === 'splitDiff';
 	/** 分屏右侧为 Markdown 预览且启用跟滚时，才做左右滚动同步（Diff 模式下右侧无预览 DOM） */
 	const splitPreviewScrollSyncEligible =
 		viewMode === 'split' &&
@@ -436,6 +442,22 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 		setInternalMarkdownBottomBarOpen((o) => !o);
 	}, []);
 
+	const setViewMode = useCallback(
+		(
+			next: MarkdownViewMode | ((prev: MarkdownViewMode) => MarkdownViewMode),
+		) => {
+			setViewModeState((prev) => {
+				const resolved = typeof next === 'function' ? next(prev) : next;
+				if (prev === 'split' && resolved === 'preview') {
+					pendingSplitPreviewScrollTopRef.current =
+						previewViewportRef.current?.scrollTop ?? null;
+				}
+				return resolved;
+			});
+		},
+		[],
+	);
+
 	const copyToClipboard = useCallback(async (text: string) => {
 		await clipboardAdapterRef.current?.copyToClipboard(text);
 	}, []);
@@ -456,9 +478,9 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	const toggleMarkdownAssistant = useCallback(() => {
 		if (!bottomBarAssistantNode) return;
 		const next = !markdownAssistantOpen;
-		// 仅通过机器人开关关闭助手时：回到「编辑源码」，避免仍停留在为助手而设的左编右预览分屏
+		// 关闭助手：预览模式保持预览，其余（含曾为助手而开的 split）回到编辑
 		if (!next) {
-			setViewMode('edit');
+			setViewMode((vm) => (vm === 'preview' ? 'preview' : 'edit'));
 		}
 		if (assistantPanelControlled && onMarkdownAssistantOpenChange) {
 			onMarkdownAssistantOpenChange(next);
@@ -618,7 +640,8 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 		editorBootstrapTextRef.current = value;
 	}
 
-	const deferredPreviewMarkdown = useDeferredValue(value);
+	/** 左栏预览与编辑器同源即时正文，避免 deferred 滞后导致 scroll sync 折线偏移 */
+	const leftPreviewMarkdown = value ?? '';
 	/** 分屏下用即时正文，避免 deferred 滞后导致预览 DOM 与编辑器 scroll 不同步 */
 	const splitPaneMarkdown = viewMode === 'split' ? (value ?? '') : '';
 	/** Diff 右侧（modified）与主编辑器正文同步 */
@@ -698,29 +721,20 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 		setInternalMarkdownAssistantOpen(false);
 	}, [bottomBarAssistantNode, assistantPanelControlled]);
 
-	// 开启助手后需有右侧栏位：从纯编辑 / 纯预览 / 分屏 Diff 进入「左编 + 右侧助手」
+	// viewMode / 助手开关变化时同步 splitLayout，避免右侧面板保持 0 导致无法撑开
 	useEffect(() => {
-		if (!markdownAssistantOpen || !bottomBarAssistantNode) return;
-		setViewMode((vm) =>
-			vm === 'split'
-				? vm
-				: vm === 'splitDiff' || vm === 'edit' || vm === 'preview'
-					? 'split'
-					: vm,
-		);
-	}, [markdownAssistantOpen, bottomBarAssistantNode]);
-
-	// viewMode 在 edit ↔ split* 切换时同步 splitLayout，避免右侧面板保持 0 导致无法撑开
-	useEffect(() => {
-		// 仅对 Markdown 双栏骨架生效：preview 不渲染 panel group
-		if (viewMode === 'edit') {
-			panelGroupRef.current?.setLayout({ editor: 100, right: 0 });
+		if (viewMode === 'edit' || viewMode === 'preview') {
+			panelGroupRef.current?.setLayout(
+				markdownRightPaneVisible
+					? lastSplitLayoutRef.current
+					: { editor: 100, right: 0 },
+			);
 			return;
 		}
 		if (viewMode === 'split' || viewMode === 'splitDiff') {
 			panelGroupRef.current?.setLayout(lastSplitLayoutRef.current);
 		}
-	}, [viewMode]);
+	}, [viewMode, markdownRightPaneVisible]);
 
 	useEffect(() => {
 		if (prevDocumentIdentityRef.current !== documentIdentity) {
@@ -734,6 +748,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	// 换篇时重置编辑器滚动与预览锚点缓存，避免 Monaco / 分屏跟滚沿用上一篇位置
 	useLayoutEffect(() => {
 		markdownScrollSyncSnapshotRef.current = null;
+		pendingSplitPreviewScrollTopRef.current = null;
 		const vp = previewViewportRef.current;
 		if (vp) {
 			vp.scrollTop = 0;
@@ -829,6 +844,69 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 		if (viewModeRef.current !== 'split') return;
 		flushEditorScrollToPreviewSync();
 	}, [flushEditorScrollToPreviewSync]);
+
+	// ponytail: 左栏双挂载 + 分屏同款 sync；preview→edit 须在 focusEditor microtask 之后再跑一次
+	useLayoutEffect(() => {
+		const prev = prevViewModeRef.current;
+		if (prev === viewMode) return;
+
+		const runSync = () => {
+			const ed = editorRef.current;
+			const vp = previewViewportRef.current;
+			if (!ed?.getModel() || !vp) return;
+			applyEditorLayoutRef.current?.();
+			markdownScrollSyncSnapshotRef.current = null;
+
+			if (prev === 'preview' && viewMode === 'edit') {
+				suppressEditorScrollEchoRef.current = true;
+				try {
+					syncEditorScrollFromMarkdownPreview(
+						ed,
+						vp,
+						markdownScrollSyncSnapshotRef,
+					);
+				} finally {
+					scheduleClearSuppressEditorEcho();
+				}
+				return;
+			}
+			if (prev === 'edit' && viewMode === 'preview') {
+				suppressPreviewScrollEchoRef.current = true;
+				try {
+					syncPreviewScrollFromMarkdownEditor(
+						ed,
+						vp,
+						markdownScrollSyncSnapshotRef,
+					);
+				} finally {
+					scheduleClearSuppressPreviewEcho();
+				}
+				return;
+			}
+			if (prev === 'split' && viewMode === 'preview') {
+				const top = pendingSplitPreviewScrollTopRef.current;
+				pendingSplitPreviewScrollTopRef.current = null;
+				if (top == null) return;
+				const max = Math.max(0, vp.scrollHeight - vp.clientHeight);
+				vp.scrollTop = Math.min(max, Math.max(0, top));
+			}
+		};
+
+		if (prev === 'preview' && viewMode === 'edit') {
+			queueMicrotask(() => {
+				runSync();
+				requestAnimationFrame(runSync);
+			});
+			return;
+		}
+		runSync();
+		requestAnimationFrame(runSync);
+	}, [
+		viewMode,
+		leftPreviewMarkdown,
+		scheduleClearSuppressEditorEcho,
+		scheduleClearSuppressPreviewEcho,
+	]);
 
 	const syncEditorFromPreview = useCallback(() => {
 		if (viewModeRef.current === 'splitDiff') return;
@@ -1430,7 +1508,9 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 				requestAnimationFrame(() => applyEditorLayoutFromHost());
 			});
 
-			editor.focus();
+			if (viewModeRef.current !== 'preview') {
+				editor.focus();
+			}
 		},
 		[
 			getMarkdownFromEditorRef,
@@ -1619,27 +1699,14 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 						</QuickContextMenu>
 					) : null}
 
-					{/* Markdown：preview 仍为纯预览；其余模式统一用“双栏骨架”，避免 edit→split 时 Editor 卸载/重挂载造成闪断 */}
-					{isMarkdown && viewMode === 'preview' ? (
-						<div className="h-full min-h-0 min-w-0 max-w-full w-full overflow-hidden contain-[inline-size]">
-							<ParserMarkdownPreviewPane
-								markdown={deferredPreviewMarkdown}
-								documentIdentity={documentIdentity}
-								t={t}
-								showPreviewScrollCornerFab
-								enableMermaid={markdownEnableMermaid}
-							/>
-						</div>
-					) : null}
-
-					{isMarkdown && viewMode !== 'preview' ? (
+					{/* Markdown：统一双栏；preview/edit 左栏双挂载（invisible 切换，保留 layout 供 sync 测量） */}
+					{isMarkdown ? (
 						<ResizablePanelGroup
 							orientation="horizontal"
 							className="h-full min-h-0 min-w-0 max-w-full"
 							groupRef={panelGroupRef}
 							onLayoutChanged={(layout) => {
-								// 仅在分屏状态下记忆用户拖拽后的布局（edit 状态的 100/0 不需要记）
-								if (viewMode === 'split' || viewMode === 'splitDiff') {
+								if (markdownRightPaneVisible) {
 									lastSplitLayoutRef.current = layout;
 								}
 							}}
@@ -1650,44 +1717,97 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 								minSize={20}
 								className="min-h-0 min-w-0"
 							>
-								<div
-									className={cn(
-										'flex h-full min-h-0 min-w-0 flex-col overflow-hidden',
-									)}
-								>
-									<QuickContextMenu
-										items={editorContextMenuItems}
-										triggerAsChild
-										onCloseAutoFocus={handleEditorContextMenuCloseAutoFocus}
+								{viewMode === 'split' || viewMode === 'splitDiff' ? (
+									<div
+										className={cn(
+											'flex h-full min-h-0 min-w-0 flex-col overflow-hidden',
+										)}
 									>
-										<div
-											ref={editorHostRef}
-											className="box-border h-full min-h-0 min-w-0 max-w-full w-full overflow-hidden contain-[inline-size]"
+										<QuickContextMenu
+											items={editorContextMenuItems}
+											triggerAsChild
+											onCloseAutoFocus={handleEditorContextMenuCloseAutoFocus}
 										>
-											<Editor
-												height="100%"
-												width="100%"
-												language={language}
-												path={monacoModelPath}
-												keepCurrentModel
-												defaultValue={editorBootstrapTextRef.current}
-												beforeMount={handleMonacoBeforeMount}
-												theme={glassThemeId}
-												onMount={handleEditorMount}
-												options={mergedEditorOptions}
-												loading={<Loading text={loadingEditorText} />}
+											<div
+												ref={editorHostRef}
+												className="box-border h-full min-h-0 min-w-0 max-w-full w-full overflow-hidden contain-[inline-size]"
+											>
+												<Editor
+													height="100%"
+													width="100%"
+													language={language}
+													path={monacoModelPath}
+													keepCurrentModel
+													defaultValue={editorBootstrapTextRef.current}
+													beforeMount={handleMonacoBeforeMount}
+													theme={glassThemeId}
+													onMount={handleEditorMount}
+													options={mergedEditorOptions}
+													loading={<Loading text={loadingEditorText} />}
+												/>
+											</div>
+										</QuickContextMenu>
+									</div>
+								) : (
+									<div className="relative h-full min-h-0 min-w-0 overflow-hidden">
+										<div
+											className={cn(
+												'absolute inset-0 min-h-0 min-w-0 overflow-hidden contain-[inline-size]',
+												viewMode !== 'preview' &&
+													'invisible pointer-events-none',
+											)}
+										>
+											<ParserMarkdownPreviewPane
+												markdown={leftPreviewMarkdown}
+												documentIdentity={documentIdentity}
+												t={t}
+												viewportRef={previewViewportRef}
+												showPreviewScrollCornerFab
+												enableMermaid={markdownEnableMermaid}
 											/>
 										</div>
-									</QuickContextMenu>
-								</div>
+										<div
+											className={cn(
+												'absolute inset-0 flex min-h-0 min-w-0 flex-col overflow-hidden',
+												viewMode === 'preview' &&
+													'invisible pointer-events-none',
+											)}
+										>
+											<QuickContextMenu
+												items={editorContextMenuItems}
+												triggerAsChild
+												onCloseAutoFocus={handleEditorContextMenuCloseAutoFocus}
+											>
+												<div
+													ref={editorHostRef}
+													className="box-border h-full min-h-0 min-w-0 max-w-full w-full overflow-hidden contain-[inline-size]"
+												>
+													<Editor
+														height="100%"
+														width="100%"
+														language={language}
+														path={monacoModelPath}
+														keepCurrentModel
+														defaultValue={editorBootstrapTextRef.current}
+														beforeMount={handleMonacoBeforeMount}
+														theme={glassThemeId}
+														onMount={handleEditorMount}
+														options={mergedEditorOptions}
+														loading={<Loading text={loadingEditorText} />}
+													/>
+												</div>
+											</QuickContextMenu>
+										</div>
+									</div>
+								)}
 							</ResizablePanel>
 							<ResizableHandle
 								withHandle
 								className={cn(
 									'w-0',
-									viewMode === 'edit'
-										? 'pointer-events-none opacity-0'
-										: 'pointer-events-auto opacity-100',
+									markdownRightPaneVisible
+										? 'pointer-events-auto opacity-100'
+										: 'pointer-events-none opacity-0',
 								)}
 							/>
 							<ResizablePanel
@@ -1696,9 +1816,9 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 								minSize={0}
 								className={cn(
 									'min-h-0 min-w-0',
-									viewMode === 'edit'
-										? 'pointer-events-none opacity-0'
-										: 'pointer-events-auto opacity-100',
+									markdownRightPaneVisible
+										? 'pointer-events-auto opacity-100'
+										: 'pointer-events-none opacity-0',
 								)}
 							>
 								<div className="border-l border-theme/10 h-full min-h-0 min-w-0 overflow-hidden contain-[inline-size]">
@@ -1732,7 +1852,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 												loading={<Loading text={loadingDiffEditorText} />}
 											/>
 										</div>
-									) : (
+									) : viewMode === 'split' ? (
 										<ParserMarkdownPreviewPane
 											markdown={splitPaneMarkdown}
 											documentIdentity={documentIdentity}
@@ -1745,7 +1865,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 											}
 											enableMermaid={markdownEnableMermaid}
 										/>
-									)}
+									) : null}
 								</div>
 							</ResizablePanel>
 						</ResizablePanelGroup>

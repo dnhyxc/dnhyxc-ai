@@ -529,6 +529,13 @@ const UPDATE_INFO_SECTIONS_ZH: UpdateInfoSection[] = [
 				description:
 					'Diff 与主编辑器共用粘性滚动开关；粘性条背景通过全局样式与主题变量对齐，减轻玻璃主题下色偏或装饰层干扰。',
 			},
+			{
+				id: 's7-8',
+				title: '预览/编辑与文档助手 Panel 协同',
+				dateLabel: '2026-06-27',
+				description:
+					'纯预览占满全宽，不再出现右侧空预览占位；开启文档助手后预览模式左侧仍为预览、编辑模式左侧仍为编辑器；预览与编辑切换时保持助手 Panel 打开，并尽量对齐阅读滚动位置。',
+			},
 		],
 	},
 	{

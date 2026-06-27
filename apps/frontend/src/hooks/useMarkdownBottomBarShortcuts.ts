@@ -213,7 +213,6 @@ export function useMarkdownBottomBarShortcuts(input: {
 			if (hit(chords.markdownBarAction1)) {
 				e.preventDefault();
 				e.stopPropagation();
-				closeMarkdownAssistant();
 				setViewMode('edit');
 				queueMicrotask(focusEditor);
 				return;
@@ -231,7 +230,6 @@ export function useMarkdownBottomBarShortcuts(input: {
 			if (hit(chords.markdownBarAction3)) {
 				e.preventDefault();
 				e.stopPropagation();
-				closeMarkdownAssistant();
 				if (viewModeRef.current === 'preview') {
 					setViewMode('edit');
 					queueMicrotask(focusEditor);

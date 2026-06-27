@@ -1,5 +1,7 @@
 # Monaco Markdown 分屏跟随滚动：实现说明
 
+> **延伸阅读**：[markdown-view-panel-scroll.md](./markdown-view-panel-scroll.md)（全屏预览/编辑与助手 Panel 布局、preview ↔ edit 滚动对齐；复用本文 sync 工具）。
+
 本文记录知识库 / Markdown 编辑器**分屏（split）**下「左侧 Monaco、右侧预览」**纵向滚动对齐**的完整实现思路、涉及模块与维护要点。实现分布在 `apps/frontend` 与 `packages/markdown-kit` 中。
 
 ---

@@ -17,7 +17,7 @@
 | [`llm/`](./llm/)             | 大模型接入（硅基、`createLlm`、设置页） | [llm/README.md](./llm/README.md)                                                                                                         |
 | [`ops/`](./ops/)             | 部署、Nginx、本地上传目录               | [ops/README.md](./ops/README.md)                                                                                                         |
 | [`app/`](./app/)             | 前端壳层：路由鉴权、Tauri、i18n         | [app/README.md](./app/README.md)                                                                                                         |
-| [`monaco/`](./monaco/)       | Monaco / Markdown 编辑器                | 按文件名检索                                                                                                                             |
+| [`monaco/`](./monaco/)       | Monaco / Markdown 编辑器                | [monaco/README.md](./monaco/README.md)                                                                                                    |
 | [`mermaid/`](./mermaid/)     | Mermaid 围栏与预览                      | [mermaid/markdown-zoom-and-preview.md](./mermaid/markdown-zoom-and-preview.md)                                                           |
 | [`tools/`](./tools/)         | `@dnhyxc-ai/markdown-kit`               | [tools/index.md](./tools/index.md)                                                                                                       |
 | [`react/`](./react/)         | React Hooks 专题                        | 按文件名检索                                                                                                                             |
@@ -117,6 +117,8 @@
 | EPUB 阅读背景与顶栏/侧栏色差                                      | [ebook/epub-reader-surface-bg.md](./ebook/epub-reader-surface-bg.md)                                                                                     |
 | EPUB 阅读设置无法点击正文关闭                                     | [ebook/epub-reader-settings-dismiss.md](./ebook/epub-reader-settings-dismiss.md)                                                                         |
 | 复制到助手后输入中文乱码                                          | [knowledge/assistant-insert-focus.md](./knowledge/assistant-insert-focus.md) §5.1                                                                        |
+| 知识库纯预览右侧空「预览内容为空」/ 双预览占位                    | [monaco/markdown-view-panel-scroll.md](./monaco/markdown-view-panel-scroll.md)                                                                           |
+| 预览 ↔ 编辑切换滚动错位 / 开助手后左侧总是编辑器                  | [monaco/markdown-view-panel-scroll.md](./monaco/markdown-view-panel-scroll.md) · [monaco/markdown-split-scroll-sync.md](./monaco/markdown-split-scroll-sync.md) |
 
 ---
 

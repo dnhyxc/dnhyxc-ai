@@ -380,7 +380,6 @@ export const MarkdownBottomBar = memo(function MarkdownBottomBar(
 								className={markdownBarIconBtnClass(viewMode === 'edit')}
 								aria-label={t?.('monaco.bottomBar.aria.edit') ?? '编辑源码'}
 								onClick={() => {
-									closeMarkdownAssistant();
 									setViewMode('edit');
 									queueMicrotask(focusEditor);
 								}}
@@ -423,7 +422,6 @@ export const MarkdownBottomBar = memo(function MarkdownBottomBar(
 								className={markdownBarIconBtnClass(viewMode === 'preview')}
 								aria-label={t?.('monaco.bottomBar.aria.preview') ?? '预览渲染'}
 								onClick={() => {
-									closeMarkdownAssistant();
 									if (viewMode === 'preview') {
 										setViewMode('edit');
 										queueMicrotask(focusEditor);
