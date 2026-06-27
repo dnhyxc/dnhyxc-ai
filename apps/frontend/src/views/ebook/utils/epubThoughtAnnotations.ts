@@ -1,15 +1,29 @@
 import type { Rendition } from 'epubjs';
 import type { EbookThought, EbookThoughtClickCluster } from '../types';
 import {
+	type EpubIframeContents,
+	extractCfiSpineHint,
+	getRenditionContentsList,
+	isDomRangeStrictlyContained,
+	isQuoteStrictlyNested,
+	setSvgAttrIfChanged,
+} from './epubMarkShared';
+import {
+	parseSvgMarkRect,
 	resolveCfiDomRange,
 	resolveMarkSvgLineSegments,
 	type SvgLineSegment,
 } from './epubRangeGeometry';
 
-type EpubIframeContents = {
-	document: Document;
-	window: Window;
+/** marks-pane 内 SVG rect 的局部坐标（随滚动由 epub.js 同步更新，无需 getClientRects） */
+export type SvgLocalRect = SvgLineSegment;
+
+export type UserHighlightBlockerSource = {
+	cfi: string;
+	rects: SvgLocalRect[];
 };
+
+export { parseSvgMarkRect };
 
 /**
  * EPUB 想法下划线点击事件处理器类型定义
@@ -116,46 +130,6 @@ function ensureThoughtUnderlineStyles(doc: Document = document): void {
 	}
 	// 始终将样式内容设置为最新下划线样式，确保主题或配置变动时及时刷新
 	style.textContent = EPUB_THOUGHT_UNDERLINE_CSS;
-}
-
-function getRenditionContentsList(rend?: Rendition): EpubIframeContents[] {
-	if (!rend) return [];
-	const raw = rend.getContents();
-	return Array.isArray(raw)
-		? (raw as EpubIframeContents[])
-		: raw
-			? [raw as EpubIframeContents]
-			: [];
-}
-
-/** marks-pane 内 SVG rect 的局部坐标（随滚动由 epub.js 同步更新，无需 getClientRects） */
-export type SvgLocalRect = {
-	x: number;
-	y: number;
-	width: number;
-	height: number;
-};
-
-export type UserHighlightBlockerSource = {
-	cfi: string;
-	rects: SvgLocalRect[];
-};
-
-export function parseSvgMarkRect(rect: SVGRectElement): SvgLocalRect | null {
-	const x = Number.parseFloat(rect.getAttribute('x') ?? 'NaN');
-	const y = Number.parseFloat(rect.getAttribute('y') ?? 'NaN');
-	const width = Number.parseFloat(rect.getAttribute('width') ?? 'NaN');
-	const height = Number.parseFloat(rect.getAttribute('height') ?? 'NaN');
-	if (
-		!Number.isFinite(x) ||
-		!Number.isFinite(y) ||
-		!Number.isFinite(width) ||
-		!Number.isFinite(height)
-	) {
-		return null;
-	}
-	if (width <= 0.5 || height <= 0.5) return null;
-	return { x, y, width, height };
 }
 
 function patchAllThoughtUnderlineMarks(rend?: Rendition): void {
@@ -375,12 +349,6 @@ function applyVisibleThoughtUnderlineLine(
 	line.setAttribute('stroke-width', '1');
 	line.setAttribute('stroke-dasharray', THOUGHT_LINE_DASHARRAY);
 	line.setAttribute('stroke-linecap', 'round');
-}
-
-function setSvgAttrIfChanged(el: Element, name: string, value: string): void {
-	if (el.getAttribute(name) !== value) {
-		el.setAttribute(name, value);
-	}
 }
 
 function syncThoughtMarkRects(
@@ -804,79 +772,6 @@ function sortCfiGroupsForUnderlineStack(
 		if (spanDiff !== 0) return spanDiff;
 		return a[0].length - b[0].length;
 	});
-}
-
-/**
- * 判断 inner Range 是否被 outer Range 严格包含（而不是刚好重合）。
- * “严格包含”定义为：
- *   - inner 的起点不得早于 outer（大于等于 outer 起点）
- *   - inner 的终点不得晚于 outer（小于等于 outer 终点）
- *   - 但两端不能都等于 outer（即不能完全重合，必须有至少一端不等于）
- *
- * @param inner - 待判断的内部区间
- * @param outer - 被比较的外部区间
- * @returns 若 inner 严格在 outer 区间内部则返回 true，否则返回 false
- */
-function isDomRangeStrictlyContained(inner: Range, outer: Range): boolean {
-	try {
-		// 检查 inner 的起点是否大于等于 outer 起点
-		const startsAfterOrEqual =
-			inner.compareBoundaryPoints(Range.START_TO_START, outer) >= 0;
-		// 检查 inner 的终点是否小于等于 outer 终点
-		const endsBeforeOrEqual =
-			inner.compareBoundaryPoints(Range.END_TO_END, outer) <= 0;
-		// 如起点早于 outer 或终点晚于 outer，则不被包含
-		if (!startsAfterOrEqual || !endsBeforeOrEqual) return false;
-		// 检查两端是否与 outer 完全重合
-		const sameStart =
-			inner.compareBoundaryPoints(Range.START_TO_START, outer) === 0;
-		const sameEnd = inner.compareBoundaryPoints(Range.END_TO_END, outer) === 0;
-		// 只要存在一端不同即可认定被严格包含
-		return !(sameStart && sameEnd);
-	} catch {
-		return false;
-	}
-}
-
-/**
- * 从给定的 CFI range 字符串中提取“Spine Hint”部分（即基于 spine 的章节定位标识）。
- *
- * CFI 结构通常如下例所示：
- *   epubcfi(/6/12!/4/2[chapter01]!/4/2/14)
- * 其中，"/6/12" 表示 spine 内部的位置，即“Spine Hint”；后面的 ! 为分隔符。
- *
- * 该函数的作用是：只保留括号中的 spine hint 部分（不含 ! 及其后的片段），用于判断不同 CFI 是否属于同一章节内容。
- * 若解析未匹配到，则返回原值，保证不出错。
- *
- * @param cfiRange - 形如 'epubcfi(...!...)' 的 CFI range 字符串
- * @returns   Spine Hint 部分（即括号内 ! 之前的路径）；未匹配返回原字符串
- */
-function extractCfiSpineHint(cfiRange: string): string {
-	// 使用正则匹配 "epubcfi(" 后面到第一个 "!" 之前的所有内容，并去除多余部分
-	const match = cfiRange.match(/epubcfi\(([^!]+)!/);
-	return match?.[1] ?? cfiRange;
-}
-
-/**
- * 判断 innerQuote 是否被 outerQuote 严格包含（即 innerQuote 是 outerQuote 的连续子串，但不能等于 outerQuote 本身）
- *
- * 规则说明：
- *   - 若任一参数为空或完全相等，认为“没有被严格包含”，直接返回 false
- *   - 若 innerQuote 作为连续子串存在于 outerQuote 内（且不全等），认为被严格包含，返回 true
- *   - 典型用例：innerQuote='他很高兴', outerQuote='那天他很高兴地走出门' => true
- *
- * @param innerQuote - 要检查是否嵌套在 outerQuote 内的小摘录（子串）
- * @param outerQuote - 外层的更长摘录（父串）
- * @returns innerQuote 是否被 outerQuote 严格嵌套
- */
-function isQuoteStrictlyNested(
-	innerQuote: string,
-	outerQuote: string,
-): boolean {
-	// 任意一端为空，或内容完全相同不算“严格嵌套”
-	if (!innerQuote || !outerQuote || innerQuote === outerQuote) return false;
-	// outerQuote 包含 innerQuote（且不全等）视为严格嵌套
-	return outerQuote.includes(innerQuote);
 }
 
 /**

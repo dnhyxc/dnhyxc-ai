@@ -13,6 +13,7 @@
 | 维度 | 用户划线 | 想法虚线 | 播放背景 |
 |------|----------|----------|----------|
 | **主模块** | `epubUserHighlights.ts` | `epubThoughtAnnotations.ts` | `epubListenMarkHighlight.ts` |
+| **横切 helper** | 共用 `epubMarkShared.ts`（CFI spine、Range 嵌套、SVG attr、contents 列表） | 同上 | 同上 |
 | **几何内核** | 共用 `epubRangeGeometry.ts` | 同上 | 同上 |
 | **滚动** | `epubScrolledNav.ts`（侧栏引用等） | 同上 | 同上 + `epubListenSegmentOverlay.ts` |
 | **DOM class** | `moke-epub-user-hl` | `moke-epub-thought-ul` | `moke-epub-listen-bg` |
@@ -138,7 +139,7 @@ flowchart TB
 | **`patchEpubThoughtUnderlineMarks(rend?)`** | 遍历想法 `g`：用 `resolveMarkSvgLineSegments` 得每行几何；画 `<line stroke-dasharray>` 琥珀虚线；与 `userHighlightBlockerSources` 求交，**跳过被用户色块覆盖的线段**。 | `runEpubReadingAnnotationPatch` |
 | **`setUserHighlightBlockerSourcesForThoughtPatch(sources)`** | 模块级注入 blocker 数组；patch 想法前由 user 侧 `collectUserHighlightBlockerSources` 填充。 | sync 中 apply 用户后、patch 前 |
 | **`restackThoughtMarkGroups(rend?)`** | 想法 `g` 按 CFI 跨度**从短到长**排序后 append，短选区在上层便于点击嵌套想法。 | patch 末尾（在用户 restack **之前**） |
-| **`parseSvgMarkRect(rect)`** | 读 SVGRectElement 的 x/y/width/height 为数值对象，非法则 null。 | collectUserHighlightBlockerSources |
+| **`parseSvgMarkRect(rect)`** | 读 SVGRectElement 的 x/y/width/height 为数值对象，非法或 ≤0.5px 则 null；**定义**于 `epubRangeGeometry.ts`，想法层 re-export。 | blocker 收集、readMarkSvgLineSegmentsFromRects |
 
 ### 5.3 播放背景专用
 

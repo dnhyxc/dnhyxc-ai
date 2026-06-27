@@ -48,6 +48,7 @@ import type {
 	EbookThoughtClickCluster,
 	EbookThoughtQuoteGroup,
 } from '../types';
+import { extractCfiSpineHint } from './epubMarkShared';
 import {
 	beginEpubAnnotationSyncScope,
 	cfiFromDomRange,
@@ -55,6 +56,8 @@ import {
 	resolveCfiDomRange,
 } from './epubRangeGeometry';
 import { isThoughtCfiRangeStrictlyContained } from './epubThoughtAnnotations';
+
+export { extractCfiSpineHint };
 
 export function groupThoughtsByCfi(
 	thoughts: EbookThought[],
@@ -290,12 +293,6 @@ function areThoughtCfisConnected(
 		allRanges,
 		allCfis,
 	);
-}
-
-/** 从 CFI 提取 spine 路径，用于限定同章节候选集 */
-export function extractCfiSpineHint(cfiRange: string): string {
-	const match = cfiRange.match(/epubcfi\(([^!]+)!/);
-	return match?.[1] ?? cfiRange;
 }
 
 /** 切换书籍时清空章节连通图缓存 */

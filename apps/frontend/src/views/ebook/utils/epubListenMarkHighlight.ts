@@ -5,7 +5,14 @@
  */
 import type { Rendition } from 'epubjs';
 import {
+	findMarksPaneSvgInDocument,
+	getRenditionContentsList,
+	setSvgAttrIfChanged,
+} from './epubMarkShared';
+import {
 	clientRectToSvgLocalSegment,
+	findMarksPaneContainer,
+	findMarksPaneSvgFromGroup,
 	getAccurateRangeLineClientRects,
 	getRenditionViewsList,
 	normalizeSelectionRangeForEpub,
@@ -48,11 +55,8 @@ function isRangeConnected(range: Range | null): range is Range {
 
 function listListenDocuments(rend: Rendition): Document[] {
 	const docs = new Set<Document>();
-	const raw = rend.getContents();
-	const items: unknown[] = Array.isArray(raw) ? raw : raw ? [raw] : [];
-	for (const item of items) {
-		const doc = (item as { document?: Document }).document;
-		if (doc) docs.add(doc);
+	for (const item of getRenditionContentsList(rend)) {
+		if (item.document) docs.add(item.document);
 	}
 	getEpubScrollContainer(rend)
 		?.querySelectorAll('iframe')
@@ -149,10 +153,6 @@ function collectPurgeDocs(rend?: Rendition): Set<Document> {
 	return docs;
 }
 
-function setSvgAttr(el: Element, name: string, value: string): void {
-	if (el.getAttribute(name) !== value) el.setAttribute(name, value);
-}
-
 /**
  * 听书专用行盒：段首（如 …… 后）getAccurateRangeLineClientRects 可能带上一条误检行，
  * 将首行 top 对齐句首 caret，避免背景整体上移一行。
@@ -188,11 +188,9 @@ function listenRangeToSvgSegments(
 	range: Range,
 ): SvgLineSegment[] {
 	const normalized = normalizeSelectionRangeForEpub(range) ?? range;
-	const svg = group.closest('svg');
-	const container = svg?.parentElement;
-	if (!(svg instanceof SVGSVGElement) || !(container instanceof HTMLElement)) {
-		return [];
-	}
+	const svg = findMarksPaneSvgFromGroup(group);
+	const container = svg ? findMarksPaneContainer(svg) : null;
+	if (!svg || !container) return [];
 	return listenLineRects(normalized).map((rect) =>
 		clientRectToSvgLocalSegment(rect, svg, container),
 	);
@@ -203,29 +201,21 @@ function syncMarkRects(group: SVGElement, segments: SvgLineSegment[]): void {
 	group.replaceChildren();
 	for (const seg of segments) {
 		const rect = ownerDoc.createElementNS('http://www.w3.org/2000/svg', 'rect');
-		setSvgAttr(rect, 'x', String(seg.x));
-		setSvgAttr(rect, 'y', String(seg.y));
-		setSvgAttr(rect, 'width', String(seg.width));
-		setSvgAttr(rect, 'height', String(seg.height));
-		setSvgAttr(rect, 'fill', EPUB_LISTEN_SEGMENT_FILL);
-		setSvgAttr(rect, 'fill-opacity', '1');
-		setSvgAttr(rect, 'stroke', 'transparent');
-		setSvgAttr(rect, 'stroke-width', '0');
+		setSvgAttrIfChanged(rect, 'x', String(seg.x));
+		setSvgAttrIfChanged(rect, 'y', String(seg.y));
+		setSvgAttrIfChanged(rect, 'width', String(seg.width));
+		setSvgAttrIfChanged(rect, 'height', String(seg.height));
+		setSvgAttrIfChanged(rect, 'fill', EPUB_LISTEN_SEGMENT_FILL);
+		setSvgAttrIfChanged(rect, 'fill-opacity', '1');
+		setSvgAttrIfChanged(rect, 'stroke', 'transparent');
+		setSvgAttrIfChanged(rect, 'stroke-width', '0');
 		group.appendChild(rect);
 	}
 	group.style.pointerEvents = 'none';
 }
 
-function findMarksPaneSvg(doc: Document): SVGSVGElement | null {
-	for (const pane of doc.querySelectorAll('.marks-pane')) {
-		const svg = pane.querySelector('svg');
-		if (svg instanceof SVGSVGElement) return svg;
-	}
-	return null;
-}
-
 function ensureListenMarkGroup(doc: Document): SVGElement | null {
-	const svg = findMarksPaneSvg(doc);
+	const svg = findMarksPaneSvgInDocument(doc);
 	if (!svg) return null;
 
 	let group = svg.querySelector(LISTEN_MARK_SELECTOR);

@@ -7,6 +7,15 @@ import type {
 	EpubHighlightStyle,
 } from '../types';
 import {
+	extractCfiSpineHint,
+	getRenditionContentsList,
+	isDomRangeOverlapping,
+	isDomRangeStrictlyContained,
+	isDomRangeTouchingOrOverlapping,
+	isQuoteStrictlyNested,
+	setSvgAttrIfChanged,
+} from './epubMarkShared';
+import {
 	beginEpubAnnotationSyncScope,
 	cfiFromDomRange,
 	EPUB_ANNOTATION_IGNORE_CLASS,
@@ -15,6 +24,7 @@ import {
 	getAccurateRangeLineClientRects,
 	getAccurateRangeLineClientRectsCached,
 	isPointInRangeTextBand,
+	parseSvgMarkRect,
 	resolveCfiDomRange,
 	resolveMarkSvgLineSegments,
 	type SvgLineSegment,
@@ -29,7 +39,6 @@ import {
 import {
 	applyEpubThoughtUnderlines,
 	hasTextSelectionInRend,
-	parseSvgMarkRect,
 	patchEpubThoughtUnderlineMarks,
 	restackThoughtMarkGroups,
 	setUserHighlightBlockerSourcesForThoughtPatch,
@@ -134,16 +143,6 @@ function buildWavyUnderlinePath(
 let highlightMetaByCfi = new Map<string, EbookUserHighlight>();
 
 const USER_HIGHLIGHT_SELECTOR = `g.${EPUB_USER_HIGHLIGHT_CLASS}, g[ref="${EPUB_USER_HIGHLIGHT_CLASS}"], g[ref*="${EPUB_USER_HIGHLIGHT_CLASS}"], g[class*="${EPUB_USER_HIGHLIGHT_CLASS}"]`;
-
-function getRenditionContentsList(rend?: Rendition): EpubIframeContents[] {
-	if (!rend) return [];
-	const raw = rend.getContents();
-	return Array.isArray(raw)
-		? (raw as EpubIframeContents[])
-		: raw
-			? [raw as EpubIframeContents]
-			: [];
-}
 
 /** 遍历当前 Rendition 下所有含用户划线 mark 的文档（包括主文档和各 EPUB iframe） */
 function iterHighlightDocuments(rend: Rendition): Document[] {
@@ -327,12 +326,6 @@ function resolveHighlightMetaFromGroup(
 		style: (el.dataset[DATA_STYLE] ?? 'highlight') as EpubHighlightStyle,
 		color: (el.dataset[DATA_COLOR] ?? 'pink') as EpubHighlightColorId,
 	};
-}
-
-function setSvgAttrIfChanged(el: Element, name: string, value: string): void {
-	if (el.getAttribute(name) !== value) {
-		el.setAttribute(name, value);
-	}
 }
 
 // 批量修补（刷新）所有用户高亮 SVG 分组的标注样式和内容
@@ -907,48 +900,6 @@ function attachUserHighlightReaderClickListener(
 		for (const fn of cleanups.values()) fn();
 		cleanups.clear();
 	};
-}
-
-function extractCfiSpineHint(cfiRange: string): string {
-	const match = cfiRange.match(/epubcfi\(([^!]+)!/);
-	return match?.[1] ?? cfiRange;
-}
-
-function isQuoteStrictlyNested(
-	innerQuote: string,
-	outerQuote: string,
-): boolean {
-	if (!innerQuote || !outerQuote || innerQuote === outerQuote) return false;
-	return outerQuote.includes(innerQuote);
-}
-
-function isDomRangeOverlapping(a: Range, b: Range): boolean {
-	try {
-		if (a.startContainer.ownerDocument !== b.startContainer.ownerDocument) {
-			return false;
-		}
-		return (
-			a.compareBoundaryPoints(Range.END_TO_START, b) > 0 &&
-			a.compareBoundaryPoints(Range.START_TO_END, b) < 0
-		);
-	} catch {
-		return false;
-	}
-}
-
-/** 相交或端点相接（「…杨广死」+「死于…」共享「死」边界） */
-function isDomRangeTouchingOrOverlapping(a: Range, b: Range): boolean {
-	try {
-		if (a.startContainer.ownerDocument !== b.startContainer.ownerDocument) {
-			return false;
-		}
-		return (
-			a.compareBoundaryPoints(Range.END_TO_START, b) >= 0 &&
-			a.compareBoundaryPoints(Range.START_TO_END, b) <= 0
-		);
-	} catch {
-		return false;
-	}
 }
 
 function highlightSpanLength(item: EbookUserHighlight): number {
@@ -2420,22 +2371,6 @@ export function installEpubReadingMarkClickListeners(
 
 /** 导出供侧栏 PopBar 锚定阅读区正文位置 */
 export { resolveCfiDomRange };
-
-function isDomRangeStrictlyContained(inner: Range, outer: Range): boolean {
-	try {
-		const startsAfterOrEqual =
-			inner.compareBoundaryPoints(Range.START_TO_START, outer) >= 0;
-		const endsBeforeOrEqual =
-			inner.compareBoundaryPoints(Range.END_TO_END, outer) <= 0;
-		if (!startsAfterOrEqual || !endsBeforeOrEqual) return false;
-		const sameStart =
-			inner.compareBoundaryPoints(Range.START_TO_START, outer) === 0;
-		const sameEnd = inner.compareBoundaryPoints(Range.END_TO_END, outer) === 0;
-		return !(sameStart && sameEnd);
-	} catch {
-		return false;
-	}
-}
 
 export function syncEpubReadingAnnotations(
 	rend: Rendition,

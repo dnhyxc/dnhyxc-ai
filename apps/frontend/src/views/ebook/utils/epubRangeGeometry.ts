@@ -24,12 +24,13 @@
  * 适用场景涵盖：高亮渲染、注释业务、朗读高亮、区域同步、跨章节/跨 iframe 定位与 UI 覆盖等 EPUB 阅读核心复杂交互需求。
  */
 import type { Rendition } from 'epubjs';
+import {
+	type EpubIframeContents,
+	getRenditionContentsList,
+} from './epubMarkShared';
 
-type EpubIframeContents = {
-	document: Document;
-	window: Window;
-	cfiFromRange: (range: Range, ignoreClass?: string) => string;
-};
+export type { EpubIframeContents };
+export { getRenditionContentsList };
 
 export const EPUB_ANNOTATION_IGNORE_CLASS = 'epubjs-hl';
 
@@ -45,16 +46,6 @@ export function getRenditionViewsList(rend?: Rendition): EpubRenditionView[] {
 	if (!raw) return [];
 	if (Array.isArray(raw)) return raw as EpubRenditionView[];
 	return (raw as { all?: () => EpubRenditionView[] }).all?.() ?? [];
-}
-
-function getRenditionContentsList(rend?: Rendition): EpubIframeContents[] {
-	if (!rend) return [];
-	const raw = rend.getContents();
-	return Array.isArray(raw)
-		? (raw as EpubIframeContents[])
-		: raw
-			? [raw as EpubIframeContents]
-			: [];
 }
 
 const TRIM_BOUNDARY_MAX_STEPS = 8192;
@@ -390,14 +381,35 @@ export type SvgLineSegment = {
 	height: number;
 };
 
-function findMarksPaneSvg(group: Element): SVGSVGElement | null {
+export function findMarksPaneSvgFromGroup(
+	group: Element,
+): SVGSVGElement | null {
 	const svg = group.closest('svg');
 	return svg instanceof SVGSVGElement ? svg : null;
 }
 
-function findMarksPaneContainer(svg: SVGSVGElement): HTMLElement | null {
+export function findMarksPaneContainer(svg: SVGSVGElement): HTMLElement | null {
 	const parent = svg.parentElement;
 	return parent instanceof HTMLElement ? parent : null;
+}
+
+/** 读单个 SVG rect 的局部坐标；非法或过小则 null */
+export function parseSvgMarkRect(rect: SVGRectElement): SvgLineSegment | null {
+	const x = Number.parseFloat(rect.getAttribute('x') ?? 'NaN');
+	const y = Number.parseFloat(rect.getAttribute('y') ?? 'NaN');
+	const width = Number.parseFloat(rect.getAttribute('width') ?? 'NaN');
+	const height = Number.parseFloat(rect.getAttribute('height') ?? 'NaN');
+	if (
+		!Number.isFinite(x) ||
+		!Number.isFinite(y) ||
+		!Number.isFinite(width) ||
+		!Number.isFinite(height) ||
+		width <= 0.5 ||
+		height <= 0.5
+	) {
+		return null;
+	}
+	return { x, y, width, height };
 }
 
 export function clientRectToSvgLocalSegment(
@@ -435,7 +447,7 @@ export function resolveDomRangeSvgLineSegments(
 	range: Range,
 ): SvgLineSegment[] {
 	const normalized = normalizeSelectionRangeForEpub(range) ?? range;
-	const svg = findMarksPaneSvg(group);
+	const svg = findMarksPaneSvgFromGroup(group);
 	const container = svg ? findMarksPaneContainer(svg) : null;
 	if (!svg || !container) return [];
 
@@ -451,21 +463,8 @@ export function readMarkSvgLineSegmentsFromRects(
 	const segments: SvgLineSegment[] = [];
 	for (const node of group.querySelectorAll('rect')) {
 		if (!(node instanceof SVGRectElement)) continue;
-		const x = Number.parseFloat(node.getAttribute('x') ?? 'NaN');
-		const y = Number.parseFloat(node.getAttribute('y') ?? 'NaN');
-		const width = Number.parseFloat(node.getAttribute('width') ?? 'NaN');
-		const height = Number.parseFloat(node.getAttribute('height') ?? 'NaN');
-		if (
-			!Number.isFinite(x) ||
-			!Number.isFinite(y) ||
-			!Number.isFinite(width) ||
-			!Number.isFinite(height) ||
-			width <= 0.5 ||
-			height <= 0.5
-		) {
-			continue;
-		}
-		segments.push({ x, y, width, height });
+		const parsed = parseSvgMarkRect(node);
+		if (parsed) segments.push(parsed);
 	}
 	return segments;
 }
