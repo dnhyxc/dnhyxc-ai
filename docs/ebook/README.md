@@ -47,6 +47,8 @@
 | [epub-listen-player-bar.md](./epub-listen-player-bar.md)                             | **增量**：听书播放条分句菜单、倍速 0.75×～3×、跳转居中滚动与 TTS 即时倍速                                              |
 | [epub-quote-listen-player-bar.md](./epub-quote-listen-player-bar.md)                   | **增量**：听当前共用底部播放条（暂停/切句/倍速，与听书同一组件）                                                      |
 | [epub-listen-bg-resize-relayout.md](./epub-listen-bg-resize-relayout.md)               | **增量**：听读播放背景随分栏/侧栏 resize 重绘（`repaintActive` 重挂 group、ResizeObserver、`EpubPane` 接线）            |
+| [epub-listen-sentence-leading-punct.md](./epub-listen-sentence-leading-punct.md)         | **增量**：听读分句句首中文标点（`……`、`——`、开引号与句界算法对称处理）                                                  |
+| [epub-listen-cloud-prefetch.md](./epub-listen-cloud-prefetch.md)                           | **增量**：听书/听当前句间云端 TTS 预取（`prefetchCloudEnglishTts` 缩短连播句间等待）                                  |
 | [epub-mark-shared-extraction.md](./epub-mark-shared-extraction.md)                       | **增量（纯重构）**：mark 层公共 utils 抽取至 `epubMarkShared.ts` + geometry export，行为不变                          |
 | [epub-listen-user-highlight-reconcile.md](./epub-listen-user-highlight-reconcile.md) | **增量**：听当前与用户划线 DOM 协调（reconcile 孤儿 mark、apply 存在性校验、播完 sync）                                                       |
 | [../Influence-point/epub-listen-bg-vs-annotations.md](../Influence-point/epub-listen-bg-vs-annotations.md) | **影响点**：播放背景色 vs 用户划线 / 想法划线（现行隔离与历史风险）                                                                           |

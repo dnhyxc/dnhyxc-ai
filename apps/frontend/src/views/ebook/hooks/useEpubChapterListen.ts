@@ -6,6 +6,7 @@ import {
 	buildSentenceOffsetSpans,
 	isEnglishPlaybackAvailable,
 	playEnglishPreferred,
+	prefetchCloudEnglishTts,
 	primeEnglishPlaybackForUserGesture,
 	stopAllEnglishPlayback,
 	stripMarkdownForTts,
@@ -180,35 +181,75 @@ export function useEpubChapterListen(
 		[syncState],
 	);
 
+	/**
+	 * 按当前句游标依次朗读章节中的句子。
+	 * 对每句启动英文朗读，提前预取下一句的云端 TTS；高亮当前句，朗读失败弹 Toast。
+	 * 朗读中如暂停或中断则返回 false，否则全部朗读完返回 true。
+	 */
 	const playSentencesFromCursor = useCallback(
 		async (
 			ctx: SectionCtx,
 			gen: number,
 			opts?: { scrollCenterOnFirst?: boolean },
 		): Promise<boolean> => {
+			// 结构获取当前章节原文、句子切分、句子 DOM Range 信息
 			const { plain, sentences, sentenceRanges } = ctx;
+			// 获取 epub.js 渲染实例
 			const rend = getRenditionRef.current();
+			// 获取当前句子索引
 			const startSi = sentenceCursorRef.current;
+			// 维护已预取云端 TTS 的（句子索引 -> Promise） 映射
+			const prefetchedByIndex = new Map<
+				number,
+				ReturnType<typeof prefetchCloudEnglishTts>
+			>();
 
+			// 预取指定句索引的云端 TTS 音频（若未预取且文本非空）
+			const schedulePrefetch = (index: number) => {
+				// 超范围或已预取过直接跳过
+				if (index >= sentences.length || prefetchedByIndex.has(index)) return;
+				const sent = sentences[index];
+				if (!sent) return;
+				// 按句子区间从原文切片并去 markdown
+				const raw = stripMarkdownForTts(
+					plain.slice(sent.start, sent.end),
+				).trim();
+				if (!raw) return;
+				// 存入预取 Map：将 Promise 放进去即可
+				prefetchedByIndex.set(index, prefetchCloudEnglishTts(raw));
+			};
+			// 首次进入时，立即预取下一句
+			schedulePrefetch(startSi + 1);
+
+			// 从当前句索引遍历到该章节句尾
 			for (let si = sentenceCursorRef.current; si < sentences.length; si += 1) {
+				// 若 loop 序号变动或暂停则中止
 				if (!isGenActive(gen) || pausedRef.current) return false;
 
+				// 拿到当前句子切片
 				const sent = sentences[si]!;
+				// 去 markdown 获取朗读文本
 				const spokenRaw = stripMarkdownForTts(
 					plain.slice(sent.start, sent.end),
 				);
+				// 若纯空句则跳过
 				if (!spokenRaw.trim()) continue;
 
+				// 更新当前游标到此句
 				sentenceCursorRef.current = si;
+				// 推送 listen 状态更新（驱动 UI 响应：当前句、句数等）
 				syncState({
 					status: 'playing',
 					sentenceIndex: si,
 					sentenceCount: sentences.length,
 				});
 
+				// 为当前句算出对应的 DOM Range，用于高亮
 				const domRange = sentenceRanges[si];
 				const hasHighlight = !!(rend && domRange);
+
 				if (hasHighlight) {
+					// 第一条朗读可配置自动居中滚动
 					const jumpScroll =
 						opts?.scrollCenterOnFirst && si === startSi
 							? ({ forceScroll: true, align: 'center' as const } as const)
@@ -216,11 +257,17 @@ export function useEpubChapterListen(
 					showChapterListenSentenceHighlight(rend, domRange, jumpScroll);
 				}
 
+				// 预取下一句 TTS
+				schedulePrefetch(si + 1);
+
 				try {
+					// 播放当前句的英文（优先本地音色，次之云端 MP3，prefetchedCloud 可命中提前下发）
 					await playEnglishPreferred(spokenRaw, {
 						speak: { rate: rateRef.current },
+						prefetchedCloud: prefetchedByIndex.get(si) ?? null,
 					});
 				} catch {
+					// 播放失败发 toast 通知，若未中断则弹警告，后续中止
 					if (isGenActive(gen)) {
 						Toast({
 							type: 'warning',
@@ -230,10 +277,13 @@ export function useEpubChapterListen(
 					return false;
 				}
 
+				// 检查循环条件：被暂停/loop 变更直接中断
 				if (!isGenActive(gen) || pausedRef.current) return false;
+				// 朗读完当前句后如有高亮则清除
 				if (hasHighlight) clearChapterListenSentenceHighlight(rend);
 			}
 
+			// 一轮全部朗读成功，检查 loop 是否仍然有效
 			return isGenActive(gen);
 		},
 		[syncState],

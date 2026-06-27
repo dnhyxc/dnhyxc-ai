@@ -9,5 +9,7 @@
 | [epub-listen-utils-consolidation.md](./epub-listen-utils-consolidation.md) | 听读 **utils 7→3 文件合并**：路径对照、API 不变项、文档滞后、回归清单 |
 | [epub-mark-shared-extraction.md](./epub-mark-shared-extraction.md) | **mark 层公共 utils 抽取**（`epubMarkShared` + geometry export）：CFI/Range/SVG 去重、对各层影响 |
 | [epub-quote-listen-player-bar.md](./epub-quote-listen-player-bar.md) | **听当前共用底部播放条**：按句播放重构、与听书互斥、句内 cadence 高亮变化 |
+| [epub-listen-sentence-leading-punct.md](./epub-listen-sentence-leading-punct.md) | **句界算法句首中文标点**：`buildSentenceOffsetSpans` 对听书/听当前/TTS 分句与背景对齐的影响 |
+| [epub-listen-cloud-prefetch.md](./epub-listen-cloud-prefetch.md) | **句间云端 TTS 预取**：`prefetchCloudEnglishTts` 对听书/听当前连播与其它 `playEnglishPreferred` 调用方的影响 |
 
 **阅读约定**：结论以仓库 **当前源码** 为准；「历史风险」指旧实现曾出现的问题，不代表现行代码仍会触发。

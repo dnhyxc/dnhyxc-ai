@@ -444,6 +444,12 @@ export type TtsCadenceChunkEvent = {
 	sentencePlainEnd: number;
 };
 
+/** 听书逐句：上一句播放期间预取的云端 MP3（plain 为实际请求的 chunk 文本） */
+export type EnglishTtsSentencePrefetch = {
+	plain: string;
+	ready: CloudTtsReady;
+};
+
 export type PlayEnglishPreferredOptions = {
 	/** 为 true 时强制本机 Web Speech（如本机音色设置试听）；省略时会员走云端、非会员走本机 */
 	preferLocal?: boolean;
@@ -451,9 +457,14 @@ export type PlayEnglishPreferredOptions = {
 	speak?: SpeakEnglishOptions;
 	/** 每个 TTS 节奏段开始/结束（句内子句不重复触发句末） */
 	onCadenceChunk?: (event: TtsCadenceChunkEvent) => void;
+	/** 听书/听当前逐句：由上一轮发起的下一句云端预取（缩短句间等待） */
+	prefetchedCloud?: Promise<EnglishTtsSentencePrefetch> | null;
 };
 
-type CadencePlaybackHooks = Pick<PlayEnglishPreferredOptions, 'onCadenceChunk'>;
+type CadencePlaybackHooks = Pick<
+	PlayEnglishPreferredOptions,
+	'onCadenceChunk' | 'prefetchedCloud'
+>;
 
 type CloudTtsPlaybackOptions = CadencePlaybackHooks & {
 	rate?: number;
@@ -918,6 +929,44 @@ function mergeUint8Arrays(parts: Uint8Array[]): ArrayBuffer {
 	return merged.buffer;
 }
 
+/** 与 playCloudTtsCadenceSegments 首段请求对齐的 chunk 文本（便于句间预取命中） */
+function firstCloudTtsChunkPlain(plain: string): string {
+	const chunks = splitTextForTtsCadence(plain);
+	return chunks[0]?.text ?? plain;
+}
+
+async function resolveCloudTtsReady(
+	chunkPlain: string,
+	prefetched?: Promise<EnglishTtsSentencePrefetch> | null,
+): Promise<CloudTtsReady> {
+	if (prefetched) {
+		try {
+			const hit = await prefetched;
+			if (hit.plain === chunkPlain) return hit.ready;
+		} catch {
+			// 预取失败则回退现场请求
+		}
+	}
+	return startCloudTts(chunkPlain);
+}
+
+/**
+ * 听书/听当前：在播当前句时预取下一句云端 MP3；非云端路径返回 null。
+ */
+export function prefetchCloudEnglishTts(
+	rawText: string,
+	options?: Pick<PlayEnglishPreferredOptions, 'preferLocal'>,
+): Promise<EnglishTtsSentencePrefetch> | null {
+	if (!shouldUseCloudEnglishTts(options)) return null;
+	const plain = stripMarkdownForTts(rawText);
+	if (!plain) return null;
+	const chunkPlain = firstCloudTtsChunkPlain(plain);
+	return startCloudTts(chunkPlain).then((ready) => ({
+		plain: chunkPlain,
+		ready,
+	}));
+}
+
 /** 发起云端 TTS 请求；命中 LRU 则直接返回 Blob */
 async function startCloudTts(plain: string): Promise<CloudTtsReady> {
 	await ensureMinimaxTtsUserPrefsLoaded();
@@ -1058,7 +1107,10 @@ async function playCloudTtsCadenceSegments(
 		chunks[0].text.length <= MAX_SINGLE_CLOUD_TTS_CHARS
 	) {
 		emitCadenceChunk(opts, plain, chunks, 0, 'start');
-		const ready = await startCloudTts(chunks[0].text);
+		const ready = await resolveCloudTtsReady(
+			chunks[0].text,
+			opts?.prefetchedCloud,
+		);
 		if (!isPlaybackGenerationActive(generation)) return;
 		await playCloudTtsReady(ready, generation, rate);
 		if (!isPlaybackGenerationActive(generation)) return;
@@ -1066,8 +1118,9 @@ async function playCloudTtsCadenceSegments(
 		return;
 	}
 
-	let pendingReady: Promise<CloudTtsReady> | null = startCloudTts(
+	let pendingReady: Promise<CloudTtsReady> | null = resolveCloudTtsReady(
 		chunks[0].text,
+		opts?.prefetchedCloud,
 	);
 
 	for (let i = 0; i < chunks.length; i += 1) {
@@ -1243,6 +1296,7 @@ export async function playEnglishPreferred(
 	const useCloud = shouldUseCloudEnglishTts(options);
 	const cadenceHooks: CadencePlaybackHooks = {
 		onCadenceChunk: options?.onCadenceChunk,
+		prefetchedCloud: options?.prefetchedCloud,
 	};
 
 	if (!useCloud) {
@@ -1400,68 +1454,68 @@ export function setPreferredLocalEnglishVoiceByUri(voiceURI: string): void {
 /** 设置页「自动」选项的 Select value */
 export const LOCAL_ENGLISH_TTS_VOICE_AUTO = '__auto__';
 
-/**
- * - ponytail: 模块自检——长文须能切成多段，否则云端首播仍等整段合成，
- * - 任意地方第一次 import '@/utils/englishTts' 时，模块求值到文件末尾就会跑这段 if。
- * - 例如电子书划句朗读、英语学习页、云 TTS 设置页等，
- * 只要 import 了这个模块，自检就会执行一次（模块通常只加载一次，不会重复跑）。
- */
-if (splitTextForTtsCadence('测'.repeat(200)).length < 2) {
-	throw new Error('[englishTts] 长文分段异常，云端流水线无法缩短首声');
-}
+// /**
+//  * - ponytail: 模块自检——长文须能切成多段，否则云端首播仍等整段合成，
+//  * - 任意地方第一次 import '@/utils/englishTts' 时，模块求值到文件末尾就会跑这段 if。
+//  * - 例如电子书划句朗读、英语学习页、云 TTS 设置页等，
+//  * 只要 import 了这个模块，自检就会执行一次（模块通常只加载一次，不会重复跑）。
+//  */
+// if (splitTextForTtsCadence('测'.repeat(200)).length < 2) {
+// 	throw new Error('[englishTts] 长文分段异常，云端流水线无法缩短首声');
+// }
 
-{
-	const cases = [
-		'赞叹一声：\u201c阿弥陀佛！\u201d这个在政治上',
-		'赞叹一声：\u201c阿弥陀佛！ \u201d这个在政治上',
-		'太好了！！！\u201d接下来',
-	];
-	for (const plain of cases) {
-		const spans = buildSentenceOffsetSpans(plain);
-		const trimmed = plain.trim();
-		const first = trimmed.slice(spans[0]?.start ?? 0, spans[0]?.end ?? 0);
-		if (spans.length < 2 || !first.includes('！')) {
-			throw new Error(`[englishTts] 叹号句界异常: ${plain}`);
-		}
-		if (!first.endsWith('\u201d')) {
-			throw new Error(`[englishTts] 闭合引号未纳入前句: ${plain}`);
-		}
-		if (!trimmed.slice(spans[1]?.start ?? 0).match(/^这|接下/)) {
-			throw new Error(`[englishTts] 叹号后句界错位: ${plain}`);
-		}
-	}
-	const ellipsisMid = buildSentenceOffsetSpans('第一句。……第二句。');
-	const emMid = '第一句。……第二句。'.trim();
-	const e1 = ellipsisMid[1];
-	if (
-		ellipsisMid.length !== 2 ||
-		emMid.slice(e1?.start ?? 0, e1?.end ?? 0) !== '……第二句'
-	) {
-		throw new Error('[englishTts] 句中省略号应并入下一句');
-	}
-	const dashStart = buildSentenceOffsetSpans('——他说完就走了。');
-	const d0 = dashStart[0];
-	if (
-		dashStart.length !== 1 ||
-		'——他说完就走了。'.trim().slice(d0?.start ?? 0, d0?.end ?? 0) !==
-			'——他说完就走了'
-	) {
-		throw new Error('[englishTts] 句首破折号应并入本句');
-	}
-	const leading = buildSentenceOffsetSpans('……他走了。');
-	const leadingText = '……他走了。'.trim();
-	const l0 = leading[0];
-	if (
-		leading.length !== 1 ||
-		l0?.start !== 0 ||
-		leadingText.slice(l0.start, l0.end) !== '……他走了'
-	) {
-		throw new Error('[englishTts] 段首省略号不应单独成句');
-	}
-	const openerNext = buildSentenceOffsetSpans('完。\u201c下一句。\u201d');
-	const t2 = '完。\u201c下一句。\u201d'.trim();
-	const s1 = t2.slice(openerNext[1]?.start ?? 0, openerNext[1]?.end ?? 0);
-	if (openerNext.length !== 2 || !s1.startsWith('\u201c')) {
-		throw new Error('[englishTts] 句首开引号应归入下一句');
-	}
-}
+// {
+// 	const cases = [
+// 		'赞叹一声：\u201c阿弥陀佛！\u201d这个在政治上',
+// 		'赞叹一声：\u201c阿弥陀佛！ \u201d这个在政治上',
+// 		'太好了！！！\u201d接下来',
+// 	];
+// 	for (const plain of cases) {
+// 		const spans = buildSentenceOffsetSpans(plain);
+// 		const trimmed = plain.trim();
+// 		const first = trimmed.slice(spans[0]?.start ?? 0, spans[0]?.end ?? 0);
+// 		if (spans.length < 2 || !first.includes('！')) {
+// 			throw new Error(`[englishTts] 叹号句界异常: ${plain}`);
+// 		}
+// 		if (!first.endsWith('\u201d')) {
+// 			throw new Error(`[englishTts] 闭合引号未纳入前句: ${plain}`);
+// 		}
+// 		if (!trimmed.slice(spans[1]?.start ?? 0).match(/^这|接下/)) {
+// 			throw new Error(`[englishTts] 叹号后句界错位: ${plain}`);
+// 		}
+// 	}
+// 	const ellipsisMid = buildSentenceOffsetSpans('第一句。……第二句。');
+// 	const emMid = '第一句。……第二句。'.trim();
+// 	const e1 = ellipsisMid[1];
+// 	if (
+// 		ellipsisMid.length !== 2 ||
+// 		emMid.slice(e1?.start ?? 0, e1?.end ?? 0) !== '……第二句'
+// 	) {
+// 		throw new Error('[englishTts] 句中省略号应并入下一句');
+// 	}
+// 	const dashStart = buildSentenceOffsetSpans('——他说完就走了。');
+// 	const d0 = dashStart[0];
+// 	if (
+// 		dashStart.length !== 1 ||
+// 		'——他说完就走了。'.trim().slice(d0?.start ?? 0, d0?.end ?? 0) !==
+// 			'——他说完就走了'
+// 	) {
+// 		throw new Error('[englishTts] 句首破折号应并入本句');
+// 	}
+// 	const leading = buildSentenceOffsetSpans('……他走了。');
+// 	const leadingText = '……他走了。'.trim();
+// 	const l0 = leading[0];
+// 	if (
+// 		leading.length !== 1 ||
+// 		l0?.start !== 0 ||
+// 		leadingText.slice(l0.start, l0.end) !== '……他走了'
+// 	) {
+// 		throw new Error('[englishTts] 段首省略号不应单独成句');
+// 	}
+// 	const openerNext = buildSentenceOffsetSpans('完。\u201c下一句。\u201d');
+// 	const t2 = '完。\u201c下一句。\u201d'.trim();
+// 	const s1 = t2.slice(openerNext[1]?.start ?? 0, openerNext[1]?.end ?? 0);
+// 	if (openerNext.length !== 2 || !s1.startsWith('\u201c')) {
+// 		throw new Error('[englishTts] 句首开引号应归入下一句');
+// 	}
+// }

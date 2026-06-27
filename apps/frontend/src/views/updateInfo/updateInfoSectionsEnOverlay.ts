@@ -1106,4 +1106,14 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'While quote Listen is playing, the same bottom bar as listen-while-reading appears with pause/resume, stop, previous/next sentence, sentence list jump, and speed 0.75×–3×. PopBar and reading-notes quote entries are unchanged; mutually exclusive with listen-while-reading.',
 	},
+	's25-55': {
+		title: 'EPUB listen sentence split for leading Chinese punctuation',
+		description:
+			'While listen-while-reading or quote Listen is playing, leading ellipsis, em dashes, and opening quotes are kept with the sentence they belong to—the sentence list and per-sentence highlight stay aligned with speech instead of splitting empty sentences or drifting off the read text.',
+	},
+	's25-56': {
+		title: 'Smoother cloud listen between sentences',
+		description:
+			'When using cloud voice for listen-while-reading or quote Listen in continuous playback, the gap between sentences is shorter so the next line starts sooner after the previous one finishes. Local browser speech is unchanged.',
+	},
 };
