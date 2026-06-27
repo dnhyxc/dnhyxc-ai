@@ -8,7 +8,7 @@ import {
 	stripMarkdownForTts,
 } from '@/utils/englishTts';
 import { clearListenMarkHighlight } from './epubListenMarkHighlight';
-import { syncChapterListenScrollSession } from './epubListenSegmentOverlay';
+import { showEpubListenDomRange } from './epubListenSegmentOverlay';
 import { getRenditionViewsList, resolveCfiDomRange } from './epubRangeGeometry';
 import { getEpubScrollContainer } from './epubScrolledNav';
 
@@ -239,8 +239,9 @@ export function indexChapterSentenceRanges(
 export function showChapterListenSentenceHighlight(
 	rend: Rendition,
 	range: Range,
+	opts?: { forceScroll?: boolean; align?: 'center' | 'nearest' },
 ): void {
-	syncChapterListenScrollSession(rend, range);
+	showEpubListenDomRange(rend, range, opts);
 }
 
 export function clearChapterListenSentenceHighlight(rend?: Rendition): void {

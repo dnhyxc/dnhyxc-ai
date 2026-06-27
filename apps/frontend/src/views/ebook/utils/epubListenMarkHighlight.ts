@@ -287,42 +287,113 @@ function paintIframeOverlay(doc: Document, range: Range): boolean {
 	return true;
 }
 
+/**
+ * 重绘当前激活的“听书高亮”标记
+ * 场景：包括听书激活/换句/resize等（需保证mark层或SVG重建后能重新绘制）
+ * 优先SVG方式绘制背景；SVG不可用时兜底用iframe内div overlay绘制
+ */
 function repaintActive(): void {
+	// 若无激活高亮或高亮Range已失效（被移除），直接返回
 	if (!active || !isRangeConnected(active.range)) return;
+
+	// 标准化选区Range（消除跨iframe等异常情况）
 	const normalized =
 		normalizeSelectionRangeForEpub(active.range) ?? active.range;
-	if (active.mode === 'svg' && active.group?.isConnected) {
-		paintDirectSvg(active.group, normalized);
-	} else {
-		paintIframeOverlay(active.doc, normalized);
+
+	// 获取Range所属的Document（用于后续节点操作）
+	const doc = normalized.startContainer.ownerDocument;
+	if (!doc) return;
+
+	// resize后 marks-pane SVG 可能被重建，不能复用上次的group，需重新查找/挂载SVG <g>
+	const group = ensureListenMarkGroup(doc);
+
+	// 若能找到SVG group且能正常画高亮，则采用SVG方案
+	if (group && paintDirectSvg(group, normalized)) {
+		active.mode = 'svg'; // 标记当前模式为svg
+		active.group = group; // 存储本次使用的group
+		active.doc = doc; // 记录doc，方便后续复用判断
+		return;
+	}
+	// 若SVG失败（group挂载失败或paint失败），则 fallback 到iframe内div绘制 overlay
+	if (paintIframeOverlay(doc, normalized)) {
+		active.mode = 'iframe'; // 标记当前模式为iframe
+		active.group = null; // 本次不用group
+		active.doc = doc;
 	}
 }
 
+// 安排高亮重绘的调度任务（带防抖，防止重复执行），每次只有一个动画帧回调在队列中
 function schedulePatch(rend: Rendition): void {
+	// 若当前无激活高亮或 rend 对象不符，则直接返回
 	if (!active || active.rend !== rend) return;
+	// 取消之前已挂起的动画帧，以防止积压
 	cancelAnimationFrame(relayoutRaf);
+	// 新建一个动画帧用于高亮重绘
 	relayoutRaf = requestAnimationFrame(() => {
+		// 回调进入后先重置标记，表示当前无 pending 动画帧
 		relayoutRaf = 0;
+		// 若激活状态有变（如已解绑或更换页面），终止重绘
 		if (!active || active.rend !== rend) return;
+		// 实际执行高亮重绘
 		repaintActive();
 	});
 }
 
+/**
+ * 监听并自动重绘高亮背景（窗口尺寸/EPUB重排/容器滚动/渲染事件时）
+ * @param rend EPUB.js 的 Rendition 实例
+ */
 function attachRelayout(rend: Rendition): void {
+	// 清理前一次监听，避免重复监听或内存泄露
 	detachRelayout?.();
+
+	// 定义重排回调，统一调度 schedulePatch
 	const onRelayout = () => schedulePatch(rend);
+
+	// 绑定 EPUB 渲染相关事件，重排要求
 	rend.on('relocated', onRelayout);
 	rend.on('rendered', onRelayout);
+
+	// 存储需要后续清理的回调（如 ResizeObserver）
+	const resizeCleanups: (() => void)[] = [];
+	// 获取滚动容器（区分不同渲染布局模式）
+	const scrollContainer = getEpubScrollContainer(rend);
+	if (scrollContainer) {
+		// 监听页面尺寸变化，自动重绘高亮
+		const ro = new ResizeObserver(() => onRelayout());
+		ro.observe(scrollContainer);
+		resizeCleanups.push(() => ro.disconnect());
+		// 若容器的父级节点存在，额外监听父容器尺寸变化，处理分栏/窗口变更
+		const host = scrollContainer.parentElement;
+		if (host) {
+			const roHost = new ResizeObserver(() => onRelayout());
+			roHost.observe(host);
+			resizeCleanups.push(() => roHost.disconnect());
+		}
+	}
+
+	// 定义 detachRelayout，用于后续解绑监听与清理 observer
 	detachRelayout = () => {
+		// 取消帧动画回调
 		cancelAnimationFrame(relayoutRaf);
 		relayoutRaf = 0;
+		// 依次执行所有 observer 清理函数
+		for (const cleanup of resizeCleanups) cleanup();
 		try {
+			// 解绑 EPUB 渲染事件
 			rend.off('relocated', onRelayout);
 			rend.off('rendered', onRelayout);
 		} catch {
-			// rendition 已销毁
+			// rendition 已销毁，无需额外处理
 		}
 	};
+}
+
+/** 阅读区宽度变化后重绘当前句播放背景（分栏拖拽、侧栏开关等） */
+export function relayoutListenMarkHighlight(rend: Rendition): void {
+	schedulePatch(rend);
+	// soft resize 后 marks-pane 偶发晚一帧就绪
+	requestAnimationFrame(() => schedulePatch(rend));
 }
 
 /** 绘制当前句背景（内部先全量清除） */

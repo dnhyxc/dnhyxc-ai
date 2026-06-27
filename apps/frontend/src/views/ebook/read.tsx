@@ -2229,11 +2229,13 @@ function EbookReadPage() {
 								spineIndex={chapterListen.spineIndex}
 								sentenceIndex={chapterListen.sentenceIndex}
 								sentenceCount={chapterListen.sentenceCount}
+								sentenceLabels={chapterListen.sentenceLabels}
 								rate={chapterListen.rate}
 								onTogglePlay={chapterListen.togglePlay}
 								onStop={chapterListen.stop}
 								onPrevSentence={chapterListen.prevSentence}
 								onNextSentence={chapterListen.nextSentence}
+								onGoToSentence={chapterListen.goToSentence}
 								onRateChange={chapterListen.setRate}
 							/>
 						</div>

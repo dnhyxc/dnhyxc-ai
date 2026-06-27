@@ -44,8 +44,11 @@
 | [epub-listen-host-overlay.md](./epub-listen-host-overlay.md)                       | **增量**：听当前 host 浮层绘制与跨段句间清除（替代 iframe 三层 mark）                                                                          |
 | [epub-listen-auto-follow-fab.md](./epub-listen-auto-follow-fab.md)                   | **增量**：听当前播放自动滚入视口、手动滚动打断与右下角回位 FAB                                                                                 |
 | [epub-chapter-listen.md](./epub-chapter-listen.md)                                   | **增量**：EPUB 边听边读 MVP（innerText 播放、TreeWalker 句 Range、`epubListenMarkHighlight` 背景、顶栏听书与底部播放条） |
+| [epub-listen-player-bar.md](./epub-listen-player-bar.md)                             | **增量**：听书播放条分句菜单、倍速 0.75×～3×、跳转居中滚动与 TTS 即时倍速                                              |
+| [epub-listen-bg-resize-relayout.md](./epub-listen-bg-resize-relayout.md)               | **增量**：听读播放背景随分栏/侧栏 resize 重绘（`repaintActive` 重挂 group、ResizeObserver、`EpubPane` 接线）            |
 | [epub-listen-user-highlight-reconcile.md](./epub-listen-user-highlight-reconcile.md) | **增量**：听当前与用户划线 DOM 协调（reconcile 孤儿 mark、apply 存在性校验、播完 sync）                                                       |
 | [../Influence-point/epub-listen-bg-vs-annotations.md](../Influence-point/epub-listen-bg-vs-annotations.md) | **影响点**：播放背景色 vs 用户划线 / 想法划线（现行隔离与历史风险）                                                                           |
+| [../Influence-point/epub-listen-resize-relayout.md](../Influence-point/epub-listen-resize-relayout.md) | **影响点**：阅读区 resize 重绘对原有功能的影响面                                                                                              |
 | [../Influence-point/epub-listen-utils-consolidation.md](../Influence-point/epub-listen-utils-consolidation.md) | **影响点**：听读 utils 7→3 文件合并、路径对照与回归清单                                                                                       |
 | [epub-thought-quote-viewport.md](./epub-thought-quote-viewport.md)                 | **增量**：想法侧栏开合后左侧引用段落保持视口可见（CFI 锚点 + 分栏 resize 后 scroll 校正）                                                    |
 | [epub-thought-quote-highlight-toggle.md](./epub-thought-quote-highlight-toggle.md) | **增量**：侧栏引用区划线/删除划线与 PopBar 对齐的 full 覆盖度判定                                                                               |

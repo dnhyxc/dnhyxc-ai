@@ -150,6 +150,44 @@ export function scrollEpubDomRangeIntoView(
 	return true;
 }
 
+/** 连续滚动：将 Range 垂直居中到阅读容器视口 */
+export function scrollEpubDomRangeToCenter(
+	rend: Rendition,
+	range: Range,
+): boolean {
+	const container = getEpubScrollContainer(rend);
+	if (!container) return false;
+
+	const win = range.startContainer.ownerDocument?.defaultView;
+	const iframe = win?.frameElement as HTMLIFrameElement | null;
+	if (!iframe) return false;
+
+	const { top, bottom } = readRangeViewportBounds(range, iframe);
+	const rangeMid = (top + bottom) / 2;
+	const containerRect = container.getBoundingClientRect();
+	const containerMid = (containerRect.top + containerRect.bottom) / 2;
+	container.scrollTop += rangeMid - containerMid;
+	return true;
+}
+
+/**
+ * 听书分句跳转等：将 Range 滚到视口中央；分页模式回退 scrollEpubRangeIntoView。
+ */
+export async function scrollEpubRangeToViewCenter(
+	rend: Rendition,
+	range: Range,
+	fallbackCfi?: string,
+): Promise<boolean> {
+	if (getEpubScrollContainer(rend)) {
+		try {
+			return scrollEpubDomRangeToCenter(rend, range);
+		} catch {
+			return false;
+		}
+	}
+	return scrollEpubRangeIntoView(rend, range, fallbackCfi);
+}
+
 /**
  * 听当前 / 引用定位：Range 不在视口内时滚入可见区域。
  * 连续滚动调容器 scrollTop；分页模式 rend.display(cfi) 翻页。

@@ -2,6 +2,7 @@ import { Toast } from '@ui/sonner';
 import type { Rendition } from 'epubjs';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+	applyActiveEnglishPlaybackRate,
 	buildSentenceOffsetSpans,
 	isEnglishPlaybackAvailable,
 	playEnglishPreferred,
@@ -29,13 +30,16 @@ import {
 
 export type ChapterListenStatus = 'idle' | 'loading' | 'playing' | 'paused';
 
-export const CHAPTER_LISTEN_RATES = [0.75, 1, 1.25, 1.5] as const;
+export const CHAPTER_LISTEN_RATES = [
+	0.75, 1, 1.25, 1.5, 1.8, 2, 2.25, 2.5, 2.8, 3,
+] as const;
 
 type ChapterListenState = {
 	status: ChapterListenStatus;
 	spineIndex: number;
 	sentenceIndex: number;
 	sentenceCount: number;
+	sentenceLabels: string[];
 	rate: number;
 };
 
@@ -44,6 +48,7 @@ const IDLE_STATE: ChapterListenState = {
 	spineIndex: -1,
 	sentenceIndex: 0,
 	sentenceCount: 0,
+	sentenceLabels: [],
 	rate: 1,
 };
 
@@ -53,6 +58,15 @@ type SectionCtx = {
 	sentenceRanges: Array<Range | null>;
 	spineIndex: number;
 };
+
+function buildSentenceLabels(
+	plain: string,
+	sentences: Array<{ start: number; end: number }>,
+): string[] {
+	return sentences.map((sent) =>
+		stripMarkdownForTts(plain.slice(sent.start, sent.end)).trim(),
+	);
+}
 
 /**
  * EPUB 从当前可见位置连续听书（innerText 抽正文 + playEnglishPreferred）
@@ -157,6 +171,7 @@ export function useEpubChapterListen(
 				spineIndex: visible.spineIndex,
 				sentenceIndex: sentenceCursorRef.current,
 				sentenceCount: sentences.length,
+				sentenceLabels: buildSentenceLabels(plain, sentences),
 				rate: rateRef.current,
 			});
 
@@ -166,9 +181,14 @@ export function useEpubChapterListen(
 	);
 
 	const playSentencesFromCursor = useCallback(
-		async (ctx: SectionCtx, gen: number): Promise<boolean> => {
+		async (
+			ctx: SectionCtx,
+			gen: number,
+			opts?: { scrollCenterOnFirst?: boolean },
+		): Promise<boolean> => {
 			const { plain, sentences, sentenceRanges } = ctx;
 			const rend = getRenditionRef.current();
+			const startSi = sentenceCursorRef.current;
 
 			for (let si = sentenceCursorRef.current; si < sentences.length; si += 1) {
 				if (!isGenActive(gen) || pausedRef.current) return false;
@@ -189,7 +209,11 @@ export function useEpubChapterListen(
 				const domRange = sentenceRanges[si];
 				const hasHighlight = !!(rend && domRange);
 				if (hasHighlight) {
-					showChapterListenSentenceHighlight(rend, domRange);
+					const jumpScroll =
+						opts?.scrollCenterOnFirst && si === startSi
+							? ({ forceScroll: true, align: 'center' as const } as const)
+							: undefined;
+					showChapterListenSentenceHighlight(rend, domRange, jumpScroll);
 				}
 
 				try {
@@ -310,11 +334,13 @@ export function useEpubChapterListen(
 		resolveStartCfiRef.current = true;
 
 		const sentences = buildSentenceOffsetSpans(preview.plain.trim());
+		const plain = preview.plain.trim();
 		syncState({
 			status: 'loading',
 			spineIndex: preview.spineIndex,
 			sentenceIndex: 0,
 			sentenceCount: sentences.length,
+			sentenceLabels: buildSentenceLabels(plain, sentences),
 			rate: rateRef.current,
 		});
 
@@ -370,11 +396,13 @@ export function useEpubChapterListen(
 			}
 
 			const sentences = buildSentenceOffsetSpans(preview.plain.trim());
+			const plain = preview.plain.trim();
 			syncState({
 				status: resumePlay ? 'loading' : 'paused',
 				spineIndex: preview.spineIndex,
 				sentenceIndex: 0,
 				sentenceCount: sentences.length,
+				sentenceLabels: buildSentenceLabels(plain, sentences),
 				rate: rateRef.current,
 			});
 
@@ -409,15 +437,12 @@ export function useEpubChapterListen(
 		stopInternal();
 	}, [stopInternal]);
 
-	const seekSentence = useCallback(
-		(delta: -1 | 1) => {
+	const goToSentence = useCallback(
+		(index: number) => {
 			const ctx = sectionRef.current;
 			if (!ctx?.sentences.length) return;
 
-			const next = Math.min(
-				ctx.sentences.length - 1,
-				Math.max(0, sentenceCursorRef.current + delta),
-			);
+			const next = Math.min(ctx.sentences.length - 1, Math.max(0, index));
 			sentenceCursorRef.current = next;
 			loopGenRef.current += 1;
 			stopAllEnglishPlayback();
@@ -427,20 +452,29 @@ export function useEpubChapterListen(
 			syncState({
 				sentenceIndex: next,
 				sentenceCount: ctx.sentences.length,
+				sentenceLabels: buildSentenceLabels(ctx.plain, ctx.sentences),
 				status: 'playing',
 			});
 
 			const rend = getRenditionRef.current();
 			if (!rend) return;
 
-			void playSentencesFromCursor(ctx, gen);
+			void playSentencesFromCursor(ctx, gen, { scrollCenterOnFirst: true });
 		},
 		[playSentencesFromCursor, syncState],
+	);
+
+	const seekSentence = useCallback(
+		(delta: -1 | 1) => {
+			goToSentence(sentenceCursorRef.current + delta);
+		},
+		[goToSentence],
 	);
 
 	const setRate = useCallback(
 		(rate: number) => {
 			rateRef.current = rate;
+			applyActiveEnglishPlaybackRate(rate);
 			syncState({ rate });
 		},
 		[syncState],
@@ -472,6 +506,7 @@ export function useEpubChapterListen(
 		syncToCurrentView,
 		prevSentence: () => seekSentence(-1),
 		nextSentence: () => seekSentence(1),
+		goToSentence,
 		setRate,
 	};
 }

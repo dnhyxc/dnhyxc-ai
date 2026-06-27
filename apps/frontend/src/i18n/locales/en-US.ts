@@ -1643,7 +1643,9 @@ export const enUS = {
 	'ebook.read.listenBook.resume': 'Resume',
 	'ebook.read.listenBook.prevSentence': 'Previous sentence',
 	'ebook.read.listenBook.nextSentence': 'Next sentence',
-	'ebook.read.listenBook.speed': 'Speed',
+	'ebook.read.listenBook.sentenceMenu': 'Sentences',
+	'ebook.read.listenBook.sentenceMenuEmpty': 'No sentences',
+	'ebook.read.listenBook.speed': 'Playback speed',
 	'ebook.read.listenBook.progress':
 		'Ch. {chapter} · sentence {current}/{total}',
 	'ebook.read.listenBook.loading': 'Loading…',

@@ -20,6 +20,7 @@ import {
 import {
 	getEpubScrollContainer,
 	scrollEpubRangeIntoView,
+	scrollEpubRangeToViewCenter,
 } from './epubScrolledNav';
 
 export {
@@ -482,7 +483,11 @@ function ensureChapterDomListenSession(rend: Rendition): ListenSession {
 	return session;
 }
 
-export function showEpubListenDomRange(rend: Rendition, range: Range): void {
+export function showEpubListenDomRange(
+	rend: Rendition,
+	range: Range,
+	opts?: { forceScroll?: boolean; align?: 'center' | 'nearest' },
+): void {
 	if (!isRangeConnected(range)) return;
 	const snapped =
 		normalizeSelectionRangeForEpub(range.cloneRange()) ?? range.cloneRange();
@@ -494,6 +499,18 @@ export function showEpubListenDomRange(rend: Rendition, range: Range): void {
 	active.activeDomRange = snapped.cloneRange();
 	if (isNew) clearListenMarkHighlight(rend);
 	showListenMarkHighlight(rend, snapped);
+
+	if (opts?.forceScroll) {
+		void withProgrammaticScroll(async () => {
+			if (opts.align === 'center') {
+				await scrollEpubRangeToViewCenter(rend, snapped, active.cfi);
+				return;
+			}
+			await scrollEpubRangeIntoView(rend, snapped, active.cfi);
+		});
+		return;
+	}
+
 	if (isNew && active.autoFollow) requestListenAutoFollowScroll();
 }
 

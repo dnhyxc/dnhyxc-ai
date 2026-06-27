@@ -1091,4 +1091,14 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'While reading EPUB, tap Listen to book in the header to hear continuous sentence-by-sentence TTS from your current position. A bottom bar offers pause/resume, prev/next sentence, and speed. Current sentence gets a light yellow tint and auto-scrolls into view; manual scroll pauses follow and a bottom-right button returns to the playing line. Mutually exclusive with quote Listen; TOC jumps resume from the new location. EPUB only.',
 	},
+	's25-52': {
+		title: 'EPUB listen bar: sentences & speed',
+		description:
+			'The listen-while-reading bottom bar adds a Sentences button to open a per-chapter list and jump to any line (the list scrolls to the line currently playing). Speed is chosen from a popup grid from 0.75× to 3×; with cloud voice, changing speed takes effect on the current sentence immediately. Jumping from the list scrolls that sentence to the center of the screen for easier reading along.',
+	},
+	's25-53': {
+		title: 'EPUB listen highlight follows panel resize',
+		description:
+			'While Listen or listen-while-reading is playing, opening or closing the reading-thoughts sidebar, dragging the MOKE/thoughts split, or narrowing the window keeps the light-yellow sentence highlight aligned with the reflowed text instead of drifting or disappearing. Independent of user highlights and thought underlines.',
+	},
 };

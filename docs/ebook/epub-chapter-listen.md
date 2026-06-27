@@ -6,6 +6,7 @@
 - [EPUB 听当前逐句播放背景](epub-listen-sentence-bg.md) — 「听当前」plain 偏移与 `onCadenceChunk`
 - [EPUB 听当前 host 浮层](epub-listen-host-overlay.md) — 「听当前」绘制层（听书**不**走 overlay session）
 - [EPUB 听当前播放自动跟随与回位 FAB](epub-listen-auto-follow-fab.md) — `autoFollow`、FAB（听书可共用 FAB 状态）
+- [EPUB 听书播放条：分句菜单与倍速增强](epub-listen-player-bar.md) — 分句跳转、倍速 3×、TTS `playbackRate`
 
 ## 1. 背景与目标
 

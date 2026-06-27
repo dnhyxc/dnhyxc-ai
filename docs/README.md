@@ -25,6 +25,7 @@
 | [`meta/`](./meta/)           | 发布与更新同步                          | [meta/project-features-update.md](./meta/project-features-update.md)                                                                     |
 | [`pay/`](./pay/)             | Stripe 会员充值、开通与到期             | [pay/stripe-membership-billing.md](./pay/stripe-membership-billing.md)、[pay/membership-active-hook.md](./pay/membership-active-hook.md) |
 | [`ebook/`](./ebook/)         | 电子书书架、EPUB/PDF 阅读与进度         | [ebook/README.md](./ebook/README.md)                                                                                                     |
+| [`ideas/`](./ideas/)         | **规划态**功能实现思路（架构/流程图）   | [ideas/README.md](./ideas/README.md)                                                                                                     |
 | [`Influence-point/`](./Influence-point/) | 跨功能改动影响面分析              | [Influence-point/README.md](./Influence-point/README.md)                                                                                 |
 
 ---
@@ -103,7 +104,8 @@
 | 删想法列表最后一条后侧栏空白不收起 / 详情正文比列表下垂             | [ebook/epub-thought-list-delete-close.md](./ebook/epub-thought-list-delete-close.md)                                                                     |
 | 书摘分享图片 / 复制到微信                                         | [ebook/epub-quote-share.md](./ebook/epub-quote-share.md)                                                                                                 |
 | EPUB「听当前」无声 / 中文书摘本机不读                             | [ebook/epub-quote-listen.md](./ebook/epub-quote-listen.md)                                                                                               |
-| EPUB 边听边读 / 顶栏听书 / 播放条                                 | [ebook/epub-chapter-listen.md](./ebook/epub-chapter-listen.md)                                                                                            |
+| EPUB 边听边读 / 顶栏听书 / 播放条 / 分句跳转 / 倍速                 | [ebook/epub-chapter-listen.md](./ebook/epub-chapter-listen.md) · [ebook/epub-listen-player-bar.md](./ebook/epub-listen-player-bar.md)                      |
+| EPUB 听读播放背景在分栏/侧栏 resize 后错位或消失                    | [ebook/epub-listen-bg-resize-relayout.md](./ebook/epub-listen-bg-resize-relayout.md) · [Influence-point/epub-listen-resize-relayout.md](./Influence-point/epub-listen-resize-relayout.md) |
 | 听当前无逐句淡黄底 / Safari 无背景                                | [ebook/epub-listen-sentence-bg.md](./ebook/epub-listen-sentence-bg.md)                                                                                   |
 | 听当前跨段多句同时高亮 / 换句背景不消                               | [ebook/epub-listen-host-overlay.md](./ebook/epub-listen-host-overlay.md)                                                                                 |
 | 听当前后划线重复 / 无法取消划线                                   | [ebook/epub-listen-user-highlight-reconcile.md](./ebook/epub-listen-user-highlight-reconcile.md)                                                         |
@@ -119,6 +121,7 @@
 ## 文档类型
 
 - **实现 / 修复**：各域下 `*-implementation*`、`*-complete*` 或专题名 md。
+- **规划 / 实现思路**：[`ideas/`](./ideas/) — 需求阶段的架构图、流程图与分阶段步骤（Skill：`feature-implementation-idea`）。
 - **运维**：`ops/deploy.md`、`ops/nginx.md`、`ops/server-deployment.md`。
 - **用户向**：根目录 `project-guide.md`、`project-update-info.md`（正文不出现仓库路径）。
 

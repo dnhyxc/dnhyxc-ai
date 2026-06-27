@@ -455,23 +455,105 @@ export type PlayEnglishPreferredOptions = {
 
 type CadencePlaybackHooks = Pick<PlayEnglishPreferredOptions, 'onCadenceChunk'>;
 
+type CloudTtsPlaybackOptions = CadencePlaybackHooks & {
+	rate?: number;
+};
+
+/** HTMLAudioElement.playbackRate 常用可听范围；听书 UI 最高 3x */
+function clampPlaybackRate(rate?: number): number {
+	const r = rate ?? 1;
+	return Math.min(3, Math.max(0.5, r));
+}
+
+/** 句末终止符（含全角叹号/问号） */
+const SENTENCE_TERMINATOR = /[.!?。！？；\uFF01\uFF1F]/u;
+
+/** 句末标点后仍属同一句的闭合符号（弯引号/直角引号/全角引号等） */
+const TRAILING_CLOSER_AFTER_SENTENCE_END =
+	/[\u2018\u2019\u201c\u201d\u0022\u0027\u300c\u300d\u300e\u300f\ufe41\ufe42\uff02\u00bb\u300b\u3011\uff09)]/u;
+
+function isAttachableAfterSentenceEnd(trimmed: string, index: number): boolean {
+	const ch = trimmed[index];
+	if (!ch) return false;
+	if (SENTENCE_TERMINATOR.test(ch)) return true;
+	if (TRAILING_CLOSER_AFTER_SENTENCE_END.test(ch)) return true;
+	if (ch === '\u2026') return true;
+	if (ch === '.' && trimmed.startsWith('......', index)) return true;
+	if (
+		ch === '.' &&
+		trimmed.startsWith('...', index) &&
+		trimmed[index + 3] !== '.'
+	) {
+		return true;
+	}
+	return false;
+}
+
+function consumeAttachableAfterSentenceEnd(
+	trimmed: string,
+	index: number,
+): number {
+	const ch = trimmed[index]!;
+	if (SENTENCE_TERMINATOR.test(ch)) {
+		let j = index;
+		while (j < trimmed.length && SENTENCE_TERMINATOR.test(trimmed[j]!)) j += 1;
+		return j;
+	}
+	if (ch === '\u2026') {
+		let j = index;
+		while (j < trimmed.length && trimmed[j] === '\u2026') j += 1;
+		return j;
+	}
+	if (ch === '.' && trimmed.startsWith('......', index)) return index + 6;
+	if (
+		ch === '.' &&
+		trimmed.startsWith('...', index) &&
+		trimmed[index + 3] !== '.'
+	) {
+		return index + 3;
+	}
+	if (TRAILING_CLOSER_AFTER_SENTENCE_END.test(ch)) return index + 1;
+	return index;
+}
+
+/** 句末标点后继续吞掉省略号、重复叹号、闭合引号；允许中间空白（innerText 常压成空格） */
+function extendSentenceBoundaryEnd(trimmed: string, end: number): number {
+	let j = end;
+	while (j < trimmed.length) {
+		if (/\s/u.test(trimmed[j]!)) {
+			let k = j;
+			while (k < trimmed.length && /\s/u.test(trimmed[k]!)) k += 1;
+			if (k >= trimmed.length || !isAttachableAfterSentenceEnd(trimmed, k))
+				break;
+			j = k;
+			continue;
+		}
+		if (!isAttachableAfterSentenceEnd(trimmed, j)) break;
+		j = consumeAttachableAfterSentenceEnd(trimmed, j);
+	}
+	return j;
+}
+
 /** 句末边界（trimmed plain 内下标，不含边界字符之后的内容） */
 function sentenceBoundaryEnd(trimmed: string, i: number): number {
 	const ch = trimmed[i];
 	if (!ch) return -1;
-	if (/[.!?。！？；]/.test(ch)) return i + 1;
-	// Unicode 省略号（… / …… 均在此截断）
-	if (ch === '\u2026') {
+	let end = -1;
+	if (SENTENCE_TERMINATOR.test(ch)) end = i + 1;
+	else if (ch === '\u2026') {
 		let j = i + 1;
 		while (j < trimmed.length && trimmed[j] === '\u2026') j += 1;
-		return j;
+		end = j;
+	} else if (ch === '.' && trimmed.startsWith('......', i)) end = i + 6;
+	else if (
+		ch === '.' &&
+		trimmed.startsWith('...', i) &&
+		trimmed[i + 3] !== '.'
+	) {
+		end = i + 3;
 	}
-	// ASCII 省略号
-	if (ch === '.' && trimmed.startsWith('......', i)) return i + 6;
-	if (ch === '.' && trimmed.startsWith('...', i) && trimmed[i + 3] !== '.') {
-		return i + 3;
-	}
-	return -1;
+	if (end < 0) return -1;
+	return extendSentenceBoundaryEnd(trimmed, end);
 }
 
 /** 与 DOM 锚点 / TTS sentenceIndex 对齐的句界（plain 内 start/end 偏移） */
@@ -704,6 +786,12 @@ export function stopAllEnglishPlayback(): void {
 	stopPlaybackMediaOnly();
 }
 
+/** 听书等场景切换倍速：云端 MP3 即时生效；本机 Web Speech 仅影响下一句 */
+export function applyActiveEnglishPlaybackRate(rate: number): void {
+	const clamped = clampPlaybackRate(rate);
+	if (cloudAudio) cloudAudio.playbackRate = clamped;
+}
+
 async function readResponseBodyAsArrayBuffer(
 	res: Response,
 ): Promise<ArrayBuffer> {
@@ -802,9 +890,10 @@ function waitCloudAudioEnd(
 
 		const armTimeout = () => {
 			window.clearTimeout(timeoutId);
+			const playbackRate = audio.playbackRate > 0 ? audio.playbackRate : 1;
 			const durationMs =
 				Number.isFinite(audio.duration) && audio.duration > 0
-					? audio.duration * 1000 * 1.5 + 5000
+					? ((audio.duration * 1000) / playbackRate) * 1.5 + 5000
 					: 90_000;
 			timeoutId = window.setTimeout(
 				() => {
@@ -835,9 +924,10 @@ function waitCloudAudioEnd(
 async function playCloudTtsReady(
 	ready: CloudTtsReady,
 	generation: number,
+	rate?: number,
 ): Promise<void> {
 	if (ready.kind === 'cached') {
-		await playCloudMp3Blob(ready.blob, generation);
+		await playCloudMp3Blob(ready.blob, generation, rate);
 		return;
 	}
 
@@ -845,7 +935,11 @@ async function playCloudTtsReady(
 	const buf = await readResponseBodyAsArrayBuffer(ready.response);
 	if (!isPlaybackGenerationActive(generation)) return;
 	touchCloudTtsCache(ready.cacheKey, buf);
-	await playCloudMp3Blob(new Blob([buf], { type: 'audio/mpeg' }), generation);
+	await playCloudMp3Blob(
+		new Blob([buf], { type: 'audio/mpeg' }),
+		generation,
+		rate,
+	);
 }
 
 /**
@@ -854,21 +948,22 @@ async function playCloudTtsReady(
 async function playCloudTtsCadenceSegments(
 	plain: string,
 	generation: number,
-	hooks?: CadencePlaybackHooks,
+	opts?: CloudTtsPlaybackOptions,
 ): Promise<void> {
 	const chunks = splitTextForTtsCadence(plain);
 	if (chunks.length === 0) return;
+	const rate = clampPlaybackRate(opts?.rate);
 
 	if (
 		chunks.length === 1 &&
 		chunks[0].text.length <= MAX_SINGLE_CLOUD_TTS_CHARS
 	) {
-		emitCadenceChunk(hooks, plain, chunks, 0, 'start');
+		emitCadenceChunk(opts, plain, chunks, 0, 'start');
 		const ready = await startCloudTts(chunks[0].text);
 		if (!isPlaybackGenerationActive(generation)) return;
-		await playCloudTtsReady(ready, generation);
+		await playCloudTtsReady(ready, generation, rate);
 		if (!isPlaybackGenerationActive(generation)) return;
-		emitCadenceChunk(hooks, plain, chunks, 0, 'end');
+		emitCadenceChunk(opts, plain, chunks, 0, 'end');
 		return;
 	}
 
@@ -881,11 +976,11 @@ async function playCloudTtsCadenceSegments(
 
 		if (i > 0) {
 			const prevPause = chunks[i - 1]?.pauseAfterMs ?? PAUSE_AFTER_CLAUSE_MS;
-			await pauseMs(prevPause);
+			await pauseMs(Math.max(0, Math.round(prevPause / rate)));
 			if (!isPlaybackGenerationActive(generation)) return;
 		}
 
-		emitCadenceChunk(hooks, plain, chunks, i, 'start');
+		emitCadenceChunk(opts, plain, chunks, i, 'start');
 
 		const ready = await pendingReady!;
 		if (!isPlaybackGenerationActive(generation)) return;
@@ -893,13 +988,17 @@ async function playCloudTtsCadenceSegments(
 		pendingReady =
 			i + 1 < chunks.length ? startCloudTts(chunks[i + 1].text) : null;
 
-		await playCloudTtsReady(ready, generation);
+		await playCloudTtsReady(ready, generation, rate);
 		if (!isPlaybackGenerationActive(generation)) return;
-		emitCadenceChunk(hooks, plain, chunks, i, 'end');
+		emitCadenceChunk(opts, plain, chunks, i, 'end');
 	}
 }
 
-function playCloudMp3Blob(blob: Blob, generation: number): Promise<void> {
+function playCloudMp3Blob(
+	blob: Blob,
+	generation: number,
+	rate?: number,
+): Promise<void> {
 	stopPlaybackMediaOnly();
 	if (!isPlaybackGenerationActive(generation)) {
 		return Promise.resolve();
@@ -908,6 +1007,7 @@ function playCloudMp3Blob(blob: Blob, generation: number): Promise<void> {
 	const url = URL.createObjectURL(blob);
 	cloudObjectUrl = url;
 	const audio = new Audio(url);
+	audio.playbackRate = clampPlaybackRate(rate);
 	cloudAudio = audio;
 	return audio.play().then(
 		() => waitCloudAudioEnd(audio, url, generation),
@@ -1059,7 +1159,10 @@ export async function playEnglishPreferred(
 	}
 
 	try {
-		await playCloudTtsCadenceSegments(plain, generation, cadenceHooks);
+		await playCloudTtsCadenceSegments(plain, generation, {
+			...cadenceHooks,
+			rate: speakOpts?.rate,
+		});
 		return;
 	} catch {
 		if (!isPlaybackGenerationActive(generation)) return;
@@ -1206,4 +1309,26 @@ export const LOCAL_ENGLISH_TTS_VOICE_AUTO = '__auto__';
  */
 if (splitTextForTtsCadence('测'.repeat(200)).length < 2) {
 	throw new Error('[englishTts] 长文分段异常，云端流水线无法缩短首声');
+}
+
+{
+	const cases = [
+		'赞叹一声：\u201c阿弥陀佛！\u201d这个在政治上',
+		'赞叹一声：\u201c阿弥陀佛！ \u201d这个在政治上',
+		'太好了！！！\u201d接下来',
+	];
+	for (const plain of cases) {
+		const spans = buildSentenceOffsetSpans(plain);
+		const trimmed = plain.trim();
+		const first = trimmed.slice(spans[0]?.start ?? 0, spans[0]?.end ?? 0);
+		if (spans.length < 2 || !first.includes('！')) {
+			throw new Error(`[englishTts] 叹号句界异常: ${plain}`);
+		}
+		if (!first.endsWith('\u201d')) {
+			throw new Error(`[englishTts] 闭合引号未纳入前句: ${plain}`);
+		}
+		if (!trimmed.slice(spans[1]?.start ?? 0).match(/^这|接下/)) {
+			throw new Error(`[englishTts] 叹号后句界错位: ${plain}`);
+		}
+	}
 }

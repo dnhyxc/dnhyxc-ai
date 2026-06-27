@@ -16,6 +16,7 @@ import {
 	attachEpubIframePointerDown,
 	type EpubReaderContextMenuPayload,
 } from '../utils/epubContextMenuAttach';
+import { relayoutListenMarkHighlight } from '../utils/epubListenMarkHighlight';
 import {
 	applyEpubReaderAppearance,
 	type EpubReaderSettings,
@@ -501,6 +502,7 @@ export function EpubPane({
 			}
 			// soft resize 可能令高亮失色/划线消失，需立即恢复批注样式
 			patchEpubReadingAnnotations(rend, { sync: true });
+			relayoutListenMarkHighlight(rend);
 		};
 
 		// 封装动画帧防抖批量 resize
