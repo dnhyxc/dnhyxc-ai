@@ -8,9 +8,17 @@ import {
 	MINIMAX_TTS_MODELS,
 } from '@/constants/minimaxTts';
 import {
+	DEFAULT_XFYUN_TTS_VCN,
+	isXfyunTtsVcn,
+	xfyunPitchFromPitch,
+	xfyunSpeedFromMinimaxSpeed,
+	xfyunVolumeFromVol,
+} from '@/constants/xfyunTts';
+import {
 	type CloudTtsSettingsView,
 	clearCloudTtsSettings,
 	getCloudTtsSettings,
+	type TtsPlaybackSource,
 	updateCloudTtsSettings,
 } from '@/service/cloudTtsSettings';
 import {
@@ -25,7 +33,7 @@ export type MinimaxTtsUserPrefs = CloudTtsSettingsView;
 
 export const DEFAULT_MINIMAX_TTS_USER_PREFS: MinimaxTtsUserPrefs = {
 	enabled: false,
-	playbackSource: 'cloud',
+	playbackSource: 'local',
 	model: DEFAULT_MINIMAX_TTS_MODEL,
 	voiceId: DEFAULT_MINIMAX_TTS_VOICE_ID,
 	speed: 1,
@@ -42,6 +50,28 @@ export const DEFAULT_MINIMAX_TTS_USER_PREFS: MinimaxTtsUserPrefs = {
 let cachedUserId = 0;
 let cachedPrefs: MinimaxTtsUserPrefs = { ...DEFAULT_MINIMAX_TTS_USER_PREFS };
 let loadPromise: Promise<MinimaxTtsUserPrefs> | null = null;
+
+function normalizePlaybackSource(raw: unknown): TtsPlaybackSource {
+	if (raw === 'local') return 'local';
+	if (raw === 'xfyun') return 'xfyun';
+	return 'cloud';
+}
+
+/** 切换朗读来源时，voiceId 在 MiniMax id 与讯飞 vcn 间对齐默认值 */
+export function voiceIdForPlaybackSource(
+	source: TtsPlaybackSource,
+	currentVoiceId: string,
+): string {
+	if (source === 'xfyun') {
+		return isXfyunTtsVcn(currentVoiceId)
+			? currentVoiceId
+			: DEFAULT_XFYUN_TTS_VCN;
+	}
+	if (source === 'cloud' && isXfyunTtsVcn(currentVoiceId)) {
+		return DEFAULT_MINIMAX_TTS_VOICE_ID;
+	}
+	return currentVoiceId || DEFAULT_MINIMAX_TTS_VOICE_ID;
+}
 
 function clampNumber(
 	raw: unknown,
@@ -72,7 +102,7 @@ export function normalizeMinimaxTtsUserPrefs(
 	const format = pickString(o.format, 'mp3', 16);
 	return {
 		enabled: Boolean(o.enabled),
-		playbackSource: o.playbackSource === 'local' ? 'local' : 'cloud',
+		playbackSource: normalizePlaybackSource(o.playbackSource),
 		model: (MINIMAX_TTS_MODELS as readonly string[]).includes(model)
 			? model
 			: DEFAULT_MINIMAX_TTS_MODEL,
@@ -256,6 +286,27 @@ export function buildMinimaxTtsRequestExtras(): Record<string, unknown> {
 	if (prefs.emotion) body.emotion = prefs.emotion;
 	if (prefs.languageBoost) body.languageBoost = prefs.languageBoost;
 	return body;
+}
+
+/** 讯飞在线合成 POST body（不含 text）；与 MiniMax 共用 vol/pitch/speed 字段，此处映射到 0–100 */
+export function buildXfyunTtsRequestExtras(): Record<string, unknown> {
+	const prefs = loadMinimaxTtsUserPrefs();
+	const vcn = isXfyunTtsVcn(prefs.voiceId)
+		? prefs.voiceId
+		: DEFAULT_XFYUN_TTS_VCN;
+	return {
+		vcn,
+		speed: xfyunSpeedFromMinimaxSpeed(prefs.speed),
+		volume: xfyunVolumeFromVol(prefs.vol),
+		pitch: xfyunPitchFromPitch(prefs.pitch),
+	};
+}
+
+/** 前端 MP3 缓存 key 后缀：讯飞 vcn / 语速变更后不与旧缓存混用 */
+export function buildXfyunTtsCacheKeySuffix(): string {
+	const userId = getLoggedInUserId();
+	const userPart = userId > 0 ? String(userId) : '0';
+	return `${userPart}\u0001${JSON.stringify(buildXfyunTtsRequestExtras())}`;
 }
 
 /** 前端 MP3 缓存 key 后缀：自定义参数变更后不与旧缓存混用 */

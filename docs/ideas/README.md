@@ -6,6 +6,7 @@
 |------|------|
 | [epub-mark-layers.md](./epub-mark-layers.md) | EPUB **用户划线 / 想法虚线 / 播放背景** 三层架构、sync 编排、分阶段验收 |
 | [epub-mark-epubjs-primitives.md](./epub-mark-epubjs-primitives.md) | 同上三层的 **epub.js 原语详解**：选区、文本提取、CFI、annotations、marks-pane |
+| [xfyun-cloud-tts.md](./xfyun-cloud-tts.md) | **讯飞在线云端 TTS**（已上线）：三选一选路、Nest `ws` 代理、前后端架构/时序/分阶段 |
 
 **生成 Skill**：[`feature-implementation-idea`](../../.cursor/skills/feature-implementation-idea/SKILL.md)
 

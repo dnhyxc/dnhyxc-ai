@@ -195,3 +195,15 @@ export enum MinimaxEnum {
 	/** 默认 English_captivating_female1 */
 	MINIMAX_TTS_VOICE_ID = 'MINIMAX_TTS_VOICE_ID',
 }
+
+/** 讯飞在线语音合成 WebSocket 流式（speech-transcription/xfyun/*） */
+export enum XfyunEnum {
+	XFYUN_APP_ID = 'XFYUN_APP_ID',
+	XFYUN_API_KEY = 'XFYUN_API_KEY',
+	XFYUN_API_SECRET = 'XFYUN_API_SECRET',
+	/** 发音人 vcn，未配置时默认 x4_yezi（讯飞小露） */
+	XFYUN_TTS_VCN = 'XFYUN_TTS_VCN',
+}
+
+/** 在线流式合成默认发音人（控制台已开通） */
+export const DEFAULT_XFYUN_TTS_VCN = 'x4_yezi';

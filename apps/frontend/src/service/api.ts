@@ -64,6 +64,9 @@ export const SPEECH_TTS = '/speech-transcription/speech';
 /** MiniMax T2A 流式 TTS（speech-2.8-hd，需 MINIMAX_API_KEY） */
 export const SPEECH_MINIMAX_TTS_STREAM =
 	'/speech-transcription/minimax/speech/stream';
+/** 讯飞在线语音合成（WebSocket 代理 → MP3，需 XFYUN_* 环境变量） */
+export const SPEECH_XFYUN_TTS_STREAM =
+	'/speech-transcription/xfyun/speech/stream';
 /** MiniMax T2A 非流式 TTS */
 export const SPEECH_MINIMAX_TTS = '/speech-transcription/minimax/speech';
 

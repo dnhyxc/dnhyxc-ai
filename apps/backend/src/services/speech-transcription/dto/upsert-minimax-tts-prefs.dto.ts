@@ -39,8 +39,8 @@ export class UpsertMinimaxTtsPrefsDto {
 	enabled!: boolean;
 
 	@IsString()
-	@IsIn(['local', 'cloud'])
-	playbackSource!: 'local' | 'cloud';
+	@IsIn(['local', 'cloud', 'xfyun'])
+	playbackSource!: 'local' | 'cloud' | 'xfyun';
 
 	@IsString()
 	@IsIn(MINIMAX_TTS_MODELS)

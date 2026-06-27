@@ -170,7 +170,29 @@ export const zhCN = {
 	/** 云端朗读 */
 	'setting.cloudTts.title': '云端语音设置',
 	'setting.cloudTts.desc':
-		'开启后，英语学习等场景的喇叭统一走云端合成，并可调整下方朗读参数；关闭则与上方「本机语音设置」互斥，改走本机朗读。点「恢复默认参数」可恢复服务端默认合成（仍保持云端选路）。',
+		'在上方选择 MiniMax 云端后，可调整下方朗读参数；与「本机语音」「讯飞云端」互斥。点「恢复默认参数」可恢复服务端默认合成（仍保持当前选路）。',
+	'setting.cloudTts.playbackSourceTitle': '朗读来源',
+	'setting.cloudTts.playbackSourceHelp':
+		'有效会员三选一，互斥生效：本机 Web Speech、MiniMax 云端或讯飞在线合成。',
+	'setting.cloudTts.playbackSource.local': '本机语音',
+	'setting.cloudTts.playbackSource.cloud': 'MiniMax 云端',
+	'setting.cloudTts.playbackSource.xfyun': '讯飞云端',
+	'setting.cloudTts.playbackSourceHelp.local':
+		'使用浏览器 Web Speech，音色由下方本机设置决定。',
+	'setting.cloudTts.playbackSourceHelp.cloud':
+		'使用 MiniMax 流式合成，参数见下方 MiniMax 区块。',
+	'setting.cloudTts.playbackSourceHelp.xfyun':
+		'使用讯飞在线合成，适合中文听书；参数见下方讯飞区块。',
+	'setting.cloudTts.xfyunTitle': '讯飞云端语音',
+	'setting.cloudTts.xfyunDesc':
+		'在上方选择「讯飞云端」后生效；未配置服务端密钥时将回退硅基/本机。',
+	'setting.cloudTts.xfyunVoice': '发音人',
+	'setting.cloudTts.xfyunSpeed': '语速',
+	'setting.cloudTts.xfyunVolume': '音量',
+	'setting.cloudTts.xfyunPitch': '音高',
+	'setting.cloudTts.xfyunPreview': '讯飞试听',
+	'setting.cloudTts.xfyunPreviewText':
+		'这是讯飞云端朗读效果的试听，适合中文听书场景。',
 	'setting.cloudTts.paramsTitle': '朗读参数',
 	'setting.cloudTts.paramsDesc': '音色、语速与音频格式等，可按需调整。',
 	'setting.cloudTts.paramsHelpAria': '查看朗读参数字段说明',

@@ -841,6 +841,11 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'With cloud voice enabled, longer text (e.g. e-book quote excerpts, long classic sentences) is synthesized in sentence-sized segments—the first segment starts playing as soon as it is ready, and the next segment is prefetched while the current one plays. Short words and phrases still use a single request. Same behavior for Listen on EPUB quotes and English learning play buttons.',
 	},
+	's24-44': {
+		title: 'iFlytek cloud narration',
+		description:
+			'Active members can choose iFlytek cloud as the playback source in Voice settings (mutually exclusive with local and MiniMax cloud)—suited for Chinese listen-to-book. Configure voice, speed, volume, and pitch with preview; if the server is not configured or synthesis fails, playback falls back to other cloud or local voice.',
+	},
 	's25-1': {
 		title: 'E-book bookshelf',
 		description:

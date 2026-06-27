@@ -180,7 +180,29 @@ export const enUS = {
 		'BGE-only vector mode active (knowledge_chunks_v2)',
 	'setting.cloudTts.title': 'Cloud voice settings',
 	'setting.cloudTts.desc':
-		'When on, speaker buttons use cloud synthesis with the parameters below; when off, playback uses local Web Speech (mutually exclusive with Local voice settings above). Restore default parameters keeps cloud routing but uses server defaults.',
+		'When MiniMax cloud is selected above, adjust the parameters below. Mutually exclusive with Local and iFlytek cloud.',
+	'setting.cloudTts.playbackSourceTitle': 'Playback source',
+	'setting.cloudTts.playbackSourceHelp':
+		'Active members choose one: local Web Speech, MiniMax cloud, or iFlytek online TTS.',
+	'setting.cloudTts.playbackSource.local': 'Local voice',
+	'setting.cloudTts.playbackSource.cloud': 'MiniMax cloud',
+	'setting.cloudTts.playbackSource.xfyun': 'iFlytek cloud',
+	'setting.cloudTts.playbackSourceHelp.local':
+		'Browser Web Speech; voice from the local section below.',
+	'setting.cloudTts.playbackSourceHelp.cloud':
+		'MiniMax streaming synthesis; parameters in the MiniMax section below.',
+	'setting.cloudTts.playbackSourceHelp.xfyun':
+		'iFlytek online synthesis; good for Chinese narration; see the iFlytek section below.',
+	'setting.cloudTts.xfyunTitle': 'iFlytek cloud voice',
+	'setting.cloudTts.xfyunDesc':
+		'Applies when iFlytek cloud is selected above; falls back to CosyVoice/local if the server is not configured.',
+	'setting.cloudTts.xfyunVoice': 'Voice',
+	'setting.cloudTts.xfyunSpeed': 'Speed',
+	'setting.cloudTts.xfyunVolume': 'Volume',
+	'setting.cloudTts.xfyunPitch': 'Pitch',
+	'setting.cloudTts.xfyunPreview': 'iFlytek preview',
+	'setting.cloudTts.xfyunPreviewText':
+		'This is a preview of iFlytek cloud reading, suited for Chinese narration.',
 	'setting.cloudTts.paramsTitle': 'Playback parameters',
 	'setting.cloudTts.paramsDesc':
 		'Voice, speed, audio format, and related options.',

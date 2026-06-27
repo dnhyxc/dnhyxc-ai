@@ -300,3 +300,5 @@ REDIS_PORT=6379
 ## 📖 项目开发 PRD
 
 - [Tauri 文档](https://github.com/dnhyxc/dnhyxc-ai/wiki/%E5%BC%80%E5%8F%91-TODO)
+
+- [讯飞语音文档](https://console.xfyun.cn/services/tts)

@@ -60,6 +60,7 @@
 		"class-transformer": "^0.5.1",
 		"class-validator": "^0.14.3",
 		"compressing": "^2.0.0",
+		"cos-nodejs-sdk-v5": "^2.14.6",
 		"docx": "^9.5.0",
 		"dotenv": "^17.2.3",
 		"express-rate-limit": "^8.2.1",
@@ -76,7 +77,6 @@
 		"passport": "^0.7.0",
 		"passport-jwt": "^4.0.1",
 		"pdf-parse": "^1.1.1",
-		"cos-nodejs-sdk-v5": "^2.14.6",
 		"reflect-metadata": "^0.2.2",
 		"request-ip": "^3.3.0",
 		"rxjs": "^7.8.1",
@@ -86,6 +86,7 @@
 		"typeorm": "^0.3.28",
 		"winston": "^3.19.0",
 		"winston-daily-rotate-file": "^5.0.0",
+		"ws": "^8.19.0",
 		"xlsx": "^0.18.5"
 	},
 	"devDependencies": {

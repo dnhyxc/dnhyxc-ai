@@ -2,11 +2,15 @@
  * 英语学习朗读：有效会员默认走云端 TTS（单词/语句/练习统一），失败则回退本机 Web Speech；
  * 非会员默认仅本机 Web Speech，不请求 TTS 接口。
  * `preferLocal: true` 时强制本机（如本机音色设置页试听）；默认按会员状态选路。
- * 云端 CosyVoice2 无 seed，同一句会随机漂移；对规范化文本做 MP3 缓存以保证重复播放读音一致。
+ * 云端 CosyVoice2 / MiniMax / 讯飞在线 无 seed，同一句会随机漂移；对规范化文本做 MP3 缓存以保证重复播放读音一致。
  * 本机无法直接调用 macOS「翻译/词典」弹窗 API；初始默认 Karen 女声，可用 setPreferredLocalEnglishVoiceKey 切换。
  */
 import { BASE_URL } from '@/constants';
-import { SPEECH_MINIMAX_TTS_STREAM, SPEECH_TTS } from '@/service/api';
+import {
+	SPEECH_MINIMAX_TTS_STREAM,
+	SPEECH_TTS,
+	SPEECH_XFYUN_TTS_STREAM,
+} from '@/service/api';
 import {
 	getLoggedInUserId,
 	USER_INFO_STORAGE_KEY,
@@ -17,6 +21,8 @@ import { isMembershipActiveFromUserInfo } from '@/utils/membershipActive';
 import {
 	buildMinimaxTtsCacheKeySuffix,
 	buildMinimaxTtsRequestExtras,
+	buildXfyunTtsCacheKeySuffix,
+	buildXfyunTtsRequestExtras,
 	ensureMinimaxTtsUserPrefsLoaded,
 	loadMinimaxTtsUserPrefs,
 } from '@/utils/minimaxTtsPrefs';
@@ -794,12 +800,21 @@ function touchCloudTtsCache(key: string, audio: ArrayBuffer): void {
 }
 
 function getCloudTtsFromCache(plain: string): Blob | null {
-	const cacheKey = plain + buildMinimaxTtsCacheKeySuffix();
+	const cacheKey = buildCloudTtsCacheKey(plain);
 	const hit = cloudTtsAudioCache.get(cacheKey);
 	if (!hit) return null;
 	cloudTtsAudioCache.delete(cacheKey);
 	cloudTtsAudioCache.set(cacheKey, hit);
 	return new Blob([hit], { type: 'audio/mpeg' });
+}
+
+/** 云端 MP3 LRU key：按用户选路区分 MiniMax / 讯飞参数后缀 */
+function buildCloudTtsCacheKey(plain: string): string {
+	const prefs = loadMinimaxTtsUserPrefs();
+	if (prefs.playbackSource === 'xfyun') {
+		return `${plain}\u0000xfyun${buildXfyunTtsCacheKeySuffix()}`;
+	}
+	return plain + buildMinimaxTtsCacheKeySuffix();
 }
 
 function readToken(): string {
@@ -970,7 +985,7 @@ export function prefetchCloudEnglishTts(
 /** 发起云端 TTS 请求；命中 LRU 则直接返回 Blob */
 async function startCloudTts(plain: string): Promise<CloudTtsReady> {
 	await ensureMinimaxTtsUserPrefsLoaded();
-	const cacheKey = plain + buildMinimaxTtsCacheKeySuffix();
+	const cacheKey = buildCloudTtsCacheKey(plain);
 	const cached = getCloudTtsFromCache(plain);
 	if (cached) {
 		return { kind: 'cached', blob: cached, cacheKey };
@@ -986,11 +1001,23 @@ async function startCloudTts(plain: string): Promise<CloudTtsReady> {
 		'Content-Type': 'application/json',
 	};
 
-	let res = await platformFetch(BASE_URL + SPEECH_MINIMAX_TTS_STREAM, {
-		method: 'POST',
-		headers,
-		body: JSON.stringify({ text: plain, ...buildMinimaxTtsRequestExtras() }),
-	});
+	const prefs = loadMinimaxTtsUserPrefs();
+	const source = prefs.playbackSource;
+	let res = await platformFetch(
+		BASE_URL +
+			(source === 'xfyun'
+				? SPEECH_XFYUN_TTS_STREAM
+				: SPEECH_MINIMAX_TTS_STREAM),
+		{
+			method: 'POST',
+			headers,
+			body: JSON.stringify(
+				source === 'xfyun'
+					? { text: plain, ...buildXfyunTtsRequestExtras() }
+					: { text: plain, ...buildMinimaxTtsRequestExtras() },
+			),
+		},
+	);
 
 	if (res.status === 503 || res.status === 401 || res.status === 502) {
 		res = await platformFetch(BASE_URL + SPEECH_TTS, {

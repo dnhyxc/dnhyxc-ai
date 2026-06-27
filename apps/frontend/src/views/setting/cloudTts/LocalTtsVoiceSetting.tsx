@@ -11,7 +11,6 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from '@ui/dropdown-menu';
-import { Switch } from '@ui/index';
 import { Label } from '@ui/label';
 import { ScrollArea } from '@ui/scroll-area';
 import { ChevronDown, Volume2 } from 'lucide-react';
@@ -19,6 +18,7 @@ import { observer } from 'mobx-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
+import type { TtsPlaybackSource } from '@/service/cloudTtsSettings';
 import useStore from '@/store';
 import { getLoggedInUserId } from '@/store/loggedInUserId';
 import type { LocalEnglishVoiceOption } from '@/utils/englishTts';
@@ -73,16 +73,11 @@ function VoiceDropdownGroup({
 export const LocalTtsVoiceSetting = observer(function LocalTtsVoiceSetting({
 	showDivider = false,
 	isMemberActive = false,
-	playbackSource = 'cloud',
-	onPlaybackSourceChange,
-	playbackPrefsLoading = false,
+	playbackSource = 'local',
 }: {
 	showDivider?: boolean;
-	/** 有效会员：展示与本机/云端互斥的朗读选路开关 */
 	isMemberActive?: boolean;
-	playbackSource?: 'local' | 'cloud';
-	onPlaybackSourceChange?: (source: 'local' | 'cloud') => void;
-	playbackPrefsLoading?: boolean;
+	playbackSource?: TtsPlaybackSource;
 }) {
 	const { t } = useI18n();
 	const { userStore } = useStore();
@@ -194,7 +189,7 @@ export const LocalTtsVoiceSetting = observer(function LocalTtsVoiceSetting({
 		<div
 			className={cn(
 				'w-full',
-				showDivider ? 'border-b border-theme/20 pb-4.5' : 'pb-4.5',
+				showDivider ? 'mt-3.5 border-b border-theme/20 pb-4.5' : 'pb-4.5',
 			)}
 		>
 			<div className="text-md font-bold">
@@ -203,28 +198,6 @@ export const LocalTtsVoiceSetting = observer(function LocalTtsVoiceSetting({
 			<div className="my-2 px-8.5 text-xs text-textcolor/55">
 				{t('setting.system.localTts.desc')}
 			</div>
-			{isMemberActive && !playbackPrefsLoading ? (
-				<div className="mt-3.5 flex items-center justify-between gap-4 px-8.5 text-sm">
-					<div className="min-w-0 flex-1">
-						<Label
-							htmlFor="local-tts-playback"
-							className="cursor-pointer text-sm font-medium"
-						>
-							{t('setting.system.localTts.enabledLabel')}
-						</Label>
-						<p className="mt-1 text-xs text-textcolor/55">
-							{t('setting.system.localTts.enabledHelp')}
-						</p>
-					</div>
-					<Switch
-						id="local-tts-playback"
-						checked={playbackSource === 'local'}
-						onCheckedChange={(checked) =>
-							onPlaybackSourceChange?.(checked ? 'local' : 'cloud')
-						}
-					/>
-				</div>
-			) : null}
 			{!supported ? (
 				<p className="px-8.5 text-sm text-textcolor/70">
 					{t('setting.system.localTts.unsupported')}
@@ -234,7 +207,14 @@ export const LocalTtsVoiceSetting = observer(function LocalTtsVoiceSetting({
 					{t('setting.system.localTts.noVoices')}
 				</p>
 			) : (
-				<div className="mt-3.5 flex flex-wrap items-center gap-3 px-8.5 text-sm">
+				<div
+					className={cn(
+						'mt-3.5 flex flex-wrap items-center gap-3 px-8.5 text-sm',
+						isMemberActive &&
+							playbackSource !== 'local' &&
+							'pointer-events-none opacity-50',
+					)}
+				>
 					<Label id="local-english-tts-voice" className="shrink-0">
 						{t('setting.system.localTts.voiceLabel')}
 					</Label>

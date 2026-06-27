@@ -6,6 +6,7 @@ import { MinimaxTtsPrefsService } from './minimax-tts-prefs.service';
 import { MinimaxTtsUserConfig } from './minimax-tts-user-config.entity';
 import { SiliconflowTranscriptionService } from './siliconflow-transcription.service';
 import { SpeechTranscriptionController } from './speech-transcription.controller';
+import { XfyunTtsService } from './xfyun-tts.service';
 
 /**
  * 公共语音：硅基 ASR/TTS + MiniMax 流式 TTS；HTTP 路由 + 可导出 Service 供其它模块注入。
@@ -16,11 +17,13 @@ import { SpeechTranscriptionController } from './speech-transcription.controller
 	providers: [
 		SiliconflowTranscriptionService,
 		MinimaxTtsService,
+		XfyunTtsService,
 		MinimaxTtsPrefsService,
 	],
 	exports: [
 		SiliconflowTranscriptionService,
 		MinimaxTtsService,
+		XfyunTtsService,
 		MinimaxTtsPrefsService,
 	],
 })

@@ -47,14 +47,14 @@ export class MinimaxTtsUserConfig {
 	@Column({ type: 'int', default: 1 })
 	channel!: number;
 
-	/** 会员朗读选路：local 本机 Web Speech，cloud 云端 TTS */
+	/** 会员朗读选路：local 本机 Web Speech，cloud MiniMax，xfyun 讯飞在线 */
 	@Column({
 		name: 'playback_source',
 		type: 'varchar',
 		length: 16,
-		default: 'cloud',
+		default: 'local',
 	})
-	playbackSource!: 'local' | 'cloud';
+	playbackSource!: 'local' | 'cloud' | 'xfyun';
 
 	@UpdateDateColumn({ name: 'updated_at', type: 'timestamp' })
 	updatedAt!: Date;

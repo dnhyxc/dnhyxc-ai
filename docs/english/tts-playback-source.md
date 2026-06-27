@@ -1,8 +1,8 @@
 # 会员朗读选路：本机 / 云端互斥开关（playbackSource）
 
-> **文档角色（主文档）**：有效会员在语音设置页用 **本机 / 云端 Switch 互斥** 选择英语学习喇叭的默认介质；偏好字段 `playbackSource` 入库并与 `playEnglishPreferred` 选路衔接。  
+> **文档角色（主文档）**：有效会员在语音设置页用 **本机 / MiniMax 云端 / 讯飞云端** 三选一（`PlaybackSourcePicker`）选择朗读默认介质；偏好字段 `playbackSource` 入库并与 `playEnglishPreferred` 选路衔接。  
 > **端到端全景**：[`tts-end-to-end-guide.md`](./tts-end-to-end-guide.md)  
-> **延伸阅读**：[`tts-membership-routing.md`](./tts-membership-routing.md)（各场景调用与 `preferLocal`）、[`voice-settings-page.md`](./voice-settings-page.md)（页壳分区）、[`cloud-tts-prefs-db.md`](./cloud-tts-prefs-db.md)（账号同步表结构）。
+> **延伸阅读**：[`xfyun-cloud-tts.md`](./xfyun-cloud-tts.md)（讯飞在线合成与 Node 18 `ws`）、[`tts-membership-routing.md`](./tts-membership-routing.md)（各场景调用与 `preferLocal`）、[`voice-settings-page.md`](./voice-settings-page.md)（页壳分区）、[`cloud-tts-prefs-db.md`](./cloud-tts-prefs-db.md)（账号同步表结构）。
 
 若与仓库最新源码不一致，**以源码为准**。
 
@@ -19,7 +19,7 @@
 | 用户 | 语音设置 UI | 喇叭默认介质 |
 |------|-------------|--------------|
 | **非会员** | 仅本机区块，无 Switch | **本机** Web Speech |
-| **有效会员** | 本机区「使用本机语音朗读」+ 云端区「使用云端语音朗读」，**互斥** | 由 `playbackSource`：`local` → 本机；`cloud` → 云端（失败仍回退本机） |
+| **有效会员** | 顶栏 **PlaybackSourcePicker** 三选一：本机 / MiniMax 云端 / 讯飞云端 | 由 `playbackSource`：`local` / `cloud` / `xfyun`（失败仍回退本机或硅基） |
 
 **例外**：本机区块 **试听** 仍 `preferLocal: true`，不受 `playbackSource` 影响。
 

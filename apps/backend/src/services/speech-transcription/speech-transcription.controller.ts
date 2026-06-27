@@ -16,8 +16,10 @@ import type { Request, Response } from 'express';
 import { memoryStorage } from 'multer';
 import { JwtGuard } from 'src/guards/jwt.guard';
 import { MinimaxTtsDto } from './dto/minimax-tts.dto';
+import { XfyunTtsDto } from './dto/xfyun-tts.dto';
 import { MinimaxTtsService } from './minimax-tts.service';
 import { SiliconflowTranscriptionService } from './siliconflow-transcription.service';
+import { XfyunTtsService } from './xfyun-tts.service';
 
 type AuthedRequest = Request & { user?: { userId?: number } };
 
@@ -31,6 +33,7 @@ export class SpeechTranscriptionController {
 	constructor(
 		private readonly siliconflowTranscriptionService: SiliconflowTranscriptionService,
 		private readonly minimaxTtsService: MinimaxTtsService,
+		private readonly xfyunTtsService: XfyunTtsService,
 	) {}
 
 	/**
@@ -110,5 +113,48 @@ export class SpeechTranscriptionController {
 			return;
 		}
 		res.end();
+	}
+
+	/**
+	 * 讯飞在线语音合成：WebSocket 流式收齐后以 MP3 输出（与 MiniMax 流式 endpoint 形态一致）。
+	 * @see https://www.xfyun.cn/doc/tts/online_tts/API.html
+	 */
+	@Post('xfyun/speech/stream')
+	async xfyunSpeechStream(
+		@Body() body: XfyunTtsDto,
+		@Req() req: AuthedRequest,
+		@Res({ passthrough: false }) res: Response,
+	) {
+		const userId = req.user?.userId;
+		this.xfyunTtsService.resolveOptions(body);
+		res.status(200);
+		res.setHeader('Content-Type', this.xfyunTtsService.resolveContentType());
+		res.setHeader('Cache-Control', 'no-store');
+		res.setHeader('X-Content-Type-Options', 'nosniff');
+
+		try {
+			for await (const chunk of this.xfyunTtsService.streamSpeech(
+				body,
+				userId,
+			)) {
+				res.write(chunk);
+			}
+		} catch (err) {
+			if (!res.headersSent) {
+				throw err;
+			}
+			res.end();
+			return;
+		}
+		res.end();
+	}
+
+	@Post('xfyun/speech')
+	async xfyunSpeech(@Body() body: XfyunTtsDto, @Req() req: AuthedRequest) {
+		const userId = req.user?.userId;
+		const buffer = await this.xfyunTtsService.synthesizeSpeech(body, userId);
+		return new StreamableFile(buffer, {
+			type: this.xfyunTtsService.resolveContentType(),
+		});
 	}
 }

@@ -1,9 +1,12 @@
 import { http, type RequestConfig } from '@/utils/fetch';
 import { SETTINGS_CLOUD_TTS } from './api';
 
+/** 会员朗读选路：本机 / MiniMax 云端 / 讯飞在线，三选一互斥 */
+export type TtsPlaybackSource = 'local' | 'cloud' | 'xfyun';
+
 export type CloudTtsSettingsView = {
 	enabled: boolean;
-	playbackSource: 'local' | 'cloud';
+	playbackSource: TtsPlaybackSource;
 	model: string;
 	voiceId: string;
 	speed: number;
