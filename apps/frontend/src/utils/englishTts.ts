@@ -468,16 +468,96 @@ function clampPlaybackRate(rate?: number): number {
 /** 句末终止符（含全角叹号/问号） */
 const SENTENCE_TERMINATOR = /[.!?。！？；\uFF01\uFF1F]/u;
 
-/** 句末标点后仍属同一句的闭合符号（弯引号/直角引号/全角引号等） */
+/** 句末标点后仍属同一句的闭合符号（不含开引号/开括号，避免吞掉下一句句首） */
 const TRAILING_CLOSER_AFTER_SENTENCE_END =
-	/[\u2018\u2019\u201c\u201d\u0022\u0027\u300c\u300d\u300e\u300f\ufe41\ufe42\uff02\u00bb\u300b\u3011\uff09)]/u;
+	/[\u2019\u201d\u0022\u0027\u300d\u300f\ufe42\uff02\u00bb\u300b\u3011\uff09)\]]/u;
+
+/** 句首仍属同一句的开引号/开括号/破折号/省略号（与句末 extend 对称） */
+const LEADING_OPENER_BEFORE_SENTENCE_START =
+	/[\u2018\u201c\u300c\u300e\ufe41\uff02\u00ab\u300a\u3010\uff08([]/u;
+
+function isLeadingEllipsisAt(trimmed: string, index: number): boolean {
+	const ch = trimmed[index];
+	if (!ch) return false;
+	if (ch === '\u2026') return true;
+	if (ch === '.' && trimmed.startsWith('......', index)) return true;
+	return (
+		ch === '.' && trimmed.startsWith('...', index) && trimmed[index + 3] !== '.'
+	);
+}
+
+function isAttachableBeforeSentenceStart(
+	trimmed: string,
+	index: number,
+): boolean {
+	const ch = trimmed[index];
+	if (!ch) return false;
+	if (LEADING_OPENER_BEFORE_SENTENCE_START.test(ch)) return true;
+	if (isLeadingEllipsisAt(trimmed, index)) return true;
+	if (ch === '-' && trimmed.startsWith('——', index)) return true;
+	if (ch === '-' && trimmed.startsWith('--', index)) return true;
+	return false;
+}
+
+function consumeLeadingAttachableBeforeSentenceStart(
+	trimmed: string,
+	index: number,
+): number {
+	const ch = trimmed[index]!;
+	if (ch === '-' && trimmed.startsWith('——', index)) return index + 2;
+	if (ch === '-' && trimmed.startsWith('--', index)) return index + 2;
+	if (isLeadingEllipsisAt(trimmed, index)) {
+		if (ch === '\u2026') {
+			let j = index;
+			while (j < trimmed.length && trimmed[j] === '\u2026') j += 1;
+			return j;
+		}
+		if (ch === '.' && trimmed.startsWith('......', index)) return index + 6;
+		return index + 3;
+	}
+	if (LEADING_OPENER_BEFORE_SENTENCE_START.test(ch)) return index + 1;
+	return index + 1;
+}
+
+/** 句首标点前扩 span.start（开引号、……、—— 等归入本句，不单拆一句） */
+function computeSentenceSpanStart(
+	trimmed: string,
+	segmentStart: number,
+	contentStart: number,
+): number {
+	let pos = segmentStart;
+	while (pos < contentStart) {
+		while (pos < contentStart && /\s/u.test(trimmed[pos]!)) pos += 1;
+		if (pos >= contentStart) break;
+		if (!isAttachableBeforeSentenceStart(trimmed, pos)) break;
+		pos = consumeLeadingAttachableBeforeSentenceStart(trimmed, pos);
+	}
+	return pos > segmentStart ? segmentStart : contentStart;
+}
+
+function isWithinSentenceLeadingAttachables(
+	trimmed: string,
+	index: number,
+	segmentStart: number,
+): boolean {
+	let pos = segmentStart;
+	while (pos <= index && pos < trimmed.length) {
+		while (pos < trimmed.length && /\s/u.test(trimmed[pos]!)) pos += 1;
+		if (pos > index) return false;
+		if (!isAttachableBeforeSentenceStart(trimmed, pos)) return false;
+		const next = consumeLeadingAttachableBeforeSentenceStart(trimmed, pos);
+		if (index < next) return true;
+		pos = next;
+	}
+	return false;
+}
 
 function isAttachableAfterSentenceEnd(trimmed: string, index: number): boolean {
 	const ch = trimmed[index];
 	if (!ch) return false;
 	if (SENTENCE_TERMINATOR.test(ch)) return true;
 	if (TRAILING_CLOSER_AFTER_SENTENCE_END.test(ch)) return true;
-	if (ch === '\u2026') return true;
+	// ponytail: 省略号只作句末断点，不在 extend 里吞掉下一句段首的 ……
 	if (ch === '.' && trimmed.startsWith('......', index)) return true;
 	if (
 		ch === '.' &&
@@ -497,11 +577,6 @@ function consumeAttachableAfterSentenceEnd(
 	if (SENTENCE_TERMINATOR.test(ch)) {
 		let j = index;
 		while (j < trimmed.length && SENTENCE_TERMINATOR.test(trimmed[j]!)) j += 1;
-		return j;
-	}
-	if (ch === '\u2026') {
-		let j = index;
-		while (j < trimmed.length && trimmed[j] === '\u2026') j += 1;
 		return j;
 	}
 	if (ch === '.' && trimmed.startsWith('......', index)) return index + 6;
@@ -535,21 +610,35 @@ function extendSentenceBoundaryEnd(trimmed: string, end: number): number {
 }
 
 /** 句末边界（trimmed plain 内下标，不含边界字符之后的内容） */
-function sentenceBoundaryEnd(trimmed: string, i: number): number {
+function sentenceBoundaryEnd(
+	trimmed: string,
+	i: number,
+	segmentStart: number,
+): number {
 	const ch = trimmed[i];
 	if (!ch) return -1;
 	let end = -1;
 	if (SENTENCE_TERMINATOR.test(ch)) end = i + 1;
 	else if (ch === '\u2026') {
+		if (isWithinSentenceLeadingAttachables(trimmed, i, segmentStart)) {
+			return -1;
+		}
 		let j = i + 1;
 		while (j < trimmed.length && trimmed[j] === '\u2026') j += 1;
 		end = j;
-	} else if (ch === '.' && trimmed.startsWith('......', i)) end = i + 6;
-	else if (
+	} else if (ch === '.' && trimmed.startsWith('......', i)) {
+		if (isWithinSentenceLeadingAttachables(trimmed, i, segmentStart)) {
+			return -1;
+		}
+		end = i + 6;
+	} else if (
 		ch === '.' &&
 		trimmed.startsWith('...', i) &&
 		trimmed[i + 3] !== '.'
 	) {
+		if (isWithinSentenceLeadingAttachables(trimmed, i, segmentStart)) {
+			return -1;
+		}
 		end = i + 3;
 	}
 	if (end < 0) return -1;
@@ -567,7 +656,7 @@ export function buildSentenceOffsetSpans(
 	let rawStart = 0;
 
 	for (let i = 0; i < trimmed.length; i += 1) {
-		const boundary = sentenceBoundaryEnd(trimmed, i);
+		const boundary = sentenceBoundaryEnd(trimmed, i, rawStart);
 		if (boundary < 0) continue;
 
 		const slice = trimmed.slice(rawStart, boundary);
@@ -575,7 +664,12 @@ export function buildSentenceOffsetSpans(
 		if (content) {
 			const lead = slice.length - slice.trimStart().length;
 			const trail = slice.length - slice.trimEnd().length;
-			spans.push({ start: rawStart + lead, end: boundary - trail });
+			const start = computeSentenceSpanStart(
+				trimmed,
+				rawStart,
+				rawStart + lead,
+			);
+			spans.push({ start, end: boundary - trail });
 		}
 
 		rawStart = boundary;
@@ -591,7 +685,12 @@ export function buildSentenceOffsetSpans(
 			const lead =
 				trimmed.slice(rawStart).length -
 				trimmed.slice(rawStart).trimStart().length;
-			spans.push({ start: rawStart + lead, end: trimmed.length });
+			const start = computeSentenceSpanStart(
+				trimmed,
+				rawStart,
+				rawStart + lead,
+			);
+			spans.push({ start, end: trimmed.length });
 		}
 	}
 
@@ -1330,5 +1429,39 @@ if (splitTextForTtsCadence('测'.repeat(200)).length < 2) {
 		if (!trimmed.slice(spans[1]?.start ?? 0).match(/^这|接下/)) {
 			throw new Error(`[englishTts] 叹号后句界错位: ${plain}`);
 		}
+	}
+	const ellipsisMid = buildSentenceOffsetSpans('第一句。……第二句。');
+	const emMid = '第一句。……第二句。'.trim();
+	const e1 = ellipsisMid[1];
+	if (
+		ellipsisMid.length !== 2 ||
+		emMid.slice(e1?.start ?? 0, e1?.end ?? 0) !== '……第二句'
+	) {
+		throw new Error('[englishTts] 句中省略号应并入下一句');
+	}
+	const dashStart = buildSentenceOffsetSpans('——他说完就走了。');
+	const d0 = dashStart[0];
+	if (
+		dashStart.length !== 1 ||
+		'——他说完就走了。'.trim().slice(d0?.start ?? 0, d0?.end ?? 0) !==
+			'——他说完就走了'
+	) {
+		throw new Error('[englishTts] 句首破折号应并入本句');
+	}
+	const leading = buildSentenceOffsetSpans('……他走了。');
+	const leadingText = '……他走了。'.trim();
+	const l0 = leading[0];
+	if (
+		leading.length !== 1 ||
+		l0?.start !== 0 ||
+		leadingText.slice(l0.start, l0.end) !== '……他走了'
+	) {
+		throw new Error('[englishTts] 段首省略号不应单独成句');
+	}
+	const openerNext = buildSentenceOffsetSpans('完。\u201c下一句。\u201d');
+	const t2 = '完。\u201c下一句。\u201d'.trim();
+	const s1 = t2.slice(openerNext[1]?.start ?? 0, openerNext[1]?.end ?? 0);
+	if (openerNext.length !== 2 || !s1.startsWith('\u201c')) {
+		throw new Error('[englishTts] 句首开引号应归入下一句');
 	}
 }
