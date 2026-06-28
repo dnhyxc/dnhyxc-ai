@@ -1131,4 +1131,9 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'When using local browser speech for listen-while-reading, quote Listen, or English learning playback, the first sentence no longer occasionally stays silent. MiniMax or iFlytek cloud voice is unchanged.',
 	},
+	's25-58': {
+		title: 'Continuous-scroll listen-while-reading resume',
+		description:
+			'When reading EPUB in continuous scroll mode, chapter listen now continues into the next on-screen section after the current block finishes. Previous/next sentence and sentence-list jumps no longer exit playback by mistake. Paginated page-turn mode is unchanged.',
+	},
 };

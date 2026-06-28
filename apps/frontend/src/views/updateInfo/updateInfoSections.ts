@@ -1698,6 +1698,13 @@ const UPDATE_INFO_SECTIONS_ZH: UpdateInfoSection[] = [
 				description:
 					'使用本机语音听书、听当前或英语学习喇叭时，第一句不再偶发无声；MiniMax 或讯飞云端朗读不受影响。',
 			},
+			{
+				id: 's25-58',
+				title: 'EPUB 连续滚动听书续播',
+				dateLabel: '2026-06-27',
+				description:
+					'阅读设置为连续滚动时，听书播完当前可见段落会自动衔接下方内容继续朗读；播放条上一句/下一句与分句跳转不再误退出播放。分页翻页模式听书行为不变。',
+			},
 		],
 	},
 ];

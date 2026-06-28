@@ -228,51 +228,109 @@ let scrollSettleTimer = 0;
 let pendingFollowScroll = false;
 const followListeners = new Set<(state: EpubListenAutoFollowState) => void>();
 
+/**
+ * 通知所有订阅者自动跟随状态
+ * 该函数会根据当前 session 状态构造 autoFollow 状态对象，并逐一调用监听队列中的回调函数
+ */
 function emitAutoFollowState(): void {
+	// 构造当前自动跟随状态
 	const state: EpubListenAutoFollowState = {
+		// active 表示当前 session 是否存在
 		active: session != null,
+		// autoFollow 表示当前自动跟随状态，若 session 为空则默认为 true
 		autoFollow: session?.autoFollow ?? true,
 	};
+	// 依次将状态对象传递给所有订阅的监听器
 	for (const fn of followListeners) fn(state);
 }
 
+// 订阅听书自动跟随状态变化：传入回调函数，每当自动跟随状态更新时会调用该函数
 export function subscribeEpubListenAutoFollow(
-	listener: (state: EpubListenAutoFollowState) => void,
+	listener: (state: EpubListenAutoFollowState) => void, // 订阅者回调，参数为当前的跟随状态对象
 ): () => void {
+	// 将传入的回调加入监听队列
 	followListeners.add(listener);
+	// 立即触发一次回调，通知最新状态
 	emitAutoFollowState();
+	// 返回取消订阅的方法，外部可用于移除监听
 	return () => followListeners.delete(listener);
 }
 
+/**
+ * 判断传入的 Range 是否仍然连接到当前 DOM 树
+ * 若 range 为 null 或其节点已经被移除（失去连接），则返回 false
+ * 机制：尝试访问 range.startContainer.nodeName，
+ * 若节点已被移除会抛出异常，此时捕获并返回 false
+ * 否则返回 true，表示该 Range 仍然与当前文档结构关联
+ * @param range 需要校验的 DOM Range
+ * @returns 布尔值，true 表示已连接，false 表示无效或断开
+ */
 function isRangeConnected(range: Range | null): range is Range {
+	// 若 range 为 null，则立即返回 false
 	if (!range) return false;
 	try {
+		// 尝试访问 startContainer 的 nodeName 属性
+		// 若节点已断开，这里会异常
 		void range.startContainer.nodeName;
+		// 未抛出异常，说明 Range 有效且连接
 		return true;
 	} catch {
+		// 捕获异常，Range 已与 DOM 脱离
 		return false;
 	}
 }
 
+/**
+ * 获取 EPUB Rendition 实例下所有的内容窗口（contents）
+ * 若返回为数组，直接返回数组；若为单个对象则封装为数组；若为空则返回空数组
+ * 常用于多 iframe 场景下遍历所有内容窗口（如多页面分页或多 chapter）
+ *
+ * @param rend - EPUB.js 的 Rendition 实例（代表 reader 渲染器）
+ * @returns 一个对象数组，每个对象包含 document（文档对象）和 window（窗口对象）
+ */
 function getContents(
 	rend: Rendition,
 ): Array<{ document: Document; window: Window }> {
+	// 调用 rendition 的 getContents 获取内容窗口。可能是数组、单个对象或 undefined
 	const raw = rend.getContents();
+	// 若 getContents 返回数组，则直接返回
 	return Array.isArray(raw)
 		? raw
-		: raw
+		: // 若返回为对象（单 iframe），则封装为数组返回
+			raw
 			? [raw as { document: Document; window: Window }]
-			: [];
+			: // 若返回为空，则返回空数组
+				[];
 }
 
+/**
+ * 克隆当前 EPUB 选区（Range），用于后续定位或操作
+ * 遍历所有 EPUB Rendition 的内容窗口（iframe），找到第一个有效的 Selection
+ * - 若 Selection 为空、已折叠、无 Range，则跳过
+ * - 若选中内容仅为空白字符串，也跳过
+ * - 优先尝试用 normalizeSelectionRangeForEpub 标准化选区
+ * - 若无法标准化，则直接克隆原始 Range
+ * - 若所有窗口均无有效选区，则返回 null
+ *
+ * @param rend EPUB.js 的 Rendition（阅读器渲染实例）
+ * @returns 标准化后的选区 Range 对象或 null
+ */
 export function cloneActiveEpubSelection(rend: Rendition): Range | null {
+	// 遍历所有内容 iframe/window
 	for (const { window: w } of getContents(rend)) {
+		// 获取当前窗口 selection
 		const sel = w.getSelection();
+		// 若无 selection 或为折叠状态（即无选区）或 range 数为 0，跳过
 		if (!sel || sel.isCollapsed || !sel.rangeCount) continue;
+		// 取第一个 Range（一般 EPUB 只允许单 range 选中）
 		const raw = sel.getRangeAt(0);
+		// 若选中内容全是空白，跳过
 		if (!raw.toString().trim()) continue;
+		// 优先用标准化工具处理（不同环境、跨 iframe、兼容性场景）
+		// 若不可用就直接 clone
 		return normalizeSelectionRangeForEpub(raw) ?? raw.cloneRange();
 	}
+	// 所有内容窗口均无有效选区
 	return null;
 }
 

@@ -1,5 +1,7 @@
 # EPUB 边听边读（听当前 + 听书）— 开发者实现手册
 
+> **手册版本**：2026-06-27 — 同步 **连续滚动多 iframe 听书续播**（`runScrollSectionLoop` / `epubScrollListenAdvance`）；utils 已合并为 3 文件（见 [Influence-point/epub-listen-utils-consolidation.md](../Influence-point/epub-listen-utils-consolidation.md)）。
+
 ## 文档角色
 
 **本文档**：EPUB **听当前**（选区/引用/想法朗读）与 **听书**（顶栏全书连续听）的 **唯一完整开发者手册**。目标读者是需要维护、扩展或从零复刻该能力的工程师。
@@ -11,7 +13,9 @@
 | 本手册 | `docs/ebook/developer/epub-listen-dev.md` | 原理、模块边界、调用链、可照抄源码 |
 | 听当前增量 | `docs/ebook/epub-quote-listen.md` | 三入口、历史 diff |
 | 听书增量 | `docs/ebook/epub-chapter-listen.md` | 听书定稿架构、废弃方案 |
-| 播放背景 | `docs/ebook/epub-listen-sentence-bg.md` | plain 偏移与 `onCadenceChunk` |
+| 连续滚动听书 | `docs/ebook/epub-scroll-listen-section-advance.md` | 改动前后代码对比 |
+| 多 iframe 解题套路 | `docs/ideas/epub-scroll-multi-iframe-listen.md` | 规划态：根因、逐点清单、复现步骤 |
+| 播放背景 | `docs/ebook/epub-listen-sentence-bg.md` | plain 偏移（听当前历史 cadence 专题） |
 | 自动跟随 FAB | `docs/ebook/epub-listen-auto-follow-fab.md` | scroll guard 细节 |
 | 与用户划线 | `docs/ebook/epub-listen-user-highlight-reconcile.md` | 播放层 DOM 隔离 |
 
@@ -22,7 +26,7 @@
 | 1 | **§0** | 维护定位表、M1–M5 从零阶段 |
 | 2 | **§1–§2** | 能力边界、架构总览、数据流 |
 | 3 | **§3** | **听当前**完整链路 |
-| 4 | **§4** | **听书**完整链路 |
+| 4 | **§4** | **听书**完整链路（含连续滚动 / 分页分叉） |
 | 5 | **§5** | 共享层：TTS、高亮、滚动、互斥 |
 | 6 | **§6–§7** | 阅读页接线、验收清单 |
 | 7 | **§8** | 带逐行注释的关键源码 |
@@ -44,15 +48,18 @@
 
 | 现象 | 先打开 | 关键符号 | 怎么验 |
 |------|--------|----------|--------|
-| 点「听当前」无声 | `useEbookQuoteListen.ts` | `playEnglishPreferred` | 控制台 TTS 报错 |
-| 听当前有句背景、听书没有 | `epubListenChapterHighlight.ts` | `indexChapterSentenceRanges` 是否全 null | 断点 `sentenceRanges[i]` |
-| 听书误报「本章暂无文字」 | `epubListenVisibleSection.ts` | `getRenditionViewsList`、`pickDocumentForListen` | `views()` 不可 `for…of` |
+| 点「听当前」无声 | `useEbookQuoteListen.ts` | `playFromCursor` → `playEnglishPreferred` | 控制台 TTS 报错 |
+| 听当前有句背景、听书没有 | `epubListenChapter.ts` | `indexChapterSentenceRanges` 是否全 null | 断点 `sentenceRanges[i]` |
+| 听书误报「本章暂无文字」 | `epubListenChapter.ts` | `listIframeDocuments`、`pickDocumentForListen` | `views()` 不可 `for…of` |
 | 换句背景残留/叠层 | `epubListenMarkHighlight.ts` | 换句前 `clearListenMarkHighlight` | marks-pane SVG |
 | 播放句不在视口、不自动滚 | `epubListenSegmentOverlay.ts` | `activeDomRange`、`requestListenAutoFollowScroll` | session 是否有 Range |
 | 手动滚后无 FAB | `EpubListenFollowFab.tsx` | `subscribeEpubListenAutoFollow` | `active && !autoFollow` |
-| 听书与听当前同时响 | `epubListenController.ts` | `invokeStop*` | 互斥注册 |
-| 听书节末不翻章 | `epubListenVisibleSection.ts` | `waitForNextSection` | `rend.next()` + `relocated` |
-| 目录跳转后听书错位 | `useEpubChapterListen.ts` | `syncToCurrentView` | TOC `onSelect` 回调 |
+| 听书与听当前同时响 | `epubListenSegmentOverlay.ts` | `invokeStop*` / `register*ListenStop` | 互斥注册 |
+| **连续滚动**节末不续播 / 误报读完 | `epubScrollListenAdvance.ts` | `advanceScrollListenSection`、`listEpubViewSlots` | 播完 7/7 后 DOM 下一 `.epub-view` |
+| **分页**节末不翻章 | `epubListenChapter.ts` | `waitForNextSection` | `rend.next()` + `relocated` |
+| 切句后播放条消失 | `useEpubChapterListen.ts` | `goToSentence` → `runListenLoop`；`!finished` 时 `!isGenActive` | 连点「下一句」不应 `stopInternal` |
+| 听书卡在 loading | `useEpubChapterListen.ts` | `applySection` 是否 return null | 勿在 apply 层做 gen 门禁 |
+| 目录跳转后听书错位 | `useEpubChapterListen.ts` | `syncToCurrentView`、`sectionDocRef` | TOC `onSelect` 回调 |
 | 背景与用户划线互删 | `epubListenMarkHighlight.ts` | class `moke-epub-listen-bg` | 与用户 `moke-epub-user-hl` 分离 |
 
 ### 0.3 从零实现：严格按阶段
@@ -79,34 +86,45 @@
 
 **验收**：拖选 → 听当前 → 能朗读 → 停止。
 
-#### M3：听当前句级背景 + 自动跟随
+#### M3：听当前句级背景 + 自动跟随 + 播放条
 
 | 步 | 做什么 |
 |----|--------|
 | 1 | `beginEpubListenOverlaySession` + `buildDomSentenceIndex` |
-| 2 | `onCadenceChunk` → `showEpubListenPlainSpan` → `paintSentence` |
+| 2 | `playFromCursor` 逐句 `playEnglishPreferred` + `showEpubListenPlainSpan` |
 | 3 | `epubListenMarkHighlight.showListenMarkHighlight` |
-| 4 | `attachListenScrollGuard` + `EpubListenFollowFab` |
+| 4 | `attachListenScrollGuard` + `EpubListenFollowFab` + `EpubListenPlayerBar` |
 
-**验收**：长选区逐句淡黄底；手动滚动出 FAB；点 FAB 回位。
+**验收**：长选区逐句淡黄底；手动滚动出 FAB；底部播放条可切句/暂停。
 
-#### M4：听书连续播放
+#### M4：听书连续播放（分页模式）
 
 | 步 | 做什么 |
 |----|--------|
-| 1 | `extractVisibleListenSection`（innerText） |
-| 2 | `useEpubChapterListen` 状态机 + `runListenLoop` |
+| 1 | `extractVisibleListenSection`（innerText，在 `epubListenChapter.ts`） |
+| 2 | `useEpubChapterListen` + `runPaginatedListenLoop` + `waitForNextSection` |
 | 3 | `indexChapterSentenceRanges` 节级句 Range |
 | 4 | `EpubListenPlayerBar` + 顶栏耳机 |
 
-**验收**：听书从可见章连续播；底部播放条；节末 `next()`。
+**验收**：**分页翻页** EPUB 听书节末 `rend.next()` 衔接；播放条正常。
+
+#### M4b：听书连续滚动（多 iframe）
+
+| 步 | 做什么 |
+|----|--------|
+| 1 | `isScrollListenMode` + `sectionDocRef` |
+| 2 | `runScrollSectionLoop`：首节 `prepareSection`，后续 `extractListenSectionForDocument` |
+| 3 | `epubScrollListenAdvance.ts`：`advanceScrollListenSection` |
+| 4 | `goToSentence` → `runListenLoop(gen)`；`!finished` 先判 `!isGenActive` |
+
+**验收**：连续滚动下播完当前 iframe 自动下一 iframe；切句不退出。
 
 #### M5：互斥与边界
 
 | 步 | 做什么 |
 |----|--------|
-| 1 | `epubListenController` 双向 stop |
-| 2 | `syncToCurrentView`（目录跳转） |
+| 1 | `epubListenSegmentOverlay` 内 `register*ListenStop` / `invokeStop*` |
+| 2 | `syncToCurrentView`（目录跳转 + `sectionDocRef`） |
 | 3 | `……` / `——` / 省略号句界（`buildSentenceOffsetSpans`） |
 
 ### 0.4 运行时调用链
@@ -121,11 +139,11 @@
 5. beginEpubListenOverlaySession(rend, plain, { cfi, selectionRange })
    └─ buildDomSentenceIndex(outerRange) → sentences + plain
    └─ attachListenScrollGuard
-6. playEnglishPreferred(speakPlain, { onCadenceChunk })
-   └─ emitCadenceChunk(phase:'start') → showEpubListenPlainSpan → paintSentence
-      └─ sentenceToRange → showListenMarkHighlight + requestListenAutoFollowScroll
-   └─ emitCadenceChunk(phase:'end', isLastInSentence) → clearActiveListenHighlight
-7. finally → clearEpubListenSegmentOverlay
+6. playFromCursor(gen): 逐句循环
+   └─ showEpubListenPlainSpan(i) → showListenMarkHighlight + autoFollow
+   └─ playEnglishPreferred(单句, { prefetchedCloud })
+   └─ clearActiveListenHighlight
+7. stopInternal → clearEpubListenSegmentOverlay
 ```
 
 **听书（顶栏耳机）**：
@@ -133,16 +151,19 @@
 ```text
 1. toggleChapterListen → startFromCurrentPosition
 2. invokeStopQuoteListen(); clearEpubListenSegmentOverlay(); beginChapterListenAutoFollow
-3. extractVisibleListenSection → plain + outerRange + spineIndex
+3. extractVisibleListenSection → preview；sectionDocRef = preview.document
 4. runListenLoop(gen):
-   a. prepareSection → buildSentenceOffsetSpans + indexChapterSentenceRanges
-   b. playSentencesFromCursor:
-      └─ 每句 stripMarkdownForTts(plain.slice) → playEnglishPreferred(spokenRaw)
-      └─ showChapterListenSentenceHighlight → syncChapterListenScrollSession
-         └─ showEpubListenDomRange → showListenMarkHighlight + autoFollow scroll
-      └─ 句末 clearChapterListenSentenceHighlight
-   c. waitForNextSection → rend.next() → 下一节循环
-5. stopInternal → teardownChapterListenHighlight + clearEpubListenSegmentOverlay
+   ├─ isScrollListenMode?
+   │    是 → runScrollSectionLoop:
+   │      a. 首节 prepareSection（视口 + CFI）/ 后续 extractListenSectionForDocument(doc)
+   │      b. applySection → sectionRef + sectionDocRef + 播放条
+   │      c. playSentencesFromCursor（逐句 TTS + 高亮 + 预取）
+   │      d. advanceScrollListenSection(rend, sectionDoc)  // 槽位 scroll + manager.check
+   │    否 → runPaginatedListenLoop:
+   │      a–c 同上（每轮 prepareSection 视口）
+   │      d. waitForNextSection → rend.next()
+5. goToSentence / pause: ++loopGenRef；旧环 !isGenActive → 静默 return（不 stopInternal）
+6. stopInternal → teardownChapterListenHighlight + clearEpubListenSegmentOverlay
 ```
 
 ---
@@ -154,7 +175,7 @@
 | 能力 | 入口 | 播放范围 | UI |
 |------|------|----------|-----|
 | **听当前** | 选区 PopBar、想法卡片、上下文菜单 | 用户选中的一段 | 无独立播放条；工具条可保持 |
-| **听书** | 顶栏耳机图标 | 当前可见 spine 节起，逐句至全书末 | 底部 `EpubListenPlayerBar` |
+| **听书** | 顶栏耳机图标 | 当前 iframe / 可见节起，逐句至全书末 | 底部 `EpubListenPlayerBar` |
 
 二者 **互斥**：启动一方会 `invokeStop*` 停止另一方。
 
@@ -168,10 +189,11 @@
 | 正文来源 | 选区 DOM → `buildDomSentenceIndex` | `body.innerText` + `stripMarkdownForTts` |
 | 句界 | 与 TTS 共用 `buildSentenceOffsetSpans` | 同上 |
 | 句 → DOM | `DomListenSentence.anchor`（字符流锚点） | `indexChapterSentenceRanges`（TreeWalker + indexOf） |
-| TTS 调用 | 一次 `playEnglishPreferred(整段plain)` | **每句** `playEnglishPreferred(spokenRaw)` |
-| 句背景触发 | TTS `onCadenceChunk` 回调 | 每句播放前同步调用 |
+| TTS 调用 | **每句** `playEnglishPreferred`（`playFromCursor`） | **每句** `playEnglishPreferred` + 句间预取 |
+| 句背景触发 | 每句播放前 `showEpubListenPlainSpan` | 每句播放前 `showChapterListenSentenceHighlight` |
 | 滚动 session | `beginEpubListenOverlaySession`（含 plain 句表） | `beginChapterListenAutoFollow` + `showEpubListenDomRange`（`activeDomRange`） |
-| 节/章衔接 | 无 | `waitForNextSection` → `rend.next()` |
+| 节/章衔接 | 无 | **分页**：`waitForNextSection` → `rend.next()`<br>**连续滚动**：`advanceScrollListenSection`（按 `.epub-view` 槽位，不用 `rend.next`） |
+| 节的单位 | 选区一段 plain | **一个 iframe `document`**（滚动）或 **视口节**（分页每轮 prepare） |
 
 **设计原则**：播放文本与句界算法 **必须与 TTS 同源**（`stripMarkdownForTts` + `buildSentenceOffsetSpans`），否则背景句与朗读句错位。
 
@@ -180,7 +202,8 @@
 - 词级卡拉 OK、唇形同步
 - Whispersync 级精确进度持久化
 - 听书预扫描全书 DOM 句表（易卡死）
-- 听书走 `onCadenceChunk` + overlay plain 映射（与 innerText 句表易失配）
+- 听书走 **`onCadenceChunk`** 驱动背景（听当前已改为逐句 `playFromCursor`，与听书对齐）
+- 连续滚动听书用 **`rend.next()` / 合并多 iframe 句流** / 播放中 **`rend.display`** 预加载（历史回归，见 ideas 文档）
 - 每句 `window.find` 搜索 DOM（O(n²) 卡死）
 
 ---
@@ -197,13 +220,13 @@
 │  useEbookQuoteListen    useEpubChapterListen                │
 ├─────────────────────────────────────────────────────────────┤
 │ 播放编排                                                    │
-│  epubListenSegmentOverlay（session、autoFollow、句表/DOM）  │
-│  epubListenVisibleSection（听书：可见节 innerText）         │
-│  epubListenController（互斥 stop 注册）                     │
+│  epubListenSegmentOverlay（session、autoFollow、互斥 stop）  │
+│  epubListenChapter（听书：innerText、句 Range、waitForNext）│
+│  epubScrollListenAdvance 🆕（连续滚动：槽位 advance）       │
 ├─────────────────────────────────────────────────────────────┤
-│ 句 ↔ DOM                                                    │
-│  epubListenSentenceIndex（听当前：DOM 字符流锚点）          │
-│  epubListenChapterHighlight（听书：TreeWalker 顺序匹配）    │
+│ 句 ↔ DOM（均在 epubListenChapter / overlay 内）             │
+│  buildDomSentenceIndex（听当前）                            │
+│  indexChapterSentenceRanges（听书 TreeWalker 顺序匹配）     │
 ├─────────────────────────────────────────────────────────────┤
 │ 视觉 + 滚动                                                 │
 │  epubListenMarkHighlight（淡黄 SVG/iframe 单层）            │
@@ -236,15 +259,21 @@ flowchart TB
   subgraph quote [听当前]
     Q1[选区 Range] --> Q2[buildDomSentenceIndex]
     Q2 --> Q3[overlay session]
-    Q3 --> Q4[playEnglishPreferred + onCadenceChunk]
-    Q4 --> Q5[paintSentence → markHighlight]
+    Q3 --> Q4[playFromCursor 逐句]
+    Q4 --> Q5[showEpubListenPlainSpan → markHighlight]
   end
 
   subgraph chapter [听书]
-    C1[innerText plain] --> C2[buildSentenceOffsetSpans]
+    C0{isScrollListenMode?}
+    C0 -->|是| C1[document 粒度 sectionDocRef]
+    C0 -->|否| C1b[每轮 extractVisibleListenSection]
+    C1 --> C2[buildSentenceOffsetSpans]
+    C1b --> C2
     C2 --> C3[indexChapterSentenceRanges]
     C3 --> C4[每句 playEnglishPreferred]
-    C4 --> C5[syncChapterListenScrollSession → markHighlight]
+    C4 --> C5[syncChapterListenScrollSession]
+    C1 --> C6[advanceScrollListenSection]
+    C1b --> C7[waitForNextSection]
   end
 
   Q5 --> M[epubListenMarkHighlight]
@@ -282,11 +311,10 @@ useEbookQuoteListen(t, getRendition, onListenSessionEnd?)
 
 ### 3.3 TTS 与句背景同步
 
-- 一次播放整段 `speakPlain`（不是逐句 await）。
-- **`playEnglishPreferred`** 内部按 **节奏块（cadence chunk）** 回调 **`onCadenceChunk`**：
-  - `phase: 'start'` → `showEpubListenPlainSpan(..., sentenceIndex)` → **`paintSentence`**
-  - `phase: 'end'` 且 `isLastInSentence` → **`clearActiveListenHighlight`**
-- **`paintSentence`**：`sentenceToRange(sentences[i])` → `showListenMarkHighlight`；换句先 `clearListenMarkHighlight`；若 `autoFollow` 则 `requestListenAutoFollowScroll`。
+- **`playFromCursor(gen)`** 从 `sentenceCursorRef` 逐句循环（与听书 `playSentencesFromCursor` 同构）。
+- 每句：`showEpubListenPlainSpan(0, 0, si)` → **`showListenMarkHighlight`**；`autoFollow` 时滚入视口。
+- 句末 **`clearActiveListenHighlight`**；整段播完或 stop → **`clearEpubListenSegmentOverlay`**。
+- 云端 TTS：**`prefetchCloudEnglishTts`** 句间预取（与听书相同模式）。
 
 ### 3.4 停止与清理
 
@@ -297,27 +325,35 @@ useEbookQuoteListen(t, getRendition, onListenSessionEnd?)
 
 ## 4. 听书 — 实现原理
 
-### 4.1 状态机
+### 4.1 状态机与关键 ref
 
 `ChapterListenStatus`：`idle` | `loading` | `playing` | `paused`
 
-| 字段 | 含义 |
-|------|------|
-| `spineIndex` | 当前 spine 节下标 |
-| `sentenceIndex` / `sentenceCount` | 节内句进度 |
-| `rate` | 倍速 0.75 / 1 / 1.25 / 1.5 |
+| 字段 / ref | 含义 |
+|------------|------|
+| `state.spineIndex` | 播放条章号（来自 `applySection`） |
+| `sentenceIndex` / `sentenceCount` | 当前 iframe / 节内句进度 |
+| `sectionRef` | 当前节 `SectionCtx`（plain、句表、ranges） |
+| `sectionDocRef` 🆕 | 当前 iframe **`contentDocument`**（滚动续播身份） |
+| `resolveStartCfiRef` | 首节是否解析 CFI 起始句 |
+| `scrollSeekRef` 🆕 | 切句后首句 `scrollCenterOnFirst` |
+| `loopGenRef` | 代际取消令牌 |
 
-**代际取消**：`loopGenRef` 递增使进行中的 `runListenLoop` / `playSentencesFromCursor` 自行退出（pause、stop、seek 均 bump gen）。
+**代际取消**：`loopGenRef` 递增使 `runScrollSectionLoop` / `runPaginatedListenLoop` / `playSentencesFromCursor` 退出。pause、stop、**goToSentence** 均 bump gen；旧环 **`!finished && !isGenActive(gen)` → return**，不得 `stopInternal`。
 
-### 4.2 可见节抽取
+### 4.2 正文抽取（两路径）
 
-**`extractVisibleListenSection(rend, spineHint?)`**：
+**视口路径 — `extractVisibleListenSection(rend, spineHint?)`**（`epubListenChapter.ts`）：
 
-1. **`listIframeDocuments`**：`getContents` + **`getRenditionViewsList(rend)`**（勿对 `views()` 直接 `for…of`）+ 滚动容器内 iframe。
-2. **`pickDocumentForListen`**：优先 `spineHint` 对应 view；多 iframe 时用视口 **垂直中心** 选有正文的 document。
-3. **`innerText`** → `stripMarkdownForTts` → `plain`（与 TTS 同源）。
-4. `outerRange = selectNodeContents(body)` 供句 Range 索引。
-5. `plain` 超 `MAX_PLAIN_CHARS`（50000）截断。
+1. **`listIframeDocuments`**：`getContents` + **`getRenditionViewsList(rend)`** + 滚动容器 iframe。
+2. **`pickDocumentForListen`**：优先 `spineHint`；多 iframe 时视口垂直中心选有正文 document。
+3. 用于：**开播 preview**、**首节** `prepareSection`、**分页**每轮 `prepareSection`。
+
+**固定 document 路径 — `extractListenSectionForDocument(rend, doc)`** 🆕：
+
+- 对 **已知** iframe `document` 抽 `plain` + `outerRange`（算法与视口路径相同）。
+- `spineIndexForDocument`：view.index → canonical href → fallback。
+- 用于：**连续滚动** `runScrollSectionLoop` 第二节起（节间 advance 后 `sectionDocRef` 已更新）。
 
 ### 4.3 起始句
 
@@ -325,29 +361,68 @@ useEbookQuoteListen(t, getRendition, onListenSessionEnd?)
 
 - **`resolveListenStartSentence`**：用当前阅读 CFI 解析 DOM Range，在 `sentenceRanges` 中找 **最后一个 END ≤ CFI 位置** 的句索引。
 
-### 4.4 播放循环
+### 4.4 播放循环（分页 vs 连续滚动）
+
+**入口 `runListenLoop(gen)`**：
 
 ```text
-runListenLoop(gen):
-  loop:
-    ctx = prepareSection(rend, gen)     // 空则 Toast emptySection
-    finished = playSentencesFromCursor(ctx, gen)
-    if paused → return
-    if !finished → stop
-    waitForNextSection(rend)            // rend.next + relocated 或超时
-    if !advanced → Toast finished → stop
-    sentenceCursor = 0
+if isScrollListenMode(rend)  → runScrollSectionLoop(gen)
+else                          → runPaginatedListenLoop(gen, opts)
 ```
 
-**`playSentencesFromCursor`**（核心）：
+**连续滚动 — `runScrollSectionLoop`**：
 
-- 从 `sentenceCursorRef` 遍历 `sentences`（plain 偏移 `{start,end}`）。
-- 每句：`spokenRaw = stripMarkdownForTts(plain.slice(start, end))`。
-- **`playEnglishPreferred(spokenRaw, { speak: { rate } })`** — 逐句 await。
-- 有 `sentenceRanges[i]` 则高亮 + 自动跟随；**无 Range 仍播 TTS**（graceful degradation）。
-- 句末 `clearChapterListenSentenceHighlight`。
+```text
+sectionDoc = sectionDocRef; usePrepare = resolveStartCfi || !sectionDoc
+loop:
+  if usePrepare:
+    ctx = prepareSection(rend)           // 视口 + CFI
+  else:
+    visible = extractListenSectionForDocument(rend, sectionDoc)
+    ctx = applySection(rend, visible)
+  playSentencesFromCursor(ctx, gen, { scrollCenterOnFirst })
+  if !finished: gen失效→return; paused→return; else stopInternal
+  syncState(loading)
+  nextDoc = advanceScrollListenSection(rend, sectionDoc)
+  if !nextDoc → Toast finished → stop
+  sectionDocRef = nextDoc; cursor = 0
+```
 
-### 4.5 句 DOM 索引（节级一次）
+**分页 — `runPaginatedListenLoop`**（与改前单环等价）：
+
+```text
+loop:
+  ctx = prepareSection(rend)             // 每轮视口
+  playSentencesFromCursor(ctx, gen)
+  waitForNextSection(rend)               // rend.next + relocated
+```
+
+**`prepareSection` / `applySection` 拆分**：
+
+- `prepareSection`：视口抽取 → `applySection`。
+- `applySection`：写 `sectionRef`、`sectionDocRef`、播放条；可选 CFI 起始句；**始终 return ctx**（不在此层 `isGenActive` 门禁）。
+
+**`playSentencesFromCursor`**（两模式共用）：
+
+- 从 `sentenceCursorRef` 遍历；`prefetchCloudEnglishTts` 预取下一句。
+- 每句 `playEnglishPreferred(spokenRaw, { prefetchedCloud, rate })`。
+- 有 `sentenceRanges[i]` 则高亮；无 Range 仍播 TTS。
+
+### 4.5 连续滚动节间 advance（`epubScrollListenAdvance.ts`）
+
+**问题**：continuous manager 在 `.epub-container` 内同时挂多个 `.epub-view`（空槽、hidden iframe、当前章）。`rend.next()` 换 spine 不能表示「当前 iframe → 下一 iframe」。
+
+**`advanceScrollListenSection(rend, currentDoc)`**：
+
+1. **`listEpubViewSlots`**：DOM 顺序枚举 `.epub-view` → `{ viewEl, doc }`；空正文 doc 视为未加载。
+2. **快路径**：`nextLoadedDoc` — 当前槽之后第一个已有 doc。
+3. **慢路径**：对后续空槽 **`ensureSlotDocument`**：`scrollTo(offsetTop)` + 最多 8 次 **`manager.check()`** + 双 rAF。
+4. **nudge**：仍失败则 `scrollTop += ~0.9 视口高`，最多 **5 轮**（`ADVANCE_ROUNDS`）。
+5. 返回下一 `Document` 或 null。
+
+**刻意不做**：`rend.next()`、`rend.display(spineIndex)`、合并多 iframe plain 为一条句流。
+
+### 4.6 句 DOM 索引（节级一次）
 
 **`indexChapterSentenceRanges(outerRange, plain)`**：
 
@@ -358,16 +433,17 @@ runListenLoop(gen):
 
 与听当前 **`buildDomSentenceIndex`** 不同：听书 plain 来自 **innerText**，不能直接用选区字符流，故用顺序匹配而非 anchor 流。
 
-### 4.6 高亮与滚动
+### 4.7 高亮与滚动
 
 - **`showChapterListenSentenceHighlight`** → **`syncChapterListenScrollSession`** → **`showEpubListenDomRange`**
 - 写入 session **`activeDomRange`**，供 FAB / `scrollActiveListenIntoView` 使用。
 - 启动时 **`beginChapterListenAutoFollow(rend)`** 提前挂 scroll guard。
 
-### 4.7 播放条与目录
+### 4.8 播放条、切句与目录
 
-- **`EpubListenPlayerBar`**：pause/resume、stop、prev/next sentence、倍速。
-- TOC **`onSelect`**：若 `chapterListen.isActive` → **`syncToCurrentView()`**（`waitForRelocated` 后从新 CFI 重算节与起始句）。
+- **`EpubListenPlayerBar`**：pause/resume、stop、prev/next、分句菜单、倍速（0.75×–3×）。
+- **`goToSentence(index)`**：设游标 + `scrollSeekRef` + `++loopGenRef` → **`runListenLoop(gen)`**（勿孤立调用 `playSentencesFromCursor`，否则旧环误 `stopInternal`）。
+- TOC **`onSelect`**：`chapterListen.syncToCurrentView()` — 重置 `sectionDocRef`、CFI 起始句，必要时重入 `runListenLoop`。
 
 ---
 
@@ -403,9 +479,9 @@ runListenLoop(gen):
 - 连续滚动模式 → 调容器 `scrollTop`。
 - 分页模式 → `cfiFromDomRange` / `fallbackCfi` → `rend.display(cfi)`。
 
-### 5.4 互斥（`epubListenController.ts`）
+### 5.4 互斥（`epubListenSegmentOverlay.ts`）
 
-模块级 `stopQuoteListen` / `stopChapterListen` 回调注册：
+模块级 `stopQuoteListen` / `stopChapterListen` 回调（原 `epubListenController` 已合并入 overlay）：
 
 - `useEbookQuoteListen` 注册 quote stop；听当前前 `invokeStopChapterListen()`。
 - `useEpubChapterListen` 注册 chapter stop；听书前 `invokeStopQuoteListen()`。
@@ -468,11 +544,11 @@ const chapterListen = useEpubChapterListen(
 ### 听书
 
 - [ ] 顶栏耳机 → 底部播放条 → 从当前 CFI 附近句开始播
-- [ ] 连续滚动 / 分页 EPUB 均能抽到正文（不误报 emptySection）
+- [ ] **分页**：节末 `rend.next()`；**连续滚动**：当前 iframe 末句后自动下一 iframe
+- [ ] 连续滚动：不应在下方仍有正文时误报「全书读完」
 - [ ] 有句 Range 时有背景 + 自动跟随；无 Range 仍出声
-- [ ] 节末自动下一 spine；全书完 Toast
-- [ ] 暂停/继续、上句/下句、倍速生效
-- [ ] 目录跳转后续播新位置
+- [ ] 暂停/继续、上句/下句、分句菜单、倍速生效；**切句不退出播放条**
+- [ ] 目录跳转后续播新位置（`sectionDocRef` 对齐）
 - [ ] 播放中点听当前 → 听书停止
 
 ---
@@ -481,117 +557,50 @@ const chapterListen = useEpubChapterListen(
 
 以下摘录与仓库当前实现一致，供对照实现。**每行源码上方一行中文注释**。
 
-### 8.1 `useEbookQuoteListen` — `toggleListen`
+### 8.1 `useEbookQuoteListen` — `startPlayback` + `playFromCursor`
 
-**来源**：`apps/frontend/src/views/ebook/hooks/useEbookQuoteListen.ts` · **改动后** · 约 L45–L118
+**来源**：`apps/frontend/src/views/ebook/hooks/useEbookQuoteListen.ts` · **当前** · 约 L128–L305
 
 ```typescript
-// 用 useCallback 固定 toggleListen 引用，避免 PopBar 无意义重渲染
-const toggleListen = useCallback(
-	// 异步：内部 await TTS 播放
-	async (
-		// 界面传入的选区文本（可能已 trim）
-		text: string,
-		// 唯一 key：同一 key 再点视为停止
-		key: string,
-		// 选区 CFI，供 overlay session 与分页滚动用
-		cfiRange?: string,
-		// PopBar 冻结的 Range，避免点击时 selection 丢失
-		frozenRange?: Range | null,
-	) => {
-		// 去掉首尾空白后的朗读源文本
-		const trimmed = text.trim();
-		// 空文本直接返回，不启 TTS
-		if (!trimmed) return;
-		// 若正在播同一 key，则用户意图为「停止」
-		if (playingKey === key) {
-			// 停止所有 TTS 实例
-			stopAllEnglishPlayback();
-			// 清 overlay session、高亮、scroll guard
-			clearEpubListenSegmentOverlay();
-			// 通知外层 sync 用户划线等
-			onListenSessionEnd?.();
-			//  UI 状态回到未播放
-			setPlayingKey(null);
-			return;
-		}
-		// 听当前启动前必须先停听书（互斥）
-		invokeStopChapterListen();
-		// 浏览器不支持 TTS 则 Toast 并返回
-		if (!isEnglishPlaybackAvailable()) {
-			Toast({
-				type: 'warning',
-				title: t('englishLearning.tts.unsupported'),
-			});
-			return;
-		}
-		// 停止其它 TTS，清旧 overlay
-		stopAllEnglishPlayback();
-		clearEpubListenSegmentOverlay();
-		// 标记当前播放 key
-		setPlayingKey(key);
+// 从 sentenceCursorRef 起逐句播放；与听书 playSentencesFromCursor 同构
+const playFromCursor = useCallback(async (gen: number): Promise<boolean> => {
+	const rend = getRenditionRef.current?.() ?? null;
+	const meta = getEpubListenSessionMeta();
+	const plain = meta?.plain ?? fallbackPlainRef.current;
+	const sentenceCount =
+		meta?.sentenceCount ?? buildSentenceOffsetSpans(plain.trim()).length;
+	if (!plain.trim() || sentenceCount <= 0) return false;
 
-		// 取 epub.js Rendition，无则 null
-		const rend = getRendition?.() ?? null;
-		// CFI 字符串 trim
-		const cfi = cfiRange?.trim() ?? '';
-		// 解析 plain、selectionRange（DOM 选区）
-		const { plain, selectionRange } = resolveEpubListenPlain(
-			rend,
-			trimmed,
-			frozenRange,
-		);
+	for (let si = sentenceCursorRef.current; si < sentenceCount; si += 1) {
+		if (!isGenActive(gen) || pausedRef.current) return false;
+		const spokenRaw = resolveSpokenAt(si, plain);
+		if (!spokenRaw) continue;
+		sentenceCursorRef.current = si;
+		syncState({ status: 'playing', sentenceIndex: si, sentenceCount });
+		if (rend) showEpubListenPlainSpan(0, 0, si);
+		await playEnglishPreferred(spokenRaw, {
+			speak: { rate: rateRef.current },
+			prefetchedCloud: prefetchedByIndex.get(si) ?? null,
+		});
+		if (!isGenActive(gen) || pausedRef.current) return false;
+		if (rend) clearActiveListenHighlight(rend);
+	}
+	return isGenActive(gen);
+}, [syncState]);
 
-		// 有 rendition 且 plain 非空才建 overlay session（句表 + autoFollow）
-		if (rend && plain) {
-			beginEpubListenOverlaySession(rend, plain, {
-				cfi,
-				selectionRange,
-			});
-		}
-
-		// session 内 plain 优先（DOM 句表可能修正 plain）
-		const speakPlain = getEpubListenSessionPlain() ?? plain;
-
-		try {
-			// 一次播完整段；句背景靠 onCadenceChunk 驱动
-			await playEnglishPreferred(speakPlain, {
-				onCadenceChunk: (event) => {
-					// 无 rendition 无法画 EPUB 背景
-					if (!rend) return;
-					// 句内 chunk 结束
-					if (event.phase === 'end') {
-						// 仅在该句最后一个 chunk 结束时清背景
-						if (event.isLastInSentence) {
-							clearActiveListenHighlight(rend);
-						}
-						return;
-					}
-					// chunk 开始：按 sentenceIndex 画对应句
-					showEpubListenPlainSpan(
-						event.sentencePlainStart,
-						event.sentencePlainEnd,
-						event.sentenceIndex,
-					);
-				},
-			});
-		} catch {
-			// TTS 失败 Toast
-			Toast({
-				type: 'warning',
-				title: t('englishLearning.tts.unsupported'),
-			});
-		} finally {
-			// 无论成功失败都 teardown session
-			clearEpubListenSegmentOverlay();
-			onListenSessionEnd?.();
-			// 仅当仍是本 key 时清 playingKey（防竞态）
-			setPlayingKey((k) => (k === key ? null : k));
-		}
-	},
-	[getRendition, onListenSessionEnd, playingKey, t],
-);
+// 听当前启动：建 overlay session → syncState → playFromCursor
+const startPlayback = useCallback(async (text, key, cfiRange?, frozenRange?) => {
+	invokeStopChapterListen();
+	// ... resolveEpubListenPlain + beginEpubListenOverlaySession ...
+	const gen = ++loopGenRef.current;
+	sentenceCursorRef.current = 0;
+	syncState({ status: 'loading', sentenceIndex: 0, sentenceCount, ... });
+	const finished = await playFromCursor(gen);
+	if (finished && isGenActive(gen)) stopInternal();
+}, [playFromCursor, stopInternal, syncState]);
 ```
+
+**读完应掌握**：听当前已 **逐句 await TTS**，句背景由 **`showEpubListenPlainSpan`** 同步驱动，不再依赖 `onCadenceChunk`。
 
 ---
 
@@ -771,7 +780,7 @@ const playSentencesFromCursor = useCallback(
 
 ### 8.5 `extractVisibleListenSection` — 听书正文抽取
 
-**来源**：`apps/frontend/src/views/ebook/utils/epubListenVisibleSection.ts` · **改动后** · 约 L99–L126
+**来源**：`apps/frontend/src/views/ebook/utils/epubListenChapter.ts` · **当前** · 约 L170–L210
 
 ```typescript
 // 同步读取当前可见 spine 节：plain + outerRange + spineIndex
@@ -948,9 +957,9 @@ export function EpubListenFollowFab() {
 
 ---
 
-### 8.9 `epubListenController` — 互斥
+### 8.9 互斥 — `registerChapterListenStop` / `invokeStopQuoteListen`
 
-**来源**：`apps/frontend/src/views/ebook/utils/epubListenController.ts` · **全文**
+**来源**：`apps/frontend/src/views/ebook/utils/epubListenSegmentOverlay.ts` · **当前** · 约 L697–L710
 
 ```typescript
 /** 听当前 vs 听书互斥：一方启动时停止另一方 */
@@ -985,18 +994,64 @@ export function invokeStopChapterListen(): void {
 
 ---
 
+### 8.10 `runListenLoop` — 分页 / 连续滚动分叉
+
+**来源**：`apps/frontend/src/views/ebook/hooks/useEpubChapterListen.ts` · **当前** · 约 L488–L502
+
+```typescript
+const runListenLoop = useCallback(
+	async (gen: number, opts?: { continueSections?: boolean }) => {
+		const rend = getRenditionRef.current();
+		if (!rend) {
+			stopInternal();
+			return;
+		}
+		if (isScrollListenMode(rend)) {
+			await runScrollSectionLoop(gen);
+			return;
+		}
+		await runPaginatedListenLoop(gen, opts);
+	},
+	[runPaginatedListenLoop, runScrollSectionLoop, stopInternal],
+);
+```
+
+---
+
+### 8.11 `runScrollSectionLoop` — 连续滚动主环（摘录）
+
+**来源**：`apps/frontend/src/views/ebook/hooks/useEpubChapterListen.ts` · **当前** · 约 L309–L422
+
+见 §4.4 文字流程；完整实现含 `usePrepare` / `extractListenSectionForDocument` / `advanceScrollListenSection` 三分支。
+
+---
+
+### 8.12 `advanceScrollListenSection`
+
+**来源**：`apps/frontend/src/views/ebook/utils/epubScrollListenAdvance.ts` · **当前** · 约 L165–L207
+
+见 §4.5；常量 `SLOT_TRIES=8`、`ADVANCE_ROUNDS=5`。
+
+---
+
+### 8.13 `goToSentence`
+
+**来源**：`apps/frontend/src/views/ebook/hooks/useEpubChapterListen.ts` · **当前** · 约 L656–L678
+
+切句：`scrollSeekRef` + `++loopGenRef` + **`void runListenLoop(gen)`**。
+
+---
+
 ## 9. 源码路径速查
 
 | 说明 | 路径 |
 |------|------|
 | 听当前 Hook | `apps/frontend/src/views/ebook/hooks/useEbookQuoteListen.ts` |
 | 听书 Hook | `apps/frontend/src/views/ebook/hooks/useEpubChapterListen.ts` |
-| Overlay / autoFollow | `apps/frontend/src/views/ebook/utils/epubListenSegmentOverlay.ts` |
-| 听书可见节 | `apps/frontend/src/views/ebook/utils/epubListenVisibleSection.ts` |
-| 听书句 Range | `apps/frontend/src/views/ebook/utils/epubListenChapterHighlight.ts` |
-| 听当前 DOM 句表 | `apps/frontend/src/views/ebook/utils/epubListenSentenceIndex.ts` |
+| Overlay / autoFollow / 互斥 | `apps/frontend/src/views/ebook/utils/epubListenSegmentOverlay.ts` |
+| 听书正文 + 句 Range + waitForNext | `apps/frontend/src/views/ebook/utils/epubListenChapter.ts` |
+| 连续滚动槽位 advance 🆕 | `apps/frontend/src/views/ebook/utils/epubScrollListenAdvance.ts` |
 | 播放背景绘制 | `apps/frontend/src/views/ebook/utils/epubListenMarkHighlight.ts` |
-| 互斥 | `apps/frontend/src/views/ebook/utils/epubListenController.ts` |
 | 滚入视口 | `apps/frontend/src/views/ebook/utils/epubScrolledNav.ts` |
 | TTS | `apps/frontend/src/utils/englishTts.ts` |
 | FAB | `apps/frontend/src/views/ebook/components/EpubListenFollowFab.tsx` |
@@ -1009,12 +1064,13 @@ export function invokeStopChapterListen(): void {
 
 | 问题 | 原因 | 处理 |
 |------|------|------|
-| 听书 emptySection | `views()` 迭代抛错或 iframe 未发现 | 必须用 `getRenditionViewsList` |
-| 有声音无背景 | `indexChapterSentenceRanges` 未命中 | 检查 innerText 与 DOM 归一化是否一致；无 Range 仍属预期降级 |
-| FAB 不出现 | 无 active session | 听书需 `beginChapterListenAutoFollow`；高亮需 `showEpubListenDomRange` |
-| 点击 FAB 不滚 | `activeDomRange` 为 null | 确认 `resolveActiveListenDomRange` 分支 |
-| 背景偏上一行 | 段首 `……` 误检行 | `listenLineRects` 对齐 caret |
-| 换句叠两层黄 | 未先 clear | 换句必须 `clearListenMarkHighlight` |
+| 听书 emptySection | `views()` 迭代抛错或 iframe 未发现 | `getRenditionViewsList` + `listIframeDocuments` |
+| 连续滚动节末误报读完 | 空槽未加载 / nudge 用尽 | 查 `.epub-view`；见 `docs/ideas/epub-scroll-multi-iframe-listen.md` |
+| 切句后播放条消失 | 旧环误 `stopInternal` | `goToSentence` → `runListenLoop`；`!isGenActive` 静默 return |
+| 听书卡在 loading | apply 层 gen 门禁 return null | `applySection` 始终 return ctx |
+| 有声音无背景 | 句 Range 未命中 | innerText 与 DOM 归一化；无 Range 可降级 |
+| FAB 不出现 | 无 active session | `beginChapterListenAutoFollow` + `showEpubListenDomRange` |
+| 换句叠两层黄 | 未先 clear | `clearListenMarkHighlight` |
 
 ---
 

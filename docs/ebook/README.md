@@ -20,7 +20,7 @@
 | [epub-reading-thoughts.md](./epub-reading-thoughts.md)                           | **数据层**：服务端存储、虚线下划线、重叠去重、选区防误触                                                                                        |
 | [developer/README.md](./developer/README.md)                                       | **开发者手册索引**（听读 + 想法 + 用户划线）                                                                                                    |
 | [developer/epub-mark-layers-shared.md](./developer/epub-mark-layers-shared.md) | **开发者**：用户划线 / 想法虚线 / 播放背景 — 共用方法表与流程图 |
-| [developer/epub-listen-dev.md](./developer/epub-listen-dev.md)                   | **唯一主文档（听当前 + 听书）**：架构、调用链、M1–M5 从零、逐行注释源码                                                                       |
+| [developer/epub-listen-dev.md](./developer/epub-listen-dev.md)                   | **唯一主文档（听当前 + 听书）**：含连续滚动多 iframe 续播、调用链、M1–M5、源码摘录                                                                       |
 | [developer/epub-thought-add-underline-dev.md](./developer/epub-thought-add-underline-dev.md) | **唯一主文档（想法）**：§0 从何下手 + §2 白话思路 + §3–§19                                                                                      |
 | [developer/epub-user-highlight-dev.md](./developer/epub-user-highlight-dev.md)   | **唯一主文档（用户划线）**：§0–§18 白话思路 + 重叠合并 + PopBar + 与想法共存                                                                    |
 | [epub-thought-side-panel.md](./epub-thought-side-panel.md)                       | **当前 UI**：读书想法右侧分栏（与 MK 问书互斥）、footer 固定输入                                                                                |
@@ -44,6 +44,7 @@
 | [epub-listen-host-overlay.md](./epub-listen-host-overlay.md)                       | **增量**：听当前 host 浮层绘制与跨段句间清除（替代 iframe 三层 mark）                                                                          |
 | [epub-listen-auto-follow-fab.md](./epub-listen-auto-follow-fab.md)                   | **增量**：听当前播放自动滚入视口、手动滚动打断与右下角回位 FAB                                                                                 |
 | [epub-chapter-listen.md](./epub-chapter-listen.md)                                   | **增量**：EPUB 边听边读 MVP（innerText 播放、TreeWalker 句 Range、`epubListenMarkHighlight` 背景、顶栏听书与底部播放条） |
+| [epub-scroll-listen-section-advance.md](./epub-scroll-listen-section-advance.md)     | **增量**：连续滚动听书逐 iframe 节间衔接（`runScrollSectionLoop` / `advanceScrollListenSection`） |
 | [epub-listen-player-bar.md](./epub-listen-player-bar.md)                             | **增量**：听书播放条分句菜单、倍速 0.75×～3×、跳转居中滚动与 TTS 即时倍速                                              |
 | [epub-quote-listen-player-bar.md](./epub-quote-listen-player-bar.md)                   | **增量**：听当前共用底部播放条（暂停/切句/倍速，与听书同一组件）                                                      |
 | [epub-listen-bg-resize-relayout.md](./epub-listen-bg-resize-relayout.md)               | **增量**：听读播放背景随分栏/侧栏 resize 重绘（`repaintActive` 重挂 group、ResizeObserver、`EpubPane` 接线）            |

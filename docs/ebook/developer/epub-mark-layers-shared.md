@@ -145,13 +145,13 @@ flowchart TB
 
 | 方法 | 文件 | 具体作用 | 典型调用时机 |
 |------|------|----------|--------------|
-| **`showListenMarkHighlight(rend, range)`** | `epubListenMarkHighlight.ts` | ① `normalizeSelectionRangeForEpub`；② **`clearListenMarkHighlight` 只清 listen 层**；③ `ensureListenMarkGroup` 找 marks-pane SVG；④ 有 SVG 则 `paintDirectSvg`（`listenLineRects`→`clientRectToSvgLocalSegment`→黄色 rect）；⑤ 否则 `paintIframeOverlay` 在 iframe 文档挂 `#moke-epub-listen-iframe-layer`；⑥ 注册 `relocated`/`rendered` 重绘。 | 听当前 `paintSentence`、听书 `syncChapterListenScrollSession` |
+| **`showListenMarkHighlight(rend, range)`** | `epubListenMarkHighlight.ts` | … | 听当前 `showEpubListenPlainSpan`、听书 `syncChapterListenScrollSession` |
 | **`clearListenMarkHighlight(rend?)`** | 同上 | 取消 RAF；`purgeListenAnnotations`（**仅** `moke-epub-listen` class）；`purgeDocListenLayers` 删 listen SVG/iframe 层；**不**调用 `annotations.remove` 无 class 过滤。 | 换句、停止听书、句末（听当前） |
 | **`listenLineRects(range)`** | 同上（内部） | 在 `getAccurateRangeLineClientRects` 结果上，用句首 caret rect 对齐首行 top，修正 `……` 段首误检导致背景整体上移一行。 | `paintDirectSvg` / `paintIframeOverlay` |
 | **`syncMarkRects(group, segments)`** | 同上（内部） | 清空 `g` 子节点，为每段 `SvgLineSegment` 创建 SVG `<rect fill=rgba(251,231,128,0.28)>`。 | paintDirectSvg |
 | **`repaintActive()`** | 同上（内部） | 滚动/翻页后按缓存的 `active.range` 重新 paint，保持播放底与文字对齐。 | `relocated` / `rendered` 回调 |
 | **`syncChapterListenScrollSession(rend, range)`** | `epubListenSegmentOverlay.ts` | 调 `showEpubListenDomRange`：写入 session `activeDomRange`、画 mark、若 `autoFollow` 则 `scrollEpubRangeIntoView`。 | 听书每句播放前 |
-| **`paintSentence(sentenceIndex)`** | `epubListenSegmentOverlay.ts` | 听当前：`resolveSentenceRange`（DOM 锚点）→ `showListenMarkHighlight` → 可选 autoFollow。 | TTS `onCadenceChunk` phase start |
+| **`paintSentence(sentenceIndex)`** | `epubListenSegmentOverlay.ts` | 听当前历史路径；现行听当前用 `showEpubListenPlainSpan` 逐句驱动。 | 可选 legacy |
 | **`attachListenScrollGuard(rend)`** | `epubListenSegmentOverlay.ts` | 监听 scroll container、iframe document、wheel；用户滚动时 `pauseListenAutoFollow` 并显示 FAB。 | 听当前/听书 session 启动 |
 
 ---
@@ -196,7 +196,7 @@ flowchart TD
 ```mermaid
 flowchart TD
   subgraph quote ["听当前 · epubListenSegmentOverlay.ts + englishTts"]
-    Q1["onCadenceChunk phase=start<br/>📁 useEbookQuoteListen → englishTts<br/>TTS 每句开始时回调"]
+    Q1["playFromCursor 每句 start<br/>📁 useEbookQuoteListen<br/>showEpubListenPlainSpan"]
     Q2["paintSentence(sentenceIndex)<br/>📁 epubListenSegmentOverlay.ts<br/>DomListenSentence 锚点 → DOM Range"]
   end
   subgraph chapter ["听书 · epubListenChapter.ts"]
@@ -293,7 +293,8 @@ flowchart LR
 | 想法虚线 | `apps/frontend/src/views/ebook/utils/epubThoughtAnnotations.ts` |
 | 播放背景 | `apps/frontend/src/views/ebook/utils/epubListenMarkHighlight.ts` |
 | 听读 session | `apps/frontend/src/views/ebook/utils/epubListenSegmentOverlay.ts` |
-| 听书正文/句 Range | `apps/frontend/src/views/ebook/utils/epubListenChapter.ts` |
+| 听书正文/句 Range / 节间 | `apps/frontend/src/views/ebook/utils/epubListenChapter.ts` |
+| 连续滚动槽位 advance | `apps/frontend/src/views/ebook/utils/epubScrollListenAdvance.ts` |
 
 ---
 

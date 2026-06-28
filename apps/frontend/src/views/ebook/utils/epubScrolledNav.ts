@@ -85,21 +85,36 @@ function readRangeViewportBounds(range: Range, iframe: HTMLIFrameElement) {
 	return { top: y, bottom: y + Math.max(caretRect.height, 1) };
 }
 
+/**
+ * 判断给定 DOM Range 是否已在阅读器可视区域（含指定 marginPx 内边距）
+ * 用于 EPUB 连续滚动模式，需支持多 iframe 下主页面坐标判断
+ *
+ * @param rend     EPUB.js Rendition 实例，用于确定主滚动容器
+ * @param range    需检测可见性的 DOM Range（一般落在内文 iframe）
+ * @param marginPx 上下边界预留多少像素安全边距（进视区域再留白）
+ * @returns        是否已完全在可见范围内（含 marginPx 安全留白）
+ */
 function isDomRangeInReaderView(
 	rend: Rendition,
 	range: Range,
 	marginPx: number,
 ): boolean {
+	// 1. 获取 range 所在文档的 window 对象
 	const win = range.startContainer.ownerDocument?.defaultView;
+	// 2. 通过 window 拿到对应的 iframe 元素
 	const iframe = win?.frameElement as HTMLIFrameElement | null;
+	// 若未找到 iframe，则无法判断，直接判为不可见
 	if (!iframe) return false;
 
+	// 3. 计算 range 在主页面的绝对 top/bottom 坐标（跨 iframe 偏移）
 	const { top, bottom } = readRangeViewportBounds(range, iframe);
+	// 4. 获取 EPUB 主阅读容器的 DOMRect（若找不到，用 iframe 兜底）
 	const container = getEpubScrollContainer(rend);
 	const boundsRect = container
 		? container.getBoundingClientRect()
 		: iframe.getBoundingClientRect();
 
+	// 5. 判断 range 是否已在容器的 marginPx 以内可视区
 	return (
 		top >= boundsRect.top + marginPx && bottom <= boundsRect.bottom - marginPx
 	);
@@ -246,29 +261,52 @@ export function scrollEpubCfiIntoView(
 	return scrollEpubDomRangeIntoView(rend, range);
 }
 
-/** 连续滚动：滚到顶/底时衔接相邻 spine（优先 manager.check，回退 prev/next） */
+/**
+ * 连续滚动：滚动到顶/底时自动衔接相邻 spine（优先 manager.check，回退 prev/next）
+ * 用于 EPUB 连续阅读时，滚动触达顶部/底部时自动切换上一章/下一章，实现无缝章节浏览体验
+ * @param rend        epub.js 的 Rendition 实例
+ * @param isDestroyed 用于判断组件/实例是否已卸载的函数（避免已销毁后回调）
+ * @returns           清理事件监听的回调函数
+ */
 export function attachEpubScrolledEdgeNav(
 	rend: Rendition,
 	isDestroyed: () => boolean,
 ): () => void {
+	// 获取连续滚动容器（主滚动 div）
 	const container = getEpubScrollContainer(rend);
+	// 若没有容器（如非连续滚动模式），直接返回空卸载函数
 	if (!container) return () => {};
 
+	// busy 标志表示当前是否正处理章节切换，避免重复触发
 	let busy = false;
+	// cooldownUntil 标记下次允许 edge 触发的时间戳（ms），用于冷却防止连发
 	let cooldownUntil = 0;
 
+	/**
+	 * 执行章节边缘切换动作（到顶调用 prev，到底调用 next）
+	 * - 优先调用底层 manager.check 方法（可定制逻辑），如无则直接 prev/next 跳转
+	 * - 冷却防抖，busy 防再入
+	 * @param action 'prev' 表示上一章节，'next' 表示下一章节
+	 * @param e      事件对象（如传入则 preventDefault 阻止默认滚动行为）
+	 */
 	const runEdgeAction = (action: 'prev' | 'next', e?: Event) => {
+		// 若组件已销毁、正在忙、仍在冷却期内，直接跳过
 		if (isDestroyed() || busy || Date.now() < cooldownUntil) return;
+		// 阻止默认行为（如 native 滚动）
 		e?.preventDefault();
 
+		// 标记为 busy，进入冷却期 EDGE_COOLDOWN_MS 毫秒
 		busy = true;
 		cooldownUntil = Date.now() + EDGE_COOLDOWN_MS;
 
+		// 获取 epub manager 实例
 		const manager = getManager(rend);
+		// 优先调用 manager.check（如 ContinuousViewManager.check 可自定义切换逻辑），否则直接 prev/next
 		const task = manager?.check
 			? Promise.resolve(manager.check())
 			: Promise.resolve(action === 'next' ? rend.next() : rend.prev());
 
+		// 忽略任务异常（如无更多章节），任务完成后 busy 重置，允许下次触发
 		void task
 			.catch(() => undefined)
 			.finally(() => {
@@ -276,17 +314,29 @@ export function attachEpubScrolledEdgeNav(
 			});
 	};
 
+	/**
+	 * wheel 事件处理：检测鼠标滚轮触顶/底时自动切换章节
+	 * - dy > 0 为向下滚动（检查是否已到容器底部 atBottom）
+	 * - dy < 0 为向上滚动（检查是否已到容器顶部 atTop）
+	 * - 若未触及边缘不处理
+	 */
 	const onWheel = (e: WheelEvent) => {
 		const dy = e.deltaY;
+		// 没有实际滚动（水平或无滚动）直接返回
 		if (dy === 0) return;
 
+		// 检查当前容器是否已在顶/底边界（带一定像素容差）
 		const { atTop, atBottom } = scrollEdges(container);
+		// 向下且已到底部，触发下一章节
 		if (dy > 0 && atBottom) runEdgeAction('next', e);
+		// 向上且已到顶部，触发上一章节
 		else if (dy < 0 && atTop) runEdgeAction('prev', e);
 	};
 
+	// 注册 wheel 事件监听，passive: false 以便在回调内阻止默认行为
 	container.addEventListener('wheel', onWheel, { passive: false });
 
+	// 返回卸载函数，用于移除 wheel 事件监听（通常组件卸载时调用）
 	return () => {
 		container.removeEventListener('wheel', onWheel);
 	};

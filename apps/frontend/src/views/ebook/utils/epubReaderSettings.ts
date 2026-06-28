@@ -302,6 +302,10 @@ export function applyEpubReaderAppearance(
 		'.kindle-cn-frame-yuanjiao': {
 			'border-color': '#666 !important',
 		},
+		'.kindle-cn-frame-zhijiao': {
+			'border-color': '#666 !important',
+			'border-radius': '5px !important',
+		},
 	});
 }
 

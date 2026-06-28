@@ -7,6 +7,9 @@
 - [EPUB 听当前 host 浮层](epub-listen-host-overlay.md) — 「听当前」绘制层（听书**不**走 overlay session）
 - [EPUB 听当前播放自动跟随与回位 FAB](epub-listen-auto-follow-fab.md) — `autoFollow`、FAB（听书可共用 FAB 状态）
 - [EPUB 听书播放条：分句菜单与倍速增强](epub-listen-player-bar.md) — 分句跳转、倍速 3×、TTS `playbackRate`
+- [连续滚动听书逐 iframe 节间衔接 — 影响点分析](../Influence-point/epub-scroll-listen-section-advance.md) — `runScrollSectionLoop` / 分页分叉回归范围
+- [连续滚动听书逐 iframe 节间衔接](./epub-scroll-listen-section-advance.md) — 实现思路与改动前后代码对比
+- [连续滚动多 iframe 听书续播 — 实现思路](../ideas/epub-scroll-multi-iframe-listen.md) — 问题根因、逐点改动、类似场景通用套路
 
 ## 1. 背景与目标
 
