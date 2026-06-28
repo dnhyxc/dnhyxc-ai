@@ -23,17 +23,17 @@ import {
 	type VisibleListenSection,
 	waitForNextSection,
 	waitForRelocated,
-} from '../utils/epubListenChapter';
+} from '../utils/epub/listen/epubListenChapter';
 import {
 	beginChapterListenAutoFollow,
 	clearEpubListenSegmentOverlay,
 	invokeStopQuoteListen,
 	registerChapterListenStop,
-} from '../utils/epubListenSegmentOverlay';
+} from '../utils/epub/listen/epubListenSegmentOverlay';
 import {
 	advanceScrollListenSection,
 	isScrollListenMode,
-} from '../utils/epubScrollListenAdvance';
+} from '../utils/epub/listen/epubScrollListenAdvance';
 
 export type ChapterListenStatus = 'idle' | 'loading' | 'playing' | 'paused';
 

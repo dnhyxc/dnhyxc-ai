@@ -36,27 +36,27 @@ import {
 import ebookStore from '@/store/ebook';
 import { copyToClipboard } from '@/utils/clipboard';
 import { getRequestErrorMessage } from '@/utils/fetch';
-import { EbookAssistant } from './components/EbookAssistant';
-import { EbookPageShell } from './components/EbookPageShell';
-import { EbookPanelHeader } from './components/EbookPanelHeader';
-import { EbookReadSplitLayout } from './components/EbookReadSplitLayout';
-import { EbookTocDrawer } from './components/EbookTocDrawer';
-import { EpubListenFollowFab } from './components/EpubListenFollowFab';
-import { EpubListenPlayerBar } from './components/EpubListenPlayerBar';
-import { EpubPane } from './components/EpubPane';
-import { EpubQuoteShareDialog } from './components/EpubQuoteShareDialog';
+import { EbookPageShell } from './components/layout/EbookPageShell';
+import { EbookPanelHeader } from './components/layout/EbookPanelHeader';
+import { EbookReadSplitLayout } from './components/layout/EbookReadSplitLayout';
+import { EbookTocDrawer } from './components/layout/EbookTocDrawer';
+import { EpubListenFollowFab } from './components/listen/EpubListenFollowFab';
+import { EpubListenPlayerBar } from './components/listen/EpubListenPlayerBar';
+import { EbookAssistant } from './components/reader/EbookAssistant';
+import { EpubPane } from './components/reader/EpubPane';
 import {
 	EpubReaderContextMenu,
 	type EpubReaderContextMenuState,
-} from './components/EpubReaderContextMenu';
-import { EpubReaderSettingsPopover } from './components/EpubReaderSettingsPopover';
+} from './components/reader/EpubReaderContextMenu';
+import { EpubReaderSettingsPopover } from './components/reader/EpubReaderSettingsPopover';
+import { PdfPane } from './components/reader/PdfPane';
 import {
 	EpubSelectionPopBar,
 	type EpubSelectionPopBarState,
-} from './components/EpubSelectionPopBar';
-import { EpubThought } from './components/EpubThought';
-import { EpubThoughtList } from './components/EpubThoughtList';
-import { PdfPane } from './components/PdfPane';
+} from './components/selection/EpubSelectionPopBar';
+import { EpubQuoteShareDialog } from './components/share/EpubQuoteShareDialog';
+import { EpubThought } from './components/thought/EpubThought';
+import { EpubThoughtList } from './components/thought/EpubThoughtList';
 import { useEbookQuoteListen, useEpubChapterListen } from './hooks';
 import type {
 	EbookThought,
@@ -66,42 +66,21 @@ import type {
 	EpubHighlightColorId,
 	EpubHighlightStyle,
 } from './types';
+import { subscribeEbookSplitPanelResizeEnd } from './utils/common/ebookSplitResize';
+import { type EbookOpenSource, resolveOpen } from './utils/common/io';
+import { findActiveTocItemIndex } from './utils/common/tocActiveIndex';
+import { getRememberedEpubPopBarSelectionRange } from './utils/epub/listen/epubListenSegmentOverlay';
 import {
-	buildEpubContextMenuItems,
-	type EpubReaderContextActions,
-} from './utils/buildEpubContextMenuItems';
-import {
-	buildPdfContextMenuItems,
-	type PdfReaderContextActions,
-} from './utils/buildPdfContextMenuItems';
-import { subscribeEbookSplitPanelResizeEnd } from './utils/ebookSplitResize';
-import { getRememberedEpubPopBarSelectionRange } from './utils/epubListenSegmentOverlay';
-import {
-	extractQuoteSegmentsFromRange,
-	type QuoteShareRun,
-} from './utils/epubQuoteShareStyled';
-import { cfiFromDomRange, trimSelectionRange } from './utils/epubRangeGeometry';
-import {
-	DEFAULT_EPUB_READER_SETTINGS,
-	type EpubReaderSettings,
-	epubReaderSurfaceBgClass,
-	getEpubReaderSurfaceCssVars,
-	loadEpubReaderSettings,
-	saveEpubReaderSettings,
-} from './utils/epubReaderSettings';
-import { scrollEpubCfiIntoView } from './utils/epubScrolledNav';
-import {
-	buildEpubPopBarPayloadFromCfiRange,
-	type EpubSelectionPopBarPayload,
-	suppressEpubSelectionPopBarDismiss,
-} from './utils/epubSelectionToolbarAttach';
+	cfiFromDomRange,
+	trimSelectionRange,
+} from './utils/epub/mark/epubRangeGeometry';
 import {
 	buildSingleCfiCluster,
 	extractCfiSpineHint,
 	getThoughtClusterHighlightSubject,
 	invalidateThoughtClusterConnectivityCache,
 	reconcileThoughtClickCluster,
-} from './utils/epubThoughtCluster';
+} from './utils/epub/mark/epubThoughtCluster';
 import {
 	buildMergedHighlightTarget,
 	findAllUserHighlightsCoveringCfi,
@@ -113,9 +92,34 @@ import {
 	isSelectionFullyHighlighted,
 	resolveCfiDomRange,
 	resolveMergedOverlappingHighlight,
-} from './utils/epubUserHighlights';
-import { type EbookOpenSource, resolveOpen } from './utils/io';
-import { parsePdfPageHref } from './utils/pdfOutline';
+} from './utils/epub/mark/epubUserHighlights';
+import {
+	buildEpubContextMenuItems,
+	type EpubReaderContextActions,
+} from './utils/epub/reader/buildEpubContextMenuItems';
+import {
+	extractQuoteSegmentsFromRange,
+	type QuoteShareRun,
+} from './utils/epub/reader/epubQuoteShareStyled';
+import {
+	DEFAULT_EPUB_READER_SETTINGS,
+	type EpubReaderSettings,
+	epubReaderSurfaceBgClass,
+	getEpubReaderSurfaceCssVars,
+	loadEpubReaderSettings,
+	saveEpubReaderSettings,
+} from './utils/epub/reader/epubReaderSettings';
+import { scrollEpubCfiIntoView } from './utils/epub/reader/epubScrolledNav';
+import {
+	buildEpubPopBarPayloadFromCfiRange,
+	type EpubSelectionPopBarPayload,
+	suppressEpubSelectionPopBarDismiss,
+} from './utils/epub/reader/epubSelectionToolbarAttach';
+import {
+	buildPdfContextMenuItems,
+	type PdfReaderContextActions,
+} from './utils/pdf/buildPdfContextMenuItems';
+import { parsePdfPageHref } from './utils/pdf/pdfOutline';
 import {
 	loadPdfZoom,
 	PDF_ZOOM_MAX,
@@ -123,8 +127,7 @@ import {
 	PDF_ZOOM_STEP,
 	savePdfZoom,
 	stepPdfZoom,
-} from './utils/pdfReaderSettings';
-import { findActiveTocItemIndex } from './utils/tocActiveIndex';
+} from './utils/pdf/pdfReaderSettings';
 
 function EbookReadPage() {
 	const { t } = useI18n();

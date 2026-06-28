@@ -23,7 +23,7 @@ import {
 	registerQuoteListenStop,
 	resolveEpubListenPlain,
 	showEpubListenPlainSpan,
-} from '../utils/epubListenSegmentOverlay';
+} from '../utils/epub/listen/epubListenSegmentOverlay';
 import type { ChapterListenStatus } from './useEpubChapterListen';
 
 type QuoteListenState = {

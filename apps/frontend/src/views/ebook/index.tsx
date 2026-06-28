@@ -11,12 +11,12 @@ import { useI18n, useMembershipActive } from '@/hooks';
 import useStore from '@/store';
 import ebookStore, { EBOOK_UPLOAD_MEMBERSHIP_REQUIRED } from '@/store/ebook';
 import { isTauriRuntime } from '@/utils/runtime';
-import EbookCategoryManageDialog from './components/EbookCategoryManageDialog';
-import { EbookPageShell } from './components/EbookPageShell';
-import { EbookPanelHeader } from './components/EbookPanelHeader';
-import { EbookShelfBookCard } from './components/EbookShelfBookCard';
-import EbookShelfCategoryRail from './components/EbookShelfCategoryRail';
-import { EbookShelfUploadBanner } from './components/EbookShelfUploadBanner';
+import { EbookPageShell } from './components/layout/EbookPageShell';
+import { EbookPanelHeader } from './components/layout/EbookPanelHeader';
+import EbookCategoryManageDialog from './components/shelf/EbookCategoryManageDialog';
+import { EbookShelfBookCard } from './components/shelf/EbookShelfBookCard';
+import EbookShelfCategoryRail from './components/shelf/EbookShelfCategoryRail';
+import { EbookShelfUploadBanner } from './components/shelf/EbookShelfUploadBanner';
 
 function EbookShelfPage() {
 	const { t } = useI18n();

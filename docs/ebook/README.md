@@ -51,6 +51,7 @@
 | [epub-listen-sentence-leading-punct.md](./epub-listen-sentence-leading-punct.md)         | **增量**：听读分句句首中文标点（`……`、`——`、开引号与句界算法对称处理）                                                  |
 | [epub-listen-cloud-prefetch.md](./epub-listen-cloud-prefetch.md)                           | **增量**：听书/听当前句间云端 TTS 预取（`prefetchCloudEnglishTts` 缩短连播句间等待）                                  |
 | [epub-mark-shared-extraction.md](./epub-mark-shared-extraction.md)                       | **增量（纯重构）**：mark 层公共 utils 抽取至 `epubMarkShared.ts` + geometry export，行为不变                          |
+| [ebook-folder-archive.md](./ebook-folder-archive.md)                                       | **增量（纯重构）**：`utils/`、`components/` 按功能域分子目录归档 + import 路径对照表，行为不变                        |
 | [epub-listen-user-highlight-reconcile.md](./epub-listen-user-highlight-reconcile.md) | **增量**：听当前与用户划线 DOM 协调（reconcile 孤儿 mark、apply 存在性校验、播完 sync）                                                       |
 | [../Influence-point/epub-listen-bg-vs-annotations.md](../Influence-point/epub-listen-bg-vs-annotations.md) | **影响点**：播放背景色 vs 用户划线 / 想法划线（现行隔离与历史风险）                                                                           |
 | [../Influence-point/epub-listen-resize-relayout.md](../Influence-point/epub-listen-resize-relayout.md) | **影响点**：阅读区 resize 重绘对原有功能的影响面                                                                                              |

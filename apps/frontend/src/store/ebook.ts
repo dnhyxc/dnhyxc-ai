@@ -29,8 +29,11 @@ import type {
 	EbookShelfCategoryKey,
 	Prog,
 } from '@/views/ebook/types';
-import { fileToCoverFile } from '@/views/ebook/utils/coverImage';
-import { pickTauri, tauriPickedFileToUpload } from '@/views/ebook/utils/io';
+import { fileToCoverFile } from '@/views/ebook/utils/common/coverImage';
+import {
+	pickTauri,
+	tauriPickedFileToUpload,
+} from '@/views/ebook/utils/common/io';
 import { getLoggedInUserInfoFromStorage } from './loggedInUserId';
 
 export const EBOOK_UPLOAD_MEMBERSHIP_REQUIRED =
