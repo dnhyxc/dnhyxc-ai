@@ -352,6 +352,12 @@ function pauseMs(ms: number): Promise<void> {
 	});
 }
 
+/** beginPlaybackSession/stopAll 里 cancel() 后立刻 speak()，Chrome 会无声并 onerror；云端走 Audio 不受影响 */
+async function settleSpeechSynthesisAfterCancel(): Promise<void> {
+	if (!isEnglishTtsSupported()) return;
+	await pauseMs(50);
+}
+
 function pickEnglishVoice(): SpeechSynthesisVoice | null {
 	if (!isEnglishTtsSupported()) return null;
 
@@ -1125,50 +1131,74 @@ async function playCloudTtsCadenceSegments(
 	generation: number,
 	opts?: CloudTtsPlaybackOptions,
 ): Promise<void> {
+	// 将文本按节奏规则切分为块（句、短语等），每块单独生成 TTS
 	const chunks = splitTextForTtsCadence(plain);
+
+	// 如果无可用块，直接返回
 	if (chunks.length === 0) return;
+
+	// 获取播放速率，兜底为 1
 	const rate = clampPlaybackRate(opts?.rate);
 
+	// 若文本仅有一个块，且不超过单次云 TTS 最大长度，直接整段播（省去分段机制）
 	if (
 		chunks.length === 1 &&
 		chunks[0].text.length <= MAX_SINGLE_CLOUD_TTS_CHARS
 	) {
+		// 告知外部“本段开始”
 		emitCadenceChunk(opts, plain, chunks, 0, 'start');
+		// 请求云端 TTS 资源（可能复用 Prefetch）
 		const ready = await resolveCloudTtsReady(
 			chunks[0].text,
 			opts?.prefetchedCloud,
 		);
+		// 检查播放世代是否仍有效，用户可能已终止
 		if (!isPlaybackGenerationActive(generation)) return;
+		// 播放 MP3（Blob）
 		await playCloudTtsReady(ready, generation, rate);
+		// 再次校验世代，避免用户在播放间 stop
 		if (!isPlaybackGenerationActive(generation)) return;
+		// 播放结束，通知外部“本段结束”
 		emitCadenceChunk(opts, plain, chunks, 0, 'end');
 		return;
 	}
 
+	// 多段场景：准备首段的 TTS Promise，后续循环中依次推进
 	let pendingReady: Promise<CloudTtsReady> | null = resolveCloudTtsReady(
 		chunks[0].text,
 		opts?.prefetchedCloud,
 	);
 
+	// 逐段播放 TTS，支持逐句暂停与准备下一段
 	for (let i = 0; i < chunks.length; i += 1) {
+		// 中途停止世代播放则直接返回终止流程
 		if (!isPlaybackGenerationActive(generation)) return;
 
 		if (i > 0) {
+			// 为每一段（首段除外）播放前等待上段定义的停顿时长，单位 ms，速率控制
 			const prevPause = chunks[i - 1]?.pauseAfterMs ?? PAUSE_AFTER_CLAUSE_MS;
 			await pauseMs(Math.max(0, Math.round(prevPause / rate)));
+			// 校验暂停期间世代是否仍然有效
 			if (!isPlaybackGenerationActive(generation)) return;
 		}
 
+		// 发出“本块开始”事件（供 UI/外部响应）
 		emitCadenceChunk(opts, plain, chunks, i, 'start');
 
+		// 等待本段的 TTS（云端 MP3）就绪
 		const ready = await pendingReady!;
+		// 校验世代合法性，避免用户终止后继续播
 		if (!isPlaybackGenerationActive(generation)) return;
 
+		// 并行尝试准备下一个 chunk 的 TTS（浏览器端潜在并行请求），如到最后一段则置 null
 		pendingReady =
 			i + 1 < chunks.length ? startCloudTts(chunks[i + 1].text) : null;
 
+		// 播放当前段 MP3
 		await playCloudTtsReady(ready, generation, rate);
+		// 校验播放后世代有效性
 		if (!isPlaybackGenerationActive(generation)) return;
+		// 段播放完，发出“本块结束”事件
 		emitCadenceChunk(opts, plain, chunks, i, 'end');
 	}
 }
@@ -1267,70 +1297,107 @@ function waitForVoicesReady(): Promise<void> {
 	});
 }
 
+// 本地朗读带 playback generation 支持，句级分段、世代守护、语速处理及 50ms settle 修正
 async function speakEnglishTextWithGeneration(
 	text: string,
 	generation: number,
 	options?: SpeakEnglishOptions & CadencePlaybackHooks,
 ): Promise<void> {
+	// 未检测到本机 TTS 支持时直接返回
 	if (!isEnglishTtsSupported()) return;
 
+	// 去除文本 markdown 标记，仅保留朗读内容
 	const plain = stripMarkdownForTts(text);
+	// 文本为空直接返回
 	if (!plain) return;
+	// 检查播放世代，避免过期 session 播放
 	if (!isPlaybackGenerationActive(generation)) return;
 
+	// 等待音色列表加载完毕（部分浏览器首次异步）
 	await waitForVoicesReady();
+	// settle 期间可能用户已 stop
 	if (!isPlaybackGenerationActive(generation)) return;
+	// Chrome/Safari fix：cancel 后需显式等待 50ms 后再 speak，避免首段无声
+	await settleSpeechSynthesisAfterCancel();
+	// again 检查世代，有可能 settle 时用户已停止
+	if (!isPlaybackGenerationActive(generation)) return;
+	// 刷新本地缓存音色（部分平台缓存命中需刷新无废品）
 	resetCachedEnglishVoice();
 
+	// 按语调规则拆分分段，得到拟朗读的 chunk 数组
 	const chunks = splitTextForTtsCadence(plain);
+	// 多段朗读语速稍慢，单段使用标准语速
 	const chunkRate = chunks.length > 1 ? 0.86 : 0.9;
+	// 分段顺次朗读
 	for (let i = 0; i < chunks.length; i += 1) {
+		// 朗读期间，世代快速变动需即刻 return
 		if (!isPlaybackGenerationActive(generation)) return;
 		const chunk = chunks[i];
+		// 首段无需停顿，每段前按设定停顿
 		if (i > 0) {
+			// 取前一段的分句停顿时间（如无用默认）
 			const prevPause = chunks[i - 1]?.pauseAfterMs ?? PAUSE_AFTER_CLAUSE_MS;
 			await pauseMs(prevPause);
+			// 停顿期间世代提前变化（用户已停止）须退出
 			if (!isPlaybackGenerationActive(generation)) return;
 		}
+		// 分段播放前事件钩子，可外部监听
 		emitCadenceChunk(options, plain, chunks, i, 'start');
+		// 朗读当前 chunk，单段时用标准语速，多段时降为 chunkRate
 		await speakOneUtterance(chunk.text, generation, {
 			rate: options?.rate ?? chunkRate,
 			pitch: options?.pitch,
 			volume: options?.volume,
 		});
+		// 朗读 chunk 后再校验，部分平台朗读中可被中断
 		if (!isPlaybackGenerationActive(generation)) return;
+		// 结束事件钩子触发，可用于外界状态更新
 		emitCadenceChunk(options, plain, chunks, i, 'end');
 	}
 }
 
+// 朗读英文文本的入口函数，自动开启新的播放世代，保障操作唯一性
 export async function speakEnglishText(
 	text: string,
 	options?: SpeakEnglishOptions,
 ): Promise<void> {
+	// 启动一个全新的播放 session（每次朗读时都会更新播放世代，避免并发/过期混乱）
 	const generation = beginPlaybackSession();
+	// 调用内部实现函数，实际朗读文本，带入当前世代参数
 	await speakEnglishTextWithGeneration(text, generation, options);
 }
 
+// 朗读英文文本优选本地或云端 TTS，自动处理分段语调与回退逻辑
 export async function playEnglishPreferred(
 	rawText: string,
 	options?: PlayEnglishPreferredOptions,
 ): Promise<void> {
+	// 去除 markdown 语法，获得纯文本
 	const plain = stripMarkdownForTts(rawText);
+	// 空文本直接返回，不进行朗读
 	if (!plain) return;
 
+	// 启动新的播放世代/session，后续朗读周期内保持唯一性，防止异步混乱
 	const generation = beginPlaybackSession();
+	// 外部透传的朗读语调/速度/音量选项
 	const speakOpts = options?.speak;
+	// 根据用户状态、设置判断是否优先使用云端 TTS
 	const useCloud = shouldUseCloudEnglishTts(options);
+	// 注入给分段 cadence 朗读的回调钩子，如分段事件、提前缓存音频等
 	const cadenceHooks: CadencePlaybackHooks = {
 		onCadenceChunk: options?.onCadenceChunk,
 		prefetchedCloud: options?.prefetchedCloud,
 	};
 
+	// 优先分支：本地 TTS
 	if (!useCloud) {
+		// 播放期间世代（播放 session）已失效直接返回（如已被 stop）
 		if (!isPlaybackGenerationActive(generation)) return;
+		// 浏览器本地 TTS 功能不可用时，抛出 NO_TTS 异常
 		if (!isEnglishTtsSupported()) {
 			throw new Error('NO_TTS');
 		}
+		// 实际调用本地 Web Speech 朗读，按设置参数与钩子
 		await speakEnglishTextWithGeneration(rawText, generation, {
 			...speakOpts,
 			...cadenceHooks,
@@ -1338,17 +1405,22 @@ export async function playEnglishPreferred(
 		return;
 	}
 
+	// 云端优先路径，根据用户偏好及能力优先尝试云端；失败兜底本地
 	try {
+		// 调用云端 TTS 分段朗读，透传 cadence 钩子与用户参数
 		await playCloudTtsCadenceSegments(plain, generation, {
 			...cadenceHooks,
 			rate: speakOpts?.rate,
 		});
 		return;
 	} catch {
+		// 云端朗读出错时，二次校验世代有效性
 		if (!isPlaybackGenerationActive(generation)) return;
+		// 若本地没有 TTS 可用，也抛 NO_TTS 错
 		if (!isEnglishTtsSupported()) {
 			throw new Error('NO_TTS');
 		}
+		// 回退本地朗读，参数同前
 		await speakEnglishTextWithGeneration(rawText, generation, {
 			...speakOpts,
 			...cadenceHooks,

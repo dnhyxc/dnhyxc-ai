@@ -1691,6 +1691,13 @@ const UPDATE_INFO_SECTIONS_ZH: UpdateInfoSection[] = [
 				description:
 					'使用云端语音听书或听当前连续播放时，句与句之间衔接更紧，减少上一句播完后长时间空白再读下一句的情况；本机朗读路径不变。',
 			},
+			{
+				id: 's25-57',
+				title: '本机朗读首句修复',
+				dateLabel: '2026-06-27',
+				description:
+					'使用本机语音听书、听当前或英语学习喇叭时，第一句不再偶发无声；MiniMax 或讯飞云端朗读不受影响。',
+			},
 		],
 	},
 ];

@@ -290,6 +290,18 @@ export function applyEpubReaderAppearance(
 			border: `1px solid ${isDarkBg ? '#333333' : '#e0e0e0'} !important`,
 			'border-radius': `5px !important`,
 		},
+		'.kindle-cn-frame-zhishidian': {
+			'background-color': `${isDarkBg ? '#1e1e1e' : '#f5f5f5'} !important`,
+			'border-radius': '5px !important',
+		},
+		'.kindle-cn-frame-zsdtext': {
+			'background-color': `${isDarkBg ? '#1e1e1e' : '#f5f5f5'} !important`,
+			'border-top-left-radius': '5px !important',
+			'border-top-right-radius': '5px !important',
+		},
+		'.kindle-cn-frame-yuanjiao': {
+			'border-color': '#666 !important',
+		},
 	});
 }
 

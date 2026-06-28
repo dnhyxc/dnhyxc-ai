@@ -6,7 +6,8 @@
 > **云端同句读音一致（MP3 LRU 缓存）**见 [`english-tts-cache-consistency.md`](./english-tts-cache-consistency.md)。  
 > **MiniMax 流式 TTS 与硅基回退**见 [`minimax-cloud-tts.md`](./minimax-cloud-tts.md)。  
 > **设置页用户偏好**见 [`cloud-tts-settings.md`](./cloud-tts-settings.md)。  
-> **本机 Web Speech 音色**见 [`english-tts-local-voice.md`](./english-tts-local-voice.md)。
+> **本机 Web Speech 音色**见 [`english-tts-local-voice.md`](./english-tts-local-voice.md)。  
+> **cancel 后 settle（首句无声修复）**见 [`tts-local-cancel-settle.md`](./tts-local-cancel-settle.md)。
 
 ## 1. 背景与目标
 

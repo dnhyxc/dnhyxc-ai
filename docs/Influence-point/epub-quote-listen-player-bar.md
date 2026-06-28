@@ -5,6 +5,7 @@
 - [epub-listen-player-bar.md](../ebook/epub-listen-player-bar.md) — 听书播放条 UI 与倍速/分句菜单
 - [epub-quote-listen.md](../ebook/epub-quote-listen.md) — 听当前三入口与 TTS 复用（改前无播放条）
 - [epub-listen-bg-vs-annotations.md](./epub-listen-bg-vs-annotations.md) — 播放背景 vs 用户划线 / 想法虚线
+- [tts-local-cancel-settle.md](./tts-local-cancel-settle.md) — 本机 Web Speech cancel settle（听当前首句）
 - [developer/epub-listen-dev.md](../ebook/developer/epub-listen-dev.md) — 听当前 + 听书总手册
 
 ## 1. 分析目的

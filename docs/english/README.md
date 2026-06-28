@@ -79,6 +79,7 @@
 | [tts-playback-source.md](./tts-playback-source.md) | **会员本机/MiniMax/讯飞** 三选一与 `playbackSource` 入库 |
 | [xfyun-cloud-tts.md](./xfyun-cloud-tts.md) | **讯飞在线云端朗读**：WS 合成、设置页音量/音高、Node 18 `ws` |
 | [english-tts-playback.md](./english-tts-playback.md) | 播放世代、异步丢弃 |
+| [tts-local-cancel-settle.md](./tts-local-cancel-settle.md) | **增量**：本机 `cancel()` 后 50ms settle，修复首句无声（听当前/听书本机路径） |
 | [english-tts-cache-consistency.md](./english-tts-cache-consistency.md) | 云端同句 MP3 LRU |
 - 列表/UI：[english-learning-list-network-retry.md](./english-learning-list-network-retry.md)、[english-learning-vocab-ui-refactor.md](./english-learning-vocab-ui-refactor.md)
 - 完整列表：`ls docs/english/*.md`

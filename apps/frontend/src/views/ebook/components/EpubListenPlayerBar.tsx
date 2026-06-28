@@ -203,7 +203,7 @@ export function EpubListenPlayerBar({
 	return (
 		<div
 			className={cn(
-				'border-theme/10 bg-theme/5 flex shrink-0 items-center gap-2 overflow-x-hidden border-t px-3 h-12',
+				'border-theme/10 flex shrink-0 items-center gap-2 overflow-x-hidden border-t px-3 h-12',
 				'backdrop-blur-[2px]',
 			)}
 			role="region"

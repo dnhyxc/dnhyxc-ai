@@ -12,5 +12,6 @@
 | [epub-listen-sentence-leading-punct.md](./epub-listen-sentence-leading-punct.md) | **句界算法句首中文标点**：`buildSentenceOffsetSpans` 对听书/听当前/TTS 分句与背景对齐的影响 |
 | [epub-listen-cloud-prefetch.md](./epub-listen-cloud-prefetch.md) | **句间云端 TTS 预取**：`prefetchCloudEnglishTts` 对听书/听当前连播与其它 `playEnglishPreferred` 调用方的影响 |
 | [monaco-markdown-view-panel.md](./monaco-markdown-view-panel.md) | **Markdown 预览/编辑与助手 Panel**：布局 co-mount、开助手不再强制 split、纯预览全宽对 split/Diff/知识库助手的影响 |
+| [tts-local-cancel-settle.md](./tts-local-cancel-settle.md) | **本机 Web Speech cancel 后 50ms settle**：听当前首句修复、全站本机/回退路径起播延迟与云端无影响 |
 
 **阅读约定**：结论以仓库 **当前源码** 为准；「历史风险」指旧实现曾出现的问题，不代表现行代码仍会触发。

@@ -1126,4 +1126,9 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'When using cloud voice for listen-while-reading or quote Listen in continuous playback, the gap between sentences is shorter so the next line starts sooner after the previous one finishes. Local browser speech is unchanged.',
 	},
+	's25-57': {
+		title: 'Local speech first sentence fix',
+		description:
+			'When using local browser speech for listen-while-reading, quote Listen, or English learning playback, the first sentence no longer occasionally stays silent. MiniMax or iFlytek cloud voice is unchanged.',
+	},
 };
