@@ -33,6 +33,9 @@ interface IProps {
 	showFooter?: boolean;
 	showClose?: boolean;
 	showCloseIcon?: boolean;
+	/** DialogContent inline 样式（如 EPUB 阅读 chrome CSS 变量） */
+	contentStyle?: React.CSSProperties;
+	contentClassName?: string;
 }
 
 const Model: React.FC<IProps> = ({
@@ -51,6 +54,8 @@ const Model: React.FC<IProps> = ({
 	showFooter,
 	showClose = true,
 	showCloseIcon = true,
+	contentStyle,
+	contentClassName,
 }) => {
 	const onOk = () => {
 		onSubmit?.();
@@ -62,7 +67,8 @@ const Model: React.FC<IProps> = ({
 			<DialogContent
 				showCloseButton={showCloseIcon}
 				overlayClassName={MODEL_OVERLAY_CLASS}
-				style={{ maxWidth: width, height }}
+				className={contentClassName}
+				style={{ maxWidth: width, height, ...contentStyle }}
 			>
 				{header ? (
 					<DialogHeader>

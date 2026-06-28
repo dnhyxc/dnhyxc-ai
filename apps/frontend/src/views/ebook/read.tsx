@@ -92,6 +92,7 @@ import {
 	isSelectionFullyHighlighted,
 	resolveCfiDomRange,
 	resolveMergedOverlappingHighlight,
+	resolveSelectionHighlightCoverage,
 } from './utils/epub/mark/epubUserHighlights';
 import {
 	buildEpubContextMenuItems,
@@ -331,16 +332,19 @@ function EbookReadPage() {
 		};
 	}, [bookId, t]);
 
-	const selectionFullyHighlighted = useMemo(() => {
-		if (!selectionPopBar?.cfiRange) return false;
+	const selectionHighlightCoverage = useMemo(() => {
+		if (!selectionPopBar?.cfiRange) return 'none' as const;
 		const rend = epubNavRef.current?.getRendition() ?? undefined;
-		return isSelectionFullyHighlighted(
+		return resolveSelectionHighlightCoverage(
 			highlights,
 			selectionPopBar.cfiRange,
 			selectionPopBar.selectedText,
 			rend,
 		);
 	}, [highlights, selectionPopBar, epubNavReady]);
+
+	const selectionFullyHighlighted = selectionHighlightCoverage === 'full';
+	const selectionHasHighlight = selectionHighlightCoverage !== 'none';
 
 	/**
 	 * 针对指定 cfiRange + quote 的选区，执行高亮的新增/合并/更新流程，保证无重叠、无重复、最精确划线
@@ -2360,6 +2364,7 @@ function EbookReadPage() {
 					state={selectionPopBar}
 					labels={selectionPopBarLabels}
 					selectionFullyHighlighted={selectionFullyHighlighted}
+					selectionHasHighlight={selectionHasHighlight}
 					highlightStyle={highlightStyle}
 					highlightColor={highlightColor}
 					onHighlightStyleChange={onHighlightStyleChange}
@@ -2372,6 +2377,8 @@ function EbookReadPage() {
 					onShare={onSelectionPopBarShare}
 					onListen={onSelectionPopBarListen}
 					onClearSelection={clearEpubSelection}
+					chromeStyle={epubSurfaceProps?.chromeStyle}
+					readerBgTheme={epubSettings.bgTheme}
 				/>
 			) : null}
 
@@ -2383,6 +2390,7 @@ function EbookReadPage() {
 					quoteSegments={quoteShareSegments}
 					bookTitle={book.title}
 					author={book.author}
+					chromeStyle={epubSurfaceProps?.chromeStyle}
 				/>
 			) : null}
 		</EbookPageShell>

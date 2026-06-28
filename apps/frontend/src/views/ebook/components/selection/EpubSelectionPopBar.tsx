@@ -1,7 +1,8 @@
 import { Popover, PopoverAnchor, PopoverContent } from '@ui/index';
-import { useLayoutEffect, useMemo, useState } from 'react';
+import { type CSSProperties, useLayoutEffect, useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
 import type { EpubHighlightColorId, EpubHighlightStyle } from '../../types';
+import type { EpubReaderBgTheme } from '../../utils/epub/reader/epubReaderSettings';
 import type { EpubSelectionPopBarPayload } from '../../utils/epub/reader/epubSelectionToolbarAttach';
 import {
 	type EpubSelectionPopBarLabels,
@@ -18,6 +19,7 @@ type Props = {
 	state: EpubSelectionPopBarState | null;
 	labels: EpubSelectionPopBarLabels;
 	selectionFullyHighlighted?: boolean;
+	selectionHasHighlight?: boolean;
 	highlightStyle: EpubHighlightStyle;
 	highlightColor: EpubHighlightColorId;
 	onHighlightStyleChange: (style: EpubHighlightStyle) => void;
@@ -30,6 +32,9 @@ type Props = {
 	onShare?: () => void;
 	onListen?: () => void;
 	onClearSelection?: () => void;
+	/** Portal 挂载阅读 chrome CSS 变量（字色/表面） */
+	chromeStyle?: CSSProperties;
+	readerBgTheme?: EpubReaderBgTheme;
 };
 
 /**
@@ -40,6 +45,7 @@ export function EpubSelectionPopBar({
 	state,
 	labels,
 	selectionFullyHighlighted,
+	selectionHasHighlight,
 	highlightStyle,
 	highlightColor,
 	onHighlightStyleChange,
@@ -52,6 +58,8 @@ export function EpubSelectionPopBar({
 	onShare,
 	onListen,
 	onClearSelection,
+	chromeStyle,
+	readerBgTheme = 'default',
 }: Props) {
 	const [visible, setVisible] = useState(false);
 
@@ -98,6 +106,7 @@ export function EpubSelectionPopBar({
 					'group/pop z-50 w-auto border-0 bg-transparent p-0 shadow-none outline-none',
 					!visible && 'pointer-events-none opacity-0',
 				)}
+				style={chromeStyle}
 				onOpenAutoFocus={(e) => e.preventDefault()}
 				onCloseAutoFocus={(e) => e.preventDefault()}
 				onMouseDown={(e) => e.preventDefault()}
@@ -105,6 +114,7 @@ export function EpubSelectionPopBar({
 				<EpubSelectionPopBarPanel
 					labels={labels}
 					selectionFullyHighlighted={selectionFullyHighlighted}
+					selectionHasHighlight={selectionHasHighlight}
 					highlightStyle={highlightStyle}
 					highlightColor={highlightColor}
 					onHighlightStyleChange={onHighlightStyleChange}
@@ -118,6 +128,7 @@ export function EpubSelectionPopBar({
 					onListen={onListen}
 					onClearSelection={onClearSelection}
 					caretAnchorX={state.x}
+					readerBgTheme={readerBgTheme}
 				/>
 			</PopoverContent>
 		</Popover>

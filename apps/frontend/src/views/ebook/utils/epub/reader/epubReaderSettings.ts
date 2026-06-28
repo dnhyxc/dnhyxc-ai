@@ -263,6 +263,24 @@ export const epubReaderChromeListItemIdleClass =
 export const epubReaderChromeListItemActiveClass =
 	'bg-textcolor/12 text-textcolor font-medium hover:bg-textcolor/12 focus:bg-textcolor/12 focus:text-textcolor';
 
+/** 选区 PopBar 毛玻璃面板（基于阅读 surface，Portal 内需配合 getEpubReaderChromeCssVars） */
+export const epubReaderPopBarSurfaceClass =
+	'rounded-md bg-[color-mix(in_oklch,var(--epub-reader-surface-bg,var(--color-theme-card))_92%,transparent)] backdrop-blur-md backdrop-saturate-150 text-textcolor';
+
+/** PopBar 箭头 fill，与面板 surface 同色 */
+export const EPUB_READER_POPBAR_CARET_FILL =
+	'color-mix(in oklch, var(--epub-reader-surface-bg, var(--color-theme-card)) 92%, transparent)';
+
+/** 跟随应用 / 夜间用主题 shadow-6；其余阅读背景用固定 rgba 投影 */
+export function epubReaderPopBarShadowClass(
+	bgTheme: EpubReaderBgTheme,
+): string {
+	if (bgTheme === 'default' || bgTheme === 'night') {
+		return 'drop-shadow-(--shadow-6)';
+	}
+	return 'drop-shadow-[0_4px_12px_rgba(0,0,0,0.2)]';
+}
+
 /** @deprecated 请用 resolveEpubBgColor + inline style */
 export function epubReaderHostBgClass(bgTheme: EpubReaderBgTheme): string {
 	if (bgTheme === 'default') {

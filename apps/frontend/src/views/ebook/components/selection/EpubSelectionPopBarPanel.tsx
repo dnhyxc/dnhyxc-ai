@@ -2,6 +2,12 @@ import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import type { EpubHighlightColorId, EpubHighlightStyle } from '../../types';
 import {
+	EPUB_READER_POPBAR_CARET_FILL,
+	type EpubReaderBgTheme,
+	epubReaderPopBarShadowClass,
+	epubReaderPopBarSurfaceClass,
+} from '../../utils/epub/reader/epubReaderSettings';
+import {
 	EpubHighlightStyleBar,
 	type EpubHighlightStyleBarLabels,
 } from './EpubHighlightStyleBar';
@@ -17,6 +23,8 @@ export type EpubSelectionPopBarPanelProps = {
 	labels: EpubSelectionPopBarLabels;
 	/** 选区非空白正文是否均已划线；为 true 时展示「删除划线」，否则展示「划线」 */
 	selectionFullyHighlighted?: boolean;
+	/** 选区是否命中任意用户划线（含 partial）；为 true 时展示顶栏样式/颜色条 */
+	selectionHasHighlight?: boolean;
 	highlightStyle: EpubHighlightStyle;
 	highlightColor: EpubHighlightColorId;
 	onHighlightStyleChange: (style: EpubHighlightStyle) => void;
@@ -29,11 +37,13 @@ export type EpubSelectionPopBarPanelProps = {
 	onShare?: () => void;
 	onListen?: () => void;
 	onClearSelection?: () => void;
-	/** 是否展示样式/颜色条；默认 true */
+	/** 显式覆盖是否展示样式/颜色条；默认随 selectionHasHighlight */
 	showHighlightStyleBar?: boolean;
 	/** 箭头对准的视口 X；不传则居中 */
 	caretAnchorX?: number;
 	variant?: 'floating' | 'inline';
+	/** 阅读背景主题，决定 PopBar 投影（default/night → shadow-6，其余 → rgba） */
+	readerBgTheme?: EpubReaderBgTheme;
 };
 
 const ARROW_EDGE_PADDING = 10;
@@ -68,7 +78,7 @@ function PopBarCaret({ left }: { left: number }) {
 				<title>Caret</title>
 				<path
 					d={`M0 0 H${ARROW_WIDTH} L${ARROW_WIDTH / 2} ${ARROW_HEIGHT} Z`}
-					fill="color-mix(in oklch, var(--theme-card) 95%, transparent)"
+					fill={EPUB_READER_POPBAR_CARET_FILL}
 				/>
 			</svg>
 			<svg
@@ -86,7 +96,7 @@ function PopBarCaret({ left }: { left: number }) {
 				<title>Caret</title>
 				<path
 					d={`M0 ${ARROW_HEIGHT} H${ARROW_WIDTH} L${ARROW_WIDTH / 2} 0 Z`}
-					fill="color-mix(in oklch, var(--theme-card) 95%, transparent)"
+					fill={EPUB_READER_POPBAR_CARET_FILL}
 				/>
 			</svg>
 		</>
@@ -97,6 +107,7 @@ function PopBarCaret({ left }: { left: number }) {
 export function EpubSelectionPopBarPanel({
 	labels,
 	selectionFullyHighlighted = false,
+	selectionHasHighlight = false,
 	highlightStyle,
 	highlightColor,
 	onHighlightStyleChange,
@@ -111,11 +122,14 @@ export function EpubSelectionPopBarPanel({
 	onClearSelection,
 	caretAnchorX,
 	variant = 'floating',
-	showHighlightStyleBar = true,
+	showHighlightStyleBar,
+	readerBgTheme = 'default',
 }: EpubSelectionPopBarPanelProps) {
 	const toolbarRef = useRef<HTMLDivElement>(null);
 	const [arrowLeft, setArrowLeft] = useState<number | null>(null);
 	const hasHighlight = selectionFullyHighlighted;
+	const shouldShowHighlightStyleBar =
+		showHighlightStyleBar ?? selectionHasHighlight;
 
 	const measureArrowLeft = useCallback((): number | null => {
 		const toolbar = toolbarRef.current;
@@ -143,15 +157,12 @@ export function EpubSelectionPopBarPanel({
 			window.removeEventListener('resize', updateArrowLeft);
 			observer?.disconnect();
 		};
-	}, [measureArrowLeft, showHighlightStyleBar]);
+	}, [measureArrowLeft, shouldShowHighlightStyleBar]);
 
 	return (
-		<div className="relative drop-shadow-(--shadow-6)">
-			<div
-				ref={toolbarRef}
-				className="rounded-md bg-[color-mix(in_oklch,var(--theme-card)_92%,transparent)] backdrop-blur-md backdrop-saturate-150"
-			>
-				{showHighlightStyleBar ? (
+		<div className={cn('relative', epubReaderPopBarShadowClass(readerBgTheme))}>
+			<div ref={toolbarRef} className={epubReaderPopBarSurfaceClass}>
+				{shouldShowHighlightStyleBar ? (
 					<EpubHighlightStyleBar
 						style={highlightStyle}
 						color={highlightColor}

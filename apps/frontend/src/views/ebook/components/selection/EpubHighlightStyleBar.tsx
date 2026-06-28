@@ -123,8 +123,8 @@ export function EpubHighlightStyleBar({
 							className={cn(
 								'flex size-7 items-center justify-center rounded-md transition-colors',
 								active
-									? 'bg-theme/10 ring-1 ring-teal-500/40'
-									: 'hover:bg-theme/8',
+									? 'bg-textcolor/10 ring-1 ring-teal-500/40'
+									: 'hover:bg-textcolor/8',
 							)}
 						>
 							{option.render(active)}

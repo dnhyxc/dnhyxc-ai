@@ -2,12 +2,22 @@ import Model from '@design/Model';
 import { Button, ScrollArea } from '@ui/index';
 import { Toast } from '@ui/sonner';
 import { CheckCircle } from 'lucide-react';
+import type { CSSProperties } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useI18n } from '@/hooks';
+import { cn } from '@/lib/utils';
 import { downloadBlob } from '@/utils';
 import { copyCanvasToClipboard } from '@/utils/clipboard';
-import { renderQuoteShareCard } from '../../utils/epub/reader/epubQuoteShareCard';
+import {
+	EPUB_QUOTE_SHARE_CARD_BG,
+	renderQuoteShareCard,
+} from '../../utils/epub/reader/epubQuoteShareCard';
 import type { QuoteShareRun } from '../../utils/epub/reader/epubQuoteShareStyled';
+import {
+	epubReaderChromeBorderColorClass,
+	epubReaderChromePrimaryButtonClass,
+	epubReaderSurfaceBgClass,
+} from '../../utils/epub/reader/epubReaderSettings';
 
 type Props = {
 	open: boolean;
@@ -16,6 +26,8 @@ type Props = {
 	quoteSegments?: QuoteShareRun[];
 	bookTitle: string;
 	author?: string;
+	/** EPUB 阅读 chrome（Portal 内需单独挂载） */
+	chromeStyle?: CSSProperties;
 };
 
 /** 预览区固定高度，避免生成前后弹窗高度跳动 */
@@ -36,6 +48,7 @@ export function EpubQuoteShareDialog({
 	quoteSegments,
 	bookTitle,
 	author,
+	chromeStyle,
 }: Props) {
 	const { t, locale } = useI18n();
 	const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -157,18 +170,33 @@ export function EpubQuoteShareDialog({
 			width="400px"
 			showFooter={false}
 			footer={null}
+			contentStyle={chromeStyle}
+			contentClassName={cn(
+				epubReaderSurfaceBgClass,
+				epubReaderChromeBorderColorClass,
+				'text-textcolor',
+			)}
 		>
 			<div
-				className={`flex min-h-0 flex-col overflow-hidden rounded-md border border-theme/10 bg-[#F7F7F7] ${PREVIEW_BOX_CLASS}`}
+				className={cn(
+					'flex min-h-0 flex-col overflow-hidden rounded-md border border-black/8',
+					PREVIEW_BOX_CLASS,
+				)}
+				style={
+					{
+						backgroundColor: EPUB_QUOTE_SHARE_CARD_BG,
+						'--epub-quote-share-preview-bg': EPUB_QUOTE_SHARE_CARD_BG,
+					} as CSSProperties
+				}
 			>
 				<ScrollArea
 					className="min-h-0 flex-1 -mx-4.5 min-w-0 w-[calc(100%+2.25rem)] rounded-[inherit]"
-					viewportClassName="min-w-0 max-w-full rounded-[inherit] [&>div]:!block [&>div]:!min-h-0"
+					viewportClassName="min-w-0 max-w-full rounded-[inherit] bg-[var(--epub-quote-share-preview-bg)] [&>div]:!block [&>div]:!min-h-0"
 				>
 					<div className="px-4.5">
 						{loading ? (
 							<div
-								className={`flex w-full min-h-[min(calc(75vh-10rem),600px)] items-center justify-center text-sm text-textcolor/50`}
+								className={`flex w-full min-h-[min(calc(75vh-10rem),600px)] items-center justify-center text-sm text-[#999999]`}
 							>
 								{t('ebook.read.quoteShare.generating')}
 							</div>
@@ -188,7 +216,10 @@ export function EpubQuoteShareDialog({
 			<div className="grid shrink-0 grid-cols-2 gap-4 pt-0.5">
 				<Button
 					type="button"
-					className="min-w-0 w-full cursor-pointer"
+					className={cn(
+						'min-w-0 w-full cursor-pointer',
+						epubReaderChromePrimaryButtonClass,
+					)}
 					disabled={loading || copying || downloading || !canvas}
 					onClick={onCopyImage}
 				>
@@ -206,7 +237,10 @@ export function EpubQuoteShareDialog({
 				</Button>
 				<Button
 					type="button"
-					className="min-w-0 w-full cursor-pointer"
+					className={cn(
+						'min-w-0 w-full cursor-pointer',
+						epubReaderChromePrimaryButtonClass,
+					)}
 					disabled={loading || copying || downloading || !canvas}
 					onClick={onDownloadImage}
 				>

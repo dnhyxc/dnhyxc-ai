@@ -1146,4 +1146,14 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'In continuous scroll mode, EPUB previous/next page entries are hidden from the header and context menu; paginated mode still shows them. While the sentence list or speed menu is open, tapping the reading area closes it (same as Reading settings). The TOC drawer title is now “Book contents”.',
 	},
+	's25-61': {
+		title: 'EPUB selection PopBar reader chrome',
+		description:
+			'The floating selection toolbar background, text, and shadow follow your reading background and text color. The top highlight style/color strip appears only when the selection already has a user highlight (including partial coverage), not on a fresh selection.',
+	},
+	's25-62': {
+		title: 'EPUB quote share dialog reader chrome',
+		description:
+			'The Share quote dialog title, buttons, and borders follow reader chrome for readability. The generated share image and preview area keep the fixed light-gray calendar card colors for pasting into WeChat and similar apps.',
+	},
 };

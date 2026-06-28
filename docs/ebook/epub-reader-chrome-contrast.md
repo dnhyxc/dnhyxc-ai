@@ -6,7 +6,7 @@
 
 **姊妹文档**：[epub-reader-surface-bg.md](./epub-reader-surface-bg.md)、[epub-thought-side-panel.md](./epub-thought-side-panel.md)、[epub-listen-player-bar.md](./epub-listen-player-bar.md)、[ebook-moke-assistant.md](./ebook-moke-assistant.md)。
 
-**延伸阅读**：[epub-read-page-nav-dismiss.md](./epub-read-page-nav-dismiss.md)（分页翻页入口、点击正文关浮层、目录文案）。
+**延伸阅读**：[epub-read-page-nav-dismiss.md](./epub-read-page-nav-dismiss.md)（分页翻页入口、点击正文关浮层、目录文案）、[epub-selection-popbar-chrome.md](./epub-selection-popbar-chrome.md)（选区 PopBar）、[epub-quote-share-dialog-chrome.md](./epub-quote-share-dialog-chrome.md)（书摘分享弹窗）。
 
 ---
 

@@ -13,12 +13,17 @@ const PAD_X = 52;
 const CONTENT_W = CARD_WIDTH - PAD_X * 2;
 const SCALE = 2;
 
-/** 参考微信读书书摘卡配色 */
-const BG = '#F7F7F7';
-const TEXT_PRIMARY = '#332C2B';
-const TEXT_SECONDARY = '#999999';
-const TEXT_BRAND = '#888888';
-const DIVIDER = '#E0E0E0';
+/** 分享卡固定配色（微信读书风，不随阅读主题变化） */
+const CARD_PALETTE = {
+	bg: '#F7F7F7',
+	textPrimary: '#332C2B',
+	textSecondary: '#999999',
+	textBrand: '#888888',
+	divider: '#E0E0E0',
+} as const;
+
+/** 分享卡与弹窗预览区共用的固定背景色 */
+export const EPUB_QUOTE_SHARE_CARD_BG = CARD_PALETTE.bg;
 
 const FONT_SANS =
 	'PingFang SC, Hiragino Sans GB, Microsoft YaHei, Noto Sans SC, sans-serif';
@@ -182,7 +187,7 @@ function measureCardHeight(
 }
 
 function drawDivider(ctx: CanvasRenderingContext2D, y: number): void {
-	ctx.strokeStyle = DIVIDER;
+	ctx.strokeStyle = CARD_PALETTE.divider;
 	ctx.lineWidth = 1;
 	const half = LAYOUT.dividerWidth / 2;
 	ctx.beginPath();
@@ -205,7 +210,7 @@ function drawCard(
 	const brand = input.brand.trim();
 	const { lines: quoteLines } = resolveQuoteLines(ctx, input);
 
-	ctx.fillStyle = BG;
+	ctx.fillStyle = CARD_PALETTE.bg;
 	ctx.fillRect(0, 0, CARD_WIDTH, height);
 
 	ctx.textAlign = 'center';
@@ -213,7 +218,7 @@ function drawCard(
 
 	let y = LAYOUT.padTop;
 
-	ctx.fillStyle = TEXT_PRIMARY;
+	ctx.fillStyle = CARD_PALETTE.textPrimary;
 	ctx.font = `${LAYOUT.dayWeight} ${LAYOUT.daySize}px ${FONT_SANS}`;
 	ctx.fillText(day, CARD_WIDTH / 2, y);
 	y += LAYOUT.daySize + LAYOUT.gapAfterDay;
@@ -222,7 +227,7 @@ function drawCard(
 	ctx.fillText(monthYear, CARD_WIDTH / 2, y);
 	y += LAYOUT.monthLineHeight + LAYOUT.gapAfterMonth;
 
-	ctx.fillStyle = TEXT_SECONDARY;
+	ctx.fillStyle = CARD_PALETTE.textSecondary;
 	ctx.font = `400 ${LAYOUT.weekdaySize}px ${FONT_SANS}`;
 	ctx.fillText(weekday, CARD_WIDTH / 2, y);
 	y += LAYOUT.weekdayLineHeight + LAYOUT.gapBeforeDivider;
@@ -230,12 +235,18 @@ function drawCard(
 	drawDivider(ctx, y);
 	y += 1 + LAYOUT.gapAfterDivider;
 
-	drawStyledQuoteLines(ctx, quoteLines, CARD_WIDTH / 2, y, TEXT_PRIMARY);
+	drawStyledQuoteLines(
+		ctx,
+		quoteLines,
+		CARD_WIDTH / 2,
+		y,
+		CARD_PALETTE.textPrimary,
+	);
 	y += measureStyledQuoteHeight(quoteLines) + LAYOUT.gapAfterQuote;
 
 	if (title) {
 		ctx.font = `400 ${LAYOUT.titleSize}px ${FONT_SANS}`;
-		ctx.fillStyle = TEXT_PRIMARY;
+		ctx.fillStyle = CARD_PALETTE.textPrimary;
 		ctx.fillText(title, CARD_WIDTH / 2, y);
 		y += LAYOUT.titleLineHeight;
 	}
@@ -243,7 +254,7 @@ function drawCard(
 	if (author) {
 		y += title ? LAYOUT.gapAfterTitle : 0;
 		ctx.font = `400 ${LAYOUT.authorSize}px ${FONT_SANS}`;
-		ctx.fillStyle = TEXT_SECONDARY;
+		ctx.fillStyle = CARD_PALETTE.textSecondary;
 		ctx.fillText(author, CARD_WIDTH / 2, y);
 		y += LAYOUT.authorLineHeight;
 	}
@@ -251,7 +262,7 @@ function drawCard(
 	if (brand) {
 		y += LAYOUT.gapBeforeBrand;
 		ctx.font = `400 ${LAYOUT.brandSize}px ${FONT_SANS}`;
-		ctx.fillStyle = TEXT_BRAND;
+		ctx.fillStyle = CARD_PALETTE.textBrand;
 		ctx.fillText(brand, CARD_WIDTH / 2, y);
 	}
 }

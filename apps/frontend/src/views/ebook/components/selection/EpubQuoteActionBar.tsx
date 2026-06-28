@@ -1,5 +1,6 @@
 import {
-	ALargeSmall,
+	AudioWaveform,
+	Baseline,
 	CheckCircle,
 	Copy,
 	type LucideIcon,
@@ -100,11 +101,12 @@ const ACTION_ORDER: Record<BarVariant, ActionId[]> = {
 
 const ACTION_ICONS: Partial<Record<ActionId, LucideIcon>> = {
 	copy: Copy,
-	underline: ALargeSmall,
+	underline: Baseline,
 	removeUnderline: Strikethrough,
 	writeThought: MessageSquarePlus,
 	share: Share2,
 	askBook: Search,
+	listen: AudioWaveform,
 };
 
 const HANDLER_PROP: Partial<
@@ -139,12 +141,6 @@ const ICON_CLASS: Record<BarVariant, string> = {
 	panel: 'stroke-[1.5]',
 	inline: 'stroke-[1.75]',
 	floating: 'size-4 stroke-[1.75]',
-};
-
-const LISTEN_CLASS: Record<BarVariant, string> = {
-	panel: 'text-sm font-semibold leading-none',
-	inline: 'text-[11px] font-semibold leading-none',
-	floating: 'text-sm font-semibold leading-none',
 };
 
 const ITEM_BUTTON_CLASS: Record<BarVariant, string> = {
@@ -226,9 +222,6 @@ function renderActionIcon(
 				aria-hidden
 			/>
 		);
-	}
-	if (id === 'listen') {
-		return <span className={LISTEN_CLASS[variant]}>听</span>;
 	}
 	const Icon = ACTION_ICONS[id];
 	if (!Icon) return null;
