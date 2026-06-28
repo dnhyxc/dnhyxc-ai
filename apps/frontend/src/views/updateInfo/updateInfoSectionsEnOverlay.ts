@@ -1136,4 +1136,14 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'When reading EPUB in continuous scroll mode, chapter listen now continues into the next on-screen section after the current block finishes. Previous/next sentence and sentence-list jumps no longer exit playback by mistake. Paginated page-turn mode is unchanged.',
 	},
+	's25-59': {
+		title: 'EPUB reader chrome text and contrast',
+		description:
+			'After you change text color and reading background in Reading settings, the header, thought/MOKE side panels, input fields, listen sentence/speed menus, settings panel, and table of contents keep readable text, dividers, and buttons—no more gray-on-pink buttons or black portal menus.',
+	},
+	's25-60': {
+		title: 'EPUB paginated nav and dismiss overlays',
+		description:
+			'In continuous scroll mode, EPUB previous/next page entries are hidden from the header and context menu; paginated mode still shows them. While the sentence list or speed menu is open, tapping the reading area closes it (same as Reading settings). The TOC drawer title is now “Book contents”.',
+	},
 };

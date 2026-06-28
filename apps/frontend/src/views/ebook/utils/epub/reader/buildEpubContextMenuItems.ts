@@ -20,6 +20,8 @@ export type EpubReaderContextActions = {
 
 type BuildEpubContextMenuItemsInput = {
 	hasSelection: boolean;
+	/** 分页翻页时才展示上一页/下一页 */
+	showPageNav?: boolean;
 	actionsRef: MutableRefObject<EpubReaderContextActions | null>;
 	t: (key: string, params?: Record<string, unknown>) => string;
 };
@@ -27,6 +29,7 @@ type BuildEpubContextMenuItemsInput = {
 /** EPUB 阅读区右键菜单（结构对齐知识库 Monaco 编辑器 `buildMonacoEditorContextMenuItems`） */
 export function buildEpubContextMenuItems({
 	hasSelection,
+	showPageNav = false,
 	actionsRef,
 	t,
 }: BuildEpubContextMenuItemsInput): QuickContextMenuEntry[] {
@@ -64,21 +67,27 @@ export function buildEpubContextMenuItems({
 		});
 		items.push({ type: 'separator', id: 'sep-nav' });
 	}
-	items.push({
-		type: 'item',
-		id: 'prev',
-		label: t('ebook.read.prev'),
-		shortcut: '←',
-		onSelect: () => actionsRef.current?.prevPage(),
-	});
-	items.push({
-		type: 'item',
-		id: 'next',
-		label: t('ebook.read.next'),
-		shortcut: '→',
-		onSelect: () => actionsRef.current?.nextPage(),
-	});
-	items.push({ type: 'separator', id: 'sep-tools' });
+
+	if (showPageNav) {
+		items.push({
+			type: 'item',
+			id: 'prev',
+			label: t('ebook.read.prev'),
+			shortcut: '←',
+			onSelect: () => actionsRef.current?.prevPage(),
+		});
+		items.push({
+			type: 'item',
+			id: 'next',
+			label: t('ebook.read.next'),
+			shortcut: '→',
+			onSelect: () => actionsRef.current?.nextPage(),
+		});
+		items.push({ type: 'separator', id: 'sep-tools' });
+	} else if (hasSelection) {
+		items.push({ type: 'separator', id: 'sep-tools' });
+	}
+
 	items.push({
 		type: 'item',
 		id: 'toc',

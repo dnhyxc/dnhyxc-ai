@@ -21,7 +21,7 @@ import {
 	useState,
 } from 'react';
 import { useNavigate, useParams } from 'react-router';
-import { useI18n } from '@/hooks';
+import { useI18n, useTheme } from '@/hooks';
 import { cn } from '@/lib/utils';
 import {
 	createEbookHighlight,
@@ -105,7 +105,7 @@ import {
 	DEFAULT_EPUB_READER_SETTINGS,
 	type EpubReaderSettings,
 	epubReaderSurfaceBgClass,
-	getEpubReaderSurfaceCssVars,
+	getEpubReaderChromeCssVars,
 	loadEpubReaderSettings,
 	saveEpubReaderSettings,
 } from './utils/epub/reader/epubReaderSettings';
@@ -131,6 +131,7 @@ import {
 
 function EbookReadPage() {
 	const { t } = useI18n();
+	const { theme: appTheme } = useTheme();
 	const { bookId = '' } = useParams();
 	const nav = useNavigate();
 	const book = ebookStore.bookById(bookId);
@@ -155,6 +156,14 @@ function EbookReadPage() {
 	const [tocItems, setTocItems] = useState<EbookTocItem[]>([]);
 	const [tocOpen, setTocOpen] = useState(false);
 	const [epubSettingsOpen, setEpubSettingsOpen] = useState(false);
+	const [listenSentenceMenuOpen, setListenSentenceMenuOpen] = useState(false);
+	const [listenRateMenuOpen, setListenRateMenuOpen] = useState(false);
+	const epubSettingsOpenRef = useRef(epubSettingsOpen);
+	epubSettingsOpenRef.current = epubSettingsOpen;
+	const listenSentenceMenuOpenRef = useRef(listenSentenceMenuOpen);
+	listenSentenceMenuOpenRef.current = listenSentenceMenuOpen;
+	const listenRateMenuOpenRef = useRef(listenRateMenuOpen);
+	listenRateMenuOpenRef.current = listenRateMenuOpen;
 	const [epubSettings, setEpubSettings] = useState<EpubReaderSettings>(
 		loadEpubReaderSettings,
 	);
@@ -1245,6 +1254,23 @@ function EbookReadPage() {
 		setEpubSettingsOpen(false);
 	}, []);
 
+	const closeReaderFloatingUi = useCallback(() => {
+		closeEpubSettings();
+		setListenSentenceMenuOpen(false);
+		setListenRateMenuOpen(false);
+	}, [closeEpubSettings]);
+
+	/** iframe 内 mousedown 不冒泡；监听常挂载，用 ref 判断是否需要关浮层 */
+	const onEpubReaderPointerDown = useCallback(() => {
+		if (
+			epubSettingsOpenRef.current ||
+			listenSentenceMenuOpenRef.current ||
+			listenRateMenuOpenRef.current
+		) {
+			closeReaderFloatingUi();
+		}
+	}, [closeReaderFloatingUi]);
+
 	const patchPdfZoom = useCallback((delta: number) => {
 		setPdfZoom((prev) => {
 			const next = stepPdfZoom(prev, delta);
@@ -1799,12 +1825,14 @@ function EbookReadPage() {
 		}
 		return buildEpubContextMenuItems({
 			hasSelection: contextMenu?.hasSelection ?? false,
+			showPageNav: epubSettings.pageFlow === 'paginated',
 			actionsRef: contextActionsRef,
 			t,
 		});
 	}, [
 		book?.fmt,
 		contextMenu?.hasSelection,
+		epubSettings.pageFlow,
 		pdfNavReady,
 		pdfPage,
 		pdfTotal,
@@ -1856,11 +1884,17 @@ function EbookReadPage() {
 
 	const epubSurfaceProps = useMemo(() => {
 		if (book?.fmt !== 'epub') return undefined;
+		const chromeStyle = getEpubReaderChromeCssVars(
+			epubSettings.bgTheme,
+			epubSettings.textColor,
+			appTheme,
+		);
 		return {
 			surfaceClassName: epubReaderSurfaceBgClass,
-			surfaceStyle: getEpubReaderSurfaceCssVars(epubSettings.bgTheme),
+			surfaceStyle: chromeStyle,
+			chromeStyle,
 		};
-	}, [book?.fmt, epubSettings.bgTheme]);
+	}, [book?.fmt, epubSettings.bgTheme, epubSettings.textColor, appTheme]);
 
 	if (!book) {
 		if (bookResolving || !ebookStore.ready) {
@@ -1953,44 +1987,48 @@ function EbookReadPage() {
 					</Button>
 				</Tooltip>
 
-				<Tooltip
-					side="bottom"
-					sideOffset={6}
-					delayDuration={200}
-					shadow
-					content={t('ebook.read.prev')}
-				>
-					<Button
-						type="button"
-						variant="ghost"
-						size="icon-sm"
-						className="text-textcolor/80 hover:text-teal-500"
-						disabled={!epubNavReady}
-						aria-label={t('ebook.read.prev')}
-						onClick={() => epubNavRef.current?.prev()}
-					>
-						<ChevronLeft className="size-4" />
-					</Button>
-				</Tooltip>
-				<Tooltip
-					side="bottom"
-					sideOffset={6}
-					delayDuration={200}
-					shadow
-					content={t('ebook.read.next')}
-				>
-					<Button
-						type="button"
-						variant="ghost"
-						size="icon-sm"
-						className="text-textcolor/80 hover:text-teal-500"
-						disabled={!epubNavReady}
-						aria-label={t('ebook.read.next')}
-						onClick={() => epubNavRef.current?.next()}
-					>
-						<ChevronRight className="size-4" />
-					</Button>
-				</Tooltip>
+				{epubSettings.pageFlow === 'paginated' ? (
+					<>
+						<Tooltip
+							side="bottom"
+							sideOffset={6}
+							delayDuration={200}
+							shadow
+							content={t('ebook.read.prev')}
+						>
+							<Button
+								type="button"
+								variant="ghost"
+								size="icon-sm"
+								className="text-textcolor/80 hover:text-teal-500"
+								disabled={!epubNavReady}
+								aria-label={t('ebook.read.prev')}
+								onClick={() => epubNavRef.current?.prev()}
+							>
+								<ChevronLeft className="size-4" />
+							</Button>
+						</Tooltip>
+						<Tooltip
+							side="bottom"
+							sideOffset={6}
+							delayDuration={200}
+							shadow
+							content={t('ebook.read.next')}
+						>
+							<Button
+								type="button"
+								variant="ghost"
+								size="icon-sm"
+								className="text-textcolor/80 hover:text-teal-500"
+								disabled={!epubNavReady}
+								aria-label={t('ebook.read.next')}
+								onClick={() => epubNavRef.current?.next()}
+							>
+								<ChevronRight className="size-4" />
+							</Button>
+						</Tooltip>
+					</>
+				) : null}
 				<EpubReaderSettingsPopover
 					settings={epubSettings}
 					onChange={patchEpubSettings}
@@ -2205,9 +2243,7 @@ function EbookReadPage() {
 						<div
 							className="relative flex h-full min-h-0 flex-1 flex-col overflow-hidden"
 							onContextMenu={onHostContextMenu}
-							onPointerDown={() => {
-								if (epubSettingsOpen) closeEpubSettings();
-							}}
+							onPointerDown={onEpubReaderPointerDown}
 						>
 							<div className="relative h-full min-h-0 flex-1 overflow-hidden">
 								<EpubPane
@@ -2222,9 +2258,7 @@ function EbookReadPage() {
 										!tocOpen && !epubSettingsOpen && !sidePanelOpen
 									}
 									onReaderContextMenu={showEpubContextMenu}
-									onReaderPointerDown={
-										epubSettingsOpen ? closeEpubSettings : undefined
-									}
+									onReaderPointerDown={onEpubReaderPointerDown}
 									onSelectionPopBar={onSelectionPopBarChange}
 									thoughts={thoughts}
 									highlights={highlights}
@@ -2247,6 +2281,11 @@ function EbookReadPage() {
 								onNextSentence={epubListenBar.nextSentence}
 								onGoToSentence={epubListenBar.goToSentence}
 								onRateChange={epubListenBar.setRate}
+								sentenceMenuOpen={listenSentenceMenuOpen}
+								onSentenceMenuOpenChange={setListenSentenceMenuOpen}
+								rateMenuOpen={listenRateMenuOpen}
+								onRateMenuOpenChange={setListenRateMenuOpen}
+								menuChromeStyle={epubSurfaceProps?.chromeStyle}
 							/>
 						</div>
 					</EbookReadSplitLayout>
@@ -2288,6 +2327,9 @@ function EbookReadPage() {
 				onOpenChange={setTocOpen}
 				items={tocItems}
 				activeIndex={activeTocIndex}
+				chromeStyle={
+					book.fmt === 'epub' ? epubSurfaceProps?.chromeStyle : undefined
+				}
 				onSelect={(href) => {
 					const pdfPage = parsePdfPageHref(href);
 					if (pdfPage != null) {

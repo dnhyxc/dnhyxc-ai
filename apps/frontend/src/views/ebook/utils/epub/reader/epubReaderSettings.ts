@@ -28,6 +28,7 @@
  */
 import type { Rendition } from 'epubjs';
 import type { ThemeName } from '@/hooks';
+import { cn } from '@/lib/utils';
 
 export const EPUB_READER_SETTINGS_STORAGE_KEY = 'dnhyxc_epub_reader_settings';
 
@@ -165,6 +166,9 @@ export function resolveEpubReaderBackground(
 /** EPUB 阅读页壳层/侧栏共用的表面背景 CSS 变量名 */
 export const EPUB_READER_SURFACE_CSS_VAR = '--epub-reader-surface-bg';
 
+/** 阅读页 chrome（顶栏/设置/播放条等）正文字色 CSS 变量名 */
+export const EPUB_READER_TEXT_CSS_VAR = '--epub-reader-text-color';
+
 /**
  * 页面壳、顶栏、侧栏与阅读区共用的表面背景。
  * default 跟随应用主题；其余与 iframe 内阅读背景一致。
@@ -184,6 +188,25 @@ export function getEpubReaderSurfaceCssVars(
 ): Record<string, string> {
 	return {
 		[EPUB_READER_SURFACE_CSS_VAR]: resolveEpubReaderSurfaceBackground(bgTheme),
+	};
+}
+
+/** 阅读页 chrome：表面背景 + 正文字色（覆盖 --color-textcolor 供 text-textcolor/* 继承） */
+export function getEpubReaderChromeCssVars(
+	bgTheme: EpubReaderBgTheme,
+	textColor: EpubReaderTextColor,
+	appTheme: ThemeName,
+): Record<string, string> {
+	const resolvedText = resolveEpubTextColor(textColor, appTheme);
+	return {
+		...getEpubReaderSurfaceCssVars(bgTheme),
+		[EPUB_READER_TEXT_CSS_VAR]: resolvedText,
+		'--color-textcolor': resolvedText,
+		'--theme-textcolor': resolvedText,
+		// body 的 text-textcolor 在子树内继承的是 body 处算出的色值；根节点显式设 color 才能让 textarea 等未挂 utility 的节点跟随阅读字色
+		color: resolvedText,
+		// Portal 下拉/抽屉不在阅读壳子 DOM 内，须 inline 背景避免仍用 bg-theme-background（应用主题）
+		backgroundColor: resolveEpubReaderSurfaceBackground(bgTheme),
 	};
 }
 
@@ -210,6 +233,35 @@ export const epubReaderSurfaceFadeFromClass =
 /** 加载遮罩（替代 bg-theme-background/80） */
 export const epubReaderSurfaceOverlayClass =
 	'bg-[color-mix(in_oklch,var(--epub-reader-surface-bg,var(--color-theme-background))_80%,transparent)]';
+
+/** 阅读页 chrome 分隔线色（基于正文字色，避免 border-theme 在自定义阅读背景上不可见） */
+export const epubReaderChromeBorderColorClass = 'border-textcolor/18';
+
+/** 阅读页 chrome 次要按钮（取消、删除等） */
+export const epubReaderChromeOutlineButtonClass =
+	'border-textcolor/28 text-textcolor bg-transparent shadow-none hover:bg-textcolor/10';
+
+/** 阅读页 chrome 主按钮（保存、编辑等；字/底反转保证与表面背景对比） */
+export const epubReaderChromePrimaryButtonClass =
+	'bg-textcolor text-[var(--epub-reader-surface-bg,var(--color-theme-background))] hover:bg-textcolor/90 border-transparent';
+
+/** 阅读页 chrome 内 textarea：覆盖 ui/Textarea 默认 placeholder/caret */
+export const epubReaderChromeTextareaClass =
+	'text-textcolor placeholder:text-textcolor/40 caret-textcolor';
+
+/** Portal 下拉菜单容器（分句/倍速等；覆盖 DropdownMenuContent 默认 bg-theme-background） */
+export const epubReaderChromeMenuContentClass = cn(
+	epubReaderSurfaceBgClass,
+	epubReaderChromeBorderColorClass,
+	'border text-textcolor',
+);
+
+/** 阅读 chrome 列表项：默认 / 选中（基于正文字色，非应用 theme 色） */
+export const epubReaderChromeListItemIdleClass =
+	'text-textcolor hover:bg-textcolor/10 focus:bg-textcolor/10 focus:text-textcolor';
+
+export const epubReaderChromeListItemActiveClass =
+	'bg-textcolor/12 text-textcolor font-medium hover:bg-textcolor/12 focus:bg-textcolor/12 focus:text-textcolor';
 
 /** @deprecated 请用 resolveEpubBgColor + inline style */
 export function epubReaderHostBgClass(bgTheme: EpubReaderBgTheme): string {

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
+import { epubReaderChromeBorderColorClass } from '../../utils/epub/reader/epubReaderSettings';
 
 export type EbookPanelHeaderProps = {
 	title?: ReactNode;
@@ -29,7 +30,8 @@ export function EbookPanelHeader({
 		<header
 			className={cn(
 				EBOOK_PANEL_BAR_HEIGHT_CLASS,
-				'border-theme/10 flex shrink-0 items-stretch gap-3 border-b px-2',
+				'flex shrink-0 items-stretch gap-3 border-b px-2',
+				epubReaderChromeBorderColorClass,
 				className,
 			)}
 		>

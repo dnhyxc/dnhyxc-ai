@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 import type { EpubHighlightColorId, EpubHighlightStyle } from '../../types';
 import { EPUB_HIGHLIGHT_COLOR_OPTIONS } from '../../utils/epub/mark/epubUserHighlights';
+import { epubReaderChromeBorderColorClass } from '../../utils/epub/reader/epubReaderSettings';
 
 export type EpubHighlightStyleBarLabels = {
 	styleHighlight: string;
@@ -103,7 +104,12 @@ export function EpubHighlightStyleBar({
 	labels,
 }: Props) {
 	return (
-		<div className="flex items-center justify-between gap-3 border-b border-theme/10 px-2 py-1.5">
+		<div
+			className={cn(
+				'flex items-center justify-between gap-3 border-b px-2 py-1.5',
+				epubReaderChromeBorderColorClass,
+			)}
+		>
 			<div className="flex items-center gap-1">
 				{STYLE_OPTIONS.map((option) => {
 					const active = style === option.id;

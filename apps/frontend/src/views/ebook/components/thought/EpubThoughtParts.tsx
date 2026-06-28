@@ -14,6 +14,7 @@ import { formatDate, resolveCosUrlForWebDisplay } from '@/utils';
 import type { EpubHighlightColorId, EpubHighlightStyle } from '../../types';
 import { EPUB_HIGHLIGHT_COLOR_OPTIONS } from '../../utils/epub/mark/epubUserHighlights';
 import {
+	epubReaderChromeBorderColorClass,
 	epubReaderSurfaceFadeFromClass,
 	epubReaderSurfaceHoverClass,
 	epubReaderSurfaceSelectedClass,
@@ -242,7 +243,12 @@ export function EpubThoughtClusterExcerpt({
 		useQuoteExcerptClamp(resetKey, 1);
 
 	return (
-		<div className="text-textcolor/55 border-theme/10 flex items-center gap-0.5 border-t px-4 py-2 text-xs">
+		<div
+			className={cn(
+				'text-textcolor/55 flex items-center gap-0.5 border-t px-4 py-2 text-xs',
+				epubReaderChromeBorderColorClass,
+			)}
+		>
 			<div ref={wrapperRef} className="min-w-0 flex-1">
 				<p
 					ref={textRef}
@@ -379,7 +385,8 @@ export function EpubThoughtQuoteCard({
 				<div
 					className={cn(
 						quoteCardBarRowClass,
-						'border-theme/10 justify-between gap-3 border-b px-4',
+						'justify-between gap-3 border-b px-4',
+						epubReaderChromeBorderColorClass,
 					)}
 				>
 					<div className="flex min-w-0 flex-1 items-baseline gap-2">
@@ -477,7 +484,8 @@ export function EpubThoughtQuoteCard({
 			{panelQuoteActions && hasQuote ? (
 				<div
 					className={cn(
-						'flex h-[51px] shrink-0 items-center border-theme/10 border-t pb-0.5',
+						'flex h-[51px] shrink-0 items-center border-t pb-0.5',
+						epubReaderChromeBorderColorClass,
 					)}
 				>
 					<EpubQuoteActionBar
@@ -506,7 +514,8 @@ export function EpubThoughtItemCard({
 			onClick={onClick}
 			data-selected={selected ? 'true' : undefined}
 			className={cn(
-				'p-4 text-left transition-colors border-t border-theme/10',
+				'p-4 text-left transition-colors border-t',
+				epubReaderChromeBorderColorClass,
 				onClick && cn('cursor-pointer', epubReaderSurfaceHoverClass),
 				selected && epubReaderSurfaceSelectedClass,
 				className,

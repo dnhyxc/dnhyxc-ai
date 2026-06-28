@@ -1,6 +1,8 @@
 import { useI18n } from '@/hooks';
+import { cn } from '@/lib/utils';
 import type { EbookThought, EbookThoughtClickCluster } from '../../types';
 import { getThoughtClusterDisplayQuote } from '../../utils/epub/mark/epubThoughtCluster';
+import { epubReaderChromeBorderColorClass } from '../../utils/epub/reader/epubReaderSettings';
 import type { EpubQuoteActionBarProps } from '../selection/EpubQuoteActionBar';
 import { EpubThoughtPanelShell } from './EpubThoughtPanelShell';
 import {
@@ -41,7 +43,12 @@ export function EpubThoughtList({
 			/>
 
 			{cluster.selectedThoughtId ? (
-				<p className="text-textcolor/50 border-theme/10 border-t px-4 py-2 text-xs">
+				<p
+					className={cn(
+						'text-textcolor/50 border-t px-4 py-2 text-xs',
+						epubReaderChromeBorderColorClass,
+					)}
+				>
 					{t('ebook.read.thought.selectedQuoteHint')}
 				</p>
 			) : null}

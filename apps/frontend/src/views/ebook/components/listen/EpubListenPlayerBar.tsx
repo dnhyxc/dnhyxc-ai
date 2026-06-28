@@ -15,6 +15,7 @@ import {
 	Play,
 	Square,
 } from 'lucide-react';
+import type { CSSProperties } from 'react';
 import { useCallback, useRef, useState } from 'react';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
@@ -22,6 +23,12 @@ import {
 	CHAPTER_LISTEN_RATES,
 	type ChapterListenStatus,
 } from '../../hooks/useEpubChapterListen';
+import {
+	epubReaderChromeBorderColorClass,
+	epubReaderChromeListItemActiveClass,
+	epubReaderChromeListItemIdleClass,
+	epubReaderChromeMenuContentClass,
+} from '../../utils/epub/reader/epubReaderSettings';
 
 function formatListenRate(value: number): string {
 	return `${value} X`;
@@ -33,9 +40,6 @@ function truncateSentenceLabel(text: string, maxLen = 56): string {
 	if (normalized.length <= maxLen) return normalized;
 	return `${normalized.slice(0, maxLen)}…`;
 }
-
-const SENTENCE_ITEM_SELECTED_CLASS =
-	'bg-teal-500/15 text-teal-700 font-medium ring-1 ring-teal-500/30 focus:bg-teal-500/15 focus:text-teal-700 dark:text-teal-300';
 
 function offsetTopWithin(
 	container: HTMLElement,
@@ -138,6 +142,14 @@ type Props = {
 	onNextSentence: () => void;
 	onGoToSentence: (index: number) => void;
 	onRateChange: (rate: number) => void;
+	/** 受控：分句下拉是否展开（便于阅读区 pointer 关闭） */
+	sentenceMenuOpen?: boolean;
+	onSentenceMenuOpenChange?: (open: boolean) => void;
+	/** 受控：倍速下拉是否展开（便于阅读区 pointer 关闭） */
+	rateMenuOpen?: boolean;
+	onRateMenuOpenChange?: (open: boolean) => void;
+	/** Portal 下拉菜单需单独挂阅读 chrome 字色变量 */
+	menuChromeStyle?: CSSProperties;
 };
 
 /** 听书底部播放条 */
@@ -154,12 +166,29 @@ export function EpubListenPlayerBar({
 	onNextSentence,
 	onGoToSentence,
 	onRateChange,
+	sentenceMenuOpen: sentenceMenuOpenProp,
+	onSentenceMenuOpenChange,
+	rateMenuOpen: rateMenuOpenProp,
+	onRateMenuOpenChange,
+	menuChromeStyle,
 }: Props) {
 	const { t } = useI18n();
-	const [sentenceOpen, setSentenceOpen] = useState(false);
+	const [sentenceOpenUncontrolled, setSentenceOpenUncontrolled] =
+		useState(false);
+	const [rateOpenUncontrolled, setRateOpenUncontrolled] = useState(false);
+	const sentenceOpen = sentenceMenuOpenProp ?? sentenceOpenUncontrolled;
+	const rateOpen = rateMenuOpenProp ?? rateOpenUncontrolled;
 	const sentenceViewportRef = useRef<HTMLDivElement | null>(null);
 	const sentenceOpenRef = useRef(false);
 	const scrollRetryGenRef = useRef(0);
+
+	const handleRateOpenChange = useCallback(
+		(open: boolean) => {
+			if (onRateMenuOpenChange) onRateMenuOpenChange(open);
+			else setRateOpenUncontrolled(open);
+		},
+		[onRateMenuOpenChange],
+	);
 
 	const queueScrollToActiveSentence = useCallback(() => {
 		const gen = ++scrollRetryGenRef.current;
@@ -172,11 +201,12 @@ export function EpubListenPlayerBar({
 	const handleSentenceOpenChange = useCallback(
 		(open: boolean) => {
 			sentenceOpenRef.current = open;
-			setSentenceOpen(open);
+			if (onSentenceMenuOpenChange) onSentenceMenuOpenChange(open);
+			else setSentenceOpenUncontrolled(open);
 			if (open) queueScrollToActiveSentence();
 			else scrollRetryGenRef.current += 1;
 		},
-		[queueScrollToActiveSentence],
+		[onSentenceMenuOpenChange, queueScrollToActiveSentence],
 	);
 
 	const bindSentenceViewport = useCallback(
@@ -203,7 +233,8 @@ export function EpubListenPlayerBar({
 	return (
 		<div
 			className={cn(
-				'border-theme/10 flex shrink-0 items-center gap-2 overflow-x-hidden border-t px-3 h-12',
+				'flex shrink-0 items-center gap-2 overflow-x-hidden border-t px-3 h-12',
+				epubReaderChromeBorderColorClass,
 				'backdrop-blur-[2px]',
 			)}
 			role="region"
@@ -267,7 +298,6 @@ export function EpubListenPlayerBar({
 						disabled={loading || sentenceCount <= 0}
 						className="text-textcolor/80 shrink-0"
 						aria-label={t('ebook.read.listenBook.sentenceMenu')}
-						title={t('ebook.read.listenBook.sentenceMenu')}
 						onPointerDown={(e) => e.stopPropagation()}
 					>
 						<ListOrdered className="size-4" aria-hidden />
@@ -276,7 +306,11 @@ export function EpubListenPlayerBar({
 				<DropdownMenuContent
 					side="top"
 					align="end"
-					className="z-50 w-72 overflow-hidden p-1 pb-4"
+					className={cn(
+						'z-50 w-72 overflow-hidden p-1 pb-4',
+						epubReaderChromeMenuContentClass,
+					)}
+					style={menuChromeStyle}
 				>
 					<DropdownMenuLabel className="text-textcolor/45 px-3 pt-2 pb-3 text-center text-xs font-normal">
 						{t('ebook.read.listenBook.sentenceMenu')} （{sentenceIndex + 1}/
@@ -302,19 +336,17 @@ export function EpubListenPlayerBar({
 											data-active-sentence={selected ? 'true' : undefined}
 											aria-current={selected ? 'true' : undefined}
 											className={cn(
-												'min-w-0 scroll-my-1 items-start gap-2 rounded-sm px-2 py-2 text-xs leading-snug',
+												'min-w-0 scroll-my-1 items-start gap-2 rounded-md px-2 py-2 text-xs leading-snug transition-colors',
 												selected
-													? SENTENCE_ITEM_SELECTED_CLASS
-													: 'text-textcolor/80',
+													? epubReaderChromeListItemActiveClass
+													: epubReaderChromeListItemIdleClass,
 											)}
 											onSelect={() => onGoToSentence(index)}
 										>
 											<span
 												className={cn(
 													'shrink-0 tabular-nums',
-													selected
-														? 'text-teal-700 dark:text-teal-300'
-														: 'text-textcolor/45',
+													selected ? 'text-textcolor' : 'text-textcolor/45',
 												)}
 											>
 												{index + 1}.
@@ -357,7 +389,11 @@ export function EpubListenPlayerBar({
 				</Button>
 			</Tooltip>
 
-			<DropdownMenu modal={false}>
+			<DropdownMenu
+				modal={false}
+				open={rateOpen}
+				onOpenChange={handleRateOpenChange}
+			>
 				<DropdownMenuTrigger asChild>
 					<Button
 						type="button"
@@ -365,7 +401,7 @@ export function EpubListenPlayerBar({
 						size="sm"
 						disabled={loading}
 						className={cn(
-							'text-textcolor/75 border-theme/12 bg-theme/8 hover:bg-theme/12',
+							'text-textcolor/75 border-textcolor/22 bg-textcolor/8 hover:bg-textcolor/12',
 							'h-6 w-15 shrink-0 gap-0.5 rounded-md border px-2.5 text-xs font-medium tabular-nums',
 						)}
 						aria-label={t('ebook.read.listenBook.speed')}
@@ -378,7 +414,8 @@ export function EpubListenPlayerBar({
 				<DropdownMenuContent
 					side="top"
 					align="end"
-					className="z-50 min-w-36 p-1"
+					className={cn('z-50 min-w-36 p-1', epubReaderChromeMenuContentClass)}
+					style={menuChromeStyle}
 				>
 					<DropdownMenuLabel className="text-textcolor/45 px-4.5 pb-3 pt-2 text-center text-xs font-normal">
 						{t('ebook.read.listenBook.speed')}
@@ -390,10 +427,10 @@ export function EpubListenPlayerBar({
 								<DropdownMenuItem
 									key={r}
 									className={cn(
-										'min-w-0 justify-center px-2 py-1.5 text-xs tabular-nums',
+										'min-w-0 justify-center rounded-md px-2 py-1.5 text-xs tabular-nums transition-colors',
 										selected
-											? 'bg-teal-500/12 text-teal-700 focus:bg-teal-500/12 focus:text-teal-700 dark:text-teal-300'
-											: 'text-textcolor/80',
+											? epubReaderChromeListItemActiveClass
+											: epubReaderChromeListItemIdleClass,
 									)}
 									onSelect={() => onRateChange(r)}
 								>

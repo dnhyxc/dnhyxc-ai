@@ -8,7 +8,7 @@ import {
 } from '@ui/index';
 import { Bolt, GalleryHorizontal, type LucideIcon, Scroll } from 'lucide-react';
 import { useCallback } from 'react';
-import { useI18n } from '@/hooks';
+import { useI18n, useTheme } from '@/hooks';
 import { cn } from '@/lib/utils';
 import {
 	EPUB_BG_THEME_OPTIONS,
@@ -17,9 +17,10 @@ import {
 	type EpubReaderPageFlow,
 	type EpubReaderSettings,
 	type EpubReaderTextColor,
+	epubReaderChromeBorderColorClass,
 	epubReaderSurfaceBgClass,
 	epubReaderSurfaceMutedClass,
-	getEpubReaderSurfaceCssVars,
+	getEpubReaderChromeCssVars,
 	resolveEpubReaderSurfaceBackground,
 } from '../../utils/epub/reader/epubReaderSettings';
 
@@ -54,7 +55,7 @@ function BgThemeSwatches({
 						aria-label={label}
 						aria-pressed={selected}
 						className={cn(
-							'cursor-pointer ring-theme/25 relative w-auto h-9 rounded-lg ring-1 transition',
+							'text-gray-500 text-xs cursor-pointer ring-theme/25 relative w-10 h-10 rounded-lg ring-1 transition',
 							selected && 'ring-teal-600 ring-2',
 							opt.id === 'default' &&
 								'bg-theme-background from-theme/8 to-theme/20 bg-linear-to-br',
@@ -63,11 +64,7 @@ function BgThemeSwatches({
 						style={opt.bgColor ? { backgroundColor: opt.bgColor } : undefined}
 						onClick={() => onChange(opt.id)}
 					>
-						{opt.id === 'default' ? (
-							<span className="text-textcolor/45 absolute inset-0 flex items-center justify-center text-[10px] font-medium">
-								Aa
-							</span>
-						) : null}
+						{label.slice(0, 1)}
 					</button>
 				);
 			})}
@@ -98,7 +95,7 @@ function TextColorSwatches({
 						aria-label={label}
 						aria-pressed={selected}
 						className={cn(
-							'cursor-pointer ring-theme/25 bg-theme-background relative flex w-auto h-9 items-center justify-center rounded-lg ring-1 transition',
+							'cursor-pointer ring-theme/25 bg-theme-background relative flex w-10 h-10 items-center justify-center rounded-lg ring-1 transition',
 							selected && 'ring-teal-600 ring-2',
 							isAuto && 'from-theme/8 to-theme/20 bg-linear-to-br',
 						)}
@@ -178,6 +175,7 @@ export function EpubReaderSettingsPopover({
 	disabled,
 }: EpubReaderSettingsPopoverProps) {
 	const { t } = useI18n();
+	const { theme: appTheme } = useTheme();
 
 	const handleWheel = useCallback((event: React.WheelEvent<HTMLDivElement>) => {
 		event.stopPropagation();
@@ -214,17 +212,22 @@ export function EpubReaderSettingsPopover({
 				side="bottom"
 				sideOffset={8}
 				className={cn(
-					'w-80 overflow-hidden p-0 border-theme/10',
+					'w-80 overflow-hidden p-0',
+					epubReaderChromeBorderColorClass,
 					epubReaderSurfaceBgClass,
 				)}
 				style={{
-					...getEpubReaderSurfaceCssVars(settings.bgTheme),
+					...getEpubReaderChromeCssVars(
+						settings.bgTheme,
+						settings.textColor,
+						appTheme,
+					),
 					backgroundColor: resolveEpubReaderSurfaceBackground(settings.bgTheme),
 				}}
 			>
 				<ScrollArea
-					className="max-h-[min(85vh,33.78rem)] w-full"
-					viewportClassName="max-h-[min(85vh,33.78rem)] [&>div]:min-h-0!"
+					className="max-h-[min(80vh,33.78rem)] w-full"
+					viewportClassName="max-h-[min(80vh,33.78rem)] [&>div]:min-h-0!"
 					onWheel={handleWheel}
 					onWheelCapture={handleWheelCapture}
 				>
@@ -295,7 +298,7 @@ export function EpubReaderSettingsPopover({
 								value={settings.bgTheme}
 								onChange={(bgTheme) => onChange({ bgTheme })}
 							/>
-							<p className="text-textcolor/50 text-[11px] leading-snug">
+							<p className="text-textcolor/50 text-xs leading-snug">
 								{t(`ebook.read.settings.bgTheme.${settings.bgTheme}`)}
 							</p>
 						</div>
@@ -308,7 +311,7 @@ export function EpubReaderSettingsPopover({
 								value={settings.textColor}
 								onChange={(textColor) => onChange({ textColor })}
 							/>
-							<p className="text-textcolor/50 text-[11px] leading-snug">
+							<p className="text-textcolor/50 text-xs leading-snug">
 								{t(`ebook.read.settings.textColor.${settings.textColor}`)}
 							</p>
 						</div>

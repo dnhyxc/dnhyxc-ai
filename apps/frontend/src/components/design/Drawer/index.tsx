@@ -38,6 +38,8 @@ export interface DrawerProps {
 	hideClose?: boolean;
 	/** 宽度 (仅在 side 为 left/right 时生效)，例如 "w-[400px]" or "sm:max-w-[600px]" */
 	width?: string;
+	/** Sheet 内容区 inline 样式（如 EPUB 阅读 chrome CSS 变量） */
+	contentStyle?: React.CSSProperties;
 }
 
 /**
@@ -58,6 +60,7 @@ export function Drawer({
 	footer,
 	hideClose,
 	width,
+	contentStyle,
 }: DrawerProps) {
 	return (
 		<Sheet open={open} onOpenChange={onOpenChange} defaultOpen={defaultOpen}>
@@ -69,6 +72,7 @@ export function Drawer({
 					width,
 					className,
 				)}
+				style={contentStyle}
 				aria-describedby={undefined}
 			>
 				{/* 确保至少有一个 DialogTitle，用于无障碍访问 */}

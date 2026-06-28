@@ -3,6 +3,7 @@
  */
 import { Drawer } from '@design/Drawer';
 import { ScrollArea } from '@ui/index';
+import type { CSSProperties } from 'react';
 import { useEffect, useRef } from 'react';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
@@ -15,6 +16,8 @@ export type EbookTocDrawerProps = {
 	/** 当前阅读位置对应的目录项索引；无匹配时为 -1 */
 	activeIndex?: number;
 	onSelect: (href: string) => void;
+	/** EPUB 阅读 chrome 字色（Drawer Portal 内需单独挂载） */
+	chromeStyle?: CSSProperties;
 };
 
 export function EbookTocDrawer({
@@ -23,6 +26,7 @@ export function EbookTocDrawer({
 	items,
 	activeIndex = -1,
 	onSelect,
+	chromeStyle,
 }: EbookTocDrawerProps) {
 	const { t } = useI18n();
 	const activeItemRef = useRef<HTMLButtonElement>(null);
@@ -41,6 +45,7 @@ export function EbookTocDrawer({
 			open={open}
 			onOpenChange={onOpenChange}
 			bodyClassName="pt-1.5 pb-2"
+			contentStyle={chromeStyle}
 		>
 			<div className="flex h-full min-h-0 flex-col">
 				<ScrollArea className="box-border flex min-h-0 flex-1 flex-col pr-1.5">

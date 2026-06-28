@@ -60,6 +60,8 @@
 | [epub-thought-quote-highlight-toggle.md](./epub-thought-quote-highlight-toggle.md) | **增量**：侧栏引用区划线/删除划线与 PopBar 对齐的 full 覆盖度判定                                                                               |
 | [epub-split-soft-resize.md](./epub-split-soft-resize.md)                           | **增量**：EPUB 分栏拖拽 soft resize（rAF 合并、即时 patch 划线、松手 full sync，避免白屏）                                                      |
 | [epub-reader-surface-bg.md](./epub-reader-surface-bg.md)                           | **增量**：阅读背景 CSS 变量同步顶栏、右栏、MOKE/想法侧栏与设置 Popover                                                                          |
+| [epub-reader-chrome-contrast.md](./epub-reader-chrome-contrast.md)                 | **增量**：阅读 chrome 字色/边框/按钮/Portal 菜单对比度（想法、MOKE、听书分句倍速、设置、目录）                                                    |
+| [epub-read-page-nav-dismiss.md](./epub-read-page-nav-dismiss.md)                   | **增量**：分页模式才显示顶栏/右键翻页；点击正文关闭设置与听书分句/倍速；目录文案「书籍目录」                                                      |
 | [epub-reader-settings-dismiss.md](./epub-reader-settings-dismiss.md)               | **增量**：阅读设置打开时点击左侧正文（含 iframe）关闭面板                                                                                       |
 | [epub-thought-underlines-sync.md](./epub-thought-underlines-sync.md)             | **增量**：下划线批注与监听拆分，修复保存/切章偶发白屏                                                                                           |
 | [epub-thought-drawer.md](./epub-thought-drawer.md)                               | **已废弃归档**：全屏底部 Sheet 抽屉（组件已删，勿作实现依据）                                                                                   |

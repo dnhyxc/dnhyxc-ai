@@ -1,6 +1,7 @@
 import { ScrollArea } from '@ui/index';
 import { forwardRef, type ReactNode } from 'react';
 import { cn } from '@/lib/utils';
+import { epubReaderChromeBorderColorClass } from '../../utils/epub/reader/epubReaderSettings';
 
 export const EPUB_THOUGHT_PANEL_SCROLL_VIEWPORT_CLASS =
 	'h-full min-h-0 min-w-0 max-w-full focus-visible:ring-0 focus-visible:outline-none [&>div]:!min-w-0 [&>div]:!max-w-full [&>div]:min-h-0!';
@@ -35,7 +36,14 @@ export const EpubThoughtPanelShell = forwardRef<HTMLDivElement, Props>(
 				</ScrollArea>
 
 				{footer ? (
-					<div className="shrink-0 mt-4 border-t border-theme/10">{footer}</div>
+					<div
+						className={cn(
+							'shrink-0 mt-4 border-t',
+							epubReaderChromeBorderColorClass,
+						)}
+					>
+						{footer}
+					</div>
 				) : null}
 			</div>
 		);

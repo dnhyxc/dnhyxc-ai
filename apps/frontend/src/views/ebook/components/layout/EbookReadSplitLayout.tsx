@@ -6,11 +6,13 @@ import {
 	ResizablePanel,
 	ResizablePanelGroup,
 } from '@/components/ui/resizable';
+import { cn } from '@/lib/utils';
 import {
 	beginEbookSplitPanelPointerDrag,
 	endEbookSplitPanelPointerDrag,
 	notifyEbookSplitPanelResizeEnd,
 } from '../../utils/common/ebookSplitResize';
+import { epubReaderChromeBorderColorClass } from '../../utils/epub/reader/epubReaderSettings';
 
 export type EbookReadSplitLayoutProps = {
 	/** 右侧分栏是否展开（MOKE 助手或读书想法） */
@@ -109,7 +111,12 @@ export function EbookReadSplitLayout({
 						minSize={0}
 						className="min-h-0 min-w-0 overflow-hidden"
 					>
-						<div className="border-theme/10 flex h-full min-h-0 min-w-0 flex-col overflow-hidden border-l contain-[inline-size]">
+						<div
+							className={cn(
+								'flex h-full min-h-0 min-w-0 flex-col overflow-hidden border-l contain-[inline-size]',
+								epubReaderChromeBorderColorClass,
+							)}
+						>
 							<div className="min-h-0 flex-1 overflow-hidden">{sidePanel}</div>
 						</div>
 					</ResizablePanel>

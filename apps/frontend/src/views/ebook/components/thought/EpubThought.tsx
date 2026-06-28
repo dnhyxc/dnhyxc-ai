@@ -3,6 +3,12 @@ import { Button } from '@ui/index';
 import { useEffect, useRef } from 'react';
 import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
+import {
+	epubReaderChromeBorderColorClass,
+	epubReaderChromeOutlineButtonClass,
+	epubReaderChromePrimaryButtonClass,
+	epubReaderChromeTextareaClass,
+} from '../../utils/epub/reader/epubReaderSettings';
 import type { EpubQuoteActionBarProps } from '../selection/EpubQuoteActionBar';
 import { EpubThoughtPanelShell } from './EpubThoughtPanelShell';
 import {
@@ -35,7 +41,8 @@ type Props = {
 
 const THOUGHT_TEXTAREA_CLASS = cn(
 	'h-full min-h-0 field-sizing-fixed resize-none border-none bg-transparent p-0 shadow-none rounded-none',
-	'focus-visible:ring-transparent text-textcolor placeholder:text-textcolor/40 text-base',
+	'focus-visible:ring-transparent text-base',
+	epubReaderChromeTextareaClass,
 );
 
 export function EpubThought({
@@ -103,6 +110,7 @@ export function EpubThought({
 									type="button"
 									size="sm"
 									variant="outline"
+									className={epubReaderChromeOutlineButtonClass}
 									disabled={saving}
 									onClick={onClose}
 								>
@@ -111,6 +119,7 @@ export function EpubThought({
 								<Button
 									type="button"
 									size="sm"
+									className={epubReaderChromePrimaryButtonClass}
 									disabled={!content.trim() || saving}
 									onClick={() => void onSave()}
 								>
@@ -129,7 +138,9 @@ export function EpubThought({
 							placeholder={t('ebook.read.thought.placeholder')}
 							className={cn(
 								'h-full max-h-none border-0 px-3 pt-3',
-								mode === 'edit' ? 'border-t border-theme/10' : undefined,
+								mode === 'edit'
+									? cn('border-t', epubReaderChromeBorderColorClass)
+									: undefined,
 							)}
 							textareaClassName={THOUGHT_TEXTAREA_CLASS}
 						/>
@@ -163,6 +174,7 @@ export function EpubThought({
 									type="button"
 									variant="outline"
 									size="sm"
+									className={epubReaderChromeOutlineButtonClass}
 									disabled={saving}
 									onClick={() => void onDelete()}
 								>
@@ -173,6 +185,7 @@ export function EpubThought({
 								<Button
 									type="button"
 									size="sm"
+									className={epubReaderChromePrimaryButtonClass}
 									disabled={saving}
 									onClick={onEdit}
 								>
