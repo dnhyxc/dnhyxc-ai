@@ -100,7 +100,7 @@ export type EbookHighlightDto = {
 	cfiRange: string;
 	quote: string;
 	style: 'highlight' | 'underline' | 'wavy';
-	color: 'pink' | 'purple' | 'blue' | 'green' | 'yellow';
+	color: string;
 	createdAt: string;
 	updatedAt: string;
 };

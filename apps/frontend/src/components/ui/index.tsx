@@ -3,6 +3,7 @@ export * from './button';
 export * from './card';
 export * from './carousel';
 export * from './checkbox';
+export * from './color-picker';
 export * from './combobox';
 export * from './command';
 export * from './context-menu';

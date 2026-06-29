@@ -1640,6 +1640,7 @@ export const enUS = {
 	'ebook.read.selectionPop.styleUnderline': 'Straight underline',
 	'ebook.read.selectionPop.styleWavy': 'Wavy underline',
 	'ebook.read.selectionPop.colorPrefix': 'Highlight color',
+	'ebook.read.selectionPop.customColor': 'Custom color',
 	'ebook.read.selectionPop.share': 'Share',
 	'ebook.read.quoteShare.title': 'Share excerpt',
 	'ebook.read.quoteShare.hint':

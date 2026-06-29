@@ -1161,4 +1161,9 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'When reading EPUB, after you maximize or enlarge the window, loaded chapters automatically re-center to the new reading width without refreshing. Uses the same soft resize path as user highlights and listen playback backgrounds.',
 	},
+	's25-64': {
+		title: 'EPUB custom highlight colors',
+		description:
+			'While reading EPUB, on the style strip for an existing highlight you can use Custom color to open a color picker—choose any hue and adjust fill opacity. Each highlight stores its own color and opacity and syncs to your account. EPUB only; PDF not supported yet.',
+	},
 };

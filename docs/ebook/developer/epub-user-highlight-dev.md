@@ -4,6 +4,8 @@
 
 **本文档**：EPUB **用户划线**（选中 → 粉/紫/蓝/绿/黄 高亮 / 下划线 / 波浪线 → 持久化 → 点击改色删）的 **唯一完整开发者手册**。结构对齐 [epub-thought-add-underline-dev.md](./epub-thought-add-underline-dev.md)（想法虚线手册）：**白话实现思路 + 可执行维护表 + 关键源码**。
 
+**延伸阅读**：[epub-highlight-custom-color-picker 影响点分析](../../Influence-point/epub-highlight-custom-color-picker.md) — 自定义色 ColorPicker、`#rrggbb(aa)` 与 PopBar 嵌套取色波及面；[epub-highlight-custom-color.md](../epub-highlight-custom-color.md) — 实现说明与代码对比。
+
 **推荐阅读顺序**：
 
 | 顺序 | 章节 | 内容 |

@@ -2,11 +2,12 @@ import {
 	IsIn,
 	IsOptional,
 	IsString,
+	Matches,
 	MaxLength,
 	MinLength,
 } from 'class-validator';
 import {
-	EBOOK_HIGHLIGHT_COLORS,
+	EBOOK_HIGHLIGHT_COLOR_PATTERN,
 	EBOOK_HIGHLIGHT_STYLES,
 } from './create-ebook-highlight.dto';
 
@@ -22,6 +23,6 @@ export class UpdateEbookHighlightDto {
 	style?: (typeof EBOOK_HIGHLIGHT_STYLES)[number];
 
 	@IsOptional()
-	@IsIn(EBOOK_HIGHLIGHT_COLORS)
-	color?: (typeof EBOOK_HIGHLIGHT_COLORS)[number];
+	@Matches(EBOOK_HIGHLIGHT_COLOR_PATTERN)
+	color?: string;
 }

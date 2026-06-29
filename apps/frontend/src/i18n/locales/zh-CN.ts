@@ -1502,6 +1502,7 @@ export const zhCN = {
 	'ebook.read.selectionPop.styleUnderline': '直线下划线',
 	'ebook.read.selectionPop.styleWavy': '波浪下划线',
 	'ebook.read.selectionPop.colorPrefix': '划线颜色',
+	'ebook.read.selectionPop.customColor': '自定义颜色',
 	'ebook.read.selectionPop.share': '分享书摘',
 	'ebook.read.quoteShare.title': '分享书摘',
 	'ebook.read.quoteShare.hint': '生成书摘图片，可复制到微信等应用粘贴分享',

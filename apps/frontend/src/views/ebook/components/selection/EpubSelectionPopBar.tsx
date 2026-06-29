@@ -109,7 +109,17 @@ export function EpubSelectionPopBar({
 				style={chromeStyle}
 				onOpenAutoFocus={(e) => e.preventDefault()}
 				onCloseAutoFocus={(e) => e.preventDefault()}
-				onMouseDown={(e) => e.preventDefault()}
+				onMouseDown={(e) => {
+					const el = e.target as HTMLElement;
+					if (
+						el.closest(
+							'input, textarea, select, [data-slot=popover-content], [data-slot=select-content]',
+						)
+					) {
+						return;
+					}
+					e.preventDefault();
+				}}
 			>
 				<EpubSelectionPopBarPanel
 					labels={labels}

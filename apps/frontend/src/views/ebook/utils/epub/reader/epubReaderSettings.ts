@@ -359,6 +359,7 @@ export function applyEpubReaderAppearance(
 			'background-color': `${isDarkBg ? '#1e1e1e' : '#f5f5f5'} !important`,
 			border: `1px solid ${isDarkBg ? '#333333' : '#e0e0e0'} !important`,
 			'border-radius': `5px !important`,
+			padding: `2px 6px !important`,
 		},
 		'.kindle-cn-frame-zhishidian': {
 			'background-color': `${isDarkBg ? '#1e1e1e' : '#f5f5f5'} !important`,

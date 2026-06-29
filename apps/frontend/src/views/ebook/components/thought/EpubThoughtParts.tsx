@@ -12,7 +12,7 @@ import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import { formatDate, resolveCosUrlForWebDisplay } from '@/utils';
 import type { EpubHighlightColorId, EpubHighlightStyle } from '../../types';
-import { EPUB_HIGHLIGHT_COLOR_OPTIONS } from '../../utils/epub/mark/epubUserHighlights';
+import { resolveHighlightPalette } from '../../utils/epub/mark/epubUserHighlights';
 import {
 	epubReaderChromeBorderColorClass,
 	epubReaderSurfaceFadeFromClass,
@@ -24,13 +24,6 @@ import {
 	type EpubQuoteActionBarProps,
 } from '../selection/EpubQuoteActionBar';
 
-const COLOR_BY_ID = Object.fromEntries(
-	EPUB_HIGHLIGHT_COLOR_OPTIONS.map((item) => [item.id, item]),
-) as Record<
-	EpubHighlightColorId,
-	(typeof EPUB_HIGHLIGHT_COLOR_OPTIONS)[number]
->;
-
 function EpubHighlightedQuoteText({
 	quote,
 	highlight,
@@ -40,7 +33,9 @@ function EpubHighlightedQuoteText({
 	highlight?: { style: EpubHighlightStyle; color: EpubHighlightColorId } | null;
 	onHighlightClick?: () => void;
 }) {
-	const palette = highlight ? COLOR_BY_ID[highlight.color] : undefined;
+	const palette = highlight
+		? resolveHighlightPalette(highlight.color)
+		: undefined;
 	const interactive = Boolean(onHighlightClick);
 	const showHighlightVisual = Boolean(highlight && palette);
 

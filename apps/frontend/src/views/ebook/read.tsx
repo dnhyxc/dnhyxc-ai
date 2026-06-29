@@ -89,10 +89,12 @@ import {
 	findUserHighlightByCfi,
 	findUserHighlightCoveringCfi,
 	findUserHighlightForSelection,
+	isCustomHighlightColor,
 	isSelectionFullyHighlighted,
 	resolveCfiDomRange,
 	resolveMergedOverlappingHighlight,
 	resolveSelectionHighlightCoverage,
+	saveEpubHighlightCustomColor,
 } from './utils/epub/mark/epubUserHighlights';
 import {
 	buildEpubContextMenuItems,
@@ -244,6 +246,10 @@ function EbookReadPage() {
 		useState<EpubHighlightColorId>('pink');
 	const highlightsRef = useRef(highlights);
 	highlightsRef.current = highlights;
+	/** 串行化划线 upsert，避免 ColorPicker 连续提交并发删改同一 id */
+	const highlightUpsertQueueRef = useRef(
+		Promise.resolve(null as EbookUserHighlight | null),
+	);
 	const returnToListClusterRef = useRef<EbookThoughtClickCluster | null>(null);
 	/** 想法侧栏开合时保持左侧引用段落在视口内（分栏 resize 后回滚） */
 	const thoughtQuoteAnchorCfiRef = useRef<string | undefined>(undefined);
@@ -364,135 +370,143 @@ function EbookReadPage() {
 			style: EpubHighlightStyle,
 			color: EpubHighlightColorId,
 		): Promise<EbookUserHighlight | null> => {
-			// 基本校验，无选区或无 bookId 不处理
-			if (!cfiRange || !bookId) return null;
+			const execute = async (): Promise<EbookUserHighlight | null> => {
+				// 基本校验，无选区或无 bookId 不处理
+				if (!cfiRange || !bookId) return null;
 
-			// 当前 epub 渲染器实例（如存在）
-			const rend = epubNavRef.current?.getRendition() ?? undefined;
-			// 存储本次最终确定的 cfi & quote
-			let targetCfi = cfiRange;
-			let targetQuote = quote;
-			// 需删除的重叠高亮 id 集合
-			const removeIds = new Set<string>();
+				// 当前 epub 渲染器实例（如存在）
+				const rend = epubNavRef.current?.getRendition() ?? undefined;
+				// 存储本次最终确定的 cfi & quote
+				let targetCfi = cfiRange;
+				let targetQuote = quote;
+				// 需删除的重叠高亮 id 集合
+				const removeIds = new Set<string>();
 
-			// -------（1）标准化选区 + 查找 DOM 重叠/合并 -------
-			if (rend) {
-				// 尝试解析当前 cfiRange 对应 domRange
-				const resolved = resolveCfiDomRange(rend, cfiRange);
-				if (resolved) {
-					// 对 domRange 归一化，去除多余空白等
-					const normalized = trimSelectionRange(resolved);
-					// 重新计算 CFI，保证与实际 dom 对齐，避免多余重叠
-					targetCfi = cfiFromDomRange(rend, normalized) ?? cfiRange.trim();
-					// 取标准文本
-					targetQuote = normalized.toString().trim() || quote.trim();
-				}
+				// -------（1）标准化选区 + 查找 DOM 重叠/合并 -------
+				if (rend) {
+					// 尝试解析当前 cfiRange 对应 domRange
+					const resolved = resolveCfiDomRange(rend, cfiRange);
+					if (resolved) {
+						// 对 domRange 归一化，去除多余空白等
+						const normalized = trimSelectionRange(resolved);
+						// 重新计算 CFI，保证与实际 dom 对齐，避免多余重叠
+						targetCfi = cfiFromDomRange(rend, normalized) ?? cfiRange.trim();
+						// 取标准文本
+						targetQuote = normalized.toString().trim() || quote.trim();
+					}
 
-				// 查找所有与当前 CFI/quote 重叠、相接的高亮（用于合并连片的选择）
-				const merged = resolveMergedOverlappingHighlight(
-					rend,
-					targetCfi,
-					targetQuote,
-					highlightsRef.current,
-				);
-				// 更新合并后的目标 cfi/quote，准备实际保存
-				targetCfi = merged.cfiRange;
-				targetQuote = merged.quote;
-				// 合并目标中需删除的旧高亮收集
-				for (const id of merged.removeHighlightIds) {
-					removeIds.add(id);
-				}
-			}
-
-			// -------（2）查找被完全包含于此次选区的旧高亮，也一并移除 -------
-			const superseded = findHighlightsStrictlyContainedIn(
-				{ cfiRange: targetCfi, quote: targetQuote },
-				// 已确定将要被删除的先排除避免重复
-				highlightsRef.current.filter((h) => !h.id || !removeIds.has(h.id)),
-			);
-			for (const item of superseded) {
-				if (item.id) removeIds.add(item.id);
-			}
-
-			// -------（3）如有合并并删除多个高亮，根据新一组目标再次归一化 cfi/quote -------
-			// 仅依赖 DOM 合并和严格包含（不比对 quote 子串，避免选错）
-			if (rend && removeIds.size > 0) {
-				// 获取所有待合并的高亮对象
-				const mergeTargets = highlightsRef.current.filter(
-					(h) => h.id && removeIds.has(h.id),
-				);
-				// 使用所有合并对象重新计算合并目标（位置更准）
-				const mergedTarget = buildMergedHighlightTarget(
-					rend,
-					targetCfi,
-					targetQuote,
-					mergeTargets,
-				);
-				targetCfi = mergedTarget.cfiRange;
-				targetQuote = mergedTarget.quote;
-			}
-
-			try {
-				// -------（4）无重叠（只需新增或更新一个高亮） -------
-				if (removeIds.size === 0) {
-					// 检查是不是当前 cfi 已有同样的高亮（完全覆盖）
-					const existingExact = findUserHighlightByCfi(
-						highlightsRef.current,
+					// 查找所有与当前 CFI/quote 重叠、相接的高亮（用于合并连片的选择）
+					const merged = resolveMergedOverlappingHighlight(
+						rend,
 						targetCfi,
+						targetQuote,
+						highlightsRef.current,
 					);
+					// 更新合并后的目标 cfi/quote，准备实际保存
+					targetCfi = merged.cfiRange;
+					targetQuote = merged.quote;
+					// 合并目标中需删除的旧高亮收集
+					for (const id of merged.removeHighlightIds) {
+						removeIds.add(id);
+					}
+				}
 
-					const item = existingExact?.id
-						? // 已有则直接更新内容/样式/颜色
-							await updateEbookHighlight(existingExact.id, {
-								quote: targetQuote,
-								style,
-								color,
-							})
-						: // 没有则直接新建
-							await createEbookHighlight({
-								bookId,
-								cfiRange: targetCfi,
-								quote: targetQuote,
-								style,
-								color,
-							});
+				// -------（2）查找被完全包含于此次选区的旧高亮，也一并移除 -------
+				const superseded = findHighlightsStrictlyContainedIn(
+					{ cfiRange: targetCfi, quote: targetQuote },
+					// 已确定将要被删除的先排除避免重复
+					highlightsRef.current.filter((h) => !h.id || !removeIds.has(h.id)),
+				);
+				for (const item of superseded) {
+					if (item.id) removeIds.add(item.id);
+				}
 
-					// 刷新本地高亮缓存并触发界面刷新
+				// -------（3）如有合并并删除多个高亮，根据新一组目标再次归一化 cfi/quote -------
+				// 仅依赖 DOM 合并和严格包含（不比对 quote 子串，避免选错）
+				if (rend && removeIds.size > 0) {
+					// 获取所有待合并的高亮对象
+					const mergeTargets = highlightsRef.current.filter(
+						(h) => h.id && removeIds.has(h.id),
+					);
+					// 使用所有合并对象重新计算合并目标（位置更准）
+					const mergedTarget = buildMergedHighlightTarget(
+						rend,
+						targetCfi,
+						targetQuote,
+						mergeTargets,
+					);
+					targetCfi = mergedTarget.cfiRange;
+					targetQuote = mergedTarget.quote;
+				}
+
+				try {
+					// -------（4）无重叠（只需新增或更新一个高亮） -------
+					if (removeIds.size === 0) {
+						// 检查是不是当前 cfi 已有同样的高亮（完全覆盖）
+						const existingExact = findUserHighlightByCfi(
+							highlightsRef.current,
+							targetCfi,
+						);
+
+						const item = existingExact?.id
+							? // 已有则直接更新内容/样式/颜色
+								await updateEbookHighlight(existingExact.id, {
+									quote: targetQuote,
+									style,
+									color,
+								})
+							: // 没有则直接新建
+								await createEbookHighlight({
+									bookId,
+									cfiRange: targetCfi,
+									quote: targetQuote,
+									style,
+									color,
+								});
+
+						// 刷新本地高亮缓存并触发界面刷新
+						const next = [
+							...highlightsRef.current.filter((h) => h.id !== item.id),
+							item,
+						];
+						highlightsRef.current = next;
+						setHighlights(next);
+						return item;
+					}
+
+					// -------（5）如需清理（即有多余重叠/包裹的高亮）先删除再新建 -------
+					await Promise.all(
+						[...removeIds].map((id) => deleteEbookHighlight(id)),
+					);
+					const item = await createEbookHighlight({
+						bookId,
+						cfiRange: targetCfi,
+						quote: targetQuote,
+						style,
+						color,
+					});
+					// 刷新高亮缓存及列表：移除删除目标，加入新高亮
 					const next = [
-						...highlightsRef.current.filter((h) => h.id !== item.id),
+						...highlightsRef.current.filter((h) => !removeIds.has(h.id)),
 						item,
 					];
 					highlightsRef.current = next;
 					setHighlights(next);
 					return item;
+				} catch (e) {
+					// 错误处理，弹窗提示
+					Toast({
+						type: 'error',
+						title: t('ebook.read.highlight.saveFailed'),
+						message: getRequestErrorMessage(e),
+					});
+					return null;
 				}
+			};
 
-				// -------（5）如需清理（即有多余重叠/包裹的高亮）先删除再新建 -------
-				await Promise.all([...removeIds].map((id) => deleteEbookHighlight(id)));
-				const item = await createEbookHighlight({
-					bookId,
-					cfiRange: targetCfi,
-					quote: targetQuote,
-					style,
-					color,
-				});
-				// 刷新高亮缓存及列表：移除删除目标，加入新高亮
-				const next = [
-					...highlightsRef.current.filter((h) => !removeIds.has(h.id)),
-					item,
-				];
-				highlightsRef.current = next;
-				setHighlights(next);
-				return item;
-			} catch (e) {
-				// 错误处理，弹窗提示
-				Toast({
-					type: 'error',
-					title: t('ebook.read.highlight.saveFailed'),
-					message: getRequestErrorMessage(e),
-				});
-				return null;
-			}
+			const result = highlightUpsertQueueRef.current.then(execute, execute);
+			highlightUpsertQueueRef.current = result.catch(() => null);
+			return result;
 		},
 		[bookId, t],
 	);
@@ -801,8 +815,10 @@ function EbookReadPage() {
 	// 用于处理高亮颜色的变更（如切换黄/粉/蓝/紫标注色），通常在高亮弹出栏中点击颜色按钮触发
 	const onHighlightColorChange = useCallback(
 		(color: EpubHighlightColorId) => {
-			// 更新当前选中高亮颜色到 React 状态，（影响实时 UI 展示及后续高亮操作）
 			setHighlightColor(color);
+			if (isCustomHighlightColor(color)) {
+				saveEpubHighlightCustomColor(color);
+			}
 
 			// 获取当前弹出栏的 payload 信息，包括用户所选区域的 cfiRange 和相关文本
 			const payload = selectionPopBarRef.current;
@@ -1392,6 +1408,7 @@ function EbookReadPage() {
 			styleUnderline: t('ebook.read.selectionPop.styleUnderline'),
 			styleWavy: t('ebook.read.selectionPop.styleWavy'),
 			colorPrefix: t('ebook.read.selectionPop.colorPrefix'),
+			customColor: t('ebook.read.selectionPop.customColor'),
 		}),
 		[t, listenLabel],
 	);

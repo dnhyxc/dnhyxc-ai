@@ -112,12 +112,15 @@ export type EbookThoughtClickCluster = {
 /** EPUB 用户划线样式（选区高亮 / 直线下划线 / 波浪线） */
 export type EpubHighlightStyle = 'highlight' | 'underline' | 'wavy';
 
-export type EpubHighlightColorId =
+export type EpubHighlightPresetColorId =
 	| 'pink'
 	| 'purple'
 	| 'blue'
 	| 'green'
 	| 'yellow';
+
+/** 预设色或自定义 `#rrggbb` / `#rrggbbaa`（末字节为填充透明度） */
+export type EpubHighlightColorId = EpubHighlightPresetColorId | `#${string}`;
 
 /** EPUB 用户划线（服务端存储，按 CFI 定位） */
 export type EbookUserHighlight = {

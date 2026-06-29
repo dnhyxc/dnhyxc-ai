@@ -1,8 +1,17 @@
-import { Check } from 'lucide-react';
+import { Check, Palette } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { ColorPicker } from '@/components/ui';
 import { cn } from '@/lib/utils';
 import type { EpubHighlightColorId, EpubHighlightStyle } from '../../types';
-import { EPUB_HIGHLIGHT_COLOR_OPTIONS } from '../../utils/epub/mark/epubUserHighlights';
+import {
+	customHighlightFillAlpha,
+	customHighlightStroke,
+	EPUB_HIGHLIGHT_COLOR_OPTIONS,
+	formatCustomHighlightColor,
+	isCustomHighlightColor,
+	loadEpubHighlightCustomColor,
+	saveEpubHighlightCustomColor,
+} from '../../utils/epub/mark/epubUserHighlights';
 import { epubReaderChromeBorderColorClass } from '../../utils/epub/reader/epubReaderSettings';
 
 export type EpubHighlightStyleBarLabels = {
@@ -10,6 +19,7 @@ export type EpubHighlightStyleBarLabels = {
 	styleUnderline: string;
 	styleWavy: string;
 	colorPrefix: string;
+	customColor: string;
 };
 
 type Props = {
@@ -22,7 +32,10 @@ type Props = {
 
 const STYLE_OPTIONS: {
 	id: EpubHighlightStyle;
-	labelKey: keyof EpubHighlightStyleBarLabels;
+	labelKey: Exclude<
+		keyof EpubHighlightStyleBarLabels,
+		'colorPrefix' | 'customColor'
+	>;
 	render: (active: boolean) => ReactNode;
 }[] = [
 	{
@@ -103,6 +116,15 @@ export function EpubHighlightStyleBar({
 	onColorChange,
 	labels,
 }: Props) {
+	const lastCustom = loadEpubHighlightCustomColor();
+	const customSwatch = isCustomHighlightColor(color)
+		? customHighlightStroke(color)
+		: customHighlightStroke(lastCustom);
+	const pickerAlpha = isCustomHighlightColor(color)
+		? customHighlightFillAlpha(color)
+		: customHighlightFillAlpha(lastCustom);
+	const customActive = isCustomHighlightColor(color);
+
 	return (
 		<div
 			className={cn(
@@ -159,6 +181,51 @@ export function EpubHighlightStyleBar({
 						</button>
 					);
 				})}
+				<ColorPicker
+					value={customSwatch}
+					alpha={pickerAlpha}
+					size="sm"
+					onChange={(hex, { alpha }) => {
+						const next = formatCustomHighlightColor(hex, alpha);
+						saveEpubHighlightCustomColor(next);
+						if (next !== color.toLowerCase()) {
+							onColorChange(next);
+						}
+					}}
+				>
+					<button
+						type="button"
+						aria-label={labels.customColor}
+						title={labels.customColor}
+						className={cn(
+							'relative flex size-5 shrink-0 items-center justify-center overflow-hidden rounded-full border-0 p-0 transition-transform outline-none focus-visible:ring-2 focus-visible:ring-teal-500/50',
+							customActive &&
+								'scale-110 ring-2 ring-teal-500/50 ring-offset-1 ring-offset-transparent',
+						)}
+						style={
+							customActive
+								? { backgroundColor: customHighlightStroke(color) }
+								: {
+										backgroundColor: 'transparent',
+										backgroundImage:
+											'conic-gradient(from 0deg, #ff6b81, #9b59b6, #78bfff, #96c24e, #ffdc6a, #ff6b81)',
+									}
+						}
+					>
+						{customActive ? (
+							<Check
+								className="size-3 text-white"
+								strokeWidth={3}
+								aria-hidden
+							/>
+						) : (
+							<Palette
+								className="size-3 text-white drop-shadow-sm"
+								aria-hidden
+							/>
+						)}
+					</button>
+				</ColorPicker>
 			</div>
 		</div>
 	);

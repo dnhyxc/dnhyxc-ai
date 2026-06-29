@@ -4,6 +4,7 @@ import type {
 	EbookThoughtClickCluster,
 	EbookUserHighlight,
 	EpubHighlightColorId,
+	EpubHighlightPresetColorId,
 	EpubHighlightStyle,
 } from '../../../types';
 import {
@@ -61,7 +62,7 @@ const DATA_STYLE = 'hlStyle';
 const DATA_COLOR = 'hlColor';
 
 export const EPUB_HIGHLIGHT_COLOR_OPTIONS: {
-	id: EpubHighlightColorId;
+	id: EpubHighlightPresetColorId;
 	fill: string;
 	stroke: string;
 }[] = [
@@ -73,12 +74,115 @@ export const EPUB_HIGHLIGHT_COLOR_OPTIONS: {
 	{ id: 'yellow', fill: 'rgba(255, 220, 106, 0.28)', stroke: '#ffdc6a' },
 ];
 
+export const EPUB_HIGHLIGHT_CUSTOM_COLOR_STORAGE_KEY =
+	'dnhyxc_epub_highlight_custom_color';
+
+const PRESET_COLOR_IDS = new Set<EpubHighlightPresetColorId>(
+	EPUB_HIGHLIGHT_COLOR_OPTIONS.map((item) => item.id),
+);
+
 const COLOR_BY_ID = Object.fromEntries(
 	EPUB_HIGHLIGHT_COLOR_OPTIONS.map((item) => [item.id, item]),
 ) as Record<
-	EpubHighlightColorId,
+	EpubHighlightPresetColorId,
 	(typeof EPUB_HIGHLIGHT_COLOR_OPTIONS)[number]
 >;
+
+const CUSTOM_HIGHLIGHT_FILL_ALPHA = 0.28;
+
+const CUSTOM_HEX6 = /^#[0-9a-fA-F]{6}$/;
+const CUSTOM_HEX8 = /^#[0-9a-fA-F]{8}$/;
+
+export function isPresetHighlightColor(
+	color: string,
+): color is EpubHighlightPresetColorId {
+	return PRESET_COLOR_IDS.has(color as EpubHighlightPresetColorId);
+}
+
+export function isCustomHighlightColor(
+	color: EpubHighlightColorId,
+): color is `#${string}` {
+	return CUSTOM_HEX6.test(color) || CUSTOM_HEX8.test(color);
+}
+
+/** 自定义色描边/色块用的 `#rrggbb` */
+export function customHighlightStroke(color: `#${string}`): `#${string}` {
+	return color.slice(0, 7) as `#${string}`;
+}
+
+/** 从 `#rrggbbaa` 解析填充透明度（0–100）；6 位 hex 用默认 28% */
+export function customHighlightFillAlpha(color: `#${string}`): number {
+	if (CUSTOM_HEX8.test(color)) {
+		return Math.round((Number.parseInt(color.slice(7, 9), 16) / 255) * 100);
+	}
+	return Math.round(CUSTOM_HIGHLIGHT_FILL_ALPHA * 100);
+}
+
+export function formatCustomHighlightColor(
+	hex: string,
+	alphaPercent: number,
+): `#${string}` {
+	const rgb = hex.replace('#', '').slice(0, 6).toLowerCase();
+	const a = Math.min(255, Math.max(0, Math.round((alphaPercent / 100) * 255)));
+	return `#${rgb}${a.toString(16).padStart(2, '0')}` as `#${string}`;
+}
+
+export function normalizeHighlightColor(color: string): EpubHighlightColorId {
+	if (isPresetHighlightColor(color)) return color;
+	const m = /^#?([0-9a-fA-F]{6})([0-9a-fA-F]{2})?$/i.exec(color.trim());
+	if (m) {
+		const hex = m[1]!.toLowerCase();
+		const aa = m[2]?.toLowerCase();
+		return (aa ? `#${hex}${aa}` : `#${hex}`) as EpubHighlightColorId;
+	}
+	return 'pink';
+}
+
+function hexToRgba(hex: string, alpha: number): string {
+	const h = hex.replace('#', '');
+	const r = Number.parseInt(h.slice(0, 2), 16);
+	const g = Number.parseInt(h.slice(2, 4), 16);
+	const b = Number.parseInt(h.slice(4, 6), 16);
+	return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+export function resolveHighlightPalette(colorId: EpubHighlightColorId): {
+	fill: string;
+	stroke: string;
+} {
+	if (isPresetHighlightColor(colorId)) {
+		return COLOR_BY_ID[colorId];
+	}
+	if (isCustomHighlightColor(colorId)) {
+		const stroke = customHighlightStroke(colorId);
+		const alpha = customHighlightFillAlpha(colorId) / 100;
+		return {
+			stroke,
+			fill: hexToRgba(stroke, alpha),
+		};
+	}
+	return COLOR_BY_ID.pink;
+}
+
+export function loadEpubHighlightCustomColor(): `#${string}` {
+	try {
+		const raw = localStorage.getItem(EPUB_HIGHLIGHT_CUSTOM_COLOR_STORAGE_KEY);
+		if (raw && isCustomHighlightColor(raw as EpubHighlightColorId)) {
+			return raw as `#${string}`;
+		}
+	} catch {
+		// ignore
+	}
+	return '#ff6b81';
+}
+
+export function saveEpubHighlightCustomColor(hex: `#${string}`): void {
+	try {
+		localStorage.setItem(EPUB_HIGHLIGHT_CUSTOM_COLOR_STORAGE_KEY, hex);
+	} catch {
+		// ignore
+	}
+}
 
 const UNDERLINE_OFFSET_PX = 2;
 const MIN_USER_HIGHLIGHT_BLOCKER_PX = 2;
@@ -324,7 +428,7 @@ function resolveHighlightMetaFromGroup(
 	}
 	return {
 		style: (el.dataset[DATA_STYLE] ?? 'highlight') as EpubHighlightStyle,
-		color: (el.dataset[DATA_COLOR] ?? 'pink') as EpubHighlightColorId,
+		color: normalizeHighlightColor(el.dataset[DATA_COLOR] ?? 'pink'),
 	};
 }
 
@@ -345,7 +449,7 @@ function patchUserHighlightMarks(
 			g,
 			metaByCfi,
 		);
-		const palette = COLOR_BY_ID[colorId] ?? COLOR_BY_ID.pink;
+		const palette = resolveHighlightPalette(colorId);
 		// 禁用事件穿透到高亮层，避免高亮遮挡影响文本操作
 		if (groupEl.style.pointerEvents !== 'none') {
 			groupEl.style.pointerEvents = 'none';
@@ -575,7 +679,7 @@ function patchAllUserHighlightMarks(rend?: Rendition): void {
 function buildHighlightStyles(
 	item: EbookUserHighlight,
 ): Record<string, string> {
-	const palette = COLOR_BY_ID[item.color] ?? COLOR_BY_ID.pink;
+	const palette = resolveHighlightPalette(item.color);
 	if (item.style === 'highlight') {
 		return {
 			fill: palette.fill,

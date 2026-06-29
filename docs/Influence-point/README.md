@@ -16,5 +16,6 @@
 | [epub-scroll-listen-section-advance.md](./epub-scroll-listen-section-advance.md) | **连续滚动听书逐 iframe 节间衔接**：`runScrollSectionLoop` / `advanceScrollListenSection` 对分页听书、播放条切句、听当前互斥的影响 |
 | [epub-window-resize-relayout.md](./epub-window-resize-relayout.md) | **窗口放大/全屏 EPUB 居中**：`relayoutEpubViews` + `window.resize` settle 对分栏 soft resize、划线 sync、听书背景的影响 |
 | [epub-listen-follow-fab-layout.md](./epub-listen-follow-fab-layout.md) | **布局变化后 Follow FAB**：`checkEpubListenFollowAfterLayout` 对听书/听当前 autoFollow、FAB 与 resize 链路的影响 |
+| [epub-highlight-custom-color-picker.md](./epub-highlight-custom-color-picker.md) | **划线自定义色 ColorPicker**：`#rrggbb(aa)` 持久化、PopBar 嵌套取色、upsert 串行与想法侧栏展示 |
 
 **阅读约定**：结论以仓库 **当前源码** 为准；「历史风险」指旧实现曾出现的问题，不代表现行代码仍会触发。

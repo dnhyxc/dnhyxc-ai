@@ -1740,6 +1740,13 @@ const UPDATE_INFO_SECTIONS_ZH: UpdateInfoSection[] = [
 				description:
 					'阅读 EPUB 时放大窗口或全屏后，已加载章节会自动按新阅读区宽度居中重排，无需刷新页面；与用户划线、听书播放背景重排共用 soft resize 路径。',
 			},
+			{
+				id: 's25-64',
+				title: 'EPUB 划线自定义色',
+				dateLabel: '2026-06-27',
+				description:
+					'阅读 EPUB 时，在已有划线的选区工具条样式条中，除五种预设色外可使用自定义色打开取色器，选择任意颜色并调节填充透明度；每条划线的颜色与透明度独立保存并随账号同步。仅 EPUB，PDF 暂不支持。',
+			},
 		],
 	},
 ];

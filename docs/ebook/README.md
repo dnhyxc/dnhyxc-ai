@@ -28,6 +28,7 @@
 | [epub-user-highlight-impl.md](./epub-user-highlight-impl.md)                     | **已归档索引** → [developer/epub-user-highlight-dev.md](./developer/epub-user-highlight-dev.md)                                                 |
 | [epub-highlight-dom-match.md](./epub-highlight-dom-match.md)                     | **增量**：划线按 CFI/DOM 命中，避免 quote 同名跨位置误删/误合并；PopBar 划线/删除划线覆盖度规则                                                 |
 | [epub-popbar-perf-ux.md](./epub-popbar-perf-ux.md)                               | **增量**：PopBar 防闪烁、划线 sync 增量 apply、highlightToggle 单槽位、重复 sync 去除                                                           |
+| [epub-highlight-custom-color.md](./epub-highlight-custom-color.md)                 | **增量**：划线自定义色 ColorPicker、`#rrggbb(aa)` 持久化、upsert 串行与 PopBar 嵌套取色                                                         |
 | [epub-annotation-sync-perf.md](./epub-annotation-sync-perf.md)                   | **增量**：划线/想法 sync 主线程优化（patch 快路径、CFI 缓存、想法 DOM restack、即时 patch）；**选区落空行卡死**修复（`forEachTextNodeInRange`） |
 | [epub-thought-underline-impl.md](./epub-thought-underline-impl.md)               | **主文档（想法虚线）**：分组、嵌套去重、选区防误触、与用户划线叠加（逐步拆解 + 逐行注释代码）                                                   |
 | [epub-thought-partial-overlap.md](./epub-thought-partial-overlap.md)             | **增量**：部分相交的想法选区 patch 层 blocker 去重，避免重叠段双线叠加                                                                          |
@@ -56,6 +57,8 @@
 | [../Influence-point/epub-listen-bg-vs-annotations.md](../Influence-point/epub-listen-bg-vs-annotations.md) | **影响点**：播放背景色 vs 用户划线 / 想法划线（现行隔离与历史风险）                                                                           |
 | [../Influence-point/epub-listen-resize-relayout.md](../Influence-point/epub-listen-resize-relayout.md) | **影响点**：阅读区 resize 重绘对原有功能的影响面                                                                                              |
 | [../Influence-point/epub-listen-utils-consolidation.md](../Influence-point/epub-listen-utils-consolidation.md) | **影响点**：听读 utils 7→3 文件合并、路径对照与回归清单                                                                                       |
+- [epub-highlight-custom-color.md](./epub-highlight-custom-color.md) — 实现说明与代码对比
+- [../Influence-point/epub-highlight-custom-color-picker.md](../Influence-point/epub-highlight-custom-color-picker.md) — **影响点**：划线自定义色 ColorPicker、`#rrggbb(aa)` 持久化与 PopBar/想法侧栏波及面                                                           |
 | [epub-thought-quote-viewport.md](./epub-thought-quote-viewport.md)                 | **增量**：想法侧栏开合后左侧引用段落保持视口可见（CFI 锚点 + 分栏 resize 后 scroll 校正）                                                    |
 | [epub-thought-quote-highlight-toggle.md](./epub-thought-quote-highlight-toggle.md) | **增量**：侧栏引用区划线/删除划线与 PopBar 对齐的 full 覆盖度判定                                                                               |
 | [epub-split-soft-resize.md](./epub-split-soft-resize.md)                           | **增量**：EPUB 分栏拖拽 soft resize（rAF 合并、即时 patch 划线、松手 full sync，避免白屏）                                                      |

@@ -1,4 +1,11 @@
-import { IsIn, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
+import {
+	IsIn,
+	IsString,
+	IsUUID,
+	Matches,
+	MaxLength,
+	MinLength,
+} from 'class-validator';
 
 export const EBOOK_HIGHLIGHT_STYLES = [
 	'highlight',
@@ -13,6 +20,10 @@ export const EBOOK_HIGHLIGHT_COLORS = [
 	'green',
 	'yellow',
 ] as const;
+
+/** 预设色或自定义 `#rrggbb` / `#rrggbbaa` */
+export const EBOOK_HIGHLIGHT_COLOR_PATTERN =
+	/^(pink|purple|blue|green|yellow|#[0-9a-fA-F]{6}(?:[0-9a-fA-F]{2})?)$/;
 
 export class CreateEbookHighlightDto {
 	@IsUUID()
@@ -31,6 +42,6 @@ export class CreateEbookHighlightDto {
 	@IsIn(EBOOK_HIGHLIGHT_STYLES)
 	style: (typeof EBOOK_HIGHLIGHT_STYLES)[number];
 
-	@IsIn(EBOOK_HIGHLIGHT_COLORS)
-	color: (typeof EBOOK_HIGHLIGHT_COLORS)[number];
+	@Matches(EBOOK_HIGHLIGHT_COLOR_PATTERN)
+	color: string;
 }
