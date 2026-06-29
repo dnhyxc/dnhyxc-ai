@@ -261,6 +261,7 @@ class EbookStore {
 			});
 			return book;
 		} catch {
+			console.log('fetchBookIfMissing error', bookId);
 			return undefined;
 		}
 	}

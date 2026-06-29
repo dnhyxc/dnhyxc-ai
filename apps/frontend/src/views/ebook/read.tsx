@@ -1154,6 +1154,7 @@ function EbookReadPage() {
 					setOpenSource(result.source);
 				}
 			} catch (e) {
+				setOpen(new ArrayBuffer(0));
 				Toast({
 					type: 'error',
 					title: t('ebook.err.open'),
@@ -1917,7 +1918,7 @@ function EbookReadPage() {
 		};
 	}, [book?.fmt, epubSettings.bgTheme, epubSettings.textColor, appTheme]);
 
-	if (!book) {
+	if (!book || open?.byteLength === 0) {
 		if (bookResolving || !ebookStore.ready) {
 			return (
 				<EbookPageShell>
