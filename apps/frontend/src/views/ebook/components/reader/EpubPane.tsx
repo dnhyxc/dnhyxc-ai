@@ -10,9 +10,13 @@ import type {
 	EbookTocItem,
 	EbookUserHighlight,
 } from '../../types';
-import { subscribeEbookSplitPanelResizeEnd } from '../../utils/common/ebookSplitResize';
+import {
+	ebookSplitPanelResizingRef,
+	subscribeEbookSplitPanelResizeEnd,
+} from '../../utils/common/ebookSplitResize';
 import { READER_NATIVE_SCROLLBAR_EPUB_CONTAINER } from '../../utils/common/readerScrollbar';
 import { relayoutListenMarkHighlight } from '../../utils/epub/listen/epubListenMarkHighlight';
+import { checkEpubListenFollowAfterLayout } from '../../utils/epub/listen/epubListenSegmentOverlay';
 import {
 	installEpubThoughtUnderlineListeners,
 	teardownAppliedThoughtUnderlines,
@@ -484,6 +488,7 @@ export function EpubPane({
 
 		// ============================ 页面尺寸自适应机制 ============================
 		let resizeRaf: number | null = null; // 防抖计时器
+		let windowResizeSettleTimer: ReturnType<typeof setTimeout> | null = null;
 
 		// 实际尺寸应用及高亮样式恢复
 		const applyHostResize = () => {
@@ -503,6 +508,7 @@ export function EpubPane({
 			// soft resize 可能令高亮失色/划线消失，需立即恢复批注样式
 			patchEpubReadingAnnotations(rend, { sync: true });
 			relayoutListenMarkHighlight(rend);
+			checkEpubListenFollowAfterLayout(rend);
 		};
 
 		// 封装动画帧防抖批量 resize
@@ -534,6 +540,19 @@ export function EpubPane({
 		});
 		ro.observe(el); // 监听 EPUB 容器 div 异步变化
 
+		// 窗口放大/全屏：epub.js 固定初始宽高时不自带 window resize；补监听并在稳定后 settle
+		const onWindowResize = () => {
+			scheduleHostResize();
+			if (ebookSplitPanelResizingRef.current) return;
+			if (windowResizeSettleTimer) clearTimeout(windowResizeSettleTimer);
+			windowResizeSettleTimer = setTimeout(() => {
+				windowResizeSettleTimer = null;
+				if (ebookSplitPanelResizingRef.current) return;
+				settleHostResize();
+			}, 150);
+		};
+		window.addEventListener('resize', onWindowResize);
+
 		const unsubSplitResizeEnd =
 			subscribeEbookSplitPanelResizeEnd(settleHostResize); // 参与 SplitPanel 拖动事件
 
@@ -541,6 +560,8 @@ export function EpubPane({
 		return () => {
 			// 停止尺寸动画帧
 			if (resizeRaf != null) cancelAnimationFrame(resizeRaf);
+			if (windowResizeSettleTimer) clearTimeout(windowResizeSettleTimer);
+			window.removeEventListener('resize', onWindowResize);
 			unsubSplitResizeEnd();
 			destroyed = true; // 标记 Effect 结束，后续异步流程可以短路
 

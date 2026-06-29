@@ -118,6 +118,7 @@
 | 开/关想法侧栏后左侧引用段滚出屏幕                                 | [ebook/epub-thought-quote-viewport.md](./ebook/epub-thought-quote-viewport.md)                                                                           |
 | EPUB 阅读背景与顶栏/侧栏色差                                      | [ebook/epub-reader-surface-bg.md](./ebook/epub-reader-surface-bg.md)                                                                                     |
 | EPUB 粉/米背景下按钮、边框或听书菜单看不清                        | [ebook/epub-reader-chrome-contrast.md](./ebook/epub-reader-chrome-contrast.md)                                                                           |
+| EPUB 放大/全屏后正文贴左、需刷新才居中                            | [ebook/epub-window-resize-relayout.md](./ebook/epub-window-resize-relayout.md)                                                                           |
 | EPUB 选区 PopBar 字色/投影不对或顶栏样式条不该出现                | [ebook/epub-selection-popbar-chrome.md](./ebook/epub-selection-popbar-chrome.md)                                                                         |
 | 书摘分享弹窗按钮看不清 / 预览区与图片底色不一致                   | [ebook/epub-quote-share-dialog-chrome.md](./ebook/epub-quote-share-dialog-chrome.md)                                                                     |
 | EPUB 阅读设置无法点击正文关闭                                     | [ebook/epub-reader-settings-dismiss.md](./ebook/epub-reader-settings-dismiss.md)                                                                         |

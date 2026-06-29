@@ -68,9 +68,9 @@ export const EPUB_HIGHLIGHT_COLOR_OPTIONS: {
 	// fill 仅用于背景高亮；保持原色相，降低透明度以免压住正文
 	{ id: 'pink', fill: 'rgba(255, 107, 129, 0.28)', stroke: '#ff6b81' },
 	{ id: 'purple', fill: 'rgba(155, 89, 182, 0.28)', stroke: '#9b59b6' },
-	{ id: 'blue', fill: 'rgba(52, 152, 219, 0.28)', stroke: '#3498db' },
-	{ id: 'green', fill: 'rgba(46, 204, 113, 0.28)', stroke: '#2ecc71' },
-	{ id: 'yellow', fill: 'rgba(241, 196, 15, 0.32)', stroke: '#f1c40f' },
+	{ id: 'blue', fill: 'rgba(120, 191, 255, 0.28)', stroke: '#78bfff' },
+	{ id: 'green', fill: 'rgba(150, 194, 78, 0.28)', stroke: '#96c24e' },
+	{ id: 'yellow', fill: 'rgba(255, 220, 106, 0.28)', stroke: '#ffdc6a' },
 ];
 
 const COLOR_BY_ID = Object.fromEntries(

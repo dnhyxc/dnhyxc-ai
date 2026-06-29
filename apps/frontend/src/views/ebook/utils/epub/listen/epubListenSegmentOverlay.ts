@@ -15,6 +15,7 @@ import {
 } from '../mark/epubRangeGeometry';
 import {
 	getEpubScrollContainer,
+	isEpubRangeInReaderView,
 	scrollEpubRangeIntoView,
 	scrollEpubRangeToViewCenter,
 } from '../reader/epubScrolledNav';
@@ -417,20 +418,37 @@ function scrollActiveListenIntoView(): void {
 	});
 }
 
+/**
+ * 暂停自动跟随模式
+ * 若当前 session 的 autoFollow 状态为 true，则置为 false，并通知监听者
+ */
 function pauseListenAutoFollow(): void {
+	// 当前没有 session 或 autoFollow 已为 false 时无需处理，直接返回
 	if (!session?.autoFollow) return;
+	// 关闭自动跟随标记
 	session.autoFollow = false;
+	// 通知所有监听该状态变化
 	emitAutoFollowState();
 }
 
+/**
+ * 延迟触发：用于检测用户主动滚动结束后的“scroll settle”逻辑
+ * 防抖处理，150ms 未发生新的滚动事件则认为用户滚动已结束。
+ * 若期间 pendingFollowScroll 置为 true 且 session 仍在自动跟随，则自动滚动到当前语句
+ */
 function scheduleScrollSettle(): void {
+	// 先清除上一次的 settle 计时器，确保只有最新计时有效
 	clearTimeout(scrollSettleTimer);
+	// 启动新计时，150ms 后检查滚动状态
 	scrollSettleTimer = window.setTimeout(() => {
+		// 认为已无用户滚动，重置 userScrolling 标记
 		userScrolling = false;
+		// 若没有待处理的自动跟随滚动或 session 已不在自动跟随状态，则直接重置 pendingFollowScroll
 		if (!pendingFollowScroll || !session?.autoFollow) {
 			pendingFollowScroll = false;
 			return;
 		}
+		// 处理自动跟随滚动：先清除待滚动标记，再实际调用滚动逻辑
 		pendingFollowScroll = false;
 		scrollActiveListenIntoView();
 	}, 150);
@@ -550,6 +568,31 @@ export function resumeEpubListenAutoFollow(): void {
 	pendingFollowScroll = false;
 	emitAutoFollowState();
 	scrollActiveListenIntoView();
+}
+
+/** 阅读区布局变化后：当前播放句不在视口内则暂停 autoFollow，展示右下角回到播放 FAB */
+export function checkEpubListenFollowAfterLayout(rend: Rendition): void {
+	// 使用双层 requestAnimationFrame，确保页面动画和重排完成后再进行可见性检测，避免因布局抖动导致判断不准
+	requestAnimationFrame(() => {
+		// 在第一个动画帧后继续排队第二次动画帧，确保所有异步 DOM 变更（如 softResize、批注面板收起/展开）落稳
+		requestAnimationFrame(() => {
+			// 若未激活 session 或 session 所绑定的 rendition 与当前传入不符则直接返回
+			if (!session || session.rend !== rend) return;
+			// 获取当前播放句所在的有效 DOM Range
+			const range = resolveActiveListenDomRange();
+			// 如果当前没有有效 Range（如段落尚未加载/切换章节），不做任何处理
+			if (!range) return;
+			try {
+				// 若该 Range 已在阅读器可见区域内，则无需处理，正常维持 autoFollow
+				if (isEpubRangeInReaderView(rend, range)) return;
+			} catch {
+				// 若可见性判断过程中发生异常（如 Range 非法），直接返回
+				return;
+			}
+			// 若 Range 不在可视区，则暂停自动跟随并触发 UI 提示
+			pauseListenAutoFollow();
+		});
+	});
 }
 
 function ensureChapterDomListenSession(rend: Rendition): ListenSession {

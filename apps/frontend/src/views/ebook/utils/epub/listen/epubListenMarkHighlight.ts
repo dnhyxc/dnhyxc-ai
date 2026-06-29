@@ -20,12 +20,21 @@ import {
 } from '../mark/epubRangeGeometry';
 import { getEpubScrollContainer } from '../reader/epubScrolledNav';
 
-export const EPUB_LISTEN_SEGMENT_FILL = 'rgba(251, 231, 128, 0.28)';
+// 听书高亮区域的填充色，带透明度，用于突出正在朗读的文本区块
+export const EPUB_LISTEN_SEGMENT_FILL = 'rgba(135, 207, 92, 0.15)';
+// export const EPUB_LISTEN_SEGMENT_FILL = 'rgba(220, 255, 151, 0.15)';
+// export const EPUB_LISTEN_SEGMENT_FILL = 'rgba(251, 231, 128, 0.25)';
+
+// 标记 SVG 或 iframe 层的高亮 class，方便样式和 DOM 查询
 export const EPUB_LISTEN_HIGHLIGHT_CLASS = 'moke-epub-listen-bg';
 
+// 匹配所有"听书高亮"相关分组的选择器（兼容老 class 写法，可查找所有高亮 SVG g 分组节点）
 const LISTEN_MARK_SELECTOR = `g.${EPUB_LISTEN_HIGHLIGHT_CLASS}, g[class*="${EPUB_LISTEN_HIGHLIGHT_CLASS}"]`;
+
+// 用于听书 SVG/iframe 高亮的绝对定位浮层 ID
 const IFRAME_LAYER_ID = 'moke-epub-listen-iframe-layer';
-/** legacy CSS Highlight 名（清除旧会话残留） */
+
+// legacy 旧版 CSS 高亮 class 名，主要用于清理旧会话的高亮残留
 const LEGACY_CSS_HIGHLIGHT = 'moke-epub-listen-seg';
 
 type PaintMode = 'svg' | 'iframe';
@@ -450,8 +459,4 @@ export function clearListenMarkHighlight(rend?: Rendition): void {
 				root.replaceChildren();
 			});
 	}
-}
-
-if (!EPUB_LISTEN_SEGMENT_FILL.includes('0.28')) {
-	throw new Error('[epubListenMarkHighlight] 播放背景色透明度异常');
 }

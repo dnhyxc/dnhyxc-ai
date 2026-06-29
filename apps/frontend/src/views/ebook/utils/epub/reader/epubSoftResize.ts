@@ -1,5 +1,11 @@
 import type { Rendition } from 'epubjs';
 
+type EpubView = {
+	displayed?: boolean;
+	size?: (width?: number, height?: number) => void;
+	expand?: (force?: boolean) => void;
+};
+
 type EpubViewManager = {
 	stage?: {
 		size: (
@@ -8,8 +14,22 @@ type EpubViewManager = {
 		) => { width: number; height: number };
 	};
 	_stageSize?: { width: number; height: number };
+	viewSettings?: { width?: number; height?: number };
+	views?: { all?: () => EpubView[] };
 	updateLayout: () => void;
 };
+
+/** updateLayout 后让已渲染 iframe view 按新 column 尺寸 re-lock / expand（避免宽屏仍贴左） */
+function relayoutEpubViews(manager: EpubViewManager): void {
+	const w = manager.viewSettings?.width;
+	const h = manager.viewSettings?.height;
+	if (!w || !h || !manager.views?.all) return;
+	for (const view of manager.views.all()) {
+		if (!view.displayed) continue;
+		view.size?.(w, h);
+		view.expand?.(true);
+	}
+}
 
 /**
  * 在不 clear 已有 view 的前提下更新 EPUB 排版。
@@ -29,6 +49,7 @@ export function softResizeEpubRendition(
 	const h = Math.max(Math.floor(height), 1);
 	const prev = manager._stageSize;
 	if (prev && prev.width === w && prev.height === h) {
+		relayoutEpubViews(manager);
 		return true;
 	}
 
@@ -40,6 +61,7 @@ export function softResizeEpubRendition(
 		rendition.settings.height = h;
 		manager.stage.size(w, h);
 		manager.updateLayout();
+		relayoutEpubViews(manager);
 		return true;
 	} catch {
 		return false;

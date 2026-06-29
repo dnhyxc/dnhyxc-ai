@@ -59,6 +59,7 @@
 | [epub-thought-quote-viewport.md](./epub-thought-quote-viewport.md)                 | **增量**：想法侧栏开合后左侧引用段落保持视口可见（CFI 锚点 + 分栏 resize 后 scroll 校正）                                                    |
 | [epub-thought-quote-highlight-toggle.md](./epub-thought-quote-highlight-toggle.md) | **增量**：侧栏引用区划线/删除划线与 PopBar 对齐的 full 覆盖度判定                                                                               |
 | [epub-split-soft-resize.md](./epub-split-soft-resize.md)                           | **增量**：EPUB 分栏拖拽 soft resize（rAF 合并、即时 patch 划线、松手 full sync，避免白屏）                                                      |
+| [epub-window-resize-relayout.md](./epub-window-resize-relayout.md)                 | **增量**：窗口放大/全屏后 EPUB 正文居中重排（view relayout + window.resize settle）                                                               |
 | [epub-reader-surface-bg.md](./epub-reader-surface-bg.md)                           | **增量**：阅读背景 CSS 变量同步顶栏、右栏、MOKE/想法侧栏与设置 Popover                                                                          |
 | [epub-reader-chrome-contrast.md](./epub-reader-chrome-contrast.md)                 | **增量**：阅读 chrome 字色/边框/按钮/Portal 菜单对比度（想法、MOKE、听书分句倍速、设置、目录）                                                    |
 | [epub-selection-popbar-chrome.md](./epub-selection-popbar-chrome.md)               | **增量**：选区 PopBar 阅读 chrome（surface/投影/Portal 字色）；划线顶栏仅已有划线时展示                                                           |

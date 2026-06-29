@@ -401,7 +401,7 @@ export function EpubListenPlayerBar({
 						size="sm"
 						disabled={loading}
 						className={cn(
-							'text-textcolor/75 border-textcolor/22 bg-textcolor/8 hover:bg-textcolor/12',
+							'text-textcolor/75 border-theme/5 bg-textcolor/8 hover:bg-textcolor/12',
 							'h-6 w-15 shrink-0 gap-0.5 rounded-md border px-2.5 text-xs font-medium tabular-nums',
 						)}
 						aria-label={t('ebook.read.listenBook.speed')}

@@ -94,10 +94,10 @@ function readRangeViewportBounds(range: Range, iframe: HTMLIFrameElement) {
  * @param marginPx 上下边界预留多少像素安全边距（进视区域再留白）
  * @returns        是否已完全在可见范围内（含 marginPx 安全留白）
  */
-function isDomRangeInReaderView(
+export function isEpubRangeInReaderView(
 	rend: Rendition,
 	range: Range,
-	marginPx: number,
+	marginPx: number = QUOTE_VIEW_MARGIN_PX,
 ): boolean {
 	// 1. 获取 range 所在文档的 window 对象
 	const win = range.startContainer.ownerDocument?.defaultView;
@@ -213,7 +213,7 @@ export async function scrollEpubRangeIntoView(
 	fallbackCfi?: string,
 ): Promise<boolean> {
 	try {
-		if (isDomRangeInReaderView(rend, range, QUOTE_VIEW_MARGIN_PX)) {
+		if (isEpubRangeInReaderView(rend, range, QUOTE_VIEW_MARGIN_PX)) {
 			return true;
 		}
 	} catch {
@@ -241,7 +241,7 @@ export async function scrollEpubRangeIntoView(
 	const resolved = resolveCfiDomRange(rend, cfi);
 	if (!resolved) return true;
 	try {
-		return isDomRangeInReaderView(rend, resolved, QUOTE_VIEW_MARGIN_PX);
+		return isEpubRangeInReaderView(rend, resolved, QUOTE_VIEW_MARGIN_PX);
 	} catch {
 		return true;
 	}

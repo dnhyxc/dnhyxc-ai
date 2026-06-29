@@ -1733,6 +1733,13 @@ const UPDATE_INFO_SECTIONS_ZH: UpdateInfoSection[] = [
 				description:
 					'分享书摘对话框的标题、按钮与边框会跟随阅读 chrome 保持可读；生成的分享图片与预览区底色仍保持固定浅灰日历卡配色，便于粘贴到微信等应用。',
 			},
+			{
+				id: 's25-63',
+				title: 'EPUB 窗口放大后正文居中',
+				dateLabel: '2026-06-27',
+				description:
+					'阅读 EPUB 时放大窗口或全屏后，已加载章节会自动按新阅读区宽度居中重排，无需刷新页面；与用户划线、听书播放背景重排共用 soft resize 路径。',
+			},
 		],
 	},
 ];

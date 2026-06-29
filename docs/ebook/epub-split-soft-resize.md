@@ -4,7 +4,7 @@
 
 **增量专题**：读书页左右分栏拖拽手柄时，左侧 EPUB 阅读区宽度连续变化。旧实现每次 `ResizeObserver` 触发都调用 `rendition.resize()`，会 **清空 view 并重载章节**，连续拖拽出现 **白屏/闪烁**；新实现用 `softResizeEpubRendition` 只更新 stage 尺寸与 layout，拖拽结束再 `syncEpubReadingAnnotations` 做完整同步，拖拽过程中用 `patchEpubReadingAnnotations(rend, { sync: true })` 恢复用户划线样式。
 
-**姊妹文档**：[epub-annotation-sync-perf.md](./epub-annotation-sync-perf.md)（patch 快路径与 sync 性能）、[epub-thought-quote-highlight-toggle.md](./epub-thought-quote-highlight-toggle.md)（侧栏引用划线判定）、[epub-thought-list-ui.md](./epub-thought-list-ui.md)（想法列表 UI，分栏同栏位）。
+**姊妹文档**：[epub-annotation-sync-perf.md](./epub-annotation-sync-perf.md)（patch 快路径与 sync 性能）、[epub-thought-quote-highlight-toggle.md](./epub-thought-quote-highlight-toggle.md)（侧栏引用划线判定）、[epub-thought-list-ui.md](./epub-thought-list-ui.md)（想法列表 UI，分栏同栏位）、[epub-window-resize-relayout.md](./epub-window-resize-relayout.md)（窗口放大/全屏居中）。
 
 **延伸阅读**：[epub-user-highlight-impl.md](./epub-user-highlight-impl.md)、[epub-thought-side-panel.md](./epub-thought-side-panel.md)。
 

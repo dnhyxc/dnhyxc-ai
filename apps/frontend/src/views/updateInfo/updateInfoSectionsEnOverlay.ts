@@ -1156,4 +1156,9 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'The Share quote dialog title, buttons, and borders follow reader chrome for readability. The generated share image and preview area keep the fixed light-gray calendar card colors for pasting into WeChat and similar apps.',
 	},
+	's25-63': {
+		title: 'EPUB relayout after window maximize',
+		description:
+			'When reading EPUB, after you maximize or enlarge the window, loaded chapters automatically re-center to the new reading width without refreshing. Uses the same soft resize path as user highlights and listen playback backgrounds.',
+	},
 };
