@@ -1582,6 +1582,7 @@ export const enUS = {
 	'ebook.shelf.coverFailed': 'Failed to set cover',
 	'ebook.shelf.editTitle': 'Edit title',
 	'ebook.shelf.editTitleHint': 'Click to edit: {title}',
+	'ebook.shelf.bookCategory': 'Book category: {category}',
 	'ebook.shelf.titleSaved': 'Title updated',
 	'ebook.shelf.titleFailed': 'Failed to update title',
 	'ebook.shelf.alreadyImportedTitle': 'Already on shelf',
@@ -1678,6 +1679,7 @@ export const enUS = {
 	'ebook.read.listenBook.nextSentence': 'Next sentence',
 	'ebook.read.listenBook.sentenceMenu': 'Sentences',
 	'ebook.read.listenBook.sentenceMenuEmpty': 'No sentences',
+	'ebook.read.listenBook.scrollToCurrentSentence': 'Scroll to current sentence',
 	'ebook.read.listenBook.speed': 'Playback speed',
 	'ebook.read.listenBook.progress':
 		'Ch. {chapter} · sentence {current}/{total}',

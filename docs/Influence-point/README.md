@@ -18,5 +18,7 @@
 | [epub-listen-follow-fab-layout.md](./epub-listen-follow-fab-layout.md) | **布局变化后 Follow FAB**：`checkEpubListenFollowAfterLayout` 对听书/听当前 autoFollow、FAB 与 resize 链路的影响 |
 | [epub-highlight-custom-color-picker.md](./epub-highlight-custom-color-picker.md) | **划线自定义色 ColorPicker**：`#rrggbb(aa)` 持久化、PopBar 嵌套取色、upsert 串行与想法侧栏展示 |
 | [cloud-tts-user-credentials-fallback.md](./cloud-tts-user-credentials-fallback.md) | **云端 TTS 用户凭证与失败降级**：MiniMax/讯飞 Key 入库、`xfyunVoiceId` 独立、失败 Toast、移除讯飞→硅基中转、设置页 UI |
+| [ebook-shelf-empty-tab-reset.md](./ebook-shelf-empty-tab-reset.md) | **书架分类空 Tab 隐藏与自动回「全部」**：未分类/0 册分类不展示、移走最后一本切 Tab、卡片 Tooltip 分类 |
+| [epub-listen-player-bar-ui.md](./epub-listen-player-bar-ui.md) | **听书播放条 UI**：分句虚拟列表、滚到当前句、刻度尺倍速 0.5–3×、列表选中样式 |
 
 **阅读约定**：结论以仓库 **当前源码** 为准；「历史风险」指旧实现曾出现的问题，不代表现行代码仍会触发。

@@ -131,6 +131,14 @@ class EbookStore {
 		return Number.isFinite(this.total) && this.total >= 0 ? this.total : 0;
 	}
 
+	/** 分类 / 未分类 Tab 内最后一本书移走后切回「全部」 */
+	resetActiveCategoryIfEmpty(): void {
+		if (this.activeCategoryKey.kind === 'all') return;
+		if (this.books.length > 0 || this.safeTotal() > 0) return;
+		this.activeCategoryKey = { kind: 'all' };
+		void this.fetchPage(1, false);
+	}
+
 	bookMatchesActiveCategory(categoryId?: string | null): boolean {
 		const key = this.activeCategoryKey;
 		if (key.kind === 'all') return true;
@@ -143,13 +151,15 @@ class EbookStore {
 	resolveImportCategoryId(): string | undefined {
 		const key = this.activeCategoryKey;
 		if (key.kind === 'category') {
+			console.log('resolveImportCategoryId', key.categoryId);
 			return key.categoryId;
 		}
 		const userId = loggedInUserId();
 		const last = readLastImportCategoryId(userId);
-		if (last && this.categories.some((c) => c.id === last)) {
-			return last;
-		}
+		console.log('resolveImportCategoryId', last, this.categories);
+		// if (last && this.categories.some((c) => c.id === last)) {
+		// 	return last;
+		// }
 		return undefined;
 	}
 
@@ -366,6 +376,7 @@ class EbookStore {
 				}
 			}
 			this.bookCache[bookId] = updated;
+			this.resetActiveCategoryIfEmpty();
 		});
 		void this.fetchCategories();
 	}
@@ -470,6 +481,7 @@ class EbookStore {
 			delete this.bookCache[bookId];
 			delete this.progMap[bookId];
 			this.total = Math.max(0, this.safeTotal() - 1);
+			this.resetActiveCategoryIfEmpty();
 		});
 		void this.fetchCategories();
 	}

@@ -47,6 +47,8 @@
 | [epub-chapter-listen.md](./epub-chapter-listen.md)                                   | **增量**：EPUB 边听边读 MVP（innerText 播放、TreeWalker 句 Range、`epubListenMarkHighlight` 背景、顶栏听书与底部播放条） |
 | [epub-scroll-listen-section-advance.md](./epub-scroll-listen-section-advance.md)     | **增量**：连续滚动听书逐 iframe 节间衔接（`runScrollSectionLoop` / `advanceScrollListenSection`） |
 | [epub-listen-player-bar.md](./epub-listen-player-bar.md)                             | **增量**：听书播放条分句菜单、倍速 0.75×～3×、跳转居中滚动与 TTS 即时倍速                                              |
+| [epub-listen-player-bar-ruler-ui.md](./epub-listen-player-bar-ruler-ui.md)             | **增量（本轮）**：刻度尺倍速 0.5×～3×、分句虚拟列表与「滚到当前句」                                                     |
+| [ebook-shelf-empty-tab-reset.md](./ebook-shelf-empty-tab-reset.md)                     | **增量**：书架空分类 Tab 隐藏、移走最后一本自动回「全部」、卡片 Tooltip 显示分类                                        |
 | [epub-quote-listen-player-bar.md](./epub-quote-listen-player-bar.md)                   | **增量**：听当前共用底部播放条（暂停/切句/倍速，与听书同一组件）                                                      |
 | [epub-listen-bg-resize-relayout.md](./epub-listen-bg-resize-relayout.md)               | **增量**：听读播放背景随分栏/侧栏 resize 重绘（`repaintActive` 重挂 group、ResizeObserver、`EpubPane` 接线）            |
 | [epub-listen-sentence-leading-punct.md](./epub-listen-sentence-leading-punct.md)         | **增量**：听读分句句首中文标点（`……`、`——`、开引号与句界算法对称处理）                                                  |

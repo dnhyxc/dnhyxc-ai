@@ -1,6 +1,8 @@
 # 电子书书架分类
 
 > **文档角色**：**我的书架**（`/ebook`）按用户自定义分类分组浏览、筛选、移动书籍；服务端 per-user 分类 CRUD + `categoryId` 字段。  
+> **影响面（空 Tab / 自动回全部 / 卡片 Tooltip）**：[ebook-shelf-empty-tab-reset.md](../Influence-point/ebook-shelf-empty-tab-reset.md)  
+> **实现说明（本轮）**：[ebook-shelf-empty-tab-reset.md](./ebook-shelf-empty-tab-reset.md)  
 > **延伸阅读**：[ebook-reader-shelf.md](./ebook-reader-shelf.md)（书架主文档）、[ebook-membership-upload.md](./ebook-membership-upload.md)（导入与会员策略）。  
 > **产品 SPEC（验收条款）**：`apps/frontend/specs/ebook-shelf-category.md`（开发向，非用户文档）。
 

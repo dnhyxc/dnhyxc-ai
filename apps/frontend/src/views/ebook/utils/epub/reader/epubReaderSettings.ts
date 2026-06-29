@@ -256,12 +256,12 @@ export const epubReaderChromeMenuContentClass = cn(
 	'border text-textcolor',
 );
 
-/** 阅读 chrome 列表项：默认 / 选中（基于正文字色，非应用 theme 色） */
+/** 阅读 chrome 列表项：默认 / 选中（与 EbookTocDrawer 目录项一致） */
 export const epubReaderChromeListItemIdleClass =
-	'text-textcolor hover:bg-textcolor/10 focus:bg-textcolor/10 focus:text-textcolor';
+	'text-textcolor transition-colors hover:bg-theme/10 focus:bg-theme/10 focus:text-textcolor';
 
 export const epubReaderChromeListItemActiveClass =
-	'bg-textcolor/12 text-textcolor font-medium hover:bg-textcolor/12 focus:bg-textcolor/12 focus:text-textcolor';
+	'bg-theme/15 text-theme font-medium hover:bg-theme/15 focus:bg-theme/15 focus:text-theme';
 
 /** 选区 PopBar 毛玻璃面板（基于阅读 surface，Portal 内需配合 getEpubReaderChromeCssVars） */
 export const epubReaderPopBarSurfaceClass =

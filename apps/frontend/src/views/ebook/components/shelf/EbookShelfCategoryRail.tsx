@@ -32,16 +32,22 @@ function EbookShelfCategoryRail() {
 			label: t('ebook.shelf.category.all'),
 			count: totalBookCount,
 		},
-		...categories.map((c) => ({
-			key: { kind: 'category' as const, categoryId: c.id },
-			label: c.name,
-			count: c.bookCount,
-		})),
-		{
-			key: { kind: 'uncategorized' },
-			label: t('ebook.shelf.category.uncategorized'),
-			count: uncategorizedCount,
-		},
+		...categories
+			.map((c) => ({
+				key: { kind: 'category' as const, categoryId: c.id },
+				label: c.name,
+				count: c.bookCount,
+			}))
+			.filter((c) => c.count > 0),
+		...(uncategorizedCount > 0
+			? [
+					{
+						key: { kind: 'uncategorized' as const },
+						label: t('ebook.shelf.category.uncategorized'),
+						count: uncategorizedCount,
+					},
+				]
+			: []),
 	];
 
 	return (

@@ -614,11 +614,30 @@ export function EbookShelfBookCard({
 							sideOffset={4}
 							delayDuration={300}
 							shadow
-							className="max-w-[min(100vw-2rem,16rem)] w-auto whitespace-normal text-left wrap-break-word leading-snug"
+							className="max-w-[min(100vw-2rem,18rem)] whitespace-normal text-left wrap-break-word leading-snug"
 							content={
-								onUpdateTitle
-									? t('ebook.shelf.editTitleHint', { title: book.title })
-									: book.title
+								onUpdateTitle ? (
+									<div className="text-textcolor/75 flex flex-col justify-center items-start gap-1">
+										<div className="max-w-[calc(100vw-3rem)] relative z-10 whitespace-pre-wrap wrap-break-word">
+											<span className="text-textcolor/75 ">
+												{t('ebook.shelf.bookCategory', {
+													category: '',
+												})}
+											</span>
+											<span className="text-teal-600">
+												{categories.find((c) => c.id === book.categoryId)?.name}
+											</span>
+										</div>
+										<div className="max-w-[calc(100vw-3rem)] relative z-10 whitespace-pre-wrap wrap-break-word">
+											<span className="text-textcolor/75">
+												{t('ebook.shelf.editTitleHint', { title: '' })}
+											</span>
+											<span className="text-teal-600">{book.title}</span>
+										</div>
+									</div>
+								) : (
+									book.title
+								)
 							}
 						>
 							<button

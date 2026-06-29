@@ -6,8 +6,10 @@
 - [EPUB 听当前 host 浮层](epub-listen-host-overlay.md) — `showEpubListenDomRange` 绘制层
 - [EPUB 听当前播放自动跟随与回位 FAB](epub-listen-auto-follow-fab.md) — 自动跟随与 `forceScroll` 互斥关系
 - [developer/epub-listen-dev.md](developer/epub-listen-dev.md) — 听读开发者主文档
+- [epub-listen-player-bar-ruler-ui.md](epub-listen-player-bar-ruler-ui.md) — **增量（本轮）**：刻度尺倍速 0.5×～3×、分句虚拟列表与「滚到当前句」
 
-**文档角色**：本轮 **听书底部播放条** 增量（分句跳转菜单、倍速 0.75×～3×、TTS 倍速贯通、跳转居中滚动）。
+**文档角色**：本轮 **听书底部播放条** 增量（分句跳转菜单、倍速 0.75×～3×、TTS 倍速贯通、跳转居中滚动）。  
+> **影响面（分句虚拟列表 / 刻度倍速 UI）**：[epub-listen-player-bar-ui.md](../Influence-point/epub-listen-player-bar-ui.md)
 
 ## 1. 背景与目标
 

@@ -1171,4 +1171,14 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'While reading EPUB, on the style strip for an existing highlight you can use Custom color to open a color picker—choose any hue and adjust fill opacity. Each highlight stores its own color and opacity and syncs to your account. EPUB only; PDF not supported yet.',
 	},
+	's25-65': {
+		title: 'EPUB listen bar: ruler speed and sentence list',
+		description:
+			'Listen while reading and Listen selection now use a ruler-style speed panel (0.5×–3× in 0.1 steps, with round preset buttons). The sentence list uses virtual scrolling for smoother long chapters; after you scroll the list manually, a Scroll to current sentence button returns to the playing line.',
+	},
+	's25-66': {
+		title: 'Bookshelf category tabs and title tooltip',
+		description:
+			'Empty custom categories and the Uncategorized tab when there are no uncategorized books are hidden. Moving or deleting the last book in a category returns you to All. Hovering a card title shows both its category and full title.',
+	},
 };
