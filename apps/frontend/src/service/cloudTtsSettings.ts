@@ -9,6 +9,7 @@ export type CloudTtsSettingsView = {
 	playbackSource: TtsPlaybackSource;
 	model: string;
 	voiceId: string;
+	xfyunVoiceId: string;
 	speed: number;
 	vol: number;
 	pitch: number;
@@ -18,6 +19,10 @@ export type CloudTtsSettingsView = {
 	sampleRate: number;
 	bitrate: number;
 	channel: 1 | 2;
+	xfyunAppId: string;
+	xfyunApiKey: string;
+	xfyunApiSecret: string;
+	minimaxApiKey: string;
 };
 
 export const getCloudTtsSettings = (config?: RequestConfig) =>

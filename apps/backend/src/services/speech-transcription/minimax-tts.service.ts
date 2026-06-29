@@ -2,6 +2,7 @@ import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { MinimaxEnum } from '../../enum/config.enum';
 import type { MinimaxTtsDto } from './dto/minimax-tts.dto';
+import { MinimaxTtsPrefsService } from './minimax-tts-prefs.service';
 
 const TTS_INPUT_MAX_CHARS = 10_000;
 const TTS_SPEECH_CACHE_MAX = 128;
@@ -76,7 +77,10 @@ export class MinimaxTtsService {
 	/**
 	 * @param config 注入的配置服务
 	 */
-	constructor(private readonly config: ConfigService) {}
+	constructor(
+		private readonly config: ConfigService,
+		private readonly prefsService: MinimaxTtsPrefsService,
+	) {}
 
 	/**
 	 * 获取并裁剪环境变量值
@@ -94,12 +98,13 @@ export class MinimaxTtsService {
 	 * 解析 MiniMax TTS 调用所需的认证信息
 	 * @returns 对象包含 apiKey, groupId, baseUrl
 	 */
-	private resolveCredentials(): {
+	private async resolveCredentials(userId?: number): Promise<{
 		apiKey: string;
 		groupId?: string;
 		baseUrl: string;
-	} {
-		const apiKey = this.trimEnv(MinimaxEnum.MINIMAX_API_KEY);
+	}> {
+		const userKey = await this.prefsService.getMinimaxApiKey(userId);
+		const apiKey = userKey ?? this.trimEnv(MinimaxEnum.MINIMAX_API_KEY);
 		if (!apiKey) {
 			throw new HttpException(
 				'未配置 MINIMAX_API_KEY，无法进行 MiniMax 语音合成',
@@ -382,8 +387,9 @@ export class MinimaxTtsService {
 	private async requestMiniMax(
 		resolved: MinimaxTtsResolved,
 		stream: boolean,
+		userId?: number,
 	): Promise<Response> {
-		const { apiKey, groupId, baseUrl } = this.resolveCredentials();
+		const { apiKey, groupId, baseUrl } = await this.resolveCredentials(userId);
 		const url = `${baseUrl}/v1/t2a_v2`;
 		return fetch(url, {
 			method: 'POST',
@@ -404,7 +410,7 @@ export class MinimaxTtsService {
 		const cached = this.getFromCache(cacheKey);
 		if (cached) return Buffer.from(cached);
 
-		const res = await this.requestMiniMax(resolved, false);
+		const res = await this.requestMiniMax(resolved, false, userId);
 		const raw = await res.text();
 		if (!res.ok) {
 			throw new HttpException(
@@ -461,7 +467,7 @@ export class MinimaxTtsService {
 			return;
 		}
 
-		const res = await this.requestMiniMax(resolved, true);
+		const res = await this.requestMiniMax(resolved, true, userId);
 		if (!res.ok) {
 			const raw = await res.text();
 			throw new HttpException(

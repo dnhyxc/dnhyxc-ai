@@ -12,17 +12,6 @@ import {
 	Min,
 } from 'class-validator';
 
-const MINIMAX_TTS_MODELS = [
-	'speech-2.8-hd',
-	'speech-2.8-turbo',
-	'speech-2.6-hd',
-	'speech-2.6-turbo',
-	'speech-02-hd',
-	'speech-02-turbo',
-	'speech-01-hd',
-	'speech-01-turbo',
-] as const;
-
 const MINIMAX_AUDIO_FORMATS = [
 	'mp3',
 	'pcm',
@@ -53,8 +42,9 @@ export class MinimaxTtsDto {
 	text!: string;
 
 	@IsOptional()
-	@IsIn(MINIMAX_TTS_MODELS)
-	model?: (typeof MINIMAX_TTS_MODELS)[number];
+	@IsString()
+	@MaxLength(64)
+	model?: string;
 
 	@IsOptional()
 	@IsString()

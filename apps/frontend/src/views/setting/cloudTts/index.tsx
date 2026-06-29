@@ -14,18 +14,18 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from '@ui/select';
-import { Minus, Plus, Volume2 } from 'lucide-react';
+import { Eye, EyeOff, Minus, Plus, Volume2 } from 'lucide-react';
 import { observer } from 'mobx-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
 	defaultMinimaxTtsVoiceIdForLanguageBoost,
+	getDefaultMinimaxCloudCredentials,
 	getMinimaxTtsVoiceDisplayName,
 	getMinimaxTtsVoicesByGender,
 	getMinimaxTtsVoicesForLanguageBoost,
 	MINIMAX_TTS_AUDIO_FORMATS,
 	MINIMAX_TTS_EMOTIONS,
 	MINIMAX_TTS_LANGUAGE_BOOST_VALUES,
-	MINIMAX_TTS_MODELS,
 	type MinimaxTtsLanguageBoost,
 	type MinimaxTtsVoice,
 } from '@/constants/minimaxTts';
@@ -54,7 +54,7 @@ import {
 	loadMinimaxTtsUserPrefs,
 	type MinimaxTtsUserPrefs,
 	saveMinimaxTtsUserPrefs,
-	voiceIdForPlaybackSource,
+	withDefaultCloudTtsPrefs,
 } from '@/utils/minimaxTtsPrefs';
 import { LocalTtsVoiceSetting } from './LocalTtsVoiceSetting';
 import { ParamsHelpPopover } from './ParamsHelpPopover';
@@ -215,6 +215,76 @@ function PrefSelectField({
 	);
 }
 
+function PrefTextField({
+	id,
+	label,
+	value,
+	onChange,
+	disabled,
+	labelClassName,
+	type = 'text',
+	secret = false,
+	placeholder = '',
+}: {
+	id: string;
+	label: string;
+	value: string;
+	onChange: (value: string) => void;
+	disabled?: boolean;
+	labelClassName: string;
+	type?: 'text' | 'password';
+	/** 与 LLM API Key 一致：眼睛按钮切换明文/密文 */
+	secret?: boolean;
+	placeholder?: string;
+}) {
+	const { t } = useI18n();
+	const [visible, setVisible] = useState(false);
+	const inputType = secret ? (visible ? 'text' : 'password') : type;
+
+	const _placeholder = placeholder || t('setting.llm.apiKeyPlaceholder');
+
+	return (
+		<div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+			<Label htmlFor={id} className={labelClassName}>
+				{label}
+			</Label>
+			<div className="relative min-w-0 flex-1">
+				<Input
+					id={id}
+					type={inputType}
+					value={value}
+					disabled={disabled}
+					placeholder={_placeholder}
+					autoComplete={secret ? 'new-password' : 'off'}
+					onChange={(e) => onChange(e.target.value)}
+					className={cn(fieldInputClass, 'w-full', secret && 'pr-10')}
+				/>
+				{secret ? (
+					<Button
+						type="button"
+						variant="ghost"
+						size="icon"
+						className="absolute top-1/2 right-1.5 size-6 -translate-y-1/2 text-textcolor/55 hover:text-textcolor"
+						disabled={disabled || !value}
+						aria-label={
+							visible
+								? t('setting.llm.hideApiKey')
+								: t('setting.llm.showApiKey')
+						}
+						onClick={() => setVisible((v) => !v)}
+					>
+						{visible ? (
+							<EyeOff className="size-4" aria-hidden />
+						) : (
+							<Eye className="size-4" aria-hidden />
+						)}
+					</Button>
+				) : null}
+			</div>
+		</div>
+	);
+}
+
 function formatVoiceOptionLabel(name: string, id: string): string {
 	return `${name} · ${id}`;
 }
@@ -303,7 +373,7 @@ const CloudTtsSetting = observer(() => {
 	const loggedInUserId = userStore.userInfo?.id ?? getLoggedInUserId();
 	const fieldLabelClass = useMemo(() => getFieldLabelClass(locale), [locale]);
 	const [prefs, setPrefs] = useState<MinimaxTtsUserPrefs>(() =>
-		loadMinimaxTtsUserPrefs(),
+		withDefaultCloudTtsPrefs(loadMinimaxTtsUserPrefs()),
 	);
 	const [loading, setLoading] = useState(true);
 	const [activePreview, setActivePreview] =
@@ -316,7 +386,7 @@ const CloudTtsSetting = observer(() => {
 			return;
 		}
 		if (loggedInUserId <= 0) {
-			setPrefs({ ...DEFAULT_MINIMAX_TTS_USER_PREFS });
+			setPrefs(withDefaultCloudTtsPrefs(DEFAULT_MINIMAX_TTS_USER_PREFS));
 			setLoading(false);
 			return;
 		}
@@ -324,7 +394,7 @@ const CloudTtsSetting = observer(() => {
 		setLoading(true);
 		void ensureMinimaxTtsUserPrefsLoaded(loggedInUserId)
 			.then((next) => {
-				if (!cancelled) setPrefs(next);
+				if (!cancelled) setPrefs(withDefaultCloudTtsPrefs(next));
 			})
 			.finally(() => {
 				if (!cancelled) setLoading(false);
@@ -340,17 +410,15 @@ const CloudTtsSetting = observer(() => {
 				const next = { ...prev, ...partial };
 				if (partial.playbackSource) {
 					next.playbackSource = partial.playbackSource;
-					next.voiceId = voiceIdForPlaybackSource(
-						partial.playbackSource,
-						next.voiceId,
-					);
 					if (partial.playbackSource === 'cloud') {
 						next.enabled = true;
 					}
 				}
 				if (
 					'model' in partial ||
+					'minimaxApiKey' in partial ||
 					'voiceId' in partial ||
+					'xfyunVoiceId' in partial ||
 					'speed' in partial ||
 					'vol' in partial ||
 					'pitch' in partial ||
@@ -370,11 +438,6 @@ const CloudTtsSetting = observer(() => {
 			});
 		},
 		[loggedInUserId],
-	);
-
-	const modelOptions = useMemo(
-		() => MINIMAX_TTS_MODELS.map((value) => ({ value, label: value })),
-		[],
 	);
 
 	const formatOptions = useMemo(
@@ -407,8 +470,10 @@ const CloudTtsSetting = observer(() => {
 
 	const onResetMinimax = () => {
 		const d = DEFAULT_MINIMAX_TTS_USER_PREFS;
+		const cloudDefaults = getDefaultMinimaxCloudCredentials();
 		const partial: Partial<MinimaxTtsUserPrefs> = {
-			model: d.model,
+			model: cloudDefaults.model,
+			minimaxApiKey: '',
 			vol: d.vol,
 			pitch: d.pitch,
 			emotion: d.emotion,
@@ -429,21 +494,22 @@ const CloudTtsSetting = observer(() => {
 	const onResetXfyun = () => {
 		const d = DEFAULT_MINIMAX_TTS_USER_PREFS;
 		patch({
-			voiceId: DEFAULT_XFYUN_TTS_VCN,
+			xfyunVoiceId: DEFAULT_XFYUN_TTS_VCN,
 			speed: d.speed,
 			vol: d.vol,
 			pitch: d.pitch,
+			xfyunAppId: '',
+			xfyunApiKey: '',
+			xfyunApiSecret: '',
 		});
 	};
 
-	const onPreview = async (target: CloudTtsPreviewTarget, textKey: string) => {
+	const onPreview = async (_target: CloudTtsPreviewTarget, textKey: string) => {
 		if (previewing) return;
 		stopAllEnglishPlayback();
-		setActivePreview(target);
+		setActivePreview(_target);
 		try {
-			await playEnglishPreferred(t(textKey), {
-				preferLocal: false,
-			});
+			await playEnglishPreferred(t(textKey), { preferLocal: false });
 		} finally {
 			setActivePreview(null);
 		}
@@ -458,8 +524,8 @@ const CloudTtsSetting = observer(() => {
 		[locale],
 	);
 
-	const xfyunVoiceId = isXfyunTtsVcn(prefs.voiceId)
-		? prefs.voiceId
+	const xfyunVoiceId = isXfyunTtsVcn(prefs.xfyunVoiceId)
+		? prefs.xfyunVoiceId
 		: DEFAULT_XFYUN_TTS_VCN;
 	const xfyunVolumeUi = xfyunVolumeFromVol(prefs.vol);
 	const xfyunPitchUi = xfyunPitchFromPitch(prefs.pitch);
@@ -503,12 +569,12 @@ const CloudTtsSetting = observer(() => {
 						</div>
 					) : (
 						<>
-							<div className="mt-3.5 w-full border-b border-theme/20 pb-4.5">
-								<div className="text-md font-bold">
-									{t('setting.cloudTts.title')}
-								</div>
-								<div className="my-2 px-8.5 text-xs text-textcolor/55">
-									{t('setting.cloudTts.desc')}
+							<div className="mt-3.5 w-full">
+								<div className="flex items-center gap-1">
+									<div className="text-md font-bold">
+										{t('setting.cloudTts.title')}
+									</div>
+									<ParamsHelpPopover />
 								</div>
 							</div>
 
@@ -519,22 +585,23 @@ const CloudTtsSetting = observer(() => {
 										'pointer-events-none opacity-50',
 								)}
 							>
-								<div className="flex items-center gap-1">
-									<div className="text-md font-bold">
-										{t('setting.cloudTts.paramsTitle')}
-									</div>
-									<ParamsHelpPopover />
+								<div className="space-y-1 text-xs text-textcolor/55">
+									<p>{t('setting.cloudTts.desc')}</p>
 								</div>
-								<p className="text-xs text-textcolor/55">
-									{t('setting.cloudTts.paramsDesc')}
-								</p>
-
-								<PrefSelectField
-									id="cloud-tts-model"
+								<PrefTextField
+									id="minimax-api-key"
+									label={t('setting.cloudTts.minimaxApiKey')}
+									value={prefs.minimaxApiKey}
+									onChange={(minimaxApiKey) => patch({ minimaxApiKey })}
+									disabled={fieldsDisabled}
+									labelClassName={fieldLabelClass}
+									secret
+								/>
+								<PrefTextField
+									id="minimax-model-name"
 									label={t('setting.cloudTts.model')}
 									value={prefs.model}
-									onValueChange={(model) => patch({ model })}
-									options={modelOptions}
+									onChange={(model) => patch({ model })}
 									disabled={fieldsDisabled}
 									labelClassName={fieldLabelClass}
 								/>
@@ -697,9 +764,6 @@ const CloudTtsSetting = observer(() => {
 								<div className="text-md font-bold">
 									{t('setting.cloudTts.xfyunTitle')}
 								</div>
-								<div className="my-2 px-8.5 text-xs text-textcolor/55">
-									{t('setting.cloudTts.xfyunDesc')}
-								</div>
 							</div>
 
 							<div
@@ -709,11 +773,42 @@ const CloudTtsSetting = observer(() => {
 										'pointer-events-none opacity-50',
 								)}
 							>
+								<p className="text-xs text-textcolor/55">
+									{t('setting.cloudTts.xfyunCredentialsHint')}
+								</p>
+								<PrefTextField
+									id="xfyun-app-id"
+									label={t('setting.cloudTts.xfyunAppId')}
+									value={prefs.xfyunAppId}
+									placeholder={t('setting.llm.appIdPlaceholder')}
+									onChange={(xfyunAppId) => patch({ xfyunAppId })}
+									disabled={xfyunFieldsDisabled}
+									labelClassName={fieldLabelClass}
+								/>
+								<PrefTextField
+									id="xfyun-api-key"
+									label={t('setting.cloudTts.xfyunApiKey')}
+									value={prefs.xfyunApiKey}
+									onChange={(xfyunApiKey) => patch({ xfyunApiKey })}
+									disabled={xfyunFieldsDisabled}
+									labelClassName={fieldLabelClass}
+									secret
+								/>
+								<PrefTextField
+									id="xfyun-api-secret"
+									label={t('setting.cloudTts.xfyunApiSecret')}
+									value={prefs.xfyunApiSecret}
+									placeholder={t('setting.llm.apiSecretPlaceholder')}
+									onChange={(xfyunApiSecret) => patch({ xfyunApiSecret })}
+									disabled={xfyunFieldsDisabled}
+									labelClassName={fieldLabelClass}
+									secret
+								/>
 								<PrefSelectField
 									id="xfyun-tts-voice"
 									label={t('setting.cloudTts.xfyunVoice')}
 									value={xfyunVoiceId}
-									onValueChange={(voiceId) => patch({ voiceId })}
+									onValueChange={(vcn) => patch({ xfyunVoiceId: vcn })}
 									options={xfyunVoiceOptions}
 									disabled={xfyunFieldsDisabled}
 									labelClassName={fieldLabelClass}
@@ -780,7 +875,7 @@ const CloudTtsSetting = observer(() => {
 									)}
 									disabled={previewing || prefs.playbackSource !== 'xfyun'}
 									onClick={() =>
-										void onPreview('xfyun', 'setting.cloudTts.xfyunPreviewText')
+										void onPreview('xfyun', 'setting.cloudTts.previewText')
 									}
 								>
 									<Volume2 className="size-4" aria-hidden />

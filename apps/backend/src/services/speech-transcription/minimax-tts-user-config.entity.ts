@@ -15,6 +15,15 @@ export class MinimaxTtsUserConfig {
 	@Column({ name: 'voice_id', type: 'varchar', length: 128, default: '' })
 	voiceId!: string;
 
+	/** 讯飞发音人 vcn；与 MiniMax voiceId 独立存储 */
+	@Column({
+		name: 'xfyun_voice_id',
+		type: 'varchar',
+		length: 128,
+		default: 'x4_yezi',
+	})
+	xfyunVoiceId!: string;
+
 	@Column({ type: 'double', default: 1 })
 	speed!: number;
 
@@ -55,6 +64,30 @@ export class MinimaxTtsUserConfig {
 		default: 'local',
 	})
 	playbackSource!: 'local' | 'cloud' | 'xfyun';
+
+	/** 讯飞应用凭证；均为空时 TTS 走后端环境变量 */
+	@Column({ name: 'xfyun_app_id', type: 'varchar', length: 64, default: '' })
+	xfyunAppId!: string;
+
+	@Column({ name: 'xfyun_api_key', type: 'varchar', length: 128, default: '' })
+	xfyunApiKey!: string;
+
+	@Column({
+		name: 'xfyun_api_secret',
+		type: 'varchar',
+		length: 128,
+		default: '',
+	})
+	xfyunApiSecret!: string;
+
+	/** MiniMax API Key；为空时 TTS 走后端环境变量 */
+	@Column({
+		name: 'minimax_api_key',
+		type: 'varchar',
+		length: 256,
+		default: '',
+	})
+	minimaxApiKey!: string;
 
 	@UpdateDateColumn({ name: 'updated_at', type: 'timestamp' })
 	updatedAt!: Date;

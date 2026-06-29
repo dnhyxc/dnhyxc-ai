@@ -5,10 +5,11 @@
  * 云端 CosyVoice2 / MiniMax / 讯飞在线 无 seed，同一句会随机漂移；对规范化文本做 MP3 缓存以保证重复播放读音一致。
  * 本机无法直接调用 macOS「翻译/词典」弹窗 API；初始默认 Karen 女声，可用 setPreferredLocalEnglishVoiceKey 切换。
  */
+import { Toast } from '@ui/sonner';
 import { BASE_URL } from '@/constants';
+import { translateSync } from '@/i18n';
 import {
 	SPEECH_MINIMAX_TTS_STREAM,
-	SPEECH_TTS,
 	SPEECH_XFYUN_TTS_STREAM,
 } from '@/service/api';
 import {
@@ -482,6 +483,46 @@ type CloudTtsPlaybackOptions = CadencePlaybackHooks & {
 	rate?: number;
 };
 
+/** ponytail: 听书逐句时云端可能连续失败，冷却内只弹一次 Toast */
+let lastCloudTtsErrorToastAt = 0;
+const CLOUD_TTS_ERROR_TOAST_COOLDOWN_MS = 12_000;
+
+type NoTtsError = Error & { cloudTtsNotified?: boolean };
+
+function throwNoTts(opts?: { cloudTtsNotified?: boolean }): never {
+	const err = new Error('NO_TTS') as NoTtsError;
+	if (opts?.cloudTtsNotified) err.cloudTtsNotified = true;
+	throw err;
+}
+
+/** 云端 TTS 失败时统一 Toast（试听/听书/单词朗读等共用） */
+function notifyCloudTtsFallback(canFallbackLocal: boolean): void {
+	const now = Date.now();
+	if (now - lastCloudTtsErrorToastAt < CLOUD_TTS_ERROR_TOAST_COOLDOWN_MS)
+		return;
+	lastCloudTtsErrorToastAt = now;
+
+	const source = loadMinimaxTtsUserPrefs().playbackSource;
+	const titleKey =
+		source === 'xfyun'
+			? 'englishLearning.tts.cloudXfyunFailed'
+			: 'englishLearning.tts.cloudMinimaxFailed';
+
+	if (canFallbackLocal) {
+		Toast({
+			type: 'warning',
+			title: translateSync(titleKey),
+			message: translateSync('englishLearning.tts.cloudFallbackLocal'),
+		});
+		return;
+	}
+	Toast({
+		type: 'error',
+		title: translateSync(titleKey),
+		message: translateSync('englishLearning.tts.unsupported'),
+	});
+}
+
 /** HTMLAudioElement.playbackRate 常用可听范围；听书 UI 最高 3x */
 function clampPlaybackRate(rate?: number): number {
 	const r = rate ?? 1;
@@ -914,6 +955,8 @@ export function stopCloudEnglishTts(): void {
 
 export function stopAllEnglishPlayback(): void {
 	playbackGeneration += 1;
+	// 新听书/试听会话开始时会先 stop；重置冷却以便云端报错立即 Toast
+	lastCloudTtsErrorToastAt = 0;
 	stopPlaybackMediaOnly();
 }
 
@@ -1009,7 +1052,7 @@ async function startCloudTts(plain: string): Promise<CloudTtsReady> {
 
 	const prefs = loadMinimaxTtsUserPrefs();
 	const source = prefs.playbackSource;
-	let res = await platformFetch(
+	const res = await platformFetch(
 		BASE_URL +
 			(source === 'xfyun'
 				? SPEECH_XFYUN_TTS_STREAM
@@ -1025,14 +1068,7 @@ async function startCloudTts(plain: string): Promise<CloudTtsReady> {
 		},
 	);
 
-	if (res.status === 503 || res.status === 401 || res.status === 502) {
-		res = await platformFetch(BASE_URL + SPEECH_TTS, {
-			method: 'POST',
-			headers,
-			body: JSON.stringify({ text: plain }),
-		});
-	}
-
+	// ponytail: 云端失败不中转硅基/MiniMax；由 playEnglishPreferred catch 统一降级本机 Web Speech
 	if (!res.ok) {
 		throw new Error(`TTS_HTTP_${res.status}`);
 	}
@@ -1395,7 +1431,7 @@ export async function playEnglishPreferred(
 		if (!isPlaybackGenerationActive(generation)) return;
 		// 浏览器本地 TTS 功能不可用时，抛出 NO_TTS 异常
 		if (!isEnglishTtsSupported()) {
-			throw new Error('NO_TTS');
+			throwNoTts();
 		}
 		// 实际调用本地 Web Speech 朗读，按设置参数与钩子
 		await speakEnglishTextWithGeneration(rawText, generation, {
@@ -1414,11 +1450,11 @@ export async function playEnglishPreferred(
 		});
 		return;
 	} catch {
-		// 云端朗读出错时，二次校验世代有效性
+		const canFallbackLocal = isEnglishTtsSupported();
+		notifyCloudTtsFallback(canFallbackLocal);
 		if (!isPlaybackGenerationActive(generation)) return;
-		// 若本地没有 TTS 可用，也抛 NO_TTS 错
-		if (!isEnglishTtsSupported()) {
-			throw new Error('NO_TTS');
+		if (!canFallbackLocal) {
+			throwNoTts({ cloudTtsNotified: true });
 		}
 		// 回退本地朗读，参数同前
 		await speakEnglishTextWithGeneration(rawText, generation, {

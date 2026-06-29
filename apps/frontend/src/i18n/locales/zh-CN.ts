@@ -110,6 +110,8 @@ export const zhCN = {
 	'setting.llm.modelOption.deepseekChat': 'deepseek-chat',
 	'setting.llm.apiKey': 'API Key',
 	'setting.llm.apiKeyPlaceholder': '请输入 API Key',
+	'setting.llm.apiSecretPlaceholder': '请输入 API Secret',
+	'setting.llm.appIdPlaceholder': '请输入 APP ID',
 	'setting.llm.showApiKey': '显示 API Key',
 	'setting.llm.hideApiKey': '隐藏 API Key',
 	'setting.llm.apiKeyKeepPlaceholder': '留空则保留已保存的密钥',
@@ -170,7 +172,7 @@ export const zhCN = {
 	/** 云端朗读 */
 	'setting.cloudTts.title': '云端语音设置',
 	'setting.cloudTts.desc':
-		'在上方选择 MiniMax 云端后，可调整下方朗读参数；与「本机语音」「讯飞云端」互斥。点「恢复默认参数」可恢复服务端默认合成（仍保持当前选路）。',
+		'选择上方「MiniMax 云端」后生效，API Key、模型填写后使用自定义设置，留空或点击「恢复默认参数」则使用默认配置。',
 	'setting.cloudTts.playbackSourceTitle': '朗读来源',
 	'setting.cloudTts.playbackSourceHelp':
 		'有效会员三选一，互斥生效：本机 Web Speech、MiniMax 云端或讯飞在线合成。',
@@ -183,18 +185,22 @@ export const zhCN = {
 		'使用 MiniMax 流式合成，参数见下方 MiniMax 区块。',
 	'setting.cloudTts.playbackSourceHelp.xfyun':
 		'使用讯飞在线合成，适合中文听书；参数见下方讯飞区块。',
-	'setting.cloudTts.xfyunTitle': '讯飞云端语音',
-	'setting.cloudTts.xfyunDesc':
-		'在上方选择「讯飞云端」后生效；未配置服务端密钥时将回退硅基/本机。',
+	'setting.cloudTts.xfyunTitle': '讯飞语音设置',
+	'setting.cloudTts.xfyunCredentialsHint':
+		'选择上方「讯飞云端」后生效；APPID、APIKey、APISecret 均填写后设置生效；留空或点击「恢复默认参数」则使用默认配置。',
+	'setting.cloudTts.xfyunAppId': 'APPID',
+	'setting.cloudTts.xfyunApiKey': 'APIKey',
+	'setting.cloudTts.xfyunApiSecret': 'APISecret',
 	'setting.cloudTts.xfyunVoice': '发音人',
 	'setting.cloudTts.xfyunSpeed': '语速',
 	'setting.cloudTts.xfyunVolume': '音量',
 	'setting.cloudTts.xfyunPitch': '音高',
 	'setting.cloudTts.xfyunPreview': '讯飞试听',
-	'setting.cloudTts.xfyunPreviewText':
-		'这是讯飞云端朗读效果的试听，适合中文听书场景。',
 	'setting.cloudTts.paramsTitle': '朗读参数',
 	'setting.cloudTts.paramsDesc': '音色、语速与音频格式等，可按需调整。',
+	'setting.cloudTts.minimaxCredentialsHint':
+		'API Key 留空时使用服务端环境变量；模型名称留空时同样回退服务端配置。',
+	'setting.cloudTts.minimaxApiKey': 'API Key',
 	'setting.cloudTts.paramsHelpAria': '查看朗读参数字段说明',
 	'setting.cloudTts.paramsHelpTitle': '字段说明',
 	'setting.cloudTts.fieldHelp.model':
@@ -255,8 +261,7 @@ export const zhCN = {
 	'setting.cloudTts.decreaseValue': '减小{label}',
 	'setting.cloudTts.increaseValue': '增大{label}',
 	'setting.cloudTts.preview': '云端试听',
-	'setting.cloudTts.previewText':
-		'This is a preview of the cloud reading effect with the parameters set above.',
+	'setting.cloudTts.previewText': '这是基于上方参数的云端朗读效果预览。',
 
 	/** 主题设置 */
 	'setting.theme.colorTitle': '彩色主题',
@@ -1397,6 +1402,10 @@ export const zhCN = {
 	'englishLearning.tts.stop': '停止',
 	'englishLearning.tts.unsupported':
 		'朗读不可用，请检查登录与云端语音配置，或换用支持本机语音的浏览器。',
+	'englishLearning.tts.cloudXfyunFailed': '讯飞云端朗读失败',
+	'englishLearning.tts.cloudMinimaxFailed': 'MiniMax 云端朗读失败',
+	'englishLearning.tts.cloudFallbackLocal':
+		'已改用本机语音播放，请检查讯飞应用凭证或服务端配置。',
 	'englishLearning.tts.hint':
 		'消息区朗读优先云端 TTS，失败时使用浏览器语音；单词表可逐词播放。',
 	'route.document.title': '智能文档处理',

@@ -844,7 +844,12 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 	's24-44': {
 		title: 'iFlytek cloud narration',
 		description:
-			'Active members can choose iFlytek cloud as the playback source in Voice settings (mutually exclusive with local and MiniMax cloud)—suited for Chinese listen-to-book. Configure voice, speed, volume, and pitch with preview; if the server is not configured or synthesis fails, playback falls back to other cloud or local voice.',
+			'Active members can choose iFlytek cloud as the playback source in Voice settings (mutually exclusive with local and MiniMax cloud)—suited for Chinese listen-to-book. Configure voice, speed, volume, and pitch with preview; if the server is not configured or synthesis fails, you are notified and playback falls back to local voice.',
+	},
+	's24-45': {
+		title: 'Cloud TTS credentials and failure alerts',
+		description:
+			'In Voice settings → Cloud voice settings, the MiniMax section accepts API Key and model name; the iFlytek section accepts APP ID, API Key, and API Secret (leave blank to use server defaults). MiniMax and iFlytek voice choices are stored separately when switching sources. Cloud synthesis failures show a clear alert and attempt local voice when available.',
 	},
 	's25-1': {
 		title: 'E-book bookshelf',

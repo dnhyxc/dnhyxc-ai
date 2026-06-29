@@ -47,6 +47,37 @@ export type MinimaxTtsLanguageBoost =
 
 export const DEFAULT_MINIMAX_TTS_MODEL = 'speech-2.8-hd';
 export const DEFAULT_MINIMAX_TTS_VOICE_ID = 'English_captivating_female1';
+
+export type DefaultMinimaxCloudCredentials = {
+	minimaxApiKey: string;
+	model: string;
+};
+
+function readMinimaxEnv(key: keyof ImportMetaEnv): string {
+	const raw = import.meta.env[key];
+	return typeof raw === 'string' ? raw.trim() : '';
+}
+
+/** 设置页 MiniMax 模型默认名（来自 VITE_MINIMAX_MODEL_NAME；API Key 不预填） */
+export function getDefaultMinimaxCloudCredentials(): DefaultMinimaxCloudCredentials {
+	return {
+		minimaxApiKey: '',
+		model:
+			readMinimaxEnv('VITE_MINIMAX_MODEL_NAME') || DEFAULT_MINIMAX_TTS_MODEL,
+	};
+}
+
+/** 空 model 用环境变量默认；API Key 仅保留用户已保存值 */
+export function fillMinimaxCloudCredentialsFromEnv<
+	T extends DefaultMinimaxCloudCredentials,
+>(prefs: T): T {
+	const env = getDefaultMinimaxCloudCredentials();
+	return {
+		...prefs,
+		model: prefs.model.trim() || env.model,
+	};
+}
+
 /** 中文朗读默认音色（甜美女性） */
 export const DEFAULT_MINIMAX_TTS_CHINESE_VOICE_ID = 'female-tianmei';
 

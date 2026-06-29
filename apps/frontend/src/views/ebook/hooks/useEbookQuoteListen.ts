@@ -191,9 +191,11 @@ export function useEbookQuoteListen(
 						speak: { rate: rateRef.current },
 						prefetchedCloud: prefetchedByIndex.get(si) ?? null,
 					});
-				} catch {
-					// 如果 gen 没失效，反馈 TTS 不支持的 toast
-					if (isGenActive(gen)) {
+				} catch (err) {
+					if (
+						isGenActive(gen) &&
+						!(err as { cloudTtsNotified?: boolean }).cloudTtsNotified
+					) {
 						Toast({
 							type: 'warning',
 							title: tRef.current('englishLearning.tts.unsupported'),

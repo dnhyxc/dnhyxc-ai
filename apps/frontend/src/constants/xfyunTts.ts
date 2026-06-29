@@ -1,6 +1,28 @@
 /** 讯飞在线合成默认发音人（控制台已开通） */
 export const DEFAULT_XFYUN_TTS_VCN = 'x4_yezi';
 
+export type DefaultXfyunCredentials = {
+	xfyunAppId: string;
+	xfyunApiKey: string;
+	xfyunApiSecret: string;
+};
+
+/** 讯飞凭证默认均为空；留空时 TTS 走后端环境变量，仅用户手动填写后生效 */
+export function getDefaultXfyunCredentials(): DefaultXfyunCredentials {
+	return {
+		xfyunAppId: '',
+		xfyunApiKey: '',
+		xfyunApiSecret: '',
+	};
+}
+
+/** ponytail: 讯飞凭证不再从 VITE_* 预填，原样返回 */
+export function fillXfyunCredentialsFromEnv<T extends DefaultXfyunCredentials>(
+	prefs: T,
+): T {
+	return prefs;
+}
+
 export type XfyunTtsVoice = {
 	vcn: string;
 	nameZh: string;

@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import WebSocket from 'ws';
 import { DEFAULT_XFYUN_TTS_VCN, XfyunEnum } from '../../enum/config.enum';
 import type { XfyunTtsDto } from './dto/xfyun-tts.dto';
+import { MinimaxTtsPrefsService } from './minimax-tts-prefs.service';
 
 // https://console.xfyun.cn/services/tts
 const TTS_WS_URL = 'wss://tts-api.xfyun.cn/v2/tts';
@@ -43,11 +44,14 @@ type XfyunWsMessage = {
 export class XfyunTtsService {
 	private readonly speechCache = new Map<string, Buffer>();
 
-	constructor(private readonly config: ConfigService) {}
+	constructor(
+		private readonly config: ConfigService,
+		private readonly prefsService: MinimaxTtsPrefsService,
+	) {}
 
 	isConfigured(): boolean {
 		try {
-			this.resolveCredentials();
+			this.resolveEnvCredentials();
 			return true;
 		} catch {
 			return false;
@@ -61,7 +65,7 @@ export class XfyunTtsService {
 		return trimmed.length > 0 ? trimmed : undefined;
 	}
 
-	private resolveCredentials(): {
+	private resolveEnvCredentials(): {
 		appId: string;
 		apiKey: string;
 		apiSecret: string;
@@ -76,6 +80,20 @@ export class XfyunTtsService {
 			);
 		}
 		return { appId, apiKey, apiSecret };
+	}
+
+	private async resolveCredentials(userId?: number): Promise<{
+		appId: string;
+		apiKey: string;
+		apiSecret: string;
+		credTag: string;
+	}> {
+		const custom = await this.prefsService.getXfyunCredentials(userId);
+		if (custom) {
+			return { ...custom, credTag: custom.appId };
+		}
+		const env = this.resolveEnvCredentials();
+		return { ...env, credTag: 'env' };
 	}
 
 	resolveOptions(dto: XfyunTtsDto): XfyunTtsResolved {
@@ -102,9 +120,14 @@ export class XfyunTtsService {
 		};
 	}
 
-	private buildCacheKey(resolved: XfyunTtsResolved, userId?: number): string {
+	private buildCacheKey(
+		resolved: XfyunTtsResolved,
+		userId?: number,
+		credTag = 'env',
+	): string {
 		return [
 			userId != null && userId > 0 ? String(userId) : '0',
+			credTag,
 			resolved.vcn,
 			String(resolved.speed),
 			String(resolved.volume),
@@ -202,8 +225,11 @@ export class XfyunTtsService {
 	}
 
 	/** ponytail: ws 包（Node 18 无全局 WebSocket；undici@8 需 Node 20+） */
-	private synthesizeViaWebSocket(resolved: XfyunTtsResolved): Promise<Buffer> {
-		const { appId, apiKey, apiSecret } = this.resolveCredentials();
+	private synthesizeViaWebSocket(
+		resolved: XfyunTtsResolved,
+		credentials: { appId: string; apiKey: string; apiSecret: string },
+	): Promise<Buffer> {
+		const { appId, apiKey, apiSecret } = credentials;
 		const requestPayload = this.buildRequestPayload(resolved, appId);
 		const wsUrl = this.buildAuthWsUrl(apiKey, apiSecret);
 
@@ -280,11 +306,12 @@ export class XfyunTtsService {
 
 	async synthesizeSpeech(dto: XfyunTtsDto, userId?: number): Promise<Buffer> {
 		const resolved = this.resolveOptions(dto);
-		const cacheKey = this.buildCacheKey(resolved, userId);
+		const credentials = await this.resolveCredentials(userId);
+		const cacheKey = this.buildCacheKey(resolved, userId, credentials.credTag);
 		const cached = this.getFromCache(cacheKey);
 		if (cached) return Buffer.from(cached);
 
-		const buffer = await this.synthesizeViaWebSocket(resolved);
+		const buffer = await this.synthesizeViaWebSocket(resolved, credentials);
 		this.setCache(cacheKey, buffer);
 		return buffer;
 	}
@@ -294,14 +321,15 @@ export class XfyunTtsService {
 		userId?: number,
 	): AsyncGenerator<Buffer> {
 		const resolved = this.resolveOptions(dto);
-		const cacheKey = this.buildCacheKey(resolved, userId);
+		const credentials = await this.resolveCredentials(userId);
+		const cacheKey = this.buildCacheKey(resolved, userId, credentials.credTag);
 		const cached = this.getFromCache(cacheKey);
 		if (cached?.length) {
 			yield cached;
 			return;
 		}
 
-		const buffer = await this.synthesizeViaWebSocket(resolved);
+		const buffer = await this.synthesizeViaWebSocket(resolved, credentials);
 		if (buffer.length) {
 			this.setCache(cacheKey, buffer);
 			yield buffer;

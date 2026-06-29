@@ -2,6 +2,8 @@ import {
 	DEFAULT_MINIMAX_TTS_LANGUAGE_BOOST,
 	DEFAULT_MINIMAX_TTS_MODEL,
 	DEFAULT_MINIMAX_TTS_VOICE_ID,
+	fillMinimaxCloudCredentialsFromEnv,
+	getDefaultMinimaxCloudCredentials,
 	MINIMAX_TTS_AUDIO_FORMATS,
 	MINIMAX_TTS_EMOTIONS,
 	MINIMAX_TTS_LANGUAGE_BOOST_VALUES,
@@ -9,6 +11,7 @@ import {
 } from '@/constants/minimaxTts';
 import {
 	DEFAULT_XFYUN_TTS_VCN,
+	fillXfyunCredentialsFromEnv,
 	isXfyunTtsVcn,
 	xfyunPitchFromPitch,
 	xfyunSpeedFromMinimaxSpeed,
@@ -31,11 +34,14 @@ const LEGACY_STORAGE_KEY = 'english_learning_minimax_tts_prefs';
 
 export type MinimaxTtsUserPrefs = CloudTtsSettingsView;
 
+const defaultMinimaxCloud = getDefaultMinimaxCloudCredentials();
+
 export const DEFAULT_MINIMAX_TTS_USER_PREFS: MinimaxTtsUserPrefs = {
 	enabled: false,
 	playbackSource: 'local',
-	model: DEFAULT_MINIMAX_TTS_MODEL,
+	model: defaultMinimaxCloud.model,
 	voiceId: DEFAULT_MINIMAX_TTS_VOICE_ID,
+	xfyunVoiceId: DEFAULT_XFYUN_TTS_VCN,
 	speed: 1,
 	vol: 5,
 	pitch: 0,
@@ -45,6 +51,10 @@ export const DEFAULT_MINIMAX_TTS_USER_PREFS: MinimaxTtsUserPrefs = {
 	sampleRate: 32_000,
 	bitrate: 128_000,
 	channel: 1,
+	xfyunAppId: '',
+	xfyunApiKey: '',
+	xfyunApiSecret: '',
+	minimaxApiKey: '',
 };
 
 let cachedUserId = 0;
@@ -55,22 +65,6 @@ function normalizePlaybackSource(raw: unknown): TtsPlaybackSource {
 	if (raw === 'local') return 'local';
 	if (raw === 'xfyun') return 'xfyun';
 	return 'cloud';
-}
-
-/** 切换朗读来源时，voiceId 在 MiniMax id 与讯飞 vcn 间对齐默认值 */
-export function voiceIdForPlaybackSource(
-	source: TtsPlaybackSource,
-	currentVoiceId: string,
-): string {
-	if (source === 'xfyun') {
-		return isXfyunTtsVcn(currentVoiceId)
-			? currentVoiceId
-			: DEFAULT_XFYUN_TTS_VCN;
-	}
-	if (source === 'cloud' && isXfyunTtsVcn(currentVoiceId)) {
-		return DEFAULT_MINIMAX_TTS_VOICE_ID;
-	}
-	return currentVoiceId || DEFAULT_MINIMAX_TTS_VOICE_ID;
 }
 
 function clampNumber(
@@ -91,6 +85,28 @@ function pickString(raw: unknown, fallback: string, maxLen = 128): string {
 	return trimmed.slice(0, maxLen);
 }
 
+function pickOptionalCredential(raw: unknown, maxLen: number): string {
+	if (typeof raw !== 'string') return '';
+	return raw.trim().slice(0, maxLen);
+}
+
+/** 旧版 voiceId 与讯飞 vcn 混存时拆分到独立字段 */
+function splitLegacyVoiceStorage(
+	prefs: MinimaxTtsUserPrefs,
+	rawXfyunVoiceId: unknown,
+): MinimaxTtsUserPrefs {
+	let voiceId = prefs.voiceId;
+	let xfyunVoiceId = pickString(rawXfyunVoiceId, DEFAULT_XFYUN_TTS_VCN, 128);
+	if (isXfyunTtsVcn(voiceId) && typeof rawXfyunVoiceId !== 'string') {
+		xfyunVoiceId = voiceId;
+		voiceId = DEFAULT_MINIMAX_TTS_VOICE_ID;
+	}
+	if (!isXfyunTtsVcn(xfyunVoiceId)) {
+		xfyunVoiceId = DEFAULT_XFYUN_TTS_VCN;
+	}
+	return { ...prefs, voiceId, xfyunVoiceId };
+}
+
 export function normalizeMinimaxTtsUserPrefs(
 	raw: unknown,
 ): MinimaxTtsUserPrefs {
@@ -100,13 +116,14 @@ export function normalizeMinimaxTtsUserPrefs(
 	const o = raw as Record<string, unknown>;
 	const model = pickString(o.model, DEFAULT_MINIMAX_TTS_MODEL, 64);
 	const format = pickString(o.format, 'mp3', 16);
-	return {
+	const base: MinimaxTtsUserPrefs = {
 		enabled: Boolean(o.enabled),
 		playbackSource: normalizePlaybackSource(o.playbackSource),
 		model: (MINIMAX_TTS_MODELS as readonly string[]).includes(model)
 			? model
 			: DEFAULT_MINIMAX_TTS_MODEL,
 		voiceId: pickString(o.voiceId, DEFAULT_MINIMAX_TTS_VOICE_ID, 128),
+		xfyunVoiceId: pickString(o.xfyunVoiceId, DEFAULT_XFYUN_TTS_VCN, 128),
 		speed: clampNumber(o.speed, 0.5, 2, 1),
 		vol: clampNumber(o.vol, 0.01, 10, 5),
 		pitch: Math.round(clampNumber(o.pitch, -12, 12, 0)),
@@ -136,7 +153,26 @@ export function normalizeMinimaxTtsUserPrefs(
 		sampleRate: Math.round(clampNumber(o.sampleRate, 8000, 44_100, 32_000)),
 		bitrate: Math.round(clampNumber(o.bitrate, 32_000, 256_000, 128_000)),
 		channel: clampNumber(o.channel, 1, 2, 1) === 2 ? 2 : 1,
+		xfyunAppId: pickOptionalCredential(o.xfyunAppId, 64),
+		xfyunApiKey: pickOptionalCredential(o.xfyunApiKey, 128),
+		xfyunApiSecret: pickOptionalCredential(o.xfyunApiSecret, 128),
+		minimaxApiKey: pickOptionalCredential(o.minimaxApiKey, 256),
 	};
+	return splitLegacyVoiceStorage(base, o.xfyunVoiceId);
+}
+
+/** 服务端空字段回填 VITE_* 默认值（讯飞 + MiniMax） */
+export function withDefaultCloudTtsPrefs(
+	prefs: MinimaxTtsUserPrefs,
+): MinimaxTtsUserPrefs {
+	return fillMinimaxCloudCredentialsFromEnv(fillXfyunCredentialsFromEnv(prefs));
+}
+
+/** @deprecated 使用 withDefaultCloudTtsPrefs */
+export function withDefaultXfyunCredentials(
+	prefs: MinimaxTtsUserPrefs,
+): MinimaxTtsUserPrefs {
+	return withDefaultCloudTtsPrefs(prefs);
 }
 
 function setCache(
@@ -246,6 +282,8 @@ export async function saveMinimaxTtsUserPrefs(
 		return normalizeMinimaxTtsUserPrefs(prefs);
 	}
 	const body = normalizeMinimaxTtsUserPrefs(prefs);
+	// 设置页改参后立即写入内存，试听/听书 cache key 与请求参数同步
+	setCache(id, body);
 	const res = await updateCloudTtsSettings(body);
 	removeLegacyLocalPrefs(id);
 	return setCache(id, normalizeMinimaxTtsUserPrefs(res.data));
@@ -291,8 +329,8 @@ export function buildMinimaxTtsRequestExtras(): Record<string, unknown> {
 /** 讯飞在线合成 POST body（不含 text）；与 MiniMax 共用 vol/pitch/speed 字段，此处映射到 0–100 */
 export function buildXfyunTtsRequestExtras(): Record<string, unknown> {
 	const prefs = loadMinimaxTtsUserPrefs();
-	const vcn = isXfyunTtsVcn(prefs.voiceId)
-		? prefs.voiceId
+	const vcn = isXfyunTtsVcn(prefs.xfyunVoiceId)
+		? prefs.xfyunVoiceId
 		: DEFAULT_XFYUN_TTS_VCN;
 	return {
 		vcn,
@@ -302,18 +340,21 @@ export function buildXfyunTtsRequestExtras(): Record<string, unknown> {
 	};
 }
 
-/** 前端 MP3 缓存 key 后缀：讯飞 vcn / 语速变更后不与旧缓存混用 */
+/** 前端 MP3 缓存 key 后缀：讯飞凭证 / vcn / 语速等变更后不与旧缓存混用 */
 export function buildXfyunTtsCacheKeySuffix(): string {
+	const prefs = loadMinimaxTtsUserPrefs();
 	const userId = getLoggedInUserId();
 	const userPart = userId > 0 ? String(userId) : '0';
-	return `${userPart}\u0001${JSON.stringify(buildXfyunTtsRequestExtras())}`;
+	const creds = `${prefs.xfyunAppId.trim()}\u0002${prefs.xfyunApiKey.trim()}\u0002${prefs.xfyunApiSecret.trim()}`;
+	return `${userPart}\u0001${creds}\u0001${JSON.stringify(buildXfyunTtsRequestExtras())}`;
 }
 
-/** 前端 MP3 缓存 key 后缀：自定义参数变更后不与旧缓存混用 */
+/** 前端 MP3 缓存 key 后缀：自定义参数 / 凭证变更后不与旧缓存混用 */
 export function buildMinimaxTtsCacheKeySuffix(): string {
 	const prefs = loadMinimaxTtsUserPrefs();
 	if (!prefs.enabled) return '';
 	const userId = getLoggedInUserId();
 	const userPart = userId > 0 ? String(userId) : '0';
-	return `${userPart}\u0001${JSON.stringify(buildMinimaxTtsRequestExtras())}`;
+	const creds = prefs.minimaxApiKey.trim();
+	return `${userPart}\u0001${creds}\u0001${JSON.stringify(buildMinimaxTtsRequestExtras())}`;
 }

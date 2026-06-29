@@ -10,17 +10,6 @@ import {
 	Min,
 } from 'class-validator';
 
-const MINIMAX_TTS_MODELS = [
-	'speech-2.8-hd',
-	'speech-2.8-turbo',
-	'speech-2.6-hd',
-	'speech-2.6-turbo',
-	'speech-02-hd',
-	'speech-02-turbo',
-	'speech-01-hd',
-	'speech-01-turbo',
-] as const;
-
 const MINIMAX_AUDIO_FORMATS = [
 	'mp3',
 	'pcm',
@@ -43,12 +32,18 @@ export class UpsertMinimaxTtsPrefsDto {
 	playbackSource!: 'local' | 'cloud' | 'xfyun';
 
 	@IsString()
-	@IsIn(MINIMAX_TTS_MODELS)
-	model!: (typeof MINIMAX_TTS_MODELS)[number];
+	@MaxLength(64)
+	model!: string;
 
 	@IsString()
 	@MaxLength(128)
 	voiceId!: string;
+
+	/** 讯飞发音人 vcn */
+	@IsOptional()
+	@IsString()
+	@MaxLength(128)
+	xfyunVoiceId?: string;
 
 	@IsNumber()
 	@Min(0.5)
@@ -92,4 +87,26 @@ export class UpsertMinimaxTtsPrefsDto {
 	@IsInt()
 	@IsIn([1, 2])
 	channel!: number;
+
+	/** 讯飞 APPID；空表示使用服务端环境变量 */
+	@IsOptional()
+	@IsString()
+	@MaxLength(64)
+	xfyunAppId?: string;
+
+	@IsOptional()
+	@IsString()
+	@MaxLength(128)
+	xfyunApiKey?: string;
+
+	@IsOptional()
+	@IsString()
+	@MaxLength(128)
+	xfyunApiSecret?: string;
+
+	/** MiniMax API Key；空表示使用服务端环境变量 */
+	@IsOptional()
+	@IsString()
+	@MaxLength(256)
+	minimaxApiKey?: string;
 }

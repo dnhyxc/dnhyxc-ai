@@ -115,6 +115,8 @@ export const enUS = {
 	'setting.llm.modelOption.deepseekChat': 'deepseek-chat',
 	'setting.llm.apiKey': 'API Key',
 	'setting.llm.apiKeyPlaceholder': 'Enter API Key',
+	'setting.llm.apiSecretPlaceholder': 'Enter API Secret',
+	'setting.llm.appIdPlaceholder': 'Enter APP ID',
 	'setting.llm.showApiKey': 'Show API Key',
 	'setting.llm.hideApiKey': 'Hide API Key',
 	'setting.llm.apiKeyKeepPlaceholder': 'Leave blank to keep saved key',
@@ -180,7 +182,7 @@ export const enUS = {
 		'BGE-only vector mode active (knowledge_chunks_v2)',
 	'setting.cloudTts.title': 'Cloud voice settings',
 	'setting.cloudTts.desc':
-		'When MiniMax cloud is selected above, adjust the parameters below. Mutually exclusive with Local and iFlytek cloud.',
+		'When MiniMax cloud is selected above, fill in API Key and model name to use custom settings; leave blank or click "Reset to defaults" to use default configuration.',
 	'setting.cloudTts.playbackSourceTitle': 'Playback source',
 	'setting.cloudTts.playbackSourceHelp':
 		'Active members choose one: local Web Speech, MiniMax cloud, or iFlytek online TTS.',
@@ -193,19 +195,23 @@ export const enUS = {
 		'MiniMax streaming synthesis; parameters in the MiniMax section below.',
 	'setting.cloudTts.playbackSourceHelp.xfyun':
 		'iFlytek online synthesis; good for Chinese narration; see the iFlytek section below.',
-	'setting.cloudTts.xfyunTitle': 'iFlytek cloud voice',
-	'setting.cloudTts.xfyunDesc':
-		'Applies when iFlytek cloud is selected above; falls back to CosyVoice/local if the server is not configured.',
+	'setting.cloudTts.xfyunTitle': 'xfyun voice settings',
+	'setting.cloudTts.xfyunCredentialsHint':
+		'Applies when iFlytek cloud is selected above; Fill APP ID, API Key, and API Secret to use your own iFlytek app; leave blank or click "Reset to defaults" to use server default configuration.',
+	'setting.cloudTts.xfyunAppId': 'APP ID',
+	'setting.cloudTts.xfyunApiKey': 'API Key',
+	'setting.cloudTts.xfyunApiSecret': 'API Secret',
 	'setting.cloudTts.xfyunVoice': 'Voice',
 	'setting.cloudTts.xfyunSpeed': 'Speed',
 	'setting.cloudTts.xfyunVolume': 'Volume',
 	'setting.cloudTts.xfyunPitch': 'Pitch',
 	'setting.cloudTts.xfyunPreview': 'iFlytek preview',
-	'setting.cloudTts.xfyunPreviewText':
-		'This is a preview of iFlytek cloud reading, suited for Chinese narration.',
 	'setting.cloudTts.paramsTitle': 'Playback parameters',
 	'setting.cloudTts.paramsDesc':
 		'Voice, speed, audio format, and related options.',
+	'setting.cloudTts.minimaxCredentialsHint':
+		'Leave API Key empty to use the server environment variable; model name falls back to server config when empty.',
+	'setting.cloudTts.minimaxApiKey': 'API Key',
 	'setting.cloudTts.paramsHelpAria': 'Playback parameter field help',
 	'setting.cloudTts.paramsHelpTitle': 'Field reference',
 	'setting.cloudTts.fieldHelp.model':
@@ -1529,6 +1535,10 @@ export const enUS = {
 	'englishLearning.tts.stop': 'Stop',
 	'englishLearning.tts.unsupported':
 		'Playback unavailable. Check login and cloud TTS, or use a browser with local speech.',
+	'englishLearning.tts.cloudXfyunFailed': 'iFlytek cloud playback failed',
+	'englishLearning.tts.cloudMinimaxFailed': 'MiniMax cloud playback failed',
+	'englishLearning.tts.cloudFallbackLocal':
+		'Playing with local voice instead. Check your iFlytek credentials or server configuration.',
 	'englishLearning.tts.hint':
 		'Cloud TTS is tried first; browser speech is the fallback. Vocabulary cards play each word.',
 	'route.document.title': 'Document',

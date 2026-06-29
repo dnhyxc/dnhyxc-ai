@@ -9,6 +9,7 @@ export type MinimaxTtsPrefsView = {
 	playbackSource: 'local' | 'cloud' | 'xfyun';
 	model: string;
 	voiceId: string;
+	xfyunVoiceId: string;
 	speed: number;
 	vol: number;
 	pitch: number;
@@ -18,6 +19,11 @@ export type MinimaxTtsPrefsView = {
 	sampleRate: number;
 	bitrate: number;
 	channel: 1 | 2;
+	/** 讯飞 APPID；空串表示使用服务端环境变量 */
+	xfyunAppId: string;
+	xfyunApiKey: string;
+	xfyunApiSecret: string;
+	minimaxApiKey: string;
 };
 
 export const DEFAULT_MINIMAX_TTS_PREFS: MinimaxTtsPrefsView = {
@@ -25,6 +31,7 @@ export const DEFAULT_MINIMAX_TTS_PREFS: MinimaxTtsPrefsView = {
 	playbackSource: 'local',
 	model: 'speech-2.8-hd',
 	voiceId: 'English_captivating_female1',
+	xfyunVoiceId: 'x4_yezi',
 	speed: 1,
 	vol: 5,
 	pitch: 0,
@@ -34,6 +41,10 @@ export const DEFAULT_MINIMAX_TTS_PREFS: MinimaxTtsPrefsView = {
 	sampleRate: 32_000,
 	bitrate: 128_000,
 	channel: 1,
+	xfyunAppId: '',
+	xfyunApiKey: '',
+	xfyunApiSecret: '',
+	minimaxApiKey: '',
 };
 
 @Injectable()
@@ -62,12 +73,24 @@ export class MinimaxTtsPrefsService {
 		return 'cloud';
 	}
 
+	private trimCredential(raw?: string | null): string {
+		return raw?.trim() ?? '';
+	}
+
+	private defaultXfyunVoiceId(raw?: string | null): string {
+		const v = raw?.trim() ?? '';
+		return v || DEFAULT_MINIMAX_TTS_PREFS.xfyunVoiceId;
+	}
+
 	private rowToView(row: MinimaxTtsUserConfig): MinimaxTtsPrefsView {
+		const voiceId = row.voiceId?.trim() || DEFAULT_MINIMAX_TTS_PREFS.voiceId;
+		const xfyunVoiceId = this.defaultXfyunVoiceId(row.xfyunVoiceId);
 		return {
 			enabled: Boolean(row.enabled),
 			playbackSource: this.normalizePlaybackSource(row.playbackSource),
 			model: row.model?.trim() || DEFAULT_MINIMAX_TTS_PREFS.model,
-			voiceId: row.voiceId?.trim() || DEFAULT_MINIMAX_TTS_PREFS.voiceId,
+			voiceId,
+			xfyunVoiceId,
 			speed: row.speed ?? DEFAULT_MINIMAX_TTS_PREFS.speed,
 			vol: row.vol ?? DEFAULT_MINIMAX_TTS_PREFS.vol,
 			pitch: row.pitch ?? DEFAULT_MINIMAX_TTS_PREFS.pitch,
@@ -78,7 +101,38 @@ export class MinimaxTtsPrefsService {
 			sampleRate: row.sampleRate ?? DEFAULT_MINIMAX_TTS_PREFS.sampleRate,
 			bitrate: row.bitrate ?? DEFAULT_MINIMAX_TTS_PREFS.bitrate,
 			channel: row.channel === 2 ? 2 : 1,
+			xfyunAppId: this.trimCredential(row.xfyunAppId),
+			xfyunApiKey: this.trimCredential(row.xfyunApiKey),
+			xfyunApiSecret: this.trimCredential(row.xfyunApiSecret),
+			minimaxApiKey: this.trimCredential(row.minimaxApiKey),
 		};
+	}
+
+	/** 用户填写时返回自定义 MiniMax API Key，否则 null（TTS 走环境变量） */
+	async getMinimaxApiKey(userId?: number): Promise<string | null> {
+		if (userId == null || !Number.isFinite(userId) || userId <= 0) {
+			return null;
+		}
+		const row = await this.repo.findOne({ where: { userId } });
+		if (!row) return null;
+		const apiKey = this.trimCredential(row.minimaxApiKey);
+		return apiKey || null;
+	}
+
+	/** 用户三项均填写时返回自定义讯飞凭证，否则 null（TTS 走环境变量） */
+	async getXfyunCredentials(
+		userId?: number,
+	): Promise<{ appId: string; apiKey: string; apiSecret: string } | null> {
+		if (userId == null || !Number.isFinite(userId) || userId <= 0) {
+			return null;
+		}
+		const row = await this.repo.findOne({ where: { userId } });
+		if (!row) return null;
+		const appId = this.trimCredential(row.xfyunAppId);
+		const apiKey = this.trimCredential(row.xfyunApiKey);
+		const apiSecret = this.trimCredential(row.xfyunApiSecret);
+		if (!appId || !apiKey || !apiSecret) return null;
+		return { appId, apiKey, apiSecret };
 	}
 
 	async getPublicView(userId?: number): Promise<MinimaxTtsPrefsView> {
@@ -102,6 +156,7 @@ export class MinimaxTtsPrefsService {
 		row.playbackSource = this.normalizePlaybackSource(dto.playbackSource);
 		row.model = dto.model;
 		row.voiceId = dto.voiceId.trim();
+		row.xfyunVoiceId = this.defaultXfyunVoiceId(dto.xfyunVoiceId);
 		row.speed = dto.speed;
 		row.vol = dto.vol;
 		row.pitch = dto.pitch;
@@ -111,6 +166,10 @@ export class MinimaxTtsPrefsService {
 		row.sampleRate = dto.sampleRate;
 		row.bitrate = dto.bitrate;
 		row.channel = dto.channel === 2 ? 2 : 1;
+		row.xfyunAppId = dto.xfyunAppId?.trim() ?? '';
+		row.xfyunApiKey = dto.xfyunApiKey?.trim() ?? '';
+		row.xfyunApiSecret = dto.xfyunApiSecret?.trim() ?? '';
+		row.minimaxApiKey = dto.minimaxApiKey?.trim() ?? '';
 		await this.repo.save(row);
 		return this.rowToView(row);
 	}

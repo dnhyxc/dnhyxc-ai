@@ -9,6 +9,13 @@ interface ImportMetaEnv {
 	readonly VITE_GLM_API_KEY?: string;
 	readonly VITE_GLM_BASE_URL?: string;
 	readonly VITE_GLM_MODEL_NAME?: string;
+	/** 讯飞云端语音设置页凭证默认值 */
+	readonly VITE_XFYUN_APP_ID?: string;
+	readonly VITE_XFYUN_API_KEY?: string;
+	readonly VITE_XFYUN_API_SECRET?: string;
+	/** MiniMax 云端语音设置页默认值 */
+	readonly VITE_MINIMAX_API_KEY?: string;
+	readonly VITE_MINIMAX_MODEL_NAME?: string;
 	/** 浏览器独立运行时的版本展示（可选） */
 	readonly VITE_APP_VERSION?: string;
 }

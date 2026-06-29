@@ -2,7 +2,7 @@
 
 > **文档角色（主文档）**：有效会员在 **语音设置** 增加第三种朗读来源 **讯飞云端**；Nest 经 `ws` 连讯飞 WebSocket 合成 MP3，前端与 MiniMax 共用偏好表与 `englishTts` 选路。  
 > **规划态思路（架构/时序/分阶段）**：[`docs/ideas/xfyun-cloud-tts.md`](../ideas/xfyun-cloud-tts.md)  
-> **延伸阅读**：[`tts-playback-source.md`](./tts-playback-source.md)（选路字段）、[`cloud-tts-settings.md`](./cloud-tts-settings.md)（设置页结构）、[`minimax-cloud-tts.md`](./minimax-cloud-tts.md)（MiniMax 路径）、[`tts-end-to-end-guide.md`](./tts-end-to-end-guide.md)（全景）。
+> **延伸阅读**：[`tts-playback-source.md`](./tts-playback-source.md)（选路字段）、[`cloud-tts-settings.md`](./cloud-tts-settings.md)（设置页结构）、[`minimax-cloud-tts.md`](./minimax-cloud-tts.md)（MiniMax 路径）、[`tts-end-to-end-guide.md`](./tts-end-to-end-guide.md)（全景）、[`cloud-tts-user-credentials-fallback.md`](../Influence-point/cloud-tts-user-credentials-fallback.md)（用户凭证与失败降级影响面）。
 
 若与仓库最新源码不一致，**以源码为准**。
 

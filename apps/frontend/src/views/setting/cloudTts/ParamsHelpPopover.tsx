@@ -14,9 +14,6 @@ const FIELD_HELP = [
 		label: 'setting.cloudTts.voiceId',
 		help: 'setting.cloudTts.fieldHelp.voiceId',
 	},
-	{ label: 'setting.cloudTts.speed', help: 'setting.cloudTts.fieldHelp.speed' },
-	{ label: 'setting.cloudTts.vol', help: 'setting.cloudTts.fieldHelp.vol' },
-	{ label: 'setting.cloudTts.pitch', help: 'setting.cloudTts.fieldHelp.pitch' },
 	{
 		label: 'setting.cloudTts.emotion',
 		help: 'setting.cloudTts.fieldHelp.emotionIntro',
