@@ -2,6 +2,7 @@ import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { MinimaxEnum } from '../../enum/config.enum';
 import type { MinimaxTtsDto } from './dto/minimax-tts.dto';
+import { DEFAULT_MINIMAX_TTS_MODEL } from './minimax-tts-models';
 import { MinimaxTtsPrefsService } from './minimax-tts-prefs.service';
 
 const TTS_INPUT_MAX_CHARS = 10_000;
@@ -135,7 +136,8 @@ export class MinimaxTtsService {
 			text: plain,
 			model:
 				dto.model?.trim() ||
-				(this.trimEnv(MinimaxEnum.MINIMAX_TTS_MODEL) ?? 'speech-2.8-hd'),
+				(this.trimEnv(MinimaxEnum.MINIMAX_TTS_MODEL) ??
+					DEFAULT_MINIMAX_TTS_MODEL),
 			voiceId:
 				dto.voiceId?.trim() ||
 				(this.trimEnv(MinimaxEnum.MINIMAX_TTS_VOICE_ID) ??

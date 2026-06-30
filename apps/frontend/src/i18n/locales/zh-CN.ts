@@ -204,7 +204,7 @@ export const zhCN = {
 	'setting.cloudTts.paramsHelpAria': '查看朗读参数字段说明',
 	'setting.cloudTts.paramsHelpTitle': '字段说明',
 	'setting.cloudTts.fieldHelp.model':
-		'云端朗读合成模型，如 speech-2.8-hd（音质更好）或 turbo 系列（更快）。',
+		'云端朗读合成模型，如 speech-2.8-turbo（默认，更快）或 hd 系列（音质更好）。',
 	'setting.cloudTts.fieldHelp.voiceId':
 		'朗读音色，决定由谁朗读；从预设列表中选择即可。',
 	'setting.cloudTts.fieldHelp.speed': '语速，范围 0.5–2，1 为正常速度。',
@@ -240,6 +240,9 @@ export const zhCN = {
 		'与上方「使用本机语音朗读」互斥；开启后下方参数表单生效。',
 	'setting.cloudTts.openPresets': '选择预设',
 	'setting.cloudTts.model': '模型',
+	'setting.cloudTts.modelPlaceholder': '输入模型名称',
+	'setting.cloudTts.modelOption.speech28Hd': 'speech-2.8-hd（音质更好）',
+	'setting.cloudTts.modelOption.speech28Turbo': 'speech-2.8-turbo（默认）',
 	'setting.cloudTts.voiceId': '音色类别',
 	'setting.cloudTts.voiceGroup.female': '女性',
 	'setting.cloudTts.voiceGroup.male': '男性',

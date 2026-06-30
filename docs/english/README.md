@@ -67,6 +67,7 @@
 |------|------|
 | [minimax-cloud-tts.md](./minimax-cloud-tts.md) | **MiniMax 流式 TTS** 完整实现（§11 逐函数注释代码 + 排查） |
 | [cloud-tts-settings.md](./cloud-tts-settings.md) | **设置页云端朗读**：UI、请求合并、ScrollArea |
+| [cloud-tts-minimax-model-settings.md](./cloud-tts-minimax-model-settings.md) | **增量**：MiniMax model 默认 turbo、白名单 2.8、Combobox、后端 `@IsIn` |
 | [minimax-chinese-voices.md](./minimax-chinese-voices.md) | **增量**：云端 MiniMax 中文系统音色（64 项）与语言增强联动 |
 | [cloud-tts-segment-pipeline.md](./cloud-tts-segment-pipeline.md) | **增量**：云端长文分段流水线（预取下一段、放弃 MSE） |
 | [cloud-tts-cadence-prefetch.md](./cloud-tts-cadence-prefetch.md) | **深度**：句读分段 + 播段预取实现（`pendingReady` 时序与完整源码） |

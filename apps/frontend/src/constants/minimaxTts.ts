@@ -2,12 +2,6 @@
 export const MINIMAX_TTS_MODELS = [
 	'speech-2.8-hd',
 	'speech-2.8-turbo',
-	'speech-2.6-hd',
-	'speech-2.6-turbo',
-	'speech-02-hd',
-	'speech-02-turbo',
-	'speech-01-hd',
-	'speech-01-turbo',
 ] as const;
 
 export const MINIMAX_TTS_AUDIO_FORMATS = [
@@ -45,7 +39,7 @@ export const DEFAULT_MINIMAX_TTS_LANGUAGE_BOOST =
 export type MinimaxTtsLanguageBoost =
 	(typeof MINIMAX_TTS_LANGUAGE_BOOST_VALUES)[number];
 
-export const DEFAULT_MINIMAX_TTS_MODEL = 'speech-2.8-hd';
+export const DEFAULT_MINIMAX_TTS_MODEL = 'speech-2.8-turbo';
 export const DEFAULT_MINIMAX_TTS_VOICE_ID = 'English_captivating_female1';
 
 export type DefaultMinimaxCloudCredentials = {

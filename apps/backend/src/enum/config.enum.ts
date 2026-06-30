@@ -190,7 +190,7 @@ export enum MinimaxEnum {
 	MINIMAX_GROUP_ID = 'MINIMAX_GROUP_ID',
 	/** API 根路径，默认 https://api.minimaxi.com；备用 https://api-bj.minimaxi.com */
 	MINIMAX_TTS_BASE_URL = 'MINIMAX_TTS_BASE_URL',
-	/** 默认 speech-2.8-hd */
+	/** 默认 speech-2.8-turbo */
 	MINIMAX_TTS_MODEL = 'MINIMAX_TTS_MODEL',
 	/** 默认 English_captivating_female1 */
 	MINIMAX_TTS_VOICE_ID = 'MINIMAX_TTS_VOICE_ID',

@@ -215,7 +215,7 @@ export const enUS = {
 	'setting.cloudTts.paramsHelpAria': 'Playback parameter field help',
 	'setting.cloudTts.paramsHelpTitle': 'Field reference',
 	'setting.cloudTts.fieldHelp.model':
-		'Cloud synthesis model, e.g. speech-2.8-hd (higher quality) or turbo (faster).',
+		'Cloud synthesis model, e.g. speech-2.8-turbo (default, faster) or hd (higher quality).',
 	'setting.cloudTts.fieldHelp.voiceId':
 		'Voice used for playback; choose from the preset list.',
 	'setting.cloudTts.fieldHelp.speed':
@@ -252,6 +252,9 @@ export const enUS = {
 		'Mutually exclusive with “Use local voice for playback” above; the parameter form applies when this is on.',
 	'setting.cloudTts.openPresets': 'Choose preset',
 	'setting.cloudTts.model': 'Model',
+	'setting.cloudTts.modelPlaceholder': 'Enter model name',
+	'setting.cloudTts.modelOption.speech28Hd': 'speech-2.8-hd (higher quality)',
+	'setting.cloudTts.modelOption.speech28Turbo': 'speech-2.8-turbo (default)',
 	'setting.cloudTts.voiceId': 'Voice category',
 	'setting.cloudTts.voiceGroup.female': 'Female',
 	'setting.cloudTts.voiceGroup.male': 'Male',

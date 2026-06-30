@@ -1307,6 +1307,13 @@ const UPDATE_INFO_SECTIONS_ZH: UpdateInfoSection[] = [
 				description:
 					'语音设置 → 云端语音设置中，MiniMax 区块可填写 API Key 与模型名，讯飞区块可填写 APPID / APIKey / APISecret（留空则使用服务端默认）；切换朗读来源时 MiniMax 与讯飞音色分别保存；云端合成失败时会明确提示并尝试本机朗读。',
 			},
+			{
+				id: 's24-46',
+				title: 'MiniMax 模型选择与默认',
+				dateLabel: '2026-06-27',
+				description:
+					'语音设置 → 云端语音设置中，MiniMax 模型改为输入 + 预设下拉（speech-2.8-hd / speech-2.8-turbo，与大模型设置同款交互）；新用户与恢复默认为 turbo；仅支持 2.8 系列两项——若账号仍保存旧版 2.6 / 02 / 01 模型名，需改为 hd 或 turbo 后再保存。',
+			},
 		],
 	},
 	{

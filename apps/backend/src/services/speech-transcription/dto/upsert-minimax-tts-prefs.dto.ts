@@ -9,6 +9,10 @@ import {
 	MaxLength,
 	Min,
 } from 'class-validator';
+import {
+	MINIMAX_TTS_MODELS,
+	type MinimaxTtsModel,
+} from '../minimax-tts-models';
 
 const MINIMAX_AUDIO_FORMATS = [
 	'mp3',
@@ -33,7 +37,8 @@ export class UpsertMinimaxTtsPrefsDto {
 
 	@IsString()
 	@MaxLength(64)
-	model!: string;
+	@IsIn([...MINIMAX_TTS_MODELS])
+	model!: MinimaxTtsModel;
 
 	@IsString()
 	@MaxLength(128)

@@ -856,6 +856,11 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'In Voice settings → Cloud voice settings, the MiniMax section accepts API Key and model name; the iFlytek section accepts APP ID, API Key, and API Secret (leave blank to use server defaults). MiniMax and iFlytek voice choices are stored separately when switching sources. Cloud synthesis failures show a clear alert and attempt local voice when available.',
 	},
+	's24-46': {
+		title: 'MiniMax model picker and default',
+		description:
+			'In Voice settings → Cloud voice settings, the MiniMax model field is now a creatable combobox (speech-2.8-hd / speech-2.8-turbo, same pattern as LLM settings). New users and restore-default use turbo; only these two 2.8 models are accepted—accounts still storing legacy 2.6 / 02 / 01 names must switch to hd or turbo before saving.',
+	},
 	's25-1': {
 		title: 'E-book bookshelf',
 		description:

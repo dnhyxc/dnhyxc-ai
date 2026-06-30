@@ -4,6 +4,7 @@
 
 import Loading from '@design/Loading';
 import { Button } from '@ui/button';
+import { CreatableCombobox } from '@ui/combobox';
 import { Input, Label } from '@ui/index';
 import {
 	Select,
@@ -26,6 +27,7 @@ import {
 	MINIMAX_TTS_AUDIO_FORMATS,
 	MINIMAX_TTS_EMOTIONS,
 	MINIMAX_TTS_LANGUAGE_BOOST_VALUES,
+	MINIMAX_TTS_MODELS,
 	type MinimaxTtsLanguageBoost,
 	type MinimaxTtsVoice,
 } from '@/constants/minimaxTts';
@@ -61,6 +63,14 @@ import { ParamsHelpPopover } from './ParamsHelpPopover';
 import { PlaybackSourcePicker } from './PlaybackSourcePicker';
 
 const EMOTION_NONE = '__none__';
+
+const MINIMAX_MODEL_OPTION_I18N: Record<
+	(typeof MINIMAX_TTS_MODELS)[number],
+	string
+> = {
+	'speech-2.8-hd': 'setting.cloudTts.modelOption.speech28Hd',
+	'speech-2.8-turbo': 'setting.cloudTts.modelOption.speech28Turbo',
+};
 
 type CloudTtsPreviewTarget = 'minimax' | 'xfyun';
 
@@ -445,6 +455,15 @@ const CloudTtsSetting = observer(() => {
 		[],
 	);
 
+	const minimaxModelOptions = useMemo(
+		() =>
+			MINIMAX_TTS_MODELS.map((value) => ({
+				value,
+				label: t(MINIMAX_MODEL_OPTION_I18N[value]),
+			})),
+		[t],
+	);
+
 	const emotionOptions = useMemo(
 		() => [
 			{
@@ -597,14 +616,26 @@ const CloudTtsSetting = observer(() => {
 									labelClassName={fieldLabelClass}
 									secret
 								/>
-								<PrefTextField
-									id="minimax-model-name"
-									label={t('setting.cloudTts.model')}
-									value={prefs.model}
-									onChange={(model) => patch({ model })}
-									disabled={fieldsDisabled}
-									labelClassName={fieldLabelClass}
-								/>
+								<div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+									<Label
+										htmlFor="minimax-model-name"
+										className={fieldLabelClass}
+									>
+										{t('setting.cloudTts.model')}
+									</Label>
+									<div className="min-w-0 flex-1">
+										<CreatableCombobox
+											id="minimax-model-name"
+											value={prefs.model}
+											onChange={(model) => patch({ model })}
+											options={minimaxModelOptions}
+											placeholder={t('setting.cloudTts.modelPlaceholder')}
+											presetsAriaLabel={t('setting.cloudTts.openPresets')}
+											disabled={fieldsDisabled}
+											inputClassName={fieldInputClass}
+										/>
+									</div>
+								</div>
 
 								<VoiceSelectField
 									id="cloud-tts-voice"

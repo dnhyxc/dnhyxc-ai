@@ -9,7 +9,7 @@ export class MinimaxTtsUserConfig {
 	@Column({ type: 'boolean', default: false })
 	enabled!: boolean;
 
-	@Column({ type: 'varchar', length: 64, default: 'speech-2.8-hd' })
+	@Column({ type: 'varchar', length: 64, default: 'speech-2.8-turbo' })
 	model!: string;
 
 	@Column({ name: 'voice_id', type: 'varchar', length: 128, default: '' })

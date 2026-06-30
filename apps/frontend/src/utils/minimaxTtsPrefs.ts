@@ -7,7 +7,6 @@ import {
 	MINIMAX_TTS_AUDIO_FORMATS,
 	MINIMAX_TTS_EMOTIONS,
 	MINIMAX_TTS_LANGUAGE_BOOST_VALUES,
-	MINIMAX_TTS_MODELS,
 } from '@/constants/minimaxTts';
 import {
 	DEFAULT_XFYUN_TTS_VCN,
@@ -119,9 +118,8 @@ export function normalizeMinimaxTtsUserPrefs(
 	const base: MinimaxTtsUserPrefs = {
 		enabled: Boolean(o.enabled),
 		playbackSource: normalizePlaybackSource(o.playbackSource),
-		model: (MINIMAX_TTS_MODELS as readonly string[]).includes(model)
-			? model
-			: DEFAULT_MINIMAX_TTS_MODEL,
+		// 设置页模型为自由输入；白名单见 MINIMAX_TTS_MODELS，后端 DTO 校验
+		model,
 		voiceId: pickString(o.voiceId, DEFAULT_MINIMAX_TTS_VOICE_ID, 128),
 		xfyunVoiceId: pickString(o.xfyunVoiceId, DEFAULT_XFYUN_TTS_VCN, 128),
 		speed: clampNumber(o.speed, 0.5, 2, 1),

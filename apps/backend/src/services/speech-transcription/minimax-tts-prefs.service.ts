@@ -2,6 +2,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import type { UpsertMinimaxTtsPrefsDto } from './dto/upsert-minimax-tts-prefs.dto';
+import { DEFAULT_MINIMAX_TTS_MODEL } from './minimax-tts-models';
 import { MinimaxTtsUserConfig } from './minimax-tts-user-config.entity';
 
 export type MinimaxTtsPrefsView = {
@@ -29,7 +30,7 @@ export type MinimaxTtsPrefsView = {
 export const DEFAULT_MINIMAX_TTS_PREFS: MinimaxTtsPrefsView = {
 	enabled: false,
 	playbackSource: 'local',
-	model: 'speech-2.8-hd',
+	model: DEFAULT_MINIMAX_TTS_MODEL,
 	voiceId: 'English_captivating_female1',
 	xfyunVoiceId: 'x4_yezi',
 	speed: 1,
