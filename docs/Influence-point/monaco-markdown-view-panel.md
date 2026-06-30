@@ -6,6 +6,7 @@
 - [markdown-split-scroll-sync.md](../monaco/markdown-split-scroll-sync.md) — 分屏左右跟随滚动（本改动复用其 sync 工具，未改算法）
 - [markdown-bottom-bar.md](../monaco/markdown-bottom-bar.md) — 底部操作栏与快捷键入口
 - [markdown-split-diff-compare.md](../monaco/markdown-split-diff-compare.md) — Diff 对照模式
+- [knowledge-editor-long-text-perf.md](./knowledge-editor-long-text-perf.md) — 长文编辑性能优化对知识库编辑/助手的影响面
 
 **阅读约定**：结论以仓库 **当前源码** 为准；「历史风险」指旧实现曾出现的问题，不代表现行代码仍会触发。
 

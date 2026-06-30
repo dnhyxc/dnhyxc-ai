@@ -129,6 +129,11 @@ export const PROJECT_GUIDE_ITEMS_EN: Record<
 		description:
 			'When logged in while editing Knowledge, use the doc assistant at the bottom for multi-turn help on the current Markdown—polish, summarize, or Q&A.\nHidden when logged out; local editing still works.\nLong threads: scroll-to-bottom / scroll-to-top near the input; during streaming, scroll back to follow the latest output; after streaming ends, if you had scrolled up to stop auto-follow, the list stays where you left it.\nSend selected text to the assistant (context menu or ⌘/Ctrl+Shift+V) for AI or RAG follow-ups; the input auto-focuses with the caret at the end of the inserted text; overlapping selections may be deduped (per release).\nMulti-turn: AI mode uses saved session history within the token budget; RAG mode mainly uses retrieved chunks each turn. Backend generation is aligned with main Chat via SiliconFlow; interaction is unchanged.\nDesktop: text/voice input like Chat, follows UI language; dictation fills the input live and stays after you stop recording.\nGenerate outline: in AI mode (not RAG), use “Generate outline”; the TOC is prepended or the top heading is normalized to “## 目录”; skipped if that heading already exists; anchor-only lists get the heading only.\nStreaming: no “thinking process” block; the generating spinner animates correctly.',
 	},
+	'pg-s5-7': {
+		title: '5.7 Long-form editing',
+		description:
+			'For long articles (e.g. tens of thousands of characters) with the doc assistant open, typing in edit-only mode for title, body, and assistant questions should feel noticeably smoother. Preview and split preview still render the full document after switching; save, auto-save, and assistant send behavior are unchanged.',
+	},
 	'pg-s6-1': {
 		title: '6.1 Task lists',
 		description:

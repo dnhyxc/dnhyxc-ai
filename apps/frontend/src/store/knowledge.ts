@@ -41,6 +41,14 @@ function deriveKnowledgeTitleFromMarkdown(markdown: string): string {
 	return `对话摘录-${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}`;
 }
 
+/** ponytail: O(n) trim/比较；长文编辑时由派生字段让 UI 只订阅 boolean */
+function syncKnowledgeDraftDerivedFlags(store: KnowledgeStore) {
+	store.markdownNonempty = store.markdown.trim().length > 0;
+	store.isDraftDirty =
+		store.knowledgeTitle.trim() !== store.knowledgePersistedSnapshot.title ||
+		store.markdown !== store.knowledgePersistedSnapshot.content;
+}
+
 class KnowledgeStore {
 	overwriteSaveEnabledStorageKey = 'dnhyxc-ai.knowledge.overwriteSaveEnabled';
 	autoSaveEnabledStorageKey = 'dnhyxc-ai.knowledge.autoSave.enabled';
@@ -69,6 +77,12 @@ class KnowledgeStore {
 
 	// —— 知识页编辑器草稿（与列表同属知识域，离开路由不丢）——
 	markdown = '';
+
+	/** trim 后是否有正文；仅 emptiness 变化时更新，供助手等避免订阅全文 */
+	markdownNonempty = false;
+
+	/** 标题或正文相对 persisted 快照是否有未保存变更 */
+	isDraftDirty = false;
 
 	/** 知识编辑页标题（与 markdown 同存） */
 	knowledgeTitle = '';
@@ -158,10 +172,12 @@ class KnowledgeStore {
 
 	setMarkdown(value: string) {
 		this.markdown = value;
+		syncKnowledgeDraftDerivedFlags(this);
 	}
 
 	setKnowledgeTitle(value: string) {
 		this.knowledgeTitle = value;
+		syncKnowledgeDraftDerivedFlags(this);
 	}
 
 	setKnowledgeEditingKnowledgeId(id: string | null) {
@@ -186,6 +202,7 @@ class KnowledgeStore {
 
 	setKnowledgePersistedSnapshot(snapshot: KnowledgePersistedSnapshot) {
 		this.knowledgePersistedSnapshot = snapshot;
+		syncKnowledgeDraftDerivedFlags(this);
 	}
 
 	/** 打开「覆盖已有文件」确认（桌面端保存冲突时） */
@@ -259,6 +276,7 @@ class KnowledgeStore {
 		this.knowledgeLocalDirPath = null;
 		this.knowledgePersistedSnapshot = { title: '', content: '' };
 		this.markdown = '';
+		syncKnowledgeDraftDerivedFlags(this);
 		this.knowledgeOverwriteOpen = false;
 		this.knowledgeOverwriteTargetPath = '';
 		this.knowledgePendingSavePayload = null;
@@ -279,6 +297,7 @@ class KnowledgeStore {
 		this.markdown = body;
 		this.knowledgeTitle = deriveKnowledgeTitleFromMarkdown(body);
 		this.knowledgePersistedSnapshot = { title: '', content: '' };
+		syncKnowledgeDraftDerivedFlags(this);
 	}
 
 	get getMarkdown() {

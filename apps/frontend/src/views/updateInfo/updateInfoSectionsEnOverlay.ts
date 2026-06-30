@@ -338,6 +338,11 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'Fixes Knowledge doc assistant, ebook MOKE assistant, and English-learning Agent jumping to the bottom after streaming when you had scrolled up to read history. Scroll back to the bottom or tap “Scroll to bottom” to resume following new output.',
 	},
+	's6-26': {
+		title: 'Smoother long-form Knowledge editing',
+		description:
+			'Improves typing responsiveness for long Markdown in edit-only mode; with the doc assistant open, title, body, and assistant input feel more responsive. Preview and split preview still render the full document after switching.',
+	},
 	's7-1': {
 		title: 'IME (input method editor) compatibility',
 		description:

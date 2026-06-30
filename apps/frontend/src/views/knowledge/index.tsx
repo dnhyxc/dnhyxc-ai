@@ -37,6 +37,7 @@ import {
 	TAURI_KNOWLEDGE_DIR,
 } from './constants';
 import KnowledgeAssistant, {
+	type KnowledgeAssistantHandle,
 	type KnowledgeAssistantMode,
 	readKnowledgeAssistantPanelMode,
 } from './KnowledgeAssistant';
@@ -66,18 +67,59 @@ function isMonacoInEventPath(e: KeyboardEvent): boolean {
 	return false;
 }
 
+/** 标题栏：只订阅 title / isDraftDirty，避免长文编辑时随 markdown 全文重渲染 */
+const KnowledgeTitleField = observer(function KnowledgeTitleField({
+	t,
+}: {
+	t: (key: string, params?: Record<string, unknown>) => string;
+}) {
+	const { knowledgeStore } = useStore();
+	return (
+		<div className="flex flex-1 items-center pl-3 gap-1">
+			<span
+				role="img"
+				aria-label={
+					knowledgeStore.isDraftDirty
+						? t('knowledge.title.unsavedChanges')
+						: t('knowledge.title.document')
+				}
+				className="relative inline-flex shrink-0"
+			>
+				<NotebookPen size={16} className="text-textcolor" />
+				{knowledgeStore.isDraftDirty ? (
+					<span
+						className="pointer-events-none absolute -right-0.5 -top-0.5 size-2 rounded-full bg-orange-500"
+						aria-hidden
+					/>
+				) : null}
+			</span>
+			<Input
+				value={knowledgeStore.knowledgeTitle}
+				maxLength={100}
+				onChange={(e) => knowledgeStore.setKnowledgeTitle(e.target.value)}
+				placeholder={t('knowledge.title.placeholder')}
+				aria-label={t('knowledge.title.aria')}
+				className="md:text-base h-full border-0 bg-transparent pr-2 text-textcolor shadow-none placeholder:text-sm placeholder:text-textcolor/60 focus-visible:border-0 focus-visible:ring-0"
+			/>
+		</div>
+	);
+});
+
 /** 知识编辑页：正文与标题等草稿存于 knowledgeStore，聊天助手条「保存到知识库」会写入同一份草稿并跳转至此 */
 const Knowledge = observer(() => {
 	const { knowledgeStore, userStore } = useStore();
 	const { t } = useI18n();
 	const { theme } = useTheme();
-	const [assistantInput, setAssistantInput] = useState('');
-	const [ragAssistantInput, setRagAssistantInput] = useState('');
-	/** 递增时在 ChatEntry 同步 input 后聚焦并将光标置于末尾（对齐 ebook MOKE 问书） */
-	const [focusInputAtEndKey, setFocusInputAtEndKey] = useState(0);
+	const assistantRef = useRef<KnowledgeAssistantHandle>(null);
 	/** 与 KnowledgeAssistant 内 AI/RAG 切换同步，供「复制选中内容到助手」写入对应输入框 */
 	const knowledgeAssistantModeRef = useRef<KnowledgeAssistantMode>(
 		readKnowledgeAssistantPanelMode(),
+	);
+	const onKnowledgeAssistantModeChange = useCallback(
+		(mode: KnowledgeAssistantMode) => {
+			knowledgeAssistantModeRef.current = mode;
+		},
+		[],
 	);
 
 	const [shareOpen, setShareOpen] = useState(false);
@@ -117,7 +159,7 @@ const Knowledge = observer(() => {
 	);
 
 	const scheduleAssistantInputFocus = useCallback(() => {
-		window.setTimeout(() => setFocusInputAtEndKey((n) => n + 1), 0);
+		window.setTimeout(() => assistantRef.current?.focusInputAtEnd(), 0);
 	}, []);
 
 	const [knowledgeChords, setKnowledgeChords] = useState<{
@@ -230,16 +272,7 @@ const Knowledge = observer(() => {
 		// 记录本次插入内容和时间
 		lastAssistantInsertRef.current = { text: next, at: now };
 
-		const appendBlock = (prev: string) => {
-			const cur = (prev ?? '').trim();
-			return cur ? `${cur}\n\n${next}` : next;
-		};
-
-		if (knowledgeAssistantModeRef.current === 'rag') {
-			setRagAssistantInput((prev) => appendBlock(prev));
-		} else {
-			setAssistantInput((prev) => appendBlock(prev));
-		}
+		assistantRef.current?.appendInput(next, knowledgeAssistantModeRef.current);
 
 		// 对齐 ebook openAssistant：同步打开面板；内容写入后再聚焦（右键路径由 Monaco 拦截 onCloseAutoFocus）
 		setMarkdownAssistantOpen(true);
@@ -322,11 +355,17 @@ const Knowledge = observer(() => {
 		[assistantArticleBinding, trashOpenNonce],
 	);
 
-	// 切换知识文档（binding 变化）时清空助手输入框，避免把上一篇草稿带到下一篇
-	useEffect(() => {
-		setAssistantInput('');
-		setRagAssistantInput('');
-	}, [assistantArticleBinding]);
+	const knowledgeAssistantNode = useMemo(
+		() =>
+			isCloudLoggedIn ? (
+				<KnowledgeAssistant
+					ref={assistantRef}
+					documentKey={assistantDocumentKey}
+					onAssistantModeChange={onKnowledgeAssistantModeChange}
+				/>
+			) : null,
+		[isCloudLoggedIn, assistantDocumentKey, onKnowledgeAssistantModeChange],
+	);
 
 	/** 清空标题与正文（store 级草稿，与 markdown 一并清除） */
 	const resetEditorToNewDraft = useCallback(() => {
@@ -1137,12 +1176,6 @@ const Knowledge = observer(() => {
 		overwriteTargetPath.split(/[/\\]/).filter(Boolean).pop() ??
 		overwriteTargetPath;
 
-	const markdownForDirty = knowledgeStore.markdown ?? '';
-	const snapForDirty = knowledgeStore.knowledgePersistedSnapshot;
-	const hasUnsavedChanges =
-		knowledgeStore.knowledgeTitle.trim() !== snapForDirty.title ||
-		markdownForDirty !== snapForDirty.content;
-
 	return (
 		<div className="w-full h-full flex flex-col justify-center items-center m-0">
 			<Confirm
@@ -1239,55 +1272,8 @@ const Knowledge = observer(() => {
 							shortcutHintOpenTrash={knowledgeChords.openTrash}
 						/>
 					}
-					title={
-						<div className="flex flex-1 items-center pl-3 gap-1">
-							<span
-								role="img"
-								aria-label={
-									hasUnsavedChanges
-										? t('knowledge.title.unsavedChanges')
-										: t('knowledge.title.document')
-								}
-								className="relative inline-flex shrink-0"
-							>
-								<NotebookPen size={16} className="text-textcolor" />
-								{hasUnsavedChanges ? (
-									<span
-										className="pointer-events-none absolute -right-0.5 -top-0.5 size-2 rounded-full bg-orange-500"
-										aria-hidden
-									/>
-								) : null}
-							</span>
-							<Input
-								value={knowledgeStore.knowledgeTitle}
-								maxLength={100}
-								onChange={(e) =>
-									knowledgeStore.setKnowledgeTitle(e.target.value)
-								}
-								placeholder={t('knowledge.title.placeholder')}
-								aria-label={t('knowledge.title.aria')}
-								className="md:text-base h-full border-0 bg-transparent pr-2 text-textcolor shadow-none placeholder:text-sm placeholder:text-textcolor/60 focus-visible:border-0 focus-visible:ring-0"
-							/>
-						</div>
-					}
-					bottomBarAssistantNode={
-						isCloudLoggedIn ? (
-							<KnowledgeAssistant
-								documentKey={knowledgeAssistantDocumentKey(
-									assistantArticleBinding,
-									trashOpenNonce,
-								)}
-								input={assistantInput}
-								setInput={setAssistantInput}
-								ragInput={ragAssistantInput}
-								setRagInput={setRagAssistantInput}
-								focusInputAtEndKey={focusInputAtEndKey}
-								onAssistantModeChange={(mode) => {
-									knowledgeAssistantModeRef.current = mode;
-								}}
-							/>
-						) : null
-					}
+					title={<KnowledgeTitleField t={t} />}
+					bottomBarAssistantNode={knowledgeAssistantNode}
 				/>
 			</ScrollArea>
 			<KnowledgeList

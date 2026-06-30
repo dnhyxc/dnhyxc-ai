@@ -54,6 +54,7 @@
 | [auto-save.md](./auto-save.md) |
 | [knowledge-save-format-before-persist.md](./knowledge-save-format-before-persist.md) | 保存 / 自动保存前先格式化再落库 |
 | [knowledge-save-body-limit.md](./knowledge-save-body-limit.md) | 云端保存请求体上限与 DTO 对齐（修复 PayloadTooLargeError） |
+| [knowledge-editor-long-text-perf.md](./knowledge-editor-long-text-perf.md) | **长文编辑性能**：纯 edit 停喂隐藏预览、Store 派生 boolean、助手输入内化 |
 | [shortcuts.md](./shortcuts.md) |
 | [unauthenticated-local-only.md](./unauthenticated-local-only.md) |
 

@@ -640,8 +640,9 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 		editorBootstrapTextRef.current = value;
 	}
 
-	/** 左栏预览与编辑器同源即时正文，避免 deferred 滞后导致 scroll sync 折线偏移 */
-	const leftPreviewMarkdown = value ?? '';
+	/** 纯编辑态不喂预览正文，避免长文每键重解析拖慢 Monaco 与标题输入 */
+	const leftPreviewMarkdown =
+		viewMode === 'preview' || viewMode === 'split' ? (value ?? '') : '';
 	/** 分屏下用即时正文，避免 deferred 滞后导致预览 DOM 与编辑器 scroll 不同步 */
 	const splitPaneMarkdown = viewMode === 'split' ? (value ?? '') : '';
 	/** Diff 右侧（modified）与主编辑器正文同步 */

@@ -57,6 +57,7 @@
 | 向量分片 ole.log / 代码截断                                       | [knowledge/knowledge-chunk-boundaries.md](./knowledge/knowledge-chunk-boundaries.md)                                                                     |
 | 保存知识库后 `Invalid array length` / Node OOM                    | [knowledge/knowledge-chunk-infinite-loop-oom.md](./knowledge/knowledge-chunk-infinite-loop-oom.md)                                                       |
 | 云端保存知识库报「请求体过大」/ PayloadTooLarge                   | [knowledge/knowledge-save-body-limit.md](./knowledge/knowledge-save-body-limit.md)                                                                       |
+| 知识库长文编辑卡顿（标题/正文/助手输入）                          | [knowledge/knowledge-editor-long-text-perf.md](./knowledge/knowledge-editor-long-text-perf.md)                                                             |
 | 对话运行久后 Node OOM / 附件重复解析                              | [chat/chat-memory-oom.md](./chat/chat-memory-oom.md)                                                                                                     |
 | 流式输出时代码块无法横向滚动                                      | [chat/streaming-code-block-scroll.md](./chat/streaming-code-block-scroll.md)                                                                             |
 | 生产 rate-limit `ERR_ERL_UNEXPECTED_X_FORWARDED_FOR`              | [ops/trust-proxy-rate-limit.md](./ops/trust-proxy-rate-limit.md)                                                                                         |
