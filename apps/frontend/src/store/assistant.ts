@@ -24,6 +24,7 @@ import {
 	ASSISTANT_SSE_USER_ABORT_MARKER,
 	streamAssistantSse,
 } from '@/utils/assistantSse';
+import { createStreamingMobxPatchScheduler } from '@/utils/scheduleStreamingMobxPatch';
 
 /**
  * 对外暴露的 AssistantStore 公开 API。
@@ -1538,22 +1539,26 @@ export class AssistantStore {
 		}
 
 		// 该方法合并助手流式返回的增量，并实时写入对应助手消息
-		const applyAssistantPatch = (delta: string, thinkDelta?: string) => {
-			if (delta) accumulated += delta; // 累积正文
-			if (thinkDelta) thinkBuf += thinkDelta; // 累积 thinkContent
-			// 每次都用新对象替换，触发 observable 数组精确的变更感知
+		const flushAssistantPatch = () => {
 			runInAction(() => {
 				const idx = state.messages.findIndex(
 					(m) => m.chatId === assistantChatId,
 				);
-				if (idx < 0) return; // 未找到则忽略
+				if (idx < 0) return;
 				const prev = state.messages[idx] as Message;
 				state.messages[idx] = {
 					...prev,
-					content: accumulated, // 刷新正文
-					thinkContent: thinkBuf, // 刷新思考
+					content: accumulated,
+					thinkContent: thinkBuf,
 				};
 			});
+		};
+		const assistantPatchScheduler =
+			createStreamingMobxPatchScheduler(flushAssistantPatch);
+		const applyAssistantPatch = (delta: string, thinkDelta?: string) => {
+			if (delta) accumulated += delta;
+			if (thinkDelta) thinkBuf += thinkDelta;
+			assistantPatchScheduler.schedule();
 		};
 
 		try {
@@ -1587,6 +1592,7 @@ export class AssistantStore {
 					},
 					// 流式交付完成（含错误/中止）
 					onComplete: async (err) => {
+						assistantPatchScheduler.flush();
 						// 判断是否为用户主动取消
 						const userAborted = err === ASSISTANT_SSE_USER_ABORT_MARKER;
 						runInAction(() => {
@@ -1692,6 +1698,7 @@ export class AssistantStore {
 				void this.refreshSessionListForCurrentDocument().catch(() => {});
 			}
 		} catch {
+			assistantPatchScheduler.flush();
 			// 流式 SSE 发生顶层错误时需恢复 UI 状态
 			runInAction(() => {
 				state.isSending = false;

@@ -4,6 +4,8 @@
 
 - [knowledge-editor-long-text-perf.md](./knowledge-editor-long-text-perf.md) — 长文编辑态渲染隔离（Store 派生 boolean、纯 edit 停喂隐藏预览、标题区 observer）
 - [knowledge-editor-long-text-perf.md](../knowledge/knowledge-editor-long-text-perf.md) — 第一轮实现说明（改动前后对比）
+- [knowledge-preview-assistant-perf.md](../knowledge/knowledge-preview-assistant-perf.md) — **正式实现文档**（改动前后对比 + 逐行注释）
+- [knowledge-preview-assistant-perf.md](../ideas/knowledge-preview-assistant-perf.md) — 规划态实现思路（架构/时序/分阶段）
 - [monaco-markdown-view-panel.md](./monaco-markdown-view-panel.md) — Markdown 预览/编辑与助手 Panel 布局 co-mount
 - [knowledge-assistant-complete.md](../knowledge/knowledge-assistant-complete.md) — 知识库助手完整链路（会话、`documentKey`、持久化）
 - [knowledge-view.md](../../apps/frontend/specs/knowledge-view.md) — 知识编辑页规格

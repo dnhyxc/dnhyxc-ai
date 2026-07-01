@@ -479,6 +479,7 @@ export const zhCN = {
 	'monaco.bottomBar.aria.reset': '复位操作栏位置',
 
 	'markdown.preview.empty': '预览内容为空',
+	'markdown.preview.loading': '内容加载中…',
 	'markdown.preview.scroll.toBottom': '滚动到底部',
 	'markdown.preview.scroll.toTop': '滚动到顶部',
 

@@ -19,7 +19,10 @@ import {
 import type { Message } from '@/types/chat';
 
 export type UseAssistantScrollOptions = {
-	messages: readonly Message[];
+	/** 流式贴底 revision；与 `messageCount` 联用时可不传 `messages` */
+	contentRevision?: string;
+	messageCount?: number;
+	messages?: readonly Message[];
 	isStreaming: boolean;
 	/** 切换文档/会话时重置贴底 */
 	resetKey?: string | null;
@@ -42,6 +45,8 @@ export type UseAssistantScrollResult = {
 
 /** 助手滚动：流式贴底 + 代码块工具栏 + 置顶/置底 FAB */
 export function useAssistantScroll({
+	contentRevision: contentRevisionProp,
+	messageCount: messageCountProp,
 	messages,
 	isStreaming,
 	resetKey,
@@ -49,7 +54,10 @@ export function useAssistantScroll({
 	codeToolbarLayoutDeps = [],
 	scrollBehavior = 'smooth',
 }: UseAssistantScrollOptions): UseAssistantScrollResult {
-	const streamTick = buildStreamTick(messages);
+	const streamTick =
+		contentRevisionProp ??
+		(messages ? buildStreamTick(messages) : String(messageCountProp ?? 0));
+	const messageCount = messageCountProp ?? messages?.length ?? 0;
 
 	const {
 		viewportRef,
@@ -85,10 +93,10 @@ export function useAssistantScroll({
 	const { relayout: relayoutCodeToolbar } = useChatCodeFloatingToolbar(
 		viewportRef as RefObject<HTMLElement | null>,
 		{
-			layoutDeps: [streamTick, messages.length, ...codeToolbarLayoutDeps],
+			layoutDeps: [streamTick, messageCount, ...codeToolbarLayoutDeps],
 			passiveScrollLayout: true,
 			passiveScrollDeps: [
-				messages.length,
+				messageCount,
 				streamTick,
 				isStreaming,
 				...codeToolbarLayoutDeps,
@@ -109,11 +117,11 @@ export function useAssistantScroll({
 	}, [scrollViewportHandlers, relayoutCodeToolbar, updateScrollFab]);
 
 	useEffect(() => {
-		if (messages.length === 0) {
+		if (messageCount === 0) {
 			scrollFabModeRef.current = 'hidden';
 			setScrollFabMode('hidden');
 		}
-	}, [messages.length]);
+	}, [messageCount]);
 
 	useEffect(() => {
 		let ro: ResizeObserver | null = null;
@@ -130,7 +138,7 @@ export function useAssistantScroll({
 			window.clearTimeout(tid);
 			ro?.disconnect();
 		};
-	}, [streamTick, messages.length, updateScrollFab, viewportRef]);
+	}, [streamTick, messageCount, updateScrollFab, viewportRef]);
 
 	const onScrollFabClick = useCallback(() => {
 		const vp = viewportRef.current;

@@ -1,3 +1,4 @@
+import Loading from '@design/Loading';
 import { MermaidFenceIsland } from '@design/MermaidFenceIsland';
 import { MermaidFenceToolbarActions } from '@design/MermaidFenceToolbar';
 import Tooltip from '@design/Tooltip';
@@ -85,6 +86,10 @@ interface ParserMarkdownPreviewPaneProps {
 	withScrollArea?: boolean;
 	/** 右栏助手等同屏重任务时关闭，避免与助手侧共用全局代码吸顶条 layout 争用主线程 */
 	enableCodeFloatingToolbar?: boolean;
+	/**
+	 * 源正文已有内容但 `markdown` 尚未就绪（deferred/latch 追平帧）时展示加载态，避免误显示「预览为空」。
+	 */
+	pendingSourceMarkdown?: string;
 }
 
 /**
@@ -101,6 +106,7 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 	enableMermaid = true,
 	withScrollArea = true,
 	enableCodeFloatingToolbar = true,
+	pendingSourceMarkdown,
 }: ParserMarkdownPreviewPaneProps) {
 	const markdownRef = useRef<HTMLDivElement>(null);
 	/** 与 `dangerouslySetInnerHTML` 同层，保证 Mermaid 在内容写入后再扫描节点 */
@@ -283,36 +289,47 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 		enableCodeFloatingToolbar ? { layoutDeps: [markdown] } : undefined,
 	);
 
+	// 同步滚动区域的度量数据（比如触发代码工具栏重新布局）。
 	const syncScrollMetrics = useCallback(() => {
+		// 如果未启用代码浮动工具栏，则无需同步
 		if (!enableCodeFloatingToolbar) return;
+		// 获取当前滚动视口 DOM 元素
 		const el = effectiveScrollViewportRef.current;
+		// 如果视口不存在也不用处理
 		if (!el) return;
+		// 触发代码工具栏重新布局
 		relayoutCodeToolbar();
 	}, [
-		enableCodeFloatingToolbar,
-		relayoutCodeToolbar,
-		effectiveScrollViewportRef,
+		enableCodeFloatingToolbar, // 依赖：是否启用代码浮动工具栏
+		relayoutCodeToolbar, // 依赖：重新布局回调
+		effectiveScrollViewportRef, // 依赖：滚动视口引用
 	]);
 
+	// 处理滚动视口滚动事件
 	const handleViewportScroll = useCallback(
+		// _e: UIEvent<HTMLDivElement> 为滚动事件对象，这里没有使用
 		(_e: UIEvent<HTMLDivElement>) => {
+			// 同步滚动区域的各种度量（比如用于代码工具栏的重新定位）
 			syncScrollMetrics();
+			// 若有传入 onViewportScrollFollow 回调，则调用（通常用于触底保持跟随等逻辑）
 			onViewportScrollFollow?.();
+			// 如果显示右下角滚动浮动按钮（如置顶/置底），刷新其展示状态
 			if (showPreviewScrollCornerFab) refreshPreviewScrollFab();
 		},
 		[
-			syncScrollMetrics,
-			onViewportScrollFollow,
-			showPreviewScrollCornerFab,
-			refreshPreviewScrollFab,
+			syncScrollMetrics, // 依赖：度量同步函数
+			onViewportScrollFollow, // 依赖：自定义滚动跟随回调
+			showPreviewScrollCornerFab, // 依赖：是否展示滚动浮动按钮
+			refreshPreviewScrollFab, // 依赖：刷新浮动按钮显示的回调
 		],
 	);
 
 	useEffect(() => {
+		if (!enableCodeFloatingToolbar) return;
 		syncScrollMetrics();
 		const id = requestAnimationFrame(() => syncScrollMetrics());
 		return () => cancelAnimationFrame(id);
-	}, [markdown, syncScrollMetrics]);
+	}, [markdown, syncScrollMetrics, enableCodeFloatingToolbar]);
 
 	// 正文变化 / 视口尺寸变化时更新「是否可滚、是否触底」
 	useEffect(() => {
@@ -406,6 +423,9 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 		</div>
 	);
 
+	const previewPending =
+		!markdown.trim() && Boolean(pendingSourceMarkdown?.trim());
+
 	return (
 		<div
 			ref={markdownRef}
@@ -441,6 +461,10 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 						</div>
 					</ScrollArea>
 				)
+			) : previewPending ? (
+				<div className="flex h-full min-h-0 items-center justify-center p-3">
+					<Loading text={t?.('markdown.preview.loading') ?? '内容加载中…'} />
+				</div>
 			) : (
 				<div className="flex items-center justify-center flex-col gap-5 h-full box-border min-w-0 max-w-full w-full p-3 rounded-md">
 					<Component className="w-16 h-16 text-textcolor/70 animate-bounce" />

@@ -508,6 +508,7 @@ export const enUS = {
 
 	// Markdown 预览文案
 	'markdown.preview.empty': 'Nothing to preview',
+	'markdown.preview.loading': 'Loading preview…',
 	'markdown.preview.scroll.toBottom': 'Scroll to bottom',
 	'markdown.preview.scroll.toTop': 'Scroll to top',
 

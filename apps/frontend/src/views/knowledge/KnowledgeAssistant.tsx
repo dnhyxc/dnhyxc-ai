@@ -19,12 +19,16 @@ import {
 	useState,
 } from 'react';
 import {
-	AssistantMessageRow,
 	AssistantShell,
-	type SelectMessageByChatId,
 	useAssistantShare,
 } from '@/components/design/Assistant';
-import { useAssistantCopy, useAssistantScroll, useI18n } from '@/hooks';
+import {
+	useAssistantCopy,
+	useAssistantMessageCount,
+	useAssistantScroll,
+	useAssistantStreamTick,
+	useI18n,
+} from '@/hooks';
 import { cn } from '@/lib/utils';
 import useStore from '@/store';
 import assistantStore from '@/store/assistant';
@@ -40,6 +44,7 @@ import {
 	type KnowledgeAssistantChatFooterHandle,
 	KnowledgeAssistantFooterControls,
 } from './KnowledgeAssistantChatFooter';
+import { KnowledgeAssistantMessageList } from './KnowledgeAssistantMessageList';
 import {
 	buildKnowledgeAssistantDocumentMessage,
 	documentHasCanonicalTocHeading,
@@ -89,13 +94,9 @@ export function readKnowledgeAssistantPanelMode(): KnowledgeAssistantPanelMode {
 		: 'ai';
 }
 
-const selectAssistantMessageByChatId: SelectMessageByChatId = (chatId) =>
-	assistantStore.messages.find((m) => m.chatId === chatId);
-
-const selectRagMessageByChatId: SelectMessageByChatId = (chatId) =>
-	knowledgeRagQaStore.messages.find((m) => m.chatId === chatId);
-
 const EMPTY_AI_MESSAGES: readonly Message[] = [];
+
+const getAiMessages = () => assistantStore.messages;
 
 const KnowledgeAssistantInner = observer(
 	forwardRef<KnowledgeAssistantHandle, KnowledgeAssistantProps>(
@@ -200,22 +201,23 @@ const KnowledgeAssistantInner = observer(
 				[knowledgeStore, t],
 			);
 
-			const aiMessages = assistantStore.messages;
-			const ragMessages = knowledgeRagQaStore.messages;
-			const messages = isRagMode ? ragMessages : aiMessages;
+			const aiMessageCount = useAssistantMessageCount(false);
+			const ragMessageCount = useAssistantMessageCount(true);
+			const messageCount = isRagMode ? ragMessageCount : aiMessageCount;
+			const streamTick = useAssistantStreamTick(isRagMode);
 
 			/** AI 模式非流式就绪贴底签名（会话 + 条数；不含 chatId，避免流式落库换 id 误触发滚底） */
 			const aiIdleFlushKey = useMemo((): string | null => {
 				if (isRagMode) return null;
 				if (assistantStore.isHistoryLoading) return null;
-				if (aiMessages.length === 0) return null;
-				return `${documentKey}-${assistantStore.activeSessionId ?? ''}-${aiMessages.length}`;
+				if (aiMessageCount === 0) return null;
+				return `${documentKey}-${assistantStore.activeSessionId ?? ''}-${aiMessageCount}`;
 			}, [
 				isRagMode,
 				documentKey,
 				assistantStore.activeSessionId,
 				assistantStore.isHistoryLoading,
-				aiMessages.length,
+				aiMessageCount,
 			]);
 
 			const {
@@ -226,7 +228,8 @@ const KnowledgeAssistantInner = observer(
 				scrollFabMode,
 				onScrollFabClick,
 			} = useAssistantScroll({
-				messages,
+				contentRevision: streamTick,
+				messageCount,
 				isStreaming: isRagMode
 					? knowledgeRagQaStore.isStreaming
 					: assistantStore.isStreaming,
@@ -259,7 +262,7 @@ const KnowledgeAssistantInner = observer(
 			const showPostStreamActions =
 				!isRagMode &&
 				isLoggedIn &&
-				aiMessages.length > 0 &&
+				aiMessageCount > 0 &&
 				editorHasBody &&
 				!assistantStore.isHistoryLoading &&
 				!assistantStore.isSending &&
@@ -269,7 +272,7 @@ const KnowledgeAssistantInner = observer(
 			const showRagNewConversation =
 				isRagMode &&
 				isLoggedIn &&
-				ragMessages.length > 0 &&
+				ragMessageCount > 0 &&
 				!knowledgeRagQaStore.isSending &&
 				!knowledgeRagQaStore.isStreaming;
 
@@ -390,13 +393,7 @@ const KnowledgeAssistantInner = observer(
 					type: 'success',
 					title: t('knowledge.assistant.tocPrependedToDoc'),
 				});
-			}, [
-				isRagMode,
-				assistantStore.isStreaming,
-				assistantStore.messages,
-				knowledgeStore,
-				t,
-			]);
+			}, [isRagMode, assistantStore.isStreaming, knowledgeStore, t]);
 
 			const stopGenerating = useCallback(() => {
 				if (isRagMode) {
@@ -426,7 +423,7 @@ const KnowledgeAssistantInner = observer(
 				setShareModelVisible,
 				shareChatNode,
 			} = useAssistantShare({
-				messages: aiMessages,
+				getAllMessages: getAiMessages,
 				sessionId: assistantStore.activeSessionId,
 				sessionType: 'assistant',
 				enabled:
@@ -439,8 +436,8 @@ const KnowledgeAssistantInner = observer(
 			/** 当前为「会话列表 + 底部输入」视图（与加载中 / 空状态引导互斥） */
 			const conversationColumnActive = !(
 				(!isRagMode && assistantStore.isHistoryLoading) ||
-				(isRagMode && !ragMessages.length) ||
-				(!isRagMode && !aiMessages.length)
+				(isRagMode && ragMessageCount === 0) ||
+				(!isRagMode && aiMessageCount === 0)
 			);
 
 			const emptyState = isRagMode ? (
@@ -499,22 +496,13 @@ const KnowledgeAssistantInner = observer(
 					t={t}
 					isLoading={!isRagMode && assistantStore.isHistoryLoading}
 					loadingText={t('knowledge.assistant.loadingConversation')}
-					hasMessages={messages.length > 0}
+					hasMessages={messageCount > 0}
 					emptyState={emptyState}
 					viewportRef={scrollViewportRef}
 					scrollAreaHandlers={scrollAreaHandlers}
-					messageList={messages.map((message, index) => (
-						<AssistantMessageRow
-							key={message.chatId}
-							selectMessageByChatId={
-								isRagMode
-									? selectRagMessageByChatId
-									: selectAssistantMessageByChatId
-							}
-							t={t}
-							chatId={message.chatId}
-							index={index}
-							messagesLength={messages.length}
+					messageList={
+						<KnowledgeAssistantMessageList
+							isRagMode={isRagMode}
 							isCopyedId={isCopyedId}
 							onCopy={onCopy}
 							onSaveToKnowledge={onSaveToKnowledge}
@@ -524,8 +512,9 @@ const KnowledgeAssistantInner = observer(
 							scrollViewportRef={
 								scrollViewportRef as RefObject<HTMLElement | null>
 							}
+							t={t}
 						/>
-					))}
+					}
 					listFooter={
 						<>
 							{showRagNewConversation ? (
@@ -593,7 +582,7 @@ const KnowledgeAssistantInner = observer(
 									shareChatNode={shareChatNode}
 									aiMessages={
 										allowAiShare && shareSelection.isSharing
-											? aiMessages
+											? getAiMessages()
 											: EMPTY_AI_MESSAGES
 									}
 									showEntryToolbar={showEntryToolbar}

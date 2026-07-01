@@ -343,6 +343,11 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'Improves typing responsiveness for long Markdown in edit-only mode; with the doc assistant open, title, body, and assistant input feel more responsive. Preview and split preview still render the full document after switching.',
 	},
+	's6-27': {
+		title: 'Smoother preview + assistant together',
+		description:
+			'When the left Markdown preview or split view and the right doc assistant are both open during streaming replies, typing, scrolling, and the typewriter output feel more responsive. Preview may briefly show “Loading content…” while catching up, instead of a false empty state. Complements §6 long-form editing and §7 preview/assistant panel behavior.',
+	},
 	's7-1': {
 		title: 'IME (input method editor) compatibility',
 		description:

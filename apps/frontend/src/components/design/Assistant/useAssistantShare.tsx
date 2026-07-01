@@ -8,7 +8,9 @@ import type {
 } from './types';
 
 export type UseAssistantShareParams = {
-	messages: Message[];
+	messages?: readonly Message[];
+	/** 优先于 messages：避免父组件 render 订阅 messages 数组 */
+	getAllMessages?: () => readonly Message[];
 	sessionId: string | null | undefined;
 	sessionType: AssistantShareSessionType;
 	/** 登录、会话存在、业务开关等；false 时不挂载分享 UI */
@@ -22,7 +24,8 @@ export type UseAssistantShareParams = {
 export function useAssistantShare(
 	params: UseAssistantShareParams,
 ): UseAssistantShareResult {
-	const { messages, sessionId, sessionType, enabled } = params;
+	const { messages, getAllMessages, sessionId, sessionType, enabled } = params;
+	const readMessages = getAllMessages ?? (() => messages ?? []);
 	const [shareModelVisible, setShareModelVisible] = useState(false);
 	const [pendingShareChatId, setPendingShareChatId] = useState<string | null>(
 		null,
@@ -32,16 +35,16 @@ export function useAssistantShare(
 
 	const shareFlow = useShareFlow<Message>({
 		enabled: allowAiShare,
-		getAllMessages: () => messages,
+		getAllMessages: () => [...readMessages()],
 		pairResolver: (message, all) =>
-			resolveSharePairFromList(message, all ?? messages),
+			resolveSharePairFromList(message, all ?? [...readMessages()]),
 	});
 
 	const { shareSelection } = shareFlow;
 	const resolveSharePair = useCallback(
 		(message: Message): [string, string] | null =>
-			resolveSharePairFromList(message, messages),
-		[messages],
+			resolveSharePairFromList(message, [...readMessages()]),
+		[getAllMessages, messages],
 	);
 
 	const onShare = useCallback(
@@ -66,7 +69,7 @@ export function useAssistantShare(
 
 	useEffect(() => {
 		if (!shareSelection.isSharing || !pendingShareChatId) return;
-		const target = messages.find((m) => m.chatId === pendingShareChatId);
+		const target = readMessages().find((m) => m.chatId === pendingShareChatId);
 		if (!target) return;
 		const pair = resolveSharePair(target);
 		if (pair) {
@@ -74,6 +77,7 @@ export function useAssistantShare(
 		}
 		setPendingShareChatId(null);
 	}, [
+		getAllMessages,
 		messages,
 		pendingShareChatId,
 		resolveSharePair,
@@ -100,7 +104,7 @@ export function useAssistantShare(
 				open={shareModelVisible}
 				onOpenChange={onCloseShareModel}
 				checkedMessages={shareSelection.checkedMessages}
-				orderedMessageIds={messages.map((m) => m.chatId)}
+				orderedMessageIds={readMessages().map((m) => m.chatId)}
 				sessionId={sessionId ?? undefined}
 				sessionType={sessionType}
 			/>

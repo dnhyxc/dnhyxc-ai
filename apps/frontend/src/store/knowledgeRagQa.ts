@@ -6,6 +6,7 @@ import { makeAutoObservable, runInAction } from 'mobx';
 import { v4 as uuidv4 } from 'uuid';
 import type { Message } from '@/types/chat';
 import { streamKnowledgeQaSse } from '@/utils/knowledgeRagQaSse';
+import { createStreamingMobxPatchScheduler } from '@/utils/scheduleStreamingMobxPatch';
 
 export type KnowledgeRagEvidence = {
 	knowledgeId: string;
@@ -115,8 +116,7 @@ export class KnowledgeRagQaStore {
 
 		let accumulated = '';
 
-		const patchAssistant = (delta: string) => {
-			if (delta) accumulated += delta;
+		const flushRagAssistantPatch = () => {
 			runInAction(() => {
 				const idx = this.messages.findIndex(
 					(m) => m.chatId === assistantChatId,
@@ -128,6 +128,16 @@ export class KnowledgeRagQaStore {
 					content: accumulated,
 				};
 			});
+		};
+		// 创建启动流式 mobx patch 调度器，每当 flushRagAssistantPatch 被调用时，及时递交流式内容
+		const ragPatchScheduler = createStreamingMobxPatchScheduler(
+			flushRagAssistantPatch,
+		);
+
+		// 处理 assistant 的增量 token：将 delta 累加到 accumulated，调度 patchScheduler 进行更新
+		const patchAssistant = (delta: string) => {
+			if (delta) accumulated += delta;
+			ragPatchScheduler.schedule();
 		};
 
 		try {
@@ -151,6 +161,7 @@ export class KnowledgeRagQaStore {
 					},
 					onDelta: (d) => patchAssistant(d),
 					onDone: (ev) => {
+						ragPatchScheduler.flush();
 						if (Array.isArray(ev)) {
 							runInAction(() => {
 								this.lastEvidences = ev as KnowledgeRagEvidence[];
@@ -172,6 +183,7 @@ export class KnowledgeRagQaStore {
 						});
 					},
 					onError: (msg) => {
+						ragPatchScheduler.flush();
 						runInAction(() => {
 							this.loadError = msg;
 							this.isSending = false;
@@ -190,6 +202,7 @@ export class KnowledgeRagQaStore {
 						});
 					},
 					onComplete: (err) => {
+						ragPatchScheduler.flush();
 						runInAction(() => {
 							this.isSending = false;
 							const idx = this.messages.findIndex(
@@ -216,6 +229,7 @@ export class KnowledgeRagQaStore {
 				this.abortStream = abort;
 			});
 		} catch {
+			ragPatchScheduler.flush();
 			runInAction(() => {
 				this.isSending = false;
 				const idx = this.messages.findIndex(

@@ -15,12 +15,11 @@ import {
 import MarkdownEditor from '@/components/design/Monaco';
 import Share from '@/components/design/Share';
 import { Input } from '@/components/ui';
-import { useI18n, useTheme } from '@/hooks';
+import { useAssistantPaneBusy, useI18n, useTheme } from '@/hooks';
 import type { ShortcutSource } from '@/hooks/useMarkdownBottomBarShortcuts';
 import { saveKnowledge } from '@/service';
 import useStore from '@/store';
 import assistantStore from '@/store/assistant';
-import knowledgeRagQaStore from '@/store/knowledgeRagQa';
 import { KnowledgeRecord } from '@/types';
 import { isTauriRuntime } from '@/utils';
 import { copyToClipboard, pasteFromClipboard } from '@/utils/clipboard';
@@ -147,18 +146,17 @@ const KnowledgeMarkdownPane = observer(function KnowledgeMarkdownPane({
 	toolbar: ReactNode;
 }) {
 	const { knowledgeStore } = useStore();
+	const assistantPaneBusy = useAssistantPaneBusy(markdownAssistantOpen);
 	const handleMarkdownChange = useCallback(
 		(value: string) => {
 			knowledgeStore.setMarkdown(value);
 		},
 		[knowledgeStore],
 	);
-	const assistantPaneBusy =
-		markdownAssistantOpen &&
-		(assistantStore.isStreaming ||
-			assistantStore.isSending ||
-			knowledgeRagQaStore.isStreaming ||
-			knowledgeRagQaStore.isSending);
+	const clipboardAdapter = useMemo(
+		() => ({ copyToClipboard, pasteFromClipboard }),
+		[],
+	);
 
 	return (
 		<MarkdownEditor
@@ -171,10 +169,7 @@ const KnowledgeMarkdownPane = observer(function KnowledgeMarkdownPane({
 			theme={monacoTheme}
 			language={monacoLanguage}
 			shortcutSource={shortcutSource}
-			clipboardAdapter={{
-				copyToClipboard,
-				pasteFromClipboard,
-			}}
+			clipboardAdapter={clipboardAdapter}
 			documentIdentity={documentIdentity}
 			markdownAssistantOpen={markdownAssistantOpen}
 			onMarkdownAssistantOpenChange={onMarkdownAssistantOpenChange}

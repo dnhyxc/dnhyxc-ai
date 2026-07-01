@@ -657,6 +657,9 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	const latchedLeftPreviewRef = useRef(leftPreviewMarkdownRaw);
 	if (!assistantPaneBusy) {
 		latchedLeftPreviewRef.current = leftPreviewMarkdownRaw;
+	} else if (latchedLeftPreviewRef.current !== leftPreviewMarkdownRaw) {
+		// busy 中 edit→preview 时 raw 从 '' 变为全文，须追平 latch（否则预览一直为空）
+		latchedLeftPreviewRef.current = leftPreviewMarkdownRaw;
 	}
 	// ponytail: 助手同开时低优先级/冻结左栏预览，避免与流式 Markdown 解析抢主线程
 	const leftPreviewMarkdown = unmountEditorInPreviewWithAssistant
@@ -664,8 +667,39 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 			? latchedLeftPreviewRef.current
 			: leftPreviewMarkdownDeferred
 		: leftPreviewMarkdownRaw;
-	/** 分屏下用即时正文，避免 deferred 滞后导致预览 DOM 与编辑器 scroll 不同步 */
-	const splitPaneMarkdown = viewMode === 'split' ? (value ?? '') : '';
+	/**
+	 * 分屏（split）模式下：
+	 * splitPaneMarkdownRaw 为当前编辑器正文（value），用于 Markdown 预览的原始内容输入。
+	 * 用即时（非 deferred）value，避免 useDeferredValue 带来的滞后导致同步滚动异常。
+	 * 只有在分屏模式下才赋值（否则空字符串，防止非分屏预览串数据）。
+	 */
+	const splitPaneMarkdownRaw = viewMode === 'split' ? (value ?? '') : '';
+
+	/**
+	 * latchedSplitPreviewRef 是为了在助手繁忙（assistantPaneBusy=true）时保持预览内容“冻结”，
+	 * 不被 editor 持续变化拖慢主线程渲染。
+	 * - 若助手不忙，则正常跟随 splitPaneMarkdownRaw 同步；
+	 * - 若助手忙，并且输入发生了变化，则也需要同步最新；否则一直是旧内容。
+	 * 此 latch 方案让助手繁忙下主线程压力降低，但在分屏输入有变时也不会遗漏。
+	 */
+	const latchedSplitPreviewRef = useRef(splitPaneMarkdownRaw);
+	if (!assistantPaneBusy) {
+		// 助手未繁忙，直接更新 latch，保证预览内容和编辑内容同步
+		latchedSplitPreviewRef.current = splitPaneMarkdownRaw;
+	} else if (latchedSplitPreviewRef.current !== splitPaneMarkdownRaw) {
+		// 助手繁忙时，如果内容有变，也同步，避免流式状态新的编辑被丢失
+		latchedSplitPreviewRef.current = splitPaneMarkdownRaw;
+	}
+	/**
+	 * 分屏 Markdown 正文渲染选择逻辑：
+	 * 当「助手右侧面板已激活」且「助手繁忙」且「当前为分屏模式」时，
+	 * 使用 latchedSplitPreviewRef.current（保存上一次的值，避免 assistant 繁忙时不断渲染影响主线程）；
+	 * 否则，正常用 splitPaneMarkdownRaw（此时不用卡住预览）。
+	 */
+	const splitPaneMarkdown =
+		assistantRightPaneActive && assistantPaneBusy && viewMode === 'split'
+			? latchedSplitPreviewRef.current
+			: splitPaneMarkdownRaw;
 	/** Diff 右侧（modified）与主编辑器正文同步 */
 	const splitDiffModifiedText =
 		viewMode === 'splitDiff' ? normalizeMonacoEol(value ?? '') : '';
@@ -1822,12 +1856,13 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 										>
 											<ParserMarkdownPreviewPane
 												markdown={leftPreviewMarkdown}
+												pendingSourceMarkdown={leftPreviewMarkdownRaw}
 												documentIdentity={documentIdentity}
 												t={t}
 												viewportRef={previewViewportRef}
 												showPreviewScrollCornerFab
 												enableMermaid={markdownEnableMermaid}
-												// enableCodeFloatingToolbar={!assistantRightPaneActive}
+												enableCodeFloatingToolbar={!assistantRightPaneActive}
 											/>
 										</div>
 										{!unmountEditorInPreviewWithAssistant ? (
@@ -1923,6 +1958,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 									) : viewMode === 'split' ? (
 										<ParserMarkdownPreviewPane
 											markdown={splitPaneMarkdown}
+											pendingSourceMarkdown={splitPaneMarkdownRaw}
 											documentIdentity={documentIdentity}
 											t={t}
 											viewportRef={previewViewportRef}
@@ -1932,6 +1968,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 													: undefined
 											}
 											enableMermaid={markdownEnableMermaid}
+											enableCodeFloatingToolbar={!assistantRightPaneActive}
 										/>
 									) : null}
 								</div>
