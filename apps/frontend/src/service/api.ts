@@ -67,6 +67,9 @@ export const SPEECH_MINIMAX_TTS_STREAM =
 /** 讯飞在线语音合成（WebSocket 代理 → MP3，需 XFYUN_* 环境变量） */
 export const SPEECH_XFYUN_TTS_STREAM =
 	'/speech-transcription/xfyun/speech/stream';
+/** Microsoft Edge 在线语音合成（edge-tts-universal，免费无需 API Key） */
+export const SPEECH_EDGE_TTS_STREAM =
+	'/speech-transcription/edge/speech/stream';
 /** MiniMax T2A 非流式 TTS */
 export const SPEECH_MINIMAX_TTS = '/speech-transcription/minimax/speech';
 

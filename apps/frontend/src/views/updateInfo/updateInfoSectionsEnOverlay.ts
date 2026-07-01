@@ -866,6 +866,16 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'In Voice settings → Cloud voice settings, the MiniMax model field is now a creatable combobox (speech-2.8-hd / speech-2.8-turbo, same pattern as LLM settings). New users and restore-default use turbo; only these two 2.8 models are accepted—accounts still storing legacy 2.6 / 02 / 01 names must switch to hd or turbo before saving.',
 	},
+	's24-47': {
+		title: 'Edge cloud narration',
+		description:
+			'Voice settings adds Edge cloud (Microsoft online speech—free, no API Key). All signed-in users can pick Local or Edge at the top; active members can also choose MiniMax or iFlytek. Edge settings (voice, speed/volume/pitch, preview) appear before the MiniMax block and share the same playback routing as English learning and EPUB listen-to-book.',
+	},
+	's24-48': {
+		title: 'Per-provider prosody fields',
+		description:
+			'Speed, volume, and pitch are saved separately for MiniMax, iFlytek, and Edge—tuning one provider no longer overwrites the others. Legacy accounts with shared fields get a one-time copy into all three sets on sync.',
+	},
 	's25-1': {
 		title: 'E-book bookshelf',
 		description:

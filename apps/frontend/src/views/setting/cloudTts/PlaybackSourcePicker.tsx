@@ -4,18 +4,22 @@ import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import type { TtsPlaybackSource } from '@/service/cloudTtsSettings';
 
-const SOURCES: TtsPlaybackSource[] = ['local', 'cloud', 'xfyun'];
+const MEMBER_SOURCES: TtsPlaybackSource[] = ['local', 'edge', 'cloud', 'xfyun'];
+const FREE_SOURCES: TtsPlaybackSource[] = ['local', 'edge'];
 
 export function PlaybackSourcePicker({
 	value,
 	onChange,
 	disabled,
+	isMemberActive = false,
 }: {
 	value: TtsPlaybackSource;
 	onChange: (source: TtsPlaybackSource) => void;
 	disabled?: boolean;
+	isMemberActive?: boolean;
 }) {
 	const { t } = useI18n();
+	const sources = isMemberActive ? MEMBER_SOURCES : FREE_SOURCES;
 
 	return (
 		<div className={cn('w-full', disabled && 'pointer-events-none opacity-50')}>
@@ -23,14 +27,18 @@ export function PlaybackSourcePicker({
 				{t('setting.cloudTts.playbackSourceTitle')}
 			</div>
 			<div className="my-2 px-8.5 text-xs text-textcolor/55">
-				{t('setting.cloudTts.playbackSourceHelp')}
+				{t(
+					isMemberActive
+						? 'setting.cloudTts.playbackSourceHelp'
+						: 'setting.cloudTts.playbackSourceHelpFree',
+				)}
 			</div>
 			<RadioGroup
 				value={value}
 				onValueChange={(next) => onChange(next as TtsPlaybackSource)}
 				className="mt-3.5 flex flex-col gap-3 px-8.5 text-sm"
 			>
-				{SOURCES.map((source) => {
+				{sources.map((source) => {
 					const id = `tts-playback-${source}`;
 					return (
 						<div key={source} className="flex items-start gap-2">

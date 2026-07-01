@@ -78,6 +78,7 @@
 | [tts-end-to-end-guide.md](./tts-end-to-end-guide.md) | **TTS 端到端全景**：非技术可读 + 前后端逐行注释代码 |
 | [tts-membership-routing.md](./tts-membership-routing.md) | **按会员选路**：单词/语句/练习统一云端或本机 |
 | [tts-playback-source.md](./tts-playback-source.md) | **会员本机/MiniMax/讯飞** 三选一与 `playbackSource` 入库 |
+| [cloud-tts-edge-voice.md](./cloud-tts-edge-voice.md) | **Edge 云端朗读**、分模式 prosody、非会员本机+Edge 选路（前后端实现） |
 | [xfyun-cloud-tts.md](./xfyun-cloud-tts.md) | **讯飞在线云端朗读**：WS 合成、设置页音量/音高、Node 18 `ws` |
 | [cloud-tts-user-credentials.md](./cloud-tts-user-credentials.md) | **用户凭证与失败降级**：MiniMax/讯飞 Key 入库、Toast、xfyunVoiceId 独立 |
 | [english-tts-playback.md](./english-tts-playback.md) | 播放世代、异步丢弃 |

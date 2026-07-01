@@ -19,6 +19,12 @@ import { Eye, EyeOff, Minus, Plus, Volume2 } from 'lucide-react';
 import { observer } from 'mobx-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+	DEFAULT_EDGE_TTS_VOICE,
+	EDGE_TTS_LISTEN_VOICES,
+	getEdgeTtsVoiceLabel,
+	isEdgeTtsVoiceId,
+} from '@/constants/edgeTts';
+import {
 	defaultMinimaxTtsVoiceIdForLanguageBoost,
 	getDefaultMinimaxCloudCredentials,
 	getMinimaxTtsVoiceDisplayName,
@@ -35,11 +41,7 @@ import {
 	DEFAULT_XFYUN_TTS_VCN,
 	getXfyunTtsVoiceLabel,
 	isXfyunTtsVcn,
-	pitchFromXfyunPitch,
-	volFromXfyunVolume,
 	XFYUN_TTS_LISTEN_VOICES,
-	xfyunPitchFromPitch,
-	xfyunVolumeFromVol,
 } from '@/constants/xfyunTts';
 import { useI18n, useMembershipActive } from '@/hooks';
 import { cn } from '@/lib/utils';
@@ -51,6 +53,7 @@ import {
 	stopAllEnglishPlayback,
 } from '@/utils/englishTts';
 import {
+	clampPlaybackSourceForMembership,
 	DEFAULT_MINIMAX_TTS_USER_PREFS,
 	ensureMinimaxTtsUserPrefsLoaded,
 	loadMinimaxTtsUserPrefs,
@@ -72,7 +75,7 @@ const MINIMAX_MODEL_OPTION_I18N: Record<
 	'speech-2.8-turbo': 'setting.cloudTts.modelOption.speech28Turbo',
 };
 
-type CloudTtsPreviewTarget = 'minimax' | 'xfyun';
+type CloudTtsPreviewTarget = 'minimax' | 'xfyun' | 'edge';
 
 const fieldInputClass =
 	'flex-1 min-w-0 border border-theme/20 bg-transparent shadow-none focus-visible:ring-0 focus-visible:border-theme/40';
@@ -391,12 +394,13 @@ const CloudTtsSetting = observer(() => {
 	const previewing = activePreview !== null;
 
 	useEffect(() => {
-		if (!isMemberActive) {
-			setLoading(false);
-			return;
-		}
 		if (loggedInUserId <= 0) {
-			setPrefs(withDefaultCloudTtsPrefs(DEFAULT_MINIMAX_TTS_USER_PREFS));
+			setPrefs(
+				clampPlaybackSourceForMembership(
+					withDefaultCloudTtsPrefs(DEFAULT_MINIMAX_TTS_USER_PREFS),
+					isMemberActive,
+				),
+			);
 			setLoading(false);
 			return;
 		}
@@ -404,7 +408,14 @@ const CloudTtsSetting = observer(() => {
 		setLoading(true);
 		void ensureMinimaxTtsUserPrefsLoaded(loggedInUserId)
 			.then((next) => {
-				if (!cancelled) setPrefs(withDefaultCloudTtsPrefs(next));
+				if (!cancelled) {
+					setPrefs(
+						clampPlaybackSourceForMembership(
+							withDefaultCloudTtsPrefs(next),
+							isMemberActive,
+						),
+					);
+				}
 			})
 			.finally(() => {
 				if (!cancelled) setLoading(false);
@@ -420,7 +431,10 @@ const CloudTtsSetting = observer(() => {
 				const next = { ...prev, ...partial };
 				if (partial.playbackSource) {
 					next.playbackSource = partial.playbackSource;
-					if (partial.playbackSource === 'cloud') {
+					if (
+						partial.playbackSource === 'cloud' ||
+						partial.playbackSource === 'edge'
+					) {
 						next.enabled = true;
 					}
 				}
@@ -429,9 +443,10 @@ const CloudTtsSetting = observer(() => {
 					'minimaxApiKey' in partial ||
 					'voiceId' in partial ||
 					'xfyunVoiceId' in partial ||
-					'speed' in partial ||
-					'vol' in partial ||
-					'pitch' in partial ||
+					'edgeVoiceId' in partial ||
+					'minimaxSpeed' in partial ||
+					'minimaxVol' in partial ||
+					'minimaxPitch' in partial ||
 					'emotion' in partial ||
 					'format' in partial ||
 					'languageBoost' in partial ||
@@ -493,8 +508,8 @@ const CloudTtsSetting = observer(() => {
 		const partial: Partial<MinimaxTtsUserPrefs> = {
 			model: cloudDefaults.model,
 			minimaxApiKey: '',
-			vol: d.vol,
-			pitch: d.pitch,
+			minimaxVol: d.minimaxVol,
+			minimaxPitch: d.minimaxPitch,
 			emotion: d.emotion,
 			format: d.format,
 			languageBoost: d.languageBoost,
@@ -504,7 +519,7 @@ const CloudTtsSetting = observer(() => {
 		};
 		if (prefs.playbackSource === 'cloud') {
 			partial.voiceId = d.voiceId;
-			partial.speed = d.speed;
+			partial.minimaxSpeed = d.minimaxSpeed;
 			partial.enabled = true;
 		}
 		patch(partial);
@@ -514,12 +529,22 @@ const CloudTtsSetting = observer(() => {
 		const d = DEFAULT_MINIMAX_TTS_USER_PREFS;
 		patch({
 			xfyunVoiceId: DEFAULT_XFYUN_TTS_VCN,
-			speed: d.speed,
-			vol: d.vol,
-			pitch: d.pitch,
+			xfyunSpeed: d.xfyunSpeed,
+			xfyunVolume: d.xfyunVolume,
+			xfyunPitch: d.xfyunPitch,
 			xfyunAppId: '',
 			xfyunApiKey: '',
 			xfyunApiSecret: '',
+		});
+	};
+
+	const onResetEdge = () => {
+		const d = DEFAULT_MINIMAX_TTS_USER_PREFS;
+		patch({
+			edgeVoiceId: DEFAULT_EDGE_TTS_VOICE,
+			edgeSpeed: d.edgeSpeed,
+			edgeVol: d.edgeVol,
+			edgePitch: d.edgePitch,
 		});
 	};
 
@@ -546,14 +571,28 @@ const CloudTtsSetting = observer(() => {
 	const xfyunVoiceId = isXfyunTtsVcn(prefs.xfyunVoiceId)
 		? prefs.xfyunVoiceId
 		: DEFAULT_XFYUN_TTS_VCN;
-	const xfyunVolumeUi = xfyunVolumeFromVol(prefs.vol);
-	const xfyunPitchUi = xfyunPitchFromPitch(prefs.pitch);
+
+	const edgeVoiceOptions = useMemo(
+		() =>
+			EDGE_TTS_LISTEN_VOICES.map((voice) => ({
+				value: voice.id,
+				label: getEdgeTtsVoiceLabel(voice, locale),
+			})),
+		[locale],
+	);
+
+	const edgeVoiceId = isEdgeTtsVoiceId(prefs.edgeVoiceId)
+		? prefs.edgeVoiceId
+		: DEFAULT_EDGE_TTS_VOICE;
 
 	const fieldsDisabled =
 		loading || prefs.playbackSource !== 'cloud' || previewing;
 
 	const xfyunFieldsDisabled =
 		loading || prefs.playbackSource !== 'xfyun' || previewing;
+
+	const edgeFieldsDisabled =
+		loading || prefs.playbackSource !== 'edge' || previewing;
 
 	const onPlaybackSourceChange = (source: TtsPlaybackSource) => {
 		patch({ playbackSource: source });
@@ -565,357 +604,454 @@ const CloudTtsSetting = observer(() => {
 	return (
 		<div className={pageShellClass}>
 			<div className="w-full">
-				{isMemberActive && !loading ? (
+				{!loading ? (
 					<div className="border-b border-theme/20 pb-4.5">
 						<PlaybackSourcePicker
 							value={prefs.playbackSource}
 							onChange={onPlaybackSourceChange}
 							disabled={previewing}
+							isMemberActive={isMemberActive}
 						/>
 					</div>
 				) : null}
 
 				<LocalTtsVoiceSetting
-					showDivider={isMemberActive}
-					isMemberActive={isMemberActive}
+					showDivider={!loading}
 					playbackSource={prefs.playbackSource}
 				/>
 
-				{isMemberActive ? (
-					loading ? (
-						<div className="flex items-center justify-center py-16">
-							<Loading text="正在奋力加载中..." />
+				{loading ? (
+					<div className="flex items-center justify-center py-16">
+						<Loading text="正在奋力加载中..." />
+					</div>
+				) : (
+					<>
+						<div className="mt-3.5 w-full">
+							<div className="text-md font-bold">
+								{t('setting.cloudTts.edgeTitle')}
+							</div>
 						</div>
-					) : (
-						<>
-							<div className="mt-3.5 w-full">
-								<div className="flex items-center gap-1">
-									<div className="text-md font-bold">
-										{t('setting.cloudTts.title')}
-									</div>
-									<ParamsHelpPopover />
-								</div>
-							</div>
 
-							<div
-								className={cn(
-									'my-3.5 flex flex-col gap-4 px-8.5 text-sm',
-									prefs.playbackSource !== 'cloud' &&
-										'pointer-events-none opacity-50',
-								)}
+						<div
+							className={cn(
+								'my-3.5 flex flex-col gap-4 px-8.5 text-sm',
+								prefs.playbackSource !== 'edge' &&
+									'pointer-events-none opacity-50',
+							)}
+						>
+							<p className="text-xs text-textcolor/55">
+								{t('setting.cloudTts.edgeHint')}
+							</p>
+							<PrefSelectField
+								id="edge-tts-voice"
+								label={t('setting.cloudTts.edgeVoice')}
+								value={edgeVoiceId}
+								onValueChange={(voice) => patch({ edgeVoiceId: voice })}
+								options={edgeVoiceOptions}
+								disabled={edgeFieldsDisabled}
+								labelClassName={fieldLabelClass}
+							/>
+							<NumberField
+								id="edge-tts-speed"
+								label={t('setting.cloudTts.speed')}
+								value={prefs.edgeSpeed}
+								min={0.5}
+								max={2}
+								step={0.1}
+								disabled={edgeFieldsDisabled}
+								labelClassName={fieldLabelClass}
+								onChange={(edgeSpeed) => patch({ edgeSpeed })}
+							/>
+							<NumberField
+								id="edge-tts-vol"
+								label={t('setting.cloudTts.vol')}
+								value={prefs.edgeVol}
+								min={0.01}
+								max={10}
+								step={0.1}
+								disabled={edgeFieldsDisabled}
+								labelClassName={fieldLabelClass}
+								onChange={(edgeVol) => patch({ edgeVol })}
+							/>
+							<NumberField
+								id="edge-tts-pitch"
+								label={t('setting.cloudTts.pitch')}
+								value={prefs.edgePitch}
+								min={-12}
+								max={12}
+								step={1}
+								disabled={edgeFieldsDisabled}
+								labelClassName={fieldLabelClass}
+								onChange={(edgePitch) => patch({ edgePitch })}
+							/>
+						</div>
+
+						<div
+							className={cn(
+								'mt-3.5 flex flex-wrap items-center justify-end gap-3 px-8.5',
+								isMemberActive ? 'pb-2' : 'pb-4.5',
+							)}
+						>
+							<Button
+								type="button"
+								variant="outline"
+								size="sm"
+								className="min-w-24 cursor-pointer border border-theme/20"
+								disabled={previewing || prefs.playbackSource !== 'edge'}
+								onClick={onResetEdge}
 							>
-								<div className="space-y-1 text-xs text-textcolor/55">
-									<p>{t('setting.cloudTts.desc')}</p>
+								{t('setting.cloudTts.reset')}
+							</Button>
+							<Button
+								type="button"
+								size="sm"
+								className={cn(
+									'min-w-24 cursor-pointer gap-1.5',
+									activePreview === 'edge' &&
+										previewing &&
+										'disabled:opacity-100',
+								)}
+								disabled={previewing || prefs.playbackSource !== 'edge'}
+								onClick={() =>
+									void onPreview('edge', 'setting.cloudTts.previewText')
+								}
+							>
+								<Volume2 className="size-4" aria-hidden />
+								{t('setting.cloudTts.edgePreview')}
+							</Button>
+						</div>
+
+						{isMemberActive ? (
+							<>
+								<div className="mt-3.5 w-full border-t border-theme/20 pt-4.5">
+									<div className="flex items-center gap-1">
+										<div className="text-md font-bold">
+											{t('setting.cloudTts.title')}
+										</div>
+										<ParamsHelpPopover />
+									</div>
 								</div>
-								<PrefTextField
-									id="minimax-api-key"
-									label={t('setting.cloudTts.minimaxApiKey')}
-									value={prefs.minimaxApiKey}
-									onChange={(minimaxApiKey) => patch({ minimaxApiKey })}
-									disabled={fieldsDisabled}
-									labelClassName={fieldLabelClass}
-									secret
-								/>
-								<div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
-									<Label
-										htmlFor="minimax-model-name"
-										className={fieldLabelClass}
+
+								<div
+									className={cn(
+										'my-3.5 flex flex-col gap-4 px-8.5 text-sm',
+										prefs.playbackSource !== 'cloud' &&
+											'pointer-events-none opacity-50',
+									)}
+								>
+									<div className="space-y-1 text-xs text-textcolor/55">
+										<p>{t('setting.cloudTts.desc')}</p>
+									</div>
+									<PrefTextField
+										id="minimax-api-key"
+										label={t('setting.cloudTts.minimaxApiKey')}
+										value={prefs.minimaxApiKey}
+										onChange={(minimaxApiKey) => patch({ minimaxApiKey })}
+										disabled={fieldsDisabled}
+										labelClassName={fieldLabelClass}
+										secret
+									/>
+									<div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+										<Label
+											htmlFor="minimax-model-name"
+											className={fieldLabelClass}
+										>
+											{t('setting.cloudTts.model')}
+										</Label>
+										<div className="min-w-0 flex-1">
+											<CreatableCombobox
+												id="minimax-model-name"
+												value={prefs.model}
+												onChange={(model) => patch({ model })}
+												options={minimaxModelOptions}
+												placeholder={t('setting.cloudTts.modelPlaceholder')}
+												presetsAriaLabel={t('setting.cloudTts.openPresets')}
+												disabled={fieldsDisabled}
+												inputClassName={fieldInputClass}
+											/>
+										</div>
+									</div>
+
+									<VoiceSelectField
+										id="cloud-tts-voice"
+										label={t('setting.cloudTts.voiceId')}
+										value={prefs.voiceId}
+										onValueChange={(voiceId) => patch({ voiceId })}
+										disabled={fieldsDisabled}
+										labelClassName={fieldLabelClass}
+										languageBoost={
+											prefs.languageBoost as MinimaxTtsLanguageBoost
+										}
+									/>
+
+									<NumberField
+										id="cloud-tts-speed"
+										label={t('setting.cloudTts.speed')}
+										value={prefs.minimaxSpeed}
+										min={0.5}
+										max={2}
+										step={0.1}
+										disabled={fieldsDisabled}
+										labelClassName={fieldLabelClass}
+										onChange={(minimaxSpeed) => patch({ minimaxSpeed })}
+									/>
+									<NumberField
+										id="cloud-tts-vol"
+										label={t('setting.cloudTts.vol')}
+										value={prefs.minimaxVol}
+										min={0.01}
+										max={10}
+										step={0.1}
+										disabled={fieldsDisabled}
+										labelClassName={fieldLabelClass}
+										onChange={(minimaxVol) => patch({ minimaxVol })}
+									/>
+									<NumberField
+										id="cloud-tts-pitch"
+										label={t('setting.cloudTts.pitch')}
+										value={prefs.minimaxPitch}
+										min={-12}
+										max={12}
+										step={1}
+										disabled={fieldsDisabled}
+										labelClassName={fieldLabelClass}
+										onChange={(minimaxPitch) => patch({ minimaxPitch })}
+									/>
+
+									<PrefSelectField
+										id="cloud-tts-emotion"
+										label={t('setting.cloudTts.emotion')}
+										value={prefs.emotion || EMOTION_NONE}
+										onValueChange={(emotion) =>
+											patch({
+												emotion: emotion === EMOTION_NONE ? '' : emotion,
+											})
+										}
+										options={emotionOptions}
+										disabled={fieldsDisabled}
+										labelClassName={fieldLabelClass}
+									/>
+
+									<PrefSelectField
+										id="cloud-tts-format"
+										label={t('setting.cloudTts.format')}
+										value={prefs.format}
+										onValueChange={(format) => patch({ format })}
+										options={formatOptions}
+										disabled={fieldsDisabled}
+										labelClassName={fieldLabelClass}
+									/>
+
+									<PrefSelectField
+										id="cloud-tts-lang-boost"
+										label={t('setting.cloudTts.languageBoost')}
+										value={prefs.languageBoost}
+										onValueChange={(languageBoost) => {
+											const boost = languageBoost as MinimaxTtsLanguageBoost;
+											const voices = getMinimaxTtsVoicesForLanguageBoost(boost);
+											const voiceIds = new Set(voices.map((v) => v.id));
+											const voiceId = voiceIds.has(prefs.voiceId)
+												? prefs.voiceId
+												: defaultMinimaxTtsVoiceIdForLanguageBoost(boost);
+											patch({ languageBoost: boost, voiceId });
+										}}
+										options={languageBoostOptions}
+										disabled={fieldsDisabled}
+										labelClassName={fieldLabelClass}
+									/>
+
+									<p className="text-xs text-textcolor/55">
+										{t('setting.cloudTts.advancedHint')}
+									</p>
+									<NumberField
+										id="cloud-tts-sample-rate"
+										label={t('setting.cloudTts.sampleRate')}
+										value={prefs.sampleRate}
+										min={8000}
+										max={44100}
+										step={1000}
+										disabled={fieldsDisabled}
+										labelClassName={fieldLabelClass}
+										onChange={(sampleRate) => patch({ sampleRate })}
+									/>
+									<NumberField
+										id="cloud-tts-bitrate"
+										label={t('setting.cloudTts.bitrate')}
+										value={prefs.bitrate}
+										min={32000}
+										max={256000}
+										step={1000}
+										disabled={fieldsDisabled}
+										labelClassName={fieldLabelClass}
+										onChange={(bitrate) => patch({ bitrate })}
+									/>
+									<NumberField
+										id="cloud-tts-channel"
+										label={t('setting.cloudTts.channel')}
+										value={prefs.channel}
+										min={1}
+										max={2}
+										step={1}
+										disabled={fieldsDisabled}
+										labelClassName={fieldLabelClass}
+										onChange={(channel) =>
+											patch({ channel: channel === 2 ? 2 : 1 })
+										}
+									/>
+								</div>
+
+								<div className="mt-3.5 flex flex-wrap items-center justify-end gap-3 px-8.5 pb-2">
+									<Button
+										type="button"
+										variant="outline"
+										size="sm"
+										className="min-w-24 cursor-pointer border border-theme/20"
+										disabled={previewing || prefs.playbackSource !== 'cloud'}
+										onClick={onResetMinimax}
 									>
-										{t('setting.cloudTts.model')}
-									</Label>
-									<div className="min-w-0 flex-1">
-										<CreatableCombobox
-											id="minimax-model-name"
-											value={prefs.model}
-											onChange={(model) => patch({ model })}
-											options={minimaxModelOptions}
-											placeholder={t('setting.cloudTts.modelPlaceholder')}
-											presetsAriaLabel={t('setting.cloudTts.openPresets')}
-											disabled={fieldsDisabled}
-											inputClassName={fieldInputClass}
-										/>
+										{t('setting.cloudTts.reset')}
+									</Button>
+									<Button
+										type="button"
+										size="sm"
+										className={cn(
+											'min-w-24 cursor-pointer gap-1.5',
+											activePreview === 'minimax' &&
+												previewing &&
+												'disabled:opacity-100',
+										)}
+										disabled={previewing || prefs.playbackSource !== 'cloud'}
+										onClick={() =>
+											void onPreview('minimax', 'setting.cloudTts.previewText')
+										}
+									>
+										<Volume2 className="size-4" aria-hidden />
+										{t('setting.cloudTts.preview')}
+									</Button>
+								</div>
+
+								<div className="mt-3.5 w-full border-t border-theme/20 pt-4.5">
+									<div className="text-md font-bold">
+										{t('setting.cloudTts.xfyunTitle')}
 									</div>
 								</div>
 
-								<VoiceSelectField
-									id="cloud-tts-voice"
-									label={t('setting.cloudTts.voiceId')}
-									value={prefs.voiceId}
-									onValueChange={(voiceId) => patch({ voiceId })}
-									disabled={fieldsDisabled}
-									labelClassName={fieldLabelClass}
-									languageBoost={prefs.languageBoost as MinimaxTtsLanguageBoost}
-								/>
-
-								<NumberField
-									id="cloud-tts-speed"
-									label={t('setting.cloudTts.speed')}
-									value={prefs.speed}
-									min={0.5}
-									max={2}
-									step={0.1}
-									disabled={fieldsDisabled}
-									labelClassName={fieldLabelClass}
-									onChange={(speed) => patch({ speed })}
-								/>
-								<NumberField
-									id="cloud-tts-vol"
-									label={t('setting.cloudTts.vol')}
-									value={prefs.vol}
-									min={0.01}
-									max={10}
-									step={0.1}
-									disabled={fieldsDisabled}
-									labelClassName={fieldLabelClass}
-									onChange={(vol) => patch({ vol })}
-								/>
-								<NumberField
-									id="cloud-tts-pitch"
-									label={t('setting.cloudTts.pitch')}
-									value={prefs.pitch}
-									min={-12}
-									max={12}
-									step={1}
-									disabled={fieldsDisabled}
-									labelClassName={fieldLabelClass}
-									onChange={(pitch) => patch({ pitch })}
-								/>
-
-								<PrefSelectField
-									id="cloud-tts-emotion"
-									label={t('setting.cloudTts.emotion')}
-									value={prefs.emotion || EMOTION_NONE}
-									onValueChange={(emotion) =>
-										patch({ emotion: emotion === EMOTION_NONE ? '' : emotion })
-									}
-									options={emotionOptions}
-									disabled={fieldsDisabled}
-									labelClassName={fieldLabelClass}
-								/>
-
-								<PrefSelectField
-									id="cloud-tts-format"
-									label={t('setting.cloudTts.format')}
-									value={prefs.format}
-									onValueChange={(format) => patch({ format })}
-									options={formatOptions}
-									disabled={fieldsDisabled}
-									labelClassName={fieldLabelClass}
-								/>
-
-								<PrefSelectField
-									id="cloud-tts-lang-boost"
-									label={t('setting.cloudTts.languageBoost')}
-									value={prefs.languageBoost}
-									onValueChange={(languageBoost) => {
-										const boost = languageBoost as MinimaxTtsLanguageBoost;
-										const voices = getMinimaxTtsVoicesForLanguageBoost(boost);
-										const voiceIds = new Set(voices.map((v) => v.id));
-										const voiceId = voiceIds.has(prefs.voiceId)
-											? prefs.voiceId
-											: defaultMinimaxTtsVoiceIdForLanguageBoost(boost);
-										patch({ languageBoost: boost, voiceId });
-									}}
-									options={languageBoostOptions}
-									disabled={fieldsDisabled}
-									labelClassName={fieldLabelClass}
-								/>
-
-								<p className="text-xs text-textcolor/55">
-									{t('setting.cloudTts.advancedHint')}
-								</p>
-								<NumberField
-									id="cloud-tts-sample-rate"
-									label={t('setting.cloudTts.sampleRate')}
-									value={prefs.sampleRate}
-									min={8000}
-									max={44100}
-									step={1000}
-									disabled={fieldsDisabled}
-									labelClassName={fieldLabelClass}
-									onChange={(sampleRate) => patch({ sampleRate })}
-								/>
-								<NumberField
-									id="cloud-tts-bitrate"
-									label={t('setting.cloudTts.bitrate')}
-									value={prefs.bitrate}
-									min={32000}
-									max={256000}
-									step={1000}
-									disabled={fieldsDisabled}
-									labelClassName={fieldLabelClass}
-									onChange={(bitrate) => patch({ bitrate })}
-								/>
-								<NumberField
-									id="cloud-tts-channel"
-									label={t('setting.cloudTts.channel')}
-									value={prefs.channel}
-									min={1}
-									max={2}
-									step={1}
-									disabled={fieldsDisabled}
-									labelClassName={fieldLabelClass}
-									onChange={(channel) =>
-										patch({ channel: channel === 2 ? 2 : 1 })
-									}
-								/>
-							</div>
-
-							<div className="mt-3.5 flex flex-wrap items-center justify-end gap-3 px-8.5 pb-2">
-								<Button
-									type="button"
-									variant="outline"
-									size="sm"
-									className="min-w-24 cursor-pointer border border-theme/20"
-									disabled={previewing || prefs.playbackSource !== 'cloud'}
-									onClick={onResetMinimax}
-								>
-									{t('setting.cloudTts.reset')}
-								</Button>
-								<Button
-									type="button"
-									size="sm"
+								<div
 									className={cn(
-										'min-w-24 cursor-pointer gap-1.5',
-										activePreview === 'minimax' &&
-											previewing &&
-											'disabled:opacity-100',
+										'my-3.5 flex flex-col gap-4 px-8.5 text-sm',
+										prefs.playbackSource !== 'xfyun' &&
+											'pointer-events-none opacity-50',
 									)}
-									disabled={previewing || prefs.playbackSource !== 'cloud'}
-									onClick={() =>
-										void onPreview('minimax', 'setting.cloudTts.previewText')
-									}
 								>
-									<Volume2 className="size-4" aria-hidden />
-									{t('setting.cloudTts.preview')}
-								</Button>
-							</div>
+									<p className="text-xs text-textcolor/55">
+										{t('setting.cloudTts.xfyunCredentialsHint')}
+									</p>
+									<PrefTextField
+										id="xfyun-app-id"
+										label={t('setting.cloudTts.xfyunAppId')}
+										value={prefs.xfyunAppId}
+										placeholder={t('setting.llm.appIdPlaceholder')}
+										onChange={(xfyunAppId) => patch({ xfyunAppId })}
+										disabled={xfyunFieldsDisabled}
+										labelClassName={fieldLabelClass}
+									/>
+									<PrefTextField
+										id="xfyun-api-key"
+										label={t('setting.cloudTts.xfyunApiKey')}
+										value={prefs.xfyunApiKey}
+										onChange={(xfyunApiKey) => patch({ xfyunApiKey })}
+										disabled={xfyunFieldsDisabled}
+										labelClassName={fieldLabelClass}
+										secret
+									/>
+									<PrefTextField
+										id="xfyun-api-secret"
+										label={t('setting.cloudTts.xfyunApiSecret')}
+										value={prefs.xfyunApiSecret}
+										placeholder={t('setting.llm.apiSecretPlaceholder')}
+										onChange={(xfyunApiSecret) => patch({ xfyunApiSecret })}
+										disabled={xfyunFieldsDisabled}
+										labelClassName={fieldLabelClass}
+										secret
+									/>
+									<PrefSelectField
+										id="xfyun-tts-voice"
+										label={t('setting.cloudTts.xfyunVoice')}
+										value={xfyunVoiceId}
+										onValueChange={(vcn) => patch({ xfyunVoiceId: vcn })}
+										options={xfyunVoiceOptions}
+										disabled={xfyunFieldsDisabled}
+										labelClassName={fieldLabelClass}
+									/>
 
-							<div className="mt-3.5 w-full border-t border-theme/20 pt-4.5">
-								<div className="text-md font-bold">
-									{t('setting.cloudTts.xfyunTitle')}
+									<NumberField
+										id="xfyun-tts-speed"
+										label={t('setting.cloudTts.xfyunSpeed')}
+										value={prefs.xfyunSpeed}
+										min={0}
+										max={100}
+										step={1}
+										disabled={xfyunFieldsDisabled}
+										labelClassName={fieldLabelClass}
+										onChange={(xfyunSpeed) => patch({ xfyunSpeed })}
+									/>
+									<NumberField
+										id="xfyun-tts-volume"
+										label={t('setting.cloudTts.xfyunVolume')}
+										value={prefs.xfyunVolume}
+										min={0}
+										max={100}
+										step={1}
+										disabled={xfyunFieldsDisabled}
+										labelClassName={fieldLabelClass}
+										onChange={(xfyunVolume) => patch({ xfyunVolume })}
+									/>
+									<NumberField
+										id="xfyun-tts-pitch"
+										label={t('setting.cloudTts.xfyunPitch')}
+										value={prefs.xfyunPitch}
+										min={0}
+										max={100}
+										step={1}
+										disabled={xfyunFieldsDisabled}
+										labelClassName={fieldLabelClass}
+										onChange={(xfyunPitch) => patch({ xfyunPitch })}
+									/>
 								</div>
-							</div>
 
-							<div
-								className={cn(
-									'my-3.5 flex flex-col gap-4 px-8.5 text-sm',
-									prefs.playbackSource !== 'xfyun' &&
-										'pointer-events-none opacity-50',
-								)}
-							>
-								<p className="text-xs text-textcolor/55">
-									{t('setting.cloudTts.xfyunCredentialsHint')}
-								</p>
-								<PrefTextField
-									id="xfyun-app-id"
-									label={t('setting.cloudTts.xfyunAppId')}
-									value={prefs.xfyunAppId}
-									placeholder={t('setting.llm.appIdPlaceholder')}
-									onChange={(xfyunAppId) => patch({ xfyunAppId })}
-									disabled={xfyunFieldsDisabled}
-									labelClassName={fieldLabelClass}
-								/>
-								<PrefTextField
-									id="xfyun-api-key"
-									label={t('setting.cloudTts.xfyunApiKey')}
-									value={prefs.xfyunApiKey}
-									onChange={(xfyunApiKey) => patch({ xfyunApiKey })}
-									disabled={xfyunFieldsDisabled}
-									labelClassName={fieldLabelClass}
-									secret
-								/>
-								<PrefTextField
-									id="xfyun-api-secret"
-									label={t('setting.cloudTts.xfyunApiSecret')}
-									value={prefs.xfyunApiSecret}
-									placeholder={t('setting.llm.apiSecretPlaceholder')}
-									onChange={(xfyunApiSecret) => patch({ xfyunApiSecret })}
-									disabled={xfyunFieldsDisabled}
-									labelClassName={fieldLabelClass}
-									secret
-								/>
-								<PrefSelectField
-									id="xfyun-tts-voice"
-									label={t('setting.cloudTts.xfyunVoice')}
-									value={xfyunVoiceId}
-									onValueChange={(vcn) => patch({ xfyunVoiceId: vcn })}
-									options={xfyunVoiceOptions}
-									disabled={xfyunFieldsDisabled}
-									labelClassName={fieldLabelClass}
-								/>
-
-								<NumberField
-									id="xfyun-tts-speed"
-									label={t('setting.cloudTts.xfyunSpeed')}
-									value={prefs.speed}
-									min={0.5}
-									max={2}
-									step={0.1}
-									disabled={xfyunFieldsDisabled}
-									labelClassName={fieldLabelClass}
-									onChange={(speed) => patch({ speed })}
-								/>
-								<NumberField
-									id="xfyun-tts-volume"
-									label={t('setting.cloudTts.xfyunVolume')}
-									value={xfyunVolumeUi}
-									min={0}
-									max={100}
-									step={1}
-									disabled={xfyunFieldsDisabled}
-									labelClassName={fieldLabelClass}
-									onChange={(volume) =>
-										patch({ vol: volFromXfyunVolume(volume) })
-									}
-								/>
-								<NumberField
-									id="xfyun-tts-pitch"
-									label={t('setting.cloudTts.xfyunPitch')}
-									value={xfyunPitchUi}
-									min={0}
-									max={100}
-									step={1}
-									disabled={xfyunFieldsDisabled}
-									labelClassName={fieldLabelClass}
-									onChange={(xfyunPitch) =>
-										patch({ pitch: pitchFromXfyunPitch(xfyunPitch) })
-									}
-								/>
-							</div>
-
-							<div className="mt-3.5 flex flex-wrap items-center justify-end gap-3 px-8.5 pb-4.5">
-								<Button
-									type="button"
-									variant="outline"
-									size="sm"
-									className="min-w-24 cursor-pointer border border-theme/20"
-									disabled={previewing || prefs.playbackSource !== 'xfyun'}
-									onClick={onResetXfyun}
-								>
-									{t('setting.cloudTts.reset')}
-								</Button>
-								<Button
-									type="button"
-									size="sm"
-									className={cn(
-										'min-w-24 cursor-pointer gap-1.5',
-										activePreview === 'xfyun' &&
-											previewing &&
-											'disabled:opacity-100',
-									)}
-									disabled={previewing || prefs.playbackSource !== 'xfyun'}
-									onClick={() =>
-										void onPreview('xfyun', 'setting.cloudTts.previewText')
-									}
-								>
-									<Volume2 className="size-4" aria-hidden />
-									{t('setting.cloudTts.xfyunPreview')}
-								</Button>
-							</div>
-						</>
-					)
-				) : null}
+								<div className="mt-3.5 flex flex-wrap items-center justify-end gap-3 px-8.5 pb-4.5">
+									<Button
+										type="button"
+										variant="outline"
+										size="sm"
+										className="min-w-24 cursor-pointer border border-theme/20"
+										disabled={previewing || prefs.playbackSource !== 'xfyun'}
+										onClick={onResetXfyun}
+									>
+										{t('setting.cloudTts.reset')}
+									</Button>
+									<Button
+										type="button"
+										size="sm"
+										className={cn(
+											'min-w-24 cursor-pointer gap-1.5',
+											activePreview === 'xfyun' &&
+												previewing &&
+												'disabled:opacity-100',
+										)}
+										disabled={previewing || prefs.playbackSource !== 'xfyun'}
+										onClick={() =>
+											void onPreview('xfyun', 'setting.cloudTts.previewText')
+										}
+									>
+										<Volume2 className="size-4" aria-hidden />
+										{t('setting.cloudTts.xfyunPreview')}
+									</Button>
+								</div>
+							</>
+						) : null}
+					</>
+				)}
 			</div>
 		</div>
 	);

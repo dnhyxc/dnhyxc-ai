@@ -1,6 +1,7 @@
 # 会员朗读选路：本机 / 云端互斥开关（playbackSource）
 
 > **文档角色（主文档）**：有效会员在语音设置页用 **本机 / MiniMax 云端 / 讯飞云端** 三选一（`PlaybackSourcePicker`）选择朗读默认介质；偏好字段 `playbackSource` 入库并与 `playEnglishPreferred` 选路衔接。  
+> **Edge 与分模式参数（2026-07）**：已扩展为 **本机 + Edge（全员）+ MiniMax/讯飞（会员）** 与三套独立 prosody——见 [`cloud-tts-edge-voice.md`](./cloud-tts-edge-voice.md)（本页 §2–§4 描述改前行为，新选路以该文为准）。  
 > **端到端全景**：[`tts-end-to-end-guide.md`](./tts-end-to-end-guide.md)  
 > **延伸阅读**：[`xfyun-cloud-tts.md`](./xfyun-cloud-tts.md)（讯飞在线合成与 Node 18 `ws`）、[`tts-membership-routing.md`](./tts-membership-routing.md)（各场景调用与 `preferLocal`）、[`voice-settings-page.md`](./voice-settings-page.md)（页壳分区）、[`cloud-tts-prefs-db.md`](./cloud-tts-prefs-db.md)（账号同步表结构）。
 

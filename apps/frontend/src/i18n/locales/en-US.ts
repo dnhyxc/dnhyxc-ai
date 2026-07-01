@@ -185,16 +185,21 @@ export const enUS = {
 		'When MiniMax cloud is selected above, fill in API Key and model name to use custom settings; leave blank or click "Reset to defaults" to use default configuration.',
 	'setting.cloudTts.playbackSourceTitle': 'Playback source',
 	'setting.cloudTts.playbackSourceHelp':
-		'Active members choose one: local Web Speech, MiniMax cloud, or iFlytek online TTS.',
+		'Active members choose one: local Web Speech, Edge cloud, MiniMax cloud, or iFlytek online TTS.',
+	'setting.cloudTts.playbackSourceHelpFree':
+		'Choose one: local Web Speech or Edge cloud (free).',
 	'setting.cloudTts.playbackSource.local': 'Local voice',
 	'setting.cloudTts.playbackSource.cloud': 'MiniMax cloud',
 	'setting.cloudTts.playbackSource.xfyun': 'iFlytek cloud',
+	'setting.cloudTts.playbackSource.edge': 'Edge cloud',
 	'setting.cloudTts.playbackSourceHelp.local':
 		'Browser Web Speech; voice from the local section below.',
 	'setting.cloudTts.playbackSourceHelp.cloud':
 		'MiniMax streaming synthesis; parameters in the MiniMax section below.',
 	'setting.cloudTts.playbackSourceHelp.xfyun':
 		'iFlytek online synthesis; good for Chinese narration; see the iFlytek section below.',
+	'setting.cloudTts.playbackSourceHelp.edge':
+		'Microsoft Edge online TTS; see Edge section below.',
 	'setting.cloudTts.xfyunTitle': 'xfyun voice settings',
 	'setting.cloudTts.xfyunCredentialsHint':
 		'Applies when iFlytek cloud is selected above; Fill APP ID, API Key, and API Secret to use your own iFlytek app; leave blank or click "Reset to defaults" to use server default configuration.',
@@ -206,6 +211,11 @@ export const enUS = {
 	'setting.cloudTts.xfyunVolume': 'Volume',
 	'setting.cloudTts.xfyunPitch': 'Pitch',
 	'setting.cloudTts.xfyunPreview': 'iFlytek preview',
+	'setting.cloudTts.edgeTitle': 'Edge voice settings',
+	'setting.cloudTts.edgeHint':
+		'Applies when Edge cloud is selected above; Microsoft Edge online TTS.',
+	'setting.cloudTts.edgeVoice': 'Voice',
+	'setting.cloudTts.edgePreview': 'Edge preview',
 	'setting.cloudTts.paramsTitle': 'Playback parameters',
 	'setting.cloudTts.paramsDesc':
 		'Voice, speed, audio format, and related options.',
@@ -1540,6 +1550,7 @@ export const enUS = {
 	'englishLearning.tts.unsupported':
 		'Playback unavailable. Check login and cloud TTS, or use a browser with local speech.',
 	'englishLearning.tts.cloudXfyunFailed': 'iFlytek cloud playback failed',
+	'englishLearning.tts.cloudEdgeFailed': 'Edge free voice playback failed',
 	'englishLearning.tts.cloudMinimaxFailed': 'MiniMax cloud playback failed',
 	'englishLearning.tts.cloudFallbackLocal':
 		'Playing with local voice instead. Check your iFlytek credentials or server configuration.',

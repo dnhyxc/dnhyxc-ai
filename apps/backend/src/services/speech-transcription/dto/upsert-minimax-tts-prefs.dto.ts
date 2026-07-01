@@ -32,8 +32,8 @@ export class UpsertMinimaxTtsPrefsDto {
 	enabled!: boolean;
 
 	@IsString()
-	@IsIn(['local', 'cloud', 'xfyun'])
-	playbackSource!: 'local' | 'cloud' | 'xfyun';
+	@IsIn(['local', 'cloud', 'xfyun', 'edge'])
+	playbackSource!: 'local' | 'cloud' | 'xfyun' | 'edge';
 
 	@IsString()
 	@MaxLength(64)
@@ -50,20 +50,56 @@ export class UpsertMinimaxTtsPrefsDto {
 	@MaxLength(128)
 	xfyunVoiceId?: string;
 
+	/** Edge TTS 发音人 ShortName */
+	@IsOptional()
+	@IsString()
+	@MaxLength(128)
+	edgeVoiceId?: string;
+
 	@IsNumber()
 	@Min(0.5)
 	@Max(2)
-	speed!: number;
+	minimaxSpeed!: number;
 
 	@IsNumber()
 	@Min(0.01)
 	@Max(10)
-	vol!: number;
+	minimaxVol!: number;
 
 	@IsInt()
 	@Min(-12)
 	@Max(12)
-	pitch!: number;
+	minimaxPitch!: number;
+
+	@IsNumber()
+	@Min(0)
+	@Max(100)
+	xfyunSpeed!: number;
+
+	@IsNumber()
+	@Min(0)
+	@Max(100)
+	xfyunVolume!: number;
+
+	@IsInt()
+	@Min(0)
+	@Max(100)
+	xfyunPitch!: number;
+
+	@IsNumber()
+	@Min(0.5)
+	@Max(2)
+	edgeSpeed!: number;
+
+	@IsNumber()
+	@Min(0.01)
+	@Max(10)
+	edgeVol!: number;
+
+	@IsInt()
+	@Min(-12)
+	@Max(12)
+	edgePitch!: number;
 
 	/** 空字符串表示不传 emotion */
 	@IsOptional()

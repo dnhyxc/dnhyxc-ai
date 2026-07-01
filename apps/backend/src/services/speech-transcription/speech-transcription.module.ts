@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { EdgeTtsService } from './edge-tts.service';
 import { MinimaxTtsService } from './minimax-tts.service';
 import { MinimaxTtsPrefsController } from './minimax-tts-prefs.controller';
 import { MinimaxTtsPrefsService } from './minimax-tts-prefs.service';
@@ -18,12 +19,14 @@ import { XfyunTtsService } from './xfyun-tts.service';
 		SiliconflowTranscriptionService,
 		MinimaxTtsService,
 		XfyunTtsService,
+		EdgeTtsService,
 		MinimaxTtsPrefsService,
 	],
 	exports: [
 		SiliconflowTranscriptionService,
 		MinimaxTtsService,
 		XfyunTtsService,
+		EdgeTtsService,
 		MinimaxTtsPrefsService,
 	],
 })

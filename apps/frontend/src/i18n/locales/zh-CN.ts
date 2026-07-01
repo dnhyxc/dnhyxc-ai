@@ -175,16 +175,21 @@ export const zhCN = {
 		'选择上方「MiniMax 云端」后生效，API Key、模型填写后使用自定义设置，留空或点击「恢复默认参数」则使用默认配置。',
 	'setting.cloudTts.playbackSourceTitle': '朗读来源',
 	'setting.cloudTts.playbackSourceHelp':
-		'有效会员三选一，互斥生效：本机 Web Speech、MiniMax 云端或讯飞在线合成。',
+		'有效会员四选一，互斥生效：本机 Web Speech、Edge 云端、MiniMax 云端或讯飞在线合成。',
+	'setting.cloudTts.playbackSourceHelpFree':
+		'二选一，互斥生效：本机 Web Speech 或 Edge 云端。',
 	'setting.cloudTts.playbackSource.local': '本机语音',
 	'setting.cloudTts.playbackSource.cloud': 'MiniMax 云端',
 	'setting.cloudTts.playbackSource.xfyun': '讯飞云端',
+	'setting.cloudTts.playbackSource.edge': 'Edge 云端',
 	'setting.cloudTts.playbackSourceHelp.local':
 		'使用浏览器 Web Speech，音色由下方本机设置决定。',
 	'setting.cloudTts.playbackSourceHelp.cloud':
 		'使用 MiniMax 流式合成，参数见下方 MiniMax 区块。',
 	'setting.cloudTts.playbackSourceHelp.xfyun':
 		'使用讯飞在线合成，适合中文听书；参数见下方讯飞区块。',
+	'setting.cloudTts.playbackSourceHelp.edge':
+		'使用 Microsoft Edge 在线合成；参数见下方 Edge 区块。',
 	'setting.cloudTts.xfyunTitle': '讯飞语音设置',
 	'setting.cloudTts.xfyunCredentialsHint':
 		'选择上方「讯飞云端」后生效；APPID、APIKey、APISecret 均填写后设置生效；留空或点击「恢复默认参数」则使用默认配置。',
@@ -196,6 +201,11 @@ export const zhCN = {
 	'setting.cloudTts.xfyunVolume': '音量',
 	'setting.cloudTts.xfyunPitch': '音高',
 	'setting.cloudTts.xfyunPreview': '讯飞试听',
+	'setting.cloudTts.edgeTitle': 'Edge 语音设置',
+	'setting.cloudTts.edgeHint':
+		'选择上方「Edge 免费语音」后生效；基于 Microsoft Edge 在线 TTS。',
+	'setting.cloudTts.edgeVoice': '发音人',
+	'setting.cloudTts.edgePreview': 'Edge 试听',
 	'setting.cloudTts.paramsTitle': '朗读参数',
 	'setting.cloudTts.paramsDesc': '音色、语速与音频格式等，可按需调整。',
 	'setting.cloudTts.minimaxCredentialsHint':
@@ -1407,6 +1417,7 @@ export const zhCN = {
 	'englishLearning.tts.unsupported':
 		'朗读不可用，请检查登录与云端语音配置，或换用支持本机语音的浏览器。',
 	'englishLearning.tts.cloudXfyunFailed': '讯飞云端朗读失败',
+	'englishLearning.tts.cloudEdgeFailed': 'Edge 免费语音朗读失败',
 	'englishLearning.tts.cloudMinimaxFailed': 'MiniMax 云端朗读失败',
 	'englishLearning.tts.cloudFallbackLocal':
 		'已改用本机语音播放，请检查讯飞应用凭证或服务端配置。',

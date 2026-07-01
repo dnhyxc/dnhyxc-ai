@@ -1,8 +1,8 @@
 import { http, type RequestConfig } from '@/utils/fetch';
 import { SETTINGS_CLOUD_TTS } from './api';
 
-/** 会员朗读选路：本机 / MiniMax 云端 / 讯飞在线，三选一互斥 */
-export type TtsPlaybackSource = 'local' | 'cloud' | 'xfyun';
+/** 会员朗读选路：本机 / MiniMax 云端 / 讯飞在线 / Edge TTS，四选一互斥 */
+export type TtsPlaybackSource = 'local' | 'cloud' | 'xfyun' | 'edge';
 
 export type CloudTtsSettingsView = {
 	enabled: boolean;
@@ -10,9 +10,16 @@ export type CloudTtsSettingsView = {
 	model: string;
 	voiceId: string;
 	xfyunVoiceId: string;
-	speed: number;
-	vol: number;
-	pitch: number;
+	edgeVoiceId: string;
+	minimaxSpeed: number;
+	minimaxVol: number;
+	minimaxPitch: number;
+	xfyunSpeed: number;
+	xfyunVolume: number;
+	xfyunPitch: number;
+	edgeSpeed: number;
+	edgeVol: number;
+	edgePitch: number;
 	emotion: string;
 	format: string;
 	languageBoost: string;

@@ -15,8 +15,10 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import type { Request, Response } from 'express';
 import { memoryStorage } from 'multer';
 import { JwtGuard } from 'src/guards/jwt.guard';
+import { EdgeTtsDto } from './dto/edge-tts.dto';
 import { MinimaxTtsDto } from './dto/minimax-tts.dto';
 import { XfyunTtsDto } from './dto/xfyun-tts.dto';
+import { EdgeTtsService } from './edge-tts.service';
 import { MinimaxTtsService } from './minimax-tts.service';
 import { SiliconflowTranscriptionService } from './siliconflow-transcription.service';
 import { XfyunTtsService } from './xfyun-tts.service';
@@ -34,6 +36,7 @@ export class SpeechTranscriptionController {
 		private readonly siliconflowTranscriptionService: SiliconflowTranscriptionService,
 		private readonly minimaxTtsService: MinimaxTtsService,
 		private readonly xfyunTtsService: XfyunTtsService,
+		private readonly edgeTtsService: EdgeTtsService,
 	) {}
 
 	/**
@@ -155,6 +158,48 @@ export class SpeechTranscriptionController {
 		const buffer = await this.xfyunTtsService.synthesizeSpeech(body, userId);
 		return new StreamableFile(buffer, {
 			type: this.xfyunTtsService.resolveContentType(),
+		});
+	}
+
+	/**
+	 * Microsoft Edge 在线语音合成（edge-tts-universal）：免费、无需 API Key。
+	 */
+	@Post('edge/speech/stream')
+	async edgeSpeechStream(
+		@Body() body: EdgeTtsDto,
+		@Req() req: AuthedRequest,
+		@Res({ passthrough: false }) res: Response,
+	) {
+		const userId = req.user?.userId;
+		this.edgeTtsService.resolveOptions(body);
+		res.status(200);
+		res.setHeader('Content-Type', this.edgeTtsService.resolveContentType());
+		res.setHeader('Cache-Control', 'no-store');
+		res.setHeader('X-Content-Type-Options', 'nosniff');
+
+		try {
+			for await (const chunk of this.edgeTtsService.streamSpeech(
+				body,
+				userId,
+			)) {
+				res.write(chunk);
+			}
+		} catch (err) {
+			if (!res.headersSent) {
+				throw err;
+			}
+			res.end();
+			return;
+		}
+		res.end();
+	}
+
+	@Post('edge/speech')
+	async edgeSpeech(@Body() body: EdgeTtsDto, @Req() req: AuthedRequest) {
+		const userId = req.user?.userId;
+		const buffer = await this.edgeTtsService.synthesizeSpeech(body, userId);
+		return new StreamableFile(buffer, {
+			type: this.edgeTtsService.resolveContentType(),
 		});
 	}
 }

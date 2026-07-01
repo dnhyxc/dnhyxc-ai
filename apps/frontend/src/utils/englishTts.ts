@@ -9,6 +9,7 @@ import { Toast } from '@ui/sonner';
 import { BASE_URL } from '@/constants';
 import { translateSync } from '@/i18n';
 import {
+	SPEECH_EDGE_TTS_STREAM,
 	SPEECH_MINIMAX_TTS_STREAM,
 	SPEECH_XFYUN_TTS_STREAM,
 } from '@/service/api';
@@ -20,6 +21,8 @@ import {
 import { getPlatformFetch } from '@/utils/fetch';
 import { isMembershipActiveFromUserInfo } from '@/utils/membershipActive';
 import {
+	buildEdgeTtsCacheKeySuffix,
+	buildEdgeTtsRequestExtras,
 	buildMinimaxTtsCacheKeySuffix,
 	buildMinimaxTtsRequestExtras,
 	buildXfyunTtsCacheKeySuffix,
@@ -506,7 +509,9 @@ function notifyCloudTtsFallback(canFallbackLocal: boolean): void {
 	const titleKey =
 		source === 'xfyun'
 			? 'englishLearning.tts.cloudXfyunFailed'
-			: 'englishLearning.tts.cloudMinimaxFailed';
+			: source === 'edge'
+				? 'englishLearning.tts.cloudEdgeFailed'
+				: 'englishLearning.tts.cloudMinimaxFailed';
 
 	if (canFallbackLocal) {
 		Toast({
@@ -861,6 +866,9 @@ function buildCloudTtsCacheKey(plain: string): string {
 	if (prefs.playbackSource === 'xfyun') {
 		return `${plain}\u0000xfyun${buildXfyunTtsCacheKeySuffix()}`;
 	}
+	if (prefs.playbackSource === 'edge') {
+		return `${plain}\u0000edge${buildEdgeTtsCacheKeySuffix()}`;
+	}
 	return plain + buildMinimaxTtsCacheKeySuffix();
 }
 
@@ -883,28 +891,40 @@ function isCloudEnglishTtsAllowed(): boolean {
 	}
 }
 
-/** 会员可走云端；非会员需本机 Web Speech 可用 */
-export function isEnglishPlaybackAvailable(): boolean {
-	if (!isCloudEnglishTtsAllowed()) {
-		return isEnglishTtsSupported();
-	}
-	if (!shouldUseCloudEnglishTts()) {
-		return isEnglishTtsSupported();
-	}
-	return true;
+function isMemberOnlyPlaybackSource(source: string): boolean {
+	return source === 'cloud' || source === 'xfyun';
 }
 
-/** 会员朗读选路：读内存缓存中的 playbackSource；非会员恒 false */
+/** 会员可走 MiniMax / 讯飞 / Edge；非会员仅 Edge 云端 */
+function canUseCloudPlaybackSource(source: string): boolean {
+	if (source === 'local') return false;
+	if (isCloudEnglishTtsAllowed()) return true;
+	return source === 'edge';
+}
+
+/** 会员可走云端；非会员可选 Edge 云端或本机 Web Speech */
+export function isEnglishPlaybackAvailable(): boolean {
+	const prefs = loadMinimaxTtsUserPrefs();
+	if (canUseCloudPlaybackSource(prefs.playbackSource)) return true;
+	if (shouldUseCloudEnglishTts()) return true;
+	return isEnglishTtsSupported();
+}
+
+/** 朗读选路：读 playbackSource；非会员仅 edge 走云端 */
 function shouldUseCloudEnglishTts(
 	options?: PlayEnglishPreferredOptions,
 ): boolean {
 	if (options?.preferLocal === true) return false;
-	if (options?.preferLocal === false) {
-		return isCloudEnglishTtsAllowed();
-	}
-	if (!isCloudEnglishTtsAllowed()) return false;
 	const prefs = loadMinimaxTtsUserPrefs();
-	return prefs.playbackSource !== 'local';
+	const source = prefs.playbackSource;
+	if (source === 'local') return false;
+	if (options?.preferLocal === false) {
+		return canUseCloudPlaybackSource(source);
+	}
+	if (isMemberOnlyPlaybackSource(source) && !isCloudEnglishTtsAllowed()) {
+		return false;
+	}
+	return canUseCloudPlaybackSource(source);
 }
 
 function isPlaybackGenerationActive(generation: number): boolean {
@@ -1052,21 +1072,23 @@ async function startCloudTts(plain: string): Promise<CloudTtsReady> {
 
 	const prefs = loadMinimaxTtsUserPrefs();
 	const source = prefs.playbackSource;
-	const res = await platformFetch(
-		BASE_URL +
-			(source === 'xfyun'
-				? SPEECH_XFYUN_TTS_STREAM
-				: SPEECH_MINIMAX_TTS_STREAM),
-		{
-			method: 'POST',
-			headers,
-			body: JSON.stringify(
-				source === 'xfyun'
-					? { text: plain, ...buildXfyunTtsRequestExtras() }
-					: { text: plain, ...buildMinimaxTtsRequestExtras() },
-			),
-		},
-	);
+	const endpoint =
+		source === 'xfyun'
+			? SPEECH_XFYUN_TTS_STREAM
+			: source === 'edge'
+				? SPEECH_EDGE_TTS_STREAM
+				: SPEECH_MINIMAX_TTS_STREAM;
+	const bodyExtras =
+		source === 'xfyun'
+			? buildXfyunTtsRequestExtras()
+			: source === 'edge'
+				? buildEdgeTtsRequestExtras()
+				: buildMinimaxTtsRequestExtras();
+	const res = await platformFetch(BASE_URL + endpoint, {
+		method: 'POST',
+		headers,
+		body: JSON.stringify({ text: plain, ...bodyExtras }),
+	});
 
 	// ponytail: 云端失败不中转硅基/MiniMax；由 playEnglishPreferred catch 统一降级本机 Web Speech
 	if (!res.ok) {

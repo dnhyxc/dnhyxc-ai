@@ -72,11 +72,9 @@ function VoiceDropdownGroup({
 
 export const LocalTtsVoiceSetting = observer(function LocalTtsVoiceSetting({
 	showDivider = false,
-	isMemberActive = false,
 	playbackSource = 'local',
 }: {
 	showDivider?: boolean;
-	isMemberActive?: boolean;
 	playbackSource?: TtsPlaybackSource;
 }) {
 	const { t } = useI18n();
@@ -210,9 +208,7 @@ export const LocalTtsVoiceSetting = observer(function LocalTtsVoiceSetting({
 				<div
 					className={cn(
 						'mt-3.5 flex flex-wrap items-center gap-3 px-8.5 text-sm',
-						isMemberActive &&
-							playbackSource !== 'local' &&
-							'pointer-events-none opacity-50',
+						playbackSource !== 'local' && 'pointer-events-none opacity-50',
 					)}
 				>
 					<Label id="local-english-tts-voice" className="shrink-0">

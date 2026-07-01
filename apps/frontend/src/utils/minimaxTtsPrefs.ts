@@ -1,3 +1,4 @@
+import { DEFAULT_EDGE_TTS_VOICE, isEdgeTtsVoiceId } from '@/constants/edgeTts';
 import {
 	DEFAULT_MINIMAX_TTS_LANGUAGE_BOOST,
 	DEFAULT_MINIMAX_TTS_MODEL,
@@ -12,6 +13,7 @@ import {
 	DEFAULT_XFYUN_TTS_VCN,
 	fillXfyunCredentialsFromEnv,
 	isXfyunTtsVcn,
+	XFYUN_TTS_PARAM_DEFAULT,
 	xfyunPitchFromPitch,
 	xfyunSpeedFromMinimaxSpeed,
 	xfyunVolumeFromVol,
@@ -41,9 +43,16 @@ export const DEFAULT_MINIMAX_TTS_USER_PREFS: MinimaxTtsUserPrefs = {
 	model: defaultMinimaxCloud.model,
 	voiceId: DEFAULT_MINIMAX_TTS_VOICE_ID,
 	xfyunVoiceId: DEFAULT_XFYUN_TTS_VCN,
-	speed: 1,
-	vol: 5,
-	pitch: 0,
+	edgeVoiceId: DEFAULT_EDGE_TTS_VOICE,
+	minimaxSpeed: 1,
+	minimaxVol: 5,
+	minimaxPitch: 0,
+	xfyunSpeed: XFYUN_TTS_PARAM_DEFAULT,
+	xfyunVolume: XFYUN_TTS_PARAM_DEFAULT,
+	xfyunPitch: XFYUN_TTS_PARAM_DEFAULT,
+	edgeSpeed: 1,
+	edgeVol: 5,
+	edgePitch: 0,
 	emotion: '',
 	format: 'mp3',
 	languageBoost: DEFAULT_MINIMAX_TTS_LANGUAGE_BOOST,
@@ -63,6 +72,7 @@ let loadPromise: Promise<MinimaxTtsUserPrefs> | null = null;
 function normalizePlaybackSource(raw: unknown): TtsPlaybackSource {
 	if (raw === 'local') return 'local';
 	if (raw === 'xfyun') return 'xfyun';
+	if (raw === 'edge') return 'edge';
 	return 'cloud';
 }
 
@@ -93,6 +103,7 @@ function pickOptionalCredential(raw: unknown, maxLen: number): string {
 function splitLegacyVoiceStorage(
 	prefs: MinimaxTtsUserPrefs,
 	rawXfyunVoiceId: unknown,
+	rawEdgeVoiceId: unknown,
 ): MinimaxTtsUserPrefs {
 	let voiceId = prefs.voiceId;
 	let xfyunVoiceId = pickString(rawXfyunVoiceId, DEFAULT_XFYUN_TTS_VCN, 128);
@@ -103,7 +114,37 @@ function splitLegacyVoiceStorage(
 	if (!isXfyunTtsVcn(xfyunVoiceId)) {
 		xfyunVoiceId = DEFAULT_XFYUN_TTS_VCN;
 	}
-	return { ...prefs, voiceId, xfyunVoiceId };
+	let edgeVoiceId = pickString(rawEdgeVoiceId, DEFAULT_EDGE_TTS_VOICE, 128);
+	if (!isEdgeTtsVoiceId(edgeVoiceId)) {
+		edgeVoiceId = DEFAULT_EDGE_TTS_VOICE;
+	}
+	return { ...prefs, voiceId, xfyunVoiceId, edgeVoiceId };
+}
+
+/** 旧版共用 speed/vol/pitch 拆到各模式独立字段（仅缺新字段时生效） */
+function splitLegacyProsodyFields(
+	prefs: MinimaxTtsUserPrefs,
+	raw: Record<string, unknown>,
+): MinimaxTtsUserPrefs {
+	const hasNewProsody =
+		'minimaxSpeed' in raw || 'xfyunSpeed' in raw || 'edgeSpeed' in raw;
+	if (hasNewProsody) return prefs;
+
+	const legacySpeed = clampNumber(raw.speed, 0.5, 2, 1);
+	const legacyVol = clampNumber(raw.vol, 0.01, 10, 5);
+	const legacyPitch = Math.round(clampNumber(raw.pitch, -12, 12, 0));
+	return {
+		...prefs,
+		minimaxSpeed: legacySpeed,
+		minimaxVol: legacyVol,
+		minimaxPitch: legacyPitch,
+		xfyunSpeed: xfyunSpeedFromMinimaxSpeed(legacySpeed),
+		xfyunVolume: xfyunVolumeFromVol(legacyVol),
+		xfyunPitch: xfyunPitchFromPitch(legacyPitch),
+		edgeSpeed: legacySpeed,
+		edgeVol: legacyVol,
+		edgePitch: legacyPitch,
+	};
 }
 
 export function normalizeMinimaxTtsUserPrefs(
@@ -122,9 +163,20 @@ export function normalizeMinimaxTtsUserPrefs(
 		model,
 		voiceId: pickString(o.voiceId, DEFAULT_MINIMAX_TTS_VOICE_ID, 128),
 		xfyunVoiceId: pickString(o.xfyunVoiceId, DEFAULT_XFYUN_TTS_VCN, 128),
-		speed: clampNumber(o.speed, 0.5, 2, 1),
-		vol: clampNumber(o.vol, 0.01, 10, 5),
-		pitch: Math.round(clampNumber(o.pitch, -12, 12, 0)),
+		edgeVoiceId: pickString(o.edgeVoiceId, DEFAULT_EDGE_TTS_VOICE, 128),
+		minimaxSpeed: clampNumber(o.minimaxSpeed ?? o.speed, 0.5, 2, 1),
+		minimaxVol: clampNumber(o.minimaxVol ?? o.vol, 0.01, 10, 5),
+		minimaxPitch: Math.round(
+			clampNumber(o.minimaxPitch ?? o.pitch, -12, 12, 0),
+		),
+		xfyunSpeed: clampNumber(o.xfyunSpeed, 0, 100, XFYUN_TTS_PARAM_DEFAULT),
+		xfyunVolume: clampNumber(o.xfyunVolume, 0, 100, XFYUN_TTS_PARAM_DEFAULT),
+		xfyunPitch: Math.round(
+			clampNumber(o.xfyunPitch, 0, 100, XFYUN_TTS_PARAM_DEFAULT),
+		),
+		edgeSpeed: clampNumber(o.edgeSpeed, 0.5, 2, 1),
+		edgeVol: clampNumber(o.edgeVol, 0.01, 10, 5),
+		edgePitch: Math.round(clampNumber(o.edgePitch, -12, 12, 0)),
 		emotion: (() => {
 			const e = pickString(o.emotion, '', 32);
 			if (!e || e === '__none__' || e === 'whisper') return '';
@@ -156,7 +208,24 @@ export function normalizeMinimaxTtsUserPrefs(
 		xfyunApiSecret: pickOptionalCredential(o.xfyunApiSecret, 128),
 		minimaxApiKey: pickOptionalCredential(o.minimaxApiKey, 256),
 	};
-	return splitLegacyVoiceStorage(base, o.xfyunVoiceId);
+	const withVoices = splitLegacyVoiceStorage(
+		base,
+		o.xfyunVoiceId,
+		o.edgeVoiceId,
+	);
+	return splitLegacyProsodyFields(withVoices, o);
+}
+
+/** 非会员仅允许 local / edge；会员源若过期则回退 local */
+export function clampPlaybackSourceForMembership(
+	prefs: MinimaxTtsUserPrefs,
+	isMemberActive: boolean,
+): MinimaxTtsUserPrefs {
+	if (isMemberActive) return prefs;
+	if (prefs.playbackSource === 'cloud' || prefs.playbackSource === 'xfyun') {
+		return { ...prefs, playbackSource: 'local' };
+	}
+	return prefs;
 }
 
 /** 服务端空字段回填 VITE_* 默认值（讯飞 + MiniMax） */
@@ -311,9 +380,9 @@ export function buildMinimaxTtsRequestExtras(): Record<string, unknown> {
 	const body: Record<string, unknown> = {
 		model: prefs.model,
 		voiceId: prefs.voiceId,
-		speed: prefs.speed,
-		vol: prefs.vol,
-		pitch: prefs.pitch,
+		speed: prefs.minimaxSpeed,
+		vol: prefs.minimaxVol,
+		pitch: prefs.minimaxPitch,
 		format: prefs.format,
 		sampleRate: prefs.sampleRate,
 		bitrate: prefs.bitrate,
@@ -324,7 +393,7 @@ export function buildMinimaxTtsRequestExtras(): Record<string, unknown> {
 	return body;
 }
 
-/** 讯飞在线合成 POST body（不含 text）；与 MiniMax 共用 vol/pitch/speed 字段，此处映射到 0–100 */
+/** 讯飞在线合成 POST body（不含 text） */
 export function buildXfyunTtsRequestExtras(): Record<string, unknown> {
 	const prefs = loadMinimaxTtsUserPrefs();
 	const vcn = isXfyunTtsVcn(prefs.xfyunVoiceId)
@@ -332,9 +401,9 @@ export function buildXfyunTtsRequestExtras(): Record<string, unknown> {
 		: DEFAULT_XFYUN_TTS_VCN;
 	return {
 		vcn,
-		speed: xfyunSpeedFromMinimaxSpeed(prefs.speed),
-		volume: xfyunVolumeFromVol(prefs.vol),
-		pitch: xfyunPitchFromPitch(prefs.pitch),
+		speed: Math.round(prefs.xfyunSpeed),
+		volume: Math.round(prefs.xfyunVolume),
+		pitch: prefs.xfyunPitch,
 	};
 }
 
@@ -355,4 +424,25 @@ export function buildMinimaxTtsCacheKeySuffix(): string {
 	const userPart = userId > 0 ? String(userId) : '0';
 	const creds = prefs.minimaxApiKey.trim();
 	return `${userPart}\u0001${creds}\u0001${JSON.stringify(buildMinimaxTtsRequestExtras())}`;
+}
+
+/** Edge TTS POST body（不含 text） */
+export function buildEdgeTtsRequestExtras(): Record<string, unknown> {
+	const prefs = loadMinimaxTtsUserPrefs();
+	const voice = isEdgeTtsVoiceId(prefs.edgeVoiceId)
+		? prefs.edgeVoiceId
+		: DEFAULT_EDGE_TTS_VOICE;
+	return {
+		voice,
+		speed: prefs.edgeSpeed,
+		vol: prefs.edgeVol,
+		pitch: prefs.edgePitch,
+	};
+}
+
+/** 前端 MP3 缓存 key 后缀：Edge 发音人 / 语速等变更后不与旧缓存混用 */
+export function buildEdgeTtsCacheKeySuffix(): string {
+	const userId = getLoggedInUserId();
+	const userPart = userId > 0 ? String(userId) : '0';
+	return `${userPart}\u0001${JSON.stringify(buildEdgeTtsRequestExtras())}`;
 }

@@ -3,6 +3,7 @@
 ## 延伸阅读
 
 - [cloud-tts-minimax-model-settings.md](./cloud-tts-minimax-model-settings.md) — MiniMax 默认 model / 白名单 / 设置 Combobox（本轮）
+- [cloud-tts-edge-prosody-membership.md](./cloud-tts-edge-prosody-membership.md) — Edge TTS / 分模式 prosody / 非会员 Edge（本轮）
 - [cloud-tts-settings.md](../english/cloud-tts-settings.md) — 设置页结构与偏好字段（姊妹稿部分滞后，见 §7）
 - [cloud-tts-user-credentials.md](../english/cloud-tts-user-credentials.md) — **实现说明**（改动前后对比）
 - [xfyun-cloud-tts.md](../english/xfyun-cloud-tts.md) — 讯飞选路与参数映射（`voiceId` 存 vcn 描述已过时）

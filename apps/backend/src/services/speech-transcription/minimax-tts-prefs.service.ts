@@ -2,18 +2,26 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import type { UpsertMinimaxTtsPrefsDto } from './dto/upsert-minimax-tts-prefs.dto';
+import { DEFAULT_EDGE_TTS_VOICE } from './edge-tts-voices';
 import { DEFAULT_MINIMAX_TTS_MODEL } from './minimax-tts-models';
 import { MinimaxTtsUserConfig } from './minimax-tts-user-config.entity';
 
 export type MinimaxTtsPrefsView = {
 	enabled: boolean;
-	playbackSource: 'local' | 'cloud' | 'xfyun';
+	playbackSource: 'local' | 'cloud' | 'xfyun' | 'edge';
 	model: string;
 	voiceId: string;
 	xfyunVoiceId: string;
-	speed: number;
-	vol: number;
-	pitch: number;
+	edgeVoiceId: string;
+	minimaxSpeed: number;
+	minimaxVol: number;
+	minimaxPitch: number;
+	xfyunSpeed: number;
+	xfyunVolume: number;
+	xfyunPitch: number;
+	edgeSpeed: number;
+	edgeVol: number;
+	edgePitch: number;
 	emotion: string;
 	format: string;
 	languageBoost: string;
@@ -33,9 +41,16 @@ export const DEFAULT_MINIMAX_TTS_PREFS: MinimaxTtsPrefsView = {
 	model: DEFAULT_MINIMAX_TTS_MODEL,
 	voiceId: 'English_captivating_female1',
 	xfyunVoiceId: 'x4_yezi',
-	speed: 1,
-	vol: 5,
-	pitch: 0,
+	edgeVoiceId: DEFAULT_EDGE_TTS_VOICE,
+	minimaxSpeed: 1,
+	minimaxVol: 5,
+	minimaxPitch: 0,
+	xfyunSpeed: 50,
+	xfyunVolume: 50,
+	xfyunPitch: 50,
+	edgeSpeed: 1,
+	edgeVol: 5,
+	edgePitch: 0,
 	emotion: '',
 	format: 'mp3',
 	languageBoost: 'auto',
@@ -68,9 +83,12 @@ export class MinimaxTtsPrefsService {
 		return e;
 	}
 
-	private normalizePlaybackSource(raw?: string): 'local' | 'cloud' | 'xfyun' {
+	private normalizePlaybackSource(
+		raw?: string,
+	): 'local' | 'cloud' | 'xfyun' | 'edge' {
 		if (raw === 'local') return 'local';
 		if (raw === 'xfyun') return 'xfyun';
+		if (raw === 'edge') return 'edge';
 		return 'cloud';
 	}
 
@@ -83,18 +101,31 @@ export class MinimaxTtsPrefsService {
 		return v || DEFAULT_MINIMAX_TTS_PREFS.xfyunVoiceId;
 	}
 
+	private defaultEdgeVoiceId(raw?: string | null): string {
+		const v = raw?.trim() ?? '';
+		return v || DEFAULT_MINIMAX_TTS_PREFS.edgeVoiceId;
+	}
+
 	private rowToView(row: MinimaxTtsUserConfig): MinimaxTtsPrefsView {
 		const voiceId = row.voiceId?.trim() || DEFAULT_MINIMAX_TTS_PREFS.voiceId;
 		const xfyunVoiceId = this.defaultXfyunVoiceId(row.xfyunVoiceId);
+		const edgeVoiceId = this.defaultEdgeVoiceId(row.edgeVoiceId);
 		return {
 			enabled: Boolean(row.enabled),
 			playbackSource: this.normalizePlaybackSource(row.playbackSource),
 			model: row.model?.trim() || DEFAULT_MINIMAX_TTS_PREFS.model,
 			voiceId,
 			xfyunVoiceId,
-			speed: row.speed ?? DEFAULT_MINIMAX_TTS_PREFS.speed,
-			vol: row.vol ?? DEFAULT_MINIMAX_TTS_PREFS.vol,
-			pitch: row.pitch ?? DEFAULT_MINIMAX_TTS_PREFS.pitch,
+			edgeVoiceId,
+			minimaxSpeed: row.minimaxSpeed ?? DEFAULT_MINIMAX_TTS_PREFS.minimaxSpeed,
+			minimaxVol: row.minimaxVol ?? DEFAULT_MINIMAX_TTS_PREFS.minimaxVol,
+			minimaxPitch: row.minimaxPitch ?? DEFAULT_MINIMAX_TTS_PREFS.minimaxPitch,
+			xfyunSpeed: row.xfyunSpeed ?? DEFAULT_MINIMAX_TTS_PREFS.xfyunSpeed,
+			xfyunVolume: row.xfyunVolume ?? DEFAULT_MINIMAX_TTS_PREFS.xfyunVolume,
+			xfyunPitch: row.xfyunPitch ?? DEFAULT_MINIMAX_TTS_PREFS.xfyunPitch,
+			edgeSpeed: row.edgeSpeed ?? DEFAULT_MINIMAX_TTS_PREFS.edgeSpeed,
+			edgeVol: row.edgeVol ?? DEFAULT_MINIMAX_TTS_PREFS.edgeVol,
+			edgePitch: row.edgePitch ?? DEFAULT_MINIMAX_TTS_PREFS.edgePitch,
 			emotion: this.normalizeEmotion(row.emotion),
 			format: row.format?.trim() || DEFAULT_MINIMAX_TTS_PREFS.format,
 			languageBoost:
@@ -158,9 +189,16 @@ export class MinimaxTtsPrefsService {
 		row.model = dto.model;
 		row.voiceId = dto.voiceId.trim();
 		row.xfyunVoiceId = this.defaultXfyunVoiceId(dto.xfyunVoiceId);
-		row.speed = dto.speed;
-		row.vol = dto.vol;
-		row.pitch = dto.pitch;
+		row.edgeVoiceId = this.defaultEdgeVoiceId(dto.edgeVoiceId);
+		row.minimaxSpeed = dto.minimaxSpeed;
+		row.minimaxVol = dto.minimaxVol;
+		row.minimaxPitch = dto.minimaxPitch;
+		row.xfyunSpeed = dto.xfyunSpeed;
+		row.xfyunVolume = dto.xfyunVolume;
+		row.xfyunPitch = dto.xfyunPitch;
+		row.edgeSpeed = dto.edgeSpeed;
+		row.edgeVol = dto.edgeVol;
+		row.edgePitch = dto.edgePitch;
 		row.emotion = emotion;
 		row.format = dto.format;
 		row.languageBoost = dto.languageBoost;

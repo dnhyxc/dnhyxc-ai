@@ -1321,6 +1321,20 @@ const UPDATE_INFO_SECTIONS_ZH: UpdateInfoSection[] = [
 				description:
 					'语音设置 → 云端语音设置中，MiniMax 模型改为输入 + 预设下拉（speech-2.8-hd / speech-2.8-turbo，与大模型设置同款交互）；新用户与恢复默认为 turbo；仅支持 2.8 系列两项——若账号仍保存旧版 2.6 / 02 / 01 模型名，需改为 hd 或 turbo 后再保存。',
 			},
+			{
+				id: 's24-47',
+				title: 'Edge 云端朗读',
+				dateLabel: '2026-07-02',
+				description:
+					'语音设置新增 Edge 云端（Microsoft 在线语音，免费、无需 API Key）。所有登录用户可在页顶朗读来源选本机或 Edge；有效会员另可选 MiniMax、讯飞。Edge 设置（发音人、语速/音量/音高、试听）位于 MiniMax 区块之前，与英语学习喇叭、电子书听读共用选路。',
+			},
+			{
+				id: 's24-48',
+				title: '分模式朗读参数',
+				dateLabel: '2026-07-02',
+				description:
+					'MiniMax、讯飞、Edge 的语速/音量/音高各自独立保存，调整一种来源不再覆盖其它来源；旧账号首次同步时会从原共用参数复制到三套字段。',
+			},
 		],
 	},
 	{
