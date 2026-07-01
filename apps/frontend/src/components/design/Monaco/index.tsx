@@ -12,6 +12,7 @@ import { PanelTopClose, PanelTopOpen } from 'lucide-react';
 import {
 	type RefObject,
 	useCallback,
+	useDeferredValue,
 	useEffect,
 	useId,
 	useLayoutEffect,
@@ -117,6 +118,11 @@ interface MarkdownEditorProps {
 	 * @param open - 控制助手面板显示（true）或隐藏（false）
 	 */
 	onMarkdownAssistantOpenChange?: (open: boolean) => void;
+	/**
+	 * 右栏助手正在发送/流式时为 true：左栏预览暂停重解析，避免与助手争用主线程。
+	 * 由知识页 observer 子组件传入。
+	 */
+	assistantPaneBusy?: boolean;
 	/** 为 markdown 时是否显示编辑/预览/分屏切换；默认 true */
 	enableMarkdownPreview?: boolean;
 	/**
@@ -268,6 +274,7 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 	bottomBarAssistantNode,
 	markdownAssistantOpen: markdownAssistantOpenProp,
 	onMarkdownAssistantOpenChange,
+	assistantPaneBusy = false,
 	enableMarkdownPreview = true,
 	wordWrap = 'bounded',
 	wordWrapColumn = MARKDOWN_EDITOR_WORD_WRAP_COLUMN,
@@ -640,9 +647,23 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 		editorBootstrapTextRef.current = value;
 	}
 
+	/** 纯预览且右栏助手同开：隐藏 Monaco 不参与 layout，减轻与助手流式/输入的主线程争用 */
+	const unmountEditorInPreviewWithAssistant =
+		assistantRightPaneActive && viewMode === 'preview';
 	/** 纯编辑态不喂预览正文，避免长文每键重解析拖慢 Monaco 与标题输入 */
-	const leftPreviewMarkdown =
+	const leftPreviewMarkdownRaw =
 		viewMode === 'preview' || viewMode === 'split' ? (value ?? '') : '';
+	const leftPreviewMarkdownDeferred = useDeferredValue(leftPreviewMarkdownRaw);
+	const latchedLeftPreviewRef = useRef(leftPreviewMarkdownRaw);
+	if (!assistantPaneBusy) {
+		latchedLeftPreviewRef.current = leftPreviewMarkdownRaw;
+	}
+	// ponytail: 助手同开时低优先级/冻结左栏预览，避免与流式 Markdown 解析抢主线程
+	const leftPreviewMarkdown = unmountEditorInPreviewWithAssistant
+		? assistantPaneBusy
+			? latchedLeftPreviewRef.current
+			: leftPreviewMarkdownDeferred
+		: leftPreviewMarkdownRaw;
 	/** 分屏下用即时正文，避免 deferred 滞后导致预览 DOM 与编辑器 scroll 不同步 */
 	const splitPaneMarkdown = viewMode === 'split' ? (value ?? '') : '';
 	/** Diff 右侧（modified）与主编辑器正文同步 */
@@ -795,6 +816,47 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 		ed.setValue(next);
 		ed.updateOptions({ placeholder: next.trim() ? '' : placeholder });
 	}, [value, placeholder, documentIdentity]);
+
+	/** 预览+助手时 Editor 已卸载，外部 setMarkdown 仍须写入 keepCurrentModel 的 TextModel */
+	useEffect(() => {
+		if (editorRef.current || !monaco) return;
+		const model = monaco.editor.getModel(monaco.Uri.parse(monacoModelPath));
+		if (!model) return;
+		const next = normalizeMonacoEol(value ?? '');
+		if (normalizeMonacoEol(model.getValue()) === next) {
+			lastEmittedRef.current = next;
+			prevIdentityForValueSyncRef.current = documentIdentity;
+			return;
+		}
+		prevIdentityForValueSyncRef.current = documentIdentity;
+		lastEmittedRef.current = next;
+		model.setValue(next);
+	}, [value, monaco, monacoModelPath, documentIdentity]);
+
+	useEffect(() => {
+		if (!getMarkdownFromEditorRef) return;
+		if (editorRef.current) return;
+		if (!unmountEditorInPreviewWithAssistant) return;
+		getMarkdownFromEditorRef.current = () => {
+			const model = monaco?.editor.getModel(monaco.Uri.parse(monacoModelPath));
+			const v = normalizeMonacoEol(
+				model?.getValue() ?? valueFromPropsRef.current ?? '',
+			);
+			lastEmittedRef.current = v;
+			onChangeRef.current?.(v);
+			return v;
+		};
+		return () => {
+			if (!editorRef.current && getMarkdownFromEditorRef) {
+				getMarkdownFromEditorRef.current = null;
+			}
+		};
+	}, [
+		getMarkdownFromEditorRef,
+		unmountEditorInPreviewWithAssistant,
+		monaco,
+		monacoModelPath,
+	]);
 
 	const rebuildMarkdownScrollSyncSnapshot = useCallback(() => {
 		const vp = previewViewportRef.current;
@@ -1765,40 +1827,45 @@ const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
 												viewportRef={previewViewportRef}
 												showPreviewScrollCornerFab
 												enableMermaid={markdownEnableMermaid}
+												// enableCodeFloatingToolbar={!assistantRightPaneActive}
 											/>
 										</div>
-										<div
-											className={cn(
-												'absolute inset-0 flex min-h-0 min-w-0 flex-col overflow-hidden',
-												viewMode === 'preview' &&
-													'invisible pointer-events-none',
-											)}
-										>
-											<QuickContextMenu
-												items={editorContextMenuItems}
-												triggerAsChild
-												onCloseAutoFocus={handleEditorContextMenuCloseAutoFocus}
+										{!unmountEditorInPreviewWithAssistant ? (
+											<div
+												className={cn(
+													'absolute inset-0 flex min-h-0 min-w-0 flex-col overflow-hidden',
+													viewMode === 'preview' &&
+														'invisible pointer-events-none',
+												)}
 											>
-												<div
-													ref={editorHostRef}
-													className="box-border h-full min-h-0 min-w-0 max-w-full w-full overflow-hidden contain-[inline-size]"
+												<QuickContextMenu
+													items={editorContextMenuItems}
+													triggerAsChild
+													onCloseAutoFocus={
+														handleEditorContextMenuCloseAutoFocus
+													}
 												>
-													<Editor
-														height="100%"
-														width="100%"
-														language={language}
-														path={monacoModelPath}
-														keepCurrentModel
-														defaultValue={editorBootstrapTextRef.current}
-														beforeMount={handleMonacoBeforeMount}
-														theme={glassThemeId}
-														onMount={handleEditorMount}
-														options={mergedEditorOptions}
-														loading={<Loading text={loadingEditorText} />}
-													/>
-												</div>
-											</QuickContextMenu>
-										</div>
+													<div
+														ref={editorHostRef}
+														className="box-border h-full min-h-0 min-w-0 max-w-full w-full overflow-hidden contain-[inline-size]"
+													>
+														<Editor
+															height="100%"
+															width="100%"
+															language={language}
+															path={monacoModelPath}
+															keepCurrentModel
+															defaultValue={editorBootstrapTextRef.current}
+															beforeMount={handleMonacoBeforeMount}
+															theme={glassThemeId}
+															onMount={handleEditorMount}
+															options={mergedEditorOptions}
+															loading={<Loading text={loadingEditorText} />}
+														/>
+													</div>
+												</QuickContextMenu>
+											</div>
+										) : null}
 									</div>
 								)}
 							</ResizablePanel>

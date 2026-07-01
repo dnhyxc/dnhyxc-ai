@@ -7,11 +7,9 @@ import { Button, Toast } from '@ui/index';
 import { BookOpen, CirclePlus, Sparkles } from 'lucide-react';
 import { observer } from 'mobx-react';
 import {
-	type Dispatch,
 	forwardRef,
 	memo,
 	type RefObject,
-	type SetStateAction,
 	useCallback,
 	useEffect,
 	useImperativeHandle,
@@ -21,15 +19,11 @@ import {
 	useState,
 } from 'react';
 import {
-	AssistantFooter,
 	AssistantMessageRow,
-	AssistantSessionEntryToolbar,
-	AssistantShareBar,
 	AssistantShell,
 	type SelectMessageByChatId,
 	useAssistantShare,
 } from '@/components/design/Assistant';
-import ChatEntry from '@/components/design/ChatEntry';
 import { useAssistantCopy, useAssistantScroll, useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import useStore from '@/store';
@@ -37,10 +31,15 @@ import assistantStore from '@/store/assistant';
 import knowledgeRagQaStore from '@/store/knowledgeRagQa';
 import type { Message } from '@/types/chat';
 import {
-	KNOWLEDGE_ASSISTANT_MODES,
 	KNOWLEDGE_ASSISTANT_PROMPTS,
+	type KnowledgeAssistantPanelMode,
 	type KnowledgeAssistantPromptKind,
 } from './constants';
+import {
+	KnowledgeAssistantChatFooter,
+	type KnowledgeAssistantChatFooterHandle,
+	KnowledgeAssistantFooterControls,
+} from './KnowledgeAssistantChatFooter';
 import {
 	buildKnowledgeAssistantDocumentMessage,
 	documentHasCanonicalTocHeading,
@@ -52,14 +51,10 @@ import {
 	prependTocToDocument,
 } from './utils';
 
-export type KnowledgeAssistantMode = 'ai' | 'rag';
+export type KnowledgeAssistantMode = KnowledgeAssistantPanelMode;
 
 /** 供知识页从编辑器选区写入助手草稿，避免输入 state 提升到整页 */
-export type KnowledgeAssistantHandle = {
-	appendInput: (text: string, mode?: KnowledgeAssistantMode) => void;
-	clearInputs: () => void;
-	focusInputAtEnd: () => void;
-};
+export type KnowledgeAssistantHandle = KnowledgeAssistantChatFooterHandle;
 
 interface KnowledgeAssistantProps {
 	/** 与 MarkdownEditor `documentIdentity` 一致，用于绑定助手多轮会话 */
@@ -69,12 +64,14 @@ interface KnowledgeAssistantProps {
 	 * 若不传则组件内部维护 input state。
 	 */
 	input?: string;
-	setInput?: Dispatch<SetStateAction<string>>;
+	setInput?: import('react').Dispatch<import('react').SetStateAction<string>>;
 	/**
 	 * 外部受控 RAG 输入框（可选）：与 input 一致，供「复制选中内容到助手」写入 RAG 模式草稿。
 	 */
 	ragInput?: string;
-	setRagInput?: Dispatch<SetStateAction<string>>;
+	setRagInput?: import('react').Dispatch<
+		import('react').SetStateAction<string>
+	>;
 	/** 递增时在 input 同步后聚焦输入框并将光标置于末尾（对齐 ebook） */
 	focusInputAtEndKey?: number;
 	/** 当前面板为 AI / RAG 时通知父级，便于外部写入对应输入框 */
@@ -85,7 +82,7 @@ interface KnowledgeAssistantProps {
 export const KNOWLEDGE_ASSISTANT_MODE_STORAGE_KEY = 'knowledge-assistant-mode';
 
 /** 与初次挂载时组件内 state 初始化逻辑一致，供父组件初始化「当前模式」ref */
-export function readKnowledgeAssistantPanelMode(): KnowledgeAssistantMode {
+export function readKnowledgeAssistantPanelMode(): KnowledgeAssistantPanelMode {
 	if (typeof window === 'undefined') return 'ai';
 	return localStorage.getItem(KNOWLEDGE_ASSISTANT_MODE_STORAGE_KEY) === 'rag'
 		? 'rag'
@@ -97,6 +94,8 @@ const selectAssistantMessageByChatId: SelectMessageByChatId = (chatId) =>
 
 const selectRagMessageByChatId: SelectMessageByChatId = (chatId) =>
 	knowledgeRagQaStore.messages.find((m) => m.chatId === chatId);
+
+const EMPTY_AI_MESSAGES: readonly Message[] = [];
 
 const KnowledgeAssistantInner = observer(
 	forwardRef<KnowledgeAssistantHandle, KnowledgeAssistantProps>(
@@ -114,25 +113,16 @@ const KnowledgeAssistantInner = observer(
 		) {
 			const { knowledgeStore, userStore } = useStore();
 			const { t } = useI18n();
+			const chatFooterRef = useRef<KnowledgeAssistantChatFooterHandle>(null);
 
-			const [internalInput, setInternalInput] = useState('');
-			const input = inputProp ?? internalInput;
-			const setInput = setInputProp ?? setInternalInput;
 			const [assistantMode, setAssistantModeState] =
-				useState<KnowledgeAssistantMode>(readKnowledgeAssistantPanelMode);
-			const setAssistantMode = useCallback((m: KnowledgeAssistantMode) => {
+				useState<KnowledgeAssistantPanelMode>(readKnowledgeAssistantPanelMode);
+			const setAssistantMode = useCallback((m: KnowledgeAssistantPanelMode) => {
 				setAssistantModeState(m);
 				if (typeof window !== 'undefined') {
 					localStorage.setItem(KNOWLEDGE_ASSISTANT_MODE_STORAGE_KEY, m);
 				}
 			}, []);
-			const [internalRagInput, setInternalRagInput] = useState('');
-			const ragInput = ragInputProp ?? internalRagInput;
-			const setRagInput = setRagInputProp ?? setInternalRagInput;
-			const [internalFocusInputAtEndKey, setInternalFocusInputAtEndKey] =
-				useState(0);
-			const focusInputAtEndKey =
-				focusInputAtEndKeyProp + internalFocusInputAtEndKey;
 			const isRagMode = assistantMode === 'rag';
 			const { isCopyedId, onCopy } = useAssistantCopy();
 			/** 用于检测「刚切入 RAG 模式」：仅在 false→true 时贴底，避免影响 AI 模式与其它渲染 */
@@ -143,49 +133,17 @@ const KnowledgeAssistantInner = observer(
 
 			const isLoggedIn = Boolean(userStore.userInfo?.id);
 			const editorHasBody = knowledgeStore.markdownNonempty;
-			const activeInput = isRagMode ? ragInput : input;
-
-			const appendInputBlock = useCallback(
-				(text: string, mode: KnowledgeAssistantMode = assistantMode) => {
-					const next = text.trim();
-					if (!next) return;
-					const appendBlock = (prev: string) => {
-						const cur = (prev ?? '').trim();
-						return cur ? `${cur}\n\n${next}` : next;
-					};
-					if (mode === 'rag') {
-						setRagInput((prev) => appendBlock(prev));
-					} else {
-						setInput((prev) => appendBlock(prev));
-					}
-				},
-				[assistantMode, setInput, setRagInput],
-			);
 
 			useImperativeHandle(
 				ref,
 				() => ({
 					appendInput: (text, mode) =>
-						appendInputBlock(text, mode ?? assistantMode),
-					clearInputs: () => {
-						setInput('');
-						setRagInput('');
-					},
-					focusInputAtEnd: () => {
-						setInternalFocusInputAtEndKey((n) => n + 1);
-					},
+						chatFooterRef.current?.appendInput(text, mode),
+					clearInputs: () => chatFooterRef.current?.clearInputs(),
+					focusInputAtEnd: () => chatFooterRef.current?.focusInputAtEnd(),
 				}),
-				[appendInputBlock, assistantMode, setInput, setRagInput],
+				[],
 			);
-
-			useEffect(() => {
-				setInput('');
-				setRagInput('');
-			}, [documentKey, setInput, setRagInput]);
-
-			useLayoutEffect(() => {
-				onAssistantModeChange?.(assistantMode);
-			}, [assistantMode, onAssistantModeChange]);
 
 			// 左侧当前文档身份变化时调用 activate
 			// 未保存草稿的 key 形如 `draft-new__trash-*` 也必须走此处；若跳过则 `activeDocumentKey` 为空，发送时会提示「文档未就绪」。
@@ -220,29 +178,6 @@ const KnowledgeAssistantInner = observer(
 					assistantStore.setKnowledgeAssistantPersistenceAllowed(true);
 				};
 			}, [assistantPersistenceAllowed]);
-
-			// 左侧编辑器被清空时，同步清空「AI 助手」输入框（RAG 独立输入，且不因正文清空而清空）
-			useEffect(() => {
-				if (assistantMode !== 'ai') return;
-				/**
-				 * 注意：开启助手会导致 Monaco 视图切换与编辑器重挂载，期间父级 markdown 可能出现极短暂的空串。
-				 * 若此处立刻清空输入框，会造成“刚复制进输入框就被清掉”的体验。
-				 *
-				 * 策略：仅当 markdown 持续为空一段时间后再清空输入框，规避重挂载瞬态。
-				 */
-				if (knowledgeStore.markdownNonempty) return;
-				const id = window.setTimeout(() => {
-					if (!knowledgeStore.markdownNonempty) {
-						setInput('');
-					}
-				}, 200);
-				return () => window.clearTimeout(id);
-			}, [
-				knowledgeStore.markdownNonempty,
-				setInput,
-				knowledgeStore,
-				assistantMode,
-			]);
 
 			const onSaveToKnowledge = useCallback(
 				(message: Message) => {
@@ -351,39 +286,6 @@ const KnowledgeAssistantInner = observer(
 				flushScrollToBottom();
 				requestAnimationFrame(() => flushScrollToBottom());
 			}, [showRagNewConversation, flushScrollToBottom]);
-
-			const sendMessage = useCallback(
-				async (content?: string) => {
-					if (isRagMode) {
-						const text = (content ?? ragInput).trim();
-						if (!text) return;
-						if (!isLoggedIn) {
-							Toast({
-								type: 'warning',
-								title: t('knowledge.assistant.loginToUse'),
-							});
-							return;
-						}
-						setRagInput('');
-						enableStreamStickToBottom();
-						await knowledgeRagQaStore.sendMessage(text);
-						return;
-					}
-					const text = (content ?? input).trim();
-					if (!text) return;
-					if (!isLoggedIn) {
-						Toast({
-							type: 'warning',
-							title: t('knowledge.assistant.loginToUse'),
-						});
-						return;
-					}
-					setInput('');
-					enableStreamStickToBottom();
-					await assistantStore.sendMessage(text);
-				},
-				[input, ragInput, isLoggedIn, enableStreamStickToBottom, isRagMode],
-			);
 
 			/** 首页快捷卡片：用户气泡仅显示标题，请求体携带当前文档全文 */
 			const sendKnowledgePromptCard = useCallback(
@@ -516,14 +418,6 @@ const KnowledgeAssistantInner = observer(
 			const isAiSessionSwitcherLocked =
 				showAiSessionActions && assistantStore.isAssistantSessionSwitcherLocked;
 
-			const [isAiHistoryDrawerOpen, setIsAiHistoryDrawerOpen] = useState(false);
-
-			useEffect(() => {
-				if (!isAiHistoryDrawerOpen) return;
-				// 打开抽屉时轻量刷新一次会话列表
-				void assistantStore.refreshSessionListForCurrentDocument();
-			}, [isAiHistoryDrawerOpen]);
-
 			const {
 				allowAiShare,
 				shareFlow,
@@ -548,96 +442,6 @@ const KnowledgeAssistantInner = observer(
 				(isRagMode && !ragMessages.length) ||
 				(!isRagMode && !aiMessages.length)
 			);
-
-			const assistantFooter = isLoggedIn ? (
-				<AssistantFooter
-					embedded={conversationColumnActive}
-					showScrollFab={conversationColumnActive && scrollFabMode !== 'hidden'}
-					scrollFab={{
-						mode: scrollFabMode,
-						onClick: onScrollFabClick,
-						toBottomLabel: t('knowledge.assistant.scrollToBottom'),
-						toTopLabel: t('knowledge.assistant.scrollToTop'),
-					}}
-				>
-					{allowAiShare && shareSelection.isSharing ? (
-						<AssistantShareBar
-							messages={aiMessages}
-							checkboxId="knowledge-assistant-share-all"
-							selectAllLabelKey="knowledge.assistant.share.selectAll"
-							createLinkLabelKey="knowledge.assistant.share.createLink"
-							shareSelection={shareSelection}
-							shareFlow={shareFlow}
-							setShareModelVisible={setShareModelVisible}
-						/>
-					) : (
-						<ChatEntry
-							t={t}
-							focusInputAtEndKey={focusInputAtEndKey}
-							input={isRagMode ? ragInput : input}
-							setInput={isRagMode ? setRagInput : setInput}
-							className="w-full px-0 pb-4"
-							textareaClassName="min-h-9"
-							inputWrapClassName="border-theme/5"
-							sendMessage={sendMessage}
-							placeholder={
-								isRagMode
-									? t('knowledge.assistant.placeholder.rag')
-									: editorHasBody
-										? t('knowledge.assistant.placeholder.ai')
-										: t('knowledge.assistant.placeholder.aiNeedsBody')
-							}
-							disableTextInput={
-								isRagMode ? false : !editorHasBody && !activeInput.trim()
-							}
-							loading={
-								isRagMode
-									? knowledgeRagQaStore.isSending
-									: assistantStore.isSending
-							}
-							stopGenerating={
-								isRagMode
-									? knowledgeRagQaStore.isStreaming
-										? stopGenerating
-										: undefined
-									: assistantStore.isStreaming
-										? stopGenerating
-										: undefined
-							}
-							entryChildren={
-								<AssistantSessionEntryToolbar
-									store="document"
-									visible={showEntryToolbar}
-									showSessionActions={showAiSessionActions}
-									isSessionSwitcherLocked={isAiSessionSwitcherLocked}
-									isHistoryDrawerOpen={isAiHistoryDrawerOpen}
-									setIsHistoryDrawerOpen={setIsAiHistoryDrawerOpen}
-									enableStreamStickToBottom={enableStreamStickToBottom}
-									flushScrollToBottom={flushScrollToBottom}
-									extraActions={KNOWLEDGE_ASSISTANT_MODES.map((item) => (
-										<Button
-											key={item.id}
-											variant="link"
-											size="sm"
-											className={cn(
-												'px-2.5 border border-theme/10',
-												assistantMode === item.id
-													? 'text-teal-500 bg-theme/5'
-													: 'text-textcolor/80 hover:bg-theme/5',
-											)}
-											onClick={() => setAssistantMode(item.id)}
-										>
-											<item.icon />
-											{t(item.labelKey)}
-										</Button>
-									))}
-								/>
-							}
-						/>
-					)}
-					{shareChatNode}
-				</AssistantFooter>
-			) : null;
 
 			const emptyState = isRagMode ? (
 				<div className="max-w-3xl mx-auto text-textcolor/70 flex flex-1 justify-center items-start text-sm pt-4 pl-4 pr-4">
@@ -732,7 +536,7 @@ const KnowledgeAssistantInner = observer(
 										className="w-fit rounded-md border border-theme/5 bg-theme/5 px-3 py-1.5 text-sm text-textcolor/80 transition-colors hover:border-theme/20 hover:text-textcolor"
 										onClick={() => {
 											knowledgeRagQaStore.resetConversation();
-											setRagInput('');
+											chatFooterRef.current?.clearInputs();
 										}}
 									>
 										<CirclePlus />
@@ -758,7 +562,47 @@ const KnowledgeAssistantInner = observer(
 							) : null}
 						</>
 					}
-					footer={assistantFooter}
+					footer={
+						<KnowledgeAssistantFooterControls isRagMode={isRagMode}>
+							{({ isSending, isStreaming }) => (
+								<KnowledgeAssistantChatFooter
+									ref={chatFooterRef}
+									documentKey={documentKey}
+									isLoggedIn={isLoggedIn}
+									isRagMode={isRagMode}
+									assistantMode={assistantMode}
+									setAssistantMode={setAssistantMode}
+									onAssistantModeChange={onAssistantModeChange}
+									input={inputProp}
+									setInput={setInputProp}
+									ragInput={ragInputProp}
+									setRagInput={setRagInputProp}
+									focusInputAtEndKey={focusInputAtEndKeyProp}
+									conversationColumnActive={conversationColumnActive}
+									scrollFabMode={scrollFabMode}
+									onScrollFabClick={onScrollFabClick}
+									enableStreamStickToBottom={enableStreamStickToBottom}
+									flushScrollToBottom={flushScrollToBottom}
+									isSending={isSending}
+									isStreaming={isStreaming}
+									onStopGenerating={stopGenerating}
+									allowAiShare={allowAiShare}
+									shareSelection={shareSelection}
+									shareFlow={shareFlow}
+									setShareModelVisible={setShareModelVisible}
+									shareChatNode={shareChatNode}
+									aiMessages={
+										allowAiShare && shareSelection.isSharing
+											? aiMessages
+											: EMPTY_AI_MESSAGES
+									}
+									showEntryToolbar={showEntryToolbar}
+									showAiSessionActions={showAiSessionActions}
+									isAiSessionSwitcherLocked={isAiSessionSwitcherLocked}
+								/>
+							)}
+						</KnowledgeAssistantFooterControls>
+					}
 				/>
 			);
 		},

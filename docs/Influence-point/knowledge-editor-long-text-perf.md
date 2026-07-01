@@ -5,6 +5,7 @@
 - [knowledge-editor-long-text-perf.md](../knowledge/knowledge-editor-long-text-perf.md) — 实现说明（改动前后对比与代码注释）
 - [monaco-markdown-view-panel.md](./monaco-markdown-view-panel.md) — Markdown 预览/编辑与助手 Panel 布局组合
 - [knowledge-assistant-complete.md](../knowledge/knowledge-assistant-complete.md) — 知识库助手完整链路（会话、`documentKey`、持久化）
+- [knowledge-preview-assistant-pane-perf.md](./knowledge-preview-assistant-pane-perf.md) — 预览+助手同开：Monaco 卸载/冻结、轻量输入条（第二轮）
 - [markdown-editor-context-menu.md](../monaco/markdown-editor-context-menu.md) — 选区「复制到助手」与受控输入框约定
 - [knowledge-view.md](../../apps/frontend/specs/knowledge-view.md) — 知识编辑页规格（脏检查、自动保存、助手激活）
 

@@ -12,6 +12,7 @@ import AuthStore from './auth';
 import ChatStore from './chat';
 import EbookStore from './ebook';
 import KnowledgeStore from './knowledge';
+import KnowledgeRagQaStore from './knowledgeRagQa';
 import UserStore from './user';
 
 class RootStore {
@@ -21,6 +22,7 @@ class RootStore {
 	knowledgeStore = KnowledgeStore;
 	assistantStore = AssistantStore;
 	ebookStore = EbookStore;
+	knowledgeRagQaStore = KnowledgeRagQaStore;
 }
 
 const store = new RootStore();

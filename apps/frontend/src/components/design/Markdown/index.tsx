@@ -83,6 +83,8 @@ interface ParserMarkdownPreviewPaneProps {
 	enableMermaid?: boolean;
 	/** 是否启用自动滚动 */
 	withScrollArea?: boolean;
+	/** 右栏助手等同屏重任务时关闭，避免与助手侧共用全局代码吸顶条 layout 争用主线程 */
+	enableCodeFloatingToolbar?: boolean;
 }
 
 /**
@@ -98,6 +100,7 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 	showPreviewScrollCornerFab = false,
 	enableMermaid = true,
 	withScrollArea = true,
+	enableCodeFloatingToolbar = true,
 }: ParserMarkdownPreviewPaneProps) {
 	const markdownRef = useRef<HTMLDivElement>(null);
 	/** 与 `dangerouslySetInnerHTML` 同层，保证 Mermaid 在内容写入后再扫描节点 */
@@ -277,14 +280,19 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 
 	const { relayout: relayoutCodeToolbar } = useChatCodeFloatingToolbar(
 		effectiveScrollViewportRef,
-		{ layoutDeps: [markdown] },
+		enableCodeFloatingToolbar ? { layoutDeps: [markdown] } : undefined,
 	);
 
 	const syncScrollMetrics = useCallback(() => {
+		if (!enableCodeFloatingToolbar) return;
 		const el = effectiveScrollViewportRef.current;
 		if (!el) return;
 		relayoutCodeToolbar();
-	}, [relayoutCodeToolbar]);
+	}, [
+		enableCodeFloatingToolbar,
+		relayoutCodeToolbar,
+		effectiveScrollViewportRef,
+	]);
 
 	const handleViewportScroll = useCallback(
 		(_e: UIEvent<HTMLDivElement>) => {
@@ -406,7 +414,9 @@ const ParserMarkdownPreviewPane = memo(function ParserMarkdownPreviewPane({
 				embedInParentScroll ? 'overflow-visible' : 'overflow-hidden',
 			)}
 		>
-			{withScrollArea ? <ChatCodeFloatingToolbar t={t} /> : null}
+			{withScrollArea && enableCodeFloatingToolbar ? (
+				<ChatCodeFloatingToolbar t={t} />
+			) : null}
 			{markdown ? (
 				embedInParentScroll ? (
 					<div className="box-border min-w-0 max-w-full w-full p-3">

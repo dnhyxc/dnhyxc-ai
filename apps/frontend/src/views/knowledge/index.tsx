@@ -3,7 +3,15 @@ import { ScrollArea } from '@ui/scroll-area';
 import { Toast } from '@ui/sonner';
 import { NotebookPen } from 'lucide-react';
 import { observer } from 'mobx-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+	type ReactNode,
+	type RefObject,
+	useCallback,
+	useEffect,
+	useMemo,
+	useRef,
+	useState,
+} from 'react';
 import MarkdownEditor from '@/components/design/Monaco';
 import Share from '@/components/design/Share';
 import { Input } from '@/components/ui';
@@ -12,6 +20,7 @@ import type { ShortcutSource } from '@/hooks/useMarkdownBottomBarShortcuts';
 import { saveKnowledge } from '@/service';
 import useStore from '@/store';
 import assistantStore from '@/store/assistant';
+import knowledgeRagQaStore from '@/store/knowledgeRagQa';
 import { KnowledgeRecord } from '@/types';
 import { isTauriRuntime } from '@/utils';
 import { copyToClipboard, pasteFromClipboard } from '@/utils/clipboard';
@@ -102,6 +111,105 @@ const KnowledgeTitleField = observer(function KnowledgeTitleField({
 				className="md:text-base h-full border-0 bg-transparent pr-2 text-textcolor shadow-none placeholder:text-sm placeholder:text-textcolor/60 focus-visible:border-0 focus-visible:ring-0"
 			/>
 		</div>
+	);
+});
+
+/** 仅订阅 markdown / 草稿相关 store 字段，避免标题栏/弹层随正文每键重渲染 */
+const KnowledgeMarkdownPane = observer(function KnowledgeMarkdownPane({
+	t,
+	monacoTheme,
+	monacoLanguage,
+	shortcutSource,
+	documentIdentity,
+	markdownAssistantOpen,
+	onMarkdownAssistantOpenChange,
+	onInsertSelectionToAssistant,
+	getMarkdownFromEditorRef,
+	formatMarkdownBeforeSaveRef,
+	knowledgeChords,
+	knowledgeAssistantNode,
+	toolbar,
+}: {
+	t: (key: string, params?: Record<string, unknown>) => string;
+	monacoTheme: 'vs' | 'vs-dark';
+	monacoLanguage: string;
+	shortcutSource: ShortcutSource;
+	documentIdentity: string;
+	markdownAssistantOpen: boolean;
+	onMarkdownAssistantOpenChange: (open: boolean) => void;
+	onInsertSelectionToAssistant: (text: string | null | undefined) => void;
+	getMarkdownFromEditorRef: RefObject<(() => string) | null>;
+	formatMarkdownBeforeSaveRef: RefObject<(() => Promise<string>) | null>;
+	knowledgeChords: {
+		toggleMarkdownBottomBar: string;
+	};
+	knowledgeAssistantNode: ReactNode;
+	toolbar: ReactNode;
+}) {
+	const { knowledgeStore } = useStore();
+	const handleMarkdownChange = useCallback(
+		(value: string) => {
+			knowledgeStore.setMarkdown(value);
+		},
+		[knowledgeStore],
+	);
+	const assistantPaneBusy =
+		markdownAssistantOpen &&
+		(assistantStore.isStreaming ||
+			assistantStore.isSending ||
+			knowledgeRagQaStore.isStreaming ||
+			knowledgeRagQaStore.isSending);
+
+	return (
+		<MarkdownEditor
+			className="h-full min-w-0 max-w-full w-full"
+			stickyScrollEnabled={false}
+			stickyScrollScrollWithEditor={false}
+			diffBaselineSource="persisted"
+			diffBaselineText={knowledgeStore.knowledgePersistedSnapshot.content}
+			height={EDITOR_HEIGHT}
+			theme={monacoTheme}
+			language={monacoLanguage}
+			shortcutSource={shortcutSource}
+			clipboardAdapter={{
+				copyToClipboard,
+				pasteFromClipboard,
+			}}
+			documentIdentity={documentIdentity}
+			markdownAssistantOpen={markdownAssistantOpen}
+			onMarkdownAssistantOpenChange={onMarkdownAssistantOpenChange}
+			assistantPaneBusy={assistantPaneBusy}
+			t={t}
+			value={knowledgeStore.markdown}
+			onChange={handleMarkdownChange}
+			onInsertSelectionToAssistant={onInsertSelectionToAssistant}
+			getMarkdownFromEditorRef={getMarkdownFromEditorRef}
+			formatMarkdownBeforeSaveRef={formatMarkdownBeforeSaveRef}
+			markdownBottomBarShortcutHint={knowledgeChords.toggleMarkdownBottomBar}
+			overwriteSaveEnabled={knowledgeStore.knowledgeOverwriteSaveEnabled}
+			onOverwriteSaveEnabledChange={(enabled) =>
+				knowledgeStore.setKnowledgeOverwriteSaveEnabled(enabled)
+			}
+			autoSaveEnabled={
+				knowledgeStore.knowledgeOverwriteSaveEnabled
+					? knowledgeStore.knowledgeAutoSaveEnabled
+					: false
+			}
+			onAutoSaveEnabledChange={
+				knowledgeStore.knowledgeOverwriteSaveEnabled
+					? (enabled) => knowledgeStore.setKnowledgeAutoSaveEnabled(enabled)
+					: undefined
+			}
+			autoSaveIntervalSec={knowledgeStore.knowledgeAutoSaveIntervalSec}
+			onAutoSaveIntervalSecChange={
+				knowledgeStore.knowledgeOverwriteSaveEnabled
+					? (sec) => knowledgeStore.setKnowledgeAutoSaveIntervalSec(sec)
+					: undefined
+			}
+			toolbar={toolbar}
+			title={<KnowledgeTitleField t={t} />}
+			bottomBarAssistantNode={knowledgeAssistantNode}
+		/>
 	);
 });
 
@@ -456,13 +564,6 @@ const Knowledge = observer(() => {
 			setTrashOpen(false);
 		}
 	}, [isCloudLoggedIn]);
-
-	const handleMarkdownChange = useCallback(
-		(value: string) => {
-			knowledgeStore.setMarkdown(value);
-		},
-		[knowledgeStore],
-	);
 
 	// 约束：未开启覆盖保存时，不展示也不允许开启自动保存（避免后台定时保存触发冲突/弹窗逻辑分支）
 	useEffect(() => {
@@ -1205,54 +1306,19 @@ const Knowledge = observer(() => {
 			/>
 
 			<ScrollArea className="h-full min-w-0 w-full overflow-y-auto p-5.5 pt-0 rounded-none">
-				<MarkdownEditor
-					className="h-full min-w-0 max-w-full w-full"
-					stickyScrollEnabled={false}
-					stickyScrollScrollWithEditor={false}
-					// Diff 基线：知识库/回收站均以“打开时的快照”为主；新草稿快照为空则等价于“当前 vs 空”
-					diffBaselineSource="persisted"
-					diffBaselineText={knowledgeStore.knowledgePersistedSnapshot.content}
-					height={EDITOR_HEIGHT}
-					theme={monacoTheme}
-					language={monacoLanguage}
+				<KnowledgeMarkdownPane
+					t={t}
+					monacoTheme={monacoTheme}
+					monacoLanguage={monacoLanguage}
 					shortcutSource={shortcutSource}
-					clipboardAdapter={{
-						copyToClipboard,
-						pasteFromClipboard,
-					}}
-					// trashOpenNonce：回收站 pick 等与助手会话对齐；clearDocumentNonce：仅清空草稿时 bump，驱动 Monaco 换篇且不重置助手
 					documentIdentity={`${knowledgeAssistantDocumentKey(assistantArticleBinding, trashOpenNonce)}__clear-${clearDocumentNonce}`}
 					markdownAssistantOpen={markdownAssistantOpen}
 					onMarkdownAssistantOpenChange={setMarkdownAssistantOpen}
-					t={t}
-					value={knowledgeStore.markdown}
-					onChange={handleMarkdownChange}
 					onInsertSelectionToAssistant={onInsertSelectionToAssistant}
 					getMarkdownFromEditorRef={getMarkdownFromEditorRef}
 					formatMarkdownBeforeSaveRef={formatMarkdownBeforeSaveRef}
-					markdownBottomBarShortcutHint={
-						knowledgeChords.toggleMarkdownBottomBar
-					}
-					overwriteSaveEnabled={knowledgeStore.knowledgeOverwriteSaveEnabled}
-					onOverwriteSaveEnabledChange={(enabled) =>
-						knowledgeStore.setKnowledgeOverwriteSaveEnabled(enabled)
-					}
-					autoSaveEnabled={
-						knowledgeStore.knowledgeOverwriteSaveEnabled
-							? knowledgeStore.knowledgeAutoSaveEnabled
-							: false
-					}
-					onAutoSaveEnabledChange={
-						knowledgeStore.knowledgeOverwriteSaveEnabled
-							? (enabled) => knowledgeStore.setKnowledgeAutoSaveEnabled(enabled)
-							: undefined
-					}
-					autoSaveIntervalSec={knowledgeStore.knowledgeAutoSaveIntervalSec}
-					onAutoSaveIntervalSecChange={
-						knowledgeStore.knowledgeOverwriteSaveEnabled
-							? (sec) => knowledgeStore.setKnowledgeAutoSaveIntervalSec(sec)
-							: undefined
-					}
+					knowledgeChords={knowledgeChords}
+					knowledgeAssistantNode={knowledgeAssistantNode}
 					toolbar={
 						<KnowledgeEditorToolbar
 							onOpenLibrary={() => setListOpen(true)}
@@ -1272,8 +1338,6 @@ const Knowledge = observer(() => {
 							shortcutHintOpenTrash={knowledgeChords.openTrash}
 						/>
 					}
-					title={<KnowledgeTitleField t={t} />}
-					bottomBarAssistantNode={knowledgeAssistantNode}
 				/>
 			</ScrollArea>
 			<KnowledgeList

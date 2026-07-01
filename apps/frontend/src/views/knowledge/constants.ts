@@ -24,8 +24,11 @@ export type KnowledgeAssistantPromptItem = {
 	descriptionKey: string;
 };
 
+/** AI / RAG 面板模式（与 KNOWLEDGE_ASSISTANT_MODES[].id 一致） */
+export type KnowledgeAssistantPanelMode = 'ai' | 'rag';
+
 export type KnowledgeAssistantMode = {
-	id: 'ai' | 'rag';
+	id: KnowledgeAssistantPanelMode;
 	labelKey: string;
 	icon: LucideIcon;
 };
