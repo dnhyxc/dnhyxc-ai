@@ -13,6 +13,7 @@
 | [tauri-browser.md](./tauri-browser.md) | Tauri / 浏览器双端 |
 | [tauri-macos-ats-http.md](./tauri-macos-ats-http.md) | macOS ATS（摘要；细节见 [../cos/cos-dev-http-proxy.md](../cos/cos-dev-http-proxy.md)） |
 | [http-network-error-toast.md](./http-network-error-toast.md) | 网络错误 Toast |
+| [tauri-http-all-method-retry.md](./tauri-http-all-method-retry.md) | **Tauri HttpClient 全方法重试**：POST 等写请求默认 2 次、`catch`/`handleErrorResponse` 修复 |
 | [voice-input-implementation.md](./voice-input-implementation.md) | 语音输入（对话等） |
 
 上级：[../README.md](../README.md)

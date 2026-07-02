@@ -23,7 +23,7 @@ error sending request for url (https://...)
 | i18n | 提供 **无 React 上下文** 的 `translateSync`，供 `fetch.ts` 等模块使用 |
 | 文案 | 新增 `common.networkErrorTryAgain`、`common.requestFailed` |
 
-**与重试的关系**：重试逻辑不变；仅在 **最终失败** 弹出 Toast 时改写展示文案。`silent: true` 的请求仍不弹 Toast。
+**与重试的关系**：重试逻辑不变；仅在 **最终失败** 弹出 Toast 时改写展示文案。`silent: true` 的请求仍不弹 Toast。Tauri 默认重试范围扩展见 [tauri-http-all-method-retry.md](./tauri-http-all-method-retry.md)。
 
 若与仓库最新源码不一致，**以源码为准**。
 

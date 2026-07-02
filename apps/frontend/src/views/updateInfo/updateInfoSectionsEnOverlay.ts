@@ -120,6 +120,11 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'Mind init order, capability degradation, and link policy so browser-only environments do not hit desktop-only APIs and white-screen.',
 	},
+	's3-6': {
+		title: 'Desktop auto-retry on transient network failures',
+		description:
+			'On Tauri desktop, when a remote API call fails with a transient no-response network error (not only list loading), the app briefly retries before showing an error—fewer false “network error, please check your connection” toasts. Browser behavior is unchanged.',
+	},
 	's4-1': {
 		title: 'Streaming chat (SSE)',
 		description:
@@ -875,6 +880,11 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		title: 'Per-provider prosody fields',
 		description:
 			'Speed, volume, and pitch are saved separately for MiniMax, iFlytek, and Edge—tuning one provider no longer overwrites the others. Legacy accounts with shared fields get a one-time copy into all three sets on sync.',
+	},
+	's24-49': {
+		title: 'Desktop cloud narration playback fix',
+		description:
+			'Fixes Tauri desktop cases where Edge / MiniMax / iFlytek cloud narration showed “playing” but stayed silent until pause/play or a second tap. Applies to English learning speaker, EPUB listen-to-book / listen selection, and voice-settings preview. Browser still uses stream endpoints; startup is slightly more reliable.',
 	},
 	's25-1': {
 		title: 'E-book bookshelf',

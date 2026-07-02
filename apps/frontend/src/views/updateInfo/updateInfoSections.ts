@@ -154,6 +154,13 @@ const UPDATE_INFO_SECTIONS_ZH: UpdateInfoSection[] = [
 				description:
 					'注意入口初始化顺序、能力降级与外链策略，避免在纯浏览器环境因桌面专用 API 误用导致白屏或异常。',
 			},
+			{
+				id: 's3-6',
+				title: '桌面端网络请求自动重试',
+				dateLabel: '2026-07-02',
+				description:
+					'Tauri 桌面端访问远程接口时，若出现瞬时「未收到响应」类网络失败（不限于列表加载），会自动短暂重试后再提示，减少误报「网络异常，请检查网络后重试」；浏览器行为不变。',
+			},
 		],
 	},
 	{
@@ -1334,6 +1341,13 @@ const UPDATE_INFO_SECTIONS_ZH: UpdateInfoSection[] = [
 				dateLabel: '2026-07-02',
 				description:
 					'MiniMax、讯飞、Edge 的语速/音量/音高各自独立保存，调整一种来源不再覆盖其它来源；旧账号首次同步时会从原共用参数复制到三套字段。',
+			},
+			{
+				id: 's24-49',
+				title: '桌面端云端朗读播放修复',
+				dateLabel: '2026-07-02',
+				description:
+					'修复 Tauri 桌面端使用 Edge / MiniMax / 讯飞云端时偶发「显示播放中但无声、暂停再播才恢复」；英语学习喇叭、电子书听书/听当前、语音设置试听均受益；浏览器仍按原 stream 路径，仅起播更稳。',
 			},
 		],
 	},

@@ -68,6 +68,7 @@ export const SPEECH_MINIMAX_TTS_STREAM =
 export const SPEECH_XFYUN_TTS_STREAM =
 	'/speech-transcription/xfyun/speech/stream';
 /** Microsoft Edge 在线语音合成（edge-tts-universal，免费无需 API Key） */
+export const SPEECH_EDGE_TTS = '/speech-transcription/edge/speech';
 export const SPEECH_EDGE_TTS_STREAM =
 	'/speech-transcription/edge/speech/stream';
 /** MiniMax T2A 非流式 TTS */

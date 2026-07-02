@@ -3,6 +3,7 @@
 ## 延伸阅读
 
 - [cloud-tts-user-credentials-fallback.md](./cloud-tts-user-credentials-fallback.md) — MiniMax/讯飞凭证、失败 Toast、三选一路由（姊妹稿，部分结论已扩展）
+- [tts-tauri-cloud-playback.md](./tts-tauri-cloud-playback.md) — Tauri 云端 MP3 播放修复（Edge 线上桌面无声挂起补丁）
 - [cloud-tts-minimax-model-settings.md](./cloud-tts-minimax-model-settings.md) — MiniMax 模型白名单与 Combobox
 - [tts-local-cancel-settle.md](./tts-local-cancel-settle.md) — 本机 Web Speech 降级与 cancel settle
 - [epub-listen-cloud-prefetch.md](./epub-listen-cloud-prefetch.md) — 句间云端预取（仍走 `shouldUseCloudEnglishTts`）

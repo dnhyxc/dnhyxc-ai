@@ -87,7 +87,8 @@ export interface RequestConfig
 	silent?: boolean;
 	/**
 	 * 瞬时网络失败时的额外重试次数（总尝试 = retries + 1）。
-	 * 默认：Tauri 下 GET/HEAD 为 2，其余为 0（线上远程 HTTPS 偶发 `error sending request`）。
+	 * 默认：Tauri 下为 2（线上远程 HTTPS 偶发 `error sending request`）；Web 为 0。
+	 * 仅当未收到 HTTP response（`canRetry` 内 `!response`）时重试，与 GET 同理。
 	 */
 	retries?: number;
 }
@@ -361,10 +362,13 @@ class HttpClient {
 	// 错误处理
 	private async handleErrorResponse(
 		response: Response,
-		error?: any,
+		parsedBody?: unknown,
 	): Promise<RequestError> {
 		try {
-			const responseBody = await this.parseResponseBody(response);
+			const responseBody =
+				parsedBody !== undefined
+					? parsedBody
+					: await this.parseResponseBody(response);
 
 			if (responseBody && typeof responseBody === 'object') {
 				return {
@@ -392,7 +396,7 @@ class HttpClient {
 		return {
 			code: response.status || 500,
 			message: response.statusText || '请求失败',
-			data: error,
+			data: parsedBody,
 		};
 	}
 
@@ -490,8 +494,8 @@ class HttpClient {
 			body: method === 'GET' || method === 'HEAD' ? undefined : body,
 		};
 
-		const isIdempotentRead = method === 'GET' || method === 'HEAD';
-		const defaultRetries = isTauriRuntime() && isIdempotentRead ? 2 : 0;
+		// ponytail: 线上 Tauri 远程 HTTPS 对所有方法均可能 `error sending request`；canRetry 要求 !response 才重试
+		const defaultRetries = isTauriRuntime() ? 2 : 0;
 		const retryCount = finalConfig.retries ?? defaultRetries;
 		const maxAttempts = retryCount + 1;
 
@@ -534,15 +538,15 @@ class HttpClient {
 			} catch (error) {
 				let requestError: RequestError;
 
-				if (response) {
-					requestError = await this.handleErrorResponse(response, error);
-				} else if (
+				if (
 					error &&
 					typeof error === 'object' &&
 					'code' in error &&
 					'message' in error
 				) {
 					requestError = error as RequestError;
+				} else if (response) {
+					requestError = await this.handleErrorResponse(response, error);
 				} else {
 					requestError = this.handleNetworkError(error);
 				}

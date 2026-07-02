@@ -9,6 +9,7 @@ import { Toast } from '@ui/sonner';
 import { BASE_URL } from '@/constants';
 import { translateSync } from '@/i18n';
 import {
+	SPEECH_EDGE_TTS,
 	SPEECH_EDGE_TTS_STREAM,
 	SPEECH_MINIMAX_TTS_STREAM,
 	SPEECH_XFYUN_TTS_STREAM,
@@ -30,6 +31,7 @@ import {
 	ensureMinimaxTtsUserPrefsLoaded,
 	loadMinimaxTtsUserPrefs,
 } from '@/utils/minimaxTtsPrefs';
+import { isTauriRuntime } from '@/utils/runtime';
 
 type CloudTtsReady =
 	| { kind: 'cached'; blob: Blob; cacheKey: string }
@@ -831,6 +833,10 @@ function emitCadenceChunk(
 
 let cloudAudio: HTMLAudioElement | null = null;
 let cloudObjectUrl: string | null = null;
+/** 点击同步解锁 Tauri/WKWebView 云端 Audio（须在 fetch 合成之前调用） */
+let cloudAudioUnlock: HTMLAudioElement | null = null;
+const SILENT_WAV_DATA_URI =
+	'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
 
 /** 每次新播放或 stopAll 时递增，用于丢弃过期的异步 TTS 请求/本机朗读 */
 let playbackGeneration = 0;
@@ -989,6 +995,10 @@ export function applyActiveEnglishPlaybackRate(rate: number): void {
 async function readResponseBodyAsArrayBuffer(
 	res: Response,
 ): Promise<ArrayBuffer> {
+	// Tauri HTTP 对 chunked stream 读 body 易挂起；Edge 线上一整段 MP3，直接 arrayBuffer 更稳
+	if (isTauriRuntime()) {
+		return res.arrayBuffer();
+	}
 	const reader = res.body?.getReader();
 	if (!reader) {
 		return res.arrayBuffer();
@@ -1076,7 +1086,9 @@ async function startCloudTts(plain: string): Promise<CloudTtsReady> {
 		source === 'xfyun'
 			? SPEECH_XFYUN_TTS_STREAM
 			: source === 'edge'
-				? SPEECH_EDGE_TTS_STREAM
+				? isTauriRuntime()
+					? SPEECH_EDGE_TTS
+					: SPEECH_EDGE_TTS_STREAM
 				: SPEECH_MINIMAX_TTS_STREAM;
 	const bodyExtras =
 		source === 'xfyun'
@@ -1261,6 +1273,40 @@ async function playCloudTtsCadenceSegments(
 	}
 }
 
+function waitCloudAudioCanPlay(audio: HTMLAudioElement): Promise<void> {
+	if (audio.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+		return Promise.resolve();
+	}
+	return new Promise((resolve, reject) => {
+		const onReady = () => {
+			cleanup();
+			resolve();
+		};
+		const onError = () => {
+			cleanup();
+			reject(new Error('AUDIO_LOAD'));
+		};
+		const cleanup = () => {
+			audio.removeEventListener('canplay', onReady);
+			audio.removeEventListener('error', onError);
+		};
+		audio.addEventListener('canplay', onReady, { once: true });
+		audio.addEventListener('error', onError, { once: true });
+	});
+}
+
+async function startCloudAudioPlayback(audio: HTMLAudioElement): Promise<void> {
+	await waitCloudAudioCanPlay(audio);
+	try {
+		await audio.play();
+	} catch (err) {
+		if (!isTauriRuntime()) throw err;
+		audio.load();
+		await waitCloudAudioCanPlay(audio);
+		await audio.play();
+	}
+}
+
 function playCloudMp3Blob(
 	blob: Blob,
 	generation: number,
@@ -1276,7 +1322,7 @@ function playCloudMp3Blob(
 	const audio = new Audio(url);
 	audio.playbackRate = clampPlaybackRate(rate);
 	cloudAudio = audio;
-	return audio.play().then(
+	return startCloudAudioPlayback(audio).then(
 		() => waitCloudAudioEnd(audio, url, generation),
 		(err) => {
 			if (!isPlaybackGenerationActive(generation)) {
@@ -1435,6 +1481,9 @@ export async function playEnglishPreferred(
 	// 空文本直接返回，不进行朗读
 	if (!plain) return;
 
+	// 仍在用户点击栈内：解锁 speech + Audio（线上 Edge 合成数秒，Tauri 须在此 prime）
+	primeEnglishPlaybackForUserGesture();
+
 	// 启动新的播放世代/session，后续朗读周期内保持唯一性，防止异步混乱
 	const generation = beginPlaybackSession();
 	// 外部透传的朗读语调/速度/音量选项
@@ -1509,6 +1558,17 @@ export function primeEnglishPlaybackForUserGesture(): void {
 		window.speechSynthesis?.speak(unlock);
 	} catch {
 		// 部分环境无 speechSynthesis
+	}
+	// 原先只解锁 speechSynthesis；云端 MP3 走 Audio，Tauri 异步 fetch 后 play() 会挂起直至再次点击
+	try {
+		if (!cloudAudioUnlock) {
+			cloudAudioUnlock = new Audio(SILENT_WAV_DATA_URI);
+		}
+		cloudAudioUnlock.volume = 0.001;
+		cloudAudioUnlock.currentTime = 0;
+		void cloudAudioUnlock.play().catch(() => {});
+	} catch {
+		// 部分 WebView 无 Audio
 	}
 }
 

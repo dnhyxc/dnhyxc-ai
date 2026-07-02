@@ -74,11 +74,13 @@
 | 语言增强中文但音色列表仍是英文                                    | [english/minimax-chinese-voices.md](./english/minimax-chinese-voices.md)                                                                                 |
 | 换设备后云端朗读参数丢失 / 需账号同步                             | [english/cloud-tts-prefs-db.md](./english/cloud-tts-prefs-db.md)                                                                                         |
 | 长文云端朗读首声慢 / 播放中无声卡住                         | [english/cloud-tts-segment-pipeline.md](./english/cloud-tts-segment-pipeline.md) §3、§6；分段预取细节 [cloud-tts-cadence-prefetch.md](./english/cloud-tts-cadence-prefetch.md) |
+| Tauri 桌面云端「播放中无声、暂停再播恢复」                    | [english/tts-tauri-cloud-playback.md](./english/tts-tauri-cloud-playback.md)                                                                             |
 | Edge 云端不可用 / 非会员选路 / 分模式语速被覆盖               | [english/cloud-tts-edge-voice.md](./english/cloud-tts-edge-voice.md) §5                                                                                  |
 | TTS 从点喇叭到出声（前后端全链路）                                | [english/tts-end-to-end-guide.md](./english/tts-end-to-end-guide.md)                                                                                     |
 | 支付成功但资料页仍非会员 / 到期仍显示会员                         | [pay/stripe-membership-billing.md](./pay/stripe-membership-billing.md) §6–§7                                                                             |
 | 换号后仍看到上一账号的草稿或助手对话                              | [app/user-switch-state-reset.md](./app/user-switch-state-reset.md)                                                                                       |
 | 登录成功瞬间又回到登录页 / cloud-tts 401                          | [app/login-cloud-tts-prefetch-401.md](./app/login-cloud-tts-prefetch-401.md)                                                                             |
+| Tauri 桌面频繁 Toast「网络异常，请检查网络后重试」                | [app/tauri-http-all-method-retry.md](./app/tauri-http-all-method-retry.md)                                                                              |
 | 阅读页顶栏显示「智能对话」而非书架                                | [ebook/ebook-reader-shelf.md](./ebook/ebook-reader-shelf.md) §3.4、[app/route-auth.md](./app/route-auth.md)                                              |
 | PDF 目录跳转报 canvas 并发渲染错误                                | [ebook/shelf-reader-polish.md](./ebook/shelf-reader-polish.md) §3.6                                                                                      |
 | EPUB 连续滚动无法自动进入下一章                                   | [ebook/epub-reader-settings-scroll.md](./ebook/epub-reader-settings-scroll.md) §3.2                                                                      |

@@ -1,6 +1,6 @@
 # Edge 云端朗读、分模式韵律参数与会员选路
 
-**文档角色**：本轮 Edge TTS 接入的实现说明（前后端一体）。影响面矩阵见 [../Influence-point/cloud-tts-edge-prosody-membership.md](../Influence-point/cloud-tts-edge-prosody-membership.md)。选路历史见 [tts-playback-source.md](./tts-playback-source.md)、[tts-membership-routing.md](./tts-membership-routing.md)。
+**文档角色**：本轮 Edge TTS 接入的实现说明（前后端一体）。影响面矩阵见 [../Influence-point/cloud-tts-edge-prosody-membership.md](../Influence-point/cloud-tts-edge-prosody-membership.md)；Tauri 桌面播放补丁见 [../Influence-point/tts-tauri-cloud-playback.md](../Influence-point/tts-tauri-cloud-playback.md)（实现细节见 [tts-tauri-cloud-playback.md](./tts-tauri-cloud-playback.md)）。选路历史见 [tts-playback-source.md](./tts-playback-source.md)、[tts-membership-routing.md](./tts-membership-routing.md)。
 
 ## 1. 背景与目标
 
