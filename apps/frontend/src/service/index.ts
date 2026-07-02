@@ -2027,6 +2027,28 @@ export const saveEbookProgress = async (prog: Prog): Promise<void> => {
 	});
 };
 
+/** 页面刷新/关闭时 keepalive 上报（async PUT 会被浏览器中断） */
+export function saveEbookProgressKeepalive(prog: Prog): void {
+	if (typeof window === 'undefined') return;
+	const token = localStorage.getItem('token')?.trim();
+	if (!token) return;
+	const body = JSON.stringify({
+		bookId: prog.bookId,
+		epubCfi: prog.epubCfi,
+		pdfPage: prog.pdfPage,
+		percent: prog.percent,
+	});
+	void fetch(`${BASE_URL}${EBOOK_PROGRESS}`, {
+		method: 'PUT',
+		headers: {
+			'Content-Type': 'application/json',
+			Authorization: `Bearer ${token}`,
+		},
+		body,
+		keepalive: true,
+	});
+}
+
 /** PUT /ebook/title：更新书名 */
 export const updateEbookTitle = async (
 	bookId: string,

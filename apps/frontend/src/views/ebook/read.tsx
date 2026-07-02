@@ -264,6 +264,14 @@ function EbookReadPage() {
 		updatedAt: '',
 	});
 	const progTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+	const pendingEpubProgRef = useRef<{
+		cfi: string;
+		percent?: number;
+	} | null>(null);
+	const pendingPdfProgRef = useRef<{
+		page: number;
+		percent?: number;
+	} | null>(null);
 
 	useEffect(() => {
 		quoteShareOpenRef.current = quoteShareOpen;
@@ -1175,14 +1183,16 @@ function EbookReadPage() {
 				epubSpineIndexRef.current = spineIndex;
 				setEpubSpineIndex(spineIndex);
 			}
+			pendingEpubProgRef.current = { cfi, percent };
 			if (progTimer.current) clearTimeout(progTimer.current);
 			progTimer.current = setTimeout(() => {
+				pendingEpubProgRef.current = null;
 				ebookStore.saveProg({
 					bookId: book.id,
 					epubCfi: cfi,
 					percent,
 				});
-			}, 800);
+			}, 2_000);
 		},
 		[book],
 	);
@@ -1199,17 +1209,70 @@ function EbookReadPage() {
 	const savePage = useCallback(
 		(page: number, percent?: number) => {
 			if (!book) return;
+			pendingPdfProgRef.current = { page, percent };
 			if (progTimer.current) clearTimeout(progTimer.current);
 			progTimer.current = setTimeout(() => {
+				pendingPdfProgRef.current = null;
 				ebookStore.saveProg({
 					bookId: book.id,
 					pdfPage: page,
 					percent,
 				});
-			}, 800);
+			}, 2_000);
 		},
 		[book],
 	);
+
+	const flushReadingProgress = useCallback(
+		(opts?: { keepalive?: boolean }) => {
+			if (progTimer.current) {
+				clearTimeout(progTimer.current);
+				progTimer.current = null;
+			}
+			if (book) {
+				const epubPending = pendingEpubProgRef.current;
+				if (epubPending) {
+					pendingEpubProgRef.current = null;
+					ebookStore.saveProg({
+						bookId: book.id,
+						epubCfi: epubPending.cfi,
+						percent: epubPending.percent,
+					});
+				}
+				const pdfPending = pendingPdfProgRef.current;
+				if (pdfPending) {
+					pendingPdfProgRef.current = null;
+					ebookStore.saveProg({
+						bookId: book.id,
+						pdfPage: pdfPending.page,
+						percent: pdfPending.percent,
+					});
+				}
+				if (opts?.keepalive) {
+					ebookStore.flushProgRemoteSync(book.id, { keepalive: true });
+				} else {
+					void ebookStore.flushProgRemoteSync(book.id);
+				}
+			}
+		},
+		[book],
+	);
+
+	useEffect(() => {
+		const onPageHide = () => flushReadingProgress({ keepalive: true });
+		const onVisibility = () => {
+			if (document.visibilityState === 'hidden') {
+				flushReadingProgress({ keepalive: true });
+			}
+		};
+		window.addEventListener('pagehide', onPageHide);
+		document.addEventListener('visibilitychange', onVisibility);
+		return () => {
+			window.removeEventListener('pagehide', onPageHide);
+			document.removeEventListener('visibilitychange', onVisibility);
+			flushReadingProgress({ keepalive: true });
+		};
+	}, [flushReadingProgress]);
 
 	const onEpubReady = useCallback(
 		(api: {

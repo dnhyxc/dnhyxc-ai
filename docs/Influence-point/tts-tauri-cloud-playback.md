@@ -7,6 +7,7 @@
 - [tts-tauri-cloud-playback.md](../english/tts-tauri-cloud-playback.md) — 本篇对应的实现说明与代码对比
 - [tts-local-cancel-settle.md](./tts-local-cancel-settle.md) — 本机 Web Speech cancel settle（**不触达**本改动）
 - [epub-listen-cloud-prefetch.md](./epub-listen-cloud-prefetch.md) — 句间云端预取（仍走 `startCloudTts` / `playCloudMp3Blob`）
+- [tts-edge-unify-stream-endpoint.md](./tts-edge-unify-stream-endpoint.md) — **Edge 统一 stream endpoint**（与 §2.2 Tauri 非流式分流**相反**，以最新源码为准）
 
 **阅读约定**：结论以仓库 **当前源码** 为准；「历史风险」指旧实现曾出现问题（如线上桌面 Edge「播放中无声、暂停再播恢复」），不代表现行代码仍会触发。
 

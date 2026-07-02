@@ -9,7 +9,6 @@ import { Toast } from '@ui/sonner';
 import { BASE_URL } from '@/constants';
 import { translateSync } from '@/i18n';
 import {
-	SPEECH_EDGE_TTS,
 	SPEECH_EDGE_TTS_STREAM,
 	SPEECH_MINIMAX_TTS_STREAM,
 	SPEECH_XFYUN_TTS_STREAM,
@@ -1086,9 +1085,7 @@ async function startCloudTts(plain: string): Promise<CloudTtsReady> {
 		source === 'xfyun'
 			? SPEECH_XFYUN_TTS_STREAM
 			: source === 'edge'
-				? isTauriRuntime()
-					? SPEECH_EDGE_TTS
-					: SPEECH_EDGE_TTS_STREAM
+				? SPEECH_EDGE_TTS_STREAM
 				: SPEECH_MINIMAX_TTS_STREAM;
 	const bodyExtras =
 		source === 'xfyun'

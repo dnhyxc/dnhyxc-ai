@@ -16,6 +16,7 @@ import {
 	reorderEbookCategories,
 	saveEbookCover,
 	saveEbookProgress,
+	saveEbookProgressKeepalive,
 	updateEbookCategory,
 	updateEbookTitle,
 	uploadEbookFile,
@@ -98,10 +99,29 @@ export type EbookUploadState = {
 	bookId?: string;
 };
 
+/** 本地 progMap 即时更新；远端 PUT 防抖合并，避免听书 relocated 刷屏 */
+const PROG_REMOTE_DEBOUNCE_MS = 8_000;
+const PROG_PERCENT_SYNC_EPS = 0.005;
+
+function progNeedsRemoteSync(next: Prog, lastSynced?: Prog): boolean {
+	if (!lastSynced) return true;
+	if (next.epubCfi !== lastSynced.epubCfi) return true;
+	if (next.pdfPage !== lastSynced.pdfPage) return true;
+	const np = next.percent;
+	const lp = lastSynced.percent;
+	if (np == null && lp == null) return false;
+	if (np == null || lp == null) return true;
+	return Math.abs(np - lp) >= PROG_PERCENT_SYNC_EPS;
+}
+
 class EbookStore {
 	books: Book[] = [];
 	bookCache: Record<string, Book> = {};
 	progMap: Record<string, Prog> = {};
+	lastSyncedProgMap: Record<string, Prog> = {};
+	progPendingBookIds = new Set<string>();
+	progFlushTimer: ReturnType<typeof setTimeout> | null = null;
+	progRemoteInflight: Promise<void> | null = null;
 	total = 0;
 	pageNo = 1;
 	pageSize = EBOOK_SHELF_PAGE_SIZE;
@@ -225,6 +245,7 @@ class EbookStore {
 				} else {
 					this.books = data.books;
 					this.progMap = data.progMap ?? {};
+					this.seedSyncedProgMap(this.progMap);
 				}
 				this.ready = true;
 			});
@@ -267,6 +288,7 @@ class EbookStore {
 				this.bookCache[book.id] = book;
 				if (prog) {
 					this.progMap[book.id] = prog;
+					this.lastSyncedProgMap[book.id] = prog;
 				}
 			});
 			return book;
@@ -289,6 +311,12 @@ class EbookStore {
 		this.books = [];
 		this.bookCache = {};
 		this.progMap = {};
+		this.lastSyncedProgMap = {};
+		this.progPendingBookIds.clear();
+		if (this.progFlushTimer) {
+			clearTimeout(this.progFlushTimer);
+			this.progFlushTimer = null;
+		}
 		this.total = 0;
 		this.pageNo = 1;
 		this.ready = false;
@@ -480,6 +508,8 @@ class EbookStore {
 			this.books = this.books.filter((b) => b.id !== bookId);
 			delete this.bookCache[bookId];
 			delete this.progMap[bookId];
+			delete this.lastSyncedProgMap[bookId];
+			this.progPendingBookIds.delete(bookId);
 			this.total = Math.max(0, this.safeTotal() - 1);
 			this.resetActiveCategoryIfEmpty();
 		});
@@ -515,7 +545,82 @@ class EbookStore {
 		runInAction(() => {
 			this.progMap[patch.bookId] = next;
 		});
-		void saveEbookProgress(next);
+		this.scheduleProgRemoteSync(patch.bookId);
+	}
+
+	seedSyncedProgMap(map: Record<string, Prog>): void {
+		this.lastSyncedProgMap = { ...map };
+	}
+
+	scheduleProgRemoteSync(bookId: string): void {
+		this.progPendingBookIds.add(bookId);
+		if (this.progFlushTimer) clearTimeout(this.progFlushTimer);
+		this.progFlushTimer = setTimeout(() => {
+			this.progFlushTimer = null;
+			void this.flushProgRemoteSync();
+		}, PROG_REMOTE_DEBOUNCE_MS);
+	}
+
+	/** 离开阅读页 / 切后台 / 刷新时同步；keepalive 供 pagehide 使用 */
+	flushProgRemoteSync(
+		bookId?: string,
+		opts?: { keepalive?: boolean },
+	): Promise<void> {
+		if (this.progFlushTimer) {
+			clearTimeout(this.progFlushTimer);
+			this.progFlushTimer = null;
+		}
+		const ids = bookId ? [bookId] : [...this.progPendingBookIds];
+		if (ids.length === 0) return Promise.resolve();
+
+		if (opts?.keepalive) {
+			for (const id of ids) {
+				const next = this.progMap[id];
+				if (!next) {
+					this.progPendingBookIds.delete(id);
+					continue;
+				}
+				const last = this.lastSyncedProgMap[id];
+				if (!progNeedsRemoteSync(next, last)) {
+					this.progPendingBookIds.delete(id);
+					continue;
+				}
+				saveEbookProgressKeepalive(next);
+				this.lastSyncedProgMap[id] = next;
+				this.progPendingBookIds.delete(id);
+			}
+			return Promise.resolve();
+		}
+
+		const run = async () => {
+			for (const id of ids) {
+				const next = this.progMap[id];
+				if (!next) {
+					this.progPendingBookIds.delete(id);
+					continue;
+				}
+				const last = this.lastSyncedProgMap[id];
+				if (!progNeedsRemoteSync(next, last)) {
+					this.progPendingBookIds.delete(id);
+					continue;
+				}
+				try {
+					await saveEbookProgress(next);
+					this.lastSyncedProgMap[id] = next;
+					this.progPendingBookIds.delete(id);
+				} catch {
+					this.progPendingBookIds.add(id);
+					this.scheduleProgRemoteSync(id);
+				}
+			}
+		};
+
+		this.progRemoteInflight = (this.progRemoteInflight ?? Promise.resolve())
+			.then(run, run)
+			.finally(() => {
+				if (this.progRemoteInflight) this.progRemoteInflight = null;
+			});
+		return this.progRemoteInflight;
 	}
 
 	bookById(id: string): Book | undefined {

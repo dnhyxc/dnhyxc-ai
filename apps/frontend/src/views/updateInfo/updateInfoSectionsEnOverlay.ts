@@ -1216,4 +1216,9 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'Empty custom categories and the Uncategorized tab when there are no uncategorized books are hidden. Moving or deleting the last book in a category returns you to All. Hovering a card title shows both its category and full title.',
 	},
+	's25-67': {
+		title: 'Reading progress sync improvements',
+		description:
+			'EPUB/PDF reading progress still saves automatically. Refreshing the page, closing the tab, or switching away tries to sync immediately to your account, reducing lost position after a hard refresh. During listen-while-reading and other frequent page updates, cloud sync requests are merged; local resume position still updates right away.',
+	},
 };
