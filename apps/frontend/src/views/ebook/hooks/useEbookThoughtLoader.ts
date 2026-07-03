@@ -102,21 +102,6 @@ export function useEbookThoughtLoader({
 	}, [bookId]);
 
 	useEffect(() => {
-		if (!bookId || bookFmt === 'epub') return;
-		let cancelled = false;
-		void fetchEbookThoughts(bookId)
-			.then((list) => {
-				if (!cancelled) setThoughts(list);
-			})
-			.catch((error) => {
-				if (!cancelled) onLoadErrorRef.current?.(error);
-			});
-		return () => {
-			cancelled = true;
-		};
-	}, [bookId, bookFmt]);
-
-	useEffect(() => {
 		if (!bookId || bookFmt !== 'epub' || !epubNavReady) return;
 		const rend = getRendition();
 		if (!rend) return;

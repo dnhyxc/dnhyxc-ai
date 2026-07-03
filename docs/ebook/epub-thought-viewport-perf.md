@@ -10,6 +10,7 @@
 - [epub-scroll-stutter-perf.md](./epub-scroll-stutter-perf.md) — relocated 80ms 合并、叠层投影缓存
 - [../ideas/ebook-multi-user-thought-viewport-perf.md](../ideas/ebook-multi-user-thought-viewport-perf.md) — 规划态架构图
 - [../Influence-point/epub-thought-viewport-mark.md](../Influence-point/epub-thought-viewport-mark.md) — **影响点**：按章拉取/视口 mark 对全量 EPUB 的波及
+- [../Influence-point/epub-thought-loader-full-fetch-removal.md](../Influence-point/epub-thought-loader-full-fetch-removal.md) — **影响点**：移除进书误全量 list（`book?.fmt` 竞态）
 
 ---
 

@@ -44,7 +44,7 @@
 | 听书/听当前背景 | **否** | host 浮层独立；未改 `epubListenMarkHighlight` |
 | 新建想法后邻近虚线 | **有条件变化** | 修复：数据轨 `reclaimOffViewportMarks=false`；历史曾误删邻近线 |
 | 公开书多人虚线 | **是（增强）** | 灰/橙色 + CFI 投影扣减；与私有部分重叠规则一致 |
-| PDF 想法 | **否** | loader 仍全书一次 fetch |
+| PDF 想法 | **否** | 产品不支持想法；见 [epub-thought-loader-full-fetch-removal.md](./epub-thought-loader-full-fetch-removal.md) |
 
 ---
 
@@ -150,6 +150,7 @@
 | `docs/ebook/epub-annotation-sync-perf.md` | 未含视口 mount / 按章 list；与本篇互补 |
 | `docs/ebook/developer/epub-mark-layers-shared.md` | 需补 `syncEpubThoughtUnderlines` 拆分与 context |
 | `docs/Influence-point/epub-scroll-stutter-perf.md` | 未单独成文；滚动收益已并入 `epub-scroll-stutter-perf.md` 实现文 |
+| [epub-thought-loader-full-fetch-removal.md](./epub-thought-loader-full-fetch-removal.md) | 移除进书误全量 list；本篇 §1「PDF 全书 fetch」结论已修订 |
 
 ---
 
