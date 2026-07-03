@@ -1236,4 +1236,9 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'Smoother scrolling when many highlights or reading notes are on the page in continuous-scroll mode; marks stay aligned after you stop scrolling. Helps especially when reading public books with multiple people’s notes.',
 	},
+	's25-71': {
+		title: 'EPUB continuous-scroll TOC jump',
+		description:
+			'When reading in continuous scroll, tapping a chapter in the book TOC reliably scrolls to the start of that chapter (or its anchor), instead of stopping at the chapter end or showing the previous chapter’s tail. Paginated page-flow is unchanged.',
+	},
 };

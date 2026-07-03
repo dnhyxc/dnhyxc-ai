@@ -11,6 +11,8 @@ export const READER_NATIVE_SCROLLBAR = [
 
 /** epub.js 滚动发生在内部 .epub-container 上 */
 export const READER_NATIVE_SCROLLBAR_EPUB_CONTAINER = [
+	'[&_.epub-container]:[overflow-anchor:none]',
+	'[&_.epub-view]:[overflow-anchor:none]',
 	'[&_.epub-container]:[scrollbar-width:thin]',
 	'[&_.epub-container]:[scrollbar-color:color-mix(in_oklch,var(--theme-border)_60%,transparent)_transparent]',
 	'[&_.epub-container::-webkit-scrollbar]:w-2',

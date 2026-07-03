@@ -1,6 +1,7 @@
-import type { Rendition } from 'epubjs';
+import type { Book, Rendition } from 'epubjs';
 
 import { cfiFromDomRange, resolveCfiDomRange } from '../mark/epubRangeGeometry';
+import { resolveSpineIndexForHref } from './epubSpineIndex';
 
 const SCROLL_EDGE_PX = 16;
 /** 分栏开合后保持引用段落在视口内的上下留白 */
@@ -37,6 +38,218 @@ export function getEpubScrollContainer(rend: Rendition): HTMLElement | null {
 function getManager(rend: Rendition): EpubManager | null {
 	// 类型断言强行访问私有 manager 属性，未初始化场景返回 null
 	return (rend as unknown as { manager?: EpubManager }).manager ?? null;
+}
+
+type EpubViewSlot = {
+	index: number;
+	element?: HTMLElement;
+};
+
+function pauseForLayout(): Promise<void> {
+	return new Promise((resolve) => {
+		requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+	});
+}
+
+function findViewElForSpineIndex(
+	rend: Rendition,
+	spineIndex: number,
+): HTMLElement | null {
+	const views = (
+		rend as unknown as { manager?: { views?: { all?: () => EpubViewSlot[] } } }
+	).manager?.views?.all?.();
+	const match = views?.find((view) => view.index === spineIndex);
+	return match?.element ?? null;
+}
+
+async function resolveViewElAfterDisplay(
+	rend: Rendition,
+	book: Book,
+	href: string,
+): Promise<HTMLElement | null> {
+	const spineIndex = resolveSpineIndexForHref(book, href);
+	if (spineIndex != null) {
+		const byIndex = findViewElForSpineIndex(rend, spineIndex);
+		if (byIndex) return byIndex;
+	}
+
+	try {
+		const loc = (await Promise.resolve(rend.currentLocation())) as
+			| { start?: { index?: number } }
+			| undefined;
+		const idx = loc?.start?.index;
+		if (idx != null) {
+			const byLoc = findViewElForSpineIndex(rend, idx);
+			if (byLoc) return byLoc;
+		}
+	} catch {
+		// currentLocation 不可用
+	}
+
+	if (href.includes('#')) {
+		const host = getEpubScrollContainer(rend);
+		if (host) {
+			for (const el of host.querySelectorAll('.epub-view')) {
+				const viewEl = el as HTMLElement;
+				if (resolveNavAnchor(viewEl, href)) return viewEl;
+			}
+		}
+	}
+
+	return null;
+}
+
+function findNavAnchor(
+	rend: Rendition,
+	viewEl: HTMLElement | null,
+	href: string,
+): HTMLElement | null {
+	if (viewEl) {
+		const hit = resolveNavAnchor(viewEl, href);
+		if (hit) return hit;
+	}
+
+	const host = getEpubScrollContainer(rend);
+	if (!host) return null;
+	for (const el of host.querySelectorAll('.epub-view')) {
+		const hit = resolveNavAnchor(el as HTMLElement, href);
+		if (hit) return hit;
+	}
+	return null;
+}
+
+/** 连续滚动目录跳转：目标 .epub-view 应对齐的 scrollTop */
+export function scrolledChapterScrollTop(viewOffsetTop: number): number {
+	return Math.max(0, viewOffsetTop - SCROLL_EDGE_PX);
+}
+
+/** 目录跳转：目标元素顶边相对容器顶边的 scrollTop 增量 */
+export function scrolledNavAlignDelta(
+	targetTop: number,
+	containerTop: number,
+): number {
+	return targetTop - containerTop - SCROLL_EDGE_PX;
+}
+
+function resolveNavAnchor(
+	viewEl: HTMLElement,
+	href: string,
+): HTMLElement | null {
+	const hash = href.split('#')[1];
+	if (!hash) return null;
+
+	let decoded = hash;
+	try {
+		decoded = decodeURIComponent(hash);
+	} catch {
+		// 保留原始 hash
+	}
+
+	const doc = viewEl.querySelector('iframe')?.contentDocument;
+	if (!doc) return null;
+
+	const anchor =
+		doc.getElementById(decoded) ??
+		doc.querySelector(`a[name="${CSS.escape(decoded)}"]`) ??
+		doc.querySelector(`[id="${CSS.escape(decoded)}"]`);
+	return anchor instanceof HTMLElement ? anchor : null;
+}
+
+function alignViewTopToContainer(
+	rend: Rendition,
+	viewEl: HTMLElement,
+): boolean {
+	const container = getEpubScrollContainer(rend);
+	if (!container) return false;
+
+	const delta = scrolledNavAlignDelta(
+		viewEl.getBoundingClientRect().top,
+		container.getBoundingClientRect().top,
+	);
+	if (Math.abs(delta) < 1) return true;
+	container.scrollTop += delta;
+	return true;
+}
+
+function alignElementTopToContainer(
+	rend: Rendition,
+	target: HTMLElement,
+): boolean {
+	const container = getEpubScrollContainer(rend);
+	if (!container) return false;
+
+	const delta = scrolledNavAlignDelta(
+		target.getBoundingClientRect().top,
+		container.getBoundingClientRect().top,
+	);
+	if (Math.abs(delta) < 1) return true;
+	container.scrollTop += delta;
+	return true;
+}
+
+async function trimContinuousViews(rend: Rendition): Promise<void> {
+	const trim = (
+		rend as unknown as { manager?: { trim?: () => Promise<unknown> } }
+	).manager?.trim;
+	if (!trim) return;
+	await Promise.resolve(trim()).catch(() => undefined);
+}
+
+function alignScrolledNavTarget(
+	rend: Rendition,
+	href: string,
+	viewEl: HTMLElement | null,
+): boolean {
+	const hasFragment = href.includes('#');
+	const anchor = findNavAnchor(rend, viewEl, href);
+	if (anchor) return alignElementTopToContainer(rend, anchor);
+	if (hasFragment) return false;
+	if (!viewEl) return false;
+
+	return alignViewTopToContainer(rend, viewEl);
+}
+
+// ponytail: 固定次数校正 + trim；upgrade: ResizeObserver 直到 targetTop 稳定
+const NAV_ALIGN_SETTLE_MS = [0, 100, 220] as const;
+
+async function settleScrolledNavAlign(
+	rend: Rendition,
+	book: Book,
+	href: string,
+): Promise<void> {
+	for (let i = 0; i < NAV_ALIGN_SETTLE_MS.length; i += 1) {
+		const delay = NAV_ALIGN_SETTLE_MS[i]!;
+		if (delay > 0) {
+			await new Promise<void>((resolve) => {
+				window.setTimeout(resolve, delay);
+			});
+		}
+		await pauseForLayout();
+		const viewEl = await resolveViewElAfterDisplay(rend, book, href);
+		alignScrolledNavTarget(rend, href, viewEl);
+		if (i === 1) {
+			await trimContinuousViews(rend);
+			await pauseForLayout();
+			const trimmedView = await resolveViewElAfterDisplay(rend, book, href);
+			alignScrolledNavTarget(rend, href, trimmedView);
+		}
+	}
+}
+
+/**
+ * 连续滚动：目录/外链 href 跳转后把目标章顶对齐视口。
+ * epub.js continuous 在 display 后 prepend 邻章、批注 patch 会改布局；单次 offsetTop 不够，需多次按视口坐标校正。
+ */
+export async function displayEpubScrolledHref(
+	rend: Rendition,
+	book: Book,
+	href: string,
+): Promise<void> {
+	await rend.display(href);
+	if (!getEpubScrollContainer(rend)) return;
+
+	await pauseForLayout();
+	await settleScrolledNavAlign(rend, book, href);
 }
 
 /**

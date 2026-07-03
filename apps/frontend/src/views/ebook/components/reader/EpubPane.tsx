@@ -42,7 +42,10 @@ import {
 	type EpubReaderSettings,
 	resolveEpubReaderSurfaceBackground,
 } from '../../utils/epub/reader/epubReaderSettings';
-import { attachEpubScrolledEdgeNav } from '../../utils/epub/reader/epubScrolledNav';
+import {
+	attachEpubScrolledEdgeNav,
+	displayEpubScrolledHref,
+} from '../../utils/epub/reader/epubScrolledNav';
 import {
 	attachEpubSelectionPopBar,
 	clearEpubTextSelection,
@@ -480,8 +483,17 @@ export function EpubPane({
 						await rendRef.current.next();
 					},
 					go: async (href) => {
-						if (!rendRef.current) return;
-						await rendRef.current.display(href);
+						const rend = rendRef.current;
+						const spineBook = bookRef.current;
+						if (!rend) return;
+						if (
+							readerSettingsRef.current.pageFlow === 'scrolled' &&
+							spineBook
+						) {
+							await displayEpubScrolledHref(rend, spineBook, href);
+							return;
+						}
+						await rend.display(href);
 					},
 					clearTextSelection: () => {
 						if (!rendRef.current) return;
