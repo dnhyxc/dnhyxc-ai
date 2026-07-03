@@ -4,6 +4,7 @@
 
 | 文档 | 范围 |
 |------|------|
+| [epub-all-features-dev.md](./epub-all-features-dev.md) | **全功能总手册**：渲染生命周期 + 用户划线 + 读书想法 + 阅读设置 + 章节听读 + 引用听读 + 公开想法增量同步 + 跨功能互斥 + 复用清单（M1–M8、11 个源码符号逐行注释） |
 | [epub-mark-layers-shared.md](./epub-mark-layers-shared.md) | **三层标注共用方法**：用户划线 / 想法虚线 / 播放背景 — 几何管道、sync 编排、流程图 |
 | [epub-listen-dev.md](./epub-listen-dev.md) | **边听边读总手册**：听当前 + 听书（含连续滚动多 iframe 续播）+ TTS/高亮/互斥 |
 | [epub-thought-add-underline-dev.md](./epub-thought-add-underline-dev.md) | 读书想法：添加 + 琥珀虚线 + 侧栏 + 点击聚合 |

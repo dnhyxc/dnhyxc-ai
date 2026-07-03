@@ -1241,4 +1241,14 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'When reading in continuous scroll, tapping a chapter in the book TOC reliably scrolls to the start of that chapter (or its anchor), instead of stopping at the chapter end or showing the previous chapter’s tail. Paginated page-flow is unchanged.',
 	},
+	's25-72': {
+		title: 'Shelf sorted by last read time',
+		description:
+			'Shelf cards are now ordered by last read time (descending) instead of by when the book was added — books you just read float to the top, while unread books still keep their added-time order. The order updates immediately as you read and progress is saved; pagination, public-book merges, and newly added books all follow the same rule.',
+	},
+	's25-73': {
+		title: 'Shelf card uncategorized fallback label',
+		description:
+			'When hovering a shelf card title, if the book is uncategorized or its category was deleted, the category name no longer shows blank — it falls back to “Uncategorized” (matching the Uncategorized tab).',
+	},
 };

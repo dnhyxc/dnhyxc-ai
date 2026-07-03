@@ -9,14 +9,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Response } from 'express';
-import {
-	Brackets,
-	FindOptionsWhere,
-	In,
-	IsNull,
-	Repository,
-	SelectQueryBuilder,
-} from 'typeorm';
+import { Brackets, In, IsNull, Repository, SelectQueryBuilder } from 'typeorm';
 import { decodeChineseFilename } from '../../utils';
 import { normalizeUploadPublicPath } from '../../utils/upload-paths';
 import { isCosObjectKey } from '../upload/cos.config';
@@ -272,10 +265,6 @@ export class EbookService {
 		const take = pageSize;
 		const skip = (pageNo - 1) * take;
 
-		const where: FindOptionsWhere<EbookBook> = {
-			userId,
-			sourceBookId: IsNull(),
-		};
 		if (query.categoryId) {
 			const cat = await this.categoryRepo.findOne({
 				where: { id: query.categoryId, userId },
@@ -283,17 +272,33 @@ export class EbookService {
 			if (!cat) {
 				throw new NotFoundException('分类不存在');
 			}
-			where.categoryId = query.categoryId;
-		} else if (query.uncategorizedOnly) {
-			where.categoryId = IsNull();
 		}
 
-		const [books, total] = await this.bookRepo.findAndCount({
-			where,
-			order: { createdAt: 'DESC' },
-			take,
-			skip,
-		});
+		const qb = this.bookRepo
+			.createQueryBuilder('b')
+			.leftJoin(
+				EbookProgress,
+				'p',
+				'p.book_id = b.id AND p.user_id = :userId',
+				{ userId },
+			)
+			.select('b')
+			.addSelect(
+				'CASE WHEN p.updated_at IS NOT NULL THEN p.updated_at ELSE b.created_at END',
+				'shelf_sort',
+			)
+			.where('b.user_id = :userId', { userId })
+			.andWhere('b.source_book_id IS NULL');
+		if (query.categoryId) {
+			qb.andWhere('b.category_id = :categoryId', {
+				categoryId: query.categoryId,
+			});
+		} else if (query.uncategorizedOnly) {
+			qb.andWhere('b.category_id IS NULL');
+		}
+		qb.orderBy('shelf_sort', 'DESC').skip(skip).take(take);
+
+		const [books, total] = await qb.getManyAndCount();
 		const ids = books.map((b) => b.id);
 		const progresses =
 			ids.length === 0

@@ -97,6 +97,27 @@ function shelfQueryFromKey(key: EbookShelfCategoryKey): {
 	return {};
 }
 
+function bookLastReadMs(book: Book, progMap: Record<string, Prog>): number {
+	const prog =
+		progMap[book.id] ??
+		(book.readingBookId ? progMap[book.readingBookId] : undefined);
+	if (prog?.updatedAt) {
+		const readAt = Date.parse(prog.updatedAt);
+		if (Number.isFinite(readAt)) return readAt;
+	}
+	const addedAt = Date.parse(book.addedAt);
+	return Number.isFinite(addedAt) ? addedAt : 0;
+}
+
+function sortBooksByLastRead(
+	books: Book[],
+	progMap: Record<string, Prog>,
+): Book[] {
+	return [...books].sort(
+		(a, b) => bookLastReadMs(b, progMap) - bookLastReadMs(a, progMap),
+	);
+}
+
 export type EbookUploadPhase = 'reading' | 'uploading';
 
 export type EbookUploadState = {
@@ -321,6 +342,15 @@ class EbookStore {
 				this.total =
 					Number.isFinite(nextTotal) && nextTotal >= 0 ? nextTotal : 0;
 				this.pageNo = page;
+				const nextProgMap =
+					key.kind === 'all' && publicData && !append
+						? {
+								...(publicData.progMap ?? {}),
+								...(data.progMap ?? {}),
+							}
+						: append
+							? this.progMap
+							: (data.progMap ?? {});
 				if (append) {
 					const existingIds = new Set(this.books.map((b) => b.id));
 					const merged = [...this.books];
@@ -330,22 +360,26 @@ class EbookStore {
 							merged.push(book);
 						}
 					}
-					this.books = merged;
+					for (const [bookId, prog] of Object.entries(data.progMap ?? {})) {
+						nextProgMap[bookId] = prog;
+					}
+					this.books = sortBooksByLastRead(merged, nextProgMap);
+					this.progMap = nextProgMap;
 				} else if (key.kind === 'all' && publicData) {
 					const mineIds = new Set(data.books.map((b) => b.id));
 					const publicBooks = publicData.books.filter(
 						(b) => !mineIds.has(b.id),
 					);
-					this.books = [...data.books, ...publicBooks];
-					this.progMap = {
-						...(publicData.progMap ?? {}),
-						...(data.progMap ?? {}),
-					};
+					this.progMap = nextProgMap;
 					this.seedSyncedProgMap(this.progMap);
+					this.books = sortBooksByLastRead(
+						[...data.books, ...publicBooks],
+						nextProgMap,
+					);
 				} else {
-					this.books = data.books;
-					this.progMap = data.progMap ?? {};
+					this.progMap = nextProgMap;
 					this.seedSyncedProgMap(this.progMap);
+					this.books = sortBooksByLastRead(data.books, nextProgMap);
 				}
 				this.ready = true;
 			});
@@ -461,7 +495,10 @@ class EbookStore {
 			return;
 		}
 		const existed = this.books.some((b) => b.id === book.id);
-		this.books = [book, ...this.books.filter((b) => b.id !== book.id)];
+		this.books = sortBooksByLastRead(
+			[book, ...this.books.filter((b) => b.id !== book.id)],
+			this.progMap,
+		);
 		if (!existed && isNew) {
 			this.total = this.safeTotal() + 1;
 		}
@@ -670,6 +707,13 @@ class EbookStore {
 		};
 		runInAction(() => {
 			this.progMap[patch.bookId] = next;
+			if (
+				this.books.some(
+					(b) => b.id === patch.bookId || b.readingBookId === patch.bookId,
+				)
+			) {
+				this.books = sortBooksByLastRead(this.books, this.progMap);
+			}
 		});
 		this.scheduleProgRemoteSync(patch.bookId);
 	}

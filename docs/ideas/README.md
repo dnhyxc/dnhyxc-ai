@@ -15,6 +15,7 @@
 | [ebook-public-thought-live-sync.md](./ebook-public-thought-live-sync.md) | **公开书想法实时同步**（核心已上线）：/sync 增量、双轨触发、点击列表聚类 → **归档** [epub-public-thought-live-sync.md](../ebook/epub-public-thought-live-sync.md) |
 | [ebook-thought-sync-perf-optimization.md](./ebook-thought-sync-perf-optimization.md) | **Sync 性能优化**（已上线）：P0 私有 gate、M8 SQL 增量、M6 deletedIds 软删、改前改后对照 |
 | [ebook-multi-user-thought-viewport-perf.md](./ebook-multi-user-thought-viewport-perf.md) | **多人想法划线 + 视口性能**（已上线）→ **归档** [epub-thought-viewport-perf.md](../ebook/epub-thought-viewport-perf.md) |
+| [epub-toc-chapter-top-align.md](./epub-toc-chapter-top-align.md) | **EPUB 点击目录章首对齐**（规划）：连续滚动升级为 ResizeObserver 稳定性循环、分页新增章首 CFI 重排 + `break-before:column` 注入 |
 
 **生成 Skill**：[`feature-implementation-idea`](../../.cursor/skills/feature-implementation-idea/SKILL.md)
 

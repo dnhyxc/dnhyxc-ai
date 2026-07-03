@@ -659,7 +659,8 @@ export function EbookShelfBookCard({
 												})}
 											</span>
 											<span className="text-teal-600">
-												{categories.find((c) => c.id === book.categoryId)?.name}
+												{categories.find((c) => c.id === book.categoryId)
+													?.name || t('ebook.shelf.category.uncategorized')}
 											</span>
 										</div>
 										<div className="max-w-[calc(100vw-3rem)] relative z-10 whitespace-pre-wrap wrap-break-word">

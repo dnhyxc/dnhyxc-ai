@@ -19,7 +19,8 @@
 | [ebook-shelf-category.md](./ebook-shelf-category.md)                             | **增量**：书架分类（面包屑、Tab Rail、Model 管理弹窗、书名行移动 Popover、删分类归入未分类）                                                    |
 | [ebook-cos-stream-io.md](./ebook-cos-stream-io.md)                               | **增量**：COS 流式上传/下载，避免大文件整包进内存                                                                                               |
 | [epub-reading-thoughts.md](./epub-reading-thoughts.md)                           | **数据层**：服务端存储、虚线下划线、重叠去重、选区防误触                                                                                        |
-| [developer/README.md](./developer/README.md)                                       | **开发者手册索引**（听读 + 想法 + 用户划线）                                                                                                    |
+| [developer/README.md](./developer/README.md)                                       | **开发者手册索引**（全功能总手册 + 听读 + 想法 + 用户划线）                                                                                    |
+| [developer/epub-all-features-dev.md](./developer/epub-all-features-dev.md) | **唯一全功能总手册**：渲染生命周期 + 划线 + 想法 + 阅读设置 + 章节听读 + 引用听读 + 公开想法增量同步 + 跨功能互斥 + 复用清单（M1–M8、11 个源码符号逐行注释） |
 | [developer/epub-mark-layers-shared.md](./developer/epub-mark-layers-shared.md) | **开发者**：用户划线 / 想法虚线 / 播放背景 — 共用方法表与流程图 |
 | [developer/epub-listen-dev.md](./developer/epub-listen-dev.md)                   | **唯一主文档（听当前 + 听书）**：含连续滚动多 iframe 续播、调用链、M1–M5、源码摘录                                                                       |
 | [developer/epub-thought-add-underline-dev.md](./developer/epub-thought-add-underline-dev.md) | **唯一主文档（想法）**：§0 从何下手 + §2 白话思路 + §3–§19                                                                                      |
@@ -55,6 +56,8 @@
 | [epub-listen-player-bar.md](./epub-listen-player-bar.md)                             | **增量**：听书播放条分句菜单、倍速 0.75×～3×、跳转居中滚动与 TTS 即时倍速                                              |
 | [epub-listen-player-bar-ruler-ui.md](./epub-listen-player-bar-ruler-ui.md)             | **增量（本轮）**：刻度尺倍速 0.5×～3×、分句虚拟列表与「滚到当前句」                                                     |
 | [ebook-shelf-empty-tab-reset.md](./ebook-shelf-empty-tab-reset.md)                     | **增量**：书架空分类 Tab 隐藏、移走最后一本自动回「全部」、卡片 Tooltip 显示分类                                        |
+| [ebook-shelf-sort-last-read.md](./ebook-shelf-sort-last-read.md)                       | **增量（2026-07-03）**：书架按最近阅读时间排序（后端 `CASE WHEN shelf_sort` + 前端 `sortBooksByLastRead` 兜底） |
+| [ebook-shelf-card-uncategorized.md](./ebook-shelf-card-uncategorized.md)               | **增量（2026-07-03）**：书架卡片书名 Tooltip 分类名缺失时回退「未分类」文案，避免空白                              |
 | [ebook-progress-remote-debounce.md](./ebook-progress-remote-debounce.md)               | **增量（本轮）**：阅读进度 8s 远端防抖 + 页内 2s debounce + pagehide keepalive flush，听书 relocated 降噪 |
 | [epub-quote-listen-player-bar.md](./epub-quote-listen-player-bar.md)                   | **增量**：听当前共用底部播放条（暂停/切句/倍速，与听书同一组件）                                                      |
 | [epub-listen-bg-resize-relayout.md](./epub-listen-bg-resize-relayout.md)               | **增量**：听读播放背景随分栏/侧栏 resize 重绘（`repaintActive` 重挂 group、ResizeObserver、`EpubPane` 接线）            |
