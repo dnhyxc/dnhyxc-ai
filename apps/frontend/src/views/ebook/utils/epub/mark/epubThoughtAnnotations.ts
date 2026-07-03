@@ -65,7 +65,7 @@ const THOUGHT_LINE_OPACITY = '0.55';
 /** 下划线与文字底边的间距（px） */
 const THOUGHT_LINE_OFFSET_PX = 1;
 /** 虚线：短线长度、间隔 */
-const THOUGHT_LINE_DASHARRAY = '1 6';
+const THOUGHT_LINE_DASHARRAY = '2 5';
 
 const EPUB_THOUGHT_UNDERLINE_CSS = `
 g.${EPUB_THOUGHT_UNDERLINE_CLASS} > rect,

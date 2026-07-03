@@ -9,9 +9,9 @@ import {
 	maxEbookThoughtUpdatedAt,
 } from '../utils/epub/mark/epubThoughtSync';
 
-/** 滚动停稳后再探测（与进度保存同量级，避免短停触发 sync→全量 mark）；两次探测至少间隔 15s */
+/** 滚动停稳后再探测（与进度保存同量级，避免短停触发 sync→全量 mark）；两次探测至少间隔 5s */
 const RELOC_DEBOUNCE_MS = 2_000;
-const MIN_SYNC_INTERVAL_MS = 15_000;
+const MIN_SYNC_INTERVAL_MS = 5_000;
 
 type SyncOptions = {
 	/** 打开想法列表等交互：跳过节流 */
