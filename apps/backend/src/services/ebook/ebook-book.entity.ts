@@ -49,6 +49,17 @@ export class EbookBook {
 	@Column({ type: 'uuid', name: 'category_id', nullable: true })
 	categoryId: string | null;
 
+	/** 书主源书：是否全站公开 */
+	@Column({ name: 'is_public', type: 'boolean', default: false })
+	isPublic!: boolean;
+
+	/** 非空 = 读者的读书记录，指向源书 */
+	@Column({ type: 'uuid', name: 'source_book_id', nullable: true })
+	sourceBookId: string | null;
+
+	@Column({ name: 'public_at', type: 'timestamp', nullable: true })
+	publicAt: Date | null;
+
 	@CreateDateColumn({ name: 'created_at', type: 'timestamp' })
 	createdAt: Date;
 

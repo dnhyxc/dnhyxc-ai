@@ -10,8 +10,8 @@ import {
 import {
 	BookOpen,
 	FileText,
-	FolderInput,
 	ImagePlus,
+	LayoutList,
 	Play,
 	Trash2,
 } from 'lucide-react';
@@ -20,6 +20,7 @@ import { useI18n } from '@/hooks';
 import { cn } from '@/lib/utils';
 import { resolveUploadedFileUrl } from '@/utils/upload-file-url';
 import type { Book, EbookCategory, Prog } from '../../types';
+import { EbookBookVisibilitySwitch } from './EbookBookVisibilitySwitch';
 
 function byFmt<T>(fmt: Book['fmt'], epub: T, pdf: T): T {
 	return fmt === 'epub' ? epub : pdf;
@@ -51,6 +52,7 @@ export type EbookShelfBookCardProps = {
 	book: Book;
 	prog?: Prog;
 	categories?: EbookCategory[];
+	shelfMode?: 'mine' | 'public';
 	onOpen: (bookId: string) => void;
 	onRemove: (bookId: string) => void;
 	onSetCover?: (bookId: string, file: File) => Promise<void>;
@@ -84,7 +86,7 @@ function shelfCornerBtnClass(danger?: boolean) {
 
 function shelfTitleActionBtnClass(disabled?: boolean, hoverColor?: boolean) {
 	return cn(
-		'inline-flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md',
+		'inline-flex shrink-0 cursor-pointer items-center justify-center rounded-md',
 		'text-textcolor/70 transition-colors hover:bg-transparent hover:text-textcolor',
 		disabled && 'pointer-events-none opacity-50',
 		hoverColor && 'hover:text-teal-500',
@@ -164,6 +166,7 @@ export function EbookShelfBookCard({
 	book,
 	prog,
 	categories = [],
+	shelfMode = 'mine',
 	onOpen,
 	onRemove,
 	onSetCover,
@@ -171,6 +174,8 @@ export function EbookShelfBookCard({
 	onMoveCategory,
 }: EbookShelfBookCardProps) {
 	const { t } = useI18n();
+	const isPublicShelf = shelfMode === 'public';
+	const canManage = !isPublicShelf;
 	const coverInputRef = useRef<HTMLInputElement>(null);
 	const titleCommittingRef = useRef(false);
 	const [coverBusy, setCoverBusy] = useState(false);
@@ -181,7 +186,11 @@ export function EbookShelfBookCard({
 	const [categoryMenuOpen, setCategoryMenuOpen] = useState(false);
 	const pct = prog?.percent;
 	const fmtLabel = book.fmt === 'epub' ? 'EPUB' : 'PDF';
+	const ownerLabel = book.owner?.username?.trim();
+	const ownerDisplay = ownerLabel || t('ebook.shelf.publicOwner');
 	const openLabel = prog ? t('ebook.shelf.continue') : t('ebook.shelf.read');
+	const cloudReady = book.src.kind === 'store' && book.fmt === 'epub';
+	const showPublicIcon = Boolean(book.owner);
 
 	const onCoverFile = async (list: FileList | null) => {
 		const file = list?.[0];
@@ -272,9 +281,9 @@ export function EbookShelfBookCard({
 						onClick={(e) => e.stopPropagation()}
 					>
 						{categoryBusy ? (
-							<Spinner className="size-3.5 text-textcolor -mr-1" aria-hidden />
+							<Spinner className="size-4 shrink-0 text-textcolor" aria-hidden />
 						) : (
-							<FolderInput className="size-4.5 -mr-1" aria-hidden />
+							<LayoutList className="size-4 shrink-0" aria-hidden />
 						)}
 					</button>
 				</PopoverTrigger>
@@ -327,7 +336,7 @@ export function EbookShelfBookCard({
 	) : null;
 
 	return (
-		<div className="flex w-full min-w-0 flex-col gap-1.5">
+		<div className="flex w-full min-w-0 flex-col gap-1.5 overflow-hidden">
 			<div
 				className={cn(
 					'group relative aspect-3/4 w-full min-w-0 overflow-hidden rounded-md',
@@ -448,28 +457,39 @@ export function EbookShelfBookCard({
 							<span
 								className={cn(
 									SHELF_META_CHIP,
-									'uppercase tracking-wider text-textcolor/75',
+									'max-w-[calc(100%-2.5rem)] truncate tracking-wider text-textcolor/75 uppercase',
 								)}
 							>
 								{fmtLabel}
 							</span>
 							<div className="flex items-center gap-1">
-								<Tooltip
-									side="bottom"
-									sideOffset={6}
-									delayDuration={200}
-									shadow
-									content={t('common.delete')}
-								>
-									<button
-										type="button"
-										className={shelfCornerBtnClass(true)}
-										aria-label={t('common.delete')}
-										onClick={() => onRemove(book.id)}
+								{canManage ? (
+									<Tooltip
+										side="bottom"
+										sideOffset={6}
+										delayDuration={200}
+										shadow
+										content={t('common.delete')}
 									>
-										<Trash2 className="size-3.5" aria-hidden />
-									</button>
-								</Tooltip>
+										<button
+											type="button"
+											className={shelfCornerBtnClass(true)}
+											aria-label={t('common.delete')}
+											onClick={() => onRemove(book.id)}
+										>
+											<Trash2 className="size-3.5" aria-hidden />
+										</button>
+									</Tooltip>
+								) : (
+									<span
+										className={cn(
+											SHELF_META_CHIP,
+											'max-w-22 truncate text-textcolor/75',
+										)}
+									>
+										{ownerDisplay}
+									</span>
+								)}
 							</div>
 						</div>
 
@@ -521,7 +541,7 @@ export function EbookShelfBookCard({
 						</div>
 
 						<div className={SHELF_HOVER_BAR}>
-							{onSetCover ? (
+							{canManage && onSetCover ? (
 								<>
 									<input
 										ref={coverInputRef}
@@ -561,13 +581,20 @@ export function EbookShelfBookCard({
 										</button>
 									</Tooltip>
 								</>
+							) : isPublicShelf ? (
+								<span
+									className={cn(
+										SHELF_META_CHIP,
+										'text-xs uppercase tracking-wide text-textcolor/75',
+									)}
+								>
+									{t('ebook.shelf.publicBadge')}
+								</span>
 							) : (
 								<span className="size-7 shrink-0" aria-hidden />
 							)}
 							{pct != null ? (
-								<span
-									className={cn(SHELF_META_CHIP, 'text-textcolor/75 pb-0.5')}
-								>
+								<span className={cn(SHELF_META_CHIP, 'text-textcolor/75')}>
 									{t('ebook.shelf.progress', { pct })}
 								</span>
 							) : (
@@ -578,15 +605,15 @@ export function EbookShelfBookCard({
 				</div>
 			</div>
 
-			<div className="flex h-7 w-full min-w-0 items-center gap-1">
-				{editingTitle ? (
+			{editingTitle ? (
+				<div className="h-7 w-full min-w-0 overflow-hidden">
 					<Input
 						autoFocus
 						value={titleDraft}
 						disabled={titleSaving}
 						maxLength={100}
 						className={cn(
-							'h-full min-h-0 min-w-0 flex-1 rounded px-1.5 py-0 text-sm leading-none shadow-none',
+							'h-7 min-h-0 min-w-0 w-full rounded px-1.5 py-0 text-sm leading-none shadow-none',
 							'border-theme/5 bg-theme/5 focus-visible:border-theme/10 focus-visible:ring-0',
 						)}
 						aria-label={t('ebook.shelf.editTitle')}
@@ -607,8 +634,15 @@ export function EbookShelfBookCard({
 							cancelTitleEdit();
 						}}
 					/>
-				) : (
-					<>
+				</div>
+			) : (
+				<div className="flex h-7 w-full min-w-0 items-center gap-1 overflow-hidden">
+					<div className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden">
+						{showPublicIcon ? (
+							<span className="shrink-0 rounded-sm bg-teal-600 px-1 py-0.5 mr-2 text-xs text-white">
+								{t('ebook.shelf.publicBadge')}
+							</span>
+						) : null}
 						<Tooltip
 							side="top"
 							sideOffset={4}
@@ -616,7 +650,7 @@ export function EbookShelfBookCard({
 							shadow
 							className="max-w-[min(100vw-2rem,18rem)] whitespace-normal text-left wrap-break-word leading-snug"
 							content={
-								onUpdateTitle ? (
+								canManage && onUpdateTitle ? (
 									<div className="text-textcolor/75 flex flex-col justify-center items-start gap-1">
 										<div className="max-w-[calc(100vw-3rem)] relative z-10 whitespace-pre-wrap wrap-break-word">
 											<span className="text-textcolor/75 ">
@@ -643,21 +677,35 @@ export function EbookShelfBookCard({
 							<button
 								type="button"
 								className={cn(
-									'flex h-full min-w-0 flex-1 items-center px-0.5 text-left',
-									onUpdateTitle && 'cursor-text hover:text-textcolor',
+									'block min-w-0 flex-1 overflow-hidden text-left',
+									canManage &&
+										onUpdateTitle &&
+										'cursor-text hover:text-textcolor',
 								)}
-								disabled={!onUpdateTitle}
-								onClick={startTitleEdit}
+								disabled={!onUpdateTitle || !canManage}
+								onClick={canManage ? startTitleEdit : undefined}
 							>
-								<span className="text-textcolor/85 block min-w-0 truncate text-sm font-medium leading-none">
+								<span className="text-textcolor/85 block w-full min-w-0 truncate text-sm font-medium leading-snug">
 									{book.title}
 								</span>
 							</button>
 						</Tooltip>
-						{moveCategoryMenu}
-					</>
-				)}
-			</div>
+					</div>
+					{canManage ? (
+						<div className="flex shrink-0 items-center gap-0.5 ml-1">
+							{book.fmt === 'epub' && !book.sourceBookId ? (
+								<EbookBookVisibilitySwitch
+									book={book}
+									canToggle={cloudReady}
+									compact
+									className={shelfTitleActionBtnClass(!cloudReady, true)}
+								/>
+							) : null}
+							{moveCategoryMenu}
+						</div>
+					) : null}
+				</div>
+			)}
 		</div>
 	);
 }

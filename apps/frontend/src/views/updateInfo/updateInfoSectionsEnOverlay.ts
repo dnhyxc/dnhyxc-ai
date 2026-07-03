@@ -1221,4 +1221,19 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'EPUB/PDF reading progress still saves automatically. Refreshing the page, closing the tab, or switching away tries to sync immediately to your account, reducing lost position after a hard refresh. During listen-while-reading and other frequent page updates, cloud sync requests are merged; local resume position still updates right away.',
 	},
+	's25-68': {
+		title: 'Public-book reading-note underline stacking',
+		description:
+			'When reading a publicly shared EPUB, you can see the owner’s and others’ reading notes (gray dashed underlines) alongside your own (amber). Where your note overlaps theirs, only your underline shows; multiple partially overlapping notes of your own also render as a single underline. EPUB only.',
+	},
+	's25-69': {
+		title: 'Public EPUB books on the shelf',
+		description:
+			'Owners can mark cloud-backed EPUBs as public. All signed-in users can discover and read them from their own shelf (All or Public tab)—no share link required. Reading progress, highlights, and your own notes stay per account; you can see the owner’s public reading notes. Cloud backup is required before publishing; PDF is not supported yet.',
+	},
+	's25-70': {
+		title: 'EPUB continuous-scroll highlight performance',
+		description:
+			'Smoother scrolling when many highlights or reading notes are on the page in continuous-scroll mode; marks stay aligned after you stop scrolling. Helps especially when reading public books with multiple people’s notes.',
+	},
 };

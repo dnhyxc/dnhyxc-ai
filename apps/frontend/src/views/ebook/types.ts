@@ -16,6 +16,17 @@ export type Book = {
 	coverUrl?: string;
 	addedAt: string;
 	categoryId?: string | null;
+	isPublic?: boolean;
+	sourceBookId?: string | null;
+	owner?: EbookBookOwner;
+	/** 公开书架：当前用户已有读书记录时的 id */
+	readingBookId?: string;
+};
+
+export type EbookBookOwner = {
+	userId: number;
+	username: string;
+	avatar: string;
 };
 
 /** 书架分类 */
@@ -26,11 +37,12 @@ export type EbookCategory = {
 	bookCount: number;
 };
 
-/** 书架 Tab：全部 | 某分类 | 未分类 */
+/** 书架 Tab：全部 | 某分类 | 未分类 | 公开 */
 export type EbookShelfCategoryKey =
 	| { kind: 'all' }
 	| { kind: 'category'; categoryId: string }
-	| { kind: 'uncategorized' };
+	| { kind: 'uncategorized' }
+	| { kind: 'public' };
 
 export type EbookCategoriesSummary = {
 	categories: EbookCategory[];
@@ -66,6 +78,15 @@ export type EbookShelfData = {
 export type EbookBookDetail = {
 	book: Book;
 	prog?: Prog;
+	publicSource?: EbookPublicSource;
+};
+
+export type EbookPublicSource = {
+	sourceBookId: string;
+	ownerUserId: number;
+	ownerUsername: string;
+	ownerAvatar: string;
+	isStillPublic: boolean;
 };
 
 /** EPUB 读书想法（服务端存储，按 CFI 定位） */
@@ -82,6 +103,22 @@ export type EbookThought = {
 	avatar: string;
 	createdAt: string;
 	updatedAt: string;
+	/** 公开发送为 true；私密发送仅本人可见 */
+	isPublic?: boolean;
+};
+
+/** 公开书想法列表版本戳（轻量轮询用） */
+export type EbookThoughtRevision = {
+	count: number;
+	latestUpdatedAt: string | null;
+};
+
+/** 公开书想法同步：版本戳 + 增量变更（单次请求） */
+export type EbookThoughtSync = {
+	revision: EbookThoughtRevision;
+	changes: EbookThought[];
+	/** since 之后对当前用户不可见的 id（软删 / 他人改私密） */
+	deletedIds?: string[];
 };
 
 /** 同一 cfiRange 下的想法分组（数据库粒度不变） */

@@ -285,11 +285,25 @@ type ThoughtCardProps = {
 	username: string;
 	avatar?: string;
 	createdAt?: string;
+	/** 公开发送为 true；缺省按公开展示（与列表/详情数据一致） */
+	isPublic?: boolean;
 	children: ReactNode;
 	className?: string;
 	selected?: boolean;
 	onClick?: () => void;
 };
+
+function ThoughtVisibilityBadge({ isPublic }: { isPublic: boolean }) {
+	const { t } = useI18n();
+
+	return (
+		<span className={cn('shrink-0 text-xs', 'text-textcolor/35')}>
+			{isPublic
+				? t('ebook.read.thought.visibilityPublic')
+				: t('ebook.read.thought.visibilityPrivate')}
+		</span>
+	);
+}
 
 /** 引用卡片顶栏 / 底栏操作条统一行高 */
 const quoteCardBarRowClass = 'flex h-[50px] shrink-0 items-center';
@@ -320,11 +334,13 @@ function ThoughtUserMeta({
 	username,
 	avatar,
 	createdAt,
+	isPublic,
 	mode,
 }: {
 	username: string;
 	avatar?: string;
 	createdAt?: string;
+	isPublic?: boolean;
 	mode?: 'create' | 'edit';
 }) {
 	const publishedAt = formatDate(createdAt ?? '');
@@ -343,6 +359,14 @@ function ThoughtUserMeta({
 					<span className="text-textcolor/35 shrink-0 text-xs tabular-nums">
 						{publishedAt}
 					</span>
+				) : null}
+				{isPublic != null ? (
+					<>
+						<span className="text-textcolor/25 shrink-0 text-xs" aria-hidden>
+							·
+						</span>
+						<ThoughtVisibilityBadge isPublic={isPublic} />
+					</>
 				) : null}
 			</div>
 		</div>
@@ -499,6 +523,7 @@ export function EpubThoughtItemCard({
 	username,
 	avatar,
 	createdAt,
+	isPublic,
 	children,
 	className,
 	selected,
@@ -520,6 +545,7 @@ export function EpubThoughtItemCard({
 				username={username}
 				avatar={avatar}
 				createdAt={createdAt}
+				isPublic={isPublic}
 			/>
 			{children}
 		</div>
@@ -532,6 +558,7 @@ export function EpubThoughtComposeCard({
 	username,
 	avatar,
 	createdAt,
+	isPublic,
 	children,
 	actions,
 	className,
@@ -540,6 +567,7 @@ export function EpubThoughtComposeCard({
 	username?: string;
 	avatar?: string;
 	createdAt?: string;
+	isPublic?: boolean;
 	children: ReactNode;
 	/** 输入框内底栏操作（对齐 ChatEntry 取消/发送布局） */
 	actions?: ReactNode;
@@ -552,6 +580,7 @@ export function EpubThoughtComposeCard({
 					username={username}
 					avatar={avatar}
 					createdAt={createdAt}
+					isPublic={isPublic}
 					mode={mode}
 				/>
 			) : null}

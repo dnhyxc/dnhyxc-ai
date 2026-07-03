@@ -29,10 +29,10 @@ import {
 	deleteEbookHighlight,
 	deleteEbookThought,
 	fetchEbookHighlights,
-	fetchEbookThoughts,
 	updateEbookHighlight,
 	updateEbookThought,
 } from '@/service';
+import useStore from '@/store';
 import ebookStore from '@/store/ebook';
 import { copyToClipboard } from '@/utils/clipboard';
 import { getRequestErrorMessage } from '@/utils/fetch';
@@ -55,9 +55,12 @@ import {
 	type EpubSelectionPopBarState,
 } from './components/selection/EpubSelectionPopBar';
 import { EpubQuoteShareDialog } from './components/share/EpubQuoteShareDialog';
+import { EbookBookVisibilitySwitch } from './components/shelf/EbookBookVisibilitySwitch';
 import { EpubThought } from './components/thought/EpubThought';
 import { EpubThoughtList } from './components/thought/EpubThoughtList';
 import { useEbookQuoteListen, useEpubChapterListen } from './hooks';
+import { useEbookThoughtLoader } from './hooks/useEbookThoughtLoader';
+import { usePublicEbookThoughtSync } from './hooks/usePublicEbookThoughtSync';
 import type {
 	EbookThought,
 	EbookThoughtClickCluster,
@@ -74,13 +77,16 @@ import {
 	cfiFromDomRange,
 	trimSelectionRange,
 } from './utils/epub/mark/epubRangeGeometry';
+import { ephemeralPinThoughtCfis } from './utils/epub/mark/epubThoughtAnnotations';
 import {
 	buildSingleCfiCluster,
+	expandClusterFromMarkSeed,
 	extractCfiSpineHint,
 	getThoughtClusterHighlightSubject,
 	invalidateThoughtClusterConnectivityCache,
 	reconcileThoughtClickCluster,
 } from './utils/epub/mark/epubThoughtCluster';
+import { isSharedEbookThoughtContext } from './utils/epub/mark/epubThoughtSync';
 import {
 	buildMergedHighlightTarget,
 	findAllUserHighlightsCoveringCfi,
@@ -135,10 +141,22 @@ import {
 function EbookReadPage() {
 	const { t } = useI18n();
 	const { theme: appTheme } = useTheme();
+	const { userStore } = useStore();
+	const currentUserId = Number(userStore.userInfo?.id) || 0;
 	const { bookId = '' } = useParams();
 	const nav = useNavigate();
+	const [bookResolving, setBookResolving] = useState(false);
+	/** ensureBookForRead 完成后才判定源书是否下架（仅进书/刷新时拉一次详情） */
+	const [bookDetailReady, setBookDetailReady] = useState(false);
 	const book = ebookStore.bookById(bookId);
 	const prog = ebookStore.progOf(bookId);
+	const publicSource = ebookStore.publicSourceOf(bookId);
+	const publicSourceRevoked =
+		bookDetailReady &&
+		Boolean(book?.sourceBookId && !publicSource?.isStillPublic);
+	const isOwnerSourceBook =
+		book != null && !book.sourceBookId && book.fmt === 'epub';
+	const canSetPublic = isOwnerSourceBook && book?.src.kind === 'store';
 	const currentEpubCfiRef = useRef(prog?.epubCfi ?? '');
 	const epubSpineIndexRef = useRef<number | undefined>(undefined);
 
@@ -151,8 +169,6 @@ function EbookReadPage() {
 		getBook: () => import('epubjs').Book | null;
 		syncReadingAnnotations: (nextHighlights?: EbookUserHighlight[]) => void;
 	} | null>(null);
-
-	const [bookResolving, setBookResolving] = useState(false);
 
 	const [open, setOpen] = useState<ArrayBuffer | null>(null);
 	const [openSource, setOpenSource] = useState<EbookOpenSource | null>(null);
@@ -218,17 +234,16 @@ function EbookReadPage() {
 		cfiRange?: string;
 		copySelection: () => void;
 	} | null>(null);
-	const [thoughts, setThoughts] = useState<EbookThought[]>([]);
+	const [thoughtListCluster, setThoughtListCluster] =
+		useState<EbookThoughtClickCluster | null>(null);
+	const thoughtListClusterRef = useRef<EbookThoughtClickCluster | null>(null);
+	thoughtListClusterRef.current = thoughtListCluster;
 	const [thoughtDialogOpen, setThoughtDialogOpen] = useState(false);
 	const [thoughtDialogMode, setThoughtDialogMode] = useState<
 		'create' | 'view' | 'edit'
 	>('create');
 	const [thoughtSaving, setThoughtSaving] = useState(false);
 	const [thoughtListOpen, setThoughtListOpen] = useState(false);
-	const [thoughtListCluster, setThoughtListCluster] =
-		useState<EbookThoughtClickCluster | null>(null);
-	const thoughtListClusterRef = useRef<EbookThoughtClickCluster | null>(null);
-	thoughtListClusterRef.current = thoughtListCluster;
 	const [thoughtComposeScrollKey, setThoughtComposeScrollKey] = useState(0);
 	const [selectionPopBar, setSelectionPopBar] =
 		useState<EpubSelectionPopBarState | null>(null);
@@ -255,6 +270,7 @@ function EbookReadPage() {
 	const thoughtQuoteAnchorCfiRef = useRef<string | undefined>(undefined);
 	const [thoughtDraft, setThoughtDraft] = useState({
 		id: '',
+		userId: 0,
 		quote: '',
 		cfiRange: '',
 		content: '',
@@ -262,6 +278,7 @@ function EbookReadPage() {
 		avatar: '',
 		createdAt: '',
 		updatedAt: '',
+		isPublic: true,
 	});
 	const progTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const pendingEpubProgRef = useRef<{
@@ -280,16 +297,18 @@ function EbookReadPage() {
 	useEffect(() => {
 		if (!bookId) return;
 		let cancelled = false;
+		setBookDetailReady(false);
 		void (async () => {
-			if (!ebookStore.ready) {
-				await ebookStore.hydrate();
+			if (!ebookStore.bookById(bookId)) {
+				setBookResolving(true);
 			}
-			if (cancelled || ebookStore.bookById(bookId)) return;
-			setBookResolving(true);
 			try {
-				await ebookStore.fetchBookIfMissing(bookId);
+				await ebookStore.ensureBookForRead(bookId);
 			} finally {
-				if (!cancelled) setBookResolving(false);
+				if (!cancelled) {
+					setBookResolving(false);
+					setBookDetailReady(true);
+				}
 			}
 		})();
 		return () => {
@@ -299,28 +318,49 @@ function EbookReadPage() {
 
 	useEffect(() => {
 		invalidateThoughtClusterConnectivityCache();
-		if (!bookId) {
-			setThoughts([]);
-			return;
-		}
-		let cancelled = false;
-		void fetchEbookThoughts(bookId)
-			.then((list) => {
-				if (!cancelled) setThoughts(list);
-			})
-			.catch((e) => {
-				if (!cancelled) {
-					Toast({
-						type: 'error',
-						title: t('ebook.read.thought.loadFailed'),
-						message: getRequestErrorMessage(e),
-					});
-				}
+	}, [bookId]);
+
+	const getEpubRendition = useCallback(
+		() => epubNavRef.current?.getRendition() ?? null,
+		[],
+	);
+
+	const onThoughtLoadError = useCallback(
+		(error: unknown) => {
+			Toast({
+				type: 'error',
+				title: t('ebook.read.thought.loadFailed'),
+				message: getRequestErrorMessage(error),
 			});
-		return () => {
-			cancelled = true;
-		};
-	}, [bookId, t]);
+		},
+		[t],
+	);
+
+	const { thoughts, setThoughts, ensureLoadedSpineThoughts } =
+		useEbookThoughtLoader({
+			bookId: bookId || undefined,
+			bookFmt: book?.fmt,
+			epubNavReady,
+			getRendition: getEpubRendition,
+			onLoadError: onThoughtLoadError,
+		});
+	const thoughtsRef = useRef(thoughts);
+	thoughtsRef.current = thoughts;
+
+	const { scheduleSync: schedulePublicThoughtSync, refreshThoughtsNow } =
+		usePublicEbookThoughtSync({
+			bookId,
+			book,
+			publicSource,
+			thoughts,
+			setThoughts,
+			onMerged: invalidateThoughtClusterConnectivityCache,
+		});
+	const publicThoughtSyncEnabledRef = useRef(false);
+	publicThoughtSyncEnabledRef.current = isSharedEbookThoughtContext(
+		book,
+		publicSource,
+	);
 
 	useEffect(() => {
 		if (!bookId) {
@@ -886,6 +926,7 @@ function EbookReadPage() {
 			// 在状态中准备当前要查看的想法草稿，用于弹窗内容显示
 			setThoughtDraft({
 				id: thought.id, // 想法唯一 id
+				userId: thought.userId,
 				quote: thought.quote, // 被标注引用的文本内容
 				cfiRange: thought.cfiRange, // CFI 定位范围，用于定位电子书位置
 				content: thought.content, // 想法正文内容
@@ -893,6 +934,7 @@ function EbookReadPage() {
 				avatar: thought.avatar, // 用户头像
 				createdAt: thought.createdAt, // 创建时间
 				updatedAt: thought.updatedAt, // 更新时间
+				isPublic: thought.isPublic !== false,
 			});
 			// 将弹窗模式设为「查看」模式，后续可切换为编辑、创建等其它模式
 			setThoughtDialogMode('view');
@@ -957,6 +999,7 @@ function EbookReadPage() {
 			setThoughtListOpen(false);
 			setThoughtDraft({
 				id: '',
+				userId: currentUserId,
 				quote: trimmed,
 				cfiRange,
 				content: '',
@@ -964,12 +1007,13 @@ function EbookReadPage() {
 				avatar: '',
 				createdAt: '',
 				updatedAt: '',
+				isPublic: true,
 			});
 			setThoughtDialogMode('create');
 			setThoughtDialogOpen(true);
 			setThoughtComposeScrollKey((key) => key + 1);
 		},
-		[t],
+		[t, currentUserId],
 	);
 
 	const onSelectionPopBarChange = useCallback(
@@ -1019,84 +1063,114 @@ function EbookReadPage() {
 	const openThoughtCluster = useCallback(
 		(cluster: EbookThoughtClickCluster) => {
 			if (cluster.allThoughts.length === 0) return;
-			const rend = epubNavRef.current?.getRendition() ?? undefined;
-			const { cfiRange } = getThoughtClusterHighlightSubject(cluster, rend);
-			if (cfiRange.trim()) {
-				thoughtQuoteAnchorCfiRef.current = cfiRange.trim();
-			}
-			startTransition(() => {
-				setAssistantOpen(false);
-				setThoughtListCluster({ ...cluster, selectedThoughtId: undefined });
-				setThoughtListOpen(true);
-			});
+			const seedCluster = { ...cluster, selectedThoughtId: undefined };
+
+			void (async () => {
+				const rend = epubNavRef.current?.getRendition() ?? undefined;
+				const fresh = await refreshThoughtsNow();
+				const allThoughts = fresh ?? thoughtsRef.current;
+
+				invalidateThoughtClusterConnectivityCache();
+				const reconciled = rend
+					? expandClusterFromMarkSeed(
+							rend,
+							allThoughts,
+							seedCluster.allThoughts,
+						)
+					: reconcileThoughtClickCluster(seedCluster, allThoughts, rend);
+				if (!reconciled || reconciled.allThoughts.length === 0) return;
+
+				const { cfiRange } = getThoughtClusterHighlightSubject(
+					reconciled,
+					rend,
+				);
+				if (cfiRange.trim()) {
+					thoughtQuoteAnchorCfiRef.current = cfiRange.trim();
+				}
+
+				startTransition(() => {
+					setAssistantOpen(false);
+					setThoughtListCluster(reconciled);
+					setThoughtListOpen(true);
+				});
+			})();
 		},
-		[],
+		[refreshThoughtsNow],
 	);
 
-	const saveThought = useCallback(async () => {
-		const content = thoughtDraft.content.trim();
-		if (!content || !thoughtDraft.cfiRange || !bookId || thoughtSaving) {
-			return;
-		}
-		setThoughtSaving(true);
-		try {
-			let cfiRange = thoughtDraft.cfiRange;
-			let quote = thoughtDraft.quote;
-			const rend = epubNavRef.current?.getRendition();
-			if (rend) {
-				const resolved = resolveCfiDomRange(rend, cfiRange);
-				if (resolved) {
-					const normalized = trimSelectionRange(resolved);
-					cfiRange = cfiFromDomRange(rend, normalized) ?? cfiRange.trim();
-					quote = normalized.toString().trim() || quote.trim();
-				}
+	const saveThought = useCallback(
+		async (isPublic: boolean) => {
+			const content = thoughtDraft.content.trim();
+			if (!content || !thoughtDraft.cfiRange || !bookId || thoughtSaving) {
+				return;
 			}
-			if (thoughtDialogMode === 'create') {
-				const item = await createEbookThought({
-					bookId,
-					cfiRange,
-					quote,
-					content,
-				});
-				setThoughts((prev) => {
-					const updated = [item, ...prev];
-					const snapshot = returnToListClusterRef.current;
-					const clusterCfis = snapshot
-						? new Set(snapshot.quoteGroups.map((group) => group.cfiRange))
-						: null;
-					if (clusterCfis?.has(item.cfiRange)) {
-						const reconciled = reconcileThoughtClickCluster(
-							snapshot!,
-							updated,
-							epubNavRef.current?.getRendition() ?? undefined,
-						);
-						if (reconciled) {
-							setThoughtListCluster(reconciled);
-						}
-					} else {
-						setThoughtListCluster(
-							buildSingleCfiCluster(updated, item.cfiRange) ?? null,
-						);
+			setThoughtSaving(true);
+			try {
+				let cfiRange = thoughtDraft.cfiRange;
+				let quote = thoughtDraft.quote;
+				const rend = epubNavRef.current?.getRendition();
+				if (rend) {
+					const resolved = resolveCfiDomRange(rend, cfiRange);
+					if (resolved) {
+						const normalized = trimSelectionRange(resolved);
+						cfiRange = cfiFromDomRange(rend, normalized) ?? cfiRange.trim();
+						quote = normalized.toString().trim() || quote.trim();
 					}
-					return updated;
+				}
+				if (thoughtDialogMode === 'create') {
+					const item = await createEbookThought({
+						bookId,
+						cfiRange,
+						quote,
+						content,
+						isPublic,
+					});
+					ephemeralPinThoughtCfis([cfiRange]);
+					setThoughts((prev) => {
+						const updated = [item, ...prev];
+						const snapshot = returnToListClusterRef.current;
+						const clusterCfis = snapshot
+							? new Set(snapshot.quoteGroups.map((group) => group.cfiRange))
+							: null;
+						if (clusterCfis?.has(item.cfiRange)) {
+							const reconciled = reconcileThoughtClickCluster(
+								snapshot!,
+								updated,
+								epubNavRef.current?.getRendition() ?? undefined,
+							);
+							if (reconciled) {
+								setThoughtListCluster(reconciled);
+							}
+						} else {
+							setThoughtListCluster(
+								buildSingleCfiCluster(updated, item.cfiRange) ?? null,
+							);
+						}
+						return updated;
+					});
+					setThoughtListOpen(true);
+					returnToListClusterRef.current = null;
+				} else if (thoughtDraft.id) {
+					const item = await updateEbookThought(thoughtDraft.id, {
+						content,
+						isPublic,
+					});
+					ephemeralPinThoughtCfis([item.cfiRange]);
+					setThoughts((prev) => prev.map((t) => (t.id === item.id ? item : t)));
+				}
+				setThoughtDialogOpen(false);
+			} catch (e) {
+				Toast({
+					type: 'error',
+					title: t('ebook.read.thought.saveFailed'),
+					message: getRequestErrorMessage(e),
 				});
-				setThoughtListOpen(true);
-				returnToListClusterRef.current = null;
-			} else if (thoughtDraft.id) {
-				const item = await updateEbookThought(thoughtDraft.id, { content });
-				setThoughts((prev) => prev.map((t) => (t.id === item.id ? item : t)));
+			} finally {
+				setThoughtSaving(false);
 			}
-			setThoughtDialogOpen(false);
-		} catch (e) {
-			Toast({
-				type: 'error',
-				title: t('ebook.read.thought.saveFailed'),
-				message: getRequestErrorMessage(e),
-			});
-		} finally {
-			setThoughtSaving(false);
-		}
-	}, [bookId, t, thoughtDialogMode, thoughtDraft, thoughtSaving]);
+		},
+		[bookId, t, thoughtDialogMode, thoughtDraft, thoughtSaving],
+	);
 
 	// 删除读书想法的回调函数，使用useCallback保证依赖变化时更新
 	const deleteThought = useCallback(async () => {
@@ -1142,7 +1216,7 @@ function EbookReadPage() {
 	]);
 
 	useEffect(() => {
-		if (!book) return;
+		if (!book || !bookDetailReady || publicSourceRevoked) return;
 		let cancelled = false;
 		setOpen(null);
 		setOpenSource(null);
@@ -1173,13 +1247,18 @@ function EbookReadPage() {
 		return () => {
 			cancelled = true;
 		};
-	}, [book]);
+		// ponytail: 仅进书/换书时开文件；不轮询 publicSource，阅读中不踢出
+	}, [book?.id, book?.fmt, bookDetailReady, publicSourceRevoked, t]);
 
 	const saveCfi = useCallback(
 		(cfi: string, percent?: number, spineIndex?: number) => {
 			if (!book) return;
 			if (cfi.trim()) currentEpubCfiRef.current = cfi;
-			if (spineIndex != null && Number.isFinite(spineIndex)) {
+			if (
+				spineIndex != null &&
+				Number.isFinite(spineIndex) &&
+				epubSpineIndexRef.current !== spineIndex
+			) {
 				epubSpineIndexRef.current = spineIndex;
 				setEpubSpineIndex(spineIndex);
 			}
@@ -1193,8 +1272,17 @@ function EbookReadPage() {
 					percent,
 				});
 			}, 2_000);
+			if (publicThoughtSyncEnabledRef.current) {
+				schedulePublicThoughtSync();
+			}
+			if (book.fmt === 'epub') {
+				requestAnimationFrame(() => {
+					const rend = epubNavRef.current?.getRendition();
+					if (rend) ensureLoadedSpineThoughts(rend);
+				});
+			}
 		},
-		[book],
+		[book, schedulePublicThoughtSync, ensureLoadedSpineThoughts],
 	);
 
 	const activeTocIndex = useMemo(
@@ -1603,6 +1691,7 @@ function EbookReadPage() {
 		thoughtListCluster.allThoughts.length > 0;
 
 	const thoughtPanelOpen = thoughtDialogOpen || thoughtListPanelOpen;
+	const [pinnedThoughtCfisRevision, setPinnedThoughtCfisRevision] = useState(0);
 
 	const syncThoughtQuoteAnchorCfi = useCallback(() => {
 		if (thoughtDialogOpen && thoughtDraft.cfiRange?.trim()) {
@@ -1626,6 +1715,35 @@ function EbookReadPage() {
 		thoughtListCluster,
 		epubNavReady,
 	]);
+
+	const getPinnedThoughtCfis = useCallback(() => {
+		const pins = new Set<string>();
+		if (thoughtDialogOpen && thoughtDraft.cfiRange.trim()) {
+			pins.add(thoughtDraft.cfiRange.trim());
+		}
+		if (thoughtListPanelOpen && thoughtListCluster) {
+			const rend = epubNavRef.current?.getRendition() ?? undefined;
+			const { cfiRange } = getThoughtClusterHighlightSubject(
+				thoughtListCluster,
+				rend,
+			);
+			if (cfiRange.trim()) pins.add(cfiRange.trim());
+		}
+		const anchor = thoughtQuoteAnchorCfiRef.current;
+		if (thoughtPanelOpen && anchor?.trim()) pins.add(anchor.trim());
+		return pins;
+	}, [
+		thoughtDialogOpen,
+		thoughtDraft.cfiRange,
+		thoughtListPanelOpen,
+		thoughtListCluster,
+		thoughtPanelOpen,
+		epubNavReady,
+	]);
+
+	useEffect(() => {
+		setPinnedThoughtCfisRevision((revision) => revision + 1);
+	}, [thoughtPanelOpen, thoughtDraft.cfiRange, thoughtListCluster]);
 
 	const scrollThoughtQuoteAnchorIntoView = useCallback(() => {
 		const cfi = thoughtQuoteAnchorCfiRef.current;
@@ -1670,6 +1788,11 @@ function EbookReadPage() {
 		setThoughtListCluster(null);
 	}, []);
 
+	const viewingOwnThought =
+		thoughtDialogMode === 'create' ||
+		!thoughtDraft.id ||
+		thoughtDraft.userId === currentUserId;
+
 	const sidePanel = useMemo(() => {
 		if (!book) return null;
 		if (assistantOpen) {
@@ -1695,6 +1818,7 @@ function EbookReadPage() {
 					avatar={thoughtDraft.avatar}
 					createdAt={thoughtDraft.createdAt}
 					updatedAt={thoughtDraft.updatedAt}
+					isPublic={thoughtDraft.isPublic !== false}
 					quoteActions={thoughtDialogQuoteActions}
 					onQuoteHighlightClick={() =>
 						openHighlightPopBarAtBookContent(
@@ -1706,9 +1830,13 @@ function EbookReadPage() {
 						setThoughtDraft((d) => ({ ...d, content }))
 					}
 					onSave={saveThought}
-					onDelete={thoughtDialogMode !== 'create' ? deleteThought : undefined}
+					onDelete={
+						viewingOwnThought && thoughtDialogMode !== 'create'
+							? deleteThought
+							: undefined
+					}
 					onEdit={
-						thoughtDialogMode === 'view'
+						viewingOwnThought && thoughtDialogMode === 'view'
 							? () => setThoughtDialogMode('edit')
 							: undefined
 					}
@@ -1742,6 +1870,9 @@ function EbookReadPage() {
 		thoughtDialogOpen,
 		thoughtDialogQuoteActions,
 		thoughtDraft,
+		thoughtDraft.userId,
+		currentUserId,
+		viewingOwnThought,
 		thoughtListCluster,
 		thoughtListPanelOpen,
 		thoughtListQuoteActions,
@@ -1981,8 +2112,36 @@ function EbookReadPage() {
 		};
 	}, [book?.fmt, epubSettings.bgTheme, epubSettings.textColor, appTheme]);
 
+	if (!bookDetailReady || bookResolving) {
+		return (
+			<EbookPageShell>
+				<div className="text-textcolor/60 flex flex-1 flex-col items-center justify-center py-12 text-center text-sm">
+					<Loading text={t('common.loading')} />
+				</div>
+			</EbookPageShell>
+		);
+	}
+
+	if (book && publicSourceRevoked) {
+		return (
+			<EbookPageShell>
+				<div className="text-textcolor/60 flex flex-1 flex-col items-center justify-center gap-3 px-6 py-12 text-center text-sm">
+					<p>{t('ebook.read.publicSourceRevoked')}</p>
+					<Button
+						type="button"
+						variant="secondary"
+						size="sm"
+						onClick={() => nav('/ebook')}
+					>
+						{t('ebook.read.backShelf')}
+					</Button>
+				</div>
+			</EbookPageShell>
+		);
+	}
+
 	if (!book || open?.byteLength === 0) {
-		if (bookResolving || !ebookStore.ready) {
+		if (bookResolving) {
 			return (
 				<EbookPageShell>
 					<div className="text-textcolor/60 flex flex-1 flex-col items-center justify-center py-12 text-center text-sm">
@@ -2011,6 +2170,19 @@ function EbookReadPage() {
 	const epubHeaderTrailing =
 		book.fmt === 'epub' ? (
 			<>
+				{canSetPublic && book ? (
+					<EbookBookVisibilitySwitch
+						book={book}
+						canToggle={canSetPublic}
+						compact
+						tooltipSide="bottom"
+						className={cn(
+							book.isPublic
+								? 'bg-theme/15 text-teal-500'
+								: 'text-textcolor/80 hover:text-teal-500',
+						)}
+					/>
+				) : null}
 				<Tooltip
 					side="bottom"
 					sideOffset={6}
@@ -2346,7 +2518,11 @@ function EbookReadPage() {
 									onReaderPointerDown={onEpubReaderPointerDown}
 									onSelectionPopBar={onSelectionPopBarChange}
 									thoughts={thoughts}
+									annotationSpineKey={epubSpineIndex}
+									getPinnedThoughtCfis={getPinnedThoughtCfis}
+									pinnedThoughtCfisRevision={pinnedThoughtCfisRevision}
 									highlights={highlights}
+									currentUserId={currentUserId}
 									onThoughtClick={openViewThought}
 									onThoughtClusterClick={openThoughtCluster}
 									onUserHighlightPopBar={onUserHighlightPopBar}

@@ -9,7 +9,14 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Response } from 'express';
-import { FindOptionsWhere, In, IsNull, Repository } from 'typeorm';
+import {
+	Brackets,
+	FindOptionsWhere,
+	In,
+	IsNull,
+	Repository,
+	SelectQueryBuilder,
+} from 'typeorm';
 import { decodeChineseFilename } from '../../utils';
 import { normalizeUploadPublicPath } from '../../utils/upload-paths';
 import { isCosObjectKey } from '../upload/cos.config';
@@ -34,6 +41,12 @@ import { EbookHighlight } from './ebook-highlight.entity';
 import { EbookProgress } from './ebook-progress.entity';
 import { EbookThought } from './ebook-thought.entity';
 
+export type EbookBookOwnerDto = {
+	userId: number;
+	username: string;
+	avatar: string;
+};
+
 export type EbookBookDto = {
 	id: string;
 	fmt: 'epub' | 'pdf';
@@ -44,6 +57,11 @@ export type EbookBookDto = {
 	coverUrl?: string;
 	addedAt: string;
 	categoryId?: string | null;
+	isPublic?: boolean;
+	sourceBookId?: string | null;
+	owner?: EbookBookOwnerDto;
+	/** 公开书架：当前用户已有读书记录时的 id */
+	readingBookId?: string;
 };
 
 export type EbookCategoryDto = {
@@ -78,6 +96,13 @@ export type EbookShelfPageDto = {
 export type EbookBookDetailDto = {
 	book: EbookBookDto;
 	prog?: EbookProgDto;
+	publicSource?: {
+		sourceBookId: string;
+		ownerUserId: number;
+		ownerUsername: string;
+		ownerAvatar: string;
+		isStillPublic: boolean;
+	};
 };
 
 export type EbookThoughtDto = {
@@ -92,6 +117,19 @@ export type EbookThoughtDto = {
 	avatar: string;
 	createdAt: string;
 	updatedAt: string;
+	isPublic: boolean;
+};
+
+export type EbookThoughtRevisionDto = {
+	count: number;
+	latestUpdatedAt: string | null;
+};
+
+export type EbookThoughtSyncDto = {
+	revision: EbookThoughtRevisionDto;
+	changes: EbookThoughtDto[];
+	/** since 之后对当前用户不可见的想法 id（软删 / 改私密） */
+	deletedIds: string[];
 };
 
 export type EbookHighlightDto = {
@@ -183,6 +221,24 @@ export class EbookService {
 		if (book.coverPath) dto.coverUrl = book.coverPath;
 		if (book.categoryId != null) dto.categoryId = book.categoryId;
 		else dto.categoryId = null;
+		if (book.isPublic) dto.isPublic = true;
+		if (book.sourceBookId) dto.sourceBookId = book.sourceBookId;
+		return dto;
+	}
+
+	private async toBookDtoWithOwner(
+		book: EbookBook,
+		userInfoMap: Map<number, EbookThoughtUserInfo>,
+	): Promise<EbookBookDto> {
+		const dto = this.toBookDto(book);
+		const info = userInfoMap.get(book.userId);
+		if (info) {
+			dto.owner = {
+				userId: book.userId,
+				username: info.username,
+				avatar: info.avatar,
+			};
+		}
 		return dto;
 	}
 
@@ -201,6 +257,10 @@ export class EbookService {
 		userId: number,
 		query: QueryEbookShelfDto = {},
 	): Promise<EbookShelfPageDto> {
+		const scope = query.scope ?? 'mine';
+		if (scope === 'public') {
+			return this.getPublicShelf(userId, query);
+		}
 		if (query.categoryId && query.uncategorizedOnly) {
 			throw new BadRequestException(
 				'categoryId 与 uncategorizedOnly 不能同时使用',
@@ -212,7 +272,10 @@ export class EbookService {
 		const take = pageSize;
 		const skip = (pageNo - 1) * take;
 
-		const where: FindOptionsWhere<EbookBook> = { userId };
+		const where: FindOptionsWhere<EbookBook> = {
+			userId,
+			sourceBookId: IsNull(),
+		};
 		if (query.categoryId) {
 			const cat = await this.categoryRepo.findOne({
 				where: { id: query.categoryId, userId },
@@ -251,6 +314,70 @@ export class EbookService {
 		};
 	}
 
+	private async getPublicShelf(
+		userId: number,
+		query: QueryEbookShelfDto,
+	): Promise<EbookShelfPageDto> {
+		const pageNo = query.pageNo ?? 1;
+		const pageSize = query.pageSize ?? 20;
+		const take = pageSize;
+		const skip = (pageNo - 1) * take;
+
+		const [publicBooks, total] = await this.bookRepo
+			.createQueryBuilder('b')
+			.where('b.is_public = :isPublic', { isPublic: true })
+			.andWhere('b.source_book_id IS NULL')
+			.andWhere('b.user_id != :userId', { userId })
+			.orderBy('b.public_at', 'DESC')
+			.addOrderBy('b.created_at', 'DESC')
+			.skip(skip)
+			.take(take)
+			.getManyAndCount();
+
+		const ownerIds = publicBooks.map((b) => b.userId);
+		const userInfoMap = await this.buildUserInfoMap(ownerIds);
+
+		const sourceIds = publicBooks.map((b) => b.id);
+		const readingRecords =
+			sourceIds.length === 0
+				? []
+				: await this.bookRepo.find({
+						where: { userId, sourceBookId: In(sourceIds) },
+					});
+		const readingBySource = new Map(
+			readingRecords.map((r) => [r.sourceBookId!, r]),
+		);
+		const readingIds = readingRecords.map((r) => r.id);
+		const progresses =
+			readingIds.length === 0
+				? []
+				: await this.progRepo.find({
+						where: { userId, bookId: In(readingIds) },
+					});
+		const progByReadingId = new Map(progresses.map((p) => [p.bookId, p]));
+
+		const progMap: Record<string, EbookProgDto> = {};
+		const shelfBooks: EbookBookDto[] = [];
+		for (const book of publicBooks) {
+			const dto = await this.toBookDtoWithOwner(book, userInfoMap);
+			const reading = readingBySource.get(book.id);
+			if (reading) {
+				dto.readingBookId = reading.id;
+				const prog = progByReadingId.get(reading.id);
+				if (prog) progMap[book.id] = this.toProgDto(prog);
+			}
+			shelfBooks.push(dto);
+		}
+
+		return {
+			books: shelfBooks,
+			progMap,
+			total,
+			pageNo,
+			pageSize,
+		};
+	}
+
 	async getBook(userId: number, bookId: string): Promise<EbookBookDetailDto> {
 		const book = await this.bookRepo.findOne({
 			where: { id: bookId, userId },
@@ -261,10 +388,98 @@ export class EbookService {
 		const prog = await this.progRepo.findOne({
 			where: { bookId, userId },
 		});
-		return {
+		const detail: EbookBookDetailDto = {
 			book: this.toBookDto(book),
 			prog: prog ? this.toProgDto(prog) : undefined,
 		};
+		if (book.sourceBookId) {
+			const source = await this.bookRepo.findOne({
+				where: { id: book.sourceBookId },
+			});
+			if (source) {
+				const ownerMap = await this.buildUserInfoMap([source.userId]);
+				const owner = ownerMap.get(source.userId) ?? {
+					username: String(source.userId),
+					avatar: '',
+				};
+				detail.publicSource = {
+					sourceBookId: source.id,
+					ownerUserId: source.userId,
+					ownerUsername: owner.username,
+					ownerAvatar: owner.avatar,
+					isStillPublic: source.isPublic,
+				};
+			}
+		}
+		return detail;
+	}
+
+	async setBookVisibility(
+		userId: number,
+		bookId: string,
+		isPublic: boolean,
+	): Promise<EbookBookDto> {
+		const book = await this.bookRepo.findOne({
+			where: { id: bookId, userId },
+		});
+		if (!book) {
+			throw new NotFoundException('书籍不存在');
+		}
+		if (book.sourceBookId) {
+			throw new ForbiddenException('读书记录不能设置公开状态');
+		}
+		if (book.fmt !== 'epub') {
+			throw new BadRequestException('仅支持公开 EPUB 书籍');
+		}
+		if (isPublic && (!book.filePath || book.srcKind !== 'store')) {
+			throw new BadRequestException('请先上传至云端后再公开');
+		}
+		book.isPublic = isPublic;
+		if (isPublic && !book.publicAt) {
+			book.publicAt = new Date();
+		}
+		await this.bookRepo.save(book);
+		return this.toBookDto(book);
+	}
+
+	async openPublicBook(
+		userId: number,
+		sourceBookId: string,
+	): Promise<{ readingBookId: string }> {
+		const source = await this.bookRepo.findOne({
+			where: { id: sourceBookId, sourceBookId: IsNull(), isPublic: true },
+		});
+		if (!source) {
+			throw new NotFoundException('书籍不存在或已下架');
+		}
+		if (source.userId === userId) {
+			throw new BadRequestException('不能通过公开入口打开自己的书');
+		}
+		if (source.fmt !== 'epub' || !source.filePath) {
+			throw new BadRequestException('仅支持公开 EPUB 书籍');
+		}
+
+		const existing = await this.bookRepo.findOne({
+			where: { userId, sourceBookId },
+		});
+		if (existing) {
+			return { readingBookId: existing.id };
+		}
+
+		const reading = this.bookRepo.create({
+			userId,
+			sourceBookId,
+			fmt: source.fmt,
+			title: source.title,
+			author: source.author,
+			srcKind: 'store',
+			filePath: source.filePath,
+			size: source.size,
+			coverPath: source.coverPath,
+			isPublic: false,
+		});
+		await this.bookRepo.save(reading);
+		return { readingBookId: reading.id };
 	}
 
 	/** 按桌面 local_path 查找当前用户是否已登记该书 */
@@ -413,7 +628,7 @@ export class EbookService {
 		if (!book) {
 			throw new NotFoundException('书籍不存在');
 		}
-		if (book.srcKind === 'store' && book.filePath) {
+		if (book.srcKind === 'store' && book.filePath && !book.sourceBookId) {
 			await this.tryDeleteStoredEbookFile(book.filePath);
 		}
 		await this.tryDeleteCoverFile(book.coverPath);
@@ -518,15 +733,34 @@ export class EbookService {
 		bookId: string,
 	): Promise<EbookFilePayload> {
 		const book = await this.bookRepo.findOne({ where: { id: bookId, userId } });
-		if (!book || book.srcKind !== 'store' || !book.filePath) {
+		if (!book) {
 			throw new NotFoundException('文件不存在');
 		}
 
-		if (!isCosEbookKey(book.filePath)) {
+		let filePath = book.filePath;
+		let fmt = book.fmt;
+		if (book.sourceBookId) {
+			const source = await this.bookRepo.findOne({
+				where: { id: book.sourceBookId },
+			});
+			if (!source?.isPublic) {
+				throw new ForbiddenException('该书已取消公开');
+			}
+			if (!filePath) {
+				filePath = source.filePath ?? null;
+				fmt = source.fmt ?? fmt;
+			}
+		}
+
+		if (!filePath || book.srcKind !== 'store') {
+			throw new NotFoundException('文件不存在');
+		}
+
+		if (!isCosEbookKey(filePath)) {
 			throw new NotFoundException('云端文件不存在');
 		}
 
-		return { kind: 'cos', key: book.filePath, fmt: book.fmt };
+		return { kind: 'cos', key: filePath, fmt };
 	}
 
 	async pipeFileToResponse(
@@ -613,6 +847,7 @@ export class EbookService {
 			.select('b.category_id', 'categoryId')
 			.addSelect('COUNT(*)', 'cnt')
 			.where('b.user_id = :userId', { userId })
+			.andWhere('b.source_book_id IS NULL')
 			.groupBy('b.category_id')
 			.getRawMany<{ categoryId: string | null; cnt: string }>();
 		const countMap = new Map<string, number>();
@@ -625,7 +860,9 @@ export class EbookService {
 				countMap.set(row.categoryId, cnt);
 			}
 		}
-		const totalBookCount = await this.bookRepo.count({ where: { userId } });
+		const totalBookCount = await this.bookRepo.count({
+			where: { userId, sourceBookId: IsNull() },
+		});
 		return {
 			categories: categories.map((c) => ({
 				id: c.id,
@@ -765,10 +1002,252 @@ export class EbookService {
 			avatar: user.avatar,
 			createdAt: row.createdAt.toISOString(),
 			updatedAt: row.updatedAt.toISOString(),
+			isPublic: row.isPublic,
 		};
 	}
 
-	/** 按 userId 批量查 user + profile，username/avatar 每次响应时实时解析 */
+	private buildThoughtRevision(rows: EbookThought[]): EbookThoughtRevisionDto {
+		if (rows.length === 0) {
+			return { count: 0, latestUpdatedAt: null };
+		}
+		let latestMs = rows[0]!.updatedAt.getTime();
+		for (let i = 1; i < rows.length; i++) {
+			latestMs = Math.max(latestMs, rows[i]!.updatedAt.getTime());
+		}
+		return {
+			count: rows.length,
+			latestUpdatedAt: new Date(latestMs).toISOString(),
+		};
+	}
+
+	/** 想法所属范围（不含可见性 / 软删过滤） */
+	private async appendThoughtBookScope(
+		qb: SelectQueryBuilder<EbookThought>,
+		userId: number,
+		book: EbookBook,
+	): Promise<void> {
+		if (book.sourceBookId) {
+			const source = await this.bookRepo.findOne({
+				where: { id: book.sourceBookId },
+			});
+			if (!source) {
+				throw new NotFoundException('源书不存在');
+			}
+			if (!source.isPublic) {
+				const hasRecord = await this.bookRepo.findOne({
+					where: { userId, sourceBookId: book.sourceBookId },
+				});
+				if (!hasRecord) {
+					throw new NotFoundException('书籍不存在');
+				}
+				qb.andWhere(
+					new Brackets((where) => {
+						where
+							.where(
+								't.book_id = :sourceBookId AND t.user_id = :sourceUserId',
+								{
+									sourceBookId: source.id,
+									sourceUserId: source.userId,
+								},
+							)
+							.orWhere(
+								't.book_id = :readingBookId AND t.user_id = :viewerUserId',
+								{
+									readingBookId: book.id,
+									viewerUserId: userId,
+								},
+							);
+					}),
+				);
+				return;
+			}
+
+			// 公开源书读书记录：源书全部想法 + 各读者读书记录上的想法（可见性由 is_public 过滤）
+			const readingIds = (
+				await this.bookRepo.find({
+					where: { sourceBookId: source.id },
+					select: ['id'],
+				})
+			).map((r) => r.id);
+			qb.andWhere(
+				new Brackets((where) => {
+					where.where('t.book_id = :sourceBookId', {
+						sourceBookId: source.id,
+					});
+					if (readingIds.length > 0) {
+						where.orWhere('t.book_id IN (:...readingIds)', { readingIds });
+					}
+				}),
+			);
+			return;
+		}
+
+		if (book.isPublic) {
+			const readingIds = (
+				await this.bookRepo.find({
+					where: { sourceBookId: book.id },
+					select: ['id'],
+				})
+			).map((r) => r.id);
+			qb.andWhere(
+				new Brackets((where) => {
+					where.where('t.book_id = :bookId AND t.user_id = :viewerUserId', {
+						bookId: book.id,
+						viewerUserId: userId,
+					});
+					if (readingIds.length > 0) {
+						where.orWhere('t.book_id IN (:...readingIds)', { readingIds });
+					}
+				}),
+			);
+			return;
+		}
+
+		qb.andWhere('t.book_id = :bookId AND t.user_id = :viewerUserId', {
+			bookId: book.id,
+			viewerUserId: userId,
+		});
+	}
+
+	private appendThoughtSpineHintsFilter(
+		qb: SelectQueryBuilder<EbookThought>,
+		spineHints?: string[],
+	): void {
+		if (!spineHints?.length) return;
+		const normalized = [
+			...new Set(
+				spineHints
+					.map((hint) => hint.trim())
+					.filter(Boolean)
+					.map((hint) => (hint.startsWith('/') ? hint : `/${hint}`)),
+			),
+		];
+		if (normalized.length === 0) return;
+
+		qb.andWhere(
+			new Brackets((sub) => {
+				for (let index = 0; index < normalized.length; index++) {
+					const param = `thoughtSpineHint${index}`;
+					sub.orWhere(`t.cfi_range LIKE :${param}`, {
+						[param]: `%epubcfi(${normalized[index]}!%`,
+					});
+				}
+			}),
+		);
+	}
+
+	/** 与 collectThoughtRowsForBook 等价的可见性 + 范围条件（SQL 层，供 sync 增量/aggregate） */
+	private async createVisibleThoughtsQueryBuilder(
+		userId: number,
+		book: EbookBook,
+	): Promise<SelectQueryBuilder<EbookThought>> {
+		const qb = this.thoughtRepo.createQueryBuilder('t');
+		await this.appendThoughtBookScope(qb, userId, book);
+
+		if (book.sourceBookId || book.isPublic) {
+			qb.andWhere(
+				'(t.user_id = :viewerUserId OR t.is_public = :isPublicTrue)',
+				{
+					viewerUserId: userId,
+					isPublicTrue: true,
+				},
+			);
+		}
+
+		qb.andWhere('t.deleted_at IS NULL');
+		return qb;
+	}
+
+	private async queryRemovedThoughtIdsSince(
+		userId: number,
+		book: EbookBook,
+		since: Date,
+	): Promise<string[]> {
+		const ids = new Set<string>();
+
+		const softDeletedQb = this.thoughtRepo.createQueryBuilder('t');
+		await this.appendThoughtBookScope(softDeletedQb, userId, book);
+		softDeletedQb
+			.andWhere('t.deleted_at IS NOT NULL AND t.deleted_at > :since', { since })
+			.andWhere('(t.user_id = :viewerUserId OR t.is_public = :isPublicTrue)', {
+				viewerUserId: userId,
+				isPublicTrue: true,
+			});
+		const softDeleted = await softDeletedQb
+			.select('t.id', 'id')
+			.getRawMany<{ id: string }>();
+		for (const row of softDeleted) ids.add(row.id);
+
+		if (book.sourceBookId || book.isPublic) {
+			const revokedQb = this.thoughtRepo.createQueryBuilder('t');
+			await this.appendThoughtBookScope(revokedQb, userId, book);
+			revokedQb
+				.andWhere('t.deleted_at IS NULL')
+				.andWhere('t.updated_at > :since', { since })
+				.andWhere('t.user_id != :viewerUserId', { viewerUserId: userId })
+				.andWhere('t.is_public = :isPublicFalse', { isPublicFalse: false });
+			const revoked = await revokedQb
+				.select('t.id', 'id')
+				.getRawMany<{ id: string }>();
+			for (const row of revoked) ids.add(row.id);
+		}
+
+		return [...ids];
+	}
+
+	private async queryVisibleThoughtRows(
+		userId: number,
+		book: EbookBook,
+		since?: Date,
+		spineHints?: string[],
+	): Promise<EbookThought[]> {
+		const qb = await this.createVisibleThoughtsQueryBuilder(userId, book);
+		if (since) {
+			qb.andWhere('t.updated_at > :since', { since });
+		}
+		this.appendThoughtSpineHintsFilter(qb, spineHints);
+		return qb.orderBy('t.created_at', 'DESC').getMany();
+	}
+
+	private async queryVisibleThoughtRevision(
+		userId: number,
+		book: EbookBook,
+	): Promise<EbookThoughtRevisionDto> {
+		const qb = await this.createVisibleThoughtsQueryBuilder(userId, book);
+		const raw = await qb
+			.select('COUNT(*)', 'cnt')
+			.addSelect('MAX(t.updated_at)', 'latest')
+			.getRawOne<{ cnt: string; latest: Date | null }>();
+		const count = Number(raw?.cnt ?? 0);
+		if (count === 0) {
+			return { count: 0, latestUpdatedAt: null };
+		}
+		const latest = raw?.latest;
+		return {
+			count,
+			latestUpdatedAt: latest ? new Date(latest).toISOString() : null,
+		};
+	}
+
+	private async collectThoughtRowsForBook(
+		userId: number,
+		book: EbookBook,
+		spineHints?: string[],
+	): Promise<EbookThought[]> {
+		return this.queryVisibleThoughtRows(userId, book, undefined, spineHints);
+	}
+
+	private async mapThoughtRowsToDtos(
+		rows: EbookThought[],
+	): Promise<EbookThoughtDto[]> {
+		const userInfoMap = await this.buildUserInfoMap(
+			rows.map((row) => row.userId),
+		);
+		return Promise.all(
+			rows.map((row) => this.toThoughtDtoWithUsername(row, userInfoMap)),
+		);
+	}
+
 	private async buildUserInfoMap(
 		userIds: number[],
 	): Promise<Map<number, EbookThoughtUserInfo>> {
@@ -820,18 +1299,78 @@ export class EbookService {
 	async listThoughts(
 		userId: number,
 		bookId: string,
+		spineHints?: string[],
 	): Promise<EbookThoughtDto[]> {
-		await this.assertBookOwned(userId, bookId);
-		const rows = await this.thoughtRepo.find({
-			where: { userId, bookId },
-			order: { createdAt: 'DESC' },
-		});
-		const userInfoMap = await this.buildUserInfoMap(
-			rows.map((row) => row.userId),
-		);
-		return Promise.all(
-			rows.map((row) => this.toThoughtDtoWithUsername(row, userInfoMap)),
-		);
+		const book = await this.assertBookOwned(userId, bookId);
+		const rows = await this.collectThoughtRowsForBook(userId, book, spineHints);
+		return this.mapThoughtRowsToDtos(rows);
+	}
+
+	async getThoughtsRevision(
+		userId: number,
+		bookId: string,
+	): Promise<EbookThoughtRevisionDto> {
+		const book = await this.assertBookOwned(userId, bookId);
+		if (!book.isPublic && !book.sourceBookId) {
+			return { count: 0, latestUpdatedAt: null };
+		}
+		return this.queryVisibleThoughtRevision(userId, book);
+	}
+
+	async listThoughtChanges(
+		userId: number,
+		bookId: string,
+		since: Date,
+	): Promise<EbookThoughtDto[]> {
+		const { changes } = await this.syncThoughts(userId, bookId, since);
+		return changes;
+	}
+
+	async syncThoughts(
+		userId: number,
+		bookId: string,
+		since?: Date,
+	): Promise<EbookThoughtSyncDto> {
+		const book = await this.assertBookOwned(userId, bookId);
+		if (!book.isPublic && !book.sourceBookId) {
+			return {
+				revision: { count: 0, latestUpdatedAt: null },
+				changes: [],
+				deletedIds: [],
+			};
+		}
+
+		if (since) {
+			const revision = await this.queryVisibleThoughtRevision(userId, book);
+			const deletedIds = await this.queryRemovedThoughtIdsSince(
+				userId,
+				book,
+				since,
+			);
+			const changedRows = await this.queryVisibleThoughtRows(
+				userId,
+				book,
+				since,
+			);
+			if (changedRows.length === 0 && deletedIds.length === 0) {
+				return { revision, changes: [], deletedIds: [] };
+			}
+			return {
+				revision,
+				changes:
+					changedRows.length > 0
+						? await this.mapThoughtRowsToDtos(changedRows)
+						: [],
+				deletedIds,
+			};
+		}
+
+		const rows = await this.queryVisibleThoughtRows(userId, book);
+		return {
+			revision: this.buildThoughtRevision(rows),
+			changes: await this.mapThoughtRowsToDtos(rows),
+			deletedIds: [],
+		};
 	}
 
 	async createThought(
@@ -845,6 +1384,7 @@ export class EbookService {
 			cfiRange: dto.cfiRange.trim(),
 			quote: dto.quote.trim(),
 			content: dto.content.trim(),
+			isPublic: dto.isPublic !== false,
 		});
 		await this.thoughtRepo.save(row);
 		return this.toThoughtDtoWithUsername(row);
@@ -856,24 +1396,28 @@ export class EbookService {
 		dto: UpdateEbookThoughtDto,
 	): Promise<EbookThoughtDto> {
 		const row = await this.thoughtRepo.findOne({
-			where: { id: thoughtId, userId },
+			where: { id: thoughtId, userId, deletedAt: IsNull() },
 		});
 		if (!row) {
 			throw new NotFoundException('想法不存在');
 		}
 		row.content = dto.content.trim();
+		if (dto.isPublic !== undefined) {
+			row.isPublic = dto.isPublic;
+		}
 		await this.thoughtRepo.save(row);
 		return this.toThoughtDtoWithUsername(row);
 	}
 
 	async removeThought(userId: number, thoughtId: string): Promise<void> {
 		const row = await this.thoughtRepo.findOne({
-			where: { id: thoughtId, userId },
+			where: { id: thoughtId, userId, deletedAt: IsNull() },
 		});
 		if (!row) {
 			throw new NotFoundException('想法不存在');
 		}
-		await this.thoughtRepo.delete({ id: thoughtId, userId });
+		row.deletedAt = new Date();
+		await this.thoughtRepo.save(row);
 	}
 
 	private toHighlightDto(row: EbookHighlight): EbookHighlightDto {

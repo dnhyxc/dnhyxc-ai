@@ -27,6 +27,9 @@
 | [ebook-shelf-empty-tab-reset.md](./ebook-shelf-empty-tab-reset.md) | **书架分类空 Tab 隐藏与自动回「全部」**：未分类/0 册分类不展示、移走最后一本切 Tab、卡片 Tooltip 分类 |
 | [epub-listen-player-bar-ui.md](./epub-listen-player-bar-ui.md) | **听书播放条 UI**：分句虚拟列表、滚到当前句、刻度尺倍速 0.5–3×、列表选中样式 |
 | [ebook-progress-remote-debounce.md](./ebook-progress-remote-debounce.md) | **阅读进度远端防抖 + keepalive flush**：8s PUT 合并、页内 2s debounce、`pagehide` 不丢进度 |
+| [ebook-public-share.md](./ebook-public-share.md) | **公开书籍与协作阅读**：源书/读书记录、书架 `scope=public`、visibility、对私有书架与阅读的影响 |
+| [epub-public-thought-live-sync.md](./epub-public-thought-live-sync.md) | **公开书想法 `/sync`**：双轨增量、私有书 gate、`openThoughtCluster` 先 sync 的波及面 |
+| [epub-thought-viewport-mark.md](./epub-thought-viewport-mark.md) | **想法按章拉取 + 视口 mark**：`spineHints`、双轨 reclaim、sync 拆分、对划线/听书/大册私有书的影响 |
 | [tts-edge-unify-stream-endpoint.md](./tts-edge-unify-stream-endpoint.md) | **Edge TTS 统一 `SPEECH_EDGE_TTS_STREAM`**：取消 Tauri/Web endpoint 分流对云端朗读的影响 |
 
 **阅读约定**：结论以仓库 **当前源码** 为准；「历史风险」指旧实现曾出现的问题，不代表现行代码仍会触发。

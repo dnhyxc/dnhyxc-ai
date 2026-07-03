@@ -30,8 +30,9 @@ type Props = {
 	avatar?: string;
 	createdAt?: string;
 	updatedAt?: string;
+	isPublic?: boolean;
 	onContentChange: (value: string) => void;
-	onSave: () => void | Promise<void>;
+	onSave: (isPublic: boolean) => void | Promise<void>;
 	onDelete?: () => void | Promise<void>;
 	onEdit?: () => void;
 	saving?: boolean;
@@ -54,6 +55,7 @@ export function EpubThought({
 	username,
 	avatar,
 	createdAt,
+	isPublic,
 	onContentChange,
 	onSave,
 	onDelete,
@@ -78,7 +80,7 @@ export function EpubThought({
 
 	const handleSaveFromKeyboard = () => {
 		if (!content.trim() || saving) return;
-		void onSave();
+		void onSave(true);
 	};
 
 	useEffect(() => {
@@ -102,6 +104,7 @@ export function EpubThought({
 						username={mode === 'edit' ? displayName : undefined}
 						avatar={mode === 'edit' ? avatar : undefined}
 						createdAt={mode === 'edit' ? createdAt : undefined}
+						isPublic={mode === 'edit' ? isPublic !== false : undefined}
 						mode={mode}
 						className={mode === 'edit' ? 'pt-3' : undefined}
 						actions={
@@ -119,11 +122,21 @@ export function EpubThought({
 								<Button
 									type="button"
 									size="sm"
+									variant="outline"
+									className={epubReaderChromeOutlineButtonClass}
+									disabled={!content.trim() || saving}
+									onClick={() => void onSave(false)}
+								>
+									{t('ebook.read.thought.sendPrivate')}
+								</Button>
+								<Button
+									type="button"
+									size="sm"
 									className={epubReaderChromePrimaryButtonClass}
 									disabled={!content.trim() || saving}
-									onClick={() => void onSave()}
+									onClick={() => void onSave(true)}
 								>
-									{t('ebook.read.thought.save')}
+									{t('ebook.read.thought.sendPublic')}
 								</Button>
 							</>
 						}
@@ -163,6 +176,7 @@ export function EpubThought({
 					username={displayName}
 					avatar={avatar}
 					createdAt={createdAt}
+					isPublic={isPublic !== false}
 				>
 					<p className="text-textcolor text-sm wrap-break-word">
 						{content.trim() || t('ebook.read.thought.empty')}

@@ -40,6 +40,37 @@ export function extractCfiSpineHint(cfiRange: string): string {
 	return match?.[1] ?? cfiRange;
 }
 
+/** 统一 spine 路径比较（去 id 方括号、补前导 `/`） */
+export function normalizeCfiSpineHint(hint: string): string {
+	const trimmed = hint.trim();
+	if (!trimmed) return trimmed;
+	const fromCfi = trimmed.match(/epubcfi\(([^!]+)!/)?.[1];
+	const raw = (fromCfi ?? trimmed)
+		.replace(/\[[^\]]*\]/g, '')
+		.replace(/\/+$/, '');
+	if (!raw) return trimmed;
+	return raw.startsWith('/') ? raw : `/${raw}`;
+}
+
+/** 当前 rendition 已加载 iframe 对应的 spine 路径集合 */
+export function collectLoadedSpineHints(rend: Rendition): Set<string> {
+	const hints = new Set<string>();
+	for (const contents of getRenditionContentsList(rend)) {
+		try {
+			const doc = contents.document;
+			const body = doc.body ?? doc.documentElement;
+			const range = doc.createRange();
+			range.selectNodeContents(body);
+			range.collapse(true);
+			const cfi = contents.cfiFromRange(range);
+			hints.add(normalizeCfiSpineHint(extractCfiSpineHint(cfi)));
+		} catch {
+			// iframe 未就绪
+		}
+	}
+	return hints;
+}
+
 /** innerQuote 是否为 outerQuote 的严格连续子串（不全等） */
 export function isQuoteStrictlyNested(
 	innerQuote: string,

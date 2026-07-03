@@ -19,7 +19,7 @@ function isActiveKey(
 /** 书架页内栏：书籍分类 Tab（可横向滚动） */
 function EbookShelfCategoryRail() {
 	const { t } = useI18n();
-	const { activeCategoryKey, categories, totalBookCount, uncategorizedCount } =
+	const { activeCategoryKey, categories, uncategorizedCount, publicBookTotal } =
 		ebookStore;
 
 	const chips: Array<{
@@ -30,7 +30,7 @@ function EbookShelfCategoryRail() {
 		{
 			key: { kind: 'all' },
 			label: t('ebook.shelf.category.all'),
-			count: totalBookCount,
+			count: ebookStore.shelfAllCount,
 		},
 		...categories
 			.map((c) => ({
@@ -39,6 +39,15 @@ function EbookShelfCategoryRail() {
 				count: c.bookCount,
 			}))
 			.filter((c) => c.count > 0),
+		...(publicBookTotal > 0
+			? [
+					{
+						key: { kind: 'public' as const },
+						label: t('ebook.shelf.category.public'),
+						count: publicBookTotal,
+					},
+				]
+			: []),
 		...(uncategorizedCount > 0
 			? [
 					{

@@ -7,6 +7,7 @@ import type {
 	EpubHighlightPresetColorId,
 	EpubHighlightStyle,
 } from '../../../types';
+import { getEpubScrollContainer } from '../reader/epubScrolledNav';
 import {
 	buildEpubPopBarPayloadFromCfiRange,
 	type EpubSelectionPopBarPayload,
@@ -40,7 +41,10 @@ import {
 import {
 	applyEpubThoughtUnderlines,
 	hasTextSelectionInRend,
+	invalidateAppliedThoughtUnderlinesMissingDom,
+	invalidateThoughtStackProjectionCache,
 	patchEpubThoughtUnderlineMarks,
+	refreshThoughtUnderlinesInViewport,
 	restackThoughtMarkGroups,
 	setUserHighlightBlockerSourcesForThoughtPatch,
 	type UserHighlightBlockerSource,
@@ -2476,17 +2480,42 @@ export function installEpubReadingMarkClickListeners(
 /** 导出供侧栏 PopBar 锚定阅读区正文位置 */
 export { resolveCfiDomRange };
 
-export function syncEpubReadingAnnotations(
+/** 想法变化时轻量同步：不碰高亮、不清叠层投影缓存 */
+export function syncEpubThoughtUnderlines(
 	rend: Rendition,
 	thoughts: EbookThought[],
-	highlights: EbookUserHighlight[],
 	appliedThoughtsRef: Map<string, string>,
+	currentUserId = 0,
+): void {
+	beginEpubAnnotationSyncScope();
+	try {
+		invalidateAppliedThoughtUnderlinesMissingDom(rend, appliedThoughtsRef);
+		applyEpubThoughtUnderlines(
+			rend,
+			thoughts,
+			appliedThoughtsRef,
+			currentUserId,
+		);
+		setUserHighlightBlockerSourcesForThoughtPatch(
+			collectUserHighlightBlockerSources(rend),
+		);
+		patchEpubThoughtUnderlineMarks(rend);
+		restackThoughtMarkGroups(rend);
+	} finally {
+		endEpubAnnotationSyncScope();
+	}
+}
+
+/** 用户划线变化时同步（会刷新想法虚线与用户划线的叠层关系） */
+export function syncEpubUserHighlights(
+	rend: Rendition,
+	highlights: EbookUserHighlight[],
 	appliedHighlightsRef: Map<string, string>,
 ): void {
 	beginEpubAnnotationSyncScope();
 	try {
+		invalidateThoughtStackProjectionCache();
 		invalidateAppliedUserHighlightsMissingDom(rend, appliedHighlightsRef);
-		setUserHighlightBlockerSourcesForThoughtPatch([]);
 		const highlightPlan = buildHighlightRenderPlan(rend, highlights);
 		applyEpubUserHighlights(
 			rend,
@@ -2494,14 +2523,28 @@ export function syncEpubReadingAnnotations(
 			appliedHighlightsRef,
 			highlightPlan,
 		);
-		applyEpubThoughtUnderlines(rend, thoughts, appliedThoughtsRef);
 		setUserHighlightBlockerSourcesForThoughtPatch(
 			collectUserHighlightBlockerSources(rend),
 		);
-		runEpubReadingAnnotationPatch(rend);
+		patchAllUserHighlightMarks(rend);
+		patchEpubThoughtUnderlineMarks(rend);
+		restackThoughtMarkGroups(rend);
+		restackUserHighlightMarkGroups(rend);
 	} finally {
 		endEpubAnnotationSyncScope();
 	}
+}
+
+export function syncEpubReadingAnnotations(
+	rend: Rendition,
+	thoughts: EbookThought[],
+	highlights: EbookUserHighlight[],
+	appliedThoughtsRef: Map<string, string>,
+	appliedHighlightsRef: Map<string, string>,
+	currentUserId = 0,
+): void {
+	syncEpubUserHighlights(rend, highlights, appliedHighlightsRef);
+	syncEpubThoughtUnderlines(rend, thoughts, appliedThoughtsRef, currentUserId);
 }
 
 let readingAnnotationPatchRaf = 0;
@@ -2513,7 +2556,7 @@ function runEpubReadingAnnotationPatch(rend: Rendition): void {
 		setUserHighlightBlockerSourcesForThoughtPatch(
 			collectUserHighlightBlockerSources(rend),
 		);
-		patchEpubThoughtUnderlineMarks(rend);
+		patchEpubThoughtUnderlineMarks(rend, { viewportOnly: true });
 		restackThoughtMarkGroups(rend);
 		restackUserHighlightMarkGroups(rend);
 	} catch {
@@ -2694,8 +2737,35 @@ export function installEpubUserHighlightPatchListeners(
 	const onContent = () => schedulePatch(true);
 	rend.hooks.content.register(onContent);
 
-	const onRelocated = () => schedulePatch(false);
+	// ponytail: relocated / 章内滚动合并 patch；视口内动态挂载想法划线
+	let relocatedPatchTimer: ReturnType<typeof setTimeout> | null = null;
+	let viewportScrollTimer: ReturnType<typeof setTimeout> | null = null;
+	const RELOCATED_PATCH_IDLE_MS = 120;
+	const VIEWPORT_SCROLL_IDLE_MS = 100;
+
+	const onViewportScroll = () => {
+		if (viewportScrollTimer) clearTimeout(viewportScrollTimer);
+		viewportScrollTimer = setTimeout(() => {
+			viewportScrollTimer = null;
+			refreshThoughtUnderlinesInViewport(rend);
+			schedulePatch(true);
+		}, VIEWPORT_SCROLL_IDLE_MS);
+	};
+
+	const onRelocated = () => {
+		if (relocatedPatchTimer) clearTimeout(relocatedPatchTimer);
+		relocatedPatchTimer = setTimeout(() => {
+			relocatedPatchTimer = null;
+			refreshThoughtUnderlinesInViewport(rend);
+			schedulePatch(false);
+		}, RELOCATED_PATCH_IDLE_MS);
+	};
 	rend.on('relocated', onRelocated);
+
+	const scrollContainer = getEpubScrollContainer(rend);
+	scrollContainer?.addEventListener('scroll', onViewportScroll, {
+		passive: true,
+	});
 
 	const onRendered = () => schedulePatch(true);
 	rend.on('rendered', onRendered);
@@ -2703,6 +2773,9 @@ export function installEpubUserHighlightPatchListeners(
 	schedulePatch(true);
 
 	return () => {
+		if (relocatedPatchTimer) clearTimeout(relocatedPatchTimer);
+		if (viewportScrollTimer) clearTimeout(viewportScrollTimer);
+		scrollContainer?.removeEventListener('scroll', onViewportScroll);
 		cancelAnimationFrame(readingAnnotationPatchRaf);
 		readingAnnotationPatchRaf = 0;
 		pendingReadingAnnotationFullPatch = false;

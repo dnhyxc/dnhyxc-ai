@@ -1,4 +1,11 @@
-import { IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
+import {
+	IsBoolean,
+	IsOptional,
+	IsString,
+	IsUUID,
+	MaxLength,
+	MinLength,
+} from 'class-validator';
 
 export class CreateEbookThoughtDto {
 	@IsUUID()
@@ -18,4 +25,8 @@ export class CreateEbookThoughtDto {
 	@MinLength(1)
 	@MaxLength(16384)
 	content: string;
+
+	@IsOptional()
+	@IsBoolean()
+	isPublic?: boolean;
 }

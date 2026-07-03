@@ -32,8 +32,26 @@ function EbookShelfPage() {
 		void ebookStore.hydrate();
 	}, [userId]);
 
-	const onOpen = (bookId: string) => {
-		nav(`/ebook/read/${bookId}`);
+	const isPublicShelf = ebookStore.activeCategoryKey.kind === 'public';
+	const isAllShelf = ebookStore.activeCategoryKey.kind === 'all';
+
+	const onOpen = async (id: string) => {
+		const hit = ebookStore.books.find((b) => b.id === id);
+		if (isPublicShelf || (isAllShelf && hit?.owner)) {
+			try {
+				const readingId =
+					hit?.readingBookId ?? (await ebookStore.openPublicBook(id));
+				nav(`/ebook/read/${readingId}`);
+			} catch (e) {
+				Toast({
+					type: 'error',
+					title: t('ebook.err.open'),
+					message: e instanceof Error ? e.message : String(e),
+				});
+			}
+			return;
+		}
+		nav(`/ebook/read/${id}`);
 	};
 
 	const onPickTauri = async () => {
@@ -168,13 +186,19 @@ function EbookShelfPage() {
 		ebookStore.ready &&
 		ebookStore.total === 0 &&
 		!ebookStore.loading &&
-		ebookStore.totalBookCount === 0;
+		ebookStore.shelfAllCount === 0;
+	const showPublicEmpty =
+		ebookStore.ready &&
+		ebookStore.total === 0 &&
+		!ebookStore.loading &&
+		isPublicShelf;
 	const showCategoryEmpty =
 		ebookStore.ready &&
 		ebookStore.total === 0 &&
 		!ebookStore.loading &&
 		ebookStore.totalBookCount > 0 &&
-		ebookStore.activeCategoryKey.kind !== 'all';
+		ebookStore.activeCategoryKey.kind !== 'all' &&
+		ebookStore.activeCategoryKey.kind !== 'public';
 	const showLoadMoreHint = ebookStore.loadingMore;
 
 	const isTauri = isTauriRuntime();
@@ -299,6 +323,10 @@ function EbookShelfPage() {
 						<div className="text-textcolor/60 py-12 text-center text-sm">
 							{t('ebook.shelf.empty')}
 						</div>
+					) : showPublicEmpty ? (
+						<div className="text-textcolor/60 py-12 text-center text-sm">
+							{t('ebook.shelf.publicEmpty')}
+						</div>
 					) : showCategoryEmpty ? (
 						<div className="text-textcolor/60 py-12 text-center text-sm">
 							{t('ebook.shelf.category.empty')}
@@ -312,11 +340,22 @@ function EbookShelfPage() {
 										book={b}
 										prog={ebookStore.progOf(b.id)}
 										categories={ebookStore.categories}
+										shelfMode={
+											isPublicShelf || (isAllShelf && b.owner)
+												? 'public'
+												: 'mine'
+										}
 										onOpen={onOpen}
 										onRemove={onRequestRemove}
-										onSetCover={onSetCover}
-										onUpdateTitle={onUpdateTitle}
-										onMoveCategory={onMoveCategory}
+										onSetCover={
+											isPublicShelf || b.owner ? undefined : onSetCover
+										}
+										onUpdateTitle={
+											isPublicShelf || b.owner ? undefined : onUpdateTitle
+										}
+										onMoveCategory={
+											isPublicShelf || b.owner ? undefined : onMoveCategory
+										}
 									/>
 								))}
 							</div>

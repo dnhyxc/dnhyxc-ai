@@ -36,9 +36,13 @@ import { CreateEbookHighlightDto } from './dto/create-ebook-highlight.dto';
 import { CreateEbookThoughtDto } from './dto/create-ebook-thought.dto';
 import { QueryEbookByLocalPathDto } from './dto/query-ebook-by-local-path.dto';
 import { QueryEbookCategoriesSummaryDto } from './dto/query-ebook-categories-summary.dto';
+import { QueryEbookListThoughtsDto } from './dto/query-ebook-list-thoughts.dto';
 import { QueryEbookShelfDto } from './dto/query-ebook-shelf.dto';
+import { QueryEbookThoughtChangesDto } from './dto/query-ebook-thought-changes.dto';
+import { QueryEbookThoughtSyncDto } from './dto/query-ebook-thought-sync.dto';
 import { ReorderEbookCategoriesDto } from './dto/reorder-ebook-categories.dto';
 import { SaveEbookProgressDto } from './dto/save-ebook-progress.dto';
+import { UpdateEbookBookVisibilityDto } from './dto/update-ebook-book-visibility.dto';
 import { UpdateEbookCategoryDto } from './dto/update-ebook-category.dto';
 import { UpdateEbookHighlightDto } from './dto/update-ebook-highlight.dto';
 import { UpdateEbookThoughtDto } from './dto/update-ebook-thought.dto';
@@ -196,6 +200,29 @@ export class EbookController {
 		);
 	}
 
+	@Put('book/:id/visibility')
+	@UseInterceptors(ResponseInterceptor)
+	async setBookVisibility(
+		@Req() req: AuthedRequest,
+		@Param('id', ParseUUIDPipe) id: string,
+		@Body() dto: UpdateEbookBookVisibilityDto,
+	) {
+		return this.ebookService.setBookVisibility(
+			this.userId(req),
+			id,
+			dto.isPublic,
+		);
+	}
+
+	@Post('public/:sourceBookId/open')
+	@UseInterceptors(ResponseInterceptor)
+	async openPublicBook(
+		@Req() req: AuthedRequest,
+		@Param('sourceBookId', ParseUUIDPipe) sourceBookId: string,
+	) {
+		return this.ebookService.openPublicBook(this.userId(req), sourceBookId);
+	}
+
 	@Get('book/:id')
 	@UseInterceptors(ResponseInterceptor)
 	async getBook(
@@ -285,13 +312,59 @@ export class EbookController {
 		return { id };
 	}
 
+	@Get('thoughts/:bookId/sync')
+	@UseInterceptors(ResponseInterceptor)
+	async thoughtSync(
+		@Req() req: AuthedRequest,
+		@Param('bookId', ParseUUIDPipe) bookId: string,
+		@Query() query: QueryEbookThoughtSyncDto,
+	) {
+		const since =
+			typeof query.since === 'string' && query.since.trim()
+				? new Date(query.since)
+				: undefined;
+		return this.ebookService.syncThoughts(this.userId(req), bookId, since);
+	}
+
+	@Get('thoughts/:bookId/revision')
+	@UseInterceptors(ResponseInterceptor)
+	async thoughtsRevision(
+		@Req() req: AuthedRequest,
+		@Param('bookId', ParseUUIDPipe) bookId: string,
+	) {
+		return this.ebookService.getThoughtsRevision(this.userId(req), bookId);
+	}
+
+	@Get('thoughts/:bookId/changes')
+	@UseInterceptors(ResponseInterceptor)
+	async thoughtChanges(
+		@Req() req: AuthedRequest,
+		@Param('bookId', ParseUUIDPipe) bookId: string,
+		@Query() query: QueryEbookThoughtChangesDto,
+	) {
+		return this.ebookService.listThoughtChanges(
+			this.userId(req),
+			bookId,
+			new Date(query.since),
+		);
+	}
+
 	@Get('thoughts/:bookId')
 	@UseInterceptors(ResponseInterceptor)
 	async listThoughts(
 		@Req() req: AuthedRequest,
 		@Param('bookId', ParseUUIDPipe) bookId: string,
+		@Query() query: QueryEbookListThoughtsDto,
 	) {
-		return this.ebookService.listThoughts(this.userId(req), bookId);
+		const spineHints = query.spineHints
+			?.split(',')
+			.map((hint) => hint.trim())
+			.filter(Boolean);
+		return this.ebookService.listThoughts(
+			this.userId(req),
+			bookId,
+			spineHints?.length ? spineHints : undefined,
+		);
 	}
 
 	@Post('thoughts')

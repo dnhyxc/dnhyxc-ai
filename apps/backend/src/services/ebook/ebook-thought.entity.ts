@@ -9,6 +9,8 @@ import {
 
 @Entity('ebook_thought')
 @Index('idx_ebook_thought_user_book', ['userId', 'bookId'])
+@Index('idx_ebook_thought_book_updated', ['bookId', 'updatedAt'])
+@Index('idx_ebook_thought_book_deleted', ['bookId', 'deletedAt'])
 export class EbookThought {
 	@PrimaryGeneratedColumn('uuid')
 	id: string;
@@ -27,6 +29,12 @@ export class EbookThought {
 
 	@Column({ type: 'text' })
 	content: string;
+
+	@Column({ name: 'is_public', type: 'boolean', default: true })
+	isPublic!: boolean;
+
+	@Column({ name: 'deleted_at', type: 'timestamp', nullable: true })
+	deletedAt: Date | null = null;
 
 	@CreateDateColumn({ name: 'created_at', type: 'timestamp' })
 	createdAt: Date;

@@ -33,6 +33,11 @@
 | [epub-thought-underline-impl.md](./epub-thought-underline-impl.md)               | **主文档（想法虚线）**：分组、嵌套去重、选区防误触、与用户划线叠加（逐步拆解 + 逐行注释代码）                                                   |
 | [epub-thought-partial-overlap.md](./epub-thought-partial-overlap.md)             | **增量**：部分相交的想法选区 patch 层 blocker 去重，避免重叠段双线叠加                                                                          |
 | [epub-thought-user-highlight-overlap.md](./epub-thought-user-highlight-overlap.md) | **增量**：想法虚线与用户划线叠加修复（句内虚线、下划线误扣、restack + patch blocker）                                                         |
+| [epub-public-thought-underline-overlay.md](./epub-public-thought-underline-overlay.md) | **增量（2026-07-02）**：公开书多人想法虚线叠层（本人/他人色、CFI 投影扣减、DOM invalidate）                                              |
+| [ebook-public-share.md](./ebook-public-share.md) | **增量（2026-07-02）**：公开书籍与协作阅读（源书/读书记录、`scope=public` 书架、visibility API、想法合并） |
+| [epub-public-thought-live-sync.md](./epub-public-thought-live-sync.md) | **增量（2026-07-02）**：公开书想法 `/sync` 增量、双轨触发、`epubThoughtSync`、点击列表一次即最新 |
+| [epub-thought-viewport-perf.md](./epub-thought-viewport-perf.md) | **增量（2026-07-03）**：按章 `spineHints` 拉取、视口动态 mount、双轨 reclaim、`ephemeralPin` |
+| [epub-scroll-stutter-perf.md](./epub-scroll-stutter-perf.md) | **增量（2026-07-02）**：连续滚动 mark patch（relocated 80ms 合并、叠层 CFI 投影缓存） |
 | [epub-thought-cluster-bridging.md](./epub-thought-cluster-bridging.md)           | **主文档（想法桥接）**：点击聚合规则（A/B/标点/换行何时合并）、连通图 v5、逐行注释代码                                                          |
 | [epub-thought-list-ui.md](./epub-thought-list-ui.md)                               | **增量**：想法列表单击进详情、分组摘录展开、引用 clamp 泛化；移除列表内选中与引用点击回书                                                       |
 | [epub-thought-underline-empty-gap.md](./epub-thought-underline-empty-gap.md)       | **增量**：跨段落写想法时空行不再画虚线（空白文本片段过滤 + mark 校正快路径）                                                                  |

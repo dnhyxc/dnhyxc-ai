@@ -1,6 +1,7 @@
 import { Transform, Type } from 'class-transformer';
 import {
 	IsBoolean,
+	IsIn,
 	IsNumber,
 	IsOptional,
 	IsUUID,
@@ -22,6 +23,10 @@ export class QueryEbookShelfDto {
 	@Min(1)
 	@Max(100)
 	pageSize?: number;
+
+	@IsOptional()
+	@IsIn(['mine', 'public', 'all'])
+	scope?: 'mine' | 'public' | 'all';
 
 	@IsOptional()
 	@IsUUID()

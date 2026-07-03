@@ -25,6 +25,8 @@ import type {
 	EbookCategory,
 	EbookShelfData,
 	EbookThought,
+	EbookThoughtRevision,
+	EbookThoughtSync,
 	EbookUserHighlight,
 	Prog,
 } from '@/views/ebook/types';
@@ -60,6 +62,7 @@ import {
 	EBOOK_FILE,
 	EBOOK_HIGHLIGHTS,
 	EBOOK_PROGRESS,
+	EBOOK_PUBLIC_OPEN,
 	EBOOK_SHELF,
 	EBOOK_THOUGHTS,
 	EBOOK_TITLE,
@@ -1874,6 +1877,7 @@ export const deleteKnowledgeTrashBatch = async (ids: string[]) => {
 export const loadEbookShelf = async (params?: {
 	pageNo?: number;
 	pageSize?: number;
+	scope?: 'mine' | 'public' | 'all';
 	categoryId?: string;
 	uncategorizedOnly?: boolean;
 }): Promise<EbookShelfData> => {
@@ -1881,6 +1885,28 @@ export const loadEbookShelf = async (params?: {
 		querys: params,
 		silent: true,
 	});
+	return res.data;
+};
+
+/** PUT /ebook/book/:id/visibility */
+export const setEbookBookVisibility = async (
+	bookId: string,
+	isPublic: boolean,
+): Promise<Book> => {
+	const res = await http.put<Book>(`${EBOOK_BOOK}/${bookId}/visibility`, {
+		isPublic,
+	});
+	return res.data;
+};
+
+/** POST /ebook/public/:sourceBookId/open */
+export const openEbookPublicBook = async (
+	sourceBookId: string,
+): Promise<{ readingBookId: string }> => {
+	const res = await http.post<{ readingBookId: string }>(
+		`${EBOOK_PUBLIC_OPEN}/${sourceBookId}/open`,
+		{},
+	);
 	return res.data;
 };
 
@@ -2076,8 +2102,53 @@ export const saveEbookCover = async (
 /** GET /ebook/thoughts/:bookId */
 export const fetchEbookThoughts = async (
 	bookId: string,
+	options?: { spineHints?: string[] },
 ): Promise<EbookThought[]> => {
-	const res = await http.get<EbookThought[]>(`${EBOOK_THOUGHTS}/${bookId}`);
+	const spineHints = options?.spineHints
+		?.map((hint) => hint.trim())
+		.filter(Boolean);
+	const res = await http.get<EbookThought[]>(`${EBOOK_THOUGHTS}/${bookId}`, {
+		querys:
+			spineHints && spineHints.length > 0
+				? { spineHints: spineHints.join(',') }
+				: undefined,
+	});
+	return res.data;
+};
+
+/** GET /ebook/thoughts/:bookId/sync?since= — 公开书单次同步（版本戳 + 增量） */
+export const fetchEbookThoughtSync = async (
+	bookId: string,
+	since?: string,
+): Promise<EbookThoughtSync> => {
+	const res = await http.get<EbookThoughtSync>(
+		`${EBOOK_THOUGHTS}/${bookId}/sync`,
+		{
+			querys: since ? { since } : undefined,
+		},
+	);
+	return res.data;
+};
+
+/** GET /ebook/thoughts/:bookId/revision — 公开书轻量版本探测 */
+export const fetchEbookThoughtsRevision = async (
+	bookId: string,
+): Promise<EbookThoughtRevision> => {
+	const res = await http.get<EbookThoughtRevision>(
+		`${EBOOK_THOUGHTS}/${bookId}/revision`,
+	);
+	return res.data;
+};
+
+/** GET /ebook/thoughts/:bookId/changes?since= — 公开书增量同步 */
+export const fetchEbookThoughtChanges = async (
+	bookId: string,
+	since: string,
+): Promise<EbookThought[]> => {
+	const res = await http.get<EbookThought[]>(
+		`${EBOOK_THOUGHTS}/${bookId}/changes`,
+		{ querys: { since } },
+	);
 	return res.data;
 };
 
@@ -2087,6 +2158,7 @@ export const createEbookThought = async (body: {
 	cfiRange: string;
 	quote: string;
 	content: string;
+	isPublic?: boolean;
 }): Promise<EbookThought> => {
 	const res = await http.post<EbookThought>(EBOOK_THOUGHTS, body);
 	return res.data;
@@ -2095,7 +2167,7 @@ export const createEbookThought = async (body: {
 /** PUT /ebook/thoughts/:id */
 export const updateEbookThought = async (
 	thoughtId: string,
-	body: { content: string },
+	body: { content: string; isPublic?: boolean },
 ): Promise<EbookThought> => {
 	const res = await http.put<EbookThought>(
 		`${EBOOK_THOUGHTS}/${thoughtId}`,

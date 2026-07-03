@@ -11,12 +11,14 @@ import {
 	getEbookBook,
 	loadEbookCategoriesSummary,
 	loadEbookShelf,
+	openEbookPublicBook,
 	removeEbook,
 	removeEbookCategory,
 	reorderEbookCategories,
 	saveEbookCover,
 	saveEbookProgress,
 	saveEbookProgressKeepalive,
+	setEbookBookVisibility,
 	updateEbookCategory,
 	updateEbookTitle,
 	uploadEbookFile,
@@ -27,6 +29,7 @@ import type {
 	Book,
 	BookFmt,
 	EbookCategory,
+	EbookPublicSource,
 	EbookShelfCategoryKey,
 	Prog,
 } from '@/views/ebook/types';
@@ -78,9 +81,13 @@ function writeLastImportCategoryId(
 }
 
 function shelfQueryFromKey(key: EbookShelfCategoryKey): {
+	scope?: 'mine' | 'public';
 	categoryId?: string;
 	uncategorizedOnly?: boolean;
 } {
+	if (key.kind === 'public') {
+		return { scope: 'public' };
+	}
 	if (key.kind === 'category') {
 		return { categoryId: key.categoryId };
 	}
@@ -117,6 +124,7 @@ function progNeedsRemoteSync(next: Prog, lastSynced?: Prog): boolean {
 class EbookStore {
 	books: Book[] = [];
 	bookCache: Record<string, Book> = {};
+	publicSourceCache: Record<string, EbookPublicSource> = {};
 	progMap: Record<string, Prog> = {};
 	lastSyncedProgMap: Record<string, Prog> = {};
 	progPendingBookIds = new Set<string>();
@@ -134,6 +142,7 @@ class EbookStore {
 	categories: EbookCategory[] = [];
 	uncategorizedCount = 0;
 	totalBookCount = 0;
+	publicBookTotal = 0;
 	activeCategoryKey: EbookShelfCategoryKey = { kind: 'all' };
 	categoriesLoading = false;
 
@@ -144,7 +153,15 @@ class EbookStore {
 	}
 
 	get hasMore(): boolean {
+		if (this.activeCategoryKey.kind === 'all') {
+			return this.books.length < this.totalBookCount + this.publicBookTotal;
+		}
 		return this.books.length < this.safeTotal();
+	}
+
+	/** 「全部」Tab 角标：我的源书 + 他人公开书 */
+	get shelfAllCount(): number {
+		return this.totalBookCount + this.publicBookTotal;
 	}
 
 	safeTotal(): number {
@@ -161,6 +178,7 @@ class EbookStore {
 
 	bookMatchesActiveCategory(categoryId?: string | null): boolean {
 		const key = this.activeCategoryKey;
+		if (key.kind === 'public') return false;
 		if (key.kind === 'all') return true;
 		if (key.kind === 'uncategorized') {
 			return categoryId == null;
@@ -184,7 +202,59 @@ class EbookStore {
 	}
 
 	async hydrate(): Promise<void> {
-		await Promise.all([this.fetchCategories(), this.fetchPage(1, false)]);
+		const tasks: Promise<unknown>[] = [
+			this.fetchCategories(),
+			this.fetchPage(1, false),
+		];
+		// 「全部」Tab 的 fetchPage 已拉公开书并写入 publicBookTotal，无需再 pageSize=1 探测
+		if (this.activeCategoryKey.kind !== 'all') {
+			tasks.push(this.fetchPublicCount());
+		}
+		await Promise.all(tasks);
+	}
+
+	/** 阅读页直链/刷新：只拉单书详情，不请求书架分页（始终刷新，避免书架缓存 isPublic 过期误开 sync） */
+	async ensureBookForRead(bookId: string): Promise<Book | undefined> {
+		try {
+			const detail = await getEbookBook(bookId);
+			const { book, prog, publicSource } = detail;
+			runInAction(() => {
+				this.bookCache[book.id] = book;
+				if (publicSource) {
+					this.publicSourceCache[book.id] = publicSource;
+				} else {
+					delete this.publicSourceCache[book.id];
+				}
+				if (prog) {
+					this.progMap[book.id] = prog;
+					this.lastSyncedProgMap[book.id] = prog;
+				}
+				this.ready = true;
+			});
+			return book;
+		} catch {
+			runInAction(() => {
+				this.ready = true;
+			});
+			return this.bookById(bookId);
+		}
+	}
+
+	async fetchPublicCount(): Promise<void> {
+		try {
+			const data = await loadEbookShelf({
+				scope: 'public',
+				pageNo: 1,
+				pageSize: 1,
+			});
+			runInAction(() => {
+				const nextTotal = Number(data.total);
+				this.publicBookTotal =
+					Number.isFinite(nextTotal) && nextTotal >= 0 ? nextTotal : 0;
+			});
+		} catch {
+			// 公开数量加载失败不阻塞书架
+		}
 	}
 
 	async fetchCategories(): Promise<void> {
@@ -221,14 +291,33 @@ class EbookStore {
 			this.loading = true;
 		}
 		try {
+			const key = this.activeCategoryKey;
 			const data = await loadEbookShelf({
 				pageNo: page,
 				pageSize: this.pageSize,
-				...shelfQueryFromKey(this.activeCategoryKey),
+				...shelfQueryFromKey(key),
 			});
+			const publicData =
+				key.kind === 'all' && page === 1 && !append
+					? await loadEbookShelf({
+							scope: 'public',
+							pageNo: 1,
+							pageSize: 100,
+						})
+					: null;
 			if (seq !== this.shelfFetchSeq) return;
 			runInAction(() => {
-				const nextTotal = Number(data.total);
+				if (publicData) {
+					const pubTotal = Number(publicData.total);
+					this.publicBookTotal =
+						Number.isFinite(pubTotal) && pubTotal >= 0 ? pubTotal : 0;
+				}
+				const mineTotal = Number(data.total);
+				const nextTotal =
+					key.kind === 'all'
+						? (Number.isFinite(mineTotal) && mineTotal >= 0 ? mineTotal : 0) +
+							this.publicBookTotal
+						: Number(data.total);
 				this.total =
 					Number.isFinite(nextTotal) && nextTotal >= 0 ? nextTotal : 0;
 				this.pageNo = page;
@@ -242,6 +331,17 @@ class EbookStore {
 						}
 					}
 					this.books = merged;
+				} else if (key.kind === 'all' && publicData) {
+					const mineIds = new Set(data.books.map((b) => b.id));
+					const publicBooks = publicData.books.filter(
+						(b) => !mineIds.has(b.id),
+					);
+					this.books = [...data.books, ...publicBooks];
+					this.progMap = {
+						...(publicData.progMap ?? {}),
+						...(data.progMap ?? {}),
+					};
+					this.seedSyncedProgMap(this.progMap);
 				} else {
 					this.books = data.books;
 					this.progMap = data.progMap ?? {};
@@ -283,9 +383,13 @@ class EbookStore {
 		const hit = this.bookById(bookId);
 		if (hit) return hit;
 		try {
-			const { book, prog } = await getEbookBook(bookId);
+			const detail = await getEbookBook(bookId);
+			const { book, prog, publicSource } = detail;
 			runInAction(() => {
 				this.bookCache[book.id] = book;
+				if (publicSource) {
+					this.publicSourceCache[book.id] = publicSource;
+				}
 				if (prog) {
 					this.progMap[book.id] = prog;
 					this.lastSyncedProgMap[book.id] = prog;
@@ -296,6 +400,26 @@ class EbookStore {
 			console.log('fetchBookIfMissing error', bookId);
 			return undefined;
 		}
+	}
+
+	async setBookPublic(bookId: string, isPublic: boolean): Promise<Book> {
+		const updated = await setEbookBookVisibility(bookId, isPublic);
+		runInAction(() => {
+			this.books = this.books.map((b) => (b.id === bookId ? updated : b));
+			this.bookCache[bookId] = updated;
+		});
+		void this.fetchPublicCount();
+		return updated;
+	}
+
+	async openPublicBook(sourceBookId: string): Promise<string> {
+		const { readingBookId } = await openEbookPublicBook(sourceBookId);
+		await this.fetchBookIfMissing(readingBookId);
+		return readingBookId;
+	}
+
+	publicSourceOf(bookId: string): EbookPublicSource | undefined {
+		return this.publicSourceCache[bookId];
 	}
 
 	progOf(bookId: string): Prog | undefined {
@@ -310,6 +434,7 @@ class EbookStore {
 	resetOnUserSwitch(): void {
 		this.books = [];
 		this.bookCache = {};
+		this.publicSourceCache = {};
 		this.progMap = {};
 		this.lastSyncedProgMap = {};
 		this.progPendingBookIds.clear();
@@ -325,6 +450,7 @@ class EbookStore {
 		this.categories = [];
 		this.uncategorizedCount = 0;
 		this.totalBookCount = 0;
+		this.publicBookTotal = 0;
 		this.activeCategoryKey = { kind: 'all' };
 		this.clearUploadState();
 	}

@@ -1,16 +1,21 @@
 import type { Rendition } from 'epubjs';
 import type { EbookThought, EbookThoughtClickCluster } from '../../../types';
+import { getEpubScrollContainer } from '../reader/epubScrolledNav';
 import {
+	collectLoadedSpineHints,
 	type EpubIframeContents,
 	extractCfiSpineHint,
 	getRenditionContentsList,
 	isDomRangeStrictlyContained,
 	isQuoteStrictlyNested,
+	normalizeCfiSpineHint,
 	setSvgAttrIfChanged,
 } from './epubMarkShared';
 import {
 	parseSvgMarkRect,
+	readMarkSvgLineSegmentsFromRects,
 	resolveCfiDomRange,
+	resolveHighlightSvgLineSegments,
 	resolveMarkSvgLineSegments,
 	type SvgLineSegment,
 } from './epubRangeGeometry';
@@ -50,8 +55,12 @@ const EPUB_THOUGHT_UNDERLINE_STYLE_ID = 'moke-epub-thought-ul-styles';
 const THOUGHT_MARK_DATA_SHOW_LINE = 'showLine';
 const THOUGHT_MARK_DATA_SHOW_LINE_ATTR = 'show-line';
 
-/** 深色背景下也可见的琥珀色细虚线 */
-const THOUGHT_LINE_COLOR = '#d97706';
+/** 深色背景下也可见的琥珀色细虚线（本人） */
+const THOUGHT_LINE_COLOR_OWN = '#d97706';
+/** 他人 / 书主想法虚线 */
+const THOUGHT_LINE_COLOR_FOREIGN = '#797673';
+const THOUGHT_MARK_DATA_LINE_OWN = 'thoughtLineOwn';
+const THOUGHT_MARK_DATA_LINE_OWN_ATTR = 'thought-line-own';
 const THOUGHT_LINE_OPACITY = '0.55';
 /** 下划线与文字底边的间距（px） */
 const THOUGHT_LINE_OFFSET_PX = 1;
@@ -68,11 +77,17 @@ g[ref="${EPUB_THOUGHT_UNDERLINE_CLASS}"] > rect {
 }
 g.${EPUB_THOUGHT_UNDERLINE_CLASS} > line,
 g[ref="${EPUB_THOUGHT_UNDERLINE_CLASS}"] > line {
-	stroke: ${THOUGHT_LINE_COLOR} !important;
+	stroke: ${THOUGHT_LINE_COLOR_OWN} !important;
 	stroke-opacity: ${THOUGHT_LINE_OPACITY} !important;
 	stroke-width: 1 !important;
 	stroke-dasharray: ${THOUGHT_LINE_DASHARRAY} !important;
 	stroke-linecap: round !important;
+}
+g.${EPUB_THOUGHT_UNDERLINE_CLASS}[data-${THOUGHT_MARK_DATA_LINE_OWN_ATTR}="0"] > line,
+g[ref="${EPUB_THOUGHT_UNDERLINE_CLASS}"][data-${THOUGHT_MARK_DATA_LINE_OWN_ATTR}="0"] > line,
+g.${EPUB_THOUGHT_UNDERLINE_CLASS} > line.moke-epub-thought-ul-foreign,
+g[ref="${EPUB_THOUGHT_UNDERLINE_CLASS}"] > line.moke-epub-thought-ul-foreign {
+	stroke: ${THOUGHT_LINE_COLOR_FOREIGN} !important;
 }
 g.${EPUB_THOUGHT_UNDERLINE_CLASS}[data-${THOUGHT_MARK_DATA_SHOW_LINE_ATTR}="0"] > line,
 g[ref="${EPUB_THOUGHT_UNDERLINE_CLASS}"][data-${THOUGHT_MARK_DATA_SHOW_LINE_ATTR}="0"] > line {
@@ -88,7 +103,7 @@ g[ref="${EPUB_THOUGHT_UNDERLINE_CLASS}"] > line.moke-epub-thought-ul-suppressed 
 
 /** epub.js 默认 merge 到 g 上；rect 继承后成虚线框，line 默认黑色在深色主题不可见 */
 export const EPUB_THOUGHT_UNDERLINE_STYLES: Record<string, string> = {
-	stroke: THOUGHT_LINE_COLOR,
+	stroke: THOUGHT_LINE_COLOR_OWN,
 	'stroke-opacity': THOUGHT_LINE_OPACITY,
 	'stroke-width': '1',
 	'stroke-dasharray': THOUGHT_LINE_DASHARRAY,
@@ -132,7 +147,12 @@ function ensureThoughtUnderlineStyles(doc: Document = document): void {
 	style.textContent = EPUB_THOUGHT_UNDERLINE_CSS;
 }
 
-function patchAllThoughtUnderlineMarks(rend?: Rendition): void {
+function patchAllThoughtUnderlineMarks(
+	rend?: Rendition,
+	options?: { viewportOnly?: boolean },
+): void {
+	const pinCfis = resolvePinnedCfis();
+	const viewportOnly = options?.viewportOnly ?? false;
 	const docs = new Set<Document>([document]);
 	for (const contents of getRenditionContentsList(rend)) {
 		if (contents.document) docs.add(contents.document);
@@ -141,7 +161,7 @@ function patchAllThoughtUnderlineMarks(rend?: Rendition): void {
 	for (const doc of docs) {
 		try {
 			ensureThoughtUnderlineStyles(doc);
-			patchThoughtUnderlineMarks(doc, rend);
+			patchThoughtUnderlineMarks(doc, rend, pinCfis, viewportOnly);
 		} catch {
 			// iframe 卸载或文档不可用时忽略
 		}
@@ -164,6 +184,11 @@ export function restackThoughtMarkGroups(rend?: Rendition): void {
 					),
 				] as SVGElement[];
 				groups.sort((left, right) => {
+					const leftCfi = left.dataset.epubcfi?.trim() ?? '';
+					const rightCfi = right.dataset.epubcfi?.trim() ?? '';
+					const leftOwn = isThoughtMarkLineOwn(leftCfi, left);
+					const rightOwn = isThoughtMarkLineOwn(rightCfi, right);
+					if (leftOwn !== rightOwn) return leftOwn ? 1 : -1;
 					const spanDiff =
 						thoughtMarkSpanLength(right) - thoughtMarkSpanLength(left);
 					if (spanDiff !== 0) return spanDiff;
@@ -192,8 +217,11 @@ export function setUserHighlightBlockerSourcesForThoughtPatch(
 }
 
 /** 滚动/翻页后 patch 想法下划线 DOM，不重绘批注 */
-export function patchEpubThoughtUnderlineMarks(rend?: Rendition): void {
-	patchAllThoughtUnderlineMarks(rend);
+export function patchEpubThoughtUnderlineMarks(
+	rend?: Rendition,
+	options?: { viewportOnly?: boolean },
+): void {
+	patchAllThoughtUnderlineMarks(rend, options);
 }
 
 /**
@@ -209,7 +237,300 @@ export function patchEpubThoughtUnderlineMarks(rend?: Rendition): void {
  */
 const THOUGHT_LINE_SEG_CLASS = 'moke-epub-thought-ul-seg';
 const THOUGHT_LINE_SUPPRESSED_CLASS = 'moke-epub-thought-ul-suppressed';
+const THOUGHT_LINE_FOREIGN_CLASS = 'moke-epub-thought-ul-foreign';
+
+/** cfi → 是否本人想法（patch 时写入 data 属性；epub.js 自定义 data 不可靠） */
+const thoughtLineOwnByCfi = new Map<string, boolean>();
 const MIN_THOUGHT_LINE_SEGMENT_PX = 2;
+
+const THOUGHT_MARK_SELECTOR = `g.${EPUB_THOUGHT_UNDERLINE_CLASS}, g[ref="${EPUB_THOUGHT_UNDERLINE_CLASS}"]`;
+
+/** 全书 CFI 组数超过此阈值时，仅对已加载 spine 章节 apply（避免换章全量 underline） */
+const SPINE_SCOPED_APPLY_MIN_GROUPS = 35;
+/** 当前章或全书想法较多时，按视口动态挂载 mark（类似微信读书） */
+const VIEWPORT_APPLY_MIN_CHAPTER_CFIS = 8;
+const VIEWPORT_APPLY_MIN_TOTAL_CFIS = 30;
+const VIEWPORT_KEEP_MARGIN_FACTOR = 0.85;
+const VIEWPORT_REMOVE_MARGIN_FACTOR = 1.7;
+
+type ThoughtViewportBand = { top: number; bottom: number };
+
+type ThoughtUnderlineApplyContext = {
+	getThoughts: () => EbookThought[];
+	appliedRef: Map<string, string>;
+	getCurrentUserId: () => number;
+	getPinnedCfis?: () => ReadonlySet<string>;
+};
+
+let thoughtUnderlineApplyContext: ThoughtUnderlineApplyContext | null = null;
+
+/** sync / 本地新建后下一轮 apply 强制挂载的 CFI（无视视口裁剪） */
+const ephemeralPinCfis = new Set<string>();
+
+export function ephemeralPinThoughtCfis(cfis: Iterable<string>): void {
+	ephemeralPinCfis.clear();
+	for (const cfi of cfis) {
+		const key = cfi.trim();
+		if (key) ephemeralPinCfis.add(key);
+	}
+}
+
+export function setThoughtUnderlineApplyContext(
+	ctx: ThoughtUnderlineApplyContext | null,
+): void {
+	thoughtUnderlineApplyContext = ctx;
+}
+
+function shouldScopeThoughtApplyBySpine(
+	cfiGroupCount: number,
+	loadedSpines: Set<string>,
+): boolean {
+	return (
+		cfiGroupCount >= SPINE_SCOPED_APPLY_MIN_GROUPS && loadedSpines.size > 0
+	);
+}
+
+function thoughtSpineHint(cfiRange: string): string {
+	return normalizeCfiSpineHint(extractCfiSpineHint(cfiRange));
+}
+
+function resolveThoughtViewportRoot(rend: Rendition): HTMLElement | null {
+	const scroll = getEpubScrollContainer(rend);
+	if (scroll) return scroll;
+	for (const contents of getRenditionContentsList(rend)) {
+		return contents.document.documentElement;
+	}
+	return null;
+}
+
+function readThoughtViewportBands(container: HTMLElement): {
+	keep: ThoughtViewportBand;
+	remove: ThoughtViewportBand;
+} {
+	const rect = container.getBoundingClientRect();
+	const height = rect.height > 0 ? rect.height : window.innerHeight;
+	const keepMargin = height * VIEWPORT_KEEP_MARGIN_FACTOR;
+	const removeMargin = height * VIEWPORT_REMOVE_MARGIN_FACTOR;
+	return {
+		keep: { top: rect.top - keepMargin, bottom: rect.bottom + keepMargin },
+		remove: {
+			top: rect.top - removeMargin,
+			bottom: rect.bottom + removeMargin,
+		},
+	};
+}
+
+function isClientRectInThoughtBand(
+	rect: DOMRect,
+	band: ThoughtViewportBand,
+): boolean {
+	return rect.bottom >= band.top && rect.top <= band.bottom;
+}
+
+function isThoughtMarkGroupInBand(
+	groupEl: SVGElement,
+	band: ThoughtViewportBand,
+): boolean {
+	for (const rect of groupEl.querySelectorAll('rect')) {
+		if (isClientRectInThoughtBand(rect.getBoundingClientRect(), band)) {
+			return true;
+		}
+	}
+	return false;
+}
+
+function isCfiRangeInThoughtBand(
+	rend: Rendition,
+	cfiRange: string,
+	band: ThoughtViewportBand,
+): boolean {
+	const range = resolveCfiDomRange(rend, cfiRange);
+	if (!range) return true;
+	const rects = range.getClientRects();
+	// ponytail: 布局未就绪时 rects 为空，视为在带内并 apply，避免 sync 新增划线被误跳过
+	if (rects.length === 0) return true;
+	for (let index = 0; index < rects.length; index++) {
+		if (isClientRectInThoughtBand(rects.item(index)!, band)) {
+			return true;
+		}
+	}
+	return false;
+}
+
+function shouldUseViewportThoughtApply(
+	totalGroupCount: number,
+	chapterGroupCount: number,
+): boolean {
+	return (
+		totalGroupCount >= VIEWPORT_APPLY_MIN_TOTAL_CFIS ||
+		chapterGroupCount >= VIEWPORT_APPLY_MIN_CHAPTER_CFIS
+	);
+}
+
+function resolvePinnedCfis(
+	options?: ApplyThoughtUnderlineOptions,
+): Set<string> {
+	const pins = new Set<string>();
+	for (const cfi of options?.pinCfis ?? []) {
+		const key = cfi.trim();
+		if (key) pins.add(key);
+	}
+	const fromCtx = thoughtUnderlineApplyContext?.getPinnedCfis?.();
+	if (fromCtx) {
+		for (const cfi of fromCtx) {
+			const key = cfi.trim();
+			if (key) pins.add(key);
+		}
+	}
+	for (const cfi of ephemeralPinCfis) {
+		pins.add(cfi);
+	}
+	return pins;
+}
+
+function filterThoughtMarkGroupsForViewportPatch(
+	groupEls: SVGElement[],
+	rend: Rendition | undefined,
+	pinCfis: Set<string>,
+): SVGElement[] {
+	if (!rend || groupEls.length === 0) return groupEls;
+	const ctx = thoughtUnderlineApplyContext;
+	if (!ctx) return groupEls;
+
+	const thoughts = ctx.getThoughts();
+	const scoped = filterThoughtsForAnnotationApply(rend, thoughts);
+	const totalGroups = groupThoughtsByCfi(thoughts).size;
+	const chapterGroups = groupThoughtsByCfi(scoped).size;
+	if (!shouldUseViewportThoughtApply(totalGroups, chapterGroups)) {
+		return groupEls;
+	}
+
+	const root = resolveThoughtViewportRoot(rend);
+	if (!root) return groupEls;
+	const { keep } = readThoughtViewportBands(root);
+	return groupEls.filter((groupEl) => {
+		const cfi = groupEl.dataset.epubcfi?.trim() ?? '';
+		if (cfi && pinCfis.has(cfi)) return true;
+		return isThoughtMarkGroupInBand(groupEl, keep);
+	});
+}
+
+/** 滚动/换章：视口内增量 apply，视口外回收 mark */
+export function refreshThoughtUnderlinesInViewport(rend: Rendition): void {
+	const ctx = thoughtUnderlineApplyContext;
+	if (!ctx) return;
+	applyEpubThoughtUnderlines(
+		rend,
+		ctx.getThoughts(),
+		ctx.appliedRef,
+		ctx.getCurrentUserId(),
+		{ reclaimOffViewportMarks: true },
+	);
+}
+
+/** @deprecated 别名，滚动 patch 仍调用 */
+export const refreshThoughtUnderlinesForLoadedSpines =
+	refreshThoughtUnderlinesInViewport;
+
+function buildPresentThoughtMarkCfis(rend: Rendition): Set<string> {
+	const present = new Set<string>();
+	for (const doc of iterThoughtUnderlineDocuments(rend)) {
+		try {
+			for (const group of doc.querySelectorAll(THOUGHT_MARK_SELECTOR)) {
+				const cfi = (group as SVGElement).dataset.epubcfi?.trim();
+				if (cfi) present.add(cfi);
+			}
+		} catch {
+			// iframe 卸载时忽略
+		}
+	}
+	return present;
+}
+
+function iterThoughtUnderlineDocuments(rend: Rendition): Document[] {
+	const docs = new Set<Document>([document]);
+	for (const contents of getRenditionContentsList(rend)) {
+		if (contents.document) docs.add(contents.document);
+	}
+	return [...docs];
+}
+
+/** appliedRef 有记录但 marks-pane 无对应 mark 时返回 false，迫使重 apply */
+export function isThoughtUnderlineMarkPresent(
+	rend: Rendition,
+	cfiRange: string,
+): boolean {
+	const cfi = cfiRange.trim();
+	if (!cfi) return false;
+	for (const doc of iterThoughtUnderlineDocuments(rend)) {
+		try {
+			for (const group of doc.querySelectorAll(THOUGHT_MARK_SELECTOR)) {
+				if ((group as SVGElement).dataset.epubcfi?.trim() === cfi) {
+					return true;
+				}
+			}
+		} catch {
+			// iframe 卸载时忽略
+		}
+	}
+	return false;
+}
+
+/** 跨 mark 叠层 CFI 投影缓存；滚动 patch 复用，thought/高亮 sync 时清空 */
+const thoughtStackProjectionCache = new Map<string, SvgLineSegment[]>();
+
+export function invalidateThoughtStackProjectionCache(): void {
+	thoughtStackProjectionCache.clear();
+}
+
+function stackProjectionCacheKey(targetCfi: string, otherCfi: string): string {
+	return `${targetCfi}\0${otherCfi}`;
+}
+
+function resolveStackProjectionSegments(
+	rend: Rendition | undefined,
+	targetGroup: SVGElement,
+	targetCfi: string,
+	otherCfi: string,
+	otherGroup: SVGElement,
+): SvgLineSegment[] {
+	const otherKey = otherCfi.trim();
+	if (!otherKey) return [];
+
+	const cacheKey = stackProjectionCacheKey(targetCfi, otherKey);
+	const cached = thoughtStackProjectionCache.get(cacheKey);
+	if (cached) return cached;
+
+	const segments =
+		rend && otherKey
+			? resolveHighlightSvgLineSegments(rend, targetGroup, otherKey)
+			: readMarkSvgLineSegmentsFromRects(otherGroup);
+	thoughtStackProjectionCache.set(cacheKey, segments);
+	return segments;
+}
+
+export function invalidateAppliedThoughtUnderlinesMissingDom(
+	rend: Rendition,
+	appliedRef: Map<string, string>,
+): void {
+	const presentCfis = new Set<string>();
+	for (const doc of iterThoughtUnderlineDocuments(rend)) {
+		try {
+			for (const group of doc.querySelectorAll(THOUGHT_MARK_SELECTOR)) {
+				const cfi = (group as SVGElement).dataset.epubcfi?.trim();
+				if (cfi) presentCfis.add(cfi);
+			}
+		} catch {
+			// iframe 卸载时忽略
+		}
+	}
+	for (const cfi of [...appliedRef.keys()]) {
+		if (!presentCfis.has(cfi)) {
+			appliedRef.delete(cfi);
+			thoughtLineOwnByCfi.delete(cfi);
+		}
+	}
+}
 
 type ThoughtLineSegment = {
 	x1: number;
@@ -335,16 +656,45 @@ function hideThoughtUnderlineLine(line: SVGLineElement): void {
 	line.setAttribute('stroke-opacity', '0');
 }
 
+function resolveThoughtLineColor(
+	group: EbookThought[],
+	currentUserId: number,
+): string {
+	return group.some((t) => t.userId === currentUserId)
+		? THOUGHT_LINE_COLOR_OWN
+		: THOUGHT_LINE_COLOR_FOREIGN;
+}
+
+function resolveMarkLineColor(groupEl: SVGElement, cfi: string): string {
+	return isThoughtMarkLineOwn(cfi, groupEl)
+		? THOUGHT_LINE_COLOR_OWN
+		: THOUGHT_LINE_COLOR_FOREIGN;
+}
+
+function syncThoughtLineOwnMark(groupEl: SVGElement, cfi: string): boolean {
+	const lineOwn = isThoughtMarkLineOwn(cfi, groupEl);
+	const attr = lineOwn ? '1' : '0';
+	if (groupEl.dataset[THOUGHT_MARK_DATA_LINE_OWN] !== attr) {
+		groupEl.dataset[THOUGHT_MARK_DATA_LINE_OWN] = attr;
+	}
+	return lineOwn;
+}
+
 function applyVisibleThoughtUnderlineLine(
 	line: SVGLineElement,
 	segment: ThoughtLineSegment,
+	groupEl: SVGElement,
+	cfi: string,
 ): void {
+	const lineOwn = syncThoughtLineOwnMark(groupEl, cfi);
+	const color = resolveMarkLineColor(groupEl, cfi);
 	line.classList.remove(THOUGHT_LINE_SUPPRESSED_CLASS);
+	line.classList.toggle(THOUGHT_LINE_FOREIGN_CLASS, !lineOwn);
 	line.setAttribute('x1', String(segment.x1));
 	line.setAttribute('x2', String(segment.x2));
 	line.setAttribute('y1', String(segment.y));
 	line.setAttribute('y2', String(segment.y));
-	line.setAttribute('stroke', THOUGHT_LINE_COLOR);
+	line.setAttribute('stroke', color);
 	line.setAttribute('stroke-opacity', THOUGHT_LINE_OPACITY);
 	line.setAttribute('stroke-width', '1');
 	line.setAttribute('stroke-dasharray', THOUGHT_LINE_DASHARRAY);
@@ -406,36 +756,83 @@ function thoughtMarkSpanLength(groupEl: SVGElement): number {
 	return cfi.length;
 }
 
-/** 将已绘制的想法虚线段登记为 blocker，供较短/后绘制的重叠选区扣减 */
-function appendThoughtLineBlockerRects(
-	sources: UserHighlightBlockerSource[],
-	cfi: string,
-	thoughtRect: SvgLocalRect,
-	segments: ThoughtLineSegment[],
-): void {
-	const rects = segments
-		.map((segment) => ({
-			x: segment.x1,
-			y: thoughtRect.y,
-			width: segment.x2 - segment.x1,
-			height: thoughtRect.height,
-		}))
-		.filter((rect) => rect.width >= MIN_THOUGHT_LINE_SEGMENT_PX);
-	if (rects.length === 0) return;
-	sources.push({ cfi, rects });
+function isThoughtMarkLineOwn(cfi: string, groupEl?: SVGElement): boolean {
+	const fromMap = thoughtLineOwnByCfi.get(cfi);
+	if (fromMap !== undefined) return fromMap;
+	if (groupEl) {
+		return groupEl.dataset[THOUGHT_MARK_DATA_LINE_OWN] !== '0';
+	}
+	return true;
 }
 
-function compareThoughtMarksForLineDrawOrder(
+function compareThoughtMarksForStacking(
 	left: PreparedThoughtMark,
 	right: PreparedThoughtMark,
 ): number {
-	if (!left.showLine && !right.showLine) return 0;
-	if (!left.showLine) return 1;
-	if (!right.showLine) return -1;
-	// ponytail: 较短选区先画线，较长选区后画并扣减重叠（句子级不被整段盖住）
-	const spanDiff = left.span - right.span;
+	const leftOwn = isThoughtMarkLineOwn(left.cfi, left.groupEl);
+	const rightOwn = isThoughtMarkLineOwn(right.cfi, right.groupEl);
+	if (leftOwn !== rightOwn) return leftOwn ? 1 : -1;
+	const spanDiff = right.span - left.span;
 	if (spanDiff !== 0) return spanDiff;
-	return right.cfi.length - left.cfi.length;
+	return left.cfi.length - right.cfi.length;
+}
+
+function buildThoughtMarkStackRank(
+	prepared: PreparedThoughtMark[],
+): Map<SVGElement, number> {
+	const order = [...prepared].sort(compareThoughtMarksForStacking);
+	const rankByGroup = new Map<SVGElement, number>();
+	for (let index = 0; index < order.length; index++) {
+		rankByGroup.set(order[index]!.groupEl, index);
+	}
+	return rankByGroup;
+}
+
+/** 预计算每个下层 mark 需扣减的更高叠层投影线段（CFI 解析每对只做一次） */
+function buildHigherStackOverlaySegmentsByItem(
+	prepared: PreparedThoughtMark[],
+	rankByGroup: Map<SVGElement, number>,
+	rend?: Rendition,
+): Map<SVGElement, SvgLineSegment[]> {
+	const segmentsByItem = new Map<SVGElement, SvgLineSegment[]>();
+
+	for (const item of prepared) {
+		const itemRank = rankByGroup.get(item.groupEl) ?? 0;
+		const allSegments: SvgLineSegment[] = [];
+
+		for (const other of prepared) {
+			if (other.groupEl === item.groupEl) continue;
+			const otherRank = rankByGroup.get(other.groupEl) ?? 0;
+			if (otherRank <= itemRank) continue;
+
+			allSegments.push(
+				...resolveStackProjectionSegments(
+					rend,
+					item.groupEl,
+					item.cfi,
+					other.cfi,
+					other.groupEl,
+				),
+			);
+		}
+
+		segmentsByItem.set(item.groupEl, allSegments);
+	}
+
+	return segmentsByItem;
+}
+
+function collectHigherStackOverlayBlockers(
+	thoughtLocal: SvgLocalRect,
+	higherStackSegments: SvgLineSegment[],
+): SvgLocalRect[] {
+	const blockers: SvgLocalRect[] = [];
+	for (const seg of higherStackSegments) {
+		if (horizontalSvgOverlap(thoughtLocal, seg)) {
+			blockers.push(seg);
+		}
+	}
+	return blockers;
 }
 
 function prepareThoughtUnderlineMark(
@@ -444,6 +841,7 @@ function prepareThoughtUnderlineMark(
 ): PreparedThoughtMark {
 	const showLine = groupEl.dataset[THOUGHT_MARK_DATA_SHOW_LINE] !== '0';
 	const cfi = groupEl.dataset.epubcfi?.trim() ?? '';
+	syncThoughtLineOwnMark(groupEl, cfi);
 
 	groupEl.querySelectorAll(`line.${THOUGHT_LINE_SEG_CLASS}`).forEach((node) => {
 		node.remove();
@@ -492,7 +890,7 @@ function applyThoughtUnderlineLineSegments(
 				line.classList.add(THOUGHT_LINE_SEG_CLASS);
 				item.groupEl.appendChild(line);
 			}
-			applyVisibleThoughtUnderlineLine(line, segment);
+			applyVisibleThoughtUnderlineLine(line, segment, item.groupEl, item.cfi);
 		});
 	});
 
@@ -504,25 +902,37 @@ function applyThoughtUnderlineLineSegments(
 function patchThoughtUnderlineMarks(
 	root: ParentNode = document,
 	rend?: Rendition,
+	pinCfis: Set<string> = new Set(),
+	viewportOnly = false,
 ): void {
-	const groupEls = [
+	let groupEls = [
 		...root.querySelectorAll(
 			`g.${EPUB_THOUGHT_UNDERLINE_CLASS}, g[ref="${EPUB_THOUGHT_UNDERLINE_CLASS}"]`,
 		),
 	] as SVGElement[];
 	if (groupEls.length === 0) return;
 
+	if (viewportOnly) {
+		groupEls = filterThoughtMarkGroupsForViewportPatch(groupEls, rend, pinCfis);
+		if (groupEls.length === 0) return;
+	}
+
 	const prepared = groupEls.map((groupEl) =>
 		prepareThoughtUnderlineMark(groupEl, rend),
 	);
+	const rankByGroup = buildThoughtMarkStackRank(prepared);
+	const higherStackSegmentsByItem = buildHigherStackOverlaySegmentsByItem(
+		prepared,
+		rankByGroup,
+		rend,
+	);
 
-	// 较短选区先画；用户划线 blocker 扣重叠段，thoughtBlockers 扣想法间重叠
-	const thoughtLineBlockerSources: UserHighlightBlockerSource[] = [];
 	const lineSegmentsByGroup = new Map<SVGElement, ThoughtLineSegment[][]>();
-	const drawOrder = [...prepared].sort(compareThoughtMarksForLineDrawOrder);
 
-	for (const item of drawOrder) {
+	for (const item of prepared) {
 		const perRectSegments: ThoughtLineSegment[][] = [];
+		const higherStackSegments =
+			higherStackSegmentsByItem.get(item.groupEl) ?? [];
 
 		for (const rect of item.rects) {
 			const thoughtLocal = parseSvgMarkRect(rect);
@@ -535,26 +945,17 @@ function patchThoughtUnderlineMarks(
 				thoughtLocal,
 				userHighlightBlockerSources,
 			);
-			const thoughtBlockers = getHighlightBlockerRectsForThought(
+			const stackBlockers = collectHigherStackOverlayBlockers(
 				thoughtLocal,
-				thoughtLineBlockerSources,
+				higherStackSegments,
 			);
 			const segments = item.showLine
 				? computeThoughtLineSegmentsNotOverlappingHighlights(thoughtLocal, [
 						...userBlockers,
-						...thoughtBlockers,
+						...stackBlockers,
 					])
 				: [];
 			perRectSegments.push(segments);
-
-			if (item.showLine && segments.length > 0) {
-				appendThoughtLineBlockerRects(
-					thoughtLineBlockerSources,
-					item.cfi,
-					thoughtLocal,
-					segments,
-				);
-			}
 		}
 
 		lineSegmentsByGroup.set(item.groupEl, perRectSegments);
@@ -590,15 +991,6 @@ function patchThoughtUnderlineMarks(
  *
  * - g.moke-epub-thought-ul            ：通过 class 选中
  * - g[ref="moke-epub-thought-ul"]     ：通过 ref 属性选中（某些 epub.js 版本 mark 时用 ref）
- */
-const THOUGHT_MARK_SELECTOR = `g.${EPUB_THOUGHT_UNDERLINE_CLASS}, g[ref="${EPUB_THOUGHT_UNDERLINE_CLASS}"]`;
-
-/**
- * 设置所有 EPUB 想法下划线 mark 的 pointer-events
- *
- * 常用于“临时禁止下划线交互”，如选中文字阶段禁用点击，防止误触发想法弹窗。
- *
- * @param value pointer-events 的 CSS 属性，'none' 表示禁止交互、'auto' 恢复允许（可点击）
  */
 function setThoughtMarkPointerEvents(value: 'none' | 'auto'): void {
 	for (const selector of [THOUGHT_MARK_SELECTOR]) {
@@ -735,14 +1127,6 @@ function attachThoughtMarkClickGuard(rend: Rendition): () => void {
 	};
 }
 
-/**
- * 按 cfiRange 分组聚合所有想法
- *
- * 为什么要分组：EPUB 正文同一段落（同一 cfiRange）可能存在多条想法，页面下划线只需画一条，点击弹出全部想法。此函数将数组聚合为 Map，key 为去除空白的 cfiRange，value 为该段下所有想法，保证每组在后续渲染和事件分发时可批量处理。
- *
- * @param thoughts 所有想法（来自接口，未分组）
- * @returns Map<string, EbookThought[]> key: cfiRange, value: 属于该段的全部想法
- */
 function groupThoughtsByCfi(
 	thoughts: EbookThought[],
 ): Map<string, EbookThought[]> {
@@ -755,6 +1139,21 @@ function groupThoughtsByCfi(
 		map.set(cfi, list); // 更新分组映射
 	}
 	return map;
+}
+
+/** 仅保留当前 rendition 已加载 spine 的想法（大书换章 apply 热路径） */
+export function filterThoughtsForAnnotationApply(
+	rend: Rendition,
+	thoughts: EbookThought[],
+): EbookThought[] {
+	const grouped = groupThoughtsByCfi(thoughts);
+	const loadedSpines = collectLoadedSpineHints(rend);
+	if (!shouldScopeThoughtApplyBySpine(grouped.size, loadedSpines)) {
+		return thoughts;
+	}
+	return thoughts.filter((thought) =>
+		loadedSpines.has(thoughtSpineHint(thought.cfiRange)),
+	);
 }
 
 /** 选区跨度（字符数）：用于重叠下划线叠放，短选区后绘制、位于上层以优先响应点击 */
@@ -846,42 +1245,119 @@ function buildThoughtUnderlineSignature(
 	return `${showLine ? '1' : '0'}|${thoughtIds.join(',')}`;
 }
 
+export type ApplyThoughtUnderlineOptions = {
+	/** 侧栏锚点 / 新建想法 / sync 等：无视视口裁剪强制挂载 */
+	pinCfis?: Iterable<string>;
+	/** 滚动停稳时回收视口外 mark；想法增删改时应为 false */
+	reclaimOffViewportMarks?: boolean;
+};
+
 /**
  * 仅同步下划线批注（thoughts 变化时调用，不重复注册 hooks）
- * ponytail: 每条想法都画可见虚线；嵌套/重叠由 patch 短选区先画 + thoughtBlockers 去重。
+ * 大书：按视口动态挂载（keep 带内 apply，remove 带外回收），类似微信读书。
  */
 export function applyEpubThoughtUnderlines(
 	rend: Rendition,
 	thoughts: EbookThought[],
 	appliedRef: Map<string, string>,
+	currentUserId = 0,
+	options?: ApplyThoughtUnderlineOptions,
 ): void {
 	try {
 		ensureThoughtUnderlineStyles();
 	} catch {
+		ephemeralPinCfis.clear();
 		return;
 	}
 
-	const grouped = groupThoughtsByCfi(thoughts);
-	const nextCfis = new Set(grouped.keys());
+	const pinCfis = resolvePinnedCfis(options);
+	const scopedThoughts = filterThoughtsForAnnotationApply(rend, thoughts);
+	const grouped = groupThoughtsByCfi(scopedThoughts);
+	const allGrouped = groupThoughtsByCfi(thoughts);
+	const loadedSpines = collectLoadedSpineHints(rend);
+	const scopeBySpine = shouldScopeThoughtApplyBySpine(
+		allGrouped.size,
+		loadedSpines,
+	);
+	const viewportMode = shouldUseViewportThoughtApply(
+		allGrouped.size,
+		grouped.size,
+	);
+	const viewportRoot = viewportMode ? resolveThoughtViewportRoot(rend) : null;
+	const viewportBands = viewportRoot
+		? readThoughtViewportBands(viewportRoot)
+		: null;
 
-	for (const cfiRange of [...appliedRef.keys()]) {
-		if (!nextCfis.has(cfiRange)) {
+	const shouldKeepCfiApplied = (cfiRange: string): boolean => {
+		if (pinCfis.has(cfiRange)) return true;
+		if (!viewportMode || !viewportBands) return true;
+		for (const doc of iterThoughtUnderlineDocuments(rend)) {
 			try {
-				rend.annotations.remove(cfiRange, 'underline');
+				for (const group of doc.querySelectorAll(THOUGHT_MARK_SELECTOR)) {
+					if ((group as SVGElement).dataset.epubcfi?.trim() !== cfiRange) {
+						continue;
+					}
+					return isThoughtMarkGroupInBand(
+						group as SVGElement,
+						viewportBands.remove,
+					);
+				}
 			} catch {
 				// ignore
 			}
-			appliedRef.delete(cfiRange);
 		}
+		return isCfiRangeInThoughtBand(rend, cfiRange, viewportBands.keep);
+	};
+
+	const presentCfis = buildPresentThoughtMarkCfis(rend);
+	const nextCfis = new Set(grouped.keys());
+
+	for (const [cfiRange, group] of grouped) {
+		thoughtLineOwnByCfi.set(
+			cfiRange,
+			group.some((t) => t.userId === currentUserId),
+		);
+	}
+	for (const key of [...thoughtLineOwnByCfi.keys()]) {
+		if (!nextCfis.has(key)) thoughtLineOwnByCfi.delete(key);
+	}
+
+	for (const cfiRange of [...appliedRef.keys()]) {
+		const dropData =
+			!nextCfis.has(cfiRange) ||
+			(scopeBySpine && !loadedSpines.has(thoughtSpineHint(cfiRange)));
+		const dropViewport =
+			Boolean(options?.reclaimOffViewportMarks) &&
+			viewportMode &&
+			!shouldKeepCfiApplied(cfiRange);
+		if (!dropData && !dropViewport) continue;
+		if (pinCfis.has(cfiRange) && dropViewport && nextCfis.has(cfiRange)) {
+			continue;
+		}
+		try {
+			rend.annotations.remove(cfiRange, 'underline');
+		} catch {
+			// ignore
+		}
+		appliedRef.delete(cfiRange);
 	}
 
 	const sortedEntries = sortCfiGroupsForUnderlineStack([...grouped.entries()]);
 
 	for (const [cfiRange, group] of sortedEntries) {
+		if (viewportMode && !pinCfis.has(cfiRange) && viewportBands) {
+			if (!isCfiRangeInThoughtBand(rend, cfiRange, viewportBands.keep)) {
+				continue;
+			}
+		}
+
 		const thoughtIds = group.map((t) => t.id);
 		const showLine = true;
-		const nextSig = buildThoughtUnderlineSignature(thoughtIds, showLine);
-		if (appliedRef.get(cfiRange) === nextSig) continue;
+		const lineOwn = group.some((t) => t.userId === currentUserId);
+		const nextSig = `${buildThoughtUnderlineSignature(thoughtIds, showLine)}|${lineOwn ? '1' : '0'}`;
+		if (appliedRef.get(cfiRange) === nextSig && presentCfis.has(cfiRange)) {
+			continue;
+		}
 
 		try {
 			rend.annotations.remove(cfiRange, 'underline');
@@ -890,16 +1366,22 @@ export function applyEpubThoughtUnderlines(
 				{
 					thoughtIds,
 					[THOUGHT_MARK_DATA_SHOW_LINE]: showLine ? '1' : '0',
+					[THOUGHT_MARK_DATA_LINE_OWN]: lineOwn ? '1' : '0',
 				},
 				undefined,
 				EPUB_THOUGHT_UNDERLINE_CLASS,
-				EPUB_THOUGHT_UNDERLINE_STYLES,
+				{
+					...EPUB_THOUGHT_UNDERLINE_STYLES,
+					stroke: resolveThoughtLineColor(group, currentUserId),
+				},
 			);
 			appliedRef.set(cfiRange, nextSig);
+			presentCfis.add(cfiRange);
 		} catch {
 			appliedRef.delete(cfiRange);
 		}
 	}
+	ephemeralPinCfis.clear();
 }
 
 /** 移除当前 appliedRef 中记录的全部下划线 */
@@ -908,6 +1390,7 @@ export function teardownAppliedThoughtUnderlines(
 	appliedRef: Map<string, string>,
 ): void {
 	for (const cfiRange of [...appliedRef.keys()]) {
+		thoughtLineOwnByCfi.delete(cfiRange);
 		try {
 			rend.annotations.remove(cfiRange, 'underline');
 		} catch {

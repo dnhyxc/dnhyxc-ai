@@ -98,6 +98,7 @@ function EpubThoughtListItem({
 			username={thought.username || t('ebook.read.thought.unknownUser')}
 			avatar={thought.avatar}
 			createdAt={thought.createdAt}
+			isPublic={thought.isPublic !== false}
 			selected={selected}
 			onClick={() => onOpenThoughtDetail(thought)}
 		>

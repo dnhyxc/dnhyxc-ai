@@ -19,6 +19,7 @@ import { relayoutListenMarkHighlight } from '../../utils/epub/listen/epubListenM
 import { checkEpubListenFollowAfterLayout } from '../../utils/epub/listen/epubListenSegmentOverlay';
 import {
 	installEpubThoughtUnderlineListeners,
+	setThoughtUnderlineApplyContext,
 	teardownAppliedThoughtUnderlines,
 } from '../../utils/epub/mark/epubThoughtAnnotations';
 import {
@@ -27,6 +28,8 @@ import {
 	patchEpubReadingAnnotations,
 	resetEpubReadingAnnotationSyncState,
 	syncEpubReadingAnnotations,
+	syncEpubThoughtUnderlines,
+	syncEpubUserHighlights,
 	teardownAppliedUserHighlights,
 } from '../../utils/epub/mark/epubUserHighlights';
 import {
@@ -77,6 +80,12 @@ type Props = {
 	onSelectionPopBar?: (payload: EpubSelectionPopBarPayload | null) => void;
 	/** 读书想法（下划线标注） */
 	thoughts?: EbookThought[];
+	/** 换章时触发想法 apply（thoughts 未变但需重画当前章） */
+	annotationSpineKey?: number;
+	/** 侧栏锚点等需强制挂载的 CFI */
+	getPinnedThoughtCfis?: () => ReadonlySet<string>;
+	/** pin 集合变化时触发想法重同步 */
+	pinnedThoughtCfisRevision?: number;
 	onThoughtClick?: (thought: EbookThought) => void;
 	onThoughtClusterClick?: (cluster: EbookThoughtClickCluster) => void;
 	onUserHighlightPopBar?: (
@@ -85,6 +94,8 @@ type Props = {
 	) => void;
 	/** 用户划线（高亮 / 下划线 / 波浪线） */
 	highlights?: EbookUserHighlight[];
+	/** 用于想法下划线本人 / 他人配色 */
+	currentUserId?: number;
 };
 
 /** epub.js 全书百分比需 locations.generate；未就绪时用 spine 索引粗估 */
@@ -135,10 +146,14 @@ export function EpubPane({
 	onReaderPointerDown,
 	onSelectionPopBar,
 	thoughts = [],
+	annotationSpineKey,
+	getPinnedThoughtCfis,
+	pinnedThoughtCfisRevision = 0,
 	onThoughtClick,
 	onThoughtClusterClick,
 	onUserHighlightPopBar,
 	highlights = [],
+	currentUserId = 0,
 }: Props) {
 	const { theme: appTheme } = useTheme();
 	const [appThemeName, setAppThemeName] = useState<ThemeName>(appTheme);
@@ -162,8 +177,10 @@ export function EpubPane({
 	const onThoughtClickRef = useRef(onThoughtClick);
 	const onThoughtClusterClickRef = useRef(onThoughtClusterClick);
 	const onUserHighlightPopBarRef = useRef(onUserHighlightPopBar);
+	const getPinnedThoughtCfisRef = useRef(getPinnedThoughtCfis);
 	const thoughtsRef = useRef(thoughts);
 	const highlightsRef = useRef(highlights);
+	const currentUserIdRef = useRef(currentUserId);
 	const appliedThoughtsRef = useRef<Map<string, string>>(new Map());
 	const appliedHighlightsRef = useRef<Map<string, string>>(new Map());
 	const keyboardNavEnabledRef = useRef(keyboardNavEnabled);
@@ -211,8 +228,10 @@ export function EpubPane({
 	onThoughtClickRef.current = onThoughtClick;
 	onThoughtClusterClickRef.current = onThoughtClusterClick;
 	onUserHighlightPopBarRef.current = onUserHighlightPopBar;
+	getPinnedThoughtCfisRef.current = getPinnedThoughtCfis;
 	thoughtsRef.current = thoughts;
 	highlightsRef.current = highlights;
+	currentUserIdRef.current = currentUserId;
 	keyboardNavEnabledRef.current = keyboardNavEnabled;
 
 	// 仅在换书（open 变化）时记录起始 CFI，避免翻页保存进度后整书重载闪烁
@@ -302,17 +321,45 @@ export function EpubPane({
 	}, [rendReady, onReaderPointerDown]);
 
 	useEffect(() => {
+		if (!rendReady) return;
+		setThoughtUnderlineApplyContext({
+			getThoughts: () => thoughtsRef.current ?? [],
+			appliedRef: appliedThoughtsRef.current,
+			getCurrentUserId: () => currentUserIdRef.current,
+			getPinnedCfis: () =>
+				getPinnedThoughtCfisRef.current?.() ?? new Set<string>(),
+		});
+		return () => setThoughtUnderlineApplyContext(null);
+	}, [rendReady]);
+
+	useEffect(() => {
 		const rend = rendRef.current;
 		if (!rend || !rendReady) return;
 
-		syncEpubReadingAnnotations(
+		syncEpubThoughtUnderlines(
 			rend,
 			thoughts ?? [],
-			highlights ?? [],
 			appliedThoughtsRef.current,
+			currentUserId,
+		);
+	}, [
+		thoughts,
+		annotationSpineKey,
+		pinnedThoughtCfisRevision,
+		rendReady,
+		currentUserId,
+	]);
+
+	useEffect(() => {
+		const rend = rendRef.current;
+		if (!rend || !rendReady) return;
+
+		syncEpubUserHighlights(
+			rend,
+			highlights ?? [],
 			appliedHighlightsRef.current,
 		);
-	}, [thoughts, highlights, rendReady]);
+	}, [highlights, rendReady]);
 
 	// EPUB 渲染器主生命周期副作用
 	useEffect(() => {
@@ -451,6 +498,7 @@ export function EpubPane({
 							nextHighlights ?? highlightsRef.current ?? [],
 							appliedThoughtsRef.current,
 							appliedHighlightsRef.current,
+							currentUserIdRef.current,
 						);
 					},
 				});
@@ -531,6 +579,7 @@ export function EpubPane({
 				highlightsRef.current ?? [],
 				appliedThoughtsRef.current,
 				appliedHighlightsRef.current,
+				currentUserIdRef.current,
 			);
 		};
 

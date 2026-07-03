@@ -222,6 +222,8 @@ export const EBOOK_CATEGORIES_SUMMARY = '/ebook/categories/summary';
 export const EBOOK_CATEGORIES = '/ebook/categories';
 /** 电子书：书籍归属分类 */
 export const EBOOK_BOOK_CATEGORY = '/ebook/book';
+/** 电子书：公开书籍幂等打开 */
+export const EBOOK_PUBLIC_OPEN = '/ebook/public';
 
 /** 英语学习：按主题生成经典语句（译文 + 出处 + 赏析） */
 export const ENGLISH_LEARNING_CLASSIC_QUOTES =
