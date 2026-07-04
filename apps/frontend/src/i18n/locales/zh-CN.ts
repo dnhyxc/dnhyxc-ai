@@ -637,6 +637,8 @@ export const zhCN = {
 	'auth.captcha': '验证码',
 	'auth.username.placeholder': '请输入用户名',
 	'auth.password.placeholder': '请输入密码',
+	'auth.showPassword': '显示密码',
+	'auth.hidePassword': '隐藏密码',
 	'auth.captcha.placeholder': '请输入验证码',
 	'auth.login.submit': '登录',
 	'auth.captcha.fetchFailed': '获取验证码失败！',

@@ -163,6 +163,11 @@ export const PROJECT_GUIDE_ITEMS_EN: Record<
 		description:
 			'Shortcuts such as save or clear draft apply only on the Knowledge page to avoid accidental triggers elsewhere.',
 	},
+	'pg-s7-3': {
+		title: '7.3 Form filling tips',
+		description:
+			'On login, register, and settings forms, Tab jumps directly between input fields—skipping buttons and links—and Enter submits the form, so filling is faster. Password fields have an eye icon on the right to toggle plaintext, letting you spot and fix typos without deleting everything.',
+	},
 	'pg-s8-1': {
 		title: '8.1 File storage',
 		description:

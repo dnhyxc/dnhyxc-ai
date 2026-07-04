@@ -2,6 +2,7 @@ import { Toaster } from '@ui/sonner';
 import { useEffect } from 'react';
 import { createBrowserRouter, RouteObject } from 'react-router';
 import { RouterProvider } from 'react-router/dom';
+import { useInputsOnlyTab } from '@/hooks';
 import {
 	attachTauriPlainFieldClipboardShortcuts,
 	getValue,
@@ -13,6 +14,8 @@ import { isTauriRuntime } from '@/utils/runtime';
 import routes from './routes';
 
 const App = () => {
+	useInputsOnlyTab();
+
 	useEffect(() => {
 		let cancelled = false;
 		const unlistenFns: Array<() => void> = [];

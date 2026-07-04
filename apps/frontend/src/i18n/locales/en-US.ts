@@ -697,6 +697,8 @@ export const enUS = {
 	'auth.captcha': 'Captcha',
 	'auth.username.placeholder': 'Enter username',
 	'auth.password.placeholder': 'Enter password',
+	'auth.showPassword': 'Show password',
+	'auth.hidePassword': 'Hide password',
 	'auth.captcha.placeholder': 'Enter captcha',
 	'auth.login.submit': 'Sign in',
 	'auth.captcha.fetchFailed': 'Failed to fetch captcha.',

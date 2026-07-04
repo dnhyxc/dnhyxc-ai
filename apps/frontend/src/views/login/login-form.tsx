@@ -1,3 +1,4 @@
+import SecretInput from '@design/SecretInput';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Toast } from '@ui/sonner';
 import { Spinner } from '@ui/spinner';
@@ -143,9 +144,11 @@ const LoginForm: React.FC<IProps> = ({ onForgetPwd }) => {
 						<FormItem>
 							<FormLabel className="text-md">{t('auth.password')}</FormLabel>
 							<FormControl>
-								<Input
-									type="password"
+								<SecretInput
 									placeholder={t('auth.password.placeholder')}
+									autoComplete="current-password"
+									showLabel={t('auth.showPassword')}
+									hideLabel={t('auth.hidePassword')}
 									{...field}
 								/>
 							</FormControl>

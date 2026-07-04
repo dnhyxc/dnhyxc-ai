@@ -15,5 +15,8 @@
 | [http-network-error-toast.md](./http-network-error-toast.md) | 网络错误 Toast |
 | [tauri-http-all-method-retry.md](./tauri-http-all-method-retry.md) | **Tauri HttpClient 全方法重试**：POST 等写请求默认 2 次、`catch`/`handleErrorResponse` 修复 |
 | [voice-input-implementation.md](./voice-input-implementation.md) | 语音输入（对话等） |
+| [secret-input-component.md](./secret-input-component.md) | **SecretInput 密文输入组件**：设计系统统一组件，密码/API Key + 眼睛显隐按钮、受控/非受控、`tabIndex=-1` |
+| [setting-api-key-secret-input.md](./setting-api-key-secret-input.md) | **设置页 API Key 改用 SecretInput**：LLM + 云端 TTS 设置页去重样板代码 |
+| [login-password-secret-input-tab.md](./login-password-secret-input-tab.md) | **登录页密码显隐 + 全局 Tab 仅输入框**：`SecretInput` 接入登录/注册/找回密码、`useInputsOnlyTab` Hook |
 
 上级：[../README.md](../README.md)

@@ -10,6 +10,7 @@ export * from './useAssistantPaneBusy';
 export * from './useAssistantScroll';
 export * from './useIncrementalClassicQuoteFavoriteStatus';
 export * from './useIncrementalVocabFavoriteStatus';
+export * from './useInputsOnlyTab';
 export * from './useIsSuperAdmin';
 export * from './useMarkdownHashLinkViewportScroll';
 export * from './useMembershipActive';

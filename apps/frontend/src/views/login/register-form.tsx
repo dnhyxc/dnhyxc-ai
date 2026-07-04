@@ -1,3 +1,4 @@
+import SecretInput from '@design/SecretInput';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
@@ -106,9 +107,11 @@ const RegisterForm: React.FC<IProps> = ({ onRegister }) => {
 						<FormItem>
 							<FormLabel className="text-md">{t('auth.password')}</FormLabel>
 							<FormControl>
-								<Input
-									type="password"
+								<SecretInput
 									placeholder={t('auth.password.placeholder')}
+									autoComplete="new-password"
+									showLabel={t('auth.showPassword')}
+									hideLabel={t('auth.hidePassword')}
 									{...field}
 								/>
 							</FormControl>

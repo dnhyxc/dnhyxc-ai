@@ -1,9 +1,8 @@
+import SecretInput from '@design/SecretInput';
 import { Button } from '@ui/button';
 import { CreatableCombobox } from '@ui/combobox';
 import { Spinner, Switch, Toast } from '@ui/index';
-import { Input } from '@ui/input';
 import { Label } from '@ui/label';
-import { Eye, EyeOff } from 'lucide-react';
 import { observer } from 'mobx-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useI18n, useIsSuperAdmin, useMembershipActive } from '@/hooks';
@@ -238,7 +237,6 @@ const LlmSetting = observer(() => {
 	const [modelName, setModelName] = useState(providerDefaults.modelName);
 	const [apiKey, setApiKey] = useState('');
 	const [savedApiKey, setSavedApiKey] = useState('');
-	const [showApiKey, setShowApiKey] = useState(false);
 
 	const [vectorDefaults, setVectorDefaults] = useState(
 		FALLBACK_VECTOR_DEFAULTS,
@@ -260,7 +258,6 @@ const LlmSetting = observer(() => {
 	);
 	const [vectorApiKey, setVectorApiKey] = useState('');
 	const [savedVectorApiKey, setSavedVectorApiKey] = useState('');
-	const [showVectorApiKey, setShowVectorApiKey] = useState(false);
 	const [vectorSaving, setVectorSaving] = useState(false);
 	const [vectorBgeOnly, setVectorBgeOnly] = useState(false);
 
@@ -446,7 +443,6 @@ const LlmSetting = observer(() => {
 				const { displayKey, savedKey } = resolveApiKeyFields(res.data.apiKey);
 				setSavedApiKey(savedKey);
 				setApiKey(displayKey);
-				setShowApiKey(false);
 
 				setVectorBaseUrl(resolveTextField(res.data.vectorBaseUrl, vd.baseUrl));
 				setVectorRerankUrl(
@@ -464,7 +460,6 @@ const LlmSetting = observer(() => {
 				const vectorKey = resolveApiKeyFields(res.data.vectorApiKey);
 				setSavedVectorApiKey(vectorKey.savedKey);
 				setVectorApiKey(vectorKey.displayKey);
-				setShowVectorApiKey(false);
 				setVectorBgeOnly(Boolean(res.data.vectorBgeOnly));
 			}
 		} finally {
@@ -783,7 +778,6 @@ const LlmSetting = observer(() => {
 				const { displayKey, savedKey } = resolveApiKeyFields(res.data.apiKey);
 				setSavedApiKey(savedKey);
 				setApiKey(displayKey);
-				setShowApiKey(false);
 				Toast({
 					type: 'success',
 					title: t('setting.llm.saveSuccess'),
@@ -804,7 +798,6 @@ const LlmSetting = observer(() => {
 				setModelName(providerDefaults.modelName);
 				setSavedApiKey('');
 				setApiKey('');
-				setShowApiKey(false);
 				Toast({
 					type: 'success',
 					title: t('setting.llm.clearSuccess'),
@@ -835,7 +828,6 @@ const LlmSetting = observer(() => {
 				const vectorKey = resolveApiKeyFields(res.data.vectorApiKey);
 				setSavedVectorApiKey(vectorKey.savedKey);
 				setVectorApiKey(vectorKey.displayKey);
-				setShowVectorApiKey(false);
 				setVectorBgeOnly(Boolean(res.data.vectorBgeOnly));
 				Toast({
 					type: 'success',
@@ -860,7 +852,6 @@ const LlmSetting = observer(() => {
 				setVectorCollectionName(vectorDefaults.collectionName);
 				setSavedVectorApiKey('');
 				setVectorApiKey('');
-				setShowVectorApiKey(false);
 				setVectorBgeOnly(false);
 				Toast({
 					type: 'success',
@@ -937,36 +928,16 @@ const LlmSetting = observer(() => {
 									<Label htmlFor="llm-api-key" className={llmFormLabelClass}>
 										{t('setting.llm.apiKey')}
 									</Label>
-									<div className="relative min-w-0 flex-1">
-										<Input
+									<div className="min-w-0 flex-1">
+										<SecretInput
+											key={savedApiKey}
 											id="llm-api-key"
-											type={showApiKey ? 'text' : 'password'}
 											value={apiKey}
 											onChange={(e) => setApiKey(e.target.value)}
 											placeholder={t('setting.llm.apiKeyPlaceholder')}
 											disabled={saving}
-											autoComplete="new-password"
-											className={cn(fieldInputClass, 'pr-10')}
+											className={cn(fieldInputClass, 'w-full')}
 										/>
-										<Button
-											type="button"
-											variant="ghost"
-											size="icon"
-											className="absolute top-1/2 right-1.5 size-6 -translate-y-1/2 text-textcolor/55 hover:text-textcolor"
-											disabled={saving || !apiKey}
-											aria-label={
-												showApiKey
-													? t('setting.llm.hideApiKey')
-													: t('setting.llm.showApiKey')
-											}
-											onClick={() => setShowApiKey((v) => !v)}
-										>
-											{showApiKey ? (
-												<EyeOff className="size-4" aria-hidden />
-											) : (
-												<Eye className="size-4" aria-hidden />
-											)}
-										</Button>
 									</div>
 								</div>
 							</div>
@@ -1188,36 +1159,16 @@ const LlmSetting = observer(() => {
 											>
 												{t('setting.llm.vectorApiKey')}
 											</Label>
-											<div className="relative min-w-0 flex-1">
-												<Input
+											<div className="min-w-0 flex-1">
+												<SecretInput
+													key={savedVectorApiKey}
 													id="vector-api-key"
-													type={showVectorApiKey ? 'text' : 'password'}
 													value={vectorApiKey}
 													onChange={(e) => setVectorApiKey(e.target.value)}
 													placeholder={t('setting.llm.apiKeyPlaceholder')}
 													disabled={saving || vectorSaving}
-													autoComplete="new-password"
-													className={cn(fieldInputClass, 'pr-10')}
+													className={cn(fieldInputClass, 'w-full')}
 												/>
-												<Button
-													type="button"
-													variant="ghost"
-													size="icon"
-													className="absolute top-1/2 right-1.5 size-6 -translate-y-1/2 text-textcolor/55 hover:text-textcolor"
-													disabled={vectorSaving || saving || !vectorApiKey}
-													aria-label={
-														showVectorApiKey
-															? t('setting.llm.hideApiKey')
-															: t('setting.llm.showApiKey')
-													}
-													onClick={() => setShowVectorApiKey((v) => !v)}
-												>
-													{showVectorApiKey ? (
-														<EyeOff className="size-4" aria-hidden />
-													) : (
-														<Eye className="size-4" aria-hidden />
-													)}
-												</Button>
 											</div>
 										</div>
 

@@ -226,6 +226,12 @@ const PROJECT_GUIDE_SECTIONS_ZH: ProjectGuideSection[] = [
 				title: '7.2 页面内快捷键（知识库）',
 				description: '如保存、清空草稿等仅在知识库页生效，避免误触。',
 			},
+			{
+				id: 'pg-s7-3',
+				title: '7.3 表单填写小技巧',
+				description:
+					'登录、注册、设置等表单页，按 Tab 会直接跳到下一个输入框，跳过按钮和链接，配合 Enter 提交表单，填写更快；密码输入框右侧有眼睛图标，点击可切换明文/密文显示，输错时可直接看到并修改具体字符。',
+			},
 		],
 	},
 	{

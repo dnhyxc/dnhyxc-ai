@@ -3,6 +3,7 @@
  */
 
 import Loading from '@design/Loading';
+import SecretInput from '@design/SecretInput';
 import { Button } from '@ui/button';
 import { CreatableCombobox } from '@ui/combobox';
 import { Input, Label } from '@ui/index';
@@ -15,7 +16,7 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from '@ui/select';
-import { Eye, EyeOff, Minus, Plus, Volume2 } from 'lucide-react';
+import { Minus, Plus, Volume2 } from 'lucide-react';
 import { observer } from 'mobx-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -251,48 +252,37 @@ function PrefTextField({
 	placeholder?: string;
 }) {
 	const { t } = useI18n();
-	const [visible, setVisible] = useState(false);
-	const inputType = secret ? (visible ? 'text' : 'password') : type;
 
-	const _placeholder = placeholder || t('setting.llm.apiKeyPlaceholder');
+	const _placeholder =
+		placeholder || (secret ? t('setting.llm.apiKeyPlaceholder') : '');
 
 	return (
 		<div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
 			<Label htmlFor={id} className={labelClassName}>
 				{label}
 			</Label>
-			<div className="relative min-w-0 flex-1">
-				<Input
-					id={id}
-					type={inputType}
-					value={value}
-					disabled={disabled}
-					placeholder={_placeholder}
-					autoComplete={secret ? 'new-password' : 'off'}
-					onChange={(e) => onChange(e.target.value)}
-					className={cn(fieldInputClass, 'w-full', secret && 'pr-10')}
-				/>
+			<div className="min-w-0 flex-1">
 				{secret ? (
-					<Button
-						type="button"
-						variant="ghost"
-						size="icon"
-						className="absolute top-1/2 right-1.5 size-6 -translate-y-1/2 text-textcolor/55 hover:text-textcolor"
-						disabled={disabled || !value}
-						aria-label={
-							visible
-								? t('setting.llm.hideApiKey')
-								: t('setting.llm.showApiKey')
-						}
-						onClick={() => setVisible((v) => !v)}
-					>
-						{visible ? (
-							<EyeOff className="size-4" aria-hidden />
-						) : (
-							<Eye className="size-4" aria-hidden />
-						)}
-					</Button>
-				) : null}
+					<SecretInput
+						id={id}
+						value={value}
+						disabled={disabled}
+						placeholder={_placeholder}
+						onChange={(e) => onChange(e.target.value)}
+						className={cn(fieldInputClass, 'w-full')}
+					/>
+				) : (
+					<Input
+						id={id}
+						type={type}
+						value={value}
+						disabled={disabled}
+						placeholder={_placeholder}
+						autoComplete="off"
+						onChange={(e) => onChange(e.target.value)}
+						className={cn(fieldInputClass, 'w-full')}
+					/>
+				)}
 			</div>
 		</div>
 	);

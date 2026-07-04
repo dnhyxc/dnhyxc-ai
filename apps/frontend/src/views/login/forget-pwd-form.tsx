@@ -1,3 +1,4 @@
+import SecretInput from '@design/SecretInput';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
 	Form,
@@ -167,9 +168,11 @@ const ForgetPwdForm: React.FC<IProps> = ({ onForgetPwd, switchLogin }) => {
 						<FormItem>
 							<FormLabel className="text-md">{t('auth.password')}</FormLabel>
 							<FormControl>
-								<Input
-									type="password"
+								<SecretInput
 									placeholder={t('auth.password.placeholder')}
+									autoComplete="new-password"
+									showLabel={t('auth.showPassword')}
+									hideLabel={t('auth.hidePassword')}
 									{...field}
 								/>
 							</FormControl>
@@ -186,9 +189,11 @@ const ForgetPwdForm: React.FC<IProps> = ({ onForgetPwd, switchLogin }) => {
 								{t('auth.confirmPassword')}
 							</FormLabel>
 							<FormControl>
-								<Input
-									type="password"
+								<SecretInput
 									placeholder={t('auth.confirmPassword.placeholder')}
+									autoComplete="new-password"
+									showLabel={t('auth.showPassword')}
+									hideLabel={t('auth.hidePassword')}
 									{...field}
 								/>
 							</FormControl>

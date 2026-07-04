@@ -95,6 +95,16 @@ export const UPDATE_INFO_BULLETS_EN: Record<
 		description:
 			'After cloud TTS preferences were synced to your account, some users were sent back to the login page right after a successful sign-in while background sync ran without credentials. Login order and member-only prefetch are adjusted so the session stays active in production.',
 	},
+	's2-10': {
+		title: 'Password fields support plaintext toggle',
+		description:
+			'Password fields on the login, register, and forgot-password pages now have an eye icon on the right. Click it to toggle between hidden and plaintext, so you can see and fix typos without deleting the whole thing. The toggle button itself is skipped when tabbing, so keyboard navigation stays fast.',
+	},
+	's2-11': {
+		title: 'Faster form filling with Tab key',
+		description:
+			'Global Tab navigation now jumps only between input fields (text inputs, textareas, select dropdowns, etc.) and skips buttons, links, and other non-input controls. Combine with Enter to submit forms—greatly speeds up login, register, and similar flows. Buttons and links still work normally with clicks.',
+	},
 	's3-1': {
 		title: 'One frontend for desktop and browser',
 		description:
