@@ -30,7 +30,7 @@ export function EbookPanelHeader({
 		<header
 			className={cn(
 				EBOOK_PANEL_BAR_HEIGHT_CLASS,
-				'flex shrink-0 items-stretch gap-3 border-b px-2',
+				'flex shrink-0 items-stretch gap-4.5 border-b px-2',
 				epubReaderChromeBorderColorClass,
 				className,
 			)}

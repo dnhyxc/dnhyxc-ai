@@ -84,7 +84,7 @@ function EbookShelfCategoryRail() {
 						variant="ghost"
 						size="sm"
 						className={cn(
-							'h-8 shrink-0 gap-1.5 px-2.5 font-medium hover:bg-transparent dark:hover:bg-transparent',
+							'h-8 shrink-0 gap-1.5 px-2 font-medium hover:bg-transparent dark:hover:bg-transparent first:pl-0 last:pr-0',
 							active
 								? 'text-textcolor hover:text-textcolor'
 								: 'text-textcolor/60 hover:text-textcolor',

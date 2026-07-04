@@ -339,6 +339,7 @@ function EbookCategoryManageDialog({
 								ref={addInputRef}
 								value={newName}
 								maxLength={20}
+								autoFocus
 								placeholder={t('ebook.shelf.category.add')}
 								className="h-8 min-w-0 flex-1 truncate border-0 bg-transparent px-1 text-sm shadow-none focus-visible:border-0 focus-visible:ring-0"
 								disabled={adding}
