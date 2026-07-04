@@ -742,6 +742,7 @@ export const enUS = {
 	'home.features.enter': 'Enter',
 	'home.sections.showcase': 'Highlights',
 	'home.sections.steps': 'Quick start',
+	'home.sections.quicklinks': 'Quick links',
 	'home.features.chat.title': 'Chat',
 	'home.features.chat.subtitle': 'Natural language',
 	'home.features.chat.desc':
@@ -768,6 +769,12 @@ export const enUS = {
 	'home.steps.register.desc': 'Create your personal account',
 	'home.steps.start.title': 'Start',
 	'home.steps.start.desc': 'Enjoy the smart assistant experience',
+	'home.quicklinks.dnhyxc-ai.title': 'dnhyxc-ai',
+	'home.quicklinks.dnhyxc-ai.desc': 'dnhyxc-ai web',
+	'home.quicklinks.blog.title': 'My blog',
+	'home.quicklinks.blog.desc': 'My blog website',
+	'home.quicklinks.github.title': 'GitHub',
+	'home.quicklinks.github.desc': 'My GitHub repository',
 
 	// 知识库文案
 	'knowledge.common.untitled': 'Untitled',
@@ -1787,8 +1794,9 @@ export const enUS = {
 	'route.updateInfo.title': 'Release notes',
 	'route.projectGuide.title': 'Product guide',
 	'route.downloadDesktop.title': 'Download desktop app',
-	'route.guard.needLoginTitle':
-		'This page requires you to sign in before accessing.',
+	'route.guard.needLoginTitle': 'Please sign in before accessing',
+	'route.guard.needLoginMessage': '「{page}」requires sign-in.',
+	'route.guard.unknownPage': 'This page',
 
 	'downloadPage.hero.badge': 'Desktop · Stable',
 	'downloadPage.hero.title': 'Download dnhyxc-ai for desktop',

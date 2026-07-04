@@ -74,7 +74,7 @@ const Home = () => {
 				navigateRegister: true,
 			},
 			{
-				step: '4',
+				step: '3',
 				title: t('home.steps.start.title'),
 				desc: t('home.steps.start.desc'),
 				icon: Zap,
@@ -126,6 +126,38 @@ const Home = () => {
 			},
 		];
 	}, [navigate, t]);
+
+	const QUICKLINKS = useMemo(() => {
+		return [
+			{
+				index: '1',
+				icon: Rocket,
+				title: t('home.quicklinks.dnhyxc-ai.title'),
+				desc: t('home.quicklinks.dnhyxc-ai.desc'),
+				color: 'from-lime-300 to-emerald-500',
+				downloadDesktop: true,
+				onClick: () => void openExternalUrl('https://dnhyxc.cn:9002'),
+			},
+			{
+				index: '2',
+				icon: Code2,
+				title: t('home.quicklinks.blog.title'),
+				desc: t('home.quicklinks.blog.desc'),
+				color: 'from-indigo-300 to-blue-400',
+				downloadDesktop: true,
+				onClick: () => void openExternalUrl('https://dnhyxc.cn'),
+			},
+			{
+				index: '3',
+				icon: Code2,
+				title: t('home.quicklinks.github.title'),
+				desc: t('home.quicklinks.github.desc'),
+				color: 'from-red-300 to-rose-400',
+				downloadDesktop: true,
+				onClick: () => void openExternalUrl('https://github.com/dnhyxc'),
+			},
+		];
+	}, [t]);
 
 	useEffect(() => {
 		const unlistenAboutPromise = onListen('about-send-message', (event) => {
@@ -378,6 +410,56 @@ const Home = () => {
 										>
 											<span className="text-lg font-bold text-textcolor">
 												{item.step}
+											</span>
+										</div>
+										<div className="min-w-0 flex-1">
+											<h4 className="mb-1 font-semibold text-textcolor transition-colors group-hover:text-teal-300">
+												{item.title}
+											</h4>
+											<p className="text-sm text-textcolor/50">{item.desc}</p>
+										</div>
+										<motion.div
+											className="ml-2 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-theme-white/5 group-hover:bg-theme-white/10"
+											whileHover={{ x: 4 }}
+										>
+											<ArrowRight className="h-5 w-5 text-textcolor/40 group-hover:text-teal-400" />
+										</motion.div>
+									</motion.div>
+								))}
+							</div>
+						</motion.div>
+
+						<motion.div
+							initial={{ opacity: 0, y: 16 }}
+							whileInView={{ opacity: 1, y: 0 }}
+							viewport={{ once: true, margin: '-40px' }}
+							transition={{ duration: 0.4 }}
+							className="relative overflow-hidden rounded-md bg-theme-background/80 p-6 backdrop-blur-xl"
+						>
+							<div className="pointer-events-none absolute right-0 top-0 h-32 w-32 rounded-full bg-linear-to-br from-teal-500/12 to-transparent blur-3xl" />
+							<h3
+								className="relative z-10 mb-6 text-xl font-semibold text-textcolor"
+								style={{ fontFamily: '"Syne", "Noto Sans SC", sans-serif' }}
+							>
+								{t('home.sections.quicklinks')}
+							</h3>
+							<div className="space-y-4">
+								{QUICKLINKS.map((item, idx) => (
+									<motion.div
+										key={item.index}
+										initial={{ opacity: 0, x: -12 }}
+										whileInView={{ opacity: 1, x: 0 }}
+										viewport={{ once: true }}
+										transition={{ delay: idx * 0.06, duration: 0.35 }}
+										whileHover={{ scale: 1.01 }}
+										className="group relative flex cursor-pointer items-center rounded-md border border-transparent bg-theme-white/5 p-5 backdrop-blur-sm transition-all duration-300 hover:border-theme-white/12 hover:bg-theme-white/10 hover:shadow-lg hover:shadow-teal-500/10"
+										onClick={item.onClick}
+									>
+										<div
+											className={`mr-4 flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-linear-to-br ${item.color} shadow-lg group-hover:shadow-xl md:mr-5`}
+										>
+											<span className="text-lg font-bold text-textcolor">
+												{item.index}
 											</span>
 										</div>
 										<div className="min-w-0 flex-1">

@@ -15,6 +15,7 @@ import { Outlet, useLocation, useNavigate } from 'react-router';
 import { ChatCoreProvider } from '@/contexts';
 import { useI18n, useTheme } from '@/hooks';
 import { hasValidAuthToken, requiresAuthForPath } from '@/router/authPaths';
+import { formatRoutePageLabel } from '@/router/routeMeta';
 import { isTauriRuntime } from '@/utils/runtime';
 
 const Layout = () => {
@@ -39,6 +40,9 @@ const Layout = () => {
 			Toast({
 				type: 'warning',
 				title: t('route.guard.needLoginTitle'),
+				message: t('route.guard.needLoginMessage', {
+					page: formatRoutePageLabel(location.pathname, t),
+				}),
 			});
 		}
 		navigate('/login', {

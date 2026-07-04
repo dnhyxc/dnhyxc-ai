@@ -675,6 +675,7 @@ export const zhCN = {
 	'home.features.enter': '进入模块',
 	'home.sections.showcase': '特色功能',
 	'home.sections.steps': '快速开始',
+	'home.sections.quicklinks': '快捷链接',
 	'home.features.chat.title': '智能对话',
 	'home.features.chat.subtitle': '自然语言处理',
 	'home.features.chat.desc':
@@ -700,6 +701,12 @@ export const zhCN = {
 	'home.steps.register.desc': '创建您的个人账户',
 	'home.steps.start.title': '开始使用',
 	'home.steps.start.desc': '享受智能助手服务',
+	'home.quicklinks.dnhyxc-ai.title': 'dnhyxc-ai',
+	'home.quicklinks.dnhyxc-ai.desc': 'dnhyxc-ai 网页版',
+	'home.quicklinks.blog.title': '我的博客',
+	'home.quicklinks.blog.desc': '我的博客网站',
+	'home.quicklinks.github.title': 'GitHub',
+	'home.quicklinks.github.desc': '我的 GitHub 仓库',
 
 	'knowledge.common.untitled': '未命名',
 	'knowledge.toolbar.save': '保存',
@@ -1640,7 +1647,9 @@ export const zhCN = {
 	'route.updateInfo.title': '更新信息',
 	'route.projectGuide.title': '产品指南',
 	'route.downloadDesktop.title': '下载桌面客户端',
-	'route.guard.needLoginTitle': '该页面需要登录后才能访问。',
+	'route.guard.needLoginTitle': '请先登录后再访问',
+	'route.guard.needLoginMessage': '「{page}」需要登录后才能访问。',
+	'route.guard.unknownPage': '该页面',
 
 	'downloadPage.hero.badge': '桌面客户端 · 正式发行版',
 	'downloadPage.hero.title': '下载 dnhyxc-ai 桌面版',
